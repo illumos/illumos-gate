@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,7 +191,7 @@ portfop_vfs_hash_t	 portvfs_hash[PORTFOP_PVFSHASH_SZ];
  *
  * If there are greater then the following number of watches on a vnode,
  * it will attempt to discard an oldest inactive watch(pfp) at the time
- * a new watch is being registerd and when events get delivered. We
+ * a new watch is being registered and when events get delivered. We
  * do this to avoid accumulating inactive watches on a file.
  */
 int	port_fop_maxpfps = 20;
@@ -558,7 +558,7 @@ port_fop_femuninstall(vnode_t *vp)
 		/*
 		 * we could possibly uninstall the fem hooks when
 		 * the vnode becomes inactive and the v_fopdata is
-		 * free. But the hooks get triggered uncessarily
+		 * free. But the hooks get triggered unnecessarily
 		 * even though there are no active watches. So, we
 		 * uninstall it here.
 		 */
@@ -568,8 +568,8 @@ port_fop_femuninstall(vnode_t *vp)
 
 
 		/*
-		 * If we uinstalled fem means no process is watching this
-		 * vnode, remove it from the vfs's list of watched vnodes.
+		 * If we successfully uninstalled fem, no process is watching
+		 * this vnode, Remove it from the vfs's list of watched vnodes.
 		 */
 		pvfsp = pvp->pvp_pvfsp;
 		vfsp = vp->v_vfsp;
@@ -789,29 +789,24 @@ port_getsrc(port_t *pp, int source)
 
 
 /*
- * compare time stamps and generate an event if it has changed.
+ * Compare time stamps and generate an event if it has changed.
+ * Note that the port cache pointer will be valid due to a reference
+ * to the port. We need to grab the port cache lock and verify that
+ * the pfp is still the same before proceeding to deliver an event.
  */
 static void
-port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
+port_check_timestamp(portfop_cache_t *pfcp, vnode_t *vp, vnode_t *dvp,
+	portfop_t *pfp, void *objptr, uintptr_t object)
 {
 	vattr_t		vatt;
 	portfop_vp_t	*pvp = vp->v_fopdata;
 	int		events = 0;
 	port_kevent_t	*pkevp;
 	file_obj_t	*fobj;
-
-	if (!(pfp->pfop_flags & PORT_FOP_ACTIVE)) {
-		/*
-		 * some event got delivered, don't bother with
-		 * checking the timestamps.
-		 */
-		return;
-	}
+	portfop_t	*tpfp;
 
 	/*
-	 * If time stamps is specified, get attributes and compare. This
-	 * needs to be done after registering. We should check if any
-	 * timestamps have been specified before getting attr XXX.
+	 * If time stamps are specified, get attributes and compare.
 	 */
 	vatt.va_mask = AT_ATIME|AT_MTIME|AT_CTIME;
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
@@ -847,9 +842,31 @@ port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
 #endif /* _SYSCALL32_IMPL */
 	}
 
+	/*
+	 * Now grab the cache lock and verify that we are still
+	 * dealing with the same pfp and curthread is the one
+	 * which registered it. We need to do this to avoid
+	 * delivering redundant events.
+	 */
+	mutex_enter(&pfcp->pfc_lock);
+	tpfp = port_cache_lookup_fop(pfcp, curproc->p_pid, object);
+
+	if (tpfp == NULL || tpfp != pfp ||
+	    pfp->pfop_vp != vp || pfp->pfop_dvp != dvp ||
+	    pfp->pfop_callrid != curthread ||
+	    !(pfp->pfop_flags & PORT_FOP_ACTIVE)) {
+		/*
+		 * Some other event was delivered, the file
+		 * watch was removed or reassociated. Just
+		 * ignore it and leave
+		 */
+		mutex_exit(&pfcp->pfc_lock);
+		return;
+	}
+
 	mutex_enter(&pvp->pvp_mutex);
 	/*
-	 * The pfp cannot dissappear as the port cache lock is held.
+	 * The pfp cannot disappear as the port cache lock is held.
 	 * While the pvp_mutex is held, no events will get delivered.
 	 */
 	if (pfp->pfop_flags & PORT_FOP_ACTIVE &&
@@ -905,6 +922,7 @@ port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
 		 */
 		if (events == 0) {
 			mutex_exit(&pvp->pvp_mutex);
+			mutex_exit(&pfcp->pfc_lock);
 			return;
 		}
 
@@ -916,7 +934,7 @@ port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
 		pkevp->portkev_events |= events;
 		/*
 		 * Move it to the tail as active once are in the
-		 * begining of the list.
+		 * beginning of the list.
 		 */
 		port_fop_listremove(pvp, pfp);
 		port_fop_listinsert_tail(pvp, pfp);
@@ -924,6 +942,7 @@ port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
 		pfp->pfop_flags |= PORT_FOP_KEV_ONQ;
 	}
 	mutex_exit(&pvp->pvp_mutex);
+	mutex_exit(&pfcp->pfc_lock);
 }
 
 /*
@@ -1153,6 +1172,7 @@ port_pfp_setup(portfop_t **pfpp, port_t *pp, vnode_t *vp, portfop_cache_t *pfcp,
 		/*
 		 * pkevp will get freed here.
 		 */
+		pfp->pfop_cname = NULL;
 		port_pcache_remove_fop(pfcp, pfp);
 		mutex_exit(&pvp->pvp_mutex);
 		return (error);
@@ -1215,7 +1235,6 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	void		*objptr;
 	char		*cname;
 	int		clen;
-	int		removing = 0;
 	int		follow;
 
 	/*
@@ -1240,7 +1259,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	vp = dvp = NULL;
 
 	/*
-	 * findout if we need to follow symbolic links.
+	 * find out if we need to follow symbolic links.
 	 */
 	follow = !(events & FILE_NOFOLLOW);
 	events = events & ~FILE_NOFOLLOW;
@@ -1299,6 +1318,10 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	}
 
 	if (pfp == NULL) {
+		vnode_t *tvp;
+		portfop_t	*tpfp;
+		int error;
+
 		/*
 		 * Add a new association, save the file name and the
 		 * directory vnode pointer.
@@ -1309,6 +1332,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 			goto errout;
 		}
 
+		pfp->pfop_callrid = curthread;
 		/*
 		 * File name used, so make sure we don't free it.
 		 */
@@ -1319,42 +1343,69 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 		 * the lookup and before the fem hooks where added. If
 		 * so, return error. The vnode will still exist as we have
 		 * a hold on it.
+		 *
+		 * Drop the cache lock before calling port_fop_getdvp().
+		 * port_fop_getdvp() may block either in the vfs layer
+		 * or some filesystem.  Therefore there is potential
+		 * for deadlock if cache lock is held and if some other
+		 * thread is attempting to deliver file events which would
+		 * require getting the cache lock, while it may be holding
+		 * the filesystem or vfs layer locks.
 		 */
-		if (pfp->pfop_flags & PORT_FOP_ACTIVE &&
-		    !(pfp->pfop_flags & PORT_FOP_REMOVING)) {
-			vnode_t *tvp;
-			int error;
-
-			tvp = NULL;
-			if ((error = port_fop_getdvp(objptr, &tvp, NULL,
-			    NULL, NULL, follow)) == 0) {
-				if (tvp != NULL) {
-					tvp = port_resolve_vp(tvp);
-				}
-			}
-			if (error || tvp == NULL || tvp != vp) {
-
+		mutex_exit(&pfcp->pfc_lock);
+		tvp = NULL;
+		if ((error = port_fop_getdvp(objptr, &tvp, NULL,
+		    NULL, NULL, follow)) == 0) {
+			if (tvp != NULL) {
+				tvp = port_resolve_vp(tvp);
 				/*
-				 * remove the pfp and fem hooks, if pfp still
-				 * active and it is not being removed from
-				 * the vnode list. This is checked in
-				 * port_remove_fop with the vnode lock held.
+				 * This vnode pointer is just used
+				 * for comparison, so rele it
 				 */
-				if (port_remove_fop(pfp, pfcp, 0, NULL)) {
-					/*
-					 * the pfp was removed, means no
-					 * events where queued. Report the
-					 * error now.
-					 */
-					error = EINVAL;
-					if (tvp != NULL)
-						VN_RELE(tvp);
-					mutex_exit(&pfcp->pfc_lock);
-					goto errout;
-				}
-			} else {
 				VN_RELE(tvp);
 			}
+		}
+
+		if (error || tvp == NULL || tvp != vp) {
+			/*
+			 * Since we dropped the cache lock, make sure
+			 * we are still dealing with the same pfp and this
+			 * is the thread which registered it.
+			 */
+			mutex_enter(&pfcp->pfc_lock);
+			tpfp = port_cache_lookup_fop(pfcp,
+			    curproc->p_pid, object);
+
+			error = 0;
+			if (tpfp == NULL || tpfp != pfp ||
+			    pfp->pfop_vp != vp ||
+			    pfp->pfop_dvp != dvp ||
+			    pfp->pfop_callrid != curthread) {
+				/*
+				 * Some other event was delivered, the file
+				 * watch was removed or reassociated, just
+				 * ignore it and leave
+				 */
+				mutex_exit(&pfcp->pfc_lock);
+				goto errout;
+			}
+
+			/*
+			 * remove the pfp and fem hooks, if pfp still
+			 * active and it is not being removed from
+			 * the vnode list. This is checked in
+			 * port_remove_fop with the vnode lock held.
+			 */
+			if (port_remove_fop(pfp, pfcp, 0, NULL)) {
+				/*
+				 * The pfp was removed, means no
+				 * events where queued. Report the
+				 * error now.
+				 */
+				error = EINVAL;
+			}
+			mutex_exit(&pfcp->pfc_lock);
+			goto errout;
 		}
 	} else {
 		portfop_vp_t	*pvp = vp->v_fopdata;
@@ -1377,43 +1428,35 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 		pfp->pfop_events = events;
 
 		/*
-		 * check if this pfp is being removed. port_fop_excep()
-		 * will deliver an exception event.
-		 */
-		if (pfp->pfop_flags & PORT_FOP_REMOVING) {
-			removing  = 1;
-		}
-
-		/*
 		 * If not active, mark it active even if it is being
 		 * removed. Then it can send an exception event.
 		 *
 		 * Move it to the head, as the active ones are only
-		 * in the begining. If removing, the pfp will be on
+		 * in the beginning. If removing, the pfp will be on
 		 * a temporary list, no need to move it to the front
-		 * all the entries will be processed.
+		 * all the entries will be processed. Some exception
+		 * events will be delivered in port_fop_excep();
 		 */
 		if (!(pfp->pfop_flags & PORT_FOP_ACTIVE)) {
 			pfp->pfop_flags |= PORT_FOP_ACTIVE;
-			if (!removing) {
+			if (!(pfp->pfop_flags & PORT_FOP_REMOVING)) {
 				pvp = (portfop_vp_t *)vp->v_fopdata;
 				port_fop_listremove(pvp, pfp);
 				port_fop_listinsert_head(pvp, pfp);
 			}
 		}
+		pfp->pfop_callrid = curthread;
 		mutex_exit(&pvp->pvp_mutex);
+		mutex_exit(&pfcp->pfc_lock);
 	}
-
 
 	/*
-	 * compare time stamps and deliver events. The pfp cannot
-	 * dissappear since we are holding the cache lock.
+	 * Compare time stamps and deliver events.
 	 */
-	if (!removing && vp->v_type != VFIFO) {
-		port_check_timestamp(vp, pfp, objptr);
+	if (vp->v_type != VFIFO) {
+		port_check_timestamp(pfcp, vp, dvp, pfp, objptr, object);
 	}
 
-	mutex_exit(&pfcp->pfc_lock);
 	error = 0;
 
 	/*
@@ -1481,7 +1524,7 @@ port_dissociate_fop(port_t *pp, uintptr_t object)
 	 * the the pfp is being removed due to an exception event
 	 * in port_fop_sendevent()->port_fop_excep() and port_remove_fop().
 	 * Since port source cache lock is held, port_fop_excep() cannot
-	 * complete. And the vnode itself will not dissapear as long pfp's
+	 * complete. The vnode itself will not disappear as long its pfps
 	 * have a reference.
 	 */
 	(void) port_remove_fop(pfp, pfcp, 1, &active);
@@ -1684,7 +1727,7 @@ port_fop_sendevent(vnode_t *vp, int events, vnode_t *dvp, char *cname)
 
 	if (!removeall) {
 		/*
-		 * All the active ones are in the begining of the list.
+		 * All the active ones are in the beginning of the list.
 		 */
 		for (pfp = (portfop_t *)list_head(&pvp->pvp_pfoplist);
 		    pfp && pfp->pfop_flags & PORT_FOP_ACTIVE; pfp = npfp) {
@@ -1710,7 +1753,7 @@ port_fop_sendevent(vnode_t *vp, int events, vnode_t *dvp, char *cname)
 					 * removed from the vnode's list. This
 					 * pointer is referenced in
 					 * port_remove_fop(). The vnode it
-					 * self cannot dissapear until this
+					 * self cannot disappear until this
 					 * pfp gets removed and freed.
 					 */
 					port_fop_listremove(pvp, pfp);

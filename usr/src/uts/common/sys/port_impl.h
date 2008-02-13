@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -244,6 +244,7 @@ typedef struct  portfop {
 	port_kevent_t	*pfop_pev;	/* event pointers */
 	char		*pfop_cname;	/* file component name */
 	int		pfop_clen;
+	kthread_t	*pfop_callrid;	/* thread doing the associate */
 } portfop_t;
 
 /*
