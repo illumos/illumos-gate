@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16426,7 +16426,6 @@ sd_sense_key_illegal_request(struct sd_lun *un, struct buf *bp,
 	ASSERT(xp != NULL);
 	ASSERT(pktp != NULL);
 
-	SD_UPDATE_ERRSTATS(un, sd_softerrs);
 	SD_UPDATE_ERRSTATS(un, sd_rq_illrq_err);
 
 	si.ssi_severity = SCSI_ERR_INFO;
