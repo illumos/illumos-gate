@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,6 +169,7 @@ typedef struct name_list {
 	uint8_t max_pct;
 	ushort_t count;
 	int status;
+	char *label;
 } name_list_t;
 
 typedef struct ari_list {
@@ -619,6 +620,8 @@ merge_name_list(name_list_t **list, name_list_t *new, int add_pct)
 				lp->pct = np->pct;
 			}
 			max_pct = np->max_pct;
+			if (np->label)
+				free(np->label);
 			free(np->name);
 			free(np);
 			np = NULL;
@@ -720,6 +723,7 @@ alloc_name_list(char *name, uint8_t pct)
 	nlp->next = nlp;
 	nlp->prev = nlp;
 	nlp->status = 0;
+	nlp->label = NULL;
 	return (nlp);
 }
 
@@ -733,6 +737,8 @@ free_name_list(name_list_t *list)
 		do {
 			lp = next;
 			next = lp->next;
+			if (lp->label)
+				free(lp->label);
 			free(lp->name);
 			free(lp);
 		} while (next != list);
@@ -1045,6 +1051,7 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 	char *name;
 	uint8_t lpct = 0;
 	char *lclass = NULL;
+	char *label;
 
 	(void) nvlist_lookup_uint8(nvl, FM_FAULT_CERTAINTY, &lpct);
 	if (nvlist_lookup_string(nvl, FM_CLASS, &lclass) == 0) {
@@ -1056,6 +1063,9 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 		if (name != NULL) {
 			nlp = alloc_name_list(name, lpct);
 			free(name);
+			if (nvlist_lookup_string(nvl, FM_FAULT_LOCATION,
+			    &label) == 0)
+				nlp->label = strdup(label);
 			(void) merge_name_list(fru_p, nlp, 1);
 		}
 		get_serial_no(lfru, serial_p, lpct);
@@ -1336,13 +1346,17 @@ print_name_list(name_list_t *list, char *label, char *(func)(char *),
 	padding[l] = 0;
 	(void) printf("%s", label);
 	name = list->name;
-	if (func)
-		fru = func(list->name);
-	if (fru) {
-		(void) printf(" \"%s\" (%s)", fru, name);
-		free(fru);
-	} else {
+	if (func == NULL)
 		(void) printf(" %s", name);
+	else if (list->label)
+		(void) printf(" \"%s\" (%s)", list->label, name);
+	else {
+		fru = func(list->name);
+		if (fru) {
+			(void) printf(" \"%s\" (%s)", fru, name);
+			free(fru);
+		} else
+			(void) printf(" %s", name);
 	}
 	if (list->pct && pct > 0 && pct < 100) {
 		if (list->count > 1) {
@@ -1645,14 +1659,28 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 				(void) printf("-----------------------------"
 				    "---------------------------------------"
 				    "----------\n");
-			fru_label = get_fmri_label(tp->resource);
-			if (fru_label) {
-				(void) printf("\"%s\" (%s)\n", fru_label,
-				    tp->resource);
-				free(fru_label);
-			} else {
-				(void) printf("%s\n", tp->resource);
-			}
+			slp = tp->status_rec_list;
+			end = slp;
+			do {
+				srp = slp->status_record;
+				fru = find_fru(srp, tp->resource);
+				if (fru) {
+					if (fru->label)
+						(void) printf("\"%s\" (%s)\n",
+						    fru->label, fru->name);
+					else if (fru_label =
+					    get_fmri_label(fru->name)) {
+						(void) printf("\"%s\" (%s)\n",
+						    fru_label, fru->name);
+						free(fru_label);
+					} else
+						(void) printf("%s\n",
+						    fru->name);
+					break;
+				}
+				slp = slp->next;
+			} while (slp != end);
+
 			slp = tp->status_rec_list;
 			end = slp;
 			do {

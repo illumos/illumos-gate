@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -527,7 +527,7 @@ FRU_set(tnode_t *tn, did_t *pd,
 	 * the label.
 	 */
 	if (strcmp(nm, IOBOARD) != 0 && strcmp(nm, PCI_DEVICE) != 0 &&
-	    strcmp(nm, PCIEX_DEVICE) != 0) {
+	    strcmp(nm, PCIEX_DEVICE) != 0 && strcmp(nm, PCIEX_BUS) != 0) {
 		(void) topo_node_fru_set(tn, NULL, 0, &e);
 		return (0);
 	}
@@ -539,7 +539,7 @@ FRU_set(tnode_t *tn, did_t *pd,
 		e = FRU_fmri_set(mp, tn);
 		return (e);
 	} else if (strcmp(nm, PCI_DEVICE) == 0 ||
-	    strcmp(nm, PCIEX_DEVICE) == 0) {
+	    strcmp(nm, PCIEX_DEVICE) == 0 || strcmp(nm, PCIEX_BUS) == 0) {
 		nvlist_t *in, *out;
 
 		mp = did_mod(pd);

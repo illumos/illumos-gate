@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,8 @@ pci_fru_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 
 	*out = NULL;
 	nm = topo_node_name(node);
-	if (strcmp(nm, PCI_DEVICE) != 0 && strcmp(nm, PCIEX_DEVICE) != 0)
+	if (strcmp(nm, PCI_DEVICE) != 0 && strcmp(nm, PCIEX_DEVICE) != 0 &&
+	    strcmp(nm, PCIEX_BUS) != 0)
 		return (0);
 
 	if (nvlist_lookup_uint64(in, "nv1", &ptr) != 0) {

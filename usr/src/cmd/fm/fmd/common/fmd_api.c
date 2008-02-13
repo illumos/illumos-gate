@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1696,9 +1696,7 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
 	/*
 	 * Try to find the location label for this resource
 	 */
-	(void) topo_fmri_label(thp, rsrc, &loc, &err);
-	if (loc == NULL)
-		(void) topo_fmri_label(thp, fru, &loc, &err);
+	(void) topo_fmri_label(thp, fru, &loc, &err);
 
 	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, loc);
 
