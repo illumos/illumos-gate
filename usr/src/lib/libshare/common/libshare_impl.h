@@ -55,19 +55,19 @@ typedef void *sa_phandle_t;
 
 #define	SA_PLUGIN_VERSION	1
 struct sa_plugin_ops {
-	int	sa_version;
+	int	sa_version;			/* version number */
 	char	*sa_protocol;			/* protocol name */
 	int	(*sa_init)();
 	void	(*sa_fini)();
 	int	(*sa_share)(sa_share_t);	/* start sharing */
 	int	(*sa_unshare)(sa_share_t, char *);	/* stop sharing */
-	int	(*sa_valid_prop)(sa_property_t, sa_optionset_t);
+	int	(*sa_valid_prop)(sa_property_t, sa_optionset_t); /* validate */
 	int	(*sa_valid_space)(char *);	/* is name valid optionspace? */
 	int	(*sa_security_prop)(char *);	/* property is security */
 	int	(*sa_legacy_opts)(sa_group_t, char *); /* parse legacy opts */
 	char   *(*sa_legacy_format)(sa_group_t, int);
-	int	(*sa_set_proto_prop)(sa_property_t);
-	sa_protocol_properties_t (*sa_get_proto_set)();
+	int	(*sa_set_proto_prop)(sa_property_t);	/* set a property */
+	sa_protocol_properties_t (*sa_get_proto_set)();	/* get properties */
 	char   *(*sa_get_proto_status)();
 	char   *(*sa_space_alias)(char *);
 	int	(*sa_update_legacy)(sa_share_t);
@@ -81,6 +81,7 @@ struct sa_plugin_ops {
 	int	(*sa_rename_resource)(sa_handle_t, sa_resource_t, char *);
 	int	(*sa_run_command)(int, int, char **); /* proto specific */
 	int	(*sa_command_help)();
+	int	(*sa_delete_proto_section)(char *);
 };
 
 struct sa_proto_handle {

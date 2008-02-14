@@ -61,6 +61,7 @@
 	<device match="lo3" />
 	<device match="log" />
 	<device match="logindmux" />
+	<device match="nsmb" />
 	<device match="net/*" />
 	<device match="null" />
 	<device match="openprom" arch="sparc" />

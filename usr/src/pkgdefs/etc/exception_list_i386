@@ -870,6 +870,8 @@ usr/lib/fs/nfs/libshare_nfs.so		i386
 usr/lib/fs/nfs/amd64/libshare_nfs.so	i386
 usr/lib/fs/smb/libshare_smb.so		i386
 usr/lib/fs/smb/amd64/libshare_smb.so	i386
+usr/lib/fs/smbfs/libshare_smbfs.so	i386
+usr/lib/fs/smbfs/amd64/libshare_smbfs.so	i386
 usr/include/libshare_impl.h		i386
 usr/include/scfutil.h			i386
 usr/sbin/i86/sharemgr			i386
@@ -1041,3 +1043,11 @@ usr/lib/vscan/llib-lvscan.ln	i386
 # drivers.  There is no usr/ component to this sub-platform, but the
 # directory is created in the proto area to keep other tools happy.
 usr/platform/i86hvm		i386
+#
+# libsmbfs is private
+#
+usr/lib/libsmbfs.so			i386
+usr/lib/amd64/libsmbfs.so		i386
+usr/lib/llib-lsmbfs			i386
+usr/lib/llib-lsmbfs.ln			i386
+usr/lib/amd64/llib-lsmbfs.ln		i386

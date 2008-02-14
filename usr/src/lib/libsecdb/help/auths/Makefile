@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -98,6 +98,7 @@ HTMLENTS = \
 	SmfValueRouting.html \
 	SmfValueSMB.html \
 	AuthReadSMB.html \
+	SmfSMBFSStates.html \
 	SmfSMBStates.html \
 	SmfValueVscan.html \
 	SmfVscanStates.html \

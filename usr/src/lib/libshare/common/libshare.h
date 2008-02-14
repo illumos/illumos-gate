@@ -85,6 +85,10 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_MULTIPLE_ERROR	26	/* multiple protocols reported error */
 #define	SA_PATH_IS_SUBDIR	27	/* check_path found path is subdir */
 #define	SA_PATH_IS_PARENTDIR	28	/* check_path found path is parent */
+#define	SA_NO_SECTION		29	/* protocol requires section info */
+#define	SA_NO_SUCH_SECTION	30	/* no section found */
+#define	SA_NO_PROPERTIES	31	/* no properties found */
+#define	SA_PASSWORD_ENC		32	/* passwords must be encrypted */
 
 /* API Initialization */
 #define	SA_INIT_SHARE_API	0x0001	/* init share specific interface */
@@ -122,6 +126,8 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_FEATURE_DFSTAB	0x0002	/* need to manage in dfstab */
 #define	SA_FEATURE_ALLOWSUBDIRS	0x0004	/* allow subdirs to be shared */
 #define	SA_FEATURE_ALLOWPARDIRS	0x0008	/* allow parent dirs to be shared */
+#define	SA_FEATURE_HAS_SECTIONS	0x0010	/* protocol supports sections */
+#define	SA_FEATURE_ADD_PROPERTIES	0x0020	/* can add properties */
 
 /*
  * legacy files
@@ -208,6 +214,8 @@ extern void sa_free_derived_optionset(sa_optionset_t);
 extern sa_property_t sa_get_property(sa_optionset_t, char *);
 extern sa_property_t sa_get_next_property(sa_group_t);
 extern char *sa_get_property_attr(sa_property_t, char *);
+extern sa_property_t sa_create_section(char *, char *);
+extern void sa_set_section_attr(sa_property_t, char *, char *);
 extern sa_property_t sa_create_property(char *, char *);
 extern int sa_add_property(void *, sa_property_t);
 extern int sa_update_property(sa_property_t, char *);
@@ -233,9 +241,11 @@ extern char *sa_proto_legacy_format(char *, sa_group_t, int);
 extern int sa_is_security(char *, char *);
 extern sa_protocol_properties_t sa_proto_get_properties(char *);
 extern uint64_t sa_proto_get_featureset(char *);
+extern sa_property_t sa_get_protocol_section(sa_protocol_properties_t, char *);
+extern sa_property_t sa_get_next_protocol_section(sa_property_t, char *);
 extern sa_property_t sa_get_protocol_property(sa_protocol_properties_t, char *);
-extern sa_property_t sa_get_next_protocol_property(sa_property_t);
-extern int sa_set_protocol_property(sa_property_t, char *);
+extern sa_property_t sa_get_next_protocol_property(sa_property_t, char *);
+extern int sa_set_protocol_property(sa_property_t, char *, char *);
 extern char *sa_get_protocol_status(char *);
 extern void sa_format_free(char *);
 extern sa_protocol_properties_t sa_create_protocol_properties(char *);
@@ -246,6 +256,7 @@ extern char *sa_proto_space_alias(char *, char *);
 extern int sa_proto_get_transients(sa_handle_t, char *);
 extern int sa_proto_notify_resource(sa_resource_t, char *);
 extern int sa_proto_change_notify(sa_share_t, char *);
+extern int sa_proto_delete_section(char *, char *);
 
 /* handle legacy (dfstab/sharetab) files */
 extern int sa_delete_legacy(sa_share_t, char *);

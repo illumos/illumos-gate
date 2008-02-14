@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,11 +220,11 @@ static int	ignore(char *);
 int
 main(int argc, char *argv[])
 {
-	char	*special,		/* argument of special/resource */
-		*mountp,		/* argument of mount directory */
-		*fstype,		/* wherein the fstype name is filled */
-		*newargv[ARGV_MAX],	/* arg list for specific command */
-		*farg = NULL, *Farg = NULL;
+	char	*special,	/* argument of special/resource */
+	    *mountp,		/* argument of mount directory */
+	    *fstype,		/* wherein the fstype name is filled */
+	    *newargv[ARGV_MAX],	/* arg list for specific command */
+	    *farg = NULL, *Farg = NULL;
 	int	ii, ret, cc, fscnt;
 	struct stat64	stbuf;
 	struct vfstab	vget, vref;
@@ -317,8 +317,8 @@ main(int argc, char *argv[])
 	/* pv mututally exclusive */
 	if (pflg + vflg + aflg > 1) {
 		fprintf(stderr, gettext
-			("%s: -a, -p, and -v are mutually exclusive\n"),
-			myname);
+		    ("%s: -a, -p, and -v are mutually exclusive\n"),
+		    myname);
 		usage();
 	}
 
@@ -328,14 +328,14 @@ main(int argc, char *argv[])
 	 */
 	if (aflg && Oflg) {
 		fprintf(stderr, gettext
-			("%s: -a and -O are mutually exclusive\n"), myname);
+		    ("%s: -a and -O are mutually exclusive\n"), myname);
 		usage();
 	}
 
 	/* dfF mutually exclusive */
 	if (fflg + Fflg > 1) {
 		fprintf(stderr, gettext
-			("%s: More than one FSType specified\n"), myname);
+		    ("%s: More than one FSType specified\n"), myname);
 		usage();
 	}
 
@@ -425,10 +425,10 @@ gettext("%s: Cannot use -p and -v with arguments\n"), myname);
 	    mountp == NULL) {
 		if ((fd = fopen(vfstab, "r")) == NULL) {
 			if (fstype == NULL || special == NULL ||
-					mountp == NULL) {
+			    mountp == NULL) {
 				fprintf(stderr, gettext(
-					"%s: Cannot open %s\n"),
-					myname, vfstab);
+				    "%s: Cannot open %s\n"),
+				    myname, vfstab);
 				exit(1);
 			} else {
 				/*
@@ -455,7 +455,8 @@ gettext("%s: Cannot use -p and -v with arguments\n"), myname);
 			special = vref.vfs_special = mountp;
 			mountp = vref.vfs_mountp = NULL;
 			/* skip erroneous lines; they were reported above */
-			while ((ret = getvfsany(fd, &vget, &vref)) > 0);
+			while ((ret = getvfsany(fd, &vget, &vref)) > 0)
+				;
 		}
 
 		fclose(fd);
@@ -474,20 +475,20 @@ gettext("%s: Cannot use -p and -v with arguments\n"), myname);
 		} else if (special == NULL) {
 			if (stat64(mountp, &stbuf) == -1) {
 				fprintf(stderr, gettext("%s: cannot stat %s\n"),
-					myname, mountp);
+				    myname, mountp);
 				exit(2);
 			}
 			if (((mode = (stbuf.st_mode & S_IFMT)) == S_IFBLK) ||
-				(mode == S_IFCHR)) {
+			    (mode == S_IFCHR)) {
 				fprintf(stderr,
 gettext("%s: mount point cannot be determined\n"),
-					myname);
+				    myname);
 				exit(1);
 			} else
 				{
 				fprintf(stderr,
 gettext("%s: special cannot be determined\n"),
-					myname);
+				    myname);
 				exit(1);
 			}
 		} else if (fstype == NULL)
@@ -544,18 +545,18 @@ usage(void)
 {
 	fprintf(stderr,	gettext("Usage:\n%s [-v | -p]\n"), myname);
 	fprintf(stderr, gettext(
-		"%s [-F FSType] [-V] [current_options] [-o specific_options]"),
-		myname);
+	    "%s [-F FSType] [-V] [current_options] [-o specific_options]"),
+	    myname);
 	fprintf(stderr, gettext("\n\t{special | mount_point}\n"));
 
 	fprintf(stderr, gettext(
-		"%s [-F FSType] [-V] [current_options] [-o specific_options]"),
-		myname);
+	    "%s [-F FSType] [-V] [current_options] [-o specific_options]"),
+	    myname);
 	fprintf(stderr, gettext("\n\tspecial mount_point\n"));
 
 	fprintf(stderr, gettext(
 	"%s -a [-F FSType ] [-V] [current_options] [-o specific_options]\n"),
-		myname);
+	    myname);
 	fprintf(stderr, gettext("\t[mount_point ...]\n"));
 
 	exit(1);
@@ -605,7 +606,7 @@ print_mnttab(int vflg, int pflg)
 	}
 	rfp = fopen(REMOTE, "r");
 	while ((ret = getextmntent(fd, &mget, sizeof (struct extmnttab)))
-			== 0) {
+	    == 0) {
 		if (ignore(mget.mnt_mntopts))
 			continue;
 		if (mget.mnt_special && mget.mnt_mountp &&
@@ -615,26 +616,26 @@ print_mnttab(int vflg, int pflg)
 			if (pflg) {
 				elide_dev(mget.mnt_mntopts);
 				printf("%s - %s %s - no %s\n",
-					mget.mnt_special,
-					mget.mnt_mountp,
-					mget.mnt_fstype,
-					mget.mnt_mntopts != NULL ?
-						mget.mnt_mntopts : "-");
+				    mget.mnt_special,
+				    mget.mnt_mountp,
+				    mget.mnt_fstype,
+				    mget.mnt_mntopts != NULL ?
+				    mget.mnt_mntopts : "-");
 			} else if (vflg) {
 				printf("%s on %s type %s %s%s on %s",
-					mget.mnt_special,
-					mget.mnt_mountp,
-					mget.mnt_fstype,
-					remote(mget.mnt_fstype, rfp),
-					flags(mget.mnt_mntopts, NEW),
-					time_buf);
+				    mget.mnt_special,
+				    mget.mnt_mountp,
+				    mget.mnt_fstype,
+				    remote(mget.mnt_fstype, rfp),
+				    flags(mget.mnt_mntopts, NEW),
+				    time_buf);
 			} else
 				printf("%s on %s %s%s on %s",
-					mget.mnt_mountp,
-					mget.mnt_special,
-					remote(mget.mnt_fstype, rfp),
-					flags(mget.mnt_mntopts, OLD),
-					time_buf);
+				    mget.mnt_mountp,
+				    mget.mnt_special,
+				    remote(mget.mnt_fstype, rfp),
+				    flags(mget.mnt_mntopts, OLD),
+				    time_buf);
 		}
 	}
 	if (ret > 0)
@@ -731,7 +732,7 @@ remote(char *fstype, FILE *rfp)
 	extern char *strtok();
 
 	if (rfp == NULL || fstype == NULL ||
-			strlen(fstype) > (size_t)FSTYPE_MAX)
+	    strlen(fstype) > (size_t)FSTYPE_MAX)
 		return ("");	/* not a remote */
 	rewind(rfp);
 	while (fgets(buf, sizeof (buf), rfp) != NULL) {
@@ -752,22 +753,22 @@ vfserror(int flag, char *special)
 	case VFS_TOOLONG:
 		fprintf(stderr,
 gettext("%s: Warning: Line in vfstab for \"%s\" exceeds %d characters\n"),
-			myname, special, VFS_LINE_MAX-1);
+		    myname, special, VFS_LINE_MAX-1);
 		break;
 	case VFS_TOOFEW:
 		fprintf(stderr,
 gettext("%s: Warning: Line for \"%s\" in vfstab has too few entries\n"),
-			myname, special);
+		    myname, special);
 		break;
 	case VFS_TOOMANY:
 		fprintf(stderr,
 gettext("%s: Warning: Line for \"%s\" in vfstab has too many entries\n"),
-			myname, special);
+		    myname, special);
 		break;
 	default:
 		fprintf(stderr, gettext(
-			"%s: Warning: Error in line for \"%s\" in vfstab\n"),
-			myname, special);
+		    "%s: Warning: Error in line for \"%s\" in vfstab\n"),
+		    myname, special);
 	}
 }
 
@@ -777,18 +778,18 @@ mnterror(int flag)
 	switch (flag) {
 	case MNT_TOOLONG:
 		fprintf(stderr,
-			gettext("%s: Line in mnttab exceeds %d characters\n"),
-			myname, MNT_LINE_MAX-2);
+		    gettext("%s: Line in mnttab exceeds %d characters\n"),
+		    myname, MNT_LINE_MAX-2);
 		break;
 	case MNT_TOOFEW:
 		fprintf(stderr,
-			gettext("%s: Line in mnttab has too few entries\n"),
-			myname);
+		    gettext("%s: Line in mnttab has too few entries\n"),
+		    myname);
 		break;
 	case MNT_TOOMANY:
 		fprintf(stderr,
-			gettext("%s: Line in mnttab has too many entries\n"),
-			myname);
+		    gettext("%s: Line in mnttab has too many entries\n"),
+		    myname);
 		break;
 	}
 	exit(1);
@@ -802,6 +803,13 @@ doexec(char *fstype, char *newargv[])
 	char	*vfs_path = VFS_PATH;
 	char	*alt_path = ALT_PATH;
 	int	i;
+	int	smbfs;
+
+	/*
+	 * Special case smbfs file system.
+	 * Execute command in profile if possible.
+	 */
+	smbfs = strcmp(fstype, "smbfs") == 0;
 
 	/* build the full pathname of the fstype dependent command. */
 	sprintf(full_path, "%s/%s/%s", vfs_path, fstype, myname);
@@ -824,11 +832,23 @@ doexec(char *fstype, char *newargv[])
 	 * '..mount: not found' message when '/usr' is mounted
 	 */
 	if (access(full_path, 0) == 0) {
+		if (smbfs) {
+			/*
+			 * Run mount_smbfs(1m) with pfexec so that we can
+			 * add sys_mount privilege, (via exec_attr, etc.)
+			 * allowing normal users to mount on any directory
+			 * they own.
+			 */
+			newargv[0] = "pfexec";
+			newargv[1] = full_path;
+			execv("/usr/bin/pfexec", &newargv[0]);
+			newargv[1] = myname;
+		}
 		execv(full_path, &newargv[1]);
 		if (errno == EACCES) {
 			fprintf(stderr,
 			gettext("%s: Cannot execute %s - permission denied\n"),
-				myname, full_path);
+			    myname, full_path);
 		}
 		if (errno == ENOEXEC) {
 			newargv[0] = "sh";
@@ -836,11 +856,17 @@ doexec(char *fstype, char *newargv[])
 			execv("/sbin/sh", &newargv[0]);
 		}
 	}
+	if (smbfs) {
+		newargv[0] = "pfexec";
+		newargv[1] = alter_path;
+		execv("/usr/bin/pfexec", &newargv[0]);
+		newargv[1] = myname;
+	}
 	execv(alter_path, &newargv[1]);
 	if (errno == EACCES) {
 		fprintf(stderr, gettext(
-			"%s: Cannot execute %s - permission denied\n"),
-			myname, alter_path);
+		    "%s: Cannot execute %s - permission denied\n"),
+		    myname, alter_path);
 		exit(1);
 	}
 	if (errno == ENOEXEC) {
@@ -849,8 +875,8 @@ doexec(char *fstype, char *newargv[])
 		execv("/sbin/sh", &newargv[0]);
 	}
 	fprintf(stderr,
-		gettext("%s: Operation not applicable to FSType %s\n"),
-		myname, fstype);
+	    gettext("%s: Operation not applicable to FSType %s\n"),
+	    myname, fstype);
 	exit(1);
 }
 
@@ -954,7 +980,7 @@ parmount(char **mntlist, int count, char *fstype)
 			return (0);
 
 		fprintf(stderr, gettext("%s: No valid entries found in %s\n"),
-				myname, vfstab);
+		    myname, vfstab);
 		return (1);
 	}
 
@@ -966,7 +992,7 @@ parmount(char **mntlist, int count, char *fstype)
 	 */
 	if (!lofscnt)
 		qsort((void *)vfsarray, vfsarraysize, sizeof (vfsent_t *),
-			mlevelcmp);
+		    mlevelcmp);
 
 	/*
 	 * Shrink the vfsll linked list down to the new list.  This will
@@ -1003,7 +1029,7 @@ getvfsall(char *fstype, int takeall)
 
 	if ((fp = fopen(vfstab, "r")) == NULL) {
 		fprintf(stderr, gettext("%s: Cannot open %s\n"),
-			myname, vfstab);
+		    myname, vfstab);
 		exit(1);
 	}
 
@@ -1156,8 +1182,8 @@ make_vfsarray(char **mntlist, int count)
 
 		if (!found) {
 			fprintf(stderr, gettext(
-				"%s: Warning: %s not found in %s\n"),
-				myname, *mntlist, vfstab);
+			    "%s: Warning: %s not found in %s\n"),
+			    myname, *mntlist, vfstab);
 			exitcode = 1;
 		}
 	}
@@ -1243,15 +1269,15 @@ do_mounts(void)
 			 */
 			if (lofscnt == 0) {
 				qsort((void *)vl, cnt, sizeof (vfsent_t *),
-					mlevelcmp);
+				    mlevelcmp);
 				vp = *vl;
 			}
 		}
 
 		if (vp->flag & VRPFAILED) {
 			fprintf(stderr, gettext(
-				"%s: Nonexistent mount point: %s\n"),
-				myname, vp->v.vfs_mountp);
+			    "%s: Nonexistent mount point: %s\n"),
+			    myname, vp->v.vfs_mountp);
 			vp->flag |= VNOTMOUNTED;
 			exitcode = 1;
 			continue;
@@ -1444,7 +1470,7 @@ cleanupkid(pid_t pid, int wstat)
 		 * This should never happen.
 		 */
 		fprintf(stderr, gettext(
-			"%s: Unknown child %d\n"), myname, pid);
+		    "%s: Unknown child %d\n"), myname, pid);
 		exitcode = 1;
 		return (ret);
 	}
@@ -1494,7 +1520,7 @@ new_vfsent(struct vfstab *vin, int order)
 		if ((new->v.vfs_mntopts = strdup(specific_opts)) == NULL)
 			nomem();
 	} else if (vin->vfs_mntopts &&
-			(new->v.vfs_mntopts = strdup(vin->vfs_mntopts)) == NULL)
+	    (new->v.vfs_mntopts = strdup(vin->vfs_mntopts)) == NULL)
 			nomem();
 
 	new->order = order;
@@ -1576,21 +1602,21 @@ check_fields(char *fstype, char *mountp)
 
 	if (strlen(fstype) > (size_t)FSTYPE_MAX) {
 		fprintf(stderr,
-			gettext("%s: FSType %s exceeds %d characters\n"),
-			myname, fstype, FSTYPE_MAX);
+		    gettext("%s: FSType %s exceeds %d characters\n"),
+		    myname, fstype, FSTYPE_MAX);
 		return (1);
 	}
 
 	if (mountp == NULL) {
 		fprintf(stderr,
-			gettext("%s: Mount point cannot be determined\n"),
-			myname);
+		    gettext("%s: Mount point cannot be determined\n"),
+		    myname);
 		return (1);
 	}
 	if (*mountp != '/') {
 		fprintf(stderr, gettext(
-			"%s: Mount point %s is not an absolute pathname.\n"),
-			myname, mountp);
+		    "%s: Mount point %s is not an absolute pathname.\n"),
+		    myname, mountp);
 		return (1);
 	}
 	/*
@@ -1601,12 +1627,12 @@ check_fields(char *fstype, char *mountp)
 	if (!aflg && stat64(mountp, &stbuf) < 0) {
 		if (errno == ENOENT || errno == ENOTDIR)
 			fprintf(stderr,
-				gettext("%s: Mount point %s does not exist.\n"),
-				myname, mountp);
+			    gettext("%s: Mount point %s does not exist.\n"),
+			    myname, mountp);
 		else {
 			fprintf(stderr,
-				gettext("%s: Cannot stat mount point %s.\n"),
-				myname, mountp);
+			    gettext("%s: Cannot stat mount point %s.\n"),
+			    myname, mountp);
 			perror(myname);
 		}
 		return (1);

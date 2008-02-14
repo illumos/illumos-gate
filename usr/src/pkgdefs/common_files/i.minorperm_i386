@@ -318,6 +318,7 @@ ucode:*
 battery:*
 smbsrv:*
 vscan:*
+nsmb:*
 EOF
 }
 

@@ -180,3 +180,4 @@ rtls:* 0666 root sys
 vnic:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys
+nsmb:* 0666 root sys

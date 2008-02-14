@@ -2096,3 +2096,24 @@ secpolicy_vscan(const cred_t *cr)
 
 	return (0);
 }
+
+/*
+ * secpolicy_smbfs_login
+ *
+ * Determines if the caller can add and delete the smbfs login
+ * password in the the nsmb kernel module for the CIFS client.
+ *
+ * Returns:
+ * 0       access is allowed.
+ * EPERM   access is NOT allowed.
+ */
+int
+secpolicy_smbfs_login(const cred_t *cr, uid_t uid)
+{
+	uid_t cruid = crgetruid(cr);
+
+	if (cruid == uid)
+		return (0);
+	return (PRIV_POLICY(cr, PRIV_PROC_OWNER, B_FALSE,
+	    EPERM, NULL));
+}

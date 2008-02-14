@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -258,8 +258,8 @@ main(int argc, char **argv)
 	mntnull(&mget);
 	if (listlength == 0) {
 		fprintf(stderr, gettext(
-			"%s: warning: no entries found in %s\n"),
-				myname, mnttab);
+		    "%s: warning: no entries found in %s\n"),
+		    myname, mnttab);
 		mget.mnt_mountp = mname;	/* assume mount point */
 		no_mnttab++;
 		doexec(&mget);
@@ -310,15 +310,15 @@ main(int argc, char **argv)
 			lmp = getmntlast(mntll, NULL, mp->ment.mnt_mountp);
 
 			if (lmp && strcmp(lmp->ment.mnt_special,
-					mp->ment.mnt_special)) {
+			    mp->ment.mnt_special)) {
 				errno = EBUSY;
 				rpterr(mname);
 				exit(1);
 			}
 		} else {
 			fprintf(stderr, gettext(
-				"%s: warning: %s not in mnttab\n"),
-				myname, mname);
+			    "%s: warning: %s not in mnttab\n"),
+			    myname, mname);
 			if (Vflg)
 				exit(1);
 				/*
@@ -346,7 +346,7 @@ doexec(struct mnttab *ment)
 #ifdef DEBUG
 	if (dflg)
 		fprintf(stderr, "%d: umounting %s\n",
-			getpid(), ment->mnt_mountp);
+		    getpid(), ment->mnt_mountp);
 #endif
 
 	/* try to exec the dependent portion */
@@ -355,19 +355,26 @@ doexec(struct mnttab *ment)
 		char	alter_path[FULLPATH_MAX];
 		char	*newargv[ARGV_MAX];
 		int 	ii;
+		int	smbfs;
 
 		if (strlen(ment->mnt_fstype) > (size_t)FSTYPE_MAX) {
 			fprintf(stderr, gettext(
-				"%s: FSType %s exceeds %d characters\n"),
-				myname, ment->mnt_fstype, FSTYPE_MAX);
+			    "%s: FSType %s exceeds %d characters\n"),
+			    myname, ment->mnt_fstype, FSTYPE_MAX);
 			exit(1);
 		}
 
+		/*
+		 * Special case smbfs file system.
+		 * Execute command in profile if possible.
+		 */
+		smbfs = strcmp(ment->mnt_fstype, "smbfs") == 0;
+
 		/* build the full pathname of the fstype dependent command. */
 		sprintf(full_path, "%s/%s/%s", fs_path, ment->mnt_fstype,
-					myname);
+		    myname);
 		sprintf(alter_path, "%s/%s/%s", alt_path, ment->mnt_fstype,
-					myname);
+		    myname);
 
 		/*
 		 * create the new arg list, and end the list with a
@@ -385,7 +392,7 @@ doexec(struct mnttab *ment)
 			newargv[ii++] = "-f";
 		}
 		newargv[ii++] = (ment->mnt_mountp)
-				? ment->mnt_mountp : ment->mnt_special;
+		    ? ment->mnt_mountp : ment->mnt_special;
 		newargv[ii] = NULL;
 
 		/* set the new argv[0] to the filename */
@@ -401,11 +408,28 @@ doexec(struct mnttab *ment)
 		}
 
 		/* Try to exec the fstype dependent umount. */
+		if (smbfs) {
+			/*
+			 * Run umount_smbfs(1m) with pfexec so that we can
+			 * add sys_mount privilege, (via exec_attr, etc.)
+			 * allowing normal users to unmount any directory
+			 * they own.
+			 */
+			newargv[0] = "pfexec";
+			newargv[1] = full_path;
+			execv("/usr/bin/pfexec", &newargv[0]);
+			newargv[1] = myname;
+		}
 		execv(full_path, &newargv[1]);
 		if (errno == ENOEXEC) {
 			newargv[0] = "sh";
 			newargv[1] = full_path;
 			execv("/sbin/sh", &newargv[0]);
+		}
+		if (smbfs) {
+			newargv[0] = "pfexec";
+			newargv[1] = alter_path;
+			execv("/usr/bin/pfexec", &newargv[0]);
 		}
 		newargv[1] = myname;
 		execv(alter_path, &newargv[1]);
@@ -417,7 +441,7 @@ doexec(struct mnttab *ment)
 		/* exec failed */
 		if (errno != ENOENT) {
 			fprintf(stderr, gettext("umount: cannot execute %s\n"),
-					full_path);
+			    full_path);
 			exit(1);
 		}
 	}
@@ -429,8 +453,9 @@ doexec(struct mnttab *ment)
 	/* don't use -o with generic */
 	if (oflg) {
 		fprintf(stderr, gettext(
-	"%s: %s specific umount does not exist; -o suboption ignored\n"),
-		myname, ment->mnt_fstype ? ment->mnt_fstype : "<null>");
+		    "%s: %s specific umount does not exist;"
+		    " -o suboption ignored\n"),
+		    myname, ment->mnt_fstype ? ment->mnt_fstype : "<null>");
 	}
 
 	signal(SIGHUP,  SIG_IGN);
@@ -446,12 +471,12 @@ doexec(struct mnttab *ment)
 	 */
 	if (fflg) {
 		if (((ret = umount2(ment->mnt_mountp, MS_FORCE)) < 0) &&
-				(errno != EBUSY && errno != ENOTSUP &&
-				errno != EPERM))
+		    (errno != EBUSY && errno != ENOTSUP &&
+		    errno != EPERM))
 			ret = umount2(ment->mnt_special, MS_FORCE);
 	} else {
 		if (((ret = umount2(ment->mnt_mountp, 0)) < 0) &&
-				(errno != EBUSY) && (errno != EPERM))
+		    (errno != EBUSY) && (errno != EPERM))
 			ret = umount2(ment->mnt_special, 0);
 	}
 
@@ -478,8 +503,8 @@ rpterr(char *sp)
 		break;
 	case ENOENT:
 		fprintf(stderr,
-			gettext("%s: %s no such file or directory\n"),
-			myname, sp);
+		    gettext("%s: %s no such file or directory\n"),
+		    myname, sp);
 		break;
 	case EINVAL:
 		fprintf(stderr, gettext("%s: %s not mounted\n"), myname, sp);
@@ -489,11 +514,11 @@ rpterr(char *sp)
 		break;
 	case ENOTBLK:
 		fprintf(stderr,
-			gettext("%s: %s block device required\n"), myname, sp);
+		    gettext("%s: %s block device required\n"), myname, sp);
 		break;
 	case ECOMM:
 		fprintf(stderr,
-			gettext("%s: warning: broken link detected\n"), myname);
+		    gettext("%s: warning: broken link detected\n"), myname);
 		break;
 	default:
 		perror(myname);
@@ -506,7 +531,7 @@ usage(void)
 {
 	fprintf(stderr, gettext(
 "Usage:\n%s [-f] [-V] [-o specific_options] {special | mount-point}\n"),
-		myname);
+	    myname);
 	fprintf(stderr, gettext(
 "%s -a [-f] [-V] [-o specific_options] [mount_point ...]\n"), myname);
 	exit(1);
@@ -518,13 +543,13 @@ mnterror(int flag)
 	switch (flag) {
 	case MNT_TOOLONG:
 		fprintf(stderr,
-			gettext("%s: line in mnttab exceeds %d characters\n"),
-			myname, MNT_LINE_MAX-2);
+		    gettext("%s: line in mnttab exceeds %d characters\n"),
+		    myname, MNT_LINE_MAX-2);
 		break;
 	case MNT_TOOFEW:
 		fprintf(stderr,
-			gettext("%s: line in mnttab has too few entries\n"),
-			myname);
+		    gettext("%s: line in mnttab has too few entries\n"),
+		    myname);
 		break;
 	default:
 		break;
@@ -616,7 +641,7 @@ parumount(char **mntlist, int count)
 		if (count == 0)		/* not an error, just none found */
 			return (0);
 		fprintf(stderr, gettext("%s: no valid entries found in %s\n"),
-				myname, mnttab);
+		    myname, mnttab);
 		return (1);
 	}
 
@@ -626,7 +651,7 @@ parumount(char **mntlist, int count)
 	 */
 	if (lofscnt == 0) {
 		qsort((void *)mntarray, listlength, sizeof (mountent_t *),
-			mcompar);
+		    mcompar);
 		/*
 		 * If we do not detect a lofs by now, we never will.
 		 */
@@ -702,8 +727,8 @@ make_mntarray(char **mntlist, int count)
 		cp = *mntlist++;
 		if (realpath(cp, resolve) == NULL) {
 			fprintf(stderr,
-				gettext("%s: warning: can't resolve %s\n"),
-				myname, cp);
+			    gettext("%s: warning: can't resolve %s\n"),
+			    myname, cp);
 			exitcode = 1;
 			mp = getmntlast(mntll, NULL, cp); /* try anyways */
 		} else
@@ -716,8 +741,8 @@ make_mntarray(char **mntlist, int count)
 			 * try to umount it: append it to mntarray.
 			 */
 			fprintf(stderr, gettext(
-				"%s: warning: %s not found in %s\n"),
-				myname, resolve, mnttab);
+			    "%s: warning: %s not found in %s\n"),
+			    myname, resolve, mnttab);
 			exitcode = 1;
 			mntnull(&mnew);
 			mnew.mnt_special = mnew.mnt_mountp = strdup(resolve);
@@ -753,7 +778,7 @@ getmntall(void)
 
 	if ((fp = fopen(mnttab, "r")) == NULL) {
 		fprintf(stderr, gettext("%s: warning cannot open %s\n"),
-				myname, mnttab);
+		    myname, mnttab);
 		return (0);
 	}
 	mtail = NULL;
@@ -844,7 +869,7 @@ do_umounts(mountent_t **mntarray)
 #ifdef DEBUG
 		if (dflg && pid > 0) {
 			fprintf(stderr, "parent %d: umounting %d %s\n",
-				getpid(), pid, mp->ment.mnt_mountp);
+			    getpid(), pid, mp->ment.mnt_mountp);
 		}
 #endif
 		if (pid == 0) {		/* child */
@@ -934,7 +959,7 @@ dowait(void)
 		 */
 #ifdef DEBUG
 		fprintf(stderr, gettext(
-			"%s: unknown child %d\n"), myname, child);
+		    "%s: unknown child %d\n"), myname, child);
 #endif
 		exitcode = 1;
 		return (1);

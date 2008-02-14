@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -256,6 +256,7 @@ f none usr/lib/help/auths/locale/SmfNWAMStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfPowerStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfRoutingStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSendmailStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfSMBFSStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
@@ -342,6 +343,7 @@ f none usr/lib/help/profiles/locale/RtObAccessMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtProcManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/RtRightsDelegate.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSoftwareInstall.html 444 root bin
+f none usr/lib/help/profiles/locale/RtSMBFSMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSMBMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSysEvMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtUserMngmnt.html 444 root bin

@@ -335,6 +335,7 @@ systrace:systrace
 physmem:*
 smbsrv:*
 vscan:*
+nsmb:*
 EOF
 }
 

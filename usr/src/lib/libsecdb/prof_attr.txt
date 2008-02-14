@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ Log Management:::Manage log files:help=RtLogMngmnt.html
 Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
-File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
+File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management,SMBFS Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
@@ -77,6 +77,7 @@ Kerberos Client Management:::Maintain and Administer Kerberos excluding the serv
 Kerberos Server Management:::Maintain and Administer Kerberos Servers:profiles=Kerberos Client Management;help=RtKerberosSrvrMngmnt.html
 DAT Administration:::Manage the DAT configuration:help=RtDatAdmin.html
 SMB Management:::Manage the SMB service:auths=solaris.smf.manage.smb,solaris.smf.value.smb,solaris.smf.read.smb;help=RtSMBMngmnt.html
+SMBFS Management:::Manage the SMB client:auths=solaris.smf.manage.smbfs,solaris.smf.value,solaris.smf.modify.application;help=RtSMBFSMngmnt.html
 ZFS File System Management:::Create and Manage ZFS File Systems:help=RtZFSFileSysMngmnt.html
 ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMngmnt.html
 Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html

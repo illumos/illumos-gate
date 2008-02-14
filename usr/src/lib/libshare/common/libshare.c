@@ -211,6 +211,18 @@ sa_errorstr(int err)
 	case SA_PATH_IS_PARENTDIR:
 		ret = dgettext(TEXT_DOMAIN, "path is parent of a share");
 		break;
+	case SA_NO_SECTION:
+		ret = dgettext(TEXT_DOMAIN, "protocol requires a section");
+		break;
+	case SA_NO_PROPERTIES:
+		ret = dgettext(TEXT_DOMAIN, "properties not found");
+		break;
+	case SA_NO_SUCH_SECTION:
+		ret = dgettext(TEXT_DOMAIN, "section not found");
+		break;
+	case SA_PASSWORD_ENC:
+		ret = dgettext(TEXT_DOMAIN, "passwords must be encrypted");
+		break;
 	default:
 		(void) snprintf(errstr, sizeof (errstr),
 		    dgettext(TEXT_DOMAIN, "unknown %d"), err);
@@ -357,8 +369,9 @@ set_legacy_timestamp(xmlNodePtr root, char *path, uint64_t tval)
 		int ret;
 
 		(void) snprintf(tstring, sizeof (tstring), "%lld", tval);
-		xmlSetProp(node, (xmlChar *)"timestamp", (xmlChar *)tstring);
-		xmlSetProp(node, (xmlChar *)"path", (xmlChar *)path);
+		(void) xmlSetProp(node, (xmlChar *)"timestamp",
+		    (xmlChar *)tstring);
+		(void) xmlSetProp(node, (xmlChar *)"path", (xmlChar *)path);
 		/* now commit to SMF */
 		ret = sa_get_instance(handle->scfhandle, "default");
 		if (ret == SA_OK) {
@@ -907,7 +920,7 @@ sa_init(int init_service)
 				    (xmlChar *)"sharecfg");
 				if (handle->doc != NULL &&
 				    handle->tree != NULL) {
-					xmlDocSetRootElement(handle->doc,
+					(void) xmlDocSetRootElement(handle->doc,
 					    handle->tree);
 					err = add_handle_for_root(handle->tree,
 					    handle);
@@ -1375,7 +1388,7 @@ mark_excluded_protos(sa_group_t group, xmlNodePtr share, uint64_t flags)
 		}
 	}
 	if (exclude_list[0] != '\0')
-		xmlSetProp(share, (xmlChar *)"exclude",
+		(void) xmlSetProp(share, (xmlChar *)"exclude",
 		    (xmlChar *)exclude_list);
 }
 
@@ -1432,8 +1445,8 @@ _sa_add_share(sa_group_t group, char *sharepath, int persist, int *error,
 		return (node);
 	}
 
-	xmlSetProp(node, (xmlChar *)"path", (xmlChar *)sharepath);
-	xmlSetProp(node, (xmlChar *)"type",
+	(void) xmlSetProp(node, (xmlChar *)"path", (xmlChar *)sharepath);
+	(void) xmlSetProp(node, (xmlChar *)"type",
 	    persist ? (xmlChar *)"persist" : (xmlChar *)"transient");
 	if (flags != 0)
 		mark_excluded_protos(group, node, flags);
@@ -1745,7 +1758,7 @@ sa_move_share(sa_group_t group, sa_share_t share)
 		 * now that the share isn't in its old group, add to
 		 * the new one
 		 */
-		xmlAddChild((xmlNodePtr)group, (xmlNodePtr)share);
+		(void) xmlAddChild((xmlNodePtr)group, (xmlNodePtr)share);
 		/* need to deal with SMF */
 		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 		if (impl_handle != NULL) {
@@ -1808,9 +1821,9 @@ _sa_create_group(sa_handle_impl_t impl_handle, char *groupname)
 		node = xmlNewChild(impl_handle->tree, NULL, (xmlChar *)"group",
 		    NULL);
 		if (node != NULL) {
-			xmlSetProp(node, (xmlChar *)"name",
+			(void) xmlSetProp(node, (xmlChar *)"name",
 			    (xmlChar *)groupname);
-			xmlSetProp(node, (xmlChar *)"state",
+			(void) xmlSetProp(node, (xmlChar *)"state",
 			    (xmlChar *)"enabled");
 		}
 	}
@@ -1831,8 +1844,10 @@ _sa_create_zfs_group(sa_group_t group, char *groupname)
 
 	node = xmlNewChild((xmlNodePtr)group, NULL, (xmlChar *)"group", NULL);
 	if (node != NULL) {
-		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)groupname);
-		xmlSetProp(node, (xmlChar *)"state", (xmlChar *)"enabled");
+		(void) xmlSetProp(node, (xmlChar *)"name",
+		    (xmlChar *)groupname);
+		(void) xmlSetProp(node, (xmlChar *)"state",
+		    (xmlChar *)"enabled");
 	}
 
 	return ((sa_group_t)node);
@@ -1871,10 +1886,10 @@ sa_create_group(sa_handle_t handle, char *groupname, int *error)
 			node = xmlNewChild(impl_handle->tree, NULL,
 			    (xmlChar *)"group", NULL);
 			if (node != NULL) {
-				xmlSetProp(node, (xmlChar *)"name",
+				(void) xmlSetProp(node, (xmlChar *)"name",
 				    (xmlChar *)groupname);
 				/* default to the group being enabled */
-				xmlSetProp(node, (xmlChar *)"state",
+				(void) xmlSetProp(node, (xmlChar *)"state",
 				    (xmlChar *)"enabled");
 				ret = sa_create_instance(impl_handle->scfhandle,
 				    groupname);
@@ -2032,9 +2047,10 @@ set_node_attr(void *nodehdl, char *tag, char *value)
 	xmlNodePtr node = (xmlNodePtr)nodehdl;
 	if (node != NULL && tag != NULL) {
 		if (value != NULL)
-			xmlSetProp(node, (xmlChar *)tag, (xmlChar *)value);
+			(void) xmlSetProp(node, (xmlChar *)tag,
+			    (xmlChar *)value);
 		else
-			xmlUnsetProp(node, (xmlChar *)tag);
+			(void) xmlUnsetProp(node, (xmlChar *)tag);
 	}
 }
 
@@ -3124,7 +3140,36 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 }
 
 /*
- * sa_create_property(name, value)
+ * sa_create_section(name, value)
+ *
+ * Create a new section with the specified name and extra data.
+ */
+
+sa_property_t
+sa_create_section(char *name, char *extra)
+{
+	xmlNodePtr node;
+
+	node = xmlNewNode(NULL, (xmlChar *)"section");
+	if (node != NULL) {
+		if (name != NULL)
+			(void) xmlSetProp(node, (xmlChar *)"name",
+			    (xmlChar *)name);
+		if (extra != NULL)
+			(void) xmlSetProp(node, (xmlChar *)"extra",
+			    (xmlChar *)extra);
+	}
+	return ((sa_property_t)node);
+}
+
+void
+sa_set_section_attr(sa_property_t sect, char *name, char *value)
+{
+	(void) xmlSetProp(sect, (xmlChar *)name, (xmlChar *)value);
+}
+
+/*
+ * sa_create_property(section, name, value)
  *
  * Create a new property with the specified name and value.
  */
@@ -3136,8 +3181,8 @@ sa_create_property(char *name, char *value)
 
 	node = xmlNewNode(NULL, (xmlChar *)"option");
 	if (node != NULL) {
-		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)name);
-		xmlSetProp(node, (xmlChar *)"value", (xmlChar *)value);
+		(void) xmlSetProp(node, (xmlChar *)"type", (xmlChar *)name);
+		(void) xmlSetProp(node, (xmlChar *)"value", (xmlChar *)value);
 	}
 	return ((sa_property_t)node);
 }
@@ -3333,6 +3378,91 @@ sa_update_property(sa_property_t property, char *value)
 }
 
 /*
+ * sa_get_protocol_section(propset, prop)
+ *
+ * Get the specified protocol specific section. These are global to
+ * the protocol and not specific to a group or share.
+ */
+
+sa_protocol_properties_t
+sa_get_protocol_section(sa_protocol_properties_t propset, char *section)
+{
+	xmlNodePtr node = (xmlNodePtr)propset;
+	xmlChar *value = NULL;
+	char *proto;
+
+	proto = sa_get_optionset_attr(propset, "type");
+	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0)
+		return (propset);
+
+	for (node = node->children; node != NULL;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"section") == 0) {
+			if (section == NULL)
+				break;
+			value = xmlGetProp(node, (xmlChar *)"name");
+			if (value != NULL &&
+			    xmlStrcasecmp(value, (xmlChar *)section) == 0) {
+				break;
+			}
+			if (value != NULL) {
+				xmlFree(value);
+				value = NULL;
+			}
+		}
+	}
+	if (value != NULL)
+		xmlFree(value);
+	if (node != NULL && xmlStrcmp(node->name, (xmlChar *)"section") != 0) {
+		/*
+		 * avoid a non option node -- it is possible to be a
+		 * text node
+		 */
+		node = NULL;
+	}
+	return ((sa_protocol_properties_t)node);
+}
+
+/*
+ * sa_get_next_protocol_section(prop, find)
+ *
+ * Get the next protocol specific section in the list.
+ */
+
+sa_property_t
+sa_get_next_protocol_section(sa_property_t prop, char *find)
+{
+	xmlNodePtr node;
+	xmlChar *value = NULL;
+	char *proto;
+
+	proto = sa_get_optionset_attr(prop, "type");
+	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0)
+		return ((sa_property_t)NULL);
+
+	for (node = ((xmlNodePtr)prop)->next; node != NULL;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"section") == 0) {
+			if (find == NULL)
+				break;
+			value = xmlGetProp(node, (xmlChar *)"name");
+			if (value != NULL &&
+			    xmlStrcasecmp(value, (xmlChar *)find) == 0) {
+				break;
+			}
+			if (value != NULL) {
+				xmlFree(value);
+				value = NULL;
+			}
+
+		}
+	}
+	if (value != NULL)
+		xmlFree(value);
+	return ((sa_property_t)node);
+}
+
+/*
  * sa_get_protocol_property(propset, prop)
  *
  * Get the specified protocol specific property. These are global to
@@ -3344,6 +3474,9 @@ sa_get_protocol_property(sa_protocol_properties_t propset, char *prop)
 {
 	xmlNodePtr node = (xmlNodePtr)propset;
 	xmlChar *value = NULL;
+
+	if (propset == NULL)
+		return (NULL);
 
 	for (node = node->children; node != NULL;
 	    node = node->next) {
@@ -3380,16 +3513,30 @@ sa_get_protocol_property(sa_protocol_properties_t propset, char *prop)
  */
 
 sa_property_t
-sa_get_next_protocol_property(sa_property_t prop)
+sa_get_next_protocol_property(sa_property_t prop, char *find)
 {
 	xmlNodePtr node;
+	xmlChar *value = NULL;
 
 	for (node = ((xmlNodePtr)prop)->next; node != NULL;
 	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
-			break;
+			if (find == NULL)
+				break;
+			value = xmlGetProp(node, (xmlChar *)"type");
+			if (value != NULL &&
+			    xmlStrcasecmp(value, (xmlChar *)find) == 0) {
+				break;
+			}
+			if (value != NULL) {
+				xmlFree(value);
+				value = NULL;
+			}
+
 		}
 	}
+	if (value != NULL)
+		xmlFree(value);
 	return ((sa_property_t)node);
 }
 
@@ -3401,7 +3548,7 @@ sa_get_next_protocol_property(sa_property_t prop)
  */
 
 int
-sa_set_protocol_property(sa_property_t prop, char *value)
+sa_set_protocol_property(sa_property_t prop, char *section, char *value)
 {
 	sa_protocol_properties_t propset;
 	char *proto;
@@ -3411,6 +3558,9 @@ sa_set_protocol_property(sa_property_t prop, char *value)
 	if (propset != NULL) {
 		proto = sa_get_optionset_attr(propset, "type");
 		if (proto != NULL) {
+			if (section != NULL)
+				set_node_attr((xmlNodePtr)prop, "section",
+				    section);
 			set_node_attr((xmlNodePtr)prop, "value", value);
 			ret = sa_proto_set_property(proto, prop);
 			sa_free_attr_string(proto);
@@ -3450,7 +3600,7 @@ sa_create_protocol_properties(char *proto)
 
 	node = xmlNewNode(NULL, (xmlChar *)"propertyset");
 	if (node != NULL)
-		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
+		(void) xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
 	return (node);
 }
 
@@ -3575,15 +3725,15 @@ sa_add_resource(sa_share_t share, char *resource, int persist, int *error)
 		node = xmlNewChild((xmlNodePtr)share, NULL,
 		    (xmlChar *)"resource", NULL);
 		if (node != NULL) {
-			xmlSetProp(node, (xmlChar *)"name",
+			(void) xmlSetProp(node, (xmlChar *)"name",
 			    (xmlChar *)resource);
-			xmlSetProp(node, (xmlChar *)"type", persist ?
+			(void) xmlSetProp(node, (xmlChar *)"type", persist ?
 			    (xmlChar *)"persist" : (xmlChar *)"transient");
 			if (persist != SA_SHARE_TRANSIENT) {
 				index = _sa_get_next_resource_index(share);
 				(void) snprintf(istring, sizeof (istring), "%d",
 				    index);
-				xmlSetProp(node, (xmlChar *)"id",
+				(void) xmlSetProp(node, (xmlChar *)"id",
 				    (xmlChar *)istring);
 				if (!sa_group_is_zfs(group) &&
 				    sa_is_persistent((sa_group_t)share)) {

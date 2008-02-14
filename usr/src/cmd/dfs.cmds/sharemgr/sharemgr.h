@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,8 @@ typedef enum {
 typedef enum {
 	USAGE_CTL_GET,
 	USAGE_CTL_SET,
-	USAGE_CTL_STATUS
+	USAGE_CTL_STATUS,
+	USAGE_CTL_DELSECT
 } sc_usage_t;
 
 typedef struct sa_command {

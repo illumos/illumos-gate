@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 LIBRARY =	libshare.a
@@ -41,8 +41,7 @@ LIBSRCS =	$(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid
-all install := LDLIBS += -lxml2
+LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid -lxml2
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 #add nfs/lib directory as part of the include path

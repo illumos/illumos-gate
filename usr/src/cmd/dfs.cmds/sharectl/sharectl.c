@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,9 @@ sc_get_usage(sc_usage_t index)
 	case USAGE_CTL_STATUS:
 		ret = gettext("status [-h | proto ...]");
 		break;
+	case USAGE_CTL_DELSECT:
+		ret = gettext("delsect [-h] section proto");
+		break;
 	}
 	return (ret);
 }
@@ -121,6 +124,10 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 	struct options *optlist = NULL;
 	int ret = SA_OK;
 	int c;
+	sa_protocol_properties_t propset, propsect;
+	sa_property_t prop;
+	char *section, *value, *name;
+	int first = 1;
 
 	while ((c = getopt(argc, argv, "?hp:")) != EOF) {
 		switch (c) {
@@ -153,73 +160,96 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 	}
 
 	proto = argv[optind];
-	if (sa_valid_protocol(proto)) {
-		sa_protocol_properties_t propset;
-		propset = sa_proto_get_properties(proto);
-		if (propset != NULL) {
-			sa_property_t prop;
-			char *value;
-			char *name;
+	if (!sa_valid_protocol(proto)) {
+		(void) printf(gettext("Invalid protocol specified: %s\n"),
+		    proto);
+		return (SA_INVALID_PROTOCOL);
+	}
+	propset = sa_proto_get_properties(proto);
+	if (propset == NULL)
+		return (ret);
 
-			if (optlist == NULL) {
-				/*
-				 * Display all known properties for
-				 * this protocol.
-				 */
-				for (prop = sa_get_protocol_property(propset,
-				    NULL);
-				    prop != NULL;
-				    prop = sa_get_next_protocol_property(
-				    prop)) {
+	if (optlist == NULL) {
+		/* Display all known properties for this protocol */
+		for (propsect = sa_get_protocol_section(propset, NULL);
+		    propsect != NULL;
+		    propsect = sa_get_next_protocol_section(propsect, NULL)) {
+			section = sa_get_property_attr(propsect,
+			    "name");
+			/*
+			 * If properties are organized into sections, as
+			 * in the SMB client, print the section name.
+			 */
+			if (sa_proto_get_featureset(proto) &
+			    SA_FEATURE_HAS_SECTIONS) {
+				if (!first)
+					(void) printf("\n");
+				first = 0;
+				(void) printf("[%s]\n", section);
+			}
+			/* Display properties for this section */
+			for (prop = sa_get_protocol_property(propsect, NULL);
+			    prop != NULL;
+			    prop = sa_get_next_protocol_property(prop, NULL)) {
 
-					/*
-					 * Get and display the
-					 * property and value.
-					 */
-					name = sa_get_property_attr(prop,
-					    "type");
-					if (name != NULL) {
-						value = sa_get_property_attr(
-						    prop, "value");
-						(void) printf(gettext(
-						    "%s=%s\n"), name,
-						    value != NULL ? value : "");
-					}
-					if (value != NULL)
-						sa_free_attr_string(value);
-					if (name != NULL)
-						sa_free_attr_string(name);
+				/* get and display the property and value */
+				name = sa_get_property_attr(prop, "type");
+				if (name != NULL) {
+					value = sa_get_property_attr(prop,
+					    "value");
+					(void) printf(gettext("%s=%s\n"), name,
+					    value != NULL ? value : "");
 				}
-			} else {
-				struct options *opt;
-				/* list the specified option(s) */
-				for (opt = optlist;
-				    opt != NULL;
-				    opt = opt->next) {
-					prop = sa_get_protocol_property(
-					    propset, opt->optname);
-					if (prop != NULL) {
-						value = sa_get_property_attr(
-						    prop, "value");
-						(void) printf(gettext(
-						    "%s=%s\n"),
-						    opt->optname,
-						    value != NULL ?
-						    value : "");
-						sa_free_attr_string(value);
-					} else {
-						(void) printf(gettext(
-						    "%s: not defined\n"),
-						    opt->optname);
-						ret = SA_NO_SUCH_PROP;
-					}
-				}
+				if (value != NULL)
+					sa_free_attr_string(value);
+				if (name != NULL)
+					sa_free_attr_string(name);
 			}
 		}
 	} else {
-		(void) printf(gettext("Invalid protocol specified: %s\n"),
-		    proto);
-		ret = SA_INVALID_PROTOCOL;
+		struct options *opt;
+
+		/* list the specified option(s) */
+		for (opt = optlist; opt != NULL; opt = opt->next) {
+			int printed = 0;
+
+			for (propsect = sa_get_protocol_section(propset, NULL);
+			    propsect != NULL;
+			    propsect = sa_get_next_protocol_section(propsect,
+			    NULL)) {
+
+				section = sa_get_property_attr(propsect,
+				    "name");
+				for (prop = sa_get_protocol_property(propsect,
+				    opt->optname);
+				    prop != NULL;
+				    prop = sa_get_next_protocol_property(
+				    propsect, opt->optname)) {
+					value = sa_get_property_attr(prop,
+					    "value");
+					if (sa_proto_get_featureset(proto) &
+					    SA_FEATURE_HAS_SECTIONS) {
+						(void) printf(
+						    gettext("[%s] %s=%s\n"),
+						    section, opt->optname,
+						    value != NULL ? value : "");
+						sa_free_attr_string(section);
+					} else {
+						(void) printf(
+						    gettext("%s=%s\n"),
+						    opt->optname,
+						    value != NULL ? value : "");
+					}
+					sa_free_attr_string(value);
+					printed = 1;
+				}
+			}
+			if (!printed) {
+				(void) printf(gettext("%s: not defined\n"),
+				    opt->optname);
+				ret = SA_NO_SUCH_PROP;
+			}
+		}
 	}
 	return (ret);
 }
@@ -230,9 +260,12 @@ sc_set(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *proto = NULL;
 	struct options *optlist = NULL;
+	sa_protocol_properties_t propsect;
 	int ret = SA_OK;
 	int c;
+	int err;
 	sa_protocol_properties_t propset;
+	sa_property_t prop;
 
 	while ((c = getopt(argc, argv, "?hp:")) != EOF) {
 		switch (c) {
@@ -271,53 +304,71 @@ sc_set(sa_handle_t handle, int flags, int argc, char *argv[])
 		return (SA_INVALID_PROTOCOL);
 	}
 	propset = sa_proto_get_properties(proto);
-	if (propset != NULL) {
-		sa_property_t prop;
-		int err;
-		if (optlist == NULL) {
-			(void) printf(gettext("usage: %s\n"),
-			    sc_get_usage(USAGE_CTL_SET));
-			(void) printf(gettext(
-			    "\tat least one property and value "
-			    "must be specified\n"));
-		} else {
-			struct options *opt;
-			/* list the specified option(s) */
-			for (opt = optlist;
-			    opt != NULL;
-			    opt = opt->next) {
-				prop = sa_get_protocol_property(
-				    propset, opt->optname);
-				if (prop != NULL) {
-					/*
-					 * "err" is used in order to
-					 * prevent setting ret to
-					 * SA_OK if there has been a
-					 * real error. We want to be
-					 * able to return an error
-					 * status on exit in that
-					 * case. Error messages are
-					 * printed for each error, so
-					 * we only care on exit that
-					 * there was an error and not
-					 * the specific error value.
-					 */
-					err = sa_set_protocol_property(
-					    prop, opt->optvalue);
-					if (err != SA_OK) {
-						(void) printf(gettext(
-						    "Could not set property"
-						    " %s: %s\n"),
-						    opt->optname,
-						    sa_errorstr(err));
-						ret = err;
-					}
-				} else {
+	if (propset == NULL)
+		return (ret);
+
+	if (optlist == NULL) {
+		(void) printf(gettext("usage: %s\n"),
+		    sc_get_usage(USAGE_CTL_SET));
+		(void) printf(gettext(
+		    "\tat least one property and value "
+		    "must be specified\n"));
+	} else {
+		struct options *opt;
+		char *section = NULL;
+		/* fetch and change the specified option(s) */
+		for (opt = optlist; opt != NULL; opt = opt->next) {
+			if (strncmp("section", opt->optname, 7) == 0) {
+				if (section != NULL)
+					free(section);
+				section = strdup(opt->optvalue);
+				continue;
+			}
+			if (sa_proto_get_featureset(proto) &
+			    SA_FEATURE_HAS_SECTIONS) {
+				propsect = sa_get_protocol_section(propset,
+				    section);
+				prop = sa_get_protocol_property(propsect,
+				    opt->optname);
+			} else {
+				prop = sa_get_protocol_property(propset,
+				    opt->optname);
+			}
+			if (prop == NULL && sa_proto_get_featureset(proto) &
+			    SA_FEATURE_ADD_PROPERTIES) {
+				sa_property_t sect;
+				sect = sa_create_section(section, NULL);
+				sa_set_section_attr(sect, "type", proto);
+				(void) sa_add_protocol_property(propset, sect);
+				prop = sa_create_property(
+				    opt->optname, opt->optvalue);
+				(void) sa_add_protocol_property(sect, prop);
+			}
+			if (prop != NULL) {
+				/*
+				 * "err" is used in order to prevent
+				 * setting ret to SA_OK if there has
+				 * been a real error. We want to be
+				 * able to return an error status on
+				 * exit in that case. Error messages
+				 * are printed for each error, so we
+				 * only care on exit that there was an
+				 * error and not the specific error
+				 * value.
+				 */
+				err = sa_set_protocol_property(prop, section,
+				    opt->optvalue);
+				if (err != SA_OK) {
 					(void) printf(gettext(
-					    "%s: not defined\n"),
-					    opt->optname);
-					ret = SA_NO_SUCH_PROP;
+					    "Could not set property"
+					    " %s: %s\n"),
+					    opt->optname, sa_errorstr(err));
+					ret = err;
 				}
+			} else {
+				(void) printf(gettext("%s: not defined\n"),
+				    opt->optname);
+				ret = SA_NO_SUCH_PROP;
 			}
 		}
 	}
@@ -395,10 +446,78 @@ sc_status(sa_handle_t handle, int flags, int argc, char *argv[])
 	return (ret);
 }
 
+/*ARGSUSED*/
+static int
+sc_delsect(sa_handle_t handle, int flags, int argc, char *argv[])
+{
+	char *proto = NULL;
+	char *section = NULL;
+	sa_protocol_properties_t propset;
+	sa_protocol_properties_t propsect;
+	int ret = SA_OK;
+	int c;
+
+	while ((c = getopt(argc, argv, "?h")) != EOF) {
+		switch (c) {
+		default:
+			ret = SA_SYNTAX_ERR;
+			/*FALLTHROUGH*/
+		case '?':
+		case 'h':
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_DELSECT));
+			return (ret);
+		}
+		/*NOTREACHED*/
+	}
+
+	section = argv[optind++];
+
+	if (optind >= argc) {
+		(void) printf(gettext("usage: %s\n"),
+		    sc_get_usage(USAGE_CTL_DELSECT));
+		(void) printf(gettext(
+		    "\tsection and protocol must be specified.\n"));
+		return (SA_INVALID_PROTOCOL);
+	}
+
+	proto = argv[optind];
+	if (!sa_valid_protocol(proto)) {
+		(void) printf(gettext("Invalid protocol specified: %s\n"),
+		    proto);
+		return (SA_INVALID_PROTOCOL);
+	}
+
+	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0) {
+		(void) printf(gettext("Protocol %s does not have sections\n"),
+		    section, proto);
+		return (SA_NOT_SUPPORTED);
+	}
+
+	propset = sa_proto_get_properties(proto);
+	if (propset == NULL) {
+		(void) printf(gettext("Cannot get properties for %s\n"),
+		    proto);
+		return (SA_NO_PROPERTIES);
+	}
+
+	propsect = sa_get_protocol_section(propset, section);
+	if (propsect == NULL) {
+		(void) printf(gettext("Cannot find section %s for proto %s\n"),
+		    section, proto);
+		return (SA_NO_SUCH_SECTION);
+	}
+
+	ret = sa_proto_delete_section(proto, section);
+
+	return (ret);
+}
+
 static sa_command_t commands[] = {
 	{"get", 0, sc_get, USAGE_CTL_GET},
 	{"set", 0, sc_set, USAGE_CTL_SET},
 	{"status", 0, sc_status, USAGE_CTL_STATUS},
+	{"delsect", 0, sc_delsect, USAGE_CTL_DELSECT},
 	{NULL, 0, NULL, 0},
 };
 

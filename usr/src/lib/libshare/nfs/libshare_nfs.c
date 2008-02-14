@@ -104,7 +104,10 @@ struct sa_plugin_ops sa_plugin_ops = {
 	nfs_features,
 	NULL,	/* transient shares */
 	NULL,	/* notify resource */
-	NULL
+	NULL,	/* rename_resource */
+	NULL,	/* run_command */
+	NULL,	/* command_help */
+	NULL	/* delete_proto_section */
 };
 
 /*

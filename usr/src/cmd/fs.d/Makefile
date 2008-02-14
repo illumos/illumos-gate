@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,7 @@ include ../Makefile.cmd
 
 SUBDIR1= lofs zfs
 SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs \
-		autofs mntfs objfs sharefs
+		autofs mntfs objfs sharefs smbclnt
 SUBDIRS= $(SUBDIR1) $(SUBDIR2)
 I18NDIRS= $(SUBDIR2)
 

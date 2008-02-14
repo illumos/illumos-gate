@@ -7477,6 +7477,7 @@ mondo_loop() {
 			mxfe:*			mxfe*
 			clone:rtls		rtls
 			rtls:*			rtls*
+			nsmb:*			nsmb*
 		EOF
 
 		if [ $target_isa = i386 ] && [[ $rootslice = /dev/rdsk/* || \

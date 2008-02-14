@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,7 @@ int secpolicy_rsm_access(const cred_t *, uid_t, mode_t);
 int secpolicy_setpriority(const cred_t *);
 int secpolicy_settime(const cred_t *);
 int secpolicy_smb(const cred_t *);
+int secpolicy_smbfs_login(const cred_t *, uid_t);
 int secpolicy_spec_open(const cred_t *, struct vnode *, int);
 int secpolicy_sti(const cred_t *);
 int secpolicy_swapctl(const cred_t *);

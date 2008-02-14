@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,11 +68,13 @@ COMMON_MODULES_KVM = \
 	logindmux \
 	md \
 	nca \
+	nsmb \
 	ptm \
 	random \
 	s1394 \
 	scsi_vhci \
 	sctp \
+	smbfs \
 	smbsrv \
 	specfs \
 	sppp \

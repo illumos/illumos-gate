@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/Makefile
@@ -35,9 +35,11 @@ UTSBASE = ..
 
 include Makefile.sparc
 
-LINT_KMODLIBS	 = $(LINT_KMODS:e1000g=)
-LINT_LIBS	 = $(LINT_LIB) $(GEN_LINT_LIB) \
-		   $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
+LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
+LINT_KMODLIBS	= $(LINT_KMODS_X2:e1000g=)
+LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
+		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 $(CLOSED_BUILD)LINT_LIBS += $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 

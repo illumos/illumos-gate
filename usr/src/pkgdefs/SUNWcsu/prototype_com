@@ -493,6 +493,7 @@ f none usr/lib/help/auths/locale/C/SmfNWAMStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfPowerStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfRoutingStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSendmailStates.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfSMBFSStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSyslogStates.html 444 root bin
@@ -561,6 +562,7 @@ f none usr/lib/help/profiles/locale/C/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtProcManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtRightsDelegate.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSoftwareInstall.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSMBFSMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSMBMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSysEvMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtUserMngmnt.html 444 root bin

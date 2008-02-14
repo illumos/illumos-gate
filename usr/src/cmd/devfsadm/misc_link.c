@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +174,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo", "dm2s",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name,
+	},
+	{ "pseudo", "ddi_pseudo", "nsmb",
+	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name,
 	},
 };
 

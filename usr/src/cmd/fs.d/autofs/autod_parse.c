@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  *	autod_parse.c
  *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -160,7 +159,7 @@ parse_entry(char *key, char *mapname, char *mapopts, struct mapline *ml,
 			trace_mapents("do_mapent_hosts:(return)", mapents);
 
 		if (hierarchical_sort(mapents, &rootnode, key, mapname)
-				!= PARSE_OK)
+		    != PARSE_OK)
 			goto parse_error;
 	} else {
 		/*
@@ -250,13 +249,13 @@ mapline_to_mapent(struct mapent **mapents, struct mapline *ml, char *key,
 	if (macro_expand(key, lp, lq, LINESZ)) {
 		syslog(LOG_ERR,
 		"mapline_to_mapent: map %s: line too long (max %d chars)",
-			mapname, LINESZ - 1);
+		    mapname, LINESZ - 1);
 		return (PARSE_ERROR);
 	}
 	if (trace > 3 && (strcmp(ml->linebuf, lp) != 0))
 		trace_prt(1,
-			"  mapline_to_mapent: (expanded) mapline (%s,%s)\n",
-			ml->linebuf, ml->lineqbuf);
+		    "  mapline_to_mapent: (expanded) mapline (%s,%s)\n",
+		    ml->linebuf, ml->lineqbuf);
 
 	/* init the head of mapentry list to null */
 	*mapents = NULL;
@@ -277,7 +276,11 @@ mapline_to_mapent(struct mapent **mapents, struct mapline *ml, char *key,
 	} else
 		strcpy(defaultopts, mapopts);
 
-	implied = *w != '/'; /* implied is 1 only if '/' is implicit */
+	/*
+	 * implied is true if there is no '/' (the usual NFS case)
+	 * or if there are two slashes (the smbfs case)
+	 */
+	implied = ((*w != '/') || (*(w+1) == '/'));
 	while (*w == '/' || implied) {
 		mp = me;
 		if ((me = (struct mapent *)malloc(sizeof (*me))) == NULL)
@@ -340,7 +343,7 @@ mapline_to_mapent(struct mapent **mapents, struct mapline *ml, char *key,
 		if (w[0] == '\0' || w[0] == '-') {
 			syslog(LOG_ERR,
 			"mapline_to_mapent: bad location=%s map=%s key=%s",
-				w, mapname, key);
+			    w, mapname, key);
 			return (PARSE_ERROR);
 		}
 
@@ -474,8 +477,8 @@ hierarchical_sort(struct mapent *mapents, hiernode **rootnode, char *key,
 						 * Add a new one
 						 */
 						if ((rc = alloc_hiernode
-							(&newnode, dirname))
-							!= PARSE_OK)
+						    (&newnode, dirname))
+						    != PARSE_OK)
 							return (rc);
 						prevnode->leveldir = newnode;
 						prevnode = newnode;
@@ -503,7 +506,7 @@ hierarchical_sort(struct mapent *mapents, hiernode **rootnode, char *key,
 			/* duplicate mntpoint found */
 			syslog(LOG_ERR,
 			"hierarchical_sort: duplicate mntpnt map=%s key=%s",
-				mapname, key);
+			    mapname, key);
 			return (PARSE_ERROR);
 		}
 
@@ -542,17 +545,17 @@ push_options(hiernode *node, char *defaultopts, char *mapopts, int err)
 		if (me != NULL) {	/* not all nodes point to a mapentry */
 			me->map_err = err;
 			if ((rc = set_mapent_opts(me, me->map_mntopts,
-				defaultopts, mapopts)) != PARSE_OK)
+			    defaultopts, mapopts)) != PARSE_OK)
 				return (rc);
 		}
 
 		/* push the options to subdirs */
 		if (node->subdir != NULL) {
 			if (node->mapent && strcmp(node->mapent->map_fstype,
-				MNTTYPE_AUTOFS) == 0)
+			    MNTTYPE_AUTOFS) == 0)
 				err = MAPENT_UATFS;
 			if ((rc = push_options(node->subdir, defaultopts,
-				mapopts, err)) != PARSE_OK)
+			    mapopts, err)) != PARSE_OK)
 				return (rc);
 		}
 		node = node->leveldir;
@@ -623,7 +626,7 @@ set_mapent_opts(struct mapent *me, char *opts, char *defaultopts,
 			p += strlen(BACKFSTYPE_EQ);
 
 			if (strncmp(p, MNTTYPE_NFS, len) ==  0 &&
-				(p[len] == '\0' || p[len] == ',')) {
+			    (p[len] == '\0' || p[len] == ',')) {
 				/*
 				 * Cached nfs mount
 				 */
@@ -638,7 +641,7 @@ set_mapent_opts(struct mapent *me, char *opts, char *defaultopts,
 	 * more option pushing work.
 	 */
 	if (fstype_opt == TRUE &&
-		(strcmp(me->map_mntopts, NO_OPTS) == 0)) {
+	    (strcmp(me->map_mntopts, NO_OPTS) == 0)) {
 		free(me->map_mntopts);
 		if ((rc = fstype_opts(me, opts, defaultopts,
 		    mapopts)) != PARSE_OK)
@@ -647,7 +650,7 @@ set_mapent_opts(struct mapent *me, char *opts, char *defaultopts,
 
 done:
 	if (((me->map_fstype = strdup(fstype)) == NULL) ||
-		((me->map_mounter = strdup(mounter)) == NULL)) {
+	    ((me->map_mounter = strdup(mounter)) == NULL)) {
 		if (me->map_fstype != NULL)
 			free(me->map_fstype);
 		syslog(LOG_ERR, "set_mapent_opts: No memory");
@@ -773,7 +776,7 @@ modify_mapents(struct mapent **mapents, char *mapname,
 	 * at one level below the rootnode given by subdir.
 	 */
 	if ((rc = set_and_fake_mapent_mntlevel(rootnode, subdir, key, mapname,
-		&faked_mapents, isdirect, mapopts, mount_access)) != PARSE_OK)
+	    &faked_mapents, isdirect, mapopts, mount_access)) != PARSE_OK)
 		return (rc);
 
 	/*
@@ -791,7 +794,7 @@ modify_mapents(struct mapent **mapents, char *mapname,
 	me = *mapents;
 	while (me != NULL) {
 		if ((me->map_mntlevel ==  -1) || (me->map_err) ||
-			(mount_access == FALSE && me->map_mntlevel == 0)) {
+		    (mount_access == FALSE && me->map_mntlevel == 0)) {
 			/*
 			 * syslog any errors and free entry
 			 */
@@ -827,8 +830,8 @@ modify_mapents(struct mapent **mapents, char *mapname,
 		 * to autonodes
 		 */
 		if (me->map_mntlevel == 1 &&
-			(strcmp(me->map_fstype, MNTTYPE_AUTOFS) != 0) &&
-			(me->map_faked != TRUE)) {
+		    (strcmp(me->map_fstype, MNTTYPE_AUTOFS) != 0) &&
+		    (me->map_faked != TRUE)) {
 			if ((rc = convert_mapent_to_automount(me, mapname,
 			    mapopts)) != PARSE_OK)
 				return (rc);
@@ -877,7 +880,7 @@ set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
 	 * contains no '/' at the end. Took some mucking to get that right.
 	 */
 	if ((rc = get_dir_from_path(dirname, &subdir_child, sizeof (dirname)))
-				!= PARSE_OK)
+	    != PARSE_OK)
 		return (rc);
 
 	if (dirname[0] != '\0')
@@ -897,7 +900,7 @@ set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
 				return (rc);
 			if (dirname[0] != '\0')
 				sprintf(traversed_path, "%s/%s",
-					traversed_path, dirname);
+				    traversed_path, dirname);
 
 		} else {
 			/* try next leveldir */
@@ -922,14 +925,14 @@ set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
 	if (prevnode->mapent != NULL && mount_access == TRUE) {
 		if (trace > 3)
 			trace_prt(1, "  node mountpoint %s\t travpath=%s\n",
-				prevnode->mapent->map_mntpnt, traversed_path);
+			    prevnode->mapent->map_mntpnt, traversed_path);
 
 		/*
 		 * Copy traversed path map_mntpnt to get rid of any extra
 		 * '/' the map entry may contain.
 		 */
 		if (strlen(prevnode->mapent->map_mntpnt) <
-				strlen(traversed_path)) { /* sanity check */
+		    strlen(traversed_path)) { /* sanity check */
 			if (verbose)
 				syslog(LOG_ERR,
 				"set_and_fake_mapent_mntlevel: path=%s error",
@@ -948,7 +951,7 @@ set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
 	} else if (currnode != NULL) {
 		if (trace > 3)
 			trace_prt(1, "  No rootnode, travpath=%s\n",
-				traversed_path);
+			    traversed_path);
 		if ((rc = mark_and_fake_level1_noroot(currnode,
 		    traversed_path, key, mapname, faked_mapents, isdirect,
 		    mapopts)) != PARSE_OK)
@@ -988,7 +991,7 @@ mark_level1_root(hiernode *node, char *traversed_path)
 				sprintf(w, "%s/%s", traversed_path,
 				    node->dirname);
 				if (mark_level1_root(node->subdir, w)
-						== PARSE_ERROR)
+				    == PARSE_ERROR)
 					return (PARSE_ERROR);
 			} else {
 				if (verbose) {
@@ -1079,7 +1082,7 @@ mark_and_fake_level1_noroot(hiernode *node, char *traversed_path,
 			(void) memset((char *)me, 0, sizeof (*me));
 
 			if ((me->map_fs = (struct mapfs *)
-				malloc(sizeof (struct mapfs))) == NULL)
+			    malloc(sizeof (struct mapfs))) == NULL)
 				return (ENOMEM);
 			(void) memset(me->map_fs, 0, sizeof (struct mapfs));
 
@@ -1092,14 +1095,14 @@ mark_and_fake_level1_noroot(hiernode *node, char *traversed_path,
 			me->map_root = strdup(w1);
 
 			sprintf(faked_map_mntpnt, "%s/%s", traversed_path,
-				node->dirname);
+			    node->dirname);
 			me->map_mntpnt = strdup(faked_map_mntpnt);
 			me->map_fstype = strdup(MNTTYPE_AUTOFS);
 			me->map_mounter = strdup(MNTTYPE_AUTOFS);
 
 			/* set options */
 			if ((rc = automount_opts(&me->map_mntopts, mapopts))
-				!= PARSE_OK)
+			    != PARSE_OK)
 				return (rc);
 			me->map_fs->mfs_dir = strdup(mapname);
 			me->map_mntlevel = 1;
@@ -1190,7 +1193,7 @@ convert_mapent_to_automount(struct mapent *me, char *mapname,
 
 alloc_failed:
 	syslog(LOG_ERR,
-		"convert_mapent_to_automount: Memory allocation failed");
+	    "convert_mapent_to_automount: Memory allocation failed");
 	return (ENOMEM);
 }
 
@@ -1215,7 +1218,7 @@ automount_opts(char **map_mntopts, char *mapopts)
 	if (len > AUTOFS_MAXOPTSLEN) {
 		syslog(LOG_ERR,
 		"option string %s too long (max=%d)", mapopts,
-			AUTOFS_MAXOPTSLEN-8);
+		    AUTOFS_MAXOPTSLEN-8);
 		return (PARSE_ERROR);
 	}
 
@@ -1277,10 +1280,10 @@ parse_fsinfo(char *mapname, struct mapent *mapents)
 		bufq = "";
 		if (strcmp(me->map_fstype, MNTTYPE_NFS) == 0) {
 			err = parse_nfs(mapname, me, me->map_fsw,
-				me->map_fswq, &bufp, &bufq, wordsz);
+			    me->map_fswq, &bufp, &bufq, wordsz);
 		} else {
 			err = parse_special(me, me->map_fsw, me->map_fswq,
-				&bufp, &bufq, wordsz);
+			    &bufp, &bufq, wordsz);
 		}
 
 		if (err != PARSE_OK || *me->map_fsw != '\0' ||
@@ -1738,24 +1741,24 @@ trace_mapents(char *s, struct mapent *mapents)
 	trace_prt(1, "\n\t%s\n", s);
 	for (me = mapents; me; me = me->map_next) {
 		trace_prt(1, "  (%s,%s)\t %s%s -%s\n",
-			me->map_fstype ? me->map_fstype : "",
-			me->map_mounter ? me->map_mounter : "",
-			me->map_root  ? me->map_root : "",
-			me->map_mntpnt ? me->map_mntpnt : "",
-			me->map_mntopts ? me->map_mntopts : "");
+		    me->map_fstype ? me->map_fstype : "",
+		    me->map_mounter ? me->map_mounter : "",
+		    me->map_root  ? me->map_root : "",
+		    me->map_mntpnt ? me->map_mntpnt : "",
+		    me->map_mntopts ? me->map_mntopts : "");
 		for (mfs = me->map_fs; mfs; mfs = mfs->mfs_next)
 			trace_prt(0, "\t\t%s:%s\n",
-				mfs->mfs_host ? mfs->mfs_host: "",
-				mfs->mfs_dir ? mfs->mfs_dir : "");
+			    mfs->mfs_host ? mfs->mfs_host: "",
+			    mfs->mfs_dir ? mfs->mfs_dir : "");
 
 		trace_prt(1, "\tme->map_fsw=%s\n",
-			me->map_fsw ? me->map_fsw:"",
-			me->map_fswq ? me->map_fsw:"");
+		    me->map_fsw ? me->map_fsw:"",
+		    me->map_fswq ? me->map_fsw:"");
 		trace_prt(1, "\t mntlevel=%d\t%s\t%s err=%d\n",
-			me->map_mntlevel,
-			me->map_modified ? "modify=TRUE":"modify=FALSE",
-			me->map_faked ? "faked=TRUE":"faked=FALSE",
-			me->map_err);
+		    me->map_mntlevel,
+		    me->map_modified ? "modify=TRUE":"modify=FALSE",
+		    me->map_faked ? "faked=TRUE":"faked=FALSE",
+		    me->map_err);
 	}
 }
 
@@ -1778,12 +1781,12 @@ trace_hierarchy(hiernode *node, int nodelevel)
 			for (i = 0; i < nodelevel; i++)
 				trace_prt(0, "\t");
 			trace_prt(0, "\t(%s, ",
-				currnode->dirname ? currnode->dirname :"");
+			    currnode->dirname ? currnode->dirname :"");
 			if (currnode->mapent) {
 				trace_prt(0, "%d, %s)\n",
-					currnode->mapent->map_mntlevel,
-					currnode->mapent->map_mntopts ?
-					currnode->mapent->map_mntopts:"");
+				    currnode->mapent->map_mntlevel,
+				    currnode->mapent->map_mntopts ?
+				    currnode->mapent->map_mntopts:"");
 			}
 			else
 				trace_prt(0, " ,)\n");
@@ -1793,12 +1796,12 @@ trace_hierarchy(hiernode *node, int nodelevel)
 			for (i = 0; i < nodelevel; i++)
 				trace_prt(0, "\t");
 			trace_prt(0, "\t(%s, ",
-				currnode->dirname ? currnode->dirname :"");
+			    currnode->dirname ? currnode->dirname :"");
 			if (currnode->mapent) {
 				trace_prt(0, "%d, %s)\n",
-					currnode->mapent->map_mntlevel,
-					currnode->mapent->map_mntopts ?
-					currnode->mapent->map_mntopts:"");
+				    currnode->mapent->map_mntlevel,
+				    currnode->mapent->map_mntopts ?
+				    currnode->mapent->map_mntopts:"");
 			}
 			else
 				trace_prt(0, ", )\n");

@@ -361,6 +361,9 @@ COMMON_SUBDIRS= \
 	SUNWslpr \
 	SUNWslpu \
 	SUNWsmapi  \
+	SUNWsmbfskr \
+	SUNWsmbfsr \
+	SUNWsmbfsu \
 	SUNWsmbskr  \
 	SUNWsmbsr  \
 	SUNWsmbsu  \

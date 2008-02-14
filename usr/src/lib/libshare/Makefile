@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,7 +35,7 @@ $(BUILD64)MACHS += $(MACH64)
 
 # Add plugin module directories here. They need to build after the libshare
 # objects are built.
-PLUGINS =	smb nfs
+PLUGINS =	nfs smb smbfs
 $(PLUGINS):	$(MACHS)
 
 SUBDIRS =	$(MACHS) $(PLUGINS)

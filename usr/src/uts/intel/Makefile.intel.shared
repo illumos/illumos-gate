@@ -323,6 +323,7 @@ DRV_KMODS	+= wpi
 DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
 DRV_KMODS	+= chxge
+DRV_KMODS	+= nsmb
 
 #
 # Don't build some of these for OpenSolaris, since they will be
@@ -467,6 +468,7 @@ SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL
 FS_KMODS	+= autofs cachefs ctfs dev devfs fdfs fifofs hsfs lofs
 FS_KMODS	+= lx_afs lx_proc mntfs namefs nfs objfs zfs
 FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs sharefs
+FS_KMODS	+= smbfs
 
 #
 #	Streams Modules (/kernel/strmod):

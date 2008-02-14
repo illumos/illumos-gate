@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,12 +45,13 @@ SUBDIRS = \
 	rhosts_auth	\
 	roles		\
 	sample		\
+	smb		\
+	smbfs		\
 	tsol_acct	\
 	unix_auth	\
 	unix_account	\
 	unix_cred	\
-	unix_session	\
-	smb
+	unix_session
 
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/pam_modules/smartcard

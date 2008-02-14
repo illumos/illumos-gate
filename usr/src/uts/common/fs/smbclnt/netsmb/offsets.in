@@ -1,0 +1,134 @@
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+\
+\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+\
+\ offsets.in: input file for the ctfstabs program,
+\ used to generate ioc_check.h - which verifies
+\ invariance of our ioctl data structures across
+\ 32-bit and 64-bit ABIs.
+
+#ifndef	_GENASSYM
+#define	_GENASSYM
+#endif
+
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/socket_impl.h>
+#include <netsmb/smb.h>
+#include <netsmb/netbios.h>
+#include <netsmb/smb_dev.h>
+
+sockaddr_any	SIZEOF_SOCKADDR_ANY
+
+sockaddr_in	SIZEOF_SOCKADDR_IN
+
+sockaddr_nb	SIZEOF_SOCKADDR_NB
+
+smbioc_ossn	SIZEOF_SMBIOC_OSSN
+	ioc_server
+	ioc_local
+	ioc_localcs
+	ioc_servercs
+	ioc_srvname
+	ioc_user
+	ioc_workgroup
+	ioc_password	IOC_SSN_PASSWD
+	ioc_opt		IOC_SSN_OPT
+	ioc_timeout
+	ioc_retrycount
+	ioc_owner	IOC_SSN_OWNER
+	ioc_group	IOC_SSN_GROUP
+	ioc_mode	IOC_SSN_MODE
+	ioc_rights	IOC_SSN_RIGHTS
+	ioc_intoklen
+	ioc_outtoklen
+	_ioc_intok
+	_ioc_outtok
+
+smbioc_oshare	SIZEOF_SMBIOC_OSHARE
+	ioc_share
+	ioc_password	IOC_SH_PASSWD
+	ioc_opt 	IOC_SH_OPT
+	ioc_stype
+	ioc_owner	IOC_SH_OWNER
+	ioc_group	IOC_SH_GROUP
+	ioc_mode	IOC_SH_MODE
+	ioc_rights	IOC_SH_RIGHTS
+
+smbioc_rq	SIZEOF_SMBIOC_RQ
+	ioc_cmd
+	ioc_twc
+	ioc_tbc
+	ioc_rpbufsz
+	ioc_rwc
+	ioc_rbc
+	ioc_errclass	IOC_RQ_ERRCLASS
+	ioc_serror	IOC_RQ_SERROR
+	ioc_error	IOC_RQ_ERROR
+	_ioc_twords
+	_ioc_tbytes
+	_ioc_rpbuf
+
+smbioc_t2rq	SIZEOF_SMBIOC_T2RQ
+	ioc_setup
+	ioc_setupcnt
+	ioc_name
+	ioc_tparamcnt
+	ioc_tdatacnt
+	ioc_rparamcnt
+	ioc_rdatacnt
+	ioc_errclass	IOC_T2_ERRCLASS
+	ioc_serror	IOC_T2_SERROR
+	ioc_error	IOC_T2_ERROR
+	ioc_rpflags2
+	_ioc_tparam
+	_ioc_tdata
+	_ioc_rparam
+	_ioc_rdata
+
+smbioc_flags	SIZEOF_SMBIOC_FLAGS
+	ioc_level
+	ioc_mask
+	ioc_flags
+
+smbioc_lookup	SIZEOF_SMBIOC_LOOKUP
+	ioc_level	IOC_LOOK_LEVEL
+	ioc_flags	IOC_LOOK_FLAGS
+	ioc_sh
+	ioc_ssn
+
+smbioc_rw	SIZEOF_SMBIOC_RW
+	ioc_fh
+	ioc_cnt
+	_ioc_offset
+	_ioc_base
+
+smbioc_pk	SIZEOF_SMBIOC_PK
+	pk_dom
+	pk_usr
+	pk_pass

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -518,8 +518,36 @@ sa_proto_delete_legacy(char *proto, sa_share_t share)
 	if (ops != NULL) {
 		if (ops->sa_delete_legacy != NULL)
 			ret = ops->sa_delete_legacy(share);
-	} else 	if (proto == NULL) {
-		ret = SA_INVALID_PROTOCOL;
+	} else {
+		if (proto != NULL)
+			ret = SA_NOT_IMPLEMENTED;
+		else
+			ret = SA_INVALID_PROTOCOL;
+	}
+	return (ret);
+}
+
+/*
+ * sa_proto_delete_section(proto, section)
+ *
+ * Remove the specified section from the protocol specific legacy files,
+ * if supported.
+ */
+
+int
+sa_proto_delete_section(char *proto, char *section)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = SA_OK;
+
+	if (ops != NULL) {
+		if (ops->sa_delete_proto_section != NULL)
+			ret = ops->sa_delete_proto_section(section);
+	} else {
+		if (proto != NULL)
+			ret = SA_NOT_IMPLEMENTED;
+		else
+			ret = SA_INVALID_PROTOCOL;
 	}
 	return (ret);
 }
@@ -540,6 +568,7 @@ sa_proto_change_notify(sa_share_t share, char *proto)
 		if (ops->sa_change_notify != NULL)
 			ret = ops->sa_change_notify(share);
 	} else	if (proto == NULL) {
+
 			ret = SA_INVALID_PROTOCOL;
 	}
 	return (ret);

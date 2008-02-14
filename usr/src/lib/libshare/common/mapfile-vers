@@ -29,6 +29,8 @@ SUNWprivate {
     global:
 	sa_get_optionset;
 	sa_create_property;
+	sa_create_section;
+	sa_set_section_attr;
 	sa_get_property;
 	sa_create_security;
 	sa_update_legacy;
@@ -45,6 +47,7 @@ SUNWprivate {
 	sa_get_group;
 	sa_get_security;
 	sa_get_protocol_property;
+	sa_get_protocol_section;
 	sa_add_share;
 	sa_valid_group_name;
 	sa_get_optionset_attr;
@@ -77,6 +80,7 @@ SUNWprivate {
 	sa_proto_valid_space;
 	sa_proto_space_alias;
 	sa_get_next_protocol_property;
+	sa_get_next_protocol_section;
 	sa_remove_share;
 	sa_is_share;
 	sa_get_share_description;
@@ -128,6 +132,7 @@ SUNWprivate {
 	sa_set_resource_description;
 	sa_get_resource_description;
 	sa_fix_resource_name;
+	sa_proto_delete_section;
 	sa_needs_refresh;
 	sa_get_zfs_handle;
 	sa_zfs_process_share;

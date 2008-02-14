@@ -145,7 +145,8 @@ SUBDIRS += \
 	ncad_addr	\
 	gss_mechs/mech_krb5	.WAIT	\
 	libkrb5	.WAIT	\
-	krb5	.WAIT
+	krb5	.WAIT	\
+	libsmbfs
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/smartcard
 SUBDIRS += \
@@ -304,6 +305,7 @@ MSGSUBDIRS=		\
 	libshell	\
 	libsldap	\
 	libslp		\
+	libsmbfs	\
 	libsmedia	\
 	libtsol		\
 	libuutil	\
@@ -521,6 +523,7 @@ sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
 libshell:	libast libcmd libdll libsocket libsecdb
 libsip:		libmd5
+libsmbfs:	libsocket libnsl libkrb5
 libsocket:	libnsl
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol
@@ -549,7 +552,7 @@ libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
 libsec:		libavl
 brand:		libc libsocket
-libshare:	libscf libzfs libuuid libfsmgt libsecdb
+libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
 libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \

@@ -262,6 +262,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/sharefs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/smbclnt/netsmb/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/smbclnt/smbfs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/sockfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1237,6 +1245,18 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/proc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/sharefs/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+NSMBLINT = -erroff=E_FUNC_RET_ALWAYS_IGNOR2 -erroff=E_FUNC_RET_MAYBE_IGNORED2
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/smbclnt/netsmb/%.c
+	@($(LHEAD) $(LINT.c) $(NSMBLINT) $< $(LTAIL))
+
+$(LINTS_DIR)/smbfs_smb.ln:	$(UTSBASE)/common/fs/smbclnt/smbfs/smbfs_smb.c
+	@($(LHEAD) $(LINT.c) $(NSMBLINT) \
+	    $(UTSBASE)/common/fs/smbclnt/smbfs/smbfs_smb.c $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/smbclnt/smbfs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/sockfs/%.c

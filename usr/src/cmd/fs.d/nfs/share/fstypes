@@ -1,3 +1,4 @@
 nfs NFS Utilities
 autofs AUTOFS Utilities
 cachefs CACHEFS Utilities
+smbfs CIFS Utilities

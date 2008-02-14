@@ -148,3 +148,4 @@ vnic 252
 pit_beep 253
 vscan 254
 softmac 255
+nsmb 256

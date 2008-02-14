@@ -947,6 +947,8 @@ usr/lib/fs/nfs/libshare_nfs.so		sparc
 usr/lib/fs/nfs/sparcv9/libshare_nfs.so	sparc
 usr/lib/fs/smb/libshare_smb.so		sparc
 usr/lib/fs/smb/sparcv9/libshare_smb.so	sparc
+usr/lib/fs/smbfs/libshare_smbfs.so	sparc
+usr/lib/fs/smbfs/sparcv9/libshare_smbfs.so	sparc
 usr/include/libshare_impl.h		sparc
 usr/include/scfutil.h			sparc
 usr/sbin/sparcv9/sharemgr		sparc
@@ -1121,3 +1123,11 @@ usr/include/libvscan.h	sparc
 #
 usr/lib/vscan/llib-lvscan	sparc
 usr/lib/vscan/llib-lvscan.ln	sparc
+#
+# libsmbfs is private
+#
+usr/lib/libsmbfs.so			sparc
+usr/lib/sparcv9/libsmbfs.so		sparc
+usr/lib/llib-lsmbfs			sparc
+usr/lib/llib-lsmbfs.ln			sparc
+usr/lib/sparcv9/llib-lsmbfs.ln		sparc

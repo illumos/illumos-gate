@@ -114,16 +114,16 @@ struct sa_plugin_ops sa_plugin_ops = {
 	smb_enable_share,
 	smb_disable_share,
 	smb_validate_property,
-	NULL,
-	NULL,
+	NULL,	/* valid_space */
+	NULL,	/* security_prop */
 	smb_parse_optstring,
 	smb_format_options,
 	smb_set_proto_prop,
 	smb_get_proto_set,
 	smb_get_status,
-	NULL,
-	NULL,
-	NULL,
+	NULL,	/* space_alias */
+	NULL,	/* update_legacy */
+	NULL,	/* delete_legacy */
 	smb_share_changed,
 	smb_enable_resource,
 	smb_disable_resource,
@@ -131,8 +131,9 @@ struct sa_plugin_ops sa_plugin_ops = {
 	smb_list_transient,
 	smb_resource_changed,
 	smb_rename_resource,
-	NULL,
-	NULL
+	NULL,	/* run_command */
+	NULL,	/* command_help */
+	NULL	/* delete_proto_section */
 };
 
 /*
