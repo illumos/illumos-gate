@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1497,6 +1497,15 @@ mir_rput(queue_t *q, mblk_t *mp)
 		mp->b_cont = NULL;
 
 		/*
+		 * Drop zero-length mblks to prevent unbounded kernel memory
+		 * consumption.
+		 */
+		if (MBLKL(mp) == 0) {
+			freeb(mp);
+			continue;
+		}
+
+		/*
 		 * If frag_len is negative, we're still in the process of
 		 * building frag_header -- try to complete it with this mblk.
 		 */
@@ -1506,11 +1515,10 @@ mir_rput(queue_t *q, mblk_t *mp)
 			frag_header += *mp->b_rptr++;
 		}
 
-		if (MBLKL(mp) == 0) {
+		if (MBLKL(mp) == 0 && frag_len < 0) {
 			/*
-			 * This was either a zero-length mblk or we consumed
-			 * it while trying to complete the fragment header.
-			 * In either case, free it and move on.
+			 * We consumed this mblk while trying to complete the
+			 * fragment header.  Free it and move on.
 			 */
 			freeb(mp);
 			continue;
