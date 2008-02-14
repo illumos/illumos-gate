@@ -46,9 +46,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.5";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.6";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.5";
+static char e1000g_version[] = "Driver Ver. 5.2.6";
 
 /*
  * Proto types for DDI entry points
@@ -2513,7 +2513,11 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		case e1000_82572:
 		case e1000_82573:
 		case e1000_80003es2lan:
-			*txflags = HCKSUM_IPHDRCKSUM | HCKSUM_INET_PARTIAL;
+			if (Adapter->tx_hcksum_enabled)
+				*txflags = HCKSUM_IPHDRCKSUM |
+				    HCKSUM_INET_PARTIAL;
+			else
+				return (B_FALSE);
 			break;
 
 		/*
@@ -2695,6 +2699,14 @@ e1000g_get_conf(struct e1000g *Adapter)
 	    e1000g_get_prop(Adapter, "tx_recycle_num",
 	    MIN_TX_RECYCLE_NUM, MAX_TX_RECYCLE_NUM,
 	    DEFAULT_TX_RECYCLE_NUM);
+
+	/*
+	 * Hardware checksum enable/disable parameter
+	 */
+	Adapter->tx_hcksum_enabled =
+	    e1000g_get_prop(Adapter, "tx_hcksum_enabled",
+	    0, 1, DEFAULT_TX_HCKSUM_ENABLE);
+
 }
 
 /*

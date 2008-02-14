@@ -166,6 +166,7 @@ extern "C" {
 						/* which is normally 0x040 */
 #define	DEFAULT_TBI_COMPAT_ENABLE	1	/* Enable SBP workaround */
 #define	DEFAULT_MSI_ENABLE		1	/* MSI Enable */
+#define	DEFAULT_TX_HCKSUM_ENABLE	1	/* Hardware checksum enable */
 
 #define	TX_DRAIN_TIME		(200)	/* # milliseconds xmit drain */
 
@@ -958,6 +959,7 @@ typedef struct e1000g {
 #endif
 
 	boolean_t msi_enabled;
+	boolean_t tx_hcksum_enabled;
 	int intr_type;
 	int intr_cnt;
 	int intr_cap;
