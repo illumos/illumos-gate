@@ -1057,15 +1057,14 @@ process_deferred_links(struct dca_impl *dcip, int flags)
  * Called in non-daemon mode to take a snap shot of the devinfo tree.
  * Then it calls the appropriate functions to build /devices and /dev.
  * It also flushes path_to_inst.
- * DINFOCACHE snapshot needs to be updated when devfsadm is run.
- * This will only happen if the flags that devfsadm uses matches the flags
- * that DINFOCACHE uses and that is why flags is set to
- * DI_CACHE_SNAPSHOT_FLAGS.
+ * Except in the devfsadm -i (single driver case), the flags used by devfsadm
+ * needs to match DI_CACHE_SNAPSHOT_FLAGS. That will make DINFOCACHE snapshot
+ * updated.
  */
 void
 process_devinfo_tree()
 {
-	uint_t		flags = DI_CACHE_SNAPSHOT_FLAGS;
+	uint_t		flags;
 	struct dca_impl	dci;
 	char		name[MAXNAMELEN];
 	char		*fcn = "process_devinfo_tree: ";
@@ -1095,6 +1094,7 @@ process_devinfo_tree()
 		dci.dci_flags |= DCA_LOAD_DRV;
 		(void) snprintf(name, sizeof (name), "%s", driver);
 		dci.dci_driver = name;
+		flags = DINFOCPYALL | DINFOPATH;
 
 	} else if (load_attach_drv == TRUE) {
 		/*
@@ -1107,7 +1107,7 @@ process_devinfo_tree()
 			vprint(CHATTY_MID, "%susing snapshot cache\n", fcn);
 		} else {
 			vprint(CHATTY_MID, "%sattaching all drivers\n", fcn);
-			flags |= DINFOFORCE;
+			flags = DI_CACHE_SNAPSHOT_FLAGS;
 			if (cleanup) {
 				/*
 				 * remove dangling entries from /etc/devices
