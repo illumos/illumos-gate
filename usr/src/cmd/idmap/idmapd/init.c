@@ -40,7 +40,6 @@
 #include <sys/stat.h>
 #include <rpcsvc/daemon_utils.h>
 
-static const char *me = "idmapd";
 
 int
 init_mapping_system()
@@ -91,8 +90,8 @@ load_config()
 
 	if (rc != 0)
 		/* Partial failure */
-		idmapdlog(LOG_ERR, "%s: Various errors occurred while loading "
-		    "the configuration; check the logs", me);
+		idmapdlog(LOG_ERR, "Various errors occurred while loading "
+		    "the configuration; check the logs");
 
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
@@ -113,7 +112,7 @@ load_config()
 		return (rc);
 	}
 
-	idmapdlog(LOG_DEBUG, "%s: Initial configuration loaded", me);
+	idmapdlog(LOG_DEBUG, "Initial configuration loaded");
 
 	return (0);
 }
@@ -131,9 +130,9 @@ reload_ad()
 	if (pgcfg->default_domain == NULL ||
 	    pgcfg->global_catalog == NULL) {
 		if (_idmapdstate.ad == NULL)
-			idmapdlog(LOG_ERR, "%s: AD lookup disabled", me);
+			idmapdlog(LOG_ERR, "AD lookup disabled");
 		else
-			idmapdlog(LOG_ERR, "%s: cannot update AD context", me);
+			idmapdlog(LOG_ERR, "cannot update AD context");
 		return (-1);
 	}
 
@@ -173,51 +172,45 @@ print_idmapdstate()
 	RDLOCK_CONFIG();
 
 	if (_idmapdstate.cfg == NULL) {
-		idmapdlog(LOG_INFO, "%s: Null configuration", me);
+		idmapdlog(LOG_INFO, "Null configuration");
 		UNLOCK_CONFIG();
 		return;
 	}
 
 	pgcfg = &_idmapdstate.cfg->pgcfg;
 
-	idmapdlog(LOG_DEBUG, "%s: list_size_limit=%llu", me,
-	    pgcfg->list_size_limit);
-	idmapdlog(LOG_DEBUG, "%s: default_domain=%s", me,
+	idmapdlog(LOG_DEBUG, "list_size_limit=%llu", pgcfg->list_size_limit);
+	idmapdlog(LOG_DEBUG, "default_domain=%s",
 	    CHECK_NULL(pgcfg->default_domain));
-	idmapdlog(LOG_DEBUG, "%s: domain_name=%s", me,
-	    CHECK_NULL(pgcfg->domain_name));
-	idmapdlog(LOG_DEBUG, "%s: machine_sid=%s", me,
-	    CHECK_NULL(pgcfg->machine_sid));
+	idmapdlog(LOG_DEBUG, "domain_name=%s", CHECK_NULL(pgcfg->domain_name));
+	idmapdlog(LOG_DEBUG, "machine_sid=%s", CHECK_NULL(pgcfg->machine_sid));
 	if (pgcfg->domain_controller == NULL ||
 	    pgcfg->domain_controller[0].host[0] == '\0') {
-		idmapdlog(LOG_DEBUG, "%s: No domain controllers known", me);
+		idmapdlog(LOG_DEBUG, "No domain controllers known");
 	} else {
 		for (i = 0; pgcfg->domain_controller[i].host[0] != '\0'; i++)
-			idmapdlog(LOG_DEBUG, "%s: domain_controller=%s port=%d",
-			    me, pgcfg->domain_controller[i].host,
+			idmapdlog(LOG_DEBUG, "domain_controller=%s port=%d",
+			    pgcfg->domain_controller[i].host,
 			    pgcfg->domain_controller[i].port);
 	}
-	idmapdlog(LOG_DEBUG, "%s: forest_name=%s", me,
-	    CHECK_NULL(pgcfg->forest_name));
-	idmapdlog(LOG_DEBUG, "%s: site_name=%s", me,
-	    CHECK_NULL(pgcfg->site_name));
+	idmapdlog(LOG_DEBUG, "forest_name=%s", CHECK_NULL(pgcfg->forest_name));
+	idmapdlog(LOG_DEBUG, "site_name=%s", CHECK_NULL(pgcfg->site_name));
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
-		idmapdlog(LOG_DEBUG, "%s: No global catalog servers known", me);
+		idmapdlog(LOG_DEBUG, "No global catalog servers known");
 	} else {
 		for (i = 0; pgcfg->global_catalog[i].host[0] != '\0'; i++)
-			idmapdlog(LOG_DEBUG, "%s: global_catalog=%s port=%d",
-			    me,
+			idmapdlog(LOG_DEBUG, "global_catalog=%s port=%d",
 			    pgcfg->global_catalog[i].host,
 			    pgcfg->global_catalog[i].port);
 	}
-	idmapdlog(LOG_DEBUG, "%s: ds_name_mapping_enabled=%s", me,
+	idmapdlog(LOG_DEBUG, "ds_name_mapping_enabled=%s",
 	    (pgcfg->ds_name_mapping_enabled == TRUE) ? "true" : "false");
-	idmapdlog(LOG_DEBUG, "%s: ad_unixuser_attr=%s", me,
+	idmapdlog(LOG_DEBUG, "ad_unixuser_attr=%s",
 	    CHECK_NULL(pgcfg->ad_unixuser_attr));
-	idmapdlog(LOG_DEBUG, "%s: ad_unixgroup_attr=%s", me,
+	idmapdlog(LOG_DEBUG, "ad_unixgroup_attr=%s",
 	    CHECK_NULL(pgcfg->ad_unixgroup_attr));
-	idmapdlog(LOG_DEBUG, "%s: nldap_winname_attr=%s", me,
+	idmapdlog(LOG_DEBUG, "nldap_winname_attr=%s",
 	    CHECK_NULL(pgcfg->nldap_winname_attr));
 
 	UNLOCK_CONFIG();
@@ -229,16 +222,14 @@ create_directory(const char *path, uid_t uid, gid_t gid)
 	int	rc;
 
 	if ((rc = mkdir(path, 0700)) < 0 && errno != EEXIST) {
-		idmapdlog(LOG_ERR,
-		    "%s: Error creating directory %s (%s)",
-		    me, path, strerror(errno));
+		idmapdlog(LOG_ERR, "Error creating directory %s (%s)",
+		    path, strerror(errno));
 		return (-1);
 	}
 
 	if (lchown(path, uid, gid) < 0) {
-		idmapdlog(LOG_ERR,
-		    "%s: Error creating directory %s (%s)",
-		    me, path, strerror(errno));
+		idmapdlog(LOG_ERR, "Error creating directory %s (%s)",
+		    path, strerror(errno));
 		if (rc == 0)
 			(void) rmdir(path);
 		return (-1);

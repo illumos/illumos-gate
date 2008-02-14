@@ -29,7 +29,6 @@
  * Database related utility routines
  */
 
-#include <atomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,8 +51,6 @@
 #include "schema.h"
 #include "nldaputils.h"
 
-
-static int degraded = 0;	/* whether the FMRI has been marked degraded */
 
 static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
 		sqlite_vm **, int *, int, const char ***);
@@ -176,77 +173,6 @@ idmap_get_tsd(void)
 	}
 
 	return (tsd);
-}
-
-static
-const char *
-get_fmri(void)
-{
-	static char *fmri = NULL;
-	static char buf[60];
-	char *s;
-
-	membar_consumer();
-	s = fmri;
-	if (s != NULL && *s == '\0')
-		return (NULL);
-	else if (s != NULL)
-		return (s);
-
-	if ((s = getenv("SMF_FMRI")) == NULL || strlen(s) >= sizeof (buf))
-		buf[0] = '\0';
-	else
-		(void) strlcpy(buf, s, sizeof (buf));
-
-	membar_producer();
-	fmri = buf;
-
-	return (get_fmri());
-}
-
-/*
- * Wrappers for smf_degrade/restore_instance()
- *
- * smf_restore_instance() is too heavy duty to be calling every time we
- * have a successful AD name<->SID lookup.
- */
-void
-degrade_svc(const char *reason)
-{
-	const char *fmri;
-
-	/*
-	 * If the config update thread is in a state where auto-discovery could
-	 * be re-tried, then this will make it try it -- a sort of auto-refresh.
-	 */
-	idmap_cfg_poke_updates();
-
-	if ((fmri = get_fmri()) == NULL)
-		return;
-
-	membar_consumer();
-	if (degraded)
-		return;
-	membar_producer();
-	degraded = 1;
-	(void) smf_degrade_instance(fmri, 0);
-	idmapdlog(LOG_ERR, "idmapd: Degraded operation (%s)", reason);
-}
-
-void
-restore_svc(void)
-{
-	const char *fmri;
-
-	if ((fmri = get_fmri()) == NULL)
-		return;
-
-	membar_consumer();
-	if (!degraded)
-		return;
-	(void) smf_restore_instance(fmri);
-	membar_producer();
-	degraded = 0;
 }
 
 /*
@@ -650,7 +576,7 @@ rollback:
  * Execute the given SQL statment without using any callbacks
  */
 idmap_retcode
-sql_exec_no_cb(sqlite *db, char *sql)
+sql_exec_no_cb(sqlite *db, const char *dbname, char *sql)
 {
 	char		*errmsg = NULL;
 	int		r;
@@ -660,8 +586,8 @@ sql_exec_no_cb(sqlite *db, char *sql)
 	assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
 
 	if (r != SQLITE_OK) {
-		idmapdlog(LOG_ERR, "Database error during %s (%s)", sql,
-		    CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "Database error on %s while executing %s "
+		    "(%s)", dbname, sql, CHECK_NULL(errmsg));
 		retcode = idmapd_string2stat(errmsg);
 		if (errmsg != NULL)
 			sqlite_freemem(errmsg);
@@ -750,7 +676,7 @@ out:
  * Generate and execute SQL statement for LIST RPC calls
  */
 idmap_retcode
-process_list_svc_sql(sqlite *db, char *sql, uint64_t limit,
+process_list_svc_sql(sqlite *db, const char *dbname, char *sql, uint64_t limit,
 		list_svc_cb cb, void *result)
 {
 	list_cb_data_t	cb_data;
@@ -772,8 +698,8 @@ process_list_svc_sql(sqlite *db, char *sql, uint64_t limit,
 
 	default:
 		retcode = IDMAP_ERR_INTERNAL;
-		idmapdlog(LOG_ERR, "Database error during %s (%s)", sql,
-		    CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "Database error on %s while executing "
+		    "%s (%s)", dbname, sql, CHECK_NULL(errmsg));
 		break;
 	}
 	if (errmsg != NULL)
@@ -987,7 +913,7 @@ add_namerule(sqlite *db, idmap_namerule *rule)
 		goto out;
 	}
 
-	retcode = sql_exec_no_cb(db, sql);
+	retcode = sql_exec_no_cb(db, IDMAP_DBNAME, sql);
 
 	if (retcode == IDMAP_ERR_OTHER)
 		retcode = IDMAP_ERR_CFG;
@@ -1006,7 +932,7 @@ flush_namerules(sqlite *db)
 {
 	idmap_stat	retcode;
 
-	retcode = sql_exec_no_cb(db, "DELETE FROM namerules;");
+	retcode = sql_exec_no_cb(db, IDMAP_DBNAME, "DELETE FROM namerules;");
 
 	return (retcode);
 }
@@ -1052,7 +978,7 @@ rm_namerule(sqlite *db, idmap_namerule *rule)
 	}
 
 
-	retcode = sql_exec_no_cb(db, sql);
+	retcode = sql_exec_no_cb(db, IDMAP_DBNAME, sql);
 
 out:
 	if (expr != NULL)
@@ -2827,7 +2753,7 @@ update_cache_pid2sid(lookup_state_t *state, sqlite *cache,
 		goto out;
 	}
 
-	retcode = sql_exec_no_cb(cache, sql);
+	retcode = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql);
 	if (retcode != IDMAP_SUCCESS)
 		goto out;
 
@@ -2855,7 +2781,7 @@ update_cache_pid2sid(lookup_state_t *state, sqlite *cache,
 		goto out;
 	}
 
-	retcode = sql_exec_no_cb(cache, sql);
+	retcode = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql);
 
 out:
 	if (sql != NULL)
@@ -2900,7 +2826,7 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 			goto out;
 		}
 
-		retcode = sql_exec_no_cb(cache, sql);
+		retcode = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql);
 		if (retcode != IDMAP_SUCCESS)
 			goto out;
 
@@ -2928,7 +2854,7 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 		goto out;
 	}
 
-	retcode = sql_exec_no_cb(cache, sql);
+	retcode = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql);
 	if (retcode != IDMAP_SUCCESS)
 		goto out;
 
@@ -2956,7 +2882,7 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 		goto out;
 	}
 
-	retcode = sql_exec_no_cb(cache, sql);
+	retcode = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql);
 
 out:
 	if (sql != NULL)

@@ -574,6 +574,8 @@ retry:
 	 * around the wrong number of times.
 	 */
 	for (;;) {
+		if (adh != NULL && adh->ld != NULL && !adh->dead)
+			break;
 		if (adh == NULL || (adh = adh->next) == NULL)
 			adh = host_head;
 		if (adh->owner == ad)

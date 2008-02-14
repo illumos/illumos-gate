@@ -53,9 +53,6 @@
 /*LINTLIBRARY*/
 
 
-static const char *me = "idmapd";
-
-
 static pthread_t update_thread_handle = 0;
 
 static int idmapd_ev_port = -1;
@@ -78,7 +75,7 @@ generate_machine_sid(char **machine_sid)
 
 	*machine_sid = calloc(1, MACHINE_SID_LEN);
 	if (*machine_sid == NULL) {
-		idmapdlog(LOG_ERR, "%s: Out of memory", me);
+		idmapdlog(LOG_ERR, "Out of memory");
 		return (-1);
 	}
 	(void) strcpy(*machine_sid, "S-1-5-21");
@@ -98,6 +95,23 @@ generate_machine_sid(char **machine_sid)
 	}
 
 	return (0);
+}
+
+static bool_t
+prop_exists(idmap_cfg_handles_t *handles, char *name)
+{
+	bool_t exists = FALSE;
+
+	scf_property_t *scf_prop = scf_property_create(handles->main);
+	scf_value_t *value = scf_value_create(handles->main);
+
+	if (scf_pg_get_property(handles->config_pg, name, scf_prop) == 0)
+		exists = TRUE;
+
+	scf_value_destroy(value);
+	scf_property_destroy(scf_prop);
+
+	return (exists);
 }
 
 /* Check if in the case of failure the original value of *val is preserved */
@@ -130,8 +144,8 @@ get_val_int(idmap_cfg_handles_t *handles, char *name,
 		rc = scf_value_get_integer(value, val);
 		break;
 	default:
-		idmapdlog(LOG_ERR, "%s: Invalid scf integer type (%d)",
-		    me, type);
+		idmapdlog(LOG_ERR, "Invalid scf integer type (%d)",
+		    type);
 		rc = -1;
 		break;
 	}
@@ -164,7 +178,7 @@ scf_value2string(scf_value_t *value)
 			buf_size *= 2;
 			buf = (char *)realloc(buf, buf_size * sizeof (char));
 			if (!buf) {
-				idmapdlog(LOG_ERR, "%s: Out of memory", me);
+				idmapdlog(LOG_ERR, "Out of memory");
 				rc = -1;
 				goto destruction;
 			}
@@ -212,8 +226,8 @@ restart:
 
 	if (scf_iter_property_values(iter, scf_prop) < 0) {
 		idmapdlog(LOG_ERR,
-		    "%s: scf_iter_property_values(%s) failed: %s",
-		    me, name, scf_strerror(scf_error()));
+		    "scf_iter_property_values(%s) failed: %s",
+		    name, scf_strerror(scf_error()));
 		goto destruction;
 	}
 
@@ -235,7 +249,7 @@ restart:
 	}
 
 	if ((servers = calloc(count + 1, sizeof (*servers))) == NULL) {
-		idmapdlog(LOG_ERR, "%s: Out of memory", me);
+		idmapdlog(LOG_ERR, "Out of memory");
 		goto destruction;
 	}
 
@@ -299,8 +313,8 @@ get_val_astring(idmap_cfg_handles_t *handles, char *name, char **val)
 
 	if (scf_property_get_value(scf_prop, value) < 0) {
 		idmapdlog(LOG_ERR,
-		    "%s: scf_property_get_value(%s) failed: %s",
-		    me, name, scf_strerror(scf_error()));
+		    "scf_property_get_value(%s) failed: %s",
+		    name, scf_strerror(scf_error()));
 		rc = -1;
 		goto destruction;
 	}
@@ -337,38 +351,38 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 	    (value = scf_value_create(handles->main)) == NULL ||
 	    (tx = scf_transaction_create(handles->main)) == NULL ||
 	    (ent = scf_entry_create(handles->main)) == NULL) {
-		idmapdlog(LOG_ERR, "%s: Unable to set property %s: %s",
-		    me, name, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "Unable to set property %s",
+		    name, scf_strerror(scf_error()));
 		goto destruction;
 	}
 
 	for (i = 0; i < MAX_TRIES && (ret == -2 || ret == 0); i++) {
 		if (scf_transaction_start(tx, handles->config_pg) == -1) {
 			idmapdlog(LOG_ERR,
-			    "%s: scf_transaction_start(%s) failed: %s",
-			    me, name, scf_strerror(scf_error()));
+			    "scf_transaction_start(%s) failed: %s",
+			    name, scf_strerror(scf_error()));
 			goto destruction;
 		}
 
 		if (scf_transaction_property_new(tx, ent, name,
 		    SCF_TYPE_ASTRING) < 0) {
 			idmapdlog(LOG_ERR,
-			    "%s: scf_transaction_property_new() failed: %s",
-			    me, scf_strerror(scf_error()));
+			    "scf_transaction_property_new() failed: %s",
+			    scf_strerror(scf_error()));
 			goto destruction;
 		}
 
 		if (scf_value_set_astring(value, val) == -1) {
 			idmapdlog(LOG_ERR,
-			    "%s: scf_value_set_astring() failed: %s",
-			    me, scf_strerror(scf_error()));
+			    "scf_value_set_astring() failed: %s",
+			    scf_strerror(scf_error()));
 			goto destruction;
 		}
 
 		if (scf_entry_add_value(ent, value) == -1) {
 			idmapdlog(LOG_ERR,
-			    "%s: scf_entry_add_value() failed: %s",
-			    me, scf_strerror(scf_error()));
+			    "scf_entry_add_value() failed: %s",
+			    scf_strerror(scf_error()));
 			goto destruction;
 		}
 
@@ -382,12 +396,12 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 			 * retry tx.
 			 */
 			idmapdlog(LOG_WARNING,
-			    "%s: scf_transaction_commit(%s) failed - Retry: %s",
-			    me, name, scf_strerror(scf_error()));
+			    "scf_transaction_commit(%s) failed - Retry: %s",
+			    name, scf_strerror(scf_error()));
 			if (scf_pg_update(handles->config_pg) == -1) {
 				idmapdlog(LOG_ERR,
-				    "%s: scf_pg_update() failed: %s",
-				    me, scf_strerror(scf_error()));
+				    "scf_pg_update() failed: %s",
+				    scf_strerror(scf_error()));
 				goto destruction;
 			}
 			scf_transaction_reset(tx);
@@ -399,8 +413,8 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 		rc = 0;
 	else if (ret != -2)
 		idmapdlog(LOG_ERR,
-		    "%s: scf_transaction_commit(%s) failed: %s",
-		    me, name, scf_strerror(scf_error()));
+		    "scf_transaction_commit(%s) failed: %s",
+		    name, scf_strerror(scf_error()));
 
 destruction:
 	scf_value_destroy(value);
@@ -422,7 +436,7 @@ update_value(char **value, char **new, char *name)
 		return (FALSE);
 	}
 
-	idmapdlog(LOG_INFO, "%s: change %s=%s", me, name, CHECK_NULL(*new));
+	idmapdlog(LOG_INFO, "change %s=%s", name, CHECK_NULL(*new));
 	if (*value != NULL)
 		free(*value);
 	*value = *new;
@@ -454,13 +468,13 @@ update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
 
 	if (*value == NULL) {
 		/* We're unsetting this DS property */
-		idmapdlog(LOG_INFO, "%s: change %s=<none>", me, name);
+		idmapdlog(LOG_INFO, "change %s=<none>", name);
 		return (TRUE);
 	}
 
 	/* List all the new DSs */
 	for (i = 0; (*value)[i].host[0] != '\0'; i++)
-		idmapdlog(LOG_INFO, "%s: change %s=%s port=%d", me, name,
+		idmapdlog(LOG_INFO, "change %s=%s port=%d", name,
 		    (*value)[i].host, (*value)[i].port);
 	return (TRUE);
 }
@@ -568,18 +582,18 @@ retry:
 		 */
 		(void) unlink(IDMAP_CACHEDIR "/ccache");
 		/* HUP is the refresh method, so re-read SMF config */
-		(void) idmapdlog(LOG_INFO, "idmapd: SMF refresh");
+		(void) idmapdlog(LOG_INFO, "SMF refresh");
 		WRLOCK_CONFIG();
 		(void) idmap_cfg_unload(&_idmapdstate.cfg->pgcfg);
 		rc = idmap_cfg_load(&_idmapdstate.cfg->handles,
 		    &_idmapdstate.cfg->pgcfg, 1);
 		if (rc < -1)
 			(void) idmapdlog(LOG_ERR,
-			    "idmapd: Various errors re-loading configuration "
+			    "Various errors re-loading configuration "
 			    "will cause AD lookups to fail");
 		else if (rc == -1)
 			(void) idmapdlog(LOG_WARNING,
-			    "idmapd: Various errors re-loading configuration "
+			    "Various errors re-loading configuration "
 			    "may cause AD lookups to fail");
 		UNLOCK_CONFIG();
 		return (TRUE);
@@ -632,34 +646,34 @@ idmap_cfg_update_thread(void *arg)
 		new_cfg.default_domain = ad_disc_get_DomainName(ad_ctx);
 		if (new_cfg.default_domain == NULL)
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Default Domain", me);
+			    "unable to discover Default Domain");
 
 		new_cfg.domain_name = ad_disc_get_DomainName(ad_ctx);
 		if (new_cfg.domain_name == NULL)
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Domain Name", me);
+			    "unable to discover Domain Name");
 
 		new_cfg.domain_controller =
 		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
 		if (new_cfg.domain_controller == NULL)
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Domain Controller", me);
+			    "unable to discover Domain Controller");
 
 		new_cfg.forest_name = ad_disc_get_ForestName(ad_ctx);
 		if (new_cfg.forest_name == NULL)
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Forest Name", me);
+			    "unable to discover Forest Name");
 
 		new_cfg.site_name = ad_disc_get_SiteName(ad_ctx);
 		if (new_cfg.site_name == NULL)
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Site Name", me);
+			    "unable to discover Site Name");
 
 		new_cfg.global_catalog =
 		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE);
 		if (new_cfg.global_catalog == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Global Catalog", me);
+			    "unable to discover Global Catalog");
 			poke_is_interesting = 1;
 		} else {
 			poke_is_interesting = 0;
@@ -670,9 +684,9 @@ idmap_cfg_update_thread(void *arg)
 		    new_cfg.domain_controller == NULL &&
 		    new_cfg.forest_name == NULL &&
 		    new_cfg.global_catalog == NULL) {
-			idmapdlog(LOG_NOTICE, "%s: Could not auto-discover AD "
+			idmapdlog(LOG_NOTICE, "Could not auto-discover AD "
 			    "domain and forest names nor domain controllers "
-			    "and global catalog servers", me);
+			    "and global catalog servers");
 		}
 
 		/*
@@ -681,7 +695,7 @@ idmap_cfg_update_thread(void *arg)
 		WRLOCK_CONFIG();
 
 		if (live_cfg->list_size_limit != new_cfg.list_size_limit) {
-			idmapdlog(LOG_INFO, "%s: change list_size=%d", me,
+			idmapdlog(LOG_INFO, "change list_size=%d",
 			    new_cfg.list_size_limit);
 			live_cfg->list_size_limit = new_cfg.list_size_limit;
 		}
@@ -740,24 +754,22 @@ idmap_cfg_update_thread(void *arg)
 int
 idmap_cfg_start_updates(void)
 {
-	const char *me = "idmap_cfg_start_updates";
-
 	if ((idmapd_ev_port = port_create()) < 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to create event port: %s",
-		    me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to create event port: %s",
+		    strerror(errno));
 		return (-1);
 	}
 
 	if ((rt_sock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to open routing socket: %s",
-		    me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to open routing socket: %s",
+		    strerror(errno));
 		(void) close(idmapd_ev_port);
 		return (-1);
 	}
 
 	if (fcntl(rt_sock, F_SETFL, O_NDELAY|O_NONBLOCK) < 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to set routing socket flags: %s",
-		    me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to set routing socket flags: %s",
+		    strerror(errno));
 		(void) close(rt_sock);
 		(void) close(idmapd_ev_port);
 		return (-1);
@@ -765,8 +777,8 @@ idmap_cfg_start_updates(void)
 
 	if (port_associate(idmapd_ev_port, PORT_SOURCE_FD,
 	    rt_sock, POLLIN, NULL) != 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to associate the routing "
-		    "socket with the event port: %s", me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to associate the routing "
+		    "socket with the event port: %s", strerror(errno));
 		(void) close(rt_sock);
 		(void) close(idmapd_ev_port);
 		return (-1);
@@ -774,8 +786,8 @@ idmap_cfg_start_updates(void)
 
 	if ((errno = pthread_create(&update_thread_handle, NULL,
 	    idmap_cfg_update_thread, NULL)) != 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to start update thread: %s",
-		    me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to start update thread: %s",
+		    strerror(errno));
 		(void) port_dissociate(idmapd_ev_port, PORT_SOURCE_FD, rt_sock);
 		(void) close(rt_sock);
 		(void) close(idmapd_ev_port);
@@ -794,6 +806,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	int errors = 0;
 	uint8_t bool_val;
 	char *str = NULL;
+	bool_t new_debug_mode;
 	ad_disc_t ad_ctx = handles->ad_ctx;
 
 	pgcfg->list_size_limit = 0;
@@ -814,17 +827,28 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	ad_disc_refresh(handles->ad_ctx);
 
 	if (scf_pg_update(handles->config_pg) < 0) {
-		idmapdlog(LOG_ERR, "%s: scf_pg_update() failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf_pg_update() failed: %s",
+		    scf_strerror(scf_error()));
 		rc = -2;
 		goto exit;
 	}
 
 	if (scf_pg_update(handles->general_pg) < 0) {
-		idmapdlog(LOG_ERR, "%s: scf_pg_update() failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf_pg_update() failed: %s",
+		    scf_strerror(scf_error()));
 		rc = -2;
 		goto exit;
+	}
+
+	new_debug_mode = prop_exists(handles, "debug");
+	if (_idmapdstate.debug_mode != new_debug_mode) {
+		if (_idmapdstate.debug_mode == FALSE) {
+			_idmapdstate.debug_mode = new_debug_mode;
+			idmapdlog(LOG_DEBUG, "debug mode enabled");
+		} else {
+			idmapdlog(LOG_DEBUG, "debug mode disabled");
+			_idmapdstate.debug_mode = new_debug_mode;
+		}
 	}
 
 	rc = get_val_int(handles, "list_size_limit",
@@ -873,17 +897,16 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 			pgcfg->default_domain = strdup(pgcfg->domain_name);
 			if (str != NULL) {
 				idmapdlog(LOG_WARNING,
-				    "%s: Ignoring obsolete, undocumented "
-				    "config/mapping_domain property", me);
+				    "Ignoring obsolete, undocumented "
+				    "config/mapping_domain property");
 			}
 		} else if (str != NULL) {
 			pgcfg->default_domain = strdup(str);
 			pgcfg->dflt_dom_set_in_smf = TRUE;
 			idmapdlog(LOG_WARNING,
-			    "%s: The config/mapping_domain property is "
+			    "The config/mapping_domain property is "
 			    "obsolete; support for it will be removed, "
-			    "please use config/default_domain instead",
-			    me);
+			    "please use config/default_domain instead");
 		}
 	}
 
@@ -968,10 +991,9 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 
 		if (pgcfg->nldap_winname_attr != NULL) {
 			idmapdlog(LOG_ERR,
-			    "%s: native LDAP based name mapping not supported "
+			    "native LDAP based name mapping not supported "
 			    "at this time. Please unset "
-			    "config/nldap_winname_attr and restart idmapd.",
-			    me);
+			    "config/nldap_winname_attr and restart idmapd.");
 			rc = -3;
 			goto exit;
 		}
@@ -979,11 +1001,11 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		if (pgcfg->ad_unixuser_attr == NULL &&
 		    pgcfg->ad_unixgroup_attr == NULL) {
 			idmapdlog(LOG_ERR,
-			    "%s: If config/ds_name_mapping_enabled property "
+			    "If config/ds_name_mapping_enabled property "
 			    "is set to true then atleast one of the following "
 			    "name mapping attributes must be specified. "
 			    "(config/ad_unixuser_attr OR "
-			    "config/ad_unixgroup_attr)", me);
+			    "config/ad_unixgroup_attr)");
 			rc = -3;
 			goto exit;
 		}
@@ -1000,7 +1022,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		pgcfg->default_domain = ad_disc_get_DomainName(ad_ctx);
 		if (pgcfg->default_domain == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Default Domain", me);
+			    "unable to discover Default Domain");
 		}
 	}
 
@@ -1008,7 +1030,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		pgcfg->domain_name = ad_disc_get_DomainName(ad_ctx);
 		if (pgcfg->domain_name == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Domain Name", me);
+			    "unable to discover Domain Name");
 		}
 	}
 
@@ -1017,7 +1039,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
 		if (pgcfg->domain_controller == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Domain Controller", me);
+			    "unable to discover Domain Controller");
 		}
 	}
 
@@ -1025,7 +1047,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		pgcfg->forest_name = ad_disc_get_ForestName(ad_ctx);
 		if (pgcfg->forest_name == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Forest Name", me);
+			    "unable to discover Forest Name");
 		}
 	}
 
@@ -1033,7 +1055,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		pgcfg->site_name = ad_disc_get_SiteName(ad_ctx);
 		if (pgcfg->site_name == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Site Name", me);
+			    "unable to discover Site Name");
 		}
 	}
 
@@ -1042,7 +1064,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE);
 		if (pgcfg->global_catalog == NULL) {
 			idmapdlog(LOG_INFO,
-			    "%s: unable to discover Global Catalog", me);
+			    "unable to discover Global Catalog");
 		}
 	}
 
@@ -1066,7 +1088,7 @@ idmap_cfg_init()
 	/* First the smf repository handles: */
 	idmap_cfg_t *cfg = calloc(1, sizeof (idmap_cfg_t));
 	if (!cfg) {
-		idmapdlog(LOG_ERR, "%s: Out of memory", me);
+		idmapdlog(LOG_ERR, "Out of memory");
 		return (NULL);
 	}
 	handles = &cfg->handles;
@@ -1074,14 +1096,14 @@ idmap_cfg_init()
 	(void) pthread_mutex_init(&handles->mutex, NULL);
 
 	if (!(handles->main = scf_handle_create(SCF_VERSION))) {
-		idmapdlog(LOG_ERR, "%s: scf_handle_create() failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf_handle_create() failed: %s",
+		    scf_strerror(scf_error()));
 		goto error;
 	}
 
 	if (scf_handle_bind(handles->main) < 0) {
-		idmapdlog(LOG_ERR, "%s: scf_handle_bind() failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf_handle_bind() failed: %s",
+		    scf_strerror(scf_error()));
 		goto error;
 	}
 
@@ -1089,8 +1111,8 @@ idmap_cfg_init()
 	    !(handles->instance = scf_instance_create(handles->main)) ||
 	    !(handles->config_pg = scf_pg_create(handles->main)) ||
 	    !(handles->general_pg = scf_pg_create(handles->main))) {
-		idmapdlog(LOG_ERR, "%s: scf handle creation failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf handle creation failed: %s",
+		    scf_strerror(scf_error()));
 		goto error;
 	}
 
@@ -1102,15 +1124,15 @@ idmap_cfg_init()
 	    handles->config_pg,		/* pg */
 	    NULL,				/* prop */
 	    SCF_DECODE_FMRI_EXACT) < 0) {
-		idmapdlog(LOG_ERR, "%s: scf_handle_decode_fmri() failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf_handle_decode_fmri() failed: %s",
+		    scf_strerror(scf_error()));
 		goto error;
 	}
 
 	if (scf_service_get_pg(handles->service,
 	    GENERAL_PG, handles->general_pg) < 0) {
-		idmapdlog(LOG_ERR, "%s: scf_service_get_pg() failed: %s",
-		    me, scf_strerror(scf_error()));
+		idmapdlog(LOG_ERR, "scf_service_get_pg() failed: %s",
+		    scf_strerror(scf_error()));
 		goto error;
 	}
 

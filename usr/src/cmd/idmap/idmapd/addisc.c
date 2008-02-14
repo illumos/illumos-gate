@@ -120,8 +120,6 @@
 #define	GC_ALL_A_NAME_FSTR "gc._msdcs.%s."
 
 
-#define	me	"idmapd"
-
 enum ad_item_type {
 		AD_TYPE_INVALID = 0,	/* The value is not valid */
 		AD_TYPE_FIXED,		/* The value was fixed by caller */
@@ -300,8 +298,8 @@ find_subnets()
 	lifrp = &lifr;
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to open IPv4 socket for "
-		    "listing network interfaces (%s)", me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to open IPv4 socket for "
+		    "listing network interfaces (%s)", strerror(errno));
 		return (NULL);
 	}
 
@@ -309,14 +307,14 @@ find_subnets()
 	lifn.lifn_flags = 0;
 	if (ioctl(sock, SIOCGLIFNUM, (char *)&lifn) < 0) {
 		idmapdlog(LOG_ERR,
-		    "%s: Failed to find the number of network interfaces (%s)",
-		    me, strerror(errno));
+		    "Failed to find the number of network interfaces (%s)",
+		    strerror(errno));
 		close(sock);
 		return (NULL);
 	}
 
 	if (lifn.lifn_count < 1) {
-		idmapdlog(LOG_ERR, "%s: No IPv4 network interfaces found", me);
+		idmapdlog(LOG_ERR, "No IPv4 network interfaces found");
 		close(sock);
 		return (NULL);
 	}
@@ -327,14 +325,14 @@ find_subnets()
 	lifc.lifc_buf = malloc(lifc.lifc_len);
 
 	if (lifc.lifc_buf == NULL) {
-		idmapdlog(LOG_ERR, "%s: Out of memory", me);
+		idmapdlog(LOG_ERR, "Out of memory");
 		close(sock);
 		return (NULL);
 	}
 
 	if (ioctl(sock, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		idmapdlog(LOG_ERR, "%s: Failed to list network interfaces (%s)",
-		    me, strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to list network interfaces (%s)",
+		    strerror(errno));
 		free(lifc.lifc_buf);
 		close(sock);
 		return (NULL);
@@ -618,18 +616,18 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		    msg.buf, sizeof (msg.buf));
 	}
 
-	idmapdlog(LOG_DEBUG, "%s: %sing DNS for SRV RRs named '%s'", me,
+	idmapdlog(LOG_DEBUG, "%sing DNS for SRV RRs named '%s'",
 	    query_type, svc_name);
 
 	if (len < 0) {
-		idmapdlog(LOG_ERR, "%s: DNS %s for '%s' failed (%s)", me,
+		idmapdlog(LOG_ERR, "DNS %s for '%s' failed (%s)",
 		    query_type, svc_name, hstrerror(state->res_h_errno));
 		return (NULL);
 	}
 	if (len > sizeof (msg.buf)) {
-		idmapdlog(LOG_ERR, "%s: DNS query %ib message doesn't fit"
+		idmapdlog(LOG_ERR, "DNS query %ib message doesn't fit"
 		    " into %ib buffer",
-		    me, len, sizeof (msg.buf));
+		    len, sizeof (msg.buf));
 		return (NULL);
 	}
 
@@ -642,8 +640,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 
 	for (cnt = qdcount; cnt > 0; --cnt) {
 		if ((len = dn_skipname(ptr, eom)) < 0) {
-			idmapdlog(LOG_ERR,
-			    "%s: DNS query invalid message format", me);
+			idmapdlog(LOG_ERR, "DNS query invalid message format");
 			return (NULL);
 		}
 		ptr += len + QFIXEDSZ;
@@ -660,8 +657,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		len = dn_expand(msg.buf, eom, ptr, namebuf,
 		    sizeof (namebuf));
 		if (len < 0) {
-			idmapdlog(LOG_ERR,
-			    "%s: DNS query invalid message format", me);
+			idmapdlog(LOG_ERR, "DNS query invalid message format");
 			return (NULL);
 		}
 		if (rrname != NULL && *rrname == NULL)
@@ -672,8 +668,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		NS_GET32(rttl, ptr);
 		NS_GET16(size, ptr);
 		if ((end = ptr + size) > eom) {
-			idmapdlog(LOG_ERR,
-			    "%s: DNS query invalid message format", me);
+			idmapdlog(LOG_ERR, "DNS query invalid message format");
 			return (NULL);
 		}
 
@@ -688,18 +683,16 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		len = dn_expand(msg.buf, eom, ptr, srv->host,
 		    sizeof (srv->host));
 		if (len < 0) {
-			idmapdlog(LOG_ERR, "%s: DNS query invalid SRV record",
-			    me);
+			idmapdlog(LOG_ERR, "DNS query invalid SRV record");
 			return (NULL);
 		}
 
 		if (rttl < *ttl)
 			*ttl = rttl;
 
-		idmapdlog(LOG_DEBUG,
-		    "%s: Found %s %d IN SRV [%d][%d] %s:%d", me,
-		    namebuf, rttl, srv->priority, srv->weight,
-		    srv->host, srv->port);
+		idmapdlog(LOG_DEBUG, "Found %s %d IN SRV [%d][%d] %s:%d",
+		    namebuf, rttl, srv->priority, srv->weight, srv->host,
+		    srv->port);
 
 		/* 3. move ptr to the end of current record */
 
@@ -763,8 +756,8 @@ ldap_lookup_entry_attr(LDAP **ld, ad_disc_ds_t *domainControllers,
 			*ld = ldap_init(domainControllers[i].host,
 			    domainControllers[i].port);
 			if (*ld == NULL) {
-				idmapdlog(LOG_INFO, "%s: Couldn't connect to "
-				    "AD DC %s:%d (%s)", me,
+				idmapdlog(LOG_INFO, "Couldn't connect to "
+				    "AD DC %s:%d (%s)",
 				    domainControllers[i].host,
 				    domainControllers[i].port,
 				    strerror(errno));
@@ -791,8 +784,8 @@ ldap_lookup_entry_attr(LDAP **ld, ad_disc_ds_t *domainControllers,
 
 			if (rc == LDAP_SUCCESS)
 				break;
-			idmapdlog(LOG_INFO, "%s: LDAP SASL bind to %s:%d "
-			    "failed (%s)", me, domainControllers[i].host,
+			idmapdlog(LOG_INFO, "LDAP SASL bind to %s:%d "
+			    "failed (%s)", domainControllers[i].host,
 			    domainControllers[i].port, ldap_err2string(rc));
 			(void) ldap_unbind(*ld);
 			*ld = NULL;
@@ -800,9 +793,9 @@ ldap_lookup_entry_attr(LDAP **ld, ad_disc_ds_t *domainControllers,
 	}
 
 	if (*ld == NULL) {
-		idmapdlog(LOG_ERR, "%s: Couldn't open and SASL bind LDAP "
+		idmapdlog(LOG_NOTICE, "Couldn't open and SASL bind LDAP "
 		    "connections to any domain controllers; discovery of "
-		    "some items will fail", me);
+		    "some items will fail");
 		return (NULL);
 	}
 
@@ -953,7 +946,7 @@ validate_DomainName(ad_disc_t ctx)
 	free(srvname);
 
 	if (dname == NULL) {
-		idmapdlog(LOG_ERR, "%s: Out of memory", me);
+		idmapdlog(LOG_ERR, "Out of memory");
 		return;
 	}
 

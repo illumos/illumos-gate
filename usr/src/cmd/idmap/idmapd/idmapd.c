@@ -30,6 +30,7 @@
  */
 
 #include "idmapd.h"
+#include <atomic.h>
 #include <signal.h>
 #include <rpc/pmap_clnt.h> /* for pmap_unset */
 #include <string.h> /* strcmp */
@@ -59,10 +60,6 @@ static void	term_handler(int);
 static void	init_idmapd();
 static void	fini_idmapd();
 
-#ifndef SIG_PF
-#define	SIG_PF void(*)(int)
-#endif
-
 #define	_RPCSVC_CLOSEDOWN 120
 
 int _rpcsvcstate = _IDLE;	/* Set when a request is serviced */
@@ -73,10 +70,7 @@ idmapd_state_t	_idmapdstate;
 SVCXPRT *xprt = NULL;
 
 static int dfd = -1;		/* our door server fildes, for unregistration */
-
-#ifdef DEBUG
-#define	RPC_SVC_FG
-#endif
+static int degraded = 0;	/* whether the FMRI has been marked degraded */
 
 /*
  * This is needed for mech_krb5 -- we run as daemon, yes, but we want
@@ -112,9 +106,20 @@ app_krb5_user_uid(void)
 static void
 term_handler(int sig)
 {
-	(void) idmapdlog(LOG_INFO, "idmapd: Terminating.");
+	idmapdlog(LOG_INFO, "Terminating.");
 	fini_idmapd();
 	_exit(0);
+}
+
+/*ARGSUSED*/
+static void
+usr1_handler(int sig)
+{
+	bool_t saved_debug_mode = _idmapdstate.debug_mode;
+
+	_idmapdstate.debug_mode = TRUE;
+	print_idmapdstate();
+	_idmapdstate.debug_mode = saved_debug_mode;
 }
 
 static int pipe_fd = -1;
@@ -174,7 +179,6 @@ daemonize_start(void)
 	(void) setsid();
 	(void) umask(0077);
 	openlog("idmap", LOG_PID, LOG_DAEMON);
-	_idmapdstate.daemon_mode = TRUE;
 	return (0);
 }
 
@@ -183,18 +187,17 @@ int
 main(int argc, char **argv)
 {
 	int c;
-#ifdef RPC_SVC_FG
-	bool_t daemonize = FALSE;
-#else
-	bool_t daemonize = TRUE;
-#endif
 
-	while ((c = getopt(argc, argv, "d")) != EOF) {
+	_idmapdstate.daemon_mode = TRUE;
+	_idmapdstate.debug_mode = FALSE;
+	while ((c = getopt(argc, argv, "d")) != -1) {
 		switch (c) {
 			case 'd':
-				daemonize = FALSE;
+				_idmapdstate.daemon_mode = FALSE;
 				break;
 			default:
+				fprintf(stderr, "Usage: /usr/lib/idmapd");
+				return (SMF_EXIT_ERR_CONFIG);
 				break;
 		}
 	}
@@ -204,17 +207,17 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	if (is_system_labeled() && getzoneid() != GLOBAL_ZONEID) {
-		(void) idmapdlog(LOG_ERR,
-		    "idmapd: with Trusted Extensions idmapd runs only in the "
+		idmapdlog(LOG_ERR,
+		    "with Trusted Extensions idmapd runs only in the "
 		    "global zone");
 		exit(1);
 	}
 
 	(void) mutex_init(&_svcstate_lock, USYNC_THREAD, NULL);
 
-	if (daemonize == TRUE) {
+	if (_idmapdstate.daemon_mode == TRUE) {
 		if (daemonize_start() < 0) {
-			(void) perror("idmapd: unable to daemonize");
+			(void) idmapdlog(LOG_ERR, "unable to daemonize");
 			exit(-1);
 		}
 	} else
@@ -226,20 +229,21 @@ main(int argc, char **argv)
 
 	/* signal handlers that should run only after we're initialized */
 	(void) sigset(SIGTERM, term_handler);
+	(void) sigset(SIGUSR1, usr1_handler);
 	(void) sigset(SIGHUP, idmap_cfg_hup_handler);
 
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,
 	    DAEMON_UID, DAEMON_GID,
 	    PRIV_PROC_AUDIT, PRIV_FILE_DAC_READ,
 	    (char *)NULL) == -1) {
-		(void) idmapdlog(LOG_ERR, "idmapd: unable to drop privileges");
+		idmapdlog(LOG_ERR, "unable to drop privileges");
 		exit(1);
 	}
 
 	__fini_daemon_priv(PRIV_PROC_FORK, PRIV_PROC_EXEC, PRIV_PROC_SESSION,
 	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, (char *)NULL);
 
-	if (daemonize == TRUE)
+	if (_idmapdstate.daemon_mode == TRUE)
 		daemonize_ready();
 
 	/* With doors RPC this just wastes this thread, oh well */
@@ -267,44 +271,38 @@ init_idmapd()
 	(void) unlink(IDMAP_CACHEDIR "/ccache");
 	putenv("KRB5CCNAME=" IDMAP_CACHEDIR "/ccache");
 
-	memset(&_idmapdstate, 0, sizeof (_idmapdstate));
-
 	if (sysinfo(SI_HOSTNAME, _idmapdstate.hostname,
 	    sizeof (_idmapdstate.hostname)) == -1) {
 		error = errno;
-		idmapdlog(LOG_ERR,
-		    "idmapd: unable to determine hostname, error: %d",
+		idmapdlog(LOG_ERR, "unable to determine hostname, error: %d",
 		    error);
 		exit(1);
 	}
 
 	if ((error = init_mapping_system()) < 0) {
-		idmapdlog(LOG_ERR,
-		    "idmapd: unable to initialize mapping system");
+		idmapdlog(LOG_ERR, "unable to initialize mapping system");
 		exit(error < -2 ? SMF_EXIT_ERR_CONFIG : 1);
 	}
 
 	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, connmaxrec);
 	if (xprt == NULL) {
-		idmapdlog(LOG_ERR,
-		    "idmapd: unable to create door RPC service");
+		idmapdlog(LOG_ERR, "unable to create door RPC service");
 		goto errout;
 	}
 
 	if (!svc_control(xprt, SVCSET_CONNMAXREC, &connmaxrec)) {
-		idmapdlog(LOG_ERR,
-		    "idmapd: unable to limit RPC request size");
+		idmapdlog(LOG_ERR, "unable to limit RPC request size");
 		goto errout;
 	}
 
 	dfd = xprt->xp_fd;
 
 	if (dfd == -1) {
-		idmapdlog(LOG_ERR, "idmapd: unable to register door");
+		idmapdlog(LOG_ERR, "unable to register door");
 		goto errout;
 	}
 	if ((error = idmap_reg(dfd)) != 0) {
-		idmapdlog(LOG_ERR, "idmapd: unable to register door (%s)",
+		idmapdlog(LOG_ERR, "unable to register door (%s)",
 		    strerror(errno));
 		goto errout;
 	}
@@ -312,8 +310,8 @@ init_idmapd()
 	if ((error = allocids(_idmapdstate.new_eph_db,
 	    8192, &_idmapdstate.next_uid,
 	    8192, &_idmapdstate.next_gid)) != 0) {
-		idmapdlog(LOG_ERR, "idmapd: unable to allocate ephemeral IDs "
-		    "(%s)", strerror(errno));
+		idmapdlog(LOG_ERR, "unable to allocate ephemeral IDs (%s)",
+		    strerror(errno));
 		_idmapdstate.next_uid = _idmapdstate.limit_uid = SENTINEL_PID;
 		_idmapdstate.next_gid = _idmapdstate.limit_gid = SENTINEL_PID;
 	} else {
@@ -339,16 +337,98 @@ fini_idmapd()
 		svc_destroy(xprt);
 }
 
+static
+const char *
+get_fmri(void)
+{
+	static char *fmri = NULL;
+	static char buf[60];
+	char *s;
+
+	membar_consumer();
+	s = fmri;
+	if (s != NULL && *s == '\0')
+		return (NULL);
+	else if (s != NULL)
+		return (s);
+
+	if ((s = getenv("SMF_FMRI")) == NULL || strlen(s) >= sizeof (buf))
+		buf[0] = '\0';
+	else
+		(void) strlcpy(buf, s, sizeof (buf));
+
+	membar_producer();
+	fmri = buf;
+
+	return (get_fmri());
+}
+
+/*
+ * Wrappers for smf_degrade/restore_instance()
+ *
+ * smf_restore_instance() is too heavy duty to be calling every time we
+ * have a successful AD name<->SID lookup.
+ */
+void
+degrade_svc(const char *reason)
+{
+	const char *fmri;
+
+	/*
+	 * If the config update thread is in a state where auto-discovery could
+	 * be re-tried, then this will make it try it -- a sort of auto-refresh.
+	 */
+	idmap_cfg_poke_updates();
+
+	membar_consumer();
+	if (degraded)
+		return;
+	membar_producer();
+	degraded = 1;
+
+	if ((fmri = get_fmri()) != NULL)
+		(void) smf_degrade_instance(fmri, 0);
+
+	idmapdlog(LOG_ERR, "Degraded operation (%s)", reason);
+}
+
+void
+restore_svc(void)
+{
+	const char *fmri;
+
+	membar_consumer();
+	if (!degraded)
+		return;
+
+	if ((fmri = get_fmri()) == NULL)
+		(void) smf_restore_instance(fmri);
+
+	membar_producer();
+	degraded = 0;
+	idmapdlog(LOG_INFO, "Normal operation restored");
+}
+
 void
 idmapdlog(int pri, const char *format, ...)
 {
 	va_list args;
 
 	va_start(args, format);
-	if (_idmapdstate.daemon_mode == FALSE) {
+
+	if (_idmapdstate.debug_mode == TRUE ||
+	    _idmapdstate.daemon_mode == FALSE) {
 		(void) vfprintf(stderr, format, args);
 		(void) fprintf(stderr, "\n");
 	}
+
+	/*
+	 * We don't want to fill up the logs with useless messages when
+	 * we're degraded, but we still want to log.
+	 */
+	if (degraded)
+		pri = LOG_DEBUG;
+
 	(void) vsyslog(pri, format, args);
 	va_end(args);
 }

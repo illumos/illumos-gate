@@ -57,8 +57,8 @@
 		return (1);\
 	}
 
-#define	PROCESS_LIST_SVC_SQL(rcode, db, sql, limit, cb, res, len)\
-	rcode = process_list_svc_sql(db, sql, limit, cb, res);\
+#define	PROCESS_LIST_SVC_SQL(rcode, db, dbname, sql, limit, cb, res, len)\
+	rcode = process_list_svc_sql(db, dbname, sql, limit, cb, res);\
 	if (rcode == IDMAP_ERR_BUSY)\
 		res->retcode = IDMAP_ERR_BUSY;\
 	else if (rcode == IDMAP_SUCCESS && len == 0)\
@@ -350,7 +350,8 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	state.sid2pid_done = state.pid2sid_done = TRUE;
 
 	/* Update cache in a single transaction */
-	if (sql_exec_no_cb(cache, "BEGIN TRANSACTION;") != IDMAP_SUCCESS)
+	if (sql_exec_no_cb(cache, IDMAP_CACHENAME, "BEGIN TRANSACTION;")
+	    != IDMAP_SUCCESS)
 		goto out;
 
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
@@ -373,9 +374,11 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/* Commit if we have at least one successful update */
 	if (state.sid2pid_done == FALSE || state.pid2sid_done == FALSE)
-		(void) sql_exec_no_cb(cache, "COMMIT TRANSACTION;");
+		(void) sql_exec_no_cb(cache, IDMAP_CACHENAME,
+		    "COMMIT TRANSACTION;");
 	else
-		(void) sql_exec_no_cb(cache, "END TRANSACTION;");
+		(void) sql_exec_no_cb(cache, IDMAP_CACHENAME,
+		    "END TRANSACTION;");
 
 out:
 	cleanup_lookup_state(&state);
@@ -519,8 +522,8 @@ idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit,
 	}
 
 	/* Execute the SQL statement and update the return buffer */
-	PROCESS_LIST_SVC_SQL(retcode, cache, sql, limit, list_mappings_cb,
-	    result, result->mappings.mappings_len);
+	PROCESS_LIST_SVC_SQL(retcode, cache, IDMAP_CACHENAME, sql, limit,
+	    list_mappings_cb, result, result->mappings.mappings_len);
 
 out:
 	if (sql)
@@ -679,8 +682,8 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 	}
 
 	/* Execute the SQL statement and update the return buffer */
-	PROCESS_LIST_SVC_SQL(retcode, db, sql, limit, list_namerules_cb,
-	    result, result->rules.rules_len);
+	PROCESS_LIST_SVC_SQL(retcode, db, IDMAP_DBNAME, sql, limit,
+	    list_namerules_cb, result, result->rules.rules_len);
 
 out:
 	if (expr)
@@ -701,36 +704,31 @@ verify_rules_auth(struct svc_req *rqstp)
 	uid_t		uid;
 	char		buf[1024];
 	struct passwd	pwd;
-	const char	*me = "verify_rules_auth";
 
 	if (svc_getcallerucred(rqstp->rq_xprt, &uc) != 0) {
-		idmapdlog(LOG_ERR,
-		    "%s: svc_getcallerucred failed (errno=%d)",
-		    me, errno);
+		idmapdlog(LOG_ERR, "svc_getcallerucred failed during "
+		    "authorization (%s)", strerror(errno));
 		return (-1);
 	}
 
 	uid = ucred_geteuid(uc);
 	if (uid == (uid_t)-1) {
-		idmapdlog(LOG_ERR,
-		    "%s: ucred_geteuid failed (errno=%d)",
-		    me, errno);
+		idmapdlog(LOG_ERR, "ucred_geteuid failed during "
+		    "authorization (%s)", strerror(errno));
 		ucred_free(uc);
 		return (-1);
 	}
 
 	if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) == NULL) {
-		idmapdlog(LOG_ERR,
-		    "%s: getpwuid_r(%u) failed (errno=%d)",
-		    me, uid, errno);
+		idmapdlog(LOG_ERR, "getpwuid_r(%u) failed during "
+		    "authorization (%s)", uid, strerror(errno));
 		ucred_free(uc);
 		return (-1);
 	}
 
 	if (chkauthattr(IDMAP_RULES_AUTH, pwd.pw_name) != 1) {
-		idmapdlog(LOG_INFO,
-		    "%s: %s does not have authorization.",
-		    me, pwd.pw_name);
+		idmapdlog(LOG_INFO, "%s is not authorized (%s)",
+		    pwd.pw_name, IDMAP_RULES_AUTH);
 		ucred_free(uc);
 		return (-1);
 	}
@@ -781,7 +779,7 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
 	if (res->retcode != IDMAP_SUCCESS)
 		goto out;
 
-	res->retcode = sql_exec_no_cb(db, "BEGIN TRANSACTION;");
+	res->retcode = sql_exec_no_cb(db, IDMAP_DBNAME, "BEGIN TRANSACTION;");
 	if (res->retcode != IDMAP_SUCCESS)
 		goto out;
 	trans = TRUE;
@@ -826,12 +824,14 @@ out:
 	if (trans) {
 		if (res->retcode == IDMAP_SUCCESS) {
 			res->retcode =
-			    sql_exec_no_cb(db, "COMMIT TRANSACTION;");
+			    sql_exec_no_cb(db, IDMAP_DBNAME,
+			    "COMMIT TRANSACTION;");
 			if (res->retcode !=  IDMAP_SUCCESS)
 				res->error_index = -2;
 		}
 		else
-			(void) sql_exec_no_cb(db, "ROLLBACK TRANSACTION;");
+			(void) sql_exec_no_cb(db, IDMAP_DBNAME,
+			    "ROLLBACK TRANSACTION;");
 	}
 
 	res->retcode = idmap_stat4prot(res->retcode);

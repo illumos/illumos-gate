@@ -73,7 +73,8 @@ typedef enum idmap_namemap_mode {
 typedef struct idmapd_state {
 	rwlock_t	rwlk_cfg;		/* config lock */
 	idmap_cfg_t	*cfg;			/* config */
-	bool_t		daemon_mode;		/* daemon mode? yes/no */
+	bool_t		daemon_mode;
+	bool_t		debug_mode;
 	char		hostname[MAX_NAME_LEN];	/* my hostname */
 	uid_t		next_uid;
 	gid_t		next_gid;
@@ -186,7 +187,6 @@ typedef struct msg_table {
 #define	IDMAP_CACHEDIR	"/var/run/idmap"
 #define	IDMAP_DBNAME	IDMAP_DBDIR "/idmap.db"
 #define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
-#define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
 
 #define	EMPTY_STRING(str)	(str == NULL || *str == 0)
 
@@ -233,7 +233,7 @@ extern int		init_dbs();
 extern void		fini_dbs();
 extern idmap_retcode	get_db_handle(sqlite **);
 extern idmap_retcode	get_cache_handle(sqlite **);
-extern idmap_retcode	sql_exec_no_cb(sqlite *, char *);
+extern idmap_retcode	sql_exec_no_cb(sqlite *, const char *, char *);
 extern idmap_retcode	add_namerule(sqlite *, idmap_namerule *);
 extern idmap_retcode	rm_namerule(sqlite *, idmap_namerule *);
 extern idmap_retcode	flush_namerules(sqlite *);
@@ -243,8 +243,8 @@ extern char 		*tolower_u8(const char *);
 extern idmap_retcode	gen_sql_expr_from_rule(idmap_namerule *, char **);
 extern idmap_retcode	validate_list_cb_data(list_cb_data_t *, int,
 				char **, int, uchar_t **, size_t);
-extern idmap_retcode	process_list_svc_sql(sqlite *, char *, uint64_t,
-				list_svc_cb, void *);
+extern idmap_retcode	process_list_svc_sql(sqlite *, const char *, char *,
+				uint64_t, list_svc_cb, void *);
 extern idmap_retcode	sid2pid_first_pass(lookup_state_t *, sqlite *,
 				idmap_mapping *, idmap_id_res *);
 extern idmap_retcode	sid2pid_second_pass(lookup_state_t *, sqlite *,
