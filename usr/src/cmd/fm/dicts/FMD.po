@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -29,7 +29,7 @@
 # General-purpose messages
 #
 msgid "syslog-msgs-message-template"
-msgstr "SUNW-MSG-ID: %s, TYPE: %s, VER: 1, SEVERITY: %s\nEVENT-TIME: %s\nPLATFORM: %s, PSN: %s, HOSTNAME: %s\nSOURCE: %s, REV: %s\nEVENT-ID: %s\nDESC: %s\nAUTO-RESPONSE: %s\nIMPACT: %s\nREC-ACTION: %s\n"
+msgstr "SUNW-MSG-ID: %s, TYPE: %s, VER: 1, SEVERITY: %s\nEVENT-TIME: %s\nPLATFORM: %s, CSN: %s, HOSTNAME: %s\nSOURCE: %s, REV: %s\nEVENT-ID: %s\nDESC: %s\nAUTO-RESPONSE: %s\nIMPACT: %s\nREC-ACTION: %s\n"
 #
 # Fault-related messages
 #

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -404,7 +404,7 @@ fm_banner(void)
 	    fm_msgid, tod.tv_sec, tod.tv_nsec, (u_longlong_t)now);
 
 	console_printf(
-"PLATFORM: %s, PSN: -, HOSTNAME: %s\n"
+"PLATFORM: %s, CSN: -, HOSTNAME: %s\n"
 "SOURCE: %s, REV: %s %s\n",
 	    platform, utsname.nodename, utsname.sysname,
 	    utsname.release, utsname.version);

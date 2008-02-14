@@ -2027,7 +2027,7 @@ sun4v_print_chassis_serial_no()
 		return;
 
 	log_printf("\n");
-	log_printf("Product Serial Number");
+	log_printf("Chassis Serial Number");
 	log_printf("\n");
 	log_printf("---------------------\n");
 	err = picl_get_propval_by_name(chassish, PICL_PROP_SERIAL_NUMBER,
