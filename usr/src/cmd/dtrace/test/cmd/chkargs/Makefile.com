@@ -49,7 +49,7 @@ all: $(PROG)
 clean lint:
 
 clobber:
-	$(RM) $(PROG)
+	$(RM) $(PROG) $(ROOTISAEXEC)
 
 $(PROG): ../$(PROG).c
 	$(LINK.c) -o $@ ../$(PROG).c $(LDLIBS)
@@ -66,7 +66,8 @@ $(ROOTBIN64)/%: %
 	$(INS.file)
 
 $(ROOTISAEXEC):
-	$(RM) $@; $(CP) -p /usr/lib/isaexec $@
+	$(RM) $@;
+	$(CP) -p $(ISAEXEC) $@
 
 $(ROOTBIN)/%: $(ROOTBIN)
 	$(INS.dir)

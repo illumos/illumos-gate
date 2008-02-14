@@ -23,11 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
-include $(SRC)/cmd/Makefile.cmd
+include ../Makefile.com
 
-SUBDIRS = $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-include ../../Makefile.subdirs
+install: $(ROOTPROG32) $(ROOTISAEXEC)
