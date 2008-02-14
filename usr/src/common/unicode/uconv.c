@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,11 @@ static const uchar_t remaining_bytes_tbl[0x100] = {
  * the first byte of a UTF-8 character.  Index is remaining bytes at above of
  * the character.
  */
-static const uchar_t masks_tbl[6] = { 0x00, 0x1f, 0x0f, 0x07, 0x03, 0x01 };
+#ifdef	_KERNEL
+const uchar_t u8_masks_tbl[6] = { 0x00, 0x1f, 0x0f, 0x07, 0x03, 0x01 };
+#else
+static const uchar_t u8_masks_tbl[6] = { 0x00, 0x1f, 0x0f, 0x07, 0x03, 0x01 };
+#endif	/* _KERNEL */
 
 /*
  * The following two vectors are to provide valid minimum and
@@ -716,7 +720,7 @@ uconv_u8tou16(const uchar_t *u8s, size_t *utf8len,
 				return (EILSEQ);
 
 			first_b = hi;
-			hi = hi & masks_tbl[remaining_bytes];
+			hi = hi & u8_masks_tbl[remaining_bytes];
 
 			for (; remaining_bytes > 0; remaining_bytes--) {
 				/*
@@ -816,7 +820,7 @@ uconv_u8tou32(const uchar_t *u8s, size_t *utf8len,
 				return (EILSEQ);
 
 			first_b = hi;
-			hi = hi & masks_tbl[remaining_bytes];
+			hi = hi & u8_masks_tbl[remaining_bytes];
 
 			for (; remaining_bytes > 0; remaining_bytes--) {
 				if (u8l >= *utf8len)

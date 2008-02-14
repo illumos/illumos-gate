@@ -1595,6 +1595,14 @@ NXGE_HCALL_OBJS =	\
 #
 KICONV_EMEA_OBJS += kiconv_emea.o
 
+KICONV_JA_OBJS += kiconv_ja.o
+
+KICONV_KO_OBJS += kiconv_cck_common.o kiconv_ko.o
+
+KICONV_SC_OBJS += kiconv_cck_common.o kiconv_sc.o
+
+KICONV_TC_OBJS += kiconv_cck_common.o kiconv_tc.o
+
 #
 #	AAC module
 #

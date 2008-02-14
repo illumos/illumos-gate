@@ -458,5 +458,13 @@ l none kernel/sys/amd64/rpcmod=../../../kernel/strmod/amd64/rpcmod
 f none kernel/sys/amd64/semsys 755 root sys
 f none kernel/sys/amd64/shmsys 755 root sys
 f none kernel/kiconv/kiconv_emea 755 root sys
+f none kernel/kiconv/kiconv_ja 755 root sys
+f none kernel/kiconv/kiconv_ko 755 root sys
+f none kernel/kiconv/kiconv_sc 755 root sys
+f none kernel/kiconv/kiconv_tc 755 root sys
 d none kernel/kiconv/amd64 755 root sys
 f none kernel/kiconv/amd64/kiconv_emea 755 root sys
+f none kernel/kiconv/amd64/kiconv_ja 755 root sys
+f none kernel/kiconv/amd64/kiconv_ko 755 root sys
+f none kernel/kiconv/amd64/kiconv_sc 755 root sys
+f none kernel/kiconv/amd64/kiconv_tc 755 root sys

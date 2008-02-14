@@ -258,3 +258,7 @@ d none kernel/devname/sparcv9 755 root sys
 f none kernel/devname/sparcv9/sdev_nsconfig_mod 755 root sys
 d none kernel/kiconv/sparcv9 755 root sys
 f none kernel/kiconv/sparcv9/kiconv_emea 755 root sys
+f none kernel/kiconv/sparcv9/kiconv_ja 755 root sys
+f none kernel/kiconv/sparcv9/kiconv_ko 755 root sys
+f none kernel/kiconv/sparcv9/kiconv_sc 755 root sys
+f none kernel/kiconv/sparcv9/kiconv_tc 755 root sys

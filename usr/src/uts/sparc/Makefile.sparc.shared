@@ -468,4 +468,4 @@ DEVNAME_KMODS	+= sdev_nsconfig_mod
 #
 #	kiconv modules (/kernel/kiconv):
 #
-KICONV_KMODS	+= kiconv_emea
+KICONV_KMODS	+= kiconv_emea kiconv_ja kiconv_ko kiconv_sc kiconv_tc

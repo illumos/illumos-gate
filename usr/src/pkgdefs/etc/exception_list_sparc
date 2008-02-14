@@ -982,9 +982,32 @@ usr/include/sqlite/sqlite.h		sparc
 #
 # Private/Internal kiconv header files. Do not ship.
 #
+usr/include/sys/kiconv_big5_utf8.h	sparc
+usr/include/sys/kiconv_cck_common.h	sparc
+usr/include/sys/kiconv_cp950hkscs_utf8.h	sparc
 usr/include/sys/kiconv_emea1.h		sparc
 usr/include/sys/kiconv_emea2.h		sparc
+usr/include/sys/kiconv_euckr_utf8.h	sparc
+usr/include/sys/kiconv_euctw_utf8.h	sparc
+usr/include/sys/kiconv_gb18030_utf8.h	sparc
+usr/include/sys/kiconv_gb2312_utf8.h	sparc
+usr/include/sys/kiconv_hkscs_utf8.h	sparc
+usr/include/sys/kiconv_ja.h		sparc
+usr/include/sys/kiconv_ja_jis_to_unicode.h	sparc
+usr/include/sys/kiconv_ja_unicode_to_jis.h	sparc
+usr/include/sys/kiconv_ko.h		sparc
 usr/include/sys/kiconv_latin1.h		sparc
+usr/include/sys/kiconv_sc.h		sparc
+usr/include/sys/kiconv_tc.h		sparc
+usr/include/sys/kiconv_uhc_utf8.h	sparc
+usr/include/sys/kiconv_utf8_big5.h	sparc
+usr/include/sys/kiconv_utf8_cp950hkscs.h	sparc
+usr/include/sys/kiconv_utf8_euckr.h	sparc
+usr/include/sys/kiconv_utf8_euctw.h	sparc
+usr/include/sys/kiconv_utf8_gb18030.h	sparc
+usr/include/sys/kiconv_utf8_gb2312.h	sparc
+usr/include/sys/kiconv_utf8_hkscs.h	sparc
+usr/include/sys/kiconv_utf8_uhc.h	sparc
 #
 # This header file is shared only between the power commands and
 # ppm/srn modules # and should not be in any package

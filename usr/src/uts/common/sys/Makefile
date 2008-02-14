@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -288,9 +288,32 @@ CHKHDRS=			\
 	kdi.h			\
 	kdi_impl.h		\
 	kiconv.h		\
+	kiconv_big5_utf8.h	\
+	kiconv_cck_common.h	\
+	kiconv_cp950hkscs_utf8.h	\
 	kiconv_emea1.h		\
 	kiconv_emea2.h		\
+	kiconv_euckr_utf8.h	\
+	kiconv_euctw_utf8.h	\
+	kiconv_gb18030_utf8.h	\
+	kiconv_gb2312_utf8.h	\
+	kiconv_hkscs_utf8.h	\
+	kiconv_ja.h		\
+	kiconv_ja_jis_to_unicode.h	\
+	kiconv_ja_unicode_to_jis.h	\
+	kiconv_ko.h		\
 	kiconv_latin1.h		\
+	kiconv_sc.h		\
+	kiconv_tc.h		\
+	kiconv_uhc_utf8.h	\
+	kiconv_utf8_big5.h	\
+	kiconv_utf8_cp950hkscs.h	\
+	kiconv_utf8_euckr.h	\
+	kiconv_utf8_euctw.h	\
+	kiconv_utf8_gb18030.h	\
+	kiconv_utf8_gb2312.h	\
+	kiconv_utf8_hkscs.h	\
+	kiconv_utf8_uhc.h	\
 	kidmap.h		\
 	klwp.h			\
 	kmdb.h			\
