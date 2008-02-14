@@ -3271,10 +3271,15 @@ upgrade_one(zpool_handle_t *zhp, void *data)
 	}
 
 	cur_version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
-	if (cur_version >= cbp->cb_version) {
+	if (cur_version > cbp->cb_version) {
 		(void) printf(gettext("Pool '%s' is already formatted "
-		    "using more current version '%d'.\n"), zpool_get_name(zhp),
-		    cur_version);
+		    "using more current version '%llu'.\n"),
+		    zpool_get_name(zhp), cur_version);
+		return (0);
+	}
+	if (cur_version == cbp->cb_version) {
+		(void) printf(gettext("Pool '%s' is already formatted "
+		    "using the current version.\n"), zpool_get_name(zhp));
 		return (0);
 	}
 

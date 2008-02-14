@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -477,6 +477,13 @@ static void arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes);
 #define	HDR_L2_WRITE_HEAD(hdr)	((hdr)->b_flags & ARC_L2_WRITE_HEAD)
 
 /*
+ * Other sizes
+ */
+
+#define	HDR_SIZE ((int64_t)sizeof (arc_buf_hdr_t))
+#define	L2HDR_SIZE ((int64_t)sizeof (l2arc_buf_hdr_t))
+
+/*
  * Hash table routines
  */
 
@@ -738,7 +745,7 @@ hdr_cons(void *vbuf, void *unused, int kmflag)
 	cv_init(&buf->b_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&buf->b_freeze_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	ARCSTAT_INCR(arcstat_hdr_size, sizeof (arc_buf_hdr_t));
+	ARCSTAT_INCR(arcstat_hdr_size, HDR_SIZE);
 	return (0);
 }
 
@@ -756,7 +763,7 @@ hdr_dest(void *vbuf, void *unused)
 	cv_destroy(&buf->b_cv);
 	mutex_destroy(&buf->b_freeze_lock);
 
-	ARCSTAT_INCR(arcstat_hdr_size, -sizeof (arc_buf_hdr_t));
+	ARCSTAT_INCR(arcstat_hdr_size, -HDR_SIZE);
 }
 
 /*
@@ -3406,17 +3413,15 @@ arc_fini(void)
 static void
 l2arc_hdr_stat_add(void)
 {
-	ARCSTAT_INCR(arcstat_l2_hdr_size, sizeof (arc_buf_hdr_t) +
-	    sizeof (l2arc_buf_hdr_t));
-	ARCSTAT_INCR(arcstat_hdr_size, -sizeof (arc_buf_hdr_t));
+	ARCSTAT_INCR(arcstat_l2_hdr_size, HDR_SIZE + L2HDR_SIZE);
+	ARCSTAT_INCR(arcstat_hdr_size, -HDR_SIZE);
 }
 
 static void
 l2arc_hdr_stat_remove(void)
 {
-	ARCSTAT_INCR(arcstat_l2_hdr_size, -sizeof (arc_buf_hdr_t) -
-	    sizeof (l2arc_buf_hdr_t));
-	ARCSTAT_INCR(arcstat_hdr_size, sizeof (arc_buf_hdr_t));
+	ARCSTAT_INCR(arcstat_l2_hdr_size, -(HDR_SIZE + L2HDR_SIZE));
+	ARCSTAT_INCR(arcstat_hdr_size, HDR_SIZE);
 }
 
 /*
