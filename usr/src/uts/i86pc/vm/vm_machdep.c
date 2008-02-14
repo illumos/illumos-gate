@@ -2596,8 +2596,10 @@ page_get_contigpages(
 	}
 	plist = NULL;
 	minctg = howmany(npages, sgllen);
-	mcpl = NULL;
 	while (npages > sgllen || getone) {
+		if (minctg > npages)
+			minctg = npages;
+		mcpl = NULL;
 		/*
 		 * We could just want unconstrained but contig pages.
 		 */
@@ -2651,10 +2653,11 @@ page_get_contigpages(
 		 * list we will return for this request.
 		 */
 		page_list_concat(&plist, &mcpl);
-		getone = 0;
 		npages -= minctg;
 		*npagesp = npages;
 		sgllen--;
+		if (getone)
+			break;
 	}
 	return (plist);
 fail:
