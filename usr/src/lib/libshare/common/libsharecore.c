@@ -753,7 +753,7 @@ add_syntax_comment(xmlNodePtr root, char *line, char *err, int todfstab)
 
 	node = xmlNewChild(root, NULL, (xmlChar *)"error", (xmlChar *)line);
 	if (node != NULL)
-		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)err);
+		(void) xmlSetProp(node, (xmlChar *)"type", (xmlChar *)err);
 	if (todfstab)
 		sa_comment_line(line, err);
 }

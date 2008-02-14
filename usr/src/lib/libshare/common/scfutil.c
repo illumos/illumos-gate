@@ -260,9 +260,10 @@ sa_extract_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 		return (ret);
 
 	if (proto != NULL)
-		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
+		(void) xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
 	if (sectype != NULL)
-		xmlSetProp(node, (xmlChar *)"sectype", (xmlChar *)sectype);
+		(void) xmlSetProp(node, (xmlChar *)"sectype",
+		    (xmlChar *)sectype);
 	/*
 	 * Have node to work with so iterate over the properties
 	 * in the pg and create option sub nodes.
@@ -303,7 +304,7 @@ sa_extract_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 					 * recurse. Use xmlAddChild
 					 * directly, instead.
 					 */
-					xmlAddChild(node,
+					(void) xmlAddChild(node,
 					    (xmlNodePtr) saprop);
 				}
 			}
@@ -360,7 +361,7 @@ sa_extract_attrs(xmlNodePtr root, scfutilhandle_t *handle,
 		if (scf_property_get_value(prop, value) == 0) {
 			if (scf_value_get_astring(value, valuestr,
 			    vallen) >= 0) {
-				xmlSetProp(root, (xmlChar *)"state",
+				(void) xmlSetProp(root, (xmlChar *)"state",
 				    (xmlChar *)valuestr);
 			}
 		}
@@ -370,7 +371,7 @@ sa_extract_attrs(xmlNodePtr root, scfutilhandle_t *handle,
 		if (scf_property_get_value(prop, value) == 0) {
 			if (scf_value_get_astring(value, valuestr,
 			    vallen) > 0) {
-				xmlSetProp(root, (xmlChar *)"zfs",
+				(void) xmlSetProp(root, (xmlChar *)"zfs",
 				    (xmlChar *)valuestr);
 			}
 		}
@@ -440,10 +441,11 @@ _sa_make_resource(xmlNodePtr node, char *valuestr)
 	}
 	node = xmlNewChild(node, NULL, (xmlChar *)"resource", NULL);
 	if (node != NULL) {
-		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)name);
-		xmlSetProp(node, (xmlChar *)"id", (xmlChar *)idx);
+		(void) xmlSetProp(node, (xmlChar *)"name", (xmlChar *)name);
+		(void) xmlSetProp(node, (xmlChar *)"id", (xmlChar *)idx);
 		/* SMF values are always persistent */
-		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)"persist");
+		(void) xmlSetProp(node, (xmlChar *)"type",
+		    (xmlChar *)"persist");
 		if (description != NULL && strlen(description) > 0) {
 			(void) xmlNewChild(node, NULL, (xmlChar *)"description",
 			    (xmlChar *)description);
@@ -513,8 +515,9 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 		 * stored in the share "id" property. We use this
 		 * later.
 		 */
-		xmlSetProp(node, (xmlChar *)"id", (xmlChar *)id);
-		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)"persist");
+		(void) xmlSetProp(node, (xmlChar *)"id", (xmlChar *)id);
+		(void) xmlSetProp(node, (xmlChar *)"type",
+		    (xmlChar *)"persist");
 	}
 
 	if (iter == NULL || value == NULL || prop == NULL || name == NULL)
@@ -551,7 +554,7 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 			 * If a share attr, then simple -
 			 * usually path and id name
 			 */
-			xmlSetProp(node, (xmlChar *)name,
+			(void) xmlSetProp(node, (xmlChar *)name,
 			    (xmlChar *)valuestr);
 		} else if (strcmp(name, "resource") == 0) {
 			/*
@@ -797,7 +800,7 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 			node = xmlNewChild(root, NULL, (xmlChar *)"security",
 			    NULL);
 			if (node != NULL)
-				xmlSetProp(node, (xmlChar *)"sectype",
+				(void) xmlSetProp(node, (xmlChar *)"sectype",
 				    (xmlChar *)sectype);
 		}
 	}
@@ -806,7 +809,7 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 		goto out;
 	}
 
-	xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
+	(void) xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
 	/* now find the properties */
 	iter = scf_iter_create(handle->handle);
 	value = scf_value_create(handle->handle);
@@ -897,7 +900,7 @@ sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
 			ret = SA_NO_MEMORY;
 			goto out;
 		}
-		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)buff);
+		(void) xmlSetProp(node, (xmlChar *)"name", (xmlChar *)buff);
 		if (strcmp(buff, "default") == 0)
 			is_default = B_TRUE;
 
@@ -1079,9 +1082,9 @@ sa_extract_defaults(xmlNodePtr root, scfutilhandle_t *handle,
 			node = xmlNewChild(root, NULL, (xmlChar *)"legacy",
 			    NULL);
 			if (node != NULL) {
-				xmlSetProp(node, (xmlChar *)"timestamp",
+				(void) xmlSetProp(node, (xmlChar *)"timestamp",
 				    (xmlChar *)valuestr);
-				xmlSetProp(node, (xmlChar *)"path",
+				(void) xmlSetProp(node, (xmlChar *)"path",
 				    (xmlChar *)SA_LEGACY_DFSTAB);
 			}
 		}
@@ -1679,7 +1682,7 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 			/* slipped by */
 			char shname[SA_SHARE_UUID_BUFLEN];
 			generate_unique_sharename(shname);
-			xmlSetProp((xmlNodePtr)share, (xmlChar *)"id",
+			(void) xmlSetProp((xmlNodePtr)share, (xmlChar *)"id",
 			    (xmlChar *)shname);
 			sharename = strdup(shname);
 		}
