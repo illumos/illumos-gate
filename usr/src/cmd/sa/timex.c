@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ static int nsec_per_tick;
 
 void printt(char *, hrtime_t);
 void hmstime(char[]);
-void diag(char *);
+void usage();
 
 int
 main(int argc, char **argv)
@@ -93,10 +93,13 @@ main(int argc, char **argv)
 		case 'r':  strcat(aopt, "-r ");  break;
 		case 't':  strcat(aopt, "-t ");  break;
 
-		case '?':  diag("Usage: timex [-s][-o][-p[-fhkmrt]] cmd");
+		case '?':  usage();
 				break;
 		}
-	if (optind >= argc)	diag("Missing command");
+	if (optind >= argc) {
+		fprintf(stderr, "timex: Missing command\n");
+		usage();
+	}
 
 	/*
 	 * Check to see if accounting is installed and print a somewhat
@@ -270,9 +273,9 @@ hmstime(char stime[])
 }
 
 void
-diag(char *s)
+usage()
 {
-	fprintf(stderr, "%s\n", s);
+	fprintf(stderr, "Usage: timex [-o] [-p [-fhkmrt]] [-s] command\n");
 	unlink(fname);
 	exit(EXIT_FAILURE);
 }
