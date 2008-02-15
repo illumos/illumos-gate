@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -340,11 +340,6 @@ xen_pv_init(dev_info_t *xpv_dip)
 	(void) __cpuid_insn(&cp);
 	xen_major = cp.cp_eax >> 16;
 	xen_minor = cp.cp_eax & 0xffff;
-	if (xen_major != 3 || xen_minor != 0) {
-		cmn_err(CE_WARN, "Xen version %d.%d is not supported",
-		    xen_major, xen_minor);
-		return (-1);
-	}
 
 	/*
 	 * cpuid function 0x40000002 returns information about the
