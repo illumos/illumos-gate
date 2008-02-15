@@ -91,13 +91,6 @@ i i.seedmanifest
 # SUNWcsr
 #
 s none bin=./usr/bin
-d none boot 755 root sys
-d none boot/solaris 755 root sys
-d none boot/solaris/bin 0755 root sys
-f none boot/solaris/bin/create_ramdisk 0555 root sys
-f none boot/solaris/bin/extract_boot_filelist 0555 root sys
-f none boot/solaris/filelist.ramdisk 0644 root sys
-f none boot/solaris/filelist.safe 0644 root sys
 d none dev 755 root sys
 d none etc 755 root sys
 e renamenew etc/.login 644 root sys

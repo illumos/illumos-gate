@@ -48,6 +48,11 @@ i i.mptconf
 #
 # SUNWckr
 #
+f none boot/solaris/bin/create_diskmap 0555 root sys
+f none boot/solaris/bin/mbr 0555 root sys
+s none boot/solaris/bin/root_archive=../../../usr/sbin/root_archive
+f none boot/solaris/bin/symdef 0555 root sys
+f none boot/solaris/bin/update_grub 0555 root sys
 f none kernel/crypto/aes 755 root sys
 f none kernel/crypto/arcfour 755 root sys
 f none kernel/crypto/blowfish 755 root sys

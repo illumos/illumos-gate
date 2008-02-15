@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,6 @@
 #
 # SUNWcsr
 #
-f none boot/solaris/bin/create_diskmap 0555 root sys
 f none sbin/biosdev 555 root bin
 f none sbin/installgrub 0555 root sys
 d none var/ld/amd64 755 root bin
