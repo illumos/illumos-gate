@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -134,6 +134,7 @@ ddi-forceload =
 	"misc/scsi_vhci/scsi_vhci_f_asym_lsi",
 	"misc/scsi_vhci/scsi_vhci_f_asym_emc",
 	"misc/scsi_vhci/scsi_vhci_f_sym_emc",
+	"misc/scsi_vhci/scsi_vhci_f_sym_hds",
 	"misc/scsi_vhci/scsi_vhci_f_sym",
 	"misc/scsi_vhci/scsi_vhci_f_tpgs";
 

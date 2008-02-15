@@ -563,6 +563,7 @@ MISC_KMODS	+= sysinit
 MISC_KMODS	+= tem
 MISC_KMODS	+= tlimod
 MISC_KMODS	+= usba usba10 usbs49_fw
+MISC_KMODS	+= scsi_vhci_f_sym_hds
 MISC_KMODS	+= scsi_vhci_f_sym
 MISC_KMODS	+= scsi_vhci_f_tpgs
 MISC_KMODS	+= scsi_vhci_f_asym_sun

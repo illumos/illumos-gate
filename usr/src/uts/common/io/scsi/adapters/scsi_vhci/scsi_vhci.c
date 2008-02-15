@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,12 +62,13 @@ int vhci_prout_not_ready_retry = 180;
 #define	VHCI_SCSI_PERR		0x47
 #define	VHCI_PGR_ILLEGALOP	-2
 #define	VHCI_NUM_UPDATE_TASKQ	8
-#define	VHCI_STD_INQ_SIZE	128
+/* changed to 132 to accomodate HDS */
+#define	VHCI_STD_INQ_SIZE	132
 
 /*
  * Version Macros
  */
-#define	VHCI_NAME_VERSION	"SCSI VHCI Driver %I%"
+#define	VHCI_NAME_VERSION	"SCSI VHCI Driver 1.68"
 char		vhci_version_name[] = VHCI_NAME_VERSION;
 
 int		vhci_first_time = 0;
@@ -4790,7 +4791,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	ASSERT(psd != NULL);
 
 	/*
-	 * For INQUIRY response buffer size, we use VHCI_STD_INQ_SIZE(128bytes)
+	 * For INQUIRY response buffer size, we use VHCI_STD_INQ_SIZE(132bytes)
 	 * instead of SUN_INQSIZE(48bytes) which is used in sd layer. This is
 	 * because we could get the Vendor specific parameters(present 97th
 	 * byte onwards) which are required to process Vendor specific data
@@ -7110,10 +7111,15 @@ vhci_lun_free(dev_info_t *tgt_dip)
 	}
 	dvlp->svl_lun_wwn = NULL;
 
+
 	if (dvlp->svl_fops_name) {
 		kmem_free(dvlp->svl_fops_name, strlen(dvlp->svl_fops_name)+1);
 	}
 	dvlp->svl_fops_name = NULL;
+
+	if (dvlp->svl_fops_ctpriv != NULL) {
+		dvlp->svl_fops->sfo_device_unprobe(sd, dvlp->svl_fops_ctpriv);
+	}
 
 	if (dvlp->svl_flags & VLUN_TASK_D_ALIVE_FLG)
 		taskq_destroy(dvlp->svl_taskq);

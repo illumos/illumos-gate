@@ -180,6 +180,7 @@ f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_lsi 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_sun 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_sym 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_sym_emc 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_sym_hds 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_tpgs 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/agpmaster 755 root sys
@@ -381,6 +382,7 @@ f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_lsi 755 root sys
 f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_sun 755 root sys
 f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym 755 root sys
 f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_emc 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_hds 755 root sys
 f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_tpgs 755 root sys
 
 d none kernel/misc/amd64 755 root sys

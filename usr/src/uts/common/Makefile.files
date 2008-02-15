@@ -685,6 +685,8 @@ SCSI_VHCI_F_TPGS_OBJS +=	tpgs.o
 
 SCSI_VHCI_F_ASYM_SUN_OBJS +=	asym_sun.o
 
+SCSI_VHCI_F_SYM_HDS_OBJS += 	sym_hds.o
+
 SGEN_OBJS +=	sgen.o
 
 SMP_OBJS +=	smp.o
