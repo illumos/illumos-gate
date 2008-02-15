@@ -37,6 +37,7 @@
 
 # packaging files
 i pkginfo
+i depend
 i copyright
 i postinstall
 i preremove
