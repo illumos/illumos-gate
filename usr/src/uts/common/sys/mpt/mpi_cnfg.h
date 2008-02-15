@@ -1035,6 +1035,7 @@ typedef struct raid_vol0_status {
 #define	MPI_RAIDVOL0_STATUS_STATE_OPTIMAL		0x00
 #define	MPI_RAIDVOL0_STATUS_STATE_DEGRADED		0x01
 #define	MPI_RAIDVOL0_STATUS_STATE_FAILED		0x02
+#define	MPI_RAIDVOL0_STATUS_STATE_MISSING		0x03
 
 typedef struct raid_vol0_settings {
 	uint16_t		Settings;
