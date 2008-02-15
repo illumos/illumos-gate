@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,17 +98,28 @@ mgmt_handle_fini(targ_scf_t *h)
 		if (h->t_scope != NULL) {
 			unbind = 1;
 			scf_scope_destroy(h->t_scope);
+			h->t_scope = NULL;
 		}
-		if (h->t_service != NULL)
+		if (h->t_instance != NULL) {
+			scf_instance_destroy(h->t_instance);
+			h->t_instance = NULL;
+		}
+		if (h->t_service != NULL) {
 			scf_service_destroy(h->t_service);
-		if (h->t_pg != NULL)
+			h->t_service = NULL;
+		}
+		if (h->t_pg != NULL) {
 			scf_pg_destroy(h->t_pg);
+			h->t_pg = NULL;
+		}
 		if (h->t_handle != NULL) {
 			if (unbind)
 				(void) scf_handle_unbind(h->t_handle);
 			scf_handle_destroy(h->t_handle);
+			h->t_handle = NULL;
 		}
 		free(h);
+		h = NULL;
 	}
 }
 
@@ -238,6 +249,8 @@ mgmt_get_main_config(tgt_node_t **node)
 	scf_property_t *prop = NULL;
 	scf_value_t *value = NULL;
 	scf_iter_t *iter = NULL;
+	scf_iter_t *iter_v = NULL;
+	scf_iter_t *iter_pv = NULL;
 	char pname[32];
 	char valuebuf[MAXPATHLEN];
 	char passcode[32];
@@ -245,11 +258,12 @@ mgmt_get_main_config(tgt_node_t **node)
 	tgt_node_t	*n;
 	tgt_node_t	*pn;
 	tgt_node_t	*vn;
+	Boolean_t	status = False;
 
 	h = mgmt_handle_init();
 
 	if (h == NULL)
-		return (False);
+		return (status);
 
 	prop = scf_property_create(h->t_handle);
 	value = scf_value_create(h->t_handle);
@@ -306,7 +320,6 @@ mgmt_get_main_config(tgt_node_t **node)
 	}
 
 	while (scf_iter_next_pg(iter, h->t_pg) > 0) {
-		scf_iter_t *iter_v = scf_iter_create(h->t_handle);
 		char *iname;
 
 		scf_pg_get_name(h->t_pg, pname, sizeof (pname));
@@ -325,13 +338,13 @@ mgmt_get_main_config(tgt_node_t **node)
 		n = tgt_node_alloc(pname, String, iname);
 		if (n == NULL)
 			goto error;
+
+		iter_v = scf_iter_create(h->t_handle);
 		if (scf_iter_pg_properties(iter_v, h->t_pg) == -1) {
-			scf_iter_destroy(iter_v);
 			goto error;
 		}
 		while (scf_iter_next_property(iter_v, prop) > 0) {
 			/* there may be many values in one property */
-			scf_iter_t *iter_pv = scf_iter_create(h->t_handle);
 			char *vname;
 
 			scf_property_get_name(prop, pname, sizeof (pname));
@@ -357,6 +370,8 @@ mgmt_get_main_config(tgt_node_t **node)
 					goto error;
 				tgt_node_add(n, pn);
 				*vname = '\0';
+
+				iter_pv = scf_iter_create(h->t_handle);
 				scf_iter_property_values(iter_pv, prop);
 				while (scf_iter_next_value(iter_pv, value)
 				    > 0) {
@@ -368,10 +383,13 @@ mgmt_get_main_config(tgt_node_t **node)
 						goto error;
 					tgt_node_add(pn, vn);
 				}
+				scf_iter_destroy(iter_pv);
+				iter_pv = NULL;
 			}
 		}
 		tgt_node_add(*node, n);
 		scf_iter_destroy(iter_v);
+		iter_v = NULL;
 	}
 
 	/* chap-secrets are stored in "passwords" pgroup as "application" */
@@ -418,21 +436,21 @@ mgmt_get_main_config(tgt_node_t **node)
 			}
 		}
 	}
-	(void) pthread_mutex_unlock(&scf_conf_mutex);
-	scf_iter_destroy(iter);
-	scf_value_destroy(value);
-	scf_property_destroy(prop);
-	return (True);
 
+	status = True;
 error:
-	if (*node != NULL)
+	if ((status != True) && (*node != NULL))
 		tgt_node_free(*node);
 	(void) pthread_mutex_unlock(&scf_conf_mutex);
+	if (iter_pv != NULL)
+		scf_iter_destroy(iter_pv);
+	if (iter_v != NULL)
+		scf_iter_destroy(iter_v);
 	scf_iter_destroy(iter);
 	scf_value_destroy(value);
 	scf_property_destroy(prop);
 	mgmt_handle_fini(h);
-	return (False);
+	return (status);
 }
 
 static int
@@ -771,11 +789,12 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	char pgname[64];
 	char valuebuf[MAXPATHLEN];
 	tgt_node_t	*n;
+	Boolean_t status = False;
 
 	h = mgmt_handle_init();
 
 	if (h == NULL)
-		return (False);
+		return (status);
 
 	prop = scf_property_create(h->t_handle);
 	value = scf_value_create(h->t_handle);
@@ -821,19 +840,14 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 		}
 	}
 
-	(void) pthread_mutex_unlock(&scf_param_mutex);
-	scf_iter_destroy(iter);
-	scf_value_destroy(value);
-	scf_property_destroy(prop);
-	return (True);
-
+	status = True;
 error:
 	(void) pthread_mutex_unlock(&scf_param_mutex);
 	scf_iter_destroy(iter);
 	scf_value_destroy(value);
 	scf_property_destroy(prop);
 	mgmt_handle_fini(h);
-	return (False);
+	return (status);
 }
 
 Boolean_t
@@ -935,7 +949,7 @@ mgmt_convert_param(char *dir, tgt_node_t *tnode)
 convert_ret_t
 mgmt_convert_conf()
 {
-	targ_scf_t *h = NULL;
+	targ_scf_t		*h = NULL;
 	xmlTextReaderPtr	r;
 	convert_ret_t		ret = CONVERT_FAIL;
 	int			xml_fd = -1;

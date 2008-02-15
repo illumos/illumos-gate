@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1649,11 +1649,12 @@ get_local_name(char *iname)
 
 	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
 	    != NULL) {
-		if ((tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
-		    True) && (strcmp(str, iname) == 0)) {
+		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) == True) {
+			if (strcmp(str, iname) == 0)
+				ret = strdup(targ->x_value);
 			free(str);
-			ret = strdup(targ->x_value);
-			break;
+			if (ret != NULL)
+				break;
 		}
 	}
 	return (ret);
