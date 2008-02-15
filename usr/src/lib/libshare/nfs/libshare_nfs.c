@@ -2317,11 +2317,12 @@ skipwhitespace(char *str)
  * Extract the property and value out of the line and create the
  * property in the optionset.
  */
-static void
+static int
 extractprop(char *name, char *value)
 {
 	sa_property_t prop;
 	int index;
+	int ret = SA_OK;
 	/*
 	 * Remove any leading
 	 * white space.
@@ -2333,8 +2334,11 @@ extractprop(char *name, char *value)
 		fixcaselower(name);
 		prop = sa_create_property(proto_options[index].name, value);
 		if (prop != NULL)
-			(void) sa_add_protocol_property(protoset, prop);
+			ret = sa_add_protocol_property(protoset, prop);
+		else
+			ret = SA_NO_MEMORY;
 	}
+	return (ret);
 }
 
 /*
@@ -2352,13 +2356,15 @@ initprotofromdefault()
 	char buff[BUFSIZ];
 	char *name;
 	char *value;
+	int ret = SA_OK;
 
 	protoset = sa_create_protocol_properties("nfs");
 
 	if (protoset != NULL) {
 		nfs = fopen(NFSADMIN, "r");
 		if (nfs != NULL) {
-			while (fgets(buff, sizeof (buff), nfs) != NULL) {
+			while (ret == SA_OK &&
+			    fgets(buff, sizeof (buff), nfs) != NULL) {
 				switch (buff[0]) {
 				case '\n':
 				case '#':
@@ -2370,17 +2376,20 @@ initprotofromdefault()
 					value = strchr(name, '=');
 					if (value != NULL) {
 						*value++ = '\0';
-						extractprop(name, value);
+						ret = extractprop(name, value);
 					}
 				}
 			}
-			if (nfs != NULL)
-				(void) fclose(nfs);
+			(void) fclose(nfs);
+		} else {
+			(void) printf(gettext("Problem with file: %s\n"),
+			    NFSADMIN);
+			ret = SA_SYSTEM_ERR;
 		}
+	} else {
+		ret = SA_NO_MEMORY;
 	}
-	if (protoset == NULL)
-		return (SA_NO_MEMORY);
-	return (SA_OK);
+	return (ret);
 }
 
 /*

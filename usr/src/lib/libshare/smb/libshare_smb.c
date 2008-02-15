@@ -999,13 +999,14 @@ smb_load_proto_properties()
 	char value[MAX_VALUE_BUFLEN];
 	char *name;
 	int index;
+	int ret = SA_OK;
 	int rc;
 
 	protoset = sa_create_protocol_properties(SMB_PROTOCOL_NAME);
 	if (protoset == NULL)
 		return (SA_NO_MEMORY);
 
-	for (index = 0; index < SMB_OPT_NUM; index++) {
+	for (index = 0; index < SMB_OPT_NUM && ret == SA_OK; index++) {
 		rc = smb_config_get(smb_proto_options[index].smb_index,
 		    value, sizeof (value));
 		if (rc != SMBD_SMF_OK)
@@ -1013,9 +1014,11 @@ smb_load_proto_properties()
 		name = smb_config_getname(smb_proto_options[index].smb_index);
 		prop = sa_create_property(name, value);
 		if (prop != NULL)
-			(void) sa_add_protocol_property(protoset, prop);
+			ret = sa_add_protocol_property(protoset, prop);
+		else
+			ret = SA_NO_MEMORY;
 	}
-	return (SA_OK);
+	return (ret);
 }
 
 /*
@@ -1032,8 +1035,7 @@ smb_share_init(void)
 	if (sa_plugin_ops.sa_init != smb_share_init)
 		return (SA_SYSTEM_ERR);
 
-	if (smb_load_proto_properties() != SA_OK)
-		return (SA_SYSTEM_ERR);
+	ret = smb_load_proto_properties();
 
 	return (ret);
 }

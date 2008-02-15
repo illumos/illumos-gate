@@ -1059,7 +1059,7 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *protocol = NULL;
 	int ret = SA_OK;
 	struct options *optlist = NULL;
-	int err = 0;
+	int err = SA_OK;
 	int auth;
 
 	while ((c = getopt(argc, argv, "?fhvnP:p:")) != EOF) {
@@ -1105,12 +1105,28 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 				break;
 			}
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				err = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_CREATE));
-			return (0);
+			return (err);
 		}
 	}
 
@@ -1357,12 +1373,28 @@ sa_delete(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'f':
 			force++;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_DELETE));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -1590,6 +1622,7 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 	int verbose = 0;
 	int c;
 	char *protocol = NULL;
+	int ret = SA_OK;
 #ifdef lint
 	flags = flags;
 #endif
@@ -1615,12 +1648,28 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 				return (SA_INVALID_PROTOCOL);
 			}
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_LIST));
-			return (0);
+				return (ret);
 		}
 	}
 
@@ -2174,12 +2223,28 @@ sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'x':
 			xml++;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_SHOW));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -2412,12 +2477,28 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 't':
 			persist = SA_SHARE_TRANSIENT;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_ADD_SHARE));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -2663,12 +2744,28 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			sharepath = optarg;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_MOVE_SHARE));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -2853,12 +2950,28 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			rsrcname = optarg;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_REMOVE_SHARE));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -3100,12 +3213,28 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			sharepath = optarg;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_SET_SHARE));
-			return (SA_OK);
+			return (ret);
 		}
 	}
 
@@ -3721,12 +3850,28 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			optset = optarg;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_SET));
-			return (SA_OK);
+			return (ret);
 		}
 	}
 
@@ -4247,12 +4392,28 @@ sa_unset(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			optset = optarg;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_UNSET));
-			return (SA_OK);
+			return (ret);
 		}
 	}
 
@@ -4351,12 +4512,27 @@ sa_enable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'v':
 			verbose++;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
-			(void) printf(gettext("usage: %s\n"),
-			    sa_get_usage(USAGE_ENABLE));
-			return (0);
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				(void) printf(gettext("usage: %s\n"),
+				    sa_get_usage(USAGE_ENABLE));
+				return (ret);
+			}
 		}
 	}
 
@@ -4550,12 +4726,28 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'v':
 			verbose++;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_DISABLE));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -4665,12 +4857,29 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'v':
 			verbose++;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			ret = SA_OK;
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_START));
-			return (SA_OK);
+			return (ret);
 		}
 	}
 
@@ -4776,12 +4985,29 @@ sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'v':
 			verbose++;
 			break;
-		default:
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
+		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			ret = SA_OK;
+			switch (optopt) {
+			default:
+				ret = SA_SYNTAX_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_STOP));
-			return (0);
+			return (ret);
 		}
 	}
 
@@ -5145,11 +5371,27 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			argsused++;
 			break;
 		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
 		case '?':
 		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_LEGACY_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) fprintf(stderr, gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_SHARE));
-			return (SA_OK);
+			return (ret);
 		}
 	}
 
@@ -5380,9 +5622,6 @@ sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 
 	while ((c = getopt(argc, argv, "?hF:o:p")) != EOF) {
 		switch (c) {
-		case 'h':
-		case '?':
-			break;
 		case 'F':
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
@@ -5405,10 +5644,28 @@ sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			persist = SA_SHARE_PERMANENT;
 			argsused++;
 			break;
+		case 'h':
+			/* optopt on valid arg isn't defined */
+			optopt = c;
+			/*FALLTHROUGH*/
+		case '?':
 		default:
+			/*
+			 * Since a bad option gets to here, sort it
+			 * out and return a syntax error return value
+			 * if necessary.
+			 */
+			switch (optopt) {
+			default:
+				ret = SA_LEGACY_ERR;
+				break;
+			case 'h':
+			case '?':
+				break;
+			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_UNSHARE));
-			return (SA_OK);
+			return (ret);
 		}
 	}
 
