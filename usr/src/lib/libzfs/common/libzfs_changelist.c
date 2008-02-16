@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Ramprakash Jelari
@@ -284,7 +284,7 @@ changelist_postfix(prop_changelist_t *clp)
 /*
  * Is this "dataset" a child of "parent"?
  */
-static boolean_t
+boolean_t
 isa_child_of(const char *dataset, const char *parent)
 {
 	int len;

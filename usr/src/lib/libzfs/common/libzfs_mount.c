@@ -1117,7 +1117,7 @@ mount_cb(zfs_handle_t *zhp, void *data)
 
 	cbp->cb_datasets[cbp->cb_used++] = zhp;
 
-	return (zfs_iter_children(zhp, mount_cb, cbp));
+	return (zfs_iter_filesystems(zhp, mount_cb, cbp));
 }
 
 static int
@@ -1166,7 +1166,7 @@ zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
 	int *good;
 
 	/*
-	 * Gather all datasets within the pool.
+	 * Gather all non-snap datasets within the pool.
 	 */
 	if ((cb.cb_datasets = zfs_alloc(hdl, 4 * sizeof (void *))) == NULL)
 		return (-1);
@@ -1178,7 +1178,7 @@ zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
 	cb.cb_datasets[0] = zfsp;
 	cb.cb_used = 1;
 
-	if (zfs_iter_children(zfsp, mount_cb, &cb) != 0)
+	if (zfs_iter_filesystems(zfsp, mount_cb, &cb) != 0)
 		goto out;
 
 	/*

@@ -151,6 +151,7 @@ int changelist_haszonedchild(prop_changelist_t *);
 
 void remove_mountpoint(zfs_handle_t *);
 int create_parents(libzfs_handle_t *, char *, int);
+boolean_t isa_child_of(const char *dataset, const char *parent);
 
 zfs_handle_t *make_dataset_handle(libzfs_handle_t *, const char *);
 
