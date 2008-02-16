@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -401,10 +401,25 @@ extern "C" {
 #define	XMITS_PCI_X_STATUS_PFAR_MASK		0xffffffff
 #define	XMITS_PCIX_STAT_SC_DSCRD		0x20ull
 #define	XMITS_PCIX_STAT_SC_TTO			0x10ull
-#define	XMITS_PCIX_STAT_SMMU			0x8ull
-#define	XMITS_PCIX_STAT_SDSTAT			0x4ull
-#define	XMITS_PCIX_STAT_CMMU			0x2ull
-#define	XMITS_PCIX_STAT_CDSTAT			0x1ull
+/*
+ * As a workaround for an XMITS ASIC bug, the following PCI-X errors are
+ * assigned new bit positions within the PCI-X Error Status Register to
+ * match what is actually implemented in the XMITS ASIC:
+ *
+ *      			Spec		New
+ * Error			Bit Position	Bit Position
+ * --------------------		------------	------------
+ * XMITS_PCIX_STAT_SMMU		0x8ull		0x4ull
+ * XMITS_PCIX_STAT_SDSTAT	0x4ull		0x8ull
+ * XMITS_PCIX_STAT_CMMU		0x2ull		0x1ull
+ * XMITS_PCIX_STAT_CDSTAT	0x1ull		0x2ull
+ *
+ */
+#define	XMITS_PCIX_STAT_SMMU			0x4ull
+#define	XMITS_PCIX_STAT_SDSTAT			0x8ull
+#define	XMITS_PCIX_STAT_CMMU			0x1ull
+#define	XMITS_PCIX_STAT_CDSTAT			0x2ull
+
 #define	XMITS_PCIX_STAT_SERR_ON_PERR		(1ull << 32)
 #define	XMITS_PCIX_STAT_PERR_RECOV_INT_EN	(1ull << 33)
 #define	XMITS_PCIX_STAT_PERR_RECOV_INT		(1ull << 34)
