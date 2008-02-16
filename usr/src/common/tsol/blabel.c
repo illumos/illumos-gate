@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,9 +181,12 @@ blinlset(const m_label_t *label, const blset_t lset)
 {
 	int i;
 
-	for (i = 0; i < NSLS_MAX; i++)
+	for (i = 0; i < NSLS_MAX; i++) {
+		if (!BLTYPE(&lset[i], SUN_SL_ID))
+			return (B_FALSE);
 		if (BLEQUAL(label, &lset[i]))
 			return (B_TRUE);
+	}
 	return (B_FALSE);
 }
 #endif /* _KERNEL */
