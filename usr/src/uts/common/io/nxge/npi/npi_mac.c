@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2356,12 +2356,24 @@ npi_status_t
 npi_xmac_xpcs_reset(npi_handle_t handle, uint8_t portn)
 {
 	uint64_t val;
+	int delay = 100;
 
 	ASSERT(IS_XMAC_PORT_NUM_VALID(portn));
 
 	XPCS_REG_RD(handle, portn, XPCS_CTRL_1_REG, &val);
 	val |= XPCS_CTRL1_RST;
 	XPCS_REG_WR(handle, portn, XPCS_CTRL_1_REG, val);
+
+	while ((--delay) && (val & XPCS_CTRL1_RST)) {
+		NXGE_DELAY(10);
+		XPCS_REG_RD(handle, portn, XPCS_CTRL_1_REG, &val);
+	}
+
+	if (delay == 0) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_xmac_xpcs_reset portn <%d> failed", portn));
+		return (NPI_FAILURE);
+	}
 
 	return (NPI_SUCCESS);
 }
@@ -2567,13 +2579,23 @@ npi_mac_pcs_reset(npi_handle_t handle, uint8_t portn)
 {
 	/* what to do here ? */
 	uint64_t val = 0;
+	int delay = 100;
 
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	PCS_REG_RD(handle, portn, PCS_MII_CTRL_REG, &val);
 	val |= PCS_MII_RESET;
 	PCS_REG_WR(handle, portn, PCS_MII_CTRL_REG, val);
-
+	while ((delay) && (val & PCS_MII_RESET)) {
+		NXGE_DELAY(10);
+		PCS_REG_RD(handle, portn, PCS_MII_CTRL_REG, &val);
+		delay--;
+	}
+	if (delay == 0) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_bmac_pcs_reset portn <%d> failed", portn));
+		return (NPI_FAILURE);
+	}
 	return (NPI_SUCCESS);
 }
 

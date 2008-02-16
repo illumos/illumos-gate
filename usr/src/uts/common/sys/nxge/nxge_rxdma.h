@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +116,7 @@ typedef struct _nxge_rx_ring_stats_t {
 	 * Error event stats.
 	 */
 	uint32_t	rx_rbr_tmout;
+	uint32_t	pkt_too_long_err;
 	uint32_t	l2_err;
 	uint32_t	l4_cksum_err;
 	uint32_t	fflp_soft_err;

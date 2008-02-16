@@ -2112,6 +2112,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 	uint32_t		bytes_read;
 	uint64_t		pkt_type;
 	uint64_t		frag;
+	boolean_t		pkt_too_long_err = B_FALSE;
 #ifdef	NXGE_DEBUG
 	int			dump_len;
 #endif
@@ -2175,6 +2176,15 @@ nxge_receive_packet(p_nxge_t nxgep,
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 			"<== nxge_receive_packet: failed: l2 length is 0."));
 		return;
+	}
+
+	/*
+	 * Sofware workaround for BMAC hardware limitation that allows
+	 * maxframe size of 1526, instead of 1522 for non-jumbo and 0x2406
+	 * instead of 0x2400 for jumbo.
+	 */
+	if (l2_len > nxgep->mac.maxframesize) {
+		pkt_too_long_err = B_TRUE;
 	}
 
 	/* Hardware sends us 4 bytes of CRC as no stripping is done.  */
@@ -2345,7 +2355,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 		msg_index, l2_len,
 		rx_msg_p->cur_usage_cnt, rx_msg_p->max_usage_cnt));
 
-	if ((error_type) || (dcf_err)) {
+	if ((error_type) || (dcf_err) || (pkt_too_long_err)) {
 		rdc_stats->ierrors++;
 		if (dcf_err) {
 			rdc_stats->dcf_err++;
@@ -2358,6 +2368,12 @@ nxge_receive_packet(p_nxge_t nxgep,
 #endif
 			NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, NULL,
 					NXGE_FM_EREPORT_RDMC_DCF_ERR);
+		} else if (pkt_too_long_err) {
+			rdc_stats->pkt_too_long_err++;
+			NXGE_DEBUG_MSG((nxgep, RX_CTL, " nxge_receive_packet:"
+			    " channel %d packet length [%d] > "
+			    "maxframesize [%d]", channel, l2_len + ETHERFCSL,
+			    nxgep->mac.maxframesize));
 		} else {
 				/* Update error stats */
 			error_disp_cnt = NXGE_ERROR_SHOW_MAX;

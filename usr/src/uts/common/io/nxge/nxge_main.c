@@ -476,7 +476,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (nxgep->niu_type == NEPTUNE_2_10GF) {
 		if (nxgep->function_num > 1) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Unsupported"
+			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "Unsupported"
 			    " function %d. Only functions 0 and 1 are "
 			    "supported for this card.", nxgep->function_num));
 			status = NXGE_ERROR;

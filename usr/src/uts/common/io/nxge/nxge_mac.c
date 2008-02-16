@@ -35,6 +35,7 @@ extern uint32_t nxge_no_link_notify;
 extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
 extern boolean_t nxge_jumbo_enable;
+extern uint32_t nxge_jumbo_mtu;
 
 typedef enum {
 	CHECK_LINK_RESCHEDULE,
@@ -1390,6 +1391,16 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 	handle = nxgep->npi_handle;
 	switch (portn) {
 	case 0:
+		/* Reset Serdes */
+		ESR_REG_WR(handle, ESR_RESET_REG, ESR_RESET_0);
+		NXGE_DELAY(20);
+		ESR_REG_WR(handle, ESR_RESET_REG, 0x0);
+		NXGE_DELAY(2000);
+
+		/* Configure Serdes to 10G mode */
+		ESR_REG_WR(handle, ESR_0_PLL_CONFIG_REG,
+		    ESR_PLL_CFG_10G_SERDES);
+
 		ESR_REG_WR(handle, ESR_0_CONTROL_REG,
 		    ESR_CTL_EN_SYNCDET_0 | ESR_CTL_EN_SYNCDET_1 |
 		    ESR_CTL_EN_SYNCDET_2 | ESR_CTL_EN_SYNCDET_3 |
@@ -1416,6 +1427,16 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 		}
 		break;
 	case 1:
+		/* Reset Serdes */
+		ESR_REG_WR(handle, ESR_RESET_REG, ESR_RESET_1);
+		NXGE_DELAY(20);
+		ESR_REG_WR(handle, ESR_RESET_REG, 0x0);
+		NXGE_DELAY(2000);
+
+		/* Configure Serdes to 10G mode */
+		ESR_REG_WR(handle, ESR_1_PLL_CONFIG_REG,
+		    ESR_PLL_CFG_10G_SERDES);
+
 		ESR_REG_WR(handle, ESR_1_CONTROL_REG,
 		    ESR_CTL_EN_SYNCDET_0 | ESR_CTL_EN_SYNCDET_1 |
 		    ESR_CTL_EN_SYNCDET_2 | ESR_CTL_EN_SYNCDET_3 |
@@ -2282,18 +2303,21 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 	/* Set Max and Min Frame Size */
 	if (nxgep->param_arr[param_accept_jumbo].value || nxge_jumbo_enable) {
 		SET_MAC_ATTR2(handle, ap, portn,
-		    MAC_PORT_FRAME_SIZE, 64, 0x2400, rs);
+		    MAC_PORT_FRAME_SIZE, 64, nxge_jumbo_mtu, rs);
 	} else {
-		/* Do not add CRC 4 bytes to the max or the min frame size */
+		/*
+		 * Set the maxframe size to 1522 (1518 + 4) to account for
+		 * VLAN tagged packets
+		 */
 		SET_MAC_ATTR2(handle, ap, portn,
-		    MAC_PORT_FRAME_SIZE, 64, 0x5EE, rs);
+		    MAC_PORT_FRAME_SIZE, 64, 0x5EE + 4, rs);
 	}
 
 	if (rs != NPI_SUCCESS)
 		goto fail;
 	if (nxgep->param_arr[param_accept_jumbo].value ||
 		nxgep->mac.is_jumbo == B_TRUE)
-		nxgep->mac.maxframesize = 0x2400;
+		nxgep->mac.maxframesize = (uint16_t)nxge_jumbo_mtu;
 	else
 		nxgep->mac.maxframesize = 0x5EE + 4;
 	nxgep->mac.minframesize = 64;
@@ -5497,7 +5521,8 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 					goto error_exit;
 				}
 
-				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[nxgep->function_num] =
+				    port_fd_arr[0];
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 10 - 1"));

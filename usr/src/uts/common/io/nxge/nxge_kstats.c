@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@ typedef enum {
 	RDC_STAT_RSP_CNT_ERR,
 	RDC_STAT_BYTE_EN_BUS,
 	RDC_STAT_RSP_DAT_ERR,
+	RDC_STAT_PKT_TOO_LONG_ERR,
 	RDC_STAT_COMPL_L2_ERR,
 	RDC_STAT_COMPL_L4_CKSUM_ERR,
 	RDC_STAT_COMPL_ZCP_SOFT_ERR,
@@ -112,6 +113,7 @@ nxge_kstat_index_t nxge_rdc_stats[] = {
 	{RDC_STAT_RSP_CNT_ERR, KSTAT_DATA_ULONG, "rdc_rsp_cnt_err"},
 	{RDC_STAT_BYTE_EN_BUS, KSTAT_DATA_ULONG, "rdc_byte_en_bus"},
 	{RDC_STAT_RSP_DAT_ERR, KSTAT_DATA_ULONG, "rdc_rsp_dat_err"},
+	{RDC_STAT_PKT_TOO_LONG_ERR, KSTAT_DATA_ULONG, "rdc_pkt_too_long_err"},
 	{RDC_STAT_COMPL_L2_ERR, KSTAT_DATA_ULONG, "rdc_compl_l2_err"},
 	{RDC_STAT_COMPL_L4_CKSUM_ERR, KSTAT_DATA_ULONG, "rdc_compl_l4_cksum"},
 	{RDC_STAT_COMPL_ZCP_SOFT_ERR, KSTAT_DATA_ULONG,
@@ -623,6 +625,8 @@ nxge_rdc_stat_update(kstat_t *ksp, int rw)
 		statsp->rsp_cnt_err = rdc_kstatsp->rsp_cnt_err.value.ul;
 		statsp->byte_en_bus = rdc_kstatsp->byte_en_bus.value.ul;
 		statsp->rsp_dat_err = rdc_kstatsp->rsp_dat_err.value.ul;
+		statsp->pkt_too_long_err =
+		    rdc_kstatsp->pkt_too_long_err.value.ul;
 		statsp->l2_err = rdc_kstatsp->compl_l2_err.value.ul;
 		statsp->l4_cksum_err = rdc_kstatsp->compl_l4_cksum_err.value.ul;
 		statsp->fflp_soft_err =
@@ -652,6 +656,8 @@ nxge_rdc_stat_update(kstat_t *ksp, int rw)
 		rdc_kstatsp->rsp_cnt_err.value.ul = statsp->rsp_cnt_err;
 		rdc_kstatsp->byte_en_bus.value.ul = statsp->byte_en_bus;
 		rdc_kstatsp->rsp_dat_err.value.ul = statsp->rsp_dat_err;
+		rdc_kstatsp->pkt_too_long_err.value.ul =
+		    statsp->pkt_too_long_err;
 		rdc_kstatsp->compl_l2_err.value.ul = statsp->l2_err;
 		rdc_kstatsp->compl_l4_cksum_err.value.ul = statsp->l4_cksum_err;
 		rdc_kstatsp->compl_fflp_soft_err.value.ul =

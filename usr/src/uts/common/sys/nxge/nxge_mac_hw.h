@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1864,6 +1864,7 @@ typedef union _xpcs_ctrl1_t {
 #define	XPCS_STATUS1_FAULT		0x0080
 #define	XPCS_STATUS1_RX_LINK_STATUS_UP	0x0004 /* Link status interrupt */
 #define	XPCS_STATUS1_LOW_POWER_ABILITY	0x0002 /* low power mode */
+#define	XPCS_STATUS_RX_LINK_STATUS_UP	0x1000 /* Link status interrupt */
 
 
 typedef	union _xpcs_stat1_t {
@@ -2362,11 +2363,13 @@ typedef	union _xpcs_config_t {
 #define	ESR_PLL_CFG_HALF_RATE_1		0x10
 #define	ESR_PLL_CFG_HALF_RATE_2		0x20
 #define	ESR_PLL_CFG_HALF_RATE_3		0x40
-#define	ESR_PLL_CFG_1G_SERDES		(ESR_PLL_CFG_FBDIV_0 | \
-					ESR_PLL_CFG_HALF_RATE_0 | \
-					ESR_PLL_CFG_HALF_RATE_1 | \
-					ESR_PLL_CFG_HALF_RATE_2 | \
+#define	ESR_PLL_CFG_1G_SERDES		(ESR_PLL_CFG_FBDIV_0 |		\
+					ESR_PLL_CFG_HALF_RATE_0 |	\
+					ESR_PLL_CFG_HALF_RATE_1 |	\
+					ESR_PLL_CFG_HALF_RATE_2 |	\
 					ESR_PLL_CFG_HALF_RATE_3)
+
+#define	ESR_PLL_CFG_10G_SERDES		ESR_PLL_CFG_FBDIV_2
 
 /* ESR Neptune Serdes Control Register */
 #define	ESR_CTL_EN_SYNCDET_0		0x00000001

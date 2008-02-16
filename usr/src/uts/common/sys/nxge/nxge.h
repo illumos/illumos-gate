@@ -785,6 +785,7 @@ typedef struct _nxge_rdc_kstat {
 	kstat_named_t	byte_en_bus;
 	kstat_named_t	rsp_dat_err;
 
+	kstat_named_t	pkt_too_long_err;
 	kstat_named_t	compl_l2_err;
 	kstat_named_t	compl_l4_cksum_err;
 	kstat_named_t	compl_zcp_soft_err;
