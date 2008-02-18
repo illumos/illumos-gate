@@ -114,6 +114,8 @@
 #include <smbsrv/smb_incl.h>
 #include <sys/sdt.h>
 
+static void smb_reply_notify_change_request(smb_request_t *);
+
 /*
  * smb_nt_transact_notify_change
  *
@@ -122,7 +124,7 @@
  * a monitored directory is changed or client cancels one of its already
  * sent requests.
  */
-int
+smb_sdrc_t
 smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 {
 	uint32_t		CompletionFilter;
@@ -136,7 +138,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	node = sr->fid_ofile->f_node;
@@ -146,7 +148,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 		 * Notify change requests are only valid on directories.
 		 */
 		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY, 0, 0);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	mutex_enter(&sr->sr_mutex);
@@ -191,7 +193,8 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_REQ_STATE_CANCELED:
 		mutex_exit(&sr->sr_mutex);
 		smbsr_error(sr, NT_STATUS_CANCELLED, 0, 0);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
+
 	default:
 		ASSERT(0);
 		mutex_exit(&sr->sr_mutex);
@@ -208,7 +211,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
  * If client cancels the request or session dropped, an NT_STATUS_CANCELED
  * is sent in reply.
  */
-int
+static void
 smb_reply_notify_change_request(smb_request_t *sr)
 {
 	smb_node_t	*node;
@@ -250,7 +253,7 @@ smb_reply_notify_change_request(smb_request_t *sr)
 		data_off = param_off + n_param + data_pad;
 		total_bytes = param_pad + n_param + data_pad + n_data;
 
-		smbsr_encode_result(sr, 18+n_setup, total_bytes,
+		(void) smbsr_encode_result(sr, 18+n_setup, total_bytes,
 		    "b 3. llllllllb C w #. C #. C",
 		    18 + n_setup,	/* wct */
 		    n_param,		/* Total Parameter Bytes */
@@ -314,7 +317,6 @@ smb_reply_notify_change_request(smb_request_t *sr)
 	sr->sr_state = SMB_REQ_STATE_COMPLETED;
 	mutex_exit(&sr->sr_mutex);
 	smb_request_free(sr);
-	return (0);
 }
 
 /*
@@ -556,7 +558,7 @@ smb_notify_change_daemon(smb_thread_t *thread, void *si_void)
 				ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 				tmp = list_next(&sr_list, sr);
 				list_remove(&sr_list, sr);
-				(void) smb_reply_notify_change_request(sr);
+				smb_reply_notify_change_request(sr);
 				sr = tmp;
 			}
 		}

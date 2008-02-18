@@ -70,16 +70,17 @@ smb_smf_create_service_pgroup(smb_scfhandle_t *handle, char *pgroup)
 	int ret = SMBD_SMF_OK;
 	int err;
 
-	if (handle == NULL) {
+	if (handle == NULL)
 		return (SMBD_SMF_SYSTEM_ERR);
-	}
 
 	/*
 	 * only create a handle if it doesn't exist. It is ok to exist
 	 * since the pg handle will be set as a side effect.
 	 */
 	if (handle->scf_pg == NULL)
-		handle->scf_pg = scf_pg_create(handle->scf_handle);
+		if ((handle->scf_pg =
+		    scf_pg_create(handle->scf_handle)) == NULL)
+			return (SMBD_SMF_SYSTEM_ERR);
 
 	/*
 	 * if the pgroup exists, we are done. If it doesn't, then we
@@ -584,12 +585,19 @@ smb_smf_scf_init(char *svc_name)
 			if (scf_handle_bind(handle->scf_handle) == 0) {
 				handle->scf_scope =
 				    scf_scope_create(handle->scf_handle);
+
+				if (handle->scf_scope == NULL)
+					goto err;
+
 				if (scf_handle_get_local_scope(
 				    handle->scf_handle, handle->scf_scope) != 0)
 					goto err;
 
 				handle->scf_service =
 				    scf_service_create(handle->scf_handle);
+
+				if (handle->scf_service == NULL)
+					goto err;
 
 				if (scf_scope_get_service(handle->scf_scope,
 				    svc_name, handle->scf_service)
@@ -598,6 +606,10 @@ smb_smf_scf_init(char *svc_name)
 				}
 				handle->scf_pg =
 				    scf_pg_create(handle->scf_handle);
+
+				if (handle->scf_pg == NULL)
+					goto err;
+
 				handle->scf_state = SCH_STATE_INIT;
 			} else {
 				goto err;

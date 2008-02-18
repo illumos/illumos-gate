@@ -79,7 +79,7 @@
  * end of file. An attempt to seek before the start of the file sets the
  * current file pointer to the start of the file.
  */
-int
+smb_sdrc_t
 smb_com_seek(struct smb_request *sr)
 {
 	ushort_t	mode;
@@ -87,31 +87,30 @@ smb_com_seek(struct smb_request *sr)
 	uint32_t	off_ret;
 	int		rc;
 
-	if (smbsr_decode_vwv(sr, "wwl", &sr->smb_fid, &mode, &off) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "wwl", &sr->smb_fid, &mode, &off) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	if (mode == SMB_SEEK_END) {
+	if (mode == SMB_SEEK_END)
 		(void) smb_set_file_size(sr);
-	}
 
 	if ((rc = smb_ofile_seek(sr->fid_ofile, mode, off, &off_ret)) != 0) {
 		if (rc == EINVAL) {
 			smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		} else {
 			smbsr_error(sr, 0, ERRSRV, ERRerror);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 	}
 
-	smbsr_encode_result(sr, 2, 0, "blw", 2, off_ret, 0);
+	if (smbsr_encode_result(sr, 2, 0, "blw", 2, off_ret, 0))
+		return (SDRC_ERROR_REPLY);
+
 	return (SDRC_NORMAL_REPLY);
 }

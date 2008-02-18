@@ -79,12 +79,12 @@ smbsr_connect_tree(struct smb_request *sr)
 		 */
 		if (sharename[1] != '\\') {
 			smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-			/* NOTREACHED */
+			return (ERRinvnetname);
 		}
 
 		if ((sharename = strchr(sharename+2, '\\')) == 0) {
 			smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-			/* NOTREACHED */
+			return (ERRinvnetname);
 		}
 
 		++sharename;
@@ -93,13 +93,13 @@ smbsr_connect_tree(struct smb_request *sr)
 		 * This should be a sharename: no embedded '\' allowed.
 		 */
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		/* NOTREACHED */
+		return (ERRinvnetname);
 	}
 
 	if (smb_get_stype(sharename, sr->arg.tcon.service, &stype) != 0) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
-		/* NOTREACHED */
+		return (ERROR_BAD_DEV_TYPE);
 	}
 
 	if ((rc = smbsr_setup_share(sr, sharename, stype, errmsg)) != 0) {
@@ -112,7 +112,7 @@ smbsr_connect_tree(struct smb_request *sr)
 		 */
 		status = (rc == ERRaccess) ? NT_STATUS_ACCESS_DENIED : 0;
 		smbsr_error(sr, status, ERRSRV, rc);
-		/* NOTREACHED */
+		return (rc);
 	}
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
@@ -124,7 +124,7 @@ smbsr_connect_tree(struct smb_request *sr)
 		smbsr_share_report(sr, sharename, access_msg, errmsg);
 	}
 
-	return (rc);
+	return (0);
 }
 
 

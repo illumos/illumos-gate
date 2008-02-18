@@ -1136,16 +1136,7 @@ smb_session_worker(
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_SUBMITTED:
 		mutex_exit(&sr->sr_mutex);
-		if (smb_dispatch_request(sr) < 0) {
-			smb_rwx_rwenter(&sr->session->s_lock, RW_WRITER);
-			if (sr->session->s_state !=
-			    SMB_SESSION_STATE_DISCONNECTED) {
-				smb_soshutdown(sr->session->sock);
-				sr->session->s_state =
-				    SMB_SESSION_STATE_DISCONNECTED;
-			}
-			smb_rwx_rwexit(&sr->session->s_lock);
-		}
+		smb_dispatch_request(sr);
 		mutex_enter(&sr->sr_mutex);
 		if (!sr->sr_keep) {
 			sr->sr_state = SMB_REQ_STATE_COMPLETED;

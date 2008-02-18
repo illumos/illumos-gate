@@ -149,87 +149,8 @@ static kstat_t *smb_dispatch_ksp = NULL;
 static kstat_named_t *smb_dispatch_kstat_data = NULL;
 static int smb_dispatch_kstat_size = 0;
 
-static int 	is_andx_com(unsigned char);
-
-extern void	smbsr_decode_error(struct smb_request *sr);
-extern void	smbsr_encode_error(struct smb_request *sr);
-extern void	smbsr_check_result(struct smb_request *sr, int wct, int bcc);
-
-extern int	smb_com_cancel_forward(struct smb_request *);
-extern int	smb_com_check_directory(struct smb_request *);
-extern int	smb_com_close(struct smb_request *);
-extern int	smb_com_close_and_tree_disconnect(struct smb_request *);
-extern int	smb_com_close_print_file(struct smb_request *);
-extern int	smb_com_copy(struct smb_request *);
-extern int	smb_com_create(struct smb_request *);
-extern int	smb_com_create_directory(struct smb_request *);
-extern int	smb_com_create_new(struct smb_request *);
-extern int	smb_com_create_temporary(struct smb_request *);
-extern int	smb_com_delete(struct smb_request *);
-extern int	smb_com_delete_directory(struct smb_request *);
-extern int	smb_com_echo(struct smb_request *);
-extern int	smb_com_find(struct smb_request *);
-extern int	smb_com_find_close(struct smb_request *);
-extern int	smb_com_find_close2(struct smb_request *);
-extern int	smb_com_find_notify_close(struct smb_request *);
-extern int	smb_com_find_unique(struct smb_request *);
-extern int	smb_com_flush(struct smb_request *);
-extern int	smb_com_forward_user_name(struct smb_request *);
-extern int	smb_com_get_machine_name(struct smb_request *);
-extern int	smb_com_get_print_queue(struct smb_request *);
-extern int	smb_com_invalid_command(struct smb_request *);
-extern int	smb_com_ioctl(struct smb_request *);
-extern int	smb_com_ioctl_secondary(struct smb_request *);
-extern int	smb_com_lock_and_read(struct smb_request *);
-extern int	smb_com_lock_byte_range(struct smb_request *);
-extern int	smb_com_locking_andx(struct smb_request *);
-extern int	smb_com_logoff_andx(struct smb_request *);
-extern int	smb_com_move(struct smb_request *);
-extern int	smb_com_negotiate(struct smb_request *);
-extern int	smb_com_nt_cancel(struct smb_request *);
-extern int	smb_com_nt_create_andx(struct smb_request *);
-extern int	smb_com_nt_transact(struct smb_request *);
-extern int	smb_com_nt_transact_secondary(struct smb_request *);
-extern int	smb_com_open(struct smb_request *);
-extern int	smb_com_open_andx(struct smb_request *);
-extern int	smb_com_open_print_file(struct smb_request *);
-extern int	smb_com_process_exit(struct smb_request *);
-extern int	smb_com_query_information(struct smb_request *);
-extern int	smb_com_query_information2(struct smb_request *);
-extern int	smb_com_query_information_disk(struct smb_request *);
-extern int	smb_com_read(struct smb_request *);
-extern int	smb_com_read_andx(struct smb_request *);
-extern int	smb_com_read_mpx(struct smb_request *);
-extern int	smb_com_read_mpx_secondary(struct smb_request *);
-extern int	smb_com_read_raw(struct smb_request *);
-extern int	smb_com_rename(struct smb_request *);
-extern int	smb_com_search(struct smb_request *);
-extern int	smb_com_seek(struct smb_request *);
-extern int	smb_com_send_broadcast_message(struct smb_request *);
-extern int	smb_com_send_end_mb_message(struct smb_request *);
-extern int	smb_com_send_single_message(struct smb_request *);
-extern int	smb_com_send_start_mb_message(struct smb_request *);
-extern int	smb_com_send_text_mb_message(struct smb_request *);
-extern int	smb_com_session_setup_andx(struct smb_request *);
-extern int	smb_com_set_information(struct smb_request *);
-extern int	smb_com_set_information2(struct smb_request *);
-extern int	smb_com_transaction(struct smb_request *);
-extern int	smb_com_transaction2(struct smb_request *);
-extern int	smb_com_transaction2_secondary(struct smb_request *);
-extern int	smb_com_transaction_secondary(struct smb_request *);
-extern int	smb_com_tree_connect(struct smb_request *);
-extern int	smb_com_tree_connect_andx(struct smb_request *);
-extern int	smb_com_tree_disconnect(struct smb_request *);
-extern int	smb_com_unlock_byte_range(struct smb_request *);
-extern int	smb_com_write(struct smb_request *);
-extern int	smb_com_write_and_close(struct smb_request *);
-extern int	smb_com_write_and_unlock(struct smb_request *);
-extern int	smb_com_write_andx(struct smb_request *);
-extern int	smb_com_write_complete(struct smb_request *);
-extern int	smb_com_write_mpx(struct smb_request *);
-extern int	smb_com_write_mpx_secondary(struct smb_request *);
-extern int	smb_com_write_print_file(struct smb_request *);
-extern int	smb_com_write_raw(struct smb_request *);
+static int is_andx_com(unsigned char);
+static int smbsr_check_result(struct smb_request *, int, int);
 
 static smb_dispatch_table_t	dispatch[256] = {
 	{ smb_com_create_directory,				/* 0x00 000 */
@@ -715,8 +636,6 @@ static smb_dispatch_table_t	dispatch[256] = {
 	{ 0, 0, 0, RW_READER, 0 }				/* 0xFF 255 */
 };
 
-int smb_watch = -1;
-int smb_emit_sending = 0;
 
 /*
  * smbsr_cleanup
@@ -767,12 +686,12 @@ smbsr_cleanup(struct smb_request *sr)
 	mutex_exit(&sr->sr_mutex);
 }
 
-int
+void
 smb_dispatch_request(struct smb_request *sr)
 {
-	int			rc;
+	smb_sdrc_t		sdrc;
 	smb_dispatch_table_t	*sdd;
-	smb_error_t		err;
+	boolean_t		disconnect = B_FALSE;
 
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
@@ -799,15 +718,16 @@ smb_dispatch_request(struct smb_request *sr)
 	    &sr->smb_pid,
 	    &sr->smb_uid,
 	    &sr->smb_mid) != 0) {
-		return (-1);
+		disconnect = B_TRUE;
+		goto drop_connection;
 	}
 
 	/*
-	 * The reply "header" is filled in now even though
-	 * it most likely will be rewritten under reply_ready:
-	 * below. Could just reserve the space. But this
-	 * (for now) is convenient incase the dialect dispatcher
-	 * has to send a special reply (like TRANSACT).
+	 * The reply "header" is filled in now even though it will,
+	 * most likely, be rewritten under reply_ready below.  We
+	 * could reserve the space but this is convenient in case
+	 * the dialect dispatcher has to send a special reply (like
+	 * TRANSACT).
 	 *
 	 * Ensure that the 32-bit error code flag is turned off.
 	 * Clients seem to set it in transact requests and they may
@@ -839,14 +759,11 @@ smb_dispatch_request(struct smb_request *sr)
 	 */
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_request(sr) != 0) {
-			err.severity = ERROR_SEVERITY_ERROR;
-			err.status = NT_STATUS_ACCESS_DENIED;
-			err.errcls = ERRDOS;
-			err.errcode = ERROR_ACCESS_DENIED;
-			smbsr_set_error(sr, &err);
-			rc = -1;
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+			    ERRDOS, ERROR_ACCESS_DENIED);
+			disconnect = B_TRUE;
 			smb_rwx_rwenter(&sr->session->s_lock, RW_READER);
-			goto reply_error;
+			goto report_error;
 		}
 	}
 
@@ -856,17 +773,16 @@ andx_more:
 	smb_rwx_rwenter(&sr->session->s_lock, sdd->sdt_slock_mode);
 
 	if (smb_decode_mbc(&sr->command, "b", &sr->smb_wct) != 0) {
-		rc = -3;
-		goto cant_decode;
+		disconnect = B_TRUE;
+		goto report_error;
 	}
 
 	(void) MBC_SHADOW_CHAIN(&sr->smb_vwv, &sr->command,
 	    sr->command.chain_offset, sr->smb_wct * 2);
 
-	if (smb_decode_mbc(&sr->command, "#.w",
-	    sr->smb_wct*2, &sr->smb_bcc) != 0) {
-		rc = -5;
-		goto cant_decode;
+	if (smb_decode_mbc(&sr->command, "#.w", sr->smb_wct*2, &sr->smb_bcc)) {
+		disconnect = B_TRUE;
+		goto report_error;
 	}
 
 	(void) MBC_SHADOW_CHAIN(&sr->smb_data, &sr->command,
@@ -874,8 +790,8 @@ andx_more:
 
 	sr->command.chain_offset += sr->smb_bcc;
 	if (sr->command.chain_offset > sr->command.max_bytes) {
-		rc = -6;
-		goto cant_decode;
+		disconnect = B_TRUE;
+		goto report_error;
 	}
 
 	/* Store pointers for later */
@@ -885,8 +801,8 @@ andx_more:
 		/* Peek ahead and don't disturb vwv */
 		if (smb_peek_mbc(&sr->smb_vwv, sr->smb_vwv.chain_offset, "b.w",
 		    &sr->andx_com, &sr->andx_off) < 0) {
-			rc = -7;
-			goto cant_decode;
+			disconnect = B_TRUE;
+			goto report_error;
 		}
 	} else {
 		sr->andx_com = (unsigned char)-1;
@@ -906,227 +822,178 @@ andx_more:
 	}
 	mutex_exit(&sr->sr_mutex);
 
-	if (sdd->sdt_function) {
-
-		if ((rc = setjmp(&sr->exjb))) {
-			/*
-			 * Handle any errors from raw write.
-			 */
-			if (sr->session->s_state ==
-			    SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
-				/*
-				 * Set state so that the netbios session
-				 * daemon will start accepting data again.
-				 */
-				sr->session->s_write_raw_status = 0;
-				sr->session->s_state =
-				    SMB_SESSION_STATE_NEGOTIATED;
-			}
-
-			/*
-			 * We should never have sr->sr_keep set here
-			 * since this is the error path.
-			 */
-			ASSERT(sr->sr_keep == 0);
-
-			smbsr_cleanup(sr);
-
-			if (sr->smb_com == smb_watch) {
-				smb_emit_sending = 1;
-			}
-			if (rc < 0) {
-				rc -= 1000;
-				goto cant_decode;
-			}
-			goto reply_error;
-		}
-
-		/*
-		 * Setup UID and TID information (if required). Both functions
-		 * will set the sr credentials. In domain mode, the user and
-		 * tree credentials should be the same. In share mode, the
-		 * tree credentials (defined in the share definition) should
-		 * override the user credentials.
-		 */
-		if (!(sdd->sdt_flags & SDDF_SUPPRESS_UID)) {
-			sr->uid_user = smb_user_lookup_by_uid(sr->session,
-			    &sr->user_cr, sr->smb_uid);
-			if (sr->uid_user == NULL) {
-				smbsr_error(sr, 0, ERRSRV, ERRbaduid);
-				/* NOTREACHED */
-			}
-			if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID)) {
-				sr->tid_tree = smb_tree_lookup_by_tid(
-				    sr->uid_user, sr->smb_tid);
-				if (sr->tid_tree == NULL) {
-					smbsr_error(sr, 0, ERRSRV, ERRinvnid);
-					/* NOTREACHED */
-				}
-			}
-		}
-
-		/*
-		 * If the command is not a read raw request we can set the
-		 * state of the session back to SMB_SESSION_STATE_NEGOTIATED
-		 * (if the current state is SMB_SESSION_STATE_OPLOCK_BREAKING).
-		 * Otherwise we let the read raw handler to deal with it.
-		 */
-		if ((sr->session->s_state ==
-		    SMB_SESSION_STATE_OPLOCK_BREAKING) &&
-		    (sr->smb_com != SMB_COM_READ_RAW)) {
-			krw_t	mode;
-			/*
-			 * The lock may have to be upgraded because, at this
-			 * point, we don't know how it was entered. We just
-			 * know that it has to be entered in writer mode here.
-			 * Whatever mode was used to enter the lock, it will
-			 * be restored.
-			 */
-			mode = smb_rwx_rwupgrade(&sr->session->s_lock);
-			if (sr->session->s_state ==
-			    SMB_SESSION_STATE_OPLOCK_BREAKING) {
-				sr->session->s_state =
-				    SMB_SESSION_STATE_NEGOTIATED;
-			}
-			smb_rwx_rwdowngrade(&sr->session->s_lock, mode);
-		}
-
-		DTRACE_PROBE1(smb__dispatch__com, struct smb_request_t *, sr);
-
-		/*
-		 * Increment method invocation count. This value is exposed
-		 * via kstats, and it represents a count of all the dispatched
-		 * requests, including the ones that have a return value, other
-		 * than SDRC_NORMAL_REPLY.
-		 */
-		SMB_ALL_DISPATCH_STAT_INCR(sdd->sdt_dispatch_stats.value.ui64);
-
-		rc = (*sdd->sdt_function)(sr);
-
-		/*
-		 * Only call smbsr_cleanup if smb->sr_keep is not set.  The
-		 * smb_nt_transact_notify_change function will set
-		 * smb->sr_keep if it retains control of the request when
-		 * it returns.  In that case the notify change code
-		 * will call smbsr_cleanup later when the request is finally
-		 * completed.
-		 */
-		if (sr->sr_keep == 0)
-			smbsr_cleanup(sr);
-	} else {
-		rc = SDRC_UNIMPLEMENTED;	/* Unknown? */
+	if (sdd->sdt_function == NULL) {
+		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
+		goto report_error;
 	}
 
-	if (rc != SDRC_NORMAL_REPLY) {	/* normal case special & fast */
-		switch (rc) {
-		case SDRC_NORMAL_REPLY:
-			break;
+	/*
+	 * Setup UID and TID information (if required). Both functions
+	 * will set the sr credentials. In domain mode, the user and
+	 * tree credentials should be the same. In share mode, the
+	 * tree credentials (defined in the share definition) should
+	 * override the user credentials.
+	 */
+	if (!(sdd->sdt_flags & SDDF_SUPPRESS_UID)) {
+		sr->uid_user = smb_user_lookup_by_uid(sr->session,
+		    &sr->user_cr, sr->smb_uid);
+		if (sr->uid_user == NULL) {
+			smbsr_error(sr, 0, ERRSRV, ERRbaduid);
+			goto report_error;
+		}
 
-		case SDRC_ERROR_REPLY:
-			goto reply_error;
-
-		case SDRC_DROP_VC:
-			switch (sr->session->s_state) {
-			case SMB_SESSION_STATE_DISCONNECTED:
-			case SMB_SESSION_STATE_TERMINATED:
-				break;
-			default:
-				smb_soshutdown(sr->session->sock);
-				break;
+		if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID)) {
+			sr->tid_tree = smb_tree_lookup_by_tid(
+			    sr->uid_user, sr->smb_tid);
+			if (sr->tid_tree == NULL) {
+				smbsr_error(sr, 0, ERRSRV, ERRinvnid);
+				goto report_error;
 			}
-			goto reply_error;
-
-		case SDRC_NO_REPLY:
-			/* tricky. */
-			smb_rwx_rwexit(&sr->session->s_lock);
-			return (0);
-
-		case SDRC_UNIMPLEMENTED:
-			sr->smb_rcls = ERRDOS;
-			sr->smb_err = ERRbadfunc;
-			goto reply_error;
-
-		default:
-			sr->smb_rcls = ERRDOS;
-			sr->smb_err = ERRerror;	/* need better */
-			goto reply_error;
 		}
 	}
 
+	/*
+	 * If the command is not a read raw request we can set the
+	 * state of the session back to SMB_SESSION_STATE_NEGOTIATED
+	 * (if the current state is SMB_SESSION_STATE_OPLOCK_BREAKING).
+	 * Otherwise we let the read raw handler to deal with it.
+	 */
+	if ((sr->session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING) &&
+	    (sr->smb_com != SMB_COM_READ_RAW)) {
+		krw_t	mode;
+		/*
+		 * The lock may have to be upgraded because, at this
+		 * point, we don't know how it was entered. We just
+		 * know that it has to be entered in writer mode here.
+		 * Whatever mode was used to enter the lock, it will
+		 * be restored.
+		 */
+		mode = smb_rwx_rwupgrade(&sr->session->s_lock);
+		if (sr->session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING)
+			sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+
+		smb_rwx_rwdowngrade(&sr->session->s_lock, mode);
+	}
+
+	DTRACE_PROBE1(smb__dispatch__com, struct smb_request_t *, sr);
+
+	/*
+	 * Increment method invocation count. This value is exposed
+	 * via kstats, and it represents a count of all the dispatched
+	 * requests, including the ones that have a return value, other
+	 * than SDRC_NORMAL_REPLY.
+	 */
+	SMB_ALL_DISPATCH_STAT_INCR(sdd->sdt_dispatch_stats.value.ui64);
+
+	if ((sdrc = (*sdd->sdt_function)(sr)) != SDRC_NORMAL_REPLY) {
+		/*
+		 * Handle errors from raw write.
+		 */
+		if (sr->session->s_state ==
+		    SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
+			/*
+			 * Set state so that the netbios session
+			 * daemon will start accepting data again.
+			 */
+			sr->session->s_write_raw_status = 0;
+			sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		}
+	}
+
+	/*
+	 * Only call smbsr_cleanup if smb->sr_keep is not set.
+	 * smb_nt_transact_notify_change will set smb->sr_keep if it
+	 * retains control of the request when it returns.  In that
+	 * case the notify change code will call smbsr_cleanup later
+	 * when the request has completed.
+	 */
+	if (sr->sr_keep == 0)
+		smbsr_cleanup(sr);
+
+	switch (sdrc) {
+	case SDRC_NORMAL_REPLY:
+		break;
+
+	case SDRC_DROP_VC:
+		disconnect = B_TRUE;
+		goto drop_connection;
+
+	case SDRC_NO_REPLY:
+		smb_rwx_rwexit(&sr->session->s_lock);
+		return;
+
+	case SDRC_ERROR_REPLY:
+		goto report_error;
+
+	case SDRC_UNIMPLEMENTED:
+	case SDRC_UNSUPPORTED:
+	default:
+		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
+		goto report_error;
+	}
+
+	/*
+	 * If there's no AndX command, we're done.
+	 */
 	if (sr->andx_com == 0xff)
 		goto reply_ready;
 
-	/* have to back-patch the AndXCommand and AndXOffset */
+	/*
+	 * Otherwise, we have to back-patch the AndXCommand and AndXOffset
+	 * and continue processing.
+	 */
 	sr->andx_prev_wct = sr->cur_reply_offset;
 	(void) smb_poke_mbc(&sr->reply, sr->andx_prev_wct + 1, "b.w",
 	    sr->andx_com, MBC_LENGTH(&sr->reply));
 
 	smb_rwx_rwexit(&sr->session->s_lock);
 
-	/* now it gets interesting */
 	sr->command.chain_offset = sr->orig_request_hdr + sr->andx_off;
-
 	sr->smb_com = sr->andx_com;
-
 	goto andx_more;
 
-reply_ready:
-
-	if (SMB_TREE_CASE_INSENSITIVE(sr)) {
-		sr->smb_flg |= SMB_FLAGS_CASE_INSENSITIVE;
-	} else {
-		sr->smb_flg &= ~SMB_FLAGS_CASE_INSENSITIVE;
-	}
-
-	(void) smb_poke_mbc(&sr->reply, 0, SMB_HEADER_ED_FMT,
-	    sr->first_smb_com,
-	    sr->smb_rcls,
-	    sr->smb_reh,
-	    sr->smb_err,
-	    sr->smb_flg | SMB_FLAGS_REPLY,
-	    sr->smb_flg2,
-	    sr->smb_pid_high,
-	    sr->smb_sig,
-	    sr->smb_tid,
-	    sr->smb_pid,
-	    sr->smb_uid,
-	    sr->smb_mid);
-
-	if (sr->session->signing.flags & SMB_SIGNING_ENABLED)
-		smb_sign_reply(sr, NULL);
-
-	if ((rc = smb_session_send(sr->session, 0, &sr->reply)) == 0)
-		sr->reply.chain = 0;
-
-	smb_rwx_rwexit(&sr->session->s_lock);
-
-	return (rc);
-
-cant_decode:
-reply_error:
+report_error:
 	sr->reply.chain_offset = sr->cur_reply_offset;
 	(void) smb_encode_mbc(&sr->reply, "bw", 0, 0);
 
 	sr->smb_wct = 0;
 	sr->smb_bcc = 0;
 
-	if (sr->smb_rcls == 0) {
-		sr->smb_rcls = ERRSRV;
-		sr->smb_err  = ERRerror;
+	if (sr->smb_rcls == 0)
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
+
+reply_ready:
+	smbsr_send_reply(sr);
+
+drop_connection:
+	if (disconnect) {
+		switch (sr->session->s_state) {
+		case SMB_SESSION_STATE_DISCONNECTED:
+		case SMB_SESSION_STATE_TERMINATED:
+			break;
+		default:
+			smb_soshutdown(sr->session->sock);
+			sr->session->s_state = SMB_SESSION_STATE_DISCONNECTED;
+			break;
+		}
 	}
-	goto reply_ready;
+
+	smb_rwx_rwexit(&sr->session->s_lock);
 }
 
+int
+smbsr_encode_empty_result(struct smb_request *sr)
+{
+	return (smbsr_encode_result(sr, 0, 0, "bw", 0, 0));
+}
 
-void
-smbsr_encode_result(struct smb_request *sr, int wct,
-    int bcc, char *fmt, ...)
+int
+smbsr_encode_result(struct smb_request *sr, int wct, int bcc, char *fmt, ...)
 {
 	va_list ap;
 
-	if (MBC_LENGTH(&sr->reply) != sr->cur_reply_offset) {
-		smbsr_encode_error(sr);
-	}
+	if (MBC_LENGTH(&sr->reply) != sr->cur_reply_offset)
+		return (-1);
 
 	va_start(ap, fmt);
 	(void) smb_mbc_encode(&sr->reply, fmt, ap);
@@ -1135,10 +1002,13 @@ smbsr_encode_result(struct smb_request *sr, int wct,
 	sr->smb_wct = (unsigned char)wct;
 	sr->smb_bcc = (uint16_t)bcc;
 
-	smbsr_check_result(sr, wct, bcc);
+	if (smbsr_check_result(sr, wct, bcc) != 0)
+		return (-1);
+
+	return (0);
 }
 
-void
+static int
 smbsr_check_result(struct smb_request *sr, int wct, int bcc)
 {
 	int		offset = sr->cur_reply_offset;
@@ -1153,53 +1023,44 @@ smbsr_check_result(struct smb_request *sr, int wct, int bcc)
 		m = m->m_next;
 	}
 
-	if ((offset + 3) > total_bytes) {
-		smbsr_encode_error(sr);
-		/* NOTREACHED */
-	}
+	if ((offset + 3) > total_bytes)
+		return (-1);
 
 	(void) smb_peek_mbc(&sr->reply, offset, "b", &temp);
-	if (temp != wct) {
-		smbsr_encode_error(sr);
-		/* NOTREACHED */
-	}
+	if (temp != wct)
+		return (-1);
 
-	if ((offset + (wct * 2 + 1)) > total_bytes) {
-		smbsr_encode_error(sr);
-		/* NOTREACHED */
-	}
+	if ((offset + (wct * 2 + 1)) > total_bytes)
+		return (-1);
 
 	/* reply wct & vwv seem ok, consider data now */
 	offset += wct * 2 + 1;
 
-	if ((offset + 2) > total_bytes) {
-		smbsr_encode_error(sr);
-	}
+	if ((offset + 2) > total_bytes)
+		return (-1);
 
 	(void) smb_peek_mbc(&sr->reply, offset, "bb", &temp, &temp1);
 	if (bcc == VAR_BCC) {
 		if ((temp != 0xFF) || (temp1 != 0xFF)) {
-			smbsr_encode_error(sr);
-			/* NOTREACHED */
+			return (-1);
 		} else {
 			bcc = (total_bytes - offset) - 2;
 			(void) smb_poke_mbc(&sr->reply, offset, "bb",
 			    bcc, bcc >> 8);
 		}
 	} else {
-		if ((temp != (bcc&0xFF)) || (temp1 != ((bcc>>8)&0xFF))) {
-			smbsr_encode_error(sr);
-		}
+		if ((temp != (bcc&0xFF)) || (temp1 != ((bcc>>8)&0xFF)))
+			return (-1);
 	}
 
 	offset += bcc + 2;
 
-	if (offset != total_bytes) {
-		smbsr_encode_error(sr);
-	}
+	if (offset != total_bytes)
+		return (-1);
 
 	sr->smb_wct = (unsigned char)wct;
 	sr->smb_bcc = (uint16_t)bcc;
+	return (0);
 }
 
 int
@@ -1229,6 +1090,11 @@ smbsr_decode_data(struct smb_request *sr, char *fmt, ...)
 void
 smbsr_send_reply(struct smb_request *sr)
 {
+	if (SMB_TREE_CASE_INSENSITIVE(sr))
+		sr->smb_flg |= SMB_FLAGS_CASE_INSENSITIVE;
+	else
+		sr->smb_flg &= ~SMB_FLAGS_CASE_INSENSITIVE;
+
 	(void) smb_poke_mbc(&sr->reply, 0, SMB_HEADER_ED_FMT,
 	    sr->first_smb_com,
 	    sr->smb_rcls,
@@ -1246,26 +1112,8 @@ smbsr_send_reply(struct smb_request *sr)
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED)
 		smb_sign_reply(sr, NULL);
 
-	(void) smb_session_send(sr->session, 0, &sr->reply);
-}
-
-
-void
-smbsr_decode_error(struct smb_request *sr)
-{
-	longjmp(&sr->exjb);
-}
-
-void
-smbsr_encode_error(struct smb_request *sr)
-{
-	longjmp(&sr->exjb);
-}
-
-void
-smbsr_encode_empty_result(struct smb_request *sr)
-{
-	smbsr_encode_result(sr, 0, 0, "bw", 0, 0);
+	if (smb_session_send(sr->session, 0, &sr->reply) == 0)
+		sr->reply.chain = 0;
 }
 
 /*
@@ -1330,12 +1178,8 @@ smbsr_map_errno(int errnum, smb_error_t *err)
 void
 smbsr_errno(struct smb_request *sr, int errnum)
 {
-	smb_error_t err;
-
-	smbsr_map_errno(errnum, &err);
-	smbsr_set_error(sr, &err);
-	longjmp(&sr->exjb);
-	/* NOTREACHED */
+	smbsr_map_errno(errnum, &sr->smb_error);
+	smbsr_set_error(sr, &sr->smb_error);
 }
 
 /*
@@ -1344,14 +1188,12 @@ smbsr_errno(struct smb_request *sr, int errnum)
 void
 smbsr_warn(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
 {
-	smb_error_t err;
+	sr->smb_error.severity = ERROR_SEVERITY_WARNING;
+	sr->smb_error.status   = status;
+	sr->smb_error.errcls   = errcls;
+	sr->smb_error.errcode  = errcode;
 
-	err.severity = ERROR_SEVERITY_WARNING;
-	err.status   = status;
-	err.errcls   = errcls;
-	err.errcode  = errcode;
-
-	smbsr_set_error(sr, &err);
+	smbsr_set_error(sr, &sr->smb_error);
 }
 
 /*
@@ -1360,16 +1202,12 @@ smbsr_warn(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
 void
 smbsr_error(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
 {
-	smb_error_t err;
+	sr->smb_error.severity = ERROR_SEVERITY_ERROR;
+	sr->smb_error.status   = status;
+	sr->smb_error.errcls   = errcls;
+	sr->smb_error.errcode  = errcode;
 
-	err.severity = ERROR_SEVERITY_ERROR;
-	err.status   = status;
-	err.errcls   = errcls;
-	err.errcode  = errcode;
-
-	smbsr_set_error(sr, &err);
-	longjmp(&sr->exjb);
-	/* NOTREACHED */
+	smbsr_set_error(sr, &sr->smb_error);
 }
 
 /*
@@ -1466,7 +1304,7 @@ is_andx_com(unsigned char com)
  * Invalid command stub.
  */
 /*ARGSUSED*/
-int
+smb_sdrc_t
 smb_com_invalid_command(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

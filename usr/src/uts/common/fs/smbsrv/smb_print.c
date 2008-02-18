@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +84,7 @@
  * ERRSRV/ERRqfull
  * ERRSRV/ERRqtoobig
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_open_print_file(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -119,7 +119,7 @@ smb_com_open_print_file(struct smb_request *sr)
  * other types of Fid closing requests to invalidate the Fid and begin
  * spooling.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_close_print_file(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -195,17 +195,17 @@ smb_com_close_print_file(struct smb_request *sr)
  * ERRHRD/ERRerror
  * ERRSRV/ERRbaduid
  */
-int
+smb_sdrc_t
 smb_com_get_print_queue(struct smb_request *sr)
 {
 	unsigned short max_count, start_ix;
 
-	if (smbsr_decode_vwv(sr, "ww", &max_count, &start_ix) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "ww", &max_count, &start_ix) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	smbsr_encode_result(sr, 2, 3, "bwwwbw", 2, 0, 0, 3, 1, 0);
+	if (smbsr_encode_result(sr, 2, 3, "bwwwbw", 2, 0, 0, 3, 1, 0))
+		return (SDRC_ERROR_REPLY);
+
 	return (SDRC_NORMAL_REPLY);
 }
 
@@ -246,7 +246,7 @@ smb_com_get_print_queue(struct smb_request *sr)
  * support the application of normal write requests to print spool files.
  *
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_write_print_file(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

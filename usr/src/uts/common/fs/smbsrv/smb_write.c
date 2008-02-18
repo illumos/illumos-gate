@@ -44,9 +44,9 @@ typedef struct smb_write_param {
 } smb_write_param_t;
 
 
-int smb_write_common(struct smb_request *sr, smb_write_param_t *param);
-int smb_write_truncate(struct smb_request *sr, smb_write_param_t *param);
-int smb_set_file_size(struct smb_request *sr);
+static int smb_write_common(struct smb_request *, smb_write_param_t *);
+static int smb_write_truncate(struct smb_request *, smb_write_param_t *);
+int smb_set_file_size(struct smb_request *);
 
 
 /*
@@ -59,7 +59,7 @@ int smb_set_file_size(struct smb_request *sr);
  * counts differ but there is no error, the client will assume that the
  * server encountered a resource issue.
  */
-int
+smb_sdrc_t
 smb_com_write(struct smb_request *sr)
 {
 	smb_write_param_t *param;
@@ -71,15 +71,14 @@ smb_com_write(struct smb_request *sr)
 	rc = smbsr_decode_vwv(sr, "wwl", &sr->smb_fid, &param->w_count, &off);
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	param->w_offset = (uint64_t)off;
@@ -92,8 +91,7 @@ smb_com_write(struct smb_request *sr)
 
 		if ((rc != 0) || (param->w_vdb.len != param->w_count)) {
 			kmem_free(param, sizeof (smb_write_param_t));
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
@@ -104,12 +102,12 @@ smb_com_write(struct smb_request *sr)
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_result(sr, 1, 0, "bww", 1, param->w_count, 0);
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->w_count, 0);
 	kmem_free(param, sizeof (smb_write_param_t));
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -123,7 +121,7 @@ smb_com_write(struct smb_request *sr)
  * the mtime.  Otherwise the file system stamps the mtime.  Failure to
  * set mtime should not result in an error response.
  */
-int
+smb_sdrc_t
 smb_com_write_and_close(struct smb_request *sr)
 {
 	smb_write_param_t *param;
@@ -143,15 +141,14 @@ smb_com_write_and_close(struct smb_request *sr)
 
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	param->w_offset = (uint64_t)off;
@@ -167,8 +164,7 @@ smb_com_write_and_close(struct smb_request *sr)
 
 		if ((rc != 0) || (param->w_vdb.len != param->w_count)) {
 			kmem_free(param, sizeof (smb_write_param_t));
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
@@ -179,18 +175,18 @@ smb_com_write_and_close(struct smb_request *sr)
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_common_close(sr, last_write)) != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_result(sr, 1, 0, "bww", 1, param->w_count, 0);
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->w_count, 0);
 	kmem_free(param, sizeof (smb_write_param_t));
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -207,7 +203,7 @@ smb_com_write_and_close(struct smb_request *sr)
  * counts differ but there is no error, the client will assume that the
  * server encountered a resource issue.
  */
-int
+smb_sdrc_t
 smb_com_write_and_unlock(struct smb_request *sr)
 {
 	smb_write_param_t *param;
@@ -218,7 +214,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	param = kmem_zalloc(sizeof (smb_write_param_t), KM_SLEEP);
@@ -227,28 +223,26 @@ smb_com_write_and_unlock(struct smb_request *sr)
 	    &remcnt);
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (param->w_count == 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		kmem_free(param, sizeof (smb_write_param_t));
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smbsr_decode_data(sr, "D", &param->w_vdb);
 
 	if ((rc != 0) || (param->w_count != param->w_vdb.len)) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	param->w_offset = (uint64_t)off;
@@ -257,7 +251,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
 	if ((rc = smb_write_common(sr, param)) != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	result = smb_unlock_range(sr, sr->fid_ofile->f_node, param->w_offset,
@@ -266,12 +260,12 @@ smb_com_write_and_unlock(struct smb_request *sr)
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
 		    ERRDOS, ERRnotlocked);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_result(sr, 1, 0, "bww", 1, param->w_count, 0);
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->w_count, 0);
 	kmem_free(param, sizeof (smb_write_param_t));
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -285,7 +279,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
  * If bit 0 of WriteMode is set, Fid must refer to a disk file and
  * the data must be on stable storage before responding.
  */
-int
+smb_sdrc_t
 smb_com_write_andx(struct smb_request *sr)
 {
 	smb_write_param_t *param;
@@ -315,30 +309,28 @@ smb_com_write_andx(struct smb_request *sr)
 
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (SMB_WRMODE_IS_STABLE(param->w_mode) &&
 	    STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smbsr_decode_data(sr, "#.#B", data_offset, param->w_count,
 	    &param->w_vdb);
 	if ((rc != 0) || (param->w_vdb.len != param->w_count)) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
@@ -347,15 +339,15 @@ smb_com_write_andx(struct smb_request *sr)
 		if ((rc = smb_write_common(sr, param)) != 0) {
 			kmem_free(param, sizeof (smb_write_param_t));
 			smbsr_errno(sr, rc);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 	}
 
-	smbsr_encode_result(sr, 6, 0, "bb1.ww6.w",
+	rc = smbsr_encode_result(sr, 6, 0, "bb1.ww6.w",
 	    6, sr->andx_com, 15, param->w_count, 0);
 
 	kmem_free(param, sizeof (smb_write_param_t));
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -363,7 +355,7 @@ smb_com_write_andx(struct smb_request *sr)
  *
  * Returns errno values.
  */
-int
+static int
 smb_write_common(struct smb_request *sr, smb_write_param_t *param)
 {
 	struct smb_ofile *ofile = sr->fid_ofile;
@@ -379,10 +371,8 @@ smb_write_common(struct smb_request *sr, smb_write_param_t *param)
 		if (node->attr.sa_vattr.va_type != VDIR) {
 			rc = smb_lock_range_access(sr, node, param->w_offset,
 			    param->w_count, B_TRUE);
-			if (rc != NT_STATUS_SUCCESS) {
-				smbsr_error(sr, rc, ERRSRV, ERRaccess);
-				/* NOTREACHED */
-			}
+			if (rc != NT_STATUS_SUCCESS)
+				return (EPERM);
 		}
 
 		if (SMB_WRMODE_IS_STABLE(param->w_mode) ||
@@ -435,46 +425,41 @@ smb_write_common(struct smb_request *sr, smb_write_param_t *param)
  *
  * Returns errno values.
  */
-int
+static int
 smb_write_truncate(struct smb_request *sr, smb_write_param_t *param)
 {
 	struct smb_ofile *ofile = sr->fid_ofile;
 	smb_node_t *node = ofile->f_node;
 	boolean_t append_only = B_FALSE;
+	uint32_t status;
 	int rc;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0)
 		return (0);
 
-	rc = smb_ofile_access(sr->fid_ofile, sr->user_cr, FILE_WRITE_DATA);
-	if (rc != NT_STATUS_SUCCESS) {
-		rc = smb_ofile_access(sr->fid_ofile, sr->user_cr,
+	status = smb_ofile_access(sr->fid_ofile, sr->user_cr, FILE_WRITE_DATA);
+	if (status != NT_STATUS_SUCCESS) {
+		status = smb_ofile_access(sr->fid_ofile, sr->user_cr,
 		    FILE_APPEND_DATA);
-		if (rc != NT_STATUS_SUCCESS) {
-			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
-			    ERROR_ACCESS_DENIED);
-			/* NOTREACHED */
-		} else {
+		if (status != NT_STATUS_SUCCESS)
+			return (EACCES);
+		else
 			append_only = B_TRUE;
-		}
 	}
 
 	smb_rwx_xenter(&node->n_lock);
 
 	if (append_only && (param->w_offset < node->n_size)) {
 		smb_rwx_xexit(&node->n_lock);
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERRnoaccess);
-		/* NOTREACHED */
+		return (EACCES);
 	}
 
 	if (node->attr.sa_vattr.va_type != VDIR) {
-		rc = smb_lock_range_access(sr, node, param->w_offset,
+		status = smb_lock_range_access(sr, node, param->w_offset,
 		    param->w_count, B_TRUE);
-		if (rc != NT_STATUS_SUCCESS) {
+		if (status != NT_STATUS_SUCCESS) {
 			smb_rwx_xexit(&node->n_lock);
-			smbsr_error(sr, rc, ERRSRV, ERRaccess);
-			/* NOTREACHED */
+			return (EACCES);
 		}
 	}
 
@@ -546,12 +531,10 @@ smb_set_file_size(struct smb_request *sr)
  * We never send raw write commands to other servers so, if we receive a
  * write_complete, we treat it as an error.
  */
-int
+smb_sdrc_t /*ARGSUSED*/
 smb_com_write_complete(struct smb_request *sr)
 {
-	smbsr_decode_error(sr);
-	/* NOT REACHED */
-	return (0);
+	return (SDRC_ERROR_REPLY);
 }
 
 /*
@@ -562,13 +545,13 @@ smb_com_write_complete(struct smb_request *sr)
  * connection oriented transports and NT supports SMB_COM_READ_MPX
  * only over connectionless transports.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_write_mpx(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
 }
 
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_write_mpx_secondary(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

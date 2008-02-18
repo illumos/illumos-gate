@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,7 @@
  *	ERRSRV/<implementation specific>
  *	ERRHRD/<implementation specific>
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_forward_user_name(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -105,7 +105,7 @@ smb_com_forward_user_name(struct smb_request *sr)
  *	ERRSRV/<implementation specific>
  *	ERRHRD/<implementation specific>
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_cancel_forward(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -141,7 +141,7 @@ smb_com_cancel_forward(struct smb_request *sr)
  *	ERRSRV/ERRinvnid
  *	ERRSRV/<implementation specific>
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_get_machine_name(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

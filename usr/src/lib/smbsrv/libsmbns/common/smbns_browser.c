@@ -48,62 +48,39 @@
 
 #define	SMB_SERVER_SIGNATURE		0xaa550415
 
-/*
- * Macro definitions:
- */
-static char	*lanman = MAILSLOT_LANMAN;
-static char	*browse	= MAILSLOT_BROWSE;
+typedef struct smb_hostinfo {
+	list_node_t	hi_lnd;
+	smb_nic_t	hi_nic;
+	char		hi_nbname[NETBIOS_NAME_SZ];
+	name_entry_t	hi_netname;
+	uint32_t	hi_nextannouce;
+	int		hi_reps;
+	int		hi_interval;
+	uint8_t		hi_updatecnt;
+	uint32_t	hi_type;
+} smb_hostinfo_t;
 
-typedef struct server_info {
-	uint32_t type;
-	uint32_t signature;
-	char major;
-	char minor;
-	char hostname[NETBIOS_NAME_SZ];
-	char comment[SMB_PI_MAX_COMMENT];
-	char update_count;
-	struct name_entry name;
-} server_info_t;
+typedef struct smb_browserinfo {
+	list_t		bi_hlist;
+	int		bi_hcnt;
+	rwlock_t	bi_hlist_rwl;
+	boolean_t	bi_changed;
+	mutex_t		bi_mtx;
+} smb_browserinfo_t;
 
-#define	BROWSER_NF_INVALID 0x00
-#define	BROWSER_NF_VALID   0x01
+static smb_browserinfo_t smb_binfo;
 
-typedef struct browser_netinfo {
-	uint32_t flags;
-	int	next_announce;
-	int	reps;
-	int	interval;
-	server_info_t server;
-	mutex_t mtx;
-} browser_netinfo_t;
+static int smb_browser_init(void);
+static void smb_browser_infoinit(void);
+static void smb_browser_infoterm(void);
+static void smb_browser_infofree(void);
 
-/*
- * Local Data Definitions:
- */
-static struct browser_netinfo smb_browser_info[SMB_PI_MAX_NETWORKS];
-
-static void smb_browser_init(void);
-
-static inline browser_netinfo_t *
-smb_browser_getnet(int net)
+void
+smb_browser_reconfig(void)
 {
-	browser_netinfo_t *subnet;
-
-	if (net < smb_nic_get_num()) {
-		subnet = &smb_browser_info[net];
-		(void) mutex_lock(&subnet->mtx);
-		if (subnet->flags & BROWSER_NF_VALID)
-			return (subnet);
-	}
-
-	return (0);
-}
-
-static inline void
-smb_browser_putnet(browser_netinfo_t *netinfo)
-{
-	if (netinfo)
-		(void) mutex_unlock(&netinfo->mtx);
+	(void) mutex_lock(&smb_binfo.bi_mtx);
+	smb_binfo.bi_changed = B_TRUE;
+	(void) mutex_unlock(&smb_binfo.bi_mtx);
 }
 
 /*
@@ -611,7 +588,7 @@ smb_browser_putnet(browser_netinfo_t *netinfo)
 
 int
 smb_browser_load_transact_header(unsigned char *buffer, int maxcnt,
-	int data_count, int reply, char *mailbox)
+    int data_count, int reply, char *mailbox)
 {
 	smb_msgbuf_t mb;
 	int	mailboxlen;
@@ -661,66 +638,21 @@ smb_browser_load_transact_header(unsigned char *buffer, int maxcnt,
 	return (result);
 }
 
-/*
- * smb_net_id
- *
- * Lookup for the given IP in the NICs info table.
- * If it finds a matching entry it'll return the index,
- * otherwise returns -1.
- *
- * SMB network table and SMB browser info table share
- * the same index.
- */
-int
-smb_net_id(uint32_t ipaddr)
-{
-	uint32_t myaddr, mask;
-	int net, smb_nc_cnt;
-
-	smb_nc_cnt = smb_nic_get_num();
-	for (net = 0; net < smb_nc_cnt; net++) {
-		net_cfg_t cfg;
-		if (smb_nic_get_byind(net, &cfg) == NULL)
-			break;
-		mask = cfg.mask;
-		myaddr = cfg.ip;
-		if ((ipaddr & mask) == (myaddr & mask))
-			return (net);
-	}
-
-	return (-1);
-}
-
-/*
- * smb_browser_get_srvname
- *
- */
-struct name_entry *
-smb_browser_get_srvname(unsigned short netid)
-{
-	if (netid < smb_nic_get_num())
-		return (&(smb_browser_info[netid].server.name));
-
-	return (NULL);
-}
-
 static int
-smb_browser_addr_of_subnet(struct name_entry *name, int subnet,
+smb_browser_addr_of_subnet(struct name_entry *name, smb_hostinfo_t *hinfo,
     struct name_entry *result)
 {
 	uint32_t ipaddr, mask, saddr;
 	struct addr_entry *addr;
-	int smb_nc_cnt;
-	net_cfg_t cfg;
 
-	smb_nc_cnt = smb_nic_get_num();
-	if ((name == 0) || subnet >= smb_nc_cnt)
+	if (name == NULL)
 		return (-1);
 
-	if (smb_nic_get_byind(subnet, &cfg) == NULL)
+	if (hinfo->hi_nic.nic_smbflags & SMB_NICF_ALIAS)
 		return (-1);
-	ipaddr = cfg.ip;
-	mask = cfg.mask;
+
+	ipaddr = hinfo->hi_nic.nic_ip;
+	mask = hinfo->hi_nic.nic_mask;
 
 	*result = *name;
 	addr = &name->addr_list;
@@ -741,27 +673,15 @@ smb_browser_addr_of_subnet(struct name_entry *name, int subnet,
 
 
 static int
-smb_browser_bcast_addr_of_subnet(struct name_entry *name, int net,
+smb_browser_bcast_addr_of_subnet(struct name_entry *name, uint32_t bcast,
     struct name_entry *result)
 {
-	uint32_t broadcast;
-	int smb_nc_cnt;
-	net_cfg_t cfg;
-
-	smb_nc_cnt = smb_nic_get_num();
-	if (net >= smb_nc_cnt)
-		return (-1);
-
-	if (name != 0 && name != result)
+	if (name != NULL && name != result)
 		*result = *name;
 
-	if (smb_nic_get_byind(net, &cfg) == NULL)
-		return (-1);
-
-	broadcast = cfg.broadcast;
 	result->addr_list.sin.sin_family = AF_INET;
 	result->addr_list.sinlen = sizeof (result->addr_list.sin);
-	result->addr_list.sin.sin_addr.s_addr = broadcast;
+	result->addr_list.sin.sin_addr.s_addr = bcast;
 	result->addr_list.sin.sin_port = htons(DGM_SRVC_UDP_PORT);
 	result->addr_list.forw = result->addr_list.back = &result->addr_list;
 	return (0);
@@ -839,16 +759,14 @@ smb_browser_bcast_addr_of_subnet(struct name_entry *name, int net,
  * HostAnnouncement frames on this name as described above for D(1d).
  */
 
-void
-smb_browser_send_HostAnnouncement(int net, int32_t next_announcement,
+static void
+smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
+    uint32_t next_announcement, boolean_t remove,
     struct addr_entry *addr, char suffix)
 {
 	smb_msgbuf_t mb;
 	int offset, announce_len, data_length;
 	struct name_entry dest_name;
-	struct name_entry server_name;
-	struct browser_netinfo *subnet;
-	server_info_t *server;
 	unsigned char *buffer;
 	uint32_t type;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
@@ -857,16 +775,15 @@ smb_browser_send_HostAnnouncement(int net, int32_t next_announcement,
 		return;
 	(void) utf8_strupr(resource_domain);
 
-	if (addr == 0) {
+	if (addr == NULL) {
 		/* Local master Browser */
-		smb_init_name_struct(
-		    (unsigned char *)resource_domain, suffix,
+		smb_init_name_struct((unsigned char *)resource_domain, suffix,
 		    0, 0, 0, 0, 0, &dest_name);
-		if (smb_browser_bcast_addr_of_subnet(0, net, &dest_name) < 0)
+		if (smb_browser_bcast_addr_of_subnet(0, hinfo->hi_nic.nic_bcast,
+		    &dest_name) < 0)
 			return;
 	} else {
-		smb_init_name_struct(
-		    (unsigned char *)resource_domain, suffix,
+		smb_init_name_struct((unsigned char *)resource_domain, suffix,
 		    0, 0, 0, 0, 0, &dest_name);
 		dest_name.addr_list = *addr;
 		dest_name.addr_list.forw = dest_name.addr_list.back =
@@ -880,22 +797,14 @@ smb_browser_send_HostAnnouncement(int net, int32_t next_announcement,
 		return;
 	}
 
-	subnet = smb_browser_getnet(net);
-	if (subnet == 0) {
-		free(buffer);
-		return;
-	}
-
-	server = &subnet->server;
-
 	data_length = 1 + 1 + 4 + 16 + 1 + 1 + 4 + 4 +
-	    strlen(server->comment) + 1;
+	    strlen(hinfo->hi_nic.nic_cmnt) + 1;
 
-	if ((offset = smb_browser_load_transact_header(buffer,
+	offset = smb_browser_load_transact_header(buffer,
 	    MAX_DATAGRAM_LENGTH, data_length, ONE_WAY_TRANSACTION,
-	    browse)) < 0) {
+	    MAILSLOT_BROWSE);
 
-		smb_browser_putnet(subnet);
+	if (offset < 0) {
 		free(buffer);
 		return;
 	}
@@ -905,60 +814,66 @@ smb_browser_send_HostAnnouncement(int net, int32_t next_announcement,
 	 * specifying a type of 0 just prior to shutting down, to allow it to
 	 * quickly be removed from the list of available servers.
 	 */
-	type = (nb_status.state & NETBIOS_SHUTTING_DOWN) ? 0 : server->type;
+	if (remove || (nb_status.state & NETBIOS_SHUTTING_DOWN))
+		type = 0;
+	else
+		type = hinfo->hi_type;
 
 	smb_msgbuf_init(&mb, buffer + offset, MAX_DATAGRAM_LENGTH - offset, 0);
-	announce_len = smb_msgbuf_encode(&mb, "bbl16cbblls",
-	    (char)HOST_ANNOUNCEMENT,	/* Announcement opcode */
-	    (char)++subnet->server.update_count,
-	    next_announcement * 60000,	/* Periodicity in MilliSeconds */
-	    server->hostname, /* Server name */
-	    server->major,	/* our major version */
-	    server->minor,	/* our minor version */
-	    type,		/* server type  */
-	    server->signature,	/* Signature */
-	    server->comment);	/* Let 'em know */
 
-	server_name = server->name;
-	smb_browser_putnet(subnet);
+	announce_len = smb_msgbuf_encode(&mb, "bbl16cbblls",
+	    HOST_ANNOUNCEMENT,
+	    ++hinfo->hi_updatecnt,
+	    next_announcement * 60000,	/* Periodicity in MilliSeconds */
+	    hinfo->hi_nbname,
+	    SMB_VERSION_MAJOR,
+	    SMB_VERSION_MINOR,
+	    type,
+	    SMB_SERVER_SIGNATURE,
+	    hinfo->hi_nic.nic_cmnt);
 
 	if (announce_len > 0)
-		(void) smb_netbios_datagram_send(&server_name, &dest_name,
+		(void) smb_netbios_datagram_send(&hinfo->hi_netname, &dest_name,
 		    buffer, offset + announce_len);
 
 	free(buffer);
 	smb_msgbuf_term(&mb);
 }
 
-void
+static void
 smb_browser_process_AnnouncementRequest(struct datagram *datagram,
     char *mailbox)
 {
-	struct browser_netinfo *subnet;
-	unsigned int next_announcement;
+	smb_hostinfo_t *hinfo;
+	uint32_t next_announcement;
 	uint32_t delay = random() % 29; /* in seconds */
-	int	net;
+	boolean_t h_found = B_FALSE;
 
-	if (strcmp(mailbox, lanman) != 0) {
+	if (strcmp(mailbox, MAILSLOT_LANMAN) != 0) {
 		syslog(LOG_DEBUG, "smb_browse: Wrong Mailbox (%s)", mailbox);
-		return;
-	}
-
-	net = smb_net_id(datagram->src.addr_list.sin.sin_addr.s_addr);
-	if (net < 0) {
-		/* We don't know who this is so ignore it... */
 		return;
 	}
 
 	(void) sleep(delay);
 
-	subnet = smb_browser_getnet(net);
-	if (subnet) {
-		next_announcement = subnet->next_announce * 60 * 1000;
-		smb_browser_putnet(subnet);
-		smb_browser_send_HostAnnouncement(net, next_announcement,
-		    &datagram->src.addr_list, 0x1D);
+	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
+	hinfo = list_head(&smb_binfo.bi_hlist);
+	while (hinfo) {
+		if ((hinfo->hi_nic.nic_ip & hinfo->hi_nic.nic_mask) ==
+		    (datagram->src.addr_list.sin.sin_addr.s_addr &
+		    hinfo->hi_nic.nic_mask)) {
+			h_found = B_TRUE;
+			break;
+		}
+		hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 	}
+
+	if (h_found) {
+		next_announcement = hinfo->hi_nextannouce * 60 * 1000;
+		smb_browser_send_HostAnnouncement(hinfo, next_announcement,
+		    B_FALSE, &datagram->src.addr_list, 0x1D);
+	}
+	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
 }
 
 void *
@@ -1119,19 +1034,20 @@ smb_browser_dispatch(void *arg)
  *     This name is registered by Primary Domain Controllers.
  */
 
-void
+static void
 smb_browser_config(void)
 {
+	smb_hostinfo_t *hinfo;
 	struct name_entry	name;
 	struct name_entry	master;
 	struct name_entry	dest;
 	struct name_entry	*entry;
-	int smb_nc_cnt;
-	net_cfg_t cfg;
-	int net;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
+	int rc;
 
-	smb_browser_init();
+	if (smb_browser_init() != 0)
+		return;
+
 	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
 		return;
 	(void) utf8_strupr(resource_domain);
@@ -1142,18 +1058,17 @@ smb_browser_config(void)
 	entry = smb_name_find_name(&name);
 	smb_name_unlock_name(entry);
 
-	smb_nc_cnt = smb_nic_get_num();
-	for (net = 0; net < smb_nc_cnt; net++) {
-		if (smb_nic_get_byind(net, &cfg) == NULL)
-			break;
-		if (cfg.exclude)
-			continue;
-		smb_init_name_struct(
-		    (unsigned char *)resource_domain, 0x00, 0,
-		    cfg.ip, htons(DGM_SRVC_UDP_PORT),
+	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
+	hinfo = list_head(&smb_binfo.bi_hlist);
+	while (hinfo) {
+		smb_init_name_struct((unsigned char *)resource_domain, 0x00, 0,
+		    hinfo->hi_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
 		    NAME_ATTR_GROUP, NAME_ATTR_LOCAL, &name);
 		(void) smb_name_add_name(&name);
+
+		hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 	}
+	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
 
 	/* All our local master browsers */
 	smb_init_name_struct((unsigned char *)resource_domain, 0x1D,
@@ -1161,16 +1076,23 @@ smb_browser_config(void)
 	entry = smb_name_find_name(&dest);
 
 	if (entry) {
-		for (net = 0; net < smb_nc_cnt; net++) {
-			if (smb_browser_addr_of_subnet(entry, net, &master)
-			    == 0) {
+		(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
+		hinfo = list_head(&smb_binfo.bi_hlist);
+		while (hinfo) {
+			rc = smb_browser_addr_of_subnet(entry, hinfo, &master);
+			if (rc == 0) {
 				syslog(LOG_DEBUG,
 				    "smbd: Master browser found at %s",
 				    inet_ntoa(master.addr_list.sin.sin_addr));
 			}
+			hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 		}
+		(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+
 		smb_name_unlock_name(entry);
 	}
+
+	/* Domain master browser */
 	smb_init_name_struct((unsigned char *)resource_domain,
 	    0x1B, 0, 0, 0, 0, 0, &dest);
 
@@ -1182,65 +1104,60 @@ smb_browser_config(void)
 	}
 }
 
-static void
-smb_browser_init()
+static int
+smb_browser_init(void)
 {
-	struct browser_netinfo *subnet;
-	struct server_info *server;
-	char cmnt[SMB_PI_MAX_COMMENT], hostname[MAXHOSTNAMELEN];
-	int i, j;
-	int smb_nc_cnt;
-	net_cfg_t cfg;
+	smb_hostinfo_t *hinfo;
+	smb_niciter_t ni;
+	uint32_t type;
 
-	(void) smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-	(void) smb_config_getstr(SMB_CI_SYS_CMNT, cmnt, sizeof (cmnt));
+	(void) rw_wrlock(&smb_binfo.bi_hlist_rwl);
+	smb_browser_infofree();
 
-	smb_nc_cnt = smb_nic_get_num();
-	for (i = 0; i < smb_nc_cnt; i++) {
-		if (smb_nic_get_byind(i, &cfg) == NULL)
-			break;
-		if (cfg.exclude)
+	if (smb_nic_getfirst(&ni) != 0) {
+		(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+		return (-1);
+	}
+
+	type = MY_SERVER_TYPE;
+	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN)
+		type |= SV_DOMAIN_MEMBER;
+
+	do {
+		if (ni.ni_nic.nic_smbflags & SMB_NICF_NBEXCL)
 			continue;
 
-		subnet = &smb_browser_info[i];
-		(void) mutex_lock(&subnet->mtx);
+		hinfo = malloc(sizeof (smb_hostinfo_t));
+		if (hinfo == NULL) {
+			smb_browser_infofree();
+			(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+			return (-1);
+		}
 
+		hinfo->hi_nic = ni.ni_nic;
 		/* One Minute announcements for first five */
-		subnet->flags = BROWSER_NF_VALID;
-		subnet->next_announce = 1;
-		subnet->interval = 1;
-		subnet->reps = 5;
+		hinfo->hi_nextannouce = 1;
+		hinfo->hi_interval = 1;
+		hinfo->hi_reps = 5;
+		hinfo->hi_updatecnt = 0;
+		hinfo->hi_type = type;
 
-		server = &subnet->server;
-		bzero(server, sizeof (struct server_info));
+		/* This is the name used for HostAnnouncement */
+		(void) strlcpy(hinfo->hi_nbname, hinfo->hi_nic.nic_host,
+		    NETBIOS_NAME_SZ);
+		(void) utf8_strupr(hinfo->hi_nbname);
 
-		server->type = MY_SERVER_TYPE;
-		server->major = SMB_VERSION_MAJOR;
-		server->minor = SMB_VERSION_MINOR;
-		server->signature = SMB_SERVER_SIGNATURE;
-		(void) strlcpy(server->comment, cmnt, SMB_PI_MAX_COMMENT);
+		/* 0x20: file server service  */
+		smb_init_name_struct((unsigned char *)hinfo->hi_nbname,
+		    0x20, 0, hinfo->hi_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
+		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &hinfo->hi_netname);
 
-		(void) snprintf(server->hostname, NETBIOS_NAME_SZ, "%.15s",
-		    hostname);
+		list_insert_tail(&smb_binfo.bi_hlist, hinfo);
+		smb_binfo.bi_hcnt++;
+	} while (smb_nic_getnext(&ni) == 0);
 
-		/*
-		 * 00 is workstation service.
-		 * 20 is file server service.
-		 */
-		smb_init_name_struct((unsigned char *)server->hostname, 0x20, 0,
-		    cfg.ip, htons(DGM_SRVC_UDP_PORT),
-		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &server->name);
-
-		(void) mutex_unlock(&subnet->mtx);
-	}
-
-	/* Invalidate unconfigured NICs */
-	for (j = i; j < SMB_PI_MAX_NETWORKS; j++) {
-		subnet = &smb_browser_info[j];
-		(void) mutex_lock(&subnet->mtx);
-		subnet->flags = BROWSER_NF_INVALID;
-		(void) mutex_unlock(&subnet->mtx);
-	}
+	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+	return (0);
 }
 
 /*
@@ -1251,24 +1168,16 @@ smb_browser_init()
  * is a member of domain "D", this frame is sent to the NETBIOS unique name
  * D(1d) and mailslot "\\MAILSLOT\\BROWSE".
  */
-void
-smb_browser_non_master_duties(int net)
+static void
+smb_browser_non_master_duties(smb_hostinfo_t *hinfo, boolean_t remove)
 {
-	struct browser_netinfo *subnet;
 	struct name_entry name;
 	struct name_entry *dest;
 	struct addr_entry addr;
-	int interval;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 
-	subnet = smb_browser_getnet(net);
-	if (subnet == 0)
-		return;
-
-	interval = subnet->interval;
-	smb_browser_putnet(subnet);
-
-	smb_browser_send_HostAnnouncement(net, interval, 0, 0x1D);
+	smb_browser_send_HostAnnouncement(hinfo, hinfo->hi_interval,
+	    remove, 0, 0x1D);
 	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
 		return;
 
@@ -1281,41 +1190,39 @@ smb_browser_non_master_duties(int net)
 		addr = dest->addr_list;
 		addr.forw = addr.back = &addr;
 		smb_name_unlock_name(dest);
-		smb_browser_send_HostAnnouncement(net, interval, &addr, 0x1D);
+		smb_browser_send_HostAnnouncement(hinfo, hinfo->hi_interval,
+		    remove, &addr, 0x1D);
 	} else {
-		smb_init_name_struct(
-		    (unsigned char *)resource_domain, 0x1B,
+		smb_init_name_struct((unsigned char *)resource_domain, 0x1B,
 		    0, 0, 0, 0, 0, &name);
 		if ((dest = smb_name_find_name(&name))) {
 			addr = dest->addr_list;
 			addr.forw = addr.back = &addr;
 			smb_name_unlock_name(dest);
-			smb_browser_send_HostAnnouncement(net, interval,
-			    &addr, 0x1B);
+			smb_browser_send_HostAnnouncement(hinfo,
+			    remove, hinfo->hi_interval, &addr, 0x1B);
 		}
 	}
 
-	subnet = smb_browser_getnet(net);
 	/*
 	 * One Minute announcements for first five
-	 * minutes, one munute longer each round
+	 * minutes, one minute longer each round
 	 * until 12 minutes and every 12 minutes
 	 * thereafter.
 	 */
-	if (--subnet->reps == 0) {
-		if (subnet->interval < 12)
-			subnet->interval++;
+	if (--hinfo->hi_reps == 0) {
+		if (hinfo->hi_interval < 12)
+			hinfo->hi_interval++;
 
-		subnet->reps = 1;
+		hinfo->hi_reps = 1;
 	}
 
-	subnet->next_announce = subnet->interval;
-	smb_browser_putnet(subnet);
+	hinfo->hi_nextannouce = hinfo->hi_interval;
 }
 
 
 /*
- * browser_sleep
+ * smb_browser_sleep
  *
  * Put browser in 1 minute sleep if netbios services are not
  * shutting down and both name and datagram services are still
@@ -1324,10 +1231,10 @@ smb_browser_non_master_duties(int net)
  * 1 if everything is ok or 0 if browser shouldn't continue
  * running.
  */
-static int
-browser_sleep()
+static boolean_t
+smb_browser_sleep(void)
 {
-	int slept = 0;
+	boolean_t slept = B_FALSE;
 	timestruc_t to;
 
 	(void) mutex_lock(&nb_status.mtx);
@@ -1337,21 +1244,21 @@ browser_sleep()
 
 		if (slept) {
 			(void) mutex_unlock(&nb_status.mtx);
-			return (1);
+			return (B_TRUE);
 		}
 
 		to.tv_sec = 60;  /* 1 minute */
 		to.tv_nsec = 0;
 		(void) cond_reltimedwait(&nb_status.cv, &nb_status.mtx, &to);
-		slept = 1;
+		slept = B_TRUE;
 	}
 	(void) mutex_unlock(&nb_status.mtx);
 
-	return (0);
+	return (B_FALSE);
 }
 
 /*
- * smb_browser_start
+ * smb_browser_daemon
  *
  * Smb Netbios browser daemon.
  */
@@ -1359,38 +1266,125 @@ browser_sleep()
 void *
 smb_browser_daemon(void *arg)
 {
-	int	net;
-	int next_announce;
-	struct browser_netinfo *subnet;
-	int run = 1;
-	int smb_nc_cnt;
-	net_cfg_t cfg;
+	smb_hostinfo_t *hinfo;
 
+	smb_browser_infoinit();
 	smb_browser_config();
 
-	nb_status.state |= NETBIOS_BROWSER_RUNNING;
+	smb_netbios_chg_status(NETBIOS_BROWSER_RUNNING, 1);
 
-	while (run) {
-		smb_nc_cnt = smb_nic_get_num();
-		for (net = 0; net < smb_nc_cnt; net++) {
-			if (smb_nic_get_byind(net, &cfg) == NULL)
-				break;
-			if (cfg.exclude)
+restart:
+	do {
+		(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
+		hinfo = list_head(&smb_binfo.bi_hlist);
+		while (hinfo) {
+			if (--hinfo->hi_nextannouce > 0 ||
+			    hinfo->hi_nic.nic_bcast == 0) {
+				hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 				continue;
+			}
 
-			subnet = smb_browser_getnet(net);
-			next_announce = --subnet->next_announce;
-			smb_browser_putnet(subnet);
+			smb_browser_non_master_duties(hinfo, B_FALSE);
 
-			if (next_announce > 0 || cfg.broadcast == 0)
-				continue;
+			/* Check to see whether reconfig is needed */
+			(void) mutex_lock(&smb_binfo.bi_mtx);
+			if (smb_binfo.bi_changed) {
+				smb_binfo.bi_changed = B_FALSE;
+				(void) mutex_unlock(&smb_binfo.bi_mtx);
+				(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+				smb_browser_config();
+				goto restart;
+			}
+			(void) mutex_unlock(&smb_binfo.bi_mtx);
 
-			smb_browser_non_master_duties(net);
+			hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 		}
+		(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+	} while (smb_browser_sleep());
 
-		run = browser_sleep();
-	}
-
+	smb_browser_infoterm();
 	smb_netbios_chg_status(NETBIOS_BROWSER_RUNNING, 0);
 	return (0);
+}
+
+/*
+ * smb_browser_netlogon
+ *
+ * Sends SAMLOGON/NETLOGON request for all host/ips, except
+ * aliases, to find a domain controller.
+ */
+void
+smb_browser_netlogon(char *domain)
+{
+	smb_hostinfo_t *hinfo;
+	int protocol;
+
+	if (smb_config_getbool(SMB_CI_DOMAIN_MEMB))
+		protocol = NETLOGON_PROTO_SAMLOGON;
+	else
+		protocol = NETLOGON_PROTO_NETLOGON;
+
+	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
+	hinfo = list_head(&smb_binfo.bi_hlist);
+	while (hinfo) {
+		if ((hinfo->hi_nic.nic_smbflags & SMB_NICF_ALIAS) == 0)
+			smb_netlogon_request(&hinfo->hi_netname, protocol,
+			    domain);
+		hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
+	}
+	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+}
+
+/*
+ * smb_browser_infoinit
+ *
+ * This function is called only once when browser daemon starts
+ * to initialize global smb_binfo structure
+ */
+static void
+smb_browser_infoinit(void)
+{
+	(void) rw_wrlock(&smb_binfo.bi_hlist_rwl);
+	list_create(&smb_binfo.bi_hlist, sizeof (smb_hostinfo_t),
+	    offsetof(smb_hostinfo_t, hi_lnd));
+	smb_binfo.bi_hcnt = 0;
+	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+
+	(void) mutex_lock(&smb_binfo.bi_mtx);
+	smb_binfo.bi_changed = B_FALSE;
+	(void) mutex_unlock(&smb_binfo.bi_mtx);
+}
+
+/*
+ * smb_browser_infoterm
+ *
+ * This function is called only once when browser daemon stops
+ * to destruct smb_binfo structure
+ */
+static void
+smb_browser_infoterm(void)
+{
+	(void) rw_wrlock(&smb_binfo.bi_hlist_rwl);
+	smb_browser_infofree();
+	list_destroy(&smb_binfo.bi_hlist);
+	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
+}
+
+/*
+ * smb_browser_infofree
+ *
+ * Removes all the hostinfo structures from the browser list
+ * and frees the allocated memory
+ */
+static void
+smb_browser_infofree(void)
+{
+	smb_hostinfo_t *hinfo;
+
+	while ((hinfo = list_head(&smb_binfo.bi_hlist)) != NULL) {
+		list_remove(&smb_binfo.bi_hlist, hinfo);
+		free(hinfo);
+	}
+
+	smb_binfo.bi_hcnt = 0;
 }

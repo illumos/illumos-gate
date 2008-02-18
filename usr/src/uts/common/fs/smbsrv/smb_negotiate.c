@@ -240,7 +240,7 @@ static void smb_get_security_info(
  * Function: int smb_com_negotiate(struct smb_request *)
  */
 
-int
+smb_sdrc_t
 smb_com_negotiate(struct smb_request *sr)
 {
 	int			dialect = 0;
@@ -254,6 +254,7 @@ smb_com_negotiate(struct smb_request *sr)
 	unsigned short		secmode;
 	uint32_t		sesskey;
 	uint32_t		capabilities = 0;
+	int			rc;
 
 	unsigned short max_mpx_count;
 	WORD tz_correction;
@@ -262,7 +263,7 @@ smb_com_negotiate(struct smb_request *sr)
 	if (sr->session->s_state != SMB_SESSION_STATE_ESTABLISHED) {
 		/* The protocol has already been negotiated. */
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	for (pos = 0;
@@ -270,7 +271,7 @@ smb_com_negotiate(struct smb_request *sr)
 	    pos++) {
 		if (smb_decode_mbc(&sr->smb_data, "%L", sr, &p) != 0) {
 			smbsr_error(sr, 0, ERRSRV, ERRerror);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		this_dialect = smb_xlate_dialect_str_to_cd(p);
@@ -285,7 +286,7 @@ smb_com_negotiate(struct smb_request *sr)
 	}
 	if (sel_pos < 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	smb_get_security_info(sr, &secmode, (unsigned char *)key,
@@ -301,7 +302,7 @@ smb_com_negotiate(struct smb_request *sr)
 		(void) sosetsockopt(sr->session->sock, SOL_SOCKET, SO_RCVBUF,
 		    (const void *)&smb_dos_tcp_rcvbuf,
 		    sizeof (smb_dos_tcp_rcvbuf));
-		smbsr_encode_result(sr, 1, 0, "bww", 1, sel_pos, 0);
+		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, sel_pos, 0);
 		break;
 
 	case Windows_for_Workgroups_3_1a:
@@ -315,7 +316,7 @@ smb_com_negotiate(struct smb_request *sr)
 		    (const void *)&smb_dos_tcp_rcvbuf,
 		    sizeof (smb_dos_tcp_rcvbuf));
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
-		smbsr_encode_result(sr, 13, VAR_BCC,
+		rc = smbsr_encode_result(sr, 13, VAR_BCC,
 		    "(wct) b" "(dix) w" "(sec) w" "(mbs) w"
 		    "(mmc) w" "(mnv) w" "(raw) w" "(key) l"
 		    "(tim/dat) Y"       "(tz)  w" "(ekl) w"
@@ -343,7 +344,7 @@ smb_com_negotiate(struct smb_request *sr)
 		    (const void *)&smb_dos_tcp_rcvbuf,
 		    sizeof (smb_dos_tcp_rcvbuf));
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
-		smbsr_encode_result(sr, 13, VAR_BCC,
+		rc = smbsr_encode_result(sr, 13, VAR_BCC,
 		    "(wct) b" "(dix) w" "(sec) w" "(mbs) w"
 		    "(mmc) w" "(mnv) w" "(raw) w" "(key) l"
 		    "(tim/dat) Y"       "(tz)  w" "(ekl) w"
@@ -411,7 +412,7 @@ smb_com_negotiate(struct smb_request *sr)
 		/*LINTED E_ASSIGN_NARROW_CONV (uint16_t)*/
 		max_mpx_count = smb_info.si.skc_maxworkers;
 
-		smbsr_encode_result(sr, 17, VAR_BCC,
+		rc = smbsr_encode_result(sr, 17, VAR_BCC,
 		    "(wct) b" "(dix) w" "(sec) b" "(mmc) w"
 		    "(mnv) w" "(mbs) l" "(raw) l" "(key) l"
 		    "(cap) l" "(tim) T" "(tz) w" "(ekl) b"
@@ -436,8 +437,11 @@ smb_com_negotiate(struct smb_request *sr)
 
 	default:
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
+
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	/*
 	 * Save the agreed dialect. Note that this value is also

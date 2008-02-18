@@ -324,7 +324,7 @@
 /*
  * Function: int smb_com_trans2_query_path_information(struct smb_request *)
  */
-int
+smb_sdrc_t
 smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	char			*path, *alt_nm_ptr;
@@ -343,7 +343,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 		    ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -355,8 +355,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(name, MAXNAMELEN);
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -383,7 +382,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -394,7 +393,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 	smb_node_release(dir_node);
 	(void) strcpy(name, node->od_name);
@@ -577,9 +576,9 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
-		/* NOTREACHED */
-		break;
+		return (SDRC_ERROR_REPLY);
 	}
+
 	smb_node_release(node);
 	kmem_free(name, MAXNAMELEN);
 	kmem_free(short_name, MAXNAMELEN);

@@ -299,6 +299,7 @@ smb_fsop_create(
     smb_attr_t *ret_attr)
 {
 	struct open_param *op = &sr->arg.open;
+	boolean_t no_xvattr = B_FALSE;
 	smb_node_t *fnode;
 	smb_attr_t file_attr;
 	vnode_t *xattrdirvp;
@@ -396,6 +397,31 @@ smb_fsop_create(
 
 		rc = smb_vop_stream_create(fnode->vp, sname, attr, &vp,
 		    &xattrdirvp, flags, cr);
+
+		if (rc != 0) {
+			smb_node_release(fnode);
+			kmem_free(fname, MAXNAMELEN);
+			kmem_free(sname, MAXNAMELEN);
+			return (rc);
+		}
+
+		if (sr && sr->tid_tree)
+			if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
+				no_xvattr = B_TRUE;
+
+		attr->sa_vattr.va_uid = file_attr.sa_vattr.va_uid;
+		attr->sa_vattr.va_gid = file_attr.sa_vattr.va_gid;
+		attr->sa_mask = SMB_AT_UID | SMB_AT_GID;
+
+		/*
+		 * The second parameter of smb_vop_setattr() is set to
+		 * NULL, even though an unnamed stream exists.  This is
+		 * because we want to set the UID and GID on the named
+		 * stream in this case for consistency with the (unnamed
+		 * stream) file (see comments for smb_vop_setattr()).
+		 */
+
+		rc = smb_vop_setattr(vp, NULL, attr, 0, kcred, no_xvattr);
 
 		if (rc != 0) {
 			smb_node_release(fnode);

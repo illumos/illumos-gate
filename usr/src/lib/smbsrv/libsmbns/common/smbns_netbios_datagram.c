@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -323,7 +323,6 @@ smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
 	char *buffer;
 	char ha_source[NETBIOS_DOMAIN_NAME_MAX];
 	char ha_dest[NETBIOS_DOMAIN_NAME_MAX];
-	net_cfg_t cfg;
 
 	(void) smb_first_level_name_encode(src, (unsigned char *)ha_source,
 	    sizeof (ha_source));
@@ -378,9 +377,8 @@ smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
 	do {
 		ipaddr = addr->sin.sin_addr.s_addr;
 		/* Don't send anything to myself... */
-		if (smb_nic_get_byip(ipaddr, &cfg) != NULL) {
+		if (smb_nic_exists(ipaddr, B_FALSE))
 			goto next;
-		}
 
 		sin.sin_addr.s_addr = ipaddr;
 		sin.sin_port = addr->sin.sin_port;
@@ -405,7 +403,6 @@ smb_netbios_datagram_send_to_net(struct name_entry *src,
 	char *buffer;
 	char ha_source[NETBIOS_DOMAIN_NAME_MAX];
 	char ha_dest[NETBIOS_DOMAIN_NAME_MAX];
-	net_cfg_t cfg;
 
 	(void) smb_first_level_name_encode(src, (unsigned char *)ha_source,
 	    sizeof (ha_source));
@@ -459,9 +456,9 @@ smb_netbios_datagram_send_to_net(struct name_entry *src,
 	addr = &dest->addr_list;
 	do {
 		ipaddr = addr->sin.sin_addr.s_addr;
-		if (smb_nic_get_byip(ipaddr, &cfg) != NULL) {
+		if (smb_nic_exists(ipaddr, B_FALSE))
 			goto next;
-		}
+
 		sin.sin_addr.s_addr = ipaddr;
 		sin.sin_port = addr->sin.sin_port;
 		(void) sendto(datagram_sock, buffer, count, 0,
@@ -954,7 +951,6 @@ smb_netbios_datagram_service_daemon(void *arg)
 	struct sockaddr_in 	sin;
 	struct datagram 	*datagram;
 	int			bytes, flag = 1;
-	net_cfg_t cfg;
 
 	(void) mutex_lock(&smb_dgq_mtx);
 	bzero(&smb_datagram_queue, sizeof (smb_datagram_queue));
@@ -1009,11 +1005,11 @@ ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
 		}
 
 		/* Ignore any incoming packets from myself... */
-		if (smb_nic_get_byip(
-		    datagram->inaddr.sin.sin_addr.s_addr,
-		    &cfg) != NULL) {
+		if (smb_nic_exists(datagram->inaddr.sin.sin_addr.s_addr,
+		    B_FALSE)) {
 			goto ignore;
 		}
+
 		if (smb_datagram_decode(datagram, bytes) < 0)
 			goto ignore;
 

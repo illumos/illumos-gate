@@ -39,54 +39,50 @@
  * Failure to set the timestamp, even if requested by the client,
  * should not result in an error response from the server.
  */
-int
+smb_sdrc_t
 smb_com_close(struct smb_request *sr)
 {
 	uint32_t last_wtime;
 	int rc = 0;
 
 	rc = smbsr_decode_vwv(sr, "wl", &sr->smb_fid, &last_wtime);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smb_common_close(sr, last_wtime);
 	if (rc) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_empty_result(sr);
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
  * Close the file represented by fid and then disconnect the
  * associated tree.
  */
-int
+smb_sdrc_t
 smb_com_close_and_tree_disconnect(struct smb_request *sr)
 {
 	uint32_t last_wtime;
 	int rc = 0;
 
 	rc = smbsr_decode_vwv(sr, "wl", &sr->smb_fid, &last_wtime);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smb_common_close(sr, last_wtime);
@@ -95,11 +91,11 @@ smb_com_close_and_tree_disconnect(struct smb_request *sr)
 
 	if (rc) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_empty_result(sr);
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*

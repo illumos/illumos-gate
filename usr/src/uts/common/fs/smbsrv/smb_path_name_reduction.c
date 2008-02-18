@@ -218,6 +218,11 @@ smb_pathname_reduce(
 	*dir_node = NULL;
 	*last_component = '\0';
 
+	if (sr && sr->tid_tree) {
+		if (!STYPE_ISDSK(sr->tid_tree->t_res_type))
+			return (EACCES);
+	}
+
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		lookup_flags |= FIGNORECASE;
 

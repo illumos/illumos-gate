@@ -351,12 +351,21 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 /*
  * smb_vop_setattr()
  *
- * smb_fsop_setattr()/smb_vop_setattr() should always be called from the CIFS
- * service to set attributes due to special processing for streams files.
+ * smb_fsop_setattr()/smb_vop_setattr() should always be used instead of
+ * VOP_SETATTR() when calling from the CIFS service, due to special processing
+ * for streams files.
  *
- * When smb_vop_setattr() is called on a named stream file, all indicated
- * attributes except the size are set on the unnamed stream file.  The size
- * (if indicated) is set on the named stream file.
+ * Streams have a size but otherwise do not have separate attributes from
+ * the (unnamed stream) file, i.e., the security and ownership of the file
+ * applies to the stream.  In contrast, extended attribute files, which are
+ * used to implement streams, are independent objects with their own
+ * attributes.
+ *
+ * For compatibility with streams, we set the size on the extended attribute
+ * file and apply other attributes to the (unnamed stream) file.  The one
+ * exception is that the UID and GID can be set on the stream by passing a
+ * NULL unnamed_vp, which allows callers to synchronize stream ownership
+ * with the (unnamed stream) file.
  */
 
 int
@@ -403,7 +412,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 	/*
 	 * If the size of the stream needs to be set, set it on
 	 * the stream file directly.  (All other indicated attributes
-	 * are set on the stream's unnamed stream, above.)
+	 * are set on the stream's unnamed stream, except under the
+	 * exception described in the function header.)
 	 */
 
 	if (at_size) {

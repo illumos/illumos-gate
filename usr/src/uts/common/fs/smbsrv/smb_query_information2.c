@@ -61,29 +61,28 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_query_information2(struct smb_request *sr)
 {
 	smb_node_t *node;
 	smb_attr_t *attr;
 	uint32_t	dsize, dasize;
 	unsigned short	dattr;
+	int rc;
 
-	if (smbsr_decode_vwv(sr, "w", &sr->smb_fid) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "w", &sr->smb_fid) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 
 	if (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	node = sr->fid_ofile->f_node;
@@ -93,7 +92,7 @@ smb_com_query_information2(struct smb_request *sr)
 	dasize = attr->sa_vattr.va_blksize * attr->sa_vattr.va_nblocks;
 	dsize = (dattr & SMB_FA_DIRECTORY) ? 0 : attr->sa_vattr.va_size;
 
-	smbsr_encode_result(sr, 11, 0, "byyyllww",
+	rc = smbsr_encode_result(sr, 11, 0, "byyyllww",
 	    11,						/* wct */
 	    smb_gmt_to_local_time(attr->sa_crtime.tv_sec),
 	    /* LastAccessTime */
@@ -105,5 +104,5 @@ smb_com_query_information2(struct smb_request *sr)
 	    dattr,					/* FileAttributes */
 	    0);						/* bcc */
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

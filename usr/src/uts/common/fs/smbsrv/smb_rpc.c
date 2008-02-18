@@ -245,7 +245,7 @@ smb_rpc_initialize(struct smb_request *sr, char *pipe_name)
  * residual data remains in the output stream until the client claims
  * it or closes the pipe.
  */
-int
+smb_sdrc_t
 smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 {
 	struct smb_xa *xa;
@@ -271,7 +271,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 		smb_rpc_exit(pipe_info);
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	streamin = &pipe_info->input;
@@ -290,7 +290,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 		smb_rpc_exit(pipe_info);
 		smbsr_error(sr, NT_STATUS_CLIENT_SERVER_PARAMETERS_INVALID,
 		    0, 0);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*

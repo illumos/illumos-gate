@@ -53,7 +53,7 @@ static int smb_do_rename(struct smb_request *sr,
  * renamed. The encoding of SearchAttributes is described in section 3.10
  * - File Attribute Encoding.
  */
-int
+smb_sdrc_t
 smb_com_rename(struct smb_request *sr)
 {
 	static kmutex_t mutex;
@@ -65,22 +65,18 @@ smb_com_rename(struct smb_request *sr)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	src_fqi = &sr->arg.dirop.fqi;
 	dst_fqi = &sr->arg.dirop.dst_fqi;
 
-	if (smbsr_decode_vwv(sr, "w", &src_fqi->srch_attr) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "w", &src_fqi->srch_attr) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	rc = smbsr_decode_data(sr, "%SS", sr, &src_fqi->path, &dst_fqi->path);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	dst_fqi->srch_attr = 0;
 
@@ -101,17 +97,17 @@ smb_com_rename(struct smb_request *sr)
 		if (rc == EEXIST) {
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
 			    ERRDOS, ERROR_ALREADY_EXISTS);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		if (rc == EPIPE) {
 			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (src_fqi->dir_snode)
@@ -129,9 +125,8 @@ smb_com_rename(struct smb_request *sr)
 	SMB_NULL_FQI_NODES(*src_fqi);
 	SMB_NULL_FQI_NODES(*dst_fqi);
 
-	smbsr_encode_empty_result(sr);
-
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*

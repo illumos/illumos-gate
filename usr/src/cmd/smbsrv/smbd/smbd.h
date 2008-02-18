@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@ extern "C" {
 
 extern int smb_nicmon_start(void);
 extern void smb_nicmon_stop(void);
+extern void smb_nicmon_reconfig(void);
 extern int smb_winpipe_doorsvc_start(void);
 extern void smb_winpipe_doorsvc_stop(void);
 extern int smb_lmshrd_srv_start(void);

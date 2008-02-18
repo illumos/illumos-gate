@@ -227,7 +227,7 @@
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_door_svc.h>
 
-int
+smb_sdrc_t
 smb_com_session_setup_andx(struct smb_request *sr)
 {
 	uint16_t maxbufsize, maxmpxcount, vcnumber = 0;
@@ -256,10 +256,8 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		    &sr->andx_off, &maxbufsize, &maxmpxcount, &vcnumber,
 		    &sesskey, &ci_pwlen, &cs_pwlen, &capabilities);
 
-		if (rc != 0) {
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
-		}
+		if (rc != 0)
+			return (SDRC_ERROR_REPLY);
 
 		ci_password = kmem_alloc(ci_pwlen + 1, KM_SLEEP);
 		cs_password = kmem_alloc(cs_pwlen + 1, KM_SLEEP);
@@ -288,8 +286,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		if (rc != 0) {
 			kmem_free(ci_password, ci_pwlen + 1);
 			kmem_free(cs_password, cs_pwlen + 1);
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		ci_password[ci_pwlen] = 0;
@@ -315,17 +312,14 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		    &sr->andx_off, &maxbufsize, &maxmpxcount,
 		    &vcnumber, &sesskey, &ci_pwlen);
 
-		if (rc != 0) {
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
-		}
+		if (rc != 0)
+			return (SDRC_ERROR_REPLY);
 
 		ci_password = kmem_alloc(ci_pwlen + 1, KM_SLEEP);
 		rc = smbsr_decode_data(sr, "%#c", sr, ci_pwlen, ci_password);
 		if (rc != 0) {
 			kmem_free(ci_password, ci_pwlen + 1);
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		ci_password[ci_pwlen] = 0;
@@ -371,7 +365,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		if (cs_password)
 			kmem_free(cs_password, cs_pwlen + 1);
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	} else if (utf8_strcasecmp(primary_domain, hostname) == 0) {
 		/*
 		 * When domain name is equal to hostname, it means
@@ -430,7 +424,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 			if (cs_password)
 				kmem_free(cs_password, cs_pwlen + 1);
 			smbsr_error(sr, 0, ERRSRV, ERRbadpw);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		if (usr_token->tkn_session_key) {
@@ -462,7 +456,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		if (session_key)
 			kmem_free(session_key, sizeof (smb_session_key_t));
 		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
-		/* no return */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->user_cr = user->u_cred;
@@ -499,7 +493,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	 * and I don't know if a change would cause any problems (see the
 	 * conditional test below).
 	 */
-	smbsr_encode_result(sr, 3, VAR_BCC, "bb.www%uuu",
+	rc = smbsr_encode_result(sr, 3, VAR_BCC, "bb.www%uuu",
 	    3,
 	    sr->andx_com,
 	    -1,			/* andx_off */
@@ -510,5 +504,5 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	    "NT LAN Manager 4.0",
 	    smb_info.si.skc_resource_domain);
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

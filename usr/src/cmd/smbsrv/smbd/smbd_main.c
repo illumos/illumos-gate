@@ -66,9 +66,6 @@
 #define	SMB_CCACHE SMB_VARRUN_DIR "/ccache"
 #define	SMB_DBDIR "/var/smb"
 
-extern void smb_netbios_name_reconfig();
-extern void smb_browser_config();
-
 static int smbd_daemonize_init(void);
 static void smbd_daemonize_fini(int, int);
 
@@ -439,6 +436,9 @@ smbd_service_init(void)
 	}
 
 	(void) smb_lgrp_start();
+
+	(void) smb_pwd_init();
+
 	return (lmshare_start());
 }
 
@@ -469,6 +469,7 @@ smbd_service_fini(void)
 	smb_idmap_stop();
 	smb_lgrp_stop();
 	smbd_remove_ccache();
+	smb_pwd_fini();
 
 }
 
@@ -534,9 +535,7 @@ smbd_refresh_monitor(void *arg)
 		 * what is necessary.
 		 */
 		ads_refresh();
-		smb_nic_build_info();
-		(void) smb_netbios_name_reconfig();
-		(void) smb_browser_config();
+		smb_nicmon_reconfig();
 		smbd_remove_ccache();
 		if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &dummy) < 0) {
 			smbd_report("configuration update ioctl: %s",

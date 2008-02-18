@@ -313,7 +313,7 @@ lsarpc_s_OpenAccount(void *arg, struct mlrpc_xaction *mxa)
 
 	hd = ndr_hdlookup(mxa, id);
 	if ((hd == NULL) || (hd->nh_data != &lsarpc_key_domain)) {
-		bzero(&param, sizeof (struct mslsa_OpenAccount));
+		bzero(param, sizeof (struct mslsa_OpenAccount));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}

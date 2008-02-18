@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@
  * As far as I can tell, this part of the protocol is not implemented
  * by NT server.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_find_notify_close(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

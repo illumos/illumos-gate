@@ -62,23 +62,22 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_lock_byte_range(struct smb_request *sr)
 {
 	uint32_t	count;
 	uint32_t	off;
 	DWORD		result;
+	int		rc;
 
-	if (smbsr_decode_vwv(sr, "wll", &sr->smb_fid, &count, &off) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "wll", &sr->smb_fid, &count, &off) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -91,10 +90,9 @@ smb_com_lock_byte_range(struct smb_request *sr)
 	    (u_offset_t)off, (uint64_t)count,  0, SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, result);
-		/* NOT REACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_empty_result(sr);
-
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

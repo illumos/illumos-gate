@@ -223,23 +223,20 @@
  * read nor write the file.
  */
 
-int
+smb_sdrc_t
 smb_com_open(struct smb_request *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint16_t file_attr;
-	DWORD status;
+	int rc;
 
 	bzero(op, sizeof (sr->arg.open));
-	if (smbsr_decode_vwv(sr, "ww", &op->omode, &op->fqi.srch_attr) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "ww", &op->omode, &op->fqi.srch_attr) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
+
 	op->desired_access = smb_omode_to_amask(op->omode);
 	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
 
@@ -247,7 +244,7 @@ smb_com_open(struct smb_request *sr)
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	op->dsize = 0; /* Don't set spurious size */
@@ -264,27 +261,22 @@ smb_com_open(struct smb_request *sr)
 		}
 	}
 
-	if ((status = smb_open_subr(sr)) != NT_STATUS_SUCCESS) {
-		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-			    ERRDOS, ERROR_SHARING_VIOLATION);
-		else
-			smbsr_error(sr, status, 0, 0);
-
-		/* NOTREACHED */
-	}
+	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) == MYF_OPLOCK_NONE) {
 		sr->smb_flg &=
 		    ~(SMB_FLAGS_OPLOCK | SMB_FLAGS_OPLOCK_NOTIFY_ANY);
 	}
 
-	if (op->dsize > UINT_MAX)
+	if (op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
+		return (SDRC_ERROR_REPLY);
+	}
 
 	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
 
-	smbsr_encode_result(sr, 7, 0, "bwwllww",
+	rc = smbsr_encode_result(sr, 7, 0, "bwwllww",
 	    7,
 	    sr->smb_fid,
 	    file_attr,
@@ -293,10 +285,10 @@ smb_com_open(struct smb_request *sr)
 	    op->omode & SMB_DA_ACCESS_MASK,
 	    (uint16_t)0);	/* bcc */
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
-int
+smb_sdrc_t
 smb_com_open_andx(struct smb_request *sr)
 {
 	struct open_param	*op = &sr->arg.open;
@@ -305,8 +297,6 @@ smb_com_open_andx(struct smb_request *sr)
 	uint16_t		granted_access;
 	uint16_t		ofun;
 	uint16_t		file_attr;
-	int count;
-	DWORD status;
 	int rc;
 
 	bzero(op, sizeof (sr->arg.open));
@@ -314,15 +304,11 @@ smb_com_open_andx(struct smb_request *sr)
 	rc = smbsr_decode_vwv(sr, "b.wwwwwlwll4.", &sr->andx_com,
 	    &sr->andx_off, &flags, &op->omode, &op->fqi.srch_attr,
 	    &file_attr, &CreationTime, &ofun, &op->dsize, &op->timeo);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%u", sr, &op->fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%u", sr, &op->fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	op->desired_access = smb_omode_to_amask(op->omode);
 	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
@@ -331,14 +317,14 @@ smb_com_open_andx(struct smb_request *sr)
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	op->dattr = file_attr;
 	op->create_disposition = smb_ofun_to_crdisposition(ofun);
 	if (op->create_disposition == ((uint32_t)SMB_INVALID_CRDISPOSITION)) {
 		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_PARAMETER);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	op->create_options = (op->omode & SMB_DA_WRITE_THROUGH)
@@ -353,38 +339,13 @@ smb_com_open_andx(struct smb_request *sr)
 		op->utime.tv_sec = smb_local_time_to_gmt(CreationTime);
 	op->utime.tv_nsec = 0;
 
-	status = NT_STATUS_SUCCESS;
-	/*
-	 * According to NT, when exclusive share access failed,
-	 * instead of raising "access deny" error immediately,
-	 * we should wait for the client holding the exclusive
-	 * file to close the file. If the wait timed out, we
-	 * report a sharing violation; otherwise, we grant access.
-	 * smb_open_subr returns NT_STATUS_SHARING_VIOLATION when
-	 * it encounters an exclusive share access deny: we wait
-	 * and retry.
-	 */
-	for (count = 0; count <= 4; count++) {
-		if (count) {
-			delay(MSEC_TO_TICK(400));
-		}
+	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
-		if ((status = smb_open_subr(sr)) == NT_STATUS_SUCCESS)
-			break;
-	}
-
-	if (status != NT_STATUS_SUCCESS) {
-		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-			    ERRDOS, ERROR_SHARING_VIOLATION);
-		else
-			smbsr_error(sr, status, 0, 0);
-
-		/* NOTREACHED */
-	}
-
-	if (op->dsize > UINT_MAX)
+	if (op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
+		return (SDRC_ERROR_REPLY);
+	}
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) != MYF_OPLOCK_NONE) {
 		op->action_taken |= SMB_OACT_LOCK;
@@ -398,7 +359,7 @@ smb_com_open_andx(struct smb_request *sr)
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smb_node_t *node = sr->fid_ofile->f_node;
-		smbsr_encode_result(sr, 15, 0,
+		rc = smbsr_encode_result(sr, 15, 0,
 		    "b b.w w wll www wl 2. w",
 		    15,
 		    sr->andx_com, VAR_BCC,
@@ -411,7 +372,7 @@ smb_com_open_andx(struct smb_request *sr)
 		    op->action_taken, op->fileid,
 		    0);
 	} else {
-		smbsr_encode_result(sr, 15, 0,
+		rc = smbsr_encode_result(sr, 15, 0,
 		    "b b.w w wll www wl 2. w",
 		    15,
 		    sr->andx_com, VAR_BCC,
@@ -425,5 +386,5 @@ smb_com_open_andx(struct smb_request *sr)
 		    0);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

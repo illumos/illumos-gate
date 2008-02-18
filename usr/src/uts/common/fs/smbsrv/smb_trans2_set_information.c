@@ -97,12 +97,13 @@ smb_trans2_set_information(
 		return (smb_set_alloc_info(sr, info, smberr));
 
 	default:
-		smberr->status = NT_STATUS_INVALID_INFO_CLASS;
-		smberr->errcls = ERRDOS;
-		smberr->errcode = ERROR_INVALID_PARAMETER;
-		return (NT_STATUS_UNSUCCESSFUL);
+		break;
 	}
-	/*NOTREACHED*/
+
+	smberr->status = NT_STATUS_INVALID_INFO_CLASS;
+	smberr->errcls = ERRDOS;
+	smberr->errcode = ERROR_INVALID_PARAMETER;
+	return (NT_STATUS_UNSUCCESSFUL);
 }
 
 /*

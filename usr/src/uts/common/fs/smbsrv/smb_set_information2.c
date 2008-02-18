@@ -57,7 +57,7 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_set_information2(struct smb_request *sr)
 {
 	unsigned short		la_ddate, la_dtime;
@@ -70,22 +70,20 @@ smb_com_set_information2(struct smb_request *sr)
 
 	rc = smbsr_decode_vwv(sr, "wwwwwww", &sr->smb_fid, &cr_ddate, &cr_dtime,
 	    &la_ddate, &la_dtime, &lw_ddate, &lw_dtime);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	node = sr->fid_ofile->f_node;
 
 	if (node == 0 || sr->fid_ofile->f_ftype != SMB_FTYPE_DISK) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	crtime.tv_nsec = mtime.tv_nsec = atime.tv_nsec = 0;
@@ -112,10 +110,9 @@ smb_com_set_information2(struct smb_request *sr)
 	rc = smb_sync_fsattr(sr, sr->user_cr, node);
 	if (rc) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_empty_result(sr);
-
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

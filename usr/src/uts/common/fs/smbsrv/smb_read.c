@@ -37,7 +37,7 @@ typedef struct smb_read_param {
 } smb_read_param_t;
 
 
-int smb_common_read(struct smb_request *sr, smb_read_param_t *param);
+int smb_common_read(struct smb_request *, smb_read_param_t *);
 
 
 /*
@@ -55,7 +55,7 @@ int smb_common_read(struct smb_request *sr, smb_read_param_t *param);
  * length response is generated.  A count returned which is less than the
  * count requested is the end of file indicator.
  */
-int
+smb_sdrc_t
 smb_com_read(struct smb_request *sr)
 {
 	smb_read_param_t param;
@@ -65,10 +65,8 @@ smb_com_read(struct smb_request *sr)
 
 	rc = smbsr_decode_vwv(sr, "wwlw", &sr->smb_fid,
 	    &param.r_count, &off_low, &remcnt);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	param.r_offset = (uint64_t)off_low;
 	param.r_mincnt = 0;
@@ -76,18 +74,18 @@ smb_com_read(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_common_read(sr, &param)) != 0) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_result(sr, 5, VAR_BCC, "bw8.wbwC",
+	rc = smbsr_encode_result(sr, 5, VAR_BCC, "bw8.wbwC",
 	    5, param.r_count, VAR_BCC, 0x01, param.r_count, &sr->raw_data);
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -112,7 +110,7 @@ smb_com_read(struct smb_request *sr)
  * length response is generated.  A count returned which is less than the
  * count requested is the end of file indicator.
  */
-int
+smb_sdrc_t
 smb_com_lock_and_read(struct smb_request *sr)
 {
 	smb_read_param_t param;
@@ -123,15 +121,13 @@ smb_com_lock_and_read(struct smb_request *sr)
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smbsr_decode_vwv(sr, "wwlw", &sr->smb_fid,
 	    &param.r_count, &off_low, &remcnt);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	param.r_offset = (uint64_t)off_low;
 	param.r_mincnt = 0;
@@ -139,24 +135,25 @@ smb_com_lock_and_read(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	result = smb_lock_range(sr, sr->fid_ofile, param.r_offset,
 	    (uint64_t)param.r_count, UINT_MAX, SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, result);
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_common_read(sr, &param)) != 0) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_result(sr, 5, VAR_BCC, "bw8.wbwC",
+	rc = smbsr_encode_result(sr, 5, VAR_BCC, "bw8.wbwC",
 	    5, param.r_count, VAR_BCC, 0x1, param.r_count, &sr->raw_data);
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -180,7 +177,7 @@ smb_com_lock_and_read(struct smb_request *sr)
  *
  * Read errors are handled by sending a zero length response.
  */
-int
+smb_sdrc_t
 smb_com_read_raw(struct smb_request *sr)
 {
 	smb_read_param_t	param;
@@ -204,17 +201,15 @@ smb_com_read_raw(struct smb_request *sr)
 			param.r_offset = ((uint64_t)off_high << 32) | off_low;
 		}
 
-		if (rc != 0) {
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
-		}
+		if (rc != 0)
+			return (SDRC_ERROR_REPLY);
 
 		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
 		    sr->smb_fid);
 		if (sr->fid_ofile == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		rc = smb_common_read(sr, &param);
@@ -267,7 +262,7 @@ smb_com_read_raw(struct smb_request *sr)
  * LM 0.12 to support 64-bit offsets, indicated by sending a wct of
  * 12 and including additional offset information.
  */
-int
+smb_sdrc_t
 smb_com_read_andx(struct smb_request *sr)
 {
 	smb_read_param_t param;
@@ -290,22 +285,20 @@ smb_com_read_andx(struct smb_request *sr)
 		param.r_offset = (uint64_t)off_low;
 	}
 
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	param.r_mincnt = 0;
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_common_read(sr, &param)) != 0) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -320,7 +313,7 @@ smb_com_read_andx(struct smb_request *sr)
 	 * is a follow-up to an earlier RPC transaction.
 	 */
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
-		smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.ww10.wbC",
+		rc = smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.ww10.wbC",
 		    12,			/* wct */
 		    secondary,		/* Secondary andx command */
 		    offset2,		/* offset to next */
@@ -331,7 +324,7 @@ smb_com_read_andx(struct smb_request *sr)
 		    0x02,		/* unknown */
 		    &sr->raw_data);
 	} else {
-		smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.ww10.wC",
+		rc = smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.ww10.wC",
 		    12,			/* wct */
 		    secondary,		/* Secondary andx command */
 		    offset2,		/* offset to next */
@@ -342,7 +335,7 @@ smb_com_read_andx(struct smb_request *sr)
 		    &sr->raw_data);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 /*
@@ -439,14 +432,14 @@ smb_common_read(struct smb_request *sr, smb_read_param_t *param)
  * only over connectionless transports.
  */
 /*ARGSUSED*/
-int
+smb_sdrc_t
 smb_com_read_mpx(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
 }
 
 /*ARGSUSED*/
-int
+smb_sdrc_t
 smb_com_read_mpx_secondary(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

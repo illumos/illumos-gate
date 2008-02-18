@@ -59,8 +59,10 @@ OBJS_COMMON = 			\
 	smb_ht.o		\
 	smb_idmap.o		\
 	smb_info.o		\
+	smb_list.o		\
 	smb_lgrp.o		\
 	smb_mac.o		\
+	smb_nic.o		\
 	smb_pwdutil.o		\
 	smb_privilege.o		\
 	smb_scfutil.o		\
@@ -76,7 +78,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lc -lresolv -lidmap
+LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lc -lsocket -lresolv -lidmap
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

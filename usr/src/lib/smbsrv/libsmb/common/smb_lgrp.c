@@ -35,6 +35,7 @@
 #include <assert.h>
 #include <libintl.h>
 #include <smbsrv/libsmb.h>
+#include <smb_sqlite.h>
 
 #define	SMB_LGRP_LOCAL_IDX	0
 #define	SMB_LGRP_BUILTIN_IDX	1
@@ -176,97 +177,6 @@ static void smb_lgrp_set_default_privs(smb_group_t *);
 static boolean_t smb_lgrp_chkname(char *);
 static boolean_t smb_lgrp_chkmember(uint16_t);
 static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, nt_sid_t **);
-
-#ifdef _LP64
-/*
- * We cannot make 64-bit version of libsqlite because the code
- * has some problems.
- */
-
-/*ARGSUSED*/
-sqlite *
-sqlite_open(const char *filename, int mode, char **errmsg)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-void
-sqlite_close(sqlite *db)
-{
-}
-
-/*ARGSUSED*/
-char *
-sqlite_mprintf(const char *fmt, ...)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-void
-sqlite_freemem(void *p)
-{
-}
-
-/*ARGSUSED*/
-int
-sqlite_compile(sqlite *db, const char *zSql, const char **pzTail,
-    sqlite_vm **ppVm, char **pzErrmsg)
-{
-	return (SQLITE_ERROR);
-}
-
-/*ARGSUSED*/
-void
-sqlite_free_table(char **res)
-{
-}
-
-/*ARGSUSED*/
-int
-sqlite_last_insert_rowid(sqlite *db)
-{
-	return (-1);
-}
-
-/*ARGSUSED*/
-void
-sqlite_busy_timeout(sqlite *db, int ms)
-{
-}
-
-/*ARGSUSED*/
-int
-sqlite_get_table(sqlite *db, const char *zSql, char ***pazResult, int *pnRow,
-    int *pnColumn, char **pzErrMsg)
-{
-	return (SQLITE_ERROR);
-}
-
-/*ARGSUSED*/
-int
-sqlite_step(sqlite_vm *pVm, int *pN, const char ***pazValue,
-    const char ***pazColName)
-{
-	return (SQLITE_ERROR);
-}
-
-/*ARGSUSED*/
-int
-sqlite_exec(sqlite *db, const char *zSql, sqlite_callback xCallback, void *pArg,
-    char **pzErrMsg)
-{
-	return (SQLITE_ERROR);
-}
-
-/*ARGSUSED*/
-int
-sqlite_finalize(sqlite_vm *pVm, char **pzErrMsg)
-{
-	return (SQLITE_ERROR);
-}
-#endif /* _LP64 */
 
 /*
  * smb_lgrp_add

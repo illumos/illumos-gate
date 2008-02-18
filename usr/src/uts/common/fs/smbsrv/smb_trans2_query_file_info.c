@@ -73,7 +73,7 @@ uint32_t smb_pad_align(uint32_t offset, uint32_t align);
  * immediately.
  */
 
-int
+smb_sdrc_t
 smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	static smb_attr_t pipe_attr;
@@ -99,14 +99,13 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_param_mb, "ww", &sr->smb_fid,
 	    &infolev) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	switch (sr->fid_ofile->f_ftype) {
@@ -176,8 +175,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	default:
 		smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-		/* NOTREACHED */
-		break;
+		return (SDRC_ERROR_REPLY);
 	}
 
 	filebuf = kmem_alloc(MAXNAMELEN+1, KM_SLEEP);
@@ -359,7 +357,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 			kmem_free(filebuf, MAXNAMELEN+1);
 			kmem_free(mangled_name, MAXNAMELEN);
 			smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-			/* NOT REACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		if (SMB_IS_STREAM(node)) {
@@ -386,8 +384,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(filebuf, MAXNAMELEN+1);
 		kmem_free(mangled_name, MAXNAMELEN);
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
-		/* NOTREACHED */
-		break;
+		return (SDRC_ERROR_REPLY);
 	}
 
 	kmem_free(filebuf, MAXNAMELEN+1);

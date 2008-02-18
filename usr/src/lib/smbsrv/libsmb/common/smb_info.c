@@ -440,3 +440,65 @@ smb_trace(const char *s)
 {
 	syslog(LOG_DEBUG, "%s", s);
 }
+
+/*
+ * smb_tonetbiosname
+ *
+ * Creates a NetBIOS name based on the given name and suffix.
+ * NetBIOS name is 15 capital characters, padded with space if needed
+ * and the 16th byte is the suffix.
+ */
+void
+smb_tonetbiosname(char *name, char *nb_name, char suffix)
+{
+	char tmp_name[NETBIOS_NAME_SZ];
+	mts_wchar_t wtmp_name[NETBIOS_NAME_SZ];
+	unsigned int cpid;
+	int len;
+	size_t rc;
+
+	len = 0;
+	rc = mts_mbstowcs(wtmp_name, (const char *)name, NETBIOS_NAME_SZ);
+
+	if (rc != (size_t)-1) {
+		wtmp_name[NETBIOS_NAME_SZ - 1] = 0;
+		cpid = oem_get_smb_cpid();
+		rc = unicodestooems(tmp_name, wtmp_name, NETBIOS_NAME_SZ, cpid);
+		if (rc > 0)
+			len = strlen(tmp_name);
+	}
+
+	(void) memset(nb_name, ' ', NETBIOS_NAME_SZ - 1);
+	if (len) {
+		(void) utf8_strupr(tmp_name);
+		(void) memcpy(nb_name, tmp_name, len);
+	}
+	nb_name[NETBIOS_NAME_SZ - 1] = suffix;
+}
+
+int
+smb_get_nameservers(struct in_addr *ips, int sz)
+{
+	union res_sockaddr_union set[MAXNS];
+	int i, cnt;
+	struct __res_state res_state;
+
+	if (ips == NULL)
+		return (0);
+
+	bzero(&res_state, sizeof (struct __res_state));
+	if (res_ninit(&res_state) < 0)
+		return (0);
+
+	cnt = res_getservers(&res_state, set, MAXNS);
+	for (i = 0; i < cnt; i++) {
+		if (i >= sz)
+			break;
+		ips[i] = set[i].sin.sin_addr;
+		syslog(LOG_DEBUG, "NS Found %s name server\n",
+		    inet_ntoa(ips[i]));
+	}
+	syslog(LOG_DEBUG, "NS Found %d name servers\n", i);
+	res_ndestroy(&res_state);
+	return (i);
+}

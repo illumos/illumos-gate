@@ -834,7 +834,7 @@ extern "C" {
 #define	SV_LOCAL_LIST_ONLY	0x40000000	/* Enumerate only "local" */
 #define	SV_TYPE_DOMAIN_ENUM	0x80000000	/*  Enumerate Domains */
 
-#define	MY_SERVER_TYPE	(SV_SERVER | SV_NT | SV_SERVER_NT | SV_DOMAIN_MEMBER)
+#define	MY_SERVER_TYPE	(SV_SERVER | SV_NT | SV_SERVER_NT)
 
 
 #define	PRQ_ACTIVE	0	/* Active */

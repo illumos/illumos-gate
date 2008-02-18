@@ -65,7 +65,7 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
-int
+smb_sdrc_t
 smb_com_query_information(struct smb_request *sr)
 {
 	int			rc;
@@ -78,25 +78,31 @@ smb_com_query_information(struct smb_request *sr)
 	char			*name;
 	timestruc_t		*mtime;
 
-	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	if (smbsr_decode_data(sr, "%S", sr, &path) != 0) {
-		kmem_free(name, MAXNAMELEN);
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		dattr = SMB_FA_NORMAL;
+		write_time = file_size = 0;
+		rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
+		    10, dattr, write_time, file_size, 0);
+		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 	}
 
+	if (smbsr_decode_data(sr, "%S", sr, &path) != 0)
+		return (SDRC_ERROR_REPLY);
+
 	/*
-	 * Some MS clients pass NULL file names
-	 * NT interprets this as "\"
+	 * Interpret NULL file names as "\".
 	 */
-	if (strlen(path) == 0) path = "\\";
+	if (strlen(path) == 0)
+		path = "\\";
+
+	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	if ((rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name))
 	    != 0) {
 		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -104,7 +110,7 @@ smb_com_query_information(struct smb_request *sr)
 		smb_node_release(dir_node);
 		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	smb_node_release(dir_node);
@@ -115,14 +121,14 @@ smb_com_query_information(struct smb_request *sr)
 	file_size = (uint32_t)smb_node_get_size(node, &node->attr);
 
 	smb_node_release(node);
+	kmem_free(name, MAXNAMELEN);
 
-	smbsr_encode_result(sr, 10, 0, "bwll10.w",
+	rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
 	    10,			/* wct */
 	    dattr,
 	    write_time,		/* Last write time */
 	    file_size,		/* FileSize */
 	    0);			/* bcc */
 
-	kmem_free(name, MAXNAMELEN);
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

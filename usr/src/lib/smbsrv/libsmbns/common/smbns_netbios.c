@@ -159,27 +159,26 @@ smb_netbios_start(void)
 static void *
 smb_netbios_timer(void *arg)
 {
-	static unsigned int	ticks;
+	static unsigned int ticks = 0;
 
 	smb_netbios_chg_status(NETBIOS_TIMER_RUNNING, 1);
 
 	while ((nb_status.state & NETBIOS_SHUTTING_DOWN) == 0) {
 		(void) sleep(1);
+		ticks++;
 
-		if (nb_status.state & NETBIOS_DATAGRAM_SVC_RUNNING)
-			smb_netbios_datagram_tick();
-		else
+		if ((nb_status.state & NETBIOS_DATAGRAM_SVC_RUNNING) == 0)
 			break;
 
-		if (nb_status.state & NETBIOS_NAME_SVC_RUNNING) {
-			smb_netbios_name_tick();
-
-			/* every 10 minutes */
-			if ((ticks % 600) == 0)
-				smb_netbios_cache_clean();
-		}
-		else
+		if ((nb_status.state & NETBIOS_NAME_SVC_RUNNING) == 0)
 			break;
+
+		smb_netbios_datagram_tick();
+		smb_netbios_name_tick();
+
+		/* every 10 minutes */
+		if ((ticks % 600) == 0)
+			smb_netbios_cache_clean();
 	}
 
 	nb_status.state &= ~NETBIOS_TIMER_RUNNING;
@@ -218,37 +217,16 @@ void
 smb_encode_netbios_name(unsigned char *name, char suffix, unsigned char *scope,
     struct name_entry *dest)
 {
-	char tmp_name[NETBIOS_NAME_SZ];
-	mts_wchar_t wtmp_name[NETBIOS_NAME_SZ];
-	unsigned int cpid;
-	int	len;
-	size_t rc;
+	smb_tonetbiosname((char *)name, (char *)dest->name, suffix);
 
-	len = 0;
-	rc = mts_mbstowcs(wtmp_name, (const char *)name, NETBIOS_NAME_SZ);
-
-	if (rc != (size_t)-1) {
-		wtmp_name[NETBIOS_NAME_SZ - 1] = 0;
-		cpid = oem_get_smb_cpid();
-		rc = unicodestooems(tmp_name, wtmp_name, NETBIOS_NAME_SZ, cpid);
-		if (rc > 0)
-			len = strlen(tmp_name);
-	}
-
-	(void) memset(dest->name, ' ', NETBIOS_NAME_SZ - 1);
-	if (len) {
-		(void) utf8_strupr(tmp_name);
-		(void) memcpy(dest->name, tmp_name, len);
-	}
-	dest->name[NETBIOS_NAME_SZ - 1] = suffix;
-
-	if (scope == NULL) {
-		(void) smb_config_getstr(SMB_CI_NBSCOPE, (char *)dest->scope,
-		    NETBIOS_DOMAIN_NAME_MAX);
-	} else {
+	if (scope) {
 		(void) strlcpy((char *)dest->scope, (const char *)scope,
-		    NETBIOS_DOMAIN_NAME_MAX);
+		    sizeof (dest->scope));
+	} else {
+		(void) smb_config_getstr(SMB_CI_NBSCOPE, (char *)dest->scope,
+		    sizeof (dest->scope));
 	}
+
 	(void) utf8_strupr((char *)dest->scope);
 }
 

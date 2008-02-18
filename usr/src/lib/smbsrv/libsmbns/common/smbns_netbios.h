@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,928 +27,6 @@
 #define	_SMB_NETBIOS_H_
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * 4.2.  NAME SERVICE PACKETS
- *
- * 4.2.1.  GENERAL FORMAT OF NAME SERVICE PACKETS
- *
- *   The NetBIOS Name Service packets follow the packet structure defined
- *   in the Domain Name Service (DNS) RFC 883 [7 (pg 26-31)].  The
- *   structures are compatible with the existing DNS packet formats,
- *   however, additional types and codes have been added to work with
- *   NetBIOS.
- *
- *   If Name Service packets are sent over a TCP connection they are
- *   preceded by a 16 bit unsigned integer representing the length of the
- *   Name Service packet.
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   + ------                                                ------- +
- *   |                            HEADER                             |
- *   + ------                                                ------- +
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                       QUESTION ENTRIES                        /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                    ANSWER RESOURCE RECORDS                    /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                  AUTHORITY RESOURCE RECORDS                   /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                  ADDITIONAL RESOURCE RECORDS                  /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.1.1 HEADER
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           | OPCODE  |   NM_FLAGS  | RCODE |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          QDCOUNT              |           ANCOUNT             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          NSCOUNT              |           ARCOUNT             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   Field     Description
- *
- *   NAME_TRN_ID      Transaction ID for Name Service Transaction.
- *                    Requester places a unique value for each active
- *                    transaction.  Responder puts NAME_TRN_ID value
- *                    from request packet in response packet.
- *
- *   OPCODE           Packet type code, see table below.
- *
- *   NM_FLAGS         Flags for operation, see table below.
- *
- *   RCODE            Result codes of request.  Table of RCODE values
- *                    for each response packet below.
- *
- *   QDCOUNT          Unsigned 16 bit integer specifying the number of
- *                    entries in the question section of a Name
- *                    Service packet.  Always zero (0) for responses.
- *                    Must be non-zero for all NetBIOS Name requests.
- *
- *   ANCOUNT          Unsigned 16 bit integer specifying the number of
- *                    resource records in the answer section of a Name
- *                    Service packet.
- *
- *   NSCOUNT          Unsigned 16 bit integer specifying the number of
- *                    resource records in the authority section of a
- *                    Name Service packet.
- *
- *   ARCOUNT          Unsigned 16 bit integer specifying the number of
- *                    resource records in the additional records
- *                    section of a Name Service packet.
- */
-
-
-/*
- *   The OPCODE field is defined as:
- *
- *     0   1   2   3   4
- *   +---+---+---+---+---+
- *   | R |    OPCODE     |
- *   +---+---+---+---+---+
- *
- *   Symbol     Bit(s)   Description
- *
- *   OPCODE        1-4   Operation specifier:
- *                         0 = query
- *                         5 = registration
- *                         6 = release
- *                         7 = WACK
- *                         8 = refresh
- *
- *   R               0   RESPONSE flag:
- *                         if bit == 0 then request packet
- *                         if bit == 1 then response packet.
- */
-
-/*
- *   The NM_FLAGS field is defined as:
- *
- *
- *     0   1   2   3   4   5   6
- *   +---+---+---+---+---+---+---+
- *   |AA |TC |RD |RA | 0 | 0 | B |
- *   +---+---+---+---+---+---+---+
- *
- *   Symbol     Bit(s)   Description
- *
- *   B               6   Broadcast Flag.
- *                         = 1: packet was broadcast or multicast
- *                         = 0: unicast
- *
- *   RA              3   Recursion Available Flag.
- *
- *                       Only valid in responses from a NetBIOS Name
- *                       Server -- must be zero in all other
- *                       responses.
- *
- *                       If one (1) then the NBNS supports recursive
- *                       query, registration, and release.
- *
- *                       If zero (0) then the end-node must iterate
- *                       for query and challenge for registration.
- *
- *   RD              2   Recursion Desired Flag.
- *
- *                       May only be set on a request to a NetBIOS
- *                       Name Server.
- *
- *                       The NBNS will copy its state into the
- *                       response packet.
- *
- *                       If one (1) the NBNS will iterate on the
- *                       query, registration, or release.
- *
- *   TC              1   Truncation Flag.
- *
- *                       Set if this message was truncated because the
- *                       datagram carrying it would be greater than
- *                       576 bytes in length.  Use TCP to get the
- *                       information from the NetBIOS Name Server.
- *
- *   AA              0   Authoritative Answer flag.
- *
- *                       Must be zero (0) if R flag of OPCODE is zero
- *                       (0).
- *
- *                       If R flag is one (1) then if AA is one (1)
- *                       then the node responding is an authority for
- *                       the domain name.
- *
- *                       End nodes responding to queries always set
- *                       this bit in responses.
- */
-
-/*
- * 4.2.1.2 QUESTION SECTION
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         QUESTION_TYPE         |        QUESTION_CLASS         |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   Field            Description
- *
- *   QUESTION_NAME    The compressed name representation of the
- *                    NetBIOS name for the request.
- *
- *   QUESTION_TYPE    The type of request.  The values for this field
- *                    are specified for each request.
- *
- *   QUESTION_CLASS   The class of the request.  The values for this
- *                    field are specified for each request.
- *
- *   QUESTION_TYPE is defined as:
- *
- *   Symbol      Value   Description:
- *
- *   NB         0x0020   NetBIOS general Name Service Resource Record
- *   NBSTAT     0x0021   NetBIOS NODE STATUS Resource Record (See NODE
- *                       STATUS REQUEST)
- *
- *   QUESTION_CLASS is defined as:
- *
- *   Symbol      Value   Description:
- *
- *   IN         0x0001   Internet class
- */
-
-/*
- * 4.2.1.3 RESOURCE RECORD
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           RR_TYPE             |          RR_CLASS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           RDLENGTH            |                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
- *   /                                                               /
- *   /                             RDATA                             /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   Field            Description
- *
- *   RR_NAME          The compressed name representation of the
- *                    NetBIOS name corresponding to this resource
- *                    record.
- *
- *   RR_TYPE          Resource record type code
- *
- *   RR_CLASS         Resource record class code
- *
- *   TTL              The Time To Live of a the resource record's
- *                    name.
- *
- *   RDLENGTH         Unsigned 16 bit integer that specifies the
- *                    number of bytes in the RDATA field.
- *
- *   RDATA            RR_CLASS and RR_TYPE dependent field.  Contains
- *                    the resource information for the NetBIOS name.
- *
- *   RESOURCE RECORD RR_TYPE field definitions:
- *
- *   Symbol      Value   Description:
- *
- *   A          0x0001   IP address Resource Record (See REDIRECT NAME
- *                       QUERY RESPONSE)
- *   NS         0x0002   Name Server Resource Record (See REDIRECT
- *                       NAME QUERY RESPONSE)
- *   NULL       0x000A   NULL Resource Record (See WAIT FOR
- *                       ACKNOWLEDGEMENT RESPONSE)
- *   NB         0x0020   NetBIOS general Name Service Resource Record
- *                       (See NB_FLAGS and NB_ADDRESS, below)
- *   NBSTAT     0x0021   NetBIOS NODE STATUS Resource Record (See NODE
- *                       STATUS RESPONSE)
- *
- *   RESOURCE RECORD RR_CLASS field definitions:
- *
- *   Symbol      Value   Description:
- *
- *   IN         0x0001   Internet class
- *
- *   NB_FLAGS field of the RESOURCE RECORD RDATA field for RR_TYPE of
- *   "NB":
- *
- *                                             1   1   1   1   1   1
- *     0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5
- *   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
- *   | G |  ONT  |                RESERVED                           |
- *   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
- *
- *   Symbol     Bit(s)   Description:
- *
- *   RESERVED     3-15   Reserved for future use.  Must be zero (0).
- *   ONT           1,2   Owner Node Type:
- *                          00 = B node
- *                          01 = P node
- *                          10 = M node
- *                          11 = Reserved for future use
- *                       For registration requests this is the
- *                       claimant's type.
- *                       For responses this is the actual owner's
- *                       type.
- *
- *   G               0   Group Name Flag.
- *                       If one (1) then the RR_NAME is a GROUP
- *                       NetBIOS name.
- *                       If zero (0) then the RR_NAME is a UNIQUE
- *                       NetBIOS name.
- *
- *   The NB_ADDRESS field of the RESOURCE RECORD RDATA field for
- *   RR_TYPE of "NB" is the IP address of the name's owner.
- */
-
-/*
- * 4.2.2. NAME REGISTRATION REQUEST
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |0|  0x5  |0|0|1|0|0 0|B|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |        IN (0x0001)            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   Since the RR_NAME is the same name as the QUESTION_NAME, the
- *   RR_NAME representation must use pointers to the QUESTION_NAME
- *   name's labels to guarantee the length of the datagram is less
- *   than the maximum 576 bytes.  See section above on name formats
- *   and also page 31 and 32 of RFC 883, Domain Names - Implementation
- *   and Specification, for a complete description of compressed name
- *   label pointers.
- */
-
-/*
- * 4.2.3 NAME OVERWRITE REQUEST & DEMAND
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |0|  0x5  |0|0|0|0|0 0|B|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |        IN (0x0001)            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.4 NAME REFRESH REQUEST
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |0|  0x9  |0|0|0|0|0 0|B|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |        IN (0x0001)            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.5 POSITIVE NAME REGISTRATION RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x5  |1|0|1|1|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.6 NEGATIVE NAME REGISTRATION RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x5  |1|0|1|1|0 0|0| RCODE |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   RCODE field values:
- *
- *   Symbol      Value   Description:
- *
- *   FMT_ERR       0x1   Format Error.  Request was invalidly
- *                       formatted.
- *   SRV_ERR       0x2   Server failure.  Problem with NBNS, cannot
- *                       process name.
- *   IMP_ERR       0x4   Unsupported request error.  Allowable only
- *                       for challenging NBNS when gets an Update type
- *                       registration request.
- *   RFS_ERR       0x5   Refused error.  For policy reasons server
- *                       will not register this name from this host.
- *   ACT_ERR       0x6   Active error.  Name is owned by another node.
- *   CFT_ERR       0x7   Name in conflict error.  A UNIQUE name is
- *                       owned by more than one node.
- */
-
-/*
- * 4.2.7 END-NODE CHALLENGE REGISTRATION RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x5  |1|0|1|0|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.8 NAME CONFLICT DEMAND
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x5  |1|0|1|1|0 0|0|  0x7  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          0x00000000                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |0|ONT|0|     0x000             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          0x00000000                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   This packet is identical to a NEGATIVE NAME REGISTRATION RESPONSE
- *   with RCODE = CFT_ERR.
- */
-
-/*
- * 4.2.9 NAME RELEASE REQUEST & DEMAND
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |0|  0x6  |0|0|0|0|0 0|B|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |        IN (0x0001)            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          0x00000000                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   Since the RR_NAME is the same name as the QUESTION_NAME, the
- *   RR_NAME representation must use label string pointers to the
- *   QUESTION_NAME labels to guarantee the length of the datagram is
- *   less than the maximum 576 bytes.  This is the same condition as
- *   with the NAME REGISTRATION REQUEST.
- */
-
-/*
- * 4.2.10 POSITIVE NAME RELEASE RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x6  |1|0|0|0|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.11 NEGATIVE NAME RELEASE RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x6  |1|0|0|0|0 0|0| RCODE |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0006              |          NB_FLAGS             |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          NB_ADDRESS                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   RCODE field values:
- *
- *   Symbol      Value   Description:
- *
- *   FMT_ERR       0x1   Format Error.  Request was invalidly
- *                       formatted.
- *
- *   SRV_ERR       0x2   Server failure.  Problem with NBNS, cannot
- *                       process name.
- *
- *   RFS_ERR       0x5   Refused error.  For policy reasons server
- *                       will not release this name from this host.
- *
- *   ACT_ERR       0x6   Active error.  Name is owned by another node.
- *                       Only that node may release it.  A NetBIOS
- *                       Name Server can optionally allow a node to
- *                       release a name it does not own.  This would
- *                       facilitate detection of inactive names for
- *                       nodes that went down silently.
- */
-
-/*
- * 4.2.12 NAME QUERY REQUEST
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |0|  0x0  |0|0|1|0|0 0|B|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |        IN (0x0001)            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.13 POSITIVE NAME QUERY RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x0  |1|T|1|?|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NB (0x0020)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           RDLENGTH            |                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
- *   |                                                               |
- *   /                       ADDR_ENTRY ARRAY                        /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   The ADDR_ENTRY ARRAY a sequence of zero or more ADDR_ENTRY
- *   records.  Each ADDR_ENTRY record represents an owner of a name.
- *   For group names there may be multiple entries.  However, the list
- *   may be incomplete due to packet size limitations.  Bit 22, "T",
- *   will be set to indicate truncated data.
- *
- *   Each ADDR_ENTRY has the following format:
- *
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          NB_FLAGS             |          NB_ADDRESS           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |   NB_ADDRESS (continued)      |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.14 NEGATIVE NAME QUERY RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x0  |1|0|1|?|0 0|0| RCODE |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NULL (0x000A)       |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          0x00000000                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   RCODE field values:
- *
- *   Symbol      Value   Description
- *
- *   FMT_ERR       0x1   Format Error.  Request was invalidly
- *                       formatted.
- *   SRV_ERR       0x2   Server failure.  Problem with NBNS, cannot
- *                       process name.
- *   NAM_ERR       0x3   Name Error.  The name requested does not
- *                       exist.
- *   IMP_ERR       0x4   Unsupported request error.  Allowable only
- *                       for challenging NBNS when gets an Update type
- *                       registration request.
- *   RFS_ERR       0x5   Refused error.  For policy reasons server
- *                       will not register this name from this host.
- */
-
-/*
- * 4.2.15 REDIRECT NAME QUERY RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x0  |0|0|1|0|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           NS (0x0002)         |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           RDLENGTH            |                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               +
- *   |                                                               |
- *   /                            NSD_NAME                           /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           A (0x0001)          |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |             0x0004            |           NSD_IP_ADDR         |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |     NSD_IP_ADDR, continued    |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   An end node responding to a NAME QUERY REQUEST always responds
- *   with the AA and RA bits set for both the NEGATIVE and POSITIVE
- *   NAME QUERY RESPONSE packets.  An end node never sends a REDIRECT
- *   NAME QUERY RESPONSE packet.
- *
- *   When the requestor receives the REDIRECT NAME QUERY RESPONSE it
- *   must reiterate the NAME QUERY REQUEST to the NBNS specified by
- *   the NSD_IP_ADDR field of the A type RESOURCE RECORD in the
- *   ADDITIONAL section of the response packet.  This is an optional
- *   packet for the NBNS.
- *
- *   The NSD_NAME and the RR_NAME in the ADDITIONAL section of the
- *   response packet are the same name.  Space can be optimized if
- *   label string pointers are used in the RR_NAME which point to the
- *   labels in the NSD_NAME.
- *
- *   The RR_NAME in the AUTHORITY section is the name of the domain
- *   the NBNS called by NSD_NAME has authority over.
- */
-
-/*
- * 4.2.16 WAIT FOR ACKNOWLEDGEMENT (WACK) RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x7  |1|0|0|0|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   /                                                               /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          NULL (0x0020)        |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                              TTL                              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |           0x0002              | OPCODE  |   NM_FLAGS  |  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   The NAME_TRN_ID of the WACK RESPONSE packet is the same
- *   NAME_TRN_ID of the request that the NBNS is telling the requestor
- *   to wait longer to complete.  The RR_NAME is the name from the
- *   request, if any.  If no name is available from the request then
- *   it is a null name, single byte of zero.
- *
- *   The TTL field of the ResourceRecord is the new time to wait, in
- *   seconds, for the request to complete.  The RDATA field contains
- *   the OPCODE and NM_FLAGS of the request.
- *
- *   A TTL value of 0 means that the NBNS can not estimate the time it
- *   may take to complete a response.
- */
-
-/*
- * 4.2.17 NODE STATUS REQUEST
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |0|  0x0  |0|0|0|0|0 0|B|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0001               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                         QUESTION_NAME                         /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NBSTAT (0x0021)       |        IN (0x0001)            |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- */
-
-/*
- * 4.2.18 NODE STATUS RESPONSE
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         NAME_TRN_ID           |1|  0x0  |1|0|0|0|0 0|0|  0x0  |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0001              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          0x0000               |           0x0000              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   /                            RR_NAME                            /
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |        NBSTAT (0x0021)        |         IN (0x0001)           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                          0x00000000                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          RDLENGTH             |   NUM_NAMES   |               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+               +
- *   |                                                               |
- *   +                                                               +
- *   /                         NODE_NAME ARRAY                       /
- *   +                                                               +
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                                                               |
- *   +                                                               +
- *   /                           STATISTICS                          /
- *   +                                                               +
- *   |                                                               |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   The NODE_NAME ARRAY is an array of zero or more NUM_NAMES entries
- *   of NODE_NAME records.  Each NODE_NAME entry represents an active
- *   name in the same NetBIOS scope as the requesting name in the
- *   local name table of the responder.  RR_NAME is the requesting
- *   name.
- */
 
 #include <stdio.h>
 #include <synch.h>
@@ -963,14 +41,14 @@
 
 #define	QUEUE_INSERT_TAIL(q, e) \
 	((e)->back) = (void *)((q)->back);	\
-	((e)->forw) = (void *)(q);		    \
+	((e)->forw) = (void *)(q);		\
 	((q)->back->forw) = (void *)(e);	\
 	((q)->back) = (void *)(e);
 
 #define	QUEUE_CLIP(e) \
 	(e)->forw->back = (e)->back;	\
 	(e)->back->forw = (e)->forw;	\
-	(e)->forw = 0;					\
+	(e)->forw = 0;			\
 	(e)->back = 0;
 
 #define	NETBIOS_NAME_SVC_LAUNCHED	0x00001
@@ -993,6 +71,11 @@
 #define	NETBIOS_SHUT_DOWN		0x20000
 
 char smb_node_type;
+
+#define	SMB_NODETYPE_B	'B'
+#define	SMB_NODETYPE_P	'P'
+#define	SMB_NODETYPE_M	'M'
+#define	SMB_NODETYPE_H	'H'
 
 typedef struct {
 	mutex_t mtx;
@@ -1082,7 +165,7 @@ typedef struct name_entry {
 	unsigned short		attributes;
 	struct addr_entry	addr_list;
 	mutex_t			mtx;
-} name_entry;
+} name_entry_t;
 
 struct name_question {
 	struct name_entry 	*name;
@@ -1523,6 +606,11 @@ typedef struct name_queue {
 	mutex_t mtx;
 } name_queue_t;
 
+typedef struct nbcache_iter {
+	HT_ITERATOR		nbc_hti;
+	struct name_entry	*nbc_entry;
+} nbcache_iter_t;
+
 #define	NETBIOS_EMPTY_NAME (unsigned char *)""
 
 #define	NETBIOS_NAME_IS_STAR(name) \
@@ -1536,13 +624,11 @@ void smb_netbios_chg_status(uint32_t status, int set);
 int  smb_netbios_cache_init(void);
 void smb_netbios_cache_fini(void);
 void smb_netbios_cache_dump(void);
-void smb_netbios_cache_print(void);
-void smb_netbios_cache_diag(char ** pbuf);
 int smb_netbios_cache_count(void);
 void smb_netbios_cache_clean(void);
 void smb_netbios_cache_reset_ttl(void);
-void smb_netbios_cache_delete_locals(name_queue_t *delq);
-void smb_netbios_cache_refresh(name_queue_t *refq);
+void smb_netbios_cache_delete_locals(name_queue_t *);
+void smb_netbios_cache_refresh(name_queue_t *);
 
 int smb_netbios_cache_insert(struct name_entry *name);
 int smb_netbios_cache_insert_list(struct name_entry *name);
@@ -1550,23 +636,21 @@ void smb_netbios_cache_delete(struct name_entry *name);
 int smb_netbios_cache_delete_addr(struct name_entry *name);
 struct name_entry *smb_netbios_cache_lookup(struct name_entry *name);
 struct name_entry *smb_netbios_cache_lookup_addr(struct name_entry *name);
-void smb_netbios_cache_update_entry(struct name_entry *entry,
-					struct name_entry *name);
-void smb_netbios_cache_unlock_entry(struct name_entry *name);
-unsigned char *smb_netbios_cache_status(unsigned char *buf, int bufsize,
-					unsigned char *scope);
+void smb_netbios_cache_update_entry(struct name_entry *, struct name_entry *);
+void smb_netbios_cache_unlock_entry(struct name_entry *);
+unsigned char *smb_netbios_cache_status(unsigned char *, int, unsigned char *);
+int smb_netbios_cache_getfirst(nbcache_iter_t *);
+int smb_netbios_cache_getnext(nbcache_iter_t *);
 
 void smb_netbios_name_dump(struct name_entry *entry);
 void smb_netbios_name_logf(struct name_entry *entry);
 void smb_netbios_name_freeaddrs(struct name_entry *entry);
-struct name_entry *smb_netbios_name_dup(struct name_entry *entry,
-						int alladdr);
+struct name_entry *smb_netbios_name_dup(struct name_entry *, int);
 
 /* Name service functions */
 void *smb_netbios_name_service_daemon(void *);
-void smb_init_name_struct(unsigned char *, char,
-			    unsigned char *, uint32_t, unsigned short,
-			    uint32_t, uint32_t, struct name_entry *);
+void smb_init_name_struct(unsigned char *, char, unsigned char *, uint32_t,
+    unsigned short, uint32_t, uint32_t, struct name_entry *);
 
 struct name_entry *smb_name_find_name(struct name_entry *name);
 int smb_name_add_name(struct name_entry *name);
@@ -1577,41 +661,24 @@ void smb_netbios_name_config(void);
 void smb_netbios_name_unconfig(void);
 void smb_netbios_name_tick(void);
 
-int smb_first_level_name_encode(struct name_entry *name,
-			    unsigned char *out, int max_out);
-int smb_first_level_name_decode(unsigned char *in,
-			    struct name_entry *name);
-void smb_encode_netbios_name(unsigned char *name,
-			    char suffix, unsigned char *scope,
-			    struct name_entry *dest);
+int smb_first_level_name_encode(struct name_entry *, unsigned char *, int);
+int smb_first_level_name_decode(unsigned char *, struct name_entry *);
+void smb_encode_netbios_name(unsigned char *, char, unsigned char *,
+    struct name_entry *);
 
 /* Datagram service functions */
 void *smb_netbios_datagram_service_daemon(void *);
 int smb_netbios_datagram_send(struct name_entry *,
-			    struct name_entry *, unsigned char *, int);
+    struct name_entry *, unsigned char *, int);
 void smb_netbios_datagram_tick(void);
 
-
 /* browser functions */
-void smb_browser_config(void);
 void *smb_browser_dispatch(void *arg);
 void *smb_browser_daemon(void *);
-int smb_net_id(uint32_t ipaddr);
-struct name_entry *smb_browser_get_srvname(unsigned short netid);
-int smb_browser_load_transact_header(unsigned char *buffer,
-    int maxcnt, int data_count, int reply, char *mailbox);
+int smb_browser_load_transact_header(unsigned char *, int, int, int, char *);
 
 /* Netlogon function */
-/*
- * smb_netlogon_receive
- *
- * This is where we handle all incoming NetLogon messages. Currently, we
- * ignore requests from anyone else. We are only interested in responses
- * to our own requests. The NetLogonResponse provides the name of the PDC.
- * If we don't already have a controller name, we use the name provided
- * in the message. Otherwise we use the name already in the environment.
- */
-void smb_netlogon_receive(struct datagram *datagram, char *mailbox,
-    unsigned char *data, int datalen);
+void smb_netlogon_receive(struct datagram *, char *, unsigned char *, int);
+void smb_netlogon_request(struct name_entry *, int, char *);
 
 #endif /* _SMB_NETBIOS_H_ */

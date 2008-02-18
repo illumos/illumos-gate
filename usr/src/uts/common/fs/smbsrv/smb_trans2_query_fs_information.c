@@ -261,7 +261,7 @@ is_dot_or_dotdot(char *name)
 /*
  * smb_com_trans2_query_fs_information
  */
-int
+smb_sdrc_t
 smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	int			rc;
@@ -276,22 +276,25 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 	char 			*fsname = "NTFS";
 	fsvol_attr_t		vol_attr;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "w", &infolev) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
+		return (SDRC_ERROR_REPLY);
 	}
+
+	if (smb_decode_mbc(&xa->req_param_mb, "w", &infolev) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	snode = sr->tid_tree->t_snode;
 	if (fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr) != 0) {
 		smbsr_errno(sr, ESTALE);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	switch (infolev) {
 	case SMB_INFO_ALLOCATION:
 		if ((rc = smb_fsop_statfs(sr->user_cr, snode, &df)) != 0) {
 			smbsr_errno(sr, rc);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		max_int = (uint64_t)UINT_MAX;
@@ -366,7 +369,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FS_SIZE_INFO:
 		if ((rc = smb_fsop_statfs(sr->user_cr, snode, &df)) != 0) {
 			smbsr_errno(sr, rc);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		length = 512;
@@ -388,7 +391,6 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FS_ATTRIBUTE_INFO:
-
 		if ((sr->smb_flg2 & SMB_FLAGS2_UNICODE) ||
 		    (sr->session->native_os == NATIVE_OS_WINNT) ||
 		    (sr->session->native_os == NATIVE_OS_WIN2000) ||
@@ -426,8 +428,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 
 	default:
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
-		/* NOTREACHED */
-		break;
+		return (SDRC_ERROR_REPLY);
 	}
 
 	return (SDRC_NORMAL_REPLY);

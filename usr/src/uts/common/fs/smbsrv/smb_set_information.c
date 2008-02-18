@@ -58,7 +58,7 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
-int
+smb_sdrc_t
 smb_com_set_information(struct smb_request *sr)
 {
 	int			rc;
@@ -70,34 +70,38 @@ smb_com_set_information(struct smb_request *sr)
 	struct smb_node		*node;
 	char			*name;
 
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		(void) smbsr_encode_empty_result(sr);
+		return (SDRC_NORMAL_REPLY);
+	}
+
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	if (smbsr_decode_vwv(sr, "wl10.", &dattr, &utime.tv_sec) != 0) {
 		kmem_free(name, MAXNAMELEN);
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (smbsr_decode_data(sr, "%S", sr, &path) != 0) {
 		kmem_free(name, MAXNAMELEN);
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 	utime.tv_nsec = 0;
 
-	if ((rc = smb_pathname_reduce(sr, sr->user_cr, path,
-	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name))
-	    != 0) {
+	rc = smb_pathname_reduce(sr, sr->user_cr, path,
+	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name);
+	if (rc != 0) {
 		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, name, &node, &attr, 0, 0)) != 0) {
+	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dir_node, name, &node, &attr, 0, 0);
+	if (rc != 0) {
 		smb_node_release(dir_node);
 		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	smb_node_release(dir_node);
@@ -116,13 +120,13 @@ smb_com_set_information(struct smb_request *sr)
 
 	rc = smb_sync_fsattr(sr, sr->user_cr, node);
 	smb_node_release(node);
+	kmem_free(name, MAXNAMELEN);
+
 	if (rc) {
-		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_empty_result(sr);
-	kmem_free(name, MAXNAMELEN);
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

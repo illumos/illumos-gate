@@ -67,9 +67,6 @@ typedef struct {
 } SmbPath;
 
 
-extern int smb_common_create_directory(struct smb_request *sr);
-
-
 static int smbpath_next(SmbPath* spp);
 static SmbPath* smbpath_new(SmbRequest* sr);
 
@@ -80,21 +77,25 @@ static SmbPath* smbpath_new(SmbRequest* sr);
  * It is possible to get a full pathname here and the client expects any
  * or all of the components to be created if they don't already exist.
  */
-int
+smb_sdrc_t
 smb_com_create_directory(struct smb_request *sr)
 {
 	SmbPath* spp;
 	DWORD status;
 	int rc = 0;
 
-	if (smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (SDRC_ERROR_REPLY);
 	}
+
+	if (smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	if ((status = smb_validate_dirname(sr->arg.dirop.fqi.path)) != 0) {
 		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -105,16 +106,20 @@ smb_com_create_directory(struct smb_request *sr)
 
 	while (smbpath_next(spp)) {
 		rc = smb_common_create_directory(sr);
-		if (rc != 0 && rc != EEXIST)
+		if (rc != 0 && rc != EEXIST) {
 			smbsr_errno(sr, rc);
+			return (SDRC_ERROR_REPLY);
+		}
 	}
 
 	/* We should have created one directory successfully! */
-	if (rc != 0)
+	if (rc != 0) {
 		smbsr_errno(sr, rc);
+		return (SDRC_ERROR_REPLY);
+	}
 
-	smbsr_encode_empty_result(sr);
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 
@@ -158,12 +163,6 @@ smb_common_create_directory(struct smb_request *sr)
 	smb_attr_t new_attr;
 	struct smb_node *dnode;
 	struct smb_node *node;
-
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
-	}
 
 	sr->arg.dirop.fqi.srch_attr = 0;
 

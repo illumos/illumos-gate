@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1597,36 +1597,6 @@ smb_decode_vwv(struct smb_request *sr, char *fmt, ...)
 	return (rc);
 }
 
-
-int
-smb_decode_data(struct smb_request *sr, char *fmt, ...)
-{
-	if (smb_decode_mbc(&sr->smb_data, fmt, (int *)(&fmt + 1)) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
-	return (0);
-}
-
-
-void
-smb_encode_header(struct smb_request *sr, int wct,
-    int bcc, char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	if (smb_mbc_encode(&sr->reply, fmt, ap) != 0) {
-		va_end(ap);
-		smbsr_encode_error(sr);
-		/* NOTREACHED */
-	}
-	va_end(ap);
-	/*LINTED E_ASSIGN_NARROW_CONV*/
-	sr->smb_wct = wct;
-	/*LINTED E_ASSIGN_NARROW_CONV*/
-	sr->smb_bcc = bcc;
-}
 
 int
 smb_peek_mbc(struct mbuf_chain *mbc, int offset, char *fmt, ...)

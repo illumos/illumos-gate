@@ -167,7 +167,7 @@
  *    SMB_COM_READ    SMB_COM_READ_ANDX
  *    SMB_COM_IOCTL
  */
-int
+smb_sdrc_t
 smb_com_nt_create_andx(struct smb_request *sr)
 {
 	struct open_param	*op = &sr->arg.open;
@@ -181,8 +181,6 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	unsigned short		NameLength;
 	smb_attr_t		new_attr;
 	smb_node_t		*node;
-	DWORD status;
-	int count;
 	int rc;
 
 	op->dsize = 0;
@@ -200,25 +198,21 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	    &ImpersonationLevel,
 	    &SecurityFlags);
 
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	if (NameLength >= MAXPATHLEN) {
 		smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND, 0, 0);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	if (smbsr_decode_data(sr, "%#u", sr, NameLength, &op->fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%#u", sr, NameLength, &op->fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	op->fqi.srch_attr = 0;
@@ -255,42 +249,15 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		if (sr->fid_ofile == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		op->fqi.dir_snode = sr->fid_ofile->f_node;
 		smbsr_disconnect_file(sr);
 	}
 
-	status = NT_STATUS_SUCCESS;
-	/*
-	 * According to NT, when exclusive share access failed,
-	 * instead of raising "access deny" error immediately,
-	 * we should wait for the client holding the exclusive
-	 * file to close the file. If the wait timed out, we
-	 * report a sharing violation; otherwise, we grant access.
-	 * smb_open_subr returns NT_STATUS_SHARING_VIOLATION when
-	 * it encounters an exclusive share access deny: we wait
-	 * and retry.
-	 */
-	for (count = 0; count <= 4; count++) {
-		if (count) {
-			delay(MSEC_TO_TICK(400));
-		}
-
-		if ((status = smb_open_subr(sr)) == NT_STATUS_SUCCESS)
-			break;
-	}
-
-	if (status != NT_STATUS_SUCCESS) {
-		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-			    ERRDOS, ERROR_SHARING_VIOLATION);
-		else
-			smbsr_error(sr, status, 0, 0);
-
-		/* NOTREACHED */
-	}
+	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		switch (MYF_OPLOCK_TYPE(op->my_flags)) {
@@ -327,7 +294,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 			node->attr.sa_vattr.va_size = new_attr.sa_vattr.va_size;
 		}
 
-		smbsr_encode_result(sr, 34, 0, "bb.wbwlTTTTlqqwwbw",
+		rc = smbsr_encode_result(sr, 34, 0, "bb.wbwlTTTTlqqwwbw",
 		    34,
 		    sr->andx_com,
 		    0x67,
@@ -348,7 +315,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	} else {
 		/* Named PIPE */
 		OplockLevel = 0;
-		smbsr_encode_result(sr, 34, 0, "bb.wbwlqqqqlqqwwbw",
+		rc = smbsr_encode_result(sr, 34, 0, "bb.wbwlqqqqlqqwwbw",
 		    34,
 		    sr->andx_com,
 		    0x67,
@@ -368,5 +335,5 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    0);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

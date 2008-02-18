@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_nt_cancel(struct smb_request *sr)
 {
 	struct smb_request *req;

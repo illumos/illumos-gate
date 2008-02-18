@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +159,7 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_tree_connect_andx(struct smb_request *sr)
 {
 	unsigned char *pwbuf = NULL;
@@ -168,10 +168,8 @@ smb_com_tree_connect_andx(struct smb_request *sr)
 
 	rc = smbsr_decode_vwv(sr, "b.www", &sr->andx_com, &sr->andx_off,
 	    &sr->arg.tcon.flags, &pwlen);
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	if (pwlen != 0) {
 		pwbuf = (unsigned char *)smbsr_malloc(&sr->request_storage,
@@ -179,19 +177,19 @@ smb_com_tree_connect_andx(struct smb_request *sr)
 		bzero(pwbuf, pwlen);
 	}
 
-	if (smbsr_decode_data(sr, "%#cus", sr, pwlen, pwbuf,
-	    &sr->arg.tcon.path, &sr->arg.tcon.service) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	rc = smbsr_decode_data(sr, "%#cus", sr, pwlen, pwbuf,
+	    &sr->arg.tcon.path, &sr->arg.tcon.service);
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->arg.tcon.pwdlen = pwlen;
 	sr->arg.tcon.password = (char *)pwbuf;
 
-	(void) smbsr_connect_tree(sr);
+	if (smbsr_connect_tree(sr) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	if (sr->session->dialect < NT_LM_0_12) {
-		smbsr_encode_result(sr, 2, VAR_BCC, "bb.wwss",
+		rc = smbsr_encode_result(sr, 2, VAR_BCC, "bb.wwss",
 		    (char)2,		/* wct */
 		    sr->andx_com,
 		    VAR_BCC,
@@ -199,7 +197,7 @@ smb_com_tree_connect_andx(struct smb_request *sr)
 		    sr->arg.tcon.service,
 		    sr->tid_tree->t_typename);
 	} else {
-		smbsr_encode_result(sr, 3, VAR_BCC, "bb.wwws%u",
+		rc = smbsr_encode_result(sr, 3, VAR_BCC, "bb.wwws%u",
 		    (char)3,		/* wct */
 		    sr->andx_com,
 		    (short)64,
@@ -209,5 +207,6 @@ smb_com_tree_connect_andx(struct smb_request *sr)
 		    sr,
 		    sr->tid_tree->t_typename);
 	}
-	return (SDRC_NORMAL_REPLY);
+
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

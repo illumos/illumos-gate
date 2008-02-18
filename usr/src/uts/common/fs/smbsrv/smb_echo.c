@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
  * Each response echoes the data sent, though ByteCount may indicate
  * no data. If echo-count is zero, no response is sent.
  */
-int
+smb_sdrc_t
 smb_com_echo(struct smb_request *sr)
 {
 	unsigned short necho;
@@ -45,19 +45,16 @@ smb_com_echo(struct smb_request *sr)
 	struct mbuf_chain reply;
 	char *data;
 
-	if (smbsr_decode_vwv(sr, "w", &necho) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "w", &necho) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	nbytes = sr->smb_bcc;
-
 	data = smbsr_malloc(&sr->request_storage, nbytes);
 
-	(void) smb_decode_mbc(&sr->smb_data, "#c", nbytes, data);
+	if (smb_decode_mbc(&sr->smb_data, "#c", nbytes, data))
+		return (SDRC_ERROR_REPLY);
 
 	for (i = 1; i <= necho; ++i) {
-
 		MBC_INIT(&reply, SMB_HEADER_ED_LEN + 10 + nbytes);
 
 		(void) smb_encode_mbc(&reply, SMB_HEADER_ED_FMT,
@@ -89,7 +86,7 @@ smb_com_echo(struct smb_request *sr)
 /*
  * Broadcast messages are not supported.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_send_broadcast_message(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -98,7 +95,7 @@ smb_com_send_broadcast_message(struct smb_request *sr)
 /*
  * Multi-block messages are not supported.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_send_end_mb_message(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -107,7 +104,7 @@ smb_com_send_end_mb_message(struct smb_request *sr)
 /*
  * Single-block messages are not supported.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_send_single_message(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -116,7 +113,7 @@ smb_com_send_single_message(struct smb_request *sr)
 /*
  * Multi-block messages are not supported.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_send_start_mb_message(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);
@@ -125,7 +122,7 @@ smb_com_send_start_mb_message(struct smb_request *sr)
 /*
  * Multi-block messages are not supported.
  */
-int /*ARGSUSED*/
+smb_sdrc_t /*ARGSUSED*/
 smb_com_send_text_mb_message(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

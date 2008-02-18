@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,7 +114,7 @@
 #include <smbsrv/smb_incl.h>
 
 /*ARGSUSED*/
-int
+smb_sdrc_t
 smb_com_copy(struct smb_request *sr)
 {
 	return (SDRC_UNIMPLEMENTED);

@@ -67,7 +67,7 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
-int
+smb_sdrc_t
 smb_com_query_information_disk(struct smb_request *sr)
 {
 	int			rc;
@@ -77,9 +77,16 @@ smb_com_query_information_disk(struct smb_request *sr)
 	unsigned short		blocks_per_unit, bytes_per_block;
 	unsigned short		total_units, free_units;
 
-	if ((rc = smb_fsop_statfs(sr->user_cr, sr->tid_tree->t_snode, &df))
-	    != 0)
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
+		return (SDRC_ERROR_REPLY);
+	}
+
+	rc = smb_fsop_statfs(sr->user_cr, sr->tid_tree->t_snode, &df);
+	if (rc != 0) {
 		smbsr_errno(sr, rc);
+		return (SDRC_ERROR_REPLY);
+	}
 
 	unit_size = 1;
 	block_size = df.f_frsize;
@@ -117,7 +124,7 @@ smb_com_query_information_disk(struct smb_request *sr)
 	bytes_per_block = (unsigned short)block_size;
 	blocks_per_unit = (unsigned short)unit_size;
 
-	smbsr_encode_result(sr, 5, 0, "bwwww2.w",
+	rc = smbsr_encode_result(sr, 5, 0, "bwwww2.w",
 	    5,
 	    total_units,	/* total_units */
 	    blocks_per_unit,	/* blocks_per_unit */
@@ -125,5 +132,5 @@ smb_com_query_information_disk(struct smb_request *sr)
 	    free_units,		/* free_units */
 	    0);			/* bcc */
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

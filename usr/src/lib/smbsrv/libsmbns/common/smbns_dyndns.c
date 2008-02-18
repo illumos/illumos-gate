@@ -1671,11 +1671,11 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
 int
 dyndns_update(void)
 {
-	int i, forw_update_ok, error;
+	int forw_update_ok, error;
 	char fqdn[MAXHOSTNAMELEN];
 	char *my_ip;
-	int nc_cnt;
 	struct in_addr addr;
+	smb_niciter_t ni;
 	int rc;
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
@@ -1683,8 +1683,6 @@ dyndns_update(void)
 
 	if (smb_getfqhostname(fqdn, MAXHOSTNAMELEN) != 0)
 		return (-1);
-
-	nc_cnt = smb_nic_get_num();
 
 	error = 0;
 	forw_update_ok = 0;
@@ -1698,17 +1696,14 @@ dyndns_update(void)
 		error++;
 	}
 
-	for (i = 0; i < nc_cnt; i++) {
-		net_cfg_t cfg;
-		if (smb_nic_get_byind(i, &cfg) == NULL)
-			break;
-		addr.s_addr = cfg.ip;
-		if (addr.s_addr == 0)
-			continue;
-		if (smb_nic_status(cfg.ifname, IFF_STANDBY) ||
-		    smb_nic_status(cfg.ifname, IFF_PRIVATE))
+	if (smb_nic_getfirst(&ni) != 0)
+		return (-1);
+
+	do {
+		if (ni.ni_nic.nic_sysflags & (IFF_STANDBY | IFF_PRIVATE))
 			continue;
 
+		addr.s_addr = ni.ni_nic.nic_ip;
 		my_ip = (char *)strdup(inet_ntoa(addr));
 		if (my_ip == NULL) {
 			error++;
@@ -1733,7 +1728,7 @@ dyndns_update(void)
 			error++;
 
 		(void) free(my_ip);
-	}
+	} while (smb_nic_getnext(&ni) == 0);
 
 	return ((error == 0) ? 0 : -1);
 }
@@ -1752,11 +1747,11 @@ dyndns_update(void)
 int
 dyndns_clear_rev_zone(void)
 {
-	int i, error;
+	int error;
 	char fqdn[MAXHOSTNAMELEN];
 	char *my_ip;
-	int nc_cnt;
 	struct in_addr addr;
+	smb_niciter_t ni;
 	int rc;
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
@@ -1765,21 +1760,16 @@ dyndns_clear_rev_zone(void)
 	if (smb_getfqhostname(fqdn, MAXHOSTNAMELEN) != 0)
 		return (-1);
 
-	nc_cnt = smb_nic_get_num();
-
 	error = 0;
 
-	for (i = 0; i < nc_cnt; i++) {
-		net_cfg_t cfg;
-		if (smb_nic_get_byind(i, &cfg) == NULL)
-			break;
-		addr.s_addr = cfg.ip;
-		if (addr.s_addr == 0)
-			continue;
-		if (smb_nic_status(cfg.ifname, IFF_STANDBY) ||
-		    smb_nic_status(cfg.ifname, IFF_PRIVATE))
+	if (smb_nic_getfirst(&ni) != 0)
+		return (-1);
+
+	do {
+		if (ni.ni_nic.nic_sysflags & (IFF_STANDBY | IFF_PRIVATE))
 			continue;
 
+		addr.s_addr = ni.ni_nic.nic_ip;
 		my_ip = (char *)strdup(inet_ntoa(addr));
 		if (my_ip == NULL) {
 			error++;
@@ -1791,7 +1781,7 @@ dyndns_clear_rev_zone(void)
 			error++;
 
 		(void) free(my_ip);
-	}
+	} while (smb_nic_getnext(&ni) == 0);
 
 	return ((error == 0) ? 0 : -1);
 }

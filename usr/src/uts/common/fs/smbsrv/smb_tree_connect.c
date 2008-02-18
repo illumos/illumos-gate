@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,41 +67,37 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+/*
+ * If the negotiated dialect is MICROSOFT NETWORKS 1.03 or earlier,
+ * MaxBufferSize in the response message indicates the maximum size
+ * message that the server can handle.  The client should not generate
+ * messages, nor expect to receive responses, larger than this.  This
+ * must be constant for a given server. For newer dialects, this field
+ * is ignored.
+ */
+smb_sdrc_t
 smb_com_tree_connect(struct smb_request *sr)
 {
+	int rc;
+
 	/*
-	 * I'm not sure it this should be "%A.sA"
-	 * now that unicode is enabled.
+	 * Perhaps this should be "%A.sA" now that unicode is enabled.
 	 */
-	if (smbsr_decode_data(sr, "%AAA", sr, &sr->arg.tcon.path,
-	    &sr->arg.tcon.password, &sr->arg.tcon.service) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	rc = smbsr_decode_data(sr, "%AAA", sr, &sr->arg.tcon.path,
+	    &sr->arg.tcon.password, &sr->arg.tcon.service);
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->arg.tcon.flags = 0;
 
-	/*
-	 * If the negotiated dialect is MICROSOFT NETWORKS 1.03
-	 * or earlier, MaxBufferSize in the response message
-	 * indicates the maximum size message that the server can
-	 * handle.  The client should not generate messages, nor
-	 * expect to receive responses, larger than this.  This
-	 * must be constant for a given server. For newer dialects,
-	 * this field is ignored.
-	 *
-	 * The reason for this is that the maximum buffer size is
-	 * established during the NEGOTIATE.
-	 */
+	if (smbsr_connect_tree(sr) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	(void) smbsr_connect_tree(sr);
-
-	smbsr_encode_result(sr, 2, 0, "bwww",
+	rc = smbsr_encode_result(sr, 2, 0, "bwww",
 	    2,				/* wct */
 	    (WORD)smb_maxbufsize,	/* MaxBufferSize */
 	    sr->smb_tid,		/* TID */
 	    0);				/* bcc */
 
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

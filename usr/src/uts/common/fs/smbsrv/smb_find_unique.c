@@ -204,7 +204,7 @@
  *	ERRSRV/ERRaccess
  *	ERRSRV/ERRinvnid
  */
-int
+smb_sdrc_t
 smb_com_find_unique(struct smb_request *sr)
 {
 	int			rc;
@@ -217,26 +217,26 @@ smb_com_find_unique(struct smb_request *sr)
 	vdb = kmem_alloc(sizeof (struct vardata_block), KM_SLEEP);
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (smbsr_decode_data(sr, "%AV", sr, &path, vdb) != 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (vdb->len != 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
 	/* begin search */
-	(void) smb_rdir_open(sr, path, sattr);
+	if (smb_rdir_open(sr, path, sattr) != 0) {
+		kmem_free(vdb, sizeof (struct vardata_block));
+		return (SDRC_ERROR_REPLY);
+	}
 
 	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
 	pc->dc_cookie = 0;
@@ -265,21 +265,20 @@ smb_com_find_unique(struct smb_request *sr)
 		/* returned error by smb_rdir_next() */
 		kmem_free(vdb, sizeof (struct vardata_block));
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (count == 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
 		smbsr_error(sr, 0, ERRDOS, ERRnofiles);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = (MBC_LENGTH(&sr->reply) - sr->cur_reply_offset) - 8;
 	if (smb_poke_mbc(&sr->reply, sr->cur_reply_offset,
 	    "bwwbw", 1, count, rc+3, 5, rc) < 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_encode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 	kmem_free(vdb, sizeof (struct vardata_block));
 	return (SDRC_NORMAL_REPLY);

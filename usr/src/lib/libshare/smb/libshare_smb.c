@@ -293,6 +293,25 @@ smb_isautoenable(void)
 }
 
 /*
+ * smb_ismaint()
+ *
+ * Determine if the SMF service instance is in the disabled state or
+ * not. A number of operations depend on this state.
+ */
+static boolean_t
+smb_ismaint(void)
+{
+	char *str;
+	boolean_t ret = B_FALSE;
+
+	if ((str = smf_get_state(SMBD_DEFAULT_INSTANCE_FMRI)) != NULL) {
+		ret = (strcmp(str, SCF_STATE_STRING_MAINT) == 0);
+		free(str);
+	}
+	return (ret);
+}
+
+/*
  * smb_enable_share tells the implementation that it is to enable the share.
  * This entails converting the path and options into the appropriate ioctl
  * calls. It is assumed that all error checking of paths, etc. were
@@ -361,7 +380,7 @@ smb_enable_share(sa_share_t share)
 			 * For now, it is OK to not be able to enable
 			 * the service.
 			 */
-			if (err == SA_BUSY)
+			if (err == SA_BUSY || err == SA_SYSTEM_ERR)
 				err = SA_OK;
 		} else {
 			online = B_TRUE;
@@ -1233,7 +1252,16 @@ smb_enable_service(void)
 			if (smb_isonline()) {
 				ret =  SA_OK;
 				break;
+			} else if (smb_ismaint()) {
+				/* maintenance requires help */
+				ret = SA_SYSTEM_ERR;
+				break;
+			} else if (smb_isdisabled()) {
+				/* disabled is ok */
+				ret = SA_OK;
+				break;
 			} else {
+				/* try another time */
 				ret = SA_BUSY;
 				(void) sleep(1);
 			}

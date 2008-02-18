@@ -55,22 +55,20 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_unlock_byte_range(struct smb_request *sr)
 {
 	uint32_t	Length;
 	uint32_t	Offset;
 	DWORD		result;
 
-	if (smbsr_decode_vwv(sr, "wll", &sr->smb_fid, &Length, &Offset) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "wll", &sr->smb_fid, &Length, &Offset) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	result = smb_unlock_range(sr, sr->fid_ofile->f_node,
@@ -78,10 +76,11 @@ smb_com_unlock_byte_range(struct smb_request *sr)
 	if (result != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
 		    ERRDOS, ERRnotlocked);
-		/* NOT REACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
-	smbsr_encode_empty_result(sr);
+	if (smbsr_encode_empty_result(sr))
+		return (SDRC_ERROR_REPLY);
 
 	return (SDRC_NORMAL_REPLY);
 }

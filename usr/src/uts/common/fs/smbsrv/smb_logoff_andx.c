@@ -62,16 +62,17 @@
  * ERRSRV/invnid  - TID was invalid
  * ERRSRV/baduid  - UID was invalid
  */
-int
+smb_sdrc_t
 smb_com_logoff_andx(struct smb_request *sr)
 {
 	if (sr->uid_user == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRbaduid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	smb_user_logoff(sr->uid_user);
 
-	smbsr_encode_result(sr, 2, 0, "bb.ww", 2, sr->andx_com, -1, 0);
+	if (smbsr_encode_result(sr, 2, 0, "bb.ww", 2, sr->andx_com, -1, 0))
+		return (SDRC_ERROR_REPLY);
 	return (SDRC_NORMAL_REPLY);
 }

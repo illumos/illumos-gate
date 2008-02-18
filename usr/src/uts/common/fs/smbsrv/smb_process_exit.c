@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,14 +55,16 @@
 
 #include <smbsrv/smb_incl.h>
 
-int
+smb_sdrc_t
 smb_com_process_exit(struct smb_request *sr)
 {
+	int rc;
+
 	sr->uid_user = smb_user_lookup_by_uid(sr->session, &sr->user_cr,
 	    sr->smb_uid);
 	if (sr->uid_user == NULL) {
-		smbsr_encode_empty_result(sr);
-		return (SDRC_NORMAL_REPLY);
+		rc = smbsr_encode_empty_result(sr);
+		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -79,6 +81,6 @@ smb_com_process_exit(struct smb_request *sr)
 		smb_tree_close_all_by_pid(sr->uid_user, sr->smb_pid);
 	}
 
-	smbsr_encode_empty_result(sr);
-	return (SDRC_NORMAL_REPLY);
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }

@@ -41,8 +41,7 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 	smb_odir_t	*od;
 	smb_node_t	*node;
 	char		*last_component;
-	unsigned int	rc;
-	int		erc;
+	int		rc;
 
 	last_component = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
@@ -51,28 +50,29 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 	    &node, last_component)) != 0) {
 		kmem_free(last_component, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (-1);
 	}
 
 	if ((node->vp)->v_type != VDIR) {
 		smb_node_release(node);
 		kmem_free(last_component, MAXNAMELEN);
 		smbsr_error(sr, 0, ERRDOS, ERRbadpath);
-		/* NOTREACHED */
+		return (-1);
 	}
 
-	erc = smb_fsop_access(sr, sr->user_cr, node, FILE_LIST_DIRECTORY);
-	if (erc != 0) {
+	rc = smb_fsop_access(sr, sr->user_cr, node, FILE_LIST_DIRECTORY);
+	if (rc != 0) {
 		smb_node_release(node);
 		kmem_free(last_component, MAXNAMELEN);
+
 		if (sr->smb_com == SMB_COM_SEARCH) {
 			smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
 			    ERRDOS, ERROR_NO_MORE_FILES);
-			return (SDRC_NORMAL_REPLY);
+			return (-2);
 		} else {
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERROR_ACCESS_DENIED);
-			/* NOTREACHED */
+			return (-1);
 		}
 	}
 
@@ -82,13 +82,12 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 	if (od == NULL) {
 		smb_node_release(node);
 		smbsr_error(sr, 0, ERRDOS, ERROR_NO_MORE_FILES);
-		/* NOTREACHED */
+		return (-1);
 	}
 
 	sr->smb_sid = od->d_sid;
 	sr->sid_odir = od;
-
-	return (-1);
+	return (0);
 }
 
 
@@ -250,12 +249,10 @@ smb_rdir_next(
 		    dir->d_dir_snode, pc->dc_name, &fnode, &pc->dc_attr, 0, 0);
 
 		if (rc != 0) {
-			if (rc != ENOENT) {
+			if (rc != ENOENT)
 				return (rc);
-			}
-			else
-				continue;
-			/* NOTREACHED */
+
+			continue;
 		}
 
 		/* Root of file system? */

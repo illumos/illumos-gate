@@ -77,7 +77,7 @@ smb_netbios_cache_init()
 }
 
 void
-smb_netbios_cache_fini()
+smb_netbios_cache_fini(void)
 {
 	(void) rw_wrlock(&nb_cache_lock);
 	ht_destroy_table(smb_netbios_cache);
@@ -86,11 +86,57 @@ smb_netbios_cache_fini()
 }
 
 void
-smb_netbios_cache_clean()
+smb_netbios_cache_clean(void)
 {
 	(void) rw_wrlock(&nb_cache_lock);
 	(void) ht_clean_table(smb_netbios_cache);
 	(void) rw_unlock(&nb_cache_lock);
+}
+
+int
+smb_netbios_cache_getfirst(nbcache_iter_t *iter)
+{
+	HT_ITEM *item;
+	struct name_entry *entry;
+
+	(void) rw_rdlock(&nb_cache_lock);
+	item = ht_findfirst(smb_netbios_cache, &iter->nbc_hti);
+	if (item == NULL || item->hi_data == NULL) {
+		(void) rw_unlock(&nb_cache_lock);
+		return (-1);
+	}
+
+	entry = (struct name_entry *)item->hi_data;
+	(void) mutex_lock(&entry->mtx);
+	iter->nbc_entry = smb_netbios_name_dup(entry, 1);
+	(void) mutex_unlock(&entry->mtx);
+
+	(void) rw_unlock(&nb_cache_lock);
+
+	return ((iter->nbc_entry) ? 0 : -1);
+}
+
+int
+smb_netbios_cache_getnext(nbcache_iter_t *iter)
+{
+	HT_ITEM *item;
+	struct name_entry *entry;
+
+	(void) rw_rdlock(&nb_cache_lock);
+	item = ht_findnext(&iter->nbc_hti);
+	if (item == NULL || item->hi_data == NULL) {
+		(void) rw_unlock(&nb_cache_lock);
+		return (-1);
+	}
+
+	entry = (struct name_entry *)item->hi_data;
+	(void) mutex_lock(&entry->mtx);
+	iter->nbc_entry = smb_netbios_name_dup(entry, 1);
+	(void) mutex_unlock(&entry->mtx);
+
+	(void) rw_unlock(&nb_cache_lock);
+
+	return ((iter->nbc_entry) ? 0 : -1);
 }
 
 /*
@@ -106,19 +152,15 @@ smb_netbios_cache_lookup(struct name_entry *name)
 	HT_ITEM *item;
 	nb_key_t key;
 	struct name_entry *entry = NULL;
-	unsigned char scope[SMB_PI_MAX_SCOPE];
 	unsigned char hostname[MAXHOSTNAMELEN];
 
 	if (NETBIOS_NAME_IS_STAR(name->name)) {
 		/* Return our address */
-		(void) smb_config_getstr(SMB_CI_NBSCOPE, (char *)scope,
-		    sizeof (scope));
-		(void) utf8_strupr((char *)scope);
-
-		if (smb_getnetbiosname((char *)hostname, MAXHOSTNAMELEN) != 0)
+		if (smb_getnetbiosname((char *)hostname, sizeof (hostname))
+		    != 0)
 			return (NULL);
 
-		smb_encode_netbios_name(hostname, 0x00, scope, name);
+		smb_encode_netbios_name(hostname, 0x00, NULL, name);
 	}
 
 	(void) rw_rdlock(&nb_cache_lock);
@@ -196,6 +238,7 @@ smb_netbios_cache_insert(struct name_entry *name)
 	struct addr_entry *name_addr;
 	HT_ITEM *item;
 	nb_key_t key;
+	int rc;
 
 	/* No point in adding a name with IP address 255.255.255.255 */
 	if (name->addr_list.sin.sin_addr.s_addr == 0xffffffff)
@@ -216,10 +259,9 @@ smb_netbios_cache_insert(struct name_entry *name)
 		    (addr->sin.sin_port == name_addr->sin.sin_port)) {
 			entry->attributes |=
 			    name_addr->attributes & NAME_ATTR_LOCAL;
-			syslog(LOG_DEBUG, "cache_insert: exists");
 			(void) mutex_unlock(&entry->mtx);
 			(void) rw_unlock(&nb_cache_lock);
-			return (0); /* exists */
+			return (0);
 		}
 
 		/* Was not primary: looks for others */
@@ -227,32 +269,31 @@ smb_netbios_cache_insert(struct name_entry *name)
 		    addr != &entry->addr_list; addr = addr->forw) {
 			if (NETBIOS_SAME_IP(addr, name_addr) &&
 			    (addr->sin.sin_port == name_addr->sin.sin_port)) {
-				syslog(LOG_DEBUG, "cache_insert: dup");
 				(void) mutex_unlock(&entry->mtx);
 				(void) rw_unlock(&nb_cache_lock);
-				return (0); /* exists */
+				return (0);
 			}
 		}
 
-		addr = (struct addr_entry *)malloc(sizeof (struct addr_entry));
-		if (addr == 0) {
-			(void) mutex_unlock(&entry->mtx);
-			(void) rw_unlock(&nb_cache_lock);
-			return (-1);
+		if ((addr = malloc(sizeof (struct addr_entry))) != NULL) {
+			*addr = name->addr_list;
+			entry->attributes |= addr->attributes;
+			QUEUE_INSERT_TAIL(&entry->addr_list, addr);
+			rc = 0;
+		} else {
+			rc = -1;
 		}
-		*addr = name->addr_list;
-		entry->attributes |= addr->attributes;
-		QUEUE_INSERT_TAIL(&entry->addr_list, addr);
+
 		(void) mutex_unlock(&entry->mtx);
 		(void) rw_unlock(&nb_cache_lock);
-		return (0);
+		return (rc);
 	}
 
-	entry = (struct name_entry *)malloc(sizeof (struct name_entry));
-	if (entry == 0) {
+	if ((entry = malloc(sizeof (struct name_entry))) == NULL) {
 		(void) rw_unlock(&nb_cache_lock);
 		return (-1);
 	}
+
 	*entry = *name;
 	entry->addr_list.forw = entry->addr_list.back = &entry->addr_list;
 	entry->attributes |= entry->addr_list.attributes;

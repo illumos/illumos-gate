@@ -36,12 +36,17 @@
 #include <fcntl.h>
 #include <thread.h>
 #include <pwd.h>
+#include <dlfcn.h>
+#include <link.h>
 #include <smbsrv/libsmb.h>
 
 #define	SMB_PASSWD	"/var/smb/smbpasswd"
 #define	SMB_OPASSWD	"/var/smb/osmbpasswd"
 #define	SMB_PASSTEMP	"/var/smb/ptmp"
 #define	SMB_PASSLCK	"/var/smb/.pwd.lock"
+#define	SMB_LIBPALT	"/usr/lib/smbsrv"
+#define	SMB_LIBNALT	"libsmb_pwd.so"
+#define	SMB_LIB_ALT	SMB_LIBPALT "/" SMB_LIBNALT
 
 #define	SMB_PWD_DISABLE	"*DIS*"
 #define	SMB_PWD_BUFSIZE 256
@@ -69,11 +74,19 @@ static pid_t lck_pid = 0;	/* process's pid at last lock */
 static thread_t lck_tid = 0;	/* thread that holds the lock */
 static int fildes = -1;
 static mutex_t lck_lock = DEFAULTMUTEX;
+static void *smb_pwd_hdl = NULL;
 
 typedef struct smb_pwbuf {
 	char *pw_name;
 	smb_passwd_t *pw_pwd;
 } smb_pwbuf_t;
+
+static struct {
+	smb_passwd_t *(*smb_pwd_getpasswd)(const char *name,
+						smb_passwd_t *smbpw);
+	int (*smb_pwd_setcntl)(const char *name, int control);
+	int (*smb_pwd_setpasswd)(const char *name, const char *password);
+} smb_pwd_ops;
 
 static int smb_pwd_lock(void);
 static int smb_pwd_unlock(void);
@@ -84,6 +97,45 @@ static smb_pwbuf_t *smb_pwd_fgetent(FILE *, smb_pwbuf_t *, char *, size_t);
 static int smb_pwd_fputent(FILE *, smb_pwbuf_t *);
 static int smb_pwd_chgpwent(smb_passwd_t *, const char *, int);
 static int smb_pwd_update(const char *, const char *, int);
+
+void
+smb_pwd_init(void)
+{
+	smb_pwd_hdl = dlopen(SMB_LIB_ALT, RTLD_NOW | RTLD_LOCAL);
+
+	if (smb_pwd_hdl == NULL)
+		return; /* interposition library not found */
+
+	bzero((void *)&smb_pwd_ops, sizeof (smb_pwd_ops));
+
+	smb_pwd_ops.smb_pwd_getpasswd =
+	    (smb_passwd_t *(*)())dlsym(smb_pwd_hdl, "smb_pwd_getpasswd");
+
+	smb_pwd_ops.smb_pwd_setcntl =
+	    (int (*)())dlsym(smb_pwd_hdl, "smb_pwd_setcntl");
+
+	smb_pwd_ops.smb_pwd_setpasswd =
+	    (int (*)())dlsym(smb_pwd_hdl, "smb_pwd_setpasswd");
+
+	if (smb_pwd_ops.smb_pwd_getpasswd == NULL ||
+	    smb_pwd_ops.smb_pwd_setcntl == NULL ||
+	    smb_pwd_ops.smb_pwd_setpasswd == NULL) {
+		(void) dlclose(smb_pwd_hdl);
+		smb_pwd_hdl = NULL;
+
+		/* If error or function(s) are missing, use original lib */
+		bzero((void *)&smb_pwd_ops, sizeof (smb_pwd_ops));
+	}
+}
+
+void
+smb_pwd_fini(void)
+{
+	if (smb_pwd_hdl) {
+		(void) dlclose(smb_pwd_hdl);
+		smb_pwd_hdl = NULL;
+	}
+}
 
 /*
  * smb_pwd_get
@@ -101,6 +153,9 @@ smb_pwd_getpasswd(const char *name, smb_passwd_t *smbpw)
 	smb_pwbuf_t pwbuf;
 	int err;
 	FILE *fp;
+
+	if (smb_pwd_ops.smb_pwd_getpasswd != NULL)
+		return (smb_pwd_ops.smb_pwd_getpasswd(name, smbpw));
 
 	err = smb_pwd_lock();
 	if (err != SMB_PWE_SUCCESS)
@@ -141,6 +196,9 @@ smb_pwd_getpasswd(const char *name, smb_passwd_t *smbpw)
 int
 smb_pwd_setpasswd(const char *name, const char *password)
 {
+	if (smb_pwd_ops.smb_pwd_setpasswd != NULL)
+		return (smb_pwd_ops.smb_pwd_setpasswd(name, password));
+
 	return (smb_pwd_update(name, password, 0));
 }
 
@@ -153,6 +211,9 @@ smb_pwd_setpasswd(const char *name, const char *password)
 int
 smb_pwd_setcntl(const char *name, int control)
 {
+	if (smb_pwd_ops.smb_pwd_setcntl != NULL)
+		return (smb_pwd_ops.smb_pwd_setcntl(name, control));
+
 	if (control == 0)
 		return (SMB_PWE_SUCCESS);
 

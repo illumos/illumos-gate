@@ -55,7 +55,6 @@ static unsigned long mlrpc_frag_size = MLRPC_FRAG_SZ;
 /*
  * Context table.
  */
-#define	CTXT_PIPE_SZ		65536
 #define	CTXT_TABLE_ENTRIES	128
 static struct mlsvc_rpc_context context_table[CTXT_TABLE_ENTRIES];
 static mutex_t mlrpc_context_lock;
@@ -167,8 +166,8 @@ mlrpc_lookup(int fid)
 
 	if (available) {
 		bzero(available, sizeof (struct mlsvc_rpc_context));
-		available->inpipe = malloc(CTXT_PIPE_SZ);
-		available->outpipe = malloc(CTXT_PIPE_SZ);
+		available->inpipe = malloc(SMB_CTXT_PIPE_SZ);
+		available->outpipe = malloc(SMB_CTXT_PIPE_SZ);
 
 		if (available->inpipe == NULL || available->outpipe == NULL) {
 			free(available->inpipe);

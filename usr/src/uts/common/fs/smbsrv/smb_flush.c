@@ -73,20 +73,19 @@ smb_commit_required(int state)
  * We need to protect the list because there's a good chance we'll
  * block during the flush operation.
  */
-int
+smb_sdrc_t
 smb_com_flush(smb_request_t *sr)
 {
 	smb_ofile_t	*file;
 	smb_llist_t	*flist;
+	int		rc;
 
-	if (smbsr_decode_vwv(sr, "w", &sr->smb_fid) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "w", &sr->smb_fid) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	if (smb_flush_required == 0) {
-		smbsr_encode_empty_result(sr);
-		return (SDRC_NORMAL_REPLY);
+		rc = smbsr_encode_empty_result(sr);
+		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 	}
 
 	if (sr->smb_fid != 0xffff) {
@@ -95,7 +94,7 @@ smb_com_flush(smb_request_t *sr)
 		if (sr->fid_ofile == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 
 		smb_flush_file(sr, sr->fid_ofile);
@@ -111,8 +110,9 @@ smb_com_flush(smb_request_t *sr)
 		}
 		smb_llist_exit(flist);
 	}
-	smbsr_encode_empty_result(sr);
-	return (SDRC_NORMAL_REPLY);
+
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 
@@ -122,7 +122,8 @@ smb_com_flush(smb_request_t *sr)
  * If writes on this file are not synchronous, flush it using the NFSv3
  * commit interface.
  */
-static void smb_flush_file(struct smb_request *sr, struct smb_ofile *ofile)
+static void
+smb_flush_file(struct smb_request *sr, struct smb_ofile *ofile)
 {
 	if ((ofile->f_node->flags & NODE_FLAGS_WRITE_THROUGH) == 0)
 		(void) smb_fsop_commit(sr, sr->user_cr, ofile->f_node);

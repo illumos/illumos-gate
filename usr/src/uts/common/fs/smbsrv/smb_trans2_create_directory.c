@@ -58,36 +58,38 @@
 #include <smbsrv/smb_incl.h>
 
 
-extern int smb_common_create_directory(struct smb_request *sr);
-
-
 /*
  * smb_com_trans2_create_directory
  */
-int
+smb_sdrc_t
 smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 {
 	int	rc;
 	DWORD	status;
 
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (SDRC_ERROR_REPLY);
+	}
+
 	if (smb_decode_mbc(&xa->req_param_mb, "%4.s",
 	    sr, &sr->arg.dirop.fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((status = smb_validate_dirname(sr->arg.dirop.fqi.path)) != 0) {
 		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if ((rc = smb_common_create_directory(sr)) != 0) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (smb_encode_mbc(&xa->rep_param_mb, "w", 0) < 0)
-		smbsr_encode_error(sr);
+		return (SDRC_ERROR_REPLY);
 
 	return (SDRC_NORMAL_REPLY);
 }

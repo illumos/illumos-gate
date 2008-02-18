@@ -43,19 +43,12 @@ SUNWprivate {
 	dyndns_clear_rev_zone;
 	dyndns_update;
 	msdcs_lookup_ads;
-	smb_browser_config;
-	smb_get_nameservers;
+	smb_browser_netlogon;
+	smb_browser_reconfig;
 	smb_kinit;
 	smb_netbios_name_reconfig;
 	smb_netbios_start;
 	smb_netbios_shutdown;
-	smb_netlogon_request;
-	smb_nic_build_info;
-	smb_nic_get_byind;
-	smb_nic_get_byip;
-	smb_nic_get_bysubnet;
-	smb_nic_get_num;
-	smb_nic_status;
     local:
 	*;
 };

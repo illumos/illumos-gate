@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,8 +41,7 @@ OBJS_COMMON=			\
 	smbns_netbios_cache.o	\
 	smbns_netbios_datagram.o\
 	smbns_netbios_name.o	\
-	smbns_netlogon.o	\
-	smbns_nicconfig.o
+	smbns_netlogon.o
 
 OBJECTS=	$(OBJS_COMMON) $(OBJS_SHARED)
 

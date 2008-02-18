@@ -86,7 +86,7 @@ static uint32_t smb_delete_check(smb_request_t *sr, smb_node_t *node,
  * ERRSRV/ERRinvid
  * ERRSRV/ERRbaduid
  */
-int
+smb_sdrc_t
 smb_com_delete(struct smb_request *sr)
 {
 	int	rc;
@@ -104,15 +104,14 @@ smb_com_delete(struct smb_request *sr)
 	int is_stream;
 	smb_odir_context_t *pc;
 
-	if (smbsr_decode_vwv(sr, "w", &sattr) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "w", &sattr) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%S", sr, &path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%S", sr, &path) != 0)
+		return (SDRC_ERROR_REPLY);
+
+	if (smb_rdir_open(sr, path, sattr) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -121,8 +120,6 @@ smb_com_delete(struct smb_request *sr)
 	fullname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 	is_stream = smb_stream_parse_name(path, fname, sname);
-
-	(void) smb_rdir_open(sr, path, sattr);
 	dir_snode = sr->sid_odir->d_dir_snode;
 
 	/*
@@ -208,31 +205,15 @@ smb_com_delete(struct smb_request *sr)
 		node = NULL;
 
 		if (rc != 0) {
-			if (rc != ENOENT) {
-				smb_rdir_close(sr);
-				kmem_free(pc, sizeof (*pc));
-				kmem_free(name, MAXNAMELEN);
-				kmem_free(fname, MAXNAMELEN);
-				kmem_free(sname, MAXNAMELEN);
-				kmem_free(fullname, MAXPATHLEN);
-				smbsr_errno(sr, rc);
-				/* NOTREACHED */
-			}
+			if (rc != ENOENT)
+				goto delete_errno;
 		} else {
 			deleted++;
 		}
 	}
 
 	if ((rc != 0) && (rc != ENOENT)) {
-		/* rc returned by smb_rdir_next() */
-		smb_rdir_close(sr);
-		kmem_free(pc, sizeof (*pc));
-		kmem_free(name, MAXNAMELEN);
-		kmem_free(fname, MAXNAMELEN);
-		kmem_free(sname, MAXNAMELEN);
-		kmem_free(fullname, MAXPATHLEN);
-		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		goto delete_errno;
 	}
 
 	if (deleted == 0) {
@@ -244,15 +225,24 @@ smb_com_delete(struct smb_request *sr)
 	}
 
 	smb_rdir_close(sr);
-
-	smbsr_encode_empty_result(sr);
-
 	kmem_free(pc, sizeof (*pc));
 	kmem_free(name, MAXNAMELEN);
 	kmem_free(fname, MAXNAMELEN);
 	kmem_free(sname, MAXNAMELEN);
 	kmem_free(fullname, MAXPATHLEN);
-	return (SDRC_NORMAL_REPLY);
+
+	rc = smbsr_encode_empty_result(sr);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+
+delete_errno:
+	smb_rdir_close(sr);
+	kmem_free(pc, sizeof (*pc));
+	kmem_free(name, MAXNAMELEN);
+	kmem_free(fname, MAXNAMELEN);
+	kmem_free(sname, MAXNAMELEN);
+	kmem_free(fullname, MAXPATHLEN);
+	smbsr_errno(sr, rc);
+	return (SDRC_ERROR_REPLY);
 
 delete_error:
 	smb_rdir_close(sr);
@@ -262,8 +252,7 @@ delete_error:
 	kmem_free(sname, MAXNAMELEN);
 	kmem_free(fullname, MAXPATHLEN);
 	smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
-	/* NOTREACHED */
-	return (SDRC_NORMAL_REPLY); /* compiler complains otherwise */
+	return (SDRC_ERROR_REPLY);
 }
 
 uint32_t

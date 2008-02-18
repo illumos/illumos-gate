@@ -255,7 +255,7 @@ svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
 
 	hd = ndr_hdlookup(mxa, id);
 	if ((hd == NULL) || (hd->nh_data != &svcctl_key_service)) {
-		bzero(&param, sizeof (struct svcctl_QueryServiceStatus));
+		bzero(param, sizeof (struct svcctl_QueryServiceStatus));
 		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}
@@ -298,7 +298,7 @@ svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
 
 	hd = ndr_hdlookup(mxa, id);
 	if ((hd == NULL) || (hd->nh_data != &svcctl_key_manager)) {
-		bzero(&param, sizeof (struct svcctl_EnumServicesStatus));
+		bzero(param, sizeof (struct svcctl_EnumServicesStatus));
 		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}
@@ -371,7 +371,7 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
 
 	hd = ndr_hdlookup(mxa, id);
 	if ((hd == NULL) || (hd->nh_data != &svcctl_key_service)) {
-		bzero(&param, sizeof (struct svcctl_QueryServiceConfig));
+		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}

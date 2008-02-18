@@ -290,7 +290,7 @@ smb_unregister_catia_callback()
  *  UCHAR Data[ TotalDataCount ]  Level dependent info about the matches
  *                                found in the search
  */
-int
+smb_sdrc_t
 smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		more = 0, rc;
@@ -307,20 +307,19 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (smb_decode_mbc(&xa->req_param_mb, "%wwww4.u", sr,
 	    &sattr, &maxcount, &fflag, &infolev, &path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	maxdata = smb_trans2_find_get_maxdata(sr, infolev, fflag);
 	if (maxdata == 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_LEVEL,
 		    ERRDOS, ERROR_INVALID_LEVEL);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -335,7 +334,8 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
 		(void) smb_convert_unicode_wildcards(path);
 
-	(void) smb_rdir_open(sr, path, sattr);
+	if (smb_rdir_open(sr, path, sattr) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	/*
 	 * Get a copy of information
@@ -362,7 +362,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		smb_rdir_close(sr);
 		kmem_free(pattern, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -438,7 +438,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
  *  UCHAR Data[TotalDataCount]         Level dependent info about the
  *                                      matches found in the search
  */
-int
+smb_sdrc_t
 smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 {
 	uint16_t fflag, infolev;
@@ -462,14 +462,13 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	 */
 	if (smb_decode_mbc(&xa->req_param_mb, "%www lw", sr,
 	    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree, sr->smb_sid);
 	if (sr->sid_odir == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	maxdata = smb_trans2_find_get_maxdata(sr, infolev, fflag);
@@ -477,7 +476,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 		smb_rdir_close(sr);
 		smbsr_error(sr, NT_STATUS_INVALID_LEVEL,
 		    ERRDOS, ERROR_INVALID_LEVEL);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -511,7 +510,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 		smb_rdir_close(sr);
 		kmem_free(pattern, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (fflag & SMB_FIND_CLOSE_AFTER_REQUEST ||
@@ -1096,21 +1095,22 @@ smb_trans2_find_mbc_encode(
 /*
  * Close a search started by a Trans2FindFirst2 request.
  */
-int
+smb_sdrc_t
 smb_com_find_close2(smb_request_t *sr)
 {
-	if (smbsr_decode_vwv(sr, "w", &sr->smb_sid) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "w", &sr->smb_sid) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree, sr->smb_sid);
 	if (sr->sid_odir == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	smb_rdir_close(sr);
-	smbsr_encode_empty_result(sr);
+
+	if (smbsr_encode_empty_result(sr))
+		return (SDRC_ERROR_REPLY);
+
 	return (SDRC_NORMAL_REPLY);
 }

@@ -110,7 +110,7 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
-int
+smb_sdrc_t
 smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	smb_trans2_setinfo_t *info;
@@ -127,8 +127,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_decode_mbc(&xa->req_param_mb, "%w4.u", sr, &info->level,
 	    &info->path) != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type) ||
@@ -136,7 +135,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, info->path,
@@ -146,7 +145,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -158,21 +157,22 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_errno(sr, rc);
+		return (SDRC_ERROR_REPLY);
 	}
 
 	info->node = ret_snode;
 	status = smb_trans2_set_information(sr, info, &smberr);
 	info->node = NULL;
 	smb_node_release(ret_snode);
-	if (status == NT_STATUS_DATA_ERROR) {
-		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	} else if (status == NT_STATUS_UNSUCCESSFUL) {
-		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
-		/* NOTREACHED */
-	}
 	kmem_free(info, sizeof (smb_trans2_setinfo_t));
+
+	if (status == NT_STATUS_DATA_ERROR)
+		return (SDRC_ERROR_REPLY);
+
+	if (status == NT_STATUS_UNSUCCESSFUL) {
+		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
+		return (SDRC_ERROR_REPLY);
+	}
+
 	return (SDRC_NORMAL_REPLY);
 }

@@ -58,7 +58,7 @@
  * security descriptor. For information not defined in CIFS section 4.2.2
  * see section 4.2.1 (NT_CREATE_ANDX).
  */
-int
+smb_sdrc_t
 smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 {
 	struct open_param *op = &sr->arg.open;
@@ -94,10 +94,8 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 	    &ImpersonationLevel,
 	    &SecurityFlags);
 
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	/*
 	 * If name length is zero, interpret as "\".
@@ -107,23 +105,21 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 	} else {
 		rc = smb_decode_mbc(&xa->req_param_mb, "%#u",
 		    sr, NameLength, &op->fqi.path);
-		if (rc != 0) {
-			smbsr_decode_error(sr);
-			/* NOTREACHED */
-		}
+		if (rc != 0)
+			return (SDRC_ERROR_REPLY);
 	}
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (sd_len) {
 		status = smb_decode_sd(xa, &sd);
 		if (status != NT_STATUS_SUCCESS) {
 			smbsr_error(sr, status, 0, 0);
-			/* NOTREACHED */
+			return (SDRC_ERROR_REPLY);
 		}
 		op->sd = &sd;
 	} else {
@@ -171,19 +167,13 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 		smbsr_disconnect_file(sr);
 	}
 
-	status = smb_open_subr(sr);
+	status = smb_common_open(sr);
+
 	if (op->sd)
 		smb_sd_term(op->sd);
 
-	if (status != NT_STATUS_SUCCESS) {
-		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-			    ERRDOS, ERROR_SHARING_VIOLATION);
-		else
-			smbsr_error(sr, status, 0, 0);
-
-		/* NOTREACHED */
-	}
+	if (status != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		switch (MYF_OPLOCK_TYPE(op->my_flags)) {

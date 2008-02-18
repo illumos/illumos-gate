@@ -32,14 +32,14 @@
 
 /*
  * This table defines the list of IOCTL/FSCTL values for which we'll
- * return a specific NT status code, based on observation of NT.
+ * return a specific NT status code.
  */
 static struct {
 	uint32_t fcode;
 	DWORD status;
 } ioctl_ret_tbl[] = {
-	{FSCTL_GET_OBJECT_ID,		NT_STATUS_INVALID_PARAMETER},
-	{FSCTL_QUERY_ALLOCATED_RANGES,	NT_STATUS_INVALID_PARAMETER}
+	{ FSCTL_GET_OBJECT_ID,		NT_STATUS_INVALID_PARAMETER },
+	{ FSCTL_QUERY_ALLOCATED_RANGES,	NT_STATUS_INVALID_PARAMETER }
 };
 
 
@@ -75,7 +75,7 @@ static struct {
  *                             io or fs control.
  * Data[ DataCount ]           The results of the io or fs control.
  */
-int
+smb_sdrc_t
 smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 {
 	DWORD status = NT_STATUS_SUCCESS;
@@ -86,15 +86,12 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 	int i;
 
 	if (smb_decode_mbc(&xa->req_setup_mb, "lwbb",
-	    &fcode,
-	    &fid,
-	    &is_fsctl,
-	    &is_flags) != 0) {
+	    &fcode, &fid, &is_fsctl, &is_flags) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
+		return (SDRC_ERROR_REPLY);
 	}
 
-	for (i = 0;
-	    i < sizeof (ioctl_ret_tbl) / sizeof (ioctl_ret_tbl[0]);
+	for (i = 0; i < sizeof (ioctl_ret_tbl) / sizeof (ioctl_ret_tbl[0]);
 	    i++) {
 		if (ioctl_ret_tbl[i].fcode == fcode) {
 			status = ioctl_ret_tbl[i].status;
@@ -102,8 +99,10 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 		}
 	}
 
-	if (status != NT_STATUS_SUCCESS)
+	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, 0, 0);
+		return (SDRC_ERROR_REPLY);
+	}
 
 	(void) smb_encode_mbc(&xa->rep_param_mb, "l", 0);
 	return (SDRC_NORMAL_REPLY);

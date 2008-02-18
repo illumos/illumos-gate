@@ -43,13 +43,6 @@
 #include <smbsrv/lsalib.h>
 
 /*
- * Local protocol flags used to indicate which version of the
- * netlogon protocol to use when attempting to find the PDC.
- */
-#define	NETLOGON_PROTO_NETLOGON			0x01
-#define	NETLOGON_PROTO_SAMLOGON			0x02
-
-/*
  * Maximum time to wait for a domain controller (30 seconds).
  */
 #define	SMB_NETLOGON_TIMEOUT	30
@@ -121,8 +114,16 @@ smbd_join(smb_joininfo_t *info)
 				    "host principal.");
 			}
 		}
+
+		(void) smb_config_getstr(SMB_CI_DOMAIN_NAME, nbt_domain,
+		    sizeof (nbt_domain));
+
 		(void) smb_config_set_secmode(info->mode);
 		(void) smb_config_setstr(SMB_CI_DOMAIN_NAME, info->domain_name);
+
+		if (strcasecmp(nbt_domain, info->domain_name))
+			smb_browser_reconfig();
+
 		return (NT_STATUS_SUCCESS);
 	}
 
@@ -299,8 +300,6 @@ smb_netlogon_dc_browser(void *arg)
 {
 	boolean_t rc;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
-	int net, smb_nc_cnt;
-	int protocol;
 
 	for (;;) {
 		(void) mutex_lock(&smb_netlogon_info.snli_locate_mtx);
@@ -318,16 +317,8 @@ smb_netlogon_dc_browser(void *arg)
 
 		smb_setdomaininfo(NULL, NULL, 0);
 		if (msdcs_lookup_ads(resource_domain) == 0) {
-			if (smb_config_getbool(SMB_CI_DOMAIN_MEMB))
-				protocol = NETLOGON_PROTO_SAMLOGON;
-			else
-				protocol = NETLOGON_PROTO_NETLOGON;
-
-			smb_nc_cnt = smb_nic_get_num();
-			for (net = 0; net < smb_nc_cnt; net++) {
-				smb_netlogon_request(net, protocol,
-				    resource_domain);
-			}
+			/* Try to locate a DC via NetBIOS */
+			smb_browser_netlogon(resource_domain);
 		}
 
 		rc = smb_ntdomain_is_valid(SMB_NETLOGON_TIMEOUT);

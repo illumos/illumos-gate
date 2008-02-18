@@ -29,8 +29,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ldap.h>
-#include <net/if.h>
-
 #include <smbsrv/libsmb.h>
 
 #ifdef	__cplusplus
@@ -105,35 +103,10 @@ extern int smb_netbios_start(void);
 extern void smb_netbios_shutdown(void);
 extern void smb_netbios_name_reconfig(void);
 
-/* Browser Configure */
-extern void smb_browser_config(void);
+/* Browser Functions */
+extern void smb_browser_reconfig(void);
+extern void smb_browser_netlogon(char *);
 
-extern void smb_netlogon_request(int, int, char *);
-
-/*
- * NIC listing and config
- */
-#define	SIZE_IP	17
-
-typedef struct {
-	char		ifname[LIFNAMSIZ];
-	uint32_t	ip;
-	uint32_t	mask;
-	uint32_t	broadcast;
-	uint64_t	flags;
-	boolean_t	exclude;
-} net_cfg_t;
-
-#define	GATEWAY_FILE	"/etc/defaultrouter"
-
-/* NIC Config functions */
-extern int smb_get_nameservers(struct in_addr *, int);
-extern void smb_nic_build_info(void);
-extern net_cfg_t *smb_nic_get_byind(int, net_cfg_t *);
-extern net_cfg_t *smb_nic_get_bysubnet(uint32_t, net_cfg_t *);
-extern net_cfg_t *smb_nic_get_byip(uint32_t, net_cfg_t *);
-extern int smb_nic_get_num(void);
-extern boolean_t smb_nic_status(char *, uint64_t);
 
 #ifdef	__cplusplus
 }

@@ -199,7 +199,7 @@ static int smb_transfer_write_raw_data(smb_request_t *sr,
 
 #define	WR_MODE_WR_THRU	1
 
-int
+smb_sdrc_t
 smb_com_write_raw(struct smb_request *sr)
 {
 	int			rc = 0;
@@ -218,9 +218,8 @@ smb_com_write_raw(struct smb_request *sr)
 	smb_node_t		*fnode;
 	smb_error_t		err;
 
-	if (sr->session->s_state != SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
+	if (sr->session->s_state != SMB_SESSION_STATE_WRITE_RAW_ACTIVE)
 		return (SDRC_DROP_VC);
-	}
 
 	if (sr->smb_wct == 12) {
 		off_high = 0;
@@ -235,10 +234,8 @@ smb_com_write_raw(struct smb_request *sr)
 		data_offset -= 63;
 	}
 
-	if (rc != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (rc != 0)
+		return (SDRC_ERROR_REPLY);
 
 	off = ((offset_t)off_high << 32) | off_low;
 	addl_xfer_count = count - data_length;
@@ -246,7 +243,7 @@ smb_com_write_raw(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	fnode = sr->fid_ofile->f_node;
@@ -263,7 +260,7 @@ smb_com_write_raw(struct smb_request *sr)
 			    count, B_TRUE);
 			if (rc != NT_STATUS_SUCCESS) {
 				smbsr_error(sr, rc, ERRSRV, ERRaccess);
-				/* NOTREACHED */
+				return (SDRC_ERROR_REPLY);
 			}
 		}
 	}
@@ -275,8 +272,7 @@ smb_com_write_raw(struct smb_request *sr)
 	if (sr->smb_data.chain_offset + data_offset + data_length >
 	    sr->smb_data.max_bytes) {
 		/* Error handling code will wake up the session daemon */
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	/*
@@ -451,9 +447,9 @@ notify_write_raw_complete:
 	}
 	/* Write complete notification */
 	sr->first_smb_com = SMB_COM_WRITE_COMPLETE;
-	smbsr_encode_result(sr, 1, 0, "bww", 1,
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
 	    count - (lcount + addl_lcount), 0);
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
 }
 
 

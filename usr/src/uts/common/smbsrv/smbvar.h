@@ -981,6 +981,12 @@ struct smb_fqi {			/* fs_query_info */
 #define	OPLOCK_MIN_TIMEOUT	(5 * 1000)
 #define	OPLOCK_STD_TIMEOUT	(15 * 1000)
 
+typedef struct {
+	uint32_t severity;
+	uint32_t status;
+	uint16_t errcls;
+	uint16_t errcode;
+} smb_error_t;
 
 /*
  * SMB Request State Machine
@@ -1148,9 +1154,12 @@ struct smb_request {
 	unsigned int		reply_seqnum;	/* reply sequence number */
 	unsigned char		first_smb_com;	/* command code */
 	unsigned char		smb_com;	/* command code */
-	unsigned char		smb_rcls;	/* error code class */
-	unsigned char		smb_reh;	/* rsvd (AH DOS INT-24 ERR) */
+
+	uint8_t			smb_rcls;	/* error code class */
+	uint8_t			smb_reh;	/* rsvd (AH DOS INT-24 ERR) */
 	uint16_t		smb_err;	/* error code */
+	smb_error_t		smb_error;
+
 	uint8_t			smb_flg;	/* flags */
 	uint16_t		smb_flg2;	/* flags */
 	uint16_t		smb_pid_high;	/* high part of pid */
@@ -1216,7 +1225,6 @@ struct smb_request {
 
 	} arg;
 
-	label_t			exjb;
 	cred_t			*user_cr;
 };
 
@@ -1301,13 +1309,17 @@ typedef struct smb_xa {
 #define	SDDF_SUPPRESS_UNLEASH		0x0004
 #define	SDDF_SUPPRESS_SHOW		0x0080
 
-#define	SDRC_NORMAL_REPLY	0
-#define	SDRC_DROP_VC		1
-#define	SDRC_NO_REPLY		2
-#define	SDRC_ERROR_REPLY	3
-#define	SDRC_UNIMPLEMENTED	4
-#define	SDRC_UNSUPPORTED	5
-
+/*
+ * SMB dispatch return codes.
+ */
+typedef enum {
+	SDRC_NORMAL_REPLY = 0,
+	SDRC_DROP_VC,
+	SDRC_NO_REPLY,
+	SDRC_ERROR_REPLY,
+	SDRC_UNIMPLEMENTED,
+	SDRC_UNSUPPORTED
+} smb_sdrc_t;
 
 struct vardata_block {
 	unsigned char		tag;
@@ -1374,13 +1386,6 @@ typedef struct smb_info {
 #define	SMB_NEW_KID() atomic_inc_64_nv(&smb_info.si_global_kid)
 #define	SMB_UNIQ_FID() atomic_inc_32_nv(&smb_info.si_uniq_fid)
 
-typedef struct {
-	uint32_t severity;
-	uint32_t status;
-	uint16_t errcls;
-	uint16_t errcode;
-} smb_error_t;
-
 /*
  * This is to be used by Trans2SetFileInfo
  * and Trans2SetPathInfo
@@ -1411,7 +1416,7 @@ typedef struct smb_tsd {
 #define	SMB_INVALID_CRDISPOSITION	-1
 
 typedef struct smb_dispatch_table {
-	int			(*sdt_function)(struct smb_request *);
+	smb_sdrc_t		(*sdt_function)(struct smb_request *);
 	char			sdt_dialect;
 	unsigned char		sdt_flags;
 	krw_t			sdt_slock_mode;

@@ -74,7 +74,7 @@
  * For the time being, we will leave it till we have time.
  */
 
-int
+smb_sdrc_t
 smb_com_tree_disconnect(struct smb_request *sr)
 {
 	/*
@@ -101,11 +101,14 @@ smb_com_tree_disconnect(struct smb_request *sr)
 
 	if (sr->uid_user == NULL || sr->tid_tree == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRinvnid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	smbsr_rq_notify(sr, sr->session, sr->tid_tree);
 	smb_tree_disconnect(sr->tid_tree);
-	smbsr_encode_empty_result(sr);
+
+	if (smbsr_encode_empty_result(sr))
+		return (SDRC_ERROR_REPLY);
+
 	return (SDRC_NORMAL_REPLY);
 }

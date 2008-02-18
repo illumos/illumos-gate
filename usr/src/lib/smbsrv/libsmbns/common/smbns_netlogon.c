@@ -74,29 +74,24 @@ static char resource_domain[SMB_PI_MAX_DOMAIN];
  * in smb_netlogon_receive.
  */
 void
-smb_netlogon_request(int net, int protocol, char *domain)
+smb_netlogon_request(struct name_entry *server, int protocol, char *domain)
 {
-	struct name_entry *server;
 	nt_domain_t *ntdp;
 
-	server = smb_browser_get_srvname(net);
-	if (server == 0)
+	if (domain == NULL || *domain == '\0')
 		return;
 
-	(void) strlcpy(resource_domain, domain,
-	    sizeof (resource_domain));
+	(void) strlcpy(resource_domain, domain, sizeof (resource_domain));
 
-	if (strlen(resource_domain) > 0) {
-		ntdp = nt_domain_lookup_name(resource_domain);
-		if (protocol == NETLOGON_PROTO_SAMLOGON && ntdp)
-			smb_netlogon_samlogon(server,
-			    MAILSLOT_NETLOGON_SAMLOGON_RDC,
-			    resource_domain);
-		else
-			smb_netlogon_query(server,
-			    MAILSLOT_NETLOGON_RDC,
-			    resource_domain);
-	}
+	ntdp = nt_domain_lookup_name(resource_domain);
+	if (ntdp && (protocol == NETLOGON_PROTO_SAMLOGON))
+		smb_netlogon_samlogon(server,
+		    MAILSLOT_NETLOGON_SAMLOGON_RDC,
+		    resource_domain);
+	else
+		smb_netlogon_query(server,
+		    MAILSLOT_NETLOGON_RDC,
+		    resource_domain);
 }
 
 /*
@@ -521,8 +516,6 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 static int
 better_dc(uint32_t cur_ip, uint32_t new_ip)
 {
-	net_cfg_t cfg;
-
 	/*
 	 * If we don't have any current DC,
 	 * then use the new one of course.
@@ -530,9 +523,10 @@ better_dc(uint32_t cur_ip, uint32_t new_ip)
 	if (cur_ip == 0)
 		return (1);
 
-	if (smb_nic_get_bysubnet(cur_ip, &cfg) != NULL)
+	if (smb_nic_exists(cur_ip, B_TRUE))
 		return (0);
-	if (smb_nic_get_bysubnet(new_ip, &cfg) != NULL)
+
+	if (smb_nic_exists(new_ip, B_TRUE))
 		return (1);
 	/*
 	 * Otherwise, just keep the old one.

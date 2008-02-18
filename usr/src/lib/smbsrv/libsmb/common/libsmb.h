@@ -33,7 +33,9 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/list.h>
 #include <arpa/inet.h>
+#include <net/if.h>
 #include <netdb.h>
 
 #include <stdlib.h>
@@ -43,6 +45,7 @@ extern "C" {
 
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
+#include <smbsrv/netbios.h>
 
 /*
  * XXX - These header files are here, only because other libraries
@@ -280,6 +283,10 @@ extern int smb_gethostname(char *, size_t, int);
 extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
 
+extern int smb_get_nameservers(struct in_addr *, int);
+extern void smb_tonetbiosname(char *, char *, char);
+
+
 void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
 
@@ -430,6 +437,8 @@ typedef struct smb_passwd {
 #define	SMB_PWE_SYSTEM_ERROR	11
 #define	SMB_PWE_MAX		12
 
+extern void smb_pwd_init(void);
+extern void smb_pwd_fini(void);
 extern smb_passwd_t *smb_pwd_getpasswd(const char *, smb_passwd_t *);
 extern int smb_pwd_setpasswd(const char *, const char *);
 extern int smb_pwd_setcntl(const char *, int);
@@ -664,6 +673,45 @@ int smb_lookup_name(char *, smb_gsid_t *);
 #define	SMB_LGRP_NAME_CHAR_MAX	32
 #define	SMB_LGRP_COMMENT_MAX	256
 #define	SMB_LGRP_NAME_MAX	(SMB_LGRP_NAME_CHAR_MAX * MTS_MB_CHAR_MAX + 1)
+
+/*
+ * values for smb_nic_t.smbflags
+ */
+#define	SMB_NICF_NBEXCL		0x01	/* Excluded from Netbios activities */
+#define	SMB_NICF_ALIAS		0x02	/* This is an alias */
+
+/*
+ * smb_nic_t
+ *     nic_host		actual host name
+ *     nic_nbname	16-byte NetBIOS host name
+ */
+typedef struct {
+	char		nic_host[MAXHOSTNAMELEN];
+	char		nic_nbname[NETBIOS_NAME_SZ];
+	char		nic_cmnt[SMB_PI_MAX_COMMENT];
+	char		nic_ifname[LIFNAMSIZ];
+	uint32_t	nic_ip;
+	uint32_t	nic_mask;
+	uint32_t	nic_bcast;
+	uint32_t	nic_smbflags;
+	uint64_t	nic_sysflags;
+} smb_nic_t;
+
+typedef struct smb_niciter {
+	smb_nic_t ni_nic;
+	int ni_cookie;
+	int ni_seqnum;
+} smb_niciter_t;
+
+/* NIC config functions */
+int smb_nic_init(void);
+void smb_nic_fini(void);
+int smb_nic_getnum(char *);
+int smb_nic_addhost(const char *, const char *, int, const char **);
+int smb_nic_delhost(const char *);
+int smb_nic_getfirst(smb_niciter_t *);
+int smb_nic_getnext(smb_niciter_t *);
+boolean_t smb_nic_exists(uint32_t, boolean_t);
 
 #ifdef	__cplusplus
 }

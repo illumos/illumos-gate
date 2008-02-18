@@ -36,44 +36,27 @@ static uint32_t smb_common_create(struct smb_request *sr);
  * open the file and return a fid.  The file is specified using a
  * fully qualified name relative to the tree.
  */
-int
+smb_sdrc_t
 smb_com_create(struct smb_request *sr)
 {
 	struct open_param *op = &sr->arg.open;
-	uint32_t status;
 
 	bzero(op, sizeof (sr->arg.open));
 
-	if (smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	op->create_disposition = FILE_OVERWRITE_IF;
-	status = smb_common_create(sr);
 
-	switch (status) {
-	case NT_STATUS_SUCCESS:
-		break;
+	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
-	case NT_STATUS_SHARING_VIOLATION:
-		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-		    ERRDOS, ERROR_SHARING_VIOLATION);
-		/* NOTREACHED */
-		break;
+	if (smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0))
+		return (SDRC_ERROR_REPLY);
 
-	default:
-		smbsr_error(sr, status, 0, 0);
-		/* NOTREACHED */
-		break;
-	}
-
-	smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0);
 	return (SDRC_NORMAL_REPLY);
 }
 
@@ -81,44 +64,27 @@ smb_com_create(struct smb_request *sr)
  * Create a new file and return a fid.  The file is specified using
  * a fully qualified name relative to the tree.
  */
-int
+smb_sdrc_t
 smb_com_create_new(struct smb_request *sr)
 {
 	struct open_param *op = &sr->arg.open;
-	uint32_t status;
 
 	bzero(op, sizeof (sr->arg.open));
 
-	if (smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	op->create_disposition = FILE_CREATE;
-	status = smb_common_create(sr);
 
-	switch (status) {
-	case NT_STATUS_SUCCESS:
-		break;
+	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
-	case NT_STATUS_SHARING_VIOLATION:
-		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-		    ERRDOS, ERROR_SHARING_VIOLATION);
-		/* NOTREACHED */
-		break;
+	if (smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0))
+		return (SDRC_ERROR_REPLY);
 
-	default:
-		smbsr_error(sr, status, 0, 0);
-		/* NOTREACHED */
-		break;
-	}
-
-	smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0);
 	return (SDRC_NORMAL_REPLY);
 }
 
@@ -127,28 +93,23 @@ smb_com_create_new(struct smb_request *sr)
  * Create a unique file in the specified directory relative to the
  * current tree.  No attributes are specified.
  */
-int
+smb_sdrc_t
 smb_com_create_temporary(struct smb_request *sr)
 {
 	static uint16_t tmp_id = 10000;
 	struct open_param *op = &sr->arg.open;
 	char name[SMB_CREATE_NAMEBUF_SZ];
 	char *buf;
-	uint32_t status;
 	uint16_t reserved;
 	uint16_t bcc;
 
 	bzero(op, sizeof (sr->arg.open));
 
-	if (smbsr_decode_vwv(sr, "wl", &reserved, &op->utime.tv_sec) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_vwv(sr, "wl", &reserved, &op->utime.tv_sec) != 0)
+		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0) {
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	}
+	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
+		return (SDRC_ERROR_REPLY);
 
 	++tmp_id;
 	bcc = 1; /* null terminator */
@@ -158,25 +119,14 @@ smb_com_create_temporary(struct smb_request *sr)
 	(void) snprintf(buf, MAXPATHLEN, "%s\\%s", op->fqi.path, name);
 	op->fqi.path = buf;
 	op->create_disposition = FILE_CREATE;
-	status = smb_common_create(sr);
 
-	switch (status) {
-	case NT_STATUS_SUCCESS:
-		break;
+	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR_REPLY);
 
-	case NT_STATUS_SHARING_VIOLATION:
-		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-		    ERRDOS, ERROR_SHARING_VIOLATION);
-		/* NOTREACHED */
-		break;
+	if (smbsr_encode_result(sr, 1, 0, "bwwbs", 1, sr->smb_fid, bcc, 4,
+	    name))
+		return (SDRC_ERROR_REPLY);
 
-	default:
-		smbsr_error(sr, status, 0, 0);
-		/* NOTREACHED */
-		break;
-	}
-
-	smbsr_encode_result(sr, 1, 0, "bwwbs", 1, sr->smb_fid, bcc, 4, name);
 	return (SDRC_NORMAL_REPLY);
 }
 
@@ -200,7 +150,7 @@ smb_common_create(struct smb_request *sr)
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
-		/* NOTREACHED */
+		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
 	op->dsize = 0;
@@ -213,7 +163,7 @@ smb_common_create(struct smb_request *sr)
 		}
 	}
 
-	status = smb_open_subr(sr);
+	status = smb_common_open(sr);
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) == MYF_OPLOCK_NONE) {
 		sr->smb_flg &=

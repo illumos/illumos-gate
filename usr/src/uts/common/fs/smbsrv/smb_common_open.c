@@ -39,7 +39,9 @@
 #include <sys/fcntl.h>
 #include <sys/nbmlock.h>
 
-extern uint32_t smb_is_executable(char *path);
+extern uint32_t smb_is_executable(char *);
+
+static uint32_t smb_open_subr(smb_request_t *);
 
 /*
  * The default stability mode is to perform the write-through
@@ -207,6 +209,42 @@ smb_ofun_to_crdisposition(uint16_t  ofun)
 }
 
 /*
+ * Retry opens to avoid spurious sharing violations, due to timing
+ * issues between closes and opens.  The client that already has the
+ * file open may be in the process of closing it.
+ */
+uint32_t
+smb_common_open(smb_request_t *sr)
+{
+	uint32_t status = NT_STATUS_SUCCESS;
+	int count;
+
+	for (count = 0; count <= 4; count++) {
+		if (count)
+			delay(MSEC_TO_TICK(400));
+
+		if ((status = smb_open_subr(sr)) == NT_STATUS_SUCCESS)
+			break;
+	}
+
+	switch (status) {
+	case NT_STATUS_SUCCESS:
+		break;
+
+	case NT_STATUS_SHARING_VIOLATION:
+		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
+		    ERRDOS, ERROR_SHARING_VIOLATION);
+		break;
+
+	default:
+		/* Error already set. */
+		break;
+	}
+
+	return (status);
+}
+
+/*
  * smb_open_subr
  *
  * Notes on write-through behaviour. It looks like pre-LM0.12 versions
@@ -229,8 +267,8 @@ smb_ofun_to_crdisposition(uint16_t  ofun)
  * handle things in here.
  */
 
-uint32_t
-smb_open_subr(struct smb_request *sr)
+static uint32_t
+smb_open_subr(smb_request_t *sr)
 {
 	int			created = 0;
 	struct smb_node		*node = 0;
@@ -247,7 +285,7 @@ smb_open_subr(struct smb_request *sr)
 	uint32_t		status = NT_STATUS_SUCCESS;
 	int			is_dir;
 	smb_error_t		err;
-	int			is_stream;
+	int			is_stream = 0;
 	int			lookup_flags = SMB_FOLLOW_LINKS;
 	uint32_t		daccess;
 	uint32_t		share_access = op->share_access;
@@ -257,17 +295,16 @@ smb_open_subr(struct smb_request *sr)
 
 	if (is_dir) {
 		/*
-		 * The file being created or opened is a directory file.
-		 * With this flag, the Disposition parameter must be set to
-		 * one of FILE_CREATE, FILE_OPEN, or FILE_OPEN_IF
+		 * The object being created or opened is a directory,
+		 * and the Disposition parameter must be one of
+		 * FILE_CREATE, FILE_OPEN, or FILE_OPEN_IF
 		 */
 		if ((op->create_disposition != FILE_CREATE) &&
 		    (op->create_disposition != FILE_OPEN_IF) &&
 		    (op->create_disposition != FILE_OPEN)) {
 			smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 			    ERRDOS, ERROR_INVALID_ACCESS);
-			/* invalid open mode */
-			/* NOTREACHED */
+			return (NT_STATUS_INVALID_PARAMETER);
 		}
 	}
 
@@ -278,7 +315,6 @@ smb_open_subr(struct smb_request *sr)
 	op->desired_access = smb_access_generic_to_file(op->desired_access);
 
 	if (sr->session->s_file_cnt >= SMB_SESSION_OFILE_MAX) {
-
 		ASSERT(sr->uid_user);
 		cmn_err(CE_NOTE, "smbd[%s\\%s]: %s", sr->uid_user->u_domain,
 		    sr->uid_user->u_name,
@@ -286,7 +322,7 @@ smb_open_subr(struct smb_request *sr)
 
 		smbsr_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
 		    ERRDOS, ERROR_TOO_MANY_OPEN_FILES);
-		/* NOTREACHED */
+		return (NT_STATUS_TOO_MANY_OPENED_FILES);
 	}
 
 	/* This must be NULL at this point */
@@ -303,23 +339,19 @@ smb_open_subr(struct smb_request *sr)
 		 * No further processing for IPC, we need to either
 		 * raise an exception or return success here.
 		 */
-		if ((rc = smb_rpc_open(sr)) != 0) {
-			smbsr_error(sr, rc, 0, 0);
-			/* NOTREACHED */
-		} else {
-			return (NT_STATUS_SUCCESS);
-		}
-		break;
+		if ((status = smb_rpc_open(sr)) != NT_STATUS_SUCCESS)
+			smbsr_error(sr, status, 0, 0);
+		return (status);
 
 	default:
-		smbsr_error(sr, 0, ERRSRV, ERRinvdevice);
-		/* NOTREACHED */
-		break;
+		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
+		    ERRDOS, ERROR_BAD_DEV_TYPE);
+		return (NT_STATUS_BAD_DEVICE_TYPE);
 	}
 
 	if ((pathlen = strlen(op->fqi.path)) >= MAXPATHLEN) {
 		smbsr_error(sr, 0, ERRSRV, ERRfilespecs);
-		/* NOTREACHED */
+		return (NT_STATUS_NAME_TOO_LONG);
 	}
 
 	/*
@@ -334,7 +366,7 @@ smb_open_subr(struct smb_request *sr)
 
 	if ((status = smb_validate_object_name(op->fqi.path, is_dir)) != 0) {
 		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
-		/* NOTREACHED */
+		return (status);
 	}
 
 	cur_node = op->fqi.dir_snode ?
@@ -344,7 +376,7 @@ smb_open_subr(struct smb_request *sr)
 	    sr->tid_tree->t_snode, cur_node, &op->fqi.dir_snode,
 	    op->fqi.last_comp)) {
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (sr->smb_error.status);
 	}
 
 	/*
@@ -376,7 +408,7 @@ smb_open_subr(struct smb_request *sr)
 		smb_node_release(op->fqi.dir_snode);
 		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_errno(sr, rc);
-		/* NOTREACHED */
+		return (sr->smb_error.status);
 	}
 
 	/*
@@ -411,7 +443,7 @@ smb_open_subr(struct smb_request *sr)
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
 			    ERRDOS, ERROR_ACCESS_DENIED);
-			/* NOTREACHED */
+			return (NT_STATUS_FILE_IS_A_DIRECTORY);
 		}
 
 		if (op->fqi.last_attr.sa_vattr.va_type == VDIR) {
@@ -427,7 +459,7 @@ smb_open_subr(struct smb_request *sr)
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
 				    ERRDOS, ERROR_ACCESS_DENIED);
-				/* NOTREACHED */
+				return (NT_STATUS_FILE_IS_A_DIRECTORY);
 			}
 		} else if (op->my_flags & MYF_MUST_BE_DIRECTORY) {
 			rw_exit(&node->n_share_lock);
@@ -436,7 +468,7 @@ smb_open_subr(struct smb_request *sr)
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
 			    ERRDOS, ERROR_DIRECTORY);
-			/* NOTREACHED */
+			return (NT_STATUS_NOT_A_DIRECTORY);
 		}
 
 		/*
@@ -450,7 +482,7 @@ smb_open_subr(struct smb_request *sr)
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_DELETE_PENDING,
 			    ERRDOS, ERROR_ACCESS_DENIED);
-			/* NOTREACHED */
+			return (NT_STATUS_DELETE_PENDING);
 		}
 
 		/*
@@ -463,7 +495,7 @@ smb_open_subr(struct smb_request *sr)
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
 			    ERRDOS, ERROR_ALREADY_EXISTS);
-			/* NOTREACHED */
+			return (NT_STATUS_OBJECT_NAME_COLLISION);
 		}
 
 		/*
@@ -481,7 +513,7 @@ smb_open_subr(struct smb_request *sr)
 					SMB_NULL_FQI_NODES(op->fqi);
 					smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 					    ERRDOS, ERRnoaccess);
-					/* NOTREACHED */
+					return (NT_STATUS_ACCESS_DENIED);
 				}
 			}
 		}
@@ -503,6 +535,7 @@ smb_open_subr(struct smb_request *sr)
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 				    ERRDOS, ERRnoaccess);
+				return (NT_STATUS_ACCESS_DENIED);
 			}
 		}
 
@@ -531,9 +564,11 @@ smb_open_subr(struct smb_request *sr)
 			if (status == NT_STATUS_PRIVILEGE_NOT_HELD) {
 				smbsr_error(sr, status,
 				    ERRDOS, ERROR_PRIVILEGE_NOT_HELD);
+				return (status);
 			} else {
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 				    ERRDOS, ERROR_ACCESS_DENIED);
+				return (NT_STATUS_ACCESS_DENIED);
 			}
 		}
 
@@ -553,7 +588,7 @@ smb_open_subr(struct smb_request *sr)
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, status,
 				    ERRDOS, ERROR_VC_DISCONNECTED);
-				/* NOTREACHED */
+				return (status);
 			}
 		}
 
@@ -569,7 +604,7 @@ smb_open_subr(struct smb_request *sr)
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 				    ERRDOS, ERROR_ACCESS_DENIED);
-				/* NOTREACHED */
+				return (NT_STATUS_ACCESS_DENIED);
 			}
 
 			if (node->attr.sa_vattr.va_size != op->dsize) {
@@ -589,7 +624,7 @@ smb_open_subr(struct smb_request *sr)
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
 					smbsr_errno(sr, rc);
-					/* NOTREACHED */
+					return (sr->smb_error.status);
 				}
 
 				op->dsize = op->fqi.last_attr.sa_vattr.va_size;
@@ -618,13 +653,15 @@ smb_open_subr(struct smb_request *sr)
 		/* Last component was not found. */
 		dnode = op->fqi.dir_snode;
 
+		if (is_dir == 0)
+			is_stream = smb_stream_parse_name(op->fqi.path,
+			    NULL, NULL);
+
 		if ((op->create_disposition == FILE_OPEN) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
 
-			is_stream = smb_stream_parse_name(op->fqi.path,
-			    NULL, NULL);
 			/*
 			 * The requested file not found so the operation should
 			 * fail with these two dispositions
@@ -634,7 +671,8 @@ smb_open_subr(struct smb_request *sr)
 				    ERRDOS, ERROR_FILE_NOT_FOUND);
 			else
 				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-			/* NOTREACHED */
+
+			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 		}
 
 		/*
@@ -646,7 +684,9 @@ smb_open_subr(struct smb_request *sr)
 		bzero(&new_attr, sizeof (new_attr));
 		if (is_dir == 0) {
 			new_attr.sa_vattr.va_type = VREG;
-			new_attr.sa_vattr.va_mode = 0666;
+			new_attr.sa_vattr.va_mode = is_stream ? S_IRUSR :
+			    S_IRUSR | S_IRGRP | S_IROTH |
+			    S_IWUSR | S_IWGRP | S_IWOTH;
 			new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
 
 			/*
@@ -678,7 +718,7 @@ smb_open_subr(struct smb_request *sr)
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
-				/* NOTREACHED */
+				return (sr->smb_error.status);
 			}
 
 			if (op->dattr & SMB_FA_READONLY) {
@@ -732,7 +772,7 @@ smb_open_subr(struct smb_request *sr)
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
 					smbsr_errno(sr, rc);
-					/* NOTREACHED */
+					return (sr->smb_error.status);
 				} else {
 					op->fqi.last_attr = node->attr;
 				}
@@ -751,7 +791,7 @@ smb_open_subr(struct smb_request *sr)
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
-				/* NOTREACHED */
+				return (sr->smb_error.status);
 			}
 
 			node = op->fqi.last_snode;
@@ -777,7 +817,7 @@ smb_open_subr(struct smb_request *sr)
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		/* NOTREACHED */
+		return (NT_STATUS_ACCESS_DENIED);
 	}
 
 	if (max_requested) {
@@ -806,7 +846,7 @@ smb_open_subr(struct smb_request *sr)
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_error(sr, err.status, err.errcls, err.errcode);
-		/* NOTREACHED */
+		return (err.status);
 	}
 
 	/*
@@ -846,7 +886,7 @@ smb_open_subr(struct smb_request *sr)
 
 			smbsr_error(sr, status,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
-			/* NOTREACHED */
+			return (status);
 		}
 
 		op->my_flags |= granted_oplock;

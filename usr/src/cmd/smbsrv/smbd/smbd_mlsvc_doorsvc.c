@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
@@ -228,21 +229,28 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 
 		inpipe->sp_datalen = context->inlen;
 		context->inlen = 0;
-
 		context->outcookie = 0;
 		context->outlen = outpipe->sp_datalen;
 	}
-
 	if (mdhin.md_call_type == SMB_RPC_TRANSACT) {
-		bcopy(bufp, inpipe->sp_data, tmp_pipe.sp_datalen);
-		inpipe->sp_datalen = tmp_pipe.sp_datalen;
-
+		/*
+		 * Append trans data to the pipe
+		 */
+		if ((tmp_pipe.sp_datalen +
+		    context->inlen) > SMB_CTXT_PIPE_SZ) {
+			context->inlen = 0;
+			goto zero_exit;
+		}
+		bcopy(bufp, inpipe->sp_data + context->inlen,
+		    tmp_pipe.sp_datalen);
+		inpipe->sp_datalen += tmp_pipe.sp_datalen;
 		context = mlrpc_process(inpipe->sp_pipeid, user_ctx);
 		if (context == NULL)
 			goto zero_exit;
 
 		context->outcookie = 0;
 		context->outlen = outpipe->sp_datalen;
+		context->inlen = 0;
 		if (outpipe->sp_datalen < mdhin.md_length)
 			adj_len = outpipe->sp_datalen;
 		if (outpipe->sp_datalen > mdhin.md_length)
@@ -252,8 +260,13 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 
 	if (mdhin.md_call_type == SMB_RPC_WRITE) {
 		/*
-		 * Append write data to the stream.
+		 * Append write data to the pipe
 		 */
+		if ((tmp_pipe.sp_datalen +
+		    context->inlen) > SMB_CTXT_PIPE_SZ) {
+			context->inlen = 0;
+			goto zero_exit;
+		}
 		bcopy(bufp, inpipe->sp_data + context->inlen,
 		    tmp_pipe.sp_datalen);
 		inpipe->sp_datalen += tmp_pipe.sp_datalen;

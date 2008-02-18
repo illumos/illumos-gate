@@ -588,11 +588,10 @@ strnchr(const char *s, char c, int n)
 	return (0);
 }
 
-/*ARGSUSED*/
-static int
+static boolean_t
 is_multihome(char *name)
 {
-	return ((smb_nic_get_num() > 1) ? 1 : 0);
+	return (smb_nic_getnum(name) > 1);
 }
 
 /*
@@ -1976,9 +1975,11 @@ smb_send_name_query_response(struct addr_entry *addr,
 			    NAME_ATTR_OWNER_NODE_TYPE);
 
 			BE_OUT16(scan, attr); scan += 2;
-			(void) memcpy(scan, &raddr->sin.sin_addr.s_addr,
-			    sizeof (uint32_t));
-			scan += 4;
+
+			*scan++ = raddr->sin.sin_addr.s_addr;
+			*scan++ = raddr->sin.sin_addr.s_addr >> 8;
+			*scan++ = raddr->sin.sin_addr.s_addr >> 16;
+			*scan++ = raddr->sin.sin_addr.s_addr >> 24;
 
 			answer.rdlength += 6;
 			raddr = raddr->forw;
@@ -2134,7 +2135,6 @@ smb_send_node_status_response(struct addr_entry *addr,
 	unsigned char 		*scan;
 	unsigned char 		*scan_end;
 	unsigned char		data[MAX_NETBIOS_REPLY_DATA_SIZE];
-	net_cfg_t cfg;
 	boolean_t scan_done = B_FALSE;
 
 	bzero(&packet, sizeof (struct name_packet));
@@ -2162,10 +2162,10 @@ smb_send_node_status_response(struct addr_entry *addr,
 
 	scan_end = data + MAX_NETBIOS_REPLY_DATA_SIZE;
 
-	if (smb_nic_get_bysubnet(addr->sin.sin_addr.s_addr, &cfg) == NULL)
-		net_ipaddr = 0;
+	if (smb_nic_exists(addr->sin.sin_addr.s_addr, B_TRUE))
+		net_ipaddr = addr->sin.sin_addr.s_addr;
 	else
-		net_ipaddr = cfg.ip;
+		net_ipaddr = 0;
 
 	(void) smb_config_getnum(SMB_CI_MAX_CONNECTIONS, &max_connections);
 
@@ -2575,9 +2575,11 @@ smb_name_Bnode_delete_name(struct name_entry *name)
 		    NAME_ATTR_OWNER_NODE_TYPE);
 
 		BE_OUT16(scan, attr); scan += 2;
-		(void) memcpy(scan, &raddr->sin.sin_addr.s_addr,
-		    sizeof (uint32_t));
-		scan += 4;
+
+		*scan++ = raddr->sin.sin_addr.s_addr;
+		*scan++ = raddr->sin.sin_addr.s_addr >> 8;
+		*scan++ = raddr->sin.sin_addr.s_addr >> 16;
+		*scan++ = raddr->sin.sin_addr.s_addr >> 24;
 
 		additional.rdlength += 6;
 	} while (raddr != &name->addr_list);
@@ -3010,10 +3012,11 @@ smb_name_Pnode_delete_name(struct name_entry *name)
 		    NAME_ATTR_OWNER_NODE_TYPE);
 
 		BE_OUT16(scan, attr); scan += 2;
-		BE_OUT32(scan, raddr->sin.sin_addr.s_addr); scan += 4;
-		(void) memcpy(scan, &raddr->sin.sin_addr.s_addr,
-		    sizeof (uint32_t));
-		scan += 4;
+
+		*scan++ = raddr->sin.sin_addr.s_addr;
+		*scan++ = raddr->sin.sin_addr.s_addr >> 8;
+		*scan++ = raddr->sin.sin_addr.s_addr >> 16;
+		*scan++ = raddr->sin.sin_addr.s_addr >> 24;
 
 		additional.rdlength = 6;
 		raddr = raddr->forw;
@@ -4472,9 +4475,7 @@ smb_netbios_worker(void *arg)
 		if (packet->answer)
 			smb_netbios_name_freeaddrs(packet->answer->name);
 		free(packet);
-	}
-	else
-	{
+	} else {
 		syslog(LOG_DEBUG, "SmbNBNS: error decoding received packet");
 	}
 
@@ -4497,33 +4498,62 @@ smb_netbios_wins_config(char *ip)
 		smb_nbns[nbns_num].sin.sin_addr.s_addr = ipaddr;
 		smb_nbns[nbns_num++].sin.sin_port =
 		    htons(NAME_SERVICE_UDP_PORT);
-		smb_node_type = 'H';
+		smb_node_type = SMB_NODETYPE_H;
+	}
+}
+
+static void
+smb_netbios_name_registration(void)
+{
+	nbcache_iter_t nbc_iter;
+	struct name_entry *name;
+	int rc;
+
+	rc = smb_netbios_cache_getfirst(&nbc_iter);
+	while (rc == 0) {
+		name = nbc_iter.nbc_entry;
+		(void) smb_netbios_name_logf(name);
+		if (IS_UNIQUE(name->attributes) && IS_LOCAL(name->attributes)) {
+			switch (smb_node_type) {
+			case SMB_NODETYPE_B:
+				(void) smb_name_Bnode_add_name(name);
+				break;
+			case SMB_NODETYPE_P:
+				(void) smb_name_Pnode_add_name(name);
+				break;
+			case SMB_NODETYPE_M:
+				(void) smb_name_Mnode_add_name(name);
+				break;
+			case SMB_NODETYPE_H:
+			default:
+				(void) smb_name_Hnode_add_name(name);
+				break;
+			}
+		}
+		free(name);
+		rc = smb_netbios_cache_getnext(&nbc_iter);
 	}
 }
 
 void
 smb_netbios_name_config(void)
 {
-	uint32_t ipaddr;
 	struct name_entry name;
-	char myname[MAXHOSTNAMELEN];
-	int i;
-	int smb_nc_cnt;
-	net_cfg_t cfg;
 	char wins_ip[16];
-
-	if (smb_getnetbiosname(myname, MAXHOSTNAMELEN) != 0)
-		return;
+	smb_niciter_t ni;
+	int rc;
 
 	/* Start with no broadcast addresses */
 	bcast_num = 0;
 	bzero(smb_bcast_list, sizeof (addr_entry_t) * SMB_PI_MAX_NETWORKS);
 
-	smb_nc_cnt = smb_nic_get_num();
-	/* Add all of my broadcast addresses */
-	for (i = 0; i < smb_nc_cnt; i++) {
-		if (smb_nic_get_byind(i, &cfg) == NULL) {
-			break;
+	/* Add all of the broadcast addresses */
+	rc = smb_nic_getfirst(&ni);
+	while (rc == 0) {
+		if (ni.ni_nic.nic_smbflags &
+		    (SMB_NICF_ALIAS | SMB_NICF_NBEXCL)) {
+			rc = smb_nic_getnext(&ni);
+			continue;
 		}
 		smb_bcast_list[bcast_num].flags = ADDR_FLAG_VALID;
 		smb_bcast_list[bcast_num].attributes = NAME_ATTR_LOCAL;
@@ -4532,11 +4562,12 @@ smb_netbios_name_config(void)
 		smb_bcast_list[bcast_num].sin.sin_port =
 		    htons(NAME_SERVICE_UDP_PORT);
 		smb_bcast_list[bcast_num++].sin.sin_addr.s_addr =
-		    cfg.broadcast;
+		    ni.ni_nic.nic_bcast;
+		rc = smb_nic_getnext(&ni);
 	}
 
 	/* Start with no WINS */
-	smb_node_type = 'B';
+	smb_node_type = SMB_NODETYPE_B;
 	nbns_num = 0;
 	bzero(smb_nbns, sizeof (addr_entry_t) * SMB_PI_MAX_WINS);
 
@@ -4546,24 +4577,25 @@ smb_netbios_name_config(void)
 	(void) smb_config_getstr(SMB_CI_WINS_SRV2, wins_ip, sizeof (wins_ip));
 	smb_netbios_wins_config(wins_ip);
 
-	for (i = 0; i < smb_nc_cnt; i++) {
-		if (smb_nic_get_byind(i, &cfg) == NULL) {
-			break;
-		}
-		if (cfg.exclude)
+	if (smb_nic_getfirst(&ni) != 0)
+		return;
+
+	do {
+		if (ni.ni_nic.nic_smbflags & SMB_NICF_NBEXCL)
 			continue;
 
-		ipaddr = cfg.ip;
-		smb_init_name_struct((unsigned char *)myname, 0x00, 0, ipaddr,
-		    htons(DGM_SRVC_UDP_PORT), NAME_ATTR_UNIQUE,
-		    NAME_ATTR_LOCAL, &name);
-		(void) smb_name_add_name(&name);
-
-		smb_init_name_struct((unsigned char *)myname, 0x20, 0,
-		    ipaddr, htons(DGM_SRVC_UDP_PORT),
+		smb_init_name_struct((unsigned char *)ni.ni_nic.nic_host,
+		    0x00, 0, ni.ni_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
 		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &name);
-		(void) smb_name_add_name(&name);
-	}
+		(void) smb_netbios_cache_insert(&name);
+
+		smb_init_name_struct((unsigned char *)ni.ni_nic.nic_host,
+		    0x20, 0, ni.ni_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
+		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &name);
+		(void) smb_netbios_cache_insert(&name);
+	} while (smb_nic_getnext(&ni) == 0);
+
+	smb_netbios_name_registration();
 }
 
 void
@@ -4612,7 +4644,6 @@ smb_netbios_name_service_daemon(void *arg)
 	int			flag = 1;
 	char 			*buf;
 	worker_param_t 		*worker_param;
-	net_cfg_t cfg;
 
 	/*
 	 * Initialize reply_queue
@@ -4689,10 +4720,8 @@ ignore:		bzero(addr, sizeof (struct addr_entry));
 		}
 
 		/* Ignore any incoming packets from myself... */
-		if (smb_nic_get_byip(addr->sin.sin_addr.s_addr,
-		    &cfg) != NULL) {
+		if (smb_nic_exists(addr->sin.sin_addr.s_addr, B_FALSE))
 			goto ignore;
-		}
 
 		/*
 		 * Launch a netbios worker to process the received packet.

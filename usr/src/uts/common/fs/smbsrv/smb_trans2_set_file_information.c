@@ -101,7 +101,7 @@
 /*
  * smb_com_trans2_set_file_information
  */
-int
+smb_sdrc_t
 smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	smb_trans2_setinfo_t *info;
@@ -116,8 +116,7 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 	    &info->level);
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type) ||
@@ -125,14 +124,14 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	info->node = sr->fid_ofile->f_node;
@@ -143,19 +142,19 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
+		return (SDRC_ERROR_REPLY);
 	}
 
 	status = smb_trans2_set_information(sr, info, &smberr);
-	if (status == NT_STATUS_DATA_ERROR) {
-		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_decode_error(sr);
-		/* NOTREACHED */
-	} else if (status == NT_STATUS_UNSUCCESSFUL) {
-		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
-		/* NOTREACHED */
-	}
 	kmem_free(info, sizeof (smb_trans2_setinfo_t));
+
+	if (status == NT_STATUS_DATA_ERROR)
+		return (SDRC_ERROR_REPLY);
+
+	if (status == NT_STATUS_UNSUCCESSFUL) {
+		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
+		return (SDRC_ERROR_REPLY);
+	}
+
 	return (SDRC_NORMAL_REPLY);
 }

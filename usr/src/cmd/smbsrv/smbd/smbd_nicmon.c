@@ -49,11 +49,10 @@
 
 static pthread_t smb_nicmon_thread;
 
-static void smb_setup_rtsock(int, int *);
-static int smb_nics_changed(int);
-static void *smb_nicmonitor(void *);
-static int smb_setup_eventpipe(int *, int *);
-static void smb_process_nic_change();
+static void smb_nicmon_setup_rtsock(int, int *);
+static int smb_nicmon_needscan(int);
+static void *smb_nicmon_daemon(void *);
+static int smb_nicmon_setup_eventpipe(int *, int *);
 
 /* Use this to stop monitoring */
 static int eventpipe_write = -1;
@@ -66,13 +65,19 @@ smb_nicmon_start(void)
 {
 	int rc = 0;
 
-	smb_nic_build_info();
-	rc = pthread_create(&smb_nicmon_thread, NULL, smb_nicmonitor, 0);
-	if (rc != 0) {
-		syslog(LOG_ERR, "smb_nicmonitor: "
-		    "NIC monitoring failed to start: %s", strerror(errno));
+	if ((rc = smb_nic_init()) != 0) {
+		syslog(LOG_ERR, "NIC monitor failed to initialize (%s)",
+		    strerror(errno));
 		return (rc);
 	}
+
+	rc = pthread_create(&smb_nicmon_thread, NULL, smb_nicmon_daemon, 0);
+	if (rc != 0) {
+		syslog(LOG_ERR, "NIC monitor failed to start (%s)",
+		    strerror(errno));
+		return (rc);
+	}
+
 	return (rc);
 }
 
@@ -88,30 +93,67 @@ smb_nicmon_stop(void)
 		return;
 
 	(void) write(eventpipe_write, &buf, sizeof (buf));
+	smb_nic_fini();
+}
+
+/*
+ * Call this to do stuff after ifs changed.
+ */
+void
+smb_nicmon_reconfig(void)
+{
+	boolean_t ddns_enabled;
+
+	ddns_enabled = smb_config_getbool(SMB_CI_DYNDNS_ENABLE);
+
+	/* Clear rev zone before creating if list */
+	if (ddns_enabled) {
+		if (dyndns_clear_rev_zone() != 0) {
+			syslog(LOG_ERR, "smb_nicmon_daemon: "
+			    "failed to clear DNS reverse lookup zone");
+		}
+	}
+
+	/* re-initialize NIC table */
+	if (smb_nic_init() != 0)
+		syslog(LOG_ERR, "smb_nicmon_daemon: "
+		    "failed to get NIC information");
+
+	smb_netbios_name_reconfig();
+	smb_browser_reconfig();
+
+	if (ddns_enabled) {
+		if (dyndns_update() != 0) {
+			syslog(LOG_ERR, "smb_nicmon_daemon: "
+			    "failed to update dynamic DNS");
+		}
+	}
 }
 
 /*
  * Setup routing socket for getting RTM messages.
  */
 static void
-smb_setup_rtsock(int af, int *s)
+smb_nicmon_setup_rtsock(int af, int *s)
 {
 	int flags;
 
 	*s = socket(PF_ROUTE, SOCK_RAW, af);
 	if (*s == -1) {
-		syslog(LOG_ERR, "smb_setup_rtsock: failed to "
+		syslog(LOG_ERR, "smb_nicmon_daemon: failed to "
 		    "create routing socket");
 		return;
 	}
 	if ((flags = fcntl(*s, F_GETFL, 0)) < 0) {
-		syslog(LOG_ERR, "smb_setup_rtsock: failed to fcntl F_GETFL");
+		syslog(LOG_ERR, "smb_nicmon_daemon: "
+		    "failed to fcntl F_GETFL");
 		(void) close(*s);
 		*s = -1;
 		return;
 	}
 	if ((fcntl(*s, F_SETFL, flags | O_NONBLOCK)) < 0) {
-		syslog(LOG_ERR, "smb_setup_rtsock: failed to fcntl F_SETFL");
+		syslog(LOG_ERR, "smb_nicmon_daemon: "
+		    "failed to fcntl F_SETFL");
 		(void) close(*s);
 		*s = -1;
 		return;
@@ -119,7 +161,7 @@ smb_setup_rtsock(int af, int *s)
 }
 
 static int
-smb_nics_changed(int sock)
+smb_nicmon_needscan(int sock)
 {
 	int	nbytes;
 	int64_t msg[2048 / 8];
@@ -137,7 +179,7 @@ smb_nics_changed(int sock)
 			continue;
 		}
 		if (nbytes < rtm->rtm_msglen) {
-			syslog(LOG_DEBUG, "smb_nicmonitor: short read: %d "
+			syslog(LOG_DEBUG, "smb_nicmon_daemon: short read: %d "
 			    "of %d", nbytes, rtm->rtm_msglen);
 			continue;
 		}
@@ -160,12 +202,12 @@ smb_nics_changed(int sock)
  * Create pipe for signal delivery and set up signal handlers.
  */
 static int
-smb_setup_eventpipe(int *read_pipe, int *write_pipe)
+smb_nicmon_setup_eventpipe(int *read_pipe, int *write_pipe)
 {
 	int fds[2];
 
 	if ((pipe(fds)) < 0) {
-		syslog(LOG_ERR, "smb_nicmonitor: failed to open pipe");
+		syslog(LOG_ERR, "smb_nicmon_daemon: failed to open pipe");
 		return (1);
 	}
 	*read_pipe = fds[0];
@@ -173,41 +215,9 @@ smb_setup_eventpipe(int *read_pipe, int *write_pipe)
 	return (0);
 }
 
-/*
- * Call this to do stuff after ifs changed.
- */
-static void
-smb_process_nic_change()
-{
-	boolean_t ddns_enabled;
-
-	ddns_enabled = smb_config_getbool(SMB_CI_DYNDNS_ENABLE);
-
-	/* Clear rev zone before creating if list */
-	if (ddns_enabled) {
-		if (dyndns_clear_rev_zone() != 0) {
-			syslog(LOG_ERR, "smb_nicmonitor: "
-			    "failed to clear DNS reverse lookup zone");
-		}
-	}
-
-	/* re-initialize NIC table */
-	smb_nic_build_info();
-
-	smb_netbios_name_reconfig();
-	smb_browser_config();
-
-	if (ddns_enabled) {
-		if (dyndns_update() != 0) {
-			syslog(LOG_ERR, "smb_nicmonitor: "
-			    "failed to update dynamic DNS");
-		}
-	}
-}
-
 /*ARGSUSED*/
 static void *
-smb_nicmonitor(void *args)
+smb_nicmon_daemon(void *args)
 {
 	struct pollfd pollfds[2];
 	int pollfd_num = 2;
@@ -221,13 +231,16 @@ smb_nicmonitor(void *args)
 	 * monitor changes in NIC interfaces. We are only interested
 	 * in new inerface addition/deletion and change in UP/DOWN status.
 	 */
-	smb_setup_rtsock(AF_INET, &rtsock_v4);
+	smb_nicmon_setup_rtsock(AF_INET, &rtsock_v4);
 	if (rtsock_v4 == -1) {
-		syslog(LOG_ERR, "smb_nicmonitor: cannot open routing socket");
+		syslog(LOG_ERR, "smb_nicmon_daemon: "
+		    "cannot open routing socket");
 		return (NULL);
 	}
-	if (smb_setup_eventpipe(&eventpipe_read, &eventpipe_write) != 0) {
-		syslog(LOG_ERR, "smb_nicmonitor: cannot open event pipes");
+
+	if (smb_nicmon_setup_eventpipe(&eventpipe_read, &eventpipe_write)
+	    != 0) {
+		syslog(LOG_ERR, "smb_nicmon_daemon: cannot open event pipes");
 		return (NULL);
 	}
 
@@ -243,7 +256,7 @@ smb_nicmonitor(void *args)
 		if (poll(pollfds, pollfd_num, -1) < 0) {
 			if (errno == EINTR)
 				continue;
-			syslog(LOG_ERR, "smb_nicmonitor: "
+			syslog(LOG_ERR, "smb_nicmon_daemon: "
 			    "poll failed with errno %d", errno);
 			break;
 		}
@@ -252,7 +265,7 @@ smb_nicmonitor(void *args)
 			    !(pollfds[i].revents & POLLIN))
 				continue;
 			if (pollfds[i].fd == rtsock_v4)
-				nic_changed = smb_nics_changed(rtsock_v4);
+				nic_changed = smb_nicmon_needscan(rtsock_v4);
 			if (pollfds[i].fd == eventpipe_read)
 				goto done;
 		}
@@ -262,7 +275,7 @@ smb_nicmonitor(void *args)
 		 * nic list and other configs.
 		 */
 		if (nic_changed)
-			smb_process_nic_change();
+			smb_nicmon_reconfig();
 	}
 done:
 	/* Close sockets */

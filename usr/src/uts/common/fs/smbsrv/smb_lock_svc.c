@@ -691,7 +691,6 @@ smb_lock_range_error(smb_request_t *sr, uint32_t status32)
 		errcode = ERRlock;
 
 	smbsr_error(sr, status32, ERRDOS, errcode);
-	/* NOTREACHED */
 }
 
 /*
