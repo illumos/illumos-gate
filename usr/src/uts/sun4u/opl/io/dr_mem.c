@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -406,7 +406,6 @@ dr_memlist_del_retired_pages(struct memlist *mlist)
 
 		pfn = page_pptonum(pp);
 
-		ASSERT((pp->p_offset >> PAGESHIFT) == pfn);
 		/*
 		 * Page retirement currently breaks large pages into PAGESIZE
 		 * pages. If this changes, need to remove the assert and deal
