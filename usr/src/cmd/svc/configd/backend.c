@@ -49,6 +49,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 #include <zone.h>
+#include <libscf_priv.h>
 
 #include "configd.h"
 #include "repcache_protocol.h"
@@ -740,13 +741,72 @@ fail:
 }
 
 /*
+ * This interface is called to perform the actual copy
+ *
+ * Return:
+ *	_FAIL_UNKNOWN		read/write fails
+ *	_FAIL_NO_RESOURCES	out of memory
+ *	_SUCCESS		copy succeeds
+ */
+static rep_protocol_responseid_t
+backend_do_copy(const char *src, int srcfd, const char *dst,
+    int dstfd, size_t *sz)
+{
+	char *buf;
+	off_t nrd, nwr, n, r_off = 0, w_off = 0;
+
+	if ((buf = malloc(8192)) == NULL)
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+
+	while ((nrd = read(srcfd, buf, 8192)) != 0) {
+		if (nrd < 0) {
+			if (errno == EINTR)
+				continue;
+
+			configd_critical(
+			    "Backend copy failed: fails to read from %s "
+			    "at offset %d: %s\n", src, r_off, strerror(errno));
+			free(buf);
+			return (REP_PROTOCOL_FAIL_UNKNOWN);
+		}
+
+		r_off += nrd;
+
+		nwr = 0;
+		do {
+			if ((n = write(dstfd, &buf[nwr], nrd - nwr)) < 0) {
+				if (errno == EINTR)
+					continue;
+
+				configd_critical(
+				    "Backend copy failed: fails to write to %s "
+				    "at offset %d: %s\n", dst, w_off,
+				    strerror(errno));
+				free(buf);
+				return (REP_PROTOCOL_FAIL_UNKNOWN);
+			}
+
+			nwr += n;
+			w_off += n;
+
+		} while (nwr < nrd);
+	}
+
+	if (sz)
+		*sz = w_off;
+
+	free(buf);
+	return (REP_PROTOCOL_SUCCESS);
+}
+
+/*
  * Can return:
  *	_BAD_REQUEST		name is not valid
  *	_TRUNCATED		name is too long for current repository path
  *	_UNKNOWN		failed for unknown reason (details written to
  *				console)
  *	_BACKEND_READONLY	backend is not writable
- *
+ *	_NO_RESOURCES		out of memory
  *	_SUCCESS		Backup completed successfully.
  */
 static rep_protocol_responseid_t
@@ -756,30 +816,35 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	ssize_t old_sz;
 	ssize_t old_max = max_repository_backups;
 	ssize_t cur;
-
 	char *finalname;
-
-	char finalpath[PATH_MAX];
-	char tmppath[PATH_MAX];
-	char buf[8192];
+	char *finalpath;
+	char *tmppath;
 	int infd, outfd;
 	size_t len;
-	off_t inlen, outlen, offset;
-
 	time_t now;
 	struct tm now_tm;
-
 	rep_protocol_responseid_t result;
 
-	if (be->be_readonly)
-		return (REP_PROTOCOL_FAIL_BACKEND_READONLY);
+	if ((finalpath = malloc(PATH_MAX)) == NULL)
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
 
-	result = backend_backup_base(be, name, finalpath, sizeof (finalpath));
+	if ((tmppath = malloc(PATH_MAX)) == NULL) {
+		free(finalpath);
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+	}
+
+	if (be->be_readonly) {
+		result = REP_PROTOCOL_FAIL_BACKEND_READONLY;
+		goto out;
+	}
+
+	result = backend_backup_base(be, name, finalpath, PATH_MAX);
 	if (result != REP_PROTOCOL_SUCCESS)
-		return (result);
+		goto out;
 
 	if (!backend_check_backup_needed(be->be_path, finalpath)) {
-		return (REP_PROTOCOL_SUCCESS);
+		result = REP_PROTOCOL_SUCCESS;
+		goto out;
 	}
 
 	/*
@@ -792,30 +857,33 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	else
 		finalname = finalpath;
 
-	(void) strlcpy(tmppath, finalpath, sizeof (tmppath));
-	if (strlcat(tmppath, "-tmpXXXXXX", sizeof (tmppath)) >=
-	    sizeof (tmppath))
-		return (REP_PROTOCOL_FAIL_TRUNCATED);
+	(void) strlcpy(tmppath, finalpath, PATH_MAX);
+	if (strlcat(tmppath, "-tmpXXXXXX", PATH_MAX) >= PATH_MAX) {
+		result = REP_PROTOCOL_FAIL_TRUNCATED;
+		goto out;
+	}
 
 	now = time(NULL);
 	if (localtime_r(&now, &now_tm) == NULL) {
 		configd_critical(
 		    "\"%s\" backup failed: localtime(3C) failed: %s\n", name,
 		    be->be_path, strerror(errno));
-		return (REP_PROTOCOL_FAIL_UNKNOWN);
+		result = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto out;
 	}
 
-	if (strftime(finalpath + len, sizeof (finalpath) - len,
-	    "-%Y""%m""%d""_""%H""%M""%S", &now_tm) >=
-	    sizeof (finalpath) - len) {
-		return (REP_PROTOCOL_FAIL_TRUNCATED);
+	if (strftime(finalpath + len, PATH_MAX - len,
+	    "-%Y""%m""%d""_""%H""%M""%S", &now_tm) >= PATH_MAX - len) {
+		result = REP_PROTOCOL_FAIL_TRUNCATED;
+		goto out;
 	}
 
 	infd = open(be->be_path, O_RDONLY);
 	if (infd < 0) {
 		configd_critical("\"%s\" backup failed: opening %s: %s\n", name,
 		    be->be_path, strerror(errno));
-		return (REP_PROTOCOL_FAIL_UNKNOWN);
+		result = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto out;
 	}
 
 	outfd = mkstemp(tmppath);
@@ -823,40 +891,13 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 		configd_critical("\"%s\" backup failed: mkstemp(%s): %s\n",
 		    name, tmppath, strerror(errno));
 		(void) close(infd);
-		return (REP_PROTOCOL_FAIL_UNKNOWN);
+		result = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto out;
 	}
 
-	for (;;) {
-		do {
-			inlen = read(infd, buf, sizeof (buf));
-		} while (inlen < 0 && errno == EINTR);
-
-		if (inlen <= 0)
-			break;
-
-		for (offset = 0; offset < inlen; offset += outlen) {
-			do {
-				outlen = write(outfd, buf + offset,
-				    inlen - offset);
-			} while (outlen < 0 && errno == EINTR);
-
-			if (outlen >= 0)
-				continue;
-
-			configd_critical(
-			    "\"%s\" backup failed: write to %s: %s\n",
-			    name, tmppath, strerror(errno));
-			result = REP_PROTOCOL_FAIL_UNKNOWN;
-			goto fail;
-		}
-	}
-
-	if (inlen < 0) {
-		configd_critical(
-		    "\"%s\" backup failed: read from %s: %s\n",
-		    name, be->be_path, strerror(errno));
+	if ((result = backend_do_copy((const char *)be->be_path, infd,
+	    (const char *)tmppath, outfd, NULL)) != REP_PROTOCOL_SUCCESS)
 		goto fail;
-	}
 
 	/*
 	 * grab the old list before doing our re-name.
@@ -886,7 +927,7 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 		/* unlink all but the first (old_max - 1) files */
 		for (cur = old_max - 1; cur < old_sz; cur++) {
 			(void) strlcpy(finalname, old_list[cur],
-			    sizeof (finalpath) - (finalname - finalpath));
+			    PATH_MAX - (finalname - finalpath));
 			if (unlink(finalpath) < 0)
 				configd_critical(
 				    "\"%s\" backup completed, but removing old "
@@ -904,6 +945,10 @@ fail:
 	(void) close(outfd);
 	if (result != REP_PROTOCOL_SUCCESS)
 		(void) unlink(tmppath);
+
+out:
+	free(finalpath);
+	free(tmppath);
 
 	return (result);
 }
@@ -1074,7 +1119,7 @@ backend_fd_write(int fd, const char *mess)
  *	_UNKNOWN		failed for unknown reason (details written to
  *				console)
  *	_BACKEND_READONLY	backend is not writable
- *
+ *	_NO_RESOURCES		out of memory
  *	_SUCCESS		Backup completed successfully.
  */
 rep_protocol_responseid_t
@@ -1084,13 +1129,260 @@ backend_create_backup(const char *name)
 	sqlite_backend_t *be;
 
 	result = backend_lock(BACKEND_TYPE_NORMAL, 0, &be);
-	if (result != REP_PROTOCOL_SUCCESS)
-		return (result);
+	assert(result == REP_PROTOCOL_SUCCESS);
 
 	result = backend_create_backup_locked(be, name);
 	backend_unlock(be);
 
 	return (result);
+}
+
+/*
+ * Copy the repository.  If the sw_back flag is not set, we are
+ * copying the repository from the default location under /etc/svc to
+ * the tmpfs /etc/svc/volatile location.  If the flag is set, we are
+ * copying back to the /etc/svc location from the volatile location
+ * after manifest-import is completed.
+ *
+ * Can return:
+ *
+ *	REP_PROTOCOL_SUCCESS		successful copy and rename
+ *	REP_PROTOCOL_FAIL_UNKNOWN	file operation error
+ *	REP_PROTOCOL_FAIL_NO_RESOURCES	out of memory
+ */
+static rep_protocol_responseid_t
+backend_switch_copy(const char *src, const char *dst, int sw_back)
+{
+	int srcfd, dstfd;
+	char *tmppath = malloc(PATH_MAX);
+	rep_protocol_responseid_t res = REP_PROTOCOL_SUCCESS;
+	struct stat s_buf;
+	size_t cpsz, sz;
+
+	if (tmppath == NULL) {
+		res = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		goto out;
+	}
+
+	/*
+	 * Create and open the related db files
+	 */
+	(void) strlcpy(tmppath, dst, PATH_MAX);
+	sz = strlcat(tmppath, "-XXXXXX", PATH_MAX);
+	assert(sz < PATH_MAX);
+	if (sz >= PATH_MAX) {
+		configd_critical(
+		    "Backend copy failed: strlcat %s: overflow\n", tmppath);
+		abort();
+	}
+
+	if ((dstfd = mkstemp(tmppath)) < 0) {
+		configd_critical("Backend copy failed: mkstemp %s: %s\n",
+		    tmppath, strerror(errno));
+		res = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto out;
+	}
+
+	if ((srcfd = open(src, O_RDONLY)) < 0) {
+		configd_critical("Backend copy failed: opening %s: %s\n",
+		    src, strerror(errno));
+		res = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto errexit;
+	}
+
+	/*
+	 * fstat the backend before copy for sanity check.
+	 */
+	if (fstat(srcfd, &s_buf) < 0) {
+		configd_critical("Backend copy failed: fstat %s: %s\n",
+		    src, strerror(errno));
+		res = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto errexit;
+	}
+
+	if ((res = backend_do_copy(src, srcfd, dst, dstfd, &cpsz)) !=
+	    REP_PROTOCOL_SUCCESS)
+		goto errexit;
+
+	if (cpsz != s_buf.st_size) {
+		configd_critical("Backend copy failed: incomplete copy\n");
+		res = REP_PROTOCOL_FAIL_UNKNOWN;
+		goto errexit;
+	}
+
+	/*
+	 * Rename tmppath to dst
+	 */
+	if (rename(tmppath, dst) < 0) {
+		configd_critical(
+		    "Backend copy failed: rename %s to %s: %s\n",
+		    tmppath, dst, strerror(errno));
+		res = REP_PROTOCOL_FAIL_UNKNOWN;
+	}
+
+errexit:
+	if (res != REP_PROTOCOL_SUCCESS && unlink(tmppath) < 0)
+		configd_critical(
+		    "Backend copy failed: remove %s: %s\n",
+		    tmppath, strerror(errno));
+
+	(void) close(srcfd);
+	(void) close(dstfd);
+
+out:
+	free(tmppath);
+	if (sw_back) {
+		if (unlink(src) < 0)
+			configd_critical(
+			    "Backend copy failed: remove %s: %s\n",
+			    src, strerror(errno));
+	}
+
+	return (res);
+}
+
+/*
+ * Perform sanity check on the repository.
+ * Return 0 if check succeeds or -1 if fails.
+ */
+static int
+backend_switch_check(struct sqlite *be_db, char **errp)
+{
+	struct run_single_int_info info;
+	uint32_t val = -1UL;
+	int r;
+
+	info.rs_out = &val;
+	info.rs_result = REP_PROTOCOL_FAIL_NOT_FOUND;
+
+	r = sqlite_exec(be_db,
+	    "SELECT schema_version FROM schema_version;",
+	    run_single_int_callback, &info, errp);
+
+	if (r == SQLITE_OK &&
+	    info.rs_result != REP_PROTOCOL_FAIL_NOT_FOUND &&
+	    val == BACKEND_SCHEMA_VERSION)
+		return (0);
+	else
+		return (-1);
+}
+
+/*
+ * Backend switch entry point.  It is called to perform the backend copy and
+ * switch from src to dst.  First, it blocks all other clients from accessing
+ * the repository by calling backend_lock to lock the repository.  Upon
+ * successful lock, copying and switching of the repository are performed.
+ *
+ * Can return:
+ *	REP_PROTOCOL_SUCCESS			successful switch
+ *	REP_PROTOCOL_FAIL_BACKEND_ACCESS	backen access fails
+ *	REP_PROTOCOL_FAIL_BACKEND_READONLY	backend is not writable
+ *	REP_PROTOCOL_FAIL_UNKNOWN		file operation error
+ *	REP_PROTOCOL_FAIL_NO_RESOURCES		out of memory
+ */
+rep_protocol_responseid_t
+backend_switch(int sw_back)
+{
+	rep_protocol_responseid_t result;
+	sqlite_backend_t *be;
+	struct sqlite *new;
+	char *errp;
+	const char *dst;
+
+	result = backend_lock(BACKEND_TYPE_NORMAL, 1, &be);
+	if (result != REP_PROTOCOL_SUCCESS)
+		return (result);
+
+	if (sw_back) {
+		dst = REPOSITORY_DB;
+	} else {
+		dst = FAST_REPOSITORY_DB;
+	}
+
+	/*
+	 * Do the actual copy and rename
+	 */
+	result = backend_switch_copy(be->be_path, dst, sw_back);
+	if (result != REP_PROTOCOL_SUCCESS) {
+		goto errout;
+	}
+
+	/*
+	 * Do the backend sanity check and switch
+	 */
+	new = sqlite_open(dst, 0600, &errp);
+	if (new != NULL) {
+		/*
+		 * Sanity check
+		 */
+		if (backend_switch_check(new, &errp) == 0) {
+			free((char *)be->be_path);
+			be->be_path = strdup(dst);
+			if (be->be_path == NULL) {
+				configd_critical(
+				    "Backend switch failed: strdup %s: %s\n",
+				    dst, strerror(errno));
+				result = REP_PROTOCOL_FAIL_NO_RESOURCES;
+				sqlite_close(new);
+			} else {
+				sqlite_close(be->be_db);
+				be->be_db = new;
+			}
+		} else {
+			configd_critical(
+			    "Backend switch failed: integrity check %s: %s\n",
+			    dst, errp);
+			result = REP_PROTOCOL_FAIL_BACKEND_ACCESS;
+		}
+	} else {
+		configd_critical("Backend switch failed: sqlite_open %s: %s\n",
+		    dst, errp);
+		result = REP_PROTOCOL_FAIL_BACKEND_ACCESS;
+	}
+
+errout:
+	backend_unlock(be);
+	return (result);
+}
+
+/*
+ * This routine is called to attempt the recovery of
+ * the most recent valid repository if possible when configd
+ * is restarted for some reasons or when system crashes
+ * during the switch operation.  The repository databases
+ * referenced here are indicators of successful switch
+ * operations.
+ */
+static void
+backend_switch_recovery(void)
+{
+	const char *fast_db = FAST_REPOSITORY_DB;
+	char *errp;
+	struct stat s_buf;
+	struct sqlite *be_db;
+
+
+	/*
+	 * A good transient db containing most recent data can
+	 * exist if system or svc.configd crashes during the
+	 * switch operation.  If that is the case, check its
+	 * integrity and use it.
+	 */
+	if (stat(fast_db, &s_buf) < 0) {
+		return;
+	}
+
+	/*
+	 * Do sanity check on the db
+	 */
+	be_db = sqlite_open(fast_db, 0600, &errp);
+
+	if (be_db != NULL) {
+		if (backend_switch_check(be_db, &errp) == 0)
+			(void) backend_switch_copy(fast_db, REPOSITORY_DB, 1);
+	}
+
+	(void) unlink(fast_db);
 }
 
 /*ARGSUSED*/
@@ -1890,6 +2182,14 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 		    sqlite_version, SQLITE_VERSION);
 		return (CONFIGD_EXIT_DATABASE_INIT_FAILED);
 	}
+
+	/*
+	 * If the system crashed during a backend switch, there might
+	 * be a leftover transient database which contains useful
+	 * information which can be used for recovery.
+	 */
+	backend_switch_recovery();
+
 	if (db_file == NULL)
 		db_file = REPOSITORY_DB;
 	if (strcmp(db_file, REPOSITORY_DB) != 0) {

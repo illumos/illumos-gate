@@ -359,6 +359,12 @@
  *	the operation that is being annotated, and file is the file being
  *	processed.  This will be used to mark operations which comprise
  *	multiple primitive operations such as svccfg import.
+ *
+ * SWITCH(flag) -> result
+ *	The flag is used to indicate the direction of the switch operation.
+ *	When the flag is set to 'fast', move the main repository from the
+ *	default location (/etc/svc) to the tmpfs locationa (/etc/svc/volatile).
+ *	When it is set to 'perm', the switch is reversed.
  */
 
 #include <door.h>
@@ -382,7 +388,7 @@ extern "C" {
  * This value should be incremented any time the protocol changes.  When in
  * doubt, bump it.
  */
-#define	REPOSITORY_DOOR_VERSION			(20 + REPOSITORY_DOOR_BASEVER)
+#define	REPOSITORY_DOOR_VERSION			(21 + REPOSITORY_DOOR_BASEVER)
 
 /*
  * flags for rdr_flags
@@ -477,6 +483,8 @@ enum rep_protocol_requestid {
 	REP_PROTOCOL_BACKUP,
 
 	REP_PROTOCOL_SET_AUDIT_ANNOTATION,
+
+	REP_PROTOCOL_SWITCH,
 
 	REP_PROTOCOL_MAX_REQUEST
 };
@@ -820,6 +828,12 @@ struct rep_protocol_annotation {
 	enum rep_protocol_requestid rpr_request;	/* SET_ANNOTATION */
 	char rpr_operation[REP_PROTOCOL_NAME_LEN];
 	char rpr_file[MAXPATHLEN];
+};
+
+struct rep_protocol_switch_request {
+	enum rep_protocol_requestid rpr_request;	/* SWITCH */
+	uint32_t rpr_changeid;
+	int rpr_flag;
 };
 
 /*

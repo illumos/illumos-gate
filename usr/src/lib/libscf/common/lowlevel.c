@@ -6860,6 +6860,55 @@ _scf_request_backup(scf_handle_t *h, const char *name)
 	return (SCF_SUCCESS);
 }
 
+/*
+ * Request svc.configd daemon to switch repository database.
+ *
+ * Can fail:
+ *
+ *	_NOT_BOUND		handle is not bound
+ *	_CONNECTION_BROKEN	server is not reachable
+ *	_INTERNAL		file operation error
+ *				the server response is too big
+ *	_PERMISSION_DENIED	not enough privileges to do request
+ *	_BACKEND_READONLY	backend is not writable
+ *	_BACKEND_ACCESS		backend access fails
+ *	_NO_RESOURCES		svc.configd is out of memory
+ */
+int
+_scf_repository_switch(scf_handle_t *h, int scf_sw)
+{
+	struct rep_protocol_switch_request request;
+	struct rep_protocol_response response;
+	int	r;
+
+	/*
+	 * Setup request protocol and make door call
+	 * Hold rh_lock lock before handle_next_changeid call
+	 */
+	(void) pthread_mutex_lock(&h->rh_lock);
+
+	request.rpr_flag = scf_sw;
+	request.rpr_request = REP_PROTOCOL_SWITCH;
+	request.rpr_changeid = handle_next_changeid(h);
+
+	r = make_door_call(h, &request, sizeof (request),
+	    &response, sizeof (response));
+
+	(void) pthread_mutex_unlock(&h->rh_lock);
+
+	if (r < 0) {
+		DOOR_ERRORS_BLOCK(r);
+	}
+
+	/*
+	 * Pass protocol error up
+	 */
+	if (response.rpr_response != REP_PROTOCOL_SUCCESS)
+		return (scf_set_error(proto_error(response.rpr_response)));
+
+	return (SCF_SUCCESS);
+}
+
 int
 _scf_pg_is_read_protected(const scf_propertygroup_t *pg, boolean_t *out)
 {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2107,6 +2107,7 @@ main(int argc, char *argv[])
 {
 	int o;
 	int err;
+	int sw_back;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -2388,7 +2389,62 @@ main(int argc, char *argv[])
 				    "unknown error (see console for details)";
 				break;
 			}
+
 			uu_warn("failed to backup repository: %s\n", reason);
+			exit_status = UU_EXIT_FATAL;
+		}
+	} else if (strcmp(argv[optind], "_smf_repository_switch") == 0) {
+		const char *reason = NULL;
+
+		++optind;
+
+		/*
+		 * Check argument and setup scf_switch structure
+		 */
+		if (optind != argc - 1)
+			exit(1);
+
+		if (strcmp(argv[optind], "fast") == 0) {
+			sw_back = 0;
+		} else if (strcmp(argv[optind], "perm") == 0) {
+			sw_back = 1;
+		} else {
+			exit(UU_EXIT_USAGE);
+		}
+
+		/*
+		 * Call into switch primitive
+		 */
+		if ((err = _scf_repository_switch(h, sw_back)) !=
+		    SCF_SUCCESS) {
+			/*
+			 * Retrieve per thread SCF error code
+			 */
+			switch (scf_error()) {
+			case SCF_ERROR_NOT_BOUND:
+				abort();
+				/* NOTREACHED */
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+			case SCF_ERROR_BACKEND_READONLY:
+				scfdie();
+				/* NOTREACHED */
+
+			case SCF_ERROR_PERMISSION_DENIED:
+			case SCF_ERROR_INVALID_ARGUMENT:
+				reason = scf_strerror(scf_error());
+				break;
+
+			case SCF_ERROR_INTERNAL:
+				reason = "File operation error: (see console)";
+				break;
+
+			default:
+				abort();
+				/* NOTREACHED */
+			}
+
+			uu_warn("failed to switch repository: %s\n", reason);
 			exit_status = UU_EXIT_FATAL;
 		}
 	} else {

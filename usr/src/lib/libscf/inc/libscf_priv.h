@@ -281,6 +281,14 @@ int scf_set_count_property(scf_transaction_t *, char *, uint64_t, boolean_t);
 #define	SCF_WALK_NOINSTANCE	0x10
 #define	SCF_WALK_EXPLICIT	0x20
 
+/*
+ * The default locations of the repository dbs
+ */
+#define	REPOSITORY_DB		"/etc/svc/repository.db"
+#define	NONPERSIST_DB		"/etc/svc/volatile/svc_nonpersist.db"
+#define	FAST_REPOSITORY_DB	"/etc/svc/volatile/fast_repository.db"
+
+
 typedef struct scf_walkinfo {
 	const char		*fmri;
 	scf_scope_t		*scope;
@@ -306,6 +314,11 @@ scf_error_t scf_walk_fmri(scf_handle_t *, int, char **, int,
  *	_BACKEND_READONLY (filesystem is still read-only)
  */
 int _scf_request_backup(scf_handle_t *, const char *);
+
+/*
+ * Repository switch client
+ */
+int _scf_repository_switch(scf_handle_t *, int);
 
 /*
  * Determines whether a property group requires authorization to read; this

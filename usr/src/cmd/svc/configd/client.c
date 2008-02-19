@@ -1762,7 +1762,7 @@ client_wait(repcache_client_t *cp, const void *in, size_t insz,
  *	_UNKNOWN		failed for unknown reason (details written to
  *				console)
  *	_BACKEND_READONLY	backend is not writable
- *
+ *	_NO_RESOURCES		out of memory
  *	_SUCCESS		Backup completed successfully.
  */
 static rep_protocol_responseid_t
@@ -1994,6 +1994,44 @@ start_audit_session(repcache_client_t *cp)
 	ucred_free(cred);
 }
 
+/*
+ * Handle switch client request
+ *
+ * This routine can return:
+ *
+ *	_PERMISSION_DENIED	not enough privileges to do request.
+ *	_UNKNOWN		file operation error (details written to
+ *				the console).
+ *	_SUCCESS		switch operation is completed.
+ *	_BACKEND_ACCESS		backend access fails.
+ *	_NO_RESOURCES		out of memory.
+ *	_BACKEND_READONLY	backend is not writable.
+ */
+static rep_protocol_responseid_t
+repository_switch(repcache_client_t *cp,
+    struct rep_protocol_switch_request *rpr)
+{
+	rep_protocol_responseid_t result;
+	ucred_t *uc = get_ucred();
+
+	if (!client_is_privileged() && (uc == NULL ||
+	    ucred_geteuid(uc) != 0)) {
+		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
+	}
+
+	(void) pthread_mutex_lock(&cp->rc_lock);
+	if (rpr->rpr_changeid != cp->rc_changeid) {
+		if ((result = backend_switch(rpr->rpr_flag)) ==
+		    REP_PROTOCOL_SUCCESS)
+			cp->rc_changeid = rpr->rpr_changeid;
+	} else {
+		result = REP_PROTOCOL_SUCCESS;
+	}
+	(void) pthread_mutex_unlock(&cp->rc_lock);
+
+	return (result);
+}
+
 typedef rep_protocol_responseid_t protocol_simple_f(repcache_client_t *cp,
     const void *rpr);
 
@@ -2167,6 +2205,9 @@ static struct protocol_entry {
 
 	PROTO(REP_PROTOCOL_SET_AUDIT_ANNOTATION,	set_annotation,
 	    struct rep_protocol_annotation),
+
+	PROTO(REP_PROTOCOL_SWITCH,			repository_switch,
+	    struct rep_protocol_switch_request),
 
 	PROTO_END()
 };

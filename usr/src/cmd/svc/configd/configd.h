@@ -83,12 +83,6 @@ extern int _mutex_held(struct _lwp_mutex_t *);
  */
 #define	COMPOSITION_DEPTH	2
 
-/*
- * The default locations of the repository dbs
- */
-#define	REPOSITORY_DB	"/etc/svc/repository.db"
-#define	NONPERSIST_DB	"/etc/svc/volatile/svc_nonpersist.db"
-
 #define	CONFIGD_CORE	"core.%f.%t.%p"
 
 #ifndef NDEBUG
@@ -761,6 +755,7 @@ int backend_init(const char *, const char *, int);
 void backend_fini(void);
 
 rep_protocol_responseid_t backend_create_backup(const char *);
+rep_protocol_responseid_t backend_switch(int);
 
 /*
  * call on any database inconsistency -- cleans up state as best it can,

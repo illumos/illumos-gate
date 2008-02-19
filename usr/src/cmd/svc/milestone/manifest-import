@@ -29,6 +29,8 @@
 
 [ -f /lib/svc/share/smf_include.sh ] || exit 1
 
+. /lib/svc/share/smf_include.sh
+
 activity=false
 
 X=
@@ -445,6 +447,13 @@ if [ -n "$nonsite_manifests" -o -n "$site_manifests" ]; then
 
 	echo "Loading smf(5) service descriptions: \c" > /dev/msglog
 
+	#
+	# Attempt of moving the repository to tmpfs.  If that doesn't
+	# work, reset doswitch so we don't attempt switching back.
+	#
+	/usr/sbin/svcadm _smf_repository_switch fast
+	doswitch=$?
+
 	i=1; n=$#
 	while [ $# -gt 0 ]; do
 		printf "%${fwidth}s/%${fwidth}s" $i $n > /dev/msglog
@@ -453,6 +462,21 @@ if [ -n "$nonsite_manifests" -o -n "$site_manifests" ]; then
 		shift
 		echo "$backup\c" > /dev/msglog
 	done
+
+	#
+	# If switch back fails, exit with the fatal error code.
+	# Normally the failure indicates that there is a serious
+	# problem on the root file system such as file operation
+	# failure or repository access failure.
+	#
+	if [ $doswitch -eq 0 ]; then
+		/usr/sbin/svcadm _smf_repository_switch perm || { \
+		    echo "Repository switch back operation failed, \c"
+		    echo "please check the system log for the"
+		    echo "possible fatal error messages."
+		    exit $SMF_EXIT_ERR_FATAL
+                    }
+	fi
 
 	echo > /dev/msglog
 	echo "Loaded $n smf(5) service descriptions"
