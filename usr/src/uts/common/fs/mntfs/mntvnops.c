@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,13 +158,13 @@ mntfs_optprint(struct vfs *vfsp, char *buf)
 			else
 				optinbuf = 1;
 			buf += snprintf(buf, MAX_MNTOPT_STR,
-				"%s", mop->mo_name);
+			    "%s", mop->mo_name);
 			/*
 			 * print option value if there is one
 			 */
 			if (mop->mo_arg != NULL) {
 				buf += snprintf(buf, MAX_MNTOPT_STR, "=%s",
-					mop->mo_arg);
+				    mop->mo_arg);
 			}
 		}
 	}
@@ -445,7 +445,7 @@ mntfs_mapin(char *base, size_t size)
 {
 	size_t rlen = roundup(size, PAGESIZE);
 	struct as *as = curproc->p_as;
-	char *addr;
+	char *addr = NULL;
 
 	as_rangelock(as);
 	map_addr(&addr, rlen, 0, 1, 0);
@@ -466,11 +466,11 @@ mntfs_freesnap(mntsnap_t *snap)
 {
 	if (snap->mnts_text != NULL)
 		(void) as_unmap(curproc->p_as, snap->mnts_text,
-			roundup(snap->mnts_textsize, PAGESIZE));
+		    roundup(snap->mnts_textsize, PAGESIZE));
 	snap->mnts_textsize = snap->mnts_count = 0;
 	if (snap->mnts_metadata != NULL)
 		(void) as_unmap(curproc->p_as, snap->mnts_metadata,
-			roundup(snap->mnts_metasize, PAGESIZE));
+		    roundup(snap->mnts_metasize, PAGESIZE));
 	snap->mnts_metasize = 0;
 }
 

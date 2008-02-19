@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989 AT&T.
@@ -4314,18 +4314,10 @@ nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	}
 
 	as_rangelock(as);
-	if (!(flags & MAP_FIXED)) {
-		map_addr(addrp, len, off, 1, flags);
-		if (*addrp == NULL) {
-			as_rangeunlock(as);
-			error = ENOMEM;
-			goto done;
-		}
-	} else {
-		/*
-		 * User specified address - blow away any previous mappings
-		 */
-		(void) as_unmap(as, *addrp, len);
+	error = choose_addr(as, addrp, len, off, ADDR_VACALIGN, flags);
+	if (error != 0) {
+		as_rangeunlock(as);
+		goto done;
 	}
 
 	vn_a.vp = vp;

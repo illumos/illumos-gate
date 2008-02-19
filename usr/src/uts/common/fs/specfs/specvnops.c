@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2255,21 +2255,11 @@ spec_segmap(
 	}
 
 	as_rangelock(as);
-	if ((flags & MAP_FIXED) == 0) {
-		/*
-		 * Pick an address w/o worrying about
-		 * any vac alignment constraints.
-		 */
-		map_addr(addrp, len, (offset_t)off, 0, flags);
-		if (*addrp == NULL) {
-			as_rangeunlock(as);
-			return (ENOMEM);
-		}
-	} else {
-		/*
-		 * User-specified address; blow away any previous mappings.
-		 */
-		(void) as_unmap(as, *addrp, len);
+	/* Pick an address w/o worrying about any vac alignment constraints. */
+	error = choose_addr(as, addrp, len, off, ADDR_NOVACALIGN, flags);
+	if (error != 0) {
+		as_rangeunlock(as);
+		return (error);
 	}
 
 	dev_a.mapfunc = mapfunc;
@@ -2407,18 +2397,10 @@ spec_map(
 			return (ENXIO);
 
 		as_rangelock(as);
-		if ((flags & MAP_FIXED) == 0) {
-			map_addr(addrp, len, off, 1, flags);
-			if (*addrp == NULL) {
-				as_rangeunlock(as);
-				return (ENOMEM);
-			}
-		} else {
-			/*
-			 * User-specified address; blow away any
-			 * previous mappings.
-			 */
-			(void) as_unmap(as, *addrp, len);
+		error = choose_addr(as, addrp, len, off, ADDR_VACALIGN, flags);
+		if (error != 0) {
+			as_rangeunlock(as);
+			return (error);
 		}
 
 		vn_a.vp = cvp;

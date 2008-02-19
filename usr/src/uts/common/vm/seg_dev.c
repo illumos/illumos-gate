@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2439,21 +2439,11 @@ ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	}
 
 	as_rangelock(as);
-	if ((flags & MAP_FIXED) == 0) {
-		/*
-		 * Pick an address w/o worrying about
-		 * any vac alignment constraints.
-		 */
-		map_addr(addrp, len, ptob(pfn), 0, flags);
-		if (*addrp == NULL) {
-			as_rangeunlock(as);
-			return (ENOMEM);
-		}
-	} else {
-		/*
-		 * User-specified address; blow away any previous mappings.
-		 */
-		(void) as_unmap(as, *addrp, len);
+	/* Pick an address w/o worrying about any vac alignment constraints. */
+	error = choose_addr(as, addrp, len, ptob(pfn), ADDR_NOVACALIGN, flags);
+	if (error != 0) {
+		as_rangeunlock(as);
+		return (error);
 	}
 
 	dev_a.mapfunc = mapfunc;

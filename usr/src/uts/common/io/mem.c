@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -826,24 +826,15 @@ mmsegmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 	minor = getminor(dev);
 
 	as_rangelock(as);
-	if ((flags & MAP_FIXED) == 0) {
-		/*
-		 * No need to worry about vac alignment on /dev/zero
-		 * since this is a "clone" object that doesn't yet exist.
-		 */
-		map_addr(addrp, len, (offset_t)off,
-		    (minor == M_MEM) || (minor == M_KMEM), flags);
-
-		if (*addrp == NULL) {
-			as_rangeunlock(as);
-			return (ENOMEM);
-		}
-	} else {
-		/*
-		 * User specified address -
-		 * Blow away any previous mappings.
-		 */
-		(void) as_unmap(as, *addrp, len);
+	/*
+	 * No need to worry about vac alignment on /dev/zero
+	 * since this is a "clone" object that doesn't yet exist.
+	 */
+	error = choose_addr(as, addrp, len, off,
+	    (minor == M_MEM) || (minor == M_KMEM), flags);
+	if (error != 0) {
+		as_rangeunlock(as);
+		return (error);
 	}
 
 	switch (minor) {

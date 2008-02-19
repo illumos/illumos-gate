@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1106,7 +1106,7 @@ mapelfexec(
 {
 	Phdr *phdr;
 	int i, prot, error;
-	caddr_t addr;
+	caddr_t addr = NULL;
 	size_t zfodsz;
 	int ptload = 0;
 	int page;

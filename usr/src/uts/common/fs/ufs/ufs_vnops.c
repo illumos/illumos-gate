@@ -5601,22 +5601,16 @@ retry_map:
 	}
 
 	as_rangelock(as);
-	if ((flags & MAP_FIXED) == 0) {
-		map_addr(addrp, len, off, 1, flags);
-		if (*addrp == NULL) {
-			as_rangeunlock(as);
-			error = ENOMEM;
-			goto out;
-		}
-	} else {
-		/*
-		 * User specified address - blow away any previous mappings.
-		 * If we are retrying (because ufs_lockfs_trybegin failed in
-		 * the previous attempt), some other thread could have grabbed
-		 * the same VA range. In that case, we would unmap the valid
-		 * VA range, that is ok.
-		 */
-		(void) as_unmap(as, *addrp, len);
+	/*
+	 * Note that if we are retrying (because ufs_lockfs_trybegin failed in
+	 * the previous attempt), some other thread could have grabbed
+	 * the same VA range if MAP_FIXED is set. In that case, choose_addr
+	 * would unmap the valid VA range, that is ok.
+	 */
+	error = choose_addr(as, addrp, len, off, ADDR_VACALIGN, flags);
+	if (error != 0) {
+		as_rangeunlock(as);
+		goto out;
 	}
 
 	/*

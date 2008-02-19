@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,7 @@ brk_internal(caddr_t nva, uint_t brkszc)
 	 */
 	nva = (caddr_t)P2ROUNDUP((uintptr_t)nva, pgsz);
 	ova = (caddr_t)P2ROUNDUP((uintptr_t)(p->p_brkbase + p->p_brksize),
-		PAGESIZE);
+	    PAGESIZE);
 
 	if ((nva < p->p_brkbase) || (size > p->p_brksize &&
 	    size > as_rctl)) {
@@ -490,6 +490,40 @@ grow_internal(caddr_t sp, uint_t growszc)
 }
 
 /*
+ * Find address for user to map.
+ * If MAP_FIXED is not specified, we can pick any address we want, but we will
+ * first try the value in *addrp if it is non-NULL.  Thus this is implementing
+ * a way to try and get a preferred address.
+ */
+int
+choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
+    int vacalign, uint_t flags)
+{
+	caddr_t basep = (caddr_t)(uintptr_t)((uintptr_t)*addrp & PAGEMASK);
+	size_t lenp = len;
+
+	ASSERT(AS_ISCLAIMGAP(as));	/* searches should be serialized */
+	if (flags & MAP_FIXED) {
+		(void) as_unmap(as, *addrp, len);
+		return (0);
+	} else if (basep != NULL && ((flags & MAP_ALIGN) == 0) &&
+	    !as_gap(as, len, &basep, &lenp, 0, *addrp)) {
+		/* User supplied address was available */
+		*addrp = basep;
+	} else {
+		/*
+		 * No user supplied address or the address supplied was not
+		 * available.
+		 */
+		map_addr(addrp, len, off, vacalign, flags);
+	}
+	if (*addrp == NULL)
+		return (ENOMEM);
+	return (0);
+}
+
+
+/*
  * Used for MAP_ANON - fast way to get anonymous pages
  */
 static int
@@ -497,6 +531,7 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
     offset_t pos)
 {
 	struct segvn_crargs vn_a;
+	int error;
 
 	if (((PROT_ALL & uprot) != uprot))
 		return (EACCES);
@@ -523,16 +558,15 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 		default:
 			return (ENOMEM);
 		}
-		(void) as_unmap(as, *addrp, len);
-	} else {
-		/*
-		 * No need to worry about vac alignment for anonymous
-		 * pages since this is a "clone" object that doesn't
-		 * yet exist.
-		 */
-		map_addr(addrp, len, pos, 0, flags);
-		if (*addrp == NULL)
-			return (ENOMEM);
+	}
+	/*
+	 * No need to worry about vac alignment for anonymous
+	 * pages since this is a "clone" object that doesn't
+	 * yet exist.
+	 */
+	error = choose_addr(as, addrp, len, pos, ADDR_NOVACALIGN, flags);
+	if (error != 0) {
+		return (error);
 	}
 
 	/*
@@ -602,7 +636,7 @@ smmap_common(caddr_t *addrp, size_t len,
 
 		/* alignment needs to be a power of 2 >= page size */
 		if (((uintptr_t)*addrp < PAGESIZE && (uintptr_t)*addrp != 0) ||
-			!ISP2((uintptr_t)*addrp))
+		    !ISP2((uintptr_t)*addrp))
 			return (EINVAL);
 	}
 	/*

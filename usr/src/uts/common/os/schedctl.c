@@ -556,7 +556,7 @@ schedctl_page_lookup(sc_shared_t *ssp)
 static int
 schedctl_map(struct anon_map *amp, caddr_t *uaddrp, caddr_t kaddr)
 {
-	caddr_t addr;
+	caddr_t addr = NULL;
 	struct as *as = curproc->p_as;
 	struct segvn_crargs vn_a;
 	int error;

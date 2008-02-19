@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,7 +166,7 @@ ksyms_buflist_alloc(ksyms_buflist_hdr_t *hdr, size_t size)
 static char *
 ksyms_asmap(struct as *as, size_t rlen)
 {
-	char *addr;
+	char *addr = NULL;
 
 	as_rangelock(as);
 	map_addr(&addr, rlen, 0, 1, 0);
@@ -223,7 +222,7 @@ ksyms_open(dev_t *devp, int flag, int otyp, struct cred *cred)
 	ksyms_buflist_hdr_t hdr;
 	bzero(&hdr, sizeof (struct ksyms_buflist_hdr));
 	list_create(&hdr.blist, PAGESIZE,
-				offsetof(ksyms_buflist_t, buflist_node));
+	    offsetof(ksyms_buflist_t, buflist_node));
 
 	ASSERT(getminor(*devp) == 0);
 
@@ -345,7 +344,7 @@ ksyms_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 		return (ENOTSUP);
 
 	if (off < 0 || len <= 0 || off > kip->ksyms_size ||
-		len > kip->ksyms_size - off)
+	    len > kip->ksyms_size - off)
 		return (EINVAL);
 
 	rlen = roundup(len, PAGESIZE);

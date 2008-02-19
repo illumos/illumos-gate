@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,12 @@ extern pgcnt_t	pages_before_pager; /* XXX */
 #define	MAPPGSZC_STACK	0x04
 #define	MAPPGSZC_HEAP	0x08
 
+/*
+ * vacalign values for choose_addr
+ */
+#define	ADDR_NOVACALIGN	0
+#define	ADDR_VACALIGN	1
+
 struct as;
 struct page;
 struct anon;
@@ -133,6 +139,8 @@ extern	size_t map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len,
     int memcntl);
 extern	uint_t map_pgszcvec(caddr_t addr, size_t size, uintptr_t off, int flags,
     int type, int memcntl);
+extern int choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
+    int vacalign, uint_t flags);
 extern	void map_addr(caddr_t *addrp, size_t len, offset_t off, int vacalign,
     uint_t flags);
 extern	int map_addr_vacalign_check(caddr_t, u_offset_t);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2048,18 +2048,10 @@ udf_map(
 	}
 
 	as_rangelock(as);
-	if ((flags & MAP_FIXED) == 0) {
-		map_addr(addrp, len, off, 1, flags);
-		if (*addrp == NULL) {
-			as_rangeunlock(as);
-			error = ENOMEM;
-			goto end;
-		}
-	} else {
-		/*
-		 * User specified address - blow away any previous mappings
-		 */
-		(void) as_unmap(as, *addrp, len);
+	error = choose_addr(as, addrp, len, off, ADDR_VACALIGN, flags);
+	if (error != 0) {
+		as_rangeunlock(as);
+		goto end;
 	}
 
 	vn_a.vp = vp;
