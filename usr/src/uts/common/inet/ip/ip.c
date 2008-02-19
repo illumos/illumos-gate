@@ -4970,6 +4970,7 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 			 */
 			if ((dst_ire->ire_zoneid != zoneid &&
 			    dst_ire->ire_zoneid != ALL_ZONES) ||
+			    (!(dst_ire->ire_flags & RTF_SETSRC)) &&
 			    (!(dst_ire->ire_type & IRE_BROADCAST) &&
 			    ((dst_ill->ill_group != NULL) ||
 			    (dst_ire->ire_ipif->ipif_flags & IPIF_DEPRECATED) ||
