@@ -19,15 +19,11 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 Hitachi Ltd. */
+/* Portions Copyright 2008 Hitachi Ltd. */
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * This file contains confidential information of other companies
- * and should not be distributed in source form without approval
- * from Sun Legal.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
