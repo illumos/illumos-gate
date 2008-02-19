@@ -1310,3 +1310,5 @@ Bugid   Risk Synopsis
 4947191 OSNet should use direct bindings  (link-editor components only)
 6654381 lazy loading fall-back needs optimizing
 6658385 ld core dumps when building Xorg on nv_82
+6516808 ld.so.1's token expansion provides no escape for platforms that don't
+	report HWCAP

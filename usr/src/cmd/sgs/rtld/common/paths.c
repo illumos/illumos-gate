@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -217,15 +217,19 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 				if (search) {
 					const char	*fmt;
 
-					if (num)
-					    fmt = MSG_ORIG(MSG_LDD_FMT_PATHN);
-					else
-					    fmt = MSG_ORIG(MSG_LDD_FMT_PATH1);
+					if (num) {
+						fmt =
+						    MSG_ORIG(MSG_LDD_FMT_PATHN);
+					} else {
+						fmt =
+						    MSG_ORIG(MSG_LDD_FMT_PATH1);
+					}
 					(void) printf(fmt, pnp->p_name);
 				} else
 					DBG_CALL(Dbg_libs_path(lml, pnp->p_name,
 					    pnp->p_orig, config->c_name));
 			}
+			/* BEGIN CSTYLED */
 			if (search) {
 				if (dirlist->p_orig & LA_SER_CONFIG)
 				    (void) printf(MSG_INTL(MSG_LDD_PTH_ENDDFLC),
@@ -233,6 +237,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 				else
 				    (void) printf(MSG_INTL(MSG_LDD_PTH_ENDDFL));
 			}
+			/* END CSTYLED */
 		}
 		break;
 	default:
@@ -392,7 +397,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			    (platform != 0)) {
 				if ((nlen += platform_sz) < PATH_MAX) {
 					(void) strncpy(nptr, platform,
-						platform_sz);
+					    platform_sz);
 					nptr = nptr + platform_sz;
 					olen += MSG_TKN_PLATFORM_SIZE;
 					optr += MSG_TKN_PLATFORM_SIZE;
@@ -571,15 +576,32 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 
 		/*
 		 * If reserved token was found, and could not be expanded,
-		 * this is an error.
+		 * diagnose the error condition.
 		 */
 		if (token) {
 			if (_flags)
 				flags |= _flags;
 			else {
+				char	buf[PATH_MAX], *str;
+
+				/*
+				 * Note, the original string we're expanding
+				 * might contain a number of ':' separated
+				 * paths.  Isolate the path we're processing to
+				 * provide a more precise error diagnostic.
+				 */
+				if (str = strchr(oname, ':')) {
+					size_t	slen = str - oname;
+
+					(void) strncpy(buf, oname, slen);
+					buf[slen] = '\0';
+					str = buf;
+				} else
+					str = oname;
+
 				eprintf(lml, ERR_FATAL,
 				    MSG_INTL(MSG_ERR_EXPAND2), NAME(lmp),
-				    oname, token);
+				    str, token);
 				return (0);
 			}
 		}
@@ -609,7 +631,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 	 * now if more than one ISALIST is encountered we return the original
 	 * node untouched.
 	 */
-	if (isaflag) {
+	if (isa && isaflag) {
 		if (isaflag == 1) {
 			if (list)
 				*list = _list;
@@ -781,6 +803,7 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 	 */
 	if ((info & LA_SER_MASK) == 0) {
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
+			/* BEGIN CSTYLED */
 			if ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0) {
 			    if (lml->lm_flags &
 				(LML_FLG_TRC_VERBOSE | LML_FLG_TRC_SEARCH))
@@ -792,6 +815,7 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 				    (void) printf(MSG_INTL(MSG_LDD_FIL_ILLEGAL),
 					opath);
 			}
+			/* END CSTYLED */
 		} else
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), opath,
 			    strerror(EACCES));
@@ -881,7 +905,7 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 			olen = len;
 			if ((tkns = expand(&str, &len, &elist, orig, omit,
 			    clmp)) == 0)
-				return (NULL);
+				continue;
 
 			if (elist != nlist) {
 				if (olist)
