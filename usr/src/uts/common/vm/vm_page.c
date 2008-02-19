@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5669,15 +5669,6 @@ page_migrate(
 		to = lgrp_mem_choose(seg, addr, pgsz);
 
 		/*
-		 * Check to see whether we are trying to migrate page to lgroup
-		 * where it is allocated already
-		 */
-		if (to == from) {
-			PP_CLRMIGRATE(pp);
-			goto next;
-		}
-
-		/*
 		 * Need to get exclusive lock's to migrate
 		 */
 		for (i = 0; i < page_cnt; i++) {
@@ -5692,7 +5683,24 @@ page_migrate(
 				    page_cnt);
 				break;
 			}
+
+			/*
+			 * Check to see whether we are trying to migrate
+			 * page to lgroup where it is allocated already.
+			 * If so, clear the migrate bit and skip to next
+			 * page.
+			 */
+			if (i == 0 && to == from) {
+				PP_CLRMIGRATE(ppa[0]);
+				page_downgrade(ppa[0]);
+				goto next;
+			}
 		}
+
+		/*
+		 * If all constituent pages couldn't be locked,
+		 * unlock pages locked so far and skip to next page.
+		 */
 		if (i != page_cnt) {
 			while (--i != -1) {
 				page_downgrade(ppa[i]);
