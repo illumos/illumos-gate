@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -439,11 +439,11 @@ lgrp_traverse(md_t *md)
 
 		mem_stripes = (mem_stripe_t *)(mpo_mblock + n_mblocks);
 	}
-	for (i = 0; i < n_mblocks; i++) {
-		mpo_mblock[i].node = mblocknodes[i];
+	for (i = 0, j = 0; j < n_mblocks; j++) {
+		mpo_mblock[i].node = mblocknodes[j];
 
 		/* Without a base or size value we will fail */
-		result = get_int(md, mblocknodes[i], PROP_LG_BASE,
+		result = get_int(md, mblocknodes[j], PROP_LG_BASE,
 		    &mpo_mblock[i].base);
 		if (result < 0) {
 			MPO_STATUS("lgrp_traverse: "
@@ -453,7 +453,7 @@ lgrp_traverse(md_t *md)
 			goto fail;
 		}
 
-		result = get_int(md, mblocknodes[i], PROP_LG_SIZE,
+		result = get_int(md, mblocknodes[j], PROP_LG_SIZE,
 		    &mpo_mblock[i].size);
 		if (result < 0) {
 			MPO_STATUS("lgrp_traverse: "
@@ -463,7 +463,7 @@ lgrp_traverse(md_t *md)
 			goto fail;
 		}
 
-		result = get_int(md, mblocknodes[i],
+		result = get_int(md, mblocknodes[j],
 		    PROP_LG_RA_PA_OFFSET, &mpo_mblock[i].ra_to_pa);
 
 		/* If we don't have an ra_pa_offset, just set it to 0 */
@@ -475,7 +475,35 @@ lgrp_traverse(md_t *md)
 		    mpo_mblock[i].base,
 		    mpo_mblock[i].size,
 		    mpo_mblock[i].ra_to_pa);
+
+		/* check for unsupportable values of base and size */
+		if (mpo_mblock[i].base >
+		    mpo_mblock[i].base + mpo_mblock[i].size) {
+			MPO_STATUS("lgrp_traverse: "
+			    "PROP_LG_BASE+PROP_LG_SIZE is invalid: "
+			    "base = %lx, size = %lx",
+			    mpo_mblock[i].base, mpo_mblock[i].size);
+			n_mblocks = 0;
+			ret_val = -1;
+			goto fail;
+		}
+
+		/* eliminate size==0 blocks */
+		if (mpo_mblock[i].size != 0) {
+			i++;
+		}
 	}
+
+	if (i == 0) {
+		MPO_STATUS("lgrp_traverse: "
+		    "No non-empty mblock nodes were found "
+		    "in the Machine Descriptor\n");
+		n_mblocks = 0;
+		ret_val = -1;
+		goto fail;
+	}
+	ASSERT(i <= n_mblocks);
+	n_mblocks = i;
 
 	/* Must sort mblocks by address for mem_node_iterator_init() */
 	mblock_sort(mpo_mblock, n_mblocks);
@@ -887,6 +915,8 @@ plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 
 	/* Check for non-MPO sun4v platforms */
 	if (n_locality_groups <= 1) {
+		ASSERT(n_locality_groups == 1);
+		ASSERT(max_locality_groups == 1 && max_mem_nodes == 1);
 		mpo_plat_assign_lgrphand_to_mem_node(LGRP_DEFAULT_HANDLE, 0);
 		for (elem = 0; elem < nelems; list++, elem++) {
 			base = list->addr;
@@ -897,9 +927,25 @@ plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 		}
 		mem_node_pfn_shift = 0;
 		mem_node_physalign = 0;
-		n_mem_stripes = 0;
-		if (n_mblocks == 1)
-			return;
+
+		if (n_mblocks == 1) {
+			n_mem_stripes = 0;
+		} else {
+			n_mem_stripes = n_mblocks;
+			bzero(mem_stripes, mstripesz);
+			for (i = 0; i < n_mblocks; i++) {
+				base = mpo_mblock[i].base;
+				end = base + mpo_mblock[i].size;
+				ASSERT(end > base);
+				mem_stripes[i].exists = 1;
+				mpo_mblock[i].base_pfn = btop(base);
+				mpo_mblock[i].end_pfn = btop(end - 1);
+				mem_stripes[i].physbase =
+				    mpo_mblock[i].base_pfn;
+				mem_stripes[i].physmax = mpo_mblock[i].end_pfn;
+			}
+		}
+		return;
 	}
 
 	bzero(mem_stripes, mstripesz);
@@ -912,7 +958,6 @@ plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 	stripe_shift = highbit(max_locality_groups) - 1;
 
 	for (i = 0; i < n_mblocks; i++) {
-		mpo_mblock[i].mnode_mask = (mnodeset_t)0;
 		base = mpo_mblock[i].base;
 		end = mpo_mblock[i].base + mpo_mblock[i].size;
 		ra_to_pa = mpo_mblock[i].ra_to_pa;
@@ -940,7 +985,6 @@ plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 
 			mnode = lgrphand;
 			ASSERT(mnode < max_mem_nodes);
-			mpo_mblock[i].mnode_mask |= (mnodeset_t)1 << mnode;
 
 			/*
 			 * Calculate the size of the fragment that does not
@@ -1088,30 +1132,50 @@ plat_rapfn_to_papfn(pfn_t pfn)
 
 /*
  * plat_mem_node_iterator_init()
- *	Initialize cookie to iterate over pfn's in an mnode.  There is
- *	no additional iterator function.  The caller uses the info from
- *	the iterator structure directly.
+ *      Initialize cookie "it" to iterate over pfn's in an mnode.  There is
+ *      no additional iterator function.  The caller uses the info from
+ *      the iterator structure directly.
  *
- *	pfn: starting pfn.
- * 	mnode: desired mnode.
- *	init: set to 1 for full init, 0 for continuation
+ *      pfn: starting pfn.
+ *      mnode: desired mnode.
+ *	szc: desired page size.
+ *      init:
+ *          if 1, start a new traversal, initialize "it", find first
+ *              mblock containing pfn, and return its starting pfn
+ *              within the mnode.
+ *          if 0, continue the previous traversal using passed-in data
+ *              from "it", advance to the next mblock, and return its
+ *              starting pfn within the mnode.
+ *      it: returns readonly data to the caller; see below.
  *
- *	Returns the appropriate starting pfn for the iteration
- *	the same as the input pfn if it falls in an mblock.
- *	Returns the (pfn_t)-1 value if the input pfn lies past
- *	the last valid mnode pfn.
+ *	The input pfn must be aligned for the page size szc.
+ *
+ *      Returns: starting pfn for the iteration for the mnode/mblock,
+ *	    which is aligned according to the page size,
+ *          or returns (pfn_t)(-1) if the input pfn lies past the last
+ *          valid pfn of the mnode.
+ *      Returns misc values in the "it" struct that allows the caller
+ *          to advance the pfn within an mblock using address arithmetic;
+ *          see definition of mem_node_iterator_t in vm_dep.h.
+ *          When the caller calculates a pfn that is greater than the
+ *          returned value it->mi_mblock_end, the caller should again
+ *          call plat_mem_node_iterator_init, passing init=0.
  */
 pfn_t
-plat_mem_node_iterator_init(pfn_t pfn, int mnode,
+plat_mem_node_iterator_init(pfn_t pfn, int mnode, uchar_t szc,
     mem_node_iterator_t *it, int init)
 {
 	int i;
+	pgcnt_t szcpgcnt = PNUM_SIZE(szc);
 	struct mblock_md *mblock;
 	pfn_t base, end;
+	mem_stripe_t *ms;
+	uint64_t szcpagesize;
 
 	ASSERT(it != NULL);
 	ASSERT(mnode >= 0 && mnode < max_mem_nodes);
 	ASSERT(n_mblocks > 0);
+	ASSERT(P2PHASE(pfn, szcpgcnt) == 0);
 
 	if (init) {
 		it->mi_last_mblock = 0;
@@ -1120,6 +1184,8 @@ plat_mem_node_iterator_init(pfn_t pfn, int mnode,
 
 	/* Check if mpo is not enabled and we only have one mblock */
 	if (n_locality_groups == 1 && n_mblocks == 1) {
+		if (P2PHASE(base_ra_to_pa_pfn, szcpgcnt))
+			return ((pfn_t)-1);
 		it->mi_mnode = mnode;
 		it->mi_ra_to_pa = base_ra_to_pa_pfn;
 		it->mi_mnode_pfn_mask = 0;
@@ -1128,49 +1194,49 @@ plat_mem_node_iterator_init(pfn_t pfn, int mnode,
 		it->mi_mblock_base = mem_node_config[mnode].physbase;
 		it->mi_mblock_end = mem_node_config[mnode].physmax;
 		if (pfn < it->mi_mblock_base)
-			pfn = it->mi_mblock_base;
-		else if (pfn > it->mi_mblock_end)
+			pfn = P2ROUNDUP(it->mi_mblock_base, szcpgcnt);
+		if ((pfn + szcpgcnt - 1) > it->mi_mblock_end)
 			pfn = (pfn_t)-1;
 		return (pfn);
 	}
 
-	/*
-	 * Find mblock that contains pfn, or first mblock after pfn,
-	 * else pfn is out of bounds, so use the last mblock.
-	 * mblocks are sorted in ascending address order.
-	 */
-	ASSERT(it->mi_last_mblock < n_mblocks);
-	ASSERT(init == 1 || pfn > mpo_mblock[it->mi_last_mblock].end_pfn);
-	i = init ? 0 : it->mi_last_mblock + 1;
-	if (i == n_mblocks)
-		return ((pfn_t)-1);
+	/* init=1 means begin iterator, init=0 means continue */
+	if (init == 1) {
+		i = 0;
+	} else {
+		ASSERT(it->mi_last_mblock < n_mblocks);
+		i = it->mi_last_mblock;
+		ASSERT(pfn >
+		    mem_stripes[i * max_locality_groups + mnode].physmax);
+		if (++i == n_mblocks)
+			return ((pfn_t)-1);
+	}
 
+	/*
+	 * Find mblock that contains pfn for mnode's stripe, or first such an
+	 * mblock after pfn, else pfn is out of bound and we'll return -1.
+	 * mblocks and stripes are sorted in ascending address order.
+	 */
+	szcpagesize = szcpgcnt << PAGESHIFT;
 	for (; i < n_mblocks; i++) {
-		if ((mpo_mblock[i].mnode_mask & ((mnodeset_t)1 << mnode)) &&
-		    (pfn <= mpo_mblock[i].end_pfn))
+		if (P2PHASE(mpo_mblock[i].ra_to_pa, szcpagesize))
+			continue;
+		ms = &mem_stripes[i * max_locality_groups + mnode];
+		if (ms->exists && (pfn + szcpgcnt - 1) <= ms->physmax &&
+		    (P2ROUNDUP(ms->physbase, szcpgcnt) + szcpgcnt - 1) <=
+		    ms->physmax)
 			break;
 	}
 	if (i == n_mblocks) {
 		it->mi_last_mblock = i - 1;
 		return ((pfn_t)-1);
 	}
+
 	it->mi_last_mblock = i;
 
-	/*
-	 * Memory stripes are defined if there is more than one locality
-	 * group, so use the stripe bounds.  Otherwise use mblock bounds.
-	 */
 	mblock = &mpo_mblock[i];
-	if (n_mem_stripes > 0) {
-		mem_stripe_t *ms =
-		    &mem_stripes[i * max_locality_groups + mnode];
-		base = ms->physbase;
-		end = ms->physmax;
-	} else {
-		ASSERT(mnode == 0);
-		base = mblock->base_pfn;
-		end = mblock->end_pfn;
-	}
+	base = ms->physbase;
+	end = ms->physmax;
 
 	it->mi_mnode = mnode;
 	it->mi_ra_to_pa = btop(mblock->ra_to_pa);
@@ -1179,10 +1245,11 @@ plat_mem_node_iterator_init(pfn_t pfn, int mnode,
 	it->mi_mnode_pfn_mask = home_mask_pfn;	/* is 0 for non-MPO case */
 	it->mi_mnode_pfn_shift = home_mask_pfn_shift;
 	it->mi_mnode_mask = max_locality_groups - 1;
-	if (pfn < base)
-		pfn = base;
-	else if (pfn > end)
-		pfn = (pfn_t)-1;
+	if (pfn < base) {
+		pfn = P2ROUNDUP(base, szcpgcnt);
+		ASSERT(pfn + szcpgcnt - 1 <= end);
+	}
+	ASSERT((pfn + szcpgcnt - 1) <= mpo_mblock[i].end_pfn);
 	return (pfn);
 }
 

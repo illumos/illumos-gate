@@ -624,7 +624,8 @@ done:
 
 	/* check for possible memblock switch */
 	if (npfn > it->mi_mblock_end) {
-		pfn = plat_mem_node_iterator_init(npfn, it->mi_mnode, it, 0);
+		pfn = plat_mem_node_iterator_init(npfn, it->mi_mnode, szc, it,
+		    0);
 		if (pfn == (pfn_t)-1)
 			return (pfn);
 		ASSERT(pfn >= it->mi_mblock_base && pfn <= it->mi_mblock_end);
@@ -653,7 +654,7 @@ page_coloring_init_cpu()
 
 	for (i = 0; i < max_mem_nodes; i++) {
 		memset(&it, 0, sizeof (it));
-		if (plat_mem_node_iterator_init(0, i, &it, 1) != (pfn_t)-1)
+		if (plat_mem_node_iterator_init(0, i, 0, &it, 1) != (pfn_t)-1)
 			break;
 	}
 	ASSERT(i < max_mem_nodes);

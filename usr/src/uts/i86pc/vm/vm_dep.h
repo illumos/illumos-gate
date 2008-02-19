@@ -130,7 +130,7 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 
 /* mem node iterator is not used on x86 */
 #define	MEM_NODE_ITERATOR_DECL(it)
-#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, it)
+#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, szc, it)
 
 /*
  * interleaved_mnodes mode is never set on x86, therefore,

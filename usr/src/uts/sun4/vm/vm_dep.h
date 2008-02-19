@@ -133,10 +133,10 @@ typedef struct mem_node_iterator {
 
 #define	MEM_NODE_ITERATOR_DECL(it) \
 	mem_node_iterator_t it
-#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, it) \
-	(pfn) = plat_mem_node_iterator_init((pfn), (mnode), (it), 1)
+#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, szc, it) \
+	(pfn) = plat_mem_node_iterator_init((pfn), (mnode), (szc), (it), 1)
 
-extern pfn_t plat_mem_node_iterator_init(pfn_t, int,
+extern pfn_t plat_mem_node_iterator_init(pfn_t, int, uchar_t,
     mem_node_iterator_t *, int);
 extern pfn_t plat_rapfn_to_papfn(pfn_t);
 extern int interleaved_mnodes;
@@ -145,7 +145,7 @@ extern int interleaved_mnodes;
 
 #define	MEM_NODE_ITERATOR_DECL(it) \
 	void *it = NULL
-#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, it)
+#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, szc, it)
 
 #endif	/* sun4v */
 

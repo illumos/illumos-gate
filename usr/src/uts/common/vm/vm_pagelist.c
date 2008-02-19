@@ -734,12 +734,15 @@ page_ctrs_alloc(caddr_t alloc_base)
 				int mrange;
 				MEM_NODE_ITERATOR_DECL(it);
 
-				MEM_NODE_ITERATOR_INIT(pfnum, mnode, &it);
-				ASSERT(pfnum != (pfn_t)-1);
-				PAGE_NEXT_PFN_FOR_COLOR(pfnum, r, i,
-				    color_mask, color_mask, &it);
-				idx = PNUM_TO_IDX(mnode, r, pfnum);
-				idx = (idx >= r_pgcnt) ? 0 : idx;
+				MEM_NODE_ITERATOR_INIT(pfnum, mnode, r, &it);
+				if (pfnum == (pfn_t)-1) {
+					idx = 0;
+				} else {
+					PAGE_NEXT_PFN_FOR_COLOR(pfnum, r, i,
+					    color_mask, color_mask, &it);
+					idx = PNUM_TO_IDX(mnode, r, pfnum);
+					idx = (idx >= r_pgcnt) ? 0 : idx;
+				}
 				for (mrange = 0; mrange < nranges; mrange++) {
 					PAGE_COUNTERS_CURRENT_COLOR(mnode,
 					    r, i, mrange) = idx;
@@ -1127,12 +1130,15 @@ page_ctrs_adjust(int mnode)
 			for (m = mlo; m < mhi; m++) {
 				if (mem_node_config[m].exists == 0)
 					continue;
-				MEM_NODE_ITERATOR_INIT(pfnum, m, &it);
-				ASSERT(pfnum != (pfn_t)-1);
-				PAGE_NEXT_PFN_FOR_COLOR(pfnum, r, i, color_mask,
-				    color_mask, &it);
-				idx = PNUM_TO_IDX(m, r, pfnum);
-				idx = (idx < pcsz) ? idx : 0;
+				MEM_NODE_ITERATOR_INIT(pfnum, m, r, &it);
+				if (pfnum == (pfn_t)-1) {
+					idx = 0;
+				} else {
+					PAGE_NEXT_PFN_FOR_COLOR(pfnum, r, i,
+					    color_mask, color_mask, &it);
+					idx = PNUM_TO_IDX(m, r, pfnum);
+					idx = (idx < pcsz) ? idx : 0;
+				}
 				for (mrange = 0; mrange < nranges; mrange++) {
 					PAGE_COUNTERS_CURRENT_COLOR(m,
 					    r, i, mrange) = idx;
@@ -2237,8 +2243,11 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 
 	/* round to szcpgcnt boundaries */
 	lo = P2ROUNDUP(lo, szcpgcnt);
-	MEM_NODE_ITERATOR_INIT(lo, mnode, &it);
-	ASSERT(lo != (pfn_t)-1);
+	MEM_NODE_ITERATOR_INIT(lo, mnode, szc, &it);
+	if (lo == (pfn_t)-1) {
+		rw_exit(&page_ctrs_rwlock[mnode]);
+		return (NULL);
+	}
 	hi = hi & ~(szcpgcnt - 1);
 
 	/* set lo to the closest pfn of the right color */
@@ -2281,10 +2290,10 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 	if (pfnum < lo || pfnum >= hi) {
 		pfnum = lo;
 	} else {
-		MEM_NODE_ITERATOR_INIT(pfnum, mnode, &it);
+		MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
 		if (pfnum == (pfn_t)-1) {
 			pfnum = lo;
-			MEM_NODE_ITERATOR_INIT(pfnum, mnode, &it);
+			MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
 			ASSERT(pfnum != (pfn_t)-1);
 		} else if ((PFN_2_COLOR(pfnum, szc, &it) ^ color) & ceq_mask ||
 		    (interleaved_mnodes && PFN_2_MEM_NODE(pfnum) != mnode)) {
@@ -2293,7 +2302,7 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 			    color_mask, &it);
 			if (pfnum >= hi) {
 				pfnum = lo;
-				MEM_NODE_ITERATOR_INIT(pfnum, mnode, &it);
+				MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
 			}
 		}
 	}
@@ -2322,7 +2331,7 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 			/* jump to the next page in the range */
 			if (pfnum < nlo) {
 				pfnum = P2ROUNDUP(nlo, szcpgcnt);
-				MEM_NODE_ITERATOR_INIT(pfnum, mnode, &it);
+				MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
 				idx = PNUM_TO_IDX(mnode, r, pfnum);
 				if (idx >= len || pfnum >= hi)
 					goto wrapit;
@@ -2391,7 +2400,7 @@ next:
 		if (idx >= len || pfnum >= hi) {
 wrapit:
 			pfnum = lo;
-			MEM_NODE_ITERATOR_INIT(pfnum, mnode, &it);
+			MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
 			idx = PNUM_TO_IDX(mnode, r, pfnum);
 			wrap++;
 #if defined(__sparc)
@@ -3422,7 +3431,7 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		/* round to szcpgcnt boundaries */
 		lo = P2ROUNDUP(lo, szcpgcnt);
 
-		MEM_NODE_ITERATOR_INIT(lo, mnode, &it);
+		MEM_NODE_ITERATOR_INIT(lo, mnode, szc, &it);
 		hi = P2ALIGN((hi + 1), szcpgcnt) - 1;
 
 		if (hi <= lo)
@@ -3450,15 +3459,16 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 
 		randpfn = (pfn_t)GETTICK();
 		randpfn = ((randpfn % (hi - lo)) + lo) & ~(skip - 1);
-		MEM_NODE_ITERATOR_INIT(randpfn, mnode, &it);
-		if (ceq_mask || interleaved_mnodes) {
+		MEM_NODE_ITERATOR_INIT(randpfn, mnode, szc, &it);
+		if (ceq_mask || interleaved_mnodes || randpfn == (pfn_t)-1) {
 			if (randpfn != (pfn_t)-1) {
 				PAGE_NEXT_PFN_FOR_COLOR(randpfn, szc, bin,
 				    ceq_mask, color_mask, &it);
 			}
 			if (randpfn >= hi) {
 				randpfn = lo;
-				MEM_NODE_ITERATOR_INIT(randpfn, mnode, &it);
+				MEM_NODE_ITERATOR_INIT(randpfn, mnode, szc,
+				    &it);
 			}
 		}
 		randpp = mseg->pages + (randpfn - mseg->pages_base);
@@ -3498,7 +3508,7 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 			}
 			if (pp >= endpp) {
 				/* start from the beginning */
-				MEM_NODE_ITERATOR_INIT(lo, mnode, &it);
+				MEM_NODE_ITERATOR_INIT(lo, mnode, szc, &it);
 				pp = mseg->pages + (lo - mseg->pages_base);
 				ASSERT(pp->p_pagenum == lo);
 				ASSERT(pp + szcpgcnt <= endpp);
