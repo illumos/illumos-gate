@@ -707,8 +707,9 @@ get_ra_limit(md_t *mdp)
  * First, look up the number of bits available to pass an entry number.
  * This can vary by platform and may result in allocating an unreasonably
  * (or impossibly) large amount of memory for the corresponding table,
- * so we clamp it by 'max_entries'.  If the prop is missing, use
- * 'default_entries'.
+ * so we clamp it by 'max_entries'.  Finally, since the q size is used when
+ * calling contig_mem_alloc(), which expects a power of 2, clamp the q size
+ * down to a power of 2.  If the prop is missing, use 'default_entries'.
  */
 static uint64_t
 get_single_q_size(md_t *mdp, mde_cookie_t cpu_node_cookie,
@@ -730,6 +731,10 @@ get_single_q_size(md_t *mdp, mde_cookie_t cpu_node_cookie,
 	}
 
 	entries = MIN(entries, max_entries);
+	/* If not a power of 2, truncate to a power of 2. */
+	if ((entries & (entries - 1)) != 0) {
+		entries = 1 << (highbit(entries) - 1);
+	}
 
 	return (entries);
 }
