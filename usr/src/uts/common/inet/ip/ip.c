@@ -20691,10 +20691,11 @@ notdata:
 	/*
 	 * Make sure we have a full-word aligned message and that at least
 	 * a simple IP header is accessible in the first message.  If not,
-	 * try a pullup.
+	 * try a pullup.  For labeled systems we need to always take this
+	 * path as M_CTLs are "notdata" but have trailing data to process.
 	 */
 	if (!OK_32PTR(rptr) ||
-	    (mp->b_wptr - rptr) < IP_SIMPLE_HDR_LENGTH) {
+	    (mp->b_wptr - rptr) < IP_SIMPLE_HDR_LENGTH || is_system_labeled()) {
 hdrtoosmall:
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
@@ -22183,6 +22184,16 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
 			if (conn_outgoing_ill != NULL)
 				ill_refrele(conn_outgoing_ill);
 			return;
+		}
+		/*
+		 * Trusted Extensions supports all-zones interfaces, so
+		 * zoneid == ALL_ZONES is valid, but IPsec maps ALL_ZONES to
+		 * the global zone.
+		 */
+		if (zoneid == ALL_ZONES && mp->b_datap->db_type == M_CTL) {
+			io = (ipsec_out_t *)mp->b_rptr;
+			ASSERT(io->ipsec_out_type == IPSEC_OUT);
+			zoneid = io->ipsec_out_zoneid;
 		}
 	}
 

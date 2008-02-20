@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@
 #include <net/if_dl.h>
 #include <inet/ip_if.h>
 #include <sys/strsun.h>
+#include <sys/strsubr.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ipdrop.h>
 #include <inet/tun.h>
@@ -2780,7 +2781,9 @@ tun_update_link_mtu(queue_t *q, uint32_t pmtu, boolean_t icmp)
 	/*
 	 * If the pmtu provided came from an ICMP error being passed up
 	 * from below, then the pmtu argument has already been adjusted
-	 * by the IPsec overhead and ip header length.
+	 * by the IPsec overhead and ip header length.  For ICMP6, the
+	 * encap limit option's size is also accounted for as part of
+	 * outer_hlen in icmp_ricmp_err_v?_v6().
 	 */
 	if (!icmp && atp->tun_itp != NULL &&
 	    (atp->tun_itp->itp_flags & ITPF_P_ACTIVE))
@@ -2793,10 +2796,11 @@ tun_update_link_mtu(queue_t *q, uint32_t pmtu, boolean_t icmp)
 			newmtu = IP_MIN_MTU;
 	} else {
 		ASSERT(atp->tun_flags & TUN_L_V6);
-		if (!icmp)
+		if (!icmp) {
 			newmtu -= sizeof (ip6_t);
-		if (atp->tun_encap_lim > 0)
-			newmtu -= IPV6_TUN_ENCAP_OPT_LEN;
+			if (atp->tun_encap_lim > 0)
+				newmtu -= IPV6_TUN_ENCAP_OPT_LEN;
+		}
 		if (newmtu < IPV6_MIN_MTU)
 			newmtu = IPV6_MIN_MTU;
 	}
@@ -4729,7 +4733,8 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
 
-			nmp = allocb(hdrlen + atp->tun_extra_offset, BPRI_HI);
+			nmp = allocb_cred(hdrlen + atp->tun_extra_offset,
+			    DB_CRED(mp));
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -4773,8 +4778,8 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
-			nmp = allocb(hdrlen + atp->tun_extra_offset,
-			    BPRI_HI);
+			nmp = allocb_cred(hdrlen + atp->tun_extra_offset,
+			    DB_CRED(mp));
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -5251,8 +5256,8 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 		if ((mp->b_rptr - mp->b_datap->db_base) < sizeof (ipha_t)) {
 			/* no */
 
-			nmp = allocb(sizeof (ipha_t) + atp->tun_extra_offset,
-			    BPRI_HI);
+			nmp = allocb_cred(sizeof (ipha_t) +
+			    atp->tun_extra_offset, DB_CRED(mp));
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -5438,8 +5443,8 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
-			nmp = allocb(hdrlen + atp->tun_extra_offset,
-			    BPRI_HI);
+			nmp = allocb_cred(hdrlen + atp->tun_extra_offset,
+			    DB_CRED(mp));
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);

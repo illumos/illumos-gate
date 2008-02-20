@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -675,11 +675,10 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
 		copylen = MBLKL(mp);
 		if (copylen > 256)
 			copylen = 256;
-		new_mp = allocb(hlen + copylen +
-		    (mp->b_rptr - mp->b_datap->db_base), BPRI_HI);
+		new_mp = allocb_cred(hlen + copylen +
+		    (mp->b_rptr - mp->b_datap->db_base), DB_CRED(mp));
 		if (new_mp == NULL)
 			return (ENOMEM);
-		mblk_setcred(new_mp, DB_CRED(mp));
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;
@@ -1251,11 +1250,10 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
 			copylen = 256;
 		if (copylen < hdr_len)
 			copylen = hdr_len;
-		new_mp = allocb(hlen + copylen +
-		    (mp->b_rptr - mp->b_datap->db_base), BPRI_HI);
+		new_mp = allocb_cred(hlen + copylen +
+		    (mp->b_rptr - mp->b_datap->db_base), DB_CRED(mp));
 		if (new_mp == NULL)
 			return (ENOMEM);
-		mblk_setcred(new_mp, DB_CRED(mp));
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;

@@ -1623,7 +1623,7 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		}
 		msg_len = len_needed;
 	}
-	mp1 = allocb(IPV6_HDR_LEN + len, BPRI_HI);
+	mp1 = allocb_cred(IPV6_HDR_LEN + len, DB_CRED(mp));
 	if (mp1 == NULL) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpOutErrors);
 		freemsg(ipsec_mp);
@@ -9164,13 +9164,14 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	boolean_t	drop_if_delayed = B_FALSE;
 	boolean_t	multirt_need_resolve = B_FALSE;
 	mblk_t		*copy_mp = NULL;
-	int		err;
+	int		err = 0;
 	int		ip6i_flags = 0;
 	zoneid_t	zoneid;
 	ill_t		*saved_ill = NULL;
 	boolean_t	conn_lock_held;
 	boolean_t	need_decref = B_FALSE;
 	ip_stack_t	*ipst;
+	int		adjust;
 
 	if (q->q_next != NULL) {
 		ill = (ill_t *)q->q_ptr;
@@ -9297,6 +9298,30 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		goto notv6;
 	}
 
+	if (is_system_labeled() && DB_TYPE(mp) == M_DATA &&
+	    (connp == NULL || !connp->conn_ulp_labeled)) {
+		if (connp != NULL) {
+			ASSERT(CONN_CRED(connp) != NULL);
+			err = tsol_check_label_v6(BEST_CRED(mp, connp),
+			    &mp, &adjust, connp->conn_mac_exempt, ipst);
+		} else if (DB_CRED(mp) != NULL) {
+			err = tsol_check_label_v6(DB_CRED(mp),
+			    &mp, &adjust, 0, ipst);
+		}
+		if (mctl_present)
+			first_mp->b_cont = mp;
+		else
+			first_mp = mp;
+		if (err != 0) {
+			DTRACE_PROBE3(
+			    tsol_ip_log_drop_checklabel_ip6, char *,
+			    "conn(1), failed to check/update mp(2)",
+			    conn_t, connp, mblk_t, mp);
+			    freemsg(first_mp);
+			return;
+		}
+		ip6h = (ip6_t *)mp->b_rptr;
+	}
 	if (q->q_next != NULL) {
 		/*
 		 * We don't know if this ill will be used for IPv6
@@ -9328,7 +9353,6 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		do_outrequests = B_FALSE;
 		zoneid = (zoneid_t)(uintptr_t)arg;
 	} else {
-		connp = (conn_t *)arg;
 		ASSERT(connp != NULL);
 		zoneid = connp->conn_zoneid;
 
