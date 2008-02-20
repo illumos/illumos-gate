@@ -540,6 +540,8 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		    "UNMAP_PERM_ADDR",	/* PTL1_BAD_HCALL_UNMAP_PERM_EINVAL */
 		"return value ENOMAP from hcall: "\
 		    "UNMAP_PERM_ADDR", /* PTL1_BAD_HCALL_UNMAP_PERM_ENOMAP */
+		"error raising a TSB exception", /* PTL1_BAD_RAISE_TSBEXCP */
+		"missing shared TSB"	/* PTL1_NO_SCDTSB8K */
 	};
 
 	uint_t reason = pstate->ptl1_regs.ptl1_gregs[0].ptl1_g1;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15274,6 +15274,10 @@ sfmmu_leave_scd(sfmmu_t *sfmmup, uchar_t r_type)
 
 	if (SFMMU_FLAGS_ISSET(sfmmup, HAT_JOIN_SCD)) {
 		SFMMU_FLAGS_CLEAR(sfmmup, HAT_JOIN_SCD);
+		/*
+		 * Since HAT_JOIN_SCD was set our context
+		 * is still invalid.
+		 */
 	} else {
 		/*
 		 * For a multi-thread process, we must stop
@@ -15281,11 +15285,12 @@ sfmmu_leave_scd(sfmmu_t *sfmmup, uchar_t r_type)
 		 */
 
 		sfmmu_invalidate_ctx(sfmmup);
-
-		/* Clear all the rid's for ISM, delete flags, etc */
-		ASSERT(SFMMU_FLAGS_ISSET(sfmmup, HAT_ISMBUSY));
-		sfmmu_ism_hatflags(sfmmup, 0);
 	}
+
+	/* Clear all the rid's for ISM, delete flags, etc */
+	ASSERT(SFMMU_FLAGS_ISSET(sfmmup, HAT_ISMBUSY));
+	sfmmu_ism_hatflags(sfmmup, 0);
+
 	/*
 	 * Update sfmmu_ttecnt to include the rgn ttecnt for rgns that
 	 * are in SCD before this sfmmup leaves the SCD.
@@ -15425,14 +15430,13 @@ sfmmu_ism_hatflags(sfmmu_t *sfmmup, int addflag)
 				continue;
 			}
 			ASSERT(rid >= 0 && rid < SFMMU_MAX_ISM_REGIONS);
-			if (SF_RGNMAP_TEST(scdp->scd_ismregion_map, rid)) {
-				if (addflag) {
-					ism_map[i].imap_hatflags |=
-					    HAT_CTX1_FLAG;
-				} else {
-					ism_map[i].imap_hatflags &=
-					    ~HAT_CTX1_FLAG;
-				}
+			if (SF_RGNMAP_TEST(scdp->scd_ismregion_map, rid) &&
+			    addflag) {
+				ism_map[i].imap_hatflags |=
+				    HAT_CTX1_FLAG;
+			} else {
+				ism_map[i].imap_hatflags &=
+				    ~HAT_CTX1_FLAG;
 			}
 		}
 		ism_blkp = ism_blkp->iblk_next;
