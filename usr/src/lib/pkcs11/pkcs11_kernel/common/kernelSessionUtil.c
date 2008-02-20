@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,27 +389,23 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
  * 1) Check to see if the session struct is tagged with a session
  *    magic number. This is to detect when an application passes
  *    a bogus session pointer.
- * 2) Acquire the locks on the designated session and the slot which owns
- *    this session.
+ * 2) Acquire the locks on the designated session.
  * 3) Check to see if the session is in the closing state that another
  *    thread is performing.
  * 4) Increment the session reference count by one. This is to prevent
  *    this session from being closed by other thread.
- * 5) Release the locks on the designated session and on the slot.
+ * 5) Release the locks on the designated session.
  */
 CK_RV
 handle2session(CK_SESSION_HANDLE hSession, kernel_session_t **session_p)
 {
 	kernel_session_t *sp = (kernel_session_t *)(hSession);
 	CK_RV rv;
-	kernel_slot_t *pslot;
 
 	if ((sp == NULL) ||
 	    (sp->magic_marker != KERNELTOKEN_SESSION_MAGIC)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	} else {
-		pslot = slot_table[sp->ses_slotid];
-		(void) pthread_mutex_lock(&pslot->sl_mutex);
 		(void) pthread_mutex_lock(&sp->session_mutex);
 		if (sp->ses_close_sync & SESSION_IS_CLOSING) {
 			rv = CKR_SESSION_CLOSED;
@@ -419,7 +415,6 @@ handle2session(CK_SESSION_HANDLE hSession, kernel_session_t **session_p)
 			rv = CKR_OK;
 		}
 		(void) pthread_mutex_unlock(&sp->session_mutex);
-		(void) pthread_mutex_unlock(&pslot->sl_mutex);
 	}
 
 	if (rv == CKR_OK)

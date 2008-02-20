@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -330,7 +329,7 @@ soft_delete_session(soft_session_t *session_p,
 		 */
 		session_p->ses_close_sync |= SESSION_REFCNT_WAITING;
 		(void) pthread_cond_wait(&session_p->ses_free_cond,
-			&session_p->session_mutex);
+		    &session_p->session_mutex);
 	}
 
 	session_p->ses_close_sync &= ~SESSION_REFCNT_WAITING;
@@ -396,14 +395,12 @@ soft_delete_session(soft_session_t *session_p,
  * 1) Check to see if the session struct is tagged with a session
  *    magic number. This is to detect when an application passes
  *    a bogus session pointer.
- * 2) Acquire the locks on the global session list and on the designated
- *    session.
+ * 2) Acquire the lock on the designated session.
  * 3) Check to see if the session is in the closing state that another
  *    thread is performing.
  * 4) Increment the session reference count by one. This is to prevent
  *    this session from being closed by other thread.
- * 5) Release the locks held on the designated session and on the global
- *    session list.
+ * 5) Release the lock held on the designated session.
  */
 CK_RV
 handle2session(CK_SESSION_HANDLE hSession, soft_session_t **session_p)
@@ -411,18 +408,13 @@ handle2session(CK_SESSION_HANDLE hSession, soft_session_t **session_p)
 
 	soft_session_t *sp = (soft_session_t *)(hSession);
 
-	(void) pthread_mutex_lock(&soft_sessionlist_mutex);
+	/*
+	 * No need to hold soft_sessionlist_mutex as we are
+	 * just reading the value and 32-bit reads are atomic.
+	 */
 	if (all_sessions_closing) {
-		(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 		return (CKR_SESSION_CLOSED);
 	}
-	/*
-	 * We need to free the global session list lock to prevent deadlock
-	 * between C_CloseSession and C_DestroyObject. S1WS/NSS does
-	 * explicit deletion (C_DestroyObject) after implicit deletion by
-	 * C_CloseSession.
-	 */
-	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 
 	if ((sp == NULL) ||
 	    (sp->magic_marker != SOFTTOKEN_SESSION_MAGIC)) {

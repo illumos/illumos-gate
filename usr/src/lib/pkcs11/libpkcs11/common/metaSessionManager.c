@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ meta_sessionManager_finalize()
  * meta_handle2session
  *
  * Convert a CK_SESSION_HANDLE to the corresponding metasession. If
- * successful, a reader-lock on the session will be held to indicate
+ * successful, a write-lock on the session will be held to indicate
  * that it's in use. Call REFRELEASE() when finished.
  *
  */
@@ -114,21 +114,10 @@ meta_handle2session(CK_SESSION_HANDLE hSession, meta_session_t **session)
 	meta_session_t *tmp_session = (meta_session_t *)(hSession);
 
 	/* Check for bad args (eg CK_INVALID_HANDLE, which is 0/NULL). */
-	if (tmp_session == NULL) {
-		*session = NULL;
+	if (tmp_session == NULL ||
+	    tmp_session->magic_marker != METASLOT_SESSION_MAGIC) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
-
-
-	/* Lock to ensure the magic-check + read-lock is atomic. */
-	(void) pthread_rwlock_rdlock(&meta_sessionclose_lock);
-
-	if (tmp_session->magic_marker != METASLOT_SESSION_MAGIC) {
-		(void) pthread_rwlock_unlock(&meta_sessionclose_lock);
-		*session = NULL;
-		return (CKR_SESSION_HANDLE_INVALID);
-	}
-	(void) pthread_rwlock_unlock(&meta_sessionclose_lock);
 
 	/*
 	 * sessions can only be used by a single thread at a time.
@@ -221,6 +210,7 @@ meta_session_deactivate(meta_session_t *session,
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
 	session->isClosingSession = B_TRUE;
+	session->magic_marker = METASLOT_SESSION_BADMAGIC;
 	(void) pthread_mutex_unlock(&session->isClosingSession_lock);
 
 	/*
@@ -232,7 +222,6 @@ meta_session_deactivate(meta_session_t *session,
 		(void) pthread_rwlock_wrlock(&meta_sessionlist_lock);
 	}
 
-	session->magic_marker = METASLOT_SESSION_BADMAGIC;
 	REMOVE_FROM_LIST(meta_sessionlist_head, session);
 	if (meta_sessionlist_head == NULL) {
 		isLastSession = B_TRUE;
