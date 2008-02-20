@@ -254,7 +254,7 @@ auto_mount_thread(struct autofs_callargs *argsp)
 
 	mutex_init(&auto_mount_thread_cpr_lock, NULL, MUTEX_DEFAULT, NULL);
 	CALLB_CPR_INIT(&cprinfo, &auto_mount_thread_cpr_lock,
-		callb_generic_cpr, "auto_mount_thread");
+	    callb_generic_cpr, "auto_mount_thread");
 
 	fnp = argsp->fnc_fnp;
 	vp = fntovn(fnp);
@@ -314,6 +314,12 @@ auto_new_mount_thread(fnnode_t *fnp, char *name, cred_t *cred)
 	autofs_thr_success++;
 }
 
+#define	DOOR_BUF_ALIGN		(1024*1024)
+#define	DOOR_BUF_MULTIPLIER	3
+#define	DOOR_BUF_DEFAULT_SZ	(DOOR_BUF_MULTIPLIER * DOOR_BUF_ALIGN)
+int	doorbuf_defsz = DOOR_BUF_DEFAULT_SZ;
+
+/*ARGSUSED*/
 int
 auto_calldaemon(
 	zoneid_t 		zoneid,
@@ -325,18 +331,20 @@ auto_calldaemon(
 	int			reslen,
 	bool_t 			hard)	/* retry forever? */
 {
-
-	int 			retry, error = 0;
-	k_sigset_t 		smask;
-	door_arg_t		door_args;
-	door_handle_t		dh;
-	XDR			xdrarg, xdrres;
+	int			 retry;
+	int			 error = 0;
+	k_sigset_t		 smask;
+	door_arg_t		 door_args;
+	door_handle_t		 dh;
+	XDR			 xdrarg;
+	XDR			 xdrres;
 	struct autofs_globals 	*fngp = NULL;
-	void			*orig_resp = NULL;
-	int			orig_reslen = reslen;
+	void			*orp = NULL;
+	int			 orl;
+	int			 rlen;
 	autofs_door_args_t	*xdr_argsp;
-	int			xdr_len = 0;
-	int			printed_not_running_msg = 0;
+	int			 xdr_len = 0;
+	int			 printed_not_running_msg = 0;
 	klwp_t			*lwp = ttolwp(curthread);
 
 	/*
@@ -345,8 +353,7 @@ auto_calldaemon(
 	 * curproc->p_zone.
 	 */
 	ASSERT(zoneid == getzoneid());
-	if (zone_status_get(curproc->p_zone) >=
-			ZONE_IS_SHUTTING_DOWN) {
+	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN) {
 		/*
 		 * There's no point in trying to talk to
 		 * automountd.  Plus, zone_shutdown() is
@@ -398,7 +405,7 @@ auto_calldaemon(
 
 	if (argsp) {
 		xdrmem_create(&xdrarg, (char *)&xdr_argsp->xdr_arg,
-			xdr_argsp->xdr_len, XDR_ENCODE);
+		    xdr_argsp->xdr_len, XDR_ENCODE);
 
 		if (!(*xarg_func)(&xdrarg, argsp)) {
 			kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
@@ -415,8 +422,10 @@ auto_calldaemon(
 	 * In this case we need to free the memory originally allocated
 	 * for that buffer.
 	 */
-	if (orig_reslen)
-		orig_resp = kmem_zalloc(orig_reslen, KM_SLEEP);
+	if (resp)
+		rlen = xdr_sizeof(xresp_func, resp);
+	orl = (rlen == 0) ? doorbuf_defsz : MAX(rlen, doorbuf_defsz);
+	orp = kmem_zalloc(orl, KM_SLEEP);
 
 	do {
 		retry = 0;
@@ -427,8 +436,8 @@ auto_calldaemon(
 		mutex_exit(&fngp->fng_autofs_daemon_lock);
 
 		if (dh == NULL) {
-			if (orig_resp)
-				kmem_free(orig_resp, orig_reslen);
+			if (orp)
+				kmem_free(orp, orl);
 			kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
 			return (ENOENT);
 		}
@@ -436,8 +445,8 @@ auto_calldaemon(
 		door_args.data_size = sizeof (*xdr_argsp) + xdr_argsp->xdr_len;
 		door_args.desc_ptr = NULL;
 		door_args.desc_num = 0;
-		door_args.rbuf = orig_resp ? (char *)orig_resp : NULL;
-		door_args.rsize = reslen;
+		door_args.rbuf = orp ? (char *)orp : NULL;
+		door_args.rsize = orl;
 
 		sigintr(&smask, 1);
 		error = door_ki_upcall(dh, &door_args);
@@ -445,19 +454,56 @@ auto_calldaemon(
 
 		door_ki_rele(dh);
 
+		/*
+		 * Handle daemon errors
+		 */
 		if (!error) {
+			/*
+			 * Upcall successful. Let's check for soft errors
+			 * from the daemon. We only recover from overflow
+			 * type scenarios. Any other errors, we return to
+			 * the caller.
+			 */
 			autofs_door_res_t *adr =
-				(autofs_door_res_t *)door_args.rbuf;
-			if (door_args.rbuf != NULL &&
-				(error = adr->res_status)) {
-				kmem_free(xdr_argsp,
-					xdr_len + sizeof (*xdr_argsp));
-				if (orig_resp)
-					kmem_free(orig_resp, orig_reslen);
-				return (error);
+			    (autofs_door_res_t *)door_args.rbuf;
+
+			if (door_args.rbuf != NULL) {
+				int	 nl;
+
+				switch (error = adr->res_status) {
+				case 0:	/* no error; continue */
+					break;
+
+				case EOVERFLOW:
+					/*
+					 * orig landing buf not big enough.
+					 * xdr_len in XDR_BYTES_PER_UNIT
+					 */
+					if ((nl = adr->xdr_len) > 0 &&
+					    (btopr(nl) < freemem/64)) {
+						if (orp)
+							kmem_free(orp, orl);
+						orp = kmem_zalloc(nl, KM_SLEEP);
+						orl = nl;
+						retry = 1;
+						break;
+					}
+					/*FALLTHROUGH*/
+
+				default:
+					kmem_free(xdr_argsp,
+					    xdr_len + sizeof (*xdr_argsp));
+					if (orp)
+						kmem_free(orp, orl);
+					return (error);
+				}
 			}
 			continue;
 		}
+
+		/*
+		 * no daemon errors; now process door/comm errors (if any)
+		 */
 		switch (error) {
 		case EINTR:
 			/*
@@ -510,13 +556,12 @@ auto_calldaemon(
 				fngp->fng_autofs_daemon_dh = NULL;
 			}
 			mutex_exit(&fngp->fng_autofs_daemon_lock);
-			AUTOFS_DPRINT((5,
-				"auto_calldaemon error=%d\n", error));
+			AUTOFS_DPRINT((5, "auto_calldaemon error=%d\n", error));
 			if (hard) {
 				if (!fngp->fng_printed_not_running_msg) {
-				    fngp->fng_printed_not_running_msg = 1;
-				    zprintf(zoneid, "automountd not "\
-					"running, retrying\n");
+					fngp->fng_printed_not_running_msg = 1;
+					zprintf(zoneid, "automountd not "
+					    "running, retrying\n");
 				}
 				delay(hz);
 				retry = 1;
@@ -524,16 +569,16 @@ auto_calldaemon(
 			} else {
 				error = ECONNREFUSED;
 				kmem_free(xdr_argsp,
-					xdr_len + sizeof (*xdr_argsp));
-				if (orig_resp)
-					kmem_free(orig_resp, orig_reslen);
+				    xdr_len + sizeof (*xdr_argsp));
+				if (orp)
+					kmem_free(orp, orl);
 				return (error);
 			}
 		default:	/* Unknown must be fatal */
 			error = ENOENT;
 			kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
-			if (orig_resp)
-				kmem_free(orig_resp, orig_reslen);
+			if (orp)
+				kmem_free(orp, orl);
 			return (error);
 		}
 	} while (retry);
@@ -543,14 +588,16 @@ auto_calldaemon(
 		zprintf(zoneid, "automountd OK\n");
 	}
 
-	if (orig_resp && orig_reslen) {
+	if (orp && orl) {
 		autofs_door_res_t	*door_resp;
-		door_resp =
-			(autofs_door_res_t *)door_args.rbuf;
-		if ((void *)door_args.rbuf != orig_resp)
-			kmem_free(orig_resp, orig_reslen);
+		door_resp = (autofs_door_res_t *)door_args.rbuf;
+
+		if ((void *)door_args.rbuf != orp)
+			kmem_free(orp, orl);
+
 		xdrmem_create(&xdrres, (char *)&door_resp->xdr_res,
-			door_resp->xdr_len, XDR_DECODE);
+		    door_resp->xdr_len, XDR_DECODE);
+
 		if (!((*xresp_func)(&xdrres, resp)))
 			error = EINVAL;
 		kmem_free(door_args.rbuf, door_args.rsize);
@@ -567,14 +614,8 @@ auto_null_request(fninfo_t *fnip, bool_t hard)
 
 	AUTOFS_DPRINT((4, "\tauto_null_request\n"));
 
-	error = auto_calldaemon(fngp->fng_zoneid,
-		NULLPROC,
-		xdr_void,
-		NULL,
-		xdr_void,
-		NULL,
-		0,
-		hard);
+	error = auto_calldaemon(fngp->fng_zoneid, NULLPROC,
+	    xdr_void, NULL, xdr_void, NULL, 0, hard);
 
 	AUTOFS_DPRINT((5, "\tauto_null_request: error=%d\n", error));
 	return (error);
@@ -591,7 +632,7 @@ auto_lookup_request(
 {
 	int 				error;
 	struct autofs_globals 		*fngp;
-	struct autofs_lookupargs	reqst;
+	struct autofs_lookupargs	 reqst;
 	autofs_lookupres 		*resp;
 	struct linka 			*p;
 
@@ -617,15 +658,9 @@ auto_lookup_request(
 
 	resp = kmem_zalloc(sizeof (*resp), KM_SLEEP);
 
-	error = auto_calldaemon(fngp->fng_zoneid,
-		AUTOFS_LOOKUP,
-		xdr_autofs_lookupargs,
-		&reqst,
-		xdr_autofs_lookupres,
-		(void *)resp,
-		sizeof (autofs_lookupres),
-		hard);
-
+	error = auto_calldaemon(fngp->fng_zoneid, AUTOFS_LOOKUP,
+	    xdr_autofs_lookupargs, &reqst, xdr_autofs_lookupres,
+	    (void *)resp, sizeof (autofs_lookupres), hard);
 
 	if (error) {
 		xdr_free(xdr_autofs_lookupres, (char *)resp);
@@ -643,31 +678,34 @@ auto_lookup_request(
 				lnp->dir = NULL;
 				*mountreq = TRUE;
 				break;
+
 			case AUTOFS_LINK_RQ:
-				p =
-				&resp->lu_type.lookup_result_type_u.lt_linka;
+			p = &resp->lu_type.lookup_result_type_u.lt_linka;
 				lnp->dir = kmem_alloc(strlen(p->dir) + 1,
-					KM_SLEEP);
+				    KM_SLEEP);
 				(void) strcpy(lnp->dir, p->dir);
 				lnp->link = kmem_alloc(strlen(p->link) + 1,
-					KM_SLEEP);
+				    KM_SLEEP);
 				(void) strcpy(lnp->link, p->link);
 				break;
+
 			case AUTOFS_NONE:
 				lnp->link = NULL;
 				lnp->dir = NULL;
 				break;
+
 			default:
-				auto_log(fngp->fng_verbose,
-					fngp->fng_zoneid, CE_WARN,
-				    "auto_lookup_request: bad action type %d",
-				    resp->lu_res);
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+				    CE_WARN, "auto_lookup_request: bad action "
+				    "type %d", resp->lu_res);
 				error = ENOENT;
 			}
 			break;
+
 		case AUTOFS_NOENT:
 			error = ENOENT;
 			break;
+
 		default:
 			error = ENOENT;
 			auto_log(fngp->fng_verbose, fngp->fng_zoneid, CE_WARN,
@@ -718,14 +756,9 @@ auto_mount_request(
 
 	xdrres = kmem_zalloc(sizeof (*xdrres), KM_SLEEP);
 
-	error = auto_calldaemon(fngp->fng_zoneid,
-		AUTOFS_MNTINFO,
-		xdr_autofs_lookupargs,
-		&reqst,
-		xdr_autofs_mountres,
-		(void *)xdrres,
-		sizeof (autofs_mountres),
-		hard);
+	error = auto_calldaemon(fngp->fng_zoneid, AUTOFS_MNTINFO,
+	    xdr_autofs_lookupargs, &reqst, xdr_autofs_mountres,
+	    (void *)xdrres, sizeof (autofs_mountres), hard);
 
 	if (!error) {
 		fngp->fng_verbose = xdrres->mr_verbose;
@@ -775,17 +808,12 @@ auto_send_unmount_request(
 	struct autofs_globals *fngp = vntofn(fnip->fi_rootvp)->fn_globals;
 
 	AUTOFS_DPRINT((4, "\tauto_send_unmount_request: fstype=%s "
-			" mntpnt=%s\n", ul->fstype, ul->mntpnt));
+	    " mntpnt=%s\n", ul->fstype, ul->mntpnt));
 
 	bzero(&xdrres, sizeof (umntres));
-	error = auto_calldaemon(fngp->fng_zoneid,
-		AUTOFS_UNMOUNT,
-		xdr_umntrequest,
-		(void *)ul,
-		xdr_umntres,
-		(void *)&xdrres,
-		sizeof (umntres),
-		hard);
+	error = auto_calldaemon(fngp->fng_zoneid, AUTOFS_UNMOUNT,
+	    xdr_umntrequest, (void *)ul, xdr_umntres, (void *)&xdrres,
+	    sizeof (umntres), hard);
 
 	if (!error)
 		error = xdrres.status;
@@ -989,8 +1017,7 @@ auto_perform_actions(
 	struct autofs_globals 	*fngp;
 	cred_t 			*zcred;
 
-	AUTOFS_DPRINT((4, "auto_perform_actions: alp=%p\n",
-		(void *)alp));
+	AUTOFS_DPRINT((4, "auto_perform_actions: alp=%p\n", (void *)alp));
 
 	fngp = dfnp->fn_globals;
 	dvp = fntovn(dfnp);
@@ -1040,7 +1067,7 @@ auto_perform_actions(
 		mutex_enter(&dfnp->fn_lock);
 		if (dfnp->fn_flags & MF_MOUNTPOINT) {
 			AUTOFS_DPRINT((10, "autofs: clearing mountpoint "
-				"flag on %s.", dfnp->fn_name));
+			    "flag on %s.", dfnp->fn_name));
 			ASSERT(dfnp->fn_dirents == NULL);
 			ASSERT(dfnp->fn_trigger == NULL);
 		}
@@ -1089,13 +1116,11 @@ auto_perform_actions(
 
 		if (dfnip->fi_flags & MF_DIRECT) {
 			AUTOFS_DPRINT((10, "\tDIRECT\n"));
-			(void) sprintf(buff, "%s/%s", dfnip->fi_path,
-				mntpnt);
+			(void) sprintf(buff, "%s/%s", dfnip->fi_path, mntpnt);
 		} else {
 			AUTOFS_DPRINT((10, "\tINDIRECT\n"));
 			(void) sprintf(buff, "%s/%s/%s",
-				dfnip->fi_path,
-				dfnp->fn_name, mntpnt);
+			    dfnip->fi_path, dfnp->fn_name, mntpnt);
 		}
 
 		if (vn_mountedvfs(dvp) == NULL) {
@@ -1116,9 +1141,8 @@ auto_perform_actions(
 				 */
 				if (vn_mountedvfs(fntovn(mfnp)) != NULL) {
 					cmn_err(CE_PANIC,
-						"auto_perform_actions:"
-						" mfnp=%p covered",
-						(void *)mfnp);
+					    "auto_perform_actions:"
+					    " mfnp=%p covered", (void *)mfnp);
 				}
 			} else {
 				/*
@@ -1140,10 +1164,10 @@ auto_perform_actions(
 				mvp = fntovn(mfnp);
 			} else {
 				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
-					CE_WARN, "autofs: mount of %s "
-					"failed - can't create"
-					" mountpoint.", buff);
-					continue;
+				    CE_WARN, "autofs: mount of %s "
+				    "failed - can't create"
+				    " mountpoint.", buff);
+				continue;
 			}
 		} else {
 			/*
@@ -1152,21 +1176,18 @@ auto_perform_actions(
 			 * mount has succeeded since the root is
 			 * mounted.
 			 */
-			if (error = auto_getmntpnt(dvp, mntpnt, &mvp,
-				kcred)) {
-				auto_log(fngp->fng_verbose,
-					fngp->fng_zoneid,
-					CE_WARN, "autofs: mount of %s "
-					"failed - mountpoint doesn't"
-					" exist.", buff);
+			if (error = auto_getmntpnt(dvp, mntpnt, &mvp, kcred)) {
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+				    CE_WARN, "autofs: mount of %s "
+				    "failed - mountpoint doesn't"
+				    " exist.", buff);
 				continue;
 			}
 			if (mvp->v_type == VLNK) {
-				auto_log(fngp->fng_verbose,
-					fngp->fng_zoneid,
-					CE_WARN, "autofs: %s symbolic "
-					"link: not a valid mountpoint "
-					"- mount failed", buff);
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+				    CE_WARN, "autofs: %s symbolic "
+				    "link: not a valid mountpoint "
+				    "- mount failed", buff);
 				VN_RELE(mvp);
 				error = ENOENT;
 				continue;
@@ -1198,8 +1219,8 @@ mount:
 		kmem_free(margs.optptr, MAX_MNTOPT_STR);
 		if (error != 0) {
 			auto_log(fngp->fng_verbose, fngp->fng_zoneid,
-				CE_WARN, "autofs: domount of %s failed "
-				"error=%d", buff, error);
+			    CE_WARN, "autofs: domount of %s failed "
+			    "error=%d", buff, error);
 			VN_RELE(mvp);
 			continue;
 		}
@@ -1215,8 +1236,7 @@ mount:
 		 * unmount routine already knows that such case was
 		 * done in the kernel.
 		 */
-		if (vfs_matchops(dvp->v_vfsp,
-			vfs_getops(mvp->v_vfsp))) {
+		if (vfs_matchops(dvp->v_vfsp, vfs_getops(mvp->v_vfsp))) {
 			mfnp = vntofn(mvp);
 			mutex_enter(&mfnp->fn_lock);
 			mfnp->fn_flags |= MF_IK_MOUNT;
@@ -1242,10 +1262,8 @@ mount:
 					error = dounmount(mvfsp, 0, CRED());
 					if (error) {
 						cmn_err(CE_WARN,
-							"autofs: could"
-							" not unmount"
-							" vfs=%p",
-							(void *)mvfsp);
+						    "autofs: could not unmount"
+						    " vfs=%p", (void *)mvfsp);
 					}
 				} else
 					vn_vfsunlock(mvp);
@@ -1259,7 +1277,7 @@ mount:
 		}
 
 		auto_mount = vfs_matchops(dvp->v_vfsp,
-			vfs_getops(newvp->v_vfsp));
+		    vfs_getops(newvp->v_vfsp));
 		newfnp = vntofn(newvp);
 		newfnp->fn_parent = dfnp;
 
@@ -1290,16 +1308,14 @@ mount:
 			 * holds reference to it as its trigger node.
 			 */
 			AUTOFS_DPRINT((10, "\tadding trigger %s to %s\n",
-				newfnp->fn_name, dfnp->fn_name));
+			    newfnp->fn_name, dfnp->fn_name));
 			AUTOFS_DPRINT((10, "\tfirst trigger is %s\n",
-				dfnp->fn_trigger->fn_name));
+			    dfnp->fn_trigger->fn_name));
 			if (newfnp->fn_next != NULL)
-				AUTOFS_DPRINT((10,
-					"\tnext trigger is %s\n",
-					newfnp->fn_next->fn_name));
+				AUTOFS_DPRINT((10, "\tnext trigger is %s\n",
+				    newfnp->fn_next->fn_name));
 			else
-				AUTOFS_DPRINT((10,
-					"\tno next trigger\n"));
+				AUTOFS_DPRINT((10, "\tno next trigger\n"));
 		} else
 			VN_RELE(newvp);
 
@@ -1695,7 +1711,7 @@ auto_getmntpnt(
 	 * This code is similar to lookupname() in fs/lookup.c.
 	 */
 	error = pn_get_buf(path, UIO_SYSSPACE, &lookpn,
-		namebuf, sizeof (namebuf));
+	    namebuf, sizeof (namebuf));
 	if (error == 0) {
 		error = lookuppnvp(&lookpn, NULL, NO_FOLLOW, NULLVPP,
 		    mvpp, rootdir, newvp, cred);
@@ -1961,9 +1977,8 @@ unmount_node(vnode_t *cvp, int force)
 		mntfs_getmntopts(vfsp, &ul.mntopts, &mntoptslen);
 		if (ul.mntopts == NULL) {
 			auto_log(cfnp->fn_globals->fng_verbose,
-				cfnp->fn_globals->fng_zoneid,
-				CE_WARN, "unmount_node: "
-			    "no memory");
+			    cfnp->fn_globals->fng_zoneid, CE_WARN,
+			    "unmount_node: no memory");
 			vn_vfsunlock(cvp);
 			error = ENOMEM;
 			goto done;
@@ -2134,7 +2149,7 @@ unmount_tree(struct autofs_globals *fngp, int force)
 
 	mutex_init(&unmount_tree_cpr_lock, NULL, MUTEX_DEFAULT, NULL);
 	CALLB_CPR_INIT(&cprinfo, &unmount_tree_cpr_lock, callb_generic_cpr,
-		"unmount_tree");
+	    "unmount_tree");
 
 	/*
 	 * Got to release lock before attempting unmount in case
@@ -2386,20 +2401,19 @@ top:
 				 */
 				error = 0;
 				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
-					CE_WARN,
-				    "unmount_tree: automountd connection "
-				    "dropped");
+				    CE_WARN, "unmount_tree: automountd "
+				    "connection dropped");
 				if (fnip->fi_flags & MF_DIRECT) {
 					auto_log(fngp->fng_verbose,
-						fngp->fng_zoneid, CE_WARN,
-						"unmount_tree: "
+					    fngp->fng_zoneid, CE_WARN,
+					    "unmount_tree: "
 					    "%s successfully unmounted - "
 					    "do not remount triggers",
 					    fnip->fi_path);
 				} else {
 					auto_log(fngp->fng_verbose,
-						fngp->fng_zoneid, CE_WARN,
-						"unmount_tree: "
+					    fngp->fng_zoneid, CE_WARN,
+					    "unmount_tree: "
 					    "%s/%s successfully unmounted - "
 					    "do not remount triggers",
 					    fnip->fi_path, fnp->fn_name);
@@ -2443,14 +2457,11 @@ top:
 			 * Unmount failed, got to remount triggers.
 			 */
 			ASSERT((fnp->fn_flags & MF_THISUID_MATCH_RQD) == 0);
-			error = auto_perform_actions(fnip, fnp, alp,
-				CRED());
+			error = auto_perform_actions(fnip, fnp, alp, CRED());
 			if (error) {
-				auto_log(fngp->fng_verbose,
-					fngp->fng_zoneid, CE_WARN,
-					"autofs: can't remount "
-				    "triggers fnp=%p error=%d", (void *)fnp,
-				    error);
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+				    CE_WARN, "autofs: can't remount triggers "
+				    "fnp=%p error=%d", (void *)fnp, error);
 				error = 0;
 				/*
 				 * The action list should have been
@@ -2458,7 +2469,6 @@ top:
 				 * since an error occured
 				 */
 				alp = NULL;
-
 			}
 		}
 	} else {
@@ -2475,9 +2485,10 @@ top:
 			gethrestime(&now);
 			if (fnp->fn_parent == fngp->fng_rootfnnodep)
 				fnp->fn_atime = fnp->fn_mtime = now;
-			else
-				fnp->fn_parent->fn_atime =
-					fnp->fn_parent->fn_mtime = now;
+			else {
+				fnp->fn_parent->fn_atime = now;
+				fnp->fn_parent->fn_mtime = now;
+			}
 		}
 
 		/*
@@ -2585,7 +2596,7 @@ auto_do_unmount(struct autofs_globals *fngp)
 	zone_t *zone = curproc->p_zone;
 
 	CALLB_CPR_INIT(&cprinfo, &fngp->fng_unmount_threads_lock,
-		callb_generic_cpr, "auto_do_unmount");
+	    callb_generic_cpr, "auto_do_unmount");
 
 	for (;;) {	/* forever */
 		mutex_enter(&fngp->fng_unmount_threads_lock);
@@ -2604,7 +2615,7 @@ newthread:
 			 * the below.
 			 */
 			CALLB_CPR_SAFE_END(&cprinfo,
-				&fngp->fng_unmount_threads_lock);
+			    &fngp->fng_unmount_threads_lock);
 			CALLB_CPR_EXIT(&cprinfo);
 			zthread_exit();
 			/* NOTREACHED */
@@ -2612,7 +2623,7 @@ newthread:
 		if (fngp->fng_unmount_threads < autofs_unmount_threads) {
 			fngp->fng_unmount_threads++;
 			CALLB_CPR_SAFE_END(&cprinfo,
-				&fngp->fng_unmount_threads_lock);
+			    &fngp->fng_unmount_threads_lock);
 			mutex_exit(&fngp->fng_unmount_threads_lock);
 
 			(void) zthread_create(NULL, 0, unmount_zone_tree, fngp,

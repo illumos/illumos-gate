@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -342,12 +342,11 @@ autofs_readdir_1_r(
 {
 	if (trace > 0)
 		trace_prt(1, "READDIR REQUEST	: %s @ %ld\n",
-		req->rda_map, req->rda_offset);
+		    req->rda_map, req->rda_offset);
 
 	do_readdir(req, res);
 	if (trace > 0)
-		trace_prt(1, "READDIR REPLY	: status=%d\n",
-			res->rd_status);
+		trace_prt(1, "READDIR REPLY	: status=%d\n", res->rd_status);
 }
 
 static void
@@ -371,17 +370,17 @@ autofs_unmount_1_r(
 	if (trace > 0) {
 		char ctime_buf[CTIME_BUF_LEN];
 		if (ctime_r(&timenow, ctime_buf, CTIME_BUF_LEN) == NULL)
-		    ctime_buf[0] = '\0';
+			ctime_buf[0] = '\0';
 
 		trace_prt(1, "UNMOUNT REQUEST: %s", ctime_buf);
 		for (ul = m; ul; ul = ul->next)
 			trace_prt(1, " resource=%s fstype=%s mntpnt=%s"
-				" mntopts=%s %s\n",
-				ul->mntresource,
-				ul->fstype,
-				ul->mntpnt,
-				ul->mntopts,
-				ul->isdirect ? "direct" : "indirect");
+			    " mntopts=%s %s\n",
+			    ul->mntresource,
+			    ul->fstype,
+			    ul->mntpnt,
+			    ul->mntopts,
+			    ul->isdirect ? "direct" : "indirect");
 	}
 
 
@@ -407,14 +406,13 @@ autofs_lookup_1_r(
 
 		trace_prt(1, "LOOKUP REQUEST: %s", ctime_buf);
 		trace_prt(1, "  name=%s[%s] map=%s opts=%s path=%s direct=%d\n",
-			m->name, m->subdir, m->map, m->opts,
-			m->path, m->isdirect);
+		    m->name, m->subdir, m->map, m->opts, m->path, m->isdirect);
 	}
 
 	bzero(&link, sizeof (struct linka));
 
 	status = do_lookup1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, m->uid, &action, &link);
+	    (uint_t)m->isdirect, m->uid, &action, &link);
 	if (status == 0) {
 		/*
 		 * Return action list to kernel.
@@ -450,12 +448,11 @@ autofs_mntinfo_1_r(
 
 		trace_prt(1, "MOUNT REQUEST:   %s", ctime_buf);
 		trace_prt(1, "  name=%s[%s] map=%s opts=%s path=%s direct=%d\n",
-			m->name, m->subdir, m->map, m->opts,
-			m->path, m->isdirect);
+		    m->name, m->subdir, m->map, m->opts, m->path, m->isdirect);
 	}
 
 	status = do_mount1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, m->uid, &alp, DOMOUNT_USER);
+	    (uint_t)m->isdirect, m->uid, &alp, DOMOUNT_USER);
 	if (status != 0) {
 		/*
 		 * An error occurred, free action list if allocated.
@@ -483,17 +480,17 @@ autofs_mntinfo_1_r(
 		switch (res->mr_type.status) {
 		case AUTOFS_ACTION:
 			trace_prt(1,
-				"MOUNT REPLY    : status=%d, AUTOFS_ACTION\n",
-				status);
+			    "MOUNT REPLY    : status=%d, AUTOFS_ACTION\n",
+			    status);
 			break;
 		case AUTOFS_DONE:
 			trace_prt(1,
-				"MOUNT REPLY    : status=%d, AUTOFS_DONE\n",
-				status);
+			    "MOUNT REPLY    : status=%d, AUTOFS_DONE\n",
+			    status);
 			break;
 		default:
 			trace_prt(1, "MOUNT REPLY    : status=%d, UNKNOWN\n",
-				status);
+			    status);
 		}
 	}
 
@@ -504,7 +501,7 @@ autofs_mntinfo_1_r(
 		} else {
 			/* indirect mount */
 			syslog(LOG_ERR,
-				"mount of %s/%s failed", m->path, m->name);
+			    "mount of %s/%s failed", m->path, m->name);
 		}
 	}
 }
@@ -571,11 +568,10 @@ free_action_list(action_list *alp)
 			if (mp->fstype) {
 				if (strcmp(mp->fstype, "autofs") == 0) {
 					free_autofs_args((autofs_args *)
-						mp->dataptr);
-				} else if (strncmp(mp->fstype,
-					"nfs", 3) == 0) {
+					    mp->dataptr);
+				} else if (strncmp(mp->fstype, "nfs", 3) == 0) {
 					free_nfs_args((struct nfs_args *)
-						mp->dataptr);
+					    mp->dataptr);
 				}
 			}
 			mp->dataptr = NULL;
@@ -672,8 +668,8 @@ autofs_get_buffer(size_t size)
 		bzero(tsd->atsd_buf, size);
 		return (tsd->atsd_buf);
 	} else {
-		syslog(LOG_ERR, gettext("Can't Allocate tsd buffer, size %d"),
-			size);
+		syslog(LOG_ERR,
+		    gettext("Can't Allocate tsd buffer, size %d"), size);
 		return (NULL);
 	}
 }
@@ -691,20 +687,20 @@ autofs_doorfunc(
 	door_desc_t *dp,
 	uint_t n_desc)
 {
-
 	char			*res;
-	int			res_size;
-	int			which, error = 0;
-
+	int			 res_size;
+	int			 which;
+	int			 error = 0;
+	int			 srsz = 0;
 	autofs_lookupargs	*xdrargs;
-	autofs_lookupres	lookup_res;
+	autofs_lookupres	 lookup_res;
 	autofs_rddirargs	*rddir_args;
-	autofs_rddirres		rddir_res;
-	autofs_mountres		mount_res;
+	autofs_rddirres		 rddir_res;
+	autofs_mountres		 mount_res;
 	umntrequest		*umnt_args;
-	umntres			umount_res;
+	umntres			 umount_res;
 	autofs_door_res_t	*door_res;
-	autofs_door_res_t	failed_res;
+	autofs_door_res_t	 failed_res;
 
 	if (arg_size < sizeof (autofs_door_args_t)) {
 		failed_res.res_status = EINVAL;
@@ -713,8 +709,7 @@ autofs_doorfunc(
 		/*
 		 * If we got here the door_return() failed.
 		 */
-		syslog(LOG_ERR, "Bad argument, door_return failure %d",
-			error);
+		syslog(LOG_ERR, "Bad argument, door_return failure %d", error);
 		return;
 	}
 
@@ -724,10 +719,10 @@ autofs_doorfunc(
 	switch (which) {
 	case AUTOFS_LOOKUP:
 		if (error = decode_args(xdr_autofs_lookupargs,
-				(autofs_door_args_t *)argp, (caddr_t *)&xdrargs,
-				sizeof (autofs_lookupargs))) {
-			syslog(LOG_ERR, "error allocating lookup arguments"
-				" buffer");
+		    (autofs_door_args_t *)argp, (caddr_t *)&xdrargs,
+		    sizeof (autofs_lookupargs))) {
+			syslog(LOG_ERR,
+			    "error allocating lookup arguments buffer");
 			failed_res.res_status = error;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -742,9 +737,9 @@ autofs_doorfunc(
 		free(xdrargs);
 
 		if (!encode_res(xdr_autofs_lookupres, &door_res,
-					(caddr_t)&lookup_res, &res_size)) {
-			syslog(LOG_ERR, "error allocating lookup"
-			"results buffer");
+		    (caddr_t)&lookup_res, &res_size)) {
+			syslog(LOG_ERR,
+			    "error allocating lookup results buffer");
 			failed_res.res_status = EINVAL;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -756,10 +751,10 @@ autofs_doorfunc(
 
 	case AUTOFS_MNTINFO:
 		if (error = decode_args(xdr_autofs_lookupargs,
-				(autofs_door_args_t *)argp, (caddr_t *)&xdrargs,
-				sizeof (autofs_lookupargs))) {
-			syslog(LOG_ERR, "error allocating lookup arguments"
-				" buffer");
+		    (autofs_door_args_t *)argp, (caddr_t *)&xdrargs,
+		    sizeof (autofs_lookupargs))) {
+			syslog(LOG_ERR,
+			    "error allocating lookup arguments buffer");
 			failed_res.res_status = error;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -779,9 +774,9 @@ autofs_doorfunc(
 		 * always been done when memory allocations fail.
 		 */
 		if (!encode_res(xdr_autofs_mountres, &door_res,
-					(caddr_t)&mount_res, &res_size)) {
-			syslog(LOG_ERR, "error allocating mount"
-				"results buffer");
+		    (caddr_t)&mount_res, &res_size)) {
+			syslog(LOG_ERR,
+			    "error allocating mount results buffer");
 			failed_res.res_status = EAGAIN;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -794,10 +789,10 @@ autofs_doorfunc(
 
 	case AUTOFS_UNMOUNT:
 		if (error = decode_args(xdr_umntrequest,
-			    (autofs_door_args_t *)argp,
-			    (caddr_t *)&umnt_args, sizeof (umntrequest))) {
-			syslog(LOG_ERR, "error allocating unmount "
-			    "argument buffer");
+		    (autofs_door_args_t *)argp,
+		    (caddr_t *)&umnt_args, sizeof (umntrequest))) {
+			syslog(LOG_ERR,
+			    "error allocating unmount argument buffer");
 			failed_res.res_status = error;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -813,9 +808,9 @@ autofs_doorfunc(
 		free(umnt_args);
 
 		if (!encode_res(xdr_umntres, &door_res, (caddr_t)&umount_res,
-				&res_size)) {
-			syslog(LOG_ERR, "error allocating unmount"
-			    "results buffer");
+		    &res_size)) {
+			syslog(LOG_ERR,
+			    "error allocating unmount results buffer");
 			failed_res.res_status = EINVAL;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -828,11 +823,11 @@ autofs_doorfunc(
 
 	case AUTOFS_READDIR:
 		if (error = decode_args(xdr_autofs_rddirargs,
-			(autofs_door_args_t *)argp,
-			(caddr_t *)&rddir_args,
-			sizeof (autofs_rddirargs))) {
+		    (autofs_door_args_t *)argp,
+		    (caddr_t *)&rddir_args,
+		    sizeof (autofs_rddirargs))) {
 			syslog(LOG_ERR,
-				"error allocating readdir argument buffer");
+			    "error allocating readdir argument buffer");
 			failed_res.res_status = error;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -847,8 +842,8 @@ autofs_doorfunc(
 
 		if (!encode_res(xdr_autofs_rddirres, &door_res,
 		    (caddr_t)&rddir_res, &res_size)) {
-			syslog(LOG_ERR, "error allocating readdir"
-			    "results buffer");
+			syslog(LOG_ERR,
+			    "error allocating readdir results buffer");
 			failed_res.res_status = ENOMEM;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
@@ -867,7 +862,7 @@ autofs_doorfunc(
 			 * If we got here, door_return() failed
 			 */
 			syslog(LOG_ERR, "dump debug door_return failure %d",
-				error);
+			    error);
 			return;
 #endif
 	case NULLPROC:
@@ -880,12 +875,29 @@ autofs_doorfunc(
 			res_size = sizeof (autofs_door_res_t);
 			break;
 	}
+
+	srsz = res_size;
+	errno = 0;
 	error = door_return(res, res_size, NULL, 0);
-	/*
-	 * If we got here, door_return failed.
-	 */
-	syslog(LOG_ERR, "door_return failed %d, buffer %p, buffer size %d",
-		error, (void *)res, res_size);
+
+	if (errno == E2BIG) {
+		/*
+		 * Failed due to encoded results being bigger than the
+		 * kernel expected bufsize. Passing actual results size
+		 * back down to kernel.
+		 */
+		failed_res.res_status = EOVERFLOW;
+		failed_res.xdr_len = srsz;
+		res = (caddr_t)&failed_res;
+		res_size = sizeof (autofs_door_res_t);
+	} else {
+		syslog(LOG_ERR, "door_return failed %d, buffer %p, "
+		    "buffer size %d", error, (void *)res, res_size);
+		res = NULL;
+		res_size = 0;
+	}
+	(void) door_return(res, res_size, NULL, 0);
+	/* NOTREACHED */
 }
 
 static int
@@ -964,8 +976,7 @@ decode_args(
 
 	*xdrargs = malloc(size);
 	if (*xdrargs == NULL) {
-		syslog(LOG_ERR, "error allocating arguments"
-				" buffer");
+		syslog(LOG_ERR, "error allocating arguments buffer");
 		return (ENOMEM);
 	}
 
@@ -1001,8 +1012,7 @@ encode_res(
 	(*results)->xdr_len = *size;
 	*size = sizeof (autofs_door_res_t) + (*results)->xdr_len;
 	xdrmem_create(&xdrs, (caddr_t)((*results)->xdr_res),
-		(*results)->xdr_len,
-		XDR_ENCODE);
+	    (*results)->xdr_len, XDR_ENCODE);
 	if (!(*xdrfunc)(&xdrs, resp)) {
 		(*results)->res_status = EINVAL;
 		syslog(LOG_ERR, "error encoding results");
@@ -1030,12 +1040,10 @@ automountd_wait_for_cleanup(pid_t pid)
 	 * filesystems
 	 */
 	if (door_revoke(did_fork_exec) == -1) {
-		syslog(LOG_ERR, "failed to door_revoke(%d) %m",
-			did_fork_exec);
+		syslog(LOG_ERR, "failed to door_revoke(%d) %m", did_fork_exec);
 	}
 	if (door_revoke(did_exec_map) == -1) {
-		syslog(LOG_ERR, "failed to door_revoke(%d) %m",
-			did_exec_map);
+		syslog(LOG_ERR, "failed to door_revoke(%d) %m", did_exec_map);
 	}
 	exit(child_exitval);
 }
