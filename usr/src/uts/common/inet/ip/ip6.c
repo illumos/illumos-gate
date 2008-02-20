@@ -9317,7 +9317,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			    tsol_ip_log_drop_checklabel_ip6, char *,
 			    "conn(1), failed to check/update mp(2)",
 			    conn_t, connp, mblk_t, mp);
-			    freemsg(first_mp);
+			freemsg(first_mp);
 			return;
 		}
 		ip6h = (ip6_t *)mp->b_rptr;
