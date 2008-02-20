@@ -571,8 +571,6 @@ dsl_dataset_close(dsl_dataset_t *ds, int mode, void *tag)
 	mutex_enter(&ds->ds_lock);
 	ASSERT3U(ds->ds_open_refcount, >=, weight);
 	ds->ds_open_refcount -= weight;
-	dprintf_ds(ds, "closing mode %u refcount now 0x%llx\n",
-	    mode, ds->ds_open_refcount);
 	mutex_exit(&ds->ds_lock);
 
 	dmu_buf_rele(ds->ds_dbuf, tag);

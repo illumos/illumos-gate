@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,7 +280,7 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	dsl_prop_cb_record_t *cbr;
 	objset_t *mos = dp->dp_meta_objset;
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za;
 	int err;
 
 	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
@@ -311,14 +311,15 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	}
 	mutex_exit(&dd->dd_lock);
 
+	za = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
 	for (zap_cursor_init(&zc, mos,
 	    dd->dd_phys->dd_child_dir_zapobj);
-	    zap_cursor_retrieve(&zc, &za) == 0;
+	    zap_cursor_retrieve(&zc, za) == 0;
 	    zap_cursor_advance(&zc)) {
-		/* XXX recursion could blow stack; esp. za! */
-		dsl_prop_changed_notify(dp, za.za_first_integer,
+		dsl_prop_changed_notify(dp, za->za_first_integer,
 		    propname, value, FALSE);
 	}
+	kmem_free(za, sizeof (zap_attribute_t));
 	zap_cursor_fini(&zc);
 	dsl_dir_close(dd, FTAG);
 }

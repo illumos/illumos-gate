@@ -855,22 +855,19 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 	static int seq;
 	zfs_cmd_t zc = { 0 };
 	int err;
-	prop_changelist_t *clp = NULL;
+	prop_changelist_t *clp;
+	zfs_handle_t *zhp;
 
-	if (strchr(name, '@') == NULL) {
-		zfs_handle_t *zhp = zfs_open(hdl, name,
-		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
-		if (zhp == NULL)
-			return (-1);
-		clp = changelist_gather(zhp, ZFS_PROP_NAME,
-		    flags.force ? MS_FORCE : 0);
-		zfs_close(zhp);
-		if (clp == NULL)
-			return (-1);
-		err = changelist_prefix(clp);
-		if (err)
-			return (err);
-	}
+	zhp = zfs_open(hdl, name, ZFS_TYPE_DATASET);
+	if (zhp == NULL)
+		return (-1);
+	clp = changelist_gather(zhp, ZFS_PROP_NAME, flags.force ? MS_FORCE : 0);
+	zfs_close(zhp);
+	if (clp == NULL)
+		return (-1);
+	err = changelist_prefix(clp);
+	if (err)
+		return (err);
 
 	if (tryname) {
 		(void) strcpy(newname, tryname);
@@ -884,7 +881,7 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 			    zc.zc_name, zc.zc_value);
 		}
 		err = ioctl(hdl->libzfs_fd, ZFS_IOC_RENAME, &zc);
-		if (err == 0 && clp)
+		if (err == 0)
 			changelist_rename(clp, name, tryname);
 	} else {
 		err = ENOENT;
@@ -903,7 +900,7 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 			    zc.zc_name, zc.zc_value);
 		}
 		err = ioctl(hdl->libzfs_fd, ZFS_IOC_RENAME, &zc);
-		if (err == 0 && clp)
+		if (err == 0)
 			changelist_rename(clp, name, newname);
 		if (err && flags.verbose) {
 			(void) printf("failed (%u) - "
@@ -917,11 +914,8 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 			(void) printf("failed (%u)\n", errno);
 	}
 
-	if (clp) {
-		(void) changelist_postfix(clp);
-		changelist_free(clp);
-	}
-
+	(void) changelist_postfix(clp);
+	changelist_free(clp);
 
 	return (err);
 }
@@ -931,42 +925,39 @@ recv_destroy(libzfs_handle_t *hdl, const char *name, int baselen,
     char *newname, recvflags_t flags)
 {
 	zfs_cmd_t zc = { 0 };
-	int err;
-	zfs_handle_t *zhp = NULL;
+	int err = 0;
+	prop_changelist_t *clp;
+	zfs_handle_t *zhp;
+
+	zhp = zfs_open(hdl, name, ZFS_TYPE_DATASET);
+	if (zhp == NULL)
+		return (-1);
+	clp = changelist_gather(zhp, ZFS_PROP_NAME, flags.force ? MS_FORCE : 0);
+	zfs_close(zhp);
+	if (clp == NULL)
+		return (-1);
+	err = changelist_prefix(clp);
+	if (err)
+		return (err);
 
 	zc.zc_objset_type = DMU_OST_ZFS;
 	(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
-
-	/* unmount it */
-	if (strchr(name, '@') == NULL) {
-		zhp = zfs_open(hdl, name,
-		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
-		if (zhp == NULL)
-			return (-1);
-		err = zfs_unmount(zhp, NULL, flags.force ? MS_FORCE : 0);
-		if (err) {
-			zfs_close(zhp);
-			return (err);
-		}
-	}
 
 	if (flags.verbose)
 		(void) printf("attempting destroy %s\n", zc.zc_name);
 	err = ioctl(hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc);
 
-	if (err != 0) {
-		(void) zfs_mount(zhp, NULL, 0);
-		err = recv_rename(hdl, name, NULL, baselen, newname, flags);
-	}
-	if (zhp)
-		zfs_close(zhp);
-
-	if (flags.verbose) {
-		if (err == 0)
+	if (err == 0) {
+		if (flags.verbose)
 			(void) printf("success\n");
-		else
-			(void) printf("failed (%u)\n", errno);
+		changelist_remove(clp, zc.zc_name);
 	}
+
+	(void) changelist_postfix(clp);
+	changelist_free(clp);
+
+	if (err != 0)
+		err = recv_rename(hdl, name, NULL, baselen, newname, flags);
 
 	return (err);
 }
