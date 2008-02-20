@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@
 #define	ALLOCFAIL	((char *)"Allocation failure.")
 #define	RCBROKEN	((char *)"Repository connection broken.")
 
-#define	MAX_COMMIT_RETRIES		20
+#define	MAX_COMMIT_RETRIES		10
 #define	MAX_COMMIT_RETRY_INT		(5 * 1000000)	/* 5 seconds */
 #define	INITIAL_COMMIT_RETRY_INT	(10000)		/* 1/100th second */
 
@@ -358,6 +358,64 @@ restarter_event_get_current_states(restarter_event_t *e,
 }
 
 /*
+ * restarter_event_publish_retry() is a wrapper around sysevent_evc_publish().
+ * In case, the event cannot be sent at the first attempt (sysevent_evc_publish
+ * returned EAGAIN - sysevent queue full), this function retries a few time
+ * and return ENOSPC if it reaches the retry limit.
+ *
+ * The arguments to this function map the arguments of sysevent_evc_publish().
+ *
+ * On success, return 0. On error, return
+ *
+ *   EFAULT - internal sysevent_evc_publish() error
+ *   ENOMEM - internal sysevent_evc_publish() error
+ *   EBADF - scp is invalid (sysevent_evc_publish() returned EINVAL)
+ *   ENOSPC - sysevent queue full (sysevent_evc_publish() returned EAGAIN)
+ */
+int
+restarter_event_publish_retry(evchan_t *scp, const char *class,
+    const char *subclass, const char *vendor, const char *pub_name,
+    nvlist_t *attr_list, uint32_t flags)
+{
+	int retries, ret;
+	useconds_t retry_int = INITIAL_COMMIT_RETRY_INT;
+
+	for (retries = 0; retries < MAX_COMMIT_RETRIES; retries++) {
+		ret = sysevent_evc_publish(scp, class, subclass, vendor,
+		    pub_name, attr_list, flags);
+		if (ret == 0)
+			break;
+
+		switch (ret) {
+		case EAGAIN:
+			/* Queue is full */
+			(void) usleep(retry_int);
+
+			retry_int = min(retry_int * 2, MAX_COMMIT_RETRY_INT);
+			break;
+
+		case EINVAL:
+			ret = EBADF;
+			/* FALLTHROUGH */
+
+		case EFAULT:
+		case ENOMEM:
+			return (ret);
+
+		case EOVERFLOW:
+		default:
+			/* internal error - abort */
+			bad_fail("sysevent_evc_publish", ret);
+		}
+	}
+
+	if (retries == MAX_COMMIT_RETRIES)
+		ret = ENOSPC;
+
+	return (ret);
+}
+
+/*
  * Commit the state, next state, and auxiliary state into the repository.
  * Let the graph engine know about the state change and error.  On success,
  * return 0. On error, return
@@ -375,6 +433,7 @@ restarter_event_get_current_states(restarter_event_t *e,
  *   EROFS - backend is readonly
  *   EFAULT - internal sysevent_evc_publish() error
  *   EBADF - h is invalid (sysevent_evc_publish() returned EINVAL)
+ *   ENOSPC - sysevent queue full (sysevent_evc_publish() returned EAGAIN)
  */
 int
 restarter_set_states(restarter_event_handle_t *h, const char *inst,
@@ -387,8 +446,6 @@ restarter_set_states(restarter_event_handle_t *h, const char *inst,
 	nvlist_t *attr;
 	scf_handle_t *scf_h;
 	instance_data_t id;
-	useconds_t retry_int = INITIAL_COMMIT_RETRY_INT;
-	int retries;
 	int ret = 0;
 	char *p = (char *)aux;
 
@@ -441,48 +498,21 @@ restarter_set_states(restarter_event_handle_t *h, const char *inst,
 	    nvlist_add_int32(attr, RESTARTER_NAME_ERROR, e) != 0 ||
 	    nvlist_add_string(attr, RESTARTER_NAME_INSTANCE, inst) != 0) {
 		ret = ENOMEM;
-		goto errout;
-	}
+	} else {
+		id.i_fmri = inst;
+		id.i_state = cur_state;
+		id.i_next_state = next_state;
 
-	id.i_fmri = inst;
-	id.i_state = cur_state;
-	id.i_next_state = next_state;
+		ret = _restarter_commit_states(scf_h, &id, new_cur_state,
+		    new_next_state, aux);
 
-	ret = _restarter_commit_states(scf_h, &id, new_cur_state,
-	    new_next_state, aux);
-	if (ret != 0)
-		goto errout;
-
-	for (retries = 0; retries < MAX_COMMIT_RETRIES; retries++) {
-		ret = sysevent_evc_publish(h->reh_master_channel, "master",
-		    "state_change", "com.sun", "librestart", attr,
-		    EVCH_NOSLEEP);
-		if (ret == 0)
-			break;
-
-		switch (ret) {
-		case EAGAIN:
-			/* Queue is full */
-			(void) usleep(retry_int);
-
-			retry_int = min(retry_int * 2, MAX_COMMIT_RETRY_INT);
-			break;
-
-		case EFAULT:
-		case ENOMEM:
-			goto errout;
-
-		case EINVAL:
-			ret = EBADF;
-			goto errout;
-
-		case EOVERFLOW:
-		default:
-			bad_fail("sysevent_evc_publish", ret);
+		if (ret == 0) {
+			ret = restarter_event_publish_retry(
+			    h->reh_master_channel, "master", "state_change",
+			    "com.sun", "librestart", attr, EVCH_NOSLEEP);
 		}
 	}
 
-errout:
 	nvlist_free(attr);
 	(void) scf_handle_unbind(scf_h);
 	scf_handle_destroy(scf_h);

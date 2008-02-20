@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -375,6 +375,7 @@ restarter_protocol_send_event(const char *inst, evchan_t *chan,
     restarter_event_type_t event)
 {
 	nvlist_t *attr;
+	int ret;
 
 	/*
 	 * If the service is managed by the master restarter,
@@ -399,12 +400,21 @@ restarter_protocol_send_event(const char *inst, evchan_t *chan,
 	    nvlist_add_string(attr, RESTARTER_NAME_INSTANCE, (char *)inst) != 0)
 		uu_die("Allocation failure\n");
 
-	if (sysevent_evc_publish(chan, "protocol", "restarter", "com.sun",
-	    "svc.startd", attr, EVCH_NOSLEEP) != 0) {
-		if (errno == EAGAIN)
-			uu_die("%s: queue is full\n", inst);
-		uu_die("%s: can't publish event: %s\n", inst, strerror(errno));
+	if ((ret = restarter_event_publish_retry(chan, "protocol", "restarter",
+	    "com.sun", "svc.startd", attr, EVCH_NOSLEEP)) != 0) {
+
+		switch (ret) {
+		case ENOSPC:
+			log_framework(LOG_DEBUG, "Dropping %s event for %s. "
+			    "Delegate may not be running.\n",
+			    event_names[event], inst);
+			break;
+		default:
+			uu_die("%s: can't publish event: %s\n", inst,
+			    strerror(errno));
+		}
 	}
+
 	nvlist_free(attr);
 
 	if (event != RESTARTER_EVENT_TYPE_ADD_INSTANCE) {

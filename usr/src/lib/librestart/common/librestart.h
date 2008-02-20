@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <libsysevent.h>
 #include <libcontract.h>
 #include <libscf.h>
 #include <limits.h>
@@ -193,6 +193,8 @@ int restarter_set_states(restarter_event_handle_t *, const char *,
     restarter_instance_state_t, restarter_instance_state_t,
     restarter_instance_state_t, restarter_instance_state_t, restarter_error_t,
     const char *);
+int restarter_event_publish_retry(evchan_t *, const char *, const char *,
+    const char *, const char *, nvlist_t *, uint32_t);
 
 int restarter_store_contract(scf_instance_t *, ctid_t,
     restarter_contract_type_t);

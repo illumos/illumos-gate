@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,6 +36,7 @@ SUNWprivate_1.1 {
 	restarter_event_get_seq;
 	restarter_event_get_time;
 	restarter_event_get_type;
+	restarter_event_publish_retry;
 	restarter_free_method_context;
 	_restarter_get_channel_name;
 	restarter_get_method_context;
