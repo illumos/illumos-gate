@@ -1834,7 +1834,6 @@ vhci_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		vpkt->vpkt_state = VHCI_PKT_IDLE;
 		vpkt->vpkt_tgt_init_cdblen = cmdlen;
 		vpkt->vpkt_tgt_init_scblen = statuslen;
-		vpkt->vpkt_tgt_init_privlen = tgtlen;
 		newpkt = 1;
 	} else { /* pkt not NULL */
 		vpkt = pkt->pkt_ha_private;
@@ -2371,7 +2370,7 @@ bind_path:
 		pkt = scsi_init_pkt(address, pkt,
 		    vpkt->vpkt_tgt_init_bp, vpkt->vpkt_tgt_init_cdblen,
 		    vpkt->vpkt_tgt_init_scblen,
-		    vpkt->vpkt_tgt_init_privlen, flags, func, NULL);
+		    0, flags, func, NULL);
 
 		if (pkt == NULL) {
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
@@ -7984,7 +7983,7 @@ vhci_create_retry_pkt(struct vhci_pkt *vpkt)
 	 */
 	pkt = vhci_scsi_init_pkt(&svp->svp_psd->sd_address, pkt,
 	    vpkt->vpkt_tgt_init_bp, vpkt->vpkt_tgt_init_cdblen,
-	    vpkt->vpkt_tgt_init_scblen, vpkt->vpkt_tgt_init_privlen,
+	    vpkt->vpkt_tgt_init_scblen, 0,
 	    PKT_CONSISTENT,
 	    NULL_FUNC, NULL);
 	if (pkt != NULL) {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,7 +271,6 @@ struct vhci_pkt {
 	 * bind to
 	 */
 	int				vpkt_tgt_init_cdblen;
-	int				vpkt_tgt_init_privlen;
 	int				vpkt_tgt_init_scblen;
 	int				vpkt_tgt_init_pkt_flags;
 	struct buf			*vpkt_tgt_init_bp;
