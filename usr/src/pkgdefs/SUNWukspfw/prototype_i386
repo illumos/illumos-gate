@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,6 +47,6 @@
 #
 # SUNWukspfw
 #
-f preserve kernel/misc/usbs49_fw 0755 root sys
+v preserve kernel/misc/usbs49_fw 0755 root sys
 d none kernel/misc/amd64 0755 root sys
-f preserve kernel/misc/amd64/usbs49_fw 0755 root sys
+v preserve kernel/misc/amd64/usbs49_fw 0755 root sys
