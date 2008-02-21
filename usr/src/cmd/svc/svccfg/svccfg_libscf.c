@@ -9847,6 +9847,82 @@ lscf_add(const char *name)
 	}
 }
 
+/* return 1 if the entity has no persistent pgs, else return 0 */
+static int
+entity_has_no_pgs(void *ent, int isservice)
+{
+	scf_iter_t *iter = NULL;
+	scf_propertygroup_t *pg = NULL;
+	uint32_t flags;
+	int err;
+	int ret = 1;
+
+	if ((iter = scf_iter_create(g_hndl)) == NULL ||
+	    (pg = scf_pg_create(g_hndl)) == NULL)
+		scfdie();
+
+	if (isservice) {
+		if (scf_iter_service_pgs(iter, (scf_service_t *)ent) < 0)
+			scfdie();
+	} else {
+		if (scf_iter_instance_pgs(iter, (scf_instance_t *)ent) < 0)
+			scfdie();
+	}
+
+	while ((err = scf_iter_next_pg(iter, pg)) == 1) {
+		if (scf_pg_get_flags(pg, &flags) != 0)
+			scfdie();
+
+		/* skip nonpersistent pgs */
+		if (flags & SCF_PG_FLAG_NONPERSISTENT)
+			continue;
+
+		ret = 0;
+		break;
+	}
+
+	if (err == -1)
+		scfdie();
+
+	scf_pg_destroy(pg);
+	scf_iter_destroy(iter);
+
+	return (ret);
+}
+
+/* return 1 if the service has no instances, else return 0 */
+static int
+svc_has_no_insts(scf_service_t *svc)
+{
+	scf_instance_t *inst;
+	scf_iter_t *iter;
+	int r;
+	int ret = 1;
+
+	if ((inst = scf_instance_create(g_hndl)) == NULL ||
+	    (iter = scf_iter_create(g_hndl)) == NULL)
+		scfdie();
+
+	if (scf_iter_service_instances(iter, svc) != 0)
+		scfdie();
+
+	r = scf_iter_next_instance(iter, inst);
+	if (r == 1) {
+		ret = 0;
+	} else if (r == 0) {
+		ret = 1;
+	} else if (r == -1) {
+		scfdie();
+	} else {
+		bad_error("scf_iter_next_instance", r);
+	}
+
+	scf_iter_destroy(iter);
+	scf_instance_destroy(inst);
+
+	return (ret);
+}
+
 /*
  * Entity deletion.
  */
@@ -9866,6 +9942,10 @@ delete_dependency_pg(const char *fmri, const char *name)
 	scf_propertygroup_t *pg = NULL;
 	scf_error_t result;
 	char *pgty;
+	scf_service_t *svc = NULL;
+	scf_instance_t *inst = NULL;
+	scf_iter_t *iter = NULL;
+	char *name_buf = NULL;
 
 	result = fmri_to_entity(g_hndl, fmri, &entity, &isservice);
 	switch (result) {
@@ -9913,32 +9993,103 @@ delete_dependency_pg(const char *fmri, const char *name)
 
 	free(pgty);
 
-	if (scf_pg_delete(pg) == 0) {
-		scf_instance_t *inst = NULL;
-		scf_iter_t *iter = NULL;
-		char *name_buf = NULL;
+	if (scf_pg_delete(pg) != 0) {
+		result = scf_error();
+		if (result != SCF_ERROR_PERMISSION_DENIED)
+			scfdie();
+		goto out;
+	}
 
-		result = SCF_ERROR_NONE;
+	/*
+	 * We have to handle the case where we've just deleted the last
+	 * property group of a "dummy" entity (instance or service).
+	 * A "dummy" entity is an entity only present to hold an
+	 * external dependency.
+	 * So, in the case we deleted the last property group then we
+	 * can also delete the entity. If the entity is an instance then
+	 * we must verify if this was the last instance for the service
+	 * and if it is, we can also delete the service if it doesn't
+	 * have any property group either.
+	 */
 
-		if (isservice) {
-			if ((inst = scf_instance_create(g_hndl)) == NULL ||
-			    (iter = scf_iter_create(g_hndl)) == NULL)
+	result = SCF_ERROR_NONE;
+
+	if (isservice) {
+		svc = (scf_service_t *)entity;
+
+		if ((inst = scf_instance_create(g_hndl)) == NULL ||
+		    (iter = scf_iter_create(g_hndl)) == NULL)
+			scfdie();
+
+		name_buf = safe_malloc(max_scf_name_len + 1);
+	} else {
+		inst = (scf_instance_t *)entity;
+	}
+
+	/*
+	 * If the entity is an instance and we've just deleted its last
+	 * property group then we should delete it.
+	 */
+	if (!isservice && entity_has_no_pgs(entity, isservice)) {
+		/* find the service before deleting the inst. - needed later */
+		if ((svc = scf_service_create(g_hndl)) == NULL)
+			scfdie();
+
+		if (scf_instance_get_parent(inst, svc) != 0)
+			scfdie();
+
+		/* delete the instance */
+		if (scf_instance_delete(inst) != 0) {
+			if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
 				scfdie();
 
-			name_buf = safe_malloc(max_scf_name_len + 1);
+			result = SCF_ERROR_PERMISSION_DENIED;
+			goto out;
 		}
+		/* no need to refresh the instance */
+		inst = NULL;
+	}
+
+	/*
+	 * If the service has no more instances and pgs or we just deleted the
+	 * last instance and the service doesn't have anymore propery groups
+	 * then the service should be deleted.
+	 */
+	if (svc != NULL &&
+	    svc_has_no_insts(svc) &&
+	    entity_has_no_pgs((void *)svc, 1)) {
+		if (scf_service_delete(svc) == 0) {
+			if (isservice) {
+				/* no need to refresh the service */
+				svc = NULL;
+			}
+
+			goto out;
+		}
+
+		if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
+			scfdie();
+
+		result = SCF_ERROR_PERMISSION_DENIED;
+	}
+
+	/* if the entity has not been deleted, refresh it */
+	if ((isservice && svc != NULL) || (!isservice && inst != NULL)) {
 		(void) refresh_entity(isservice, entity, fmri, inst, iter,
 		    name_buf);
+	}
 
+out:
+	if (isservice && (inst != NULL && iter != NULL)) {
 		free(name_buf);
 		scf_iter_destroy(iter);
 		scf_instance_destroy(inst);
-	} else if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
-		scfdie();
-	else
-		result = SCF_ERROR_PERMISSION_DENIED;
+	}
 
-out:
+	if (!isservice && svc != NULL) {
+		scf_service_destroy(svc);
+	}
+
 	scf_pg_destroy(pg);
 	if (entity != NULL)
 		entity_destroy(entity, isservice);
@@ -10076,10 +10227,71 @@ out:
 	return (ret);
 }
 
+static uint8_t
+pg_is_external_dependency(scf_propertygroup_t *pg)
+{
+	char *type;
+	scf_value_t *val;
+	scf_property_t *prop;
+	uint8_t b = B_FALSE;
+
+	type = safe_malloc(max_scf_pg_type_len + 1);
+
+	if (scf_pg_get_type(pg, type, max_scf_pg_type_len + 1) < 0)
+		scfdie();
+
+	if ((prop = scf_property_create(g_hndl)) == NULL ||
+	    (val = scf_value_create(g_hndl)) == NULL)
+		scfdie();
+
+	if (strcmp(type, SCF_GROUP_DEPENDENCY) == 0) {
+		if (pg_get_prop(pg, scf_property_external, prop) == 0) {
+			if (scf_property_get_value(prop, val) != 0)
+				scfdie();
+			if (scf_value_get_boolean(val, &b) != 0)
+				scfdie();
+		}
+	}
+
+	free(type);
+	(void) scf_value_destroy(val);
+	(void) scf_property_destroy(prop);
+
+	return (b);
+}
+
+#define	DELETE_FAILURE			-1
+#define	DELETE_SUCCESS_NOEXTDEPS	0
+#define	DELETE_SUCCESS_EXTDEPS		1
+
+/*
+ * lscf_instance_delete() deletes an instance.  Before calling
+ * scf_instance_delete(), though, we make sure the instance isn't
+ * running and delete dependencies in other entities which the instance
+ * declared as "dependents".  If there are dependencies which were
+ * created for other entities, then instead of deleting the instance we
+ * make it "empty" by deleting all other property groups and all
+ * snapshots.
+ *
+ * lscf_instance_delete() verifies that there is no external dependency pgs
+ * before suppressing the instance. If there is, then we must not remove them
+ * now in case the instance is re-created otherwise the dependencies would be
+ * lost. The external dependency pgs will be removed if the dependencies are
+ * removed.
+ *
+ * Returns:
+ *  DELETE_FAILURE		on failure
+ *  DELETE_SUCCESS_NOEXTDEPS	on success - no external dependencies
+ *  DELETE_SUCCESS_EXTDEPS	on success - external dependencies
+ */
 static int
 lscf_instance_delete(scf_instance_t *inst, int force)
 {
 	scf_propertygroup_t *pg;
+	scf_snapshot_t *snap;
+	scf_iter_t *iter;
+	int err;
+	int external = 0;
 
 	/* If we're not forcing and the instance is running, refuse. */
 	if (!force && inst_is_running(inst)) {
@@ -10094,32 +10306,125 @@ lscf_instance_delete(scf_instance_t *inst, int force)
 		    "Use delete -f if it is not.\n"), fmri);
 
 		free(fmri);
-		return (-1);
+		return (DELETE_FAILURE);
 	}
 
 	pg = scf_pg_create(g_hndl);
 	if (pg == NULL)
 		scfdie();
 
-	if (scf_instance_get_pg(inst, SCF_PG_DEPENDENTS, pg) == SCF_SUCCESS)
+	if (scf_instance_get_pg(inst, SCF_PG_DEPENDENTS, pg) == 0)
 		(void) delete_dependents(pg);
 	else if (scf_error() != SCF_ERROR_NOT_FOUND)
 		scfdie();
 
 	scf_pg_destroy(pg);
 
-	if (scf_instance_delete(inst) != SCF_SUCCESS) {
+	/*
+	 * If the instance has some external dependencies then we must
+	 * keep them in case the instance is reimported otherwise the
+	 * dependencies would be lost on reimport.
+	 */
+	if ((iter = scf_iter_create(g_hndl)) == NULL ||
+	    (pg = scf_pg_create(g_hndl)) == NULL)
+		scfdie();
+
+	if (scf_iter_instance_pgs(iter, inst) < 0)
+		scfdie();
+
+	while ((err = scf_iter_next_pg(iter, pg)) == 1) {
+		if (pg_is_external_dependency(pg)) {
+			external = 1;
+			continue;
+		}
+
+		if (scf_pg_delete(pg) != 0) {
+			if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
+				scfdie();
+			else {
+				semerr(emsg_permission_denied);
+
+				(void) scf_iter_destroy(iter);
+				(void) scf_pg_destroy(pg);
+				return (DELETE_FAILURE);
+			}
+		}
+	}
+
+	if (err == -1)
+		scfdie();
+
+	(void) scf_iter_destroy(iter);
+	(void) scf_pg_destroy(pg);
+
+	if (external) {
+		/*
+		 * All the pgs have been deleted for the instance except
+		 * the ones holding the external dependencies.
+		 * For the job to be complete, we must also delete the
+		 * snapshots associated with the instance.
+		 */
+		if ((snap = scf_snapshot_create((scf_handle_t *)g_hndl)) ==
+		    NULL)
+			scfdie();
+		if ((iter = scf_iter_create((scf_handle_t *)g_hndl)) == NULL)
+			scfdie();
+
+		if (scf_iter_instance_snapshots(iter, inst) == -1)
+			scfdie();
+
+		while ((err = scf_iter_next_snapshot(iter, snap)) == 1) {
+			if (_scf_snapshot_delete(snap) != 0) {
+				if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
+					scfdie();
+
+				semerr(emsg_permission_denied);
+
+				(void) scf_iter_destroy(iter);
+				(void) scf_snapshot_destroy(snap);
+				return (DELETE_FAILURE);
+			}
+		}
+
+		if (err == -1)
+			scfdie();
+
+		(void) scf_iter_destroy(iter);
+		(void) scf_snapshot_destroy(snap);
+		return (DELETE_SUCCESS_EXTDEPS);
+	}
+
+	if (scf_instance_delete(inst) != 0) {
 		if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
 			scfdie();
 
 		semerr(emsg_permission_denied);
 
-		return (-1);
+		return (DELETE_FAILURE);
 	}
 
-	return (0);
+	return (DELETE_SUCCESS_NOEXTDEPS);
 }
 
+/*
+ * lscf_service_delete() deletes a service.  Before calling
+ * scf_service_delete(), though, we call lscf_instance_delete() for
+ * each of the instances and delete dependencies in other entities
+ * which were created as "dependents" of this service.  If there are
+ * dependencies which were created for other entities, then we delete
+ * all other property groups in the service and leave it as "empty".
+ *
+ * lscf_service_delete() verifies that there is no external dependency
+ * pgs at the instance & service level before suppressing the service.
+ * If there is, then we must not remove them now in case the service
+ * is re-imported otherwise the dependencies would be lost. The external
+ * dependency pgs will be removed if the dependencies are removed.
+ *
+ * Returns:
+ *   DELETE_FAILURE		on failure
+ *   DELETE_SUCCESS_NOEXTDEPS	on success - no external dependencies
+ *   DELETE_SUCCESS_EXTDEPS	on success - external dependencies
+ */
 static int
 lscf_service_delete(scf_service_t *svc, int force)
 {
@@ -10127,31 +10432,42 @@ lscf_service_delete(scf_service_t *svc, int force)
 	scf_instance_t *inst;
 	scf_propertygroup_t *pg;
 	scf_iter_t *iter;
+	int ret;
+	int external = 0;
 
 	if ((inst = scf_instance_create(g_hndl)) == NULL ||
 	    (pg = scf_pg_create(g_hndl)) == NULL ||
 	    (iter = scf_iter_create(g_hndl)) == NULL)
 		scfdie();
 
-	if (scf_iter_service_instances(iter, svc) != SCF_SUCCESS)
+	if (scf_iter_service_instances(iter, svc) != 0)
 		scfdie();
 
 	for (r = scf_iter_next_instance(iter, inst);
 	    r == 1;
 	    r = scf_iter_next_instance(iter, inst)) {
-		if (lscf_instance_delete(inst, force) == -1) {
+
+		ret = lscf_instance_delete(inst, force);
+		if (ret == DELETE_FAILURE) {
 			scf_iter_destroy(iter);
 			scf_pg_destroy(pg);
 			scf_instance_destroy(inst);
-			return (-1);
+			return (DELETE_FAILURE);
 		}
+
+		/*
+		 * Record the fact that there is some external dependencies
+		 * at the instance level.
+		 */
+		if (ret == DELETE_SUCCESS_EXTDEPS)
+			external |= 1;
 	}
 
 	if (r != 0)
 		scfdie();
 
 	/* Delete dependency property groups in dependent services. */
-	if (scf_service_get_pg(svc, SCF_PG_DEPENDENTS, pg) == SCF_SUCCESS)
+	if (scf_service_get_pg(svc, SCF_PG_DEPENDENTS, pg) == 0)
 		(void) delete_dependents(pg);
 	else if (scf_error() != SCF_ERROR_NOT_FOUND)
 		scfdie();
@@ -10160,17 +10476,53 @@ lscf_service_delete(scf_service_t *svc, int force)
 	scf_pg_destroy(pg);
 	scf_instance_destroy(inst);
 
-	if (r != 0)
-		return (-1);
+	/*
+	 * If the service has some external dependencies then we don't
+	 * want to remove them in case the service is re-imported.
+	 */
+	if ((pg = scf_pg_create(g_hndl)) == NULL ||
+	    (iter = scf_iter_create(g_hndl)) == NULL)
+		scfdie();
 
-	if (scf_service_delete(svc) == SCF_SUCCESS)
-		return (0);
+	if (scf_iter_service_pgs(iter, svc) < 0)
+		scfdie();
+
+	while ((r = scf_iter_next_pg(iter, pg)) == 1) {
+		if (pg_is_external_dependency(pg)) {
+			external |= 2;
+			continue;
+		}
+
+		if (scf_pg_delete(pg) != 0) {
+			if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
+				scfdie();
+			else {
+				semerr(emsg_permission_denied);
+
+				(void) scf_iter_destroy(iter);
+				(void) scf_pg_destroy(pg);
+				return (DELETE_FAILURE);
+			}
+		}
+	}
+
+	if (r == -1)
+		scfdie();
+
+	(void) scf_iter_destroy(iter);
+	(void) scf_pg_destroy(pg);
+
+	if (external != 0)
+		return (DELETE_SUCCESS_EXTDEPS);
+
+	if (scf_service_delete(svc) == 0)
+		return (DELETE_SUCCESS_NOEXTDEPS);
 
 	if (scf_error() != SCF_ERROR_PERMISSION_DENIED)
 		scfdie();
 
 	semerr(emsg_permission_denied);
-	return (-1);
+	return (DELETE_FAILURE);
 }
 
 static int

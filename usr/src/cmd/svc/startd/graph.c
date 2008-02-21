@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5969,21 +5969,60 @@ out:
 	return (rebound ? ECONNRESET : 0);
 }
 
+/*
+ * process_delete() deletes an instance from the dgraph if 'fmri' is an
+ * instance fmri or if 'fmri' matches the 'general' property group of an
+ * instance (or the 'general/enabled' property).
+ *
+ * 'fmri' may be overwritten and cannot be trusted on return by the caller.
+ */
 static void
 process_delete(char *fmri, scf_handle_t *h)
 {
-	char *lfmri;
-	const char *inst_name, *pg_name;
+	char *lfmri, *end_inst_fmri;
+	const char *inst_name = NULL;
+	const char *pg_name = NULL;
+	const char *prop_name = NULL;
 
 	lfmri = safe_strdup(fmri);
 
 	/* Determine if the FMRI is a property group or instance */
 	if (scf_parse_svc_fmri(lfmri, NULL, NULL, &inst_name, &pg_name,
-	    NULL) != SCF_SUCCESS) {
+	    &prop_name) != SCF_SUCCESS) {
 		log_error(LOG_WARNING,
 		    "Received invalid FMRI \"%s\" from repository server.\n",
 		    fmri);
 	} else if (inst_name != NULL && pg_name == NULL) {
+		(void) dgraph_remove_instance(fmri, h);
+	} else if (inst_name != NULL && pg_name != NULL) {
+		/*
+		 * If we're deleting the 'general' property group or
+		 * 'general/enabled' property then the whole instance
+		 * must be removed from the dgraph.
+		 */
+		if (strcmp(pg_name, SCF_PG_GENERAL) != 0) {
+			free(lfmri);
+			return;
+		}
+
+		if (prop_name != NULL &&
+		    strcmp(prop_name, SCF_PROPERTY_ENABLED) != 0) {
+			free(lfmri);
+			return;
+		}
+
+		/*
+		 * Because the instance has already been deleted from the
+		 * repository, we cannot use any scf_ functions to retrieve
+		 * the instance FMRI however we can easily reconstruct it
+		 * manually.
+		 */
+		end_inst_fmri = strstr(fmri, SCF_FMRI_PROPERTYGRP_PREFIX);
+		if (end_inst_fmri == NULL)
+			bad_error("process_delete", 0);
+
+		end_inst_fmri[0] = '\0';
+
 		(void) dgraph_remove_instance(fmri, h);
 	}
 
@@ -6073,7 +6112,10 @@ retry:
 				bad_error("process_pg_event", r);
 			}
 		} else {
-			/* service, instance, or pg deleted. */
+			/*
+			 * Service, instance, or pg deleted.
+			 * Don't trust fmri on return.
+			 */
 			process_delete(fmri, h);
 		}
 	}
