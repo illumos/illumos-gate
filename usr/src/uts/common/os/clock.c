@@ -1780,7 +1780,7 @@ deadman(void)
 		return;
 	}
 
-	if (CPU->cpu_deadman_countdown-- > 0)
+	if (--CPU->cpu_deadman_countdown > 0)
 		return;
 
 	/*
