@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,8 +178,14 @@ lwpchan_delete_mapping(proc_t *p, caddr_t start, caddr_t end)
 			addr = ent->lwpchan_addr;
 			if (start <= addr && addr < end) {
 				*prev = ent->lwpchan_next;
+				/*
+				 * We do this only for the obsolete type
+				 * USYNC_PROCESS_ROBUST.  Otherwise robust
+				 * locks do not draw ELOCKUNMAPPED or
+				 * EOWNERDEAD due to being unmapped.
+				 */
 				if (ent->lwpchan_pool == LWPCHAN_MPPOOL &&
-				    (ent->lwpchan_type & LOCK_ROBUST))
+				    (ent->lwpchan_type & USYNC_PROCESS_ROBUST))
 					lwp_mutex_cleanup(ent, LOCK_UNMAPPED);
 				kmem_free(ent, sizeof (*ent));
 				atomic_add_32(&lcp->lwpchan_entries, -1);
@@ -234,7 +240,7 @@ lwpchan_alloc_cache(proc_t *p, uint_t bits)
 	lcp->lwpchan_mask = lcp->lwpchan_size - 1;
 	lcp->lwpchan_entries = 0;
 	lcp->lwpchan_cache = kmem_zalloc(lcp->lwpchan_size *
-		sizeof (lwpchan_hashbucket_t), KM_SLEEP);
+	    sizeof (lwpchan_hashbucket_t), KM_SLEEP);
 	lcp->lwpchan_next_data = NULL;
 
 	mutex_enter(&p->p_lcp_lock);
@@ -243,7 +249,7 @@ lwpchan_alloc_cache(proc_t *p, uint_t bits)
 			/* someone beat us to it */
 			mutex_exit(&p->p_lcp_lock);
 			kmem_free(lcp->lwpchan_cache, lcp->lwpchan_size *
-				sizeof (lwpchan_hashbucket_t));
+			    sizeof (lwpchan_hashbucket_t));
 			kmem_free(lcp, sizeof (lwpchan_data_t));
 			return;
 		}
@@ -266,7 +272,7 @@ lwpchan_alloc_cache(proc_t *p, uint_t bits)
 			while (ent != NULL) {
 				next = ent->lwpchan_next;
 				newbucket = lwpchan_bucket(lcp,
-					(uintptr_t)ent->lwpchan_addr);
+				    (uintptr_t)ent->lwpchan_addr);
 				ent->lwpchan_next = newbucket->lwpchan_chain;
 				newbucket->lwpchan_chain = ent;
 				ent = next;
@@ -345,7 +351,7 @@ lwpchan_destroy_cache(int exec)
 	while (lcp != NULL) {
 		lwpchan_data_t *next_lcp = lcp->lwpchan_next_data;
 		kmem_free(lcp->lwpchan_cache, lcp->lwpchan_size *
-			sizeof (lwpchan_hashbucket_t));
+		    sizeof (lwpchan_hashbucket_t));
 		kmem_free(lcp, sizeof (lwpchan_data_t));
 		lcp = next_lcp;
 	}
@@ -1037,7 +1043,8 @@ lwp_clear_mutex(lwp_mutex_t *lp, uint16_t lockflg)
 	uint16_t flag;
 
 	fuword16_noerr(&lp->mutex_flag, &flag);
-	if ((flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) == 0) {
+	if ((flag &
+	    (LOCK_OWNERDEAD | LOCK_UNMAPPED | LOCK_NOTRECOVERABLE)) == 0) {
 		flag |= lockflg;
 		suword16_noerr(&lp->mutex_flag, flag);
 	}
@@ -1531,7 +1538,7 @@ lwp_mutex_wakeup(lwp_mutex_t *lp, int release_all)
 	 */
 	if (release_all)
 		lwp_release_all(&lwpchan);
-	else if (lwp_release(&lwpchan, &waiters, 0) == 1)
+	else if (lwp_release(&lwpchan, &waiters, 0))
 		suword8_noerr(&lp->mutex_waiters, waiters);
 	lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
 out:
@@ -1669,6 +1676,8 @@ lwp_cond_wait(lwp_cond_t *cv, lwp_mutex_t *mp, timespec_t *tsp, int check_park)
 		 * unlock the condition variable's mutex. (pagefaults are
 		 * possible here.)
 		 */
+		if (mtype & USYNC_PROCESS)
+			suword32_noerr(&mp->mutex_ownerpid, 0);
 		ulock_clear(&mp->mutex_lockw);
 		fuword8_noerr(&mp->mutex_waiters, &waiters);
 		if (waiters != 0) {
@@ -1684,7 +1693,7 @@ lwp_cond_wait(lwp_cond_t *cv, lwp_mutex_t *mp, timespec_t *tsp, int check_park)
 			 * requestor will update the waiter bit correctly by
 			 * re-evaluating it.
 			 */
-			if (lwp_release(&m_lwpchan, &waiters, 0) > 0)
+			if (lwp_release(&m_lwpchan, &waiters, 0))
 				suword8_noerr(&mp->mutex_waiters, waiters);
 		}
 		m_locked = 0;
@@ -1788,6 +1797,8 @@ efault:
 	if (UPIMUTEX(mtype) == 0) {
 		lwpchan_lock(&m_lwpchan, LWPCHAN_MPPOOL);
 		m_locked = 1;
+		if (mtype & USYNC_PROCESS)
+			suword32_noerr(&mp->mutex_ownerpid, 0);
 		ulock_clear(&mp->mutex_lockw);
 		fuword8_noerr(&mp->mutex_waiters, &waiters);
 		if (waiters != 0) {
@@ -1795,7 +1806,7 @@ efault:
 			 * See comment above on lock clearing and lwp_release()
 			 * success/failure.
 			 */
-			if (lwp_release(&m_lwpchan, &waiters, 0) > 0)
+			if (lwp_release(&m_lwpchan, &waiters, 0))
 				suword8_noerr(&mp->mutex_waiters, waiters);
 		}
 		m_locked = 0;
@@ -2563,7 +2574,7 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 		 * lwp_release() occurs, and the lock requestor will
 		 * update the waiter bit correctly by re-evaluating it.
 		 */
-		if (lwp_release(&mlwpchan, &mwaiters, 0) > 0)
+		if (lwp_release(&mlwpchan, &mwaiters, 0))
 			suword8_noerr(&mp->mutex_waiters, mwaiters);
 	}
 	lwpchan_unlock(&mlwpchan, LWPCHAN_MPPOOL);
@@ -2661,7 +2672,7 @@ out_drop:
 		 * See comment above on lock clearing and lwp_release()
 		 * success/failure.
 		 */
-		if (lwp_release(&mlwpchan, &mwaiters, 0) > 0)
+		if (lwp_release(&mlwpchan, &mwaiters, 0))
 			suword8_noerr(&mp->mutex_waiters, mwaiters);
 	}
 	lwpchan_unlock(&mlwpchan, LWPCHAN_MPPOOL);
@@ -2873,7 +2884,8 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 	}
 	if (ent->lwpchan_type & USYNC_PROCESS) {
 		fuword32_noerr(&lp->mutex_ownerpid, (uint32_t *)&owner_pid);
-		if (owner_pid != curproc->p_pid)
+		if ((UPIMUTEX(ent->lwpchan_type) || owner_pid != 0) &&
+		    owner_pid != curproc->p_pid)
 			goto out;
 	}
 	if (UPIMUTEX(ent->lwpchan_type)) {
@@ -2894,11 +2906,34 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 	} else {
 		lwpchan_lock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
 		locked = 1;
-		(void) lwp_clear_mutex(lp, lockflg);
-		ulock_clear(&lp->mutex_lockw);
-		fuword8_noerr(&lp->mutex_waiters, &waiters);
-		if (waiters && lwp_release(&ent->lwpchan_lwpchan, &waiters, 0))
-			suword8_noerr(&lp->mutex_waiters, waiters);
+		if ((ent->lwpchan_type & USYNC_PROCESS) && owner_pid == 0) {
+			/*
+			 * There is no owner.  If there are waiters,
+			 * we should wake up one or all of them.
+			 * It doesn't hurt to wake them up in error
+			 * since they will just retry the lock and
+			 * go to sleep again if necessary.
+			 */
+			fuword8_noerr(&lp->mutex_waiters, &waiters);
+			if (waiters != 0) {	/* there are waiters */
+				fuword16_noerr(&lp->mutex_flag, &flag);
+				if (flag & LOCK_NOTRECOVERABLE) {
+					lwp_release_all(&ent->lwpchan_lwpchan);
+					suword8_noerr(&lp->mutex_waiters, 0);
+				} else if (lwp_release(&ent->lwpchan_lwpchan,
+				    &waiters, 0)) {
+					suword8_noerr(&lp->mutex_waiters,
+					    waiters);
+				}
+			}
+		} else {
+			(void) lwp_clear_mutex(lp, lockflg);
+			ulock_clear(&lp->mutex_lockw);
+			fuword8_noerr(&lp->mutex_waiters, &waiters);
+			if (waiters &&
+			    lwp_release(&ent->lwpchan_lwpchan, &waiters, 0))
+				suword8_noerr(&lp->mutex_waiters, waiters);
+		}
 		lwpchan_unlock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
 	}
 out:
@@ -3128,7 +3163,7 @@ lwp_mutex_unlock(lwp_mutex_t *lp)
 		    (flag & LOCK_NOTRECOVERABLE)) {
 			lwp_release_all(&lwpchan);
 			suword8_noerr(&lp->mutex_waiters, 0);
-		} else if (lwp_release(&lwpchan, &waiters, 0) == 1) {
+		} else if (lwp_release(&lwpchan, &waiters, 0)) {
 			suword8_noerr(&lp->mutex_waiters, waiters);
 		}
 	}

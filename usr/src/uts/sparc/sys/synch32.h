@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,10 @@ extern "C" {
 #define	mutex_magic		flags.magic
 #define	mutex_owner		data
 /* used to atomically operate on whole word via cas or swap instruction */
-#define	mutex_lockword		lock.lock32.lockword /* address of */
+#define	mutex_lockword		lock.lock32.lockword
+/* this requires cas64 */
+#define	mutex_lockword64	lock.owner64
+/* these are bytes */
 #define	mutex_lockw		lock.lock64.pad[4]
 #define	mutex_waiters		lock.lock64.pad[7]
 #define	mutex_spinners		lock.lock64.pad[5]

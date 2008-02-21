@@ -102,6 +102,7 @@
  * and why they are different for sparc and intel.
  */
 #if defined(__sparc)
+
 /* lock.lock64.pad[x]	   4 5 6 7 */
 #define	LOCKMASK	0xff000000
 #define	WAITERMASK	0x000000ff
@@ -110,7 +111,15 @@
 #define	WAITER		0x00000001
 #define	LOCKSET		0xff
 #define	LOCKCLEAR	0
+
+#define	PIDSHIFT	32
+#define	LOCKMASK64	0xffffffffff000000ULL
+#define	LOCKBYTE64	0x00000000ff000000ULL
+#define	WAITERMASK64	0x00000000000000ffULL
+#define	SPINNERMASK64	0x0000000000ff0000ULL
+
 #elif defined(__x86)
+
 /* lock.lock64.pad[x]	   7 6 5 4 */
 #define	LOCKMASK	0xff000000
 #define	WAITERMASK	0x00ff0000
@@ -119,6 +128,13 @@
 #define	WAITER		0x00010000
 #define	LOCKSET		0x01
 #define	LOCKCLEAR	0
+
+#define	PIDSHIFT	0
+#define	LOCKMASK64	0xff000000ffffffffULL
+#define	LOCKBYTE64	0x0100000000000000ULL
+#define	WAITERMASK64	0x00ff000000000000ULL
+#define	SPINNERMASK64	0x0000ff0000000000ULL
+
 #else
 #error "neither __sparc nor __x86 is defined"
 #endif

@@ -26,10 +26,12 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/sdt.h>
+#define	atomic_cas_64	_atomic_cas_64
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include <sys/sdt.h>
+#include <atomic.h>
 
 /*
  * This mutex is initialized to be held by lwp#1.
@@ -39,7 +41,6 @@
 mutex_t	stall_mutex = DEFAULTMUTEX;
 
 static int shared_mutex_held(mutex_t *);
-static int mutex_unlock_internal(mutex_t *, int);
 static int mutex_queuelock_adaptive(mutex_t *);
 static void mutex_wakeup_all(mutex_t *);
 
@@ -289,6 +290,43 @@ clear_lockbyte(volatile uint32_t *lockword)
 	} while (atomic_cas_32(lockword, old, new) != old);
 
 	return (old);
+}
+
+/*
+ * Same as clear_lockbyte(), but operates on mutex_lockword64.
+ * The mutex_ownerpid field is cleared along with the lock byte.
+ */
+static uint64_t
+clear_lockbyte64(volatile uint64_t *lockword64)
+{
+	uint64_t old;
+	uint64_t new;
+
+	do {
+		old = *lockword64;
+		new = old & ~LOCKMASK64;
+	} while (atomic_cas_64(lockword64, old, new) != old);
+
+	return (old);
+}
+
+/*
+ * Similar to set_lock_byte(), which only tries to set the lock byte.
+ * Here, we attempt to set the lock byte AND the mutex_ownerpid,
+ * keeping the remaining bytes constant.
+ */
+static int
+set_lock_byte64(volatile uint64_t *lockword64, pid_t ownerpid)
+{
+	uint64_t old;
+	uint64_t new;
+
+	old = *lockword64 & ~LOCKMASK64;
+	new = old | ((uint64_t)(uint_t)ownerpid << PIDSHIFT) | LOCKBYTE64;
+	if (atomic_cas_64(lockword64, old, new) == old)
+		return (LOCKCLEAR);
+
+	return (LOCKSET);
 }
 
 /*
@@ -1171,11 +1209,11 @@ done:
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
 		/*
-		 * We shouldn't own the mutex; clear the lock.
+		 * We shouldn't own the mutex.
+		 * Just clear the lock; everyone has already been waked up.
 		 */
 		mp->mutex_owner = 0;
-		if (clear_lockbyte(&mp->mutex_lockword) & WAITERMASK)
-			mutex_wakeup_all(mp);
+		(void) clear_lockbyte(&mp->mutex_lockword);
 		error = ENOTRECOVERABLE;
 	}
 
@@ -1246,7 +1284,7 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	int error = EBUSY;
-	volatile uint8_t *lockp = (volatile uint8_t *)&mp->mutex_lockw;
+	volatile uint64_t *lockp = (volatile uint64_t *)&mp->mutex_lockword64;
 	uint32_t new_lockword;
 	int count = 0;
 	int max_count;
@@ -1269,9 +1307,9 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	 * incurring the overhead of the spin loop.
 	 */
 	enter_critical(self);
-	if (set_lock_byte(lockp) == 0) {
+	if (set_lock_byte64(lockp, udp->pid) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
-		mp->mutex_ownerpid = udp->pid;
+		/* mp->mutex_ownerpid was set by set_lock_byte64() */
 		exit_critical(self);
 		error = 0;
 		goto done;
@@ -1299,9 +1337,10 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	}
 	DTRACE_PROBE1(plockstat, mutex__spin, mp);
 	for (count = 1; ; count++) {
-		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
+		if ((*lockp & LOCKMASK64) == 0 &&
+		    set_lock_byte64(lockp, udp->pid) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
-			mp->mutex_ownerpid = udp->pid;
+			/* mp->mutex_ownerpid was set by set_lock_byte64() */
 			error = 0;
 			break;
 		}
@@ -1326,9 +1365,9 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 		 * necessary for correctness, to avoid ending up with an
 		 * unheld mutex with waiters but no one to wake them up.
 		 */
-		if (set_lock_byte(lockp) == 0) {
+		if (set_lock_byte64(lockp, udp->pid) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
-			mp->mutex_ownerpid = udp->pid;
+			/* mp->mutex_ownerpid was set by set_lock_byte64() */
 			error = 0;
 		}
 		count++;
@@ -1339,15 +1378,12 @@ done:
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
 		/*
-		 * We shouldn't own the mutex; clear the lock.
+		 * We shouldn't own the mutex.
+		 * Just clear the lock; everyone has already been waked up.
 		 */
 		mp->mutex_owner = 0;
-		mp->mutex_ownerpid = 0;
-		if (clear_lockbyte(&mp->mutex_lockword) & WAITERMASK) {
-			no_preempt(self);
-			(void) ___lwp_mutex_wakeup(mp, 1);
-			preempt(self);
-		}
+		/* mp->mutex_ownerpid is cleared by clear_lockbyte64() */
+		(void) clear_lockbyte64(&mp->mutex_lockword64);
 		error = ENOTRECOVERABLE;
 	}
 
@@ -1481,8 +1517,8 @@ mutex_unlock_queue(mutex_t *mp, int release_all)
 	lwpid_t lwpid = 0;
 	uint32_t old_lockword;
 
-	mp->mutex_owner = 0;
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
+	mp->mutex_owner = 0;
 	old_lockword = clear_lockbyte(&mp->mutex_lockword);
 	if ((old_lockword & WAITERMASK) &&
 	    (release_all || (old_lockword & SPINNERMASK) == 0)) {
@@ -1504,14 +1540,14 @@ mutex_unlock_queue(mutex_t *mp, int release_all)
 static void
 mutex_unlock_process(mutex_t *mp, int release_all)
 {
-	uint32_t old_lockword;
+	uint64_t old_lockword64;
 
-	mp->mutex_owner = 0;
-	mp->mutex_ownerpid = 0;
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-	old_lockword = clear_lockbyte(&mp->mutex_lockword);
-	if ((old_lockword & WAITERMASK) &&
-	    (release_all || (old_lockword & SPINNERMASK) == 0)) {
+	mp->mutex_owner = 0;
+	/* mp->mutex_ownerpid is cleared by clear_lockbyte64() */
+	old_lockword64 = clear_lockbyte64(&mp->mutex_lockword64);
+	if ((old_lockword64 & WAITERMASK64) &&
+	    (release_all || (old_lockword64 & SPINNERMASK64) == 0)) {
 		ulwp_t *self = curthread;
 		no_preempt(self);	/* ensure a prompt wakeup */
 		(void) ___lwp_mutex_wakeup(mp, release_all);
@@ -1635,11 +1671,11 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
 		/*
-		 * We shouldn't own the mutex; clear the lock.
+		 * We shouldn't own the mutex.
+		 * Just clear the lock; everyone has already been waked up.
 		 */
 		mp->mutex_owner = 0;
-		if (clear_lockbyte(&mp->mutex_lockword) & WAITERMASK)
-			mutex_wakeup_all(mp);
+		(void) clear_lockbyte(&mp->mutex_lockword);
 		error = ENOTRECOVERABLE;
 	}
 
@@ -1902,9 +1938,9 @@ fast_process_lock(mutex_t *mp, timespec_t *tsp, int mtype, int try)
 	 */
 	ASSERT((mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK)) == 0);
 	enter_critical(self);
-	if (set_lock_byte(&mp->mutex_lockw) == 0) {
+	if (set_lock_byte64(&mp->mutex_lockword64, udp->pid) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
-		mp->mutex_ownerpid = udp->pid;
+		/* mp->mutex_ownerpid was set by set_lock_byte64() */
 		exit_critical(self);
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 		return (0);
@@ -2155,7 +2191,7 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 	if (mtype & LOCK_PRIO_INHERIT) {
 		no_preempt(self);
 		mp->mutex_owner = 0;
-		mp->mutex_ownerpid = 0;
+		/* mp->mutex_ownerpid is cleared by ___lwp_mutex_unlock() */
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 		mp->mutex_lockw = LOCKCLEAR;
 		error = ___lwp_mutex_unlock(mp);
@@ -2997,7 +3033,7 @@ cond_sleep_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	self->ul_sp = stkptr();
 	self->ul_wchan = cvp;
 	mp->mutex_owner = 0;
-	mp->mutex_ownerpid = 0;
+	/* mp->mutex_ownerpid is cleared by ___lwp_cond_wait() */
 	if (mtype & LOCK_PRIO_INHERIT)
 		mp->mutex_lockw = LOCKCLEAR;
 	/*

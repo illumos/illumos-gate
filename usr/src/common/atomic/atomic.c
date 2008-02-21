@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -421,7 +422,7 @@ atomic_cas_ulong(volatile ulong_t *target, ulong_t cmp, ulong_t new)
 }
 
 uint64_t
-atomic_cas_uint64(volatile uint64_t *target, ulong_t cmp, uint64_t new)
+atomic_cas_64(volatile uint64_t *target, uint64_t cmp, uint64_t new)
 {
 	uint64_t old = *target;
 	if (old == cmp)
