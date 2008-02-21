@@ -2138,12 +2138,12 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 	zfs_acl_t	*aclp;
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	int		error;
-	int		access_deny = ACCESS_UNDETERMINED;
 	uid_t		uid = crgetuid(cr);
 	uint64_t 	who;
 	uint16_t	type, iflags;
 	uint16_t	entry_type;
 	uint32_t	access_mask;
+	uint32_t	deny_mask = 0;
 	zfs_ace_hdr_t	*acep = NULL;
 	boolean_t	checkit;
 	uid_t		fowner;
@@ -2259,27 +2259,33 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 		}
 
 		if (checkit) {
-			if (access_mask & *working_mode) {
-				if (type == ALLOW) {
-					*working_mode &=
-					    ~(*working_mode & access_mask);
-					if (*working_mode == 0) {
-						access_deny = 0;
-					}
-				} else if (type == DENY) {
-					access_deny = EACCES;
-				}
+			uint32_t mask_matched = (access_mask & *working_mode);
+
+			if (mask_matched) {
+				if (type == DENY)
+					deny_mask |= mask_matched;
+
+				*working_mode &= ~mask_matched;
 			}
 		}
 
-		if (access_deny != ACCESS_UNDETERMINED)
+		/* Are we done? */
+		if (*working_mode == 0)
 			break;
 	}
 
 	mutex_exit(&zp->z_acl_lock);
 	zfs_acl_free(aclp);
-out:
-	return (access_deny);
+
+	/* Put the found 'denies' back on the working mode */
+	if (deny_mask) {
+		*working_mode |= deny_mask;
+		return (EACCES);
+	} else if (*working_mode) {
+		return (ACCESS_UNDETERMINED);
+	}
+
+	return (0);
 }
 
 static int
