@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,10 +51,9 @@ gencsr_pkcs11(KMF_HANDLE_T kmfhandle,
 	char *token, char *subject, char *altname,
 	KMF_GENERALNAMECHOICES alttype, int altcrit,
 	char *certlabel, KMF_KEY_ALG keyAlg,
-	int keylen,
-	uint16_t kubits, int kucrit,
+	int keylen, uint16_t kubits, int kucrit,
 	KMF_ENCODE_FORMAT fmt, char *csrfile,
-	KMF_CREDENTIAL *tokencred)
+	KMF_CREDENTIAL *tokencred, EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv = KMF_OK;
 	KMF_KEY_HANDLE pubk, prik;
@@ -149,7 +148,15 @@ gencsr_pkcs11(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
 		    "SetCSRKeyUsage");
 	}
-
+	if (ekulist != NULL) {
+		int i;
+		for (i = 0; kmfrv == KMF_OK && i < ekulist->eku_count; i++) {
+			SET_VALUE(kmf_add_csr_eku(&csr,
+			    &ekulist->ekulist[i],
+			    ekulist->critlist[i]),
+			    "Extended Key Usage");
+		}
+	}
 	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
 	    KMF_OK) {
 		kmfrv = kmf_create_csr_file(&signedCsr, fmt, csrfile);
@@ -181,7 +188,7 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	int keylen, KMF_ENCODE_FORMAT fmt,
 	char *subject, char *altname, KMF_GENERALNAMECHOICES alttype,
 	int altcrit, uint16_t kubits, int kucrit,
-	char *dir, char *outcsr, char *outkey)
+	char *dir, char *outcsr, char *outkey, EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEY_HANDLE pubk, prik;
@@ -310,6 +317,15 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
 		    "kmf_set_csr_ku");
 	}
+	if (ekulist != NULL) {
+		int i;
+		for (i = 0; kmfrv == KMF_OK && i < ekulist->eku_count; i++) {
+			SET_VALUE(kmf_add_csr_eku(&csr,
+			    &ekulist->ekulist[i],
+			    ekulist->critlist[i]),
+			    "Extended Key Usage");
+		}
+	}
 	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
 	    KMF_OK) {
 		kmfrv = kmf_create_csr_file(&signedCsr, fmt, fullcsrpath);
@@ -336,7 +352,7 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 	KMF_KEY_ALG keyAlg, int keylen,
 	uint16_t kubits, int kucrit,
 	KMF_ENCODE_FORMAT fmt, char *csrfile,
-	KMF_CREDENTIAL *tokencred)
+	KMF_CREDENTIAL *tokencred, EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEY_HANDLE pubk, prik;
@@ -430,6 +446,15 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
 		    "kmf_set_csr_ku");
 	}
+	if (ekulist != NULL) {
+		int i;
+		for (i = 0; kmfrv == KMF_OK && i < ekulist->eku_count; i++) {
+			SET_VALUE(kmf_add_csr_eku(&csr,
+			    &ekulist->ekulist[i],
+			    ekulist->critlist[i]),
+			    "Extended Key Usage");
+		}
+	}
 	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
 	    KMF_OK) {
 		kmfrv = kmf_create_csr_file(&signedCsr, fmt, csrfile);
@@ -487,6 +512,7 @@ pk_gencsr(int argc, char *argv[])
 	char *format = NULL;
 	char *altname = NULL;
 	char *kustr = NULL;
+	char *ekustr = NULL;
 	uint16_t kubits = 0;
 	char *keytype = PK_DEFAULT_KEYTYPE;
 	KMF_HANDLE_T kmfhandle = NULL;
@@ -498,11 +524,12 @@ pk_gencsr(int argc, char *argv[])
 	KMF_CREDENTIAL tokencred = {NULL, 0};
 	KMF_GENERALNAMECHOICES alttype = 0;
 	int altcrit = 0, kucrit = 0;
+	EKU_LIST *ekulist = NULL;
 
 	while ((opt = getopt_av(argc, argv,
 	    "ik:(keystore)s:(subject)n:(nickname)A:(altname)"
 	    "u:(keyusage)T:(token)d:(dir)p:(prefix)t:(keytype)"
-	    "y:(keylen)l:(label)c:(outcsr)"
+	    "y:(keylen)l:(label)c:(outcsr)e:(eku)"
 	    "K:(outkey)F:(format)")) != EOF) {
 
 		if (opt != 'i' && EMPTYSTRING(optarg_av))
@@ -577,6 +604,9 @@ pk_gencsr(int argc, char *argv[])
 				if (format)
 					return (PK_ERR_USAGE);
 				format = optarg_av;
+				break;
+			case 'e':
+				ekustr = optarg_av;
 				break;
 			default:
 				cryptoerror(LOG_STDERR, gettext(
@@ -701,6 +731,18 @@ pk_gencsr(int argc, char *argv[])
 			goto end;
 		}
 	}
+	if (ekustr != NULL) {
+		rv = verify_ekunames(ekustr, &ekulist);
+		if (rv != KMF_OK) {
+			(void) fprintf(stderr, gettext("EKUs must "
+			    "be specified as a comma-separated list. "
+			    "See the man page for details.\n"));
+			rv = PK_ERR_USAGE;
+			goto end;
+		}
+	}
+
+
 	if ((rv = Str2KeyType(keytype, &keyAlg, &sigAlg)) != 0) {
 		cryptoerror(LOG_STDERR, gettext("Unrecognized keytype (%s).\n"),
 		    keytype);
@@ -727,25 +769,28 @@ pk_gencsr(int argc, char *argv[])
 		    tokenname, subname, altname, alttype, altcrit,
 		    certlabel, dir, prefix,
 		    keyAlg, keylen, kubits, kucrit,
-		    fmt, outcsr, &tokencred);
+		    fmt, outcsr, &tokencred, ekulist);
 
 	} else if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = gencsr_pkcs11(kmfhandle,
 		    tokenname, subname, altname, alttype, altcrit,
 		    certlabel, keyAlg, keylen,
-		    kubits, kucrit, fmt, outcsr, &tokencred);
+		    kubits, kucrit, fmt, outcsr, &tokencred, ekulist);
 
 	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
 		rv = gencsr_file(kmfhandle,
 		    keyAlg, keylen, fmt, subname, altname,
 		    alttype, altcrit, kubits, kucrit,
-		    dir, outcsr, outkey);
+		    dir, outcsr, outkey, ekulist);
 	}
 
 end:
 	if (rv != KMF_OK)
 		display_error(kmfhandle, rv,
 		    gettext("Error creating CSR or keypair"));
+
+	if (ekulist != NULL)
+		free_eku_list(ekulist);
 
 	if (subname)
 		free(subname);

@@ -2630,7 +2630,7 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 	boolean_t is_token = B_TRUE, is_private = B_FALSE;
 	KMF_KEY_HANDLE *keys;
 	uint32_t *numkeys;
-	KMF_CREDENTIAL cred;
+	KMF_CREDENTIAL *cred = NULL;
 	KMF_KEY_CLASS keyclass = KMF_KEYCLASS_NONE;
 	char *findLabel, *idstr;
 	KMF_KEY_ALG keytype = KMF_KEYALG_NONE;
@@ -2733,15 +2733,11 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 	 * Authenticate if the object is a token object,
 	 * a private or secred key, or if the user passed in credentials.
 	 */
-	if ((rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
-	    (void *)&cred, NULL)) == KMF_OK) {
-		if (cred.credlen > 0) {
-			rv = pk11_authenticate(handle, &cred);
-			if (rv != KMF_OK)
-				return (rv);
-		}
-	} else {
-		rv = KMF_OK; /* cred is optional */
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred != NULL && (cred->credlen > 0)) {
+		rv = pk11_authenticate(handle, cred);
+		if (rv != KMF_OK)
+			return (rv);
 	}
 
 	keys = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
@@ -3156,7 +3152,7 @@ KMFPK11_CreateSymKey(KMF_HANDLE_T handle,
 	uint32_t		attrkeylen = 0;
 	uint32_t		keylen_size = sizeof (uint32_t);
 	char			*keylabel = NULL;
-	KMF_CREDENTIAL		cred;
+	KMF_CREDENTIAL		*cred = NULL;
 	uint32_t		is_sensitive = B_FALSE;
 	uint32_t		is_not_extractable = B_FALSE;
 
@@ -3324,12 +3320,11 @@ KMFPK11_CreateSymKey(KMF_HANDLE_T handle,
 	SETATTR(templ, i, CKA_VERIFY, &true, sizeof (true));
 	i++;
 
-	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
-	    (void *)&cred, NULL);
-	if (rv != KMF_OK)
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	rv = pk11_authenticate(handle, &cred);
+	rv = pk11_authenticate(handle, cred);
 	if (rv != KMF_OK) {
 		return (rv);
 	}
@@ -3414,21 +3409,19 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle,
 	CK_RV		rv = CKR_OK;
 	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
 	CK_SESSION_HANDLE	session = NULL;
-	KMF_CREDENTIAL	oldcred = {NULL, 0};
-	KMF_CREDENTIAL	newcred = {NULL, 0};
+	KMF_CREDENTIAL	*oldcred;
+	KMF_CREDENTIAL	*newcred;
 	CK_SLOT_ID	slotid;
 
 	if (handle == NULL || attrlist == NULL || numattr == 0)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
-	    (void *)&oldcred, NULL);
-	if (rv != KMF_OK)
+	oldcred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (oldcred == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	rv = kmf_get_attr(KMF_NEWPIN_ATTR, attrlist, numattr,
-	    (void *)&newcred, NULL);
-	if (rv != KMF_OK)
+	newcred = kmf_get_attr_ptr(KMF_NEWPIN_ATTR, attrlist, numattr);
+	if (newcred == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	rv = kmf_get_attr(KMF_SLOT_ID_ATTR, attrlist, numattr,
@@ -3439,10 +3432,10 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle,
 		 * If a slot wasn't given, the user must pass
 		 * a token label so we can find the slot here.
 		 */
-		rv = kmf_get_string_attr(KMF_TOKEN_LABEL_ATTR, attrlist,
-		    numattr, &tokenlabel);
-		if (rv != KMF_OK)
-			return (rv);
+		tokenlabel = kmf_get_attr_ptr(KMF_TOKEN_LABEL_ATTR, attrlist,
+		    numattr);
+		if (tokenlabel == NULL)
+			return (KMF_ERR_BAD_PARAMETER);
 
 		rv = kmf_pk11_token_lookup(handle, tokenlabel, &slotid);
 		if (rv != KMF_OK)
@@ -3458,8 +3451,8 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle,
 	}
 
 	rv = C_SetPIN(session,
-	    (CK_BYTE *)oldcred.cred, oldcred.credlen,
-	    (CK_BYTE *)newcred.cred, newcred.credlen);
+	    (CK_BYTE *)oldcred->cred, oldcred->credlen,
+	    (CK_BYTE *)newcred->cred, newcred->credlen);
 
 	if (rv != CKR_OK) {
 		SET_ERROR(kmfh, rv);

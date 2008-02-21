@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,11 @@ extern "C" {
 extern CK_BBOOL	pk_false;
 extern CK_BBOOL	pk_true;
 
+typedef struct {
+	int	eku_count;
+	int	*critlist;
+	KMF_OID	*ekulist;
+} EKU_LIST;
 
 /* Common functions. */
 extern CK_RV	init_pk11(void);
@@ -122,6 +127,12 @@ KMF_RETURN hexstring2bytes(uchar_t *, uchar_t **, size_t *);
 KMF_RETURN verify_altname(char *arg, KMF_GENERALNAMECHOICES *, int *);
 KMF_RETURN verify_keyusage(char *arg, uint16_t *, int *);
 KMF_RETURN verify_file(char *);
+KMF_RETURN verify_ekunames(char *, EKU_LIST **);
+
+void free_eku_list(EKU_LIST *);
+
+int yn_to_int(char *);
+
 int get_token_password(KMF_KEYSTORE_TYPE, char *, KMF_CREDENTIAL *);
 void display_error(void *, KMF_RETURN, char *);
 #define	DEFAULT_NSS_TOKEN	"internal"

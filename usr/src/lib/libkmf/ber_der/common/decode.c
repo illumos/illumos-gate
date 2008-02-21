@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -144,7 +144,7 @@ kmfber_skip_tag(BerElement *ber, ber_len_t *len)
 			return (KMFBER_DEFAULT);
 		diff = sizeof (ber_int_t) - noctets;
 		if (kmfber_read(ber, (char *)&netlen + diff, noctets)
-			!= noctets)
+		    != noctets)
 			return (KMFBER_DEFAULT);
 		*len = ntohl(netlen);
 	} else {
@@ -251,12 +251,12 @@ kmfber_get_stringb(BerElement *ber, char *buf, ber_len_t *len)
 
 #ifdef STR_TRANSLATION
 	if (datalen > 0 && (ber->ber_options & KMFBER_OPT_TRANSLATE_STRINGS)
-		!= 0 && ber->ber_decode_translate_proc != NULL) {
+	    != 0 && ber->ber_decode_translate_proc != NULL) {
 
 		transbuf = buf;
 		++datalen;
 		if ((*(ber->ber_decode_translate_proc))(&transbuf, &datalen,
-			0) != 0) {
+		    0) != 0) {
 			return (KMFBER_DEFAULT);
 		}
 		if (datalen > *len) {
@@ -311,7 +311,7 @@ ber_get_oid(BerElement *ber, struct berval *oid)
 	oid->bv_len = len;
 
 	if (kmfber_read(ber, oid->bv_val, oid->bv_len) !=
-		(ber_slen_t)oid->bv_len)
+	    (ber_slen_t)oid->bv_len)
 		return (KMFBER_DEFAULT);
 
 	return (tag);
@@ -324,16 +324,18 @@ ber_get_bigint(BerElement *ber, struct berval **bv)
 	ber_tag_t	tag;
 
 	if ((*bv = (struct berval *)malloc(sizeof (struct berval)))
-		== NULL) {
+	    == NULL) {
 		return (KMFBER_DEFAULT);
 	}
+	(*bv)->bv_len = 0;
+	(*bv)->bv_val = NULL;
 
 	if ((tag = kmfber_skip_tag(ber, &len)) != BER_INTEGER) {
 		return (KMFBER_DEFAULT);
 	}
 
 	if (((*bv)->bv_val = (char *)malloc((size_t)len + 1))
-		== NULL) {
+	    == NULL) {
 		return (KMFBER_DEFAULT);
 	}
 
@@ -370,7 +372,7 @@ kmfber_get_stringal(BerElement *ber, struct berval **bv)
 	ber_tag_t	tag;
 
 	if ((*bv = (struct berval *)malloc(sizeof (struct berval)))
-		== NULL) {
+	    == NULL) {
 		return (KMFBER_DEFAULT);
 	}
 
@@ -379,7 +381,7 @@ kmfber_get_stringal(BerElement *ber, struct berval **bv)
 	}
 
 	if (((*bv)->bv_val = (char *)malloc((size_t)len + 1))
-		== NULL) {
+	    == NULL) {
 		return (KMFBER_DEFAULT);
 	}
 
@@ -520,162 +522,156 @@ kmfber_scanf(BerElement *ber, const char *fmt, ...)
 
 	for (rc = 0, p = (char *)fmt; *p && rc != KMFBER_DEFAULT; p++) {
 	switch (*p) {
-	    case 'a':	/* octet string - allocate storage as needed */
+		case 'a':	/* octet string - allocate storage as needed */
 		ss = va_arg(ap, char **);
 		rc = kmfber_get_stringa(ber, ss);
 		break;
 
-	    case 'b':	/* boolean */
+		case 'b':	/* boolean */
 		i = va_arg(ap, int *);
 		rc = kmfber_get_boolean(ber, i);
 		break;
 
-	    case 'D':	/* Object ID */
+		case 'D':	/* Object ID */
 		bval = va_arg(ap, struct berval *);
 		rc = ber_get_oid(ber, bval);
 		break;
-	    case 'e':	/* enumerated */
-	    case 'i':	/* int */
+		case 'e':	/* enumerated */
+		case 'i':	/* int */
 		b_int = va_arg(ap, ber_int_t *);
 		rc = kmfber_get_int(ber, b_int);
 		break;
 
-	    case 'l':	/* length of next item */
+		case 'l':	/* length of next item */
 		l = va_arg(ap, ber_slen_t *);
 		rc = kmfber_peek_tag(ber, (ber_len_t *)l);
 		break;
 
-	    case 'n':	/* null */
+		case 'n':	/* null */
 		rc = kmfber_get_null(ber);
 		break;
 
-	    case 's':	/* octet string - in a buffer */
+		case 's':	/* octet string - in a buffer */
 		s = va_arg(ap, char *);
 		l = va_arg(ap, ber_slen_t *);
 		rc = kmfber_get_stringb(ber, s, (ber_len_t *)l);
 		break;
 
-	    case 'o':	/* octet string in a supplied berval */
+		case 'o':	/* octet string in a supplied berval */
 		bval = va_arg(ap, struct berval *);
 		(void) kmfber_peek_tag(ber, &bval->bv_len);
 		rc = kmfber_get_stringa(ber, &bval->bv_val);
 		break;
 
-	    case 'I': /* variable length Integer */
+		case 'I': /* variable length Integer */
 		/* Treat INTEGER same as an OCTET string, but ignore the tag */
 		bvp = va_arg(ap, struct berval **);
 		rc = ber_get_bigint(ber, bvp);
 		break;
-	    case 'O': /* octet string - allocate & include length */
+		case 'O': /* octet string - allocate & include length */
 		bvp = va_arg(ap, struct berval **);
 		rc = kmfber_get_stringal(ber, bvp);
 		break;
 
-	    case 'B':	/* bit string - allocate storage as needed */
+		case 'B':	/* bit string - allocate storage as needed */
 		ss = va_arg(ap, char **);
 		l = va_arg(ap, ber_slen_t *); /* for length, in bits */
 		rc = kmfber_get_bitstringa(ber, ss, (ber_len_t *)l);
 		break;
 
-	    case 't':	/* tag of next item */
+		case 't':	/* tag of next item */
 		t = va_arg(ap, ber_tag_t *);
 		*t = kmfber_peek_tag(ber, &len);
 		rc = (ber_int_t)(*t);
 		break;
 
-	    case 'T':	/* skip tag of next item */
+		case 'T':	/* skip tag of next item */
 		t = va_arg(ap, ber_tag_t *);
 		*t = kmfber_skip_tag(ber, &len);
 		rc = (ber_int_t)(*t);
 		break;
 
-	    case 'v':	/* sequence of strings */
+		case 'v':	/* sequence of strings */
 		sss = va_arg(ap, char ***);
+		if (sss == NULL)
+			break;
 		*sss = NULL;
 		j = 0;
 		array_size = 0;
 		for (tag = kmfber_first_element(ber, &len, &last);
-			(tag != KMFBER_DEFAULT &&
-			tag != KMFBER_END_OF_SEQORSET &&
-			rc != KMFBER_DEFAULT);
-			tag = kmfber_next_element(ber, &len, last)) {
-		    if (*sss == NULL) {
-			/* Make room for at least 15 strings */
-			*sss = (char **)malloc(16 * sizeof (char *));
-			array_size = 16;
-		    } else {
-			if ((size_t)(j+2) > array_size) {
-			    /* We'v overflowed our buffer */
-			    *sss = (char **)realloc(*sss,
-				(array_size * 2) * sizeof (char *));
-			    array_size = array_size * 2;
+		    (tag != KMFBER_DEFAULT &&
+		    tag != KMFBER_END_OF_SEQORSET &&
+		    rc != KMFBER_DEFAULT);
+		    tag = kmfber_next_element(ber, &len, last)) {
+			if (*sss == NULL) {
+				/* Make room for at least 15 strings */
+				*sss = (char **)malloc(16 * sizeof (char *));
+				array_size = 16;
+			} else {
+				if ((size_t)(j+2) > array_size) {
+					/* We'v overflowed our buffer */
+					*sss = (char **)realloc(*sss,
+					    (array_size * 2) * sizeof (char *));
+					array_size = array_size * 2;
+				}
 			}
-		    }
-		    rc = kmfber_get_stringa(ber, &((*sss)[j]));
-		    j++;
+			rc = kmfber_get_stringa(ber, &((*sss)[j]));
+			j++;
 		}
-		if (rc != KMFBER_DEFAULT &&
-			tag != KMFBER_END_OF_SEQORSET) {
-		    rc = KMFBER_DEFAULT;
+		if (rc != KMFBER_DEFAULT && tag != KMFBER_END_OF_SEQORSET) {
+			rc = KMFBER_DEFAULT;
 		}
 		if (j > 0)
-		    (*sss)[j] = NULL;
+			(*sss)[j] = NULL;
 		break;
 
-	    case 'V':	/* sequence of strings + lengths */
+		case 'V':	/* sequence of strings + lengths */
 		bv = va_arg(ap, struct berval ***);
 		*bv = NULL;
 		j = 0;
 		for (tag = kmfber_first_element(ber, &len, &last);
-			(tag != KMFBER_DEFAULT &&
-			tag != KMFBER_END_OF_SEQORSET &&
-			rc != KMFBER_DEFAULT);
-			tag = kmfber_next_element(ber, &len, last)) {
-		    if (*bv == NULL) {
-			*bv = (struct berval **)malloc(
-				2 * sizeof (struct berval *));
-		    } else {
-			*bv = (struct berval **)realloc(*bv,
-				(j + 2) * sizeof (struct berval *));
-		    }
-		    rc = kmfber_get_stringal(ber, &((*bv)[j]));
-		    j++;
+		    (tag != KMFBER_DEFAULT &&
+		    tag != KMFBER_END_OF_SEQORSET &&
+		    rc != KMFBER_DEFAULT);
+		    tag = kmfber_next_element(ber, &len, last)) {
+			if (*bv == NULL) {
+				*bv = (struct berval **)malloc(
+				    2 * sizeof (struct berval *));
+			} else {
+				*bv = (struct berval **)realloc(*bv,
+				    (j + 2) * sizeof (struct berval *));
+			}
+			rc = kmfber_get_stringal(ber, &((*bv)[j]));
+			j++;
 		}
 		if (rc != KMFBER_DEFAULT &&
-			tag != KMFBER_END_OF_SEQORSET) {
-		    rc = KMFBER_DEFAULT;
+		    tag != KMFBER_END_OF_SEQORSET) {
+			rc = KMFBER_DEFAULT;
 		}
 		if (j > 0)
-		    (*bv)[j] = NULL;
+			(*bv)[j] = NULL;
 		break;
 
-	    case 'x':	/* skip the next element - whatever it is */
+		case 'x':	/* skip the next element - whatever it is */
 		if ((rc = kmfber_skip_tag(ber, &len)) == KMFBER_DEFAULT)
-		    break;
+			break;
 		ber->ber_ptr += len;
 		break;
 
-	    case '{':	/* begin sequence */
-	    case '[':	/* begin set */
+		case '{':	/* begin sequence */
+		case '[':	/* begin set */
 		if (*(p + 1) != 'v' && *(p + 1) != 'V')
-		    rc = kmfber_skip_tag(ber, &len);
+			rc = kmfber_skip_tag(ber, &len);
 		break;
 
-	    case '}':	/* end sequence */
-	    case ']':	/* end set */
+		case '}':	/* end sequence */
+		case ']':	/* end set */
 		break;
 
-	    default:
-#ifdef KMFBER_DEBUG
-		{
-		    char msg[80];
-		    sprintf(msg, "unknown fmt %c\n", *p);
-		    ber_err_print(msg);
-		}
-#endif
+		default:
 		rc = KMFBER_DEFAULT;
 		break;
-	}
+		}
 	}
 
 
@@ -683,90 +679,95 @@ kmfber_scanf(BerElement *ber, const char *fmt, ...)
 	if (rc == KMFBER_DEFAULT) {
 	va_start(ap, fmt);
 	for (p--; fmt < p && *fmt; fmt++) {
-	    switch (*fmt) {
+		switch (*fmt) {
 		case 'a':	/* octet string - allocate storage as needed */
-		    ss = va_arg(ap, char **);
-		    free(*ss);
-		    *ss = NULL;
-		    break;
+			ss = va_arg(ap, char **);
+			if (ss != NULL && *ss != NULL) {
+				free(*ss);
+				*ss = NULL;
+			}
+			break;
 
 		case 'b':	/* boolean */
-		    i = va_arg(ap, int *);
-		    break;
+			i = va_arg(ap, int *);
+			break;
 
 		case 'e':	/* enumerated */
 		case 'i':	/* int */
-		    l = va_arg(ap, ber_slen_t *);
-		    break;
+			l = va_arg(ap, ber_slen_t *);
+			break;
 
 		case 'l':	/* length of next item */
-		    l = va_arg(ap, ber_slen_t *);
-		    break;
+			l = va_arg(ap, ber_slen_t *);
+			break;
 
 		case 'n':	/* null */
-		    break;
+			break;
 
 		case 's':	/* octet string - in a buffer */
-		    s = va_arg(ap, char *);
-		    l = va_arg(ap, ber_slen_t *);
-		    break;
+			s = va_arg(ap, char *);
+			l = va_arg(ap, ber_slen_t *);
+			break;
 
 		case 'o':	/* octet string in a supplied berval */
-		    bval = va_arg(ap, struct berval *);
-		    if (bval->bv_val) free(bval->bv_val);
-		    (void) memset(bval, 0, sizeof (struct berval));
-		    break;
+			bval = va_arg(ap, struct berval *);
+			if (bval->bv_val) free(bval->bv_val);
+			(void) memset(bval, 0, sizeof (struct berval));
+			break;
 
 		case 'O':	/* octet string - allocate & include length */
-		    bvp = va_arg(ap, struct berval **);
-		    kmfber_bvfree(*bvp);
-		    bvp = NULL;
-		    break;
+			bvp = va_arg(ap, struct berval **);
+			kmfber_bvfree(*bvp);
+			bvp = NULL;
+			break;
 
 		case 'B':	/* bit string - allocate storage as needed */
-		    ss = va_arg(ap, char **);
-		    l = va_arg(ap, ber_slen_t *); /* for length, in bits */
-		    if (*ss) free(*ss);
-		    *ss = NULL;
-		    break;
+			ss = va_arg(ap, char **);
+			l = va_arg(ap, ber_slen_t *); /* for length, in bits */
+			if (ss != NULL && *ss != NULL) {
+				free(*ss);
+				*ss = NULL;
+			}
+			break;
 
 		case 't':	/* tag of next item */
-		    t = va_arg(ap, ber_tag_t *);
-		    break;
+			t = va_arg(ap, ber_tag_t *);
+			break;
 		case 'T':	/* skip tag of next item */
-		    t = va_arg(ap, ber_tag_t *);
-		    break;
+			t = va_arg(ap, ber_tag_t *);
+			break;
 
 		case 'v':	/* sequence of strings */
-		    sss = va_arg(ap, char ***);
-		    ber_svecfree(*sss);
-		    *sss = NULL;
-		    break;
+			sss = va_arg(ap, char ***);
+			if (sss != NULL && *sss != NULL) {
+				ber_svecfree(*sss);
+				*sss = NULL;
+			}
+			break;
 
 		case 'V':	/* sequence of strings + lengths */
-		    bv = va_arg(ap, struct berval ***);
-		    kmfber_bvecfree(*bv);
-		    *bv = NULL;
-		    break;
+			bv = va_arg(ap, struct berval ***);
+			kmfber_bvecfree(*bv);
+			*bv = NULL;
+			break;
 
 		case 'x':	/* skip the next element - whatever it is */
-		    break;
+			break;
 
 		case '{':	/* begin sequence */
 		case '[':	/* begin set */
-		    break;
+			break;
 
 		case '}':	/* end sequence */
 		case ']':	/* end set */
-		    break;
+			break;
 
 		default:
-		    break;
-	    }
+			break;
+		}
 	} /* for */
 	va_end(ap);
 	} /* if */
-
 
 	return (rc);
 }
@@ -777,7 +778,7 @@ kmfber_bvdup(const struct berval *bv)
 	struct berval	*new;
 
 	if ((new = (struct berval *)malloc(sizeof (struct berval)))
-		== NULL) {
+	    == NULL) {
 		return (NULL);
 	}
 	if (bv->bv_val == NULL) {
@@ -785,8 +786,8 @@ kmfber_bvdup(const struct berval *bv)
 		new->bv_len = 0;
 	} else {
 		if ((new->bv_val = (char *)malloc(bv->bv_len + 1))
-			== NULL) {
-		    return (NULL);
+		    == NULL) {
+			return (NULL);
 		}
 		(void) memmove(new->bv_val, bv->bv_val, (size_t)bv->bv_len);
 		new->bv_val[bv->bv_len] = '\0';

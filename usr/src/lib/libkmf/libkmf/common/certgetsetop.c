@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,8 +289,8 @@ end:
 	return (ret);
 }
 
-static KMF_BOOL
-isEKUPresent(KMF_X509EXT_EKU *ekuptr, KMF_OID *ekuoid)
+KMF_BOOL
+is_eku_present(KMF_X509EXT_EKU *ekuptr, KMF_OID *ekuoid)
 {
 	int i;
 
@@ -304,7 +304,7 @@ isEKUPresent(KMF_X509EXT_EKU *ekuptr, KMF_OID *ekuoid)
 	return (0);
 }
 
-static KMF_RETURN
+KMF_RETURN
 parse_eku_data(const KMF_DATA *asn1data, KMF_X509EXT_EKU *ekuptr)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -2097,7 +2097,7 @@ kmf_add_cert_eku(KMF_X509_CERTIFICATE *CertData, KMF_OID *ekuOID,
 		 */
 		ret = parse_eku_data(&foundextn->BERvalue, &ekudata);
 		if (ret == KMF_OK) {
-			if (isEKUPresent(&ekudata, ekuOID)) {
+			if (is_eku_present(&ekudata, ekuOID)) {
 				goto out;
 			}
 		}

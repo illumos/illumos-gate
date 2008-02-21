@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,8 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 	char *certlabel, KMF_KEY_ALG keyAlg,
 	KMF_ALGORITHM_INDEX sigAlg,
 	int keylen, uint32_t ltime, KMF_BIGINT *serial,
-	uint16_t kubits, int kucrit, KMF_CREDENTIAL *tokencred)
+	uint16_t kubits, int kucrit, KMF_CREDENTIAL *tokencred,
+	EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv = KMF_OK;
 	KMF_KEY_HANDLE pubk, prik;
@@ -168,6 +169,15 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_cert_ku(&signedCert, kucrit, kubits),
 		    "KeyUsage");
 
+	if (ekulist != NULL) {
+		int i;
+		for (i = 0; kmfrv == KMF_OK && i < ekulist->eku_count; i++) {
+			SET_VALUE(kmf_add_cert_eku(&signedCert,
+			    &ekulist->ekulist[i], ekulist->critlist[i]),
+			    "Extended Key Usage");
+		}
+	}
+
 	/*
 	 * Construct attributes for the kmf_sign_cert operation.
 	 */
@@ -229,7 +239,8 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	uint32_t ltime, char *subject, char *altname,
 	KMF_GENERALNAMECHOICES alttype, int altcrit,
 	KMF_BIGINT *serial, uint16_t kubits, int kucrit,
-	char *dir, char *outcert, char *outkey)
+	char *dir, char *outcert, char *outkey,
+	EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEY_HANDLE pubk, prik;
@@ -384,6 +395,15 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	if (kubits != 0)
 		SET_VALUE(kmf_set_cert_ku(&signedCert, kucrit, kubits),
 		    "KeyUsage");
+
+	if (ekulist != NULL) {
+		int i;
+		for (i = 0; kmfrv == KMF_OK && i < ekulist->eku_count; i++) {
+			SET_VALUE(kmf_add_cert_eku(&signedCert,
+			    &ekulist->ekulist[i],
+			    ekulist->critlist[i]), "Extended Key Usage");
+		}
+	}
 	/*
 	 * Construct attributes for the kmf_sign_cert operation.
 	 */
@@ -451,7 +471,8 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	KMF_ALGORITHM_INDEX sigAlg,
 	int keylen, char *trust,
 	uint32_t ltime, KMF_BIGINT *serial, uint16_t kubits,
-	int kucrit, KMF_CREDENTIAL *tokencred)
+	int kucrit, KMF_CREDENTIAL *tokencred,
+	EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEY_HANDLE pubk, prik;
@@ -573,6 +594,14 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_cert_ku(&signedCert, kucrit, kubits),
 		    "subjectAltName");
 
+	if (ekulist != NULL) {
+		int i;
+		for (i = 0; kmfrv == KMF_OK && i < ekulist->eku_count; i++) {
+			SET_VALUE(kmf_add_cert_eku(&signedCert,
+			    &ekulist->ekulist[i],
+			    ekulist->critlist[i]), "Extended Key Usage");
+		}
+	}
 	/*
 	 * Construct attributes for the kmf_sign_cert operation.
 	 */
@@ -662,6 +691,7 @@ pk_gencert(int argc, char *argv[])
 	char *serstr = NULL;
 	char *altname = NULL;
 	char *keyusagestr = NULL;
+	char *ekustr = NULL;
 	KMF_GENERALNAMECHOICES alttype = 0;
 	KMF_BIGINT serial = { NULL, 0 };
 	uint32_t ltime;
@@ -674,11 +704,12 @@ pk_gencert(int argc, char *argv[])
 	KMF_CREDENTIAL tokencred = {NULL, 0};
 	uint16_t kubits = 0;
 	int altcrit = 0, kucrit = 0;
+	EKU_LIST *ekulist = NULL;
 
 	while ((opt = getopt_av(argc, argv,
 	    "ik:(keystore)s:(subject)n:(nickname)A:(altname)"
 	    "T:(token)d:(dir)p:(prefix)t:(keytype)y:(keylen)"
-	    "r:(trust)L:(lifetime)l:(label)c:(outcert)"
+	    "r:(trust)L:(lifetime)l:(label)c:(outcert)e:(eku)"
 	    "K:(outkey)S:(serial)F:(format)u:(keyusage)")) != EOF) {
 
 		if (opt != 'i' && EMPTYSTRING(optarg_av))
@@ -769,6 +800,9 @@ pk_gencert(int argc, char *argv[])
 				if (format)
 					return (PK_ERR_USAGE);
 				format = optarg_av;
+				break;
+			case 'e':
+				ekustr = optarg_av;
 				break;
 			default:
 				return (PK_ERR_USAGE);
@@ -906,6 +940,16 @@ pk_gencert(int argc, char *argv[])
 			goto end;
 		}
 	}
+	if (ekustr != NULL) {
+		rv = verify_ekunames(ekustr, &ekulist);
+		if (rv != KMF_OK) {
+			(void) fprintf(stderr, gettext("EKUs must "
+			    "be specified as a comma-separated list. "
+			    "See the man page for details.\n"));
+			rv = PK_ERR_USAGE;
+			goto end;
+		}
+	}
 
 	if (kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN) {
 		if (tokenname == NULL || !strlen(tokenname)) {
@@ -926,25 +970,29 @@ pk_gencert(int argc, char *argv[])
 		rv = gencert_nss(kmfhandle,
 		    tokenname, subname, altname, alttype, altcrit,
 		    certlabel, dir, prefix, keyAlg, sigAlg, keylen,
-		    trust, ltime, &serial, kubits, kucrit, &tokencred);
+		    trust, ltime, &serial, kubits, kucrit, &tokencred,
+		    ekulist);
 
 	} else if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = gencert_pkcs11(kmfhandle,
 		    tokenname, subname, altname, alttype, altcrit,
 		    certlabel, keyAlg, sigAlg, keylen, ltime,
-		    &serial, kubits, kucrit, &tokencred);
+		    &serial, kubits, kucrit, &tokencred, ekulist);
 
 	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
 		rv = gencert_file(kmfhandle,
 		    keyAlg, sigAlg, keylen, fmt,
 		    ltime, subname, altname, alttype, altcrit,
-		    &serial, kubits, kucrit, dir, outcert, outkey);
+		    &serial, kubits, kucrit, dir, outcert, outkey,
+		    ekulist);
 	}
 
 	if (rv != KMF_OK)
 		display_error(kmfhandle, rv,
 		    gettext("Error creating certificate and keypair"));
 end:
+	if (ekulist != NULL)
+		free_eku_list(ekulist);
 	if (subname)
 		free(subname);
 	if (tokencred.cred != NULL)

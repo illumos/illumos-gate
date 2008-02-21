@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *
@@ -87,6 +87,7 @@ extern KMF_RETURN kmf_create_cert_file(const KMF_DATA *, KMF_ENCODE_FORMAT,
 extern KMF_RETURN kmf_download_cert(KMF_HANDLE_T, char *, char *, int,
 	unsigned int, char *, KMF_ENCODE_FORMAT *);
 
+extern KMF_RETURN kmf_is_cert_data(KMF_DATA *, KMF_ENCODE_FORMAT *);
 extern KMF_RETURN kmf_is_cert_file(KMF_HANDLE_T, char *, KMF_ENCODE_FORMAT *);
 
 extern KMF_RETURN kmf_check_cert_date(KMF_HANDLE_T, const KMF_DATA *);
@@ -128,8 +129,11 @@ extern KMF_RETURN kmf_set_csr_sig_alg(KMF_CSR_DATA *, KMF_ALGORITHM_INDEX);
 extern KMF_RETURN kmf_set_csr_subject_altname(KMF_CSR_DATA *, char *,
 	int, KMF_GENERALNAMECHOICES);
 extern KMF_RETURN kmf_set_csr_ku(KMF_CSR_DATA *, int, uint16_t);
+extern KMF_RETURN kmf_decode_csr(KMF_HANDLE_T, KMF_DATA *, KMF_CSR_DATA *);
+extern KMF_RETURN kmf_verify_csr(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 extern KMF_RETURN kmf_sign_csr(KMF_HANDLE_T, const KMF_CSR_DATA *,
 	KMF_KEY_HANDLE *, KMF_DATA *);
+extern KMF_RETURN kmf_add_csr_eku(KMF_CSR_DATA *, KMF_OID *, int);
 
 /*
  * GetCert operations.
@@ -283,6 +287,7 @@ extern KMF_RETURN kmf_pem_to_der(unsigned char *, int, unsigned char **, int *);
 extern char *kmf_oid_to_string(KMF_OID *);
 extern KMF_RETURN kmf_string_to_oid(char *, KMF_OID *);
 extern int kmf_compare_rdns(KMF_X509_NAME *, KMF_X509_NAME *);
+extern KMF_RETURN kmf_get_data_format(KMF_DATA *, KMF_ENCODE_FORMAT *);
 extern KMF_RETURN kmf_get_file_format(char *, KMF_ENCODE_FORMAT *);
 extern uint32_t kmf_string_to_ku(char *);
 extern char *kmf_ku_to_string(uint32_t);
@@ -291,6 +296,9 @@ extern KMF_RETURN kmf_hexstr_to_bytes(unsigned char *, unsigned char **,
 
 extern KMF_RETURN kmf_get_plugin_info(KMF_HANDLE_T, char *,
 	KMF_KEYSTORE_TYPE *, char **);
+
+extern KMF_OID *kmf_ekuname_to_oid(char *);
+extern char *kmf_oid_to_ekuname(KMF_OID *);
 
 #define	KMF_CompareRDNs kmf_compare_rdns
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -4712,57 +4712,6 @@ out:
 
 	if (xcrl != NULL)
 		X509_CRL_free(xcrl);
-
-	return (ret);
-}
-
-/*
- * Check a file to see if it is a certficate file with PEM or DER format.
- * If success, return its format in the pformat argument.
- */
-KMF_RETURN
-OpenSSL_IsCertFile(KMF_HANDLE_T handle, char *filename,
-	KMF_ENCODE_FORMAT *pformat)
-{
-	KMF_RETURN	ret = KMF_OK;
-	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
-	BIO		*bio = NULL;
-	X509		*xcert = NULL;
-
-	if (filename == NULL) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	ret = kmf_get_file_format(filename, pformat);
-	if (ret != KMF_OK)
-		return (ret);
-
-	bio = BIO_new_file(filename, "rb");
-	if (bio == NULL)	{
-		SET_ERROR(kmfh, ERR_get_error());
-		ret = KMF_ERR_OPEN_FILE;
-		goto out;
-	}
-
-	if ((*pformat) == KMF_FORMAT_PEM) {
-		if ((xcert = PEM_read_bio_X509(bio, NULL,
-		    NULL, NULL)) == NULL) {
-			ret = KMF_ERR_BAD_CERTFILE;
-		}
-	} else if ((*pformat) == KMF_FORMAT_ASN1) {
-		if ((xcert = d2i_X509_bio(bio, NULL)) == NULL) {
-			ret = KMF_ERR_BAD_CERTFILE;
-		}
-	} else {
-		ret = KMF_ERR_BAD_CERTFILE;
-	}
-
-out:
-	if (bio != NULL)
-		(void) BIO_free(bio);
-
-	if (xcert != NULL)
-		X509_free(xcert);
 
 	return (ret);
 }

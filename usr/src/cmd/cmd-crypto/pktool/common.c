@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,16 +165,7 @@ logout_token(CK_SESSION_HANDLE sess)
 CK_RV
 get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 {
-	char		*save_phrase, *phrase1, *phrase2;
-
-
-#ifdef DEBUG
-	if (getenv("TOKENPIN") != NULL) {
-		*pin = (CK_UTF8CHAR_PTR)strdup(getenv("TOKENPIN"));
-		*pinlen = strlen((char *)(*pin));
-		return (CKR_OK);
-	}
-#endif /* DEBUG */
+	char *save_phrase, *phrase1, *phrase2;
 
 	/* Prompt user for a PIN. */
 	if (prompt1 == NULL) {
@@ -205,6 +196,22 @@ get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 	return (CKR_OK);
 }
 
+int
+yn_to_int(char *ynstr)
+{
+	char *y = gettext("yes");
+	char *n = gettext("no");
+	if (ynstr == NULL)
+		return (-1);
+
+	if (strncasecmp(ynstr, y, 1) == 0)
+		return (1);
+	else if (strncasecmp(ynstr, n, 1) == 0)
+		return (0);
+	else
+		return (-1);
+}
+
 /*
  * Gets yes/no response from user.  If either no prompt is supplied, a
  * default prompt is used.  If not message for invalid input is supplied,
@@ -215,17 +222,8 @@ get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 boolean_t
 yesno(char *prompt, char *invalid, boolean_t dflt)
 {
-	char		*response, buf[1024];
-	char		*yes = gettext("yes");
-	char		*no = gettext("no");
-
-
-#ifdef DEBUG
-	/* If debugging or testing, return TRUE and avoid prompting */
-	if (getenv("TOKENPIN") != NULL) {
-		return (B_TRUE);
-	}
-#endif /* DEBUG */
+	char	*response, buf[1024];
+	int	ans;
 
 	if (prompt == NULL)
 		prompt = gettext("Enter (y)es or (n)o? ");
@@ -245,10 +243,10 @@ yesno(char *prompt, char *invalid, boolean_t dflt)
 		if (*response == '\0')
 			break;		/* go to default response */
 
-		/* Is it valid input?  Return appropriately. */
-		if (strncasecmp(response, yes, 1) == 0)
+		ans = yn_to_int(response);
+		if (ans == 1)
 			return (B_TRUE);
-		if (strncasecmp(response, no, 1) == 0)
+		else if (ans == 0)
 			return (B_FALSE);
 
 		/* Indicate invalid input, and try again. */
@@ -451,11 +449,11 @@ KS2Int(char *keystore_str)
 {
 	if (keystore_str == NULL)
 		return (0);
-	if (!strcasecmp(keystore_str, "pkcs11"))
+	if (strcasecmp(keystore_str, "pkcs11") == 0)
 		return (KMF_KEYSTORE_PK11TOKEN);
-	else if (!strcasecmp(keystore_str, "nss"))
+	else if (strcasecmp(keystore_str, "nss") == 0)
 		return (KMF_KEYSTORE_NSS);
-	else if (!strcasecmp(keystore_str, "file"))
+	else if (strcasecmp(keystore_str, "file") == 0)
 		return (KMF_KEYSTORE_OPENSSL);
 	else
 		return (0);
@@ -507,7 +505,7 @@ Str2Lifetime(char *ltimestr, uint32_t *ltime)
 	int num;
 	char timetok[6];
 
-	if (ltimestr == NULL || !strlen(ltimestr)) {
+	if (ltimestr == NULL || strlen(ltimestr) == 0) {
 		/* default to 1 year lifetime */
 		*ltime = SECSPERDAY * DAYSPERNYEAR;
 		return (0);
@@ -517,14 +515,14 @@ Str2Lifetime(char *ltimestr, uint32_t *ltime)
 	if (sscanf(ltimestr, "%d-%06s", &num, timetok) != 2)
 		return (-1);
 
-	if (!strcasecmp(timetok, "day") ||
-	    !strcasecmp(timetok, "days")) {
+	if (strcasecmp(timetok, "day") == 0||
+	    strcasecmp(timetok, "days") == 0) {
 		*ltime = num * SECSPERDAY;
-	} else if (!strcasecmp(timetok, "hour") ||
-	    !strcasecmp(timetok, "hours")) {
+	} else if (strcasecmp(timetok, "hour") == 0||
+	    strcasecmp(timetok, "hours") == 0) {
 		*ltime = num * SECSPERHOUR;
-	} else if (!strcasecmp(timetok, "year") ||
-	    !strcasecmp(timetok, "years")) {
+	} else if (strcasecmp(timetok, "year") == 0 ||
+	    strcasecmp(timetok, "years") == 0) {
 		*ltime = num * SECSPERDAY * DAYSPERNYEAR;
 	} else {
 		*ltime = 0;
@@ -545,11 +543,11 @@ OT2Int(char *objclass)
 
 	c = strchr(objclass, ':');
 	if (c != NULL) {
-		if (!strcasecmp(c, ":private"))
+		if (strcasecmp(c, ":private") == 0)
 			retval = PK_PRIVATE_OBJ;
-		else if (!strcasecmp(c, ":public"))
+		else if (strcasecmp(c, ":public") == 0)
 			retval = PK_PUBLIC_OBJ;
-		else if (!strcasecmp(c, ":both"))
+		else if (strcasecmp(c, ":both") == 0)
 			retval = PK_PRIVATE_OBJ | PK_PUBLIC_OBJ;
 		else /* unrecognized option */
 			return (-1);
@@ -557,21 +555,21 @@ OT2Int(char *objclass)
 		*c = '\0';
 	}
 
-	if (!strcasecmp(objclass, "public")) {
+	if (strcasecmp(objclass, "public") == 0) {
 		if (retval)
 			return (-1);
 		return (retval | PK_PUBLIC_OBJ | PK_CERT_OBJ | PK_PUBKEY_OBJ);
-	} else if (!strcasecmp(objclass, "private")) {
+	} else if (strcasecmp(objclass, "private") == 0) {
 		if (retval)
 			return (-1);
 		return (retval | PK_PRIKEY_OBJ | PK_PRIVATE_OBJ);
-	} else if (!strcasecmp(objclass, "both")) {
+	} else if (strcasecmp(objclass, "both") == 0) {
 		if (retval)
 			return (-1);
 		return (PK_KEY_OBJ | PK_PUBLIC_OBJ | PK_PRIVATE_OBJ);
-	} else if (!strcasecmp(objclass, "cert")) {
+	} else if (strcasecmp(objclass, "cert") == 0) {
 		return (retval | PK_CERT_OBJ);
-	} else if (!strcasecmp(objclass, "key")) {
+	} else if (strcasecmp(objclass, "key") == 0) {
 		if (retval == 0) /* return all keys */
 			return (retval | PK_KEY_OBJ);
 		else if (retval == (PK_PRIVATE_OBJ | PK_PUBLIC_OBJ))
@@ -583,7 +581,7 @@ OT2Int(char *objclass)
 		else if (retval & PK_PRIVATE_OBJ)
 			/* Only return private keys */
 			return (retval | PK_PRIKEY_OBJ);
-	} else if (!strcasecmp(objclass, "crl")) {
+	} else if (strcasecmp(objclass, "crl") == 0) {
 		if (retval)
 			return (-1);
 		return (retval | PK_CRL_OBJ);
@@ -597,22 +595,20 @@ OT2Int(char *objclass)
 KMF_ENCODE_FORMAT
 Str2Format(char *formstr)
 {
-	if (formstr == NULL || !strcasecmp(formstr, "der"))
+	if (formstr == NULL || strcasecmp(formstr, "der") == 0)
 		return (KMF_FORMAT_ASN1);
-	if (!strcasecmp(formstr, "pem"))
+	if (strcasecmp(formstr, "pem") == 0)
 		return (KMF_FORMAT_PEM);
-	if (!strcasecmp(formstr, "pkcs12"))
+	if (strcasecmp(formstr, "pkcs12") == 0)
 		return (KMF_FORMAT_PKCS12);
-	if (!strcasecmp(formstr, "raw"))
+	if (strcasecmp(formstr, "raw") == 0)
 		return (KMF_FORMAT_RAWKEY);
 
 	return (KMF_FORMAT_UNDEF);
 }
 
-
 KMF_RETURN
-select_token(void *kmfhandle, char *token,
-	int readonly)
+select_token(void *kmfhandle, char *token, int readonly)
 {
 	KMF_ATTRIBUTE attlist[10];
 	int i = 0;
@@ -645,11 +641,9 @@ select_token(void *kmfhandle, char *token,
 	return (rv);
 }
 
-
 KMF_RETURN
 configure_nss(void *kmfhandle, char *dir, char *prefix)
 {
-
 	KMF_ATTRIBUTE attlist[10];
 	int i = 0;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
@@ -685,7 +679,6 @@ configure_nss(void *kmfhandle, char *dir, char *prefix)
 
 	return (rv);
 }
-
 
 KMF_RETURN
 get_pk12_password(KMF_CREDENTIAL *cred)
@@ -927,11 +920,11 @@ verify_keyusage(char *kustr, uint16_t *kubits, int *critical)
 	char *k;
 
 	*kubits = 0;
-	if (kustr == NULL || !strlen(kustr))
+	if (kustr == NULL || strlen(kustr) == 0)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* Check to see if this is critical */
-	if (!strncasecmp(kustr, "critical:", strlen("critical:"))) {
+	if (strncasecmp(kustr, "critical:", strlen("critical:")) == 0) {
 		*critical = TRUE;
 		kustr += strlen("critical:");
 	} else {
@@ -966,7 +959,7 @@ verify_altname(char *arg, KMF_GENERALNAMECHOICES *type, int *critical)
 	KMF_RETURN rv = KMF_OK;
 
 	/* Check to see if this is critical */
-	if (!strncasecmp(arg, "critical:", strlen("critical:"))) {
+	if (strncasecmp(arg, "critical:", strlen("critical:")) == 0) {
 		*critical = TRUE;
 		arg += strlen("critical:");
 	} else {
@@ -992,6 +985,10 @@ verify_altname(char *arg, KMF_GENERALNAMECHOICES *type, int *critical)
 		*type = GENNAME_DIRECTORYNAME;
 	else if (strcmp(arg, "RID") == 0)
 		*type = GENNAME_REGISTEREDID;
+	else if (strcmp(arg, "KRB") == 0)
+		*type = GENNAME_KRB5PRINC;
+	else if (strcmp(arg, "UPN") == 0)
+		*type = GENNAME_SCLOGON_UPN;
 	else
 		rv = KMF_ERR_BAD_PARAMETER;
 
@@ -1079,4 +1076,101 @@ display_error(void *handle, KMF_RETURN errcode, char *prefix)
 	if (rv1 != KMF_OK && rv2 != KMF_OK)
 		cryptoerror(LOG_STDERR, gettext("<unknown error>\n"));
 
+}
+
+static KMF_RETURN
+addToEKUList(EKU_LIST *ekus, int critical, KMF_OID *newoid)
+{
+	if (newoid != NULL && ekus != NULL) {
+		ekus->eku_count++;
+
+		ekus->critlist = realloc(ekus->critlist,
+		    ekus->eku_count * sizeof (int));
+		if (ekus->critlist != NULL)
+			ekus->critlist[ekus->eku_count-1] = critical;
+		else
+			return (KMF_ERR_MEMORY);
+
+		ekus->ekulist = realloc(
+		    ekus->ekulist, ekus->eku_count * sizeof (KMF_OID));
+		if (ekus->ekulist != NULL)
+			ekus->ekulist[ekus->eku_count-1] = *newoid;
+		else
+			return (KMF_ERR_MEMORY);
+	}
+	return (KMF_OK);
+}
+
+void
+free_eku_list(EKU_LIST *ekus)
+{
+	if (ekus != NULL && ekus->eku_count > 0) {
+		int i;
+		for (i = 0; i < ekus->eku_count; i++) {
+			kmf_free_data(&ekus->ekulist[i]);
+		}
+		free(ekus->ekulist);
+		free(ekus->critlist);
+	}
+}
+
+static KMF_RETURN
+parse_ekus(char *ekustr, EKU_LIST *ekus)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_OID *newoid;
+	int critical;
+
+	if (strncasecmp(ekustr, "critical:",
+	    strlen("critical:")) == 0) {
+		critical = TRUE;
+		ekustr += strlen("critical:");
+	} else {
+		critical = FALSE;
+	}
+	newoid = kmf_ekuname_to_oid(ekustr);
+	if (newoid != NULL) {
+		rv = addToEKUList(ekus, critical, newoid);
+		free(newoid);
+	} else {
+		rv = PK_ERR_USAGE;
+	}
+
+	return (rv);
+}
+
+KMF_RETURN
+verify_ekunames(char *ekuliststr, EKU_LIST **ekulist)
+{
+	KMF_RETURN rv = KMF_OK;
+	char *p;
+	EKU_LIST *ekus = NULL;
+
+	if (ekuliststr == NULL || strlen(ekuliststr) == 0)
+		return (0);
+
+	/*
+	 * The list should be comma separated list of EKU Names.
+	 */
+	p = strtok(ekuliststr, ",");
+
+	/* If no tokens found, then maybe it's just a single EKU value */
+	if (p == NULL) {
+		rv = parse_ekus(ekuliststr, ekus);
+	}
+
+	while (p != NULL) {
+		rv = parse_ekus(p, ekus);
+
+		if (rv != KMF_OK)
+			break;
+		p = strtok(NULL, ",");
+	}
+
+	if (rv != KMF_OK)
+		free_eku_list(ekus);
+	else
+		*ekulist = ekus;
+
+	return (rv);
 }

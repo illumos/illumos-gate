@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _KMFAPIP_H
@@ -219,62 +219,59 @@ typedef struct _kmf_handle {
 
 KMF_PLUGIN_FUNCLIST *KMF_Plugin_Initialize();
 
-KMF_RETURN
-VerifyDataWithKey(KMF_HANDLE_T, KMF_DATA *, KMF_ALGORITHM_INDEX, KMF_DATA *,
-	KMF_DATA *);
+extern KMF_RETURN
+VerifyDataWithKey(KMF_HANDLE_T, KMF_DATA *, KMF_ALGORITHM_INDEX,
+    KMF_DATA *, KMF_DATA *);
 
-KMF_BOOL pkcs_algid_to_keytype(
-	KMF_ALGORITHM_INDEX, CK_KEY_TYPE *);
+extern KMF_BOOL pkcs_algid_to_keytype(
+    KMF_ALGORITHM_INDEX, CK_KEY_TYPE *);
 
-KMF_RETURN PKCS_VerifyData(
-	KMF_HANDLE *,
-	KMF_ALGORITHM_INDEX,
-	KMF_X509_SPKI *,
-	KMF_DATA *, KMF_DATA *);
+extern KMF_RETURN PKCS_VerifyData(
+    KMF_HANDLE *,
+    KMF_ALGORITHM_INDEX,
+    KMF_X509_SPKI *,
+    KMF_DATA *, KMF_DATA *);
 
-KMF_RETURN PKCS_EncryptData(
-	KMF_HANDLE *,
-	KMF_ALGORITHM_INDEX,
-	KMF_X509_SPKI *,
-	KMF_DATA *,
-	KMF_DATA *);
+extern KMF_RETURN PKCS_EncryptData(
+    KMF_HANDLE *,
+    KMF_ALGORITHM_INDEX,
+    KMF_X509_SPKI *,
+    KMF_DATA *,
+    KMF_DATA *);
 
-KMF_PLUGIN *FindPlugin(KMF_HANDLE_T, KMF_KEYSTORE_TYPE);
+extern KMF_PLUGIN *FindPlugin(KMF_HANDLE_T, KMF_KEYSTORE_TYPE);
 
-KMF_BOOL IsEqualOid(KMF_OID *, KMF_OID *);
+extern KMF_BOOL IsEqualOid(KMF_OID *, KMF_OID *);
 
-KMF_RETURN copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
-	KMF_X509_ALGORITHM_IDENTIFIER *srcid);
+extern KMF_RETURN copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
+    KMF_X509_ALGORITHM_IDENTIFIER *srcid);
 
-KMF_OID *x509_algid_to_algoid(KMF_ALGORITHM_INDEX);
-KMF_ALGORITHM_INDEX x509_algoid_to_algid(KMF_OID *);
+extern KMF_OID *x509_algid_to_algoid(KMF_ALGORITHM_INDEX);
+extern KMF_ALGORITHM_INDEX x509_algoid_to_algid(KMF_OID *);
 
-KMF_RETURN PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
-	const KMF_X509_SPKI *, CK_KEY_TYPE, CK_OBJECT_HANDLE *,
-	KMF_BOOL *);
+extern KMF_RETURN PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
+    const KMF_X509_SPKI *, CK_KEY_TYPE, CK_OBJECT_HANDLE *,
+    KMF_BOOL *);
 
-KMF_RETURN GetIDFromSPKI(KMF_X509_SPKI *, KMF_DATA *);
-
-KMF_RETURN kmf_set_altname(KMF_X509_EXTENSIONS *,
-	KMF_OID *, int, KMF_GENERALNAMECHOICES, char *);
-KMF_RETURN GetSequenceContents(char *, size_t, char **, size_t *);
-KMF_X509_EXTENSION *FindExtn(KMF_X509_EXTENSIONS *, KMF_OID *);
-KMF_RETURN add_an_extension(KMF_X509_EXTENSIONS *exts,
-	KMF_X509_EXTENSION *newextn);
-KMF_RETURN set_integer(KMF_DATA *, void *, int);
-void free_keyidlist(KMF_OID *, int);
-KMF_RETURN copy_data(KMF_DATA *, KMF_DATA *);
-void Cleanup_PK11_Session(KMF_HANDLE_T handle);
-void free_dp_name(KMF_CRL_DIST_POINT *);
-void free_dp(KMF_CRL_DIST_POINT *);
-KMF_RETURN set_key_usage_extension(KMF_X509_EXTENSIONS *,
-	int, uint32_t);
-KMF_RETURN init_pk11();
-KMF_RETURN kmf_select_token(KMF_HANDLE_T, char *, int);
-
-KMF_RETURN test_attributes(int, KMF_ATTRIBUTE_TESTER *,
-	int, KMF_ATTRIBUTE_TESTER *, int, KMF_ATTRIBUTE *);
-
+extern KMF_RETURN GetIDFromSPKI(KMF_X509_SPKI *, KMF_DATA *);
+extern KMF_RETURN kmf_select_token(KMF_HANDLE_T, char *, int);
+extern KMF_RETURN kmf_set_altname(KMF_X509_EXTENSIONS *,
+    KMF_OID *, int, KMF_GENERALNAMECHOICES, char *);
+extern KMF_RETURN GetSequenceContents(char *, size_t, char **, size_t *);
+extern KMF_X509_EXTENSION *FindExtn(KMF_X509_EXTENSIONS *, KMF_OID *);
+extern KMF_RETURN add_an_extension(KMF_X509_EXTENSIONS *exts,
+    KMF_X509_EXTENSION *newextn);
+extern KMF_RETURN set_integer(KMF_DATA *, void *, int);
+extern void free_keyidlist(KMF_OID *, int);
+extern KMF_RETURN copy_data(KMF_DATA *, KMF_DATA *);
+extern void Cleanup_PK11_Session(KMF_HANDLE_T handle);
+extern void free_dp_name(KMF_CRL_DIST_POINT *);
+extern void free_dp(KMF_CRL_DIST_POINT *);
+extern KMF_RETURN set_key_usage_extension(KMF_X509_EXTENSIONS *,
+    int, uint32_t);
+extern KMF_RETURN init_pk11();
+extern KMF_RETURN test_attributes(int, KMF_ATTRIBUTE_TESTER *,
+    int, KMF_ATTRIBUTE_TESTER *, int, KMF_ATTRIBUTE *);
 
 /* Indexes into the key parts array for RSA keys */
 #define	KMF_RSA_MODULUS			(0)
@@ -351,7 +348,9 @@ extern KMF_RETURN get_entrylist(conf_entrylist_t **);
 extern void free_entrylist(conf_entrylist_t *);
 extern void free_entry(conf_entry_t *);
 extern conf_entry_t *dup_entry(conf_entry_t *);
-boolean_t is_valid_keystore_type(KMF_KEYSTORE_TYPE);
+extern boolean_t is_valid_keystore_type(KMF_KEYSTORE_TYPE);
+extern KMF_BOOL is_eku_present(KMF_X509EXT_EKU *, KMF_OID *);
+extern KMF_RETURN parse_eku_data(const KMF_DATA *, KMF_X509EXT_EKU *);
 
 #ifdef __cplusplus
 }

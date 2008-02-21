@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,7 +85,7 @@ show_policy(KMF_POLICY_RECORD *plc)
 	if (plc->eku_set.eku_count > 0) {
 		(void) printf(gettext("Extended Key Usage Values:\n"));
 		for (i = 0; i < plc->eku_set.eku_count; i++) {
-			char *s = kmf_oid_to_eku_string(
+			char *s = kmf_oid_to_ekuname(
 			    &plc->eku_set.ekulist[i]);
 			(void) printf("\t%s\t(%s)\n",
 			    kmf_oid_to_string(&plc->eku_set.ekulist[i]),

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -379,3 +379,24 @@ KMFOID_OIW_DSAWithSHA1  = {OID_OIW_ALGORITHM_LENGTH+1,
 KMFOID_X9CM_DSA = {OID_X9CM_X9ALGORITHM_LENGTH+1, OID_X9CM_DSA},
 KMFOID_X9CM_DSAWithSHA1 = {OID_X9CM_X9ALGORITHM_LENGTH+1,
 		OID_X9CM_DSAWithSHA1};
+
+/*
+ * New for PKINIT support.
+ */
+static uint8_t
+OID_pkinit_san[] = { OID_KRB5_SAN },
+OID_pkinit_san_upn[] = { OID_MS_KP_SC_LOGON_UPN },
+OID_pkinit_kp_clientauth[] = { OID_KRB5_PKINIT_KPCLIENTAUTH },
+OID_pkinit_kp_kdc[] = { OID_KRB5_PKINIT_KPKDC },
+OID_pkinit_kp_sc_logon[] = { OID_MS_KP_SC_LOGON };
+
+const KMF_OID
+KMFOID_PKINIT_san = {OID_KRB5_SAN_LENGTH, OID_pkinit_san },
+KMFOID_PKINIT_ClientAuth = {OID_KRB5_PKINIT_KPCLIENTAUTH_LENGTH,
+    OID_pkinit_kp_clientauth},
+KMFOID_PKINIT_Kdc = {OID_KRB5_PKINIT_KPKDC_LENGTH,
+    OID_pkinit_kp_kdc},
+KMFOID_MS_KP_SCLogon = {OID_MS_KP_SC_LOGON_LENGTH,
+    OID_pkinit_kp_sc_logon},
+KMFOID_MS_KP_SCLogon_UPN = {OID_MS_KP_SC_LOGON_UPN_LENGTH,
+    OID_pkinit_san_upn};

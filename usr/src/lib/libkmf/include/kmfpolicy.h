@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _KMFPOLICY_H
@@ -176,9 +176,6 @@ typedef struct {
 #define	TMPFILE_TEMPLATE	"policyXXXXXX"
 
 extern int parsePolicyElement(xmlNodePtr, KMF_POLICY_RECORD *);
-
-extern char *kmf_oid_to_eku_string(KMF_OID *);
-extern KMF_OID *kmf_ekuname_to_oid(char *);
 
 extern KMF_RETURN kmf_get_policy(char *, char *, KMF_POLICY_RECORD *);
 extern KMF_RETURN kmf_add_policy_to_db(KMF_POLICY_RECORD *, char *, boolean_t);

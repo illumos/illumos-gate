@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,8 +255,112 @@ kmf_set_csr_ku(KMF_CSR_DATA *CSRData,
 	return (ret);
 }
 
+KMF_RETURN
+kmf_add_csr_eku(KMF_CSR_DATA *CSRData, KMF_OID *ekuOID,
+	int critical)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_X509_EXTENSION *foundextn;
+	KMF_X509_EXTENSION newextn;
+	BerElement *asn1 = NULL;
+	BerValue *extdata = NULL;
+	char *olddata = NULL;
+	size_t oldsize = 0;
+	KMF_X509EXT_EKU ekudata;
+
+	if (CSRData == NULL || ekuOID == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	(void) memset(&ekudata, 0, sizeof (KMF_X509EXT_EKU));
+	(void) memset(&newextn, 0, sizeof (newextn));
+
+	foundextn = FindExtn(&CSRData->csr.extensions,
+	    (KMF_OID *)&KMFOID_ExtendedKeyUsage);
+	if (foundextn != NULL) {
+		ret = GetSequenceContents((char *)foundextn->BERvalue.Data,
+		    foundextn->BERvalue.Length, &olddata, &oldsize);
+		if (ret != KMF_OK)
+			goto out;
+
+		/*
+		 * If the EKU is already in the cert, then just return OK.
+		 */
+		ret = parse_eku_data(&foundextn->BERvalue, &ekudata);
+		if (ret == KMF_OK) {
+			if (is_eku_present(&ekudata, ekuOID)) {
+				goto out;
+			}
+		}
+	}
+	if ((asn1 = kmfder_alloc()) == NULL)
+		return (KMF_ERR_MEMORY);
+
+	if (kmfber_printf(asn1, "{") == -1) {
+		ret = KMF_ERR_ENCODING;
+		goto out;
+	}
+
+	/* Write the old extension data first */
+	if (olddata != NULL && oldsize > 0) {
+		if (kmfber_write(asn1, olddata, oldsize, 0) == -1) {
+			ret = KMF_ERR_ENCODING;
+			goto out;
+		}
+	}
+
+	/* Append this EKU OID and close the sequence */
+	if (kmfber_printf(asn1, "D}", ekuOID) == -1) {
+		ret = KMF_ERR_ENCODING;
+		goto out;
+	}
+
+	if (kmfber_flatten(asn1, &extdata) == -1) {
+		ret = KMF_ERR_ENCODING;
+		goto out;
+	}
+
+	/*
+	 * If we are just adding to an existing list of EKU OIDs,
+	 * just replace the BER data associated with the found extension.
+	 */
+	if (foundextn != NULL) {
+		free(foundextn->BERvalue.Data);
+		foundextn->critical = critical;
+		foundextn->BERvalue.Data = (uchar_t *)extdata->bv_val;
+		foundextn->BERvalue.Length = extdata->bv_len;
+	} else {
+		ret = copy_data(&newextn.extnId,
+		    (KMF_DATA *)&KMFOID_ExtendedKeyUsage);
+		if (ret != KMF_OK)
+			goto out;
+		newextn.critical = critical;
+		newextn.format = KMF_X509_DATAFORMAT_ENCODED;
+		newextn.BERvalue.Data = (uchar_t *)extdata->bv_val;
+		newextn.BERvalue.Length = extdata->bv_len;
+		ret = kmf_set_csr_extn(CSRData, &newextn);
+		if (ret != KMF_OK)
+			free(newextn.BERvalue.Data);
+	}
+
+out:
+	kmf_free_eku(&ekudata);
+	if (extdata != NULL)
+		free(extdata);
+
+	if (olddata != NULL)
+		free(olddata);
+
+	if (asn1 != NULL)
+		kmfber_free(asn1, 1);
+
+	if (ret != KMF_OK)
+		kmf_free_data(&newextn.extnId);
+
+	return (ret);
+}
+
 static KMF_RETURN
-SignCsr(KMF_HANDLE_T handle,
+sign_csr(KMF_HANDLE_T handle,
 	const KMF_DATA *SubjectCsr,
 	KMF_KEY_HANDLE	*Signkey,
 	KMF_X509_ALGORITHM_IDENTIFIER *algo,
@@ -376,7 +480,7 @@ kmf_sign_csr(KMF_HANDLE_T handle,
 
 	err = DerEncodeTbsCsr((KMF_TBS_CSR *)&tbsCsr->csr, &csrdata);
 	if (err == KMF_OK) {
-		err = SignCsr(handle, &csrdata, Signkey,
+		err = sign_csr(handle, &csrdata, Signkey,
 		    (KMF_X509_ALGORITHM_IDENTIFIER *)
 		    &tbsCsr->signature.algorithmIdentifier,
 		    SignedCsr);
@@ -387,6 +491,85 @@ kmf_sign_csr(KMF_HANDLE_T handle,
 	}
 	kmf_free_data(&csrdata);
 	return (err);
+}
+
+/*
+ * kmf_decode_csr
+ *
+ * Description:
+ *   This function decodes raw CSR data and fills in the KMF_CSR_DATA
+ *   record.
+ *
+ * Inputs:
+ *	KMF_HANDLE_T handle
+ *	KMF_DATA *rawcsr
+ *	KMF_CSR_DATA *csrdata;
+ */
+KMF_RETURN
+kmf_decode_csr(KMF_HANDLE_T handle, KMF_DATA *rawcsr, KMF_CSR_DATA *csrdata)
+{
+	KMF_RETURN rv;
+	KMF_CSR_DATA *cdata = NULL;
+
+	if (handle == NULL || rawcsr == NULL || csrdata == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = DerDecodeSignedCsr(rawcsr, &cdata);
+	if (rv != KMF_OK)
+		return (rv);
+
+	(void) memcpy(csrdata, cdata, sizeof (KMF_CSR_DATA));
+
+	free(cdata);
+	return (rv);
+}
+
+KMF_RETURN
+kmf_verify_csr(KMF_HANDLE_T handle, int numattr,
+	KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_CSR_DATA *csrdata = NULL;
+	KMF_ALGORITHM_INDEX algid;
+	KMF_X509_ALGORITHM_IDENTIFIER *x509alg;
+	KMF_DATA rawcsr;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_CSR_DATA_ATTR, FALSE, sizeof (KMF_CSR_DATA),
+	    sizeof (KMF_CSR_DATA)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, rv);
+
+	rv = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
+	if (rv != KMF_OK)
+		return (rv);
+
+	csrdata = kmf_get_attr_ptr(KMF_CSR_DATA_ATTR, attrlist, numattr);
+	if (csrdata == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = DerEncodeTbsCsr(&csrdata->csr, &rawcsr);
+	if (rv != KMF_OK)
+		return (rv);
+
+	x509alg = &csrdata->signature.algorithmIdentifier;
+	algid = x509_algoid_to_algid(&x509alg->algorithm);
+
+	rv = PKCS_VerifyData(handle, algid,
+	    &csrdata->csr.subjectPublicKeyInfo,
+	    &rawcsr,
+	    &csrdata->signature.encrypted);
+
+	kmf_free_data(&rawcsr);
+	return (rv);
 }
 
 static KMF_RETURN

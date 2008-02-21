@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,6 +87,8 @@ SUNW_1.1 {
 	KMFOID_MD5WithRSA;
 	KMFOID_Member;
 	KMFOID_MessageDigest;
+	KMFOID_MS_KP_SCLogon;
+	KMFOID_MS_KP_SCLogon_UPN;
 	KMFOID_Name;
 	KMFOID_NameConstraints;
 	KMFOID_OIW_DSAWithSHA1;
@@ -94,6 +96,9 @@ SUNW_1.1 {
 	KMFOID_OrganizationName;
 	KMFOID_OrganizationalUnitName;
 	KMFOID_Owner;
+	KMFOID_PKINIT_ClientAuth;
+	KMFOID_PKINIT_Kdc;
+	KMFOID_PKINIT_san;
 	KMFOID_PKIX_KP_ClientAuth;
 	KMFOID_PKIX_KP_CodeSigning;
 	KMFOID_PKIX_KP_EmailProtection;
@@ -152,6 +157,7 @@ SUNW_1.1 {
 	KMFOID_domainComponent;
 	KMFOID_userid;
 	kmf_add_cert_eku;
+	kmf_add_csr_eku;
 	kmf_add_policy_to_db;
 	kmf_build_pk12;
 	kmf_check_cert_date;
@@ -163,6 +169,7 @@ SUNW_1.1 {
 	kmf_create_keypair;
 	kmf_create_ocsp_request;
 	kmf_create_sym_key;
+	kmf_decode_csr;
 	kmf_decrypt;
 	kmf_delete_cert_from_keystore;
 	kmf_delete_crl;
@@ -182,6 +189,7 @@ SUNW_1.1 {
 	kmf_find_cert_in_crl;
 	kmf_find_crl;
 	kmf_find_key;
+	kmf_find_prikey_by_cert;
 	kmf_free_algoid;
 	kmf_free_bigint;
 	kmf_free_crl_dist_pts;
@@ -225,6 +233,7 @@ SUNW_1.1 {
 	kmf_get_cert_subject_str;
 	kmf_get_cert_validity;
 	kmf_get_cert_version_str;
+	kmf_get_data_format;
 	kmf_get_encoded_ocsp_response;
 	kmf_get_file_format;
 	kmf_get_kmf_error_str;
@@ -241,16 +250,16 @@ SUNW_1.1 {
 	kmf_import_cert;
 	kmf_import_objects;
 	kmf_initialize;
+	kmf_is_cert_data;
 	kmf_is_cert_file;
 	kmf_is_crl_file;
 	kmf_ku_to_string;
 	kmf_list_crl;
-	kmf_oid_to_eku_string;
+	kmf_oid_to_ekuname;
 	kmf_oid_to_string;
 	kmf_pem_to_der;
 	kmf_pk11_token_lookup;
 	kmf_read_input_file;
-	kmf_select_token;
 	kmf_set_attr;
 	kmf_set_attr_at_index;
 	kmf_set_cert_basic_constraint;
@@ -284,6 +293,7 @@ SUNW_1.1 {
 	kmf_validate_cert;
 	kmf_verify_cert;
 	kmf_verify_crl_file;
+	kmf_verify_csr;
 	kmf_verify_data;
 	kmf_verify_policy;
     local:
@@ -323,6 +333,7 @@ SUNWprivate_1.1 {
 	free_entry;
 	free_entrylist;
 	get_entrylist;
+	kmf_select_token;
 	parsePolicyElement;
 	PKCS_AcquirePublicKeyHandle;
 	PKCS_GetDefaultSignatureMode;

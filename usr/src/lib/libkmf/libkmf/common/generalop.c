@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -137,7 +137,9 @@ static kmf_error_map kmf_errcodes[] = {
 	{KMF_KEYSTORE_ALREADY_INITIALIZED, "KMF_KEYSTORE_ALREADY_INITIALIZED"},
 	{KMF_ERR_SENSITIVE_KEY,		"KMF_ERR_SENSITIVE_KEY"},
 	{KMF_ERR_UNEXTRACTABLE_KEY,	"KMF_ERR_UNEXTRACTABLE_KEY"},
-	{KMF_ERR_KEY_MISMATCH,		"KMF_ERR_KEY_MISMATCH"}
+	{KMF_ERR_KEY_MISMATCH,		"KMF_ERR_KEY_MISMATCH"},
+	{KMF_ERR_ATTR_NOT_FOUND,	"KMF_ERR_ATTR_NOT_FOUND"},
+	{KMF_ERR_KMF_CONF,		"KMF_ERR_KMF_CONF"}
 };
 
 typedef struct {
@@ -820,8 +822,14 @@ static boolean_t
 check_for_pem(uchar_t *buf, KMF_ENCODE_FORMAT *fmt)
 {
 	char *p;
+	int i;
 
 	if (buf == NULL)
+		return (FALSE);
+
+	for (i = 0; i < 8 && isascii(buf[i]); i++)
+		/* loop to make sure this is ascii */;
+	if (i != 8)
 		return (FALSE);
 
 	if (memcmp(buf, "Bag Attr", 8) == 0) {
@@ -834,8 +842,11 @@ check_for_pem(uchar_t *buf, KMF_ENCODE_FORMAT *fmt)
 	while (p != NULL) {
 		if (strstr(p, "-----BEGIN") != NULL) {
 			*fmt = KMF_FORMAT_PEM;
+			/* Restore the buffer */
+			buf[strlen(p)] = '\n';
 			return (TRUE);
 		}
+		buf[strlen(p)] = '\n';
 		p = strtok(NULL, "\n");
 	}
 	return (FALSE);
@@ -932,11 +943,28 @@ check_for_pkcs12(uchar_t *buf, int buf_len)
 }
 
 KMF_RETURN
+kmf_get_data_format(KMF_DATA *data, KMF_ENCODE_FORMAT *fmt)
+{
+	uchar_t *buf = data->Data;
+
+	if (check_for_pkcs12(buf, data->Length) == TRUE) {
+		*fmt = KMF_FORMAT_PKCS12;
+	} else if (buf[0] == 0x30 && (buf[1] & 0x80)) {
+		/* It is most likely a generic ASN.1 encoded file */
+		*fmt = KMF_FORMAT_ASN1;
+	} else if (check_for_pem(buf, fmt) != TRUE) {
+		/* Cannot determine this file format */
+		*fmt = KMF_FORMAT_UNDEF;
+		return (KMF_ERR_ENCODING);
+	}
+	return (KMF_OK);
+}
+
+KMF_RETURN
 kmf_get_file_format(char *filename, KMF_ENCODE_FORMAT *fmt)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_DATA filebuf = {NULL, 0};
-	uchar_t *buf;
 
 	if (filename == NULL || !strlen(filename) || fmt == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -951,20 +979,7 @@ kmf_get_file_format(char *filename, KMF_ENCODE_FORMAT *fmt)
 		goto end;
 	}
 
-	buf = filebuf.Data;
-	if (check_for_pkcs12(buf, filebuf.Length) == TRUE) {
-		*fmt = KMF_FORMAT_PKCS12;
-	} else if (buf[0] == 0x30 && (buf[1] & 0x80)) {
-		/* It is most likely a generic ASN.1 encoded file */
-		*fmt = KMF_FORMAT_ASN1;
-	} else if (check_for_pem(buf, fmt) == TRUE) {
-		goto end;
-	} else {
-		/* Cannot determine this file format */
-		*fmt = 0;
-		ret = KMF_ERR_ENCODING;
-	}
-
+	ret = kmf_get_data_format(&filebuf, fmt);
 end:
 	kmf_free_data(&filebuf);
 	return (ret);
@@ -1676,6 +1691,88 @@ encode_ipaddr(char *name, KMF_DATA *derdata)
 }
 
 static KMF_RETURN
+encode_krb5(char *name, KMF_DATA *derdata)
+{
+	KMF_RETURN rv = KMF_OK;
+	char *at, *realm;
+	BerElement *asn1 = NULL;
+	BerValue *extdata = NULL;
+
+	at = strchr(name, '@');
+	if (at == NULL)
+		return (KMF_ERR_ENCODING);
+
+	realm = at+1;
+	*at = 0;
+
+	if ((asn1 = kmfder_alloc()) == NULL)
+		return (KMF_ERR_MEMORY);
+
+	if (kmfber_printf(asn1, "{D{", &KMFOID_PKINIT_san) == -1)
+		goto cleanup;
+
+	if (kmfber_printf(asn1, "l", strlen(realm)) == -1)
+		goto cleanup;
+	if (kmfber_write(asn1, realm, strlen(realm), 0) != strlen(realm))
+		goto cleanup;
+	if (kmfber_printf(asn1, "l", strlen(name)) == -1)
+		goto cleanup;
+	if (kmfber_write(asn1, name, strlen(name), 0) != strlen(name))
+		goto cleanup;
+	if (kmfber_printf(asn1, "}}") == -1)
+		goto cleanup;
+
+	if (kmfber_flatten(asn1, &extdata) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+
+	derdata->Data = (uchar_t *)extdata->bv_val;
+	derdata->Length = extdata->bv_len;
+
+	free(extdata);
+cleanup:
+	if (asn1 != NULL)
+		kmfber_free(asn1, 1);
+
+	if (*at == 0)
+		*at = '@';
+
+	return (rv);
+}
+
+static KMF_RETURN
+encode_sclogon(char *name, KMF_DATA *derdata)
+{
+	KMF_RETURN rv = KMF_OK;
+	BerElement *asn1 = NULL;
+	BerValue *extdata = NULL;
+
+	if ((asn1 = kmfder_alloc()) == NULL)
+		return (KMF_ERR_MEMORY);
+
+	/* The name is encoded as a KerberosString (IA5STRING) */
+	if (kmfber_printf(asn1, "{Ds}",
+	    &KMFOID_MS_KP_SCLogon, name) == -1)
+		goto cleanup;
+
+	if (kmfber_flatten(asn1, &extdata) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+
+	derdata->Data = (uchar_t *)extdata->bv_val;
+	derdata->Length = extdata->bv_len;
+
+	free(extdata);
+cleanup:
+	if (asn1 != NULL)
+		kmfber_free(asn1, 1);
+
+	return (rv);
+}
+
+static KMF_RETURN
 verify_uri_format(char *uristring)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -1764,6 +1861,14 @@ encode_altname(char *namedata,
 			}
 			(void) kmf_free_dn(&dnname);
 			tagval = (0xA0 | nametype);
+			break;
+		case GENNAME_KRB5PRINC:
+			tagval = (0x80 | GENNAME_OTHERNAME);
+			ret = encode_krb5(namedata, encodedname);
+			break;
+		case GENNAME_SCLOGON_UPN:
+			tagval = (0x80 | GENNAME_OTHERNAME);
+			ret = encode_sclogon(namedata, encodedname);
 			break;
 		default:
 			/* unsupported */

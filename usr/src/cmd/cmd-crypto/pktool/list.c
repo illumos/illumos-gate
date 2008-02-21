@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -606,7 +606,7 @@ list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 			numattr++;
 		}
 
-		if (serial != NULL) {
+		if (serial != NULL && serial->val != NULL) {
 			kmf_set_attr_at_index(attrlist, numattr,
 			    KMF_BIGINT_ATTR, serial,
 			    sizeof (KMF_BIGINT));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -467,19 +467,16 @@ PEM_DecodeFinal(PEM_ENCODE_CTX *ctx, unsigned char *out, int *outl)
 }
 
 static int
-get_line(unsigned char *in, char *buf)
+get_line(unsigned char *in, int inlen, char *buf, int buflen)
 {
-
 	int i = 0;
-	int len = 0;
 
-	while ((in[i] != '\n')) {
+	while ((i < inlen) && (i < buflen) && (in[i] != '\n')) {
 		buf[i] = in[i];
 		i++;
-		len++;
 	}
 
-	return (len);
+	return (i);
 }
 
 KMF_RETURN
@@ -499,13 +496,13 @@ Pem2Der(unsigned char *in, int inlen,
 
 	(void) memset(buf, 0, sizeof (buf));
 
-	for (;;) {
+	while (total < inlen) {
 		/*
 		 * get a line (ended at '\n'), which returns
 		 * number of bytes in the line
 		 */
-		i = get_line(in + total, buf);
-		if (i <= 0) {
+		i = get_line(in + total, inlen - total, buf, sizeof (buf));
+		if (i == 0) {
 			kmf_rv = KMF_ERR_ENCODING;
 			goto err;
 		}
@@ -542,11 +539,11 @@ Pem2Der(unsigned char *in, int inlen,
 
 	dataB[0] = '\0';
 
-	for (;;) {
+	while (total < inlen) {
 		(void) memset(buf, 0, 1024);
-		i = get_line(in+total, buf);
+		i = get_line(in+total, inlen - total, buf, sizeof (buf));
 
-		if (i <= 0) break;
+		if (i == 0) break;
 
 		j = i;
 		while ((j >= 0) && (buf[j] <= ' '))
@@ -570,6 +567,9 @@ Pem2Der(unsigned char *in, int inlen,
 		dataB[bl+j] = '\0';
 		bl += j;
 	}
+
+	if (nameB == NULL)
+		goto err;
 
 	i = strlen(nameB);
 	if ((strncmp(buf, "-----END ", 9) != 0) ||

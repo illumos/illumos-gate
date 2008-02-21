@@ -2,7 +2,7 @@
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,7 +229,9 @@ typedef enum {
 	GENNAME_EDIPARTYNAME,
 	GENNAME_URI,
 	GENNAME_IPADDRESS,
-	GENNAME_REGISTEREDID
+	GENNAME_REGISTEREDID,
+	GENNAME_KRB5PRINC,
+	GENNAME_SCLOGON_UPN
 } KMF_GENERALNAMECHOICES;
 
 /*
@@ -956,8 +958,45 @@ typedef struct {
 #define	OID_PKIX_AD_CAISSUERS_LENGTH (OID_PKIX_AD_LENGTH + 1)
 
 /* end PKIX part1 */
-#define	OID_APPL_TCP_PROTO   43, 6, 1, 2, 1, 27, 4
-#define	OID_APPL_TCP_PROTO_LENGTH   8
+
+/*
+ * From RFC4556 (PKINIT)
+ *
+ * pkinit = { iso(1) identified-organization(3) dod(6) internet(1)
+ *   security(5) kerberosv5(2) pkinit(3) }
+ */
+#define	OID_KRB5_PKINIT	43, 6, 1, 5, 2, 3
+#define	OID_KRB5_PKINIT_LENGTH	6
+
+#define	OID_KRB5_PKINIT_KPCLIENTAUTH	OID_KRB5_PKINIT, 4
+#define	OID_KRB5_PKINIT_KPCLIENTAUTH_LENGTH (OID_KRB5_PKINIT_LENGTH + 1)
+
+#define	OID_KRB5_PKINIT_KPKDC		OID_KRB5_PKINIT, 5
+#define	OID_KRB5_PKINIT_KPKDC_LENGTH	(OID_KRB5_PKINIT_LENGTH + 1)
+
+#define	OID_KRB5_SAN	43, 6, 1, 5, 2, 2
+#define	OID_KRB5_SAN_LENGTH 6
+
+/*
+ * Microsoft OIDs:
+ * id-ms-san-sc-logon-upn =
+ * {iso(1) identified-organization(3) dod(6) internet(1) private(4)
+ *  enterprise(1) microsoft(311) 20 2 3}
+ *
+ * id-ms-kp-sc-logon =
+ * {iso(1) identified-organization(3) dod(6) internet(1) private(4)
+ *  enterprise(1) microsoft(311) 20 2 2}
+ */
+#define	OID_MS	43, 6, 1, 4, 1, 130, 55
+#define	OID_MS_LENGTH 7
+#define	OID_MS_KP_SC_LOGON		OID_MS, 20, 2, 2
+#define	OID_MS_KP_SC_LOGON_LENGTH	(OID_MS_LENGTH + 3)
+
+#define	OID_MS_KP_SC_LOGON_UPN		OID_MS, 20, 2, 3
+#define	OID_MS_KP_SC_LOGON_UPN_LENGTH	(OID_MS_LENGTH + 3)
+
+#define	OID_APPL_TCP_PROTO		43, 6, 1, 2, 1, 27, 4
+#define	OID_APPL_TCP_PROTO_LENGTH	8
 
 #define	OID_DAP	OID_DS, 3, 1
 #define	OID_DAP_LENGTH	(OID_DS_LENGTH + 2)
@@ -1126,6 +1165,14 @@ KMFOID_SHA1WithDSA,
 KMFOID_OIW_DSAWithSHA1,
 KMFOID_X9CM_DSA,
 KMFOID_X9CM_DSAWithSHA1;
+
+/* For PKINIT support */
+extern const KMF_OID
+KMFOID_PKINIT_san,
+KMFOID_PKINIT_ClientAuth,
+KMFOID_PKINIT_Kdc,
+KMFOID_MS_KP_SCLogon,
+KMFOID_MS_KP_SCLogon_UPN;
 
 /*
  * KMF Certificate validation codes.  These may be masked together.
