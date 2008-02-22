@@ -122,6 +122,9 @@ nce_advert_flags(const nce_t *nce)
 
 	if (nce->nce_flags & NCE_F_ISROUTER)
 		flag |= NDP_ISROUTER;
+	if (!(nce->nce_flags & NCE_F_ANYCAST))
+		flag |= NDP_ORIDE;
+
 	return (flag);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,8 +134,6 @@ phyint_create(char *name)
 
 	pi->pi_sock = -1;
 	if (phyint_init_from_k(pi) == -1) {
-		if (pi->pi_group_name != NULL)
-			free(pi->pi_group_name);
 		free(pi);
 		return (NULL);
 	}
@@ -247,34 +245,6 @@ start_over:
 		return (0);
 	}
 	pi->pi_kernel_state |= PI_PRESENT;
-
-	bzero(lifr.lifr_groupname, sizeof (lifr.lifr_groupname));
-	if (ioctl(fd, SIOCGLIFGROUPNAME, (caddr_t)&lifr) < 0) {
-		logperror_pi(pi, "phyint_init_from_k: ioctl (get group name)");
-		goto error;
-	}
-
-	if (lifr.lifr_groupname != NULL && strlen(lifr.lifr_groupname) != 0) {
-		if (pi->pi_group_name == NULL) {
-			pi->pi_group_name = malloc(
-			    sizeof (lifr.lifr_groupname));
-			if (pi->pi_group_name == NULL) {
-				logperror_pi(pi, "phyint_init_from_k:"
-				    " malloc(group name)");
-				goto error;
-			}
-		}
-		/*
-		 * Size of the group name can only be LIFNAMESZ -1 characters
-		 * which is ensured by kernel. Thus, we don't need strncpy.
-		 */
-		(void) strncpy(pi->pi_group_name, lifr.lifr_groupname,
-		    sizeof (lifr.lifr_name));
-		pi->pi_group_name[sizeof (pi->pi_group_name) - 1] = '\0';
-	} else if (pi->pi_group_name != NULL) {
-		free(pi->pi_group_name);
-		pi->pi_group_name = NULL;
-	}
 
 	if (ioctl(fd, SIOCGLIFMTU, (caddr_t)&lifr) < 0) {
 		logperror_pi(pi, "phyint_init_from_k: ioctl (get mtu)");
@@ -527,17 +497,15 @@ phyint_delete(struct phyint *pi)
 	if (pi->pi_next != NULL)
 		pi->pi_next->pi_prev = pi->pi_prev;
 	pi->pi_next = pi->pi_prev = NULL;
-	if (pi->pi_group_name != NULL)
-		free(pi->pi_group_name);
 	free(pi);
 	num_of_phyints--;
 }
 
 /*
- * Called with the number of millseconds elapsed since the last call.
+ * Called with the number of milliseconds elapsed since the last call.
  * Determines if any timeout event has occurred and
  * returns the number of milliseconds until the next timeout event
- * for the phyint iself (excluding prefixes and routers).
+ * for the phyint itself (excluding prefixes and routers).
  * Returns TIMER_INFINITY for "never".
  */
 uint_t
@@ -622,7 +590,7 @@ phyint_print(struct phyint *pi)
 	if (pi->pi_TmpAddrsEnabled) {
 		logmsg(LOG_DEBUG, "\ttmp_token: %s\n",
 		    inet_ntop(AF_INET6, (void *)&pi->pi_tmp_token,
-			abuf, sizeof (abuf)));
+		    abuf, sizeof (abuf)));
 		logmsg(LOG_DEBUG, "\ttmp config: pref %d valid %d "
 		    "maxdesync %d desync %d regen %d\n",
 		    pi->pi_TmpPreferredLifetime, pi->pi_TmpValidLifetime,
@@ -632,7 +600,7 @@ phyint_print(struct phyint *pi)
 	if (pi->pi_flags & IFF_POINTOPOINT) {
 		logmsg(LOG_DEBUG, "\tdst_token: %s\n",
 		    inet_ntop(AF_INET6, (void *)&pi->pi_dst_token,
-			abuf, sizeof (abuf)));
+		    abuf, sizeof (abuf)));
 	}
 	logmsg(LOG_DEBUG, "\tLinkMTU %d CurHopLimit %d "
 	    "BaseReachableTime %d\n\tReachableTime %d RetransTimer %d\n",
@@ -1297,7 +1265,7 @@ prefix_init_from_k(struct prefix *pr)
 		    IN6_ARE_ADDR_EQUAL(&pr->pr_address, &pr->pr_prefix)) {
 			char abuf[INET6_ADDRSTRLEN];
 
-			logmsg(LOG_ERR, "ingoring interface %s: it appears to "
+			logmsg(LOG_ERR, "ignoring interface %s: it appears to "
 			    "be configured with an invalid interface id "
 			    "(%s/%u)\n",
 			    pr->pr_name,
@@ -1597,7 +1565,7 @@ prefix_update_k(struct prefix *pr)
 			    "for PR_AUTO on\n",
 			    pr->pr_name,
 			    inet_ntop(AF_INET6, (void *)&pr->pr_address,
-				abuf, sizeof (abuf)));
+			    abuf, sizeof (abuf)));
 		}
 		if (ioctl(pi->pi_sock, SIOCSLIFADDR, (char *)&lifr) < 0) {
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFADDR");
@@ -1614,7 +1582,7 @@ prefix_update_k(struct prefix *pr)
 			logmsg(LOG_DEBUG, "prefix_update_k(%s) set subnet "
 			    "%s/%u for PR_AUTO on\n", pr->pr_name,
 			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-				abuf, sizeof (abuf)), lifr.lifr_addrlen);
+			    abuf, sizeof (abuf)), lifr.lifr_addrlen);
 		}
 		if (ioctl(pi->pi_sock, SIOCSLIFSUBNET, (char *)&lifr) < 0) {
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFSUBNET");
@@ -1673,7 +1641,7 @@ prefix_update_k(struct prefix *pr)
 			logmsg(LOG_DEBUG, "prefix_update_k(%s) set addr %s "
 			    "for PR_AUTO off\n", pr->pr_name,
 			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-				abuf, sizeof (abuf)));
+			    abuf, sizeof (abuf)));
 		}
 		if (ioctl(pi->pi_sock, SIOCSLIFADDR, (char *)&lifr) < 0) {
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFADDR");
@@ -1709,7 +1677,7 @@ prefix_update_k(struct prefix *pr)
 			logmsg(LOG_DEBUG, "prefix_update_k(%s) set subnet "
 			    "%s/%d for PR_ONLINK on\n", pr->pr_name,
 			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-				abuf, sizeof (abuf)), lifr.lifr_addrlen);
+			    abuf, sizeof (abuf)), lifr.lifr_addrlen);
 		}
 		if (ioctl(pi->pi_sock, SIOCSLIFSUBNET, (char *)&lifr) < 0) {
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFSUBNET");
@@ -1740,7 +1708,7 @@ prefix_update_k(struct prefix *pr)
 			logmsg(LOG_DEBUG, "prefix_update_k(%s) set subnet "
 			    "%s/%d for PR_ONLINK off\n", pr->pr_name,
 			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-				abuf, sizeof (abuf)), lifr.lifr_addrlen);
+			    abuf, sizeof (abuf)), lifr.lifr_addrlen);
 		}
 		if (ioctl(pi->pi_sock, SIOCSLIFSUBNET, (char *)&lifr) < 0) {
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFSUBNET");
@@ -2191,7 +2159,6 @@ router_update_k(struct router *dr)
 		router_add_k(dr);
 }
 
-
 /*
  * Called with the number of millseconds elapsed since the last call.
  * Determines if any timeout event has occurred and
@@ -2317,7 +2284,6 @@ router_delete_k(struct router *dr)
 	pi->pi_num_k_routers--;
 }
 
-
 static void
 router_print(struct router *dr)
 {
@@ -2327,7 +2293,6 @@ router_print(struct router *dr)
 	    inet_ntop(AF_INET6, (void *)&dr->dr_address, abuf, sizeof (abuf)),
 	    dr->dr_physical->pi_name, dr->dr_inkernel, dr->dr_lifetime);
 }
-
 
 void
 phyint_print_all(void)

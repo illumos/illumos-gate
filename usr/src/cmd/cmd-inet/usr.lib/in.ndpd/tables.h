@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,7 +124,6 @@ struct phyint {
 	 * Tracked using pi_each_time_since_random.
 	 */
 	uint_t		pi_RetransTimer;		/* In milliseconds */
-	char		*pi_group_name;
 
 	uint_t		pi_ra_flags;		/* Detect when to start DHCP */
 };
@@ -245,7 +244,6 @@ struct router {
 extern struct phyint *phyints;
 extern int num_of_phyints;
 
-
 /*
  * Functions
  */
@@ -297,7 +295,6 @@ extern struct router	*router_create(struct phyint *pi, struct in6_addr addr,
 			    uint_t lifetime);
 extern void		router_update_k(struct router *dr);
 extern uint_t		router_timer(struct router *dr, uint_t elapsed);
-
 
 extern void	check_to_advertise(struct phyint *pi, enum adv_events event);
 extern void	check_to_solicit(struct phyint *pi,
