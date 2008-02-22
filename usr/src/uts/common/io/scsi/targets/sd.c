@@ -6882,6 +6882,9 @@ sd_unit_attach(dev_info_t *devi)
 	    "sd_unit_attach: un:0x%p un_stats created\n", un);
 
 	sd_create_errstats(un, instance);
+	if (un->un_errstats == NULL) {
+		goto create_errstats_failed;
+	}
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 	    "sd_unit_attach: un:0x%p errstats created\n", un);
 
@@ -7304,7 +7307,6 @@ sd_unit_attach(dev_info_t *devi)
 	/*
 	 * Read and initialize the devid for the unit.
 	 */
-	ASSERT(un->un_errstats != NULL);
 	if (un->un_f_devid_supported) {
 		sd_register_devid(un, devi, reservation_flag);
 	}
@@ -7517,13 +7519,16 @@ spinup_failed:
 	 * Partition stats apparently are not used with removables. These would
 	 * not have been created during attach, so no need to clean them up...
 	 */
-	if (un->un_stats != NULL) {
-		kstat_delete(un->un_stats);
-		un->un_stats = NULL;
-	}
 	if (un->un_errstats != NULL) {
 		kstat_delete(un->un_errstats);
 		un->un_errstats = NULL;
+	}
+
+create_errstats_failed:
+
+	if (un->un_stats != NULL) {
+		kstat_delete(un->un_stats);
+		un->un_stats = NULL;
 	}
 
 	ddi_xbuf_attr_unregister_devinfo(un->un_xbuf_attr, devi);
