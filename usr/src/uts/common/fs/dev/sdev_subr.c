@@ -521,7 +521,7 @@ sdev_get_moduleops(struct sdev_node *dv)
 		if (map->dir_invalid) {
 			if (map->dir_module && map->dir_newmodule &&
 			    (strcmp(map->dir_module,
-					map->dir_newmodule) == 0)) {
+			    map->dir_newmodule) == 0)) {
 				load = 0;
 			}
 			sdev_replace_nsmap(map, map->dir_newmodule,
@@ -1230,7 +1230,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			(void) sdev_dirdelete(nddv, *ndvp);
 			*ndvp = NULL;
 			error = VOP_RMDIR(nddv->sdev_attrvp, nnm,
-				    nddv->sdev_attrvp, cred, NULL, 0);
+			    nddv->sdev_attrvp, cred, NULL, 0);
 			if (error)
 				goto err_out;
 		} else {
@@ -1254,7 +1254,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 				error = VOP_REMOVE(nddv->sdev_attrvp,
 				    nnm, cred, NULL, 0);
 				if (error)
-				    goto err_out;
+					goto err_out;
 			}
 		}
 	}
@@ -1811,7 +1811,7 @@ sdev_call_devfsadmd(struct sdev_node *ddv, struct sdev_node *dv, char *nm)
 		error = 0;
 	} else if (!DEVNAME_DEVFSADM_HAS_RUN(devfsadm_state)) {
 		sdcmn_err6(("lookup %s/%s starting devfsadm, 0x%x\n",
-			ddv->sdev_name, nm, devfsadm_state));
+		    ddv->sdev_name, nm, devfsadm_state));
 
 		sdev_devfsadmd_thread(ddv, dv, kcred);
 		mutex_enter(&dv->sdev_lookup_lock);
@@ -3026,7 +3026,7 @@ sdev_modctl_lookup(const char *path, vnode_t **r_vp)
 
 int
 sdev_modctl_readdir(const char *dir, char ***dirlistp,
-	int *npathsp, int *npathsp_alloc)
+	int *npathsp, int *npathsp_alloc, int checking_empty)
 {
 	char	**pathlist = NULL;
 	char	**newlist = NULL;
@@ -3081,18 +3081,17 @@ sdev_modctl_readdir(const char *dir, char ***dirlistp,
 			break;
 
 		for (dp = dbuf; ((intptr_t)dp < (intptr_t)dbuf + dbuflen);
-			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
+		    dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
 
 			nm = dp->d_name;
 
 			if (strcmp(nm, ".") == 0 || strcmp(nm, "..") == 0)
 				continue;
-
 			if (npaths == npaths_alloc) {
 				npaths_alloc += 64;
 				newlist = (char **)
 				    kmem_zalloc((npaths_alloc + 1) *
-					sizeof (char *), KM_SLEEP);
+				    sizeof (char *), KM_SLEEP);
 				if (pathlist) {
 					bcopy(pathlist, newlist,
 					    npaths * sizeof (char *));
@@ -3106,6 +3105,12 @@ sdev_modctl_readdir(const char *dir, char ***dirlistp,
 			bcopy(nm, s, n);
 			pathlist[npaths++] = s;
 			sdcmn_err11(("  %s/%s\n", dir, s));
+
+			/* if checking empty, one entry is as good as many */
+			if (checking_empty) {
+				eof = 1;
+				break;
+			}
 		}
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,16 +150,14 @@ disk_callback_wwn(di_minor_t minor, di_node_t node)
 	int targ;
 	int *intp;
 
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
-		"target", &intp) <= 0) {
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "target", &intp) <= 0) {
 		return (DEVFSADM_CONTINUE);
 	}
 	targ = *intp;
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
-		    "lun", &intp) <= 0) {
-		    lun = 0;
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "lun", &intp) <= 0) {
+		lun = 0;
 	} else {
-		    lun = *intp;
+		lun = *intp;
 	}
 	(void) sprintf(disk, "t%dd%d", targ, lun);
 
@@ -181,10 +179,10 @@ disk_callback_fabric(di_minor_t minor, di_node_t node)
 
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
 	    "client-guid", (char **)&wwn) > 0) {
-		if (strlcpy((char *)ascii_wwn, (char *)wwn, sizeof (ascii_wwn))
-			>= sizeof (ascii_wwn)) {
+		if (strlcpy((char *)ascii_wwn, (char *)wwn,
+		    sizeof (ascii_wwn)) >= sizeof (ascii_wwn)) {
 			devfsadm_errprint("SUNW_disk_link: GUID too long:%d",
-				strlen((char *)wwn));
+			    strlen((char *)wwn));
 			return (DEVFSADM_CONTINUE);
 		}
 		lun = 0;
@@ -468,7 +466,6 @@ reserved_links_exist(di_node_t node, di_minor_t minor, int nflags)
 	char *s;
 	char l[PATH_MAX];
 	int switch_link = 0;
-	struct stat sb;
 	char *mn = di_minor_name(minor);
 
 	if (dvlink_cache == NULL || mn == NULL) {
@@ -476,10 +473,8 @@ reserved_links_exist(di_node_t node, di_minor_t minor, int nflags)
 		return (DEVFSADM_FAILURE);
 	}
 
-	if (stat(ENUMERATE_RESERVED, &sb) == -1) {
-		devfsadm_print(disk_mid, "%s: No reserved file: %s. Will "
-		    "not bypass new link creation\n",
-		    modname, ENUMERATE_RESERVED);
+	if (!devfsadm_have_reserved()) {
+		devfsadm_print(disk_mid, "%s: No reserved links\n", modname);
 		return (DEVFSADM_FAILURE);
 	}
 
@@ -512,8 +507,8 @@ reserved_links_exist(di_node_t node, di_minor_t minor, int nflags)
 			return (DEVFSADM_FAILURE);
 		}
 		(void) snprintf(s+1, sizeof (phys_path) - (s + 1 - phys_path),
-			"%s%s", *mn == *(MN_SMI) ? MN_EFI : MN_SMI,
-			strstr(s, ",raw") ? ",raw" : "");
+		    "%s%s", *mn == *(MN_SMI) ? MN_EFI : MN_SMI,
+		    strstr(s, ",raw") ? ",raw" : "");
 		(void) di_devlink_cache_walk(dvlink_cache, DISK_LINK_RE,
 		    phys_path, DI_PRIMARY_LINK, &head, dvlink_cb);
 	}

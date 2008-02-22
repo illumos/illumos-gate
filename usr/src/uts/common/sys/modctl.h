@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,6 +269,7 @@ struct modlinkage {
 #define	MODRETIRE		40
 #define	MODUNRETIRE		41
 #define	MODISRETIRED		42
+#define	MODDEVEMPTYDIR		43
 
 /*
  * sub cmds for MODEVENTS

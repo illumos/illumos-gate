@@ -3153,9 +3153,6 @@ rm_parent_dir_if_empty(char *pathname)
 {
 	char *ptr, path[PATH_MAX + 1];
 	char *fcn = "rm_parent_dir_if_empty: ";
-	finddevhdl_t fhandle;
-	const char *f;
-	int rv;
 
 	vprint(REMOVE_MID, "%schecking %s if empty\n", fcn, pathname);
 
@@ -3173,17 +3170,8 @@ rm_parent_dir_if_empty(char *pathname)
 
 		*ptr = '\0';
 
-		if ((rv = finddev_readdir(path, &fhandle)) != 0) {
-			err_print(OPENDIR_FAILED, path, strerror(rv));
-			return;
-		}
-
-		/*
-		 * An empty pathlist implies an empty directory
-		 */
-		f = finddev_next(fhandle);
-		finddev_close(fhandle);
-		if (f == NULL) {
+		if (finddev_emptydir(path)) {
+			/* directory is empty */
 			if (s_rmdir(path) == 0) {
 				vprint(REMOVE_MID,
 				    "%sremoving empty dir %s\n", fcn, path);
@@ -8967,6 +8955,15 @@ bad_re:
 		free(re_array[i].d_pmatch);
 	}
 	return (DEVFSADM_FAILURE);
+}
+
+/*
+ * Return 1 if we have reserved links.
+ */
+int
+devfsadm_have_reserved()
+{
+	return (enumerate_reserved ? 1 : 0);
 }
 
 /*

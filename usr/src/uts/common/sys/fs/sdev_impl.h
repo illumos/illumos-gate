@@ -624,7 +624,7 @@ extern void *sdev_get_vtor(struct sdev_node *dv);
 /*
  * devinfo helpers
  */
-extern int sdev_modctl_readdir(const char *, char ***, int *, int *);
+extern int sdev_modctl_readdir(const char *, char ***, int *, int *, int);
 extern void sdev_modctl_readdir_free(char **, int, int);
 extern int sdev_modctl_devexists(const char *);
 

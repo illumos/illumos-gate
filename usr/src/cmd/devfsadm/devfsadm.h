@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,6 +250,7 @@ int devfsadm_read_link(char *link, char **devfs_path);
 char *s_strdup(const char *ptr);
 
 /* Private interface between reserve subsystm and disks link generator */
+int devfsadm_have_reserved(void);
 int devfsadm_is_reserved(devlink_re_t re_array[], char *devlink);
 int devfsadm_reserve_id_cache(devlink_re_t re_array[], enumerate_file_t *head);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -254,6 +254,65 @@ finddev_readdir(const char *path, finddevhdl_t *handlep)
 		return (finddev_readdir_devfs(path, handlep));
 	}
 	return (finddev_readdir_alt(path, handlep));
+}
+
+/*
+ * Return true if a directory is empty
+ * Use the standard library readdir to determine if a directory is
+ * empty.
+ */
+static int
+finddev_emptydir_alt(const char *path)
+{
+	DIR		*dir;
+	struct dirent	*dp;
+
+	if ((dir = opendir(path)) == NULL)
+		return (ENOENT);
+
+	while ((dp = readdir(dir)) != NULL) {
+		if ((strcmp(dp->d_name, ".") == 0) ||
+		    (strcmp(dp->d_name, "..") == 0))
+			continue;
+		(void) closedir(dir);
+		return (0);		/* not empty */
+	}
+	(void) closedir(dir);
+	return (1);			/* empty */
+}
+
+/*
+ * Use of the dev filesystem's private readdir does (not trigger
+ * the implicit device reconfiguration) to determine if a directory
+ * is empty.
+ *
+ * Note: only useable with paths mounted on an instance of the
+ * dev filesystem.
+ *
+ * Does not return the . and .. entries.
+ * Empty directories are returned as an zero-length list.
+ * ENOENT is returned as a NULL list pointer.
+ */
+static int
+finddev_emptydir_devfs(const char *path)
+{
+	int	rv;
+	int	empty;
+
+	rv = modctl(MODDEVEMPTYDIR, path, strlen(path), &empty);
+	if (rv == 0) {
+		return (empty);
+	}
+	return (0);
+}
+
+int
+finddev_emptydir(const char *path)
+{
+	if (GLOBAL_DEV_PATH(path)) {
+		return (finddev_emptydir_devfs(path));
+	}
+	return (finddev_emptydir_alt(path));
 }
 
 void

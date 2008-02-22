@@ -7314,7 +7314,7 @@ i_ddi_di_cache_free(struct di_cache *cache)
 void
 i_ddi_di_cache_invalidate(int kmflag)
 {
-	uint_t	flag;
+	int	cache_valid;
 
 	if (!modrootloaded || !i_ddi_io_initialized()) {
 		if (di_cache_debug)
@@ -7322,16 +7322,15 @@ i_ddi_di_cache_invalidate(int kmflag)
 		return;
 	}
 
-	/*
-	 * Invalidate the in-core cache and
-	 * increment devtree generation number
-	 */
-	atomic_and_32(&di_cache.cache_valid, 0);
+	/* Increment devtree generation number. */
 	atomic_inc_ulong(&devtree_gen);
 
-	flag = (kmflag == KM_SLEEP) ? TQ_SLEEP : TQ_NOSLEEP;
-
-	(void) taskq_dispatch(system_taskq, free_cache_task, NULL, flag);
+	/* Invalidate the in-core cache and dispatch free on valid->invalid */
+	cache_valid = atomic_swap_uint(&di_cache.cache_valid, 0);
+	if (cache_valid) {
+		(void) taskq_dispatch(system_taskq, free_cache_task, NULL,
+		    (kmflag == KM_SLEEP) ? TQ_SLEEP : TQ_NOSLEEP);
+	}
 
 	if (di_cache_debug) {
 		cmn_err(CE_NOTE, "invalidation with km_flag: %s",

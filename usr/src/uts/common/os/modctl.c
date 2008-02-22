@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2046,7 +2046,7 @@ modctl_devreaddir(const char *udir, int udirlen,
 		goto err;
 
 	if ((ret = sdev_modctl_readdir(dir, &dirlist,
-	    &npaths, &npaths_alloc)) != 0) {
+	    &npaths, &npaths_alloc, 0)) != 0) {
 		ASSERT(dirlist == NULL);
 		goto err;
 	}
@@ -2089,6 +2089,42 @@ err:
 		sdev_modctl_readdir_free(dirlist, npaths, npaths_alloc);
 	if (paths)
 		kmem_free(paths, lens);
+	kmem_free(dir, udirlen + 1);
+	return (ret);
+}
+
+static int
+modctl_devemptydir(const char *udir, int udirlen, int *uempty)
+{
+	char	*dir;
+	int	ret;
+	char	**dirlist = NULL;
+	int	npaths;
+	int	npaths_alloc;
+	int	empty;
+
+	/*
+	 * copyin the /dev path including terminating null
+	 */
+	udirlen++;
+	if (udirlen <= 1 || udirlen > MAXPATHLEN)
+		return (EINVAL);
+	dir = kmem_zalloc(udirlen + 1, KM_SLEEP);
+	if ((ret = copyinstr(udir, dir, udirlen, NULL)) != 0)
+		goto err;
+
+	if ((ret = sdev_modctl_readdir(dir, &dirlist,
+	    &npaths, &npaths_alloc, 1)) != 0) {
+		goto err;
+	}
+
+	empty = npaths ? 0 : 1;
+	if (copyout(&empty, uempty, sizeof (empty)))
+		ret = EFAULT;
+
+err:
+	if (dirlist)
+		sdev_modctl_readdir_free(dirlist, npaths, npaths_alloc);
 	kmem_free(dir, udirlen + 1);
 	return (ret);
 }
@@ -2345,6 +2381,11 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 	case MODDEVREADDIR:	/* non-reconfiguring /dev readdir */
 		error = modctl_devreaddir((const char *)a1, (size_t)a2,
 		    (char *)a3, (int64_t *)a4);
+		break;
+
+	case MODDEVEMPTYDIR:	/* non-reconfiguring /dev emptydir */
+		error = modctl_devemptydir((const char *)a1, (size_t)a2,
+		    (int *)a3);
 		break;
 
 	case MODDEVNAME:

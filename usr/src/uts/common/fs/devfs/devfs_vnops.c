@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -180,6 +180,7 @@ devfs_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr,
 		return (ENOENT);
 	}
 
+	rw_enter(&dv->dv_contents, RW_READER);
 	if (dv->dv_attr) {
 		/*
 		 * obtain from the memory version of attribute.
@@ -195,6 +196,7 @@ devfs_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr,
 		dsysdebug(error, ("vop_getattr %s %d\n", dv->dv_name, error));
 		dv_vattr_merge(dv, vap);
 	}
+	rw_exit(&dv->dv_contents);
 
 	/*
 	 * Restrict the permissions of the node fronting the console
@@ -241,7 +243,7 @@ devfs_setattr_dir(
 again:	if (dv->dv_attr) {
 
 		error = secpolicy_vnode_setattr(cr, vp, vap,
-				dv->dv_attr, flags, devfs_unlocked_access, dv);
+		    dv->dv_attr, flags, devfs_unlocked_access, dv);
 
 		if (error)
 			goto out;
@@ -281,9 +283,9 @@ again:	if (dv->dv_attr) {
 		if (vap->va_mask & (AT_MODE|AT_UID|AT_GID|AT_ATIME|AT_MTIME)) {
 			/* Set the attributes */
 			error = VOP_SETATTR(dv->dv_attrvp,
-				vap, flags, cr, NULL);
+			    vap, flags, cr, NULL);
 			dsysdebug(error,
-				("vop_setattr %s %d\n", dv->dv_name, error));
+			    ("vop_setattr %s %d\n", dv->dv_name, error));
 
 			/*
 			 * Some file systems may return EROFS for a setattr
@@ -459,8 +461,7 @@ devfs_setattr(
 		ASSERT(vp->v_type != VDIR);
 		*vattrp = dv_vattr_file;
 		error = VOP_GETATTR(dv->dv_attrvp, vattrp, 0, cr, ct);
-		dsysdebug(error, ("vop_getattr %s %d\n",
-			dv->dv_name, error));
+		dsysdebug(error, ("vop_getattr %s %d\n", dv->dv_name, error));
 		if (error)
 			goto out;
 		dv->dv_attr = vattrp;
@@ -469,10 +470,10 @@ devfs_setattr(
 	}
 
 	error = secpolicy_vnode_setattr(cr, vp, vap, dv->dv_attr,
-					flags, devfs_unlocked_access, dv);
+	    flags, devfs_unlocked_access, dv);
 	if (error) {
 		dsysdebug(error, ("devfs_setattr %s secpolicy error %d\n",
-			dv->dv_name, error));
+		    dv->dv_name, error));
 		goto out;
 	}
 
@@ -530,13 +531,13 @@ devfs_setattr(
 		} else {
 			if (mask & AT_MODE)
 				dcmn_err5(("%s persisting mode 0%o\n",
-					dv->dv_name, vap->va_mode));
+				    dv->dv_name, vap->va_mode));
 			if (mask & AT_UID)
 				dcmn_err5(("%s persisting uid %d\n",
-					dv->dv_name, vap->va_uid));
+				    dv->dv_name, vap->va_uid));
 			if (mask & AT_GID)
 				dcmn_err5(("%s persisting gid %d\n",
-					dv->dv_name, vap->va_gid));
+				    dv->dv_name, vap->va_gid));
 
 			if (dv->dv_attrvp == NULL) {
 				dvp = DVTOV(dv->dv_dotdot);
@@ -734,16 +735,14 @@ devfs_access(struct vnode *vp, int mode, int flags, struct cred *cr,
 		return (EACCES);
 	}
 
+	rw_enter(&dv->dv_contents, RW_READER);
 	if (dv->dv_attr && ((dv->dv_flags & DV_ACL) == 0)) {
-		rw_enter(&dv->dv_contents, RW_READER);
-		if (dv->dv_attr) {
-			res = devfs_unlocked_access(dv, mode, cr);
-			rw_exit(&dv->dv_contents);
-			return (res);
-		}
-		rw_exit(&dv->dv_contents);
+		res = devfs_unlocked_access(dv, mode, cr);
+	} else {
+		res = VOP_ACCESS(dv->dv_attrvp, mode, flags, cr, ct);
 	}
-	return (VOP_ACCESS(dv->dv_attrvp, mode, flags, cr, ct));
+	rw_exit(&dv->dv_contents);
+	return (res);
 }
 
 /*

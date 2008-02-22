@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -473,6 +473,7 @@ typedef struct __finddevhdl *finddevhdl_t;
 
 extern int		device_exists(const char *);
 extern int		finddev_readdir(const char *, finddevhdl_t *);
+extern int		finddev_emptydir(const char *);
 extern void		finddev_close(finddevhdl_t);
 extern const char	*finddev_next(finddevhdl_t);
 
