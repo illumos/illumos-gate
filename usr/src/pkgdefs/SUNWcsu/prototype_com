@@ -528,6 +528,7 @@ d none usr/lib/help/profiles/locale/C 755 root bin
 f none usr/lib/help/profiles/locale/C/RtAll.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtAuditCtrl.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtAuditReview.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtConsUser.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtContractObserver.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtCronMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtCryptoMngmnt.html 444 root bin

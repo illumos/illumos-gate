@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,10 +56,10 @@
 
 static int show_auths(char *, char **, int, int);
 static int list_auths(userattr_t *, char **, int *);
-static char *get_default_auths(char **, int *);
+static void get_default_auths(char *, char **, int *);
 static void getProfiles(char *, char **, int *, char **, int *);
 static void add_auths(char *, char **, int *);
-
+static void free_auths(char **, int *);
 
 static char *progname = "auths";
 
@@ -70,35 +70,34 @@ main(int argc, char *argv[])
 	int		status = EXIT_OK;
 	char		*defauths[MAXAUTHS];
 	int		defauth_cnt = 0;
-	int		i;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	(void) get_default_auths(defauths, &defauth_cnt);
-
 	switch (argc) {
 	case 1:
+		get_default_auths(NULL, defauths, &defauth_cnt);
 		status = show_auths(NULL, defauths, defauth_cnt, 0);
 		break;
 	case 2:
+		get_default_auths(argv[argc-1], defauths, &defauth_cnt);
 		status = show_auths(argv[argc-1], defauths, defauth_cnt, 0);
 		break;
 	default:
 		while (*++argv) {
+			get_default_auths(*argv, defauths, &defauth_cnt);
 			status = show_auths(*argv, defauths, defauth_cnt, 1);
 			if (status == EXIT_FATAL) {
 				break;
 			}
+			/* free memory allocated for default authorizations */
+			free_auths(defauths, &defauth_cnt);
 		}
 		break;
 	}
 
 	/* free memory allocated for default authorizations */
-	for (i = 0; i < defauth_cnt; i++) {
-		free(defauths[i]);
-	}
-
+	free_auths(defauths, &defauth_cnt);
 	status = (status == EXIT_OK) ? status : EXIT_FATAL;
 
 	return (status);
@@ -198,9 +197,7 @@ show_auths(char *username, char **defauths, int defauth_cnt, int print_name)
 	}
 
 	/* free memory allocated for authorizations */
-	for (i = 0; i < userauth_cnt; i++) {
-		free(userauths[i]);
-	}
+	free_auths(userauths, &userauth_cnt);
 
 	return (status);
 }
@@ -237,30 +234,35 @@ list_auths(userattr_t *user, char **authArray, int *authcnt)
 }
 
 
-static char *
-get_default_auths(char **authArray, int *authcnt)
+static void
+get_default_auths(char *user, char **authArray, int *authcnt)
 {
 	char *auths = NULL;
 	char *profs = NULL;
 	char *profArray[MAXPROFS];
 	int profcnt = 0;
 
-	if (defopen(AUTH_POLICY) == NULL) {
-		auths = defread(DEF_AUTH);
+	if (user == NULL) {
+		struct passwd *pw;
+
+		if ((pw = getpwuid(getuid())) != NULL) {
+			user = pw->pw_name;
+		}
+	}
+
+	if (_get_user_defs(user, &auths, &profs) == 0) {
 		if (auths != NULL) {
 			add_auths(auths, authArray, authcnt);
 		}
 
 		/* get authorizations from default profiles */
-		profs = defread(DEF_PROF);
 		if (profs != NULL) {
 			getProfiles(profs, profArray, &profcnt,
 			    authArray, authcnt);
 			free_proflist(profArray, profcnt);
 		}
+		_free_user_defs(auths, profs);
 	}
-
-	return (auths);
 }
 
 void
@@ -294,6 +296,17 @@ add_auths(char *auths, char **authArray, int *authcnt)
 		}
 	}
 
+}
+
+static void
+free_auths(char *auths[], int *auth_cnt)
+{
+	int i;
+
+	for (i = 0; i < *auth_cnt; i++) {
+		free(auths[i]);
+	}
+	*auth_cnt = 0;
 }
 
 static void

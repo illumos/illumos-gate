@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ static uid_t get_uid(char *);
 static gid_t get_gid(char *);
 static priv_set_t *get_privset(const char *);
 static priv_set_t *get_granted_privs(uid_t);
-static void get_default_privs(priv_set_t *);
+static void get_default_privs(const char *, priv_set_t *);
 static void get_profile_privs(char *, char **, int *, priv_set_t *);
 
 static int isnumber(char *);
@@ -145,8 +145,8 @@ main(int argc, char *argv[])
 			}
 			if (setppriv(PRIV_ON, PRIV_INHERITABLE, wanted) != 0) {
 				(void) fprintf(stderr,
-						gettext("setppriv(): %s\n"),
-						strerror(errno));
+				    gettext("setppriv(): %s\n"),
+				    strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			/* Trick exec into thinking we're not suid */
@@ -305,7 +305,7 @@ set_attrs:
 	if (lset != NULL && setppriv(PRIV_SET, PRIV_LIMIT, lset) != 0 ||
 	    iset != NULL && setppriv(PRIV_ON, PRIV_INHERITABLE, iset) != 0) {
 		(void) fprintf(stderr, gettext("%s: can't set privileges\n"),
-			cmd_realpath);
+		    cmd_realpath);
 		return (0);
 	}
 	if (setreuid(uid, euid) == -1) {
@@ -452,7 +452,7 @@ get_granted_privs(uid_t uid)
 		free_proflist(profArray, profcnt);
 	}
 
-	get_default_privs(res);
+	get_default_privs(pwent->pw_name, res);
 
 	if (ua != NULL)
 		free_userattr(ua);
@@ -461,21 +461,20 @@ get_granted_privs(uid_t uid)
 }
 
 static void
-get_default_privs(priv_set_t *pset)
+get_default_privs(const char *user, priv_set_t *pset)
 {
 	char *profs = NULL;
 	char *profArray[MAXPROFS];
 	int profcnt = 0;
 
-	if (defopen(AUTH_POLICY) == 0) {
+	if (_get_user_defs(user, NULL, &profs) == 0) {
 		/* get privileges from default profiles */
-		profs = defread(DEF_PROF);
 		if (profs != NULL) {
 			get_profile_privs(profs, profArray, &profcnt, pset);
 			free_proflist(profArray, profcnt);
+			_free_user_defs(NULL, profs);
 		}
 	}
-	(void) defopen(NULL);
 }
 
 static void

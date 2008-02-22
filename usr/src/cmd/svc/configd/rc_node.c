@@ -351,6 +351,7 @@
 #include <libscf_priv.h>
 #include <prof_attr.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -490,8 +491,6 @@ static rc_node_t *rc_scope;
 static pthread_mutex_t	rc_pg_notify_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t	rc_pg_notify_cv = PTHREAD_COND_INITIALIZER;
 static uint_t		rc_notify_in_use;	/* blocks removals */
-
-static pthread_mutex_t	perm_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /*
  * Some combinations of property group/property name require a special
@@ -1515,38 +1514,11 @@ perm_granted(permcheck_t *pcp)
 	uid_t uid;
 	userattr_t *uap;
 	char *authlist, *userattr_authlist, *proflist, *def_prof = NULL;
-
-	/*
-	 * Get generic authorizations from policy.conf
-	 *
-	 * Note that _get_auth_policy is not threadsafe, so we single-thread
-	 * access to it.
-	 */
-	(void) pthread_mutex_lock(&perm_lock);
-	ret = _get_auth_policy(&authlist, &def_prof);
-	(void) pthread_mutex_unlock(&perm_lock);
-
-	if (ret != 0)
-		return (-1);
-
-	if (authlist != NULL) {
-		ret = check_auth_list(pcp, authlist);
-
-		if (ret) {
-			_free_auth_policy(authlist, def_prof);
-			return (ret);
-		}
-	}
-
-	/*
-	 * Put off checking def_prof for later in an attempt to consolidate
-	 * prof_attr accesses.
-	 */
+	struct passwd pw;
+	char pwbuf[1024];	/* XXX should be NSS_BUFLEN_PASSWD */
 
 	/* Get the uid */
 	if ((uc = get_ucred()) == NULL) {
-		_free_auth_policy(authlist, def_prof);
-
 		if (errno == EINVAL) {
 			/*
 			 * Client is no longer waiting for our response (e.g.,
@@ -1569,7 +1541,33 @@ perm_granted(permcheck_t *pcp)
 	uid = ucred_geteuid(uc);
 	assert(uid != (uid_t)-1);
 
-	uap = getuseruid(uid);
+	if (getpwuid_r(uid, &pw, pwbuf, sizeof (pwbuf)) == NULL) {
+		return (-1);
+	}
+
+	/*
+	 * Get user's default authorizations from policy.conf
+	 */
+	ret = _get_user_defs(pw.pw_name, &authlist, &def_prof);
+
+	if (ret != 0)
+		return (-1);
+
+	if (authlist != NULL) {
+		ret = check_auth_list(pcp, authlist);
+
+		if (ret) {
+			_free_user_defs(authlist, def_prof);
+			return (ret);
+		}
+	}
+
+	/*
+	 * Put off checking def_prof for later in an attempt to consolidate
+	 * prof_attr accesses.
+	 */
+
+	uap = getusernam(pw.pw_name);
 	if (uap != NULL) {
 		/* Get the authorizations from user_attr. */
 		userattr_authlist = kva_match(uap->attr, USERATTR_AUTHS_KW);
@@ -1589,7 +1587,7 @@ perm_granted(permcheck_t *pcp)
 			ret = check_prof_list(pcp, proflist);
 	}
 
-	_free_auth_policy(authlist, def_prof);
+	_free_user_defs(authlist, def_prof);
 	if (uap != NULL)
 		free_userattr(uap);
 

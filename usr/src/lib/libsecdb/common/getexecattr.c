@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,8 +74,8 @@ getexecprof(const char *name, const char *type, const char *id, int search_flag)
 	int		err = 0;
 	char		unique[NSS_BUFLEN_EXECATTR];
 	char		buf[NSS_BUFLEN_EXECATTR];
-	execattr_t	*head = (execattr_t *)NULL;
-	execattr_t	*prev = (execattr_t *)NULL;
+	execattr_t	*head = NULL;
+	execattr_t	*prev = NULL;
 	execstr_t	exec;
 	execstr_t	*tmp;
 
@@ -83,7 +83,7 @@ getexecprof(const char *name, const char *type, const char *id, int search_flag)
 	(void) memset(&exec, 0, sizeof (execstr_t));
 
 	if ((search_flag != GET_ONE) && (search_flag != GET_ALL)) {
-		return ((execattr_t *)NULL);
+		return (NULL);
 	}
 
 	if ((name == NULL) && (type == NULL) && (id == NULL)) {
@@ -101,7 +101,7 @@ getexecprof(const char *name, const char *type, const char *id, int search_flag)
 			};
 			break;
 		default:
-			head = (execattr_t *)NULL;
+			head = NULL;
 			break;
 		}
 		endexecattr();
@@ -129,12 +129,12 @@ getexecuser(const char *username, const char *type, const char *id,
 	char		buf[NSS_BUFLEN_USERATTR];
 	userstr_t	user;
 	userstr_t	*utmp;
-	execattr_t	*head = (execattr_t *)NULL;
-	execattr_t	*prev = (execattr_t *)NULL;
-	execattr_t	*new = (execattr_t *)NULL;
+	execattr_t	*head = NULL;
+	execattr_t	*prev =  NULL;
+	execattr_t	*new = NULL;
 
 	if ((search_flag != GET_ONE) && (search_flag != GET_ALL)) {
-		return ((execattr_t *)NULL);
+		return (NULL);
 	}
 
 	if (username == NULL) {
@@ -156,7 +156,7 @@ getexecuser(const char *username, const char *type, const char *id,
 				prev = get_tail(head);
 			}
 			while ((utmp = _getuserattr(&user,
-				    buf, NSS_BUFLEN_USERATTR, &err)) != NULL) {
+			    buf, NSS_BUFLEN_USERATTR, &err)) != NULL) {
 				if ((new =
 				    userprof((const char *)(utmp->name),
 				    type, id, search_flag)) != NULL) {
@@ -171,7 +171,7 @@ getexecuser(const char *username, const char *type, const char *id,
 			}
 			break;
 		default:
-			head = (execattr_t *)NULL;
+			head = NULL;
 			break;
 		}
 		enduserattr();
@@ -187,7 +187,7 @@ execattr_t *
 match_execattr(execattr_t *exec, const char *profname, const char *type,
     const char *id)
 {
-	execattr_t	*execp = (execattr_t *)NULL;
+	execattr_t	*execp = NULL;
 
 	for (execp = exec; execp != NULL; execp = execp->next) {
 		if ((profname && execp->name &&
@@ -218,7 +218,7 @@ endexecattr()
 void
 free_execattr(execattr_t *exec)
 {
-	if (exec != (execattr_t *)NULL) {
+	if (exec != NULL) {
 		free(exec->name);
 		free(exec->type);
 		free(exec->policy);
@@ -240,16 +240,16 @@ userprof(const char *username, const char *type, const char *id,
 	int		err = 0;
 	char		*last;
 	char		*sep = ",";
-	char		*proflist = (char *)NULL;
-	char		*profname = (char *)NULL;
+	char		*proflist = NULL;
+	char		*profname = NULL;
 	char		buf[NSS_BUFLEN_USERATTR];
 	char		pwdb[NSS_BUFLEN_PASSWD];
 	kva_t		*user_attr;
 	userstr_t	user;
 	userstr_t	*utmp;
 	execattr_t	*exec;
-	execattr_t	*head = (execattr_t *)NULL;
-	execattr_t	*prev = (execattr_t *)NULL;
+	execattr_t	*head = NULL;
+	execattr_t	*prev = NULL;
 	struct passwd	pwd;
 
 	char		*profArray[MAXPROFS];
@@ -265,7 +265,6 @@ userprof(const char *username, const char *type, const char *id,
 
 	utmp = _getusernam(username, &user, buf, NSS_BUFLEN_USERATTR, &err);
 	if (utmp != NULL) {
-		proflist = NULL;
 		user_attr = _str2kva(user.attr, KV_ASSIGN, KV_DELIMITER);
 		if ((proflist = kva_match(user_attr, "profiles")) != NULL) {
 			/* Get the list of profiles for this user */
@@ -278,16 +277,15 @@ userprof(const char *username, const char *type, const char *id,
 	}
 
 	/* Get the list of default profiles */
-	if (defopen(AUTH_POLICY) == NULL) {
-		proflist = defread(DEF_PROF);
-		(void) defopen(NULL);
-	}
+	proflist = NULL;
+	(void) _get_user_defs(username, NULL, &proflist);
 	if (proflist != NULL) {
 		for (profname = _strtok_escape(proflist, sep, &last);
 		    profname != NULL;
 		    profname = _strtok_escape(NULL, sep, &last)) {
 			getproflist(profname, profArray, &profcnt);
 		}
+		_free_user_defs(NULL, proflist);
 	}
 
 	if (profcnt == 0) {
@@ -321,8 +319,8 @@ userprof(const char *username, const char *type, const char *id,
 static execattr_t *
 get_tail(execattr_t *exec)
 {
-	execattr_t *i_exec = (execattr_t *)NULL;
-	execattr_t *j_exec = (execattr_t *)NULL;
+	execattr_t *i_exec = NULL;
+	execattr_t *j_exec = NULL;
 
 	if (exec != NULL) {
 		if (exec->next == NULL) {
@@ -345,10 +343,10 @@ execstr2attr(execstr_t *es)
 	execattr_t	*newexec;
 
 	if (es == NULL) {
-		return ((execattr_t *)NULL);
+		return (NULL);
 	}
-	if ((newexec = (execattr_t *)malloc(sizeof (execattr_t))) == NULL) {
-		return ((execattr_t *)NULL);
+	if ((newexec = malloc(sizeof (execattr_t))) == NULL) {
+		return (NULL);
 	}
 
 	newexec->name = _do_unescape(es->name);
@@ -361,7 +359,7 @@ execstr2attr(execstr_t *es)
 	if (es->next) {
 		newexec->next = execstr2attr((execstr_t *)(es->next));
 	} else {
-		newexec->next = (execattr_t *)NULL;
+		newexec->next = NULL;
 	}
 	return (newexec);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,14 +82,14 @@ extern char *_argv_to_csl(char **strings);
 extern char **_csl_to_argv(char *csl);
 extern char *_do_unescape(char *src);
 extern void _free_argv(char **p_argv);
-extern int _get_auth_policy(char **, char **);
-extern void _free_auth_policy(char *, char *);
 extern int _insert2kva(kva_t *, char *, char *);
 extern int _kva2str(kva_t *, char *, int, char *, char *);
 extern kva_t *_kva_dup(kva_t *);
 extern void _kva_free(kva_t *);
 extern kva_t *_new_kva(int size);
 extern kva_t *_str2kva(char *, char *, char *);
+extern int _get_user_defs(const char *, char **, char **);
+extern void _free_user_defs(char *, char *);
 
 #else				/* not __STDC__ */
 
@@ -100,14 +100,14 @@ extern char *_argv_to_csl();
 extern char **_csl_to_argv();
 extern char *_do_unescape();
 extern void _free_argv();
-extern int _get_auth_policy();
-extern void _free_auth_policy();
 extern int  _insert2kva();
 extern int _kva2str();
 extern kva_t *_kva_dup();
 extern void _kva_free(kva_t *);
 extern kva_t *_new_kva();
 extern int _str2kva();
+extern int _get_user_defs();
+extern void _free_user_defs();
 #endif				/* __STDC__ */
 
 #ifdef	__cplusplus

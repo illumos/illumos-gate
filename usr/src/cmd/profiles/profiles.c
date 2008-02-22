@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ static void print_profs_long(char *, void *, int);
 static void print_profs(char *, char **, int, int);
 static void format_attr(int *, int, char *);
 static void getProfiles(char *, char **, int *);
-static void getDefaultProfiles(char **, int *);
+static void getDefaultProfiles(char *, char **, int *);
 
 static char *progname = "profiles";
 
@@ -93,10 +93,10 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	if (*argv == NULL) {
-		status = show_profs((char *)NULL, print_flag);
+		status = show_profs(NULL, print_flag);
 	} else {
 		do {
-			status = show_profs(*argv, print_flag);
+			status = show_profs((char *)*argv, print_flag);
 			if (status == EXIT_FATAL) {
 				break;
 			}
@@ -136,7 +136,7 @@ show_profs(char *username, int print_flag)
 		if ((user = getusernam(username)) != NULL) {
 			status = list_profs(user, print_flag);
 		} else {
-			getDefaultProfiles(profArray, &profcnt);
+			getDefaultProfiles(username, profArray, &profcnt);
 			if (profcnt == 0) {
 				status = EXIT_NON_FATAL;
 			} else {
@@ -183,7 +183,7 @@ list_profs(userattr_t *user, int print_flag)
 			getProfiles(proflist, profArray, &profcnt);
 		}
 		/* Also get any default profiles */
-		getDefaultProfiles(profArray, &profcnt);
+		getDefaultProfiles(user->name, profArray, &profcnt);
 		if (profcnt == 0) {
 			status = EXIT_NON_FATAL;
 		}
@@ -324,16 +324,14 @@ print_profs(char *user, char **profnames, int print_flag, int profcnt)
  * Get the list of default profiles from /etc/security/policy.conf
  */
 static void
-getDefaultProfiles(char **profArray, int *profcnt)
+getDefaultProfiles(char *user, char **profArray, int *profcnt)
 {
 	char *profs = NULL;
 
-	if (defopen(AUTH_POLICY) == NULL) {
-		profs = defread(DEF_PROF);
+	if (_get_user_defs(user, NULL, &profs) == 0) {
+		if (profs != NULL) {
+			getProfiles(profs, profArray, profcnt);
+			_free_user_defs(NULL, profs);
+		}
 	}
-
-	if (profs != NULL) {
-		getProfiles(profs, profArray, profcnt);
-	}
-
 }

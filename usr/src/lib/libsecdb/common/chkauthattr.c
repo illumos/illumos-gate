@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <limits.h>
+#include <pwd.h>
+#include <nss_dbdefs.h>
 #include <deflt.h>
 #include <auth_attr.h>
 #include <prof_attr.h>
@@ -40,10 +42,8 @@
 
 
 static int _is_authorized(const char *, char *);
-static int _chk_policy_auth(const char *, char **, int *);
+static int _chk_policy_auth(const char *, const char *, char **, int *);
 static int _chkprof_for_auth(const char *, const char *, char **, int *);
-
-
 int
 chkauthattr(const char *authname, const char *username)
 {
@@ -59,7 +59,8 @@ chkauthattr(const char *authname, const char *username)
 		return (0);
 
 	/* Check against AUTHS_GRANTED and PROFS_GRANTED in policy.conf */
-	auth_granted = _chk_policy_auth(authname, chkedprof, &chkedprof_cnt);
+	auth_granted = _chk_policy_auth(authname, username, chkedprof,
+	    &chkedprof_cnt);
 	if (auth_granted)
 		goto exit;
 
@@ -203,45 +204,6 @@ _is_authorized(const char *authname, char *auths)
 }
 
 
-int
-_get_auth_policy(char **def_auth, char **def_prof)
-{
-	char *cp;
-
-	if (defopen(AUTH_POLICY) != 0)
-		return (-1);
-
-	cp = defread(DEF_AUTH);
-	if (cp != NULL) {
-		*def_auth = strdup(cp);
-		if (*def_auth == NULL)
-			return (-1);
-	} else {
-		*def_auth = NULL;
-	}
-
-	cp = defread(DEF_PROF);
-	if (cp != NULL) {
-		*def_prof = strdup(cp);
-		if (*def_prof == NULL) {
-			free(*def_auth);
-			return (-1);
-		}
-	} else {
-		*def_prof = NULL;
-	}
-
-	(void) defopen(NULL);
-	return (0);
-}
-
-void
-_free_auth_policy(char *def_auth, char *def_prof)
-{
-	free(def_auth);
-	free(def_prof);
-}
-
 /*
  * read /etc/security/policy.conf for AUTHS_GRANTED.
  * return 1 if found matching authname.
@@ -249,12 +211,14 @@ _free_auth_policy(char *def_auth, char *def_prof)
  * default profiles.
  */
 static int
-_chk_policy_auth(const char *authname, char **chkedprof, int *chkedprof_cnt)
+_chk_policy_auth(const char *authname, const char *username, char **chkedprof,
+    int *chkedprof_cnt)
 {
-	char	*auths, *profs;
+	char	*auths = NULL;
+	char	*profs = NULL;
 	int	ret = 1;
 
-	if (_get_auth_policy(&auths, &profs) != 0)
+	if (_get_user_defs(username, &auths, &profs) != 0)
 		return (0);
 
 	if (auths != NULL) {
@@ -270,6 +234,102 @@ _chk_policy_auth(const char *authname, char **chkedprof, int *chkedprof_cnt)
 	ret = 0;
 
 exit:
-	_free_auth_policy(auths, profs);
+	_free_user_defs(auths, profs);
 	return (ret);
+}
+
+#define	CONSOLE "/dev/console"
+
+static int
+is_cons_user(const char *user)
+{
+	struct stat	cons;
+	struct passwd	pw;
+	char		pwbuf[NSS_BUFLEN_PASSWD];
+
+	if (user == NULL) {
+		return (0);
+	}
+	if (stat(CONSOLE, &cons) == -1) {
+		return (0);
+	}
+	if (getpwnam_r(user, &pw, pwbuf, sizeof (pwbuf)) == NULL) {
+		return (0);
+	}
+
+	return (pw.pw_uid == cons.st_uid);
+}
+
+
+int
+_get_user_defs(const char *user, char **def_auth, char **def_prof)
+{
+	char *cp;
+	char *profs;
+
+	if (defopen(AUTH_POLICY) != 0) {
+		if (def_auth != NULL) {
+			*def_auth = NULL;
+		}
+		if (def_prof != NULL) {
+			*def_prof = NULL;
+		}
+		return (-1);
+	}
+
+	if (def_auth != NULL) {
+		if ((cp = defread(DEF_AUTH)) != NULL) {
+			if ((*def_auth = strdup(cp)) == NULL) {
+				(void) defopen(NULL);
+				return (-1);
+			}
+		} else {
+			*def_auth = NULL;
+		}
+	}
+	if (def_prof != NULL) {
+		if (is_cons_user(user) &&
+		    (cp = defread(DEF_CONSUSER)) != NULL) {
+			if ((*def_prof = strdup(cp)) == NULL) {
+				(void) defopen(NULL);
+				return (-1);
+			}
+		}
+		if ((cp = defread(DEF_PROF)) != NULL) {
+			int	prof_len;
+
+			if (*def_prof == NULL) {
+				if ((*def_prof = strdup(cp)) == NULL) {
+					(void) defopen(NULL);
+					return (-1);
+				}
+				(void) defopen(NULL);
+				return (0);
+			}
+
+			/* concatenate def profs with "," separator */
+			prof_len = strlen(*def_prof) + strlen(cp) + 2;
+			if ((profs = malloc(prof_len)) == NULL) {
+				free(*def_prof);
+				*def_prof = NULL;
+				(void) defopen(NULL);
+				return (-1);
+			}
+			(void) snprintf(profs, prof_len, "%s,%s", *def_prof,
+			    cp);
+			free(*def_prof);
+			*def_prof = profs;
+		}
+	}
+
+	(void) defopen(NULL);
+	return (0);
+}
+
+
+void
+_free_user_defs(char *def_auth, char *def_prof)
+{
+	free(def_auth);
+	free(def_prof);
 }

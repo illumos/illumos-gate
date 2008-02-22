@@ -33,6 +33,7 @@ HTMLENTS = \
 	RtAuditCtrl.html \
 	RtAuditReview.html \
 	RtContractObserver.html \
+	RtConsUser.html \
 	RtCronMngmnt.html \
 	RtCryptoMngmnt.html \
 	RtLogMngmnt.html \

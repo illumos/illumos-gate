@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -43,6 +42,7 @@ do
 		#
 		ag="AUTHS_GRANTED=solaris.device.cdrw"
 		pg="PROFS_GRANTED=Basic Solaris User"
+		wo="CONSOLE_USER=Console User"
 		sed -n -e '/^[^#]/q;p' < $src > $dest.$$
 		sed -n \
 		    -e "s/^#AUTHS_GRANTED=$/$ag/" \
@@ -51,13 +51,24 @@ do
 		    -e "s/  *$//" \
 		    -e '/^[^#]/,$p' < $dest >> $dest.$$
 
-		if grep 'PROFS_GRANTED=' $dest > /dev/null 2>&1
+		grep 'PROFS_GRANTED=' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			sed < $dest.$$ > $dest -e "/^AUTHS_GRANTED=/a\\
+$pg"
+			cat $dest > $dest.$$
+		fi
+
+		if grep 'CONSOLE_USER=' $dest > /dev/null 2>&1
 		then
 			cat $dest.$$ > $dest
 		else
-			sed < $dest.$$ > $dest -e "/^AUTHS_GRANTED=/a\\
-$pg"
+			sed < $dest.$$ > $dest -e "/^PROFS_GRANTED=/a\\
+$wo"
+			echo "${dest} updating entries for CONSOLE_USER," \
+			     "see policy.conf(4) for details." \
+			    >> ${CLEANUP_FILE}
 		fi
+
 		rm -f $dest.$$
 
 		grep 'CRYPT_' $dest > /dev/null 2>&1

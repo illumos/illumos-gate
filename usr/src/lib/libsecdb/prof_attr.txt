@@ -34,6 +34,7 @@
 All:::Execute any command as the user or role:help=RtAll.html
 Audit Control:::Configure BSM auditing:auths=solaris.audit.config,solaris.jobs.admin;help=RtAuditCtrl.html
 Audit Review:::Review BSM auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
+Console User:::Manage System as the Console User:help=RtConsUser.html
 Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
 Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html
 Printer Management:::Manage printers, daemons, spooling:auths=solaris.print.*,solaris.label.print,solaris.smf.manage.discovery.printers.*,solaris.smf.value.discovery.printers.*;help=RtPrntAdmin.html

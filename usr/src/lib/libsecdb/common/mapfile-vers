@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,8 +64,8 @@ SUNWprivate_1.1 {
 	_csl_to_argv;
 	_do_unescape;
 	_free_argv;
-	_free_auth_policy;
-	_get_auth_policy;
+	_free_user_defs;
+	_get_user_defs;
 	_insert2kva;
 	_kva2str;
 	_kva_dup;

@@ -316,6 +316,7 @@ f none usr/lib/help/profiles/locale/RtAuditCtrl.html 444 root bin
 f none usr/lib/help/profiles/locale/RtAuditReview.html 444 root bin
 f none usr/lib/help/profiles/locale/RtDeviceMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtPrntAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/RtConsUser.html 444 root bin
 f none usr/lib/help/profiles/locale/RtContractObserver.html 444 root bin
 f none usr/lib/help/profiles/locale/RtCronMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtCryptoMngmnt.html 444 root bin
