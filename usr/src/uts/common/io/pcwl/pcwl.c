@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -711,7 +711,7 @@ pcwl_card_insert(pcwl_maci_t *pcwl_p)
 			break;
 		}
 		if (tbl_p->flags & CISTPL_CFTABLE_TPCE_FS_PWR &&
-			tbl_p->pd.flags & CISTPL_CFTABLE_TPCE_FS_PWR_VCC) {
+		    tbl_p->pd.flags & CISTPL_CFTABLE_TPCE_FS_PWR_VCC) {
 			if (tbl_p->pd.pd_vcc.avgI > hi) {
 				hi = tbl_p->pd.pd_vcc.avgI;
 				pcwl_p->pcwl_config_hi = tbl_p->index;
@@ -2456,7 +2456,7 @@ pcwl_cfg_bssid(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 			bzero(buf + WIFI_BUF_OFFSET,
 			    sizeof (wl_bssid_t));
 		} else if (ret == WL_PORT_TO_IBSS ||
-			ret == WL_PORT_TO_BSS || ret == WL_PORT_OOR) {
+		    ret == WL_PORT_TO_BSS || ret == WL_PORT_OOR) {
 			(void) pcwl_get_ltv(pcwl_p, 6,
 			    WL_RID_BSSID, (uint16_t *)bssid);
 			PCWL_SWAP16((uint16_t *)bssid, 6);
@@ -2769,7 +2769,7 @@ done:
 static int
 pcwl_cfg_phy(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t ret, i;
+	uint16_t ret, retval, i;
 	pcwl_rf_t *rf_p;
 	wldp_t	*infp;
 	wldp_t *outfp;
@@ -2790,13 +2790,13 @@ pcwl_cfg_phy(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_dsss_t);
 	if (cmd == WLAN_GET_PARAM) {
 		if (ret = pcwl_get_ltv(pcwl_p, 2,
-		    WL_RID_CURRENT_CHNL, &ret)) {
+		    WL_RID_CURRENT_CHNL, &retval)) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_HW_ERROR;
 			goto done;
 		}
-		((wl_dsss_t *)(outfp->wldp_buf))->wl_dsss_channel = ret;
-		PCWLDBG((CE_CONT, "pcwl_getset: channel=%d\n", ret));
+		((wl_dsss_t *)(outfp->wldp_buf))->wl_dsss_channel = retval;
+		PCWLDBG((CE_CONT, "pcwl_getset: channel=%d\n", retval));
 		((wl_dsss_t *)(outfp->wldp_buf))->wl_dsss_subtype = WL_DSSS;
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
@@ -2966,7 +2966,7 @@ pcwl_cfg_desiredrates(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 			}
 		}
 		PCWLDBG((CE_CONT, "pcwl: get rate=%d\n", rate));
-		    outfp->wldp_result = WL_SUCCESS;
+		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
 		bzero(rates, sizeof (rates));
 		for (i = 0; i < 4; i++) {
@@ -3468,7 +3468,7 @@ pcwl_cfg_wepkey(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 				    rf_p->rf_ckeys[i].ckey_dat, i));
 			}
 			PCWLDBG((CE_CONT, "pcwl: rf_ckeys[%d]=%s\n", i,
-				(char *)(rf_p->rf_ckeys[i].ckey_dat)));
+			    (char *)(rf_p->rf_ckeys[i].ckey_dat)));
 		}
 		outfp->wldp_result = WL_SUCCESS;
 	} else {

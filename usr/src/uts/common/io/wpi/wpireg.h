@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +147,7 @@ extern "C" {
 #define	WPI_GPIO_SLEEP		(1 << 4)
 #define	WPI_GPIO_PWR_STATUS	0x07000000
 #define	WPI_GPIO_PWR_SLEEP	(4 << 24)
+#define	WPI_GPIO_HW_RF_KILL	(1 << 27)
 
 /*
  * possible flags for register WPI_CHICKEN
@@ -180,6 +181,7 @@ extern "C" {
 #define	WPI_ALIVE_INTR	(1 << 0)
 #define	WPI_WAKEUP_INTR	(1 << 1)
 #define	WPI_RX_SWINT	(1 << 3)
+#define	WPI_RF_KILL	(1 << 7)
 #define	WPI_SW_ERROR	(1 << 25)
 #define	WPI_TX_INTR	(1 << 27)
 #define	WPI_HW_ERROR	(1 << 29)

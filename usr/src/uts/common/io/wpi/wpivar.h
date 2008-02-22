@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -184,6 +184,7 @@ typedef struct wpi_softc {
 	uint32_t		sc_tx_err;
 	uint32_t		sc_rx_err;
 	uint32_t		sc_tx_retries;
+
 #ifdef WPI_BPF
 	struct bpf_if		*sc_drvbpf;
 
@@ -209,6 +210,8 @@ typedef struct wpi_softc {
 #define	WPI_F_HW_ERR_RECOVER	(1 << 3)
 #define	WPI_F_RATE_AUTO_CTL	(1 << 4)
 #define	WPI_F_RUNNING		(1 << 5)
+#define	WPI_F_SUSPEND		(1 << 6)
+#define	WPI_F_RADIO_OFF		(1 << 7)
 
 #define	WPI_SUCCESS		0
 #define	WPI_FAIL		1

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@
 #define	WPI_DEBUG_TX		(1 << 11)
 #define	WPI_DEBUG_RATECTL	(1 << 12)
 #define	WPI_DEBUG_RADIO		(1 << 13)
+#define	WPI_DEBUG_RESUME	(1 << 14)
 uint32_t wpi_dbg_flags = 0;
 #define	WPI_DBG(x) \
 	wpi_dbg x
@@ -399,7 +400,23 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	wifi_data_t		wd = { 0 };
 	mac_register_t		*macp;
 
-	if (cmd != DDI_ATTACH) {
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		sc = ddi_get_soft_state(wpi_soft_state_p,
+		    ddi_get_instance(dip));
+		ASSERT(sc != NULL);
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags &= ~WPI_F_SUSPEND;
+		mutex_exit(&sc->sc_glock);
+		if (sc->sc_flags & WPI_F_RUNNING) {
+			(void) wpi_init(sc);
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+		}
+		WPI_DBG((WPI_DEBUG_RESUME, "wpi: resume \n"));
+		return (DDI_SUCCESS);
+	default:
 		err = DDI_FAILURE;
 		goto attach_fail1;
 	}
@@ -669,8 +686,21 @@ wpi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	sc = ddi_get_soft_state(wpi_soft_state_p, ddi_get_instance(dip));
 	ASSERT(sc != NULL);
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		if (sc->sc_flags & WPI_F_RUNNING) {
+			wpi_stop(sc);
+		}
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags |= WPI_F_SUSPEND;
+		mutex_exit(&sc->sc_glock);
+		WPI_DBG((WPI_DEBUG_RESUME, "wpi: suspend \n"));
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 	if (!(sc->sc_flags & WPI_F_ATTACHED))
 		return (DDI_FAILURE);
 
@@ -1777,9 +1807,19 @@ wpi_notif_softintr(caddr_t arg)
 			    LE_32(*status)));
 
 			if (LE_32(*status) & 1) {
-				/* the radio button has to be pushed */
+				/*
+				 * the radio button has to be pushed(OFF). It
+				 * is considered as a hw error, the
+				 * wpi_thread() tries to recover it after the
+				 * button is pushed again(ON)
+				 */
 				cmn_err(CE_NOTE,
 				    "wpi: Radio transmitter is off\n");
+				sc->sc_ostate = sc->sc_ic.ic_state;
+				ieee80211_new_state(&sc->sc_ic,
+				    IEEE80211_S_INIT, -1);
+				sc->sc_flags |=
+				    (WPI_F_HW_ERR_RECOVER | WPI_F_RADIO_OFF);
 			}
 			break;
 		}
@@ -1822,6 +1862,11 @@ wpi_intr(caddr_t arg)
 	uint32_t r, rfh;
 
 	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & WPI_F_SUSPEND) {
+		mutex_exit(&sc->sc_glock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	r = WPI_READ(sc, WPI_INTR);
 	if (r == 0 || r == 0xffffffff) {
 		mutex_exit(&sc->sc_glock);
@@ -1903,6 +1948,11 @@ wpi_m_tx(void *arg, mblk_t *mp)
 	ieee80211com_t	*ic = &sc->sc_ic;
 	mblk_t			*next;
 
+	if (sc->sc_flags & WPI_F_SUSPEND) {
+		freemsgchain(mp);
+		return (NULL);
+	}
+
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		freemsgchain(mp);
 		return (NULL);
@@ -1945,6 +1995,16 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	bzero(cmd, sizeof (*cmd));
 
 	mutex_enter(&sc->sc_tx_lock);
+	if (sc->sc_flags & WPI_F_SUSPEND) {
+		mutex_exit(&sc->sc_tx_lock);
+		if ((type & IEEE80211_FC0_TYPE_MASK) !=
+		    IEEE80211_FC0_TYPE_DATA) {
+			freemsg(mp);
+		}
+		err = WPI_FAIL;
+		goto exit;
+	}
+
 	if (ring->queued > ring->count - 64) {
 		WPI_DBG((WPI_DEBUG_TX, "wpi_send(): no txbuf\n"));
 		sc->sc_need_reschedule = 1;
@@ -2230,9 +2290,24 @@ wpi_m_start(void *arg)
 		DELAY(1000000);
 		err = wpi_init(sc);
 	}
-	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
-	return (err);
+	if (err) {
+		/*
+		 * The hw init err(eg. RF is OFF). Return Success to make
+		 * the 'plumb' succeed. The wpi_thread() tries to re-init
+		 * background.
+		 */
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags |= WPI_F_HW_ERR_RECOVER;
+		mutex_exit(&sc->sc_glock);
+		return (WPI_SUCCESS);
+	}
+	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	mutex_enter(&sc->sc_glock);
+	sc->sc_flags |= WPI_F_RUNNING;
+	mutex_exit(&sc->sc_glock);
+
+	return (WPI_SUCCESS);
 }
 
 static void
@@ -2247,6 +2322,9 @@ wpi_m_stop(void *arg)
 	sc->sc_flags &= ~WPI_F_HW_ERR_RECOVER;
 	sc->sc_flags &= ~WPI_F_RATE_AUTO_CTL;
 	mutex_exit(&sc->sc_mt_lock);
+	mutex_enter(&sc->sc_glock);
+	sc->sc_flags &= ~WPI_F_RUNNING;
+	mutex_exit(&sc->sc_glock);
 }
 
 /*ARGSUSED*/
@@ -2294,9 +2372,27 @@ wpi_thread(wpi_sc_t *sc)
 	ieee80211com_t	*ic = &sc->sc_ic;
 	clock_t clk;
 	int times = 0, err, n = 0, timeout = 0;
+	uint32_t tmp;
 
 	mutex_enter(&sc->sc_mt_lock);
 	while (sc->sc_mf_thread_switch) {
+		tmp = WPI_READ(sc, WPI_GPIO_CTL);
+		if (tmp & WPI_GPIO_HW_RF_KILL) {
+			sc->sc_flags &= ~WPI_F_RADIO_OFF;
+		} else {
+			sc->sc_flags |= WPI_F_RADIO_OFF;
+		}
+		/*
+		 * If in SUSPEND or the RF is OFF, do nothing
+		 */
+		if ((sc->sc_flags & WPI_F_SUSPEND) ||
+		    (sc->sc_flags & WPI_F_RADIO_OFF)) {
+			mutex_exit(&sc->sc_mt_lock);
+			delay(drv_usectohz(100000));
+			mutex_enter(&sc->sc_mt_lock);
+			continue;
+		}
+
 		/*
 		 * recovery fatal error
 		 */
@@ -2320,6 +2416,8 @@ wpi_thread(wpi_sc_t *sc)
 					continue;
 			}
 			n = 0;
+			if (!err)
+				sc->sc_flags |= WPI_F_RUNNING;
 			sc->sc_flags &= ~WPI_F_HW_ERR_RECOVER;
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(2000000));
@@ -2926,6 +3024,12 @@ wpi_init(wpi_sc_t *sc)
 
 	(void) wpi_power_up(sc);
 	wpi_hw_config(sc);
+
+	tmp = WPI_READ(sc, WPI_GPIO_CTL);
+	if (!(tmp & WPI_GPIO_HW_RF_KILL)) {
+		cmn_err(CE_WARN, "wpi_init(): Radio transmitter is off\n");
+		goto fail1;
+	}
 
 	/* init Rx ring */
 	wpi_mem_lock(sc);
