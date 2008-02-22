@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,8 @@ extern "C" {
 #define	DIMM		"dimm"
 #define	DISK		"disk"
 #define	DRAMCHANNEL	"dram-channel"
+#define	FAN		"fan"
+#define	FANMODULE	"fanmodule"
 #define	HOSTBRIDGE	"hostbridge"
 #define	INTERCONNECT	"interconnect"
 #define	IOBOARD		"ioboard"
@@ -65,6 +67,8 @@ extern "C" {
 #define	PCIEX_ROOT	"pciexrc"
 #define	PCIEX_SWUP	"pciexswu"
 #define	PCIEX_SWDWN	"pciexswd"
+#define	POWERMODULE	"powermodule"
+#define	PSU		"psu"
 #define	RANK		"rank"
 #define	SYSTEMBOARD	"systemboard"
 #define	XAUI		"xaui"

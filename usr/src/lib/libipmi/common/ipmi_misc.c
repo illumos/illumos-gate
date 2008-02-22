@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libipmi.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "ipmi_impl.h"
@@ -35,8 +36,8 @@ ipmi_get_deviceid(ipmi_handle_t *ihp)
 {
 	ipmi_cmd_t cmd, *resp;
 
-	if (ihp->ih_deviceid_valid)
-		return (&ihp->ih_deviceid);
+	if (ihp->ih_deviceid != NULL)
+		return (ihp->ih_deviceid);
 
 	cmd.ic_netfn = IPMI_NETFN_APP;
 	cmd.ic_lun = 0;
@@ -52,10 +53,67 @@ ipmi_get_deviceid(ipmi_handle_t *ihp)
 		return (NULL);
 	}
 
-	(void) memcpy(&ihp->ih_deviceid, resp->ic_data,
-	    sizeof (ipmi_deviceid_t));
-	ihp->ih_deviceid.id_product = LE_16(ihp->ih_deviceid.id_product);
-	ihp->ih_deviceid_valid = B_TRUE;
+	/*
+	 * The devid response data may include additional data beyond the end of
+	 * the normal structure, so we copy the entire response.
+	 */
+	if ((ihp->ih_deviceid = ipmi_alloc(ihp, resp->ic_dlen)) == NULL)
+		return (NULL);
 
-	return (&ihp->ih_deviceid);
+	(void) memcpy(ihp->ih_deviceid, resp->ic_data, resp->ic_dlen);
+	ihp->ih_deviceid->id_product = LE_16(ihp->ih_deviceid->id_product);
+	ihp->ih_deviceid_len = resp->ic_dlen;
+
+	return (ihp->ih_deviceid);
+}
+
+/*
+ * Returns the firmware revision as a string.  This does the work of converting
+ * the deviceid data into a human readable string (decoding the BCD values).
+ * It also encodes the fact that Sun ILOM includes the additional micro revision
+ * at the end of the deviceid information.
+ */
+const char *
+ipmi_firmware_version(ipmi_handle_t *ihp)
+{
+	ipmi_deviceid_t *dp;
+	uint8_t *auxrev;
+	size_t len;
+	char rev[128];
+	int i;
+
+	if (ihp->ih_firmware_rev != NULL)
+		return (ihp->ih_firmware_rev);
+
+	if ((dp = ipmi_get_deviceid(ihp)) == NULL)
+		return (NULL);
+
+	/*
+	 * Start with the major an minor revision numbers
+	 */
+	(void) snprintf(rev, sizeof (rev), "%d.%d", dp->id_firm_major,
+	    ipmi_convert_bcd(dp->id_firm_minor));
+
+	if (ipmi_is_sun_ilom(dp) &&
+	    ihp->ih_deviceid_len >= sizeof (ipmi_deviceid_t) + 4) {
+		/*
+		 * With Sun ILOM we have the micro revision at the end of the
+		 * deviceid.  The first two bytes of the aux revision field are
+		 * the platform version and release version.
+		 */
+		auxrev = (uint8_t *)dp + sizeof (ipmi_deviceid_t);
+		for (i = 0; i < 2; i++) {
+			if (auxrev[i] == 0)
+				continue;
+
+			len = strlen(rev);
+			(void) snprintf(rev + len, sizeof (rev) - len, ".%u",
+			    auxrev[i]);
+		}
+	}
+
+	if ((ihp->ih_firmware_rev = ipmi_strdup(ihp, rev)) == NULL)
+		return (NULL);
+
+	return (ihp->ih_firmware_rev);
 }

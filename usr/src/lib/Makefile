@@ -256,7 +256,10 @@ sparc_SUBDIRS= .WAIT	\
 
 FM_sparc_DEPLIBS= libpri
 
-fm: libexacct $(FM_$(MACH)_DEPLIBS)
+fm:			\
+	libexacct	\
+	libipmi		\
+	$(FM_$(MACH)_DEPLIBS)
 
 #
 # Create a special version of $(SUBDIRS) with no .WAIT's, for use with the

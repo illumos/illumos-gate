@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,13 @@ typedef struct ipmi_cmd_sunoem_led_get {
 #define	IPMI_SUNOEM_LED_TYPE_LOCATE	3
 #define	IPMI_SUNOEM_LED_TYPE_ANY	0xFF
 
+boolean_t
+ipmi_is_sun_ilom(ipmi_deviceid_t *dp)
+{
+	return (ipmi_devid_manufacturer(dp) == IPMI_OEM_SUN &&
+	    dp->id_product == IPMI_PROD_SUN_ILOM);
+}
+
 static int
 check_sunoem(ipmi_handle_t *ihp)
 {
@@ -74,7 +81,7 @@ check_sunoem(ipmi_handle_t *ihp)
 	if ((devid = ipmi_get_deviceid(ihp)) == NULL)
 		return (-1);
 
-	if (ipmi_devid_manufacturer(devid) != IPMI_OEM_SUN)
+	if (!ipmi_is_sun_ilom(devid))
 		return (ipmi_set_error(ihp, EIPMI_INVALID_COMMAND, NULL));
 
 	return (0);

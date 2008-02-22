@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@ ipmi_handle_t *
 ipmi_open(int *errp, char **msg)
 {
 	ipmi_handle_t *ihp;
+	static char errmsg[48];
 
 	if (msg)
 		*msg = NULL;
@@ -52,11 +53,13 @@ ipmi_open(int *errp, char **msg)
 
 	ihp->ih_retries = 3;
 
-	if ((ihp->ih_tdata = ihp->ih_transport->it_open(ihp)) == NULL) {
+	if ((ihp->ih_tdata = ihp->ih_transport->it_open(ihp)) == NULL ||
+	    ipmi_sdr_init(ihp) != 0 || ipmi_entity_init(ihp) != 0) {
 		*errp = ihp->ih_errno;
 		if (msg) {
-			if ((*msg = strdup(ipmi_errmsg(ihp))) == NULL)
-				*msg = "memory allocation failure";
+			(void) strncpy(errmsg, ipmi_errmsg(ihp), 47);
+			errmsg[47] = '\0';
+			*msg = errmsg;
 		}
 		ipmi_close(ihp);
 		return (NULL);
@@ -70,8 +73,11 @@ ipmi_close(ipmi_handle_t *ihp)
 {
 	if (ihp->ih_transport && ihp->ih_tdata)
 		ihp->ih_transport->it_close(ihp->ih_tdata);
-	ipmi_sdr_clear(ihp);
+	ipmi_free(ihp, ihp->ih_deviceid);
+	ipmi_free(ihp, ihp->ih_firmware_rev);
 	ipmi_user_clear(ihp);
+	ipmi_sdr_fini(ihp);
+	ipmi_entity_fini(ihp);
 	free(ihp);
 }
 

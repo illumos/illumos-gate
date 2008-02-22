@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -30,8 +30,8 @@
 
     <range name='chip' min='0' max='100'>
 
-        <propset type='product'
-	    set='Sun-Fire-V20z|Sun-Fire-V40z|W1100z-2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
+        <set type='product'
+	    setlist='Sun-Fire-V20z|Sun-Fire-V40z|W1100z-2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
@@ -46,9 +46,9 @@
 
             </propgroup>
 
-        </propset> 
-        <propset type='product'
-	    set='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2|Sun-Blade-X8440-Server-Module|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2|Sun-Blade-X8440-Server-Module|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
@@ -63,9 +63,9 @@
 
             </propgroup>
 
-        </propset> 
-        <propset type='product'
-	    set='Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
@@ -80,9 +80,9 @@
 
             </propgroup>
 
-        </propset> 
-        <propset type='product'
-	    set='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
@@ -96,7 +96,7 @@
 
             </propgroup>
 
-        </propset> 
+        </set> 
 
     <dependents grouping='children'>
 
@@ -107,7 +107,7 @@
             <dependents grouping='children'>
 	    
                 <range name='chip-select' min='0' max='7'>
-                    <propset type='product' set='Sun-Blade-X8440-Server-Module|Sun-Fire-X4600-M2'>
+                    <set type='product' setlist='Sun-Blade-X8440-Server-Module|Sun-Fire-X4600-M2'>
 		    
                         <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -124,8 +124,8 @@
 
                         </propgroup>
 
-                    </propset>
-                    <propset type='product' set='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+                    </set>
+                    <set type='product' setlist='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
 		    
                         <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -142,14 +142,14 @@
 
                         </propgroup>
 
-                    </propset>
+                    </set>
 		</range>
             </dependents>
 	    </range>
 
             <range name='dimm' min='0' max='16'>
 
-                <propset type='product' set='Sun-Ultra-20-Workstation|Sun-Fire(TM)-X2100'>
+                <set type='product' setlist='Sun-Ultra-20-Workstation|Sun-Fire(TM)-X2100'>
 		    
                     <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -166,8 +166,8 @@
 
                     </propgroup>
 
-                </propset> 
-                <propset type='product' set='Sun-Fire-V20z|Sun-Fire-V40z|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E'>
+                </set> 
+                <set type='product' setlist='Sun-Fire-V20z|Sun-Fire-V40z|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E'>
 		    
                     <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -188,9 +188,9 @@
 
                     </propgroup>
 
-                </propset>
-                <propset type='product'
-		    set='Sun-Ultra-40-M2-Workstation'>
+                </set>
+                <set type='product'
+		    setlist='Sun-Ultra-40-M2-Workstation'>
 		    
                     <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -209,9 +209,9 @@
 
                     </propgroup>
 
-               </propset>
-                <propset type='product'
-		    set='X2100-M2'>
+                </set>
+                <set type='product'
+		    setlist='X2100-M2'>
 		    
                     <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -230,7 +230,7 @@
 
                     </propgroup>
 
-               </propset>
+               </set>
 
             </range>
 

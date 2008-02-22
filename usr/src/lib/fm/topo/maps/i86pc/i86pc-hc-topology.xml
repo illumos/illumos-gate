@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -31,11 +31,11 @@
   <range name='motherboard' min='0' max='0'>
     <node instance='0'>
       <propgroup name='protocol' version='1'
-        name-stability='Private' data-stability='Private' >
-        <propval name='label' type='string'
-          value='MB' />
+          name-stability='Private' data-stability='Private' >
+          <propval name='label' type='string' value='MB' />
       </propgroup>
     </node>
+ 
     <dependents grouping='children'>
       <range name='chip' min='0' max='100'>
         <enum-method name='chip' version='1' />
@@ -45,6 +45,45 @@
         <enum-method name='hostbridge' version='1' />
       </range>
     </dependents>
+    
+  </range>
+
+  <range name='chassis' min='0' max='0'>
+    <node instance='0'>
+    </node>
+    
+    <dependents grouping='children'>
+    
+    <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2|Sun-Fire-X4240|Sun-Fire-X4440'>
+       <range name='psu' min='0' max='100'>
+   	  <enum-method name='ipmi' version='1' />
+   	  <propmap name='psu' />
+       </range>
+       <range name='fanmodule' min='0' max='100'>
+          <propmap name='fan' />
+       </range>
+    </set>
+
+    <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540'>
+       <range name='psu' min='0' max='100'>
+ 	  <propmap name='psu' />
+       </range>
+       <range name='fanmodule' min='0' max='100'>
+          <propmap name='fan' />
+       </range>
+    </set>
+      
+    <set type='product' setlist='default'>
+       <range name='psu' min='0' max='100'>
+   	  <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='fan' min='0' max='100'>
+	  <enum-method name='ipmi' version='1' />
+       </range>
+    </set>
+
+    </dependents>
+
   </range>
 
 </topology>

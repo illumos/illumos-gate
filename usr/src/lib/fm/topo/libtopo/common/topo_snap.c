@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,6 +232,8 @@ topo_close(topo_hdl_t *thp)
 		topo_hdl_strfree(thp, thp->th_product);
 	if (thp->th_rootdir != NULL)
 		topo_hdl_strfree(thp, thp->th_rootdir);
+	if (thp->th_ipmi != NULL)
+		ipmi_close(thp->th_ipmi);
 
 	/*
 	 * Clean-up snapshot
@@ -293,6 +295,14 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 			topo_hdl_unlock(thp);
 			return (NULL);
 		}
+	}
+
+	if (thp->th_ipmi != NULL &&
+	    ipmi_sdr_changed(thp->th_ipmi) &&
+	    ipmi_sdr_refresh(thp->th_ipmi) != 0) {
+		topo_dprintf(thp, TOPO_DBG_ERR,
+		    "failed to refresh IPMI sdr repository: %s\n",
+		    ipmi_errmsg(thp->th_ipmi));
 	}
 
 	if ((ustr = topo_hdl_strdup(thp, thp->th_uuid)) == NULL)
@@ -403,7 +413,6 @@ topo_snap_release(topo_hdl_t *thp)
 	topo_hdl_lock(thp);
 	topo_snap_destroy(thp);
 	topo_hdl_unlock(thp);
-
 }
 
 topo_walk_t *

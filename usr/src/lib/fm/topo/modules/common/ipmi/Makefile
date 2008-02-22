@@ -24,45 +24,11 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-LIBRARY=	libipmi.a
-VERS=		.1
+MODULE = ipmi
+CLASS = common
 
-OBJECTS=	ipmi_bmc.o	\
-		ipmi_entity.o	\
-		ipmi_fru.o	\
-		ipmi_hash.o	\
-		ipmi_list.o	\
-		ipmi_misc.o	\
-		ipmi_sel.o	\
-		ipmi_sdr.o	\
-		ipmi_sensor.o	\
-		ipmi_sunoem.o	\
-		ipmi_tables.o	\
-		ipmi_user.o	\
-		ipmi_util.o	\
-		libipmi.o
+MODULESRCS = ipmi_enum.c ipmi_methods.c
 
-SRCS=		$(OBJECTS:%.o:$(SRCDIR)/%c.)
+include ../../Makefile.plugin
 
-include ../../Makefile.lib
-
-LIBS=		$(DYNLIB) $(LINTLIB)
-
-SRCDIR=		../common
-
-INCS +=		-I$(SRCDIR)
-LDLIBS +=	-lc
-CPPFLAGS +=	$(INCS)
-
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
-.KEEP_STATE:
-
-all: $(LIBS)
-
-lint: lintcheck
-
-$(SRCDIR)/ipmi_tables.c: $(SRCDIR)/mktables.sh $(SRCDIR)/libipmi.h
-	sh $(SRCDIR)/mktables.sh $(SRCDIR)/libipmi.h > $@
-
-include ../../Makefile.targ
+LDLIBS += -lipmi

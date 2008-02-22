@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,17 +27,41 @@
 SUNWprivate_1.1 {
     global:
 	ipmi_close;
+	ipmi_entity_iter;
+	ipmi_entity_iter_children;
+	ipmi_entity_iter_sdr;
+	ipmi_entity_lookup;
+	ipmi_entity_lookup_sdr;
+	ipmi_entity_name;
+	ipmi_entity_parent;
+	ipmi_entity_present;
+	ipmi_entity_present_sdr;
 	ipmi_errmsg;
 	ipmi_errno;
+	ipmi_firmware_version;
 	ipmi_fru_parse_board;
 	ipmi_fru_parse_product;
 	ipmi_fru_read;
 	ipmi_get_deviceid;
 	ipmi_get_sensor_reading;
 	ipmi_open;
+	ipmi_sdr_changed;
 	ipmi_sdr_get;
+	ipmi_sdr_iter;
+	ipmi_sdr_lookup;
+	ipmi_sdr_lookup_compact_sensor;
+	ipmi_sdr_lookup_full_sensor;
 	ipmi_sdr_lookup_fru;
 	ipmi_sdr_lookup_generic;
+	ipmi_sdr_refresh;
+	ipmi_sel_get_entry;
+	ipmi_sel_get_info;
+	ipmi_sel_get_time;
+	ipmi_sel_get_utc_offset;
+	ipmi_sel_set_time;
+	ipmi_sel_set_utc_offset;
+	ipmi_sensor_reading_name;
+	ipmi_sensor_type_name;
 	ipmi_send;
 	ipmi_set_sensor_reading;
 	ipmi_sunoem_led_get;

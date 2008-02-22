@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,106 +111,6 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 	return (sz);
 }
 
-/*
- * See Sect 12 of the IPMI Platform Management FRU Information Storage
- * Definition (v1.1).
- *
- * The FRU Product Info Area contains a number of fields which encode
- * both the type and length of various name fields into a single byte.
- * The byte is a bitfield broken down as follows:
- *
- *   bits	descr
- *   ----	-----
- *   7:6	encoding:
- *		11b = 8-bit ascii
- *              10b = 6-bit packed ascii
- *   5:0	length of data in bytes
- *
- * This function extracts the type and length and then copies the data into the
- * supplied buffer.  If the type is 6-bit packed ASCII then it first converts
- * the string to an 8-bit ASCII string
- *
- * The function returns the length of the data.
- */
-static int
-ipmi_fru_decode_string(uint8_t typelen, char *data, char *buf)
-{
-	int i, j = 0, chunks, leftovers;
-	uint8_t tmp, lo, type, len;
-
-	type = typelen >> 6;
-	len = BITX(typelen, 5, 0);
-
-	if (len == 0) {
-		*buf = '\0';
-		return (len);
-	}
-	/*
-	 * If the type is 8-bit ASCII, we can simply copy the string and return
-	 */
-	if (type == 0x3) {
-		(void) strncpy(buf, data, len);
-		*(buf+len) = '\0';
-		return (len);
-	} else if (type == 0x1 || type == 0x0) {
-		/*
-		 * Yuck - they either used BCD plus encoding, which we don't
-		 * currently handle, or they used an unspecified encoding type.
-		 * In these cases we'll set buf to an empty string.  We still
-		 * need to return the length so that we can get to the next
-		 * record.
-		 */
-		*buf = '\0';
-		return (len);
-	}
-
-	/*
-	 * Otherwise, it's 6-bit packed ASCII, so we have to convert the
-	 * data first
-	 */
-	chunks = len / 3;
-	leftovers = len % 3;
-
-	/*
-	 * First we decode the 6-bit string in chunks of 3 bytes as far as
-	 * possible
-	 */
-	for (i = 0; i < chunks; i++) {
-		tmp = BITX(*(data+j), 5, 0);
-		*buf++ = (char)(tmp + 32);
-
-		lo = BITX(*(data+j++), 7, 6);
-		tmp = BITX(*(data+j), 3, 0);
-		tmp = (tmp << 2) | lo;
-		*buf++ = (char)(tmp + 32);
-
-		lo = BITX(*(data+j++), 7, 4);
-		tmp = BITX(*(data+j), 1, 0);
-		tmp = (tmp << 4) | lo;
-		*buf++ = (char)(tmp + 32);
-
-		tmp = BITX(*(data+j++), 7, 2);
-		*buf++ = (char)(tmp + 32);
-	}
-	switch (leftovers) {
-		case 1:
-			tmp = BITX(*(data+j), 5, 0);
-			*buf++ = (char)(tmp + 32);
-			break;
-		case 2:
-			tmp = BITX(*(data+j), 5, 0);
-			*buf++ = (char)(tmp + 32);
-
-			lo = BITX(*(data+j++), 7, 6);
-			tmp = BITX(*(data+j), 3, 0);
-			tmp = (tmp << 2) | lo;
-			*buf++ = (char)(tmp + 32);
-			break;
-	}
-	*buf = '\0';
-	return (len);
-}
-
 int
 ipmi_fru_parse_product(ipmi_handle_t *ihp, char *fru_area,
     ipmi_fru_prod_info_t *buf)
@@ -236,27 +136,36 @@ ipmi_fru_parse_product(ipmi_handle_t *ihp, char *fru_area,
 	tmp = fru_area + (fru_hdr.ifh_product_info_off * 8) + 3;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifpi_manuf_name);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifpi_manuf_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifpi_product_name);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1,
+	    buf->ifpi_product_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifpi_part_number);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifpi_part_number);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifpi_product_version);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1,
+	    buf->ifpi_product_version);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifpi_product_serial);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1,
+	    buf->ifpi_product_serial);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	(void) ipmi_fru_decode_string(typelen, tmp+1, buf->ifpi_asset_tag);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifpi_asset_tag);
 
 	return (0);
 }
@@ -293,19 +202,24 @@ ipmi_fru_parse_board(ipmi_handle_t *ihp, char *fru_area,
 	tmp += 3;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifbi_manuf_name);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifbi_manuf_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifbi_board_name);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifbi_board_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifbi_product_serial);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1,
+	    buf->ifbi_product_serial);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = ipmi_fru_decode_string(typelen, tmp+1, buf->ifbi_part_number);
+	len = BITX(typelen, 4, 0);
+	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifbi_part_number);
 
 	return (0);
 }

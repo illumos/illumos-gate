@@ -1,0 +1,269 @@
+#!/usr/bin/perl -w
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# The fan topologies can be quite complicated, but are ultimately regular.  This
+# perl file uses some simplified internal structures to generate an .xml file
+# without the maintenance overhead.
+#
+
+use Getopt::Std;
+use strict;
+
+#
+# Master table of platforms.
+#
+my @platforms = (
+    #
+    # Galaxy 1/2 platforms.
+    #
+    # These systems have 2 fan-connector boards.  Each fan-connector board has 3
+    # fan modules.  Each fan module is an individual FRU.  The fan-connector
+    # boards are also FRUs.
+    #
+    {
+	set => "Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|" .
+	    "Sun-Fire-X4100-M2|Sun-Fire-X4200-M2",
+	topology => [
+	    {
+		label => "FT %d",
+		count => 2,
+		fru => "self"
+	    }, {
+		count => 3,
+		label => "FT %d FM %d",
+		entity_ref => "ft%d.fm%d.led",
+		fru => "self"
+	    }
+	]
+    },
+
+    #
+    # Thumper platforms
+    #
+    # These systems have 5 fan modules, with each fan module containing 2 fans.
+    # The FRUs for the individual fans are the containing fan module.
+    #
+    {
+	set => "Sun-Fire-X4500|Sun-Fire-X4540",
+	topology => [
+	    {
+		label => "FT %d",
+		count => 5,
+		fru => "self",
+		entity_ref => "ft%d.prsnt",
+	    }, {
+		count => 2,
+		fru => "parent"
+	    }
+	]
+    },
+
+    #
+    # Fan Module/Fan topology for all G1N/G2N platforms.
+    #
+    # These systems have 6 fan modules, with each fan module containing 2 fans.
+    # The FRU's for the individual fans are the containing fan module.
+    #
+    # Unfortunately, the IPMI topology on these systems is rather broken, and
+    # all the SDRs that should be separate entities in fact refer to the same
+    # entity IDs.  So we have to use the alternative 'entity_present' option
+    # using a single SDR record.
+    #
+    {
+	set => "Sun-Fire-X4240|Sun-Fire-X4440",
+	topology => [
+	    {
+		count => 2,
+		label => "FT %d",
+		fru => "self"
+	    }, {
+		label => "FT %d FM %d",
+		count => 3,
+		fru => "self",
+		entity_present => "fb%d.fm%d.prsnt",
+	    }, {
+		count => 2,
+		fru => "parent"
+	    }
+
+	]
+    }
+);
+
+sub usage
+{
+	print STDERR "Usage: xml-gen -p <platform> -i <input_xml_file> -o <output_xml_file>\n";
+}
+
+#
+# Process an entry in the topology list.  We are passed the indentation level,
+# the current topology array, and any pushed indices.  This is called
+# recursively.
+#
+sub process_topology
+{
+	my ($indent, $toporef, @indices) = @_;
+	my @topo = @$toporef;
+	my $level = shift @topo;
+	my $type = $#topo == -1 ? "fan" : "fanmodule";
+
+	printf(OFILE "%*s<range name='%s' min='%d' max='%d'>\n",
+	    $indent, "", $type, 0, $level->{count} - 1);
+	$indent += 2;
+
+	for (my $i = 0; $i < $level->{count}; $i++) {
+		push @indices, $i;
+
+		printf(OFILE "%*s<node instance='%d'>\n", $indent, "", $i);
+
+		$indent += 2;
+
+		# Protocol properties (label, fmri)
+		printf(OFILE "%*s<propgroup name='protocol' version='1' " .
+		    "name-stability='Private' data-stability='Private'>\n",
+		    $indent, "");
+
+		$indent += 2;
+
+		if ($level->{label}) {
+			printf(OFILE "%*s<propval name='label' type='string' " .
+			    "value='", $indent, "");
+			printf(OFILE $level->{label}, @indices);
+			printf(OFILE "' />\n");
+		}
+
+		printf(OFILE "%*s<propmethod name='ipmi_fru_fmri' " .
+		    "version='0' propname='FRU' proptype='fmri'>\n",
+		    $indent, "");
+		printf(OFILE "%*s<argval name='entity' type='string' " .
+		    "value='%s' />\n", $indent + 2, "", $level->{fru});
+		printf(OFILE "%*s</propmethod>\n", $indent, "");
+
+		$indent -= 2;
+
+		printf(OFILE "%*s</propgroup>\n", $indent, "");
+
+		#
+		# Entity reference (if any)
+		#
+		if ($level->{entity_ref} || $level->{entity_present}) {
+			my $name = $level->{entity_ref} ? "entity_ref" :
+			    "entity_present";
+			my $val = $level->{$name};
+			printf(OFILE "%*s<propgroup name='ipmi' version='1' " .
+			    "name-stability='Private' " .
+			    "data-stability='Private' >\n", $indent, "");
+			printf(OFILE "%*s<propval name='%s' " .
+			    "type='string' value='", $indent + 2, "", $name);
+			printf(OFILE $val, @indices);
+			printf(OFILE "' />\n");
+			printf(OFILE "%*s</propgroup>\n", $indent, "");
+		}
+
+
+		#
+		# Children (if any)
+		#
+		if ($#topo != -1) {
+			printf(OFILE "%*s<dependents grouping='children'>\n",
+			    $indent, "");
+			process_topology($indent + 2, \@topo, @indices);
+			printf(OFILE "%*s</dependents>\n", $indent, "");
+		}
+
+		#
+		# Post-process IPMI enumerator method
+		#
+		printf(OFILE "%*s<enum-method name='ipmi' version='1' />\n",
+		   $indent, "");
+
+		$indent -= 2;
+
+		printf(OFILE "%*s</node>\n", $indent, "");
+		pop @indices;
+	}
+
+	$indent -= 2;
+	printf(OFILE "%*s</range>\n", $indent, "");
+}
+
+#
+# Process a single platform file.
+#
+sub process_platform
+{
+	my ($desc) = @_;
+	my $indent = 2;
+
+	printf(OFILE "%*s<set type='product' setlist='%s'>\n", $indent, "",
+	    $desc->{set});
+
+	process_topology($indent + 2, $desc->{topology});
+
+	printf(OFILE "%*s</set>\n", $indent, "");
+}
+
+my %options;
+getopts("p:i:o:h", \%options);
+if ($options{'h'}) {
+	usage();
+	exit (1);
+} 
+
+my $platform = $options{'p'};
+my $input_file = $options{'i'};
+my $output_file = $options{'o'};
+
+if (!$platform || !$input_file || !$output_file) {
+	usage();
+	exit (1);
+}
+
+open(IFILE, "< $input_file") || die("$input_file cannot be opened.");
+open(OFILE, "> $output_file") || die("$output_file cannot be opened.");
+
+#
+# Open the file and read in the header until we reach the <topology> node.
+#
+while (<IFILE>) {
+	last if /<topology/;
+	print OFILE;
+}
+
+#
+# Construct the framework.
+#
+print OFILE "<topology name='fan' scheme='hc'>\n";
+
+my $desc;
+foreach $desc (@platforms) {
+	my $set = $desc->{set};
+	process_platform($desc);
+}
+
+print OFILE "</topology>\n";

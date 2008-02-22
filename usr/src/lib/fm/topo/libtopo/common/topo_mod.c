@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -598,6 +598,22 @@ topo_mod_devinfo(topo_mod_t *mod)
 		thp->th_di = di_init("/", DINFOCPYALL);
 
 	return (thp->th_di);
+}
+
+ipmi_handle_t *
+topo_mod_ipmi(topo_mod_t *mod)
+{
+	topo_hdl_t *thp = mod->tm_hdl;
+	int err;
+	char *errmsg;
+
+	if (thp->th_ipmi == NULL)
+		if ((thp->th_ipmi = ipmi_open(&err, &errmsg)) == NULL)
+			topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
+			    "ipmi_open() failed: %s (ipmi errno=%d)", errmsg,
+			    err);
+
+	return (thp->th_ipmi);
 }
 
 di_prom_handle_t

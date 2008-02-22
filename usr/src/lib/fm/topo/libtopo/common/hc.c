@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,6 +118,8 @@ static const hcc_t hc_canon[] = {
 	{ DIMM, TOPO_STABILITY_PRIVATE },
 	{ DISK, TOPO_STABILITY_PRIVATE },
 	{ DRAMCHANNEL, TOPO_STABILITY_PRIVATE },
+	{ FAN, TOPO_STABILITY_PRIVATE },
+	{ FANMODULE, TOPO_STABILITY_PRIVATE },
 	{ HOSTBRIDGE, TOPO_STABILITY_PRIVATE },
 	{ INTERCONNECT, TOPO_STABILITY_PRIVATE },
 	{ IOBOARD, TOPO_STABILITY_PRIVATE },
@@ -135,6 +137,8 @@ static const hcc_t hc_canon[] = {
 	{ PCIEX_ROOT, TOPO_STABILITY_PRIVATE },
 	{ PCIEX_SWUP, TOPO_STABILITY_PRIVATE },
 	{ PCIEX_SWDWN, TOPO_STABILITY_PRIVATE },
+	{ POWERMODULE, TOPO_STABILITY_PRIVATE },
+	{ PSU, TOPO_STABILITY_PRIVATE },
 	{ RANK, TOPO_STABILITY_PRIVATE },
 	{ SYSTEMBOARD, TOPO_STABILITY_PRIVATE },
 	{ XAUI, TOPO_STABILITY_PRIVATE },
@@ -206,23 +210,23 @@ hc_prop_set(tnode_t *node, nvlist_t *auth)
 	/*
 	 * Inherit if we can, it saves memory
 	 */
-	if (topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT,
-	    &err) != 0) {
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
 		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT, &prod)
 		    == 0)
 			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
 			    FM_FMRI_AUTH_PRODUCT, TOPO_PROP_IMMUTABLE, prod,
 			    &err);
 	}
-	if (topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_CHASSIS,
-	    &err) != 0) {
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_CHASSIS,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
 		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &csn) == 0)
 			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
 			    FM_FMRI_AUTH_CHASSIS, TOPO_PROP_IMMUTABLE, csn,
 			    &err);
 	}
-	if (topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_SERVER,
-	    &err) != 0) {
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_SERVER,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
 		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server)
 		    == 0)
 			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,

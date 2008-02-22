@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,11 +46,13 @@
 #include <topo_parse.h>
 #include <topo_error.h>
 
-static tf_rdata_t *topo_xml_walk(topo_mod_t *,
-    tf_info_t *, xmlNodePtr, tnode_t *);
+static tf_rdata_t *topo_xml_walk(topo_mod_t *, tf_info_t *, xmlNodePtr,
+    tnode_t *);
+static tf_edata_t *enum_attributes_process(topo_mod_t *, xmlNodePtr);
+static int enum_run(topo_mod_t *, tf_rdata_t *);
+static int decorate_nodes(topo_mod_t *, tf_rdata_t *, xmlNodePtr, tnode_t *,
+    tf_pad_t **);
 
-static int decorate_nodes(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn,
-    tnode_t *ptn, char *name, tf_pad_t **rpad);
 
 int
 xmlattr_to_stab(topo_mod_t *mp, xmlNodePtr n, const char *stabname,
@@ -577,8 +579,9 @@ register_method(topo_mod_t *mp, tnode_t *ptn, struct propmeth_data *meth)
 	    meth->arg_nvl, &err) != 0) {
 
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "failed to register "
-		    "propmethod %s for property %s on node %s=%d (%s)\n",
-		    meth->meth_name, meth->prop_name,
+		    "propmethod %s for property \"%s\" in propgrp %s on node "
+		    "%s=%d (%s)\n",
+		    meth->meth_name, meth->prop_name, meth->pg_name,
 		    topo_node_name(ptn), topo_node_instance(ptn),
 		    topo_strerror(err));
 		return (-1);
@@ -840,20 +843,20 @@ pgroups_record(topo_mod_t *mp, xmlNodePtr pxn, tnode_t *tn, const char *rname,
 }
 
 /*
- * psn:	pointer to a "propset" XML node
- * key: string to search the propset for
+ * psn:	pointer to a "set" XML node
+ * key: string to search the set for
  *
- * returns: 1, if the propset contains key
+ * returns: 1, if the set contains key
  *          0, otherwise
  */
 static int
-propset_contains(topo_mod_t *mp, char *key, char *set)
+set_contains(topo_mod_t *mp, char *key, char *set)
 {
 	char *prod;
 	int rv = 0;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "propset_contains(key = %s, "
-	    "set = %s)\n", key, set);
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "set_contains(key = %s, "
+	    "setlist = %s)\n", key, set);
 
 	prod = strtok((char *)set, "|");
 	if (prod && (strcmp(key, prod) == 0))
@@ -872,15 +875,17 @@ propset_contains(topo_mod_t *mp, char *key, char *set)
  * parent xmlNode pxn.
  */
 static int
-pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
-    tf_pad_t **rpad, const char *rname)
+pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
+    tf_pad_t **rpad)
 {
-	xmlNodePtr cn, gcn, psn;
-	xmlNodePtr def_propset = NULL;
+	xmlNodePtr cn, gcn, psn, ecn;
+	xmlNodePtr def_set = NULL;
 	tf_pad_t *new = *rpad;
+	tf_rdata_t tmp_rd;
 	int pgcnt = 0;
 	int dcnt = 0;
-	int joined_propset = 0;
+	int ecnt = 0;
+	int joined_set = 0;
 	xmlChar *set;
 	char *key;
 
@@ -892,17 +897,25 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 			    "cn->name is %s \n", (char *)cn->name);
 			/*
 			 * We're iterating through the XML children looking for
-			 * three types of elements:
+			 * four types of elements:
 			 *   1) dependents elements
 			 *   2) unconstrained pgroup elements
-			 *   3) pgroup elements constrained by propset elements
+			 *   3) pgroup elements constrained by set elements
+			 *   4) enum-method elements for the case that we want
+			 *	to post-process a statically defined node
 			 */
 			if (xmlStrcmp(cn->name, (xmlChar *)Dependents) == 0)
 				dcnt++;
 			else if (xmlStrcmp(cn->name, (xmlChar *)Propgrp) == 0)
 				pgcnt++;
-			else if (xmlStrcmp(cn->name, (xmlChar *)Propset) == 0) {
-				set = xmlGetProp(cn, (xmlChar *)Set);
+			else if (xmlStrcmp(cn->name, (xmlChar *)Enum_meth)
+			    == 0) {
+				ecn = cn;
+				ecnt++;
+			} else if (xmlStrcmp(cn->name, (xmlChar *)Set) == 0) {
+				if (joined_set)
+					continue;
+				set = xmlGetProp(cn, (xmlChar *)Setlist);
 
 				if (mp->tm_hdl->th_product)
 					key = mp->tm_hdl->th_product;
@@ -910,17 +923,16 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 					key = mp->tm_hdl->th_platform;
 
 				/*
-				 * If it's the default propset then we'll store
+				 * If it's the default set then we'll store
 				 * a pointer to it so that if none of the other
-				 * propsets apply to our product we can fall
+				 * sets apply to our product we can fall
 				 * back to this one.
 				 */
 				if (strcmp((char *)set, "default") == 0)
-					def_propset = cn;
-				else if (propset_contains(mp, key,
-				    (char *)set)) {
+					def_set = cn;
+				else if (set_contains(mp, key, (char *)set)) {
 					psn = cn;
-					joined_propset = 1;
+					joined_set = 1;
 					for (gcn = cn->xmlChildrenNode;
 					    gcn != NULL; gcn = gcn->next) {
 						if (xmlStrcmp(gcn->name,
@@ -932,14 +944,14 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 			}
 		}
 		/*
-		 * If we haven't found a propset that contains our product AND
-		 * a default propset exists, then we'll process it.
+		 * If we haven't found a set that contains our product AND
+		 * a default set exists, then we'll process it.
 		 */
-		if (!joined_propset && def_propset) {
+		if (!joined_set && def_set) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-			    "Falling back to default propset\n");
-			joined_propset = 1;
-			psn = def_propset;
+			    "Falling back to default set\n");
+			joined_set = 1;
+			psn = def_set;
 			for (gcn = psn->xmlChildrenNode; gcn != NULL;
 			    gcn = gcn->next) {
 				if (xmlStrcmp(gcn->name, (xmlChar *)Propgrp)
@@ -948,8 +960,31 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 			}
 		}
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-		    "pad_process: dcnt=%d, pgcnt=%d, joined_propset=%d\n",
-		    dcnt, pgcnt, joined_propset);
+		    "pad_process: dcnt=%d, pgcnt=%d, ecnt=%d, joined_set=%d\n",
+		    dcnt, pgcnt, ecnt, joined_set);
+		/*
+		 * If an enum-method element was found, AND we're a child of a
+		 * node element, then we invoke the enumerator so that it can do
+		 * post-processing of the node.
+		 */
+		if (ecnt && (strcmp((const char *)pxn->name, Node) == 0)) {
+			if ((tmp_rd.rd_einfo = enum_attributes_process(mp, ecn))
+			    == NULL)
+				return (-1);
+			tmp_rd.rd_mod = mp;
+			tmp_rd.rd_name = rd->rd_name;
+			tmp_rd.rd_min = rd->rd_min;
+			tmp_rd.rd_max = rd->rd_max;
+			tmp_rd.rd_pn = ptn;
+			if (enum_run(mp, &tmp_rd) < 0) {
+				/*
+				 * Note the failure but continue on
+				 */
+				topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
+				    "pad_process: enumeration failed.\n");
+			}
+			topo_mod_free(mp, tmp_rd.rd_einfo, sizeof (tf_edata_t));
+		}
 		/*
 		 * Here we allocate an element in an intermediate data structure
 		 * which keeps track property groups and dependents of the range
@@ -973,20 +1008,20 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 				return (-1);
 			}
 
-			if (joined_propset) {
+			if (joined_set) {
 				/*
 				 * If the property groups are contained within a
-				 * propset then they will be one level lower in
+				 * set then they will be one level lower in
 				 * the XML tree.
 				 */
-				if (pgroups_record(mp, psn, ptn, rname, new,
-				    (const char *)pxn->name) < 0) {
+				if (pgroups_record(mp, psn, ptn, rd->rd_name,
+				    new, (const char *)pxn->name) < 0) {
 					tf_pad_free(mp, new);
 					return (-1);
 				}
 			} else {
-				if (pgroups_record(mp, pxn, ptn, rname, new,
-				    (const char *)pxn->name) < 0) {
+				if (pgroups_record(mp, pxn, ptn, rd->rd_name,
+				    new, (const char *)pxn->name) < 0) {
 					tf_pad_free(mp, new);
 					return (-1);
 				}
@@ -996,7 +1031,7 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 	}
 
 	if (new->tpad_dcnt > 0)
-		if (dependents_create(mp, xinfo, new, pxn, ptn) < 0)
+		if (dependents_create(mp, rd->rd_finfo, new, pxn, ptn) < 0)
 			return (-1);
 
 	if (new->tpad_pgcnt > 0)
@@ -1005,6 +1040,7 @@ pad_process(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn,
 
 	return (0);
 }
+
 
 static int
 node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
@@ -1037,6 +1073,7 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 			goto nodedone;
 	}
 	ntn = topo_node_lookup(rd->rd_pn, rd->rd_name, inst);
+
 	if (ntn == NULL) {
 
 		/*
@@ -1049,7 +1086,6 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 			rv = 0;
 		goto nodedone;
 	}
-
 	if ((newi = tf_idata_new(mp, inst, ntn)) == NULL) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "node_process: tf_idata_new failed.\n");
@@ -1060,8 +1096,7 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 		    "node_process: tf_idata_insert failed.\n");
 		goto nodedone;
 	}
-	if (pad_process(mp, rd->rd_finfo, nn, ntn, &newi->ti_pad, rd->rd_name)
-	    < 0)
+	if (pad_process(mp, rd, nn, ntn, &newi->ti_pad) < 0)
 		goto nodedone;
 	rv = 0;
 nodedone:
@@ -1108,6 +1143,7 @@ enum_attributes_process(topo_mod_t *mp, xmlNodePtr en)
 enodedone:
 	if (einfo->te_name != NULL)
 		xmlFree(einfo->te_name);
+	topo_mod_free(mp, einfo, sizeof (tf_edata_t));
 	return (NULL);
 }
 
@@ -1157,21 +1193,21 @@ enum_run(topo_mod_t *mp, tf_rdata_t *rd)
 
 
 int
-decorate_nodes(topo_mod_t *mp,
-    tf_info_t *xinfo, xmlNodePtr pxn, tnode_t *ptn, char *name, tf_pad_t **rpad)
+decorate_nodes(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
+    tf_pad_t **rpad)
 {
 	tnode_t *ctn;
 
 	ctn = topo_child_first(ptn);
 	while (ctn != NULL) {
 		/* Only care about instances within the range */
-		if (strcmp(topo_node_name(ctn), name) != 0) {
+		if (strcmp(topo_node_name(ctn), rd->rd_name) != 0) {
 			ctn = topo_child_next(ptn, ctn);
 			continue;
 		}
-		if (pad_process(mp, xinfo, pxn, ctn, rpad, name) < 0)
+		if (pad_process(mp, rd, pxn, ctn, rpad) < 0)
 			return (-1);
-		if (decorate_nodes(mp, xinfo, pxn, ctn, name, rpad) < 0)
+		if (decorate_nodes(mp, rd, pxn, ctn, rpad) < 0)
 			return (-1);
 		ctn = topo_child_next(ptn, ctn);
 	}
@@ -1194,6 +1230,7 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "topo_xml_range_process\n"
 	    "process %s range beneath %s\n", rd->rd_name,
 	    topo_node_name(rd->rd_pn));
+
 	e = topo_node_range_create(mp,
 	    rd->rd_pn, rd->rd_name, rd->rd_min, rd->rd_max);
 	if (e != 0 && topo_mod_errno(mp) != ETOPO_NODE_DUP) {
@@ -1256,7 +1293,7 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 
 	/* Now look for nodes, i.e., hard instances */
 	for (cn = rn->xmlChildrenNode; cn != NULL; cn = cn->next) {
-		if (xmlStrcmp(cn->name, (xmlChar *)Node) == 0)
+		if (xmlStrcmp(cn->name, (xmlChar *)Node) == 0) {
 			if (node_process(mp, cn, rd) < 0) {
 				topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 				    "node processing failed: %s.\n",
@@ -1265,6 +1302,7 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 				    EMOD_PARTIAL_ENUM));
 			}
 			ccnt++;
+		}
 	}
 
 	/*
@@ -1276,8 +1314,7 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 	 * to all of nodes in this range
 	 */
 	if (rd->rd_finfo->tf_flags & TF_PROPMAP)
-		(void) decorate_nodes(mp, rd->rd_finfo, rn, rd->rd_pn,
-		    rd->rd_name, &rd->rd_pad);
+		(void) decorate_nodes(mp, rd, rn, rd->rd_pn, &rd->rd_pad);
 	else {
 		ct = topo_child_first(rd->rd_pn);
 		while (ct != NULL) {
@@ -1286,8 +1323,8 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 				ct = topo_child_next(rd->rd_pn, ct);
 				continue;
 			}
-			if (pad_process(mp, rd->rd_finfo, rn, ct, &rd->rd_pad,
-			    rd->rd_name) < 0)
+			if (pad_process(mp, rd, rn, ct, &rd->rd_pad)
+			    < 0)
 				return (-1);
 			ct = topo_child_next(rd->rd_pn, ct);
 			ccnt++;
@@ -1310,16 +1347,76 @@ static tf_rdata_t *
 topo_xml_walk(topo_mod_t *mp,
     tf_info_t *xinfo, xmlNodePtr croot, tnode_t *troot)
 {
-	xmlNodePtr curr;
+	xmlNodePtr curr, def_set = NULL;
 	tf_rdata_t *rr, *pr, *rdp;
+	xmlChar *set;
+	char *key;
+	int joined_set = 0;
+
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "topo_xml_walk\n");
+	rr = pr = NULL;
+	/*
+	 * First iterate through all the XML nodes at this level to look for
+	 * set nodes.
+	 */
+	for (curr = croot->xmlChildrenNode; curr != NULL; curr = curr->next) {
+		if (curr->name == NULL) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+			    "topo_xml_walk: Ignoring nameless xmlnode\n");
+			continue;
+		}
+		if (xmlStrcmp(curr->name, (xmlChar *)Set) == 0) {
+			if (joined_set)
+				continue;
+
+			set = xmlGetProp(curr, (xmlChar *)Setlist);
+
+			if (mp->tm_hdl->th_product)
+				key = mp->tm_hdl->th_product;
+			else
+				key = mp->tm_hdl->th_platform;
+
+			/*
+			 * If it's the default set then we'll store
+			 * a pointer to it so that if none of the other
+			 * sets apply to our product we can fall
+			 * back to this one.
+			 */
+			if (strcmp((char *)set, "default") == 0)
+				def_set = curr;
+			else if (set_contains(mp, key, (char *)set)) {
+				joined_set = 1;
+				if ((rdp = topo_xml_walk(mp, xinfo, curr,
+				    troot)) == NULL) {
+					topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+					    "topo_xml_walk: failed1\n");
+				}
+				if (pr == NULL) {
+					rr = pr = rdp;
+				} else {
+					pr->rd_next = rdp;
+					pr = rdp;
+				}
+				rr->rd_cnt++;
+			}
+			xmlFree(set);
+		}
+	}
+	/*
+	 * If we haven't found a set that contains our product AND a default set
+	 * exists, then we'll process it.
+	 */
+	if (!joined_set && def_set)
+		if (topo_xml_walk(mp, xinfo, def_set, troot) == NULL) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+			    "topo_xml_walk: failed2\n");
+		}
 
 	/*
-	 * What we're interested in are children xmlNodes of croot tagged
+	 * Now we're interested in children xmlNodes of croot tagged
 	 * as 'ranges'.  These define what topology nodes may exist, and need
 	 * to be verified.
 	 */
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "topo_xml_walk\n");
-	rr = pr = NULL;
 	for (curr = croot->xmlChildrenNode; curr != NULL; curr = curr->next) {
 		if (curr->name == NULL) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,

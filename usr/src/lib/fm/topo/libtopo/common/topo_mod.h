@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 
 #include <fm/libtopo.h>
 #include <fm/topo_hc.h>
+#include <libipmi.h>
 #include <libnvpair.h>
 #include <libdevinfo.h>
 
@@ -115,6 +116,7 @@ extern void topo_method_unregister(topo_mod_t *, tnode_t *, const char *);
 extern void topo_method_unregister_all(topo_mod_t *, tnode_t *);
 
 extern di_node_t topo_mod_devinfo(topo_mod_t *);
+extern ipmi_handle_t *topo_mod_ipmi(topo_mod_t *);
 extern di_prom_handle_t topo_mod_prominfo(topo_mod_t *);
 extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 

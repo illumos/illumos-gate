@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,12 @@
 #include <stdarg.h>
 
 #include "ipmi_impl.h"
+
+/*
+ * Extracts bits between index h (high, inclusive) and l (low, exclusive) from
+ * u, which must be an unsigned integer.
+ */
+#define	BITX(u, h, l)	(((u) >> (l)) & ((1LU << ((h) - (l) + 1LU)) - 1LU))
 
 /*
  * Error handling
@@ -60,33 +66,6 @@ ipmi_errno(ipmi_handle_t *ihp)
 	return (ihp->ih_errno);
 }
 
-static struct {
-	int		err;
-	const char	*msg;
-} errno_table[] = {
-	{ EIPMI_NOMEM,			"memory allocation failure" },
-	{ EIPMI_BMC_OPEN_FAILED,	"failed to open /dev/bmc" },
-	{ EIPMI_BMC_PUTMSG,		"failed to send message to /dev/bmc" },
-	{ EIPMI_BMC_GETMSG,
-	    "failed to read response from /dev/bmc" },
-	{ EIPMI_BMC_RESPONSE,
-	    "failed to read response from /dev/bmc" },
-	{ EIPMI_INVALID_COMMAND,	"invalid command" },
-	{ EIPMI_COMMAND_TIMEOUT,	"command timed out" },
-	{ EIPMI_DATA_LENGTH_EXCEEDED,	"maximum data length exceeded" },
-	{ EIPMI_SEND_FAILED,		"failed to send BMC request" },
-	{ EIPMI_UNSPECIFIED,		"unspecified BMC error" },
-	{ EIPMI_BAD_RESPONSE_LENGTH,
-	    "unexpected command response data length" },
-	{ EIPMI_INVALID_RESERVATION,	"invalid or cancelled reservation" },
-	{ EIPMI_NOT_PRESENT,		"request entity not present" },
-	{ EIPMI_INVALID_REQUEST,	"malformed request data" },
-	{ EIPMI_BUSY,			"service processor is busy" },
-	{ EIPMI_NOSPACE,		"service processor is out of space" },
-	{ EIPMI_UNAVAILABLE,		"service processor is unavailable" },
-	{ EIPMI_ACCESS,			"insufficient privileges" }
-};
-
 /* ARGSUSED */
 const char *
 ipmi_errmsg(ipmi_handle_t *ihp)
@@ -95,9 +74,9 @@ ipmi_errmsg(ipmi_handle_t *ihp)
 	const char *str;
 
 	str = NULL;
-	for (i = 0; i < sizeof (errno_table) / sizeof (errno_table[0]); i++) {
-		if (errno_table[i].err == ihp->ih_errno) {
-			str = errno_table[i].msg;
+	for (i = 0; ipmi_errno_table[i].int_name != NULL; i++) {
+		if (ipmi_errno_table[i].int_value == ihp->ih_errno) {
+			str = ipmi_errno_table[i].int_name;
 			break;
 		}
 	}
@@ -116,7 +95,6 @@ ipmi_errmsg(ipmi_handle_t *ihp)
 /*
  * Memory allocation
  */
-
 void *
 ipmi_alloc(ipmi_handle_t *ihp, size_t size)
 {
@@ -155,4 +133,167 @@ void
 ipmi_free(ipmi_handle_t *ihp, void *ptr)
 {
 	free(ptr);
+}
+
+/*
+ * Translation between #defines and strings.
+ */
+void
+ipmi_entity_name(uint8_t id, char *buf, size_t len)
+{
+	ipmi_name_trans_t *ntp;
+
+	for (ntp = &ipmi_entity_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == id) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", id);
+}
+
+void
+ipmi_sensor_type_name(uint8_t type, char *buf, size_t len)
+{
+	ipmi_name_trans_t *ntp;
+
+	for (ntp = &ipmi_sensor_type_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == type) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", type);
+}
+
+void
+ipmi_sensor_reading_name(uint8_t sensor_type, uint8_t reading_type,
+    char *buf, size_t len)
+{
+	uint8_t val;
+	ipmi_name_trans_t *ntp;
+
+	if (reading_type == IPMI_RT_SPECIFIC) {
+		val = sensor_type;
+		ntp = &ipmi_sensor_type_table[0];
+	} else {
+		val = reading_type;
+		ntp = &ipmi_reading_type_table[0];
+	}
+
+	for (; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == val) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	if (reading_type == IPMI_RT_SPECIFIC)
+		(void) snprintf(buf, len, "%02x/%02x", reading_type,
+		    sensor_type);
+	else
+		(void) snprintf(buf, len, "%02x", reading_type);
+}
+
+/*
+ * Converts a BCD decimal value to an integer.
+ */
+int
+ipmi_convert_bcd(int value)
+{
+	int ret = 0;
+	int digit;
+	int i;
+
+	for (i = 7; i >= 0; i--) {
+		digit = ((value & (0xf << (i * 4))) >> (i * 4));
+		ret += digit * 10 * i;
+	}
+
+	return (ret);
+}
+
+/*
+ * See sections 43.15 and 43.16
+ *
+ * This is a utility function for decoding the strings that are packed into
+ * sensor data records.  If the type is 6-bit packed ASCII, then it converts
+ * the string to an 8-bit ASCII string and copies that into the suuplied buffer.
+ * If it is 8-bit ASCII, it copies the string into the supplied buffer as-is.
+ */
+void
+ipmi_decode_string(uint8_t type, uint8_t len, char *data, char *buf)
+{
+	int i, j = 0, chunks, leftovers;
+	uint8_t tmp, lo;
+
+	if (len == 0) {
+		*buf = '\0';
+		return;
+	}
+	/*
+	 * If the type is 8-bit ASCII, we can simply copy the string and return
+	 */
+	if (type == 0x3) {
+		(void) strncpy(buf, data, len);
+		*(buf+len) = '\0';
+		return;
+	} else if (type == 0x1 || type == 0x0) {
+		/*
+		 * Yuck - they either used BCD plus encoding, which we don't
+		 * currently handle, or they used an unspecified encoding type.
+		 * In these cases we'll set buf to an empty string.  We still
+		 * need to return the length so that we can get to the next
+		 * record.
+		 */
+		*buf = '\0';
+		return;
+	}
+
+	/*
+	 * Otherwise, it's 6-bit packed ASCII, so we have to convert the
+	 * data first
+	 */
+	chunks = len / 3;
+	leftovers = len % 3;
+
+	/*
+	 * First we decode the 6-bit string in chunks of 3 bytes as far as
+	 * possible
+	 */
+	for (i = 0; i < chunks; i++) {
+		tmp = BITX(*(data+j), 5, 0);
+		*buf++ = (char)(tmp + 32);
+
+		lo = BITX(*(data+j++), 7, 6);
+		tmp = BITX(*(data+j), 3, 0);
+		tmp = (tmp << 2) | lo;
+		*buf++ = (char)(tmp + 32);
+
+		lo = BITX(*(data+j++), 7, 4);
+		tmp = BITX(*(data+j), 1, 0);
+		tmp = (tmp << 4) | lo;
+		*buf++ = (char)(tmp + 32);
+
+		tmp = BITX(*(data+j++), 7, 2);
+		*buf++ = (char)(tmp + 32);
+	}
+	switch (leftovers) {
+		case 1:
+			tmp = BITX(*(data+j), 5, 0);
+			*buf++ = (char)(tmp + 32);
+			break;
+		case 2:
+			tmp = BITX(*(data+j), 5, 0);
+			*buf++ = (char)(tmp + 32);
+
+			lo = BITX(*(data+j++), 7, 6);
+			tmp = BITX(*(data+j), 3, 0);
+			tmp = (tmp << 2) | lo;
+			*buf++ = (char)(tmp + 32);
+			break;
+	}
+	*buf = '\0';
 }

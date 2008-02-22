@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,11 @@
 #include <string.h>
 
 #include "ipmi_impl.h"
+
+typedef struct ipmi_user_impl {
+	ipmi_list_t	iu_list;
+	ipmi_user_t	iu_user;
+} ipmi_user_impl_t;
 
 /*
  * Get User Access.  See section 22.27.
@@ -160,13 +165,12 @@ ipmi_get_user_name(ipmi_handle_t *ihp, uint8_t uid)
 void
 ipmi_user_clear(ipmi_handle_t *ihp)
 {
-	ipmi_user_t *up, *next;
+	ipmi_user_impl_t *uip;
 
-	while ((up = ihp->ih_users) != NULL) {
-		next = up->iu_next;
-		ipmi_free(ihp, up->iu_name);
-		ipmi_free(ihp, up);
-		ihp->ih_users = next;
+	while ((uip = ipmi_list_next(&ihp->ih_users)) != NULL) {
+		ipmi_list_delete(&ihp->ih_users, uip);
+		ipmi_free(ihp, uip->iu_user.iu_name);
+		ipmi_free(ihp, uip);
 	}
 }
 
@@ -179,6 +183,7 @@ ipmi_user_iter(ipmi_handle_t *ihp, int (*func)(ipmi_user_t *, void *),
 {
 	ipmi_get_user_access_t *resp;
 	uint8_t i;
+	ipmi_user_impl_t *uip;
 	ipmi_user_t *up;
 	const char *name;
 
@@ -197,16 +202,18 @@ ipmi_user_iter(ipmi_handle_t *ihp, int (*func)(ipmi_user_t *, void *),
 		    IPMI_USER_CHANNEL_CURRENT, i)) == NULL)
 			return (-1);
 
-		if ((up = ipmi_zalloc(ihp, sizeof (ipmi_user_t))) == NULL)
+		if ((uip = ipmi_zalloc(ihp, sizeof (ipmi_user_impl_t))) == NULL)
 			return (-1);
+
+		up = &uip->iu_user;
 
 		up->iu_enabled = resp->igua_enabled_uid;
 		up->iu_uid = i;
 		up->iu_ipmi_msg_enable = resp->igua_ipmi_msg_enable;
 		up->iu_link_auth_enable = resp->igua_link_auth_enable;
 		up->iu_priv = resp->igua_privilege_level;
-		up->iu_next = ihp->ih_users;
-		ihp->ih_users = up;
+
+		ipmi_list_append(&ihp->ih_users, uip);
 
 		if ((name = ipmi_get_user_name(ihp, i)) == NULL)
 			return (-1);
@@ -216,8 +223,9 @@ ipmi_user_iter(ipmi_handle_t *ihp, int (*func)(ipmi_user_t *, void *),
 			return (-1);
 	}
 
-	for (up = ihp->ih_users; up != NULL; up = up->iu_next) {
-		if (func(up, data) != 0)
+	for (uip = ipmi_list_next(&ihp->ih_users); uip != NULL;
+	    uip = ipmi_list_next(uip)) {
+		if (func(&uip->iu_user, data) != 0)
 			return (-1);
 	}
 

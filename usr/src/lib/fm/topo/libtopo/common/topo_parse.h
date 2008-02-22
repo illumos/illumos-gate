@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +148,7 @@ typedef struct tf_info {
 #define	Range "range"
 #define	Scheme "scheme"
 #define	Set "set"
+#define	Setlist "setlist"
 #define	Siblings "siblings"
 #define	Static "static"
 #define	String "string"
@@ -165,7 +166,6 @@ typedef struct tf_info {
 #define	Prop_meth "propmethod"
 #define	Propgrp "propgroup"
 #define	Propval "propval"
-#define	Propset "propset"
 #define	Propmap "propmap"
 
 #define	Node "node"

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,6 +66,7 @@ f none usr/lib/fm/fmd/fmd 555 root bin
 f none usr/lib/fm/fmd/fminject 555 root bin
 f none usr/lib/fm/fmd/fmsim 555 root bin
 f none usr/lib/fm/fmd/fmtopo 555 root bin
+f none usr/lib/fm/fmd/ipmitopo 555 root bin
 d none usr/lib/fm/fmd/plugins 755 root bin
 f none usr/lib/fm/fmd/plugins/cpumem-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/cpumem-retire.so 555 root bin
@@ -132,6 +133,7 @@ d none usr/lib/fm/topo/maps 755 root bin
 f none usr/lib/fm/topo/maps/xfp-hc-topology.xml 444 root bin
 d none usr/lib/fm/topo/plugins 755 root bin
 f none usr/lib/fm/topo/plugins/disk.so 555 root bin
+f none usr/lib/fm/topo/plugins/ipmi.so 555 root bin
 f none usr/lib/fm/topo/plugins/xfp.so 555 root bin
 d none usr/lib/locale 755 root bin
 d none usr/lib/locale/C 755 root bin

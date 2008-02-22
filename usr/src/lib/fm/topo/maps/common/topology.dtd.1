@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -112,23 +112,24 @@
                         External | Obsolete ) #REQUIRED >
 
 <!--
-  propset
-	This element is for associating property groups according to a set type.
+  set
+	This element is for associating ranges, nodes or property groups
+	according to a set type.
 
 	Its attributes are
 
 		type	The type of this property group set.  'product' is the
 			only set type currently supported.
-		set	The list of set types.
+		setlist	The list of set types.
 
 -->
 
-<!ELEMENT propset
-	 ( propgroup* ) >
+<!ELEMENT set
+	 ( range*, propgroup* ) >
 
-<!ATTLIST propset
+<!ATTLIST set
 	type	( product ) #REQUIRED
-	set	CDATA #REQUIRED >
+	setlist	CDATA #REQUIRED >
 
 <!--
   propmap
@@ -206,7 +207,6 @@
 	name		CDATA #REQUIRED
 	version		CDATA #REQUIRED >
 
-
 <!--
   node
 
@@ -219,7 +219,7 @@
 -->
 
 <!ELEMENT node
-	( propgroup*, dependents*, propset* ) >
+	( propgroup*, dependents*, set*, enum-method* ) >
 
 <!ATTLIST node
 	instance	CDATA #REQUIRED >
@@ -235,7 +235,7 @@
 -->
 
 <!ELEMENT dependents 
-	( range | xi:include )+ >
+	(( range | xi:include )+, set) >
 
 <!ATTLIST dependents 
 	grouping ( children | siblings ) "children" #REQUIRED >
@@ -254,12 +254,11 @@
 
 	max	The largest allowed instance number for an
 		actual topo node.
-
 -->
 
 <!ELEMENT range
 	( enum-method?, propmap?, node*, propgroup*, dependents*,
-	    propset* ) >
+	    set? ) >
 
 <!ATTLIST range
 	name		CDATA #REQUIRED
@@ -277,7 +276,7 @@
 -->
 
 <!ELEMENT topology
-	(range* | xi:include*)>
+	((range* | xi:include*), set)>
 
 <!ATTLIST topology
 	name	CDATA #REQUIRED

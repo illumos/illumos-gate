@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -872,17 +872,27 @@ prop_method_register(tnode_t *node, const char *pgname, const char *pname,
 		return (register_methoderror(node, pm, err, 1,
 		    ETOPO_PROP_NOMEM));
 
-	if ((pv = prop_create(node, pgname, pname, ptype, TOPO_PROP_MUTABLE,
-	    err)) == NULL) {
-		/* node unlocked */
-		return (register_methoderror(node, pm, err, 0, *err));
-	}
+	/*
+	 * It's possible the property may already exist.  However we still want
+	 * to allow the method to be registered.  This is to handle the case
+	 * where we specify an prop method in an xml map to override the value
+	 * that was set by the enumerator.
+	 */
+	if ((pv = propval_get(pgroup_get(node, pgname), pname)) == NULL)
+		if ((pv = prop_create(node, pgname, pname, ptype,
+		    TOPO_PROP_MUTABLE, err)) == NULL) {
+			/* node unlocked */
+			return (register_methoderror(node, pm, err, 0, *err));
+		}
 
 	if (pv->tp_method != NULL)
 		return (register_methoderror(node, pm, err, 1,
 		    ETOPO_METHOD_DEFD));
 
-	pv->tp_val = NULL;
+	if (pv->tp_val != NULL) {
+		nvlist_free(pv->tp_val);
+		pv->tp_val = NULL;
+	}
 	pv->tp_method = pm;
 
 	topo_node_unlock(node);
@@ -994,8 +1004,17 @@ topo_prop_inherit(tnode_t *node, const char *pgname, const char *name, int *err)
 
 	topo_node_lock(pnode);
 	topo_node_lock(node);
+
 	/*
-	 * Check for an existing property group and prop val
+	 * Check if the requested property group and prop val are already set
+	 * on the node.
+	 */
+	if (propval_get(pgroup_get(node, pgname), name) != NULL)
+		return (inherit_seterror(node, err, ETOPO_PROP_DEFD));
+
+	/*
+	 * Check if the requested property group and prop val exists on the
+	 * parent node
 	 */
 	if ((pv = propval_get(pgroup_get(pnode, pgname), name)) == NULL)
 		return (inherit_seterror(node, err, ETOPO_PROP_NOENT));

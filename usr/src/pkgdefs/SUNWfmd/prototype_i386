@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -82,6 +82,8 @@ f none usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so 555 root bin
 d none usr/platform/i86pc/lib/fm/topo/maps 755 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 444 root bin
+f none usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml 444 root bin
+f none usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4500-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4540-hc-topology.xml 444 root bin

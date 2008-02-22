@@ -24,45 +24,60 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-LIBRARY=	libipmi.a
-VERS=		.1
-
-OBJECTS=	ipmi_bmc.o	\
-		ipmi_entity.o	\
-		ipmi_fru.o	\
-		ipmi_hash.o	\
-		ipmi_list.o	\
-		ipmi_misc.o	\
-		ipmi_sel.o	\
-		ipmi_sdr.o	\
-		ipmi_sensor.o	\
-		ipmi_sunoem.o	\
-		ipmi_tables.o	\
-		ipmi_user.o	\
-		ipmi_util.o	\
-		libipmi.o
-
-SRCS=		$(OBJECTS:%.o:$(SRCDIR)/%c.)
-
-include ../../Makefile.lib
-
-LIBS=		$(DYNLIB) $(LINTLIB)
-
-SRCDIR=		../common
-
-INCS +=		-I$(SRCDIR)
-LDLIBS +=	-lc
-CPPFLAGS +=	$(INCS)
-
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
 .KEEP_STATE:
+.SUFFIXES:
 
-all: $(LIBS)
+SRCS += ipmitopo.c
+OBJS = $(SRCS:%.c=%.o)
+LINTFILES = $(SRCS:%.c=%.ln)
 
-lint: lintcheck
+PROG = ipmitopo
+ROOTLIBFM = $(ROOT)/usr/lib/fm
+ROOTLIBFMD = $(ROOT)/usr/lib/fm/fmd
+ROOTPROG = $(ROOTLIBFMD)/$(PROG)
 
-$(SRCDIR)/ipmi_tables.c: $(SRCDIR)/mktables.sh $(SRCDIR)/libipmi.h
-	sh $(SRCDIR)/mktables.sh $(SRCDIR)/libipmi.h > $@
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CPPFLAGS += -I. -I../common
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
+LDLIBS += -lipmi
+LINTFLAGS += -mnu
 
-include ../../Makefile.targ
+.NO_PARALLEL:
+.PARALLEL: $(OBJS) $(LINTFILES)
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
+	$(POST_PROCESS)
+
+%.o: ../common/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+clean:
+	$(RM) $(OBJS) $(LINTFILES)
+
+clobber: clean
+	$(RM) $(PROG)
+
+%.ln: ../common/%.c
+	$(LINT.c) -c $<
+
+%.ln: %.c
+	$(LINT.c) -c $<
+
+lint: $(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES)
+
+$(ROOTLIBFMD)/%: %
+	$(INS.file)
+
+install_h:
+
+install: all $(ROOTPROG)

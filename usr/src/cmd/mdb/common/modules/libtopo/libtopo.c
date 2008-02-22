@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -187,8 +187,13 @@ topo_module(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_cv",
 	    addr + offsetof(topo_mod_t, tm_cv),
 	    "Module condition variable");
-	mdb_printf("%-12s %-36s %-30s\n", "tm_busy", tm.tm_busy,
-	    "Busy indicator");
+	if (tm.tm_busy)
+		mdb_printf("%-12s %-36s %-30s\n", "tm_busy", "TRUE",
+		    "Busy indicator");
+	else
+		mdb_printf("%-12s %-36s %-30s\n", "tm_busy", "FALSE",
+		    "Busy indicator");
+
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_next", tm.tm_next,
 	    "Next module in hash chain");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_hdl", tm.tm_hdl,
@@ -339,14 +344,18 @@ static void
 dump_propmethod(uintptr_t addr)
 {
 	topo_propmethod_t pm;
+	char mname[32];
 
 	if (mdb_vread(&pm, sizeof (pm), addr) != sizeof (pm)) {
 		mdb_warn("failed to read topo_propmethod at %p", addr);
 		return;
 	}
+	if (mdb_readstr(mname, sizeof (mname), (uintptr_t)pm.tpm_name) < 0) {
+		(void) mdb_snprintf(mname, sizeof (mname), "<%p>", pm.tpm_name);
+	}
 
-	mdb_printf("       method: %-32s version: %-16s args: %p\n",
-	    pm.tpm_name, pm.tpm_version, pm.tpm_args);
+	mdb_printf("       method: %-32s version: %-16d args: %p\n",
+	    mname, pm.tpm_version, pm.tpm_args);
 }
 
 /*
