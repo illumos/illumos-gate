@@ -284,10 +284,11 @@ static void
 ip_squeue_clean(void *arg1, mblk_t *mp, void *arg2)
 {
 	squeue_t	*sqp = arg2;
-	ill_rx_ring_t	*ring = sqp->sq_rx_ring;
+	ill_rx_ring_t	*ring = (ill_rx_ring_t *)mp->b_wptr;
 	ill_t		*ill;
 
 	ASSERT(sqp != NULL);
+	mp->b_wptr = NULL;
 
 	if (ring == NULL) {
 		return;
@@ -400,6 +401,16 @@ ip_squeue_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 	TCP_DEBUG_GETPCSTACK(connp->conn_tcp->tcmp_stk, 15);
 	mp = &connp->conn_tcp->tcp_closemp;
 	CONN_INC_REF(connp);
+
+	/*
+	 * Since the field sq_rx_ring for default squeue is NULL,
+	 * ip_squeue_clean() will have no way to get the ring if we
+	 * don't pass the pointer to it. We use b_wptr to do so
+	 * as use of b_wptr for any other purpose is not expected.
+	 */
+
+	ASSERT(mp->b_wptr == NULL);
+	mp->b_wptr = (unsigned char *)rx_ring;
 	squeue_enter(sqp, mp, ip_squeue_clean, connp, NULL);
 
 	mutex_enter(&ill->ill_lock);
