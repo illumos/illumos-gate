@@ -341,7 +341,7 @@ auto_calldaemon(
 	struct autofs_globals 	*fngp = NULL;
 	void			*orp = NULL;
 	int			 orl;
-	int			 rlen;
+	int			 rlen = 0;	/* MUST be initialized */
 	autofs_door_args_t	*xdr_argsp;
 	int			 xdr_len = 0;
 	int			 printed_not_running_msg = 0;
