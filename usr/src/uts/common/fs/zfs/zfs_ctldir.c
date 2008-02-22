@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,8 @@
  * (ie: snapshots) are ZFS nodes and have their own unique vfs_t.
  * However, vnodes within these mounted on file systems have their v_vfsp
  * fields set to the head filesystem to make NFS happy (see
- * zfsctl_snapdir_lookup()).
+ * zfsctl_snapdir_lookup()). We VFS_HOLD the head filesystem's vfs_t
+ * so that it cannot be freed until all snapshots have been unmounted.
  */
 
 #include <fs/fs_subr.h>
@@ -75,6 +76,18 @@
 #include <sys/dmu.h>
 #include <sys/dsl_deleg.h>
 #include <sys/mount.h>
+
+typedef struct zfsctl_node {
+	gfs_dir_t	zc_gfs_private;
+	uint64_t	zc_id;
+	timestruc_t	zc_cmtime;	/* ctime and mtime, always the same */
+} zfsctl_node_t;
+
+typedef struct zfsctl_snapdir {
+	zfsctl_node_t	sd_node;
+	kmutex_t	sd_lock;
+	avl_tree_t	sd_snaps;
+} zfsctl_snapdir_t;
 
 typedef struct {
 	char		*se_name;
@@ -107,6 +120,7 @@ static const fs_operation_def_t zfsctl_tops_snapshot[];
 
 static vnode_t *zfsctl_mknode_snapdir(vnode_t *);
 static vnode_t *zfsctl_snapshot_mknode(vnode_t *, uint64_t objset);
+static int zfsctl_unmount_snap(zfs_snapentry_t *, int, cred_t *);
 
 static gfs_opsvec_t zfsctl_opsvec[] = {
 	{ ".zfs", zfsctl_tops_root, &zfsctl_ops_root },
@@ -114,18 +128,6 @@ static gfs_opsvec_t zfsctl_opsvec[] = {
 	{ ".zfs/snapshot/vnode", zfsctl_tops_snapshot, &zfsctl_ops_snapshot },
 	{ NULL }
 };
-
-typedef struct zfsctl_node {
-	gfs_dir_t	zc_gfs_private;
-	uint64_t	zc_id;
-	timestruc_t	zc_cmtime;	/* ctime and mtime, always the same */
-} zfsctl_node_t;
-
-typedef struct zfsctl_snapdir {
-	zfsctl_node_t	sd_node;
-	kmutex_t	sd_lock;
-	avl_tree_t	sd_snaps;
-} zfsctl_snapdir_t;
 
 /*
  * Root directory elements.  We have only a single static entry, 'snapshot'.
@@ -432,42 +434,38 @@ zfsctl_snapshot_zname(vnode_t *vp, const char *name, int len, char *zname)
 	return (0);
 }
 
-int
-zfsctl_unmount_snap(vnode_t *dvp, const char *name, int force, cred_t *cr)
+static int
+zfsctl_unmount_snap(zfs_snapentry_t *sep, int fflags, cred_t *cr)
 {
-	zfsctl_snapdir_t *sdp = dvp->v_data;
-	zfs_snapentry_t search, *sep;
-	avl_index_t where;
-	int err;
+	vnode_t *svp = sep->se_root;
+	int error;
 
-	ASSERT(MUTEX_HELD(&sdp->sd_lock));
-
-	search.se_name = (char *)name;
-	if ((sep = avl_find(&sdp->sd_snaps, &search, &where)) == NULL)
-		return (ENOENT);
-
-	ASSERT(vn_ismntpt(sep->se_root));
+	ASSERT(vn_ismntpt(svp));
 
 	/* this will be dropped by dounmount() */
-	if ((err = vn_vfswlock(sep->se_root)) != 0)
-		return (err);
+	if ((error = vn_vfswlock(svp)) != 0)
+		return (error);
 
-	VN_HOLD(sep->se_root);
-	err = dounmount(vn_mountedvfs(sep->se_root), force, kcred);
-	if (err) {
-		VN_RELE(sep->se_root);
-		return (err);
+	VN_HOLD(svp);
+	error = dounmount(vn_mountedvfs(svp), fflags, cr);
+	if (error) {
+		VN_RELE(svp);
+		return (error);
 	}
-	ASSERT(sep->se_root->v_count == 1);
-	gfs_vop_inactive(sep->se_root, cr, NULL);
+	VFS_RELE(svp->v_vfsp);
+	/*
+	 * We can't use VN_RELE(), as that will try to invoke
+	 * zfsctl_snapdir_inactive(), which would cause us to destroy
+	 * the sd_lock mutex held by our caller.
+	 */
+	ASSERT(svp->v_count == 1);
+	gfs_vop_inactive(svp, cr, NULL);
 
-	avl_remove(&sdp->sd_snaps, sep);
 	kmem_free(sep->se_name, strlen(sep->se_name) + 1);
 	kmem_free(sep, sizeof (zfs_snapentry_t));
 
 	return (0);
 }
-
 
 static void
 zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
@@ -575,6 +573,8 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr,
     caller_context_t *ct, int flags)
 {
 	zfsctl_snapdir_t *sdp = dvp->v_data;
+	zfs_snapentry_t *sep;
+	zfs_snapentry_t search;
 	char snapname[MAXNAMELEN];
 	int err;
 
@@ -587,13 +587,18 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr,
 
 	mutex_enter(&sdp->sd_lock);
 
-	err = zfsctl_unmount_snap(dvp, name, MS_FORCE, cr);
-	if (err) {
-		mutex_exit(&sdp->sd_lock);
-		return (err);
+	search.se_name = name;
+	sep = avl_find(&sdp->sd_snaps, &search, NULL);
+	if (sep) {
+		avl_remove(&sdp->sd_snaps, sep);
+		err = zfsctl_unmount_snap(sep, MS_FORCE, cr);
+		if (err)
+			avl_add(&sdp->sd_snaps, sep);
+		else
+			err = dmu_objset_destroy(snapname);
+	} else {
+		err = ENOENT;
 	}
-
-	err = dmu_objset_destroy(snapname);
 
 	mutex_exit(&sdp->sd_lock);
 
@@ -692,6 +697,13 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 			 * try to remount it.
 			 */
 			goto domount;
+		} else {
+			/*
+			 * VROOT was set during the traverse call.  We need
+			 * to clear it since we're pretending to be part
+			 * of our parent's vfs.
+			 */
+			(*vpp)->v_flag &= ~VROOT;
 		}
 		mutex_exit(&sdp->sd_lock);
 		ZFS_EXIT(zfsvfs);
@@ -914,6 +926,7 @@ zfsctl_snapshot_mknode(vnode_t *pvp, uint64_t objset)
 	    zfsctl_ops_snapshot, NULL, NULL, MAXNAMELEN, NULL, NULL);
 	zcp = vp->v_data;
 	zcp->zc_id = objset;
+	VFS_HOLD(vp->v_vfsp);
 
 	return (vp);
 }
@@ -952,6 +965,7 @@ zfsctl_snapshot_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 
 	mutex_exit(&sdp->sd_lock);
 	VN_RELE(dvp);
+	VFS_RELE(vp->v_vfsp);
 
 	/*
 	 * Dispose of the vnode for the snapshot mount point.
@@ -1037,7 +1051,7 @@ int
 zfsctl_umount_snapshots(vfs_t *vfsp, int fflags, cred_t *cr)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
-	vnode_t *dvp, *svp;
+	vnode_t *dvp;
 	zfsctl_snapdir_t *sdp;
 	zfs_snapentry_t *sep, *next;
 	int error;
@@ -1053,7 +1067,6 @@ zfsctl_umount_snapshots(vfs_t *vfsp, int fflags, cred_t *cr)
 
 	sep = avl_first(&sdp->sd_snaps);
 	while (sep != NULL) {
-		svp = sep->se_root;
 		next = AVL_NEXT(&sdp->sd_snaps, sep);
 
 		/*
@@ -1061,32 +1074,17 @@ zfsctl_umount_snapshots(vfs_t *vfsp, int fflags, cred_t *cr)
 		 * have just been unmounted by somebody else, and
 		 * will be cleaned up by zfsctl_snapdir_inactive().
 		 */
-		if (vn_ismntpt(svp)) {
-			if ((error = vn_vfswlock(svp)) != 0)
-				goto out;
-
-			VN_HOLD(svp);
-			error = dounmount(vn_mountedvfs(svp), fflags, cr);
-			if (error) {
-				VN_RELE(svp);
-				goto out;
-			}
-
+		if (vn_ismntpt(sep->se_root)) {
 			avl_remove(&sdp->sd_snaps, sep);
-			kmem_free(sep->se_name, strlen(sep->se_name) + 1);
-			kmem_free(sep, sizeof (zfs_snapentry_t));
-
-			/*
-			 * We can't use VN_RELE(), as that will try to
-			 * invoke zfsctl_snapdir_inactive(), and that
-			 * would lead to an attempt to re-grab the sd_lock.
-			 */
-			ASSERT3U(svp->v_count, ==, 1);
-			gfs_vop_inactive(svp, cr, NULL);
+			error = zfsctl_unmount_snap(sep, fflags, cr);
+			if (error) {
+				avl_add(&sdp->sd_snaps, sep);
+				break;
+			}
 		}
 		sep = next;
 	}
-out:
+
 	mutex_exit(&sdp->sd_lock);
 	VN_RELE(dvp);
 
