@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,27 +71,27 @@ read_line(FILE *fp, char *buffer, int buflen, char *errstr)
 			break;
 		switch (c) {
 		case '\n':
-		    if (linelen > 0 && buffer[linelen - 1] == '\\') {
-			/* Continuation line found */
-			--linelen;
-		    } else {
-			/* end of line found */
-			buffer[linelen] = '\0';
-			return (linelen);
-		    }
-		    break;
+			if (linelen > 0 && buffer[linelen - 1] == '\\') {
+				/* Continuation line found */
+				--linelen;
+			} else {
+				/* end of line found */
+				buffer[linelen] = '\0';
+				return (linelen);
+			}
+			break;
 		default:
-		    buffer[linelen++] = c;
+			buffer[linelen++] = c;
 		}
 	}
 
 	if (linelen >= buflen) {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Buffer overflow, line too long."));
+		    gettext("Buffer overflow, line too long."));
 		return (-2);
 	} else if (linelen > 0 && buffer[linelen - 1] == '\\') {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Unterminated continuation line."));
+		    gettext("Unterminated continuation line."));
 		return (-2);
 	} else {
 		/* end of file */
@@ -123,8 +123,8 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 	fp = fopen(file, "rF");
 	if (fp == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Unable to open filename '%s' "
-			"for reading (errno=%d)."), file, errno);
+		    gettext("Unable to open filename '%s' "
+		    "for reading (errno=%d)."), file, errno);
 		MKERROR(LOG_ERR, *error, NS_CONFIG_FILE, strdup(errstr), NULL);
 		return (NS_NOTFOUND);
 	}
@@ -133,7 +133,7 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 	lineno = 0;
 	for (; ; ) {
 		if ((linelen = read_line(fp, buffer, sizeof (buffer),
-			errstr)) < 0)
+		    errstr)) < 0)
 			/* End of file */
 			break;
 		lineno++;
@@ -149,27 +149,27 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 		if (name == NULL || value == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
 			    gettext("Missing Name or Value on line %d."),
-				    lineno);
+			    lineno);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			(void) fclose(fp);
 			return (NS_PARSE_ERR);
 		}
 		if (__s_api_get_versiontype(ptr, name, &i) != 0) {
 			(void) snprintf(errstr, sizeof (errstr),
 			    gettext("Illegal profile type on line %d."),
-				    lineno);
+			    lineno);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			(void) fclose(fp);
 			return (NS_PARSE_ERR);
 		}
 		if (!first && i == NS_LDAP_FILE_VERSION_P) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Illegal NS_LDAP_FILE_VERSION "
-				"on line %d."), lineno);
+			    gettext("Illegal NS_LDAP_FILE_VERSION "
+			    "on line %d."), lineno);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			(void) fclose(fp);
 			return (NS_PARSE_ERR);
 		}
@@ -179,17 +179,17 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 		case CLIENTCONFIG:
 			if (cred_file == 0) {
 				ret = __ns_ldap_setParamValue(ptr, i, value,
-					error);
+				    error);
 				if (ret != NS_SUCCESS) {
 					(void) fclose(fp);
 					return (ret);
 				}
 			} else if (i != NS_LDAP_FILE_VERSION_P) {
 				(void) snprintf(errstr, sizeof (errstr),
-					gettext("Illegal entry in '%s' on "
-					"line %d"), file, lineno);
+				    gettext("Illegal entry in '%s' on "
+				    "line %d"), file, lineno);
 				MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 				(void) fclose(fp);
 				return (NS_PARSE_ERR);
 			}
@@ -199,17 +199,17 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 				break;
 			if (cred_file) {
 				ret = __ns_ldap_setParamValue(ptr, i, value,
-					error);
+				    error);
 				if (ret != NS_SUCCESS) {
 					(void) fclose(fp);
 					return (ret);
 				}
 			} else {
 				(void) snprintf(errstr, sizeof (errstr),
-					gettext("Illegal entry in '%s' on "
-					"line %d"), file, lineno);
+				    gettext("Illegal entry in '%s' on "
+				    "line %d"), file, lineno);
 				MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 				(void) fclose(fp);
 				return (NS_PARSE_ERR);
 			}
@@ -219,17 +219,17 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 	if (!cred_file && emptyfile) {
 		/* Error in read_line */
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Empty config file: '%s'"), file);
+		    gettext("Empty config file: '%s'"), file);
 		MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_PARSE_ERR);
 	}
 	if (linelen == -2) {
 		/* Error in read_line */
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Line too long in '%s'"), file);
+		    gettext("Line too long in '%s'"), file);
 		MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_PARSE_ERR);
 	}
 	return (NS_SUCCESS);
@@ -252,10 +252,9 @@ __ns_ldap_LoadConfiguration()
 	ptr = __s_api_create_config();
 	if (ptr == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("__ns_ldap_LoadConfiguration: "
-				"Out of memory."));
+		    gettext("__ns_ldap_LoadConfiguration: Out of memory."));
 		MKERROR(LOG_ERR, error, NS_CONFIG_NOTLOADED,
-			strdup(errstr), NULL);
+		    strdup(errstr), NULL);
 		return (error);
 	}
 
@@ -358,20 +357,20 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname)
 		    gettext("No configuration information available for %s."),
 		    domainname == NULL ? "<no domain specified>" : domainname);
 		MKERROR(LOG_WARNING, errorp, NS_CONFIG_NOTLOADED,
-			strdup(errstr), NULL);
+		    strdup(errstr), NULL);
 		return (errorp);
 	}
 	(void) memset((char *)configinfo, 0, sizeof (LineBuf));
 	for (i = 0; i <= NS_LDAP_MAX_PIT_P; i++) {
-		str = __s_api_strValue(ptr, string, sizeof (string),
-			i, NS_DOOR_FMT);
+		str = __s_api_strValue(ptr, string, sizeof (string), i,
+		    NS_DOOR_FMT);
 		if (str == NULL)
 			continue;
 		if (_print2buf(configinfo, str, 1) != 0) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("_print2buf: Out of memory."));
+			    gettext("_print2buf: Out of memory."));
 			MKERROR(LOG_WARNING, errorp, NS_CONFIG_NOTLOADED,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			__s_api_release_config(ptr);
 			if (str != (char *)&string[0]) {
 				free(str);
@@ -406,7 +405,7 @@ __ns_ldap_DumpLdif(char *filename)
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("No configuration information available."));
 		MKERROR(LOG_ERR, errorp, NS_CONFIG_NOTLOADED, strdup(errstr),
-			NULL);
+		    NULL);
 		return (errorp);
 	}
 
@@ -416,10 +415,10 @@ __ns_ldap_DumpLdif(char *filename)
 		fp = fopen(filename, "wF");
 		if (fp == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to open filename %s for ldif "
-				"dump (errno=%d)."), filename, errno);
+			    gettext("Unable to open filename %s for ldif "
+			    "dump (errno=%d)."), filename, errno);
 			MKERROR(LOG_WARNING, errorp, NS_CONFIG_FILE,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			__s_api_release_config(ptr);
 			return (errorp);
 		}
@@ -429,10 +428,10 @@ __ns_ldap_DumpLdif(char *filename)
 	if (ptr->paramList[NS_LDAP_SEARCH_BASEDN_P].ns_ptype != CHARPTR ||
 	    ptr->paramList[NS_LDAP_PROFILE_P].ns_ptype != CHARPTR) {
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Required BaseDN and/or Profile name "
-				"ldif fields not present"));
+		    gettext("Required BaseDN and/or Profile name "
+		    "ldif fields not present"));
 		MKERROR(LOG_WARNING, errorp, NS_CONFIG_FILE, strdup(errstr),
-			NULL);
+		    NULL);
 		__s_api_release_config(ptr);
 		return (errorp);
 	}
@@ -449,14 +448,11 @@ __ns_ldap_DumpLdif(char *filename)
 
 	/* dump objectclass names */
 	if (ptr->version == NS_LDAP_V1) {
-		(void) fprintf(fp,
-			"ObjectClass: top\nObjectClass: %s\n",
-			_PROFILE1_OBJECTCLASS);
+		(void) fprintf(fp, "ObjectClass: top\nObjectClass: %s\n",
+		    _PROFILE1_OBJECTCLASS);
 	} else {
-		(void) fprintf(fp,
-			"ObjectClass: top\n"
-			"ObjectClass: %s\n",
-			_PROFILE2_OBJECTCLASS);
+		(void) fprintf(fp, "ObjectClass: top\nObjectClass: %s\n",
+		    _PROFILE2_OBJECTCLASS);
 	}
 
 	/* For each parameter - construct value */
@@ -469,7 +465,7 @@ __ns_ldap_DumpLdif(char *filename)
 		 * are not part of version 2 profiles
 		 */
 		if ((i != NS_LDAP_BINDDN_P) && (i != NS_LDAP_BINDPASSWD_P) &&
-				(i != NS_LDAP_HOST_CERTPATH_P))
+		    (i != NS_LDAP_HOST_CERTPATH_P))
 			(void) fprintf(fp, "%s\n", str);
 		if (str != (char *)&string[0]) {
 			free(str);
@@ -504,16 +500,17 @@ __ns_ldap_DumpConfigFiles(char **files)
 	ParamIndexType	i = 0;
 	FILE		*fp;
 	int		rc;
-	ns_ldap_error_t	*errorp;
+	ns_ldap_error_t	*errorp = NULL;
 	struct stat	buf;
 	int		cfgtype;
+	boolean_t	file_export_error = B_FALSE;
 
 	ptr = __s_api_get_default_config();
 	if (ptr == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("No configuration information available."));
+		    gettext("No configuration information available."));
 		MKERROR(LOG_ERR, errorp, NS_CONFIG_NOTLOADED, strdup(errstr),
-			NULL);
+		    NULL);
 		return (errorp);
 	}
 
@@ -528,44 +525,92 @@ __ns_ldap_DumpConfigFiles(char **files)
 		fp = fopen(filename, "wF");
 		if (fp == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to open filename %s"
-				" for configuration dump (errno=%d)."),
-				filename, errno);
-			MKERROR(LOG_WARNING, errorp, NS_CONFIG_FILE,
-				strdup(errstr), NULL);
+			    gettext("Unable to open filename %s"
+			    " for configuration dump (%s)."),
+			    filename, strerror(errno));
+			MKERROR(LOG_ERR, errorp, NS_CONFIG_FILE,
+			    strdup(errstr), NULL);
 			__s_api_release_config(ptr);
 			return (errorp);
 		}
-		if (rc == 0)
-			(void) fchmod(fileno(fp), buf.st_mode);
-		else
-			(void) fchmod(fileno(fp), 0400);
-		(void) fprintf(fp, "#\n# %s\n#\n", DONOTEDIT);
+		if (rc == 0) {
+			if (fchmod(fileno(fp), buf.st_mode) != 0) {
+				(void) snprintf(errstr, sizeof (errstr),
+				    gettext("Unable to set permissions for file"
+				    " %s for configuration dump (%s)."),
+				    filename, strerror(errno));
+				(void) fclose(fp);
+				file_export_error = B_TRUE;
+				break;
+			}
+		} else {
+			if (fchmod(fileno(fp), 0400) != 0) {
+				(void) snprintf(errstr, sizeof (errstr),
+				    gettext("Unable to set permissions for file"
+				    " %s for configuration dump (%s)."),
+				    filename, strerror(errno));
+				(void) fclose(fp);
+				file_export_error = B_TRUE;
+				break;
+			}
+		}
+		if (fprintf(fp, "#\n# %s\n#\n", DONOTEDIT) < 0) {
+			(void) snprintf(errstr, sizeof (errstr), gettext(
+			    "Writing to file %s for configuration dump failed "
+			    "(%s)."), filename, strerror(errno));
+			file_export_error = B_TRUE;
+		}
 
 		/* assume VERSION is set and it outputs first */
 
 		/* For each parameter - construct value */
-		for (i = 0; i <= NS_LDAP_MAX_PIT_P; i++) {
+		for (i = 0; !file_export_error && (i <= NS_LDAP_MAX_PIT_P);
+		    i++) {
 			cfgtype = __s_api_get_configtype(i);
 			if ((docred == 0 && cfgtype == CREDCONFIG) ||
-				(docred == 1 && cfgtype != CREDCONFIG))
+			    (docred == 1 && cfgtype != CREDCONFIG))
 				continue;
 
-			str = __s_api_strValue(ptr, string, BUFSIZ,
-					i, NS_FILE_FMT);
+			str = __s_api_strValue(ptr, string, BUFSIZ, i,
+			    NS_FILE_FMT);
 			if (str == NULL)
 				continue;
-			(void) fprintf(fp, "%s\n", str);
+			if (fprintf(fp, "%s\n", str) < 0) {
+				(void) snprintf(errstr, sizeof (errstr),
+				    gettext("Writing to file %s for"
+				    "configuration dump failed (%s)."),
+				    filename, strerror(errno));
+				file_export_error = B_TRUE;
+			}
+
 			if (str != (char *)&string[0]) {
 				free(str);
 				str = NULL;
 			}
 		}
-		(void) fclose(fp);
+		if (fclose(fp) != 0) {
+			/* Break if error already hit */
+			if (file_export_error)
+				break;
+
+			(void) snprintf(errstr, sizeof (errstr), gettext(
+			    "Writing to file %s for configuration dump failed "
+			    "during file close (%s)."), filename,
+			    strerror(errno));
+			file_export_error = B_TRUE;
+			break;
+		}
+
+	}
+
+	if (file_export_error) {
+		MKERROR(LOG_ERR, errorp, NS_CONFIG_FILE,
+		    strdup(errstr), NULL);
+		(void) unlink(filename);
 	}
 
 	__s_api_release_config(ptr);
-	return (NULL);
+	return (errorp);
 }
 
 ns_ldap_error_t *
@@ -619,8 +664,8 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 
 	if (result->entries_count > 1) {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Configuration Error: More than"
-				" one profile found"));
+		    gettext("Configuration Error: More than one profile "
+		    "found"));
 		MKERROR(LOG_ERR, errorp, NS_PARSE_ERR, strdup(errstr), NULL);
 		(void) __ns_ldap_freeError(&errorp);
 		return (NULL);
@@ -648,7 +693,7 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 		if (strcasecmp(attrname, "objectclass") == 0) {
 			for (m = 0; m < attr->value_count; m++) {
 				if (strcasecmp(_PROFILE2_OBJECTCLASS,
-					attr->attrvalue[m]) == 0) {
+				    attr->attrvalue[m]) == 0) {
 					prof_ver = 2;
 					break;
 				}
@@ -658,12 +703,12 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 	/* update the configuration to accept v1 or v2 attributes */
 	if (prof_ver == 1) {
 		(void) strcpy(val, NS_LDAP_VERSION_1);
-		(void) __ns_ldap_setParamValue(ptr,
-				NS_LDAP_FILE_VERSION_P, val, &error);
+		(void) __ns_ldap_setParamValue(ptr, NS_LDAP_FILE_VERSION_P,
+		    val, &error);
 	} else {
 		(void) strcpy(val, NS_LDAP_VERSION_2);
-		(void) __ns_ldap_setParamValue(ptr,
-				NS_LDAP_FILE_VERSION_P, val, &error);
+		(void) __ns_ldap_setParamValue(ptr, NS_LDAP_FILE_VERSION_P,
+		    val, &error);
 	}
 
 	for (l = 0; l < entry->attr_count; l++) {
@@ -686,7 +731,7 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 			/* Multiple Value - insert 1 at a time */
 			for (m = 0; m < attr->value_count; m++) {
 				(void) __ns_ldap_setParamValue(ptr, index,
-						attrval[m], &error);
+				    attrval[m], &error);
 			}
 			break;
 		default:
@@ -697,34 +742,38 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 				if (firsttime == 1) {
 					firsttime = 0;
 					(void) strlcpy(val, attrval[m],
-						sizeof (val));
+					    sizeof (val));
 				} else {
 					(void) strlcat(val, " ", sizeof (val));
 					(void) strlcat(val, attrval[m],
-						sizeof (val));
+					    sizeof (val));
 				}
 			}
-			(void) __ns_ldap_setParamValue(ptr, index, val,
-						&error);
+			(void) __ns_ldap_setParamValue(ptr, index, val, &error);
+
 			break;
 		}
 	}
 	if (ptr->version != NS_LDAP_V1) {
-	    if (curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_ptype == CHARPTR) {
-		(void) __ns_ldap_setParamValue(ptr, NS_LDAP_BINDDN_P,
-			curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_pc, &error);
-	    }
-	    if (curr_ptr->paramList[NS_LDAP_BINDPASSWD_P].ns_ptype == CHARPTR) {
-		(void) __ns_ldap_setParamValue(ptr, NS_LDAP_BINDPASSWD_P,
-			curr_ptr->paramList[NS_LDAP_BINDPASSWD_P].ns_pc,
-			&error);
-	    }
-	    if (curr_ptr->paramList[NS_LDAP_HOST_CERTPATH_P].ns_ptype ==
-			CHARPTR) {
-		(void) __ns_ldap_setParamValue(ptr, NS_LDAP_HOST_CERTPATH_P,
-			curr_ptr->paramList[NS_LDAP_HOST_CERTPATH_P].ns_pc,
-			&error);
-	    }
+		if (curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_ptype == CHARPTR) {
+			(void) __ns_ldap_setParamValue(ptr, NS_LDAP_BINDDN_P,
+			    curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_pc,
+			    &error);
+		}
+		if (curr_ptr->paramList[NS_LDAP_BINDPASSWD_P].ns_ptype ==
+		    CHARPTR) {
+			(void) __ns_ldap_setParamValue(ptr,
+			    NS_LDAP_BINDPASSWD_P,
+			    curr_ptr->paramList[NS_LDAP_BINDPASSWD_P].ns_pc,
+			    &error);
+		}
+		if (curr_ptr->paramList[NS_LDAP_HOST_CERTPATH_P].ns_ptype ==
+		    CHARPTR) {
+			(void) __ns_ldap_setParamValue(ptr,
+			    NS_LDAP_HOST_CERTPATH_P,
+			    curr_ptr->paramList[NS_LDAP_HOST_CERTPATH_P].ns_pc,
+			    &error);
+		}
 	}
 	__s_api_release_config(curr_ptr);
 	return (ptr);
@@ -755,12 +804,12 @@ __ns_ldap_download(const char *profile, char *addr, char *baseDN,
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("No configuration information available."));
 		MKERROR(LOG_ERR, *errorp, NS_CONFIG_NOTLOADED, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_CONFIG);
 	}
 
-	rc = __ns_ldap_setParamValue(ptr, NS_LDAP_SEARCH_BASEDN_P,
-				baseDN, errorp);
+	rc = __ns_ldap_setParamValue(ptr, NS_LDAP_SEARCH_BASEDN_P, baseDN,
+	    errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		__s_api_release_config(ptr);
 		return (rc);
@@ -772,11 +821,9 @@ __ns_ldap_download(const char *profile, char *addr, char *baseDN,
 		return (rc);
 
 	(void) snprintf(filter, sizeof (filter), _PROFILE_FILTER,
-			_PROFILE1_OBJECTCLASS,
-			_PROFILE2_OBJECTCLASS,
-			profile);
+	    _PROFILE1_OBJECTCLASS, _PROFILE2_OBJECTCLASS, profile);
 	rc = __ns_ldap_list(_PROFILE_CONTAINER, (const char *)filter,
-		NULL, NULL, NULL, 0, &result, errorp, NULL, NULL);
+	    NULL, NULL, NULL, 0, &result, errorp, NULL, NULL);
 
 	if (rc != NS_LDAP_SUCCESS)
 		return (rc);
@@ -791,7 +838,7 @@ __ns_ldap_download(const char *profile, char *addr, char *baseDN,
 	if (rc != NS_LDAP_SUCCESS) {
 		__s_api_destroy_config(new_ptr);
 		MKERROR(LOG_ERR, *errorp, NS_CONFIG_NOTLOADED, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -830,7 +877,7 @@ __ns_ldap_print_config(int verbose)
 			(void) snprintf(errstr, sizeof (errstr),
 			    gettext("No configuration information."));
 			MKERROR(LOG_WARNING, errorp, NS_CONFIG_NOTLOADED,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			return (errorp);
 		}
 	}

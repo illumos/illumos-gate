@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2684,27 +2684,36 @@ perform_update(void)
 	}
 
 	(void) rw_rdlock(&ldap_lock);
-	if ((error = __ns_ldap_DumpConfiguration(NSCONFIGREFRESH)) != NULL) {
-		logit("Error: __ns_ldap_DumpConfiguration(\"%s\") failed, "
-		    "status: %d "
-		    "message: %s\n", NSCONFIGREFRESH,
-		    error->status, error->message);
+	if (((error = __ns_ldap_DumpConfiguration(NSCONFIGREFRESH)) != NULL) ||
+	    ((error = __ns_ldap_DumpConfiguration(NSCREDREFRESH)) != NULL)) {
+		logit("Error: __ns_ldap_DumpConfiguration failed, "
+		    "status: %d message: %s\n", error->status, error->message);
 		__ns_ldap_freeError(&error);
+		(void) rw_unlock(&ldap_lock);
+		return;
 	}
-	if ((error = __ns_ldap_DumpConfiguration(NSCREDREFRESH)) != NULL) {
-		logit("Error: __ns_ldap_DumpConfiguration(\"%s\") failed, "
-		    "status: %d "
-		    "message: %s\n", NSCREDREFRESH,
-		    error->status, error->message);
-		__ns_ldap_freeError(&error);
+	if (rename(NSCONFIGREFRESH, NSCONFIGFILE) != 0) {
+		logit("Error: unlink failed - errno: %s\n", strerror(errno));
+		syslog(LOG_ERR, "Unable to refresh profile, LDAP configuration"
+		    "files not written");
+		(void) rw_unlock(&ldap_lock);
+		return;
 	}
-	if (rename(NSCONFIGREFRESH, NSCONFIGFILE) != 0)
-		logit("Error: unlink failed - errno: %d\n", errno);
-	if (rename(NSCREDREFRESH, NSCREDFILE) != 0)
-		logit("Error: unlink failed - errno: %d\n", errno);
+	if (rename(NSCREDREFRESH, NSCREDFILE) != 0) {
+		/*
+		 * We probably have inconsistent configuration at this point.
+		 * If we were to create a backup file and rename it here, that
+		 * operation might also fail. Consequently there is no safe way
+		 * to roll back.
+		 */
+		logit("Error: unlink failed - errno: %s\n", strerror(errno));
+		syslog(LOG_ERR, "Unable to refresh profile consistently, "
+		    "LDAP configuration files inconsistent");
+		(void) rw_unlock(&ldap_lock);
+		return;
+	}
 
 	(void) rw_unlock(&ldap_lock);
-
 }
 
 void
