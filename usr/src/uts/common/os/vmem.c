@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,13 +289,14 @@
  * Therefore, we serialize all allocations from vmem_seg_arena (which is OK
  * because they're rare).  We cannot allow a non-blocking allocation to get
  * tied up behind a blocking allocation, however, so we use separate locks
- * for VM_SLEEP and VM_NOSLEEP allocations.  In addition, if the system is
+ * for VM_SLEEP and VM_NOSLEEP allocations.  Similarly, VM_PUSHPAGE allocations
+ * must not block behind ordinary VM_SLEEPs.  In addition, if the system is
  * panicking then we must keep enough resources for panic_thread to do its
- * work.  Thus we have at most three threads trying to allocate from
+ * work.  Thus we have at most four threads trying to allocate from
  * vmem_seg_arena, and each thread consumes at most three segment structures,
- * so we must maintain a 9-seg reserve.
+ * so we must maintain a 12-seg reserve.
  */
-#define	VMEM_POPULATE_RESERVE	9
+#define	VMEM_POPULATE_RESERVE	12
 
 /*
  * vmem_populate() ensures that each arena has VMEM_MINFREE seg structures
@@ -314,6 +315,7 @@ static kmutex_t vmem_list_lock;
 static kmutex_t vmem_segfree_lock;
 static kmutex_t vmem_sleep_lock;
 static kmutex_t vmem_nosleep_lock;
+static kmutex_t vmem_pushpage_lock;
 static kmutex_t vmem_panic_lock;
 static vmem_t *vmem_list;
 static vmem_t *vmem_metadata_arena;
@@ -654,6 +656,7 @@ vmem_is_populator()
 {
 	return (mutex_owner(&vmem_sleep_lock) == curthread ||
 	    mutex_owner(&vmem_nosleep_lock) == curthread ||
+	    mutex_owner(&vmem_pushpage_lock) == curthread ||
 	    mutex_owner(&vmem_panic_lock) == curthread);
 }
 
@@ -691,6 +694,8 @@ vmem_populate(vmem_t *vmp, int vmflag)
 		lp = &vmem_panic_lock;
 	else if (vmflag & VM_NOSLEEP)
 		lp = &vmem_nosleep_lock;
+	else if (vmflag & VM_PUSHPAGE)
+		lp = &vmem_pushpage_lock;
 	else
 		lp = &vmem_sleep_lock;
 
