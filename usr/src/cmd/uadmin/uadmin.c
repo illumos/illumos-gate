@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 
 static const char *Usage = "Usage: %s cmd fcn [mdep]\n";
 
-static int turnoff_auditd();
+static int turnoff_auditd(int, int);
 static void wait_for_auqueue();
 
 int
@@ -220,7 +220,7 @@ main(int argc, char *argv[])
 			wait_for_auqueue();
 		}
 
-		if (turnoff_auditd() == -1)
+		if (turnoff_auditd(cmd, fcn) == -1)
 			(void) fprintf(stderr, "%s: can't turn off auditd\n",
 			    argv[0]);
 
@@ -243,11 +243,43 @@ main(int argc, char *argv[])
 }
 
 static int
-turnoff_auditd()
+turnoff_auditd(int cmd, int fcn)
 {
 	char	*smf_state;
 	int	rc = -1;
 	int	retries = 15;
+
+	switch (cmd) {
+	case A_SHUTDOWN:
+	case A_REBOOT:
+	case A_DUMP:
+		/* system shutting down, turn off auditd */
+		break;
+	case A_REMOUNT:
+	case A_SWAPCTL:
+	case A_FTRACE:
+		/* No system discontinuity, don't turn off auditd */
+		return (0);
+	case A_FREEZE:
+		switch (fcn) {
+		case AD_CHECK_SUSPEND_TO_DISK:	/* AD_CHECK */
+		case AD_CHECK_SUSPEND_TO_RAM:
+		case AD_REUSEINIT:
+		case AD_REUSEFINI:
+			/* No system discontinuity, don't turn off auditd */
+			return (0);
+		case AD_REUSABLE:
+		case AD_SUSPEND_TO_DISK:	/* AD_COMPRESS */
+		case AD_SUSPEND_TO_RAM:
+		case AD_FORCE:
+			/* suspend the system, change audit files */
+			/* XXX not implemented for now */
+		default:
+			return (-1);
+		}
+	default:
+		return (-1);
+	}
 
 	if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
 		(void) fprintf(stderr, "error disabling auditd: %s\n",
