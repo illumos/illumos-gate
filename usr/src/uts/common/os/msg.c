@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -267,7 +267,7 @@ static struct modlsys modlsys32 = {
  *		   process on the copyout queue.
  */
 
-static ulong_t msg_type_hash(long);
+static uint_t msg_type_hash(long);
 static int msgq_check_err(kmsqid_t *qp, int cvres);
 static int msg_rcvq_sleep(list_t *, msgq_wakeup_t *, kmutex_t **,
     kmsqid_t *);
@@ -615,7 +615,7 @@ top:
 		 * when the first send happens, the lowest type will be set
 		 * properly.
 		 */
-		qp->msg_lowest_type = -1;
+		qp->msg_lowest_type = LONG_MAX;
 		list_create(&qp->msg_cpy_block,
 		    sizeof (msgq_wakeup_t),
 		    offsetof(msgq_wakeup_t, msgw_list));
@@ -652,7 +652,7 @@ msgrcv(int msqid, struct ipcmsgbuf *msgp, size_t msgsz, long msgtyp, int msgflg)
 	size_t		xtsz;	/* transfer byte count */
 	int		error = 0;
 	int		cvres;
-	ulong_t		msg_hash;
+	uint_t		msg_hash;
 	msgq_wakeup_t	msg_entry;
 
 	CPU_STATS_ADDQ(CPU, sys, msg, 1);	/* bump msg send/rcv count */
@@ -682,11 +682,25 @@ findmsg:
 		 * We found a possible message to copy out.
 		 */
 		if ((smp->msg_flags & MSG_RCVCOPY) == 0) {
+			long t = msg_entry.msgw_snd_wake;
 			/*
 			 * It is available, attempt to copy it.
 			 */
 			error = msg_copyout(qp, msgtyp, &lock, &xtsz, msgsz,
 			    smp, msgp, msgflg);
+
+			/*
+			 * It is possible to consume a different message
+			 * type then what originally awakened for (negative
+			 * types).  If this happens a check must be done to
+			 * to determine if another receiver is available
+			 * for the waking message type,  Failure to do this
+			 * can result in a message on the queue that can be
+			 * serviced by a sleeping receiver.
+			 */
+			if (!error && t && (smp->msg_type != t))
+				msg_wakeup_rdr(qp, &qp->msg_fnd_sndr, t);
+
 			/*
 			 * Don't forget to wakeup a sleeper that blocked because
 			 * we were copying things out.
@@ -845,9 +859,9 @@ static struct msg *
 msgrcv_lookup(kmsqid_t *qp, long msgtyp)
 {
 	struct msg 		*smp = NULL;
-	int			qp_low;
+	long			qp_low;
 	struct msg		*mp;	/* ptr to msg on q */
-	int			low_msgtype;
+	long			low_msgtype;
 	static struct msg	neg_copy_smp;
 
 	mp = list_head(&qp->msg_list);
@@ -881,7 +895,7 @@ msgrcv_lookup(kmsqid_t *qp, long msgtyp)
 			 * that there isn't a value lower than that.
 			 */
 			low_msgtype = -msgtyp;
-			if (low_msgtype++ < qp_low) {
+			if (low_msgtype < qp_low) {
 				return (NULL);
 			}
 			if (qp->msg_neg_copy) {
@@ -889,7 +903,8 @@ msgrcv_lookup(kmsqid_t *qp, long msgtyp)
 				return (&neg_copy_smp);
 			}
 			for (; mp; mp = list_next(&qp->msg_list, mp)) {
-				if (mp->msg_type < low_msgtype) {
+				if (mp->msg_type <= low_msgtype &&
+				    !(smp && smp->msg_type <= mp->msg_type)) {
 					smp = mp;
 					low_msgtype = mp->msg_type;
 					if (low_msgtype == qp_low) {
@@ -1204,7 +1219,7 @@ msg_wakeup_rdr(kmsqid_t *qp, msg_select_t **flist, long type)
 {
 	msg_select_t	*walker = *flist;
 	msgq_wakeup_t	*wakeup;
-	ulong_t		msg_hash;
+	uint_t		msg_hash;
 
 	msg_hash = msg_type_hash(type);
 
@@ -1222,24 +1237,19 @@ msg_wakeup_rdr(kmsqid_t *qp, msg_select_t **flist, long type)
 	}
 }
 
-static ulong_t
+static uint_t
 msg_type_hash(long msg_type)
 {
-	long	temp;
-	ulong_t	hash;
-
 	if (msg_type < 0) {
+		long	hash = -msg_type / MSG_NEG_INTERVAL;
 		/*
 		 * Negative message types are hashed over an
 		 * interval.  Any message type that hashes
 		 * beyond MSG_MAX_QNUM is automatically placed
 		 * in the last bucket.
 		 */
-		temp = -msg_type;
-		hash = temp / MSG_NEG_INTERVAL;
-		if (hash > MSG_MAX_QNUM) {
+		if (hash > MSG_MAX_QNUM)
 			hash = MSG_MAX_QNUM;
-		}
 		return (hash);
 	}
 
@@ -1247,9 +1257,8 @@ msg_type_hash(long msg_type)
 	 * 0 or positive message type.  The first bucket is reserved for
 	 * message receivers of type 0, the other buckets we hash into.
 	 */
-	if (msg_type) {
-		return (1 + (msg_type % (MSG_MAX_QNUM)));
-	}
+	if (msg_type)
+		return (1 + (msg_type % MSG_MAX_QNUM));
 	return (0);
 }
 
@@ -1259,17 +1268,28 @@ msg_type_hash(long msg_type)
  */
 
 static msgq_wakeup_t *
-/* LINTED */
+/* ARGSUSED */
 msg_fnd_any_snd(kmsqid_t *qp, int msg_hash, long type)
 {
-	return (list_head(&qp->msg_wait_snd[0]));
+	msgq_wakeup_t	*walker;
+
+	walker = list_head(&qp->msg_wait_snd[0]);
+
+	if (walker)
+		list_remove(&qp->msg_wait_snd[0], walker);
+	return (walker);
 }
 
 static msgq_wakeup_t *
-/* LINTED */
+/* ARGSUSED */
 msg_fnd_any_rdr(kmsqid_t *qp, int msg_hash, long type)
 {
-	return (list_head(&qp->msg_cpy_block));
+	msgq_wakeup_t	*walker;
+
+	walker = list_head(&qp->msg_cpy_block);
+	if (walker)
+		list_remove(&qp->msg_cpy_block, walker);
+	return (walker);
 }
 
 static msgq_wakeup_t *
@@ -1279,12 +1299,14 @@ msg_fnd_spc_snd(kmsqid_t *qp, int msg_hash, long type)
 
 	walker = list_head(&qp->msg_wait_snd[msg_hash]);
 
-	while (walker && walker->msgw_type != type &&
-	    (walker = list_next(&qp->msg_wait_snd[msg_hash], walker)))
-		continue;
+	while (walker && walker->msgw_type != type)
+		walker = list_next(&qp->msg_wait_snd[msg_hash], walker);
+	if (walker)
+		list_remove(&qp->msg_wait_snd[msg_hash], walker);
 	return (walker);
 }
 
+/* ARGSUSED */
 static msgq_wakeup_t *
 msg_fnd_neg_snd(kmsqid_t *qp, int msg_hash, long type)
 {
@@ -1322,11 +1344,13 @@ msg_fnd_neg_snd(kmsqid_t *qp, int msg_hash, long type)
 			 * range of types.
 			 */
 			if (-qptr->msgw_type >= type) {
+				list_remove(&qp->msg_wait_snd_ngt[check_index],
+				    qptr);
 				return (qptr);
 			}
-			qptr = list_next(&qp->msg_wait_snd_ngt[msg_hash], qptr);
+			qptr = list_next(&qp->msg_wait_snd_ngt[check_index],
+			    qptr);
 		}
-
 		if (++check_index > MSG_MAX_QNUM) {
 			check_index = neg_index;
 		}
@@ -1348,10 +1372,13 @@ msg_rcvq_sleep(list_t *queue, msgq_wakeup_t *entry, kmutex_t **lock,
 	cvres = cv_wait_sig(&entry->msgw_wake_cv, *lock);
 	*lock = ipc_relock(msq_svc, qp->msg_perm.ipc_id, *lock);
 	qp->msg_rcv_cnt--;
-	/*
-	 * We have woken up, so remove ourselves from the waiter list.
-	 */
-	list_remove(queue, entry);
+
+	if (list_link_active(&entry->msgw_list)) {
+		/*
+		 * We woke up unexpectedly, remove ourself.
+		 */
+		list_remove(queue, entry);
+	}
 
 	return (cvres);
 }
@@ -1361,13 +1388,9 @@ msg_rcvq_wakeup_all(list_t *q_ptr)
 {
 	msgq_wakeup_t	*q_walk;
 
-	q_walk = (msgq_wakeup_t *)list_head(q_ptr);
-	while (q_walk) {
-		/*
-		 * Walk the entire list, wake every process up.
-		 */
+	while (q_walk = list_head(q_ptr)) {
+		list_remove(q_ptr, q_walk);
 		cv_signal(&q_walk->msgw_wake_cv);
-		q_walk = list_next(q_ptr, q_walk);
 	}
 }
 
