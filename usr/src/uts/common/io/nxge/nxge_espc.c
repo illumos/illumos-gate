@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,6 +253,9 @@ nxge_vpd_info_get(p_nxge_t nxgep)
 	} else if (strncmp(nxgep->vpd_info.bd_model,
 	    NXGE_ALONSO_BM_STR, strlen(NXGE_ALONSO_BM_STR)) == 0) {
 		nxgep->platform_type = P_NEPTUNE_ALONSO;
+	} else if (strncmp(nxgep->vpd_info.bd_model,
+	    NXGE_RFEM_BM_STR, strlen(NXGE_RFEM_BM_STR)) == 0) {
+		nxgep->hot_swappable_phy = B_TRUE;
 	}
 
 	/* If Alonso platform, replace "mif" for the last 2 ports phy-type */

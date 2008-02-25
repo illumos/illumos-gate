@@ -31,6 +31,9 @@
 #define	LINK_MONITOR_PERIOD	(1000 * 1000)
 #define	LM_WAIT_MULTIPLIER	8
 
+#define	SERDES_RDY_WT_INTERVAL	50
+#define	MAX_SERDES_RDY_RETRIES	10
+
 extern uint32_t nxge_no_link_notify;
 extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
@@ -250,6 +253,10 @@ check_phy_done:
 			nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
 			nxgep->mac.portmode = PORT_1G_FIBER;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "1G FIBER Xcvr"));
+		} else if (strcmp("xgf", prop_val) == 0) {
+			nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+			nxgep->mac.portmode = PORT_10G_FIBER;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G FIBER Xcvr"));
 		}
 
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, nxgep->dip,
@@ -1370,7 +1377,7 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 {
 	npi_handle_t		handle;
 	uint8_t			portn;
-	int			chan;
+	int			chan, i;
 	sr_rx_tx_ctrl_l_t	rx_tx_ctrl_l;
 	sr_rx_tx_ctrl_h_t	rx_tx_ctrl_h;
 	sr_glue_ctrl0_l_t	glue_ctrl0_l;
@@ -1546,27 +1553,51 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 		    portn, val16l, val16h));
 	}
 
-	ESR_REG_RD(handle, ESR_INTERNAL_SIGNALS_REG, &val);
-
 	if (portn == 0) {
-		if ((val & ESR_SIG_P0_BITS_MASK) !=
-				(ESR_SIG_SERDES_RDY0_P0 | ESR_SIG_DETECT0_P0 |
-					ESR_SIG_XSERDES_RDY_P0 |
-					ESR_SIG_XDETECT_P0_CH3 |
-					ESR_SIG_XDETECT_P0_CH2 |
-					ESR_SIG_XDETECT_P0_CH1 |
-					ESR_SIG_XDETECT_P0_CH0)) {
-			goto fail;
+		/* Wait for serdes to be ready */
+		for (i = 0; i < MAX_SERDES_RDY_RETRIES; i++) {
+			ESR_REG_RD(handle, ESR_INTERNAL_SIGNALS_REG, &val);
+			if ((val & ESR_SIG_P0_BITS_MASK) !=
+			    (ESR_SIG_SERDES_RDY0_P0 | ESR_SIG_DETECT0_P0 |
+			    ESR_SIG_XSERDES_RDY_P0 |
+			    ESR_SIG_XDETECT_P0_CH3 |
+			    ESR_SIG_XDETECT_P0_CH2 |
+			    ESR_SIG_XDETECT_P0_CH1 |
+			    ESR_SIG_XDETECT_P0_CH0))
+
+				NXGE_DELAY(SERDES_RDY_WT_INTERVAL);
+			else
+				break;
+		}
+
+		if (i == MAX_SERDES_RDY_RETRIES) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_neptune_10G_serdes_init: "
+			    "Serdes/signal for port<%d> not ready", portn));
+				goto fail;
 		}
 	} else if (portn == 1) {
-		if ((val & ESR_SIG_P1_BITS_MASK) !=
-				(ESR_SIG_SERDES_RDY0_P1 | ESR_SIG_DETECT0_P1 |
-					ESR_SIG_XSERDES_RDY_P1 |
-					ESR_SIG_XDETECT_P1_CH3 |
-					ESR_SIG_XDETECT_P1_CH2 |
-					ESR_SIG_XDETECT_P1_CH1 |
-					ESR_SIG_XDETECT_P1_CH0)) {
-			goto fail;
+		/* Wait for serdes to be ready */
+		for (i = 0; i < MAX_SERDES_RDY_RETRIES; i++) {
+			ESR_REG_RD(handle, ESR_INTERNAL_SIGNALS_REG, &val);
+			if ((val & ESR_SIG_P1_BITS_MASK) !=
+			    (ESR_SIG_SERDES_RDY0_P1 | ESR_SIG_DETECT0_P1 |
+			    ESR_SIG_XSERDES_RDY_P1 |
+			    ESR_SIG_XDETECT_P1_CH3 |
+			    ESR_SIG_XDETECT_P1_CH2 |
+			    ESR_SIG_XDETECT_P1_CH1 |
+			    ESR_SIG_XDETECT_P1_CH0))
+
+				NXGE_DELAY(SERDES_RDY_WT_INTERVAL);
+			else
+				break;
+		}
+
+		if (i == MAX_SERDES_RDY_RETRIES) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_neptune_10G_serdes_init: "
+			    "Serdes/signal for port<%d> not ready", portn));
+				goto fail;
 		}
 	}
 
@@ -3539,7 +3570,7 @@ nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mii_read: xcvr_port<%d>"
 			"xcvr_reg<%d>", xcvr_portn, xcvr_reg));
 
-	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)) {
@@ -3554,14 +3585,14 @@ nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	} else
 		goto fail;
 
-	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mii_read: xcvr_port<%d>"
 			"xcvr_reg<%d> value=0x%x",
 			xcvr_portn, xcvr_reg, *value));
 	return (NXGE_OK);
 fail:
-	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_mii_read: Failed to read mii on xcvr %d",
 			xcvr_portn));
@@ -3581,7 +3612,7 @@ nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 			"xcvr_reg<%d> value=0x%x", xcvr_portn, xcvr_reg,
 			value));
 
-	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)) {
@@ -3596,13 +3627,13 @@ nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	} else
 		goto fail;
 
-	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mii_write: xcvr_port<%d>"
 			"xcvr_reg<%d>", xcvr_portn, xcvr_reg));
 	return (NXGE_OK);
 fail:
-	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_mii_write: Failed to write mii on xcvr %d",
@@ -4560,8 +4591,8 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 		/* stats has not been allocated. */
 		return (NXGE_OK);
 	}
-	/* Don't check link if we're not in internal loopback mode */
-	if (nxgep->statsp->port_stats.lb_mode != nxge_lb_normal)
+	/* Don't check link if we're in internal loopback mode */
+	if (nxgep->statsp->port_stats.lb_mode >= nxge_lb_serdes10g)
 		return (NXGE_OK);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -5241,7 +5272,7 @@ nxge_get_cl22_phy_id(p_nxge_t nxgep, int phy_port)
 	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	npi_status_t	npi_status = NPI_SUCCESS;
 
-	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	npi_status = npi_mac_mif_mii_read(handle, phy_port, NXGE_PHY_ID_REG_1,
 	    &val1);
 	if (npi_status != NPI_SUCCESS) {
@@ -5261,7 +5292,7 @@ nxge_get_cl22_phy_id(p_nxge_t nxgep, int phy_port)
 	phy_id |= val2;
 
 exit:
-	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PHY ID [0x%llx]",
 	    phy_port, phy_id));
 
@@ -5520,9 +5551,25 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 					    "Unsupported neptune type 10"));
 					goto error_exit;
 				}
-
-				hw_p->xcvr_addr[nxgep->function_num] =
-				    port_fd_arr[0];
+				/*
+				 * For GOA, which is a hot swappable PHY, the
+				 * phy address to function number mapping
+				 * should be preserved, i.e., addr 16 is
+				 * assigned to function 0 and 20 to function 1
+				 * But for Huron XAUI, the assignment should
+				 * be by function number, i.e., whichever
+				 * function number attaches should be
+				 * assigned the available PHY (this is required
+				 * primarily to support pre-production Huron
+				 * boards where function 0 is mapped to addr 17
+				 */
+				if (port_fd_arr[0] ==
+				    BCM8706_ALT_GOA_PORT1_ADDR) {
+					hw_p->xcvr_addr[1] = port_fd_arr[0];
+				} else {
+					hw_p->xcvr_addr[nxgep->function_num] =
+					    port_fd_arr[0];
+				}
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 10 - 1"));
@@ -5717,14 +5764,14 @@ nxge_bcm5464_link_led_off(p_nxge_t nxgep) {
 		break;
 	}
 
-	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	rs = npi_mac_mif_mii_write(nxgep->npi_handle,
 	    xcvr_portn, BCM5464R_MISC, 0xb4ee);
 	if (rs != NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "<== nxge_bcm5464_link_led_off: npi_mac_mif_mii_write "
 		    "returned error 0x[%x]", rs));
-		MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+		MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 		return;
 	}
 
@@ -5736,7 +5783,7 @@ nxge_bcm5464_link_led_off(p_nxge_t nxgep) {
 		    "returned error 0x[%x]", rs));
 	}
 
-	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 }
 
 static nxge_status_t

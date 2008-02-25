@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,12 +60,15 @@ static void
 nxge_rtrace_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
 
 /* ARGSUSED */
-void
+nxge_status_t
 nxge_global_reset(p_nxge_t nxgep)
 {
+	nxge_status_t	status = NXGE_OK;
+
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_global_reset"));
 
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
+	if ((status = nxge_link_monitor(nxgep, LINK_MONITOR_STOP)) != NXGE_OK)
+		return (status);
 	(void) nxge_intr_hw_disable(nxgep);
 
 	if ((nxgep->suspended) ||
@@ -77,13 +80,18 @@ nxge_global_reset(p_nxge_t nxgep)
 			nxge_lb_serdes1000) ||
 			(nxgep->statsp->port_stats.lb_mode ==
 			nxge_lb_serdes10g))) {
-		(void) nxge_link_init(nxgep);
+		if ((status = nxge_link_init(nxgep)) != NXGE_OK)
+			return (status);
 	}
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
-	(void) nxge_mac_init(nxgep);
+
+	if ((status = nxge_link_monitor(nxgep, LINK_MONITOR_START)) != NXGE_OK)
+		return (status);
+	if ((status = nxge_mac_init(nxgep)) != NXGE_OK)
+		return (status);
 	(void) nxge_intr_hw_enable(nxgep);
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_global_reset"));
+	return (status);
 }
 
 /* ARGSUSED */
@@ -881,7 +889,12 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 				"!nxge%d: Returning to normal operation",
 				nxgep->instance);
 		}
-		nxge_set_lb_normal(nxgep);
+		if (nxge_set_lb_normal(nxgep) != NXGE_OK) {
+			status = B_FALSE;
+			cmn_err(CE_NOTE,
+			    "!nxge%d: Failed to return to normal operation",
+			    nxgep->instance);
+		}
 		goto nxge_set_lb_exit;
 	}
 	nxgep->statsp->port_stats.lb_mode = lb_mode;
@@ -923,10 +936,14 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy1000) ||
 		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy)) {
 
-		(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-		(void) nxge_xcvr_find(nxgep);
-		(void) nxge_link_init(nxgep);
-		(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+		if (nxge_link_monitor(nxgep, LINK_MONITOR_STOP) != NXGE_OK)
+			goto nxge_set_lb_err;
+		if (nxge_xcvr_find(nxgep) != NXGE_OK)
+			goto nxge_set_lb_err;
+		if (nxge_link_init(nxgep) != NXGE_OK)
+			goto nxge_set_lb_err;
+		if (nxge_link_monitor(nxgep, LINK_MONITOR_START) != NXGE_OK)
+			goto nxge_set_lb_err;
 	}
 	if (lb_info->lb_type == internal) {
 		if ((nxgep->statsp->port_stats.lb_mode == nxge_lb_mac10g) ||
@@ -948,19 +965,29 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		nxgep->statsp->mac_stats.link_duplex = 2;
 		nxgep->statsp->mac_stats.link_up = 1;
 	}
-	nxge_global_reset(nxgep);
+	if (nxge_global_reset(nxgep) != NXGE_OK)
+		goto nxge_set_lb_err;
 
 nxge_set_lb_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		"<== nxge_set_lb status = 0x%08x", status));
 	return (status);
+nxge_set_lb_err:
+	status = B_FALSE;
+	cmn_err(CE_NOTE,
+	    "!nxge%d: Failed to put adapter in %s loopback mode",
+	    nxgep->instance, lb_info->key);
+	return (status);
 }
 
 /* ARGSUSED */
-void
+nxge_status_t
 nxge_set_lb_normal(p_nxge_t nxgep)
 {
+	nxge_status_t	status = NXGE_OK;
+
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_set_lb_normal"));
+
 	nxgep->statsp->port_stats.lb_mode = nxge_lb_normal;
 	nxgep->param_arr[param_autoneg].value =
 		nxgep->param_arr[param_autoneg].old_value;
@@ -979,14 +1006,20 @@ nxge_set_lb_normal(p_nxge_t nxgep)
 	nxgep->param_arr[param_master_cfg_value].value =
 		nxgep->param_arr[param_master_cfg_value].old_value;
 
-	nxge_global_reset(nxgep);
+	if ((status = nxge_global_reset(nxgep)) != NXGE_OK)
+		return (status);
 
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-	(void) nxge_xcvr_find(nxgep);
-	(void) nxge_link_init(nxgep);
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+	if ((status = nxge_link_monitor(nxgep, LINK_MONITOR_STOP)) != NXGE_OK)
+		return (status);
+	if ((status = nxge_xcvr_find(nxgep)) != NXGE_OK)
+		return (status);
+	if ((status = nxge_link_init(nxgep)) != NXGE_OK)
+		return (status);
+	status = nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_set_lb_normal"));
+
+	return (status);
 }
 
 /* ARGSUSED */

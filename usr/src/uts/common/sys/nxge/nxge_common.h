@@ -484,7 +484,6 @@ typedef struct nxge_hw_list {
 	nxge_os_mutex_t 	nxge_tcam_lock;
 	nxge_os_mutex_t 	nxge_vlan_lock;
 	nxge_os_mutex_t 	nxge_mdio_lock;
-	nxge_os_mutex_t 	nxge_mii_lock;
 
 	nxge_dev_info_t		*parent_devp;
 	struct _nxge_t		*nxge_p[NXGE_MAX_PORTS];

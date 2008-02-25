@@ -839,12 +839,14 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 		statsp->rx_viol_err_cnt =
 			xmac_kstatsp->rx_viol_err_cnt.value.ul;
 		statsp->rx_byte_cnt = xmac_kstatsp->rx_byte_cnt.value.ul;
+		statsp->rx_frame_cnt = xmac_kstatsp->rx_frame_cnt.value.ul;
 		statsp->rx_hist1_cnt = xmac_kstatsp->rx_hist1_cnt.value.ul;
 		statsp->rx_hist2_cnt = xmac_kstatsp->rx_hist2_cnt.value.ul;
 		statsp->rx_hist3_cnt = xmac_kstatsp->rx_hist3_cnt.value.ul;
 		statsp->rx_hist4_cnt = xmac_kstatsp->rx_hist4_cnt.value.ul;
 		statsp->rx_hist5_cnt = xmac_kstatsp->rx_hist5_cnt.value.ul;
 		statsp->rx_hist6_cnt = xmac_kstatsp->rx_hist6_cnt.value.ul;
+		statsp->rx_hist7_cnt = xmac_kstatsp->rx_hist7_cnt.value.ul;
 		statsp->rx_mult_cnt = xmac_kstatsp->rx_mult_cnt.value.ul;
 		statsp->rx_frag_cnt = xmac_kstatsp->rx_frag_cnt.value.ul;
 		statsp->rx_frame_align_err_cnt =
@@ -887,12 +889,14 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 		xmac_kstatsp->rx_viol_err_cnt.value.ul =
 			statsp->rx_viol_err_cnt;
 		xmac_kstatsp->rx_byte_cnt.value.ul = statsp->rx_byte_cnt;
+		xmac_kstatsp->rx_frame_cnt.value.ul = statsp->rx_frame_cnt;
 		xmac_kstatsp->rx_hist1_cnt.value.ul = statsp->rx_hist1_cnt;
 		xmac_kstatsp->rx_hist2_cnt.value.ul = statsp->rx_hist2_cnt;
 		xmac_kstatsp->rx_hist3_cnt.value.ul = statsp->rx_hist3_cnt;
 		xmac_kstatsp->rx_hist4_cnt.value.ul = statsp->rx_hist4_cnt;
 		xmac_kstatsp->rx_hist5_cnt.value.ul = statsp->rx_hist5_cnt;
 		xmac_kstatsp->rx_hist6_cnt.value.ul = statsp->rx_hist6_cnt;
+		xmac_kstatsp->rx_hist7_cnt.value.ul = statsp->rx_hist7_cnt;
 		xmac_kstatsp->rx_mult_cnt.value.ul = statsp->rx_mult_cnt;
 		xmac_kstatsp->rx_frag_cnt.value.ul = statsp->rx_frag_cnt;
 		xmac_kstatsp->rx_frame_align_err_cnt.value.ul =
@@ -1416,7 +1420,7 @@ nxge_setup_kstats(p_nxge_t nxgep)
 	kstat_named_init(&nxgekp->mdt_pld_bind_fail, "mdt_pld_bind_fail",
 		KSTAT_DATA_ULONG);
 #endif
-#ifdef ACNXGEPT_JUMBO
+#ifdef ACCEPT_JUMBO
 	kstat_named_init(&nxgekp->tx_jumbo_pkts, "tx_jumbo_pkts",
 		KSTAT_DATA_ULONG);
 #endif
@@ -1424,7 +1428,7 @@ nxge_setup_kstats(p_nxge_t nxgep)
 	/*
 	 * Rx Statistics.
 	 */
-#ifdef ACNXGEPT_JUMBO
+#ifdef ACCEPT_JUMBO
 	kstat_named_init(&nxgekp->rx_jumbo_pkts, "rx_jumbo_pkts",
 		KSTAT_DATA_ULONG);
 #endif
@@ -1472,6 +1476,8 @@ nxge_xmac_init_kstats(struct kstat *ksp)
 		KSTAT_DATA_ULONG);
 
 	/* Receive MAC statistics */
+	kstat_named_init(&nxgekp->rx_frame_cnt, "rxmac_frame_cnt",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_overflow_err, "rxmac_overflow_err",
 		KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_underflow_err, "rxmac_underflow_err",
@@ -1499,6 +1505,8 @@ nxge_xmac_init_kstats(struct kstat *ksp)
 		KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist6_cnt, "rxmac_1024_1522_cnt",
 		KSTAT_DATA_ULONG);
+	kstat_named_init(&nxgekp->rx_hist7_cnt, "rxmac_jumbo_cnt",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_broadcast_cnt, "rxmac_broadcast_cnt",
 		KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_mult_cnt, "rxmac_multicast_cnt",
@@ -1612,6 +1620,8 @@ nxge_mac_init_kstats(p_nxge_t nxgep, struct kstat *ksp)
 	kstat_named_init(&nxgekp->rx_frame_align_err_cnt,
 		"rxmac_alignment_err",
 		KSTAT_DATA_ULONG);
+	kstat_named_init(&nxgekp->rx_frame_cnt, "rxmac_frame_cnt",
+	    KSTAT_DATA_ULONG);
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		kstat_named_init(&nxgekp->rx_hist1_cnt, "rxmac_64_cnt",
 			KSTAT_DATA_ULONG);
@@ -1625,6 +1635,8 @@ nxge_mac_init_kstats(p_nxge_t nxgep, struct kstat *ksp)
 			KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist6_cnt, "rxmac_1024_1522_cnt",
 			KSTAT_DATA_ULONG);
+		kstat_named_init(&nxgekp->rx_hist7_cnt, "rxmac_jumbo_cnt",
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_broadcast_cnt,
 			"rxmac_broadcast_cnt",
 			KSTAT_DATA_ULONG);
@@ -1640,9 +1652,6 @@ nxge_mac_init_kstats(p_nxge_t nxgep, struct kstat *ksp)
 			KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_local_fault_err_cnt,
 			"rxmac_local_faults",
-			KSTAT_DATA_ULONG);
-	} else if (nxgep->mac.porttype == PORT_TYPE_BMAC) {
-		kstat_named_init(&nxgekp->rx_frame_cnt, "rxmac_frame_cnt",
 			KSTAT_DATA_ULONG);
 	}
 }
@@ -1742,11 +1751,15 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		/*
 		 * Rx Statistics.
 		 */
-#ifdef ACNXGEPT_JUMBO
+#ifdef ACCEPT_JUMBO
 		statsp->port_stats.rx_jumbo_pkts =
 			nxgekp->rx_jumbo_pkts.value.ul;
 #endif
-		(void) nxge_xmac_stat_update(ksp, KSTAT_WRITE);
+		if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
+			(void) nxge_xmac_stat_update(ksp, KSTAT_WRITE);
+		} else {
+			(void) nxge_bmac_stat_update(ksp, KSTAT_WRITE);
+		}
 		return (0);
 	} else {
 		if (nxgep->filter.all_phys_cnt)
@@ -1883,7 +1896,11 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		nxgekp->rx_jumbo_pkts.value.ul =
 			statsp->port_stats.rx_jumbo_pkts;
 #endif
-		(void) nxge_xmac_stat_update(ksp, KSTAT_READ);
+		if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
+			(void) nxge_xmac_stat_update(ksp, KSTAT_READ);
+		} else {
+			(void) nxge_bmac_stat_update(ksp, KSTAT_READ);
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_port_kstat_update"));
@@ -1928,50 +1945,84 @@ nxge_save_cntrs(p_nxge_t nxgep)
 		XMAC_REG_RD(handle, portn, XRXMAC_CRC_ER_CNT_REG, &val);
 		statsp->xmac_stats.rx_crc_err_cnt +=
 			(val & XRXMAC_CRC_ER_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_MPSZER_CNT_REG, &val);
 		statsp->xmac_stats.rx_len_err_cnt +=
 			(val & XRXMAC_MPSZER_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_CD_VIO_CNT_REG, &val);
 		statsp->xmac_stats.rx_viol_err_cnt +=
 			(val & XRXMAC_CD_VIO_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_BT_CNT_REG, &val);
 		statsp->xmac_stats.rx_byte_cnt += (val & XRXMAC_BT_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT1_REG, &val);
 		statsp->xmac_stats.rx_hist1_cnt +=
 			(val & XRXMAC_HIST_CNT1_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT1_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT2_REG, &val);
 		statsp->xmac_stats.rx_hist2_cnt +=
 			(val & XRXMAC_HIST_CNT2_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT2_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT3_REG, &val);
 		statsp->xmac_stats.rx_hist3_cnt +=
 			(val & XRXMAC_HIST_CNT3_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT3_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT4_REG, &val);
 		statsp->xmac_stats.rx_hist4_cnt +=
 			(val & XRXMAC_HIST_CNT4_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT4_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT5_REG, &val);
 		statsp->xmac_stats.rx_hist5_cnt +=
 			(val & XRXMAC_HIST_CNT5_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT5_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT6_REG, &val);
 		statsp->xmac_stats.rx_hist6_cnt +=
 			(val & XRXMAC_HIST_CNT6_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT6_MASK);
+
+		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT7_REG, &val);
+		statsp->xmac_stats.rx_hist7_cnt +=
+		    (val & XRXMAC_HIST_CNT7_MASK);
+		statsp->xmac_stats.rx_frame_cnt +=
+		    (val & XRXMAC_HIST_CNT7_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_BC_FRM_CNT_REG, &val);
 		statsp->xmac_stats.rx_broadcast_cnt +=
 			(val & XRXMAC_BC_FRM_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_MC_FRM_CNT_REG, &val);
 		statsp->xmac_stats.rx_mult_cnt +=
 			(val & XRXMAC_MC_FRM_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_FRAG_CNT_REG, &val);
 		statsp->xmac_stats.rx_frag_cnt += (val & XRXMAC_FRAG_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XRXMAC_AL_ER_CNT_REG, &val);
 		statsp->xmac_stats.rx_frame_align_err_cnt +=
 			(val & XRXMAC_AL_ER_CNT_MASK);
+
 		XMAC_REG_RD(handle, portn, XMAC_LINK_FLT_CNT_REG, &val);
 		statsp->xmac_stats.rx_linkfault_err_cnt +=
 			(val & XMAC_LINK_FLT_CNT_MASK);
+
 		(void) npi_xmac_xpcs_read(handle, portn,
 			XPCS_REG_DESCWERR_COUNTER, &cnt32);
 		statsp->xmac_stats.xpcs_deskew_err_cnt +=
 			(val & XMAC_XPCS_DESKEW_ERR_CNT_MASK);
+
 #ifdef	NXGE_DEBUG_SYMBOL_ERR
 		(void) npi_xmac_xpcs_read(handle, portn,
 			XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &cnt32);
@@ -1994,28 +2045,50 @@ nxge_save_cntrs(p_nxge_t nxgep)
 		 */
 		BMAC_REG_RD(handle, portn, BTXMAC_FRM_CNT_REG, &val);
 		statsp->bmac_stats.tx_frame_cnt += (val & BTXMAC_FRM_CNT_MASK);
-		XMAC_REG_RD(handle, portn, BTXMAC_BYTE_CNT_REG, &val);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, BTXMAC_FRM_CNT_REG, 0);
+
+		BMAC_REG_RD(handle, portn, BTXMAC_BYTE_CNT_REG, &val);
 		statsp->bmac_stats.tx_byte_cnt += (val & BTXMAC_BYTE_CNT_MASK);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, BTXMAC_BYTE_CNT_REG, 0);
 
 		/*
 		 * Receive MAC statistics.
 		 */
-		XMAC_REG_RD(handle, portn, RXMAC_FRM_CNT_REG, &val);
+		BMAC_REG_RD(handle, portn, RXMAC_FRM_CNT_REG, &val);
 		statsp->bmac_stats.rx_frame_cnt += (val & RXMAC_FRM_CNT_MASK);
-		XMAC_REG_RD(handle, portn, BRXMAC_BYTE_CNT_REG, &val);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, RXMAC_FRM_CNT_REG, 0);
+
+		BMAC_REG_RD(handle, portn, BRXMAC_BYTE_CNT_REG, &val);
 		statsp->bmac_stats.rx_byte_cnt += (val & BRXMAC_BYTE_CNT_MASK);
-		XMAC_REG_RD(handle, portn, BMAC_AL_ER_CNT_REG, &val);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, BRXMAC_BYTE_CNT_REG, 0);
+
+		BMAC_REG_RD(handle, portn, BMAC_AL_ER_CNT_REG, &val);
 		statsp->bmac_stats.rx_align_err_cnt +=
 			(val & BMAC_AL_ER_CNT_MASK);
-		XMAC_REG_RD(handle, portn, MAC_LEN_ER_CNT_REG, &val);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, BMAC_AL_ER_CNT_REG, 0);
+
+		BMAC_REG_RD(handle, portn, MAC_LEN_ER_CNT_REG, &val);
 		statsp->bmac_stats.rx_len_err_cnt +=
 			(val & MAC_LEN_ER_CNT_MASK);
-		XMAC_REG_RD(handle, portn, BMAC_CRC_ER_CNT_REG, &val);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, MAC_LEN_ER_CNT_REG, 0);
+
+		BMAC_REG_RD(handle, portn, BMAC_CRC_ER_CNT_REG, &val);
 		statsp->bmac_stats.rx_crc_err_cnt +=
 			(val & BMAC_CRC_ER_CNT_MASK);
-		XMAC_REG_RD(handle, portn, BMAC_CD_VIO_CNT_REG, &val);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, BMAC_CRC_ER_CNT_REG, 0);
+
+		BMAC_REG_RD(handle, portn, BMAC_CD_VIO_CNT_REG, &val);
 		statsp->bmac_stats.rx_viol_err_cnt +=
 			(val & BMAC_CD_VIO_CNT_MASK);
+		/* Clear register as it is not auto clear on read */
+		BMAC_REG_WR(handle, portn, BMAC_CD_VIO_CNT_REG, 0);
 	}
 	/* Update IPP counters */
 	(void) npi_ipp_get_ecc_err_count(handle, portn, &cnt8);

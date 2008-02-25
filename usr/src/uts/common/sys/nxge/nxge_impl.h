@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -658,6 +658,8 @@ typedef struct _nxge_mmac_stats_t {
 #define	NXGE_2XGF_PEM_BM_STR		"501-7626"
 #define	NXGE_ALONSO_BM_STR		"373-0202-01"
 #define	NXGE_ALONSO_MODEL_STR		"SUNW,CP3220"
+#define	NXGE_RFEM_BM_STR		"501-7961-01"
+#define	NXGE_RFEM_MODEL_STR		"SUNW,pcie-rfem"
 #define	NXGE_EROM_LEN			1048576
 
 #endif
@@ -751,7 +753,7 @@ int nxge_m_stat(void *arg, uint_t, uint64_t *);
 void
 nxge_hw_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
 void nxge_loopback_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
-void nxge_global_reset(p_nxge_t);
+nxge_status_t nxge_global_reset(p_nxge_t);
 uint_t nxge_intr(void *, void *);
 void nxge_intr_enable(p_nxge_t);
 void nxge_intr_disable(p_nxge_t);
@@ -761,7 +763,6 @@ void nxge_hw_init_niu_common(p_nxge_t);
 void nxge_intr_hw_enable(p_nxge_t);
 void nxge_intr_hw_disable(p_nxge_t);
 void nxge_hw_stop(p_nxge_t);
-void nxge_global_reset(p_nxge_t);
 void nxge_check_hw_state(p_nxge_t);
 
 void nxge_rxdma_channel_put64(nxge_os_acc_handle_t,
@@ -816,7 +817,7 @@ boolean_t nxge_nd_load(caddr_t *, char *, pfi_t, pfi_t, caddr_t);
 void nxge_nd_free(caddr_t *);
 int nxge_nd_getset(p_nxge_t, queue_t *, caddr_t, p_mblk_t);
 
-void nxge_set_lb_normal(p_nxge_t);
+nxge_status_t nxge_set_lb_normal(p_nxge_t);
 boolean_t nxge_set_lb(p_nxge_t, queue_t *, p_mblk_t);
 
 /* nxge_virtual.c */

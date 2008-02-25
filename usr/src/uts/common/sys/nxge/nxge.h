@@ -261,7 +261,10 @@ typedef struct _nxge_param_t {
 } nxge_param_t, *p_nxge_param_t;
 
 
-
+/*
+ * Do not change the order of the elements of this enum as that will
+ * break the driver code.
+ */
 typedef enum {
 	nxge_lb_normal,
 	nxge_lb_ext10g,
@@ -933,6 +936,7 @@ typedef	struct _nxge_mac_kstat {
 	kstat_named_t	rx_hist4_cnt;
 	kstat_named_t	rx_hist5_cnt;
 	kstat_named_t	rx_hist6_cnt;
+	kstat_named_t	rx_hist7_cnt;
 	kstat_named_t	rx_broadcast_cnt;
 	kstat_named_t	rx_mult_cnt;
 	kstat_named_t	rx_frag_cnt;

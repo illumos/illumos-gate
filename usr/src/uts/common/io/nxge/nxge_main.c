@@ -4800,7 +4800,6 @@ nxge_init_common_dev(p_nxge_t nxgep)
 		MUTEX_INIT(&hw_p->nxge_tcam_lock, NULL, MUTEX_DRIVER, NULL);
 		MUTEX_INIT(&hw_p->nxge_vlan_lock, NULL, MUTEX_DRIVER, NULL);
 		MUTEX_INIT(&hw_p->nxge_mdio_lock, NULL, MUTEX_DRIVER, NULL);
-		MUTEX_INIT(&hw_p->nxge_mii_lock, NULL, MUTEX_DRIVER, NULL);
 
 		nxge_hw_list = hw_p;
 
@@ -4863,7 +4862,6 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 				MUTEX_DESTROY(&hw_p->nxge_tcam_lock);
 				MUTEX_DESTROY(&hw_p->nxge_cfg_lock);
 				MUTEX_DESTROY(&hw_p->nxge_mdio_lock);
-				MUTEX_DESTROY(&hw_p->nxge_mii_lock);
 				NXGE_DEBUG_MSG((nxgep, MOD_CTL,
 					"==> nxge_uninit_common_device: "
 					"func # %d "
