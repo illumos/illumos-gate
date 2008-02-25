@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,8 +111,8 @@ htol(char *s, m_label_t *l)
 		if (!unhex(&h, &size, 1)) {
 			return (-1);
 		}
-		size *= sizeof (uint32_t);	/* words to bytes */
-		if (size > len) {
+		/* convert size from words to bytes */
+		if ((size * sizeof (uint32_t)) > len) {
 			/*
 			 * internal label greater than will fit in current
 			 * binary.
