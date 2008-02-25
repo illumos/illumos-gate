@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
 
 #include <sys/ctfs.h>
 #include <sys/contract.h>
+#include <string.h>
 #include <libnvpair.h>
 #include <assert.h>
 #include <unistd.h>
@@ -68,10 +69,30 @@ int
 ct_tmpl_set_internal(int fd, uint_t id, uintptr_t value)
 {
 	ct_param_t param;
+	uint64_t param_value = value;
+
 	param.ctpm_id = id;
-	param.ctpm_value = (uint64_t)value;
+	param.ctpm_size = sizeof (uint64_t);
+	param.ctpm_value = &param_value;
 	if (ioctl(fd, CT_TSET, &param) == -1)
 		return (errno);
+
+	return (0);
+}
+
+int
+ct_tmpl_set_internal_string(int fd, uint_t id, const char *value)
+{
+	ct_param_t param;
+
+	if (value == NULL)
+		return (EINVAL);
+	param.ctpm_id = id;
+	param.ctpm_size = strlen(value) + 1;
+	param.ctpm_value = (void *)value;
+	if (ioctl(fd, CT_TSET, &param) == -1)
+		return (errno);
+
 	return (0);
 }
 
@@ -91,8 +112,11 @@ int
 ct_tmpl_set_cookie(int fd, uint64_t cookie)
 {
 	ct_param_t param;
+	uint64_t param_value = cookie;
+
 	param.ctpm_id = CTP_COOKIE;
-	param.ctpm_value = cookie;
+	param.ctpm_size = sizeof (uint64_t);
+	param.ctpm_value = &param_value;
 	if (ioctl(fd, CT_TSET, &param) == -1)
 		return (errno);
 	return (0);
@@ -102,24 +126,28 @@ int
 ct_tmpl_get_internal(int fd, uint_t id, uint_t *value)
 {
 	ct_param_t param;
+	uint64_t param_value;
 
 	param.ctpm_id = id;
+	param.ctpm_size = sizeof (uint64_t);
+	param.ctpm_value = &param_value;
 	if (ioctl(fd, CT_TGET, &param) == -1)
 		return (errno);
-	*value = param.ctpm_value;
+	*value = param_value;
 	return (0);
 }
 
 int
-ct_tmpl_get_internal_string(int fd, uint_t id, char *value)
+ct_tmpl_get_internal_string(int fd, uint32_t id, char *buf, size_t size)
 {
 	ct_param_t param;
 
 	param.ctpm_id = id;
-	param.ctpm_value = (uint64_t)(uintptr_t)value;
+	param.ctpm_size = size;
+	param.ctpm_value = buf;
 	if (ioctl(fd, CT_TGET, &param) == -1)
-		return (errno);
-	return (0);
+		return (-1);
+	return (param.ctpm_size);
 }
 
 int
@@ -140,9 +168,10 @@ ct_tmpl_get_cookie(int fd, uint64_t *cookie)
 	ct_param_t param;
 
 	param.ctpm_id = CTP_COOKIE;
+	param.ctpm_size = sizeof (uint64_t);
+	param.ctpm_value = cookie;
 	if (ioctl(fd, CT_TGET, &param) == -1)
 		return (errno);
-	*cookie = param.ctpm_value;
 	return (0);
 }
 

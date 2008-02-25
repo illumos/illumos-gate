@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,11 @@ extern "C" {
 #endif
 
 typedef uint64_t	ctevid_t;
+
+/*
+ * Contract parameter maximum size, in bytes
+ */
+#define	CT_PARAM_MAX_SIZE	8192
 
 /*
  * Common event types
@@ -108,8 +113,8 @@ typedef struct ct_status {
 
 typedef struct ct_param {
 	uint32_t ctpm_id;
-	uint32_t ctpm_pad;
-	uint64_t ctpm_value;
+	uint32_t ctpm_size;
+	void	 *ctpm_value;
 } ct_param_t;
 
 #ifdef	__cplusplus

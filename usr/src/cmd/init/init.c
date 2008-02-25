@@ -287,6 +287,14 @@ static lvl_t lvls[] = {
 #define	COMMENT	5
 
 /*
+ * inittab entry id constants
+ */
+#define	INITTAB_ENTRY_ID_SIZE 4
+#define	INITTAB_ENTRY_ID_STR_FORMAT "%.4s"	/* if INITTAB_ENTRY_ID_SIZE */
+						/* changes, this should */
+						/* change accordingly */
+
+/*
  * Init can be in any of three main states, "normal" mode where it is
  * processing entries for the lines file in a normal fashion, "boot" mode,
  * where it is only interested in the boot actions, and "powerfail" mode,
@@ -298,7 +306,8 @@ static lvl_t lvls[] = {
 #define	PF_MODES	(M_PF | M_PWAIT)
 
 struct PROC_TABLE {
-	char	p_id[4];	/* Four letter unique id of process */
+	char	p_id[INITTAB_ENTRY_ID_SIZE];	/* Four letter unique id of */
+						/* process */
 	pid_t	p_pid;		/* Process id */
 	short	p_count;	/* How many respawns of this command in */
 				/*   the current series */
@@ -373,8 +382,9 @@ struct PROC_TABLE {
 #define	NO_ROOM		((struct PROC_TABLE *)(FAILURE))
 
 struct CMD_LINE {
-	char c_id[4];	/* Four letter unique id of process to be */
-			/*   affected by action */
+	char c_id[INITTAB_ENTRY_ID_SIZE];	/* Four letter unique id of */
+						/* process to be affected by */
+						/* action */
 	short c_levels;	/* Mask of legal levels for process */
 	short c_action;	/* Mask for type of action required */
 	char *c_command; /* Pointer to init command */
@@ -518,8 +528,16 @@ static int	glob_envn;		/* Number of environment strings */
 static struct pollfd	poll_fds[1];
 static int		poll_nfds = 0;	/* poll_fds is uninitialized */
 
+/*
+ * Contracts constants
+ */
+#define	SVC_INIT_PREFIX "init:/"
+#define	SVC_AUX_SIZE (INITTAB_ENTRY_ID_SIZE + 1)
+#define	SVC_FMRI_SIZE (sizeof (SVC_INIT_PREFIX) + INITTAB_ENTRY_ID_SIZE)
+
 static int	legacy_tmpl = -1;	/* fd for legacy contract template */
 static int	startd_tmpl = -1;	/* fd for svc.startd's template */
+static char	startd_svc_aux[SVC_AUX_SIZE];
 
 static char	startd_cline[256] = "";	/* svc.startd's command line */
 static int	do_restart_startd = 1;	/* Whether to restart svc.startd. */
@@ -2027,6 +2045,8 @@ boot_init()
 	struct PROC_TABLE *process, *oprocess;
 	struct CMD_LINE	cmd;
 	char	line[MAXCMDL];
+	char	svc_aux[SVC_AUX_SIZE];
+	char	init_svc_fmri[SVC_FMRI_SIZE];
 	char *old_path;
 	int maxfiles;
 
@@ -2040,9 +2060,11 @@ boot_init()
 	 * and sysinit entries.
 	 */
 	while (getcmd(&cmd, &line[0]) == TRUE) {
-		if (startd_tmpl >= 0 && id_eq(cmd.c_id, "smf"))
+		if (startd_tmpl >= 0 && id_eq(cmd.c_id, "smf")) {
 			process_startd_line(&cmd, line);
-		else if (cmd.c_action == M_INITDEFAULT) {
+			(void) snprintf(startd_svc_aux, SVC_AUX_SIZE,
+			    INITTAB_ENTRY_ID_STR_FORMAT, cmd.c_id);
+		} else if (cmd.c_action == M_INITDEFAULT) {
 			/*
 			 * initdefault is no longer meaningful, as the SMF
 			 * milestone controls what (legacy) run level we
@@ -2059,6 +2081,17 @@ boot_init()
 			 */
 			if (process = findpslot(&cmd)) {
 				(void) sigset(SIGCLD, SIG_DFL);
+				(void) snprintf(svc_aux, SVC_AUX_SIZE,
+				    INITTAB_ENTRY_ID_STR_FORMAT, cmd.c_id);
+				(void) snprintf(init_svc_fmri, SVC_FMRI_SIZE,
+				    SVC_INIT_PREFIX INITTAB_ENTRY_ID_STR_FORMAT,
+				    cmd.c_id);
+				if (legacy_tmpl >= 0) {
+					(void) ct_pr_tmpl_set_svc_fmri(
+					    legacy_tmpl, init_svc_fmri);
+					(void) ct_pr_tmpl_set_svc_aux(
+					    legacy_tmpl, svc_aux);
+				}
 
 				for (oprocess = process;
 				    (process = efork(M_OFF, oprocess,
@@ -4069,7 +4102,7 @@ contract_make_template(uint_t info, uint_t critical, uint_t fatal,
 
 	if (err = ct_pr_tmpl_set_param(fd, CT_PR_INHERIT | CT_PR_REGENT))
 		console(B_TRUE, "Contract set template inherit, regent "
-		    "failed.\n");
+		    "failed: %s.\n", strerror(err));
 
 	/*
 	 * These errors result in a misconfigured template, which is better
@@ -4373,6 +4406,16 @@ startd_run(const char *cline, int tmpl, ctid_t old_ctid)
 		    "%s.\n", strerror(err));
 	}
 
+	if ((err = ct_pr_tmpl_set_svc_fmri(startd_tmpl,
+	    SCF_SERVICE_STARTD)) != 0)
+		console(B_TRUE,
+		    "Can not set svc_fmri in contract template: %s\n",
+		    strerror(err));
+	if ((err = ct_pr_tmpl_set_svc_aux(startd_tmpl,
+	    startd_svc_aux)) != 0)
+		console(B_TRUE,
+		    "Can not set svc_aux in contract template: %s\n",
+		    strerror(err));
 	did_activate = !(ct_tmpl_activate(tmpl));
 	if (!did_activate)
 		console(B_TRUE,

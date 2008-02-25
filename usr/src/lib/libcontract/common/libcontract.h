@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,10 +93,14 @@ extern int ct_event_get_newct(ct_evthdl_t, ctid_t *);
 extern int ct_pr_tmpl_set_transfer(int, ctid_t);
 extern int ct_pr_tmpl_set_fatal(int, uint_t);
 extern int ct_pr_tmpl_set_param(int, uint_t);
+extern int ct_pr_tmpl_set_svc_fmri(int, const char *);
+extern int ct_pr_tmpl_set_svc_aux(int, const char *);
 
 extern int ct_pr_tmpl_get_transfer(int, ctid_t *);
 extern int ct_pr_tmpl_get_fatal(int, uint_t *);
 extern int ct_pr_tmpl_get_param(int, uint_t *);
+extern int ct_pr_tmpl_get_svc_fmri(int, char *, size_t);
+extern int ct_pr_tmpl_get_svc_aux(int, char *, size_t);
 
 extern int ct_pr_event_get_pid(ct_evthdl_t, pid_t *);
 extern int ct_pr_event_get_ppid(ct_evthdl_t, pid_t *);
@@ -112,6 +116,10 @@ extern int ct_pr_status_get_param(ct_stathdl_t, uint_t *);
 extern int ct_pr_status_get_fatal(ct_stathdl_t, uint_t *);
 extern int ct_pr_status_get_members(ct_stathdl_t, pid_t **, uint_t *);
 extern int ct_pr_status_get_contracts(ct_stathdl_t, ctid_t **, uint_t *);
+extern int ct_pr_status_get_svc_fmri(ct_stathdl_t, char **);
+extern int ct_pr_status_get_svc_aux(ct_stathdl_t, char **);
+extern int ct_pr_status_get_svc_ctid(ct_stathdl_t, ctid_t *);
+extern int ct_pr_status_get_svc_creator(ct_stathdl_t, char **);
 
 /*
  * Device contract routines
@@ -127,7 +135,6 @@ int ct_dev_status_get_aset(ct_stathdl_t, uint_t *);
 int ct_dev_status_get_noneg(ct_stathdl_t, uint_t *);
 int ct_dev_status_get_dev_state(ct_stathdl_t, uint_t *);
 int ct_dev_status_get_minor(ct_stathdl_t, char **);
-
 
 
 #ifdef __cplusplus

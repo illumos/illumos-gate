@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -495,9 +494,12 @@ out:
 }
 
 static int
-prepare_contract()
+prepare_contract(const char *script, const char *action)
 {
 	int fd;
+	char *svc_name;
+	char *svc_strbuf;
+	int err = 0;
 
 	do
 		fd = open64(CTFS_ROOT "/process/template", O_RDWR);
@@ -507,18 +509,50 @@ prepare_contract()
 		return (-1);
 	}
 
+	svc_strbuf = malloc(CT_PARAM_MAX_SIZE);
+	if (svc_strbuf == NULL) {
+		uu_warn(gettext("Can not allocate memory"));
+		err = -1;
+		goto cleanup;
+	}
+
+	(void) strlcpy(svc_strbuf, SCF_FMRI_LEGACY_PREFIX, CT_PARAM_MAX_SIZE);
+	svc_name = path_to_svc_name(script);
+	(void) strlcat(svc_strbuf, svc_name ? svc_name : script,
+	    CT_PARAM_MAX_SIZE);
+	if (svc_name != NULL) {
+		free(svc_name);
+	}
+
+	if ((errno = ct_pr_tmpl_set_svc_fmri(fd, svc_strbuf)) != 0) {
+		uu_warn(gettext("Can not set svc_fmri"));
+		err = -1;
+		goto cleanup;
+	}
+
+	(void) strlcpy(svc_strbuf, action, CT_PARAM_MAX_SIZE);
+	if ((errno = ct_pr_tmpl_set_svc_aux(fd, svc_strbuf)) != 0) {
+		uu_warn(gettext("Can not set svc_aux"));
+		err = -1;
+		goto cleanup;
+	}
+
 	/* Leave HWERR in fatal set. */
 
 	errno = ct_tmpl_activate(fd);
 	if (errno != 0) {
 		assert(errno == EPERM);
 		uu_warn(gettext("Can not activate contract template"));
-		(void) close(fd);
-		return (-1);
+		err = -1;
+		goto cleanup;
 	}
 
+cleanup:
+	if (svc_strbuf != NULL)
+		free(svc_strbuf);
 	(void) close(fd);
-	return (0);
+
+	return (err);
 }
 
 static void
@@ -569,7 +603,7 @@ approved_env(char **env)
 
 			if (env[i][l] == '=' &&
 			    strncmp(env[i], evars_to_pass[j], l) == 0)
-			    newenv[i_new++] = env[i];
+				newenv[i_new++] = env[i];
 		}
 	}
 
@@ -834,7 +868,7 @@ main(int argc, char *argv[], char *envp[])
 		uu_die(gettext(
 		    "Could not create new environment: out of memory.\n"));
 
-	if (prepare_contract() == -1) {
+	if (prepare_contract(script, action) == -1) {
 		if (start_flag && pg != NULL)
 			cleanup_pg(pg);
 

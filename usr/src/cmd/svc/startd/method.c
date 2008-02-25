@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -303,6 +303,8 @@ out:
 	*ctidp = 0;
 }
 
+static const char *method_names[] = { "start", "stop", "refresh" };
+
 /*
  * int method_ready_contract(restarter_inst_t *, int, method_restart_t, int)
  *
@@ -390,6 +392,11 @@ method_ready_contract(restarter_inst_t *inst, int type,
 		}
 	}
 
+	err = ct_pr_tmpl_set_svc_fmri(tmpl, inst->ri_i.i_fmri);
+	assert(err == 0);
+	err = ct_pr_tmpl_set_svc_aux(tmpl, method_names[type]);
+	assert(err == 0);
+
 	err = ct_tmpl_activate(tmpl);
 	assert(err == 0);
 
@@ -401,8 +408,6 @@ out:
 
 	return (ret);
 }
-
-static const char *method_names[] = { "start", "stop", "refresh" };
 
 static void
 exec_method(const restarter_inst_t *inst, int type, const char *method,

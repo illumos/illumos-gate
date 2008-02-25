@@ -4977,6 +4977,7 @@ zone_enter(zoneid_t zoneid)
 			}
 		}
 	}
+
 	mutex_exit(&pp->p_lock);
 	mutex_exit(&ct->ct_lock);
 
@@ -5110,6 +5111,17 @@ zone_enter(zoneid_t zoneid)
 	 * This means that a lot of the following code can be commonized and
 	 * shared with zsched().
 	 */
+
+	/*
+	 * If the process contract fmri was inherited, we need to
+	 * flag this so that any contract status will not leak
+	 * extra zone information, svc_fmri in this case
+	 */
+	if (ctp->conp_svc_ctid != ct->ct_id) {
+		mutex_enter(&ct->ct_lock);
+		ctp->conp_svc_zone_enter = ct->ct_id;
+		mutex_exit(&ct->ct_lock);
+	}
 
 	/*
 	 * Reset the encapsulating process contract's zone.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +48,9 @@ struct ctlib_event_info {
 };
 
 extern int ct_tmpl_set_internal(int, uint_t, uintptr_t);
+extern int ct_tmpl_set_internal_string(int, uint_t, const char *);
 extern int ct_tmpl_get_internal(int, uint_t, uint_t *);
-extern int ct_tmpl_get_internal_string(int, uint_t, char *);
+extern int ct_tmpl_get_internal_string(int, uint32_t, char *, size_t);
 
 typedef struct contract_type {
 	const char *type_name;

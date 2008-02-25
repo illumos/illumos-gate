@@ -87,6 +87,12 @@ extern "C" {
 #define	SCF_FMRI_INSTANCE_PREFIX	":"
 #define	SCF_FMRI_PROPERTYGRP_PREFIX	"/:properties/"
 #define	SCF_FMRI_PROPERTY_PREFIX	"/"
+#define	SCF_FMRI_LEGACY_PREFIX		"lrc:"
+
+/*
+ * sulogin Service FMRI
+ */
+#define	SVC_SULOGIN_FMRI ((const char *)"svc:/system/sulogin")
 
 typedef struct scf_decoration_info {
 	const char *sdi_name;

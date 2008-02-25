@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,6 +298,70 @@ verb_inherit(ct_stathdl_t hdl)
 }
 
 /*
+ * verb_svc_fmri
+ *
+ * Display the process contract service fmri
+ */
+static void
+verb_svc_fmri(ct_stathdl_t hdl)
+{
+	char *svc_fmri;
+	int err;
+	if (err = ct_pr_status_get_svc_fmri(hdl, &svc_fmri))
+		verb_error(err);
+	else
+		(void) printf("%s\n", svc_fmri);
+}
+
+/*
+ * verb_svc_aux
+ *
+ * Display the process contract service fmri auxiliar
+ */
+static void
+verb_svc_aux(ct_stathdl_t hdl)
+{
+	char *svc_aux;
+	int err;
+	if (err = ct_pr_status_get_svc_aux(hdl, &svc_aux))
+		verb_error(err);
+	else
+		(void) printf("%s\n", svc_aux);
+}
+
+/*
+ * verb_svc_ctid
+ *
+ * Display the process contract service fmri ctid
+ */
+static void
+verb_svc_ctid(ct_stathdl_t hdl)
+{
+	ctid_t svc_ctid;
+	int err;
+	if (err = ct_pr_status_get_svc_ctid(hdl, &svc_ctid))
+		verb_error(err);
+	else
+		(void) printf("%ld\n", svc_ctid);
+}
+
+/*
+ * verb_svc_creator
+ *
+ * Display the process contract creator's execname
+ */
+static void
+verb_svc_creator(ct_stathdl_t hdl)
+{
+	char *svc_creator;
+	int err;
+	if (err = ct_pr_status_get_svc_creator(hdl, &svc_creator))
+		verb_error(err);
+	else
+		(void) printf("%s\n", svc_creator);
+}
+
+/*
  * Common contract status fields.
  */
 static verbout_t vcommon[] = {
@@ -319,6 +382,10 @@ static verbout_t vprocess[] = {
 	"parameter set", verb_param,
 	"member processes", verb_members,
 	"inherited contracts", verb_inherit,
+	"service fmri", verb_svc_fmri,
+	"service fmri ctid", verb_svc_ctid,
+	"creator", verb_svc_creator,
+	"aux", verb_svc_aux,
 	NULL
 };
 
@@ -576,7 +643,7 @@ scan_all(int *types, int ntypes, ctid_t *ids, int nids)
 		 * list of acceptable types to print_contract.
 		 */
 		test = nids ? (bsearch(&key, ids, nids, sizeof (int),
-			    int_compar) == NULL) : (ntypes != 0);
+		    int_compar) == NULL) : (ntypes != 0);
 		print_contract("all", key, NULL, (test ? types : NULL), ntypes);
 	}
 	(void) closedir(dir);

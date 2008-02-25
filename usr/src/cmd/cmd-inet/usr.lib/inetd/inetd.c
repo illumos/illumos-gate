@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3056,7 +3056,7 @@ run_method(instance_t *instance, instance_method_t method,
 		goto prefork_failure;
 	}
 
-	if (contract_prefork() == -1)
+	if (contract_prefork(instance->fmri, method) == -1)
 		goto prefork_failure;
 	child_pid = fork();
 	serrno = errno;

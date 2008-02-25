@@ -80,6 +80,7 @@ int secpolicy_blacklist(const cred_t *);
 int secpolicy_chroot(const cred_t *);
 int secpolicy_clock_highres(const cred_t *);
 int secpolicy_console(const cred_t *);
+int secpolicy_contract_identity(const cred_t *);
 int secpolicy_contract_observer(const cred_t *, struct contract *);
 boolean_t secpolicy_contract_observer_choice(const cred_t *);
 int secpolicy_contract_event(const cred_t *);

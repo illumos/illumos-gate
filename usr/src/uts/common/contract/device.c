@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -501,75 +501,66 @@ static int
 ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 {
 	ctmpl_device_t *dtmpl = tmpl->ctmpl_data;
-	char *buf;
 	int error;
 	dev_info_t *dip;
 	int spec_type;
+	uint64_t param_value;
+	char *str_value;
 
 	ASSERT(MUTEX_HELD(&tmpl->ctmpl_lock));
 
+	if (param->ctpm_id == CTDP_MINOR) {
+		str_value = (char *)param->ctpm_value;
+		str_value[param->ctpm_size - 1] = '\0';
+	} else {
+		param_value = *(uint64_t *)param->ctpm_value;
+	}
+
 	switch (param->ctpm_id) {
 	case CTDP_ACCEPT:
-		if (param->ctpm_value & ~CT_DEV_ALLEVENT)
+		if (param_value & ~CT_DEV_ALLEVENT)
 			return (EINVAL);
-		if (param->ctpm_value == 0)
+		if (param_value == 0)
 			return (EINVAL);
-		if (param->ctpm_value == CT_DEV_ALLEVENT)
+		if (param_value == CT_DEV_ALLEVENT)
 			return (EINVAL);
 
-		dtmpl->ctd_aset = param->ctpm_value;
+		dtmpl->ctd_aset = param_value;
 		break;
 	case CTDP_NONEG:
-		if (param->ctpm_value != CTDP_NONEG_SET &&
-		    param->ctpm_value != CTDP_NONEG_CLEAR)
+		if (param_value != CTDP_NONEG_SET &&
+		    param_value != CTDP_NONEG_CLEAR)
 			return (EINVAL);
 
 		/*
 		 * only privileged processes can designate a contract
 		 * non-negotiatble.
 		 */
-		if (param->ctpm_value == CTDP_NONEG_SET &&
+		if (param_value == CTDP_NONEG_SET &&
 		    (error = secpolicy_sys_devices(cr)) != 0) {
 			return (error);
 		}
 
-		dtmpl->ctd_noneg = param->ctpm_value;
+		dtmpl->ctd_noneg = param_value;
 		break;
 
 	case CTDP_MINOR:
-		if (param->ctpm_value == NULL)
-			return (EINVAL);
-
-		buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
-		/*
-		 * Copyin the device path
-		 */
-		error = copyinstr((char *)(uintptr_t)param->ctpm_value, buf,
-		    MAXPATHLEN, NULL);
-		if (error != 0) {
-			kmem_free(buf, MAXPATHLEN);
-			return (error);
-		}
-		buf[MAXPATHLEN - 1] = '\0';
-
-		if (*buf != '/' ||
-		    strncmp(buf, "/devices/", strlen("/devices/")) == 0 ||
-		    strstr(buf, "../devices/") || strchr(buf, ':') == NULL) {
-			kmem_free(buf, MAXPATHLEN);
+		if (*str_value != '/' ||
+		    strncmp(str_value, "/devices/",
+		    strlen("/devices/")) == 0 ||
+		    strstr(str_value, "../devices/") != NULL ||
+		    strchr(str_value, ':') == NULL) {
 			return (EINVAL);
 		}
 
 		spec_type = 0;
 		dip = NULL;
-		if (resolve_pathname(buf, &dip, NULL, &spec_type) != 0) {
-			kmem_free(buf, MAXPATHLEN);
+		if (resolve_pathname(str_value, &dip, NULL, &spec_type) != 0) {
 			return (ERANGE);
 		}
 		ddi_release_devi(dip);
 
 		if (spec_type != S_IFCHR && spec_type != S_IFBLK) {
-			kmem_free(buf, MAXPATHLEN);
 			return (EINVAL);
 		}
 
@@ -577,8 +568,7 @@ ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 			kmem_free(dtmpl->ctd_minor,
 			    strlen(dtmpl->ctd_minor) + 1);
 		}
-		dtmpl->ctd_minor = i_ddi_strdup(buf, KM_SLEEP);
-		kmem_free(buf, MAXPATHLEN);
+		dtmpl->ctd_minor = i_ddi_strdup(str_value, KM_SLEEP);
 		break;
 	case CTP_EV_CRITICAL:
 		/*
@@ -586,10 +576,10 @@ ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 		 * may be added to the critical set. We retain the
 		 * following code however for future enhancements.
 		 */
-		if (EXCESS(param->ctpm_value) &&
+		if (EXCESS(param_value) &&
 		    (error = secpolicy_contract_event(cr)) != 0)
 			return (error);
-		tmpl->ctmpl_ev_crit = param->ctpm_value;
+		tmpl->ctmpl_ev_crit = param_value;
 		break;
 	default:
 		return (EINVAL);
@@ -608,24 +598,22 @@ static int
 ctmpl_device_get(struct ct_template *template, ct_param_t *param)
 {
 	ctmpl_device_t *dtmpl = template->ctmpl_data;
-	int		error;
+	uint64_t *param_value = param->ctpm_value;
 
 	ASSERT(MUTEX_HELD(&template->ctmpl_lock));
 
 	switch (param->ctpm_id) {
 	case CTDP_ACCEPT:
-		param->ctpm_value = dtmpl->ctd_aset;
+		*param_value = dtmpl->ctd_aset;
 		break;
 	case CTDP_NONEG:
-		param->ctpm_value = dtmpl->ctd_noneg;
+		*param_value = dtmpl->ctd_noneg;
 		break;
 	case CTDP_MINOR:
 		if (dtmpl->ctd_minor) {
-			error = copyoutstr(dtmpl->ctd_minor,
-			    (char *)(uintptr_t)param->ctpm_value,
-			    MAXPATHLEN, NULL);
-			if (error != 0)
-				return (error);
+			param->ctpm_size = strlcpy((char *)param->ctpm_value,
+			    dtmpl->ctd_minor, param->ctpm_size);
+			param->ctpm_size++;
 		} else {
 			return (ENOENT);
 		}

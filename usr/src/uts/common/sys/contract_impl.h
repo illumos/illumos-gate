@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,8 +56,8 @@ extern int ct_debug;
 #ifdef _SYSCALL32
 
 /*
- * 32-bit versions of the event and status structures, for use (only)
- * by the 64-bit kernel.  See sys/contract.h for the normal versions.
+ * 32-bit versions of the event, status and parameter structures, for use
+ * (only) by the 64-bit kernel.  See sys/contract.h for the normal versions.
  * Use pack(4) to get offsets and structure size correct on amd64.
  */
 
@@ -95,6 +95,12 @@ typedef struct ct_status32 {
 	uint64_t ctst_cookie;
 	caddr32_t ctst_buffer;
 } ct_status32_t;
+
+typedef struct ct_param32 {
+	uint32_t  ctpm_id;
+	uint32_t  ctpm_size;
+	caddr32_t ctpm_value;
+} ct_param32_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()

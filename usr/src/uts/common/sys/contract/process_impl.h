@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,8 @@
 #include <sys/contract_impl.h>
 #include <sys/contract/process.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/refstr.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,6 +47,8 @@ struct ctmpl_process {
 	contract_t	*ctp_subsume;
 	uint_t		ctp_params;
 	uint_t		ctp_ev_fatal;
+	refstr_t	*ctp_svc_fmri;	/* Service FMRI */
+	refstr_t	*ctp_svc_aux;	/* Creator Auxiliary field */
 };
 
 struct cont_process {
@@ -57,6 +60,13 @@ struct cont_process {
 	uint_t		conp_ev_fatal;	/* events to kill on */
 	uint_t		conp_nmembers;
 	uint_t		conp_ninherited;
+	refstr_t	*conp_svc_fmri;		/* Service FMRI */
+	ctid_t		conp_svc_ctid;		/* Service FMRI creator ctid */
+	refstr_t	*conp_svc_creator;	/* contract creator */
+	refstr_t	*conp_svc_aux;		/* Creator Auxiliary field */
+	ctid_t		conp_svc_zone_enter;	/* zone_enter flag */
+						/* requires ct_lock for */
+						/* access */
 };
 
 /*

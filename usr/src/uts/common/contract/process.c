@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,8 @@
 #include <sys/cmn_err.h>
 #include <sys/nvpair.h>
 #include <sys/policy.h>
+#include <sys/refstr.h>
+#include <sys/sunddi.h>
 
 /*
  * Process Contracts
@@ -116,6 +118,7 @@
 
 ct_type_t *process_type;
 ctmpl_process_t *sys_process_tmpl;
+refstr_t *conp_svc_aux_default;
 
 /*
  * Macro predicates for determining when events should be sent and how.
@@ -157,12 +160,20 @@ ctmpl_process_dup(struct ct_template *template)
 		contract_hold(new->ctp_subsume);
 	new->ctp_params = old->ctp_params;
 	new->ctp_ev_fatal = old->ctp_ev_fatal;
+	new->ctp_svc_fmri = old->ctp_svc_fmri;
+	if (new->ctp_svc_fmri != NULL) {
+		refstr_hold(new->ctp_svc_fmri);
+	}
+	new->ctp_svc_aux = old->ctp_svc_aux;
+	if (new->ctp_svc_aux != NULL) {
+		refstr_hold(new->ctp_svc_aux);
+	}
 
 	return (&new->ctp_ctmpl);
 }
 
 /*
- * ctmpl_process_dup
+ * ctmpl_process_free
  *
  * The process contract template free entry point.  Just releases a
  * to-be-subsumed contract and frees the template.
@@ -174,6 +185,12 @@ ctmpl_process_free(struct ct_template *template)
 
 	if (ctp->ctp_subsume)
 		contract_rele(ctp->ctp_subsume);
+	if (ctp->ctp_svc_fmri != NULL) {
+		refstr_rele(ctp->ctp_svc_fmri);
+	}
+	if (ctp->ctp_svc_aux != NULL) {
+		refstr_rele(ctp->ctp_svc_aux);
+	}
 	kmem_free(template, sizeof (ctmpl_process_t));
 }
 
@@ -211,22 +228,32 @@ ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 	ctmpl_process_t *ctp = tmpl->ctmpl_data;
 	contract_t *ct;
 	int error;
+	uint64_t param_value;
+	char *str_value;
 
-	/*
-	 * No process contract parameters are > 32 bits.
-	 */
-	if (param->ctpm_value & ~UINT32_MAX)
-		return (EINVAL);
+	if ((param->ctpm_id == CTPP_SVC_FMRI) ||
+	    (param->ctpm_id == CTPP_CREATOR_AUX)) {
+		str_value = (char *)param->ctpm_value;
+		str_value[param->ctpm_size - 1] = '\0';
+	} else {
+		param_value = *(uint64_t *)param->ctpm_value;
+		/*
+		 * No process contract parameters are > 32 bits.
+		 * Unless it is a string.
+		 */
+		if (param_value & ~UINT32_MAX)
+			return (EINVAL);
+	}
 
 	switch (param->ctpm_id) {
 	case CTPP_SUBSUME:
-		if (param->ctpm_value != 0) {
+		if (param_value != 0) {
 			/*
 			 * Ensure that the contract exists, that we
 			 * hold the contract, and that the contract is
 			 * empty.
 			 */
-			ct = contract_type_ptr(process_type, param->ctpm_value,
+			ct = contract_type_ptr(process_type, param_value,
 			    curproc->p_zone->zone_uniqid);
 			if (ct == NULL)
 				return (ESRCH);
@@ -246,9 +273,9 @@ ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 		ctp->ctp_subsume = ct;
 		break;
 	case CTPP_PARAMS:
-		if (param->ctpm_value & ~CT_PR_ALLPARAM)
+		if (param_value & ~CT_PR_ALLPARAM)
 			return (EINVAL);
-		ctp->ctp_params = param->ctpm_value;
+		ctp->ctp_params = param_value;
 		/*
 		 * If an unprivileged process requests that
 		 * CT_PR_PGRPONLY be set, remove any unsafe events from
@@ -263,21 +290,41 @@ ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 		}
 
 		break;
+	case CTPP_SVC_FMRI:
+		if (error = secpolicy_contract_identity(cr))
+			return (error);
+		if (ctp->ctp_svc_fmri != NULL)
+			refstr_rele(ctp->ctp_svc_fmri);
+		if (strcmp(CT_PR_SVC_DEFAULT, str_value) == 0)
+			ctp->ctp_svc_fmri = NULL;
+		else
+			ctp->ctp_svc_fmri =
+			    refstr_alloc(str_value);
+		break;
+	case CTPP_CREATOR_AUX:
+		if (ctp->ctp_svc_aux != NULL)
+			refstr_rele(ctp->ctp_svc_aux);
+		if (param->ctpm_size == 1) /* empty string */
+			ctp->ctp_svc_aux = NULL;
+		else
+			ctp->ctp_svc_aux =
+			    refstr_alloc(str_value);
+		break;
 	case CTP_EV_CRITICAL:
 		/*
 		 * We simply don't allow adding events to the critical
 		 * event set which aren't permitted by our policy or by
 		 * privilege.
 		 */
-		if (EXCESS(ctp, param->ctpm_value) &&
+		if (EXCESS(ctp, param_value) &&
 		    (error = secpolicy_contract_event(cr)) != 0)
 			return (error);
-		tmpl->ctmpl_ev_crit = param->ctpm_value;
+		tmpl->ctmpl_ev_crit = param_value;
 		break;
 	case CTPP_EV_FATAL:
-		if (param->ctpm_value & ~CT_PR_ALLFATAL)
+		if (param_value & ~CT_PR_ALLFATAL)
 			return (EINVAL);
-		ctp->ctp_ev_fatal = param->ctpm_value;
+		ctp->ctp_ev_fatal = param_value;
 		/*
 		 * Check to see if an unprivileged process is
 		 * requesting that events be removed from the fatal
@@ -309,17 +356,43 @@ static int
 ctmpl_process_get(struct ct_template *template, ct_param_t *param)
 {
 	ctmpl_process_t *ctp = template->ctmpl_data;
+	uint64_t *param_value = param->ctpm_value;
 
 	switch (param->ctpm_id) {
 	case CTPP_SUBSUME:
-		param->ctpm_value = ctp->ctp_subsume ?
+		*param_value = ctp->ctp_subsume ?
 		    ctp->ctp_subsume->ct_id : 0;
 		break;
 	case CTPP_PARAMS:
-		param->ctpm_value = ctp->ctp_params;
+		*param_value = ctp->ctp_params;
+		break;
+	case CTPP_SVC_FMRI:
+		if (ctp->ctp_svc_fmri == NULL) {
+			param->ctpm_size =
+			    strlcpy((char *)param->ctpm_value,
+			    CT_PR_SVC_DEFAULT, param->ctpm_size);
+		} else {
+			param->ctpm_size =
+			    strlcpy((char *)param->ctpm_value,
+			    refstr_value(ctp->ctp_svc_fmri), param->ctpm_size);
+		}
+		param->ctpm_size++;
+		break;
+	case CTPP_CREATOR_AUX:
+		if (ctp->ctp_svc_aux == NULL) {
+			param->ctpm_size =
+			    strlcpy((char *)param->ctpm_value,
+			    refstr_value(conp_svc_aux_default),
+			    param->ctpm_size);
+		} else {
+			param->ctpm_size =
+			    strlcpy((char *)param->ctpm_value,
+			    refstr_value(ctp->ctp_svc_aux), param->ctpm_size);
+		}
+		param->ctpm_size++;
 		break;
 	case CTPP_EV_FATAL:
-		param->ctpm_value = ctp->ctp_ev_fatal;
+		*param_value = ctp->ctp_ev_fatal;
 		break;
 	default:
 		return (EINVAL);
@@ -363,6 +436,8 @@ contract_process_default(void)
 	new->ctp_ctmpl.ctmpl_ev_info = CT_PR_EV_CORE | CT_PR_EV_SIGNAL;
 	new->ctp_ctmpl.ctmpl_ev_crit = CT_PR_EV_EMPTY | CT_PR_EV_HWERR;
 	new->ctp_ev_fatal = CT_PR_EV_HWERR;
+	new->ctp_svc_fmri = NULL;
+	new->ctp_svc_aux = NULL;
 
 	return (&new->ctp_ctmpl);
 }
@@ -379,6 +454,15 @@ contract_process_free(contract_t *ct)
 	crfree(ctp->conp_cred);
 	list_destroy(&ctp->conp_members);
 	list_destroy(&ctp->conp_inherited);
+	if (ctp->conp_svc_fmri != NULL) {
+		refstr_rele(ctp->conp_svc_fmri);
+	}
+	if (ctp->conp_svc_aux != NULL) {
+		refstr_rele(ctp->conp_svc_aux);
+	}
+	if (ctp->conp_svc_creator != NULL) {
+		refstr_rele(ctp->conp_svc_creator);
+	}
 	kmem_free(ctp, sizeof (cont_process_t));
 }
 
@@ -572,10 +656,12 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 	uint32_t *pids, *ctids;
 	uint_t npids, nctids;
 	uint_t spids, sctids;
+	ctid_t local_svc_zone_enter;
 
 	if (detail == CTD_FIXED) {
 		mutex_enter(&ct->ct_lock);
 		contract_status_common(ct, zone, status, model);
+		local_svc_zone_enter = ctp->conp_svc_zone_enter;
 		mutex_exit(&ct->ct_lock);
 	} else {
 		contract_t *cnext;
@@ -611,8 +697,8 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 		    pnext = list_next(&ctp->conp_members, pnext))
 			pids[loc++] = pnext->p_pid;
 		ASSERT(loc == npids);
+		local_svc_zone_enter = ctp->conp_svc_zone_enter;
 		mutex_exit(&ct->ct_lock);
-
 	}
 
 	/*
@@ -626,8 +712,37 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 		    npids) == 0);
 		VERIFY(nvlist_add_uint32_array(nvl, CTPS_CONTRACTS, ctids,
 		    nctids) == 0);
+		VERIFY(nvlist_add_string(nvl, CTPS_CREATOR_AUX,
+		    refstr_value(ctp->conp_svc_aux)) == 0);
+		VERIFY(nvlist_add_string(nvl, CTPS_SVC_CREATOR,
+		    refstr_value(ctp->conp_svc_creator)) == 0);
 		kmem_free(pids, spids * sizeof (uint32_t));
 		kmem_free(ctids, sctids * sizeof (uint32_t));
+	}
+
+	/*
+	 * if we are in a local zone and svc_fmri was inherited from
+	 * the global zone, we provide fake svc_fmri and svc_ctid
+	 */
+	if (local_svc_zone_enter == 0||
+	    zone->zone_uniqid == GLOBAL_ZONEUNIQID) {
+		if (detail > CTD_COMMON) {
+			VERIFY(nvlist_add_int32(nvl, CTPS_SVC_CTID,
+			    ctp->conp_svc_ctid) == 0);
+		}
+		if (detail == CTD_ALL) {
+			VERIFY(nvlist_add_string(nvl, CTPS_SVC_FMRI,
+			    refstr_value(ctp->conp_svc_fmri)) == 0);
+		}
+	} else {
+		if (detail > CTD_COMMON) {
+			VERIFY(nvlist_add_int32(nvl, CTPS_SVC_CTID,
+			    local_svc_zone_enter) == 0);
+		}
+		if (detail == CTD_ALL) {
+			VERIFY(nvlist_add_string(nvl, CTPS_SVC_FMRI,
+			    CT_PR_SVC_FMRI_ZONE_ENTER) == 0);
+		}
 	}
 }
 
@@ -672,6 +787,11 @@ contract_process_init(void)
 	sys_process_tmpl->ctp_subsume = NULL;
 	sys_process_tmpl->ctp_params = CT_PR_NOORPHAN;
 	sys_process_tmpl->ctp_ev_fatal = CT_PR_EV_HWERR;
+	sys_process_tmpl->ctp_svc_fmri =
+	    refstr_alloc("svc:/system/init:default");
+	sys_process_tmpl->ctp_svc_aux = refstr_alloc("");
+	conp_svc_aux_default = sys_process_tmpl->ctp_svc_aux;
+	refstr_hold(conp_svc_aux_default);
 }
 
 /*
@@ -708,6 +828,41 @@ contract_process_create(ctmpl_process_t *tmpl, proc_t *parent, int canfail)
 		contract_process_free(&ctp->conp_contract);
 		return (NULL);
 	}
+
+	/*
+	 * inherit svc_fmri if not defined by consumer. In this case, inherit
+	 * also svc_ctid to keep track of the contract id where
+	 * svc_fmri was set
+	 */
+	if (tmpl->ctp_svc_fmri == NULL) {
+		ctp->conp_svc_fmri = parent->p_ct_process->conp_svc_fmri;
+		ctp->conp_svc_ctid = parent->p_ct_process->conp_svc_ctid;
+		ctp->conp_svc_zone_enter =
+		    parent->p_ct_process->conp_svc_zone_enter;
+	} else {
+		ctp->conp_svc_fmri = tmpl->ctp_svc_fmri;
+		ctp->conp_svc_ctid = ctp->conp_contract.ct_id;
+		/* make svc_zone_enter flag false when svc_fmri is set */
+		ctp->conp_svc_zone_enter = 0;
+	}
+	refstr_hold(ctp->conp_svc_fmri);
+	/* set svc_aux to default value if not defined in template */
+	if (tmpl->ctp_svc_aux == NULL) {
+		ctp->conp_svc_aux = conp_svc_aux_default;
+	} else {
+		ctp->conp_svc_aux = tmpl->ctp_svc_aux;
+	}
+	refstr_hold(ctp->conp_svc_aux);
+	/*
+	 * set svc_creator to execname
+	 * We special case pid0 because when newproc() creates
+	 * the init process, the p_user.u_comm field of sched's proc_t
+	 * has not been populated yet.
+	 */
+	if (parent->p_pidp == &pid0) /* if the kernel is the creator */
+		ctp->conp_svc_creator = refstr_alloc("sched");
+	else
+		ctp->conp_svc_creator = refstr_alloc(parent->p_user.u_comm);
 
 	/*
 	 * Transfer subcontracts only after new contract is visible.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -327,7 +327,7 @@ extern int iterate_repository_contracts(instance_t *, int);
 extern int contract_init(void);
 extern void contract_fini(void);
 void contract_postfork(void);
-int contract_prefork(void);
+int contract_prefork(const char *, int);
 extern int get_latest_contract(ctid_t *cid);
 extern int adopt_contract(ctid_t, const char *);
 extern int abandon_contract(ctid_t);

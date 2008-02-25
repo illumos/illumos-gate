@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +89,8 @@ typedef enum lifetime {
 
 #define	USAGESTR	\
 	"Usage: %s [-i eventlist] [-f eventlist] [-l lifetime] \n" \
-	"\t[-o optionlist] [-r count [-t]] [-v] command\n"
+	"\t[-o optionlist] [-r count [-t]] [-v]\n" \
+	"\t[-F fmri] [-A aux] command\n"
 
 /*
  * usage
@@ -391,13 +391,16 @@ main(int argc, char **argv)
 	uint_t	eff_param, opt_param = 0;
 	lifetime_t opt_life = LT_CONTRACT;
 
+	char *svc_fmri = NULL;
+	char *svc_aux = NULL;
+
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 	uu_alt_exit(UU_PROFILE_LAUNCHER);
 
 	(void) uu_setpname(argv[0]);
 
-	while ((s = getopt(argc, argv, "a:l:o:i:c:f:r:tvV")) != EOF) {
+	while ((s = getopt(argc, argv, "a:A:l:o:i:c:f:F:r:tvV")) != EOF) {
 		switch (s) {
 		case 'a':
 			if (uu_strtoint(optarg, &opt_adopt, sizeof (opt_adopt),
@@ -454,6 +457,12 @@ main(int argc, char **argv)
 		case 'f':
 			opt2bits(option_events, OPT_FATAL, optarg, &opt_fatal,
 			    optopt);
+			break;
+		case 'F':
+			svc_fmri = optarg;
+			break;
+		case 'A':
+			svc_aux = optarg;
 			break;
 		default:
 			usage();
@@ -525,6 +534,11 @@ main(int argc, char **argv)
 		opt_crit |= opt_fatal | CT_PR_EV_EMPTY;
 	if (errno = ct_tmpl_set_critical(fd, opt_crit))
 		uu_die(gettext("set critical failed"));
+	if (svc_fmri && (errno = ct_pr_tmpl_set_svc_fmri(fd, svc_fmri)))
+		uu_die(gettext("set fmri failed: "
+		    "insufficient privileges\n"));
+	if (svc_aux && (errno = ct_pr_tmpl_set_svc_aux(fd, svc_aux)))
+		uu_die(gettext("set aux failed"));
 
 	/*
 	 * Activate the template.

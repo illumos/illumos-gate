@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/ctfs.h>
 #include <sys/ctfs_impl.h>
 #include <sys/file.h>
+#include <sys/model.h>
 
 /*
  * CTFS routines for the /system/contract/<type>/template vnode.
@@ -125,8 +126,12 @@ ctfs_tmpl_ioctl(
 {
 	ctfs_tmplnode_t	*tmplnode = vp->v_data;
 	ct_param_t param;
+	STRUCT_DECL(ct_param, uarg);
 	ctid_t ctid;
+	uint32_t local_ctpm_size;
 	int error;
+
+	STRUCT_INIT(uarg, flag);
 
 	switch (cmd) {
 	case CT_TACTIVATE:
@@ -145,18 +150,40 @@ ctfs_tmpl_ioctl(
 		*rvalp = ctid;
 		break;
 	case CT_TSET:
-		if (copyin((void *)arg, &param, sizeof (ct_param_t)))
+		if (copyin((void *)arg, STRUCT_BUF(uarg), STRUCT_SIZE(uarg)))
 			return (EFAULT);
-		return (ctmpl_set(tmplnode->ctfs_tmn_tmpl, &param, cr));
+		param.ctpm_id = STRUCT_FGET(uarg, ctpm_id);
+		param.ctpm_size = STRUCT_FGET(uarg, ctpm_size);
+		if (param.ctpm_size > CT_PARAM_MAX_SIZE ||
+		    param.ctpm_size == 0)
+			return (EINVAL);
+		param.ctpm_value = kmem_alloc(param.ctpm_size, KM_SLEEP);
+		if (copyin(STRUCT_FGETP(uarg, ctpm_value), param.ctpm_value,
+		    param.ctpm_size))
+			return (EFAULT);
+		error = ctmpl_set(tmplnode->ctfs_tmn_tmpl, &param, cr);
+		kmem_free(param.ctpm_value, param.ctpm_size);
+		return (error);
 	case CT_TGET:
-		if (copyin((void *)arg, &param, sizeof (ct_param_t)))
+		if (copyin((void *)arg, STRUCT_BUF(uarg), STRUCT_SIZE(uarg)))
 			return (EFAULT);
+		param.ctpm_id = STRUCT_FGET(uarg, ctpm_id);
+		param.ctpm_size = STRUCT_FGET(uarg, ctpm_size);
+		if (param.ctpm_size > CT_PARAM_MAX_SIZE)
+			param.ctpm_size = CT_PARAM_MAX_SIZE;
+		if (param.ctpm_size == 0)
+			return (EINVAL);
+		local_ctpm_size = param.ctpm_size;
+		param.ctpm_value = kmem_alloc(param.ctpm_size, KM_SLEEP);
 		error = ctmpl_get(tmplnode->ctfs_tmn_tmpl, &param);
-		if (error)
-			return (error);
-		if (copyout(&param, (void *)arg, sizeof (ct_param_t)))
-			return (EFAULT);
-		break;
+		STRUCT_FSET(uarg, ctpm_size, param.ctpm_size);
+		if (!error &&
+		    (copyout(param.ctpm_value, STRUCT_FGETP(uarg, ctpm_value),
+		    MIN(local_ctpm_size, param.ctpm_size))) ||
+		    copyout(STRUCT_BUF(uarg), (void *)arg, STRUCT_SIZE(uarg)))
+			error = EFAULT;
+		kmem_free(param.ctpm_value, local_ctpm_size);
+		return (error);
 	default:
 		return (EINVAL);
 	}

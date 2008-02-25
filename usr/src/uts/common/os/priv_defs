@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
 INSERT COMMENT
@@ -39,6 +39,10 @@ privilege PRIV_CONTRACT_EVENT
 	Allows a process to request critical events without limitation.
 	Allows a process to request reliable delivery of all events on
 	any event queue.
+
+privilege PRIV_CONTRACT_IDENTITY
+	Allows a process to set the service FMRI value of a process
+	contract template.
 
 privilege PRIV_CONTRACT_OBSERVER
 

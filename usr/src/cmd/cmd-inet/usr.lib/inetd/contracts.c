@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,9 +117,21 @@ contract_fini(void)
  * contract template.
  */
 int
-contract_prefork(void)
+contract_prefork(const char *fmri, int method)
 {
 	int err;
+
+	if ((err = ct_pr_tmpl_set_svc_fmri(active_tmpl_fd, fmri)) != 0) {
+		error_msg(gettext("Failed to set svc_fmri term: %s"),
+		    strerror(err));
+		return (-1);
+	}
+	if ((err = ct_pr_tmpl_set_svc_aux(active_tmpl_fd,
+	    methods[method].name)) != 0) {
+		error_msg(gettext("Failed to set svc_aux term: %s"),
+		    strerror(err));
+		return (-1);
+	}
 
 	debug_msg("Entering contract_prefork");
 

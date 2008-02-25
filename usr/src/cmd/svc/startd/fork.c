@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <fcntl.h>
 #include <libcontract.h>
 #include <libcontract_priv.h>
+#include <libscf_priv.h>
 #include <limits.h>
 #include <port.h>
 #include <signal.h>
@@ -129,7 +130,7 @@ fork_mount(char *path, char *opts)
  *   fork_sulogin (with its no-fork argument set) on errors.
  */
 static pid_t
-fork_common(const char *name, int retries, ctid_t *ctidp,
+fork_common(const char *name, const char *svc_fmri, int retries, ctid_t *ctidp,
     uint_t inf, uint_t crit, uint_t fatal, uint_t param, uint64_t cookie)
 {
 	uint_t tries = 0;
@@ -150,6 +151,8 @@ fork_common(const char *name, int retries, ctid_t *ctidp,
 	err |= ct_tmpl_set_informative(ctfd, inf);
 	err |= ct_pr_tmpl_set_param(ctfd, param);
 	err |= ct_tmpl_set_cookie(ctfd, cookie);
+	err |= ct_pr_tmpl_set_svc_fmri(ctfd, svc_fmri);
+	err |= ct_pr_tmpl_set_svc_aux(ctfd, name);
 	if (err) {
 		(void) close(ctfd);
 		fork_sulogin(B_TRUE, "Could not set %s process contract "
@@ -228,9 +231,9 @@ fork_sulogin(boolean_t immediate, const char *format, ...)
 		ctid_t	ctid;
 		pid_t	pid;
 
-		pid = fork_common("sulogin", MAX_SULOGIN_RETRIES, &ctid,
-		    CT_PR_EV_HWERR, 0, CT_PR_EV_HWERR, CT_PR_PGRPONLY,
-		    SULOGIN_COOKIE);
+		pid = fork_common("sulogin", SVC_SULOGIN_FMRI,
+		    MAX_SULOGIN_RETRIES, &ctid, CT_PR_EV_HWERR, 0,
+		    CT_PR_EV_HWERR, CT_PR_PGRPONLY, SULOGIN_COOKIE);
 
 		if (pid != 0) {
 			(void) waitpid(pid, NULL, 0);
@@ -317,8 +320,9 @@ retry:
 		contract_abandon(ctid);
 	ctid = -1;
 
-	pid = fork_common("svc.configd", MAX_CONFIGD_RETRIES, &ctid,
-	    0, CT_PR_EV_EXIT, 0, CT_PR_INHERIT | CT_PR_REGENT, CONFIGD_COOKIE);
+	pid = fork_common("svc.configd", SCF_SERVICE_CONFIGD,
+	    MAX_CONFIGD_RETRIES, &ctid, 0, CT_PR_EV_EXIT, 0,
+	    CT_PR_INHERIT | CT_PR_REGENT, CONFIGD_COOKIE);
 
 	if (pid != 0) {
 		int exitstatus;

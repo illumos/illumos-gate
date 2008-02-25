@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@
 int
 ct_dev_tmpl_set_minor(int fd, char *minor)
 {
-	return (ct_tmpl_set_internal(fd, CTDP_MINOR, (uintptr_t)minor));
+	return (ct_tmpl_set_internal_string(fd, CTDP_MINOR, minor));
 }
 
 int
@@ -68,18 +68,13 @@ ct_dev_tmpl_clear_noneg(int fd)
 int
 ct_dev_tmpl_get_minor(int fd, char *buf, size_t *buflenp)
 {
-	char	path[PATH_MAX];
-	int	error;
-	size_t	len;
+	int ret = ct_tmpl_get_internal_string(fd, CTDP_MINOR, buf, *buflenp);
 
-	error = ct_tmpl_get_internal_string(fd, CTDP_MINOR, path);
-	if (error) {
-		return (error);
-	}
+	if (ret == -1)
+		return (errno);
 
-	len = strlcpy(buf, path, *buflenp);
-	if (len >= *buflenp) {
-		*buflenp = len + 1;
+	if (ret >= *buflenp) {
+		*buflenp = ret + 1;
 		return (EOVERFLOW);
 	}
 

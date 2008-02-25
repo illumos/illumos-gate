@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,16 @@ extern "C" {
 
 typedef struct ctmpl_process ctmpl_process_t;
 typedef struct cont_process cont_process_t;
+
+/*
+ * Default value for FMRI terms
+ */
+#define	CT_PR_SVC_DEFAULT	"inherit:"
+
+/*
+ * zone_enter() pseudo-FMRI
+ */
+#define	CT_PR_SVC_FMRI_ZONE_ENTER	"svc:/system/zone_enter:default"
 
 /*
  * ctr_params flags
@@ -66,6 +75,10 @@ typedef struct cont_process cont_process_t;
 #define	CTPP_EV_FATAL		0
 #define	CTPP_PARAMS		1
 #define	CTPP_SUBSUME		2
+#define	CTPP_SVC_FMRI		3
+#define	CTPP_SVC_CTID		4
+#define	CTPP_SVC_CREATOR	5
+#define	CTPP_CREATOR_AUX	6
 
 /*
  * Status fields
@@ -74,6 +87,10 @@ typedef struct cont_process cont_process_t;
 #define	CTPS_EV_FATAL		"ctps_ev_fatal"
 #define	CTPS_MEMBERS		"ctps_members"
 #define	CTPS_CONTRACTS		"ctps_contracts"
+#define	CTPS_SVC_FMRI		"ctps_svc_fmri"
+#define	CTPS_SVC_CTID		"ctps_svc_ctid"
+#define	CTPS_SVC_CREATOR	"ctps_svc_creator"
+#define	CTPS_CREATOR_AUX	"ctps_creator_aux"
 
 /*
  * Event fields

@@ -1904,6 +1904,17 @@ secpolicy_cpc_cpu(const cred_t *cr)
 }
 
 /*
+ * secpolicy_contract_identity
+ *
+ * Determine if the subject may set the process contract FMRI value
+ */
+int
+secpolicy_contract_identity(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_CONTRACT_IDENTITY, B_FALSE, EPERM, NULL));
+}
+
+/*
  * secpolicy_contract_observer
  *
  * Determine if the subject may observe a specific contract's events.

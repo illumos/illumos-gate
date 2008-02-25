@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1461,31 +1461,29 @@ int
 ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
 {
 	int result = 0;
+	uint64_t param_value = *(uint64_t *)param->ctpm_value;
 
 	mutex_enter(&template->ctmpl_lock);
 	switch (param->ctpm_id) {
 	case CTP_COOKIE:
-		template->ctmpl_cookie = param->ctpm_value;
+		template->ctmpl_cookie = param_value;
 		break;
 	case CTP_EV_INFO:
-		if (param->ctpm_value &
-		    ~(uint64_t)template->ctmpl_ops->allevents)
+		if (param_value & ~(uint64_t)template->ctmpl_ops->allevents)
 			result = EINVAL;
 		else
-			template->ctmpl_ev_info = param->ctpm_value;
+			template->ctmpl_ev_info = param_value;
 		break;
 	case CTP_EV_CRITICAL:
-		if (param->ctpm_value &
-		    ~(uint64_t)template->ctmpl_ops->allevents) {
+		if (param_value & ~(uint64_t)template->ctmpl_ops->allevents) {
 			result = EINVAL;
 			break;
-		} else if ((~template->ctmpl_ev_crit &
-		    param->ctpm_value) == 0) {
+		} else if ((~template->ctmpl_ev_crit & param_value) == 0) {
 			/*
 			 * Assume that a pure reduction of the critical
 			 * set is allowed by the contract type.
 			 */
-			template->ctmpl_ev_crit = param->ctpm_value;
+			template->ctmpl_ev_crit = param_value;
 			break;
 		}
 		/*
@@ -1511,17 +1509,18 @@ int
 ctmpl_get(ct_template_t *template, ct_param_t *param)
 {
 	int result = 0;
+	uint64_t *param_value = param->ctpm_value;
 
 	mutex_enter(&template->ctmpl_lock);
 	switch (param->ctpm_id) {
 	case CTP_COOKIE:
-		param->ctpm_value = template->ctmpl_cookie;
+		*param_value = template->ctmpl_cookie;
 		break;
 	case CTP_EV_INFO:
-		param->ctpm_value = template->ctmpl_ev_info;
+		*param_value = template->ctmpl_ev_info;
 		break;
 	case CTP_EV_CRITICAL:
-		param->ctpm_value = template->ctmpl_ev_crit;
+		*param_value = template->ctmpl_ev_crit;
 		break;
 	default:
 		result = template->ctmpl_ops->ctop_get(template, param);

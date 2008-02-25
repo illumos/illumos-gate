@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +57,18 @@ ct_pr_tmpl_set_param(int fd, uint_t param)
 }
 
 int
+ct_pr_tmpl_set_svc_fmri(int fd, const char *fmri)
+{
+	return (ct_tmpl_set_internal_string(fd, CTPP_SVC_FMRI, fmri));
+}
+
+int
+ct_pr_tmpl_set_svc_aux(int fd, const char *desc)
+{
+	return (ct_tmpl_set_internal_string(fd, CTPP_CREATOR_AUX, desc));
+}
+
+int
 ct_pr_tmpl_get_transfer(int fd, ctid_t *ctid)
 {
 	return (ct_tmpl_get_internal(fd, CTPP_SUBSUME, (uint_t *)ctid));
@@ -73,6 +84,18 @@ int
 ct_pr_tmpl_get_param(int fd, uint_t *param)
 {
 	return (ct_tmpl_get_internal(fd, CTPP_PARAMS, param));
+}
+
+int
+ct_pr_tmpl_get_svc_fmri(int fd, char *fmri, size_t size)
+{
+	return (ct_tmpl_get_internal_string(fd, CTPP_SVC_FMRI, fmri, size));
+}
+
+int
+ct_pr_tmpl_get_svc_aux(int fd, char *desc, size_t size)
+{
+	return (ct_tmpl_get_internal_string(fd, CTPP_CREATOR_AUX, desc, size));
 }
 
 /*
@@ -246,4 +269,49 @@ ct_pr_status_get_contracts(ct_stathdl_t stathdl, ctid_t **contracts,
 		return (ENOENT);
 	return (nvlist_lookup_uint32_array(info->nvl, CTPS_CONTRACTS,
 	    (uint_t **)contracts, n));
+}
+
+int
+ct_pr_status_get_svc_fmri(ct_stathdl_t stathdl, char **svc_fmri)
+{
+	struct ctlib_status_info *info = stathdl;
+	if (info->status.ctst_type != CTT_PROCESS)
+		return (EINVAL);
+	if (info->nvl == NULL)
+		return (ENOENT);
+	return (nvlist_lookup_string(info->nvl, CTPS_SVC_FMRI, svc_fmri));
+}
+
+int
+ct_pr_status_get_svc_aux(ct_stathdl_t stathdl, char **svc_aux)
+{
+	struct ctlib_status_info *info = stathdl;
+	if (info->status.ctst_type != CTT_PROCESS)
+		return (EINVAL);
+	if (info->nvl == NULL)
+		return (ENOENT);
+	return (nvlist_lookup_string(info->nvl, CTPS_CREATOR_AUX, svc_aux));
+}
+
+int
+ct_pr_status_get_svc_ctid(ct_stathdl_t stathdl, ctid_t *ctid)
+{
+	struct ctlib_status_info *info = stathdl;
+	if (info->status.ctst_type != CTT_PROCESS)
+		return (EINVAL);
+	if (info->nvl == NULL)
+		return (ENOENT);
+	return (nvlist_lookup_int32(info->nvl, CTPS_SVC_CTID,
+	    (int32_t *)ctid));
+}
+
+int
+ct_pr_status_get_svc_creator(ct_stathdl_t stathdl, char **svc_creator)
+{
+	struct ctlib_status_info *info = stathdl;
+	if (info->status.ctst_type != CTT_PROCESS)
+		return (EINVAL);
+	if (info->nvl == NULL)
+		return (ENOENT);
+	return (nvlist_lookup_string(info->nvl, CTPS_SVC_CREATOR, svc_creator));
 }

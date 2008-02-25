@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +84,6 @@
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
 #endif /* TEXT_DOMAIN */
 
-#define	LEGACY_SCHEME	"lrc:"
 #define	LEGACY_UNKNOWN	"unknown"
 
 /* Flags for pg_get_single_val() */
@@ -1443,11 +1442,12 @@ sprint_fmri(char **buf, scf_walkinfo_t *wip)
 		    max_scf_fmri_length + 1) == -1)
 			scfdie();
 	} else {
-		(void) strcpy(fmri_buf, LEGACY_SCHEME);
+		(void) strcpy(fmri_buf, SCF_FMRI_LEGACY_PREFIX);
 		if (pg_get_single_val(wip->pg, SCF_LEGACY_PROPERTY_NAME,
-		    SCF_TYPE_ASTRING, fmri_buf + sizeof (LEGACY_SCHEME) - 1,
-		    max_scf_fmri_length + 1 - (sizeof (LEGACY_SCHEME) - 1),
-		    0) != 0)
+		    SCF_TYPE_ASTRING, fmri_buf +
+		    sizeof (SCF_FMRI_LEGACY_PREFIX) - 1,
+		    max_scf_fmri_length + 1 -
+		    (sizeof (SCF_FMRI_LEGACY_PREFIX) - 1), 0) != 0)
 			(void) strcat(fmri_buf, LEGACY_UNKNOWN);
 	}
 
