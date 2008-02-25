@@ -77,11 +77,8 @@ static int sessionPoolSize = 0;
 static int sharedConnNumber = 0;
 static mutex_t sharedConnNumberLock = DEFAULTMUTEX;
 
+static int check_nscd_proc(pid_t pid, boolean_t check_uid);
 
-static mutex_t	nscdLock = DEFAULTMUTEX;
-static int	nscdChecked = 0;
-static pid_t	checkedPid = -1;
-static int	isNscd = 0;
 /*
  * SSF values are for SASL integrity & privacy.
  * JES DS5.2 does not support this feature but DS6 does.
@@ -339,52 +336,130 @@ ns_setup_mt_conn_and_tsd(LDAP *ld) {
 }
 
 /*
- * Check /proc/PID/psinfo to see if this process is nscd
- * If it is, treat connection as NS_LDAP_KEEP_CONN, to reduce
- * constant reconnects for many operations.
- * A more complete solution is to develop true connection pooling.
- * However, this is much better than a new connection for every request.
+ * Check name and UID of process, if it is nscd.
+ *
+ * Input:
+ *   pid	: PID of checked process
+ *   check_uid	: check if UID == 0
+ * Output:
+ *   1	: nscd detected
+ *   0	: nscd not confirmed
+ */
+static int
+check_nscd_proc(pid_t pid, boolean_t check_uid)
+{
+	psinfo_t	pinfo;
+	char		fname[MAXPATHLEN];
+	ssize_t		ret;
+	int		fd;
+
+	if (snprintf(fname, MAXPATHLEN, "/proc/%d/psinfo", pid) > 0) {
+		if ((fd = open(fname,  O_RDONLY)) >= 0) {
+			ret = read(fd, &pinfo, sizeof (psinfo_t));
+			(void) close(fd);
+			if ((ret == sizeof (psinfo_t)) &&
+			    (strcmp(pinfo.pr_fname, "nscd") == 0)) {
+				if (check_uid && (pinfo.pr_uid != 0))
+					return (0);
+				return (1);
+			}
+		}
+	}
+	return (0);
+}
+
+/*
+ * Check if this process is peruser nscd.
+ */
+int
+__s_api_peruser_proc(void)
+{
+	pid_t		my_ppid;
+	static mutex_t	nscdLock = DEFAULTMUTEX;
+	static pid_t	checkedPpid = (pid_t)-1;
+	static int	isPeruserNscd = 0;
+
+	my_ppid = getppid();
+
+	/*
+	 * Already checked before for this process? If yes, return cached
+	 * response.
+	 */
+	if (my_ppid == checkedPpid) {
+		return (isPeruserNscd);
+	}
+
+	(void) mutex_lock(&nscdLock);
+
+	/* Check once more incase another thread has just complete this. */
+	if (my_ppid == checkedPpid) {
+		(void) mutex_unlock(&nscdLock);
+		return (isPeruserNscd);
+	}
+
+	/* Reinitialize to be sure there is no residue after fork. */
+	isPeruserNscd = 0;
+
+	/* Am I the nscd process? */
+	if (check_nscd_proc(getpid(), B_FALSE)) {
+		/* Is my parent the nscd process with UID == 0. */
+		isPeruserNscd = check_nscd_proc(my_ppid, B_TRUE);
+	}
+
+	/* Remeber for whom isPeruserNscd is. */
+	checkedPpid = my_ppid;
+
+	(void) mutex_unlock(&nscdLock);
+	return (isPeruserNscd);
+}
+
+/*
+ * Check if this process is main nscd.
  */
 int
 __s_api_nscd_proc(void)
 {
 	pid_t		my_pid;
-	psinfo_t	pinfo;
-	char		fname[BUFSIZ];
-	int		ret;
-	int		fd;
+	static mutex_t	nscdLock = DEFAULTMUTEX;
+	static pid_t	checkedPid = (pid_t)-1;
+	static int	isMainNscd = 0;
 
-	/* Don't bother checking if this process isn't root. */
-	/* It can't be nscd */
+	/*
+	 * Don't bother checking if this process isn't root, this cannot
+	 * be main nscd.
+	 */
 	if (getuid() != 0)
 		return (0);
 
 	my_pid = getpid();
-	if (nscdChecked && (my_pid == checkedPid)) {
-		return (isNscd);
+
+	/*
+	 * Already checked before for this process? If yes, return cached
+	 * response.
+	 */
+	if (my_pid == checkedPid) {
+		return (isMainNscd);
 	}
+
 	(void) mutex_lock(&nscdLock);
-	if (nscdChecked && (my_pid == checkedPid)) {
+
+	/* Check once more incase another thread has just done this. */
+	if (my_pid == checkedPid) {
 		(void) mutex_unlock(&nscdLock);
-		return (isNscd);
+		return (isMainNscd);
 	}
-	nscdChecked = 1;
+
+	/*
+	 * Am I the nscd process? UID is already checked, not needed from
+	 * psinfo.
+	 */
+	isMainNscd = check_nscd_proc(my_pid, B_FALSE);
+
+	/* Remeber for whom isMainNscd is. */
 	checkedPid = my_pid;
-	isNscd = 0;
-	if (snprintf(fname, BUFSIZ, "/proc/%d/psinfo", my_pid) != 0) {
-		if ((fd = open(fname,  O_RDONLY)) > 0) {
-			ret = read(fd, &pinfo, sizeof (psinfo_t));
-			(void) close(fd);
-			if (ret == sizeof (psinfo_t) &&
-			    (strcmp(pinfo.pr_fname, "nscd") == 0)) {
-				/* process runs as root and is named nscd */
-				/* that's good enough for now */
-				isNscd = 1;
-			}
-		}
-	}
+
 	(void) mutex_unlock(&nscdLock);
-	return (isNscd);
+	return (isMainNscd);
 }
 
 /*
@@ -809,7 +884,7 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
 	 * alive, no need to continue.
 	 */
 	if ((flags & NS_LDAP_NEW_CONN) || (!__s_api_nscd_proc() &&
-	    !(flags & NS_LDAP_KEEP_CONN)))
+	    !__s_api_peruser_proc() && !(flags & NS_LDAP_KEEP_CONN)))
 		return (-1);
 
 	*conp = NULL;
@@ -902,7 +977,7 @@ findConnection(int flags, const char *serverAddr,
 	 * alive, no need to continue.
 	 */
 	if ((flags & NS_LDAP_NEW_CONN) || (!__s_api_nscd_proc() &&
-	    !(flags & NS_LDAP_KEEP_CONN)))
+	    !__s_api_peruser_proc() && !(flags & NS_LDAP_KEEP_CONN)))
 		return (-1);
 
 #ifdef DEBUG
@@ -1668,7 +1743,8 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 
 	if (!fini &&
 	    ((flag & NS_LDAP_NEW_CONN) == 0) && !cp->notAvail &&
-	    ((flag & NS_LDAP_KEEP_CONN) || __s_api_nscd_proc())) {
+	    ((flag & NS_LDAP_KEEP_CONN) || __s_api_nscd_proc() ||
+	    __s_api_peruser_proc())) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "tid= %d: keep alive (fini = %d "
 		    "shared = %d)\n", t, fini, cp->shared);
