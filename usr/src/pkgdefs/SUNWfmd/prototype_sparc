@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -184,6 +184,7 @@ f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T200-hc-topolog
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T1000-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T1000-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Blade-T6300-hc-topology.xml 444 root bin
+f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Netra-T2000-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320 755 root sys
 d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320/lib/fm 755 root bin
@@ -206,6 +207,12 @@ f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5140-hc-topology.xml 444 root b
 f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5240-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5440-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,T5140/lib/fm/topo/maps/Sun-Blade-T6340-hc-topology.xml 444 root bin
+d none usr/platform/SUNW,Netra-CP3060 755 root sys
+d none usr/platform/SUNW,Netra-CP3060/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib/fm 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib/fm/topo 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib/fm/topo/maps 755 root bin
+f none usr/platform/SUNW,Netra-CP3060/lib/fm/topo/maps/Netra-CP3060-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Netra-CP3260 755 root sys
 d none usr/platform/SUNW,Netra-CP3260/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib/fm 755 root bin
