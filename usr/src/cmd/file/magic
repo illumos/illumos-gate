@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -547,3 +547,66 @@
 8	ullong		0x00000002f5bacbac	ZFS snapshot stream
 # little endian stream
 8	ullong		0xaccbbaf502000000	ZFS snapshot stream
+
+
+# Video files
+2	string		\001\272\041	MPEG Movie file
+0	string		\377\375	MPEG-1 Audio Layer 2
+0	string		\377\373	MPEG-1 Audio Layer 3
+0	string		\377\372	MPEG-1 Audio Layer 3
+0	string		\111\104\063	MPEG-1 Layer 3 with ID3v2
+
+# AVI and GVI files
+20	string	hdrlavih	RIFF Avi Video
+>36	ulong	>0		%u Max Bps,
+>64	ushort	x		%u X
+>68	ushort	x		%u,
+>48	ulong	x		%u frames
+
+20	string	goog		RIFF gvi
+>88	ulong	>0		%u Max Bps
+>116	ushort	x		%u X
+>120	ushort	x		%u,
+>100	ulong	x		%u frames
+
+# JPEG 2000 - jp2 image file.
+3	string		\014\152\120\040\040	JPEG 2000 Image file
+
+# iso 9660 CD-ROM image and El Torito Bootable standard
+32769	string		CD\0		ISO 9660 filesystem image
+>34823	string		EL\040TORITO	- El Torito
+
+# Palm Pilot files .pdb and .prc of some type.
+0x3c	string	TEXtREAd		Palm DOC file
+0x3c	string	SDocSilX		iSilo 3 Doc file for PalmPilot
+0x3c	string	applSil			iSilo Application file
+0x3c	string	appl			Palm Pilot Application
+0x3c	string	ToGoToGo		iSilo Doc file for Palm Pilot
+
+#SGI files with .rgb extention
+0	string	\001\332			SGI Image data,
+>2	byte	1			RLE,
+>2	byte	0			Verbatim,
+>5	ubyte	x			%u-D
+>7	ubyte	x			%u x
+>9	ubyte	x			%u, 
+>11	ubyte	x			%u channel(s)
+
+# MS Documents. Not much info available.
+0	string	\320\317\021\340\241\261\032\341	Microsoft
+>546	string	bjbj					Word
+>0	byte	<0					Document
+0	string	{\\rtf		Microsoft Rich Text Format Document
+
+# mp4 media format with different media files embedded in it
+4	string	ftyp		MPEG-4
+>8	string	isom		Base Media v1 [IS0 14496-12:2003]
+>8	string	iso2		Base Media v2 [ISO 14496-12:2005]
+>8	string	m4a\040		Apple iTunes AAC-LC (.M4A) Audio
+>8	string	m4v\040		Apple iTunes (.M4V) Video
+>8	string	qt		Apple QuickTime (.MOV/QT)
+>8	string	jp2		JPEG 2000 Image
+>8	string	jpm		JPEG 2000 Compound Image (.JPM) [ISO 15444-6]
+>8	string	jpx		JPEG 2000 w/ extensions (.JPX) [ISO 15444-2]
+>8	string	mp42		v2 [ISO 14496-14]
+4	string	moov		QuickTime MOV file

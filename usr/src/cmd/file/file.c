@@ -26,7 +26,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1568,7 +1568,7 @@ zipfile(char *fbuf, int fd)
 			break;
 
 		if (XFHID(xfhdr) == XFJAVASIG) {
-			(void) printf("%s\n", gettext("java program"));
+			(void) printf("%s\n", gettext("java archive file"));
 			return (1);
 		}
 		xoff += sizeof (xfhdr) + XFDATASIZ(xfhdr);
