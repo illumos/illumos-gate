@@ -2186,11 +2186,17 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 		char osname[MAXNAMELEN];
 		int mode;
 
-		VERIFY3U(0, ==, zfs_suspend_fs(zfsvfs, osname, &mode));
-		ASSERT(strcmp(osname, zc->zc_name) == 0);
-		error = dmu_objset_rollback(os);
-		VERIFY3U(0, ==, zfs_resume_fs(zfsvfs, osname, mode));
+		error = zfs_suspend_fs(zfsvfs, osname, &mode);
+		if (error == 0) {
+			int resume_err;
 
+			ASSERT(strcmp(osname, zc->zc_name) == 0);
+			error = dmu_objset_rollback(os);
+			resume_err = zfs_resume_fs(zfsvfs, osname, mode);
+			error = error ? error : resume_err;
+		} else {
+			dmu_objset_close(os);
+		}
 		VFS_RELE(zfsvfs->z_vfs);
 	} else {
 		error = dmu_objset_rollback(os);
@@ -2294,9 +2300,19 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	if (!error) {
 		mutex_enter(&os->os->os_user_ptr_lock);
 		zfsvfs = dmu_objset_get_user(os);
-		if (zfsvfs != NULL)
+		if (zfsvfs != NULL) {
 			VFS_HOLD(zfsvfs->z_vfs);
-		mutex_exit(&os->os->os_user_ptr_lock);
+			mutex_exit(&os->os->os_user_ptr_lock);
+			if (!mutex_tryenter(&zfsvfs->z_online_recv_lock)) {
+				VFS_RELE(zfsvfs->z_vfs);
+				dmu_objset_close(os);
+				nvlist_free(props);
+				releasef(fd);
+				return (EBUSY);
+			}
+		} else {
+			mutex_exit(&os->os->os_user_ptr_lock);
+		}
 		dmu_objset_close(os);
 	}
 
@@ -2304,8 +2320,10 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		error = dmu_objset_open(zc->zc_string, DMU_OST_ANY,
 		    DS_MODE_STANDARD | DS_MODE_READONLY, &origin);
 		if (error) {
-			if (zfsvfs != NULL)
+			if (zfsvfs != NULL) {
+				mutex_exit(&zfsvfs->z_online_recv_lock);
 				VFS_RELE(zfsvfs->z_vfs);
+			}
 			nvlist_free(props);
 			releasef(fd);
 			return (error);
@@ -2317,8 +2335,10 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	if (origin)
 		dmu_objset_close(origin);
 	if (error) {
-		if (zfsvfs != NULL)
+		if (zfsvfs != NULL) {
+			mutex_exit(&zfsvfs->z_online_recv_lock);
 			VFS_RELE(zfsvfs->z_vfs);
+		}
 		nvlist_free(props);
 		releasef(fd);
 		return (error);
@@ -2372,15 +2392,25 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 			char osname[MAXNAMELEN];
 			int mode;
 
-			(void) zfs_suspend_fs(zfsvfs, osname, &mode);
-			error = dmu_recv_end(&drc);
-			error |= zfs_resume_fs(zfsvfs, osname, mode);
+			error = zfs_suspend_fs(zfsvfs, osname, &mode);
+			if (error == 0) {
+				int resume_err;
+
+				error = dmu_recv_end(&drc);
+				resume_err = zfs_resume_fs(zfsvfs,
+				    osname, mode);
+				error = error ? error : resume_err;
+			} else {
+				dmu_recv_abort_cleanup(&drc);
+			}
 		} else {
 			error = dmu_recv_end(&drc);
 		}
 	}
-	if (zfsvfs != NULL)
+	if (zfsvfs != NULL) {
+		mutex_exit(&zfsvfs->z_online_recv_lock);
 		VFS_RELE(zfsvfs->z_vfs);
+	}
 
 	zc->zc_cookie = off - fp->f_offset;
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)

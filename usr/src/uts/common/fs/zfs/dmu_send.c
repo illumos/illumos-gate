@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -466,6 +466,15 @@ recv_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	/* most recent snapshot must match fromguid */
 	if (ds->ds_prev->ds_phys->ds_guid != rbsa->fromguid)
 		return (ENODEV);
+
+	/* temporary clone name must not exist */
+	err = zap_lookup(ds->ds_dir->dd_pool->dp_meta_objset,
+	    ds->ds_dir->dd_phys->dd_child_dir_zapobj,
+	    rbsa->clonelastname, 8, 1, &val);
+	if (err == 0)
+		return (EEXIST);
+	if (err != ENOENT)
+		return (err);
 
 	/* new snapshot name must not exist */
 	err = zap_lookup(ds->ds_dir->dd_pool->dp_meta_objset,
@@ -963,8 +972,8 @@ restore_free(struct restorearg *ra, objset_t *os,
 	return (err);
 }
 
-static void
-recv_abort_cleanup(dmu_recv_cookie_t *drc)
+void
+dmu_recv_abort_cleanup(dmu_recv_cookie_t *drc)
 {
 	if (drc->drc_newfs || drc->drc_real_ds != drc->drc_logical_ds) {
 		/*
@@ -1124,7 +1133,7 @@ out:
 		 * leave it in the restoring state.
 		 */
 		txg_wait_synced(drc->drc_real_ds->ds_dir->dd_pool, 0);
-		recv_abort_cleanup(drc);
+		dmu_recv_abort_cleanup(drc);
 	}
 
 	kmem_free(ra.buf, ra.bufsize);
@@ -1182,7 +1191,7 @@ dmu_recv_end(dmu_recv_cookie_t *drc)
 	    DS_MODE_PRIMARY, DS_MODE_EXCLUSIVE)) {
 		lmode = DS_MODE_EXCLUSIVE;
 	} else {
-		recv_abort_cleanup(drc);
+		dmu_recv_abort_cleanup(drc);
 		return (EBUSY);
 	}
 

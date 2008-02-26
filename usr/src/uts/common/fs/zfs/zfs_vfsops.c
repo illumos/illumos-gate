@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -624,6 +624,18 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	return (0);
 }
 
+static void
+zfs_freezfsvfs(zfsvfs_t *zfsvfs)
+{
+	mutex_destroy(&zfsvfs->z_znodes_lock);
+	mutex_destroy(&zfsvfs->z_online_recv_lock);
+	list_destroy(&zfsvfs->z_all_znodes);
+	rrw_destroy(&zfsvfs->z_teardown_lock);
+	rw_destroy(&zfsvfs->z_teardown_inactive_lock);
+	rw_destroy(&zfsvfs->z_fuid_lock);
+	kmem_free(zfsvfs, sizeof (zfsvfs_t));
+}
+
 static int
 zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 {
@@ -650,6 +662,7 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	zfsvfs->z_show_ctldir = ZFS_SNAPDIR_VISIBLE;
 
 	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zfsvfs->z_online_recv_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
 	    offsetof(znode_t, z_link_node));
 	rrw_init(&zfsvfs->z_teardown_lock);
@@ -738,12 +751,7 @@ out:
 	if (error) {
 		if (zfsvfs->z_os)
 			dmu_objset_close(zfsvfs->z_os);
-		mutex_destroy(&zfsvfs->z_znodes_lock);
-		list_destroy(&zfsvfs->z_all_znodes);
-		rrw_destroy(&zfsvfs->z_teardown_lock);
-		rw_destroy(&zfsvfs->z_teardown_inactive_lock);
-		rw_destroy(&zfsvfs->z_fuid_lock);
-		kmem_free(zfsvfs, sizeof (zfsvfs_t));
+		zfs_freezfsvfs(zfsvfs);
 	} else {
 		atomic_add_32(&zfs_active_fs_count, 1);
 	}
@@ -1145,7 +1153,6 @@ zfs_root(vfs_t *vfsp, vnode_t **vpp)
 static int
 zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 {
-	objset_t *os = zfsvfs->z_os;
 	znode_t	*zp;
 
 	rrw_enter(&zfsvfs->z_teardown_lock, RW_WRITER, FTAG);
@@ -1225,9 +1232,9 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 	/*
 	 * Evict cached data
 	 */
-	if (dmu_objset_evict_dbufs(os)) {
+	if (dmu_objset_evict_dbufs(zfsvfs->z_os)) {
 		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
-		(void) dmu_objset_evict_dbufs(os);
+		(void) dmu_objset_evict_dbufs(zfsvfs->z_os);
 	}
 
 	return (0);
@@ -1482,13 +1489,8 @@ zfs_freevfs(vfs_t *vfsp)
 	for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
 		mutex_destroy(&zfsvfs->z_hold_mtx[i]);
 
-	mutex_destroy(&zfsvfs->z_znodes_lock);
-	list_destroy(&zfsvfs->z_all_znodes);
-	rrw_destroy(&zfsvfs->z_teardown_lock);
-	rw_destroy(&zfsvfs->z_teardown_inactive_lock);
 	zfs_fuid_destroy(zfsvfs);
-	rw_destroy(&zfsvfs->z_fuid_lock);
-	kmem_free(zfsvfs, sizeof (zfsvfs_t));
+	zfs_freezfsvfs(zfsvfs);
 
 	atomic_add_32(&zfs_active_fs_count, -1);
 }
