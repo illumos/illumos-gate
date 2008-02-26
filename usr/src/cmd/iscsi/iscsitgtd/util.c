@@ -845,10 +845,26 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 	return (rval);
 }
 
+/*
+ * Pre-seed connection parameters to default values
+ * See RFC 3720 Section 12
+ */
 void
 connection_parameters_default(iscsi_conn_t *c)
 {
-	c->c_tpgt = 1;
+	c->c_max_connections = 1;		/* MaxConnections */
+	c->c_tpgt = 1;				/* TargetPortalGroupTag */
+	c->c_initialR2T = True;			/* InitialR2T */
+	c->c_immediate_data = True;		/* ImmediateData */
+	c->c_max_recv_data = 8192;		/* MaxRecvDataSegmentLength */
+	c->c_max_burst_len = 262214;		/* MaxBurstLength */
+	c->c_first_burst_len = 65536;		/* FirstBurstLength */
+	c->c_default_time_2_wait = 2;		/* DefaultTime2Wait */
+	c->c_default_time_2_retain = 20;	/* DefaultTime2Retain */
+	c->c_max_outstanding_r2t = 1;		/* MaxOutStandingR2T */
+	c->c_data_pdu_in_order = True;		/* DataPDUInOrder */
+	c->c_data_sequence_in_order = True;	/* DataSequenceOrder */
+	c->c_erl = 0;				/* ErrorRecoveryLevel */
 }
 
 /*
@@ -1044,7 +1060,7 @@ sna_lt(uint32_t n1, uint32_t n2)
 {
 	return ((n1 != n2) &&
 	    (((n1 < n2) && ((n2 - n1) < SNA32_CHECK)) ||
-	    ((n1 > n2) && ((n2 - n1) < SNA32_CHECK))));
+	    ((n1 > n2) && ((n1 - n2) > SNA32_CHECK))));
 }
 
 /*
@@ -1057,7 +1073,7 @@ sna_lte(uint32_t n1, uint32_t n2)
 {
 	return ((n1 == n2) ||
 	    (((n1 < n2) && ((n2 - n1) < SNA32_CHECK)) ||
-	    ((n1 > n2) && ((n2 - n1) < SNA32_CHECK))));
+	    ((n1 > n2) && ((n1 - n2) > SNA32_CHECK))));
 }
 
 Boolean_t

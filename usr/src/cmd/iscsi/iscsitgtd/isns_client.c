@@ -687,6 +687,8 @@ isns_fini()
 
 	/* log off all targets */
 	isns_op_all(ISNS_TGT_LOGOUT);
+
+	isns_initialized = False;
 }
 
 static int
@@ -1282,8 +1284,7 @@ isns_reg_all()
 	 */
 	if ((tgt = tgt_node_next(targets_config, XML_ELEMENT_TARG, tgt))
 	    == NULL) {
-		syslog(LOG_ALERT, "ISNS: no iscsi target found\n");
-		return (-1);
+		return (0);
 	}
 	if (tgt->x_value == NULL) {
 		syslog(LOG_ALERT, "ISNS: target with NULL local name\n");

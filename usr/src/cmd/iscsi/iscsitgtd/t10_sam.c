@@ -1059,7 +1059,7 @@ trans_cmd_dup(t10_cmd_t *cmd)
 		return (False);
 	bcopy(cmd, c, sizeof (*c));
 	if ((c->c_cdb = (uint8_t *)malloc(c->c_cdb_len)) == NULL) {
-		free(c);
+		umem_cache_free(t10_cmd_cache, c);
 		return (False);
 	}
 	bcopy(cmd->c_cdb, c->c_cdb, c->c_cdb_len);

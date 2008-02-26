@@ -802,15 +802,16 @@ valid_radius_srv(char *name, char *prop)
 char *
 valid_isns_srv(char *name, char *prop)
 {
-	struct addrinfo	*res	= NULL;
 	char		*msg	= NULL;
 	char		*sp, *p;
+	int		so;
 	int		port;
 
 	if ((sp = strdup(prop)) == NULL) {
 		xml_rtn_msg(&msg, ERR_NO_MEM);
 		return (msg);
-	} else if ((p = strrchr(sp, ':')) != NULL) {
+	}
+	if ((p = strrchr(sp, ':')) != NULL) {
 		*p++ = '\0';
 		port = atoi(p);
 		if ((port < 1) || (port > 65535)) {
@@ -819,10 +820,13 @@ valid_isns_srv(char *name, char *prop)
 			return (msg);
 		}
 	}
-	if ((getaddrinfo(sp, NULL, NULL, &res) != 0) || (res == NULL))
+
+	so = isns_open(sp);
+	if (so < 0)
 		xml_rtn_msg(&msg, ERR_INVALID_ISNS_SRV);
 	else
-		freeaddrinfo(res);
+		isns_close(so);
+
 	free(sp);
 	return (msg);
 }

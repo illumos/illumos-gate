@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,7 @@ iscsi_full_feature(iscsi_conn_t *c)
 			(void) snprintf(debug, sizeof (debug),
 			    "CON%x  Failed to read in AHS", c->c_num);
 			queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
+			free(ahs);
 			return (False);
 		}
 	}
@@ -117,6 +118,8 @@ iscsi_full_feature(iscsi_conn_t *c)
 			    "CON%x  CRC error: actual 0x%x v. calc 0x%x",
 			    c->c_num, crc_actual, crc_calculated);
 			queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
+			if (ahs != NULL)
+				free(ahs);
 			return (False);
 		}
 	}
@@ -147,7 +150,7 @@ iscsi_full_feature(iscsi_conn_t *c)
 			break;
 		}
 	} else {
-		iscsi_cmd_remove(c, htonl(h.expstatsn));
+		iscsi_cmd_remove(c, ntohl(h.expstatsn));
 		switch (h.opcode & ISCSI_OPCODE_MASK) {
 		case ISCSI_OP_NOOP_OUT:
 			rval = handle_noop_cmd(c, &h, ahs, ahslen);

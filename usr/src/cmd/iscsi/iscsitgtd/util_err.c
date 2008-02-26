@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,6 +193,8 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("No credentials available from door"));
 	case ERR_NO_PERMISSION:
 		return ((char *)gettext("Permission denied"));
+	case ERR_INVALID_ISNS_SRV:
+		return ((char *)gettext("Invalid ISNS Server name"));
 	case ERR_ISNS_ERROR:
 		return ((char *)gettext("ISNS error"));
 	case ERR_TPGT_NO_IPADDR:

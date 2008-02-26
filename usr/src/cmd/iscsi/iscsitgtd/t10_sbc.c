@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,7 +300,8 @@ sbc_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
 	    e->cmd_name, cmd->c_trans_id);
 #endif
-	(*e->cmd_data)(cmd, id, offset, data, data_len);
+	if (*e->cmd_data != NULL)
+		(*e->cmd_data)(cmd, id, offset, data, data_len);
 }
 
 /*
