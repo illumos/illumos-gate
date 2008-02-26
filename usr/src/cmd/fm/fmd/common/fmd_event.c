@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -345,12 +345,15 @@ fmd_event_match(fmd_event_t *e, uint_t type, const void *data)
 {
 	fmd_event_impl_t *ep = (fmd_event_impl_t *)e;
 
+	if (ep->ev_type != type)
+		return (0);
+
 	if (type == FMD_EVT_PROTOCOL)
-		return (ep->ev_type == type && fmd_strmatch(ep->ev_data, data));
+		return (fmd_strmatch(ep->ev_data, data));
 	else if (type == FMD_EVT_TIMEOUT)
 		return ((id_t)data == ((fmd_modtimer_t *)ep->ev_data)->mt_id);
 	else
-		return (ep->ev_type == type && ep->ev_data == data);
+		return (ep->ev_data == data);
 }
 
 int

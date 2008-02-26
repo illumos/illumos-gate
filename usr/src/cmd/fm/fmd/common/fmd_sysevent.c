@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ static char *sysev_sid;		/* event channel subscriber identifier */
 static void *sysev_evc;		/* event channel cookie from evc_bind */
 
 static fmd_xprt_t *sysev_xprt;
+static int sysev_xprt_refcnt;
 static fmd_hdl_t *sysev_hdl;
 
 static struct sysev_stats {
@@ -81,9 +82,11 @@ static struct sysev_stats {
 	{ "eagain", FMD_TYPE_UINT64, "events retried due to low memory" },
 };
 
-static pthread_cond_t sysev_replay_cv = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t sysev_replay_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t sysev_cv = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t sysev_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int sysev_replay_wait = 1;
+static int sysev_exiting;
+
 
 /*
  * Receive an event from the SysEvent channel and post it to our transport.
@@ -100,36 +103,46 @@ sysev_recv(sysevent_t *sep, void *arg)
 	fmd_xprt_t *xp = arg;
 	nvlist_t *nvl;
 	hrtime_t hrt;
+	int rc = 0;
 
-	(void) pthread_mutex_lock(&sysev_replay_mutex);
+	(void) pthread_mutex_lock(&sysev_mutex);
+	if (sysev_exiting == 1) {
+		while (sysev_xprt_refcnt > 0)
+			(void) pthread_cond_wait(&sysev_cv, &sysev_mutex);
+		(void) pthread_mutex_unlock(&sysev_mutex);
+		return (EAGAIN);
+	}
+	sysev_xprt_refcnt++;
 	while (sysev_replay_wait)
-		(void) pthread_cond_wait(&sysev_replay_cv, &sysev_replay_mutex);
-	(void) pthread_mutex_unlock(&sysev_replay_mutex);
+		(void) pthread_cond_wait(&sysev_cv, &sysev_mutex);
+	(void) pthread_mutex_unlock(&sysev_mutex);
 
 	if (strcmp(sysevent_get_class_name(sep), EC_FM) != 0) {
 		fmd_hdl_error(sysev_hdl, "discarding event 0x%llx: unexpected"
 		    " transport class %s\n", seq, sysevent_get_class_name(sep));
 		sysev_stats.bad_class.fmds_value.ui64++;
-		return (0);
-	}
-
-	if (sysevent_get_attr_list(sep, &nvl) != 0) {
+	} else if (sysevent_get_attr_list(sep, &nvl) != 0) {
 		if (errno == EAGAIN || errno == ENOMEM) {
 			fmd_modhash_tryapply(fmd.d_mod_hash, fmd_module_trygc);
 			fmd_scheme_hash_trygc(fmd.d_schemes);
 			sysev_stats.eagain.fmds_value.ui64++;
-			return (EAGAIN);
+			rc = EAGAIN;
+		} else {
+			fmd_hdl_error(sysev_hdl, "discarding event 0x%llx: "
+			    "missing or invalid payload", seq);
+			sysev_stats.bad_attr.fmds_value.ui64++;
 		}
-
-		fmd_hdl_error(sysev_hdl, "discarding event 0x%llx: missing "
-		    "or invalid payload", seq);
-		sysev_stats.bad_attr.fmds_value.ui64++;
-		return (0);
+	} else {
+		sysevent_get_time(sep, &hrt);
+		fmd_xprt_post(sysev_hdl, xp, nvl, hrt);
 	}
 
-	sysevent_get_time(sep, &hrt);
-	fmd_xprt_post(sysev_hdl, xp, nvl, hrt);
-	return (0);
+	(void) pthread_mutex_lock(&sysev_mutex);
+	if (--sysev_xprt_refcnt == 0 && sysev_exiting == 1)
+		(void) pthread_cond_broadcast(&sysev_cv);
+	(void) pthread_mutex_unlock(&sysev_mutex);
+
+	return (rc);
 }
 
 /*
@@ -341,10 +354,10 @@ next:
 
 	(void) close(fd);
 done:
-	(void) pthread_mutex_lock(&sysev_replay_mutex);
+	(void) pthread_mutex_lock(&sysev_mutex);
 	sysev_replay_wait = 0;
-	(void) pthread_cond_broadcast(&sysev_replay_cv);
-	(void) pthread_mutex_unlock(&sysev_replay_mutex);
+	(void) pthread_cond_broadcast(&sysev_cv);
+	(void) pthread_mutex_unlock(&sysev_mutex);
 }
 
 static const fmd_prop_t sysev_props[] = {
@@ -453,8 +466,17 @@ sysev_fini(fmd_hdl_t *hdl)
 		sysevent_evc_unbind(sysev_evc);
 	}
 
-	if (sysev_xprt != NULL)
+	if (sysev_xprt != NULL) {
+		/*
+		 * Wait callback returns before destroy the transport.
+		 */
+		(void) pthread_mutex_lock(&sysev_mutex);
+		sysev_exiting = 1;
+		while (sysev_xprt_refcnt > 0)
+			(void) pthread_cond_wait(&sysev_cv, &sysev_mutex);
+		(void) pthread_mutex_unlock(&sysev_mutex);
 		fmd_xprt_close(hdl, sysev_xprt);
+	}
 
 	fmd_prop_free_string(hdl, sysev_class);
 	fmd_prop_free_string(hdl, sysev_channel);

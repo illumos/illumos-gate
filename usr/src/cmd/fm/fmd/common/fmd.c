@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -783,7 +783,6 @@ fmd_run(fmd_t *dp, int pfd)
 	fmd_xprt_suspend_all();
 
 	(void) door_server_create(fmd_door);
-	fmd_dr_init();
 
 	dp->d_rmod->mod_timerids = fmd_idspace_create(dp->d_pname, 1, 16);
 	dp->d_timers = fmd_timerq_create();
@@ -900,6 +899,11 @@ fmd_run(fmd_t *dp, int pfd)
 
 	(void) fmd_conf_getprop(dp->d_conf, "agent.path", &pap);
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops, NULL);
+
+	/*
+	 * Subscribe to sysevents after all modules have been loaded.
+	 */
+	fmd_dr_init();
 
 	/*
 	 * With all modules loaded, replay fault events from the ASRU cache for

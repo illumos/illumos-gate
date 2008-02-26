@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,8 @@ static const char *const _fmd_case_snames[] = {
 };
 
 extern volatile uint32_t fmd_asru_fake_not_present;
+
+static fmd_case_impl_t *fmd_case_tryhold(fmd_case_impl_t *);
 
 fmd_case_hash_t *
 fmd_case_hash_create(void)
@@ -440,9 +442,13 @@ fmd_case_hash_lookup(fmd_case_hash_t *chp, const char *uuid)
 			break;
 	}
 
+	/*
+	 * If deleting bit is set, treat the case as if it doesn't exist.
+	 */
 	if (cip != NULL)
-		fmd_case_hold((fmd_case_t *)cip);
-	else
+		cip = fmd_case_tryhold(cip);
+
+	if (cip == NULL)
 		(void) fmd_set_errno(EFMD_CASE_INVAL);
 
 	(void) pthread_rwlock_unlock(&chp->ch_lock);
@@ -459,8 +465,8 @@ fmd_case_hash_insert(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 	h = fmd_strhash(cip->ci_uuid) % chp->ch_hashlen;
 
 	for (eip = chp->ch_hash[h]; eip != NULL; eip = eip->ci_next) {
-		if (strcmp(cip->ci_uuid, eip->ci_uuid) == 0) {
-			fmd_case_hold((fmd_case_t *)eip);
+		if (strcmp(cip->ci_uuid, eip->ci_uuid) == 0 &&
+		    fmd_case_tryhold(eip) != NULL) {
 			(void) pthread_rwlock_unlock(&chp->ch_lock);
 			return (eip); /* uuid already present */
 		}
@@ -481,6 +487,11 @@ fmd_case_hash_delete(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 {
 	fmd_case_impl_t *cp, **pp;
 	uint_t h;
+
+	ASSERT(MUTEX_HELD(&cip->ci_lock));
+
+	cip->ci_flags |= FMD_CF_DELETING;
+	(void) pthread_mutex_unlock(&cip->ci_lock);
 
 	(void) pthread_rwlock_wrlock(&chp->ch_lock);
 
@@ -506,6 +517,9 @@ fmd_case_hash_delete(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 	chp->ch_count--;
 
 	(void) pthread_rwlock_unlock(&chp->ch_lock);
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	ASSERT(cip->ci_flags & FMD_CF_DELETING);
 }
 
 fmd_case_t *
@@ -701,8 +715,7 @@ fmd_case_hold(fmd_case_t *cp)
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
-	cip->ci_refs++;
-	ASSERT(cip->ci_refs != 0);
+	fmd_case_hold_locked(cp);
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 }
 
@@ -712,8 +725,29 @@ fmd_case_hold_locked(fmd_case_t *cp)
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 
 	ASSERT(MUTEX_HELD(&cip->ci_lock));
+	if (cip->ci_flags & FMD_CF_DELETING)
+		fmd_panic("attempt to hold a deleting case %p (%s)\n",
+		    (void *)cip, cip->ci_uuid);
 	cip->ci_refs++;
 	ASSERT(cip->ci_refs != 0);
+}
+
+static fmd_case_impl_t *
+fmd_case_tryhold(fmd_case_impl_t *cip)
+{
+	/*
+	 * If the case's "deleting" bit is unset, hold and return case,
+	 * otherwise, return NULL.
+	 */
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	if (cip->ci_flags & FMD_CF_DELETING) {
+		(void) pthread_mutex_unlock(&cip->ci_lock);
+		cip = NULL;
+	} else {
+		fmd_case_hold_locked((fmd_case_t *)cip);
+		(void) pthread_mutex_unlock(&cip->ci_lock);
+	}
+	return (cip);
 }
 
 void

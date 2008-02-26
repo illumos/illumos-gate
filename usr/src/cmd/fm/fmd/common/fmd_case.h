@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,7 @@ typedef struct fmd_case_impl {
 #define	FMD_CF_REPAIRED		0x08	/* case has been repaired */
 #define	FMD_CF_REPAIRING	0x10	/* case repair in progress */
 #define	FMD_CF_INVISIBLE	0x20	/* case should be invisible */
+#define	FMD_CF_DELETING		0x40	/* case is about to be deleted */
 
 typedef struct fmd_case_hash {
 	pthread_rwlock_t ch_lock;	/* lock protecting case hash */
