@@ -1362,7 +1362,7 @@ static uint64_t
 smb_share_features(void)
 {
 	return (SA_FEATURE_RESOURCE | SA_FEATURE_ALLOWSUBDIRS |
-	    SA_FEATURE_ALLOWPARDIRS);
+	    SA_FEATURE_ALLOWPARDIRS | SA_FEATURE_SERVER);
 }
 
 /*

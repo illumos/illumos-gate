@@ -3012,5 +3012,5 @@ nfs_space_alias(char *space)
 static uint64_t
 nfs_features()
 {
-	return ((uint64_t)SA_FEATURE_DFSTAB);
+	return ((uint64_t)SA_FEATURE_DFSTAB | SA_FEATURE_SERVER);
 }

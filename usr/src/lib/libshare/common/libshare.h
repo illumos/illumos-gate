@@ -128,6 +128,7 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_FEATURE_ALLOWPARDIRS	0x0008	/* allow parent dirs to be shared */
 #define	SA_FEATURE_HAS_SECTIONS	0x0010	/* protocol supports sections */
 #define	SA_FEATURE_ADD_PROPERTIES	0x0020	/* can add properties */
+#define	SA_FEATURE_SERVER	0x0040	/* protocol supports server mode */
 
 /*
  * legacy files

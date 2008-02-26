@@ -1041,6 +1041,125 @@ make_resources(sa_group_t group)
 }
 
 /*
+ * check_valid_group(group, protocol)
+ *
+ * Check to see that the group should have the protocol added (if
+ * there is one specified).
+ */
+
+static int
+check_valid_group(sa_group_t group, char *groupname, char *protocol)
+{
+
+	if (protocol != NULL) {
+		if (has_protocol(group, protocol)) {
+			(void) printf(gettext(
+			    "Group \"%s\" already exists"
+			    " with protocol %s\n"), groupname,
+			    protocol);
+			return (SA_DUPLICATE_NAME);
+		} else if (strcmp(groupname, "default") == 0 &&
+		    strcmp(protocol, "nfs") != 0) {
+			(void) printf(gettext(
+			    "Group \"%s\" only allows protocol "
+			    "\"%s\"\n"), groupname, "nfs");
+			return (SA_INVALID_PROTOCOL);
+		}
+	} else {
+		/* must add new protocol */
+		(void) printf(gettext(
+		    "Group already exists and no protocol "
+		    "specified.\n"));
+		return (SA_DUPLICATE_NAME);
+	}
+	return (SA_OK);
+}
+
+/*
+ * enforce_featureset(group, protocol, dryrun, force)
+ *
+ * Check the protocol featureset against the group and enforce any
+ * rules that might be imposed.
+ */
+
+static int
+enforce_featureset(sa_group_t group, char *protocol, boolean_t dryrun,
+    boolean_t force)
+{
+	uint64_t features;
+
+	if (protocol == NULL)
+		return (SA_OK);
+
+	/*
+	 * First check to see if specified protocol is one we want to
+	 * allow on a group. Only server protocols are allowed here.
+	 */
+	features = sa_proto_get_featureset(protocol);
+	if (!(features & SA_FEATURE_SERVER)) {
+		(void) printf(
+		    gettext("Protocol \"%s\" not supported.\n"), protocol);
+		return (SA_INVALID_PROTOCOL);
+	}
+
+	/*
+	 * Check to see if the new protocol is one that requires
+	 * resource names and make sure we are compliant before
+	 * proceeding.
+	 */
+	if ((features & SA_FEATURE_RESOURCE) &&
+	    !resource_compliant(group)) {
+		if (force && !dryrun) {
+			make_resources(group);
+		} else {
+			(void) printf(
+			    gettext("Protocol requires resource names to be "
+			    "set: %s\n"), protocol);
+			return (SA_RESOURCE_REQUIRED);
+		}
+	}
+	return (SA_OK);
+}
+
+/*
+ * set_all_protocols(group)
+ *
+ * Get the list of all protocols and add all server protocols to the
+ * group.
+ */
+
+static int
+set_all_protocols(sa_group_t group)
+{
+	char **protolist;
+	int numprotos, i;
+	uint64_t features;
+	sa_optionset_t optionset;
+	int ret = SA_OK;
+
+	/*
+	 * Now make sure we really want to put this protocol on a
+	 * group. Only server protocols can go here.
+	 */
+	numprotos = sa_get_protocols(&protolist);
+	for (i = 0; i < numprotos; i++) {
+		features = sa_proto_get_featureset(protolist[i]);
+		if (features & SA_FEATURE_SERVER) {
+			optionset = sa_create_optionset(group, protolist[i]);
+			if (optionset == NULL) {
+				ret = SA_NO_MEMORY;
+				break;
+			}
+		}
+	}
+
+	if (protolist != NULL)
+		free(protolist);
+
+	return (ret);
+}
+
+/*
  * sa_create(flags, argc, argv)
  *	create a new group
  *	this may or may not have a protocol associated with it.
@@ -1052,26 +1171,27 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *groupname;
 
 	sa_group_t group;
-	int force = 0;
-	int verbose = 0;
-	int dryrun = 0;
+	boolean_t force = B_FALSE;
+	boolean_t verbose = B_FALSE;
+	boolean_t dryrun = B_FALSE;
 	int c;
 	char *protocol = NULL;
 	int ret = SA_OK;
 	struct options *optlist = NULL;
 	int err = SA_OK;
 	int auth;
+	boolean_t created = B_FALSE;
 
 	while ((c = getopt(argc, argv, "?fhvnP:p:")) != EOF) {
 		switch (c) {
 		case 'f':
-			force++;
+			force = B_TRUE;
 			break;
 		case 'v':
-			verbose++;
+			verbose = B_TRUE;
 			break;
 		case 'n':
-			dryrun++;
+			dryrun = B_TRUE;
 			break;
 		case 'P':
 			if (protocol != NULL) {
@@ -1174,27 +1294,7 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 		/* group exists so must be a protocol add */
-		if (protocol != NULL) {
-			if (has_protocol(group, protocol)) {
-				(void) printf(gettext(
-				    "Group \"%s\" already exists"
-				    " with protocol %s\n"), groupname,
-				    protocol);
-				ret = SA_DUPLICATE_NAME;
-			} else if (strcmp(groupname, "default") == 0 &&
-			    strcmp(protocol, "nfs") != 0) {
-				(void) printf(gettext(
-				    "Group \"%s\" only allows protocol "
-				    "\"%s\"\n"), groupname, "nfs");
-				ret = SA_INVALID_PROTOCOL;
-			}
-		} else {
-			/* must add new protocol */
-			(void) printf(gettext(
-			    "Group already exists and no protocol "
-			    "specified.\n"));
-			ret = SA_DUPLICATE_NAME;
-		}
+		ret = check_valid_group(group, groupname, protocol);
 	} else {
 		/*
 		 * is it a valid name? Must comply with SMF instance
@@ -1217,34 +1317,24 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 		if (group == NULL) {
 			group = sa_create_group(handle, (char *)groupname,
 			    &err);
+			created = B_TRUE;
 		}
 		if (group != NULL) {
 			sa_optionset_t optionset;
-			/*
-			 * First check to see if the new protocol is one that
-			 * requires resource names and make sure we are
-			 * compliant before proceeding.
-			 */
-			if (protocol != NULL) {
-				uint64_t features;
 
-				features = sa_proto_get_featureset(protocol);
-				if ((features & SA_FEATURE_RESOURCE) &&
-				    !resource_compliant(group)) {
-					if (force) {
-						make_resources(group);
-					} else {
-						ret = SA_RESOURCE_REQUIRED;
-						(void) printf(
-						    gettext("Protocol "
-						    "requires resource "
-						    "names to be "
-						    "set: %s\n"),
-						    protocol);
-						goto err;
-					}
-				}
-			}
+			/*
+			 * Check group and protocol against featureset
+			 * requirements.
+			 */
+			ret = enforce_featureset(group, protocol,
+			    dryrun, force);
+			if (ret != SA_OK)
+				goto err;
+
+			/*
+			 * So far so good. Now add the required
+			 * optionset(s) to the group.
+			 */
 			if (optlist != NULL) {
 				(void) add_optionset(group, optlist, protocol,
 				    &ret);
@@ -1254,15 +1344,8 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 				if (optionset == NULL)
 					ret = SA_NO_MEMORY;
 			} else if (protocol == NULL) {
-				char **protolist;
-				int numprotos, i;
-				numprotos = sa_get_protocols(&protolist);
-				for (i = 0; i < numprotos; i++) {
-					optionset = sa_create_optionset(group,
-					    protolist[i]);
-				}
-				if (protolist != NULL)
-					free(protolist);
+				/* default group create so add all protocols */
+				ret = set_all_protocols(group);
 			}
 			/*
 			 * We have a group and legal additions
@@ -1292,6 +1375,9 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 		ret = SA_NO_PERMISSION;
 	}
 err:
+	if (ret != SA_OK && created)
+		ret = sa_remove_group(group);
+
 	free_opt(optlist);
 	return (ret);
 }

@@ -379,11 +379,20 @@ static void
 show_status(char *proto)
 {
 	char *status;
+	uint64_t features;
 
 	status = sa_get_protocol_status(proto);
-	(void) printf("%s\t%s\n", proto, status ? gettext(status) : "-");
+	features = sa_proto_get_featureset(proto);
+	(void) printf("%s\t%s", proto, status ? gettext(status) : "-");
 	if (status != NULL)
 		free(status);
+	/*
+	 * Need to flag a client only protocol so test suites can
+	 * remove it from consideration.
+	 */
+	if (!(features & SA_FEATURE_SERVER))
+		(void) printf(" client");
+	(void) printf("\n");
 }
 
 static int
