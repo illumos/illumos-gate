@@ -634,14 +634,12 @@ struct ufs_q {
 #define	UQ_WAIT		(0x0002)	/* thread is waiting on q server */
 #define	UQ_SUSPEND	(0x0004)	/* request for suspension */
 #define	UQ_SUSPENDED	(0x0008)	/* thread has suspended itself */
-#define	UQ_FASTCLIENTS	(0x0010)	/* fast clients in ufs_delq_info */
 
 /*
  * When logging is enabled, statvfs must account for blocks and files that
  * may be on the delete queue.  Protected by ufsvfsp->vfs_delete.uq_mutex
  */
 struct ufs_delq_info {
-	kcondvar_t	delq_fast_cv;	/* for fast-operating clients */
 	u_offset_t	delq_unreclaimed_blocks;
 	ulong_t		delq_unreclaimed_files;
 };

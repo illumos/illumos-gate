@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,11 +223,6 @@ again:
 		 * process a block of entries until below high water mark
 		 */
 		return (uq->uq_ne - (uq->uq_lowat >> 1));
-	} else if (uq->uq_flags & UQ_FASTCLIENTS) {
-		/*
-		 * Let the fast acting clients through
-		 */
-		return (0);
 	}
 	if (uq->uq_flags & UQ_WAIT) {
 		uq->uq_flags &= ~UQ_WAIT;
@@ -443,7 +438,6 @@ ufs_delete_init(struct ufsvfs *ufsvfsp, int lowat)
 
 	ufs_thread_init(&ufsvfsp->vfs_delete, lowat);
 	(void) memset((void *)delq_info, 0, sizeof (*delq_info));
-	cv_init(&delq_info->delq_fast_cv, NULL, CV_DEFAULT, NULL);
 }
 
 /*
@@ -467,7 +461,7 @@ again:
 	/*
 	 * Sleep until there is work to do.  Only do one entry at
 	 * a time, to reduce the wait time for checking for a suspend
-	 * or fast-client request.  The ?: is for pedantic portability.
+	 * request.  The ?: is for pedantic portability.
 	 */
 	ne = ufs_thread_run(uq, &cprinfo) ? 1 : 0;
 
@@ -490,23 +484,6 @@ again:
 		uq->uq_ne--;
 		mutex_exit(&uq->uq_mutex);
 		ufs_delete(ufsvfsp, ip, 1);
-		mutex_enter(&uq->uq_mutex);
-	}
-
-	/*
-	 * If there are any fast clients, let all of them through.
-	 * Mainly intended for statvfs(), which doesn't need to do
-	 * anything except look at the number of bytes/inodes that
-	 * are in the queue.
-	 */
-	if (uq->uq_flags & UQ_FASTCLIENTS) {
-		uq->uq_flags &= ~UQ_FASTCLIENTS;
-		/*
-		 * Give clients a chance.  The lock exit/entry
-		 * allows waiting statvfs threads through.
-		 */
-		cv_broadcast(&delq_info->delq_fast_cv);
-		mutex_exit(&uq->uq_mutex);
 		mutex_enter(&uq->uq_mutex);
 	}
 	goto again;
@@ -646,19 +623,7 @@ ufs_delete_adjust_stats(struct ufsvfs *ufsvfsp, struct statvfs64 *sp)
 	struct ufs_q *uq = &ufsvfsp->vfs_delete;
 	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
-	/*
-	 * We'll get signalled when it's our turn.  However, if there's
-	 * nothing going on, there's no point in waking up the delete
-	 * thread and waiting for it to tell us to continue.
-	 */
 	mutex_enter(&uq->uq_mutex);
-
-	if ((uq->uq_flags & UQ_FASTCLIENTS) || (uq->uq_ne != 0)) {
-		uq->uq_flags |= UQ_FASTCLIENTS;
-		cv_broadcast(&uq->uq_cv);
-		cv_wait(&delq_info->delq_fast_cv, &uq->uq_mutex);
-	}
-
 	/*
 	 * The blocks accounted for in the delete queue info are
 	 * counted in DEV_BSIZE chunks, but ufs_statvfs counts in
