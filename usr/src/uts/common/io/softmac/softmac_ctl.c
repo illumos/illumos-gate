@@ -287,11 +287,6 @@ softmac_rput_process_proto(queue_t *rq, mblk_t *mp)
 		if (len < DL_ERROR_ACK_SIZE)
 			goto runt;
 
-		cmn_err(CE_NOTE, "softmac: received DL_ERROR_ACK for "
-		    "%s errno/unix_errno 0x%x/%d",
-		    dl_primstr(dlp->error_ack.dl_error_primitive),
-		    dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno);
-
 		softmac_process_dlpi(slp, mp, DL_ERROR_ACK_SIZE,
 		    dlp->error_ack.dl_error_primitive);
 		return;

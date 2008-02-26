@@ -380,7 +380,7 @@ i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
     dladm_aggr_port_attr_db_t *ports, uint32_t flags, int cmd)
 {
 	char *orig_portstr = NULL, *portstr = NULL;
-	laioc_add_rem_t *iocp;
+	laioc_add_rem_t *iocp = NULL;
 	laioc_port_t *ioc_ports;
 	uint32_t orig_nports, result_nports, len, i, j;
 	dladm_conf_t conf;

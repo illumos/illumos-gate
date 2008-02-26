@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/id_space.h>
+#include <sys/esunddi.h>
 #include <sys/stat.h>
 #include <sys/mkdev.h>
 #include <sys/stream.h>
@@ -507,6 +508,19 @@ mac_open(const char *macname, mac_handle_t *mhp)
 	if ((err = mac_hold(macname, &mip)) != 0)
 		return (err);
 
+	/*
+	 * Hold the dip associated to the MAC to prevent it from being
+	 * detached. For a softmac, its underlying dip is held by the
+	 * mi_open() callback.
+	 *
+	 * This is done to be more tolerant with some defective drivers,
+	 * which incorrectly handle mac_unregister() failure in their
+	 * xxx_detach() routine. For example, some drivers ignore the
+	 * failure of mac_unregister() and free all resources that
+	 * that are needed for data transmition.
+	 */
+	e_ddi_hold_devi(mip->mi_dip);
+
 	rw_enter(&mip->mi_gen_lock, RW_WRITER);
 
 	if ((mip->mi_oref != 0) ||
@@ -521,6 +535,7 @@ mac_open(const char *macname, mac_handle_t *mhp)
 	 */
 	if ((err = mip->mi_open(mip->mi_driver)) != 0) {
 		rw_exit(&mip->mi_gen_lock);
+		ddi_release_devi(mip->mi_dip);
 		mac_rele(mip);
 		return (err);
 	}
@@ -578,6 +593,7 @@ mac_close(mac_handle_t mh)
 	}
 	rw_exit(&mip->mi_gen_lock);
 
+	ddi_release_devi(mip->mi_dip);
 	mac_rele(mip);
 }
 

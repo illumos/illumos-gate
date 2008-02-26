@@ -1126,8 +1126,17 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	}
 	(void) memcpy(&ifflags, &lifreq.lifr_flags, sizeof (ifflags));
 
-	/* Ignore loopback and multipoint interfaces */
-	if (!(ifflags & IFF_MULTICAST) || (ifflags & IFF_LOOPBACK)) {
+	/*
+	 * Ignore interfaces that are always incapable of DR:
+	 *   - IFF_VIRTUAL:	e.g., loopback and vni
+	 *   - IFF_POINTOPOINT:	e.g., sppp and ip.tun
+	 *   - !IFF_MULTICAST:	e.g., ip.6to4tun
+	 *
+	 * Note: The !IFF_MULTICAST check can be removed once iptun is
+	 * implemented as a datalink.
+	 */
+	if (!(ifflags & IFF_MULTICAST) ||
+	    (ifflags & (IFF_POINTOPOINT | IFF_VIRTUAL))) {
 		rcm_log_message(RCM_TRACE3, "IP: if ignored (%s)\n",
 		    pif.pi_ifname);
 		return (0);
