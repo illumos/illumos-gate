@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,9 +135,10 @@ typedef int bool;
 #define	PT_MAXSWAP	32
 #define	PT_SCHED	33
 #define	PT_IPTYPE	34
+#define	PT_DEFROUTER	35
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_IPTYPE
+#define	PT_MAX		PT_DEFROUTER
 
 #define	MAX_EQ_PROP_PAIRS	3
 

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +212,9 @@ char *safe_strdup(char *s);
 
 <TSTATE>physical	{ return PHYSICAL; }
 <CSTATE>physical	{ return PHYSICAL; }
+
+<TSTATE>defrouter	{ return DEFROUTER; }
+<CSTATE>defrouter	{ return DEFROUTER; }
 
 <TSTATE>dir	{ return DIR; }
 <CSTATE>dir	{ return DIR; }

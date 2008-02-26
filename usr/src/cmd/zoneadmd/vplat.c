@@ -2476,6 +2476,30 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		    lifr.lifr_name, addrstr4, buffer);
 	}
 
+	/*
+	 * If a default router was specified for this interface
+	 * set the route now. Ignore if already set.
+	 */
+	if (strlen(nwiftabptr->zone_nwif_defrouter) > 0) {
+		int status;
+		char *argv[7];
+
+		argv[0] = "route";
+		argv[1] = "add";
+		argv[2] = "-ifp";
+		argv[3] = nwiftabptr->zone_nwif_physical;
+		argv[4] = "default";
+		argv[5] = nwiftabptr->zone_nwif_defrouter;
+		argv[6] = NULL;
+
+		status = forkexec(zlogp, "/usr/sbin/route", argv);
+		if (status != 0 && status != EEXIST)
+			zerror(zlogp, B_FALSE, "Unable to set route for "
+			    "interface %s to %s\n",
+			    nwiftabptr->zone_nwif_physical,
+			    nwiftabptr->zone_nwif_defrouter);
+	}
+
 	(void) close(s);
 	return (Z_OK);
 bad:

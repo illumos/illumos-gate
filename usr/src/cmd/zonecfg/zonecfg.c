@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,6 +220,7 @@ static char *prop_types[] = {
 	ALIAS_MAXSWAP,
 	"scheduling-class",
 	"ip-type",
+	"defrouter",
 	NULL
 };
 
@@ -936,10 +937,13 @@ usage(bool verbose, uint_t flags)
 			    pt_to_str(PT_PHYSICAL), gettext("<interface>"));
 			(void) fprintf(fp, gettext("See ifconfig(1M) for "
 			    "details of the <interface> string.\n"));
-			(void) fprintf(fp, gettext("%s %s is valid if the %s "
-			    "property is set to %s, otherwise it must not be "
-			    "set.\n"),
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_DEFROUTER), gettext("<IP-address>"));
+			(void) fprintf(fp, gettext("%s %s and %s %s are valid "
+			    "if the %s property is set to %s, otherwise they "
+			    "must not be set.\n"),
 			    cmd_to_str(CMD_SET), pt_to_str(PT_ADDRESS),
+			    cmd_to_str(CMD_SET), pt_to_str(PT_DEFROUTER),
 			    pt_to_str(PT_IPTYPE), "shared");
 			break;
 		case RT_DEVICE:
@@ -1155,8 +1159,9 @@ usage(bool verbose, uint_t flags)
 		    pt_to_str(PT_OPTIONS));
 		(void) fprintf(fp, "\t%s\t%s\n", rt_to_str(RT_IPD),
 		    pt_to_str(PT_DIR));
-		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_NET),
-		    pt_to_str(PT_ADDRESS), pt_to_str(PT_PHYSICAL));
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n", rt_to_str(RT_NET),
+		    pt_to_str(PT_ADDRESS), pt_to_str(PT_PHYSICAL),
+		    pt_to_str(PT_DEFROUTER));
 		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DEVICE),
 		    pt_to_str(PT_MATCH));
 		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_RCTL),
@@ -1779,6 +1784,7 @@ export_func(cmd_t *cmd)
 		    rt_to_str(RT_NET));
 		export_prop(of, PT_ADDRESS, nwiftab.zone_nwif_address);
 		export_prop(of, PT_PHYSICAL, nwiftab.zone_nwif_physical);
+		export_prop(of, PT_DEFROUTER, nwiftab.zone_nwif_defrouter);
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 	(void) zonecfg_endnwifent(handle);
@@ -2550,6 +2556,11 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab, bool fill_in_only)
 			    pp->pv_simple,
 			    sizeof (nwiftab->zone_nwif_physical));
 			break;
+		case PT_DEFROUTER:
+			(void) strlcpy(nwiftab->zone_nwif_defrouter,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_defrouter));
+			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
 			    Z_NO_PROPERTY_TYPE, TRUE);
@@ -3297,6 +3308,18 @@ remove_property(cmd_t *cmd)
 			zone_perror(pt_to_str(prop_type), err, TRUE);
 		zonecfg_free_rctl_value_list(rctlvaltab);
 		return;
+	case RT_NET:
+		if (prop_type != PT_DEFROUTER) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    TRUE);
+			long_usage(CMD_REMOVE, TRUE);
+			usage(FALSE, HELP_PROPS);
+			return;
+		} else {
+			bzero(&in_progress_nwiftab.zone_nwif_defrouter,
+			    sizeof (in_progress_nwiftab.zone_nwif_defrouter));
+			return;
+		}
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, TRUE);
 		long_usage(CMD_REMOVE, TRUE);
@@ -4159,6 +4182,15 @@ set_func(cmd_t *cmd)
 			    prop_id,
 			    sizeof (in_progress_nwiftab.zone_nwif_physical));
 			break;
+		case PT_DEFROUTER:
+			if (validate_net_address_syntax(prop_id) != Z_OK) {
+				saw_error = TRUE;
+				return;
+			}
+			(void) strlcpy(in_progress_nwiftab.zone_nwif_defrouter,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_defrouter));
+			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
 			    TRUE);
@@ -4688,6 +4720,7 @@ output_net(FILE *fp, struct zone_nwiftab *nwiftab)
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_NET));
 	output_prop(fp, PT_ADDRESS, nwiftab->zone_nwif_address, B_TRUE);
 	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
+	output_prop(fp, PT_DEFROUTER, nwiftab->zone_nwif_defrouter, B_TRUE);
 }
 
 static void
@@ -5457,8 +5490,10 @@ verify_func(cmd_t *cmd)
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
 		/*
 		 * physical is required in all cases.
-		 * A shared IP requires an address, while
-		 * an exclusive IP must not have an address.
+		 * A shared IP requires an address,
+		 * and may include a default router, while
+		 * an exclusive IP must have neither an address
+		 * nor a default router.
 		 */
 		check_reqd_prop(nwiftab.zone_nwif_physical, RT_NET,
 		    PT_PHYSICAL, &ret_val);
@@ -5473,6 +5508,14 @@ verify_func(cmd_t *cmd)
 				zerr(gettext("%s: %s cannot be specified "
 				    "for an exclusive IP type"),
 				    rt_to_str(RT_NET), pt_to_str(PT_ADDRESS));
+				saw_error = TRUE;
+				if (ret_val == Z_OK)
+					ret_val = Z_INVAL;
+			}
+			if (strlen(nwiftab.zone_nwif_defrouter) > 0) {
+				zerr(gettext("%s: %s cannot be specified "
+				    "for an exclusive IP type"),
+				    rt_to_str(RT_NET), pt_to_str(PT_DEFROUTER));
 				saw_error = TRUE;
 				if (ret_val == Z_OK)
 					ret_val = Z_INVAL;

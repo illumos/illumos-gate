@@ -96,6 +96,7 @@
 #define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
 #define	DTD_ATTR_AUTOBOOT	(const xmlChar *) "autoboot"
 #define	DTD_ATTR_IPTYPE		(const xmlChar *) "ip-type"
+#define	DTD_ATTR_DEFROUTER	(const xmlChar *) "defrouter"
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
@@ -2209,6 +2210,11 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	    sizeof (tabptr->zone_nwif_address))) != Z_OK)
 		return (err);
 
+	if ((err = fetchprop(cur, DTD_ATTR_DEFROUTER,
+	    tabptr->zone_nwif_defrouter,
+	    sizeof (tabptr->zone_nwif_defrouter))) != Z_OK)
+		return (err);
+
 	return (Z_OK);
 }
 
@@ -2224,6 +2230,9 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 	if ((err = newprop(newnode, DTD_ATTR_PHYSICAL,
 	    tabptr->zone_nwif_physical)) != Z_OK)
+		return (err);
+	if ((err = newprop(newnode, DTD_ATTR_DEFROUTER,
+	    tabptr->zone_nwif_defrouter)) != Z_OK)
 		return (err);
 	return (Z_OK);
 }
@@ -4382,6 +4391,13 @@ zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 
 	if ((err = fetchprop(cur, DTD_ATTR_PHYSICAL, tabptr->zone_nwif_physical,
 	    sizeof (tabptr->zone_nwif_physical))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_DEFROUTER,
+	    tabptr->zone_nwif_defrouter,
+	    sizeof (tabptr->zone_nwif_defrouter))) != Z_OK) {
 		handle->zone_dh_cur = handle->zone_dh_top;
 		return (err);
 	}
