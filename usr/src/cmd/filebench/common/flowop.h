@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,6 +136,7 @@ void flowoplib_init(void);
 void flowop_delete_all(flowop_t **threadlist);
 void flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes);
 void flowop_beginop(threadflow_t *threadflow, flowop_t *flowop);
+void flowop_destruct_all_flows(threadflow_t *threadflow);
 
 #ifdef	__cplusplus
 }

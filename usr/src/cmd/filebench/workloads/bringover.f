@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,8 @@ set $dirwidth=20
 set $filesize=16k
 set $iosize=1m
 set $nthreads=1
+
+set mode quit alldone
 
 define fileset name=srcfiles,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
 define fileset name=destfiles,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth
@@ -48,11 +50,12 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "Bringover Version 2.1 personality successfully loaded"
+echo  "Bringover Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$nfiles=<value>    defaults to $nfiles"
 usage "       set \$iosize=<size>     defaults to $iosize"
 usage "       set \$dirwidth=<value>  defaults to $dirwidth"
 usage "       set \$nthreads=<value>  defaults to $nthreads"
-usage "       run runtime (e.g. run 60)"
+usage " "
+usage "       run 0"

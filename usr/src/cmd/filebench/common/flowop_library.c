@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,7 @@
 
 static int flowoplib_init_generic(flowop_t *flowop);
 static void flowoplib_destruct_generic(flowop_t *flowop);
+static void flowoplib_destruct_noop(flowop_t *flowop);
 static int flowoplib_fdnum(threadflow_t *threadflow, flowop_t *flowop);
 static int flowoplib_write(threadflow_t *threadflow, flowop_t *flowop);
 #ifdef HAVE_AIO
@@ -162,7 +163,7 @@ static flowoplib_t flowoplib_funcs[] = {
 	FLOW_TYPE_SYNC, 0, "semblock", flowoplib_semblock_init,
 	flowoplib_semblock, flowoplib_semblock_destruct,
 	FLOW_TYPE_SYNC, 0, "sempost", flowoplib_sempost_init,
-	flowoplib_sempost, flowoplib_destruct_generic,
+	flowoplib_sempost, flowoplib_destruct_noop,
 	FLOW_TYPE_OTHER, 0, "hog", flowoplib_init_generic,
 	flowoplib_hog, flowoplib_destruct_generic,
 	FLOW_TYPE_OTHER, 0, "delay", flowoplib_init_generic,
@@ -242,16 +243,31 @@ static int
 flowoplib_init_generic(flowop_t *flowop)
 {
 	(void) ipc_mutex_unlock(&flowop->fo_lock);
-	return (0);
+	return (FILEBENCH_OK);
 }
 
-/* ARGSUSED */
 static void
 flowoplib_destruct_generic(flowop_t *flowop)
 {
-	/* release any resources held by the flowop */
-	if (flowop->fo_buf)
-		free(flowop->fo_buf);
+	char *buf;
+
+	/* release any local resources held by the flowop */
+	(void) ipc_mutex_lock(&flowop->fo_lock);
+	buf = flowop->fo_buf;
+	flowop->fo_buf = NULL;
+	(void) ipc_mutex_unlock(&flowop->fo_lock);
+
+	if (buf)
+		free(buf);
+}
+
+/*
+ * Special total noop destruct
+ */
+/* ARGSUSED */
+static void
+flowoplib_destruct_noop(flowop_t *flowop)
+{
 }
 
 /*
@@ -309,7 +325,7 @@ flowoplib_fdnum(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR, "Out of file descriptors in flowop %s"
 		    " (too many files : %d", flowop->fo_name,
 		    *(flowop->fo_fileset->fs_entries));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	/* First time around */
@@ -331,7 +347,9 @@ flowoplib_fdnum(threadflow_t *threadflow, flowop_t *flowop)
 /*
  * Determines the file descriptor to use, and attempts to open
  * the file if it is not already open. Also determines the wss
- * value. Returns -1 on errors, 0 otherwise.
+ * value. Returns FILEBENCH_ERROR on errors, FILESET_NORSC if
+ * if flowop_openfile_common couldn't obtain an appropriate file
+ * from a the fileset, and FILEBENCH_OK otherwise.
  */
 static int
 flowoplib_filesetup(threadflow_t *threadflow, flowop_t *flowop,
@@ -340,12 +358,14 @@ flowoplib_filesetup(threadflow_t *threadflow, flowop_t *flowop,
 	int fd = flowoplib_fdnum(threadflow, flowop);
 
 	if (fd == -1)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
 	if (threadflow->tf_fd[fd] == 0) {
-		if (flowoplib_openfile_common(
-		    threadflow, flowop, fd) == -1)
-			return (-1);
+		int ret;
+
+		if ((ret = flowoplib_openfile_common(
+		    threadflow, flowop, fd)) != FILEBENCH_OK)
+			return (ret);
 
 		if (threadflow->tf_fse[fd]) {
 			filebench_log(LOG_DEBUG_IMPL, "opened file %s",
@@ -369,12 +389,12 @@ flowoplib_filesetup(threadflow_t *threadflow, flowop_t *flowop,
 		*wssp = *flowop->fo_wss;
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Determines the io buffer or random offset into tf_mem for
- * the IO operation. Returns -1 on errors, 0 otherwise.
+ * the IO operation. Returns FILEBENCH_ERROR on errors, FILEBENCH_OK otherwise.
  */
 static int
 flowoplib_iobufsetup(threadflow_t *threadflow, flowop_t *flowop,
@@ -386,7 +406,7 @@ flowoplib_iobufsetup(threadflow_t *threadflow, flowop_t *flowop,
 	if (iosize == 0) {
 		filebench_log(LOG_ERROR, "zero iosize for thread %s",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if ((memsize = *threadflow->tf_memsize) != 0) {
@@ -396,7 +416,7 @@ flowoplib_iobufsetup(threadflow_t *threadflow, flowop_t *flowop,
 			filebench_log(LOG_ERROR,
 			    "tf_memsize smaller than IO size for thread %s",
 			    flowop->fo_name);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		*iobufp = threadflow->tf_mem + memoffset;
 
@@ -409,30 +429,34 @@ flowoplib_iobufsetup(threadflow_t *threadflow, flowop_t *flowop,
 		}
 		if ((flowop->fo_buf == NULL) && ((flowop->fo_buf
 		    = (char *)malloc(iosize)) == NULL))
-				return (-1);
+			return (FILEBENCH_ERROR);
 
 		flowop->fo_buf_size = iosize;
 		*iobufp = flowop->fo_buf;
 	}
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Determines the file descriptor to use, opens it if necessary, the
  * io buffer or random offset into tf_mem for IO operation and the wss
- * value. Returns -1 on errors, 0 otherwise.
+ * value. Returns FILEBENCH_ERROR on errors, FILEBENCH_OK otherwise.
  */
 static int
 flowoplib_iosetup(threadflow_t *threadflow, flowop_t *flowop,
     vinteger_t *wssp, caddr_t *iobufp, int *filedescp, vinteger_t iosize)
 {
-	if (flowoplib_filesetup(threadflow, flowop, wssp, filedescp) == -1)
-		return (-1);
+	int ret;
 
-	if (flowoplib_iobufsetup(threadflow, flowop, iobufp, iosize) == -1)
-		return (-1);
+	if ((ret = flowoplib_filesetup(threadflow, flowop, wssp, filedescp)) !=
+	    FILEBENCH_OK)
+		return (ret);
 
-	return (0);
+	if ((ret = flowoplib_iobufsetup(threadflow, flowop, iobufp, iosize)) !=
+	    FILEBENCH_OK)
+		return (ret);
+
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -440,15 +464,16 @@ flowoplib_iosetup(threadflow_t *threadflow, flowop_t *flowop,
  * a file descriptor number index is fetched, otherwise a
  * supplied fileobj file is used. In either case the specified
  * file will be opened if not already open. If the flowop has
- * neither a fileset or fileobj, an error is logged and -1
+ * neither a fileset or fileobj, an error is logged and FILEBENCH_ERROR
  * returned.
  *
  * The actual read is done to a random offset in the
  * threadflow's thread memory (tf_mem), with a size set by
  * fo_iosize and at either a random disk offset within the
  * working set size, or at the next sequential location. If
- * any errors are encountered, -1 is returned, if successful,
- * 0 is returned.
+ * any errors are encountered, FILEBENCH_ERROR is returned,
+ * if no appropriate file can be obtained from the fileset then
+ * FILEBENCH_NORSC is returned, otherise FILEBENCH_OK is returned.
  */
 static int
 flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
@@ -458,9 +483,9 @@ flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
 	int filedesc;
 	int ret;
 
-	if (flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
-	    &filedesc, *flowop->fo_iosize) != 0)
-		return (-1);
+	if ((ret = flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
+	    &filedesc, *flowop->fo_iosize)) != FILEBENCH_OK)
+		return (ret);
 
 	if (*flowop->fo_random) {
 		uint64_t fileoffset;
@@ -470,7 +495,7 @@ flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
 			filebench_log(LOG_ERROR,
 			    "file size smaller than IO size for thread %s",
 			    flowop->fo_name);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 
 		(void) flowop_beginop(threadflow, flowop);
@@ -483,7 +508,7 @@ flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
 			    flowop->fo_fileset->fs_name,
 			    fileoffset, iobuf, strerror(errno));
 			flowop_endop(threadflow, flowop, 0);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		(void) flowop_endop(threadflow, flowop, ret);
 
@@ -499,7 +524,7 @@ flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
 			    flowop->fo_fileset->fs_name,
 			    iobuf, strerror(errno));
 			(void) flowop_endop(threadflow, flowop, 0);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		(void) flowop_endop(threadflow, flowop, ret);
 
@@ -507,7 +532,7 @@ flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
 			(void) lseek64(filedesc, 0, SEEK_SET);
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 #ifdef HAVE_AIO
@@ -551,9 +576,9 @@ aio_allocate(flowop_t *flowop)
 
 /*
  * Searches for the aiolist element that has a matching
- * completion block, aiocb. If none found returns -1. If
+ * completion block, aiocb. If none found returns FILEBENCH_ERROR. If
  * found, removes the aiolist element from flowop thread's
- * list and returns 0.
+ * list and returns FILEBENCH_OK.
  */
 static int
 aio_deallocate(flowop_t *flowop, struct aiocb64 *aiocb)
@@ -564,7 +589,7 @@ aio_deallocate(flowop_t *flowop, struct aiocb64 *aiocb)
 
 	if (aiocb == NULL) {
 		filebench_log(LOG_ERROR, "null aiocb deallocate");
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	while (aiolist) {
@@ -577,7 +602,7 @@ aio_deallocate(flowop_t *flowop, struct aiocb64 *aiocb)
 	}
 
 	if (match == NULL)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
 	/* Remove from the list */
 	if (previous)
@@ -585,7 +610,7 @@ aio_deallocate(flowop_t *flowop, struct aiocb64 *aiocb)
 	else
 		flowop->fo_thread->tf_aiolist = match->al_next;
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -594,8 +619,10 @@ aio_deallocate(flowop_t *flowop, struct aiocb64 *aiocb)
  * with a fileobj, allocates and fills an aiolist_t element
  * for the write, and issues the asynchronous write. This
  * operation is only valid for random IO, and returns an
- * error if the flowop is set for sequential IO. Returns 0
- * on success, -1 on any encountered error.
+ * error if the flowop is set for sequential IO. Returns
+ * FILEBENCH_OK on success, FILEBENCH_NORSC if iosetup can't
+ * obtain a file to open, and FILEBENCH_ERROR on any
+ * encountered error.
  */
 static int
 flowoplib_aiowrite(threadflow_t *threadflow, flowop_t *flowop)
@@ -603,10 +630,11 @@ flowoplib_aiowrite(threadflow_t *threadflow, flowop_t *flowop)
 	caddr_t iobuf;
 	vinteger_t wss;
 	int filedesc;
+	int ret;
 
-	if (flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
-	    &filedesc, *flowop->fo_iosize) != 0)
-		return (-1);
+	if ((ret = flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
+	    &filedesc, *flowop->fo_iosize)) != FILEBENCH_OK)
+		return (ret);
 
 	if (*flowop->fo_random) {
 		uint64_t fileoffset;
@@ -618,7 +646,7 @@ flowoplib_aiowrite(threadflow_t *threadflow, flowop_t *flowop)
 			filebench_log(LOG_ERROR,
 			    "file size smaller than IO size for thread %s",
 			    flowop->fo_name);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 
 		aiolist = aio_allocate(flowop);
@@ -643,10 +671,10 @@ flowoplib_aiowrite(threadflow_t *threadflow, flowop_t *flowop)
 		}
 		flowop_endop(threadflow, flowop, *flowop->fo_iosize);
 	} else {
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 
@@ -720,7 +748,7 @@ flowoplib_aiowait(threadflow_t *threadflow, flowop_t *flowop)
 				filebench_log(LOG_ERROR, "Could not remove "
 				    "aio from list ");
 				flowop_endop(threadflow, flowop, 0);
-				return (-1);
+				return (FILEBENCH_ERROR);
 			}
 		}
 
@@ -752,7 +780,7 @@ flowoplib_aiowait(threadflow_t *threadflow, flowop_t *flowop)
 				filebench_log(LOG_ERROR, "Could not remove aio "
 				    "from list ");
 				flowop_endop(threadflow, flowop, 0);
-				return (-1);
+				return (FILEBENCH_ERROR);
 			}
 		}
 
@@ -769,7 +797,7 @@ flowoplib_aiowait(threadflow_t *threadflow, flowop_t *flowop)
 
 	free(worklist);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 #endif /* HAVE_AIO */
@@ -786,7 +814,7 @@ flowoplib_block_init(flowop_t *flowop)
 	(void) pthread_cond_init(&flowop->fo_cv, ipc_condattr());
 	(void) ipc_mutex_unlock(&flowop->fo_lock);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -809,7 +837,7 @@ flowoplib_block(threadflow_t *threadflow, flowop_t *flowop)
 
 	(void) ipc_mutex_unlock(&flowop->fo_lock);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -820,7 +848,7 @@ flowoplib_block(threadflow_t *threadflow, flowop_t *flowop)
  * flowops whose name matches this flowop's "fo_targetname"
  * attribute. The target list is generated on the first
  * invocation, and the run will be shutdown if no targets
- * are found. Otherwise the routine always returns 0.
+ * are found. Otherwise the routine always returns FILEBENCH_OK.
  */
 static int
 flowoplib_wakeup(threadflow_t *threadflow, flowop_t *flowop)
@@ -869,7 +897,7 @@ flowoplib_wakeup(threadflow_t *threadflow, flowop_t *flowop)
 		target = target->fo_targetnext;
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -898,7 +926,7 @@ flowoplib_hog(threadflow_t *threadflow, flowop_t *flowop)
 	}
 	flowop_endop(threadflow, flowop, 0);
 	filebench_log(LOG_DEBUG_IMPL, "hog exit");
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 
@@ -913,7 +941,7 @@ flowoplib_delay(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_beginop(threadflow, flowop);
 	(void) sleep(value);
 	flowop_endop(threadflow, flowop, 0);
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -938,7 +966,7 @@ flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 {
 	/* Immediately bail if not set/enabled */
 	if (filebench_shm->eventgen_hz == 0)
-		return (0);
+		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
@@ -959,14 +987,14 @@ flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 		(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
 	}
 	flowop_endop(threadflow, flowop, 0);
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Blocks the calling thread if the number of issued I/O
  * operations exceeds the number of posted events, thus
  * limiting the average I/O operation rate to the rate
- * specified by eventgen_hz. Always returns 0.
+ * specified by eventgen_hz. Always returns FILEBENCH_OK.
  */
 static int
 flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
@@ -977,7 +1005,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 
 	/* Immediately bail if not set/enabled */
 	if (filebench_shm->eventgen_hz == 0)
-		return (0);
+		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
@@ -991,7 +1019,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	/* Is this the first time around */
 	if (flowop->fo_tputlast == 0) {
 		flowop->fo_tputlast = iops;
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	delta = iops - flowop->fo_tputlast;
@@ -1001,7 +1029,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	/* No need to block if the q isn't empty */
 	if (flowop->fo_tputbucket >= 0LL) {
 		flowop_endop(threadflow, flowop, 0);
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	iops = flowop->fo_tputbucket * -1;
@@ -1023,14 +1051,14 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	}
 	flowop_endop(threadflow, flowop, 0);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Blocks the calling thread if the number of issued filebench
  * operations exceeds the number of posted events, thus limiting
  * the average filebench operation rate to the rate specified by
- * eventgen_hz. Always returns 0.
+ * eventgen_hz. Always returns FILEBENCH_OK.
  */
 static int
 flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
@@ -1041,7 +1069,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 
 	/* Immediately bail if not set/enabled */
 	if (filebench_shm->eventgen_hz == 0)
-		return (0);
+		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
@@ -1054,7 +1082,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	/* Is this the first time around */
 	if (flowop->fo_tputlast == 0) {
 		flowop->fo_tputlast = ops;
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	delta = ops - flowop->fo_tputlast;
@@ -1064,7 +1092,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	/* No need to block if the q isn't empty */
 	if (flowop->fo_tputbucket >= 0LL) {
 		flowop_endop(threadflow, flowop, 0);
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	ops = flowop->fo_tputbucket * -1;
@@ -1085,7 +1113,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	}
 	flowop_endop(threadflow, flowop, 0);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 
@@ -1094,7 +1122,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
  * issued exceeds one megabyte times the number of posted
  * events, thus limiting the average I/O byte rate to one
  * megabyte times the event rate as set by eventgen_hz.
- * Always retuns 0.
+ * Always retuns FILEBENCH_OK.
  */
 static int
 flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
@@ -1105,7 +1133,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 
 	/* Immediately bail if not set/enabled */
 	if (filebench_shm->eventgen_hz == 0)
-		return (0);
+		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
@@ -1119,7 +1147,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	/* Is this the first time around */
 	if (flowop->fo_tputlast == 0) {
 		flowop->fo_tputlast = bytes;
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	delta = bytes - flowop->fo_tputlast;
@@ -1129,7 +1157,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	/* No need to block if the q isn't empty */
 	if (flowop->fo_tputbucket >= 0LL) {
 		flowop_endop(threadflow, flowop, 0);
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
 	bytes = flowop->fo_tputbucket * -1;
@@ -1153,7 +1181,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	}
 	flowop_endop(threadflow, flowop, 0);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1180,18 +1208,18 @@ flowoplib_finishonbytes(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_beginop(threadflow, flowop);
 	if (b > bytes) {
 		flowop_endop(threadflow, flowop, 0);
-		return (1);
+		return (FILEBENCH_DONE);
 	}
 	flowop_endop(threadflow, flowop, 0);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Stop filebench run when specified number of I/O operations have
  * been performed. Compares controlstats.fs_count with *flowop->value,
- * and if greater returns 1, stopping the run, if not, returns 0 to
- * continue running.
+ * and if greater returns 1, stopping the run, if not, returns FILEBENCH_OK
+ * to continue running.
  */
 static int
 flowoplib_finishoncount(threadflow_t *threadflow, flowop_t *flowop)
@@ -1202,13 +1230,13 @@ flowoplib_finishoncount(threadflow_t *threadflow, flowop_t *flowop)
 	ops = controlstats.fs_count;
 
 	flowop_beginop(threadflow, flowop);
-	if (ops > count) {
+	if (ops >= count) {
 		flowop_endop(threadflow, flowop, 0);
-		return (1);
+		return (FILEBENCH_DONE);
 	}
 	flowop_endop(threadflow, flowop, 0);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1225,8 +1253,8 @@ flowoplib_finishoncount(threadflow_t *threadflow, flowop_t *flowop)
  * already been initialized, also allocates a pair of semids
  * and initializes the highwater System V semaphore.
  * If no System V semaphores, then does nothing special.
- * Returns -1 if it cannot acquire a set of System V semphores
- * or if the initial post to the semaphore set fails. Returns 0
+ * Returns FILEBENCH_ERROR if it cannot acquire a set of System V semphores
+ * or if the initial post to the semaphore set fails. Returns FILEBENCH_OK
  * on success.
  */
 static int
@@ -1254,7 +1282,7 @@ flowoplib_semblock_init(flowop_t *flowop)
 		filebench_log(LOG_ERROR, "semblock init lookup %x failed: %s",
 		    filebench_shm->semkey,
 		    strerror(errno));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if ((highwater = flowop->fo_semid_hw) == 0)
@@ -1268,7 +1296,7 @@ flowoplib_semblock_init(flowop_t *flowop)
 	if ((semop(semid, &sbuf[0], 1) == -1) && errno) {
 		filebench_log(LOG_ERROR, "semblock init post failed: %s (%d,"
 		    "%d)", strerror(errno), sbuf[0].sem_num, sbuf[0].sem_op);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 #else
 	filebench_log(LOG_DEBUG_IMPL,
@@ -1281,13 +1309,13 @@ flowoplib_semblock_init(flowop_t *flowop)
 	if (!(*flowop->fo_blocking))
 		(void) ipc_mutex_unlock(&flowop->fo_lock);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Releases the semids for the System V semaphore allocated
  * to this flowop. If not using System V semaphores, then
- * it is effectively just a no-op. Always returns 0.
+ * it is effectively just a no-op.
  */
 static void
 flowoplib_semblock_destruct(flowop_t *flowop)
@@ -1302,9 +1330,9 @@ flowoplib_semblock_destruct(flowop_t *flowop)
 
 /*
  * Attempts to pass a System V or posix semaphore as appropriate,
- * and blocks if necessary. Returns -1 if a set of System V
+ * and blocks if necessary. Returns FILEBENCH_ERROR if a set of System V
  * semphores is not available or cannot be acquired, or if the initial
- * post to the semaphore set fails. Returns 0 on success.
+ * post to the semaphore set fails. Returns FILEBENCH_OK on success.
  */
 static int
 flowoplib_semblock(threadflow_t *threadflow, flowop_t *flowop)
@@ -1320,7 +1348,7 @@ flowoplib_semblock(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR, "lookup semop %x failed: %s",
 		    filebench_shm->semkey,
 		    strerror(errno));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	filebench_log(LOG_DEBUG_IMPL,
@@ -1368,7 +1396,7 @@ flowoplib_semblock(threadflow_t *threadflow, flowop_t *flowop)
 	for (i = 0; i < value; i++) {
 		if (sem_wait(&flowop->fo_sem) == -1) {
 			filebench_log(LOG_ERROR, "semop wait failed");
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 	}
 
@@ -1376,13 +1404,11 @@ flowoplib_semblock(threadflow_t *threadflow, flowop_t *flowop)
 	    flowop->fo_name, flowop->fo_instance);
 #endif /* HAVE_SYSV_SEM */
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
- * Calls ipc_seminit(), and does so whether System V semaphores
- * are available or not. Hence it will cause ipc_seminit to log errors
- * if they are not. Always returns 0.
+ * Calls ipc_seminit(). Always returns FILEBENCH_OK.
  */
 /* ARGSUSED */
 static int
@@ -1391,7 +1417,7 @@ flowoplib_sempost_init(flowop_t *flowop)
 #ifdef HAVE_SYSV_SEM
 	ipc_seminit();
 #endif /* HAVE_SYSV_SEM */
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1467,7 +1493,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 			    "lookup semop %x failed: %s",
 			    filebench_shm->semkey,
 			    strerror(errno));
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 
 		sbuf[0].sem_num = target->fo_semid_lw;
@@ -1493,7 +1519,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 #endif /* HAVE_SEMTIMEDOP */
 			filebench_log(LOG_ERROR, "semop post failed: %s",
 			    strerror(errno));
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 
 		filebench_log(LOG_DEBUG_IMPL,
@@ -1509,7 +1535,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 		for (i = 0; i < value; i++) {
 			if (sem_post(&target->fo_sem) == -1) {
 				filebench_log(LOG_ERROR, "semop post failed");
-				return (-1);
+				return (FILEBENCH_ERROR);
 			}
 		}
 
@@ -1521,7 +1547,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 	}
 	flowop_endop(threadflow, flowop, 0);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 
@@ -1547,9 +1573,10 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 
 /*
  * Emulates (and actually does) file open. Obtains a file descriptor
- * index, then calls flowoplib_openfile_common() to open. Returns -1
- * if not file descriptor is found or flowoplib_openfile_common
- * encounters an error, otherwise 0.
+ * index, then calls flowoplib_openfile_common() to open. Returns
+ * FILEBENCH_ERROR if no file descriptor is found, and returns the
+ * status from flowoplib_openfile_common otherwise (FILEBENCH_ERROR,
+ * FILEBENCH_NORSC, FILEBENCH_OK).
  */
 static int
 flowoplib_openfile(threadflow_t *threadflow, flowop_t *flowop)
@@ -1557,7 +1584,7 @@ flowoplib_openfile(threadflow_t *threadflow, flowop_t *flowop)
 	int fd = flowoplib_fdnum(threadflow, flowop);
 
 	if (fd == -1)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
 	return (flowoplib_openfile_common(threadflow, flowop, fd));
 }
@@ -1570,7 +1597,9 @@ flowoplib_openfile(threadflow_t *threadflow, flowop_t *flowop)
  * specified in the filesetentry is opened, and the returned
  * operating system file descriptor and a pointer to the
  * filesetentry are stored in tf_fd[fd] and tf_fse[fd],
- * respectively. Returns -1 on error, 0 on success.
+ * respectively. Returns FILEBENCH_ERROR on error,
+ * FILEBENCH_NORSC if no suitable filesetentry can be found,
+ * and FILEBENCH_OK on success.
  */
 static int
 flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
@@ -1589,12 +1618,12 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to open without closing on fd %d",
 		    flowop->fo_name, fd);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if (flowop->fo_fileset == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 #ifdef HAVE_RAW_SUPPORT
@@ -1624,7 +1653,7 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 			filebench_log(LOG_ERROR,
 			    "Failed to open raw device %s: %s",
 			    name, strerror(errno));
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 
 		/* if running on Solaris, use un-buffered io */
@@ -1634,17 +1663,17 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 
 		threadflow->tf_fse[fd] = NULL;
 
-		return (0);
+		return (FILEBENCH_OK);
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
 	if ((file = fileset_pick(flowop->fo_fileset,
 	    FILESET_PICKEXISTS, tid)) == NULL) {
-		filebench_log(LOG_ERROR,
+		filebench_log(LOG_DEBUG_SCRIPT,
 		    "flowop %s failed to pick file from %s on fd %d",
 		    flowop->fo_name,
 		    flowop->fo_fileset->fs_name, fd);
-		return (-1);
+		return (FILEBENCH_NORSC);
 	}
 
 	threadflow->tf_fse[fd] = file;
@@ -1657,14 +1686,14 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 	if (threadflow->tf_fd[fd] < 0) {
 		filebench_log(LOG_ERROR, "failed to open file %s",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	filebench_log(LOG_DEBUG_SCRIPT,
 	    "flowop %s: opened %s fd[%d] = %d",
 	    flowop->fo_name, file->fse_path, fd, threadflow->tf_fd[fd]);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1674,10 +1703,10 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
  * to select a specific filesetentry whose file does not currently
  * exist for the file create operation. Then calls
  * fileset_openfile() with the O_CREATE flag set to create the
- * file. Returns -1 if the array index specified by fdnumber is
+ * file. Returns FILEBENCH_ERROR if the array index specified by fdnumber is
  * already in use, the flowop has no associated fileset, or
  * the create call fails. Returns 1 if a filesetentry with a
- * nonexistent file cannot be found. Returns 0 on success.
+ * nonexistent file cannot be found. Returns FILEBENCH_OK on success.
  */
 static int
 flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
@@ -1689,12 +1718,12 @@ flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to create without closing on fd %d",
 		    flowop->fo_name, fd);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if (flowop->fo_fileset == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 #ifdef HAVE_RAW_SUPPORT
@@ -1703,15 +1732,16 @@ flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to a createfile on RAW device",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
 	if ((file = fileset_pick(flowop->fo_fileset,
 	    FILESET_PICKNOEXIST, 0)) == NULL) {
-		filebench_log(LOG_DEBUG_SCRIPT, "flowop %s failed to pick file",
-		    flowop->fo_name);
-		return (1);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s failed to pick file from fileset %s",
+		    flowop->fo_name, flowop->fo_fileset->fs_name);
+		return (FILEBENCH_NORSC);
 	}
 
 	threadflow->tf_fse[fd] = file;
@@ -1724,22 +1754,22 @@ flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
 	if (threadflow->tf_fd[fd] < 0) {
 		filebench_log(LOG_ERROR, "failed to create file %s",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	filebench_log(LOG_DEBUG_SCRIPT,
 	    "flowop %s: created %s fd[%d] = %d",
 	    flowop->fo_name, file->fse_path, fd, threadflow->tf_fd[fd]);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Emulates delete of a file. Picks an arbitrary filesetentry
  * whose file exists and uses unlink() to delete it. Clears
- * the FSE_EXISTS flag for the filesetentry. Returns -1 if the
- * flowop has no associated fileset. Returns 1 if an appropriate
- * filesetentry cannot be found, and 0 on success.
+ * the FSE_EXISTS flag for the filesetentry. Returns FILEBENCH_ERROR if the
+ * flowop has no associated fileset. Returns FILEBENCH_NORSC if an appropriate
+ * filesetentry cannot be found, and FILEBENCH_OK on success.
  */
 static int
 flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
@@ -1751,7 +1781,7 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 
 	if (flowop->fo_fileset == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	fileset = flowop->fo_fileset;
@@ -1762,7 +1792,7 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted a deletefile on RAW device",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
@@ -1770,7 +1800,7 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	    FILESET_PICKEXISTS, 0)) == NULL) {
 		filebench_log(LOG_DEBUG_SCRIPT, "flowop %s failed to pick file",
 		    flowop->fo_name);
-		return (1);
+		return (FILEBENCH_NORSC);
 	}
 
 	*path = 0;
@@ -1789,15 +1819,15 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 
 	filebench_log(LOG_DEBUG_SCRIPT, "deleted file %s", file->fse_path);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Emulates fsync of a file. Obtains the file descriptor index
  * from the flowop, obtains the actual file descriptor from
  * the threadflow's table, checks to be sure it is still an
- * open file, then does an fsync operation on it. Returns -1
- * if the file no longer is open, 0 otherwise.
+ * open file, then does an fsync operation on it. Returns FILEBENCH_ERROR
+ * if the file no longer is open, FILEBENCH_OK otherwise.
  */
 static int
 flowoplib_fsync(threadflow_t *threadflow, flowop_t *flowop)
@@ -1809,7 +1839,7 @@ flowoplib_fsync(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to fsync a closed fd %d",
 		    flowop->fo_name, fd);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	file = threadflow->tf_fse[fd];
@@ -1819,7 +1849,7 @@ flowoplib_fsync(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to a fsync a RAW device",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	/* Measure time to fsync */
@@ -1829,14 +1859,14 @@ flowoplib_fsync(threadflow_t *threadflow, flowop_t *flowop)
 
 	filebench_log(LOG_DEBUG_SCRIPT, "fsync file %s", file->fse_path);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Emulate fsync of an entire fileset. Search through the
  * threadflow's file descriptor array, doing fsync() on each
  * open file that belongs to the flowop's fileset. Always
- * returns 0.
+ * returns FILEBENCH_OK.
  */
 static int
 flowoplib_fsyncset(threadflow_t *threadflow, flowop_t *flowop)
@@ -1862,7 +1892,7 @@ flowoplib_fsyncset(threadflow_t *threadflow, flowop_t *flowop)
 		    file->fse_path);
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1871,8 +1901,8 @@ flowoplib_fsyncset(threadflow_t *threadflow, flowop_t *flowop)
  * threadflow's table, checks to be sure it is still an open
  * file, then does a close operation on it. Then sets the
  * threadflow file descriptor table entry to 0, and the file set
- * entry pointer to NULL. Returns -1 if the file was not open,
- * 0 otherwise.
+ * entry pointer to NULL. Returns FILEBENCH_ERROR if the file was not open,
+ * FILEBENCH_OK otherwise.
  */
 static int
 flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
@@ -1884,7 +1914,7 @@ flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to close an already closed fd %d",
 		    flowop->fo_name, fd);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	/* Measure time to close */
@@ -1899,15 +1929,15 @@ flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
 
 	filebench_log(LOG_DEBUG_SCRIPT, "closed file %s", file->fse_path);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * Emulate stat of a file. Picks an arbitrary filesetentry with
  * an existing file from the flowop's fileset, then performs a
- * stat() operation on it. Returns -1 if the flowop has no
- * associated fileset. Returns 1 if an appropriate filesetentry
- * cannot be found, and 0 on success.
+ * stat() operation on it. Returns FILEBENCH_ERROR if the flowop has no
+ * associated fileset. Returns FILEBENCH_NORSC if an appropriate filesetentry
+ * cannot be found, and FILEBENCH_OK on success.
  */
 static int
 flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
@@ -1919,7 +1949,7 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 
 	if (flowop->fo_fileset == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	fileset = flowop->fo_fileset;
@@ -1928,7 +1958,7 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 	    FILESET_PICKEXISTS, 0)) == NULL) {
 		filebench_log(LOG_DEBUG_SCRIPT, "flowop %s failed to pick file",
 		    flowop->fo_name);
-		return (1);
+		return (FILEBENCH_NORSC);
 	}
 
 	*path = 0;
@@ -1944,7 +1974,7 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 
 	(void) ipc_mutex_unlock(&file->fse_lock);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 
@@ -1963,7 +1993,8 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
  * file descriptor and filesetentry stored at the locations indexed
  * by the flowop's fdnumber. It then seeks to the beginning of the
  * associated file, and reads fs_iosize bytes at a time until the end
- * of the file. Returns -1 on error, 0 on success.
+ * of the file. Returns FILEBENCH_ERROR on error, FILEBENCH_NORSC if
+ * out of files, and FILEBENCH_OK on success.
  */
 static int
 flowoplib_readwholefile(threadflow_t *threadflow, flowop_t *flowop)
@@ -1977,15 +2008,16 @@ flowoplib_readwholefile(threadflow_t *threadflow, flowop_t *flowop)
 	vinteger_t iosize = *flowop->fo_iosize;
 
 	/* get the file to use */
-	if (flowoplib_filesetup(threadflow, flowop, &wss, &filedesc) != 0)
-		return (-1);
+	if ((ret = flowoplib_filesetup(threadflow, flowop, &wss,
+	    &filedesc)) != FILEBENCH_OK)
+		return (ret);
 
 	/* an I/O size of zero means read entire working set with one I/O */
 	if (iosize == 0)
 		iosize = wss;
 
 	if (flowoplib_iobufsetup(threadflow, flowop, &iobuf, iosize) != 0)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
 	/* Measure time to read bytes */
 	flowop_beginop(threadflow, flowop);
@@ -1999,10 +2031,10 @@ flowoplib_readwholefile(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_ERROR,
 		    "Failed to read fd %d: %s",
 		    fd, strerror(errno));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -2016,8 +2048,9 @@ flowoplib_readwholefile(threadflow_t *threadflow, flowop_t *flowop)
  * filesetentry's  fse_size will be used. A random memory
  * buffer offset is calculated, and, if fo_random is TRUE,
  * a random file offset is used for the write. Otherwise the
- * write is to the next sequential location. Returns 1 on
- * errors, 0 on success.
+ * write is to the next sequential location. Returns
+ * FILEBENCH_ERROR on errors, FILEBENCH_NORSC if iosetup can't
+ * obtain a file, or FILEBENCH_OK on success.
  */
 static int
 flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
@@ -2025,10 +2058,11 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
 	caddr_t iobuf;
 	vinteger_t wss;
 	int filedesc;
+	int ret;
 
-	if (flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
-	    &filedesc, *flowop->fo_iosize) != 0)
-		return (-1);
+	if ((ret = flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
+	    &filedesc, *flowop->fo_iosize)) != FILEBENCH_OK)
+		return (ret);
 
 	if (*flowop->fo_random) {
 		uint64_t fileoffset;
@@ -2038,7 +2072,7 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
 			filebench_log(LOG_ERROR,
 			    "file size smaller than IO size for thread %s",
 			    flowop->fo_name);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		flowop_beginop(threadflow, flowop);
 		if (pwrite64(filedesc, iobuf,
@@ -2047,7 +2081,7 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
 			    "offset %lld io buffer %zd: %s",
 			    fileoffset, iobuf, strerror(errno));
 			flowop_endop(threadflow, flowop, 0);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		flowop_endop(threadflow, flowop, *flowop->fo_iosize);
 	} else {
@@ -2058,12 +2092,12 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
 			    "write failed, io buffer %zd: %s",
 			    iobuf, strerror(errno));
 			flowop_endop(threadflow, flowop, 0);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		flowop_endop(threadflow, flowop, *flowop->fo_iosize);
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -2071,8 +2105,8 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
  * is taken from a filesetentry identified by fo_srcfdnumber or
  * from the working set size, while the file descriptor used is
  * identified by fo_fdnumber. Does multiple writes of fo_iosize
- * length length until full file has been written. Returns -1 on
- * error, 0 on success.
+ * length length until full file has been written. Returns FILEBENCH_ERROR on
+ * error, FILEBENCH_NORSC if out of files, FILEBENCH_OK on success.
  */
 static int
 flowoplib_writewholefile(threadflow_t *threadflow, flowop_t *flowop)
@@ -2089,21 +2123,22 @@ flowoplib_writewholefile(threadflow_t *threadflow, flowop_t *flowop)
 	vinteger_t iosize = *flowop->fo_iosize;
 
 	/* get the file to use */
-	if (flowoplib_filesetup(threadflow, flowop, &wss, &filedesc) != 0)
-		return (-1);
+	if ((ret = flowoplib_filesetup(threadflow, flowop, &wss,
+	    &filedesc)) != FILEBENCH_OK)
+		return (ret);
 
 	/* an I/O size of zero means read entire working set with one I/O */
 	if (iosize == 0)
 		iosize = wss;
 
 	if (flowoplib_iobufsetup(threadflow, flowop, &iobuf, iosize) != 0)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
 	file = threadflow->tf_fse[srcfd];
 	if ((srcfd != 0) && (file == NULL)) {
 		filebench_log(LOG_ERROR, "flowop %s: NULL src file",
 		    flowop->fo_name);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if (file)
@@ -2120,14 +2155,14 @@ flowoplib_writewholefile(threadflow_t *threadflow, flowop_t *flowop)
 			    "Failed to write %d bytes on fd %d: %s",
 			    wsize, filedesc, strerror(errno));
 			flowop_endop(threadflow, flowop, 0);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		wsize = (int)MIN(wss - seek, iosize);
 		bytes += ret;
 	}
 	flowop_endop(threadflow, flowop, bytes);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 
@@ -2144,7 +2179,8 @@ flowoplib_writewholefile(threadflow_t *threadflow, flowop_t *flowop)
  * bytes. Writes are actually done from fo_buf, rather than
  * tf_mem as is done with flowoplib_write(), and no check
  * is made to see if fo_iosize exceeds the size of fo_buf.
- * Returns -1 on error, 0 on success.
+ * Returns FILEBENCH_ERROR on error, FILEBENCH_NORSC if out of
+ * files in the fileset, FILEBENCH_OK on success.
  */
 static int
 flowoplib_appendfile(threadflow_t *threadflow, flowop_t *flowop)
@@ -2155,9 +2191,9 @@ flowoplib_appendfile(threadflow_t *threadflow, flowop_t *flowop)
 	vinteger_t iosize = *flowop->fo_iosize;
 	int ret;
 
-	if (flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
-	    &filedesc, iosize) != 0)
-		return (-1);
+	if ((ret = flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
+	    &filedesc, iosize)) != FILEBENCH_OK)
+		return (ret);
 
 	/* XXX wss is not being used */
 
@@ -2170,11 +2206,11 @@ flowoplib_appendfile(threadflow_t *threadflow, flowop_t *flowop)
 		    "Failed to write %d bytes on fd %d: %s",
 		    iosize, filedesc, strerror(errno));
 		flowop_endop(threadflow, flowop, 0);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 	flowop_endop(threadflow, flowop, iosize);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -2190,7 +2226,8 @@ flowoplib_appendfile(threadflow_t *threadflow, flowop_t *flowop)
  * FILE_ALLOC_BLOCK in size are done until the full transfer
  * size has been written. Writes are actually done from fo_buf,
  * rather than tf_mem as is done with flowoplib_write().
- * Returns -1 on error, 0 on success.
+ * Returns FILEBENCH_ERROR on error, FILEBENCH_NORSC if out of
+ * files in the fileset, FILEBENCH_OK on success.
  */
 static int
 flowoplib_appendfilerand(threadflow_t *threadflow, flowop_t *flowop)
@@ -2199,21 +2236,21 @@ flowoplib_appendfilerand(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t appendsize;
 	int filedesc;
 	vinteger_t wss;
-	int ret = 0;
+	int ret;
 
 	if (filebench_randomno64(&appendsize, *flowop->fo_iosize, 1LL) != 0)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
 	/* skip if attempting zero length append */
 	if (appendsize == 0) {
 		flowop_beginop(threadflow, flowop);
 		flowop_endop(threadflow, flowop, 0LL);
-		return (0);
+		return (FILEBENCH_OK);
 	}
 
-	if (flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
-	    &filedesc, appendsize) != 0)
-		return (-1);
+	if ((ret = flowoplib_iosetup(threadflow, flowop, &wss, &iobuf,
+	    &filedesc, appendsize)) != FILEBENCH_OK)
+		return (ret);
 
 	/* XXX wss is not being used */
 
@@ -2227,12 +2264,12 @@ flowoplib_appendfilerand(threadflow_t *threadflow, flowop_t *flowop)
 		    "Failed to write %d bytes on fd %d: %s",
 		    appendsize, filedesc, strerror(errno));
 		flowop_endop(threadflow, flowop, 0);
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	flowop_endop(threadflow, flowop, appendsize);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 

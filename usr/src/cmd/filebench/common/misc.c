@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,6 +331,19 @@ __V((int level, const char *fmt, ...))
 		level = LOG_ERROR;
 	}
 
+	/* Quit if this is a LOG_ERROR messages and they are disabled */
+	if ((filebench_shm->shm_1st_err) && (level == LOG_ERROR))
+		return;
+
+	if (level == LOG_ERROR1) {
+		if (filebench_shm->shm_1st_err)
+			return;
+
+		/* A LOG_ERROR1 temporarily disables LOG_ERROR messages */
+		filebench_shm->shm_1st_err = 1;
+		level = LOG_ERROR;
+	}
+
 	/* Only log greater than debug setting */
 	if ((level != LOG_DUMP) && (level != LOG_LOG) &&
 	    (level > filebench_shm->debug_level))
@@ -376,7 +389,7 @@ fatal:
 
 	} else if (filebench_shm->debug_level > LOG_INFO) {
 		(void) fprintf(stdout, "%5d: %4.3f: %s",
-		    (int)pid, (now - filebench_shm->epoch) / FSECS,
+		    (int)my_pid, (now - filebench_shm->epoch) / FSECS,
 		    line);
 	} else {
 		(void) fprintf(stdout, "%4.3f: %s",
@@ -385,7 +398,8 @@ fatal:
 	}
 
 	if (level == LOG_ERROR) {
-		(void) fprintf(stdout, " on line %d", lex_lineno);
+		if (my_procflow == NULL)
+			(void) fprintf(stdout, " on line %d", lex_lineno);
 	}
 
 	if ((level != LOG_LOG) && (level != LOG_DUMP)) {
@@ -405,7 +419,7 @@ void
 filebench_shutdown(int error) {
 	filebench_log(LOG_DEBUG_IMPL, "Shutdown");
 	(void) unlink("/tmp/filebench_shm");
-	if (filebench_shm->allrunning)
+	if (filebench_shm->shm_running)
 		procflow_shutdown();
 	filebench_shm->f_abort = 1;
 	ipc_ismdelete();

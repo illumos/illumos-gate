@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -402,6 +402,13 @@ stats_snap(void)
 		return;
 	}
 
+	/* don't print out if run ended in error */
+	if (filebench_shm->f_abort == FILEBENCH_ABORT_ERROR) {
+		filebench_log(LOG_ERROR,
+		    "NO VALID RESULTS! FileBench run terminated prematurely");
+		return;
+	}
+
 	globalstats->fs_etime = gethrtime();
 
 	filebench_log(LOG_DEBUG_SCRIPT, "Stats period = %ds",
@@ -544,6 +551,10 @@ stats_dump(char *filename)
 	flowstat_t *aiostat = &globalstats[FLOW_TYPE_AIO];
 	flowop_t *flowop;
 
+	/* don't dump stats if run ended in error */
+	if (filebench_shm->f_abort == FILEBENCH_ABORT_ERROR)
+		return;
+
 	(void) strcpy(filebench_shm->dump_filename, filename);
 
 	filebench_log(LOG_INFO, "in statsdump %s", filename);
@@ -615,6 +626,10 @@ stats_xmldump(char *filename)
 	flowstat_t *iostat = &globalstats[FLOW_TYPE_IO];
 	flowstat_t *aiostat = &globalstats[FLOW_TYPE_AIO];
 	flowop_t *flowop;
+
+	/* don't dump stats if run ended in error */
+	if (filebench_shm->f_abort == FILEBENCH_ABORT_ERROR)
+		return;
 
 	(void) strcpy(filebench_shm->dump_filename, filename);
 

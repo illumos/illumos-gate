@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,7 +157,7 @@ static void parser_abort(int arg);
 %token FSV_STRING FSV_VAL_INT FSV_VAL_BOOLEAN FSV_VARIABLE FSV_WHITESTRING
 %token FST_INT FST_BOOLEAN
 %token FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSE_ALL FSE_SNAP FSE_DUMP
-%token FSE_DIRECTORY FSE_COMMAND FSE_FILESET FSE_XMLDUMP
+%token FSE_DIRECTORY FSE_COMMAND FSE_FILESET FSE_XMLDUMP FSE_MODE
 %token FSK_SEPLST FSK_OPENLST FSK_CLOSELST FSK_ASSIGN FSK_IN FSK_QUOTE
 %token FSK_DIRSEPLST
 %token FSA_SIZE FSA_PREALLOC FSA_PARALLOC FSA_PATH FSA_REUSE
@@ -166,7 +166,7 @@ static void parser_abort(int arg);
 %token FSA_DSYNC FSA_TARGET FSA_ITERS FSA_NICE FSA_VALUE FSA_BLOCKING
 %token FSA_HIGHWATER FSA_DIRECTIO FSA_DIRWIDTH FSA_FD FSA_SRCFD FSA_ROTATEFD
 %token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA
-%token FSA_DIRGAMMA FSA_USEISM
+%token FSA_DIRGAMMA FSA_USEISM FSA_ALLDONE FSA_FIRSTDONE FSA_TIMEOUT
 
 %type <ival> FSV_VAL_INT
 %type <bval> FSV_VAL_BOOLEAN
@@ -684,6 +684,24 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 		parser_vars($$);
 	}
 	$$->cmd = NULL;
+} | FSC_SET FSE_MODE FSC_QUIT FSA_TIMEOUT
+{
+	filebench_shm->shm_rmode = FILEBENCH_MODE_TIMEOUT;
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = NULL;
+} | FSC_SET FSE_MODE FSC_QUIT FSA_ALLDONE
+{
+	filebench_shm->shm_rmode = FILEBENCH_MODE_QALLDONE;
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = NULL;
+} | FSC_SET FSE_MODE FSC_QUIT FSA_FIRSTDONE
+{
+	filebench_shm->shm_rmode = FILEBENCH_MODE_Q1STDONE;
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = NULL;
 };
 
 stats_command: FSC_STATS FSE_SNAP
@@ -1180,26 +1198,26 @@ main(int argc, char *argv[])
 	printf("FileBench Version %s\n", FILEBENCH_VERSION);
 	filebench_init();
 
+	/* get process pid for use with message logging */
+	my_pid = getpid();
+
 #ifdef USE_PROCESS_MODEL
 	if (*procname) {
-		pid = getpid();
-
+		/* A child FileBench instance */
 		if (ipc_attach(shmaddr) < 0) {
 			filebench_log(LOG_ERROR, "Cannot attach shm for %s",
 			    procname);
 			exit(1);
 		}
 
-		if (procflow_exec(procname, instance) < 0) {
-			filebench_log(LOG_ERROR, "Cannot startup process %s",
-			    procname);
+		if (procflow_exec(procname, instance) < 0)
 			exit(1);
-		}
-		exit(1);
+
+		exit(0);
 	}
 #endif
 
-	pid = getpid();
+	/* master (or only) process */
 	ipc_init();
 
 	if (fscriptname)
@@ -1917,6 +1935,7 @@ parser_fileset_define(cmd_t *cmd)
 static void
 parser_proc_create(cmd_t *cmd)
 {
+	filebench_shm->shm_1st_err = 0;
 	if (procflow_init() != 0) {
 		filebench_log(LOG_ERROR, "Failed to create processes\n");
 		filebench_shutdown(1);
@@ -1993,27 +2012,36 @@ parser_filebench_shutdown(cmd_t *cmd)
 }
 
 /*
- * Sleeps for cmd->cmd_qty seconds, one second at a time.
+ * This is Used for timing runs.Pauses the master thread in one second
+ * intervals until the supplied ptime runs out or the f_abort flag
+ * is raised. If given a time of zero or less, or the mode is stop on
+ * lack of resources, it will pause until f_abort is raised.
  */
 static void
-parser_sleep(cmd_t *cmd)
+parser_pause(int ptime)
 {
-	int sleeptime;
+	int timeslept = 0;
 
-	/* check for startup errors */
-	if (filebench_shm->f_abort)
-		return;
-
-	sleeptime = cmd->cmd_qty;
-	filebench_log(LOG_INFO, "Running...");
-	while (sleeptime) {
-		(void) sleep(1);
-		sleeptime--;
-		if (filebench_shm->f_abort)
-			break;
+	if ((filebench_shm->shm_rmode == FILEBENCH_MODE_TIMEOUT) &&
+	    (ptime > 0)) {
+		while (timeslept < ptime) {
+			(void) sleep(1);
+			timeslept++;
+			if (filebench_shm->f_abort)
+				break;
+		}
+	} else {
+		/* initial runtime of 0 means run till abort */
+		/* CONSTCOND */
+		while (1) {
+			(void) sleep(1);
+			timeslept++;
+			if (filebench_shm->f_abort)
+				break;
+		}
 	}
-	filebench_log(LOG_INFO, "Run took %lld seconds...",
-	    cmd->cmd_qty - sleeptime);
+
+	filebench_log(LOG_INFO, "Run took %lld seconds...", timeslept);
 }
 
 /*
@@ -2029,6 +2057,7 @@ parser_run(cmd_t *cmd)
 	int runtime;
 
 	runtime = cmd->cmd_qty;
+
 	parser_fileset_create(cmd);
 	parser_proc_create(cmd);
 
@@ -2038,14 +2067,9 @@ parser_run(cmd_t *cmd)
 
 	filebench_log(LOG_INFO, "Running...");
 	stats_clear();
-	while (runtime) {
-		(void) sleep(1);
-		runtime--;
-		if (filebench_shm->f_abort)
-			break;
-	}
-	filebench_log(LOG_INFO, "Run took %lld seconds...",
-	    cmd->cmd_qty - runtime);
+
+	parser_pause(runtime);
+
 	parser_statssnap(cmd);
 	parser_proc_shutdown(cmd);
 }
@@ -2074,15 +2098,11 @@ parser_run_variable(cmd_t *cmd)
 
 	filebench_log(LOG_INFO, "Running...");
 	stats_clear();
-	while (runtime) {
-		(void) sleep(1);
-		runtime--;
-		if (filebench_shm->f_abort)
-			break;
-	}
-	filebench_log(LOG_INFO, "Run took %lld seconds...",
-	    *integer - runtime);
+
+	parser_pause(runtime);
+
 	parser_statssnap(cmd);
+	parser_proc_shutdown(cmd);
 }
 
 char *usagestr = NULL;
@@ -2161,6 +2181,24 @@ parser_vars(cmd_t *cmd)
 }
 
 /*
+ * Sleeps for cmd->cmd_qty seconds, one second at a time.
+ */
+static void
+parser_sleep(cmd_t *cmd)
+{
+	int sleeptime;
+
+	/* check for startup errors */
+	if (filebench_shm->f_abort)
+		return;
+
+	sleeptime = cmd->cmd_qty;
+	filebench_log(LOG_INFO, "Running...");
+
+	parser_pause(sleeptime);
+}
+
+/*
  * Same as parser_sleep, except the sleep time is obtained from a variable
  * whose name is passed to it as an argument on the command line.
  */
@@ -2183,14 +2221,8 @@ parser_sleep_variable(cmd_t *cmd)
 		return;
 
 	filebench_log(LOG_INFO, "Running...");
-	while (sleeptime) {
-		(void) sleep(1);
-		sleeptime--;
-		if (filebench_shm->f_abort)
-			break;
-	}
-	filebench_log(LOG_INFO, "Run took %lld seconds...",
-	    *integer - sleeptime);
+
+	parser_pause(sleeptime);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,7 @@ flowop_beginop(threadflow_t *threadflow, flowop_t *flowop)
 		char procname[128];
 
 		(void) snprintf(procname, sizeof (procname),
-		    "/proc/%d/lwp/%d/lwpusage", pid, _lwp_self());
+		    "/proc/%d/lwp/%d/lwpusage", my_pid, _lwp_self());
 		threadflow->tf_lwpusagefd = open(procname, O_RDONLY);
 	}
 
@@ -192,6 +192,45 @@ flowop_initflow(flowop_t *flowop)
 }
 
 /*
+ * Calls the flowop's destruct function, pointed to by
+ * flowop->fo_destruct.
+ */
+static void
+flowop_destructflow(flowop_t *flowop)
+{
+	(*flowop->fo_destruct)(flowop);
+}
+
+/*
+ * call the destruct funtions of all the threadflow's flowops,
+ * if it is still flagged as "running".
+ */
+void
+flowop_destruct_all_flows(threadflow_t *threadflow)
+{
+	flowop_t *flowop;
+
+	(void) ipc_mutex_lock(&threadflow->tf_lock);
+
+	/* prepare to call destruct flow routines, if necessary */
+	if (threadflow->tf_running == 0) {
+
+		/* allready destroyed */
+		(void) ipc_mutex_unlock(&threadflow->tf_lock);
+		return;
+	}
+
+	flowop = threadflow->tf_ops;
+	threadflow->tf_running = 0;
+	(void) ipc_mutex_unlock(&threadflow->tf_lock);
+
+	while (flowop) {
+		flowop_destructflow(flowop);
+		flowop = flowop->fo_threadnext;
+	}
+}
+
+/*
  * The final initialization and main execution loop for the
  * worker threads. Sets threadflow and flowop start times,
  * waits for all process to start, then creates the runtime
@@ -210,8 +249,6 @@ flowop_start(threadflow_t *threadflow)
 	size_t memsize;
 	int ret = 0;
 
-	pid = getpid();
-
 #ifdef HAVE_PROCFS
 	if (noproc == 0) {
 		char procname[128];
@@ -219,7 +256,7 @@ flowop_start(threadflow_t *threadflow)
 		int pfd;
 
 		(void) snprintf(procname, sizeof (procname),
-		    "/proc/%d/lwp/%d/lwpctl", pid, _lwp_self());
+		    "/proc/%d/lwp/%d/lwpctl", my_pid, _lwp_self());
 		pfd = open(procname, O_WRONLY);
 		(void) pwrite(pfd, &ctl, sizeof (ctl), 0);
 		(void) close(pfd);
@@ -303,12 +340,8 @@ flowop_start(threadflow_t *threadflow)
 		int i;
 
 		/* Abort if asked */
-		if (threadflow->tf_abort || filebench_shm->f_abort) {
-			(void) ipc_mutex_lock(&threadflow->tf_lock);
-			threadflow->tf_running = 0;
-			(void) ipc_mutex_unlock(&threadflow->tf_lock);
+		if (threadflow->tf_abort || filebench_shm->f_abort)
 			break;
-		}
 
 		/* Be quiet while stats are gathered */
 		if (filebench_shm->bequiet) {
@@ -317,7 +350,7 @@ flowop_start(threadflow_t *threadflow)
 		}
 
 		/* Take it easy until everyone is ready to go */
-		if (!filebench_shm->allrunning)
+		if (!filebench_shm->shm_running)
 			(void) sleep(1);
 
 		if (flowop->fo_stats.fs_stime == 0)
@@ -325,13 +358,6 @@ flowop_start(threadflow_t *threadflow)
 
 		if (flowop == NULL) {
 			filebench_log(LOG_ERROR, "flowop_read null flowop");
-			return;
-		}
-
-		if (threadflow->tf_memsize == 0) {
-			filebench_log(LOG_ERROR,
-			    "Zero memory size for thread %s",
-			    threadflow->tf_name);
 			return;
 		}
 
@@ -348,30 +374,62 @@ flowop_start(threadflow_t *threadflow)
 			    "%s-%d", threadflow->tf_name, flowop->fo_name,
 			    flowop->fo_instance);
 
-			/* Return value > 0 means "stop the filebench run" */
-			if (ret > 0) {
-				filebench_log(LOG_VERBOSE,
-				    "%s: exiting flowop %s-%d",
-				    threadflow->tf_name, flowop->fo_name,
+			/*
+			 * Return value FILEBENCH_ERROR means "flowop
+			 * failed, stop the filebench run"
+			 */
+			if (ret == FILEBENCH_ERROR) {
+				filebench_log(LOG_ERROR,
+				    "%s-%d: flowop %s-%d failed",
+				    threadflow->tf_name,
+				    threadflow->tf_instance,
+				    flowop->fo_name,
 				    flowop->fo_instance);
 				(void) ipc_mutex_lock(&threadflow->tf_lock);
 				threadflow->tf_abort = 1;
-				filebench_shm->f_abort = 1;
-				threadflow->tf_running = 0;
+				filebench_shm->f_abort = FILEBENCH_ABORT_ERROR;
 				(void) ipc_mutex_unlock(&threadflow->tf_lock);
 				break;
 			}
+
 			/*
-			 * Return value < 0 means "flowop failed, stop the
-			 * filebench run"
+			 * Return value of FILEBENCH_NORSC means "stop
+			 * the filebench run" if in "end on no work mode",
+			 * otherwise it indicates an error
 			 */
-			if (ret < 0) {
-				filebench_log(LOG_ERROR, "flowop %s failed",
-				    flowop->fo_name);
+			if (ret == FILEBENCH_NORSC) {
 				(void) ipc_mutex_lock(&threadflow->tf_lock);
-				threadflow->tf_abort = 1;
-				filebench_shm->f_abort = 1;
-				threadflow->tf_running = 0;
+				threadflow->tf_abort = FILEBENCH_DONE;
+				if (filebench_shm->shm_rmode ==
+				    FILEBENCH_MODE_Q1STDONE) {
+					filebench_shm->f_abort =
+					    FILEBENCH_ABORT_RSRC;
+				} else if (filebench_shm->shm_rmode !=
+				    FILEBENCH_MODE_QALLDONE) {
+					filebench_log(LOG_ERROR1,
+					    "WARNING! Run stopped early:\n   "
+					    "             flowop %s-%d could "
+					    "not obtain a file. Please\n      "
+					    "          reduce runtime, "
+					    "increase fileset entries "
+					    "($nfiles), or switch modes.",
+					    flowop->fo_name,
+					    flowop->fo_instance);
+					filebench_shm->f_abort =
+					    FILEBENCH_ABORT_ERROR;
+				}
+				(void) ipc_mutex_unlock(&threadflow->tf_lock);
+				break;
+			}
+
+			/*
+			 * Return value of FILEBENCH_DONE means "stop
+			 * the filebench run without error"
+			 */
+			if (ret == FILEBENCH_DONE) {
+				(void) ipc_mutex_lock(&threadflow->tf_lock);
+				threadflow->tf_abort = FILEBENCH_DONE;
+				filebench_shm->f_abort = FILEBENCH_ABORT_DONE;
 				(void) ipc_mutex_unlock(&threadflow->tf_lock);
 				break;
 			}
@@ -392,7 +450,10 @@ flowop_start(threadflow_t *threadflow)
 	    _lwp_self());
 #endif
 
-	pthread_exit(&ret);
+	/* Tell flowops to destroy locally acquired state */
+	flowop_destruct_all_flows(threadflow);
+
+	pthread_exit(&threadflow->tf_abort);
 }
 
 void
@@ -402,19 +463,7 @@ flowop_init(void)
 }
 
 /*
- * Calls the flowop's destruct function, pointed to by
- * flowop->fo_destruct.
- */
-static void
-flowop_destructflow(flowop_t *flowop)
-{
-	(*flowop->fo_destruct)(flowop);
-}
-
-/*
  * Delete the designated flowop from the thread's flowop list.
- * After removal from the list, the flowop is destroyed with
- * flowop_destructflow().
  */
 static void
 flowop_delete(flowop_t **flowoplist, flowop_t *flowop)
@@ -456,9 +505,6 @@ flowop_delete(flowop_t **flowoplist, flowop_t *flowop)
 			entry = entry->fo_threadnext;
 		}
 	}
-
-	/* Call destructor */
-	flowop_destructflow(flowop);
 
 #ifdef HAVE_PROCFS
 	/* Close /proc stats */

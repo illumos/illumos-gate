@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,14 @@ extern "C" {
 
 #define	FILEBENCH_NSEMS 128
 
+#define	FILEBENCH_ABORT_ERROR  	1
+#define	FILEBENCH_ABORT_DONE   	2
+#define	FILEBENCH_ABORT_RSRC	3
+
+#define	FILEBENCH_MODE_TIMEOUT	0x0
+#define	FILEBENCH_MODE_Q1STDONE	0x1
+#define	FILEBENCH_MODE_QALLDONE	0x2
+
 typedef struct filebench_shm {
 	pthread_mutex_t fileset_lock;
 	pthread_mutex_t procflow_lock;
@@ -108,8 +116,10 @@ typedef struct filebench_shm {
 	size_t		shm_allocated;
 	caddr_t		shm_addr;
 	char		*shm_ptr;
-	int		allrunning;
+	int		shm_running;
 	int		f_abort;
+	int		shm_rmode;
+	int		shm_1st_err;
 
 	int		marker;
 

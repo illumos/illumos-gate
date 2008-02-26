@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,8 @@ set $meandirwidth=100
 set $filesize=16k
 set $iosize=1m
 set $nthreads=16
+
+set mode quit alldone
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth
 
@@ -44,7 +46,7 @@ define process name=filecreate,instances=1
   }
 }
 
-echo  "Createfiles Version 2.1 personality successfully loaded"
+echo  "Createfiles Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$iosize=<size>      defaults to $iosize"
@@ -53,4 +55,4 @@ usage "       set \$nthreads=<value>   defaults to $nthreads"
 usage "       set \$meandirwidth=<size> defaults to $meandirwidth"
 usage "(sets mean dir width and dir depth is calculated as log (width, nfiles)"
 usage " "
-usage "       run runtime (e.g. run 60)"
+usage "       run 0"

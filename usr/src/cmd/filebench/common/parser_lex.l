@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,6 +97,7 @@ snap                    { return FSE_SNAP; }
 dump                    { return FSE_DUMP; }
 xmldump                 { return FSE_XMLDUMP; }
 all                     { return FSE_ALL; }
+mode                    { return FSE_MODE; }
 
 cached                  { return FSA_CACHED; }
 dirwidth                { return FSA_DIRWIDTH; }
@@ -132,6 +133,9 @@ value                   { return FSA_VALUE;}
 workingset              { return FSA_WSS; }
 blocking                { return FSA_BLOCKING; }
 highwater               { return FSA_HIGHWATER; }
+alldone                 { return FSA_ALLDONE; }
+firstdone               { return FSA_FIRSTDONE; }
+timeout                 { return FSA_TIMEOUT; }
 
 <INITIAL>\"			{ 
                                 BEGIN WHITESTRINGSTATE;

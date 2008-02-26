@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,9 @@
 #include "flowop.h"
 #include "ipc.h"
 
-pid_t pid;
-static int procflow_delete_wait_cnt = 0;
+/* pid and procflow pointer for this process */
+pid_t my_pid;
+procflow_t *my_procflow = NULL;
 
 static procflow_t *procflow_define_common(procflow_t **list, char *name,
     procflow_t *inherit, int instance);
@@ -135,6 +136,7 @@ procflow_createproc(procflow_t *procflow)
 	}
 #endif /* HAVE_FORK1 */
 
+	/* if child, start up new copy of filebench */
 	if (pid == 0) {
 #ifdef USE_SYSTEM
 		char syscmd[1024];
@@ -170,6 +172,7 @@ procflow_createproc(procflow_t *procflow)
 #endif
 		exit(1);
 	} else {
+		/* if parent, save pid and return */
 		procflow->pf_pid = pid;
 	}
 #else
@@ -277,6 +280,7 @@ procflow_exec(char *name, int instance)
 #ifdef HAVE_SETRLIMIT
 	struct rlimit rlp;
 #endif
+	int ret;
 
 	filebench_log(LOG_DEBUG_IMPL,
 	    "procflow_execproc %s-%d",
@@ -288,10 +292,15 @@ procflow_exec(char *name, int instance)
 		    name, instance);
 		return (-1);
 	}
-	procflow->pf_pid = pid;
+
+	/* set the slave process' procflow pointer */
+	my_procflow = procflow;
+
+	/* set its pid from value stored by main() */
+	procflow->pf_pid = my_pid;
 
 	filebench_log(LOG_DEBUG_IMPL,
-	    "Started up %s pid %d", procflow->pf_name, pid);
+	    "Started up %s pid %d", procflow->pf_name, my_pid);
 
 	filebench_log(LOG_DEBUG_IMPL,
 	    "nice = %llx", procflow->pf_nice);
@@ -308,18 +317,23 @@ procflow_exec(char *name, int instance)
 	filebench_log(LOG_DEBUG_SCRIPT, "%d file descriptors", rlp.rlim_cur);
 #endif
 
-	if (threadflow_init(procflow) < 0) {
-		filebench_log(LOG_ERROR,
-		    "Failed to start threads for %s pid %d",
-		    procflow->pf_name, pid);
-		procflow->pf_running = 0;
-		exit(1);
+	if ((ret = threadflow_init(procflow)) != FILEBENCH_OK) {
+		if (ret < 0) {
+			filebench_log(LOG_ERROR,
+			    "Failed to start threads for %s pid %d",
+			    procflow->pf_name, my_pid);
+		}
+	} else {
+		filebench_log(LOG_DEBUG_IMPL,
+		    "procflow_createproc exiting...");
 	}
-	filebench_log(LOG_DEBUG_IMPL, "procflow_createproc exiting...");
-	procflow->pf_running = 0;
-	exit(0);
 
-	return (0);
+	procflow->pf_running = 0;
+	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	filebench_shm->shm_running --;
+	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+
+	return (ret);
 }
 
 
@@ -373,8 +387,11 @@ procflow_createnwait(void *nothing)
 			filebench_shutdown(1);
 		}
 
-		if (filebench_shm->allrunning == 0)
+		/* nothing running, exit */
+		if (filebench_shm->shm_running == 0) {
+			filebench_shm->f_abort = FILEBENCH_ABORT_RSRC;
 			pthread_exit(0);
+		}
 	}
 	/* NOTREACHED */
 	return (NULL);
@@ -454,11 +471,11 @@ procflow_wait(pid_t pid)
  * the procflow is not deleted. Otherwise it returns 0.
  */
 static int
-procflow_delete(procflow_t *procflow)
+procflow_delete(procflow_t *procflow, int wait_cnt)
 {
 	procflow_t *entry;
 
-	threadflow_delete_all(&procflow->pf_threads);
+	threadflow_delete_all(&procflow->pf_threads, wait_cnt);
 
 	filebench_log(LOG_DEBUG_SCRIPT,
 	    "Deleted proc: (%s-%d) pid %d",
@@ -473,11 +490,11 @@ procflow_delete(procflow_t *procflow)
 		    procflow->pf_instance,
 		    procflow->pf_pid);
 
-		if (procflow_delete_wait_cnt < 10) {
+		if (wait_cnt) {
 			(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
 			(void) sleep(1);
 			(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
-			procflow_delete_wait_cnt++;
+			wait_cnt--;
 			continue;
 		}
 #ifdef USE_PROCESS_MODEL
@@ -534,6 +551,7 @@ int
 procflow_allstarted()
 {
 	procflow_t *procflow = filebench_shm->proclist;
+	int running_procs = 0;
 	int ret = 0;
 
 	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
@@ -568,16 +586,18 @@ procflow_allstarted()
 		}
 
 		if (waits == 0)
-			filebench_log(LOG_INFO, "Failed to start process %s-%d",
+			filebench_log(LOG_INFO,
+			    "Failed to start process %s-%d",
 			    procflow->pf_name,
 			    procflow->pf_instance);
 
+		running_procs++;
 		threadflow_allstarted(procflow->pf_pid, procflow->pf_threads);
 
 		procflow = procflow->pf_next;
 	}
+	filebench_shm->shm_running = running_procs;
 
-	filebench_shm->allrunning = 1;
 	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
 
 
@@ -586,7 +606,7 @@ procflow_allstarted()
 
 
 /*
- * Sets the f_abort flag and clears the allrunning flag to stop
+ * Sets the f_abort flag and clears the running count to stop
  * all the flowop execution threads from running. Iterates
  * through the procflow list and deletes all procflows except
  * for the FLOW_MASTER procflow. Resets the f_abort flag when
@@ -596,11 +616,12 @@ void
 procflow_shutdown(void)
 {
 	procflow_t *procflow = filebench_shm->proclist;
+	int wait_cnt;
 
 	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
-	filebench_shm->allrunning = 0;
+	filebench_shm->shm_running = 0;
 	filebench_shm->f_abort = 1;
-	procflow_delete_wait_cnt = 0;
+	wait_cnt = SHUTDOWN_WAIT_SECONDS;
 
 	while (procflow) {
 		if (procflow->pf_instance &&
@@ -612,8 +633,11 @@ procflow_shutdown(void)
 		    procflow->pf_name,
 		    procflow->pf_instance,
 		    procflow->pf_pid);
-		(void) procflow_delete(procflow);
+		(void) procflow_delete(procflow, wait_cnt);
 		procflow = procflow->pf_next;
+		/* grow more impatient */
+		if (wait_cnt)
+			wait_cnt--;
 	}
 
 	filebench_shm->f_abort = 0;

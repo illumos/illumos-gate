@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,15 +51,16 @@ uint64_t gethrtime();
 #endif
 #define	FSECS (double)1000000000.0
 
-#define	LOG_INFO 1
-#define	LOG_VERBOSE 2
-#define	LOG_DEBUG_SCRIPT 3
-#define	LOG_DEBUG_IMPL 5
+#define	LOG_INFO 2
+#define	LOG_VERBOSE 3
+#define	LOG_DEBUG_SCRIPT 4
+#define	LOG_DEBUG_IMPL 6
 #define	LOG_DEBUG_NEVER 10
 #define	LOG_LOG 1000
 #define	LOG_DUMP 1001
 #define	LOG_FATAL 999
 #define	LOG_ERROR 0
+#define	LOG_ERROR1 1
 
 var_t *date_var(var_t *var);
 var_t *script_var(var_t *var);
