@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@
 extern char **environ;
 
 extern ServerOptions options;
-extern u_char *session_id2;
+extern uchar_t *session_id2;
 extern int session_id2_len;
 
 Gssctxt	*xxx_gssctxt;
@@ -99,7 +99,7 @@ ssh_gssapi_server_mechs(gss_OID_set *mechs)
 	maj = gss_create_empty_oid_set(&min, &s);
 	if (GSS_ERROR(maj)) {
 		debug("Could not allocate GSS-API resources (%s)",
-			ssh_gssapi_last_error(NULL, &maj, &min));
+		    ssh_gssapi_last_error(NULL, &maj, &min));
 		return;
 	}
 
@@ -110,12 +110,11 @@ ssh_gssapi_server_mechs(gss_OID_set *mechs)
 	}
 
 	maj = gss_acquire_cred(&min, GSS_C_NO_NAME, 0, indicated,
-			GSS_C_ACCEPT, &creds, &acquired, NULL);
+	    GSS_C_ACCEPT, &creds, &acquired, NULL);
 
 	if (GSS_ERROR(maj))
 		debug("Failed to acquire GSS-API credentials for any "
-			"mechanisms (%s)",
-			ssh_gssapi_last_error(NULL, &maj, &min));
+		    "mechanisms (%s)", ssh_gssapi_last_error(NULL, &maj, &min));
 
 	(void) gss_release_oid_set(&min, &indicated);
 	(void) gss_release_cred(&min, &creds);
@@ -123,14 +122,14 @@ ssh_gssapi_server_mechs(gss_OID_set *mechs)
 	if (acquired == GSS_C_NULL_OID_SET || acquired->count == 0)
 		return;
 
-	for (i = 0 ; i < acquired->count ; i++ ) {
+	for (i = 0; i < acquired->count; i++) {
 		if (ssh_gssapi_is_spnego(&acquired->elements[i]))
 			continue;
 
 		maj = gss_add_oid_set_member(&min, &acquired->elements[i], &s);
 		if (GSS_ERROR(maj)) {
 			debug("Could not allocate GSS-API resources (%s)",
-				ssh_gssapi_last_error(NULL, &maj, &min));
+			    ssh_gssapi_last_error(NULL, &maj, &min));
 			return;
 		}
 	}
@@ -142,14 +141,16 @@ ssh_gssapi_server_mechs(gss_OID_set *mechs)
 	}
 }
 
-/* Wrapper around accept_sec_context
- * Requires that the context contains:
+/*
+ * Wrapper around accept_sec_context. Requires that the context contains:
+ *
  *    oid
  *    credentials	(from ssh_gssapi_acquire_cred)
  */
 /* Priviledged */
-OM_uint32 ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_t recv_tok,
-				gss_buffer_t send_tok)
+OM_uint32
+ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_t recv_tok,
+    gss_buffer_t send_tok)
 {
 	/*
 	 * Acquiring a cred for the ctx->desired_mech for GSS_C_NO_NAME
@@ -157,43 +158,39 @@ OM_uint32 ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_t recv_tok,
 	 * and then checking that ctx->desired_mech agrees with
 	 * ctx->actual_mech...
 	 */
-	ctx->major=gss_accept_sec_context(&ctx->minor,
-					  &ctx->context,
-					  GSS_C_NO_CREDENTIAL,
-					  recv_tok,
-					  GSS_C_NO_CHANNEL_BINDINGS,
-					  &ctx->src_name,
-					  &ctx->actual_mech,
-					  send_tok,
-					  &ctx->flags,
-					  NULL,
-					  &ctx->deleg_creds);
+	ctx->major = gss_accept_sec_context(&ctx->minor, &ctx->context,
+	    GSS_C_NO_CREDENTIAL, recv_tok, GSS_C_NO_CHANNEL_BINDINGS,
+	    &ctx->src_name, &ctx->actual_mech, send_tok, &ctx->flags,
+	    NULL, &ctx->deleg_creds);
+
 	if (GSS_ERROR(ctx->major))
 		ssh_gssapi_error(ctx, "accepting security context");
 
 	if (ctx->major == GSS_S_CONTINUE_NEEDED && send_tok->length == 0)
-		fatal("Zero length GSS context token output when continue needed");
+		fatal("Zero length GSS context token output when "
+		    "continue needed");
 	else if (GSS_ERROR(ctx->major) && send_tok->length == 0)
 		debug2("Zero length GSS context error token output");
 
 	if (ctx->major == GSS_S_COMPLETE &&
 	    ctx->desired_mech != GSS_C_NULL_OID &&
 	    (ctx->desired_mech->length != ctx->actual_mech->length ||
-		memcmp(ctx->desired_mech->elements,
-		    ctx->actual_mech->elements,
-		    ctx->desired_mech->length) != 0)) {
-		gss_OID_set supported;
-		OM_uint32   min;
-		int	    present = 0;
+	    memcmp(ctx->desired_mech->elements, ctx->actual_mech->elements,
+	    ctx->desired_mech->length) != 0)) {
 
-		debug("The client did not use the GSS-API mechanism it asked for");
+		gss_OID_set supported;
+		OM_uint32 min;
+		int present = 0;
+
+		debug("The client did not use the GSS-API mechanism it "
+		    "asked for");
 
 		/* Let it slide as long as the mech is supported */
 		ssh_gssapi_server_mechs(&supported);
-		if (supported != GSS_C_NULL_OID_SET)
-			(void) gss_test_oid_set_member(&min,
-						       ctx->actual_mech,
-						       supported, &present);
+		if (supported != GSS_C_NULL_OID_SET) {
+			(void) gss_test_oid_set_member(&min, ctx->actual_mech,
+			    supported, &present);
+		}
 		if (!present)
 			ctx->major = GSS_S_BAD_MECH;
 	}
@@ -203,11 +200,12 @@ OM_uint32 ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_t recv_tok,
 
 	if (ctx->major == GSS_S_COMPLETE) {
 		ctx->major = gss_inquire_context(&ctx->minor, ctx->context,
-					NULL, &ctx->dst_name, NULL, NULL,
-					NULL, NULL, &ctx->established);
+		    NULL, &ctx->dst_name, NULL, NULL, NULL, NULL,
+		    &ctx->established);
 
 		if (GSS_ERROR(ctx->major)) {
-			ssh_gssapi_error(ctx, "inquiring established sec context");
+			ssh_gssapi_error(ctx,
+			    "inquiring established sec context");
 			return (ctx->major);
 		}
 
@@ -227,7 +225,7 @@ ssh_gssapi_cleanup_creds(Gssctxt *ctx)
 	return;
 #else
 	return;
-/*#error "Portability broken in cleanup of stored creds"*/
+/* #error "Portability broken in cleanup of stored creds" */
 #endif /* HAVE_GSS_STORE_CRED */
 }
 
@@ -237,7 +235,7 @@ ssh_gssapi_storecreds(Gssctxt *ctx, Authctxt *authctxt)
 #ifdef USE_PAM
 	char **penv, **tmp_env;
 #endif /* USE_PAM */
-	
+
 	if (authctxt == NULL) {
 		error("Missing context while storing GSS-API credentials");
 		return;
@@ -249,16 +247,16 @@ ssh_gssapi_storecreds(Gssctxt *ctx, Authctxt *authctxt)
 	if (ctx == NULL)
 		ctx = xxx_gssctxt;
 
-	if (!options.gss_cleanup_creds || 
+	if (!options.gss_cleanup_creds ||
 	    ctx->deleg_creds == GSS_C_NO_CREDENTIAL) {
 		debug3("Not storing delegated GSS credentials"
-			" (none delegated)");
+		    " (none delegated)");
 		return;
 	}
 
 	if (!authctxt->valid || authctxt->pw == NULL) {
 		debug3("Not storing delegated GSS credentials"
-			" for invalid user");
+		    " for invalid user");
 		return;
 	}
 
@@ -298,14 +296,14 @@ ssh_gssapi_storecreds(Gssctxt *ctx, Authctxt *authctxt)
 	if (authctxt->pw->pw_uid != geteuid()) {
 		temporarily_use_uid(authctxt->pw);
 		ctx->major = gss_store_cred(&ctx->minor, ctx->deleg_creds,
-				GSS_C_INITIATE, GSS_C_NULL_OID, 0,
-				ctx->default_creds, NULL, NULL);
+		    GSS_C_INITIATE, GSS_C_NULL_OID, 0, ctx->default_creds,
+		    NULL, NULL);
 		restore_uid();
 	} else {
 		/* only when logging in as the privileged user used by sshd */
 		ctx->major = gss_store_cred(&ctx->minor, ctx->deleg_creds,
-				GSS_C_INITIATE, GSS_C_NULL_OID, 0,
-				ctx->default_creds, NULL, NULL);
+		    GSS_C_INITIATE, GSS_C_NULL_OID, 0, ctx->default_creds,
+		    NULL, NULL);
 	}
 #ifdef USE_PAM
 	environ = tmp_env;
@@ -325,13 +323,13 @@ ssh_gssapi_storecreds(Gssctxt *ctx, Authctxt *authctxt)
 	if (ssh_gssapi_is_gsi(ctx->mech))
 		ssh_gssapi_krb5_storecreds(ctx);
 #endif /* GSI_GSS */
-/*#error "Mechanism-specific code missing in ssh_gssapi_storecreds()"*/
+/* #error "Mechanism-specific code missing in ssh_gssapi_storecreds()" */
 	return;
 #endif /* HAVE_GSS_STORE_CRED */
 }
 
 void
-ssh_gssapi_do_child(Gssctxt *ctx, char ***envp, u_int *envsizep)
+ssh_gssapi_do_child(Gssctxt *ctx, char ***envp, uint_t *envsizep)
 {
 	/*
 	 * MIT/Heimdal/GSI specific code goes here.
@@ -347,7 +345,6 @@ ssh_gssapi_do_child(Gssctxt *ctx, char ***envp, u_int *envsizep)
 #ifdef GSI_GSS
 #error "GSI krb5-specific code missing in ssh_gssapi_storecreds()"
 #endif /* GSI_GSS */
-	return;
 }
 
 int
@@ -366,7 +363,7 @@ ssh_gssapi_userok(Gssctxt *ctx, char *user)
 		int user_ok = 0;
 
 		ctx->major = __gss_userok(&ctx->minor, ctx->src_name, user,
-			&user_ok);
+		    &user_ok);
 		if (GSS_ERROR(ctx->major)) {
 			debug2("__GSS_userok() failed");
 			return (0);
@@ -389,15 +386,15 @@ ssh_gssapi_userok(Gssctxt *ctx, char *user)
 		buf.value = user;
 		buf.length = strlen(user);
 		ctx->major = gss_import_name(&ctx->minor, &buf,
-					GSS_C_NULL_OID, &iname);
+		    GSS_C_NULL_OID, &iname);
 		if (GSS_ERROR(ctx->major)) {
 			ssh_gssapi_error(ctx,
-				"importing name for authorizing initiator");
+			    "importing name for authorizing initiator");
 			goto failed_simple_userok;
 		}
 
 		ctx->major = gss_canonicalize_name(&ctx->minor, iname,
-					ctx->actual_mech, &cname);
+		    ctx->actual_mech, &cname);
 		(void) gss_release_name(&min, &iname);
 		if (GSS_ERROR(ctx->major)) {
 			ssh_gssapi_error(ctx, "canonicalizing name");
@@ -412,16 +409,16 @@ ssh_gssapi_userok(Gssctxt *ctx, char *user)
 		}
 
 		ctx->major = gss_export_name(&ctx->minor, ctx->src_name,
-			&ename2);
+		    &ename2);
 		if (GSS_ERROR(ctx->major)) {
 			ssh_gssapi_error(ctx,
-				"exporting client principal name");
+			    "exporting client principal name");
 			(void) gss_release_buffer(&min, &ename1);
 			goto failed_simple_userok;
 		}
 
 		eql = (ename1.length == ename2.length &&
-			memcmp(ename1.value, ename2.value, ename1.length) == 0);
+		    memcmp(ename1.value, ename2.value, ename1.length) == 0);
 
 		(void) gss_release_buffer(&min, &ename1);
 		(void) gss_release_buffer(&min, &ename2);
@@ -440,7 +437,7 @@ failed_simple_userok:
 		struct passwd	*pw;
 
 		maj = gsscred_name_to_unix_cred(ctx->src_name,
-				ctx->actual_mech, &uid, NULL, NULL, NULL);
+		    ctx->actual_mech, &uid, NULL, NULL, NULL);
 
 		if (GSS_ERROR(maj))
 			goto failed_simple_gsscred_userok;
@@ -452,6 +449,7 @@ failed_simple_userok:
 			return (1);
 		/* fall through */
 	}
+
 failed_simple_gsscred_userok:
 #endif /* HAVE_GSSCRED_API */
 #ifdef KRB5_GSS
@@ -490,7 +488,7 @@ ssh_gssapi_localname(Gssctxt *ctx)
 			goto failed_gsscred_localname;
 
 		maj = gsscred_name_to_unix_cred(ctx->src_name,
-				ctx->actual_mech, &uid, NULL, NULL, NULL);
+		    ctx->actual_mech, &uid, NULL, NULL, NULL);
 
 		if (GSS_ERROR(maj))
 			goto failed_gsscred_localname;
@@ -515,4 +513,4 @@ failed_gsscred_localname:
 #endif /* GSI_GSS */
 	return (NULL);
 }
-#endif /*GSSAPI */
+#endif /* GSSAPI */

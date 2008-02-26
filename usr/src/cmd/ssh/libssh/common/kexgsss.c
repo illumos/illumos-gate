@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,16 +58,16 @@ kexgss_server(Kex *kex)
 	OM_uint32 maj_status, min_status;
 	gss_buffer_desc gssbuf, send_tok, recv_tok, msg_tok;
 	Gssctxt *ctxt = NULL;
-        unsigned int klen, kout;
-        unsigned int sbloblen = 0;
-        unsigned char *kbuf, *hash;
+	unsigned int klen, kout;
+	unsigned int sbloblen = 0;
+	unsigned char *kbuf, *hash;
 	unsigned char *server_host_key_blob = NULL;
-        DH *dh;
+	DH *dh;
 	Key *server_host_key = NULL;
-        BIGNUM *shared_secret = NULL;
-        BIGNUM *dh_client_pub = NULL;
-	int type =0;
-	u_int slen;
+	BIGNUM *shared_secret = NULL;
+	BIGNUM *dh_client_pub = NULL;
+	int type = 0;
+	uint_t slen;
 	gss_OID oid;
 
 	/*
@@ -96,37 +96,39 @@ kexgss_server(Kex *kex)
 	do {
 		debug("Wait SSH2_MSG_GSSAPI_INIT");
 		type = packet_read();
-		switch(type) {
+		switch (type) {
 		case SSH2_MSG_KEXGSS_INIT:
-			if (dh_client_pub!=NULL)
-				fatal("Received KEXGSS_INIT after initialising");
-			recv_tok.value=packet_get_string(&slen);
-			recv_tok.length=slen; /* int vs. size_t */
+			if (dh_client_pub != NULL)
+				fatal("Received KEXGSS_INIT after "
+				    "initialising");
+			recv_tok.value = packet_get_string(&slen);
+			recv_tok.length = slen; /* int vs. size_t */
 
-		        dh_client_pub = BN_new();
+			dh_client_pub = BN_new();
 
-		        if (dh_client_pub == NULL)
-        			fatal("dh_client_pub == NULL");
-		  	packet_get_bignum2(dh_client_pub);
+			if (dh_client_pub == NULL)
+				fatal("dh_client_pub == NULL");
+			packet_get_bignum2(dh_client_pub);
 
-		  	/* Send SSH_MSG_KEXGSS_HOSTKEY here, if we want */
+			/* Send SSH_MSG_KEXGSS_HOSTKEY here, if we want */
 			if (sbloblen) {
 				packet_start(SSH2_MSG_KEXGSS_HOSTKEY);
-				packet_put_string(server_host_key_blob, sbloblen);
+				packet_put_string(server_host_key_blob,
+				    sbloblen);
 				packet_send();
 				packet_write_wait();
 			}
 			break;
 		case SSH2_MSG_KEXGSS_CONTINUE:
-			recv_tok.value=packet_get_string(&slen);
-			recv_tok.length=slen; /* int vs. size_t */
+			recv_tok.value = packet_get_string(&slen);
+			recv_tok.length = slen; /* int vs. size_t */
 			break;
 		default:
-			packet_disconnect("Protocol error: didn't expect packet type %d",
-					   type);
+			packet_disconnect("Protocol error: didn't expect "
+			    "packet type %d", type);
 		}
 
-		maj_status = ssh_gssapi_accept_ctx(ctxt,&recv_tok, &send_tok);
+		maj_status = ssh_gssapi_accept_ctx(ctxt, &recv_tok, &send_tok);
 
 		xfree(recv_tok.value); /* We allocated this, not gss */
 
@@ -136,7 +138,7 @@ kexgss_server(Kex *kex)
 		if (maj_status == GSS_S_CONTINUE_NEEDED) {
 			debug("Sending GSSAPI_CONTINUE");
 			packet_start(SSH2_MSG_KEXGSS_CONTINUE);
-			packet_put_string(send_tok.value,send_tok.length);
+			packet_put_string(send_tok.value, send_tok.length);
 			packet_send();
 			packet_write_wait();
 			(void) gss_release_buffer(&min_status, &send_tok);
@@ -145,9 +147,9 @@ kexgss_server(Kex *kex)
 
 	if (GSS_ERROR(maj_status)) {
 		kex_gss_send_error(ctxt);
-		if (send_tok.length>0) {
+		if (send_tok.length > 0) {
 			packet_start(SSH2_MSG_KEXGSS_CONTINUE);
-			packet_put_string(send_tok.value,send_tok.length);
+			packet_put_string(send_tok.value, send_tok.length);
 			packet_send();
 			packet_write_wait();
 			(void) gss_release_buffer(&min_status, &send_tok);
@@ -165,12 +167,12 @@ kexgss_server(Kex *kex)
 	dh = dh_new_group1();
 	dh_gen_key(dh, kex->we_need * 8);
 
-        if (!dh_pub_is_valid(dh, dh_client_pub))
-                packet_disconnect("bad client public DH value");
+	if (!dh_pub_is_valid(dh, dh_client_pub))
+		packet_disconnect("bad client public DH value");
 
-        klen = DH_size(dh);
-        kbuf = xmalloc(klen);
-        kout = DH_compute_key(kbuf, dh_client_pub, dh);
+	klen = DH_size(dh);
+	kbuf = xmalloc(klen);
+	kout = DH_compute_key(kbuf, dh_client_pub, dh);
 
 	shared_secret = BN_new();
 	BN_bin2bn(kbuf, kout, shared_secret);
@@ -178,16 +180,16 @@ kexgss_server(Kex *kex)
 	xfree(kbuf);
 
 	/* The GSSAPI hash is identical to the Diffie Helman one */
-        hash = kex_dh_hash(
-            kex->client_version_string,
-            kex->server_version_string,
-            buffer_ptr(&kex->peer), buffer_len(&kex->peer),
-            buffer_ptr(&kex->my), buffer_len(&kex->my),
-            server_host_key_blob, sbloblen,
-            dh_client_pub,
-            dh->pub_key,
-            shared_secret
-	);
+	hash = kex_dh_hash(
+	    kex->client_version_string,
+	    kex->server_version_string,
+	    buffer_ptr(&kex->peer), buffer_len(&kex->peer),
+	    buffer_ptr(&kex->my), buffer_len(&kex->my),
+	    server_host_key_blob, sbloblen,
+	    dh_client_pub,
+	    dh->pub_key,
+	    shared_secret);
+
 	BN_free(dh_client_pub);
 
 	if (kex->session_id == NULL) {
@@ -202,24 +204,24 @@ kexgss_server(Kex *kex)
 	gssbuf.length = 20;	/* yes, it's always 20 (SHA-1) */
 	gssbuf.value = hash;	/* and it's static constant storage */
 
-	if (GSS_ERROR(ssh_gssapi_get_mic(ctxt,&gssbuf,&msg_tok))) {
+	if (GSS_ERROR(ssh_gssapi_get_mic(ctxt, &gssbuf, &msg_tok))) {
 		kex_gss_send_error(ctxt);
 		fatal("Couldn't get MIC");
 	}
 
 	packet_start(SSH2_MSG_KEXGSS_COMPLETE);
 	packet_put_bignum2(dh->pub_key);
-	packet_put_string((char *)msg_tok.value,msg_tok.length);
+	packet_put_string((char *)msg_tok.value, msg_tok.length);
 	(void) gss_release_buffer(&min_status, &msg_tok);
 
 	if (send_tok.length != 0) {
 		packet_put_char(1); /* true */
-		packet_put_string((char *)send_tok.value,send_tok.length);
+		packet_put_string((char *)send_tok.value, send_tok.length);
 		(void) gss_release_buffer(&min_status, &send_tok);
 	} else {
 		packet_put_char(0); /* false */
 	}
- 	packet_send();
+	packet_send();
 	packet_write_wait();
 
 	DH_free(dh);
@@ -232,9 +234,9 @@ kexgss_server(Kex *kex)
 static void
 kex_gss_send_error(Gssctxt *ctxt) {
 	char *errstr;
-	OM_uint32 maj,min;
+	OM_uint32 maj, min;
 
-	errstr = ssh_gssapi_last_error(ctxt,&maj,&min);
+	errstr = ssh_gssapi_last_error(ctxt, &maj, &min);
 	if (errstr) {
 		packet_start(SSH2_MSG_KEXGSS_ERROR);
 		packet_put_int(maj);

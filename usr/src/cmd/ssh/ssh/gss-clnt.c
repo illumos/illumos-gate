@@ -21,7 +21,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,12 +92,12 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 		return;
 	}
 	maj = gss_acquire_cred(&min, GSS_C_NO_NAME, 0, indicated,
-			GSS_C_INITIATE, &creds, &acquired, NULL);
+	    GSS_C_INITIATE, &creds, &acquired, NULL);
 
 	if (GSS_ERROR(maj)) {
 		errmsg = ssh_gssapi_last_error(NULL, &maj, &min);
 		debug("Failed to acquire GSS-API credentials for any "
-			"mechanisms (%s)", errmsg);
+		    "mechanisms (%s)", errmsg);
 		xfree(errmsg);
 		(void) gss_release_oid_set(&min, &indicated);
 		(void) gss_release_oid_set(&min, &supported);
@@ -105,7 +105,7 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 	}
 	(void) gss_release_cred(&min, &creds);
 
-	for (i = 0 ; i < acquired->count ; i++) {
+	for (i = 0; i < acquired->count; i++) {
 		mech = &acquired->elements[i];
 
 		if (ssh_gssapi_is_spnego(mech))
@@ -124,8 +124,7 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 		 * 'Twould be useful to have a test that could save us
 		 * the bother of trying this for SPKM and the such...
 		 */
-		maj = ssh_gssapi_init_ctx(ctxt, server_host, 0,
-				NULL, &tok);
+		maj = ssh_gssapi_init_ctx(ctxt, server_host, 0, NULL, &tok);
 		if (GSS_ERROR(maj)) {
 			errmsg = ssh_gssapi_last_error(ctxt, NULL, NULL);
 			debug("Skipping GSS-API mechanism %s (%s)",
@@ -149,8 +148,9 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 }
 
 
-/* Wrapper to init_sec_context
- * Requires that the context contains:
+/*
+ * Wrapper to init_sec_context. Requires that the context contains:
+ *
  *	oid
  * 	server name (from ssh_gssapi_import_name)
  */
@@ -161,7 +161,7 @@ ssh_gssapi_init_ctx(Gssctxt *ctx, const char *server_host, int deleg_creds,
 	int flags = GSS_C_MUTUAL_FLAG | GSS_C_INTEG_FLAG;
 
 	debug("%s(%p, %s, %d, %p, %p)", __func__, ctx, server_host,
-		deleg_creds, recv_tok, send_tok);
+	    deleg_creds, recv_tok, send_tok);
 
 	if (deleg_creds) {
 		flags |= GSS_C_DELEG_FLAG;
@@ -170,26 +170,22 @@ ssh_gssapi_init_ctx(Gssctxt *ctx, const char *server_host, int deleg_creds,
 
 	/* Build target principal */
 	if (ctx->desired_name == GSS_C_NO_NAME &&
-	    !ssh_gssapi_import_name(ctx, server_host))
-		return ctx->major;
+	    !ssh_gssapi_import_name(ctx, server_host)) {
+		return (ctx->major);
+	}
 
-      	ctx->major=gss_init_sec_context(&ctx->minor,
-      					GSS_C_NO_CREDENTIAL,
-      					&ctx->context,
-      					ctx->desired_name,
-      					ctx->desired_mech,
-      					flags,
-      					0, /* default lifetime */
-      					NULL, /* no channel bindings */
-      					recv_tok,
-      					NULL, /* actual mech type */
-      					send_tok,
-      					&ctx->flags,
-      					NULL); /* actual lifetime */
+	ctx->major = gss_init_sec_context(&ctx->minor, GSS_C_NO_CREDENTIAL,
+	    &ctx->context, ctx->desired_name, ctx->desired_mech, flags,
+	    0, /* default lifetime */
+	    NULL, /* no channel bindings */
+	    recv_tok,
+	    NULL, /* actual mech type */
+	    send_tok, &ctx->flags,
+	    NULL); /* actual lifetime */
 
-      	if (GSS_ERROR(ctx->major))
+	if (GSS_ERROR(ctx->major))
 		ssh_gssapi_error(ctx, "calling GSS_Init_sec_context()");
 
-      	return(ctx->major);
+	return (ctx->major);
 }
 #endif /* GSSAPI */

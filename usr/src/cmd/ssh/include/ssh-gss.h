@@ -22,12 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SSH_GSS_H
-#define _SSH_GSS_H
+#define	_SSH_GSS_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -46,27 +46,27 @@
 
 /* MIT Kerberos doesn't seem to define GSS_NT_HOSTBASED_SERVICE */
 #ifndef GSS_C_NT_HOSTBASED_SERVICE
-#define GSS_C_NT_HOSTBASED_SERVICE gss_nt_service_name
+#define	GSS_C_NT_HOSTBASED_SERVICE gss_nt_service_name
 #endif /* GSS_C_NT_... */
 #endif /* !HEIMDAL */
 #endif /* GSS_KRB5 */
 #endif /* SUNW_GSSAPI */
 
 /* draft-ietf-secsh-gsskeyex-03 */
-#define SSH2_MSG_KEXGSS_INIT				30
-#define SSH2_MSG_KEXGSS_CONTINUE 			31
-#define SSH2_MSG_KEXGSS_COMPLETE 			32
-#define SSH2_MSG_KEXGSS_HOSTKEY				33
-#define SSH2_MSG_KEXGSS_ERROR				34
-#define SSH2_MSG_USERAUTH_GSSAPI_RESPONSE     		60
-#define SSH2_MSG_USERAUTH_GSSAPI_TOKEN        		61
-#define SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE	63
-#define SSH2_MSG_USERAUTH_GSSAPI_ERROR			64
-#define SSH2_MSG_USERAUTH_GSSAPI_ERRTOK			65
-#define SSH2_MSG_USERAUTH_GSSAPI_MIC			66
+#define	SSH2_MSG_KEXGSS_INIT				30
+#define	SSH2_MSG_KEXGSS_CONTINUE 			31
+#define	SSH2_MSG_KEXGSS_COMPLETE 			32
+#define	SSH2_MSG_KEXGSS_HOSTKEY				33
+#define	SSH2_MSG_KEXGSS_ERROR				34
+#define	SSH2_MSG_USERAUTH_GSSAPI_RESPONSE		60
+#define	SSH2_MSG_USERAUTH_GSSAPI_TOKEN			61
+#define	SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE	63
+#define	SSH2_MSG_USERAUTH_GSSAPI_ERROR			64
+#define	SSH2_MSG_USERAUTH_GSSAPI_ERRTOK			65
+#define	SSH2_MSG_USERAUTH_GSSAPI_MIC			66
 
-#define KEX_GSS_SHA1					"gss-group1-sha1-"
-#define SSH_GSS_HOSTBASED_SERVICE			"host"
+#define	KEX_GSS_SHA1					"gss-group1-sha1-"
+#define	SSH_GSS_HOSTBASED_SERVICE			"host"
 
 #ifndef HAVE_GSS_STORE_CRED
 typedef struct ssh_gssapi_cred_store ssh_gssapi_cred_store; /* server-only */
@@ -104,8 +104,9 @@ void ssh_gssapi_client_kex_hook(Kex *kex, char **proposal);
 /* Map an encoded mechanism keyex name to a mechanism OID */
 void ssh_gssapi_mech_oid_to_kexname(const gss_OID mech, char **kexname);
 void ssh_gssapi_mech_oids_to_kexnames(const gss_OID_set mechs,
-				      char **kexname_list);
-void ssh_gssapi_oid_of_kexname(const char *kexname, gss_OID *mech); /* dup oid? */
+    char **kexname_list);
+/* dup oid? */
+void ssh_gssapi_oid_of_kexname(const char *kexname, gss_OID *mech);
 
 /*
  * Unfortunately, the GSS-API is not generic enough for some things --
@@ -117,15 +118,14 @@ int  ssh_gssapi_is_gsi(gss_OID oid);
 int  ssh_gssapi_is_dh(gss_OID oid);
 
 /* GSS_Init/Accept_sec_context() and GSS_Acquire_cred() wrappers */
-OM_uint32 ssh_gssapi_init_ctx(Gssctxt *ctx,
-			      const char *server_host,
-			      int deleg_creds,
-			      gss_buffer_t recv_tok,
-			      gss_buffer_t send_tok);   /* client-only */
-OM_uint32 ssh_gssapi_accept_ctx(Gssctxt *ctx,
-				gss_buffer_t recv_tok,
-				gss_buffer_t send_tok); /* server-only */
-OM_uint32 ssh_gssapi_acquire_cred(Gssctxt *ctx);	    /* server-only */
+/* client-only */
+OM_uint32 ssh_gssapi_init_ctx(Gssctxt *ctx, const char *server_host,
+    int deleg_creds, gss_buffer_t recv_tok, gss_buffer_t send_tok);
+/* server-only */
+OM_uint32 ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_t recv_tok,
+    gss_buffer_t send_tok);
+/* server-only */
+OM_uint32 ssh_gssapi_acquire_cred(Gssctxt *ctx);
 
 /* MIC wrappers */
 OM_uint32 ssh_gssapi_get_mic(Gssctxt *ctx, gss_buffer_t buffer,
@@ -149,7 +149,7 @@ struct Authctxt; /* needed to avoid conflicts between auth.h, sshconnect2.c */
 void	ssh_gssapi_storecreds(Gssctxt *ctx, struct Authctxt *authctxt);
 
 /* ... else, if other interfaces are available for GSS-API cred storing */
-void	ssh_gssapi_do_child(Gssctxt *ctx, char ***envp, u_int *envsizep);
+void	ssh_gssapi_do_child(Gssctxt *ctx, char ***envp, uint_t *envsizep);
 void	ssh_gssapi_cleanup_creds(Gssctxt *ctx);
 
 /* Misc */
@@ -158,9 +158,8 @@ const char	*ssh_gssapi_oid_to_name(gss_OID oid);
 char		*ssh_gssapi_oid_to_str(gss_OID oid);
 gss_OID		 ssh_gssapi_dup_oid(gss_OID oid);
 gss_OID		 ssh_gssapi_make_oid(size_t length, void *elements);
-gss_OID		 ssh_gssapi_make_oid_ext(size_t length,
-					 void *elements,
-					 int der_wrapped);
+gss_OID		 ssh_gssapi_make_oid_ext(size_t length, void *elements,
+		    int der_wrapped);
 void		*ssh_gssapi_der_wrap(size_t, size_t *length);
 size_t		 ssh_gssapi_der_wrap_size(size_t, size_t *length);
 void		 ssh_gssapi_release_oid(gss_OID *oid);

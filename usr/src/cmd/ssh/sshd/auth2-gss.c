@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@
 #include "ssh-gss.h"
 
 extern ServerOptions options;
-extern u_char *session_id2;
+extern uchar_t *session_id2;
 extern int session_id2_len;
 extern Gssctxt *xxx_gssctxt;
 
@@ -55,9 +55,9 @@ static void userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt);
 static void
 userauth_gssapi_keyex(Authctxt *authctxt)
 {
-        gss_buffer_desc g_mic_data, mic_tok;
+	gss_buffer_desc g_mic_data, mic_tok;
 	Buffer mic_data;
-        OM_uint32 maj_status, min_status;
+	OM_uint32 maj_status, min_status;
 
 	if (authctxt == NULL || authctxt->method == NULL)
 		fatal("No authentication context during gssapi-keyex userauth");
@@ -67,7 +67,7 @@ userauth_gssapi_keyex(Authctxt *authctxt)
 		debug("No GSS-API context during gssapi-keyex userauth");
 		return;
 	}
-		
+
 	/* Make data buffer to verify MIC with */
 	buffer_init(&mic_data);
 	buffer_put_string(&mic_data, session_id2, session_id2_len);
@@ -79,12 +79,12 @@ userauth_gssapi_keyex(Authctxt *authctxt)
 	g_mic_data.value  = buffer_ptr(&mic_data);
 	g_mic_data.length = buffer_len(&mic_data);
 
-	mic_tok.value=packet_get_string(&mic_tok.length);
+	mic_tok.value = packet_get_string(&mic_tok.length);
 
 	maj_status = gss_verify_mic(&min_status, xxx_gssctxt->context,
-				&g_mic_data, &mic_tok, NULL);
+	    &g_mic_data, &mic_tok, NULL);
 
-        packet_check_eom();
+	packet_check_eom();
 	buffer_clear(&mic_data);
 
 	if (maj_status != GSS_S_COMPLETE)
@@ -95,15 +95,14 @@ userauth_gssapi_keyex(Authctxt *authctxt)
 	/* Leave Gssctxt around for ssh_gssapi_cleanup/storecreds() */
 	if (xxx_gssctxt->deleg_creds == GSS_C_NO_CREDENTIAL)
 		ssh_gssapi_delete_ctx(&xxx_gssctxt);
-
-        return;
 }
 
 static void ssh_gssapi_userauth_error(Gssctxt *ctxt);
 static void input_gssapi_token(int type, u_int32_t plen, void *ctxt);
 static void input_gssapi_mic(int type, u_int32_t plen, void *ctxt);
 static void input_gssapi_errtok(int, u_int32_t, void *);
-static void input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt);
+static void input_gssapi_exchange_complete(int type, u_int32_t plen,
+    void *ctxt);
 
 static void
 userauth_gssapi_abandon(Authctxt *authctxt, Authmethod *method)
@@ -113,158 +112,163 @@ userauth_gssapi_abandon(Authctxt *authctxt, Authmethod *method)
 	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
 	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
 	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
 }
 
 static void
 userauth_gssapi(Authctxt *authctxt)
 {
-	gss_OID_set     supported_mechs;
-	int		mechs;
-	int		present = 0;
-	OM_uint32       min_status;
-	u_int		len;
-	char 		*doid = NULL;
-	gss_OID		oid = GSS_C_NULL_OID;
+	gss_OID_set supported_mechs;
+	int mechs, present = 0;
+	OM_uint32 min_status;
+	uint_t len;
+	char *doid = NULL;
+	gss_OID oid = GSS_C_NULL_OID;
 
-        if (datafellows & SSH_OLD_GSSAPI) {
-                debug("Early drafts of GSSAPI userauth not supported");
-                return;
-        }
+	if (datafellows & SSH_OLD_GSSAPI) {
+		debug("Early drafts of GSSAPI userauth not supported");
+		return;
+	}
 
-        mechs=packet_get_int();
-        if (mechs==0) {
+	mechs = packet_get_int();
+	if (mechs == 0) {
 		packet_check_eom();
-                debug("Mechanism negotiation is not supported");
-                return;
-        }
+		debug("Mechanism negotiation is not supported");
+		return;
+	}
 
 	ssh_gssapi_server_mechs(&supported_mechs);
 
-        do {
-                mechs--;
+	do {
+		mechs--;
 
 		if (oid != GSS_C_NULL_OID)
 			ssh_gssapi_release_oid(&oid);
 
-                doid = packet_get_string(&len);
+		doid = packet_get_string(&len);
 
 		/* ick */
-               	if (doid[0]!=0x06 || (len > 2 && doid[1]!=len-2)) {
-               		log("Mechanism OID received using the old encoding form");
+		if (doid[0] != 0x06 || (len > 2 && doid[1] != len - 2)) {
+			log("Mechanism OID received using the old "
+			    "encoding form");
 			oid = ssh_gssapi_make_oid(len, doid);
-               	} else {
+		} else {
 			oid = ssh_gssapi_make_oid(len - 2, doid + 2);
-               	}
-            	(void) gss_test_oid_set_member(&min_status, oid,
-					       supported_mechs, &present);
-                debug("Client offered gssapi userauth with %s (%s)",
-			ssh_gssapi_oid_to_str(oid),
-			present ? "supported" : "unsupported");
-        } while (!present && (mechs > 0));
+		}
 
-        if (!present) {
+		(void) gss_test_oid_set_member(&min_status, oid,
+		    supported_mechs, &present);
+
+		debug("Client offered gssapi userauth with %s (%s)",
+		    ssh_gssapi_oid_to_str(oid),
+		    present ? "supported" : "unsupported");
+	} while (!present && (mechs > 0));
+
+	if (!present) {
 		/* userauth_finish() will send SSH2_MSG_USERAUTH_FAILURE */
 		debug2("No mechanism offered by the client is available");
-                ssh_gssapi_release_oid(&oid);
-                return;
-        }
+		ssh_gssapi_release_oid(&oid);
+		return;
+	}
 
-	ssh_gssapi_build_ctx((Gssctxt **)&authctxt->method->method_data, 0, oid);
-        ssh_gssapi_release_oid(&oid);
-        /* Send SSH_MSG_USERAUTH_GSSAPI_RESPONSE */
+	ssh_gssapi_build_ctx((Gssctxt **)&authctxt->method->method_data,
+	    0, oid);
+	ssh_gssapi_release_oid(&oid);
+	/* Send SSH_MSG_USERAUTH_GSSAPI_RESPONSE */
 
-       	packet_start(SSH2_MSG_USERAUTH_GSSAPI_RESPONSE);
+	packet_start(SSH2_MSG_USERAUTH_GSSAPI_RESPONSE);
 
 	/* Just return whatever we found -- the matched mech does us no good */
 	packet_put_string(doid, len);
 	xfree(doid);
 
-        packet_send();
-        packet_write_wait();
+	packet_send();
+	packet_write_wait();
 
 	/* Setup rest of gssapi userauth conversation */
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, &input_gssapi_token);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, &input_gssapi_errtok);
-        authctxt->method->postponed = 1;
-
-        return;
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, &input_gssapi_token);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, &input_gssapi_errtok);
+	authctxt->method->postponed = 1;
 }
 
 static void
 input_gssapi_token(int type, u_int32_t plen, void *ctxt)
 {
-        Authctxt *authctxt = ctxt;
-        Gssctxt *gssctxt;
-        gss_buffer_desc send_tok,recv_tok;
-        OM_uint32 maj_status, min_status;
-	u_int len;
+	Authctxt *authctxt = ctxt;
+	Gssctxt *gssctxt;
+	gss_buffer_desc send_tok, recv_tok;
+	OM_uint32 maj_status, min_status;
+	uint_t len;
 
-        if (authctxt == NULL || authctxt->method == NULL ||
-	    (authctxt->method->method_data == NULL))
-                fatal("No authentication or GSSAPI context during gssapi-with-mic userauth");
+	if (authctxt == NULL || authctxt->method == NULL ||
+	    (authctxt->method->method_data == NULL)) {
+		fatal("No authentication or GSSAPI context during "
+		    "gssapi-with-mic userauth");
+	}
 
-        gssctxt=authctxt->method->method_data;
-        recv_tok.value=packet_get_string(&len);
-        recv_tok.length=len; /* u_int vs. size_t */
+	gssctxt = authctxt->method->method_data;
+	recv_tok.value = packet_get_string(&len);
+	recv_tok.length = len; /* u_int vs. size_t */
 
-        maj_status = ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok);
-        packet_check_eom();
+	maj_status = ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok);
+	packet_check_eom();
 
-        if (GSS_ERROR(maj_status)) {
-        	ssh_gssapi_userauth_error(gssctxt);
+	if (GSS_ERROR(maj_status)) {
+		ssh_gssapi_userauth_error(gssctxt);
 		if (send_tok.length != 0) {
 			packet_start(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK);
-	                packet_put_string(send_tok.value,send_tok.length);
-        	        packet_send();
-               		packet_write_wait();
-               	}
-                authctxt->method->postponed = 0;
-                dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
-                userauth_finish(authctxt, authctxt->method->name);
-        } else {
-               	if (send_tok.length != 0) {
-               		packet_start(SSH2_MSG_USERAUTH_GSSAPI_TOKEN);
-               		packet_put_string(send_tok.value,send_tok.length);
-               		packet_send();
-               		packet_write_wait();
-                }
-	        if (maj_status == GSS_S_COMPLETE) {
-        	        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN,NULL);
-                	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC,
-                             	     &input_gssapi_mic);
-                	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE,
-                             	     &input_gssapi_exchange_complete);
-                }
-        }
+			packet_put_string(send_tok.value, send_tok.length);
+			packet_send();
+			packet_write_wait();
+		}
+		authctxt->method->postponed = 0;
+		dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
+		userauth_finish(authctxt, authctxt->method->name);
+	} else {
+		if (send_tok.length != 0) {
+			packet_start(SSH2_MSG_USERAUTH_GSSAPI_TOKEN);
+			packet_put_string(send_tok.value, send_tok.length);
+			packet_send();
+			packet_write_wait();
+		}
+		if (maj_status == GSS_S_COMPLETE) {
+			dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
+			dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC,
+			    &input_gssapi_mic);
+			dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE,
+			    &input_gssapi_exchange_complete);
+		}
+	}
 
-        gss_release_buffer(&min_status, &send_tok);
+	gss_release_buffer(&min_status, &send_tok);
 }
 
 static void
 input_gssapi_errtok(int type, u_int32_t plen, void *ctxt)
 {
-        Authctxt *authctxt = ctxt;
-        Gssctxt *gssctxt;
-        gss_buffer_desc send_tok,recv_tok;
+	Authctxt *authctxt = ctxt;
+	Gssctxt *gssctxt;
+	gss_buffer_desc send_tok, recv_tok;
 
-        if (authctxt == NULL || authctxt->method == NULL ||
-	    (authctxt->method->method_data == NULL))
-                fatal("No authentication or GSSAPI context during gssapi-with-mic userauth");
+	if (authctxt == NULL || authctxt->method == NULL ||
+	    (authctxt->method->method_data == NULL)) {
+		fatal("No authentication or GSSAPI context during "
+		    "gssapi-with-mic userauth");
+	}
 
-        gssctxt=authctxt->method->method_data;
-        recv_tok.value=packet_get_string(&recv_tok.length);
-        packet_check_eom();
+	gssctxt = authctxt->method->method_data;
+	recv_tok.value = packet_get_string(&recv_tok.length);
+	packet_check_eom();
 
-        /* Push the error token into GSSAPI to see what it says */
-        (void) ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok);
+	/* Push the error token into GSSAPI to see what it says */
+	(void) ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok);
 
 	debug("Client sent GSS-API error token during GSS userauth-- %s",
-		ssh_gssapi_last_error(gssctxt, NULL, NULL));
+	    ssh_gssapi_last_error(gssctxt, NULL, NULL));
 
 	/* We can't return anything to the client, even if we wanted to */
 	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
-	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK,NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
 
 
 	/*
@@ -284,17 +288,18 @@ input_gssapi_mic(int type, u_int32_t plen, void *ctxt)
 {
 	Authctxt *authctxt = ctxt;
 	Gssctxt *gssctxt;
-        gss_buffer_desc g_mic_data, mic_tok;
+	gss_buffer_desc g_mic_data, mic_tok;
 	Buffer mic_data;
-        OM_uint32 maj_status, min_status;
+	OM_uint32 maj_status, min_status;
 
 	if (authctxt == NULL || authctxt->method == NULL ||
 	    (authctxt->method->method_data == NULL)) {
-		debug3("No authentication or GSSAPI context during gssapi-with-mic userauth");
+		debug3("No authentication or GSSAPI context during "
+		    "gssapi-with-mic userauth");
 		return;
 	}
 
-	gssctxt=authctxt->method->method_data;
+	gssctxt = authctxt->method->method_data;
 
 	/* Make data buffer to verify MIC with */
 	buffer_init(&mic_data);
@@ -307,12 +312,12 @@ input_gssapi_mic(int type, u_int32_t plen, void *ctxt)
 	g_mic_data.value  = buffer_ptr(&mic_data);
 	g_mic_data.length = buffer_len(&mic_data);
 
-	mic_tok.value=packet_get_string(&mic_tok.length);
+	mic_tok.value = packet_get_string(&mic_tok.length);
 
 	maj_status = gss_verify_mic(&min_status, gssctxt->context,
-				&g_mic_data, &mic_tok, NULL);
+	    &g_mic_data, &mic_tok, NULL);
 
-        packet_check_eom();
+	packet_check_eom();
 	buffer_free(&mic_data);
 
 	if (maj_status != GSS_S_COMPLETE)
@@ -330,30 +335,31 @@ input_gssapi_mic(int type, u_int32_t plen, void *ctxt)
 
 	xxx_gssctxt = gssctxt;
 
-        authctxt->method->postponed = 0;
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
-        userauth_finish(authctxt, authctxt->method->name);
+	authctxt->method->postponed = 0;
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
+	userauth_finish(authctxt, authctxt->method->name);
 }
 
-/* This is called when the client thinks we've completed authentication.
+/*
+ * This is called when the client thinks we've completed authentication.
  * It should only be enabled in the dispatch handler by the function above,
  * which only enables it once the GSSAPI exchange is complete.
  */
 static void
 input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt)
 {
-        Authctxt *authctxt = ctxt;
-        Gssctxt *gssctxt;
+	Authctxt *authctxt = ctxt;
+	Gssctxt *gssctxt;
 
 	packet_check_eom();
 
 	if (authctxt == NULL || authctxt->method == NULL ||
 	    (authctxt->method->method_data == NULL))
-                fatal("No authentication or GSSAPI context");
+		fatal("No authentication or GSSAPI context");
 
-        gssctxt=authctxt->method->method_data;
+	gssctxt = authctxt->method->method_data;
 
 	/*
 	 * SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE -> gssapi userauth
@@ -378,25 +384,28 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt)
 	 * this will do for now.
 	 */
 #if 0
-        authctxt->method->authenticated = ssh_gssapi_userok(gssctxt, authctxt->user);
+	authctxt->method->authenticated = ssh_gssapi_userok(gssctxt,
+	    authctxt->user);
 #endif
 
 	if (xxx_gssctxt != gssctxt)
 		ssh_gssapi_delete_ctx(&gssctxt);
 	ssh_gssapi_delete_ctx(&gssctxt);
-        authctxt->method->postponed = 0;
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
-        dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
-        userauth_finish(authctxt, authctxt->method->name);
+	authctxt->method->postponed = 0;
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
+	dispatch_set(SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
+	userauth_finish(authctxt, authctxt->method->name);
 }
 
-static void ssh_gssapi_userauth_error(Gssctxt *ctxt) {
+static void
+ssh_gssapi_userauth_error(Gssctxt *ctxt)
+{
 	char *errstr;
-	OM_uint32 maj,min;
+	OM_uint32 maj, min;
 
-	errstr=ssh_gssapi_last_error(ctxt,&maj,&min);
+	errstr = ssh_gssapi_last_error(ctxt, &maj, &min);
 	if (errstr) {
 		packet_start(SSH2_MSG_USERAUTH_GSSAPI_ERROR);
 		packet_put_int(maj);
@@ -414,8 +423,7 @@ static void ssh_gssapi_userauth_error(Gssctxt *ctxt) {
  *
  * Does authorization, figures out how to store delegated creds.
  */
-static
-void
+static void
 userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 {
 	char *local_user = NULL;
@@ -435,8 +443,8 @@ userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 		    strcmp(local_user, authctxt->user) == 0)
 			gssctxt->default_creds = 1; /* store creds as default */
 
-		authctxt->method->authenticated = 
-			do_pam_non_initial_userauth(authctxt);
+		authctxt->method->authenticated =
+		    do_pam_non_initial_userauth(authctxt);
 
 	} else if (*authctxt->user == '\0') {
 		/* Requested username == ""; derive username from princ name */
@@ -449,7 +457,7 @@ userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 		gssctxt->default_creds = 1; /* store creds as default */
 
 		authctxt->method->authenticated =
-			do_pam_non_initial_userauth(authctxt);
+		    do_pam_non_initial_userauth(authctxt);
 	}
 
 	if (local_user != NULL)
@@ -457,13 +465,13 @@ userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 
 	if (*authctxt->user != '\0' && authctxt->method->authenticated != 0) {
 		major = gss_display_name(&gssctxt->minor, gssctxt->src_name,
-			    &dispname, NULL);
+		    &dispname, NULL);
 		if (major == GSS_S_COMPLETE) {
 			log("Authorized principal %.*s, authenticated with "
 			    "GSS mechanism %s, to: %s",
-				dispname.length, (char *)dispname.value,
-				ssh_gssapi_oid_to_name(gssctxt->actual_mech),
-				authctxt->user);
+			    dispname.length, (char *)dispname.value,
+			    ssh_gssapi_oid_to_name(gssctxt->actual_mech),
+			    authctxt->user);
 		}
 		(void) gss_release_buffer(&gssctxt->minor, &dispname);
 	}
@@ -485,9 +493,9 @@ Authmethod method_external = {
 };
 
 Authmethod method_gssapi = {
-        "gssapi",
-        &options.gss_authentication,
-        userauth_gssapi,
+	"gssapi",
+	&options.gss_authentication,
+	userauth_gssapi,
 	userauth_gssapi_abandon,
 	NULL,
 	NULL,
@@ -512,9 +520,9 @@ Authmethod method_external = {
 };
 
 Authmethod method_gssapi = {
-        "gssapi-with-mic",
-        &options.gss_authentication,
-        userauth_gssapi,
+	"gssapi-with-mic",
+	&options.gss_authentication,
+	userauth_gssapi,
 	userauth_gssapi_abandon,
 	NULL,
 	NULL,
