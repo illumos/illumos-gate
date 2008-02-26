@@ -43,6 +43,9 @@
 static int (*nvpacker)(nvlist_t *, char **, size_t *, int, int);
 static int (*nvsize)(nvlist_t *, size_t *, int);
 static int (*nvunpacker)(char *, size_t, nvlist_t **);
+static int (*nvfree)(nvlist_t *);
+static int (*nvlookupint64)(nvlist_t *, const char *, uint64_t *);
+
 static mutex_t attrlock = DEFAULTMUTEX;
 static int initialized;
 extern int __openattrdirat(int basefd, const char *name);
@@ -72,6 +75,11 @@ attrat_init()
 		    (nvsize = (int (*)(nvlist_t *,
 		    size_t *, int)) dlsym(libnvhandle,
 		    "nvlist_size")) == NULL ||
+		    (nvfree = (int (*)(nvlist_t *)) dlsym(libnvhandle,
+		    "nvlist_free")) == NULL ||
+		    (nvlookupint64 = (int (*)(nvlist_t *, const char *,
+		    uint64_t *)) dlsym(libnvhandle,
+		    "nvlist_lookup_uint64")) == NULL ||
 		    (nvunpacker = (int (*)(char *, size_t,
 		    nvlist_t **)) dlsym(libnvhandle,
 		    "nvlist_unpack")) == NULL) {
@@ -283,4 +291,16 @@ setattrat(int basefd, xattr_view_t view, const char *name, nvlist_t *request)
 	(void) close(xattrfd);
 	errno = saveerrno;
 	return (error);
+}
+
+void
+libc_nvlist_free(nvlist_t *nvp)
+{
+	nvfree(nvp);
+}
+
+int
+libc_nvlist_lookup_uint64(nvlist_t *nvp, const char *name, uint64_t *value)
+{
+	return (nvlookupint64(nvp, name, value));
 }

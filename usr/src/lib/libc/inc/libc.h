@@ -51,6 +51,7 @@
 #include <stdarg.h>
 #include <wchar.h>
 #include <wctype.h>
+#include <libnvpair.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -72,6 +73,8 @@ extern void callout_lock_enter(void);
 extern void callout_lock_exit(void);
 extern void *lmalloc(size_t);
 extern void lfree(void *, size_t);
+extern void libc_nvlist_free(nvlist_t *);
+extern int libc_nvlist_lookup_uint64(nvlist_t *, const char *, uint64_t *);
 extern void *libc_malloc(size_t);
 extern void *libc_realloc(void *, size_t);
 extern void libc_free(void *);
@@ -350,7 +353,6 @@ extern int _doscan(FILE *, const char *, va_list);
 extern int _wcscoll(const wchar_t *, const wchar_t *);
 extern size_t _wcsxfrm(wchar_t *, const wchar_t *, size_t);
 extern wint_t _fputwc(wint_t, FILE *);
-
 #ifdef	__cplusplus
 }
 #endif
