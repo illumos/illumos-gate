@@ -4039,7 +4039,7 @@ st_queued_strategy(buf_t *bp)
 	 * We don't observe O_NDELAY past the open,
 	 * as it will not make sense for tapes.
 	 */
-	if (un->un_state == ST_STATE_OFFLINE && un->un_restore_pos) {
+	if (un->un_state == ST_STATE_OFFLINE || un->un_restore_pos) {
 		/*
 		 * reset state to avoid recursion
 		 */
@@ -8493,8 +8493,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 		goto exit;
 
 	} else {				/* special I/O */
-		int stat_size = (un->un_arq_enabled ?
-		    sizeof (struct scsi_arq_status) : 1);
 		struct buf *allocbp = NULL;
 		com = (uchar_t)(uintptr_t)bp->b_forw;
 		count = bp->b_bcount;
@@ -9350,10 +9348,6 @@ st_intr(struct scsi_pkt *pkt)
 
 	ASSERT(bp != un->un_recov_buf);
 
-	if (pkt == un->un_rqs) {
-		scsi_sync_pkt(pkt);
-	}
-
 	un->un_rqs_state &= ~(ST_RQS_ERROR);
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG, "st_intr()\n");
@@ -9389,6 +9383,7 @@ st_intr(struct scsi_pkt *pkt)
 		 */
 		ASSERT(pkt == un->un_rqs);
 		ASSERT(un->un_state == ST_STATE_SENSING);
+		scsi_sync_pkt(pkt);
 		action = st_handle_sense(un, bp, &un->un_pos);
 		/*
 		 * Make rqs isn't going to be retied.
@@ -9414,7 +9409,9 @@ st_intr(struct scsi_pkt *pkt)
 		 */
 		action = st_handle_autosense(un, bp, &un->un_pos);
 
-	} else  if ((SCBP(pkt)->sts_busy) || (SCBP(pkt)->sts_chk)) {
+	} else  if ((SCBP(pkt)->sts_busy) ||
+	    (SCBP(pkt)->sts_chk) ||
+	    (SCBP(pkt)->sts_vu7)) {
 		/*
 		 * Okay, we weren't running a REQUEST SENSE. Call a routine
 		 * to see if the status bits we're okay. If a request sense
@@ -9522,13 +9519,18 @@ again:
 			un->un_state = ST_STATE_SENSING;
 		}
 
-		/* Whats going to happen here? */
+		/*
+		 * zero the sense data.
+		 */
+		bzero(un->un_rqs->pkt_scbp, SENSE_LENGTH);
 
-		((recov_info *)un->un_rqs->pkt_private)->cmd_bp = bp;
-
-		bzero(ST_RQSENSE, SENSE_LENGTH);
-
-		scsi_sync_pkt(un->un_rqs); /* HELLO */
+		/*
+		 * If this is not a retry on QUE_SENSE point to the original
+		 * bp of the command that got us here.
+		 */
+		if (pkt != un->un_rqs) {
+			((recov_info *)un->un_rqs->pkt_private)->cmd_bp = bp;
+		}
 
 		if (un->un_throttle) {
 			un->un_last_throttle = un->un_throttle;
@@ -11087,6 +11089,12 @@ st_check_error(struct scsi_tape *un, struct scsi_pkt *pkt)
 		 * so we just try again
 		 */
 		action = QUE_SENSE;
+	} else if (SCBP(pkt)->sts_vu7) {
+		/*
+		 * This is an aborted task. This can be a reset on the other
+		 * port of a multiport drive. Lets try and recover it.
+		 */
+		action = DEVICE_RESET;
 	} else {
 		action = COMMAND_DONE;
 	}
@@ -11197,12 +11205,13 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 	ST_FUNC(ST_DEVINFO, st_set_state);
 
 	ASSERT(mutex_owned(ST_MUTEX));
+	ASSERT(bp != un->un_recov_buf);
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_set_state(): eof=%x	fmneeded=%x  pkt_resid=0x%lx (%ld)\n",
 	    un->un_pos.eof, un->un_fmneeded, sp->pkt_resid, sp->pkt_resid);
 
-	if ((bp != un->un_sbufp) && (bp != un->un_recov_buf)) {
+	if (bp != un->un_sbufp) {
 #ifdef STDEBUG
 		if (DEBUGGING && sp->pkt_resid) {
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -11211,7 +11220,9 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		}
 #endif
 		bp->b_resid = sp->pkt_resid;
-		st_calc_bnum(un, bp, sp);
+		if (geterror(bp) != EIO) {
+			st_calc_bnum(un, bp, sp);
+		}
 		if (bp->b_flags & B_READ) {
 			un->un_lastop = ST_OP_READ;
 			un->un_fmneeded = 0;
@@ -11241,6 +11252,9 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		case SCMD_WRITE:
 		case SCMD_WRITE_G4:
 			bp->b_resid = sp->pkt_resid;
+			if (geterror(bp) == EIO) {
+				break;
+			}
 			new_lastop = ST_OP_WRITE;
 			st_calc_bnum(un, bp, sp);
 			if (un->un_dp->options & ST_REEL) {
@@ -11252,6 +11266,9 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		case SCMD_READ:
 		case SCMD_READ_G4:
 			bp->b_resid = sp->pkt_resid;
+			if (geterror(bp) == EIO) {
+				break;
+			}
 			new_lastop = ST_OP_READ;
 			st_calc_bnum(un, bp, sp);
 			un->un_fmneeded = 0;
@@ -13809,6 +13826,10 @@ st_read_attributes(struct scsi_tape *un, uint16_t attribute, void *pnt,
 
 	ST_FUNC(ST_DEVINFO, st_read_attributes);
 
+	if (un->un_sd->sd_inq->inq_ansi < 3) {
+		return (ENOTTY);
+	}
+
 	cmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
 
 	cdb[0] = (char)SCMD_READ_ATTRIBUTE;
@@ -15953,6 +15974,10 @@ st_get_media_id_via_media_serial_cmd(struct scsi_tape *un, ubufunc_t bufunc)
 
 	ST_FUNC(ST_DEVINFO, st_get_media_id_via_media_serial_cmd);
 
+	if (un->un_sd->sd_inq->inq_ansi < 3) {
+		return (ENOTTY);
+	}
+
 	ucmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
 upsize:
 	buf = kmem_alloc(size, KM_SLEEP);
@@ -16172,6 +16197,10 @@ st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 		error_number = 0;
 		break;
 
+	default:
+		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
+		    "st_recov_ret with unhandled errstat %d\n", err);
+		/* FALLTHROUGH */
 	case COMMAND_DONE_ERROR:
 	case COMMAND_DONE_EACCES:
 		ST_DO_KSTATS(bp, kstat_waitq_exit);
@@ -16180,9 +16209,6 @@ st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 		st_set_pe_flag(un);
 		break;
 
-	default:
-		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
-		    "st_recov_ret with unhandled errstat %d\n", err);
 	}
 	st_bioerror(bp, error_number);
 	st_done_and_mutex_exit(un, bp);
@@ -16326,8 +16352,9 @@ st_recover(void *arg)
 			    un->un_mspl, sizeof (struct seq_mode));
 			if (rval) {
 				st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
+			} else {
+				st_recov_ret(un, errinfo, COMMAND_DONE);
 			}
-			st_recov_ret(un, errinfo, COMMAND_DONE);
 			return;
 		}
 		/*
@@ -16431,6 +16458,7 @@ st_recov_cb(struct scsi_pkt *pkt)
 		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
 		    "pkt_reason not handled yet %s",
 		    scsi_rname(pkt->pkt_reason));
+		action = COMMAND_DONE_ERROR;
 	}
 
 	switch (action) {
@@ -16446,6 +16474,7 @@ st_recov_cb(struct scsi_pkt *pkt)
 		bioerror(bp, EIO);
 		break;
 
+	case DEVICE_RESET:
 	case QUE_BUSY_COMMAND:
 		/* longish timeout */
 		timout = ST_STATUS_BUSY_TIMEOUT;
@@ -16479,6 +16508,11 @@ st_recov_cb(struct scsi_pkt *pkt)
 	default:
 		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
 		    "Unhandled recovery state 0x%x\n", action);
+		un->un_pos.pmode = invalid;
+		un->un_err_resid = bp->b_resid = bp->b_bcount;
+		st_bioerror(bp, EIO);
+		st_set_pe_flag(un);
+		break;
 	}
 
 	st_done_and_mutex_exit(un, bp);
@@ -17292,7 +17326,9 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 	if (rval != TRAN_BUSY) {
 		return (COMMAND_DONE_ERROR);
 	}
+	mutex_exit(ST_MUTEX);
 	rval = st_handle_start_busy(un, bp, ST_TRAN_BUSY_TIMEOUT, 0);
+	mutex_enter(ST_MUTEX);
 	if (rval) {
 		return (COMMAND_DONE_ERROR);
 	}
