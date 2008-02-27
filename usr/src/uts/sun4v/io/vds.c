@@ -451,6 +451,20 @@ static int 	vd_reset_access_failure = 0;
 static boolean_t vd_volume_force_slice = B_FALSE;
 
 /*
+ * The label of disk images created with some earlier versions of the virtual
+ * disk software is not entirely correct and have an incorrect v_sanity field
+ * (usually 0) instead of VTOC_SANE. This creates a compatibility problem with
+ * these images because we are now validating that the disk label (and the
+ * sanity) is correct when a disk image is opened.
+ *
+ * This tunable is set to false to not validate the sanity field and ensure
+ * compatibility. If the tunable is set to true, we will do a strict checking
+ * of the sanity but this can create compatibility problems with old disk
+ * images.
+ */
+static boolean_t vd_file_validate_sanity = B_FALSE;
+
+/*
  * Supported protocol version pairs, from highest (newest) to lowest (oldest)
  *
  * Each supported major version should appear only once, paired with (and only
@@ -2181,7 +2195,7 @@ vd_file_validate_geometry(vd_t *vd)
 
 	if (label.dkl_magic != DKL_MAGIC ||
 	    label.dkl_cksum != vd_lbl2cksum(&label) ||
-	    label.dkl_vtoc.v_sanity != VTOC_SANE ||
+	    (vd_file_validate_sanity && label.dkl_vtoc.v_sanity != VTOC_SANE) ||
 	    label.dkl_vtoc.v_nparts != V_NUMPAR) {
 
 		if (vd_file_validate_efi(vd) == 0) {
