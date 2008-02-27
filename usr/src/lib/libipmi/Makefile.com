@@ -50,6 +50,7 @@ LIBS=		$(DYNLIB) $(LINTLIB)
 
 SRCDIR=		../common
 
+CLEANFILES +=	$(SRCDIR)/ipmi_tables.c	
 INCS +=		-I$(SRCDIR)
 LDLIBS +=	-lc
 CPPFLAGS +=	$(INCS)
