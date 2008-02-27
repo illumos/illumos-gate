@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,13 +123,13 @@ static int		cmdarg;		/* command line argument */
 static avl_tree_t	*stree = NULL;	/* source file inode search tree */
 static acl_t		*s1acl;
 static int		saflg = 0;	/* 'cp' extended system attr. */
-static int		srcfd;
-static int		targfd;
-static int		sourcedirfd;
-static int		targetdirfd;
-static DIR 		*srcdirp;
-static int		srcattrfd;
-static int		targattrfd;
+static int		srcfd = -1;
+static int		targfd = -1;
+static int		sourcedirfd = -1;
+static int		targetdirfd = -1;
+static DIR 		*srcdirp = NULL;
+static int		srcattrfd = -1;
+static int		targattrfd = -1;
 static struct stat 	attrdir;
 
 /* Extended system attributes support */
@@ -1601,7 +1601,6 @@ static int
 copyattributes(char *source, char *target)
 {
 	struct dirent *dp;
-	char *srcbuf, *targbuf;
 	int error = 0;
 	int aclerror;
 	mode_t mode;
@@ -1609,8 +1608,6 @@ copyattributes(char *source, char *target)
 	acl_t *xacl = NULL;
 	acl_t *attrdiracl = NULL;
 	struct timeval times[2];
-
-	srcbuf = targbuf = NULL;
 
 
 	if (pathconf(source,  _PC_XATTR_EXISTS) != 1)
@@ -1819,16 +1816,11 @@ next:
 			acl_free(xacl);
 			xacl = NULL;
 		}
-		if (srcbuf != NULL)
-			free(srcbuf);
-		if (targbuf != NULL)
-			free(targbuf);
 		if (srcattrfd != -1)
 			(void) close(srcattrfd);
 		if (targattrfd != -1)
 			(void) close(targattrfd);
 		srcattrfd = targattrfd = -1;
-		srcbuf = targbuf = NULL;
 	}
 out:
 	if (xacl != NULL) {
@@ -1839,10 +1831,6 @@ out:
 		acl_free(attrdiracl);
 		attrdiracl = NULL;
 	}
-	if (srcbuf)
-		free(srcbuf);
-	if (targbuf)
-		free(targbuf);
 
 	if (!saflg && !pflg && !mve)
 		close_all();
@@ -2125,6 +2113,8 @@ traverse_attrfile(struct dirent *dp, char *source, char *target, int  first)
 {
 	int		error = 0;
 
+	srcattrfd = targattrfd = -1;
+
 	if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
 	    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
 	    dp->d_name[2] == '\0') ||
@@ -2202,7 +2192,8 @@ out:
 		if (srcattrfd != -1)
 			(void) close(srcattrfd);
 		if (targattrfd != -1)
-		(void) close(targattrfd);
+			(void) close(targattrfd);
+		srcattrfd = targattrfd = -1;
 	}
 	return (error == 0 ? 0 :1);
 }
