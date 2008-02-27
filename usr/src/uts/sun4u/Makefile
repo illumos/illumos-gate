@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,12 +67,17 @@ $(CLOSED_BUILD)CRYPTO_EK_KMODS	+= arcfour2048
 
 
 def		:=	TARGET= def
+def.prereq	:=	TARGET= def
 all		:=	TARGET= all
+all.prereq	:=	TARGET= all
 install		:=	TARGET= install
+install.prereq	:=	TARGET= all
 install_h	:=	TARGET= install_h
+install_h.prere	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
+lint.prereq	:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
@@ -113,6 +118,92 @@ modlintlib:	$(LINT_KMODS) $(CLOSED_LINT_KMODS)
 
 genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+#
+# Privilege constants
+#
+# NOTE: The rules for generating priv_const.c file are shared between all
+# processor architectures and should be kept in sync. If they are changed in
+# this file make sure that x86 rules are updated as well.
+#
+PRIVS_C = $(UTSBASE)/common/os/priv_const.c
+
+$(PRIVS_C): $(PRIVS_AWK) $(PRIVS_DEF)
+	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) cfile=$@
+
+
+#
+# Prerequisites
+#
+# The uts/Makefile defines build parallelism for sun4 platforms such that sparc,
+# sun4u and sun4v are all built in parallel. Also this Makefile specifies that
+# all IMPLEMENTATIONS sun4u sub-platforms are built in parallel. This requires
+# building certain parts before the parallel build can start. The uts/Makefile
+# appends the '.prereq' string to the original target and executes this Makefile
+# to build any prerequisites needed before the full parallel build can start.
+# After that make continues with normal targets.
+#
+# Any build prerequisites for sun4 and IMPLEMENTATIONS builds should be
+# described here.
+#
+# genassym is used to build dtrace and genunix, so it should be built first.
+#
+# priv_const.c is required to build genunix.
+#
+# genunix is used by everyone to ctfmerge with. Genunix is merged with sparc/ip
+#   so as a side effect this dependency builds sparc/ip as part of the
+#   prerequisites.
+#
+# unix is not required by itself but several sun4u platforms require
+#   sun4u/platmod to be present. The easiest way to achieve this is to build
+#   sun4u/unix first since sun4u/unix Makefile builds sun4u/platform correctly.
+#   This causes full sun4u/unix to be built before all sun4u platforms and
+#   before uts/sun4v and uts/sparc, but it acceptable since it is not spending
+#   too much time building sun4u/unix.
+#
+all.prereq def.prereq install.prereq: genassym genunix unix
+
+#
+# Various sun4u platforms expect proto/root_sparc/platform/sun4u/include to be
+# present. This is handled by running make install_h in sun4u/unix directory
+# first.
+#
+install_h.prereq: FRC
+	@cd sys; pwd; $(MAKE) $(TARGET)
+
+#
+# sun4u/unix and sun4u/genunix should be linted first since sparc does global
+# cross-check with these lint libraries. The sun4u/unix and sun4u/genunix can be
+# linted in parallel.
+#
+LINT_PREREQ = unix.lint genunix.lint
+lint.prereq: $(LINT_PREREQ)
+
+.PARALLEL:  $(LINT_PREREQ)
+
+$(LINT_PREREQ):
+	@cd $(@:%.lint=%); pwd; $(MAKE) $(TARGET)
+
+#
+# Nothing to do with any other prerequisites
+#
+%.prereq:
+
+#
+# Platform inter-dependencies
+#
+lw8: serengeti
+
+quasar: darwin
+
+#
+# The genunix requires priv_const.c file to be generated first.
+#
+genunix: $(PRIVS_C)
+
+#
+# Rules
+#
 
 $(IMPLEMENTATIONS):	FRC
 	@cd $@; pwd; THISIMPL=$@ $(MAKE) $(NO_STATE) $(TARGET)
@@ -204,6 +295,7 @@ $(USR_DESKTOP_LIB_DIR):		$(USR_DESKTOP_DIR)
 LINT_TARGET	= globallint
 
 globallint:
+	@pwd
 	@-$(ECHO) "\nSUN4U KERNEL: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 

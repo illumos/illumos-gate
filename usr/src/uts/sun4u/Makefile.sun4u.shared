@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -158,38 +158,38 @@ include $(UTSTREE)/common/Makefile.files
 include $(UTSBASE)/Makefile.uts
 
 # These come after Makefile.uts (for CLOSED_BUILD).
-IMPLEMENTATIONS		 = tazmo .WAIT
-IMPLEMENTATIONS		+= starfire .WAIT
-IMPLEMENTATIONS		+= javelin .WAIT
-IMPLEMENTATIONS		+= darwin .WAIT
-IMPLEMENTATIONS		+= quasar .WAIT
-IMPLEMENTATIONS		+= grover .WAIT
-IMPLEMENTATIONS		+= enchilada .WAIT
-IMPLEMENTATIONS		+= taco .WAIT
-IMPLEMENTATIONS		+= mpxu .WAIT
-IMPLEMENTATIONS		+= excalibur .WAIT
-IMPLEMENTATIONS		+= montecarlo .WAIT
-IMPLEMENTATIONS		+= serengeti .WAIT
-IMPLEMENTATIONS		+= littleneck .WAIT
-IMPLEMENTATIONS		+= starcat .WAIT
-IMPLEMENTATIONS		+= daktari .WAIT
-IMPLEMENTATIONS		+= cherrystone .WAIT
-IMPLEMENTATIONS		+= fjlite .WAIT
-IMPLEMENTATIONS		+= snowbird .WAIT
-IMPLEMENTATIONS		+= schumacher .WAIT
-IMPLEMENTATIONS		+= blade .WAIT
-IMPLEMENTATIONS		+= boston .WAIT
-IMPLEMENTATIONS		+= seattle .WAIT
-IMPLEMENTATIONS		+= chicago .WAIT
-IMPLEMENTATIONS		+= sunfire .WAIT
-IMPLEMENTATIONS		+= lw8 .WAIT
-IMPLEMENTATIONS		+= makaha .WAIT
-IMPLEMENTATIONS		+= opl .WAIT
-IMPLEMENTATIONS		+= lw2plus .WAIT
-IMPLEMENTATIONS		+= douglas .WAIT
+IMPLEMENTATIONS		 = tazmo 
+IMPLEMENTATIONS		+= starfire 
+IMPLEMENTATIONS		+= javelin 
+IMPLEMENTATIONS		+= darwin 
+IMPLEMENTATIONS		+= quasar 
+IMPLEMENTATIONS		+= grover 
+IMPLEMENTATIONS		+= enchilada 
+IMPLEMENTATIONS		+= taco 
+IMPLEMENTATIONS		+= mpxu 
+IMPLEMENTATIONS		+= excalibur 
+IMPLEMENTATIONS		+= montecarlo 
+IMPLEMENTATIONS		+= serengeti 
+IMPLEMENTATIONS		+= littleneck 
+IMPLEMENTATIONS		+= starcat 
+IMPLEMENTATIONS		+= daktari 
+IMPLEMENTATIONS		+= cherrystone 
+IMPLEMENTATIONS		+= fjlite 
+IMPLEMENTATIONS		+= snowbird 
+IMPLEMENTATIONS		+= schumacher 
+IMPLEMENTATIONS		+= blade 
+IMPLEMENTATIONS		+= boston 
+IMPLEMENTATIONS		+= seattle 
+IMPLEMENTATIONS		+= chicago 
+IMPLEMENTATIONS		+= sunfire 
+IMPLEMENTATIONS		+= lw8 
+IMPLEMENTATIONS		+= makaha 
+IMPLEMENTATIONS		+= opl 
+IMPLEMENTATIONS		+= lw2plus 
+IMPLEMENTATIONS		+= douglas
 
-$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	= chalupa .WAIT
-$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= ents .WAIT
+$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	= chalupa 
+$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= ents 
 
 #
 #	machine specific optimization, override default in Makefile.master

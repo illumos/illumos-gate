@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -120,7 +120,7 @@ _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all install: $(ROOTDIRS) .WAIT $(SUBDIRS)
+all install: $(SUBDIRS)
 
 clean: $(SUBDIRS)
 
@@ -133,7 +133,9 @@ lint: $(LINTSUBDIRS)
 
 _msg: $(MSGSUBDIRS)
 
-$(SUBDIRS): FRC
+.PARALLEL: $(SUBDIRS) $(PKG_SUBDIRS) $(CLOSED_SUBDIRS)
+
+$(SUBDIRS): $(ROOTDIRS) FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 $(PKG_SUBDIRS): FRC

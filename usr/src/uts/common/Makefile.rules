@@ -1087,15 +1087,6 @@ $(MD_XDR_CSRC)/metamed_xdr.c:	$(MD_XDR_XSRC)/metamed.x
 	nawk '{sub(/metamed.h/, "mdmed.h"); print $$0}' >$@
 
 #
-# Privilege constants
-#
-
-PRIVS_C = $(UTSBASE)/common/os/priv_const.c
-
-$(PRIVS_C): $(PRIVS_AWK) $(PRIVS_DEF)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) cfile=$@
-
-#
 #	Section 1b:	Lint `objects'
 #
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/crypto/aes/%.c

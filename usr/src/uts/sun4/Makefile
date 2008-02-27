@@ -19,54 +19,25 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-UTSBASE	= ../../..
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This makefile drives the production of all sparc-specific dependencies that
+# should be built before sun4v/sun4u/sparc platforms can be built in parallel.
+#
 
 #
-# include global definitions
+# Include platform-specific Makefile definitions.
 #
-include ../Makefile.starfire
+UTSBASE = ..
+include  $(UTSBASE)/$(MACH)/Makefile.$(MACH)
 
-#
-# Override defaults.
-#
-FILEMODE	 = 644
-GROUP = bin
-
-HDRS=	cvc.h
-
-STARHDRS=	$(UTSBASE)/sun4u/ngdr/sys/dr.h \
-		$(UTSBASE)/sun4u/ngdr/sys/dr_util.h
-
-ROOTHDRS=	$(HDRS:%=$(USR_STARFIRE_ISYS_DIR)/%)
-
-ROOTDIR=	$(ROOT)/usr/share/src
-ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
-
-CHECKHDRS=	$(HDRS:%.h=%.check) \
-		$(STARHDRS:%.h=%.check)
-
-.KEEP_STATE:
-
-.PARALLEL: $(CHECKHDRS) $(ROOTHDRS)
-
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTLINK)
-
-check:	$(CHECKHDRS)
+SPARC_PREREQ = $(UTSBASE)/sun4u
 
 #
-# install rules
+# So far all the prerequisite information is in sun4u Makefile
 #
-$(USR_STARFIRE_ISYS_DIR)/%:	% $(USR_STARFIRE_ISYS_DIR)
-	$(INS.file)
-
-$(ROOTDIRS):
-	$(INS.dir.root.bin)
-
-FRC:
-
-include ../Makefile.targ
+%.prereq:
+	@cd $(SPARC_PREREQ); pwd; $(MAKE) $(NO_STATE) $@

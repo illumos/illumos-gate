@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,14 +30,46 @@ include ../Makefile.master
 #
 # List of architectures to build as part of the standard build.
 #
-# Note that sparc must trail the individual platforms so that sparc
-# lint targets will have the unix lint libraries to compare against.
+# Some of these architectures are built in parallel (see i386_PARALLEL and
+# sparc_PARALLEL). This requires building some parts first before parallel build
+# can start. Platform make files know what should be built as a prerequisite for
+# the parallel build to work. The i386_PREREQ and sparc_PREREQ variables tell
+# which platform directory to enter to start making prerequisite dependencies.
 #
 sparc_ARCHITECTURES = sun4v sun4u sparc
 
-i386_ARCHITECTURES = i86pc
-i386_ARCHITECTURES += i86xpv
-i386_ARCHITECTURES += intel
+i386_ARCHITECTURES = i86pc i86xpv intel
+
+#
+# For i386 all architectures can be compiled in parallel.
+#
+# intel/Makefile knows how to build prerequisites needed for parallel build.
+#
+i386_PREREQ = intel
+i386_PARALLEL = $(i386_ARCHITECTURES)
+
+#
+# For sparc all architectures can be compiled in parallel.
+#
+# sun4/Makefile knows how to build prerequisites needed for parallel build.
+# can start.
+#
+sparc_PREREQ = sun4
+sparc_PARALLEL = $(sparc_ARCHITECTURES)
+
+#
+# Platforms defined in $(MACH)_PARALLEL are built in parallel. DUMMY is placed
+# at the end in case $(MACH)_PARALLEL is empty to prevent everything going in
+# parallel.
+#
+.PARALLEL: $($(MACH)_PARALLEL) DUMMY
+
+#
+# For build prerequisites we use a special target which is constructed by adding
+# '.prereq' suffix to the $(MACH)_PREREQ.
+#
+PREREQ_TARGET = $($(MACH)_PREREQ:%=%.prereq)
+
 
 def		:=	TARGET= def
 all		:=	TARGET= all
@@ -69,7 +101,23 @@ install_dirs:
 	@cd ..; pwd; $(MAKE) rootdirs
 	@pwd
 
-$($(MACH)_ARCHITECTURES): FRC
+#
+# Rule to build prerequisites. The left part of the pattern will match
+# PREREQ_TARGET.
+#
+# The location of the Makefile is determined by strippinng '.prereq' suffix from
+# the target name. We add '.prereq' suffix to the target passed to the child
+# Makefile so that it can distinguish prerequisite build from the regular one.
+#
+#
+%.prereq:
+	@cd $(@:%.prereq=%); pwd; $(MAKE) $(NO_STATE) $(TARGET).prereq
+
+#
+# Rule to build architecture files. Build all required prerequisites and then
+# build the rest (potentially in parallel).
+#
+$($(MACH)_ARCHITECTURES): $(PREREQ_TARGET) FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(PMTMO_FILE) pmtmo_file: $(PATCH_MAKEUP_TABLE)

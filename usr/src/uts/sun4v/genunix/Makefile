@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -135,11 +135,8 @@ install:  	$(INSTALL_DEPS)
 $(LIBGEN):	$(GENUNIX) $(LIBSTUBS)
 	$(BUILD.SO) $(GENUNIX) $(LIBSTUBS)
 
-$(IPCTF_TARGET) ipctf_target: FRC
-	@cd $(IPDRV_DIR); pwd; $(MAKE) ipctf.$(OBJS_DIR)
-	@pwd
-
 $(GENUNIX): $(IPCTF_TARGET) $(OBJECTS)
+	@pwd
 	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_GENUNIX_MERGE)
 	$(POST_PROCESS)

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -163,26 +163,16 @@ $(KRTLD_O):	$(KRTLD_OBJECTS)
 	$(LD) -r -o $@ -M$(KRTLD_MAPFILE) $(KRTLD_OBJECTS)
 
 #
-#	Special rules for generating assym.h for inclusion in assembly files.
-#
-$(DSF_DIR)/$(OBJS_DIR)/assym.h:	FRC
-	@cd $(DSF_DIR); $(MAKE) all.targ
-
-$(GENLIB):	FRC
-	@(cd $(GENLIB_DIR); pwd; $(MAKE) all.targ)
-	@pwd
-
-$(PLATLIB):
-	?@(cd $(PLAT_DIR); pwd; $(MAKE) all.targ)
-	?@pwd
-
-#
 #	CPU_OBJ now comprises of 2 object files which come from sun4 common
 #	and from architecture dependent code.  OBJS_DIR is prepended where
 #	CPU_OBJ is defined to allow for building multiple CPU_OBJ's
 #
 $(CPULIB):	$(CPU_OBJ)
 	$(BUILD.SO) $(CPU_OBJ)
+
+$(PLATLIB):
+	?@(cd $(PLAT_DIR); pwd; $(MAKE) all.targ)
+	?@pwd
 
 #
 #	The global lint target builds the kernel lint library (llib-lunix.ln)
@@ -195,6 +185,7 @@ $(CPULIB):	$(CPU_OBJ)
 #
 
 $(LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
+	@pwd
 	@-$(ECHO) "\n$(UNIX): (library construction):"
 	@$(LINT) -o $(UNIX) $(LINTFLAGS) $(LINTS)
 	@$(MV) $(@F) $@

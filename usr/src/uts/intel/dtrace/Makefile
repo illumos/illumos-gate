@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,11 +72,5 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 install:	$(INSTALL_DEPS)
 
 $(BINARY):	$(ASSYM_H)
-
-#
-#	Rule to generate assym.h
-#
-$(ASSYM_H): FRC
-	@cd $(DSF_DIR); $(MAKE) all.targ
 
 include $(UTSBASE)/intel/Makefile.targ

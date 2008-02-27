@@ -71,17 +71,22 @@ $(CLOSED_BUILD)CRYPTO_EK_KMODS	+= blowfish448
 #
 #
 def		:=	TARGET= def
+def.prereq	:=	TARGET= def
 all		:=	TARGET= all
+all.prereq	:=	TARGET= all
 install		:=	TARGET= install
+install.prereq	:=	TARGET= all
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
+lint.prereq	:=	TARGET= lint
 modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 install_h	:=	TARGET= install_h
+install_h.prereq	:=	TARGET= install_h
 
 .KEEP_STATE:
 
@@ -90,6 +95,59 @@ install_h	:=	TARGET= install_h
 
 def all install clean clobber modlist: genassym $(KMODS) $(CLOSED_KMODS) \
 	$(SVVS) $(XMODS) $(CLOSED_XMODS) config
+
+
+#
+# Privilege constants
+#
+# NOTE: The rules for generating priv_const.c file are shared between all
+# processor architectures and and should be kept in sync. If they are changed in
+# this file make sure that sparc rules are updated as well.
+#
+PRIVS_C = $(SRC)/uts/common/os/priv_const.c
+
+$(PRIVS_C): $(PRIVS_AWK) $(PRIVS_DEF)
+	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) cfile=$@
+
+#
+# Prerequisites
+#
+# The uts/Makefile defines build parallelism for x86 platforms such that i86pc,
+# i86xpv and intel are all built in parallel. This requires building certain
+# parts before the parallel build can start. The uts/Makefile appends the
+# '.prereq' string to the original target and executes this Makefile to build
+# any prerequisites needed before the full parallel build can start. After that
+# make continues with normal targets.
+#
+# Any build prerequisites for x86 builds should be described here.
+#
+# genassym is used to build intel/dtrace and genunix, so it should be built
+# first.
+#
+# priv_const.c is required to build genunix.
+#
+# genunix is used by everyone to ctf-merge with. Genunix is CTF-merged with
+#   intel/ip so as a side effect this dependency builds intel/ip as part of the
+#   prerequisites.
+#
+# intel/dtrace depends on i86pc/genassym, so we need to build both
+# i86pc/genassym and intel/genassym.
+#
+all.prereq install.prereq def.prereq: genassym genunix FRC
+	@cd ../i86pc/genassym; pwd; $(MAKE) $(@:%.prereq=%)
+
+#
+# i86pc lint libraries should be built first
+#
+lint.prereq: FRC
+	@cd ../i86pc; pwd; $(MAKE) $(NO_STATE) lint
+
+#
+# Nothing to do for any other prerequisite targets.
+#
+%.prereq:
+
+genunix: $(PRIVS_C)
 
 modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
 	$(XMODS) $(CLOSED_XMODS)
@@ -135,6 +193,7 @@ LINT_TARGET	= globallint
 globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
 globallint:
+	@pwd
 	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.intel) | $(LGREP.2)
 

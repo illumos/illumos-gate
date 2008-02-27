@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -195,10 +195,6 @@ $(MULTIBOOT):	$(DBOOT_O)
 $(DSF_DIR)/$(OBJS_DIR)/assym.h $(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h:	FRC
 	@cd $(DSF_DIR); $(MAKE) all.targ
 
-$(GENLIB): FRC
-	@(cd $(GENLIB_DIR); pwd; $(MAKE) all.targ)
-	@pwd
-
 #
 #	The global lint target builds the kernel lint library (llib-lunix.ln)
 #	which is equivalent to a lint of /unix.o. Then all kernel modules for
@@ -210,11 +206,13 @@ $(GENLIB): FRC
 #
 
 $(LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
+	@pwd
 	@-$(ECHO) "\n$(UNIX): (library construction):"
 	@$(LINT) -o$(UNIX) $(LINTFLAGS) $(LINTS)
 	@$(MV) $(@F) $@
 
 $(DBOOT_LINT_LIB):	$(LINT_LIB_DIR) $(DBOOT_LINTS)
+	@pwd
 	@-$(ECHO) "\n$(DBOOT): (library construction):"
 	@$(LINT) -o$(DBOOT) $(DBOOT_LINTFLAGS) $(DBOOT_LINTS)
 	@$(MV) $(@F) $@

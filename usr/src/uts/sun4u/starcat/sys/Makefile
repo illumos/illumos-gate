@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 UTSBASE	= ../../..
 
@@ -54,9 +54,6 @@ ROOTHDRS=	$(HDRS:%=$(USR_STARCAT_ISYS_DIR)/%)
 ROOTDIR=	$(ROOT)/usr/share/src
 ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
 
-ROOTLINK=	$(ROOTDIR)/uts/$(PLATFORM)/sys
-LINKDEST=	../../../../platform/$(PLATFORM)/include/sys
-
 CHECKHDRS=	$(HDRS:%.h=%.check) \
 		$(CHKHDRS:%.h=%.check) \
 		$(STARHDRS:%.h=%.check)
@@ -77,10 +74,6 @@ $(USR_STARCAT_ISYS_DIR)/%:	% $(USR_STARCAT_ISYS_DIR)
 
 $(ROOTDIRS):
 	$(INS.dir.bin.bin)
-
-# -r because this used to be a directory and is now a link.
-$(ROOTLINK):	$(ROOTDIRS)
-	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@ $(CHOWNLINK) $(CHGRPLINK)
 
 FRC:
 

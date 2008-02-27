@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -153,19 +153,6 @@ $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
 $(KRTLD_O):	$(KRTLD_OBJECTS)
 	$(LD) -r -o $@ -M$(KRTLD_MAPFILE) $(KRTLD_OBJECTS)
 
-#
-#	Special rules for generating assym.h for inclusion in assembly files.
-#
-$(DSF_DIR)/$(OBJS_DIR)/assym.h:	FRC
-	@cd $(DSF_DIR); $(MAKE) all.targ
-
-$(GENLIB):	FRC
-	@(cd $(GENLIB_DIR); pwd; $(MAKE) all.targ)
-	@pwd
-
-$(PLATLIB):
-	?@(cd $(PLAT_DIR); pwd; $(MAKE) all.targ)
-	?@pwd
 #
 #	CPU_OBJ now comprises of 2 object files which come from sun4 common
 #	and from architecture dependent code.  OBJS_DIR is prepended where

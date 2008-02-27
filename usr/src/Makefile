@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +50,16 @@ HDRSUBDIRS=	uts head lib cmd ucbhead
 # standards.
 #
 CHKHDRSUBDIRS=	head uts lib
+
+#
+# Headers that can be built in parallel
+#
+PARALLEL_HEADERS = sysheaders userheaders libheaders ucbheaders cmdheaders
+
+#
+# Directories that can be built in parallel
+#
+PARALLEL_DIRS = uts lib
 
 # The check target also causes smf(5) service manifests to be validated.
 CHKMFSTSUBDIRS=	cmd
@@ -134,10 +144,16 @@ closedbins: FRC $(ROOTDIRS)
 		    (cd $(ROOT); tar xBpf -); \
 	fi
 
+#
+# Declare what parts can be build in parallel
+# DUMMY at the end is used in case macro expansion produces an empty string to
+# prevent everything going in parallel
+#
+.PARALLEL: $(PARALLEL_HEADERS) DUMMY
+.PARALLEL: $(PARALLEL_DIRS) DUMMY
+
 $(SUBDIRS) head ucbhead pkgdefs: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-.PARALLEL:	sysheaders userheaders libheaders ucbheaders cmdheaders
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.
