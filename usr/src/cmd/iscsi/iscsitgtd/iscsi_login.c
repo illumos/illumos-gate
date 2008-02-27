@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -902,10 +902,10 @@ login_set_auth(iscsi_sess_t *s)
 			 */
 			xnInitiator = NULL;
 			while ((xnInitiator = tgt_node_next(xnAcl,
-			    XML_ELEMENT_INIT, xnInitiator)) != NULL) {
+			    XML_ELEMENT_ACLINIT, xnInitiator)) != NULL) {
 
 				if ((tgt_find_value_str(xnInitiator,
-				    XML_ELEMENT_INIT, &possible) == False) ||
+				    XML_ELEMENT_ACLINIT, &possible) == False) ||
 				    (possible == NULL))
 					continue;
 

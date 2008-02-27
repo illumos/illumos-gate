@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,16 +37,17 @@ extern "C" {
 #include <iscsitgt_impl.h>
 #include <ucred.h>
 
-#define	SA_TARGET_SVC_NAME	"system/iscsitgt"
+#define	SA_TARGET_SVC_NAME		"system/iscsitgt"
+#define	SA_TARGET_SVC_INSTANCE_FMRI	"svc:/system/iscsitgt:default"
 
-#define	ISCSI_READ_AUTHNAME	"read_authorization"
-#define	ISCSI_MODIFY_AUTHNAME	"modify_authorization"
-#define	ISCSI_VALUE_AUTHNAME	"value_authorization"
+#define	ISCSI_READ_AUTHNAME		"read_authorization"
+#define	ISCSI_MODIFY_AUTHNAME		"modify_authorization"
+#define	ISCSI_VALUE_AUTHNAME		"value_authorization"
 
-#define	ISCSI_AUTH_READ		"solaris.smf.read.iscsitgt"
-#define	ISCSI_AUTH_MANAGE	"solaris.smf.manage.iscsitgt"
-#define	ISCSI_AUTH_MODIFY	"solaris.smf.modify.iscsitgt"
-#define	ISCSI_AUTH_VALUE	"solaris.smf.value.iscsitgt"
+#define	ISCSI_AUTH_READ			"solaris.smf.read.iscsitgt"
+#define	ISCSI_AUTH_MANAGE		"solaris.smf.manage.iscsitgt"
+#define	ISCSI_AUTH_MODIFY		"solaris.smf.modify.iscsitgt"
+#define	ISCSI_AUTH_VALUE		"solaris.smf.value.iscsitgt"
 
 typedef enum {
 	CONVERT_OK = 0,

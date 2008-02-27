@@ -153,7 +153,7 @@ check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 	if ((acl != NULL) && (inode == NULL))
 		return (False);
 
-	while ((tgt_initiator = tgt_node_next(acl, XML_ELEMENT_INIT,
+	while ((tgt_initiator = tgt_node_next(acl, XML_ELEMENT_ACLINIT,
 	    tgt_initiator)) != NULL) {
 
 		if (strcmp(inode->x_value, tgt_initiator->x_value) == 0) {

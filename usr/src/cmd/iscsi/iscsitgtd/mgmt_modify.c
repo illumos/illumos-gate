@@ -339,7 +339,7 @@ modify_target(tgt_node_t *x)
 			return (msg);
 		}
 
-		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
+		c = tgt_node_alloc(XML_ELEMENT_ACLINIT, String, prop);
 		if (c == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);

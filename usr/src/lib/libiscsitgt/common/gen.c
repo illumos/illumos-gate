@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,8 +89,10 @@ tgt_door_call(char *str, int smf_flags)
 		 */
 		if (((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) == -1) ||
 		    (door_call(s, &d) == -1)) {
-			if (s != -1)
+			if (s != -1) {
 				(void) close(s);
+				s = -1;
+			}
 			if (check_and_online(smf_flags) == False) {
 				goto error;
 			} else if ((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) ==
@@ -148,6 +150,9 @@ tgt_door_call(char *str, int smf_flags)
 			d.rbuf		= door_buf;
 			d.rsize		= allocated;
 		}
+
+		(void) close(s);
+		s = -1;
 	} while (n == NULL);
 
 error:

@@ -211,7 +211,7 @@ remove_target(tgt_node_t *x)
 			xml_rtn_msg(&msg, ERR_ACL_NOT_FOUND);
 			return (msg);
 		}
-		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
+		c = tgt_node_alloc(XML_ELEMENT_ACLINIT, String, prop);
 		if (tgt_node_remove(list, c, MatchBoth) == False) {
 			xml_rtn_msg(&msg, ERR_INIT_NOT_FOUND);
 			goto error;

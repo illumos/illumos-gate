@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,7 @@ typedef enum {
 #define	XML_ELEMENT_NAME	"name"
 #define	XML_ELEMENT_ACL		"acl"
 #define	XML_ELEMENT_ACLLIST	"acl-list"
+#define	XML_ELEMENT_ACLINIT	"acl-initiator"
 #define	XML_ELEMENT_TPGT	"tpgt"
 #define	XML_ELEMENT_TPGTLIST	"tpgt-list"
 #define	XML_ELEMENT_SIZE	"size"

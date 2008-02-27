@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,9 +363,9 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 	    NULL) {
 		lnp = NULL;
 		tgt_buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_Start);
-		while ((lnp = tgt_node_next(lnode, XML_ELEMENT_INIT, lnp)) !=
+		while ((lnp = tgt_node_next(lnode, XML_ELEMENT_ACLINIT, lnp)) !=
 		    NULL)
-			tgt_buf_add(msg, XML_ELEMENT_INIT, lnp->x_value);
+			tgt_buf_add(msg, XML_ELEMENT_ACLINIT, lnp->x_value);
 		tgt_buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_End);
 	}
 

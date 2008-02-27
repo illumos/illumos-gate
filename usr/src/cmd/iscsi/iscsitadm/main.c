@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1080,7 +1080,7 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		(void) printf("%s%s:\n", dospace(1), gettext("ACL list"));
 		n2 = tgt_node_next_child(n1, XML_ELEMENT_ACLLIST, NULL);
 		n3 = NULL;
-		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_INIT, n3)) {
+		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_ACLINIT, n3)) {
 			(void) printf("%s%s: %s\n", dospace(2),
 			    gettext("Initiator"),
 			    n3->x_value);

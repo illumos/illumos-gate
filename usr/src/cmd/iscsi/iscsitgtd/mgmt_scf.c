@@ -699,6 +699,8 @@ mgmt_config_save2scf()
 		mgmt_transaction_end(h);
 	}
 
+	if (smf_refresh_instance(SA_TARGET_SVC_INSTANCE_FMRI) != 0)
+		goto error;
 
 	(void) pthread_mutex_unlock(&scf_conf_mutex);
 	scf_iter_destroy(iter);
