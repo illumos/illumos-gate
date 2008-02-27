@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1300,10 +1300,28 @@ nfs4delegreturn_cleanup_impl(rnode4_t *rp, nfs4_server_t *np,
 	mntinfo4_t *mi = VTOMI4(RTOV4(rp));
 	boolean_t need_rele = B_FALSE;
 
+	/*
+	 * Caller must be holding mi_recovlock in read mode
+	 * to call here.  This is provided by start_op.
+	 * Delegation management requires to grab s_lock
+	 * first and then r_statev4_lock.
+	 */
+
+	if (np == NULL) {
+		np = find_nfs4_server_all(mi, 1);
+		ASSERT(np != NULL);
+		need_rele = B_TRUE;
+	} else {
+		mutex_enter(&np->s_lock);
+	}
+
 	mutex_enter(&rp->r_statev4_lock);
 
 	if (rp->r_deleg_type == OPEN_DELEGATE_NONE) {
 		mutex_exit(&rp->r_statev4_lock);
+		mutex_exit(&np->s_lock);
+		if (need_rele)
+			nfs4_server_rele(np);
 		return;
 	}
 
@@ -1319,26 +1337,13 @@ nfs4delegreturn_cleanup_impl(rnode4_t *rp, nfs4_server_t *np,
 	rp->r_deleg_needs_recovery = OPEN_DELEGATE_NONE;
 	rp->r_deleg_needs_recall = FALSE;
 	rp->r_deleg_return_pending = FALSE;
-	mutex_exit(&rp->r_statev4_lock);
-
-	/*
-	 * Caller must be holding mi_recovlock in read mode
-	 * to call here.  This is provided by start_op.
-	 */
-
-	if (np == NULL) {
-		np = find_nfs4_server_all(mi, 1);
-		ASSERT(np != NULL);
-		need_rele = B_TRUE;
-	} else {
-		mutex_enter(&np->s_lock);
-	}
 
 	/*
 	 * Remove the rnode from the server's list and
 	 * update the ref counts.
 	 */
 	list_remove(&np->s_deleg_list, rp);
+	mutex_exit(&rp->r_statev4_lock);
 	nfs4_dec_state_ref_count_nolock(np, mi);
 	mutex_exit(&np->s_lock);
 	/* removed list node removes a reference */
