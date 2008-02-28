@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,6 +193,15 @@ adjust_ace_pair(ace_t *pair, mode_t mode)
 	    sizeof (ace_t), mode);
 }
 
+static void
+ace_allow_deny_helper(uint16_t type, boolean_t *allow, boolean_t *deny)
+{
+	if (type == ACE_ACCESS_ALLOWED_ACE_TYPE)
+		*allow = B_TRUE;
+	else if (type == ACE_ACCESS_DENIED_ACE_TYPE)
+		*deny = B_TRUE;
+}
+
 /*
  * ace_trivial:
  * determine whether an ace_t acl is trivial
@@ -207,9 +216,12 @@ ace_trivial_common(void *acep, int aclcnt,
     uint64_t (*walk)(void *, uint64_t, int aclcnt,
     uint16_t *, uint16_t *, uint32_t *))
 {
-	int owner_seen = 0;
-	int group_seen = 0;
-	int everyone_seen = 0;
+	boolean_t owner_allow = B_FALSE;
+	boolean_t group_allow = B_FALSE;
+	boolean_t everyone_allow = B_FALSE;
+	boolean_t owner_deny = B_FALSE;
+	boolean_t group_deny = B_FALSE;
+	boolean_t everyone_deny = B_FALSE;
 	uint16_t flags;
 	uint32_t mask;
 	uint16_t type;
@@ -218,20 +230,24 @@ ace_trivial_common(void *acep, int aclcnt,
 	while (cookie = walk(acep, cookie, aclcnt, &flags, &type, &mask)) {
 		switch (flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
-			if (group_seen || everyone_seen)
+			if (group_allow || group_deny || everyone_allow ||
+			    everyone_deny)
 				return (1);
-			owner_seen++;
+			ace_allow_deny_helper(type, &owner_allow, &owner_deny);
 			break;
 		case ACE_GROUP|ACE_IDENTIFIER_GROUP:
-			if (everyone_seen || owner_seen == 0)
+			if (everyone_allow || everyone_deny &&
+			    (!owner_allow && !owner_deny))
 				return (1);
-			group_seen++;
+			ace_allow_deny_helper(type, &group_allow, &group_deny);
 			break;
 
 		case ACE_EVERYONE:
-			if (owner_seen == 0 || group_seen == 0)
+			if (!owner_allow && !owner_deny &&
+			    !group_allow && !group_deny)
 				return (1);
-			everyone_seen++;
+			ace_allow_deny_helper(type,
+			    &everyone_allow, &everyone_deny);
 			break;
 		default:
 			return (1);
@@ -264,7 +280,8 @@ ace_trivial_common(void *acep, int aclcnt,
 
 	}
 
-	if ((owner_seen == 0) || (group_seen == 0) || (everyone_seen == 0))
+	if (!owner_allow || !owner_deny || !group_allow || !group_deny ||
+	    !everyone_allow || !everyone_deny)
 		return (1);
 
 	return (0);
