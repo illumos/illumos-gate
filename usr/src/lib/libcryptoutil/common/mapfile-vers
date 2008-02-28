@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,9 @@ SUNWprivate {
 	pkcs11_default_token;
 	pkcs11_get_pass;
 	pkcs11_mech2keytype;
+	pkcs11_mech2keygen;
 	pkcs11_mech2str;
+	pkcs11_nzero_random_data;
 	pkcs11_random_data;
 	pkcs11_read_data;
 	pkcs11_str2mech;

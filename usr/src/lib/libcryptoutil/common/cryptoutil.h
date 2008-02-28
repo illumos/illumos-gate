@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,6 +127,8 @@ extern uentry_t *getent_uef(char *);
 extern void tohexstr(uchar_t *bytes, size_t blen, char *hexstr, size_t hexlen);
 extern CK_RV pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type,
     CK_KEY_TYPE *ktype);
+extern CK_RV pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type,
+    CK_MECHANISM_TYPE *gen_mech);
 extern char *pkcs11_strerror(CK_RV rv);
 
 extern int
@@ -141,6 +143,7 @@ extern int pkcs11_get_pass(char *token_name, char **pdata, size_t *psize,
     size_t min_psize, boolean_t with_confirmation);
 
 extern int pkcs11_random_data(void *dbuf, size_t dlen);
+extern int pkcs11_nzero_random_data(void *dbuf, size_t dlen);
 extern int pkcs11_read_data(char *filename, void **dbuf, size_t *dlen);
 
 #ifdef __cplusplus
