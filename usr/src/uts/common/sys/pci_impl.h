@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,18 +92,23 @@ typedef struct 	pci_acc_cfblk {
 } pci_acc_cfblk_t;
 
 struct pci_bus_resource {
-	struct memlist *io_ports;
-	struct memlist *mem_space;
-	struct memlist *pmem_space;
+	struct memlist *io_ports;	/* available free io res */
+	struct memlist *io_ports_used;	/* used io res */
+	struct memlist *mem_space;	/* available free mem res */
+	struct memlist *mem_space_used;	/* used mem res */
+	struct memlist *pmem_space; /* available free prefetchable mem res */
+	struct memlist *pmem_space_used; /* used prefetchable mem res */
+	struct memlist *bus_space;	/* available free bus res */
+			/* bus_space_used not needed; can read from regs */
 	dev_info_t *dip;	/* devinfo node */
 	void *privdata;		/* private data for configuration */
 	uchar_t par_bus;	/* parent bus number */
 	uchar_t sub_bus;	/* highest bus number beyond this bridge */
 	uchar_t root_addr;	/* legacy peer bus address assignment */
-	uchar_t padding1;
-#ifdef _LP64
-	uint32_t padding2;
-#endif
+	uchar_t num_cbb;	/* # of CardBus Bridges on the bus */
+	boolean_t io_reprogram;	/* need io reprog on this bus */
+	boolean_t mem_reprogram;	/* need mem reprog on this bus */
+	boolean_t subtractive;	/* subtractive PPB */
 };
 
 extern struct pci_bus_resource *pci_bus_res;
@@ -113,10 +118,14 @@ extern struct pci_bus_resource *pci_bus_res;
  */
 extern struct memlist *memlist_alloc(void);
 extern void memlist_free(struct memlist *);
+extern void memlist_free_all(struct memlist **);
 extern void memlist_insert(struct memlist **, uint64_t, uint64_t);
 extern int memlist_remove(struct memlist **, uint64_t, uint64_t);
 extern uint64_t memlist_find(struct memlist **, uint64_t, int);
+extern uint64_t memlist_find_with_startaddr(struct memlist **, uint64_t,
+    uint64_t, int);
 extern void memlist_dump(struct memlist *);
+extern void memlist_merge(struct memlist **, struct memlist **);
 extern struct memlist *memlist_dup(struct memlist *);
 extern int memlist_count(struct memlist *);
 

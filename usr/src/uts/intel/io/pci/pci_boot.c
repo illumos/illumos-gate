@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,9 @@
 #define	CONFIG_FIX	3
 #define	COMPAT_BUFSIZE	512
 
+#define	PPB_IO_ALIGNMENT	0x1000		/* 4K aligned */
+#define	PPB_MEM_ALIGNMENT	0x100000	/* 1M aligned */
+
 /* See AMD-8111 Datasheet Rev 3.03, Page 149: */
 #define	LPC_IO_CONTROL_REG_1	0x40
 #define	AMD8111_ENABLENMI	(uint8_t)0x80
@@ -71,18 +74,27 @@ struct pci_fixundo {
 	struct pci_fixundo	*next;
 };
 
+struct pci_devfunc {
+	struct pci_devfunc *next;
+	dev_info_t *dip;
+	uchar_t dev;
+	uchar_t func;
+	boolean_t reprogram;	/* this device needs to be reprogrammed */
+};
+
 extern int pci_bios_nbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
 int pci_boot_debug = 0;
 extern struct memlist *find_bus_res(int, int);
 static struct pci_fixundo *undolist = NULL;
+static int num_root_bus = 0;	/* count of root buses */
 
 /*
  * Module prototypes
  */
 static void enumerate_bus_devs(uchar_t bus, int config_op);
 static void create_root_bus_dip(uchar_t bus);
-static dev_info_t *process_devfunc(uchar_t, uchar_t, uchar_t, uchar_t,
+static void process_devfunc(uchar_t, uchar_t, uchar_t, uchar_t,
     ushort_t, int);
 static void add_compatible(dev_info_t *, ushort_t, ushort_t,
     ushort_t, ushort_t, uchar_t, uint_t, int);
@@ -93,16 +105,13 @@ static void add_bus_range_prop(int);
 static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
-static ACPI_STATUS lookup_acpi_obj(ACPI_HANDLE, char *, ACPI_HANDLE *);
-static int check_ppb_hotplug(dev_info_t *);
-static void fix_ppb_res(uchar_t);
+static void fix_ppb_res(uchar_t, boolean_t);
 static void alloc_res_array();
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
 static void pciex_slot_names_prop(dev_info_t *, ushort_t);
 
 extern int pci_slot_names_prop(int, char *, int);
-extern ACPI_STATUS pciehpc_acpi_eval_osc(ACPI_HANDLE, uint32_t *);
 
 /* set non-zero to force PCI peer-bus renumbering */
 int pci_bus_always_renumber = 0;
@@ -416,82 +425,211 @@ remove_used_resources()
 }
 
 /*
- * Walk up ACPI namespace starting from parobj looking for object with name
+ * Remove the resources which are already used by devices under a subtractive
+ * bridge from the bus's resources lists, because they're not available, and
+ * shouldn't be allocated to other buses.  This is necessary because tracking
+ * resources for subtractive bridges is not complete.  (Subtractive bridges only
+ * track some of their claimed resources, not "the rest of the address space" as
+ * they should, so that allocation to peer non-subtractive PPBs is easier.  We
+ * need a fully-capable global resource allocator).
  */
-static ACPI_STATUS
-lookup_acpi_obj(ACPI_HANDLE parobj, char *name, ACPI_HANDLE *retobjp)
+static void
+remove_subtractive_res()
 {
-	ACPI_HANDLE obj;
+	int i, j;
+	struct memlist *list;
 
-	do {
-		if (AcpiGetHandle(parobj, name, retobjp) == AE_OK) {
-			ASSERT(*retobjp != NULL);
-			return (AE_OK);
+	for (i = 0; i <= pci_bios_nbus; i++) {
+		if (pci_bus_res[i].subtractive) {
+			/* remove used io ports */
+			list = pci_bus_res[i].io_ports_used;
+			while (list) {
+				for (j = 0; j <= pci_bios_nbus; j++) {
+					if (pci_bus_res[j].io_ports)
+						(void) memlist_remove(
+						    &pci_bus_res[j].io_ports,
+						    list->address, list->size);
+				}
+				list = list->next;
+			}
+			/* remove used mem resource */
+			list = pci_bus_res[i].mem_space_used;
+			while (list) {
+				for (j = 0; j <= pci_bios_nbus; j++) {
+					if (pci_bus_res[j].mem_space)
+						(void) memlist_remove(
+						    &pci_bus_res[j].mem_space,
+						    list->address, list->size);
+				}
+				list = list->next;
+			}
+			/* remove used prefetchable mem resource */
+			list = pci_bus_res[i].pmem_space_used;
+			while (list) {
+				for (j = 0; j <= pci_bios_nbus; j++) {
+					if (pci_bus_res[j].pmem_space)
+						(void) memlist_remove(
+						    &pci_bus_res[j].pmem_space,
+						    list->address, list->size);
+				}
+				list = list->next;
+			}
 		}
-		obj = parobj;
-	} while (AcpiGetParent(obj, &parobj) == AE_OK);
-
-	*retobjp = NULL;
-	return (AE_NOT_FOUND);
+	}
 }
 
-static int
-check_ppb_hotplug(dev_info_t *dip)
+/* Set up this bus's "bus_space" resource list */
+static void
+setup_bus_res(int bus)
 {
-	ACPI_HANDLE pcibus_obj;
-	ACPI_HANDLE obj;
-	uint32_t hp_mode = ACPI_HP_MODE;
+	uchar_t par_bus;
+	uchar_t sub_bus;
 
-	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "pci-hotplug-type", INBAND_HPC_NONE) != INBAND_HPC_PCIE)
-		return (0);
+	if (pci_bus_res[bus].dip == NULL)	/* unused bus */
+		return;
 
-	if (acpica_get_handle(dip, &pcibus_obj) != AE_OK)
-		return (0);
-
-	if (lookup_acpi_obj(pcibus_obj, "_OSC", &obj) == AE_OK) {
-		if (pciehpc_acpi_eval_osc(obj, &hp_mode) != AE_OK)
-			hp_mode = ACPI_HP_MODE;
+	sub_bus = pci_bus_res[bus].sub_bus;
+	ASSERT(sub_bus >= bus);
+	ASSERT(pci_bus_res[bus].bus_space == NULL);
+	if (sub_bus > bus) {
+		/*
+		 * Keep the remaining available bus range in bus_space.
+		 * ('bus' is already allocated)
+		 */
+		memlist_insert(&pci_bus_res[bus].bus_space, bus + 1,
+		    sub_bus - bus);
 	}
 
-	if (hp_mode == NATIVE_HP_MODE)
-		return (1);
+	/*
+	 * Remove resources from parent bus node if this is not a
+	 * root bus.
+	 */
+	par_bus = pci_bus_res[bus].par_bus;
+	if (par_bus != (uchar_t)-1) {
+		ASSERT(pci_bus_res[par_bus].bus_space != NULL);
+		(void) memlist_remove(&pci_bus_res[par_bus].bus_space,
+		    bus, sub_bus - bus + 1);
+	}
+}
+
+static uint64_t
+get_parbus_io_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
+{
+	uint64_t addr = 0;
+	uchar_t res_bus;
 
 	/*
-	 * if ACPI hotplug mode, a child obj for the slot is also required
+	 * Skip root(peer) buses in multiple-root-bus systems, as currently
+	 * the initial resources set on each root bus might not be correctly
+	 * accounted for.  (We need to read resources from ACPI as well as
+	 * the MP tables and hotplug tables.)
 	 */
-	if (AcpiGetNextObject(ACPI_TYPE_DEVICE, pcibus_obj, NULL, &obj) !=
-	    AE_OK)
+	if ((pci_bus_res[parbus].par_bus == (uchar_t)-1) &&
+	    (num_root_bus > 1))
 		return (0);
 
-	return (1);
+	res_bus = parbus;
+	while (pci_bus_res[res_bus].subtractive) {
+		if (pci_bus_res[res_bus].io_ports)
+			break;
+		res_bus = pci_bus_res[res_bus].par_bus;
+		if (res_bus == (uchar_t)-1)
+			break; /* root bus already */
+	}
+
+	if (pci_bus_res[res_bus].io_ports) {
+		addr = memlist_find(&pci_bus_res[res_bus].io_ports,
+		    size, align);
+		if (addr) {
+			memlist_insert(&pci_bus_res[res_bus].io_ports_used,
+			    addr, size);
+			/* free the old resource */
+			memlist_free_all(&pci_bus_res[bus].io_ports);
+			/* add the new resource */
+			memlist_insert(&pci_bus_res[bus].io_ports, addr, size);
+		}
+	}
+
+	return (addr);
+}
+
+static uint64_t
+get_parbus_mem_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
+{
+	uint64_t addr = 0;
+	uchar_t res_bus;
+
+	/*
+	 * Skip root(peer) buses in multiple-root-bus systems, as currently
+	 * the initial resources set on each root bus might not be correctly
+	 * accounted for.  (We need to read resources from ACPI as well as
+	 * the MP tables and hotplug tables.)
+	 */
+	if ((pci_bus_res[parbus].par_bus == (uchar_t)-1) &&
+	    (num_root_bus > 1))
+		return (0);
+
+	res_bus = parbus;
+	while (pci_bus_res[res_bus].subtractive) {
+		if (pci_bus_res[res_bus].mem_space)
+			break;
+		res_bus = pci_bus_res[res_bus].par_bus;
+		if (res_bus == (uchar_t)-1)
+			break; /* root bus already */
+	}
+
+	if (pci_bus_res[res_bus].mem_space) {
+		addr = memlist_find(&pci_bus_res[res_bus].mem_space,
+		    size, align);
+		if (addr) {
+			memlist_insert(&pci_bus_res[res_bus].mem_space_used,
+			    addr, size);
+			/* free the old resource */
+			memlist_free_all(&pci_bus_res[bus].mem_space);
+			/* add the new resource */
+			memlist_insert(&pci_bus_res[bus].mem_space, addr, size);
+		}
+	}
+
+	return (addr);
 }
 
 /*
- * Assign i/o resources to unconfigured hotplug bridges after the first pass.
- * It must be after the first pass in order to use the ports left over after
- * accounting for i/o resources of bridges that have been configured by bios.
- * We are expecting unconfigured bridges to be empty bridges otherwise
- * this resource assignment needs to be done at an earlier stage.
+ * Assign valid resources to unconfigured pci(e) bridges. We are trying
+ * to reprogram the bridge when its
+ * 		i)   SECBUS == SUBBUS	||
+ * 		ii)  IOBASE > IOLIM	||
+ * 		iii) MEMBASE > MEMLIM
+ * This must be done after one full pass through the PCI tree to collect
+ * all BIOS-configured resources, so that we know what resources are
+ * free and available to assign to the unconfigured PPBs.
  */
 static void
-fix_ppb_res(uchar_t secbus)
+fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 {
 	uchar_t bus, dev, func;
-	uint_t base, limit;
-	uint_t io_size = 0x1000; /* io range must be mult of and 4k aligned */
-	uint64_t addr;
+	uchar_t parbus, subbus;
+	uint_t io_base, io_limit, mem_base, mem_limit;
+	uint_t io_size, mem_size;
+	uint64_t addr = 0;
 	int *regp = NULL;
 	uint_t reglen;
 	int rv, cap_ptr, physhi;
 	dev_info_t *dip;
+	uint16_t cmd_reg;
+	struct memlist *list;
+
+	/* skip root (peer) PCI busses */
+	if (pci_bus_res[secbus].par_bus == (uchar_t)-1)
+		return;
+
+	/* skip subtractive PPB when prog_sub is not TRUE */
+	if (pci_bus_res[secbus].subtractive && !prog_sub)
+		return;
 
 	/* some entries may be empty due to discontiguous bus numbering */
 	dip = pci_bus_res[secbus].dip;
 	if (dip == NULL)
-		return;
-
-	if (!check_ppb_hotplug(dip))
 		return;
 
 	rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
@@ -503,57 +641,288 @@ fix_ppb_res(uchar_t secbus)
 	func = (uchar_t)PCI_REG_FUNC_G(physhi);
 	dev = (uchar_t)PCI_REG_DEV_G(physhi);
 	bus = (uchar_t)PCI_REG_BUS_G(physhi);
-	ASSERT(bus == pci_bus_res[secbus].par_bus);
 
 	/*
-	 * Check if the slot is enabled
+	 * If pcie bridge, check to see if link is enabled
 	 */
 	cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
-	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL)
-		return;
-
-	if (pci_getw(bus, dev, func, (uint16_t)cap_ptr + PCIE_LINKCTL) &
-	    PCIE_LINKCTL_LINK_DISABLE)
-		return;
-
-	/*
-	 * base >= limit means that the bridge was not configured
-	 * This may have been set by the bios or by add_ppb_props() upon
-	 * detecting that I/O was disabled
-	 */
-
-	/*
-	 * I/O; check and attempt to allocate io_size amount from parent
-	 */
-	base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
-	limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
-	ASSERT(base != 0xff && limit != 0xff);
-
-	base = (base & 0xf0) << 8;
-	limit = ((limit & 0xf0) << 8) | 0xfff;
-
-	addr = 0;
-	if ((base > limit || base == 0) &&
-	    pci_bus_res[bus].io_ports != NULL) {
-		addr = memlist_find(&pci_bus_res[bus].io_ports, io_size,
-		    0x1000);
-		ASSERT(addr <= 0xffff - io_size);
-	}
-	if (addr != 0) {
-		memlist_insert(&pci_bus_res[secbus].io_ports, addr, io_size);
-		base = addr;
-		limit = addr + io_size - 1;
-		pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_LOW,
-		    (uint8_t)((base >> 8) & 0xf0));
-		pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW,
-		    (uint8_t)((limit >> 8) & 0xf0));
+	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		cmd_reg = pci_getw(bus, dev, func,
+		    (uint16_t)cap_ptr + PCIE_LINKCTL);
+		if (cmd_reg & PCIE_LINKCTL_LINK_DISABLE) {
+			dcmn_err(CE_NOTE,
+			    "!fix_ppb_res: ppb[%x/%x/%x] link is disabled.\n",
+			    bus, dev, func);
+			return;
+		}
 	}
 
+	subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
+	parbus = pci_bus_res[secbus].par_bus;
+	ASSERT(parbus == bus);
+
 	/*
-	 * Account for new resources
+	 * If we have a Cardbus bridge, but no bus space
 	 */
-	add_ppb_ranges_prop(secbus);
+	if (pci_bus_res[secbus].num_cbb != 0 &&
+	    pci_bus_res[secbus].bus_space == NULL) {
+		uchar_t range;
+
+		/* normally there are 2 buses under a cardbus bridge */
+		range = pci_bus_res[secbus].num_cbb * 2;
+
+		/*
+		 * Try to find and allocate a bus-range starting at subbus+1
+		 * from the parent of the PPB.
+		 */
+		for (; range != 0; range--) {
+			if (memlist_find_with_startaddr(
+			    &pci_bus_res[parbus].bus_space,
+			    subbus + 1, range, 1) != NULL)
+				break; /* find bus range resource at parent */
+		}
+		if (range != 0) {
+			memlist_insert(&pci_bus_res[secbus].bus_space,
+			    subbus + 1, range);
+			subbus = subbus + range;
+			pci_bus_res[secbus].sub_bus = subbus;
+			pci_putb(bus, dev, func, PCI_BCNF_SUBBUS, subbus);
+			add_bus_range_prop(secbus);
+
+			cmn_err(CE_NOTE, "!reprogram bus-range on ppb"
+			    "[%x/%x/%x]: %x ~ %x\n", bus, dev, func,
+			    secbus, subbus);
+		}
+	}
+
+	/*
+	 * Calculate required IO size
+	 * We are going to assign 512 bytes per bus. The size needs to be
+	 * 4K aligned and the maximum size is 16K.
+	 */
+	io_size = (subbus - secbus + 1) * 0x200;
+	io_size = (io_size + PPB_IO_ALIGNMENT) & (~(PPB_IO_ALIGNMENT - 1));
+	if (io_size > 0x4 * PPB_IO_ALIGNMENT)
+		io_size = 0x4 * PPB_IO_ALIGNMENT;
+	/*
+	 * Calculate required MEM size
+	 * We are going to assign 1M bytes per bus. The size needs to be
+	 * 1M aligned and the maximum size is 8M.
+	 */
+	mem_size = (subbus - secbus + 1) * PPB_MEM_ALIGNMENT;
+	if (mem_size > 0x8 * PPB_MEM_ALIGNMENT)
+		mem_size = 0x8 * PPB_MEM_ALIGNMENT;
+
+	/* Subtractive bridge */
+	if (pci_bus_res[secbus].subtractive && prog_sub) {
+		/*
+		 * We program an arbitrary amount of I/O and memory resource
+		 * for the subtractive bridge so that child dynamic-resource-
+		 * allocating devices (such as Cardbus bridges) have a chance
+		 * of success.  Until we have full-tree resource rebalancing,
+		 * dynamic resource allocation (thru busra) only looks at the
+		 * parent bridge, so all PPBs must have some allocatable
+		 * resource.  For non-subtractive bridges, the resources come
+		 * from the base/limit register "windows", but subtractive
+		 * bridges often don't program those (since they don't need to).
+		 * If we put all the remaining resources on the subtractive
+		 * bridge, then peer non-subtractive bridges can't allocate
+		 * more space (even though this is probably most correct).
+		 * If we put the resources only on the parent, then allocations
+		 * from children of subtractive bridges will fail without
+		 * special-case code for bypassing the subtractive bridge.
+		 * This solution is the middle-ground temporary solution until
+		 * we have fully-capable resource allocation.
+		 */
+
+		/*
+		 * Add an arbitrary I/O resource to the subtractive PPB
+		 */
+		if (pci_bus_res[secbus].io_ports == NULL) {
+			addr = get_parbus_io_res(parbus, secbus, io_size,
+			    PPB_IO_ALIGNMENT);
+			if (addr) {
+				add_ppb_ranges_prop(secbus);
+				pci_bus_res[secbus].io_reprogram =
+				    pci_bus_res[parbus].io_reprogram;
+
+				cmn_err(CE_NOTE, "!add io-range on subtractive"
+				    " ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
+				    bus, dev, func, (uint32_t)addr,
+				    (uint32_t)addr + io_size - 1);
+			}
+		}
+		/*
+		 * Add an arbitrary memory resource to the subtractive PPB
+		 */
+		if (pci_bus_res[secbus].mem_space == NULL) {
+			addr = get_parbus_mem_res(parbus, secbus, mem_size,
+			    PPB_MEM_ALIGNMENT);
+			if (addr) {
+				add_ppb_ranges_prop(secbus);
+				pci_bus_res[secbus].mem_reprogram =
+				    pci_bus_res[parbus].mem_reprogram;
+
+				cmn_err(CE_NOTE, "!add mem-range on "
+				    "subtractive ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
+				    bus, dev, func, (uint32_t)addr,
+				    (uint32_t)addr + mem_size - 1);
+			}
+		}
+
+		goto cmd_enable;
+	}
+
+	/*
+	 * io_base > io_limit means that the bridge was not configured
+	 * This may have been set by the BIOS or by add_ppb_props()
+	 * if I/O space is disabled in the Command register.
+	 */
+	io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
+	io_limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
+	io_base = (io_base & 0xf0) << 8;
+	io_limit = ((io_limit & 0xf0) << 8) | 0xfff;
+
+	if (pci_bus_res[parbus].io_reprogram || (io_base > io_limit)) {
+		if (pci_bus_res[secbus].io_ports_used) {
+			memlist_merge(&pci_bus_res[secbus].io_ports_used,
+			    &pci_bus_res[secbus].io_ports);
+		}
+		if (pci_bus_res[secbus].io_ports &&
+		    (!pci_bus_res[parbus].io_reprogram) &&
+		    (!pci_bus_res[parbus].subtractive)) {
+			/* rechoose old io ports info */
+			list = pci_bus_res[secbus].io_ports;
+			io_base = (uint_t)list->address;
+			/* 4K aligned */
+			io_base = io_base & (~(PPB_IO_ALIGNMENT - 1));
+			io_limit = (uint_t)(list->address + list->size);
+			while (list->next) {
+				list = list->next;
+				if ((list->address + list->size) > io_limit)
+					io_limit = (uint_t)
+					    (list->address + list->size);
+			}
+			io_limit = io_limit - 1;
+			/* 4K aligned */
+			io_limit = (io_limit + PPB_IO_ALIGNMENT) &
+			    (~(PPB_IO_ALIGNMENT - 1));
+			io_size = io_limit - io_base;
+			io_limit = io_limit - 1;
+			ASSERT(io_base <= io_limit);
+			memlist_free_all(&pci_bus_res[secbus].io_ports);
+			memlist_insert(&pci_bus_res[secbus].io_ports,
+			    io_base, io_size);
+			memlist_insert(&pci_bus_res[parbus].io_ports_used,
+			    io_base, io_size);
+			if (pci_bus_res[parbus].io_ports)
+				(void) memlist_remove(
+				    &pci_bus_res[parbus].io_ports,
+				    io_base, io_size);
+			pci_bus_res[secbus].io_reprogram = B_TRUE;
+		} else {
+			/* get new io ports from parent bus */
+			addr = get_parbus_io_res(parbus, secbus, io_size,
+			    PPB_IO_ALIGNMENT);
+			if (addr) {
+				io_base = addr;
+				io_limit = addr + io_size - 1;
+				pci_bus_res[secbus].io_reprogram = B_TRUE;
+			}
+		}
+		if (pci_bus_res[secbus].io_reprogram) {
+			/* reprogram PPB regs */
+			pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_LOW,
+			    (uchar_t)((io_base>>8) & 0xf0));
+			pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW,
+			    (uchar_t)((io_limit>>8) & 0xf0));
+			pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_HI, 0);
+			pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_HI, 0);
+			add_ppb_ranges_prop(secbus);
+
+			cmn_err(CE_NOTE, "!reprogram io-range on"
+			    " ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
+			    bus, dev, func, io_base, io_limit);
+		}
+	}
+
+	/*
+	 * mem_base > mem_limit
+	 */
+	mem_base = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_BASE);
+	mem_base = (mem_base & 0xfff0) << 16;
+	mem_limit = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_LIMIT);
+	mem_limit = ((mem_limit & 0xfff0) << 16) |0xfffff;
+	if (pci_bus_res[parbus].mem_reprogram || (mem_base > mem_limit)) {
+		if (pci_bus_res[secbus].mem_space_used) {
+			memlist_merge(&pci_bus_res[secbus].mem_space_used,
+			    &pci_bus_res[secbus].mem_space);
+		}
+		if (pci_bus_res[secbus].mem_space &&
+		    (!pci_bus_res[parbus].mem_reprogram) &&
+		    (!pci_bus_res[parbus].subtractive)) {
+			/* rechoose old mem resource */
+			list = pci_bus_res[secbus].mem_space;
+			mem_base = (uint_t)list->address;
+			/* 1M aligned */
+			mem_base = mem_base & (~0xfffff);
+			mem_limit = (uint_t)(list->address + list->size);
+			while (list->next) {
+				list = list->next;
+				if ((list->address + list->size) > mem_limit)
+					mem_limit = (uint_t)
+					    (list->address + list->size);
+			}
+			mem_limit = mem_limit - 1;
+			/* 1M aligned */
+			mem_limit = (mem_limit + PPB_MEM_ALIGNMENT) &
+			    (~(PPB_MEM_ALIGNMENT - 1));
+			mem_size = mem_limit - mem_base;
+			mem_limit = mem_limit - 1;
+			ASSERT(mem_base <= mem_limit);
+			memlist_free_all(&pci_bus_res[secbus].mem_space);
+			memlist_insert(&pci_bus_res[secbus].mem_space,
+			    mem_base, mem_size);
+			memlist_insert(&pci_bus_res[parbus].mem_space_used,
+			    mem_base, mem_size);
+			if (pci_bus_res[parbus].mem_space)
+				(void) memlist_remove(
+				    &pci_bus_res[parbus].mem_space,
+				    mem_base, mem_size);
+			pci_bus_res[secbus].mem_reprogram = B_TRUE;
+		} else {
+			/* get new mem resource from parent bus */
+			addr = get_parbus_mem_res(parbus, secbus, mem_size,
+			    PPB_MEM_ALIGNMENT);
+			if (addr) {
+				mem_base = addr;
+				mem_limit = addr + mem_size - 1;
+				pci_bus_res[secbus].mem_reprogram = B_TRUE;
+			}
+		}
+
+		if (pci_bus_res[secbus].mem_reprogram) {
+			/* reprogram PPB regs */
+			pci_putw(bus, dev, func, PCI_BCNF_MEM_BASE,
+			    (uint16_t)((mem_base>>16) & 0xfff0));
+			pci_putw(bus, dev, func, PCI_BCNF_MEM_LIMIT,
+			    (uint16_t)((mem_limit>>16) & 0xfff0));
+			add_ppb_ranges_prop(secbus);
+
+			cmn_err(CE_NOTE, "!reprogram mem-range on"
+			    " ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
+			    bus, dev, func, mem_base, mem_limit);
+		}
+	}
+
+cmd_enable:
+	cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
+	if (pci_bus_res[secbus].io_ports)
+		cmd_reg |= PCI_COMM_IO | PCI_COMM_ME;
+	if (pci_bus_res[secbus].mem_space)
+		cmd_reg |= PCI_COMM_MAE | PCI_COMM_ME;
+	pci_putw(bus, dev, func, PCI_CONF_COMM, cmd_reg);
 }
 
 void
@@ -575,6 +944,8 @@ pci_reprogram(void)
 				pci_bus_res[i].sub_bus = subbus;
 			add_bus_range_prop(i);
 		}
+		/* setup bus range resource on each bus */
+		setup_bus_res(i);
 	}
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
@@ -588,11 +959,22 @@ pci_reprogram(void)
 
 	/* remove used-resources from PCI resource maps */
 	remove_used_resources();
+	remove_subtractive_res();
+
+	/* reprogram the non-subtractive PPB */
+	if (pci_reconfig)
+		for (i = 0; i <= pci_bios_nbus; i++)
+			fix_ppb_res(i, B_FALSE);
 
 	for (i = 0; i <= pci_bios_nbus; i++) {
-		/* configure devices not configured by bios */
+		/* configure devices not configured by BIOS */
 		if (pci_reconfig) {
-			fix_ppb_res(i);
+			/*
+			 * Reprogram the subtractive PPB. At this time, all its
+			 * siblings should have got their resources already.
+			 */
+			if (pci_bus_res[i].subtractive)
+				fix_ppb_res(i, B_TRUE);
 			enumerate_bus_devs(i, CONFIG_NEW);
 		}
 		/* All dev programmed, so we can create available prop */
@@ -611,6 +993,7 @@ create_root_bus_dip(uchar_t bus)
 
 	ASSERT(pci_bus_res[bus].par_bus == (uchar_t)-1);
 
+	num_root_bus++;
 	ndi_devi_alloc_sleep(ddi_root_node(), "pci",
 	    (pnode_t)DEVI_SID_NODEID, &dip);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
@@ -661,14 +1044,7 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 {
 	uchar_t dev, func, nfunc, header;
 	ushort_t venid;
-	dev_info_t *dip;
-	struct pci_devfunc {
-		struct pci_devfunc *next;
-		dev_info_t *dip;
-		uchar_t bus;
-		uchar_t dev;
-		uchar_t func;
-	} *devlist = NULL, *entry;
+	struct pci_devfunc *devlist = NULL, *entry;
 
 	if (config_op == CONFIG_NEW) {
 		dcmn_err(CE_NOTE, "configuring pci bus 0x%x", bus);
@@ -706,38 +1082,17 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 				nfunc = 8;
 			}
 
-			if (config_op == CONFIG_FIX) {
-				/*
-				 * If we're processing PCI fixes, no dip
-				 * will be returned.
-				 */
-				(void) process_devfunc(bus, dev, func, header,
-				    venid, config_op);
-
-			} else if (config_op == CONFIG_INFO) {
+			if (config_op == CONFIG_FIX ||
+			    config_op == CONFIG_INFO) {
 				/*
 				 * Create the node, unconditionally, on the
 				 * first pass only.  It may still need
 				 * resource assignment, which will be
 				 * done on the second, CONFIG_NEW, pass.
 				 */
-				dip = process_devfunc(bus, dev, func, header,
+				process_devfunc(bus, dev, func, header,
 				    venid, config_op);
-				/*
-				 * If dip isn't null, put on a list to
-				 * save for reprogramming when config_op
-				 * is CONFIG_NEW.
-				 */
 
-				if (dip) {
-					entry = kmem_alloc(sizeof (*entry),
-					    KM_SLEEP);
-					entry->dip = dip;
-					entry->dev = dev;
-					entry->func = func;
-					entry->next = devlist;
-					devlist = entry;
-				}
 			}
 		}
 	}
@@ -747,17 +1102,16 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 		while (devlist) {
 			entry = devlist;
 			devlist = entry->next;
-			cmn_err(CE_NOTE,
-			    "!reprogram pci device [%d/%d/%d] (%s)",
-			    bus, entry->dev, entry->func,
-			    ddi_driver_name(entry->dip));
-			(void) add_reg_props(entry->dip, bus, entry->dev,
-			    entry->func, CONFIG_UPDATE, 0);
+			if (entry->reprogram ||
+			    pci_bus_res[bus].io_reprogram ||
+			    pci_bus_res[bus].mem_reprogram) {
+				/* reprogram device(s) */
+				(void) add_reg_props(entry->dip, bus,
+				    entry->dev, entry->func, CONFIG_NEW, 0);
+			}
 			kmem_free(entry, sizeof (*entry));
 		}
 		pci_bus_res[bus].privdata = NULL;
-	} else if (config_op != CONFIG_FIX) {
-		pci_bus_res[bus].privdata = devlist;
 	}
 }
 
@@ -961,7 +1315,7 @@ pci_fix_amd8111(uint8_t bus, uint8_t dev, uint8_t fn)
 	add_undofix_entry(bus, dev, fn, undo_amd8111_pci_fix);
 }
 
-static dev_info_t *
+static void
 process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
     ushort_t vendorid, int config_op)
 {
@@ -975,6 +1329,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	int power[2] = {1, 1};
 	int pciex = 0;
 	ushort_t is_pci_bridge = 0;
+	struct pci_devfunc *devlist = NULL, *entry = NULL;
 
 	ushort_t deviceid = pci_getw(bus, dev, func, PCI_CONF_DEVID);
 
@@ -986,6 +1341,9 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	case PCI_HEADER_CARDBUS:
 		subvenid = pci_getw(bus, dev, func, PCI_CBUS_SUBVENID);
 		subdevid = pci_getw(bus, dev, func, PCI_CBUS_SUBSYSID);
+		/* Record the # of cardbus bridges found on the bus */
+		if (config_op == CONFIG_INFO)
+			pci_bus_res[bus].num_cbb++;
 		break;
 	default:
 		subvenid = 0;
@@ -997,7 +1355,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		if (vendorid == VENID_AMD && deviceid == DEVID_AMD8111_LPC) {
 			pci_fix_amd8111(bus, dev, func);
 		}
-		return (NULL);
+		return;
 	}
 
 	/* XXX should be use generic names? derive from class? */
@@ -1104,6 +1462,20 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI))
 		add_ppb_props(dip, bus, dev, func, pciex);
+	else {
+		/*
+		 * Record the non-PPB devices on the bus for possible
+		 * reprogramming at 2nd bus enumeration.
+		 * Note: PPB reprogramming is done in fix_ppb_res()
+		 */
+		devlist = (struct pci_devfunc *)pci_bus_res[bus].privdata;
+		entry = kmem_zalloc(sizeof (*entry), KM_SLEEP);
+		entry->dip = dip;
+		entry->dev = dev;
+		entry->func = func;
+		entry->next = devlist;
+		pci_bus_res[bus].privdata = entry;
+	}
 
 	if (config_op == CONFIG_INFO &&
 	    IS_CLASS_IOAPIC(basecl, subcl, progcl)) {
@@ -1179,10 +1551,8 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		reprogram = 0;	/* don't reprogram pci-ide bridge */
 	}
 
-
-	if (reprogram)
-		return (dip);
-	return (NULL);
+	if (reprogram && (entry != NULL))
+		entry->reprogram = B_TRUE;
 }
 
 /*
@@ -1374,6 +1744,9 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	int max_basereg, j, reprogram = 0;
 	uint_t phys_hi;
 	struct memlist **io_res, **mres, **mem_res, **pmem_res;
+	struct memlist **io_res_used, **mres_used;
+	struct memlist **mem_res_used, **pmem_res_used;
+	uchar_t res_bus;
 	uint16_t cmd_reg;
 
 	pci_regspec_t regs[16] = {{0}};
@@ -1381,11 +1754,16 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	int nreg, nasgn, enable = 0;
 
 	io_res = &pci_bus_res[bus].io_ports;
+	io_res_used = &pci_bus_res[bus].io_ports_used;
 	mem_res = &pci_bus_res[bus].mem_space;
-	if (bus == 0)	/* for bus 0, there is only mem_space */
+	mem_res_used = &pci_bus_res[bus].mem_space_used;
+	if (bus == 0) {	/* for bus 0, there is only mem_space */
 		pmem_res = mem_res;
-	else
+		pmem_res_used = mem_res_used;
+	} else {
 		pmem_res = &pci_bus_res[bus].pmem_space;
+		pmem_res_used = &pci_bus_res[bus].pmem_space_used;
+	}
 
 	devloc = (uint_t)bus << 16 | (uint_t)dev << 11 | (uint_t)func << 8;
 	regs[0].pci_phys_hi = devloc;
@@ -1472,6 +1850,24 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			    (PCI_RELOCAT_B | PCI_ADDR_IO | devloc) + offset;
 			type = base & (~PCI_BASE_IO_ADDR_M);
 			base &= PCI_BASE_IO_ADDR_M;
+			/*
+			 * A device under a subtractive PPB can allocate
+			 * resources from its parent bus if there is no resource
+			 * available on its own bus.
+			 */
+			if ((config_op == CONFIG_NEW) && (*io_res == NULL)) {
+				res_bus = bus;
+				while (pci_bus_res[res_bus].subtractive) {
+					res_bus = pci_bus_res[res_bus].par_bus;
+					if (res_bus == (uchar_t)-1)
+						break; /* root bus already */
+					if (pci_bus_res[res_bus].io_ports) {
+						io_res = &pci_bus_res
+						    [res_bus].io_ports;
+						break;
+					}
+				}
+			}
 
 			/*
 			 * first pass - gather what's there
@@ -1480,15 +1876,18 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			 */
 			if (config_op == CONFIG_INFO) {	/* first pass */
 				/* take out of the resource map of the bus */
-				if (*io_res && base != 0)
-					(void) memlist_remove(io_res,
-					    (uint64_t)base, (uint64_t)len);
-				else if (*io_res)
-					reprogram = 1;
-			} else if (*io_res && base == 0) {
-				base = (uint_t)memlist_find(io_res,
-				    (uint64_t)len, (uint64_t)0x4);
 				if (base != 0) {
+					if (*io_res)
+						(void) memlist_remove(io_res,
+						    base, len);
+					memlist_insert(io_res_used, base, len);
+				} else
+					reprogram = 1;
+			} else if ((*io_res && base == 0) ||
+			    pci_bus_res[bus].io_reprogram) {
+				base = (uint_t)memlist_find(io_res, len, 0x4);
+				if (base != 0) {
+					memlist_insert(io_res_used, base, len);
 					/* XXX need to worry about 64-bit? */
 					pci_putl(bus, dev, func, offset,
 					    base | type);
@@ -1531,10 +1930,35 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			phys_hi |= (devloc | offset);
 			if (base & PCI_BASE_PREF_M) {
 				mres = pmem_res;
+				mres_used = pmem_res_used;
 				phys_hi |= PCI_PREFETCH_B;
 			} else {
 				mres = mem_res;
+				mres_used = mem_res_used;
 			}
+			/*
+			 * A device under a subtractive PPB can allocate
+			 * resources from its parent bus if there is no resource
+			 * available on its own bus.
+			 */
+			if ((config_op == CONFIG_NEW) && (*mres == NULL)) {
+				res_bus = bus;
+				while (pci_bus_res[res_bus].subtractive) {
+					res_bus = pci_bus_res[res_bus].par_bus;
+					if (res_bus == (uchar_t)-1)
+						break; /* root bus already */
+					if ((phys_hi & PCI_PREFETCH_B) &&
+					    (res_bus != 0))
+						mres = &pci_bus_res
+						    [res_bus].pmem_space;
+					else
+						mres = &pci_bus_res
+						    [res_bus].mem_space;
+					if (*mres)
+						break;
+				}
+			}
+
 			regs[nreg].pci_phys_hi =
 			    assigned[nasgn].pci_phys_hi = phys_hi;
 			assigned[nasgn].pci_phys_hi |= PCI_RELOCAT_B;
@@ -1544,15 +1968,18 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 			if (config_op == CONFIG_INFO) {
 				/* take out of the resource map of the bus */
-				if (*mres && base != 0) {
-					(void) memlist_remove(mres,
-					    (uint64_t)base, (uint64_t)len);
-				} else if (*mres)
+				if (base != 0) {
+					if (*mres)
+						(void) memlist_remove(mres,
+						    base, len);
+					memlist_insert(mres_used, base, len);
+				} else
 					reprogram = 1;
-			} else if (*mres && base == 0) {
-				base = (uint_t)memlist_find(mres,
-				    (uint64_t)len, (uint64_t)0x1000);
+			} else if ((*mres && base == 0) ||
+			    pci_bus_res[bus].mem_reprogram) {
+				base = (uint_t)memlist_find(mres, len, 0x1000);
 				if (base != NULL) {
+					memlist_insert(mres_used, base, len);
 					pci_putl(bus, dev, func, offset,
 					    base | type);
 					base = pci_getl(bus, dev, func, offset);
@@ -1607,8 +2034,9 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		nreg++, nasgn++;
 		/* take it out of the memory resource */
 		if (*mem_res && base != 0)
-			(void) memlist_remove(mem_res,
-			    (uint64_t)base, (uint64_t)len);
+			(void) memlist_remove(mem_res, base, len);
+		if (base != 0)
+			memlist_insert(mem_res, base, len);
 	}
 
 	/*
@@ -1671,9 +2099,10 @@ done:
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "assigned-addresses",
 	    (int *)assigned, nasgn * sizeof (pci_regspec_t) / sizeof (int));
-	if (config_op == CONFIG_NEW && enable) {
+	if ((config_op == CONFIG_NEW) && enable) {
 		cmn_err(CE_NOTE,
-		    "!enable PCI device [%d/%d/%d]", bus, dev, func);
+		    "!reprogram PCI device [%x/%x/%x](%s): command = %x.\n",
+		    bus, dev, func, ddi_driver_name(dip), enable);
 		cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
 		cmd_reg |= (enable | PCI_COMM_ME);
 		pci_putw(bus, dev, func, PCI_CONF_COMM, cmd_reg);
@@ -1690,7 +2119,16 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	uint_t val, io_range[2], mem_range[2], pmem_range[2];
 	uchar_t secbus = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
 	uchar_t subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
+	uchar_t progclass;
+
 	ASSERT(secbus <= subbus);
+
+	/*
+	 * Check if it's a subtractive PPB.
+	 */
+	progclass = pci_getb(bus, dev, func, PCI_CONF_PROGCLASS);
+	if (progclass == PCI_BRIDGE_PCI_IF_SUBDECODE)
+		pci_bus_res[secbus].subtractive = B_TRUE;
 
 	/*
 	 * Some BIOSes lie about max pci busses, we allow for
@@ -1743,7 +2181,7 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	/*
 	 * io range
-	 * We determine i/o windows that are left unconfigured by bios
+	 * We determine i/o windows that are left unconfigured by BIOS
 	 * through its i/o enable bit as Microsoft recommends OEMs to do.
 	 * If it is unset, we disable i/o and mark it for reconfiguration in
 	 * later passes by setting the base > limit
@@ -1767,6 +2205,9 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	if (io_range[0] != 0 && io_range[0] < io_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].io_ports,
+		    (uint64_t)io_range[0],
+		    (uint64_t)(io_range[1] - io_range[0] + 1));
+		memlist_insert(&pci_bus_res[bus].io_ports_used,
 		    (uint64_t)io_range[0],
 		    (uint64_t)(io_range[1] - io_range[0] + 1));
 		if (pci_bus_res[bus].io_ports != NULL) {
@@ -1793,6 +2234,9 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		memlist_insert(&pci_bus_res[secbus].mem_space,
 		    (uint64_t)mem_range[0],
 		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
+		memlist_insert(&pci_bus_res[bus].mem_space_used,
+		    (uint64_t)mem_range[0],
+		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
 		/* remove from parent resouce list */
 		if (pci_bus_res[bus].mem_space != NULL) {
 			(void) memlist_remove(&pci_bus_res[bus].mem_space,
@@ -1810,6 +2254,9 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	pmem_range[1] = ((val & 0xFFF0) << 16) | 0xFFFFF;
 	if (pmem_range[0] != 0 && pmem_range[0] < pmem_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].pmem_space,
+		    (uint64_t)pmem_range[0],
+		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
+		memlist_insert(&pci_bus_res[bus].pmem_space_used,
 		    (uint64_t)pmem_range[0],
 		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
 		if (pci_bus_res[bus].pmem_space != NULL) {

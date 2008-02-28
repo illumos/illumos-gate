@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +65,20 @@ void
 memlist_free(struct memlist *buf)
 {
 	kmem_free(buf, sizeof (struct memlist));
+}
+
+void
+memlist_free_all(struct memlist **list)
+{
+	struct memlist  *next, *buf;
+
+	next = *list;
+	while (next) {
+		buf = next;
+		next = buf->next;
+		kmem_free(buf, sizeof (struct memlist));
+	}
+	*list = 0;
 }
 
 /* insert in the order of addresses */
@@ -175,27 +188,87 @@ memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 uint64_t
 memlist_find(struct memlist **listp, uint64_t size, int align)
 {
-	uint_t delta = 0;
+	uint64_t delta, total_size;
 	uint64_t paddr;
 	struct memlist *prev = 0, *next;
 
 	/* find the chunk with sufficient size */
 	next = *listp;
-	while (next && (next->size < size + align - 1)) {
+	while (next) {
+		delta = next->address & ((align != 0) ? (align - 1) : 0);
+		if (delta != 0)
+			total_size = size + align - delta;
+		else
+			total_size = size; /* the addr is already aligned */
+		if (next->size >= total_size)
+			break;
 		prev = next;
 		next = prev->next;
 	}
 
 	if (next == 0)
-		return (0);
+		return (0);	/* Not found */
 
 	paddr = next->address;
-	if (align)
-		delta = (uint_t)(paddr & (align - 1));
 	if (delta)
 		paddr += align - delta;
 	(void) memlist_remove(listp, paddr, size);
+
 	return (paddr);
+}
+
+/*
+ * find and claim a memory chunk of given size, starting
+ * at a specified address
+ */
+uint64_t
+memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
+    uint64_t size, int align)
+{
+	uint64_t delta, total_size;
+	uint64_t paddr;
+	struct memlist *next;
+
+	/* find the chunk starting at 'address' */
+	next = *listp;
+	while (next && (next->address != address)) {
+		next = next->next;
+	}
+	if (next == 0)
+		return (0);	/* Not found */
+
+	delta = next->address & ((align != 0) ? (align - 1) : 0);
+	if (delta != 0)
+		total_size = size + align - delta;
+	else
+		total_size = size;	/* the addr is already aligned */
+	if (next->size < total_size)
+		return (0);	/* unsufficient size */
+
+	paddr = next->address;
+	if (delta)
+		paddr += align - delta;
+	(void) memlist_remove(listp, paddr, size);
+
+	return (paddr);
+}
+
+/*
+ * Merge memlist src into memlist dest
+ */
+void
+memlist_merge(struct memlist **src, struct memlist **dest)
+{
+	struct memlist *head, *prev;
+
+	head = *src;
+	while (head) {
+		memlist_insert(dest, head->address, head->size);
+		prev = head;
+		head = head->next;
+		memlist_free(prev);
+	}
+	*src = 0;
 }
 
 /*
