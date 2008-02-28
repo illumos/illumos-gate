@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,9 +219,9 @@ report_dups(int quiet)
 	 */
 	if (!quiet) {
 		(void) puts("\nSome blocks that were found to be in "
-			    "multiple files are still\nassigned to "
-			    "file(s).\nFragments sorted by inode and "
-			    "logical offsets:");
+		    "multiple files are still\nassigned to "
+		    "file(s).\nFragments sorted by inode and "
+		    "logical offsets:");
 
 		invert_frags(&dup_frags, &inode_frags);
 		inode = avl_first(&inode_frags);
@@ -415,6 +414,18 @@ increment_claimant(fragment_t *dup, fsck_ino_t ino, daddr32_t lfn)
 		claimant = alloc_claimant(ino, lfn);
 		avl_insert(&dup->fr_claimants, (void *)claimant, where);
 		statemap[ino] |= INCLEAR;
+		/*
+		 * If the inode is to be cleared and has zero links then remove
+		 * the zero link bit as it will be cleared anyway. If INZLINK
+		 * is being removed and it's a directory inode then add the
+		 * inode to the orphan directory list.
+		 */
+		if (statemap[ino] & INZLINK) {
+			statemap[ino] &= ~INZLINK;
+			if (statemap[ino] & DSTATE) {
+				add_orphan_dir(ino);
+			}
+		}
 		added = 1;
 	}
 

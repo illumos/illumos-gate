@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,9 @@
  *	encountered during the descent of the filesystem.  In other
  *	words, it's reachable, either by name or by being an acl or
  *	attribute.  INCLEAR declares an intent to call clri() on an
- *	inode.
+ *	inode. The INCLEAR and INZLINK attributes are treated in a
+ *	mutually exclusive manner with INCLEAR taking higher precedence
+ *	as the intent is to clear the inode.
  *
  *	INORPHAN indicates that the inode has already been seen once
  *	in pass3 and determined to be an orphan, so any additional
@@ -258,7 +260,7 @@ main(int argc, char *argv[])
 
 				(void) printf("fsck -F ufs ");
 				for (opt_count = 1; opt_count < argc;
-								opt_count++) {
+				    opt_count++) {
 					opt_text = argv[opt_count];
 					if (opt_text)
 						(void) printf("%s ", opt_text);
@@ -717,9 +719,8 @@ check_sanity(char *filename)
 		 * that option.
 		 */
 		(void) fprintf(stderr,
-			"ufs fsck: sanity check failed: "
-			"%s not block or character device\n",
-			filename);
+		    "ufs fsck: sanity check failed: "
+		    "%s not block or character device\n", filename);
 		exit(EXNOSTAT);
 	}
 
@@ -776,9 +777,8 @@ check_sanity(char *filename)
 			 */
 
 			(void) fprintf(stderr,
-				"ufs fsck: sanity check:"
-				"%s already mounted read/write\n",
-				filename);
+			    "ufs fsck: sanity check:"
+			    "%s already mounted read/write\n", filename);
 			exit(EXMOUNTED);
 		}
 	}
@@ -796,8 +796,8 @@ check_sanity(char *filename)
 		exit(EXUMNTCHK);
 	}
 	if ((sblock.fs_state + (long)sblock.fs_time == FSOKAY) &&
-		(sblock.fs_clean == FSCLEAN || sblock.fs_clean == FSSTABLE ||
-		(sblock.fs_clean == FSLOG && islog))) {
+	    (sblock.fs_clean == FSCLEAN || sblock.fs_clean == FSSTABLE ||
+	    (sblock.fs_clean == FSLOG && islog))) {
 		(void) fprintf(stderr,
 		    "ufs fsck: sanity check: %s okay\n", filename);
 	} else {

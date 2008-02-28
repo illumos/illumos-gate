@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,9 +138,9 @@ verify_inode(fsck_ino_t inumber, struct inodesc *idesc, fsck_ino_t maxinumber)
 	if ((dp->di_mode & IFMT) == 0) {
 		/* mode and type of file is not set */
 		if ((memcmp((void *)dp->di_db, (void *)zino.di_db,
-			    NDADDR * sizeof (daddr32_t)) != 0) ||
+		    NDADDR * sizeof (daddr32_t)) != 0) ||
 		    (memcmp((void *)dp->di_ib, (void *)zino.di_ib,
-			    NIADDR * sizeof (daddr32_t)) != 0) ||
+		    NIADDR * sizeof (daddr32_t)) != 0) ||
 		    (dp->di_mode != 0) || (dp->di_size != 0)) {
 			pfatal("PARTIALLY ALLOCATED INODE I=%u", inumber);
 			if (reply("CLEAR") == 1) {
@@ -156,7 +156,7 @@ verify_inode(fsck_ino_t inumber, struct inodesc *idesc, fsck_ino_t maxinumber)
 	}
 
 	isdir = ((dp->di_mode & IFMT) == IFDIR) ||
-		((dp->di_mode & IFMT) == IFATTRDIR);
+	    ((dp->di_mode & IFMT) == IFATTRDIR);
 
 	lastino = inumber;
 	if (dp->di_size > (u_offset_t)UFS_MAXOFFSET_T) {
@@ -335,9 +335,11 @@ verify_inode(fsck_ino_t inumber, struct inodesc *idesc, fsck_ino_t maxinumber)
 	 * if errorlocked or logging, then open deleted files will
 	 * manifest as di_nlink <= 0 and di_mode != 0
 	 * so skip them; they're ok.
+	 * Also skip anything already marked to be cleared.
 	 */
 	if (dp->di_nlink <= 0 &&
-	    !((errorlocked || islog) && dp->di_mode == 0)) {
+	    !((errorlocked || islog) && dp->di_mode == 0) &&
+	    !(flags & INCLEAR)) {
 		flags |= INZLINK;
 		if (debug)
 			(void) printf(
@@ -360,6 +362,7 @@ verify_inode(fsck_ino_t inumber, struct inodesc *idesc, fsck_ino_t maxinumber)
 				    inumber);
 			add_orphan_dir(inumber);
 			flags |= INCLEAR;
+			flags &= ~INZLINK;	/* It will be cleared anyway */
 		}
 		statemap[inumber] = DSTATE | flags;
 		cacheino(dp, inumber);
@@ -370,6 +373,7 @@ verify_inode(fsck_ino_t inumber, struct inodesc *idesc, fsck_ino_t maxinumber)
 		if (dp->di_size == 0) {
 			(void) printf("ZERO-LENGTH SHADOW  I=%d\n", inumber);
 			flags |= INCLEAR;
+			flags &= ~INZLINK;	/* It will be cleared anyway */
 		}
 		statemap[inumber] = SSTATE | flags;
 		cacheacl(dp, inumber);
@@ -598,7 +602,7 @@ collapse_dirhole(fsck_ino_t inumber, struct inodesc *idesc)
 			blocks = NDADDR + NINDIR(&sblock);
 		else
 			blocks = NDADDR + NINDIR(&sblock) +
-				(NINDIR(&sblock) * NINDIR(&sblock));
+			    (NINDIR(&sblock) * NINDIR(&sblock));
 		new_size = blocks * sblock.fs_bsize;
 		if (debug)
 			(void) printf("to %lld (blocks %d)\n",
@@ -708,7 +712,7 @@ pass1check(struct inodesc *idesc)
 			 */
 			if (++dupblk == MAXDUP) {
 				pwarn("EXCESSIVE DUPLICATE FRAGMENTS I=%u",
-					idesc->id_number);
+				    idesc->id_number);
 				if (reply("CONTINUE") == 0)
 					errexit("Program terminated.");
 
@@ -728,7 +732,7 @@ pass1check(struct inodesc *idesc)
 				 */
 			}
 			(void) find_dup_ref(fragno, idesc->id_number, lbn,
-					    DB_CREATE | DB_INCR);
+			    DB_CREATE | DB_INCR);
 		}
 		/*
 		 * id_entryno counts the number of disk blocks found.
