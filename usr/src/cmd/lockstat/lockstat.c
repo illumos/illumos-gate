@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,13 +129,13 @@ typedef struct ls_event_info {
 } ls_event_info_t;
 
 static ls_event_info_t g_event_info[LS_MAX_EVENTS] = {
-	{ 'C',	"Lock",	"Adaptive mutex spin",			"spin",
+	{ 'C',	"Lock",	"Adaptive mutex spin",			"nsec",
 	    "lockstat:::adaptive-spin" },
 	{ 'C',	"Lock",	"Adaptive mutex block",			"nsec",
 	    "lockstat:::adaptive-block" },
-	{ 'C',	"Lock",	"Spin lock spin",			"spin",
+	{ 'C',	"Lock",	"Spin lock spin",			"nsec",
 	    "lockstat:::spin-spin" },
-	{ 'C',	"Lock",	"Thread lock spin",			"spin",
+	{ 'C',	"Lock",	"Thread lock spin",			"nsec",
 	    "lockstat:::thread-spin" },
 	{ 'C',	"Lock",	"R/W writer blocked by writer",		"nsec",
 	    "lockstat:::rw-block", "arg2 == 0 && arg3 == 1" },
@@ -1392,12 +1391,12 @@ main(int argc, char **argv)
 			}
 			(void) fprintf(stderr,
 			    "lockstat: warning: %s exited with code %d\n",
-				argv[0], WEXITSTATUS(status));
+			    argv[0], WEXITSTATUS(status));
 		}
 	} else {
 		(void) fprintf(stderr,
 		    "lockstat: warning: %s died on signal %d\n",
-			argv[0], WTERMSIG(status));
+		    argv[0], WTERMSIG(status));
 	}
 
 	if (dtrace_stop(g_dtp) == -1)
@@ -1748,10 +1747,10 @@ report_stats(FILE *out, lsrec_t **sort_buf, size_t nrecs, uint64_t total_count,
 
 		(void) fprintf(out, "\n");
 		(void) fprintf(out, "%10s %31s %-9s %-24s\n",
-			g_event_info[event].ev_units,
-			"------ Time Distribution ------",
-			g_rates ? "ops/s" : "count",
-			rectype > LS_STACK(0) ? "Stack" : "");
+		    g_event_info[event].ev_units,
+		    "------ Time Distribution ------",
+		    g_rates ? "ops/s" : "count",
+		    rectype > LS_STACK(0) ? "Stack" : "");
 
 		first_bin = 0;
 		while (lsp->ls_hist[first_bin] == 0)

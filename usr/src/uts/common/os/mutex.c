@@ -345,12 +345,11 @@ mutex_vector_enter(mutex_impl_t *lp)
 	kthread_id_t	owner;
 	kthread_id_t	lastowner = MUTEX_NO_OWNER; /* track owner changes */
 	hrtime_t	sleep_time = 0;	/* how long we slept */
-	uint_t		spin_count = 0;	/* how many times we spun */
+	hrtime_t	spin_time = 0;	/* how long we spun */
 	cpu_t 		*cpup;
 	turnstile_t	*ts;
 	volatile mutex_impl_t *vlp = (volatile mutex_impl_t *)lp;
 	uint_t		backoff = 0;	/* current backoff */
-	int		sleep_count = 0;
 	int		changecnt = 0;	/* count of owner changes */
 
 	ASSERT_STACK_ALIGNED();
@@ -381,9 +380,10 @@ mutex_vector_enter(mutex_impl_t *lp)
 
 	CPU_STATS_ADDQ(cpup, sys, mutex_adenters, 1);
 
+	spin_time = LOCKSTAT_START_TIME(LS_MUTEX_ENTER_SPIN);
+
 	backoff = mutex_lock_backoff(0);	/* set base backoff */
 	for (;;) {
-		spin_count++;
 		mutex_lock_delay(backoff); /* backoff delay */
 
 		if (panicstr)
@@ -448,7 +448,6 @@ mutex_vector_enter(mutex_impl_t *lp)
 			(void) turnstile_block(ts, TS_WRITER_Q, lp,
 			    &mutex_sobj_ops, NULL, NULL);
 			sleep_time += gethrtime();
-			sleep_count++;
 			/* reset backoff after turnstile */
 			backoff = mutex_lock_backoff(0);
 		} else {
@@ -466,12 +465,10 @@ mutex_vector_enter(mutex_impl_t *lp)
 		LOCKSTAT_RECORD(LS_MUTEX_ENTER_BLOCK, lp, sleep_time);
 	}
 
-	/*
-	 * We do not count a sleep as a spin.
-	 */
-	if (spin_count > sleep_count) {
-		LOCKSTAT_RECORD(LS_MUTEX_ENTER_SPIN, lp,
-		    spin_count - sleep_count);
+	/* record spin time, don't count sleep time */
+	if (spin_time != 0) {
+		LOCKSTAT_RECORD_TIME(LS_MUTEX_ENTER_SPIN, lp,
+		    spin_time + sleep_time);
 	}
 
 	LOCKSTAT_RECORD0(LS_MUTEX_ENTER_ACQUIRE, lp);
@@ -618,9 +615,9 @@ mutex_destroy(kmutex_t *mp)
 void
 lock_set_spin(lock_t *lp)
 {
-	int spin_count = 1;
 	int loop_count = 0;
 	uint_t backoff = 0;	/* current backoff */
+	hrtime_t spin_time = 0;	/* how long we spun */
 
 	if (panicstr)
 		return;
@@ -628,10 +625,11 @@ lock_set_spin(lock_t *lp)
 	if (ncpus == 1)
 		panic("lock_set: %p lock held and only one CPU", lp);
 
+	spin_time = LOCKSTAT_START_TIME(LS_LOCK_SET_SPIN);
+
 	while (LOCK_HELD(lp) || !lock_spin_try(lp)) {
 		if (panicstr)
 			return;
-		spin_count++;
 		loop_count++;
 
 		if (ncpus_online == loop_count) {
@@ -643,9 +641,7 @@ lock_set_spin(lock_t *lp)
 		mutex_lock_delay(backoff);
 	}
 
-	if (spin_count) {
-		LOCKSTAT_RECORD(LS_LOCK_SET_SPIN, lp, spin_count);
-	}
+	LOCKSTAT_RECORD_TIME(LS_LOCK_SET_SPIN, lp, spin_time);
 
 	LOCKSTAT_RECORD0(LS_LOCK_SET_ACQUIRE, lp);
 }
@@ -653,9 +649,9 @@ lock_set_spin(lock_t *lp)
 void
 lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 {
-	int spin_count = 1;
 	int loop_count = 0;
 	uint_t backoff = 0;	/* current backoff */
+	hrtime_t spin_time = 0;	/* how long we spun */
 
 	if (panicstr)
 		return;
@@ -665,10 +661,11 @@ lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 
 	ASSERT(new_pil > LOCK_LEVEL);
 
+	spin_time = LOCKSTAT_START_TIME(LS_LOCK_SET_SPL_SPIN);
+
 	do {
 		splx(old_pil);
 		while (LOCK_HELD(lp)) {
-			spin_count++;
 			loop_count++;
 
 			if (panicstr) {
@@ -688,9 +685,7 @@ lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 
 	*old_pil_addr = (ushort_t)old_pil;
 
-	if (spin_count) {
-		LOCKSTAT_RECORD(LS_LOCK_SET_SPL_SPIN, lp, spin_count);
-	}
+	LOCKSTAT_RECORD_TIME(LS_LOCK_SET_SPL_SPIN, lp, spin_time);
 
-	LOCKSTAT_RECORD(LS_LOCK_SET_SPL_ACQUIRE, lp, spin_count);
+	LOCKSTAT_RECORD0(LS_LOCK_SET_SPL_ACQUIRE, lp);
 }

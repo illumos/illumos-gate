@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -351,7 +350,7 @@ turnstile_interlock(lock_t *wlp, lock_t *volatile *olpp)
 				return (1);
 			lock_clear((lock_t *)olp);
 		} else {
-			uint_t spin_count = 1;
+			hrtime_t spin_time = 0;
 			/*
 			 * If we're grabbing the locks out of order, we lose.
 			 * Drop the waiter's lock, and then grab and release
@@ -369,14 +368,15 @@ turnstile_interlock(lock_t *wlp, lock_t *volatile *olpp)
 			 * so spin until the owner's lock either becomes
 			 * available or spontaneously changes.
 			 */
+			spin_time =
+			    LOCKSTAT_START_TIME(LS_TURNSTILE_INTERLOCK_SPIN);
 			while (olp == *olpp && LOCK_HELD(olp)) {
 				if (panicstr)
 					return (1);
-				spin_count++;
 				SMT_PAUSE();
 			}
-			LOCKSTAT_RECORD(LS_TURNSTILE_INTERLOCK_SPIN,
-			    olp, spin_count);
+			LOCKSTAT_RECORD_TIME(LS_TURNSTILE_INTERLOCK_SPIN,
+			    olp, spin_time);
 		}
 	}
 }
