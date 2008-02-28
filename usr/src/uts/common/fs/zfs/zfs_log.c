@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -511,6 +511,8 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 		}
 
 		itx->itx_wr_state = write_state;
+		if (write_state == WR_NEED_COPY)
+			itx->itx_sod += len;
 		lr->lr_foid = zp->z_id;
 		lr->lr_offset = off;
 		lr->lr_length = len;
