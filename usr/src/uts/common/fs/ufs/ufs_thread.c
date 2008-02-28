@@ -448,7 +448,6 @@ ufs_thread_delete(struct vfs *vfsp)
 {
 	struct ufsvfs	*ufsvfsp = (struct ufsvfs *)vfsp->vfs_data;
 	struct ufs_q	*uq = &ufsvfsp->vfs_delete;
-	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 	struct inode	*ip;
 	long		ne;
 	callb_cpr_t	cprinfo;
