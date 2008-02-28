@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -354,7 +354,7 @@ vnex_ctl(dev_info_t *dip, dev_info_t *rdip,
 	}
 	case DDI_CTLOPS_NREGS:
 	{
-		dev_info_t *child = (dev_info_t *)arg;
+		dev_info_t *child = rdip;
 		if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&vnex_regspec, &reglen) != DDI_SUCCESS)
 			return (DDI_FAILURE);
@@ -369,8 +369,8 @@ vnex_ctl(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
 		cmn_err(CE_CONT, "%s%d: invalid op (%d) from %s%d\n",
-			ddi_get_name(dip), ddi_get_instance(dip),
-			ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(dip), ddi_get_instance(dip),
+		    ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
 		return (DDI_FAILURE);
 
 	/*
