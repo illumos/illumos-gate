@@ -107,6 +107,62 @@
  */
 #define	VD_ENTIRE_DISK_SLICE	2
 
+/* Driver types */
+typedef enum vd_driver {
+	VD_DRIVER_UNKNOWN = 0,	/* driver type unknown  */
+	VD_DRIVER_DISK,		/* disk driver */
+	VD_DRIVER_VOLUME	/* volume driver */
+} vd_driver_t;
+
+#define	VD_DRIVER_NAME_LEN	64
+
+#define	VDS_NUM_DRIVERS	(sizeof (vds_driver_types) / sizeof (vd_driver_type_t))
+
+typedef struct vd_driver_type {
+	char name[VD_DRIVER_NAME_LEN];	/* driver name */
+	vd_driver_t type;		/* driver type (disk or volume) */
+} vd_driver_type_t;
+
+/*
+ * There is no reliable way to determine if a device is representing a disk
+ * or a volume, especially with pseudo devices. So we maintain a list of well
+ * known drivers and the type of device they represent (either a disk or a
+ * volume).
+ *
+ * The list can be extended by adding a "driver-type-list" entry in vds.conf
+ * with the following syntax:
+ *
+ * 	driver-type-list="<driver>:<type>", ... ,"<driver>:<type>";
+ *
+ * Where:
+ *	<driver> is the name of a driver (limited to 64 characters)
+ *	<type> is either the string "disk" or "volume"
+ *
+ * Invalid entries in "driver-type-list" will be ignored.
+ *
+ * For example, the following line in vds.conf:
+ *
+ * 	driver-type-list="foo:disk","bar:volume";
+ *
+ * defines that "foo" is a disk driver, and driver "bar" is a volume driver.
+ *
+ * When a list is defined in vds.conf, it is checked before the built-in list
+ * (vds_driver_types[]) so that any definition from this list can be overriden
+ * using vds.conf.
+ */
+vd_driver_type_t vds_driver_types[] = {
+	{ "dad",	VD_DRIVER_DISK },	/* Solaris */
+	{ "did",	VD_DRIVER_DISK },	/* Sun Cluster */
+	{ "lofi",	VD_DRIVER_VOLUME },	/* Solaris */
+	{ "md",		VD_DRIVER_VOLUME },	/* Solaris - SVM */
+	{ "sd",		VD_DRIVER_DISK },	/* Solaris */
+	{ "ssd",	VD_DRIVER_DISK },	/* Solaris */
+	{ "vdc",	VD_DRIVER_DISK },	/* Solaris */
+	{ "vxdmp",	VD_DRIVER_DISK },	/* Veritas */
+	{ "vxio",	VD_DRIVER_VOLUME },	/* Veritas - VxVM */
+	{ "zfs",	VD_DRIVER_VOLUME }	/* Solaris */
+};
+
 /* Return a cpp token as a string */
 #define	STRINGIZE(token)	#token
 
@@ -304,6 +360,8 @@ typedef struct vds {
 	mod_hash_t	*vd_table;	/* table of virtual disks served */
 	mdeg_node_spec_t *ispecp;	/* mdeg node specification */
 	mdeg_handle_t	mdeg;		/* handle for MDEG operations  */
+	vd_driver_type_t *driver_types;	/* extra driver types (from vds.conf) */
+	int 		num_drivers;	/* num of extra driver types */
 } vds_t;
 
 /*
@@ -353,7 +411,7 @@ typedef struct vd {
 	boolean_t		is_atapi_dev;	/* Is this an IDE CD-ROM dev? */
 	ushort_t		max_xfer_sz;	/* max xfer size in DEV_BSIZE */
 	size_t			block_size;	/* blk size of actual device */
-	boolean_t		pseudo;		/* underlying pseudo dev */
+	boolean_t		volume;		/* is vDisk backed by volume */
 	boolean_t		file;		/* is vDisk backed by a file? */
 	boolean_t		scsi;		/* is vDisk backed by scsi? */
 	vnode_t			*file_vnode;	/* file vnode */
@@ -488,6 +546,7 @@ static void vd_reset_access(vd_t *vd);
 static int vd_backend_ioctl(vd_t *vd, int cmd, caddr_t arg);
 static int vds_efi_alloc_and_read(vd_t *, efi_gpt_t **, efi_gpe_t **);
 static void vds_efi_free(vd_t *, efi_gpt_t *, efi_gpe_t *);
+static void vds_driver_types_free(vds_t *vds);
 
 /*
  * Function:
@@ -3466,9 +3525,9 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 		vd->initialized |= VD_DISK_READY;
 		ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
-		PR0("vdisk_type = %s, pseudo = %s, file = %s, nslices = %u",
+		PR0("vdisk_type = %s, volume = %s, file = %s, nslices = %u",
 		    ((vd->vdisk_type == VD_DISK_TYPE_DISK) ? "disk" : "slice"),
-		    (vd->pseudo ? "yes" : "no"),
+		    (vd->volume ? "yes" : "no"),
 		    (vd->file ? "yes" : "no"),
 		    vd->nslices);
 	}
@@ -4381,6 +4440,8 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		vds->mdeg = NULL;
 	}
 
+	vds_driver_types_free(vds);
+
 	if (vds->initialized & VDS_LDI)
 		(void) ldi_ident_release(vds->ldi_ident);
 	mod_hash_destroy_hash(vds->vd_table);
@@ -4773,7 +4834,7 @@ vd_setup_partition_efi(vd_t *vd)
 
 /*
  * Setup for a virtual disk whose backend is a file (exported as a single slice
- * or as a full disk) or a pseudo device (for example a ZFS, SVM or VxVM volume)
+ * or as a full disk) or a volume device (for example a ZFS, SVM or VxVM volume)
  * exported as a full disk. In these cases, the backend is accessed using the
  * vnode interface.
  */
@@ -4828,11 +4889,11 @@ vd_setup_backend_vnode(vd_t *vd)
 
 	/*
 	 * Get max_xfer_sz from the device where the file is or from the device
-	 * itself if we have a pseudo device.
+	 * itself if we have a volume device.
 	 */
 	dev_path[0] = '\0';
 
-	if (vd->pseudo) {
+	if (vd->volume) {
 		status = ldi_open_by_name(file_path, FREAD, kcred, &lhandle,
 		    vd->vds->ldi_ident);
 	} else {
@@ -4870,7 +4931,7 @@ vd_setup_backend_vnode(vd_t *vd)
 	    file_path, dev_path, vd->max_xfer_sz);
 
 	if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
-		ASSERT(!vd->pseudo);
+		ASSERT(!vd->volume);
 		vd->vdisk_label = VD_DISK_LABEL_EFI;
 		status = vd_setup_partition_efi(vd);
 		return (0);
@@ -4960,70 +5021,20 @@ vd_setup_backend_vnode(vd_t *vd)
  *
  * Parameters:
  *	vd 	- pointer to structure containing the vDisk info
+ *	flags	- open flags
  *
  * Return Value
  *	0	- success
- *	EIO	- Invalid number of partitions
  *	!= 0	- some other non-zero return value from ldi(9F) functions
  */
 static int
-vd_open_using_ldi_by_name(vd_t *vd)
+vd_open_using_ldi_by_name(vd_t *vd, int flags)
 {
-	int		rval, status, open_flags;
-	struct dk_cinfo	dk_cinfo;
+	int		status;
 	char		*device_path = vd->device_path;
 
-	/*
-	 * Try to open the device. If the flags indicate that the device should
-	 * be opened write-enabled, we first we try to open it "read-only"
-	 * to see if we have an optical device such as a CD-ROM which, for
-	 * now, we do not permit writes to and thus should not export write
-	 * operations to the client.
-	 *
-	 * Future: if/when we implement support for guest domains writing to
-	 * optical devices we will need to do further checking of the media type
-	 * to distinguish between read-only and writable discs.
-	 */
-	if (vd->open_flags & FWRITE) {
-		open_flags = vd->open_flags & ~FWRITE;
-		status = ldi_open_by_name(device_path, open_flags, kcred,
-		    &vd->ldi_handle[0], vd->vds->ldi_ident);
-
-		if (status == 0) {
-			/* Verify backing device supports dk_cinfo */
-			status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
-			    (intptr_t)&dk_cinfo, (open_flags | FKIOCTL),
-			    kcred, &rval);
-			if (status != 0) {
-				PRN("ldi_ioctl(DKIOCINFO) returned errno %d for"
-				    " %s opened as RO", status, device_path);
-				return (status);
-			}
-
-			if (dk_cinfo.dki_partition >= V_NUMPAR) {
-				PRN("slice %u >= maximum slice %u for %s",
-				    dk_cinfo.dki_partition, V_NUMPAR,
-				    device_path);
-				return (EIO);
-			}
-
-			/*
-			 * If this is an optical device then we disable
-			 * write access and return, otherwise we close
-			 * the device and try again with writes enabled.
-			 */
-			if (dk_cinfo.dki_ctype == DKC_CDROM) {
-				vd->open_flags = open_flags;
-				return (0);
-			} else {
-				(void) ldi_close(vd->ldi_handle[0],
-				    open_flags, kcred);
-			}
-		}
-	}
-
-	/* Attempt to (re)open device */
-	status = ldi_open_by_name(device_path, open_flags, kcred,
+	/* Attempt to open device */
+	status = ldi_open_by_name(device_path, flags, kcred,
 	    &vd->ldi_handle[0], vd->vds->ldi_ident);
 
 	/*
@@ -5032,7 +5043,7 @@ vd_open_using_ldi_by_name(vd_t *vd)
 	 * the FNDELAY flag.
 	 */
 	if (status != 0)
-		status = ldi_open_by_name(device_path, vd->open_flags | FNDELAY,
+		status = ldi_open_by_name(device_path, flags | FNDELAY,
 		    kcred, &vd->ldi_handle[0], vd->vds->ldi_ident);
 
 	if (status != 0) {
@@ -5041,28 +5052,13 @@ vd_open_using_ldi_by_name(vd_t *vd)
 		return (status);
 	}
 
-	/* Verify backing device supports dk_cinfo */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
-	    (intptr_t)&dk_cinfo, (vd->open_flags | FKIOCTL), kcred,
-	    &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
-		    status, device_path);
-		return (status);
-	}
-	if (dk_cinfo.dki_partition >= V_NUMPAR) {
-		PRN("slice %u >= maximum slice %u for %s",
-		    dk_cinfo.dki_partition, V_NUMPAR, device_path);
-		return (EIO);
-	}
-
 	return (0);
 }
 
-
 /*
  * Setup for a virtual disk which backend is a device (a physical disk,
- * slice or pseudo device) that is directly exported either as a full disk
- * for a physical disk or as a slice for a pseudo device or a disk slice.
+ * slice or volume device) that is directly exported either as a full disk
+ * for a physical disk or as a slice for a volume device or a disk slice.
  * In these cases, the backend is accessed using the LDI interface.
  */
 static int
@@ -5072,20 +5068,11 @@ vd_setup_backend_ldi(vd_t *vd)
 	struct dk_cinfo	dk_cinfo;
 	char		*device_path = vd->device_path;
 
-	status = vd_open_using_ldi_by_name(vd);
-	if (status != 0) {
-		PR0("Failed to open (%s) = errno %d", device_path, status);
-		return (status);
-	}
+	/* device has been opened by vd_identify_dev() */
+	ASSERT(vd->ldi_handle[0] != NULL);
+	ASSERT(vd->dev[0] != NULL);
 
 	vd->file = B_FALSE;
-
-	/* Get device number of backing device */
-	if ((status = ldi_get_dev(vd->ldi_handle[0], &vd->dev[0])) != 0) {
-		PRN("ldi_get_dev() returned errno %d for %s",
-		    status, device_path);
-		return (status);
-	}
 
 	/* Verify backing device supports dk_cinfo */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
@@ -5099,6 +5086,32 @@ vd_setup_backend_ldi(vd_t *vd)
 		PRN("slice %u >= maximum slice %u for %s",
 		    dk_cinfo.dki_partition, V_NUMPAR, device_path);
 		return (EIO);
+	}
+
+	/*
+	 * The device has been opened read-only by vd_identify_dev(), re-open
+	 * it read-write if the write flag is set and we don't have an optical
+	 * device such as a CD-ROM, which, for now, we do not permit writes to
+	 * and thus should not export write operations to the client.
+	 *
+	 * Future: if/when we implement support for guest domains writing to
+	 * optical devices we will need to do further checking of the media type
+	 * to distinguish between read-only and writable discs.
+	 */
+	if (dk_cinfo.dki_ctype == DKC_CDROM) {
+
+		vd->open_flags &= ~FWRITE;
+
+	} else if (vd->open_flags & FWRITE) {
+
+		(void) ldi_close(vd->ldi_handle[0], vd->open_flags & ~FWRITE,
+		    kcred);
+		status = vd_open_using_ldi_by_name(vd, vd->open_flags);
+		if (status != 0) {
+			PR0("Failed to open (%s) = errno %d",
+			    device_path, status);
+			return (status);
+		}
 	}
 
 	/* Store the device's max transfer size for return to the client */
@@ -5119,13 +5132,13 @@ vd_setup_backend_ldi(vd_t *vd)
 	 * Similarly, we want to use LDI if we are accessing a CD or DVD
 	 * device (even if it isn't s2)
 	 *
-	 * Note that pseudo devices are exported as full disks using the vnode
+	 * Note that volume devices are exported as full disks using the vnode
 	 * interface, not the LDI interface.
 	 */
 	if ((dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE &&
 	    vd->vdisk_type == VD_DISK_TYPE_DISK) ||
 	    dk_cinfo.dki_ctype == DKC_CDROM) {
-		ASSERT(!vd->pseudo);
+		ASSERT(!vd->volume);
 		if (dk_cinfo.dki_ctype == DKC_SCSI_CCS)
 			vd->scsi = B_TRUE;
 		return (vd_setup_full_disk(vd));
@@ -5134,10 +5147,10 @@ vd_setup_backend_ldi(vd_t *vd)
 	/*
 	 * Export a single slice disk.
 	 *
-	 * The exported device can be either a pseudo device or a disk slice. If
+	 * The exported device can be either a volume device or a disk slice. If
 	 * it is a disk slice different from slice 2 then it is always exported
 	 * as a single slice disk even if the "slice" option is not specified.
-	 * If it is disk slice 2 or a pseudo device then it is exported as a
+	 * If it is disk slice 2 or a volume device then it is exported as a
 	 * single slice disk only if the "slice" option is specified.
 	 */
 	return (vd_setup_single_slice_disk(vd));
@@ -5159,7 +5172,7 @@ vd_setup_single_slice_disk(vd_t *vd)
 	vd->vdisk_block_size = DEV_BSIZE;
 	vd->vdisk_media = VD_MEDIA_FIXED;
 
-	if (vd->pseudo) {
+	if (vd->volume) {
 		ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
 	}
 
@@ -5200,10 +5213,82 @@ vd_setup_single_slice_disk(vd_t *vd)
 	return (status);
 }
 
+/*
+ * Description:
+ *	Open a device using its device path and identify if this is
+ *	a disk device or a volume device.
+ *
+ * Parameters:
+ *	vd 	- pointer to structure containing the vDisk info
+ *	dtype	- return the driver type of the device
+ *
+ * Return Value
+ *	0	- success
+ *	!= 0	- some other non-zero return value from ldi(9F) functions
+ */
+static int
+vd_identify_dev(vd_t *vd, int *dtype)
+{
+	int status, i;
+	char *device_path = vd->device_path;
+	char *drv_name;
+	int drv_type;
+	vds_t *vds = vd->vds;
+
+	status = vd_open_using_ldi_by_name(vd, vd->open_flags & ~FWRITE);
+	if (status != 0) {
+		PR0("Failed to open (%s) = errno %d", device_path, status);
+		return (status);
+	}
+
+	/* Get device number of backing device */
+	if ((status = ldi_get_dev(vd->ldi_handle[0], &vd->dev[0])) != 0) {
+		PRN("ldi_get_dev() returned errno %d for %s",
+		    status, device_path);
+		return (status);
+	}
+
+	/*
+	 * We start by looking if the driver is in the list from vds.conf
+	 * so that we can override the built-in list using vds.conf.
+	 */
+	drv_name = ddi_major_to_name(getmajor(vd->dev[0]));
+	drv_type = VD_DRIVER_UNKNOWN;
+
+	/* check vds.conf list */
+	for (i = 0; i < vds->num_drivers; i++) {
+		if (vds->driver_types[i].type == VD_DRIVER_UNKNOWN) {
+			/* ignore invalid entries */
+			continue;
+		}
+		if (strcmp(drv_name, vds->driver_types[i].name) == 0) {
+			drv_type = vds->driver_types[i].type;
+			goto done;
+		}
+	}
+
+	/* check built-in list */
+	for (i = 0; i < VDS_NUM_DRIVERS; i++) {
+		if (strcmp(drv_name, vds_driver_types[i].name) == 0) {
+			drv_type = vds_driver_types[i].type;
+			goto done;
+		}
+	}
+
+done:
+	PR0("driver %s identified as %s", drv_name,
+	    (drv_type == VD_DRIVER_DISK)? "DISK" :
+	    (drv_type == VD_DRIVER_VOLUME)? "VOLUME" : "UNKNOWN");
+
+	*dtype = drv_type;
+
+	return (0);
+}
+
 static int
 vd_setup_vd(vd_t *vd)
 {
-	int		status;
+	int		status, drv_type, pseudo;
 	dev_info_t	*dip;
 	vnode_t 	*vnp;
 	char		*path = vd->device_path;
@@ -5222,7 +5307,7 @@ vd_setup_vd(vd_t *vd)
 		 * single slice disk using the vnode interface.
 		 */
 		VN_RELE(vnp);
-		vd->pseudo = B_FALSE;
+		vd->volume = B_FALSE;
 		status = vd_setup_backend_vnode(vd);
 		break;
 
@@ -5232,7 +5317,7 @@ vd_setup_vd(vd_t *vd)
 		 * Backend is a device. The way it is exported depends on the
 		 * type of the device.
 		 *
-		 * - A pseudo device is exported as a full disk using the vnode
+		 * - A volume device is exported as a full disk using the vnode
 		 *   interface or as a single slice disk using the LDI
 		 *   interface.
 		 *
@@ -5256,33 +5341,52 @@ vd_setup_vd(vd_t *vd)
 			status = EIO;
 			break;
 		}
-		vd->pseudo = is_pseudo_device(dip);
+		pseudo = is_pseudo_device(dip);
 		ddi_release_devi(dip);
 		VN_RELE(vnp);
 
-		if (!vd->pseudo) {
+		if (vd_identify_dev(vd, &drv_type) != 0) {
+			PRN("%s identification failed", path);
+			status = EIO;
+			break;
+		}
+
+		/*
+		 * If the driver hasn't been identified then we consider that
+		 * pseudo devices are volumes and other devices are disks.
+		 */
+		if (drv_type == VD_DRIVER_VOLUME ||
+		    (drv_type == VD_DRIVER_UNKNOWN && pseudo)) {
+			vd->volume = B_TRUE;
+		} else {
 			status = vd_setup_backend_ldi(vd);
 			break;
 		}
 
 		/*
-		 * If this is a pseudo device then its usage depends if the
+		 * If this is a volume device then its usage depends if the
 		 * "slice" option is set or not. If the "slice" option is set
-		 * then the pseudo device will be exported as a single slice,
+		 * then the volume device will be exported as a single slice,
 		 * otherwise it will be exported as a full disk.
 		 *
 		 * For backward compatibility, if vd_volume_force_slice is set
-		 * then we always export pseudo devices as slices.
+		 * then we always export volume devices as slices.
 		 */
 		if (vd_volume_force_slice) {
 			vd->vdisk_type = VD_DISK_TYPE_SLICE;
 			vd->nslices = 1;
 		}
 
-		if (vd->vdisk_type == VD_DISK_TYPE_DISK)
+		if (vd->vdisk_type == VD_DISK_TYPE_DISK) {
+			/* close device opened during identification */
+			(void) ldi_close(vd->ldi_handle[0],
+			    vd->open_flags & ~FWRITE, kcred);
+			vd->ldi_handle[0] = NULL;
+			vd->dev[0] = 0;
 			status = vd_setup_backend_vnode(vd);
-		else
+		} else {
 			status = vd_setup_backend_ldi(vd);
+		}
 		break;
 
 	default:
@@ -5369,9 +5473,9 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t options,
 		vd->initialized |= VD_DISK_READY;
 
 		ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
-		PR0("vdisk_type = %s, pseudo = %s, file = %s, nslices = %u",
+		PR0("vdisk_type = %s, volume = %s, file = %s, nslices = %u",
 		    ((vd->vdisk_type == VD_DISK_TYPE_DISK) ? "disk" : "slice"),
-		    (vd->pseudo ? "yes" : "no"), (vd->file ? "yes" : "no"),
+		    (vd->volume ? "yes" : "no"), (vd->file ? "yes" : "no"),
 		    vd->nslices);
 	} else {
 		if (status != EAGAIN)
@@ -5705,6 +5809,101 @@ vds_get_options(md_t *md, mde_cookie_t vd_node, uint64_t *options)
 }
 
 static void
+vds_driver_types_free(vds_t *vds)
+{
+	if (vds->driver_types != NULL) {
+		kmem_free(vds->driver_types, sizeof (vd_driver_type_t) *
+		    vds->num_drivers);
+		vds->driver_types = NULL;
+		vds->num_drivers = 0;
+	}
+}
+
+/*
+ * Update the driver type list with information from vds.conf.
+ */
+static void
+vds_driver_types_update(vds_t *vds)
+{
+	char **list, *s;
+	uint_t i, num, count = 0, len;
+
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, vds->dip,
+	    DDI_PROP_DONTPASS, "driver-type-list", &list, &num) !=
+	    DDI_PROP_SUCCESS)
+		return;
+
+	/*
+	 * We create a driver_types list with as many as entries as there
+	 * is in the driver-type-list from vds.conf. However only valid
+	 * entries will be populated (i.e. entries from driver-type-list
+	 * with a valid syntax). Invalid entries will be left blank so
+	 * they will have no driver name and the driver type will be
+	 * VD_DRIVER_UNKNOWN (= 0).
+	 */
+	vds->num_drivers = num;
+	vds->driver_types = kmem_zalloc(sizeof (vd_driver_type_t) * num,
+	    KM_SLEEP);
+
+	for (i = 0; i < num; i++) {
+
+		s = strchr(list[i], ':');
+
+		if (s == NULL) {
+			PRN("vds.conf: driver-type-list, entry %d (%s): "
+			    "a colon is expected in the entry",
+			    i, list[i]);
+			continue;
+		}
+
+		len = (uintptr_t)s - (uintptr_t)list[i];
+
+		if (len == 0) {
+			PRN("vds.conf: driver-type-list, entry %d (%s): "
+			    "the driver name is empty",
+			    i, list[i]);
+			continue;
+		}
+
+		if (len >= VD_DRIVER_NAME_LEN) {
+			PRN("vds.conf: driver-type-list, entry %d (%s): "
+			    "the driver name is too long",
+			    i, list[i]);
+			continue;
+		}
+
+		if (strcmp(s + 1, "disk") == 0) {
+
+			vds->driver_types[i].type = VD_DRIVER_DISK;
+
+		} else if (strcmp(s + 1, "volume") == 0) {
+
+			vds->driver_types[i].type = VD_DRIVER_VOLUME;
+
+		} else {
+			PRN("vds.conf: driver-type-list, entry %d (%s): "
+			    "the driver type is invalid",
+			    i, list[i]);
+			continue;
+		}
+
+		(void) strncpy(vds->driver_types[i].name, list[i], len);
+
+		PR0("driver-type-list, entry %d (%s) added",
+		    i, list[i]);
+
+		count++;
+	}
+
+	ddi_prop_free(list);
+
+	if (count == 0) {
+		/* nothing was added, clean up */
+		vds_driver_types_free(vds);
+	}
+}
+
+static void
 vds_add_vd(vds_t *vds, md_t *md, mde_cookie_t vd_node)
 {
 	char		*device_path = NULL;
@@ -5940,6 +6139,9 @@ vds_do_attach(dev_info_t *dip)
 		PRN("failed to set \"%s\" property for instance %u",
 		    DDI_NO_AUTODETACH, instance);
 	}
+
+	/* read any user defined driver types from conf file and update list */
+	vds_driver_types_update(vds);
 
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
