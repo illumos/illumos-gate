@@ -68,7 +68,12 @@ C99MODE		= $(C99_ENABLE)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 LDFLAGS         += -dy -Ndrv/nsmb
 
+#
+#	Default build targets.
+#
 .KEEP_STATE:
+
+def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
