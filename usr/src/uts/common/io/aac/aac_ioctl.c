@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -516,18 +516,14 @@ aac_send_raw_srb(struct aac_softstate *softs, dev_t dev, intptr_t arg, int mode)
 	}
 	for (usge = usgt; usge < &usgt[srb_sgcount]; usge++) {
 		if (sg64) {
+			uint64_t sgaddr = ((struct aac_sg_entry64 *) \
+			    srb->sg.SgEntry)->SgAddress;
+
 			usge->bcount = ((struct aac_sg_entry64 *)srb-> \
 			    sg.SgEntry)->SgByteCount;
+			if (sgaddr > 0xffffffffull ||
+			    (sgaddr + usge->bcount - 1) > 0xffffffffull) {
 #ifndef _LP64
-			usge->addr = (caddr_t)
-			    (uint32_t)((struct aac_sg_entry64 *) \
-			    srb->sg.SgEntry)->SgAddress;
-			if ((uint32_t)usge->addr > 0xfffffffful) {
-#else
-			usge->addr = (caddr_t)
-			    ((struct aac_sg_entry64 *) \
-			    srb->sg.SgEntry)->SgAddress;
-			if ((uint64_t)usge->addr > 0xffffffffull) {
 				if (!(softs->flags & AAC_FLAGS_SG_64BIT))
 #endif
 				{
@@ -537,6 +533,11 @@ aac_send_raw_srb(struct aac_softstate *softs, dev_t dev, intptr_t arg, int mode)
 					goto finish;
 				}
 			}
+			usge->addr = (caddr_t)
+#ifndef _LP64
+			    (uint32_t)
+#endif
+			    sgaddr;
 		} else {
 			usge->bcount = srb->sg.SgEntry->SgByteCount;
 			usge->addr = (caddr_t)
