@@ -73,18 +73,15 @@ int
 load_config()
 {
 	int rc;
-	idmap_pg_config_t *pgcfg;
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
-		degrade_svc("failed to initialize config");
+		degrade_svc(0, "failed to initialize config");
 		return (-1);
 	}
-	pgcfg = &_idmapdstate.cfg->pgcfg;
 
-	rc = idmap_cfg_load(&_idmapdstate.cfg->handles,
-	    &_idmapdstate.cfg->pgcfg, 0);
+	rc = idmap_cfg_load(_idmapdstate.cfg, 0);
 	if (rc < -1) {
 		/* Total failure */
-		degrade_svc("fatal error while loading configuration");
+		degrade_svc(0, "fatal error while loading configuration");
 		return (rc);
 	}
 
@@ -93,22 +90,9 @@ load_config()
 		idmapdlog(LOG_ERR, "Various errors occurred while loading "
 		    "the configuration; check the logs");
 
-	if (pgcfg->global_catalog == NULL ||
-	    pgcfg->global_catalog[0].host[0] == '\0') {
-		degrade_svc(
-		    "global catalog server is not configured; AD lookup "
-		    "will fail until one or more global catalog server names "
-		    "are configured or discovered; auto-discovery will begin "
-		    "shortly");
-	} else {
-		restore_svc();
-	}
-
-	(void) reload_ad();
-
 	if ((rc = idmap_cfg_start_updates()) < 0) {
 		/* Total failure */
-		degrade_svc("could not start config updater");
+		degrade_svc(0, "could not start config updater");
 		return (rc);
 	}
 
@@ -118,7 +102,7 @@ load_config()
 }
 
 
-int
+void
 reload_ad()
 {
 	int	i;
@@ -127,21 +111,25 @@ reload_ad()
 
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
 
-	if (pgcfg->default_domain == NULL ||
-	    pgcfg->global_catalog == NULL) {
-		if (_idmapdstate.ad == NULL)
-			idmapdlog(LOG_ERR, "AD lookup disabled");
-		else
-			idmapdlog(LOG_ERR, "cannot update AD context");
-		return (-1);
+	if (pgcfg->global_catalog == NULL ||
+	    pgcfg->global_catalog[0].host[0] == '\0') {
+		/*
+		 * No GCs.  Continue to use the previous AD config in case
+		 * that's still good but auto-discovery had a transient failure.
+		 * If that stops working we'll go into degraded mode anyways
+		 * when it does.
+		 */
+		degrade_svc(0,
+		    "Global Catalog servers not configured/discoverable");
+		return;
 	}
 
 	old = _idmapdstate.ad;
 
 	if (idmap_ad_alloc(&new, pgcfg->default_domain,
 	    IDMAP_AD_GLOBAL_CATALOG) != 0) {
-		degrade_svc("could not initialize AD context");
-		return (-1);
+		degrade_svc(0, "could not initialize AD context");
+		return;
 	}
 
 	for (i = 0; pgcfg->global_catalog[i].host[0] != '\0'; i++) {
@@ -149,8 +137,8 @@ reload_ad()
 		    pgcfg->global_catalog[i].host,
 		    pgcfg->global_catalog[i].port) != 0) {
 			idmap_ad_free(&new);
-			degrade_svc("could not initialize AD GC context");
-			return (-1);
+			degrade_svc(0, "could not initialize AD GC context");
+			return;
 		}
 	}
 
@@ -158,8 +146,6 @@ reload_ad()
 
 	if (old != NULL)
 		idmap_ad_free(&old);
-
-	return (0);
 }
 
 

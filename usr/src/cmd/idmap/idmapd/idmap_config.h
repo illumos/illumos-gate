@@ -86,17 +86,20 @@ typedef struct idmap_pg_config {
 typedef struct idmap_cfg {
 	idmap_pg_config_t	pgcfg;	    /* live AD/ID mapping config */
 	idmap_cfg_handles_t	handles;
+	int			initialized;
 } idmap_cfg_t;
 
 
 extern void 		idmap_cfg_unload(idmap_pg_config_t *);
-extern int		idmap_cfg_load(idmap_cfg_handles_t *,
-					idmap_pg_config_t *, int);
+extern int		idmap_cfg_load(idmap_cfg_t *, int);
 extern idmap_cfg_t	*idmap_cfg_init(void);
 extern int		idmap_cfg_fini(idmap_cfg_t *);
 extern int		idmap_cfg_start_updates(void);
 extern void		idmap_cfg_poke_updates(void);
 extern void		idmap_cfg_hup_handler(int);
+
+#define	CFG_DISCOVER		0x1
+#define	CFG_LOG			0x2
 
 #ifdef __cplusplus
 }

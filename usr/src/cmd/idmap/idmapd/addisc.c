@@ -620,7 +620,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 	    query_type, svc_name);
 
 	if (len < 0) {
-		idmapdlog(LOG_ERR, "DNS %s for '%s' failed (%s)",
+		idmapdlog(LOG_DEBUG, "DNS %s for '%s' failed (%s)",
 		    query_type, svc_name, hstrerror(state->res_h_errno));
 		return (NULL);
 	}

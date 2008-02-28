@@ -370,7 +370,7 @@ get_fmri(void)
  * have a successful AD name<->SID lookup.
  */
 void
-degrade_svc(const char *reason)
+degrade_svc(int poke_discovery, const char *reason)
 {
 	const char *fmri;
 
@@ -378,18 +378,22 @@ degrade_svc(const char *reason)
 	 * If the config update thread is in a state where auto-discovery could
 	 * be re-tried, then this will make it try it -- a sort of auto-refresh.
 	 */
-	idmap_cfg_poke_updates();
+	if (poke_discovery)
+		idmap_cfg_poke_updates();
 
 	membar_consumer();
 	if (degraded)
 		return;
+
+	idmapdlog(LOG_ERR, "Degraded operation (%s).  If you are running an "
+	    "SMB server in workgroup mode, or if you're not running an SMB "
+	    "server, then you can ignore this message", reason);
+
 	membar_producer();
 	degraded = 1;
 
 	if ((fmri = get_fmri()) != NULL)
 		(void) smf_degrade_instance(fmri, 0);
-
-	idmapdlog(LOG_ERR, "Degraded operation (%s)", reason);
 }
 
 void
@@ -406,7 +410,7 @@ restore_svc(void)
 
 	membar_producer();
 	degraded = 0;
-	idmapdlog(LOG_INFO, "Normal operation restored");
+	idmapdlog(LOG_NOTICE, "Normal operation restored");
 }
 
 void

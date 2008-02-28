@@ -428,12 +428,12 @@ static int
 update_value(char **value, char **new, char *name)
 {
 	if (*new == NULL)
-		return (FALSE);
+		return (0);
 
 	if (*value != NULL && strcmp(*new, *value) == 0) {
 		free(*new);
 		*new = NULL;
-		return (FALSE);
+		return (0);
 	}
 
 	idmapdlog(LOG_INFO, "change %s=%s", name, CHECK_NULL(*new));
@@ -441,7 +441,7 @@ update_value(char **value, char **new, char *name)
 		free(*value);
 	*value = *new;
 	*new = NULL;
-	return (TRUE);
+	return (1);
 }
 
 static int
@@ -451,13 +451,13 @@ update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
 
 	if (*value == *new)
 		/* Nothing to do */
-		return (FALSE);
+		return (0);
 
 	if (*value != NULL && *new != NULL &&
 	    ad_disc_compare_ds(*value, *new) == 0) {
 		free(*new);
 		*new = NULL;
-		return (FALSE);
+		return (0);
 	}
 
 	if (*value)
@@ -469,14 +469,14 @@ update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
 	if (*value == NULL) {
 		/* We're unsetting this DS property */
 		idmapdlog(LOG_INFO, "change %s=<none>", name);
-		return (TRUE);
+		return (1);
 	}
 
 	/* List all the new DSs */
 	for (i = 0; (*value)[i].host[0] != '\0'; i++)
 		idmapdlog(LOG_INFO, "change %s=%s port=%d", name,
 		    (*value)[i].host, (*value)[i].port);
-	return (TRUE);
+	return (1);
 }
 
 
@@ -529,13 +529,13 @@ pfroute_event_is_interesting(int rt_sock)
  */
 static
 int
-wait_for_event(int poke_is_interesting, struct timespec *timeout)
+wait_for_event(int poke_is_interesting, struct timespec *timeoutp)
 {
 	port_event_t pe;
 
 retry:
 	memset(&pe, 0, sizeof (pe));
-	if (port_get(idmapd_ev_port, &pe, timeout) != 0) {
+	if (port_get(idmapd_ev_port, &pe, timeoutp) != 0) {
 		switch (errno) {
 		case EINTR:
 			goto retry;
@@ -583,20 +583,17 @@ retry:
 		(void) unlink(IDMAP_CACHEDIR "/ccache");
 		/* HUP is the refresh method, so re-read SMF config */
 		(void) idmapdlog(LOG_INFO, "SMF refresh");
-		WRLOCK_CONFIG();
-		(void) idmap_cfg_unload(&_idmapdstate.cfg->pgcfg);
-		rc = idmap_cfg_load(&_idmapdstate.cfg->handles,
-		    &_idmapdstate.cfg->pgcfg, 1);
-		if (rc < -1)
-			(void) idmapdlog(LOG_ERR,
-			    "Various errors re-loading configuration "
-			    "will cause AD lookups to fail");
-		else if (rc == -1)
-			(void) idmapdlog(LOG_WARNING,
-			    "Various errors re-loading configuration "
-			    "may cause AD lookups to fail");
-		UNLOCK_CONFIG();
-		return (TRUE);
+		rc = idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER|CFG_LOG);
+		if (rc < -1) {
+			(void) idmapdlog(LOG_ERR, "Fatal errors while reading "
+			    "SMF properties");
+			exit(1);
+		} else if (rc == -1) {
+			(void) idmapdlog(LOG_WARNING, "Various errors "
+			    "re-loading configuration may cause AD lookups "
+			    "to fail");
+		}
+		return (FALSE);
 	}
 
 	return (FALSE);
@@ -606,23 +603,24 @@ void *
 idmap_cfg_update_thread(void *arg)
 {
 
-	idmap_pg_config_t	new_cfg;
 	int			ttl, changed, poke_is_interesting;
 	idmap_cfg_handles_t	*handles = &_idmapdstate.cfg->handles;
-	idmap_pg_config_t	*live_cfg = &_idmapdstate.cfg->pgcfg;
 	ad_disc_t		ad_ctx = handles->ad_ctx;
-	struct timespec		timeout;
-
-	(void) memset(&new_cfg, 0, sizeof (new_cfg));
+	struct timespec		timeout, *timeoutp;
 
 	poke_is_interesting = 1;
 	for (ttl = 0, changed = TRUE; ; ttl = ad_disc_get_TTL(ad_ctx)) {
-		if (ttl < 0 || ttl > MAX_CHECK_TIME) {
+		/*
+		 * If ttl < 0 then we can wait for an event without timing out.
+		 * If idmapd needs to notice that the system has been joined to
+		 * a Windows domain then idmapd needs to be refreshed.
+		 */
+		timeoutp = (ttl < 0) ? NULL : &timeout;
+		if (ttl > MAX_CHECK_TIME)
 			ttl = MAX_CHECK_TIME;
-		}
 		timeout.tv_sec = ttl;
 		timeout.tv_nsec = 0;
-		changed = wait_for_event(poke_is_interesting, &timeout);
+		changed = wait_for_event(poke_is_interesting, timeoutp);
 
 		/*
 		 * If there are no interesting events, and this is not the first
@@ -634,118 +632,17 @@ idmap_cfg_update_thread(void *arg)
 
 		(void) ad_disc_SubnetChanged(ad_ctx);
 
-		/*
-		 * Load configuration data into a private copy.
-		 *
-		 * The fixed values (i.e., from SMF) have already been set in AD
-		 * auto discovery, so if all values have been set in SMF and
-		 * they haven't been changed or the service been refreshed then
-		 * the rest of this loop's body is one big no-op.
-		 */
-		ad_disc_refresh(ad_ctx);
-		new_cfg.default_domain = ad_disc_get_DomainName(ad_ctx);
-		if (new_cfg.default_domain == NULL)
-			idmapdlog(LOG_INFO,
-			    "unable to discover Default Domain");
+		if (idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER) < -1) {
+			(void) idmapdlog(LOG_ERR, "Fatal errors while reading "
+			    "SMF properties");
+			exit(1);
+		}
 
-		new_cfg.domain_name = ad_disc_get_DomainName(ad_ctx);
-		if (new_cfg.domain_name == NULL)
-			idmapdlog(LOG_INFO,
-			    "unable to discover Domain Name");
-
-		new_cfg.domain_controller =
-		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
-		if (new_cfg.domain_controller == NULL)
-			idmapdlog(LOG_INFO,
-			    "unable to discover Domain Controller");
-
-		new_cfg.forest_name = ad_disc_get_ForestName(ad_ctx);
-		if (new_cfg.forest_name == NULL)
-			idmapdlog(LOG_INFO,
-			    "unable to discover Forest Name");
-
-		new_cfg.site_name = ad_disc_get_SiteName(ad_ctx);
-		if (new_cfg.site_name == NULL)
-			idmapdlog(LOG_INFO,
-			    "unable to discover Site Name");
-
-		new_cfg.global_catalog =
-		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE);
-		if (new_cfg.global_catalog == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Global Catalog");
+		if (_idmapdstate.cfg->pgcfg.global_catalog == NULL ||
+		    _idmapdstate.cfg->pgcfg.global_catalog[0].host[0] == '\0')
 			poke_is_interesting = 1;
-		} else {
+		else
 			poke_is_interesting = 0;
-		}
-
-		if (new_cfg.default_domain == NULL &&
-		    new_cfg.domain_name == NULL &&
-		    new_cfg.domain_controller == NULL &&
-		    new_cfg.forest_name == NULL &&
-		    new_cfg.global_catalog == NULL) {
-			idmapdlog(LOG_NOTICE, "Could not auto-discover AD "
-			    "domain and forest names nor domain controllers "
-			    "and global catalog servers");
-		}
-
-		/*
-		 * Update the live configuration
-		 */
-		WRLOCK_CONFIG();
-
-		if (live_cfg->list_size_limit != new_cfg.list_size_limit) {
-			idmapdlog(LOG_INFO, "change list_size=%d",
-			    new_cfg.list_size_limit);
-			live_cfg->list_size_limit = new_cfg.list_size_limit;
-		}
-
-		/*
-		 * Update running config and decide whether we want to call
-		 * reload_ad() (i.e., if the default_domain changed or the GC
-		 * list changed).
-		 *
-		 * If default_domain came from SMF then we must not
-		 * auto-discover it.
-		 */
-		changed = FALSE;
-		if (live_cfg->dflt_dom_set_in_smf == FALSE &&
-		    update_value(&live_cfg->default_domain,
-		    &new_cfg.default_domain, "default_domain") == TRUE)
-			changed = TRUE;
-
-		(void) update_value(&live_cfg->domain_name,
-		    &new_cfg.domain_name, "domain_name");
-
-		(void) update_dirs(&live_cfg->domain_controller,
-		    &new_cfg.domain_controller, "domain_controller");
-
-		(void) update_value(&live_cfg->forest_name,
-		    &new_cfg.forest_name, "forest_name");
-
-		(void) update_value(&live_cfg->site_name,
-		    &new_cfg.site_name, "site_name");
-
-		if (update_dirs(&live_cfg->global_catalog,
-		    &new_cfg.global_catalog, "global_catalog") == TRUE)
-			changed = TRUE;
-		UNLOCK_CONFIG();
-
-		idmap_cfg_unload(&new_cfg);
-
-
-		/*
-		 * Re-create the ad_t/ad_host_t objects if
-		 * either the default domain or the global
-		 * catalog server list changed.
-		 */
-
-		if (changed) {
-			RDLOCK_CONFIG();
-			(void) reload_ad();
-			UNLOCK_CONFIG();
-			print_idmapdstate();
-		}
 	}
 	/*NOTREACHED*/
 	return (NULL);
@@ -797,47 +694,33 @@ idmap_cfg_start_updates(void)
 	return (0);
 }
 
-
+/*
+ * This is the half of idmap_cfg_load() that loads property values from
+ * SMF (using the config/ property group of the idmap FMRI).
+ *
+ * Return values: 0 -> success, -1 -> failure, -2 -> hard failures
+ * reading from SMF.
+ */
+static
 int
-idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
-	int discover)
+idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
+	int *errors)
 {
 	int rc;
-	int errors = 0;
 	uint8_t bool_val;
 	char *str = NULL;
 	bool_t new_debug_mode;
-	ad_disc_t ad_ctx = handles->ad_ctx;
-
-	pgcfg->list_size_limit = 0;
-	pgcfg->default_domain = NULL;
-	pgcfg->domain_name = NULL;
-	pgcfg->machine_sid = NULL;
-	pgcfg->domain_controller = NULL;
-	pgcfg->forest_name = NULL;
-	pgcfg->site_name = NULL;
-	pgcfg->global_catalog = NULL;
-	pgcfg->ad_unixuser_attr = NULL;
-	pgcfg->ad_unixgroup_attr = NULL;
-	pgcfg->nldap_winname_attr = NULL;
-	pgcfg->ds_name_mapping_enabled = FALSE;
-
-	pthread_mutex_lock(&handles->mutex);
-
-	ad_disc_refresh(handles->ad_ctx);
 
 	if (scf_pg_update(handles->config_pg) < 0) {
 		idmapdlog(LOG_ERR, "scf_pg_update() failed: %s",
 		    scf_strerror(scf_error()));
-		rc = -2;
-		goto exit;
+		return (-2);
 	}
 
 	if (scf_pg_update(handles->general_pg) < 0) {
 		idmapdlog(LOG_ERR, "scf_pg_update() failed: %s",
 		    scf_strerror(scf_error()));
-		rc = -2;
-		goto exit;
+		return (-2);
 	}
 
 	new_debug_mode = prop_exists(handles, "debug");
@@ -863,7 +746,8 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		errors++;
 	else
-		(void) ad_disc_set_DomainName(ad_ctx, pgcfg->domain_name);
+		(void) ad_disc_set_DomainName(handles->ad_ctx,
+		    pgcfg->domain_name);
 
 	rc = get_val_astring(handles, "default_domain",
 	    &pgcfg->default_domain);
@@ -873,8 +757,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		 * as fatal as they may leave ID mapping rules that
 		 * match unqualified winnames flapping in the wind.
 		 */
-		rc = -2;
-		goto exit;
+		return (-2);
 	}
 
 	rc = get_val_astring(handles, "mapping_domain", &str);
@@ -918,10 +801,8 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		errors++;
 	if (pgcfg->machine_sid == NULL) {
 		/* If machine_sid not configured, generate one */
-		if (generate_machine_sid(&pgcfg->machine_sid) < 0) {
-			rc =  -2;
-			goto exit;
-		}
+		if (generate_machine_sid(&pgcfg->machine_sid) < 0)
+			return (-2);
 		rc = set_val_astring(handles, "machine_sid",
 		    pgcfg->machine_sid);
 		if (rc != 0)
@@ -934,20 +815,21 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		errors++;
 	else
-		(void) ad_disc_set_DomainController(ad_ctx,
+		(void) ad_disc_set_DomainController(handles->ad_ctx,
 		    pgcfg->domain_controller);
 
 	rc = get_val_astring(handles, "forest_name", &pgcfg->forest_name);
 	if (rc != 0)
 		errors++;
 	else
-		(void) ad_disc_set_ForestName(ad_ctx, pgcfg->forest_name);
+		(void) ad_disc_set_ForestName(handles->ad_ctx,
+		    pgcfg->forest_name);
 
 	rc = get_val_astring(handles, "site_name", &pgcfg->site_name);
 	if (rc != 0)
 		errors++;
 	else
-		(void) ad_disc_set_SiteName(ad_ctx, pgcfg->site_name);
+		(void) ad_disc_set_SiteName(handles->ad_ctx, pgcfg->site_name);
 
 	str = NULL;
 	rc = get_val_ds(handles, "global_catalog", 3268,
@@ -955,7 +837,8 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		errors++;
 	else
-		(void) ad_disc_set_GlobalCatalog(ad_ctx, pgcfg->global_catalog);
+		(void) ad_disc_set_GlobalCatalog(handles->ad_ctx,
+		    pgcfg->global_catalog);
 
 	/*
 	 * Read directory-based name mappings related SMF properties
@@ -963,113 +846,212 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	bool_val = 0;
 	rc = get_val_int(handles, "ds_name_mapping_enabled",
 	    &bool_val, SCF_TYPE_BOOLEAN);
-	if (rc != 0) {
-		rc = -2;
-		goto exit;
-	} else if (bool_val) {
-		pgcfg->ds_name_mapping_enabled = TRUE;
-		rc = get_val_astring(handles, "ad_unixuser_attr",
-		    &pgcfg->ad_unixuser_attr);
-		if (rc != 0) {
-			rc = -2;
-			goto exit;
-		}
+	if (rc != 0)
+		return (-2);
 
-		rc = get_val_astring(handles, "ad_unixgroup_attr",
-		    &pgcfg->ad_unixgroup_attr);
-		if (rc != 0) {
-			rc = -2;
-			goto exit;
-		}
+	if (!bool_val)
+		return (rc);
 
-		rc = get_val_astring(handles, "nldap_winname_attr",
-		    &pgcfg->nldap_winname_attr);
-		if (rc != 0) {
-			rc = -2;
-			goto exit;
-		}
+	pgcfg->ds_name_mapping_enabled = TRUE;
+	rc = get_val_astring(handles, "ad_unixuser_attr",
+	    &pgcfg->ad_unixuser_attr);
+	if (rc != 0)
+		return (-2);
 
-		if (pgcfg->nldap_winname_attr != NULL) {
-			idmapdlog(LOG_ERR,
-			    "native LDAP based name mapping not supported "
-			    "at this time. Please unset "
-			    "config/nldap_winname_attr and restart idmapd.");
-			rc = -3;
-			goto exit;
-		}
+	rc = get_val_astring(handles, "ad_unixgroup_attr",
+	    &pgcfg->ad_unixgroup_attr);
+	if (rc != 0)
+		return (-2);
 
-		if (pgcfg->ad_unixuser_attr == NULL &&
-		    pgcfg->ad_unixgroup_attr == NULL) {
-			idmapdlog(LOG_ERR,
-			    "If config/ds_name_mapping_enabled property "
-			    "is set to true then atleast one of the following "
-			    "name mapping attributes must be specified. "
-			    "(config/ad_unixuser_attr OR "
-			    "config/ad_unixgroup_attr)");
-			rc = -3;
-			goto exit;
-		}
+	rc = get_val_astring(handles, "nldap_winname_attr",
+	    &pgcfg->nldap_winname_attr);
+	if (rc != 0)
+		return (-2);
+
+	if (pgcfg->nldap_winname_attr != NULL) {
+		idmapdlog(LOG_ERR,
+		    "Native LDAP based name mapping not supported at this "
+		    "time. Please unset config/nldap_winname_attr and restart "
+		    "idmapd.");
+		return (-3);
 	}
 
+	if (pgcfg->ad_unixuser_attr == NULL &&
+	    pgcfg->ad_unixgroup_attr == NULL) {
+		idmapdlog(LOG_ERR,
+		    "If config/ds_name_mapping_enabled property is set to "
+		    "true then atleast one of the following name mapping "
+		    "attributes must be specified. (config/ad_unixuser_attr OR "
+		    "config/ad_unixgroup_attr)");
+		return (-3);
+	}
 
-	if (!discover)
-		goto exit;
+	return (rc);
 
-	/*
-	 * Auto Discover the rest
-	 */
-	if (pgcfg->default_domain == NULL) {
+}
+
+/*
+ * This is the half of idmap_cfg_load() that auto-discovers values of
+ * discoverable properties that weren't already set via SMF properties.
+ *
+ * idmap_cfg_discover() is called *after* idmap_cfg_load_smf(), so it
+ * needs to be careful not to overwrite any properties set in SMF.
+ */
+static
+void
+idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
+{
+	ad_disc_t ad_ctx = handles->ad_ctx;
+
+	ad_disc_refresh(ad_ctx);
+
+	if (pgcfg->default_domain == NULL)
 		pgcfg->default_domain = ad_disc_get_DomainName(ad_ctx);
-		if (pgcfg->default_domain == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Default Domain");
-		}
-	}
 
-	if (pgcfg->domain_name == NULL) {
+	if (pgcfg->domain_name == NULL)
 		pgcfg->domain_name = ad_disc_get_DomainName(ad_ctx);
-		if (pgcfg->domain_name == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Domain Name");
-		}
-	}
 
-	if (pgcfg->domain_controller == NULL) {
+	if (pgcfg->domain_controller == NULL)
 		pgcfg->domain_controller =
 		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
-		if (pgcfg->domain_controller == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Domain Controller");
-		}
-	}
 
-	if (pgcfg->forest_name == NULL) {
+	if (pgcfg->forest_name == NULL)
 		pgcfg->forest_name = ad_disc_get_ForestName(ad_ctx);
-		if (pgcfg->forest_name == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Forest Name");
-		}
-	}
 
-	if (pgcfg->site_name == NULL) {
+	if (pgcfg->site_name == NULL)
 		pgcfg->site_name = ad_disc_get_SiteName(ad_ctx);
-		if (pgcfg->site_name == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Site Name");
-		}
-	}
 
-	if (pgcfg->global_catalog == NULL) {
+	if (pgcfg->global_catalog == NULL)
 		pgcfg->global_catalog =
 		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE);
-		if (pgcfg->global_catalog == NULL) {
-			idmapdlog(LOG_INFO,
-			    "unable to discover Global Catalog");
-		}
+
+	if (pgcfg->domain_name == NULL)
+		idmapdlog(LOG_DEBUG, "unable to discover Domain Name");
+	if (pgcfg->domain_controller == NULL)
+		idmapdlog(LOG_DEBUG, "unable to discover Domain Controller");
+	if (pgcfg->forest_name == NULL)
+		idmapdlog(LOG_DEBUG, "unable to discover Forest Name");
+	if (pgcfg->site_name == NULL)
+		idmapdlog(LOG_DEBUG, "unable to discover Site Name");
+	if (pgcfg->global_catalog == NULL)
+		idmapdlog(LOG_DEBUG, "unable to discover Global Catalog");
+}
+
+/*
+ * idmap_cfg_load() is called at startup, and periodically via the
+ * update thread when the auto-discovery TTLs expire, as well as part of
+ * the refresh method, to update the current configuration.  It always
+ * reads from SMF, but you still have to refresh the service after
+ * changing the config pg in order for the changes to take effect.
+ *
+ * There are two flags:
+ *
+ *  - CFG_DISCOVER
+ *  - CFG_LOG
+ *
+ * If CFG_DISCOVER is set then idmap_cfg_load() calls
+ * idmap_cfg_discover() to discover, via DNS and LDAP lookups, property
+ * values that weren't set in SMF.
+ *
+ * If CFG_LOG is set then idmap_cfg_load() will log (to LOG_NOTICE)
+ * whether the configuration changed.  This should be used only from the
+ * refresh method.
+ *
+ * Return values: 0 -> success, -1 -> failure, -2 -> hard failures
+ * reading from SMF.
+ */
+int
+idmap_cfg_load(idmap_cfg_t *cfg, int flags)
+{
+	int rc = 0;
+	int errors = 0;
+	int changed = 0;
+	idmap_pg_config_t new_pgcfg, *live_pgcfg;
+
+	live_pgcfg = &cfg->pgcfg;
+	(void) memset(&new_pgcfg, 0, sizeof (new_pgcfg));
+
+	pthread_mutex_lock(&cfg->handles.mutex);
+
+	if ((rc = idmap_cfg_load_smf(&cfg->handles, &new_pgcfg, &errors)) < -1)
+		goto err;
+
+	if (flags & CFG_DISCOVER)
+		idmap_cfg_discover(&cfg->handles, &new_pgcfg);
+
+	WRLOCK_CONFIG();
+	if (live_pgcfg->list_size_limit != new_pgcfg.list_size_limit) {
+		idmapdlog(LOG_INFO, "change list_size=%d",
+		    new_pgcfg.list_size_limit);
+		live_pgcfg->list_size_limit = new_pgcfg.list_size_limit;
 	}
 
-exit:
-	pthread_mutex_unlock(&handles->mutex);
+	/* Non-discoverable props updated here */
+	changed += update_value(&live_pgcfg->machine_sid,
+	    &new_pgcfg.machine_sid, "machine_sid");
+
+	changed += live_pgcfg->ds_name_mapping_enabled !=
+	    new_pgcfg.ds_name_mapping_enabled;
+	live_pgcfg->ds_name_mapping_enabled =
+	    new_pgcfg.ds_name_mapping_enabled;
+
+	changed += update_value(&live_pgcfg->ad_unixuser_attr,
+	    &new_pgcfg.ad_unixuser_attr, "ad_unixuser_attr");
+
+	changed += update_value(&live_pgcfg->ad_unixgroup_attr,
+	    &new_pgcfg.ad_unixgroup_attr, "ad_unixgroup_attr");
+
+	changed += update_value(&live_pgcfg->nldap_winname_attr,
+	    &new_pgcfg.nldap_winname_attr, "nldap_winname_attr");
+
+	/* Props that can be discovered and set in SMF updated here */
+	if (live_pgcfg->dflt_dom_set_in_smf == FALSE)
+		changed += update_value(&live_pgcfg->default_domain,
+		    &new_pgcfg.default_domain, "default_domain");
+
+	changed += update_value(&live_pgcfg->domain_name,
+	    &new_pgcfg.domain_name, "domain_name");
+
+	changed += update_dirs(&live_pgcfg->domain_controller,
+	    &new_pgcfg.domain_controller, "domain_controller");
+
+	changed += update_value(&live_pgcfg->forest_name,
+	    &new_pgcfg.forest_name, "forest_name");
+
+	changed += update_value(&live_pgcfg->site_name,
+	    &new_pgcfg.site_name, "site_name");
+
+	if (update_dirs(&live_pgcfg->global_catalog,
+	    &new_pgcfg.global_catalog, "global_catalog")) {
+		changed++;
+		/*
+		 * Right now we only update the ad_t used for AD lookups
+		 * when the GC list is updated.  When we add mixed
+		 * ds-based mapping we'll also need to update the ad_t
+		 * used to talk to the domain, not just the one used to
+		 * talk to the GC.
+		 */
+		if (live_pgcfg->global_catalog != NULL &&
+		    live_pgcfg->global_catalog[0].host[0] != '\0')
+			reload_ad();
+	}
+
+	idmap_cfg_unload(&new_pgcfg);
+
+	if (flags & CFG_LOG) {
+		/*
+		 * If the config changes as a result of a refresh of the
+		 * service, then logging about it can provide useful
+		 * feedback to the sysadmin.
+		 */
+		idmapdlog(LOG_NOTICE, "Configuration %schanged",
+		    changed ? "" : "un");
+	}
+
+	UNLOCK_CONFIG();
+
+err:
+	pthread_mutex_unlock(&cfg->handles.mutex);
 
 	if (rc < -1)
 		return (rc);
@@ -1216,12 +1198,14 @@ idmap_cfg_fini(idmap_cfg_t *cfg)
 void
 idmap_cfg_poke_updates(void)
 {
-	(void) port_send(idmapd_ev_port, POKE_AUTO_DISCOVERY, NULL);
+	if (idmapd_ev_port != -1)
+		(void) port_send(idmapd_ev_port, POKE_AUTO_DISCOVERY, NULL);
 }
 
 /*ARGSUSED*/
 void
-idmap_cfg_hup_handler(int sig) {
+idmap_cfg_hup_handler(int sig)
+{
 	if (idmapd_ev_port >= 0)
 		(void) port_send(idmapd_ev_port, RECONFIGURE, NULL);
 }

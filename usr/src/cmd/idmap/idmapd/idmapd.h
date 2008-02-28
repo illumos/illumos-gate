@@ -223,9 +223,9 @@ extern void	fini_mapping_system();
 extern void	print_idmapdstate();
 extern int	create_directory(const char *, uid_t, gid_t);
 extern int	load_config();
-extern int	reload_ad();
+extern void	reload_ad();
 extern int	idmap_init_tsd_key(void);
-extern void	degrade_svc(const char *);
+extern void	degrade_svc(int, const char *);
 extern void	restore_svc(void);
 
 

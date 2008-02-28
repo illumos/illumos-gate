@@ -380,13 +380,6 @@ idmap_ad_alloc(ad_t **new_ad, const char *default_domain,
 	ad->ref = 1;
 	ad->partition = part;
 
-	/*
-	 * If default_domain is NULL, deal, deferring errors until
-	 * idmap_lookup_batch_start() -- this makes it easier on the
-	 * caller, who can simply observe lookups failing as opposed to
-	 * having to conditionalize calls to lookups according to
-	 * whether it has a non-NULL ad_t *.
-	 */
 	if (default_domain == NULL)
 		default_domain = "";
 
@@ -1000,8 +993,7 @@ idmap_lookup_batch_start(ad_t *ad, int nqueries, idmap_query_state_t **state)
 
 	*state = NULL;
 
-	/* Note: ad->dflt_w2k_dom cannot be NULL - see idmap_ad_alloc() */
-	if (ad == NULL || *ad->dflt_w2k_dom == '\0')
+	if (ad == NULL)
 		return (IDMAP_ERR_INTERNAL);
 
 	adh = idmap_get_conn(ad);
@@ -1747,9 +1739,13 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 			}
 			*strchr(ecanonname, '@') = '\0';
 		} else {
-			/* 'name' not qualified and dname not given */
-			if (state->qadh->owner->dflt_w2k_dom == NULL ||
-			    *state->qadh->owner->dflt_w2k_dom == '\0') {
+			/*
+			 * 'name' not qualified and dname not given
+			 *
+			 * Note: ad->dflt_w2k_dom cannot be NULL - see
+			 * idmap_ad_alloc()
+			 */
+			if (*state->qadh->owner->dflt_w2k_dom == '\0') {
 				free(ecanonname);
 				return (IDMAP_ERR_DOMAIN);
 			}
