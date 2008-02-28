@@ -65,6 +65,7 @@
 #include <sys/efi_partition.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/kstat.h>
 #include <sys/mach_descrip.h>
 #include <sys/modctl.h>
 #include <sys/mdeg.h>
@@ -129,6 +130,9 @@ static int	vdc_create_device_nodes(vdc_t *vdc);
 static int	vdc_create_device_nodes_efi(vdc_t *vdc);
 static int	vdc_create_device_nodes_vtoc(vdc_t *vdc);
 static int	vdc_create_device_nodes_props(vdc_t *vdc);
+static void	vdc_create_io_kstats(vdc_t *vdc);
+static void	vdc_create_err_kstats(vdc_t *vdc);
+static void	vdc_set_err_kstats(vdc_t *vdc);
 static int	vdc_get_md_node(dev_info_t *dip, md_t **mdpp,
 		    mde_cookie_t *vd_nodep, mde_cookie_t *vd_portp);
 static int	vdc_get_ldc_id(md_t *, mde_cookie_t, uint64_t *);
@@ -512,6 +516,16 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_remove_minor_node(dip, NULL);
 	}
 
+	if (vdc->io_stats) {
+		kstat_delete(vdc->io_stats);
+		vdc->io_stats = NULL;
+	}
+
+	if (vdc->err_stats) {
+		kstat_delete(vdc->err_stats);
+		vdc->err_stats = NULL;
+	}
+
 	if (vdc->initialized & VDC_LOCKS) {
 		mutex_destroy(&vdc->lock);
 		mutex_destroy(&vdc->read_lock);
@@ -670,6 +684,10 @@ vdc_do_attach(dev_info_t *dip)
 
 	vdc->initialized |= VDC_THREAD;
 
+	/* Create the kstats for saving the I/O statistics used by iostat(1M) */
+	vdc_create_io_kstats(vdc);
+	vdc_create_err_kstats(vdc);
+
 	atomic_inc_32(&vdc_instance_count);
 
 	/*
@@ -710,6 +728,12 @@ vdc_do_attach(dev_info_t *dip)
 	if (vdc_setup_devid(vdc)) {
 		DMSG(vdc, 0, "[%d] No device id available\n", instance);
 	}
+
+	/*
+	 * Fill in the fields of the error statistics kstat that were not
+	 * available when creating the kstat
+	 */
+	vdc_set_err_kstats(vdc);
 
 	ddi_report_dev(dip);
 	vdc->lifecycle	= VDC_LC_ONLINE;
@@ -843,6 +867,92 @@ vdc_stop_ldc_connection(vdc_t *vdcp)
 	DMSG(vdcp, 0, "initialized=%x\n", vdcp->initialized);
 
 	return (status);
+}
+
+static void
+vdc_create_io_kstats(vdc_t *vdc)
+{
+	if (vdc->io_stats != NULL) {
+		DMSG(vdc, 0, "[%d] I/O kstat already exists\n", vdc->instance);
+		return;
+	}
+
+	vdc->io_stats = kstat_create(VDC_DRIVER_NAME, vdc->instance, NULL,
+	    "disk", KSTAT_TYPE_IO, 1, KSTAT_FLAG_PERSISTENT);
+	if (vdc->io_stats != NULL) {
+		vdc->io_stats->ks_lock = &vdc->lock;
+		kstat_install(vdc->io_stats);
+	} else {
+		cmn_err(CE_NOTE, "[%d] Failed to create kstat: I/O statistics"
+		    " will not be gathered", vdc->instance);
+	}
+}
+
+static void
+vdc_create_err_kstats(vdc_t *vdc)
+{
+	vd_err_stats_t	*stp;
+	char	kstatmodule_err[KSTAT_STRLEN];
+	char	kstatname[KSTAT_STRLEN];
+	int	ndata = (sizeof (vd_err_stats_t) / sizeof (kstat_named_t));
+	int	instance = vdc->instance;
+
+	if (vdc->err_stats != NULL) {
+		DMSG(vdc, 0, "[%d] ERR kstat already exists\n", vdc->instance);
+		return;
+	}
+
+	(void) snprintf(kstatmodule_err, sizeof (kstatmodule_err),
+	    "%serr", VDC_DRIVER_NAME);
+	(void) snprintf(kstatname, sizeof (kstatname),
+	    "%s%d,err", VDC_DRIVER_NAME, instance);
+
+	vdc->err_stats = kstat_create(kstatmodule_err, instance, kstatname,
+	    "device_error", KSTAT_TYPE_NAMED, ndata, KSTAT_FLAG_PERSISTENT);
+
+	if (vdc->err_stats == NULL) {
+		cmn_err(CE_NOTE, "[%d] Failed to create kstat: Error statistics"
+		    " will not be gathered", instance);
+		return;
+	}
+
+	stp = (vd_err_stats_t *)vdc->err_stats->ks_data;
+	kstat_named_init(&stp->vd_softerrs,	"Soft Errors",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&stp->vd_transerrs,	"Transport Errors",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&stp->vd_protoerrs,	"Protocol Errors",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&stp->vd_vid,		"Vendor",
+	    KSTAT_DATA_CHAR);
+	kstat_named_init(&stp->vd_pid,		"Product",
+	    KSTAT_DATA_CHAR);
+	kstat_named_init(&stp->vd_capacity,	"Size",
+	    KSTAT_DATA_ULONGLONG);
+
+	vdc->err_stats->ks_update  = nulldev;
+
+	kstat_install(vdc->err_stats);
+}
+
+static void
+vdc_set_err_kstats(vdc_t *vdc)
+{
+	vd_err_stats_t  *stp;
+
+	if (vdc->err_stats == NULL)
+		return;
+
+	mutex_enter(&vdc->lock);
+
+	stp = (vd_err_stats_t *)vdc->err_stats->ks_data;
+	ASSERT(stp != NULL);
+
+	stp->vd_capacity.value.ui64 = vdc->vdisk_size * vdc->block_size;
+	(void) strcpy(stp->vd_vid.value.c, "SUN");
+	(void) strcpy(stp->vd_pid.value.c, "VDSK");
+
+	mutex_exit(&vdc->lock);
 }
 
 static int
@@ -1376,7 +1486,6 @@ vdc_strategy(struct buf *buf)
 	DMSG(vdc, 2, "[%d] %s %ld bytes at block %llx : b_addr=0x%p\n",
 	    instance, (buf->b_flags & B_READ) ? "Read" : "Write",
 	    buf->b_bcount, buf->b_lblkno, (void *)buf->b_un.b_addr);
-	DTRACE_IO2(vstart, buf_t *, buf, vdc_t *, vdc);
 
 	bp_mapin(buf);
 
@@ -1395,7 +1504,7 @@ vdc_strategy(struct buf *buf)
 	/*
 	 * If the request was successfully sent, the strategy call returns and
 	 * the ACK handler calls the bioxxx functions when the vDisk server is
-	 * done.
+	 * done otherwise we handle the error here.
 	 */
 	if (rv) {
 		DMSG(vdc, 0, "Failed to read/write (err=%d)\n", rv);
@@ -2682,24 +2791,42 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
     size_t nbytes, int slice, diskaddr_t offset, int cb_type,
     void *cb_arg, vio_desc_direction_t dir)
 {
+	int	rv = 0;
+
 	ASSERT(vdcp != NULL);
 	ASSERT(slice == VD_SLICE_NONE || slice < V_NUMPAR);
 
 	mutex_enter(&vdcp->lock);
+
+	/*
+	 * If this is a block read/write operation we update the I/O statistics
+	 * to indicate that the request is being put on the waitq to be
+	 * serviced.
+	 *
+	 * We do it here (a common routine for both synchronous and strategy
+	 * calls) for performance reasons - we are already holding vdc->lock
+	 * so there is no extra locking overhead. We would have to explicitly
+	 * grab the 'lock' mutex to update the stats if we were to do this
+	 * higher up the stack in vdc_strategy() et. al.
+	 */
+	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
+		DTRACE_IO1(start, buf_t *, cb_arg);
+		VD_KSTAT_WAITQ_ENTER(vdcp->io_stats);
+	}
 
 	do {
 		while (vdcp->state != VDC_STATE_RUNNING) {
 
 			/* return error if detaching */
 			if (vdcp->state == VDC_STATE_DETACH) {
-				mutex_exit(&vdcp->lock);
-				return (ENXIO);
+				rv = ENXIO;
+				goto done;
 			}
 
 			/* fail request if connection timeout is reached */
 			if (vdcp->ctimeout_reached) {
-				mutex_exit(&vdcp->lock);
-				return (EIO);
+				rv = EIO;
+				goto done;
 			}
 
 			/*
@@ -2708,8 +2835,8 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 			 * the handshake now.
 			 */
 			if (ddi_in_panic()) {
-				mutex_exit(&vdcp->lock);
-				return (EIO);
+				rv = EIO;
+				goto done;
 			}
 
 			cv_wait(&vdcp->running_cv, &vdcp->lock);
@@ -2718,8 +2845,28 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 	} while (vdc_populate_descriptor(vdcp, operation, addr,
 	    nbytes, slice, offset, cb_type, cb_arg, dir));
 
+done:
+	/*
+	 * If this is a block read/write we update the I/O statistics kstat
+	 * to indicate that this request has been placed on the queue for
+	 * processing (i.e sent to the vDisk server) - iostat(1M) will
+	 * report the time waiting for the vDisk server under the %b column
+	 * In the case of an error we simply take it off the wait queue.
+	 */
+	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
+		if (rv == 0) {
+			VD_KSTAT_WAITQ_TO_RUNQ(vdcp->io_stats);
+			DTRACE_PROBE1(send, buf_t *, cb_arg);
+		} else {
+			VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
+			VD_KSTAT_WAITQ_EXIT(vdcp->io_stats);
+			DTRACE_IO1(done, buf_t *, cb_arg);
+		}
+	}
+
 	mutex_exit(&vdcp->lock);
-	return (0);
+
+	return (rv);
 }
 
 
@@ -2828,8 +2975,8 @@ loop:
 	dmsg.end_idx = idx;
 	vdcp->seq_num++;
 
-	DTRACE_IO2(send, vio_dring_msg_t *, &dmsg, vdc_t *, vdcp);
-
+	DTRACE_PROBE2(populate, int, vdcp->instance,
+	    vdc_local_desc_t *, local_dep);
 	DMSG(vdcp, 2, "ident=0x%lx, st=%u, end=%u, seq=%ld\n",
 	    vdcp->dring_ident, dmsg.start_idx, dmsg.end_idx, dmsg.seq_num);
 
@@ -3001,6 +3148,9 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
  * 	handled differently because interrupts are disabled and vdc
  * 	will not get messages. We have to poll for the messages instead.
  *
+ *	Note: since we don't have a buf_t available we cannot implement
+ *	the io:::done DTrace probe in this specific case.
+ *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
  *
@@ -3081,6 +3231,7 @@ vdc_drain_response(vdc_t *vdc)
 
 		DMSG(vdc, 1, "[%d] Depopulating idx=%d state=%d\n",
 		    vdc->instance, idx, ldep->dep->hdr.dstate);
+
 		rv = vdc_depopulate_descriptor(vdc, idx);
 		if (rv) {
 			DMSG(vdc, 0,
@@ -3127,7 +3278,9 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	ASSERT(ldep != NULL);
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
+	DTRACE_PROBE2(depopulate, int, vdc->instance, vdc_local_desc_t *, ldep);
 	DMSG(vdc, 2, ": idx = %d\n", idx);
+
 	dep = ldep->dep;
 	ASSERT(dep != NULL);
 	ASSERT((dep->hdr.dstate == VIO_DESC_DONE) ||
@@ -3637,6 +3790,9 @@ vdc_cancel_backup_ring(vdc_t *vdcp)
 				bufp = ldep->cb_arg;
 				ASSERT(bufp != NULL);
 				bufp->b_resid = bufp->b_bcount;
+				VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
+				VD_KSTAT_RUNQ_EXIT(vdcp->io_stats);
+				DTRACE_IO1(done, buf_t *, bufp);
 				bioerror(bufp, EIO);
 				biodone(bufp);
 				break;
@@ -3660,7 +3816,7 @@ vdc_cancel_backup_ring(vdc_t *vdcp)
 
 	vdcp->local_dring_backup = NULL;
 
-	DTRACE_IO2(processed, int, count, vdc_t *, vdcp);
+	DTRACE_PROBE2(processed, int, count, vdc_t *, vdcp);
 }
 
 /*
@@ -4147,6 +4303,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	    (end >= vdcp->dring_len) || (end < -1)) {
 		DMSG(vdcp, 0, "[%d] Bogus ACK data : start %d, end %d\n",
 		    vdcp->instance, start, end);
+		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 		mutex_exit(&vdcp->lock);
 		return (EINVAL);
 	}
@@ -4161,23 +4318,25 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 		mutex_exit(&vdcp->lock);
 		return (0);
 	case VDC_SEQ_NUM_INVALID:
-		mutex_exit(&vdcp->lock);
 		DMSG(vdcp, 0, "[%d] invalid seqno\n", vdcp->instance);
+		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
+		mutex_exit(&vdcp->lock);
 		return (ENXIO);
 	}
 
 	if (msg->tag.vio_subtype == VIO_SUBTYPE_NACK) {
 		DMSG(vdcp, 0, "[%d] DATA NACK\n", vdcp->instance);
 		VDC_DUMP_DRING_MSG(dring_msg);
+		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 		mutex_exit(&vdcp->lock);
 		return (EIO);
 
 	} else if (msg->tag.vio_subtype == VIO_SUBTYPE_INFO) {
+		VD_UPDATE_ERR_STATS(vdcp, vd_protoerrs);
 		mutex_exit(&vdcp->lock);
 		return (EPROTO);
 	}
 
-	DTRACE_IO2(recv, vio_dring_msg_t, dring_msg, vdc_t *, vdcp);
 	DMSG(vdcp, 1, ": start %d end %d\n", start, end);
 	ASSERT(start == end);
 
@@ -4207,6 +4366,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 			status = ldep->dep->payload.status; /* Future:ntoh */
 			if (status != 0) {
 				DMSG(vdcp, 1, "strategy status=%d\n", status);
+				VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 				bioerror(bufp, status);
 			}
 
@@ -4224,6 +4384,14 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 				 */
 				(void) vdc_failfast_io_queue(vdcp, bufp);
 			} else {
+				if (status == 0) {
+					int op = (bufp->b_flags & B_READ) ?
+					    VD_OP_BREAD : VD_OP_BWRITE;
+					VD_UPDATE_IO_STATS(vdcp, op,
+					    ldep->dep->payload.nbytes);
+				}
+				VD_KSTAT_RUNQ_EXIT(vdcp->io_stats);
+				DTRACE_IO1(done, buf_t *, bufp);
 				biodone(bufp);
 			}
 			break;
@@ -4237,7 +4405,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	mutex_exit(&vdcp->lock);
 
 	/* probe gives the count of how many entries were processed */
-	DTRACE_IO2(processed, int, 1, vdc_t *, vdcp);
+	DTRACE_PROBE2(processed, int, 1, vdc_t *, vdcp);
 
 	return (0);
 }
@@ -5827,6 +5995,8 @@ vdc_failfast_io_unqueue(vdc_t *vdc, clock_t deadline)
 	while (vio != NULL) {
 		vio_tmp = vio->vio_next;
 		if (vio->vio_buf != NULL) {
+			VD_KSTAT_RUNQ_EXIT(vdc->io_stats);
+			DTRACE_IO1(done, buf_t *, vio->vio_buf);
 			biodone(vio->vio_buf);
 			kmem_free(vio, sizeof (vdc_io_t));
 		} else {

@@ -523,6 +523,88 @@ typedef	struct vd_efi_dev {
 int vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **gpt, efi_gpe_t **gpe);
 void vd_efi_free(vd_efi_dev_t *dev, efi_gpt_t *gpt, efi_gpe_t *gpe);
 
+/*
+ * Macros to update the I/O statistics kstat consumed by iostat(1m).
+ */
+
+/*
+ * Given a pointer to the instance private data of a vDisk driver (vd),
+ * the type of operation and the number of bytes read/written, this macro
+ * updates the I/O statistics in the kstat.
+ */
+#define	VD_UPDATE_IO_STATS(vd, op, len)					\
+	{								\
+		ASSERT((vd) != NULL);					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		ASSERT(((op) == VD_OP_BREAD) || ((op) == VD_OP_BWRITE));\
+		if ((vd)->io_stats != NULL) { 				\
+			kstat_io_t *kip = KSTAT_IO_PTR((vd)->io_stats);	\
+			if ((op) == VD_OP_BREAD) {			\
+				kip->reads++;				\
+				kip->nread += (len);			\
+			} else {					\
+				kip->writes++;				\
+				kip->nwritten += (len);			\
+			}						\
+		}							\
+	}
+
+/*
+ * These wrapper macros take a pointer to the I/O statistics kstat and
+ * update the queue length statistics. These are 'safe' wrappers which
+ * check to see if the kstat was created when the vDisk instance was
+ * added (i.e. is not NULL).
+ */
+#define	VD_KSTAT_WAITQ_ENTER(kp)					\
+	if ((kp) != NULL) {						\
+		kstat_waitq_enter(KSTAT_IO_PTR((kp)));			\
+	}
+
+#define	VD_KSTAT_WAITQ_EXIT(kp)						\
+	if ((kp) != NULL) {						\
+		kstat_waitq_exit(KSTAT_IO_PTR((kp)));			\
+	}
+
+#define	VD_KSTAT_WAITQ_TO_RUNQ(kp)					\
+	if ((kp) != NULL) {						\
+		kstat_waitq_to_runq(KSTAT_IO_PTR((kp)));		\
+	}
+
+#define	VD_KSTAT_RUNQ_ENTER(kp)						\
+	if ((kp) != NULL) {						\
+		kstat_runq_enter(KSTAT_IO_PTR((kp)));			\
+	}
+
+#define	VD_KSTAT_RUNQ_EXIT(kp)						\
+	if ((kp) != NULL) {						\
+		kstat_runq_exit(KSTAT_IO_PTR((kp)));			\
+	}
+
+/*
+ * Given a pointer to the instance private data of a vDisk driver (vd) and
+ * the name of the error stats entry we wish to update, increment that value
+ */
+#define	VD_UPDATE_ERR_STATS(vd, stat_entry)				\
+{									\
+	ASSERT((vd) != NULL);						\
+	ASSERT(MUTEX_HELD(&(vd)->lock));				\
+	if ((vd)->err_stats != NULL) {					\
+		vd_err_stats_t	*stp;					\
+		stp = (vd_err_stats_t *)(vd)->err_stats->ks_data;	\
+		stp->stat_entry.value.ui32++;				\
+	}								\
+}
+
+/* Structure to record vDisk error statistics */
+typedef struct vd_err_stats {
+	struct kstat_named	vd_softerrs;	/* Softerrs */
+	struct kstat_named	vd_transerrs;	/* Transport errs */
+	struct kstat_named	vd_protoerrs;	/* VIO Protocol errs */
+	struct kstat_named	vd_vid;		/* Vendor ID */
+	struct kstat_named	vd_pid;		/* Product ID */
+	struct kstat_named	vd_capacity;	/* Capacity of the disk */
+} vd_err_stats_t;
+
 
 #ifdef	__cplusplus
 }

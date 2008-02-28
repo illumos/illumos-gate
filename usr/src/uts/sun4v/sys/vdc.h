@@ -320,6 +320,13 @@ typedef struct vdc {
 	kcondvar_t	failfast_io_cv;		/* cv wait for I/O to finish */
 	vdc_io_t	*failfast_io_queue;	/* failfast io queue */
 
+	/*
+	 * kstats used to store I/O statistics consumed by iostat(1M).
+	 * These are protected by the lock mutex.
+	 */
+	kstat_t		*io_stats;
+	kstat_t		*err_stats;
+
 	ldc_mem_info_t		dring_mem_info;		/* dring information */
 	uint_t			dring_curr_idx;		/* current index */
 	uint32_t		dring_len;		/* dring length */
