@@ -610,6 +610,7 @@ struct rt_map {
 	Xword		rt_sfcap;	/* software capabilities */
 	thread_t	rt_threadid;	/* thread init/fini synchronization */
 	uint_t		rt_cntl;	/* link-map control list we belong to */
+	uint_t		rt_flags2;	/* state flags2, see FL2 below */
 };
 
 
@@ -684,6 +685,7 @@ typedef struct rt_map32 {
 	uint32_t	rt_sfcap;
 	uint32_t	rt_threadid;
 	uint32_t	rt_cntl;
+	uint32_t	rt_flags2;
 } Rt_map32;
 
 #endif	/* _SYSCALL32 */
@@ -766,6 +768,7 @@ typedef struct rt_map32 {
 #define	FL1_AUD_RS_STR	0x00100000	/* RESERVATION start for AU flags */
 #define	FL1_AUD_RS_END	0x80000000	/* RESERVATION end for AU flags */
 
+#define	FL2_RT_DTFLAGS	0x00000001	/* DT_FLAGS element exists */
 
 /*
  * Flags for the tls_modactivity() routine
@@ -792,6 +795,7 @@ typedef struct rt_map32 {
 #define	MSIZE(X)	((X)->rt_msize)
 #define	FLAGS(X)	((X)->rt_flags)
 #define	FLAGS1(X)	((X)->rt_flags1)
+#define	FLAGS2(X)	((X)->rt_flags2)
 #define	TLSMODID(X)	((X)->rt_tlsmodid)
 
 #define	ALIAS(X)	((X)->rt_alias)

@@ -2340,6 +2340,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				}
 				break;
 			case DT_FLAGS:
+				FLAGS2(lmp) |= FL2_RT_DTFLAGS;
 				if (ld->d_un.d_val & DF_SYMBOLIC)
 					FLAGS1(lmp) |= FL1_RT_SYMBOLIC;
 				if (ld->d_un.d_val & DF_TEXTREL)

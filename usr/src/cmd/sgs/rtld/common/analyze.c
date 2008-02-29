@@ -47,7 +47,7 @@
 #include	"_elf.h"
 #include	"msg.h"
 
-static Fct *	vector[] = {
+static Fct	*vector[] = {
 	&elf_fct,
 #ifdef A_OUT
 	&aout_fct,
@@ -337,7 +337,7 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 		DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
 		for (APLIST_TRAVERSE(COPY_S(nlmp), idx1, lmp)) {
-			Rel_copy *	rcp;
+			Rel_copy	*rcp;
 			Aliste		idx2;
 
 			for (ALIST_TRAVERSE(COPY_R(lmp), idx2, rcp)) {
@@ -715,7 +715,7 @@ _is_so_matched(const char *name, const char *str, int path)
  *
  *  .	a NAME() - typically the full pathname of an object that has been
  *	loaded.  For example, when looking for the dependency "libc.so.1", a
- * 	search path is applied, with the eventual NAME() being "/lib/ld.so.1".
+ *	search path is applied, with the eventual NAME() being "/lib/ld.so.1".
  *	The name of the executable is typically a simple filename, such as
  *	"main", as this is the name passed to exec() to start the process.
  *
@@ -1072,8 +1072,8 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 	 * object is already loaded as an auditor.
 	 */
 	if (flags & FLG_RT_AUDIT) {
-		Lm_list *	lml;
-		Listnode *	lnp;
+		Lm_list		*lml;
+		Listnode	*lnp;
 
 		for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
 			Rt_map	*nlmp = lml->lm_head;
@@ -1468,7 +1468,7 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
     Fdesc *fdesc, Rej_desc *rej, Pnode *dir, Word * strhash, size_t olen)
 {
 	static Rtc_obj	Obj = { 0 };
-	Rtc_obj *	dobj;
+	Rtc_obj		*dobj;
 	const char	*nname = oname;
 
 	if (dir->p_name == 0)
@@ -2162,7 +2162,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			 * processed.
 			 */
 			for (APLIST_TRAVERSE(DEPENDS(dlmp1), idx2, bdp)) {
-				Rt_map *	dlmp2 = bdp->b_depend;
+				Rt_map	*dlmp2 = bdp->b_depend;
 
 				if ((bdp->b_flags & BND_NEEDED) == 0)
 					continue;
@@ -2436,7 +2436,7 @@ is_sym_interposer(Rt_map *lmp, Sym *sym)
  */
 static Sym *
 lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
-    Sym *sym)
+    Sym *osym)
 {
 	Rt_map		*lmp;
 	Slookup		sl;
@@ -2451,13 +2451,56 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 		Aliste		idx;
 
 		for (ALIST_TRAVERSE(COPY_R(*dlmp), idx, rcp)) {
-			if ((sym == rcp->r_dsym) || (sym->st_value &&
-			    (sym->st_value == rcp->r_dsym->st_value))) {
+			if ((osym == rcp->r_dsym) || (osym->st_value &&
+			    (osym->st_value == rcp->r_dsym->st_value))) {
 				*dlmp = rcp->r_rlmp;
 				*binfo |=
 				    (DBG_BINFO_INTERPOSE | DBG_BINFO_COPYREF);
 				return (rcp->r_rsym);
 			}
+		}
+	}
+
+	/*
+	 * Prior to Solaris 8, external references from an executable that were
+	 * bound to an uninitialized variable (.bss) within a shared object did
+	 * not establish a copy relocation.  This was thought to be an
+	 * optimization, to prevent copying zero's to zero's.  Typically,
+	 * interposition took its course, with the shared object binding to the
+	 * executables data definition.
+	 *
+	 * This scenario can be broken when this old executable runs against a
+	 * new shared object that is directly bound.  With no copy-relocation
+	 * record, ld.so.1 has no data to trigger the normal vectoring of the
+	 * binding to the executable.
+	 *
+	 * Starting with Solaris 8, a DT_FLAGS entry is written to all objects,
+	 * regardless of there being any DF_ flags entries.  Therefore, an
+	 * object without this dynamic tag is susceptible to the copy relocation
+	 * issue.  If the executable has no DT_FLAGS tag, and contains the same
+	 * .bss symbol definition as has been directly bound to, redirect the
+	 * binding to the executables data definition.
+	 */
+	lmp = lml->lm_head;
+	sl = *slp;
+	sl.sl_imap = lmp;
+	if (((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0) &&
+	    copy_zerobits(*dlmp, osym)) {
+		Rt_map	*ilmp;
+		Sym	*isym;
+
+		/*
+		 * Determine whether the same symbol name exists within the
+		 * executable, that the size and type of symbol are the same,
+		 * and that the symbol is also associated with .bss.
+		 */
+		if (((isym = SYMINTP(lmp)(&sl, &ilmp, binfo)) != NULL) &&
+		    (isym->st_size == osym->st_size) &&
+		    (isym->st_info == osym->st_info) &&
+		    copy_zerobits(lmp, isym)) {
+			*dlmp = lmp;
+			*binfo |= (DBG_BINFO_INTERPOSE | DBG_BINFO_COPYREF);
+			return (isym);
 		}
 	}
 
@@ -2467,17 +2510,14 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 	/*
 	 * Traverse the list of known interposers to determine whether any
 	 * offer the same symbol.  Note, the head of the link-map could be
-	 * identified as an interposer.  If it is, make sure we only look for
-	 * symbol definitions.  Otherwise, skip the head of the link-map, so
-	 * that we don't bind to any .plt references, or copy-relocations
-	 * unintentionally.
+	 * identified as an interposer.  Otherwise, skip the head of the
+	 * link-map, so that we don't bind to any .plt references, or
+	 * copy-relocation destinations unintentionally.
 	 */
 	lmp = lml->lm_head;
 	sl = *slp;
 	if (((FLAGS(lmp) & MSK_RT_INTPOSE) == 0) || (sl.sl_flags & LKUP_COPY))
 		lmp = (Rt_map *)NEXT(lmp);
-	else
-		sl.sl_flags &= ~LKUP_SPEC;
 
 	for (; lmp; lmp = (Rt_map *)NEXT(lmp)) {
 		if (FLAGS(lmp) & FLG_RT_DELETE)
@@ -2487,16 +2527,17 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 
 		if (callable(lmp, *dlmp, 0, sl.sl_flags)) {
 			Rt_map	*ilmp;
+			Sym	*isym;
 
 			sl.sl_imap = lmp;
-			if (sym = SYMINTP(lmp)(&sl, &ilmp, binfo)) {
+			if (isym = SYMINTP(lmp)(&sl, &ilmp, binfo)) {
 				/*
 				 * If this object provides individual symbol
 				 * interposers, make sure that the symbol we
 				 * have found is tagged as an interposer.
 				 */
 				if ((FLAGS(ilmp) & FLG_RT_SYMINTPO) &&
-				    (is_sym_interposer(ilmp, sym) == 0))
+				    (is_sym_interposer(ilmp, isym) == 0))
 					continue;
 
 				/*
@@ -2505,7 +2546,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 				 */
 				*binfo |= DBG_BINFO_INTERPOSE;
 				*dlmp = ilmp;
-				return (sym);
+				return (isym);
 			}
 		}
 	}
@@ -2568,7 +2609,7 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 		 */
 		for (APLIST_TRAVERSE(CALLERS(clmp), idx1, bdp)) {
 			sl.sl_imap = lmp = bdp->b_caller;
-			if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo)) != 0)
+			if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo)) != NULL)
 				goto found;
 		}
 
@@ -2587,7 +2628,8 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 				if ((gdp->gd_flags & GPD_PARENT) == 0)
 					continue;
 				sl.sl_imap = lmp = gdp->gd_depend;
-				if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo)) != 0)
+				if ((sym = SYMINTP(lmp)(&sl, dlmp,
+				    binfo)) != NULL)
 					goto found;
 			}
 		}
@@ -2614,7 +2656,7 @@ found:
 	 */
 	if (sym && (LIST(*dlmp)->lm_head != *dlmp) &&
 	    (LIST(*dlmp) == LIST(clmp))) {
-		Sym *	isym;
+		Sym	*isym;
 
 		if ((isym = lookup_sym_interpose(slp, dlmp, binfo,
 		    LIST(*dlmp), sym)) != 0)
@@ -2644,7 +2686,7 @@ core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 			Sym	*sym;
 
 			slp->sl_imap = lmp;
-			if (((sym = SYMINTP(lmp)(slp, dlmp, binfo)) != 0) ||
+			if (((sym = SYMINTP(lmp)(slp, dlmp, binfo)) != NULL) ||
 			    (*binfo & BINFO_REJSINGLE))
 				return (sym);
 		}
@@ -2697,7 +2739,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * the object (hence rsymndx is set).
 	 */
 	if (((rsymndx = slp->sl_rsymndx) != 0) &&
-	    ((sip = SYMINFO(clmp)) != 0)) {
+	    ((sip = SYMINFO(clmp)) != NULL)) {
 		/*
 		 * Find the corresponding Syminfo entry for the original
 		 * referencing symbol.
@@ -2946,7 +2988,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * the group.
 	 */
 	if (sym && ((MODE(clmp) & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP)) {
-		Sym *	isym;
+		Sym	*isym;
 
 		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, LIST(*dlmp),
 		    sym)) != 0)

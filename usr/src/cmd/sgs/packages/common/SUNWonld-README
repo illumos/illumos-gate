@@ -1312,3 +1312,7 @@ Bugid   Risk Synopsis
 6658385 ld core dumps when building Xorg on nv_82
 6516808 ld.so.1's token expansion provides no escape for platforms that don't
 	report HWCAP
+6668534 Direct bindings can compromise function address comparisons from
+	executables
+6667661 Direct bindings can compromise executables with insufficient copy
+	relocation information
