@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@ typedef struct mem_vtop32 {
 #define	MEM_SID			(('M' << 8) | 0x0B)
 #define	MEM_PAGE_FMRI_RETIRE	(('M' << 8) | 0x0C)
 #define	MEM_PAGE_FMRI_ISRETIRED	(('M' << 8) | 0x0D)
+#define	MEM_PAGE_FMRI_UNRETIRE	(('M' << 8) | 0x0E)
 
 /*
  * Bits returned from MEM_PAGE_GETERRORS ioctl for use by fmd(1M).

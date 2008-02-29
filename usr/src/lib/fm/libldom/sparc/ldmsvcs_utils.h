@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,10 @@ extern int ldmsvcs_mem_req_status(struct ldom_hdl *lhp, uint64_t pa);
 extern int ldmsvcs_cpu_req_offline(struct ldom_hdl *lhp, uint32_t cpuid);
 
 extern int ldmsvcs_mem_req_retire(struct ldom_hdl *lhp, uint64_t pa);
+
+extern int ldmsvcs_cpu_req_online(struct ldom_hdl *lhp, uint32_t cpuid);
+
+extern int ldmsvcs_mem_req_unretire(struct ldom_hdl *lhp, uint64_t pa);
 
 #ifdef	__cplusplus
 }

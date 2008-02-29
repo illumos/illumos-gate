@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,7 +256,7 @@ ldom_getinfo(struct ldom_hdl *lhp)
 
 	/*
 	 * set defaults which correspond to the case of "LDOMS not
-	 * available".  note that these can (and will) also apply to
+	 * available".	note that these can (and will) also apply to
 	 * non-sun4v machines.
 	 */
 	major_version = 0;
@@ -389,8 +389,9 @@ os_mem_page_retire(ldom_hdl_t *lhp, int cmd, nvlist_t *nvl)
 	int fd, rc, err;
 
 	if (cmd != MEM_PAGE_RETIRE && cmd != MEM_PAGE_FMRI_RETIRE &&
-	    cmd != MEM_PAGE_ISRETIRED && cmd != MEM_PAGE_FMRI_ISRETIRED)
-			return (EINVAL);
+	    cmd != MEM_PAGE_ISRETIRED && cmd != MEM_PAGE_FMRI_ISRETIRED &&
+	    cmd != MEM_PAGE_UNRETIRE && cmd != MEM_PAGE_FMRI_UNRETIRE)
+		return (EINVAL);
 
 	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
 		return (EINVAL);
@@ -533,12 +534,61 @@ ldom_fmri_retire(ldom_hdl_t *lhp, nvlist_t *nvl)
 	}
 }
 
-
-/*
- * blacklist cpus in a non-LDOMS environment
- */
 int
-ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
+ldom_fmri_unretire(ldom_hdl_t *lhp, nvlist_t *nvl)
+{
+	char *name;
+	int ret = ENOTSUP;
+
+	if (nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &name) != 0)
+		return (EINVAL);
+
+	/*
+	 * ldom_ldmd_is_up can only be true if ldom_major_version()
+	 * returned 1 earlier; the major version is constant for the
+	 * life of the client process
+	 */
+
+	if (!ldom_ldmd_is_up) {
+		/* Zeus is unavail; use local routines for status/retire */
+
+		if (strcmp(name, FM_FMRI_SCHEME_CPU) == 0) {
+			processorid_t vid;
+			uint32_t cpuid;
+
+			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid)
+			    == 0 && (vid = cpu_phys2virt(lhp, cpuid)) != -1)
+				return (p_online(vid, P_ONLINE));
+		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
+			return (os_mem_page_retire(lhp,
+			    MEM_PAGE_FMRI_UNRETIRE, nvl));
+		}
+
+		return (EINVAL);
+	} else {
+		/* Zeus is avail; use Zeus for status/retire */
+
+		if (strcmp(name, FM_FMRI_SCHEME_CPU) == 0) {
+			uint32_t cpuid;
+
+			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID,
+			    &cpuid) == 0)
+				ret = ldmsvcs_cpu_req_online(lhp, cpuid);
+		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
+			uint64_t pa;
+
+			if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
+			    &pa) == 0)
+				ret = ldmsvcs_mem_req_unretire(lhp, pa);
+			else
+				ret = EINVAL;
+		}
+		return (ret);
+	}
+}
+
+static int
+fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl, int cmd)
 {
 	char *name;
 
@@ -570,7 +620,7 @@ ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
 
 		blr.bl_class = class;
 
-		rc = ioctl(fd, BLIOC_INSERT, &blr);
+		rc = ioctl(fd, cmd, &blr);
 		err = errno;
 
 		lhp->freep((void *)&blr.bl_fmri, blr.bl_fmrisz);
@@ -583,6 +633,24 @@ ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
 	}
 
 	return (0);
+}
+
+/*
+ * blacklist cpus in a non-LDOMS environment
+ */
+int
+ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
+{
+	return (fmri_blacklist(lhp, nvl, BLIOC_INSERT));
+}
+
+/*
+ * unblacklist cpus
+ */
+int
+ldom_fmri_unblacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
+{
+	return (fmri_blacklist(lhp, nvl, BLIOC_DELETE));
 }
 
 

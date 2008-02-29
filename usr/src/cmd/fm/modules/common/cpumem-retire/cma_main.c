@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,15 +36,26 @@
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
 
+#ifdef sun4v
+#include <sys/fm/ldom.h>
+
+static fmd_hdl_t *init_hdl;
+ldom_hdl_t *cma_lhp;
+#endif
+
+extern const char *fmd_fmri_get_platform();
+
 cma_t cma;
 
 cma_stats_t cma_stats = {
 	{ "cpu_flts", FMD_TYPE_UINT64, "cpu faults resolved" },
+	{ "cpu_repairs", FMD_TYPE_UINT64, "cpu faults repaired" },
 	{ "cpu_fails", FMD_TYPE_UINT64, "cpu faults unresolveable" },
 	{ "cpu_blfails", FMD_TYPE_UINT64, "failed cpu blacklists" },
 	{ "cpu_supp", FMD_TYPE_UINT64, "cpu offlines suppressed" },
 	{ "cpu_blsupp", FMD_TYPE_UINT64, "cpu blacklists suppressed" },
 	{ "page_flts", FMD_TYPE_UINT64, "page faults resolved" },
+	{ "page_repairs", FMD_TYPE_UINT64, "page faults repaired" },
 	{ "page_fails", FMD_TYPE_UINT64, "page faults unresolveable" },
 	{ "page_supp", FMD_TYPE_UINT64, "page retires suppressed" },
 	{ "page_nonent", FMD_TYPE_UINT64, "retires for non-existent fmris" },
@@ -58,10 +69,86 @@ typedef struct cma_subscriber {
 	const char *subr_class;
 	const char *subr_sname;
 	uint_t subr_svers;
-	int (*subr_func)(fmd_hdl_t *, nvlist_t *, nvlist_t *, const char *);
+	int (*subr_func)(fmd_hdl_t *, nvlist_t *, nvlist_t *, const char *,
+	    boolean_t);
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
+#if defined(sun4v)
+	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_ck", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.datapath", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.link-c", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.link-u", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.link-f", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+
+	/*
+	 * The following ultraSPARC-T1/T2 faults do NOT retire a cpu thread,
+	 * and therefore must be intercepted before
+	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
+	 */
+	{ "fault.cpu.*.l2cachedata", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.l2cachetag", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.l2cachectl", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.l2data-c", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.l2data-u", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.mau", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.lfu-u", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.lfu-f", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.lfu-p", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cpu_retire },
+#elif defined(opl)
+	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.SPARC64-VI.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cpu_retire },
+	{ "fault.cpu.SPARC64-VII.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cpu_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.ce",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.ce-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.se",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.se-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+#else /* Generic */
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.page_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -143,6 +230,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	 */
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
+#endif
 	{ NULL, NULL, 0, NULL }
 };
 
@@ -179,7 +267,7 @@ nvl2subr(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t **asrup)
 }
 
 static void
-cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
+cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, boolean_t repair)
 {
 	char *uuid = NULL;
 	nvlist_t **nva;
@@ -196,7 +284,7 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
 	}
 
 	keepopen = nvc;
-	while (nvc-- != 0 && !fmd_case_uuclosed(hdl, uuid)) {
+	while (nvc-- != 0 && (repair || !fmd_case_uuclosed(hdl, uuid))) {
 		nvlist_t *nvl = *nva++;
 		const cma_subscriber_t *subr;
 		nvlist_t *asru;
@@ -211,14 +299,14 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
 		 * A handler must not close the case itself.
 		 */
 		if (subr->subr_func != NULL) {
-			err = subr->subr_func(hdl, nvl, asru, uuid);
+			err = subr->subr_func(hdl, nvl, asru, uuid, repair);
 
 			if (err == CMA_RA_SUCCESS)
 				keepopen--;
 		}
 	}
 
-	if (!keepopen)
+	if (!keepopen && !repair)
 		fmd_case_uuclose(hdl, uuid);
 }
 
@@ -232,18 +320,20 @@ cma_recv_one(fmd_hdl_t *hdl, nvlist_t *nvl)
 		return;
 
 	if (subr->subr_func != NULL)
-		(void) subr->subr_func(hdl, nvl, asru, NULL);
-
+		(void) subr->subr_func(hdl, nvl, asru, NULL, 0);
 }
 
 /*ARGSUSED*/
 static void
 cma_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
+	boolean_t repair = B_FALSE;
+
 	fmd_hdl_debug(hdl, "received %s\n", class);
 
-	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0)
-		cma_recv_list(hdl, nvl);
+	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 ||
+	    (repair = (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)))
+		cma_recv_list(hdl, nvl, repair);
 	else
 		cma_recv_one(hdl, nvl);
 }
@@ -254,7 +344,29 @@ cma_timeout(fmd_hdl_t *hdl, id_t id, void *arg)
 {
 	if (id == cma.cma_page_timerid)
 		cma_page_retry(hdl);
+#ifdef sun4v
+	/*
+	 * cpu offline/online needs to be retried on sun4v because
+	 * ldom request can be asynchronous.
+	 */
+	else if (id == cma.cma_cpu_timerid)
+		cma_cpu_retry(hdl);
+#endif
 }
+
+#ifdef sun4v
+static void *
+cma_init_alloc(size_t size)
+{
+	return (fmd_hdl_alloc(init_hdl, size, FMD_SLEEP));
+}
+
+static void
+cma_init_free(void *addr, size_t size)
+{
+	fmd_hdl_free(init_hdl, addr, size);
+}
+#endif
 
 static const fmd_hdl_ops_t fmd_ops = {
 	cma_recv,	/* fmdo_recv */
@@ -267,13 +379,25 @@ static const fmd_hdl_ops_t fmd_ops = {
 static const fmd_prop_t fmd_props[] = {
 	{ "cpu_tries", FMD_TYPE_UINT32, "10" },
 	{ "cpu_delay", FMD_TYPE_TIME, "1sec" },
+#ifdef sun4v
+	{ "cpu_ret_mindelay", FMD_TYPE_TIME, "5sec" },
+	{ "cpu_ret_maxdelay", FMD_TYPE_TIME, "5min" },
+#endif /* sun4v */
 	{ "cpu_offline_enable", FMD_TYPE_BOOL, "true" },
+	{ "cpu_online_enable", FMD_TYPE_BOOL, "true" },
 	{ "cpu_forced_offline", FMD_TYPE_BOOL, "true" },
+#ifdef opl
+	{ "cpu_blacklist_enable", FMD_TYPE_BOOL, "false" },
+	{ "cpu_unblacklist_enable", FMD_TYPE_BOOL, "false" },
+#else
 	{ "cpu_blacklist_enable", FMD_TYPE_BOOL, "true" },
+	{ "cpu_unblacklist_enable", FMD_TYPE_BOOL, "true" },
+#endif /* opl */
 	{ "page_ret_mindelay", FMD_TYPE_TIME, "1sec" },
 	{ "page_ret_maxdelay", FMD_TYPE_TIME, "5min" },
 	{ "page_retire_enable", FMD_TYPE_BOOL, "true" },
-#ifdef	i386
+	{ "page_unretire_enable", FMD_TYPE_BOOL, "true" },
+#ifdef i386
 	/*
 	 * On i386, leaving cases open while we retry the
 	 * retire can cause the eft module to use large amounts
@@ -296,22 +420,24 @@ void
 _fmd_init(fmd_hdl_t *hdl)
 {
 	hrtime_t nsec;
-	char buf[SYS_NMLN];
-	int ret;
-
+#ifdef i386
 	/*
 	 * Abort the cpumem-retire module if Solaris is running under the Xen
 	 * hypervisor.
 	 */
-	ret = sysinfo(SI_PLATFORM, buf, sizeof (buf));
-	if (ret == -1 || (strncmp(buf, "i86xpv", sizeof (buf)) == 0))
+	if (strcmp(fmd_fmri_get_platform(), "i86xpv") == 0)
 		return;
+#endif
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* invalid data in configuration file */
 
+	fmd_hdl_subscribe(hdl, "list.repaired");
 	fmd_hdl_subscribe(hdl, "fault.cpu.*");
 	fmd_hdl_subscribe(hdl, "fault.memory.*");
+#ifdef opl
+	fmd_hdl_subscribe(hdl, "fault.chassis.SPARC-Enterprise.cpu.*");
+#endif
 
 	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC, sizeof (cma_stats) /
 	    sizeof (fmd_stat_t), (fmd_stat_t *)&cma_stats);
@@ -325,21 +451,40 @@ _fmd_init(fmd_hdl_t *hdl)
 	cma.cma_page_mindelay = fmd_prop_get_int64(hdl, "page_ret_mindelay");
 	cma.cma_page_maxdelay = fmd_prop_get_int64(hdl, "page_ret_maxdelay");
 
+#ifdef sun4v
+	cma.cma_cpu_mindelay = fmd_prop_get_int64(hdl, "cpu_ret_mindelay");
+	cma.cma_cpu_maxdelay = fmd_prop_get_int64(hdl, "cpu_ret_maxdelay");
+#endif
+
 	cma.cma_cpu_dooffline = fmd_prop_get_int32(hdl, "cpu_offline_enable");
 	cma.cma_cpu_forcedoffline = fmd_prop_get_int32(hdl,
 	    "cpu_forced_offline");
+	cma.cma_cpu_doonline = fmd_prop_get_int32(hdl, "cpu_online_enable");
 	cma.cma_cpu_doblacklist = fmd_prop_get_int32(hdl,
 	    "cpu_blacklist_enable");
+	cma.cma_cpu_dounblacklist = fmd_prop_get_int32(hdl,
+	    "cpu_unblacklist_enable");
 	cma.cma_page_doretire = fmd_prop_get_int32(hdl, "page_retire_enable");
+	cma.cma_page_dounretire = fmd_prop_get_int32(hdl,
+	    "page_unretire_enable");
 	cma.cma_page_maxretries =
 	    fmd_prop_get_int32(hdl, "page_retire_maxretries");
 
 	if (cma.cma_page_maxdelay < cma.cma_page_mindelay)
 		fmd_hdl_abort(hdl, "page retirement delays conflict\n");
+
+#ifdef sun4v
+	init_hdl = hdl;
+	cma_lhp = ldom_init(cma_init_alloc, cma_init_free);
+#endif
 }
 
 void
 _fmd_fini(fmd_hdl_t *hdl)
 {
+#ifdef sun4v
+	ldom_fini(cma_lhp);
+	cma_cpu_fini(hdl);
+#endif
 	cma_page_fini(hdl);
 }

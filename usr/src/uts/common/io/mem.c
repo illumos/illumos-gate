@@ -586,6 +586,9 @@ mmioctl_page_fmri_retire(int cmd, intptr_t data)
 
 	case MEM_PAGE_FMRI_RETIRE:
 		return (page_retire(pa, PR_FMA));
+
+	case MEM_PAGE_FMRI_UNRETIRE:
+		return (page_unretire(pa));
 	}
 
 	return (EINVAL);
@@ -748,6 +751,7 @@ mmioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 
 	case MEM_PAGE_FMRI_RETIRE:
 	case MEM_PAGE_FMRI_ISRETIRED:
+	case MEM_PAGE_FMRI_UNRETIRE:
 		return (mmioctl_page_fmri_retire(cmd, data));
 
 #ifdef __sparc

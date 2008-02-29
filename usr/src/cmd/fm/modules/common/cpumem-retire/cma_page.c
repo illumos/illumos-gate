@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,6 @@
 #include <cma.h>
 
 #include <time.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
 #include <strings.h>
@@ -59,49 +58,6 @@
 #include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
 #include <sys/mem.h>
-
-static int
-cma_page_cmd(fmd_hdl_t *hdl, int cmd, nvlist_t *nvl)
-{
-	mem_page_t mpage;
-	char *fmribuf;
-	size_t fmrisz;
-	int fd, rc, err;
-
-	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
-		return (-1); /* errno is set for us */
-
-	if ((errno = nvlist_size(nvl, &fmrisz, NV_ENCODE_NATIVE)) != 0 ||
-	    fmrisz > MEM_FMRI_MAX_BUFSIZE ||
-	    (fmribuf = fmd_hdl_alloc(hdl, fmrisz, FMD_SLEEP)) == NULL) {
-		(void) close(fd);
-		return (-1); /* errno is set for us */
-	}
-
-	if ((errno = nvlist_pack(nvl, &fmribuf, &fmrisz,
-	    NV_ENCODE_NATIVE, 0)) != 0) {
-		fmd_hdl_free(hdl, fmribuf, fmrisz);
-		(void) close(fd);
-		return (-1); /* errno is set for us */
-	}
-
-	mpage.m_fmri = fmribuf;
-	mpage.m_fmrisz = fmrisz;
-
-	if ((rc = ioctl(fd, cmd, &mpage)) < 0)
-		err = errno;
-
-	fmd_hdl_free(hdl, fmribuf, fmrisz);
-
-	(void) close(fd);
-
-	if (rc < 0) {
-		errno = err;
-		return (-1);
-	}
-
-	return (0);
-}
 
 static void
 cma_page_free(fmd_hdl_t *hdl, cma_page_t *page)
@@ -128,18 +84,26 @@ cma_page_free(fmd_hdl_t *hdl, cma_page_t *page)
  */
 /*ARGSUSED*/
 int
-cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
+cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
+    const char *uuid, boolean_t repair)
 {
 	cma_page_t *page;
 	uint64_t pageaddr;
 	char *unumstr;
 	nvlist_t *asrucp = NULL;
+	const char *action = repair ? "unretire" : "retire";
 
 	/* It should already be expanded, but we'll do it again anyway */
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
 		fmd_hdl_debug(hdl, "failed to expand page asru\n");
 		cma_stats.bad_flts.fmds_value.ui64++;
 		return (CMA_RA_FAILURE);
+	}
+
+	if (!repair && !fmd_nvl_fmri_present(hdl, asru)) {
+		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
+		cma_stats.page_nonent.fmds_value.ui64++;
+		return (CMA_RA_SUCCESS);
 	}
 
 	if (nvlist_lookup_uint64(asru, FM_FMRI_MEM_PHYSADDR, &pageaddr) != 0) {
@@ -149,17 +113,20 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		return (CMA_RA_FAILURE);
 	}
 
-	if (!cma.cma_page_doretire) {
-		fmd_hdl_debug(hdl, "suppressed retire of page %llx\n",
-		    (u_longlong_t)pageaddr);
-		cma_stats.page_supp.fmds_value.ui64++;
-		return (CMA_RA_FAILURE);
-	}
-
-	if (!fmd_nvl_fmri_present(hdl, asru)) {
-		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
-		cma_stats.page_nonent.fmds_value.ui64++;
-		return (CMA_RA_SUCCESS);
+	if (repair) {
+		if (!cma.cma_page_dounretire) {
+			fmd_hdl_debug(hdl, "suppressed unretire of page %llx\n",
+			    (u_longlong_t)pageaddr);
+			cma_stats.page_supp.fmds_value.ui64++;
+			return (CMA_RA_SUCCESS);
+		}
+	} else {
+		if (!cma.cma_page_doretire) {
+			fmd_hdl_debug(hdl, "suppressed retire of page %llx\n",
+			    (u_longlong_t)pageaddr);
+			cma_stats.page_supp.fmds_value.ui64++;
+			return (CMA_RA_FAILURE);
+		}
 	}
 
 	/*
@@ -173,11 +140,12 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		struct topo_hdl *thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
 
 		if (topo_fmri_str2nvl(thp, unumstr, &unumfmri, &err) != 0) {
-			fmd_hdl_topo_rele(hdl, thp);
 			fmd_hdl_debug(hdl, "page retire str2nvl failed: %s\n",
 			    topo_strerror(err));
+			fmd_hdl_topo_rele(hdl, thp);
 			return (CMA_RA_FAILURE);
 		}
+
 		fmd_hdl_topo_rele(hdl, thp);
 
 		if (nvlist_dup(asru, &asrucp, 0) != 0) {
@@ -197,17 +165,25 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		nvlist_free(unumfmri);
 	}
 
-	if (cma_page_cmd(hdl, MEM_PAGE_FMRI_RETIRE,
+	if (cma_page_cmd(hdl,
+	    repair ? MEM_PAGE_FMRI_UNRETIRE : MEM_PAGE_FMRI_RETIRE,
 	    asrucp ? asrucp : asru) == 0) {
-		fmd_hdl_debug(hdl, "retired page 0x%llx\n",
-		    (u_longlong_t)pageaddr);
-		cma_stats.page_flts.fmds_value.ui64++;
+		fmd_hdl_debug(hdl, "%sd page 0x%llx\n",
+		    action, (u_longlong_t)pageaddr);
+		if (repair)
+			cma_stats.page_repairs.fmds_value.ui64++;
+		else
+			cma_stats.page_flts.fmds_value.ui64++;
 		if (asrucp)
 			nvlist_free(asrucp);
 		return (CMA_RA_SUCCESS);
-	} else if (errno != EAGAIN) {
-		fmd_hdl_debug(hdl, "retire of page 0x%llx failed, will not "
-		    "retry: %s\n", (u_longlong_t)pageaddr, strerror(errno));
+	} else if (repair || errno != EAGAIN) {
+		fmd_hdl_debug(hdl, "%s of page 0x%llx failed, will not "
+		    "retry: %s\n", action, (u_longlong_t)pageaddr,
+		    strerror(errno));
+
+		cma_stats.page_fails.fmds_value.ui64++;
+
 		if (asrucp)
 			nvlist_free(asrucp);
 		if (uuid != NULL && cma.cma_page_maxretries != 0)

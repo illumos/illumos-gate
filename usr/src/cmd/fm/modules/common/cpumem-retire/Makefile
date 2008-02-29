@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,9 +27,11 @@
 MODULE = cpumem-retire
 CLASS = common
 SRCS = \
-	cma_cpu.c \
 	cma_main.c \
-	cma_page.c
+	cma_cpu.c \
+	cma_cpu_arch.c \
+	cma_page.c \
+	cma_page_arch.c
 
 include ../../Makefile.plugin
 

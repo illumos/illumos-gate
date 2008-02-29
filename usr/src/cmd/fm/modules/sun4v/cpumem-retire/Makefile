@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,19 +28,29 @@ MODULE = cpumem-retire
 CLASS = arch
 ARCH = sun4v
 SRCS = \
-	cma_cpu.c \
 	cma_main.c \
+	cma_cpu.c \
+	cma_cpu_sun4v.c \
 	cma_page.c \
-	cma_cpu_arch.c \
-	cma_page_arch.c
+	cma_page_sun4v.c
 
 include ../../Makefile.plugin
 
 CMA_VERSION = "1.1"
 
-INCDIRS = . \
-	 $(ROOT)/usr/platform/sun4v/include
+CPUMEM_RETIRE_COMMON = ../../common/$(MODULE)
 
-CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
+INCDIRS = . \
+	 $(ROOT)/usr/platform/sun4v/include \
+	 $(CPUMEM_RETIRE_COMMON)
+
+CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)' -Dsun4v
 LDFLAGS += -R/usr/lib/fm
 LDLIBS += -L$(ROOTLIB)/fm -ltopo -lldom
+
+%.o: $(CPUMEM_RETIRE_COMMON)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(CPUMEM_RETIRE_COMMON)/%.c
+	$(LINT.c) -c $<

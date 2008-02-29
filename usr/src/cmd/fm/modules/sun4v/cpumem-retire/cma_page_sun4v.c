@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,9 +51,15 @@ cma_page_cmd(fmd_hdl_t *hdl, int cmd, nvlist_t *nvl)
 	case MEM_PAGE_FMRI_RETIRE:
 		rc = ldom_fmri_retire(cma_lhp, nvl);
 		break;
+	case MEM_PAGE_FMRI_UNRETIRE:
+		rc = ldom_fmri_unretire(cma_lhp, nvl);
+		break;
 	case MEM_PAGE_FMRI_ISRETIRED:
 		rc = ldom_fmri_status(cma_lhp, nvl);
 		break;
+	default:
+		errno = EINVAL;
+		rc = -1;
 	}
 
 	if (rc > 0) {

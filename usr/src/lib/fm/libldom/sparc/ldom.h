@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,9 @@ extern void ldom_fini(ldom_hdl_t *lhp);
 
 extern int ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
 extern int ldom_fmri_retire(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
+extern int ldom_fmri_unretire(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
 extern int ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
+extern int ldom_fmri_unblacklist(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
 
 extern ssize_t ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf);
 
