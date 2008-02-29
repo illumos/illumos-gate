@@ -278,11 +278,12 @@ static int
 drm_sun_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
 	drm_inst_state_t	*mstate;
+	drm_cminor_t	*mp, *newp;
 	drm_device_t	*dp;
-	struct minordev *mp, *newp;
-	int cloneminor;
 	minor_t		minor;
-	int			err;
+	int		newminor;
+	int		instance;
+	int		err;
 
 	mstate = drm_sup_devt_to_state(*devp);
 	/*
@@ -292,8 +293,22 @@ drm_sun_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	if (mstate == NULL)
 		return (ENXIO);
 
+	/*
+	 * The lest significant 15 bits are used for minor_number, and
+	 * the mid 3 bits are used for instance number. All minor numbers
+	 * are used as follows:
+	 * 0 -- gfx
+	 * 1 -- agpmaster
+	 * 2 -- drm
+	 * (3, MAX_CLONE_MINOR) -- drm minor node for clone open.
+	 */
 	minor = DEV2MINOR(*devp);
+	instance = DEV2INST(*devp);
 	ASSERT(minor <= MAX_CLONE_MINOR);
+
+	/*
+	 * No operations for VGA & AGP mater devices, always return OK.
+	 */
 	if ((minor == GFX_MINOR) || (minor == AGPMASTER_MINOR))
 		return (0);
 
@@ -306,19 +321,47 @@ drm_sun_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 		return (ENXIO);
 
 	/*
-	 * Here, minor consists of minor_number and instance number
-	 * the first 3 bits is for instance number.
+	 * Drm driver implements a software lock to serialize access
+	 * to graphics hardware based on per-process granulation. Before
+	 * operating graphics hardware, all clients, including kernel
+	 * and applications, must acquire this lock via DRM_IOCTL_LOCK
+	 * ioctl, and release it via DRM_IOCTL_UNLOCK after finishing
+	 * operations. Drm driver will grant r/w permission to the
+	 * process which acquires this lock (Kernel is assumed to have
+	 * process ID 0).
+	 *
+	 * A process might be terminated without releasing drm lock, in
+	 * this case, drm driver is responsible for clearing the holding.
+	 * To be informed of process exiting, drm driver uses clone open
+	 * to guarantee that each call to open(9e) have one corresponding
+	 * call to close(9e). In most cases, a process will close drm
+	 * during process termination, so that drm driver could have a
+	 * chance to release drm lock.
+	 *
+	 * In fact, a driver cannot know exactly when a process exits.
+	 * Clone open doesn't address this issue completely: Because of
+	 * inheritance, child processes inherit file descriptors from
+	 * their parent. As a result, if the parent exits before its
+	 * children, drm close(9e) entrypoint won't be called until all
+	 * of its children terminate.
+	 *
+	 * Another issue brought up by inhertance is the process PID
+	 * that calls the drm close() entry point may not be the same
+	 * as the one who called open(). Per-process struct is allocated
+	 * when a process first open() drm, and released when the process
+	 * last close() drm. Since open()/close() may be not the same
+	 * process, PID cannot be used for key to lookup per-process
+	 * struct. So, we associate minor number with per-process struct
+	 * during open()'ing, and find corresponding process struct
+	 * via minor number when close() is called.
 	 */
-	minor = getminor(*devp);
-
-	newp = kmem_zalloc(sizeof (struct minordev), KM_SLEEP);
+	newp = kmem_zalloc(sizeof (drm_cminor_t), KM_SLEEP);
 	mutex_enter(&dp->dev_lock);
-	for (cloneminor = minor; cloneminor < MAX_CLONE_MINOR;
-	    cloneminor += 1) {
-		for (mp = dp->minordevs; mp != NULL; mp = mp->next) {
-			if (mp->cloneminor == cloneminor) {
+	for (newminor = DRM_MIN_CLONEMINOR; newminor < MAX_CLONE_MINOR;
+	    newminor ++) {
+		TAILQ_FOREACH(mp, &dp->minordevs, link) {
+			if (mp->minor == newminor)
 				break;
-			}
 		}
 		if (mp == NULL)
 			goto gotminor;
@@ -328,13 +371,22 @@ drm_sun_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	return (EMFILE);
 
 gotminor:
-	newp->next = dp->minordevs;
-	newp->cloneminor = cloneminor;
-	dp->minordevs = newp;
-	dp->cloneopens++;
+	TAILQ_INSERT_TAIL(&dp->minordevs, newp, link);
+	newp->minor = newminor;
 	mutex_exit(&dp->dev_lock);
-	err = drm_open(dp, devp, flag, otyp, credp);
-	*devp = makedevice(getmajor(*devp), cloneminor);
+	err = drm_open(dp, newp, flag, otyp, credp);
+	if (err) {
+		mutex_enter(&dp->dev_lock);
+		TAILQ_REMOVE(&dp->minordevs, newp, link);
+		(void) kmem_free(mp, sizeof (drm_cminor_t));
+		mutex_exit(&dp->dev_lock);
+
+		return (err);
+	}
+
+	/* return a clone minor */
+	newminor = newminor | (instance << NBITSMNODE);
+	*devp = makedevice(getmajor(*devp), newminor);
 	return (err);
 }
 
@@ -344,8 +396,8 @@ drm_sun_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	drm_inst_state_t	*mstate;
 	drm_device_t		*dp;
-	struct minordev		*lastp, *mp;
-	minor_t minor;
+	minor_t		minor;
+	int		ret;
 
 	mstate = drm_sup_devt_to_state(dev);
 	if (mstate == NULL)
@@ -362,23 +414,9 @@ drm_sun_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 
-	lastp = NULL;
-	mutex_enter(&dp->dev_lock);
-	for (mp = dp->minordevs; mp != NULL; mp = mp->next) {
-		if (mp->cloneminor == minor) {
-			if (lastp == NULL)
-				dp->minordevs = mp->next;
-			else
-				lastp->next = mp->next;
-			dp->cloneopens--;
-			(void) kmem_free(mp, sizeof (struct minordev));
-			break;
-		} else
-			lastp = mp;
-	}
-	mutex_exit(&dp->dev_lock);
+	ret = drm_close(dp, minor, flag, otyp, credp);
 
-	return (drm_close(dp, dev, flag, otyp, credp));
+	return (ret);
 }
 
 /*ARGSUSED*/

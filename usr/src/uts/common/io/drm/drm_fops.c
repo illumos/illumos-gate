@@ -58,10 +58,24 @@ drm_find_file_by_proc(drm_device_t *dev, cred_t *credp)
 	return (NULL);
 }
 
+
+drm_cminor_t *
+drm_find_file_by_minor(drm_device_t *dev, int minor)
+{
+	drm_cminor_t	*mp;
+
+	TAILQ_FOREACH(mp, &dev->minordevs, link) {
+		if (mp->minor == minor)
+			return (mp);
+	}
+	return (NULL);
+}
+
 /* drm_open_helper is called whenever a process opens /dev/drm. */
 /*ARGSUSED*/
 int
-drm_open_helper(drm_device_t *dev, int flags, int otyp, cred_t *credp)
+drm_open_helper(drm_device_t *dev, drm_cminor_t *mp, int flags,
+    int otyp, cred_t *credp)
 {
 	drm_file_t   *priv;
 	pid_t pid;
@@ -107,9 +121,9 @@ drm_open_helper(drm_device_t *dev, int flags, int otyp, cred_t *credp)
 
 		/* first opener automatically becomes master */
 		priv->master = TAILQ_EMPTY(&dev->files);
-
 		TAILQ_INSERT_TAIL(&dev->files, priv, link);
 	}
+	mp->fpriv = priv;
 	DRM_UNLOCK();
 	return (0);
 }

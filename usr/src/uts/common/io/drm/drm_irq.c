@@ -246,17 +246,11 @@ drm_wait_vblank(DRM_IOCTL_ARGS)
 
 	flags = vblwait.request.type & _DRM_VBLANK_FLAGS_MASK;
 	if (flags & _DRM_VBLANK_SECONDARY) {
-		if (dev->driver->use_vbl_irq2 != 1) {
-			cmn_err(CE_WARN, "wait_vblank: driver %s doesn't"
-			    "support second vblank interrupt",
-			    dev->driver->driver_name);
-		}
+		if (dev->driver->use_vbl_irq2 != 1)
+			return (ENOTSUP);
 	} else {
-		if (dev->driver->use_vbl_irq != 1) {
-			cmn_err(CE_WARN, "wait_vblank: driver %s doesn't"
-			    "support vblank interrupt",
-			    dev->driver->driver_name);
-		}
+		if (dev->driver->use_vbl_irq != 1)
+			return (ENOTSUP);
 	}
 
 	sequence = atomic_read((flags & _DRM_VBLANK_SECONDARY) ?

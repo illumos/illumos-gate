@@ -285,6 +285,7 @@ static void i915_configure(drm_driver_t *driver)
 	driver->lastclose	=	i915_driver_lastclose;
 	driver->device_is_agp	=	i915_driver_device_is_agp;
 	driver->vblank_wait		=	i915_driver_vblank_wait;
+	driver->vblank_wait2		=	i915_driver_vblank_wait2;
 	driver->irq_preinstall	=	i915_driver_irq_preinstall;
 	driver->irq_postinstall	=	i915_driver_irq_postinstall;
 	driver->irq_uninstall	=	i915_driver_irq_uninstall;
@@ -304,4 +305,5 @@ static void i915_configure(drm_driver_t *driver)
 	driver->require_agp	=	1;
 	driver->use_irq	=	1;
 	driver->use_vbl_irq	=	1;
+	driver->use_vbl_irq2	=	1;
 }

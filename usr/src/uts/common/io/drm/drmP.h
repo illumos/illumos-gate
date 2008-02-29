@@ -502,10 +502,12 @@ typedef struct drm_vbl_sig {
 
 
 /* used for clone device */
-struct minordev {
-	struct minordev *next;
-	int cloneminor;
-};
+typedef TAILQ_HEAD(drm_cminor_list, drm_cminor) drm_cminor_list_t;
+typedef struct drm_cminor {
+	TAILQ_ENTRY(drm_cminor) link;
+	drm_file_t		*fpriv;
+	int			minor;
+} drm_cminor_t;
 
 /* location of GART table */
 #define	DRM_ATI_GART_MAIN	1
@@ -591,8 +593,7 @@ struct drm_driver_info {
 
 struct drm_device {
 	drm_driver_t	*driver;
-	int cloneopens;
-	struct minordev *minordevs;
+	drm_cminor_list_t	minordevs;
 	dev_info_t *dip;
 	void	*drm_handle;
 	int drm_supported;
@@ -846,8 +847,8 @@ extern int drm_dev_to_minor(dev_t);
 extern void *drm_supp_register(dev_info_t *, drm_device_t *);
 extern int drm_supp_unregister(void *);
 
-extern int drm_open(drm_device_t *, dev_t *, int, int, cred_t *);
-extern int drm_close(drm_device_t *, dev_t, int, int, cred_t *);
+extern int drm_open(drm_device_t *, drm_cminor_t *, int, int, cred_t *);
+extern int drm_close(drm_device_t *, int, int, int, cred_t *);
 extern int drm_attach(drm_device_t *);
 extern int drm_detach(drm_device_t *);
 extern int drm_probe(drm_device_t *, drm_pci_id_list_t *);
@@ -864,6 +865,8 @@ extern drm_drawable_info_t *drm_get_drawable_info(drm_device_t *,
 
 /* File Operations helpers (drm_fops.c) */
 extern drm_file_t *drm_find_file_by_proc(drm_device_t *, cred_t *);
-extern int drm_open_helper(drm_device_t *, int, int, cred_t *);
+extern drm_cminor_t *drm_find_file_by_minor(drm_device_t *, int);
+extern int drm_open_helper(drm_device_t *, drm_cminor_t *, int, int,
+    cred_t *);
 
 #endif	/* _DRMP_H */

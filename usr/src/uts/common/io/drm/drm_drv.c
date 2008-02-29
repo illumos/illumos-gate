@@ -331,10 +331,8 @@ drm_load(drm_device_t *dev)
 	dev->pci_vendor = pci_get_vendor(dev);
 	dev->pci_device = pci_get_device(dev);
 
-	dev->cloneopens = 0;
-	dev->minordevs = NULL;
 	TAILQ_INIT(&dev->maplist);
-
+	TAILQ_INIT(&dev->minordevs);
 	TAILQ_INIT(&dev->files);
 	if (dev->driver->load != NULL) {
 		retcode = dev->driver->load(dev, 0);
@@ -405,12 +403,12 @@ drm_unload(drm_device_t *dev)
 
 /*ARGSUSED*/
 int
-drm_open(drm_device_t *dev, dev_t *kdev, int openflags,
+drm_open(drm_device_t *dev, drm_cminor_t *mp, int openflags,
     int otyp, cred_t *credp)
 {
 	int retcode;
 
-	retcode = drm_open_helper(dev, openflags, otyp, credp);
+	retcode = drm_open_helper(dev, mp, openflags, otyp, credp);
 
 	if (!retcode) {
 		atomic_inc_32(&dev->counts[_DRM_STAT_OPENS]);
@@ -425,21 +423,23 @@ drm_open(drm_device_t *dev, dev_t *kdev, int openflags,
 
 /*ARGSUSED*/
 int
-drm_close(drm_device_t *dev, dev_t kdev, int flag, int otyp,
+drm_close(drm_device_t *dev, int minor, int flag, int otyp,
     cred_t *credp)
 {
-	drm_file_t *fpriv;
-	int retcode = 0;
-
-	DRM_DEBUG("drm_close: open_count = %d", dev->open_count);
+	drm_cminor_t	*mp;
+	drm_file_t		*fpriv;
+	int		retcode = 0;
 
 	DRM_LOCK();
-	fpriv = drm_find_file_by_proc(dev, credp);
-	if (!fpriv) {
+	mp = drm_find_file_by_minor(dev, minor);
+	if (!mp) {
 		DRM_UNLOCK();
 		DRM_ERROR("drm_close: can't find authenticator");
 		return (EACCES);
 	}
+
+	fpriv = mp->fpriv;
+	ASSERT(fpriv);
 
 	if (--fpriv->refs != 0)
 		goto done;
@@ -480,6 +480,9 @@ drm_close(drm_device_t *dev, dev_t kdev, int flag, int otyp,
 
 done:
 	atomic_inc_32(&dev->counts[_DRM_STAT_CLOSES]);
+
+	TAILQ_REMOVE(&dev->minordevs, mp, link);
+	drm_free(mp, sizeof (*mp), DRM_MEM_FILES);
 
 	if (--dev->open_count == 0) {
 		retcode = drm_lastclose(dev);

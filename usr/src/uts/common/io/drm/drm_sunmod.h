@@ -95,6 +95,7 @@ extern "C" {
 #define	GFX_MINOR		0
 #define	AGPMASTER_MINOR		1
 #define	DRM_MINOR		2
+#define	DRM_MIN_CLONEMINOR	3
 
 /*
  * Number of bits occupied by instance number in dev_t, currently maximum 8
