@@ -890,7 +890,6 @@ nxge_start_control_header_only:
 						B_FALSE : B_TRUE);
 	}
 
-	tx_ring_p->descs_pending += ngathers;
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: TX kick: "
 		"channel %d wr_index %d wrap %d ngathers %d desc_pend %d",
 		tx_ring_p->tdc,
@@ -906,6 +905,7 @@ nxge_start_control_header_only:
 			mp_chain = mp_chain->b_next;
 			mp->b_next = NULL;
 			if (nxge_lso_kick_cnt == lso_ngathers) {
+				tx_ring_p->descs_pending += lso_ngathers;
 				{
 					tx_ring_kick_t		kick;
 
@@ -945,6 +945,7 @@ nxge_start_control_header_only:
 			lso_again = B_TRUE;
 			goto start_again;
 		}
+		ngathers = lso_ngathers;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: TX KICKING: "));
@@ -963,6 +964,7 @@ nxge_start_control_header_only:
 			kick.value);
 	}
 
+	tx_ring_p->descs_pending += ngathers;
 	tdc_stats->tx_starts++;
 
 	MUTEX_EXIT(&tx_ring_p->lock);
