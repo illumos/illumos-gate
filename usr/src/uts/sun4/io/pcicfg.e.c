@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4683,34 +4683,34 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		    pcicfg_slot_iosize);
 		uint8_t highest_bus_reqd = new_bus + (num_slots *
 		    pcicfg_slot_busnums);
-
+#ifdef DEBUG
 		if (mem_end > mem_reqd)
-			cmn_err(CE_WARN, "Memory space consumed by bridge"
+			DEBUG3("Memory space consumed by bridge"
 			    " more than planned for %d slot(s)(%lx, %lx)",
 			    num_slots, mem_answer, mem_end);
 		if (io_end > io_reqd)
-			cmn_err(CE_WARN, "IO space consumed by bridge"
+			DEBUG3("IO space consumed by bridge"
 			    " more than planned for %d slot(s)(%lx, %lx)",
 			    num_slots, io_answer, io_end);
 		if (*highest_bus > highest_bus_reqd)
-			cmn_err(CE_WARN, "Buses consumed by bridge"
+			DEBUG3("Buses consumed by bridge"
 			    " more than planned for %d slot(s)(%x, %x)",
 			    num_slots, new_bus, *highest_bus);
 
 		if (mem_reqd > (mem_answer + mem_alen))
-			cmn_err(CE_WARN, "Memory space required by bridge"
+			DEBUG3("Memory space required by bridge"
 			    " more than available for %d slot(s)(%lx, %lx)",
 			    num_slots, mem_answer, mem_end);
 
 		if (io_reqd > (io_answer + io_alen))
-			cmn_err(CE_WARN, "IO space required by bridge"
+			DEBUG3("IO space required by bridge"
 			    " more than available for %d slot(s)(%lx, %lx)",
 			    num_slots, io_answer, io_end);
 		if (highest_bus_reqd > max_bus)
-			cmn_err(CE_WARN, "Bus numbers required by bridge"
+			DEBUG3("Bus numbers required by bridge"
 			    " more than available for %d slot(s)(%x, %x)",
 			    num_slots, new_bus, *highest_bus);
-
+#endif
 		mem_end = MAX((MIN(mem_reqd, (mem_answer + mem_alen))),
 		    mem_end);
 		io_end = MAX((MIN(io_reqd, (io_answer + io_alen))), io_end);
