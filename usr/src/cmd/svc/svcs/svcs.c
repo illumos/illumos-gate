@@ -1597,6 +1597,11 @@ sortkey_instance(char *buf, int reverse, scf_walkinfo_t *wip)
 #define	FORMAT_DATE			"%b_%d  "
 #define	FORMAT_YEAR			"%Y    "
 
+/*
+ * sprint_stime() will allocate a new buffer and snprintf the services's
+ * state timestamp.  If the timestamp is unavailable for some reason
+ * a '-' is given instead.
+ */
 static void
 sprint_stime(char **buf, scf_walkinfo_t *wip)
 {
@@ -1617,31 +1622,35 @@ sprint_stime(char **buf, scf_walkinfo_t *wip)
 	}
 
 	if (r != 0) {
+		/*
+		 * There's something amiss with our service
+		 * so we'll print a '-' for STIME.
+		 */
 		(void) snprintf(newbuf, newsize, "%s%-*s", *buf ? *buf : "",
-		    STIME_COLUMN_WIDTH + 1, "?");
-		return;
+		    STIME_COLUMN_WIDTH + 1, "-");
+	} else {
+		/* tv should be valid so we'll format it */
+		then = (time_t)tv.tv_sec;
+
+		tm = localtime(&then);
+		/*
+		 * Print time if started within the past 24 hours, print date
+		 * if within the past 12 months or, finally, print year if
+		 * started greater than 12 months ago.
+		 */
+		if (now - then < 24 * 60 * 60) {
+			(void) strftime(st_buf, sizeof (st_buf),
+			    gettext(FORMAT_TIME), tm);
+		} else if (now - then < 12 * 30 * 24 * 60 * 60) {
+			(void) strftime(st_buf, sizeof (st_buf),
+			    gettext(FORMAT_DATE), tm);
+		} else {
+			(void) strftime(st_buf, sizeof (st_buf),
+			    gettext(FORMAT_YEAR), tm);
+		}
+		(void) snprintf(newbuf, newsize, "%s%-*s ", *buf ? *buf : "",
+		    STIME_COLUMN_WIDTH + 1, st_buf);
 	}
-
-	then = (time_t)tv.tv_sec;
-
-	tm = localtime(&then);
-	/*
-	 * Print time if started within the past 24 hours, print date
-	 * if within the past 12 months, print year if started greater than
-	 * 12 months ago.
-	 */
-	if (now - then < 24 * 60 * 60)
-		(void) strftime(st_buf, sizeof (st_buf), gettext(FORMAT_TIME),
-		    tm);
-	else if (now - then < 12 * 30 * 24 * 60 * 60)
-		(void) strftime(st_buf, sizeof (st_buf), gettext(FORMAT_DATE),
-		    tm);
-	else
-		(void) strftime(st_buf, sizeof (st_buf), gettext(FORMAT_YEAR),
-		    tm);
-
-	(void) snprintf(newbuf, newsize, "%s%-*s ", *buf ? *buf : "",
-	    STIME_COLUMN_WIDTH + 1, st_buf);
 	if (*buf)
 		free(*buf);
 	*buf = newbuf;
