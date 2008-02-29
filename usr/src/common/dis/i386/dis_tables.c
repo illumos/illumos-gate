@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1852,12 +1852,15 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 
 /*
  * Similar, but for 2 operands plus an immediate.
+ * vbit indicates direction
+ * 	0 for "opcode imm, r, r_m" or
+ *	1 for "opcode imm, r_m, r"
  */
-#define	THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, w2, immsize) { \
+#define	THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, w2, immsize, vbit) { \
 		dtrace_get_modrm(x, &mode, &reg, &r_m);			\
 		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);	\
-		dtrace_get_operand(x, mode, r_m, wbit, 1);		\
-		dtrace_get_operand(x, REG_ONLY, reg, w2, 2);		\
+		dtrace_get_operand(x, mode, r_m, wbit, 2-vbit);		\
+		dtrace_get_operand(x, REG_ONLY, reg, w2, 1+vbit);	\
 		dtrace_imm_opnd(x, wbit, immsize, 0);			\
 }
 
@@ -2087,6 +2090,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		} else if ((opcode4 == 0xc) && (opcode5 >= 0x8)) {
 			dp = (instable_t *)&dis_op0FC8[0];
 		} else if ((opcode4 == 0x3) && (opcode5 == 0xA)) {
+			opcode_bytes = 3;
 			if (dtrace_get_opcode(x, &opcode6, &opcode7) != 0)
 				goto error;
 			if (opnd_size == SIZE16)
@@ -2120,6 +2124,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 					goto error;
 			}
 		} else if ((opcode4 == 0x3) && (opcode5 == 0x8)) {
+			opcode_bytes = 3;
 			if (dtrace_get_opcode(x, &opcode6, &opcode7) != 0)
 				goto error;
 			dp = (instable_t *)&dis_op0F38[(opcode6<<4)|opcode7];
@@ -2357,6 +2362,13 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 						break;
 				}
 				x->d86_mnem[i - 1] = *types[opnd_size];
+			} else if ((opnd_size == 2) && (opcode_bytes == 3) &&
+			    ((opcode6 == 1 && opcode7 == 6) ||
+			    (opcode6 == 2 && opcode7 == 2))) {
+				/*
+				 * To handle PINSRD and PEXTRD
+				 */
+				(void) strlcat(x->d86_mnem, "d", OPLEN);
 			} else {
 				(void) strlcat(x->d86_mnem, types[opnd_size],
 				    OPLEN);
@@ -2432,7 +2444,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	case IMUL:
 		wbit = LONG_OPND;
 		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, LONG_OPND,
-		    OPSIZE(opnd_size, opcode2 == 0x9));
+		    OPSIZE(opnd_size, opcode2 == 0x9), 1);
 		break;
 
 	/* memory or register operand to register, with 'w' bit	*/
@@ -2803,14 +2815,14 @@ xmm3p:
 		if (mode != REG_ONLY)
 			goto error;
 
-		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, LONG_OPND, 1);
+		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, LONG_OPND, 1,
+		    1);
 		NOMEM;
 		break;
 
 	case XMM3PM_66r:
-		wbit = XMM_OPND;
-		dtrace_get_modrm(x, &mode, &reg, &r_m);
-		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, LONG_OPND, 1);
+		THREEOPERAND(x, mode, reg, r_m, rex_prefix, LONG_OPND, XMM_OPND,
+		    1, 0);
 		break;
 
 	/* MMX/SIMD-Int predicated r32/mem to mm reg */
@@ -2823,7 +2835,7 @@ xmm3p:
 		wbit = LONG_OPND;
 		w2 = XMM_OPND;
 xmmprm:
-		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, w2, 1);
+		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, w2, 1, 1);
 		break;
 
 	/* MMX/SIMD-Int predicated mm/mem to mm reg */
@@ -2957,7 +2969,8 @@ xmmprm:
 	case XMMP_66o:
 	case XMMOPM:
 		wbit = XMM_OPND;
-		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, XMM_OPND, 1);
+		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, XMM_OPND, 1,
+		    1);
 
 #ifdef DIS_TEXT
 		/*
