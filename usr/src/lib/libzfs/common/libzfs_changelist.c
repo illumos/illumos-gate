@@ -88,7 +88,8 @@ struct prop_changelist {
 /*
  * If the property is 'mountpoint', go through and unmount filesystems as
  * necessary.  We don't do the same for 'sharenfs', because we can just re-share
- * with different options without interrupting service.
+ * with different options without interrupting service. We do handle 'sharesmb'
+ * since there may be old resource names that need to be removed.
  */
 int
 changelist_prefix(prop_changelist_t *clp)
@@ -96,7 +97,8 @@ changelist_prefix(prop_changelist_t *clp)
 	prop_changenode_t *cn;
 	int ret = 0;
 
-	if (clp->cl_prop != ZFS_PROP_MOUNTPOINT)
+	if (clp->cl_prop != ZFS_PROP_MOUNTPOINT &&
+	    clp->cl_prop != ZFS_PROP_SHARESMB)
 		return (0);
 
 	for (cn = uu_list_first(clp->cl_list); cn != NULL;
@@ -140,10 +142,22 @@ changelist_prefix(prop_changelist_t *clp)
 				(void) zfs_unshare_iscsi(cn->cn_handle);
 				break;
 			}
-		} else if (zfs_unmount(cn->cn_handle, NULL,
-		    clp->cl_flags) != 0) {
-			ret = -1;
-			cn->cn_needpost = B_FALSE;
+		} else {
+			/*
+			 * Do the property specific processing.
+			 */
+			switch (clp->cl_prop) {
+			case ZFS_PROP_MOUNTPOINT:
+				if (zfs_unmount(cn->cn_handle, NULL,
+				    clp->cl_flags) != 0) {
+					ret = -1;
+					cn->cn_needpost = B_FALSE;
+				}
+				break;
+			case ZFS_PROP_SHARESMB:
+				(void) zfs_unshare_smb(cn->cn_handle, NULL);
+				break;
+			}
 		}
 	}
 
