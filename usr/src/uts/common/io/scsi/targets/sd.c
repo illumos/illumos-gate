@@ -6895,13 +6895,16 @@ sd_unit_attach(dev_info_t *devi)
 	 * this to be before the call to sd_spin_up_unit.
 	 */
 	if (SD_IS_PARALLEL_SCSI(un) || SD_IS_SERIAL(un)) {
+		int tq_trigger_flag = (((devp->sd_inq->inq_ansi == 4) ||
+		    (devp->sd_inq->inq_ansi == 5)) &&
+		    devp->sd_inq->inq_bque) || devp->sd_inq->inq_cmdque;
+
 		/*
-		 * If SCSI-2 tagged queueing is supported by the target
-		 * and by the host adapter then we will enable it.
+		 * If tagged queueing is supported by the target
+		 * and by the host adapter then we will enable it
 		 */
 		un->un_tagflags = 0;
-		if ((devp->sd_inq->inq_rdf == RDF_SCSI2) &&
-		    (devp->sd_inq->inq_cmdque) &&
+		if ((devp->sd_inq->inq_rdf == RDF_SCSI2) && tq_trigger_flag &&
 		    (un->un_f_arq_enabled == TRUE)) {
 			if (scsi_ifsetcap(SD_ADDRESS(un), "tagged-qing",
 			    1, 1) == 1) {

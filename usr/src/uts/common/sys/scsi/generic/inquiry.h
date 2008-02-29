@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,8 @@ struct scsi_inquiry {
 		inq_mchngr	: 1,	/* embedded/attached to medium chngr */
 		inq_dualp	: 1,	/* dual port device */
 		inq_port	: 1,	/* port receiving inquiry cmd */
-				: 2;	/* reserved 			*/
+				: 1,	/* reserved */
+		inq_bque	: 1;	/* combined with cmdque */
 
 	uchar_t	inq_sftre	: 1,	/* supports Soft Reset option 	*/
 		inq_cmdque	: 1,	/* supports command queueing 	*/
@@ -152,7 +153,8 @@ struct scsi_inquiry {
 		inq_tpgs	: 1,	/* supports Target Port Group Set */
 				: 4;
 
-	uchar_t			: 2,	/* reserved 			*/
+	uchar_t	inq_bque	: 1,	/* combined with cmdque */
+				: 1,	/* reserved */
 		inq_port	: 1,	/* port receiving inquiry cmd */
 		inq_dualp	: 1,	/* dual port device */
 		inq_mchngr	: 1,	/* embedded/attached to medium chngr */
