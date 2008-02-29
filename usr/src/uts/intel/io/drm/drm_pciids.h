@@ -200,6 +200,9 @@ extern "C" {
 	{0x8086, 0x29A2, CHIP_I9XX|CHIP_I965, "Intel i965G"}, \
 	{0x8086, 0x2A02, CHIP_I9XX|CHIP_I965, "Intel i965GM"}, \
 	{0x8086, 0x2A12, CHIP_I9XX|CHIP_I965, "Intel i965GME/GLE"}, \
+	{0x8086, 0x29C2, CHIP_I9XX|CHIP_I915, "Intel G33"}, \
+	{0x8086, 0x29B2, CHIP_I9XX|CHIP_I915, "Intel Q35"}, \
+	{0x8086, 0x29D2, CHIP_I9XX|CHIP_I915, "Intel Q33"}, \
 	{0, 0, 0, NULL}
 
 #ifdef	__cplusplus

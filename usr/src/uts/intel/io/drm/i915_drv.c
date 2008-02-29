@@ -56,7 +56,7 @@
 #include "i915_drv.h"
 #include "drm_pciids.h"
 
-#define	i915_max_ioctl  15
+#define	i915_max_ioctl  0x20 /* changed from 15 */
 
 
 /*

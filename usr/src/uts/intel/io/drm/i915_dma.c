@@ -47,6 +47,11 @@
     			dev->pci_device == 0x2A02 || \
     			dev->pci_device == 0x2A12)
 
+#define	IS_G33(dev)	(dev->pci_device == 0x29b2 || \
+			dev->pci_device == 0x29c2 || \
+			dev->pci_device == 0x29d2)
+
+
 
 /* Really want an OS-independent resettable timer.  Would like to have
  * this loop run for (eg) 3 sec, but have the timer reset every time
@@ -118,6 +123,12 @@ static int i915_dma_cleanup(drm_device_t * dev)
 
 			/* Need to rewrite hardware status page */
 			I915_WRITE(0x02080, 0x1ffff000);
+		}
+
+		if (dev_priv->status_gfx_addr) {
+			dev_priv->status_gfx_addr = 0;
+			drm_core_ioremapfree(&dev_priv->hws_map, dev);
+			I915_WRITE(0x2080, 0x1ffff000);
 		}
 
 		drm_free(dev->dev_private, sizeof(drm_i915_private_t),
@@ -192,23 +203,28 @@ static int i915_initialize(drm_device_t * dev,
 	 */
 	dev_priv->allow_batchbuffer = 1;
 
-	/* Program Hardware Status Page */
-	dev_priv->status_page_dmah = drm_pci_alloc(dev, PAGE_SIZE, PAGE_SIZE,
-	    0xffffffff, 1);
+	
+	if (!IS_G33(dev)) {
+		/* Program Hardware Status Page */
+		dev_priv->status_page_dmah =
+		    drm_pci_alloc(dev, PAGE_SIZE, PAGE_SIZE,
+		    0xffffffff, 1);
 
-	if (!dev_priv->status_page_dmah) {
-		dev->dev_private = (void *)dev_priv;
-		(void) i915_dma_cleanup(dev);
-		DRM_ERROR("Can not allocate hardware status page\n");
-		return (ENOMEM);
+		if (!dev_priv->status_page_dmah) {
+			dev->dev_private = (void *)dev_priv;
+			(void) i915_dma_cleanup(dev);
+			DRM_ERROR("Can not allocate hardware status page\n");
+			return (ENOMEM);
+		}
+
+		dev_priv->hw_status_page =
+		     (void *)dev_priv->status_page_dmah->vaddr;
+		dev_priv->dma_status_page = dev_priv->status_page_dmah->paddr;
+		(void) memset(dev_priv->hw_status_page, 0, PAGE_SIZE);
+		DRM_DEBUG("hw status page @ %p\n", dev_priv->hw_status_page);
+
+		I915_WRITE(0x02080, dev_priv->dma_status_page);
 	}
-
-	dev_priv->hw_status_page = (void *)dev_priv->status_page_dmah->vaddr;
-	dev_priv->dma_status_page = dev_priv->status_page_dmah->paddr;
-	(void) memset(dev_priv->hw_status_page, 0, PAGE_SIZE);
-	DRM_DEBUG("hw status page @ %p\n", dev_priv->hw_status_page);
-
-	I915_WRITE(0x02080, dev_priv->dma_status_page);
 	DRM_DEBUG("Enabled hardware status page\n");
 
 	dev->dev_private = (void *)dev_priv;
@@ -844,6 +860,52 @@ static int i915_setparam(DRM_IOCTL_ARGS)
 }
 
 /*ARGSUSED*/
+static int i915_set_status_page(DRM_IOCTL_ARGS)
+{
+	DRM_DEVICE;
+	drm_i915_private_t *dev_priv = dev->dev_private;
+	drm_i915_hws_addr_t hws;
+
+	if (!dev_priv) {
+		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
+		return (EINVAL);
+	}
+	DRM_COPYFROM_WITH_RETURN(&hws, (drm_i915_hws_addr_t __user *) data,
+			sizeof(hws));
+	DRM_DEBUG("set status page addr 0x%08x\n", (u32)hws.addr);
+
+	dev_priv->status_gfx_addr = hws.addr & (0x1ffff<<12);
+	DRM_DEBUG("set gfx_addr 0x%08x\n", dev_priv->status_gfx_addr);
+
+	dev_priv->hws_map.offset =
+	    (u_offset_t)dev->agp->agp_info.agpi_aperbase + hws.addr;
+	dev_priv->hws_map.size = PAGE_SIZE; /* 4K pages */
+	dev_priv->hws_map.type = _DRM_REGISTERS;
+	dev_priv->hws_map.flags = 0;
+	dev_priv->hws_map.mtrr = 0;
+
+	DRM_DEBUG("set status page: i915_set_status_page: mapoffset 0x%llx\n",
+	    dev_priv->hws_map.offset);
+	drm_core_ioremap(&dev_priv->hws_map, dev);
+	if (dev_priv->hws_map.handle == NULL) {
+		dev->dev_private = (void *)dev_priv;
+		(void) i915_dma_cleanup(dev);
+		dev_priv->status_gfx_addr = 0;
+		DRM_ERROR("can not ioremap virtual address for"
+				" G33 hw status page\n");
+		return (ENOMEM);
+	}
+	dev_priv->hw_status_page = dev_priv->hws_map.dev_addr;
+
+	(void) memset(dev_priv->hw_status_page, 0, PAGE_SIZE);
+	I915_WRITE(0x02080, dev_priv->status_gfx_addr);
+	DRM_DEBUG("load hws 0x2080 with gfx mem 0x%x\n",
+			dev_priv->status_gfx_addr);
+	DRM_DEBUG("load hws at %p\n", dev_priv->hw_status_page);
+	return 0;
+}
+
+/*ARGSUSED*/
 int i915_driver_load(drm_device_t *dev, unsigned long flags)
 {
 	/* i915 has 4 more counters */
@@ -915,6 +977,8 @@ i915_init_ioctl_arrays(void)
 	    i915_cmdbuffer, 1, 0, "i915_cmdbuffer");
 	i915_set_ioctl_desc(DRM_IOCTL_NR(DRM_I915_DESTROY_HEAP),
 	    i915_mem_destroy_heap, 1, 1, "i915_mem_destroy_heap");
+	i915_set_ioctl_desc(DRM_IOCTL_NR(DRM_I915_HWS_ADDR),
+	    i915_set_status_page, 1, 0, "i915_set_status_page");
 }
 /**
  * Determine if the device really is AGP or not.

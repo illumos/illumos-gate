@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,6 @@
 #define	I915_GMADR	3	/* graphics mem BAR */
 #define	I915_GTTADDR	4	/* GTT BAR */
 #define	I965_GTTMMADR	1	/* mem-mapped registers BAR + GTT */
-#define	I965_GMADR	2	/* graphics mem BAR */
 /* In 965 1MB GTTMMADR, GTT reside in the latter 512KB */
 #define	I965_GTT_OFFSET	0x80000
 #define	GTT_SIZE_MASK	0xe
@@ -282,11 +281,8 @@ set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster,
 		    &MMIO_HANDLE(agpmaster));
 		CHECK_STATUS(status);
 
-		/*
-		 * Different computing method used in getting the base of gmadr
-		 * and aperture size.
-		 */
-		gmadr_off = IX33_CONF_GMADR;
+		gmadr_off = I915_CONF_GMADR;
+		/* Different computing method used in getting aperture size. */
 		apersize = i3XX_apersize(pci_acc_hdl);
 	} else if (IS_INTEL_965(agpmaster)) {
 		status = ddi_regs_map_setup(devi, I965_GTTMMADR,

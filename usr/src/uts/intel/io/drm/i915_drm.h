@@ -27,7 +27,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,6 +158,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_INIT_HEAP	0x0a
 #define DRM_I915_CMDBUFFER	0x0b
 #define DRM_I915_DESTROY_HEAP	0x0c
+#define	DRM_I915_HWS_ADDR	0x11
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
 #define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
@@ -308,5 +309,10 @@ typedef struct drm_i915_vblank_swap {
 	drm_vblank_seq_type_t seqtype;
 	unsigned int sequence;
 } drm_i915_vblank_swap_t;
+
+typedef struct drm_i915_hws_addr {
+	uint64_t addr;
+} drm_i915_hws_addr_t;
+
 
 #endif /* _I915_DRM_H */

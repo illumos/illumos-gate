@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,7 +165,6 @@ extern "C" {
 /* register offsets in PCI config space */
 #define	I8XX_CONF_GMADR			0x10 /* GMADR of i8xx series */
 #define	I915_CONF_GMADR			0x18 /* GMADR of i915 series */
-#define	IX33_CONF_GMADR			0x10 /* GMADR of x33 series */
 /* (Mirror) GMCH Graphics Control Register (GGC, MGGC) */
 #define	I8XX_CONF_GC			0x52
 
