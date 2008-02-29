@@ -2,7 +2,7 @@
  *
  * devinfo_storage.c : storage devices
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -173,7 +173,7 @@ devinfo_ide_host_add(HalDevice *parent, di_node_t node, char *devfs_path)
 
 	devinfo_set_default_properties (d, parent, node, devfs_path);
 	hal_device_property_set_string (d, "info.product", "IDE host controller");
-	hal_device_property_set_string (d, "info.bus", "ide_host");
+	hal_device_property_set_string (d, "info.subsystem", "ide_host");
 	hal_device_property_set_int (d, "ide_host.number", 0); /* XXX */
 
 	devinfo_add_enqueue (d, devfs_path, &devinfo_ide_handler);
@@ -190,7 +190,7 @@ devinfo_ide_device_add(HalDevice *parent, di_node_t node, char *devfs_path)
 
 	devinfo_set_default_properties (d, parent, node, devfs_path);
         hal_device_property_set_string (parent, "info.product", "IDE device");
-	hal_device_property_set_string (parent, "info.bus", "ide");
+	hal_device_property_set_string (parent, "info.subsystem", "ide");
 	hal_device_property_set_int (parent, "ide.host", 0); /* XXX */
 	hal_device_property_set_int (parent, "ide.channel", 0);
 
@@ -261,7 +261,7 @@ devinfo_scsi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devi
 	d = hal_device_new ();
 
 	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_property_set_string (d, "info.bus", "scsi");
+	hal_device_property_set_string (d, "info.subsystem", "scsi");
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
                 "%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
@@ -386,7 +386,7 @@ devinfo_pcata_add(HalDevice *parent, di_node_t node, char *devfs_path, char *dev
 	d = hal_device_new ();
 
 	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_property_set_string (d, "info.bus", "pcmcia");
+	hal_device_property_set_string (d, "info.subsystem", "pcmcia");
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
                 "%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
@@ -615,7 +615,7 @@ devinfo_lofi_add_major(HalDevice *parent, di_node_t node, char *devfs_path, char
 		d = hal_device_new ();
 
 		devinfo_set_default_properties (d, parent, node, devfs_path);
-		hal_device_property_set_string (d, "info.bus", "pseudo");
+		hal_device_property_set_string (d, "info.subsystem", "pseudo");
 
         	hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
                 	"%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
@@ -1166,7 +1166,7 @@ devinfo_storage_hotplug_begin_add (HalDevice *d, HalDevice *parent, DevinfoDevHa
 
 	p_d = parent;
 	for (;;) {
-		bus = hal_device_property_get_string (p_d, "info.bus");
+		bus = hal_device_property_get_string (p_d, "info.subsystem");
 		if (bus != NULL) {
 			for (i = 0; i < NELEM(busses); i++) {
 				if (strcmp(bus, busses[i]) == 0) {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -399,8 +399,8 @@ usba_bus_ctl(dev_info_t	*dip,
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
 		cmn_err(CE_CONT, "%s%d:	invalid	op (%d)	from %s%d",
-			ddi_node_name(dip), ddi_get_instance(dip),
-			op, ddi_node_name(rdip), ddi_get_instance(rdip));
+		    ddi_node_name(dip), ddi_get_instance(dip),
+		    op, ddi_node_name(rdip), ddi_get_instance(rdip));
 		return (DDI_FAILURE);
 
 	/*
@@ -419,7 +419,7 @@ void
 usba_usba_initialization()
 {
 	usba_log_handle = usb_alloc_log_hdl(NULL, "usba", &usba_errlevel,
-				&usba_errmask, NULL, 0);
+	    &usba_errmask, NULL, 0);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA,
 	    usba_log_handle, "usba_usba_initialization");
@@ -580,12 +580,12 @@ usba_alloc_usba_device(dev_info_t *root_hub_dip)
 	 * initialize usba_device
 	 */
 	mutex_init(&usba_device->usb_mutex, NULL, MUTEX_DRIVER,
-							iblock_cookie);
+	    iblock_cookie);
 
 	usba_init_list(&usba_device->usb_device_list, (usb_opaque_t)usba_device,
-							iblock_cookie);
+	    iblock_cookie);
 	usba_init_list(&usba_device->usb_allocated, (usb_opaque_t)usba_device,
-							iblock_cookie);
+	    iblock_cookie);
 	mutex_enter(&usba_device->usb_mutex);
 	usba_device->usb_root_hub_dip = root_hub_dip;
 
@@ -671,7 +671,7 @@ usba_free_usba_device(usba_device_t *usba_device)
 	}
 
 	(void) usba_rm_from_list(&usba_device_list,
-				&usba_device->usb_device_list);
+	    &usba_device->usb_device_list);
 
 	mutex_exit(&usba_mutex);
 
@@ -723,7 +723,7 @@ usba_free_usba_device(usba_device_t *usba_device)
 					kmem_free(
 					    usba_device->usb_cfg_str_descr[i],
 					    strlen(usba_device->
-						usb_cfg_str_descr[i]) + 1);
+					    usb_cfg_str_descr[i]) + 1);
 				}
 			}
 			/* free the array pointers */
@@ -733,22 +733,22 @@ usba_free_usba_device(usba_device_t *usba_device)
 
 		if (usba_device->usb_dev_descr) {
 			kmem_free(usba_device->usb_dev_descr,
-				    sizeof (usb_dev_descr_t));
+			    sizeof (usb_dev_descr_t));
 		}
 
 		if (usba_device->usb_mfg_str) {
 			kmem_free(usba_device->usb_mfg_str,
-				strlen(usba_device->usb_mfg_str) + 1);
+			    strlen(usba_device->usb_mfg_str) + 1);
 		}
 
 		if (usba_device->usb_product_str) {
 			kmem_free(usba_device->usb_product_str,
-				strlen(usba_device->usb_product_str) + 1);
+			    strlen(usba_device->usb_product_str) + 1);
 		}
 
 		if (usba_device->usb_serialno_str) {
 			kmem_free(usba_device->usb_serialno_str,
-				strlen(usba_device->usb_serialno_str) + 1);
+			    strlen(usba_device->usb_serialno_str) + 1);
 		}
 
 		usba_unset_usb_address(usba_device);
@@ -832,7 +832,7 @@ usba_create_child_devi(dev_info_t	*dip,
 	    (void *)usba_device, port_status);
 
 	ndi_devi_alloc_sleep(dip, node_name, (pnode_t)DEVI_SID_NODEID,
-				child_dip);
+	    child_dip);
 
 	USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
 	    "child dip=0x%p", *child_dip);
@@ -855,7 +855,7 @@ usba_create_child_devi(dev_info_t	*dip,
 		}
 		if (usb_root_hub_dip) {
 			ASSERT(usba_device->usb_root_hub_dip ==
-						usb_root_hub_dip);
+			    usb_root_hub_dip);
 		}
 
 		usba_device->usb_port_status	= port_status;
@@ -868,8 +868,8 @@ usba_create_child_devi(dev_info_t	*dip,
 			address = 0;
 
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
-				"cannot set usb address for dip=0x%p",
-				*child_dip);
+			    "cannot set usb address for dip=0x%p",
+			    *child_dip);
 
 			goto fail;
 		}
@@ -878,11 +878,11 @@ usba_create_child_devi(dev_info_t	*dip,
 
 	/* attach properties */
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, *child_dip,
-		"assigned-address", address);
+	    "assigned-address", address);
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
-			"cannot set usb address property for dip=0x%p",
-			*child_dip);
+		    "cannot set usb address property for dip=0x%p",
+		    *child_dip);
 		rval = USB_FAILURE;
 
 		goto fail;
@@ -895,7 +895,7 @@ usba_create_child_devi(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_create_child_devi: devi=0x%p (%s) ud=0x%p",
-		*child_dip, ddi_driver_name(*child_dip), usba_device);
+	    *child_dip, ddi_driver_name(*child_dip), usba_device);
 
 	return (USB_SUCCESS);
 
@@ -980,7 +980,7 @@ usba_init_list(usba_list_entry_t *element, usb_opaque_t private,
 	ddi_iblock_cookie_t	iblock_cookie)
 {
 	mutex_init(&element->list_mutex, NULL, MUTEX_DRIVER,
-						iblock_cookie);
+	    iblock_cookie);
 	mutex_enter(&element->list_mutex);
 	element->private = private;
 	mutex_exit(&element->list_mutex);
@@ -1672,7 +1672,7 @@ usba_get_ugen_binding(dev_info_t *dip)
 {
 	usba_device_t	*usba_device = usba_get_usba_device(dip);
 	usba_hcdi_t	*hcdi =
-			    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
+	    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
 
 	return (hcdi->hcdi_ugen_default_binding);
 }
@@ -1720,12 +1720,12 @@ usba_ready_device_node(dev_info_t *child_dip)
 
 	if (address != ROOT_HUB_ADDR) {
 		size = usb_parse_if_descr(
-				usb_config,
-				usb_config_length,
-				0,		/* interface index */
-				0,		/* alt interface index */
-				&if_descr,
-				USB_IF_DESCR_SIZE);
+		    usb_config,
+		    usb_config_length,
+		    0,		/* interface index */
+		    0,		/* alt interface index */
+		    &if_descr,
+		    USB_IF_DESCR_SIZE);
 
 		if (size != USB_IF_DESCR_SIZE) {
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
@@ -1751,7 +1751,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	mutex_exit(&usba_device->usb_mutex);
 
 	rval = ndi_prop_update_int_array(
-		DDI_DEV_T_NONE, child_dip, "reg", reg, 1);
+	    DDI_DEV_T_NONE, child_dip, "reg", reg, 1);
 
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
@@ -1765,7 +1765,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	    (usb_dev_descr->bDeviceClass == 0)));
 
 	is_hub = (if_descr.bInterfaceClass == USB_CLASS_HUB) ||
-		(usb_dev_descr->bDeviceClass == USB_CLASS_HUB);
+	    (usb_dev_descr->bDeviceClass == USB_CLASS_HUB);
 
 	/* set node name */
 	if (combined_node) {
@@ -1820,7 +1820,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	if (force_bind) {
 		(void) ndi_devi_set_nodename(child_dip, force_bind, 0);
 		(void) strncpy(usba_name[n++], force_bind,
-						USBA_MAX_COMPAT_NAME_LEN);
+		    USBA_MAX_COMPAT_NAME_LEN);
 	}
 
 	/* create compatible names */
@@ -1828,97 +1828,97 @@ usba_ready_device_node(dev_info_t *child_dip)
 
 		/* 1. usbVID,PID.REV */
 		(void) sprintf(usba_name[n++],
-			"usb%x,%x.%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct,
-			usb_dev_descr->bcdDevice);
+		    "usb%x,%x.%x",
+		    usb_dev_descr->idVendor,
+		    usb_dev_descr->idProduct,
+		    usb_dev_descr->bcdDevice);
 
 		/* 2. usbVID,PID */
 		(void) sprintf(usba_name[n++],
-			"usb%x,%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct);
+		    "usb%x,%x",
+		    usb_dev_descr->idVendor,
+		    usb_dev_descr->idProduct);
 
 		if (usb_dev_descr->bDeviceClass != 0) {
 			/* 3. usbVID,classDC.DSC.DPROTO */
 			(void) sprintf(usba_name[n++],
-				"usb%x,class%x.%x.%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass,
-				usb_dev_descr->bDeviceProtocol);
+			    "usb%x,class%x.%x.%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass,
+			    usb_dev_descr->bDeviceProtocol);
 
 			/* 4. usbVID,classDC.DSC */
 			(void) sprintf(usba_name[n++],
-				"usb%x,class%x.%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass);
+			    "usb%x,class%x.%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass);
 
 			/* 5. usbVID,classDC */
 			(void) sprintf(usba_name[n++],
-				"usb%x,class%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->bDeviceClass);
+			    "usb%x,class%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->bDeviceClass);
 
 			/* 6. usb,classDC.DSC.DPROTO */
 			(void) sprintf(usba_name[n++],
-				"usb,class%x.%x.%x",
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass,
-				usb_dev_descr->bDeviceProtocol);
+			    "usb,class%x.%x.%x",
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass,
+			    usb_dev_descr->bDeviceProtocol);
 
 			/* 7. usb,classDC.DSC */
 			(void) sprintf(usba_name[n++],
-				"usb,class%x.%x",
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass);
+			    "usb,class%x.%x",
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass);
 
 			/* 8. usb,classDC */
 			(void) sprintf(usba_name[n++],
-				"usb,class%x",
-				usb_dev_descr->bDeviceClass);
+			    "usb,class%x",
+			    usb_dev_descr->bDeviceClass);
 		}
 
 		if (if_descr.bInterfaceClass != 0) {
 			/* 9. usbifVID,classIC.ISC.IPROTO */
 			(void) sprintf(usba_name[n++],
-				"usbif%x,class%x.%x.%x",
-				usb_dev_descr->idVendor,
-				if_descr.bInterfaceClass,
-				if_descr.bInterfaceSubClass,
-				if_descr.bInterfaceProtocol);
+			    "usbif%x,class%x.%x.%x",
+			    usb_dev_descr->idVendor,
+			    if_descr.bInterfaceClass,
+			    if_descr.bInterfaceSubClass,
+			    if_descr.bInterfaceProtocol);
 
 			/* 10. usbifVID,classIC.ISC */
 			(void) sprintf(usba_name[n++],
-				"usbif%x,class%x.%x",
-				usb_dev_descr->idVendor,
-				if_descr.bInterfaceClass,
-				if_descr.bInterfaceSubClass);
+			    "usbif%x,class%x.%x",
+			    usb_dev_descr->idVendor,
+			    if_descr.bInterfaceClass,
+			    if_descr.bInterfaceSubClass);
 
 			/* 11. usbifVID,classIC */
 			(void) sprintf(usba_name[n++],
-				"usbif%x,class%x",
-				usb_dev_descr->idVendor,
-				if_descr.bInterfaceClass);
+			    "usbif%x,class%x",
+			    usb_dev_descr->idVendor,
+			    if_descr.bInterfaceClass);
 
 			/* 12. usbif,classIC.ISC.IPROTO */
 			(void) sprintf(usba_name[n++],
-				"usbif,class%x.%x.%x",
-				if_descr.bInterfaceClass,
-				if_descr.bInterfaceSubClass,
-				if_descr.bInterfaceProtocol);
+			    "usbif,class%x.%x.%x",
+			    if_descr.bInterfaceClass,
+			    if_descr.bInterfaceSubClass,
+			    if_descr.bInterfaceProtocol);
 
 			/* 13. usbif,classIC.ISC */
 			(void) sprintf(usba_name[n++],
-				"usbif,class%x.%x",
-				if_descr.bInterfaceClass,
-				if_descr.bInterfaceSubClass);
+			    "usbif,class%x.%x",
+			    if_descr.bInterfaceClass,
+			    if_descr.bInterfaceSubClass);
 
 			/* 14. usbif,classIC */
 			(void) sprintf(usba_name[n++],
-				"usbif,class%x",
-				if_descr.bInterfaceClass);
+			    "usbif,class%x",
+			    if_descr.bInterfaceClass);
 		}
 
 		/* 15. ugen or usb_mid */
@@ -1933,74 +1933,74 @@ usba_ready_device_node(dev_info_t *child_dip)
 		if (n_cfgs > 1) {
 			/* 1. usbVID,PID.REV.configCN */
 			(void) sprintf(usba_name[n++],
-				"usb%x,%x.%x.config%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->idProduct,
-				usb_dev_descr->bcdDevice,
-				usba_device->usb_cfg_value);
+			    "usb%x,%x.%x.config%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->idProduct,
+			    usb_dev_descr->bcdDevice,
+			    usba_device->usb_cfg_value);
 		}
 
 		/* 2. usbVID,PID.REV */
 		(void) sprintf(usba_name[n++],
-			"usb%x,%x.%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct,
-			usb_dev_descr->bcdDevice);
+		    "usb%x,%x.%x",
+		    usb_dev_descr->idVendor,
+		    usb_dev_descr->idProduct,
+		    usb_dev_descr->bcdDevice);
 
 		/* 3. usbVID,PID.configCN */
 		if (n_cfgs > 1) {
 			(void) sprintf(usba_name[n++],
-				"usb%x,%x.%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->idProduct,
-				usba_device->usb_cfg_value);
+			    "usb%x,%x.%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->idProduct,
+			    usba_device->usb_cfg_value);
 		}
 
 		/* 4. usbVID,PID */
 		(void) sprintf(usba_name[n++],
-			"usb%x,%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct);
+		    "usb%x,%x",
+		    usb_dev_descr->idVendor,
+		    usb_dev_descr->idProduct);
 
 		if (usb_dev_descr->bDeviceClass != 0) {
 			/* 5. usbVID,classDC.DSC.DPROTO */
 			(void) sprintf(usba_name[n++],
-				"usb%x,class%x.%x.%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass,
-				usb_dev_descr->bDeviceProtocol);
+			    "usb%x,class%x.%x.%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass,
+			    usb_dev_descr->bDeviceProtocol);
 
 			/* 6. usbVID,classDC.DSC */
 			(void) sprintf(usba_name[n++],
-				"usb%x.class%x.%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass);
+			    "usb%x.class%x.%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass);
 
 			/* 7. usbVID,classDC */
 			(void) sprintf(usba_name[n++],
-				"usb%x.class%x",
-				usb_dev_descr->idVendor,
-				usb_dev_descr->bDeviceClass);
+			    "usb%x.class%x",
+			    usb_dev_descr->idVendor,
+			    usb_dev_descr->bDeviceClass);
 
 			/* 8. usb,classDC.DSC.DPROTO */
 			(void) sprintf(usba_name[n++],
-				"usb,class%x.%x.%x",
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass,
-				usb_dev_descr->bDeviceProtocol);
+			    "usb,class%x.%x.%x",
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass,
+			    usb_dev_descr->bDeviceProtocol);
 
 			/* 9. usb,classDC.DSC */
 			(void) sprintf(usba_name[n++],
-				"usb,class%x.%x",
-				usb_dev_descr->bDeviceClass,
-				usb_dev_descr->bDeviceSubClass);
+			    "usb,class%x.%x",
+			    usb_dev_descr->bDeviceClass,
+			    usb_dev_descr->bDeviceSubClass);
 
 			/* 10. usb,classDC */
 			(void) sprintf(usba_name[n++],
-				"usb,class%x",
-				usb_dev_descr->bDeviceClass);
+			    "usb,class%x",
+			    usb_dev_descr->bDeviceClass);
 		}
 
 		if (usba_get_ugen_binding(child_dip) ==
@@ -2035,7 +2035,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 
 	/* update the address property */
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-			"assigned-address", usba_device->usb_addr);
+	    "assigned-address", usba_device->usb_addr);
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: address update failed");
@@ -2075,6 +2075,22 @@ usba_ready_device_node(dev_info_t *child_dip)
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: usb-release update failed");
+	}
+
+	rval = ndi_prop_update_byte_array(DDI_DEV_T_NONE, child_dip,
+	    "usb-dev-descriptor", (uchar_t *)usb_dev_descr,
+	    sizeof (usb_dev_descr_t));
+	if (rval != DDI_PROP_SUCCESS) {
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+		    "usba_ready_device_node: usb-descriptor update failed");
+	}
+
+	rval = ndi_prop_update_byte_array(DDI_DEV_T_NONE, child_dip,
+	    "usb-raw-cfg-descriptors", usb_config, usb_config_length);
+	if (rval != DDI_PROP_SUCCESS) {
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+		    "usba_ready_device_node: usb-raw-cfg-descriptors update "
+		    "failed");
 	}
 
 	devprop_str = kmem_zalloc(USB_MAXSTRINGLEN, KM_SLEEP);
@@ -2117,7 +2133,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	if (!combined_node) {
 		/* update the configuration property */
 		rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-			"configuration#", usba_device->usb_cfg_value);
+		    "configuration#", usba_device->usb_cfg_value);
 		if (rval != DDI_PROP_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
@@ -2128,11 +2144,22 @@ usba_ready_device_node(dev_info_t *child_dip)
 	if (usba_device->usb_port_status == USBA_LOW_SPEED_DEV) {
 		/* create boolean property */
 		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, child_dip,
-			"low-speed");
+		    "low-speed");
 		if (rval != DDI_PROP_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
 			    "low speed prop update failed");
+		}
+	}
+
+	if (usba_device->usb_port_status == USBA_HIGH_SPEED_DEV) {
+		/* create boolean property */
+		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, child_dip,
+		    "high-speed");
+		if (rval != DDI_PROP_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+			    "usba_ready_device_node: "
+			    "high speed prop update failed");
 		}
 	}
 
@@ -2191,11 +2218,11 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 
 	/* Parse the interface descriptor */
 	size = usb_parse_ia_descr(
-			usb_cfg,
-			usb_cfg_length,
-			first_if,	/* interface index */
-			&ia_descr,
-			USB_IA_DESCR_SIZE);
+	    usb_cfg,
+	    usb_cfg_length,
+	    first_if,	/* interface index */
+	    &ia_descr,
+	    USB_IA_DESCR_SIZE);
 
 	*if_count = 1;
 	if (size != USB_IA_DESCR_SIZE) {
@@ -2217,12 +2244,12 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 
 	/* clone this dip */
 	rval =	usba_create_child_devi(dip,
-			"interface-association",
-			NULL,		/* usba_hcdi ops */
-			NULL,		/* root hub dip */
-			port_status,	/* port status */
-			child_ud,	/* share this usba_device */
-			&child_dip);
+	    "interface-association",
+	    NULL,		/* usba_hcdi ops */
+	    NULL,		/* root hub dip */
+	    port_status,	/* port status */
+	    child_ud,	/* share this usba_device */
+	    &child_dip);
 
 	if (rval != USB_SUCCESS) {
 
@@ -2230,7 +2257,7 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 	}
 
 	rval = ndi_prop_update_int_array(
-		DDI_DEV_T_NONE, child_dip, "reg", reg, 2);
+	    DDI_DEV_T_NONE, child_dip, "reg", reg, 2);
 
 	if (rval != DDI_PROP_SUCCESS) {
 
@@ -2264,66 +2291,66 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 	if (force_bind) {
 		(void) ndi_devi_set_nodename(child_dip, force_bind, 0);
 		(void) strncpy(usba_name[n++], force_bind,
-						USBA_MAX_COMPAT_NAME_LEN);
+		    USBA_MAX_COMPAT_NAME_LEN);
 	}
 
 	/* 1) usbiaVID,PID.REV.configCN.FN */
 	(void) sprintf(usba_name[n++],
-			"usbia%x,%x.%x.config%x.%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct,
-			usb_dev_descr->bcdDevice,
-			child_ud->usb_cfg_value,
-			first_if);
+	    "usbia%x,%x.%x.config%x.%x",
+	    usb_dev_descr->idVendor,
+	    usb_dev_descr->idProduct,
+	    usb_dev_descr->bcdDevice,
+	    child_ud->usb_cfg_value,
+	    first_if);
 
 	/* 2) usbiaVID,PID.configCN.FN */
 	(void) sprintf(usba_name[n++],
-			"usbia%x,%x.config%x.%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct,
-			child_ud->usb_cfg_value,
-			first_if);
+	    "usbia%x,%x.config%x.%x",
+	    usb_dev_descr->idVendor,
+	    usb_dev_descr->idProduct,
+	    child_ud->usb_cfg_value,
+	    first_if);
 
 
 	if (ia_descr.bFunctionClass) {
 		/* 3) usbiaVID,classFC.FSC.FPROTO */
 		(void) sprintf(usba_name[n++],
-			"usbia%x,class%x.%x.%x",
-			usb_dev_descr->idVendor,
-			ia_descr.bFunctionClass,
-			ia_descr.bFunctionSubClass,
-			ia_descr.bFunctionProtocol);
+		    "usbia%x,class%x.%x.%x",
+		    usb_dev_descr->idVendor,
+		    ia_descr.bFunctionClass,
+		    ia_descr.bFunctionSubClass,
+		    ia_descr.bFunctionProtocol);
 
 		/* 4) usbiaVID,classFC.FSC */
 		(void) sprintf(usba_name[n++],
-			"usbia%x,class%x.%x",
-			usb_dev_descr->idVendor,
-			ia_descr.bFunctionClass,
-			ia_descr.bFunctionSubClass);
+		    "usbia%x,class%x.%x",
+		    usb_dev_descr->idVendor,
+		    ia_descr.bFunctionClass,
+		    ia_descr.bFunctionSubClass);
 
 		/* 5) usbiaVID,classFC */
 		(void) sprintf(usba_name[n++],
-			"usbia%x,class%x",
-			usb_dev_descr->idVendor,
-			ia_descr.bFunctionClass);
+		    "usbia%x,class%x",
+		    usb_dev_descr->idVendor,
+		    ia_descr.bFunctionClass);
 
 		/* 6) usbia,classFC.FSC.FPROTO */
 		(void) sprintf(usba_name[n++],
-			"usbia,class%x.%x.%x",
-			ia_descr.bFunctionClass,
-			ia_descr.bFunctionSubClass,
-			ia_descr.bFunctionProtocol);
+		    "usbia,class%x.%x.%x",
+		    ia_descr.bFunctionClass,
+		    ia_descr.bFunctionSubClass,
+		    ia_descr.bFunctionProtocol);
 
 		/* 7) usbia,classFC.FSC */
 		(void) sprintf(usba_name[n++],
-			"usbia,class%x.%x",
-			ia_descr.bFunctionClass,
-			ia_descr.bFunctionSubClass);
+		    "usbia,class%x.%x",
+		    ia_descr.bFunctionClass,
+		    ia_descr.bFunctionSubClass);
 
 		/* 8) usbia,classFC */
 		(void) sprintf(usba_name[n++],
-			"usbia,class%x",
-			ia_descr.bFunctionClass);
+		    "usbia,class%x",
+		    ia_descr.bFunctionClass);
 	}
 
 	if (usba_get_ugen_binding(child_dip) ==
@@ -2436,12 +2463,12 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 
 	/* Parse the interface descriptor */
 	size = usb_parse_if_descr(
-			usb_cfg,
-			usb_cfg_length,
-			intf,		/* interface index */
-			0,		/* alt interface index */
-			&if_descr,
-			USB_IF_DESCR_SIZE);
+	    usb_cfg,
+	    usb_cfg_length,
+	    intf,		/* interface index */
+	    0,		/* alt interface index */
+	    &if_descr,
+	    USB_IF_DESCR_SIZE);
 
 	if (size != USB_IF_DESCR_SIZE) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
@@ -2462,12 +2489,12 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 
 	/* clone this dip */
 	rval =	usba_create_child_devi(dip,
-			"interface",
-			NULL,		/* usba_hcdi ops */
-			NULL,		/* root hub dip */
-			port_status,	/* port status */
-			child_ud,	/* share this usba_device */
-			&child_dip);
+	    "interface",
+	    NULL,		/* usba_hcdi ops */
+	    NULL,		/* root hub dip */
+	    port_status,	/* port status */
+	    child_ud,	/* share this usba_device */
+	    &child_dip);
 
 	if (rval != USB_SUCCESS) {
 
@@ -2475,7 +2502,7 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 	}
 
 	rval = ndi_prop_update_int_array(
-		DDI_DEV_T_NONE, child_dip, "reg", reg, 2);
+	    DDI_DEV_T_NONE, child_dip, "reg", reg, 2);
 
 	if (rval != DDI_PROP_SUCCESS) {
 
@@ -2508,66 +2535,66 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 	if (force_bind) {
 		(void) ndi_devi_set_nodename(child_dip, force_bind, 0);
 		(void) strncpy(usba_name[n++], force_bind,
-						USBA_MAX_COMPAT_NAME_LEN);
+		    USBA_MAX_COMPAT_NAME_LEN);
 	}
 
 	/* 1) usbifVID,PID.REV.configCN.IN */
 	(void) sprintf(usba_name[n++],
-			"usbif%x,%x.%x.config%x.%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct,
-			usb_dev_descr->bcdDevice,
-			child_ud->usb_cfg_value,
-			intf);
+	    "usbif%x,%x.%x.config%x.%x",
+	    usb_dev_descr->idVendor,
+	    usb_dev_descr->idProduct,
+	    usb_dev_descr->bcdDevice,
+	    child_ud->usb_cfg_value,
+	    intf);
 
 	/* 2) usbifVID,PID.configCN.IN */
 	(void) sprintf(usba_name[n++],
-			"usbif%x,%x.config%x.%x",
-			usb_dev_descr->idVendor,
-			usb_dev_descr->idProduct,
-			child_ud->usb_cfg_value,
-			intf);
+	    "usbif%x,%x.config%x.%x",
+	    usb_dev_descr->idVendor,
+	    usb_dev_descr->idProduct,
+	    child_ud->usb_cfg_value,
+	    intf);
 
 
 	if (if_descr.bInterfaceClass) {
 		/* 3) usbifVID,classIC.ISC.IPROTO */
 		(void) sprintf(usba_name[n++],
-			"usbif%x,class%x.%x.%x",
-			usb_dev_descr->idVendor,
-			if_descr.bInterfaceClass,
-			if_descr.bInterfaceSubClass,
-			if_descr.bInterfaceProtocol);
+		    "usbif%x,class%x.%x.%x",
+		    usb_dev_descr->idVendor,
+		    if_descr.bInterfaceClass,
+		    if_descr.bInterfaceSubClass,
+		    if_descr.bInterfaceProtocol);
 
 		/* 4) usbifVID,classIC.ISC */
 		(void) sprintf(usba_name[n++],
-			"usbif%x,class%x.%x",
-			usb_dev_descr->idVendor,
-			if_descr.bInterfaceClass,
-			if_descr.bInterfaceSubClass);
+		    "usbif%x,class%x.%x",
+		    usb_dev_descr->idVendor,
+		    if_descr.bInterfaceClass,
+		    if_descr.bInterfaceSubClass);
 
 		/* 5) usbifVID,classIC */
 		(void) sprintf(usba_name[n++],
-			"usbif%x,class%x",
-			usb_dev_descr->idVendor,
-			if_descr.bInterfaceClass);
+		    "usbif%x,class%x",
+		    usb_dev_descr->idVendor,
+		    if_descr.bInterfaceClass);
 
 		/* 6) usbif,classIC.ISC.IPROTO */
 		(void) sprintf(usba_name[n++],
-			"usbif,class%x.%x.%x",
-			if_descr.bInterfaceClass,
-			if_descr.bInterfaceSubClass,
-			if_descr.bInterfaceProtocol);
+		    "usbif,class%x.%x.%x",
+		    if_descr.bInterfaceClass,
+		    if_descr.bInterfaceSubClass,
+		    if_descr.bInterfaceProtocol);
 
 		/* 7) usbif,classIC.ISC */
 		(void) sprintf(usba_name[n++],
-			"usbif,class%x.%x",
-			if_descr.bInterfaceClass,
-			if_descr.bInterfaceSubClass);
+		    "usbif,class%x.%x",
+		    if_descr.bInterfaceClass,
+		    if_descr.bInterfaceSubClass);
 
 		/* 8) usbif,classIC */
 		(void) sprintf(usba_name[n++],
-			"usbif,class%x",
-			if_descr.bInterfaceClass);
+		    "usbif,class%x",
+		    if_descr.bInterfaceClass);
 	}
 
 	if (usba_get_ugen_binding(child_dip) ==
@@ -2596,7 +2623,7 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 
 	/* update the address property */
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-			"assigned-address", child_ud->usb_addr);
+	    "assigned-address", child_ud->usb_addr);
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_interface_node: address update failed");
@@ -2604,7 +2631,7 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 
 	/* create property with if number */
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-		"interface", intf);
+	    "interface", intf);
 
 	if (rval != DDI_PROP_SUCCESS) {
 
@@ -2652,8 +2679,8 @@ usba_get_dev_string_descrs(dev_info_t *dip, usba_device_t *ud)
 	/* fetch manufacturer string */
 	if ((ud->usb_mfg_str == NULL) && usb_dev_descr->iManufacturer &&
 	    (usb_get_string_descr(dip, USB_LANG_ID,
-		usb_dev_descr->iManufacturer, tmpbuf, USB_MAXSTRINGLEN) ==
-		USB_SUCCESS)) {
+	    usb_dev_descr->iManufacturer, tmpbuf, USB_MAXSTRINGLEN) ==
+	    USB_SUCCESS)) {
 
 		l = strlen(tmpbuf);
 		if (l > 0) {
@@ -2669,7 +2696,7 @@ usba_get_dev_string_descrs(dev_info_t *dip, usba_device_t *ud)
 	if ((ud->usb_product_str == NULL) && usb_dev_descr->iProduct &&
 	    (usb_get_string_descr(dip, USB_LANG_ID, usb_dev_descr->iProduct,
 	    tmpbuf, USB_MAXSTRINGLEN) ==
-		USB_SUCCESS)) {
+	    USB_SUCCESS)) {
 
 		l = strlen(tmpbuf);
 		if (l > 0) {
@@ -2684,8 +2711,8 @@ usba_get_dev_string_descrs(dev_info_t *dip, usba_device_t *ud)
 	/* fetch device serial number string */
 	if ((ud->usb_serialno_str == NULL) && usb_dev_descr->iSerialNumber &&
 	    (usb_get_string_descr(dip, USB_LANG_ID,
-		usb_dev_descr->iSerialNumber, tmpbuf, USB_MAXSTRINGLEN) ==
-		USB_SUCCESS)) {
+	    usb_dev_descr->iSerialNumber, tmpbuf, USB_MAXSTRINGLEN) ==
+	    USB_SUCCESS)) {
 
 		l = strlen(tmpbuf);
 		if (l > 0) {
@@ -2762,7 +2789,7 @@ usba_get_mfg_prod_sn_str(
 
 		/* Append only parts of string that don't match mfg string. */
 		duplen = usba_str_startcmp(buffer,
-					usba_device->usb_product_str);
+		    usba_device->usb_product_str);
 
 		if (duplen != -1) {		/* Not a complete match. */
 			if (return_len > 0) {
@@ -2784,8 +2811,8 @@ usba_get_mfg_prod_sn_str(
 			buffer[return_len++] = ' ';
 		}
 		(void) strncpy(&buffer[return_len],
-				usba_device->usb_serialno_str,
-				buflen - return_len - 1);
+		    usba_device->usb_serialno_str,
+		    buflen - return_len - 1);
 	}
 
 	return (buffer);
@@ -2804,7 +2831,7 @@ usba_update_hotplug_stats(dev_info_t *dip, usb_flags_t flags)
 {
 	usba_device_t	*usba_device = usba_get_usba_device(dip);
 	usba_hcdi_t	*hcdi =
-			    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
+	    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
 
 	mutex_enter(&hcdi->hcdi_mutex);
 	if (flags & USBA_TOTAL_HOTPLUG_SUCCESS) {
@@ -2841,7 +2868,7 @@ usba_get_hotplug_stats(dev_info_t *dip, ulong_t *total_success,
 {
 	usba_device_t	*usba_device = usba_get_usba_device(dip);
 	usba_hcdi_t	*hcdi =
-			    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
+	    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
 
 	mutex_enter(&hcdi->hcdi_mutex);
 	*total_success = hcdi->hcdi_total_hotplug_success;
@@ -2861,7 +2888,7 @@ usba_reset_hotplug_stats(dev_info_t *dip)
 {
 	usba_device_t	*usba_device = usba_get_usba_device(dip);
 	usba_hcdi_t	*hcdi =
-			    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
+	    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip);
 	hcdi_hotplug_stats_t *hsp;
 
 	mutex_enter(&hcdi->hcdi_mutex);
@@ -3071,7 +3098,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 		if (usba_device->usb_client_flags[iface] &
 		    USBA_CLIENT_FLAG_ATTACH) {
 			dev_info_t *dip = usba_device->
-				usb_client_attach_list[iface].dip;
+			    usb_client_attach_list[iface].dip;
 
 			USB_DPRINTF_L2(DPRINT_MASK_USBA,
 			    usba_log_handle,
@@ -3094,10 +3121,10 @@ usba_check_for_leaks(usba_device_t *usba_device)
 		    USBA_CLIENT_FLAG_EV_CBS) {
 			dev_info_t *dip =
 			    usba_device->usb_client_ev_cb_list[iface].
-							dip;
+			    dip;
 			usb_event_t *ev_data =
 			    usba_device->usb_client_ev_cb_list[iface].
-							ev_data;
+			    ev_data;
 
 			USB_DPRINTF_L2(DPRINT_MASK_USBA,
 			    usba_log_handle,
@@ -3110,9 +3137,9 @@ usba_check_for_leaks(usba_device_t *usba_device)
 			mutex_enter(&usba_device->usb_mutex);
 
 			usba_device->usb_client_ev_cb_list[iface].
-					dip = NULL;
+			    dip = NULL;
 			usba_device->usb_client_ev_cb_list[iface].
-					ev_data = NULL;
+			    ev_data = NULL;
 			usba_device->usb_client_flags[iface] &=
 			    ~USBA_CLIENT_FLAG_EV_CBS;
 		}

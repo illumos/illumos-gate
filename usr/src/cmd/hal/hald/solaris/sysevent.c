@@ -2,7 +2,7 @@
  *
  * sysevent.c : Solaris sysevents
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -40,10 +40,11 @@
 #include "devinfo.h"
 #include "devinfo_storage.h"
 #include "devinfo_acpi.h"
+#include "devinfo_usb.h"
 #include "sysevent.h"
 
 #ifndef ESC_LOFI
-#define ESC_LOFI "lofi"
+#define	ESC_LOFI "lofi"
 #endif
 
 static void	sysevent_dev_handler(sysevent_t *);
@@ -53,6 +54,7 @@ static void	sysevent_dev_remove(gchar *, gchar *);
 static void	sysevent_dev_branch(gchar *);
 static void	sysevent_lofi_add(gchar *, gchar *);
 static void	sysevent_lofi_remove(gchar *, gchar *);
+static void	sysevent_devfs_add(gchar *);
 
 static sysevent_handle_t	*shp;
 
@@ -66,21 +68,21 @@ sysevent_init(void)
 	GError *err = NULL;
 	const char	*subcl[3];
 
-        /*
+	/*
 	 * pipe used to serialize sysevents through the main loop
- 	 */
-        if (pipe (sysevent_pipe_fds) != 0) {
-                HAL_INFO (("pipe() failed errno=%d", errno));
+	 */
+	if (pipe (sysevent_pipe_fds) != 0) {
+		HAL_INFO (("pipe() failed errno=%d", errno));
 		return (FALSE);
-        }
-        sysevent_iochannel = g_io_channel_unix_new (sysevent_pipe_fds[0]);
+	}
+	sysevent_iochannel = g_io_channel_unix_new (sysevent_pipe_fds[0]);
 	if (sysevent_iochannel == NULL) {
-                HAL_INFO (("g_io_channel_unix_new failed"));
+		HAL_INFO (("g_io_channel_unix_new failed"));
 		return (FALSE);
 	}
 	g_io_channel_set_flags (sysevent_iochannel, G_IO_FLAG_NONBLOCK, &err);
-        sysevent_source_id = g_io_add_watch (
-                sysevent_iochannel, G_IO_IN, sysevent_iochannel_data, NULL);
+	sysevent_source_id = g_io_add_watch (
+	    sysevent_iochannel, G_IO_IN, sysevent_iochannel_data, NULL);
 
 	shp = sysevent_bind_handle(sysevent_dev_handler);
 	if (shp == NULL) {
@@ -110,13 +112,20 @@ sysevent_init(void)
 	}
 
 	subcl[0] = ESC_ACPIEV_ADD;
-        subcl[1] = ESC_ACPIEV_REMOVE;
-        subcl[2] = ESC_ACPIEV_STATE_CHANGE;
+	subcl[1] = ESC_ACPIEV_REMOVE;
+	subcl[2] = ESC_ACPIEV_STATE_CHANGE;
 	if (sysevent_subscribe_event(shp, EC_ACPIEV, subcl, 3) != 0) {
-                HAL_INFO(("subscribe(dev_add) failed %d", errno));
-                sysevent_unbind_handle(shp);
-                return (FALSE);
-        }
+		HAL_INFO(("subscribe(dev_add) failed %d", errno));
+		sysevent_unbind_handle(shp);
+		return (FALSE);
+	}
+
+	subcl[0] = ESC_DEVFS_DEVI_ADD;
+	if (sysevent_subscribe_event(shp, EC_DEVFS, subcl, 1) != 0) {
+		HAL_INFO (("subscribe(EC_DEVFS) failed %d", errno));
+		sysevent_unbind_handle(shp);
+		return (FALSE);
+	}
 
 	return (B_TRUE);
 }
@@ -151,7 +160,20 @@ sysevent_dev_handler(sysevent_t *ev)
 	if (sysevent_get_attr_list(ev, &attr_list) != 0)
 		return;
 
-	if (strcmp(class, EC_ACPIEV) == 0) {		
+	if (strcmp(class, EC_DEVFS) == 0) {
+		if (nvlist_lookup_string(attr_list, DEVFS_PATHNAME, &phys_path) != 0) {
+			goto out;
+		}
+
+		snprintf(s, sizeof (s), "%s %s %s\n",
+		    class, subclass, phys_path);
+		nwritten = write(sysevent_pipe_fds[1], s, strlen(s) + 1);
+
+		HAL_INFO (("sysevent_dev_handler: wrote %d bytes", nwritten));
+		goto out;
+	}
+
+	if (strcmp(class, EC_ACPIEV) == 0) {
 		if (nvlist_lookup_string(attr_list, ACPIEV_DEV_PHYS_PATH,
 		    &phys_path) != 0) {
 			goto out;
@@ -170,14 +192,14 @@ sysevent_dev_handler(sysevent_t *ev)
 	}
 
 	if (nvlist_lookup_string(attr_list, ACPIEV_DEV_HID, &dev_hid) != 0) {
-                dev_hid = "";
+		dev_hid = "";
 	}
-        if (nvlist_lookup_string(attr_list, ACPIEV_DEV_UID, &dev_uid) != 0) {
-                dev_uid = "";
+	if (nvlist_lookup_string(attr_list, ACPIEV_DEV_UID, &dev_uid) != 0) {
+		dev_uid = "";
 	}
-        if (nvlist_lookup_uint32(attr_list, ACPIEV_DEV_INDEX, &dev_index)
+	if (nvlist_lookup_uint32(attr_list, ACPIEV_DEV_INDEX, &dev_index)
 	    != 0) {
-                dev_index = 0;
+		dev_index = 0;
 	}
 
 	snprintf(s, sizeof (s), "%s %s %s %s %s %s %d\n",
@@ -192,10 +214,10 @@ out:
 
 static gboolean
 sysevent_iochannel_data (GIOChannel *source,
-                    GIOCondition condition,
-                    gpointer user_data)
+		    GIOCondition condition,
+		    gpointer user_data)
 {
-        GError *err = NULL;
+	GError *err = NULL;
 	gchar *s = NULL;
 	gsize len;
 	int matches;
@@ -203,15 +225,15 @@ sysevent_iochannel_data (GIOChannel *source,
 	gchar subclass[1024];
 	gchar phys_path[1024];
 	gchar dev_name[1024];
-        gchar dev_uid[1024];
-        gchar dev_hid[1024];
-        gchar udi[1024];
+	gchar dev_uid[1024];
+	gchar dev_hid[1024];
+	gchar udi[1024];
 	uint_t dev_index;
 
 	HAL_INFO (("sysevent_iochannel_data"));
 
 	while (g_io_channel_read_line (sysevent_iochannel, &s, &len, NULL,
-					&err) == G_IO_STATUS_NORMAL) {
+	    &err) == G_IO_STATUS_NORMAL) {
 		if (len == 0) {
 			break;
 		}
@@ -252,12 +274,16 @@ sysevent_iochannel_data (GIOChannel *source,
 				snprintf(udi, sizeof(udi),
 				    "/org/freedesktop/Hal/devices/pseudo/"
 				    "battery_0_ac%d_0", dev_index);
-                        } else {
+			} else {
 				HAL_INFO(("dev_hid %s unknown", dev_hid));
 				continue;
 			}
 			devinfo_battery_device_rescan(phys_path, udi);
-                }
+		} else if (strcmp(class, EC_DEVFS) == 0) {
+			if (strcmp(subclass, ESC_DEVFS_DEVI_ADD) == 0) {
+				sysevent_devfs_add(phys_path);
+			}
+		}
 	}
 
 	if (err) {
@@ -275,7 +301,7 @@ sysevent_dev_add(gchar *devfs_path, gchar *name)
 
 	HAL_INFO (("dev_add: %s %s", name, devfs_path));
 
-        parent = hal_util_find_closest_ancestor (devfs_path, &parent_devfs_path, &hotplug_devfs_path);
+	parent = hal_util_find_closest_ancestor (devfs_path, &parent_devfs_path, &hotplug_devfs_path);
 	if (parent == NULL) {
 		return;
 	}
@@ -352,4 +378,73 @@ sysevent_lofi_remove(gchar *parent_devfs_path, gchar *name)
 {
 	devinfo_lofi_remove_minor(parent_devfs_path, name);
 	hotplug_event_process_queue ();
+}
+
+static HalDevice *
+lookup_parent(char *devfs_path)
+{
+	gchar		*path = NULL;
+	HalDevice	*parent = NULL;
+	char *p;
+
+	path = strdup (devfs_path);
+	p = strrchr (path, '/');
+	if (p == NULL) {
+		free (path);
+		return (NULL);
+	}
+	*p = '\0';
+
+	/* Look up the parent node in the gdl. */
+	parent = hal_device_store_match_key_value_string (hald_get_gdl (),
+	    "solaris.devfs_path", path);
+
+	if (parent == NULL) {
+		/* Look up the parent node in the tdl. */
+		parent = hal_device_store_match_key_value_string (hald_get_tdl (),
+		    "solaris.devfs_path", path);
+	}
+
+	free (path);
+	return (parent);
+}
+
+/*
+ * Handle the USB bus devices hot plugging events.
+ */
+static void
+sysevent_devfs_add(gchar *devfs_path)
+{
+	di_node_t node;
+	HalDevice *parent;
+	char *driver_name;
+
+	HAL_INFO (("devfs_handle: %s", devfs_path));
+
+	if ((node = di_init (devfs_path, DINFOCPYALL)) == DI_NODE_NIL) {
+		HAL_INFO (("device not found in devinfo %s", devfs_path));
+		return;
+	}
+
+	if ((driver_name = di_driver_name (node)) == NULL)
+		goto out;
+
+	/* The disk and printer devices are handled by EC_DEV_ADD class. */
+	if ((strcmp (driver_name, "scsa2usb") == 0) ||
+	    (strcmp (driver_name, "usbprn") == 0))
+		goto out;
+
+	if ((parent = lookup_parent (devfs_path)) == NULL)
+		goto out;
+
+	devinfo_usb_add (parent, node, devfs_path, NULL);
+
+	di_fini (node);
+
+	hotplug_event_process_queue ();
+
+	return;
+
+ out:
+	di_fini (node);
 }

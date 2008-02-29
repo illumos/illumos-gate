@@ -2,7 +2,7 @@
  *
  * devinfo_pci.c : PCI devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -52,7 +52,7 @@ HalDevice *devinfo_pci_add (HalDevice *parent, di_node_t node, char *devfs_path,
 		if (parent == NULL) {
 			return (NULL);
 		} else {
-			s = (char *)hal_device_property_get_string (parent, "info.bus");
+			s = (char *)hal_device_property_get_string (parent, "info.subsystem");
 			if ((s == NULL) || (strcmp (s, "pci") != 0)) {
 				return (NULL);
 			}
@@ -62,7 +62,7 @@ HalDevice *devinfo_pci_add (HalDevice *parent, di_node_t node, char *devfs_path,
 	d = hal_device_new ();
 	devinfo_set_default_properties (d, parent, node, devfs_path);
 
-	hal_device_property_set_string (d, "info.bus", "pci");
+	hal_device_property_set_string (d, "info.subsystem", "pci");
 
 	vid = pid = svid = spid = 0;
         if (di_prop_lookup_ints (DDI_DEV_T_ANY, node, "vendor-id", &i) > 0) {

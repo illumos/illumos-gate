@@ -33,7 +33,7 @@
 
       <!-- USB Mass Storage devices that are music players -->
       
-      <match key="@storage.physical_device:info.bus" string="usb">
+      <match key="@storage.physical_device:info.subsystem" string="usb">
         <!-- Creative -->
 	<match key="@storage.physical_device:usb.vendor_id" int="0x41e">
 	  <!-- MuVo NX -->
@@ -857,7 +857,7 @@
 
     <!-- USB devices that are music players but uses a user-space library -->
 
-    <match key="info.bus" string="usb">
+    <match key="info.subsystem" string="usb">
       <!-- Archos -->
       <match key="usb.vendor_id" int="0xe79">
         <!-- GMini 120 -->

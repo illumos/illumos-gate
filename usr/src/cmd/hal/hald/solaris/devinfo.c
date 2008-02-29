@@ -2,7 +2,7 @@
  *
  * devinfo.c : main file for libdevinfo-based device enumeration
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -294,12 +294,18 @@ hotplug_event_begin_add_devinfo (HalDevice *d, HalDevice *parent, DevinfoDevHand
 	if (parent != NULL && hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("Ignoring device since parent has info.ignore==TRUE"));
 
+		if (hal_device_store_find (hald_get_tdl (), hal_device_get_udi (d)))
+			hal_device_store_remove (hald_get_tdl (), d);
+
 		hotplug_event_end (end_token);
 		return;
 	}
 
-        /* add to TDL so preprobing callouts and prober can access it */
-        hal_device_store_add (hald_get_tdl (), d);
+	if (hal_device_store_find (hald_get_tdl (), hal_device_get_udi (d)) == NULL) {
+
+		/* add to TDL so preprobing callouts and prober can access it */
+		hal_device_store_add (hald_get_tdl (), d);
+	}
 
         /* Process preprobe fdi files */
         di_search_and_merge (d, DEVICE_INFO_TYPE_PREPROBE);

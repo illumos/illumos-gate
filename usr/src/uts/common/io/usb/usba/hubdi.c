@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1359,7 +1359,7 @@ hubd_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	/* physically zap the children we didn't find */
 	mutex_enter(HUBD_MUTEX(hubd));
 	for (port = 1; port <= hubd->h_hub_descr.bNbrPorts; port++) {
-		if (hubd->h_port_state[port] &  HUBD_CHILD_ZAP) {
+		if (hubd->h_port_state[port] &	HUBD_CHILD_ZAP) {
 			/* zap the dip and usba_device structure as well */
 			hubd_free_usba_device(hubd, hubd->h_usba_devices[port]);
 			hubd->h_children_dips[port] = NULL;
@@ -1715,6 +1715,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	hubd_t			*hubd = NULL;
 	int			i, rval;
 	int			minor;
+	uint8_t			ports_count;
 	char			*log_name = NULL;
 	const char		*root_hub_drvname;
 	usb_ep_data_t		*ep_data;
@@ -1937,6 +1938,8 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto fail;
 		}
 	}
+
+	ports_count = hubd->h_hub_descr.bNbrPorts;
 	mutex_exit(HUBD_MUTEX(hubd));
 
 	/* create minor nodes */
@@ -1952,6 +1955,12 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(HUBD_MUTEX(hubd));
 	hubd->h_init_state |= HUBD_MINOR_NODE_CREATED;
 	mutex_exit(HUBD_MUTEX(hubd));
+
+	if (ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+	    "usb-port-count", ports_count) != DDI_PROP_SUCCESS) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		    "usb-port-number update failed");
+	}
 
 	/*
 	 * host controller driver has already reported this dev
@@ -6037,7 +6046,7 @@ hubd_create_child(dev_info_t *dip,
 			    hubd->h_log_handle,
 			    "Connecting a high speed device to a "
 			    "non high speed hub (port %d) will result "
-			    "in a loss of performance.  Please connect "
+			    "in a loss of performance.	Please connect "
 			    "the device to a high speed hub to get "
 			    "the maximum performance.",
 			    port);
@@ -8394,7 +8403,7 @@ usba_hubdi_decr_power_budget(dev_info_t *dip, usba_device_t *child_ud)
 
 /*
  * hubd_wait_for_hotplug_exit:
- * 	Waiting for the exit of the running hotplug thread or ioctl thread.
+ *	Waiting for the exit of the running hotplug thread or ioctl thread.
  */
 static int
 hubd_wait_for_hotplug_exit(hubd_t *hubd)
@@ -8587,16 +8596,16 @@ Fail:
 
 /*
  * hubd_check_same_device:
- * 	- open the default pipe of the device.
- * 	- compare the old and new descriptors of the device.
- * 	- close the default pipe.
+ *	- open the default pipe of the device.
+ *	- compare the old and new descriptors of the device.
+ *	- close the default pipe.
  */
 static int
 hubd_check_same_device(hubd_t *hubd, usb_port_t port)
 {
-	dev_info_t 		*dip = hubd->h_children_dips[port];
+	dev_info_t		*dip = hubd->h_children_dips[port];
 	usb_pipe_handle_t	ph;
-	int 			rval = USB_FAILURE;
+	int			rval = USB_FAILURE;
 
 	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
 
@@ -8623,7 +8632,7 @@ hubd_check_same_device(hubd_t *hubd, usb_port_t port)
 
 /*
  * usba_hubdi_reset_device
- * 	Called by usb_reset_device to handle usb device reset.
+ *	Called by usb_reset_device to handle usb device reset.
  */
 int
 usba_hubdi_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)

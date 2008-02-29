@@ -2,7 +2,7 @@
 
 <deviceinfo version="0.2">
   <device>
-    <match key="info.bus" string="usb">
+    <match key="info.subsystem" string="usb">
       <match key="usb.interface.class" int="0x06">
         <match key="usb.interface.subclass" int="0x01">
           <match key="usb.interface.protocol" int="0x01">

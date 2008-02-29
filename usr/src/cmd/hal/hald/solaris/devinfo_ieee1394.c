@@ -2,7 +2,7 @@
  *
  * devinfo_ieee1394.c : IEEE 1394/FireWire devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -80,7 +80,7 @@ devinfo_scsa1394_add(HalDevice *parent, di_node_t node, gchar *devfs_path)
 	d = hal_device_new ();
 
 	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_property_set_string (d, "info.bus", "ieee1394");
+	hal_device_property_set_string (d, "info.subsystem", "ieee1394");
 	hal_device_property_set_string (d, "info.product", "FireWire SBP-2 device");
 
 	devinfo_add_enqueue (d, devfs_path, &devinfo_ieee1394_handler);
