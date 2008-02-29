@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -541,6 +541,8 @@ schedpaging(void *arg)
 		/* pageout() not running */
 		nscan = 0;
 		vavail = freemem - deficit;
+		if (pageout_new_spread != 0)
+			vavail -= needfree;
 		if (vavail < 0)
 			vavail = 0;
 		if (vavail > lotsfree)
@@ -554,15 +556,25 @@ schedpaging(void *arg)
 		 * happens, desscan becomes negative and pageout_scanner()
 		 * stops paging out.
 		 */
-		if (needfree) {
+		if ((needfree) && (pageout_new_spread == 0)) {
+			/*
+			 * If we've not yet collected enough samples to
+			 * calculate a spread, use the old logic of kicking
+			 * into high gear anytime needfree is non-zero.
+			 */
 			desscan = fastscan / RATETOSCHEDPAGING;
 		} else {
+			/*
+			 * Once we've calculated a spread based on system
+			 * memory and usage, just treat needfree as another
+			 * form of deficit.
+			 */
 			spgcnt_t faststmp, slowstmp, result;
 
 			slowstmp = slowscan * vavail;
 			faststmp = fastscan * (lotsfree - vavail);
 			result = (slowstmp + faststmp) /
-				nz(lotsfree) / RATETOSCHEDPAGING;
+			    nz(lotsfree) / RATETOSCHEDPAGING;
 			desscan = (pgcnt_t)result;
 		}
 
@@ -572,7 +584,7 @@ schedpaging(void *arg)
 		if (freemem < lotsfree + needfree ||
 		    pageout_sample_cnt < pageout_sample_lim) {
 			TRACE_1(TR_FAC_VM, TR_PAGEOUT_CV_SIGNAL,
-				"pageout_cv_signal:freemem %ld", freemem);
+			    "pageout_cv_signal:freemem %ld", freemem);
 			cv_signal(&proc_pageout->p_cv);
 		} else {
 			/*
@@ -708,8 +720,7 @@ pageout()
 		mutex_exit(&push_lock);
 
 		if (VOP_PUTPAGE(arg->a_vp, (offset_t)arg->a_off,
-			arg->a_len, arg->a_flags,
-			    arg->a_cred, NULL) == 0) {
+		    arg->a_len, arg->a_flags, arg->a_cred, NULL) == 0) {
 			pushes++;
 		}
 
@@ -784,13 +795,12 @@ loop:
 	count = 0;
 
 	TRACE_4(TR_FAC_VM, TR_PAGEOUT_START,
-		"pageout_start:freemem %ld lotsfree %ld nscan %ld desscan %ld",
-		freemem, lotsfree, nscan, desscan);
+	    "pageout_start:freemem %ld lotsfree %ld nscan %ld desscan %ld",
+	    freemem, lotsfree, nscan, desscan);
 
 	/* Kernel probe */
 	TNF_PROBE_2(pageout_scan_start, "vm pagedaemon", /* CSTYLED */,
-		tnf_ulong, pages_free, freemem,
-		tnf_ulong, pages_needed, needfree);
+	    tnf_ulong, pages_free, freemem, tnf_ulong, pages_needed, needfree);
 
 	pcount = 0;
 	if (pageout_sample_cnt < pageout_sample_lim) {
@@ -858,8 +868,8 @@ loop:
 
 		if ((fronthand = page_next(fronthand)) == page_first())	{
 			TRACE_2(TR_FAC_VM, TR_PAGEOUT_HAND_WRAP,
-				"pageout_hand_wrap:freemem %ld whichhand %d",
-				freemem, FRONT);
+			    "pageout_hand_wrap:freemem %ld whichhand %d",
+			    freemem, FRONT);
 
 			/*
 			 * protected by pageout_mutex instead of cpu_stat_lock
@@ -893,13 +903,12 @@ loop:
 	sample_end = gethrtime();
 
 	TRACE_5(TR_FAC_VM, TR_PAGEOUT_END,
-		"pageout_end:freemem %ld lots %ld nscan %ld des %ld count %u",
-		freemem, lotsfree, nscan, desscan, count);
+	    "pageout_end:freemem %ld lots %ld nscan %ld des %ld count %u",
+	    freemem, lotsfree, nscan, desscan, count);
 
 	/* Kernel probe */
 	TNF_PROBE_2(pageout_scan_end, "vm pagedaemon", /* CSTYLED */,
-		tnf_ulong, pages_scanned, nscan,
-		tnf_ulong, pages_free, freemem);
+	    tnf_ulong, pages_scanned, nscan, tnf_ulong, pages_free, freemem);
 
 	if (pageout_sample_cnt < pageout_sample_lim) {
 		pageout_sample_pages += pcount;
@@ -1092,7 +1101,7 @@ recheck:
 	 * and handle the page properly.
 	 */
 	TRACE_2(TR_FAC_VM, TR_PAGEOUT_FREE,
-		"pageout_free:pp %p whichhand %d", pp, whichhand);
+	    "pageout_free:pp %p whichhand %d", pp, whichhand);
 	(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
 	ppattr = hat_page_getattr(pp, P_MOD | P_REF);
 	if ((ppattr & P_REF) || ((ppattr & P_MOD) && pp->p_vnode))
