@@ -53,4 +53,6 @@ P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 
 # Dependencies specific to this package
+P SUNWkrbu	Kerberos version 5 support (Usr)
+P SUNWlxml	The XML library
 P SUNWuiu8	Iconv modules for UTF-8 Locale
