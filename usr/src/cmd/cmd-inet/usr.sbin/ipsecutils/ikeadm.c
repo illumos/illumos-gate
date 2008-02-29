@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1631,10 +1631,14 @@ print_id(char *prefix, sadb_ident_t *idp, int init_instr)
 	}
 	(void) printf(gettext("uid=%d, type "), idp->sadb_ident_id);
 	canprint = dump_sadb_idtype(idp->sadb_ident_type, stdout, NULL);
-	if (canprint)
+	if (canprint) {
 		(void) printf("\n%s %s\n", prefix, (char *)(idp + 1));
-	else
-		(void) printf(gettext("\n%s <cannot print>\n"), prefix);
+	} else {
+		(void) printf(gettext("\n%s "), prefix);
+		print_asn1_name(stdout,
+		    (const unsigned char *)(idp + 1),
+		    SADB_64TO8(idp->sadb_ident_len) - sizeof (sadb_ident_t));
+	}
 }
 
 static void

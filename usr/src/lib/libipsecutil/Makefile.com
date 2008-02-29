@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,9 +27,10 @@
 
 LIBRARY =	libipsecutil.a
 VERS =		.1
-OBJECTS =	ipsec_util.o algs.o
+OBJECTS =	ipsec_util.o algs.o ipsec_libssl_setup.o
 
 include ../../Makefile.lib
+include $(SRC)/lib/openssl/Makefile.openssl
 
 LIBS +=		$(DYNLIB) $(LINTLIB)
 
@@ -37,9 +38,12 @@ SRCDIR =	../common
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsocket -lnsl -lc
+LDLIBS +=	$(OPENSSL_LDFLAGS)
+DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
+CPPFLAGS +=	$(OPENSSL_BUILD_CPPFLAGS)
 
 .KEEP_STATE:
 

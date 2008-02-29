@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,6 +169,13 @@ extern int dbgstr2num(char *);
 /* convert a string of debug strings with +|- delimiters to a debug level */
 extern int parsedbgopts(char *);
 
+/*
+ * OpenSSL library
+ */
+#define	LIBSSL	"libssl.so"
+
+void libssl_load(void);
+boolean_t libssl_loaded;
 
 /*
  * functions to manipulate the kmcookie-label mapping file
@@ -322,6 +329,7 @@ extern void printsatime(FILE *, int64_t, const char *, const char *,
 extern void print_lifetimes(FILE *, time_t, struct sadb_lifetime *,
     struct sadb_lifetime *, struct sadb_lifetime *, boolean_t vflag);
 extern void print_address(FILE *, char *, struct sadb_address *, boolean_t);
+extern void print_asn1_name(FILE *, const unsigned char *, long);
 extern void print_key(FILE *, char *, struct sadb_key *);
 extern void print_ident(FILE *, char *, struct sadb_ident *);
 extern void print_sens(FILE *, char *, struct sadb_sens *);

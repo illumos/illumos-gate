@@ -1,4 +1,5 @@
 /*
+ *
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -1841,10 +1842,12 @@ print_ident(FILE *file, char *prefix, struct sadb_ident *id)
 	    " identity, uid=%d, type "), id->sadb_ident_id);
 	canprint = dump_sadb_idtype(id->sadb_ident_type, file, NULL);
 	(void) fprintf(file, "\n%s", prefix);
-	if (canprint)
+	if (canprint) {
 		(void) fprintf(file, "%s\n", (char *)(id + 1));
-	else
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "<cannot print>\n"));
+	} else {
+		print_asn1_name(file, (const unsigned char *)(id + 1),
+		    SADB_64TO8(id->sadb_ident_len) - sizeof (sadb_ident_t));
+	}
 }
 
 /*
