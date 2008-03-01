@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4759,7 +4759,7 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 	 * Just take a swag for the allocation for now.	 We can always
 	 * alter it later.
 	 */
-#define	SADB_EXTENDED_ACQUIRE_SIZE	2048
+#define	SADB_EXTENDED_ACQUIRE_SIZE	4096
 	mp = allocb(SADB_EXTENDED_ACQUIRE_SIZE, BPRI_HI);
 	if (mp == NULL)
 		return (NULL);

@@ -1,7 +1,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -39,6 +39,9 @@ PROTO|3|PROTO_IPSEC_ESP|sync
 ALG|2|0|none,any|-|0|0
 ALG|2|2|hmac-md5,md5|CKM_MD5_HMAC_GENERAL|128|12
 ALG|2|3|hmac-sha1,sha,sha1,sha-1,hmac-sha,hmac-sha-1|CKM_SHA_1_HMAC_GENERAL|160|12
+ALG|2|5|hmac-sha256,sha256,sha-256,hmac-sha-256|CKM_SHA256_HMAC_GENERAL|256|16
+ALG|2|6|hmac-sha384,sha384,sha-384,hmac-sha-384|CKM_SHA384_HMAC_GENERAL|384|24
+ALG|2|7|hmac-sha512,sha512,sha-512,hmac-sha-512|CKM_SHA512_HMAC_GENERAL|512|32
 ALG|3|0|any|-|0|0
 ALG|3|2|des-cbc,des|CKM_DES_CBC|64|8
 ALG|3|3|3des-cbc,3des|CKM_DES3_CBC|192|8

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.	 All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.	 All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,7 +52,22 @@ do
 		sedcmd="${sedcmd} -e 's/AES_CBC|128|/AES_CBC|128\/128-256,64|/'"
 
 		eval sed $sedcmd $dest > $dest.$$
-		mv $dest.$$ $dest
+		#
+		# Add in SHA-2 support if not already there
+		#
+		awk -F\| '\
+		BEGIN {sha256=0; sha384=0; sha512=0} \
+		/^#/ || /^$/ || /^PROTO/ {print; next}; \
+		{if ($2 == 2) {if ($3 == 5) {sha256=1}; \
+		    if ($3 == 6) {sha384=1}; if ($3 == 7) {sha512=1}; \
+		    print; next}}; \
+		{if ($2 == 3 && $3 == 0) \
+		    {if (!sha256) {print "ALG|2|5|hmac-sha256,sha256,sha-256,hmac-sha-256|CKM_SHA256_HMAC_GENERAL|256|16"; sha256=1}}; \
+		    {if (!sha384) {print "ALG|2|6|hmac-sha384,sha384,sha-384,hmac-sha-384|CKM_SHA384_HMAC_GENERAL|384|24";sha384=1}}; \
+		    {if (!sha512) {print "ALG|2|7|hmac-sha512,sha512,sha-512,hmac-sha-512|CKM_SHA512_HMAC_GENERAL|512|32";sha512=1}} print}' \
+		    $dest.$$ > $dest.2.$$
+		mv $dest.2.$$ $dest
+		rm $dest.$$
 	fi
 done
 exit 0

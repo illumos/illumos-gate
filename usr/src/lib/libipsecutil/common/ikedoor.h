@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,6 +257,9 @@ typedef struct {
 #define	IKE_PRF_NONE		0
 #define	IKE_PRF_HMAC_MD5	1
 #define	IKE_PRF_HMAC_SHA1	2
+#define	IKE_PRF_HMAC_SHA256	5
+#define	IKE_PRF_HMAC_SHA384	6
+#define	IKE_PRF_HMAC_SHA512	7
 
 typedef struct {
 	/*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1265,8 +1265,8 @@ sha2_mac_atomic(crypto_provider_handle_t provider,
 	 * Do an SHA2 update on the outer context, feeding the inner
 	 * digest as data.
 	 *
-	 * Make sure that SHA384 is handled special because
-	 * it cannot feed a 60-byte inner hash to the outer
+	 * HMAC-SHA384 needs special handling as the outer hash needs only 48
+	 * bytes of the inner hash value.
 	 */
 	if (mechanism->cm_type == SHA384_HMAC_MECH_INFO_TYPE ||
 	    mechanism->cm_type == SHA384_HMAC_GEN_MECH_INFO_TYPE)
@@ -1408,8 +1408,16 @@ sha2_mac_verify_atomic(crypto_provider_handle_t provider,
 	/*
 	 * Do an SHA2 update on the outer context, feeding the inner
 	 * digest as data.
+	 *
+	 * HMAC-SHA384 needs special handling as the outer hash needs only 48
+	 * bytes of the inner hash value.
 	 */
-	SHA2Update(&sha2_hmac_ctx.hc_ocontext, digest, sha_digest_len);
+	if (mechanism->cm_type == SHA384_HMAC_MECH_INFO_TYPE ||
+	    mechanism->cm_type == SHA384_HMAC_GEN_MECH_INFO_TYPE)
+		SHA2Update(&sha2_hmac_ctx.hc_ocontext, digest,
+		    SHA384_DIGEST_LENGTH);
+	else
+		SHA2Update(&sha2_hmac_ctx.hc_ocontext, digest, sha_digest_len);
 
 	/*
 	 * Do a SHA2 final on the outer context, storing the computed

@@ -1341,6 +1341,12 @@ prfstr(int prf)
 		return ("HMAC MD5");
 	case IKE_PRF_HMAC_SHA1:
 		return ("HMAC SHA1");
+	case IKE_PRF_HMAC_SHA256:
+		return ("HMAC SHA256");
+	case IKE_PRF_HMAC_SHA384:
+		return ("HMAC SHA384");
+	case IKE_PRF_HMAC_SHA512:
+		return ("HMAC SHA512");
 	default:
 		(void) snprintf(rtn, MAXLINESIZE,
 		    gettext("<unknown %d>"), prf);

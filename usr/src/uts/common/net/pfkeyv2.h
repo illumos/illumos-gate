@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -567,8 +567,11 @@ typedef struct sadb_x_kmc {
 #define	SADB_AALG_NONE		0
 #define	SADB_AALG_MD5HMAC	2
 #define	SADB_AALG_SHA1HMAC	3
+#define	SADB_AALG_SHA256HMAC	5
+#define	SADB_AALG_SHA384HMAC	6
+#define	SADB_AALG_SHA512HMAC	7
 
-#define	SADB_AALG_MAX		3
+#define	SADB_AALG_MAX		7
 
 /* Encryption algorithms */
 #define	SADB_EALG_NONE		0

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -595,24 +595,90 @@ struct ipsec_out_s;
  * different from this, ULP will learn the right one through
  * ICMP_FRAGMENTATION_NEEDED messages generated locally.
  *
- * AH : 12 bytes of constant header + 12 bytes of ICV checksum (MD5/SHA1).
- *
- * ESP : 8 bytes of constant header + 16 bytes of IV + 12 bytes ICV +
- * 2 bytes of trailer + 15 bytes pad = 53
- *
- * Note that for ESP, this estimate is overly pessimistic; however, a
- * more accurate estimate needs to know the exact amount of space
- * which will be available to ESP so it can just leave 2 bytes free in
- * the last cipherblock for the ESP inner trailer, and that
- * information is not available at the right moment in the current
- * stack.
+ * AH : 12 bytes of constant header + 32 bytes of ICV checksum (SHA-512).
  */
-#define	IPSEC_MAX_AH_HDR_SIZE   (24)
-#define	IPSEC_MAX_ESP_HDR_SIZE  (53)
+#define	IPSEC_MAX_AH_HDR_SIZE   (44)
 
-/* Alternate, when we know the crypto block size */
-#define	IPSEC_BASE_ESP_HDR_SIZE(sa) (4 + 4 + 12 + 1 + 2 * (sa)->ipsa_iv_len)
-#define	IPSEC_DEF_BLOCKSIZE	(8) /* safe default */
+/*
+ * ESP : Is a bit more complex...
+ *
+ * A system of one inequality and one equation MUST be solved for proper ESP
+ * overhead.  The inequality is:
+ *
+ *    MTU - sizeof (IP header + options) >=
+ *		sizeof (esph_t) + sizeof (IV or ctr) + data-size + 2 + ICV
+ *
+ * IV or counter is almost always the cipher's block size.  The equation is:
+ *
+ *    data-size % block-size = (block-size - 2)
+ *
+ * so we can put as much data into the datagram as possible.  If we are
+ * pessimistic and include our largest overhead cipher (AES) and hash
+ * (SHA-512), and assume 1500-byte MTU minus IPv4 overhead of 20 bytes, we get:
+ *
+ *    1480 >= 8 + 16 + data-size + 2 + 32
+ *    1480 >= 58 + data-size
+ *    1422 >= data-size,      1422 % 16 = 14, so 58 is the overhead!
+ *
+ * But, let's re-run the numbers with the same algorithms, but with an IPv6
+ * header:
+ *
+ *    1460 >= 58 + data-size
+ *    1402 >= data-size,     1402 % 16 = 10, meaning shrink to 1390 to get 14,
+ *
+ * which means the overhead is now 70.
+ *
+ * Hmmm... IPv4 headers can never be anything other than multiples of 4-bytes,
+ * and IPv6 ones can never be anything other than multiples of 8-bytes.  We've
+ * seen overheads of 58 and 70.  58 % 16 == 10, and 70 % 16 == 6.  IPv4 could
+ * force us to have 62 ( % 16 == 14) or 66 ( % 16 == 2), or IPv6 could force us
+ * to have 78 ( % 16 = 14).  Let's compute IPv6 + 8-bytes of options:
+ *
+ *    1452 >= 58 + data-size
+ *    1394 >= data-size,     1394 % 16 = 2, meaning shrink to 1390 to get 14,
+ *
+ * Aha!  The "ESP overhead" shrinks to 62 (70 - 8).  This is good.  Let's try
+ * IPv4 + 8 bytes of IPv4 options:
+ *
+ *    1472 >= 58 + data-size
+ *    1414 >= data-size,      1414 % 16 = 6, meaning shrink to 1406,
+ *
+ * meaning 66 is the overhead.  Let's try 12 bytes:
+ *
+ *    1468 >= 58 + data-size
+ *    1410 >= data-size,      1410 % 16 = 2, meaning also shrink to 1406,
+ *
+ * meaning 62 is the overhead.  How about 16 bytes?
+ *
+ *    1464 >= 58 + data-size
+ *    1406 >= data-size,      1402 % 16 = 14, which is great!
+ *
+ * this means 58 is the overhead.  If I wrap and add 20 bytes, it looks just
+ * like IPv6's 70 bytes.  If I add 24, we go back to 66 bytes.
+ *
+ * So picking 70 is a sensible, conservative default.  Optimal calculations
+ * will depend on knowing pre-ESP header length (called "divpoint" in the ESP
+ * code), which could be cached in the conn_t for connected endpoints, or
+ * which must be computed on every datagram otherwise.
+ */
+#define	IPSEC_MAX_ESP_HDR_SIZE  (70)
+
+/*
+ * Alternate, when we know the crypto block size via the SA.  Assume an ICV on
+ * the SA.  Use:
+ *
+ * sizeof (esph_t) + 2 * (sizeof (IV/counter)) - 2 + sizeof (ICV).  The "-2"
+ * discounts the overhead of the pad + padlen that gets swallowed up by the
+ * second (theoretically all-pad) cipher-block.  If you use our examples of
+ * AES and SHA512, you get:
+ *
+ *    8 + 32 - 2 + 32 == 70.
+ *
+ * Which is our pre-computed maximum above.
+ */
+#include <inet/ipsecesp.h>
+#define	IPSEC_BASE_ESP_HDR_SIZE(sa) \
+	(sizeof (esph_t) + ((sa)->ipsa_iv_len << 1) - 2 + (sa)->ipsa_mac_len)
 
 /*
  * Identity hash table.
