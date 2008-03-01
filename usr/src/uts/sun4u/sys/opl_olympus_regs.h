@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,7 +213,6 @@ extern "C" {
 #define	ASI_EIDR		0x6E	/* Urgent errors */
 #define	ASI_CACHE_INV		0x74	/* Cache invalidation */
 #define	ASI_ERR_INJCT		0x76	/* Error injection */
-
 /*
  * Address of ASI scratch register. ASI 0x4F
  */
@@ -222,9 +221,9 @@ extern "C" {
 #define	OPL_SCRATCHPAD_SAVE_AG3	0x10	/* used for saving global registers */
 #define	OPL_SCRATCHPAD_ERRLOG	0x18	/* keeps EIDR, log's PA & err counter */
 #define	OPL_SCRATCHPAD_UTSBREG4	0x20
-#define	OPL_SCRATCHPAD_UNUSED5	0x28
-#define	OPL_SCRATCHPAD_UNUSED6	0x30
-#define	OPL_SCRATCHPAD_UNUSED7	0x38
+#define	OPL_SCRATCHPAD_UTSBREG5 0x28
+#define	OPL_SCRATCHPAD_UTSBREG6 0x30
+#define	OPL_SCRATCHPAD_UNUSED7  0x38
 
 /*
  * Error log scratchpad register format.

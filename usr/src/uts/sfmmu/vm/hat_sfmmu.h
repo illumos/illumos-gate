@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@ extern "C" {
  * Don't alter these without considering changes to ism_map_t.
  */
 #define	DEFAULT_ISM_PAGESIZE		MMU_PAGESIZE4M
+#define	DEFAULT_ISM_PAGESZC		TTE4M
 #define	ISM_PG_SIZE(ism_vbshift)	(1 << ism_vbshift)
 #define	ISM_SZ_MASK(ism_vbshift)	(ISM_PG_SIZE(ism_vbshift) - 1)
 #define	ISM_MAP_SLOTS	8	/* Change this carefully. */
@@ -859,6 +860,188 @@ struct ctx_trace {
 #ifdef sun4v
 #define	USER_CONTEXT_TYPE	NUM_LOCKED_CTXS
 #endif
+#if defined(sun4v) || defined(UTSB_PHYS)
+/*
+ * Get the location in the 4MB base TSB of the tsbe for this fault.
+ * Assumes that the second TSB only contains 4M mappings.
+ *
+ * In:
+ *   tagacc = tag access register (not clobbered)
+ *   tsbe = 2nd TSB base register
+ *   tmp1, tmp2 = scratch registers
+ * Out:
+ *   tsbe = pointer to the tsbe in the 2nd TSB
+ */
+
+#define	GET_4MBASE_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)			\
+	and	tsbe, TSB_SOFTSZ_MASK, tmp2;	/* tmp2=szc */		\
+	andn	tsbe, TSB_SOFTSZ_MASK, tsbe;	/* tsbbase */		\
+	mov	TSB_ENTRIES(0), tmp1;	/* nentries in TSB size 0 */	\
+	sllx	tmp1, tmp2, tmp1;	/* tmp1 = nentries in TSB */	\
+	sub	tmp1, 1, tmp1;		/* mask = nentries - 1 */	\
+	srlx	tagacc, MMU_PAGESHIFT4M, tmp2; 				\
+	and	tmp2, tmp1, tmp1;	/* tsbent = virtpage & mask */	\
+	sllx	tmp1, TSB_ENTRY_SHIFT, tmp1;	/* entry num --> ptr */	\
+	add	tsbe, tmp1, tsbe	/* add entry offset to TSB base */
+
+#define	GET_2ND_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)			\
+	GET_4MBASE_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)
+
+/*
+ * Get the location in the 3rd TSB of the tsbe for this fault.
+ * The 3rd TSB corresponds to the shared context, and is used
+ * for 8K - 512k pages.
+ *
+ * In:
+ *   tagacc = tag access register (not clobbered)
+ *   tsbe, tmp1, tmp2 = scratch registers
+ * Out:
+ *   tsbe = pointer to the tsbe in the 3rd TSB
+ */
+
+#define	GET_3RD_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)			\
+	and	tsbe, TSB_SOFTSZ_MASK, tmp2;    /* tmp2=szc */		\
+	andn	tsbe, TSB_SOFTSZ_MASK, tsbe;    /* tsbbase */		\
+	mov	TSB_ENTRIES(0), tmp1;	/* nentries in TSB size 0 */	\
+	sllx	tmp1, tmp2, tmp1;	/* tmp1 = nentries in TSB */	\
+	sub	tmp1, 1, tmp1;		/* mask = nentries - 1 */	\
+	srlx	tagacc, MMU_PAGESHIFT, tmp2;				\
+	and	tmp2, tmp1, tmp1;	/* tsbent = virtpage & mask */	\
+	sllx	tmp1, TSB_ENTRY_SHIFT, tmp1;    /* entry num --> ptr */	\
+	add	tsbe, tmp1, tsbe	/* add entry offset to TSB base */
+
+#define	GET_4TH_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)                      \
+	GET_4MBASE_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)
+/*
+ * Copy the sfmmu_region_map or scd_region_map to the tsbmiss
+ * shmermap or scd_shmermap, from sfmmu_load_mmustate.
+ */
+#define	SET_REGION_MAP(rgn_map, tsbmiss_map, cnt, tmp, label)		\
+	/* BEGIN CSTYLED */						\
+label:									;\
+        ldx     [rgn_map], tmp						;\
+        dec     cnt							;\
+        add     rgn_map, CLONGSIZE, rgn_map                             ;\
+        stx     tmp, [tsbmiss_map]                                      ;\
+        brnz,pt cnt, label                                              ;\
+	    add   tsbmiss_map, CLONGSIZE, tsbmiss_map                    \
+	/* END CSTYLED */
+
+/*
+ * If there is no scd, then zero the tsbmiss scd_shmermap,
+ * from sfmmu_load_mmustate.
+ */
+#define	ZERO_REGION_MAP(tsbmiss_map, cnt, label)                        \
+	/* BEGIN CSTYLED */                                             \
+label:                                                                  ;\
+        dec     cnt                                                     ;\
+        stx     %g0, [tsbmiss_map]                                      ;\
+        brnz,pt cnt, label                                              ;\
+	    add   tsbmiss_map, CLONGSIZE, tsbmiss_map                    
+	/* END CSTYLED */
+
+/*
+ * Set hmemisc to 1 if the shared hme is also part of an scd.
+ * In:
+ *   tsbarea = tsbmiss area (not clobbered)
+ *   hmeblkpa  = hmeblkpa +  hmentoff + SFHME_TTE (not clobbered)
+ *   hmentoff = hmentoff + SFHME_TTE = tte offset(clobbered)
+ * Out:
+ *   use_shctx = 1 if shme is in scd and 0 otherwise
+ */
+#define	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hmentoff, use_shctx)               \
+	/* BEGIN CSTYLED */   	                                              \
+        sub     hmeblkpa, hmentoff, hmentoff    /* hmentofff = hmeblkpa */   ;\
+        add     hmentoff, HMEBLK_TAG, hmentoff                               ;\
+        ldxa    [hmentoff]ASI_MEM, hmentoff     /* read 1st part of tag */   ;\
+        and     hmentoff, HTAG_RID_MASK, hmentoff       /* mask off rid */   ;\
+        and     hmentoff, BT_ULMASK, use_shctx  /* mask bit index */         ;\
+        srlx    hmentoff, BT_ULSHIFT, hmentoff  /* extract word */           ;\
+        sllx    hmentoff, CLONGSHIFT, hmentoff  /* index */                  ;\
+        add     tsbarea, hmentoff, hmentoff             /* add to tsbarea */ ;\
+        ldx     [hmentoff + TSBMISS_SCDSHMERMAP], hmentoff      /* scdrgn */ ;\
+        srlx    hmentoff, use_shctx, use_shctx                               ;\
+        and     use_shctx, 0x1, use_shctx                                     \
+	/* END CSTYLED */
+
+/*
+ * Synthesize a TSB base register contents for a process.
+ *
+ * In:
+ *   tsbinfo = TSB info pointer (ro)
+ *   tsbreg, tmp1 = scratch registers
+ * Out:
+ *   tsbreg = value to program into TSB base register
+ */
+
+#define	MAKE_UTSBREG(tsbinfo, tsbreg, tmp1)			\
+	ldx	[tsbinfo + TSBINFO_PADDR], tsbreg;		\
+	lduh	[tsbinfo + TSBINFO_SZCODE], tmp1;		\
+	and	tmp1, TSB_SOFTSZ_MASK, tmp1;			\
+	or	tsbreg, tmp1, tsbreg;
+
+
+/*
+ * Load TSB base register to TSBMISS area for privte contexts.
+ * This register contains utsb_pabase in bits 63:13, and TSB size
+ * code in bits 2:0.
+ *
+ * For private context
+ * In:
+ *   tsbreg = value to load (ro)
+ *   regnum = constant or register
+ *   tmp1 = scratch register
+ * Out:
+ *   Specified scratchpad register updated
+ *
+ */
+#define	SET_UTSBREG(regnum, tsbreg, tmp1)				\
+	mov	regnum, tmp1;						\
+	stxa	tsbreg, [tmp1]ASI_SCRATCHPAD	/* save tsbreg */
+/*
+ * Get TSB base register from the scratchpad for private contexts
+ *
+ * In:
+ *   regnum = constant or register
+ *   tsbreg = scratch
+ * Out:
+ *   tsbreg = tsbreg from the specified scratchpad register
+ */
+#define	GET_UTSBREG(regnum, tsbreg)					\
+	mov	regnum, tsbreg;						\
+	ldxa	[tsbreg]ASI_SCRATCHPAD, tsbreg
+
+/*
+ * Load TSB base register to TSBMISS area for shared contexts.
+ * This register contains utsb_pabase in bits 63:13, and TSB size
+ * code in bits 2:0.
+ *
+ * In:
+ *   tsbmiss = pointer to tsbmiss area
+ *   tsbmissoffset = offset to right tsb pointer
+ *   tsbreg = value to load (ro)
+ * Out:
+ *   Specified tsbmiss area updated
+ *
+ */
+#define	SET_UTSBREG_SHCTX(tsbmiss, tsbmissoffset, tsbreg)		\
+	stx	tsbreg, [tsbmiss + tsbmissoffset]	/* save tsbreg */
+
+/*
+ * Get TSB base register from the scratchpad for
+ * shared contexts
+ *
+ * In:
+ *   tsbmiss = pointer to tsbmiss area
+ *   tsbmissoffset = offset to right tsb pointer
+ *   tsbreg = scratch
+ * Out:
+ *   tsbreg = tsbreg from the specified scratchpad register
+ */
+#define	GET_UTSBREG_SHCTX(tsbmiss, tsbmissoffset, tsbreg)		\
+	ldx	[tsbmiss + tsbmissoffset], tsbreg
+
+#endif /* defined(sun4v) || defined(UTSB_PHYS) */
 
 #ifndef	_ASM
 
@@ -1744,7 +1927,7 @@ extern size_t	tsb_slab_mask;
  * sun4u platforms that define UTSB_PHYS use physical addressing to access
  * the user TSBs at TL>0.  The first user TSB base is in the MMU I/D TSB Base
  * registers.  The second TSB base uses a dedicated scratchpad register which
- * requires a definition of SCRATCHPAD_UTSBREG in mach_sfmmu.h.  The layout for
+ * requires a definition of SCRATCHPAD_UTSBREG2 in mach_sfmmu.h.  The layout for
  * both registers is equivalent to sun4v below, except the TSB PA range is
  * [46..13] for sun4u.
  *

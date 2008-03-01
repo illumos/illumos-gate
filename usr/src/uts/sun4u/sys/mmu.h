@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,6 +217,17 @@ extern "C" {
 #define	CTXREG_CTX_SHIFT	51
 #define	CTXREG_EXT_SHIFT	16
 #define	CTXREG_NEXT_SHIFT	58
+
+/*
+ * SPARC64-VII MMU SHARED CONTEXT register Layout
+ *
+ * +-----+----+-----+--------------------+-----+----+----+-------------------+
+ * | --- | IV |  -- | Ishared ctx[44:32] | --- | DV | -- | Dshared ctx[12:0] |
+ * +-----+----+-----+--------------------+-----+----+----+-------------------+
+ * 63  48 47   46 45 44               32  31 16  15  14 13 12                0
+ */
+#define	SHCTXREG_VALID_BIT	0x8000
+#define	SHCTXREG_CTX_LSHIFT	51
 
 /*
  * The kernel always runs in KCONTEXT, and no user mappings

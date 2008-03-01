@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -831,11 +831,12 @@ sfmmu_panic10:
 	ldub	[%o0 + SFMMU_CEXT], %o2
 	sll	%o2, CTXREG_EXT_SHIFT, %o2
 	or	%o1, %o2, %o1
-#endif
-	SET_SECCTX(%o1, %g1, %o4, %o5)
-	
-	retl
-	  mov	%g4, %o0			! %o0 = ret
+#endif /* sun4u */
+
+	SET_SECCTX(%o1, %g1, %o4, %o5, alloc_ctx_lbl1)
+
+        retl
+          mov   %g4, %o0                        ! %o0 = ret
 
 	SET_SIZE(sfmmu_alloc_ctx)
 
@@ -1196,7 +1197,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	sethi	%hi(tsb_kernel_patch_asi), %o0
 	call	sfmmu_fixup_or
 	  or	%o0, %lo(tsb_kernel_patch_asi), %o0
-#endif
+#endif /* !sun4v */
 
 	ldx 	[%o5], %o4		! load ktsb base addr (VA or PA)
 
@@ -1466,7 +1467,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	ld	[%o4 + %lo(ktsb_phys)], %o4
 	movrnz	%o4, ASI_MEM, %o3
 	mov	%o3, %asi
-#endif
+#endif /* !sun4v */
 	mov	%o0, %g1			! %g1 = vaddr
 
 	/* GET_KPM_TSBE_POINTER(vpshift, tsbp, vaddr (clobbers), tmp1, tmp2) */
@@ -1498,7 +1499,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	ld	[%o4 + %lo(ktsb_phys)], %o4
 	movrnz	%o4, ASI_MEM, %o3
 	mov	%o3, %asi
-#endif
+#endif /* !sun4v */
 	mov	%o0, %g1			! %g1 = vaddr
 
 	/* GET_KPM_TSBE_POINTER(vpshift, tsbp, vaddr (clobbers), tmp1, tmp2) */
@@ -2701,7 +2702,7 @@ sfmmu_kprot_patch_ktsb4m_szcode:
 	 * g4 - g7 = scratch registers
 	 */
 	ALTENTRY(sfmmu_uprot_trap)
-#ifdef sun4v
+#ifdef sun4v 
 	GET_1ST_TSBE_PTR(%g2, %g1, %g4, %g5) 
 	/* %g1 = first TSB entry ptr now, %g2 preserved */
 
@@ -2715,7 +2716,7 @@ sfmmu_kprot_patch_ktsb4m_szcode:
 #else /* sun4v */
 #ifdef UTSB_PHYS
 	/* g1 = first TSB entry ptr */
-	GET_2ND_TSBREG(%g3)
+	GET_UTSBREG(SCRATCHPAD_UTSBREG2, %g3)
 	brlz,pt %g3, 9f			/* check for 2nd TSB */
 	  nop
 
@@ -2938,7 +2939,7 @@ dktsb4m_kpmcheck:
 	 */
 	.align	64
 	ALTENTRY(sfmmu_uitlb_fastpath)
-
+	
 	PROBE_1ST_ITSB(%g1, %g7, uitlb_fast_8k_probefail)
 	/* g4 - g5 = clobbered by PROBE_1ST_ITSB */
 	ba,pn	%xcc, sfmmu_tsb_miss_tt
@@ -2998,7 +2999,15 @@ dktsb4m_kpmcheck:
 	 * User instruction miss w/ multiple TSBs (sun4u).
 	 * The first probe covers 8K, 64K, and 512K page sizes,
 	 * because 64K and 512K mappings are replicated off 8K
-	 * pointer.  Second probe covers 4M page size only.
+	 * pointer.  Probe of 1st TSB has already been done prior to entry
+	 * into this routine. For the UTSB_PHYS case we probe up to 3
+	 * valid other TSBs in the following order:
+	 * 1) shared TSB for 4M-256M pages
+	 * 2) private TSB for 4M-256M pages
+	 * 3) shared TSB for 8K-512K pages
+	 *
+	 * For the non UTSB_PHYS case we probe the 2nd TSB here that backs
+	 * 4M-256M pages.
 	 *
 	 * Just like sfmmu_udtlb_slowpath, except:
 	 *   o Uses ASI_ITLB_IN
@@ -3007,7 +3016,6 @@ dktsb4m_kpmcheck:
 	 *
 	 * g1 = tsb8k pointer register
 	 * g2 = tag access register
-	 * g3 = 2nd tsbreg if defined UTSB_PHYS, else scratch
 	 * g4 - g6 = scratch registers
 	 * g7 = TSB tag to match
 	 */
@@ -3015,51 +3023,157 @@ dktsb4m_kpmcheck:
 	ALTENTRY(sfmmu_uitlb_slowpath)
 
 #ifdef UTSB_PHYS
-	/*
-	 * g1 = 1st TSB entry pointer
-	 * g3 = 2nd TSB base register
-	 * Need 2nd TSB entry pointer for 2nd probe.
-	 */
-	PROBE_1ST_ITSB(%g1, %g7, uitlb_8k_probefail)
 
-	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
+       GET_UTSBREG(SCRATCHPAD_UTSBREG4, %g6)
+        brlz,pt %g6, 1f
+          nop
+        GET_4TH_TSBE_PTR(%g2, %g6, %g4, %g5)
+        PROBE_4TH_ITSB(%g6, %g7, uitlb_4m_scd_probefail)
+1:
+        GET_UTSBREG(SCRATCHPAD_UTSBREG2, %g3)
+        brlz,pt %g3, 2f
+          nop
+        GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
+        PROBE_2ND_ITSB(%g3, %g7, uitlb_4m_probefail)
+2:
+        GET_UTSBREG(SCRATCHPAD_UTSBREG3, %g6)
+        brlz,pt %g6, sfmmu_tsb_miss_tt
+          nop
+        GET_3RD_TSBE_PTR(%g2, %g6, %g4, %g5)
+        PROBE_3RD_ITSB(%g6, %g7, uitlb_8K_scd_probefail)
+        ba,pn   %xcc, sfmmu_tsb_miss_tt
+          nop
+
 #else /* UTSB_PHYS */
 	mov	%g1, %g3	/* save tsb8k reg in %g3 */
 	GET_1ST_TSBE_PTR(%g3, %g1, %g5, sfmmu_uitlb)
 	PROBE_1ST_ITSB(%g1, %g7, uitlb_8k_probefail)
-
 	mov	%g2, %g6	/* GET_2ND_TSBE_PTR clobbers tagacc */
 	mov	%g3, %g7	/* copy tsb8k reg in %g7 */
 	GET_2ND_TSBE_PTR(%g6, %g7, %g3, %g4, %g5, sfmmu_uitlb)
+       /* g1 = first TSB pointer, g3 = second TSB pointer */
+        srlx    %g2, TAG_VALO_SHIFT, %g7
+        PROBE_2ND_ITSB(%g3, %g7, isynth)
+	ba,pn	%xcc, sfmmu_tsb_miss_tt
+	  nop
+	
 #endif /* UTSB_PHYS */
-	/* g1 = first TSB pointer, g3 = second TSB pointer */
-	srlx	%g2, TAG_VALO_SHIFT, %g7
-	PROBE_2ND_ITSB(%g3, %g7, isynth)
-	/* NOT REACHED */
 #endif /* sun4v */
 
+#if defined(sun4u) && defined(UTSB_PHYS)
+
+        /*
+	 * We come here for ism predict DTLB_MISS case or if
+	 * if probe in first TSB failed.
+         */
+
+        .align 64
+        ALTENTRY(sfmmu_udtlb_slowpath_noismpred)
+	
 	/*
-	 * User data miss w/ multiple TSBs.
-	 * The first probe covers 8K, 64K, and 512K page sizes,
-	 * because 64K and 512K mappings are replicated off 8K
-	 * pointer.  Second probe covers 4M page size only.
-	 *
-	 * We consider probing for 4M pages first if the VA falls
-	 * in a range that's likely to be ISM.
-	 *
-	 * g1 = tsb8k pointer register
-	 * g2 = tag access register
-	 * g3 = 2nd tsbreg if defined UTSB_PHYS, else scratch
-	 * g4 - g6 = scratch registers
-	 * g7 = TSB tag to match
+         * g1 = tsb8k pointer register
+         * g2 = tag access register
+         * g4 - %g6 = scratch registers
+         * g7 = TSB tag to match
 	 */
-	.align 64
-	ALTENTRY(sfmmu_udtlb_slowpath)
 
 	/*
-	 * Check for ISM.  If it exists, look for 4M mappings in the second TSB
-	 * first, then probe for other mappings in the first TSB if that fails.
+	 * ISM non-predict probe order
+         * probe 1ST_TSB (8K index)
+         * probe 2ND_TSB (4M index)
+         * probe 4TH_TSB (4M index)
+         * probe 3RD_TSB (8K index)
+	 * 
+	 * We already probed first TSB in DTLB_MISS handler.
 	 */
+
+        /*
+         * Private 2ND TSB 4M-256 pages
+         */
+	GET_UTSBREG(SCRATCHPAD_UTSBREG2, %g3)
+	brlz,pt %g3, 1f
+	  nop
+        GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
+        PROBE_2ND_DTSB(%g3, %g7, udtlb_4m_probefail)
+
+	/*
+	 * Shared Context 4TH TSB 4M-256 pages
+	 */
+1:
+	GET_UTSBREG(SCRATCHPAD_UTSBREG4, %g6)
+	brlz,pt %g6, 2f
+	  nop
+        GET_4TH_TSBE_PTR(%g2, %g6, %g4, %g5)
+        PROBE_4TH_DTSB(%g6, %g7, udtlb_4m_shctx_probefail)
+
+        /*
+         * Shared Context 3RD TSB 8K-512K pages
+         */
+2:
+	GET_UTSBREG(SCRATCHPAD_UTSBREG3, %g6)
+	brlz,pt %g6, sfmmu_tsb_miss_tt
+	  nop
+        GET_3RD_TSBE_PTR(%g2, %g6, %g4, %g5)
+        PROBE_3RD_DTSB(%g6, %g7, udtlb_8k_shctx_probefail)
+	ba,pn	%xcc, sfmmu_tsb_miss_tt
+	  nop
+	  
+	.align 64
+        ALTENTRY(sfmmu_udtlb_slowpath_ismpred)
+
+	/*
+         * g1 = tsb8k pointer register
+         * g2 = tag access register
+         * g4 - g6 = scratch registers
+         * g7 = TSB tag to match
+	 */
+
+	/*
+	 * ISM predict probe order
+	 * probe 4TH_TSB (4M index)
+	 * probe 2ND_TSB (4M index)
+	 * probe 1ST_TSB (8K index)
+	 * probe 3RD_TSB (8K index)
+
+	/*
+	 * Shared Context 4TH TSB 4M-256 pages
+	 */
+	GET_UTSBREG(SCRATCHPAD_UTSBREG4, %g6)
+	brlz,pt %g6, 4f
+	  nop
+        GET_4TH_TSBE_PTR(%g2, %g6, %g4, %g5)
+        PROBE_4TH_DTSB(%g6, %g7, udtlb_4m_shctx_probefail2)
+
+        /*
+         * Private 2ND TSB 4M-256 pages
+         */
+4:
+	GET_UTSBREG(SCRATCHPAD_UTSBREG2, %g3)
+	brlz,pt %g3, 5f
+	  nop
+        GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
+        PROBE_2ND_DTSB(%g3, %g7, udtlb_4m_probefail2)
+
+5:
+        PROBE_1ST_DTSB(%g1, %g7, udtlb_8k_first_probefail2)
+
+        /*
+         * Shared Context 3RD TSB 8K-512K pages
+         */
+	GET_UTSBREG(SCRATCHPAD_UTSBREG3, %g6)
+	brlz,pt %g6, 6f
+	  nop
+        GET_3RD_TSBE_PTR(%g2, %g6, %g4, %g5)
+        PROBE_3RD_DTSB(%g6, %g7, udtlb_8k_shctx_probefail2)
+6:
+	ba,pn	%xcc, sfmmu_tsb_miss_tt /* ISM Predict and ISM non-predict path */
+	  nop
+
+#else /* sun4u && UTSB_PHYS */
+
+       .align 64
+        ALTENTRY(sfmmu_udtlb_slowpath)
+
 	srax	%g2, PREDISM_BASESHIFT, %g6	/* g6 > 0 : ISM predicted */
 	brgz,pn %g6, udtlb_miss_probesecond	/* check for ISM */
 	  mov	%g1, %g3
@@ -3085,10 +3199,8 @@ udtlb_miss_probefirst:
 	brgz,pn	%g6, sfmmu_tsb_miss_tt
 	  nop
 #else /* sun4v */
-#ifndef UTSB_PHYS
 	mov	%g1, %g4
 	GET_1ST_TSBE_PTR(%g4, %g1, %g5, sfmmu_udtlb)
-#endif UTSB_PHYS
 	PROBE_1ST_DTSB(%g1, %g7, udtlb_first_probefail)
 
 	/*
@@ -3099,9 +3211,7 @@ udtlb_miss_probefirst:
 	 */
 	brgz,pn	%g6, sfmmu_tsb_miss_tt
 	  nop
-#ifndef UTSB_PHYS
 	ldxa	[%g0]ASI_DMMU_TSB_8K, %g3
-#endif UTSB_PHYS
 	/* fall through in 8K->4M probe order */
 #endif /* sun4v */
 
@@ -3119,17 +3229,11 @@ udtlb_miss_probesecond:
 	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
 	/* %g2 is okay, no need to reload, %g3 = second tsbe ptr */
 #else /* sun4v */
-#ifdef UTSB_PHYS
-	GET_2ND_TSBREG(%g3)
-	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
-	/* tagacc (%g2) is okay, no need to reload, %g3 = second tsbe ptr */
-#else /* UTSB_PHYS */
 	mov	%g3, %g7
 	GET_2ND_TSBE_PTR(%g2, %g7, %g3, %g4, %g5, sfmmu_udtlb)
 	/* %g2 clobbered, %g3 =second tsbe ptr */
 	mov	MMU_TAG_ACCESS, %g2
 	ldxa	[%g2]ASI_DMMU, %g2
-#endif /* UTSB_PHYS */
 #endif /* sun4v */
 
 	srlx	%g2, TAG_VALO_SHIFT, %g7
@@ -3139,6 +3243,8 @@ udtlb_miss_probesecond:
 	  nop
 
 	/* fall through to sfmmu_tsb_miss_tt */
+#endif /* sun4u && UTSB_PHYS */
+
 
 	ALTENTRY(sfmmu_tsb_miss_tt)
 	TT_TRACE(trace_tsbmiss)
@@ -3175,9 +3281,8 @@ udtlb_miss_probesecond:
 	wrpr	%g7, %tnpc
 0:
 	CPU_TSBMISS_AREA(%g6, %g7)
-
-	stn	%g1, [%g6 + TSBMISS_TSBPTR]	/* save first tsb pointer */
-	stn	%g3, [%g6 + TSBMISS_TSBPTR4M]	/* save second tsb pointer */
+	stn	%g1, [%g6 + TSBMISS_TSBPTR]	/* save 1ST tsb pointer */
+	stn	%g3, [%g6 + TSBMISS_TSBPTR4M]	/* save 2ND tsb pointer */
 
 	sllx	%g2, TAGACC_CTX_LSHIFT, %g3
 	brz,a,pn %g3, 1f			/* skip ahead if kernel */
@@ -3191,11 +3296,11 @@ udtlb_miss_probesecond:
 	be,pn	%icc, tsb_tl0_noctxt		/* no ctx miss exception */
 	  stn	%g7, [%g6 + (TSBMISS_SCRATCH + TSBMISS_HATID)]
 
-#ifdef sun4v
+#if defined(sun4v) || defined(UTSB_PHYS)
         ldub    [%g6 + TSBMISS_URTTEFLAGS], %g7	/* clear ctx1 flag set from */
         andn    %g7, HAT_CHKCTX1_FLAG, %g7	/* the previous tsb miss    */
         stub    %g7, [%g6 + TSBMISS_URTTEFLAGS]
-#endif
+#endif /* sun4v || UTSB_PHYS */
 	
 	ISM_CHECK(%g2, %g6, %g3, %g4, %g5, %g7, %g1, tsb_l1, tsb_ism)
 	/*
@@ -3268,11 +3373,11 @@ tsb_4M:
 
 tsb_32M:
 	sllx	%g2, TAGACC_CTX_LSHIFT, %g5
-#ifdef sun4v
+#ifdef	sun4v
         brz,pn	%g5, 6f
-#else
-	brz,pn	%g5, tsb_pagefault
-#endif        
+#else 
+	brz,pn  %g5, tsb_pagefault
+#endif
 	  ldub	[%g6 + TSBMISS_UTTEFLAGS], %g4
 	and	%g4, HAT_32M_FLAG, %g5
 	brz,pn	%g5, tsb_256M
@@ -3286,8 +3391,8 @@ tsb_32M:
 		MMU_PAGESHIFT32M, TTE32M, tsb_l32M, tsb_checktte,
 		sfmmu_suspend_tl, tsb_256M)
 	/* NOT REACHED */
-
-#ifdef sun4u
+	
+#if defined(sun4u) && !defined(UTSB_PHYS)
 #define tsb_shme        tsb_pagefault
 #endif
 tsb_256M:
@@ -3318,11 +3423,11 @@ tsb_checktte:
 	brlz,a,pt %g3, tsb_validtte
 	  rdpr	%tt, %g7
 
-#ifdef sun4u
+#if defined(sun4u) && !defined(UTSB_PHYS)
 #undef tsb_shme
-	ba	tsb_pagefault
-	  nop	
-#else
+	ba      tsb_pagefault
+	  nop
+#else /* sun4u && !UTSB_PHYS */
 
 tsb_shme:
 	/*
@@ -3419,8 +3524,8 @@ tsb_shme_checktte:
 	  or	%g1, HAT_CHKCTX1_FLAG, %g1
 	stub    %g1, [%g6 + TSBMISS_URTTEFLAGS]
 
-	SAVE_CTX1(%g7, %g2, %g1, tsb_shmel)
-#endif /* sun4u */
+	SAVE_CTX1(%g7, %g2, %g1, tsb_shmel)	
+#endif /* sun4u && !UTSB_PHYS */
 
 tsb_validtte:
 	/*
@@ -3441,15 +3546,16 @@ tsb_validtte:
 	TTE_SET_REFMOD_ML(%g3, %g4, %g5, %g6, %g7, tsb_lset_refmod,
 	    tsb_protfault) 
 
-	rdpr	%tt, %g5
 	GET_MMU_D_TTARGET(%g2, %g7)		/* %g2 = ttarget */
 #ifdef sun4v
 	MMU_FAULT_STATUS_AREA(%g7)
-	ldx	[%g7 + MMFSA_D_ADDR], %g5	/* save fault addr for later */
-#endif	
+	ldx	[%g7 + MMFSA_D_ADDR], %g5	/* load fault addr for later */
+#else /* sun4v */
+	mov     MMU_TAG_ACCESS, %g5
+	ldxa    [%g5]ASI_DMMU, %g5
+#endif /* sun4v */
 	ba,pt	%xcc, tsb_update_tl1
-	  nop	
-
+	  nop
 4:
 	/* 
 	 * If ITLB miss check exec bit.
@@ -3477,13 +3583,13 @@ tsb_validtte:
 	 * g4 = patte
 	 * g6 = tsbmiss area
 	 */
-	rdpr	%tt, %g5
+	rdpr	%tt, %g7
 #ifdef sun4v
 	MMU_FAULT_STATUS_AREA(%g2)
-	cmp	%g5, T_INSTR_MMU_MISS
+	cmp	%g7, T_INSTR_MMU_MISS
 	be,a,pt	%icc, 9f
 	  nop
-	cmp	%g5, FAST_IMMU_MISS_TT
+	cmp	%g7, FAST_IMMU_MISS_TT
 	be,a,pt	%icc, 9f
 	  nop
 	add	%g2, MMFSA_D_, %g2
@@ -3491,23 +3597,29 @@ tsb_validtte:
 	ldx	[%g2 + MMFSA_CTX_], %g7
 	sllx	%g7, TTARGET_CTX_SHIFT, %g7
 	ldx	[%g2 + MMFSA_ADDR_], %g2
-	mov	%g2, %g5		! save the fault addr for later use
+	mov	%g2, %g5		! load the fault addr for later use
 	srlx	%g2, TTARGET_VA_SHIFT, %g2
 	or	%g2, %g7, %g2
-#else
-	cmp	%g5, FAST_IMMU_MISS_TT
-	be,a,pt	%icc, tsb_update_tl1
-	  ldxa	[%g0]ASI_IMMU, %g2
-	ldxa	[%g0]ASI_DMMU, %g2
-#endif
+#else /* sun4v */
+	mov     MMU_TAG_ACCESS, %g5
+	cmp     %g7, FAST_IMMU_MISS_TT
+	be,a,pt %icc, 9f
+	   ldxa  [%g0]ASI_IMMU, %g2
+	ldxa    [%g0]ASI_DMMU, %g2
+	ba,pt   %icc, tsb_update_tl1
+	   ldxa  [%g5]ASI_DMMU, %g5
+9:
+	ldxa    [%g5]ASI_IMMU, %g5
+#endif /* sun4v */
+
 tsb_update_tl1:
 	srlx	%g2, TTARGET_CTX_SHIFT, %g7
 	brz,pn	%g7, tsb_kernel
 #ifdef sun4v
 	  and	%g3, TTE_SZ_BITS, %g7	! assumes TTE_SZ_SHFT is 0
-#else
+#else  /* sun4v */
 	  srlx	%g3, TTE_SZ_SHFT, %g7
-#endif
+#endif /* sun4v */
 
 tsb_user:
 #ifdef sun4v
@@ -3524,35 +3636,34 @@ tsb_user:
 	  nop
 #else /* ITLB_32M_256M_SUPPORT */
 	bnz,a,pn %icc, tsb_user_pn_synth
-	 cmp	%g5, FAST_IMMU_MISS_TT
+	 nop
 #endif /* ITLB_32M_256M_SUPPORT */
 #endif /* sun4v */
 
 tsb_user8k:
-#ifdef sun4v
+#if defined(sun4v) || defined(UTSB_PHYS)
 	ldub	[%g6 + TSBMISS_URTTEFLAGS], %g7
 	and	%g7, HAT_CHKCTX1_FLAG, %g1
 	brz,a,pn %g1, 1f
-	  ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = first TSB ptr
+	  ldn	[%g6 + TSBMISS_TSBPTR], %g1		! g1 = 1ST TSB ptr
 	GET_UTSBREG_SHCTX(%g6, TSBMISS_TSBSCDPTR, %g1)
-	brlz,a,pn %g1, ptl1_panic			! if no shared tsb
+	brlz,a,pn %g1, ptl1_panic			! if no shared 3RD tsb
 	  mov PTL1_NO_SCDTSB8K, %g1			! panic
-	GET_3RD_TSBE_PTR(%g5, %g1, %g6, %g7)
+        GET_3RD_TSBE_PTR(%g5, %g1, %g6, %g7)
 1:
-#else
-	ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = first TSB ptr
+#else /* defined(sun4v) || defined(UTSB_PHYS) */
+	ldn   [%g6 + TSBMISS_TSBPTR], %g1             ! g1 = 1ST TSB ptr
+#endif /* defined(sun4v) || defined(UTSB_PHYS) */
 
 #ifndef UTSB_PHYS
 	mov	ASI_N, %g7	! user TSBs accessed by VA
 	mov	%g7, %asi
-#endif /* UTSB_PHYS */
-
-#endif /* sun4v */
+#endif /* !UTSB_PHYS */
 
 	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 5)
 
-#ifdef sun4v
 	rdpr    %tt, %g5
+#ifdef sun4v
 	cmp	%g5, T_INSTR_MMU_MISS
 	be,a,pn	%xcc, 9f
 	  mov	%g3, %g5
@@ -3570,19 +3681,19 @@ tsb_user8k:
 	retry
 
 tsb_user4m:
-#ifdef sun4v
+#if defined(sun4v) || defined(UTSB_PHYS)
 	ldub	[%g6 + TSBMISS_URTTEFLAGS], %g7
 	and	%g7, HAT_CHKCTX1_FLAG, %g1
 	brz,a,pn %g1, 4f
-	  ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		! g1 = TSB ptr
-	GET_UTSBREG_SHCTX(%g6, TSBMISS_TSBSCDPTR4M, %g1)
-	brlz,a,pn %g1, 5f				! if no shared 2nd tsb
+	  ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		! g1 = 2ND TSB ptr
+	GET_UTSBREG_SHCTX(%g6, TSBMISS_TSBSCDPTR4M, %g1)! g1 = 4TH TSB ptr
+	brlz,a,pn %g1, 5f				! if no shared 4TH TSB
 	  nop
-	GET_4TH_TSBE_PTR(%g5, %g1, %g6, %g7)
-#else
-	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		! g1 = TSB ptr
-#endif
+        GET_4TH_TSBE_PTR(%g5, %g1, %g6, %g7)
 4:
+#else /* defined(sun4v) || defined(UTSB_PHYS) */
+	ldn   [%g6 + TSBMISS_TSBPTR4M], %g1             ! g1 = 2ND TSB ptr
+#endif /* defined(sun4v) || defined(UTSB_PHYS) */
 	brlz,pn %g1, 5f	/* Check to see if we have 2nd TSB programmed */
 	  nop
 
@@ -3594,8 +3705,8 @@ tsb_user4m:
         TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 6)
 
 5:
-#ifdef sun4v
 	rdpr    %tt, %g5
+#ifdef sun4v
         cmp     %g5, T_INSTR_MMU_MISS
         be,a,pn %xcc, 9f
           mov   %g3, %g5
@@ -3631,6 +3742,8 @@ tsb_user4m:
 	 * g6 = tsbmiss area
 	 */
 tsb_user_pn_synth:
+	rdpr %tt, %g5
+	cmp    %g5, FAST_IMMU_MISS_TT
 	be,pt	%xcc, tsb_user_itlb_synth	/* ITLB miss */
 	  andcc %g3, TTE_EXECPRM_INT, %g0	/* is execprm bit set */
 	bz,pn %icc, 4b				/* if not, been here before */
@@ -3650,7 +3763,7 @@ tsb_user_pn_synth:
         retry
 
 tsb_user_itlb_synth:
-	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		/* g1 = tsbp */
+	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		/* g1 =  2ND TSB */
 
 	mov	MMU_TAG_ACCESS, %g7
 	ldxa	[%g7]ASI_IMMU, %g6		/* get tag access va */
@@ -3668,21 +3781,21 @@ tsb_user_itlb_synth:
 #endif /* sun4v && ITLB_32M_256M_SUPPORT */
 
 tsb_kernel:
-#ifdef sun4v
 	rdpr	%tt, %g5
+#ifdef sun4v
 	cmp	%g7, TTE4M
 	bge,pn	%icc, 5f
 #else
 	cmp	%g7, TTESZ_VALID | TTE4M	! no 32M or 256M support
 	be,pn	%icc, 5f
-#endif
+#endif /* sun4v */
 	  nop
-	ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = 8k tsbptr
+	ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = 8K TSB ptr
 	ba,pt	%xcc, 6f
 	  nop
 5:
-	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1	! g1 = 4m tsbptr
-	brlz,pn	%g1, 3f		/* skip programming if 4m TSB ptr is -1 */
+	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1	! g1 = 4M TSB ptr
+	brlz,pn	%g1, 3f		/* skip programming if 4M TSB ptr is -1 */
 	  nop
 6:
 #ifndef sun4v
@@ -3734,7 +3847,7 @@ tsb_ism:
 	or      %g2, %g4, %g2                   /* g2 = (pseudo-)tagacc */
 	sub     %g5, (IMAP_VB_SHIFT - IMAP_HATFLAGS), %g5
 	lduha   [%g5]ASI_MEM, %g4               /* g5 = pa of imap_hatflags */
-#ifdef sun4v
+#if defined(sun4v) || defined(UTSB_PHYS)
 	and     %g4, HAT_CTX1_FLAG, %g5         /* g5 = imap_hatflags */
 	brz,pt %g5, tsb_chk4M_ism
 	  nop
@@ -3743,7 +3856,8 @@ tsb_ism:
 	stub    %g5, [%g6 + TSBMISS_URTTEFLAGS]
 	rdpr    %tt, %g5
 	SAVE_CTX1(%g5, %g3, %g1, tsb_shctxl)
-#endif
+#endif /* defined(sun4v) || defined(UTSB_PHYS) */
+
 	/*
 	 * ISM pages are always locked down.
 	 * If we can't find the tte then pagefault
@@ -3859,7 +3973,7 @@ tsb_protfault:
 	cmp	%g7, T_INSTR_MMU_MISS
 	move	%icc, %g5, %g2
 	sllx	%g2, TAGACC_CTX_LSHIFT, %g4
-#endif
+#endif /* sun4v */
 	brnz,pn	%g4, 3f				/* skip if not kernel */
 	  rdpr	%tl, %g5
 	
@@ -3988,7 +4102,7 @@ tsb_protfault:
 	  ldxa	[%g2]ASI_IMMU, %g3
 	ldxa	[%g2]ASI_DMMU, %g3
 2:	sllx	%g3, TAGACC_CTX_LSHIFT, %g3
-#endif
+#endif /* sun4v */
 	brz,a,pn %g3, ptl1_panic		! panic if called for kernel
 	  mov	PTL1_BAD_CTX_STEAL, %g1		! since kernel ctx was stolen
 	rdpr	%tl, %g5
@@ -3999,7 +4113,7 @@ tsb_protfault:
 	ba,pt	%icc, sfmmu_window_trap
 	  nop
 	SET_SIZE(sfmmu_tsb_miss)
-#endif /* lint */
+#endif  /* lint */
 
 #if defined (lint)
 /*
@@ -4110,7 +4224,7 @@ kvtop_nohblk:
 	cmp	%g5, MAX_HASHCNT	        
 #else                
 	cmp	%g5, DEFAULT_MAX_HASHCNT	/* no 32/256M kernel pages */
-#endif        
+#endif /* sun4v */   
 	be,a,pn	%icc, 6f
 	  mov	-1, %o0				/* output = -1 (PFN_INVALID) */
 	mov	%o1, %o4			/* restore hatid */
@@ -4126,7 +4240,7 @@ kvtop_nohblk:
 	move	%icc, MMU_PAGESHIFT512K, %g6
 	ba,pt	%icc, 1b
 	movne	%icc, MMU_PAGESHIFT4M, %g6
-#endif        
+#endif /* sun4v */
 6:
 	retl
  	  wrpr	%g0, %o3, %pstate		/* re-enable interrupts */

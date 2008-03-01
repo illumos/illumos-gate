@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+ 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
@@ -1076,15 +1076,13 @@ table_name/**/_dtlbmiss:						;\
 	srlx	%g3, TAGACC_CTX_LSHIFT, %g3	/* g3 = ctx */		;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kdtlb_miss					;\
+	  srax	%g2, PREDISM_BASESHIFT, %g6  /* g6 > 0 ISM predicted */ ;\
+	brgz,pn %g6, sfmmu_udtlb_slowpath_ismpred			;\
 	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
-	mov	SCRATCHPAD_UTSBREG, %g3				;\
-	ldxa	[%g3]ASI_SCRATCHPAD, %g3	/* g3 = 2nd tsb reg */	;\
-	brgez,pn %g3, sfmmu_udtlb_slowpath	/* branch if 2 TSBs */	;\
-	  nop								;\
 	ldda	[%g1]ASI_QUAD_LDD_PHYS, %g4	/* g4 = tag, %g5 data */;\
 	cmp	%g4, %g7						;\
-	bne,pn	%xcc, sfmmu_tsb_miss_tt		/* no 4M TSB, miss */	;\
-	  mov	-1, %g3			/* set 4M tsbe ptr to -1 */	;\
+	bne,pn %xcc, sfmmu_udtlb_slowpath_noismpred			;\
+	  nop								;\
 	TT_TRACE(trace_tsbhit)		/* 2 instr ifdef TRAPTRACE */	;\
 	stxa	%g5, [%g0]ASI_DTLB_IN	/* trapstat expects TTE */	;\
 	retry				/* in %g5 */			;\
@@ -1097,10 +1095,13 @@ table_name/**/_dtlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	unimp	0							;\
-        unimp   0                                                       ;\
-        unimp   0                                                       ;\
-        unimp   0                                                       ;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
 	.align 128
+	
 #else /* UTSB_PHYS */
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
@@ -1158,41 +1159,42 @@ tt1_itlbmiss:
  * MUST be EXACTLY 32 instructions or we'll break.
  */
 #ifdef UTSB_PHYS
-#define	ITLB_MISS(table_name)						 \
-	.global	table_name/**/_itlbmiss					;\
-table_name/**/_itlbmiss:						;\
-	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
-	ldxa	[%g0]ASI_IMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
-	ldxa	[%g6]ASI_IMMU, %g2		/* g2 = tag access */	;\
-	sllx	%g2, TAGACC_CTX_LSHIFT, %g3				;\
-	srlx	%g3, TAGACC_CTX_LSHIFT, %g3	/* g3 = ctx */		;\
-	cmp	%g3, INVALID_CONTEXT					;\
-	ble,pn	%xcc, sfmmu_kitlb_miss					;\
-	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
-	mov	SCRATCHPAD_UTSBREG, %g3				;\
-	ldxa	[%g3]ASI_SCRATCHPAD, %g3	/* g3 = 2nd tsb reg */	;\
-	brgez,pn %g3, sfmmu_uitlb_slowpath	/* branch if 2 TSBs */	;\
-	  nop								;\
-	ldda	[%g1]ASI_QUAD_LDD_PHYS, %g4 /* g4 = tag, g5 = data */	;\
-	cmp	%g4, %g7						;\
-	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* br if 8k ptr miss */		;\
-	  mov	-1, %g3		/* set 4M TSB ptr to -1 */		;\
-	andcc	%g5, TTE_EXECPRM_INT, %g0 /* check execute bit */	;\
-	bz,pn	%icc, exec_fault					;\
-	  nop								;\
-	TT_TRACE(trace_tsbhit)		/* 2 instr ifdef TRAPTRACE */	;\
-	stxa	%g5, [%g0]ASI_ITLB_IN	/* trapstat expects %g5 */	;\
-	retry								;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
+#define ITLB_MISS(table_name)                                            \
+        .global table_name/**/_itlbmiss                                 ;\
+table_name/**/_itlbmiss:                                                ;\
+        mov     MMU_TAG_ACCESS, %g6             /* select tag acc */    ;\
+        ldxa    [%g0]ASI_IMMU_TSB_8K, %g1       /* g1 = tsbe ptr */     ;\
+        ldxa    [%g6]ASI_IMMU, %g2              /* g2 = tag access */   ;\
+        sllx    %g2, TAGACC_CTX_LSHIFT, %g3                             ;\
+        srlx    %g3, TAGACC_CTX_LSHIFT, %g3     /* g3 = ctx */          ;\
+        cmp     %g3, INVALID_CONTEXT                                    ;\
+        ble,pn  %xcc, sfmmu_kitlb_miss                                  ;\
+          srlx  %g2, TAG_VALO_SHIFT, %g7        /* g7 = tsb tag */      ;\
+        ldda    [%g1]ASI_QUAD_LDD_PHYS, %g4 /* g4 = tag, g5 = data */   ;\
+        cmp     %g4, %g7                                                ;\
+        bne,pn  %xcc, sfmmu_uitlb_slowpath                              ;\
+          andcc %g5, TTE_EXECPRM_INT, %g0 /* check execute bit */       ;\
+        bz,pn   %icc, exec_fault                                        ;\
+          nop                                                           ;\
+        TT_TRACE(trace_tsbhit)          /* 2 instr ifdef TRAPTRACE */   ;\
+        stxa    %g5, [%g0]ASI_ITLB_IN   /* trapstat expects %g5 */      ;\
+        retry                                                           ;\
         unimp   0                                                       ;\
         unimp   0                                                       ;\
         unimp   0                                                       ;\
-	.align 128
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        .align 128 
+
 #else /* UTSB_PHYS */
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\

@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+ 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -263,7 +263,7 @@ resume(kthread_id_t t)
 	set	SFMMU_PRIVATE, %o3		! %o3 = sfmmu private flag
 	call	sfmmu_alloc_ctx
 	  mov	%g0, %o1			! %o1 = allocate flag = 0
-#ifdef sun4v
+
 	brz,a,pt %o0, 4f			! %o0 == 0, no private alloc'ed
           nop
 
@@ -277,8 +277,6 @@ resume(kthread_id_t t)
 	call	sfmmu_alloc_ctx
 	  mov	1, %o1				! %o1 = allocate flag = 1
 	
-#endif
-
 4:
 	call	sfmmu_load_mmustate		! program MMU registers
 	  mov	%i5, %o0

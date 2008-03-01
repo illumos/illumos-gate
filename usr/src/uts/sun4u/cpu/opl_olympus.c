@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,11 @@ int cpu_berr_to_verbose = 0;
  * Set to 1 if booted with all Jupiter cpus (all-Jupiter features enabled).
  */
 int cpu_alljupiter = 0;
+
+/*
+ * The sfmmu_cext field to be used by processes in a shared context domain.
+ */
+static uchar_t shctx_cext = TAGACCEXT_MKSZPAIR(DEFAULT_ISM_PAGESZC, TTE8K);
 
 static int min_ecache_size;
 static uint_t priv_hcl_1;
@@ -303,6 +308,11 @@ cpu_fix_alljupiter(void)
 	 * hwcap semantics.
 	 */
 	cpu_hwcap_flags |= AV_SPARC_IMA;
+
+	/*
+	 * Enable shared context support.
+	 */
+	shctx_on = 1;
 }
 
 #ifdef	OLYMPUS_C_REV_B_ERRATA_XCALL
@@ -803,7 +813,7 @@ mmu_large_pages_disabled(uint_t flag)
 
 /*
  * mmu_init_large_pages is called with the desired ism_pagesize parameter.
- * It may be called from set_platform_defaults, if some value other than 32M
+ * It may be called from set_platform_defaults, if some value other than 4M
  * is desired.  mmu_ism_pagesize is the tunable.  If it has a bad value,
  * then only warn, since it would be bad form to panic due to a user typo.
  *
@@ -812,12 +822,14 @@ mmu_large_pages_disabled(uint_t flag)
 void
 mmu_init_large_pages(size_t ism_pagesize)
 {
+
 	switch (ism_pagesize) {
 	case MMU_PAGESIZE4M:
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+		shctx_cext = TAGACCEXT_MKSZPAIR(TTE4M, TTE8K);
 		break;
 	case MMU_PAGESIZE32M:
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
@@ -825,6 +837,7 @@ mmu_init_large_pages(size_t ism_pagesize)
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
 		adjust_data_maxlpsize(ism_pagesize);
+		shctx_cext = TAGACCEXT_MKSZPAIR(TTE32M, TTE8K);
 		break;
 	case MMU_PAGESIZE256M:
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
@@ -832,6 +845,7 @@ mmu_init_large_pages(size_t ism_pagesize)
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE4M) | (1 << TTE32M));
 		adjust_data_maxlpsize(ism_pagesize);
+		shctx_cext = TAGACCEXT_MKSZPAIR(TTE256M, TTE8K);
 		break;
 	default:
 		cmn_err(CE_WARN, "Unrecognized mmu_ism_pagesize value 0x%lx",
@@ -844,7 +858,7 @@ mmu_init_large_pages(size_t ism_pagesize)
  * Function to reprogram the TLBs when page sizes used
  * by a process change significantly.
  */
-void
+static void
 mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 {
 	uint8_t pgsz0, pgsz1;
@@ -909,11 +923,15 @@ mmu_set_ctx_page_sizes(struct hat *hat)
 	/*
 	 * If supported, reprogram the TLBs to a larger pagesize.
 	 */
-	pgsz0 = hat->sfmmu_pgsz[0];
-	pgsz1 = hat->sfmmu_pgsz[1];
-	ASSERT(pgsz0 < mmu_page_sizes);
-	ASSERT(pgsz1 < mmu_page_sizes);
-	new_cext = TAGACCEXT_MKSZPAIR(pgsz1, pgsz0);
+	if (hat->sfmmu_scdp != NULL) {
+		new_cext = shctx_cext;
+	} else {
+		pgsz0 = hat->sfmmu_pgsz[0];
+		pgsz1 = hat->sfmmu_pgsz[1];
+		ASSERT(pgsz0 < mmu_page_sizes);
+		ASSERT(pgsz1 < mmu_page_sizes);
+		new_cext = TAGACCEXT_MKSZPAIR(pgsz1, pgsz0);
+	}
 	if (hat->sfmmu_cext != new_cext) {
 #ifdef DEBUG
 		int i;

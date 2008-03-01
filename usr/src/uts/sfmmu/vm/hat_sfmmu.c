@@ -2967,6 +2967,12 @@ sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
 		panic("sfmmu_tteload: non cacheable memory tte");
 #endif /* DEBUG */
 
+	/* don't simulate dirty bit for writeable ISM/DISM mappings */
+	if ((flags & HAT_LOAD_SHARE) && TTE_IS_WRITABLE(ttep)) {
+		TTE_SET_REF(ttep);
+		TTE_SET_MOD(ttep);
+	}
+
 	if ((flags & HAT_LOAD_SHARE) || !TTE_IS_REF(ttep) ||
 	    !TTE_IS_MOD(ttep)) {
 		/*
@@ -9678,9 +9684,7 @@ sfmmu_get_ctx(sfmmu_t *sfmmup)
 {
 	mmu_ctx_t *mmu_ctxp;
 	uint_t pstate_save;
-#ifdef sun4v
 	int ret;
-#endif
 
 	ASSERT(sfmmu_hat_lock_held(sfmmup));
 	ASSERT(sfmmup != ksfmmup);
@@ -9721,9 +9725,6 @@ sfmmu_get_ctx(sfmmu_t *sfmmup)
 	 */
 	pstate_save = sfmmu_disable_intrs();
 
-#ifdef sun4u
-	(void) sfmmu_alloc_ctx(sfmmup, 1, CPU, SFMMU_PRIVATE);
-#else
 	if (sfmmu_alloc_ctx(sfmmup, 1, CPU, SFMMU_PRIVATE) &&
 	    sfmmup->sfmmu_scdp != NULL) {
 		sf_scd_t *scdp = sfmmup->sfmmu_scdp;
@@ -9733,7 +9734,6 @@ sfmmu_get_ctx(sfmmu_t *sfmmup)
 		ASSERT(!ret || scsfmmup->sfmmu_ctxs[CPU_MMU_IDX(CPU)].cnum
 		    != INVALID_CONTEXT);
 	}
-#endif
 	sfmmu_load_mmustate(sfmmup);
 
 	sfmmu_enable_intrs(pstate_save);
@@ -13953,9 +13953,11 @@ hat_join_region(struct hat *sfmmup,
 	r_type = (r_type == HAT_REGION_ISM) ? SFMMU_REGION_ISM :
 	    SFMMU_REGION_HME;
 	/*
-	 * Currently only support shared hmes for the main text region.
+	 * Currently only support shared hmes for the read only main text
+	 * region.
 	 */
-	if (r_type == SFMMU_REGION_HME && r_obj != srdp->srd_evp) {
+	if (r_type == SFMMU_REGION_HME && ((r_obj != srdp->srd_evp) ||
+	    (r_perm & PROT_WRITE))) {
 		return (HAT_INVALID_REGION_COOKIE);
 	}
 

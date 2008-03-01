@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,6 +396,8 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"CPU ECC error loop",		/* PTL1_BAD_ECC */
 		"non-kernel context in sys/priv_trap() below or",
 						/* PTL1_BAD_CTX */
+		"error raising a TSB exception", /* PTL1_BAD_RAISE_TSBEXCP */
+		"missing shared TSB"    /* PTL1_NO_SCDTSB8K */
 	};
 
 	uint_t reason = pstate->ptl1_regs.ptl1_g1;

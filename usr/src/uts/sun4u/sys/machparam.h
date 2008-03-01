@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,6 +325,7 @@ extern "C" {
 #define	PTL1_BAD_ECC		13
 #define	PTL1_BAD_CTX		14
 #define	PTL1_BAD_RAISE_TSBEXCP	20
+#define	PTL1_NO_SCDTSB8K	21
 
 /*
  * Defines used for ptl1 related data structs.

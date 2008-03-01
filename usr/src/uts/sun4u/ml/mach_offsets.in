@@ -18,7 +18,7 @@
 \
 \ CDDL HEADER END
 \
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ offsets.in: input file to produce assym.h using the stabs program
@@ -99,47 +99,60 @@ trap_trace_record	TRAP_ENT_SIZE
 	tt_f3		TRAP_ENT_F3
 	tt_f4		TRAP_ENT_F4
 
-hat	HAT_SIZE
-	sfmmu_cpusran
-	sfmmu_tsb
-	sfmmu_ismblkpa
-	sfmmu_tteflags
-	sfmmu_cext
-	sfmmu_ctx_lock
-	sfmmu_ctxs
+hat     HAT_SIZE
+        sfmmu_cpusran
+        sfmmu_tsb
+        sfmmu_ismblkpa
+        sfmmu_tteflags
+        sfmmu_rtteflags
+        sfmmu_srdp
+        sfmmu_region_map.h_rmap_s.hmeregion_map SFMMU_HMERMAP
+        sfmmu_scdp
+        sfmmu_cext
+        sfmmu_ctx_lock
+        sfmmu_ctxs
+
+sf_scd SCD_SIZE
+        scd_sfmmup
+        scd_region_map.h_rmap_s.hmeregion_map   SCD_HMERMAP
 
 sfmmu_global_stat HATSTAT_SIZE
-	sf_pagefaults		HATSTAT_PAGEFAULT
-	sf_uhash_searches	HATSTAT_UHASH_SEARCH
-	sf_uhash_links		HATSTAT_UHASH_LINKS
-	sf_khash_searches	HATSTAT_KHASH_SEARCH
-	sf_khash_links		HATSTAT_KHASH_LINKS
+        sf_pagefaults           HATSTAT_PAGEFAULT
+        sf_uhash_searches       HATSTAT_UHASH_SEARCH
+        sf_uhash_links          HATSTAT_UHASH_LINKS
+        sf_khash_searches       HATSTAT_KHASH_SEARCH
+        sf_khash_links          HATSTAT_KHASH_LINKS
 
-sf_hment	SFHME_SIZE	SFHME_SHIFT
-	hme_tte		SFHME_TTE
+sf_hment        SFHME_SIZE      SFHME_SHIFT
+        hme_tte         SFHME_TTE
 
-tsbmiss		TSBMISS_SIZE
-	ksfmmup		TSBMISS_KHATID
-	usfmmup		TSBMISS_UHATID
-	tsbptr		TSBMISS_TSBPTR
-	tsbptr4m	TSBMISS_TSBPTR4M
-	ismblkpa	TSBMISS_ISMBLKPA
-	khashstart	TSBMISS_KHASHSTART
-	uhashstart	TSBMISS_UHASHSTART
-	khashsz		TSBMISS_KHASHSZ
-	uhashsz		TSBMISS_UHASHSZ
-	dcache_line_mask	TSBMISS_DMASK
-	uhat_tteflags	TSBMISS_UTTEFLAGS
-	uhat_rtteflags	TSBMISS_URTTEFLAGS
-	utsb_misses	TSBMISS_UTSBMISS
-	ktsb_misses	TSBMISS_KTSBMISS
-	uprot_traps	TSBMISS_UPROTS
-	kprot_traps	TSBMISS_KPROTS
-	scratch		TSBMISS_SCRATCH
+tsbmiss         TSBMISS_SIZE
+        ksfmmup         TSBMISS_KHATID
+        usfmmup         TSBMISS_UHATID
+        usrdp           TSBMISS_SHARED_UHATID
+        tsbptr          TSBMISS_TSBPTR
+        tsbptr4m        TSBMISS_TSBPTR4M
+        tsbscdptr       TSBMISS_TSBSCDPTR
+        tsbscdptr4m     TSBMISS_TSBSCDPTR4M
+        ismblkpa        TSBMISS_ISMBLKPA
+        khashstart      TSBMISS_KHASHSTART
+        uhashstart      TSBMISS_UHASHSTART
+        khashsz         TSBMISS_KHASHSZ
+        uhashsz         TSBMISS_UHASHSZ
+	dcache_line_mask TSBMISS_DMASK
+        uhat_tteflags   TSBMISS_UTTEFLAGS
+        uhat_rtteflags  TSBMISS_URTTEFLAGS
+        utsb_misses     TSBMISS_UTSBMISS
+        ktsb_misses     TSBMISS_KTSBMISS
+        uprot_traps     TSBMISS_UPROTS
+        kprot_traps     TSBMISS_KPROTS
+        scratch         TSBMISS_SCRATCH
+        shmermap        TSBMISS_SHMERMAP
+        scd_shmermap    TSBMISS_SCDSHMERMAP
 
-\#define	TSB_TAGACC	(0 * TSBMISS_SCRATCH_INCR)
-\#define	TSBMISS_HMEBP	(1 * TSBMISS_SCRATCH_INCR)
-\#define	TSBMISS_HATID	(2 * TSBMISS_SCRATCH_INCR)
+\#define        TSB_TAGACC      (0 * TSBMISS_SCRATCH_INCR)
+\#define        TSBMISS_HMEBP   (1 * TSBMISS_SCRATCH_INCR)
+\#define        TSBMISS_HATID   (2 * TSBMISS_SCRATCH_INCR)
 
 kpmtsbm		KPMTSBM_SIZE KPMTSBM_SHIFT
 	vbase		KPMTSBM_VBASE

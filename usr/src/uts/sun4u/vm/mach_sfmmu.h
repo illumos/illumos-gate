@@ -40,6 +40,7 @@
 #include <sys/cheetahregs.h>
 #include <sys/spitregs.h>
 #include <sys/opl_olympus_regs.h>
+#include <sys/mmu.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -51,7 +52,7 @@ extern "C" {
  * platform Makefile to access user TSBs via physical address but must also
  * designate one ASI_SCRATCHPAD register to hold the second user TSB.  To
  * designate the user TSB scratchpad register, platforms must provide a
- * definition for SCRATCHPAD_UTSBREG below.
+ * definition for SCRATCHPAD_UTSBREG2 below.
  *
  * Platforms that use UTSB_PHYS do not allocate 2 locked TLB entries to access
  * the user TSBs.
@@ -59,10 +60,12 @@ extern "C" {
 #if defined(UTSB_PHYS)
 
 #if defined(_OPL)
-#define	SCRATCHPAD_UTSBREG	OPL_SCRATCHPAD_UTSBREG4
+#define	SCRATCHPAD_UTSBREG2	OPL_SCRATCHPAD_UTSBREG4 /* 4M-256M pages */
+#define	SCRATCHPAD_UTSBREG3	OPL_SCRATCHPAD_UTSBREG5 /* 8K-512K pages */
+#define	SCRATCHPAD_UTSBREG4	OPL_SCRATCHPAD_UTSBREG6 /* 4M-256M pages */
 #else
-#error "Compiling UTSB_PHYS but no SCRATCHPAD_UTSBREG specified"
-#endif
+#error "Compiling UTSB_PHYS but no SCRATCHPAD_UTSBREG2 specified"
+#endif /* _OPL */
 
 #endif /* UTSB_PHYS */
 
@@ -70,17 +73,45 @@ extern "C" {
 #ifdef _ASM
 
 /*
- * This macro is used to set private secondary context register in
+ * This macro is used to set private/shared secondary context register in
  * sfmmu_alloc_ctx().
+ * if is_shctx = 0 then we set the SCONTEXT to cnum and invalidate the
+ * SHARED_CONTEXT register. If is_shctx = 1 then only the SHARED_CONTEXT
+ * register is set.
+ *  (See additional comments in sfmmu_alloc_ctx)
  * Input:
- * cnum : cnum
- * arg2 : unused
+ * cnum     = cnum
+ * is_shctx = sfmmu private/shared flag (0: private, 1: shared)
+ * tmp1 :    %o4 scratch
+ * tmp2 :    %o5 scratch
+ * label: used as local branch targets
  */
-#define	SET_SECCTX(cnum, arg2, tmp1, tmp2)			\
-	mov	MMU_SCONTEXT, tmp1;				\
-	sethi	%hi(FLUSH_ADDR), tmp2;				\
-	stxa	cnum, [tmp1]ASI_MMU_CTX;			\
-	flush	tmp2
+#define	SET_SECCTX(cnum, is_shctx, tmp1, tmp2, label)	   \
+	/* BEGIN CSTYLED */				   \
+	brnz,pn is_shctx, label/**/1			  ;\
+	  sethi   %hi(FLUSH_ADDR), tmp2			  ;\
+	mov     MMU_SCONTEXT, tmp1			  ;\
+	stxa    cnum, [tmp1]ASI_MMU_CTX			  ;\
+	flush   tmp2					  ;\
+	sethi   %hi(shctx_on), tmp1			  ;\
+	ld      [tmp1 + %lo(shctx_on)], tmp1		  ;\
+	brz,pt  tmp1, label/**/3			  ;\
+	mov    %g0, cnum				  ;\
+	ba,pt    %xcc, label/**/2			  ;\
+label/**/1:						  ;\
+	set     SHCTXREG_VALID_BIT, tmp1		  ;\
+	sllx    cnum, CTXREG_CTX_SHIFT, cnum		  ;\
+	srlx    cnum, CTXREG_CTX_SHIFT, cnum		  ;\
+	or      cnum, tmp1, cnum			  ;\
+	mov     cnum, tmp1				  ;\
+	sllx    cnum, 32, cnum				  ;\
+	or      cnum, tmp1, cnum			  ;\
+label/**/2:					          ;\
+	mov     MMU_SHARED_CONTEXT, tmp1		  ;\
+	stxa    cnum, [tmp1]ASI_MMU_CTX			  ;\
+	flush   tmp2					  ;\
+label/**/3:
+	/* END CSTYLED */
 
 /*
  * This macro is used in the MMU code to check if TL should be lowered from
@@ -94,7 +125,7 @@ extern "C" {
 	or	scr2, %lo(KERNELBASE), scr2; 			\
 	cmp	scr1, scr2; 					\
 	bgeu	%xcc, 9f;					\
-	nop;							\
+	    nop;						\
 	ba	label;						\
 	wrpr	%g0, 1, %tl;					\
 9:
@@ -537,60 +568,9 @@ label/**/_get_2nd_tsb_base:						;\
 	/* tmp1 = TSB size code */					\
 	GET_TSBE_POINTER(MMU_PAGESHIFT4M, tsbe_ptr, tagacc, tmp1, tmp2)
 
-#endif /* UTSB_PHYS */
 
+#else /* !UTSB_PHYS */
 
-#ifdef UTSB_PHYS
-
-/*
- * Synthesize a TSB base register contents for a process.
- *
- * In:
- *   tsbinfo = TSB info pointer (ro)
- *   tsbreg, tmp1 = scratch registers
- * Out:
- *   tsbreg = value to program into TSB base register
- */
-
-#define	MAKE_UTSBREG_PHYS(tsbinfo, tsbreg, tmp1)			\
-	ldx	[tsbinfo + TSBINFO_PADDR], tsbreg;		\
-	lduh	[tsbinfo + TSBINFO_SZCODE], tmp1;		\
-	and	tmp1, TSB_SOFTSZ_MASK, tmp1;			\
-	or	tsbreg, tmp1, tsbreg;				\
-
-/*
- * Load TSB base register into a dedicated scratchpad register.
- * This register contains utsb_pabase in bits 63:13, and TSB size
- * code in bits 2:0.
- *
- * In:
- *   tsbreg = value to load (ro)
- *   regnum = constant or register
- *   tmp1 = scratch register
- * Out:
- *   Specified scratchpad register updated
- *
- * Note: If this is enabled on Panther, a membar #Sync is required
- *	 following an ASI store to the scratchpad registers.
- */
-
-#define	SET_UTSBREG(regnum, tsbreg, tmp1)				\
-	mov	regnum, tmp1;						\
-	stxa	tsbreg, [tmp1]ASI_SCRATCHPAD;	/* save tsbreg */	\
-
-/*
- * Get TSB base register from the scratchpad
- *
- * In:
- *   regnum = constant or register
- *   tsbreg = scratch
- * Out:
- *   tsbreg = tsbreg from the specified scratchpad register
- */
-
-#define	GET_UTSBREG(regnum, tsbreg)					\
-	mov	regnum, tsbreg;						\
-	ldxa	[tsbreg]ASI_SCRATCHPAD, tsbreg
 
 /*
  * Determine the pointer of the entry in the first TSB to probe given
@@ -610,55 +590,7 @@ label/**/_get_2nd_tsb_base:						;\
 
 #define	GET_1ST_TSBE_PTR(tagacc, tsbe_ptr, tmp1, tmp2)
 
-/*
- * Get the location in the 2nd TSB of the tsbe for this fault.
- * Assumes that the second TSB only contains 4M mappings.
- *
- * In:
- *   tagacc = tag access register (not clobbered)
- *   tsbe = 2nd TSB base register
- *   tmp1, tmp2 = scratch registers
- * Out:
- *   tsbe = pointer to the tsbe in the 2nd TSB
- */
-
-#define	GET_2ND_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)			\
-	and	tsbe, TSB_SOFTSZ_MASK, tmp2;	/* tmp2=szc */		\
-	andn	tsbe, TSB_SOFTSZ_MASK, tsbe;	/* tsbbase */		\
-	mov	TSB_ENTRIES(0), tmp1;	/* nentries in TSB size 0 */	\
-	sllx	tmp1, tmp2, tmp1;	/* tmp1 = nentries in TSB */	\
-	sub	tmp1, 1, tmp1;		/* mask = nentries - 1 */	\
-	srlx	tagacc, MMU_PAGESHIFT4M, tmp2; 				\
-	and	tmp2, tmp1, tmp1;	/* tsbent = virtpage & mask */	\
-	sllx	tmp1, TSB_ENTRY_SHIFT, tmp1;	/* entry num --> ptr */	\
-	add	tsbe, tmp1, tsbe	/* add entry offset to TSB base */
-
-/*
- * Read the 2nd TSB base register.  This is not done in GET_2ND_TSBE_PTR as
- * an optimization since the TLB miss trap handler entries have potentially
- * already loaded the 2nd TSB base reg when we invoke GET_2ND_TSBE_PTR.
- *
- * Out:
- *   tsbreg = contents of the 2nd TSB base register
- */
-#define	GET_2ND_TSBREG(tsbreg)						\
-	GET_UTSBREG(SCRATCHPAD_UTSBREG, tsbreg);
-
-/*
- * Load the 2nd TSB base into a dedicated scratchpad register which
- * is used as a pseudo TSB base register.
- *
- * In:
- *   tsbreg = value to load (ro)
- *   regnum = constant or register
- *   tmp1 = scratch register
- * Out:
- *   Specified scratchpad register updated
- */
-#define	LOAD_2ND_TSBREG(tsbreg, tmp1)					\
-	SET_UTSBREG(SCRATCHPAD_UTSBREG, tsbreg, tmp1);
-
-#endif /* UTSB_PHYS */
+#endif /* !UTSB_PHYS */
 
 
 /*
@@ -682,135 +614,180 @@ label/**/_get_2nd_tsb_base:						;\
 #else
 #define	UTSB_PROBE_ASI	ASI_NQUAD_LD
 #endif
-
+#define	PROBE_TSB(tsbe_ptr, tag, tsbtag, label)                            \
+	/* BEGIN CSTYLED */                                             \
+        ldda    [tsbe_ptr]UTSB_PROBE_ASI, tsbtag                        ;\
+        cmp     tsbtag, tag             /* compare tag w/ TSB */        ;\
+        bne,pn  %xcc, label/**/1        /* branch if !match */          ;\
+          nop                                                           \
+	/* END CSTYLED */
 /*
- * Will probe the first TSB, and if it finds a match, will insert it
- * into the TLB and retry.
+ * Probe a TSB. If miss continue from the end of the macro for most probes
+ * except jump to TSB miss for 3rd ITSB probe. If hit retry faulted
+ * instruction for DTSB probes. For ITSB probes in case of TSB hit check
+ * execute bit and branch to exec_fault if the bit is not set otherwise retry
+ * faulted instruction. Do ITLB synthesis in case of hit in second ITSB if
+ * synthesis bit is set.
  *
- * tsbe_ptr = precomputed first TSB entry pointer (in, ro)
+ * tsbe_ptr = precomputed TSB entry pointer (in, ro)
  * vpg_4m = 4M virtual page number for tag matching  (in, ro)
  * label = where to branch to if this is a miss (text)
- * %asi = atomic ASI to use for the TSB access
  *
  * For trapstat, we have to explicily use these registers.
  * g4 = location tag will be retrieved into from TSB (out)
  * g5 = location data(tte) will be retrieved into from TSB (out)
- */
-#define	PROBE_1ST_DTSB(tsbe_ptr, vpg_4m, label)	/* g4/g5 clobbered */	\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
-	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
-	  nop								;\
-	TT_TRACE(trace_tsbhit)						;\
-	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	/* trapstat expects tte in %g5 */				;\
-	retry				/* retry faulted instruction */	;\
-label/**/1:								\
-	/* END CSTYLED */
-
-/*
- * Same as above, only if the TTE doesn't have the execute
- * bit set, will branch to exec_fault directly.
- */
-#define	PROBE_1ST_ITSB(tsbe_ptr, vpg_4m, label)				\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
-	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
-	  nop								;\
-	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
-	bz,pn	%icc, exec_fault					;\
-	  nop								;\
-	TT_TRACE(trace_tsbhit)						;\
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	retry				/* retry faulted instruction */	;\
-label/**/1:								\
-	/* END CSTYLED */
-
-/*
- * vpg_4m = 4M virtual page number for tag matching (in)
- * tsbe_ptr = precomputed second TSB entry pointer (in)
- * label = label to use to make branch targets unique (text)
  *
- * For trapstat, we have to explicity use these registers.
- * g4 = tag portion of TSBE (out)
- * g5 = data portion of TSBE (out)
+ * In case of first tsb probe tsbe_ptr is %g1. For other tsb probes
+ * move tsbe_ptr into %g1 in case of hit for traptrace.
+ *
+ * If the probe fails and we continue from call site %g4-%g5 are clobbered.
+ * 2nd ITSB probe macro will also clobber %g6 in this case.
  */
-#define	PROBE_2ND_DTSB(tsbe_ptr, vpg_4m, label)				\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
-	/* since we are looking at 2nd tsb, if it's valid, it must be 4M */ ;\
-	cmp	%g4, vpg_4m						;\
-	bne,pn	%xcc, label/**/1					;\
-	  nop								;\
-	mov	tsbe_ptr, %g1		/* trace_tsbhit wants ptr in %g1 */ ;\
-	TT_TRACE(trace_tsbhit)						;\
-	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	/* trapstat expects tte in %g5 */				;\
-	retry				/* retry faulted instruction */	;\
-label/**/1:								\
+#define	PROBE_1ST_DTSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_TSB(tsbe_ptr, vpg_4m, %g4, label)                         ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                      /* retry faulted instruction */      ;\
+label/**/1:                                                             \
+	/* END CSTYLED */
+
+#define	PROBE_2ND_DTSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_TSB(tsbe_ptr, vpg_4m, %g4, label)                         ;\
+        mov     tsbe_ptr, %g1       /* trace_tsbhit wants ptr in %g1 */ ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                      /* retry faulted instruction */      ;\
+label/**/1:                                                             \
+	/* END CSTYLED */
+
+#define	PROBE_1ST_ITSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_TSB(tsbe_ptr, vpg_4m, %g4, label)                         ;\
+        andcc   %g5, TTE_EXECPRM_INT, %g0  /* check execute bit */      ;\
+        bz,pn   %icc, exec_fault                                        ;\
+          nop                                                           ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                           /* retry faulted instruction */ ;\
+label/**/1:                                                             \
+	/* END CSTYLED */
+
+#define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        ldda    [tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */ ;\
+        cmp     %g4, vpg_4m             /* compare tag w/ TSB */        ;\
+        bne,pn  %xcc, label/**/2        /* branch if !match */          ;\
+          or    %g0, TTE4M, %g6                                         ;\
+        andcc   %g5, TTE_EXECPRM_INT, %g0  /* check execute bit */      ;\
+        bz,a,pn %icc, label/**/1                                        ;\
+          sllx  %g6, TTE_SZ_SHFT, %g6                                   ;\
+        mov     tsbe_ptr, %g1         /* trap trace wants ptr in %g1 */ ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                        /* retry faulted instruction */    ;\
+label/**/1:                                                             ;\
+        andcc %g5, TTE_E_SYNTH_INT, %g0                                 ;\
+        bz,pn   %icc, exec_fault                                        ;\
+          mov   tsbe_ptr, %g1       /* trap trace wants ptr in %g1 */   ;\
+        or      %g5, %g6, %g5                                           ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                      /* retry faulted instruction */      ;\
+label/**/2:
+	/* END CSTYLED */
+
+#ifdef UTSB_PHYS
+
+/*
+ * Updates the context filed in the tagaccess register with the shared
+ * context to force the next i/DTLB_STUFF() to load this mapping into
+ * the TLB with the shared context.
+ */
+#define	SET_SHCTX_TAGACC(tmp1, tmp2, asi)                               \
+	/* BEGIN CSTYLED */                                             \
+        mov     MMU_TAG_ACCESS, tmp2                                    ;\
+        ldxa    [tmp2]asi, tmp2                 /* tmp2 = VA|CTX */     ;\
+        srlx    tmp2, TAGACC_SHIFT, tmp2                                ;\
+        sllx    tmp2, TAGACC_SHIFT, tmp2        /* tmp2 = VA */         ;\
+        mov     MMU_SHARED_CONTEXT, tmp1        /* clobber tsbe_ptr */  ;\
+        ldxa    [tmp1]ASI_MMU_CTX, tmp1         /* tmp2 = shctx reg */  ;\
+        sllx    tmp1, SHCTXREG_CTX_LSHIFT, tmp1                         ;\
+        srlx    tmp1, SHCTXREG_CTX_LSHIFT, tmp1 /* tmp1 = SHCTX */      ;\
+        or      tmp1, tmp2, tmp1                /* tmp1  = VA|SHCTX */  ;\
+        mov     MMU_TAG_ACCESS, tmp2                                    ;\
+        stxa    tmp1, [tmp2]asi                 /* asi = VA|SHCTX */
+	/* END CSTYLED */
+
+#define	PROBE_SHCTX_DTSB(tsbe_ptr, vpg_4m, label)                       \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_TSB(tsbe_ptr, vpg_4m, %g4, label)                         ;\
+        mov     tsbe_ptr, %g1       /* trace_tsbhit wants ptr in %g1 */ ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        SET_SHCTX_TAGACC(%g3, %g4, ASI_DMMU)                            ;\
+        DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                      /* retry faulted instruction */      ;\
+label/**/1:                                                             \
+	/* END CSTYLED */
+
+#define	PROBE_3RD_DTSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_SHCTX_DTSB(tsbe_ptr, vpg_4m, label)                  ;\
+	/* END CSTYLED */
+
+#define	PROBE_4TH_DTSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_SHCTX_DTSB(tsbe_ptr, vpg_4m, label)                  ;\
+	/* END CSTYLED */
+
+#define	PROBE_SHCTX_ITSB(tsbe_ptr, vpg_4m, label)                       \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_TSB(tsbe_ptr, vpg_4m, %g4, label)                         ;\
+        andcc   %g5, TTE_EXECPRM_INT, %g0  /* check execute bit */      ;\
+        bz,pn %icc, exec_fault                                          ;\
+         mov     tsbe_ptr, %g1          /* for traptrace sake */        ;\
+        TT_TRACE(trace_tsbhit)                                          ;\
+        SET_SHCTX_TAGACC(%g3, %g4, ASI_IMMU)                            ;\
+        ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
+        retry                           /* retry faulted instruction */ ;\
+label/**/1:
+	/* END CSTYLED */
+
+#define	PROBE_3RD_ITSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_SHCTX_ITSB(tsbe_ptr, vpg_4m, sfmmu_tsb_miss_tt)      ;\
+	/* END CSTYLED */
+
+#define	PROBE_4TH_ITSB(tsbe_ptr, vpg_4m, label)                         \
+	/* BEGIN CSTYLED */                                             \
+        PROBE_SHCTX_ITSB(tsbe_ptr, vpg_4m, label)                  ;\
 	/* END CSTYLED */
 
 /*
- * Macro to get SCD shared hme map on sun4v platforms
- * (not applicable to sun4u platforms)
+ * The traptype is supplied by caller.
+ *
+ * If iTSB miss, store shctx into IMMU TAG ACCESS REG
+ * If dTSB miss, store shctx into DMMU TAG ACCESS REG
+ * Thus the [D|I]TLB_STUFF will work as expected.
  */
-#define	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hatid, hmemisc)
-
-#ifndef TRAPTRACE
-/*
- * Same as above, with the following additions:
- * If the TTE found is not executable, branch directly
- * to exec_fault after checking for ITLB synthesis.
- * If a TSB miss, branch to TSB miss handler.
- */
-#define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)				\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
-	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* branch if !match */		;\
-	  or	%g0, TTE4M, %g6						;\
-	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
-	bz,a,pn	%icc, label/**/1					;\
-	  sllx	%g6, TTE_SZ_SHFT, %g6					;\
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	retry				/* retry faulted instruction */ ;\
-label/**/1:								;\
-	andcc %g5, TTE_E_SYNTH_INT, %g0					;\
-	bz,pn	%icc, exec_fault					;\
-	  or	%g5, %g6, %g5						;\
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	retry				/* retry faulted instruction */	\
-	/* END CSTYLED */
-#else /* TRAPTRACE */
-/*
- * Same as above, with the TT_TRACE and mov tsbe_ptr, %g1 additions.
- */
-#define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)				\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
-	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* branch if !match */		;\
-	  or	%g0, TTE4M, %g6						;\
-	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
-	bz,a,pn	%icc, label/**/1					;\
-	  sllx	%g6, TTE_SZ_SHFT, %g6					;\
-	mov	tsbe_ptr, %g1		/* trap trace wants ptr in %g1 */ ;\
-	TT_TRACE(trace_tsbhit)						;\
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	retry				/* retry faulted instruction */ ;\
-label/**/1:								;\
-	andcc %g5, TTE_E_SYNTH_INT, %g0				;\
-	bz,pn	%icc, exec_fault					;\
-	  mov	tsbe_ptr, %g1		/* trap trace wants ptr in %g1 */ ;\
-	or	%g5, %g6, %g5						;\
-	TT_TRACE(trace_tsbhit)						;\
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	retry				/* retry faulted instruction */	\
+#define	SAVE_CTX1(traptype, tmp1, tmp2, label)                          \
+	/* BEGIN CSTYLED */                                             \
+        cmp     traptype, FAST_IMMU_MISS_TT                             ;\
+        be,pn %icc, label/**/1                                          ;\
+          nop                                                           ;\
+        SET_SHCTX_TAGACC(tmp1, tmp2, ASI_DMMU)                          ;\
+        membar  #Sync                                                   ;\
+        ba,a    label/**/2                                              ;\
+label/**/1:                                                             ;\
+        SET_SHCTX_TAGACC(tmp1, tmp2, ASI_IMMU)                          ;\
+        sethi   %hi(FLUSH_ADDR), tmp1                                   ;\
+        flush   tmp1                                                    ;\
+label/**/2:
 	/* END CSTYLED */
 
-#endif /* TRAPTRACE */
+#endif /* UTSB_PHYS */
+
 #endif /* _ASM */
 
 #ifdef	__cplusplus

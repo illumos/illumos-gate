@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,7 +134,7 @@ int init_mmu_page_sizes = 0;
 /*
  * mmu_init_large_pages is called with the desired ism_pagesize parameter,
  * for Panther-only systems. It may be called from set_platform_defaults,
- * if some value other than 32M is desired, for Panther-only systems.
+ * if some value other than 4M is desired, for Panther-only systems.
  * mmu_ism_pagesize is the tunable.  If it has a bad value, then only warn,
  * since it would be bad form to panic due
  * to a user typo.
@@ -252,7 +252,7 @@ static uint64_t ttecnt_threshold[MMU_PAGE_SIZES] = {
  * didn't fault any pages in. This allows the t512_1 to be reprogrammed,
  * because the T16 does not support the two giant page sizes. ouch.
  */
-void
+static void
 mmu_fixup_large_pages(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 {
 	uint_t pgsz0 = tmp_pgsz[0];
@@ -318,7 +318,7 @@ mmu_fixup_large_pages(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
  * Function to set up the page size values used to reprogram the DTLBs,
  * when page sizes used by a process change significantly.
  */
-void
+static void
 mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 {
 	uint_t pgsz0, pgsz1;
