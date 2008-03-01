@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,38 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/pkcs11/pkcs11_softtoken/i386/Makefile
 
-include ../../Makefile.softtoken.i386
+AES_PSR_OBJECTS =
+ARCFOUR_PSR_OBJECTS =
+DES_PSR_OBJECTS =
+RSA_PSR_OBJECTS =
+SHA1_PSR_OBJECTS =
+BIGNUM_PSR_OBJECTS = bignum_i386.o bignum_i386_asm.o
+BIGNUM_CFG = -DPSR_MUL -DHWCAP
+BIGNUM_PSR_SRCS = \
+	$(BIGNUMDIR)/i386/bignum_i386.c \
+	$(BIGNUMDIR)/i386/bignum_i386_asm.s
+
+include ../Makefile.com
+
+CPPFLAGS += -DMP_USE_UINT_DIGIT
+
+install: all $(ROOTLIBS) $(ROOTLINKS)
+
+DYNFLAGS += -M $(BIGNUMDIR)/i386/cap_mapfile
+
+pics/bignum_i386.o := COPTFLAG = -xO3
+
+pics/%.o:	$(BIGNUMDIR)/$(MACH)/%.c
+	$(COMPILE.c) -o $@ $(BIGNUM_CFG) $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(BIGNUMDIR)/$(MACH)/%.s
+	$(COMPILE.s) -o $@ $(BIGNUM_CFG) $<
+	$(POST_PROCESS_O)

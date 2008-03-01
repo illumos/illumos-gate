@@ -71,14 +71,6 @@ modlintlib:	$(OPL_KMODS) $(CLOSED_OPL_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-OPL_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install: $(ROOT_OPL_DIR) $(USR_OPL_DIR) \
 	$(USR_OPL_INC_DIR) \
 	$(USR_OPL_SBIN_DIR) \
@@ -126,17 +118,6 @@ LINT_LIBS	= $(LINT_LIB) \
 lint.platmod:   modlintlib
 	@-$(ECHO) "\nOpl Platform-dependent module: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #

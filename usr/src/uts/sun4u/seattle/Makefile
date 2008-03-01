@@ -68,14 +68,6 @@ modlintlib:	$(SEATTLE_KMODS)
 
 LINKED_PLATFORMS	= SUNW,Sun-Fire-V245
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-SEATTLE_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_SEATTLE_DIR) \
 		$(USR_SEATTLE_DIR) \
 		$(USR_SEATTLE_INC_DIR) \
@@ -115,18 +107,7 @@ $(SEATTLE_CRYPTO_LINKS): $(ROOT_SEATTLE_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_SEATTLE_CRYPTO_DIR_64)/$@;
 	$(SYMLINK) $(ROOT_US3_CRYPTO_LINK)/$@ $(ROOT_SEATTLE_CRYPTO_DIR_64)/$@
 
-# EXPORT DELETE START
 
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
-
-#
 #
 #	Include common targets.
 #

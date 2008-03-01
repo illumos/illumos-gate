@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,14 +72,6 @@ LINKS2DESTDIR	= ../../../../SUNW,Sun-Fire-280R/kernel/misc/sparcv9
 LW2PLUS_LINKS_2	= SUNW,Netra-T4/kernel/misc/sparcv9/platmod
 LW2PLUS_PLAT_LINKS_2  = $(LW2PLUS_LINKS_2:%=$(ROOT_PLAT_DIR)/%)
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-LW2PLUS_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-  
 install:	$(ROOT_LW2PLUS_DIR) $(USR_LW2PLUS_DIR) \
 		$(ROOT_LW2PLUS_MISC_DIR_64) \
 		$(USR_LW2PLUS_INC_DIR) \
@@ -107,17 +99,6 @@ $(LW2PLUS_PLAT_LINKS_2):
 $(LW2PLUS_CRYPTO_LINKS): $(ROOT_LW2PLUS_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_LW2PLUS_CRYPTO_DIR_64)/$@;
 	$(SYMLINK) $(ROOT_US3_CRYPTO_LINK)/$@ $(ROOT_LW2PLUS_CRYPTO_DIR_64)/$@
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2737,19 +2737,12 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
-#ifdef	CRYPTO_UNLIMITED
 			if ((sck->sk_value_len != AES_MIN_KEY_BYTES) &&
 			    (sck->sk_value_len != AES_192_KEY_BYTES) &&
 			    (sck->sk_value_len != AES_MAX_KEY_BYTES)) {
 				rv = CKR_ATTRIBUTE_VALUE_INVALID;
 				goto fail_cleanup;
 			}
-#else
-			if (sck->sk_value_len != AES_MIN_KEY_BYTES) {
-				rv = CKR_ATTRIBUTE_VALUE_INVALID;
-				goto fail_cleanup;
-			}
-#endif /* CRYPTO_UNLIMITED */
 			break;
 
 		case CKK_BLOWFISH:
@@ -2858,19 +2851,12 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 				goto fail_cleanup;
 			}
 
-#ifdef	CRYPTO_UNLIMITED
 			if ((sck->sk_value_len != AES_MIN_KEY_BYTES) &&
 			    (sck->sk_value_len != AES_192_KEY_BYTES) &&
 			    (sck->sk_value_len != AES_MAX_KEY_BYTES)) {
 				rv = CKR_ATTRIBUTE_VALUE_INVALID;
 				goto fail_cleanup;
 			}
-#else
-			if (sck->sk_value_len != AES_MIN_KEY_BYTES) {
-				rv = CKR_ATTRIBUTE_VALUE_INVALID;
-				goto fail_cleanup;
-			}
-#endif /* CRYPTO_UNLIMITED */
 
 			break;
 
@@ -2947,19 +2933,12 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKK_AES:
 			if (isValueLen) {
-#ifdef	CRYPTO_UNLIMITED
 				if ((sck->sk_value_len != AES_MIN_KEY_BYTES) &&
 				    (sck->sk_value_len != AES_192_KEY_BYTES) &&
 				    (sck->sk_value_len != AES_MAX_KEY_BYTES)) {
 					rv = CKR_ATTRIBUTE_VALUE_INVALID;
 					goto fail_cleanup;
 				}
-#else
-				if (sck->sk_value_len != AES_MIN_KEY_BYTES) {
-					rv = CKR_ATTRIBUTE_VALUE_INVALID;
-					goto fail_cleanup;
-				}
-#endif /* CRYPTO_UNLIMITED */
 			}
 			break;
 
@@ -3018,19 +2997,12 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKK_AES:
 			if (isValueLen) {
-#ifdef	CRYPTO_UNLIMITED
 				if ((sck->sk_value_len != AES_MIN_KEY_BYTES) &&
 				    (sck->sk_value_len != AES_192_KEY_BYTES) &&
 				    (sck->sk_value_len != AES_MAX_KEY_BYTES)) {
 					rv = CKR_ATTRIBUTE_VALUE_INVALID;
 					goto fail_cleanup;
 				}
-#else
-				if (sck->sk_value_len != AES_MIN_KEY_BYTES) {
-					rv = CKR_ATTRIBUTE_VALUE_INVALID;
-					goto fail_cleanup;
-				}
-#endif /* CRYPTO_UNLIMITED */
 			}
 
 			break;

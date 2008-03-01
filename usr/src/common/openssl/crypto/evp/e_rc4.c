@@ -56,13 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "cryptlib.h"
 
@@ -129,10 +122,6 @@ const EVP_CIPHER *EVP_rc4_40(void)
 static int rc4_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 			const unsigned char *iv, int enc)
 	{
-#ifndef CRYPTO_UNLIMITED
-	if (ctx->key_len > 16)
-		return 0;
-#endif /* CRYPTO_UNLIMITED */
 	RC4_set_key(&data(ctx)->ks,EVP_CIPHER_CTX_key_length(ctx),
 		    key);
 	return 1;

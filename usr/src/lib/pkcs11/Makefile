@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,17 +38,14 @@ CHECKHDRS =	$(HDRDIR)/cryptoki.h
 SUBDIRS = \
 	libpkcs11
 
+
 #
 # Don't build these for OpenSolaris, since they will be replaced by
-# binaries that are signed by Sun RE.
+# binaries that are signed by ON Gatekeepers.
 #
 $(CLOSED_BUILD)SUBDIRS += \
 			pkcs11_kernel	\
 			pkcs11_softtoken
-
-# EXPORT DELETE START
-$(CLOSED_BUILD)SUBDIRS	+= pkcs11_softtoken_extra
-# EXPORT DELETE END
 
 all 	:=	TARGET= all
 clean 	:=	TARGET= clean
@@ -65,18 +61,10 @@ install_h: $(ROOTHDRS)
 
 check:	$(CHECKHDRS)
 
+
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) -f Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-# EXPORT DELETE END
 
 include ../Makefile.targ

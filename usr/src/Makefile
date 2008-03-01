@@ -262,10 +262,7 @@ EXPORT_SRC:
 	@cd lib/libgss;   pwd; $(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libnsl;	  pwd; $(MAKE) EXPORT_SRC
-	@cd lib/openssl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/pkcs11/pkcs11_softtoken/common;  pwd; $(MAKE) EXPORT_SRC
-	@cd lib/pkcs11/libpkcs11;  pwd; $(MAKE) EXPORT_SRC
-	@cd lib/pkcs11;  pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libsldap; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libsasl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/sasl_plugins; pwd; $(MAKE) EXPORT_SRC
@@ -286,23 +283,6 @@ EXPORT_SRC:
 	@cd $(CLOSED)/uts/sun4u/forthdebug; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/intel; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/sun4u; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4u/chalupa;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/cherrystone;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/daktari;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/enchilada;	pwd;	$(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4u/ents;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/excalibur;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/chicago;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/boston;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/seattle;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/littleneck;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/lw2plus;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/mpxu;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/opl;      pwd;    $(MAKE) EXPORT_SRC
-	@cd uts/sun4u/serengeti;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/starcat;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/taco;	pwd;	$(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/uts/sun4v/io/ncp;	pwd;	$(MAKE) EXPORT_SRC
 	@cd pkgdefs;	pwd; $(MAKE) EXPORT_SRC
 	$(RM) -r $(XMOD_DELETE_FILES)

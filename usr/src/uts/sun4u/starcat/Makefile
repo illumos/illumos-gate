@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,14 +72,6 @@ modlintlib:	$(STARCAT_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-15000
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-STARCAT_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install: $(ROOT_STARCAT_DIR) $(USR_STARCAT_DIR) \
 	$(USR_STARCAT_INC_DIR) \
 	$(USR_STARCAT_SBIN_DIR) \
@@ -119,18 +111,7 @@ lint.platmod:   modlintlib
 	@-$(ECHO) "\nStarcat Platform-dependent module: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
-# EXPORT DELETE START
 
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
-
-#
 #
 #	Include common targets.
 #

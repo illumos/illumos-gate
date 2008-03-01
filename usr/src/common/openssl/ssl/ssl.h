@@ -167,16 +167,6 @@
  * SUN MICROSYSTEMS, INC., and contributed to the OpenSSL project.
  */
 
-/*
- * The portions of this code that are #ifdef CRYPTO_UNLIMITED are
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef HEADER_SSL_H 
 #define HEADER_SSL_H 
 
@@ -325,11 +315,7 @@ extern "C" {
 /* The following cipher list is used by default.
  * It also is substituted when an application-defined cipher list string
  * starts with 'DEFAULT'. */
-#ifdef CRYPTO_UNLIMITED
 #define SSL_DEFAULT_CIPHER_LIST	"ALL:!ADH:+RC4:@STRENGTH" /* low priority for RC4 */
-#else
-#define SSL_DEFAULT_CIPHER_LIST	"ALL:!DHE-RSA-AES256-SHA:!DHE-DSS-AES256-SHA:!AES256-SHA:!ADH:+RC4:@STRENGTH" /* low priority for RC4 */
-#endif /* CRYPTO_UNLIMITED */
 
 /* Used in SSL_set_shutdown()/SSL_get_shutdown(); */
 #define SSL_SENT_SHUTDOWN	1

@@ -25,13 +25,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Note: rewritten a little bit to provide error control and an OpenSSL-
    compatible API */
 
@@ -755,13 +748,8 @@ int AES_set_encrypt_key(const unsigned char *userKey, const int bits,
 
 	if (!userKey || !key)
 		return -1;
-#ifdef CRYPTO_UNLIMITED
 	if (bits != 128 && bits != 192 && bits != 256)
 		return -2;
-#else
-	if (bits != 128)
-		return -2;
-#endif /* CRYPTO_UNLIMITED */
 
 	rk = key->rd_key;
 

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 #
 #
 # uts/sun4u/taco/Makefile
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,14 +64,6 @@ def all clean clean.lint clobber modlist: $(TACO_KMODS)
 
 modlintlib:	$(TACO_KMODS)
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-TACO_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_TACO_DIR) \
 		$(USR_TACO_DIR) \
 		$(USR_TACO_INC_DIR) \
@@ -108,17 +99,6 @@ $(TACO_CRYPTO_LINKS): $(ROOT_TACO_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_TACO_CRYPTO_DIR_64)/$@;
 	$(SYMLINK) $(ROOT_US3_CRYPTO_LINK)/$@ $(ROOT_TACO_CRYPTO_DIR_64)/$@
 
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #	Include common targets.

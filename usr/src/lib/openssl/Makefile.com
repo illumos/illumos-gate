@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,9 +37,6 @@ sparcv9_COPTFLAG =	-xO5
 
 ROOTLIBDIR =     $(ROOTSFWLIB)
 ROOTLIBDIR64 =   $(ROOTSFWLIB64)
-
-#Linker flag for auxiliary filtering
-OPENSSL_FILTER_FLAG =	-Wl,-f$(LIBRARY:.a=_extra.so)$(VERS)
 
 #
 # Ensure `all' is the default target.

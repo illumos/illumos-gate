@@ -56,13 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <openssl/objects.h>
 #include <openssl/lhash.h>
@@ -86,10 +79,8 @@ int SSL_library_init(void)
 #endif
 #ifndef OPENSSL_NO_AES
 	EVP_add_cipher(EVP_aes_128_cbc());
-#ifdef CRYPTO_UNLIMITED
 	EVP_add_cipher(EVP_aes_192_cbc());
 	EVP_add_cipher(EVP_aes_256_cbc());
-#endif /* CRYPTO_UNLIMITED */
 #endif
 #ifndef OPENSSL_NO_MD2
 	EVP_add_digest(EVP_md2());

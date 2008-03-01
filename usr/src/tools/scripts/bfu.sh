@@ -3584,24 +3584,16 @@ rbac_cleanup()
 	print "\n"
 }
 
-enable_crypto_unlimited()
+remove_eof_SUNWcry()
 {
-# This is a "copy" of the SUNWcry* postinstall scripts.
-# We enable the encryption kit aes256, arcfour2048, and blowfish448 modules.
-# This is needed to ensure bfu users continue to have the full strength of
-# cryptographic algorithms they use.
+	print "SUNWcry/SUNWcryr removal cleanup...\n"
 
-	print "Simulating SUNWcry* installation...\c"
-	kcfconf=$rootprefix/etc/crypto/kcf.conf
+	# This clean up of ipsecalgs is not directly related to the EOF
+	# of SUNWcry and SUWNcryr, but due to mistakes in this file seen
+	# in earlier builds. The following lines will have no effect on
+	# most machines.
+
 	ipsecalgs=$rootprefix/etc/inet/ipsecalgs
-
-	cp $kcfconf ${kcfconf}.tmp
-
-	sed -e 's/^aes:/aes256:/' -e 's/^blowfish:/blowfish448:/' -e \
-	    's/^arcfour:/arcfour2048:/'\
-        	$kcfconf > ${kcfconf}.tmp
-
-	mv -f ${kcfconf}.tmp $kcfconf
 
 	cp $ipsecalgs ${ipsecalgs}.tmp
 
@@ -3611,21 +3603,84 @@ enable_crypto_unlimited()
 
 	mv -f ${ipsecalgs}.tmp $ipsecalgs
 
-	# Since we do that for the kernel we do it for userland as well.
+	# Packages to remove.
+	typeset -r sunwcry_pkgs='SUNWcry SUNWcryr'
+	typeset pkg
 
-	# "Clone" the policy for pkcs11_softtoken to the encryption kit version
-	# and "disable" pkcs11_softoken.
+	#
+	# First, attempt to remove the packages cleanly if possible.
+	# Use a custom "admin" file to specify that removal scripts
+	# in the packages being removed should be run even if they
+	# will run as root.
 
-	pkcs11conf=$rootprefix/etc/crypto/pkcs11.conf
+	typeset -r admfile='/tmp/sunwcry_eof.$$'
+	cat > $admfile <<- EOF
+	mail=
+	instance=overwrite
+	partial=nocheck
+	runlevel=nocheck
+	idepend=nocheck
+	rdepend=nocheck
+	space=nocheck
+	setuid=nocheck
+	conflict=nocheck
+	action=nocheck
+	basedir=default
+	EOF
 
-	cp $pkcs11conf ${pkcs11conf}.tmp
+	printf '    Removing packages...'
+	for pkg in $sunwcry_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n -a $admfile $pkg >/dev/null 2>&1
+		fi
+	done
+	printf '\n'
 
-	sed 's/pkcs11_softtoken\.so/pkcs11_softtoken_extra.so/' \
-        	$pkcs11conf > ${pkcs11conf}.tmp
+	# SUNWcry/SUNWcryr contents go away, if pkgrm didn't take
+	# care of them.
+	# The userland modules, kernel modules and OpenSSL filter libs
+	rm -f $rootprefix/usr/lib/security/pkcs11_softtoken_extra.so.1
+	rm -f $rootprefix/usr/lib/security/pkcs11_softtoken_extra.so
+	rm -f $rootprefix/usr/lib/security/sparcv9/pkcs11_softtoken_extra.so.1
+	rm -f $rootprefix/usr/lib/security/sparcv9/pkcs11_softtoken_extra.so
+	rm -f $rootprefix/usr/lib/security/amd64/pkcs11_softtoken_extra.so.1
+	rm -f $rootprefix/usr/lib/security/amd64/pkcs11_softtoken_extra.so
 
-	mv -f ${pkcs11conf}.tmp $pkcs11conf
+	rm -f $rootprefix/kernel/crypto/aes256
+	rm -f $rootprefix/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/kernel/crypto/amd64/aes256
+	rm -f $rootprefix/platform/SUNW,A70/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Netra-CP3010/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Netra-T12/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Netra-T4/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,SPARC-Enterprise/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Blade-1000/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Blade-1500/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Blade-2500/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-15000/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-280R/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-480R/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-880/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-V240/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-V250/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-V440/kernel/crypto/sparcv9/aes25
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-V445/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/SUNW,Sun-Fire/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/platform/sun4u-us3/kernel/crypto/sparcv9/aes256
+	rm -f $rootprefix/kernel/crypto/arcfour2048
+	rm -f $rootprefix/kernel/crypto/sparcv9/arcfour2048
+	rm -f $rootprefix/kernel/crypto/amd64/arcfour2048
+	rm -f $rootprefix/platform/sun4u/kernel/crypto/sparcv9/arcfour208
+	rm -f $rootprefix/kernel/crypto/blowfish448
+	rm -f $rootprefix/kernel/crypto/sparcv9/blowfish448
+	rm -f $rootprefix/kernel/crypto/amd64/blowfish448
+	rm -f $rootprefix/usr/sfw/lib/libssl_extra.so.0.9.8
+	rm -f $rootprefix/usr/sfw/lib/libcrypto_extra.so.0.9.8
+
 	print "\n"
-
 }
 
 #
@@ -7280,11 +7335,9 @@ mondo_loop() {
 		fi
 	done
 
-	# Simulate installation of SUNWcry* - these are in the bfu archives.
-	if [ -f $rootprefix/etc/crypto/kcf.conf -a \
-	    -f $rootprefix/etc/crypto/pkcs11.conf ]; then
-		enable_crypto_unlimited
-	fi
+	#
+	# Remove EOF SUNWcry/SUNWcryr
+	remove_eof_SUNWcry
 
 	# Add uCF's metaslot feature
 	if [ -f $rootprefix/etc/crypto/pkcs11.conf ] ; then

@@ -68,15 +68,6 @@
  * Sumit Gupta of Sun Microsystems Laboratories.
  *
  */
-/*
- * The portions of this code that are #ifdef SOLARIS_OPENSSL are
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* most of this code has been pilfered from my libdes speed.c program */
 
@@ -111,9 +102,6 @@
 #include <openssl/objects.h>
 #if !defined(OPENSSL_SYS_MSDOS)
 #include OPENSSL_UNISTD
-#endif
-#ifdef SOLARIS_OPENSSL
-extern int SUNWcry_installed;
 #endif
 
 #ifndef OPENSSL_SYS_NETWARE
@@ -938,31 +926,8 @@ int MAIN(int argc, char **argv)
 #endif
 #ifndef OPENSSL_NO_AES
 			if (strcmp(*argv,"aes-128-cbc") == 0) doit[D_CBC_128_AES]=1;
-#ifdef SOLARIS_OPENSSL
-		else	if (strcmp(*argv,"aes-192-cbc") == 0)
-				if (!SUNWcry_installed)
-					{
-					BIO_printf(bio_err,
-					  "aes-192-cbc not available."
-					  " SUNWcry not installed.\n");
-					goto end;
-					}
-				else
-					doit[D_CBC_192_AES]=1;
-		else	if (strcmp(*argv,"aes-256-cbc") == 0)
-				if (!SUNWcry_installed)
-					{
-					BIO_printf(bio_err,
-					  "aes-256-cbc not available."
-					  " SUNWcry not installed.\n");
-					goto end;
-					}
-				else
-					doit[D_CBC_256_AES]=1;
-#else
 		else	if (strcmp(*argv,"aes-192-cbc") == 0) doit[D_CBC_192_AES]=1;
 		else	if (strcmp(*argv,"aes-256-cbc") == 0) doit[D_CBC_256_AES]=1;
-#endif
 		else
 #endif
 #ifndef OPENSSL_NO_RSA
@@ -1030,13 +995,8 @@ int MAIN(int argc, char **argv)
 			if (strcmp(*argv,"aes") == 0)
 			{
 			doit[D_CBC_128_AES]=1;
-#ifdef SOLARIS_OPENSSL
-			doit[D_CBC_192_AES]= SUNWcry_installed;
-			doit[D_CBC_256_AES]= SUNWcry_installed;
-#else
 			doit[D_CBC_192_AES]=1;
 			doit[D_CBC_256_AES]=1;
-#endif
 			}
 		else
 #endif
@@ -1164,15 +1124,7 @@ int MAIN(int argc, char **argv)
 			BIO_printf(bio_err,"des-cbc  des-ede3 ");
 #endif
 #ifndef OPENSSL_NO_AES
-#ifdef SOLARIS_OPENSSL
-			if (SUNWcry_installed)
-				BIO_printf(bio_err,
-				  "aes-128-cbc aes-192-cbc aes-256-cbc ");
-			else
-				BIO_printf(bio_err, "aes-128-cbc ");
-#else
 			BIO_printf(bio_err,"aes-128-cbc aes-192-cbc aes-256-cbc ");
-#endif
 #endif
 #ifndef OPENSSL_NO_RC4
 			BIO_printf(bio_err,"rc4");
@@ -1762,11 +1714,7 @@ int MAIN(int argc, char **argv)
 			print_result(D_CBC_128_AES,j,count,d);
 			}
 		}
-#ifdef SOLARIS_OPENSSL
-	if (doit[D_CBC_192_AES] && SUNWcry_installed)
-#else
 	if (doit[D_CBC_192_AES])
-#endif
 		{
 		for (j=0; j<SIZE_NUM; j++)
 			{
@@ -1780,11 +1728,7 @@ int MAIN(int argc, char **argv)
 			print_result(D_CBC_192_AES,j,count,d);
 			}
 		}
-#ifdef SOLARIS_OPENSSL
-	if (doit[D_CBC_256_AES] && SUNWcry_installed)
-#else
 	if (doit[D_CBC_256_AES])
-#endif
 		{
 		for (j=0; j<SIZE_NUM; j++)
 			{
@@ -2399,9 +2343,6 @@ show_res:
 	for (k=0; k<ALGOR_NUM; k++)
 		{
 		if (!doit[k]) continue;
-#ifdef SOLARIS_OPENSSL
-		if ((k == D_CBC_192_AES || k == D_CBC_256_AES) && !SUNWcry_installed) continue;
-#endif
 		if(mr)
 			fprintf(stdout,"+F:%d:%s",k,names[k]);
 		else

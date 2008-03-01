@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,8 +27,7 @@
 
 LIBRARY = libcrypto.a
 
-OBJECTS = sunw.o								\
-	\
+OBJECTS = \
 	cryptlib.o	mem.o		mem_dbg.o	cversion.o	\
 	ex_data.o	tmdiff.o	cpt_err.o	o_time.o	\
 	uid.o		mem_clr.o	o_str.o		o_dir.o		\
@@ -233,9 +232,9 @@ CFLAGS +=	-K PIC
 CFLAGS64 +=	-K PIC
 LDLIBS +=	-lc -lsocket -lnsl
 
-DYNFLAGS +=	$(OPENSSL_FILTER_FLAG) $(OPENSSL_DYNFLAGS)
+MAPFILES =
 
-MAPFILES =	../common/mapfile
+DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 SRCDIR =	$(OPENSSL_SRC)/crypto

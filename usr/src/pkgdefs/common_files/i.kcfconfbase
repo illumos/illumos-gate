@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,6 +76,11 @@ do
 		sed -e 's/CKM_BF_/CKM_BLOWFISH_/g' $dest > $dest.$$
 		mv $dest.$$ $dest
 
+		# Undo the old kernel CRYPTO_UNLIMITED module names
+		sed -e 's/^aes256:/aes:/' -e 's/^blowfish448:/blowfish:/' -e \
+		 's/^arcfour2048:/arcfour:/' $dest > $dest.$$
+		mv -f $dest.$$ $dest
+		
 
 	fi
 

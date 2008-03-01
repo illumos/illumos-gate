@@ -59,13 +59,6 @@
 #include <openssl/opensslconf.h>
 #if !defined(OPENSSL_NO_DES) && !defined(OPENSSL_NO_SHA1)
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,10 +69,6 @@
 #include <openssl/pkcs12.h>
 
 #define PROG pkcs12_main
-
-#ifdef SOLARIS_OPENSSL
-extern int SUNWcry_installed;
-#endif
 
 const EVP_CIPHER *enc;
 
@@ -170,27 +159,8 @@ int MAIN(int argc, char **argv)
 		else if (!strcmp (*args, "-des3")) enc = EVP_des_ede3_cbc();
 #ifndef OPENSSL_NO_AES
 		else if (!strcmp(*args,"-aes128")) enc=EVP_aes_128_cbc();
-#ifdef SOLARIS_OPENSSL
-		else if (!strcmp(*argv,"-aes192"))
-			{
-			if (!SUNWcry_installed)
-				{
-				BIO_printf(bio_err,"SUNWcry not installed.\n");
-				goto end;
-				}
-			}
-		else if (!strcmp(*argv,"-aes256"))
-			{
-			if (!SUNWcry_installed)
-				{
-				BIO_printf(bio_err,"SUNWcry not installed.\n");
-				goto end;
-				}
-			}
-#else
 		else if (!strcmp(*args,"-aes192")) enc=EVP_aes_192_cbc();
 		else if (!strcmp(*args,"-aes256")) enc=EVP_aes_256_cbc();
-#endif
 #endif
 		else if (!strcmp (*args, "-noiter")) iter = 1;
 		else if (!strcmp (*args, "-maciter"))

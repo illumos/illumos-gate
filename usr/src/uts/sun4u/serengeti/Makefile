@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -70,14 +70,6 @@ modlintlib:	$(SERENGETI_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire
  
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-SERENGETI_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_SERENGETI_DIR) $(USR_SERENGETI_DIR) \
 		$(USR_SERENGETI_INC_DIR) \
 		$(USR_SERENGETI_SBIN_DIR) \
@@ -115,18 +107,6 @@ lint.platmod:	modlintlib
 	@-$(ECHO) "\nSerengeti Platform-dependent module: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
-
-#
 #
 #	Include common targets.
 #

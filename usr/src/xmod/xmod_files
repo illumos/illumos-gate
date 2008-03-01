@@ -27,8 +27,6 @@
 ../closed/uts/intel/lsimega
 ../closed/uts/intel/spwr
 ../closed/uts/intel/io/spwr
-cmd/openssl
-cmd/ssh
 common/net/wanboot
 lib/libwanboot
 lib/libwanbootutil
@@ -68,7 +66,6 @@ cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/uts/intel/sdpib
 ../closed/uts/common/io/ib/clients/sdpib
 ../closed/uts/common/sys/ib/clients/sdpib
-common/openssl
 lib/libresolv2/cylink
 lib/libresolv2/dnssafe
 ../closed/lib/gss_mechs/mech_dh/backend/Makefile.export

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,14 +80,6 @@ LW8_PLAT_LINKS_2  = $(LW8_LINKS_2:%=$(ROOT_PLAT_DIR)/%)
 LW8_PLAT_LINKS_3  = $(LW8_LINKS_3:%=$(ROOT_PLAT_DIR)/%)
 LW8_PLAT_LINKS_4  = $(LW8_LINKS_4:%=$(ROOT_PLAT_DIR)/%)
   
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-LW8_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_LW8_DIR) $(USR_LW8_DIR) \
 		$(USR_LW8_INC_DIR) \
 		$(USR_LW8_SBIN_DIR) \
@@ -125,17 +117,6 @@ $(LW8_PLAT_LINKS_4): $(ROOT_LW8_DRV_DIR_64)
 $(LW8_CRYPTO_LINKS): $(ROOT_LW8_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_LW8_CRYPTO_DIR_64)/$@;
 	$(SYMLINK) $(ROOT_US3_CRYPTO_LINK)/$@ $(ROOT_LW8_CRYPTO_DIR_64)/$@
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,14 +78,16 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 	base = key->arr;
 
-	index = (((uint64_t)in) & 0x7);
+	index = (((uintptr_t)in) & 0x7);
 
 	/* Get the 'in' on an 8-byte alignment */
 	if (index > 0) {
 		i = key->i;
 		j = key->j;
-		for (index = 8 - (uint64_t)in & 0x7; (index-- > 0) && len > 0;
+
+		for (index = 8 - index; (index-- > 0) && len > 0;
 		    len--, in++, out++) {
+
 			i = i + 1;
 			j = j + key->arr[i];
 			tmp = key->arr[i];
@@ -111,7 +112,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 	 * a multiple of 8-byte boundary.
 	 */
 #ifdef	sun4v
-	if ((((uint64_t)out) & 7) != 0) {
+	if ((((uintptr_t)out) & 7) != 0) {
 #endif	/* sun4v */
 		i = key->i;
 		j = key->j;

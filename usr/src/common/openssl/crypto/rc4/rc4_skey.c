@@ -56,13 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <openssl/rc4.h>
 #include "rc4_locl.h"
 #include <openssl/opensslv.h>
@@ -99,10 +92,6 @@ void RC4_set_key(RC4_KEY *key, int len, const unsigned char *data)
         register RC4_INT *d;
         unsigned int i;
         
-#ifndef CRYPTO_UNLIMITED
-        if (len > 16)
-                len = 16;
-#endif /* CRYPTO_UNLIMITED */
         d= &(key->data[0]);
         key->x = 0;     
         key->y = 0;     

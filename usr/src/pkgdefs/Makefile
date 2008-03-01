@@ -290,6 +290,11 @@ COMMON_SUBDIRS= \
 	SUNWocfr \
 	SUNWonfmes \
 	SUNWonzfs \
+	SUNWopenssl-man \
+	SUNWopenssl-libraries \
+	SUNWopenssl-include \
+	SUNWopenssl-commands \
+	SUNWopensslr \
 	SUNWosdem \
 	SUNWypr \
 	SUNWypu \
@@ -377,6 +382,11 @@ COMMON_SUBDIRS= \
 	SUNWspnego \
 	SUNWsra  \
 	SUNWsrh  \
+	SUNWsshcu \
+	SUNWsshr \
+	SUNWsshu \
+	SUNWsshdr \
+	SUNWsshdu \
 	SUNWtcpd \
 	SUNWtcpdS \
 	SUNWtecla \
@@ -433,22 +443,10 @@ COMMON_SUBDIRS= \
 	SUNWzoneu
 
 COMMON_XMODS= \
-	SUNWcry \
-	SUNWcryr \
 	SUNWcryptoint \
 	SUNWibsdpib \
 	SUNWkdcr \
 	SUNWkdcu \
-	SUNWopenssl-man \
-	SUNWopenssl-libraries \
-	SUNWopenssl-include \
-	SUNWopenssl-commands \
-	SUNWopensslr \
-	SUNWsshcu \
-	SUNWsshr \
-	SUNWsshu \
-	SUNWsshdr \
-	SUNWsshdu \
 	SUNWstatl \
 	SUNWsvvs \
 	SUNWtavor \

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -350,8 +350,6 @@ cfiles="
 	SUNWcsl
 	usr/lib/security/pkcs11_kernel.so.1
 	usr/lib/security/pkcs11_softtoken.so.1
-	SUNWcry
-	usr/lib/security/pkcs11_softtoken_extra.so.1
 "
 # sparc-only
 csfiles="
@@ -369,15 +367,6 @@ csfiles="
 	usr/lib/security/sparcv9/pkcs11_softtoken.so.1
 	SUNWdcar
 	kernel/drv/sparcv9/dca
-	SUNWcry
-	usr/lib/security/sparcv9/pkcs11_softtoken_extra.so.1
-	SUNWcryr
-	kernel/crypto/sparcv9/aes256
-	kernel/crypto/sparcv9/arcfour2048
-	kernel/crypto/sparcv9/blowfish448
-	platform/sun4u-us3/kernel/crypto/sparcv9/aes256
-	platform/sun4u/kernel/crypto/sparcv9/arcfour2048
-	platform/sun4v/kernel/crypto/sparcv9/arcfour2048
 "
 # x86-only
 cxfiles="
@@ -396,15 +385,6 @@ cxfiles="
 	SUNWdcar
 	kernel/drv/dca
 	kernel/drv/amd64/dca
-	SUNWcry
-	usr/lib/security/amd64/pkcs11_softtoken_extra.so.1
-	SUNWcryr
-	kernel/crypto/aes256
-	kernel/crypto/arcfour2048
-	kernel/crypto/blowfish448
-	kernel/crypto/amd64/aes256
-	kernel/crypto/amd64/arcfour2048
-	kernel/crypto/amd64/blowfish448
 "
 # These all have hard links from crypto/foo to misc/foo.
 linkedfiles="

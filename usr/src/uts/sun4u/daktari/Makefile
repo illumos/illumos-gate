@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4u/daktari/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -68,14 +68,6 @@ IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-880
 
 LINKED_PLATFORMS	= SUNW,Sun-Fire-V890
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-DAKTARI_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install: 	$(ROOT_DAKTARI_DIR) $(USR_DAKTARI_DIR) \
 		$(USR_DAKTARI_INC_DIR) \
 		$(USR_DAKTARI_SBIN_DIR) \
@@ -115,17 +107,6 @@ lint.platmod:   modlintlib
 
 $(DAKTARI_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #

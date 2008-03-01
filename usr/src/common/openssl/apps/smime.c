@@ -56,13 +56,6 @@
  *
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* S/MIME utility function */
 
 #include <stdio.h>
@@ -73,10 +66,6 @@
 #include <openssl/err.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
-
-#ifdef SOLARIS_OPENSSL
-extern int SUNWcry_installed;
-#endif
 
 #undef PROG
 #define PROG smime_main
@@ -167,29 +156,10 @@ int MAIN(int argc, char **argv)
 #ifndef OPENSSL_NO_AES
 		else if (!strcmp(*args,"-aes128"))
 				cipher = EVP_aes_128_cbc();
-#ifdef SOLARIS_OPENSSL
-		else if (strcmp(*argv,"-aes192") == 0)
-			{
-			if (!SUNWcry_installed)
-				{
-				BIO_printf(bio_err,"SUNWcry not installed.\n");
-				goto end;
-				}
-			}
-		else if (strcmp(*argv,"-aes256") == 0)
-			{
-			if (!SUNWcry_installed)
-				{
-				BIO_printf(bio_err,"SUNWcry not installed.\n");
-				goto end;
-				}
-			}
-#else
 		else if (!strcmp(*args,"-aes192"))
 				cipher = EVP_aes_192_cbc();
 		else if (!strcmp(*args,"-aes256"))
 				cipher = EVP_aes_256_cbc();
-#endif
 #endif
 		else if (!strcmp (*args, "-text")) 
 				flags |= PKCS7_TEXT;

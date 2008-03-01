@@ -62,14 +62,6 @@ def all clean clean.lint clobber modlist: $(SCHUMACHER_KMODS)
 
 modlintlib:	$(SCHUMACHER_KMODS)
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-SCHUMACHER_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_SCHUMACHER_DIR) \
 		$(USR_SCHUMACHER_DIR) \
 		$(USR_SCHUMACHER_INC_DIR) \
@@ -106,17 +98,6 @@ $(SCHUMACHER_KMODS): FRC
 $(SCHUMACHER_CRYPTO_LINKS): $(ROOT_SCHUMACHER_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_SCHUMACHER_CRYPTO_DIR_64)/$@;
 	$(SYMLINK) $(ROOT_US3_CRYPTO_LINK)/$@ $(ROOT_SCHUMACHER_CRYPTO_DIR_64)/$@
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #	Include common targets.

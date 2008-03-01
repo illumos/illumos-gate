@@ -75,14 +75,6 @@ LINKED_PLATFORMS	+= SUNW,Netra-240
 LINKED_PLATFORMS	+= SUNW,Netra-210
 
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-MPXU_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_MPXU_DIR) $(USR_MPXU_DIR) \
 		$(USR_MPXU_INC_DIR) \
 		$(USR_MPXU_SBIN_PRTDIAG) \
@@ -120,17 +112,6 @@ LINT_LIBS	 = $(LINT_LIB) \
 lint.platmod:	modlintlib
 	@-$(ECHO) "\nMPXU Platform-dependent module: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #

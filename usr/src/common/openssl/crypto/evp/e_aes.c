@@ -48,13 +48,6 @@
  *
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <openssl/opensslconf.h>
 #ifndef OPENSSL_NO_AES
 #include <openssl/evp.h>
@@ -80,7 +73,6 @@ IMPLEMENT_BLOCK_CIPHER(aes_128, ks, AES, EVP_AES_KEY,
 		       EVP_CIPHER_set_asn1_iv,
 		       EVP_CIPHER_get_asn1_iv,
 		       NULL)
-#ifdef CRYPTO_UNLIMITED
 IMPLEMENT_BLOCK_CIPHER(aes_192, ks, AES, EVP_AES_KEY,
 		       NID_aes_192, 16, 24, 16, 128,
 		       0, aes_init_key, NULL, 
@@ -93,31 +85,21 @@ IMPLEMENT_BLOCK_CIPHER(aes_256, ks, AES, EVP_AES_KEY,
 		       EVP_CIPHER_set_asn1_iv,
 		       EVP_CIPHER_get_asn1_iv,
 		       NULL)
-#endif /* CRYPTO_UNLIMITED */
 
 #define IMPLEMENT_AES_CFBR(ksize,cbits)	IMPLEMENT_CFBR(aes,AES,EVP_AES_KEY,ks,ksize,cbits,16)
 
 IMPLEMENT_AES_CFBR(128,1)
-#ifdef CRYPTO_UNLIMITED
 IMPLEMENT_AES_CFBR(192,1)
 IMPLEMENT_AES_CFBR(256,1)
-#endif /* CRYPTO_UNLIMITED */
 
 IMPLEMENT_AES_CFBR(128,8)
-#ifdef CRYPTO_UNLIMITED
 IMPLEMENT_AES_CFBR(192,8)
 IMPLEMENT_AES_CFBR(256,8)
-#endif /* CRYPTO_UNLIMITED */
 
 static int aes_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 		   const unsigned char *iv, int enc)
 	{
 	int ret;
-
-#ifndef CRYPTO_UNLIMITED
-	if (ctx->key_len > 16)
-		return 0;
-#endif /* CRYPTO_UNLIMITED */
 
 	if ((ctx->cipher->flags & EVP_CIPH_MODE) == EVP_CIPH_CFB_MODE
 	    || (ctx->cipher->flags & EVP_CIPH_MODE) == EVP_CIPH_OFB_MODE

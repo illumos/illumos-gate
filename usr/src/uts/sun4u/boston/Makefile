@@ -66,14 +66,6 @@ def all clean clean.lint clobber modlist: $(BOSTON_KMODS)
 
 modlintlib:	$(BOSTON_KMODS)
 
-# EXPORT DELETE START
-#
-# aes256 is delivered in the SUNWcryr package which is removed from
-# the EXPORT_SRC build.
-#
-BOSTON_CRYPTO_LINKS	+= aes256
-# EXPORT DELETE END
-
 install:	$(ROOT_BOSTON_DIR) \
 		$(USR_BOSTON_DIR) \
 		$(USR_BOSTON_INC_DIR) \
@@ -110,17 +102,6 @@ $(BOSTON_KMODS): FRC
 $(BOSTON_CRYPTO_LINKS): $(ROOT_BOSTON_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_BOSTON_CRYPTO_DIR_64)/$@;
 	$(SYMLINK) $(ROOT_US3_CRYPTO_LINK)/$@ $(ROOT_BOSTON_CRYPTO_DIR_64)/$@
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 #
 #

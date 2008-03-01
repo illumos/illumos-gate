@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,13 +136,6 @@ static CK_MECHANISM_INFO soft_mechanism_info[] = {
 		CKF_SIGN|CKF_VERIFY},		/* CKM_DES_MAC_GENERAL */
 	{DES_MINBYTES, DES_MAXBYTES,
 		CKF_SIGN|CKF_VERIFY},		/* CKM_DES_MAC */
-/*
- * Note that DES3 is allowed even if CRYPTO_UNLIMITED is not specified.
- * This is because 3DES has an exception to the Solaris PAC enforced
- * no crypto greater than 128 bit in core Solaris rule.
- * The actual key length of 3DES is 192, but most cryptographers regard
- * it to be effectively 112.
- */
 	{DES3_MINBYTES, DES3_MAXBYTES,
 		CKF_ENCRYPT|CKF_DECRYPT|
 		CKF_WRAP|CKF_UNWRAP},		/* CKM_DES3_CBC */

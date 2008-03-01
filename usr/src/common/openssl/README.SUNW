@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,24 +79,7 @@ The following files are different from the OpenSSL 0.9.8a release.
 
 	crypto/opensslconf.h
 
-2. Due to import restrictions of several countries we limit the use of
-   symetric keys over 128 bits. The user needs to add SUNWcry to take advantage
-   of full key length. The following files are modified for this purpose.
-   Added code is surrounded by "#ifdef CRYPTO_UNLIMITED".
-
-	crypto/bf/bf_skey.c
-	crypto/evp/c_allc.c
-	crypto/evp/e_aes.c
-	crypto/evp/e_bf.c
-	crypto/evp/e_old.c
-	crypto/evp/e_rc4.c
-	crypto/rc4/rc4_skey.c
-	crypto/aes/aes_core.c
-	ssl/ssl_ciph.c
-	ssl/ssl_algs.c
-	ssl/ssl.h
-
-3. Solaris OpenSSL supports PKCS#11 engine.
+2. Solaris OpenSSL supports PKCS#11 engine.
    This code may go back to the open-source community in the future.
 
    The following files were created.
@@ -110,29 +93,14 @@ The following files are different from the OpenSSL 0.9.8a release.
 
 	crypto/engine/engine.h
 
-
-4. The openssl command was modified to let the user know the needs of 
-   a package SUNWcry when it is not installed.
-   Added code is surrounded by "#ifdef SOLARIS_OPENSSL".
-
-	apps/gendsa.c
-	apps/genrsa.c
-	apps/pkcs12.c
-	apps/smime.c
-	apps/speed.c
-
-   Also, a new file was added.
-	crypto/sunw.c
-
-
-5. These files were modified to load the PKCS#11 engine.
+3. These files were modified to load the PKCS#11 engine.
    Added code is surrounded by "#ifdef SOLARIS_OPENSSL".
 
 	crypto/engine/eng_cnf.c
 	crypto/engine/hw_pk11.c
 
 
-6. We have a special case where OpenSSL is used by the "wanboot" binary
+4. We have a special case where OpenSSL is used by the "wanboot" binary
    program, that is run to boot the wanboot client.
    The following files are modified for this purpose.  Added code is 
    surrounded by "#ifdef _BOOT".
@@ -146,18 +114,18 @@ The following files are different from the OpenSSL 0.9.8a release.
 	e_os.h
 
 
-7. The configuration file was modified to ship with Solaris defaults.
+5. The configuration file was modified to ship with Solaris defaults.
 
 	$SRC/cmd/openssl/openssl.cnf
 	(Note: apps/openssl.cnf is unused.)
 
 
-8. Two files were added for a clean ON build even though the OpenSSL
+6. Two files were added for a clean ON build even though the OpenSSL
    code itself is not subject to lint checks.
 
 	crypto/llib-lcrypto
 	ssl/llib-lssl
 
-9. And, finally, this file was added.
+7. And, finally, this file was added.
 
 	README.SUNW

@@ -60,17 +60,6 @@
  * ECC cipher suite support in OpenSSL originally developed by 
  * SUN MICROSYSTEMS, INC., and contributed to the OpenSSL project.
  */
-
-/*
- * The portions of this code that are #ifdef CRYPTO_UNLIMITED are
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <openssl/objects.h>
 #include <openssl/comp.h>
@@ -194,10 +183,9 @@ void ssl_load_ciphers(void)
 #endif
 	ssl_cipher_methods[SSL_ENC_AES128_IDX]=
 	  EVP_get_cipherbyname(SN_aes_128_cbc);
-#ifdef	CRYPTO_UNLIMITED
 	ssl_cipher_methods[SSL_ENC_AES256_IDX]=
 	  EVP_get_cipherbyname(SN_aes_256_cbc);
-#endif
+
 	ssl_digest_methods[SSL_MD_MD5_IDX]=
 		EVP_get_digestbyname(SN_md5);
 	ssl_digest_methods[SSL_MD_SHA1_IDX]=

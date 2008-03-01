@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,7 +63,7 @@ SRCDIR =	../../../../common/openssl/ssl
 $(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
 
 LDLIBS +=	$(OPENSSL_LDFLAGS) -lcrypto -lc 
-DYNFLAGS +=	$(OPENSSL_FILTER_FLAG) $(OPENSSL_DYNFLAGS)
+DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
 
 .KEEP_STATE:
 

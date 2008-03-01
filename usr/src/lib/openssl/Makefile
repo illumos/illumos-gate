@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,12 +28,8 @@
 include		../Makefile.lib
 include		Makefile.openssl
 
-# EXPORT DELETE START
 SUBDIRS =	libcrypto \
-		libcrypto_extra \
-		libssl \
-		libssl_extra
-# EXPORT DELETE END
+		libssl
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -47,9 +42,7 @@ HDRS=		e_os2.h
 
 HDRDIR=		$(OPENSSL_SRC)
 
-# EXPORT DELETE START
 ROOTHDRDIR=	$(ROOTSFWINCLUDE)/openssl
-# EXPORT DELETE END
 
 .KEEP_STATE:
 
@@ -63,7 +56,6 @@ install_h: $(ROOTHDRDIR) $(ROOTHDRS) $(SUBDIRS)
 check:
 
 libssl: libcrypto
-libcrypto_extra: libcrypto
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -74,16 +66,5 @@ $(ROOTHDRS): $(ROOTHDRDIR)
 
 $(ROOTHDRDIR): $(ROOTSFW)
 	$(INS.dir)
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(RM) Makefile
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END		
 
 include ../Makefile.targ

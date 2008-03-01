@@ -56,13 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <openssl/opensslconf.h>
 /* Until the key-gen callbacks are modified to use newer prototypes, we allow
  * deprecated functions for openssl-internal code */
@@ -88,10 +81,6 @@
 #define DEFBITS	512
 #undef PROG
 #define PROG genrsa_main
-
-#ifdef SOLARIS_OPENSSL
-extern int SUNWcry_installed;
-#endif
 
 static int MS_CALLBACK genrsa_cb(int p, int n, BN_GENCB *cb);
 
@@ -174,29 +163,10 @@ int MAIN(int argc, char **argv)
 #ifndef OPENSSL_NO_AES
 		else if (strcmp(*argv,"-aes128") == 0)
 			enc=EVP_aes_128_cbc();
-#ifdef SOLARIS_OPENSSL
-		else if (strcmp(*argv,"-aes192") == 0)
-			{
-			if (!SUNWcry_installed)
-				{
-				BIO_printf(bio_err,"SUNWcry not installed.\n");
-				goto bad;
-				}
-			}
-		else if (strcmp(*argv,"-aes256") == 0)
-			{
-			if (!SUNWcry_installed)
-				{
-				BIO_printf(bio_err,"SUNWcry not installed.\n");
-				goto bad;
-				}
-			}
-#else
 		else if (strcmp(*argv,"-aes192") == 0)
 			enc=EVP_aes_192_cbc();
 		else if (strcmp(*argv,"-aes256") == 0)
 			enc=EVP_aes_256_cbc();
-#endif
 #endif
 		else if (strcmp(*argv,"-passout") == 0)
 			{

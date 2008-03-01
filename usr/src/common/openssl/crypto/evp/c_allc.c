@@ -56,13 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "cryptlib.h"
 #include <openssl/evp.h>
@@ -167,7 +160,6 @@ void OpenSSL_add_all_ciphers(void)
 #endif
 	EVP_add_cipher_alias(SN_aes_128_cbc,"AES128");
 	EVP_add_cipher_alias(SN_aes_128_cbc,"aes128");
-#ifdef CRYPTO_UNLIMITED
 	EVP_add_cipher(EVP_aes_192_ecb());
 	EVP_add_cipher(EVP_aes_192_cbc());
 	EVP_add_cipher(EVP_aes_192_cfb());
@@ -191,7 +183,6 @@ void OpenSSL_add_all_ciphers(void)
 	EVP_add_cipher_alias(SN_aes_256_cbc,"AES256");
 	EVP_add_cipher_alias(SN_aes_256_cbc,"aes256");
 #endif
-#endif /* CRYPTO UNLIMITED */
 	PKCS12_PBE_add();
 	PKCS5_PBE_add();
 	}

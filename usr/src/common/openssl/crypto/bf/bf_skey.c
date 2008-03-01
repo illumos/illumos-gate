@@ -56,12 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <openssl/blowfish.h>
@@ -78,11 +72,7 @@ void BF_set_key(BF_KEY *key, int len, const unsigned char *data)
 	memcpy(key,&bf_init,sizeof(BF_KEY));
 	p=key->P;
 
-#ifdef CRYPTO_UNLIMITED
 	if (len > ((BF_ROUNDS+2)*4)) len=(BF_ROUNDS+2)*4;
-#else
-        if (len > 16) len = 16;
-#endif /* CRYPTO_UNLIMITED */
 
 	d=data;
 	end= &(data[len]);
