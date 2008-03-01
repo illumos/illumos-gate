@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2591,9 +2591,18 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 			cl->cl_g.dkg_ncyl  = cl->cl_blockcount / (64 * 32);
 		} else {
 			cl->cl_g.dkg_nhead = 255;
-			cl->cl_g.dkg_nsect = 63;
-			cl->cl_g.dkg_ncyl  = cl->cl_blockcount / (255 * 63);
+
+			cl->cl_g.dkg_nsect = ((cl->cl_blockcount +
+			    (UINT16_MAX * 255 * 63) - 1) /
+			    (UINT16_MAX * 255 * 63)) * 63;
+
+			if (cl->cl_g.dkg_nsect == 0)
+				cl->cl_g.dkg_nsect = (UINT16_MAX / 63) * 63;
+
+			cl->cl_g.dkg_ncyl = cl->cl_blockcount /
+			    (255 * cl->cl_g.dkg_nsect);
 		}
+
 		cl->cl_solaris_size =
 		    cl->cl_g.dkg_ncyl * cl->cl_g.dkg_nhead * cl->cl_g.dkg_nsect;
 
@@ -4269,8 +4278,16 @@ cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie)
 			cl->cl_g.dkg_ncyl = cl->cl_blockcount / (64 * 32);
 		} else {
 			cl->cl_g.dkg_nhead = 255;
-			cl->cl_g.dkg_nsect = 63;
-			cl->cl_g.dkg_ncyl = cl->cl_blockcount / (255 * 63);
+
+			cl->cl_g.dkg_nsect = ((cl->cl_blockcount +
+			    (UINT16_MAX * 255 * 63) - 1) /
+			    (UINT16_MAX * 255 * 63)) * 63;
+
+			if (cl->cl_g.dkg_nsect == 0)
+				cl->cl_g.dkg_nsect = (UINT16_MAX / 63) * 63;
+
+			cl->cl_g.dkg_ncyl = cl->cl_blockcount /
+			    (255 * cl->cl_g.dkg_nsect);
 		}
 
 		cl->cl_g.dkg_acyl = 0;
