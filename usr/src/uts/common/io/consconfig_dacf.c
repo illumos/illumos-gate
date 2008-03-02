@@ -313,24 +313,34 @@ consconfig_dprintf(int l, const char *fmt, ...)
 }
 
 /*
- * Return a property name in /aliases.
- * The caller is responsible for freeing the memory.
- * The property value is NULL terminated string.
- * /aliases exists in OBP >= 2.4.
+ * Return a property value for the specified alias in /aliases.
  */
 char *
 get_alias(char *alias, char *buf)
 {
 	pnode_t node;
+	int len;
 
-	/* OBP >= 2.4 has /aliases */
+	/* The /aliases node only exists in OBP >= 2.4. */
 	if ((node = prom_alias_node()) == OBP_BADNODE)
 		return (NULL);
 
-	if (prom_getproplen(node, (caddr_t)alias) <= 0)
+	if ((len = prom_getproplen(node, (caddr_t)alias)) <= 0)
 		return (NULL);
 
 	(void) prom_getprop(node, (caddr_t)alias, (caddr_t)buf);
+
+	/*
+	 * The IEEE 1275 standard specifies that /aliases string property
+	 * values should be null-terminated.  Unfortunatly the reality
+	 * is that most aren't and the OBP can't easily be modified to
+	 * add null termination to these strings.  So we'll add the
+	 * null termination here.  If the string already contains a
+	 * null termination character then that's ok too because we'll
+	 * just be adding a second one.
+	 */
+	buf[len] = '\0';
+
 	prom_pathname(buf);
 	return (buf);
 }
@@ -1098,7 +1108,7 @@ consconfig_relink_conskbd(cons_state_t *sp, ldi_handle_t new_lh, int *muxid)
 
 		/* Link the stream represented by new_lh under conskbd */
 		err = ldi_ioctl(sp->conskbd_lh, I_PLINK, (uintptr_t)new_lh,
-				FKIOCTL, kcred, muxid);
+		    FKIOCTL, kcred, muxid);
 		if (err != 0) {
 			cmn_err(CE_WARN, "consconfig_relink_conskbd: "
 			    "conskbd link failed, error %d", err);
@@ -1112,7 +1122,7 @@ consconfig_relink_conskbd(cons_state_t *sp, ldi_handle_t new_lh, int *muxid)
 		 * all modules to be popped, and the keyboard vnode released.
 		 */
 		err = ldi_ioctl(sp->conskbd_lh, I_PUNLINK, *muxid,
-				FKIOCTL, kcred, &rval);
+		    FKIOCTL, kcred, &rval);
 		if (err != 0) {
 			cmn_err(CE_WARN, "consconfig_relink_conskbd: "
 			    "conskbd unlink failed, error %d", err);
@@ -1332,7 +1342,7 @@ consconfig_init_input(cons_state_t *sp)
 
 			/* Re-set baud rate */
 			(void) ldi_ioctl(new_lh, TCGETS, (intptr_t)&termios,
-						FKIOCTL, kcred, &rval);
+			    FKIOCTL, kcred, &rval);
 
 			/* Set baud rate */
 			if (consconfig_setmodes(stdindev, &termios) == 0) {
@@ -1479,8 +1489,8 @@ dynamic_console_config(void)
 	consconfig_init_input(consconfig_sp);
 
 	DPRINTF(DPRINT_L0,
-		"mousedev %lx, kbddev %lx, fbdev %lx, rconsdev %lx\n",
-		    mousedev,  kbddev, fbdev, rconsdev);
+	    "mousedev %lx, kbddev %lx, fbdev %lx, rconsdev %lx\n",
+	    mousedev,  kbddev, fbdev, rconsdev);
 
 	flush_usb_serial_buf();
 }
@@ -1814,7 +1824,7 @@ consconfig_setmodes(dev_t dev, struct termios *termiosp)
 	char buf[MAXPATHLEN];
 	int len = MAXPATHLEN;
 	char name[16];
-	int ppos, i, j;
+	int ppos, i;
 	char *path;
 	dev_t tdev;
 
@@ -1845,11 +1855,20 @@ consconfig_setmodes(dev_t dev, struct termios *termiosp)
 	(void) strcpy(name, "ttya-mode");	/* name of option we want */
 	name[3] = 'a' + i;			/* Adjust to correct line */
 
-	for (j = 0; j < sizeof (buf); j++)
-		buf[j] = 0; /* CROCK! */
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ddi_root_node(), 0, name,
 	    buf, &len) != DDI_PROP_SUCCESS)
 		return (1);	/* if no such option, just return */
+
+	/*
+	 * The IEEE 1275 standard specifies that /aliases string property
+	 * values should be null-terminated.  Unfortunatly the reality
+	 * is that most aren't and the OBP can't easily be modified to
+	 * add null termination to these strings.  So we'll add the
+	 * null termination here.  If the string already contains a
+	 * null termination character then that's ok too because we'll
+	 * just be adding a second one.
+	 */
+	buf[len] = '\0';
 
 	/* Clear out options we will be setting */
 	termiosp->c_cflag &=
@@ -1873,12 +1892,12 @@ consconfig_setmodes(dev_t dev, struct termios *termiosp)
 
 	for (i = 0; i < MAX_SPEEDS; i++) {
 		if (strncmp(buf, speedtab[i].name, ppos) == 0)
-		    break;
+			break;
 	}
 
 	if (i >= MAX_SPEEDS) {
 		cmn_err(CE_WARN,
-			"consconfig_setmodes: unrecognized speed in %s", buf);
+		    "consconfig_setmodes: unrecognized speed in %s", buf);
 		return (1);
 	}
 

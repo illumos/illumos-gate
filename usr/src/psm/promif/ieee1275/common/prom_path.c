@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-1994,1998,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,26 +54,18 @@ prom_path_gettoken(register char *from, register char *to)
  * If we have to complete the addrspec of any component, we can
  * only handle devices that have a maximum of NREGSPECS "reg" specs.
  * We cannot allocate memory inside this function.
- *
- * XXX: Assumes a single threaded model, as static buffers are used
- *	for temporary storage.  This is not to be used an an external
- *	interface.  The external interface should have temporary
- *	buffers passed in, or they should be allocated on the stack,
- *	(which may not be desirable in the kernel).
  */
-
-static char buffer[OBP_MAXPATHLEN];
-
 void
 prom_pathname(char *pathname)
 {
-	char *from = buffer;
+	char tmp[OBP_MAXPATHLEN];
+	char *from = tmp;
 	char *to = pathname;
 	char *p;
 	cell_t ci[7];
 #ifdef PROM_32BIT_ADDRS
 	char *opathname = NULL;
-#endif
+#endif /* PROM_32BIT_ADDRS */
 
 	if ((to == (char *)0) || (*to == (char)0))
 		return;
@@ -89,7 +80,15 @@ prom_pathname(char *pathname)
 		(void) prom_strcpy(pathname, opathname);
 		to = pathname;
 	}
-#endif
+	if ((uintptr_t)from > (uint32_t)-1) {
+		from = promplat_alloc(OBP_MAXPATHLEN);
+		if (from == NULL) {
+			if (opathname != NULL)
+				promplat_free(pathname, OBP_MAXPATHLEN);
+			return;
+		}
+	}
+#endif /* PROM_32BIT_ADDRS */
 
 	promif_preprom();
 
@@ -113,7 +112,12 @@ prom_pathname(char *pathname)
 		promplat_free(pathname, OBP_MAXPATHLEN);
 		to = pathname = opathname;
 	}
-#endif
+	if (from != tmp) {
+		(void) prom_strcpy(tmp, from);
+		promplat_free(from, OBP_MAXPATHLEN);
+		from = tmp;
+	}
+#endif /* PROM_32BIT_ADDRS */
 
 	/*
 	 * workaround for bugid 1218110, the prom strips the
