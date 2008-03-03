@@ -239,7 +239,7 @@ dladm_wlan_scan(datalink_id_t linkid, void *arg,
 	int			i;
 	uint32_t		count;
 	wl_ess_conf_t		*wlp;
-	wldp_t 			*gbuf;
+	wldp_t 			*gbuf = NULL;
 	dladm_wlan_attr_t	wlattr;
 	dladm_status_t		status;
 	boolean_t		connected;
@@ -665,7 +665,7 @@ done:
 dladm_status_t
 dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 {
-	wldp_t			*gbuf;
+	wldp_t			*gbuf = NULL;
 	wl_rssi_t		signal;
 	wl_bss_type_t		bsstype;
 	wl_authmode_t		authmode;
