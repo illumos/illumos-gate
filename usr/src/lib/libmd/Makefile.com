@@ -31,9 +31,9 @@
 #LIBRARY= libmd.a
 VERS= .1
 
-OBJECTS= md4.o md5.o $(MD5_PSR_OBJECTS) sha1.o sha2.o
+OBJECTS= md4.o md5.o $(MD5_PSR_OBJECTS) sha1.o $(SHA1_PSR_OBJECTS) sha2.o
 
-# Use $(SRC) to include makefiles rather than ../../ because the 
+# Use $(SRC) to include makefiles rather than ../../ because the
 # platform subdirs are one level deeper so it would be ../../../ for them
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/Makefile.rootfs

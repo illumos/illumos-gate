@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,14 @@ static void Encode(uint8_t *, const uint32_t *, size_t);
 
 static void SHA1Transform(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
     SHA1_CTX *, const uint8_t *);
+
+#elif	defined(__amd64)
+
+#define	SHA1_TRANSFORM(ctx, in) sha1_block_data_order((ctx), (in), 1)
+#define	SHA1_TRANSFORM_BLOCKS(ctx, in, num) sha1_block_data_order((ctx), \
+		(in), (num))
+
+void sha1_block_data_order(SHA1_CTX *ctx, const void *inpp, size_t num_blocks);
 
 #else
 
@@ -277,9 +285,10 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 				 * Main processing loop - input misaligned
 				 */
 				for (; i + 63 < input_len; i += 64) {
-				    bcopy(&input[i], input64, 64);
-				    SHA1TransformVIS(X0, (uint32_t *)input64,
-					&ctx->state[0], VIS);
+					bcopy(&input[i], input64, 64);
+					SHA1TransformVIS(X0,
+					    (uint32_t *)input64,
+					    &ctx->state[0], VIS);
 				}
 			} else {
 				/*
@@ -287,7 +296,7 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 				 */
 				for (; i + 63 < input_len; i += 64) {
 					SHA1TransformVIS(X0,
-					    /* LINTED E_BAD_PTR_CAST_ALIGN */
+					/* LINTED E_BAD_PTR_CAST_ALIGN */
 					    (uint32_t *)&input[i],
 					    &ctx->state[0], VIS);
 				}
@@ -298,7 +307,7 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 #endif /* _KERNEL */
 		} else {
 			for (; i + 63 < input_len; i += 64) {
-			    SHA1_TRANSFORM(ctx, &input[i]);
+				SHA1_TRANSFORM(ctx, &input[i]);
 			}
 		}
 
@@ -327,6 +336,9 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 {
 	uint32_t i, buf_index, buf_len;
 	const uint8_t *input = inptr;
+#if defined(__amd64)
+	uint32_t	block_count;
+#endif	/* __amd64 */
 
 	/* check for noop */
 	if (input_len == 0)
@@ -363,8 +375,16 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 			i = buf_len;
 		}
 
+#if !defined(__amd64)
 		for (; i + 63 < input_len; i += 64)
 			SHA1_TRANSFORM(ctx, &input[i]);
+#else
+		block_count = (input_len - i) >> 6;
+		if (block_count > 0) {
+			SHA1_TRANSFORM_BLOCKS(ctx, &input[i], block_count);
+			i += block_count << 6;
+		}
+#endif	/* !__amd64 */
 
 		/*
 		 * general optimization:
@@ -391,7 +411,7 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
  *
  * purpose: ends an sha1 digest operation, finalizing the message digest and
  *          zeroing the context.
- *   input: uchar_t *	: a buffer to store the digest in
+ *   input: uchar_t *	: A buffer to store the digest.
  *			: The function actually uses void* because many
  *			: callers pass things other than uchar_t here.
  *          SHA1_CTX *  : the context to finalize, save, and zero
@@ -419,6 +439,9 @@ SHA1Final(void *digest, SHA1_CTX *ctx)
 	/* zeroize sensitive information */
 	bzero(ctx, sizeof (*ctx));
 }
+
+
+#if !defined(__amd64)
 
 typedef uint32_t sha1word;
 
@@ -660,7 +683,7 @@ SHA1Transform(SHA1_CTX *ctx, const uint8_t blk[64])
 	 * we can make the algorithm go faster by not doing this work,
 	 * but just pretending that `d' is now `e', etc. this works
 	 * really well and obviates the need for a temporary variable.
-	 * however, we still explictly perform the rotate action,
+	 * however, we still explicitly perform the rotate action,
 	 * since it is cheaper on SPARC to do it once than to have to
 	 * do it over and over again.
 	 */
@@ -982,6 +1005,8 @@ SHA1Transform(SHA1_CTX *ctx, const uint8_t blk[64])
 	W(0) = W(1) = W(2) = W(3) = W(4) = W(5) = W(6) = W(7) = W(8) = 0;
 	W(9) = W(10) = W(11) = W(12) = W(13) = W(14) = W(15) = 0;
 }
+#endif	/* !__amd64 */
+
 
 /*
  * Encode()
