@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,6 +67,7 @@ public final class Aggregate implements Serializable
     // value of the getAggregations() method.
 
     private transient Map <String, Aggregation> map;
+    private transient int recordSequence;
 
     /**
      * Called by native code.
@@ -88,12 +89,15 @@ public final class Aggregate implements Serializable
      * belonging to this aggregate
      * @throws NullPointerException if the given collection of
      * aggregations is {@code null}
+     * @throws IllegalArgumentException if the record ordinals of the
+     * given aggregations are invalid
      */
     public
     Aggregate(long snaptimeNanos, Collection <Aggregation> aggregations)
     {
 	snaptime = snaptimeNanos;
 	mapAggregations(aggregations);
+	validate();
     }
 
     // assumes map is not yet created
@@ -105,6 +109,35 @@ public final class Aggregate implements Serializable
 	map = new HashMap <String, Aggregation> (capacity, 1.0f);
 	for (Aggregation a : aggregations) {
 	    map.put(a.getName(), a);
+	    recordSequence += a.asMap().size();
+	}
+    }
+
+    private void
+    validate()
+    {
+	int capacity = (int)(((float)recordSequence * 3.0f) / 2.0f);
+	Set <Integer> ordinals = new HashSet <Integer> (capacity, 1.0f);
+	int ordinal, max = 0;
+	for (Aggregation a : map.values()) {
+	    for (AggregationRecord r : a.asMap().values()) {
+		// Allow all ordinals to be zero for backward
+		// compatibility (allows XML decoding of aggregates that
+		// were encoded before the ordinal property was added).
+		if (!ordinals.add(ordinal = r.getOrdinal()) && (ordinal > 0)) {
+		    throw new IllegalArgumentException(
+			    "duplicate record ordinal: " + ordinal);
+		}
+		if (ordinal > max) {
+		    max = ordinal;
+		}
+	    }
+	}
+	if ((max > 0) && (max != (recordSequence - 1))) {
+	    throw new IllegalArgumentException(
+		    "The maximum record ordinal (" + max + ") does not " +
+		    "equal the number of records (" + recordSequence +
+		    ") minus one.");
 	}
     }
 
@@ -171,6 +204,61 @@ public final class Aggregate implements Serializable
     }
 
     /**
+     * Gets an unordered list of this aggregate's records. The list is
+     * sortable using {@link java.util.Collections#sort(List list,
+     * Comparator c)} with any user-defined ordering. Modifying the
+     * returned list has no effect on this aggregate.
+     *
+     * @return a newly created list that copies this aggregate's records
+     * by reference in no particular order
+     */
+    public List <AggregationRecord>
+    getRecords()
+    {
+	List <AggregationRecord> list =
+		new ArrayList <AggregationRecord> (recordSequence);
+	for (Aggregation a : map.values()) {
+	    list.addAll(a.asMap().values());
+	}
+	return list;
+    }
+
+    /**
+     * Gets an ordered list of this aggregate's records sequenced by
+     * their {@link AggregationRecord#getOrdinal() ordinal} property.
+     * Note that the unordered list returned by {@link #getRecords()}
+     * can easily be sorted by any arbitrary criteria, for example by
+     * key ascending:
+     * <pre><code>
+     * List <AggregationRecord> records = aggregate.getRecords();
+     * Collections.sort(records, new Comparator &lt;AggregationRecord&gt; () {
+     * 	public int compare(AggregationRecord r1, AggregationRecord r2) {
+     * 		return r1.getTuple().compareTo(r2.getTuple());
+     * 	}
+     * });
+     * </code></pre>
+     * Use {@code getOrderedRecords()} instead of {@code getRecords()}
+     * when you want to list records as they would be ordered by {@code
+     * dtrace(1M)}.
+     *
+     * @return a newly created list of this aggregate's records
+     * in the order used by the native DTrace library
+     */
+    public List <AggregationRecord>
+    getOrderedRecords()
+    {
+	List <AggregationRecord> list = getRecords();
+	Collections.sort(list, new Comparator <AggregationRecord> () {
+	    public int compare(AggregationRecord r1, AggregationRecord r2) {
+		int n1 = r1.getOrdinal();
+		int n2 = r2.getOrdinal();
+		return (n1 < n2 ? -1 : (n1 > n2 ? 1 : 0));
+	    }
+	});
+	return list;
+    }
+
+    /**
      * In the native DTrace library, the unnamed aggregation {@code @}
      * is given the name {@code _} (underbar).  The Java DTrace API does
      * not expose this implementation detail but instead identifies the
@@ -212,6 +300,7 @@ public final class Aggregate implements Serializable
     private void
     addRecord(String aggregationName, long aggid, AggregationRecord rec)
     {
+	rec.setOrdinal(recordSequence++);
 	aggregationName = Aggregate.filterUnnamedAggregationName(
 		aggregationName);
 	Aggregation aggregation = getAggregation(aggregationName);
@@ -246,6 +335,14 @@ public final class Aggregate implements Serializable
 	// load serialized form into private map as a defensive copy
 	mapAggregations(aggregations);
 	// check class invariants after defensive copy
+	try {
+	    validate();
+	} catch (Exception e) {
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
+	}
     }
 
     /**

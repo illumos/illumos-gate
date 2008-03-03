@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,14 @@ jmethodID g_intinit_jm = 0;
 /* java.lang.Long */
 jclass g_long_jc = 0;
 jmethodID g_longinit_jm = 0;
+
+/* java.math.BigInteger */
+jclass g_bigint_jc = 0;
+jmethodID g_bigint_val_jsm = 0;
+jmethodID g_bigint_div_jm = 0;
+jmethodID g_bigint_shl_jm = 0;
+jmethodID g_bigint_or_jm = 0;
+jmethodID g_bigint_setbit_jm = 0;
 
 /* java.lang.String */
 jclass g_string_jc = 0;
@@ -188,6 +196,19 @@ dtj_load_common(JNIEnv *jenv)
 		/* java.lang.Long */
 		{ JCLASS,  &g_long_jc, "java/lang/Long" },
 		{ JMETHOD, &g_longinit_jm, CONSTRUCTOR, "(J)V" },
+
+		/* java.math.BigInteger */
+		{ JCLASS,  &g_bigint_jc, "java/math/BigInteger" },
+		{ JMETHOD_STATIC, &g_bigint_val_jsm, "valueOf",
+			"(J)Ljava/math/BigInteger;" },
+		{ JMETHOD, &g_bigint_div_jm, "divide",
+			"(Ljava/math/BigInteger;)Ljava/math/BigInteger;" },
+		{ JMETHOD, &g_bigint_shl_jm, "shiftLeft",
+			"(I)Ljava/math/BigInteger;" },
+		{ JMETHOD, &g_bigint_or_jm, "or",
+			"(Ljava/math/BigInteger;)Ljava/math/BigInteger;" },
+		{ JMETHOD, &g_bigint_setbit_jm, "setBit",
+			"(I)Ljava/math/BigInteger;" },
 
 		/* java.lang.String */
 		{ JCLASS,  &g_string_jc, "java/lang/String" },
@@ -928,6 +949,51 @@ dtj_print_object(JNIEnv *jenv, jobject jobj)
 	}
 	(*jenv)->ReleaseStringUTFChars(jenv, jstr, cstr);
 	(*jenv)->DeleteLocalRef(jenv, jstr);
+}
+
+jobject
+dtj_uint64(JNIEnv *jenv, uint64_t u)
+{
+	int64_t i = (int64_t)u;
+	jobject val64;
+
+	if (i >= 0) {
+		val64 = (*jenv)->CallStaticObjectMethod(jenv, g_bigint_jc,
+		    g_bigint_val_jsm, u);
+	} else {
+		jobject tmp;
+
+		u ^= ((uint64_t)0x1 << 63);
+		val64 = (*jenv)->CallStaticObjectMethod(jenv, g_bigint_jc,
+		    g_bigint_val_jsm, u);
+		tmp = val64;
+		val64 = (*jenv)->CallObjectMethod(jenv, tmp,
+		    g_bigint_setbit_jm, 63);
+		(*jenv)->DeleteLocalRef(jenv, tmp);
+	}
+
+	return (val64);
+}
+
+jobject
+dtj_int128(JNIEnv *jenv, uint64_t high, uint64_t low)
+{
+	jobject val128;
+	jobject low64;
+	jobject tmp;
+
+	val128 = (*jenv)->CallStaticObjectMethod(jenv, g_bigint_jc,
+	    g_bigint_val_jsm, high);
+	tmp = val128;
+	val128 = (*jenv)->CallObjectMethod(jenv, tmp, g_bigint_shl_jm, 64);
+	(*jenv)->DeleteLocalRef(jenv, tmp);
+	low64 = dtj_uint64(jenv, low);
+	tmp = val128;
+	val128 = (*jenv)->CallObjectMethod(jenv, tmp, g_bigint_or_jm, low64);
+	(*jenv)->DeleteLocalRef(jenv, tmp);
+	(*jenv)->DeleteLocalRef(jenv, low64);
+
+	return (val128);
 }
 
 jstring

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -730,7 +730,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     public List <Record>
     getRecords()
     {
-	return Collections.unmodifiableList(records);
+	return Collections. <Record> unmodifiableList(records);
     }
 
     /**

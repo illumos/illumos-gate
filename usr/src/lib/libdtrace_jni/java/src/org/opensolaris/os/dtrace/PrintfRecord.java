@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,8 @@ import java.util.*;
  *
  * @author Tom Erickson
  */
-public final class PrintfRecord implements Record, Serializable {
+public final class PrintfRecord implements Record, Serializable,
+	Comparable <PrintfRecord> {
     static final long serialVersionUID = 727237355963977675L;
 
     static {
@@ -46,7 +47,23 @@ public final class PrintfRecord implements Record, Serializable {
 	    BeanInfo info = Introspector.getBeanInfo(PrintfRecord.class);
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
-		    new String[] {"records", "formattedString"});
+		    new String[] {"records", "formattedString"})
+	    {
+		/*
+		 * Need to prevent DefaultPersistenceDelegate from using
+		 * overridden equals() method, resulting in a
+		 * StackOverFlowError.  Revert to PersistenceDelegate
+		 * implementation.  See
+		 * http://forum.java.sun.com/thread.jspa?threadID=
+		 * 477019&tstart=135
+		 */
+		protected boolean
+		mutatesTo(Object oldInstance, Object newInstance)
+		{
+		    return (newInstance != null && oldInstance != null &&
+			    oldInstance.getClass() == newInstance.getClass());
+		}
+	    };
 	    BeanDescriptor d = info.getBeanDescriptor();
 	    d.setValue("persistenceDelegate", persistenceDelegate);
 	} catch (IntrospectionException e) {
@@ -150,7 +167,7 @@ public final class PrintfRecord implements Record, Serializable {
     public List <ValueRecord>
     getRecords()
     {
-	return Collections.unmodifiableList(records);
+	return Collections. <ValueRecord> unmodifiableList(records);
     }
 
     /**
@@ -187,6 +204,58 @@ public final class PrintfRecord implements Record, Serializable {
     getRecord(int i)
     {
 	return records.get(i);
+    }
+
+    /**
+     * Compares the specified object with this {@code PrintfRecord} for
+     * equality. Returns {@code true} if and only if the specified
+     * object is also a {@code PrintfRecord} and both records have the
+     * same formatted string and underlying data elements.
+     *
+     * @return {@code true} if and only if the specified object is also
+     * a {@code PrintfRecord} and both the formatted strings <i>and</i>
+     * the underlying data elements of both records are equal
+     */
+    @Override
+    public boolean
+    equals(Object o)
+    {
+	if (o instanceof PrintfRecord) {
+	    PrintfRecord r = (PrintfRecord)o;
+	    return (records.equals(r.records) &&
+		    formattedString.equals(r.formattedString));
+	}
+	return false;
+    }
+
+    /**
+     * Overridden to ensure that equal instances have equal hash codes.
+     */
+    @Override
+    public int
+    hashCode()
+    {
+	int hash = 17;
+	hash = (37 * hash) + records.hashCode();
+	hash = (37 * hash) + formattedString.hashCode();
+	return hash;
+    }
+
+    /**
+     * Compares the formatted string value of this record with that of
+     * the given record. Note that ordering {@code printf} records by
+     * their string values is incompatible with {@link #equals(Object o)
+     * equals()}, which also checks the underlying data elements for
+     * equality.
+     *
+     * @return a negative number, 0, or a positive number as this
+     * record's formatted string is lexicographically less than, equal
+     * to, or greater than the given record's formatted string
+     */
+    public int
+    compareTo(PrintfRecord r)
+    {
+	return formattedString.compareTo(r.formattedString);
     }
 
     private void

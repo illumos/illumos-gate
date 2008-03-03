@@ -392,7 +392,12 @@ ProbeData:
 ]], output = Yes, this is the formatted printa() output], long formatted string, 
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
          0:  1  2  3                                         ...
-]]
+, mod`func+0x4, 
+              process ID: 123456
+              User Stack Frame 1
+              User Stack Frame 2
+              User Stack Frame 3
+, 1]]
   deserialized: org.opensolaris.os.dtrace.ProbeData[epid = 7, cpu = 1, enabledProbeDescription = syscall::malloc:entry, flow = org.opensolaris.os.dtrace.Flow[kind = RETURN, depth = 3], records = [org.opensolaris.os.dtrace.PrintaRecord[snaptime = 1234567890, aggregations = [org.opensolaris.os.dtrace.Aggregation[name = counts, id = 2, records = [org.opensolaris.os.dtrace.AggregationRecord[tuple = [
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
          0:  1  2  3                                         ...
@@ -436,7 +441,12 @@ ProbeData:
 ]], output = Yes, this is the formatted printa() output], long formatted string, 
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
          0:  1  2  3                                         ...
-]]
+, mod`func+0x4, 
+              process ID: 123456
+              User Stack Frame 1
+              User Stack Frame 2
+              User Stack Frame 3
+, 1]]
 ProbeData:
   encoded: org.opensolaris.os.dtrace.ProbeData[epid = 7, cpu = 1, enabledProbeDescription = syscall::malloc:entry, flow = org.opensolaris.os.dtrace.Flow[kind = RETURN, depth = 3], records = [org.opensolaris.os.dtrace.PrintaRecord[snaptime = 1234567890, aggregations = [org.opensolaris.os.dtrace.Aggregation[name = counts, id = 2, records = [org.opensolaris.os.dtrace.AggregationRecord[tuple = [
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
@@ -481,7 +491,12 @@ ProbeData:
 ]], output = Yes, this is the formatted printa() output], long formatted string, 
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
          0:  1  2  3                                         ...
-]]
+, mod`func+0x4, 
+              process ID: 123456
+              User Stack Frame 1
+              User Stack Frame 2
+              User Stack Frame 3
+, 1]]
   decoded: org.opensolaris.os.dtrace.ProbeData[epid = 7, cpu = 1, enabledProbeDescription = syscall::malloc:entry, flow = org.opensolaris.os.dtrace.Flow[kind = RETURN, depth = 3], records = [org.opensolaris.os.dtrace.PrintaRecord[snaptime = 1234567890, aggregations = [org.opensolaris.os.dtrace.Aggregation[name = counts, id = 2, records = [org.opensolaris.os.dtrace.AggregationRecord[tuple = [
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
          0:  1  2  3                                         ...
@@ -525,7 +540,12 @@ ProbeData:
 ]], output = Yes, this is the formatted printa() output], long formatted string, 
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
          0:  1  2  3                                         ...
-]]
+, mod`func+0x4, 
+              process ID: 123456
+              User Stack Frame 1
+              User Stack Frame 2
+              User Stack Frame 3
+, 1]]
 Aggregate:
   serialized: org.opensolaris.os.dtrace.Aggregate[snaptime = 1234567890, aggregations = [org.opensolaris.os.dtrace.Aggregation[name = counts, id = 2, records = [org.opensolaris.os.dtrace.AggregationRecord[tuple = [
              0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0123456789abcdef
@@ -694,3 +714,9 @@ Program:
 Program$File:
   serialized: org.opensolaris.os.dtrace.Program$File[super = org.opensolaris.os.dtrace.Program[contents = syscall:::entry { @[execname] = count(); }, info = null], file = TestBean.out]
   deserialized: org.opensolaris.os.dtrace.Program$File[super = org.opensolaris.os.dtrace.Program[contents = syscall:::entry { @[execname] = count(); }, info = null], file = TestBean.out]
+StddevValue:
+  serialized: 37
+  deserialized: 37
+StddevValue:
+  encoded: 37
+  decoded: 37

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -443,153 +443,10 @@ public class JDTrace {
 	}
     }
 
-    static int
-    compareTuples(Tuple t1, Tuple t2, int pos)
-    {
-	int cmp = 0;
-	int len1 = t1.size();
-	int len2 = t2.size();
-	int index;
-
-	for (int i = 0; (cmp == 0) && (i < len1 && i < len2); ++i) {
-	    index = i + pos;
-	    if (index >= len1) {
-		index = index - len1;
-	    }
-	    cmp = Tuple.compare(t1, t2, index);
-	}
-
-	if (cmp == 0) {
-	    cmp = (len1 < len2 ? -1 : (len1 > len2 ? 1 : 0));
-	}
-
-	return cmp;
-    }
-
-    static int
-    compareValues(AggregationValue v1, AggregationValue v2)
-    {
-	int cmp;
-
-	if ((v1 instanceof LinearDistribution) &&
-		(v2 instanceof LinearDistribution)) {
-	    LinearDistribution l1 = (LinearDistribution)v1;
-	    LinearDistribution l2 = (LinearDistribution)v2;
-	    cmp = l1.compareTo(l2);
-	} else if ((v1 instanceof LogDistribution) &&
-		(v2 instanceof LogDistribution)) {
-	    LogDistribution l1 = (LogDistribution)v1;
-	    LogDistribution l2 = (LogDistribution)v2;
-	    cmp = l1.compareTo(l2);
-	} else {
-	    double n1 = v1.getValue().doubleValue();
-	    double n2 = v2.getValue().doubleValue();
-	    cmp = (n1 < n2 ? -1 : (n1 > n2 ? 1 : 0));
-	}
-
-	return cmp;
-    }
-
-    static Comparator <Object[]>
-    getAggValCmp(final int keypos)
-    {
-	Comparator <Object[]> CMP = new Comparator <Object[]> () {
-	    public int
-	    compare(Object[] pair1, Object[] pair2)
-	    {
-		int cmp;
-		long id1 = (Long)pair1[1];
-		long id2 = (Long)pair2[1];
-		cmp = (id1 < id2 ? -1 : (id1 > id2 ? 1 : 0));
-		if (cmp != 0) {
-		    return cmp;
-		}
-
-		AggregationRecord r1 = (AggregationRecord)pair1[0];
-		AggregationRecord r2 = (AggregationRecord)pair2[0];
-		AggregationValue v1 = r1.getValue();
-		AggregationValue v2 = r2.getValue();
-		cmp = compareValues(v1, v2);
-		if (cmp != 0) {
-		    return cmp;
-		}
-
-		cmp = compareTuples(r1.getTuple(), r2.getTuple(), keypos);
-		return cmp;
-	    }
-	};
-	return CMP;
-    };
-
-    static Comparator <Object[]>
-    getAggKeyCmp(final int keypos)
-    {
-	Comparator <Object[]> CMP = new Comparator <Object[]> () {
-	    public int
-	    compare(Object[] pair1, Object[] pair2)
-	    {
-		int cmp;
-		long id1 = (Long)pair1[1];
-		long id2 = (Long)pair2[1];
-		cmp = (id1 < id2 ? -1 : (id1 > id2 ? 1 : 0));
-		if (cmp != 0) {
-		    return cmp;
-		}
-
-		AggregationRecord r1 = (AggregationRecord)pair1[0];
-		AggregationRecord r2 = (AggregationRecord)pair2[0];
-		cmp = compareTuples(r1.getTuple(), r2.getTuple(), keypos);
-
-		return cmp;
-	    }
-	};
-	return CMP;
-    }
-
-    // Consumer getAggregate()
     static void
     printAggregate(Aggregate aggregate)
     {
-	List <AggregationRecord> list =
-		new ArrayList <AggregationRecord> ();
-	List <Object[]> sortList = new ArrayList <Object[]> ();
-	for (Aggregation a : aggregate.getAggregations()) {
-	    for (AggregationRecord rec : a.asMap().values()) {
-		sortList.add(new Object[] {rec, new Long(a.getID())});
-	    }
-	}
-
-	try {
-	    // aggsortkeypos
-	    long optval = dtrace.getOption(Option.aggsortkeypos);
-	    int keypos;
-	    if (optval == Option.UNSET) {
-		keypos = 0;
-	    } else {
-		keypos = (int)optval;
-	    }
-
-	    // aggsortkey
-	    if (dtrace.getOption(Option.aggsortkey) == Option.UNSET) {
-		Collections.sort(sortList, getAggValCmp(keypos));
-	    } else {
-		Collections.sort(sortList, getAggKeyCmp(keypos));
-	    }
-
-	    for (Object[] pair : sortList) {
-		list.add((AggregationRecord)pair[0]);
-	    }
-
-	    // aggsortrev
-	    if (dtrace.getOption(Option.aggsortrev) != Option.UNSET) {
-		Collections.reverse(list);
-	    }
-	} catch (DTraceException e) {
-	    e.printStackTrace();
-	    return;
-	}
-
-	printAggregationRecords(list);
+	printAggregationRecords(aggregate.getOrderedRecords());
     }
 
     static void
@@ -830,7 +687,7 @@ public class JDTrace {
 	}
 
 	Consumer.OpenFlag[] oflags = new Consumer.OpenFlag[openFlags.size()];
-	oflags = (Consumer.OpenFlag[])openFlags.toArray(oflags);
+	oflags = openFlags.toArray(oflags);
 
 	dtrace = new LocalConsumer() {
 	    protected Thread createThread() {
@@ -1001,12 +858,7 @@ public class JDTrace {
 	    }
 
 	    String[] compileArgs = new String[argList.size()];
-	    compileArgs = (String[])argList.toArray(compileArgs);
-
-	    if (compileRequests.isEmpty()) {
-		System.err.println("dtrace: no probes specified");
-		exit(1);
-	    }
+	    compileArgs = argList.toArray(compileArgs);
 
 	    Program program;
 	    for (CompileRequest req : compileRequests) {
@@ -1091,7 +943,7 @@ public class JDTrace {
 		    dtrace.getProgramInfo(p);
 		}
 		info = p.getInfo();
-		if (!quiet) {
+		if ((mode == Mode.EXEC) && !quiet) {
 		    System.err.printf("dtrace: %s '%s' matched %d probe%s\n",
 			    programType, programDescription,
 			    info.getMatchingProbeCount(),

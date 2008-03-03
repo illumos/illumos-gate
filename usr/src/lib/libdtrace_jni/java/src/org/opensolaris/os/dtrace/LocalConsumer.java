@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,7 +52,7 @@ public class LocalConsumer implements Consumer {
     static Logger logger = Logger.getLogger(LocalConsumer.class.getName());
 
     // Needs to match the version in dtrace_jni.c
-    private static final int DTRACE_JNI_VERSION = 2;
+    private static final int DTRACE_JNI_VERSION = 3;
 
     private static final Option[] DEFAULT_OPTIONS = new Option[] {
 	new Option(Option.bufsize, Option.kb(256)),

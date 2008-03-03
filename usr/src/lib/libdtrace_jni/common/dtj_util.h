@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,6 +154,14 @@ extern jmethodID g_intinit_jm;
 extern jclass g_long_jc;
 extern jmethodID g_longinit_jm;
 
+/* java.math.BigInteger */
+extern jclass g_bigint_jc;
+extern jmethodID g_bigint_val_jsm;
+extern jmethodID g_bigint_div_jm;
+extern jmethodID g_bigint_shl_jm;
+extern jmethodID g_bigint_or_jm;
+extern jmethodID g_bigint_setbit_jm;
+
 /* java.lang.String */
 extern jclass g_string_jc;
 extern jmethodID g_strinit_bytes_jm;
@@ -221,7 +229,7 @@ extern dtj_status_t dtj_cache_jni_classes(JNIEnv *, const dtj_table_entry_t *);
  * NoSuchElementException
  * ClassCastException
  * AssertionError
- * org.opensolaris.os.support.ResourceLimitException
+ * org.opensolaris.os.dtrace.ResourceLimitException
  *
  * Control should be returned to Java immediately afterwards.
  */
@@ -248,6 +256,17 @@ extern void dtj_wrap_exception(JNIEnv *, const char *, int);
  * pending when this function returns.
  */
 extern void dtj_print_object(JNIEnv *jenv, jobject obj);
+
+/*
+ * Gets a java.math.BigInteger representing a 64-bit unsigned integer.
+ */
+extern jobject dtj_uint64(JNIEnv *jenv, uint64_t);
+
+/*
+ * Gets a java.math.BigInteger representing a 128-bit integer given as 64 high
+ * bits (1st arg) and 64 low bits (2nd arg).
+ */
+extern jobject dtj_int128(JNIEnv *jenv, uint64_t, uint64_t);
 
 /*
  * Gets a formatted String (local reference) from a format and a variable

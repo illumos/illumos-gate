@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,6 +94,7 @@ f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Record.ht
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ScalarRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StackFrame.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StackValueRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StddevValue.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/SymbolValueRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/SumValue.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Tuple.html 0644 root other
@@ -159,6 +160,7 @@ f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ScalarRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StackFrame.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StackValueRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StddevValue.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/SymbolValueRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/SumValue.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Tuple.html 0644 root other

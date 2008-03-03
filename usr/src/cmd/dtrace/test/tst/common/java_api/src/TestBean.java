@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,7 +74,8 @@ public class TestBean {
 	"UserSymbolRecord",
 	"UserSymbolRecord$Value",
 	"Program",
-	"Program$File"
+	"Program$File",
+	"StddevValue"
     };
 
     static File file;
@@ -330,6 +331,9 @@ public class TestBean {
 	list.add(getPrintaRecord());
 	list.add(getPrintfRecord());
 	list.add(getScalarRecord());
+	list.add(getUserSymbolRecord());
+	list.add(getUserStackRecord());
+	list.add(getExitRecord());
 	ProbeData d = new ProbeData(7, 1, getProbeDescription(),
 	    getFlow(), list);
 	return d;
@@ -527,6 +531,14 @@ public class TestBean {
 	return Program.File.class.cast(p);
     }
 
+    public static StddevValue
+    getStddevValue()
+    {
+	StddevValue v = new StddevValue(37, 114, 5, Integer.toString(9544));
+	return v;
+    }
+
+    @SuppressWarnings("unchecked")
     static String
     getString(Object o)
     {
@@ -593,9 +605,11 @@ public class TestBean {
 	FileOutputStream fos = new FileOutputStream(file);
 	ObjectOutputStream out = new ObjectOutputStream(fos);
 	out.writeObject(obj);
+	out.close();
 	FileInputStream fis = new FileInputStream(file);
 	ObjectInputStream in = new ObjectInputStream(fis);
 	newobj = in.readObject();
+	in.close();
 	String deserialized = getString(newobj);
 	System.out.println("  deserialized: " + deserialized);
 

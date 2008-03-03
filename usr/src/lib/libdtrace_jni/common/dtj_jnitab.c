@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +174,10 @@ jmethodID g_aggmininit_jm = 0;
 /* MaxValue */
 jclass g_aggmax_jc = 0;
 jmethodID g_aggmaxinit_jm = 0;
+
+/* StddevValue */
+jclass g_aggstddev_jc = 0;
+jmethodID g_aggstddevinit_jm = 0;
 
 /* KernelStackRecord */
 jclass g_stack_jc = 0;
@@ -413,6 +417,12 @@ dtj_table_load(JNIEnv *jenv)
 		{ JCLASS,  &g_aggmax_jc,
 			"org/opensolaris/os/dtrace/MaxValue" },
 		{ JMETHOD, &g_aggmaxinit_jm, CONSTRUCTOR, "(J)V" },
+
+		/* StddevValue */
+		{ JCLASS,  &g_aggstddev_jc,
+			"org/opensolaris/os/dtrace/StddevValue" },
+		{ JMETHOD, &g_aggstddevinit_jm, CONSTRUCTOR,
+			"(JJLjava/math/BigInteger;)V" },
 
 		/* KernelStackRecord */
 		{ JCLASS,  &g_stack_jc,

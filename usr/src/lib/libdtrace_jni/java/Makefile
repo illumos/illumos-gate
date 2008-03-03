@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,6 +80,7 @@ APICLASSPATH=$(CLASSES):$(APIJAVASRC)
 # javac flags
 JFLAGS= -g -d $(CLASSES) -sourcepath $(APICLASSPATH) -deprecation
 JFLAGS += -target 1.5
+JFLAGS += -Xlint
 
 # The default make rule for Java files
 COMPILE.java=$(JAVAC) $(JFLAGS)
@@ -149,6 +150,7 @@ API_CLASSNAMES=\
 	ScalarRecord \
 	StackFrame \
 	StackValueRecord \
+	StddevValue \
 	SumValue \
 	SymbolValueRecord \
 	Tuple \

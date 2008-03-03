@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -118,7 +118,7 @@ class AggregateSpec {
 	if (includedAggregationNames == null) {
 	    return Collections. <String> emptySet();
 	}
-	return Collections.unmodifiableSet(includedAggregationNames);
+	return Collections. <String> unmodifiableSet(includedAggregationNames);
     }
 
     public Set <String>
@@ -127,7 +127,7 @@ class AggregateSpec {
 	if (clearedAggregationNames == null) {
 	    return Collections. <String> emptySet();
 	}
-	return Collections.unmodifiableSet(clearedAggregationNames);
+	return Collections. <String> unmodifiableSet(clearedAggregationNames);
     }
 
     public boolean

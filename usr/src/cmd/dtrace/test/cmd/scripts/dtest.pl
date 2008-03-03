@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,20 +36,19 @@ use Cwd 'abs_path';
 
 $PNAME = $0;
 $PNAME =~ s:.*/::;
-$OPTSTR = 'abd:ghi:lqsux:';
-$USAGE = "Usage: $PNAME [-abghlqsu] [-d dir] [-i isa] "
+$OPTSTR = 'abd:fghi:jlnqsx:';
+$USAGE = "Usage: $PNAME [-abfghjlnqs] [-d dir] [-i isa] "
     . "[-x opt[=arg]] [file | dir ...]\n";
 ($MACH = `uname -p`) =~ s/\W*\n//;
 
-$dtrace_path = '/usr/sbin/dtrace';
 @dtrace_argv = ();
 
 $ksh_path = '/usr/bin/ksh';
 
 @files = ();
 %exceptions = ();
+%results = ();
 $errs = 0;
-$bypassed = 0;
 
 #
 # If no test files are specified on the command-line, execute a find on "."
@@ -77,14 +76,15 @@ sub usage
 	print "\t -b  execute bad ioctl test program\n";
 	print "\t -d  specify directory for test results files and cores\n";
 	print "\t -g  enable libumem debugging when running tests\n";
+	print "\t -f  force bypassed tests to run\n";
 	print "\t -h  display verbose usage message\n";
 	print "\t -i  specify ISA to test instead of isaexec(3C) default\n";
+	print "\t -j  execute test suite using jdtrace (Java API) only\n";
 	print "\t -l  save log file of results and PIDs used by tests\n";
+	print "\t -n  execute test suite using dtrace(1m) only\n";
 	print "\t -q  set quiet mode (only report errors and summary)\n";
 	print "\t -s  save results files even for tests that pass\n";
 	print "\t -x  pass corresponding -x argument to dtrace(1M)\n";
-	print "\n\tUse \"-i java\" to run tests using the ";
-	print "Java DTrace API.\n";
 	exit(2);
 }
 
@@ -173,27 +173,36 @@ sub trim {
 	return $s;
 }
 
-# Loads exception set of skipped tests
+# Load exception set of skipped tests from the file at the given
+# pathname. The test names are assumed to be paths relative to $dt_tst,
+# for example: common/aggs/tst.neglquant.d, and specify tests to be
+# skipped.
 sub load_exceptions {
 	my($listfile) = @_;
 	my($line) = "";
 
-	exit(123) unless open(STDIN, "<$listfile");
-	while (<STDIN>) {
-		chomp;
-		$line = $_;
-		# line is non-empty and not a comment
-		if ((length($line) > 0) && ($line =~ /^\s*[^\s#]/ )) {
-			$exceptions{trim($line)} = 1;
+	%exceptions = ();
+	if (length($listfile) > 0) {
+		exit(123) unless open(STDIN, "<$listfile");
+		while (<STDIN>) {
+			chomp;
+			$line = $_;
+			# line is non-empty and not a comment
+			if ((length($line) > 0) && ($line =~ /^\s*[^\s#]/ )) {
+				$exceptions{trim($line)} = 1;
+			}
 		}
 	}
-	return 0;
 }
 
-# Return 1 if file name found in exception set, 0 otherwise
+# Return 1 if the test is found in the exception set, 0 otherwise.
 sub is_exception {
 	my($file) = @_;
 	my($i) = -1;
+
+	if (scalar(keys(%exceptions)) == 0) {
+		return 0;
+	}
 
 	# hash absolute pathname after $dt_tst/
 	$file = abs_path($file);
@@ -203,6 +212,320 @@ sub is_exception {
 		return $exceptions{$file};
 	}
 	return 0;
+}
+
+#
+# Iterate over the set of test files specified on the command-line or by
+# a find on "$defdir/common" and "$defdir/$MACH" and execute each one.
+# If the test file is executable, we fork and exec it. If the test is a
+# .ksh file, we run it with $ksh_path. Otherwise we run dtrace -s on it.
+# If the file is named tst.* we assume it should return exit status 0.
+# If the file is named err.* we assume it should return exit status 1.
+# If the file is named err.D_[A-Z0-9]+[.*].d we use dtrace -xerrtags and
+# examine stderr to ensure that a matching error tag was produced.
+# If the file is named drp.[A-Z0-9]+[.*].d we use dtrace -xdroptags and
+# examine stderr to ensure that a matching drop tag was produced.
+# If any *.out or *.err files are found we perform output comparisons.
+#
+# run_tests takes two arguments: The first is the pathname of the dtrace
+# command to invoke when running the tests. The second is the pathname
+# of a file (may be the empty string) listing tests that ought to be
+# skipped (skipped tests are listed as paths relative to $dt_tst, for
+# example: common/aggs/tst.neglquant.d).
+#
+sub run_tests {
+	my($dtrace, $exceptions_path) = @_;
+	my($passed) = 0;
+	my($bypassed) = 0;
+	my($failed) = $errs;
+	my($total) = 0;
+
+	die "$PNAME: $dtrace not found\n" unless (-x "$dtrace");
+	logmsg($dtrace . "\n");
+
+	load_exceptions($exceptions_path);
+
+	foreach $file (sort @files) {
+		$file =~ m:.*/((.*)\.(\w+)):;
+		$name = $1;
+		$base = $2;
+		$ext = $3;
+		
+		$dir = dirname($file);
+		$isksh = 0;
+		$tag = 0;
+		$droptag = 0;
+
+		if ($name =~ /^tst\./) {
+			$isksh = ($ext eq 'ksh');
+			$status = 0;
+		} elsif ($name =~ /^err\.(D_[A-Z0-9_]+)\./) {
+			$status = 1;
+			$tag = $1;
+		} elsif ($name =~ /^err\./) {
+			$status = 1;
+		} elsif ($name =~ /^drp\.([A-Z0-9_]+)\./) {
+			$status = 0;
+			$droptag = $1;
+		} else {
+			errmsg("ERROR: $file is not a valid test file name\n");
+			next;
+		}
+
+		$fullname = "$dir/$name";
+		$exe = "$dir/$base.exe";
+		$exe_pid = -1;
+
+		if ($opt_a && ($status != 0 || $tag != 0 || $droptag != 0 ||
+		    -x $exe || $isksh || -x $fullname)) {
+			$bypassed++;
+			next;
+		}
+
+		if (!$opt_f && is_exception("$dir/$name")) {
+			$bypassed++;
+			next;
+		}
+
+		if (!$isksh && -x $exe) {
+			if (($exe_pid = fork()) == -1) {
+				errmsg(
+				    "ERROR: failed to fork to run $exe: $!\n");
+				next;
+			}
+
+			if ($exe_pid == 0) {
+				open(STDIN, '</dev/null');
+
+				exec($exe);
+
+				warn "ERROR: failed to exec $exe: $!\n";
+			}
+		}
+
+		logmsg("testing $file ... ");
+
+		if (($pid = fork()) == -1) {
+			errmsg("ERROR: failed to fork to run test $file: $!\n");
+			next;
+		}
+
+		if ($pid == 0) {
+			open(STDIN, '</dev/null');
+			exit(125) unless open(STDOUT, ">$opt_d/$$.out");
+			exit(125) unless open(STDERR, ">$opt_d/$$.err");
+
+			unless (chdir($dir)) {
+				warn "ERROR: failed to chdir for $file: $!\n";
+				exit(126);
+			}
+
+			push(@dtrace_argv, '-xerrtags') if ($tag);
+			push(@dtrace_argv, '-xdroptags') if ($droptag);
+			push(@dtrace_argv, $exe_pid) if ($exe_pid != -1);
+
+			if ($isksh) {
+				exit(123) unless open(STDIN, "<$name");
+				exec("$ksh_path /dev/stdin $dtrace");
+			} elsif (-x $name) {
+				warn "ERROR: $name is executable\n";
+				exit(1);
+			} else {
+				if ($tag == 0 && $status == $0 && $opt_a) {
+					push(@dtrace_argv, '-A');
+				}
+
+				push(@dtrace_argv, '-C');
+				push(@dtrace_argv, '-s');
+				push(@dtrace_argv, $name);
+				exec($dtrace, @dtrace_argv);
+			}
+
+			warn "ERROR: failed to exec for $file: $!\n";
+			exit(127);
+		}
+
+		if (waitpid($pid, 0) == -1) {
+			errmsg("ERROR: timed out waiting for $file\n");
+			kill(9, $exe_pid) if ($exe_pid != -1);
+			kill(9, $pid);
+			next;
+		}
+
+		kill(9, $exe_pid) if ($exe_pid != -1);
+
+		if ($tag == 0 && $status == $0 && $opt_a) {
+			#
+			# We can chuck the earler output.
+			#
+			unlink($pid . '.out');
+			unlink($pid . '.err');
+
+			#
+			# This is an anonymous enabling.  We need to get
+			# the module unloaded.
+			#
+			system("dtrace -ae 1> /dev/null 2> /dev/null");
+			system("svcadm disable -s " .
+			    "svc:/network/nfs/mapid:default");
+			system("modunload -i 0 ; modunload -i 0 ; " .
+			    "modunload -i 0");
+			if (!system("modinfo | grep dtrace")) {
+				warn "ERROR: couldn't unload dtrace\n";
+				system("svcadm enable " . 
+				    "-s svc:/network/nfs/mapid:default");
+				exit(124);
+			}
+
+			#
+			# DTrace is gone.  Now update_drv(1M), and rip
+			# everything out again.
+			#
+			system("update_drv dtrace");
+			system("dtrace -ae 1> /dev/null 2> /dev/null");
+			system("modunload -i 0 ; modunload -i 0 ; " .
+			    "modunload -i 0");
+			if (!system("modinfo | grep dtrace")) {
+				warn "ERROR: couldn't unload dtrace\n";
+				system("svcadm enable " . 
+				    "-s svc:/network/nfs/mapid:default");
+				exit(124);
+			}
+
+			#
+			# Now bring DTrace back in.
+			#
+			system("sync ; sync");
+			system("dtrace -l -n bogusprobe 1> /dev/null " .
+			    "2> /dev/null");
+			system("svcadm enable -s " .
+			    "svc:/network/nfs/mapid:default");
+
+			#
+			# That should have caused DTrace to reload with
+			# the new configuration file.  Now we can try to
+			# snag our anonymous state.
+			#
+			if (($pid = fork()) == -1) {
+				errmsg("ERROR: failed to fork to run " .
+				    "test $file: $!\n");
+				next;
+			}
+
+			if ($pid == 0) {
+				open(STDIN, '</dev/null');
+				exit(125) unless open(STDOUT, ">$opt_d/$$.out");
+				exit(125) unless open(STDERR, ">$opt_d/$$.err");
+
+				push(@dtrace_argv, '-a');
+
+				unless (chdir($dir)) {
+					warn "ERROR: failed to chdir " .
+					    "for $file: $!\n";
+					exit(126);
+				}
+
+				exec($dtrace, @dtrace_argv);
+				warn "ERROR: failed to exec for $file: $!\n";
+				exit(127);
+			}
+
+			if (waitpid($pid, 0) == -1) {
+				errmsg("ERROR: timed out waiting for $file\n");
+				kill(9, $pid);
+				next;
+			}
+		}
+
+		logmsg("[$pid]\n");
+		$wstat = $?;
+		$wifexited = ($wstat & 0xFF) == 0;
+		$wexitstat = ($wstat >> 8) & 0xFF;
+		$wtermsig = ($wstat & 0x7F);
+
+		if (!$wifexited) {
+			fail("died from signal $wtermsig");
+			next;
+		}
+
+		if ($wexitstat == 125) {
+			die "$PNAME: failed to create output file in $opt_d " .
+			    "(cd elsewhere or use -d)\n";
+		}
+
+		if ($wexitstat != $status) {
+			fail("returned $wexitstat instead of $status");
+			next;
+		}
+
+		if (-f "$file.out" &&
+		    system("cmp -s $file.out $opt_d/$pid.out") != 0) {
+			fail("stdout mismatch", "$pid.out");
+			next;
+		}
+
+		if (-f "$file.err" &&
+		    system("cmp -s $file.err $opt_d/$pid.err") != 0) {
+			fail("stderr mismatch: see $pid.err");
+			next;
+		}
+
+		if ($tag) {
+			open(TSTERR, "<$opt_d/$pid.err");
+			$tsterr = <TSTERR>;
+			close(TSTERR);
+
+			unless ($tsterr =~ /: \[$tag\] line \d+:/) {
+				fail("errtag mismatch: see $pid.err");
+				next;
+			}
+		}
+
+		if ($droptag) {
+			$found = 0;
+			open(TSTERR, "<$opt_d/$pid.err");
+
+			while (<TSTERR>) {
+				if (/\[$droptag\] /) {
+					$found = 1;
+					last;
+				}
+			}
+
+			close (TSTERR);
+
+			unless ($found) {
+				fail("droptag mismatch: see $pid.err");
+				next;
+			}
+		}
+
+		unless ($opt_s) {
+			unlink($pid . '.out');
+			unlink($pid . '.err');
+		}
+	}
+
+	if ($opt_a) {
+		#
+		# If we're running with anonymous enablings, we need to
+		# restore the .conf file.
+		#
+		system("dtrace -A 1> /dev/null 2> /dev/null");
+		system("dtrace -ae 1> /dev/null 2> /dev/null");
+		system("modunload -i 0 ; modunload -i 0 ; modunload -i 0");
+		system("update_drv dtrace");
+	}
+
+	$total = scalar(@files);
+	$failed = $errs - $failed;
+	$passed = ($total - $failed - $bypassed);
+	$results{$dtrace} = {
+		"passed" => $passed,
+		"bypassed" => $bypassed,
+		"failed" => $failed,
+		"total" => $total
+	};
 }
 
 die $USAGE unless (getopts($OPTSTR));
@@ -227,6 +550,20 @@ find(\&wanted, "$defdir/common") if (scalar(@ARGV) == 0);
 find(\&wanted, "$defdir/$MACH") if (scalar(@ARGV) == 0);
 die $USAGE if (scalar(@files) == 0);
 
+$dtrace_path = '/usr/sbin/dtrace';
+$jdtrace_path = "$bindir/jdtrace";
+
+%exception_lists = ("$jdtrace_path" => "$bindir/exception.lst");
+
+if ($opt_j || $opt_n || $opt_i) {
+	@dtrace_cmds = ();
+	push(@dtrace_cmds, $dtrace_path) if ($opt_n);
+	push(@dtrace_cmds, $jdtrace_path) if ($opt_j);
+	push(@dtrace_cmds, "/usr/sbin/$opt_i/dtrace") if ($opt_i);
+} else {
+	@dtrace_cmds = ($dtrace_path, $jdtrace_path);
+}
+
 if ($opt_d) {
 	die "$PNAME: -d arg must be absolute path\n" unless ($opt_d =~ /^\//);
 	die "$PNAME: -d arg $opt_d is not a directory\n" unless (-d "$opt_d");
@@ -235,19 +572,6 @@ if ($opt_d) {
 	my $dir = getcwd;
 	system("coreadm -p $dir/%p.core");
 	$opt_d = '.';
-}
-
-if ($opt_i) {
-	if ($opt_i eq "java") {
-		$dtrace_path = $bindir . "/jdtrace";
-		die "$PNAME: jdtrace not found\n"
-		    unless (-x "$dtrace_path");
-		load_exceptions($bindir . "/exception.lst");
-	} else {
-		$dtrace_path = "/usr/sbin/$opt_i/dtrace";
-		die "$PNAME: dtrace(1M) for ISA $opt_i not found\n"
-		    unless (-x "$dtrace_path");
-	}
 }
 
 if ($opt_x) {
@@ -349,326 +673,31 @@ if ($opt_b) {
 	exit(0);
 }
 
-if ($opt_u) {
-	logmsg "spawning module unloading process... ";
-
-	$unloader = fork;
-
-	if ($unloader != 0 && !defined $unloader) {
-		#
-		# Couldn't fork for some reason.
-		#
-		die "couldn't fork: $!\n";
-	}
-
-	if ($unloader == 0) {
-		#
-		# We're in the child.  Go modunload krazy.
-		#
-		for (;;) {
-			system("modunload -i 0");
-		}
-	} else {
-		logmsg "[$unloader]\n";
-
-		$SIG{INT} = sub {
-			kill 9, $unloader;
-			exit($errs != 0);
-		};
-	}
-}
-
 #
-# Iterate over the set of test files specified on the command-line or located
-# by a find on "." and execute each one.  If the test file is executable, we
-# assume it is a #! script and run it.  Otherwise we run dtrace -s on it.
-# If the file is named tst.* we assume it should return exit status 0.
-# If the file is named err.* we assume it should return exit status 1.
-# If the file is named err.D_[A-Z0-9]+[.*].d we use dtrace -xerrtags and
-# examine stderr to ensure that a matching error tag was produced.
-# If the file is named drp.[A-Z0-9]+[.*].d we use dtrace -xdroptags and
-# examine stderr to ensure that a matching drop tag was produced.
-# If any *.out or *.err files are found we perform output comparisons.
+# Run all the tests specified on the command-line (the entire test suite
+# by default) once for each dtrace command tested, skipping any tests
+# not valid for that command. 
 #
-foreach $file (sort @files) {
-	$file =~ m:.*/((.*)\.(\w+)):;
-	$name = $1;
-	$base = $2;
-	$ext = $3;
-	
-	$dir = dirname($file);
-	$isksh = 0;
-	$tag = 0;
-	$droptag = 0;
-
-	if ($name =~ /^tst\./) {
-		$isksh = ($ext eq 'ksh');
-		$status = 0;
-	} elsif ($name =~ /^err\.(D_[A-Z0-9_]+)\./) {
-		$status = 1;
-		$tag = $1;
-	} elsif ($name =~ /^err\./) {
-		$status = 1;
-	} elsif ($name =~ /^drp\.([A-Z0-9_]+)\./) {
-		$status = 0;
-		$droptag = $1;
-	} else {
-		errmsg("ERROR: $file is not a valid test file name\n");
-		next;
-	}
-
-	$fullname = "$dir/$name";
-	$exe = "$dir/$base.exe";
-	$exe_pid = -1;
-
-	if ($opt_a && ($status != 0 || $tag != 0 || $droptag != 0 ||
-	    -x $exe || $isksh || -x $fullname)) {
-		$bypassed++;
-		next;
-	}
-
-	if ($opt_i eq "java") {
-		if (is_exception("$dir/$name")) {
-			$bypassed++;
-			next;
-		}
-	}
-
-	if (!$isksh && -x $exe) {
-		if (($exe_pid = fork()) == -1) {
-			errmsg("ERROR: failed to fork to run $exe: $!\n");
-			next;
-		}
-
-		if ($exe_pid == 0) {
-			open(STDIN, '</dev/null');
-
-			exec($exe);
-
-			warn "ERROR: failed to exec $exe: $!\n";
-		}
-	}
-
-	logmsg("testing $file ... ");
-
-	if (($pid = fork()) == -1) {
-		errmsg("ERROR: failed to fork to run test $file: $!\n");
-		next;
-	}
-
-	if ($pid == 0) {
-		open(STDIN, '</dev/null');
-		exit(125) unless open(STDOUT, ">$opt_d/$$.out");
-		exit(125) unless open(STDERR, ">$opt_d/$$.err");
-
-		unless (chdir($dir)) {
-			warn "ERROR: failed to chdir for $file: $!\n";
-			exit(126);
-		}
-
-		push(@dtrace_argv, '-xerrtags') if ($tag);
-		push(@dtrace_argv, '-xdroptags') if ($droptag);
-		push(@dtrace_argv, $exe_pid) if ($exe_pid != -1);
-
-		if ($isksh) {
-			exit(123) unless open(STDIN, "<$name");
-			exec("$ksh_path /dev/stdin $dtrace_path");
-		} elsif (-x $name) {
-		        warn "ERROR: $name is executable\n";
-			exit(1);
-		} else {
-			if ($tag == 0 && $status == $0 && $opt_a) {
-				push(@dtrace_argv, '-A');
-			}
-
-			push(@dtrace_argv, '-C');
-			push(@dtrace_argv, '-s');
-			push(@dtrace_argv, $name);
-			exec($dtrace_path, @dtrace_argv);
-		}
-
-		warn "ERROR: failed to exec for $file: $!\n";
-		exit(127);
-	}
-
-	if (waitpid($pid, 0) == -1) {
-		errmsg("ERROR: timed out waiting for $file\n");
-		kill(9, $exe_pid) if ($exe_pid != -1);
-		kill(9, $pid);
-		next;
-	}
-
-	kill(9, $exe_pid) if ($exe_pid != -1);
-
-	if ($tag == 0 && $status == $0 && $opt_a) {
-		#
-		# We can chuck the earler output.
-		#
-		unlink($pid . '.out');
-		unlink($pid . '.err');
-
-		#
-		# This is an anonymous enabling.  We need to get the module
-		# unloaded.
-		#
-		system("dtrace -ae 1> /dev/null 2> /dev/null");
-		system("svcadm disable -s svc:/network/nfs/mapid:default");
-		system("modunload -i 0 ; modunload -i 0 ; modunload -i 0");
-		if (!system("modinfo | grep dtrace")) {
-			warn "ERROR: couldn't unload dtrace\n";
-			system("svcadm enable " . 
-			    "-s svc:/network/nfs/mapid:default");
-			exit(124);
-		}
-
-		#
-		# DTrace is gone.  Now update_drv(1M), and rip everything out
-		# again.
-		#
-		system("update_drv dtrace");
-		system("dtrace -ae 1> /dev/null 2> /dev/null");
-		system("modunload -i 0 ; modunload -i 0 ; modunload -i 0");
-		if (!system("modinfo | grep dtrace")) {
-			warn "ERROR: couldn't unload dtrace\n";
-			system("svcadm enable " . 
-			    "-s svc:/network/nfs/mapid:default");
-			exit(124);
-		}
-
-		#
-		# Now bring DTrace back in.
-		#
-		system("sync ; sync");
-		system("dtrace -l -n bogusprobe 1> /dev/null 2> /dev/null");
-		system("svcadm enable -s svc:/network/nfs/mapid:default");
-
-		#
-		# That should have caused DTrace to reload with the new
-		# configuration file.  Now we can try to snag our anonymous
-		# state.
-		#
-		if (($pid = fork()) == -1) {
-			errmsg("ERROR: failed to fork to run test $file: $!\n");
-			next;
-		}
-
-		if ($pid == 0) {
-			open(STDIN, '</dev/null');
-			exit(125) unless open(STDOUT, ">$opt_d/$$.out");
-			exit(125) unless open(STDERR, ">$opt_d/$$.err");
-
-			push(@dtrace_argv, '-a');
-
-			unless (chdir($dir)) {
-				warn "ERROR: failed to chdir for $file: $!\n";
-				exit(126);
-			}
-
-			exec($dtrace_path, @dtrace_argv);
-			warn "ERROR: failed to exec for $file: $!\n";
-			exit(127);
-		}
-
-		if (waitpid($pid, 0) == -1) {
-			errmsg("ERROR: timed out waiting for $file\n");
-			kill(9, $pid);
-			next;
-		}
-	}
-
-	logmsg("[$pid]\n");
-	$wstat = $?;
-	$wifexited = ($wstat & 0xFF) == 0;
-	$wexitstat = ($wstat >> 8) & 0xFF;
-	$wtermsig = ($wstat & 0x7F);
-
-	if (!$wifexited) {
-		fail("died from signal $wtermsig");
-		next;
-	}
-
-	if ($wexitstat == 125) {
-		die "$PNAME: failed to create output file in $opt_d " .
-		    "(cd elsewhere or use -d)\n";
-	}
-
-	if ($wexitstat != $status) {
-		fail("returned $wexitstat instead of $status");
-		next;
-	}
-
-	if (-f "$file.out" && system("cmp -s $file.out $opt_d/$pid.out") != 0) {
-		fail("stdout mismatch", "$pid.out");
-		next;
-	}
-
-	if (-f "$file.err" && system("cmp -s $file.err $opt_d/$pid.err") != 0) {
-		fail("stderr mismatch: see $pid.err");
-		next;
-	}
-
-	if ($tag) {
-		open(TSTERR, "<$opt_d/$pid.err");
-		$tsterr = <TSTERR>;
-		close(TSTERR);
-
-		unless ($tsterr =~ /: \[$tag\] line \d+:/) {
-			fail("errtag mismatch: see $pid.err");
-			next;
-		}
-	}
-
-	if ($droptag) {
-		$found = 0;
-		open(TSTERR, "<$opt_d/$pid.err");
-
-		while (<TSTERR>) {
-			if (/\[$droptag\] /) {
-				$found = 1;
-				last;
-			}
-		}
-
-		close (TSTERR);
-
-		unless ($found) {
-			fail("droptag mismatch: see $pid.err");
-			next;
-		}
-	}
-
-	unless ($opt_s) {
-		unlink($pid . '.out');
-		unlink($pid . '.err');
-	}
-}
-
-if ($opt_a) {
-	#
-	# If we're running with anonymous enablings, we need to restore the
-	# .conf file.
-	#
-	system("dtrace -A 1> /dev/null 2> /dev/null");
-	system("dtrace -ae 1> /dev/null 2> /dev/null");
-	system("modunload -i 0 ; modunload -i 0 ; modunload -i 0");
-	system("update_drv dtrace");
+foreach $dtrace_cmd (@dtrace_cmds) {
+	run_tests($dtrace_cmd, $exception_lists{$dtrace_cmd});
 }
 
 $opt_q = 0; # force final summary to appear regardless of -q option
 
 logmsg("\n==== TEST RESULTS ====\n");
-logmsg("   passed: " . (scalar(@files) - $errs - $bypassed) . "\n");
+foreach $key (keys %results) {
+	my $passed = $results{$key}{"passed"};
+	my $bypassed = $results{$key}{"bypassed"};
+	my $failed = $results{$key}{"failed"};
+	my $total = $results{$key}{"total"};
 
-if ($bypassed) {
-	logmsg(" bypassed: " . $bypassed . "\n");
-}
-
-logmsg("   failed: " . $errs . "\n");
-logmsg("    total: " . scalar(@files) . "\n");
-
-if ($opt_u) {
-	kill 9, $unloader;
-	waitpid $unloader, 0;
+	logmsg("\n     mode: " . $key . "\n");
+	logmsg("   passed: " . $passed . "\n");
+	if ($bypassed) {
+		logmsg(" bypassed: " . $bypassed . "\n");
+	}
+	logmsg("   failed: " . $failed . "\n");
+	logmsg("    total: " . $total . "\n");
 }
 
 exit($errs != 0);

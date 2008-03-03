@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -192,14 +192,16 @@ public final class Aggregation implements Serializable {
     }
 
     /**
-     * Gets an unordered list of this aggregation's records.  The list
-     * is easily sortable using {@link java.util.Collections#sort(List
-     * list, Comparator c)} provided any user-defined ordering.
-     * Modifying the returned list has no effect on this aggregation.
-     * Supports XML persistence.
+     * Gets an unordered list of this aggregation's records. The list is
+     * sortable using {@link java.util.Collections#sort(List list,
+     * Comparator c)} with any user-defined ordering. Modifying the
+     * returned list has no effect on this aggregation. Supports XML
+     * persistence.
      *
      * @return a newly created list that copies this aggregation's
      * records by reference in no particular order
+     * @see Aggregate#getRecords()
+     * @see Aggregate#getOrderedRecords()
      */
     public List <AggregationRecord>
     getRecords()
@@ -233,7 +235,7 @@ public final class Aggregation implements Serializable {
     public Map <Tuple, AggregationRecord>
     asMap()
     {
-	return Collections.unmodifiableMap(map);
+	return Collections. <Tuple, AggregationRecord> unmodifiableMap(map);
     }
 
     /**

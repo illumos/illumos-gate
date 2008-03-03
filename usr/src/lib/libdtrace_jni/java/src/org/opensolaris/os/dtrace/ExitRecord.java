@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,7 +47,23 @@ public final class ExitRecord implements Record, Serializable {
 	    BeanInfo info = Introspector.getBeanInfo(ExitRecord.class);
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
-		    new String[] {"status"});
+		    new String[] {"status"})
+	    {
+		/*
+		 * Need to prevent DefaultPersistenceDelegate from using
+		 * overridden equals() method, resulting in a
+		 * StackOverFlowError.  Revert to PersistenceDelegate
+		 * implementation.  See
+		 * http://forum.java.sun.com/thread.jspa?threadID=
+		 * 477019&tstart=135
+		 */
+		protected boolean
+		mutatesTo(Object oldInstance, Object newInstance)
+		{
+		    return (newInstance != null && oldInstance != null &&
+			    oldInstance.getClass() == newInstance.getClass());
+		}
+	    };
 	    BeanDescriptor d = info.getBeanDescriptor();
 	    d.setValue("persistenceDelegate", persistenceDelegate);
 	} catch (IntrospectionException e) {
@@ -76,6 +92,36 @@ public final class ExitRecord implements Record, Serializable {
      */
     public int
     getStatus()
+    {
+	return status;
+    }
+
+    /**
+     * Compares the specified object with this {@code ExitRecord} for
+     * equality. Returns {@code true} if and only if the specified
+     * object is also an {@code ExitRecord} and both records have the
+     * same status.
+     *
+     * @return {@code true} if and only if the specified object is also
+     * an {@code ExitRecord} and both records have the same status
+     */
+    @Override
+    public boolean
+    equals(Object o)
+    {
+	if (o instanceof ExitRecord) {
+	    ExitRecord r = (ExitRecord)o;
+	    return (status == r.status);
+	}
+	return false;
+    }
+
+    /**
+     * Overridden to ensure that equal instances have equal hash codes.
+     */
+    @Override
+    public int
+    hashCode()
     {
 	return status;
     }

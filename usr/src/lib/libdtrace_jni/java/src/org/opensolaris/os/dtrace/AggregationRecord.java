@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,14 +40,14 @@ import java.beans.*;
  * @author Tom Erickson
  */
 public final class AggregationRecord implements Record, Serializable {
-    static final long serialVersionUID = -8439277589555814411L;
+    static final long serialVersionUID = -4367614268579702616L;
 
     static {
 	try {
 	    BeanInfo info = Introspector.getBeanInfo(AggregationRecord.class);
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
-		    new String[] {"tuple", "value"})
+		    new String[] {"tuple", "value", "ordinal"})
 	    {
 		/*
 		 * Need to prevent DefaultPersistenceDelegate from using
@@ -75,10 +75,32 @@ public final class AggregationRecord implements Record, Serializable {
     private Tuple tuple;
     /** @serial */
     private AggregationValue value;
+    /** @serial */
+    private int ordinal;
+
 
     /**
      * Creates an aggregation record with the given key and value.
      * Supports XML persistence.
+     *
+     * @see #AggregationRecord(Tuple tupleKey, AggregationValue
+     * recordValue, int n)
+     */
+    public
+    AggregationRecord(Tuple tupleKey, AggregationValue recordValue)
+    {
+    //
+    // Called by native code, but public to support backwardly
+    // compatible XML encoding.
+    //
+	tuple = tupleKey;
+	value = recordValue;
+	validate();
+    }
+
+    /**
+     * Creates an aggregation record with the given key, value, and
+     * ordinal. Supports XML persistence.
      *
      * @param tupleKey aggregation tuple, may be empty (see {@link
      * Tuple#EMPTY}) to indicate that this record's value belongs to an
@@ -86,14 +108,18 @@ public final class AggregationRecord implements Record, Serializable {
      * example: <pre>		{@code @a = count();}</pre>
      * @param recordValue aggregated value associated with the given
      * tuple
+     * @param n ordinal from zero (first) to n-1 (last) within the
+     * {@link Aggregate} containing this record
      * @throws NullPointerException if the given key or value is
      * {@code null}
+     * @throws IllegalArgumentException if the given ordinal is negative
      */
     public
-    AggregationRecord(Tuple tupleKey, AggregationValue recordValue)
+    AggregationRecord(Tuple tupleKey, AggregationValue recordValue, int n)
     {
 	tuple = tupleKey;
 	value = recordValue;
+	ordinal = n;
 	validate();
     }
 
@@ -105,6 +131,9 @@ public final class AggregationRecord implements Record, Serializable {
 	}
 	if (value == null) {
 	    throw new NullPointerException("value is null");
+	}
+	if (ordinal < 0) {
+	    throw new IllegalArgumentException("ordinal is negative");
 	}
     }
 
@@ -135,6 +164,38 @@ public final class AggregationRecord implements Record, Serializable {
     getValue()
     {
 	return value;
+    }
+
+    /**
+     * Gets the ordinal generated when this AggregationRecord was added
+     * to its containing {@link Aggregate} by the native DTrace library,
+     * from zero (first) to n-1 (last). The sequence described by an
+     * aggregate's record ordinals reflects the setting of the {@link
+     * Option#aggsortkey aggsortkey}, {@link Option#aggsortkeypos
+     * aggsortkeypos}, {@link Option#aggsortpos aggsortpos}, and {@link
+     * Option#aggsortrev aggsortrev} DTrace options and matches the way
+     * that the records would be ordered by {@code dtrace(1M)}.
+     *
+     * @return non-negative ordinal from zero (first) to n-1 (last)
+     * within the {@code Aggregate} containing this record
+     * @see Aggregate#getOrderedRecords()
+     */
+    public int
+    getOrdinal()
+    {
+	return ordinal;
+    }
+
+    /**
+     * Package level access; called by Aggregate
+     */
+    void
+    setOrdinal(int n)
+    {
+	if (n < 0) {
+	    throw new IllegalArgumentException("ordinal is negative");
+	}
+	ordinal = n;
     }
 
     /**

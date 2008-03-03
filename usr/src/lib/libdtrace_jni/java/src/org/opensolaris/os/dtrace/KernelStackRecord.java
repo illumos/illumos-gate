@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -159,10 +159,10 @@ public final class KernelStackRecord implements StackValueRecord,
     KernelStackRecord(StackFrame[] frames, byte[] rawBytes)
     {
 	if (frames != null) {
-	    stackFrames = (StackFrame[])frames.clone();
+	    stackFrames = frames.clone();
 	}
 	if (rawBytes != null) {
-	    rawStackData = (byte[])rawBytes.clone();
+	    rawStackData = rawBytes.clone();
 	}
 	validate();
     }
@@ -190,7 +190,7 @@ public final class KernelStackRecord implements StackValueRecord,
 	if (stackFrames == null) {
 	    return EMPTY_FRAMES;
 	}
-	return (StackFrame[])stackFrames.clone();
+	return stackFrames.clone();
     }
 
     /**
@@ -219,7 +219,7 @@ public final class KernelStackRecord implements StackValueRecord,
     public byte[]
     getRawStackData()
     {
-	return (byte[])rawStackData.clone();
+	return rawStackData.clone();
     }
 
     /**
@@ -232,7 +232,7 @@ public final class KernelStackRecord implements StackValueRecord,
     public Object
     getValue()
     {
-	return (byte[])rawStackData.clone();
+	return rawStackData.clone();
     }
 
     public List <StackFrame>
@@ -241,7 +241,8 @@ public final class KernelStackRecord implements StackValueRecord,
 	if (stackFrames == null) {
 	    return Collections. <StackFrame> emptyList();
 	}
-	return Collections.unmodifiableList(Arrays.asList(stackFrames));
+	return Collections. <StackFrame> unmodifiableList(
+		Arrays.asList(stackFrames));
     }
 
     /**
@@ -313,10 +314,10 @@ public final class KernelStackRecord implements StackValueRecord,
 	s.defaultReadObject();
 	// Make a defensive copy of stack frames and raw bytes
 	if (stackFrames != null) {
-	    stackFrames = (StackFrame[])stackFrames.clone();
+	    stackFrames = stackFrames.clone();
 	}
 	if (rawStackData != null) {
-	    rawStackData = (byte[])rawStackData.clone();
+	    rawStackData = rawStackData.clone();
 	}
 	// check class invariants
 	try {

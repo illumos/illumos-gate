@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -378,6 +378,10 @@ extern jmethodID g_aggmininit_jm;
 /* MaxValue */
 extern jclass g_aggmax_jc;
 extern jmethodID g_aggmaxinit_jm;
+
+/* StddevValue */
+extern jclass g_aggstddev_jc;
+extern jmethodID g_aggstddevinit_jm;
 
 /* KernelStackRecord */
 extern jclass g_stack_jc;

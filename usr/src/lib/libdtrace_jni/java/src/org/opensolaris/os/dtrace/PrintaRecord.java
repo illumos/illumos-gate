@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,7 +75,8 @@ import java.util.*;
  *
  * @author Tom Erickson
  */
-public final class PrintaRecord implements Record, Serializable {
+public final class PrintaRecord implements Record, Serializable,
+	Comparable <PrintaRecord> {
     static final long serialVersionUID = -4174277639915895694L;
 
     static {
@@ -84,7 +85,23 @@ public final class PrintaRecord implements Record, Serializable {
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
 		    new String[] {"snaptime", "aggregations",
-		    "formattedStrings", "tuples", "output"});
+		    "formattedStrings", "tuples", "output"})
+	    {
+		/*
+		 * Need to prevent DefaultPersistenceDelegate from using
+		 * overridden equals() method, resulting in a
+		 * StackOverFlowError.  Revert to PersistenceDelegate
+		 * implementation.  See
+		 * http://forum.java.sun.com/thread.jspa?threadID=
+		 * 477019&tstart=135
+		 */
+		protected boolean
+		mutatesTo(Object oldInstance, Object newInstance)
+		{
+		    return (newInstance != null && oldInstance != null &&
+			    oldInstance.getClass() == newInstance.getClass());
+		}
+	    };
 	    BeanDescriptor d = info.getBeanDescriptor();
 	    d.setValue("persistenceDelegate", persistenceDelegate);
 	} catch (IntrospectionException e) {
@@ -404,6 +421,68 @@ public final class PrintaRecord implements Record, Serializable {
 	    }
 	}
 	outputBuffer.append(formattedString);
+    }
+
+    /**
+     * Compares the specified object with this {@code PrintaRecord} for
+     * equality. Returns {@code true} if and only if the specified
+     * object is also a {@code PrintaRecord} and both records have the
+     * same aggregations and the same formatted strings in the same
+     * order (by aggregation tuple).
+     *
+     * @return {@code true} if and only if the specified object is also
+     * a {@code PrintaRecord} and both records have the same
+     * aggregations and the same formatted strings in the same order (by
+     * aggregation tuple)
+     */
+    @Override
+    public boolean
+    equals(Object o)
+    {
+	if (o instanceof PrintaRecord) {
+	    PrintaRecord r = (PrintaRecord)o;
+	    return (aggregations.equals(r.aggregations) &&
+		    ((formattedStrings == null || formattedStrings.isEmpty())
+		    ? (r.formattedStrings == null ||
+			r.formattedStrings.isEmpty())
+		    : formattedStrings.equals(r.formattedStrings)) &&
+		    tuples.equals(r.tuples));
+	}
+
+	return false;
+    }
+
+    /**
+     * Overridden to ensure that equal instances have equal hash codes.
+     */
+    @Override
+    public int
+    hashCode()
+    {
+	int hash = 17;
+	hash = (hash * 37) + aggregations.hashCode();
+	hash = (hash * 37) + ((formattedStrings == null ||
+	    formattedStrings.isEmpty()) ? 0 :
+	    formattedStrings.hashCode());
+	hash = (hash * 37) + tuples.hashCode();
+	return hash;
+    }
+
+    /**
+     * Compares the formatted {@link #getOutput() output} of this record
+     * with that of the given record. Note that ordering {@code printa}
+     * records by their output string values is incompatible with {@link
+     * #equals(Object o) equals()}, which also checks the underlying
+     * aggregation data for equality.
+     *
+     * @return a negative number, 0, or a positive number as this
+     * record's formatted output is lexicographically less than, equal
+     * to, or greater than the given record's formatted output
+     */
+    public int
+    compareTo(PrintaRecord r)
+    {
+	return getOutput().compareTo(r.getOutput());
     }
 
     /**

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -235,15 +235,15 @@ public abstract class Distribution implements AggregationValue,
     }
 
     /**
-     * Gets a read-only {@code List} view of this ditribution.
+     * Gets a read-only {@code List} view of this distribution.
      *
-     * @return a read-only {@code List} view of this ditribution
+     * @return a read-only {@code List} view of this distribution
      */
     public List <Bucket>
     asList()
     {
 	checkInit();
-	return Collections.unmodifiableList(buckets);
+	return Collections. <Bucket> unmodifiableList(buckets);
     }
 
     /**

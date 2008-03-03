@@ -20,20 +20,20 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-# Exception list: names tests that are bypassed when running
-# 'dtest -i java' (relative to /opt/SUNWdtrt/tst)
+# Exception list: names tests that are bypassed when running in Java
+# mode (relative to /opt/SUNWdtrt/tst)
 
 # double precision (64-bit floating point) not same in java
 common/aggs/tst.neglquant.d
 common/aggs/tst.negquant.d
 
 # freopen() (to suppress output) not supported by Java DTrace API
-common/printa/tst.walltimestamp.d
+common/printa/tst.walltimestamp.ksh
 
 # -G option not supported by jdtrace
 common/dtraceUtil/tst.ELFGenerationOut.d.ksh
@@ -46,6 +46,8 @@ common/dtraceUtil/tst.PreprocessorStatement.d.ksh
 common/usdt/tst.badguess.ksh
 common/usdt/tst.dlclose1.ksh
 common/usdt/tst.dlclose2.ksh
+common/usdt/tst.dlclose3.ksh
+common/usdt/tst.eliminate.ksh
 common/usdt/tst.enabled.ksh
 common/usdt/tst.entryreturn.ksh
 common/usdt/tst.fork.ksh
@@ -61,8 +63,14 @@ common/usdt/tst.reeval.ksh
 common/usdt/tst.static.ksh
 common/usdt/tst.static2.ksh
 common/usdt/tst.user.ksh
+sparc/usdt/tst.tailcall.ksh
+common/pid/tst.provregex3.ksh
+common/pid/tst.provregex4.ksh
 
 # freopen() and ftruncate() not supported by Java DTrace API
 common/funcs/tst.badfreopen.ksh
 common/funcs/tst.freopen.ksh
 common/funcs/tst.ftruncate.ksh
+
+# jdtrace doesn't pull in library files?
+common/pragma/tst.libdepfullyconnected.ksh

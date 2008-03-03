@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,10 +75,16 @@ $(PROG): $(SRCS)
 	$(LINK.c) -o $@ $(SRCS) $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
-$(JDTRACE_JAR): JDTrace.java Getopt.java
+JFLAGS= -g -cp $(CLASSPATH) -d $(CLASSDIR) -deprecation
+JFLAGS += -target 1.5
+JFLAGS += -Xlint
+COMPILE.java=$(JAVAC) $(JFLAGS)
+JAVASRC= JDTrace.java Getopt.java
+
+$(JDTRACE_JAR): $(JAVASRC)
 	@mkdir -p $(CLASSDIR)
 	@mkdir -p $(LIBDIR)
-	$(JAVAC) -cp $(CLASSPATH) -d $(CLASSDIR) *.java
+	$(COMPILE.java) $(JAVASRC)
 	$(JAR) -cmf $(MANIFEST) $(JDTRACE_JAR) -C $(CLASSDIR) .
 
 $(PROTO_JDTRACE_JAR): $(ROOTLIBJAVA)

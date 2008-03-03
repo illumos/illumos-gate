@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -213,6 +213,8 @@ public class Program implements Serializable {
      * compiled from a file.
      */
     public static final class File extends Program {
+	static final long serialVersionUID = 6217493430514165300L;
+
 	// Set by LocalConsumer.compile()
 	/** @serial */
 	java.io.File file;

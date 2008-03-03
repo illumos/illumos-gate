@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,7 @@
  *
  * This version needs to match the version in LocalConsumer.java
  */
-#define	DTRACE_JNI_VERSION 2
+#define	DTRACE_JNI_VERSION 3
 
 #define	FIRST_HANDLE 0		/* sequence-generated consumer ID */
 #define	NO_HANDLE -1
@@ -400,15 +400,15 @@ dtj_add_program(dtj_java_consumer_t *jc, dtj_program_t *p)
 	jobject jprogram = NULL;
 
 	switch (p->dtjp_type) {
-	    case DTJ_PROGRAM_STRING:
+	case DTJ_PROGRAM_STRING:
 		jprogram = (*jenv)->NewObject(jenv, g_program_jc,
 		    g_proginit_jm);
 		break;
-	    case DTJ_PROGRAM_FILE:
+	case DTJ_PROGRAM_FILE:
 		jprogram = (*jenv)->NewObject(jenv, g_programfile_jc,
 		    g_fproginit_jm);
 		break;
-	    default:
+	default:
 		dtj_throw_illegal_argument(jenv, "unexpected program type %d\n",
 		    p->dtjp_type);
 	}
@@ -625,7 +625,7 @@ dtj_cflag(dtj_java_consumer_t *jc, const char *opt, boolean_t *get,
 	boolean_t is_cflag = B_TRUE;
 	uint_t *flags = &jc->dtjj_consumer->dtjc_cflags;
 
-	/* see lib/libdtrace/common/dt_option.c */
+	/* see lib/libdtrace/common/dt_options.c */
 	if (strcmp(opt, "argref") == 0) {
 		dtj_flag(flags, DTRACE_C_ARGREF, get, set);
 	} else if (strcmp(opt, "cpp") == 0) {

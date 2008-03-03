@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -186,7 +186,7 @@ public final class Tuple implements Serializable, Comparable <Tuple>,
     public List <ValueRecord>
     asList()
     {
-	return Collections.unmodifiableList(elements);
+	return Collections. <ValueRecord> unmodifiableList(elements);
     }
 
     /**

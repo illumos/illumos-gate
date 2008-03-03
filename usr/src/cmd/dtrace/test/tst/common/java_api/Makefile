@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,9 +60,14 @@ lint:
 
 install: all $(PROTO_TEST_JAR)
 
+JFLAGS= -g -cp $(CLASSPATH) -d $(CLASSDIR) -deprecation
+JFLAGS += -target 1.5
+JFLAGS += -Xlint
+COMPILE.java=$(JAVAC) $(JFLAGS)
+
 $(TEST_JAR): $(SRCDIR)/*.java
 	@mkdir -p $(CLASSDIR)
-	$(JAVAC) -cp $(CLASSPATH) -d $(CLASSDIR) $(SRCDIR)/*.java
+	$(COMPILE.java) $(SRCDIR)/*.java
 	$(JAR) -cmf $(MANIFEST) $(TEST_JAR) -C $(CLASSDIR) .
 
 $(PROTO_TEST_JAR): $(JAR_DSTDIR)
