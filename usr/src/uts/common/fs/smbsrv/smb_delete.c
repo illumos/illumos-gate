@@ -30,8 +30,7 @@
 #include <smbsrv/smbinfo.h>
 #include <sys/nbmlock.h>
 
-static uint32_t smb_delete_check(smb_request_t *sr, smb_node_t *node,
-    smb_error_t *smberr);
+static uint32_t smb_delete_check(smb_request_t *, smb_node_t *);
 
 /*
  * smb_com_delete
@@ -87,31 +86,45 @@ static uint32_t smb_delete_check(smb_request_t *sr, smb_node_t *node,
  * ERRSRV/ERRbaduid
  */
 smb_sdrc_t
-smb_com_delete(struct smb_request *sr)
+smb_pre_delete(smb_request_t *sr)
 {
+	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
+	int rc;
+
+	if ((rc = smbsr_decode_vwv(sr, "w", &fqi->srch_attr)) == 0)
+		rc = smbsr_decode_data(sr, "%S", sr, &fqi->path);
+
+	DTRACE_SMB_2(op__Delete__start, smb_request_t *, sr,
+	    struct smb_fqi *, fqi);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_delete(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Delete__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_delete(smb_request_t *sr)
+{
+	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
 	int	rc;
 	int	od = 0;
 	int	deleted = 0;
-	unsigned short sattr;
-	char *path;
 	struct smb_node *dir_snode;
 	struct smb_node *node = 0;
 	char *name;
 	char *fname;
 	char *sname;
 	char *fullname;
-	smb_error_t smberr;
+	uint32_t status;
 	int is_stream;
 	smb_odir_context_t *pc;
 
-	if (smbsr_decode_vwv(sr, "w", &sattr) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (smbsr_decode_data(sr, "%S", sr, &path) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (smb_rdir_open(sr, path, sattr) != 0)
-		return (SDRC_ERROR_REPLY);
+	if (smb_rdir_open(sr, fqi->path, fqi->srch_attr) != 0)
+		return (SDRC_ERROR);
 
 	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -119,7 +132,7 @@ smb_com_delete(struct smb_request *sr)
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	fullname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
-	is_stream = smb_stream_parse_name(path, fname, sname);
+	is_stream = smb_stream_parse_name(fqi->path, fname, sname);
 	dir_snode = sr->sid_odir->d_dir_snode;
 
 	/*
@@ -133,18 +146,16 @@ smb_com_delete(struct smb_request *sr)
 		(void) strlcpy(name, pc->dc_name, MAXNAMELEN);
 
 		if (pc->dc_dattr & SMB_FA_DIRECTORY) {
-			smberr.errcls = ERRDOS;
-			smberr.errcode = ERROR_ACCESS_DENIED;
-			smberr.status = NT_STATUS_FILE_IS_A_DIRECTORY;
+			smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
+			    ERRDOS, ERROR_ACCESS_DENIED);
 			smb_node_release(node);
 			goto delete_error;
 		}
 
 		if ((pc->dc_dattr & SMB_FA_READONLY) ||
 		    (node->flags & NODE_CREATED_READONLY)) {
-			smberr.errcls = ERRDOS;
-			smberr.errcode = ERROR_ACCESS_DENIED;
-			smberr.status = NT_STATUS_CANNOT_DELETE;
+			smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
+			    ERRDOS, ERROR_ACCESS_DENIED);
 			smb_node_release(node);
 			goto delete_error;
 		}
@@ -159,11 +170,11 @@ smb_com_delete(struct smb_request *sr)
 		 */
 
 		if (OPLOCKS_IN_FORCE(node)) {
-			smberr.status = smb_break_oplock(sr, node);
+			status = smb_break_oplock(sr, node);
 
-			if (smberr.status != NT_STATUS_SUCCESS) {
-				smberr.errcls = ERRDOS;
-				smberr.errcode = ERROR_VC_DISCONNECTED;
+			if (status != NT_STATUS_SUCCESS) {
+				smbsr_error(sr, status,
+				    ERRDOS, ERROR_VC_DISCONNECTED);
 				smb_node_release(node);
 				goto delete_error;
 			}
@@ -171,7 +182,7 @@ smb_com_delete(struct smb_request *sr)
 
 		smb_node_start_crit(node, RW_READER);
 
-		if (smb_delete_check(sr, node, &smberr)) {
+		if (smb_delete_check(sr, node) != NT_STATUS_SUCCESS) {
 			smb_node_end_crit(node);
 			smb_node_release(node);
 			goto delete_error;
@@ -205,22 +216,27 @@ smb_com_delete(struct smb_request *sr)
 		node = NULL;
 
 		if (rc != 0) {
-			if (rc != ENOENT)
-				goto delete_errno;
+			if (rc != ENOENT) {
+				smbsr_errno(sr, rc);
+				goto delete_error;
+			}
 		} else {
 			deleted++;
 		}
 	}
 
 	if ((rc != 0) && (rc != ENOENT)) {
-		goto delete_errno;
+		smbsr_errno(sr, rc);
+		goto delete_error;
 	}
 
 	if (deleted == 0) {
-		smberr.errcls = ERRDOS;
-		smberr.errcode = ERROR_FILE_NOT_FOUND;
-		smberr.status = (sr->sid_odir->d_wildcards == 0)
-		    ? NT_STATUS_OBJECT_NAME_NOT_FOUND : NT_STATUS_NO_SUCH_FILE;
+		if (sr->sid_odir->d_wildcards == 0)
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		else
+			smbsr_error(sr, NT_STATUS_NO_SUCH_FILE,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
 		goto delete_error;
 	}
 
@@ -232,17 +248,7 @@ smb_com_delete(struct smb_request *sr)
 	kmem_free(fullname, MAXPATHLEN);
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
-
-delete_errno:
-	smb_rdir_close(sr);
-	kmem_free(pc, sizeof (*pc));
-	kmem_free(name, MAXNAMELEN);
-	kmem_free(fname, MAXNAMELEN);
-	kmem_free(sname, MAXNAMELEN);
-	kmem_free(fullname, MAXPATHLEN);
-	smbsr_errno(sr, rc);
-	return (SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 
 delete_error:
 	smb_rdir_close(sr);
@@ -251,40 +257,38 @@ delete_error:
 	kmem_free(fname, MAXNAMELEN);
 	kmem_free(sname, MAXNAMELEN);
 	kmem_free(fullname, MAXPATHLEN);
-	smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
-	return (SDRC_ERROR_REPLY);
+	return (SDRC_ERROR);
 }
 
-uint32_t
-smb_delete_check(smb_request_t *sr, smb_node_t *node, smb_error_t *smberr)
+/*
+ * For consistency with Windows 2000, the range check should be done
+ * after checking for sharing violations.  Attempting to delete a
+ * locked file will result in sharing violation, which is the same
+ * thing that will happen if you try to delete a non-locked open file.
+ *
+ * Note that windows 2000 rejects lock requests on open files that
+ * have been opened with metadata open modes.  The error is
+ * STATUS_ACCESS_DENIED.
+ */
+static uint32_t
+smb_delete_check(smb_request_t *sr, smb_node_t *node)
 {
-	smberr->status = smb_node_delete_check(node);
+	uint32_t status;
 
-	if (smberr->status == NT_STATUS_SHARING_VIOLATION) {
-		smberr->errcls = ERRDOS;
-		smberr->errcode = ERROR_SHARING_VIOLATION;
-		return (smberr->status);
+	status = smb_node_delete_check(node);
+
+	if (status == NT_STATUS_SHARING_VIOLATION) {
+		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
+		    ERRDOS, ERROR_SHARING_VIOLATION);
+		return (status);
 	}
 
-	/*
-	 * This should be done after Share checking due to tests with
-	 * W2K. I got sharing violation error trying to delete a
-	 * locked file which is basically the same error if you
-	 * try to delete a non-locked open file.
-	 *
-	 * One thing that I discovered during these tests is that
-	 * W2K rejects lock requests on open files which are opened
-	 * with Metadata open modes. The error is STATUS_ACCESS_DENIED.
-	 */
+	status = smb_range_check(sr, sr->user_cr, node, 0, UINT64_MAX, B_TRUE);
 
-	smberr->status = smb_range_check(sr, sr->user_cr, node, 0,
-	    UINT64_MAX, B_TRUE);
-
-	if (smberr->status != NT_STATUS_SUCCESS) {
-		smberr->errcls = ERRDOS;
-		smberr->errcode = ERROR_ACCESS_DENIED;
-		smberr->status = NT_STATUS_ACCESS_DENIED;
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
 	}
 
-	return (smberr->status);
+	return (status);
 }

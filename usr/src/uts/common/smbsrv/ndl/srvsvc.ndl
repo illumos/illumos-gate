@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,28 +282,74 @@ struct mslm_infonres {
 
 
 /*
- * SERVER SERVICE (SRVSVC)
- ****************************************************************
+ * SRVSVC - Server Service
  */
 
+/* Windows NT */
+#define SRVSVC_OPNUM_NetCharDevEnum              0x00
+#define SRVSVC_OPNUM_NetCharDevGetInfo           0x01
+#define SRVSVC_OPNUM_NetCharDevControl           0x02
+#define SRVSVC_OPNUM_NetCharDevQEnum             0x03
+#define SRVSVC_OPNUM_NetCharDevQGetInfo          0x04
+#define SRVSVC_OPNUM_NetCharDevQSetInfo          0x05
+#define SRVSVC_OPNUM_NetCharDevQPurge            0x06
+#define SRVSVC_OPNUM_NetCharDevQPurgeSelf        0x07
+#define SRVSVC_OPNUM_NetConnectEnum              0x08
+#define SRVSVC_OPNUM_NetFileEnum                 0x09
+#define SRVSVC_OPNUM_NetFileGetInfo              0x0a
+#define SRVSVC_OPNUM_NetFileClose                0x0b
+#define SRVSVC_OPNUM_NetSessionEnum              0x0c
+#define SRVSVC_OPNUM_NetSessionDel               0x0d
+#define SRVSVC_OPNUM_NetShareAdd                 0x0e
+#define SRVSVC_OPNUM_NetShareEnum                0x0f
+#define SRVSVC_OPNUM_NetShareGetInfo             0x10
+#define SRVSVC_OPNUM_NetShareSetInfo             0x11
+#define SRVSVC_OPNUM_NetShareDel                 0x12
+#define SRVSVC_OPNUM_NetShareDelSticky           0x13
+#define SRVSVC_OPNUM_NetShareCheck               0x14
+#define SRVSVC_OPNUM_NetServerGetInfo            0x15
+#define SRVSVC_OPNUM_NetServerSetInfo            0x16
+#define SRVSVC_OPNUM_NetServerDiskEnum           0x17
+#define SRVSVC_OPNUM_NetServerStatisticsGet      0x18
+#define SRVSVC_OPNUM_NetServerTransportAdd       0x19
+#define SRVSVC_OPNUM_NetServerTransportEnum      0x1a
+#define SRVSVC_OPNUM_NetServerTransportDel       0x1b
+#define SRVSVC_OPNUM_NetRemoteTOD                0x1c
+#define SRVSVC_OPNUM_NetServerSetServiceBits     0x1d
+#define SRVSVC_OPNUM_NetPathType NetPathType     0x1e
+#define SRVSVC_OPNUM_NetPathCanonicalize         0x1f
+#define SRVSVC_OPNUM_NetPathCompare              0x20
+#define SRVSVC_OPNUM_NetNameValidate             0x21
+#define SRVSVC_OPNUM_NetNameCanonicalize         0x22
+#define SRVSVC_OPNUM_NetNameCompare              0x23
+#define SRVSVC_OPNUM_NetShareEnumSticky          0x24
+#define SRVSVC_OPNUM_NetShareDelStart            0x25
+#define SRVSVC_OPNUM_NetShareDelCommit           0x26
+#define SRVSVC_OPNUM_NetGetFileSecurity          0x27
+#define SRVSVC_OPNUM_NetSetFileSecurity          0x28
+#define SRVSVC_OPNUM_NetServerTransportAddEx     0x29
+#define SRVSVC_OPNUM_NetServerSetServiceBitsEx   0x2a
+#define SRVSVC_OPNUM_NetDfsGetVersion            0x2b
 
-#define SRVSVC_OPNUM_NetConnectEnum          0x08
-#define SRVSVC_OPNUM_NetFileEnum             0x09
-#define SRVSVC_OPNUM_NetFileClose            0x0b
-#define SRVSVC_OPNUM_NetSessionEnum          0x0c
-#define SRVSVC_OPNUM_NetSessionDel           0x0d
-#define SRVSVC_OPNUM_NetShareAdd             0x0e
-#define SRVSVC_OPNUM_NetShareEnum            0x0f
-#define SRVSVC_OPNUM_NetShareGetInfo         0x10
-#define SRVSVC_OPNUM_NetShareSetInfo         0x11
-#define SRVSVC_OPNUM_NetShareDel             0x12
-#define SRVSVC_OPNUM_NetServerGetInfo        0x15
-#define SRVSVC_OPNUM_NetServerSetInfo        0x16
-#define SRVSVC_OPNUM_NetRemoteTOD            0x1c
-#define SRVSVC_OPNUM_NetNameValidate         0x21
-#define SRVSVC_OPNUM_NetShareEnumSticky      0x24
-#define SRVSVC_OPNUM_NetGetFileSecurity      0x27
-#define SRVSVC_OPNUM_NetSetFileSecurity      0x28
+/* Windows 2000 */
+#define SRVSVC_OPNUM_NetDfsCreateLocalPartition  0x2c
+#define SRVSVC_OPNUM_NetDfsDeleteLocalPartition  0x2d
+#define SRVSVC_OPNUM_NetDfsSetLocalVolumeState   0x2e
+#define SRVSVC_OPNUM_NetDfsSetServerInfo         0x2f
+#define SRVSVC_OPNUM_NetDfsCreateExitPoint       0x30
+#define SRVSVC_OPNUM_NetDfsDeleteExitPoint       0x31
+#define SRVSVC_OPNUM_NetDfsModifyPrefix          0x32
+#define SRVSVC_OPNUM_NetDfsFixLocalVolume        0x33
+#define SRVSVC_OPNUM_NetDfsManagerReportSiteInfo 0x34
+
+/* Windows XP and Windows Server 2003 */
+#define SRVSVC_OPNUM_NetServerTransportDelEx     0x35
+
+/* Windows Vista */
+#define SRVSVC_OPNUM_NetServerAliasAdd           0x36
+#define SRVSVC_OPNUM_NetServerAliasEnum          0x37
+#define SRVSVC_OPNUM_NetServerAliasDel           0x38
+#define SRVSVC_OPNUM_NetShareDelEx               0x39
 
 /*
  ***********************************************************************
@@ -1252,21 +1298,47 @@ EXTERNTYPEINFO(srvsvc_interface)
 
 
 /*
- * WKSSVC -- Workstation Service
- ****************************************************************
+ * WKSSVC - Workstation Service
  */
 
-#define WKSSVC_OPNUM_NetWkstaGetInfo	0x00
+/* Windows NT */
+#define WKSSVC_OPNUM_NetWkstaGetInfo		0x00
+#define WKSSVC_OPNUM_NetWkstaSetInfo		0x01
+#define WKSSVC_OPNUM_NetWkstaUserEnum		0x02
+#define WKSSVC_OPNUM_NetWkstaUserGetInfo	0x03
+#define WKSSVC_OPNUM_NetWkstaUserSetInfo	0x04
+#define WKSSVC_OPNUM_NetWkstaTransportEnum	0x05
+#define WKSSVC_OPNUM_NetWkstaTransportAdd	0x06
+#define WKSSVC_OPNUM_NetWkstaTransportDel	0x07
+#define WKSSVC_OPNUM_NetUseAdd			0x08
+#define WKSSVC_OPNUM_NetUseGetInfo		0x09
+#define WKSSVC_OPNUM_NetUseDel			0x0a
+#define WKSSVC_OPNUM_NetUseEnum			0x0b
+#define WKSSVC_OPNUM_NetMessageBufferSend	0x0c
+#define WKSSVC_OPNUM_NetWkstaStatisticsGet	0x0d
+#define WKSSVC_OPNUM_NetLogonDomainNameAdd	0x0e
 
+/* Windows 2000 */
+#define WKSSVC_OPNUM_NetLogonDomainNameDel	0x0f
+#define WKSSVC_OPNUM_NetJoinDomain		0x10
+#define WKSSVC_OPNUM_NetUnjoinDomain		0x11
+#define WKSSVC_OPNUM_NetValidateName		0x12
+#define WKSSVC_OPNUM_NetRenameMachineInDomain	0x13
+#define WKSSVC_OPNUM_NetGetJoinInformation	0x14
+#define WKSSVC_OPNUM_NetGetJoinableOUs		0x15
+#define WKSSVC_OPNUM_NetJoinDomain2		0x16
+#define WKSSVC_OPNUM_NetUnjoinDomain2		0x17
+#define WKSSVC_OPNUM_NetRenameMachineInDomain2	0x18
+#define WKSSVC_OPNUM_NetValidateName2		0x19
+#define WKSSVC_OPNUM_NetGetJoinableOUs2		0x1a
 
-/*
- * NET_API_STATUS NET_API_FUNCTION
- * NetWkstaGetInfo (
- *     IN  LPTSTR  servername OPTIONAL,
- *     IN  DWORD   level,
- *     OUT LPBYTE  *bufptr
- *     );
- */
+/* Windows XP and Windows Server 2003 */
+#define WKSSVC_OPNUM_NetAddAlternateComputerName	0x1b
+#define WKSSVC_OPNUM_NetRemoveAlternateComputerName	0x1c
+#define WKSSVC_OPNUM_NetSetPrimaryComputerName		0x1d
+#define WKSSVC_OPNUM_NetEnumerateComputerNames		0x1e
+#define WKSSVC_OPNUM_NetWorkstationResetDfsCache	0x1f
+
 
 struct mslm_WKSTA_INFO_100 {
     DWORD   wki100_platform_id;
@@ -1297,15 +1369,55 @@ struct mslm_WKSTA_INFO_102 {
     DWORD   wki102_logged_on_users;
 };
 
+struct mslm_WKSTA_INFO_502 {
+	DWORD char_wait;
+	DWORD collection_time;
+	DWORD maximum_collection_count;
+	DWORD keep_connection;
+	DWORD max_commands;
+	DWORD session_timeout;
+	DWORD size_char_buf;
+	DWORD max_threads;
+	DWORD lock_quota;
+	DWORD lock_increment;
+	DWORD lock_maximum;
+	DWORD pipe_increment;
+	DWORD pipe_maximum;
+	DWORD cache_file_timeout;
+	DWORD dormant_file_limit;
+	DWORD read_ahead_throughput;
+	DWORD num_mailslot_buffers;
+	DWORD num_srv_announce_buffers;
+	DWORD max_illegal_dgram_events;
+	DWORD dgram_event_reset_freq;
+	DWORD log_election_packets;
+	DWORD use_opportunistic_locking;
+	DWORD use_unlock_behind;
+	DWORD use_close_behind;
+	DWORD buf_named_pipes;
+	DWORD use_lock_read_unlock;
+	DWORD utilize_nt_caching;
+	DWORD use_raw_read;
+	DWORD use_raw_write;
+	DWORD use_write_raw_data;
+	DWORD use_encryption;
+	DWORD buf_files_deny_write;
+	DWORD buf_read_only_files;
+	DWORD force_core_create_mode;
+	DWORD use_512_byte_max_transfer;
+};
+
 INFO1RES_DEFINITION(mslm_NetWkstaGetInfo,
 	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,100)
 	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,101)
-	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,102))
+	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,102)
+	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,502))
 
 INFO1RESBUF_DEFINITION(mslm_NetWkstaGetInfo,
 	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,100)
 	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,101)
-	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,102))
+	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,102)
+	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,502))
 
 
 OPERATION(WKSSVC_OPNUM_NetWkstaGetInfo)
@@ -1317,12 +1429,56 @@ struct mslm_NetWkstaGetInfo {
 };
 
 /*
+ ***********************************************************************
+ * NetWkstaTransportEnum
+ ***********************************************************************
+ */
+
+struct mslm_NetWkstaTransportInfo0 {
+	DWORD quality_of_service;
+	DWORD num_vcs;
+	LPTSTR transport_name;
+	LPTSTR transport_address;
+	DWORD wan_ish;
+};
+
+struct mslm_NetWkstaTransportCtr0 {
+	DWORD count;
+    SIZE_IS(count)
+	struct mslm_NetWkstaTransportInfo0 *ti0;
+};
+
+union mslm_NetWkstaTransportInfo_ru {
+	CASE(0) struct mslm_NetWkstaTransportCtr0 *info0;
+	DEFAULT char *nullptr;
+};
+
+struct mslm_NetWkstaTransportInfo {
+	DWORD address;
+	DWORD level;
+    SWITCH(level)
+	union mslm_NetWkstaTransportInfo_ru ru;
+};
+
+OPERATION(WKSSVC_OPNUM_NetWkstaTransportEnum)
+struct mslm_NetWkstaTransportEnum {
+	IN 	LPTSTR	servername;
+	INOUT	struct mslm_NetWkstaTransportInfo info;
+	IN	DWORD	pref_max_len;
+	OUT 	DWORD	total_entries;
+	INOUT	DWORD	*resume_handle;
+	OUT	DWORD	status;
+};
+
+/*
  * The WKSSVC already
  */
 INTERFACE(0)
 union wkssvc_interface {
     CASE(WKSSVC_OPNUM_NetWkstaGetInfo)
-	struct mslm_NetWkstaGetInfo	NetWkstaGetInfo;
+	struct mslm_NetWkstaGetInfo		NetWkstaGetInfo;
+    CASE(WKSSVC_OPNUM_NetWkstaTransportEnum)
+	struct mslm_NetWkstaTransportEnum	NetWkstaTransportEnum;
 };
 typedef union wkssvc_interface	wkssvc_interface_t;
 EXTERNTYPEINFO(wkssvc_interface)

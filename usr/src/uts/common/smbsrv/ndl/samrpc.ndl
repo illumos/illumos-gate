@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -428,36 +428,17 @@ union samr_QueryDomainInfo_ru {
 	DEFAULT	char *nullptr;
 };
 
-
-/*
- * This structure needs to be declared, even though it can't be used in
- * samr_QueryDomainInfo, in order to calculate the correct fixup offsets.
- * If ndrgen did the right thing, samr_QueryDomainInfoRes would be one of
- * the out parameters. However, if we do it that way, the switch_value
- * isn't known early enough to do the fixup calculation. So it all has
- * to go in samr_QueryDomainInfo.
- */
 struct samr_QueryDomainInfoRes {
-	DWORD address;
 	WORD switch_value;
 	SWITCH(switch_value)
 		union samr_QueryDomainInfo_ru ru;
 };
 
-
 OPERATION(SAMR_OPNUM_QueryDomainInfo)
 struct samr_QueryDomainInfo {
 	IN	samr_handle_t domain_handle;
 	IN	WORD info_level;
-	/*
-	 * Can't use the standard "OUT result" form because
-	 * we need to include members explicitly.
-	 * OUT	struct samr_QueryDomainInfoRes result;
-	 */
-	OUT	DWORD address;
-	OUT	WORD switch_value;
-  SWITCH(info_level)
-	OUT	union samr_QueryDomainInfo_ru ru;
+	OUT	struct samr_QueryDomainInfoRes *info;
 	OUT	DWORD status;
 };
 

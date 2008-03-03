@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,12 +40,7 @@
 #include <smbsrv/alloc.h>
 #include <smbsrv/smbinfo.h>
 
-door_handle_t lmshrd_dh;
-int lmshrd_init = 0;
-kmutex_t lmshrd_dh_mtx;
-
-
-char *lmshrd_desc[] = {
+const char *lmshrd_desc[] = {
 	"",
 	"LmshrkOpenIter",
 	"LmshrkCloseIter",
@@ -66,117 +61,49 @@ char *lmshrd_desc[] = {
 	"LmshrkListTrans",
 	"LmshrkNumTrans",
 	"SmbGetKConfig",
-	0
+	NULL
 };
 
-
-static int
-lmshrd_kclient_open()
-{
-	int err = 0;
-
-	mutex_enter(&lmshrd_dh_mtx);
-	if (lmshrd_init == 0) {
-		if ((err = door_ki_open(LMSHR_DOOR_NAME, &lmshrd_dh)) != 0)
-			cmn_err(CE_WARN, "lmshrd_kclient: open %s failed",
-			    LMSHR_DOOR_NAME);
-		else
-			lmshrd_init = 1;
-	}
-	mutex_exit(&lmshrd_dh_mtx);
-
-	return (err);
-}
-
-static void
-lmshrd_kclient_close()
-{
-	mutex_enter(&lmshrd_dh_mtx);
-	if (lmshrd_init) {
-		door_ki_rele(lmshrd_dh);
-		lmshrd_init = 0;
-	}
-	mutex_exit(&lmshrd_dh_mtx);
-}
+static int lmshrd_door_check_srv_status(int, smb_dr_ctx_t *);
 
 /*
- * lmshrd_kclient_start
+ * lmshrd_kclient_init
  *
- * The SMB kernel module should invoke this function upon startup.
+ * This function is not MultiThread safe. The caller has to make sure only one
+ * thread calls this function.
  */
-int
-lmshrd_kclient_start()
+door_handle_t
+lmshrd_kclient_init(int door_id)
 {
-	int rc;
-
-	mutex_init(&lmshrd_dh_mtx, NULL, MUTEX_DEFAULT, NULL);
-	rc = lmshrd_kclient_open();
-
-	return (rc);
+	return (door_ki_lookup(door_id));
 }
 
 /*
- * lmshrd_kclient_stop
+ * lmshrd_kclient_fini
  *
- * The SMB kernel module should invoke this function upon unload.
+ * This function is not MultiThread safe. The caller has to make sure only one
+ * thread calls this function.
  */
 void
-lmshrd_kclient_stop()
+lmshrd_kclient_fini(door_handle_t dhdl)
 {
-	lmshrd_kclient_close();
-	mutex_destroy(&lmshrd_dh_mtx);
-}
-
-/*
- * Return 0 upon success. Otherwise, -1.
- */
-static int
-lmshrd_door_check_srv_status(int opcode, smb_dr_ctx_t *dec_ctx)
-{
-	int status = smb_dr_get_int32(dec_ctx);
-	int err;
-	int rc = -1;
-
-	switch (status) {
-	case LMSHR_DOOR_SRV_SUCCESS:
-		rc = 0;
-		break;
-
-	case LMSHR_DOOR_SRV_ERROR:
-		err = smb_dr_get_uint32(dec_ctx);
-		cmn_err(CE_WARN, "%s: Encountered door server error %d",
-		    lmshrd_desc[opcode], err);
-		break;
-
-	default:
-		cmn_err(CE_WARN, "%s: Unknown door server status",
-		    lmshrd_desc[opcode]);
-	}
-
-	if (rc != 0) {
-		if ((err = smb_dr_decode_finish(dec_ctx)) != 0)
-			cmn_err(CE_WARN, "%s: Decode error %d",
-			    lmshrd_desc[opcode], err);
-	}
-
-	return (rc);
+	ASSERT(dhdl != NULL);
+	if (dhdl)
+		door_ki_rele(dhdl);
 }
 
 uint64_t
-lmshrd_open_iterator(int mode)
+lmshrd_open_iterator(door_handle_t dhdl, int mode)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	unsigned int status = 0;
-	uint64_t lmshr_iter = 0;
+	door_arg_t	arg;
+	char		*buf;
+	unsigned int	used;
+	smb_dr_ctx_t	*dec_ctx;
+	smb_dr_ctx_t	*enc_ctx;
+	unsigned int	status = 0;
+	uint64_t	lmshr_iter = 0;
 
 	int opcode = LMSHR_DOOR_OPEN_ITERATOR;
-
-	if (!lmshrd_init && lmshrd_kclient_open() != 0)
-		return (lmshr_iter);
 
 	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
 	if (!buf)
@@ -199,10 +126,9 @@ lmshrd_open_iterator(int mode)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
+	if (door_ki_upcall(dhdl, &arg) != 0) {
 		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
 		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
 		return (lmshr_iter);
 	}
 
@@ -224,9 +150,8 @@ lmshrd_open_iterator(int mode)
 	return (lmshr_iter);
 }
 
-
-DWORD
-lmshrd_close_iterator(uint64_t iterator)
+uint32_t
+lmshrd_close_iterator(door_handle_t dhdl, uint64_t iterator)
 {
 	door_arg_t arg;
 	char *buf;
@@ -235,9 +160,6 @@ lmshrd_close_iterator(uint64_t iterator)
 	smb_dr_ctx_t *enc_ctx;
 	unsigned int status = 0;
 	int opcode = LMSHR_DOOR_CLOSE_ITERATOR;
-
-	if (!lmshrd_init && lmshrd_kclient_open() != 0)
-		return (NERR_InternalError);
 
 	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
 	if (!buf)
@@ -260,10 +182,9 @@ lmshrd_close_iterator(uint64_t iterator)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
+	if (door_ki_upcall(dhdl, &arg) != 0) {
 		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
 		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
 		return (NERR_InternalError);
 	}
 
@@ -284,8 +205,8 @@ lmshrd_close_iterator(uint64_t iterator)
 	return (NERR_Success);
 }
 
-DWORD
-lmshrd_iterate(uint64_t iterator, lmshare_info_t *si)
+uint32_t
+lmshrd_iterate(door_handle_t dhdl, uint64_t iterator, lmshare_info_t *si)
 {
 	door_arg_t arg;
 	char *buf;
@@ -294,9 +215,6 @@ lmshrd_iterate(uint64_t iterator, lmshare_info_t *si)
 	smb_dr_ctx_t *enc_ctx;
 	unsigned int status = 0;
 	int opcode = LMSHR_DOOR_ITERATE;
-
-	if (!lmshrd_init && lmshrd_kclient_open() != 0)
-		return (NERR_InternalError);
 
 	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
 	if (!buf)
@@ -320,10 +238,9 @@ lmshrd_iterate(uint64_t iterator, lmshare_info_t *si)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
+	if (door_ki_upcall(dhdl, &arg) != 0) {
 		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
 		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
 		return (NERR_InternalError);
 	}
 
@@ -346,7 +263,7 @@ lmshrd_iterate(uint64_t iterator, lmshare_info_t *si)
 }
 
 int
-lmshrd_num_shares(void)
+lmshrd_num_shares(door_handle_t dhdl)
 {
 	door_arg_t arg;
 	char *buf;
@@ -354,11 +271,8 @@ lmshrd_num_shares(void)
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
 	unsigned int status = 0;
-	DWORD num_shares;
+	uint32_t num_shares;
 	int opcode = LMSHR_DOOR_NUM_SHARES;
-
-	if (!lmshrd_init && lmshrd_kclient_open() != 0)
-		return (-1);
 
 	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
 	if (!buf)
@@ -380,10 +294,9 @@ lmshrd_num_shares(void)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
+	if (door_ki_upcall(dhdl, &arg) != 0) {
 		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
 		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
 		return (-1);
 	}
 
@@ -405,8 +318,8 @@ lmshrd_num_shares(void)
 	return (num_shares);
 }
 
-DWORD
-lmshrd_getinfo(char *share_name, lmshare_info_t *si)
+uint32_t
+lmshrd_getinfo(door_handle_t dhdl, char *share_name, lmshare_info_t *si)
 {
 	door_arg_t arg;
 	char *buf;
@@ -414,11 +327,8 @@ lmshrd_getinfo(char *share_name, lmshare_info_t *si)
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
 	int status;
-	DWORD rc;
+	uint32_t rc;
 	int opcode = LMSHR_DOOR_GETINFO;
-
-	if (!lmshrd_init && lmshrd_kclient_open() != 0)
-		return (NERR_InternalError);
 
 	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
 	if (!buf)
@@ -442,10 +352,9 @@ lmshrd_getinfo(char *share_name, lmshare_info_t *si)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
+	if (door_ki_upcall(dhdl, &arg) != 0) {
 		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
 		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
 		return (NERR_InternalError);
 	}
 
@@ -469,7 +378,7 @@ lmshrd_getinfo(char *share_name, lmshare_info_t *si)
 }
 
 int
-lmshrd_check(char *share_name, int opcode)
+lmshrd_check(door_handle_t dhdl, char *share_name, int opcode)
 {
 	door_arg_t arg;
 	char *buf;
@@ -477,9 +386,6 @@ lmshrd_check(char *share_name, int opcode)
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
 	int status, rc;
-
-	if (!lmshrd_init && lmshrd_kclient_open() != 0)
-		return (NERR_InternalError);
 
 	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
 	if (!buf)
@@ -503,10 +409,9 @@ lmshrd_check(char *share_name, int opcode)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
+	if (door_ki_upcall(dhdl, &arg) != 0) {
 		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
 		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
 		return (NERR_InternalError);
 	}
 
@@ -529,100 +434,39 @@ lmshrd_check(char *share_name, int opcode)
 }
 
 int
-lmshrd_exists(char *share_name)
+lmshrd_exists(door_handle_t dhdl, char *share_name)
 {
-	return (lmshrd_check(share_name, LMSHR_DOOR_EXISTS));
+	return (lmshrd_check(dhdl, share_name, LMSHR_DOOR_EXISTS));
 }
 
 int
-lmshrd_is_special(char *share_name)
+lmshrd_is_special(door_handle_t dhdl, char *share_name)
 {
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_SPECIAL));
+	return (lmshrd_check(dhdl, share_name, LMSHR_DOOR_IS_SPECIAL));
 }
 
 int
-lmshrd_is_restricted(char *share_name)
+lmshrd_is_restricted(door_handle_t dhdl, char *share_name)
 {
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_RESTRICTED));
+	return (lmshrd_check(dhdl, share_name, LMSHR_DOOR_IS_RESTRICTED));
 }
 
 int
-lmshrd_is_admin(char *share_name)
+lmshrd_is_admin(door_handle_t dhdl, char *share_name)
 {
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_ADMIN));
+	return (lmshrd_check(dhdl, share_name, LMSHR_DOOR_IS_ADMIN));
 }
 
 int
-lmshrd_is_valid(char *share_name)
+lmshrd_is_valid(door_handle_t dhdl, char *share_name)
 {
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_VALID));
+	return (lmshrd_check(dhdl, share_name, LMSHR_DOOR_IS_VALID));
 }
 
 int
-lmshrd_is_dir(char *path)
+lmshrd_is_dir(door_handle_t dhdl, char *path)
 {
-	return (lmshrd_check(path, LMSHR_DOOR_IS_DIR));
-}
-
-int
-smb_get_kconfig(smb_kmod_cfg_t *cfg)
-{
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	int status;
-	int opcode = SMB_GET_KCONFIG;
-
-	if (!lmshrd_init && lmshrd_kclient_start() != 0)
-		return (-1);
-
-	buf = MEM_MALLOC("lmshrd_kclient", LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (-1);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
-
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		cmn_err(CE_WARN, "%s: Encode error %d",
-		    lmshrd_desc[opcode], status);
-		MEM_FREE("lmshrd_kclient", buf);
-		return (-1);
-	}
-
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_ki_upcall(lmshrd_dh, &arg) != 0) {
-		cmn_err(CE_WARN, "%s: Door call failed", lmshrd_desc[opcode]);
-		MEM_FREE("lmshrd_kclient", buf);
-		lmshrd_kclient_close();
-		return (-1);
-	}
-
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		MEM_FREE("lmshrd_kclient", buf);
-		return (-1);
-	}
-
-	smb_dr_get_kconfig(dec_ctx, cfg);
-
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		cmn_err(CE_WARN, "%s: Decode error %d",
-		    lmshrd_desc[opcode], status);
-		MEM_FREE("lmshrd_kclient", buf);
-		return (-1);
-	}
-
-	MEM_FREE("lmshrd_kclient", buf);
-	return (0);
+	return (lmshrd_check(dhdl, path, LMSHR_DOOR_IS_DIR));
 }
 
 /*
@@ -634,27 +478,20 @@ smb_get_kconfig(smb_kmod_cfg_t *cfg)
  * for add operations and share_name for delete operations.
  */
 int
-lmshrd_share_upcall(void *arg, boolean_t add_share)
+lmshrd_share_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 {
-	door_arg_t doorarg = { 0 };
-	char *buf = NULL;
-	char *str = NULL;
-	int error;
-	int rc;
-	unsigned int used;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	lmshare_info_t *lmshare = NULL;
-	int opcode;
+	door_arg_t	doorarg = { 0 };
+	char		*buf = NULL;
+	char		*str = NULL;
+	int		error;
+	int		rc;
+	unsigned int	used;
+	smb_dr_ctx_t	*dec_ctx;
+	smb_dr_ctx_t	*enc_ctx;
+	lmshare_info_t	*lmshare = NULL;
+	int		opcode;
 
 	opcode = add_share == B_TRUE ? LMSHR_DOOR_ADD : LMSHR_DOOR_DELETE;
-
-	/* Return error if server isn't up and running */
-	if (!lmshrd_init)
-		return (NERR_ServerNotStarted);
-
-	if (lmshrd_kclient_open())
-		return (NERR_InternalError);
 
 	buf = MEM_MALLOC("lmshrd_share_upcall", LMSHR_DOOR_SIZE);
 	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
@@ -697,7 +534,9 @@ lmshrd_share_upcall(void *arg, boolean_t add_share)
 	doorarg.rbuf = buf;
 	doorarg.rsize = LMSHR_DOOR_SIZE;
 
-	if (error = door_ki_upcall(lmshrd_dh, &doorarg)) {
+	error = door_ki_upcall(dhdl, &doorarg);
+
+	if (error) {
 		MEM_FREE("lmshrd_share_upcall", buf);
 		if (lmshare)
 			MEM_FREE("lmshrd_share_upcall", lmshare);
@@ -727,4 +566,39 @@ lmshrd_share_upcall(void *arg, boolean_t add_share)
 	if (lmshare)
 		MEM_FREE("lmshrd_share_upcall", lmshare);
 	return ((rc == NERR_DuplicateShare && add_share) ? 0 : rc);
+}
+
+/*
+ * Return 0 upon success. Otherwise, -1.
+ */
+static int
+lmshrd_door_check_srv_status(int opcode, smb_dr_ctx_t *dec_ctx)
+{
+	int	status = smb_dr_get_int32(dec_ctx);
+	int	err;
+	int	rc = -1;
+
+	switch (status) {
+	case LMSHR_DOOR_SRV_SUCCESS:
+		rc = 0;
+		break;
+
+	case LMSHR_DOOR_SRV_ERROR:
+		err = smb_dr_get_uint32(dec_ctx);
+		cmn_err(CE_WARN, "%s: Encountered door server error %d",
+		    lmshrd_desc[opcode], err);
+		break;
+
+	default:
+		cmn_err(CE_WARN, "%s: Unknown door server status",
+		    lmshrd_desc[opcode]);
+	}
+
+	if (rc != 0) {
+		if ((err = smb_dr_decode_finish(dec_ctx)) != 0)
+			cmn_err(CE_WARN, "%s: Decode error %d",
+			    lmshrd_desc[opcode], err);
+	}
+
+	return (rc);
 }

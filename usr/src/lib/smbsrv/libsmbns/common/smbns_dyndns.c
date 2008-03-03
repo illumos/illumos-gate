@@ -47,6 +47,7 @@
 #include <net/if.h>
 
 #include <smbns_dyndns.h>
+#include <smbns_krb.h>
 
 /* internal use, in dyndns_add_entry */
 #define	DEL_NONE		2
@@ -1399,8 +1400,9 @@ dyndns_search_entry(int update_zone, const char *hostname, const char *ip_addr,
 
 /*
  * dyndns_add_remove_entry
- * Perform non-secure dynamic DNS update.  If it fails and the system is in
- * domain mode, secure update will be performed.
+ * Perform non-secure dynamic DNS update.  If it fails and host principal
+ * keys can be found in the local keytab file, secure update will be performed.
+ *
  * This routine opens a UDP socket to the DNS sever, build the update request
  * message, and sends the message to the DNS server.  The response is received
  * and check for error.  If there is no error then the local NSS cached is
@@ -1505,7 +1507,7 @@ retry_higher:
 		return (-1);
 	}
 
-	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN)
+	if (smb_krb5_find_keytab_entries(hostname, SMBNS_KRB5_KEYTAB))
 		ret = dyndns_sec_add_remove_entry(update_zone, hostname,
 		    ip_addr, life_time, update_type, del_type, dns_str);
 
@@ -1656,33 +1658,43 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
 /*
  * dyndns_update
  * Perform dynamic update on both forward and reverse lookup zone using
- * current hostname and IP addresses.  Before updating DNS, existing host
- * entries with the same hostname in the forward lookup zone are removed
+ * the specified hostname and IP addresses.  Before updating DNS, existing
+ * host entries with the same hostname in the forward lookup zone are removed
  * and existing pointer entries with the same IP addresses in the reverse
  * lookup zone are removed.  After DNS update, host entries for current
  * hostname will show current IP addresses and pointer entries for current
  * IP addresses will show current hostname.
  * Parameters:
- *   None
+ *  fqhn - fully-qualified hostname
+ *  init_msgid_counter - to indicate whether the global message id counter
+ *                       needs to be initialized or not. Any process, other
+ *                       than smbd, should specify B_TRUE for the first
+ *                       dyndns_update call, and B_FALSE for the subsequent
+ *                       dyndns_update calls.
  * Returns:
  *   -1: some dynamic DNS updates errors
  *    0: successful
  */
 int
-dyndns_update(void)
+dyndns_update(char *fqdn, boolean_t init_msgid_counter)
 {
 	int forw_update_ok, error;
-	char fqdn[MAXHOSTNAMELEN];
 	char *my_ip;
 	struct in_addr addr;
 	smb_niciter_t ni;
 	int rc;
+	char fqhn[MAXHOSTNAMELEN];
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (-1);
 
-	if (smb_getfqhostname(fqdn, MAXHOSTNAMELEN) != 0)
+	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
+
+	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn, fqdn);
+	if (init_msgid_counter)
+		if (dns_msgid_init() != 0)
+			return (-1);
 
 	error = 0;
 	forw_update_ok = 0;
@@ -1690,7 +1702,7 @@ dyndns_update(void)
 	/*
 	 * Dummy IP is okay since we are removing all using the hostname.
 	 */
-	if (dyndns_remove_entry(UPDATE_FORW, fqdn, "1.1.1.1", DEL_ALL) == 0) {
+	if (dyndns_remove_entry(UPDATE_FORW, fqhn, "1.1.1.1", DEL_ALL) == 0) {
 		forw_update_ok = 1;
 	} else {
 		error++;
@@ -1711,16 +1723,16 @@ dyndns_update(void)
 		}
 
 		if (forw_update_ok) {
-			rc = dyndns_add_entry(UPDATE_FORW, fqdn, my_ip,
+			rc = dyndns_add_entry(UPDATE_FORW, fqhn, my_ip,
 			    DDNS_TTL);
 
 			if (rc == -1)
 				error++;
 		}
 
-		rc = dyndns_remove_entry(UPDATE_REV, fqdn, my_ip, DEL_ALL);
+		rc = dyndns_remove_entry(UPDATE_REV, fqhn, my_ip, DEL_ALL);
 		if (rc == 0) {
-			rc = dyndns_add_entry(UPDATE_REV, fqdn, my_ip,
+			rc = dyndns_add_entry(UPDATE_REV, fqhn, my_ip,
 			    DDNS_TTL);
 		}
 
@@ -1739,27 +1751,28 @@ dyndns_update(void)
  * of down records prior to updating the list with new information.
  *
  * Parameters:
- *   None
+ *   fqhn - fully-qualified hostname
  * Returns:
  *   -1: some dynamic DNS updates errors
  *    0: successful
  */
 int
-dyndns_clear_rev_zone(void)
+dyndns_clear_rev_zone(char *fqdn)
 {
 	int error;
-	char fqdn[MAXHOSTNAMELEN];
 	char *my_ip;
 	struct in_addr addr;
 	smb_niciter_t ni;
 	int rc;
+	char fqhn[MAXHOSTNAMELEN];
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (-1);
 
-	if (smb_getfqhostname(fqdn, MAXHOSTNAMELEN) != 0)
+	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
 
+	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn, fqdn);
 	error = 0;
 
 	if (smb_nic_getfirst(&ni) != 0)
@@ -1776,7 +1789,7 @@ dyndns_clear_rev_zone(void)
 			continue;
 		}
 
-		rc = dyndns_remove_entry(UPDATE_REV, fqdn, my_ip, DEL_ALL);
+		rc = dyndns_remove_entry(UPDATE_REV, fqhn, my_ip, DEL_ALL);
 		if (rc != 0)
 			error++;
 

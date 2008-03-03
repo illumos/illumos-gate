@@ -61,6 +61,7 @@
 #include <syslog.h>
 #include <locale.h>
 #include <strings.h>
+#include <errno.h>
 #include <sys/synch.h>
 #include <gssapi/gssapi.h>
 
@@ -559,4 +560,35 @@ krb5_establish_sec_ctx_kinit(char *user, char *pwd,
 		}
 	}
 	return (0);
+}
+
+/*
+ * smb_ccache_init
+ *
+ * Creates the directory where the Kerberos ccache file is located
+ * and set KRB5CCNAME in the environment.
+ *
+ * Returns 0 upon succcess.  Otherwise, returns
+ * -1 if it fails to create the specified directory fails.
+ * -2 if it fails to set the KRB5CCNAME environment variable.
+ */
+int
+smb_ccache_init(char *dir, char *filename)
+{
+	static char buf[MAXPATHLEN];
+
+	if ((mkdir(dir, 0700) < 0) && (errno != EEXIST))
+		return (-1);
+
+	(void) snprintf(buf, MAXPATHLEN, "KRB5CCNAME=%s/%s", dir, filename);
+	if (putenv(buf) != 0)
+		return (-2);
+	return (0);
+}
+
+void
+smb_ccache_remove(char *path)
+{
+	if ((remove(path) < 0) && (errno != ENOENT))
+		syslog(LOG_ERR, "failed to remove ccache (%s)", path);
 }

@@ -53,6 +53,7 @@ SUNWprivate {
 	mlsvc_join;
 	mlsvc_lookup_name;
 	mlsvc_lookup_sid;
+	mlsvc_netlogon;
 	smb_logon;
 	smb_token_destroy;
 	smb_build_lmshare_info;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <sys/vfs.h>
 
-static smb_vfs_t *smb_vfs_lookup(vnode_t *);
+static smb_vfs_t *smb_vfs_lookup(smb_server_t *, vnode_t *);
 
 /*
  * smb_vfs_hold
@@ -38,7 +38,7 @@ static smb_vfs_t *smb_vfs_lookup(vnode_t *);
  * has been created yet for the fs passed in it is created.
  */
 boolean_t
-smb_vfs_hold(vfs_t *vfsp)
+smb_vfs_hold(smb_server_t *sv, vfs_t *vfsp)
 {
 	smb_vfs_t	*smb_vfs;
 	vnode_t 	*rootvp;
@@ -46,15 +46,15 @@ smb_vfs_hold(vfs_t *vfsp)
 	if ((vfsp == NULL) || VFS_ROOT(vfsp, &rootvp))
 		return (B_FALSE);
 
-	smb_llist_enter(&smb_info.si_vfs_list, RW_WRITER);
-	smb_vfs = smb_vfs_lookup(rootvp);
+	smb_llist_enter(&sv->sv_vfs_list, RW_WRITER);
+	smb_vfs = smb_vfs_lookup(sv, rootvp);
 	if (smb_vfs) {
 		DTRACE_PROBE1(smb_vfs_hold_hit, smb_vfs_t *, smb_vfs);
-		smb_llist_exit(&smb_info.si_vfs_list);
+		smb_llist_exit(&sv->sv_vfs_list);
 		VN_RELE(rootvp);
 		return (B_TRUE);
 	}
-	smb_vfs = kmem_cache_alloc(smb_info.si_cache_vfs, KM_SLEEP);
+	smb_vfs = kmem_cache_alloc(sv->si_cache_vfs, KM_SLEEP);
 
 	bzero(smb_vfs, sizeof (smb_vfs_t));
 
@@ -66,9 +66,9 @@ smb_vfs_hold(vfs_t *vfsp)
 	 * from the VFS_ROOT call above.
 	 */
 	smb_vfs->sv_rootvp = rootvp;
-	smb_llist_insert_head(&smb_info.si_vfs_list, smb_vfs);
+	smb_llist_insert_head(&sv->sv_vfs_list, smb_vfs);
 	DTRACE_PROBE1(smb_vfs_hold_miss, smb_vfs_t *, smb_vfs);
-	smb_llist_exit(&smb_info.si_vfs_list);
+	smb_llist_exit(&sv->sv_vfs_list);
 	return (B_TRUE);
 }
 
@@ -79,7 +79,7 @@ smb_vfs_hold(vfs_t *vfsp)
  * drops to zero the smb_vfs_t structure associated with the fs is freed.
  */
 void
-smb_vfs_rele(vfs_t *vfsp)
+smb_vfs_rele(smb_server_t *sv, vfs_t *vfsp)
 {
 	smb_vfs_t	*smb_vfs;
 	vnode_t		*rootvp;
@@ -89,24 +89,24 @@ smb_vfs_rele(vfs_t *vfsp)
 	if (VFS_ROOT(vfsp, &rootvp))
 		return;
 
-	smb_llist_enter(&smb_info.si_vfs_list, RW_WRITER);
-	smb_vfs = smb_vfs_lookup(rootvp);
+	smb_llist_enter(&sv->sv_vfs_list, RW_WRITER);
+	smb_vfs = smb_vfs_lookup(sv, rootvp);
 	DTRACE_PROBE2(smb_vfs_release, smb_vfs_t *, smb_vfs, vnode_t *, rootvp);
 	VN_RELE(rootvp);
 	if (smb_vfs) {
 		--smb_vfs->sv_refcnt;
 		ASSERT(smb_vfs->sv_refcnt);
 		if (--smb_vfs->sv_refcnt == 0) {
-			smb_llist_remove(&smb_info.si_vfs_list, smb_vfs);
-			smb_llist_exit(&smb_info.si_vfs_list);
+			smb_llist_remove(&sv->sv_vfs_list, smb_vfs);
+			smb_llist_exit(&sv->sv_vfs_list);
 			ASSERT(rootvp == smb_vfs->sv_rootvp);
 			VN_RELE(smb_vfs->sv_rootvp);
 			smb_vfs->sv_magic = (uint32_t)~SMB_VFS_MAGIC;
-			kmem_cache_free(smb_info.si_cache_vfs, smb_vfs);
+			kmem_cache_free(sv->si_cache_vfs, smb_vfs);
 			return;
 		}
 	}
-	smb_llist_exit(&smb_info.si_vfs_list);
+	smb_llist_exit(&sv->sv_vfs_list);
 }
 
 /*
@@ -117,20 +117,20 @@ smb_vfs_rele(vfs_t *vfsp)
  * Called at driver close time.
  */
 void
-smb_vfs_rele_all()
+smb_vfs_rele_all(smb_server_t *sv)
 {
 	smb_vfs_t	*smb_vfs;
 
-	smb_llist_enter(&smb_info.si_vfs_list, RW_WRITER);
-	while ((smb_vfs = smb_llist_head(&smb_info.si_vfs_list)) != NULL) {
+	smb_llist_enter(&sv->sv_vfs_list, RW_WRITER);
+	while ((smb_vfs = smb_llist_head(&sv->sv_vfs_list)) != NULL) {
 
 		ASSERT(smb_vfs->sv_magic == SMB_VFS_MAGIC);
 		DTRACE_PROBE1(smb_vfs_rele_all_hit, smb_vfs_t *, smb_vfs);
-		smb_llist_remove(&smb_info.si_vfs_list, smb_vfs);
+		smb_llist_remove(&sv->sv_vfs_list, smb_vfs);
 		VN_RELE(smb_vfs->sv_rootvp);
-		kmem_cache_free(smb_info.si_cache_vfs, smb_vfs);
+		kmem_cache_free(sv->si_cache_vfs, smb_vfs);
 	}
-	smb_llist_exit(&smb_info.si_vfs_list);
+	smb_llist_exit(&sv->sv_vfs_list);
 }
 
 /*
@@ -143,11 +143,11 @@ smb_vfs_rele_all()
  * this function.
  */
 static smb_vfs_t *
-smb_vfs_lookup(vnode_t *rootvp)
+smb_vfs_lookup(smb_server_t *sv, vnode_t *rootvp)
 {
 	smb_vfs_t	*smb_vfs;
 
-	smb_vfs = smb_llist_head(&smb_info.si_vfs_list);
+	smb_vfs = smb_llist_head(&sv->sv_vfs_list);
 	while (smb_vfs) {
 		ASSERT(smb_vfs->sv_magic == SMB_VFS_MAGIC);
 		if (smb_vfs->sv_rootvp == rootvp) {
@@ -155,7 +155,7 @@ smb_vfs_lookup(vnode_t *rootvp)
 			ASSERT(smb_vfs->sv_refcnt);
 			return (smb_vfs);
 		}
-		smb_vfs = smb_llist_next(&smb_info.si_vfs_list, smb_vfs);
+		smb_vfs = smb_llist_next(&sv->sv_vfs_list, smb_vfs);
 	}
 	return (NULL);
 }

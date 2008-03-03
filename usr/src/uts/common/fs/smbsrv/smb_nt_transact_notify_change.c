@@ -114,7 +114,67 @@
 #include <smbsrv/smb_incl.h>
 #include <sys/sdt.h>
 
-static void smb_reply_notify_change_request(smb_request_t *);
+static void smb_notify_change_daemon(smb_thread_t *, void *);
+static boolean_t	smb_notify_initialized = B_FALSE;
+static smb_slist_t	smb_ncr_list;
+static smb_slist_t	smb_nce_list;
+static smb_thread_t	smb_thread_notify_daemon;
+
+/*
+ * smb_notify_init
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
+int
+smb_notify_init(void)
+{
+	int	rc;
+
+	if (smb_notify_initialized)
+		return (0);
+
+	smb_slist_constructor(&smb_ncr_list, sizeof (smb_request_t),
+	    offsetof(smb_request_t, sr_ncr.nc_lnd));
+
+	smb_slist_constructor(&smb_nce_list, sizeof (smb_request_t),
+	    offsetof(smb_request_t, sr_ncr.nc_lnd));
+
+	smb_thread_init(&smb_thread_notify_daemon,
+	    "smb_notify_change_daemon", smb_notify_change_daemon, NULL,
+	    NULL, NULL);
+
+	rc = smb_thread_start(&smb_thread_notify_daemon);
+	if (rc) {
+		smb_thread_destroy(&smb_thread_notify_daemon);
+		smb_slist_destructor(&smb_ncr_list);
+		smb_slist_destructor(&smb_nce_list);
+		return (rc);
+	}
+
+	smb_notify_initialized = B_TRUE;
+
+	return (0);
+}
+
+/*
+ * smb_notify_fini
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
+void
+smb_notify_fini(void)
+{
+	if (!smb_notify_initialized)
+		return;
+
+	smb_thread_stop(&smb_thread_notify_daemon);
+	smb_thread_destroy(&smb_thread_notify_daemon);
+	smb_slist_destructor(&smb_ncr_list);
+	smb_slist_destructor(&smb_nce_list);
+	smb_notify_initialized = B_FALSE;
+}
 
 /*
  * smb_nt_transact_notify_change
@@ -133,12 +193,12 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_setup_mb, "lwb",
 	    &CompletionFilter, &sr->smb_fid, &WatchTree) != 0)
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	node = sr->fid_ofile->f_node;
@@ -148,7 +208,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 		 * Notify change requests are only valid on directories.
 		 */
 		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	mutex_enter(&sr->sr_mutex);
@@ -164,7 +224,8 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 			sr->sr_keep = B_TRUE;
 			sr->sr_state = SMB_REQ_STATE_WAITING_EVENT;
-			smb_slist_insert_tail(&smb_info.si_ncr_list, sr);
+
+			smb_slist_insert_tail(&smb_ncr_list, sr);
 
 			/*
 			 * Monitor events system-wide.
@@ -187,18 +248,18 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 				    ~(NODE_FLAGS_NOTIFY_CHANGE |
 				    NODE_FLAGS_CHANGED);
 			mutex_exit(&sr->sr_mutex);
-			return (SDRC_NORMAL_REPLY);
+			return (SDRC_SUCCESS);
 		}
 
 	case SMB_REQ_STATE_CANCELED:
 		mutex_exit(&sr->sr_mutex);
 		smbsr_error(sr, NT_STATUS_CANCELLED, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	default:
 		ASSERT(0);
 		mutex_exit(&sr->sr_mutex);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 }
 
@@ -211,7 +272,8 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
  * If client cancels the request or session dropped, an NT_STATUS_CANCELED
  * is sent in reply.
  */
-static void
+
+void
 smb_reply_notify_change_request(smb_request_t *sr)
 {
 	smb_node_t	*node;
@@ -333,19 +395,19 @@ smb_process_session_notify_change_queue(struct smb_session *session)
 	smb_request_t	*tmp;
 	boolean_t	sig = B_FALSE;
 
-	smb_slist_enter(&smb_info.si_ncr_list);
-	smb_slist_enter(&smb_info.si_nce_list);
-	sr = smb_slist_head(&smb_info.si_ncr_list);
+	smb_slist_enter(&smb_ncr_list);
+	smb_slist_enter(&smb_nce_list);
+	sr = smb_slist_head(&smb_ncr_list);
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_info.si_ncr_list, sr);
+		tmp = smb_slist_next(&smb_ncr_list, sr);
 		if (sr->session == session) {
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
 				smb_slist_obj_move(
-				    &smb_info.si_nce_list,
-				    &smb_info.si_ncr_list,
+				    &smb_nce_list,
+				    &smb_ncr_list,
 				    sr);
 				sr->sr_state = SMB_REQ_STATE_CANCELED;
 				sig = B_TRUE;
@@ -358,11 +420,10 @@ smb_process_session_notify_change_queue(struct smb_session *session)
 		}
 		sr = tmp;
 	}
-	smb_slist_exit(&smb_info.si_nce_list);
-	smb_slist_exit(&smb_info.si_ncr_list);
-	if (sig) {
-		smb_thread_signal(&smb_info.si_thread_notify_change);
-	}
+	smb_slist_exit(&smb_nce_list);
+	smb_slist_exit(&smb_ncr_list);
+	if (sig)
+		smb_thread_signal(&smb_thread_notify_daemon);
 }
 
 /*
@@ -379,20 +440,18 @@ smb_process_file_notify_change_queue(struct smb_ofile *of)
 	smb_request_t	*tmp;
 	boolean_t	sig = B_FALSE;
 
-	smb_slist_enter(&smb_info.si_ncr_list);
-	smb_slist_enter(&smb_info.si_nce_list);
-	sr = smb_slist_head(&smb_info.si_ncr_list);
+	smb_slist_enter(&smb_ncr_list);
+	smb_slist_enter(&smb_nce_list);
+	sr = smb_slist_head(&smb_ncr_list);
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_info.si_ncr_list, sr);
+		tmp = smb_slist_next(&smb_ncr_list, sr);
 		if (sr->fid_ofile == of) {
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(
-				    &smb_info.si_nce_list,
-				    &smb_info.si_ncr_list,
-				    sr);
+				smb_slist_obj_move(&smb_nce_list,
+				    &smb_ncr_list, sr);
 				sr->sr_state = SMB_REQ_STATE_CANCELED;
 				sig = B_TRUE;
 				break;
@@ -404,11 +463,10 @@ smb_process_file_notify_change_queue(struct smb_ofile *of)
 		}
 		sr = tmp;
 	}
-	smb_slist_exit(&smb_info.si_nce_list);
-	smb_slist_exit(&smb_info.si_ncr_list);
-	if (sig) {
-		smb_thread_signal(&smb_info.si_thread_notify_change);
-	}
+	smb_slist_exit(&smb_nce_list);
+	smb_slist_exit(&smb_ncr_list);
+	if (sig)
+		smb_thread_signal(&smb_thread_notify_daemon);
 }
 
 /*
@@ -425,12 +483,12 @@ smb_reply_specific_cancel_request(struct smb_request *zsr)
 	smb_request_t	*tmp;
 	boolean_t	sig = B_FALSE;
 
-	smb_slist_enter(&smb_info.si_ncr_list);
-	smb_slist_enter(&smb_info.si_nce_list);
-	sr = smb_slist_head(&smb_info.si_ncr_list);
+	smb_slist_enter(&smb_ncr_list);
+	smb_slist_enter(&smb_nce_list);
+	sr = smb_slist_head(&smb_ncr_list);
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_info.si_ncr_list, sr);
+		tmp = smb_slist_next(&smb_ncr_list, sr);
 		if ((sr->session == zsr->session) &&
 		    (sr->smb_sid == zsr->smb_sid) &&
 		    (sr->smb_uid == zsr->smb_uid) &&
@@ -440,10 +498,8 @@ smb_reply_specific_cancel_request(struct smb_request *zsr)
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(
-				    &smb_info.si_nce_list,
-				    &smb_info.si_ncr_list,
-				    sr);
+				smb_slist_obj_move(&smb_nce_list,
+				    &smb_ncr_list, sr);
 				sr->sr_state = SMB_REQ_STATE_CANCELED;
 				sig = B_TRUE;
 				break;
@@ -455,11 +511,10 @@ smb_reply_specific_cancel_request(struct smb_request *zsr)
 		}
 		sr = tmp;
 	}
-	smb_slist_exit(&smb_info.si_nce_list);
-	smb_slist_exit(&smb_info.si_ncr_list);
-	if (sig) {
-		smb_thread_signal(&smb_info.si_thread_notify_change);
-	}
+	smb_slist_exit(&smb_nce_list);
+	smb_slist_exit(&smb_ncr_list);
+	if (sig)
+		smb_thread_signal(&smb_thread_notify_daemon);
 }
 
 /*
@@ -477,23 +532,25 @@ smb_reply_specific_cancel_request(struct smb_request *zsr)
  * different parts of the volume hierarchy.
  */
 void
-smb_process_node_notify_change_queue(struct smb_node *node)
+smb_process_node_notify_change_queue(smb_node_t *node)
 {
 	smb_request_t	*sr;
 	smb_request_t	*tmp;
 	boolean_t	sig = B_FALSE;
+
+	ASSERT(node->n_magic == SMB_NODE_MAGIC);
 
 	if (!(node->flags & NODE_FLAGS_NOTIFY_CHANGE))
 		return;
 
 	node->flags |= NODE_FLAGS_CHANGED;
 
-	smb_slist_enter(&smb_info.si_ncr_list);
-	smb_slist_enter(&smb_info.si_nce_list);
-	sr = smb_slist_head(&smb_info.si_ncr_list);
+	smb_slist_enter(&smb_ncr_list);
+	smb_slist_enter(&smb_nce_list);
+	sr = smb_slist_head(&smb_ncr_list);
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_info.si_ncr_list, sr);
+		tmp = smb_slist_next(&smb_ncr_list, sr);
 		/*
 		 * send notify if:
 		 * - it's a request for the same node or
@@ -507,10 +564,8 @@ smb_process_node_notify_change_queue(struct smb_node *node)
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(
-				    &smb_info.si_nce_list,
-				    &smb_info.si_ncr_list,
-				    sr);
+				smb_slist_obj_move(&smb_nce_list,
+				    &smb_ncr_list, sr);
 				sr->sr_state = SMB_REQ_STATE_EVENT_OCCURRED;
 				sig = B_TRUE;
 				break;
@@ -522,11 +577,10 @@ smb_process_node_notify_change_queue(struct smb_node *node)
 		}
 		sr = tmp;
 	}
-	smb_slist_exit(&smb_info.si_nce_list);
-	smb_slist_exit(&smb_info.si_ncr_list);
-	if (sig) {
-		smb_thread_signal(&smb_info.si_thread_notify_change);
-	}
+	smb_slist_exit(&smb_nce_list);
+	smb_slist_exit(&smb_ncr_list);
+	if (sig)
+		smb_thread_signal(&smb_thread_notify_daemon);
 }
 
 /*
@@ -536,23 +590,21 @@ smb_process_node_notify_change_queue(struct smb_node *node)
  * responses to the requests. This function executes in the system as an
  * indivdual thread.
  */
-
-void
-smb_notify_change_daemon(smb_thread_t *thread, void *si_void)
+static void
+smb_notify_change_daemon(smb_thread_t *thread, void *arg)
 {
+	_NOTE(ARGUNUSED(arg))
+
 	smb_request_t	*sr;
 	smb_request_t	*tmp;
 	list_t		sr_list;
-	smb_info_t	*si = si_void;
 
 	list_create(&sr_list, sizeof (smb_request_t),
 	    offsetof(smb_request_t, sr_ncr.nc_lnd));
 
-	ASSERT(si != NULL);
-
 	while (smb_thread_continue(thread)) {
 
-		while (smb_slist_move_tail(&sr_list, &si->si_nce_list)) {
+		while (smb_slist_move_tail(&sr_list, &smb_nce_list)) {
 			sr = list_head(&sr_list);
 			while (sr) {
 				ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -563,51 +615,5 @@ smb_notify_change_daemon(smb_thread_t *thread, void *si_void)
 			}
 		}
 	}
-
 	list_destroy(&sr_list);
-}
-
-/*
- * smb_notify_change_event_queue_dump
- *
- * Dumps all requests in NCE queue to the system log.
- */
-void
-smb_notify_change_event_queue_dump()
-{
-	smb_request_t	*sr;
-	int		i = 0;
-
-	smb_slist_enter(&smb_info.si_nce_list);
-	sr = smb_slist_head(&smb_info.si_nce_list);
-	while (sr) {
-		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		ASSERT((sr->sr_state == SMB_REQ_STATE_CANCELED) ||
-		    (sr->sr_state == SMB_REQ_STATE_EVENT_OCCURRED));
-		i++;
-		sr = smb_slist_next(&smb_info.si_nce_list, sr);
-	}
-	smb_slist_exit(&smb_info.si_nce_list);
-}
-
-/*
- * smb_notify_change_req_queue_dump
- *
- * Dumps all requests in NCR queue to the system log.
- */
-void
-smb_notify_change_req_queue_dump()
-{
-	smb_request_t	*sr;
-	int		i = 0;
-
-	smb_slist_enter(&smb_info.si_ncr_list);
-	sr = smb_slist_head(&smb_info.si_ncr_list);
-	while (sr) {
-		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		ASSERT(sr->sr_state == SMB_REQ_STATE_WAITING_EVENT);
-		i++;
-		sr = smb_slist_next(&smb_info.si_ncr_list, sr);
-	}
-	smb_slist_exit(&smb_info.si_ncr_list);
 }

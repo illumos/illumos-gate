@@ -278,23 +278,23 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (smb_decode_mbc(&xa->req_param_mb, "w", &infolev) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	snode = sr->tid_tree->t_snode;
 	if (fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr) != 0) {
 		smbsr_errno(sr, ESTALE);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	switch (infolev) {
 	case SMB_INFO_ALLOCATION:
 		if ((rc = smb_fsop_statfs(sr->user_cr, snode, &df)) != 0) {
 			smbsr_errno(sr, rc);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		max_int = (uint64_t)UINT_MAX;
@@ -369,7 +369,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FS_SIZE_INFO:
 		if ((rc = smb_fsop_statfs(sr->user_cr, snode, &df)) != 0) {
 			smbsr_errno(sr, rc);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		length = 512;
@@ -416,7 +416,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		if (vol_attr.flags & FSOLF_STREAMS)
 			flags |= FILE_NAMED_STREAMS;
 
-		if (smb_info.si.skc_announce_quota)
+		if (smb_announce_quota)
 			flags |= FILE_VOLUME_QUOTAS;
 
 		(void) smb_encode_mbc(&xa->rep_data_mb, encode_str, sr,
@@ -428,8 +428,8 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 
 	default:
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

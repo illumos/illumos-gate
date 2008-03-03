@@ -62,16 +62,16 @@ static int smb_lmshrd_srv_check(int opcode, char *sharename);
  * Returns 0 on success. Otherwise, -1.
  */
 int
-smb_lmshrd_srv_start()
+smb_lmshrd_srv_start(void)
 {
-	int newfd;
+	int	newfd;
 
 	(void) pthread_mutex_lock(&smb_lmshrd_srv_mutex);
 
 	if (smb_lmshrd_fildes != -1) {
 		syslog(LOG_ERR, "smb_lmshrd_srv_start: duplicate");
 		(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
-		return (0);
+		return (smb_lmshrd_fildes);
 	}
 
 	if ((smb_lmshrd_fildes = door_create(smb_lmshrd_srv_door,
@@ -106,7 +106,7 @@ smb_lmshrd_srv_start()
 	}
 
 	(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
-	return (0);
+	return (smb_lmshrd_fildes);
 }
 
 

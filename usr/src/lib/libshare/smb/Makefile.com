@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,7 +33,7 @@ SMBCOMMON_DIR	= $(SRC)/common/smbsrv
 
 LIBOBJS =	libshare_smb.o smb_share_doorclnt.o
 SMBCOMMON_OBJ =	smb_share_door_decode.o smb_common_door_decode.o
-SMBBASE_OBJ =	smb_cfg.o smb_scfutil.o smb_door_client.o
+SMBBASE_OBJ =	smb_cfg.o smb_scfutil.o
 SMBMLSVC_OBJ =	smb_share_util.o
 OBJECTS =	$(LIBOBJS) $(SMBCOMMON_OBJ) $(SMBBASE_OBJ) $(SMBMLSVC_OBJ)
 

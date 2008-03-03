@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,14 +30,6 @@
  */
 
 #include <smbsrv/smb_incl.h>
-
-
-/*
- * Oplock timeout configuration.
- */
-#define	OPLOCK_RETRIES		2
-time_t smb_oplock_timeout = OPLOCK_STD_TIMEOUT;
-
 
 /*
  * Oplock functionality enable/disable (see smb_oplock_init).
@@ -155,7 +147,7 @@ smb_acquire_oplock(
 	level = level_requested & MYF_OPLOCK_MASK;
 	*level_granted = MYF_OPLOCK_NONE;
 
-	if (smb_info.si.skc_oplock_enable == 0)
+	if (sr->sr_cfg->skc_oplock_enable == 0)
 		return (NT_STATUS_SUCCESS);
 
 	if (fsd_chkcap(&sr->tid_tree->t_fsd, FSOLF_DISABLE_OPLOCKS) > 0)

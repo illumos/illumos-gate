@@ -537,19 +537,17 @@ better_dc(uint32_t cur_ip, uint32_t new_ip)
 /*
  * msdcs_lookup_ads
  *
- * Try to find a domain controller in ADS. Actually we want to query DNS
- * but we need to find out if ADS is enabled and this is probably the
- * best way. The IP address isn't set up in the ADS_HANDLE so we need to
- * make the ads_find_host call. This will only succeed if ADS is enabled.
+ * Try to find a domain controller in ADS.
  *
  * Parameter:
  *    nbt_domain - NETBIOS name of the domain
+ *    server - the ADS server to be sought.
  *
  * Returns 1 if a domain controller was found and its name and IP address
  * have been updated. Otherwise returns 0.
  */
 int
-msdcs_lookup_ads(char *nbt_domain)
+msdcs_lookup_ads(char *nbt_domain, char *server)
 {
 	ADS_HOST_INFO *hinfo = 0;
 	int ads_port = 0;
@@ -559,6 +557,7 @@ msdcs_lookup_ads(char *nbt_domain)
 	char site[MAXHOSTNAMELEN];
 	char *p;
 	char *ip_addr;
+	char *nbt_hostname;
 	struct in_addr ns_list[MAXNS];
 	int i, cnt, go_next;
 
@@ -585,12 +584,12 @@ msdcs_lookup_ads(char *nbt_domain)
 	for (i = 0; i < cnt; i++) {
 		ip_addr = inet_ntoa(ns_list[i]);
 
-		hinfo = ads_find_host(ip_addr, ads_domain, &ads_port,
+		hinfo = ads_find_host(ip_addr, ads_domain, server, &ads_port,
 		    site_service, &go_next);
 
 		if (hinfo == NULL) {
-			hinfo = ads_find_host(ip_addr, ads_domain, &ads_port,
-			    service, &go_next);
+			hinfo = ads_find_host(ip_addr, ads_domain, server,
+			    &ads_port, service, &go_next);
 		}
 
 		if ((hinfo != NULL) || (go_next == 0))
@@ -609,10 +608,12 @@ msdcs_lookup_ads(char *nbt_domain)
 	 * Remove the domain extension - the
 	 * NetBIOS browser can't handle it.
 	 */
-	if ((p = strchr(hinfo->name, '.')) != 0)
+	nbt_hostname = strdup(hinfo->name);
+	if ((p = strchr(nbt_hostname, '.')) != 0)
 		*p = '\0';
 
-	smb_netlogon_rdc_rsp(hinfo->name, hinfo->ip_addr);
+	smb_netlogon_rdc_rsp(nbt_hostname, hinfo->ip_addr);
+	free(nbt_hostname);
 
 	return (1);
 }

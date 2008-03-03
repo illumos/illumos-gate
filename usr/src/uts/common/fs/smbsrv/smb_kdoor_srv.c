@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,38 +61,55 @@ void smb_kdoor_svc(void *data, door_arg_t *dap, void (**destfnp)(void *,
  * smb_kdoor_srv_start
  *
  * When driver is opened, this function should be called to create the
- * kernel door. The door descriptor will then be passed up to the
- * user-space SMB daemon.
+ * kernel door.
  *
  * Returns 0 upon success otherwise non-zero
  */
 int
-smb_kdoor_srv_start()
+smb_kdoor_srv_start(void)
 {
-	door_desc_t smb_kdoor_desc;
-	int err;
-	int res;
-	int opcode = SMB_DR_SET_DWNCALL_DESC;
+	int	err;
 
-	if ((err = door_ki_create(smb_kdoor_svc,
-	    &smb_kdoor_cookie, 0, &smb_kdoor_hdl)) != 0) {
-		cmn_err(CE_WARN, "SmbKdoorInit: door_create"
-		    " failed(%d)", err);
-		return (err);
+	if ((err = door_ki_create(smb_kdoor_svc, &smb_kdoor_cookie, 0,
+	    &smb_kdoor_hdl)) != 0) {
+		smb_kdoor_hdl = NULL;
+		cmn_err(CE_WARN, "SmbKdoorInit: door_create failed(%d)", err);
 	}
+	return (err);
+}
+
+/*
+ * smb_kdoor_srv_set_dwncall
+ *
+ * The door descriptor will be passed up to the user-space SMB daemon.
+ */
+int
+smb_kdoor_srv_set_dwncall(void)
+{
+	door_desc_t	smb_kdoor_desc;
+	int		rc;
+
+	bzero(&smb_kdoor_desc, sizeof (smb_kdoor_desc));
 
 	smb_kdoor_desc.d_attributes = DOOR_HANDLE;
 	smb_kdoor_desc.d_data.d_handle = smb_kdoor_hdl;
 
-	res = smb_upcall_set_dwncall_desc(opcode, &smb_kdoor_desc, 1);
-	if (res != SMB_DR_OP_SUCCESS) {
+	rc = smb_upcall_set_dwncall_desc(SMB_DR_SET_DWNCALL_DESC,
+	    &smb_kdoor_desc, 1);
+
+	if (rc != SMB_DR_OP_SUCCESS) {
 		cmn_err(CE_WARN, "SmbKdoorInit: smbd failed to set the"
-		    " downcall descriptor res=%d", res);
-		smb_kdoor_srv_stop();
-		return (EIO);
+		    " downcall descriptor res=%d", rc);
+		rc = EIO;
 	}
 
-	return (0);
+	return (rc);
+}
+
+door_handle_t
+smb_kdoor_get_handle(void)
+{
+	return (smb_kdoor_hdl);
 }
 
 /*

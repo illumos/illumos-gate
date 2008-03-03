@@ -228,7 +228,20 @@
 #include <smbsrv/smb_door_svc.h>
 
 smb_sdrc_t
-smb_com_session_setup_andx(struct smb_request *sr)
+smb_pre_session_setup_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__SessionSetupX__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_session_setup_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__SessionSetupX__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_session_setup_andx(smb_request_t *sr)
 {
 	uint16_t maxbufsize, maxmpxcount, vcnumber = 0;
 	uint32_t sesskey;
@@ -237,10 +250,10 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	char *primary_domain = "";
 	char *native_os = "";
 	char *native_lanman = "";
-	char *hostname = smb_info.si.skc_hostname;
+	char *hostname = sr->sr_cfg->skc_hostname;
 	smb_token_t *usr_token = NULL;
 	smb_user_t *user = NULL;
-	int security = smb_info.si.skc_secmode;
+	int security = sr->sr_cfg->skc_secmode;
 
 	uint16_t ci_pwlen = 0;
 	unsigned char *ci_password = NULL;
@@ -257,7 +270,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		    &sesskey, &ci_pwlen, &cs_pwlen, &capabilities);
 
 		if (rc != 0)
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 
 		ci_password = kmem_alloc(ci_pwlen + 1, KM_SLEEP);
 		cs_password = kmem_alloc(cs_pwlen + 1, KM_SLEEP);
@@ -286,7 +299,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		if (rc != 0) {
 			kmem_free(ci_password, ci_pwlen + 1);
 			kmem_free(cs_password, cs_pwlen + 1);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		ci_password[ci_pwlen] = 0;
@@ -313,13 +326,13 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		    &vcnumber, &sesskey, &ci_pwlen);
 
 		if (rc != 0)
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 
 		ci_password = kmem_alloc(ci_pwlen + 1, KM_SLEEP);
 		rc = smbsr_decode_data(sr, "%#c", sr, ci_pwlen, ci_password);
 		if (rc != 0) {
 			kmem_free(ci_password, ci_pwlen + 1);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		ci_password[ci_pwlen] = 0;
@@ -345,14 +358,14 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	 */
 	sr->session->vcnumber = vcnumber;
 	if (vcnumber == 0)
-		smb_reconnection_check(sr->session);
+		smb_server_reconnection_check(sr->sr_server, sr->session);
 
 	sr->session->smb_msg_size = maxbufsize;
 
 	bzero(&clnt_info, sizeof (netr_client_t));
 
 	if (*primary_domain == 0)
-		primary_domain = smb_info.si.skc_resource_domain;
+		primary_domain = sr->sr_cfg->skc_resource_domain;
 
 	if ((cs_pwlen == 0) &&
 	    (ci_pwlen == 0 || (ci_pwlen == 1 && *ci_password == 0))) {
@@ -365,7 +378,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		if (cs_password)
 			kmem_free(cs_password, cs_pwlen + 1);
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	} else if (utf8_strcasecmp(primary_domain, hostname) == 0) {
 		/*
 		 * When domain name is equal to hostname, it means
@@ -424,7 +437,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 			if (cs_password)
 				kmem_free(cs_password, cs_pwlen + 1);
 			smbsr_error(sr, 0, ERRSRV, ERRbadpw);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		if (usr_token->tkn_session_key) {
@@ -456,7 +469,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 		if (session_key)
 			kmem_free(session_key, sizeof (smb_session_key_t));
 		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	sr->user_cr = user->u_cred;
@@ -502,7 +515,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	    sr,
 	    "Windows NT 4.0",
 	    "NT LAN Manager 4.0",
-	    smb_info.si.skc_resource_domain);
+	    sr->sr_cfg->skc_resource_domain);
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

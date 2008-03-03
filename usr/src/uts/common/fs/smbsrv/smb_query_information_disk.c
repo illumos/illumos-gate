@@ -68,7 +68,20 @@
 #include <smbsrv/smb_fsops.h>
 
 smb_sdrc_t
-smb_com_query_information_disk(struct smb_request *sr)
+smb_pre_query_information_disk(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__QueryInformationDisk__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_query_information_disk(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__QueryInformationDisk__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_query_information_disk(smb_request_t *sr)
 {
 	int			rc;
 	struct statvfs64	df;
@@ -79,13 +92,13 @@ smb_com_query_information_disk(struct smb_request *sr)
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smb_fsop_statfs(sr->user_cr, sr->tid_tree->t_snode, &df);
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	unit_size = 1;
@@ -132,5 +145,5 @@ smb_com_query_information_disk(struct smb_request *sr)
 	    free_units,		/* free_units */
 	    0);			/* bcc */
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

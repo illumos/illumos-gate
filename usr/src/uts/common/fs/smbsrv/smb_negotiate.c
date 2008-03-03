@@ -205,16 +205,6 @@
 #define	SMB_DOS_MAXBUF			0x1104
 
 /*
- * Maximum buffer size for NT: configurable based on the client environment.
- * IR104720 Experiments with Windows 2000 indicate that we achieve better
- * SmbWriteX performance with a buffer size of 64KB instead of the 37KB
- * used with Windows NT4.0. Previous experiments with NT4.0 resulted in
- * directory listing problems so this buffer size is configurable based
- * on the end-user environment. When in doubt use 37KB.
- */
-int smb_maxbufsize = SMB_NT_MAXBUF(37);
-
-/*
  * The DOS TCP rcvbuf is set to 8700 because DOS 6.1 seems to have problems
  * with other values. DOS 6.1 seems to depend on a window value of 8700 to
  * send the next set of data. If we return a window value of 40KB, after
@@ -226,22 +216,30 @@ int smb_maxbufsize = SMB_NT_MAXBUF(37);
  * for a larger TCP window sizei based on observations of Windows 2000 and
  * performance testing. March 2003.
  */
-uint32_t	smb_dos_tcp_rcvbuf = 8700;
-uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
+static uint32_t	smb_dos_tcp_rcvbuf = 8700;
+static uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
 
-static void smb_get_security_info(
-    struct smb_request *sr,
-    unsigned short *secmode,
-    unsigned char *key,
-    unsigned char *keylen,
-    uint32_t *sesskey);
+static void smb_get_security_info(smb_request_t *, unsigned short *,
+    unsigned char *, unsigned char *, uint32_t *);
 
 /*
  * Function: int smb_com_negotiate(struct smb_request *)
  */
+smb_sdrc_t
+smb_pre_negotiate(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Negotiate__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_negotiate(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Negotiate__done, smb_request_t *, sr);
+}
 
 smb_sdrc_t
-smb_com_negotiate(struct smb_request *sr)
+smb_com_negotiate(smb_request_t *sr)
 {
 	int			dialect = 0;
 	int			this_dialect;
@@ -255,15 +253,14 @@ smb_com_negotiate(struct smb_request *sr)
 	uint32_t		sesskey;
 	uint32_t		capabilities = 0;
 	int			rc;
-
-	unsigned short max_mpx_count;
-	WORD tz_correction;
-	char ipaddr_buf[INET_ADDRSTRLEN];
+	unsigned short		max_mpx_count;
+	WORD			tz_correction;
+	char			ipaddr_buf[INET_ADDRSTRLEN];
 
 	if (sr->session->s_state != SMB_SESSION_STATE_ESTABLISHED) {
 		/* The protocol has already been negotiated. */
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	for (pos = 0;
@@ -271,7 +268,7 @@ smb_com_negotiate(struct smb_request *sr)
 	    pos++) {
 		if (smb_decode_mbc(&sr->smb_data, "%L", sr, &p) != 0) {
 			smbsr_error(sr, 0, ERRSRV, ERRerror);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		this_dialect = smb_xlate_dialect_str_to_cd(p);
@@ -286,15 +283,15 @@ smb_com_negotiate(struct smb_request *sr)
 	}
 	if (sel_pos < 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_get_security_info(sr, &secmode, (unsigned char *)key,
 	    &keylen, &sesskey);
 
 	(void) microtime(&time_val);
-
-	tz_correction = -(WORD)(smb_get_gmtoff() / 60); /* tz correct. (min) */
+	/* tz correct. (min) */
+	tz_correction = -(WORD)(sr->sr_gmtoff / 60);
 
 	switch (dialect) {
 	case DIALECT_UNKNOWN:
@@ -364,7 +361,7 @@ smb_com_negotiate(struct smb_request *sr)
 		    VAR_BCC,
 		    (int)keylen,
 		    key,		/* encryption key */
-		    smb_info.si.skc_resource_domain);
+		    sr->sr_cfg->skc_resource_domain);
 		break;
 
 	case NT_LM_0_12:
@@ -398,9 +395,9 @@ smb_com_negotiate(struct smb_request *sr)
 		 * Allow SMB signatures if security challenge response enabled
 		 */
 		if ((secmode & NEGOTIATE_SECURITY_CHALLENGE_RESPONSE) &&
-		    smb_info.si.skc_signing_enable) {
+		    sr->sr_cfg->skc_signing_enable) {
 			secmode |= NEGOTIATE_SECURITY_SIGNATURES_ENABLED;
-			if (smb_info.si.skc_signing_required)
+			if (sr->sr_cfg->skc_signing_required)
 				secmode |=
 				    NEGOTIATE_SECURITY_SIGNATURES_REQUIRED;
 
@@ -409,8 +406,8 @@ smb_com_negotiate(struct smb_request *sr)
 
 		(void) inet_ntop(AF_INET, (char *)&sr->session->ipaddr,
 		    ipaddr_buf, sizeof (ipaddr_buf));
-		/*LINTED E_ASSIGN_NARROW_CONV (uint16_t)*/
-		max_mpx_count = smb_info.si.skc_maxworkers;
+
+		max_mpx_count = sr->sr_cfg->skc_maxworkers;
 
 		rc = smbsr_encode_result(sr, 17, VAR_BCC,
 		    "(wct) b" "(dix) w" "(sec) b" "(mmc) w"
@@ -432,16 +429,16 @@ smb_com_negotiate(struct smb_request *sr)
 		    VAR_BCC,
 		    (int)keylen,
 		    key,			/* encryption key */
-		    smb_info.si.skc_resource_domain);
+		    sr->sr_cfg->skc_resource_domain);
 		break;
 
 	default:
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	/*
 	 * Save the agreed dialect. Note that this value is also
@@ -449,7 +446,7 @@ smb_com_negotiate(struct smb_request *sr)
 	 */
 	sr->session->dialect = dialect;
 	sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 static void

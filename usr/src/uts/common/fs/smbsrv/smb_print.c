@@ -84,10 +84,23 @@
  * ERRSRV/ERRqfull
  * ERRSRV/ERRqtoobig
  */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_open_print_file(struct smb_request *sr)
+smb_sdrc_t
+smb_pre_open_print_file(smb_request_t *sr)
 {
-	return (SDRC_UNIMPLEMENTED);
+	DTRACE_SMB_1(op__OpenPrintFile__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_open_print_file(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__OpenPrintFile__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t /*ARGSUSED*/
+smb_com_open_print_file(smb_request_t *sr)
+{
+	return (SDRC_NOT_IMPLEMENTED);
 }
 
 
@@ -119,10 +132,23 @@ smb_com_open_print_file(struct smb_request *sr)
  * other types of Fid closing requests to invalidate the Fid and begin
  * spooling.
  */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_close_print_file(struct smb_request *sr)
+smb_sdrc_t
+smb_pre_close_print_file(smb_request_t *sr)
 {
-	return (SDRC_UNIMPLEMENTED);
+	DTRACE_SMB_1(op__ClosePrintFile__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_close_print_file(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__ClosePrintFile__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t /*ARGSUSED*/
+smb_com_close_print_file(smb_request_t *sr)
+{
+	return (SDRC_NOT_IMPLEMENTED);
 }
 
 
@@ -196,17 +222,30 @@ smb_com_close_print_file(struct smb_request *sr)
  * ERRSRV/ERRbaduid
  */
 smb_sdrc_t
-smb_com_get_print_queue(struct smb_request *sr)
+smb_pre_get_print_queue(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__GetPrintQueue__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_get_print_queue(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__GetPrintQueue__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_get_print_queue(smb_request_t *sr)
 {
 	unsigned short max_count, start_ix;
 
 	if (smbsr_decode_vwv(sr, "ww", &max_count, &start_ix) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (smbsr_encode_result(sr, 2, 3, "bwwwbw", 2, 0, 0, 3, 1, 0))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 
@@ -246,8 +285,21 @@ smb_com_get_print_queue(struct smb_request *sr)
  * support the application of normal write requests to print spool files.
  *
  */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_write_print_file(struct smb_request *sr)
+smb_sdrc_t
+smb_pre_write_print_file(smb_request_t *sr)
 {
-	return (SDRC_UNIMPLEMENTED);
+	DTRACE_SMB_1(op__WritePrintFile__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_write_print_file(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__WritePrintFile__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t /*ARGSUSED*/
+smb_com_write_print_file(smb_request_t *sr)
+{
+	return (SDRC_NOT_IMPLEMENTED);
 }

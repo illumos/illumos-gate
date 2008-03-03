@@ -327,6 +327,23 @@ mlsvc_is_null_handle(mlsvc_handle_t *handle)
 	return (0);
 }
 
+DWORD
+mlsvc_netlogon(char *server, char *domain)
+{
+	mlsvc_handle_t netr_handle;
+	DWORD status;
+
+	if (netr_open(server, domain, &netr_handle) == 0) {
+		status = netlogon_auth(server, &netr_handle,
+		    NETR_FLG_INIT);
+		(void) netr_close(&netr_handle);
+	} else {
+		status = NT_STATUS_OPEN_FAILED;
+	}
+
+	return (status);
+}
+
 /*
  * mlsvc_join
  *
@@ -339,7 +356,6 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 	smb_ntdomain_t *di;
 	int erc;
 	DWORD status;
-	mlsvc_handle_t netr_handle;
 	char machine_passwd[MLSVC_MACHINE_ACCT_PASSWD_MAX];
 	char fqdn[MAXHOSTNAMELEN];
 
@@ -394,26 +410,12 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 		}
 
 		if (status == NT_STATUS_SUCCESS) {
-			erc = smb_config_setstr(SMB_CI_MACHINE_PASSWD,
+			erc = smb_setdomainprops(NULL, server,
 			    machine_passwd);
-			if (erc != SMBD_SMF_OK)
+			if (erc != 0)
 				return (NT_STATUS_UNSUCCESSFUL);
 
-			/*
-			 * If we successfully create a trust account, we mark
-			 * ourselves as a domain member in the environment so
-			 * that we use the SAMLOGON version of the NETLOGON
-			 * PDC location protocol.
-			 */
-			(void) smb_config_setbool(SMB_CI_DOMAIN_MEMB, B_TRUE);
-
-			if (netr_open(server, domain, &netr_handle) == 0) {
-				status = netlogon_auth(server, &netr_handle,
-				    NETR_FLG_INIT);
-				(void) netr_close(&netr_handle);
-			} else {
-				status = NT_STATUS_OPEN_FAILED;
-			}
+			status = mlsvc_netlogon(server, domain);
 		}
 	} else {
 		status = NT_STATUS_LOGON_FAILURE;

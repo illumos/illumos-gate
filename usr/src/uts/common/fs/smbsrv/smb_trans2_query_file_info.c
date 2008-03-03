@@ -99,13 +99,13 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_param_mb, "ww", &sr->smb_fid,
 	    &infolev) != 0) {
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	switch (sr->fid_ofile->f_ftype) {
@@ -175,7 +175,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	default:
 		smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	filebuf = kmem_alloc(MAXNAMELEN+1, KM_SLEEP);
@@ -200,9 +200,9 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_encode_mbc(&xa->rep_data_mb,
 		    ((sr->session->native_os == NATIVE_OS_WIN95)
 		    ? "YYYllw" : "yyyllw"),
-		    smb_gmt_to_local_time(creation_time->tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, creation_time->tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)dsize,
 		    (uint32_t)dused,
 		    dattr);
@@ -218,9 +218,9 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_encode_mbc(&xa->rep_data_mb,
 		    ((sr->session->native_os == NATIVE_OS_WIN95)
 		    ? "YYYllwl" : "yyyllwl"),
-		    smb_gmt_to_local_time(creation_time->tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, creation_time->tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)dsize,
 		    (uint32_t)dused,
 		    dattr, 0);
@@ -357,7 +357,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 			kmem_free(filebuf, MAXNAMELEN+1);
 			kmem_free(mangled_name, MAXNAMELEN);
 			smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		if (SMB_IS_STREAM(node)) {
@@ -384,12 +384,12 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(filebuf, MAXNAMELEN+1);
 		kmem_free(mangled_name, MAXNAMELEN);
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	kmem_free(filebuf, MAXNAMELEN+1);
 	kmem_free(mangled_name, MAXNAMELEN);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*

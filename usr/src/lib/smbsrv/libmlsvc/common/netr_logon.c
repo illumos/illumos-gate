@@ -114,7 +114,8 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 		if (status != 0)
 			return (status);
 
-		if ((netr_global_info.flags & NETR_FLG_VALID) == 0) {
+		if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
+		    !smb_match_netlogon_seqnum()) {
 			status = netlogon_auth(di->server, &netr_handle,
 			    NETR_FLG_NULL);
 

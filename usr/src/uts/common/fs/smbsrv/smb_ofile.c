@@ -199,7 +199,7 @@ smb_ofile_open(
 		return (NULL);
 	}
 
-	of = kmem_cache_alloc(smb_info.si_cache_ofile, KM_SLEEP);
+	of = kmem_cache_alloc(tree->t_server->si_cache_ofile, KM_SLEEP);
 	bzero(of, sizeof (smb_ofile_t));
 	of->f_magic = SMB_OFILE_MAGIC;
 	of->f_refcnt = 1;
@@ -212,6 +212,7 @@ smb_ofile_open(
 	of->f_cr = tree->t_user->u_cred;
 	crhold(of->f_cr);
 	of->f_ftype = ftype;
+	of->f_server = tree->t_server;
 	of->f_session = tree->t_user->u_session;
 	of->f_user = tree->t_user;
 	of->f_tree = tree;
@@ -242,7 +243,7 @@ smb_ofile_open(
 			mutex_destroy(&of->f_mutex);
 			crfree(of->f_cr);
 			smb_idpool_free(&tree->t_fid_pool, of->f_fid);
-			kmem_cache_free(smb_info.si_cache_ofile, of);
+			kmem_cache_free(tree->t_server->si_cache_ofile, of);
 			err->status = NT_STATUS_ACCESS_DENIED;
 			err->errcls = ERRDOS;
 			err->errcode = ERROR_ACCESS_DENIED;
@@ -255,7 +256,7 @@ smb_ofile_open(
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
 	smb_llist_insert_tail(&tree->t_ofile_list, of);
 	smb_llist_exit(&tree->t_ofile_list);
-	atomic_inc_32(&smb_info.open_files);
+	atomic_inc_32(&tree->t_server->sv_open_files);
 	atomic_inc_32(&of->f_session->s_file_cnt);
 
 	return (of);
@@ -317,7 +318,7 @@ smb_ofile_close(
 				smb_process_file_notify_change_queue(of);
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 		}
-		atomic_dec_32(&smb_info.open_files);
+		atomic_dec_32(&of->f_tree->t_server->sv_open_files);
 
 		mutex_enter(&of->f_mutex);
 		ASSERT(of->f_refcnt);
@@ -573,7 +574,7 @@ smb_ofile_close_timestamp_update(
 	mtime.tv_nsec = 0;
 
 	if (mtime.tv_sec != 0 && mtime.tv_sec != 0xFFFFFFFF) {
-		mtime.tv_sec = smb_local_time_to_gmt(mtime.tv_sec);
+		mtime.tv_sec -= of->f_server->si_gmtoff;
 		what |= SMB_AT_MTIME;
 	}
 
@@ -706,7 +707,7 @@ smb_ofile_delete(
 	mutex_destroy(&of->f_mutex);
 	crfree(of->f_cr);
 	smb_idpool_free(&of->f_tree->t_fid_pool, of->f_fid);
-	kmem_cache_free(smb_info.si_cache_ofile, of);
+	kmem_cache_free(of->f_tree->t_server->si_cache_ofile, of);
 }
 
 /*

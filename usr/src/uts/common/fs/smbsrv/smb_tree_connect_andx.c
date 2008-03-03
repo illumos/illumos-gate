@@ -160,33 +160,47 @@
 #include <smbsrv/smb_incl.h>
 
 smb_sdrc_t
-smb_com_tree_connect_andx(struct smb_request *sr)
+smb_pre_tree_connect_andx(smb_request_t *sr)
 {
-	unsigned char *pwbuf = NULL;
-	unsigned short pwlen = 0;
+	uint8_t *pwbuf = NULL;
+	uint16_t pwlen = 0;
 	int rc;
 
 	rc = smbsr_decode_vwv(sr, "b.www", &sr->andx_com, &sr->andx_off,
 	    &sr->arg.tcon.flags, &pwlen);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+	if (rc == 0) {
+		if (pwlen != 0) {
+			pwbuf = (uint8_t *)smbsr_malloc(&sr->request_storage,
+			    pwlen);
+			bzero(pwbuf, pwlen);
+		}
 
-	if (pwlen != 0) {
-		pwbuf = (unsigned char *)smbsr_malloc(&sr->request_storage,
-		    pwlen);
-		bzero(pwbuf, pwlen);
+		rc = smbsr_decode_data(sr, "%#cus", sr, pwlen, pwbuf,
+		    &sr->arg.tcon.path, &sr->arg.tcon.service);
+
+		sr->arg.tcon.pwdlen = pwlen;
+		sr->arg.tcon.password = (char *)pwbuf;
 	}
 
-	rc = smbsr_decode_data(sr, "%#cus", sr, pwlen, pwbuf,
-	    &sr->arg.tcon.path, &sr->arg.tcon.service);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+	DTRACE_SMB_2(op__TreeConnectX__start, smb_request_t *, sr,
+	    struct tcon *, &sr->arg.tcon);
 
-	sr->arg.tcon.pwdlen = pwlen;
-	sr->arg.tcon.password = (char *)pwbuf;
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_tree_connect_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__TreeConnectX__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_tree_connect_andx(smb_request_t *sr)
+{
+	int rc;
 
 	if (smbsr_connect_tree(sr) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (sr->session->dialect < NT_LM_0_12) {
 		rc = smbsr_encode_result(sr, 2, VAR_BCC, "bb.wwss",
@@ -208,5 +222,5 @@ smb_com_tree_connect_andx(struct smb_request *sr)
 		    sr->tid_tree->t_typename);
 	}
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

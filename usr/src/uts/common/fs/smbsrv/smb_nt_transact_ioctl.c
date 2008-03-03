@@ -88,7 +88,7 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_decode_mbc(&xa->req_setup_mb, "lwbb",
 	    &fcode, &fid, &is_fsctl, &is_flags) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	for (i = 0; i < sizeof (ioctl_ret_tbl) / sizeof (ioctl_ret_tbl[0]);
@@ -101,9 +101,9 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	(void) smb_encode_mbc(&xa->rep_param_mb, "l", 0);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

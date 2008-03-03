@@ -47,6 +47,8 @@
 #include <smbsrv/mlsvc.h>
 
 
+extern volatile uint32_t smb_fids;
+
 /*
  * This is the list of well-known RPC named pipes that we support.
  * The full pipe path will be in the form \\PIPE\\SERVICE. The first
@@ -271,7 +273,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 		smb_rpc_exit(pipe_info);
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	streamin = &pipe_info->input;
@@ -290,7 +292,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 		smb_rpc_exit(pipe_info);
 		smbsr_error(sr, NT_STATUS_CLIENT_SERVER_PARAMETERS_INVALID,
 		    0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/*
@@ -334,7 +336,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 	}
 
 	smb_rpc_exit(pipe_info);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 

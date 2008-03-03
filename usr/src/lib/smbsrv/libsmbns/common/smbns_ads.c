@@ -55,7 +55,6 @@
 
 #define	ADS_DN_MAX	300
 #define	ADS_MAXMSGLEN 512
-#define	ADS_HOST_PREFIX "host/"
 #define	ADS_COMPUTERS_CN "Computers"
 #define	ADS_COMPUTER_NUM_ATTR 7
 #define	ADS_SHARE_NUM_ATTR 3
@@ -66,7 +65,6 @@ ADS_HOST_INFO *ads_host_info = NULL;
 mutex_t ads_host_mtx;
 char ads_site[ADS_SITE_MAX];
 mutex_t ads_site_mtx;
-
 
 /*
  * adjoin_errmsg
@@ -81,7 +79,6 @@ static char *adjoin_errmsg[] = {
 	"ADJOIN failed to add workstation trust account.",
 	"ADJOIN failed to modify workstation trust account.",
 	"ADJOIN failed to get list of encryption types.",
-	"ADJOIN failed to get host principal.",
 	"ADJOIN failed to initialize kerberos context.",
 	"ADJOIN failed to get Kerberos principal.",
 	"ADJOIN failed to set machine account password on AD.",
@@ -89,16 +86,13 @@ static char *adjoin_errmsg[] = {
 	"ADJOIN failed to write Kerberos keytab file.",
 	"ADJOIN failed to configure domain_name property for idmapd.",
 	"ADJOIN failed to refresh idmap service."
-	"ADJOIN failed to refresh SMB service."
 };
 
 static ADS_HANDLE *ads_open_main(char *domain, char *user, char *password);
 static int ads_bind(ADS_HANDLE *);
 static void ads_get_computer_dn(ADS_HANDLE *, char *, size_t);
-static char *ads_get_host_principal(char *fqhost);
-static char *ads_get_host_principal_w_realm(char *princ, char *domain);
 static int ads_get_host_principals(char *fqhost, char *domain,
-    char **princ, char **princ_r);
+    char **spn, char **upn);
 static int ads_add_computer(ADS_HANDLE *ah);
 static int ads_modify_computer(ADS_HANDLE *ah);
 static void ads_del_computer(ADS_HANDLE *ah);
@@ -372,22 +366,24 @@ ads_get_host_info(void)
  * controllers are also ADS servers.
  *
  * The ADS hostnames are stored in the answer section of the DNS reply message.
- * The IP addresses are stored in the additional section.  If the additional
- * section does not contain any IP addresses then a DNS query by hostname is
- * sent to get the IP address of the hostname.  This is very unlikely.
+ * The IP addresses are stored in the additional section.
  *
  * The DNS reply message may be in compress formed.  The compression is done
  * on repeating domain name label in the message.  i.e hostname.
  * Parameters:
  *   ns: Nameserver to use to find the ADS host
  *   domain: domain of ADS host.
+ *   sought: the ADS host to be sought. It can be set to empty string to find
+ *           any ADS hosts in that domain.
+ *
  * Returns:
  *   ADS host: fully qualified hostname, ip address, ldap port
  *   port    : LDAP port of ADS host
  */
 /*ARGSUSED*/
 ADS_HOST_INFO *
-ads_find_host(char *ns, char *domain, int *port, char *service, int *go_next)
+ads_find_host(char *ns, char *domain, char *sought, int *port, char *service,
+    int *go_next)
 {
 	int s;
 	uint16_t id, rid, data_len, eport;
@@ -404,16 +400,27 @@ ads_find_host(char *ns, char *domain, int *port, char *service, int *go_next)
 	int force_recurs = 0;
 	ADS_HOST_INFO *ads_hosts_list = NULL, *ads_host;
 	ADS_HOST_INFO *ads_hosts_list2 = NULL;
+	char *curdom = NULL;
+	boolean_t same_domain;
 
 	*go_next = 0;
 
 	/*
-	 * If we have already found an ADS server, skip the ads_find_host
-	 * process. Returns the ADS host from the cache.
+	 * If we have already found an ADS server in the given domain, return
+	 * the cached ADS host if either the sought host is not specified or
+	 * the cached ADS host matches the sought host.
 	 */
 	ads_host = ads_get_host_info();
-	if (ads_host)
-		return (ads_host);
+	if (ads_host) {
+		curdom = strchr(ads_host->name, '.');
+		same_domain = (curdom && !strcasecmp(++curdom, domain));
+		if (same_domain && (!sought ||
+		    (sought && !strncasecmp(ads_host->name, sought,
+		    strlen(sought)))))
+			return (ads_host);
+
+		ads_free_host_info();
+	}
 
 	if (ns == NULL || *ns == 0) {
 		return (NULL);
@@ -574,6 +581,7 @@ retry:
 			}
 
 			ads_hosts_list2[i].name = str;
+
 			bufptr += 10;
 			bufptr = dyndns_get_int(bufptr, &ipaddr);
 			ads_hosts_list2[i].ip_addr = ipaddr;
@@ -581,6 +589,11 @@ retry:
 
 		/* pick a host that is up */
 		for (i = 0; i < addit_cnt; i++) {
+			if ((sought) &&
+			    (strncasecmp(sought, ads_hosts_list2[i].name,
+			    strlen(sought)) != 0))
+				continue;
+
 			if (ads_ping(ads_hosts_list2[i].ip_addr) != 0) {
 				continue;
 			}
@@ -588,11 +601,13 @@ retry:
 				if (strcmp(ads_hosts_list2[i].name,
 				    ads_hosts_list[j].name) == 0)
 					break;
+
 			if (j == ans_cnt) {
 				ads_free_host_list(ads_hosts_list, ans_cnt);
 				ads_free_host_list(ads_hosts_list2, addit_cnt);
 				return (NULL);
 			}
+
 			ads_host = (ADS_HOST_INFO *)
 			    malloc(sizeof (ADS_HOST_INFO));
 			if (ads_host == NULL) {
@@ -810,11 +825,12 @@ find_ads_host:
 		for (i = 0; i < cnt; i++) {
 			if (*site_service != '\0') {
 				ads_host = ads_find_host(inet_ntoa(ns_list[i]),
-				    domain, &ads_port, site_service, &go_next);
+				    domain, NULL, &ads_port, site_service,
+				    &go_next);
 			}
 			if (ads_host == NULL) {
 				ads_host = ads_find_host(inet_ntoa(ns_list[i]),
-				    domain, &ads_port, service, &go_next);
+				    domain, NULL, &ads_port, service, &go_next);
 			}
 			if (ads_host != NULL)
 				break;
@@ -1678,78 +1694,28 @@ ads_get_computer_dn(ADS_HANDLE *ah, char *buf, size_t buflen)
 	    hostname, ADS_COMPUTERS_CN, ah->domain_dn);
 }
 
-static char *
-ads_get_host_principal(char *fqhost)
-{
-	int len;
-	char *princ;
-
-	if (!fqhost)
-		return (NULL);
-
-	len = strlen(ADS_HOST_PREFIX) + strlen(fqhost) + 1;
-	princ = (char *)malloc(len);
-
-	if (!princ) {
-		syslog(LOG_ERR, "ads_get_host_principal: resource shortage");
-		return (NULL);
-	}
-	(void) snprintf(princ, len, "%s%s", ADS_HOST_PREFIX,
-	    fqhost);
-
-	return (princ);
-}
-
-static char *
-ads_get_host_principal_w_realm(char *princ, char *domain)
-{
-	int len;
-	char *realm;
-	char *princ_r;
-
-	if (!princ || !domain)
-		return (NULL);
-
-	realm = strdup(domain);
-	if (!realm)
-		return (NULL);
-
-	(void) utf8_strupr(realm);
-
-	len = strlen(princ) + 1 + strlen(realm) + 1;
-	princ_r = (char *)malloc(len);
-	if (!princ_r) {
-		syslog(LOG_ERR, "ads_get_host_principal_w_realm: resource"
-		    " shortage");
-		free(realm);
-		return (NULL);
-	}
-
-	(void) snprintf(princ_r, len, "%s@%s", princ, realm);
-	free(realm);
-
-	return (princ_r);
-}
-
 /*
  * ads_get_host_principals
  *
+ * This function returns both the HOST Service Principal Name and User
+ * Principal Name.
+ *
  * If fqhost is NULL, this function will attempt to obtain fully qualified
- * hostname prior to generating the host principals. If caller is not
- * interested in getting the principal name without the Kerberos realm
- * info, princ can be set to NULL.
+ * hostname prior to generating the host principals. If caller is only
+ * interested in getting the User Principal Name, spn argument can be
+ * set to NULL.
  */
 static int
-ads_get_host_principals(char *fqhost, char *domain, char **princ,
-    char **princ_r)
+ads_get_host_principals(char *fqhost, char *domain, char **spn,
+    char **upn)
 {
 	char hostname[MAXHOSTNAMELEN];
 	char *p;
 
-	if (princ != NULL)
-		*princ = NULL;
+	if (spn != NULL)
+		*spn = NULL;
 
-	*princ_r = NULL;
+	*upn = NULL;
 
 	if (fqhost) {
 		(void) strlcpy(hostname, fqhost, MAXHOSTNAMELEN);
@@ -1761,18 +1727,18 @@ ads_get_host_principals(char *fqhost, char *domain, char **princ,
 		    domain);
 	}
 
-	if ((p = ads_get_host_principal(hostname)) == NULL) {
+	if ((p = smb_krb5_get_spn(SMBKRB5_SPN_IDX_HOST, hostname)) == NULL) {
 		return (-1);
 	}
 
-	*princ_r = ads_get_host_principal_w_realm(p, domain);
-	if (*princ_r == NULL) {
+	*upn = smb_krb5_get_upn(p, domain);
+	if (*upn == NULL) {
 		free(p);
 		return (-1);
 	}
 
-	if (princ != NULL)
-		*princ = p;
+	if (spn != NULL)
+		*spn = p;
 	else
 		free(p);
 
@@ -2150,39 +2116,42 @@ int
 ads_domain_change_cleanup(char *newdom)
 {
 	char origdom[MAXHOSTNAMELEN];
-	char *princ_r;
 	krb5_context ctx = NULL;
-	krb5_principal krb5princ;
+	krb5_principal krb5princs[SMBKRB5_SPN_IDX_MAX];
 	int rc;
 
-	if (smb_getfqdomainname(origdom, MAXHOSTNAMELEN))
+	if (smb_getfqdomainname(origdom, MAXHOSTNAMELEN)) {
+		if (smb_getdomainname(origdom, MAXHOSTNAMELEN) == 0)
+			if (strncasecmp(origdom, newdom, strlen(origdom)))
+				ads_free_host_info();
+
 		return (0);
+	}
 
 	if (strcasecmp(origdom, newdom) == 0)
 		return (0);
 
 	ads_free_host_info();
-	if (ads_get_host_principals(NULL, origdom, NULL, &princ_r) == -1)
+
+	if (smb_krb5_ctx_init(&ctx) != 0)
 		return (-1);
 
-	if (smb_krb5_ctx_init(&ctx) != 0) {
-		free(princ_r);
-		return (-1);
-	}
-
-	if (smb_krb5_get_principal(ctx, princ_r, &krb5princ) != 0) {
-		free(princ_r);
+	if (smb_krb5_get_principals(origdom, ctx, krb5princs) != 0) {
 		smb_krb5_ctx_fini(ctx);
 		return (-1);
 
 	}
 
-	rc = smb_krb5_remove_keytab_entries(ctx, krb5princ, SMBNS_KRB5_KEYTAB);
-	free(princ_r);
+	rc = smb_krb5_remove_keytab_entries(ctx, krb5princs,
+	    SMBNS_KRB5_KEYTAB);
+
+	smb_krb5_free_principals(ctx, krb5princs, SMBKRB5_SPN_IDX_MAX);
 	smb_krb5_ctx_fini(ctx);
 
 	return (rc);
 }
+
+
 
 /*
  * ads_join
@@ -2215,12 +2184,12 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 {
 	ADS_HANDLE *ah = NULL;
 	krb5_context ctx = NULL;
-	krb5_principal krb5princ;
+	krb5_principal krb5princs[SMBKRB5_SPN_IDX_MAX];
 	krb5_kvno kvno;
-	char *princ_r;
 	boolean_t des_only, delete = B_TRUE;
 	adjoin_status_t rc = ADJOIN_SUCCESS;
 	boolean_t new_acct;
+
 	/*
 	 * Call library functions that can be used to get
 	 * the list of encryption algorithms available on the system.
@@ -2234,13 +2203,13 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	    ENCTYPE_ARCFOUR_HMAC, ENCTYPE_AES128_CTS_HMAC_SHA1_96};
 
 	if ((ah = ads_open_main(domain, user, usr_passwd)) == NULL) {
-		(void) smb_config_refresh();
+		smb_ccache_remove(SMB_CCACHE_PATH);
 		return (ADJOIN_ERR_GET_HANDLE);
 	}
 
 	if (ads_gen_machine_passwd(machine_passwd, len) != 0) {
 		ads_close(ah);
-		(void) smb_config_refresh();
+		smb_ccache_remove(SMB_CCACHE_PATH);
 		return (ADJOIN_ERR_GEN_PASSWD);
 	}
 
@@ -2248,14 +2217,14 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		new_acct = B_FALSE;
 		if (ads_modify_computer(ah) != 0) {
 			ads_close(ah);
-			(void) smb_config_refresh();
+			smb_ccache_remove(SMB_CCACHE_PATH);
 			return (ADJOIN_ERR_MOD_TRUST_ACCT);
 		}
 	} else {
 		new_acct = B_TRUE;
 		if (ads_add_computer(ah) != 0) {
 			ads_close(ah);
-			(void) smb_config_refresh();
+			smb_ccache_remove(SMB_CCACHE_PATH);
 			return (ADJOIN_ERR_ADD_TRUST_ACCT);
 		}
 	}
@@ -2272,25 +2241,19 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	 * SmbSessionSetup request sent by SMB redirector.
 	 */
 
-	if (ads_get_host_principals(NULL, ah->domain, NULL, &princ_r) == -1) {
-		if (new_acct)
-			ads_del_computer(ah);
-		ads_close(ah);
-		(void) smb_config_refresh();
-		return (ADJOIN_ERR_GET_HOST_PRINC);
-	}
 
 	if (smb_krb5_ctx_init(&ctx) != 0) {
 		rc = ADJOIN_ERR_INIT_KRB_CTX;
 		goto adjoin_cleanup;
 	}
 
-	if (smb_krb5_get_principal(ctx, princ_r, &krb5princ) != 0) {
-		rc = ADJOIN_ERR_GET_KRB_PRINC;
+	if (smb_krb5_get_principals(ah->domain, ctx, krb5princs) != 0) {
+		rc = ADJOIN_ERR_GET_SPNS;
 		goto adjoin_cleanup;
 	}
 
-	if (smb_krb5_setpwd(ctx, krb5princ, machine_passwd) != 0) {
+	if (smb_krb5_setpwd(ctx, krb5princs[SMBKRB5_SPN_IDX_HOST],
+	    machine_passwd) != 0) {
 		rc = ADJOIN_ERR_KSETPWD;
 		goto adjoin_cleanup;
 	}
@@ -2302,7 +2265,7 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		goto adjoin_cleanup;
 	}
 
-	if (smb_krb5_update_keytab_entries(ctx, krb5princ, SMBNS_KRB5_KEYTAB,
+	if (smb_krb5_update_keytab_entries(ctx, krb5princs, SMBNS_KRB5_KEYTAB,
 	    kvno, machine_passwd, enctypes,
 	    (sizeof (enctypes) / sizeof (krb5_enctype))) != 0) {
 		rc = ADJOIN_ERR_WRITE_KEYTAB;
@@ -2327,21 +2290,14 @@ adjoin_cleanup:
 		ads_del_computer(ah);
 
 	if (rc != ADJOIN_ERR_INIT_KRB_CTX) {
-		if (rc != ADJOIN_ERR_GET_KRB_PRINC)
-			krb5_free_principal(ctx, krb5princ);
+		if (rc != ADJOIN_ERR_GET_SPNS)
+			smb_krb5_free_principals(ctx, krb5princs,
+			    SMBKRB5_SPN_IDX_MAX);
 		smb_krb5_ctx_fini(ctx);
 	}
 
 	ads_close(ah);
-	free(princ_r);
-
-	/*
-	 * Don't mask other failure.  Only reports SMF refresh
-	 * failure if no other domain join failure.
-	 */
-	if ((smb_config_refresh() != 0) && (rc == ADJOIN_SUCCESS))
-		rc = ADJOIN_ERR_SMB_REFRESH;
-
+	smb_ccache_remove(SMB_CCACHE_PATH);
 	return (rc);
 }
 

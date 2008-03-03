@@ -43,11 +43,12 @@ extern "C" {
 extern int mlsvc_init(void);
 extern uint32_t mlsvc_lookup_name(char *, nt_sid_t **, uint16_t *);
 extern uint32_t mlsvc_lookup_sid(nt_sid_t *, char **);
+extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD lsa_query_primary_domain_info(void);
 extern DWORD lsa_query_account_domain_info(void);
 extern DWORD lsa_enum_trusted_domains(void);
 
-extern boolean_t locate_resource_pdc(char *);
+extern boolean_t smbd_locate_dc(char *, char *);
 
 #define	SMB_AUTOHOME_FILE	"smbautohome"
 #define	SMB_AUTOHOME_PATH	"/etc"

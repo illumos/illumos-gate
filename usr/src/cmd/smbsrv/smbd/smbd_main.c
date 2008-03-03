@@ -62,18 +62,18 @@
 #include "smbd.h"
 
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
-#define	SMB_VARRUN_DIR "/var/run/smb"
-#define	SMB_CCACHE SMB_VARRUN_DIR "/ccache"
 #define	SMB_DBDIR "/var/smb"
+
+extern void *smbd_nbt_listener(void *);
+extern void *smbd_tcp_listener(void *);
 
 static int smbd_daemonize_init(void);
 static void smbd_daemonize_fini(int, int);
 
-static int smbd_kernel_bind(void);
+static int smbd_kernel_bind(int, int, int);
 static void smbd_kernel_unbind(void);
 static int smbd_already_running(void);
 
-static void smbd_remove_ccache(void);
 static int smbd_service_init(void);
 static void smbd_service_fini(void);
 
@@ -86,18 +86,19 @@ static void smbd_sig_handler(int sig);
 static int smbd_localtime_init(void);
 static void *smbd_localtime_monitor(void *arg);
 
-extern time_t altzone;
 
 static pthread_t localtime_thr;
 
 static int smbd_refresh_init(void);
 static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
+static pthread_t nbt_listener;
+static pthread_t tcp_listener;
 static pthread_t refresh_thr;
 static pthread_cond_t refresh_cond;
 static pthread_mutex_t refresh_mutex;
 
-static smbd_t smbd;
+smbd_t smbd;
 
 /*
  * smbd user land daemon
@@ -320,38 +321,36 @@ smbd_daemonize_fini(int fd, int exit_status)
 	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, NULL);
 }
 
+/*
+ * smbd_service_init
+ */
 static int
 smbd_service_init(void)
 {
-	static char *dir[] = {
-		SMB_DBDIR,		/* smbpasswd */
-		SMB_VARRUN_DIR		/* KRB credential cache */
-	};
-
-	int door_id;
-	int rc;
-	uint32_t mode;
-	char resource_domain[SMB_PI_MAX_DOMAIN];
-	int i;
-
+	int		id_winpipe_door;
+	int		id_lmshr_door;
+	int		id_srv_door;
+	int		rc;
+	uint32_t	mode;
+	char		resource_domain[SMB_PI_MAX_DOMAIN];
+	char		fqdn[MAXHOSTNAMELEN];
 	smbd.s_drv_fd = -1;
 
-	for (i = 0; i < (sizeof (dir)/sizeof (dir[0])); ++i) {
-		errno = 0;
 
-		if ((mkdir(dir[i], 0700) < 0) && (errno != EEXIST)) {
-			smbd_report("mkdir %s: %s", dir[i], strerror(errno));
-			return (1);
-		}
-	}
-
-	/*
-	 * Set KRB5CCNAME (for the SMB credential cache) in the environment.
-	 */
-	if (putenv("KRB5CCNAME=" SMB_CCACHE) != 0) {
-		smbd_report("unable to set KRB5CCNAME");
+	if ((mkdir(SMB_DBDIR, 0700) < 0) && (errno != EEXIST)) {
+		smbd_report("mkdir %s: %s", SMB_DBDIR, strerror(errno));
 		return (1);
 	}
+
+	if ((rc = smb_ccache_init(SMB_VARRUN_DIR, SMB_CCACHE_FILE)) != 0) {
+		if (rc == -1)
+			smbd_report("mkdir %s: %s", SMB_VARRUN_DIR,
+			    strerror(errno));
+		else
+			smbd_report("unable to set KRB5CCNAME");
+		return (1);
+	}
+
 
 	(void) oem_language_set("english");
 
@@ -381,16 +380,13 @@ smbd_service_init(void)
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 	(void) utf8_strupr(resource_domain);
 
-	mode = smb_config_get_secmode();
-	if (mode == SMB_SECMODE_DOMAIN)
-		(void) locate_resource_pdc(resource_domain);
-
 	/* Get the ID map client handle */
 	if ((rc = smb_idmap_start()) != 0) {
 		smbd_report("no idmap handle");
 		return (rc);
 	}
 
+	mode = smb_config_get_secmode();
 	if ((rc = nt_domain_init(resource_domain, mode)) != 0) {
 		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
 			smbd_report(
@@ -405,48 +401,48 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	if (smb_lmshrd_srv_start() != 0) {
+	if (mode == SMB_SECMODE_DOMAIN) {
+		if (!smb_match_netlogon_seqnum())
+			smb_set_netlogon_cred();
+		else
+			(void) smbd_locate_dc(resource_domain, "");
+
+		(void) lsa_query_primary_domain_info();
+	}
+
+	id_lmshr_door = smb_lmshrd_srv_start();
+	if (id_lmshr_door < 0) {
 		smbd_report("share initialization failed");
 	}
 
-	/* XXX following will get removed */
-	(void) smb_doorsrv_start();
-	if ((rc = smb_door_srv_start()) != 0)
+	id_srv_door = smb_door_srv_start();
+	if (id_srv_door < 0)
 		return (rc);
 
 	if ((rc = smbd_refresh_init()) != 0)
 		return (rc);
 
-	/* Call dyndns update - Just in case its configured to refresh DNS */
-	if (smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
-		(void) dyndns_update();
-
-	if ((rc = smbd_kernel_bind()) != 0)
-		smbd_report("kernel bind error: %s", strerror(errno));
+	if (smb_getfqdomainname(fqdn, MAXHOSTNAMELEN) == 0)
+		(void) dyndns_update(fqdn, B_FALSE);
 
 	(void) smbd_localtime_init();
 
-	if ((door_id = smb_winpipe_doorsvc_start()) == -1) {
+	id_winpipe_door = smb_winpipe_doorsvc_start();
+	if (id_winpipe_door < 0) {
 		smbd_report("winpipe initialization failed %s",
 		    strerror(errno));
 		return (rc);
-	} else {
-		if (ioctl(smbd.s_drv_fd, SMB_IOC_WINPIPE, &door_id) < 0)
-			smbd_report("winpipe ioctl: %s", strerror(errno));
 	}
 
 	(void) smb_lgrp_start();
 
 	(void) smb_pwd_init();
 
-	return (lmshare_start());
-}
+	rc = smbd_kernel_bind(id_lmshr_door, id_srv_door, id_winpipe_door);
+	if (rc != 0)
+		smbd_report("kernel bind error: %s", strerror(errno));
 
-static void
-smbd_remove_ccache(void)
-{
-	if ((remove(SMB_CCACHE) < 0) && (errno != ENOENT))
-		smbd_report("failed to remove SMB ccache");
+	return (lmshare_start());
 }
 
 /*
@@ -462,16 +458,16 @@ smbd_service_fini(void)
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
 	smb_door_srv_stop();
-	smb_doorsrv_stop();
 	smb_lmshrd_srv_stop();
 	lmshare_stop();
 	smb_nicmon_stop();
 	smb_idmap_stop();
 	smb_lgrp_stop();
-	smbd_remove_ccache();
+	smb_ccache_remove(SMB_CCACHE_PATH);
 	smb_pwd_fini();
 
 }
+
 
 /*
  * smbd_refresh_init()
@@ -535,8 +531,9 @@ smbd_refresh_monitor(void *arg)
 		 * what is necessary.
 		 */
 		ads_refresh();
+		smb_ccache_remove(SMB_CCACHE_PATH);
 		smb_nicmon_reconfig();
-		smbd_remove_ccache();
+		smb_set_netlogon_cred();
 		if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &dummy) < 0) {
 			smbd_report("configuration update ioctl: %s",
 			    strerror(errno));
@@ -558,7 +555,7 @@ smbd_already_running(void)
 	door_info_t info;
 	int door;
 
-	if ((door = open(SMBD_DOOR_NAME, O_RDONLY)) < 0)
+	if ((door = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (0);
 
 	if (door_info(door, &info) < 0)
@@ -574,19 +571,69 @@ smbd_already_running(void)
 	return (0);
 }
 
+/*
+ * smbd_kernel_bind
+ */
 static int
-smbd_kernel_bind(void)
+smbd_kernel_bind(int id_lmshr_door, int id_srv_door, int id_winpipe_door)
 {
+	smb_io_t	smb_io;
+	int		rc;
+
+	bzero(&smb_io, sizeof (smb_io));
+	smb_io.sio_version = SMB_IOC_VERSION;
+
 	if (smbd.s_drv_fd != -1)
 		(void) close(smbd.s_drv_fd);
 
 	if ((smbd.s_drv_fd = open(DRV_DEVICE_PATH, 0)) < 0) {
 		smbd.s_drv_fd = -1;
-		return (1);
+		return (errno);
 	}
-	return (0);
+	smb_load_kconfig(&smb_io.sio_data.cfg);
+	if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &smb_io) < 0) {
+		(void) close(smbd.s_drv_fd);
+		smbd.s_drv_fd = -1;
+		return (errno);
+	}
+	smb_io.sio_data.gmtoff = (uint32_t)(-altzone);
+	if (ioctl(smbd.s_drv_fd, SMB_IOC_GMTOFF, &smb_io) < 0) {
+		(void) close(smbd.s_drv_fd);
+		smbd.s_drv_fd = -1;
+		return (errno);
+	}
+	smb_io.sio_data.start.winpipe = id_winpipe_door;
+	smb_io.sio_data.start.lmshrd = id_lmshr_door;
+	smb_io.sio_data.start.udoor = id_srv_door;
+	if (ioctl(smbd.s_drv_fd, SMB_IOC_START, &smb_io) < 0) {
+		(void) close(smbd.s_drv_fd);
+		smbd.s_drv_fd = -1;
+		return (errno);
+	}
+
+	rc = pthread_create(&nbt_listener, NULL, smbd_nbt_listener, NULL);
+	if (rc == 0) {
+		rc = pthread_create(&tcp_listener, NULL, smbd_tcp_listener,
+		    NULL);
+		if (rc == 0)
+			return (0);
+	}
+	(void) close(smbd.s_drv_fd);
+	smbd.s_drv_fd = -1;
+	return (rc);
 }
 
+/*
+ * smbd_kernel_unbind
+ */
+static void
+smbd_kernel_unbind(void)
+{
+	if (smbd.s_drv_fd != -1) {
+		(void) close(smbd.s_drv_fd);
+		smbd.s_drv_fd = -1;
+	}
+}
 
 /*
  * Initialization of the localtime thread.
@@ -647,16 +694,6 @@ smbd_localtime_monitor(void *arg)
 
 	/*NOTREACHED*/
 	return (NULL);
-}
-
-
-static void
-smbd_kernel_unbind(void)
-{
-	if (smbd.s_drv_fd != -1) {
-		(void) close(smbd.s_drv_fd);
-		smbd.s_drv_fd = -1;
-	}
 }
 
 static void

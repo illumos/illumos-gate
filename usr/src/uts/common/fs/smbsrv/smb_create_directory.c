@@ -58,18 +58,34 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
-typedef struct smb_request SmbRequest;
-
 typedef struct {
 	char	*sp_path;	/* Original path */
 	char	*sp_curp;	/* Current pointer into the original path */
-	SmbRequest *sp_sr;	/* Current request pointer */
+	smb_request_t *sp_sr;	/* Current request pointer */
 } SmbPath;
 
 
-static int smbpath_next(SmbPath* spp);
-static SmbPath* smbpath_new(SmbRequest* sr);
+static int smbpath_next(SmbPath *spp);
+static SmbPath* smbpath_new(smb_request_t *sr);
 
+smb_sdrc_t
+smb_pre_create_directory(smb_request_t *sr)
+{
+	int rc;
+
+	rc = smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path);
+
+	DTRACE_SMB_2(op__CreateDirectory__start, smb_request_t *, sr,
+	    struct dirop *, &sr->arg.dirop);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_create_directory(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__CreateDirectory__done, smb_request_t *, sr);
+}
 
 /*
  * smb_com_create_directory
@@ -78,7 +94,7 @@ static SmbPath* smbpath_new(SmbRequest* sr);
  * or all of the components to be created if they don't already exist.
  */
 smb_sdrc_t
-smb_com_create_directory(struct smb_request *sr)
+smb_com_create_directory(smb_request_t *sr)
 {
 	SmbPath* spp;
 	DWORD status;
@@ -87,15 +103,12 @@ smb_com_create_directory(struct smb_request *sr)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
-
-	if (smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
 
 	if ((status = smb_validate_dirname(sr->arg.dirop.fqi.path)) != 0) {
 		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/*
@@ -108,18 +121,18 @@ smb_com_create_directory(struct smb_request *sr)
 		rc = smb_common_create_directory(sr);
 		if (rc != 0 && rc != EEXIST) {
 			smbsr_errno(sr, rc);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 	}
 
 	/* We should have created one directory successfully! */
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 
@@ -157,7 +170,7 @@ smb_validate_dirname(char *path)
  * Returns errno values.
  */
 int
-smb_common_create_directory(struct smb_request *sr)
+smb_common_create_directory(smb_request_t *sr)
 {
 	int rc;
 	smb_attr_t new_attr;
@@ -203,7 +216,7 @@ smb_common_create_directory(struct smb_request *sr)
 }
 
 SmbPath*
-smbpath_new(SmbRequest* sr)
+smbpath_new(smb_request_t *sr)
 {
 	int pathLen;
 	char *xpath;

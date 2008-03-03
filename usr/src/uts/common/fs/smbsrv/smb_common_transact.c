@@ -34,8 +34,6 @@
 #include <smbsrv/lmerr.h>
 #include <smbsrv/nterror.h>
 
-extern int smb_maxbufsize;
-
 #define	MAX_SHARE_NAME_LEN	13
 #define	SHARE_INFO_1_SIZE	(MAX_SHARE_NAME_LEN + sizeof (char) + \
     sizeof (short) + sizeof (uint32_t))
@@ -63,7 +61,20 @@ static smb_sdrc_t smb_nt_transact_query_quota(struct smb_request *,
     struct smb_xa *);
 
 smb_sdrc_t
-smb_com_transaction(struct smb_request *sr)
+smb_pre_transaction(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Transaction__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_transaction(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Transaction__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_transaction(smb_request_t *sr)
 {
 	int		rc;
 	unsigned char	msrcnt, suwcnt;
@@ -79,13 +90,13 @@ smb_com_transaction(struct smb_request *sr)
 	    &timeo, &pscnt, &psoff, &dscnt, &dsoff, &suwcnt);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	xa = smb_xa_create(sr->session, sr, tpscnt, tdscnt, mprcnt, mdrcnt,
 	    msrcnt, suwcnt);
 	if (xa == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRnoroom);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/* Should be some alignment stuff here in SMB? */
@@ -96,7 +107,7 @@ smb_com_transaction(struct smb_request *sr)
 	}
 	if (rc != 0) {
 		smb_xa_rele(sr->session, xa);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	xa->xa_smb_trans_name = MEM_STRDUP("smb", stn);
 
@@ -109,17 +120,17 @@ smb_com_transaction(struct smb_request *sr)
 	    sr->smb_vwv.chain_offset, suwcnt * 2)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	ready = smb_trans_ready(xa);
@@ -127,26 +138,39 @@ smb_com_transaction(struct smb_request *sr)
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	sr->r_xa = xa;
 
 	if (!ready) {
 		rc = smbsr_encode_empty_result(sr);
-		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	if (!smb_xa_complete(xa)) {
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	return (smb_trans_dispatch(sr, xa));
 }
 
 smb_sdrc_t
-smb_com_transaction_secondary(struct smb_request *sr)
+smb_pre_transaction_secondary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__TransactionSecondary__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_transaction_secondary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__TransactionSecondary__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_transaction_secondary(smb_request_t *sr)
 {
 	uint16_t tpscnt, tdscnt, pscnt, psdisp;
 	uint16_t dscnt, dsoff, dsdisp, psoff;
@@ -155,14 +179,14 @@ smb_com_transaction_secondary(struct smb_request *sr)
 
 	if ((xa = smbsr_lookup_xa(sr)) == 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_secondary(sr, xa->reply_seqnum) != 0) {
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERRnoaccess);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 	}
 
@@ -174,7 +198,7 @@ smb_com_transaction_secondary(struct smb_request *sr)
 	    &pscnt, &psoff, &psdisp, &dscnt, &dsoff, &dsdisp);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	mutex_enter(&xa->xa_mutex);
 	xa->smb_tpscnt = tpscnt;	/* might have shrunk */
@@ -186,13 +210,13 @@ smb_com_transaction_secondary(struct smb_request *sr)
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	mutex_exit(&xa->xa_mutex);
 
@@ -206,7 +230,20 @@ smb_com_transaction_secondary(struct smb_request *sr)
 }
 
 smb_sdrc_t
-smb_com_ioctl(struct smb_request *sr)
+smb_pre_ioctl(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Ioctl__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_ioctl(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Ioctl__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_ioctl(smb_request_t *sr)
 {
 	uint16_t fid, category, function, tpscnt, tdscnt, mprcnt;
 	uint16_t mdrcnt, pscnt, pdoff, dscnt, dsoff;
@@ -218,15 +255,22 @@ smb_com_ioctl(struct smb_request *sr)
 	    &pdoff, &dscnt, &dsoff);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
-	return (SDRC_UNIMPLEMENTED);
+	return (SDRC_NOT_IMPLEMENTED);
 }
 
-smb_sdrc_t /*ARGSUSED*/
-smb_com_ioctl_secondary(struct smb_request *sr)
+smb_sdrc_t
+smb_pre_transaction2(smb_request_t *sr)
 {
-	return (SDRC_UNIMPLEMENTED);
+	DTRACE_SMB_1(op__Transaction2__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_transaction2(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Transaction2__done, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -245,13 +289,13 @@ smb_com_transaction2(struct smb_request *sr)
 	    &dsoff, &suwcnt);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	xa = smb_xa_create(sr->session, sr, tpscnt, tdscnt, mprcnt, mdrcnt,
 	    msrcnt, suwcnt);
 	if (xa == 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRnoroom);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	xa->smb_flags  = flags;
@@ -263,17 +307,17 @@ smb_com_transaction2(struct smb_request *sr)
 	    sr->smb_vwv.chain_offset, suwcnt*2)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	ready = smb_trans_ready(xa);
@@ -281,26 +325,39 @@ smb_com_transaction2(struct smb_request *sr)
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	sr->r_xa = xa;
 
 	if (!ready) {
 		rc = smbsr_encode_empty_result(sr);
-		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	if (!smb_xa_complete(xa)) {
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	return (smb_trans2_dispatch(sr, xa));
 }
 
 smb_sdrc_t
-smb_com_transaction2_secondary(struct smb_request *sr)
+smb_pre_transaction2_secondary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Transaction2Secondary__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_transaction2_secondary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Transaction2Secondary__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_transaction2_secondary(smb_request_t *sr)
 {
 	uint16_t tpscnt, tdscnt, fid;
 	uint16_t pscnt, psoff, psdisp, dscnt, dsoff, dsdisp;
@@ -309,14 +366,14 @@ smb_com_transaction2_secondary(struct smb_request *sr)
 
 	if ((xa = smbsr_lookup_xa(sr)) == 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_secondary(sr, xa->reply_seqnum) != 0) {
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERRnoaccess);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 	}
 
@@ -328,7 +385,7 @@ smb_com_transaction2_secondary(struct smb_request *sr)
 	    &pscnt, &psoff, &psdisp, &dscnt, &dsoff, &dsdisp, &fid);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	mutex_enter(&xa->xa_mutex);
 	xa->smb_tpscnt = tpscnt;	/* might have shrunk */
@@ -341,13 +398,13 @@ smb_com_transaction2_secondary(struct smb_request *sr)
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	mutex_exit(&xa->xa_mutex);
 
@@ -382,7 +439,9 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 
 	switch (xa->smb_func) {
 	case NT_TRANSACT_CREATE:
-		rc = smb_nt_transact_create(sr, xa);
+		if ((rc = smb_pre_nt_transact_create(sr, xa)) == 0)
+			rc = smb_nt_transact_create(sr, xa);
+		smb_post_nt_transact_create(sr, xa);
 		break;
 	case NT_TRANSACT_NOTIFY_CHANGE:
 		rc = smb_nt_transact_notify_change(sr, xa);
@@ -400,30 +459,29 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	case NT_TRANSACT_QUERY_QUOTA:
 		(void) smb_nt_transact_query_quota(sr, xa);
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	case NT_TRANSACT_SET_QUOTA:
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	default:
 		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	switch (rc) {
-	case SDRC_NORMAL_REPLY:
+	case SDRC_SUCCESS:
 		break;
 
 	case SDRC_DROP_VC:
 	case SDRC_NO_REPLY:
-	case SDRC_ERROR_REPLY:
+	case SDRC_ERROR:
 		return (rc);
 
-	case SDRC_UNIMPLEMENTED:
-	case SDRC_UNSUPPORTED:
+	case SDRC_NOT_IMPLEMENTED:
 		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	default:
 		break;
@@ -437,7 +495,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	    xa->smb_mprcnt < n_param ||
 	    xa->smb_mdrcnt < n_data) {
 		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/* neato, blast it over there */
@@ -467,7 +525,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	    &xa->rep_param_mb,
 	    data_pad,
 	    &xa->rep_data_mb);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 
@@ -483,11 +541,23 @@ smb_nt_transact_query_quota(struct smb_request *sr, struct smb_xa *xa)
 	uint16_t flags;
 
 	if (smb_decode_mbc(&xa->req_param_mb, "%ww", sr, &fid, &flags))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
+smb_sdrc_t
+smb_pre_nt_transact(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtTransact__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_nt_transact(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtTransact__done, smb_request_t *, sr);
+}
 
 smb_sdrc_t
 smb_com_nt_transact(struct smb_request *sr)
@@ -507,13 +577,13 @@ smb_com_nt_transact(struct smb_request *sr)
 	    &dsoff, &SetupCount, &Function);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	xa = smb_xa_create(sr->session, sr, TotalParameterCount, TotalDataCount,
 	    MaxParameterCount, MaxDataCount, MaxSetupCount, SetupCount);
 	if (xa == 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRnoroom);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	xa->smb_flags  = 0;
@@ -526,17 +596,17 @@ smb_com_nt_transact(struct smb_request *sr)
 	    sr->smb_vwv.chain_offset, SetupCount * 2)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	ready = smb_trans_ready(xa);
@@ -544,24 +614,36 @@ smb_com_nt_transact(struct smb_request *sr)
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
 		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	sr->r_xa = xa;
 
 	if (!ready) {
 		rc = smbsr_encode_empty_result(sr);
-		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	if (!smb_xa_complete(xa)) {
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	return (smb_nt_trans_dispatch(sr, xa));
 }
 
+smb_sdrc_t
+smb_pre_nt_transact_secondary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtTransactSecondary__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_nt_transact_secondary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtTransactSecondary__done, smb_request_t *, sr);
+}
 
 smb_sdrc_t
 smb_com_nt_transact_secondary(struct smb_request *sr)
@@ -573,14 +655,14 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 
 	if ((xa = smbsr_lookup_xa(sr)) == 0) {
 		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_secondary(sr, xa->reply_seqnum) != 0) {
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERRnoaccess);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 	}
 
@@ -592,7 +674,7 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 	    &pscnt, &psoff, &psdisp, &dscnt, &dsoff, &dsdisp, &fid);
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	mutex_enter(&xa->xa_mutex);
 	xa->smb_tpscnt = tpscnt;	/* might have shrunk */
@@ -605,13 +687,13 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
 		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	mutex_exit(&xa->xa_mutex);
 
@@ -715,8 +797,8 @@ smb_emit_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 	(void) smb_emit_SHARE_INFO_1(output, text, name, type, comment);
 	(void) smb_encode_mbc(output, "wwwl9c.",
 	    access,
-	    smb_info.si.skc_maxconnections,
-	    smb_svcstate_session_count(&smb_info.si_svc_sm_ctx),
+	    sr->sr_cfg->skc_maxconnections,
+	    smb_server_get_session_count(),
 	    MBC_LENGTH(text),
 	    password);
 	(void) smb_encode_mbc(text, "s", path);
@@ -799,13 +881,14 @@ typedef struct {
  * Return 1 if buffer is not full yet, 0 if it's full.
  */
 static int
-smb_share_update_info(lmshare_info_t *si, smb_share_enum_t *shr_enum_info)
+smb_share_update_info(door_handle_t dhdl, lmshare_info_t *si,
+    smb_share_enum_t *shr_enum_info)
 {
 	int cmnt_len;
 	int new_info_len = shr_enum_info->sei_infolen;
 	int new_cmnt_len = shr_enum_info->sei_cmntlen;
 
-	if (lmshrd_is_special(si->share_name))
+	if (lmshrd_is_special(dhdl, si->share_name))
 		cmnt_len = 1;
 	else
 		cmnt_len = (strlen(si->comment) + 1);
@@ -861,11 +944,11 @@ smb_share_skip_share(lmshare_info_t *si)
  *  4. Share name is not longer than maximum allowed
  */
 static int
-smb_share_add_autohome(char *username, lmshare_info_t *si)
+smb_share_add_autohome(door_handle_t dhdl, char *username, lmshare_info_t *si)
 {
 	int do_add = 0;
 
-	do_add = (lmshrd_getinfo(username, si) == NERR_Success) &&
+	do_add = (lmshrd_getinfo(dhdl, username, si) == NERR_Success) &&
 	    (si->mode & LMSHRM_TRANS) &&
 	    (is_long_sharename((unsigned char *)(si->share_name)) == 0);
 
@@ -887,8 +970,8 @@ smb_share_add_autohome(char *username, lmshare_info_t *si)
  * user autohome shares.
  */
 static void
-smb_share_total_info(smb_share_enum_t *shr_enum_info, short *tot_shares_num,
-    smb_user_t *user)
+smb_share_total_info(door_handle_t dhdl, smb_share_enum_t *shr_enum_info,
+    short *tot_shares_num, smb_user_t *user)
 {
 	uint64_t iterator;
 	lmshare_info_t *si;
@@ -903,12 +986,12 @@ smb_share_total_info(smb_share_enum_t *shr_enum_info, short *tot_shares_num,
 	shr_enum_info->sei_infolen = 0;
 	shr_enum_info->sei_cmntlen = 0;
 
-	if (smb_share_add_autohome(user->u_name, auto_si)) {
+	if (smb_share_add_autohome(dhdl, user->u_name, auto_si)) {
 		(*tot_shares_num)++;
-		more_room = smb_share_update_info(auto_si, shr_enum_info);
+		more_room = smb_share_update_info(dhdl, auto_si, shr_enum_info);
 	}
 
-	iterator = lmshrd_open_iterator(LMSHRM_ALL);
+	iterator = lmshrd_open_iterator(dhdl, LMSHRM_ALL);
 	if (iterator == 0) {
 		kmem_free(si, sizeof (lmshare_info_t));
 		kmem_free(auto_si, sizeof (struct lmshare_info));
@@ -916,8 +999,8 @@ smb_share_total_info(smb_share_enum_t *shr_enum_info, short *tot_shares_num,
 	}
 
 	/* check for door errors */
-	if (lmshrd_iterate(iterator, si) != NERR_Success) {
-		(void) lmshrd_close_iterator(iterator);
+	if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
+		(void) lmshrd_close_iterator(dhdl, iterator);
 		kmem_free(si, sizeof (lmshare_info_t));
 		kmem_free(auto_si, sizeof (struct lmshare_info));
 		return;
@@ -926,8 +1009,9 @@ smb_share_total_info(smb_share_enum_t *shr_enum_info, short *tot_shares_num,
 	while (*si->share_name != 0) {
 		if (smb_share_skip_share(si)) {
 			/* check for door errors */
-			if (lmshrd_iterate(iterator, si) != NERR_Success) {
-				(void) lmshrd_close_iterator(iterator);
+			if (lmshrd_iterate(dhdl, iterator, si) !=
+			    NERR_Success) {
+				(void) lmshrd_close_iterator(dhdl, iterator);
 				kmem_free(si, sizeof (lmshare_info_t));
 				kmem_free(auto_si,
 				    sizeof (struct lmshare_info));
@@ -939,19 +1023,20 @@ smb_share_total_info(smb_share_enum_t *shr_enum_info, short *tot_shares_num,
 		(*tot_shares_num)++;
 
 		if (more_room) {
-			more_room = smb_share_update_info(si, shr_enum_info);
+			more_room = smb_share_update_info(dhdl, si,
+			    shr_enum_info);
 		}
 
 		/* check for door errors */
-		if (lmshrd_iterate(iterator, si) != NERR_Success) {
-			(void) lmshrd_close_iterator(iterator);
+		if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
+			(void) lmshrd_close_iterator(dhdl, iterator);
 			kmem_free(si, sizeof (lmshare_info_t));
 			kmem_free(auto_si, sizeof (struct lmshare_info));
 			return;
 		}
 	}
 
-	(void) lmshrd_close_iterator(iterator);
+	(void) lmshrd_close_iterator(dhdl, iterator);
 	kmem_free(si, sizeof (lmshare_info_t));
 	kmem_free(auto_si, sizeof (struct lmshare_info));
 }
@@ -985,10 +1070,9 @@ smb_encode_SHARE_INFO_1(struct mbuf_chain *output, unsigned char *name,
  *
  */
 static void
-collect_shares_info(uint64_t iterator, int shares_num,
-    struct mbuf_chain *data_mb,
-    char *cmnt_str, int *cmnt_len,
-    smb_user_t *user, int first_resp)
+collect_shares_info(door_handle_t dhdl, uint64_t iterator, int shares_num,
+    struct mbuf_chain *data_mb, char *cmnt_str, int *cmnt_len, smb_user_t *user,
+    int first_resp)
 {
 	int i = 0;
 	lmshare_info_t *si;
@@ -998,7 +1082,7 @@ collect_shares_info(uint64_t iterator, int shares_num,
 	si = kmem_zalloc(sizeof (lmshare_info_t), KM_SLEEP);
 	tsi = kmem_zalloc(sizeof (struct lmshare_info), KM_SLEEP);
 
-	if (first_resp && smb_share_add_autohome(user->u_name, tsi)) {
+	if (first_resp && smb_share_add_autohome(dhdl, user->u_name, tsi)) {
 		if (smb_encode_SHARE_INFO_1(data_mb,
 		    (unsigned char *)tsi->share_name,
 		    tsi->stype, *cmnt_len) == 0) {
@@ -1010,7 +1094,7 @@ collect_shares_info(uint64_t iterator, int shares_num,
 	}
 
 	/* check for door errors */
-	if (lmshrd_iterate(iterator, si) != NERR_Success) {
+	if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
 		kmem_free(si, sizeof (lmshare_info_t));
 		kmem_free(tsi, sizeof (struct lmshare_info));
 		return;
@@ -1022,7 +1106,7 @@ collect_shares_info(uint64_t iterator, int shares_num,
 		}
 
 
-		is_special = lmshrd_is_special(si->share_name);
+		is_special = lmshrd_is_special(dhdl, si->share_name);
 		/* check for door errors */
 		if (is_special == NERR_InternalError) {
 			kmem_free(si, sizeof (lmshare_info_t));
@@ -1052,7 +1136,7 @@ collect_shares_info(uint64_t iterator, int shares_num,
 
 	next:
 		/* check for door errors */
-		if (lmshrd_iterate(iterator, si) != NERR_Success) {
+		if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
 			kmem_free(si, sizeof (lmshare_info_t));
 			kmem_free(tsi, sizeof (struct lmshare_info));
 			return;
@@ -1065,6 +1149,7 @@ collect_shares_info(uint64_t iterator, int shares_num,
 int
 smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 {
+	door_handle_t dhdl = sr->sr_server->sv_lmshrd;
 	smb_share_enum_t shr_enum_info;
 	short left_shares_cnt;		/* Number of shares not sent yet */
 
@@ -1172,12 +1257,12 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_param_mb, "%wss(lev)w(size)w", sr,
 	    &opcode, &r_fmt, &r_fmt, &level, &cli_bufsize) != 0)
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 
 	if (level != 1) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
 		    NERR_BadTransactConfig, 0, 0, 0);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
 	n_setup = 0;	/* Setup count for NetShareEnum SMB is 0 */
@@ -1186,7 +1271,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	    (SMB_HEADER_ED_LEN + RESP_HEADER_LEN + n_param);
 
 	shr_enum_info.sei_bufsize = cli_bufsize;
-	smb_share_total_info(&shr_enum_info, &shares_tot_num, user);
+	smb_share_total_info(dhdl, &shr_enum_info, &shares_tot_num, user);
 
 	shares_tot_byte = shr_enum_info.sei_infolen + shr_enum_info.sei_cmntlen;
 
@@ -1194,7 +1279,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	if (shares_tot_byte == 0) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
 		    ERROR_NOT_ENOUGH_MEMORY, 0, 0, 0);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
 	max_shares_per_packet = data_buf_limit / SHARE_INFO_1_SIZE;
@@ -1207,7 +1292,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	/* save start of buffer to free it at the end of function */
 	cmnt_start = cmnt_str;
 
-	iterator = lmshrd_open_iterator(LMSHRM_ALL);
+	iterator = lmshrd_open_iterator(dhdl, LMSHRM_ALL);
 
 	if (iterator == NULL) {
 		MEM_FREE("smb", cmnt_str);
@@ -1236,8 +1321,9 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		 */
 		m_freem(xa->rep_data_mb.chain);
 		MBC_INIT(&xa->rep_data_mb, data_buf_limit);
-		collect_shares_info(iterator, shares_scnt, &xa->rep_data_mb,
-		    cmnt_str, &cmnt_len, user, first_resp);
+		collect_shares_info(dhdl, iterator,
+		    shares_scnt, &xa->rep_data_mb, cmnt_str, &cmnt_len, user,
+		    first_resp);
 		data_scnt = shares_scnt * SHARE_INFO_1_SIZE;
 		left_shares_cnt -= shares_scnt;
 		if (left_shares_cnt < max_shares_per_packet)
@@ -1346,13 +1432,13 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_session_send(sr->session, 0, &reply);
 	}
 
-	(void) lmshrd_close_iterator(iterator);
+	(void) lmshrd_close_iterator(dhdl, iterator);
 	MEM_FREE("smb", cmnt_start);
 	return (SDRC_NO_REPLY);
 }
 
 int
-smb_trans_net_share_get_info(struct smb_request *sr, struct smb_xa *xa)
+smb_trans_net_share_get_info(smb_request_t *sr, struct smb_xa *xa)
 {
 	uint16_t		opcode, level, max_bytes, access;
 	uint32_t		type;
@@ -1368,10 +1454,10 @@ smb_trans_net_share_get_info(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_param_mb, "%wsss(lev)w(size)w", sr,
 	    &opcode, &req_fmt, &rep_fmt, &share, &level, &max_bytes) != 0)
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 
 	(void) utf8_strlwr(share);
-	shr_found = lmshrd_getinfo(share, &si);
+	shr_found = lmshrd_getinfo(sr->sr_server->sv_lmshrd, share, &si);
 	if (strcmp(share, "ipc$") == 0) {
 		type = STYPE_IPC;
 		path = "";
@@ -1388,7 +1474,7 @@ smb_trans_net_share_get_info(struct smb_request *sr, struct smb_xa *xa)
 		/* We have no idea what this share is... */
 		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
 	if (shr_found)
@@ -1418,7 +1504,7 @@ smb_trans_net_share_get_info(struct smb_request *sr, struct smb_xa *xa)
 		    access, path, password);
 	default:
 		m_freem(str_mb.chain);
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 	}
 
 	(void) smb_encode_mbc(&xa->rep_param_mb, "www", 0,
@@ -1426,7 +1512,7 @@ smb_trans_net_share_get_info(struct smb_request *sr, struct smb_xa *xa)
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));
 	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 int
@@ -1444,11 +1530,11 @@ smb_trans_net_workstation_get_info(struct smb_request *sr, struct smb_xa *xa)
 	    (level != 10)) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
 		    NERR_BadTransactConfig, 0, 0, 0);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
-	domain = smb_info.si.skc_resource_domain;
-	hostname = smb_info.si.skc_hostname;
+	domain = sr->sr_cfg->skc_resource_domain;
+	hostname = sr->sr_cfg->skc_hostname;
 
 	MBC_INIT(&str_mb, max_bytes);
 
@@ -1471,7 +1557,7 @@ smb_trans_net_workstation_get_info(struct smb_request *sr, struct smb_xa *xa)
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));
 	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 int
@@ -1492,11 +1578,11 @@ smb_trans_net_user_get_info(struct smb_request *sr, struct smb_xa *xa)
 	    &max_bytes);
 
 	if (rc != 0)
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 
 	(void) smb_encode_mbc(&xa->rep_param_mb, "www",
 	    NERR_UserNotFound, 0, 0);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 smb_sdrc_t
@@ -1512,11 +1598,11 @@ smb_trans_server_get_info(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_param_mb, "%wssww", sr,
 	    &opcode, &req_fmt, &rep_fmt, &level, &buf_size) != 0) {
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	comment = smb_info.si.skc_system_comment;
-	hostname = smb_info.si.skc_hostname;
+	comment = sr->sr_cfg->skc_system_comment;
+	hostname = sr->sr_cfg->skc_hostname;
 
 	MBC_INIT(&str_mb, buf_size);
 
@@ -1591,7 +1677,7 @@ smb_trans_server_get_info(struct smb_request *sr, struct smb_xa *xa)
 		break;
 	default:
 		m_freem(str_mb.chain);
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 	}
 
 	(void) smb_encode_mbc(&xa->rep_param_mb, "www", 0,
@@ -1600,7 +1686,7 @@ smb_trans_server_get_info(struct smb_request *sr, struct smb_xa *xa)
 	    (MBC_LENGTH(&str_mb)));
 	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -1807,18 +1893,18 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_decode_mbc(&xa->req_param_mb,
 	    "%w s(request format) s(reply format) wwls", sr, &opcode, &s, &s,
 	    &level, &max_bytes, &server_type, &domain) != 0)
-		return (SDRC_UNSUPPORTED);
+		return (SDRC_NOT_IMPLEMENTED);
 
-	si = &smb_info.si;
+	si = sr->sr_cfg;
 
 	if (utf8_strcasecmp(si->skc_resource_domain, (char *)domain) != 0) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
 	if ((server_type & MY_SERVER_TYPE) == 0) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
 	MBC_INIT(&str_mb, max_bytes);
@@ -1836,7 +1922,7 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 	(void) smb_encode_mbc(&xa->rep_param_mb, "wwww", 0,
 	    -MBC_LENGTH(&xa->rep_data_mb), 1, 1);
 	(void) smb_encode_mbc(&xa->rep_data_mb, "m", str_mb.chain);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -1890,7 +1976,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			    &devstate)) != 0)
 				goto trans_err_not_supported;
 
-			rc = SDRC_NORMAL_REPLY;
+			rc = SDRC_SUCCESS;
 			break;
 
 		case TRANS_TRANSACT_NMPIPE:
@@ -1899,7 +1985,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			if (sr->fid_ofile == NULL) {
 				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 				    ERRDOS, ERRbadfid);
-				return (SDRC_ERROR_REPLY);
+				return (SDRC_ERROR);
 			}
 
 			rc = smb_decode_mbc(&xa->req_data_mb, "#B",
@@ -1913,9 +1999,9 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		case TRANS_WAIT_NMPIPE:
 			if (is_supported_pipe(xa->xa_smb_trans_name) == 0) {
 				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-				return (SDRC_ERROR_REPLY);
+				return (SDRC_ERROR);
 			}
-			rc = SDRC_NORMAL_REPLY;
+			rc = SDRC_SUCCESS;
 			break;
 
 		default:
@@ -1968,16 +2054,15 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	switch (rc) {
-	case SDRC_NORMAL_REPLY:
+	case SDRC_SUCCESS:
 		break;
 
 	case SDRC_DROP_VC:
 	case SDRC_NO_REPLY:
-	case SDRC_ERROR_REPLY:
+	case SDRC_ERROR:
 		return (rc);
 
-	case SDRC_UNIMPLEMENTED:
-	case SDRC_UNSUPPORTED:
+	case SDRC_NOT_IMPLEMENTED:
 		goto trans_err_not_supported;
 
 	default:
@@ -2022,7 +2107,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	    &xa->rep_param_mb,
 	    data_pad,
 	    &xa->rep_data_mb);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 
 trans_err_too_small:
 	rc = NERR_BufTooSmall;
@@ -2043,7 +2128,7 @@ trans_err:
 	    4,		/* bcc */
 	    rc,
 	    0);		/* converter word? */
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 static smb_sdrc_t
@@ -2091,7 +2176,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		if (n_data == 0) {
 			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		rc = smb_com_trans2_find_first2(sr, xa);
 		break;
@@ -2104,7 +2189,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		if (n_data == 0) {
 			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		rc = smb_com_trans2_find_next2(sr, xa);
 		break;
@@ -2117,7 +2202,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		if (n_data == 0) {
 			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		rc = smb_com_trans2_query_fs_information(sr, xa);
 		break;
@@ -2130,7 +2215,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		if (n_data == 0) {
 			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		rc = smb_com_trans2_query_path_information(sr, xa);
 		break;
@@ -2143,7 +2228,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		if (n_data == 0) {
 			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		rc = smb_com_trans2_query_file_information(sr, xa);
 		break;
@@ -2160,16 +2245,15 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	switch (rc) {
-	case SDRC_NORMAL_REPLY:
+	case SDRC_SUCCESS:
 		break;
 
 	case SDRC_DROP_VC:
 	case SDRC_NO_REPLY:
-	case SDRC_ERROR_REPLY:
+	case SDRC_ERROR:
 		return (rc);
 
-	case SDRC_UNIMPLEMENTED:
-	case SDRC_UNSUPPORTED:
+	case SDRC_NOT_IMPLEMENTED:
 		goto trans_err_not_supported;
 
 	default:
@@ -2234,7 +2318,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	    &xa->rep_param_mb,
 	    nt_unknown_secret,
 	    &xa->rep_data_mb);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 
 trans_err_too_small:
 	rc = NERR_BufTooSmall;
@@ -2255,7 +2339,7 @@ trans_err:
 	    4,		/* bcc */
 	    rc,
 	    0);		/* converter word? */
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 smb_xa_t *

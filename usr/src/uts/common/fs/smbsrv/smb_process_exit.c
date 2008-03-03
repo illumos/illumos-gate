@@ -56,7 +56,20 @@
 #include <smbsrv/smb_incl.h>
 
 smb_sdrc_t
-smb_com_process_exit(struct smb_request *sr)
+smb_pre_process_exit(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__ProcessExit__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_process_exit(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__ProcessExit__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_process_exit(smb_request_t *sr)
 {
 	int rc;
 
@@ -64,7 +77,7 @@ smb_com_process_exit(struct smb_request *sr)
 	    sr->smb_uid);
 	if (sr->uid_user == NULL) {
 		rc = smbsr_encode_empty_result(sr);
-		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	/*
@@ -82,5 +95,5 @@ smb_com_process_exit(struct smb_request *sr)
 	}
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

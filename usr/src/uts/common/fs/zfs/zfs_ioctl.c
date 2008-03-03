@@ -2701,7 +2701,7 @@ zfs_ioc_share(zfs_cmd_t *zc)
 			}
 			if (zsmbexport_fs == NULL && ((zsmbexport_fs =
 			    (int (*)(void *, boolean_t))ddi_modsym(smbsrv_mod,
-			    "lmshrd_share_upcall", &error)) == NULL)) {
+			    "smb_server_share", &error)) == NULL)) {
 				mutex_exit(&zfs_share_lock);
 				return (ENOSYS);
 			}

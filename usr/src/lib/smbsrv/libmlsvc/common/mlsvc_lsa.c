@@ -68,6 +68,8 @@ static int lsarpc_s_EnumPrivsAccount(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_LookupPrivValue(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_LookupPrivName(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_LookupPrivDisplayName(void *arg, struct mlrpc_xaction *);
+static int lsarpc_s_CreateSecret(void *, struct mlrpc_xaction *);
+static int lsarpc_s_OpenSecret(void *, struct mlrpc_xaction *);
 static int lsarpc_s_QueryInfoPolicy(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_OpenDomainHandle(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_OpenDomainHandle(void *arg, struct mlrpc_xaction *);
@@ -77,9 +79,9 @@ static int lsarpc_s_GetConnectedUser(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_LookupSids2(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_LookupNames2(void *arg, struct mlrpc_xaction *);
 
-static int lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *,
+static DWORD lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *,
     struct mlrpc_xaction *);
-static int lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *,
+static DWORD lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *,
     struct mlrpc_xaction *);
 static int lsarpc_s_UpdateDomainTable(struct mlrpc_xaction *,
     smb_userinfo_t *, struct mslsa_domain_table *, DWORD *);
@@ -96,6 +98,8 @@ static mlrpc_stub_table_t lsarpc_stub_table[] = {
 	{ lsarpc_s_LookupPrivValue,	  LSARPC_OPNUM_LookupPrivValue },
 	{ lsarpc_s_LookupPrivName,	  LSARPC_OPNUM_LookupPrivName },
 	{ lsarpc_s_LookupPrivDisplayName, LSARPC_OPNUM_LookupPrivDisplayName },
+	{ lsarpc_s_CreateSecret,	  LSARPC_OPNUM_CreateSecret },
+	{ lsarpc_s_OpenSecret,		  LSARPC_OPNUM_OpenSecret },
 	{ lsarpc_s_QueryInfoPolicy,	  LSARPC_OPNUM_QueryInfoPolicy },
 	{ lsarpc_s_OpenDomainHandle,	  LSARPC_OPNUM_OpenPolicy },
 	{ lsarpc_s_OpenDomainHandle,	  LSARPC_OPNUM_OpenPolicy2 },
@@ -453,6 +457,44 @@ lsarpc_s_LookupPrivDisplayName(void *arg, struct mlrpc_xaction *mxa)
 	return (MLRPC_DRC_OK);
 }
 
+static int
+lsarpc_s_CreateSecret(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct mslsa_CreateSecret *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
+
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &lsarpc_key_domain)) {
+		bzero(param, sizeof (struct mslsa_OpenAccount));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
+
+	bzero(&param->secret_handle, sizeof (mslsa_handle_t));
+	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	return (MLRPC_DRC_OK);
+}
+
+static int
+lsarpc_s_OpenSecret(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct mslsa_OpenSecret *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
+
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &lsarpc_key_domain)) {
+		bzero(param, sizeof (struct mslsa_OpenAccount));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
+
+	bzero(&param->secret_handle, sizeof (mslsa_handle_t));
+	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	return (MLRPC_DRC_OK);
+}
+
 /*
  * lsarpc_s_GetConnectedUser
  *
@@ -530,30 +572,61 @@ lsarpc_s_QueryInfoPolicy(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslsa_QueryInfoPolicy *param = arg;
 	struct mslsa_PolicyInfo *info;
-	int result;
+	int security_mode;
+	DWORD status;
 
 	info = (struct mslsa_PolicyInfo *)MLRPC_HEAP_MALLOC(
 	    mxa, sizeof (struct mslsa_PolicyInfo));
+	if (info == NULL) {
+		bzero(param, sizeof (struct mslsa_QueryInfoPolicy));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (MLRPC_DRC_OK);
+	}
 
 	info->switch_value = param->info_class;
 
 	switch (param->info_class) {
+	case MSLSA_POLICY_AUDIT_EVENTS_INFO:
+		info->ru.audit_events.enabled = 0;
+		info->ru.audit_events.count = 1;
+		info->ru.audit_events.settings
+		    = MLRPC_HEAP_MALLOC(mxa, sizeof (DWORD));
+		bzero(info->ru.audit_events.settings, sizeof (DWORD));
+		status = NT_STATUS_SUCCESS;
+		break;
+
 	case MSLSA_POLICY_PRIMARY_DOMAIN_INFO:
-		result = lsarpc_s_PrimaryDomainInfo(&info->ru.pd_info, mxa);
+		status = lsarpc_s_PrimaryDomainInfo(&info->ru.pd_info, mxa);
 		break;
 
 	case MSLSA_POLICY_ACCOUNT_DOMAIN_INFO:
-		result = lsarpc_s_AccountDomainInfo(&info->ru.ad_info, mxa);
+		status = lsarpc_s_AccountDomainInfo(&info->ru.ad_info, mxa);
+		break;
+
+	case MSLSA_POLICY_SERVER_ROLE_INFO:
+		security_mode = smb_config_get_secmode();
+
+		if (security_mode == SMB_SECMODE_DOMAIN)
+			info->ru.server_role.role = LSA_ROLE_MEMBER_SERVER;
+		else
+			info->ru.server_role.role = LSA_ROLE_STANDALONE_SERVER;
+
+		info->ru.server_role.pad = 0;
+		status = NT_STATUS_SUCCESS;
 		break;
 
 	default:
-		result = (MLRPC_DRC_FAULT_PARAM_0_UNIMPLEMENTED);
-		break;
+		bzero(param, sizeof (struct mslsa_QueryInfoPolicy));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_INFO_CLASS);
+		return (MLRPC_DRC_OK);
 	}
 
+	if (status != NT_STATUS_SUCCESS)
+		param->status = NT_SC_ERROR(status);
+	else
+		param->status = NT_STATUS_SUCCESS;
 	param->info = info;
-	param->status = NT_STATUS_SUCCESS;
-	return (result);
+	return (MLRPC_DRC_OK);
 }
 
 
@@ -569,70 +642,36 @@ lsarpc_s_QueryInfoPolicy(void *arg, struct mlrpc_xaction *mxa)
  * If the server name matches the local hostname, we should return
  * the local domain SID.
  */
-static int
-lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *pd_info,
+static DWORD
+lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
     struct mlrpc_xaction *mxa)
 {
-	int security_mode;
-	smb_ntdomain_t *di;
-	nt_domain_t *ntdp;
-	nt_sid_t *sid;
 	char domain_name[MLSVC_DOMAIN_NAME_MAX];
-	char *name;
-	DWORD status;
+	nt_sid_t *sid = NULL;
+	int security_mode;
 	int rc;
-
-	status = NT_STATUS_SUCCESS;
 
 	security_mode = smb_config_get_secmode();
 
 	if (security_mode != SMB_SECMODE_DOMAIN) {
 		rc = smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1);
-		if (rc != 0) {
-			status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
-			return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
-		}
-
-		name = domain_name;
 		sid = nt_sid_dup(nt_domain_local_sid());
 	} else {
-		if ((di = smb_getdomaininfo(0)) == 0) {
-			status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
-			return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
-		}
-
-		ntdp = nt_domain_lookup_name(di->domain);
-		if (ntdp == 0) {
-			(void) lsa_query_primary_domain_info();
-			ntdp = nt_domain_lookup_name(di->domain);
-		}
-
-		if (ntdp == 0) {
-			sid = nt_sid_gen_null_sid();
-			name = di->domain;
-		} else {
-			sid = nt_sid_dup(ntdp->sid);
-			name = ntdp->name;
-		}
+		rc = smb_getdomainname(domain_name, MLSVC_DOMAIN_NAME_MAX);
+		sid = smb_getdomainsid();
 	}
 
-	if (sid == 0) {
-		status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
-		return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
-	}
+	if ((sid == NULL) || (rc != 0))
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (mlsvc_string_save((ms_string_t *)&pd_info->name, name, mxa) == 0)
-		status = NT_STATUS_INSUFFICIENT_RESOURCES;
-
-	if ((pd_info->sid = (struct mslsa_sid *)mlsvc_sid_save(sid, mxa)) == 0)
-		status = NT_STATUS_INSUFFICIENT_RESOURCES;
-
+	rc = mlsvc_string_save((ms_string_t *)&info->name, domain_name, mxa);
+	info->sid = (struct mslsa_sid *)mlsvc_sid_save(sid, mxa);
 	free(sid);
 
-	if (status != NT_STATUS_SUCCESS)
-		return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
+	if ((rc == 0) || (info->sid == NULL))
+		return (NT_STATUS_NO_MEMORY);
 
-	return (MLRPC_DRC_OK);
+	return (NT_STATUS_SUCCESS);
 }
 
 
@@ -644,8 +683,8 @@ lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *pd_info,
  * NT knows who to query for information on local names and SIDs. The
  * domain name is the local hostname.
  */
-static int
-lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *ad_info,
+static DWORD
+lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
     struct mlrpc_xaction *mxa)
 {
 	char domain_name[MLSVC_DOMAIN_NAME_MAX];
@@ -653,21 +692,18 @@ lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *ad_info,
 	int rc;
 
 	if (smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1) != 0)
-		return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
+		return (NT_STATUS_NO_MEMORY);
 
 	if ((domain_sid = nt_domain_local_sid()) == NULL)
-		return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
+		return (NT_STATUS_NO_MEMORY);
 
-	rc = mlsvc_string_save((ms_string_t *)&ad_info->name,
-	    domain_name, mxa);
-	if (rc == 0)
-		return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
+	rc = mlsvc_string_save((ms_string_t *)&info->name, domain_name, mxa);
+	info->sid = (struct mslsa_sid *)mlsvc_sid_save(domain_sid, mxa);
 
-	ad_info->sid = (struct mslsa_sid *)mlsvc_sid_save(domain_sid, mxa);
-	if (ad_info->sid == NULL)
-		return (MLRPC_DRC_FAULT_OUT_OF_MEMORY);
+	if ((rc == 0) || (info->sid == NULL))
+		return (NT_STATUS_NO_MEMORY);
 
-	return (MLRPC_DRC_OK);
+	return (NT_STATUS_SUCCESS);
 }
 
 /*
@@ -861,8 +897,7 @@ lsarpc_s_UpdateDomainTable(struct mlrpc_xaction *mxa,
 	DWORD n_entry;
 	DWORD i;
 
-	if (user_info->sid_name_use == SidTypeWellKnownGroup ||
-	    user_info->sid_name_use == SidTypeUnknown ||
+	if (user_info->sid_name_use == SidTypeUnknown ||
 	    user_info->sid_name_use == SidTypeInvalid) {
 		/*
 		 * These types don't need to reference an entry in the

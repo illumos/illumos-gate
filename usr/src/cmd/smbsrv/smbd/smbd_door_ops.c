@@ -56,6 +56,8 @@ static char *smb_dop_lookup_sid(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_lookup_name(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+static char *smb_dop_join(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
 /* SMB daemon's door operation table */
 smb_dr_op_t smb_doorsrv_optab[] =
@@ -67,6 +69,7 @@ smb_dr_op_t smb_doorsrv_optab[] =
 	smb_dop_user_list,
 	smb_dop_lookup_sid,
 	smb_dop_lookup_name,
+	smb_dop_join,
 };
 
 /*ARGSUSED*/
@@ -376,5 +379,34 @@ smb_dop_lookup_sid(char *argp, size_t arg_size,
 		free(name);
 
 	xdr_free(xdr_string, (char *)&strsid);
+	return (rbuf);
+}
+
+/*ARGSUSED*/
+static char *
+smb_dop_join(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
+{
+	smb_joininfo_t jdi;
+	uint32_t status;
+	char *rbuf = NULL;
+
+	*err = SMB_DR_OP_SUCCESS;
+	*rbufsize = 0;
+
+	if (smb_dr_decode_common(argp, arg_size, xdr_smb_dr_joininfo_t, &jdi)
+	    != 0) {
+		*err = SMB_DR_OP_ERR_DECODE;
+		return (NULL);
+	}
+
+	status = smbd_join(&jdi);
+
+	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &status,
+	    xdr_uint32_t, rbufsize)) == NULL) {
+		*err = SMB_DR_OP_ERR_ENCODE;
+		*rbufsize = 0;
+	}
+
 	return (rbuf);
 }

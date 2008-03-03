@@ -988,8 +988,8 @@ usr/include/smbsrv/smb_idmap.h		i386
 usr/include/smbsrv/smb_incl.h		i386
 usr/include/smbsrv/smb_ioctl.h		i386
 usr/include/smbsrv/smb_kproto.h		i386
+usr/include/smbsrv/smb_ktypes.h		i386
 usr/include/smbsrv/smb_privilege.h	i386
-usr/include/smbsrv/smb_svc_sm.h		i386
 usr/include/smbsrv/smb_token.h		i386
 usr/include/smbsrv/smb_vops.h		i386
 usr/include/smbsrv/smb_winpipe.h	i386
@@ -997,7 +997,6 @@ usr/include/smbsrv/smb_xdr.h		i386
 usr/include/smbsrv/smbfmt.h		i386
 usr/include/smbsrv/smbinfo.h		i386
 usr/include/smbsrv/smbtrans.h		i386
-usr/include/smbsrv/smbvar.h		i386
 usr/include/smbsrv/string.h		i386
 usr/include/smbsrv/svrapi.h		i386
 usr/include/smbsrv/winioctl.h		i386
@@ -1049,7 +1048,7 @@ usr/lib/smbsrv/amd64/libsmbrdr.so	i386
 usr/lib/smbsrv/amd64/llib-lsmbrdr.ln	i386
 #
 # Private dirent, extended to include flags, for use by SMB server
-# 
+#
 usr/include/sys/extdirent.h		i386
 #
 # Private header files for vscan service

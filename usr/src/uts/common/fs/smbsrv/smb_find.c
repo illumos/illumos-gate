@@ -210,7 +210,20 @@
  *	ERRSRV/ERRinvnid
  */
 smb_sdrc_t
-smb_com_find(struct smb_request *sr)
+smb_pre_find(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Find__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_find(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Find__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_find(smb_request_t *sr)
 {
 	int			rc;
 	unsigned short		sattr, count, maxcount;
@@ -223,22 +236,22 @@ smb_com_find(struct smb_request *sr)
 	smb_odir_context_t *pc;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	rc = smbsr_decode_data(sr, "%Abw", sr, &path, &type, &key_len);
 	if ((rc != 0) || (type != 0x05))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (key_len == 0) {		/* begin search */
 		if (smb_rdir_open(sr, path, sattr) != 0)
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		cookie = 0;
 	} else if (key_len == 21) {
 		sr->smb_sid = 0;
 		if (smb_decode_mbc(&sr->smb_data, SMB_RESUME_KEY_FMT,
 		    filename, &sr->smb_sid, &cookie) != 0) {
 			/* We don't know which rdir to close */
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
@@ -246,13 +259,13 @@ smb_com_find(struct smb_request *sr)
 		if (sr->sid_odir == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		cookie--;			/* +1 when returned */
 	} else {
 		/* We don't know which rdir to close */
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
@@ -269,7 +282,7 @@ smb_com_find(struct smb_request *sr)
 		(void) smb_encode_mbc(&sr->reply, ".8c3cbl4.bYl13c",
 		    pc->dc_name83, pc->dc_name83+9, sr->smb_sid,
 		    pc->dc_cookie+1, pc->dc_dattr,
-		    smb_gmt_to_local_time(pc->dc_attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, pc->dc_attr.sa_vattr.va_mtime.tv_sec),
 		    (int32_t)smb_node_get_size(node, &pc->dc_attr),
 		    (*pc->dc_shortname) ? pc->dc_shortname : pc->dc_name);
 		smb_node_release(node);
@@ -282,23 +295,23 @@ smb_com_find(struct smb_request *sr)
 		/* returned error by smb_rdir_next() */
 		smb_rdir_close(sr);
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (count == 0) {
 		smb_rdir_close(sr);
 		smbsr_error(sr, 0, ERRDOS, ERRnofiles);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = (MBC_LENGTH(&sr->reply) - sr->cur_reply_offset) - 8;
 	if (smb_poke_mbc(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc) < 0) {
 		smb_rdir_close(sr);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -380,7 +393,20 @@ smb_com_find(struct smb_request *sr)
  *	ERRSRV/ERRinvnid
  */
 smb_sdrc_t
-smb_com_find_close(struct smb_request *sr)
+smb_pre_find_close(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__FindClose__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_find_close(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__FindClose__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_find_close(smb_request_t *sr)
 {
 	unsigned short		sattr, maxcount;
 	char			*path;
@@ -391,22 +417,22 @@ smb_com_find_close(struct smb_request *sr)
 	int			rc;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	rc = smbsr_decode_data(sr, "%Abw", sr, &path, &type, &key_len);
 	if ((rc != 0) || (type != 0x05))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (key_len == 0) {		/* begin search */
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (key_len == 21) {
 		sr->smb_sid = 0;
 		if (smb_decode_mbc(&sr->smb_data, SMB_RESUME_KEY_FMT,
 		    filename, &sr->smb_sid, &cookie) != 0) {
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
@@ -414,16 +440,16 @@ smb_com_find_close(struct smb_request *sr)
 		if (sr->sid_odir == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		cookie--;		/* +1 when returned */
 	} else {
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_rdir_close(sr);
 	if (smbsr_encode_result(sr, 1, 3, "bwwbw", 1, 0, 3, 5, 0))
-		return (SDRC_ERROR_REPLY);
-	return (SDRC_NORMAL_REPLY);
+		return (SDRC_ERROR);
+	return (SDRC_SUCCESS);
 }

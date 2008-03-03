@@ -127,7 +127,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_decode_mbc(&xa->req_param_mb, "%w4.u", sr, &info->level,
 	    &info->path) != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type) ||
@@ -135,7 +135,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, info->path,
@@ -145,7 +145,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -157,7 +157,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	info->node = ret_snode;
@@ -167,12 +167,12 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	kmem_free(info, sizeof (smb_trans2_setinfo_t));
 
 	if (status == NT_STATUS_DATA_ERROR)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (status == NT_STATUS_UNSUCCESSFUL) {
 		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

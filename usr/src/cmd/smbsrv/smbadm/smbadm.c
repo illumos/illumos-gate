@@ -57,10 +57,13 @@ typedef enum {
 	HELP_UENABLE
 } smbadm_help_t;
 
+#define	SMBADM_CMDF_GROUP	0x01
+
 typedef struct smbadm_cmdinfo {
 	char *name;
 	int (*func)(int, char **);
 	smbadm_help_t usage;
+	uint32_t flags;
 } smbadm_cmdinfo_t;
 
 smbadm_cmdinfo_t *curcmd;
@@ -81,18 +84,26 @@ static int smbadm_user_enable(int, char **);
 
 static smbadm_cmdinfo_t smbadm_cmdtable[] =
 {
-	{ "add-member",		smbadm_group_addmember,	HELP_ADD_MEMBER	},
-	{ "create",		smbadm_group_create,	HELP_CREATE	},
-	{ "delete",		smbadm_group_delete,	HELP_DELETE	},
-	{ "disable-user",	smbadm_user_disable,	HELP_UDISABLE	},
-	{ "enable-user",	smbadm_user_enable,	HELP_UENABLE	},
-	{ "get",		smbadm_group_getprop,	HELP_GET	},
-	{ "join",		smbadm_join,		HELP_JOIN	},
-	{ "list",		smbadm_list,		HELP_LIST	},
-	{ "remove-member",	smbadm_group_delmember,	HELP_DEL_MEMBER	},
-	{ "rename",		smbadm_group_rename,	HELP_RENAME	},
-	{ "set",		smbadm_group_setprop,	HELP_SET	},
-	{ "show",		smbadm_group_show,	HELP_SHOW	},
+	{ "add-member",		smbadm_group_addmember,	HELP_ADD_MEMBER,
+	SMBADM_CMDF_GROUP },
+	{ "create",		smbadm_group_create,	HELP_CREATE,
+	SMBADM_CMDF_GROUP },
+	{ "delete",		smbadm_group_delete,	HELP_DELETE,
+	SMBADM_CMDF_GROUP },
+	{ "disable-user",	smbadm_user_disable,	HELP_UDISABLE,	0 },
+	{ "enable-user",	smbadm_user_enable,	HELP_UENABLE,	0 },
+	{ "get",		smbadm_group_getprop,	HELP_GET,
+	SMBADM_CMDF_GROUP },
+	{ "join",		smbadm_join,		HELP_JOIN,	0 },
+	{ "list",		smbadm_list,		HELP_LIST,	0 },
+	{ "remove-member",	smbadm_group_delmember,	HELP_DEL_MEMBER,
+	SMBADM_CMDF_GROUP },
+	{ "rename",		smbadm_group_rename,	HELP_RENAME,
+	SMBADM_CMDF_GROUP },
+	{ "set",		smbadm_group_setprop,	HELP_SET,
+	SMBADM_CMDF_GROUP },
+	{ "show",		smbadm_group_show,	HELP_SHOW,
+	SMBADM_CMDF_GROUP },
 };
 
 #define	SMBADM_NCMD	(sizeof (smbadm_cmdtable) / sizeof (smbadm_cmdtable[0]))
@@ -135,6 +146,8 @@ static smbadm_prop_handle_t smbadm_ptable[] = {
 	smbadm_getprop_desc,	NULL			},
 };
 
+static int smbadm_grpcmd_init(void);
+static void smbadm_grpcmd_fini(void);
 static const char *smbadm_pwd_strerror(int error);
 
 /*
@@ -268,6 +281,7 @@ smbadm_join(int argc, char **argv)
 	boolean_t join_w = B_FALSE;
 	boolean_t join_d = B_FALSE;
 	uint32_t status;
+	char kdom[MAXHOSTNAMELEN];
 
 	bzero(&jdi, sizeof (jdi));
 
@@ -332,6 +346,23 @@ smbadm_join(int argc, char **argv)
 		return (1);
 	}
 
+	if ((smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kdom, sizeof (kdom))
+	    == SMBD_SMF_OK) && (*kdom != 0)) {
+		if (strncasecmp(jdi.domain_name, kdom,
+		    strlen(jdi.domain_name))) {
+			char reply[8];
+
+			(void) printf(gettext("The system has already "
+			    "joined to a different domain %s by another "
+			    "program.\nWould you like to continue [yes/no]? "),
+			    kdom);
+			(void) scanf("%8s", reply);
+			(void) trim_whitespace(reply);
+			if (strncasecmp(reply, "yes", 3) != 0)
+				return (0);
+		}
+	}
+
 	/* Join the domain */
 	if (*jdi.domain_passwd == '\0') {
 		char *p = NULL;
@@ -381,28 +412,26 @@ smbadm_join(int argc, char **argv)
 static int
 smbadm_list(int argc, char **argv)
 {
-	char resource_domain[SMB_PI_MAX_DOMAIN];
-	int sec_mode;
-	char *modename;
+	char domain[MAXHOSTNAMELEN];
+	char modename[16];
+	int rc;
 
-	if (smbd_get_security_mode(&sec_mode)) {
+	rc = smb_config_getstr(SMB_CI_SECURITY, modename, sizeof (modename));
+	if (rc != SMBD_SMF_OK) {
 		(void) fprintf(stderr,
 		    gettext("failed to get the security mode\n"));
 		return (1);
 	}
 
-	modename = (sec_mode == SMB_SECMODE_DOMAIN) ? "domain" : "workgroup";
+	(void) printf(gettext("security mode: %s\n"), modename);
 
-	(void) printf(gettext("security mode: %s\n"),
-	    smb_config_secmode_tostr(sec_mode));
-
-	if (smbd_get_param(SMB_CI_DOMAIN_NAME, resource_domain) != 0) {
-		(void) fprintf(stderr,
-		    gettext("failed to get the %s name\n"), modename);
+	if (smb_getdomainname(domain, sizeof (domain)) != 0) {
+		(void) fprintf(stderr, gettext("failed to get the %s name\n"),
+		    modename);
 		return (1);
 	}
 
-	(void) printf(gettext("%s name: %s\n"), modename, resource_domain);
+	(void) printf(gettext("%s name: %s\n"), modename, domain);
 	return (0);
 }
 
@@ -1049,23 +1078,12 @@ main(int argc, char **argv)
 					smbadm_usage(B_TRUE);
 			}
 
-			if (smb_idmap_start() != 0) {
-				(void) fprintf(stderr,
-				    gettext("failed to contact idmap service"));
-				return (1);
-			}
-
-			if ((ret = smb_lgrp_start()) != SMB_LGRP_SUCCESS) {
-				(void) fprintf(stderr,
-				    gettext("failed to initialize (%s)"),
-				    smb_lgrp_strerror(ret));
-				smb_idmap_stop();
-				return (1);
-			}
+			if ((ret = smbadm_grpcmd_init()) != 0)
+				return (ret);
 
 			ret = curcmd->func(argc - 1, &argv[1]);
-			smb_lgrp_stop();
-			smb_idmap_stop();
+
+			smbadm_grpcmd_fini();
 			return (ret);
 		}
 	}
@@ -1074,6 +1092,39 @@ main(int argc, char **argv)
 	(void) fprintf(stderr, gettext("unknown subcommand (%s)\n"), argv[1]);
 	smbadm_usage(B_FALSE);
 	return (2);
+}
+
+static int
+smbadm_grpcmd_init(void)
+{
+	int rc;
+
+	if (curcmd->flags & SMBADM_CMDF_GROUP) {
+		if (smb_idmap_start() != 0) {
+			(void) fprintf(stderr,
+			    gettext("failed to contact idmap service\n"));
+			return (1);
+		}
+
+		if ((rc = smb_lgrp_start()) != SMB_LGRP_SUCCESS) {
+			(void) fprintf(stderr,
+			    gettext("failed to initialize (%s)\n"),
+			    smb_lgrp_strerror(rc));
+			smb_idmap_stop();
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
+static void
+smbadm_grpcmd_fini(void)
+{
+	if (curcmd->flags & SMBADM_CMDF_GROUP) {
+		smb_lgrp_stop();
+		smb_idmap_stop();
+	}
 }
 
 static boolean_t

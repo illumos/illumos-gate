@@ -66,16 +66,39 @@
 #include <smbsrv/smb_fsops.h>
 
 smb_sdrc_t
-smb_com_query_information(struct smb_request *sr)
+smb_pre_query_information(smb_request_t *sr)
 {
+	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
+	int rc;
+
+	if ((rc = smbsr_decode_data(sr, "%S", sr, &fqi->path)) == 0) {
+		if (strlen(fqi->path) == 0)
+			fqi->path = "\\";
+	}
+
+	DTRACE_SMB_2(op__QueryInformation__start, smb_request_t *, sr,
+	    struct smb_fqi *, fqi);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_query_information(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__QueryInformation__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_query_information(smb_request_t *sr)
+{
+	char			*path = sr->arg.dirop.fqi.path;
+	char			*name = sr->arg.dirop.fqi.last_comp;
 	int			rc;
 	unsigned short		dattr;
 	uint32_t		write_time, file_size;
-	char			*path;
 	struct smb_node		*dir_node;
 	struct smb_node		*node;
 	smb_attr_t		attr;
-	char			*name;
 	timestruc_t		*mtime;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
@@ -83,45 +106,31 @@ smb_com_query_information(struct smb_request *sr)
 		write_time = file_size = 0;
 		rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
 		    10, dattr, write_time, file_size, 0);
-		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
-
-	if (smbsr_decode_data(sr, "%S", sr, &path) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	/*
-	 * Interpret NULL file names as "\".
-	 */
-	if (strlen(path) == 0)
-		path = "\\";
-
-	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	if ((rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name))
 	    != 0) {
-		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
 	    sr->tid_tree->t_snode, dir_node, name, &node, &attr, 0, 0)) != 0) {
 		smb_node_release(dir_node);
-		kmem_free(name, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_node_release(dir_node);
 
 	dattr = smb_node_get_dosattr(node);
 	mtime = smb_node_get_mtime(node);
-	write_time = smb_gmt_to_local_time(mtime->tv_sec);
+	write_time = smb_gmt2local(sr, mtime->tv_sec);
 	file_size = (uint32_t)smb_node_get_size(node, &node->attr);
 
 	smb_node_release(node);
-	kmem_free(name, MAXNAMELEN);
 
 	rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
 	    10,			/* wct */
@@ -130,5 +139,5 @@ smb_com_query_information(struct smb_request *sr)
 	    file_size,		/* FileSize */
 	    0);			/* bcc */
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

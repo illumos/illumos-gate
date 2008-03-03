@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_common_door.h>
 
-door_handle_t smb_kdoor_clnt_dh;
+door_handle_t smb_kdoor_clnt_dh = NULL;
 
 /*
  * smb_kdoor_clnt_free
@@ -68,11 +68,17 @@ smb_kdoor_clnt_free(char *argp, size_t arg_size, char *rbufp, size_t rbuf_size)
  * The SMB kernel module should invoke this function upon startup.
  */
 int
-smb_kdoor_clnt_start()
+smb_kdoor_clnt_start(int door_id)
 {
-	int rc = 0;
+	int	rc = 0;
 
-	rc = door_ki_open(SMB_DR_SVC_NAME, &smb_kdoor_clnt_dh);
+	if (smb_kdoor_clnt_dh == NULL) {
+		smb_kdoor_clnt_dh = door_ki_lookup(door_id);
+		if (smb_kdoor_clnt_dh == NULL) {
+			cmn_err(CE_WARN, "kdoor_clnt: lookup failed");
+			rc = -1;
+		}
+	}
 
 	return (rc);
 }
@@ -85,7 +91,10 @@ smb_kdoor_clnt_start()
 void
 smb_kdoor_clnt_stop()
 {
-	door_ki_rele(smb_kdoor_clnt_dh);
+	if (smb_kdoor_clnt_dh) {
+		door_ki_rele(smb_kdoor_clnt_dh);
+		smb_kdoor_clnt_dh = NULL;
+	}
 }
 
 /*

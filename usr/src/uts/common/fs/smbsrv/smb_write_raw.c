@@ -200,6 +200,24 @@ static int smb_transfer_write_raw_data(smb_request_t *sr,
 #define	WR_MODE_WR_THRU	1
 
 smb_sdrc_t
+smb_pre_write_raw(smb_request_t *sr)
+{
+	int rc = 0;
+
+	DTRACE_SMB_2(op__WriteRaw__start, smb_request_t *, sr,
+	    smb_rw_param_t *, sr->arg.rw);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_write_raw(smb_request_t *sr)
+{
+	DTRACE_SMB_2(op__WriteRaw__done, smb_request_t *, sr,
+	    smb_rw_param_t *, sr->arg.rw);
+}
+
+smb_sdrc_t
 smb_com_write_raw(struct smb_request *sr)
 {
 	int			rc = 0;
@@ -235,7 +253,7 @@ smb_com_write_raw(struct smb_request *sr)
 	}
 
 	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	off = ((offset_t)off_high << 32) | off_low;
 	addl_xfer_count = count - data_length;
@@ -243,7 +261,7 @@ smb_com_write_raw(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	fnode = sr->fid_ofile->f_node;
@@ -260,7 +278,7 @@ smb_com_write_raw(struct smb_request *sr)
 			    count, B_TRUE);
 			if (rc != NT_STATUS_SUCCESS) {
 				smbsr_error(sr, rc, ERRSRV, ERRaccess);
-				return (SDRC_ERROR_REPLY);
+				return (SDRC_ERROR);
 			}
 		}
 	}
@@ -272,7 +290,7 @@ smb_com_write_raw(struct smb_request *sr)
 	if (sr->smb_data.chain_offset + data_offset + data_length >
 	    sr->smb_data.max_bytes) {
 		/* Error handling code will wake up the session daemon */
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/*
@@ -449,7 +467,7 @@ notify_write_raw_complete:
 	sr->first_smb_com = SMB_COM_WRITE_COMPLETE;
 	rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
 	    count - (lcount + addl_lcount), 0);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 
@@ -532,8 +550,8 @@ smb_handle_write_raw(smb_session_t *session, smb_request_t *sr)
 		session->s_state = SMB_SESSION_STATE_WRITE_RAW_ACTIVE;
 		smb_rwx_rwexit(&session->s_lock);
 		sr->sr_state = SMB_REQ_STATE_SUBMITTED;
-		(void) taskq_dispatch(smb_info.thread_pool, smb_session_worker,
-		    sr, TQ_SLEEP);
+		(void) taskq_dispatch(session->s_server->sv_thread_pool,
+		    smb_session_worker, sr, TQ_SLEEP);
 		smb_rwx_rwenter(&session->s_lock, RW_READER);
 		while (session->s_state == SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
 			(void) smb_rwx_rwwait(&session->s_lock, -1);

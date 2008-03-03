@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,7 @@ smb_kdr_op_user_num(char *argp, size_t arg_size, size_t *rbufsize, int *errno)
 	char *rbuf;
 
 	*errno = SMB_DR_OP_SUCCESS;
-	num = smb_user_get_num();
+	num = smb_server_get_user_count();
 	rbuf = smb_kdr_encode_common(SMB_DR_OP_SUCCESS, &num, xdr_uint32_t,
 	    rbufsize);
 	if (!rbuf) {
@@ -90,7 +90,7 @@ smb_kdr_op_users(char *argp, size_t arg_size, size_t *rbufsize, int *errno)
 	}
 
 	ulist = kmem_zalloc(sizeof (smb_dr_ulist_t), KM_SLEEP);
-	(void) smb_dr_ulist_get(offset, ulist);
+	(void) smb_server_dr_ulist_get(offset, ulist, SMB_DR_MAX_USERS);
 
 	if ((rbuf = smb_kdr_encode_common(SMB_DR_OP_SUCCESS, ulist,
 	    xdr_smb_dr_ulist_t, rbufsize)) == NULL) {
@@ -130,10 +130,11 @@ smb_kdr_op_share(char *argp, size_t arg_size, size_t *rbufsize, int *errno)
 
 	switch (kshare->k_op) {
 	case LMSHR_ADD:
-		error = smb_share_export(kshare->k_path);
+		error = smb_server_share_export(kshare->k_path);
 		break;
 	case LMSHR_DELETE:
-		error = smb_share_unexport(kshare->k_path, kshare->k_sharename);
+		error = smb_server_share_unexport(kshare->k_path,
+		    kshare->k_sharename);
 		break;
 	default:
 		ASSERT(0);

@@ -39,16 +39,13 @@
 #include <sys/fcntl.h>
 #include <sys/nbmlock.h>
 
-extern uint32_t smb_is_executable(char *);
+volatile uint32_t smb_fids = 0;
 
 static uint32_t smb_open_subr(smb_request_t *);
 
-/*
- * The default stability mode is to perform the write-through
- * behaviour requested by the client.
- */
-int smb_stable_mode = 0;
+extern uint32_t smb_is_executable(char *);
 
+static uint32_t smb_open_subr(smb_request_t *);
 
 /*
  * This macro is used to delete a newly created object
@@ -63,20 +60,6 @@ int smb_stable_mode = 0;
 			(void) smb_fsop_remove(sr, sr->user_cr,		\
 			    obj.dir_snode, obj.last_comp, 0);		\
 	}
-
-/*
- * smb_set_stability
- *
- * Set the default stability mode. Normal (mode is zero) means perform
- * the write-through behaviour requested by the client. Synchronous
- * (mode is non-zero) means journal everything regardless of the write
- * through behaviour requested by the client.
- */
-void
-smb_set_stability(int mode)
-{
-	smb_stable_mode = mode;
-}
 
 /*
  * smb_access_generic_to_file
@@ -223,22 +206,14 @@ smb_common_open(smb_request_t *sr)
 		if (count)
 			delay(MSEC_TO_TICK(400));
 
-		if ((status = smb_open_subr(sr)) == NT_STATUS_SUCCESS)
+		status = smb_open_subr(sr);
+		if (status != NT_STATUS_SHARING_VIOLATION)
 			break;
 	}
 
-	switch (status) {
-	case NT_STATUS_SUCCESS:
-		break;
-
-	case NT_STATUS_SHARING_VIOLATION:
+	if (status == NT_STATUS_SHARING_VIOLATION) {
 		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 		    ERRDOS, ERROR_SHARING_VIOLATION);
-		break;
-
-	default:
-		/* Error already set. */
-		break;
 	}
 
 	return (status);
@@ -617,8 +592,8 @@ smb_open_subr(smb_request_t *sr)
 				    node, &new_attr, &op->fqi.last_attr);
 
 				if (rc) {
-					smb_fsop_unshrlock(sr->user_cr,
-					    node, uniq_fid);
+					smb_fsop_unshrlock(sr->user_cr, node,
+					    uniq_fid);
 					rw_exit(&node->n_share_lock);
 					smb_node_release(node);
 					smb_node_release(dnode);
@@ -661,17 +636,8 @@ smb_open_subr(smb_request_t *sr)
 		    (op->create_disposition == FILE_OVERWRITE)) {
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
-
-			/*
-			 * The requested file not found so the operation should
-			 * fail with these two dispositions
-			 */
-			if (is_stream)
-				smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-				    ERRDOS, ERROR_FILE_NOT_FOUND);
-			else
-				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
 			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 		}
 
@@ -730,9 +696,8 @@ smb_open_subr(smb_request_t *sr)
 
 			rw_enter(&node->n_share_lock, RW_WRITER);
 
-			status = smb_fsop_shrlock(sr->user_cr, node,
-			    uniq_fid, op->desired_access,
-			    share_access);
+			status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
+			    op->desired_access, share_access);
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
 				rw_exit(&node->n_share_lock);
@@ -856,7 +821,8 @@ smb_open_subr(smb_request_t *sr)
 	 * IR #102318 Mirroring may force synchronous
 	 * writes regardless of what we specify here.
 	 */
-	if (smb_stable_mode || (op->create_options & FILE_WRITE_THROUGH))
+	if (sr->sr_cfg->skc_sync_enable ||
+	    (op->create_options & FILE_WRITE_THROUGH))
 		node->flags |= NODE_FLAGS_WRITE_THROUGH;
 
 	op->fileid = op->fqi.last_attr.sa_vattr.va_nodeid;

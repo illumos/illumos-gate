@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,6 @@ extern "C" {
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb.h>
 
-#include <smbsrv/smbvar.h>
 #include <smbsrv/smbfmt.h>
 #include <smbsrv/smb_kproto.h>
 

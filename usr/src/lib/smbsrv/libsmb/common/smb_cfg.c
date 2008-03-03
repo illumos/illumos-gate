@@ -74,7 +74,6 @@ static smb_cfg_param_t smb_cfg_table[] =
 {
 	/* Oplock configuration, Kernel Only */
 	{SMB_CI_OPLOCK_ENABLE, "oplock_enable", SCF_TYPE_BOOLEAN, 0},
-	{SMB_CI_OPLOCK_TIMEOUT, "oplock_timeout", SCF_TYPE_INTEGER, 0},
 
 	/* Autohome configuration */
 	{SMB_CI_AUTOHOME_MAP, "autohome_map", SCF_TYPE_ASTRING, 0},
@@ -97,7 +96,6 @@ static smb_cfg_param_t smb_cfg_table[] =
 	    SCF_TYPE_INTEGER, 0},
 
 	/* Kmod specific configuration */
-	{SMB_CI_MAX_BUFSIZE, "max_bufsize", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_MAX_WORKERS, "max_workers", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_MAX_CONNECTIONS, "max_connections", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_KEEPALIVE, "keep_alive", SCF_TYPE_INTEGER, 0},
@@ -108,10 +106,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_SIGNING_CHECK, "signing_check", SCF_TYPE_BOOLEAN, 0},
 
 	/* Kmod tuning configuration */
-	{SMB_CI_FLUSH_REQUIRED, "flush_required", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_SYNC_ENABLE, "sync_enable", SCF_TYPE_BOOLEAN, 0},
-	{SMB_CI_DIRSYMLINK_DISABLE, "dir_symlink_disable", SCF_TYPE_BOOLEAN, 0},
-	{SMB_CI_ANNONCE_QUOTA, "announce_quota", SCF_TYPE_BOOLEAN, 0},
 
 	/* SMBd configuration */
 	{SMB_CI_SECURITY, "security", SCF_TYPE_ASTRING, 0},
@@ -126,7 +121,16 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_DYNDNS_ENABLE, "ddns_enable", SCF_TYPE_BOOLEAN, 0},
 
 	{SMB_CI_MACHINE_PASSWD, "machine_passwd", SCF_TYPE_ASTRING,
-	    SMB_CF_PROTECTED}
+	    SMB_CF_PROTECTED},
+	{SMB_CI_KPASSWD_SRV, "kpasswd_server", SCF_TYPE_ASTRING,
+	    0},
+	{SMB_CI_KPASSWD_DOMAIN, "kpasswd_domain", SCF_TYPE_ASTRING,
+	    0},
+	{SMB_CI_KPASSWD_SEQNUM, "kpasswd_seqnum", SCF_TYPE_INTEGER,
+	    0},
+	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER,
+	    0}
+
 	/* SMB_CI_MAX */
 };
 
@@ -700,17 +704,6 @@ smb_config_refresh_idmap(void)
 	(void) snprintf(instance, sizeof (instance), "%s:default",
 	    IDMAP_FMRI_PREFIX);
 	return (smf_refresh_instance(instance));
-}
-
-/*
- * smb_config_refresh
- *
- * Refresh SMB SMF service.
- */
-int
-smb_config_refresh(void)
-{
-	return (smf_refresh_instance(SMBD_DEFAULT_INSTANCE_FMRI));
 }
 
 int

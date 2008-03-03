@@ -62,7 +62,25 @@
 #include <smbsrv/smb_incl.h>
 
 smb_sdrc_t
-smb_com_query_information2(struct smb_request *sr)
+smb_pre_query_information2(smb_request_t *sr)
+{
+	int rc;
+
+	rc = smbsr_decode_vwv(sr, "w", &sr->smb_fid);
+
+	DTRACE_SMB_1(op__QueryInformation2__start, smb_request_t *, sr);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_query_information2(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__QueryInformation2__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_query_information2(smb_request_t *sr)
 {
 	smb_node_t *node;
 	smb_attr_t *attr;
@@ -70,19 +88,16 @@ smb_com_query_information2(struct smb_request *sr)
 	unsigned short	dattr;
 	int rc;
 
-	if (smbsr_decode_vwv(sr, "w", &sr->smb_fid) != 0)
-		return (SDRC_ERROR_REPLY);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
-
 
 	if (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	node = sr->fid_ofile->f_node;
@@ -94,15 +109,15 @@ smb_com_query_information2(struct smb_request *sr)
 
 	rc = smbsr_encode_result(sr, 11, 0, "byyyllww",
 	    11,						/* wct */
-	    smb_gmt_to_local_time(attr->sa_crtime.tv_sec),
+	    smb_gmt2local(sr, attr->sa_crtime.tv_sec),
 	    /* LastAccessTime */
-	    smb_gmt_to_local_time(attr->sa_vattr.va_atime.tv_sec),
+	    smb_gmt2local(sr, attr->sa_vattr.va_atime.tv_sec),
 	    /* LastWriteTime */
-	    smb_gmt_to_local_time(attr->sa_vattr.va_mtime.tv_sec),
+	    smb_gmt2local(sr, attr->sa_vattr.va_mtime.tv_sec),
 	    dsize,
 	    dasize,
 	    dattr,					/* FileAttributes */
 	    0);						/* bcc */
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

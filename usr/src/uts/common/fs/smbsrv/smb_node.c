@@ -89,15 +89,79 @@
 uint32_t smb_is_executable(char *path);
 static void smb_node_delete_on_close(smb_node_t *node);
 
-uint32_t	smb_node_hit = 0;
-uint32_t	smb_node_miss = 0;
-uint32_t	smb_node_alloc = 0;
-uint32_t	smb_node_free = 0;
-
 #define	VALIDATE_DIR_NODE(_dir_, _node_) \
     ASSERT((_dir_)->n_magic == SMB_NODE_MAGIC); \
     ASSERT(((_dir_)->vp->v_xattrdir) || ((_dir_)->vp->v_type == VDIR)); \
     ASSERT((_dir_)->dir_snode != (_node_));
+
+static boolean_t	smb_node_initialized = B_FALSE;
+static smb_llist_t	smb_node_hash_table[SMBND_HASH_MASK+1];
+
+/*
+ * smb_node_init
+ *
+ * Initialization of the SMB node layer.
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
+int
+smb_node_init(void)
+{
+	int	i;
+
+	if (smb_node_initialized)
+		return (0);
+
+	for (i = 0; i <= SMBND_HASH_MASK; i++) {
+		smb_llist_constructor(&smb_node_hash_table[i],
+		    sizeof (smb_node_t), offsetof(smb_node_t, n_lnd));
+	}
+	smb_node_initialized = B_TRUE;
+	return (0);
+}
+
+/*
+ * smb_node_fini
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
+void
+smb_node_fini(void)
+{
+	int	i;
+
+	if (!smb_node_initialized)
+		return;
+
+#ifdef DEBUG
+	for (i = 0; i <= SMBND_HASH_MASK; i++) {
+		smb_node_t	*node;
+
+		/*
+		 * The following sequence is just intended for sanity check.
+		 * This will have to be modified when the code goes into
+		 * production.
+		 *
+		 * The SMB node hash table should be emtpy at this point. If the
+		 * hash table is not empty a panic will be triggered.
+		 *
+		 * The reason why SMB nodes are still remaining in the hash
+		 * table is problably due to a mismatch between calls to
+		 * smb_node_lookup() and smb_node_release(). You must track that
+		 * down.
+		 */
+		node = smb_llist_head(&smb_node_hash_table[i]);
+		ASSERT(node == NULL);
+	}
+#endif
+
+	for (i = 0; i <= SMBND_HASH_MASK; i++) {
+		smb_llist_destructor(&smb_node_hash_table[i]);
+	}
+	smb_node_initialized = B_FALSE;
+}
 
 /*
  * smb_node_lookup()
@@ -180,7 +244,7 @@ smb_node_lookup(
 
 	hashkey = fsd.val[0] + attr->sa_vattr.va_nodeid;
 	hashkey += (hashkey >> 24) + (hashkey >> 16) + (hashkey >> 8);
-	node_hdr = &smb_info.node_hash_table[(hashkey & SMBND_HASH_MASK)];
+	node_hdr = &smb_node_hash_table[(hashkey & SMBND_HASH_MASK)];
 	lock_mode = RW_READER;
 
 	smb_llist_enter(node_hdr, lock_mode);
@@ -242,38 +306,37 @@ smb_node_lookup(
 		}
 		break;
 	}
-	node = kmem_cache_alloc(smb_info.si_cache_node, KM_SLEEP);
-	smb_node_alloc++;
-
+	node = kmem_cache_alloc(sr->sr_server->si_cache_node, KM_SLEEP);
 	bzero(node, sizeof (smb_node_t));
 
 	node->n_state = SMB_NODE_STATE_AVAILABLE;
 	node->n_hash_bucket = node_hdr;
+	node->n_sr = sr;
+	node->vp = vp;
+	node->n_hashkey = hashkey;
+	node->n_refcnt = 1;
+	node->tree_fsd = vp->v_vfsp->vfs_fsid;
+	node->attr = *attr;
+	node->flags |= NODE_FLAGS_ATTR_VALID;
+	node->n_size = node->attr.sa_vattr.va_size;
+	node->n_orig_session_id = sr->session->s_kid;
+	node->n_orig_uid = crgetuid(sr->user_cr);
+	node->n_cache = sr->sr_server->si_cache_node;
 
-	if (fsd_chkcap(&fsd, FSOLF_READONLY) > 0) {
+	ASSERT(od_name);
+	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
+
+	if (fsd_chkcap(&vp->v_vfsp->vfs_fsid, FSOLF_READONLY) > 0)
 		node->flags |= NODE_READ_ONLY;
-	}
 
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_nnd));
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
-	node->n_hashkey = hashkey;
-	node->n_refcnt = 1;
 
-	if (sr) {
-		node->n_orig_session_id = sr->session->s_kid;
-		node->n_orig_uid = crgetuid(sr->user_cr);
-	}
 
-	node->vp = vp;
-
-	ASSERT(od_name);
-	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
 	if (strcmp(od_name, XATTR_DIR) == 0)
 		node->flags |= NODE_XATTR_DIR;
-	node->tree_fsd = fsd;
-
 	if (op)
 		node->flags |= smb_is_executable(op->fqi.last_comp);
 
@@ -290,17 +353,13 @@ smb_node_lookup(
 		node->unnamed_stream_node = unnamed_node;
 	}
 
-	node->attr = *attr;
-	node->flags |= NODE_FLAGS_ATTR_VALID;
-	node->n_size = node->attr.sa_vattr.va_size;
-
 	smb_rwx_init(&node->n_lock);
 	node->n_magic = SMB_NODE_MAGIC;
 	smb_audit_buf_node_create(node);
-
 	DTRACE_PROBE1(smb_node_lookup_miss, smb_node_t *, node);
 	smb_audit_node(node);
 	smb_llist_insert_head(node_hdr, node);
+
 	smb_llist_exit(node_hdr);
 	return (node);
 }
@@ -394,7 +453,6 @@ smb_node_ref(smb_node_t *node)
  * smb_node_release() itself will call smb_node_release() on a node's dir_snode,
  * as smb_node_lookup() takes a hold on dir_snode.
  */
-
 void
 smb_node_release(smb_node_t *node)
 {
@@ -442,8 +500,7 @@ smb_node_release(smb_node_t *node)
 
 			smb_audit_buf_node_destroy(node);
 			smb_rwx_destroy(&node->n_lock);
-			kmem_cache_free(smb_info.si_cache_node, node);
-			++smb_node_free;
+			kmem_cache_free(node->n_cache, node);
 			return;
 
 		default:
@@ -520,31 +577,68 @@ smb_node_rename(
 }
 
 int
-smb_node_root_init()
+smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
 {
-	smb_attr_t va;
+	smb_attr_t	va;
+	int		error;
+	uint32_t	hashkey;
+	smb_llist_t	*node_hdr;
+	smb_node_t	*node;
 
 	/*
 	 * Take an explicit hold on rootdir.  This goes with the
 	 * corresponding release in smb_node_root_fini()/smb_node_release().
 	 */
+	VN_HOLD(vp);
 
-	VN_HOLD(rootdir);
-
-	if ((smb_info.si_root_smb_node = smb_node_lookup(NULL, NULL, kcred,
-	    rootdir, ROOTVOL, NULL, NULL, &va)) == NULL)
-		return (-1);
-	else
-		return (0);
-}
-
-void
-smb_node_root_fini()
-{
-	if (smb_info.si_root_smb_node) {
-		smb_node_release(smb_info.si_root_smb_node);
-		smb_info.si_root_smb_node = NULL;
+	va.sa_mask = SMB_AT_ALL;
+	error = smb_vop_getattr(vp, NULL, &va, 0, kcred);
+	if (error) {
+		VN_RELE(vp);
+		return (error);
 	}
+
+	hashkey = vp->v_vfsp->vfs_fsid.val[0] + va.sa_vattr.va_nodeid;
+	hashkey += (hashkey >> 24) + (hashkey >> 16) + (hashkey >> 8);
+	node_hdr = &smb_node_hash_table[(hashkey & SMBND_HASH_MASK)];
+
+	node = kmem_cache_alloc(sv->si_cache_node, KM_SLEEP);
+	bzero(node, sizeof (smb_node_t));
+
+	node->n_state = SMB_NODE_STATE_AVAILABLE;
+	node->n_hash_bucket = node_hdr;
+	node->vp = vp;
+	node->n_hashkey = hashkey;
+	node->n_refcnt = 1;
+	node->tree_fsd = vp->v_vfsp->vfs_fsid;
+	node->attr = va;
+	node->flags |= NODE_FLAGS_ATTR_VALID;
+	node->n_size = node->attr.sa_vattr.va_size;
+	node->n_cache = sv->si_cache_node;
+	(void) strlcpy(node->od_name, ROOTVOL, sizeof (node->od_name));
+
+	if (fsd_chkcap(&vp->v_vfsp->vfs_fsid, FSOLF_READONLY) > 0)
+		node->flags |= NODE_READ_ONLY;
+
+	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
+	    offsetof(smb_ofile_t, f_nnd));
+	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
+	    offsetof(smb_lock_t, l_lnd));
+
+	smb_rwx_init(&node->n_lock);
+	node->n_magic = SMB_NODE_MAGIC;
+	smb_audit_buf_node_create(node);
+
+	sv->si_root_smb_node = node;
+
+	smb_audit_node(node);
+	smb_llist_enter(node_hdr, RW_WRITER);
+	smb_llist_insert_head(node_hdr, node);
+	smb_llist_exit(node_hdr);
+
+	*root = node;
+
+	return (0);
 }
 
 /*

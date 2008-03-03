@@ -35,7 +35,6 @@
  * support them at this time.
  */
 
-#include <smbsrv/smbvar.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/ntstatus.h>
@@ -59,32 +58,28 @@
  * see section 4.2.1 (NT_CREATE_ANDX).
  */
 smb_sdrc_t
-smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
+smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 {
 	struct open_param *op = &sr->arg.open;
-	uint8_t			OplockLevel;
-	uint8_t			DirFlag;
-	uint8_t			SecurityFlags;
-	uint32_t		ExtFileAttributes;
-	uint32_t		sd_len;
-	uint32_t		EaLength;
-	uint32_t		Flags;
-	uint32_t		ImpersonationLevel;
-	uint32_t		RootDirFid;
-	uint32_t		NameLength;
-	smb_attr_t		new_attr;
-	smb_node_t		*node;
-	smb_sd_t		sd;
-	DWORD status;
+	uint8_t SecurityFlags;
+	uint32_t EaLength;
+	uint32_t Flags;
+	uint32_t ImpersonationLevel;
+	uint32_t NameLength;
+	uint32_t sd_len;
+	uint32_t status;
+	smb_sd_t sd;
 	int rc;
+
+	bzero(op, sizeof (sr->arg.open));
 
 	rc = smb_decode_mbc(&xa->req_param_mb, "%lllqllllllllb",
 	    sr,
 	    &Flags,
-	    &RootDirFid,
+	    &op->rootdirfid,
 	    &op->desired_access,
 	    &op->dsize,
-	    &ExtFileAttributes,
+	    &op->dattr,
 	    &op->share_access,
 	    &op->create_disposition,
 	    &op->create_options,
@@ -94,75 +89,89 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 	    &ImpersonationLevel,
 	    &SecurityFlags);
 
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
-
-	/*
-	 * If name length is zero, interpret as "\".
-	 */
-	if (NameLength == 0) {
-		op->fqi.path = "\\";
-	} else {
-		rc = smb_decode_mbc(&xa->req_param_mb, "%#u",
-		    sr, NameLength, &op->fqi.path);
-		if (rc != 0)
-			return (SDRC_ERROR_REPLY);
+	if (rc == 0) {
+		if (NameLength == 0) {
+			op->fqi.path = "\\";
+		} else if (NameLength >= MAXPATHLEN) {
+			smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
+			    ERRDOS, ERROR_PATH_NOT_FOUND);
+			rc = -1;
+		} else {
+			rc = smb_decode_mbc(&xa->req_param_mb, "%#u",
+			    sr, NameLength, &op->fqi.path);
+		}
 	}
 
-	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
-	    !(op->desired_access & DELETE)) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR_REPLY);
+	if (Flags) {
+		if (Flags & NT_CREATE_FLAG_REQUEST_OPLOCK) {
+			if (Flags & NT_CREATE_FLAG_REQUEST_OPBATCH)
+				op->my_flags = MYF_BATCH_OPLOCK;
+			else
+				op->my_flags = MYF_EXCLUSIVE_OPLOCK;
+		}
+
+		if (Flags & NT_CREATE_FLAG_OPEN_TARGET_DIR)
+			op->my_flags |= MYF_MUST_BE_DIRECTORY;
 	}
 
 	if (sd_len) {
 		status = smb_decode_sd(xa, &sd);
 		if (status != NT_STATUS_SUCCESS) {
 			smbsr_error(sr, status, 0, 0);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 		op->sd = &sd;
 	} else {
 		op->sd = NULL;
 	}
 
-	op->fqi.srch_attr = 0;
-	op->omode = 0;
+	DTRACE_SMB_2(op__NtTransactCreate__start, smb_request_t *, sr,
+	    struct open_param *, op);
 
-	op->utime.tv_sec = op->utime.tv_nsec = 0;
-	op->my_flags = 0;
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
 
-	op->dattr = ExtFileAttributes;
+void
+smb_post_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
+{
+	DTRACE_SMB_2(op__NtTransactCreate__done, smb_request_t *, sr,
+	    smb_xa_t *, xa);
+}
 
-	if (Flags) {
-		if (Flags & NT_CREATE_FLAG_REQUEST_OPLOCK) {
-			if (Flags & NT_CREATE_FLAG_REQUEST_OPBATCH) {
-				op->my_flags = MYF_BATCH_OPLOCK;
-			} else {
-				op->my_flags = MYF_EXCLUSIVE_OPLOCK;
-			}
-		}
-		if (Flags & NT_CREATE_FLAG_OPEN_TARGET_DIR)
-			op->my_flags |= MYF_MUST_BE_DIRECTORY;
+smb_sdrc_t
+smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
+{
+	struct open_param *op = &sr->arg.open;
+	uint8_t			OplockLevel;
+	uint8_t			DirFlag;
+	smb_attr_t		new_attr;
+	smb_node_t		*node;
+	uint32_t status;
+
+	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
+	    !(op->desired_access & DELETE)) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
+		return (SDRC_ERROR);
 	}
 
-	if (ExtFileAttributes & FILE_FLAG_WRITE_THROUGH)
+	if (op->dattr & FILE_FLAG_WRITE_THROUGH)
 		op->create_options |= FILE_WRITE_THROUGH;
 
-	if (ExtFileAttributes & FILE_FLAG_DELETE_ON_CLOSE)
+	if (op->dattr & FILE_FLAG_DELETE_ON_CLOSE)
 		op->create_options |= FILE_DELETE_ON_CLOSE;
 
-	if (RootDirFid == 0) {
+	if (op->rootdirfid == 0) {
 		op->fqi.dir_snode = sr->tid_tree->t_snode;
 	} else {
-		sr->smb_fid = (ushort_t)RootDirFid;
+		sr->smb_fid = (ushort_t)op->rootdirfid;
 		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
 		    sr->smb_fid);
-		/*
-		 * XXX: ASSERT() for now but we should understand if the test
-		 *	of the return value is missing because it cannot happen.
-		 */
-		ASSERT(sr->fid_ofile != NULL);
+		if (sr->fid_ofile == NULL) {
+			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+			    ERRDOS, ERRbadfid);
+			return (SDRC_ERROR);
+		}
+
 		op->fqi.dir_snode = sr->fid_ofile->f_node;
 		smbsr_disconnect_file(sr);
 	}
@@ -173,7 +182,7 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 		smb_sd_term(op->sd);
 
 	if (status != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		switch (MYF_OPLOCK_TYPE(op->my_flags)) {
@@ -244,5 +253,5 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 		    0);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

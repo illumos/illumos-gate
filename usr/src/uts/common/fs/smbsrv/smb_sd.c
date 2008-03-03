@@ -29,7 +29,6 @@
  * This module provides Security Descriptor handling functions.
  */
 
-#include <smbsrv/smbvar.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_idmap.h>

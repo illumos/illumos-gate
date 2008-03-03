@@ -123,20 +123,15 @@ extern "C" {
 #define	MAX_EXCLUDE_LIST_LEN	(SMB_PI_MAX_NETWORKS * INET_ADDRSTRLEN)
 
 typedef struct smb_kmod_cfg {
-	uint32_t skc_maxbufsize;
 	uint32_t skc_maxworkers;
 	uint32_t skc_maxconnections;
 	uint32_t skc_keepalive;
-	uint32_t skc_oplock_timeout;
 	int32_t skc_restrict_anon;
 	int32_t skc_signing_enable;
 	int32_t skc_signing_required;
 	int32_t skc_signing_check;
 	int32_t skc_oplock_enable;
-	int32_t skc_flush_required;
 	int32_t skc_sync_enable;
-	int32_t skc_dirsymlink_enable;
-	int32_t skc_announce_quota;
 	int32_t skc_secmode;
 
 	char skc_resource_domain[SMB_PI_MAX_DOMAIN];
@@ -158,20 +153,6 @@ int smbnative_pdc_value(char *native_lm);
 #define	AUTH_GUEST_GRANT		0x00000001
 #define	AUTH_IPC_ONLY_GRANT		0x00000002
 #define	AUTH_CONEXUS_GRANT		0x00000004
-
-#define	SMBD_DOOR_NAME		"/var/run/smbd_door_old"
-#define	SMBD_DOOR_VERSION	1
-
-#define	SMBD_DOOR_COOKIE	((void*)(0xdeadbeef^SMBD_DOOR_VERSION))
-#define	SMBD_DOOR_SIZE		256
-
-#define	SMBD_DOOR_SRV_SUCCESS	0
-#define	SMBD_DOOR_SRV_ERROR	-1
-
-#define	SMBD_DOOR_JOIN				1
-#define	SMBD_DOOR_PARAM_GET			2
-#define	SMBD_DOOR_PARAM_SET			3
-#define	SMBD_DOOR_NETBIOS_RECONFIG		4
 
 #ifdef __cplusplus
 }

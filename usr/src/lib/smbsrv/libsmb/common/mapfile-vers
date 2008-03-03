@@ -138,7 +138,6 @@ SUNWprivate {
 	smb_config_getname;
 	smb_config_getnum;
 	smb_config_getstr;
-	smb_config_refresh;
 	smb_config_refresh_idmap;
 	smb_config_secmode_fromstr;
 	smb_config_secmode_tostr;
@@ -201,9 +200,11 @@ SUNWprivate {
 	smb_get_nameservers;
 	smb_getdomaininfo;
 	smb_getdomainname;
+	smb_getdomainsid;
 	smb_getfqdomainname;
 	smb_getfqhostname;
 	smb_gethostname;
+	smb_getjoineddomain;
 	smb_getnetbiosname;
 	smb_idmap_batch_create;
 	smb_idmap_batch_destroy;
@@ -248,6 +249,7 @@ SUNWprivate {
 	smb_match83;
 	smb_match;
 	smb_match_ci;
+	smb_match_netlogon_seqnum;
 	smb_nic_addhost;
 	smb_nic_delhost;
 	smb_nic_exists;
@@ -281,6 +283,7 @@ SUNWprivate {
 	smb_resolve_fqdn;
 	smb_resolve_netbiosname;
 	smb_setdomaininfo;
+	smb_setdomainprops;
 	smb_smf_create_service_pgroup;
 	smb_smf_end_transaction;
 	smb_smf_get_boolean_property;
@@ -300,15 +303,12 @@ SUNWprivate {
 	smb_token_query_privilege;
 	smb_trace;
 	smb_tracef;
+	smb_update_netlogon_seqnum;
 	smb_wins_allow_list;
 	smb_wins_build_list;
 	smb_wins_exclude_list;
 	smb_wins_iplist;
 	smb_wins_is_excluded;
-	smbd_get_param;
-	smbd_get_security_mode;
-	smbd_netbios_reconfig;
-	smbd_set_param;
 	smbnative_lm_value;
 	smbnative_os_value;
 	smbnative_pdc_value;
@@ -325,6 +325,7 @@ SUNWprivate {
 	utf8_strncasecmp;
 	utf8_strupr;
 	xdr_smb_dr_bytes_t;
+	xdr_smb_dr_joininfo_t;
 	xdr_smb_dr_string_t;
 	xdr_smb_dr_ulist_t;
 	xdr_smb_dr_user_ctx_t;

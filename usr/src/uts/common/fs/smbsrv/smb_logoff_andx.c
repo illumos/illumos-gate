@@ -63,16 +63,29 @@
  * ERRSRV/baduid  - UID was invalid
  */
 smb_sdrc_t
-smb_com_logoff_andx(struct smb_request *sr)
+smb_pre_logoff_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__LogoffX__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_logoff_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__LogoffX__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_logoff_andx(smb_request_t *sr)
 {
 	if (sr->uid_user == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRbaduid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_user_logoff(sr->uid_user);
 
 	if (smbsr_encode_result(sr, 2, 0, "bb.ww", 2, sr->andx_com, -1, 0))
-		return (SDRC_ERROR_REPLY);
-	return (SDRC_NORMAL_REPLY);
+		return (SDRC_ERROR);
+	return (SDRC_SUCCESS);
 }

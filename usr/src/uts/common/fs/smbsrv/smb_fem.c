@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
 #include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/fem.h>
-
-fem_t *smb_fcn_ops = NULL;
 
 int smb_fem_fcn_create(femarg_t *, char *, vattr_t *, vcexcl_t, int,
     vnode_t **, cred_t *, int, caller_context_t *, vsecattr_t *);
@@ -60,24 +58,53 @@ static const fs_operation_def_t smb_fcn_tmpl[] = {
 	NULL, NULL
 };
 
+static boolean_t	smb_fem_initialized = B_FALSE;
+static fem_t		*smb_fcn_ops = NULL;
+/*
+ * smb_fem_init
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
 int
-smb_fem_init()
+smb_fem_init(void)
 {
-	return (fem_create("smb_fcn_ops", smb_fcn_tmpl, &smb_fcn_ops));
+	int	rc = 0;
+
+	if (smb_fem_initialized)
+		return (0);
+
+	rc = fem_create("smb_fcn_ops", smb_fcn_tmpl, &smb_fcn_ops);
+	if (rc)
+		return (rc);
+
+	smb_fem_initialized = B_TRUE;
+
+	return (0);
 }
 
+/*
+ * smb_fem_fini
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
 void
-smb_fem_shutdown()
+smb_fem_fini(void)
 {
-	if (smb_fcn_ops)
-		fem_free(smb_fcn_ops);
+	if (!smb_fem_initialized)
+		return;
+
+	fem_free(smb_fcn_ops);
+	smb_fcn_ops = NULL;
+	smb_fem_initialized = B_FALSE;
 }
 
 void
 smb_fem_fcn_install(smb_node_t *node)
 {
-	(void) fem_install(node->vp, smb_fcn_ops, (void *)node, OPARGUNIQ,
-	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
+	(void) fem_install(node->vp, smb_fcn_ops, (void *)node,
+	    OPARGUNIQ, (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
 }
 
 void

@@ -224,18 +224,35 @@
  */
 
 smb_sdrc_t
-smb_com_open(struct smb_request *sr)
+smb_pre_open(smb_request_t *sr)
+{
+	struct open_param *op = &sr->arg.open;
+	int rc;
+
+	bzero(op, sizeof (sr->arg.open));
+
+	rc = smbsr_decode_vwv(sr, "ww", &op->omode, &op->fqi.srch_attr);
+	if (rc == 0)
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
+
+	DTRACE_SMB_2(op__Open__start, smb_request_t *, sr,
+	    struct open_param *, op);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_open(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Open__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_open(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint16_t file_attr;
 	int rc;
-
-	bzero(op, sizeof (sr->arg.open));
-	if (smbsr_decode_vwv(sr, "ww", &op->omode, &op->fqi.srch_attr) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
 
 	op->desired_access = smb_omode_to_amask(op->omode);
 	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
@@ -244,7 +261,7 @@ smb_com_open(struct smb_request *sr)
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	op->dsize = 0; /* Don't set spurious size */
@@ -262,7 +279,7 @@ smb_com_open(struct smb_request *sr)
 	}
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) == MYF_OPLOCK_NONE) {
 		sr->smb_flg &=
@@ -271,7 +288,7 @@ smb_com_open(struct smb_request *sr)
 
 	if (op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
@@ -280,35 +297,66 @@ smb_com_open(struct smb_request *sr)
 	    7,
 	    sr->smb_fid,
 	    file_attr,
-	    smb_gmt_to_local_time(op->utime.tv_sec),
+	    smb_gmt2local(sr, op->utime.tv_sec),
 	    (uint32_t)op->dsize,
 	    op->omode & SMB_DA_ACCESS_MASK,
 	    (uint16_t)0);	/* bcc */
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 smb_sdrc_t
-smb_com_open_andx(struct smb_request *sr)
+smb_pre_open_andx(smb_request_t *sr)
 {
-	struct open_param	*op = &sr->arg.open;
-	uint16_t		flags;
-	uint32_t		CreationTime;
-	uint16_t		granted_access;
-	uint16_t		ofun;
-	uint16_t		file_attr;
+	struct open_param *op = &sr->arg.open;
+	uint16_t flags;
+	uint32_t CreationTime;
+	uint16_t file_attr;
+	uint16_t ofun;
 	int rc;
 
 	bzero(op, sizeof (sr->arg.open));
-	op->dsize = 0;
+
 	rc = smbsr_decode_vwv(sr, "b.wwwwwlwll4.", &sr->andx_com,
 	    &sr->andx_off, &flags, &op->omode, &op->fqi.srch_attr,
 	    &file_attr, &CreationTime, &ofun, &op->dsize, &op->timeo);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
 
-	if (smbsr_decode_data(sr, "%u", sr, &op->fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
+	if (rc == 0) {
+		rc = smbsr_decode_data(sr, "%u", sr, &op->fqi.path);
+
+		op->dattr = file_attr;
+
+		if (flags & 2)
+			op->my_flags = MYF_EXCLUSIVE_OPLOCK;
+		else if (flags & 4)
+			op->my_flags = MYF_BATCH_OPLOCK;
+
+		if ((CreationTime != 0) && (CreationTime != UINT_MAX))
+			op->utime.tv_sec = smb_local2gmt(sr, CreationTime);
+		op->utime.tv_nsec = 0;
+
+		op->create_disposition = smb_ofun_to_crdisposition(ofun);
+	}
+
+	DTRACE_SMB_2(op__OpenX__start, smb_request_t *, sr,
+	    struct open_param *, op);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_open_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__OpenX__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_open_andx(smb_request_t *sr)
+{
+	struct open_param	*op = &sr->arg.open;
+	uint16_t		file_attr;
+	uint16_t		granted_access;
+	int rc;
 
 	op->desired_access = smb_omode_to_amask(op->omode);
 	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
@@ -317,34 +365,23 @@ smb_com_open_andx(struct smb_request *sr)
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	op->dattr = file_attr;
-	op->create_disposition = smb_ofun_to_crdisposition(ofun);
 	if (op->create_disposition == ((uint32_t)SMB_INVALID_CRDISPOSITION)) {
 		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_PARAMETER);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	op->create_options = (op->omode & SMB_DA_WRITE_THROUGH)
 	    ? FILE_WRITE_THROUGH : 0;
 
-	if (flags & 2)
-		op->my_flags = MYF_EXCLUSIVE_OPLOCK;
-	else if (flags & 4)
-		op->my_flags = MYF_BATCH_OPLOCK;
-
-	if ((CreationTime != 0) && (CreationTime != UINT_MAX))
-		op->utime.tv_sec = smb_local_time_to_gmt(CreationTime);
-	op->utime.tv_nsec = 0;
-
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) != MYF_OPLOCK_NONE) {
@@ -365,7 +402,7 @@ smb_com_open_andx(struct smb_request *sr)
 		    sr->andx_com, VAR_BCC,
 		    sr->smb_fid,
 		    file_attr,
-		    smb_gmt_to_local_time(node->attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, node->attr.sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)op->dsize,
 		    granted_access, op->ftype,
 		    op->devstate,
@@ -386,5 +423,5 @@ smb_com_open_andx(struct smb_request *sr)
 		    0);
 	}
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

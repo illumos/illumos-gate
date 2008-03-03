@@ -37,6 +37,10 @@
 #include <smbsrv/libsmb.h>
 #include <smb_sqlite.h>
 
+/*
+ * Local domain SID (aka machine SID) is not stored in the domain table
+ * therefore the index is 0
+ */
 #define	SMB_LGRP_LOCAL_IDX	0
 #define	SMB_LGRP_BUILTIN_IDX	1
 
@@ -1221,7 +1225,7 @@ smb_lgrp_gtbl_count(sqlite *db, int dom_idx, int *count)
 	}
 
 	sqlite_free_table(result);
-	if (ncol != 1)
+	if (ncol > 1)
 		return (SMB_LGRP_DB_ERROR);
 
 	*count = nrow;
@@ -1615,6 +1619,8 @@ smb_lgrp_dtbl_getidx(sqlite *db, nt_sid_t *sid, uint16_t sid_type,
 		*dom_idx = SMB_LGRP_LOCAL_IDX;
 		if (smb_idmap_getid(sid, rid, &id_type) != IDMAP_SUCCESS)
 			return (SMB_LGRP_INTERNAL_ERROR);
+
+		return (SMB_LGRP_SUCCESS);
 	}
 
 	dom_sid = nt_sid_dup(sid);

@@ -208,18 +208,18 @@ smb_set_standard_info(
 	 */
 	crtime.tv_nsec = mtime.tv_nsec = atime.tv_nsec = 0;
 	if (LastWrite != 0 && LastWrite != (uint32_t)-1) {
-		mtime.tv_sec = smb_local_time_to_gmt(LastWrite);
+		mtime.tv_sec = smb_local2gmt(sr, LastWrite);
 		node->set_mtime = mtime;
 		what |= SMB_AT_MTIME;
 	}
 
 	if (Creation != 0 && Creation != (uint32_t)-1) {
-		crtime.tv_sec = smb_local_time_to_gmt(Creation);
+		crtime.tv_sec = smb_local2gmt(sr, Creation);
 		what |= SMB_AT_CRTIME;
 	}
 
 	if (LastAccess != 0 && LastAccess != (uint32_t)-1) {
-		atime.tv_sec = smb_local_time_to_gmt(LastAccess);
+		atime.tv_sec = smb_local2gmt(sr, LastAccess);
 		what |= SMB_AT_ATIME;
 	}
 

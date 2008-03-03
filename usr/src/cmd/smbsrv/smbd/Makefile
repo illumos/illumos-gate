@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,12 +28,12 @@
 PROG=	smbd
 SRCS=				\
 	smbd_door_ops.c		\
-	smbd_door_server.c	\
 	smbd_doorsvc.c		\
 	smbd_join.c		\
 	smbd_logon.c		\
 	smbd_main.c		\
 	smbd_mlsvc_doorsvc.c	\
+	smbd_net.c		\
 	smbd_nicmon.c		\
 	smbd_share_doorsvc.c
 

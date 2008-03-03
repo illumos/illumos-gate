@@ -46,7 +46,20 @@
 #include <smbsrv/smb_incl.h>
 
 smb_sdrc_t
-smb_com_nt_cancel(struct smb_request *sr)
+smb_pre_nt_cancel(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtCancel__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_nt_cancel(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtCancel__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_nt_cancel(smb_request_t *sr)
 {
 	struct smb_request *req;
 	struct smb_session *session;

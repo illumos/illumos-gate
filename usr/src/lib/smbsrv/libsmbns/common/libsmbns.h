@@ -59,15 +59,13 @@ typedef enum adjoin_status {
 	ADJOIN_ERR_ADD_TRUST_ACCT,
 	ADJOIN_ERR_MOD_TRUST_ACCT,
 	ADJOIN_ERR_GET_ENCTYPES,
-	ADJOIN_ERR_GET_HOST_PRINC,
 	ADJOIN_ERR_INIT_KRB_CTX,
-	ADJOIN_ERR_GET_KRB_PRINC,
+	ADJOIN_ERR_GET_SPNS,
 	ADJOIN_ERR_KSETPWD,
 	ADJOIN_ERR_UPDATE_CNTRL_ATTR,
 	ADJOIN_ERR_WRITE_KEYTAB,
 	ADJOIN_ERR_IDMAP_SET_DOMAIN,
 	ADJOIN_ERR_IDMAP_REFRESH,
-	ADJOIN_ERR_SMB_REFRESH,
 	ADJOIN_NUM_STATUS
 } adjoin_status_t;
 
@@ -85,20 +83,21 @@ extern int ads_lookup_share(ADS_HANDLE *, const char *, const char *, char *);
 extern int ads_add_share(ADS_HANDLE *, const char *, const char *,
     const char *);
 extern adjoin_status_t ads_join(char *, char *, char *, char *, int);
-extern char *adjoin_report_err(adjoin_status_t status);
+extern char *adjoin_report_err(adjoin_status_t);
 extern int ads_domain_change_cleanup(char *);
 
 /* DYNDNS functions */
 extern int dns_msgid_init(void);
-extern int dyndns_update(void);
-extern int dyndns_clear_rev_zone(void);
+extern int dyndns_update(char *, boolean_t);
+extern int dyndns_clear_rev_zone(char *);
 
 /* Kerberos initialization function */
-extern int smb_kinit(char *user, char *passwd);
-
+extern int smb_kinit(char *, char *);
+extern int smb_ccache_init(char *, char *);
+extern void smb_ccache_remove(char *);
 
 /* NETBIOS Functions */
-extern int msdcs_lookup_ads(char *);
+extern int msdcs_lookup_ads(char *, char *);
 extern int smb_netbios_start(void);
 extern void smb_netbios_shutdown(void);
 extern void smb_netbios_name_reconfig(void);

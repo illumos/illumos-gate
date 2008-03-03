@@ -37,6 +37,7 @@
 #include <sys/nbmlock.h>
 #include <sys/share.h>
 #include <sys/fcntl.h>
+#include <nfs/lm.h>
 
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/string.h>
@@ -50,18 +51,15 @@ void
 smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
 
 static int
-smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
-    cred_t *cr, int flags);
+smb_vop_readdir_readpage(vnode_t *, void *, uint32_t, int *, cred_t *, int);
 
 static int
-smb_vop_readdir_entry(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
-    ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr,
-    char *dirbuf, int num_bytes);
+smb_vop_readdir_entry(vnode_t *, uint32_t *, char *, int *,
+    ino64_t *, vnode_t **, char *, int, cred_t *, char *, int);
 
 static int
-smb_vop_getdents_entries(smb_node_t *dir_snode, uint32_t *cookiep,
-    int32_t *dircountp, char *arg, uint32_t flags, struct smb_request *sr,
-    cred_t *cr, char *dirbuf, int *maxentries, int num_bytes, char *);
+smb_vop_getdents_entries(smb_node_t *, uint32_t *, int32_t *, char *, uint32_t,
+    smb_request_t *, cred_t *, char *, int *, int, char *);
 
 extern int
 smb_gather_dents_info(char *args, ino_t fileid, int namelen,
@@ -94,34 +92,61 @@ static uint_t smb_attrmap[SMB_AT_MAX] = {
 	AT_SEQ
 };
 
+static boolean_t	smb_vop_initialized = B_FALSE;
+caller_context_t	smb_ct;
+
+/*
+ * smb_vop_init
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
+int
+smb_vop_init(void)
+{
+	if (smb_vop_initialized)
+		return (0);
+	/*
+	 * The caller_context will be used primarily for range locking.
+	 * Since the CIFS server is mapping its locks to POSIX locks,
+	 * only one pid is used for operations originating from the
+	 * CIFS server (to represent CIFS in the VOP_FRLOCK routines).
+	 */
+	smb_ct.cc_sysid = lm_alloc_sysidt();
+	if (smb_ct.cc_sysid == LM_NOSYSID)
+		return (ENOMEM);
+
+	smb_ct.cc_caller_id = fs_new_caller_id();
+	smb_ct.cc_pid = 0;
+	smb_ct.cc_flags = 0;
+
+	smb_vop_initialized = B_TRUE;
+	return (0);
+}
+
+/*
+ * smb_vop_fini
+ *
+ * This function is not multi-thread safe. The caller must make sure only one
+ * thread makes the call.
+ */
+void
+smb_vop_fini(void)
+{
+	if (!smb_vop_initialized)
+		return;
+
+	lm_free_sysidt(smb_ct.cc_sysid);
+	smb_ct.cc_sysid = LM_NOSYSID;
+	smb_vop_initialized = B_FALSE;
+}
+
 /*
  * The smb_ct will be used primarily for range locking.
  * Since the CIFS server is mapping its locks to POSIX locks,
  * only one pid is used for operations originating from the
  * CIFS server (to represent CIFS in the VOP_FRLOCK routines).
  */
-
-caller_context_t smb_ct;
-
-/*
- * smb_vop_start()
- *
- * Initialize the smb caller context.  This function must be called
- * before any other smb_vop calls.
- */
-
-void
-smb_vop_start(void)
-{
-	static boolean_t initialized = B_FALSE;
-
-	if (!initialized) {
-		smb_ct.cc_caller_id = fs_new_caller_id();
-		smb_ct.cc_pid = ttoproc(curthread)->p_pid;
-		smb_ct.cc_sysid = lm_alloc_sysidt();
-		initialized = B_TRUE;
-	}
-}
 
 int
 smb_vop_open(vnode_t **vpp, int mode, cred_t *cred)
@@ -484,8 +509,14 @@ smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp, cred_t *cr)
  */
 
 int
-smb_vop_lookup(vnode_t *dvp, char *name, vnode_t **vpp, char *od_name,
-    int flags, vnode_t *rootvp, cred_t *cr)
+smb_vop_lookup(
+    vnode_t		*dvp,
+    char		*name,
+    vnode_t		**vpp,
+    char		*od_name,
+    int			flags,
+    vnode_t		*rootvp,
+    cred_t		*cr)
 {
 	int error = 0;
 	int option_flags = 0;
@@ -805,8 +836,7 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 		name[0] = '\0';
 
 		error = smb_vop_readdir_entry(dvp, cookiep, name, namelen,
-		    inop, vpp, od_name, flags, cr, dirbuf,
-		    num_bytes);
+		    inop, vpp, od_name, flags, cr, dirbuf, num_bytes);
 
 		if (error)
 			break;
@@ -936,9 +966,18 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
  */
 
 static int
-smb_vop_readdir_entry(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
-    ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr,
-    char *dirbuf, int num_bytes)
+smb_vop_readdir_entry(
+    vnode_t		*dvp,
+    uint32_t		*cookiep,
+    char		*name,
+    int			*namelen,
+    ino64_t		*inop,
+    vnode_t		**vpp,
+    char		*od_name,
+    int			flags,
+    cred_t		*cr,
+    char		*dirbuf,
+    int			 num_bytes)
 {
 	uint32_t next_cookie;
 	int ebufsize;
@@ -1193,7 +1232,7 @@ smb_vop_getdents_entries(
     int32_t		*dircountp,
     char		*arg,
     uint32_t		flags,
-    struct smb_request	*sr,
+    smb_request_t	*sr,
     cred_t		*cr,
     char		*dirbuf,
     int			*maxentries,
@@ -1369,9 +1408,15 @@ smb_vop_getdents_entries(
  */
 
 int
-smb_vop_stream_lookup(vnode_t *fvp, char *stream_name, vnode_t **vpp,
-    char *od_name, vnode_t **xattrdirvpp, int flags, vnode_t *rootvp,
-    cred_t *cr)
+smb_vop_stream_lookup(
+    vnode_t		*fvp,
+    char		*stream_name,
+    vnode_t		**vpp,
+    char		*od_name,
+    vnode_t		**xattrdirvpp,
+    int			flags,
+    vnode_t		*rootvp,
+    cred_t		*cr)
 {
 	char *solaris_stream_name;
 	char *name;
@@ -1445,8 +1490,8 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr)
 	vnode_t *xattrdirvp;
 	int error;
 
-	if ((error = smb_vop_lookup_xattrdir(vp, &xattrdirvp, LOOKUP_XATTR, cr))
-	    != 0)
+	error = smb_vop_lookup_xattrdir(vp, &xattrdirvp, LOOKUP_XATTR, cr);
+	if (error != 0)
 		return (error);
 
 	/*

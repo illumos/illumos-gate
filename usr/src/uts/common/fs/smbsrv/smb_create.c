@@ -29,7 +29,7 @@
 
 #define	SMB_CREATE_NAMEBUF_SZ	16
 
-static uint32_t smb_common_create(struct smb_request *sr);
+static uint32_t smb_common_create(smb_request_t *sr);
 
 /*
  * Create a new file, or truncate an existing file to zero length,
@@ -37,27 +37,41 @@ static uint32_t smb_common_create(struct smb_request *sr);
  * fully qualified name relative to the tree.
  */
 smb_sdrc_t
-smb_com_create(struct smb_request *sr)
+smb_pre_create(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
+	int rc;
 
 	bzero(op, sizeof (sr->arg.open));
 
-	if (smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
+	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec);
+	if (rc == 0)
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
 
 	op->create_disposition = FILE_OVERWRITE_IF;
 
+	DTRACE_SMB_2(op__Create__start, smb_request_t *, sr,
+	    struct open_param *, op);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_create(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Create__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_create(smb_request_t *sr)
+{
 	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -65,51 +79,82 @@ smb_com_create(struct smb_request *sr)
  * a fully qualified name relative to the tree.
  */
 smb_sdrc_t
-smb_com_create_new(struct smb_request *sr)
+smb_pre_create_new(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
+	int rc;
 
 	bzero(op, sizeof (sr->arg.open));
 
-	if (smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
+	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->utime.tv_sec);
+	if (rc == 0)
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
 
 	op->create_disposition = FILE_CREATE;
 
-	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+	DTRACE_SMB_2(op__CreateNew__start, smb_request_t *, sr,
+	    struct open_param *, op);
 
-	if (smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0))
-		return (SDRC_ERROR_REPLY);
-
-	return (SDRC_NORMAL_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
+void
+smb_post_create_new(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__CreateNew__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_create_new(smb_request_t *sr)
+{
+	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR);
+
+	if (smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0))
+		return (SDRC_ERROR);
+
+	return (SDRC_SUCCESS);
+}
 
 /*
  * Create a unique file in the specified directory relative to the
  * current tree.  No attributes are specified.
  */
 smb_sdrc_t
-smb_com_create_temporary(struct smb_request *sr)
+smb_pre_create_temporary(smb_request_t *sr)
+{
+	struct open_param *op = &sr->arg.open;
+	uint16_t reserved;
+	int rc;
+
+	bzero(op, sizeof (sr->arg.open));
+
+	rc = smbsr_decode_vwv(sr, "wl", &reserved, &op->utime.tv_sec);
+	if (rc == 0)
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
+
+	op->create_disposition = FILE_CREATE;
+
+	DTRACE_SMB_2(op__CreateTemporary__start, smb_request_t *, sr,
+	    struct open_param *, op);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_create_temporary(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__CreateTemporary__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_create_temporary(smb_request_t *sr)
 {
 	static uint16_t tmp_id = 10000;
 	struct open_param *op = &sr->arg.open;
 	char name[SMB_CREATE_NAMEBUF_SZ];
 	char *buf;
-	uint16_t reserved;
 	uint16_t bcc;
-
-	bzero(op, sizeof (sr->arg.open));
-
-	if (smbsr_decode_vwv(sr, "wl", &reserved, &op->utime.tv_sec) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (smbsr_decode_data(sr, "%S", sr, &op->fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
 
 	++tmp_id;
 	bcc = 1; /* null terminator */
@@ -118,16 +163,15 @@ smb_com_create_temporary(struct smb_request *sr)
 	buf = smbsr_malloc(&sr->request_storage, MAXPATHLEN);
 	(void) snprintf(buf, MAXPATHLEN, "%s\\%s", op->fqi.path, name);
 	op->fqi.path = buf;
-	op->create_disposition = FILE_CREATE;
 
 	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
-	if (smbsr_encode_result(sr, 1, 0, "bwwbs", 1, sr->smb_fid, bcc, 4,
-	    name))
-		return (SDRC_ERROR_REPLY);
+	if (smbsr_encode_result(sr, 1, VAR_BCC, "bww%S", 1, sr->smb_fid,
+	    VAR_BCC, sr, name))
+		return (SDRC_ERROR);
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -135,12 +179,12 @@ smb_com_create_temporary(struct smb_request *sr)
  * mode with read/write access.
  */
 uint32_t
-smb_common_create(struct smb_request *sr)
+smb_common_create(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint32_t status;
 
-	op->utime.tv_sec = smb_local_time_to_gmt(op->utime.tv_sec);
+	op->utime.tv_sec = smb_local2gmt(sr, op->utime.tv_sec);
 	op->utime.tv_nsec = 0;
 	op->omode = SMB_DA_ACCESS_READ_WRITE | SMB_DA_SHARE_COMPATIBILITY;
 	op->desired_access = smb_omode_to_amask(op->omode);

@@ -57,7 +57,26 @@
  * USHORT ByteCount;                  Count of data bytes = 0
  */
 smb_sdrc_t
-smb_com_delete_directory(struct smb_request *sr)
+smb_pre_delete_directory(smb_request_t *sr)
+{
+	int rc;
+
+	rc = smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path);
+
+	DTRACE_SMB_2(op__DeleteDirectory__start, smb_request_t *, sr,
+	    struct dirop *, &sr->arg.dirop);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_delete_directory(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__DeleteDirectory__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_delete_directory(smb_request_t *sr)
 {
 	smb_node_t *dnode;
 	int rc;
@@ -65,18 +84,15 @@ smb_com_delete_directory(struct smb_request *sr)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
-
-	if (smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
 
 	sr->arg.dirop.fqi.srch_attr = 0;
 
 	rc = smbd_fs_query(sr, &sr->arg.dirop.fqi, FQM_PATH_MUST_EXIST);
 	if (rc) {
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	dnode = sr->arg.dirop.fqi.last_snode;
@@ -88,7 +104,7 @@ smb_com_delete_directory(struct smb_request *sr)
 
 		smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_node_release(dnode);
@@ -101,12 +117,12 @@ smb_com_delete_directory(struct smb_request *sr)
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_node_release(dnode);
 	SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

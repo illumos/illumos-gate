@@ -131,7 +131,20 @@
 #include <smbsrv/smb_incl.h>
 
 smb_sdrc_t
-smb_com_search(struct smb_request *sr)
+smb_pre_search(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Search__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_search(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Search__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_search(smb_request_t *sr)
 {
 	int			rc;
 	unsigned short		sattr, count, maxcount;
@@ -151,15 +164,15 @@ smb_com_search(struct smb_request *sr)
 	sr->smb_flg &= ~SMB_FLAGS_CASE_INSENSITIVE;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	rc = smbsr_decode_data(sr, "%Abw", sr, &path, &type, &key_len);
 	if ((rc != 0) || (type != 0x05))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if ((rc = fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr)) != 0) {
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	count = 0;
@@ -190,11 +203,11 @@ smb_com_search(struct smb_request *sr)
 
 			rc = smb_rdir_open(sr, path, sattr);
 			if (rc == -1)
-				return (SDRC_ERROR_REPLY);
+				return (SDRC_ERROR);
 			if (rc == -2) {
 				sr->reply.chain_offset = sr->cur_reply_offset;
 				(void) smb_encode_mbc(&sr->reply, "bw", 0, 0);
-				return (SDRC_NORMAL_REPLY);
+				return (SDRC_SUCCESS);
 			}
 			resume_char = 0;
 			resume_key = 0;
@@ -203,7 +216,7 @@ smb_com_search(struct smb_request *sr)
 			    &resume_char, &cookie, &sr->smb_sid,
 			    &resume_key) != 0) {
 				/* We don't know which search to close! */
-				return (SDRC_ERROR_REPLY);
+				return (SDRC_ERROR);
 			}
 
 			sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
@@ -211,11 +224,11 @@ smb_com_search(struct smb_request *sr)
 			if (sr->sid_odir == NULL) {
 				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 				    ERRDOS, ERRbadfid);
-				return (SDRC_ERROR_REPLY);
+				return (SDRC_ERROR);
 			}
 		} else {
 			/* We don't know which search to close! */
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
@@ -266,13 +279,13 @@ smb_com_search(struct smb_request *sr)
 			/* returned error by smb_rdir_next() */
 			smb_rdir_close(sr);
 			smbsr_errno(sr, rc);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		if (count == 0) {
 			smb_rdir_close(sr);
 			smbsr_error(sr, 0, ERRDOS, ERRnofiles);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 	}
 
@@ -280,5 +293,5 @@ smb_com_search(struct smb_request *sr)
 	(void) smb_poke_mbc(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc);
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

@@ -1324,7 +1324,8 @@ smb_set_proto_prop(sa_property_t prop)
 				 * processed here.
 				 */
 				if (opt->refresh & SMB_REFRESH_REFRESH)
-					(void) smb_config_refresh();
+					(void) smf_refresh_instance(
+					    SMBD_DEFAULT_INSTANCE_FMRI);
 				else if (opt->refresh & SMB_REFRESH_RESTART)
 					(void) smf_restart_instance(
 					    SMBD_DEFAULT_INSTANCE_FMRI);

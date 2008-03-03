@@ -69,6 +69,11 @@ netr_info_t netr_global_info;
  *
  * Prior to calling this function, an anonymous session to the NETLOGON
  * pipe on a domain controller(server) should have already been opened.
+ *
+ * Upon a successful NETLOGON credential chain establishment, the
+ * netlogon sequence number will be set to match the kpasswd sequence
+ * number.
+ *
  */
 DWORD
 netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
@@ -96,8 +101,11 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 
 	if ((rc = netr_server_req_challenge(netr_handle, netr_info)) == 0) {
 		rc = netr_server_authenticate2(netr_handle, netr_info);
-		if (rc == 0)
+		if (rc == 0) {
+			smb_update_netlogon_seqnum();
 			netr_info->flags |= NETR_FLG_VALID;
+
+		}
 	}
 
 	return ((rc) ? NT_STATUS_UNSUCCESSFUL : NT_STATUS_SUCCESS);

@@ -44,24 +44,6 @@
 
 static void smb_flush_file(struct smb_request *sr, struct smb_ofile *ofile);
 
-
-int smb_flush_required = 1;
-
-
-/*
- * smb_commit_required
- *
- * Specify whether or not SmbFlush should send commit requests to the
- * file system. If state is non-zero, commit requests will be sent to
- * the file system. If state is zero, SmbFlush is a no-op.
- */
-void
-smb_commit_required(int state)
-{
-	smb_flush_required = state;
-}
-
-
 /*
  * smb_com_flush
  *
@@ -74,18 +56,33 @@ smb_commit_required(int state)
  * block during the flush operation.
  */
 smb_sdrc_t
+smb_pre_flush(smb_request_t *sr)
+{
+	int rc;
+
+	rc = smbsr_decode_vwv(sr, "w", &sr->smb_fid);
+
+	DTRACE_SMB_1(op__Flush__start, smb_request_t *, sr);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_flush(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Flush__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
 smb_com_flush(smb_request_t *sr)
 {
 	smb_ofile_t	*file;
 	smb_llist_t	*flist;
 	int		rc;
 
-	if (smbsr_decode_vwv(sr, "w", &sr->smb_fid) != 0)
-		return (SDRC_ERROR_REPLY);
-
 	if (smb_flush_required == 0) {
 		rc = smbsr_encode_empty_result(sr);
-		return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	if (sr->smb_fid != 0xffff) {
@@ -94,7 +91,7 @@ smb_com_flush(smb_request_t *sr)
 		if (sr->fid_ofile == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		smb_flush_file(sr, sr->fid_ofile);
@@ -112,7 +109,7 @@ smb_com_flush(smb_request_t *sr)
 	}
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 

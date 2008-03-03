@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,15 @@ extern "C" {
 
 #define	SMBNS_KRB5_KEYTAB "/etc/krb5/krb5.keytab"
 
+/* core set of SPNs */
+typedef enum smb_krb5_spn_idx {
+	SMBKRB5_SPN_IDX_HOST = 0,
+	SMBKRB5_SPN_IDX_NFS,
+	SMBKRB5_SPN_IDX_HTTP,
+	SMBKRB5_SPN_IDX_ROOT,
+	SMBKRB5_SPN_IDX_MAX
+} smb_krb5_spn_idx_t;
+
 extern gss_OID gss_nt_user_name;
 extern gss_OID gss_nt_machine_uid_name;
 extern gss_OID gss_nt_string_uid_name;
@@ -50,16 +59,21 @@ int krb5_establish_sec_ctx_kinit(char *, char *, gss_cred_id_t,
     gss_ctx_id_t *, gss_name_t, gss_OID, int, gss_buffer_desc *,
     gss_buffer_desc *, OM_uint32 *, OM_uint32 *, int *,
     int *, OM_uint32 *, char *);
+char *smb_krb5_get_spn(smb_krb5_spn_idx_t idx, char *fqhost);
+char *smb_krb5_get_upn(char *spn, char *domain);
 int smb_krb5_ctx_init(krb5_context *ctx);
 void smb_krb5_ctx_fini(krb5_context ctx);
-int smb_krb5_get_principal(krb5_context ctx, char *princ_str,
-    krb5_principal *princ);
+int smb_krb5_get_principals(char *domain, krb5_context ctx,
+    krb5_principal *krb5princs);
+void smb_krb5_free_principals(krb5_context ctx, krb5_principal *krb5princs,
+    size_t num);
 int smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd);
-int smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal princ,
+int smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal *princs,
     char *fname);
-int smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal princ,
+int smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal *princs,
     char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
     int enctype_count);
+boolean_t smb_krb5_find_keytab_entries(const char *fqhn, char *fname);
 
 #ifdef __cplusplus
 }

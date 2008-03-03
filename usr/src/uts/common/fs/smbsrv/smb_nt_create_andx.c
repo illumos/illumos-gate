@@ -168,58 +168,42 @@
  *    SMB_COM_IOCTL
  */
 smb_sdrc_t
-smb_com_nt_create_andx(struct smb_request *sr)
+smb_pre_nt_create_andx(smb_request_t *sr)
 {
-	struct open_param	*op = &sr->arg.open;
-	unsigned char		OplockLevel;
-	unsigned char		DirFlag;
-	unsigned char		SecurityFlags;
-	uint32_t		ExtFileAttributes;
-	uint32_t		Flags;
-	uint32_t		ImpersonationLevel;
-	uint32_t		RootDirFid;
-	unsigned short		NameLength;
-	smb_attr_t		new_attr;
-	smb_node_t		*node;
+	struct open_param *op = &sr->arg.open;
+	uint8_t SecurityFlags;
+	uint32_t Flags;
+	uint32_t ImpersonationLevel;
+	uint16_t NameLength;
 	int rc;
 
-	op->dsize = 0;
+	bzero(op, sizeof (sr->arg.open));
 
 	rc = smbsr_decode_vwv(sr, "5.wlllqlllllb",
 	    &NameLength,
 	    &Flags,
-	    &RootDirFid,
+	    &op->rootdirfid,
 	    &op->desired_access,
 	    &op->dsize,
-	    &ExtFileAttributes,
+	    &op->dattr,
 	    &op->share_access,
 	    &op->create_disposition,
 	    &op->create_options,
 	    &ImpersonationLevel,
 	    &SecurityFlags);
 
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if (NameLength >= MAXPATHLEN) {
-		smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND, 0, 0);
-		return (SDRC_ERROR_REPLY);
+	if (rc == 0) {
+		if (NameLength == 0) {
+			op->fqi.path = "\\";
+		} else if (NameLength >= MAXPATHLEN) {
+			smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
+			    ERRDOS, ERROR_PATH_NOT_FOUND);
+			rc = -1;
+		} else {
+			rc = smbsr_decode_data(sr, "%#u", sr, NameLength,
+			    &op->fqi.path);
+		}
 	}
-
-	if (smbsr_decode_data(sr, "%#u", sr, NameLength, &op->fqi.path) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
-	    !(op->desired_access & DELETE)) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR_REPLY);
-	}
-
-	op->fqi.srch_attr = 0;
-	op->omode = 0;
-	op->utime.tv_sec = op->utime.tv_nsec = 0;
-	op->my_flags = 0;
-	op->dattr = ExtFileAttributes;
 
 	if (Flags) {
 		if (Flags & NT_CREATE_FLAG_REQUEST_OPLOCK) {
@@ -229,27 +213,55 @@ smb_com_nt_create_andx(struct smb_request *sr)
 				op->my_flags = MYF_EXCLUSIVE_OPLOCK;
 			}
 		}
+
 		if (Flags & NT_CREATE_FLAG_OPEN_TARGET_DIR)
 			op->my_flags |= MYF_MUST_BE_DIRECTORY;
 	}
 
-	if (ExtFileAttributes & FILE_FLAG_WRITE_THROUGH)
+	DTRACE_SMB_2(op__NtCreateX__start, smb_request_t *, sr,
+	    struct open_param *, op);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_nt_create_andx(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__NtCreateX__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_nt_create_andx(struct smb_request *sr)
+{
+	struct open_param	*op = &sr->arg.open;
+	unsigned char		OplockLevel;
+	unsigned char		DirFlag;
+	smb_attr_t		new_attr;
+	smb_node_t		*node;
+	int rc;
+
+	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
+	    !(op->desired_access & DELETE)) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
+		return (SDRC_ERROR);
+	}
+
+	if (op->dattr & FILE_FLAG_WRITE_THROUGH)
 		op->create_options |= FILE_WRITE_THROUGH;
 
-	if (ExtFileAttributes & FILE_FLAG_DELETE_ON_CLOSE)
+	if (op->dattr & FILE_FLAG_DELETE_ON_CLOSE)
 		op->create_options |= FILE_DELETE_ON_CLOSE;
 
-	if (RootDirFid == 0) {
+	if (op->rootdirfid == 0) {
 		op->fqi.dir_snode = sr->tid_tree->t_snode;
 	} else {
-		sr->smb_fid = (ushort_t)RootDirFid;
-
+		sr->smb_fid = (ushort_t)op->rootdirfid;
 		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
 		    sr->smb_fid);
 		if (sr->fid_ofile == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
-			return (SDRC_ERROR_REPLY);
+			return (SDRC_ERROR);
 		}
 
 		op->fqi.dir_snode = sr->fid_ofile->f_node;
@@ -257,7 +269,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	}
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		switch (MYF_OPLOCK_TYPE(op->my_flags)) {
@@ -335,5 +347,5 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    0);
 	}
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

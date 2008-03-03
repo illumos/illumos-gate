@@ -343,7 +343,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 		    ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -355,7 +355,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(name, MAXNAMELEN);
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/*
@@ -382,7 +382,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -393,7 +393,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 	smb_node_release(dir_node);
 	(void) strcpy(name, node->od_name);
@@ -423,9 +423,9 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_encode_mbc(&xa->rep_data_mb,
 		    ((sr->session->native_os == NATIVE_OS_WIN95)
 		    ? "YYYllw" : "yyyllw"),
-		    smb_gmt_to_local_time(ap->sa_crtime.tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_crtime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)dsize,
 		    (uint32_t)dused,
 		    dattr);
@@ -441,9 +441,9 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_encode_mbc(&xa->rep_data_mb,
 		    ((sr->session->native_os == NATIVE_OS_WIN95)
 		    ? "YYYllwl" : "yyyllwl"),
-		    smb_gmt_to_local_time(ap->sa_crtime.tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt_to_local_time(ap->sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_crtime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
+		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)dsize,
 		    (uint32_t)dused,
 		    dattr, 0);
@@ -576,12 +576,12 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smb_node_release(node);
 	kmem_free(name, MAXNAMELEN);
 	kmem_free(short_name, MAXNAMELEN);
 	kmem_free(name83, MAXNAMELEN);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

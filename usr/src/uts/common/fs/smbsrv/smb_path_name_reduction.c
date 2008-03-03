@@ -249,7 +249,7 @@ smb_pathname_reduce(
 	if (share_root_node)
 		root_node = share_root_node;
 	else
-		root_node = smb_info.si_root_smb_node;
+		root_node = sr->sr_server->si_root_smb_node;
 
 	if (cur_node == NULL)
 		cur_node = root_node;

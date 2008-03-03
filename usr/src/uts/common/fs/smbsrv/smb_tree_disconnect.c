@@ -75,7 +75,20 @@
  */
 
 smb_sdrc_t
-smb_com_tree_disconnect(struct smb_request *sr)
+smb_pre_tree_disconnect(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__TreeDisconnect__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_tree_disconnect(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__TreeDisconnect__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_tree_disconnect(smb_request_t *sr)
 {
 	/*
 	 * A Tree Disconnect request requires a valid user ID as well as a
@@ -101,14 +114,14 @@ smb_com_tree_disconnect(struct smb_request *sr)
 
 	if (sr->uid_user == NULL || sr->tid_tree == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRinvnid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	smbsr_rq_notify(sr, sr->session, sr->tid_tree);
 	smb_tree_disconnect(sr->tid_tree);
 
 	if (smbsr_encode_empty_result(sr))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }

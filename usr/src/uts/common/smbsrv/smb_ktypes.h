@@ -27,8 +27,8 @@
  * Structures and type definitions for the SMB module.
  */
 
-#ifndef _SMBSRV_SMBVAR_H
-#define	_SMBSRV_SMBVAR_H
+#ifndef _SMBSRV_SMB_KTYPES_H
+#define	_SMBSRV_SMB_KTYPES_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -36,6 +36,7 @@
 extern "C" {
 #endif
 
+#include <sys/note.h>
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/types.h>
@@ -45,6 +46,8 @@ extern "C" {
 #include <sys/sdt.h>
 #include <sys/vnode.h>
 #include <sys/cred.h>
+#include <sys/fem.h>
+#include <sys/door.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/lmshare.h>
 #include <smbsrv/smbinfo.h>
@@ -54,11 +57,9 @@ extern "C" {
 #include <smbsrv/smb_fsd.h>
 #include <smbsrv/mlsvc.h>
 
-typedef struct smb_session smb_session_t;
-typedef struct smb_request smb_request_t;
+struct smb_request;
+struct smb_server;
 typedef struct smb_sd smb_sd_t;
-
-#include <smbsrv/smb_svc_sm.h>
 
 int smb_noop(void *, size_t, int);
 
@@ -227,18 +228,16 @@ typedef struct {
 } smb_txlst_t;
 
 /*
- * IR104720 Experiments with Windows 2000 indicate that we achieve better
- * SmbWriteX performance with a buffer size of 64KB instead of the 37KB
- * used with Windows NT4.0. Previous experiments with NT4.0 resulted in
- * directory listing problems so this buffer size is configurable based
- * on the end-user environment. When in doubt use 37KB.
+ * Maximum buffer size for NT is 37KB.  If all clients are Windows 2000, this
+ * can be changed to 64KB.  37KB must be used with a mix of NT/Windows 2000
+ * clients because NT loses directory entries when values greater than 37KB are
+ * used.
  *
- * smb_maxbufsize (smb_negotiate.c) is setup from SMB_NT_MAXBUF during
- * initialization.
+ * Note: NBT_MAXBUF will be subtracted from the specified max buffer size to
+ * account for the NBT header.
  */
-#define	NBMAXBUF		8
-#define	SMB_NT_MAXBUF(S)	(((S) * 1024) - NBMAXBUF)
-extern int smb_maxbufsize;
+#define	NBT_MAXBUF		8
+#define	SMB_NT_MAXBUF		(37 * 1024)
 
 #define	OUTBUFSIZE		(65 * 1024)
 #define	SMBHEADERSIZE		32
@@ -299,6 +298,19 @@ typedef struct smb_slist {
 	uint32_t	sl_count;
 	boolean_t	sl_waiting;
 } smb_slist_t;
+
+typedef struct smb_session_list {
+	krwlock_t	se_lock;
+	uint64_t	se_wrop;
+	struct {
+		list_t		lst;
+		uint32_t	count;
+	} se_rdy;
+	struct {
+		list_t		lst;
+		uint32_t	count;
+	} se_act;
+} smb_session_list_t;
 
 typedef struct {
 	kcondvar_t	rwx_cv;
@@ -361,12 +373,12 @@ struct mbuf_chain {
 	int32_t			chain_offset;	/* Current offset into chain */
 };
 
-int MBC_LENGTH(struct mbuf_chain *MBC);
-void MBC_SETUP(struct mbuf_chain *MBC, uint32_t max_bytes);
-void MBC_INIT(struct mbuf_chain *MBC, uint32_t max_bytes);
-void MBC_FLUSH(struct mbuf_chain *MBC);
-void MBC_ATTACH_MBUF(struct mbuf_chain *MBC, struct mbuf *MBUF);
-void MBC_APPEND_MBUF(struct mbuf_chain *MBC, struct mbuf *MBUF);
+int MBC_LENGTH(struct mbuf_chain *);
+void MBC_SETUP(struct mbuf_chain *, uint32_t);
+void MBC_INIT(struct mbuf_chain *, uint32_t);
+void MBC_FLUSH(struct mbuf_chain *);
+void MBC_ATTACH_MBUF(struct mbuf_chain *, struct mbuf *);
+void MBC_APPEND_MBUF(struct mbuf_chain *, struct mbuf *);
 void MBC_ATTACH_BUF(struct mbuf_chain *MBC, unsigned char *BUF, int LEN);
 int MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
     int OFF, int LEN);
@@ -410,6 +422,8 @@ typedef struct smb_node {
 	smb_node_state_t	n_state;
 	uint32_t		n_refcnt;
 	uint32_t		n_hashkey;
+	struct smb_request	*n_sr;
+	kmem_cache_t		*n_cache;
 	smb_llist_t		*n_hash_bucket;
 	uint64_t		n_orig_session_id;
 	uint32_t		n_orig_uid;
@@ -619,7 +633,8 @@ struct smb_sign {
 #define	SMB_SESSION_MAGIC 0x53455353	/* 'SESS' */
 
 typedef enum {
-	SMB_SESSION_STATE_DISCONNECTED = 0,
+	SMB_SESSION_STATE_INITIALIZED = 0,
+	SMB_SESSION_STATE_DISCONNECTED,
 	SMB_SESSION_STATE_CONNECTED,
 	SMB_SESSION_STATE_ESTABLISHED,
 	SMB_SESSION_STATE_NEGOTIATED,
@@ -628,7 +643,7 @@ typedef enum {
 	SMB_SESSION_STATE_TERMINATED
 } smb_session_state_t;
 
-struct smb_session {
+typedef struct smb_session {
 	uint32_t		s_magic;
 	smb_rwx_t		s_lock;
 	list_node_t		s_lnd;
@@ -636,7 +651,13 @@ struct smb_session {
 	smb_session_state_t	s_state;
 	uint32_t		s_flags;
 	int			s_write_raw_status;
-	smb_thread_t		s_thread;
+	kthread_t		*s_thread;
+	kt_did_t		s_ktdid;
+	smb_kmod_cfg_t		s_cfg;
+	kmem_cache_t		*s_cache;
+	kmem_cache_t		*s_cache_request;
+	struct smb_server	*s_server;
+	uint32_t		s_gmtoff;
 	uint32_t		keep_alive;
 	uint64_t		opentime;
 	uint16_t		vcnumber;
@@ -675,7 +696,7 @@ struct smb_session {
 	uchar_t			*outpipe_data;
 	int			outpipe_datalen;
 	int			outpipe_cookie;
-};
+} smb_session_t;
 
 #define	SMB_USER_MAGIC 0x55534552	/* 'USER' */
 
@@ -703,6 +724,7 @@ typedef struct smb_user {
 	kmutex_t		u_mutex;
 	smb_user_state_t	u_state;
 
+	struct smb_server	*u_server;
 	smb_session_t		*u_session;
 	uint16_t		u_name_len;
 	char			*u_name;
@@ -736,6 +758,7 @@ typedef struct smb_tree {
 	list_node_t		t_lnd;
 	smb_tree_state_t	t_state;
 
+	struct smb_server	*t_server;
 	smb_session_t		*t_session;
 	smb_user_t		*t_user;
 	smb_node_t		*t_snode;
@@ -847,6 +870,7 @@ typedef struct smb_ofile {
 	list_node_t		f_nnd;
 	smb_ofile_state_t	f_state;
 
+	struct smb_server	*f_server;
 	smb_session_t		*f_session;
 	smb_user_t		*f_user;
 	smb_tree_t		*f_tree;
@@ -923,7 +947,7 @@ typedef struct smb_lock {
 
 	smb_session_t		*l_session;
 	smb_ofile_t		*l_file;
-	smb_request_t		*l_sr;
+	struct smb_request	*l_sr;
 
 	uint32_t		l_flags;
 	uint64_t		l_session_kid;
@@ -944,6 +968,26 @@ typedef struct smb_lock {
 #define	SMB_LOCK_TYPE_READWRITE		101
 #define	SMB_LOCK_TYPE_READONLY		102
 
+typedef struct vardata_block {
+	uint8_t			tag;
+	uint16_t		len;
+	struct uio 		uio;
+	struct iovec		iovec[MAX_IOVEC];
+} smb_vdb_t;
+
+#define	SMB_RW_MAGIC		0x52445257	/* 'RDRW' */
+
+typedef struct smb_rw_param {
+	uint32_t rw_magic;
+	smb_vdb_t rw_vdb;
+	uint64_t rw_offset;
+	uint32_t rw_last_write;
+	uint16_t rw_mode;
+	uint16_t rw_count;
+	uint16_t rw_mincnt;
+	uint16_t rw_dsoff;		/* SMB data offset */
+	uint8_t rw_andx;		/* SMB secondary andx command */
+} smb_rw_param_t;
 
 struct smb_fqi {			/* fs_query_info */
 	char			*path;
@@ -980,6 +1024,7 @@ struct smb_fqi {			/* fs_query_info */
 
 #define	OPLOCK_MIN_TIMEOUT	(5 * 1000)
 #define	OPLOCK_STD_TIMEOUT	(15 * 1000)
+#define	OPLOCK_RETRIES		2
 
 typedef struct {
 	uint32_t severity;
@@ -1121,15 +1166,17 @@ typedef enum smb_req_state {
 	SMB_REQ_STATE_CLEANED_UP
 } smb_req_state_t;
 
-struct smb_request {
+typedef struct smb_request {
 	uint32_t		sr_magic;
 	kmutex_t		sr_mutex;
 	list_node_t		sr_session_lnd;
 	smb_req_state_t		sr_state;
 	boolean_t		sr_keep;
-
-	struct smb_session	*session;
-
+	kmem_cache_t		*sr_cache;
+	struct smb_server	*sr_server;
+	uint32_t		sr_gmtoff;
+	smb_session_t		*session;
+	smb_kmod_cfg_t		*sr_cfg;
 	smb_notify_change_req_t	sr_ncr;
 
 	/* Info from session service header */
@@ -1189,7 +1236,7 @@ struct smb_request {
 	smb_user_t		*uid_user;
 
 	union {
-	    struct {
+	    struct tcon {
 		char		*path;
 		char		*service;
 		int		pwdlen;
@@ -1214,19 +1261,22 @@ struct smb_request {
 		uint32_t	ftype, devstate;
 		uint32_t	action_taken;
 		uint64_t	fileid;
+		uint32_t	rootdirfid;
 		/* This is only set by NTTransactCreate */
 		smb_sd_t	*sd;
 	    } open;
 
-	    struct {
+	    struct dirop {
 		struct smb_fqi	fqi;
 		struct smb_fqi	dst_fqi;
 	    } dirop;
 
+	    smb_rw_param_t	*rw;
+	    uint32_t		timestamp;
 	} arg;
 
 	cred_t			*user_cr;
-};
+} smb_request_t;
 
 #define	SMB_READ_PROTOCOL(smb_nh_ptr) \
 	LE_IN32(((smb_nethdr_t *)(smb_nh_ptr))->sh_protocol)
@@ -1306,54 +1356,71 @@ typedef struct smb_xa {
 #define	SDDF_NO_FLAGS			0
 #define	SDDF_SUPPRESS_TID		0x0001
 #define	SDDF_SUPPRESS_UID		0x0002
-#define	SDDF_SUPPRESS_UNLEASH		0x0004
-#define	SDDF_SUPPRESS_SHOW		0x0080
 
 /*
  * SMB dispatch return codes.
  */
 typedef enum {
-	SDRC_NORMAL_REPLY = 0,
+	SDRC_SUCCESS = 0,
+	SDRC_ERROR,
 	SDRC_DROP_VC,
 	SDRC_NO_REPLY,
-	SDRC_ERROR_REPLY,
-	SDRC_UNIMPLEMENTED,
-	SDRC_UNSUPPORTED
+	SDRC_NOT_IMPLEMENTED
 } smb_sdrc_t;
-
-struct vardata_block {
-	unsigned char		tag;
-	uint16_t		len;
-	struct uio 		uio;
-	struct iovec		iovec[MAX_IOVEC];
-};
 
 #define	VAR_BCC		((short)-1)
 
+#define	SMB_SERVER_MAGIC	0x53534552	/* 'SSER' */
 
+typedef struct {
+	kstat_named_t	state;
+	kstat_named_t	open_files;
+	kstat_named_t	open_trees;
+	kstat_named_t	open_users;
+} smb_server_stats_t;
 
+typedef struct {
+	kthread_t		*ld_kth;
+	kt_did_t		ld_ktdid;
+	struct sonode		*ld_so;
+	struct sockaddr_in	ld_sin;
+	smb_session_list_t	ld_session_list;
+} smb_listener_daemon_t;
 
-extern struct smb_info	smb_info;
+typedef enum smb_server_state {
+	SMB_SERVER_STATE_CREATED = 0,
+	SMB_SERVER_STATE_CONFIGURED,
+	SMB_SERVER_STATE_RUNNING,
+	SMB_SERVER_STATE_DELETING
+} smb_server_state_t;
 
-#define	SMB_SI_NBT_CONNECTED		0x01
-#define	SMB_SI_TCP_CONNECTED		0x02
+typedef struct smb_server {
+	uint32_t		sv_magic;
+	kcondvar_t		sv_cv;
+	kmutex_t		sv_mutex;
+	list_node_t		sv_lnd;
+	smb_server_state_t	sv_state;
+	uint32_t		sv_refcnt;
+	proc_t			*sv_proc;
+	zoneid_t		sv_zid;
+	smb_listener_daemon_t	sv_nbt_daemon;
+	smb_listener_daemon_t	sv_tcp_daemon;
+	krwlock_t		sv_cfg_lock;
+	smb_kmod_cfg_t		sv_cfg;
+	smb_session_t		*sv_session;
 
-typedef struct smb_info {
-	smb_svc_sm_ctx_t	si_svc_sm_ctx;
+	kstat_t			*sv_ksp;
+	kmutex_t		sv_ksp_mutex;
+	char			sv_ksp_name[KSTAT_STRLEN];
+	smb_server_stats_t	sv_ks_data;
 
-	uint32_t		si_open_progress;
-	uint32_t		si_connect_progress;
+	door_handle_t		sv_lmshrd;
 
-	volatile uint64_t	si_global_kid;
-	volatile uint32_t	si_gmtoff;
-	volatile uint32_t	si_uniq_fid;
+	uint32_t		si_gmtoff;
 
-	smb_thread_t		si_nbt_daemon;
-	smb_thread_t		si_tcp_daemon;
-	smb_thread_t		si_thread_notify_change;
 	smb_thread_t		si_thread_timers;
 
-	taskq_t			*thread_pool;
+	taskq_t			*sv_thread_pool;
 
 	kmem_cache_t		*si_cache_vfs;
 	kmem_cache_t		*si_cache_request;
@@ -1364,27 +1431,21 @@ typedef struct smb_info {
 	kmem_cache_t		*si_cache_odir;
 	kmem_cache_t		*si_cache_node;
 
-	smb_slist_t		si_ncr_list;
-	smb_slist_t		si_nce_list;
-
-	smb_kmod_cfg_t		si;
-
-	volatile uint32_t	open_trees;
-	volatile uint32_t	open_files;
-	volatile uint32_t	open_users;
+	volatile uint32_t	sv_open_trees;
+	volatile uint32_t	sv_open_files;
+	volatile uint32_t	sv_open_users;
 
 	smb_node_t		*si_root_smb_node;
-	smb_llist_t		node_hash_table[SMBND_HASH_MASK+1];
-	smb_llist_t		si_vfs_list;
-} smb_info_t;
+	smb_llist_t		sv_vfs_list;
+} smb_server_t;
 
 #define	SMB_INFO_NETBIOS_SESSION_SVC_RUNNING	0x0001
 #define	SMB_INFO_NETBIOS_SESSION_SVC_FAILED	0x0002
 #define	SMB_INFO_USER_LEVEL_SECURITY		0x40000000
 #define	SMB_INFO_ENCRYPT_PASSWORDS		0x80000000
 
-#define	SMB_NEW_KID() atomic_inc_64_nv(&smb_info.si_global_kid)
-#define	SMB_UNIQ_FID() atomic_inc_32_nv(&smb_info.si_uniq_fid)
+#define	SMB_NEW_KID()	atomic_inc_64_nv(&smb_kids)
+#define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
 
 /*
  * This is to be used by Trans2SetFileInfo
@@ -1397,7 +1458,6 @@ typedef struct smb_trans2_setinfo {
 	char *path;
 	char name[MAXNAMELEN];
 } smb_trans2_setinfo_t;
-
 
 #define	SMB_IS_STREAM(node) ((node)->unnamed_stream_node)
 
@@ -1416,7 +1476,9 @@ typedef struct smb_tsd {
 #define	SMB_INVALID_CRDISPOSITION	-1
 
 typedef struct smb_dispatch_table {
-	smb_sdrc_t		(*sdt_function)(struct smb_request *);
+	smb_sdrc_t		(*sdt_pre_op)(smb_request_t *);
+	smb_sdrc_t		(*sdt_function)(smb_request_t *);
+	void			(*sdt_post_op)(smb_request_t *);
 	char			sdt_dialect;
 	unsigned char		sdt_flags;
 	krw_t			sdt_slock_mode;
@@ -1738,4 +1800,4 @@ typedef struct smb_fssd {
 }
 #endif
 
-#endif /* _SMBSRV_SMBVAR_H */
+#endif /* _SMBSRV_SMB_KTYPES_H */

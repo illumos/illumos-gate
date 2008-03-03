@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@ typedef struct ads_host_info_s {
 #define	UNC_HOSTNAME 1		/* use hostname in UNC */
 #define	ADS_PATH_SCRN_LEN  60
 
-ADS_HOST_INFO *ads_find_host(char *, char *, int *, char *, int *);
+ADS_HOST_INFO *ads_find_host(char *, char *, char *, int *, char *, int *);
 char *ads_convert_directory(char *);
 
 

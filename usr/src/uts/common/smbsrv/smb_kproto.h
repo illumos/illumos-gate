@@ -44,7 +44,17 @@ extern "C" {
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
-#include <smbsrv/smbvar.h>
+#include <smbsrv/smb_ktypes.h>
+#include <smbsrv/smb_ioctl.h>
+
+extern	int smb_maxbufsize;
+extern	int smb_flush_required;
+extern	int smb_dirsymlink_enable;
+extern	int smb_announce_quota;
+extern	clock_t	smb_oplock_timeout;
+
+#define	smb_gmt2local(_sr_, _gmt_)	((_gmt_) + (_sr_)->sr_gmtoff)
+#define	smb_local2gmt(_sr_, _local_)	((_local_) - (_sr_)->sr_gmtoff)
 
 /*
  * Definitions that should be elsewhere...
@@ -62,97 +72,87 @@ int		microtime(timestruc_t *tvp);
 int		clock_get_uptime(void);
 
 /*
- * SMB Service init/shutdown functions
- */
-int smb_service_init(void);
-void smb_service_fini(void);
-int smb_service_open(struct smb_info *si);
-void smb_service_close(struct smb_info *si);
-int smb_service_connect(struct smb_info *si);
-void smb_service_disconnect(struct smb_info *si);
-int smb_service_start_threads(struct smb_info *si);
-void smb_service_stop_threads(struct smb_info *si);
-
-/*
  * SMB request handers called from the dispatcher.
  */
-smb_sdrc_t smb_com_cancel_forward(struct smb_request *);
-smb_sdrc_t smb_com_check_directory(struct smb_request *);
-smb_sdrc_t smb_com_close(struct smb_request *);
-smb_sdrc_t smb_com_close_and_tree_disconnect(struct smb_request *);
-smb_sdrc_t smb_com_close_print_file(struct smb_request *);
-smb_sdrc_t smb_com_copy(struct smb_request *);
-smb_sdrc_t smb_com_create(struct smb_request *);
-smb_sdrc_t smb_com_create_directory(struct smb_request *);
-smb_sdrc_t smb_com_create_new(struct smb_request *);
-smb_sdrc_t smb_com_create_temporary(struct smb_request *);
-smb_sdrc_t smb_com_delete(struct smb_request *);
-smb_sdrc_t smb_com_delete_directory(struct smb_request *);
-smb_sdrc_t smb_com_echo(struct smb_request *);
-smb_sdrc_t smb_com_find(struct smb_request *);
-smb_sdrc_t smb_com_find_close(struct smb_request *);
-smb_sdrc_t smb_com_find_close2(struct smb_request *);
-smb_sdrc_t smb_com_find_notify_close(struct smb_request *);
-smb_sdrc_t smb_com_find_unique(struct smb_request *);
-smb_sdrc_t smb_com_flush(struct smb_request *);
-smb_sdrc_t smb_com_forward_user_name(struct smb_request *);
-smb_sdrc_t smb_com_get_machine_name(struct smb_request *);
-smb_sdrc_t smb_com_get_print_queue(struct smb_request *);
-smb_sdrc_t smb_com_invalid_command(struct smb_request *);
-smb_sdrc_t smb_com_ioctl(struct smb_request *);
-smb_sdrc_t smb_com_ioctl_secondary(struct smb_request *);
-smb_sdrc_t smb_com_lock_and_read(struct smb_request *);
-smb_sdrc_t smb_com_lock_byte_range(struct smb_request *);
-smb_sdrc_t smb_com_locking_andx(struct smb_request *);
-smb_sdrc_t smb_com_logoff_andx(struct smb_request *);
-smb_sdrc_t smb_com_move(struct smb_request *);
-smb_sdrc_t smb_com_negotiate(struct smb_request *);
-smb_sdrc_t smb_com_nt_cancel(struct smb_request *);
-smb_sdrc_t smb_com_nt_create_andx(struct smb_request *);
-smb_sdrc_t smb_com_nt_transact(struct smb_request *);
-smb_sdrc_t smb_com_nt_transact_secondary(struct smb_request *);
-smb_sdrc_t smb_com_open(struct smb_request *);
-smb_sdrc_t smb_com_open_andx(struct smb_request *);
-smb_sdrc_t smb_com_open_print_file(struct smb_request *);
-smb_sdrc_t smb_com_process_exit(struct smb_request *);
-smb_sdrc_t smb_com_query_information(struct smb_request *);
-smb_sdrc_t smb_com_query_information2(struct smb_request *);
-smb_sdrc_t smb_com_query_information_disk(struct smb_request *);
-smb_sdrc_t smb_com_read(struct smb_request *);
-smb_sdrc_t smb_com_read_andx(struct smb_request *);
-smb_sdrc_t smb_com_read_mpx(struct smb_request *);
-smb_sdrc_t smb_com_read_mpx_secondary(struct smb_request *);
-smb_sdrc_t smb_com_read_raw(struct smb_request *);
-smb_sdrc_t smb_com_rename(struct smb_request *);
-smb_sdrc_t smb_com_search(struct smb_request *);
-smb_sdrc_t smb_com_seek(struct smb_request *);
-smb_sdrc_t smb_com_send_broadcast_message(struct smb_request *);
-smb_sdrc_t smb_com_send_end_mb_message(struct smb_request *);
-smb_sdrc_t smb_com_send_single_message(struct smb_request *);
-smb_sdrc_t smb_com_send_start_mb_message(struct smb_request *);
-smb_sdrc_t smb_com_send_text_mb_message(struct smb_request *);
-smb_sdrc_t smb_com_session_setup_andx(struct smb_request *);
-smb_sdrc_t smb_com_set_information(struct smb_request *);
-smb_sdrc_t smb_com_set_information2(struct smb_request *);
-smb_sdrc_t smb_com_transaction(struct smb_request *);
-smb_sdrc_t smb_com_transaction2(struct smb_request *);
-smb_sdrc_t smb_com_transaction2_secondary(struct smb_request *);
-smb_sdrc_t smb_com_transaction_secondary(struct smb_request *);
-smb_sdrc_t smb_com_tree_connect(struct smb_request *);
-smb_sdrc_t smb_com_tree_connect_andx(struct smb_request *);
-smb_sdrc_t smb_com_tree_disconnect(struct smb_request *);
-smb_sdrc_t smb_com_unlock_byte_range(struct smb_request *);
-smb_sdrc_t smb_com_write(struct smb_request *);
-smb_sdrc_t smb_com_write_and_close(struct smb_request *);
-smb_sdrc_t smb_com_write_and_unlock(struct smb_request *);
-smb_sdrc_t smb_com_write_andx(struct smb_request *);
-smb_sdrc_t smb_com_write_complete(struct smb_request *);
-smb_sdrc_t smb_com_write_mpx(struct smb_request *);
-smb_sdrc_t smb_com_write_mpx_secondary(struct smb_request *);
-smb_sdrc_t smb_com_write_print_file(struct smb_request *);
-smb_sdrc_t smb_com_write_raw(struct smb_request *);
+#define	SMB_SDT_OPS(NAME)	\
+	smb_pre_##NAME,		\
+	smb_com_##NAME,		\
+	smb_post_##NAME
 
-smb_sdrc_t smb_nt_transact_create(struct smb_request *, struct smb_xa *);
+#define	SMB_COM_DECL(NAME)				\
+	smb_sdrc_t smb_pre_##NAME(smb_request_t *);	\
+	smb_sdrc_t smb_com_##NAME(smb_request_t *);	\
+	void smb_post_##NAME(smb_request_t *)
+
+SMB_COM_DECL(check_directory);
+SMB_COM_DECL(close);
+SMB_COM_DECL(close_and_tree_disconnect);
+SMB_COM_DECL(close_print_file);
+SMB_COM_DECL(create);
+SMB_COM_DECL(create_directory);
+SMB_COM_DECL(create_new);
+SMB_COM_DECL(create_temporary);
+SMB_COM_DECL(delete);
+SMB_COM_DECL(delete_directory);
+SMB_COM_DECL(echo);
+SMB_COM_DECL(find);
+SMB_COM_DECL(find_close);
+SMB_COM_DECL(find_close2);
+SMB_COM_DECL(find_unique);
+SMB_COM_DECL(flush);
+SMB_COM_DECL(get_print_queue);
+SMB_COM_DECL(invalid);
+SMB_COM_DECL(ioctl);
+SMB_COM_DECL(lock_and_read);
+SMB_COM_DECL(lock_byte_range);
+SMB_COM_DECL(locking_andx);
+SMB_COM_DECL(logoff_andx);
+SMB_COM_DECL(negotiate);
+SMB_COM_DECL(nt_cancel);
+SMB_COM_DECL(nt_create_andx);
+SMB_COM_DECL(nt_transact);
+SMB_COM_DECL(nt_transact_secondary);
+SMB_COM_DECL(open);
+SMB_COM_DECL(open_andx);
+SMB_COM_DECL(open_print_file);
+SMB_COM_DECL(process_exit);
+SMB_COM_DECL(query_information);
+SMB_COM_DECL(query_information2);
+SMB_COM_DECL(query_information_disk);
+SMB_COM_DECL(read);
+SMB_COM_DECL(read_andx);
+SMB_COM_DECL(read_raw);
+SMB_COM_DECL(rename);
+SMB_COM_DECL(search);
+SMB_COM_DECL(seek);
+SMB_COM_DECL(session_setup_andx);
+SMB_COM_DECL(set_information);
+SMB_COM_DECL(set_information2);
+SMB_COM_DECL(transaction);
+SMB_COM_DECL(transaction2);
+SMB_COM_DECL(transaction2_secondary);
+SMB_COM_DECL(transaction_secondary);
+SMB_COM_DECL(tree_connect);
+SMB_COM_DECL(tree_connect_andx);
+SMB_COM_DECL(tree_disconnect);
+SMB_COM_DECL(unlock_byte_range);
+SMB_COM_DECL(write);
+SMB_COM_DECL(write_and_close);
+SMB_COM_DECL(write_and_unlock);
+SMB_COM_DECL(write_andx);
+SMB_COM_DECL(write_print_file);
+SMB_COM_DECL(write_raw);
+
+#define	SMB_NT_TRANSACT_DECL(NAME)				\
+	smb_sdrc_t smb_pre_##NAME(smb_request_t *, smb_xa_t *);	\
+	smb_sdrc_t smb_##NAME(smb_request_t *, smb_xa_t *);	\
+	void smb_post_##NAME(smb_request_t *, smb_xa_t *)
+
+SMB_NT_TRANSACT_DECL(nt_transact_create);
+
+int smb_notify_init(void);
+void smb_notify_fini(void);
+
 smb_sdrc_t smb_nt_transact_notify_change(struct smb_request *, struct smb_xa *);
 smb_sdrc_t smb_nt_transact_query_security_info(struct smb_request *,
     struct smb_xa *);
@@ -186,8 +186,6 @@ int smb_session_send(smb_session_t *, uint8_t type, struct mbuf_chain *);
 int smb_session_xprt_gethdr(smb_session_t *, smb_xprt_t *);
 
 int smb_net_id(uint32_t);
-uint32_t smb_gmt_to_local_time(uint32_t);
-uint32_t smb_local_time_to_gmt(uint32_t);
 
 void smb_process_file_notify_change_queue(struct smb_ofile *of);
 
@@ -218,10 +216,6 @@ int smb_unmangle_name(struct smb_request *sr, cred_t *cred,
 int smb_maybe_mangled_name(char *name);
 int smb_maybe_mangled_path(const char *path, size_t pathlen);
 int smb_needs_mangle(char *name, char **dot_pos);
-
-void smb_set_stability(int mode);
-void smb_commit_required(int state);
-
 
 void smbsr_cleanup(struct smb_request *sr);
 
@@ -320,8 +314,35 @@ int smb_rpc_read(struct smb_request *, struct uio *);
 int smb_rpc_write(struct smb_request *, struct uio *);
 
 /*
+ * SMB server functions (file smb_server.c)
+ */
+int smb_server_svc_init(void);
+int smb_server_svc_fini(void);
+int smb_server_create(void);
+int smb_server_delete(void);
+int smb_server_configure(smb_kmod_cfg_t *cfg);
+int smb_server_start(struct smb_io_start *);
+int smb_server_nbt_listen(int);
+int smb_server_tcp_listen(int);
+int smb_server_nbt_receive(void);
+int smb_server_tcp_receive(void);
+uint32_t smb_server_get_user_count(void);
+uint32_t smb_server_get_session_count(void);
+void smb_server_disconnect_share(char *);
+void smb_server_disconnect_volume(fs_desc_t *);
+int smb_server_dr_ulist_get(int, smb_dr_ulist_t *, int);
+int smb_server_share_export(char *);
+int smb_server_share_unexport(char *, char *);
+int smb_server_set_gmtoff(uint32_t goff);
+
+void smb_server_reconnection_check(smb_server_t *, smb_session_t *);
+void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
+
+/*
  * SMB node functions (file smb_node.c)
  */
+int smb_node_init(void);
+void smb_node_fini(void);
 struct smb_node *smb_node_lookup(struct smb_request *sr, struct open_param *op,
     cred_t *cr, vnode_t *vp, char *od_name, smb_node_t *dir_snode,
     smb_node_t *unnamed_node, smb_attr_t *attr);
@@ -333,8 +354,7 @@ void smb_node_release(smb_node_t *node);
 int smb_node_assert(smb_node_t *node, const char *file, int line);
 int smb_node_rename(smb_node_t *from_dir_snode, smb_node_t *ret_snode,
     smb_node_t *to_dir_snode, char *to_name);
-int smb_node_root_init();
-void smb_node_root_fini();
+int smb_node_root_init(vnode_t *, smb_server_t *, smb_node_t **);
 void smb_node_add_lock(smb_node_t *node, smb_lock_t *lock);
 void smb_node_destroy_lock(smb_node_t *node, smb_lock_t *lock);
 void smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file);
@@ -375,19 +395,12 @@ int smb_pathname(struct smb_request *, char *, int, smb_node_t *,
     smb_node_t *, smb_node_t **, smb_node_t **, cred_t *);
 
 /*
- * Share functions
- */
-
-int smb_share_export(char *);
-int smb_share_unexport(char *, char *);
-
-/*
  * smb_vfs functions
  */
 
-boolean_t smb_vfs_hold(vfs_t *);
-void smb_vfs_rele(vfs_t *);
-void smb_vfs_rele_all(void);
+boolean_t smb_vfs_hold(smb_server_t *, vfs_t *);
+void smb_vfs_rele(smb_server_t *, vfs_t *);
+void smb_vfs_rele_all(smb_server_t *);
 
 /*
  * String manipulation function
@@ -413,8 +426,8 @@ void smb_fem_fcn_uninstall(smb_node_t *node);
 
 /* FEM */
 
-int smb_fem_init();
-void smb_fem_shutdown();
+int smb_fem_init(void);
+void smb_fem_fini(void);
 
 int smb_try_grow(struct smb_request *sr, int64_t new_size);
 
@@ -435,9 +448,6 @@ void smb_commit_delete_on_close(struct smb_ofile *file);
 int smb_stream_parse_name(char *name, char *u_stream_name,
     char *stream_name);
 
-uint32_t smb_get_gmtoff(void);
-void smb_set_gmtoff(uint32_t);
-
 DWORD smb_trans2_set_information(struct smb_request *sr,
     smb_trans2_setinfo_t *info,
     smb_error_t *smberr);
@@ -455,19 +465,33 @@ void smb_sign_reply(struct smb_request *req, struct mbuf_chain *reply);
 uint32_t smb_mode_to_dos_attributes(smb_attr_t *ap);
 int smb_sattr_check(smb_attr_t *ap, char *name, unsigned short sattr);
 
-smb_request_t *smb_request_alloc(struct smb_session *session,
-    int request_length);
 void smb_request_cancel(smb_request_t *sr);
-void smb_request_free(smb_request_t *sr);
 
-smb_session_t *smb_session_create(struct sonode *new_so, uint16_t port);
+/*
+ * session functions (file smb_session.c)
+ */
+smb_session_t *smb_session_create(struct sonode *, uint16_t, smb_server_t *);
+int smb_session_daemon(smb_session_list_t *);
+void smb_session_reconnection_check(smb_session_list_t *, smb_session_t *);
+void smb_session_timers(smb_session_list_t *);
 void smb_session_delete(smb_session_t *session);
 void smb_session_cancel(smb_session_t *session);
 void smb_session_cancel_requests(smb_session_t *session);
 void smb_session_config(smb_session_t *session);
 void smb_session_reject(smb_session_t *session, char *reason);
-void smb_session_disconnect_share(char *);
-void smb_session_disconnect_volume(fs_desc_t *);
+void smb_session_disconnect_share(smb_session_list_t *, char *);
+void smb_session_disconnect_volume(smb_session_list_t *, fs_desc_t *);
+void smb_session_list_constructor(smb_session_list_t *);
+void smb_session_list_destructor(smb_session_list_t *);
+void smb_session_list_append(smb_session_list_t *, smb_session_t *);
+void smb_session_list_delete_tail(smb_session_list_t *);
+smb_session_t *smb_session_list_activate_head(smb_session_list_t *);
+void smb_session_list_terminate(smb_session_list_t *, smb_session_t *);
+void smb_session_list_signal(smb_session_list_t *);
+
+void smb_session_correct_keep_alive_values(smb_session_list_t *, uint32_t);
+smb_request_t *smb_request_alloc(smb_session_t *, int);
+void smb_request_free(smb_request_t *);
 
 
 /*
@@ -530,10 +554,11 @@ smb_tree_t *smb_tree_lookup_by_name(smb_user_t *, char *, smb_tree_t *);
 smb_tree_t *smb_tree_lookup_by_fsd(smb_user_t *, fs_desc_t *, smb_tree_t *);
 void smb_tree_release(smb_tree_t *tree);
 
-uint32_t smb_user_get_num(void);
 void smb_dr_user_free(smb_dr_user_ctx_t *uinfo);
 void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
-int smb_dr_ulist_get(int offset, smb_dr_ulist_t *dr_ulist);
+int smb_dr_user_create(smb_dr_user_ctx_t *, uint64_t, uint16_t, char *, char *,
+    char *, uint32_t, int32_t, time_t, uint32_t);
+
 
 /*
  * SMB user's credential functions

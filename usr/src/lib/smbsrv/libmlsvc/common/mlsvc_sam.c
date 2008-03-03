@@ -407,10 +407,12 @@ static int
 samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryDomainInfo *param = arg;
+	struct samr_QueryDomainInfoRes *info;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
 	ndr_handle_t *hd;
 	samr_keydata_t *data;
 	char *domain;
+	char hostname[MAXHOSTNAMELEN];
 	int alias_cnt;
 	int rc;
 
@@ -420,22 +422,30 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
+	info = MLRPC_HEAP_NEW(mxa, struct samr_QueryDomainInfoRes);
+	if (info == NULL) {
+		bzero(param, sizeof (struct samr_QueryDomainInfo));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (MLRPC_DRC_OK);
+	}
+	info->switch_value = param->info_level;
+	param->info = info;
+
 	data = (samr_keydata_t *)hd->nh_data;
 
 	switch (data->kd_type) {
 	case NT_DOMAIN_BUILTIN:
-		domain = "Builtin";
+		domain = "BUILTIN";
 		break;
 
 	case NT_DOMAIN_LOCAL:
-		domain = MLRPC_HEAP_MALLOC(mxa, MAXHOSTNAMELEN);
-		rc = smb_gethostname(domain, MAXHOSTNAMELEN, 1);
-
-		if (rc != 0 || domain == NULL) {
+		rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
+		if (rc != 0) {
 			bzero(param, sizeof (struct samr_QueryDomainInfo));
-			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+			param->status = NT_SC_ERROR(NT_STATUS_INTERNAL_ERROR);
 			return (MLRPC_DRC_OK);
 		}
+		domain = hostname;
 		break;
 
 	default:
@@ -446,16 +456,16 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 
 	switch (param->info_level) {
 	case SAMR_QUERY_DOMAIN_INFO_6:
-		param->ru.info6.unknown1 = 0x00000000;
-		param->ru.info6.unknown2 = 0x00147FB0;
-		param->ru.info6.unknown3 = 0x00000000;
-		param->ru.info6.unknown4 = 0x00000000;
-		param->ru.info6.unknown5 = 0x00000000;
+		info->ru.info6.unknown1 = 0x00000000;
+		info->ru.info6.unknown2 = 0x00147FB0;
+		info->ru.info6.unknown3 = 0x00000000;
+		info->ru.info6.unknown4 = 0x00000000;
+		info->ru.info6.unknown5 = 0x00000000;
 		param->status = NT_STATUS_SUCCESS;
 		break;
 
 	case SAMR_QUERY_DOMAIN_INFO_7:
-		param->ru.info7.unknown1 = 0x00000003;
+		info->ru.info7.unknown1 = 0x00000003;
 		param->status = NT_STATUS_SUCCESS;
 		break;
 
@@ -469,26 +479,26 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 			return (MLRPC_DRC_OK);
 		}
 
-		param->ru.info2.unknown1 = 0x00000000;
-		param->ru.info2.unknown2 = 0x80000000;
+		info->ru.info2.unknown1 = 0x00000000;
+		info->ru.info2.unknown2 = 0x80000000;
 
-		(void) mlsvc_string_save((ms_string_t *)&(param->ru.info2.s1),
+		(void) mlsvc_string_save((ms_string_t *)&(info->ru.info2.s1),
 		    "", mxa);
 
 		(void) mlsvc_string_save(
-		    (ms_string_t *)&(param->ru.info2.domain), domain, mxa);
+		    (ms_string_t *)&(info->ru.info2.domain), domain, mxa);
 
-		(void) mlsvc_string_save((ms_string_t *)&(param->ru.info2.s2),
+		(void) mlsvc_string_save((ms_string_t *)&(info->ru.info2.s2),
 		    "", mxa);
 
-		param->ru.info2.sequence_num = 0x0000002B;
-		param->ru.info2.unknown3 = 0x00000000;
-		param->ru.info2.unknown4 = 0x00000001;
-		param->ru.info2.unknown5 = 0x00000003;
-		param->ru.info2.unknown6 = 0x00000001;
-		param->ru.info2.num_users = 0;
-		param->ru.info2.num_groups = 0;
-		param->ru.info2.num_aliases = alias_cnt;
+		info->ru.info2.sequence_num = 0x0000002B;
+		info->ru.info2.unknown3 = 0x00000000;
+		info->ru.info2.unknown4 = 0x00000001;
+		info->ru.info2.unknown5 = 0x00000003;
+		info->ru.info2.unknown6 = 0x00000001;
+		info->ru.info2.num_users = 0;
+		info->ru.info2.num_groups = 0;
+		info->ru.info2.num_aliases = alias_cnt;
 		param->status = NT_STATUS_SUCCESS;
 		break;
 
@@ -497,8 +507,6 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_FAULT_REQUEST_OPNUM_INVALID);
 	};
 
-	param->address = (DWORD)(uintptr_t)&param->ru;
-	param->switch_value = param->info_level;
 	return (MLRPC_DRC_OK);
 }
 
@@ -1463,9 +1471,6 @@ static mlrpc_stub_table_t samr_stub_table[] = {
  * unions so we need to fix some of the data offsets at runtime. The
  * following macros and the fixup functions handle the corrections.
  */
-DECL_FIXUP_STRUCT(samr_QueryDomainInfo_ru);
-DECL_FIXUP_STRUCT(samr_QueryDomainInfoRes);
-DECL_FIXUP_STRUCT(samr_QueryDomainInfo);
 
 DECL_FIXUP_STRUCT(samr_QueryAliasInfo_ru);
 DECL_FIXUP_STRUCT(samr_QueryAliasInfoRes);
@@ -1474,30 +1479,6 @@ DECL_FIXUP_STRUCT(samr_QueryAliasInfo);
 DECL_FIXUP_STRUCT(QueryUserInfo_result_u);
 DECL_FIXUP_STRUCT(QueryUserInfo_result);
 DECL_FIXUP_STRUCT(samr_QueryUserInfo);
-
-void
-fixup_samr_QueryDomainInfo(struct samr_QueryDomainInfo *val)
-{
-	unsigned short size1 = 0;
-	unsigned short size2 = 0;
-	unsigned short size3 = 0;
-
-	switch (val->switch_value) {
-		CASE_INFO_ENT(samr_QueryDomainInfo, 2);
-		CASE_INFO_ENT(samr_QueryDomainInfo, 6);
-		CASE_INFO_ENT(samr_QueryDomainInfo, 7);
-
-		default:
-			return;
-	};
-
-	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (mlrpcconn_request_hdr_t) + sizeof (DWORD);
-
-	FIXUP_PDU_SIZE(samr_QueryDomainInfo_ru, size1);
-	FIXUP_PDU_SIZE(samr_QueryDomainInfoRes, size2);
-	FIXUP_PDU_SIZE(samr_QueryDomainInfo, size3);
-}
 
 void
 fixup_samr_QueryAliasInfo(struct samr_QueryAliasInfo *val)

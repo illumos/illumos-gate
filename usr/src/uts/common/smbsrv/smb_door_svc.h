@@ -63,10 +63,9 @@ extern "C" {
  * Otherwise, NULL pointer will be returned and appropriate error code
  * will be set.
  */
-typedef char *(*smb_dr_op_t)(char *argp, size_t arg_size, door_desc_t *dp,
-    uint_t n_desc, size_t *rbufsize, int *err);
-typedef char *(*smb_kdr_op_t)(char *argp, size_t arg_size, size_t *rbufsize,
-    int *errno);
+typedef char *(*smb_dr_op_t)(char *, size_t, door_desc_t *,
+    uint_t, size_t *, int *);
+typedef char *(*smb_kdr_op_t)(char *, size_t, size_t *, int *);
 
 extern smb_dr_op_t smb_doorsrv_optab[];
 
@@ -83,7 +82,8 @@ enum smb_dr_opcode_t {
 	SMB_DR_USER_AUTH_LOGOFF,
 	SMB_DR_USER_LIST,
 	SMB_DR_LOOKUP_SID,
-	SMB_DR_LOOKUP_NAME
+	SMB_DR_LOOKUP_NAME,
+	SMB_DR_JOIN
 };
 
 enum smb_kdr_opcode_t {
@@ -114,8 +114,8 @@ enum smb_kdr_opcode_t {
  *	  operation.
  */
 typedef struct smb_kdoor_cb_arg {
-	char *rbuf;
-	size_t rbuf_size;
+	char	*rbuf;
+	size_t	rbuf_size;
 } smb_kdoor_cb_arg_t;
 
 /*
@@ -123,63 +123,57 @@ typedef struct smb_kdoor_cb_arg {
  * ------------------------
  * NOTE: smb_kdoor_srv_init()/smb_kdoor_srv_fini() are noops.
  */
-extern int smb_kdoor_srv_start();
-extern void smb_kdoor_srv_stop();
-extern int smb_kdr_is_valid_opcode(int opcode);
+int smb_kdoor_srv_start(void);
+int smb_kdoor_srv_set_dwncall(void);
+void smb_kdoor_srv_stop(void);
+int smb_kdr_is_valid_opcode(int);
 
-extern char *smb_kdr_op_user_num(char *argp, size_t arg_size,
-    size_t *rbufsize, int *errno);
-extern char *smb_kdr_op_users(char *argp, size_t arg_size,
-    size_t *rbufsize, int *errno);
-extern char *smb_kdr_op_share(char *argp, size_t arg_size,
-    size_t *rbufsize, int *errno);
+char *smb_kdr_op_user_num(char *, size_t, size_t *, int *);
+char *smb_kdr_op_users(char *, size_t, size_t *, int *);
+char *smb_kdr_op_share(char *, size_t, size_t *, int *);
 
 /*
  * SMB kernel door client
  * ------------------------
  * NOTE: smb_kdoor_clnt_init()/smb_kdoor_clnt_fini() are noops.
  */
-extern int smb_kdoor_clnt_start();
-extern void smb_kdoor_clnt_stop();
-extern void smb_kdoor_clnt_free();
-extern char *smb_kdoor_clnt_upcall(char *argp, size_t arg_size, door_desc_t *dp,
-    uint_t desc_num, size_t *rbufsize);
+int smb_kdoor_clnt_start(int);
+void smb_kdoor_clnt_stop(void);
+void smb_kdoor_clnt_free(char *, size_t, char *, size_t);
+char *smb_kdoor_clnt_upcall(char *, size_t, door_desc_t *, uint_t, size_t *);
 
 /*
  * SMB upcalls
  */
-extern smb_token_t *smb_upcall_get_token(netr_client_t *clnt_info);
-extern int smb_upcall_set_dwncall_desc(uint32_t opcode, door_desc_t *dp,
-    uint_t n_desc);
-extern void smb_user_nonauth_logon(uint32_t);
-extern void smb_user_auth_logoff(uint32_t);
+smb_token_t *smb_upcall_get_token(netr_client_t *);
+int smb_upcall_set_dwncall_desc(uint32_t, door_desc_t *, uint_t);
+void smb_user_nonauth_logon(uint32_t);
+void smb_user_auth_logoff(uint32_t);
 #else /* _KERNEL */
 
 /*
  * SMB user-space door server
  */
-extern int smb_door_srv_start();
-extern void smb_door_srv_stop(void);
+int smb_door_srv_start(void);
+void smb_door_srv_stop(void);
 
 /* downcall descriptor */
-typedef int (*smb_dwncall_get_desc_t)();
-extern int smb_dwncall_install_callback(smb_dwncall_get_desc_t get_desc_cb);
+typedef int (*smb_dwncall_get_desc_t)(void);
+int smb_dwncall_install_callback(smb_dwncall_get_desc_t get_desc_cb);
 
-extern int smb_dr_is_valid_opcode(int opcode);
+int smb_dr_is_valid_opcode(int);
 
 /*
  * SMB user-space door client
  */
-extern int smb_dr_clnt_open(int *fd, char *path, char *op_desc);
-extern char *smb_dr_clnt_call(int fd, char *argp, size_t arg_size,
-    size_t *rbufsize, char *op_desc);
-extern void smb_dr_clnt_free(char *argp, size_t arg_size, char *rbufp,
-    size_t rbuf_size);
+int smb_dr_clnt_open(int *, char *, char *);
+char *smb_dr_clnt_call(int, char *, size_t, size_t *, char *);
+void smb_dr_clnt_free(char *, size_t, char *, size_t);
 /*
  * SMB downcalls
  */
-extern int smb_dwncall_get_users(int offset, smb_dr_ulist_t *users);
-extern int smb_dwncall_share(int op, char *path, char *sharename);
+int smb_dwncall_get_users(int, smb_dr_ulist_t *);
+int smb_dwncall_share(int, char *, char *);
 
 #endif /* _KERNEL */
 

@@ -107,17 +107,16 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 		return (SMB_DOMAIN_NOMACHINE_SID);
 	}
 
-	if (secmode == SMB_SECMODE_DOMAIN) {
-		sid = nt_sid_strtosid(NT_BUILTIN_DOMAIN_SIDSTR);
+	if ((sid = nt_sid_strtosid(NT_BUILTIN_DOMAIN_SIDSTR)) != NULL) {
 		domain = nt_domain_new(NT_DOMAIN_BUILTIN, "BUILTIN", sid);
 		(void) nt_domain_add(domain);
 		free(sid);
+	}
 
-		sid = NULL;
+	if (secmode == SMB_SECMODE_DOMAIN) {
 		rc = smb_config_getstr(SMB_CI_DOMAIN_SID, sidstr,
 		    sizeof (sidstr));
-		if (rc == SMBD_SMF_OK)
-			sid = nt_sid_strtosid(sidstr);
+		sid = (rc == SMBD_SMF_OK) ? nt_sid_strtosid(sidstr) : NULL;
 		if (nt_sid_is_valid(sid)) {
 			domain = nt_domain_new(NT_DOMAIN_PRIMARY,
 			    resource_domain, sid);
@@ -130,6 +129,7 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 		}
 
 	}
+
 	return (0);
 }
 

@@ -71,6 +71,10 @@ extern "C" {
 #include <smbsrv/smbinfo.h>
 /* End of header files to be removed. */
 
+#define	SMB_VARRUN_DIR "/var/run/smb"
+#define	SMB_CCACHE_FILE "ccache"
+#define	SMB_CCACHE_PATH SMB_VARRUN_DIR "/" SMB_CCACHE_FILE
+
 /* Max value length of all SMB properties */
 #define	MAX_VALUE_BUFLEN	512
 
@@ -107,7 +111,6 @@ typedef struct smb_scfhandle {
  */
 typedef enum {
 	SMB_CI_OPLOCK_ENABLE = 0,
-	SMB_CI_OPLOCK_TIMEOUT,
 
 	SMB_CI_AUTOHOME_MAP,
 
@@ -123,7 +126,6 @@ typedef enum {
 	SMB_CI_SRVSVC_SHRSET_ENABLE,
 	SMB_CI_MLRPC_KALIVE,
 
-	SMB_CI_MAX_BUFSIZE,
 	SMB_CI_MAX_WORKERS,
 	SMB_CI_MAX_CONNECTIONS,
 	SMB_CI_KEEPALIVE,
@@ -133,10 +135,7 @@ typedef enum {
 	SMB_CI_SIGNING_REQD,
 	SMB_CI_SIGNING_CHECK,
 
-	SMB_CI_FLUSH_REQUIRED,
 	SMB_CI_SYNC_ENABLE,
-	SMB_CI_DIRSYMLINK_DISABLE,
-	SMB_CI_ANNONCE_QUOTA,
 
 	SMB_CI_SECURITY,
 	SMB_CI_NBSCOPE,
@@ -148,6 +147,10 @@ typedef enum {
 	SMB_CI_DYNDNS_ENABLE,
 
 	SMB_CI_MACHINE_PASSWD,
+	SMB_CI_KPASSWD_SRV,
+	SMB_CI_KPASSWD_DOMAIN,
+	SMB_CI_KPASSWD_SEQNUM,
+	SMB_CI_NETLOGON_SEQNUM,
 	SMB_CI_MAX
 } smb_cfg_id_t;
 
@@ -183,14 +186,17 @@ extern int smb_config_setbool(smb_cfg_id_t, boolean_t);
 
 extern uint8_t smb_config_get_fg_flag(void);
 extern char *smb_config_get_localsid(void);
-extern int smb_config_secmode_fromstr(char *secmode);
-extern char *smb_config_secmode_tostr(int secmode);
+extern int smb_config_secmode_fromstr(char *);
+extern char *smb_config_secmode_tostr(int);
 extern int smb_config_get_secmode(void);
-extern int smb_config_set_secmode(int secmode);
-extern int smb_config_set_idmap_domain(char *value);
-extern int smb_config_set_idmap_gc(char *value);
+extern int smb_config_set_secmode(int);
+extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
-extern int smb_config_refresh(void);
+
+extern boolean_t smb_match_netlogon_seqnum(void);
+extern int smb_getjoineddomain(char *, size_t);
+extern int smb_setdomainprops(char *, char *, char *);
+extern void smb_update_netlogon_seqnum(void);
 
 /* smb_door_client.c */
 typedef struct smb_joininfo {
@@ -201,11 +207,8 @@ typedef struct smb_joininfo {
 } smb_joininfo_t;
 
 /* APIs to communicate with SMB daemon via door calls */
-extern int smbd_set_param(smb_cfg_id_t, char *);
-extern int smbd_get_param(smb_cfg_id_t, char *);
-extern int smbd_get_security_mode(int *);
-extern int smbd_netbios_reconfig(void);
 extern uint32_t smb_join(smb_joininfo_t *info);
+extern bool_t xdr_smb_dr_joininfo_t(XDR *, smb_joininfo_t *);
 
 
 #define	SMB_DOMAIN_NOMACHINE_SID	-1
@@ -282,6 +285,7 @@ extern int smb_getfqdomainname(char *, size_t);
 extern int smb_gethostname(char *, size_t, int);
 extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
+extern nt_sid_t *smb_getdomainsid(void);
 
 extern int smb_get_nameservers(struct in_addr *, int);
 extern void smb_tonetbiosname(char *, char *, char);

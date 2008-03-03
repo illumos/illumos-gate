@@ -29,7 +29,6 @@
 #include <sys/nbmlock.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/smbvar.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
 #include <smbsrv/smb_incl.h>
@@ -37,6 +36,8 @@
 #include <sys/fcntl.h>
 #include <sys/flock.h>
 #include <fs/fs_subr.h>
+
+extern caller_context_t smb_ct;
 
 static int smb_fsop_amask_to_omode(uint32_t granted_access);
 static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
@@ -66,29 +67,6 @@ static callb_cpr_t *smb_fsop_frlock_callback(flk_cb_when_t when, void *error);
  */
 
 int
-smb_fsop_start()
-{
-	int error;
-
-	smb_vop_start();
-
-	error = smb_node_root_init();
-
-	if (error == 0)
-		error = smb_fem_init();
-
-	return (error);
-}
-
-void
-smb_fsop_stop()
-{
-	smb_fem_shutdown();
-	smb_vfs_rele_all();
-	smb_node_root_fini();
-}
-
-int
 smb_fsop_open(smb_ofile_t *of)
 {
 	int mode;
@@ -99,7 +77,6 @@ smb_fsop_open(smb_ofile_t *of)
 	 * Assuming that same vnode is returned as we had before
 	 * (i.e. no special vnodes)
 	 */
-
 	return (smb_vop_open(&of->f_node->vp, mode, of->f_cr));
 }
 
@@ -132,7 +109,7 @@ smb_fsop_amask_to_omode(uint32_t granted_access)
 
 static int
 smb_fsop_create_with_sd(
-	struct smb_request *sr,
+	smb_request_t *sr,
 	cred_t *cr,
 	smb_node_t *snode,
 	char *name,
@@ -290,30 +267,30 @@ smb_fsop_create_with_sd(
 
 int
 smb_fsop_create(
-    struct smb_request *sr,
-    cred_t *cr,
-    smb_node_t *dir_snode,
-    char *name,
-    smb_attr_t *attr,
-    smb_node_t **ret_snode,
-    smb_attr_t *ret_attr)
+    smb_request_t	*sr,
+    cred_t		*cr,
+    smb_node_t		*dir_snode,
+    char		*name,
+    smb_attr_t		*attr,
+    smb_node_t		**ret_snode,
+    smb_attr_t		*ret_attr)
 {
 	struct open_param *op = &sr->arg.open;
-	boolean_t no_xvattr = B_FALSE;
-	smb_node_t *fnode;
-	smb_attr_t file_attr;
-	vnode_t *xattrdirvp;
-	vnode_t *vp;
-	char *longname = NULL;
-	char *namep;
-	char *fname;
-	char *sname;
-	int is_stream;
-	int flags = 0;
-	int rc = 0;
-	smb_fssd_t fs_sd;
-	uint32_t secinfo;
-	uint32_t status;
+	boolean_t	no_xvattr = B_FALSE;
+	smb_node_t	*fnode;
+	smb_attr_t	file_attr;
+	vnode_t		*xattrdirvp;
+	vnode_t		*vp;
+	char		*longname = NULL;
+	char		*namep;
+	char		*fname;
+	char		*sname;
+	int		is_stream;
+	int		flags = 0;
+	int		rc = 0;
+	smb_fssd_t	fs_sd;
+	uint32_t	secinfo;
+	uint32_t	status;
 
 	ASSERT(cr);
 	ASSERT(dir_snode);
@@ -514,7 +491,7 @@ smb_fsop_create(
  */
 int
 smb_fsop_mkdir(
-    struct smb_request *sr,
+    smb_request_t *sr,
     cred_t *cr,
     smb_node_t *dir_snode,
     char *name,
@@ -640,19 +617,19 @@ smb_fsop_mkdir(
 
 int
 smb_fsop_remove(
-    struct smb_request *sr,
-    cred_t *cr,
-    smb_node_t *dir_snode,
-    char *name,
-    int od)
+    smb_request_t	*sr,
+    cred_t		*cr,
+    smb_node_t		*dir_snode,
+    char		*name,
+    int			od)
 {
-	smb_node_t *fnode;
-	smb_attr_t file_attr;
-	char *longname;
-	char *fname;
-	char *sname;
-	int flags = 0;
-	int rc;
+	smb_node_t	*fnode;
+	smb_attr_t	file_attr;
+	char		*longname;
+	char		*fname;
+	char		*sname;
+	int		flags = 0;
+	int		rc;
 
 	ASSERT(cr);
 	/*
@@ -768,8 +745,7 @@ smb_fsop_remove(
  * It is assumed that snode is not a link.
  */
 int
-smb_fsop_remove_streams(struct smb_request *sr, cred_t *cr,
-    smb_node_t *fnode)
+smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 {
 	struct fs_stream_info stream_info;
 	uint32_t cookie = 0;
@@ -818,15 +794,15 @@ smb_fsop_remove_streams(struct smb_request *sr, cred_t *cr,
 
 int
 smb_fsop_rmdir(
-    struct smb_request *sr,
-    cred_t *cr,
-    smb_node_t *dir_snode,
-    char *name,
-    int od)
+    smb_request_t	*sr,
+    cred_t		*cr,
+    smb_node_t		*dir_snode,
+    char		*name,
+    int			od)
 {
-	int rc;
-	int flags = 0;
-	char *longname;
+	int		rc;
+	int		flags = 0;
+	char		*longname;
 
 	ASSERT(cr);
 	/*
@@ -899,7 +875,7 @@ smb_fsop_rmdir(
  * It is assumed that a reference exists on snode coming into this routine.
  */
 int
-smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
+smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
     smb_attr_t *attr)
 {
 	smb_node_t *unnamed_node;
@@ -961,7 +937,7 @@ smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
  */
 int
 smb_fsop_readdir(
-    struct smb_request *sr,
+    smb_request_t *sr,
     cred_t *cr,
     smb_node_t *dir_snode,
     uint32_t *cookie,
@@ -972,15 +948,15 @@ smb_fsop_readdir(
     smb_node_t **ret_snode,
     smb_attr_t *ret_attr)
 {
-	smb_node_t *ret_snodep;
-	smb_node_t *fnode;
-	smb_attr_t tmp_attr;
-	vnode_t *xattrdirvp;
-	vnode_t *fvp;
-	vnode_t *vp = NULL;
-	char *od_name;
-	int rc;
-	int flags = 0;
+	smb_node_t	*ret_snodep;
+	smb_node_t	*fnode;
+	smb_attr_t	tmp_attr;
+	vnode_t		*xattrdirvp;
+	vnode_t		*fvp;
+	vnode_t		*vp = NULL;
+	char		*od_name;
+	int		rc;
+	int		flags = 0;
 
 	ASSERT(cr);
 	ASSERT(dir_snode);
@@ -1144,7 +1120,7 @@ smb_fsop_getdents(
  */
 int
 smb_fsop_rename(
-    struct smb_request *sr,
+    smb_request_t *sr,
     cred_t *cr,
     smb_node_t *from_dir_snode,
     char *from_name,
@@ -1238,11 +1214,11 @@ smb_fsop_rename(
  */
 int
 smb_fsop_setattr(
-    smb_request_t *sr,
-    cred_t *cr,
-    smb_node_t *snode,
-    smb_attr_t *set_attr,
-    smb_attr_t *ret_attr)
+    smb_request_t	*sr,
+    cred_t		*cr,
+    smb_node_t		*snode,
+    smb_attr_t		*set_attr,
+    smb_attr_t		*ret_attr)
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
@@ -1403,7 +1379,7 @@ smb_fsop_read(
  */
 int
 smb_fsop_write(
-    struct smb_request *sr,
+    smb_request_t *sr,
     cred_t *cr,
     smb_node_t *snode,
     uio_t *uio,
@@ -1597,7 +1573,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 int
 smb_fsop_lookup_name(
-    struct smb_request *sr,
+    smb_request_t *sr,
     cred_t	*cr,
     int		flags,
     smb_node_t	*root_node,
@@ -1606,14 +1582,14 @@ smb_fsop_lookup_name(
     smb_node_t	**ret_snode,
     smb_attr_t	*ret_attr)
 {
-	smb_node_t *fnode;
-	smb_attr_t file_attr;
-	vnode_t *xattrdirvp;
-	vnode_t *vp;
-	char *od_name;
-	char *fname;
-	char *sname;
-	int rc;
+	smb_node_t	*fnode;
+	smb_attr_t	file_attr;
+	vnode_t		*xattrdirvp;
+	vnode_t		*vp;
+	char		*od_name;
+	char		*fname;
+	char		*sname;
+	int		rc;
 
 	ASSERT(cr);
 	ASSERT(dir_snode);
@@ -1724,7 +1700,7 @@ smb_fsop_lookup_name(
  */
 int
 smb_fsop_lookup(
-    struct smb_request *sr,
+    smb_request_t *sr,
     cred_t	*cr,
     int		flags,
     smb_node_t	*root_node,
@@ -1893,7 +1869,7 @@ smb_fsop_lookup(
  */
 
 int
-smb_fsop_stream_readdir(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
+smb_fsop_stream_readdir(smb_request_t *sr, cred_t *cr, smb_node_t *fnode,
     uint32_t *cookiep, struct fs_stream_info *stream_info,
     smb_node_t **ret_snode, smb_attr_t *ret_attr)
 {
@@ -2519,7 +2495,7 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
  */
 
 uint32_t
-smb_fsop_shrlock(cred_t *cr, struct smb_node *node, uint32_t uniq_fid,
+smb_fsop_shrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid,
     uint32_t desired_access, uint32_t share_access)
 {
 	int rc;
@@ -2578,20 +2554,18 @@ int
 smb_fsop_frlock(smb_request_t *sr, smb_node_t *node, smb_lock_t *lock,
     boolean_t unlock)
 {
-	vnode_t *vp;
-	flock64_t bf;
-	cred_t *cr;
-	caller_context_t *ct;
-	int cmd;
-	flk_callback_t flk_cb;
-	offset_t offset = 0;
-	int flag;
-	int error;
-	int i;
+	vnode_t		*vp;
+	flock64_t	bf;
+	cred_t		*cr;
+	int		cmd;
+	flk_callback_t	flk_cb;
+	offset_t	offset = 0;
+	int		flag;
+	int		error;
+	int		i;
 
 	flk_init_callback(&flk_cb, smb_fsop_frlock_callback, &error);
 	cr = sr->user_cr;
-	ct = &smb_ct;
 	vp = node->vp;
 	cmd = F_SETLK;
 
@@ -2615,6 +2589,6 @@ smb_fsop_frlock(smb_request_t *sr, smb_node_t *node, smb_lock_t *lock,
 	for (i = 0; i < 4; i++)
 		bf.l_pad[i] = 0;
 
-	error = fs_frlock(vp, cmd, &bf, flag, offset, &flk_cb, cr, ct);
+	error = fs_frlock(vp, cmd, &bf, flag, offset, &flk_cb, cr, &smb_ct);
 	return (error);
 }

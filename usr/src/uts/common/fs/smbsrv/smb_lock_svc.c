@@ -38,6 +38,8 @@
 #include <sys/nbmlock.h>
 #include <sys/param.h>
 
+extern caller_context_t smb_ct;
+
 static void
 smb_unlock_to_posix_unlock(smb_request_t *sr, smb_node_t *node,
     smb_lock_t *lock, boolean_t unlock);
@@ -736,8 +738,7 @@ smb_range_check(smb_request_t *sr, cred_t *cr, smb_node_t *node, uint64_t start,
 	else
 		nbl_op = NBL_READ;
 
-	if (nbl_lock_conflict(node->vp, nbl_op, start, length,
-	    svmand, &smb_ct))
+	if (nbl_lock_conflict(node->vp, nbl_op, start, length, svmand, &smb_ct))
 		return (NT_STATUS_UNSUCCESSFUL);
 
 	return (NT_STATUS_SUCCESS);

@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
-# 
+#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
-# 
+#
 
 LIBRARY= libsmb.a
 VERS= .1
@@ -52,7 +52,6 @@ OBJS_COMMON = 			\
 	smb_crypt.o		\
 	smb_ctxbuf.o		\
 	smb_domain.o		\
-	smb_door_client.o	\
 	smb_door_encdec.o	\
 	smb_doorclnt.o		\
 	smb_downcalls.o		\

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,7 +158,7 @@
 int /*ARGSUSED*/
 smb_com_trans2_get_dfs_referral(struct smb_request *sr)
 {
-	return (SDRC_UNIMPLEMENTED);
+	return (SDRC_NOT_IMPLEMENTED);
 }
 
 
@@ -201,5 +201,5 @@ smb_com_trans2_get_dfs_referral(struct smb_request *sr)
 int /*ARGSUSED*/
 smb_com_trans2_report_dfs_inconsistency(struct smb_request *sr)
 {
-	return (SDRC_UNIMPLEMENTED);
+	return (SDRC_NOT_IMPLEMENTED);
 }

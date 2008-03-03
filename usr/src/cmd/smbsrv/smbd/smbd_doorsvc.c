@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,7 @@ static void smb_door_srv_func(void *cookie, char *ptr, size_t size,
 int
 smb_door_srv_start()
 {
-	int newfd;
+	int	newfd;
 
 	(void) mutex_lock(&smb_doorsrv_mutex);
 
@@ -105,7 +105,7 @@ smb_door_srv_start()
 	}
 
 	(void) mutex_unlock(&smb_doorsrv_mutex);
-	return (0);
+	return (smb_doorsrv_fildes);
 }
 
 

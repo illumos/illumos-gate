@@ -31,9 +31,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <sys/nbmlock.h>
 
-static int smb_do_rename(struct smb_request *sr,
-				struct smb_fqi *src_fqi,
-				struct smb_fqi *dst_fqi);
+static int smb_do_rename(smb_request_t *, struct smb_fqi *, struct smb_fqi *);
 
 /*
  * smb_com_rename
@@ -54,31 +52,45 @@ static int smb_do_rename(struct smb_request *sr,
  * - File Attribute Encoding.
  */
 smb_sdrc_t
-smb_com_rename(struct smb_request *sr)
+smb_pre_rename(smb_request_t *sr)
+{
+	struct smb_fqi *src_fqi = &sr->arg.dirop.fqi;
+	struct smb_fqi *dst_fqi = &sr->arg.dirop.dst_fqi;
+	int rc;
+
+	if ((rc = smbsr_decode_vwv(sr, "w", &src_fqi->srch_attr)) == 0) {
+		rc = smbsr_decode_data(sr, "%SS", sr, &src_fqi->path,
+		    &dst_fqi->path);
+
+		dst_fqi->srch_attr = 0;
+	}
+
+	DTRACE_SMB_2(op__Rename__start, smb_request_t *, sr,
+	    struct dirop *, &sr->arg.dirop);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_rename(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Rename__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_rename(smb_request_t *sr)
 {
 	static kmutex_t mutex;
-	struct smb_fqi *src_fqi;
-	struct smb_fqi *dst_fqi;
+	struct smb_fqi *src_fqi = &sr->arg.dirop.fqi;
+	struct smb_fqi *dst_fqi = &sr->arg.dirop.dst_fqi;
 	struct smb_node *dst_node;
 	int rc;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
-
-	src_fqi = &sr->arg.dirop.fqi;
-	dst_fqi = &sr->arg.dirop.dst_fqi;
-
-	if (smbsr_decode_vwv(sr, "w", &src_fqi->srch_attr) != 0)
-		return (SDRC_ERROR_REPLY);
-
-	rc = smbsr_decode_data(sr, "%SS", sr, &src_fqi->path, &dst_fqi->path);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
-
-	dst_fqi->srch_attr = 0;
 
 	mutex_enter(&mutex);
 	rc = smb_do_rename(sr, src_fqi, dst_fqi);
@@ -86,28 +98,31 @@ smb_com_rename(struct smb_request *sr)
 
 	if (rc != 0) {
 		/*
-		 * ERROR_FILE_EXISTS doesn't work for Windows98 clients.
-		 *
-		 * Windows95 clients don't see this problem because the target
-		 * is deleted before the rename request.
-		 *
-		 * The following values are based on observed WFWG, Win9x,
-		 * NT and W2K client behaviour.
+		 * The following values are based on observed WFWG,
+		 * Windows 9x, NT and Windows 2000 behaviour.
+		 * ERROR_FILE_EXISTS doesn't work for Windows 98 clients.
+		 * Windows 95 clients don't see the problem because the
+		 * target is deleted before the rename request.
 		 */
-		if (rc == EEXIST) {
+		switch (rc) {
+		case EEXIST:
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
 			    ERRDOS, ERROR_ALREADY_EXISTS);
-			return (SDRC_ERROR_REPLY);
-		}
-
-		if (rc == EPIPE) {
+			break;
+		case EPIPE:
 			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
-			return (SDRC_ERROR_REPLY);
+			break;
+		case ENOENT:
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+			break;
+		default:
+			smbsr_errno(sr, rc);
+			break;
 		}
 
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (src_fqi->dir_snode)
@@ -126,7 +141,7 @@ smb_com_rename(struct smb_request *sr)
 	SMB_NULL_FQI_NODES(*dst_fqi);
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 /*
@@ -146,7 +161,7 @@ smb_com_rename(struct smb_request *sr)
  */
 static int
 smb_do_rename(
-    struct smb_request *sr,
+    smb_request_t *sr,
     struct smb_fqi *src_fqi,
     struct smb_fqi *dst_fqi)
 {

@@ -52,10 +52,12 @@ extern int smb_ntgroup_doorsrv_start(void);
 extern void smb_ntgroup_doorsrv_stop(void);
 
 extern int smb_netlogon_init(void);
+extern void smb_set_netlogon_cred(void);
 
 extern smb_token_t *smbd_user_auth_logon(netr_client_t *);
 extern void smbd_user_nonauth_logon(uint32_t);
 extern void smbd_user_auth_logoff(uint32_t);
+extern uint32_t smbd_join(smb_joininfo_t *);
 
 typedef struct smbd {
 	const char *s_version;		/* smbd version string */

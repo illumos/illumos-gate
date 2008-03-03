@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,10 +194,11 @@ smb_user_login(
 	ASSERT(account_name);
 	ASSERT(domain_name);
 
-	user = kmem_cache_alloc(smb_info.si_cache_user, KM_SLEEP);
+	user = kmem_cache_alloc(session->s_server->si_cache_user, KM_SLEEP);
 	bzero(user, sizeof (smb_user_t));
 	user->u_refcnt = 1;
 	user->u_session = session;
+	user->u_server = session->s_server;
 	user->u_logon_time = gethrestime_sec();
 	user->u_flags = flags;
 	user->u_privileges = privileges;
@@ -219,14 +220,14 @@ smb_user_login(
 			smb_llist_enter(&session->s_user_list, RW_WRITER);
 			smb_llist_insert_tail(&session->s_user_list, user);
 			smb_llist_exit(&session->s_user_list);
-			atomic_inc_32(&smb_info.open_users);
+			atomic_inc_32(&session->s_server->sv_open_users);
 			return (user);
 		}
 		smb_idpool_free(&session->s_uid_pool, user->u_uid);
 	}
 	kmem_free(user->u_name, (size_t)user->u_name_len);
 	kmem_free(user->u_domain, (size_t)user->u_domain_len);
-	kmem_cache_free(smb_info.si_cache_user, user);
+	kmem_cache_free(session->s_server->si_cache_user, user);
 	return (NULL);
 }
 
@@ -277,7 +278,7 @@ smb_user_logoff(
 		 */
 		user->u_state = SMB_USER_STATE_LOGGING_OFF;
 		mutex_exit(&user->u_mutex);
-		atomic_dec_32(&smb_info.open_users);
+		atomic_dec_32(&user->u_server->sv_open_users);
 		/*
 		 * All the trees hanging off of this user are disconnected.
 		 */
@@ -615,5 +616,5 @@ smb_user_delete(
 	crfree(user->u_cred);
 	kmem_free(user->u_name, (size_t)user->u_name_len);
 	kmem_free(user->u_domain, (size_t)user->u_domain_len);
-	kmem_cache_free(smb_info.si_cache_user, user);
+	kmem_cache_free(user->u_server->si_cache_user, user);
 }

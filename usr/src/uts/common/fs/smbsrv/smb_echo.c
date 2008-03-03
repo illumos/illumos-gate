@@ -37,6 +37,19 @@
  * no data. If echo-count is zero, no response is sent.
  */
 smb_sdrc_t
+smb_pre_echo(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Echo__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_echo(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Echo__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
 smb_com_echo(struct smb_request *sr)
 {
 	unsigned short necho;
@@ -46,13 +59,13 @@ smb_com_echo(struct smb_request *sr)
 	char *data;
 
 	if (smbsr_decode_vwv(sr, "w", &necho) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	nbytes = sr->smb_bcc;
 	data = smbsr_malloc(&sr->request_storage, nbytes);
 
 	if (smb_decode_mbc(&sr->smb_data, "#c", nbytes, data))
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	for (i = 1; i <= necho; ++i) {
 		MBC_INIT(&reply, SMB_HEADER_ED_LEN + 10 + nbytes);
@@ -81,49 +94,4 @@ smb_com_echo(struct smb_request *sr)
 	}
 
 	return (SDRC_NO_REPLY);
-}
-
-/*
- * Broadcast messages are not supported.
- */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_send_broadcast_message(struct smb_request *sr)
-{
-	return (SDRC_UNIMPLEMENTED);
-}
-
-/*
- * Multi-block messages are not supported.
- */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_send_end_mb_message(struct smb_request *sr)
-{
-	return (SDRC_UNIMPLEMENTED);
-}
-
-/*
- * Single-block messages are not supported.
- */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_send_single_message(struct smb_request *sr)
-{
-	return (SDRC_UNIMPLEMENTED);
-}
-
-/*
- * Multi-block messages are not supported.
- */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_send_start_mb_message(struct smb_request *sr)
-{
-	return (SDRC_UNIMPLEMENTED);
-}
-
-/*
- * Multi-block messages are not supported.
- */
-smb_sdrc_t /*ARGSUSED*/
-smb_com_send_text_mb_message(struct smb_request *sr)
-{
-	return (SDRC_UNIMPLEMENTED);
 }

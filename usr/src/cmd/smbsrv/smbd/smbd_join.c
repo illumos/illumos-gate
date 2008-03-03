@@ -56,6 +56,7 @@
 
 typedef struct smb_netlogon_info {
 	char snli_domain[SMB_PI_MAX_DOMAIN];
+	char snli_dc[MAXHOSTNAMELEN];
 	unsigned snli_flags;
 	mutex_t snli_locate_mtx;
 	cond_t snli_locate_cv;
@@ -65,6 +66,9 @@ typedef struct smb_netlogon_info {
 } smb_netlogon_info_t;
 
 static smb_netlogon_info_t smb_netlogon_info;
+
+/* NT4 domain support is not yet available. */
+static boolean_t nt4_domain_support = B_FALSE;
 
 static pthread_t lsa_monitor_thr;
 static pthread_t dc_browser_thr;
@@ -90,6 +94,44 @@ smb_ntdomain_is_valid(uint32_t timeout)
 }
 
 /*
+ * Retrieve the kpasswd server from krb5.conf.
+ */
+static int
+smbd_get_kpasswd_srv(char *srv, size_t len)
+{
+	FILE *fp;
+	static char buf[512];
+	char *p;
+
+	*srv = '\0';
+	p = getenv("KRB5_CONFIG");
+	if (p == NULL || *p == '\0')
+		p = "/etc/krb5/krb5.conf";
+
+	if ((fp = fopen(p, "r")) == NULL)
+		return (-1);
+
+	while (fgets(buf, sizeof (buf), fp)) {
+
+		/* Weed out any comment text */
+		(void) trim_whitespace(buf);
+		if (*buf == '#')
+			continue;
+
+		if ((p = strstr(buf, "kpasswd_server")) != NULL) {
+			if ((p = strchr(p, '=')) != NULL) {
+				(void) trim_whitespace(++p);
+				(void) strlcpy(srv, p, len);
+			}
+			break;
+		}
+	}
+
+	(void) fclose(fp);
+	return ((*srv == '\0') ? -1 : 0);
+}
+
+/*
  * smbd_join
  *
  * Joins the specified domain/workgroup
@@ -104,9 +146,16 @@ smbd_join(smb_joininfo_t *info)
 	char plain_user[PASS_LEN + 1];
 	char nbt_domain[SMB_PI_MAX_DOMAIN];
 	char fqdn[MAXHOSTNAMELEN];
+	char dc[MAXHOSTNAMELEN];
+	char kpasswd_domain[MAXHOSTNAMELEN];
+
+	(void) smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kpasswd_domain,
+	    MAXHOSTNAMELEN);
 
 	if (info->mode == SMB_SECMODE_WORKGRP) {
-		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
+		if ((smb_config_get_secmode() == SMB_SECMODE_DOMAIN) &&
+		    kpasswd_domain == '\0') {
+
 			if (ads_domain_change_cleanup("") != 0) {
 				syslog(LOG_ERR, "smbd: unable to remove the"
 				    " old keys from the Kerberos keytab. "
@@ -162,11 +211,18 @@ smbd_join(smb_joininfo_t *info)
 
 	smbrdr_ipc_set(plain_user, passwd_hash);
 
-	if (locate_resource_pdc(nbt_domain)) {
+	(void) smbd_get_kpasswd_srv(dc, sizeof (dc));
+	if (smbd_locate_dc(nbt_domain, dc)) {
 		if ((pi = smb_getdomaininfo(0)) == 0) {
 			status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
-			syslog(LOG_ERR, "smbd: could not get domain controller"
-			    "information for '%s'", info->domain_name);
+			if (*dc == '\0')
+				syslog(LOG_ERR, "smbd: could not get domain "
+				    "controller information for '%s'",
+				    info->domain_name);
+			else
+				syslog(LOG_ERR, "smbd: could not get the "
+				    "specified domain controller information "
+				    "'%s'", dc);
 			return (status);
 		}
 
@@ -199,7 +255,7 @@ smbd_join(smb_joininfo_t *info)
 }
 
 /*
- * locate_resource_pdc
+ * smbd_locate_dc
  *
  * This is the entry point for discovering a domain controller for the
  * specified domain. The caller may block here for around 30 seconds if
@@ -210,10 +266,14 @@ smbd_join(smb_joininfo_t *info)
  * The actual work of discovering a DC is handled by other threads.
  * All we do here is signal the request and wait for a DC or a timeout.
  *
+ * domain - domain to be discovered
+ * dc - preferred DC. If the preferred DC is set to empty string, it
+ *      will attempt to discover any DC in the specified domain.
+ *
  * Returns B_TRUE if a domain controller is available.
  */
 boolean_t
-locate_resource_pdc(char *domain)
+smbd_locate_dc(char *domain, char *dc)
 {
 	int rc;
 	timestruc_t to;
@@ -227,6 +287,8 @@ locate_resource_pdc(char *domain)
 		smb_netlogon_info.snli_flags |= SMB_NETLF_LOCATE_DC;
 		(void) strlcpy(smb_netlogon_info.snli_domain, domain,
 		    SMB_PI_MAX_DOMAIN);
+		(void) strlcpy(smb_netlogon_info.snli_dc, dc,
+		    MAXHOSTNAMELEN);
 		(void) cond_broadcast(&smb_netlogon_info.snli_locate_cv);
 	}
 
@@ -300,6 +362,7 @@ smb_netlogon_dc_browser(void *arg)
 {
 	boolean_t rc;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
+	char dc[MAXHOSTNAMELEN];
 
 	for (;;) {
 		(void) mutex_lock(&smb_netlogon_info.snli_locate_mtx);
@@ -311,12 +374,13 @@ smb_netlogon_dc_browser(void *arg)
 		}
 
 		(void) mutex_unlock(&smb_netlogon_info.snli_locate_mtx);
-
 		(void) strlcpy(resource_domain, smb_netlogon_info.snli_domain,
 		    SMB_PI_MAX_DOMAIN);
+		(void) strlcpy(dc, smb_netlogon_info.snli_dc, MAXHOSTNAMELEN);
 
 		smb_setdomaininfo(NULL, NULL, 0);
-		if (msdcs_lookup_ads(resource_domain) == 0) {
+		if ((msdcs_lookup_ads(resource_domain, dc) == 0) &&
+		    (nt4_domain_support)) {
 			/* Try to locate a DC via NetBIOS */
 			smb_browser_netlogon(resource_domain);
 		}
@@ -404,4 +468,109 @@ smb_netlogon_lsa_monitor(void *arg)
 
 	/*NOTREACHED*/
 	return (NULL);
+}
+
+
+/*
+ * smb_set_netlogon_cred
+ *
+ * If the system is joined to an AD domain via kclient, SMB daemon will need
+ * to establish the NETLOGON credential chain.
+ *
+ * Since the kclient has updated the machine password stored in SMF
+ * repository, the cached ipc_info must be updated accordingly by calling
+ * smbrdr_ipc_commit.
+ *
+ * Due to potential replication delays in a multiple DC environment, the
+ * NETLOGON rpc request must be sent to the DC, to which the KPASSWD request
+ * is sent. If the DC discovered by the SMB daemon is different than the
+ * kpasswd server, the current connection with the DC will be torn down
+ * and a DC discovery process will be triggered to locate the kpasswd
+ * server.
+ *
+ * If joining a new domain, the domain_name property must be set after a
+ * successful credential chain setup.
+ */
+void
+smb_set_netlogon_cred(void)
+{
+	smb_ntdomain_t *dp;
+	smb_ntdomain_t domain_info;
+	char kpasswd_srv[MAXHOSTNAMELEN];
+	char kpasswd_domain[MAXHOSTNAMELEN];
+	char sam_acct[MLSVC_ACCOUNT_NAME_MAX];
+	char *ipc_usr, *dom;
+	boolean_t new_domain = B_FALSE;
+
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+		return;
+
+	if (smb_match_netlogon_seqnum())
+		return;
+
+	(void) smb_config_getstr(SMB_CI_KPASSWD_SRV, kpasswd_srv,
+	    sizeof (kpasswd_srv));
+
+	if (*kpasswd_srv == '\0')
+		return;
+
+	/*
+	 * If the domain join initiated by smbadm join CLI is in
+	 * progress, don't do anything.
+	 */
+	(void) smb_gethostname(sam_acct, MLSVC_ACCOUNT_NAME_MAX - 1, 0);
+	(void) strlcat(sam_acct, "$", MLSVC_ACCOUNT_NAME_MAX);
+	ipc_usr = smbrdr_ipc_get_user();
+	if (strcasecmp(ipc_usr, sam_acct))
+		return;
+
+	if ((dp = smb_getdomaininfo(0)) == NULL) {
+		*domain_info.server = '\0';
+		(void) smb_getdomainname(domain_info.domain,
+		    sizeof (domain_info.domain));
+		dp = &domain_info;
+	}
+
+	(void) smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kpasswd_domain,
+	    sizeof (kpasswd_domain));
+
+	if (*kpasswd_domain != '\0' &&
+	    strncasecmp(kpasswd_domain, dp->domain, strlen(dp->domain))) {
+		dom = kpasswd_domain;
+		new_domain = B_TRUE;
+	} else {
+		dom = dp->domain;
+	}
+
+	/*
+	 * DC discovery will be triggered if the domain info is not
+	 * currently cached or the SMB daemon has previously discovered a DC
+	 * that is different than the kpasswd server.
+	 */
+	if (new_domain || strcasecmp(dp->server, kpasswd_srv) != 0) {
+		if (*dp->server != '\0')
+			mlsvc_disconnect(dp->server);
+
+		if (!smbd_locate_dc(dom, kpasswd_srv))
+			(void) smbd_locate_dc(dp->domain, "");
+
+		if ((dp = smb_getdomaininfo(0)) == NULL) {
+			smbrdr_ipc_commit();
+			return;
+		}
+	}
+
+	smbrdr_ipc_commit();
+	if (mlsvc_netlogon(dp->server, dp->domain)) {
+		syslog(LOG_ERR, "NETLOGON credential chain establishment"
+		    " failed");
+	} else {
+		if (new_domain) {
+			(void) smb_config_setstr(SMB_CI_DOMAIN_NAME,
+			    kpasswd_domain);
+			(void) smb_config_setstr(SMB_CI_KPASSWD_DOMAIN,
+			    kpasswd_domain);
+		}
+	}
+
 }

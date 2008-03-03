@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,8 +77,8 @@ HDRS=	alloc.h			\
 	smb_incl.h		\
 	smb_ioctl.h		\
 	smb_kproto.h		\
+	smb_ktypes.h		\
 	smb_privilege.h		\
-	smb_svc_sm.h		\
 	smb_token.h		\
 	smb_vops.h		\
 	smb_winpipe.h		\
@@ -86,7 +86,6 @@ HDRS=	alloc.h			\
 	smbfmt.h		\
 	smbinfo.h		\
 	smbtrans.h		\
-	smbvar.h		\
 	string.h		\
 	svrapi.h		\
 	winioctl.h		\

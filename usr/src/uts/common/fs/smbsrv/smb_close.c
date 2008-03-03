@@ -40,29 +40,41 @@
  * should not result in an error response from the server.
  */
 smb_sdrc_t
-smb_com_close(struct smb_request *sr)
+smb_pre_close(smb_request_t *sr)
 {
-	uint32_t last_wtime;
-	int rc = 0;
+	int rc;
 
-	rc = smbsr_decode_vwv(sr, "wl", &sr->smb_fid, &last_wtime);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+	rc = smbsr_decode_vwv(sr, "wl", &sr->smb_fid, &sr->arg.timestamp);
+
+	DTRACE_SMB_1(op__Close__start, smb_request_t *, sr);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_close(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Close__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_close(smb_request_t *sr)
+{
+	int rc;
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	rc = smb_common_close(sr, last_wtime);
+	rc = smb_common_close(sr, sr->arg.timestamp);
 	if (rc) {
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 /*
@@ -70,32 +82,44 @@ smb_com_close(struct smb_request *sr)
  * associated tree.
  */
 smb_sdrc_t
-smb_com_close_and_tree_disconnect(struct smb_request *sr)
+smb_pre_close_and_tree_disconnect(smb_request_t *sr)
 {
-	uint32_t last_wtime;
-	int rc = 0;
+	int rc;
 
-	rc = smbsr_decode_vwv(sr, "wl", &sr->smb_fid, &last_wtime);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
+	rc = smbsr_decode_vwv(sr, "wl", &sr->smb_fid, &sr->arg.timestamp);
+
+	DTRACE_SMB_1(op__CloseAndTreeDisconnect__start, smb_request_t *, sr);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_close_and_tree_disconnect(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__CloseAndTreeDisconnect__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_close_and_tree_disconnect(smb_request_t *sr)
+{
+	int rc;
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	rc = smb_common_close(sr, last_wtime);
+	rc = smb_common_close(sr, sr->arg.timestamp);
 	smbsr_rq_notify(sr, sr->session, sr->tid_tree);
 	smb_tree_disconnect(sr->tid_tree);
 
 	if (rc) {
 		smbsr_errno(sr, rc);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 /*
@@ -105,7 +129,7 @@ smb_com_close_and_tree_disconnect(struct smb_request *sr)
  * and SMBCloseAndTreeDisconnect.
  */
 int
-smb_common_close(struct smb_request *sr, uint32_t last_wtime)
+smb_common_close(smb_request_t *sr, uint32_t last_wtime)
 {
 	return (smb_ofile_close(sr->fid_ofile, last_wtime));
 }

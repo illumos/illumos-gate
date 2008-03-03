@@ -318,46 +318,42 @@ struct fs_stream_info {
 
 int fhopen(const struct smb_node *, int);
 
-extern void smb_vop_start(void);
-extern int smb_vop_open(vnode_t **, int, cred_t *);
-extern int smb_vop_close(vnode_t *, int, cred_t *);
-extern int smb_vop_read(vnode_t *, uio_t *, cred_t *);
-extern int smb_vop_write(vnode_t *, uio_t *, unsigned int *,
-    uint32_t *, cred_t *);
-extern int smb_vop_getattr(vnode_t *, vnode_t *,
-    smb_attr_t *, int, cred_t *);
-extern int smb_vop_setattr(vnode_t *, vnode_t *,
-    smb_attr_t *, int, cred_t *, boolean_t);
-extern int smb_vop_access(vnode_t *, int, int, vnode_t *,
+int smb_vop_init(void);
+void smb_vop_fini(void);
+void smb_vop_start(void);
+int smb_vop_open(vnode_t **, int, cred_t *);
+int smb_vop_close(vnode_t *, int, cred_t *);
+int smb_vop_read(vnode_t *, uio_t *, cred_t *);
+int smb_vop_write(vnode_t *, uio_t *, unsigned int *, uint32_t *, cred_t *);
+int smb_vop_getattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
+int smb_vop_setattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *,
+    boolean_t);
+int smb_vop_access(vnode_t *, int, int, vnode_t *, cred_t *);
+void smb_vop_eaccess(vnode_t *, int *, int, vnode_t *, cred_t *);
+int smb_vop_lookup(vnode_t *, char *, vnode_t **, char *, int, vnode_t *,
     cred_t *);
-extern void smb_vop_eaccess(vnode_t *, int *, int, vnode_t *,
-    cred_t *);
-extern int smb_vop_lookup(vnode_t *, char *, vnode_t **,
-    char *, int, vnode_t *, cred_t *);
-extern int smb_vop_create(vnode_t *, char *, smb_attr_t *,
-    vnode_t **, int, cred_t *, vsecattr_t *);
-extern int smb_vop_remove(vnode_t *, char *, int, cred_t *);
-extern int smb_vop_rename(vnode_t *, char *, vnode_t *,
+int smb_vop_create(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
+    vsecattr_t *);
+int smb_vop_remove(vnode_t *, char *, int, cred_t *);
+int smb_vop_rename(vnode_t *, char *, vnode_t *, char *, int, cred_t *);
+int smb_vop_mkdir(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
+    vsecattr_t *);
+int smb_vop_rmdir(vnode_t *, char *, int, cred_t *);
+int smb_vop_readdir(vnode_t *, uint32_t *, char *, int *, ino64_t *, vnode_t **,
     char *, int, cred_t *);
-extern int smb_vop_mkdir(vnode_t *, char *, smb_attr_t *,
-    vnode_t **, int, cred_t *, vsecattr_t *);
-extern int smb_vop_rmdir(vnode_t *, char *, int, cred_t *);
-extern int smb_vop_readdir(vnode_t *, uint32_t *, char *,
-    int *, ino64_t *, vnode_t **, char *, int, cred_t *);
-extern int smb_vop_commit(vnode_t *, cred_t *);
-extern int smb_vop_getdents(struct smb_node *, uint32_t *,
-    uint64_t *, int32_t *, char *, char *,
-    uint32_t, struct smb_request *, cred_t *);
-extern int smb_vop_statfs(vnode_t *, struct statvfs64 *, cred_t *);
-extern int smb_vop_stream_lookup(vnode_t *, char *,
-    vnode_t **, char *, vnode_t **, int, vnode_t *, cred_t *);
-extern int smb_vop_stream_create(vnode_t *, char *,
-    smb_attr_t *, vnode_t **, vnode_t **, int, cred_t *);
-extern int smb_vop_stream_remove(vnode_t *, char *, int, cred_t *);
-extern int smb_vop_stream_readdir(vnode_t *, uint32_t *,
-    struct fs_stream_info *, vnode_t **, vnode_t **, int, cred_t *);
-extern int smb_vop_lookup_xattrdir(vnode_t *, vnode_t **, int, cred_t *);
-extern int smb_vop_traverse_check(vnode_t **);
+int smb_vop_commit(vnode_t *, cred_t *);
+int smb_vop_getdents(struct smb_node *, uint32_t *, uint64_t *, int32_t *,
+    char *, char *, uint32_t, struct smb_request *, cred_t *);
+int smb_vop_statfs(vnode_t *, struct statvfs64 *, cred_t *);
+int smb_vop_stream_lookup(vnode_t *, char *, vnode_t **, char *, vnode_t **,
+    int, vnode_t *, cred_t *);
+int smb_vop_stream_create(vnode_t *, char *, smb_attr_t *, vnode_t **,
+    vnode_t **, int, cred_t *);
+int smb_vop_stream_remove(vnode_t *, char *, int, cred_t *);
+int smb_vop_stream_readdir(vnode_t *, uint32_t *, struct fs_stream_info *,
+    vnode_t **, vnode_t **, int, cred_t *);
+int smb_vop_lookup_xattrdir(vnode_t *, vnode_t **, int, cred_t *);
+int smb_vop_traverse_check(vnode_t **);
 
 int smb_vop_acl_read(vnode_t *, acl_t **, int, acl_type_t, cred_t *);
 int smb_vop_acl_write(vnode_t *, acl_t *, int, cred_t *);

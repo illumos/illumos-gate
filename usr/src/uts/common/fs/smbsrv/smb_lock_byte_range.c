@@ -63,6 +63,19 @@
 #include <smbsrv/smb_incl.h>
 
 smb_sdrc_t
+smb_pre_lock_byte_range(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__LockByteRange__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_lock_byte_range(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__LockByteRange__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
 smb_com_lock_byte_range(struct smb_request *sr)
 {
 	uint32_t	count;
@@ -71,13 +84,13 @@ smb_com_lock_byte_range(struct smb_request *sr)
 	int		rc;
 
 	if (smbsr_decode_vwv(sr, "wll", &sr->smb_fid, &count, &off) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	/*
@@ -90,9 +103,9 @@ smb_com_lock_byte_range(struct smb_request *sr)
 	    (u_offset_t)off, (uint64_t)count,  0, SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, result);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

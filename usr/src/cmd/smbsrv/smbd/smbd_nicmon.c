@@ -102,13 +102,15 @@ smb_nicmon_stop(void)
 void
 smb_nicmon_reconfig(void)
 {
+	char fqdn[MAXHOSTNAMELEN];
 	boolean_t ddns_enabled;
 
 	ddns_enabled = smb_config_getbool(SMB_CI_DYNDNS_ENABLE);
+	(void) smb_getfqdomainname(fqdn, MAXHOSTNAMELEN);
 
 	/* Clear rev zone before creating if list */
 	if (ddns_enabled) {
-		if (dyndns_clear_rev_zone() != 0) {
+		if (*fqdn != '\0' && dyndns_clear_rev_zone(fqdn) != 0) {
 			syslog(LOG_ERR, "smb_nicmon_daemon: "
 			    "failed to clear DNS reverse lookup zone");
 		}
@@ -123,7 +125,7 @@ smb_nicmon_reconfig(void)
 	smb_browser_reconfig();
 
 	if (ddns_enabled) {
-		if (dyndns_update() != 0) {
+		if (*fqdn != '\0' && dyndns_update(fqdn, B_FALSE) != 0) {
 			syslog(LOG_ERR, "smb_nicmon_daemon: "
 			    "failed to update dynamic DNS");
 		}

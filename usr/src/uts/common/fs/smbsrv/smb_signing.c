@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,10 +51,10 @@ static	crypto_mechanism_t crypto_mech = {CRYPTO_MECHANISM_INVALID, 0, 0};
  * NTLM response and store it in the signing structure.
  */
 void
-smb_sign_init(struct smb_request *req, smb_session_key_t *session_key,
+smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
 	char *resp, int resp_len)
 {
-	struct smb_sign *sign = &req->session->signing;
+	struct smb_sign *sign = &sr->session->signing;
 
 	/*
 	 * Initialise the crypto mechanism to MD5 if it not
@@ -67,8 +67,8 @@ smb_sign_init(struct smb_request *req, smb_session_key_t *session_key,
 			 * There is no MD5 crypto mechanism
 			 * so turn off signing
 			 */
-			smb_info.si.skc_signing_enable = 0;
-			req->session->secmode &=
+			sr->sr_cfg->skc_signing_enable = 0;
+			sr->session->secmode &=
 			    (~NEGOTIATE_SECURITY_SIGNATURES_ENABLED);
 			cmn_err(CE_WARN,
 			    "SmbSignInit: signing disabled (no MD5)");
@@ -83,11 +83,11 @@ smb_sign_init(struct smb_request *req, smb_session_key_t *session_key,
 	    resp_len);
 	sign->mackey_len = sizeof (smb_session_key_t) + resp_len;
 
-	req->reply_seqnum = 1;
+	sr->reply_seqnum = 1;
 	sign->seqnum = 2;
 	sign->flags = SMB_SIGNING_ENABLED;
 
-	if (smb_info.si.skc_signing_check)
+	if (sr->sr_cfg->skc_signing_check)
 		sign->flags |= SMB_SIGNING_CHECK;
 
 }
@@ -255,44 +255,44 @@ error:
  *
  */
 int
-smb_sign_check_request(struct smb_request *req)
+smb_sign_check_request(smb_request_t *sr)
 {
-	struct mbuf_chain command = req->command;
+	struct mbuf_chain command = sr->command;
 	unsigned char mac_sig[SMB_SIG_SIZE];
-	struct smb_sign *sign = &req->session->signing;
+	struct smb_sign *sign = &sr->session->signing;
 	int rtn = 0;
 
 	/*
 	 * Don't check secondary transactions - we dont know the sequence
 	 * number.
 	 */
-	if (req->smb_com == SMB_COM_TRANSACTION_SECONDARY ||
-	    req->smb_com == SMB_COM_TRANSACTION2_SECONDARY ||
-	    req->smb_com == SMB_COM_NT_TRANSACT_SECONDARY)
+	if (sr->smb_com == SMB_COM_TRANSACTION_SECONDARY ||
+	    sr->smb_com == SMB_COM_TRANSACTION2_SECONDARY ||
+	    sr->smb_com == SMB_COM_NT_TRANSACT_SECONDARY)
 		return (0);
 
 	if (sign->flags & SMB_SIGNING_CHECK) {
 
 		/* Reset the offset to begining of header */
-		command.chain_offset = req->orig_request_hdr;
+		command.chain_offset = sr->orig_request_hdr;
 
 		/* calculate mac signature */
 		if (smb_sign_calc(&command, sign, sign->seqnum, mac_sig) != 0)
 			return (-1);
 
 		/* compare the signatures */
-		if (memcmp(mac_sig, req->smb_sig, SMB_SIG_SIZE) != 0) {
+		if (memcmp(mac_sig, sr->smb_sig, SMB_SIG_SIZE) != 0) {
 			cmn_err(CE_WARN, "SmbSignCheckRequest: "
 			    "bad signature %x %x %x %x %x %x %x %x",
-			    req->smb_sig[0], req->smb_sig[1],
-			    req->smb_sig[2], req->smb_sig[3],
-			    req->smb_sig[4], req->smb_sig[5],
-			    req->smb_sig[6], req->smb_sig[7]);
+			    sr->smb_sig[0], sr->smb_sig[1],
+			    sr->smb_sig[2], sr->smb_sig[3],
+			    sr->smb_sig[4], sr->smb_sig[5],
+			    sr->smb_sig[6], sr->smb_sig[7]);
 #ifdef DBG_VERBOSE
 			/* Debug code to hunt for the sequence number */
 			for (i = sign->seqnum - 6; i <= sign->seqnum + 6; i++) {
 				smb_sign_calc(&command, sign, i, mac_sig);
-				if (memcmp(mac_sig, req->smb_sig,
+				if (memcmp(mac_sig, sr->smb_sig,
 				    SMB_SIG_SIZE) == 0) {
 					sign->seqnum = i;
 					goto ok;
@@ -311,10 +311,10 @@ ok:
 	 */
 	sign->seqnum++;
 
-	if (req->smb_com == SMB_COM_NT_CANCEL)
-		req->reply_seqnum = 0;
+	if (sr->smb_com == SMB_COM_NT_CANCEL)
+		sr->reply_seqnum = 0;
 	else
-		req->reply_seqnum = sign->seqnum++;
+		sr->reply_seqnum = sign->seqnum++;
 
 	return (rtn);
 }
@@ -328,16 +328,16 @@ ok:
  *
  */
 int
-smb_sign_check_secondary(struct smb_request *req, unsigned int reply_seqnum)
+smb_sign_check_secondary(smb_request_t *sr, unsigned int reply_seqnum)
 {
-	struct mbuf_chain command = req->command;
+	struct mbuf_chain command = sr->command;
 	unsigned char mac_sig[SMB_SIG_SIZE];
-	struct smb_sign *sign = &req->session->signing;
+	struct smb_sign *sign = &sr->session->signing;
 	int rtn = 0;
 
 	if (sign->flags & SMB_SIGNING_CHECK) {
 		/* Reset the offset to begining of header */
-		command.chain_offset = req->orig_request_hdr;
+		command.chain_offset = sr->orig_request_hdr;
 
 		/* calculate mac signature */
 		if (smb_sign_calc(&command, sign, reply_seqnum - 1,
@@ -346,13 +346,13 @@ smb_sign_check_secondary(struct smb_request *req, unsigned int reply_seqnum)
 
 
 		/* compare the signatures */
-		if (memcmp(mac_sig, req->smb_sig, SMB_SIG_SIZE) != 0) {
+		if (memcmp(mac_sig, sr->smb_sig, SMB_SIG_SIZE) != 0) {
 			cmn_err(CE_WARN, "SmbSignCheckSecond: bad signature");
 			rtn = -1;
 		}
 	}
 	/* Save the reply sequence number */
-	req->reply_seqnum = reply_seqnum;
+	sr->reply_seqnum = reply_seqnum;
 
 	return (rtn);
 }
@@ -368,10 +368,10 @@ smb_sign_check_secondary(struct smb_request *req, unsigned int reply_seqnum)
  *
  */
 void
-smb_sign_reply(struct smb_request *req, struct mbuf_chain *reply)
+smb_sign_reply(smb_request_t *sr, struct mbuf_chain *reply)
 {
 	struct mbuf_chain resp;
-	struct smb_sign *sign = &req->session->signing;
+	struct smb_sign *sign = &sr->session->signing;
 	unsigned char signature[SMB_SIG_SIZE];
 	struct mbuf *mbuf;
 	int size = SMB_SIG_SIZE;
@@ -381,7 +381,7 @@ smb_sign_reply(struct smb_request *req, struct mbuf_chain *reply)
 	if (reply)
 		resp = *reply;
 	else
-		resp = req->reply;
+		resp = sr->reply;
 
 	/* Reset offset to start of reply */
 	resp.chain_offset = 0;
@@ -390,7 +390,7 @@ smb_sign_reply(struct smb_request *req, struct mbuf_chain *reply)
 	/*
 	 * Calculate MAC signature
 	 */
-	if (smb_sign_calc(&resp, sign, req->reply_seqnum, signature) != 0)
+	if (smb_sign_calc(&resp, sign, sr->reply_seqnum, signature) != 0)
 		return;
 
 	/*

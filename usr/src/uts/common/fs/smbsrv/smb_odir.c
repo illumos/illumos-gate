@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,7 +196,7 @@ smb_odir_open(
 		return (NULL);
 	}
 
-	dir = kmem_cache_alloc(smb_info.si_cache_odir, KM_SLEEP);
+	dir = kmem_cache_alloc(tree->t_server->si_cache_odir, KM_SLEEP);
 	bzero(dir, sizeof (smb_odir_t));
 	dir->d_refcnt = 1;
 	dir->d_session = tree->t_session;
@@ -207,7 +207,7 @@ smb_odir_open(
 	dir->d_state = SMB_ODIR_STATE_OPEN;
 
 	if (smb_idpool_alloc(&dir->d_tree->t_sid_pool, &dir->d_sid)) {
-		kmem_cache_free(smb_info.si_cache_odir, dir);
+		kmem_cache_free(tree->t_server->si_cache_odir, dir);
 		return (NULL);
 	}
 	mutex_init(&dir->d_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -447,10 +447,11 @@ smb_odir_delete(
 	smb_llist_enter(&od->d_tree->t_odir_list, RW_WRITER);
 	smb_llist_remove(&od->d_tree->t_odir_list, od);
 	smb_llist_exit(&od->d_tree->t_odir_list);
+	od->d_magic = 0;
 
 	smb_node_release(od->d_dir_snode);
 	atomic_dec_32(&od->d_tree->t_session->s_dir_cnt);
 	smb_idpool_free(&od->d_tree->t_sid_pool, od->d_sid);
 	mutex_destroy(&od->d_mutex);
-	kmem_cache_free(smb_info.si_cache_odir, od);
+	kmem_cache_free(od->d_tree->t_server->si_cache_odir, od);
 }

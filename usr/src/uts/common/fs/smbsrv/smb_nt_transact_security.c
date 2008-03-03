@@ -25,7 +25,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <smbsrv/smbvar.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nterror.h>
@@ -79,13 +78,13 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_decode_mbc(&xa->req_param_mb, "w2.l",
 	    &sr->smb_fid, &secinfo) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 
@@ -93,7 +92,7 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 	    (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sr->tid_tree->t_acltype != ACE_T) {
@@ -107,14 +106,14 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 	status = smb_sd_read(sr, &sd, secinfo);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	sdlen = smb_sd_len(&sd, secinfo);
 	if (sdlen == 0) {
 		smb_sd_term(&sd);
 		smbsr_error(sr, NT_STATUS_INVALID_SECURITY_DESCR, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sdlen > xa->smb_mdrcnt) {
@@ -131,13 +130,13 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 		err.errcode  = ERROR_INSUFFICIENT_BUFFER;
 		smbsr_set_error(sr, &err);
 		smb_sd_term(&sd);
-		return (SDRC_NORMAL_REPLY);
+		return (SDRC_SUCCESS);
 	}
 
 	smb_encode_sd(xa, &sd, secinfo);
 	(void) smb_encode_mbc(&xa->rep_param_mb, "l", sdlen);
 	smb_sd_term(&sd);
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -169,24 +168,24 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_decode_mbc(&xa->req_param_mb, "w2.l",
 	    &sr->smb_fid, &secinfo) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if ((sr->fid_ofile->f_node == NULL) ||
 	    (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sr->fid_ofile->f_node->flags & NODE_READ_ONLY) {
 		smbsr_error(sr, NT_STATUS_MEDIA_WRITE_PROTECTED, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (sr->tid_tree->t_acltype != ACE_T) {
@@ -204,23 +203,23 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 	status = smb_decode_sd(xa, &sd);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	if (((secinfo & SMB_OWNER_SECINFO) && (sd.sd_owner == NULL)) ||
 	    ((secinfo & SMB_GROUP_SECINFO) && (sd.sd_group == NULL))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
 	status = smb_sd_write(sr, &sd, secinfo);
 	smb_sd_term(&sd);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, 0, 0);
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 	}
 
-	return (SDRC_NORMAL_REPLY);
+	return (SDRC_SUCCESS);
 }
 
 /*

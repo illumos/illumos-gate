@@ -202,7 +202,7 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 
 	if (STYPE_ISIPC(stype)) {
 		if ((user->u_flags & SMB_USER_FLAG_IPC) &&
-		    smb_info.si.skc_restrict_anon) {
+		    sr->sr_cfg->skc_restrict_anon) {
 			(void) strlcpy(errmsg, "anonymous access restricted",
 			    SMB_TREE_EMSZ);
 			return (ERRaccess);
@@ -238,7 +238,8 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	 * Only a user with admin rights is allowed to map these
 	 * shares.
 	 */
-	if ((is_admin = lmshrd_is_admin(sharename)) == NERR_InternalError) {
+	is_admin = lmshrd_is_admin(sr->sr_server->sv_lmshrd, sharename);
+	if (is_admin == NERR_InternalError) {
 		(void) strlcpy(errmsg, "internal error", SMB_TREE_EMSZ);
 		return (ERRaccess);
 	}
@@ -256,7 +257,8 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 		}
 	}
 
-	if (lmshrd_getinfo(sharename, &si) != NERR_Success) {
+	if (lmshrd_getinfo(sr->sr_server->sv_lmshrd, sharename, &si) !=
+	    NERR_Success) {
 		(void) strlcpy(errmsg, "share not found", SMB_TREE_EMSZ);
 		return (ERRinvnetname);
 	}

@@ -76,7 +76,7 @@
  * is ignored.
  */
 smb_sdrc_t
-smb_com_tree_connect(struct smb_request *sr)
+smb_pre_tree_connect(smb_request_t *sr)
 {
 	int rc;
 
@@ -85,13 +85,28 @@ smb_com_tree_connect(struct smb_request *sr)
 	 */
 	rc = smbsr_decode_data(sr, "%AAA", sr, &sr->arg.tcon.path,
 	    &sr->arg.tcon.password, &sr->arg.tcon.service);
-	if (rc != 0)
-		return (SDRC_ERROR_REPLY);
 
 	sr->arg.tcon.flags = 0;
 
+	DTRACE_SMB_2(op__TreeConnect__start, smb_request_t *, sr,
+	    struct tcon *, &sr->arg.tcon);
+
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+void
+smb_post_tree_connect(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__TreeConnect__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_tree_connect(smb_request_t *sr)
+{
+	int rc;
+
 	if (smbsr_connect_tree(sr) != 0)
-		return (SDRC_ERROR_REPLY);
+		return (SDRC_ERROR);
 
 	rc = smbsr_encode_result(sr, 2, 0, "bwww",
 	    2,				/* wct */
@@ -99,5 +114,5 @@ smb_com_tree_connect(struct smb_request *sr)
 	    sr->smb_tid,		/* TID */
 	    0);				/* bcc */
 
-	return ((rc == 0) ? SDRC_NORMAL_REPLY : SDRC_ERROR_REPLY);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

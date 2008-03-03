@@ -48,6 +48,7 @@
 static smb_ntdomain_t smbpdc_cache;
 static mutex_t smbpdc_mtx;
 static cond_t smbpdc_cv;
+static mutex_t seqnum_mtx;
 
 extern int getdomainname(char *, int);
 
@@ -134,8 +135,6 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 
 	bzero(kcfg, sizeof (smb_kmod_cfg_t));
 
-	(void) smb_config_getnum(SMB_CI_MAX_BUFSIZE, &citem);
-	kcfg->skc_maxbufsize = (uint32_t)citem;
 	(void) smb_config_getnum(SMB_CI_MAX_WORKERS, &citem);
 	kcfg->skc_maxworkers = (uint32_t)citem;
 	(void) smb_config_getnum(SMB_CI_KEEPALIVE, &citem);
@@ -144,8 +143,6 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	    (kcfg->skc_keepalive < SMB_PI_KEEP_ALIVE_MIN))
 		kcfg->skc_keepalive = SMB_PI_KEEP_ALIVE_MIN;
 
-	(void) smb_config_getnum(SMB_CI_OPLOCK_TIMEOUT, &citem);
-	kcfg->skc_oplock_timeout = (uint32_t)citem;
 	(void) smb_config_getnum(SMB_CI_MAX_CONNECTIONS, &citem);
 	kcfg->skc_maxconnections = (uint32_t)citem;
 	kcfg->skc_restrict_anon = smb_config_getbool(SMB_CI_RESTRICT_ANON);
@@ -153,11 +150,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_signing_required = smb_config_getbool(SMB_CI_SIGNING_REQD);
 	kcfg->skc_signing_check = smb_config_getbool(SMB_CI_SIGNING_CHECK);
 	kcfg->skc_oplock_enable = smb_config_getbool(SMB_CI_OPLOCK_ENABLE);
-	kcfg->skc_flush_required = smb_config_getbool(SMB_CI_FLUSH_REQUIRED);
 	kcfg->skc_sync_enable = smb_config_getbool(SMB_CI_SYNC_ENABLE);
-	kcfg->skc_dirsymlink_enable =
-	    !smb_config_getbool(SMB_CI_DIRSYMLINK_DISABLE);
-	kcfg->skc_announce_quota = smb_config_getbool(SMB_CI_ANNONCE_QUOTA);
 	kcfg->skc_secmode = smb_config_get_secmode();
 	(void) smb_getdomainname(kcfg->skc_resource_domain,
 	    sizeof (kcfg->skc_resource_domain));
@@ -310,6 +303,37 @@ smb_getdomainname(char *buf, size_t buflen)
 }
 
 /*
+ * smb_getdomainsid
+ *
+ * Returns the domain SID if the system is in domain mode.
+ * Otherwise returns NULL.
+ *
+ * Note: Callers are responsible for freeing a returned SID.
+ */
+nt_sid_t *
+smb_getdomainsid(void)
+{
+	char buf[MAXHOSTNAMELEN];
+	nt_sid_t *sid;
+	int security_mode;
+	int rc;
+
+	security_mode = smb_config_get_secmode();
+	if (security_mode != SMB_SECMODE_DOMAIN)
+		return (NULL);
+
+	*buf = '\0';
+	rc = smb_config_getstr(SMB_CI_DOMAIN_SID, buf, MAXHOSTNAMELEN);
+	if ((rc != SMBD_SMF_OK) || (*buf == '\0'))
+		return (NULL);
+
+	if ((sid = nt_sid_strtosid(buf)) == NULL)
+		return (NULL);
+
+	return (sid);
+}
+
+/*
  * smb_resolve_fqdn
  *
  * Converts the NETBIOS name of the domain (i.e. nbt_domain) to a fully
@@ -414,6 +438,139 @@ smb_getfqdomainname(char *buf, size_t buflen)
 	return (rc);
 }
 
+
+/*
+ * smb_set_machine_passwd
+ *
+ * This function should be used when setting the machine password property.
+ * The associated sequence number is incremented.
+ */
+static int
+smb_set_machine_passwd(char *passwd)
+{
+	int64_t num;
+	int rc = -1;
+
+	if (smb_config_set(SMB_CI_MACHINE_PASSWD, passwd) != SMBD_SMF_OK)
+		return (-1);
+
+	(void) mutex_lock(&seqnum_mtx);
+	(void) smb_config_getnum(SMB_CI_KPASSWD_SEQNUM, &num);
+	if (smb_config_setnum(SMB_CI_KPASSWD_SEQNUM, ++num)
+	    == SMBD_SMF_OK)
+		rc = 0;
+	(void) mutex_unlock(&seqnum_mtx);
+	return (rc);
+}
+
+/*
+ * smb_match_netlogon_seqnum
+ *
+ * A sequence number is associated with each machine password property
+ * update and the netlogon credential chain setup. If the
+ * sequence numbers don't match, a NETLOGON credential chain
+ * establishment is required.
+ *
+ * Returns 0 if kpasswd_seqnum equals to netlogon_seqnum. Otherwise,
+ * returns -1.
+ */
+boolean_t
+smb_match_netlogon_seqnum(void)
+{
+	int64_t setpasswd_seqnum;
+	int64_t netlogon_seqnum;
+
+	(void) mutex_lock(&seqnum_mtx);
+	(void) smb_config_getnum(SMB_CI_KPASSWD_SEQNUM, &setpasswd_seqnum);
+	(void) smb_config_getnum(SMB_CI_NETLOGON_SEQNUM, &netlogon_seqnum);
+	(void) mutex_unlock(&seqnum_mtx);
+	return (setpasswd_seqnum == netlogon_seqnum);
+}
+
+/*
+ * smb_getjoineddomain
+ *
+ * Returns the NETBIOS name of the domain to which the system is joined
+ * via smbadm CLI. If the system is in workgroup mode or any error has
+ * been encountered, an empty string will be returned via buf.
+ *
+ * Returns:
+ *   -1 upon errors.
+ *    0 if in workgroup mode.
+ *    1 if in domain mode.
+ */
+int
+smb_getjoineddomain(char *buf, size_t buflen)
+{
+	if (buf == NULL || buflen == 0)
+		return (-1);
+
+	*buf = '\0';
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+		return (0);
+
+	return (smb_getdomainname(buf, buflen) ? -1 : 1);
+}
+
+/*
+ * smb_setdomainprops
+ *
+ * This function should be called after joining an AD to
+ * set all the domain related SMF properties.
+ *
+ * The kpasswd_domain property is the AD domain to which the system
+ * is joined via kclient. If this function is invoked by the SMB
+ * daemon, fqdn should be set to NULL.
+ */
+int
+smb_setdomainprops(char *fqdn, char *server, char *passwd)
+{
+	if (server == NULL || passwd == NULL)
+		return (-1);
+
+	if ((*server == '\0') || (*passwd == '\0'))
+		return (-1);
+
+	if (fqdn && (smb_config_set(SMB_CI_KPASSWD_DOMAIN, fqdn) != 0))
+		return (-1);
+
+	if (smb_config_set(SMB_CI_KPASSWD_SRV, server) != 0)
+		return (-1);
+
+	if (smb_set_machine_passwd(passwd) != 0) {
+		syslog(LOG_ERR, "smb_setdomainprops: failed to set"
+		    " machine account password");
+		return (-1);
+	}
+
+	/*
+	 * If we successfully create a trust account, we mark
+	 * ourselves as a domain member in the environment so
+	 * that we use the SAMLOGON version of the NETLOGON
+	 * PDC location protocol.
+	 */
+	(void) smb_config_setbool(SMB_CI_DOMAIN_MEMB, B_TRUE);
+
+	return (0);
+}
+
+/*
+ * smb_update_netlogon_seqnum
+ *
+ * This function should only be called upon a successful netlogon
+ * credential chain establishment to set the sequence number of the
+ * netlogon to match with that of the kpasswd.
+ */
+void
+smb_update_netlogon_seqnum(void)
+{
+	int64_t num;
+
+	(void) mutex_lock(&seqnum_mtx);
+	(void) smb_config_getnum(SMB_CI_KPASSWD_SEQNUM, &num);
+	(void) smb_config_setnum(SMB_CI_NETLOGON_SEQNUM, num);
+	(void) mutex_unlock(&seqnum_mtx);
+}
 
 
 /*

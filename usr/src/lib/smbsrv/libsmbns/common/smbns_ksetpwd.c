@@ -34,9 +34,15 @@
 #include <ctype.h>
 #include <errno.h>
 #include <syslog.h>
+#include <netdb.h>
+#include <sys/param.h>
 #include <kerberosv5/krb5.h>
 #include <kerberosv5/com_err.h>
+
+#include <smbsrv/libsmb.h>
 #include <smbns_krb.h>
+
+static char *spn_prefix[] = {"host/", "nfs/", "HTTP/", "root/"};
 
 static int smb_krb5_open_wrfile(krb5_context ctx, char *fname,
     krb5_keytab *kt);
@@ -46,6 +52,106 @@ static int smb_krb5_ktadd(krb5_context ctx, krb5_keytab kt,
 static krb5_error_code smb_krb5_ktremove(krb5_context ctx, krb5_keytab kt,
     const krb5_principal princ);
 
+/*
+ * smb_krb5_get_spn
+ *
+ * Gets Service Principal Name.
+ * Caller must free the memory allocated for the spn.
+ */
+char *
+smb_krb5_get_spn(smb_krb5_spn_idx_t idx, char *fqhost)
+{
+	int len;
+	char *princ;
+	char *spn;
+
+	if (!fqhost)
+		return (NULL);
+
+	if ((idx < 0) || (idx >= SMBKRB5_SPN_IDX_MAX))
+		return (NULL);
+
+	spn = spn_prefix[idx];
+	len = strlen(spn) + strlen(fqhost) + 1;
+	princ = (char *)malloc(len);
+
+	if (!princ)
+		return (NULL);
+
+	(void) snprintf(princ, len, "%s%s", spn, fqhost);
+	return (princ);
+}
+
+/*
+ * smb_krb5_get_upn
+ *
+ * Gets User Principal Name.
+ * Caller must free the memory allocated for the upn.
+ */
+char *
+smb_krb5_get_upn(char *spn, char *domain)
+{
+	int len;
+	char *realm;
+	char *upn;
+
+	if (!spn || !domain)
+		return (NULL);
+
+	realm = strdup(domain);
+	if (!realm)
+		return (NULL);
+
+	(void) utf8_strupr(realm);
+
+	len = strlen(spn) + 1 + strlen(realm) + 1;
+	upn = (char *)malloc(len);
+	if (!upn) {
+		free(realm);
+		return (NULL);
+	}
+
+	(void) snprintf(upn, len, "%s@%s", spn, realm);
+	free(realm);
+
+	return (upn);
+}
+
+/*
+ * smb_krb5_get_host_upn
+ *
+ * Derives UPN by the given fully-qualified hostname.
+ * Caller must free the memory allocated for the upn.
+ */
+static char *
+smb_krb5_get_host_upn(const char *fqhn)
+{
+	char *upn;
+	char *realm;
+	char *dom;
+	int len;
+
+	if ((dom = strchr(fqhn, '.')) == NULL)
+		return (NULL);
+
+	if ((realm = strdup(++dom)) == NULL)
+		return (NULL);
+
+	(void) utf8_strupr(realm);
+
+	len = strlen(spn_prefix[SMBKRB5_SPN_IDX_HOST]) + strlen(fqhn) +
+	    + 1 + strlen(realm) + 1;
+	if ((upn = malloc(len)) == NULL) {
+		free(realm);
+		return (NULL);
+	}
+
+	(void) snprintf(upn, len, "%s%s@%s", spn_prefix[SMBKRB5_SPN_IDX_HOST],
+	    fqhn, realm);
+
+	free(realm);
+	return (upn);
+}
 
 /*
  * smb_krb5_ctx_init
@@ -63,18 +169,52 @@ smb_krb5_ctx_init(krb5_context *ctx)
 }
 
 /*
- * smb_krb5_get_principal
+ * smb_krb5_get_principals
  *
- * Setup the krb5_principal given the host principal in string format.
+ * Setup the krb5_principal array given the principals in string format.
  * Return 0 on success. Otherwise, return -1.
  */
 int
-smb_krb5_get_principal(krb5_context ctx, char *princ_str, krb5_principal *princ)
+smb_krb5_get_principals(char *domain, krb5_context ctx,
+    krb5_principal *krb5princs)
 {
-	if (krb5_parse_name(ctx, princ_str, princ) != 0)
-		return (-1);
+	char fqhn[MAXHOSTNAMELEN];
+	int i;
+	char *spn, *upn;
 
+	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
+			return (-1);
+
+	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn,
+	    domain);
+
+	for (i = 0; i < SMBKRB5_SPN_IDX_MAX; i++) {
+
+		if ((spn = smb_krb5_get_spn(i, fqhn)) == NULL) {
+			return (-1);
+		}
+
+		upn = smb_krb5_get_upn(spn, domain);
+		free(spn);
+
+		if (krb5_parse_name(ctx, upn, &krb5princs[i]) != 0) {
+			smb_krb5_free_principals(ctx, krb5princs, i - 1);
+			free(upn);
+			return (-1);
+		}
+		free(upn);
+	}
 	return (0);
+}
+
+void
+smb_krb5_free_principals(krb5_context ctx, krb5_principal *krb5princs,
+    size_t num)
+{
+	int i;
+
+	for (i = 0; i < num; i++)
+		krb5_free_principal(ctx, krb5princs[i]);
 }
 
 /*
@@ -166,20 +306,23 @@ smb_krb5_open_wrfile(krb5_context ctx, char *fname, krb5_keytab *kt)
  * Remove the keys from the keytab for the specified principal.
  */
 int
-smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal princ,
+smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal *princs,
     char *fname)
 {
 	krb5_keytab kt = NULL;
-	int rc = 0;
+	int rc = 0, i;
 	krb5_error_code code;
 
 	if (smb_krb5_open_wrfile(ctx, fname, &kt) != 0)
 		return (-1);
 
-	if ((code = smb_krb5_ktremove(ctx, kt, princ)) != 0) {
-		syslog(LOG_ERR, "smb_krb5_remove_keytab_entries: %s",
-		    error_message(code));
-		rc = -1;
+	for (i = 0; i < SMBKRB5_SPN_IDX_MAX; i++) {
+		if ((code = smb_krb5_ktremove(ctx, kt, princs[i])) != 0) {
+			syslog(LOG_ERR, "smb_krb5_remove_keytab_entries: %s",
+			    error_message(code));
+			rc = -1;
+			break;
+		}
 	}
 
 	krb5_kt_close(ctx, kt);
@@ -193,35 +336,80 @@ smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal princ,
  * Returns 0 on success.  Otherwise, returns -1.
  */
 int
-smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal princ,
+smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal *princs,
     char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
     int enctype_count)
 {
 	krb5_keytab kt = NULL;
-	int rc = 0, i;
+	int i, j;
 	krb5_error_code code;
 
 	if (smb_krb5_open_wrfile(ctx, fname, &kt) != 0)
 		return (-1);
 
-	if ((code = smb_krb5_ktremove(ctx, kt, princ)) != 0) {
-		syslog(LOG_ERR, "smb_krb5_update_keytab_entries: %s",
-		    error_message(code));
-		krb5_kt_close(ctx, kt);
-		return (-1);
-	}
+	for (j = 0; j < SMBKRB5_SPN_IDX_MAX; j++) {
+		if ((code = smb_krb5_ktremove(ctx, kt, princs[j])) != 0) {
+			syslog(LOG_ERR, "smb_krb5_update_keytab_entries: %s",
+			    error_message(code));
+			krb5_kt_close(ctx, kt);
+			return (-1);
+		}
 
-	for (i = 0; i < enctype_count; i++) {
-		if (smb_krb5_ktadd(ctx, kt, princ, enctypes[i], kvno, passwd)
-		    != 0) {
-			rc = -1;
-			break;
+		for (i = 0; i < enctype_count; i++) {
+			if (smb_krb5_ktadd(ctx, kt, princs[j], enctypes[i],
+			    kvno, passwd) != 0) {
+				krb5_kt_close(ctx, kt);
+				return (-1);
+			}
 		}
 
 	}
-
 	krb5_kt_close(ctx, kt);
-	return (rc);
+	return (0);
+}
+
+boolean_t
+smb_krb5_find_keytab_entries(const char *fqhn, char *fname)
+{
+	krb5_context ctx;
+	krb5_keytab kt;
+	krb5_keytab_entry entry;
+	krb5_principal princ;
+	char ktname[MAXPATHLEN];
+	char *upn;
+	boolean_t found = B_FALSE;
+
+	if (!fqhn || !fname)
+		return (found);
+
+	if ((upn = smb_krb5_get_host_upn((char *)fqhn)) == NULL)
+		return (found);
+
+	if (smb_krb5_ctx_init(&ctx) != 0) {
+		free(upn);
+		return (found);
+	}
+
+	if (krb5_parse_name(ctx, upn, &princ) != 0) {
+		free(upn);
+		smb_krb5_ctx_fini(ctx);
+		return (found);
+	}
+
+	free(upn);
+	(void) snprintf(ktname, MAXPATHLEN, "FILE:%s", fname);
+	if (krb5_kt_resolve(ctx, ktname, &kt) == 0) {
+		if (krb5_kt_get_entry(ctx, kt, princ, 0, 0, &entry) == 0) {
+			found = B_TRUE;
+			krb5_kt_free_entry(ctx, &entry);
+		}
+
+		krb5_kt_close(ctx, kt);
+	}
+
+	krb5_free_principal(ctx, princ);
+	smb_krb5_ctx_fini(ctx);
+	return (found);
 }
 
 /*

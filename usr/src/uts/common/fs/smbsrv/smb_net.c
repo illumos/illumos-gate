@@ -43,7 +43,6 @@
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/mlsvc.h>
-#include <smbsrv/smbvar.h>
 #include <smbsrv/smb_kproto.h>
 
 /*

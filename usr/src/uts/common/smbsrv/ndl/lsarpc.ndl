@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,36 +37,109 @@
 #include "ndrtypes.ndl"
 
 
-#define LSARPC_OPNUM_CloseHandle		0x00
-#define LSARPC_OPNUM_EnumPrivileges		0x02
-#define LSARPC_OPNUM_QuerySecurityObject	0x03
-#define LSARPC_OPNUM_SetSecurityObject		0x04
-#define LSARPC_OPNUM_ChangePassword		0x05
-#define LSARPC_OPNUM_OpenPolicy			0x06
-#define LSARPC_OPNUM_QueryInfoPolicy		0x07
-#define LSARPC_OPNUM_SetInfoPolicy		0x08
-#define LSARPC_OPNUM_Unknown09			0x09	/* Crashed the DC */
-#define LSARPC_OPNUM_CreateAccount		0x0a
-#define LSARPC_OPNUM_EnumerateAccounts		0x0b
-#define LSARPC_OPNUM_CreateTrustedDomain	0x0c
-#define LSARPC_OPNUM_EnumTrustedDomain		0x0d
-#define LSARPC_OPNUM_LookupNames		0x0e
-#define LSARPC_OPNUM_LookupSids			0x0f
-#define LSARPC_OPNUM_CreateSecret		0x10
-#define LSARPC_OPNUM_OpenAccount		0x11
-#define LSARPC_OPNUM_EnumPrivsAccount		0x12
-#define LSARPC_OPNUM_GetSystemAccessAccount	0x17
-#define LSARPC_OPNUM_OpenSecret			0x1c
-#define LSARPC_OPNUM_LookupPrivValue		0x1f
-#define LSARPC_OPNUM_LookupPrivName		0x20
-#define LSARPC_OPNUM_LookupPrivDisplayName	0x21
-#define LSARPC_OPNUM_AddAccountRights		0x25
-#define LSARPC_OPNUM_OpenPolicy2		0x2c
-#define LSARPC_OPNUM_GetConnectedUser		0x2d
-#define LSARPC_OPNUM_Discovery			0x2e
-#define LSARPC_OPNUM_LookupSids2		0x39
-#define LSARPC_OPNUM_LookupNames2		0x3a
+#define	LSARPC_OPNUM_CloseHandle			0x00
+#define	LSARPC_OPNUM_Delete				0x01
+#define	LSARPC_OPNUM_EnumPrivileges			0x02
+#define	LSARPC_OPNUM_QuerySecurityObject		0x03
+#define	LSARPC_OPNUM_SetSecurityObject			0x04
+#define	LSARPC_OPNUM_ChangePassword			0x05
+#define	LSARPC_OPNUM_OpenPolicy				0x06
+#define	LSARPC_OPNUM_QueryInfoPolicy			0x07
+#define	LSARPC_OPNUM_SetInfoPolicy			0x08
+#define	LSARPC_OPNUM_ClearAuditLog			0x09
+#define	LSARPC_OPNUM_CreateAccount			0x0a
+#define	LSARPC_OPNUM_EnumerateAccounts			0x0b
+#define	LSARPC_OPNUM_CreateTrustedDomain		0x0c
+#define	LSARPC_OPNUM_EnumTrustedDomain			0x0d
+#define	LSARPC_OPNUM_LookupNames			0x0e
+#define	LSARPC_OPNUM_LookupSids				0x0f
+#define	LSARPC_OPNUM_CreateSecret			0x10
+#define	LSARPC_OPNUM_OpenAccount			0x11
+#define	LSARPC_OPNUM_EnumPrivsAccount			0x12
+#define	LSARPC_OPNUM_AddAccountPrivs			0x13
+#define	LSARPC_OPNUM_RemoveAccountPrivs			0x14
+#define	LSARPC_OPNUM_GetAccountQuota			0x15
+#define	LSARPC_OPNUM_SetAccountQuota			0x16
+#define	LSARPC_OPNUM_GetSystemAccessAccount		0x17
+#define	LSARPC_OPNUM_SetSystemAccessAccount		0x18
+#define	LSARPC_OPNUM_OpenTrustedDomain			0x19
+#define	LSARPC_OPNUM_QueryInfoTrustedDomain		0x1a
+#define	LSARPC_OPNUM_SetinfoTrustedDomain		0x1b
+#define	LSARPC_OPNUM_OpenSecret				0x1c
+#define	LSARPC_OPNUM_SetSecret				0x1d
+#define	LSARPC_OPNUM_QuerySecret			0x1e
+#define	LSARPC_OPNUM_LookupPrivValue			0x1f
+#define	LSARPC_OPNUM_LookupPrivName			0x20
+#define	LSARPC_OPNUM_LookupPrivDisplayName		0x21
+#define	LSARPC_OPNUM_DeleteObject			0x22
+#define	LSARPC_OPNUM_EnumAccountsWithUserRight		0x23
+#define	LSARPC_OPNUM_EnumAccountRights			0x24
+#define	LSARPC_OPNUM_AddAccountRights			0x25
+#define	LSARPC_OPNUM_RemoveAccountRights		0x26
+#define	LSARPC_OPNUM_QueryTrustedDomainInfo		0x27
+#define	LSARPC_OPNUM_SetTrustedDomainInfo		0x28
 
+/* Windows 2000 */
+#define	LSARPC_OPNUM_DeleteTrustedDomain		0x29
+#define	LSARPC_OPNUM_StorePrivateData			0x2a
+#define	LSARPC_OPNUM_RetrievePrivateData		0x2b
+#define	LSARPC_OPNUM_OpenPolicy2			0x2c
+#define	LSARPC_OPNUM_GetConnectedUser			0x2d
+#define	LSARPC_OPNUM_QueryInfoPolicy2			0x2e
+#define	LSARPC_OPNUM_SetInfoPolicy2			0x2f
+#define	LSARPC_OPNUM_QueryTrustedDomainInfoByName	0x30
+#define	LSARPC_OPNUM_SetTrustedDomainInfoByName		0x31
+#define	LSARPC_OPNUM_EnumTrustedDomainsEx		0x32
+#define	LSARPC_OPNUM_CreateTrustedDomainEx		0x33
+#define	LSARPC_OPNUM_CloseTrustedDomainEx		0x34
+#define	LSARPC_OPNUM_QueryDomainInfoPolicy		0x35
+#define	LSARPC_OPNUM_SetDomainInfoPolicy		0x36
+#define	LSARPC_OPNUM_OpenTrustedDomainByName		0x37
+#define	LSARPC_OPNUM_TestCall				0x38
+#define	LSARPC_OPNUM_LookupSids2			0x39
+#define	LSARPC_OPNUM_LookupNames2			0x3a
+#define	LSARPC_OPNUM_CreateTrustedDomainEx2		0x3b
+
+/* Windows 2000 SP3 */
+#define	LSARPC_OPNUM_CredWrite				0x3c
+#define	LSARPC_OPNUM_CredRead				0x3d
+#define	LSARPC_OPNUM_CredEnumerate			0x3e
+#define	LSARPC_OPNUM_CredWriteDomainCreds		0x3f
+#define	LSARPC_OPNUM_CredReadDomainCreds		0x40
+#define	LSARPC_OPNUM_CredDelete				0x41
+#define	LSARPC_OPNUM_CredGetTargetInfo			0x42
+#define	LSARPC_OPNUM_CredProfileLoaded			0x43
+#define	LSARPC_OPNUM_LookupNames3			0x44
+#define	LSARPC_OPNUM_CredGetSessionTypes		0x45
+#define	LSARPC_OPNUM_RegisterAuditEvent			0x46
+#define	LSARPC_OPNUM_GenAuditEvent			0x47
+#define	LSARPC_OPNUM_UnregisterAuditEvent		0x48
+#define	LSARPC_OPNUM_QueryForestTrustInfo		0x49
+#define	LSARPC_OPNUM_SetForestTrustInfo			0x4a
+#define	LSARPC_OPNUM_CredRename				0x4b
+#define	LSARPC_OPNUM_LookupSids3			0x4c
+#define	LSARPC_OPNUM_LookupNames4			0x4d
+#define	LSARPC_OPNUM_OpenPolicySce			0x4e
+
+/* Windows Server 2003 */
+#define	LSARPC_OPNUM_AdtRegisterSecurityEventSource	0x4f
+#define	LSARPC_OPNUM_AdtUnregisterSecurityEventSource	0x50
+#define	LSARPC_OPNUM_AdtReportSecurityEvent		0x51
+
+/* Windows Vista */
+#define	LSARPC_OPNUM_CredFindBestCredential		0x52
+#define	LSARPC_OPNUM_SetAuditPolicy			0x53
+#define	LSARPC_OPNUM_QueryAuditPolicy			0x54
+#define	LSARPC_OPNUM_EnumerateAuditPolicy		0x55
+#define	LSARPC_OPNUM_EnumerateAuditCategories		0x56
+#define	LSARPC_OPNUM_EnumerateAuditSubCategories	0x57
+#define	LSARPC_OPNUM_LookupAuditCategoryName		0x58
+#define	LSARPC_OPNUM_LookupAuditSubCategoryName		0x59
+#define	LSARPC_OPNUM_SetAuditSecurity			0x5a
+#define	LSARPC_OPNUM_QueryAuditSecurity			0x5b
+#define	LSARPC_OPNUM_CredReadByTokenHandle		0x5c
+#define	LSARPC_OPNUM_CredRestoreCredentials		0x5d
+#define	LSARPC_OPNUM_CredBackupCredentials		0x5e
 
 /*
  * There are at least two lookup level settings. Level 1 appears to mean
@@ -390,6 +463,14 @@ struct mslsa_LookupSids {
  	OUT	DWORD status;
 };
 
+OPERATION(LSARPC_OPNUM_CreateSecret)
+struct mslsa_CreateSecret {
+	IN	mslsa_handle_t handle;
+	IN	mslsa_string_t name;
+	IN	DWORD access_mask;
+	OUT	mslsa_handle_t secret_handle;
+	OUT	DWORD status;
+};
 
 /*
  ***********************************************************************
@@ -454,47 +535,73 @@ struct mslsa_LookupNames {
  * below.
  ***********************************************************************
  */
-#define MSLSA_POLICY_UNKNOWN_1_INFO		1
-#define MSLSA_POLICY_UNKNOWN_2_INFO		2
+#define MSLSA_POLICY_AUDIT_LOG_INFO		1
+#define MSLSA_POLICY_AUDIT_EVENTS_INFO		2
 #define MSLSA_POLICY_PRIMARY_DOMAIN_INFO	3
 #define MSLSA_POLICY_UNKNOWN_4_INFO		4
 #define MSLSA_POLICY_ACCOUNT_DOMAIN_INFO	5
 #define MSLSA_POLICY_SERVER_ROLE_INFO		6
 #define MSLSA_POLICY_REPLICA_SOURCE_INFO	7
 #define MSLSA_POLICY_DEFAULT_QUOTA_INFO		8
+#define MSLSA_POLICY_DB_INFO			9
+#define MSLSA_POLICY_AUDIT_SET_INFO		10
+#define MSLSA_POLICY_AUDIT_QUERY_INFO		11
+#define MSLSA_POLICY_DNS_INFO			12
 
+#define	LSA_ROLE_STANDALONE_WORKSTATION		0
+#define	LSA_ROLE_MEMBER_WORKSTATION		1
+#define	LSA_ROLE_STANDALONE_SERVER		2
+#define	LSA_ROLE_MEMBER_SERVER			3
+#define	LSA_ROLE_BACKUP_DC			4
+#define	LSA_ROLE_PRIMARY_DC			5
 
+/*
+ * MSLSA_POLICY_AUDIT_EVENTS_INFO
+ */
+struct mslsa_AuditEventsInfo {
+	DWORD enabled;
+    SIZE_IS (count)
+	DWORD *settings;
+	DWORD count;
+};
+
+/*
+ * MSLSA_POLICY_PRIMARY_DOMAIN_INFO
+ */
 struct mslsa_PrimaryDomainInfo {
 	struct mslsa_string_desc name;
 	struct mslsa_sid *sid;
 };
 
-
+/*
+ * MSLSA_POLICY_ACCOUNT_DOMAIN_INFO
+ */
 struct mslsa_AccountDomainInfo {
 	struct mslsa_string_desc name;
 	struct mslsa_sid *sid;
 };
 
 /*
+ * MSLSA_POLICY_SERVER_ROLE_INFO
+ */
 struct mslsa_ServerRoleInfo {
-	WORD unknown_0x0003;
-	WORD unknown_0x000e;
+	DWORD role;
+	DWORD pad;
 };
-*/
 
 union mslsa_PolicyInfoResUnion {
-	CASE(3)	struct mslsa_PrimaryDomainInfo pd_info;
-	CASE(5)	struct mslsa_AccountDomainInfo ad_info;
+	CASE(2) struct mslsa_AuditEventsInfo audit_events;
+	CASE(3) struct mslsa_PrimaryDomainInfo pd_info;
+	CASE(5) struct mslsa_AccountDomainInfo ad_info;
+	CASE(6) struct mslsa_ServerRoleInfo server_role;
 	DEFAULT	char *nullptr;
 };
 
-
 struct mslsa_PolicyInfo {
 	WORD switch_value;
-	SWITCH(switch_value)
-		union mslsa_PolicyInfoResUnion ru;
+    SWITCH(switch_value)
+	union mslsa_PolicyInfoResUnion ru;
 };
-
 
 OPERATION(LSARPC_OPNUM_QueryInfoPolicy)
 struct mslsa_QueryInfoPolicy {
@@ -503,7 +610,6 @@ struct mslsa_QueryInfoPolicy {
 	OUT	struct mslsa_PolicyInfo *info;
 	OUT	DWORD status;
 };
-
 
 /*
  ***********************************************************************
@@ -552,6 +658,15 @@ OPERATION(LSARPC_OPNUM_EnumPrivsAccount)
 	struct mslsa_EnumPrivsAccount {
 	IN	mslsa_handle_t account_handle;
 	OUT	struct mslsa_PrivilegeSet *privileges;
+	OUT	DWORD status;
+};
+
+OPERATION(LSARPC_OPNUM_OpenSecret)
+struct mslsa_OpenSecret {
+	IN	mslsa_handle_t handle;
+	IN	mslsa_string_t name;
+	IN	DWORD access_mask;
+	OUT	mslsa_handle_t secret_handle;
 	OUT	DWORD status;
 };
 
@@ -728,29 +843,6 @@ struct lsar_LookupNames2 {
 	OUT		DWORD status;
 };
 
-
-/*
- ***********************************************************************
- * This is a generic discovery entry. As long as the handle is valid
- * this is useful for scoping the network to discover new worlds. To
- * seek out new life, new civilizations. To boldly spilt infinitives
- * where no man has gone before. So basically we send and receive a
- * big buffer and let netmon tell us to which RPC the opnum refers.
- ***********************************************************************
- */
-
-#define LSA_DISCOVERY_SIZE		16
-
-
-OPERATION(LSARPC_OPNUM_Discovery)
-struct mslsa_Discovery {
-	IN	mslsa_handle_t handle;
-	IN	DWORD in_stuff[LSA_DISCOVERY_SIZE];
-	OUT	DWORD out_stuff[LSA_DISCOVERY_SIZE];
-	OUT	DWORD status;
-};
-
-
 /*
  ***********************************************************************
  * The LSARPC interface definition.
@@ -776,8 +868,10 @@ union lsarpc_interface {
 		struct mslsa_LookupPrivName		LookupPrivName;
 	CASE(LSARPC_OPNUM_LookupPrivDisplayName)
 		struct mslsa_LookupPrivDisplayName	LookupPrivDisplayName;
-	CASE(LSARPC_OPNUM_Discovery)
-		struct mslsa_Discovery			Discovery;
+	CASE(LSARPC_OPNUM_CreateSecret)
+		struct mslsa_CreateSecret		CreateSecret;
+	CASE(LSARPC_OPNUM_OpenSecret)
+		struct mslsa_OpenSecret			OpenSecret;
 	CASE(LSARPC_OPNUM_QueryInfoPolicy)
 		struct mslsa_QueryInfoPolicy		QueryInfoPolicy;
 	CASE(LSARPC_OPNUM_OpenPolicy)

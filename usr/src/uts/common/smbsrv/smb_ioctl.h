@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,11 +33,38 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <smbsrv/smbinfo.h>
 
-#define	SMB_IOC_BASE (('S' << 16) | ('B' << 8))
-#define	SMB_IOC_GMTOFF _IOW(SMB_IOC_BASE, 1, int)
-#define	SMB_IOC_CONFIG _IOW(SMB_IOC_BASE, 2, int)
-#define	SMB_IOC_WINPIPE _IOW(SMB_IOC_BASE, 3, int)
+#define	SMB_IOC_VERSION		1
+
+#define	SMB_IOC_BASE		(('S' << 16) | ('B' << 8))
+
+#define	SMB_IOC_CONFIG		_IOW(SMB_IOC_BASE, 1, int)
+#define	SMB_IOC_START		_IOW(SMB_IOC_BASE, 2, int)
+#define	SMB_IOC_NBT_LISTEN	_IOW(SMB_IOC_BASE, 3, int)
+#define	SMB_IOC_TCP_LISTEN	_IOW(SMB_IOC_BASE, 4, int)
+#define	SMB_IOC_NBT_RECEIVE	_IOW(SMB_IOC_BASE, 5, int)
+#define	SMB_IOC_TCP_RECEIVE	_IOW(SMB_IOC_BASE, 6, int)
+#define	SMB_IOC_GMTOFF		_IOW(SMB_IOC_BASE, 7, int)
+
+#pragma	pack(1)
+
+typedef struct {
+	uint32_t	sio_version;
+	union {
+		uint32_t	gmtoff;
+		int		error;
+		smb_kmod_cfg_t	cfg;
+
+		struct smb_io_start {
+			int	winpipe;
+			int	lmshrd;
+			int	udoor;
+		} start;
+	} sio_data;
+} smb_io_t;
+
+#pragma	pack()
 
 #ifdef __cplusplus
 }

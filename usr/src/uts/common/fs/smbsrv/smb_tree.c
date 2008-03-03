@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,19 +193,19 @@ smb_tree_connect(
 		return (NULL);
 	}
 
-	tree = kmem_cache_alloc(smb_info.si_cache_tree, KM_SLEEP);
+	tree = kmem_cache_alloc(user->u_server->si_cache_tree, KM_SLEEP);
 	bzero(tree, sizeof (smb_tree_t));
 
 	if (smb_idpool_constructor(&tree->t_fid_pool)) {
 		smb_idpool_free(&user->u_tid_pool, tid);
-		kmem_cache_free(smb_info.si_cache_tree, tree);
+		kmem_cache_free(user->u_server->si_cache_tree, tree);
 		return (NULL);
 	}
 
 	if (smb_idpool_constructor(&tree->t_sid_pool)) {
 		smb_idpool_destructor(&tree->t_fid_pool);
 		smb_idpool_free(&user->u_tid_pool, tid);
-		kmem_cache_free(smb_info.si_cache_tree, tree);
+		kmem_cache_free(user->u_server->si_cache_tree, tree);
 		return (NULL);
 	}
 
@@ -223,6 +223,7 @@ smb_tree_connect(
 
 	tree->t_user = user;
 	tree->t_session = user->u_session;
+	tree->t_server = user->u_server;
 	tree->t_refcnt = 1;
 	tree->t_tid = tid;
 	tree->t_access = access_flags;
@@ -271,7 +272,7 @@ smb_tree_connect(
 	smb_llist_insert_head(&user->u_tree_list, tree);
 	smb_llist_exit(&user->u_tree_list);
 	atomic_inc_32(&user->u_session->s_tree_cnt);
-	atomic_inc_32(&smb_info.open_trees);
+	atomic_inc_32(&user->u_server->sv_open_trees);
 
 	return (tree);
 }
@@ -297,7 +298,7 @@ smb_tree_disconnect(
 		 */
 		tree->t_state = SMB_TREE_STATE_DISCONNECTING;
 		mutex_exit(&tree->t_mutex);
-		atomic_dec_32(&smb_info.open_trees);
+		atomic_dec_32(&tree->t_server->sv_open_trees);
 		/*
 		 * The files opened under this tree are closed.
 		 */
@@ -633,7 +634,7 @@ smb_tree_delete(smb_tree_t *tree)
 	smb_llist_destructor(&tree->t_odir_list);
 	smb_idpool_destructor(&tree->t_fid_pool);
 	smb_idpool_destructor(&tree->t_sid_pool);
-	kmem_cache_free(smb_info.si_cache_tree, tree);
+	kmem_cache_free(tree->t_server->si_cache_tree, tree);
 }
 
 /*

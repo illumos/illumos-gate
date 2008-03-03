@@ -65,8 +65,6 @@ mlsvc_init(void)
 	winreg_initialize();
 	logr_initialize();
 
-	(void) lsa_query_primary_domain_info();
-
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 	rc = pthread_create(&mlsvc_keepalive_thr, &tattr,
