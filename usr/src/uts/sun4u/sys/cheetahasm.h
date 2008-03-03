@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -417,6 +416,11 @@ extern "C" {
 	sll	scr1, scr2, scr2;	/* ... we need to park... */	\
 1:									\
 	set	ASI_CORE_RUNNING_RW, scr1;				\
+	ldxa    [scr1]ASI_CMP_SHARED, scr1;	/* ...but are we? */	\
+	btst    scr1, scr2;        /* check our own parked status */	\
+	bz      %xcc, 1b;        /* if we are then go round again */	\
+	nop;								\
+	set	ASI_CORE_RUNNING_RW, scr1;	/* else proceed... */	\
 	stxa	scr2, [scr1]ASI_CMP_SHARED;	/* ... and park it. */	\
 	membar	#Sync;							\
 	set	ASI_CORE_RUNNING_STATUS, scr1;	/* spin until... */	\
