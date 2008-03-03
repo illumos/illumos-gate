@@ -94,6 +94,9 @@ extern  void (*mutex_delay)(void);
 extern  void mutex_delay_default(void);
 extern  void mutex_sync(void);
 
+extern	void default_lock_delay(uint_t);
+extern	uint_t default_lock_backoff(uint_t);
+
 #endif	/* _KERNEL */
 
 #endif	/* _ASM */

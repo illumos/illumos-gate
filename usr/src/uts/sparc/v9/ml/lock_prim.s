@@ -516,9 +516,18 @@ rw_exit(krwlock_t *lp)
 3:
 	casx	[%o0], %o4, %o5			! try to grab read lock
 	cmp	%o4, %o5			! did we get it?
+#ifdef sun4v
+	be,a,pt %xcc, 0f
+	membar  #LoadLoad
+	sethi	%hi(rw_enter_sleep), %o2	! load up jump
+	jmp	%o2 + %lo(rw_enter_sleep)	! jmp to rw_enter_sleep
+	nop					! delay: do nothing
+0:
+#else /* sun4v */
 	bne,pn	%xcc, 1b			! if not, try again
 	mov	%o5, %o4			! delay: %o4 = old lock value
 	membar	#LoadLoad
+#endif /* sun4v */
 .rw_read_enter_lockstat_patch_point:
 	retl
 	nop

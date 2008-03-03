@@ -41,6 +41,7 @@
 #include <sys/ldoms.h>
 #include <sys/cpu_module.h>
 #include <sys/mutex_impl.h>
+#include <sys/rwlock.h>
 #include <vm/vm_dep.h>
 #include <sys/sdt.h>
 
@@ -332,8 +333,10 @@ startup_platform(void)
 	if (l2_cache_node_count() > 1) {
 		/* VF for example */
 		mutex_backoff_base = 2;
-		mutex_cap_factor = 16;
+		mutex_cap_factor = 64;
 	}
+	rw_lock_backoff = default_lock_backoff;
+	rw_lock_delay = default_lock_delay;
 }
 
 /*

@@ -77,6 +77,7 @@ static void update_hvdump_buffer(void);
  */
 extern uint64_t xc_tick_limit;
 extern uint64_t xc_tick_jump_limit;
+extern uint64_t xc_sync_tick_limit;
 
 /*
  * We keep our own copies, used for cache flushing, because we can be called
@@ -717,8 +718,6 @@ cpu_init_tick_freq(void)
 }
 
 int shipit(int n, uint64_t cpu_list_ra);
-extern uint64_t xc_tick_limit;
-extern uint64_t xc_tick_jump_limit;
 
 #ifdef DEBUG
 #define	SEND_MONDO_STATS	1
@@ -1248,7 +1247,7 @@ xt_sync(cpuset_t cpuset)
 	    (uint64_t)cpu_sync.byte, traptrace_id);
 
 	starttick = lasttick = gettick();
-	endtick = starttick + xc_tick_limit;
+	endtick = starttick + xc_sync_tick_limit;
 
 	for (i = (smallestid / 8); i <= (largestid / 8); i++) {
 		while (cpu_sync.xword[i] != 0) {
@@ -1287,6 +1286,7 @@ out:
 	kpreempt_enable();
 }
 
+#define	QFACTOR		200
 /*
  * Recalculate the values of the cross-call timeout variables based
  * on the value of the 'inter-cpu-latency' property of the platform node.
@@ -1325,6 +1325,7 @@ recalc_xc_timeouts(void)
 	uint64_t latency;	/* nanoseconds */
 	uint64_t maxfreq;
 	uint64_t tick_limit_save = xc_tick_limit;
+	uint64_t sync_tick_limit_save = xc_sync_tick_limit;
 	uint_t   tick_scale;
 	uint64_t top;
 	uint64_t bottom;
@@ -1352,7 +1353,6 @@ recalc_xc_timeouts(void)
 		cmn_err(CE_WARN, "recalc_xc_timeouts: platform node missing");
 		goto done;
 	}
-
 	if (md_get_prop_val(mdp, platlist[0],
 	    "inter-cpu-latency", &latency) == -1)
 		goto done;
@@ -1383,7 +1383,6 @@ recalc_xc_timeouts(void)
 	top = ((uint64_t)tk.half.high << 4) * tick_scale;
 	bottom = (((uint64_t)tk.half.low << 4) * (uint64_t)tick_scale) >> 32;
 	tick_limit = top + bottom;
-
 
 	/*
 	 * xc_init() calculated 'maxfreq' by looking at all the cpus,
@@ -1429,19 +1428,26 @@ recalc_xc_timeouts(void)
 		xc_scale = scale;
 		xc_mondo_time_limit = mondo_time_limit;
 		xc_func_time_limit = func_time_limit;
-		/*
-		 * Force the new values to be used for future cross
-		 * calls.  This is necessary only when we increase
-		 * the timeouts.
-		 */
-		if (tick_limit > tick_limit_save) {
-			cpuset_t cpuset = cpu_ready_set;
-
-			xt_sync(cpuset);
-		}
 	}
 
 done:
+	/*
+	 * Increase the timeout limit for xt_sync() cross calls.
+	 */
+	xc_sync_tick_limit = xc_tick_limit * (cpu_q_entries / QFACTOR);
+	xc_sync_tick_limit = xc_sync_tick_limit < xc_tick_limit ?
+	    xc_tick_limit : xc_sync_tick_limit;
+
+	/*
+	 * Force the new values to be used for future cross calls.
+	 * This is necessary only when we increase the timeouts.
+	 */
+	if ((xc_tick_limit > tick_limit_save) || (xc_sync_tick_limit >
+	    sync_tick_limit_save)) {
+		cpuset_t cpuset = cpu_ready_set;
+		xt_sync(cpuset);
+	}
+
 	if (nrnode > 0)
 		md_free_scan_dag(mdp, &platlist);
 	(void) md_fini_handle(mdp);

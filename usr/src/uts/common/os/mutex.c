@@ -265,7 +265,7 @@ mutex_sync(void)
 }
 
 /* calculate the backoff interval */
-static uint_t
+uint_t
 default_lock_backoff(uint_t backoff)
 {
 	uint_t cap;		/* backoff cap calculated */
@@ -306,7 +306,7 @@ default_lock_backoff(uint_t backoff)
 /*
  * default delay function for mutexes.
  */
-static void
+void
 default_lock_delay(uint_t backoff)
 {
 	ulong_t rnd;		/* random factor */

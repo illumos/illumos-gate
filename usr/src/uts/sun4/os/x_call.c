@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@ static struct xc_mbox {
 uint64_t xc_tick_limit;		/* send_mondo() tick limit value */
 uint64_t xc_tick_limit_scale = 1;	/* scale used to increase the limit */
 uint64_t xc_tick_jump_limit;	/* send_mondo() irregular tick jump limit */
+uint64_t xc_sync_tick_limit;	/* timeout limit for xt_sync() calls */
 
 /* timeout value for xcalls to be received by the target CPU */
 uint64_t xc_mondo_time_limit;
@@ -147,6 +148,7 @@ xc_init(void)
 	    ((uint64_t)sys_tick_freq * XC_SEND_MONDO_MSEC) / 1000;
 	xc_tick_jump_limit = xc_tick_limit / 32;
 	xc_tick_limit *= xc_tick_limit_scale;
+	xc_sync_tick_limit = xc_tick_limit;
 
 	/*
 	 * Maximum number of loops to wait before timing out in xc_attention.

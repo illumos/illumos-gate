@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,6 +224,9 @@ rw_locked(rwlock_impl_t *lp, krw_t rw)
 	return (0);
 }
 
+uint_t (*rw_lock_backoff)(uint_t) = NULL;
+void (*rw_lock_delay)(uint_t) = NULL;
+
 /*
  * Full-service implementation of rw_enter() to handle all the hard cases.
  * Called from the assembly version if anything complicated is going on.
@@ -238,6 +240,8 @@ rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
 	uintptr_t old, new, lock_value, lock_busy, lock_wait;
 	hrtime_t sleep_time;
 	turnstile_t *ts;
+	uint_t  backoff = 0;
+	int loop_count = 0;
 
 	if (rw == RW_READER) {
 		lock_value = RW_READ_LOCK;
@@ -251,8 +255,17 @@ rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
 
 	for (;;) {
 		if (((old = lp->rw_wwwh) & lock_busy) == 0) {
-			if (casip(&lp->rw_wwwh, old, old + lock_value) != old)
+			if (casip(&lp->rw_wwwh, old, old + lock_value) != old) {
+				if (rw_lock_delay != NULL) {
+					backoff = rw_lock_backoff(backoff);
+					rw_lock_delay(backoff);
+					if (++loop_count == ncpus_online) {
+						backoff = 0;
+						loop_count = 0;
+					}
+				}
 				continue;
+			}
 			break;
 		}
 
@@ -358,6 +371,8 @@ rw_exit_wakeup(rwlock_impl_t *lp)
 	uintptr_t old, new, lock_value;
 	kthread_t *next_writer;
 	int nreaders;
+	uint_t  backoff = 0;
+	int loop_count = 0;
 
 	membar_exit();
 
@@ -385,8 +400,17 @@ rw_exit_wakeup(rwlock_impl_t *lp)
 		old = lp->rw_wwwh;
 		new = old - lock_value;
 		if ((new & (RW_LOCKED | RW_HAS_WAITERS)) != RW_HAS_WAITERS) {
-			if (casip(&lp->rw_wwwh, old, new) != old)
+			if (casip(&lp->rw_wwwh, old, new) != old) {
+				if (rw_lock_delay != NULL) {
+					backoff = rw_lock_backoff(backoff);
+					rw_lock_delay(backoff);
+					if (++loop_count == ncpus_online) {
+						backoff = 0;
+						loop_count = 0;
+					}
+				}
 				continue;
+			}
 			break;
 		}
 
@@ -452,13 +476,25 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 	uintptr_t old;
 
 	if (rw == RW_READER) {
+		uint_t backoff = 0;
+		int loop_count = 0;
 		THREAD_KPRI_REQUEST();
-		do {
+		for (;;) {
 			if ((old = lp->rw_wwwh) & RW_WRITE_CLAIMED) {
 				THREAD_KPRI_RELEASE();
 				return (0);
 			}
-		} while (casip(&lp->rw_wwwh, old, old + RW_READ_LOCK) != old);
+			if (casip(&lp->rw_wwwh, old, old + RW_READ_LOCK) == old)
+				break;
+			if (rw_lock_delay != NULL) {
+				backoff = rw_lock_backoff(backoff);
+				rw_lock_delay(backoff);
+				if (++loop_count == ncpus_online) {
+					backoff = 0;
+					loop_count = 0;
+				}
+			}
+		}
 		LOCKSTAT_RECORD(LS_RW_TRYENTER_ACQUIRE, lp, rw);
 	} else {
 		if (casip(&lp->rw_wwwh, 0, RW_WRITE_LOCK(curthread)) != 0)
