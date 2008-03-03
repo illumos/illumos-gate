@@ -1116,6 +1116,14 @@ process_devinfo_tree()
 				flags |= DINFOCLEANUP;
 			}
 		}
+	} else {
+		/*
+		 * For devlinks, disks, ports, tapes and devfsadm -n,
+		 * just need to take a snapshot with active devices.
+		 */
+		vprint(CHATTY_MID, "%staking snapshot of active devices\n",
+			fcn);
+		flags = DINFOCPYALL;
 	}
 
 	if (((load_attach_drv == TRUE) || (single_drv == TRUE)) &&
