@@ -2009,16 +2009,11 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5704C:
 	case DEVICE_ID_5704S:
 	case DEVICE_ID_5704:
-		/*
-		 * Revision A0 of the 5704/5794 had various errata
-		 * but we have workarounds, so it *is* supported.
-		 */
 		cidp->chip_label = cidp->subven == VENDOR_ID_SUN ? 5794 : 5704;
 		cidp->mbuf_base = bge_mbuf_pool_base_5704;
 		cidp->mbuf_length = bge_mbuf_pool_len_5704;
 		dev_ok = B_TRUE;
-		if (cidp->asic_rev <  MHCR_CHIP_REV_5704_B0)
-			cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		break;
 
 	case DEVICE_ID_5705C:
