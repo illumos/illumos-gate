@@ -179,6 +179,7 @@ GENUNIX_OBJS +=	\
 		kcpc.o		\
 		kdi.o		\
 		kiconv.o	\
+		klpd.o		\
 		kmem.o		\
 		ksyms_snapshot.o	\
 		l_strplumb.o	\
@@ -1195,7 +1196,7 @@ RPCMOD_OBJS +=	rpcmod.o	clnt_cots.o	clnt_clts.o \
 		rpc_prot.o	rpc_sztypes.o	rpc_subr.o	rpcb_prot.o \
 		svc.o		svc_clts.o	svc_gen.o	svc_cots.o \
 		rpcsys.o	xdr_sizeof.o	clnt_rdma.o	svc_rdma.o \
-		xdr_rdma.o	rdma_subr.o	xdrrdma_sizeof.o	
+		xdr_rdma.o	rdma_subr.o	xdrrdma_sizeof.o
 
 TLIMOD_OBJS +=	tlimod.o	t_kalloc.o	t_kbind.o	t_kclose.o \
 		t_kconnect.o	t_kfree.o	t_kgtstate.o	t_kopen.o \
@@ -1260,7 +1261,7 @@ DPROV_OBJS +=	dprov.o
 DCA_OBJS +=	dca.o dca_3des.o dca_debug.o dca_dsa.o dca_kstat.o dca_rng.o \
 		dca_rsa.o
 
-AESPROV_OBJS +=	aes.o aes_cbc_crypt.o aes_impl.o 
+AESPROV_OBJS +=	aes.o aes_cbc_crypt.o aes_impl.o
 
 ARCFOURPROV_OBJS += arcfour.o arcfour_crypt.o
 
@@ -1540,7 +1541,7 @@ CH_COM_OBJS =	ch_mac.o ch_subr.o cspi.o espi.o ixf1010.o mc3.o mc4.o mc5.o \
 		vsc7321.o vsc7326.o xpak.o
 
 #
-#	PCI strings file 
+#	PCI strings file
 #
 PCI_STRING_OBJS = pci_strings.o
 

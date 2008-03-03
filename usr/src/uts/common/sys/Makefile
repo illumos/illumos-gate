@@ -315,6 +315,7 @@ CHKHDRS=			\
 	kiconv_utf8_hkscs.h	\
 	kiconv_utf8_uhc.h	\
 	kidmap.h		\
+	klpd.h			\
 	klwp.h			\
 	kmdb.h			\
 	kmem.h			\

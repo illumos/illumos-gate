@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3158,17 +3158,18 @@ praccess(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 			error = priv_proc_cred_perm(cr, p, NULL, mode);
 
 		if (error != 0 || p == curproc || (p->p_flag & SSYS) ||
-		    p->p_as == &kas || (xvp = p->p_exec) == NULL ||
-		    secpolicy_proc_access(cr) == 0) {
+		    p->p_as == &kas || (xvp = p->p_exec) == NULL) {
 			prunlock(pnp);
 		} else {
 			/*
 			 * Determine if the process's executable is readable.
-			 * We have to drop p->p_lock before the VOP operation.
+			 * We have to drop p->p_lock before the secpolicy
+			 * and VOP operation.
 			 */
 			VN_HOLD(xvp);
 			prunlock(pnp);
-			error = VOP_ACCESS(xvp, VREAD, 0, cr, ct);
+			if (secpolicy_proc_access(cr) != 0)
+				error = VOP_ACCESS(xvp, VREAD, 0, cr, ct);
 			VN_RELE(xvp);
 		}
 		if (error)
@@ -3390,14 +3391,16 @@ pr_lookup_procdir(vnode_t *dp, char *comp)
 		return (NULL);
 	}
 	ASSERT(p->p_stat != 0);
-	mutex_enter(&p->p_lock);
-	mutex_exit(&pidlock);
 
+	/* NOTE: we're holding pidlock across the policy call. */
 	if (secpolicy_basic_procinfo(CRED(), p, curproc) != 0) {
-		mutex_exit(&p->p_lock);
+		mutex_exit(&pidlock);
 		prfreenode(pnp);
 		return (NULL);
 	}
+
+	mutex_enter(&p->p_lock);
+	mutex_exit(&pidlock);
 
 	/*
 	 * If a process vnode already exists and it is not invalid

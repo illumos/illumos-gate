@@ -707,7 +707,8 @@ udp_bind(queue_t *q, mblk_t *mp)
 		if (priv) {
 			cred_t *cr = DB_CREDDEF(mp, connp->conn_cred);
 
-			if (secpolicy_net_privaddr(cr, port) != 0) {
+			if (secpolicy_net_privaddr(cr, port,
+			    IPPROTO_UDP) != 0) {
 				udp_err_ack(q, mp, TACCES, 0);
 				return;
 			}
@@ -3754,7 +3755,8 @@ udp_opt_set_locked(queue_t *q, uint_t optset_context, int level,
 	case IPPROTO_UDP:
 		switch (name) {
 		case UDP_ANONPRIVBIND:
-			if ((error = secpolicy_net_privaddr(cr, 0)) != 0) {
+			if ((error = secpolicy_net_privaddr(cr, 0,
+			    IPPROTO_UDP)) != 0) {
 				*outlenp = 0;
 				return (error);
 			}

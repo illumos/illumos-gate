@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -282,6 +282,7 @@ f none usr/include/kerberosv5/com_err.h 644 root bin
 f none usr/include/kerberosv5/krb5.h 644 root bin
 f none usr/include/kerberosv5/mit_copyright.h 644 root bin
 f none usr/include/kerberosv5/mit-sipb-copyright.h 644 root bin
+f none usr/include/klpd.h 644 root bin
 f none usr/include/kmfapi.h 644 root bin
 f none usr/include/kmftypes.h 644 root bin
 f none usr/include/kstat.h 644 root bin
@@ -948,6 +949,7 @@ f none usr/include/sys/kdi_impl.h 644 root bin
 f none usr/include/sys/kdi_machimpl.h 644 root bin
 f none usr/include/sys/kiconv.h 644 root bin
 f none usr/include/sys/kidmap.h 644 root bin
+f none usr/include/sys/klpd.h 644 root bin
 f none usr/include/sys/klwp.h 644 root bin
 f none usr/include/sys/kmem.h 644 root bin
 f none usr/include/sys/kmem_impl.h 644 root bin

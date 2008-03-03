@@ -64,21 +64,35 @@ setgid(gid_t gid)
 
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
-	 * the p_crlock mutex.
+	 * the p_crlock mutex.  We cannot hold the mutex across the
+	 * secpolicy functions.
 	 */
 	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
+retry:
 	cr = p->p_cred;
+	crhold(cr);
+	mutex_exit(&p->p_crlock);
+
 
 	if ((gid == cr->cr_rgid || gid == cr->cr_sgid) &&
 	    secpolicy_allow_setid(cr, -1, B_TRUE) != 0) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry;
 		error = 0;
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 		newcr->cr_gid = gid;
 		crsetsid(newcr, ksp, KSID_GROUP);
+		mutex_exit(&p->p_crlock);
 	} else if ((error = secpolicy_allow_setid(cr, -1, B_FALSE)) == 0) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry;
 		/*
 		 * A privileged process that makes itself look like a
 		 * set-gid process must be marked to produce no core dump.
@@ -93,14 +107,14 @@ setgid(gid_t gid)
 		newcr->cr_rgid = gid;
 		newcr->cr_sgid = gid;
 		crsetsid(newcr, ksp, KSID_GROUP);
+		mutex_exit(&p->p_crlock);
 	} else {
 		crfree(newcr);
+		crfree(cr);
 		if (ksp != NULL)
 			ksid_rele(ksp);
 
 	}
-
-	mutex_exit(&p->p_crlock);
 
 	if (error == 0) {
 		if (do_nocd) {
@@ -153,9 +167,16 @@ setegid(gid_t gid)
 	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
-	cr = p->p_cred;
+retry:
+	crhold(cr = p->p_cred);
+	mutex_exit(&p->p_crlock);
+
 	if (gid == cr->cr_rgid || gid == cr->cr_gid || gid == cr->cr_sgid ||
 	    (error = secpolicy_allow_setid(cr, -1, B_FALSE)) == 0) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry;
 		/*
 		 * A privileged process that makes itself look like a
 		 * set-gid process must be marked to produce no core dump.
@@ -167,13 +188,13 @@ setegid(gid_t gid)
 		p->p_cred = newcr;
 		newcr->cr_gid = gid;
 		crsetsid(newcr, ksp, KSID_GROUP);
+		mutex_exit(&p->p_crlock);
 	} else {
 		crfree(newcr);
+		crfree(cr);
 		if (ksp != NULL)
 			ksid_rele(ksp);
 	}
-
-	mutex_exit(&p->p_crlock);
 
 	if (error == 0) {
 		if (do_nocd) {

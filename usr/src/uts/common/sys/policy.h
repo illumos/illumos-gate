@@ -70,8 +70,10 @@ boolean_t priv_policy_choice(const cred_t *, int, boolean_t);
 struct kipc_perm;
 struct vfs;
 struct proc;
+struct priv_set;
 
 int secpolicy_acct(const cred_t *);
+int secpolicy_require_privs(const cred_t *, const struct priv_set *);
 int secpolicy_allow_setid(const cred_t *, uid_t, boolean_t);
 int secpolicy_audit_config(const cred_t *);
 int secpolicy_audit_getattr(const cred_t *);
@@ -110,7 +112,7 @@ int secpolicy_net_bindmlp(const cred_t *);
 int secpolicy_net_config(const cred_t *, boolean_t);
 int secpolicy_net_icmpaccess(const cred_t *);
 int secpolicy_net_mac_aware(const cred_t *);
-int secpolicy_net_privaddr(const cred_t *, in_port_t);
+int secpolicy_net_privaddr(const cred_t *, in_port_t, int proto);
 int secpolicy_net_rawaccess(const cred_t *);
 boolean_t secpolicy_net_reply_equal(const cred_t *);
 int secpolicy_newproc(const cred_t *);
@@ -160,11 +162,11 @@ int secpolicy_setid_setsticky_clear(vnode_t *, vattr_t *,
     const vattr_t *, cred_t *);
 int secpolicy_xvattr(xvattr_t *, uid_t, cred_t *, vtype_t);
 
-int secpolicy_basic_exec(const cred_t *);
+int secpolicy_basic_exec(const cred_t *, vnode_t *);
 int secpolicy_basic_fork(const cred_t *);
+int secpolicy_basic_link(const cred_t *);
 int secpolicy_basic_proc(const cred_t *);
 int secpolicy_basic_procinfo(const cred_t *, struct proc *, struct proc *);
-int secpolicy_basic_link(const cred_t *);
 
 int secpolicy_gart_access(const cred_t *);
 int secpolicy_gart_map(const cred_t *);

@@ -464,6 +464,7 @@ PORTGEN=			\
 	isastream.o		\
 	isatty.o		\
 	killpg.o		\
+	klpdlib.o		\
 	l64a.o			\
 	lckpwdf.o		\
 	lconstants.o		\

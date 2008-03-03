@@ -68,7 +68,9 @@ setuid(uid_t uid)
 	}
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
-	 * the p_crlock mutex.
+	 * the p_crlock mutex.  We can't hold on to the p_crlock for most
+	 * if this though, now that we allow kernel upcalls from the
+	 * policy routines.
 	 */
 	newcr = cralloc_ksid();
 
@@ -76,16 +78,28 @@ setuid(uid_t uid)
 
 retry:
 	mutex_enter(&p->p_crlock);
+retry_locked:
 	cr = p->p_cred;
+	crhold(cr);
+	mutex_exit(&p->p_crlock);
 
 	if ((uid == cr->cr_ruid || uid == cr->cr_suid) &&
 	    secpolicy_allow_setid(cr, uid, B_TRUE) != 0) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry_locked;
 		error = 0;
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 		newcr->cr_uid = uid;
 		crsetsid(newcr, ksp, KSID_USER);
+		mutex_exit(&p->p_crlock);
 	} else if ((error = secpolicy_allow_setid(cr, uid, B_FALSE)) == 0) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry_locked;
 		if (!uidchge && uid != cr->cr_ruid) {
 			/*
 			 * The ruid of the process is going to change. In order
@@ -123,13 +137,13 @@ retry:
 		newcr->cr_uid = uid;
 		crsetsid(newcr, ksp, KSID_USER);
 		ASSERT(uid != oldruid ? uidchge : 1);
+		mutex_exit(&p->p_crlock);
 	} else {
 		crfree(newcr);
+		crfree(cr);
 		if (ksp != NULL)
 			ksid_rele(ksp);
 	}
-
-	mutex_exit(&p->p_crlock);
 
 	/*
 	 * We decrement the number of processes associated with the oldruid
@@ -194,7 +208,9 @@ seteuid(uid_t uid)
 	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
-	cr = p->p_cred;
+retry:
+	crhold(cr = p->p_cred);
+	mutex_exit(&p->p_crlock);
 
 	if (uid == cr->cr_ruid || uid == cr->cr_uid || uid == cr->cr_suid ||
 	    (error = secpolicy_allow_setid(cr, uid, B_FALSE)) == 0) {
@@ -203,6 +219,10 @@ seteuid(uid_t uid)
 		 * set-uid process must be marked to produce no core dump,
 		 * if the effective uid did changed.
 		 */
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry;
 		if (cr->cr_uid != uid && error == 0)
 			do_nocd = 1;
 		error = 0;
@@ -210,15 +230,7 @@ seteuid(uid_t uid)
 		p->p_cred = newcr;
 		newcr->cr_uid = uid;
 		crsetsid(newcr, ksp, KSID_USER);
-	} else {
-		crfree(newcr);
-		if (ksp != NULL)
-			ksid_rele(ksp);
-	}
-
-	mutex_exit(&p->p_crlock);
-
-	if (error == 0) {
+		mutex_exit(&p->p_crlock);
 		if (do_nocd) {
 			mutex_enter(&p->p_lock);
 			p->p_flag |= SNOCD;
@@ -227,6 +239,11 @@ seteuid(uid_t uid)
 		crset(p, newcr);	/* broadcast to process threads */
 		return (0);
 	}
+
+	crfree(newcr);
+	crfree(cr);
+	if (ksp != NULL)
+		ksid_rele(ksp);
 	return (set_errno(error));
 }
 
@@ -272,16 +289,30 @@ setreuid(uid_t ruid, uid_t euid)
 
 retry:
 	mutex_enter(&p->p_crlock);
-	cr = p->p_cred;
+retry_locked:
+	crhold(cr = p->p_cred);
+	mutex_exit(&p->p_crlock);
 
 	if (ruid != -1 && ruid != cr->cr_ruid && ruid != cr->cr_uid &&
 	    secpolicy_allow_setid(cr, ruid, B_FALSE) != 0) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry_locked;
 		error = EPERM;
 	} else if (euid != -1 &&
 	    euid != cr->cr_ruid && euid != cr->cr_uid &&
 	    euid != cr->cr_suid && secpolicy_allow_setid(cr, euid, B_FALSE)) {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry_locked;
 		error = EPERM;
 	} else {
+		mutex_enter(&p->p_crlock);
+		crfree(cr);
+		if (cr != p->p_cred)
+			goto retry_locked;
 		if (!uidchge && ruid != -1 && cr->cr_ruid != ruid) {
 			/*
 			 * The ruid of the process is going to change. In order

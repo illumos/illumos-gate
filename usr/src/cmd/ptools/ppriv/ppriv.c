@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Program to examine or set process privileges.
@@ -62,6 +62,7 @@ static boolean_t	Don = B_FALSE;
 static boolean_t	Doff = B_FALSE;
 static boolean_t	list = B_FALSE;
 static boolean_t	mac_aware = B_FALSE;
+static boolean_t	xpol = B_FALSE;
 static int		mode = PRIV_STR_PORT;
 
 int
@@ -79,7 +80,7 @@ main(int argc, char **argv)
 	else
 		command = argv[0];
 
-	while ((opt = getopt(argc, argv, "lDMNevs:S")) != EOF) {
+	while ((opt = getopt(argc, argv, "lDMNevs:xS")) != EOF) {
 		switch (opt) {
 		case 'l':
 			list = B_TRUE;
@@ -110,6 +111,10 @@ main(int argc, char **argv)
 			if ((rc = parsespec(optarg)) != 0)
 				return (rc);
 			break;
+		case 'x':
+			set = B_TRUE;
+			xpol = B_TRUE;
+			break;
 		default:
 			usage();
 			/*NOTREACHED*/
@@ -137,7 +142,7 @@ main(int argc, char **argv)
 		privupdate_self();
 		rc = execvp(argv[0], &argv[0]);
 		(void) fprintf(stderr, "%s: %s: %s\n", command, argv[0],
-			strerror(errno));
+		    strerror(errno));
 	} else if (list) {
 		rc = dumppriv(argv);
 	} else {
@@ -192,8 +197,8 @@ look(char *arg)
 	    sz / ppriv->pr_nsets < ppriv->pr_setsize ||
 	    ppriv->pr_infosize > sz || sz > 1024 * 1024) {
 		(void) fprintf(stderr,
-			"%s: %s: bad PRNOTES section, size = %lx\n",
-			command, arg, (long)sz);
+		    "%s: %s: bad PRNOTES section, size = %lx\n",
+		    command, arg, (long)sz);
 		Prelease(Pr, 0);
 		return (1);
 	}
@@ -248,14 +253,14 @@ look(char *arg)
 			break;
 		default:
 			(void) fprintf(stderr, "%s: unknown priv_info: %d\n",
-				arg, pi->priv_info_type);
+			    arg, pi->priv_info_type);
 			break;
 		}
 		if (pi->priv_info_size > ppriv->pr_infosize ||
 		    pi->priv_info_size <=  sizeof (priv_info_t) ||
 		    (pi->priv_info_size & 3) != 0) {
 			(void) fprintf(stderr, "%s: bad priv_info_size: %u\n",
-				arg, pi->priv_info_size);
+			    arg, pi->priv_info_size);
 			break;
 		}
 		x += pi->priv_info_size;
@@ -263,16 +268,16 @@ look(char *arg)
 
 	for (i = 0; i < ppriv->pr_nsets; i++) {
 		extern const char *__priv_getsetbynum(const void *, int);
-		const char *setnm = pdata ? __priv_getsetbynum(pdata, i)
-					    : priv_getsetbynum(i);
-		priv_chunk_t *pc = (priv_chunk_t *)
-				    &ppriv->pr_sets[ppriv->pr_setsize * i];
+		const char *setnm = pdata ? __priv_getsetbynum(pdata, i) :
+		    priv_getsetbynum(i);
+		priv_chunk_t *pc =
+		    (priv_chunk_t *)&ppriv->pr_sets[ppriv->pr_setsize * i];
 
 
 		(void) printf("\t%c: ", setnm && !nodata ? *setnm : '?');
 		if (!nodata) {
 			extern char *__priv_set_to_str(void *,
-					const priv_set_t *, char, int);
+			    const priv_set_t *, char, int);
 			priv_set_t *pset = (priv_set_t *)pc;
 
 			char *s;
@@ -355,7 +360,7 @@ static void
 badspec(const char *spec)
 {
 	(void) fprintf(stderr, "%s: bad privilege specification: \"%s\"\n",
-				command, spec);
+	    command, spec);
 	exit(3);
 	/*NOTREACHED*/
 }
@@ -452,9 +457,9 @@ parsespec(const char *spec)
 		/* Assign is mutually exclusive with add/remove and itself */
 		if (((toupd == &rem || toupd == &add) && assign[ind] != NULL) ||
 		    (toupd == &assign && (assign[ind] != NULL ||
-			    rem[ind] != NULL || add[ind] != NULL))) {
+		    rem[ind] != NULL || add[ind] != NULL))) {
 			(void) fprintf(stderr, "%s: conflicting spec: %s\n",
-					command, spec);
+			    command, spec);
 			exit(1);
 		}
 		if ((*toupd)[ind] != NULL) {
@@ -480,7 +485,7 @@ privupdate(prpriv_t *pr, const char *arg)
 	if (sets != NULL) {
 		for (i = 0; i < pri->priv_nsets; i++) {
 			priv_set_t *target =
-				(priv_set_t *)&pr->pr_sets[pr->pr_setsize * i];
+			    (priv_set_t *)&pr->pr_sets[pr->pr_setsize * i];
 			if (rem[i] != NULL)
 				priv_intersect(rem[i], target);
 			if (add[i] != NULL)
@@ -490,7 +495,7 @@ privupdate(prpriv_t *pr, const char *arg)
 		}
 	}
 
-	if (Doff || Don) {
+	if (Doff || Don || xpol) {
 		priv_info_uint_t *pii;
 		int sz = PRIV_PRPRIV_SIZE(pr);
 		char *x = (char *)pr + PRIV_PRPRIV_INFO_OFFSET(pr);
@@ -513,7 +518,7 @@ privupdate(prpriv_t *pr, const char *arg)
 			x += pi->priv_info_size;
 		}
 		(void) fprintf(stderr,
-			"%s: cannot find privilege flags to set\n", arg);
+		    "%s: cannot find privilege flags to set\n", arg);
 		pr->pr_infosize = 0;
 		return;
 done:
@@ -521,12 +526,14 @@ done:
 		pr->pr_infosize = sizeof (priv_info_uint_t);
 		/* LINTED: alignment */
 		pii = (priv_info_uint_t *)
-			    ((char *)pr + PRIV_PRPRIV_INFO_OFFSET(pr));
+		    ((char *)pr + PRIV_PRPRIV_INFO_OFFSET(pr));
 
 		if (Don)
 			fl |= PRIV_DEBUG;
-		else
+		if (Doff)
 			fl &= ~PRIV_DEBUG;
+		if (xpol)
+			fl |= PRIV_XPOLICY;
 
 		pii->info.priv_info_size = sizeof (*pii);
 		pii->info.priv_info_type = PRIV_INFO_FLAGS;
@@ -585,6 +592,8 @@ privupdate_self(void)
 
 	if (Doff || Don)
 		(void) setpflags(PRIV_DEBUG, Don ? 1 : 0);
+	if (xpol)
+		(void) setpflags(PRIV_XPOLICY, 1);
 }
 
 static int
@@ -640,6 +649,9 @@ static struct {
 	{ PRIV_DEBUG, "PRIV_DEBUG" },
 	{ PRIV_AWARE, "PRIV_AWARE" },
 	{ PRIV_AWARE_INHERIT, "PRIV_AWARE_INHERIT" },
+	{ PRIV_XPOLICY, "PRIV_XPOLICY" },
+	{ NET_MAC_AWARE, "NET_MAC_AWARE" },
+	{ NET_MAC_AWARE_INHERIT, "NET_MAC_AWARE_INHERIT" },
 };
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/task.h>
 #include <sys/zone.h>
 #include <sys/cpucaps.h>
+#include <sys/klpd.h>
 
 int project_hash_size = 64;
 static kmutex_t project_hash_lock;
@@ -359,11 +360,14 @@ project_rele(kproject_t *p)
 		rctl_set_free(p->kpj_rctls);
 		project_kstat_delete(p);
 
+		if (p->kpj_klpd != NULL)
+			klpd_remove(&p->kpj_klpd);
+
 		if (mod_hash_destroy(projects_hash, (mod_hash_key_t)p))
 			panic("unable to delete project %d zone %d", p->kpj_id,
 			    p->kpj_zoneid);
 
-		}
+	}
 	mutex_exit(&project_hash_lock);
 }
 

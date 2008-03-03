@@ -1653,6 +1653,14 @@ SUNWprivate_1.1 {
 	__iswctype_sb;
 	__iswctype_std;
 	_jrand48;
+	klpd_create;
+	klpd_getpath;
+	klpd_getport;
+	klpd_getucred;
+	klpd_register;
+	klpd_register_id;
+	klpd_unregister;
+	klpd_unregister_id;
 	_l64a;
 	_ladd;
 	__lc_charmap;

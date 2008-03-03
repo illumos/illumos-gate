@@ -21,7 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -533,7 +533,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 81 */ IF_LP64(
 			SYSENT_CI("getdents",	getdents64,	3),
 			SYSENT_CI("getdents",	getdents32,	3)),
-	/* 82 */ SYSENT_CI("privsys",		privsys,	5),
+	/* 82 */ SYSENT_CI("privsys",		privsys,	6),
 	/* 83 */ SYSENT_CI("ucredsys",		ucredsys,	3),
 	/* 84 */ SYSENT_CI("sysfs",		sysfs,		3),
 	/* 85 */ SYSENT_CI("getmsg",		getmsg,		4),
@@ -930,7 +930,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 79 */ SYSENT_CI("rmdir",		rmdir,		1),
 	/* 80 */ SYSENT_CI("mkdir",		mkdir,		2),
 	/* 81 */ SYSENT_CI("getdents",		getdents32,	3),
-	/* 82 */ SYSENT_CI("privsys",		privsys32,	5),
+	/* 82 */ SYSENT_CI("privsys",		privsys32,	6),
 	/* 83 */ SYSENT_CI("ucredsys",		ucredsys32,	3),
 	/* 84 */ SYSENT_CI("sysfs",		sysfs,		3),
 	/* 85 */ SYSENT_CI("getmsg",		getmsg32,	4),

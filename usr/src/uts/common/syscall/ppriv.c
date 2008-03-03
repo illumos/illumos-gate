@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/systm.h>
 #include <sys/cred_impl.h>
 #include <sys/errno.h>
+#include <sys/klpd.h>
 #include <sys/proc.h>
 #include <sys/priv_impl.h>
 #include <sys/policy.h>
@@ -58,7 +59,7 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 	priv_set_t	pset, *target;
 	cred_t		*cr, *pcr;
 	proc_t		*p;
-	boolean_t	donocd;
+	boolean_t	donocd = B_FALSE;
 
 	if (!PRIV_VALIDSET(type) || !PRIV_VALIDOP(op))
 		return (set_errno(EINVAL));
@@ -70,6 +71,7 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 	cr = cralloc();
 	mutex_enter(&p->p_crlock);
 
+retry:
 	pcr = p->p_cred;
 
 	if (audit_active)
@@ -86,13 +88,25 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 		 * other sets can but only as long as they remain subsets
 		 * of P.  Only immediately after exec holds that P <= L.
 		 */
-		if (((type == PRIV_LIMIT &&
-		    !priv_issubset(&pset, &CR_LPRIV(pcr))) ||
-		    !priv_issubset(&pset, &CR_OPPRIV(pcr))) &&
-		    !priv_issubset(&pset, priv_getset(pcr, type))) {
-			mutex_exit(&p->p_crlock);
+		if (type == PRIV_LIMIT &&
+		    !priv_issubset(&pset, &CR_LPRIV(pcr))) {
 			crfree(cr);
 			return (set_errno(EPERM));
+		}
+		if (!priv_issubset(&pset, &CR_OPPRIV(pcr)) &&
+		    !priv_issubset(&pset, priv_getset(pcr, type))) {
+			mutex_exit(&p->p_crlock);
+			/* Policy override should not grow beyond L either */
+			if (type != PRIV_INHERITABLE ||
+			    !priv_issubset(&pset, &CR_LPRIV(pcr)) ||
+			    secpolicy_require_privs(CRED(), &pset) != 0) {
+				crfree(cr);
+				return (set_errno(EPERM));
+			}
+			mutex_enter(&p->p_crlock);
+			if (pcr != p->p_cred)
+				goto retry;
+			donocd = B_TRUE;
 		}
 		break;
 
@@ -157,8 +171,6 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 		priv_inverse(&diff);
 		priv_intersect(&CR_OPPRIV(pcr), &diff);
 		donocd = !priv_issubset(&diff, &CR_IPRIV(cr));
-	} else {
-		donocd = B_FALSE;
 	}
 
 	p->p_cred = cr;
@@ -225,7 +237,7 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 
 	if (val > 1 || (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
-	    flag != __PROC_PROTECT)) {
+	    flag != __PROC_PROTECT && flag != PRIV_XPOLICY)) {
 		return (EINVAL);
 	}
 
@@ -305,6 +317,13 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 		CR_FLAGS(cr) = newflags;
 	}
 
+	/*
+	 * Unsetting the flag has as side effect getting rid of
+	 * the per-credential policy.
+	 */
+	if (flag == PRIV_XPOLICY && val == 0)
+		crsetcrklpd(cr, NULL);
+
 	if (use_curcred) {
 		p->p_cred = cr;
 		mutex_exit(&p->p_crlock);
@@ -321,7 +340,8 @@ uint_t
 getpflags(uint_t flag, const cred_t *cr)
 {
 	if (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
-	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT)
+	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
+	    flag != PRIV_XPOLICY)
 		return ((uint_t)-1);
 
 	return ((CR_FLAGS(cr) & flag) != 0);
@@ -331,7 +351,8 @@ getpflags(uint_t flag, const cred_t *cr)
  * Privilege system call entry point
  */
 int
-privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize)
+privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize,
+    int itype)
 {
 	int retv;
 	extern int issetugid(void);
@@ -355,15 +376,23 @@ privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize)
 		return (retv == -1 ? set_errno(EINVAL) : retv);
 	case PRIVSYS_ISSETUGID:
 		return (issetugid());
+	case PRIVSYS_KLPD_REG:
+		if (bufsize < sizeof (priv_set_t))
+			return (set_errno(ENOMEM));
+		return ((int)klpd_reg((int)op, (idtype_t)itype, (id_t)type,
+		    buf));
+	case PRIVSYS_KLPD_UNREG:
+		return ((int)klpd_unreg((int)op, (idtype_t)itype, (id_t)type));
 	}
 	return (set_errno(EINVAL));
 }
 
 #ifdef _SYSCALL32_IMPL
 int
-privsys32(int code, priv_op_t op, priv_ptype_t type, caddr32_t *buf,
-    size32_t bufsize)
+privsys32(int code, priv_op_t op, priv_ptype_t type, caddr32_t buf,
+    size32_t bufsize, int itype)
 {
-	return (privsys(code, op, type, (void *)buf, (size_t)bufsize));
+	return (privsys(code, op, type, (void *)(uintptr_t)buf,
+	    (size_t)bufsize, itype));
 }
 #endif

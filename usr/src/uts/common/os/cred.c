@@ -62,6 +62,7 @@
 #include <sys/tsol/label.h>
 #include <sys/sid.h>
 #include <sys/idmap.h>
+#include <sys/klpd.h>
 #include <sys/varargs.h>
 
 
@@ -131,6 +132,9 @@ get_ephemeral_zsd(zone_t *zone)
 	mutex_exit(&ephemeral_zone_mutex);
 	return (eph_zsd);
 }
+
+static cred_t *crdup_flags(cred_t *, int);
+static cred_t *cralloc_flags(int);
 
 /*
  * This function is called when a zone is destroyed
@@ -236,15 +240,26 @@ cred_init(void)
 /*
  * Allocate (nearly) uninitialized cred_t.
  */
-cred_t *
-cralloc(void)
+static cred_t *
+cralloc_flags(int flgs)
 {
-	cred_t *cr = kmem_cache_alloc(cred_cache, KM_SLEEP);
+	cred_t *cr = kmem_cache_alloc(cred_cache, flgs);
+
+	if (cr == NULL)
+		return (NULL);
+
 	cr->cr_ref = 1;		/* So we can crfree() */
 	cr->cr_zone = NULL;
 	cr->cr_label = NULL;
 	cr->cr_ksid = NULL;
+	cr->cr_klpd = NULL;
 	return (cr);
+}
+
+cred_t *
+cralloc(void)
+{
+	return (cralloc_flags(KM_SLEEP));
 }
 
 /*
@@ -273,6 +288,7 @@ crget(void)
 	zone_cred_hold(cr->cr_zone);
 	if (cr->cr_label)
 		label_hold(cr->cr_label);
+	ASSERT(cr->cr_klpd == NULL);
 	return (cr);
 }
 
@@ -337,6 +353,8 @@ crfree(cred_t *cr)
 		ASSERT(cr != kcred);
 		if (cr->cr_label)
 			label_rele(cr->cr_label);
+		if (cr->cr_klpd)
+			crklpd_rele(cr->cr_klpd);
 		if (cr->cr_zone)
 			zone_cred_rele(cr->cr_zone);
 		if (cr->cr_ksid)
@@ -360,9 +378,11 @@ crcopy(cred_t *cr)
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
-		label_hold(cr->cr_label);
+		label_hold(newcr->cr_label);
 	if (newcr->cr_ksid)
-		kcrsid_hold(cr->cr_ksid);
+		kcrsid_hold(newcr->cr_ksid);
+	if (newcr->cr_klpd)
+		crklpd_hold(newcr->cr_klpd);
 	crfree(cr);
 	newcr->cr_ref = 2;		/* caller gets two references */
 	return (newcr);
@@ -385,6 +405,8 @@ crcopy_to(cred_t *oldcr, cred_t *newcr)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(newcr->cr_label);
+	if (newcr->cr_klpd)
+		crklpd_hold(newcr->cr_klpd);
 	if (nkcr) {
 		newcr->cr_ksid = nkcr;
 		kcrsidcopy_to(oldcr->cr_ksid, newcr->cr_ksid);
@@ -398,21 +420,33 @@ crcopy_to(cred_t *oldcr, cred_t *newcr)
  * Dup a cred struct to a new held one.
  *	The old cred is not freed.
  */
-cred_t *
-crdup(cred_t *cr)
+static cred_t *
+crdup_flags(cred_t *cr, int flgs)
 {
 	cred_t *newcr;
 
-	newcr = cralloc();
+	newcr = cralloc_flags(flgs);
+
+	if (newcr == NULL)
+		return (NULL);
+
 	bcopy(cr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(newcr->cr_label);
+	if (newcr->cr_klpd)
+		crklpd_hold(newcr->cr_klpd);
 	if (newcr->cr_ksid)
 		kcrsid_hold(newcr->cr_ksid);
 	newcr->cr_ref = 1;
 	return (newcr);
+}
+
+cred_t *
+crdup(cred_t *cr)
+{
+	return (crdup_flags(cr, KM_SLEEP));
 }
 
 /*
@@ -431,6 +465,8 @@ crdup_to(cred_t *oldcr, cred_t *newcr)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(newcr->cr_label);
+	if (newcr->cr_klpd)
+		crklpd_hold(newcr->cr_klpd);
 	if (nkcr) {
 		newcr->cr_ksid = nkcr;
 		kcrsidcopy_to(oldcr->cr_ksid, newcr->cr_ksid);
@@ -531,7 +567,7 @@ hasprocperm(const cred_t *tcrp, const cred_t *scrp)
  * This interface replaces hasprocperm; it works like hasprocperm but
  * additionally returns success if the proc_t's match
  * It is the preferred interface for most uses.
- * And it will acquire pcrlock itself, so it assert's that it shouldn't
+ * And it will acquire p_crlock itself, so it assert's that it shouldn't
  * be held.
  */
 int
@@ -549,9 +585,10 @@ prochasprocperm(proc_t *tp, proc_t *sp, const cred_t *scrp)
 		return (0);
 
 	mutex_enter(&tp->p_crlock);
-	tcrp = tp->p_cred;
-	rets = hasprocperm(tcrp, scrp);
+	crhold(tcrp = tp->p_cred);
 	mutex_exit(&tp->p_crlock);
+	rets = hasprocperm(tcrp, scrp);
+	crfree(tcrp);
 
 	return (rets);
 }
@@ -972,8 +1009,7 @@ newcred_from_bslabel(bslabel_t *blabel, uint32_t doi, int flags)
 	cred_t *cr = NULL;
 
 	if (lbl != NULL) {
-		if ((cr = kmem_cache_alloc(cred_cache, flags)) != NULL) {
-			bcopy(dummycr, cr, crsize);
+		if ((cr = crdup_flags(dummycr, flags)) != NULL) {
 			cr->cr_label = lbl;
 		} else {
 			label_rele(lbl);
@@ -995,12 +1031,10 @@ copycred_from_bslabel(cred_t *cr, bslabel_t *blabel, uint32_t doi, int flags)
 	cred_t *newcr = NULL;
 
 	if (lbl != NULL) {
-		if ((newcr = kmem_cache_alloc(cred_cache, flags)) != NULL) {
-			bcopy(cr, newcr, crsize);
-			if (newcr->cr_zone)
-				zone_cred_hold(newcr->cr_zone);
+		if ((newcr = crdup_flags(cr, flags)) != NULL) {
+			if (newcr->cr_label != NULL)
+				label_rele(newcr->cr_label);
 			newcr->cr_label = lbl;
-			newcr->cr_ref = 1;
 		} else {
 			label_rele(lbl);
 		}
@@ -1244,4 +1278,20 @@ crsetpriv(cred_t *cr, ...)
 	priv_adjust_PA(cr);
 	va_end(ap);
 	return (0);
+}
+
+struct credklpd *
+crgetcrklpd(const cred_t *cr)
+{
+	return (cr->cr_klpd);
+}
+
+void
+crsetcrklpd(cred_t *cr, struct credklpd *crklpd)
+{
+	ASSERT(cr->cr_ref <= 2);
+
+	if (cr->cr_klpd != NULL)
+		crklpd_rele(cr->cr_klpd);
+	cr->cr_klpd = crklpd;
 }

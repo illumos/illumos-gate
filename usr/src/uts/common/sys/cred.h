@@ -57,6 +57,7 @@ struct proc;				/* cred.h is included in proc.h */
 struct prcred;
 struct ksid;
 struct ksidlist;
+struct credklpd;
 
 struct auditinfo_addr;			/* cred.h is included in audit.h */
 
@@ -172,6 +173,9 @@ extern struct ksid *crgetsid(const cred_t *, int);
 extern struct ksidlist *crgetsidlist(const cred_t *);
 
 extern int crsetpriv(cred_t *, ...);
+
+extern struct credklpd *crgetcrklpd(const cred_t *);
+extern void crsetcrklpd(cred_t *, struct credklpd *);
 
 #endif	/* _KERNEL */
 

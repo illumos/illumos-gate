@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,9 +145,6 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	if (curthread == p->p_agenttp)
 		return (ENOTSUP);
 
-	if ((error = secpolicy_basic_exec(CRED())) != 0)
-		return (error);
-
 	if (brand_action != EBA_NONE) {
 		/*
 		 * Brand actions are not supported for processes that are not
@@ -226,6 +223,15 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		error = ENOENT;
 		pn_free(&resolvepn);
 		pn_free(&pn);
+		goto out;
+	}
+
+	if ((error = secpolicy_basic_exec(CRED(), vp)) != 0) {
+		if (dir != NULL)
+			VN_RELE(dir);
+		pn_free(&resolvepn);
+		pn_free(&pn);
+		VN_RELE(vp);
 		goto out;
 	}
 

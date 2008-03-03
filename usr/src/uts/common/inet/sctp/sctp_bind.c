@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 			 * we can use it here.
 			 */
 			if (secpolicy_net_privaddr(sctp->sctp_credp,
-			    *requested_port) != 0) {
+			    *requested_port, IPPROTO_SCTP) != 0) {
 				dprint(1,
 				    ("sctp_bind(x): no prive for port %d",
 				    *requested_port));

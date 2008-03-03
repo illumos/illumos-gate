@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@ extern "C" {
 
 struct zone;		/* forward reference */
 struct ts_label_s;	/* forward reference */
+struct credklpd;	/* forward reference */
 
 struct cred {
 	uint_t		cr_ref;		/* reference count */
@@ -79,6 +80,7 @@ struct cred {
 	projid_t	cr_projid;	/* project */
 	struct zone	*cr_zone;	/* pointer to per-zone structure */
 	struct ts_label_s *cr_label;	/* pointer to the effective label */
+	struct credklpd *cr_klpd;	/* pointer to the cred's klpd */
 	credsid_t	*cr_ksid;	/* pointer to SIDs */
 	gid_t		cr_groups[1];	/* cr_groups size not fixed */
 					/* audit info is defined dynamically */

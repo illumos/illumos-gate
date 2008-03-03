@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,8 @@ typedef enum priv_op {
 #define	PRIVSYS_SETPFLAGS	3
 #define	PRIVSYS_GETPFLAGS	4
 #define	PRIVSYS_ISSETUGID	5
+#define	PRIVSYS_KLPD_REG	6
+#define	PRIVSYS_KLPD_UNREG	7
 
 /*
  * Maximum length of a user defined privilege name.
@@ -135,9 +137,11 @@ typedef struct priv_impl_info {
 #define	__PROC_PROTECT			0x0008		/* Private */
 #define	NET_MAC_AWARE			0x0010		/* Is MAC aware */
 #define	NET_MAC_AWARE_INHERIT		0x0020		/* Inherit MAC aware */
+#define	PRIV_XPOLICY			0x0080		/* Extended policy */
 
 /* user-settable flags: */
-#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT)
+#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT |\
+			    PRIV_XPOLICY)
 
 /*
  * Header of the privilege info data structure; multiple structures can

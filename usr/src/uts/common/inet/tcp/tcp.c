@@ -3249,7 +3249,8 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 			}
 		}
 		if (priv) {
-			if (secpolicy_net_privaddr(cr, requested_port) != 0) {
+			if (secpolicy_net_privaddr(cr, requested_port,
+			    IPPROTO_TCP) != 0) {
 				if (tcp->tcp_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
 					    SL_ERROR|SL_TRACE,
@@ -10513,7 +10514,8 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				tcp->tcp_recvdstaddr = onoff;
 			break;
 		case TCP_ANONPRIVBIND:
-			if ((reterr = secpolicy_net_privaddr(cr, 0)) != 0) {
+			if ((reterr = secpolicy_net_privaddr(cr, 0,
+			    IPPROTO_TCP)) != 0) {
 				*outlenp = 0;
 				return (reterr);
 			}

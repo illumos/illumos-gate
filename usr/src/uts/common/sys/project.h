@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +83,8 @@ typedef struct kproject {
 					/* zone_nlwps_lock */
 	rctl_qty_t	kpj_ntasks_ctl;	/* protected by kpj_rctls->rcs_lock */
 	struct cpucap	*kpj_cpucap;	/* CPU cap data			*/
+	struct klpd_reg	*kpj_klpd;	/* our extended policy */
+					/* protected by klpd_mutex */
 } kproject_t;
 
 #ifdef _KERNEL

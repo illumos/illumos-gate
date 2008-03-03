@@ -89,17 +89,24 @@ setgroups(int gidsetsize, gid_t *gidset)
 	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
+retry:
 	cr = p->p_cred;
+	crhold(cr);
+	mutex_exit(&p->p_crlock);
 
 	if ((error = secpolicy_allow_setid(cr, -1, B_FALSE)) != 0) {
-		mutex_exit(&p->p_crlock);
 		if (groups != NULL)
 			kmem_free(groups, n * sizeof (gid_t));
 		if (ksl != NULL)
 			ksidlist_rele(ksl);
 		crfree(newcr);
+		crfree(cr);
 		return (set_errno(error));
 	}
+	mutex_enter(&p->p_crlock);
+	crfree(cr);
+	if (cr != p->p_cred)
+		goto retry;
 
 	crdup_to(cr, newcr);
 	crsetsidlist(newcr, ksl);
