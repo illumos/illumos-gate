@@ -14039,8 +14039,23 @@ st_get_read_pos(struct scsi_tape *un, buf_t *bp)
 		return (EIO);
 	}
 
-	pos_info = bp->b_un.b_addr;
 	d_sz = bp->b_bcount - bp->b_resid;
+	if (d_sz == 0) {
+		bp_mapout(bp);
+		return (EIO);
+	}
+
+	/*
+	 * Copy the buf to a double-word aligned memory that can hold the
+	 * tape_position_t data structure.
+	 */
+	if ((pos_info = kmem_alloc(d_sz, KM_NOSLEEP)) == NULL) {
+		scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "kmem_alloc() failed");
+		bp_mapout(bp);
+		return (EIO);
+	}
+	bcopy(bp->b_un.b_addr, pos_info, d_sz);
 
 #ifdef STDEBUG
 	if ((st_debug & 0x7) > 2) {
@@ -14055,6 +14070,7 @@ st_get_read_pos(struct scsi_tape *un, buf_t *bp)
 
 	COPY_POS(&un->un_running, &un->un_pos);
 
+	kmem_free(pos_info, d_sz);
 	bp_mapout(bp);
 
 	return (result);
