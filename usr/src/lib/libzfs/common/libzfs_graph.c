@@ -528,27 +528,22 @@ construct_graph(libzfs_handle_t *hdl, const char *dataset)
 		/*
 		 * Determine pool name and try again.
 		 */
-		char *pool, *slash;
+		int len = strcspn(dataset, "/@") + 1;
+		char *pool = zfs_alloc(hdl, len);
 
-		if ((slash = strchr(dataset, '/')) != NULL ||
-		    (slash = strchr(dataset, '@')) != NULL) {
-			pool = zfs_alloc(hdl, slash - dataset + 1);
-			if (pool == NULL) {
-				zfs_graph_destroy(zgp);
-				return (NULL);
-			}
-			(void) strncpy(pool, dataset, slash - dataset);
-			pool[slash - dataset] = '\0';
-
-			if (iterate_children(hdl, zgp, pool) == -1 ||
-			    zfs_graph_add(hdl, zgp, pool, NULL, 0) != 0) {
-				free(pool);
-				zfs_graph_destroy(zgp);
-				return (NULL);
-			}
-
-			free(pool);
+		if (pool == NULL) {
+			zfs_graph_destroy(zgp);
+			return (NULL);
 		}
+		(void) strlcpy(pool, dataset, len);
+
+		if (iterate_children(hdl, zgp, pool) == -1 ||
+		    zfs_graph_add(hdl, zgp, pool, NULL, 0) != 0) {
+			free(pool);
+			zfs_graph_destroy(zgp);
+			return (NULL);
+		}
+		free(pool);
 	}
 
 	if (ret == -1 || zfs_graph_add(hdl, zgp, dataset, NULL, 0) != 0) {
