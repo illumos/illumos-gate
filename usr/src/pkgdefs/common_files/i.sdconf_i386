@@ -23,11 +23,17 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1999-2001 by Sun Microsystems, Inc.
-# All Rights Reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
+
+add_sata_entry() {
+cat >> $dest << EOF
+name="sd" parent="$1";
+EOF
+}
 
 while read src dest
 do
@@ -97,6 +103,27 @@ do
 			cp /tmp/d2.$$ $dest
 		fi
 
+		# Add SATA HBA driver entries if not present
+		line1="name=\"sd\" parent=\"nv_sata\";"
+		echo `cat $dest` | grep "$line1" >/dev/null
+		if [ $? -ne 0 ]; then
+			add_sata_entry "nv_sata"
+		fi
+		line1="name=\"sd\" parent=\"ahci\";"
+		echo `cat $dest` | grep "$line1" >/dev/null
+		if [ $? -ne 0 ]; then
+			add_sata_entry "ahci"
+		fi
+		line1="name=\"sd\" parent=\"si3124\";"
+		echo `cat $dest` | grep "$line1" >/dev/null
+		if [ $? -ne 0 ]; then
+			add_sata_entry "si3124"
+		fi
+		line1="name=\"sd\" parent=\"marvell88sx\";"
+		echo `cat $dest` | grep "$line1" >/dev/null
+		if [ $? -ne 0 ]; then
+			add_sata_entry "marvell88sx"
+		fi
 
 		# remove temporary files
 		rm -f /tmp/d.$$ /tmp/d2.$$ /tmp/newident.$$ /tmp/rest.$$
