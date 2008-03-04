@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,12 @@ extern "C" {
 #endif
 
 
-#define	BLKIF_RING_SIZE	__RING_SIZE((blkif_sring_t *)NULL, PAGESIZE)
+#define	BLKIF_RING_SIZE \
+	__RING_SIZE((blkif_sring_t *)NULL, PAGESIZE)
+#define	BLKIF_X86_32_RING_SIZE \
+	__RING_SIZE((blkif_x86_32_sring_t *)NULL, PAGESIZE)
+#define	BLKIF_X86_64_RING_SIZE \
+	__RING_SIZE((blkif_x86_64_sring_t *)NULL, PAGESIZE)
 
 /*
  * VBDs have standard 512 byte blocks

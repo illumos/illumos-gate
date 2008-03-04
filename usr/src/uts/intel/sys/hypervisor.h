@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,7 +206,7 @@ extern long HYPERVISOR_vcpu_op(int, int, void *);
 extern long HYPERVISOR_set_segment_base(int, ulong_t);
 #endif	/* __amd64 */
 extern int HYPERVISOR_mmuext_op(struct mmuext_op *, int, uint_t *, domid_t);
-extern long HYPERVISOR_acm_op(int cmd, void *);
+extern long HYPERVISOR_acm_op(struct xen_acmctl *);
 extern long HYPERVISOR_nmi_op(int cmd, void *);
 extern long HYPERVISOR_sched_op(int, void *);
 extern long HYPERVISOR_callback_op(int, void *);

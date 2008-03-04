@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +40,11 @@
  * Copyright (c) 2004-2005, K A Fraser
  * Copyright (c) 2005, Christopher Clark
  *
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -64,16 +67,10 @@
 
 #include <sys/hypervisor.h>
 #include <xen/public/grant_table.h>
+#include <xen/public/features.h>
 
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-/* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
-#ifdef __ia64__
-#define	NR_GRANT_FRAMES 1
-#else
-#define	NR_GRANT_FRAMES 4
 #endif
 
 struct gnttab_free_callback {
@@ -107,7 +104,7 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly);
 void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
 	gnttab_frame_t page);
 
-int gnttab_grant_foreign_transfer(domid_t domid);
+int gnttab_grant_foreign_transfer(domid_t domid, pfn_t pfn);
 
 gnttab_frame_t gnttab_end_foreign_transfer_ref(grant_ref_t ref);
 gnttab_frame_t gnttab_end_foreign_transfer(grant_ref_t ref);
@@ -123,6 +120,8 @@ void gnttab_free_grant_reference(grant_ref_t ref);
 
 void gnttab_free_grant_references(grant_ref_t head);
 
+int gnttab_empty_grant_references(const grant_ref_t *pprivate_head);
+
 int gnttab_claim_grant_reference(grant_ref_t *pprivate_head);
 
 void gnttab_release_grant_reference(grant_ref_t *private_head,
@@ -131,10 +130,13 @@ void gnttab_release_grant_reference(grant_ref_t *private_head,
 void gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	void (*fn)(void *), void *arg, uint16_t count);
 
+void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
+
 void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 	gnttab_frame_t frame, int readonly);
 
-void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid);
+void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
+	pfn_t pfn);
 
 #define	gnttab_map_vaddr(map) ((void *)(map.host_virt_addr))
 

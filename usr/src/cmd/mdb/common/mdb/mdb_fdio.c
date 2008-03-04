@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,4 +322,11 @@ mdb_fdio_create_named(int fd, const char *name)
 	fdp->fd_name[MAXPATHLEN - 1] = '\0';
 
 	return (io);
+}
+
+int
+mdb_fdio_fileno(mdb_io_t *io)
+{
+	fd_data_t *fdp = io->io_data;
+	return (fdp->fd_fd);
 }

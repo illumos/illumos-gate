@@ -37,16 +37,23 @@
 #endif
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
-#define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
+#define __XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
+#define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
+#if !defined(__GNUC__) && defined(__i386__)
+#define set_xen_guest_handle_u(hnd, val)  do { (hnd).u.p = val; } while (0)
+#define get_xen_guest_handle_u(val, hnd)  do { val = (hnd).u.p; } while (0)
+#else
+#define set_xen_guest_handle_u(hnd, val)  do { (hnd).p = val; } while (0)
+#define get_xen_guest_handle_u(val, hnd)  do { val = (hnd).p; } while (0)
+#endif
 #define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
-/*
- * XXPV - we need get in privcmd
- * #ifdef __XEN_TOOLS__
- */
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
-/*
- * #endif
- */
+
+#if defined(__i386__)
+#include "xen-x86_32.h"
+#elif defined(__x86_64__)
+#include "xen-x86_64.h"
+#endif
 
 #ifndef __ASSEMBLY__
 /* Guest handles for primitive C types. */
@@ -60,12 +67,7 @@ DEFINE_XEN_GUEST_HANDLE(void);
 
 typedef unsigned long xen_pfn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
-#endif
-
-#if defined(__i386__)
-#include "xen-x86_32.h"
-#elif defined(__x86_64__)
-#include "xen-x86_64.h"
+#define PRI_xen_pfn "lx"
 #endif
 
 /*
@@ -130,12 +132,15 @@ struct vcpu_guest_context {
 #define VGCF_failsafe_disables_events  (1<<_VGCF_failsafe_disables_events)
 #define _VGCF_syscall_disables_events  4
 #define VGCF_syscall_disables_events   (1<<_VGCF_syscall_disables_events)
+#define _VGCF_online                   5
+#define VGCF_online                    (1<<_VGCF_online)
     unsigned long flags;                    /* VGCF_* flags                 */
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
     unsigned long kernel_ss, kernel_sp;     /* Virtual TSS (only SS1/SP1)   */
+    /* NB. User pagetable on x86/64 is placed in ctrlreg[1]. */
     unsigned long ctrlreg[8];               /* CR0-CR7 (control registers)  */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
 #ifdef __i386__
@@ -146,7 +151,17 @@ struct vcpu_guest_context {
 #else
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_eip;
+#ifdef __XEN__
+    union {
+        unsigned long syscall_callback_eip;
+        struct {
+            unsigned int event_callback_cs;    /* compat CS of event cb     */
+            unsigned int failsafe_callback_cs; /* compat CS of failsafe cb  */
+        };
+    };
+#else
     unsigned long syscall_callback_eip;
+#endif
 #endif
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 #ifdef __x86_64__
@@ -176,6 +191,8 @@ struct panic_info {
 	char		*pi_panicstr;	/* panic message */
 	void		*pi_ram_start;	/* Start of all-RAM mapping region */
 	void		*pi_ram_end;	/* End of all-RAM mapping region */
+	void		*pi_xen_start;	/* Start of Xen's text/heap */
+	void		*pi_xen_end;	/* End of Xen's text/heap */
 	void		*pi_stktop;	/* Top of current Xen stack */
 	struct domain	*pi_domain;	/* Panicking domain */
 	struct vcpu	*pi_vcpu;	/* Panicking vcpu */
@@ -187,7 +204,7 @@ struct panic_frame {
 	unsigned long	pf_pc;
 };
 
-#define PANIC_INFO_VERSION	1
+#define PANIC_INFO_VERSION	2
 
 #endif /* !__ASSEMBLY__ */
 

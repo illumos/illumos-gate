@@ -129,6 +129,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
 #define XENMEM_maximum_reservation  4
 
 /*
+ * Returns the maximum GPFN in use by the guest, or -ve errcode on failure.
+ */
+#define XENMEM_maximum_gpfn         14
+
+/*
  * Returns a list of MFN bases of 2MB extents comprising the machine_to_phys
  * mapping table. Architectures which do not have a m2p table do not implement
  * this command.

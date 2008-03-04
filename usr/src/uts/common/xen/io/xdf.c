@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@
 #include <xen/sys/xendev.h>
 #include <sys/gnttab.h>
 #include <sys/scsi/generic/inquiry.h>
+#include <xen/io/blkif_impl.h>
 #include <io/xdf.h>
 
 #define	FLUSH_DISKCACHE	0x1
@@ -325,16 +326,6 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ddi_iblock_cookie_t ibc;
 	ddi_iblock_cookie_t softibc;
 	int instance;
-#if defined(XPV_HVM_DRIVER) && defined(__i386)
-	/* XXX: 6609126 32-bit xdf driver panics on a 64-bit dom0 */
-	extern int xen_is_64bit;
-
-	if (xen_is_64bit) {
-		cmn_err(CE_WARN, "xdf cannot be used in 32-bit domUs on a"
-		    " 64-bit dom0.");
-		return (DDI_FAILURE);
-	}
-#endif
 
 	xdfdebug = ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_NOTPROM,
 	    "xdfdebug", 0);
@@ -1705,6 +1696,19 @@ trans_retry:
 		cmn_err(CE_WARN, "xdf@%s: failed to write event-channel",
 		    ddi_get_name_addr(dip));
 		xvdi_fatal_error(dip, rv, "writing event-channel");
+		goto abort_trans;
+	}
+
+	/*
+	 * "protocol" is written by the domain builder in the case of PV
+	 * domains. However, it is not written for HVM domains, so let's
+	 * write it here.
+	 */
+	if (rv = xenbus_printf(xbt, xsnode, "protocol", "%s",
+	    XEN_IO_PROTO_ABI_NATIVE)) {
+		cmn_err(CE_WARN, "xdf@%s: failed to write protocol",
+		    ddi_get_name_addr(dip));
+		xvdi_fatal_error(dip, rv, "writing protocol");
 		goto abort_trans;
 	}
 

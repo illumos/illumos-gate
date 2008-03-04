@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,12 +81,16 @@ import_buffer(import_export_t *iep, void *uaddr, void *kaddr, size_t size,
 		iep->ie_flags |= IE_FREE;
 	} else {
 		iep->ie_kaddr = kaddr;
+		iep->ie_flags &= ~IE_FREE;
 	}
 
 	if ((flags & IE_IMPORT) &&
 	    (ddi_copyin(uaddr, iep->ie_kaddr, size, 0) != 0)) {
-		if (iep->ie_flags & IE_FREE)
+		if (iep->ie_flags & IE_FREE) {
 			kmem_free(iep->ie_kaddr, iep->ie_size);
+			iep->ie_kaddr = NULL;
+			iep->ie_flags = 0;
+		}
 		return (-X_EFAULT);
 	}
 
@@ -109,8 +113,11 @@ export_buffer(import_export_t *iep, int *error)
 	if ((iep->ie_flags & IE_EXPORT) && (*error >= 0) &&
 	    (ddi_copyout(iep->ie_kaddr, iep->ie_uaddr, iep->ie_size, 0) != 0))
 		copy_err = -X_EFAULT;
-	if (iep->ie_flags & IE_FREE)
+	if (iep->ie_flags & IE_FREE) {
 		kmem_free(iep->ie_kaddr, iep->ie_size);
+		iep->ie_kaddr = NULL;
+		iep->ie_flags = 0;
+	}
 
 	if (copy_err != 0 && *error >= 0)
 		*error = copy_err;
@@ -135,8 +142,10 @@ import_handle(import_export_t *iep, void *field, size_t size, int flags)
 	/*LINTED: constant in conditional context*/
 	get_xen_guest_handle(ptr, (*hdl));
 	err = import_buffer(iep, ptr, NULL, size, (flags));
-	/*LINTED: constant in conditional context*/
-	set_xen_guest_handle((*hdl), (void *)((iep)->ie_kaddr));
+	if (err == 0) {
+		/*LINTED: constant in conditional context*/
+		set_xen_guest_handle((*hdl), (void *)((iep)->ie_kaddr));
+	}
 	return (err);
 }
 
@@ -189,6 +198,10 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 	 * Check this first because our wrapper will forcibly overwrite it.
 	 */
 	if (op.interface_version != XEN_DOMCTL_INTERFACE_VERSION) {
+#ifdef DEBUG
+		printf("domctl vers mismatch (cmd %d, found 0x%x, need 0x%x\n",
+		    op.cmd, op.interface_version, XEN_DOMCTL_INTERFACE_VERSION);
+#endif
 		error = -X_EACCES;
 		export_buffer(&op_ie, &error);
 		return (error);
@@ -240,8 +253,8 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 
 		size = roundup(howmany(op.u.shadow_op.pages, NBBY),
 		    sizeof (ulong_t));
-		error = import_handle(&sub_ie, &op.u.shadow_op.dirty_bitmap,
-		    size, IE_IMPEXP);
+		error = import_handle(&sub_ie,
+		    &op.u.shadow_op.dirty_bitmap, size, IE_IMPEXP);
 		break;
 	}
 
@@ -254,7 +267,7 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 		    sizeof (vcpu_guest_context_t), IE_IMPORT);
 		if (error == -X_EFAULT)
 			/*LINTED: constant in conditional context*/
-			get_xen_guest_handle(taddr, op.u.vcpucontext.ctxt);
+			get_xen_guest_handle_u(taddr, op.u.vcpucontext.ctxt);
 		else
 			taddr = sub_ie.ie_kaddr;
 		DTRACE_XPV2(setvcpucontext__start, domid_t, op.domain,
@@ -268,6 +281,25 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 		break;
 	}
 
+
+	case XEN_DOMCTL_sethvmcontext: {
+		error = import_handle(&sub_ie, &op.u.hvmcontext.buffer,
+		    op.u.hvmcontext.size, IE_IMPORT);
+		break;
+	}
+
+	case XEN_DOMCTL_gethvmcontext: {
+#if !defined(__GNUC__) && defined(__i386__)
+		if (op.u.hvmcontext.buffer.u.p != NULL)
+#else
+		if (op.u.hvmcontext.buffer.p != NULL)
+#endif
+			error = import_handle(&sub_ie, &op.u.hvmcontext.buffer,
+			    op.u.hvmcontext.size, IE_EXPORT);
+		break;
+	}
+
+	case XEN_DOMCTL_resumedomain:
 	case XEN_DOMCTL_getvcpuinfo:
 	case XEN_DOMCTL_setvcpuaffinity:
 	case XEN_DOMCTL_getvcpuaffinity:
@@ -282,6 +314,8 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 	case XEN_DOMCTL_arch_setup:
 	case XEN_DOMCTL_settimeoffset:
 	case XEN_DOMCTL_real_mode_area:
+	case XEN_DOMCTL_set_address_size:
+	case XEN_DOMCTL_sendtrigger:
 		break;
 
 	default:
@@ -348,6 +382,12 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 		break;
 	}
 
+	case XEN_SYSCTL_debug_keys: {
+		error = import_handle(&sub_ie, &op.u.debug_keys.keys,
+		    op.u.debug_keys.nr_keys, IE_IMPORT);
+		break;
+	}
+
 	case XEN_SYSCTL_tbuf_op:
 	case XEN_SYSCTL_physinfo:
 	case XEN_SYSCTL_sched_id:
@@ -362,7 +402,7 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 		 * before wiring down the output buffer appropriately.
 		 */
 		/*LINTED: constant in conditional context*/
-		get_xen_guest_handle(scdp, op.u.perfc_op.desc);
+		get_xen_guest_handle_u(scdp, op.u.perfc_op.desc);
 		if (scdp != NULL) {
 			static int numcounters = -1;
 
@@ -394,6 +434,11 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 		break;
 	}
 
+	case XEN_SYSCTL_getcpuinfo:
+		error = import_handle(&sub_ie, &op.u.getcpuinfo.info,
+		    op.u.getcpuinfo.max_cpus *
+		    sizeof (xen_sysctl_cpuinfo_t), IE_EXPORT);
+		break;
 	default:
 #ifdef DEBUG
 		printf("unrecognized HYPERVISOR_sysctl %d\n", op.cmd);
@@ -532,6 +577,7 @@ privcmd_HYPERVISOR_memory_op(int cmd, void *arg)
 
 	case XENMEM_current_reservation:
 	case XENMEM_maximum_reservation:
+	case XENMEM_maximum_gpfn:
 		if (import_buffer(&op_ie, arg, &op_arg, sizeof (op_arg.domid),
 		    IE_IMPEXP) != 0)
 			return (-X_EFAULT);
@@ -693,6 +739,10 @@ privcmd_HYPERVISOR_event_channel_op(int cmd, void *arg)
 		size = sizeof (evtchn_unmask_t);
 		flags = IE_IMPORT;
 		break;
+	case EVTCHNOP_reset:
+		size = sizeof (evtchn_reset_t);
+		flags = IE_IMPORT;
+		break;
 
 	default:
 #ifdef DEBUG
@@ -771,44 +821,48 @@ privcmd_HYPERVISOR_xen_version(int cmd, void *arg)
 }
 
 static int
-privcmd_HYPERVISOR_acm_op(int cmd, void *arg)
+privcmd_HYPERVISOR_acm_op(void *uacmctl)
 {
 	int error;
-	int size = 0;
+	struct xen_acmctl *acmctl;
 	import_export_t op_ie;
-	uint32_t flags;
 
-	switch (cmd) {
+	error = import_buffer(&op_ie, uacmctl, NULL, sizeof (*acmctl),
+	    IE_IMPEXP);
+	if (error != 0)
+		return (error);
+
+	acmctl = op_ie.ie_kaddr;
+
+	if (acmctl->interface_version != ACM_INTERFACE_VERSION) {
+#ifdef DEBUG
+		printf("acm vers mismatch (cmd %d, found 0x%x, need 0x%x\n",
+		    acmctl->cmd, acmctl->interface_version,
+		    ACM_INTERFACE_VERSION);
+#endif
+		error = -X_EACCES;
+		export_buffer(&op_ie, &error);
+		return (error);
+	}
+
+	switch (acmctl->cmd) {
 	case ACMOP_setpolicy:
-		size = sizeof (struct acm_setpolicy);
-		flags = IE_IMPORT;
-		break;
 	case ACMOP_getpolicy:
-		size = sizeof (struct acm_getpolicy);
-		flags = IE_IMPORT;
-		break;
 	case ACMOP_dumpstats:
-		size = sizeof (struct acm_dumpstats);
-		flags = IE_IMPORT;
-		break;
 	case ACMOP_getssid:
-		size = sizeof (struct acm_getssid);
-		flags = IE_IMPORT;
-		break;
 	case ACMOP_getdecision:
-		size = sizeof (struct acm_getdecision);
-		flags = IE_IMPEXP;
+	case ACMOP_chgpolicy:
+	case ACMOP_relabeldoms:
 		break;
 	default:
 #ifdef DEBUG
-		printf("unrecognized HYPERVISOR_acm_op op %d\n", cmd);
+		printf("unrecognized HYPERVISOR_acm_op op %d\n", acmctl->cmd);
 #endif
 		return (-X_EINVAL);
 	}
 
-	error = import_buffer(&op_ie, arg, NULL, size, flags);
 	if (error == 0)
-		error = HYPERVISOR_acm_op(cmd, op_ie.ie_kaddr);
+		error = HYPERVISOR_acm_op(acmctl);
 	export_buffer(&op_ie, &error);
 
 	return (error);
@@ -966,8 +1020,7 @@ do_privcmd_hypercall(void *uarg, int mode, cred_t *cr, int *rval)
 		    (uint_t *)hc->arg[2], (domid_t)hc->arg[3]);
 		break;
 	case __HYPERVISOR_acm_op:
-		error = privcmd_HYPERVISOR_acm_op(
-		    (int)hc->arg[0], (void *)hc->arg[1]);
+		error = privcmd_HYPERVISOR_acm_op((void *)hc->arg[0]);
 		break;
 	case __HYPERVISOR_hvm_op:
 		error = privcmd_HYPERVISOR_hvm_op(

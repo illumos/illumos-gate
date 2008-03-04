@@ -114,11 +114,6 @@ int		xnb_unmop_hiwat = NET_TX_RING_SIZE - (NET_TX_RING_SIZE >> 2);
 boolean_t	xnb_hv_copy = B_TRUE;
 boolean_t	xnb_explicit_pageflip_set = B_FALSE;
 
-#ifdef XNB_DEBUG
-#define	NR_GRANT_ENTRIES \
-	(NR_GRANT_FRAMES * PAGESIZE / sizeof (grant_entry_t))
-#endif /* XNB_DEBUG */
-
 /* XXPV dme: are these really invalid? */
 #define	INVALID_GRANT_HANDLE	((grant_handle_t)-1)
 #define	INVALID_GRANT_REF	((grant_ref_t)-1)
@@ -652,10 +647,6 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 			cmn_err(CE_PANIC, "xnb_to_peer: "
 			    "id %d out of range in request 0x%p",
 			    rxreq->id, (void *)rxreq);
-		if (rxreq->gref >= NR_GRANT_ENTRIES)
-			cmn_err(CE_PANIC, "xnb_to_peer: "
-			    "grant ref %d out of range in request 0x%p",
-			    rxreq->gref, (void *)rxreq);
 #endif /* XNB_DEBUG */
 
 		/* Assign a pfn and map the new page at the allocated va. */
@@ -995,10 +986,6 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 			cmn_err(CE_PANIC, "xnb_copy_to_peer: "
 			    "id %d out of range in request 0x%p",
 			    rxreq->id, (void *)rxreq);
-		if (rxreq->gref >= NR_GRANT_ENTRIES)
-			cmn_err(CE_PANIC, "xnb_copy_to_peer: "
-			    "grant ref %d out of range in request 0x%p",
-			    rxreq->gref, (void *)rxreq);
 #endif /* XNB_DEBUG */
 
 		/* 2 */
@@ -1481,8 +1468,6 @@ finished:
 
 		rxp->xr_mop.ref =
 		    RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop)->gref;
-
-		ASSERT(rxp->xr_mop.ref < NR_GRANT_ENTRIES);
 
 		*mop = rxp->xr_mop;
 		*rxpp = rxp;

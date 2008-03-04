@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,6 +367,38 @@ mdb_scf_console_term(void)
 	return (term);
 }
 
+/*
+ * Unpleasant hack: we might be debugging a hypervisor domain dump.
+ * Earlier versions use a non-ELF file.  Later versions are ELF, but are
+ * /always/ ELF64, so our standard ehdr check isn't good enough.  Since
+ * we don't want to know too much about the file format, we'll ask
+ * mdb_kb.
+ */
+#ifdef __x86
+static int
+identify_xvm_file(const char *file, int *longmode)
+{
+	int (*identify)(const char *, int *);
+
+	if (mdb_module_load("mdb_kb", MDB_MOD_GLOBAL | MDB_MOD_SILENT) != 0)
+		return (0);
+
+	identify = (int (*)())dlsym(RTLD_NEXT, "xkb_identify");
+
+	if (identify == NULL)
+		return (0);
+
+	return (identify(file, longmode));
+}
+#else
+/*ARGSUSED*/
+static int
+identify_xvm_file(const char *file, int *longmode)
+{
+	return (0);
+}
+#endif /* __x86 */
+
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -385,6 +417,7 @@ main(int argc, char *argv[], char *envp[])
 	int fflag = 0, Kflag = 0, Rflag = 0, Sflag = 0, Oflag = 0, Uflag = 0;
 
 	int ttylike;
+	int longmode = 0;
 
 	stack_t sigstack;
 
@@ -687,6 +720,33 @@ main(int argc, char *argv[], char *envp[])
 	if ((mdb.m_shell = getenv("SHELL")) == NULL)
 		mdb.m_shell = "/bin/sh";
 
+	/*
+	 * If the debugger state is to be inherited from a previous instance,
+	 * restore it now prior to path evaluation so that %R is updated.
+	 */
+	if ((p = getenv(MDB_CONFIG_ENV_VAR)) != NULL) {
+		mdb_set_config(p);
+		(void) unsetenv(MDB_CONFIG_ENV_VAR);
+	}
+
+	/*
+	 * Path evaluation part 1: Create the initial module path to allow
+	 * the target constructor to load a support module.  Then expand
+	 * any command-line arguments that modify the paths.
+	 */
+	if (Iflag != NULL)
+		mdb_set_ipath(Iflag);
+	else
+		mdb_set_ipath(MDB_DEF_IPATH);
+
+	if (Lflag != NULL)
+		mdb_set_lpath(Lflag);
+	else
+		mdb_set_lpath(MDB_DEF_LPATH);
+
+	if (mdb_get_prompt() == NULL && !(mdb.m_flags & MDB_FL_ADB))
+		(void) mdb_set_prompt(MDB_DEF_PROMPT);
+
 	if (tgt_ctor == mdb_kvm_tgt_create) {
 		if (pidarg != NULL) {
 			warn("-p and -k options are mutually exclusive\n");
@@ -791,6 +851,19 @@ main(int argc, char *argv[], char *envp[])
 
 		mdb_io_destroy(io);
 
+		if (identify_xvm_file(tgt_argv[0], &longmode) == 1 &&
+		    !fflag) {
+#ifdef _LP64
+			if (!longmode)
+				goto reexec;
+#else
+			if (longmode)
+				goto reexec;
+#endif
+			tgt_ctor = mdb_kvm_tgt_create;
+			goto tcreate;
+		}
+
 		if (tgt_ctor == mdb_rawfile_tgt_create)
 			goto tcreate; /* skip re-exec and just create target */
 
@@ -844,62 +917,6 @@ main(int argc, char *argv[], char *envp[])
 tcreate:
 	if (tgt_ctor == NULL)
 		tgt_ctor = mdb_proc_tgt_create;
-
-	/*
-	 * If the debugger state is to be inherited from a previous instance,
-	 * restore it now prior to path evaluation so that %R is updated.
-	 */
-	if ((p = getenv(MDB_CONFIG_ENV_VAR)) != NULL) {
-		mdb_set_config(p);
-		(void) unsetenv(MDB_CONFIG_ENV_VAR);
-	}
-
-	/*
-	 * Path evaluation part 1: Create the initial module path to allow
-	 * the target constructor to load a support module.  Then expand
-	 * any command-line arguments that modify the paths.
-	 */
-	if (Iflag != NULL)
-		mdb_set_ipath(Iflag);
-	else
-		mdb_set_ipath(MDB_DEF_IPATH);
-
-	if (Lflag != NULL)
-		mdb_set_lpath(Lflag);
-	else
-		mdb_set_lpath(MDB_DEF_LPATH);
-
-	if (mdb_get_prompt() == NULL && !(mdb.m_flags & MDB_FL_ADB))
-		(void) mdb_set_prompt(MDB_DEF_PROMPT);
-
-#ifdef __x86
-	/*
-	 * Unpleasant hack: we might be debugging a hypervisor domain dump,
-	 * which can be a non-ELF file in earlier versions.  Since we need to
-	 * know some unpleasant details about the format of the file, we ask
-	 * mdb_kb to identify the file if it can, and switch targets based on
-	 * its response.
-	 */
-	if (tgt_ctor == mdb_rawfile_tgt_create && !fflag) {
-		int (*identify)(const char *, int *);
-		int longmode;
-
-		if (mdb_module_load("mdb_kb",
-		    MDB_MOD_GLOBAL | MDB_MOD_SILENT) == 0 &&
-		    (identify = (int (*)())dlsym(RTLD_NEXT, "xkb_identify"))
-		    != NULL && identify(tgt_argv[0], &longmode) == 1) {
-			tgt_ctor = mdb_kvm_tgt_create;
-#ifdef _LP64
-			if (!longmode)
-				goto reexec;
-#else
-			if (longmode)
-				goto reexec;
-#endif
-		}
-	}
-#endif /* __x86 */
-
 
 	tgt = mdb_tgt_create(tgt_ctor, mdb.m_tgtflags, tgt_argc, tgt_argv);
 

@@ -33,6 +33,7 @@ cpudrv "cpu"
 xnbe "xnb,ioemu"
 xnbo "xnb,SUNW_mac"
 xnbu "xnb,netfront"
+xnbo xnb
 pit_beep "SUNW,pit_beep"
 intel_nb5000 "pci8086,25d8"
 intel_nb5000 "pci8086,25d4"

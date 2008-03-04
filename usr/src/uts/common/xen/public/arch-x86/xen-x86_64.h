@@ -55,7 +55,7 @@
  * XXPV HACK, we don't support the hypercall page yet.
  * #endif
  */
-
+  
 /*
  * 64-bit segment selectors
  * These flat segments are in the Xen-private section of every GDT. Since these
@@ -151,7 +151,10 @@ struct iret_context {
 
 #ifdef __GNUC__
 /* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
-#define __DECL_REG(name) union { uint64_t r ## name, e ## name; }
+#define __DECL_REG(name) union { \
+    uint64_t r ## name, e ## name; \
+    uint32_t _e ## name; \
+}
 #else
 /* Non-gcc sources must always use the proper 64-bit name (e.g., rax). */
 #define __DECL_REG(name) uint64_t r ## name

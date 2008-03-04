@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,10 +73,16 @@
 #include <sys/gnttab.h>
 #include <sys/lofi.h>
 #include <io/xdf.h>
+#include <xen/io/blkif_impl.h>
 #include <io/xdb.h>
 
 static xdb_t *xdb_statep;
 static int xdb_debug = 0;
+
+static int xdb_push_response(xdb_t *, uint64_t, uint8_t, uint16_t);
+static int xdb_get_request(xdb_t *, blkif_request_t *);
+static void blkif_get_x86_32_req(blkif_request_t *, blkif_x86_32_request_t *);
+static void blkif_get_x86_64_req(blkif_request_t *, blkif_x86_64_request_t *);
 
 #ifdef DEBUG
 /*
@@ -90,18 +96,18 @@ logva(xdb_t *vdp, uint64_t va)
 	int i;
 
 	page_addrs = vdp->page_addrs;
-	for (i = 0; i < XDB_MAX_IO_PAGES; i++) {
+	for (i = 0; i < XDB_MAX_IO_PAGES(vdp); i++) {
 		if (page_addrs[i] == va)
 			debug_enter("VA remapping found!");
 	}
 
-	for (i = 0; i < XDB_MAX_IO_PAGES; i++) {
+	for (i = 0; i < XDB_MAX_IO_PAGES(vdp); i++) {
 		if (page_addrs[i] == 0) {
 			page_addrs[i] = va;
 			break;
 		}
 	}
-	ASSERT(i < XDB_MAX_IO_PAGES);
+	ASSERT(i < XDB_MAX_IO_PAGES(vdp));
 }
 
 static void
@@ -111,13 +117,13 @@ unlogva(xdb_t *vdp, uint64_t va)
 	int i;
 
 	page_addrs = vdp->page_addrs;
-	for (i = 0; i < XDB_MAX_IO_PAGES; i++) {
+	for (i = 0; i < XDB_MAX_IO_PAGES(vdp); i++) {
 		if (page_addrs[i] == va) {
 			page_addrs[i] = 0;
 			break;
 		}
 	}
-	ASSERT(i < XDB_MAX_IO_PAGES);
+	ASSERT(i < XDB_MAX_IO_PAGES(vdp));
 }
 
 static void
@@ -434,18 +440,10 @@ xdb_free_req(xdb_request_t *req)
 static void
 xdb_response(xdb_t *vdp, blkif_request_t *req, boolean_t ok)
 {
-	xendev_ring_t *ringp = vdp->xs_ring;
 	ddi_acc_handle_t acchdl = vdp->xs_ring_hdl;
-	blkif_response_t *resp;
 
-	resp = xvdi_ring_get_response(ringp);
-	ASSERT(resp);
-
-	ddi_put64(acchdl, &resp->id, ddi_get64(acchdl, &req->id));
-	ddi_put8(acchdl, &resp->operation, ddi_get8(acchdl, &req->operation));
-	ddi_put16(acchdl, (uint16_t *)&resp->status,
-	    ok ? BLKIF_RSP_OKAY : BLKIF_RSP_ERROR);
-	if (xvdi_ring_push_response(ringp))
+	if (xdb_push_response(vdp, ddi_get64(acchdl, &req->id),
+	    ddi_get8(acchdl, &req->operation), ok))
 		xvdi_notify_oe(vdp->xs_dip);
 }
 
@@ -454,18 +452,28 @@ xdb_init_ioreqs(xdb_t *vdp)
 {
 	int i;
 
-	for (i = 0; i < BLKIF_RING_SIZE; i++) {
+	ASSERT(vdp->xs_nentry);
+
+	if (vdp->xs_req == NULL)
+		vdp->xs_req = kmem_alloc(vdp->xs_nentry *
+		    sizeof (xdb_request_t), KM_SLEEP);
+#ifdef DEBUG
+	if (vdp->page_addrs == NULL)
+		vdp->page_addrs = kmem_zalloc(XDB_MAX_IO_PAGES(vdp) *
+		    sizeof (uint64_t), KM_SLEEP);
+#endif
+	for (i = 0; i < vdp->xs_nentry; i++) {
 		vdp->xs_req[i].xr_idx = i;
 		vdp->xs_req[i].xr_next = i + 1;
 	}
-	vdp->xs_req[BLKIF_RING_SIZE - 1].xr_next = -1;
+	vdp->xs_req[vdp->xs_nentry - 1].xr_next = -1;
 	vdp->xs_free_req = 0;
 
 	/* alloc va in host dom for io page mapping */
 	vdp->xs_iopage_va = vmem_xalloc(heap_arena,
-	    XDB_MAX_IO_PAGES * PAGESIZE, PAGESIZE, 0, 0, 0, 0,
+	    XDB_MAX_IO_PAGES(vdp) * PAGESIZE, PAGESIZE, 0, 0, 0, 0,
 	    VM_SLEEP);
-	for (i = 0; i < XDB_MAX_IO_PAGES; i++)
+	for (i = 0; i < XDB_MAX_IO_PAGES(vdp); i++)
 		hat_prepare_mapping(kas.a_hat,
 		    vdp->xs_iopage_va + i * PAGESIZE);
 }
@@ -475,18 +483,29 @@ xdb_uninit_ioreqs(xdb_t *vdp)
 {
 	int i;
 
-	for (i = 0; i < XDB_MAX_IO_PAGES; i++)
+	for (i = 0; i < XDB_MAX_IO_PAGES(vdp); i++)
 		hat_release_mapping(kas.a_hat,
 		    vdp->xs_iopage_va + i * PAGESIZE);
 	vmem_xfree(heap_arena, vdp->xs_iopage_va,
-	    XDB_MAX_IO_PAGES * PAGESIZE);
+	    XDB_MAX_IO_PAGES(vdp) * PAGESIZE);
+	if (vdp->xs_req != NULL) {
+		kmem_free(vdp->xs_req, vdp->xs_nentry * sizeof (xdb_request_t));
+		vdp->xs_req = NULL;
+	}
+#ifdef DEBUG
+	if (vdp->page_addrs != NULL) {
+		kmem_free(vdp->page_addrs, XDB_MAX_IO_PAGES(vdp) *
+		    sizeof (uint64_t));
+		vdp->page_addrs = NULL;
+	}
+#endif
 }
 
 static uint_t
 xdb_intr(caddr_t arg)
 {
-	xendev_ring_t *ringp;
-	blkif_request_t *req;
+	blkif_request_t req;
+	blkif_request_t *reqp = &req;
 	xdb_request_t *xreq;
 	buf_t *bp;
 	uint8_t op;
@@ -506,8 +525,6 @@ xdb_intr(caddr_t arg)
 		return (DDI_INTR_UNCLAIMED);
 	}
 
-	ringp = vdp->xs_ring;
-
 	/*
 	 * We'll loop till there is no more request in the ring
 	 * We won't stuck in this loop for ever since the size of ring buffer
@@ -516,16 +533,16 @@ xdb_intr(caddr_t arg)
 	 */
 
 	/* req_event will be increased in xvdi_ring_get_request() */
-	while ((req = xvdi_ring_get_request(ringp)) != NULL) {
+	while (xdb_get_request(vdp, reqp)) {
 		ret = DDI_INTR_CLAIMED;
 
-		op = ddi_get8(vdp->xs_ring_hdl, &req->operation);
+		op = ddi_get8(vdp->xs_ring_hdl, &reqp->operation);
 		if (op == BLKIF_OP_READ			||
 		    op == BLKIF_OP_WRITE		||
 		    op == BLKIF_OP_WRITE_BARRIER	||
 		    op == BLKIF_OP_FLUSH_DISKCACHE) {
 #ifdef DEBUG
-			xdb_dump_request_oe(req);
+			xdb_dump_request_oe(reqp);
 #endif
 			xreq = xdb_get_req(vdp);
 			ASSERT(xreq);
@@ -545,11 +562,11 @@ xdb_intr(caddr_t arg)
 			}
 
 			xreq->xr_curseg = 0; /* start from first segment */
-			bp = xdb_get_buf(vdp, req, xreq);
+			bp = xdb_get_buf(vdp, reqp, xreq);
 			if (bp == NULL) {
 				/* failed to form a buf */
 				xdb_free_req(xreq);
-				xdb_response(vdp, req, B_FALSE);
+				xdb_response(vdp, reqp, B_FALSE);
 				continue;
 			}
 			bp->av_forw = NULL;
@@ -566,9 +583,8 @@ xdb_intr(caddr_t arg)
 				vdp->xs_l_iobuf->av_forw = bp;
 				vdp->xs_l_iobuf = bp;
 			}
-			vdp->xs_ionum++;
 		} else {
-			xdb_response(vdp, req, B_FALSE);
+			xdb_response(vdp, reqp, B_FALSE);
 			XDB_DBPRINT(XDB_DBG_IO, (CE_WARN, "xdb@%s: "
 			    "Unsupported cmd received from dom %d",
 			    ddi_get_name_addr(dip), vdp->xs_peer));
@@ -586,14 +602,11 @@ xdb_intr(caddr_t arg)
 static int
 xdb_biodone(buf_t *bp)
 {
-	blkif_response_t *resp;
 	int i, err, bioerr;
 	uint8_t segs;
 	gnttab_unmap_grant_ref_t unmapops[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	xdb_request_t *xreq = XDB_BP2XREQ(bp);
 	xdb_t *vdp = xreq->xr_vdp;
-	xendev_ring_t *ringp = vdp->xs_ring;
-	ddi_acc_handle_t acchdl = vdp->xs_ring_hdl;
 	buf_t *nbp;
 
 	bioerr = geterror(bp);
@@ -663,13 +676,7 @@ xdb_biodone(buf_t *bp)
 
 	/* send response back to frontend */
 	if (vdp->xs_if_status == XDB_CONNECTED) {
-		resp = xvdi_ring_get_response(ringp);
-		ASSERT(resp);
-		ddi_put64(acchdl, &resp->id, xreq->xr_id);
-		ddi_put8(acchdl, &resp->operation, xreq->xr_op);
-		ddi_put16(acchdl, (uint16_t *)&resp->status,
-		    bioerr ? BLKIF_RSP_ERROR : BLKIF_RSP_OKAY);
-		if (xvdi_ring_push_response(ringp))
+		if (xdb_push_response(vdp, xreq->xr_id, xreq->xr_op, bioerr))
 			xvdi_notify_oe(vdp->xs_dip);
 		XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE,
 		    "sent resp back to frontend, id=%llu",
@@ -680,9 +687,10 @@ xdb_biodone(buf_t *bp)
 	xdb_free_req(xreq);
 
 	vdp->xs_ionum--;
-	if ((vdp->xs_if_status != XDB_CONNECTED) && (vdp->xs_ionum == 0))
+	if ((vdp->xs_if_status != XDB_CONNECTED) && (vdp->xs_ionum == 0)) {
 		/* we're closing, someone is waiting for I/O clean-up */
 		cv_signal(&vdp->xs_ionumcv);
+	}
 
 	mutex_exit(&vdp->xs_iomutex);
 
@@ -697,6 +705,7 @@ xdb_bindto_frontend(xdb_t *vdp)
 	grant_ref_t gref;
 	evtchn_port_t evtchn;
 	dev_info_t *dip = vdp->xs_dip;
+	char protocol[64] = "";
 
 	/*
 	 * Gather info from frontend
@@ -713,11 +722,50 @@ xdb_bindto_frontend(xdb_t *vdp)
 		return (DDI_FAILURE);
 	}
 
+	vdp->xs_blk_protocol = BLKIF_PROTOCOL_NATIVE;
+	vdp->xs_nentry = BLKIF_RING_SIZE;
+	vdp->xs_entrysize = sizeof (union blkif_sring_entry);
+
+	err = xenbus_gather(XBT_NULL, oename,
+	    "protocol", "%63s", protocol, NULL);
+	if (err)
+		(void) strcpy(protocol, "unspecified, assuming native");
+	else {
+		/*
+		 * We must check for NATIVE first, so that the fast path
+		 * is taken for copying data from the guest to the host.
+		 */
+		if (strcmp(protocol, XEN_IO_PROTO_ABI_NATIVE) != 0) {
+			if (strcmp(protocol, XEN_IO_PROTO_ABI_X86_32) == 0) {
+				vdp->xs_blk_protocol = BLKIF_PROTOCOL_X86_32;
+				vdp->xs_nentry = BLKIF_X86_32_RING_SIZE;
+				vdp->xs_entrysize =
+				    sizeof (union blkif_x86_32_sring_entry);
+			} else if (strcmp(protocol, XEN_IO_PROTO_ABI_X86_64) ==
+			    0) {
+				vdp->xs_blk_protocol = BLKIF_PROTOCOL_X86_64;
+				vdp->xs_nentry = BLKIF_X86_64_RING_SIZE;
+				vdp->xs_entrysize =
+				    sizeof (union blkif_x86_64_sring_entry);
+			} else {
+				xvdi_fatal_error(dip, err, "unknown protocol");
+				return (DDI_FAILURE);
+			}
+		}
+	}
+#ifdef DEBUG
+	cmn_err(CE_NOTE, "xdb@%s: blkif protocol '%s' ",
+	    ddi_get_name_addr(dip), protocol);
+#endif
+
 	/*
 	 * map and init ring
+	 *
+	 * The ring parameters must match those which have been allocated
+	 * in the front end.
 	 */
-	err = xvdi_map_ring(dip, BLKIF_RING_SIZE,
-	    sizeof (union blkif_sring_entry), gref, &vdp->xs_ring);
+	err = xvdi_map_ring(dip, vdp->xs_nentry, vdp->xs_entrysize,
+	    gref, &vdp->xs_ring);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 	/*
@@ -1224,6 +1272,7 @@ xdb_send_buf(void *arg)
 		while ((bp = vdp->xs_f_iobuf) != NULL) {
 			vdp->xs_f_iobuf = bp->av_forw;
 			bp->av_forw = NULL;
+			vdp->xs_ionum++;
 			mutex_exit(&vdp->xs_iomutex);
 			if (bp->b_bcount != 0) {
 				int err = ldi_strategy(vdp->xs_ldi_hdl, bp);
@@ -1473,7 +1522,7 @@ static struct dev_ops xdb_dev_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. */
-	"vbd backend driver %I%",	/* Name of the module */
+	"vbd backend driver 1.4",	/* Name of the module */
 	&xdb_dev_ops			/* driver ops */
 };
 
@@ -1510,4 +1559,98 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&xdb_modlinkage, modinfop));
+}
+
+static int
+xdb_get_request(xdb_t *vdp, blkif_request_t *req)
+{
+	void *src = xvdi_ring_get_request(vdp->xs_ring);
+
+	if (src == NULL)
+		return (0);
+
+	switch (vdp->xs_blk_protocol) {
+	case BLKIF_PROTOCOL_NATIVE:
+		(void) memcpy(req, src, sizeof (*req));
+		break;
+	case BLKIF_PROTOCOL_X86_32:
+		blkif_get_x86_32_req(req, src);
+		break;
+	case BLKIF_PROTOCOL_X86_64:
+		blkif_get_x86_64_req(req, src);
+		break;
+	default:
+		cmn_err(CE_PANIC, "xdb@%s: unrecognised protocol: %d",
+		    ddi_get_name_addr(vdp->xs_dip),
+		    vdp->xs_blk_protocol);
+	}
+	return (1);
+}
+
+static int
+xdb_push_response(xdb_t *vdp, uint64_t id, uint8_t op, uint16_t status)
+{
+	ddi_acc_handle_t acchdl = vdp->xs_ring_hdl;
+	blkif_response_t *rsp = xvdi_ring_get_response(vdp->xs_ring);
+	blkif_x86_32_response_t *rsp_32 = (blkif_x86_32_response_t *)rsp;
+	blkif_x86_64_response_t *rsp_64 = (blkif_x86_64_response_t *)rsp;
+
+	ASSERT(rsp);
+
+	switch (vdp->xs_blk_protocol) {
+	case BLKIF_PROTOCOL_NATIVE:
+		ddi_put64(acchdl, &rsp->id, id);
+		ddi_put8(acchdl, &rsp->operation, op);
+		ddi_put16(acchdl, (uint16_t *)&rsp->status,
+		    status == 0 ? BLKIF_RSP_OKAY : BLKIF_RSP_ERROR);
+		break;
+	case BLKIF_PROTOCOL_X86_32:
+		ddi_put64(acchdl, &rsp_32->id, id);
+		ddi_put8(acchdl, &rsp_32->operation, op);
+		ddi_put16(acchdl, (uint16_t *)&rsp_32->status,
+		    status == 0 ? BLKIF_RSP_OKAY : BLKIF_RSP_ERROR);
+		break;
+	case BLKIF_PROTOCOL_X86_64:
+		ddi_put64(acchdl, &rsp_64->id, id);
+		ddi_put8(acchdl, &rsp_64->operation, op);
+		ddi_put16(acchdl, (uint16_t *)&rsp_64->status,
+		    status == 0 ? BLKIF_RSP_OKAY : BLKIF_RSP_ERROR);
+		break;
+	default:
+		cmn_err(CE_PANIC, "xdb@%s: unrecognised protocol: %d",
+		    ddi_get_name_addr(vdp->xs_dip),
+		    vdp->xs_blk_protocol);
+	}
+
+	return (xvdi_ring_push_response(vdp->xs_ring));
+}
+
+static void
+blkif_get_x86_32_req(blkif_request_t *dst, blkif_x86_32_request_t *src)
+{
+	int i, n = BLKIF_MAX_SEGMENTS_PER_REQUEST;
+	dst->operation = src->operation;
+	dst->nr_segments = src->nr_segments;
+	dst->handle = src->handle;
+	dst->id = src->id;
+	dst->sector_number = src->sector_number;
+	if (n > src->nr_segments)
+		n = src->nr_segments;
+	for (i = 0; i < n; i++)
+		dst->seg[i] = src->seg[i];
+}
+
+static void
+blkif_get_x86_64_req(blkif_request_t *dst, blkif_x86_64_request_t *src)
+{
+	int i, n = BLKIF_MAX_SEGMENTS_PER_REQUEST;
+	dst->operation = src->operation;
+	dst->nr_segments = src->nr_segments;
+	dst->handle = src->handle;
+	dst->id = src->id;
+	dst->sector_number = src->sector_number;
+	if (n > src->nr_segments)
+		n = src->nr_segments;
+	for (i = 0; i < n; i++)
+		dst->seg[i] = src->seg[i];
 }

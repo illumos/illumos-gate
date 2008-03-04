@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -235,8 +235,13 @@ do_privcmd_mmapbatch(void *uarg, int mode, cred_t *cr)
 		}
 
 		if (mfn == MFN_INVALID) {
-			error = EINVAL;
-			break;
+			/*
+			 * This mfn is invalid and should not be added to
+			 * segmf, as we'd only cause an immediate EFAULT when
+			 * we tried to fault it in.
+			 */
+			mfn |= XEN_DOMCTL_PFINFO_XTAB;
+			continue;
 		}
 
 		if (segmf_add_mfns(seg, addr, mfn, 1, mmb->dom) == 0)
@@ -246,7 +251,7 @@ do_privcmd_mmapbatch(void *uarg, int mode, cred_t *cr)
 		 * Tell the process that this MFN could not be mapped, so it
 		 * won't later try to access it.
 		 */
-		mfn |= 0xf0000000;
+		mfn |= XEN_DOMCTL_PFINFO_XTAB;
 		if (sulword(ulp, mfn) != 0) {
 			error = EFAULT;
 			break;

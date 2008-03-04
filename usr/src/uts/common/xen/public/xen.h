@@ -30,7 +30,7 @@
 #include "xen-compat.h"
 
 #if defined(__i386) && !defined(__i386__)
-#define __i386__
+#define __i386__ /* foo */
 #endif
 
 #if defined(__amd64) && !defined(__x86_64__)
@@ -143,6 +143,7 @@
 #define VIRQ_TBUF       4  /* G. (DOM0) Trace buffer has records available.  */
 #define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
+#define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
@@ -421,7 +422,9 @@ struct vcpu_info {
     struct arch_vcpu_info arch;
     struct vcpu_time_info time;
 }; /* 64 bytes (x86) */
+#ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
+#endif
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
@@ -479,29 +482,29 @@ struct shared_info {
     struct arch_shared_info arch;
 
 };
+#ifndef __XEN__
 typedef struct shared_info shared_info_t;
+#endif
 
 /*
- * Start-of-day memory layout for the initial domain (DOM0):
+ * Start-of-day memory layout:
  *  1. The domain is started within contiguous virtual-memory region.
- *  2. The contiguous region begins and ends on an aligned 4MB boundary.
- *  3. The region start corresponds to the load address of the OS image.
- *     If the load address is not 4MB aligned then the address is rounded down.
- *  4. This the order of bootstrap elements in the initial virtual region:
+ *  2. The contiguous region ends on an aligned 4MB boundary.
+ *  3. This the order of bootstrap elements in the initial virtual region:
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
  *      c. list of allocated page frames [mfn_list, nr_pages]
  *      d. start_info_t structure        [register ESI (x86)]
  *      e. bootstrap page tables         [pt_base, CR3 (x86)]
  *      f. bootstrap stack               [register ESP (x86)]
- *  5. Bootstrap elements are packed together, but each is 4kB-aligned.
- *  6. The initial ram disk may be omitted.
- *  7. The list of page frames forms a contiguous 'pseudo-physical' memory
+ *  4. Bootstrap elements are packed together, but each is 4kB-aligned.
+ *  5. The initial ram disk may be omitted.
+ *  6. The list of page frames forms a contiguous 'pseudo-physical' memory
  *     layout for the domain. In particular, the bootstrap virtual-memory
  *     region is a 1:1 mapping to the first section of the pseudo-physical map.
- *  8. All bootstrap elements are mapped read-writable for the guest OS. The
+ *  7. All bootstrap elements are mapped read-writable for the guest OS. The
  *     only exception is the bootstrap page table, which is mapped read-only.
- *  9. There is guaranteed to be at least 512kB padding after the final
+ *  8. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
  */
@@ -583,6 +586,8 @@ typedef struct dom0_vga_console_info {
         } vesa_lfb;
     } u;
 } dom0_vga_console_info_t;
+#define xen_vga_console_info dom0_vga_console_info
+#define xen_vga_console_info_t dom0_vga_console_info_t
 
 typedef uint8_t xen_domain_handle_t[16];
 
@@ -601,6 +606,21 @@ DEFINE_XEN_GUEST_HANDLE(uint64_t);
 #define mk_unsigned_long(x) x
 
 #endif /* !__ASSEMBLY__ */
+
+/* Default definitions for macros used by domctl/sysctl. */
+/*
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+*/
+#ifndef uint64_aligned_t
+#define uint64_aligned_t uint64_t
+#endif
+#ifndef XEN_GUEST_HANDLE_64
+#define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
+#endif
+/*
+#endif
+*/
+
 
 #endif /* __XEN_PUBLIC_XEN_H__ */
 

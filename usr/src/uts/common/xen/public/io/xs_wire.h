@@ -45,7 +45,8 @@ enum xsd_sockmsg_type
     XS_SET_PERMS,
     XS_WATCH_EVENT,
     XS_ERROR,
-    XS_IS_DOMAIN_INTRODUCED
+    XS_IS_DOMAIN_INTRODUCED,
+    XS_RESUME
 };
 
 #define XS_WRITE_NONE "NONE"
@@ -59,42 +60,27 @@ struct xsd_errors
     const char *errstring;
 };
 #define XSD_ERROR(x) { x, #x }
-#if !defined(__GNUC__)
 /* LINTED: static unused */
-static struct xsd_errors xsd_errors[] = {
-    XSD_ERROR(EINVAL),
-    XSD_ERROR(EACCES),
-    XSD_ERROR(EEXIST),
-    XSD_ERROR(EISDIR),
-    XSD_ERROR(ENOENT),
-    XSD_ERROR(ENOMEM),
-    XSD_ERROR(ENOSPC),
-    XSD_ERROR(EIO),
-    XSD_ERROR(ENOTEMPTY),
-    XSD_ERROR(ENOSYS),
-    XSD_ERROR(EROFS),
-    XSD_ERROR(EBUSY),
-    XSD_ERROR(EAGAIN),
-    XSD_ERROR(EISCONN)
-};
-#else
-static struct xsd_errors xsd_errors[] __attribute__((unused)) = {
-    XSD_ERROR(EINVAL),
-    XSD_ERROR(EACCES),
-    XSD_ERROR(EEXIST),
-    XSD_ERROR(EISDIR),
-    XSD_ERROR(ENOENT),
-    XSD_ERROR(ENOMEM),
-    XSD_ERROR(ENOSPC),
-    XSD_ERROR(EIO),
-    XSD_ERROR(ENOTEMPTY),
-    XSD_ERROR(ENOSYS),
-    XSD_ERROR(EROFS),
-    XSD_ERROR(EBUSY),
-    XSD_ERROR(EAGAIN),
-    XSD_ERROR(EISCONN)
-};
+static struct xsd_errors xsd_errors[]
+#if defined(__GNUC__)
+__attribute__((unused))
 #endif
+    = {
+    XSD_ERROR(EINVAL),
+    XSD_ERROR(EACCES),
+    XSD_ERROR(EEXIST),
+    XSD_ERROR(EISDIR),
+    XSD_ERROR(ENOENT),
+    XSD_ERROR(ENOMEM),
+    XSD_ERROR(ENOSPC),
+    XSD_ERROR(EIO),
+    XSD_ERROR(ENOTEMPTY),
+    XSD_ERROR(ENOSYS),
+    XSD_ERROR(EROFS),
+    XSD_ERROR(EBUSY),
+    XSD_ERROR(EAGAIN),
+    XSD_ERROR(EISCONN)
+};
 
 struct xsd_sockmsg
 {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,15 +61,7 @@ int __lint_xen_guest;
 	NOTE("Xen", XEN_ELFNOTE_VIRT_BASE, .4byte, 0x40000000)
 	NOTE("Xen", XEN_ELFNOTE_PADDR_OFFSET, .4byte, 0x40000000)
 #if defined(__i386)
-	/*
-	 * NB: If you want to build a kernel that works on a non-PAE
-	 * hypervisor, just comment out the next line and rebuild Solaris.
-	 * It'll just work, the kernel figures everything out dynamically.
-	 */
 	NOTE("Xen", XEN_ELFNOTE_PAE_MODE, .string, "yes,bimodal")
-	/*
-	 * XXPV: implement XEN_ELFNOTE_HV_START_LOW
-	 */
 #endif
 
 #endif /* __lint */

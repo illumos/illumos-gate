@@ -217,6 +217,19 @@ struct evtchn_unmask {
 typedef struct evtchn_unmask evtchn_unmask_t;
 
 /*
+ * EVTCHNOP_reset: Close all event channels associated with specified domain.
+ * NOTES:
+ *  1. <dom> may be specified as DOMID_SELF.
+ *  2. Only a sufficiently-privileged domain may specify other than DOMID_SELF.
+ */
+#define EVTCHNOP_reset           10
+struct evtchn_reset {
+    /* IN parameters. */
+    domid_t dom;
+};
+typedef struct evtchn_reset evtchn_reset_t;
+
+/*
  * Argument to event_channel_op_compat() hypercall. Superceded by new
  * event_channel_op() hypercall since 0x00030202.
  */

@@ -41,7 +41,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000002
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000003
 
 /*
  * Read console content from Xen buffer ring.
@@ -50,9 +50,11 @@
 struct xen_sysctl_readconsole {
     /* IN variables. */
     uint32_t clear;                /* Non-zero -> clear after reading. */
-    XEN_GUEST_HANDLE(char) buffer; /* Buffer start */
+    uint8_t  pad1[4];
+    XEN_GUEST_HANDLE_64(char) buffer; /* Buffer start */
     /* IN/OUT variables. */
     uint32_t count;            /* In: Buffer size;  Out: Used buffer size  */
+    uint8_t pad2[4];
 };
 typedef struct xen_sysctl_readconsole xen_sysctl_readconsole_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_readconsole_t);
@@ -68,11 +70,12 @@ struct xen_sysctl_tbuf_op {
 #define XEN_SYSCTL_TBUFOP_enable       4
 #define XEN_SYSCTL_TBUFOP_disable      5
     uint32_t cmd;
+    uint8_t pad[4];
     /* IN/OUT variables */
     struct xenctl_cpumap cpu_mask;
     uint32_t             evt_mask;
     /* OUT variables */
-    uint64_t buffer_mfn;
+    uint64_aligned_t buffer_mfn;
     uint32_t size;
 };
 typedef struct xen_sysctl_tbuf_op xen_sysctl_tbuf_op_t;
@@ -88,9 +91,10 @@ struct xen_sysctl_physinfo {
     uint32_t sockets_per_node;
     uint32_t nr_nodes;
     uint32_t cpu_khz;
-    uint64_t total_pages;
-    uint64_t free_pages;
-    uint64_t scrub_pages;
+    uint8_t  pad[4];
+    uint64_aligned_t total_pages;
+    uint64_aligned_t free_pages;
+    uint64_aligned_t scrub_pages;
     uint32_t hw_cap[8];
 };
 typedef struct xen_sysctl_physinfo xen_sysctl_physinfo_t;
@@ -127,10 +131,11 @@ struct xen_sysctl_perfc_op {
     /* OUT variables. */
     uint32_t       nr_counters;       /*  number of counters description  */
     uint32_t       nr_vals;           /*  number of values  */
+    uint8_t        pad[4];
     /* counter information (or NULL) */
-    XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc;
+    XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc;
     /* counter values (or NULL) */
-    XEN_GUEST_HANDLE(xen_sysctl_perfc_val_t) val;
+    XEN_GUEST_HANDLE_64(xen_sysctl_perfc_val_t) val;
 };
 typedef struct xen_sysctl_perfc_op xen_sysctl_perfc_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_op_t);
@@ -139,13 +144,45 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_op_t);
 struct xen_sysctl_getdomaininfolist {
     /* IN variables. */
     domid_t               first_domain;
+    uint8_t               pad1[2];
     uint32_t              max_domains;
-    XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t) buffer;
+    XEN_GUEST_HANDLE_64(xen_domctl_getdomaininfo_t) buffer;
     /* OUT variables. */
     uint32_t              num_domains;
+    uint8_t               pad2[4];
 };
 typedef struct xen_sysctl_getdomaininfolist xen_sysctl_getdomaininfolist_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getdomaininfolist_t);
+
+/* Inject debug keys into Xen. */
+#define XEN_SYSCTL_debug_keys        7
+struct xen_sysctl_debug_keys {
+    /* IN variables. */
+    XEN_GUEST_HANDLE_64(char) keys;
+    uint32_t nr_keys;
+    uint8_t pad[4];
+};
+typedef struct xen_sysctl_debug_keys xen_sysctl_debug_keys_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
+
+/* Get physical CPU information. */
+#define XEN_SYSCTL_getcpuinfo        8
+struct xen_sysctl_cpuinfo {
+    uint64_t idletime;
+};
+typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t); 
+struct xen_sysctl_getcpuinfo {
+    /* IN variables. */
+    uint32_t max_cpus;
+    uint8_t  pad1[4];
+    XEN_GUEST_HANDLE_64(xen_sysctl_cpuinfo_t) info;
+    /* OUT variables. */
+    uint32_t nr_cpus;
+    uint8_t  pad2[4];
+}; 
+typedef struct xen_sysctl_getcpuinfo xen_sysctl_getcpuinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t); 
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -157,6 +194,8 @@ struct xen_sysctl {
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
         struct xen_sysctl_getdomaininfolist getdomaininfolist;
+        struct xen_sysctl_debug_keys        debug_keys;
+        struct xen_sysctl_getcpuinfo        getcpuinfo;
         uint8_t                             pad[128];
     } u;
 };

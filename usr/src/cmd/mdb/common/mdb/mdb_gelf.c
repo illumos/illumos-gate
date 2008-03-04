@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,8 +133,8 @@ gelf_sect_init(mdb_gelf_file_t *gf)
 	return (gf);
 }
 
-static void *
-gelf_sect_load(mdb_gelf_file_t *gf, mdb_gelf_sect_t *gsp)
+void *
+mdb_gelf_sect_load(mdb_gelf_file_t *gf, mdb_gelf_sect_t *gsp)
 {
 	ssize_t nbytes;
 
@@ -1124,10 +1123,10 @@ mdb_gelf_symtab_create_file_by_name(mdb_gelf_file_t *gf,
 	if (gst->gst_dsect == NULL || gst->gst_ssect == NULL)
 		goto err; /* Failed to locate data or string section */
 
-	if (gelf_sect_load(gf, gst->gst_dsect) == NULL)
+	if (mdb_gelf_sect_load(gf, gst->gst_dsect) == NULL)
 		goto err; /* Failed to load data section */
 
-	if (gelf_sect_load(gf, gst->gst_ssect) == NULL)
+	if (mdb_gelf_sect_load(gf, gst->gst_ssect) == NULL)
 		goto err; /* Failed to load string section */
 
 	if (gf->gf_ehdr.e_ident[EI_CLASS] == ELFCLASS32)
@@ -1278,10 +1277,10 @@ mdb_gelf_symtab_create_dynamic(mdb_gelf_file_t *gf, uint_t tabid)
 	gst->gst_ssect->gs_shdr.sh_size = dt_strsz;
 	gst->gst_ssect->gs_shdr.sh_entsize = 0;
 
-	if (gelf_sect_load(gf, gst->gst_dsect) == NULL)
+	if (mdb_gelf_sect_load(gf, gst->gst_dsect) == NULL)
 		goto err;
 
-	if (gelf_sect_load(gf, gst->gst_ssect) == NULL)
+	if (mdb_gelf_sect_load(gf, gst->gst_ssect) == NULL)
 		goto err;
 
 	if (gf->gf_ehdr.e_ident[EI_CLASS] == ELFCLASS32)
@@ -1875,4 +1874,17 @@ mdb_gelf_rw(mdb_gelf_file_t *gf, void *buf, size_t nbytes, uintptr_t addr,
 		return (set_errno(EMDB_NOMAP));
 
 	return (nbytes - resid);
+}
+
+mdb_gelf_sect_t *
+mdb_gelf_sect_by_name(mdb_gelf_file_t *gf, const char *name)
+{
+	int i;
+
+	for (i = 0; i < gf->gf_shnum; i++) {
+		if (strcmp(gf->gf_sects[i].gs_name, name) == 0)
+			return (&gf->gf_sects[i]);
+	}
+
+	return (NULL);
 }

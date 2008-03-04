@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,9 +300,9 @@ HYPERVISOR_mmuext_op(struct mmuext_op *req, int count, uint_t *success_count,
 }
 
 long
-HYPERVISOR_acm_op(int cmd, void *arg)
+HYPERVISOR_acm_op(struct xen_acmctl *arg)
 {
-	return (__hypercall2(__HYPERVISOR_acm_op, (long)cmd, (ulong_t)arg));
+	return (__hypercall1(__HYPERVISOR_acm_op, (ulong_t)arg));
 }
 
 long

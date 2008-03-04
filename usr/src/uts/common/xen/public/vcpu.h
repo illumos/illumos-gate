@@ -42,13 +42,13 @@
  * @extra_arg == pointer to vcpu_guest_context structure containing initial
  *               state for the VCPU.
  */
-#define VCPUOP_initialise           0
+#define VCPUOP_initialise            0
 
 /*
  * Bring up a VCPU. This makes the VCPU runnable. This operation will fail
  * if the VCPU has not been initialised (VCPUOP_initialise).
  */
-#define VCPUOP_up                   1
+#define VCPUOP_up                    1
 
 /*
  * Bring down a VCPU (i.e., make it non-runnable).
@@ -64,16 +64,16 @@
  *     practise to move a VCPU onto an 'idle' or default page table, LDT and
  *     GDT before bringing it down.
  */
-#define VCPUOP_down                 2
+#define VCPUOP_down                  2
 
 /* Returns 1 if the given VCPU is up. */
-#define VCPUOP_is_up                3
+#define VCPUOP_is_up                 3
 
 /*
  * Return information about the state and running time of a VCPU.
  * @extra_arg == pointer to vcpu_runstate_info structure.
  */
-#define VCPUOP_get_runstate_info    4
+#define VCPUOP_get_runstate_info     4
 struct vcpu_runstate_info {
     /* VCPU's current state (RUNSTATE_*). */
     int      state;
@@ -128,6 +128,56 @@ struct vcpu_register_runstate_memory_area {
     } addr;
 };
 typedef struct vcpu_register_runstate_memory_area vcpu_register_runstate_memory_area_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_register_runstate_memory_area_t);
+
+/*
+ * Set or stop a VCPU's periodic timer. Every VCPU has one periodic timer
+ * which can be set via these commands. Periods smaller than one millisecond
+ * may not be supported.
+ */
+#define VCPUOP_set_periodic_timer    6 /* arg == vcpu_set_periodic_timer_t */
+#define VCPUOP_stop_periodic_timer   7 /* arg == NULL */
+struct vcpu_set_periodic_timer {
+    uint64_t period_ns;
+};
+typedef struct vcpu_set_periodic_timer vcpu_set_periodic_timer_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_set_periodic_timer_t);
+
+/*
+ * Set or stop a VCPU's single-shot timer. Every VCPU has one single-shot
+ * timer which can be set via these commands.
+ */
+#define VCPUOP_set_singleshot_timer  8 /* arg == vcpu_set_singleshot_timer_t */
+#define VCPUOP_stop_singleshot_timer 9 /* arg == NULL */
+struct vcpu_set_singleshot_timer {
+    uint64_t timeout_abs_ns;   /* Absolute system time value in nanoseconds. */
+    uint32_t flags;            /* VCPU_SSHOTTMR_??? */
+};
+typedef struct vcpu_set_singleshot_timer vcpu_set_singleshot_timer_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
+
+/* Flags to VCPUOP_set_singleshot_timer. */
+ /* Require the timeout to be in the future (return -ETIME if it's passed). */
+#define _VCPU_SSHOTTMR_future (0)
+#define VCPU_SSHOTTMR_future  (1U << _VCPU_SSHOTTMR_future)
+
+/* 
+ * Register a memory location in the guest address space for the
+ * vcpu_info structure.  This allows the guest to place the vcpu_info
+ * structure in a convenient place, such as in a per-cpu data area.
+ * The pointer need not be page aligned, but the structure must not
+ * cross a page boundary.
+ *
+ * This may be called only once per vcpu.
+ */
+#define VCPUOP_register_vcpu_info   10  /* arg == struct vcpu_info */
+struct vcpu_register_vcpu_info {
+    uint64_t mfn;    /* mfn of page to place vcpu_info */
+    uint32_t offset; /* offset within page */
+    uint32_t rsvd;   /* unused */
+};
+typedef struct vcpu_register_vcpu_info vcpu_register_vcpu_info_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 

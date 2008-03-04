@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +101,7 @@ enum xdb_fe_state {
 #define	XDB_INST2MINOR(i)	(minor_t)(i)
 #define	XDB_INST2SOFTS(instance)			\
 	((xdb_t *)ddi_get_soft_state(xdb_statep, (instance)))
-#define	XDB_MAX_IO_PAGES BLKIF_RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST
+#define	XDB_MAX_IO_PAGES(v) ((v)->xs_nentry * BLKIF_MAX_SEGMENTS_PER_REQUEST)
 /* get kva of a mapped-in page coresponding to (xreq-index, seg) pair */
 #define	XDB_IOPAGE_VA(_pagebase, _xreqidx, _seg)	\
 	((_pagebase) + ((_xreqidx)			\
@@ -192,14 +192,17 @@ struct xdb {
 	/* head of free list of xdb_request_t */
 	int		xs_free_req;
 	/* pre-allocated xdb_request_t pool */
-	xdb_request_t	xs_req[BLKIF_RING_SIZE];
+	xdb_request_t	*xs_req;
 	kstat_t		*xs_kstats;
 	uint64_t	xs_stat_req_reads;
 	uint64_t	xs_stat_req_writes;
 	uint64_t	xs_stat_req_barriers;
 	uint64_t	xs_stat_req_flushes;
+	enum blkif_protocol xs_blk_protocol;
+	size_t		xs_nentry;
+	size_t		xs_entrysize;
 #ifdef DEBUG
-	uint64_t page_addrs[XDB_MAX_IO_PAGES]; /* for debug aid */
+	uint64_t *page_addrs; /* for debug aid */
 #endif /* DEBUG */
 };
 

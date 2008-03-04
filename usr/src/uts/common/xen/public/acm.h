@@ -56,6 +56,19 @@
 #define ACM_ACCESS_DENIED           -111
 #define ACM_NULL_POINTER_ERROR      -200
 
+/*
+   Error codes reported in when trying to test for a new policy
+   These error codes are reported in an array of tuples where
+   each error code is followed by a parameter describing the error
+   more closely, such as a domain id.
+*/
+#define ACM_EVTCHN_SHARING_VIOLATION       0x100
+#define ACM_GNTTAB_SHARING_VIOLATION       0x101
+#define ACM_DOMAIN_LOOKUP                  0x102
+#define ACM_CHWALL_CONFLICT                0x103
+#define ACM_SSIDREF_IN_USE                 0x104
+
+
 /* primary policy in lower 4 bits */
 #define ACM_NULL_POLICY 0
 #define ACM_CHINESE_WALL_POLICY 1
@@ -78,7 +91,7 @@
  * whenever the interpretation of the related
  * policy's data structure changes
  */
-#define ACM_POLICY_VERSION 2
+#define ACM_POLICY_VERSION 3
 #define ACM_CHWALL_VERSION 1
 #define ACM_STE_VERSION  1
 
@@ -119,6 +132,14 @@ typedef uint16_t domaintype_t;
 /* each offset in bytes from start of the struct they
  * are part of */
 
+/* V3 of the policy buffer aded a version structure */
+struct acm_policy_version
+{
+    uint32_t major;
+    uint32_t minor;
+};
+
+
 /* each buffer consists of all policy information for
  * the respective policy given in the policy code
  *
@@ -136,7 +157,9 @@ struct acm_policy_buffer {
     uint32_t primary_buffer_offset;
     uint32_t secondary_policy_code;
     uint32_t secondary_buffer_offset;
+    struct acm_policy_version xml_pol_version; /* add in V3 */
 };
+
 
 struct acm_policy_reference_buffer {
     uint32_t len;

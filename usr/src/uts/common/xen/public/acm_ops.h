@@ -34,7 +34,7 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0008
+#define ACM_INTERFACE_VERSION   0xAAAA000A
 
 /************************************************************************/
 
@@ -49,8 +49,7 @@
 #define ACMOP_setpolicy         1
 struct acm_setpolicy {
     /* IN */
-    uint32_t interface_version;
-    XEN_GUEST_HANDLE(void) pushcache;
+    XEN_GUEST_HANDLE_64(void) pushcache;
     uint32_t pushcache_size;
 };
 
@@ -58,8 +57,7 @@ struct acm_setpolicy {
 #define ACMOP_getpolicy         2
 struct acm_getpolicy {
     /* IN */
-    uint32_t interface_version;
-    XEN_GUEST_HANDLE(void) pullcache;
+    XEN_GUEST_HANDLE_64(void) pullcache;
     uint32_t pullcache_size;
 };
 
@@ -67,8 +65,7 @@ struct acm_getpolicy {
 #define ACMOP_dumpstats         3
 struct acm_dumpstats {
     /* IN */
-    uint32_t interface_version;
-    XEN_GUEST_HANDLE(void) pullcache;
+    XEN_GUEST_HANDLE_64(void) pullcache;
     uint32_t pullcache_size;
 };
 
@@ -78,20 +75,18 @@ struct acm_dumpstats {
 #define ACM_GETBY_domainid 2
 struct acm_getssid {
     /* IN */
-    uint32_t interface_version;
     uint32_t get_ssid_by; /* ACM_GETBY_* */
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
     } id;
-    XEN_GUEST_HANDLE(void) ssidbuf;
+    XEN_GUEST_HANDLE_64(void) ssidbuf;
     uint32_t ssidbuf_size;
 };
 
 #define ACMOP_getdecision      5
 struct acm_getdecision {
     /* IN */
-    uint32_t interface_version;
     uint32_t get_decision_by1; /* ACM_GETBY_* */
     uint32_t get_decision_by2; /* ACM_GETBY_* */
     union {
@@ -106,6 +101,50 @@ struct acm_getdecision {
     /* OUT */
     uint32_t acm_decision;
 };
+
+
+#define ACMOP_chgpolicy        6
+struct acm_change_policy {
+    /* IN */
+    XEN_GUEST_HANDLE_64(void) policy_pushcache;
+    uint32_t policy_pushcache_size;
+    XEN_GUEST_HANDLE_64(void) del_array;
+    uint32_t delarray_size;
+    XEN_GUEST_HANDLE_64(void) chg_array;
+    uint32_t chgarray_size;
+    /* OUT */
+    /* array with error code */
+    XEN_GUEST_HANDLE_64(void) err_array;
+    uint32_t errarray_size;
+};
+
+#define ACMOP_relabeldoms       7
+struct acm_relabel_doms {
+    /* IN */
+    XEN_GUEST_HANDLE_64(void) relabel_map;
+    uint32_t relabel_map_size;
+    /* OUT */
+    XEN_GUEST_HANDLE_64(void) err_array;
+    uint32_t errarray_size;
+};
+
+/* future interface to Xen */
+struct xen_acmctl {
+    uint32_t cmd;
+    uint32_t interface_version;
+    union {
+        struct acm_setpolicy     setpolicy;
+        struct acm_getpolicy     getpolicy;
+        struct acm_dumpstats     dumpstats;
+        struct acm_getssid       getssid;
+        struct acm_getdecision   getdecision;
+        struct acm_change_policy change_policy;
+        struct acm_relabel_doms  relabel_doms;
+    } u;
+};
+
+typedef struct xen_acmctl xen_acmctl_t;
+DEFINE_XEN_GUEST_HANDLE(xen_acmctl_t);
 
 #endif /* __XEN_PUBLIC_ACM_OPS_H__ */
 

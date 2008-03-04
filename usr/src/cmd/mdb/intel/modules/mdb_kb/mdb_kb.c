@@ -19,17 +19,25 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * KVM backend for hypervisor domain dumps.  We don't use libkvm for such
- * dumps, since they do not have a namelist file or the typical dump structures
- * we expect to aid bootstrapping.  Instead, we bootstrap based upon a
- * debug_info structure at a known VA, using the guest's own page tables to
- * resolve to physical addresses, and construct the namelist in a manner
- * similar to ksyms_snapshot().
+ * KVM backend for hypervisor domain dumps.  We don't use libkvm for
+ * such dumps, since they do not have a namelist file or the typical
+ * dump structures we expect to aid bootstrapping.  Instead, we
+ * bootstrap based upon a debug_info structure at a known VA, using the
+ * guest's own page tables to resolve to physical addresses, and
+ * construct the namelist in a manner similar to ksyms_snapshot().
+ *
+ * Note that there are two formats understood by this module: the older,
+ * ad hoc format, which we call 'core' within this file, and an
+ * ELF-based format, known as 'elf'.
+ *
+ * We only support the older format generated on Solaris dom0: before we
+ * fixed it, core dump files were broken whenever a PFN didn't map a
+ * real MFN (!).
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,13 +70,8 @@
 #include <mdb/mdb_target_impl.h>
 
 #include <xen/public/xen.h>
-
-#if defined(__i386)
-#define	DEF_DEBUG_INFO_VA 0xfb3ff000
-#define	PAE_DEBUG_INFO_VA 0xf4bff000
-#elif defined(__amd64)
-#define	DEF_DEBUG_INFO_VA 0xfffffffffb7ff000
-#endif
+#include <xen/public/version.h>
+#include <xen/public/elfnote.h>
 
 #define	XKB_SHDR_NULL 0
 #define	XKB_SHDR_SYMTAB 1
@@ -81,17 +84,19 @@
 #define	XKB_WALK_STR 0x4
 #define	XKB_WALK_ALL (XKB_WALK_LOCAL | XKB_WALK_GLOBAL | XKB_WALK_STR)
 
+#if defined(__i386)
+#define	DEBUG_INFO 0xf4bff000
+#elif defined(__amd64)
+#define	DEBUG_INFO 0xfffffffffb7ff000
+#endif
+
 #define	PAGE_SIZE 0x1000
 #define	PAGE_SHIFT 12
 #define	PAGE_OFFSET(a) ((a) & (PAGE_SIZE - 1))
 #define	PAGE_MASK(a) ((a) & ~(PAGE_SIZE - 1))
+#define	PAGE_ALIGNED(a) (((a) & (PAGE_SIZE -1)) == 0)
 #define	PT_PADDR 0x000ffffffffff000ull
 #define	PT_VALID 0x1
-
-/*
- * Once the headers are available easily from within ON, we can use those, but
- * until then these definitions are duplicates.
- */
 
 #define	XC_CORE_MAGIC 0xF00FEBED
 #define	XC_CORE_MAGIC_HVM 0xF00FEBEE
@@ -107,6 +112,33 @@ typedef struct xc_core_header {
 	unsigned int xch_pages_offset;
 } xc_core_header_t;
 
+struct xc_elf_header {
+	uint64_t xeh_magic;
+	uint64_t xeh_nr_vcpus;
+	uint64_t xeh_nr_pages;
+	uint64_t xeh_page_size;
+};
+
+struct xc_elf_version {
+	uint64_t xev_major;
+	uint64_t xev_minor;
+	xen_extraversion_t xev_extra;
+	xen_compile_info_t xev_compile_info;
+	xen_capabilities_info_t xev_capabilities;
+	xen_changeset_info_t xev_changeset;
+	xen_platform_parameters_t xev_platform_parameters;
+	uint64_t xev_pagesize;
+};
+
+/*
+ * Either an old-style (3.0.4) core format, or the ELF format.
+ */
+typedef enum {
+	XKB_FORMAT_UNKNOWN = 0,
+	XKB_FORMAT_CORE = 1,
+	XKB_FORMAT_ELF = 2
+} xkb_type_t;
+
 typedef struct mfn_map {
 	mfn_t mm_mfn;
 	char *mm_map;
@@ -119,22 +151,46 @@ typedef struct mmu_info {
 	size_t mi_ptesize;
 } mmu_info_t;
 
+typedef struct xkb_core {
+	xc_core_header_t xc_hdr;
+	void *xc_p2m_buf;
+} xkb_core_t;
+
+typedef struct xkb_elf {
+	mdb_gelf_file_t *xe_gelf;
+	size_t *xe_off;
+	struct xc_elf_header xe_hdr;
+	struct xc_elf_version xe_version;
+} xkb_elf_t;
+
 typedef struct xkb {
 	char *xkb_path;
 	int xkb_fd;
-	xc_core_header_t xkb_hdr;
-	char *xkb_namelist;
-	size_t xkb_namesize;
-	struct vcpu_guest_context *xkb_ctxts;
+
+	xkb_type_t xkb_type;
+	xkb_core_t xkb_core;
+	xkb_elf_t xkb_elf;
+
+	size_t xkb_nr_vcpus;
+	size_t xkb_nr_pages;
+	size_t xkb_pages_off;
+	xen_pfn_t xkb_max_pfn;
 	mfn_t xkb_max_mfn;
+	int xkb_is_pae;
+
 	mmu_info_t xkb_mmu;
+	debug_info_t xkb_info;
+
+	struct vcpu_guest_context *xkb_vcpus;
+
 	char *xkb_pages;
 	mfn_t *xkb_p2m;
-	void *xkb_p2m_buf;
 	xen_pfn_t *xkb_m2p;
-	debug_info_t xkb_info;
 	mfn_map_t xkb_pt_map[4];
 	mfn_map_t xkb_map;
+
+	char *xkb_namelist;
+	size_t xkb_namesize;
 } xkb_t;
 
 static const char xkb_shstrtab[] = "\0.symtab\0.strtab\0.shstrtab\0";
@@ -155,10 +211,20 @@ static int xkb_read_word(xkb_t *, uintptr_t, uintptr_t *);
 static char *xkb_map_mfn(xkb_t *, mfn_t, mfn_map_t *);
 static int xkb_close(xkb_t *);
 
+/*
+ * Jump through the hoops we need to to correctly identify a core file
+ * of either the old or new format.
+ */
 int
 xkb_identify(const char *file, int *longmode)
 {
 	xc_core_header_t header;
+	mdb_gelf_file_t *gf = NULL;
+	mdb_gelf_sect_t *sect = NULL;
+	mdb_io_t *io = NULL;
+	char *notes = NULL;
+	char *pos;
+	int ret = 0;
 	size_t sz;
 	int fd;
 
@@ -172,24 +238,82 @@ xkb_identify(const char *file, int *longmode)
 
 	(void) close(fd);
 
-	if (header.xch_magic != XC_CORE_MAGIC)
-		return (0);
+	if (header.xch_magic == XC_CORE_MAGIC) {
+		*longmode = 0;
 
-	*longmode = 0;
-
-	/*
-	 * Indeed.
-	 */
-	sz = header.xch_index_offset - header.xch_ctxt_offset;
+		/*
+		 * Indeed.
+		 */
+		sz = header.xch_index_offset - header.xch_ctxt_offset;
 #ifdef _LP64
-	if (sizeof (struct vcpu_guest_context) * header.xch_nr_vcpus == sz)
-		*longmode = 1;
+		if (sizeof (struct vcpu_guest_context) *
+		    header.xch_nr_vcpus == sz)
+			*longmode = 1;
 #else
-	if (sizeof (struct vcpu_guest_context) * header.xch_nr_vcpus != sz)
-		*longmode = 1;
+		if (sizeof (struct vcpu_guest_context) *
+		    header.xch_nr_vcpus != sz)
+			*longmode = 1;
 #endif /* _LP64 */
 
-	return (1);
+		return (1);
+	}
+
+	if ((io = mdb_fdio_create_path(NULL, file, O_RDONLY, 0)) == NULL)
+		return (-1);
+
+	if ((gf = mdb_gelf_create(io, ET_NONE, GF_FILE)) == NULL)
+		goto out;
+
+	if ((sect = mdb_gelf_sect_by_name(gf, ".note.Xen")) == NULL)
+		goto out;
+
+	if ((notes = mdb_gelf_sect_load(gf, sect)) == NULL)
+		goto out;
+
+	for (pos = notes; pos < notes + sect->gs_shdr.sh_size; ) {
+		struct xc_elf_version *vers;
+		/* LINTED - alignment */
+		Elf64_Nhdr *nhdr = (Elf64_Nhdr *)pos;
+		char *desc;
+		char *name;
+
+		name = pos + sizeof (*nhdr);
+		desc = (char *)P2ROUNDUP((uintptr_t)name + nhdr->n_namesz, 4);
+
+		pos = desc + nhdr->n_descsz;
+
+		if (nhdr->n_type != XEN_ELFNOTE_DUMPCORE_XEN_VERSION)
+			continue;
+
+		/*
+		 * The contents of this struct differ between 32 and 64
+		 * bit; however, not until past the 'xev_capabilities'
+		 * member, so we can just about get away with this.
+		 */
+
+		/* LINTED - alignment */
+		vers = (struct xc_elf_version *)desc;
+
+		if (strstr(vers->xev_capabilities, "x86_64")) {
+			*longmode = 1;
+		} else if (strstr(vers->xev_capabilities, "x86_32") ||
+		    strstr(vers->xev_capabilities, "x86_32p")) {
+			*longmode = 0;
+		} else {
+			mdb_warn("couldn't derive word size of dump; "
+			    "assuming 64-bit");
+			*longmode = 1;
+		}
+	}
+
+	ret = 1;
+
+out:
+	if (gf != NULL)
+		mdb_gelf_destroy(gf);
+	else if (io != NULL)
+		mdb_io_destroy(io);
+	return (ret);
 }
 
 static void *
@@ -205,6 +329,9 @@ xkb_fail(xkb_t *xkb, const char *msg, ...)
 	va_end(args);
 	if (xkb != NULL)
 		(void) xkb_close(xkb);
+
+	errno = ENOEXEC;
+
 	return (NULL);
 }
 
@@ -213,7 +340,7 @@ xkb_build_m2p(xkb_t *xkb)
 {
 	size_t i;
 
-	for (i = 0; i < xkb->xkb_hdr.xch_nr_pages; i++) {
+	for (i = 0; i <= xkb->xkb_max_pfn; i++) {
 		if (xkb->xkb_p2m[i] != MFN_INVALID &&
 		    xkb->xkb_p2m[i] > xkb->xkb_max_mfn)
 			xkb->xkb_max_mfn = xkb->xkb_p2m[i];
@@ -225,7 +352,7 @@ xkb_build_m2p(xkb_t *xkb)
 	for (i = 0; i <= xkb->xkb_max_mfn; i++)
 		xkb->xkb_m2p[i] = PFN_INVALID;
 
-	for (i = 0; i < xkb->xkb_hdr.xch_nr_pages; i++) {
+	for (i = 0; i <= xkb->xkb_max_pfn; i++) {
 		if (xkb->xkb_p2m[i] != MFN_INVALID)
 			xkb->xkb_m2p[xkb->xkb_p2m[i]] = i;
 	}
@@ -234,32 +361,88 @@ xkb_build_m2p(xkb_t *xkb)
 }
 
 /*
- * Just to make things jolly fun, they've not page-aligned the p2m table.
+ * With FORMAT_CORE, we can use the table in the dump file directly.
+ * Just to make things fun, they've not page-aligned the p2m table.
  */
 static int
 xkb_map_p2m(xkb_t *xkb)
 {
 	offset_t off;
 	size_t size;
-	size_t count = xkb->xkb_hdr.xch_nr_pages;
-	size_t boff = xkb->xkb_hdr.xch_index_offset;
+	xkb_core_t *xc = &xkb->xkb_core;
+	size_t count = xkb->xkb_nr_pages;
+	size_t boff = xc->xc_hdr.xch_index_offset;
 
-	size = sizeof (mfn_t) * count + (PAGE_SIZE) * 2;
+	size = (sizeof (mfn_t) * count) + (PAGE_SIZE * 2);
 	size = PAGE_MASK(size);
 	off = PAGE_MASK(boff);
 
 	/* LINTED - alignment */
-	xkb->xkb_p2m_buf = (mfn_t *)mmap(NULL, size, PROT_READ,
+	xc->xc_p2m_buf = (mfn_t *)mmap(NULL, size, PROT_READ,
 	    MAP_SHARED, xkb->xkb_fd, off);
 
-	if (xkb->xkb_p2m_buf == (xen_pfn_t *)MAP_FAILED) {
+	if (xc->xc_p2m_buf == (xen_pfn_t *)MAP_FAILED) {
 		(void) xkb_fail(xkb, "cannot map p2m table");
 		return (0);
 	}
 
 	/* LINTED - alignment */
-	xkb->xkb_p2m = (mfn_t *)((char *)xkb->xkb_p2m_buf +
+	xkb->xkb_p2m = (mfn_t *)((char *)xc->xc_p2m_buf +
 	    PAGE_OFFSET(boff));
+
+	return (1);
+}
+
+/*
+ * With FORMAT_ELF, we have a set of <pfn,mfn> pairs, which we convert
+ * into a linear array indexed by pfn for convenience.  We also need to
+ * track the mapping between mfn and the offset in the file: a pfn with
+ * no mfn will not appear in the core file.
+ */
+static int
+xkb_build_p2m(xkb_t *xkb)
+{
+	xkb_elf_t *xe = &xkb->xkb_elf;
+	mdb_gelf_sect_t *sect;
+	size_t size;
+	size_t i;
+
+	struct elf_p2m {
+		uint64_t pfn;
+		uint64_t gmfn;
+	} *p2m;
+
+	sect = mdb_gelf_sect_by_name(xe->xe_gelf, ".xen_p2m");
+
+	if (sect == NULL) {
+		(void) xkb_fail(xkb, "cannot find section .xen_p2m");
+		return (0);
+	}
+
+	if ((p2m = mdb_gelf_sect_load(xe->xe_gelf, sect)) == NULL) {
+		(void) xkb_fail(xkb, "couldn't read .xen_p2m");
+		return (0);
+	}
+
+	for (i = 0; i < xkb->xkb_nr_pages; i++) {
+		if (p2m[i].pfn > xkb->xkb_max_pfn)
+			xkb->xkb_max_pfn = p2m[i].pfn;
+	}
+
+	size = sizeof (xen_pfn_t) * (xkb->xkb_max_pfn + 1);
+	xkb->xkb_p2m = mdb_alloc(size, UM_SLEEP);
+	size = sizeof (size_t) * (xkb->xkb_max_pfn + 1);
+	xe->xe_off = mdb_alloc(size, UM_SLEEP);
+
+	for (i = 0; i <= xkb->xkb_max_pfn; i++) {
+		xkb->xkb_p2m[i] = PFN_INVALID;
+		xe->xe_off[i] = (size_t)-1;
+	}
+
+	for (i = 0; i < xkb->xkb_nr_pages; i++) {
+		xkb->xkb_p2m[p2m[i].pfn] = p2m[i].gmfn;
+		xe->xe_off[p2m[i].pfn] = i;
+	}
 
 	return (1);
 }
@@ -284,7 +467,7 @@ xkb_as_to_mfn(xkb_t *xkb, struct as *as)
 	    &pfn))
 		return (MFN_INVALID);
 
-	if (pfn >= xkb->xkb_hdr.xch_nr_pages)
+	if (pfn > xkb->xkb_max_pfn)
 		return (MFN_INVALID);
 
 	return (xkb->xkb_p2m[pfn]);
@@ -295,8 +478,8 @@ xkb_read_helper(xkb_t *xkb, struct as *as, int phys, uint64_t addr,
     void *buf, size_t size)
 {
 	size_t left = size;
-	int windowed = xkb->xkb_pages == NULL;
-	mfn_t tlmfn = xen_cr3_to_pfn(xkb->xkb_ctxts[0].ctrlreg[3]);
+	int windowed = (xkb->xkb_pages == NULL);
+	mfn_t tlmfn = xen_cr3_to_pfn(xkb->xkb_vcpus[0].ctrlreg[3]);
 
 	if (as != NULL && (tlmfn = xkb_as_to_mfn(xkb, as)) == MFN_INVALID)
 		return (-1);
@@ -314,7 +497,7 @@ xkb_read_helper(xkb_t *xkb, struct as *as, int phys, uint64_t addr,
 				return (-1);
 		} else {
 			xen_pfn_t pfn = pos >> PAGE_SHIFT;
-			if (pfn >= xkb->xkb_hdr.xch_nr_pages)
+			if (pfn > xkb->xkb_max_pfn)
 				return (-1);
 			mfn = xkb->xkb_p2m[pfn];
 			if (mfn == MFN_INVALID)
@@ -405,6 +588,18 @@ xkb_readstr(xkb_t *xkb, uintptr_t addr)
 }
 
 static offset_t
+xkb_pfn_to_off(xkb_t *xkb, xen_pfn_t pfn)
+{
+	if (pfn == PFN_INVALID || pfn > xkb->xkb_max_pfn)
+		return (-1ULL);
+
+	if (xkb->xkb_type == XKB_FORMAT_CORE)
+		return (PAGE_SIZE * pfn);
+
+	return (PAGE_SIZE * (xkb->xkb_elf.xe_off[pfn]));
+}
+
+static offset_t
 xkb_mfn_to_offset(xkb_t *xkb, mfn_t mfn)
 {
 	xen_pfn_t pfn;
@@ -417,13 +612,13 @@ xkb_mfn_to_offset(xkb_t *xkb, mfn_t mfn)
 	if (pfn == PFN_INVALID)
 		return (-1ULL);
 
-	return (xkb->xkb_hdr.xch_pages_offset + (PAGE_SIZE * pfn));
+	return (xkb->xkb_pages_off + xkb_pfn_to_off(xkb, pfn));
 }
 
 static char *
 xkb_map_mfn(xkb_t *xkb, mfn_t mfn, mfn_map_t *mm)
 {
-	int windowed = xkb->xkb_pages == NULL;
+	int windowed = (xkb->xkb_pages == NULL);
 	offset_t off;
 
 	if (mm->mm_mfn == mfn)
@@ -458,7 +653,7 @@ xkb_map_mfn(xkb_t *xkb, mfn_t mfn, mfn_map_t *mm)
 		if (pfn == PFN_INVALID)
 			return (NULL);
 
-		mm->mm_map = xkb->xkb_pages + (PAGE_SIZE * pfn);
+		mm->mm_map = xkb->xkb_pages + xkb_pfn_to_off(xkb, pfn);
 	}
 
 	return (mm->mm_map);
@@ -467,10 +662,12 @@ xkb_map_mfn(xkb_t *xkb, mfn_t mfn, mfn_map_t *mm)
 static mfn_t
 xkb_pte_to_mfn(mmu_info_t *mmu, char *ptep)
 {
-	/* LINTED - alignment */
-	uint64_t pte = *((uint64_t *)ptep);
+	uint64_t pte = 0;
 
-	if (mmu->mi_ptesize == 4) {
+	if (mmu->mi_ptesize == 8) {
+		/* LINTED - alignment */
+		pte = *((uint64_t *)ptep);
+	} else {
 		/* LINTED - alignment */
 		pte = *((uint32_t *)ptep);
 	}
@@ -759,16 +956,257 @@ xkb_build_ksyms(xkb_t *xkb)
 	return (1);
 }
 
+static xkb_t *
+xkb_open_core(xkb_t *xkb)
+{
+	xkb_core_t *xc = &xkb->xkb_core;
+	size_t sz;
+
+	xkb->xkb_type = XKB_FORMAT_CORE;
+
+	if ((xkb->xkb_fd = open64(xkb->xkb_path, O_RDONLY)) == -1)
+		return (xkb_fail(xkb, "cannot open %s", xkb->xkb_path));
+
+	if (pread64(xkb->xkb_fd, &xc->xc_hdr, sizeof (xc->xc_hdr), 0) !=
+	    sizeof (xc->xc_hdr))
+		return (xkb_fail(xkb, "invalid dump file"));
+
+	if (xc->xc_hdr.xch_magic == XC_CORE_MAGIC_HVM)
+		return (xkb_fail(xkb, "cannot process HVM images"));
+
+	if (xc->xc_hdr.xch_magic != XC_CORE_MAGIC) {
+		return (xkb_fail(xkb, "invalid magic %d",
+		    xc->xc_hdr.xch_magic));
+	}
+
+	/*
+	 * With FORMAT_CORE, all pages are in the dump (non-existing
+	 * ones are zeroed out).
+	 */
+	xkb->xkb_nr_pages = xc->xc_hdr.xch_nr_pages;
+	xkb->xkb_pages_off = xc->xc_hdr.xch_pages_offset;
+	xkb->xkb_max_pfn = xc->xc_hdr.xch_nr_pages - 1;
+	xkb->xkb_nr_vcpus = xc->xc_hdr.xch_nr_vcpus;
+
+	sz = xkb->xkb_nr_vcpus * sizeof (*xkb->xkb_vcpus);
+
+	xkb->xkb_vcpus = mdb_alloc(sz, UM_SLEEP);
+
+	if (pread64(xkb->xkb_fd, xkb->xkb_vcpus, sz,
+	    xc->xc_hdr.xch_ctxt_offset) != sz)
+		return (xkb_fail(xkb, "cannot read VCPU contexts"));
+
+	if (xkb->xkb_vcpus[0].flags & VGCF_HVM_GUEST)
+		return (xkb_fail(xkb, "cannot process HVM images"));
+
+	/*
+	 * Try to map all the data pages. If we can't, fall back to the
+	 * window/pread() approach, which is significantly slower.
+	 */
+	xkb->xkb_pages = mmap(NULL, PAGE_SIZE * xkb->xkb_nr_pages,
+	    PROT_READ, MAP_SHARED, xkb->xkb_fd, xc->xc_hdr.xch_pages_offset);
+
+	if (xkb->xkb_pages == (char *)MAP_FAILED)
+		xkb->xkb_pages = NULL;
+
+	/*
+	 * We'd like to adapt for correctness' sake, but we have no way of
+	 * detecting a PAE guest, since cr4 writes are disallowed.
+	 */
+	xkb->xkb_is_pae = 1;
+
+	if (!xkb_map_p2m(xkb))
+		return (NULL);
+
+	return (xkb);
+}
+
+static xkb_t *
+xkb_open_elf(xkb_t *xkb)
+{
+	xkb_elf_t *xe = &xkb->xkb_elf;
+	mdb_gelf_sect_t *sect;
+	char *notes;
+	char *pos;
+	mdb_io_t *io;
+
+	if ((io = mdb_fdio_create_path(NULL, xkb->xkb_path,
+	    O_RDONLY, 0)) == NULL)
+		return (xkb_fail(xkb, "failed to open"));
+
+	xe->xe_gelf = mdb_gelf_create(io, ET_NONE, GF_FILE);
+
+	if (xe->xe_gelf == NULL) {
+		mdb_io_destroy(io);
+		return (xkb);
+	}
+
+	xkb->xkb_fd = mdb_fdio_fileno(io);
+
+	sect = mdb_gelf_sect_by_name(xe->xe_gelf, ".note.Xen");
+
+	if (sect == NULL)
+		return (xkb);
+
+	if ((notes = mdb_gelf_sect_load(xe->xe_gelf, sect)) == NULL)
+		return (xkb);
+
+	/*
+	 * Now we know this is indeed a hypervisor core dump, even if
+	 * it's corrupted.
+	 */
+	xkb->xkb_type = XKB_FORMAT_ELF;
+
+	for (pos = notes; pos < notes + sect->gs_shdr.sh_size; ) {
+		/* LINTED - alignment */
+		Elf64_Nhdr *nhdr = (Elf64_Nhdr *)pos;
+		uint64_t vers;
+		char *desc;
+		char *name;
+
+		name = pos + sizeof (*nhdr);
+		desc = (char *)P2ROUNDUP((uintptr_t)name + nhdr->n_namesz, 4);
+
+		pos = desc + nhdr->n_descsz;
+
+		switch (nhdr->n_type) {
+		case XEN_ELFNOTE_DUMPCORE_NONE:
+			break;
+
+		case XEN_ELFNOTE_DUMPCORE_HEADER:
+			if (nhdr->n_descsz != sizeof (struct xc_elf_header)) {
+				return (xkb_fail(xkb, "invalid ELF note "
+				    "XEN_ELFNOTE_DUMPCORE_HEADER\n"));
+			}
+
+			bcopy(desc, &xe->xe_hdr,
+			    sizeof (struct xc_elf_header));
+			break;
+
+		case XEN_ELFNOTE_DUMPCORE_XEN_VERSION:
+			if (nhdr->n_descsz != sizeof (struct xc_elf_version)) {
+				return (xkb_fail(xkb, "invalid ELF note "
+				    "XEN_ELFNOTE_DUMPCORE_XEN_VERSION\n"));
+			}
+
+			bcopy(desc, &xe->xe_version,
+			    sizeof (struct xc_elf_version));
+			break;
+
+		case XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION:
+			/* LINTED - alignment */
+			vers = *((uint64_t *)desc);
+			if ((vers >> 32) != 0) {
+				return (xkb_fail(xkb, "unknown major "
+				    "version %d (expected 0)\n",
+				    (int)(vers >> 32)));
+			}
+
+			if ((vers & 0xffffffff) != 1) {
+				mdb_warn("unexpected dump minor number "
+				    "version %d (expected 1)\n",
+				    (int)(vers & 0xffffffff));
+			}
+			break;
+
+		default:
+			mdb_warn("unknown ELF note %d(%s)\n",
+			    nhdr->n_type, name);
+			break;
+		}
+	}
+
+	if (xe->xe_hdr.xeh_magic == XC_CORE_MAGIC_HVM)
+		return (xkb_fail(xkb, "cannot process HVM images"));
+
+	if (xe->xe_hdr.xeh_magic != XC_CORE_MAGIC) {
+		return (xkb_fail(xkb, "invalid magic %d",
+		    xe->xe_hdr.xeh_magic));
+	}
+
+	xkb->xkb_nr_pages = xe->xe_hdr.xeh_nr_pages;
+	xkb->xkb_is_pae = (strstr(xe->xe_version.xev_capabilities,
+	    "x86_32p") != NULL);
+
+	sect = mdb_gelf_sect_by_name(xe->xe_gelf, ".xen_prstatus");
+
+	if (sect == NULL)
+		return (xkb_fail(xkb, "cannot find section .xen_prstatus"));
+
+	if (sect->gs_shdr.sh_entsize != sizeof (vcpu_guest_context_t))
+		return (xkb_fail(xkb, "invalid section .xen_prstatus"));
+
+	xkb->xkb_nr_vcpus = sect->gs_shdr.sh_size / sect->gs_shdr.sh_entsize;
+
+	if ((xkb->xkb_vcpus = mdb_gelf_sect_load(xe->xe_gelf, sect)) == NULL)
+		return (xkb_fail(xkb, "cannot load section .xen_prstatus"));
+
+	sect = mdb_gelf_sect_by_name(xe->xe_gelf, ".xen_pages");
+
+	if (sect == NULL)
+		return (xkb_fail(xkb, "cannot find section .xen_pages"));
+
+	if (!PAGE_ALIGNED(sect->gs_shdr.sh_offset))
+		return (xkb_fail(xkb, ".xen_pages is not page aligned"));
+
+	if (sect->gs_shdr.sh_entsize != PAGE_SIZE)
+		return (xkb_fail(xkb, "invalid section .xen_pages"));
+
+	xkb->xkb_pages_off = sect->gs_shdr.sh_offset;
+
+	/*
+	 * Try to map all the data pages. If we can't, fall back to the
+	 * window/pread() approach, which is significantly slower.
+	 */
+	xkb->xkb_pages = mmap(NULL, PAGE_SIZE * xkb->xkb_nr_pages,
+	    PROT_READ, MAP_SHARED, xkb->xkb_fd, xkb->xkb_pages_off);
+
+	if (xkb->xkb_pages == (char *)MAP_FAILED)
+		xkb->xkb_pages = NULL;
+
+	if (!xkb_build_p2m(xkb))
+		return (NULL);
+
+	return (xkb);
+}
+
+static void
+xkb_init_mmu(xkb_t *xkb)
+{
+#if defined(__amd64)
+	xkb->xkb_mmu.mi_max = 3;
+	xkb->xkb_mmu.mi_shift[0] = 12;
+	xkb->xkb_mmu.mi_shift[1] = 21;
+	xkb->xkb_mmu.mi_shift[2] = 30;
+	xkb->xkb_mmu.mi_shift[3] = 39;
+	xkb->xkb_mmu.mi_ptes = 512;
+	xkb->xkb_mmu.mi_ptesize = 8;
+#elif defined(__i386)
+	if (xkb->xkb_is_pae) {
+		xkb->xkb_mmu.mi_max = 2;
+		xkb->xkb_mmu.mi_shift[0] = 12;
+		xkb->xkb_mmu.mi_shift[1] = 21;
+		xkb->xkb_mmu.mi_shift[2] = 30;
+		xkb->xkb_mmu.mi_ptes = 512;
+		xkb->xkb_mmu.mi_ptesize = 8;
+	} else {
+		xkb->xkb_mmu.mi_max = 1;
+		xkb->xkb_mmu.mi_shift[0] = 12;
+		xkb->xkb_mmu.mi_shift[1] = 22;
+		xkb->xkb_mmu.mi_ptes = 1024;
+		xkb->xkb_mmu.mi_ptesize = 4;
+	}
+#endif
+}
+
 /*ARGSUSED*/
 xkb_t *
 xkb_open(const char *namelist, const char *corefile, const char *swapfile,
     int flag, const char *err)
 {
 	struct stat64 corestat;
-	uintptr_t debug_va = DEF_DEBUG_INFO_VA;
-	size_t sz;
-	size_t i;
 	xkb_t *xkb = NULL;
+	size_t i;
 
 	if (stat64(corefile, &corestat) == -1)
 		return (xkb_fail(xkb, "cannot stat %s", corefile));
@@ -781,77 +1219,27 @@ xkb_open(const char *namelist, const char *corefile, const char *swapfile,
 	for (i = 0; i < 4; i++)
 		xkb->xkb_pt_map[i].mm_map = (char *)MAP_FAILED;
 
+	xkb->xkb_type = XKB_FORMAT_UNKNOWN;
 	xkb->xkb_map.mm_map = (char *)MAP_FAILED;
-	xkb->xkb_p2m_buf = (char *)MAP_FAILED;
+	xkb->xkb_core.xc_p2m_buf = (char *)MAP_FAILED;
+	xkb->xkb_fd = -1;
 
 	xkb->xkb_path = strdup(corefile);
 
-	if ((xkb->xkb_fd = open64(corefile, O_RDONLY)) == -1)
-		return (xkb_fail(xkb, "cannot open %s", corefile));
+	if ((xkb = xkb_open_elf(xkb)) == NULL)
+		return (NULL);
 
-	if (pread64(xkb->xkb_fd, &xkb->xkb_hdr, sizeof (xkb->xkb_hdr), 0) !=
-	    sizeof (xkb->xkb_hdr))
-		return (xkb_fail(xkb, "invalid dump file"));
-
-	if (xkb->xkb_hdr.xch_magic == XC_CORE_MAGIC_HVM)
-		return (xkb_fail(xkb, "cannot process HVM images"));
-
-	if (xkb->xkb_hdr.xch_magic != XC_CORE_MAGIC) {
-		return (xkb_fail(xkb, "invalid magic %d",
-		    xkb->xkb_hdr.xch_magic));
+	if (xkb->xkb_type == XKB_FORMAT_UNKNOWN) {
+		if (!xkb_open_core(xkb))
+			return (NULL);
 	}
 
-	sz = xkb->xkb_hdr.xch_nr_vcpus * sizeof (*xkb->xkb_ctxts);
-
-	xkb->xkb_ctxts = mdb_alloc(sz, UM_SLEEP);
-
-	if (pread64(xkb->xkb_fd, xkb->xkb_ctxts, sz,
-	    xkb->xkb_hdr.xch_ctxt_offset) != sz)
-		return (xkb_fail(xkb, "cannot read VCPU contexts"));
-
-	if (xkb->xkb_ctxts[0].flags & VGCF_HVM_GUEST)
-		return (xkb_fail(xkb, "cannot process HVM images"));
-
-	/*
-	 * Try to map all the data pages. If we can't, fall back to the
-	 * window/pread() approach, which is significantly slower.
-	 */
-	xkb->xkb_pages = mmap(NULL, PAGE_SIZE * xkb->xkb_hdr.xch_nr_pages,
-	    PROT_READ, MAP_SHARED, xkb->xkb_fd,
-	    xkb->xkb_hdr.xch_pages_offset);
-
-	if (xkb->xkb_pages == (char *)MAP_FAILED)
-		xkb->xkb_pages = NULL;
-
-#if defined(__amd64)
-	xkb->xkb_mmu.mi_max = 3;
-	xkb->xkb_mmu.mi_shift[0] = 12;
-	xkb->xkb_mmu.mi_shift[1] = 21;
-	xkb->xkb_mmu.mi_shift[2] = 30;
-	xkb->xkb_mmu.mi_shift[3] = 39;
-	xkb->xkb_mmu.mi_ptes = 512;
-	xkb->xkb_mmu.mi_ptesize = 8;
-#elif defined(__i386)
-	/*
-	 * We'd like to adapt for correctness' sake, but we have no way of
-	 * detecting a PAE guest, since cr4 writes are disallowed.
-	 */
-	debug_va = PAE_DEBUG_INFO_VA;
-	xkb->xkb_mmu.mi_max = 2;
-	xkb->xkb_mmu.mi_shift[0] = 12;
-	xkb->xkb_mmu.mi_shift[1] = 21;
-	xkb->xkb_mmu.mi_shift[2] = 30;
-	xkb->xkb_mmu.mi_ptes = 512;
-	xkb->xkb_mmu.mi_ptesize = 8;
-#endif
-
-	if (!xkb_map_p2m(xkb))
-		return (NULL);
+	xkb_init_mmu(xkb);
 
 	if (!xkb_build_m2p(xkb))
 		return (NULL);
 
-	if (xkb_read(xkb, debug_va, &xkb->xkb_info,
+	if (xkb_read(xkb, DEBUG_INFO, &xkb->xkb_info,
 	    sizeof (xkb->xkb_info)) != sizeof (xkb->xkb_info))
 		return (xkb_fail(xkb, "cannot read debug_info"));
 
@@ -874,7 +1262,6 @@ xkb_open(const char *namelist, const char *corefile, const char *swapfile,
 int
 xkb_close(xkb_t *xkb)
 {
-	size_t sz;
 	size_t i;
 
 	if (xkb == NULL)
@@ -885,14 +1272,9 @@ xkb_close(xkb_t *xkb)
 		    (xkb->xkb_max_mfn + 1) * sizeof (xen_pfn_t));
 	}
 
-	sz = sizeof (xen_pfn_t) * xkb->xkb_hdr.xch_nr_pages;
-
-	if (xkb->xkb_p2m_buf != (xen_pfn_t *)MAP_FAILED)
-		(void) munmap(xkb->xkb_p2m_buf, sz);
-
 	if (xkb->xkb_pages != NULL) {
 		(void) munmap((void *)xkb->xkb_pages,
-		    PAGE_SIZE * xkb->xkb_hdr.xch_nr_pages);
+		    PAGE_SIZE * xkb->xkb_nr_pages);
 	} else {
 		for (i = 0; i < 4; i++) {
 			char *addr = xkb->xkb_pt_map[i].mm_map;
@@ -905,16 +1287,44 @@ xkb_close(xkb_t *xkb)
 		}
 	}
 
-	if (xkb->xkb_ctxts != NULL) {
-		mdb_free(xkb->xkb_ctxts, sizeof (struct vcpu_guest_context) *
-		    xkb->xkb_hdr.xch_nr_vcpus);
-	}
-
 	if (xkb->xkb_namelist != NULL)
 		mdb_free(xkb->xkb_namelist, xkb->xkb_namesize);
 
-	if (xkb->xkb_fd != -1)
-		(void) close(xkb->xkb_fd);
+	if (xkb->xkb_type == XKB_FORMAT_ELF) {
+		xkb_elf_t *xe = &xkb->xkb_elf;
+		size_t sz;
+
+		if (xe->xe_gelf != NULL)
+			mdb_gelf_destroy(xe->xe_gelf);
+
+		sz = sizeof (xen_pfn_t) * (xkb->xkb_max_pfn + 1);
+
+		if (xkb->xkb_p2m != NULL)
+			mdb_free(xkb->xkb_p2m, sz);
+
+		sz = sizeof (size_t) * (xkb->xkb_max_pfn + 1);
+
+		if (xe->xe_off != NULL)
+			mdb_free(xe->xe_off, sz);
+	} else if (xkb->xkb_type == XKB_FORMAT_CORE) {
+		xkb_core_t *xc = &xkb->xkb_core;
+		size_t sz;
+
+		if (xkb->xkb_fd != -1)
+			(void) close(xkb->xkb_fd);
+
+		sz = (xkb->xkb_nr_pages * sizeof (mfn_t)) + (PAGE_SIZE * 2);
+		sz = PAGE_MASK(sz);
+
+		if (xc->xc_p2m_buf != (xen_pfn_t *)MAP_FAILED)
+			(void) munmap(xc->xc_p2m_buf, sz);
+
+		if (xkb->xkb_vcpus != NULL) {
+			sz = sizeof (struct vcpu_guest_context) *
+			    xkb->xkb_nr_vcpus;
+			mdb_free(xkb->xkb_vcpus, sz);
+		}
+	}
 
 	free(xkb->xkb_path);
 
@@ -937,7 +1347,7 @@ xkb_sym_io(xkb_t *xkb, const char *symfile)
 uint64_t
 xkb_vtop(xkb_t *xkb, struct as *as, uintptr_t addr)
 {
-	mfn_t tlmfn = xen_cr3_to_pfn(xkb->xkb_ctxts[0].ctrlreg[3]);
+	mfn_t tlmfn = xen_cr3_to_pfn(xkb->xkb_vcpus[0].ctrlreg[3]);
 	mfn_t mfn;
 
 	if (as != NULL && (tlmfn = xkb_as_to_mfn(xkb, as)) == MFN_INVALID)
@@ -959,14 +1369,14 @@ xkb_getmregs(xkb_t *xkb, uint_t cpu, struct privmregs *mregs)
 	struct cpu_user_regs *ur;
 	struct regs *regs;
 
-	if (cpu >= xkb->xkb_hdr.xch_nr_vcpus) {
+	if (cpu >= xkb->xkb_nr_vcpus) {
 		errno = EINVAL;
 		return (-1);
 	}
 
 	bzero(mregs, sizeof (*mregs));
 
-	vcpu = &xkb->xkb_ctxts[cpu];
+	vcpu = &xkb->xkb_vcpus[cpu];
 	ur = &vcpu->user_regs;
 	regs = &mregs->pm_gregs;
 

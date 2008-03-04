@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,20 @@ static pfn_t ptable_pfn[MAX_NUM_LEVEL];
 
 /* Number of MMU_PAGESIZE pages we're adding to the Solaris dump */
 static int xpv_dump_pages;
+
+/*
+ * There are up to two large swathes of RAM that we don't want to include
+ * in the dump: those that comprise the Xen version of segkpm.  On 32-bit
+ * systems there is no such region of memory.  On 64-bit systems, there
+ * should be just a single contiguous region that corresponds to all of
+ * physical memory.  The tricky bit is that Xen's heap sometimes lives in
+ * the middle of their segkpm, and is mapped using only kpm-like addresses.
+ * In that case, we need to skip the swathes before and after Xen's heap.
+ */
+uintptr_t kpm1_low = 0;
+uintptr_t kpm1_high = 0;
+uintptr_t kpm2_low = 0;
+uintptr_t kpm2_high = 0;
 
 /*
  * Some commonly used values that we don't want to recompute over and over.
@@ -214,15 +228,6 @@ xpv_va_walk(uintptr_t *vaddr)
 				idx++;
 				scan_va += mmu.level_size[l];
 			}
-			va = scan_va;
-
-			/*
-			 * See if we've hit the end of the range.
-			 */
-			if (scan_va >= xpv_end || scan_va < *vaddr) {
-				va = scan_va;
-				break;
-			}
 
 			/*
 			 * If there are no valid mappings in this table, we
@@ -232,6 +237,13 @@ xpv_va_walk(uintptr_t *vaddr)
 				va = NEXT_ENTRY_VA(va, l + 1);
 				break;
 			}
+
+			va = scan_va;
+			/*
+			 * See if we've hit the end of the range.
+			 */
+			if (va >= xpv_end || va < *vaddr)
+				break;
 
 			/*
 			 * If this mapping is for a pagetable, we drop down
@@ -252,10 +264,16 @@ xpv_va_walk(uintptr_t *vaddr)
 				break;
 			}
 
-			/* We also want to skip the Xen version of KPM */
-			if (va >= (uintptr_t)xpv_panic_info->pi_ram_start &&
-			    va < (uintptr_t)xpv_panic_info->pi_ram_end) {
-				va = (uintptr_t)xpv_panic_info->pi_ram_end;
+			/*
+			 * See if the address is within one of the two
+			 * kpm-like regions we want to skip.
+			 */
+			if (va >= kpm1_low && va < kpm1_high) {
+				va = kpm1_high;
+				break;
+			}
+			if (va >= kpm2_low && va < kpm2_high) {
+				va = kpm2_high;
 				break;
 			}
 
@@ -690,6 +708,17 @@ xpv_do_panic(void *arg)
 		    "version of the panic_info structure.\n");
 
 	xpv_panic_info = pip;
+
+#if defined(__amd64)
+	kpm1_low = (uintptr_t)xpv_panic_info->pi_ram_start;
+	if (xpv_panic_info->pi_xen_start == NULL) {
+		kpm1_high = (uintptr_t)xpv_panic_info->pi_ram_end;
+	} else {
+		kpm1_high = (uintptr_t)xpv_panic_info->pi_xen_start;
+		kpm2_low = (uintptr_t)xpv_panic_info->pi_xen_end;
+		kpm2_high = (uintptr_t)xpv_panic_info->pi_ram_end;
+	}
+#endif
 
 	/*
 	 * Make sure we are running on the Solaris %gs.  The Xen panic code

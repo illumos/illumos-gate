@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,6 +181,8 @@ extern int mdb_iob_isapipe(mdb_iob_t *);
 extern void mdb_table_print(uint_t, const char *, ...);
 
 extern int mdb_setupterm(const char *, mdb_io_t *, int *);
+
+extern int mdb_fdio_fileno(mdb_io_t *);
 
 #endif /* _MDB */
 

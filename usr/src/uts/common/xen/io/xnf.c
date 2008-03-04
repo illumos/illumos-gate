@@ -411,7 +411,8 @@ xnf_setup_rings(xnf_t *xnfp)
 				gnttab_grant_foreign_access_ref(ref, oeid,
 				    mfn, 0);
 			} else {
-				gnttab_grant_foreign_transfer_ref(ref, oeid);
+				gnttab_grant_foreign_transfer_ref(ref,
+				    oeid, 0);
 			}
 			rxrp->id = ix;
 			rxrp->gref = ref;
@@ -1418,7 +1419,7 @@ rx_buffer_hang(xnf_t *xnfp, struct xnf_buffer_desc *bdesc)
 
 			gnttab_grant_foreign_access_ref(ref, oeid, mfn, 0);
 		} else {
-			gnttab_grant_foreign_transfer_ref(ref, oeid);
+			gnttab_grant_foreign_transfer_ref(ref, oeid, 0);
 		}
 	}
 	reqp->id = hang_ix;
