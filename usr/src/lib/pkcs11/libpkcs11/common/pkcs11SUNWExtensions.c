@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,11 +91,108 @@ KEY_TYPE_SIZE_MAPPING fixed_size_secrets[] = {
 	{CKK_CDMF, 8}, {CKK_SKIPJACK, 12}, {CKK_BATON, 40}, {CKK_JUNIPER, 40}
 };
 
+/*
+ * match_mech is an example of many possible criteria functions.
+ * It matches the given mech type (in args) with the slot's mech info.
+ * If no match is found, pkcs11_GetCriteriaSession is asked to return
+ * CKR_MECHANISM_INVALID.
+ */
+boolean_t
+match_mech(CK_SLOT_ID slot_id, void *args, CK_RV *rv)
+{
+	CK_MECHANISM_INFO mech_info;
+	CK_MECHANISM_TYPE mech = (CK_MECHANISM_TYPE)args;
+
+	*rv = CKR_MECHANISM_INVALID;
+	return (C_GetMechanismInfo(slot_id, mech, &mech_info) == CKR_OK);
+}
+
+/*
+ * pkcs11_GetCriteriaSession will initialize the framework and do all
+ * the necessary work of calling C_GetSlotList(), C_GetMechanismInfo()
+ * C_OpenSession() to create a session that meets all the criteria in
+ * the given function pointer.
+ *
+ * The criteria function must return a boolean value of true or false.
+ * The arguments to the function are the current slot id, an opaque
+ * args value that is passed through to the function, and the error
+ * value pkcs11_GetCriteriaSession should return if no slot id meets the
+ * criteria.
+ *
+ * If the function is called multiple times, it will return a new session
+ * without reinitializing the framework.
+ */
+CK_RV
+pkcs11_GetCriteriaSession(
+    boolean_t (*criteria)(CK_SLOT_ID slot_id, void *args, CK_RV *rv),
+    void *args, CK_SESSION_HANDLE_PTR hSession)
+{
+	CK_RV rv;
+	CK_ULONG slotcount;
+	CK_SLOT_ID_PTR slot_list;
+	CK_SLOT_ID slot_id;
+	CK_ULONG i;
+
+	if (hSession == NULL || criteria == NULL) {
+		return (CKR_ARGUMENTS_BAD);
+	}
+
+	/* initialize PKCS #11 */
+	if (!pkcs11_initialized) {
+		rv = C_Initialize(NULL);
+		if ((rv != CKR_OK) &&
+		    (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
+			return (rv);
+		}
+	}
+
+	/* get slot count */
+	rv = C_GetSlotList(0, NULL, &slotcount);
+	if (rv != CKR_OK) {
+		return (rv);
+	}
+
+	if (slotcount == 0) {
+		return (CKR_FUNCTION_FAILED);
+	}
+
+
+	/* allocate memory for slot list */
+	slot_list = malloc(slotcount * sizeof (CK_SLOT_ID));
+	if (slot_list == NULL) {
+		return (CKR_HOST_MEMORY);
+	}
+
+	if ((rv = C_GetSlotList(0, slot_list, &slotcount)) != CKR_OK) {
+		free(slot_list);
+		return (rv);
+	}
+
+	/* find slot with matching criteria */
+	for (i = 0; i < slotcount; i++) {
+		slot_id = slot_list[i];
+		if ((*criteria)(slot_id, args, &rv)) {
+			break;
+		}
+	}
+
+	if (i == slotcount) {
+		/* no matching slot found */
+		free(slot_list);
+		return (rv);	/* this rv is from the criteria function */
+	}
+
+	rv = C_OpenSession(slot_id, CKF_SERIAL_SESSION, NULL,
+	    NULL, hSession);
+
+	free(slot_list);
+	return (rv);
+}
 
 /*
  * SUNW_C_GetMechSession will initialize the framework and do all
  * of the neccessary work of calling C_GetSlotList(), C_GetMechanismInfo()
- * C_OpenSession() to provide a session capable of providing the requested
+ * C_OpenSession() to create a session capable of providing the requested
  * mechanism.
  *
  * If the function is called multiple times, it will return a new session
@@ -104,6 +201,13 @@ KEY_TYPE_SIZE_MAPPING fixed_size_secrets[] = {
 CK_RV
 SUNW_C_GetMechSession(CK_MECHANISM_TYPE mech, CK_SESSION_HANDLE_PTR hSession)
 {
+	/*
+	 * All the code in this function can be replaced with one line:
+	 *
+	 * return (pkcs11_GetCriteriaSession(match_mech, (void *)mech,
+	 *	hSession));
+	 *
+	 */
 	CK_RV rv;
 	CK_ULONG slotcount;
 	CK_SLOT_ID_PTR slot_list;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.   All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.   All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +83,16 @@ extern "C" {
 /* Solaris specific functions */
 
 #include <stdlib.h>
+
+/*
+ * pkcs11_GetCriteriaSession will initialize the framework and do all
+ * the necessary work of calling C_GetSlotList(), C_GetMechanismInfo()
+ * C_OpenSession() to create a session that meets all the criteria in
+ * the given function pointer.
+ */
+CK_RV pkcs11_GetCriteriaSession(
+    boolean_t (*criteria)(CK_SLOT_ID slot_id, void *args, CK_RV *rv),
+    void *args, CK_SESSION_HANDLE_PTR hSession);
 
 /*
  * SUNW_C_GetMechSession will initialize the framework and do all
