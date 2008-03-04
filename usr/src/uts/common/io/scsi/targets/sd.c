@@ -23223,6 +23223,7 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
  *             -1 - Command failed.  This could indicate a check condition
  *                  or other status value requiring recovery action.
  *
+ * NOTE: This code is only called off sddump().
  */
 
 static int
@@ -23331,9 +23332,8 @@ sd_send_polled_RQS(struct sd_lun *un)
 /*
  * Defines needed for localized version of the scsi_poll routine.
  */
-#define	SD_CSEC		10000			/* usecs */
-#define	SD_SEC_TO_CSEC	(1000000/SD_CSEC)
-
+#define	CSEC		10000			/* usecs */
+#define	SEC_TO_CSEC	(1000000/CSEC)
 
 /*
  *    Function: sd_ddi_scsi_poll()
@@ -23351,27 +23351,31 @@ sd_send_polled_RQS(struct sd_lun *un)
  * Return Code: 0 - Command completed successfully with good status
  *             -1 - Command failed.
  *
+ * NOTE: This code is almost identical to scsi_poll, however before 6668774 can
+ * be fixed (removing this code), we need to determine how to handle the
+ * KEY_UNIT_ATTENTION condition below in conditions not as limited as sddump().
+ *
+ * NOTE: This code is only called off sddump().
  */
-
 static int
 sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 {
-	int busy_count;
-	int timeout;
-	int rval = SD_FAILURE;
-	int savef;
-	uint8_t *sensep;
-	long savet;
-	void (*savec)();
-	/*
-	 * The following is defined in machdep.c and is used in determining if
-	 * the scsi transport system will do polled I/O instead of interrupt
-	 * I/O when called from xx_dump().
-	 */
-	extern int do_polled_io;
+	int			rval = -1;
+	int			savef;
+	long			savet;
+	void			(*savec)();
+	int			timeout;
+	int			busy_count;
+	int			poll_delay;
+	int			rc;
+	uint8_t			*sensep;
+	struct scsi_arq_status	*arqstat;
+	extern int		do_polled_io;
+
+	ASSERT(pkt->pkt_scbp);
 
 	/*
-	 * save old flags in pkt, to restore at end
+	 * save old flags..
 	 */
 	savef = pkt->pkt_flags;
 	savec = pkt->pkt_comp;
@@ -23390,9 +23394,8 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 	 * we don't like a polled command without timeout.
 	 * 60 seconds seems long enough.
 	 */
-	if (pkt->pkt_time == 0) {
+	if (pkt->pkt_time == 0)
 		pkt->pkt_time = SCSI_POLL_TIMEOUT;
-	}
 
 	/*
 	 * Send polled cmd.
@@ -23401,15 +23404,11 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 	 * queue full, and non-dispatched commands are retried every 10 msec.
 	 * as they are typically transient failures.  Busy status and Not
 	 * Ready are retried every second as this status takes a while to
-	 * change.  Unit attention is retried for pkt_time (60) times
-	 * with no delay.
+	 * change.
 	 */
-	timeout = pkt->pkt_time * SD_SEC_TO_CSEC;
+	timeout = pkt->pkt_time * SEC_TO_CSEC;
 
 	for (busy_count = 0; busy_count < timeout; busy_count++) {
-		int rc;
-		int poll_delay;
-
 		/*
 		 * Initialize pkt status variables.
 		 */
@@ -23421,19 +23420,18 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 				break;
 			} else {
 				/* Transport busy - try again. */
-				poll_delay = 1 * SD_CSEC; /* 10 msec */
+				poll_delay = 1 * CSEC;		/* 10 msec. */
 			}
 		} else {
 			/*
 			 * Transport accepted - check pkt status.
 			 */
 			rc = (*pkt->pkt_scbp) & STATUS_MASK;
-			if (pkt->pkt_reason == CMD_CMPLT &&
-			    rc == STATUS_CHECK &&
-			    pkt->pkt_state & STATE_ARQ_DONE) {
-				struct scsi_arq_status *arqstat =
+			if ((pkt->pkt_reason == CMD_CMPLT) &&
+			    (rc == STATUS_CHECK) &&
+			    (pkt->pkt_state & STATE_ARQ_DONE)) {
+				arqstat =
 				    (struct scsi_arq_status *)(pkt->pkt_scbp);
-
 				sensep = (uint8_t *)&arqstat->sts_sensedata;
 			} else {
 				sensep = NULL;
@@ -23442,7 +23440,7 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 			if ((pkt->pkt_reason == CMD_CMPLT) &&
 			    (rc == STATUS_GOOD)) {
 				/* No error - we're done */
-				rval = SD_SUCCESS;
+				rval = 0;
 				break;
 
 			} else if (pkt->pkt_reason == CMD_DEV_GONE) {
@@ -23452,33 +23450,40 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 			} else if ((pkt->pkt_reason == CMD_INCOMPLETE) &&
 			    (pkt->pkt_state == 0)) {
 				/* Pkt not dispatched - try again. */
-				poll_delay = 1 * SD_CSEC; /* 10 msec. */
+				poll_delay = 1 * CSEC;		/* 10 msec. */
 
 			} else if ((pkt->pkt_reason == CMD_CMPLT) &&
 			    (rc == STATUS_QFULL)) {
 				/* Queue full - try again. */
-				poll_delay = 1 * SD_CSEC; /* 10 msec. */
+				poll_delay = 1 * CSEC;		/* 10 msec. */
 
 			} else if ((pkt->pkt_reason == CMD_CMPLT) &&
 			    (rc == STATUS_BUSY)) {
 				/* Busy - try again. */
-				poll_delay = 100 * SD_CSEC; /* 1 sec. */
-				busy_count += (SD_SEC_TO_CSEC - 1);
+				poll_delay = 100 * CSEC;	/* 1 sec. */
+				busy_count += (SEC_TO_CSEC - 1);
 
 			} else if ((sensep != NULL) &&
-			    (scsi_sense_key(sensep) ==
-			    KEY_UNIT_ATTENTION)) {
-				/* Unit Attention - try again */
-				busy_count += (SD_SEC_TO_CSEC - 1); /* 1 */
+			    (scsi_sense_key(sensep) == KEY_UNIT_ATTENTION)) {
+				/*
+				 * Unit Attention - try again.
+				 * Pretend it took 1 sec.
+				 * NOTE: 'continue' avoids poll_delay
+				 */
+				busy_count += (SEC_TO_CSEC - 1);
 				continue;
 
 			} else if ((sensep != NULL) &&
 			    (scsi_sense_key(sensep) == KEY_NOT_READY) &&
 			    (scsi_sense_asc(sensep) == 0x04) &&
 			    (scsi_sense_ascq(sensep) == 0x01)) {
-				/* Not ready -> ready - try again. */
-				poll_delay = 100 * SD_CSEC; /* 1 sec. */
-				busy_count += (SD_SEC_TO_CSEC - 1);
+				/*
+				 * Not ready -> ready - try again.
+				 * 04h/01h: LUN IS IN PROCESS OF BECOMING READY
+				 * ...same as STATUS_BUSY
+				 */
+				poll_delay = 100 * CSEC;	/* 1 sec. */
+				busy_count += (SEC_TO_CSEC - 1);
 
 			} else {
 				/* BAD status - give up. */
@@ -23486,7 +23491,7 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 			}
 		}
 
-		if ((curthread->t_flag & T_INTR_THREAD) == 0 &&
+		if (((curthread->t_flag & T_INTR_THREAD) == 0) &&
 		    !do_polled_io) {
 			delay(drv_usectohz(poll_delay));
 		} else {
@@ -23498,8 +23503,22 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 	pkt->pkt_flags = savef;
 	pkt->pkt_comp = savec;
 	pkt->pkt_time = savet;
-	return (rval);
+
+	/* return on error */
+	if (rval)
+		return (rval);
+
+	/*
+	 * This is not a performance critical code path.
+	 *
+	 * As an accommodation for scsi_poll callers, to avoid ddi_dma_sync()
+	 * issues associated with looking at DMA memory prior to
+	 * scsi_pkt_destroy(), we scsi_sync_pkt() prior to return.
+	 */
+	scsi_sync_pkt(pkt);
+	return (0);
 }
+
 
 
 /*
