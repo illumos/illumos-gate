@@ -683,6 +683,8 @@ findmsg:
 		 */
 		if ((smp->msg_flags & MSG_RCVCOPY) == 0) {
 			long t = msg_entry.msgw_snd_wake;
+			long copy_type = smp->msg_type;
+
 			/*
 			 * It is available, attempt to copy it.
 			 */
@@ -698,7 +700,7 @@ findmsg:
 			 * can result in a message on the queue that can be
 			 * serviced by a sleeping receiver.
 			 */
-			if (!error && t && (smp->msg_type != t))
+			if (!error && t && (copy_type != t))
 				msg_wakeup_rdr(qp, &qp->msg_fnd_sndr, t);
 
 			/*
