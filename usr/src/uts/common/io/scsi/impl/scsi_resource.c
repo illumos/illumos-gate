@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -693,13 +693,12 @@ scsi_sync_pkt(struct scsi_pkt *pkt)
 void
 scsi_sync_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	if (pkt->pkt_handle) {
-		ASSERT((pkt->pkt_dma_flags & DDI_DMA_WRITE) ||
-			(pkt->pkt_dma_flags & DDI_DMA_READ));
+	if (pkt->pkt_handle &&
+	    (pkt->pkt_dma_flags & (DDI_DMA_WRITE | DDI_DMA_READ))) {
 		(void) ddi_dma_sync(pkt->pkt_handle,
-			pkt->pkt_dma_offset, pkt->pkt_dma_len,
-			(pkt->pkt_dma_flags & DDI_DMA_WRITE) ?
-			DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
+		    pkt->pkt_dma_offset, pkt->pkt_dma_len,
+		    (pkt->pkt_dma_flags & DDI_DMA_WRITE) ?
+		    DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
 	}
 }
 
