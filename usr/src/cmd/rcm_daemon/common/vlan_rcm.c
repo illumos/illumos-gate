@@ -845,6 +845,7 @@ vlan_update(datalink_id_t vlanid, void *arg)
 	dladm_vlan_attr_t vlan_attr;
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
+	boolean_t newnode = B_FALSE;
 	int ret = -1;
 
 	rcm_log_message(RCM_TRACE2, "VLAN: vlan_update(%u)\n", vlanid);
@@ -889,6 +890,7 @@ vlan_update(datalink_id_t vlanid, void *arg)
 		node->vc_vlan = NULL;
 		node->vc_linkid = vlan_attr.dv_linkid;
 		node->vc_state |= CACHE_NODE_NEW;
+		newnode = B_TRUE;
 	}
 
 	for (vlan = node->vc_vlan; vlan != NULL; vlan = vlan->dv_next) {
@@ -902,7 +904,7 @@ vlan_update(datalink_id_t vlanid, void *arg)
 		if ((vlan = calloc(1, sizeof (dl_vlan_t))) == NULL) {
 			rcm_log_message(RCM_ERROR, _("VLAN: malloc: %s\n"),
 			    strerror(errno));
-			if (node->vc_state & CACHE_NODE_NEW) {
+			if (newnode) {
 				free(rsrc);
 				free(node);
 			}
@@ -919,7 +921,7 @@ vlan_update(datalink_id_t vlanid, void *arg)
 	vlan->dv_implicit = vlan_attr.dv_implicit;
 	node->vc_state &= ~CACHE_NODE_STALE;
 
-	if (node->vc_state & CACHE_NODE_NEW)
+	if (newnode)
 		cache_insert(node);
 
 	rcm_log_message(RCM_TRACE3, "VLAN: vlan_update: succeeded(%u)\n",
