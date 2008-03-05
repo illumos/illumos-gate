@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,9 +124,9 @@ rfs4_fini_drc(rfs4_drc_t *drc)
  * rfs4_dr_chstate:
  *
  * Change the state of a rfs4_dupreq. If it's not in transition
- * to the FREE state, update the time used and return. If we
- * are moving to the FREE state then we need to clean up the
- * compound results and move the entry to the end of the list.
+ * to the FREE state, return. If we are moving to the FREE state
+ * then we need to clean up the compound results and move the entry
+ * to the end of the list.
  */
 void
 rfs4_dr_chstate(rfs4_dupreq_t *drp, int new_state)
@@ -140,10 +140,8 @@ rfs4_dr_chstate(rfs4_dupreq_t *drp, int new_state)
 
 	drp->dr_state = new_state;
 
-	if (new_state != NFS4_DUP_FREE) {
-		gethrestime(&drp->dr_time_used);
+	if (new_state != NFS4_DUP_FREE)
 		return;
-	}
 
 	drc = drp->drc;
 
@@ -182,7 +180,6 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
 		drp = kmem_zalloc(sizeof (rfs4_dupreq_t), KM_SLEEP);
 		drp->drc = drc;
 		drc->in_use++;
-		gethrestime(&drp->dr_time_created);
 		DTRACE_PROBE1(nfss__i__drc_new, rfs4_dupreq_t *, drp);
 		return (drp);
 	}
@@ -221,11 +218,9 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
  *
  * Search for an entry in the duplicate request cache by
  * calculating the hash index based on the XID, and examining
- * the entries in the hash bucket. If we find a match stamp the
- * time_used and return. If the entry does not match it could be
- * ready to be freed. Once we have searched the bucket we call
- * rfs4_alloc_dr() to allocate a new entry, or reuse one that is
- * available.
+ * the entries in the hash bucket. If we find a match, return.
+ * Once we have searched the bucket we call rfs4_alloc_dr() to
+ * allocate a new entry, or reuse one that is available.
  */
 int
 rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
@@ -285,15 +280,6 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 			mutex_exit(&drc->lock);
 			return (NFS4_DUP_PENDING);
 		}
-
-		/*
-		 * Not a match, but maybe this entry is okay
-		 * to be reused.
-		 */
-		if (drp->dr_state == NFS4_DUP_REPLAY) {
-			rfs4_dr_chstate(drp, NFS4_DUP_FREE);
-			list_insert_tail(&(drp->drc->dr_cache), drp);
-		}
 	}
 
 	drp = rfs4_alloc_dr(drc);
@@ -310,10 +296,9 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 		return (NFS4_DUP_ERROR);
 
 	/*
-	 * Init the state to NEW and clear the time used field.
+	 * Init the state to NEW.
 	 */
 	drp->dr_state = NFS4_DUP_NEW;
-	drp->dr_time_used.tv_sec = drp->dr_time_used.tv_nsec = 0;
 
 	/*
 	 * If needed, resize the address buffer

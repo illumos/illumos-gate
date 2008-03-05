@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,6 @@ typedef struct rfs4_dupreq {
 	list_t		*dr_bkt;
 	rfs4_drc_t	*drc;
 	int		dr_state;
-	timestruc_t 	dr_time_created;
-	timestruc_t 	dr_time_used;
 	uint32_t	dr_xid;
 	struct netbuf	dr_addr;
 	COMPOUND4res 	dr_res;
@@ -73,7 +71,6 @@ typedef struct rfs4_dupreq {
 #define	NFS4_DUP_INUSE		5
 
 extern rfs4_drc_t *nfs4_drc;
-extern unsigned nfs4_drc_lifetime;
 extern uint32_t nfs4_drc_max;
 extern uint32_t nfs4_drc_hash;
 
