@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -446,7 +446,7 @@ format_string(int set, char *buf, char *id, int off)
 	} else {
 		if ((*((char **)(void *)(id + off))) != NULL) {
 			(void) snprintf(buf, P_MAXVAL, "%s",
-					*((char **)(void *)(id + off)));
+			    *((char **)(void *)(id + off)));
 		}
 	}
 	return (0);
@@ -551,7 +551,7 @@ int
 wr_phead()
 {
 	(void) fprintf(wstream, "%s\n%s %d\n",
-			PROTM, PROTV, PROT_VERSION);
+	    PROTM, PROTV, PROT_VERSION);
 	(void) fflush(wstream);
 	return (0);
 }
@@ -604,12 +604,12 @@ wr_element(int stubidx, char *src, char *elemid)
 	int i;
 
 	(void) fprintf(wstream, "%s %s\n%s %d\n",
-			ELMID, elemid, FILDN, stubs[stubidx].size);
+	    ELMID, elemid, FILDN, stubs[stubidx].size);
 	for (i = 0; i < stubs[stubidx].size; i++) {
 		stubs[stubidx].stub[i].info.format(STRUCT_TO_STR,
-				value, src, stubs[stubidx].stub[i].info.off);
+		    value, src, stubs[stubidx].stub[i].info.off);
 		(void) fprintf(wstream, "%s %s\n",
-				stubs[stubidx].stub[i].key, value);
+		    stubs[stubidx].stub[i].key, value);
 	}
 	(void) fflush(wstream);
 	return (0);
@@ -646,6 +646,9 @@ wr_error(char *err)
 		*(err + P_MAXLEN - len - 1) = 0;
 	}
 	len = strlen(err) - 1;
+	if (strlen(err) == 0) {
+		return;
+	}
 	while (len-- > 0) {
 		if (*(err + len) == '\n')
 			*(err + len) = ' ';
