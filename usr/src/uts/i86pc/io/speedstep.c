@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
  */
 #define	ESS_PDC_REVISION		0x1
 #define	ESS_PDC_PS_MSR			(1<<0)
+#define	ESS_PDC_IO_BEFORE_HALT		(1<<1)
 #define	ESS_PDC_MP			(1<<3)
 #define	ESS_PDC_PSD			(1<<5)
 
@@ -84,7 +85,18 @@ typedef struct speedstep_state {
 	uint32_t ss_state;
 } speedstep_state_t;
 
-uint32_t ess_pdccap = ESS_PDC_PS_MSR | ESS_PDC_MP | ESS_PDC_PSD;
+/*
+ * Note that SpeedStep support requires the following _PDC bits be
+ * enabled so that ACPI returns the proper objects. The requirement
+ * that ESS_PDC_IO_BEFORE_HALT be enabled probably seems strange.
+ * Unfortunately, the _PDC bit for this feature has been historically
+ * misassociated with SpeedStep support and some BIOS implementations
+ * erroneously check this bit when evaluating _PSS methods. Enabling
+ * this bit is our only option as the likelihood of a BIOS fix on all
+ * affected platforms is not very good.
+ */
+uint32_t ess_pdccap = ESS_PDC_PS_MSR | ESS_PDC_IO_BEFORE_HALT |
+    ESS_PDC_MP | ESS_PDC_PSD;
 
 /*
  * Read the status register. How it is read, depends upon the _PCT
