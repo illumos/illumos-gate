@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,8 +108,6 @@ ibcm_arp_lrsrv(queue_t *q)
 		while (mp = getq(q)) {
 			ibcm_arp_pr_arp_ack(mp);
 		}
-	} else {
-		freemsg(mp);
 	}
 
 	return (0);
@@ -295,7 +293,7 @@ ibcm_arp_unlink_driver(queue_t **q, vnode_t **dev_vp)
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_unlink_driver: VOP_CLOSE "
 		    "failed %d\n", rc);
 	}
-	vn_rele(vp);
+	VN_RELE(vp);
 
 	return (0);
 }
@@ -488,7 +486,7 @@ ibcm_arp_get_ibd_insts_cb(dev_info_t *dip, void *arg)
 
 		if (ibds->ibcm_arp_ibd_cnt >= ibds->ibcm_arp_ibd_alloc) {
 			ibcm_arp_ip_t	*tmp = NULL;
-			int		new_count = 0;
+			uint8_t		new_count;
 
 			new_count = ibds->ibcm_arp_ibd_alloc +
 			    IBCM_ARP_IBD_INSTANCES;
@@ -666,9 +664,11 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 	ret = ibtl_cm_get_active_plist(&attr, flags, port_list_p);
 	if (ret == IBT_SUCCESS) {
 		int		i;
+		uint8_t		cnt;
 
 		plistp = port_list_p[0];
-		for (i = 0; i < plistp->p_count; i++, plistp++) {
+		cnt = plistp->p_count;
+		for (i = 0; i < cnt; i++, plistp++) {
 			ipp = ibcm_arp_ibd_gid2mac(&plistp->p_sgid, 0, &ibds);
 			if (ipp == NULL)
 				plistp->p_src_ip.family = AF_UNSPEC;
