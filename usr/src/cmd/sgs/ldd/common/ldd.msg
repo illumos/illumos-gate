@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -34,7 +34,7 @@
 # Argument usage messages.
 
 @ MSG_ARG_USAGE		"usage: %s [-d | -r] [-c] [-e envar] [-f] [-i] [-L] \
-			 [-l] [-s] [-U | -u] [-v] [-w] file(s)\n"
+			 [-l] [-p] [-s] [-U | -u] [-v] [-w] file(s)\n"
 
 # Environment messages.
 
@@ -97,7 +97,7 @@
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 
-@ MSG_STR_GETOPT	"cde:fiLlrsUuvw"
+@ MSG_STR_GETOPT	"cde:fiLlprsUuvw"
 @ MSG_STR_FMT1		"%s=./%s %s"
 @ MSG_STR_FMT2		"%s=%s %s"
 @ MSG_STR_FMT3		"%s:\n"

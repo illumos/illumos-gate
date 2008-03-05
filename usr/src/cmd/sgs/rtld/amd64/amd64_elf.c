@@ -798,35 +798,17 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 * reference was not to a weak symbol,
 					 * report an error.  Weak references
 					 * may be unresolved.
-					 * chkmsg: MSG_INTL(MSG_LDD_SYM_NFOUND)
 					 */
 					/* BEGIN CSTYLED */
 					if (symdef == 0) {
-					    Lm_list	*lml = LIST(lmp);
-
 					    if (sl.sl_bind != STB_WEAK) {
-						if (lml->lm_flags &
-						    LML_FLG_IGNRELERR) {
-						    continue;
-						} else if (lml->lm_flags &
-						    LML_FLG_TRC_WARN) {
-						    (void) printf(MSG_INTL(
-							MSG_LDD_SYM_NFOUND),
-							demangle(name),
-							NAME(lmp));
-						    continue;
-						} else {
-						    DBG_CALL(Dbg_reloc_in(lml,
-							ELF_DBG_RTLD, M_MACH,
-							M_REL_SHT_TYPE, rel,
-							NULL, name));
-						    eprintf(lml, ERR_FATAL,
-							MSG_INTL(MSG_REL_NOSYM),
-							NAME(lmp),
-							demangle(name));
+						if (elf_reloc_error(lmp, name,
+						    rel, binfo))
+							continue;
+
 						    ret = 0;
 						    break;
-						}
+
 					    } else {
 						psymndx = rsymndx;
 						psymdef = 0;

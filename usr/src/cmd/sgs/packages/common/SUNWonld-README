@@ -1316,3 +1316,5 @@ Bugid   Risk Synopsis
 	executables
 6667661 Direct bindings can compromise executables with insufficient copy
 	relocation information
+6357282 ldd should recognize PARENT and EXTERN symbols
+	PSARC/2008/148: new ldd(1) -p option

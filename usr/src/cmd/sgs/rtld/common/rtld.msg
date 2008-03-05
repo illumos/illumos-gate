@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -353,6 +353,7 @@
 @ MSG_LD_NOFLTCONFIG	"NOFLTCONFIG"
 @ MSG_LD_NOLAZY		"NOLAZYLOAD"
 @ MSG_LD_NOOBJALTER	"NOOBJALTER"
+@ MSG_LD_NOPAREXT	"NOPAREXT"
 @ MSG_LD_NOUNRESWEAK	"NOUNRESWEAK"
 @ MSG_LD_NOVERSION	"NOVERSION"
 @ MSG_LD_ORIGIN		"ORIGIN"

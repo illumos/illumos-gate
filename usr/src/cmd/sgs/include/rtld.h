@@ -358,6 +358,9 @@ struct lm_list32 {
 #define	LML_FLG_TRC_INIT	0x08000000	/* print .init order */
 #define	LML_FLG_TRC_NOUNRESWEAK	0x10000000	/* unresolved weak references */
 						/*	are not allowed */
+#define	LML_FLG_TRC_NOPAREXT	0x20000000	/* unresolved PARENT/EXTERN */
+						/*	references are not */
+						/*	allowed */
 #define	LML_MSK_TRC		0xfff00000	/* tracing mask */
 
 /*

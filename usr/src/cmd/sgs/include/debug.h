@@ -111,7 +111,7 @@ extern "C" {
 
 /*
  * Group handle dependency operations - passed to Dbg_file_hdl_action().
- * Indicates depdenencies assocation to handle.
+ * Identify the dependencies that are associated with a handle.
  */
 #define	DBG_DEP_ADD		0	/* dependency added */
 #define	DBG_DEP_UPDATE		1	/* dependency updated */
@@ -121,13 +121,24 @@ extern "C" {
 #define	DBG_DEP_ORPHAN		5	/* dependency must remain an orphan */
 #define	DBG_DEP_REINST		6	/* dependency reinstated from orphan */
 
+/*
+ * Binding information, indicating the result of a symbol binding.  Can also
+ * indicate the reference as being EXTERN or PARENT.  Binding information is
+ * used to augment diagnostic binding information (which in turn can be used by
+ * lari(1)), and to enable ldd(1) -p processing.
+ */
 #define	DBG_BINFO_FOUND		0x0001	/* information regarding binding */
 #define	DBG_BINFO_DIRECT	0x0002	/* bound directly */
 #define	DBG_BINFO_COPYREF	0x0004	/* bound to copy relocated reference */
 #define	DBG_BINFO_FILTEE	0x0008	/* bound to filtee */
 #define	DBG_BINFO_INTERPOSE	0x0010	/* bound to an identified interposer */
 #define	DBG_BINFO_PLTADDR	0x0020	/* bound to executables undefined plt */
-#define	DBG_BINFO_MSK		0xffff
+#define	DBG_BINFO_MSK		0x0fff
+
+#define	DBG_BINFO_REF_EXTERN	0x1000	/* reference to EXTERN */
+#define	DBG_BINFO_REF_PARENT	0x2000	/* reference to PARENT */
+#define	DBG_BINFO_REF_MSK	0xf000
+
 
 #define	DBG_CAP_INITIAL		0
 #define	DBG_CAP_IGNORE		1

@@ -44,6 +44,7 @@ extern "C" {
  * Common extern functions for ELF file class.
  */
 extern	int	elf_reloc(Rt_map *, uint_t);
+extern	int	elf_reloc_error(Rt_map *, const char *, void *, uint_t);
 extern	void	elf_plt_init(void *, caddr_t);
 extern	int	elf_set_prot(Rt_map *, int);
 extern	Rt_map	*elf_obj_file(Lm_list *, Aliste, const char *, int);

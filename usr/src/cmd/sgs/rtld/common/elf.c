@@ -3531,3 +3531,43 @@ elf_static_tls(Rt_map *lmp, Sym *sym, void *rel, uchar_t rtype, char *name,
 	}
 	return (-(TLSSTATOFF(lmp) - value));
 }
+
+/*
+ * If the symbol is not found and the reference was not to a weak symbol, report
+ * an error.  Weak references may be unresolved.
+ */
+int
+elf_reloc_error(Rt_map *lmp, const char *name, void *rel, uint_t binfo)
+{
+	Lm_list	*lml = LIST(lmp);
+
+	/*
+	 * Under crle(1), relocation failures are ignored.
+	 */
+	if (lml->lm_flags & LML_FLG_IGNRELERR)
+		return (1);
+
+	/*
+	 * Under ldd(1), unresolved references are reported.  However, if the
+	 * original reference is EXTERN or PARENT these references are ignored
+	 * unless ldd's -p option is in effect.
+	 */
+	if (lml->lm_flags & LML_FLG_TRC_WARN) {
+		if (((binfo & DBG_BINFO_REF_MSK) == 0) ||
+		    ((lml->lm_flags & LML_FLG_TRC_NOPAREXT) != 0)) {
+			(void) printf(MSG_INTL(MSG_LDD_SYM_NFOUND),
+			    demangle(name), NAME(lmp));
+		}
+		return (1);
+	}
+
+	/*
+	 * Otherwise, the unresolved references is fatal.
+	 */
+	DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH, M_REL_SHT_TYPE, rel,
+	    NULL, name));
+	eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
+	    demangle(name));
+
+	return (0);
+}

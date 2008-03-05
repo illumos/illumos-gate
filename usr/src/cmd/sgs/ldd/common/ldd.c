@@ -17,13 +17,12 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +31,7 @@
  * Print the list of shared objects required by a dynamic executable or shared
  * object.
  *
- * usage is: ldd [-d | -r] [-c] [-e envar] [-i] [-f] [-L] [-l] [-s]
+ * usage is: ldd [-d | -r] [-c] [-e envar] [-i] [-f] [-L] [-l] [-p] [-s]
  *		[-U | -u] [-v] [-w] file(s)
  *
  * ldd opens the file and verifies the information in the elf header.
@@ -96,7 +95,15 @@
  * LD_NOUNRESWEAK=1 to be set.  By default, an unresolved weak reference is
  * allowed, and a "0" is written to the relocation offset.  The -w option
  * disables this default.  Any weak references that can not be resolved result
- * in relocation error messages.
+ * in relocation error messages.  This option has no use without -r or -d.
+ *
+ * If the -p option is specified, no unresolved PARENT or EXTERN references are
+ * allowed.  -p causes LD_NOPAREXT=1 to be set.  By default, PARENT and EXTERN
+ * references, which have been explicitly assigned via a mapfile when a shared
+ * object was built, imply that a caller will provide the symbols, and hence
+ * these are not reported as relocation errors.  Note, the -p option is asserted
+ * by default when either the -r or -d options are used to inspect a dynamic
+ * executable.  This option has no use with a shared object without -r or -d.
  */
 #include	<fcntl.h>
 #include	<stdio.h>
@@ -135,7 +142,8 @@ static char	bind[] =	"LD_BIND_NOW= ",
 		init[] =	"LD_INIT= ",
 		uref[] =	"LD_UNREF= ",
 		used[] =	"LD_UNUSED= ",
-		weak[] =	"LD_NOUNRESWEAK= ";
+		weak[] =	"LD_NOUNRESWEAK= ",
+		nope[] =	"LD_NOPAREXT= ";
 static char	*load;
 
 static const char	*prefile_32, *prefile_64, *prefile;
@@ -173,7 +181,7 @@ main(int argc, char **argv)
 	Elf	*elf;
 	int	cflag = 0, dflag = 0, fflag = 0, iflag = 0, Lflag = 0;
 	int	lflag = 0, rflag = 0, sflag = 0, Uflag = 0, uflag = 0;
-	int	vflag = 0, wflag = 0, nfile, var, error = 0;
+	int	pflag = 0, vflag = 0, wflag = 0, nfile, var, error = 0;
 
 	Listnode	*lnp;
 
@@ -217,6 +225,9 @@ main(int argc, char **argv)
 		case 'i' :			/* print the order of .init */
 			iflag = 1;
 			break;
+		case 'p' :
+			pflag = 1;		/* expose unreferenced */
+			break;			/*	parent or externals */
 		case 'r' :			/* perform all relocations */
 			rflag = 1;
 			if (dflag)
@@ -238,7 +249,7 @@ main(int argc, char **argv)
 		case 'v' :			/* enable verbose output */
 			vflag = 1;
 			break;
-		case 'w' :			/* disable unresolved weak */
+		case 'w' :			/* expose unresolved weak */
 			wflag = 1;		/*	references */
 			break;
 		default :
@@ -317,6 +328,7 @@ main(int argc, char **argv)
 	uref[sizeof (uref) - 2] = (Uflag) ? '1' : '\0';
 	used[sizeof (used) - 2] = (uflag) ? '1' : '\0';
 	weak[sizeof (weak) - 2] = (wflag) ? '1' : '\0';
+	nope[sizeof (nope) - 2] = (pflag) ? '1' : '\0';
 
 	/*
 	 * coordinate libelf's version information
@@ -719,7 +731,8 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 		    (putenv(fltr) != 0) || (putenv(conf) != 0) ||
 		    (putenv(init) != 0) || (putenv(lazy) != 0) ||
 		    (putenv(uref) != 0) || (putenv(used) != 0) ||
-		    (putenv(weak) != 0) || (putenv(load) != 0)) {
+		    (putenv(weak) != 0) || (putenv(load) != 0) ||
+		    (putenv(nope) != 0)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ENV_FAILED), cname);
 			exit(1);
 		}

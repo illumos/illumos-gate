@@ -2718,6 +2718,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*clmp = slp->sl_cmap;
+	Lm_list		*lml = LIST(clmp);
 	Rt_map		*ilmp = slp->sl_imap, *lmp;
 	ulong_t		rsymndx;
 	Sym		*sym;
@@ -2740,12 +2741,26 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 */
 	if (((rsymndx = slp->sl_rsymndx) != 0) &&
 	    ((sip = SYMINFO(clmp)) != NULL)) {
+		uint_t	bound;
+
 		/*
 		 * Find the corresponding Syminfo entry for the original
 		 * referencing symbol.
 		 */
 		/* LINTED */
 		sip = (Syminfo *)((char *)sip + (rsymndx * SYMINENT(clmp)));
+		bound = sip->si_boundto;
+
+		/*
+		 * Identify any EXTERN or PARENT references for ldd(1).
+		 */
+		if ((lml->lm_flags & LML_FLG_TRC_WARN) &&
+		    (bound > SYMINFO_BT_LOWRESERVE)) {
+			if (bound == SYMINFO_BT_PARENT)
+				*binfo |= DBG_BINFO_REF_PARENT;
+			if (bound == SYMINFO_BT_EXTERN)
+				*binfo |= DBG_BINFO_REF_EXTERN;
+		}
 
 		/*
 		 * If the symbol information indicates a direct binding,
@@ -2755,7 +2770,6 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		 * to perform any default symbol search.
 		 */
 		if (sip->si_flags & SYMINFO_FLG_DIRECT) {
-			uint_t	bound = sip->si_boundto;
 
 			lmp = 0;
 			if (bound < SYMINFO_BT_LOWRESERVE)
@@ -2773,8 +2787,8 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			 * symbols from the head of the link map list.
 			 */
 			if (((FLAGS(clmp) & FLG_RT_TRANS) ||
-			    ((!(LIST(clmp)->lm_tflags & LML_TFLG_NODIRECT)) &&
-			    (!(slp->sl_flags & LKUP_SINGLETON)))) &&
+			    (((lml->lm_tflags & LML_TFLG_NODIRECT) == 0) &&
+			    ((slp->sl_flags & LKUP_SINGLETON) == 0))) &&
 			    ((FLAGS1(clmp) & FL1_RT_DIRECT) ||
 			    (sip->si_flags & SYMINFO_FLG_DIRECTBIND))) {
 				sym = lookup_sym_direct(slp, dlmp, binfo,
@@ -2848,7 +2862,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 
 		sym = NULL;
 
-		for (ALIST_TRAVERSE_BY_OFFSET(LIST(clmp)->lm_lists, off, lmc)) {
+		for (ALIST_TRAVERSE_BY_OFFSET(lml->lm_lists, off, lmc)) {
 			if (((sym = core_lookup_sym(lmc->lc_head, &sl, dlmp,
 			    binfo, off)) != NULL) ||
 			    (*binfo & BINFO_REJSINGLE))
@@ -2877,10 +2891,11 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		if ((lmp = ilmp) == 0)
 			lmp = LIST(clmp)->lm_head;
 
-		if ((sl.sl_flags & LKUP_WEAK) || (LIST(lmp)->lm_lazy == 0))
+		lml = LIST(lmp);
+		if ((sl.sl_flags & LKUP_WEAK) || (lml->lm_lazy == 0))
 			return ((Sym *)0);
 
-		DBG_CALL(Dbg_syms_lazy_rescan(LIST(clmp), name));
+		DBG_CALL(Dbg_syms_lazy_rescan(lml, name));
 
 		/*
 		 * If this request originated from a dlsym(RTLD_NEXT) then start
@@ -2893,7 +2908,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			Aliste	idx;
 			Lm_cntl	*lmc;
 
-			for (ALIST_TRAVERSE(LIST(clmp)->lm_lists, idx, lmc)) {
+			for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 				sl.sl_flags |= LKUP_NOFALLBACK;
 				if ((sym = _lazy_find_sym(lmc->lc_head, &sl,
 				    dlmp, binfo)) != 0)

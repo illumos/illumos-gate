@@ -1387,6 +1387,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_NOFLTCONFIG	0x1000000000ULL
 #define	ENV_FLG_BIND_LAZY	0x2000000000ULL
 #define	ENV_FLG_NOUNRESWEAK	0x4000000000ULL
+#define	ENV_FLG_NOPAREXT	0x8000000000ULL
 
 #ifdef	SIEBEL_DISABLE
 #define	ENV_FLG_FIX_1		0x8000000000ULL
@@ -1699,6 +1700,11 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			select |= SEL_ACT_LML;
 			val = LML_FLG_TRC_NOUNRESWEAK;
 			variable = ENV_FLG_NOUNRESWEAK;
+		} else if ((len == MSG_LD_NOPAREXT_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_NOPAREXT), MSG_LD_NOPAREXT_SIZE) == 0)) {
+			select |= SEL_ACT_LML;
+			val = LML_FLG_TRC_NOPAREXT;
+			variable = ENV_FLG_NOPAREXT;
 		}
 	}
 	/*
@@ -2286,6 +2292,13 @@ readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 	if ((rtld_flags2 & (RT_FL2_BINDNOW | RT_FL2_BINDLAZY)) ==
 	    (RT_FL2_BINDNOW | RT_FL2_BINDLAZY))
 		rtld_flags2 &= ~RT_FL2_BINDLAZY;
+
+	/*
+	 * When using ldd(1) -r or -d against an executable, assert -p.
+	 */
+	if ((*lmflags &
+	    (LML_FLG_TRC_WARN | LML_FLG_TRC_LDDSTUB)) == LML_FLG_TRC_WARN)
+		*lmflags |= LML_FLG_TRC_NOPAREXT;
 
 	/*
 	 * If we have a locale setting make sure its worth processing further.
