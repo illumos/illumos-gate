@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(lint)
@@ -448,6 +450,84 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 }
 
 #else
+
+/*
+ * The PLT code that landed us here placed 2 arguments on the stack as
+ * arguments to elf_rtbndr.
+ * Additionally the pc of caller is below these 2 args.
+ * Our stack will look like this after we establish a stack frame with
+ * push %rbp; movq %rsp, %rbp sequence:
+ *
+ *	8(%rbp)			arg1 - *lmp
+ *	16(%rbp), %rsi		arg2 - reloc index
+ *	24(%rbp), %rdx		arg3 - pc of caller
+ */
+#define	LBPLMPOFF	8	/* arg1 - *lmp */
+#define	LBPRELOCOFF	16	/* arg2 - reloc index */
+#define	LBRPCOFF	24	/* arg3 - pc of caller */
+
+/*
+ * Possible arguments for the resolved function are in registers as per
+ * the AMD64 ABI.  We must save on the local stack all possible register
+ * arguments before interposing functions to resolve the called function. 
+ * Possible arguments must be restored before invoking the resolved function.
+ *
+ * Local stack space storage for elf_rtbndr is allocated as follows:
+ *
+ *	Saved regs:
+ *	    %rax			 8
+ *	    %rdi			 8
+ *	    %rsi			 8
+ *	    %rdx			 8
+ *	    %rcx			 8
+ *	    %r8				 8
+ *	    %r9				 8
+ *	    %r10			 8
+ *				    =======
+ *			    Subtotal:   64 (16byte aligned)
+ *
+ *	Saved Media Regs (used to pass floating point args):
+ *	    %xmm0 - %xmm7   16 * 8:    128
+ *				    =======
+ *			    Total:     192 (16byte aligned)
+ *  
+ *  So - will subtract the following to create enough space
+ *
+ *	-8(%rbp)	entering %rax
+ *	-16(%rbp)	entering %rdi
+ *	-24(%rbp)	entering %rsi
+ *	-32(%rbp)	entering %rdx
+ *	-40(%rbp)	entering %rcx
+ *	-48(%rbp)	entering %r8
+ *	-56(%rbp)	entering %r9
+ *	-64(%rbp)	entering %r10
+ *	-80(%xmm0)	entering %xmm0
+ *	-96(%xmm1)	entering %xmm1
+ *	-112(%xmm2)	entering %xmm2
+ *	-128(%xmm3)	entering %xmm3
+ *	-144(%xmm4)	entering %xmm4
+ *	-160(%xmm5)	entering %xmm5
+ *	-176(%xmm6)	entering %xmm6
+ *	-192(%xmm7)	entering %xmm7
+ */
+#define	LS_SIZE	$192	/* local stack space to save all possible arguments */
+#define	LSRAXOFF	-8	/* for SSE register count */
+#define	LSRDIOFF	-16	/* arg 0 ... */
+#define	LSRSIOFF	-24
+#define	LSRDXOFF	-32
+#define	LSRCXOFF	-40
+#define	LSR8OFF		-48
+#define	LSR9OFF		-56
+#define	LSR10OFF	-64	/* ... arg 5 */
+#define	LSXMM0OFF	-80	/* SSE arg 0 ... */
+#define	LSXMM1OFF	-96
+#define	LSXMM2OFF	-112
+#define	LSXMM3OFF	-128
+#define	LSXMM4OFF	-144
+#define	LSXMM5OFF	-160
+#define	LSXMM6OFF	-176
+#define	LSXMM7OFF	-192	/* ... SSE arg 7 */
+
 	.weak	_elf_rtbndr
 	_elf_rtbndr = elf_rtbndr
 
@@ -456,29 +536,50 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	pushq	%rbp
 	movq	%rsp, %rbp
 
-	pushq	%rax		/* for SSE register count */
-	pushq	%rdi		/* arg 0 .. */
-	pushq	%rsi
-	pushq	%rdx
-	pushq	%rcx
-	pushq	%r8
-	pushq	%r9		/* .. arg 5 */
-	pushq	%r10		/* call chain reg */
+	subq	LS_SIZE, %rsp	/* save all ABI defined argument registers */
 
-	movq	8(%rbp), %rdi	/* arg1 - *lmp */
-	movq	16(%rbp), %rsi	/* arg2 - reloc index */
-	movq	24(%rbp), %rdx	/* arg3 - pc of caller */
-	call	elf_bndr@PLT	/* call elf_rtbndr(lmp, relndx, pc) */
-	movq	%rax, 16(%rbp)	/* store final destination */
+	movq	%rax, LSRAXOFF(%rbp)	/* for SSE register count */
+	movq	%rdi, LSRDIOFF(%rbp)	/*  arg 0 .. */
+	movq	%rsi, LSRSIOFF(%rbp)
+	movq	%rdx, LSRDXOFF(%rbp)
+	movq	%rcx, LSRCXOFF(%rbp)
+	movq	%r8, LSR8OFF(%rbp)
+	movq	%r9, LSR9OFF(%rbp)	/* .. arg 5 */
+	movq	%r10, LSR10OFF(%rbp)	/* call chain reg */
 
-	popq	%r10
-	popq	%r9
-	popq	%r8
-	popq	%rcx
-	popq	%rdx
-	popq	%rsi
-	popq	%rdi
-	popq	%rax
+	movdqa	%xmm0, LSXMM0OFF(%rbp)	/* SSE arg 0 ... */
+	movdqa	%xmm1, LSXMM1OFF(%rbp)
+	movdqa	%xmm2, LSXMM2OFF(%rbp)
+	movdqa	%xmm3, LSXMM3OFF(%rbp)
+	movdqa	%xmm4, LSXMM4OFF(%rbp)
+	movdqa	%xmm5, LSXMM5OFF(%rbp)
+	movdqa	%xmm6, LSXMM6OFF(%rbp)
+	movdqa	%xmm7, LSXMM7OFF(%rbp)	/* ... SSE arg 7 */
+
+	movq	LBPLMPOFF(%rbp), %rdi	/* arg1 - *lmp */
+	movq	LBPRELOCOFF(%rbp), %rsi	/* arg2 - reloc index */
+	movq	LBRPCOFF(%rbp), %rdx	/* arg3 - pc of caller */
+	call	elf_bndr@PLT		/* call elf_rtbndr(lmp, relndx, pc) */
+	movq	%rax, LBPRELOCOFF(%rbp)	/* store final destination */
+
+	/* restore possible arguments before invoking resolved function */
+	movq	LSRAXOFF(%rbp), %rax
+	movq	LSRDIOFF(%rbp), %rdi
+	movq	LSRSIOFF(%rbp), %rsi
+	movq	LSRDXOFF(%rbp), %rdx
+	movq	LSRCXOFF(%rbp), %rcx
+	movq	LSR8OFF(%rbp), %r8
+	movq	LSR9OFF(%rbp), %r9
+	movq	LSR10OFF(%rbp), %r10
+
+	movdqa	LSXMM0OFF(%rbp), %xmm0
+	movdqa	LSXMM1OFF(%rbp), %xmm1
+	movdqa	LSXMM2OFF(%rbp), %xmm2
+	movdqa	LSXMM3OFF(%rbp), %xmm3
+	movdqa	LSXMM4OFF(%rbp), %xmm4
+	movdqa	LSXMM5OFF(%rbp), %xmm5
+	movdqa	LSXMM6OFF(%rbp), %xmm6
+	movdqa	LSXMM7OFF(%rbp), %xmm7
 
 	movq	%rbp, %rsp
 	popq	%rbp
