@@ -65,6 +65,7 @@ usr/src/cmd/vi/THIRDPARTYLICENSE
 usr/src/cmd/which/THIRDPARTYLICENSE
 usr/src/cmd/xntpd/THIRDPARTYLICENSE
 usr/src/cmd/xstr/THIRDPARTYLICENSE
+usr/src/common/crypto/sha1/amd64/THIRDPARTYLICENSE
 usr/src/common/openssl/LICENSE
 usr/src/grub/grub-0.95/COPYING
 usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE
