@@ -1023,6 +1023,7 @@ usr/include/smbsrv/ndl/winreg.ndl	i386
 # Private/Internal dtrace scripts of smbsrv. Do not ship.
 #
 usr/lib/smbsrv/dtrace			i386
+usr/lib/smbsrv/dtrace/cifs.d		i386
 usr/lib/smbsrv/dtrace/msrpc.d		i386
 usr/lib/smbsrv/dtrace/smbnode.d		i386
 usr/lib/smbsrv/dtrace/smbvfs.d		i386
