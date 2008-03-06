@@ -1854,7 +1854,7 @@ add_page_to_pool(page_t *pp, int force)
 		page_io_pool_add(&io_pool_16m, pp);
 		goto done;
 	}
-	if (io_pool_cnt < io_pool_cnt_max || force) {
+	if (io_pool_cnt < io_pool_cnt_max || force || io_pool_4g == NULL) {
 		++io_pool_cnt;
 		page_io_pool_add(&io_pool_4g, pp);
 	} else {
@@ -2137,8 +2137,14 @@ populate_io_pool(void)
 	/*
 	 * If we are out of pages in the pool, then grow the size of the pool
 	 */
-	if (io_pool_cnt == 0)
-		io_pool_cnt_max += io_pool_cnt_max / 20; /* grow by 5% */
+	if (io_pool_cnt == 0) {
+		/*
+		 * Grow the max size of the io pool by 5%, but never more than
+		 * 25% of physical memory.
+		 */
+		if (io_pool_cnt_max < physmem / 4)
+			io_pool_cnt_max += io_pool_cnt_max / 20;
+	}
 	io_pool_grows++;	/* should be a kstat? */
 
 	/*
