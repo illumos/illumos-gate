@@ -141,7 +141,7 @@ proto_plugin_init()
 			struct sa_proto_plugin *tmp;
 
 			for (i = 0, tmp = sap_proto_list;
-			    i < num_protos;
+			    i < num_protos && tmp != NULL;
 			    tmp = tmp->plugin_next) {
 				err = 0;
 				if (tmp->plugin_ops->sa_init != NULL)

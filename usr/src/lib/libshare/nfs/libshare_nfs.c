@@ -2344,9 +2344,12 @@ extractprop(char *name, char *value)
 /*
  * initprotofromdefault()
  *
- * read the default file(s) and add the defined values to the
+ * Read the default file(s) and add the defined values to the
  * protoset.  Note that default values are known from the built in
- * table in case the file doesn't have a definition.
+ * table in case the file doesn't have a definition. Not having the
+ * /etc/default/nfs file is OK since we have builtin default
+ * values. The default file will get constructed as needed if values
+ * are changed from the defaults.
  */
 
 static int
@@ -2382,9 +2385,17 @@ initprotofromdefault()
 			}
 			(void) fclose(nfs);
 		} else {
-			(void) printf(gettext("Problem with file: %s\n"),
-			    NFSADMIN);
-			ret = SA_SYSTEM_ERR;
+			switch (errno) {
+			case EPERM:
+			case EACCES:
+				ret = SA_NO_PERMISSION;
+				break;
+			case ENOENT:
+				break;
+			default:
+				ret = SA_SYSTEM_ERR;
+				break;
+			}
 		}
 	} else {
 		ret = SA_NO_MEMORY;
@@ -2464,13 +2475,20 @@ nfs_init()
 {
 	int ret = SA_OK;
 
-	if (sa_plugin_ops.sa_init != nfs_init)
+	if (sa_plugin_ops.sa_init != nfs_init) {
 		(void) printf(dgettext(TEXT_DOMAIN,
 		    "NFS plugin not properly initialized\n"));
+		return (SA_CONFIG_ERR);
+	}
 
 	ret = initprotofromdefault();
-	if (ret == SA_OK)
-		add_defaults();
+	if (ret != SA_OK) {
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "NFS plugin problem with default file: %s\n"),
+		    sa_errorstr(ret));
+		ret = SA_OK;
+	}
+	add_defaults();
 
 	return (ret);
 }
@@ -2537,8 +2555,27 @@ read_default_file(char *fname)
 				}
 			}
 		}
+		(void) fclose(file);
+	} else {
+		int ret = SA_OK;
+		switch (errno) {
+		case EPERM:
+		case EACCES:
+			ret = SA_NO_PERMISSION;
+			break;
+		case ENOENT:
+			break;
+		default:
+			ret = SA_SYSTEM_ERR;
+			break;
+		}
+		if (ret == SA_OK) {
+			/* Want at least one comment line */
+			defs = (struct deffile *)
+			    calloc(1, sizeof (struct deffile));
+			defs->line = strdup("# NFS default file\n");
+		}
 	}
-	(void) fclose(file);
 	return (defs);
 }
 
@@ -2615,21 +2652,47 @@ set_default_file_value(char *tag, char *value)
 	struct deffile *prev;
 	char string[MAX_STRING_LENGTH];
 	int len;
-	int update = 0;
+	boolean_t update = B_FALSE;
 
 	(void) snprintf(string, MAX_STRING_LENGTH, "%s=", tag);
 	len = strlen(string);
 
 	root = defs = read_default_file(NFSADMIN);
 	if (root == NULL) {
-		if (errno == EPERM || errno == EACCES)
+		switch (errno) {
+		case EPERM:
+		case EACCES:
 			ret = SA_NO_PERMISSION;
-		else
-			ret = SA_SYSTEM_ERR;
-	} else {
+			break;
+		default:
+			ret = SA_NO_MEMORY;
+			break;
+		}
+		return (ret);
+	}
+
+	while (defs != NULL) {
+		if (defs->line != NULL &&
+		    strncasecmp(defs->line, string, len) == 0) {
+			/* replace with the new value */
+			free(defs->line);
+			fixcaseupper(tag);
+			(void) snprintf(string, sizeof (string),
+			    "%s=%s\n", tag, value);
+			string[MAX_STRING_LENGTH - 1] = '\0';
+			defs->line = strdup(string);
+			update = B_TRUE;
+			break;
+		}
+		defs = defs->next;
+	}
+	if (!update) {
+		defs = root;
+		/* didn't find, so see if it is a comment */
+		(void) snprintf(string, MAX_STRING_LENGTH, "#%s=", tag);
+		len = strlen(string);
 		while (defs != NULL) {
-			if (defs->line != NULL &&
-			    strncasecmp(defs->line, string, len) == 0) {
+			if (strncasecmp(defs->line, string, len) == 0) {
 				/* replace with the new value */
 				free(defs->line);
 				fixcaseupper(tag);
@@ -2637,50 +2700,31 @@ set_default_file_value(char *tag, char *value)
 				    "%s=%s\n", tag, value);
 				string[MAX_STRING_LENGTH - 1] = '\0';
 				defs->line = strdup(string);
-				update = 1;
+				update = B_TRUE;
 				break;
 			}
 			defs = defs->next;
 		}
-		if (!update) {
-			defs = root;
-			/* didn't find, so see if it is a comment */
-			(void) snprintf(string, MAX_STRING_LENGTH, "#%s=", tag);
-			len = strlen(string);
-			while (defs != NULL) {
-				if (strncasecmp(defs->line, string, len) == 0) {
-					/* replace with the new value */
-					free(defs->line);
-					fixcaseupper(tag);
-					(void) snprintf(string, sizeof (string),
-					    "%s=%s\n", tag, value);
-					string[MAX_STRING_LENGTH - 1] = '\0';
-					defs->line = strdup(string);
-					update = 1;
-					break;
-				}
-				defs = defs->next;
-			}
-		}
-		if (!update) {
-			fixcaseupper(tag);
-			(void) snprintf(string, sizeof (string), "%s=%s\n",
-			    tag, value);
-			prev = root;
-			while (prev->next != NULL)
-				prev = prev->next;
-			defs = malloc(sizeof (struct deffile));
-			prev->next = defs;
-			if (defs != NULL) {
-				defs->next = NULL;
-				defs->line = strdup(string);
-			}
-		}
-		if (update) {
-			ret = write_default_file(NFSADMIN, root);
-		}
-		free_default_file(root);
 	}
+	if (!update) {
+		fixcaseupper(tag);
+		(void) snprintf(string, sizeof (string), "%s=%s\n",
+		    tag, value);
+		prev = root;
+		while (prev->next != NULL)
+			prev = prev->next;
+		defs = malloc(sizeof (struct deffile));
+		prev->next = defs;
+		if (defs != NULL) {
+			defs->next = NULL;
+			defs->line = strdup(string);
+			update = B_TRUE;
+		}
+	}
+	if (update) {
+		ret = write_default_file(NFSADMIN, root);
+	}
+	free_default_file(root);
 	return (ret);
 }
 
@@ -2914,7 +2958,8 @@ nfs_validate_proto_prop(int index, char *name, char *value)
 		break;
 
 	case OPT_TYPE_PROTOCOL:
-		if (strcasecmp(value, "all") != 0 &&
+		if (strlen(value) != 0 &&
+		    strcasecmp(value, "all") != 0 &&
 		    strcasecmp(value, "tcp") != 0 &&
 		    strcasecmp(value, "udp") != 0)
 			ret = SA_BAD_VALUE;
