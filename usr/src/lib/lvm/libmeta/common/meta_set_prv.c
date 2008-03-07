@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,7 @@ checkdrive_onnode(
 	 * in disksets i.e. is running SVM RPC version 1, we
 	 * fallback to the old behaviour.
 	 */
-	if ((dnp->devid != NULL) && (!(MD_MNSET_DESC(sd)))) {
+	if (dnp->devid != NULL) {
 		char		*rname = NULL;
 		md_dev64_t	dev = NODEV64;
 
@@ -111,7 +111,7 @@ checkdrive_onnode(
 		 * nodes as possible.
 		 */
 		ret = clnt_devinfo_by_devid(node, sp, dnp->devid, &dev,
-			np->rname, &rname, NULL, ep);
+		    np->rname, &rname, NULL, ep);
 
 		/*
 		 * If the return value was ENOTSUP, we know the
@@ -138,7 +138,7 @@ checkdrive_onnode(
 		if (dev == NODEV64 || rname == (char *)NULL ||
 		    strcmp(rname, "") == 0) {
 			rval = mddserror(ep, MDE_DS_DRIVENOTCOMMON, sp->setno,
-					node, dnp->cname, sp->setname);
+			    node, dnp->cname, sp->setname);
 			goto out;
 		}
 
@@ -689,7 +689,7 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 
 			if ((meta_replicaslice(dnp, &rep_slice, ep) != 0) ||
 			    ((np = metaslicename(dnp, rep_slice, ep))
-				== NULL)) {
+			    == NULL)) {
 				mdclrerror(ep);
 				continue;
 			}
@@ -792,7 +792,7 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 					    (uintptr_t)c.c_locator.l_old_devid);
 					c.c_locator.l_old_devid_sz = 0;
 					c.c_locator.l_old_devid =
-						(uintptr_t)NULL;
+					    (uintptr_t)NULL;
 				}
 				return (-1);
 			}
