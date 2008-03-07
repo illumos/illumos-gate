@@ -3081,13 +3081,26 @@ relocate_finish(Rt_map *lmp, APlist *bound, int textrel, int ret)
 	if (bound) {
 		Aliste	idx;
 		Rt_map	*_lmp;
+		Word	used;
 
-		if (ret) {
+		/*
+		 * Only create bindings if the callers relocation was
+		 * successful (ret != 0), otherwise the object will eventually
+		 * be torn down.  Create these bindings if running under ldd(1)
+		 * with the -U/-u options regardless of relocation errors, as
+		 * the unused processing needs to traverse these bindings to
+		 * diagnose unused objects.
+		 */
+		used = LIST(lmp)->lm_flags &
+		    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED);
+
+		if (ret || used) {
 			for (APLIST_TRAVERSE(bound, idx, _lmp)) {
-				if (bind_one(lmp, _lmp, BND_REFER) == 0) {
-					ret = 0;
-					break;
-				}
+				if (bind_one(lmp, _lmp, BND_REFER) || used)
+					continue;
+
+				ret = 0;
+				break;
 			}
 		}
 		free(bound);
