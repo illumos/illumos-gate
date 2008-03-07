@@ -120,7 +120,8 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 			smbsr_error(sr, status, 0, 0);
 			return (SDRC_ERROR);
 		}
-		op->sd = &sd;
+		op->sd = kmem_alloc(sizeof (smb_sd_t), KM_SLEEP);
+		*op->sd = sd;
 	} else {
 		op->sd = NULL;
 	}
@@ -134,8 +135,15 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 void
 smb_post_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 {
+	smb_sd_t *sd = sr->arg.open.sd;
+
 	DTRACE_SMB_2(op__NtTransactCreate__done, smb_request_t *, sr,
 	    smb_xa_t *, xa);
+
+	if (sd) {
+		smb_sd_term(sd);
+		kmem_free(sd, sizeof (smb_sd_t));
+	}
 }
 
 smb_sdrc_t
@@ -177,9 +185,6 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	status = smb_common_open(sr);
-
-	if (op->sd)
-		smb_sd_term(op->sd);
 
 	if (status != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
