@@ -90,6 +90,7 @@ retry:
 		 */
 		if (type == PRIV_LIMIT &&
 		    !priv_issubset(&pset, &CR_LPRIV(pcr))) {
+			mutex_exit(&p->p_crlock);
 			crfree(cr);
 			return (set_errno(EPERM));
 		}
