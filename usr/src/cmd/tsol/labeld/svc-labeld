@@ -273,6 +273,77 @@ do_commonstart()
 	do_bootupd
 }
 
+do_servicetag_register()
+{
+	ROOTDIR=$1
+	SOL_ARCH=`/sbin/uname -p`
+	SOL_VERS=`/sbin/uname -r`
+	TX_PROD_URN="urn:uuid:fc720df3-410f-11dc-9b8e-080020a9ed93"
+
+	if [ ! -x /usr/bin/stclient ]; then
+		return
+	fi
+
+	# if already registered then do nothing more here
+	inst=`/usr/bin/svcprop -p labeld/svctag_inst $SMF_FMRI 2>/dev/null`
+	if [ -n "$inst" ]; then
+		# this instance id was saved in a SMF property
+		/usr/bin/stclient -g -i $inst -r $ROOTDIR >/dev/null 2>&1
+		if [ $? = 0 ]; then
+			# matching service tag found, so do nothing
+			return
+		else
+			# no match for instance id saved in SMF property
+			/usr/sbin/svccfg -s $SMF_FMRI delprop \
+			    labeld/svctag_inst
+			/usr/sbin/svcadm refresh $SMF_FMRI
+		fi
+	fi
+
+
+	# fall through: no service tag, or does not match saved instance id
+
+	# determine the urn of the parent (Solaris)
+	SOL_PROD_URN=""
+	case $SOL_VERS in
+	5.11)
+		SOL_PROD_URN="-F urn:uuid:6df19e63-7ef5-11db-a4bd-080020a9ed93"
+		;;
+	5.10)
+		SOL_PROD_URN="-F urn:uuid:5005588c-36f3-11d6-9cec-fc96f718e113"
+		;;
+	esac
+
+	# add the service tag
+	RC=`/usr/bin/stclient -a -p "Solaris Trusted Extensions"	\
+	    -e $SOL_VERS -t $TX_PROD_URN -P Solaris $SOL_PROD_URN	\
+	    -m Sun -A $SOL_ARCH -z global -S $0 -r $ROOTDIR`
+	if [ $? = 0 ]; then
+		# save instance id in SMF property
+		inst=`echo "$RC" | grep -i urn|awk -F=  '{print $2}'`
+		/usr/sbin/svccfg -s $SMF_FMRI setprop \
+		    labeld/svctag_inst = astring: "$inst"
+		/usr/sbin/svcadm refresh $SMF_FMRI
+	fi
+}
+
+do_servicetag_delete()
+{
+	if [ ! -x /usr/bin/stclient ]; then
+		return
+	fi
+
+	inst=`/usr/bin/svcprop -p labeld/svctag_inst $SMF_FMRI 2>/dev/null`
+
+	if [ -n "$inst" ]; then
+		# delete service tag
+		/usr/bin/stclient -d -i $inst
+		# delete saved instance id
+		/usr/sbin/svccfg -s $SMF_FMRI delprop labeld/svctag_inst
+		/usr/sbin/svcadm refresh $SMF_FMRI
+	fi
+}
+
 
 daemon_start()
 {
@@ -326,6 +397,8 @@ case "$1" in
 
 		do_commonstart
 
+		do_servicetag_register /
+
 		# start daemon proccess so our service doesn't go into
 		# maintenance state
 		daemon_start
@@ -347,6 +420,7 @@ case "$1" in
 __TRUSTED_ENABLE
 
 		do_commonstart
+		do_servicetag_register $ROOT_PATH
 		echo "$0: Started.  Must configure Trusted Extensions before booting."
 	fi
 	;;
@@ -381,7 +455,8 @@ __TRUSTED_ENABLE
 	fi
 
 	do_pamremove
-	
+	do_servicetag_delete
+
 	do_bootupd
 
 	/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` labeld
@@ -395,4 +470,5 @@ __TRUSTED_ENABLE
 esac
 
 exit $SMF_EXIT_OK
+
 
