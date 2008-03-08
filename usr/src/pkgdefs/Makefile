@@ -124,6 +124,7 @@ i386_SUBDIRS= \
 	SUNWgrubS \
 	SUNWipw \
 	SUNWiwi \
+	SUNWiwk \
 	SUNWkvm.i \
 	SUNWlxr \
 	SUNWlxu \

@@ -245,6 +245,7 @@ DRV_KMODS	+= ipsecah
 DRV_KMODS	+= ipsecesp
 DRV_KMODS	+= ipw
 DRV_KMODS	+= iwi
+DRV_KMODS	+= iwk
 DRV_KMODS	+= iwscn
 DRV_KMODS	+= kb8042
 DRV_KMODS	+= keysock
