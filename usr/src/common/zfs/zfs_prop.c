@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,13 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t canmount_table[] = {
+		{ "off",	ZFS_CANMOUNT_OFF },
+		{ "on",		ZFS_CANMOUNT_ON },
+		{ "noauto",	ZFS_CANMOUNT_NOAUTO },
+		{ NULL }
+	};
+
 	/* inherit index properties */
 	register_index(ZFS_PROP_CHECKSUM, "checksum", ZIO_CHECKSUM_DEFAULT,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
@@ -197,10 +204,9 @@ zfs_prop_init(void)
 	register_index(ZFS_PROP_VERSION, "version", 0, PROP_DEFAULT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
 	    "1 | 2 | 3 | current", "VERSION", version_table);
-
-	/* default index (boolean) properties */
-	register_index(ZFS_PROP_CANMOUNT, "canmount", 1, PROP_DEFAULT,
-	    ZFS_TYPE_FILESYSTEM, "on | off", "CANMOUNT", boolean_table);
+	register_index(ZFS_PROP_CANMOUNT, "canmount", ZFS_CANMOUNT_ON,
+	    PROP_DEFAULT, ZFS_TYPE_FILESYSTEM, "on | off | noauto",
+	    "CANMOUNT", canmount_table);
 
 	/* readonly index (boolean) properties */
 	register_index(ZFS_PROP_MOUNTED, "mounted", 0, PROP_READONLY,

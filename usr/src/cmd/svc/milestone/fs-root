@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -165,8 +165,9 @@ fi
 
 #
 # Root is already mounted (by the kernel), but still needs to be
-# checked, possibly remounted and entered into mnttab. First
-# mount /usr read only if it is a separate file system. This must
+# checked, possibly remounted and entered into mnttab.  First
+# mount /usr if it is a separate file system.  If the file system
+# type is something other than zfs, mount it read-only.  This must
 # be done first to allow utilities such as fsck and setmnt to
 # reside on /usr minimizing the space required by the root file
 # system.
@@ -198,6 +199,8 @@ if [ -n "$mountp" ]; then
 		esac
 		mountfs - /usr $cfsbacktype ro $special ||
 		    exit $SMF_EXIT_ERR_FATAL
+	elif [ "$fstype" = zfs ]; then
+		mountfs - /usr $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
 	else
 		#
 		# Must use -o largefiles here to ensure the
@@ -234,6 +237,28 @@ if [ -n "$mountp" ]; then
 		fi
 
 		mountfs -O /usr $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
+	fi
+fi
+
+#
+# if we are booted from zfs, the /usr mount probably won't be a
+# legacy mount.  Use the standard zfs mount command instead.
+
+readmnttab "/" < /etc/mnttab
+if [ "$fstype" = zfs ]; then
+	mountp=`/sbin/zfs get -H -o value mountpoint $special/usr 2>/dev/null`
+	#
+	# if mountp = /usr, there is a non-legacy mount of /usr
+	# in the boot environment being booted.
+	#
+	if [ "x$mountp" = "x/usr" ] ; then
+		/sbin/zfs mount $special/usr
+		if [ $? != 0 ] ; then
+				msg='zfs-mount failed'
+				echo $msg
+				echo "$SMF_FMRI:" $msg >/dev/msglog
+		 	exit $SMF_EXIT_ERR_FATAL
+		fi
 	fi
 fi
 

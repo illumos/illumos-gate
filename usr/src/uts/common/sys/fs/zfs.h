@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,6 +199,12 @@ typedef enum {
 #define	ZFS_DELEG_PERM_UID	"uid"
 #define	ZFS_DELEG_PERM_GID	"gid"
 #define	ZFS_DELEG_PERM_GROUPS	"groups"
+
+typedef enum {
+	ZFS_CANMOUNT_OFF = 0,
+	ZFS_CANMOUNT_ON = 1,
+	ZFS_CANMOUNT_NOAUTO = 2
+} zfs_canmount_type_t;
 
 typedef enum zfs_share_op {
 	ZFS_SHARE_NFS = 0,

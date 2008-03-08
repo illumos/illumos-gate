@@ -1720,6 +1720,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 	nvlist_t *nvl = NULL, *realprops;
 	zfs_prop_t prop;
+	int do_prefix = 1;
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
@@ -1751,8 +1752,13 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 		goto error;
 	}
 
-	if ((ret = changelist_prefix(cl)) != 0)
-		goto error;
+
+	/* do not unmount dataset if canmount is being set to noauto */
+	if (prop == ZFS_PROP_CANMOUNT && *propval == ZFS_CANMOUNT_NOAUTO)
+		do_prefix = 0;
+
+	if (do_prefix && (ret = changelist_prefix(cl)) != 0)
+			goto error;
 
 	/*
 	 * Execute the corresponding ioctl() to set this property.
@@ -1827,11 +1833,14 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 			(void) zfs_standard_error(hdl, errno, errbuf);
 		}
 	} else {
+		if (do_prefix)
+			ret = changelist_postfix(cl);
+
 		/*
 		 * Refresh the statistics so the new property value
 		 * is reflected.
 		 */
-		if ((ret = changelist_postfix(cl)) == 0)
+		if (ret == 0)
 			(void) get_stats(zhp);
 	}
 
@@ -2096,7 +2105,7 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 
 	case ZFS_PROP_CANMOUNT:
 		*val = getprop_uint64(zhp, prop, source);
-		if (*val == 0)
+		if (*val != ZFS_CANMOUNT_ON)
 			*source = zhp->zfs_name;
 		else
 			*source = "";	/* default */

@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -39,6 +38,13 @@
 # documentation): /sbin/mountall, /sbin/umountall, and
 # /lib/svc/bin/svc.startd.
 
+rootiszfs=0
+readmnttab / < /etc/mnttab
+if [ "$fstype" = zfs ] ; then
+	rootiszfs=1
+	be=$special
+fi
+
 for fs in /var /var/adm /tmp; do
 	readvfstab $fs < $vfstab
 	if [ -n "$mountp" ]; then
@@ -46,10 +52,31 @@ for fs in /var /var/adm /tmp; do
 		checkfs $fsckdev $fstype $mountp || exit $SMF_EXIT_ERR_FATAL
 		mountfs -O $mountp $fstype $mntopts - ||
 		    exit $SMF_EXIT_ERR_FATAL
+		continue
+	fi
+	if [ "$rootiszfs" = 1 ]; then
+		mountpt=`zfs get -H -o value mountpoint $be$fs 2>/dev/null`
+		if [ $? = 0 ] ; then
+			if [ "x$mountpt" = "x$fs" ] ; then
+				/sbin/zfs mount $be$fs
+			fi
+		fi
 	fi
 done
 
-mounted /var/run - tmpfs < /etc/mnttab && exit $SMF_EXIT_OK
-mountfs -O /var/run tmpfs - swap || exit $SMF_EXIT_ERR_FATAL
+mounted /var/run - tmpfs < /etc/mnttab
+if [ $? != 0 ] ; then
+	mountfs -O /var/run tmpfs - swap || exit $SMF_EXIT_ERR_FATAL
+fi
+
+if [ "$rootiszfs" = 1 ] ; then
+	/sbin/zfs list -rH -o mountpoint -s mountpoint $be | \
+	    while read mountp ; do
+		if [ "x$mountp" != "x" -a "$mountp" != "legacy" ] ; then
+			mounted $mountp - zfs < /etc/mnttab  && continue
+			/sbin/zfs mount $be$mountp
+		fi
+	done
+fi
 
 exit $SMF_EXIT_OK

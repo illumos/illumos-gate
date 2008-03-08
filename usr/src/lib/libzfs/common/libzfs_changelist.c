@@ -695,8 +695,16 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	if ((clp->cl_prop == ZFS_PROP_MOUNTPOINT) &&
 	    (zfs_prop_get(zhp, prop, property, sizeof (property),
 	    NULL, NULL, 0, B_FALSE) == 0 &&
-	    (strcmp(property, "legacy") == 0 || strcmp(property, "none") == 0)))
-		clp->cl_waslegacy = B_TRUE;
+	    (strcmp(property, "legacy") == 0 ||
+	    strcmp(property, "none") == 0))) {
+		/*
+		 * do not automatically mount ex-legacy datasets if
+		 * we specifically set canmount to noauto
+		 */
+		if (zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT) !=
+		    ZFS_CANMOUNT_NOAUTO)
+			clp->cl_waslegacy = B_TRUE;
+	}
 
 	return (clp);
 }

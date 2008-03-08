@@ -285,7 +285,7 @@ zfs_is_mountable(zfs_handle_t *zhp, char *buf, size_t buflen,
 	    strcmp(buf, ZFS_MOUNTPOINT_LEGACY) == 0)
 		return (B_FALSE);
 
-	if (!zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT))
+	if (zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT) == ZFS_CANMOUNT_OFF)
 		return (B_FALSE);
 
 	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED) &&
@@ -1099,6 +1099,11 @@ mount_cb(zfs_handle_t *zhp, void *data)
 	mount_cbdata_t *cbp = data;
 
 	if (!(zfs_get_type(zhp) & (ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME))) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	if (zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT) == ZFS_CANMOUNT_NOAUTO) {
 		zfs_close(zhp);
 		return (0);
 	}

@@ -516,6 +516,7 @@ zfs_do_create(int argc, char **argv)
 	char *propname;
 	char *propval = NULL;
 	char *strval;
+	int canmount;
 
 	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0) {
 		(void) fprintf(stderr, gettext("internal error: "
@@ -673,22 +674,29 @@ zfs_do_create(int argc, char **argv)
 
 	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_DATASET)) == NULL)
 		goto error;
+	/*
+	 * if the user doesn't want the dataset automatically mounted,
+	 * then skip the mount/share step
+	 */
+
+	canmount = zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT);
 
 	/*
 	 * Mount and/or share the new filesystem as appropriate.  We provide a
 	 * verbose error message to let the user know that their filesystem was
 	 * in fact created, even if we failed to mount or share it.
 	 */
-	if (zfs_mount(zhp, NULL, 0) != 0) {
-		(void) fprintf(stderr, gettext("filesystem successfully "
-		    "created, but not mounted\n"));
-		ret = 1;
-	} else if (zfs_share(zhp) != 0) {
-		(void) fprintf(stderr, gettext("filesystem successfully "
-		    "created, but not shared\n"));
-		ret = 1;
-	} else {
-		ret = 0;
+	ret = 0;
+	if (canmount == ZFS_CANMOUNT_ON) {
+		if (zfs_mount(zhp, NULL, 0) != 0) {
+			(void) fprintf(stderr, gettext("filesystem "
+			    "successfully created, but not mounted\n"));
+			ret = 1;
+		} else if (zfs_share(zhp) != 0) {
+			(void) fprintf(stderr, gettext("filesystem "
+			    "successfully created, but not shared\n"));
+			ret = 1;
+		}
 	}
 
 error:
@@ -3023,7 +3031,16 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, char *protocol,
 			return (1);
 		}
 
-		if (!canmount) {
+		/*
+		 * canmount	explicit	outcome
+		 * on		no		pass through
+		 * on		yes		pass through
+		 * off		no		return 0
+		 * off		yes		display error, return 1
+		 * noauto	no		return 0
+		 * noauto	yes		pass through
+		 */
+		if (canmount == ZFS_CANMOUNT_OFF) {
 			if (!explicit)
 				return (0);
 
@@ -3031,6 +3048,8 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, char *protocol,
 			    "'canmount' property is set to 'off'\n"), cmdname,
 			    zfs_get_name(zhp));
 			return (1);
+		} else if (canmount == ZFS_CANMOUNT_NOAUTO && !explicit) {
+			return (0);
 		}
 
 		/*
@@ -3582,6 +3601,10 @@ unshare_unmount(int op, int argc, char **argv)
 				    sizeof (nfsiscsi_mnt_prop),
 				    NULL, NULL, 0, B_FALSE) == 0);
 				if (strcmp(nfsiscsi_mnt_prop, "legacy") == 0)
+					continue;
+				/* Ignore canmount=noauto mounts */
+				if (zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT) ==
+				    ZFS_CANMOUNT_NOAUTO)
 					continue;
 			default:
 				break;

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -68,6 +68,31 @@ readvfstab() {
 				;;
 		esac
 
+		[ "x$mountp" = "x$1" ] && break
+	done
+}
+
+#
+# readmnttab mount_point
+#   -> (special, mountp, fstype, mntopts, mnttime)
+#
+#   A mnttab-like input stream is scanned for the mount point specified
+#   as $1.  Returns the fields of mnttab in the following shell
+#   variables:
+#
+#       special		block device
+#       mountp		mount point (must match $1, if found)
+#       fstype		file system type
+#       mntopts		file system-specific mount options.
+#	mnttime		time at which file system was mounted
+#
+#   If the mount point can not be found in the standard input stream,
+#   then all fields are set to empty values.  This function assumes that
+#   stdin is already set to /etc/mnttab (or other appropriate input
+#   stream).
+#
+readmnttab() {
+	while read special mountp fstype mntopts mnttime; do
 		[ "x$mountp" = "x$1" ] && break
 	done
 }
