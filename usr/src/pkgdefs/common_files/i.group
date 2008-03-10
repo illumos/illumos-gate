@@ -184,7 +184,7 @@ do
                 #
 		MYSQLGROUP_LINE="mysql::70:"
                 cur_name=`awk -F: '$3 == 70 {print $1}' $dest`
-                cur_id=`awk -F:'$1 == "mysql" {print $3}' $dest`
+                cur_id=`awk -F: '$1 == "mysql" {print $3}' $dest`
                 if [ ! -z "$cur_name" -a "$cur_name" != "mysql" ]; then
                         echo "ERROR: Reserved GID 70 already assigned" \
                             "to '$cur_name'" >> /tmp/CLEANUP
