@@ -10086,6 +10086,10 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	esp_req = req->ipsr_esp_req;
 	se_req = req->ipsr_self_encap_req;
 
+	/* Don't allow setting self-encap without one or more of AH/ESP. */
+	if (se_req != 0 && esp_req == 0 && ah_req == 0)
+		return (EINVAL);
+
 	/*
 	 * Are we dealing with a request to reset the policy (i.e.
 	 * zero requests).
@@ -17437,18 +17441,12 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				 * Self-encapsualted packets without AH/ESP.
 				 * If AH/ESP was present, we would have already
 				 * allocated the first_mp.
+				 *
+				 * Send this packet to find a tunnel endpoint.
+				 * if I can't find one, an ICMP
+				 * PROTOCOL_UNREACHABLE will get sent.
 				 */
-				first_mp = ipsec_in_alloc(B_TRUE,
-				    ipst->ips_netstack);
-				if (first_mp == NULL) {
-					ip1dbg(("ip_proto_input: IPSEC_IN "
-					    "allocation failure.\n"));
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(mp);
-					return;
-				}
-				first_mp->b_cont = mp;
+				goto fanout;
 			}
 			/*
 			 * We generally store the ill_index if we need to
@@ -17604,6 +17602,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	 * protocol.  When this is the case, each one gets a copy
 	 * of any incoming packets.
 	 */
+fanout:
 	ip_fanout_proto(q, first_mp, ill, ipha,
 	    IP_FF_SEND_ICMP | IP_FF_CKSUM | IP_FF_RAWIP, mctl_present,
 	    B_TRUE, recv_ill, ire->ire_zoneid);
