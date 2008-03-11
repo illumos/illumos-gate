@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -18,7 +19,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,13 +26,16 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
+if [ "$BASEDIR" = "" ]
+then
+	BASEDIR=/
+fi
 
-DATAFILES += depend
+# need to remove old pci5853,1 entry for xpv. The correct entry going
+# forward is pci5853,1.1 which is in uts/intel/os/driver_aliases
+grep '\"pci5853,1\"' ${BASEDIR}/etc/driver_aliases > /dev/null 2>&1
+if [ "$?" -eq 0 ]; then
+	update_drv -b ${BASEDIR} -d -i '"pci5853,1"' xpv > /dev/null 2>&1
+fi
 
-.KEEP_STATE:
-
-all: $(FILES) preinstall
-install: all pkg
-
-include ../Makefile.targ
+exit 0

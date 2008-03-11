@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -564,7 +564,7 @@ ec_setup_pirq(int irq, int ipl, cpuset_t *cpusp)
 		pirq_unmask_notify(IRQ_TO_PIRQ(irq));
 	} else {
 		ASSERT(irqp->ii_u2.ipl != 0);
-		cmn_err(CE_NOTE, "IRQ%d is shared", irq);
+		cmn_err(CE_NOTE, "!IRQ%d is shared", irq);
 		if (ipl > irqp->ii_u2.ipl)
 			irqp->ii_u2.ipl = ipl;
 		*cpusp = evtchn_cpus[irqp->ii_u.evtchn];

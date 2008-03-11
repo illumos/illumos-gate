@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,8 +42,7 @@
 i pkginfo
 i copyright
 i depend
-i postinstall
-i preremove
+i preinstall
 
 # xVM PV drivers
 d none platform					0755	root	sys

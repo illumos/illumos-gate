@@ -2565,6 +2565,7 @@ bfucmd="
 	/usr/sbin/tar
 	/usr/sbin/uadmin
 	/usr/sbin/umount
+	/usr/sbin/update_drv
 	/usr/sbin/wall
 	/usr/sbin/zonecfg
 	${FASTFS-$GATE/public/bin/$bfu_isa/fastfs}
@@ -5358,6 +5359,17 @@ mondo_loop() {
 			if [ $is_pcfs_boot = yes ]; then
 				setup_stubboot
 			fi
+		fi
+	fi
+
+	# before we save away driver_aliases, remove any obsolete entries
+	if [ $target_isa = i386 ]; then
+		# need to remove old pci5853,1 entry for xpv. The correct
+		# entry going forward is pci5853,1.1 which is now in
+		# uts/intel/os/driver_aliases
+		grep '\"pci5853,1\"' $root/etc/driver_aliases > /dev/null 2>&1
+		if [ "$?" -eq 0 ]; then
+			/tmp/bfubin/update_drv -b $root -d -i '"pci5853,1"' xpv > /dev/null 2>&1
 		fi
 	fi
 
