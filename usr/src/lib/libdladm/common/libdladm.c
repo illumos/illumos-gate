@@ -32,6 +32,7 @@
 #include <fcntl.h>
 #include <strings.h>
 #include <dirent.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <libdladm_impl.h>
 #include <libintl.h>
@@ -192,12 +193,6 @@ dladm_errno2status(int err)
 	}
 }
 
-/*
- * These are the uid and gid of the user 'dladm'.
- * The directory /etc/dladm and all files under it are owned by this user.
- */
-#define	DLADM_DB_OWNER	15
-#define	DLADM_DB_GROUP	3
 #define	LOCK_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 
 static int
@@ -439,7 +434,7 @@ i_dladm_rw_db(const char *db_file, mode_t db_perms,
 	 * If we are invoked by root, the file ownership needs to be fixed.
 	 */
 	if (getuid() == 0 || geteuid() == 0) {
-		if (fchown(nfd, DLADM_DB_OWNER, DLADM_DB_GROUP) < 0) {
+		if (fchown(nfd, UID_DLADM, GID_SYS) < 0) {
 			status = dladm_errno2status(errno);
 			goto done;
 		}

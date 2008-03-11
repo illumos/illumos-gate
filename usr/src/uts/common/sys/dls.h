@@ -107,9 +107,13 @@ typedef uint64_t	datalink_media_t;
  */
 #define	FDEVNAME	"devname"	/* string */
 
-#define	DLMGMT_DOOR	"/etc/.dlmgmt_door"
 /*
- * Door upcall command.
+ * The door file for the dlmgmtd (data-link management) daemon.
+ */
+#define	DLMGMT_DOOR	"/etc/svc/volatile/dladm/dlmgmt_door"
+
+/*
+ * Door upcall commands.
  */
 #define	DLMGMT_CMD_DLS_CREATE	1
 #define	DLMGMT_CMD_DLS_GETATTR	2

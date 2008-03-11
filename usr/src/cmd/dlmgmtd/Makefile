@@ -30,14 +30,11 @@ OBJS=		dlmgmt_main.o dlmgmt_door.o dlmgmt_util.o dlmgmt_db.o
 SRCS=		$(OBJS:.o=.c)
 SVCMETHOD=	svc-dlmgmtd
 MANIFEST=	dlmgmt.xml
-DOOR=     	.dlmgmt_door
 CFGFILES=	datalink.conf
 
 include ../Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
-ROOTETCDOOR=		$(DOOR:%=$(ROOTETC)/%)
-$(ROOTETCDOOR) := FILEMODE = 444
 ROOTCFGDIR=		$(ROOTETC)/dladm
 ROOTCFGFILES=		$(CFGFILES:%=$(ROOTCFGDIR)/%)
 
@@ -49,17 +46,14 @@ LDLIBS += -ldladm -ldlpi -lavl
 
 .KEEP_STATE:
 
-all: $(PROG) $(DOOR)
-
-$(DOOR):
-	$(TOUCH) $(DOOR)
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTETCDOOR) \
-	$(ROOTCFGDIR) $(ROOTCFGFILES)
+install: all $(ROOTSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTCFGDIR) \
+	$(ROOTCFGFILES)
 
 check:	$(CHKMANIFEST)
 

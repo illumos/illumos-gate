@@ -121,7 +121,6 @@ d none etc/crypto/crls 755 root sys
 f none etc/datemsk 444 root sys
 s none etc/dcopy=../usr/sbin/dcopy
 d none etc/default 755 root sys
-f none etc/.dlmgmt_door 444 root sys
 e preserve etc/default/cron 644 root sys
 e preserve etc/default/devfsadm 644 root sys
 e preserve etc/default/fs 644 root sys

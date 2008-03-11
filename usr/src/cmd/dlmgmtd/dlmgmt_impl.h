@@ -127,6 +127,8 @@ int		dlmgmt_write_db_entry(datalink_id_t, uint32_t);
 int		dlmgmt_delete_db_entry(datalink_id_t, uint32_t);
 int 		dlmgmt_db_init(void);
 
+#define	DLMGMT_TMPFS_DIR	"/etc/svc/volatile/dladm"
+
 #ifdef  __cplusplus
 }
 #endif

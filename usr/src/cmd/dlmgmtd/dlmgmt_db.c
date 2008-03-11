@@ -126,15 +126,11 @@ static size_t ntranslators = sizeof (translators) / sizeof (translator_t);
 	    translators[(type)].type_name, \
 	    LINK_PROPERTY_TYPE_VALUE_SEP, (val), LINK_PROPERTY_DELIMINATOR))
 
-#define	DLMGMT_DB_OWNER	15
-#define	DLMGMT_DB_GROUP	3
-
 /*
  * Name of the cache file to keep the active <link name, linkid> mapping
  */
 static char	cachefile[MAXPATHLEN];
 
-#define	DLMGMT_TEMP_DB_DIR		"/etc/svc/volatile"
 #define	DLMGMT_PERSISTENT_DB_PATH	"/etc/dladm/datalink.conf"
 #define	DLMGMT_MAKE_FILE_DB_PATH(buffer, persistent)	\
 	(void) snprintf((buffer), MAXPATHLEN, "%s", \
@@ -370,15 +366,17 @@ dlmgmt_process_db_onereq(dlmgmt_db_req_t *req, boolean_t writeop)
 		(void) snprintf(newfile, MAXPATHLEN, "%s.new", file);
 		if ((nfd = open(newfile, O_WRONLY | O_CREAT | O_TRUNC,
 		    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
+			err = errno;
 			(void) fclose(fp);
-			return (errno);
+			return (err);
 		}
 
 		if ((nfp = fdopen(nfd, "w")) == NULL) {
+			err = errno;
 			(void) close(nfd);
 			(void) fclose(fp);
 			(void) unlink(newfile);
-			return (errno);
+			return (err);
 		}
 	}
 	if (writeop)
@@ -388,17 +386,6 @@ dlmgmt_process_db_onereq(dlmgmt_db_req_t *req, boolean_t writeop)
 	if (!writeop || err != 0)
 		goto done;
 
-	/*
-	 * Configuration files need to be owned by the 'dladm' user.
-	 * If we are invoked by root, the file ownership needs to be fixed.
-	 */
-	if (getuid() == 0 || geteuid() == 0) {
-		if (fchown(nfd, DLMGMT_DB_OWNER, DLMGMT_DB_GROUP) < 0) {
-			err = errno;
-			goto done;
-		}
-	}
-
 	if (fflush(nfp) == EOF) {
 		err = errno;
 		goto done;
@@ -407,8 +394,9 @@ dlmgmt_process_db_onereq(dlmgmt_db_req_t *req, boolean_t writeop)
 	(void) fclose(nfp);
 
 	if (rename(newfile, file) < 0) {
+		err = errno;
 		(void) unlink(newfile);
-		return (errno);
+		return (err);
 	}
 
 	return (0);
@@ -866,7 +854,7 @@ dlmgmt_write_db_entry(datalink_id_t linkid, uint32_t flags)
  * Initialize the datalink <link name, linkid> mapping and the link's
  * attributes list based on the configuration file /etc/dladm/datalink.conf
  * and the active configuration cache file
- * /etc/svc/volatile/datalink-management:default.cache.
+ * /etc/svc/volatile/dladm/datalink-management:default.cache.
  *
  * This function is called when the datalink-management service is started
  * during reboot, and when the dlmgmtd daemon is restarted.
@@ -886,7 +874,7 @@ dlmgmt_db_init()
 	 */
 	if (debug) {
 		(void) snprintf(cachefile, MAXPATHLEN, "%s/%s%s",
-		    DLMGMT_TEMP_DB_DIR, progname, ".debug.cache");
+		    DLMGMT_TMPFS_DIR, progname, ".debug.cache");
 	} else {
 		if ((fmri = getenv("SMF_FMRI")) == NULL) {
 			dlmgmt_log(LOG_WARNING, "dlmgmtd is an smf(5) managed "
@@ -912,7 +900,7 @@ dlmgmt_db_init()
 		}
 
 		(void) snprintf(cachefile, MAXPATHLEN, "%s/%s",
-		    DLMGMT_TEMP_DB_DIR, filename);
+		    DLMGMT_TMPFS_DIR, filename);
 	}
 
 	dlmgmt_table_lock(B_TRUE);

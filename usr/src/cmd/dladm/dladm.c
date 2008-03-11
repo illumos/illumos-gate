@@ -5472,15 +5472,16 @@ do_init_secobj(int argc, char **argv)
  * "-R" option support. It is used for live upgrading. Append dladm commands
  * to a upgrade script which will be run when the alternative root boots up:
  *
- * - If the dlmgmtd door file exists on the alternative root, append dladm
- * commands to the <altroot>/var/svc/profile/upgrade_datalink script. This
- * script will be run as part of the network/physical service. We cannot defer
- * this to /var/svc/profile/upgrade because then the configuration will not
- * be able to take effect before network/physical plumbs various interfaces.
+ * - If the /etc/dladm/datalink.conf file exists on the alternative root,
+ * append dladm commands to the <altroot>/var/svc/profile/upgrade_datalink
+ * script. This script will be run as part of the network/physical service.
+ * We cannot defer this to /var/svc/profile/upgrade because then the
+ * configuration will not be able to take effect before network/physical
+ * plumbs various interfaces.
  *
- * - If the dlmgmtd door file does not exist on the alternative root, append
- * dladm commands to the <altroot>/var/svc/profile/upgrade script, which will
- * be run in the manifest-import service.
+ * - If the /etc/dladm/datalink.conf file does not exist on the alternative
+ * root, append dladm commands to the <altroot>/var/svc/profile/upgrade script,
+ * which will be run in the manifest-import service.
  *
  * Note that the SMF team is considering to move the manifest-import service
  * to be run at the very begining of boot. Once that is done, the need for
@@ -5495,10 +5496,11 @@ altroot_cmd(char *altroot, int argc, char *argv[])
 	int		i;
 
 	/*
-	 * Check for the existence of the dlmgmtd door file, and determine
-	 * the name of script file.
+	 * Check for the existence of the /etc/dladm/datalink.conf
+	 * configuration file, and determine the name of script file.
 	 */
-	(void) snprintf(path, MAXPATHLEN, "/%s/%s", altroot, DLMGMT_DOOR);
+	(void) snprintf(path, MAXPATHLEN, "/%s/etc/dladm/datalink.conf",
+	    altroot);
 	if (stat(path, &stbuf) < 0) {
 		(void) snprintf(path, MAXPATHLEN, "/%s/%s", altroot,
 		    SMF_UPGRADE_FILE);

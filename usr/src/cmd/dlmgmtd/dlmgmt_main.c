@@ -35,14 +35,15 @@
  * of datalinks is kept in /etc/dladm/datalink.conf, and the daemon keeps
  * a copy of the datalinks in the memory (see dlmgmt_id_avl and
  * dlmgmt_name_avl). The active <link name, linkid> mapping is kept in
- * /etc/svc/volatile cache file, so that the mapping can be recovered when
- * dlmgmtd exits for some reason (e.g., when dlmgmtd is accidentally killed).
+ * /etc/svc/volatile/dladm cache file, so that the mapping can be recovered
+ * when dlmgmtd exits for some reason (e.g., when dlmgmtd is accidentally
+ * killed).
  */
 
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <priv.h>
+#include <priv_utils.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -50,6 +51,8 @@
 #include <strings.h>
 #include <syslog.h>
 #include <sys/dld.h>
+#include <sys/param.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <libdlmgmt.h>
 #include "dlmgmt_impl.h"
@@ -57,19 +60,23 @@
 const char		*progname;
 boolean_t		debug;
 static int		pfds[2];
-static char		dlmgmt_door_file[] = DLMGMT_DOOR;
 static int		dlmgmt_door_fd = -1;
+static int		dld_control_fd = -1;
+
+static void		dlmgmtd_exit(int);
+static int		dlmgmt_init();
+static void		dlmgmt_fini();
+static int		dlmgmt_init_privileges();
+static void		dlmgmt_fini_privileges();
 
 static int
 dlmgmt_set_doorfd(boolean_t start)
 {
 	dld_ioc_door_t did;
 	struct strioctl iocb;
-	int fd;
 	int err = 0;
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (EINVAL);
+	assert(dld_control_fd != -1);
 
 	did.did_start_door = start;
 
@@ -78,62 +85,83 @@ dlmgmt_set_doorfd(boolean_t start)
 	iocb.ic_len	= sizeof (did);
 	iocb.ic_dp	= (char *)&did;
 
-	if (ioctl(fd, I_STR, &iocb) == -1)
+	if (ioctl(dld_control_fd, I_STR, &iocb) == -1)
 		err = errno;
 
-	(void) close(fd);
 	return (err);
 }
 
 static int
 dlmgmt_door_init()
 {
+	int fd;
 	int err;
+
+	/*
+	 * Create the door file for dlmgmtd.
+	 */
+	if ((fd = open(DLMGMT_DOOR, O_CREAT|O_RDONLY, 0644)) == -1) {
+		err = errno;
+		dlmgmt_log(LOG_ERR, "open(%s) failed: %s",
+		    DLMGMT_DOOR, strerror(err));
+		return (err);
+	}
+	(void) close(fd);
 
 	if ((dlmgmt_door_fd = door_create(dlmgmt_handler, NULL,
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
 		err = errno;
-		dlmgmt_log(LOG_WARNING, "door_create() failed: %s",
+		dlmgmt_log(LOG_ERR, "door_create() failed: %s",
 		    strerror(err));
 		return (err);
 	}
 	if (fattach(dlmgmt_door_fd, DLMGMT_DOOR) != 0) {
 		err = errno;
-		dlmgmt_log(LOG_WARNING, "fattach(%s) failed: %s",
+		dlmgmt_log(LOG_ERR, "fattach(%s) failed: %s",
 		    DLMGMT_DOOR, strerror(err));
 		goto fail;
 	}
 	if ((err = dlmgmt_set_doorfd(B_TRUE)) != 0) {
-		dlmgmt_log(LOG_WARNING, "cannot set kernel doorfd: %s",
+		dlmgmt_log(LOG_ERR, "cannot set kernel doorfd: %s",
 		    strerror(err));
+		(void) fdetach(DLMGMT_DOOR);
 		goto fail;
 	}
 
 	return (0);
 fail:
-	if (dlmgmt_door_fd != -1) {
-		(void) door_revoke(dlmgmt_door_fd);
-		dlmgmt_door_fd = -1;
-	}
-	(void) fdetach(DLMGMT_DOOR);
+	(void) door_revoke(dlmgmt_door_fd);
+	dlmgmt_door_fd = -1;
 	return (err);
 }
 
 static void
 dlmgmt_door_fini()
 {
-	(void) dlmgmt_set_doorfd(B_FALSE);
-	if ((dlmgmt_door_fd != -1) && (door_revoke(dlmgmt_door_fd) == -1)) {
+	if (dlmgmt_door_fd == -1)
+		return;
+
+	if (door_revoke(dlmgmt_door_fd) == -1) {
 		dlmgmt_log(LOG_WARNING, "door_revoke(%s) failed: %s",
-		    dlmgmt_door_file, strerror(errno));
+		    DLMGMT_DOOR, strerror(errno));
 	}
+
 	(void) fdetach(DLMGMT_DOOR);
+	(void) dlmgmt_set_doorfd(B_FALSE);
 }
 
 static int
 dlmgmt_init()
 {
-	int err;
+	int		err;
+
+	if (signal(SIGTERM, dlmgmtd_exit) == SIG_ERR ||
+	    signal(SIGINT, dlmgmtd_exit) == SIG_ERR) {
+		err = errno;
+		dlmgmt_log(LOG_ERR, "signal() for SIGTERM/INT failed: %s",
+		    strerror(err));
+		return (err);
+	}
 
 	if ((err = dlmgmt_linktable_init()) != 0)
 		return (err);
@@ -176,6 +204,7 @@ dlmgmtd_exit(int signo)
 {
 	(void) close(pfds[1]);
 	dlmgmt_fini();
+	dlmgmt_fini_privileges();
 	exit(EXIT_FAILURE);
 }
 
@@ -186,52 +215,59 @@ usage(void)
 	exit(EXIT_FAILURE);
 }
 
+/*
+ * Set the uid of this daemon to the "dladm" user. Finish the following
+ * operations before setuid() because they need root privileges:
+ *
+ *    - create the /etc/svc/volatile/dladm directory;
+ *    - change its uid/gid to "dladm"/"sys";
+ *    - open the dld control node
+ */
 static int
-dlmgmt_setup_privs()
+dlmgmt_init_privileges()
 {
-	priv_set_t *priv_set = NULL;
-	char *p;
+	struct stat	statbuf;
 
-	priv_set = priv_allocset();
-	if (priv_set == NULL || getppriv(PRIV_PERMITTED, priv_set) == -1) {
-		dlmgmt_log(LOG_WARNING, "failed to get the permitted set of "
-		    "privileges %s", strerror(errno));
-		return (-1);
+	/*
+	 * Create the DLMGMT_TMPFS_DIR directory.
+	 */
+	if (stat(DLMGMT_TMPFS_DIR, &statbuf) < 0) {
+		if (mkdir(DLMGMT_TMPFS_DIR, (mode_t)0755) < 0)
+			return (errno);
+	} else {
+		if ((statbuf.st_mode & S_IFMT) != S_IFDIR)
+			return (ENOTDIR);
 	}
 
-	p = priv_set_to_str(priv_set, ',', 0);
-	dlmgmt_log(LOG_DEBUG, "start with privs %s", p != NULL ? p : "Unknown");
-	free(p);
-
-	priv_emptyset(priv_set);
-	(void) priv_addset(priv_set, "file_dac_write");
-	(void) priv_addset(priv_set, "file_chown_self");
-	(void) priv_addset(priv_set, "sys_mount");
-	(void) priv_addset(priv_set, "sys_net_config");
-
-	if (setppriv(PRIV_SET, PRIV_INHERITABLE, priv_set) == -1) {
-		dlmgmt_log(LOG_WARNING, "failed to set the inheritable set of "
-		    "privileges %s", strerror(errno));
-		priv_freeset(priv_set);
-		return (-1);
+	if ((chmod(DLMGMT_TMPFS_DIR, 0755) < 0) ||
+	    (chown(DLMGMT_TMPFS_DIR, UID_DLADM, GID_SYS) < 0)) {
+		return (EPERM);
 	}
 
-	if (setppriv(PRIV_SET, PRIV_PERMITTED, priv_set) == -1) {
-		dlmgmt_log(LOG_WARNING, "failed to set the permitted set of "
-		    "privileges %s", strerror(errno));
-		priv_freeset(priv_set);
-		return (-1);
+	/*
+	 * When dlmgmtd is started at boot, "ALL" privilege is required
+	 * to open the dld control node.
+	 */
+	if ((dld_control_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (errno);
+
+	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, UID_DLADM,
+	    GID_SYS, NULL) == -1) {
+		(void) close(dld_control_fd);
+		dld_control_fd = -1;
+		return (EPERM);
 	}
 
-	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
-		dlmgmt_log(LOG_WARNING, "failed to set the effective set of "
-		    "privileges %s", strerror(errno));
-		priv_freeset(priv_set);
-		return (-1);
-	}
-
-	priv_freeset(priv_set);
 	return (0);
+}
+
+static void
+dlmgmt_fini_privileges()
+{
+	if (dld_control_fd != -1) {
+		(void) close(dld_control_fd);
+		dld_control_fd = -1;
+	}
 }
 
 /*
@@ -294,7 +330,7 @@ dlmgmt_daemonize(void)
 int
 main(int argc, char *argv[])
 {
-	int opt;
+	int		opt;
 
 	progname = strrchr(argv[0], '/');
 	if (progname != NULL)
@@ -318,17 +354,16 @@ main(int argc, char *argv[])
 	if (!debug && !dlmgmt_daemonize())
 		return (EXIT_FAILURE);
 
-	if (signal(SIGTERM, dlmgmtd_exit) == SIG_ERR) {
-		dlmgmt_log(LOG_WARNING, "signal() for SIGTERM failed: %s",
+	if ((errno = dlmgmt_init_privileges()) != 0) {
+		dlmgmt_log(LOG_ERR, "dlmgmt_init_privileges() failed: %s",
 		    strerror(errno));
 		goto child_out;
 	}
 
-	if (dlmgmt_init() != 0)
+	if (dlmgmt_init() != 0) {
+		dlmgmt_fini_privileges();
 		goto child_out;
-
-	if (dlmgmt_setup_privs() != 0)
-		goto child_out;
+	}
 
 	/*
 	 * Inform the parent process that it can successfully exit.
