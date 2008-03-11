@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,12 @@ struct xendev_ppd {
 
 #define	XS_OE_STATE	"SUNW,xendev:otherend_state"
 #define	XS_HP_STATE	"SUNW,xendev:hotplug_state"
+
+/*
+ * A device with xd_vdevnum == VDEV_NOXS does not participate in
+ * xenstore.
+ */
+#define	VDEV_NOXS	(-1)
 
 void	xendev_enum_class(dev_info_t *, xendev_devclass_t);
 void	xendev_enum_all(dev_info_t *, boolean_t);

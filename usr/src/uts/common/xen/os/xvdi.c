@@ -235,7 +235,7 @@ xvdi_init_dev(dev_info_t *dip)
 	devcls = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "devclass", XEN_INVAL);
 	vdevnum = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "vdev", -1);
+	    DDI_PROP_DONTPASS, "vdev", VDEV_NOXS);
 	domid = (domid_t)ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "domain", DOMID_SELF);
 
@@ -256,7 +256,7 @@ xvdi_init_dev(dev_info_t *dip)
 	/*
 	 * devices that do not need to interact with xenstore
 	 */
-	if (vdevnum == -1) {
+	if (vdevnum == VDEV_NOXS) {
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
 		    "unit-address", "0");
 		if (devcls == XEN_CONSOLE)
@@ -736,7 +736,7 @@ xvdi_create_dev(dev_info_t *parent, xendev_devclass_t devclass,
 	xdcp = i_xvdi_devclass2cfg(devclass);
 	ASSERT(xdcp != NULL);
 
-	if (vdev != -1) {
+	if (vdev != VDEV_NOXS) {
 		if (!backend) {
 			(void) snprintf(xsnamebuf, sizeof (xsnamebuf),
 			    "%s/%d", xdcp->xs_path_fe, vdev);
@@ -835,10 +835,10 @@ xendev_enum_class(dev_info_t *parent, xendev_devclass_t devclass)
 		 */
 
 		ndi_devi_enter(parent, &circ);
-		if (xvdi_find_dev(parent, devclass, DOMID_SELF, -1)
+		if (xvdi_find_dev(parent, devclass, DOMID_SELF, VDEV_NOXS)
 		    == NULL)
 			(void) xvdi_create_dev(parent, devclass,
-			    DOMID_SELF, -1);
+			    DOMID_SELF, VDEV_NOXS);
 		ndi_devi_exit(parent, circ);
 	} else {
 		/*
@@ -942,7 +942,7 @@ xvdi_find_dev(dev_info_t *parent, xendev_devclass_t devclass,
 	case XEN_EVTCHN:
 	case XEN_PRIVCMD:
 		/* Console and soft devices have no vdev. */
-		vdev = -1;
+		vdev = VDEV_NOXS;
 		break;
 	default:
 		break;
@@ -2114,6 +2114,16 @@ i_xvdi_probe_path_handler(void *arg)
 			    path);
 			goto done;
 		}
+	}
+
+	/*
+	 * This is an oxymoron, so indicates a bogus configuration we
+	 * must check for.
+	 */
+	if (vdev == VDEV_NOXS) {
+		cmn_err(CE_WARN, "i_xvdi_probe_path_handler: "
+		    "invalid path %s", path);
+		goto done;
 	}
 
 	parent = xendev_dip;

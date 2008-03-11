@@ -754,7 +754,7 @@ xdb_bindto_frontend(xdb_t *vdp)
 		}
 	}
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "xdb@%s: blkif protocol '%s' ",
+	cmn_err(CE_NOTE, "!xdb@%s: blkif protocol '%s' ",
 	    ddi_get_name_addr(dip), protocol);
 #endif
 
