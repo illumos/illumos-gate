@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -113,3 +113,25 @@ msgid  "threshold list"
 msgid  "idle path"
 msgid  "cpu-threshold"
 msgid  "cpupm"
+msgid  "-d"
+msgid  "S3-support"
+msgid  "autoS3"
+msgid  "S3-support-enable"
+msgid  "S3-support-disable"
+msgid  "??"
+msgid  "S3_helper(%s, %s, %s, %s, %s, %s)\n"
+msgid  "acpi"
+msgid  "S3"
+msgid  "value.l %lx\n"
+msgid  "preferred_pm_profile"
+msgid  "Manufacturer: %s\n"
+msgid  "Product: %s\n"
+msgid  "Sun Microsystems"
+msgid  "S3-support"
+msgid  "S3-support-enable"
+msgid  "S3-support-disable"
+msgid  "autoS3"
+msgid  "S3-autoenable"
+msgid  "S3-autodisable"
+msgid  "autopm-enable"
+msgid  "autopm-disable"

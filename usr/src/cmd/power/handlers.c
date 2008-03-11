@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ pm_map(int cmd)
 	req.datasize = sizeof (pm_cmd_string);
 
 	if (ioctl(pm_fd, PM_GET_CMD_NAME, &req) < 0) {
-		perror("PM cmd name lookup:");
+		perror(gettext("PM_GET_CMD_NAME failed:"));
 		return ("??");
 	}
 	return (pm_cmd_string);
@@ -97,13 +97,13 @@ do_ioctl(int ioctl_cmd, char *keyword, char *behavior, int suppress)
 	mesg(MDEBUG, "doing ioctl %s for %s ", pm_map(ioctl_cmd), keyword);
 	if (ioctl(pm_fd, ioctl_cmd, NULL) == -1) {
 		int suppressed = suppress == -1 || suppress == errno;
-		mesg(MDEBUG, "%s failed, %s (%ssuppressed)\n", behavior,
-		    strerror(errno), (suppressed ? "" : "not "));
 		if (!suppressed) {
 			mesg(MERR, "%s %s failed, %s\n", keyword, behavior,
 			    strerror(errno));
 			return (NOUP);
 		} else {
+			mesg(MDEBUG, "%s %s failed, %s\n", keyword, behavior,
+			    strerror(errno));
 			return (OKUP);
 		}
 	}
@@ -219,7 +219,7 @@ S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
 			kstat_close(kc);
 			return (do_ioctl(no, keyword, behavior, suppress));
 		}
-		mesg(MDEBUG, "kstat indicates preffered_pm_profile is %lx\n",
+		mesg(MDEBUG, "kstat indicates preferred_pm_profile is %lx\n",
 		    dp->value.l);
 		preferred_pm_profile = dp->value.l;
 	}
