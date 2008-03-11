@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -392,35 +392,27 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	}
 	if (istatus.bits.w0.bad_cksum_cnt_ovfl) {
 		/*
+		 * Do not send FMA ereport or log error message
+		 * in /var/adm/messages because this error does not
+		 * indicate a HW failure.
+		 *
 		 * Clear bit BAD_CS_MX of register IPP_INT_STAT
 		 * by reading register IPP_BAD_CS_CNT
 		 */
 		(void) npi_ipp_get_cs_err_count(handle, portn, &cnt16);
 		statsp->bad_cs_cnt += IPP_BAD_CS_CNT_MASK;
-		/*
-		 * Do not send FMA ereport because this error does not
-		 * indicate a HW failure
-		 */
-		if (statsp->bad_cs_cnt < (IPP_MAX_ERR_SHOW *
-				IPP_BAD_CS_CNT_MASK))
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: bad_cs_max\n"));
 	}
 	if (istatus.bits.w0.pkt_discard_cnt_ovfl) {
 		/*
+		 * Do not send FMA ereport or log error message
+		 * in /var/adm/messages because this error does not
+		 * indicate a HW failure.
+		 *
 		 * Clear bit PKT_DIS_MX of register IPP_INT_STAT
 		 * by reading register IPP_PKT_DIS
 		 */
 		(void) npi_ipp_get_pkt_dis_count(handle, portn, &cnt16);
 		statsp->pkt_dis_cnt += IPP_PKT_DIS_CNT_MASK;
-		/*
-		 * Do not send FMA ereport because this error does not
-		 * indicate a HW failure
-		 */
-		if (statsp->pkt_dis_cnt < (IPP_MAX_ERR_SHOW *
-				IPP_PKT_DIS_CNT_MASK))
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: pkt_dis_max\n"));
 	}
 	if (istatus.bits.w0.ecc_err_cnt_ovfl) {
 		/*

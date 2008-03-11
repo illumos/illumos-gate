@@ -2707,31 +2707,22 @@ nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
 				"fatal error: rbr_pre_par", channel));
 		}
 	}
+	/*
+	 * The Following 4 status bits are for information, the system
+	 * is running fine. There is no need to send FMA ereports or
+	 * log messages.
+	 */
 	if (cs.bits.hdw.port_drop_pkt) {
 		rdc_stats->port_drop_pkt++;
-		if (rdc_stats->port_drop_pkt < error_disp_cnt)
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rx_err_evnts (channel %d): "
-			"port_drop_pkt", channel));
 	}
 	if (cs.bits.hdw.wred_drop) {
 		rdc_stats->wred_drop++;
-		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rx_err_evnts(channel %d): "
-		"wred_drop", channel));
 	}
 	if (cs.bits.hdw.rbr_pre_empty) {
 		rdc_stats->rbr_pre_empty++;
-		if (rdc_stats->rbr_pre_empty < error_disp_cnt)
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rx_err_evnts(channel %d): "
-			"rbr_pre_empty", channel));
 	}
 	if (cs.bits.hdw.rcr_shadow_full) {
 		rdc_stats->rcr_shadow_full++;
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rx_err_evnts(channel %d): "
-			"rcr_shadow_full", channel));
 	}
 	if (cs.bits.hdw.config_err) {
 		rdc_stats->config_err++;
@@ -2762,11 +2753,11 @@ nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
 			"fatal error: rcrfull error", channel));
 	}
 	if (cs.bits.hdw.rbr_empty) {
+		/*
+		 * This bit is for information, there is no need
+		 * send FMA ereport or log a message.
+		 */
 		rdc_stats->rbr_empty++;
-		if (rdc_stats->rbr_empty < error_disp_cnt)
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rx_err_evnts(channel %d): "
-			"rbr empty error", channel));
 	}
 	if (cs.bits.hdw.rbrfull) {
 		rdc_stats->rbrfull++;
