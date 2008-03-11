@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -755,6 +755,7 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 			dsl_dataset_name(ds, sn.failed);
 	}
 
+out:
 	while (osn = list_head(&sn.objsets)) {
 		list_remove(&sn.objsets, osn);
 		zil_resume(dmu_objset_zil(osn->os));
@@ -762,7 +763,7 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 		kmem_free(osn, sizeof (struct osnode));
 	}
 	list_destroy(&sn.objsets);
-out:
+
 	if (err)
 		(void) strcpy(fsname, sn.failed);
 	dsl_sync_task_group_destroy(sn.dstg);
