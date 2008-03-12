@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,9 +198,16 @@ port_send_event(port_kevent_t *pkevp)
 	 */
 	if (pkevp->portkev_source != PORT_SOURCE_FD &&
 	    portq->portq_flags & PORTQ_POLLIN) {
+		port_t	*pp;
+
 		portq->portq_flags &= ~PORTQ_POLLIN;
+		/*
+		 * Need to save port_t for calling pollwakeup since port_getn()
+		 * may end up freeing pkevp once portq_mutex is dropped.
+		 */
+		pp = pkevp->portkev_port;
 		mutex_exit(&portq->portq_mutex);
-		pollwakeup(&pkevp->portkev_port->port_pollhd, POLLIN);
+		pollwakeup(&pp->port_pollhd, POLLIN);
 	} else {
 		mutex_exit(&portq->portq_mutex);
 	}
