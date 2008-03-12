@@ -1245,6 +1245,66 @@ record_ancestry(char *file, struct stat *pstatb, struct lbuf *rep,
 }
 
 /*
+ * Do re-calculate the mode for group for ACE_T type of acls.
+ * This is because, if the server's FS happens to be UFS, supporting
+ * POSIX ACL's, then it does a special calculation of group mode
+ * to be the bitwise OR of CLASS_OBJ and GROUP_OBJ (see PSARC/2001/717.)
+ *
+ * This algorithm is from the NFSv4 ACL Draft. Here a part of that
+ * algorithm is used for the group mode calculation only.
+ * What is modified here from the algorithm is that only the
+ * entries with flags ACE_GROUP are considered. For each entry
+ * with ACE_GROUP flag, the first occurance of a specific access
+ * is checked if it is allowed.
+ * We are not interested in perms for owner@ and other@, as they
+ * were taken from st_mode value.
+ * We are not interested in a_who field of ACE, as we need just
+ * unix mode bits for the group.
+ */
+int
+grp_mask_to_mode(acl_t *acep)
+{
+	int mode = 0, seen = 0;
+	int acecnt;
+	ace_t *ap;
+
+	acecnt = acl_cnt(acep);
+	for (ap = (ace_t *)acl_data(acep); acecnt--; ap++) {
+		if ((ap->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE ||
+		    ap->a_type == ACE_ACCESS_DENIED_ACE_TYPE) &&
+		    !(ap->a_flags & ACE_INHERIT_ONLY_ACE)) {
+			if (ap->a_flags & ACE_GROUP) {
+				if (ap->a_access_mask & ACE_READ_DATA) {
+					if (!(seen & S_IRGRP)) {
+						seen |= S_IRGRP;
+						if (ap->a_type ==
+						    ACE_ACCESS_ALLOWED_ACE_TYPE)
+							mode |= S_IRGRP;
+					}
+				}
+				if (ap->a_access_mask & ACE_WRITE_DATA) {
+					if (!(seen & S_IWGRP)) {
+						seen |= S_IWGRP;
+						if (ap->a_type ==
+						    ACE_ACCESS_ALLOWED_ACE_TYPE)
+							mode |= S_IWGRP;
+					}
+				}
+				if (ap->a_access_mask & ACE_EXECUTE) {
+					if (!(seen & S_IXGRP)) {
+						seen |= S_IXGRP;
+						if (ap->a_type ==
+						    ACE_ACCESS_ALLOWED_ACE_TYPE)
+							mode |= S_IXGRP;
+					}
+				}
+			}
+		}
+	}
+	return (mode);
+}
+
+/*
  * get status of file and recomputes tblocks;
  * argfl = 1 if file is a name in ls-command and = 0
  * for filename in a directory whose name is an
@@ -1470,8 +1530,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 				/*
 				 * Special handling for ufs aka aclent_t ACL's
 				 */
-				if (rep->aclp &&
-				    acl_type(rep->aclp) == ACLENT_T) {
+				if (acl_type(rep->aclp) == ACLENT_T) {
 					/*
 					 * For files with non-trivial acls, the
 					 * effective group permissions are the
@@ -1523,6 +1582,11 @@ gstat(char *file, int argfl, struct ditem *myparent)
 
 					rep->lflags |= (groupperm & mask) << 3;
 
+				} else if (acl_type(rep->aclp) == ACE_T) {
+					int mode;
+					mode = grp_mask_to_mode(rep->aclp);
+					rep->lflags &= ~S_IRWXG;
+					rep->lflags |= mode;
 				}
 			}
 
