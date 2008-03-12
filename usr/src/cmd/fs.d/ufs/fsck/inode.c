@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -349,9 +349,8 @@ ckinode_common(struct dinode *dp, struct inodesc *idesc,
 			idesc->id_blkno = dino.di_ib[i];
 			ret = iblock(idesc, i + 1,
 			    (u_offset_t)howmany(dino.di_size,
-						(u_offset_t)sblock.fs_bsize) -
-						    indir_data_blks,
-						action);
+			    (u_offset_t)sblock.fs_bsize) - indir_data_blks,
+			    action);
 			if ((action == CKI_TRUNCATE) &&
 			    (idesc->id_truncto <= indir_data_blks) &&
 			    ((idesc->id_lbn + 1) >= indir_data_blks) &&
@@ -831,7 +830,7 @@ cacheino(struct dinode *dp, fsck_ino_t inum)
 
 	blks = NDADDR + NIADDR;
 	inp = (struct inoinfo *)
-		malloc(sizeof (*inp) + (blks - 1) * sizeof (daddr32_t));
+	    malloc(sizeof (*inp) + (blks - 1) * sizeof (daddr32_t));
 	if (inp == NULL)
 		errexit("Cannot increase directory list\n");
 	init_inoinfo(inp, dp, inum); /* doesn't touch i_nextlist or i_number */
@@ -904,7 +903,7 @@ cacheacl(struct dinode *dp, fsck_ino_t inum)
 
 	blks = NDADDR + NIADDR;
 	aclp = (struct inoinfo *)
-		malloc(sizeof (*aclp) + (blks - 1) * sizeof (daddr32_t));
+	    malloc(sizeof (*aclp) + (blks - 1) * sizeof (daddr32_t));
 	if (aclp == NULL)
 		return;
 	aclpp = &aclphead[inum % numacls];
@@ -978,7 +977,7 @@ clri(struct inodesc *idesc, char *type, int verbose, int corrupting)
 	}
 	if (preen || (reply("CLEAR") == 1)) {
 		need_parent = (corrupting == CLRI_NOP_OK) ?
-			TI_NOPARENT : TI_PARENT;
+		    TI_NOPARENT : TI_PARENT;
 		freeino(idesc->id_number, need_parent);
 		if (preen)
 			(void) printf(" (CLEARED)\n");
@@ -1137,8 +1136,8 @@ allocino(fsck_ino_t request, int type)
 
 	if (debug && (request != 0) && (request != UFSROOTINO))
 		errexit("assertion failed: allocino() asked for "
-			"inode %d instead of 0 or %d",
-			(int)request, (int)UFSROOTINO);
+		    "inode %d instead of 0 or %d",
+		    (int)request, (int)UFSROOTINO);
 
 	/*
 	 * We know that we're only going to get requests for UFSROOTINO
@@ -1393,7 +1392,10 @@ freeino(fsck_ino_t ino, int update_parent)
 	 * pass1.c)
 	 */
 	if (dp->di_size > (u_offset_t)MAXOFF_T &&
-	    dp->di_size <= (u_offset_t)UFS_MAXOFFSET_T) {
+	    dp->di_size <= (u_offset_t)UFS_MAXOFFSET_T &&
+	    ftypeok(dp) &&
+	    (dp->di_mode & IFMT) != IFBLK &&
+	    (dp->di_mode & IFMT) != IFCHR) {
 		largefile_count--;
 	}
 	truncino(ino, 0, update_parent);
