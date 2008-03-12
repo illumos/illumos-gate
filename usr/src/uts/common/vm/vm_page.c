@@ -327,6 +327,23 @@ struct memseg_stats {
 
 struct memseg *memsegs;		/* list of memory segments */
 
+/*
+ * /etc/system tunable to control large page allocation hueristic.
+ *
+ * Setting to LPAP_LOCAL will heavily prefer the local lgroup over remote lgroup
+ * for large page allocation requests.  If a large page is not readily
+ * avaliable on the local freelists we will go through additional effort
+ * to create a large page, potentially moving smaller pages around to coalesce
+ * larger pages in the local lgroup.
+ * Default value of LPAP_DEFAULT will go to remote freelists if large pages
+ * are not readily available in the local lgroup.
+ */
+enum lpap {
+	LPAP_DEFAULT,	/* default large page allocation policy */
+	LPAP_LOCAL	/* local large page allocation policy */
+};
+
+enum lpap lpg_alloc_prefer = LPAP_DEFAULT;
 
 static void page_init_mem_config(void);
 static int page_do_hashin(page_t *, vnode_t *, u_offset_t);
@@ -1980,6 +1997,14 @@ page_alloc_pages(struct vnode *vp, struct seg *seg, caddr_t addr,
 
 	ASSERT(szc != 0 && szc <= (page_num_pagesizes() - 1));
 	ASSERT(pgflags == 0 || pgflags == PG_LOCAL);
+
+	/*
+	 * Check if system heavily prefers local large pages over remote
+	 * on systems with multiple lgroups.
+	 */
+	if (lpg_alloc_prefer == LPAP_LOCAL && nlgrps > 1) {
+		pgflags = PG_LOCAL;
+	}
 
 	VM_STAT_ADD(alloc_pages[0]);
 
