@@ -4585,7 +4585,8 @@ retrylock:
 	 * i_contents is held here. If dolock is zero, the lock
 	 * is held in bmap routines.
 	 */
-	beyond_eof = uoff + len > ip->i_size + PAGEOFFSET;
+	beyond_eof = uoff + len >
+	    ((ip->i_size + PAGEOFFSET) & (uintptr_t)PAGEMASK);
 	if (beyond_eof && seg != segkmap) {
 		if (dolock) {
 			rw_exit(&ip->i_contents);
