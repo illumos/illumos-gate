@@ -4888,7 +4888,7 @@ vdc_dkio_flush_cb(void *arg)
 
 /*
  * Function:
- * 	vdc_dkio_get_partition()
+ * 	vdc_dkio_gapart()
  *
  * Description:
  *	This function implements the DKIOCGAPART ioctl.
@@ -4899,7 +4899,7 @@ vdc_dkio_flush_cb(void *arg)
  *	flag	- ioctl flags
  */
 static int
-vdc_dkio_get_partition(vdc_t *vdc, caddr_t arg, int flag)
+vdc_dkio_gapart(vdc_t *vdc, caddr_t arg, int flag)
 {
 	struct dk_geom *geom;
 	struct vtoc *vtoc;
@@ -4944,6 +4944,59 @@ vdc_dkio_get_partition(vdc_t *vdc, caddr_t arg, int flag)
 	if (ddi_copyout(&data, arg, size, flag) != 0)
 		return (EFAULT);
 
+	return (0);
+}
+
+/*
+ * Function:
+ * 	vdc_dkio_partition()
+ *
+ * Description:
+ *	This function implements the DKIOCPARTITION ioctl.
+ *
+ * Arguments:
+ *	vdc	- soft state pointer
+ *	arg	- a pointer to a struct partition64 structure
+ *	flag	- ioctl flags
+ */
+static int
+vdc_dkio_partition(vdc_t *vdc, caddr_t arg, int flag)
+{
+	struct partition64 p64;
+	efi_gpt_t *gpt;
+	efi_gpe_t *gpe;
+	vd_efi_dev_t edev;
+	uint_t partno;
+	int rv;
+
+	if (ddi_copyin(arg, &p64, sizeof (struct partition64), flag)) {
+		return (EFAULT);
+	}
+
+	VD_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);
+
+	if ((rv = vd_efi_alloc_and_read(&edev, &gpt, &gpe)) != 0) {
+		return (rv);
+	}
+
+	partno = p64.p_partno;
+
+	if (partno >= gpt->efi_gpt_NumberOfPartitionEntries) {
+		vd_efi_free(&edev, gpt, gpe);
+		return (ESRCH);
+	}
+
+	bcopy(&gpe[partno].efi_gpe_PartitionTypeGUID, &p64.p_type,
+	    sizeof (struct uuid));
+	p64.p_start = gpe[partno].efi_gpe_StartingLBA;
+	p64.p_size = gpe[partno].efi_gpe_EndingLBA - p64.p_start + 1;
+
+	if (ddi_copyout(&p64, arg, sizeof (struct partition64), flag)) {
+		vd_efi_free(&edev, gpt, gpe);
+		return (EFAULT);
+	}
+
+	vd_efi_free(&edev, gpt, gpe);
 	return (0);
 }
 
@@ -6346,6 +6399,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{0, DKIOCINFO, sizeof (struct dk_cinfo), vdc_null_copy_func},
 	{0, DKIOCGMEDIAINFO, sizeof (struct dk_minfo), vdc_null_copy_func},
 	{0, USCSICMD,	sizeof (struct uscsi_cmd), vdc_null_copy_func},
+	{0, DKIOCPARTITION, 0, vdc_null_copy_func },
 	{0, DKIOCGAPART, 0, vdc_null_copy_func },
 	{0, DKIOCREMOVABLE, 0, vdc_null_copy_func},
 	{0, CDROMREADOFFSET, 0, vdc_null_copy_func}
@@ -6599,7 +6653,12 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 
 	case DKIOCGAPART:
 	{
-		return (vdc_dkio_get_partition(vdc, arg, mode));
+		return (vdc_dkio_gapart(vdc, arg, mode));
+	}
+
+	case DKIOCPARTITION:
+	{
+		return (vdc_dkio_partition(vdc, arg, mode));
 	}
 
 	case DKIOCINFO:
