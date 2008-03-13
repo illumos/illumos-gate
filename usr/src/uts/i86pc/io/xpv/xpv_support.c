@@ -342,6 +342,18 @@ xen_pv_init(dev_info_t *xpv_dip)
 	xen_minor = cp.cp_eax & 0xffff;
 
 	/*
+	 * The xpv driver is incompatible with xen versions older than 3.1. This
+	 * is due to the changes in the vcpu_info and shared_info structs used
+	 * to communicate with the hypervisor (the event channels in particular)
+	 * that were introduced with 3.1.
+	 */
+	if (xen_major < 3 || (xen_major == 3 && xen_minor < 1)) {
+		cmn_err(CE_WARN, "Xen version %d.%d is not supported",
+		    xen_major, xen_minor);
+		return (-1);
+	}
+
+	/*
 	 * cpuid function 0x40000002 returns information about the
 	 * hypercall page.  %eax nominally contains the number of pages
 	 * with hypercall code, but according to the Xen guys, "I'll
