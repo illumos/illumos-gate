@@ -1320,3 +1320,4 @@ Bugid   Risk Synopsis
 	PSARC/2008/148: new ldd(1) -p option
 6668050 First trip through PLT does not preserve args in xmm registers
 6672394 ldd(1) unused dependency processing is tricked by relocations errors
+6672544 elf_rtbndr must support non-ABI aligned stacks on amd64

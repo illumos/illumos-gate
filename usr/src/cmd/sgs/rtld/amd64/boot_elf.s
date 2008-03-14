@@ -119,6 +119,9 @@ elf_plt_trace()
  *	-16(%rbp)	store call destination
  *	-80(%rbp)	space for La_amd64_regs
  *	-88(%rbp)	prev stack size
+ *  The next %rbp offsets are only true if the caller had correct stack
+ *  alignment.  See note above SPRDIOFF for why we use %rsp alignment to
+ *  access these stack fields.
  *	-96(%rbp)	entering %rdi
  *	-104(%rbp)	entering %rsi
  *	-112(%rbp)	entering %rdx
@@ -127,61 +130,75 @@ elf_plt_trace()
  *	-136(%rbp)	entering %r9
  *	-144(%rbp)	entering %r10
  *	-152(%rbp)	entering %r11
- *	-160(%rax)	entering %rax
- *	-176(%xmm0)	entering %xmm0
- *	-192(%xmm1)	entering %xmm1
- *	-208(%xmm2)	entering %xmm2
- *	-224(%xmm3)	entering %xmm3
- *	-240(%xmm4)	entering %xmm4
- *	-256(%xmm5)	entering %xmm5
- *	-272(%xmm6)	entering %xmm6
- *	-288(%xmm7)	entering %xmm7
+ *	-160(%rbp)	entering %rax
+ *	-176(%rbp)	entering %xmm0
+ *	-192(%rbp)	entering %xmm1
+ *	-208(%rbp)	entering %xmm2
+ *	-224(%rbp)	entering %xmm3
+ *	-240(%rbp)	entering %xmm4
+ *	-256(%rbp)	entering %xmm5
+ *	-272(%rbp)	entering %xmm6
+ *	-288(%rbp)	entering %xmm7
  *
  */
 #define	SPDYNOFF    -8
 #define	SPDESTOFF   -16
 #define	SPLAREGOFF  -80
 #define	SPPRVSTKOFF -88
-#define	SPRDIOFF    -96
-#define	SPRSIOFF    -104
-#define	SPRDXOFF    -112
-#define	SPRCXOFF    -120
-#define	SPR8OFF	    -128
-#define	SPR9OFF	    -136
-#define	SPR10OFF    -144
-#define	SPR11OFF    -152
-#define	SPRAXOFF    -160
-#define	SPXMM0OFF   -176
-#define	SPXMM1OFF   -192
-#define	SPXMM2OFF   -208
-#define	SPXMM3OFF   -224
-#define	SPXMM4OFF   -240
-#define	SPXMM5OFF   -256
-#define	SPXMM6OFF   -272
-#define	SPXMM7OFF   -288
+
+/*
+ * The next set of offsets are relative to %rsp.
+ * We guarantee %rsp is ABI compliant 16-byte aligned.  This guarantees the
+ * xmm registers are saved to 16-byte aligned addresses.
+ * %rbp may only be 8 byte aligned if we came in from non-ABI compliant code.
+ */ 
+#define	SPRDIOFF	192
+#define	SPRSIOFF	184
+#define	SPRDXOFF	176
+#define	SPRCXOFF	168
+#define	SPR8OFF		160
+#define	SPR9OFF		152
+#define	SPR10OFF	144
+#define	SPR11OFF	136
+#define	SPRAXOFF	128
+#define	SPXMM0OFF	112
+#define	SPXMM1OFF	96
+#define	SPXMM2OFF	80
+#define	SPXMM3OFF	64
+#define	SPXMM4OFF	48
+#define	SPXMM5OFF	32
+#define	SPXMM6OFF	16
+#define	SPXMM7OFF	0
 
 	.globl	elf_plt_trace
 	.type	elf_plt_trace,@function
 	.align 16
 elf_plt_trace:
+	/*
+	 * Enforce ABI 16-byte stack alignment here.
+	 * The next andq instruction does this pseudo code:
+	 * If %rsp is 8 byte aligned then subtract 8 from %rsp.
+	 */
+	andq    $-16, %rsp	/* enforce ABI 16-byte stack alignment */
 	subq	$272,%rsp	/ create some local storage
-	movq	%rdi, SPRDIOFF(%rbp)
-	movq	%rsi, SPRSIOFF(%rbp)
-	movq	%rdx, SPRDXOFF(%rbp)
-	movq	%rcx, SPRCXOFF(%rbp)
-	movq	%r8, SPR8OFF(%rbp)
-	movq	%r9, SPR9OFF(%rbp)
-	movq	%r10, SPR10OFF(%rbp)
-	movq	%r11, SPR11OFF(%rbp)
-	movq	%rax, SPRAXOFF(%rbp)
-	movdqa	%xmm0, SPXMM0OFF(%rbp)
-	movdqa	%xmm1, SPXMM1OFF(%rbp)
-	movdqa	%xmm2, SPXMM2OFF(%rbp)
-	movdqa	%xmm3, SPXMM3OFF(%rbp)
-	movdqa	%xmm4, SPXMM4OFF(%rbp)
-	movdqa	%xmm5, SPXMM5OFF(%rbp)
-	movdqa	%xmm6, SPXMM6OFF(%rbp)
-	movdqa	%xmm7, SPXMM7OFF(%rbp)
+
+	movq	%rdi, SPRDIOFF(%rsp)
+	movq	%rsi, SPRSIOFF(%rsp)
+	movq	%rdx, SPRDXOFF(%rsp)
+	movq	%rcx, SPRCXOFF(%rsp)
+	movq	%r8, SPR8OFF(%rsp)
+	movq	%r9, SPR9OFF(%rsp)
+	movq	%r10, SPR10OFF(%rsp)
+	movq	%r11, SPR11OFF(%rsp)
+	movq	%rax, SPRAXOFF(%rsp)
+	movdqa	%xmm0, SPXMM0OFF(%rsp)
+	movdqa	%xmm1, SPXMM1OFF(%rsp)
+	movdqa	%xmm2, SPXMM2OFF(%rsp)
+	movdqa	%xmm3, SPXMM3OFF(%rsp)
+	movdqa	%xmm4, SPXMM4OFF(%rsp)
+	movdqa	%xmm5, SPXMM5OFF(%rsp)
+	movdqa	%xmm6, SPXMM6OFF(%rsp)
+	movdqa	%xmm7, SPXMM7OFF(%rsp)
 
 	movq	SPDYNOFF(%rbp), %rax			/ %rax = dyndata
 	testb	$LA_SYMB_NOPLTENTER, SBFLAGS_OFF(%rax)	/ <link.h>
@@ -199,17 +216,17 @@ elf_plt_trace:
 	movq	%rdi, 0(%rsi)		/ la_rsp
 	movq	0(%rbp), %rdi
 	movq	%rdi, 8(%rsi)		/ la_rbp
-	movq	SPRDIOFF(%rbp), %rdi
+	movq	SPRDIOFF(%rsp), %rdi
 	movq	%rdi, 16(%rsi)		/ la_rdi
-	movq	SPRSIOFF(%rbp), %rdi
+	movq	SPRSIOFF(%rsp), %rdi
 	movq	%rdi, 24(%rsi)		/ la_rsi
-	movq	SPRDXOFF(%rbp), %rdi
+	movq	SPRDXOFF(%rsp), %rdi
 	movq	%rdi, 32(%rsi)		/ la_rdx
-	movq	SPRCXOFF(%rbp), %rdi
+	movq	SPRCXOFF(%rsp), %rdi
 	movq	%rdi, 40(%rsi)		/ la_rcx
-	movq	SPR8OFF(%rbp), %rdi
+	movq	SPR8OFF(%rsp), %rdi
 	movq	%rdi, 48(%rsi)		/ la_r8
-	movq	SPR9OFF(%rbp), %rdi
+	movq	SPR9OFF(%rsp), %rdi
 	movq	%rdi, 56(%rsi)		/ la_r9
 
 	/*
@@ -256,23 +273,23 @@ elf_plt_trace:
 	/
 	/ Restore registers
 	/
-	movq	SPRDIOFF(%rbp), %rdi
-	movq	SPRSIOFF(%rbp), %rsi
-	movq	SPRDXOFF(%rbp), %rdx
-	movq	SPRCXOFF(%rbp), %rcx
-	movq	SPR8OFF(%rbp), %r8
-	movq	SPR9OFF(%rbp), %r9
-	movq	SPR10OFF(%rbp), %r10
-	movq	SPR11OFF(%rbp), %r11
-	movq	SPRAXOFF(%rbp), %rax
-	movdqa	SPXMM0OFF(%rbp), %xmm0
-	movdqa	SPXMM1OFF(%rbp), %xmm1
-	movdqa	SPXMM2OFF(%rbp), %xmm2
-	movdqa	SPXMM3OFF(%rbp), %xmm3
-	movdqa	SPXMM4OFF(%rbp), %xmm4
-	movdqa	SPXMM5OFF(%rbp), %xmm5
-	movdqa	SPXMM6OFF(%rbp), %xmm6
-	movdqa	SPXMM7OFF(%rbp), %xmm7
+	movq	SPRDIOFF(%rsp), %rdi
+	movq	SPRSIOFF(%rsp), %rsi
+	movq	SPRDXOFF(%rsp), %rdx
+	movq	SPRCXOFF(%rsp), %rcx
+	movq	SPR8OFF(%rsp), %r8
+	movq	SPR9OFF(%rsp), %r9
+	movq	SPR10OFF(%rsp), %r10
+	movq	SPR11OFF(%rsp), %r11
+	movq	SPRAXOFF(%rsp), %rax
+	movdqa	SPXMM0OFF(%rsp), %xmm0
+	movdqa	SPXMM1OFF(%rsp), %xmm1
+	movdqa	SPXMM2OFF(%rsp), %xmm2
+	movdqa	SPXMM3OFF(%rsp), %xmm3
+	movdqa	SPXMM4OFF(%rsp), %xmm4
+	movdqa	SPXMM5OFF(%rsp), %xmm5
+	movdqa	SPXMM6OFF(%rsp), %xmm6
+	movdqa	SPXMM7OFF(%rsp), %xmm7
 
 	subq	$8, %rbp			/ adjust %rbp for 'ret'
 	movq	%rbp, %rsp			/
@@ -320,8 +337,12 @@ elf_plt_trace:
 	/*
 	 * Grow the stack and duplicate the arguements of the
 	 * original caller.
+	 *
+	 * We save %rsp in %r11 since we need to use the current rsp for
+	 * accessing the registers saved in our stack frame.
 	 */
 .grow_stack:
+	movq	%rsp, %r11
 	subq	%rdx, %rsp			/    grow the stack 
 	movq	%rdx, SPPRVSTKOFF(%rbp)		/    -88(%rbp) == prev frame sz
 	movq	%rsp, %rcx			/    %rcx = dest
@@ -341,25 +362,26 @@ elf_plt_trace:
 	 */
 .end_while:
 	/
-	/ Restore registers
+	/ Restore registers using %r11 which contains our old %rsp value
+	/ before growing the stack.
 	/
-	movq	SPRDIOFF(%rbp), %rdi
-	movq	SPRSIOFF(%rbp), %rsi
-	movq	SPRDXOFF(%rbp), %rdx
-	movq	SPRCXOFF(%rbp), %rcx
-	movq	SPR8OFF(%rbp), %r8
-	movq	SPR9OFF(%rbp), %r9
-	movq	SPR10OFF(%rbp), %r10
-	movq	SPR11OFF(%rbp), %r11
-	movq	SPRAXOFF(%rbp), %rax
-	movdqa	SPXMM0OFF(%rbp), %xmm0
-	movdqa	SPXMM1OFF(%rbp), %xmm1
-	movdqa	SPXMM2OFF(%rbp), %xmm2
-	movdqa	SPXMM3OFF(%rbp), %xmm3
-	movdqa	SPXMM4OFF(%rbp), %xmm4
-	movdqa	SPXMM5OFF(%rbp), %xmm5
-	movdqa	SPXMM6OFF(%rbp), %xmm6
-	movdqa	SPXMM7OFF(%rbp), %xmm7
+	movq	SPRDIOFF(%r11), %rdi
+	movq	SPRSIOFF(%r11), %rsi
+	movq	SPRDXOFF(%r11), %rdx
+	movq	SPRCXOFF(%r11), %rcx
+	movq	SPR8OFF(%r11), %r8
+	movq	SPR9OFF(%r11), %r9
+	movq	SPR10OFF(%r11), %r10
+	movq	SPRAXOFF(%r11), %rax
+	movdqa	SPXMM0OFF(%r11), %xmm0
+	movdqa	SPXMM1OFF(%r11), %xmm1
+	movdqa	SPXMM2OFF(%r11), %xmm2
+	movdqa	SPXMM3OFF(%r11), %xmm3
+	movdqa	SPXMM4OFF(%r11), %xmm4
+	movdqa	SPXMM5OFF(%r11), %xmm5
+	movdqa	SPXMM6OFF(%r11), %xmm6
+	movdqa	SPXMM7OFF(%r11), %xmm7
+	movq	SPR11OFF(%r11), %r11		/ retore %r11 last
 
 	/*
 	 * Call to desitnation function - we'll return here
@@ -388,23 +410,23 @@ elf_plt_trace:
 	/
 	/ Restore registers
 	/
-	movq	SPRDIOFF(%rbp), %rdi
-	movq	SPRSIOFF(%rbp), %rsi
-	movq	SPRDXOFF(%rbp), %rdx
-	movq	SPRCXOFF(%rbp), %rcx
-	movq	SPR8OFF(%rbp), %r8
-	movq	SPR9OFF(%rbp), %r9
-	movq	SPR10OFF(%rbp), %r10
-	movq	SPR11OFF(%rbp), %r11
+	movq	SPRDIOFF(%rsp), %rdi
+	movq	SPRSIOFF(%rsp), %rsi
+	movq	SPRDXOFF(%rsp), %rdx
+	movq	SPRCXOFF(%rsp), %rcx
+	movq	SPR8OFF(%rsp), %r8
+	movq	SPR9OFF(%rsp), %r9
+	movq	SPR10OFF(%rsp), %r10
+	movq	SPR11OFF(%rsp), %r11
 	// rax already contains return value
-	movdqa	SPXMM0OFF(%rbp), %xmm0
-	movdqa	SPXMM1OFF(%rbp), %xmm1
-	movdqa	SPXMM2OFF(%rbp), %xmm2
-	movdqa	SPXMM3OFF(%rbp), %xmm3
-	movdqa	SPXMM4OFF(%rbp), %xmm4
-	movdqa	SPXMM5OFF(%rbp), %xmm5
-	movdqa	SPXMM6OFF(%rbp), %xmm6
-	movdqa	SPXMM7OFF(%rbp), %xmm7
+	movdqa	SPXMM0OFF(%rsp), %xmm0
+	movdqa	SPXMM1OFF(%rsp), %xmm1
+	movdqa	SPXMM2OFF(%rsp), %xmm2
+	movdqa	SPXMM3OFF(%rsp), %xmm3
+	movdqa	SPXMM4OFF(%rsp), %xmm4
+	movdqa	SPXMM5OFF(%rsp), %xmm5
+	movdqa	SPXMM6OFF(%rsp), %xmm6
+	movdqa	SPXMM7OFF(%rsp), %xmm7
 
 	movq	%rbp, %rsp			/
 	popq	%rbp				/
@@ -493,40 +515,45 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
  *  
  *  So - will subtract the following to create enough space
  *
- *	-8(%rbp)	entering %rax
- *	-16(%rbp)	entering %rdi
- *	-24(%rbp)	entering %rsi
- *	-32(%rbp)	entering %rdx
- *	-40(%rbp)	entering %rcx
- *	-48(%rbp)	entering %r8
- *	-56(%rbp)	entering %r9
- *	-64(%rbp)	entering %r10
- *	-80(%xmm0)	entering %xmm0
- *	-96(%xmm1)	entering %xmm1
- *	-112(%xmm2)	entering %xmm2
- *	-128(%xmm3)	entering %xmm3
- *	-144(%xmm4)	entering %xmm4
- *	-160(%xmm5)	entering %xmm5
- *	-176(%xmm6)	entering %xmm6
- *	-192(%xmm7)	entering %xmm7
+ *	0(%rsp)		save %rax
+ *	8(%rsp)		save %rdi
+ *	16(%rsp)	save %rsi
+ *	24(%rsp)	save %rdx
+ *	32(%rsp)	save %rcx
+ *	40(%rsp)	save %r8
+ *	48(%rsp)	save %r9
+ *	56(%rsp)	save %r10
+ *	64(%rsp)	save %xmm0
+ *	80(%rsp)	save %xmm1
+ *	96(%rsp)	save %xmm2
+ *	112(%rsp)	save %xmm3
+ *	128(%rsp)	save %xmm4
+ *	144(%rsp)	save %xmm5
+ *	160(%rsp)	save %xmm6
+ *	176(%rsp)	save %xmm7
+ *
+ * Note: Some callers may use 8-byte stack alignment instead of the
+ * ABI required 16-byte alignment.  We use %rsp offsets to save/restore
+ * registers because %rbp may not be 16-byte aligned.  We guarantee %rsp
+ * is 16-byte aligned in the function preamble.
  */
 #define	LS_SIZE	$192	/* local stack space to save all possible arguments */
-#define	LSRAXOFF	-8	/* for SSE register count */
-#define	LSRDIOFF	-16	/* arg 0 ... */
-#define	LSRSIOFF	-24
-#define	LSRDXOFF	-32
-#define	LSRCXOFF	-40
-#define	LSR8OFF		-48
-#define	LSR9OFF		-56
-#define	LSR10OFF	-64	/* ... arg 5 */
-#define	LSXMM0OFF	-80	/* SSE arg 0 ... */
-#define	LSXMM1OFF	-96
-#define	LSXMM2OFF	-112
-#define	LSXMM3OFF	-128
-#define	LSXMM4OFF	-144
-#define	LSXMM5OFF	-160
-#define	LSXMM6OFF	-176
-#define	LSXMM7OFF	-192	/* ... SSE arg 7 */
+#define	LSRAXOFF	0	/* for SSE register count */
+#define	LSRDIOFF	8	/* arg 0 ... */
+#define	LSRSIOFF	16
+#define	LSRDXOFF	24
+#define	LSRCXOFF	32
+#define	LSR8OFF		40
+#define	LSR9OFF		48
+#define	LSR10OFF	56	/* ... arg 5 */
+#define	LSXMM0OFF	64	/* SSE arg 0 ... */
+#define	LSXMM1OFF	80
+#define	LSXMM2OFF	96
+#define	LSXMM3OFF	112
+#define	LSXMM4OFF	128
+#define	LSXMM5OFF	144
+#define	LSXMM6OFF	160
+#define	LSXMM7OFF	176	/* ... SSE arg 7 */
 
 	.weak	_elf_rtbndr
 	_elf_rtbndr = elf_rtbndr
@@ -536,25 +563,33 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	pushq	%rbp
 	movq	%rsp, %rbp
 
+	/*
+	 * Some libraries may (incorrectly) use non-ABI compliant 8-byte stack
+	 * alignment.  Enforce ABI 16-byte stack alignment here.
+	 * The next andq instruction does this pseudo code:
+	 * If %rsp is 8 byte aligned then subtract 8 from %rsp.
+	 */
+	andq	$-16, %rsp	/* enforce ABI 16-byte stack alignment */
+
 	subq	LS_SIZE, %rsp	/* save all ABI defined argument registers */
 
-	movq	%rax, LSRAXOFF(%rbp)	/* for SSE register count */
-	movq	%rdi, LSRDIOFF(%rbp)	/*  arg 0 .. */
-	movq	%rsi, LSRSIOFF(%rbp)
-	movq	%rdx, LSRDXOFF(%rbp)
-	movq	%rcx, LSRCXOFF(%rbp)
-	movq	%r8, LSR8OFF(%rbp)
-	movq	%r9, LSR9OFF(%rbp)	/* .. arg 5 */
-	movq	%r10, LSR10OFF(%rbp)	/* call chain reg */
+	movq	%rax, LSRAXOFF(%rsp)	/* for SSE register count */
+	movq	%rdi, LSRDIOFF(%rsp)	/*  arg 0 .. */
+	movq	%rsi, LSRSIOFF(%rsp)
+	movq	%rdx, LSRDXOFF(%rsp)
+	movq	%rcx, LSRCXOFF(%rsp)
+	movq	%r8, LSR8OFF(%rsp)
+	movq	%r9, LSR9OFF(%rsp)	/* .. arg 5 */
+	movq	%r10, LSR10OFF(%rsp)	/* call chain reg */
 
-	movdqa	%xmm0, LSXMM0OFF(%rbp)	/* SSE arg 0 ... */
-	movdqa	%xmm1, LSXMM1OFF(%rbp)
-	movdqa	%xmm2, LSXMM2OFF(%rbp)
-	movdqa	%xmm3, LSXMM3OFF(%rbp)
-	movdqa	%xmm4, LSXMM4OFF(%rbp)
-	movdqa	%xmm5, LSXMM5OFF(%rbp)
-	movdqa	%xmm6, LSXMM6OFF(%rbp)
-	movdqa	%xmm7, LSXMM7OFF(%rbp)	/* ... SSE arg 7 */
+	movdqa	%xmm0, LSXMM0OFF(%rsp)	/* SSE arg 0 ... */
+	movdqa	%xmm1, LSXMM1OFF(%rsp)
+	movdqa	%xmm2, LSXMM2OFF(%rsp)
+	movdqa	%xmm3, LSXMM3OFF(%rsp)
+	movdqa	%xmm4, LSXMM4OFF(%rsp)
+	movdqa	%xmm5, LSXMM5OFF(%rsp)
+	movdqa	%xmm6, LSXMM6OFF(%rsp)
+	movdqa	%xmm7, LSXMM7OFF(%rsp)	/* ... SSE arg 7 */
 
 	movq	LBPLMPOFF(%rbp), %rdi	/* arg1 - *lmp */
 	movq	LBPRELOCOFF(%rbp), %rsi	/* arg2 - reloc index */
@@ -563,23 +598,23 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	movq	%rax, LBPRELOCOFF(%rbp)	/* store final destination */
 
 	/* restore possible arguments before invoking resolved function */
-	movq	LSRAXOFF(%rbp), %rax
-	movq	LSRDIOFF(%rbp), %rdi
-	movq	LSRSIOFF(%rbp), %rsi
-	movq	LSRDXOFF(%rbp), %rdx
-	movq	LSRCXOFF(%rbp), %rcx
-	movq	LSR8OFF(%rbp), %r8
-	movq	LSR9OFF(%rbp), %r9
-	movq	LSR10OFF(%rbp), %r10
+	movq	LSRAXOFF(%rsp), %rax
+	movq	LSRDIOFF(%rsp), %rdi
+	movq	LSRSIOFF(%rsp), %rsi
+	movq	LSRDXOFF(%rsp), %rdx
+	movq	LSRCXOFF(%rsp), %rcx
+	movq	LSR8OFF(%rsp), %r8
+	movq	LSR9OFF(%rsp), %r9
+	movq	LSR10OFF(%rsp), %r10
 
-	movdqa	LSXMM0OFF(%rbp), %xmm0
-	movdqa	LSXMM1OFF(%rbp), %xmm1
-	movdqa	LSXMM2OFF(%rbp), %xmm2
-	movdqa	LSXMM3OFF(%rbp), %xmm3
-	movdqa	LSXMM4OFF(%rbp), %xmm4
-	movdqa	LSXMM5OFF(%rbp), %xmm5
-	movdqa	LSXMM6OFF(%rbp), %xmm6
-	movdqa	LSXMM7OFF(%rbp), %xmm7
+	movdqa	LSXMM0OFF(%rsp), %xmm0
+	movdqa	LSXMM1OFF(%rsp), %xmm1
+	movdqa	LSXMM2OFF(%rsp), %xmm2
+	movdqa	LSXMM3OFF(%rsp), %xmm3
+	movdqa	LSXMM4OFF(%rsp), %xmm4
+	movdqa	LSXMM5OFF(%rsp), %xmm5
+	movdqa	LSXMM6OFF(%rsp), %xmm6
+	movdqa	LSXMM7OFF(%rsp), %xmm7
 
 	movq	%rbp, %rsp
 	popq	%rbp
