@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,11 +104,13 @@ typedef struct ahci_port {
 	ahci_rcvd_fis_t		*ahciport_rcvd_fis;
 	ddi_dma_handle_t	ahciport_rcvd_fis_dma_handle;
 	ddi_acc_handle_t	ahciport_rcvd_fis_acc_handle;
+	ddi_dma_cookie_t	ahciport_rcvd_fis_dma_cookie;
 
 	/* Pointer to command list structure */
 	ahci_cmd_header_t	*ahciport_cmd_list;
 	ddi_dma_handle_t	ahciport_cmd_list_dma_handle;
 	ddi_acc_handle_t	ahciport_cmd_list_acc_handle;
+	ddi_dma_cookie_t	ahciport_cmd_list_dma_cookie;
 
 	/* Pointer to cmmand table structure */
 	ahci_cmd_table_t	\
@@ -201,6 +203,7 @@ typedef struct ahci_ctl {
 	 * AHCI_CAP_PIO_MDRQ
 	 * AHCI_CAP_NO_MCMDLIST_NONQUEUE
 	 * AHCI_CAP_NCQ
+	 * AHCI_CAP_PM
 	 */
 	int			ahcictl_cap;
 
@@ -258,9 +261,9 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_FAILURE	(-1) /* Unsuccessful return */
 
 /* Flags for ahcictl_flags */
-#define	AHCI_PM			0x1
-#define	AHCI_ATTACH		0x2
-#define	AHCI_DETACH		0x4
+#define	AHCI_ATTACH		0x1
+#define	AHCI_DETACH		0x2
+#define	AHCI_SUSPEND		0x4
 
 /* Values for ahcictl_cap */
 /* PIO Multiple DRQ Block */
@@ -272,6 +275,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_NO_MCMDLIST_NONQUEUE	0x2
 /* Native Command Queuing (NCQ) */
 #define	AHCI_CAP_NCQ			0x4
+/* Power Management (PM) */
+#define	AHCI_CAP_PM			0x8
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
@@ -350,6 +355,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_COMMAND		0x2000
 #define	AHCIDBG_SENSEDATA	0x4000
 #define	AHCIDBG_NCQ		0x8000
+#define	AHCIDBG_PM		0x10000
 
 extern int ahci_debug_flag;
 

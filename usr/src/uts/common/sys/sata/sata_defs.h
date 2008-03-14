@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -714,6 +714,13 @@ struct mode_acoustic_management {
 #define	SCONTROL_SPD_NOLIMIT	0 /* No speed limit */
 #define	SCONTROL_SPD_GEN1	1 /* Limit Gen 1 rate */
 #define	SCONTROL_SPD_GEN2	2 /* Limit Gen 2 rate */
+
+#define	SCONTROL_GET_IPM(x)	\
+	((x & SCONTROL_IPM) >> SCONTROL_IPM_SHIFT)
+
+#define	SCONTROL_SET_IPM(x, new_val)	\
+	(x = (x & ~SCONTROL_IPM) | \
+	((new_val << SCONTROL_IPM_SHIFT) & SCONTROL_IPM))
 
 #define	SCONTROL_IPM_NORESTRICT		0 /* No PM limit */
 #define	SCONTROL_IPM_DISABLE_PARTIAL	1 /* Disable partial */

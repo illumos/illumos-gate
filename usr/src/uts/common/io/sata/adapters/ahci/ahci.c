@@ -28,6 +28,21 @@
 
 /*
  * AHCI (Advanced Host Controller Interface) SATA HBA Driver
+ *
+ * Power Management Support
+ * ------------------------
+ *
+ * At the moment, the ahci driver only implements suspend/resume to
+ * support Suspend to RAM on X86 feature. Device power management isn't
+ * implemented, link power management is disabled, and hot plug isn't
+ * allowed during the period from suspend to resume.
+ *
+ * For s/r support, the ahci driver only need to implement DDI_SUSPEND
+ * and DDI_RESUME entries, and don't need to take care of new requests
+ * sent down after suspend because the target driver (sd) has already
+ * handled these conditions, and blocked these requests. For the detailed
+ * information, please check with sdopen, sdclose and sdioctl routines.
+ *
  */
 
 #include <sys/scsi/scsi.h>
@@ -76,7 +91,9 @@ static  void ahci_dealloc_cmd_tables(ahci_ctl_t *, ahci_port_t *);
 static	int ahci_initialize_controller(ahci_ctl_t *);
 static	void ahci_uninitialize_controller(ahci_ctl_t *);
 static	int ahci_initialize_port(ahci_ctl_t *, ahci_port_t *, uint8_t);
+static	int ahci_config_space_init(ahci_ctl_t *);
 
+static	void ahci_disable_interface_pm(ahci_ctl_t *, uint8_t);
 static	int ahci_start_port(ahci_ctl_t *, ahci_port_t *, uint8_t);
 static	void ahci_find_dev_signature(ahci_ctl_t *, ahci_port_t *, uint8_t);
 static	void ahci_update_sata_registers(ahci_ctl_t *, uint8_t, sata_device_t *);
@@ -377,8 +394,6 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int attach_state;
 	uint32_t cap_status, ahci_version;
 	int intr_types;
-	ushort_t venid;
-	uint8_t revision;
 	int i;
 	pci_regspec_t *regs;
 	int regs_length;
@@ -394,8 +409,43 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		break;
 
 	case DDI_RESUME:
-		/* It will be implemented in Phase 2 */
-		return (DDI_FAILURE);
+
+		/*
+		 * During DDI_RESUME, the hardware state of the device
+		 * (power may have been removed from the device) must be
+		 * restored, allow pending requests to continue, and
+		 * service new requests.
+		 */
+		ahci_ctlp = ddi_get_soft_state(ahci_statep, instance);
+		mutex_enter(&ahci_ctlp->ahcictl_mutex);
+
+		/* Restart watch thread */
+		if (ahci_ctlp->ahcictl_timeout_id == 0)
+			ahci_ctlp->ahcictl_timeout_id = timeout(
+			    (void (*)(void *))ahci_watchdog_handler,
+			    (caddr_t)ahci_ctlp, ahci_watchdog_tick);
+
+		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+		/*
+		 * Re-initialize the controller and enable the interrupts and
+		 * restart all the ports.
+		 *
+		 * Note that so far we don't support hot-plug during
+		 * suspend/resume.
+		 */
+		if (ahci_initialize_controller(ahci_ctlp) != AHCI_SUCCESS) {
+			AHCIDBG1(AHCIDBG_ERRS|AHCIDBG_PM, ahci_ctlp,
+			    "ahci%d: Failed to initialize the controller "
+			    "during DDI_RESUME", instance);
+			return (DDI_FAILURE);
+		}
+
+		mutex_enter(&ahci_ctlp->ahcictl_mutex);
+		ahci_ctlp->ahcictl_flags &= ~ AHCI_SUSPEND;
+		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+		return (DDI_SUCCESS);
 
 	default:
 		return (DDI_FAILURE);
@@ -411,6 +461,7 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	ahci_ctlp = ddi_get_soft_state(ahci_statep, instance);
+	ahci_ctlp->ahcictl_flags |= AHCI_ATTACH;
 	ahci_ctlp->ahcictl_dip = dip;
 
 	/* Initialize the cport/port mapping */
@@ -426,8 +477,8 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * registers and port control registers
 	 *
 	 * According to the spec, the AHCI Base Address is BAR5,
-	 * but we found JMicron JMB363 PATA-SATA chipset doesn't
-	 * follow this, so we need to check which rnumber is used
+	 * but BAR0-BAR4 are optional, so we need to check which
+	 * rnumber is used for BAR5.
 	 */
 
 	/*
@@ -565,34 +616,10 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	attach_state |= AHCI_ATTACH_STATE_PCICFG_SETUP;
 
-	/*
-	 * Modify dma_attr_align of ahcictl_buffer_dma_attr. For VT8251, those
-	 * controllers with 0x00 revision id work on 4-byte aligned buffer,
-	 * which is a bug and was fixed after 0x00 revision id controllers.
-	 *
-	 * Moreover, VT8251 cannot use multiple command slots in the command
-	 * list for non-queued commands because the previous register content
-	 * of PxCI can be re-written in the register write, so a flag will be
-	 * set to record this defect - AHCI_CAP_NO_MCMDLIST_NONQUEUE.
-	 */
-	venid = pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
-	    PCI_CONF_VENID);
-
-	if (venid == VIA_VENID) {
-		revision = pci_config_get8(ahci_ctlp->ahcictl_pci_conf_handle,
-		    PCI_CONF_REVID);
-		AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
-		    "revision id = 0x%x", revision);
-		if (revision == 0x00) {
-			ahci_ctlp->ahcictl_buffer_dma_attr.dma_attr_align = 0x4;
-			AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
-			    "change ddi_attr_align to 0x4");
-		}
-
-		ahci_ctlp->ahcictl_cap = AHCI_CAP_NO_MCMDLIST_NONQUEUE;
-		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
-		    "VT8251 cannot use multiple command lists for "
-		    "non-queued commands");
+	/* Check the pci configuration space, and set caps */
+	if (ahci_config_space_init(ahci_ctlp) == AHCI_FAILURE) {
+		cmn_err(CE_WARN, "!ahci_config_space_init failed");
+		goto err_out;
 	}
 
 	/*
@@ -695,9 +722,7 @@ intr_done:
 	/*
 	 * Initialize the controller and ports.
 	 */
-	ahci_ctlp->ahcictl_flags |= AHCI_ATTACH;
 	status = ahci_initialize_controller(ahci_ctlp);
-	ahci_ctlp->ahcictl_flags &= ~AHCI_ATTACH;
 	if (status != AHCI_SUCCESS) {
 		cmn_err(CE_WARN, "!HBA initialization failed");
 		goto err_out;
@@ -717,6 +742,8 @@ intr_done:
 		goto err_out;
 	}
 
+	ahci_ctlp->ahcictl_flags &= ~AHCI_ATTACH;
+
 	AHCIDBG0(AHCIDBG_INIT, ahci_ctlp, "ahci_attach success!");
 
 	return (DDI_SUCCESS);
@@ -730,9 +757,7 @@ err_out:
 	}
 
 	if (attach_state & AHCI_ATTACH_STATE_HW_INIT) {
-		mutex_enter(&ahci_ctlp->ahcictl_mutex);
 		ahci_uninitialize_controller(ahci_ctlp);
-		mutex_exit(&ahci_ctlp->ahcictl_mutex);
 	}
 
 	if (attach_state & AHCI_ATTACH_STATE_ERR_RECV_TASKQ) {
@@ -783,6 +808,7 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
+
 		/* disable the interrupts for an uninterrupted detach */
 		mutex_enter(&ahci_ctlp->ahcictl_mutex);
 		ahci_disable_all_intrs(ahci_ctlp);
@@ -806,9 +832,7 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&ahci_ctlp->ahcictl_mutex);
 
 		/* uninitialize the controller */
-		ahci_ctlp->ahcictl_flags |= AHCI_DETACH;
 		ahci_uninitialize_controller(ahci_ctlp);
-		ahci_ctlp->ahcictl_flags &= ~AHCI_DETACH;
 
 		/* remove the interrupts */
 		ahci_rem_intrs(ahci_ctlp);
@@ -834,8 +858,39 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
-		/* It will be implemented in Phase 2 */
-		return (DDI_FAILURE);
+
+		/*
+		 * The steps associated with suspension must include putting
+		 * the underlying device into a quiescent state so that it
+		 * will not generate interrupts or modify or access memory.
+		 */
+		mutex_enter(&ahci_ctlp->ahcictl_mutex);
+		if (ahci_ctlp->ahcictl_flags & AHCI_SUSPEND) {
+			mutex_exit(&ahci_ctlp->ahcictl_mutex);
+			return (DDI_SUCCESS);
+		}
+
+		ahci_ctlp->ahcictl_flags |= AHCI_SUSPEND;
+
+		/* stop the watchdog handler */
+		if (ahci_ctlp->ahcictl_timeout_id) {
+			(void) untimeout(ahci_ctlp->ahcictl_timeout_id);
+			ahci_ctlp->ahcictl_timeout_id = 0;
+		}
+
+		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+		/*
+		 * drain the taskq
+		 */
+		ddi_taskq_wait(ahci_ctlp->ahcictl_event_taskq);
+
+		/*
+		 * Disable the interrupts and stop all the ports.
+		 */
+		ahci_uninitialize_controller(ahci_ctlp);
+
+		return (DDI_SUCCESS);
 
 	default:
 		return (DDI_FAILURE);
@@ -2575,7 +2630,8 @@ ahci_dealloc_ports_state(ahci_ctl_t *ahci_ctlp)
 }
 
 /*
- * Initialize the controller.
+ * Initialize the controller and all ports. And then try to start the ports
+ * if there are devices attached.
  *
  * This routine can be called from three seperate cases: DDI_ATTACH,
  * PM_LEVEL_D0 and DDI_RESUME. The DDI_ATTACH case is different from
@@ -2650,16 +2706,44 @@ ahci_initialize_controller(ahci_ctl_t *ahci_ctlp)
 /*
  * Reverse of ahci_initialize_controller()
  *
- * WARNING!!! ahcictl_mutex should be acquired before the function is called.
+ * We only need to stop the ports and disable the interrupt.
  */
 static void
 ahci_uninitialize_controller(ahci_ctl_t *ahci_ctlp)
 {
+	ahci_port_t *ahci_portp;
+	int port;
+
 	AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
 	    "ahci_uninitialize_controller enter");
 
 	/* disable all the interrupts. */
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
 	ahci_disable_all_intrs(ahci_ctlp);
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
+		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, port)) {
+			continue;
+		}
+
+		ahci_portp = ahci_ctlp->ahcictl_ports[port];
+
+		/* Stop the port by clearing PxCMD.ST */
+		mutex_enter(&ahci_portp->ahciport_mutex);
+
+		/*
+		 * Here we must disable the port interrupt because
+		 * ahci_disable_all_intrs only clear GHC.IE, and IS
+		 * register will be still set if PxIE is enabled.
+		 * When ahci shares one IRQ with other drivers, the
+		 * intr handler may claim the intr mistakenly.
+		 */
+		ahci_disable_port_intrs(ahci_ctlp, ahci_portp, port);
+		(void) ahci_put_port_into_notrunning_state(ahci_ctlp,
+		    ahci_portp, port);
+		mutex_exit(&ahci_portp->ahciport_mutex);
+	}
 }
 
 /*
@@ -2704,32 +2788,208 @@ next:
 
 	/*
 	 * At the time being, only probe ports/devices and get the types of
-	 * attached devices during attach. In fact, the device can be changed
-	 * during power state changes, but I would like to postpone this part
-	 * when the power management is supported.
+	 * attached devices during DDI_ATTACH. In fact, the device can be
+	 * changed during power state changes, but at the time being, we
+	 * don't support the situation.
 	 */
 	if (ahci_ctlp->ahcictl_flags & AHCI_ATTACH) {
 		/* Try to get the device signature */
 		ahci_find_dev_signature(ahci_ctlp, ahci_portp, port);
+	} else {
 
-		/* Return directly if no device connected */
-		if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
-			AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
-			    "No device connected to port %d", port);
-			goto out;
-		}
+		/*
+		 * During the resume, we need to set the PxCLB, PxCLBU, PxFB
+		 * and PxFBU registers in case these registers were cleared
+		 * during the suspend.
+		 */
+		AHCIDBG1(AHCIDBG_PM, ahci_ctlp,
+		    "ahci_initialize_port: port %d "
+		    "reset the port during resume", port);
+		(void) ahci_port_reset(ahci_ctlp, ahci_portp, port);
 
-		/* Try to start the port */
-		if (ahci_start_port(ahci_ctlp, ahci_portp, port)
-		    != AHCI_SUCCESS) {
-			AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
-			    "failed to start port %d", port);
-			return (AHCI_FAILURE);
-		}
+		AHCIDBG1(AHCIDBG_PM, ahci_ctlp,
+		    "ahci_initialize_port: port %d "
+		    "set PxCLB, PxCLBU, PxFB and PxFBU "
+		    "during resume", port);
+
+		/* Config Port Received FIS Base Address */
+		ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint64_t *)AHCI_PORT_PxFB(ahci_ctlp, port),
+		    ahci_portp->ahciport_rcvd_fis_dma_cookie.dmac_laddress);
+
+		/* Config Port Command List Base Address */
+		ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint64_t *)AHCI_PORT_PxCLB(ahci_ctlp, port),
+		    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_laddress);
+	}
+
+	/* Disable the interface power management */
+	ahci_disable_interface_pm(ahci_ctlp, port);
+
+	/* Return directly if no device connected */
+	if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
+		AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
+		    "No device connected to port %d", port);
+		goto out;
+	}
+
+	/* Try to start the port */
+	if (ahci_start_port(ahci_ctlp, ahci_portp, port)
+	    != AHCI_SUCCESS) {
+		AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
+		    "failed to start port %d", port);
+		return (AHCI_FAILURE);
 	}
 out:
 	/* Enable port interrupts */
 	ahci_enable_port_intrs(ahci_ctlp, ahci_portp, port);
+
+	return (AHCI_SUCCESS);
+}
+
+/*
+ * Figure out which chip and set flag for VT8251; Also check
+ * the power management capability.
+ */
+static int
+ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
+{
+	ushort_t venid, caps_ptr, cap_count, cap, pmcap, pmcsr;
+	uint8_t revision;
+
+	venid = pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
+	    PCI_CONF_VENID);
+
+	/*
+	 * Modify dma_attr_align of ahcictl_buffer_dma_attr. For VT8251, those
+	 * controllers with 0x00 revision id work on 4-byte aligned buffer,
+	 * which is a bug and was fixed after 0x00 revision id controllers.
+	 *
+	 * Moreover, VT8251 cannot use multiple command slots in the command
+	 * list for non-queued commands because the previous register content
+	 * of PxCI can be re-written in the register write, so a flag will be
+	 * set to record this defect - AHCI_CAP_NO_MCMDLIST_NONQUEUE.
+	 */
+	if (venid == VIA_VENID) {
+		revision = pci_config_get8(ahci_ctlp->ahcictl_pci_conf_handle,
+		    PCI_CONF_REVID);
+		AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
+		    "revision id = 0x%x", revision);
+		if (revision == 0x00) {
+			ahci_ctlp->ahcictl_buffer_dma_attr.dma_attr_align = 0x4;
+			AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
+			    "change ddi_attr_align to 0x4");
+		}
+
+		ahci_ctlp->ahcictl_cap = AHCI_CAP_NO_MCMDLIST_NONQUEUE;
+		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
+		    "VT8251 cannot use multiple command lists for "
+		    "non-queued commands");
+	}
+
+	/*
+	 * Check if capabilities list is supported and if so,
+	 * get initial capabilities pointer and clear bits 0,1.
+	 */
+	if (pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
+	    PCI_CONF_STAT) & PCI_STAT_CAP) {
+		caps_ptr = P2ALIGN(pci_config_get8(
+		    ahci_ctlp->ahcictl_pci_conf_handle,
+		    PCI_CONF_CAP_PTR), 4);
+	} else {
+		caps_ptr = PCI_CAP_NEXT_PTR_NULL;
+	}
+
+	/*
+	 * Walk capabilities if supported.
+	 */
+	for (cap_count = 0; caps_ptr != PCI_CAP_NEXT_PTR_NULL; ) {
+
+		/*
+		 * Check that we haven't exceeded the maximum number of
+		 * capabilities and that the pointer is in a valid range.
+		 */
+		if (++cap_count > PCI_CAP_MAX_PTR) {
+			AHCIDBG0(AHCIDBG_ERRS, ahci_ctlp,
+			    "too many device capabilities");
+			return (AHCI_FAILURE);
+		}
+		if (caps_ptr < PCI_CAP_PTR_OFF) {
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+			    "capabilities pointer 0x%x out of range",
+			    caps_ptr);
+			return (AHCI_FAILURE);
+		}
+
+		/*
+		 * Get next capability and check that it is valid.
+		 * For now, we only support power management.
+		 */
+		cap = pci_config_get8(ahci_ctlp->ahcictl_pci_conf_handle,
+		    caps_ptr);
+		switch (cap) {
+		case PCI_CAP_ID_PM:
+
+			/* power management supported */
+			ahci_ctlp->ahcictl_cap |= AHCI_CAP_PM;
+
+			/* Save PMCSR offset */
+			ahci_ctlp->ahcictl_pmcsr_offset = caps_ptr + PCI_PMCSR;
+
+			pmcap = pci_config_get16(
+			    ahci_ctlp->ahcictl_pci_conf_handle,
+			    caps_ptr + PCI_PMCAP);
+			pmcsr = pci_config_get16(
+			    ahci_ctlp->ahcictl_pci_conf_handle,
+			    ahci_ctlp->ahcictl_pmcsr_offset);
+			AHCIDBG2(AHCIDBG_PM, ahci_ctlp,
+			    "Power Management capability found PCI_PMCAP "
+			    "= 0x%x PCI_PMCSR = 0x%x", pmcap, pmcsr);
+#if AHCI_DEBUG
+			if ((pmcap & 0x3) == 0x3)
+				AHCIDBG0(AHCIDBG_PM, ahci_ctlp,
+				    "PCI Power Management Interface "
+				    "spec 1.2 compliant");
+#endif
+			break;
+
+		case PCI_CAP_ID_MSI:
+			AHCIDBG0(AHCIDBG_PM, ahci_ctlp, "MSI capability found");
+			break;
+
+		case PCI_CAP_ID_PCIX:
+			AHCIDBG0(AHCIDBG_PM, ahci_ctlp,
+			    "PCI-X capability found");
+			break;
+
+		case PCI_CAP_ID_PCI_E:
+			AHCIDBG0(AHCIDBG_PM, ahci_ctlp,
+			    "PCI Express capability found");
+			break;
+
+		case PCI_CAP_ID_MSI_X:
+			AHCIDBG0(AHCIDBG_PM, ahci_ctlp,
+			    "MSI-X capability found");
+			break;
+
+		case PCI_CAP_ID_SATA:
+			AHCIDBG0(AHCIDBG_PM, ahci_ctlp,
+			    "SATA capability found");
+			break;
+
+		default:
+			AHCIDBG1(AHCIDBG_PM, ahci_ctlp,
+			    "unrecognized capability 0x%x", cap);
+			break;
+		}
+
+		/*
+		 * Get next capabilities pointer and clear bits 0,1.
+		 */
+		caps_ptr = P2ALIGN(pci_config_get8(
+		    ahci_ctlp->ahcictl_pci_conf_handle,
+		    (caps_ptr + PCI_CAP_NEXT_PTR)), 4);
+	}
 
 	return (AHCI_SUCCESS);
 }
@@ -3441,6 +3701,34 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp,
 }
 
 /*
+ * According to the spec, to reliably detect hot plug removals, software
+ * must disable interface power management. Software should perform the
+ * following initialization on a port after a device is attached:
+ *   Set PxSCTL.IPM to 3h to disable interface state transitions
+ *   Set PxCMD.ALPE to '0' to disable aggressive power management
+ *   Disable device initiated interface power management by SET FEATURE
+ *
+ * We can ignore the last item because by default the feature is disabled
+ */
+static void
+ahci_disable_interface_pm(ahci_ctl_t *ahci_ctlp, uint8_t port)
+{
+	uint32_t port_scontrol, port_cmd_status;
+
+	port_scontrol = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxSCTL(ahci_ctlp, port));
+	SCONTROL_SET_IPM(port_scontrol, SCONTROL_IPM_DISABLE_BOTH);
+	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxSCTL(ahci_ctlp, port), port_scontrol);
+
+	port_cmd_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
+	port_cmd_status &= ~AHCI_CMD_STATUS_ALPE;
+	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port), port_cmd_status);
+}
+
+/*
  * Start the port - set PxCMD.ST to 1, if PxCMD.FRE is not set
  * to 1, then set it firstly.
  *
@@ -3615,7 +3903,6 @@ ahci_alloc_rcvd_fis(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 {
 	size_t rcvd_fis_size;
 	size_t ret_len;
-	ddi_dma_cookie_t rcvd_fis_dma_cookie;
 	uint_t cookie_count;
 	uint32_t cap_status;
 
@@ -3675,7 +3962,7 @@ ahci_alloc_rcvd_fis(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    DDI_DMA_CONSISTENT,
 	    DDI_DMA_SLEEP,
 	    NULL,
-	    &rcvd_fis_dma_cookie,
+	    &ahci_portp->ahciport_rcvd_fis_dma_cookie,
 	    &cookie_count) !=  DDI_DMA_MAPPED) {
 
 		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
@@ -3691,12 +3978,12 @@ ahci_alloc_rcvd_fis(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	/* Config Port Received FIS Base Address */
 	ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint64_t *)AHCI_PORT_PxFB(ahci_ctlp, port),
-	    rcvd_fis_dma_cookie.dmac_laddress);
+	    ahci_portp->ahciport_rcvd_fis_dma_cookie.dmac_laddress);
 
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "64-bit, dma address: 0x%llx",
-	    rcvd_fis_dma_cookie.dmac_laddress);
+	    ahci_portp->ahciport_rcvd_fis_dma_cookie.dmac_laddress);
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "32-bit, dma address: 0x%x",
-	    rcvd_fis_dma_cookie.dmac_address);
+	    ahci_portp->ahciport_rcvd_fis_dma_cookie.dmac_address);
 
 	return (AHCI_SUCCESS);
 }
@@ -3738,7 +4025,6 @@ ahci_alloc_cmd_list(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 {
 	size_t cmd_list_size;
 	size_t ret_len;
-	ddi_dma_cookie_t cmd_list_dma_cookie;
 	uint_t cookie_count;
 	uint32_t cap_status;
 
@@ -3797,7 +4083,7 @@ ahci_alloc_cmd_list(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    DDI_DMA_CONSISTENT,
 	    DDI_DMA_SLEEP,
 	    NULL,
-	    &cmd_list_dma_cookie,
+	    &ahci_portp->ahciport_cmd_list_dma_cookie,
 	    &cookie_count) !=  DDI_DMA_MAPPED) {
 
 		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
@@ -3813,13 +4099,13 @@ ahci_alloc_cmd_list(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	/* Config Port Command List Base Address */
 	ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint64_t *)AHCI_PORT_PxCLB(ahci_ctlp, port),
-	    cmd_list_dma_cookie.dmac_laddress);
+	    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_laddress);
 
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "64-bit, dma address: 0x%llx",
-	    cmd_list_dma_cookie.dmac_laddress);
+	    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_laddress);
 
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "32-bit, dma address: 0x%x",
-	    cmd_list_dma_cookie.dmac_address);
+	    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_address);
 
 	if (ahci_alloc_cmd_tables(ahci_ctlp, ahci_portp) != AHCI_SUCCESS) {
 		ahci_dealloc_cmd_list(ahci_ctlp, ahci_portp);
@@ -4600,8 +4886,9 @@ ahci_intr_device_mechanical_presence_status(ahci_ctl_t *ahci_ctlp,
  * If inteface power management is enabled for a port, the PxSERR.DIAG.N
  * bit may be set due to the link entering the Partial or Slumber power
  * management state, rather than due to a hot plug insertion or removal
- * event. So far, the power management is disabled, so the driver can
- * reliably get removal detection notification via the PxSERR.DIAG.N bit.
+ * event. So far, the interface power management is disabled, so the
+ * driver can reliably get removal detection notification via the
+ * PxSERR.DIAG.N bit.
  */
 static int
 ahci_intr_phyrdy_change(ahci_ctl_t *ahci_ctlp,
