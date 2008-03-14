@@ -15199,11 +15199,12 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 			rval = EIO;
 			return (rval);
 		}
-		if (st_cmd(un, SCMD_SPACE, Fmk(-count), SYNC_CMD)) {
+		if ((infront == 1) &&
+		    (st_cmd(un, SCMD_SPACE, Fmk(-count), SYNC_CMD))) {
 			rval = EIO;
 			return (rval);
-		}
-		if ((infront != 0) &&
+		} else if ((infront == 0) &&
+		    (st_cmd(un, SCMD_SPACE, Fmk((-count)-1), SYNC_CMD)) &&
 		    (st_cmd(un, SCMD_SPACE, Fmk(1), SYNC_CMD))) {
 			rval = EIO;
 			return (rval);
