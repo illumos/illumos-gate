@@ -140,18 +140,6 @@ cma_cpu_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid,
 {
 	uint_t cpuid;
 
-	/*
-	 * This added expansion is needed to cover the situation where a
-	 * cpu fault from the resource cache is replayed at fmd restart,
-	 * and the cpu resource has been remapped or replaced.  The stored
-	 * FMRI is expanded, but may have stale data.
-	 */
-	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
-		fmd_hdl_debug(hdl, "failed to expand cpu asru\n");
-		cma_stats.bad_flts.fmds_value.ui64++;
-		return (CMA_RA_FAILURE);
-	}
-
 	if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_ID, &cpuid) != 0) {
 		fmd_hdl_debug(hdl, "cpu fault missing '%s'\n", FM_FMRI_CPU_ID);
 		cma_stats.bad_flts.fmds_value.ui64++;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1362,31 +1362,24 @@ cmd_trw_deref(fmd_hdl_t *hdl, cmd_xxcu_trw_t *trw)
 void
 cmd_trw_restore(fmd_hdl_t *hdl)
 {
-	size_t sz;
-
-	if ((sz = fmd_buf_size(hdl, NULL, "waiters")) != 0) {
-		uint_t ntrw = sz / sizeof (cmd_xxcu_trw_t);
-
-		if (sz % sizeof (cmd_xxcu_trw_t) != 0) {
-			fmd_hdl_abort(hdl, "waiters array isn't of "
-			    "correct size\n");
-		}
-
+	size_t sz = fmd_buf_size(hdl, NULL, "waiters");
+	if (sz == cmd.cmd_xxcu_ntrw * sizeof (cmd_xxcu_trw_t)) {
 		/*
-		 * If the existing buffer is larger than our tuned size,
-		 * we'll only read as many as will fit.
+		 * Previous size == current size.  In absence of
+		 * versioning, assume that the structure and # of elements
+		 * have not changed.
 		 */
-		if (ntrw > cmd.cmd_xxcu_ntrw)
-			ntrw = cmd.cmd_xxcu_ntrw;
-
 		fmd_buf_read(hdl, NULL, "waiters", cmd.cmd_xxcu_trw,
-		    ntrw * sizeof (cmd_xxcu_trw_t));
-
-		if (ntrw * sizeof (cmd_xxcu_trw_t) != sz) {
-			fmd_buf_destroy(hdl, NULL, "waiters");
-			fmd_buf_write(hdl, NULL, "waiters", cmd.cmd_xxcu_trw,
-			    ntrw * sizeof (cmd_xxcu_trw_t));
-		}
+		    cmd.cmd_xxcu_ntrw * sizeof (cmd_xxcu_trw_t));
+	} else {
+		/*
+		 * Previous size != current size.  Something has changed;
+		 * hence we cannot rely on the contents of this buffer.
+		 * Delete the buffer and start fresh.
+		 */
+		fmd_buf_destroy(hdl, NULL, "waiters");
+		fmd_buf_write(hdl, NULL, "waiters", cmd.cmd_xxcu_trw,
+		    cmd.cmd_xxcu_ntrw * sizeof (cmd_xxcu_trw_t));
 	}
 }
 

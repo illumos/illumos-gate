@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1172,7 +1172,8 @@ mem_expand_opt(nvlist_t *nvl, char *unum, char **serids)
 	 */
 
 	if ((mem.mem_seg != NULL) &&
-	    (get_seg_by_sn(*serids, &seg) == 0)) {
+	    (get_seg_by_sn(*serids, &seg) == 0) &&
+	    (seg != NULL)) { /* seg can be NULL if segment missing from PRI */
 
 		if (nvlist_lookup_uint64(nvl,
 		    FM_FMRI_MEM_OFFSET, &offset) == 0) {

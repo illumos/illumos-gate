@@ -93,23 +93,32 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	nvlist_t *asrucp = NULL;
 	const char *action = repair ? "unretire" : "retire";
 
-	/* It should already be expanded, but we'll do it again anyway */
-	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
-		fmd_hdl_debug(hdl, "failed to expand page asru\n");
-		cma_stats.bad_flts.fmds_value.ui64++;
+	if (nvlist_dup(asru, &asrucp, 0) != 0) {
+		fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
 		return (CMA_RA_FAILURE);
 	}
 
-	if (!repair && !fmd_nvl_fmri_present(hdl, asru)) {
+	/* It should already be expanded, but we'll do it again anyway */
+	if (fmd_nvl_fmri_expand(hdl, asrucp) < 0) {
+		fmd_hdl_debug(hdl, "failed to expand page asru\n");
+		cma_stats.bad_flts.fmds_value.ui64++;
+		nvlist_free(asrucp);
+		return (CMA_RA_FAILURE);
+	}
+
+	if (!repair && !fmd_nvl_fmri_present(hdl, asrucp)) {
 		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
 		cma_stats.page_nonent.fmds_value.ui64++;
+		nvlist_free(asrucp);
 		return (CMA_RA_SUCCESS);
 	}
 
-	if (nvlist_lookup_uint64(asru, FM_FMRI_MEM_PHYSADDR, &pageaddr) != 0) {
+	if (nvlist_lookup_uint64(asrucp, FM_FMRI_MEM_PHYSADDR, &pageaddr)
+	    != 0) {
 		fmd_hdl_debug(hdl, "mem fault missing '%s'\n",
 		    FM_FMRI_MEM_PHYSADDR);
 		cma_stats.bad_flts.fmds_value.ui64++;
+		nvlist_free(asrucp);
 		return (CMA_RA_FAILURE);
 	}
 
@@ -118,6 +127,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			fmd_hdl_debug(hdl, "suppressed unretire of page %llx\n",
 			    (u_longlong_t)pageaddr);
 			cma_stats.page_supp.fmds_value.ui64++;
+			nvlist_free(asrucp);
 			return (CMA_RA_SUCCESS);
 		}
 	} else {
@@ -125,6 +135,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			fmd_hdl_debug(hdl, "suppressed retire of page %llx\n",
 			    (u_longlong_t)pageaddr);
 			cma_stats.page_supp.fmds_value.ui64++;
+			nvlist_free(asrucp);
 			return (CMA_RA_FAILURE);
 		}
 	}
@@ -133,7 +144,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	 * If the unum is an hc fmri string expand it to an fmri and include
 	 * that in a modified asru nvlist.
 	 */
-	if (nvlist_lookup_string(asru, FM_FMRI_MEM_UNUM, &unumstr) == 0 &&
+	if (nvlist_lookup_string(asrucp, FM_FMRI_MEM_UNUM, &unumstr) == 0 &&
 	    strncmp(unumstr, "hc:/", 4) == 0) {
 		int err;
 		nvlist_t *unumfmri;
@@ -143,16 +154,11 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			fmd_hdl_debug(hdl, "page retire str2nvl failed: %s\n",
 			    topo_strerror(err));
 			fmd_hdl_topo_rele(hdl, thp);
+			nvlist_free(asrucp);
 			return (CMA_RA_FAILURE);
 		}
 
 		fmd_hdl_topo_rele(hdl, thp);
-
-		if (nvlist_dup(asru, &asrucp, 0) != 0) {
-			fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
-			nvlist_free(unumfmri);
-			return (CMA_RA_FAILURE);
-		}
 
 		if (nvlist_add_nvlist(asrucp, FM_FMRI_MEM_UNUM "-fmri",
 		    unumfmri) != 0) {
@@ -166,16 +172,15 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	}
 
 	if (cma_page_cmd(hdl,
-	    repair ? MEM_PAGE_FMRI_UNRETIRE : MEM_PAGE_FMRI_RETIRE,
-	    asrucp ? asrucp : asru) == 0) {
+	    repair ? MEM_PAGE_FMRI_UNRETIRE : MEM_PAGE_FMRI_RETIRE, asrucp)
+	    == 0) {
 		fmd_hdl_debug(hdl, "%sd page 0x%llx\n",
 		    action, (u_longlong_t)pageaddr);
 		if (repair)
 			cma_stats.page_repairs.fmds_value.ui64++;
 		else
 			cma_stats.page_flts.fmds_value.ui64++;
-		if (asrucp)
-			nvlist_free(asrucp);
+		nvlist_free(asrucp);
 		return (CMA_RA_SUCCESS);
 	} else if (repair || errno != EAGAIN) {
 		fmd_hdl_debug(hdl, "%s of page 0x%llx failed, will not "
@@ -184,8 +189,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 
 		cma_stats.page_fails.fmds_value.ui64++;
 
-		if (asrucp)
-			nvlist_free(asrucp);
+		nvlist_free(asrucp);
 		if (uuid != NULL && cma.cma_page_maxretries != 0)
 			return (CMA_RA_SUCCESS);
 		return (CMA_RA_FAILURE);
@@ -199,11 +203,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 
 	page = fmd_hdl_zalloc(hdl, sizeof (cma_page_t), FMD_SLEEP);
 	page->pg_addr = pageaddr;
-	if (asrucp) {
-		page->pg_fmri = asrucp;
-	} else {
-		(void) nvlist_dup(asru, &page->pg_fmri, 0);
-	}
+	page->pg_fmri = asrucp;
 	if (uuid != NULL)
 		page->pg_uuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
 
@@ -218,6 +218,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	cma.cma_page_timerid =
 	    fmd_timer_install(hdl, NULL, NULL, cma.cma_page_curdelay);
 
+	/* Don't free asrucp here.  This FMRI will be needed for retry. */
 	return (CMA_RA_FAILURE);
 }
 
