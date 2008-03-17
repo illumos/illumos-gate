@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,6 +318,16 @@ convert_32to64(uint64_t *dst, uint_t *src, int size)
 }
 
 /*
+ * Convert array of 64-bit uints to 32-bit uints
+ */
+static void
+convert_64to32(uint_t *dst, uint64_t *src, int size)
+{
+	for (; size > 0; size--)
+		*dst++ = (uint32_t)(*src++);
+}
+
+/*
  * Read records from input, classify, and decide on printing.
  */
 static void
@@ -342,7 +352,7 @@ prpass(int input_pipe)
 
 	while (safe_read(fin, &tx, sizeof (struct sa))) {
 		/*
-		 * First, we convert 32bit tx to 64bit nx structure
+		 * First, we convert 32-bit tx to 64-bit nx structure
 		 * which is used later. Conversion could be done
 		 * after initial operations, right before calculations,
 		 * but it would introduce additional juggling with vars.
@@ -436,7 +446,24 @@ prpass(int input_pipe)
 		if ((eflg) && (trec > end_time))
 			break;
 		if ((oflg) && (passno == 1)) {
-			safe_write(fout, &nx, sizeof (struct sa));
+			/*
+			 * The calculated values are stroed in nx strcuture.
+			 * Convert 64-bit nx to 32-bit tx structure.
+			 */
+			tx.valid = nx.valid;
+			tx.ts = nx.ts;
+			convert_64to32((uint_t *)&tx.csi, (uint64_t *)&nx.csi,
+			    sizeof (nx.csi) / sizeof (uint64_t));
+			convert_64to32((uint_t *)&tx.cvmi, (uint64_t *)&nx.cvmi,
+			    sizeof (nx.cvmi) / sizeof (uint64_t));
+			convert_64to32((uint_t *)&tx.si, (uint64_t *)&nx.si,
+			    sizeof (nx.si) / sizeof (uint64_t));
+			(void) memcpy(&tx.vmi, &nx.vmi,
+			    sizeof (nx) - (((char *)&nx.vmi) - ((char *)&nx)));
+			if (tx.valid != 0 && tx.valid != 1)
+				fail(2, "data file not in sar format");
+
+			safe_write(fout, &tx, sizeof (struct sa));
 			for (i = 0; i < niodevs; i++)
 				safe_write(fout, &nxio[i],
 				    sizeof (iodevinfo_t));
