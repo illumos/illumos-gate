@@ -21,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
 #
 
@@ -36,6 +36,14 @@ then
 			/usr/bin/sed -n 's/keyboard-layout=//g; s/[ |	]*//p'`"
 else
 	exit 0
+fi
+
+# The firmware on the keyboard may report "Taiwanese" and so 
+# translate it to the new "Traditional-Chinese" name as this is
+# the preferred name to use.
+if [ "$KBD_LAYOUT_NAME" = "Taiwanese" ]
+then
+       KBD_LAYOUT_NAME="Traditional-Chinese"
 fi
 
 if test -n "$KBD_LAYOUT_NAME"
