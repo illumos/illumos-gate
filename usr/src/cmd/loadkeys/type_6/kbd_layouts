@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,7 +69,7 @@ Spanish=25
 Swedish=26
 Swiss-French=27
 Swiss-German=28
-Taiwanese=30
+Traditional-Chinese=30
 TurkishQ=31
 TurkishF=35
 UK-English=32
