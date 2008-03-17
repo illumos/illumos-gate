@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -965,7 +965,7 @@ meta_db_addsidenms(
 			c.c_locator.l_blkno = blkno;
 			(void) strncpy(c.c_locator.l_driver, dname,
 			    sizeof (c.c_locator.l_driver));
-			if (splitname(bname, &c.c_devname) ==
+			if (splitname(np->bname, &c.c_devname) ==
 			    METASPLIT_LONGDISKNAME && devid_in_use == FALSE) {
 				rval = mddeverror(ep, MDE_DISKNAMETOOLONG,
 				    NODEV64, np->rname);
