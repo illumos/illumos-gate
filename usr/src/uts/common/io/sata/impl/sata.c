@@ -247,6 +247,7 @@ static	int sata_probe_device(sata_hba_inst_t *, sata_device_t *);
 static	sata_drive_info_t *sata_get_device_info(sata_hba_inst_t *,
     sata_device_t *);
 static 	int sata_identify_device(sata_hba_inst_t *, sata_drive_info_t *);
+static	void sata_reidentify_device(sata_pkt_txlate_t *);
 static	struct buf *sata_alloc_local_buffer(sata_pkt_txlate_t *, int);
 static 	void sata_free_local_buffer(sata_pkt_txlate_t *);
 static 	uint64_t sata_check_capacity(sata_drive_info_t *);
@@ -4852,16 +4853,16 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 #define	WB_DOWNLOAD_MICROCODE_AND_REVERT_MODE			4
 #define	WB_DOWNLOAD_MICROCODE_AND_SAVE_MODE			5
 
+	sata_hba_inst_t *sata_hba_inst = SATA_TXLT_HBA_INST(spx);
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	struct sata_pkt *sata_pkt = spx->txlt_sata_pkt;
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+
 	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	struct scsi_extended_sense *sense;
 	int rval, mode, sector_count;
-	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
 	int cport = SATA_TXLT_CPORT(spx);
-	boolean_t synch;
 
-	synch = (spx->txlt_sata_pkt->satapkt_op_mode & SATA_OPMODE_SYNCH) != 0;
 	mode = scsipkt->pkt_cdbp[1] & 0x1f;
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -4873,6 +4874,10 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
+
+	/* Use synchronous mode */
+	spx->txlt_sata_pkt->satapkt_op_mode
+	    |= SATA_OPMODE_SYNCH | SATA_OPMODE_INTERRUPTS;
 
 	scmd->satacmd_flags.sata_data_direction = SATA_DIR_WRITE;
 
@@ -4916,167 +4921,26 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 	scmd->satacmd_lba_mid_lsb = 0;
 	scmd->satacmd_lba_high_lsb = 0;
 	scmd->satacmd_device_reg = 0;
-	spx->txlt_sata_pkt->satapkt_comp =
-	    sata_txlt_download_mcode_cmd_completion;
+	spx->txlt_sata_pkt->satapkt_comp = NULL;
 	scmd->satacmd_addr_type = 0;
 
 	/* Transfer command to HBA */
 	if (sata_hba_start(spx, &rval) != 0) {
 		/* Pkt not accepted for execution */
-		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
 		return (rval);
 	}
 
-	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
-	/*
-	 * If execution is non-synchronous,
-	 * a callback function will handle potential errors, translate
-	 * the response and will do a callback to a target driver.
-	 * If it was synchronous, check execution status using the same
-	 * framework callback.
-	 */
-	if (synch) {
-		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-		    "synchronous execution\n", NULL);
-		/* Calling pre-set completion routine */
-		(*spx->txlt_sata_pkt->satapkt_comp)(spx->txlt_sata_pkt);
-	}
-	return (TRAN_ACCEPT);
+	mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
 
-bad_param:
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-	*scsipkt->pkt_scbp = STATUS_CHECK;
-	sense = sata_arq_sense(spx);
-	sense->es_key = KEY_ILLEGAL_REQUEST;
-	sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL) {
-		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0) {
-			/* Scheduling the callback failed */
-			rval = TRAN_BUSY;
-		}
-	}
-	return (rval);
-}
-
-
-/*
- * Retry identify device when command returns SATA_INCOMPLETE_DATA
- * after doing a firmware download.
- */
-static void
-sata_retry_identify_device(void *arg)
-{
-#define	DOWNLOAD_WAIT_TIME_SECS	60
-#define	DOWNLOAD_WAIT_INTERVAL_SECS	1
-	int rval;
-	int retry_cnt;
-	sata_pkt_t *sata_pkt = (sata_pkt_t *)arg;
-	sata_pkt_txlate_t *spx =
-	    (sata_pkt_txlate_t *)sata_pkt->satapkt_framework_private;
-	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
-	sata_hba_inst_t *sata_hba_inst = spx->txlt_sata_hba_inst;
-	sata_device_t sata_device = spx->txlt_sata_pkt->satapkt_device;
-	sata_drive_info_t *sdinfo;
-
-	/*
-	 * Before returning good status, probe device.
-	 * Device probing will get IDENTIFY DEVICE data, if possible.
-	 * The assumption is that the new microcode is applied by the
-	 * device. It is a caller responsibility to verify this.
-	 */
-	for (retry_cnt = 0;
-	    retry_cnt < DOWNLOAD_WAIT_TIME_SECS / DOWNLOAD_WAIT_INTERVAL_SECS;
-	    retry_cnt++) {
-		rval = sata_probe_device(sata_hba_inst, &sata_device);
-
-		if (rval == SATA_SUCCESS) { /* Set default features */
-			sdinfo = sata_get_device_info(sata_hba_inst,
-			    &sata_device);
-			if (sata_initialize_device(sata_hba_inst, sdinfo) !=
-			    SATA_SUCCESS) {
-				/* retry */
-				(void) sata_initialize_device(sata_hba_inst,
-				    sdinfo);
-			}
-			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-			    scsipkt->pkt_comp != NULL)
-				(*scsipkt->pkt_comp)(scsipkt);
-			return;
-		} else if (rval == SATA_RETRY) {
-			delay(drv_usectohz(1000000 *
-			    DOWNLOAD_WAIT_INTERVAL_SECS));
-			continue;
-		} else	/* failed - no reason to retry */
-			break;
-	}
-
-	/*
-	 * Something went wrong, device probing failed.
-	 */
-	SATA_LOG_D((sata_hba_inst, CE_WARN,
-	    "Cannot probe device after downloading microcode\n"));
-
-	/* Reset device to force retrying the probe. */
-	(void) (*SATA_RESET_DPORT_FUNC(sata_hba_inst))
-	    (SATA_DIP(sata_hba_inst), &sata_device);
-
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
-		(*scsipkt->pkt_comp)(scsipkt);
-}
-
-/*
- * Translate completion status of download microcode command.
- * pkt completion_reason is checked to determine the completion status.
- * Do scsi callback if necessary (FLAG_NOINTR == 0)
- *
- * Note: this function may be called also for synchronously executed
- * command.
- * This function may be used only if scsi_pkt is non-NULL.
- */
-static void
-sata_txlt_download_mcode_cmd_completion(sata_pkt_t *sata_pkt)
-{
-	sata_pkt_txlate_t *spx =
-	    (sata_pkt_txlate_t *)sata_pkt->satapkt_framework_private;
-	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
-	struct scsi_extended_sense *sense;
-	sata_drive_info_t *sdinfo;
-	sata_hba_inst_t *sata_hba_inst = spx->txlt_sata_hba_inst;
-	sata_device_t sata_device = spx->txlt_sata_pkt->satapkt_device;
-	int rval;
-
+	/* Then we need synchronous check the status of the disk */
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_XFERRED_DATA | STATE_GOT_STATUS;
 	if (sata_pkt->satapkt_reason == SATA_PKT_COMPLETED) {
 		scsipkt->pkt_reason = CMD_CMPLT;
 
-		rval = sata_probe_device(sata_hba_inst, &sata_device);
-
-		if (rval == SATA_SUCCESS) { /* Set default features */
-			sdinfo = sata_get_device_info(sata_hba_inst,
-			    &sata_device);
-			if (sata_initialize_device(sata_hba_inst, sdinfo) !=
-			    SATA_SUCCESS) {
-				/* retry */
-				(void) sata_initialize_device(sata_hba_inst,
-				    sdinfo);
-			}
-			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-			    scsipkt->pkt_comp != NULL)
-				(*scsipkt->pkt_comp)(scsipkt);
-		} else {
-			(void) ddi_taskq_dispatch(
-			    (ddi_taskq_t *)SATA_TXLT_TASKQ(spx),
-			    sata_retry_identify_device,
-			    (void *)sata_pkt, TQ_NOSLEEP);
-		}
-
-
+		/* Download commmand succeed, so probe and identify device */
+		sata_reidentify_device(spx);
 	} else {
 		/* Something went wrong, microcode download command failed */
 		scsipkt->pkt_reason = CMD_INCOMPLETE;
@@ -5139,9 +5003,88 @@ sata_txlt_download_mcode_cmd_completion(sata_pkt_t *sata_pkt)
 			/* scsi callback required */
 			(*scsipkt->pkt_comp)(scsipkt);
 	}
+	return (TRAN_ACCEPT);
+
+bad_param:
+	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	*scsipkt->pkt_scbp = STATUS_CHECK;
+	sense = sata_arq_sense(spx);
+	sense->es_key = KEY_ILLEGAL_REQUEST;
+	sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL) {
+		/* scsi callback required */
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0) {
+			/* Scheduling the callback failed */
+			rval = TRAN_BUSY;
+		}
+	}
+	return (rval);
 }
 
+/*
+ * Re-identify device after doing a firmware download.
+ */
+static void
+sata_reidentify_device(sata_pkt_txlate_t *spx)
+{
+#define	DOWNLOAD_WAIT_TIME_SECS	60
+#define	DOWNLOAD_WAIT_INTERVAL_SECS	1
+	int rval;
+	int retry_cnt;
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	sata_hba_inst_t *sata_hba_inst = spx->txlt_sata_hba_inst;
+	sata_device_t sata_device = spx->txlt_sata_pkt->satapkt_device;
+	sata_drive_info_t *sdinfo;
 
+	/*
+	 * Before returning good status, probe device.
+	 * Device probing will get IDENTIFY DEVICE data, if possible.
+	 * The assumption is that the new microcode is applied by the
+	 * device. It is a caller responsibility to verify this.
+	 */
+	for (retry_cnt = 0;
+	    retry_cnt < DOWNLOAD_WAIT_TIME_SECS / DOWNLOAD_WAIT_INTERVAL_SECS;
+	    retry_cnt++) {
+		rval = sata_probe_device(sata_hba_inst, &sata_device);
+
+		if (rval == SATA_SUCCESS) { /* Set default features */
+			sdinfo = sata_get_device_info(sata_hba_inst,
+			    &sata_device);
+			if (sata_initialize_device(sata_hba_inst, sdinfo) !=
+			    SATA_SUCCESS) {
+				/* retry */
+				(void) sata_initialize_device(sata_hba_inst,
+				    sdinfo);
+			}
+			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+			    scsipkt->pkt_comp != NULL)
+				(*scsipkt->pkt_comp)(scsipkt);
+			return;
+		} else if (rval == SATA_RETRY) {
+			delay(drv_usectohz(1000000 *
+			    DOWNLOAD_WAIT_INTERVAL_SECS));
+			continue;
+		} else	/* failed - no reason to retry */
+			break;
+	}
+
+	/*
+	 * Something went wrong, device probing failed.
+	 */
+	SATA_LOG_D((sata_hba_inst, CE_WARN,
+	    "Cannot probe device after downloading microcode\n"));
+
+	/* Reset device to force retrying the probe. */
+	(void) (*SATA_RESET_DPORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), &sata_device);
+
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL)
+		(*scsipkt->pkt_comp)(scsipkt);
+}
 
 
 /*
