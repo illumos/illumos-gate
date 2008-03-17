@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ main(
 
 	/* initialize */
 	if (md_init(argc, argv, 0, 1, ep) != 0 ||
-			meta_check_root(ep) != 0) {
+	    meta_check_root(ep) != 0) {
 		mde_perror(ep, "");
 		md_exit(sp, 1);
 	}
@@ -167,7 +167,7 @@ main(
 	 * MD_DEF_RESYNC_BUF_SIZE
 	 */
 	if ((argc > 0) && (isdigit(argv[0][0]))) {
-		if ((size = atoi(argv[optind++])) < 0) {
+		if ((size = atoi(argv[0])) < 0) {
 			md_eprintf(gettext(
 			    "illegal buffer size %s\n"),
 			    argv[0]);
