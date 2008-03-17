@@ -1461,7 +1461,17 @@ int
 ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
 {
 	int result = 0;
-	uint64_t param_value = *(uint64_t *)param->ctpm_value;
+	uint64_t param_value;
+
+	if (param->ctpm_id == CTP_COOKIE ||
+	    param->ctpm_id == CTP_EV_INFO ||
+	    param->ctpm_id == CTP_EV_CRITICAL) {
+		if (param->ctpm_size < sizeof (uint64_t)) {
+			return (EINVAL);
+		} else {
+			param_value = *(uint64_t *)param->ctpm_value;
+		}
+	}
 
 	mutex_enter(&template->ctmpl_lock);
 	switch (param->ctpm_id) {
@@ -1504,12 +1514,34 @@ ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
  * ctmpl_get
  *
  * Obtains the requested terms from a template.
+ *
+ * If the term requested is a variable-sized term and the buffer
+ * provided is too small for the data, we truncate the data and return
+ * the buffer size necessary to fit the term in param->ctpm_size. If the
+ * term requested is fix-sized (uint64_t) and the buffer provided is too
+ * small, we return EINVAL.  This should never happen if you're using
+ * libcontract(3LIB), only if you call ioctl with a hand constructed
+ * ct_param_t argument.
+ *
+ * Currently, only contract specific parameters have variable-sized
+ * parameters.
  */
 int
 ctmpl_get(ct_template_t *template, ct_param_t *param)
 {
 	int result = 0;
-	uint64_t *param_value = param->ctpm_value;
+	uint64_t *param_value;
+
+	if (param->ctpm_id == CTP_COOKIE ||
+	    param->ctpm_id == CTP_EV_INFO ||
+	    param->ctpm_id == CTP_EV_CRITICAL) {
+		if (param->ctpm_size < sizeof (uint64_t)) {
+			return (EINVAL);
+		} else {
+			param_value = param->ctpm_value;
+			param->ctpm_size = sizeof (uint64_t);
+		}
+	}
 
 	mutex_enter(&template->ctmpl_lock);
 	switch (param->ctpm_id) {

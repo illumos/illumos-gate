@@ -513,6 +513,8 @@ ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 		str_value = (char *)param->ctpm_value;
 		str_value[param->ctpm_size - 1] = '\0';
 	} else {
+		if (param->ctpm_size < sizeof (uint64_t))
+			return (EINVAL);
 		param_value = *(uint64_t *)param->ctpm_value;
 	}
 
@@ -601,6 +603,13 @@ ctmpl_device_get(struct ct_template *template, ct_param_t *param)
 	uint64_t *param_value = param->ctpm_value;
 
 	ASSERT(MUTEX_HELD(&template->ctmpl_lock));
+
+	if (param->ctpm_id == CTDP_ACCEPT ||
+	    param->ctpm_id == CTDP_NONEG) {
+		if (param->ctpm_size < sizeof (uint64_t))
+			return (EINVAL);
+		param->ctpm_size = sizeof (uint64_t);
+	}
 
 	switch (param->ctpm_id) {
 	case CTDP_ACCEPT:

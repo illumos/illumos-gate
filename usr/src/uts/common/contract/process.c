@@ -236,6 +236,8 @@ ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 		str_value = (char *)param->ctpm_value;
 		str_value[param->ctpm_size - 1] = '\0';
 	} else {
+		if (param->ctpm_size < sizeof (uint64_t))
+			return (EINVAL);
 		param_value = *(uint64_t *)param->ctpm_value;
 		/*
 		 * No process contract parameters are > 32 bits.
@@ -357,6 +359,14 @@ ctmpl_process_get(struct ct_template *template, ct_param_t *param)
 {
 	ctmpl_process_t *ctp = template->ctmpl_data;
 	uint64_t *param_value = param->ctpm_value;
+
+	if (param->ctpm_id == CTPP_SUBSUME ||
+	    param->ctpm_id == CTPP_PARAMS ||
+	    param->ctpm_id == CTPP_EV_FATAL) {
+		if (param->ctpm_size < sizeof (uint64_t))
+			return (EINVAL);
+		param->ctpm_size = sizeof (uint64_t);
+	}
 
 	switch (param->ctpm_id) {
 	case CTPP_SUBSUME:
