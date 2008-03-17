@@ -5186,9 +5186,9 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
 	 * send back an ACK.
 	 */
 	if ((VSW_VER_EQ(ldcp, 1, 2) &&
-	    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+	    (pkt->xfer_mode & VIO_DRING_MODE_V1_2)) ||
 	    (VSW_VER_LT(ldcp, 1, 2) &&
-	    (ldcp->lane_in.xfer_mode == VIO_DRING_MODE_V1_0))) {
+	    (pkt->xfer_mode == VIO_DRING_MODE_V1_0))) {
 		if (pkt->ack_freq > 0) {
 			D2(NULL, "vsw_check_attr: non zero ack freq "
 			    " in SHM mode\n");
