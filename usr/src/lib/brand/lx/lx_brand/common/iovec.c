@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,41 @@ lx_pread64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 		return (-EISDIR);
 
 	ret = pread64(fd, buf, nbyte, (off64_t)LX_32TO64(off_lo, off_hi));
+
+	if (ret < 0)
+		return (-errno);
+
+	return (ret);
+}
+
+/*
+ * On Linux, the pwrite(2) system call behaves identically to Solaris except
+ * in the case of the file being opened with O_APPEND. In that case Linux's
+ * pwrite(2) ignores the offset parameter and instead appends the data to the
+ * file without modifying the current seek pointer.
+ */
+int
+lx_pwrite64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
+    uintptr_t p5)
+{
+	int fd = (int)p1;
+	void *buf = (void *)p2;
+	size_t nbyte = (size_t)p3;
+	uintptr_t off_lo = p4;
+	uintptr_t off_hi = p5;
+	ssize_t ret;
+	int rval;
+	struct stat64 statbuf;
+
+	if ((rval = fcntl(fd, F_GETFL, 0)) < 0)
+		return (-errno);
+
+	if (!(rval & O_APPEND)) {
+		ret = pwrite64(fd, buf, nbyte,
+		    (off64_t)LX_32TO64(off_lo, off_hi));
+	} else if ((ret = fstat64(fd, &statbuf)) == 0) {
+		ret = pwrite64(fd, buf, nbyte, statbuf.st_size);
+	}
 
 	if (ret < 0)
 		return (-errno);

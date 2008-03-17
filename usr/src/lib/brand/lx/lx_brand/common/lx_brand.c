@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1158,7 +1158,7 @@ static struct lx_sysent sysents[] = {
 	{"sigqueueinfo", NULL,		NOSYS_UNDOC,	0},	/* 178 */
 	{"rt_sigsuspend", lx_rt_sigsuspend, 0,		2},	/* 179 */
 	{"pread64",	lx_pread64,	0,		5},	/* 180 */
-	{"pwrite64",	pwrite64,	SYS_PASSTHRU,	5},	/* 181 */
+	{"pwrite64",	lx_pwrite64,	0,		5},	/* 181 */
 	{"chown16",	lx_chown16,	0,		3},	/* 182 */
 	{"getcwd",	lx_getcwd,	0,		2},	/* 183 */
 	{"capget",	NULL,		NOSYS_NO_EQUIV,	0},	/* 184 */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ extern int lx_read(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_readv(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_writev(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_pread64(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_pwrite64(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_socketcall(uintptr_t, uintptr_t);
 extern int lx_select(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
