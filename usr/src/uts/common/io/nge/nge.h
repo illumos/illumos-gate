@@ -75,6 +75,8 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #include <sys/netlb.h>
 #include <sys/miiregs.h>
 
+#include <sys/dld.h>
+
 #include "nge_chip.h"
 
 #define	PIO_ADDR(ngep, offset)	((void *)((caddr_t)(ngep)->io_regs+(offset)))
@@ -871,6 +873,15 @@ typedef struct nge {
 
 	nge_dev_spec_param_t	dev_spec_param;
 
+	uint32_t		param_en_pause:1,
+				param_en_asym_pause:1,
+				param_en_1000hdx:1,
+				param_en_1000fdx:1,
+				param_en_100fdx:1,
+				param_en_100hdx:1,
+				param_en_10fdx:1,
+				param_en_10hdx:1,
+				param_pad_to_32:24;
 } nge_t;
 
 extern const nge_ksindex_t nge_statistics[];

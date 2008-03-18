@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,6 +163,27 @@ nge_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 	(void) mi_mpprintf(mp, "%d", ndp->ndp_val);
 
 	return (0);
+}
+
+/*
+ * synchronize the  adv* and en* parameters.
+ *
+ * See comments in <sys/dld.h> for details of the *_en_*
+ * parameters.  The usage of ndd for setting adv parameters will
+ * synchronize all the en parameters with the nge parameters,
+ * implicitly disabling any settings made via dladm.
+ */
+static void
+nge_param_sync(nge_t *ngep)
+{
+	ngep->param_en_pause = ngep->param_adv_pause;
+	ngep->param_en_asym_pause = ngep->param_adv_asym_pause;
+	ngep->param_en_1000fdx = ngep->param_adv_1000fdx;
+	ngep->param_en_1000hdx = ngep->param_adv_1000hdx;
+	ngep->param_en_100fdx = ngep->param_adv_100fdx;
+	ngep->param_en_100hdx = ngep->param_adv_100hdx;
+	ngep->param_en_10fdx = ngep->param_adv_10fdx;
+	ngep->param_en_10hdx = ngep->param_adv_10hdx;
 }
 
 /*
@@ -391,6 +412,8 @@ nge_nd_init(nge_t *ngep)
 		}
 	}
 
+	nge_param_sync(ngep);
+
 	return (0);
 }
 
@@ -434,6 +457,8 @@ nge_nd_ioctl(nge_t *ngep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 		}
 
 		ok = nd_getset(wq, ngep->nd_data_p, mp);
+
+		nge_param_sync(ngep);
 
 		/*
 		 * If nd_getset() returns B_FALSE, the command was

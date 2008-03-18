@@ -175,8 +175,17 @@ static int		nge_m_multicst(void *, boolean_t, const uint8_t *);
 static int		nge_m_unicst(void *, const uint8_t *);
 static void		nge_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	nge_m_getcapab(void *, mac_capab_t, void *);
+static int		nge_m_setprop(void *, const char *, mac_prop_id_t,
+	uint_t, const void *);
+static int		nge_m_getprop(void *, const char *, mac_prop_id_t,
+	uint_t, void *);
+static int		nge_set_priv_prop(nge_t *, const char *, uint_t,
+	const void *);
+static int		nge_get_priv_prop(nge_t *, const char *, uint_t,
+	void *);
 
-#define		NGE_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
+#define		NGE_M_CALLBACK_FLAGS\
+		(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t nge_m_callbacks = {
 	NGE_M_CALLBACK_FLAGS,
@@ -189,7 +198,11 @@ static mac_callbacks_t nge_m_callbacks = {
 	nge_m_tx,
 	NULL,
 	nge_m_ioctl,
-	nge_m_getcapab
+	nge_m_getcapab,
+	NULL,
+	NULL,
+	nge_m_setprop,
+	nge_m_getprop
 };
 
 static int nge_add_intrs(nge_t *, int);
@@ -1483,6 +1496,585 @@ nge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		qreply(wq, mp);
 		break;
 	}
+}
+
+static boolean_t
+nge_param_locked(mac_prop_id_t pr_num)
+{
+	/*
+	 * All adv_* parameters are locked (read-only) while
+	 * the device is in any sort of loopback mode ...
+	 */
+	switch (pr_num) {
+		case DLD_PROP_ADV_1000FDX_CAP:
+		case DLD_PROP_EN_1000FDX_CAP:
+		case DLD_PROP_ADV_1000HDX_CAP:
+		case DLD_PROP_EN_1000HDX_CAP:
+		case DLD_PROP_ADV_100FDX_CAP:
+		case DLD_PROP_EN_100FDX_CAP:
+		case DLD_PROP_ADV_100HDX_CAP:
+		case DLD_PROP_EN_100HDX_CAP:
+		case DLD_PROP_ADV_10FDX_CAP:
+		case DLD_PROP_EN_10FDX_CAP:
+		case DLD_PROP_ADV_10HDX_CAP:
+		case DLD_PROP_EN_10HDX_CAP:
+		case DLD_PROP_AUTONEG:
+		case DLD_PROP_FLOWCTRL:
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * callback functions for set/get of properties
+ */
+static int
+nge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	nge_t *ngep = barg;
+	int err = 0;
+	uint64_t cur_mtu, new_mtu;
+	link_flowctrl_t fl;
+
+	mutex_enter(ngep->genlock);
+	if (ngep->param_loop_mode != NGE_LOOP_NONE &&
+	    nge_param_locked(pr_num)) {
+		/*
+		 * All adv_* parameters are locked (read-only)
+		 * while the device is in any sort of loopback mode.
+		 */
+		mutex_exit(ngep->genlock);
+		return (EBUSY);
+	}
+	switch (pr_num) {
+		case DLD_PROP_EN_1000FDX_CAP:
+			ngep->param_en_1000fdx = *(uint8_t *)pr_val;
+			ngep->param_adv_1000fdx = *(uint8_t *)pr_val;
+			goto reprogram;
+		case DLD_PROP_EN_1000HDX_CAP:
+			ngep->param_en_1000hdx = *(uint8_t *)pr_val;
+			ngep->param_adv_1000hdx = *(uint8_t *)pr_val;
+			goto reprogram;
+		case DLD_PROP_EN_100FDX_CAP:
+			ngep->param_en_100fdx = *(uint8_t *)pr_val;
+			ngep->param_adv_100fdx = *(uint8_t *)pr_val;
+			goto reprogram;
+		case DLD_PROP_EN_100HDX_CAP:
+			ngep->param_en_100hdx = *(uint8_t *)pr_val;
+			ngep->param_adv_100hdx = *(uint8_t *)pr_val;
+			goto reprogram;
+		case DLD_PROP_EN_10FDX_CAP:
+			ngep->param_en_10fdx = *(uint8_t *)pr_val;
+			ngep->param_adv_10fdx = *(uint8_t *)pr_val;
+			goto reprogram;
+		case DLD_PROP_EN_10HDX_CAP:
+			ngep->param_en_10hdx = *(uint8_t *)pr_val;
+			ngep->param_adv_10hdx = *(uint8_t *)pr_val;
+reprogram:
+		(*ngep->physops->phys_update)(ngep);
+		nge_chip_sync(ngep);
+		break;
+
+		case DLD_PROP_ADV_1000FDX_CAP:
+		case DLD_PROP_ADV_1000HDX_CAP:
+		case DLD_PROP_ADV_100FDX_CAP:
+		case DLD_PROP_ADV_100HDX_CAP:
+		case DLD_PROP_ADV_10FDX_CAP:
+		case DLD_PROP_ADV_10HDX_CAP:
+		case DLD_PROP_STATUS:
+		case DLD_PROP_SPEED:
+		case DLD_PROP_DUPLEX:
+			err = ENOTSUP; /* read-only prop. Can't set this */
+			break;
+		case DLD_PROP_AUTONEG:
+			ngep->param_adv_autoneg = *(uint8_t *)pr_val;
+			(*ngep->physops->phys_update)(ngep);
+			nge_chip_sync(ngep);
+			break;
+		case DLD_PROP_DEFMTU:
+			cur_mtu = ngep->default_mtu;
+			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
+			if (new_mtu == cur_mtu) {
+				err = 0;
+				break;
+			}
+			if (new_mtu < ETHERMTU ||
+			    new_mtu > NGE_MAX_MTU) {
+				err = EINVAL;
+				break;
+			}
+			if ((new_mtu > ETHERMTU) &&
+			    (!ngep->dev_spec_param.jumbo)) {
+				err = EINVAL;
+				break;
+			}
+			if (ngep->nge_mac_state == NGE_MAC_STARTED) {
+				err = EBUSY;
+				break;
+			}
+
+			ngep->default_mtu = new_mtu;
+			if (ngep->default_mtu > ETHERMTU &&
+			    ngep->default_mtu <= NGE_MTU_2500) {
+				ngep->buf_size = NGE_JB2500_BUFSZ;
+				ngep->tx_desc = NGE_SEND_JB2500_SLOTS_DESC;
+				ngep->rx_desc = NGE_RECV_JB2500_SLOTS_DESC;
+				ngep->rx_buf = NGE_RECV_JB2500_SLOTS_DESC * 2;
+				ngep->nge_split = NGE_SPLIT_256;
+			} else if (ngep->default_mtu > NGE_MTU_2500 &&
+			    ngep->default_mtu <= NGE_MTU_4500) {
+				ngep->buf_size = NGE_JB4500_BUFSZ;
+				ngep->tx_desc = NGE_SEND_JB4500_SLOTS_DESC;
+				ngep->rx_desc = NGE_RECV_JB4500_SLOTS_DESC;
+				ngep->rx_buf = NGE_RECV_JB4500_SLOTS_DESC * 2;
+				ngep->nge_split = NGE_SPLIT_256;
+			} else if (ngep->default_mtu > NGE_MTU_4500 &&
+			    ngep->default_mtu <= NGE_MAX_MTU) {
+				ngep->buf_size = NGE_JB9000_BUFSZ;
+				ngep->tx_desc = NGE_SEND_JB9000_SLOTS_DESC;
+				ngep->rx_desc = NGE_RECV_JB9000_SLOTS_DESC;
+				ngep->rx_buf = NGE_RECV_JB9000_SLOTS_DESC * 2;
+				ngep->nge_split = NGE_SPLIT_256;
+			} else if (ngep->default_mtu > NGE_MAX_MTU) {
+				ngep->default_mtu = NGE_MAX_MTU;
+				ngep->buf_size = NGE_JB9000_BUFSZ;
+				ngep->tx_desc = NGE_SEND_JB9000_SLOTS_DESC;
+				ngep->rx_desc = NGE_RECV_JB9000_SLOTS_DESC;
+				ngep->rx_buf = NGE_RECV_JB9000_SLOTS_DESC * 2;
+				ngep->nge_split = NGE_SPLIT_256;
+			} else if (ngep->lowmem_mode != 0) {
+				ngep->default_mtu = ETHERMTU;
+				ngep->buf_size = NGE_STD_BUFSZ;
+				ngep->tx_desc = NGE_SEND_LOWMEM_SLOTS_DESC;
+				ngep->rx_desc = NGE_RECV_LOWMEM_SLOTS_DESC;
+				ngep->rx_buf = NGE_RECV_LOWMEM_SLOTS_DESC * 2;
+				ngep->nge_split = NGE_SPLIT_32;
+			} else {
+				ngep->default_mtu = ETHERMTU;
+				ngep->buf_size = NGE_STD_BUFSZ;
+				ngep->tx_desc =
+				    ngep->dev_spec_param.tx_desc_num;
+				ngep->rx_desc =
+				    ngep->dev_spec_param.rx_desc_num;
+				ngep->rx_buf =
+				    ngep->dev_spec_param.rx_desc_num * 2;
+				ngep->nge_split =
+				    ngep->dev_spec_param.nge_split;
+			}
+
+			err = mac_maxsdu_update(ngep->mh, ngep->default_mtu);
+
+			break;
+		case DLD_PROP_FLOWCTRL:
+			bcopy(pr_val, &fl, sizeof (fl));
+			switch (fl) {
+			default:
+				err = ENOTSUP;
+				break;
+			case LINK_FLOWCTRL_NONE:
+				ngep->param_adv_pause = 0;
+				ngep->param_adv_asym_pause = 0;
+
+				ngep->param_link_rx_pause = B_FALSE;
+				ngep->param_link_tx_pause = B_FALSE;
+				break;
+			case LINK_FLOWCTRL_RX:
+				if (!((ngep->param_lp_pause == 0) &&
+				    (ngep->param_lp_asym_pause == 1))) {
+					err = EINVAL;
+					break;
+				}
+				ngep->param_adv_pause = 1;
+				ngep->param_adv_asym_pause = 1;
+
+				ngep->param_link_rx_pause = B_TRUE;
+				ngep->param_link_tx_pause = B_FALSE;
+				break;
+			case LINK_FLOWCTRL_TX:
+				if (!((ngep->param_lp_pause == 1) &&
+				    (ngep->param_lp_asym_pause == 1))) {
+					err = EINVAL;
+					break;
+				}
+				ngep->param_adv_pause = 0;
+				ngep->param_adv_asym_pause = 1;
+
+				ngep->param_link_rx_pause = B_FALSE;
+				ngep->param_link_tx_pause = B_TRUE;
+				break;
+			case LINK_FLOWCTRL_BI:
+				if (ngep->param_lp_pause != 1) {
+					err = EINVAL;
+					break;
+				}
+				ngep->param_adv_pause = 1;
+
+				ngep->param_link_rx_pause = B_TRUE;
+				ngep->param_link_tx_pause = B_TRUE;
+				break;
+			}
+
+			if (err == 0) {
+				(*ngep->physops->phys_update)(ngep);
+				nge_chip_sync(ngep);
+			}
+
+			break;
+		case DLD_PROP_PRIVATE:
+			err = nge_set_priv_prop(ngep, pr_name, pr_valsize,
+			    pr_val);
+			if (err == 0) {
+				(*ngep->physops->phys_update)(ngep);
+				nge_chip_sync(ngep);
+			}
+			break;
+		default:
+			err = ENOTSUP;
+	}
+	mutex_exit(ngep->genlock);
+	return (err);
+}
+
+static int
+nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, void *pr_val)
+{
+	nge_t *ngep = barg;
+	int err = EINVAL;
+	link_flowctrl_t fl;
+	uint64_t tmp = 0;
+
+	bzero(pr_val, pr_valsize);
+	switch (pr_num) {
+		case DLD_PROP_DUPLEX:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_link_duplex;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_SPEED:
+			if (pr_valsize >= sizeof (uint64_t)) {
+				tmp = ngep->param_link_speed * 1000000ull;
+				bcopy(&tmp, pr_val, sizeof (tmp));
+				err = 0;
+			}
+			break;
+		case DLD_PROP_STATUS:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_link_up;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_AUTONEG:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_autoneg;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_DEFMTU: {
+			if (pr_valsize >= sizeof (uint64_t)) {
+				tmp = ngep->default_mtu;
+				bcopy(&tmp, pr_val, sizeof (tmp));
+				err = 0;
+			}
+			break;
+		}
+		case DLD_PROP_FLOWCTRL:
+			if (pr_valsize >= sizeof (link_flowctrl_t)) {
+				if (ngep->param_link_rx_pause &&
+				    !ngep->param_link_tx_pause)
+					fl = LINK_FLOWCTRL_RX;
+
+				if (!ngep->param_link_rx_pause &&
+				    !ngep->param_link_tx_pause)
+					fl = LINK_FLOWCTRL_NONE;
+
+				if (!ngep->param_link_rx_pause &&
+				    ngep->param_link_tx_pause)
+					fl = LINK_FLOWCTRL_TX;
+
+				if (ngep->param_link_rx_pause &&
+				    ngep->param_link_tx_pause)
+					fl = LINK_FLOWCTRL_BI;
+				bcopy(&fl, pr_val, sizeof (fl));
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_1000FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_1000fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_1000FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_en_1000fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_1000HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_1000hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_1000HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_en_1000hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_100FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_100fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_100FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_en_100fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_100HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_100hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_100HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_en_100hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_10FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_10fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_10FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_en_10fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_10HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_adv_10hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_10HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = ngep->param_en_10hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_PRIVATE:
+			err = nge_get_priv_prop(ngep, pr_name, pr_valsize,
+			    pr_val);
+			break;
+		default:
+			err = ENOTSUP;
+	}
+	return (err);
+}
+
+/* ARGSUSED */
+static int
+nge_set_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_valsize,
+    const void *pr_val)
+{
+	int err = 0;
+	long result;
+
+	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > NGE_MAX_SDU) {
+			err = EINVAL;
+		} else {
+			ngep->param_txbcopy_threshold = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > NGE_MAX_SDU) {
+			err = EINVAL;
+		} else {
+			ngep->param_rxbcopy_threshold = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_recv_max_packet") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > NGE_RECV_SLOTS_DESC_1024) {
+			err = EINVAL;
+		} else {
+			ngep->param_recv_max_packet = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_poll_quiet_time") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 10000) {
+			err = EINVAL;
+		} else {
+			ngep->param_poll_quiet_time = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_poll_busy_time") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 10000) {
+			err = EINVAL;
+		} else {
+			ngep->param_poll_busy_time = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_intr_hwater") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > PARAM_RECV_MAX_PACKET) {
+			err = EINVAL;
+		} else {
+			ngep->param_rx_intr_hwater = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_intr_lwater") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > PARAM_RECV_MAX_PACKET) {
+			err = EINVAL;
+		} else {
+			ngep->param_rx_intr_lwater = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_n_intr") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1 || result > 10000) {
+			err = EINVAL;
+		} else {
+			ngep->param_tx_n_intr = (uint32_t)result;
+			goto reprogram;
+		}
+		return (err);
+	}
+
+	err = ENOTSUP;
+	return (err);
+
+reprogram:
+	if (err == 0) {
+		(*ngep->physops->phys_update)(ngep);
+		nge_chip_sync(ngep);
+	}
+
+	return (err);
+}
+
+static int
+nge_get_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
+{
+	char valstr[MAXNAMELEN];
+	int err = ENOTSUP;
+	uint_t strsize;
+
+	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_txbcopy_threshold);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_rxbcopy_threshold);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_recv_max_packet") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_recv_max_packet);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_poll_quiet_time") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_poll_quiet_time);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_poll_busy_time") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_poll_busy_time);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_intr_hwater") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_rx_intr_hwater);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_intr_lwater") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_rx_intr_lwater);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_n_intr") == 0) {
+		(void) sprintf(valstr, "%d", ngep->param_tx_n_intr);
+		err = 0;
+		goto done;
+	}
+
+done:
+	if (err == 0) {
+		strsize = (uint_t)strlen(valstr);
+		if (pr_valsize < strsize) {
+			err = ENOBUFS;
+		} else {
+			(void) strlcpy(pr_val, valstr, strsize);
+		}
+	}
+	return (err);
 }
 
 /* ARGSUSED */
