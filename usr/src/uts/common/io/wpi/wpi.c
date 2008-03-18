@@ -2206,8 +2206,18 @@ wpi_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 
 	err = ieee80211_ioctl(ic, wq, mp);
 	if (err == ENETRESET) {
-		(void) ieee80211_new_state(ic,
-		    IEEE80211_S_SCAN, -1);
+		/*
+		 * This is special for the hidden AP connection.
+		 * In any case, we should make sure only one 'scan'
+		 * in the driver for a 'connect' CLI command. So
+		 * when connecting to a hidden AP, the scan is just
+		 * sent out to the air when we know the desired
+		 * essid of the AP we want to connect.
+		 */
+		if (ic->ic_des_esslen) {
+			(void) ieee80211_new_state(ic,
+			    IEEE80211_S_SCAN, -1);
+		}
 	}
 }
 
