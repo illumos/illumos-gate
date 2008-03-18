@@ -1336,7 +1336,7 @@ prfstr(int prf)
 
 	switch (prf) {
 	case IKE_PRF_NONE:
-		return (gettext("<unknown>"));
+		return (gettext("<none/unavailable>"));
 	case IKE_PRF_HMAC_MD5:
 		return ("HMAC MD5");
 	case IKE_PRF_HMAC_SHA1:
@@ -1440,11 +1440,20 @@ print_xform(char *prefix, ike_p1_xform_t *xfp, boolean_t print_lifetimes)
 	if (xfp->p1xf_encr_low_bits != 0) {
 		(void) printf(gettext("(%d..%d)"), xfp->p1xf_encr_low_bits,
 		    xfp->p1xf_encr_high_bits);
+	} else if ((xfp->p1xf_encr_low_bits == 0) &&
+	    (xfp->p1xf_encr_high_bits != 0)) {
+		/*
+		 * High bits is a placeholder for
+		 * negotiated algorithm strength
+		 */
+		(void) printf(gettext("(%d)"), xfp->p1xf_encr_high_bits);
 	}
 	(void) printf(gettext("; Authentication alg: "));
 	(void) dump_aalg(xfp->p1xf_auth_alg, stdout);
-	(void) printf(gettext("\n%s PRF: %s"), prefix, prfstr(xfp->p1xf_prf));
-	(void) printf(gettext("; Oakley Group: %s\n"),
+	(void) printf("\n%s ", prefix);
+	if (xfp->p1xf_prf != 0)
+		(void) printf(gettext("PRF: %s ; "), prfstr(xfp->p1xf_prf));
+	(void) printf(gettext("Oakley Group: %s\n"),
 	    dhstr(xfp->p1xf_dh_group));
 	if (xfp->p1xf_pfs == 0) {
 		(void) printf(gettext("%s Phase 2 PFS is not used\n"), prefix);
