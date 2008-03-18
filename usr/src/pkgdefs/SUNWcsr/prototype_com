@@ -391,6 +391,7 @@ f none lib/svc/share/smf_include.sh 0444 root bin
 d none mnt 755 root sys
 d none opt 755 root sys
 d none proc 555 root root
+d none root 700 root root
 d none sbin 755 root sys
 f none sbin/autopush 555 root bin
 f none sbin/bootadm 555 root bin

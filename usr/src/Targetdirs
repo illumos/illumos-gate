@@ -133,6 +133,7 @@ ROOT.SYS= \
 	/opt  \
 	/platform  \
 	/proc  \
+	/root  \
 	/sbin  \
 	/system \
 	/system/contract \
@@ -543,6 +544,8 @@ $(ROOT)/var/adm/sa :=		DIRMODE= 775
 $(ROOT)/var/idmap :=		OWNER= daemon
 $(ROOT)/var/idmap :=		GROUP= daemon
 
+$(ROOT)/root:=			GROUP= root
+
 $(ROOT)/dev/term:=		GROUP= root
 
 $(UUCP.UUCP:%=$(ROOT)%):=	OWNER= uucp
@@ -585,6 +588,8 @@ $(ROOT)/var/preserve \
 $(ROOT)/var/spool/pkg \
 $(ROOT)/var/spool/uucppublic \
 $(ROOT)/var/tmp:=	DIRMODE= 1777
+
+$(ROOT)/root:=		DIRMODE= 700
 
 $(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
 
