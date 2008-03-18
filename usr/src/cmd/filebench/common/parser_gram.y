@@ -1,4 +1,3 @@
-
 /*
  * CDDL HEADER START
  *
@@ -92,22 +91,30 @@ static attr_t *get_attr_bool(cmd_t *cmd, int64_t name);
 static var_t *alloc_var(void);
 static var_t *get_var(cmd_t *cmd, int64_t name);
 static list_t *alloc_list();
+static probtabent_t *alloc_probtabent(void);
 
 /* Info Commands */
 static void parser_list(cmd_t *);
+static void parser_flowop_list(cmd_t *);
 
 /* Define Commands */
 static void parser_proc_define(cmd_t *);
 static void parser_thread_define(cmd_t *, procflow_t *, int instances);
-static void parser_flowop_define(cmd_t *, threadflow_t *);
+static void parser_flowop_define(cmd_t *, threadflow_t *, flowop_t **, int);
 static void parser_file_define(cmd_t *);
 static void parser_fileset_define(cmd_t *);
+static void parser_randvar_define(cmd_t *);
+static void parser_randvar_set(cmd_t *);
 
 /* Create Commands */
 static void parser_proc_create(cmd_t *);
 static void parser_thread_create(cmd_t *);
 static void parser_flowop_create(cmd_t *);
 static void parser_fileset_create(cmd_t *);
+
+/* set commands */
+static void parser_set_integer(char *, fbint_t);
+static void parser_set_var(char *, char *);
 
 /* Shutdown Commands */
 static void parser_proc_shutdown(cmd_t *);
@@ -139,13 +146,15 @@ static void parser_abort(int arg);
 %}
 
 %union {
-	int64_t	 ival;
-	uchar_t  bval;
-	char *	 sval;
-	fs_u	 val;
-	cmd_t	 *cmd;
-	attr_t	 *attr;
-	list_t	 *list;
+	int64_t		 ival;
+	uchar_t		 bval;
+	char *		 sval;
+	fs_u		 val;
+	avd_t		 avd;
+	cmd_t		*cmd;
+	attr_t		*attr;
+	list_t		*list;
+	probtabent_t	*rndtb;
 }
 
 %start commands
@@ -155,9 +164,10 @@ static void parser_abort(int arg);
 %token FSC_SYSTEM FSC_FLOWOP FSC_EVENTGEN FSC_ECHO FSC_LOAD FSC_RUN
 %token FSC_USAGE FSC_HELP FSC_VARS
 %token FSV_STRING FSV_VAL_INT FSV_VAL_BOOLEAN FSV_VARIABLE FSV_WHITESTRING
+%token FSV_RANDUNI FSV_RANDTAB FSV_RANDVAR FSV_URAND FSV_RAND48
 %token FST_INT FST_BOOLEAN
 %token FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSE_ALL FSE_SNAP FSE_DUMP
-%token FSE_DIRECTORY FSE_COMMAND FSE_FILESET FSE_XMLDUMP FSE_MODE
+%token FSE_DIRECTORY FSE_COMMAND FSE_FILESET FSE_XMLDUMP FSE_RAND FSE_MODE
 %token FSK_SEPLST FSK_OPENLST FSK_CLOSELST FSK_ASSIGN FSK_IN FSK_QUOTE
 %token FSK_DIRSEPLST
 %token FSA_SIZE FSA_PREALLOC FSA_PARALLOC FSA_PATH FSA_REUSE
@@ -165,14 +175,18 @@ static void parser_abort(int arg);
 %token FSA_IOSIZE FSA_FILE FSA_WSS FSA_NAME FSA_RANDOM FSA_INSTANCES
 %token FSA_DSYNC FSA_TARGET FSA_ITERS FSA_NICE FSA_VALUE FSA_BLOCKING
 %token FSA_HIGHWATER FSA_DIRECTIO FSA_DIRWIDTH FSA_FD FSA_SRCFD FSA_ROTATEFD
-%token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA
-%token FSA_DIRGAMMA FSA_USEISM FSA_ALLDONE FSA_FIRSTDONE FSA_TIMEOUT
+%token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA FSA_DIRDEPTHRV
+%token FSA_DIRGAMMA FSA_USEISM FSA_TYPE FSA_RANDTABLE FSA_RANDSRC FSA_RANDROUND
+%token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN
+%token FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC FSS_ROUND
+%token FSA_ALLDONE FSA_FIRSTDONE FSA_TIMEOUT
 
 %type <ival> FSV_VAL_INT
 %type <bval> FSV_VAL_BOOLEAN
 %type <sval> FSV_STRING
 %type <sval> FSV_WHITESTRING
 %type <sval> FSV_VARIABLE
+%type <sval> FSV_RANDVAR
 %type <sval> FSK_ASSIGN
 
 %type <ival> FSC_LIST FSC_DEFINE FSC_SET FSC_LOAD FSC_RUN
@@ -182,21 +196,29 @@ static void parser_abort(int arg);
 %type <ival> entity
 %type <val>  value
 
-%type <cmd> command inner_commands load_command run_command
-%type <cmd> list_command define_command debug_command create_command
+%type <cmd> command inner_commands load_command run_command list_command
+%type <cmd> proc_define_command files_define_command randvar_define_command
+%type <cmd> debug_command create_command
 %type <cmd> sleep_command stats_command set_command shutdown_command
 %type <cmd> foreach_command log_command system_command flowop_command
 %type <cmd> eventgen_command quit_command flowop_list thread_list
 %type <cmd> thread echo_command usage_command help_command vars_command
 
-%type <attr> attr_op attr_ops
-%type <attr> attr_value
-%type <list> integer_seplist string_seplist string_list var_string_list var_string
-%type <list> whitevar_string whitevar_string_list
-%type <ival> attrs_define_file attrs_define_thread attrs_flowop attrs_define_fileset
-%type <ival> attrs_define_proc attrs_eventgen
-%type <ival> attr_name
+%type <attr> files_attr_op files_attr_ops pt_attr_op pt_attr_ops
+%type <attr> fo_attr_op fo_attr_ops ev_attr_op ev_attr_ops
+%type <attr> randvar_attr_op randvar_attr_ops randvar_attr_typop
+%type <attr> randvar_attr_srcop attr_value attr_list_value
+%type <list> integer_seplist string_seplist string_list var_string_list
+%type <list> var_string whitevar_string whitevar_string_list
+%type <ival> attrs_define_file attrs_define_thread attrs_flowop
+%type <ival> attrs_define_fileset attrs_define_proc attrs_eventgen
+%type <ival> files_attr_name pt_attr_name fo_attr_name ev_attr_name
+%type <ival> randvar_attr_name FSA_TYPE randtype_name randvar_attr_param
+%type <ival> randsrc_name FSA_RANDSRC randvar_attr_tsp
+%type <ival> FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC
 
+%type <rndtb>  probtabentry_list probtabentry
+%type <avd> var_int_val
 %%
 
 commands: commands command
@@ -240,7 +262,9 @@ inner_commands: command
 };
 
 command:
-  define_command
+  proc_define_command
+| files_define_command
+| randvar_define_command
 | debug_command
 | eventgen_command
 | create_command
@@ -284,9 +308,8 @@ foreach_command: FSC_FOREACH
 		    inner_cmd = inner_cmd->cmd_next) {
 			filebench_log(LOG_DEBUG_IMPL,
 			    "packing foreach: %zx %s=%lld, cmd %zx",
-			    $$,
-			    $$->cmd_tgt1,
-			    *list->list_integer, inner_cmd);
+			    $$, $$->cmd_tgt1,
+			    avd_get_int(list->list_integer), inner_cmd);
 		}
 	}
 }| foreach_command FSV_VARIABLE FSK_IN string_seplist FSK_OPENLST inner_commands FSK_CLOSELST
@@ -319,7 +342,7 @@ integer_seplist: FSV_VAL_INT
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_integer = integer_alloc($1);
+	$$->list_integer = avd_int_alloc($1);
 }
 | integer_seplist FSK_SEPLST FSV_VAL_INT
 {
@@ -329,7 +352,7 @@ integer_seplist: FSV_VAL_INT
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_integer = integer_alloc($3);
+	$$->list_integer = avd_int_alloc($3);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -344,7 +367,7 @@ string_seplist: FSK_QUOTE FSV_WHITESTRING FSK_QUOTE
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 }
 | string_seplist FSK_SEPLST FSK_QUOTE FSV_WHITESTRING FSK_QUOTE
 {
@@ -354,7 +377,7 @@ string_seplist: FSK_QUOTE FSV_WHITESTRING FSK_QUOTE
 	if (($$ = alloc_list()) == NULL)
 			YYERROR;
 
-	$$->list_string = string_alloc($4);
+	$$->list_string = avd_str_alloc($4);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -370,7 +393,7 @@ eventgen_command: FSC_EVENTGEN
 		YYERROR;
 	$$->cmd = &parser_eventgen;
 }
-| eventgen_command attr_ops
+| eventgen_command ev_attr_ops
 {
 	$1->cmd_attr_list = $2;
 };
@@ -414,8 +437,7 @@ string_list: FSV_VARIABLE
 {
 	if (($$ = alloc_list()) == NULL)
 			YYERROR;
-
-	$$->list_string = string_alloc($1);
+	$$->list_string = avd_str_alloc($1);
 }
 | string_list FSK_SEPLST FSV_VARIABLE
 {
@@ -425,7 +447,7 @@ string_list: FSV_VARIABLE
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($3);
+	$$->list_string = avd_str_alloc($3);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -440,14 +462,14 @@ var_string: FSV_VARIABLE
 	if (($$ = alloc_list()) == NULL)
 			YYERROR;
 
-	$$->list_string = string_alloc($1);
+	$$->list_string = avd_str_alloc($1);
 }
 | FSV_STRING
 {
 	if (($$ = alloc_list()) == NULL)
 			YYERROR;
 
-	$$->list_string = string_alloc($1);
+	$$->list_string = avd_str_alloc($1);
 };
 
 var_string_list: var_string
@@ -462,7 +484,7 @@ var_string_list: var_string
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -480,7 +502,7 @@ var_string_list: var_string
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -497,7 +519,7 @@ var_string_list: var_string
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -515,7 +537,7 @@ var_string_list: var_string
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -530,14 +552,14 @@ whitevar_string: FSK_QUOTE FSV_VARIABLE
 	if (($$ = alloc_list()) == NULL)
 			YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 }
 | FSK_QUOTE FSV_WHITESTRING
 {
 	if (($$ = alloc_list()) == NULL)
 			YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 };
 
 whitevar_string_list: whitevar_string FSV_WHITESTRING
@@ -549,7 +571,7 @@ whitevar_string_list: whitevar_string FSV_WHITESTRING
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -567,7 +589,7 @@ whitevar_string_list: whitevar_string FSV_WHITESTRING
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -575,7 +597,25 @@ whitevar_string_list: whitevar_string FSV_WHITESTRING
 		list_end = list;
 	list_end->list_next = $$;
 	$$ = $1;
-} |whitevar_string_list FSV_WHITESTRING
+}| whitevar_string FSV_RANDVAR randvar_attr_tsp
+{
+	list_t *list = NULL;
+	list_t *list_end = NULL;
+
+	/* Add variable */
+	if (($$ = alloc_list()) == NULL)
+		YYERROR;
+
+	$$->list_string = avd_str_alloc($2);
+	$$->list_integer = avd_int_alloc($3);
+
+	/* Find end of list */
+	for (list = $1; list != NULL;
+	    list = list->list_next)
+		list_end = list;
+	list_end->list_next = $$;
+	$$ = $1;
+}| whitevar_string_list FSV_WHITESTRING
 {
 	list_t *list = NULL;
 	list_t *list_end = NULL;
@@ -584,7 +624,7 @@ whitevar_string_list: whitevar_string FSV_WHITESTRING
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -602,7 +642,25 @@ whitevar_string_list: whitevar_string FSV_WHITESTRING
 	if (($$ = alloc_list()) == NULL)
 		YYERROR;
 
-	$$->list_string = string_alloc($2);
+	$$->list_string = avd_str_alloc($2);
+
+	/* Find end of list */
+	for (list = $1; list != NULL;
+	    list = list->list_next)
+		list_end = list;
+	list_end->list_next = $$;
+	$$ = $1;
+}| whitevar_string_list FSV_RANDVAR randvar_attr_tsp
+{
+	list_t *list = NULL;
+	list_t *list_end = NULL;
+
+	/* Add variable */
+	if (($$ = alloc_list()) == NULL)
+		YYERROR;
+
+	$$->list_string = avd_str_alloc($2);
+	$$->list_integer = avd_int_alloc($3);
 
 	/* Find end of list */
 	for (list = $1; list != NULL;
@@ -623,6 +681,10 @@ list_command: FSC_LIST
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	$$->cmd = &parser_list;
+}
+| list_command FSC_FLOWOP
+{
+	$1->cmd = &parser_flowop_list;
 };
 
 log_command: FSC_LOG whitevar_string_list
@@ -648,6 +710,17 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	var_assign_integer($2, $4);
+	if (parentscript) {
+		$$->cmd_tgt1 = $2;
+		parser_vars($$);
+	}
+	$$->cmd = NULL;
+}
+| FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_BOOLEAN
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	var_assign_boolean($2, $4);
 	if (parentscript) {
 		$$->cmd_tgt1 = $2;
 		parser_vars($$);
@@ -702,6 +775,33 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	$$->cmd = NULL;
+}| FSC_SET FSV_RANDVAR FSS_TYPE FSK_ASSIGN randvar_attr_typop
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_randvar_set;
+	$$->cmd_tgt1 = $2;
+	$$->cmd_qty = FSS_TYPE;
+	$$->cmd_attr_list = $5;
+
+}| FSC_SET FSV_RANDVAR FSS_SRC FSK_ASSIGN randvar_attr_srcop
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_randvar_set;
+	$$->cmd_tgt1 = $2;
+	$$->cmd_qty = FSS_SRC;
+	$$->cmd_attr_list = $5;
+
+}| FSC_SET FSV_RANDVAR randvar_attr_param FSK_ASSIGN attr_value
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_randvar_set;
+	$$->cmd_tgt1 = $2;
+	$$->cmd_qty = $3;
+	$$->cmd_attr_list = $5;
+	
 };
 
 stats_command: FSC_STATS FSE_SNAP
@@ -779,7 +879,7 @@ flowop_list: flowop_command
 	$$ = $1;
 };
 
-thread: FSE_THREAD attr_ops FSK_OPENLST flowop_list FSK_CLOSELST
+thread: FSE_THREAD pt_attr_ops FSK_OPENLST flowop_list FSK_CLOSELST
 {
 	/*
 	 * Allocate a cmd node per thread, with a
@@ -812,7 +912,7 @@ thread_list: thread
 	$$ = $1;
 };
 
-define_command: FSC_DEFINE FSE_PROC attr_ops FSK_OPENLST thread_list FSK_CLOSELST
+proc_define_command: FSC_DEFINE FSE_PROC pt_attr_ops FSK_OPENLST thread_list FSK_CLOSELST
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -820,7 +920,13 @@ define_command: FSC_DEFINE FSE_PROC attr_ops FSK_OPENLST thread_list FSK_CLOSELS
 	$$->cmd_list = $5;
 	$$->cmd_attr_list = $3;
 
-}| FSC_DEFINE FSE_FILE
+}
+| proc_define_command pt_attr_ops
+{
+	$1->cmd_attr_list = $2;
+};
+
+files_define_command: FSC_DEFINE FSE_FILE
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -831,9 +937,17 @@ define_command: FSC_DEFINE FSE_PROC attr_ops FSK_OPENLST thread_list FSK_CLOSELS
 		YYERROR;
 	$$->cmd = &parser_fileset_define;
 }
-| define_command attr_ops
+| files_define_command files_attr_ops
 {
 	$1->cmd_attr_list = $2;
+};
+
+randvar_define_command: FSC_DEFINE FSE_RAND randvar_attr_ops
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_randvar_define;
+	$$->cmd_attr_list = $3;
 };
 
 create_command: FSC_CREATE entity
@@ -879,7 +993,7 @@ sleep_command: FSC_SLEEP FSV_VAL_INT
 }
 | FSC_SLEEP FSV_VARIABLE
 {
-	vinteger_t *integer;
+	fbint_t *integer;
 
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -896,7 +1010,7 @@ run_command: FSC_RUN FSV_VAL_INT
 }
 | FSC_RUN FSV_VARIABLE
 {
-	vinteger_t *integer;
+	fbint_t *integer;
 
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -905,7 +1019,7 @@ run_command: FSC_RUN FSV_VAL_INT
 }
 | FSC_RUN
 {
-	vinteger_t *integer;
+	fbint_t *integer;
 
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -926,7 +1040,7 @@ flowop_command: FSC_FLOWOP name
 		YYERROR;
 	$$->cmd_name = fb_stralloc($2);
 }
-| flowop_command attr_ops
+| flowop_command fo_attr_ops
 {
 	$1->cmd_attr_list = $2;
 };
@@ -958,6 +1072,7 @@ load_command: FSC_LOAD FSV_STRING
 	yy_switchfileparent(yyin);
 };
 
+
 entity: FSE_PROC {$$ = FSE_PROC;}
 | FSE_THREAD {$$ = FSE_THREAD;}
 | FSE_FILESET {$$ = FSE_FILESET;}
@@ -969,11 +1084,12 @@ value: FSV_VAL_INT { $$.i = $1;}
 
 name: FSV_STRING;
 
-attr_ops: attr_op
+/* attribute parsing for define file and define fileset */
+files_attr_ops: files_attr_op
 {
 	$$ = $1;
 }
-| attr_ops FSK_SEPLST attr_op
+| files_attr_ops FSK_SEPLST files_attr_op
 {
 	attr_t *attr = NULL;
 	attr_t *list_end = NULL;
@@ -987,73 +1103,329 @@ attr_ops: attr_op
 	$$ = $1;
 };
 
-attr_op: attr_name FSK_ASSIGN attr_value
+files_attr_op: files_attr_name FSK_ASSIGN attr_list_value
 {
 	$$ = $3;
 	$$->attr_name = $1;
 }
-| attr_name
+| files_attr_name
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_name = $1;
+};
+
+/* attribute parsing for random variables */
+randvar_attr_ops: randvar_attr_op
+{
+	$$ = $1;
+}
+| randvar_attr_ops FSK_SEPLST randvar_attr_op
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+}
+| randvar_attr_ops FSK_SEPLST FSA_RANDTABLE FSK_ASSIGN FSK_OPENLST probtabentry_list FSK_CLOSELST
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	
+	if ((attr = alloc_attr()) == NULL)
+		YYERROR;
+
+	attr->attr_name = FSA_RANDTABLE;
+	attr->attr_obj = (void *)$6;
+	list_end->attr_next = attr;
+	$$ = $1;
+};
+
+randvar_attr_op: randvar_attr_name FSK_ASSIGN attr_list_value
+{
+	$$ = $3;
+	$$->attr_name = $1;
+}
+| randvar_attr_name
 {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
 	$$->attr_name = $1;
 }
+| FSA_TYPE FSK_ASSIGN randvar_attr_typop
+{
+	$$ = $3;
+	$$->attr_name = FSA_TYPE;
+}
+| FSA_RANDSRC FSK_ASSIGN randvar_attr_srcop
+{
+	$$ = $3;
+	$$->attr_name = FSA_RANDSRC;
+};
 
-attr_name: attrs_define_file
-|attrs_define_fileset
-|attrs_define_thread
-|attrs_define_proc
-|attrs_flowop
-|attrs_eventgen;
+probtabentry: FSK_OPENLST var_int_val FSK_SEPLST var_int_val FSK_SEPLST var_int_val FSK_CLOSELST
+{
+	if (($$ = alloc_probtabent()) == NULL)
+		YYERROR;
+	$$->pte_percent = $2;
+	$$->pte_segmin  = $4;
+	$$->pte_segmax  = $6;
+};
+
+/* attribute parsing for prob density function table */
+probtabentry_list: probtabentry
+{
+	$$ = $1;
+}
+| probtabentry_list FSK_SEPLST probtabentry
+{
+	probtabent_t *pte = NULL;
+	probtabent_t *ptelist_end = NULL;
+
+	for (pte = $1; pte != NULL;
+	    pte = pte->pte_next)
+		ptelist_end = pte; /* Find end of prob table entry list */
+
+	ptelist_end->pte_next = $3;
+
+	$$ = $1;
+};
+
+/* attribute parsing for define thread and process */
+pt_attr_ops: pt_attr_op
+{
+	$$ = $1;
+}
+| pt_attr_ops FSK_SEPLST pt_attr_op
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+};
+
+pt_attr_op: pt_attr_name FSK_ASSIGN attr_value
+{
+	$$ = $3;
+	$$->attr_name = $1;
+}
+| pt_attr_name
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_name = $1;
+};
+
+/* attribute parsing for flowops */
+fo_attr_ops: fo_attr_op
+{
+	$$ = $1;
+}
+| fo_attr_ops FSK_SEPLST fo_attr_op
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+};
+
+fo_attr_op: fo_attr_name FSK_ASSIGN attr_value
+{
+	$$ = $3;
+	$$->attr_name = $1;
+}
+| fo_attr_name
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_name = $1;
+};
+
+/* attribute parsing for Event Generator */
+ev_attr_ops: ev_attr_op
+{
+	$$ = $1;
+}
+| ev_attr_ops FSK_SEPLST ev_attr_op
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+};
+
+ev_attr_op: ev_attr_name FSK_ASSIGN attr_value
+{
+	$$ = $3;
+	$$->attr_name = $1;
+}
+| ev_attr_name
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_name = $1;
+};
+
+
+files_attr_name: attrs_define_file
+|attrs_define_fileset;
+
+pt_attr_name: attrs_define_thread
+|attrs_define_proc;
+
+fo_attr_name: attrs_flowop;
+
+ev_attr_name: attrs_eventgen;
 
 attrs_define_proc:
-FSA_NICE { $$ = FSA_NICE;}
-|FSA_INSTANCES { $$ = FSA_INSTANCES;};
+  FSA_NICE { $$ = FSA_NICE;}
+| FSA_NAME { $$ = FSA_NAME;}
+| FSA_INSTANCES { $$ = FSA_INSTANCES;};
 
 attrs_define_file:
-FSA_SIZE { $$ = FSA_SIZE;}
+  FSA_SIZE { $$ = FSA_SIZE;}
+| FSA_NAME { $$ = FSA_NAME;}
 | FSA_PATH { $$ = FSA_PATH;}
 | FSA_REUSE { $$ = FSA_REUSE;}
 | FSA_PREALLOC { $$ = FSA_PREALLOC;}
 | FSA_PARALLOC { $$ = FSA_PARALLOC;};
 
 attrs_define_fileset:
-FSA_SIZE { $$ = FSA_SIZE;}
+  FSA_SIZE { $$ = FSA_SIZE;}
+| FSA_NAME { $$ = FSA_NAME;}
 | FSA_PATH { $$ = FSA_PATH;}
 | FSA_DIRWIDTH { $$ = FSA_DIRWIDTH;}
+| FSA_DIRDEPTHRV { $$ = FSA_DIRDEPTHRV;}
 | FSA_PREALLOC { $$ = FSA_PREALLOC;}
 | FSA_FILESIZEGAMMA { $$ = FSA_FILESIZEGAMMA;}
 | FSA_DIRGAMMA { $$ = FSA_DIRGAMMA;}
 | FSA_CACHED { $$ = FSA_CACHED;}
 | FSA_ENTRIES { $$ = FSA_ENTRIES;};
 
+randvar_attr_name:
+  FSA_NAME { $$ = FSA_NAME;}
+| FSA_RANDSEED { $$ = FSA_RANDSEED;}
+| FSA_RANDGAMMA { $$ = FSA_RANDGAMMA;}
+| FSA_RANDMEAN { $$ = FSA_RANDMEAN;}
+| FSA_RANDMIN { $$ = FSA_RANDMIN;}
+| FSA_RANDROUND { $$ = FSA_RANDROUND;};
+
+randvar_attr_tsp:
+  FSS_TYPE { $$ = FSS_TYPE;}
+| FSS_SRC { $$ = FSS_SRC;}
+| FSS_SEED { $$ = FSS_SEED;}
+| FSS_GAMMA { $$ = FSS_GAMMA;}
+| FSS_MEAN { $$ = FSS_MEAN;}
+| FSS_MIN { $$ = FSS_MIN;}
+| FSS_ROUND { $$ = FSS_ROUND;};
+
+
+randvar_attr_param:
+  FSS_SEED { $$ = FSS_SEED;}
+| FSS_GAMMA { $$ = FSS_GAMMA;}
+| FSS_MEAN { $$ = FSS_MEAN;}
+| FSS_MIN { $$ = FSS_MIN;}
+| FSS_ROUND { $$ = FSS_ROUND;};
+
+randvar_attr_typop: randtype_name
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_int_alloc($1);
+};
+
+randtype_name:
+  FSV_RANDUNI { $$ = FSV_RANDUNI;}
+| FSV_RANDTAB { $$ = FSV_RANDTAB;}
+| FSA_RANDGAMMA { $$ = FSA_RANDGAMMA;};
+
+randvar_attr_srcop: randsrc_name
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_int_alloc($1);
+};
+
+randsrc_name:
+  FSV_URAND { $$ = FSV_URAND;}
+| FSV_RAND48 { $$ = FSV_RAND48;};
+
 attrs_define_thread:
-FSA_PROCESS { $$ = FSA_PROCESS;}
-|FSA_MEMSIZE { $$ = FSA_MEMSIZE;}
-|FSA_USEISM { $$ = FSA_USEISM;}
-|FSA_INSTANCES { $$ = FSA_INSTANCES;};
+  FSA_PROCESS { $$ = FSA_PROCESS;}
+| FSA_NAME { $$ = FSA_NAME;}
+| FSA_MEMSIZE { $$ = FSA_MEMSIZE;}
+| FSA_USEISM { $$ = FSA_USEISM;}
+| FSA_INSTANCES { $$ = FSA_INSTANCES;};
 
 attrs_flowop:
-FSA_WSS { $$ = FSA_WSS;}
-|FSA_FILE { $$ = FSA_FILE;}
-|FSA_NAME { $$ = FSA_NAME;}
-|FSA_RANDOM { $$ = FSA_RANDOM;}
-|FSA_FD { $$ = FSA_FD;}
-|FSA_SRCFD { $$ = FSA_SRCFD;}
-|FSA_ROTATEFD { $$ = FSA_ROTATEFD;}
-|FSA_DSYNC { $$ = FSA_DSYNC;}
-|FSA_DIRECTIO { $$ = FSA_DIRECTIO;}
-|FSA_TARGET { $$ = FSA_TARGET;}
-|FSA_ITERS { $$ = FSA_ITERS;}
-|FSA_VALUE { $$ = FSA_VALUE;}
-|FSA_BLOCKING { $$ = FSA_BLOCKING;}
-|FSA_HIGHWATER { $$ = FSA_HIGHWATER;}
-|FSA_IOSIZE { $$ = FSA_IOSIZE;};
+  FSA_WSS { $$ = FSA_WSS;}
+| FSA_FILE { $$ = FSA_FILE;}
+| FSA_NAME { $$ = FSA_NAME;}
+| FSA_RANDOM { $$ = FSA_RANDOM;}
+| FSA_FD { $$ = FSA_FD;}
+| FSA_SRCFD { $$ = FSA_SRCFD;}
+| FSA_ROTATEFD { $$ = FSA_ROTATEFD;}
+| FSA_DSYNC { $$ = FSA_DSYNC;}
+| FSA_DIRECTIO { $$ = FSA_DIRECTIO;}
+| FSA_TARGET { $$ = FSA_TARGET;}
+| FSA_ITERS { $$ = FSA_ITERS;}
+| FSA_VALUE { $$ = FSA_VALUE;}
+| FSA_BLOCKING { $$ = FSA_BLOCKING;}
+| FSA_HIGHWATER { $$ = FSA_HIGHWATER;}
+| FSA_IOSIZE { $$ = FSA_IOSIZE;};
 
 attrs_eventgen:
-FSA_RATE { $$ = FSA_RATE;};
+  FSA_RATE { $$ = FSA_RATE;};
 
-attr_value: var_string_list {
+attr_value: FSV_STRING
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_str_alloc($1);
+} | FSV_VAL_INT {
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_int_alloc($1);
+} | FSV_VAL_BOOLEAN {
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_bool_alloc($1);
+} | FSV_VARIABLE {
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = var_ref_attr($1);
+};
+
+attr_list_value: var_string_list {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
 	$$->attr_param_list = $1;
@@ -1061,16 +1433,27 @@ attr_value: var_string_list {
 {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
-	$$->attr_string = string_alloc($1);
+	$$->attr_avd = avd_str_alloc($1);
 } | FSV_VAL_INT {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
-	$$->attr_integer = integer_alloc($1);
+	$$->attr_avd = avd_int_alloc($1);
+} | FSV_VAL_BOOLEAN {
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_bool_alloc($1);
 } | FSV_VARIABLE {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
-	$$->attr_integer = var_ref_integer($1);
-	$$->attr_string = var_ref_string($1);
+	$$->attr_avd = var_ref_attr($1);
+};
+
+var_int_val: FSV_VAL_INT
+{
+	$$ = avd_int_alloc($1);
+} | FSV_VARIABLE
+{
+	$$ = var_ref_attr($1);
 };
 
 %%
@@ -1210,8 +1593,11 @@ main(int argc, char *argv[])
 			exit(1);
 		}
 
-		if (procflow_exec(procname, instance) < 0)
+		if (procflow_exec(procname, instance) < 0) {
+			filebench_log(LOG_ERROR, "Cannot startup process %s",
+			    procname);
 			exit(1);
+		}
 
 		exit(0);
 	}
@@ -1307,8 +1693,7 @@ parser_list2string(list_t *list)
 	list_t *l;
 	char *string;
 	char *tmp;
-	vinteger_t *integer;
-
+	fbint_t *integer;
 	if ((string = malloc(MAXPATHLEN)) == NULL) {
 		filebench_log(LOG_ERROR, "Failed to allocate memory");
 		return (NULL);
@@ -1318,16 +1703,69 @@ parser_list2string(list_t *list)
 
 
 	/* Format args */
-	for (l = list; l != NULL;
-	    l = l->list_next) {
-		filebench_log(LOG_DEBUG_SCRIPT,
-		    "converting string '%s'", *l->list_string);
+	for (l = list; l != NULL; l = l->list_next) {
+		char *lstr = avd_get_str(l->list_string);
 
-		if ((tmp = var_to_string(*l->list_string)) != NULL) {
-			(void) strcat(string, tmp);
-			free(tmp);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "converting string '%s'", lstr);
+
+		/* see if it is a random variable */
+		if (l->list_integer) {
+			fbint_t param_name;
+
+			tmp = NULL;
+			param_name = avd_get_int(l->list_integer);
+			switch (param_name) {
+			case FSS_TYPE:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_TYPE);
+				break;
+
+			case FSS_SRC:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_SRC);
+				break;
+
+			case FSS_SEED:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_SEED);
+				break;
+
+			case FSS_MIN:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_MIN);
+				break;
+
+			case FSS_MEAN:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_MEAN);
+				break;
+
+			case FSS_GAMMA:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_GAMMA);
+				break;
+
+			case FSS_ROUND:
+				tmp = var_randvar_to_string(lstr,
+				    RAND_PARAM_ROUND);
+				break;
+			}
+
+			if (tmp) {
+				(void) strcat(string, tmp);
+				free(tmp);
+			} else {
+				(void) strcat(string, lstr);
+			}
 		} else {
-			(void) strcat(string, *l->list_string);
+			/* perhaps a normal variable? */
+			if ((tmp = var_to_string(lstr)) != NULL) {
+				(void) strcat(string, tmp);
+				free(tmp);
+			} else {
+				(void) strcat(string, lstr);
+			}
 		}
 	}
 	return (string);
@@ -1340,30 +1778,34 @@ parser_list2string(list_t *list)
  * containing a copy of that string. On failure either returns NULL
  * or shuts down the run.
  */
-var_string_t
+avd_t
 parser_list2varstring(list_t *list)
 {
-	/* Special case - variable name */
-	if ((list->list_next == NULL) && (*(*list->list_string) == '$'))
-		return (var_ref_string(*list->list_string));
+	char *lstr = avd_get_str(list->list_string);
 
-	return (string_alloc(parser_list2string(list)));
+	/* Special case - variable name */
+	if ((list->list_next == NULL) && (*lstr == '$'))
+		return (var_ref_attr(lstr));
+
+	return (avd_str_alloc(parser_list2string(list)));
 }
 
 /*
  * Looks for the var named in list_string of the first element of the
- * supplied list. If found, returns the var_integer portion of the var.
- * If the var is not found, cannot be allocated, the supplied list is
- * NULL, or the list_string filed is empty, returns NULL.
+ * supplied list. If found, returns the var_val portion of the var in
+ * an attribute value descriptor. If the var is not found, cannot be
+ * allocated, the supplied list is NULL, or the list_string filed is
+ * empty, returns NULL.
  */
-var_integer_t
-parser_list2integer(list_t *list)
+avd_t
+parser_list2avd(list_t *list)
 {
-	var_integer_t v;
+	avd_t avd;
+	char *lstr;
 
-	if (list && (*(list->list_string) != NULL)) {
-		v = var_ref_integer(*(list->list_string));
-		return (v);
+	if (list && ((lstr = avd_get_str(list->list_string)) != NULL)) {
+		avd = var_ref_attr(lstr);
+		return (avd);
 	}
 
 	return (NULL);
@@ -1377,18 +1819,17 @@ static void
 parser_eventgen(cmd_t *cmd)
 {
 	attr_t *attr;
-	vinteger_t rate;
+	fbint_t rate;
 
 	/* Get the rate from attribute */
 	if (attr = get_attr_integer(cmd, FSA_RATE)) {
-		if (attr->attr_integer) {
+		if (attr->attr_avd) {
+			rate = avd_get_int(attr->attr_avd);
 			filebench_log(LOG_VERBOSE,
-			    "Eventgen: %lld per second",
-			    *attr->attr_integer);
-			eventgen_setrate(*attr->attr_integer);
+			    "Eventgen: %lld per second", rate);
+			eventgen_setrate(rate);
 		}
 	}
-
 }
 
 /*
@@ -1406,10 +1847,11 @@ parser_foreach_integer(cmd_t *cmd)
 	cmd_t *inner_cmd;
 
 	for (; list != NULL; list = list->list_next) {
-		var_assign_integer(cmd->cmd_tgt1, *list->list_integer);
+		fbint_t list_int = avd_get_int(list->list_integer);
+
+		var_assign_integer(cmd->cmd_tgt1, list_int);
 		filebench_log(LOG_VERBOSE, "Iterating %s=%lld",
-		    cmd->cmd_tgt1,
-		    *list->list_integer);
+		    cmd->cmd_tgt1, list_int);
 		for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
 		    inner_cmd = inner_cmd->cmd_next) {
 			inner_cmd->cmd(inner_cmd);
@@ -1428,13 +1870,13 @@ static void
 parser_foreach_string(cmd_t *cmd)
 {
 	list_t *list = cmd->cmd_param_list;
-	cmd_t *inner_cmd;
 
 	for (; list != NULL; list = list->list_next) {
-		var_assign_string(cmd->cmd_tgt1, *list->list_string);
+		cmd_t *inner_cmd;
+		char *lstr = avd_get_str(list->list_string);
+		var_assign_string(cmd->cmd_tgt1, lstr);
 		filebench_log(LOG_VERBOSE, "Iterating %s=%s",
-		    cmd->cmd_tgt1,
-		    *list->list_string);
+		    cmd->cmd_tgt1, lstr);
 		for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
 		    inner_cmd = inner_cmd->cmd_next) {
 			inner_cmd->cmd(inner_cmd);
@@ -1453,6 +1895,15 @@ parser_list(cmd_t *cmd)
 }
 
 /*
+ * Lists the flowop name and instance number for all flowops.
+ */
+static void
+parser_flowop_list(cmd_t *cmd)
+{
+	flowop_printall();
+}
+
+/*
  * Calls procflow_define() to allocate "instances" number of  procflow(s)
  * (processes) with the supplied name. The default number of instances is
  * one. An optional priority level attribute can be supplied and is stored in
@@ -1466,12 +1917,13 @@ parser_proc_define(cmd_t *cmd)
 	procflow_t *procflow, template;
 	char *name;
 	attr_t *attr;
-	var_integer_t instances = integer_alloc(1);
+	avd_t var_instances;
+	fbint_t instances;
 	cmd_t *inner_cmd;
 
 	/* Get the name of the process */
 	if (attr = get_attr(cmd, FSA_NAME)) {
-		name = *attr->attr_string;
+		name = avd_get_str(attr->attr_avd);
 	} else {
 		filebench_log(LOG_ERROR,
 		    "define proc: proc specifies no name");
@@ -1480,13 +1932,23 @@ parser_proc_define(cmd_t *cmd)
 
 	/* Get the memory size from attribute */
 	if (attr = get_attr_integer(cmd, FSA_INSTANCES)) {
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "proc_define: Instances attr cannot be random");
+			filebench_shutdown(1);
+		}
+		var_instances = attr->attr_avd;
+		instances = avd_get_int(var_instances);
 		filebench_log(LOG_DEBUG_IMPL,
-		    "Setting instances = %lld",
-		    *attr->attr_integer);
-		instances = attr->attr_integer;
+		    "Setting instances = %lld", instances);
+	} else {
+		filebench_log(LOG_DEBUG_IMPL,
+		    "Defaulting to instances = 1");
+		var_instances = avd_int_alloc(1);
+		instances = 1;
 	}
 
-	if ((procflow = procflow_define(name, NULL, instances)) == NULL) {
+	if ((procflow = procflow_define(name, NULL, var_instances)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "Failed to instantiate %d %s process(es)\n",
 		    instances, name);
@@ -1495,17 +1957,22 @@ parser_proc_define(cmd_t *cmd)
 
 	/* Get the pri from attribute */
 	if (attr = get_attr_integer(cmd, FSA_NICE)) {
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "proc_define: priority cannot be random");
+			filebench_shutdown(1);
+		}
 		filebench_log(LOG_DEBUG_IMPL, "Setting pri = %lld",
-		    *attr->attr_integer);
-		procflow->pf_nice = attr->attr_integer;
+		    avd_get_int(attr->attr_avd));
+		procflow->pf_nice = attr->attr_avd;
 	} else
-		procflow->pf_nice = integer_alloc(0);
+		procflow->pf_nice = avd_int_alloc(0);
 
 
 	/* Create the list of threads for this process  */
 	for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
 	    inner_cmd = inner_cmd->cmd_next) {
-		parser_thread_define(inner_cmd, procflow, *instances);
+		parser_thread_define(inner_cmd, procflow, instances);
 	}
 }
 
@@ -1524,7 +1991,7 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 {
 	threadflow_t *threadflow, template;
 	attr_t *attr;
-	var_integer_t instances = integer_alloc(1);
+	avd_t instances;
 	cmd_t *inner_cmd;
 	char *name;
 
@@ -1532,7 +1999,7 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 
 	/* Get the name of the thread */
 	if (attr = get_attr(cmd, FSA_NAME)) {
-		name = *attr->attr_string;
+		name = avd_get_str(attr->attr_avd);
 	} else {
 		filebench_log(LOG_ERROR,
 		    "define thread: thread in process %s specifies no name",
@@ -1542,20 +2009,31 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 
 	/* Get the number of instances from attribute */
 	if (attr = get_attr_integer(cmd, FSA_INSTANCES)) {
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "define thread: Instances attr cannot be random");
+			filebench_shutdown(1);
+		}
 		filebench_log(LOG_DEBUG_IMPL,
 		    "define thread: Setting instances = %lld",
-		    *attr->attr_integer);
-		instances = attr->attr_integer;
-	}
+		    avd_get_int(attr->attr_avd));
+		instances = attr->attr_avd;
+	} else
+		instances = avd_int_alloc(1);
 
 	/* Get the memory size from attribute */
 	if (attr = get_attr_integer(cmd, FSA_MEMSIZE)) {
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "define thread: Memory size cannot be random");
+			filebench_shutdown(1);
+		}
 		filebench_log(LOG_DEBUG_IMPL,
 		    "define thread: Setting memsize = %lld",
-		    *attr->attr_integer);
-		template.tf_memsize = attr->attr_integer;
+		    avd_get_int(attr->attr_avd));
+		template.tf_memsize = attr->attr_avd;
 	} else
-		template.tf_memsize = integer_alloc(0);
+		template.tf_memsize = avd_int_alloc(0);
 
 	if ((threadflow = threadflow_define(procflow, name,
 	    &template, instances)) == NULL) {
@@ -1572,9 +2050,118 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 	/* Create the list of flowops */
 	for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
 	    inner_cmd = inner_cmd->cmd_next) {
-		parser_flowop_define(inner_cmd, threadflow);
+		parser_flowop_define(inner_cmd, threadflow,
+		    &threadflow->tf_ops, FLOW_MASTER);
 	}
 }
+
+/*
+ * Files in the attributes for a newly allocated flowop
+ */
+static void
+parser_flowop_get_attrs(cmd_t *cmd, flowop_t *flowop)
+{
+	attr_t *attr;
+
+	/* Get the filename from attribute */
+	if (attr = get_attr(cmd, FSA_FILE)) {
+		flowop->fo_filename = attr->attr_avd;
+		if (flowop->fo_filename == NULL) {
+			filebench_log(LOG_ERROR,
+			    "define flowop: no filename specfied");
+			filebench_shutdown(1);
+		}
+
+		if ((flowop->fo_filename->avd_type == AVD_VAL_STR) ||
+		    (flowop->fo_filename->avd_type == AVD_VARVAL_STR)) {
+			char *name;
+
+			name = avd_get_str(flowop->fo_filename);
+			flowop->fo_fileset = fileset_find(name);
+
+			if (flowop->fo_fileset == NULL) {
+				filebench_log(LOG_ERROR,
+				    "flowop %s: file %s not found",
+				    flowop->fo_name, name);
+				filebench_shutdown(1);
+			}
+		}
+	}
+
+	/* Get the iosize of the op */
+	if (attr = get_attr_integer(cmd, FSA_IOSIZE))
+		flowop->fo_iosize = attr->attr_avd;
+	else
+		flowop->fo_iosize = avd_int_alloc(0);
+
+	/* Get the working set size of the op */
+	if (attr = get_attr_integer(cmd, FSA_WSS))
+		flowop->fo_wss = attr->attr_avd;
+	else
+		flowop->fo_wss = avd_int_alloc(0);
+
+	/* Random I/O? */
+	if (attr = get_attr_bool(cmd, FSA_RANDOM))
+		flowop->fo_random = attr->attr_avd;
+	else
+		flowop->fo_random = avd_bool_alloc(FALSE);
+
+	/* Sync I/O? */
+	if (attr = get_attr_bool(cmd, FSA_DSYNC))
+		flowop->fo_dsync = attr->attr_avd;
+	else
+		flowop->fo_dsync = avd_bool_alloc(FALSE);
+
+	/* Target, for wakeup etc */
+	if (attr = get_attr(cmd, FSA_TARGET))
+		(void) strcpy(flowop->fo_targetname,
+		    avd_get_str(attr->attr_avd));
+
+	/* Value */
+	if (attr = get_attr_integer(cmd, FSA_VALUE))
+		flowop->fo_value = attr->attr_avd;
+	else
+		flowop->fo_value = avd_int_alloc(0);
+
+	/* FD */
+	if (attr = get_attr_integer(cmd, FSA_FD))
+		flowop->fo_fdnumber = avd_get_int(attr->attr_avd);
+
+	/* Rotatefd? */
+	if (attr = get_attr_bool(cmd, FSA_ROTATEFD))
+		flowop->fo_rotatefd = attr->attr_avd;
+	else
+		flowop->fo_rotatefd = avd_bool_alloc(FALSE);
+
+	/* SRC FD, for copies etc... */
+	if (attr = get_attr_integer(cmd, FSA_SRCFD))
+		flowop->fo_srcfdnumber = avd_get_int(attr->attr_avd);
+
+	/* Blocking operation? */
+	if (attr = get_attr_bool(cmd, FSA_BLOCKING))
+		flowop->fo_blocking = attr->attr_avd;
+	else
+		flowop->fo_blocking = avd_bool_alloc(FALSE);
+
+	/* Direct I/O Operation */
+	if (attr = get_attr_bool(cmd, FSA_DIRECTIO))
+		flowop->fo_directio = attr->attr_avd;
+	else
+		flowop->fo_directio = avd_bool_alloc(FALSE);
+
+	/* Highwater mark */
+	if (attr = get_attr_integer(cmd, FSA_HIGHWATER)) {
+		flowop->fo_highwater = attr->attr_avd;
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "define flowop: Highwater attr cannot be random");
+			filebench_shutdown(1);
+		}
+	} else {
+		flowop->fo_highwater = avd_int_alloc(1);
+	}
+}
+
 
 /*
  * Calls flowop_define() to allocate a flowop with the supplied name.
@@ -1604,7 +2191,8 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
  * fileobj or fileset cannot be located.
  */
 static void
-parser_flowop_define(cmd_t *cmd, threadflow_t *thread)
+parser_flowop_define(cmd_t *cmd, threadflow_t *thread,
+    flowop_t **flowoplist_hdp, int category)
 {
 	flowop_t *flowop, *flowop_type;
 	char *type = (char *)cmd->cmd_name;
@@ -1622,7 +2210,7 @@ parser_flowop_define(cmd_t *cmd, threadflow_t *thread)
 
 	/* Get the name of the flowop */
 	if (attr = get_attr(cmd, FSA_NAME)) {
-		name = *attr->attr_string;
+		name = avd_get_str(attr->attr_avd);
 	} else {
 		filebench_log(LOG_ERROR,
 		    "define flowop: flowop %s specifies no name",
@@ -1631,116 +2219,39 @@ parser_flowop_define(cmd_t *cmd, threadflow_t *thread)
 	}
 
 	if ((flowop = flowop_define(thread, name,
-	    flowop_type, FLOW_MASTER, 0)) == NULL) {
+	    flowop_type, category, 0)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "define flowop: Failed to instantiate flowop %s\n",
 		    cmd->cmd_name);
 		filebench_shutdown(1);
 	}
 
-	/* Get the filename from attribute */
-	if (attr = get_attr(cmd, FSA_FILE)) {
-		flowop->fo_fileset = fileset_find(*attr->attr_string);
-
-		if ((flowop->fo_fileset == NULL)) {
-			filebench_log(LOG_ERROR,
-			    "define flowop: file %s not found",
-			    *attr->attr_string);
-			filebench_shutdown(1);
-		}
-	}
-
-	/* Get the iosize of the op */
-	if (attr = get_attr_integer(cmd, FSA_IOSIZE))
-		flowop->fo_iosize = attr->attr_integer;
-	else
-		flowop->fo_iosize = integer_alloc(0);
-
-	/* Get the working set size of the op */
-	if (attr = get_attr_integer(cmd, FSA_WSS))
-		flowop->fo_wss = attr->attr_integer;
-	else
-		flowop->fo_wss = integer_alloc(0);
-
-	/* Random I/O? */
-	if (attr = get_attr_bool(cmd, FSA_RANDOM))
-		flowop->fo_random = attr->attr_integer;
-	else
-		flowop->fo_random = integer_alloc(0);
-
-	/* Sync I/O? */
-	if (attr = get_attr_bool(cmd, FSA_DSYNC))
-		flowop->fo_dsync = attr->attr_integer;
-	else
-		flowop->fo_dsync = integer_alloc(0);
-
 	/* Iterations */
 	if (attr = get_attr_integer(cmd, FSA_ITERS))
-		flowop->fo_iters = attr->attr_integer;
+		flowop->fo_iters = attr->attr_avd;
 	else
-		flowop->fo_iters = integer_alloc(1);
+		flowop->fo_iters = avd_int_alloc(1);
 
-
-	/* Target, for wakeup etc */
-	if (attr = get_attr(cmd, FSA_TARGET))
-		(void) strcpy(flowop->fo_targetname, *attr->attr_string);
-
-	/* Value */
-	if (attr = get_attr_integer(cmd, FSA_VALUE))
-		flowop->fo_value = attr->attr_integer;
-	else
-		flowop->fo_value = integer_alloc(0);
-
-	/* FD */
-	if (attr = get_attr_integer(cmd, FSA_FD))
-		flowop->fo_fdnumber = *attr->attr_integer;
-
-	/* Rotatefd? */
-	if (attr = get_attr_bool(cmd, FSA_ROTATEFD))
-		flowop->fo_rotatefd = attr->attr_integer;
-	else
-		flowop->fo_rotatefd = integer_alloc(0);
-
-	/* SRC FD, for copies etc... */
-	if (attr = get_attr_integer(cmd, FSA_SRCFD))
-		flowop->fo_srcfdnumber = *attr->attr_integer;
-
-	/* Blocking operation? */
-	if (attr = get_attr_bool(cmd, FSA_BLOCKING))
-		flowop->fo_blocking = attr->attr_integer;
-	else
-		flowop->fo_blocking = integer_alloc(0);
-
-	/* Blocking operation? */
-	if (attr = get_attr_bool(cmd, FSA_DIRECTIO))
-		flowop->fo_directio = attr->attr_integer;
-	else
-		flowop->fo_directio = integer_alloc(0);
-
-	/* Highwater mark */
-	if (attr = get_attr_integer(cmd, FSA_HIGHWATER))
-		flowop->fo_highwater = attr->attr_integer;
-	else
-		flowop->fo_highwater = integer_alloc(1);
+	parser_flowop_get_attrs(cmd, flowop);
 }
 
 /*
  * Calls fileset_define() to allocate a fileset with the supplied name and
- * initializes the fileset's pathname attribute, and optionally the fs_cached,
- * fs_reuse, fs_prealloc and fs_size attributes.
+ * initializes the fileset's pathname attribute, and optionally the
+ * fileset_cached, fileset_reuse, fileset_prealloc and fileset_size attributes.
  *
  */
 static fileset_t *
 parser_fileset_define_common(cmd_t *cmd)
 {
 	fileset_t *fileset;
-	char *name;
+	avd_t name;
 	attr_t *attr;
-	var_string_t pathname;
+	avd_t pathname;
 
 	/* Get the name of the file */
 	if (attr = get_attr(cmd, FSA_NAME)) {
-		name = *attr->attr_string;
+		name = attr->attr_avd;
 	} else {
 		filebench_log(LOG_ERROR,
 		    "define fileset: file or fileset specifies no name");
@@ -1750,7 +2261,7 @@ parser_fileset_define_common(cmd_t *cmd)
 	if ((fileset = fileset_define(name)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "define file: failed to instantiate file %s\n",
-		    name);
+		    avd_get_str(name));
 		return (NULL);
 	}
 
@@ -1770,36 +2281,37 @@ parser_fileset_define_common(cmd_t *cmd)
 	fileset->fs_path = pathname;
 
 	/* Should we prealloc in parallel? */
-	if (attr = get_attr_bool(cmd, FSA_PARALLOC)) {
-		fileset->fs_paralloc = attr->attr_integer;
-	} else
-		fileset->fs_paralloc = integer_alloc(0);
+	if (attr = get_attr_bool(cmd, FSA_PARALLOC))
+		fileset->fs_paralloc = attr->attr_avd;
+	else
+		fileset->fs_paralloc = avd_bool_alloc(FALSE);
 
 	/* Should we reuse the existing file? */
 	if (attr = get_attr_bool(cmd, FSA_REUSE)) {
-		fileset->fs_reuse = attr->attr_integer;
+		fileset->fs_reuse = attr->attr_avd;
 	} else
-		fileset->fs_reuse = integer_alloc(0);
+		fileset->fs_reuse = avd_bool_alloc(FALSE);
 
 	/* Should we leave in cache? */
 	if (attr = get_attr_bool(cmd, FSA_CACHED)) {
-		fileset->fs_cached = attr->attr_integer;
+		fileset->fs_cached = attr->attr_avd;
 	} else
-		fileset->fs_cached = integer_alloc(0);
+		fileset->fs_cached = avd_bool_alloc(FALSE);
 
 	/* Get the mean or absolute size of the file */
 	if (attr = get_attr_integer(cmd, FSA_SIZE)) {
-		fileset->fs_size = attr->attr_integer;
+		fileset->fs_size = attr->attr_avd;
 	} else
-		fileset->fs_size = integer_alloc(0);
+		fileset->fs_size = avd_int_alloc(0);
 
 	return (fileset);
 }
 
 /*
  * Calls parser_fileset_define_common() to allocate a fileset with
- * one entry and optionally the fs_prealloc. Sets the fs_preallocpercent,
- * fs_entries, fs_dirwidth, fs_dirgamma, and fs_sizegamma attributes
+ * one entry and optionally the fileset_prealloc. Sets the
+ * fileset_preallocpercent, fileset_entries, fileset_dirwidth,
+ * fileset_dirgamma, and fileset_sizegamma attributes
  * to appropriate values for emulating the old "fileobj" entity
  */
 static void
@@ -1819,39 +2331,40 @@ parser_file_define(cmd_t *cmd)
 	fileset->fs_attrs = FILESET_IS_FILE;
 
 	/* Set the size of the fileset to 1 */
-	fileset->fs_entries = integer_alloc(1);
+	fileset->fs_entries = avd_int_alloc(1);
 
 	/* Set the mean dir width to more than 1 */
-	fileset->fs_dirwidth = integer_alloc(10);
+	fileset->fs_dirwidth = avd_int_alloc(10);
 
 	/* Set the dir and size gammas to 0 */
-	fileset->fs_dirgamma = integer_alloc(0);
-	fileset->fs_sizegamma = integer_alloc(0);
+	fileset->fs_dirgamma = avd_int_alloc(0);
+	fileset->fs_sizegamma = avd_int_alloc(0);
 
 	/* if a raw device, all done */
 	if (fileset_checkraw(fileset)) {
 		filebench_log(LOG_VERBOSE, "File %s/%s is RAW device",
-		    *fileset->fs_path, fileset->fs_name);
+		    avd_get_str(fileset->fs_path),
+		    avd_get_str(fileset->fs_name));
 		return;
 	}
 
 	/* Does file need to be preallocated? */
 	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
 		/* yes */
-		fileset->fs_prealloc = attr->attr_integer;
-		fileset->fs_preallocpercent = integer_alloc(100);
+		fileset->fs_prealloc = attr->attr_avd;
+		fileset->fs_preallocpercent = avd_int_alloc(100);
 	} else {
 		/* no */
-		fileset->fs_prealloc = integer_alloc(0);
-		fileset->fs_preallocpercent = integer_alloc(0);
+		fileset->fs_prealloc = avd_bool_alloc(FALSE);
+		fileset->fs_preallocpercent = avd_int_alloc(0);
 	}
 }
 
 /*
  * Calls parser_fileset_define_common() to allocate a fileset with the
- * supplied name and initializes the fileset's fs_preallocpercent,
- * fs_prealloc, fs_entries, fs_dirwidth, fs_dirgamma, and fs_sizegamma
- * attributes.
+ * supplied name and initializes the fileset's fileset_preallocpercent,
+ * fileset_prealloc, fileset_entries, fileset_dirwidth, fileset_dirgamma,
+ * and fileset_sizegamma attributes.
  */
 static void
 parser_fileset_define(cmd_t *cmd)
@@ -1870,54 +2383,82 @@ parser_fileset_define(cmd_t *cmd)
 	if (fileset_checkraw(fileset)) {
 		filebench_log(LOG_ERROR,
 		    "Fileset %s/%s: Cannot create a fileset on a RAW device",
-		    *fileset->fs_path, fileset->fs_name);
+		    avd_get_str(fileset->fs_path),
+		    avd_get_str(fileset->fs_name));
 		filebench_shutdown(0);
 		return;
 	}
 
 	/* How much should we preallocate? */
 	if ((attr = get_attr_integer(cmd, FSA_PREALLOC)) &&
-	    attr->attr_integer) {
-		fileset->fs_preallocpercent = attr->attr_integer;
-	} else if (attr && !attr->attr_integer) {
-		fileset->fs_preallocpercent = integer_alloc(100);
+	    attr->attr_avd) {
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "define fileset: Prealloc attr cannot be random");
+			filebench_shutdown(1);
+		}
+		fileset->fs_preallocpercent = attr->attr_avd;
+	} else if (attr && !attr->attr_avd) {
+		fileset->fs_preallocpercent = avd_int_alloc(100);
 	} else {
-		fileset->fs_preallocpercent = integer_alloc(0);
+		fileset->fs_preallocpercent = avd_int_alloc(0);
 	}
 
 	/* Should we preallocate? */
 	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
-		fileset->fs_prealloc = attr->attr_integer;
+		fileset->fs_prealloc = attr->attr_avd;
 	} else
-		fileset->fs_prealloc = integer_alloc(0);
+		fileset->fs_prealloc = avd_bool_alloc(FALSE);
 
 	/* Get the number of files in the fileset */
 	if (attr = get_attr_integer(cmd, FSA_ENTRIES)) {
-		fileset->fs_entries = attr->attr_integer;
+		fileset->fs_entries = attr->attr_avd;
 	} else {
 		filebench_log(LOG_ERROR, "Fileset has zero entries");
-		fileset->fs_entries = integer_alloc(0);
+		fileset->fs_entries = avd_int_alloc(0);
 	}
 
 	/* Get the mean dir width of the fileset */
 	if (attr = get_attr_integer(cmd, FSA_DIRWIDTH)) {
-		fileset->fs_dirwidth = attr->attr_integer;
+		fileset->fs_dirwidth = attr->attr_avd;
 	} else {
 		filebench_log(LOG_ERROR, "Fileset has zero directory width");
-		fileset->fs_dirwidth = integer_alloc(0);
+		fileset->fs_dirwidth = avd_int_alloc(0);
 	}
 
-	/* Get the gamma value for dir width distributions */
+	/* Get the random variable for dir depth, if supplied */
+	if (attr = get_attr_integer(cmd, FSA_DIRDEPTHRV)) {
+		if (!AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "Define fileset: dirdepthrv must be random var");
+			filebench_shutdown(1);
+		}
+		fileset->fs_dirdepthrv = attr->attr_avd;
+	} else {
+		fileset->fs_dirdepthrv = NULL;
+	}
+
+	/* Get the gamma value for dir depth distributions */
 	if (attr = get_attr_integer(cmd, FSA_DIRGAMMA)) {
-		fileset->fs_dirgamma = attr->attr_integer;
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "Define fileset: dirgamma attr cannot be random");
+			filebench_shutdown(1);
+		}
+		fileset->fs_dirgamma = attr->attr_avd;
 	} else
-		fileset->fs_dirgamma = integer_alloc(1500);
+		fileset->fs_dirgamma = avd_int_alloc(1500);
 
 	/* Get the gamma value for dir width distributions */
 	if (attr = get_attr_integer(cmd, FSA_FILESIZEGAMMA)) {
-		fileset->fs_sizegamma = attr->attr_integer;
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "Define fileset: filesizegamma cannot be random");
+			filebench_shutdown(1);
+		}
+		fileset->fs_sizegamma = attr->attr_avd;
 	} else
-		fileset->fs_sizegamma = integer_alloc(1500);
+		fileset->fs_sizegamma = avd_int_alloc(1500);
 }
 
 /*
@@ -1972,6 +2513,11 @@ parser_fileset_create(cmd_t *cmd)
 {
 	if (!filecreate_done) {
 		filecreate_done = 1;
+
+		/* initialize the random number system first */
+		randdist_init();
+
+		/* create all the filesets */
 		if (fileset_createset(NULL) != 0) {
 			filebench_log(LOG_ERROR, "Failed to create filesets");
 			filebench_shutdown(1);
@@ -2081,7 +2627,7 @@ parser_run(cmd_t *cmd)
 static void
 parser_run_variable(cmd_t *cmd)
 {
-	vinteger_t *integer = var_ref_integer(cmd->cmd_tgt1);
+	avd_t integer = var_ref_attr(cmd->cmd_tgt1);
 	int runtime;
 
 	if (integer == NULL) {
@@ -2090,7 +2636,7 @@ parser_run_variable(cmd_t *cmd)
 		return;
 	}
 
-	runtime = *integer;
+	runtime = avd_get_int(integer);
 
 	/* check for startup errors */
 	if (filebench_shm->f_abort)
@@ -2199,13 +2745,35 @@ parser_sleep(cmd_t *cmd)
 }
 
 /*
+ * used by the set command to set the integer part of a regular
+ * variable, or the appropriate field of a random variable
+ */
+static void
+parser_set_integer(char *name, fbint_t integer)
+{
+	var_assign_integer(name, integer);
+}
+
+/*
+ * used by the set command to set the integer part of a regular
+ * variable from another variable, or the appropriate field of a
+ * random variable from another variable
+ */
+static void
+parser_set_var(char *dst_name, char *src_name)
+{
+	var_assign_var(dst_name, src_name);
+}
+
+
+/*
  * Same as parser_sleep, except the sleep time is obtained from a variable
  * whose name is passed to it as an argument on the command line.
  */
 static void
 parser_sleep_variable(cmd_t *cmd)
 {
-	vinteger_t *integer = var_ref_integer(cmd->cmd_tgt1);
+	avd_t integer = var_ref_attr(cmd->cmd_tgt1);
 	int sleeptime;
 
 	if (integer == NULL) {
@@ -2214,7 +2782,7 @@ parser_sleep_variable(cmd_t *cmd)
 		return;
 	}
 
-	sleeptime = *integer;
+	sleeptime = avd_get_int(integer);
 
 	/* check for startup errors */
 	if (filebench_shm->f_abort)
@@ -2575,6 +3143,205 @@ parser_abort(int arg)
 }
 
 /*
+ * define a random variable and initialize the distribution parameters
+ */
+static void
+parser_randvar_define(cmd_t *cmd)
+{
+	var_t		*var;
+	randdist_t	*rndp;
+	attr_t		*attr;
+	char		*name;
+
+	/* Get the name for the random variable */
+	if (attr = get_attr(cmd, FSA_NAME)) {
+		name = avd_get_str(attr->attr_avd);
+	} else {
+		filebench_log(LOG_ERROR,
+		    "define randvar: no name specified");
+		return;
+	}
+
+	if ((var = var_define_randvar(name)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "define randvar: failed for random variable %s",
+		    name);
+		return;
+	}
+
+	rndp = var->var_val.randptr;
+	rndp->rnd_type = 0;
+
+	/* Get the source of the random numbers */
+	if (attr = get_attr_integer(cmd, FSA_RANDSRC)) {
+		int randsrc = (int)avd_get_int(attr->attr_avd);
+
+		switch (randsrc) {
+		case FSV_URAND:
+			rndp->rnd_type |= RAND_SRC_URANDOM;
+			break;
+		case FSV_RAND48:
+			rndp->rnd_type |= RAND_SRC_GENERATOR;
+			break;
+		}
+	} else {
+		/* default to rand48 random number generator */
+		rndp->rnd_type |= RAND_SRC_GENERATOR;
+	}
+
+	/* Get the min value of the random distribution */
+	if (attr = get_attr_integer(cmd, FSA_RANDMIN))
+		rndp->rnd_min = attr->attr_avd;
+	else
+		rndp->rnd_min = avd_int_alloc(0);
+
+	/* Get the mean value of the random distribution */
+	if (attr = get_attr_integer(cmd, FSA_RANDMEAN))
+		rndp->rnd_mean = attr->attr_avd;
+	else
+		rndp->rnd_mean = avd_int_alloc(0);
+
+	/* Get the roundoff value for the random distribution */
+	if (attr = get_attr_integer(cmd, FSA_RANDROUND))
+		rndp->rnd_round = attr->attr_avd;
+	else
+		rndp->rnd_round = avd_int_alloc(0);
+
+	/* Get a tablular probablility distribution if there is one */
+	if (attr = get_attr(cmd, FSA_RANDTABLE)) {
+		rndp->rnd_probtabs = (probtabent_t *)(attr->attr_obj);
+		rndp->rnd_type |= RAND_TYPE_TABLE;
+
+		/* no need for the rest of the attributes */
+		return;
+	} else {
+		rndp->rnd_probtabs = NULL;
+	}
+
+	/* Get the type for the random variable */
+	if (attr = get_attr(cmd, FSA_TYPE)) {
+		int disttype = (int)avd_get_int(attr->attr_avd);
+
+		switch (disttype) {
+		case FSV_RANDUNI:
+			rndp->rnd_type |= RAND_TYPE_UNIFORM;
+			break;
+		case FSA_RANDGAMMA:
+			rndp->rnd_type |= RAND_TYPE_GAMMA;
+			break;
+		case FSV_RANDTAB:
+			filebench_log(LOG_ERROR,
+			    "Table distribution type without prob table");
+			break;
+		}
+	} else {
+		/* default to gamma distribution type */
+		rndp->rnd_type |= RAND_TYPE_GAMMA;
+	}
+
+	/* Get the seed for the random variable */
+	if (attr = get_attr_integer(cmd, FSA_RANDSEED))
+		rndp->rnd_seed = attr->attr_avd;
+	else
+		rndp->rnd_seed = avd_int_alloc(0);
+
+	/* Get the gamma value of the random distribution */
+	if (attr = get_attr_integer(cmd, FSA_RANDGAMMA))
+		rndp->rnd_gamma = attr->attr_avd;
+	else
+		rndp->rnd_gamma = avd_int_alloc(1500);
+}
+
+/*
+ * Set a specified random distribution parameter in a random variable.
+ */
+static void
+parser_randvar_set(cmd_t *cmd)
+{
+	var_t		*src_var, *randvar;
+	randdist_t	*rndp;
+	avd_t	value;
+
+	if ((randvar = var_find_randvar(cmd->cmd_tgt1)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "set randvar: failed",
+		    cmd->cmd_tgt1);
+		return;
+	}
+
+	rndp = randvar->var_val.randptr;
+	value = cmd->cmd_attr_list->attr_avd;
+
+	switch (cmd->cmd_qty) {
+	case FSS_TYPE:
+		{
+			int disttype = (int)avd_get_int(value);
+
+			printf("parser_randvar_set: changing type to %d\n",
+			    disttype);
+			rndp->rnd_type &= (~RAND_TYPE_MASK);
+
+			switch (disttype) {
+			case FSV_RANDUNI:
+				rndp->rnd_type |= RAND_TYPE_UNIFORM;
+				break;
+			case FSA_RANDGAMMA:
+				rndp->rnd_type |= RAND_TYPE_GAMMA;
+				break;
+			case FSV_RANDTAB:
+				rndp->rnd_type |= RAND_TYPE_TABLE;
+				break;
+			}
+			break;
+		}
+
+	case FSS_SRC:
+		{
+			int randsrc = (int)avd_get_int(value);
+
+			printf("parser_randvar_set: changing source to %d\n",
+			    randsrc);
+
+			rndp->rnd_type &=
+			    (~(RAND_SRC_URANDOM | RAND_SRC_GENERATOR));
+
+			switch (randsrc) {
+			case FSV_URAND:
+				rndp->rnd_type |= RAND_SRC_URANDOM;
+				break;
+			case FSV_RAND48:
+				rndp->rnd_type |= RAND_SRC_GENERATOR;
+				break;
+			}
+			break;
+		}
+
+	case FSS_SEED:
+		rndp->rnd_seed = value;
+		break;
+
+	case FSS_GAMMA:
+		rndp->rnd_gamma = value;
+		break;
+
+	case FSS_MEAN:
+		rndp->rnd_mean = value;
+		break;
+
+	case FSS_MIN:
+		rndp->rnd_min = value;
+		break;
+
+	case FSS_ROUND:
+		rndp->rnd_round = value;
+		break;
+
+	default:
+		filebench_log(LOG_ERROR, "setrandvar: undefined attribute");
+	}
+}
+
+/*
  * alloc_cmd() allocates the required resources for a cmd_t. On failure, a
  * filebench_log is issued and NULL is returned.
  */
@@ -2622,12 +3389,29 @@ alloc_attr()
 }
 
 /*
+ * Allocates a probtabent_t structure and zeros it. Returns NULL on failure, or
+ * a pointer to the probtabent_t.
+ */
+static probtabent_t *
+alloc_probtabent(void)
+{
+	probtabent_t *rte;
+
+	if ((rte = malloc(sizeof (probtabent_t))) == NULL) {
+		return (NULL);
+	}
+
+	(void) memset(rte, 0, sizeof (probtabent_t));
+	return (rte);
+}
+
+/*
  * Searches the attribute list for the command for the named attribute type.
  * The attribute list is created by the parser from the list of attributes
  * supplied with certain commands, such as the define and flowop commands.
  * Returns a pointer to the attribute structure if the named attribute is
  * found, otherwise returns NULL. If the attribute includes a parameter list,
- * the list is converted to a string and stored in the attr_string field of
+ * the list is converted to a string and stored in the attr_avd field of
  * the returned attr_t struct.
  */
 static attr_t *
@@ -2643,7 +3427,7 @@ get_attr(cmd_t *cmd, int64_t name)
 		    "attr %d = %d %llx?",
 		    attr->attr_name,
 		    name,
-		    attr->attr_integer);
+		    attr->attr_avd);
 
 		if (attr->attr_name == name)
 			rtn = attr;
@@ -2656,7 +3440,7 @@ get_attr(cmd_t *cmd, int64_t name)
 		filebench_log(LOG_DEBUG_SCRIPT, "attr is param list");
 		string = parser_list2string(rtn->attr_param_list);
 		if (string != NULL) {
-			rtn->attr_string = string_alloc(string);
+			rtn->attr_avd = avd_str_alloc(string);
 			filebench_log(LOG_DEBUG_SCRIPT,
 			    "attr string %s", string);
 		}
@@ -2667,7 +3451,7 @@ get_attr(cmd_t *cmd, int64_t name)
 
 /*
  * Similar to get_attr, but converts the parameter string supplied with the
- * named attribute to an integer and stores the integer in the attr_integer
+ * named attribute to an integer and stores the integer in the attr_avd
  * portion of the returned attr_t struct.
  */
 static attr_t *
@@ -2685,16 +3469,15 @@ get_attr_integer(cmd_t *cmd, int64_t name)
 	if (rtn == NULL)
 		return (NULL);
 
-	if (rtn->attr_param_list) {
-		rtn->attr_integer = parser_list2integer(rtn->attr_param_list);
-	}
+	if (rtn->attr_param_list)
+		rtn->attr_avd = parser_list2avd(rtn->attr_param_list);
 
 	return (rtn);
 }
 
 /*
  * Similar to get_attr, but converts the parameter string supplied with the
- * named attribute to an integer and stores the integer in the attr_integer
+ * named attribute to an integer and stores the integer in the attr_avd
  * portion of the returned attr_t struct. If no parameter string is supplied
  * then it defaults to TRUE (1).
  */
@@ -2714,9 +3497,18 @@ get_attr_bool(cmd_t *cmd, int64_t name)
 		return (NULL);
 
 	if (rtn->attr_param_list) {
-		rtn->attr_integer = parser_list2integer(rtn->attr_param_list);
-	} else if (rtn->attr_integer == 0) {
-		rtn->attr_integer = integer_alloc(1);
+		rtn->attr_avd = parser_list2avd(rtn->attr_param_list);
+
+	} else if (rtn->attr_avd == NULL) {
+		rtn->attr_avd = avd_bool_alloc(TRUE);
+	}
+
+	/* boolean attributes cannot point to random variables */
+	if (AVD_IS_RANDOM(rtn->attr_avd)) {
+		filebench_log(LOG_ERROR,
+		    "define flowop: Boolean attr %s cannot be random", name);
+		filebench_shutdown(1);
+		return (NULL);
 	}
 
 	return (rtn);

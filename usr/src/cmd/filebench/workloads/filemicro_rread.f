@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,7 @@ set $iosize=2k
 set $bytes=128m
 set $iters=1
 set $filesize=1g
+set $cached=false
 
 define file name=bigfile1,path=$dir,size=$filesize,prealloc,reuse,cached=$cached
 
@@ -42,11 +43,12 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "FileMicro-ReadRand Version 2.0 personality successfully loaded"
+echo  "FileMicro-ReadRand Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$filesize=<size>  defaults to $filesize"
-usage "       set \$iosize=<size>    defaults to $iosize"
-usage "       set \$bytes=<value>    defaults to $bytes"
-usage "       set \$nthreads=<value> defaults to $nthreads"
+usage "       set \$bytes=<value>     defaults to $bytes"
+usage "       set \$cached=<bool>     defaults to $cached"
+usage "       set \$filesize=<size>   defaults to $filesize"
+usage "       set \$iosize=<size>     defaults to $iosize"
+usage "       set \$nthreads=<value>  defaults to $nthreads"
 usage " "
 usage "       run runtime (e.g. run 60)"

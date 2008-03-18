@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 void eventgen_init(void);
-void eventgen_setrate(vinteger_t rate);
+void eventgen_setrate(fbint_t rate);
 var_t *eventgen_ratevar(var_t *var);
 void eventgen_usage(void);
 void eventgen_reset(void);

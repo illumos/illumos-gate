@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,30 +40,136 @@
 extern "C" {
 #endif
 
-typedef uint64_t vinteger_t;
-typedef vinteger_t *var_integer_t;
-typedef char **var_string_t;
+/* Attribute Value Descriptor types */
+typedef enum avd_type {
+	AVD_INVALID = 0,	/* avd is empty */
+	AVD_VAL_BOOL,		/* avd contains a boolean_t */
+	AVD_VARVAL_BOOL,	/* avd points to the boolean_t in a var_t */
+	AVD_VAL_INT,		/* avd contains an fbint_t */
+	AVD_VARVAL_INT,		/* avd points to the fbint_t in a var_t */
+	AVD_VAL_STR,		/* avd contains a sting (*char) */
+	AVD_VARVAL_STR,		/* avd points to a string in a var_t */
+	AVD_VAL_DBL,		/* avd contains a double float */
+	AVD_VARVAL_DBL,		/* avd points to the double in a var_t */
+	AVD_IND_VAR,		/* avd points a var_t */
+	AVD_IND_RANDVAR		/* avd points to the randdist_t associated */
+				/* with a random type var_t */
+} avd_type_t;
+
+typedef uint64_t fbint_t;
+
+/* Attribute Value Descriptor */
+typedef struct avd {
+	avd_type_t  avd_type;
+	union {
+		boolean_t	boolval;
+		boolean_t	*boolptr;
+		fbint_t		intval;
+		fbint_t		*intptr;
+		double		dblval;
+		double		*dblptr;
+		char		*strval;
+		char		**strptr;
+		struct randdist *randptr;
+		struct var	*varptr;
+	} avd_val;
+} *avd_t;
+
+#define	AVD_IS_RANDOM(vp)	((vp)->avd_type == AVD_IND_RANDVAR)
 
 typedef struct var {
 	char		*var_name;
 	int		var_type;
 	struct var	*var_next;
-	char		*var_string;
-	vinteger_t	var_integer;
+	union {
+		boolean_t	boolean;
+		fbint_t		integer;
+		double		dbl_flt;
+		char		*string;
+		struct randdist *randptr;
+	} var_val;
 } var_t;
 
-#define	VAR_TYPE_DYNAMIC 1
+#define	VAR_TYPE_GLOBAL		0x00	/* global variable */
+#define	VAR_TYPE_DYNAMIC	0x01	/* Dynamic variable */
+#define	VAR_TYPE_RANDOM		0x02	/* random variable */
+#define	VAR_TYPE_MASK		0x0f
+#define	VAR_TYPE_BOOL_SET	0x10	/* var contains a boolean */
+#define	VAR_TYPE_INT_SET	0x20	/* var contains an integer */
+#define	VAR_TYPE_STR_SET	0x30	/* var contains a string */
+#define	VAR_TYPE_DBL_SET	0x40	/* var contains a double */
+#define	VAR_TYPE_RAND_SET	0x50	/* var contains a randdist pointer */
+#define	VAR_TYPE_SET_MASK	0xf0
 
-vinteger_t *integer_alloc(vinteger_t integer);
-char **string_alloc(char *string);
-int var_assign_integer(char *name, vinteger_t integer);
-vinteger_t *var_ref_integer(char *name);
+#define	VAR_HAS_BOOLEAN(vp) \
+	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_BOOL_SET)
+
+#define	VAR_HAS_INTEGER(vp) \
+	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_INT_SET)
+
+#define	VAR_HAS_DOUBLE(vp) \
+	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_DBL_SET)
+
+#define	VAR_HAS_STRING(vp) \
+	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_STR_SET)
+
+#define	VAR_HAS_RANDDIST(vp) \
+	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_RAND_SET)
+
+#define	VAR_SET_BOOL(vp, val)	\
+	{			\
+		(vp)->var_val.boolean = (val); \
+		(vp)->var_type = \
+		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_BOOL_SET);\
+	}
+
+#define	VAR_SET_INT(vp, val)	\
+	{			\
+		(vp)->var_val.integer = (val); \
+		(vp)->var_type = \
+		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_INT_SET); \
+	}
+
+#define	VAR_SET_DBL(vp, val)	\
+	{			\
+		(vp)->var_val.dbl_flt = (val); \
+		(vp)->var_type = \
+		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_DBL_SET); \
+	}
+
+#define	VAR_SET_STR(vp, val)	\
+	{			\
+		(vp)->var_val.string = (val); \
+		(vp)->var_type = \
+		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_STR_SET); \
+	}
+
+#define	VAR_SET_RAND(vp, val)	\
+	{			\
+		(vp)->var_val.randptr = (val); \
+		(vp)->var_type = \
+		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_RAND_SET);\
+	}
+
+avd_t avd_bool_alloc(boolean_t bool);
+avd_t avd_int_alloc(fbint_t integer);
+avd_t avd_str_alloc(char *string);
+avd_t var_ref_attr(char *name);
+int var_assign_boolean(char *name, boolean_t bool);
+int var_assign_integer(char *name, fbint_t integer);
 int var_assign_string(char *name, char *string);
 int var_assign_var(char *name, char *string);
-char **var_ref_string(char *name);
+var_t *var_define_randvar(char *name);
+var_t *var_find_randvar(char *name);
+boolean_t var_to_boolean(char *name);
+fbint_t var_to_integer(char *name);
 char *var_to_string(char *name);
-vinteger_t var_to_integer(char *name);
-int integer_isset(var_integer_t);
+char *var_randvar_to_string(char *name, int param);
+boolean_t avd_get_bool(avd_t);
+fbint_t avd_get_int(avd_t);
+double avd_get_dbl(avd_t);
+char *avd_get_str(avd_t);
+int var_is_set4_randvar(char *name);
 
 #ifdef	__cplusplus
 }

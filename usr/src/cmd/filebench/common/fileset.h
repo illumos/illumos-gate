@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,37 +92,45 @@ typedef struct filesetentry {
 
 typedef struct fileset {
 	struct fileset	*fs_next;	/* Next in list */
-	char		fs_name[128];	/* Name */
-	var_string_t	fs_path;	/* Pathname prefix in fs */
-	var_integer_t	fs_entries;	/* Set size */
-	var_integer_t	fs_preallocpercent; /* Prealloc size */
+	avd_t		fs_name;	/* Name */
+	avd_t		fs_path;	/* Pathname prefix in fileset */
+	avd_t		fs_entries;	/* Number of entries attr */
+					/* (possibly random) */
+	fbint_t		fs_constentries; /* Constant version of enties attr */
+	avd_t		fs_preallocpercent; /* Prealloc size */
 	int		fs_attrs;	/* Attributes */
-	var_integer_t	fs_dirwidth;	/* Explicit or 0 for distribution */
-	var_integer_t	fs_size;	/* Explicit or 0 for distribution */
-	var_integer_t	fs_dirgamma;  /* Dirwidth Gamma distribution (* 1000) */
-	var_integer_t	fs_sizegamma; /* Filesize Gamma distribution (* 1000) */
-	var_integer_t	fs_create;	/* Attr */
-	var_integer_t	fs_prealloc;	/* Attr */
-	var_integer_t	fs_paralloc;	/* Attr */
-	var_integer_t	fs_cached;	/* Attr */
-	var_integer_t	fs_reuse;	/* Attr */
+	avd_t		fs_dirwidth;	/* Explicit or mean for distribution */
+	avd_t		fs_dirdepthrv;	/* random variable for dir depth */
+	avd_t		fs_size;	/* Explicit or mean for distribution */
+	avd_t		fs_dirgamma;	/* Dirdepth Gamma distribution */
+					/* (* 1000) defaults to 1500, set */
+					/* to 0 for explicit depth */
+	avd_t		fs_sizegamma;	/* Filesize and dirwidth Gamma */
+					/* distribution (* 1000), default */
+					/* is 1500, set to 0 for explicit */
+	avd_t		fs_create;	/* Attr */
+	avd_t		fs_prealloc;	/* Attr */
+	avd_t		fs_paralloc;	/* Attr */
+	avd_t		fs_cached;	/* Attr */
+	avd_t		fs_reuse;	/* Attr */
 	double		fs_meandepth;	/* Computed mean depth */
 	double		fs_meanwidth;	/* Specified mean dir width */
 	double		fs_meansize;	/* Specified mean file size */
 	int		fs_realfiles;	/* Actual files */
-	off64_t		fs_bytes; /* Space potentially consumed by all files */
+	off64_t		fs_bytes;	/* Total space consumed by files */
 	filesetentry_t	*fs_filelist;	/* List of files */
 	filesetentry_t	*fs_dirlist;	/* List of directories */
 	filesetentry_t	*fs_filefree;	/* Ptr to next free file */
 	filesetentry_t	*fs_dirfree;	/* Ptr to next free directory */
-	filesetentry_t	*fs_filerotor[FSE_MAXTID]; /* next file to select */
+	filesetentry_t	*fs_filerotor[FSE_MAXTID];	/* next file to */
+							/* select */
 	filesetentry_t	*fs_dirrotor;	/* Ptr to next directory to select */
 } fileset_t;
 
 int fileset_createset(fileset_t *);
 int fileset_openfile(fileset_t *fileset, filesetentry_t *entry,
     int flag, int mode, int attrs);
-fileset_t *fileset_define(char *);
+fileset_t *fileset_define(avd_t);
 fileset_t *fileset_find(char *name);
 filesetentry_t *fileset_pick(fileset_t *fileset, int flags, int tid);
 char *fileset_resolvepath(filesetentry_t *entry);

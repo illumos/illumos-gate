@@ -82,12 +82,15 @@ threadflow_usage(void)
 static int
 threadflow_createthread(threadflow_t *threadflow)
 {
+	fbint_t memsize;
+	memsize = avd_get_int(threadflow->tf_memsize);
+	threadflow->tf_constmemsize = memsize;
+
 	filebench_log(LOG_DEBUG_SCRIPT, "Creating thread %s, memory = %ld",
-	    threadflow->tf_name,
-	    *threadflow->tf_memsize);
+	    threadflow->tf_name, memsize);
 
 	if (threadflow->tf_attrs & THREADFLOW_USEISM)
-		filebench_shm->shm_required += (*threadflow->tf_memsize);
+		filebench_shm->shm_required += memsize;
 
 	if (pthread_create(&threadflow->tf_tid, NULL,
 	    (void *(*)(void*))flowop_start, threadflow) != 0) {
@@ -161,14 +164,15 @@ threadflow_init(procflow_t *procflow)
 
 	while (threadflow) {
 		threadflow_t *newthread;
+		int instances;
 		int i;
 
+		instances = avd_get_int(threadflow->tf_instances);
 		filebench_log(LOG_VERBOSE,
 		    "Starting %lld %s threads",
-		    *(threadflow->tf_instances),
-		    threadflow->tf_name);
+		    instances, threadflow->tf_name);
 
-		for (i = 1; i < *threadflow->tf_instances; i++) {
+		for (i = 1; i < instances; i++) {
 			/* Create threads */
 			newthread =
 			    threadflow_define_common(procflow,
@@ -257,9 +261,8 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 	    threadflow->tf_name,
 	    threadflow->tf_instance);
 
-	if (threadflow->tf_attrs & THREADFLOW_USEISM) {
-		filebench_shm->shm_required -= (*threadflow->tf_memsize);
-	}
+	if (threadflow->tf_attrs & THREADFLOW_USEISM)
+		filebench_shm->shm_required -= threadflow->tf_constmemsize;
 
 	if (threadflow == *threadlist) {
 		/* First on list */
@@ -442,7 +445,7 @@ threadflow_define_common(procflow_t *procflow, char *name,
  */
 threadflow_t *
 threadflow_define(procflow_t *procflow, char *name,
-    threadflow_t *inherit, var_integer_t instances)
+    threadflow_t *inherit, avd_t instances)
 {
 	threadflow_t *threadflow;
 

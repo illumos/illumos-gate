@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
  * information about collections of files and subdirectories in Filebench.
  * The fileset, once populated, consists of a tree of fileset entries of
  * type filesetentry_t which specify files and directories.  The fileset
- * is rooted in a directory specified by fs_path, and once the populated
+ * is rooted in a directory specified by fileset_path, and once the populated
  * fileset has been created, has a tree of directories and files
  * corresponding to the fileset's filesetentry tree.
  */
@@ -97,7 +97,11 @@ fileset_usage(void)
 	    "define [file name=<name> | fileset name=<name>],path=<pathname>,"
 	    ",entries=<number>\n");
 	(void) fprintf(stderr,
+	    "		        [,filesize=[size]]\n");
+	(void) fprintf(stderr,
 	    "		        [,dirwidth=[width]]\n");
+	(void) fprintf(stderr,
+	    "		        [,dirdepthrv=$random_variable_name]\n");
 	(void) fprintf(stderr,
 	    "		        [,dirgamma=[100-10000]] "
 	    "(Gamma * 1000)\n");
@@ -263,9 +267,9 @@ fileset_alloc_file(filesetentry_t *entry)
 	int fd;
 
 	*path = 0;
-	(void) strcpy(path, *entry->fse_fileset->fs_path);
+	(void) strcpy(path, avd_get_str(entry->fse_fileset->fs_path));
 	(void) strcat(path, "/");
-	(void) strcat(path, entry->fse_fileset->fs_name);
+	(void) strcat(path, avd_get_str(entry->fse_fileset->fs_name));
 	pathtmp = fileset_resolvepath(entry);
 	(void) strcat(path, pathtmp);
 
@@ -284,7 +288,7 @@ fileset_alloc_file(filesetentry_t *entry)
 			filebench_log(LOG_INFO,
 			    "Re-using file %s", path);
 
-			if (!integer_isset(entry->fse_fileset->fs_cached))
+			if (!avd_get_bool(entry->fse_fileset->fs_cached))
 				(void) fileset_freemem(fd,
 				    entry->fse_size);
 
@@ -300,7 +304,7 @@ fileset_alloc_file(filesetentry_t *entry)
 			(void) ftruncate64(fd,
 			    (off64_t)entry->fse_size);
 
-			if (!integer_isset(entry->fse_fileset->fs_cached))
+			if (!avd_get_bool(entry->fse_fileset->fs_cached))
 				(void) fileset_freemem(fd,
 				    entry->fse_size);
 
@@ -347,7 +351,7 @@ fileset_alloc_file(filesetentry_t *entry)
 		seek += wsize;
 	}
 
-	if (!integer_isset(entry->fse_fileset->fs_cached))
+	if (!avd_get_bool(entry->fse_fileset->fs_cached))
 		(void) fileset_freemem(fd, entry->fse_size);
 
 	(void) close(fd);
@@ -403,9 +407,9 @@ fileset_openfile(fileset_t *fileset,
 	int open_attrs = 0;
 
 	*path = 0;
-	(void) strcpy(path, *fileset->fs_path);
+	(void) strcpy(path, avd_get_str(fileset->fs_path));
 	(void) strcat(path, "/");
-	(void) strcat(path, fileset->fs_name);
+	(void) strcat(path, avd_get_str(fileset->fs_name));
 	pathtmp = fileset_resolvepath(entry);
 	(void) strcat(path, pathtmp);
 	(void) strcpy(dir, path);
@@ -557,14 +561,14 @@ empty:
 /*
  * Given a fileset "fileset", create the associated files as
  * specified in the attributes of the fileset. The fileset is
- * rooted in a directory whose pathname is in fs_path. If the
+ * rooted in a directory whose pathname is in fileset_path. If the
  * directory exists, meaning that there is already a fileset,
- * and the fs_reuse attribute is false, then remove it and all
+ * and the fileset_reuse attribute is false, then remove it and all
  * its contained files and subdirectories. Next, the routine
  * creates a root directory for the fileset. All the file type
  * filesetentries are cycled through creating as needed
  * their containing subdirectory trees in the filesystem and
- * creating actual files for fs_preallocpercent of them. The
+ * creating actual files for fileset_preallocpercent of them. The
  * created files are filled with fse_size bytes of unitialized
  * data. The routine returns -1 on errors, 0 on success.
  */
@@ -576,11 +580,20 @@ fileset_create(fileset_t *fileset)
 	struct stat64 sb;
 	int pickflags = FILESET_PICKUNIQUE | FILESET_PICKRESET;
 	hrtime_t start = gethrtime();
+	char *fileset_path;
+	char *fileset_name;
+	int randno;
 	int preallocated = 0;
 	int reusing = 0;
 
-	if (*fileset->fs_path == NULL) {
+	if ((fileset_path = avd_get_str(fileset->fs_path)) == NULL) {
 		filebench_log(LOG_ERROR, "%s path not set",
+		    fileset_entity_name(fileset));
+		return (-1);
+	}
+
+	if ((fileset_name = avd_get_str(fileset->fs_name)) == NULL) {
+		filebench_log(LOG_ERROR, "%s name not set",
 		    fileset_entity_name(fileset));
 		return (-1);
 	}
@@ -594,19 +607,19 @@ fileset_create(fileset_t *fileset)
 	/* XXX Add check to see if there is enough space */
 
 	/* Remove existing */
-	(void) strcpy(path, *fileset->fs_path);
+	(void) strcpy(path, fileset_path);
 	(void) strcat(path, "/");
-	(void) strcat(path, fileset->fs_name);
+	(void) strcat(path, fileset_name);
 	if ((stat64(path, &sb) == 0) && (strlen(path) > 3) &&
-	    (strlen(*fileset->fs_path) > 2)) {
-		if (!integer_isset(fileset->fs_reuse)) {
+	    (strlen(avd_get_str(fileset->fs_path)) > 2)) {
+		if (!avd_get_bool(fileset->fs_reuse)) {
 			char cmd[MAXPATHLEN];
 
 			(void) snprintf(cmd, sizeof (cmd), "rm -rf %s", path);
 			(void) system(cmd);
 			filebench_log(LOG_VERBOSE,
 			    "Removed any existing %s %s in %lld seconds",
-			    fileset_entity_name(fileset), fileset->fs_name,
+			    fileset_entity_name(fileset), fileset_name,
 			    ((gethrtime() - start) / 1000000000) + 1);
 		} else {
 			/* we are re-using */
@@ -614,7 +627,7 @@ fileset_create(fileset_t *fileset)
 			filebench_log(LOG_VERBOSE,
 			    "Re-using %s %s on %s file system.",
 			    fileset_entity_name(fileset),
-			    fileset->fs_name, sb.st_fstype);
+			    fileset_name, sb.st_fstype);
 		}
 	}
 	(void) mkdir(path, 0755);
@@ -626,21 +639,20 @@ fileset_create(fileset_t *fileset)
 	start = gethrtime();
 
 	filebench_log(LOG_VERBOSE, "Creating %s %s...",
-	    fileset_entity_name(fileset), fileset->fs_name);
+	    fileset_entity_name(fileset), fileset_name);
 
-	if (!integer_isset(fileset->fs_prealloc))
+	if (!avd_get_bool(fileset->fs_prealloc))
 		goto exit;
 
+	randno = ((RAND_MAX * (100
+	    - avd_get_int(fileset->fs_preallocpercent))) / 100);
+
 	while (entry = fileset_pick(fileset, pickflags, 0)) {
-		int randno;
 		pthread_t tid;
 
 		pickflags = FILESET_PICKUNIQUE;
 
 		entry->fse_flags &= ~FSE_EXISTS;
-
-		randno = ((RAND_MAX * (100 - *(fileset->fs_preallocpercent)))
-		    / 100);
 
 		/* entry doesn't need to be locked during initialization */
 		(void) ipc_mutex_unlock(&entry->fse_lock);
@@ -655,7 +667,7 @@ fileset_create(fileset_t *fileset)
 		else
 			entry->fse_flags &= (~FSE_REUSING);
 
-		if (integer_isset(fileset->fs_paralloc)) {
+		if (avd_get_bool(fileset->fs_paralloc)) {
 
 			/* fire off a separate allocation thread */
 			(void) pthread_mutex_lock(&paralloc_lock);
@@ -690,9 +702,8 @@ exit:
 	filebench_log(LOG_VERBOSE,
 	    "Preallocated %d of %lld of %s %s in %lld seconds",
 	    preallocated,
-	    *(fileset->fs_entries),
-	    fileset_entity_name(fileset),
-	    fileset->fs_name,
+	    fileset->fs_constentries,
+	    fileset_entity_name(fileset), fileset_name,
 	    ((gethrtime() - start) / 1000000000) + 1);
 
 	return (0);
@@ -733,9 +744,9 @@ fileset_insdirlist(fileset_t *fileset, filesetentry_t *entry)
 /*
  * Obtaines a filesetentry entity for a file to be placed in a
  * (sub)directory of a fileset. The size of the file may be
- * specified by fs_meansize, or calculated from a gamma
- * distribution of parameter fs_sizegamma and of mean size
- * fs_meansize. The filesetentry entity is placed on the file
+ * specified by fileset_meansize, or calculated from a gamma
+ * distribution of parameter fileset_sizegamma and of mean size
+ * fileset_meansize. The filesetentry entity is placed on the file
  * list in the specified parent filesetentry entity, which may
  * be a directory filesetentry, or the root filesetentry in the
  * fileset. It is also placed on the fileset's list of all
@@ -748,7 +759,6 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
 	char tmpname[16];
 	filesetentry_t *entry;
 	double drand;
-	double gamma;
 
 	if ((entry = (filesetentry_t *)ipc_malloc(FILEBENCH_FILESETENTRY))
 	    == NULL) {
@@ -770,13 +780,20 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
 		return (-1);
 	}
 
-	gamma = *(fileset->fs_sizegamma) / 1000.0;
-
-	if (gamma > 0) {
-		drand = gamma_dist_knuth(gamma, fileset->fs_meansize / gamma);
-		entry->fse_size = (off64_t)drand;
+	/* see if random variable was supplied for file size */
+	if (fileset->fs_meansize == -1) {
+		entry->fse_size = (off64_t)avd_get_int(fileset->fs_size);
 	} else {
-		entry->fse_size = (off64_t)fileset->fs_meansize;
+		double gamma;
+
+		gamma = avd_get_int(fileset->fs_sizegamma) / 1000.0;
+		if (gamma > 0) {
+			drand = gamma_dist_knuth(gamma,
+			    fileset->fs_meansize / gamma);
+			entry->fse_size = (off64_t)drand;
+		} else {
+			entry->fse_size = (off64_t)fileset->fs_meansize;
+		}
 	}
 
 	fileset->fs_bytes += entry->fse_size;
@@ -808,7 +825,7 @@ static int
 fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
     int serial, double depth)
 {
-	double randepth, drand, ranwidth, gamma;
+	double randepth, drand, ranwidth;
 	int isleaf = 0;
 	char tmpname[16];
 	filesetentry_t *entry;
@@ -837,21 +854,34 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 	entry->fse_flags |= FSE_DIR | FSE_FREE;
 	fileset_insdirlist(fileset, entry);
 
-	gamma = *(fileset->fs_dirgamma) / 1000.0;
-	if (gamma > 0) {
-		drand = gamma_dist_knuth(gamma, fileset->fs_meandepth / gamma);
-		randepth = (int)drand;
+	if (fileset->fs_dirdepthrv) {
+		randepth = (int)avd_get_int(fileset->fs_dirdepthrv);
 	} else {
-		randepth = (int)fileset->fs_meandepth;
+		double gamma;
+
+		gamma = avd_get_int(fileset->fs_dirgamma) / 1000.0;
+		if (gamma > 0) {
+			drand = gamma_dist_knuth(gamma,
+			    fileset->fs_meandepth / gamma);
+			randepth = (int)drand;
+		} else {
+			randepth = (int)fileset->fs_meandepth;
+		}
 	}
 
-	gamma = *(fileset->fs_sizegamma) / 1000.0;
-
-	if (gamma > 0) {
-		drand = gamma_dist_knuth(gamma, fileset->fs_meanwidth / gamma);
-		ranwidth = drand;
+	if (fileset->fs_meanwidth == -1) {
+		ranwidth = avd_get_dbl(fileset->fs_dirwidth);
 	} else {
-		ranwidth = fileset->fs_meanwidth;
+		double gamma;
+
+		gamma = avd_get_int(fileset->fs_sizegamma) / 1000.0;
+		if (gamma > 0) {
+			drand = gamma_dist_knuth(gamma,
+			    fileset->fs_meanwidth / gamma);
+			ranwidth = drand;
+		} else {
+			ranwidth = fileset->fs_meanwidth;
+		}
 	}
 
 	if (randepth == 0)
@@ -865,9 +895,9 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 	 * Create directory of random width according to distribution, or
 	 * if root directory, continue until #files required
 	 */
-	for (i = 1;
-	    ((parent == NULL) || (i < ranwidth + 1)) &&
-	    (fileset->fs_realfiles < *(fileset->fs_entries)); i++) {
+	for (i = 1; ((parent == NULL) || (i < ranwidth + 1)) &&
+	    (fileset->fs_realfiles < fileset->fs_constentries);
+	    i++) {
 		int ret = 0;
 
 		if (parent && isleaf)
@@ -883,9 +913,9 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 
 /*
  * Populates a fileset with files and subdirectory entries. Uses
- * the supplied fs_dirwidth and fs_entries (number of files) to
- * calculate the required fs_meandepth (of subdirectories) and
- * initialize the fs_meanwidth and fs_meansize variables. Then
+ * the supplied fileset_dirwidth and fileset_entries (number of files) to
+ * calculate the required fileset_meandepth (of subdirectories) and
+ * initialize the fileset_meanwidth and fileset_meansize variables. Then
  * calls fileset_populate_subdir() to do the recursive
  * subdirectory entry creation and leaf file entry creation. All
  * of the above is skipped if the fileset has already been
@@ -895,8 +925,8 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 static int
 fileset_populate(fileset_t *fileset)
 {
-	int nfiles;
-	int meandirwidth = *(fileset->fs_dirwidth);
+	int entries = (int)avd_get_int(fileset->fs_entries);
+	int meandirwidth;
 	int ret;
 
 	/* Skip if already populated */
@@ -909,6 +939,19 @@ fileset_populate(fileset_t *fileset)
 		return (0);
 #endif /* HAVE_RAW_SUPPORT */
 
+	/* save value of entries obtained for later, in case it was random */
+	fileset->fs_constentries = entries;
+
+	/* is dirwidth a random variable? */
+	if (AVD_IS_RANDOM(fileset->fs_dirwidth)) {
+		meandirwidth =
+		    (int)fileset->fs_dirwidth->avd_val.randptr->rnd_dbl_mean;
+		fileset->fs_meanwidth = -1;
+	} else {
+		meandirwidth = (int)avd_get_int(fileset->fs_dirwidth);
+		fileset->fs_meanwidth = (double)meandirwidth;
+	}
+
 	/*
 	 * Input params are:
 	 *	# of files
@@ -917,10 +960,20 @@ fileset_populate(fileset_t *fileset)
 	 *	# ave size of file
 	 *	max size of file
 	 */
-	nfiles = *(fileset->fs_entries);
-	fileset->fs_meandepth = log(nfiles) / log(meandirwidth);
-	fileset->fs_meanwidth = meandirwidth;
-	fileset->fs_meansize = *(fileset->fs_size);
+	fileset->fs_meandepth = log(entries) / log(meandirwidth);
+
+	/* Has a random variable been supplied for dirdepth? */
+	if (fileset->fs_dirdepthrv) {
+		/* yes, so set the random variable's mean value to meandepth */
+		fileset->fs_dirdepthrv->avd_val.randptr->rnd_dbl_mean =
+		    fileset->fs_meandepth;
+	}
+
+	/* test for random size variable */
+	if (AVD_IS_RANDOM(fileset->fs_size))
+		fileset->fs_meansize = -1;
+	else
+		fileset->fs_meansize = avd_get_int(fileset->fs_size);
 
 	if ((ret = fileset_populate_subdir(fileset, NULL, 1, 0)) != 0)
 		return (ret);
@@ -929,14 +982,13 @@ fileset_populate(fileset_t *fileset)
 exists:
 	if (fileset->fs_attrs & FILESET_IS_FILE) {
 		filebench_log(LOG_VERBOSE, "File %s: mbytes=%lld",
-		    fileset->fs_name,
+		    avd_get_str(fileset->fs_name),
 		    fileset->fs_bytes / 1024UL / 1024UL);
 	} else {
 		filebench_log(LOG_VERBOSE, "Fileset %s: %lld files, "
-		    "avg dir = %.1lf, avg depth = %.1lf, mbytes=%lld",
-		    fileset->fs_name,
-		    *(fileset->fs_entries),
-		    fileset->fs_meanwidth,
+		    "avg dir = %d, avg depth = %.1lf, mbytes=%lld",
+		    avd_get_str(fileset->fs_name), entries,
+		    meandirwidth,
 		    fileset->fs_meandepth,
 		    fileset->fs_bytes / 1024UL / 1024UL);
 	}
@@ -944,13 +996,13 @@ exists:
 }
 
 /*
- * Allocates a fileset instance, initializes fs_dirgamma and
- * fs_sizegamma default values, and sets the fileset name to the
+ * Allocates a fileset instance, initializes fileset_dirgamma and
+ * fileset_sizegamma default values, and sets the fileset name to the
  * supplied name string. Puts the allocated fileset on the
  * master fileset list and returns a pointer to it.
  */
 fileset_t *
-fileset_define(char *name)
+fileset_define(avd_t name)
 {
 	fileset_t *fileset;
 
@@ -963,12 +1015,13 @@ fileset_define(char *name)
 		return (NULL);
 	}
 
-	filebench_log(LOG_DEBUG_IMPL, "Defining file %s", name);
+	filebench_log(LOG_DEBUG_IMPL,
+	    "Defining file %s", avd_get_str(name));
 
 	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
 
-	fileset->fs_dirgamma = integer_alloc(1500);
-	fileset->fs_sizegamma = integer_alloc(1500);
+	fileset->fs_dirgamma = avd_int_alloc(1500);
+	fileset->fs_sizegamma = avd_int_alloc(1500);
 
 	/* Add fileset to global list */
 	if (filebench_shm->filesetlist == NULL) {
@@ -981,14 +1034,14 @@ fileset_define(char *name)
 
 	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
 
-	(void) strcpy(fileset->fs_name, name);
+	fileset->fs_name = name;
 
 	return (fileset);
 }
 
 /*
  * If supplied with a pointer to a fileset and the fileset's
- * fs_prealloc flag is set, calls fileset_populate() to populate
+ * fileset_prealloc flag is set, calls fileset_populate() to populate
  * the fileset with filesetentries, then calls fileset_create()
  * to make actual directories and files for the filesetentries.
  * Otherwise, it applies fileset_populate() and fileset_create()
@@ -1008,11 +1061,12 @@ fileset_createset(fileset_t *fileset)
 	/* set up for possible parallel allocate */
 	paralloc_count = 0;
 
-	if (fileset && integer_isset(fileset->fs_prealloc)) {
+	if (fileset && avd_get_bool(fileset->fs_prealloc)) {
 
 		filebench_log(LOG_INFO,
 		    "creating/pre-allocating %s %s",
-		    fileset_entity_name(fileset), fileset->fs_name);
+		    fileset_entity_name(fileset),
+		    avd_get_str(fileset->fs_name));
 
 		if ((ret = fileset_populate(fileset)) != 0)
 			return (ret);
@@ -1061,7 +1115,7 @@ fileset_find(char *name)
 	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
 
 	while (fileset) {
-		if (strcmp(name, fileset->fs_name) == 0) {
+		if (strcmp(name, avd_get_str(fileset->fs_name)) == 0) {
 			(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
 			return (fileset);
 		}
@@ -1103,9 +1157,24 @@ fileset_iter(int (*cmd)(fileset_t *fileset, int first))
 int
 fileset_print(fileset_t *fileset, int first)
 {
-	int pathlength = strlen(*fileset->fs_path) + strlen(fileset->fs_name);
-	/* 30 spaces */
-	char pad[] = "                              ";
+	int pathlength;
+	char *fileset_path;
+	char *fileset_name;
+	static char pad[] = "                              "; /* 30 spaces */
+
+	if ((fileset_path = avd_get_str(fileset->fs_path)) == NULL) {
+		filebench_log(LOG_ERROR, "%s path not set",
+		    fileset_entity_name(fileset));
+		return (-1);
+	}
+
+	if ((fileset_name = avd_get_str(fileset->fs_name)) == NULL) {
+		filebench_log(LOG_ERROR, "%s name not set",
+		    fileset_entity_name(fileset));
+		return (-1);
+	}
+
+	pathlength = strlen(fileset_path) + strlen(fileset_name);
 
 	if (pathlength > 29)
 		pathlength = 29;
@@ -1121,25 +1190,20 @@ fileset_print(fileset_t *fileset, int first)
 		if (fileset->fs_attrs & FILESET_IS_RAW_DEV) {
 			filebench_log(LOG_INFO,
 			    "%s/%s%s         (Raw Device)",
-			    *fileset->fs_path,
-			    fileset->fs_name,
-			    &pad[pathlength]);
+			    fileset_path, fileset_name, &pad[pathlength]);
 		} else {
 			filebench_log(LOG_INFO,
 			    "%s/%s%s%9lld     (Single File)",
-			    *fileset->fs_path,
-			    fileset->fs_name,
-			    &pad[pathlength],
-			    *fileset->fs_size);
+			    fileset_path, fileset_name, &pad[pathlength],
+			    avd_get_int(fileset->fs_size));
 		}
 	} else {
 		filebench_log(LOG_INFO, "%s/%s%s%9lld%12lld%10lld",
-		    *fileset->fs_path,
-		    fileset->fs_name,
+		    fileset_path, fileset_name,
 		    &pad[pathlength],
-		    *fileset->fs_size,
-		    *fileset->fs_dirwidth,
-		    *fileset->fs_entries);
+		    avd_get_int(fileset->fs_size),
+		    avd_get_int(fileset->fs_dirwidth),
+		    fileset->fs_constentries);
 	}
 	return (0);
 }
@@ -1159,9 +1223,9 @@ fileset_checkraw(fileset_t *fileset)
 
 #ifdef HAVE_RAW_SUPPORT
 	/* check for raw device */
-	(void) strcpy(path, *fileset->fs_path);
+	(void) strcpy(path, avd_get_str(fileset->fs_path));
 	(void) strcat(path, "/");
-	(void) strcat(path, fileset->fs_name);
+	(void) strcat(path, avd_get_str(fileset->fs_name));
 	if ((stat64(path, &sb) == 0) &&
 	    ((sb.st_mode & S_IFMT) == S_IFBLK) && sb.st_rdev) {
 		fileset->fs_attrs |= FILESET_IS_RAW_DEV;

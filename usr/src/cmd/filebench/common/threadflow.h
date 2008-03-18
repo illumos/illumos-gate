@@ -80,11 +80,12 @@ typedef struct threadflow {
 	struct procflow	*tf_process;	/* Back pointer to process */
 	pthread_t	tf_tid;		/* Thread id */
 	pthread_mutex_t	tf_lock;	/* Mutex around threadflow */
-	var_integer_t	tf_instances;	/* Number of instances for this flow */
+	avd_t		tf_instances;	/* Number of instances for this flow */
 	struct threadflow *tf_next;	/* Next on proc list */
 	struct flowop	*tf_ops;	/* Flowop list */
 	caddr_t		tf_mem;		/* Private Memory */
-	var_integer_t	tf_memsize;	/* Private Memory size */
+	avd_t		tf_memsize;	/* Private Memory size attribute */
+	fbint_t		tf_constmemsize; /* constant copy of memory size */
 	int		tf_fd[THREADFLOW_MAXFD + 1]; /* Thread local fd's */
 	filesetentry_t	*tf_fse[THREADFLOW_MAXFD + 1]; /* Thread local files */
 	int		tf_fdrotor;	/* Rotating fd within set */
@@ -104,8 +105,8 @@ typedef struct threadflow {
 /* Thread attrs */
 #define	THREADFLOW_DEFAULTMEM 1024*1024LL;
 
-threadflow_t *threadflow_define(procflow_t *, char *name, threadflow_t *inherit,
-    var_integer_t instances);
+threadflow_t *threadflow_define(procflow_t *, char *name,
+    threadflow_t *inherit, avd_t instances);
 threadflow_t *threadflow_find(threadflow_t *, char *);
 int threadflow_init(procflow_t *);
 void flowop_start(threadflow_t *threadflow);

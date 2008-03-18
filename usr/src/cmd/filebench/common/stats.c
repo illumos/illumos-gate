@@ -67,7 +67,7 @@ static kstat_t *sysinfo_ksp = NULL;
  * a local pointer to the sysinfo kstat, and returns the sum of user and
  * kernel time for all the cpus.
  */
-static vinteger_t
+static fbint_t
 kstats_read_cpu(void)
 {
 	int ncpus;
@@ -134,7 +134,7 @@ kstats_read_cpu(void)
 #else /* HAVE_LIBKSTAT */
 #ifdef HAVE_PROC_STAT
 static FILE *statfd = 0;
-vinteger_t
+fbint_t
 kstats_read_cpu(void)
 {
 	/*
@@ -166,7 +166,7 @@ kstats_read_cpu(void)
 }
 
 #else /* HAVE_PROC_STAT */
-vinteger_t
+fbint_t
 kstats_read_cpu(void)
 {
 	return (0);
@@ -238,7 +238,7 @@ gl_stats_ohead(void)
 }
 
 /*
- * Places the value represented by "name" into the var_integer field of the
+ * Places the value represented by "name" into the var_val.integer field of the
  * supplied var_t. Compares the supplied "name" with a set of predefined
  * names and calculates the value from the appropriate globalstats field(s).
  */
@@ -255,86 +255,117 @@ stats_findvar(var_t *var, char *name)
 		globalstats = malloc(FLOW_TYPES * sizeof (flowstat_t));
 
 	if (strcmp(name, "iocount") == 0) {
-		var->var_integer = iostat->fs_count +
-		    aiostat->fs_count;
+		fbint_t stat;
+
+		stat = iostat->fs_count + aiostat->fs_count;
+		VAR_SET_INT(var, stat);
 		filebench_log(LOG_DEBUG_IMPL, "reading stats %s = %lld",
-		    name, var->var_integer);
+		    name, stat);
 		return (var);
 	}
 
 	if (strcmp(name, "iorate") == 0) {
+		fbint_t stat;
+
 		/* LINTED E_ASSIGMENT_CAUSE_LOSS_PREC */
-		var->var_integer = (iostat->fs_count + aiostat->fs_count) /
+		stat = (iostat->fs_count + aiostat->fs_count) /
 		    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS);
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 
 	if (strcmp(name, "ioreadrate") == 0) {
+		fbint_t stat;
+
 		/* LINTED E_ASSIGMENT_CAUSE_LOSS_PREC */
-		var->var_integer = (iostat->fs_rcount + aiostat->fs_rcount) /
+		stat = (iostat->fs_rcount + aiostat->fs_rcount) /
 		    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS);
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 
 	if (strcmp(name, "iowriterate") == 0) {
+		fbint_t stat;
+
 		/* LINTED E_ASSIGMENT_CAUSE_LOSS_PREC */
-		var->var_integer = (iostat->fs_wcount + aiostat->fs_wcount) /
+		stat = (iostat->fs_wcount + aiostat->fs_wcount) /
 		    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS);
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 
 	if (strcmp(name, "iobandwidth") == 0) {
+		fbint_t stat;
+
 		/* LINTED E_ASSIGMENT_CAUSE_LOSS_PREC */
-		var->var_integer =
+		stat =
 		    ((iostat->fs_bytes + aiostat->fs_bytes) / (1024 * 1024)) /
 		    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS);
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 	if (strcmp(name, "iolatency") == 0) {
-		var->var_integer = iostat->fs_count ?
-		    iostat->fs_mstate[FLOW_MSTATE_LAT] /
+		fbint_t stat;
+
+		stat = iostat->fs_count ? iostat->fs_mstate[FLOW_MSTATE_LAT] /
 		    (iostat->fs_count * 1000UL) : 0;
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 	if (strcmp(name, "iocpu") == 0) {
-		var->var_integer = (iostat->fs_count + aiostat->fs_count) ?
+		fbint_t stat;
+
+		stat = (iostat->fs_count + aiostat->fs_count) ?
 		    (iostat->fs_mstate[FLOW_MSTATE_CPU] +
 		    aiostat->fs_mstate[FLOW_MSTATE_CPU]) / ((iostat->fs_count +
 		    aiostat->fs_count) * 1000UL) : 0;
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 
 	if (strcmp(name, "oheadcpu") == 0) {
-		var->var_integer = (iostat->fs_count + aiostat->fs_count) ?
+		fbint_t stat;
+
+		stat = (iostat->fs_count + aiostat->fs_count) ?
 		    io_stats_ohead() / ((iostat->fs_count +
 		    aiostat->fs_count) * 1000UL) : 0;
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 	if (strcmp(name, "iowait") == 0) {
-		var->var_integer = iostat->fs_count ?
+		fbint_t stat;
+
+		stat = iostat->fs_count ?
 		    iostat->fs_mstate[FLOW_MSTATE_WAIT] /
 		    (iostat->fs_count * 1000UL) : 0;
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 	if (strcmp(name, "syscpu") == 0) {
+		fbint_t stat;
+
 		/* LINTED E_ASSIGMENT_CAUSE_LOSS_PREC */
-		var->var_integer = glstat->fs_syscpu / 1000.0;
+		stat = glstat->fs_syscpu / 1000.0;
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
 	if (strcmp(name, "iocpusys") == 0) {
-		var->var_integer = (iostat->fs_count + aiostat->fs_count) ?
+		fbint_t stat;
+
+		stat = (iostat->fs_count + aiostat->fs_count) ?
 		    iostat->fs_syscpu / ((iostat->fs_count +
 		    aiostat->fs_count) * 1000UL) : 0;
 
+		VAR_SET_INT(var, stat);
 		return (var);
 	}
 
@@ -421,13 +452,12 @@ stats_snap(void)
 	while (flowop) {
 		flowop_t *flowop_master;
 
-		if (flowop->fo_instance == FLOW_MASTER) {
+		if (flowop->fo_instance <= FLOW_DEFINITION) {
 			flowop = flowop->fo_next;
 			continue;
 		}
 
-		flowop_master = flowop_find_one(flowop->fo_name,
-		    FLOW_MASTER);
+		flowop_master = flowop_find_one(flowop->fo_name, FLOW_MASTER);
 
 		/* Roll up per-flowop into global stats */
 		stats_add(&globalstats[flowop->fo_type],

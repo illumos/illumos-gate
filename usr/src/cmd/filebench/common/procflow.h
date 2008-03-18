@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,19 +40,18 @@ extern "C" {
 typedef struct procflow {
 	char		pf_name[128];
 	int		pf_instance;
-	var_integer_t	pf_instances;
+	avd_t		pf_instances;
 	int		pf_running;
 	struct procflow	*pf_next;
 	pid_t		pf_pid;
 	pthread_t	pf_tid;
 	struct threadflow *pf_threads;
 	int		pf_attrs;
-	var_integer_t	pf_nice;
+	avd_t		pf_nice;
 	flowstat_t	pf_stats;
 } procflow_t;
 
-procflow_t *procflow_define(char *name, procflow_t *inherit,
-    var_integer_t instances);
+procflow_t *procflow_define(char *name, procflow_t *inherit, avd_t instances);
 int	procflow_init(void);
 void	procflow_shutdown(void);
 int	procflow_exec(char *name, int instance);

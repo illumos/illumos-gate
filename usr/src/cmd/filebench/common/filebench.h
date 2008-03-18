@@ -66,6 +66,14 @@
 extern "C" {
 #endif
 
+#ifndef TRUE
+#define	TRUE 1
+#endif
+
+#ifndef FALSE
+#define	FALSE 0
+#endif
+
 extern pid_t my_pid;		/* this process' process id */
 extern procflow_t *my_procflow;	/* if slave process, procflow pointer */
 extern int errno;
@@ -90,8 +98,6 @@ void filebench_shutdown(int error);
 #define	filebench_randomno filebench_randomno32
 #define	FILEBENCH_RANDMAX FILEBENCH_RANDMAX32
 #endif
-int filebench_randomno32(uint32_t *, uint32_t, uint32_t);
-int filebench_randomno64(uint64_t *, uint64_t, uint64_t);
 
 #define	KB (1024LL)
 #define	MB (KB * KB)
@@ -103,7 +109,7 @@ int filebench_randomno64(uint64_t *, uint64_t, uint64_t);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.1.1"
+#define	FILEBENCH_VERSION	"1.2.0"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024

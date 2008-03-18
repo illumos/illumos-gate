@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,8 @@ extern "C" {
 #endif
 
 double gamma_dist_knuth(double a, double b);
+double gamma_dist_knuth_src(double a, double b,
+    double (*src)(unsigned short *), unsigned short *xi);
 
 #ifdef	__cplusplus
 }

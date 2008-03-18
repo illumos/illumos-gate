@@ -64,28 +64,32 @@ typedef struct flowop {
 	void		(*fo_destruct)(); /* Destructor Method */
 	int		fo_type;	/* Type */
 	int		fo_attrs;	/* Flow op attribute */
+	avd_t		fo_filename;	/* file/fileset name */
 	fileset_t	*fo_fileset;	/* Fileset for op */
 	int		fo_fd;		/* File descriptor */
 	int		fo_fdnumber;	/* User specified file descriptor */
 	int		fo_srcfdnumber;	/* User specified src file descriptor */
-	var_integer_t	fo_iosize;	/* Size of operation */
-	var_integer_t	fo_wss;		/* Flow op working set size */
+	fbint_t		fo_constvalue;	/* constant version of fo_value */
+	fbint_t		fo_constwss;	/* constant version of fo_wss */
+	avd_t		fo_iosize;	/* Size of operation */
+	avd_t		fo_wss;		/* Flow op working set size */
 	char		fo_targetname[128]; /* Target, for wakeup etc... */
 	struct flowop	*fo_targets;	/* List of targets matching name */
 	struct flowop	*fo_targetnext;	/* List of targets matching name */
-	var_integer_t	fo_iters;	/* Number of iterations of op */
-	var_integer_t	fo_value;	/* Attr */
-	var_integer_t	fo_sequential;	/* Attr */
-	var_integer_t	fo_random;	/* Attr */
-	var_integer_t	fo_stride;	/* Attr */
-	var_integer_t	fo_backwards;	/* Attr */
-	var_integer_t	fo_dsync;	/* Attr */
-	var_integer_t	fo_blocking;	/* Attr */
-	var_integer_t	fo_directio;	/* Attr */
-	var_integer_t	fo_rotatefd;	/* Attr */
+	avd_t		fo_iters;	/* Number of iterations of op */
+	avd_t		fo_value;	/* Attr */
+	avd_t		fo_sequential;	/* Attr */
+	avd_t		fo_random;	/* Attr */
+	avd_t		fo_stride;	/* Attr */
+	avd_t		fo_backwards;	/* Attr */
+	avd_t		fo_dsync;	/* Attr */
+	avd_t		fo_blocking;	/* Attr */
+	avd_t		fo_directio;	/* Attr */
+	avd_t		fo_rotatefd;	/* Attr */
 	flowstat_t	fo_stats;	/* Flow statistics */
 	pthread_cond_t	fo_cv;		/* Block/wakeup cv */
 	pthread_mutex_t	fo_lock;	/* Mutex around flowop */
+	void		*fo_private;	/* Flowop private scratch pad area */
 	char		*fo_buf;	/* Per-flowop buffer */
 	uint64_t	fo_buf_size;	/* current size of buffer */
 #ifdef HAVE_SYSV_SEM
@@ -94,7 +98,7 @@ typedef struct flowop {
 #else
 	sem_t		fo_sem;		/* sem_t for posix semaphores */
 #endif /* HAVE_SYSV_SEM */
-	var_integer_t	fo_highwater;	/* value of highwater paramter */
+	avd_t		fo_highwater;	/* value of highwater paramter */
 	void		*fo_idp;	/* id, for sems etc */
 	hrtime_t	fo_timestamp;	/* for ratecontrol, etc... */
 	int		fo_initted;	/* Set to one if initialized */
@@ -125,6 +129,7 @@ typedef struct flowop {
 #define	FLOW_TYPE_OTHER		4  /* Op is a something else */
 
 extern flowstat_t controlstats;
+extern pthread_mutex_t controlstats_lock;
 
 void flowop_init(void);
 flowop_t *flowop_define(threadflow_t *, char *name, flowop_t *inherit,
@@ -137,6 +142,7 @@ void flowop_delete_all(flowop_t **threadlist);
 void flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes);
 void flowop_beginop(threadflow_t *threadflow, flowop_t *flowop);
 void flowop_destruct_all_flows(threadflow_t *threadflow);
+void flowop_printall(void);
 
 #ifdef	__cplusplus
 }

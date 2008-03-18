@@ -24,15 +24,21 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-# 4- Sequential write(32K) of a 1G file, cached 
-# 5- Sequential write(32K) of a 1G file, uncached 
+# Sequential write() of a 1G file, size picked from a table in
+# the [1K,64K] range with a mean of 5.5K, followed by close(), cached.
+
+
 
 set $dir=/tmp
-set $cached=0
-set $count=1000
-set $iosize=1m
 set $nthreads=1
+set $cached=false
 set $sync=false
+set $count=128k
+
+define randvar name=$iosize, type=tabular, min=1k, randtable =
+{{ 80, 1k, 4k},
+ { 15, 4k, 16k},
+ { 05, 16k, 64k}}
 
 define fileset name=bigfileset,path=$dir,size=0,entries=$nthreads,dirwidth=1024,prealloc=100,cached=$cached
 
@@ -46,12 +52,15 @@ define process name=filewriter,instances=1
   }
 }
 
-echo  "FileMicro-SeqWrite Version 2.1 personality successfully loaded"
+echo  "FileMicro-SeqWriteRandVarTab Version 1.0 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$cached=<bool>    defaults to $cached"
-usage "       set \$count=<value>    defaults to $count"
-usage "       set \$iosize=<size>    defaults to $iosize"
-usage "       set \$nthreads=<value> defaults to $nthreads"
-usage "       set \$sync=<bool>      defaults to $sync"
+usage "       set \$cached=<bool>        defaults to $cached"
+usage "       set \$count=<value>        defaults to $count"
+usage "       set \$iosize.type=<type>   defaults to $iosize.type"
+usage "       set \$iosize.randsrc=<src> defaults to $iosize.randsrc"
+usage "       set \$iosize.mean=<mean>   defaults to $iosize.mean"
+usage "       set \$iosize.gamma=<gamma> defaults to $iosize.gamma"
+usage "       set \$nthreads=<value>     defaults to $nthreads"
+usage "       set \$sync=<bool>          defaults to $sync"
 usage " "
 usage "       run runtime (e.g. run 60)"

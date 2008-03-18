@@ -39,9 +39,8 @@
 
 /*
  * Routines to access high resolution system time, initialize and
- * shutdown filebench, obtain system generated random numbers from
- * "urandom", log filebench run progress and errors, and access system
- * information strings.
+ * shutdown filebench, log filebench run progress and errors, and
+ * access system information strings.
  */
 
 
@@ -115,7 +114,6 @@ parse_cpu_hz(void)
 			break;
 		}
 	}
-	printf("CPU Mhz %9.6f, sysconf:%ld\n", hertz, sysconf(_SC_CLK_TCK));
 	hz = hertz * 1000000;
 
 	return (hz);
@@ -142,8 +140,6 @@ gethrtime(void)
 }
 #endif
 
-static int urandomfd;
-
 /*
  * Main filebench initialization. Opens the random number
  * "device" file or shuts down the run if one is not found.
@@ -153,12 +149,8 @@ static int urandomfd;
 void
 filebench_init(void)
 {
-	/* open the "urandom" random number device file */
-	if ((urandomfd = open("/dev/urandom", O_RDONLY)) < 0) {
-		filebench_log(LOG_ERROR, "open /dev/urandom failed: %s",
-		    strerror(errno));
-		filebench_shutdown(1);
-	}
+	fb_random_init();
+
 #if defined(USE_RDTSC) && (LINUX_PORT)
 	cpu_hz = parse_cpu_hz();
 	if (cpu_hz <= 0) {
@@ -168,93 +160,6 @@ filebench_init(void)
 	}
 #endif /* USE_RDTSC */
 
-}
-
-/*
- * Reads a 64 bit random number from the urandom "file".
- * Shuts down the run if the read fails. Otherwise returns
- * the random number after rounding it off by "round".
- * Returns 0 on success, -1 on failure.
- */
-int
-filebench_randomno64(uint64_t *randp, uint64_t max, uint64_t round)
-{
-	uint64_t random;
-
-	/* check for round value too large */
-	if (max <= round) {
-		*randp = 0;
-
-		/* if it just fits, its ok, otherwise error */
-		if (max == round)
-			return (0);
-		else
-			return (-1);
-	}
-
-	if (read(urandomfd, &random,
-	    sizeof (uint64_t)) != sizeof (uint64_t)) {
-		filebench_log(LOG_ERROR, "read /dev/urandom failed: %s",
-		    strerror(errno));
-		filebench_shutdown(1);
-	}
-
-	/* clip with max and optionally round */
-	max -= round;
-	random = random / (FILEBENCH_RANDMAX64 / max);
-	if (round) {
-		random = random / round;
-		random *= round;
-	}
-	if (random > max)
-		random = max;
-
-	*randp = random;
-	return (0);
-}
-
-
-/*
- * Reads a 32 bit random number from the urandom "file".
- * Shuts down the run if the read fails. Otherwise returns
- * the random number after rounding it off by "round".
- * Returns 0 on success, -1 on failure.
- */
-int
-filebench_randomno32(uint32_t *randp, uint32_t max, uint32_t round)
-{
-	uint32_t random;
-
-	/* check for round value too large */
-	if (max <= round) {
-		*randp = 0;
-
-		/* if it just fits, its ok, otherwise error */
-		if (max == round)
-			return (0);
-		else
-			return (-1);
-	}
-
-	if (read(urandomfd, &random,
-	    sizeof (uint32_t)) != sizeof (uint32_t)) {
-		filebench_log(LOG_ERROR, "read /dev/urandom failed: %s",
-		    strerror(errno));
-		filebench_shutdown(1);
-	}
-
-	/* clip with max and optionally round */
-	max -= round;
-	random = random / (FILEBENCH_RANDMAX32 / max);
-	if (round) {
-		random = random / round;
-		random *= round;
-	}
-	if (random > max)
-		random = max;
-
-	*randp = random;
-	return (0);
 }
 
 extern int lex_lineno;
@@ -430,7 +335,7 @@ filebench_shutdown(int error) {
  * Put the hostname in ${hostname}. The system supplied
  * host name string is copied into an allocated string and
  * the pointer to the string is placed in the supplied
- * variable "var". If var->var_string already points to
+ * variable "var". If var->var_val.string already points to
  * a string, the string is freed. The routine always
  * returns zero (0).
  */
@@ -438,26 +343,36 @@ var_t *
 host_var(var_t *var)
 {
 	char hoststr[128];
+	char *strptr;
 
 	(void) gethostname(hoststr, 128);
-	if (var->var_string)
-		free(var->var_string);
-	var->var_string = fb_stralloc(hoststr);
+	if (VAR_HAS_STRING(var) && var->var_val.string)
+		free(var->var_val.string);
+
+	if ((strptr = fb_stralloc(hoststr)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "unable to allocate string for host name");
+		return (NULL);
+	}
+
+	VAR_SET_STR(var, strptr);
 	return (0);
 }
 
 /*
  * Put the date string in ${date}. The system supplied date is
  * copied into an allocated string and the pointer to the string
- * is placed in the supplied var_t's var_string. If
- * var->var_string already points to a string, the string
- * is freed. The routine always returns a pointer to the
- * supplied var_t.
+ * is placed in the supplied var_t's var_val.string. If
+ * var->var_val.string already points to a string, the string
+ * is freed. The routine returns a pointer to the supplied var_t,
+ * unless it is unable to allocate string for the date, in which
+ * case it returns NULL.
  */
 var_t *
 date_var(var_t *var)
 {
 	char datestr[128];
+	char *strptr;
 #ifdef HAVE_CFTIME
 	time_t t = time(NULL);
 #else
@@ -470,9 +385,16 @@ date_var(var_t *var)
 	(void) strftime(datestr, sizeof (datestr), "%y%m%d%H %M", &t);
 #endif
 
-	if (var->var_string)
-		free(var->var_string);
-	var->var_string = fb_stralloc(datestr);
+	if (VAR_HAS_STRING(var) && var->var_val.string)
+		free(var->var_val.string);
+
+	if ((strptr = fb_stralloc(datestr)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "unable to allocate string for date");
+		return (NULL);
+	}
+
+	VAR_SET_STR(var, strptr);
 
 	return (var);
 }
@@ -483,15 +405,17 @@ extern char *fscriptname;
  * Put the script name in ${script}. The path name of the script
  * used with this filebench run trimmed of the trailing ".f" and
  * all leading subdirectories. The remaining script name is
- * copied into the var_string field of the supplied variable
- * "var". The routine always returns a pointer to the supplied
- * var_t.
+ * copied into the var_val.string field of the supplied variable
+ * "var". The routine returns a pointer to the supplied var_t,
+ * unless it is unable to allocate string space, in which case it
+ * returns NULL.
  */
 var_t *
 script_var(var_t *var)
 {
 	char *scriptstr;
 	char *f = fb_stralloc(fscriptname);
+	char *strptr;
 
 	/* Trim the .f suffix */
 	for (scriptstr = f + strlen(f) - 1; scriptstr != f; scriptstr--) {
@@ -501,7 +425,14 @@ script_var(var_t *var)
 		}
 	}
 
-	var->var_string = fb_stralloc(basename(f));
+	if ((strptr = fb_stralloc(basename(f))) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "unable to allocate string for script name");
+		free(f);
+		return (NULL);
+	}
+
+	VAR_SET_STR(var, strptr);
 	free(f);
 
 	return (var);

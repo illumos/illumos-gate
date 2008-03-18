@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,15 +34,20 @@
  * From Knuth Volume 2, 3rd edition, pages 586 - 587.
  */
 static double
-gamma_dist_knuth_algG(double a)
+gamma_dist_knuth_algG(double a, double (*src)(unsigned short *),
+    unsigned short *xi)
 {
 	double p, U, V, X, q;
 
 	p = M_E/(a + M_E);
 G2:
-	U = drand48();
+	/* get a random number U */
+	U = (*src)(xi);
+
 	do {
-		V = drand48();
+		/* get a random number V */
+		V = (*src)(xi);
+
 	} while (V == 0);
 
 	if (U < p) {
@@ -57,7 +62,10 @@ G2:
 	/*
 	 * X now has density g, and q = f(X)/cg(X)
 	 */
-	U = drand48();
+
+	/* get a random number U */
+	U = (*src)(xi);
+
 	if (U >= q)
 		goto G2;
 	return (X);
@@ -69,31 +77,66 @@ G2:
  * From Knuth Volume 2, 3rd edition, page 134.
  */
 static double
-gamma_dist_knuth_algA(double a)
+gamma_dist_knuth_algA(double a, double (*src)(unsigned short *),
+    unsigned short *xi)
 {
 	double U, Y, X, V;
 
 A1:
-	U = drand48();
+	/* get a random number U */
+	U = (*src)(xi);
+
 	Y = tan(M_PI*U);
 	X = (sqrt((2*a) - 1) * Y) + a - 1;
 
 	if (X <= 0)
 		goto A1;
 
-	V = drand48();
-	/* V > (1 + Y^2) * exp((a - 1) * log(X / (a - 1)) - sqrt(2a - 1) * Y) */
+	/* get a random number V */
+	V = (*src)(xi);
+
 	if (V > ((1 + (Y*Y)) * exp((a-1) * log(X/(a-1)) - sqrt(2*a -1) * Y)))
 		goto A1;
 
 	return (X);
 }
 
+/*
+ * fetch a uniformly distributed random number using the drand48 generator
+ */
+/* ARGSUSED */
+static double
+default_src(unsigned short *xi)
+{
+	return (drand48());
+}
+
+/*
+ * Sample the gamma distributed random variable with gamma 'a' and
+ * result mulitplier 'b', which is usually mean/gamma. Uses the default
+ * drand48 random number generator as input
+ */
 double
 gamma_dist_knuth(double a, double b)
 {
 	if (a <= 1.0)
-		return (b * gamma_dist_knuth_algG(a));
+		return (b * gamma_dist_knuth_algG(a, default_src, NULL));
 	else
-		return (b * gamma_dist_knuth_algA(a));
+		return (b * gamma_dist_knuth_algA(a, default_src, NULL));
+}
+
+/*
+ * Sample the gamma distributed random variable with gamma 'a' and
+ * multiplier 'b', which is mean / gamma adjusted for the specified
+ * minimum value. The suppled random number source function is
+ * used to optain the uniformly distributed random numbers.
+ */
+double
+gamma_dist_knuth_src(double a, double b,
+    double (*src)(unsigned short *), unsigned short *xi)
+{
+	if (a <= 1.0)
+		return (b * gamma_dist_knuth_algG(a, src, xi));
+	else
+		return (b * gamma_dist_knuth_algA(a, src, xi));
 }

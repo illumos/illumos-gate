@@ -233,13 +233,14 @@ procflow_create_all_procs(void)
 	int	ret = 0;
 
 	while (procflow) {
-		int i;
+		int i, instances;
 
-		filebench_log(LOG_INFO, "Starting %lld %s instances",
-		    *(procflow->pf_instances), procflow->pf_name);
+		instances = (int)avd_get_int(procflow->pf_instances);
+		filebench_log(LOG_INFO, "Starting %d %s instances",
+		    instances, procflow->pf_name);
 
 		/* Create instances of procflow */
-		for (i = 0; (i < *procflow->pf_instances) && (ret == 0); i++) {
+		for (i = 0; (i < instances) && (ret == 0); i++) {
 			procflow_t *newproc;
 
 			/* Create processes */
@@ -305,7 +306,7 @@ procflow_exec(char *name, int instance)
 	filebench_log(LOG_DEBUG_IMPL,
 	    "nice = %llx", procflow->pf_nice);
 
-	proc_nice = *procflow->pf_nice;
+	proc_nice = avd_get_int(procflow->pf_nice);
 	filebench_log(LOG_DEBUG_IMPL, "Setting pri of %s-%d to %d",
 	    name, instance, nice(proc_nice + 10));
 
@@ -414,7 +415,7 @@ procflow_init(void)
 
 	filebench_log(LOG_DEBUG_IMPL,
 	    "procflow_init %s, %lld",
-	    procflow->pf_name, *(procflow->pf_instances));
+	    procflow->pf_name, avd_get_int(procflow->pf_instances));
 
 #ifdef USE_PROCESS_MODEL
 	if ((ret = pthread_cond_init(&procflow_procs_created, NULL)) != 0)
@@ -707,7 +708,7 @@ procflow_define_common(procflow_t **list, char *name,
  * parser_proc_define().
  */
 procflow_t *
-procflow_define(char *name, procflow_t *inherit, var_integer_t instances)
+procflow_define(char *name, procflow_t *inherit, avd_t instances)
 {
 	procflow_t *procflow;
 

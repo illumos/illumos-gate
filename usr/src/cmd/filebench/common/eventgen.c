@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,18 +149,18 @@ eventgen_init(void)
 var_t *
 eventgen_ratevar(var_t *var)
 {
-	var->var_integer = filebench_shm->eventgen_hz;
+	VAR_SET_INT(var, filebench_shm->eventgen_hz);
 	return (var);
 }
 
 /*
  * Sets the event generator rate to that supplied by
- * vinteger_t rate.
+ * fbint_t rate.
  */
 void
-eventgen_setrate(vinteger_t rate)
+eventgen_setrate(fbint_t rate)
 {
-	filebench_shm->eventgen_hz = rate;
+	filebench_shm->eventgen_hz = (int)rate;
 }
 
 /*

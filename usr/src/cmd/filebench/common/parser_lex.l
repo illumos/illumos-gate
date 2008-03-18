@@ -25,7 +25,7 @@
  */
 
 %{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 %}
 
 %{
@@ -92,6 +92,7 @@ directory               { return FSE_DIRECTORY; }
 command                 { return FSE_COMMAND; }
 process[es]*	        { return FSE_PROC; }
 thread		        { return FSE_THREAD; }
+randvar		        { return FSE_RAND; }
 clear                   { return FSE_CLEAR; }
 snap                    { return FSE_SNAP; }
 dump                    { return FSE_DUMP; }
@@ -101,9 +102,10 @@ mode                    { return FSE_MODE; }
 
 cached                  { return FSA_CACHED; }
 dirwidth                { return FSA_DIRWIDTH; }
+dirdepthrv              { return FSA_DIRDEPTHRV; }
 dirgamma                { return FSA_DIRGAMMA; }
 namelength              { return FSA_NAMELENGTH; }
-filesize                { return FSA_FILESIZE; }
+filesize                { return FSA_SIZE; }
 filesizegamma           { return FSA_FILESIZEGAMMA; }
 directio                { return FSA_DIRECTIO; }
 dsync                   { return FSA_DSYNC;  }
@@ -136,6 +138,26 @@ highwater               { return FSA_HIGHWATER; }
 alldone                 { return FSA_ALLDONE; }
 firstdone               { return FSA_FIRSTDONE; }
 timeout                 { return FSA_TIMEOUT; }
+type			{ return FSA_TYPE; }
+seed			{ return FSA_RANDSEED; }
+gamma                   { return FSA_RANDGAMMA; }
+mean                    { return FSA_RANDMEAN; }
+min                     { return FSA_RANDMIN; }
+round			{ return FSA_RANDROUND; }
+randsrc			{ return FSA_RANDSRC; }
+randtable		{ return FSA_RANDTABLE; }
+uniform                 { return FSV_RANDUNI; }
+tabular			{ return FSV_RANDTAB; }
+"."type			{ return FSS_TYPE; }
+"."seed			{ return FSS_SEED; }
+"."gamma		{ return FSS_GAMMA; }
+"."mean			{ return FSS_MEAN; }
+"."min			{ return FSS_MIN; }
+"."round		{ return FSS_ROUND; }
+"."randsrc		{ return FSS_SRC; }
+urandom			{ return FSV_URAND; }
+rand48			{ return FSV_RAND48; }
+
 
 <INITIAL>\"			{ 
                                 BEGIN WHITESTRINGSTATE;
@@ -228,23 +250,41 @@ timeout                 { return FSA_TIMEOUT; }
                                 return FSV_VAL_INT;
 }
 
-<INITIAL>true|false	{
-				if (strcmp(yytext, "true") == 0)
-					yylval.bval = 1;
-				else
-					yylval.bval = 0;
+<INITIAL>true	{
+				yylval.bval = TRUE;
 				return FSV_VAL_BOOLEAN;
 		}
 
+<INITIAL>false	{
+				yylval.bval = FALSE;
+				return FSV_VAL_BOOLEAN;
+		}
 
-
-$[({A-Za-z][A-Za-z0-9._]*[A-Za-z0-9][)}]*	{
+$[({A-Za-z][A-Za-z0-9_]*[A-Za-z0-9][)}]*	{
 				if ((yylval.sval = strdup(yytext)) == NULL) {
 					yyerror("Out of memory");
 					filebench_shutdown(E_ERROR);
 				}
+
  				return FSV_VARIABLE;
 			}
+
+
+$[({A-Za-z][A-Za-z0-9_]*"."[A-Za-z0-9][)}]*	{
+				int backtrack;
+
+				if ((backtrack =
+				    var_is_set4_randvar(yytext)) != 0)
+					yyless(yyleng - backtrack);
+
+				if ((yylval.sval = strdup(yytext)) == NULL) {
+					yyerror("Out of memory");
+					filebench_shutdown(E_ERROR);
+				}
+
+ 				return FSV_RANDVAR;
+			}
+
 
 <INITIAL>[/A-Za-z-][/A-Za-z0-9._-]*	{
 				if ((yylval.sval = strdup(yytext)) == NULL) {
@@ -253,6 +293,7 @@ $[({A-Za-z][A-Za-z0-9._]*[A-Za-z0-9][)}]*	{
 				}
  				return FSV_STRING;
 			}
+
 
 .			{
 				yyerror("Illegal character");

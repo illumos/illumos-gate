@@ -41,8 +41,7 @@
 #endif
 
 static flowop_t *flowop_define_common(threadflow_t *threadflow, char *name,
-	flowop_t *inherit, int instance, int type);
-
+    flowop_t *inherit, int instance, int type);
 
 /*
  * A collection of flowop support functions. The actual code that
@@ -70,6 +69,22 @@ flowop_printlist(flowop_t *list)
 		flowop = flowop->fo_threadnext;
 	}
 	return (0);
+}
+
+/*
+ * Prints the name and instance number of all flowops on
+ * the master flowop list to the console and the filebench log.
+ */
+void
+flowop_printall(void)
+{
+	flowop_t *flowop = filebench_shm->flowoplist;
+
+	while (flowop) {
+		filebench_log(LOG_VERBOSE, "flowop-list %s-%d",
+		    flowop->fo_name, flowop->fo_instance);
+		flowop = flowop->fo_next;
+	}
 }
 
 #define	TIMESPEC_TO_HRTIME(s, e) (((e.tv_sec - s.tv_sec) * 1000000000LL) + \
@@ -111,6 +126,7 @@ flowop_beginop(threadflow_t *threadflow, flowop_t *flowop)
 }
 
 flowstat_t controlstats;
+pthread_mutex_t controlstats_lock;
 static int controlstats_zeroed = 0;
 
 /*
@@ -156,6 +172,7 @@ flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes)
 
 	flowop->fo_stats.fs_count++;
 	flowop->fo_stats.fs_bytes += bytes;
+	(void) ipc_mutex_lock(&controlstats_lock);
 	if ((flowop->fo_type & FLOW_TYPE_IO) ||
 	    (flowop->fo_type & FLOW_TYPE_AIO)) {
 		controlstats.fs_count++;
@@ -174,6 +191,7 @@ flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes)
 		controlstats.fs_wbytes += bytes;
 		controlstats.fs_wcount++;
 	}
+	(void) ipc_mutex_unlock(&controlstats_lock);
 }
 
 /*
@@ -183,6 +201,13 @@ flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes)
 static int
 flowop_initflow(flowop_t *flowop)
 {
+	/*
+	 * save static copies of two items, in case they are supplied
+	 * from random variables
+	 */
+	flowop->fo_constvalue = avd_get_int(flowop->fo_value);
+	flowop->fo_constwss = avd_get_int(flowop->fo_wss);
+
 	if ((*flowop->fo_init)(flowop) < 0) {
 		filebench_log(LOG_ERROR, "flowop %s-%d init failed",
 		    flowop->fo_name, flowop->fo_instance);
@@ -263,10 +288,12 @@ flowop_start(threadflow_t *threadflow)
 	}
 #endif
 
+	(void) ipc_mutex_lock(&controlstats_lock);
 	if (!controlstats_zeroed) {
 		(void) memset(&controlstats, 0, sizeof (controlstats));
 		controlstats_zeroed = 1;
 	}
+	(void) ipc_mutex_unlock(&controlstats_lock);
 
 	flowop = threadflow->tf_ops;
 	threadflow->tf_stats.fs_stime = gethrtime();
@@ -316,15 +343,17 @@ flowop_start(threadflow_t *threadflow)
 	threadflow->tf_abort = 0;
 	threadflow->tf_running = 1;
 
+	memsize = (size_t)threadflow->tf_constmemsize;
+
 	/* If we are going to use ISM, allocate later */
 	if (threadflow->tf_attrs & THREADFLOW_USEISM) {
 		threadflow->tf_mem =
-		    ipc_ismmalloc((size_t)*threadflow->tf_memsize);
+		    ipc_ismmalloc(memsize);
 	} else {
-		threadflow->tf_mem = malloc((size_t)*threadflow->tf_memsize);
+		threadflow->tf_mem =
+		    malloc(memsize);
 	}
 
-	memsize = *threadflow->tf_memsize;
 	(void) memset(threadflow->tf_mem, 0, memsize);
 	filebench_log(LOG_DEBUG_SCRIPT, "Thread allocated %d bytes", memsize);
 
@@ -337,7 +366,7 @@ flowop_start(threadflow_t *threadflow)
 	/* Main filebench worker loop */
 	/* CONSTCOND */
 	while (1) {
-		int i;
+		int i, count;
 
 		/* Abort if asked */
 		if (threadflow->tf_abort || filebench_shm->f_abort)
@@ -353,26 +382,23 @@ flowop_start(threadflow_t *threadflow)
 		if (!filebench_shm->shm_running)
 			(void) sleep(1);
 
-		if (flowop->fo_stats.fs_stime == 0)
-			flowop->fo_stats.fs_stime = gethrtime();
-
 		if (flowop == NULL) {
 			filebench_log(LOG_ERROR, "flowop_read null flowop");
 			return;
 		}
 
-		filebench_log(LOG_DEBUG_SCRIPT, "%s: executing flowop %s-%d",
-		    threadflow->tf_name, flowop->fo_name, flowop->fo_instance);
+		if (flowop->fo_stats.fs_stime == 0)
+			flowop->fo_stats.fs_stime = gethrtime();
 
 		/* Execute the flowop for fo_iters times */
-		for (i = 0; i < *flowop->fo_iters; i++) {
+		count = avd_get_int(flowop->fo_iters);
+		for (i = 0; i < count; i++) {
+
 			filebench_log(LOG_DEBUG_SCRIPT, "%s: executing flowop "
 			    "%s-%d", threadflow->tf_name, flowop->fo_name,
 			    flowop->fo_instance);
+
 			ret = (*flowop->fo_func)(threadflow, flowop);
-			filebench_log(LOG_DEBUG_SCRIPT, "%s: executing flowop "
-			    "%s-%d", threadflow->tf_name, flowop->fo_name,
-			    flowop->fo_instance);
 
 			/*
 			 * Return value FILEBENCH_ERROR means "flowop
@@ -561,7 +587,7 @@ flowop_delete_all(flowop_t **flowoplist)
 
 	filebench_log(LOG_DEBUG_IMPL, "Deleting all flowops...");
 	while (flowop) {
-		filebench_log(LOG_DEBUG_IMPL, "Deleting all flowops (%s-%d)",
+		filebench_log(LOG_DEBUG_IMPL, "Deleting flowop (%s-%d)",
 		    flowop->fo_name, flowop->fo_instance);
 		flowop = flowop->fo_threadnext;
 	}
@@ -631,7 +657,7 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 	} else {
 		(void) memset(flowop, 0, sizeof (flowop_t));
 		flowop->fo_fd = -1;
-		flowop->fo_iters = integer_alloc(1);
+		flowop->fo_iters = avd_int_alloc(1);
 		flowop->fo_type = type;
 		(void) pthread_mutex_init(&flowop->fo_lock, ipc_mutexattr());
 		(void) ipc_mutex_lock(&flowop->fo_lock);
@@ -682,7 +708,7 @@ flowop_t *
 flowop_define(threadflow_t *threadflow, char *name, flowop_t *inherit,
     int instance, int type)
 {
-	flowop_t *flowop;
+	flowop_t	*flowop;
 
 	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
 	flowop = flowop_define_common(threadflow, name,
@@ -721,12 +747,14 @@ flowop_find_barrier(void)
 flowop_t *
 flowop_find(char *name)
 {
-	flowop_t *flowop = filebench_shm->flowoplist;
+	flowop_t *flowop;
 	flowop_t *result = NULL;
 
 	flowop_find_barrier();
 
 	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+
+	flowop = filebench_shm->flowoplist;
 
 	while (flowop) {
 		if (strcmp(name, flowop->fo_name) == 0) {
@@ -751,21 +779,28 @@ flowop_find(char *name)
 
 /*
  * Returns a pointer to the specified instance of flowop
- * "name" from the list returned by flowop_find().
+ * "name" from the supplied list.
  */
 flowop_t *
 flowop_find_one(char *name, int instance)
 {
-	flowop_t *result;
+	flowop_t *test_flowop;
 
-	result = flowop_find(name);
+	flowop_find_barrier();
 
-	while (result) {
-		if ((strcmp(name, result->fo_name) == 0) &&
-		    (instance == result->fo_instance))
+	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+
+	test_flowop = filebench_shm->flowoplist;
+
+	while (test_flowop) {
+		if ((strcmp(name, test_flowop->fo_name) == 0) &&
+		    (instance == test_flowop->fo_instance))
 			break;
-		result = result->fo_next;
+
+		test_flowop = test_flowop->fo_next;
 	}
 
-	return (result);
+	(void) ipc_mutex_unlock(&filebench_shm->flowop_lock);
+
+	return (test_flowop);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,17 +47,17 @@ typedef unsigned char uchar_t;
 #define	FSE_SYSTEM 1
 
 typedef struct list {
-	struct list   *list_next;
-	var_string_t  list_string;
-	var_integer_t list_integer;
+	struct list	*list_next;
+	avd_t		 list_string;
+	avd_t		 list_integer;
 } list_t;
 
 typedef struct attr {
-	int		attr_name;
+	int		 attr_name;
 	struct attr	*attr_next;
-	var_string_t	attr_string;
-	var_integer_t	attr_integer;
+	avd_t		 attr_avd;
 	list_t		*attr_param_list;
+	void		*attr_obj;
 } attr_t;
 
 typedef struct cmd {

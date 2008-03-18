@@ -410,14 +410,14 @@ ipc_attach(caddr_t shmaddr)
 }
 
 static int filebench_sizes[] = {
-	FILEBENCH_NPROCFLOWS,
-	FILEBENCH_NTHREADFLOWS,
-	FILEBENCH_NFLOWOPS,
-	FILEBENCH_NVARS,
-	FILEBENCH_NVARS,
-	FILEBENCH_NVARS,
-	FILEBENCH_NFILESETS,
-	FILEBENCH_NFILESETENTRIES};
+	FILEBENCH_NPROCFLOWS,		/* number of procflows */
+	FILEBENCH_NTHREADFLOWS,		/* number of threadflows */
+	FILEBENCH_NFLOWOPS,		/* number of flowops */
+	(FILEBENCH_NVARS * 2),		/* number of attribute value dscrs */
+	FILEBENCH_NVARS,		/* number of variables */
+	FILEBENCH_NFILESETS,		/* number of filesets */
+	FILEBENCH_NFILESETENTRIES,	/* number of fileset entries */
+	FILEBENCH_NRANDDISTS};		/* number of random distributions */
 
 /*
  * Allocates filebench objects from pre allocated region of
@@ -480,21 +480,23 @@ ipc_malloc(int type)
 		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
 		return ((char *)&filebench_shm->flowop[i]);
 
-	case FILEBENCH_INTEGER:
-		filebench_shm->integer_ptrs[i] = NULL;
+	case FILEBENCH_AVD:
+		filebench_shm->shm_avd_ptrs[i].avd_type = AVD_INVALID;
+		filebench_shm->shm_avd_ptrs[i].avd_val.varptr = NULL;
 		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->integer_ptrs[i]);
-
-	case FILEBENCH_STRING:
-		filebench_shm->string_ptrs[i] = NULL;
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->string_ptrs[i]);
+		return ((char *)&filebench_shm->shm_avd_ptrs[i]);
 
 	case FILEBENCH_VARIABLE:
 		(void) memset((char *)&filebench_shm->var[i], 0,
 		    sizeof (var_t));
 		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
 		return ((char *)&filebench_shm->var[i]);
+
+	case FILEBENCH_RANDDIST:
+		(void) memset((char *)&filebench_shm->shm_randdist[i], 0,
+		    sizeof (randdist_t));
+		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
+		return ((char *)&filebench_shm->shm_randdist[i]);
 	}
 
 	filebench_log(LOG_ERROR, "Attempt to ipc_malloc unknown type (%d)!",
@@ -548,19 +550,19 @@ ipc_free(int type, char *addr)
 		size = sizeof (flowop_t);
 		break;
 
-	case FILEBENCH_INTEGER:
-		base = (caddr_t)&filebench_shm->integer_ptrs[0];
-		size = sizeof (caddr_t);
-		break;
-
-	case FILEBENCH_STRING:
-		base = (caddr_t)&filebench_shm->string_ptrs[0];
-		size = sizeof (caddr_t);
+	case FILEBENCH_AVD:
+		base = (caddr_t)&filebench_shm->shm_avd_ptrs[0];
+		size = sizeof (avd_t);
 		break;
 
 	case FILEBENCH_VARIABLE:
 		base = (caddr_t)&filebench_shm->var[0];
 		size = sizeof (var_t);
+		break;
+
+	case FILEBENCH_RANDDIST:
+		base = (caddr_t)&filebench_shm->shm_randdist[0];
+		size = sizeof (randdist_t);
 		break;
 	}
 
