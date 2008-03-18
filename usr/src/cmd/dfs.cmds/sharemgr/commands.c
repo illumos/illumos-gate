@@ -771,7 +771,8 @@ free_opt(struct options *optlist)
  * A null value is a remove which is always valid.
  */
 static int
-valid_options(struct options *optlist, char *proto, void *object, char *sec)
+valid_options(sa_handle_t handle, struct options *optlist, char *proto,
+    void *object, char *sec)
 {
 	int ret = SA_OK;
 	struct options *cur;
@@ -792,7 +793,8 @@ valid_options(struct options *optlist, char *proto, void *object, char *sec)
 		if (prop == NULL)
 			ret = SA_NO_MEMORY;
 		if (ret != SA_OK ||
-		    (ret = sa_valid_property(parent, proto, prop)) != SA_OK) {
+		    (ret = sa_valid_property(handle, parent, proto, prop)) !=
+		    SA_OK) {
 			(void) printf(
 			    gettext("Could not add property %s: %s\n"),
 			    cur->optname, sa_errorstr(ret));
@@ -816,6 +818,7 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
 	sa_optionset_t optionset;
 	int ret = SA_OK;
 	int result = B_FALSE;
+	sa_handle_t handle;
 
 	optionset = sa_get_optionset(group, proto);
 	if (optionset == NULL) {
@@ -826,6 +829,11 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
 	}
 	if (optionset == NULL) {
 		ret = SA_NO_MEMORY;
+		goto out;
+	}
+	handle = sa_find_group_handle(group);
+	if (handle == NULL) {
+		ret = SA_CONFIG_ERR;
 		goto out;
 	}
 	while (optlist != NULL) {
@@ -840,8 +848,8 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
 				prop = sa_create_property(optlist->optname,
 				    optlist->optvalue);
 				if (prop != NULL) {
-					ret = sa_valid_property(optionset,
-					    proto, prop);
+					ret = sa_valid_property(handle,
+					    optionset, proto, prop);
 					if (ret != SA_OK) {
 						(void) sa_remove_property(prop);
 						(void) printf(gettext("Could "
@@ -1310,7 +1318,8 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 		/* check protocol vs optlist */
 		if (optlist != NULL) {
 			/* check options, if any, for validity */
-			ret = valid_options(optlist, protocol, group, NULL);
+			ret = valid_options(handle, optlist, protocol,
+			    group, NULL);
 		}
 	}
 	if (ret == SA_OK && !dryrun) {
@@ -3521,6 +3530,7 @@ add_security(sa_group_t group, char *sectype,
 	sa_security_t security;
 	int ret = SA_OK;
 	int result = 0;
+	sa_handle_t handle;
 
 	sectype = sa_proto_space_alias(proto, sectype);
 	security = sa_get_security(group, sectype, proto);
@@ -3531,8 +3541,13 @@ add_security(sa_group_t group, char *sectype,
 		sa_free_attr_string(sectype);
 
 	if (security == NULL)
-		return (ret);
+		goto done;
 
+	handle = sa_find_group_handle(group);
+	if (handle == NULL) {
+		ret = SA_CONFIG_ERR;
+		goto done;
+	}
 	while (optlist != NULL) {
 		sa_property_t prop;
 		prop = sa_get_property(security, optlist->optname);
@@ -3545,8 +3560,8 @@ add_security(sa_group_t group, char *sectype,
 				prop = sa_create_property(optlist->optname,
 				    optlist->optvalue);
 				if (prop != NULL) {
-					ret = sa_valid_property(security,
-					    proto, prop);
+					ret = sa_valid_property(handle,
+					    security, proto, prop);
 					if (ret != SA_OK) {
 						(void) sa_remove_property(prop);
 						(void) printf(gettext(
@@ -3585,6 +3600,7 @@ add_security(sa_group_t group, char *sectype,
 	 */
 	if (result)
 		ret = sa_commit_properties(security, 0);
+done:
 	*err = ret;
 	return (result);
 }
@@ -3720,7 +3736,7 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 
 		if (ret == SA_OK) {
 			/* group must exist */
-			ret = valid_options(optlist, protocol,
+			ret = valid_options(handle, optlist, protocol,
 			    share == NULL ? group : share, NULL);
 			if (ret == SA_OK && !dryrun) {
 				if (share != NULL)
@@ -3808,7 +3824,7 @@ space_set(sa_handle_t handle, char *groupname, struct options *optlist,
 		}
 		if (ret == SA_OK) {
 			/* group must exist */
-			ret = valid_options(optlist, protocol,
+			ret = valid_options(handle, optlist, protocol,
 			    share == NULL ? group : share, sectype);
 			if (ret == SA_OK && !dryrun) {
 				if (share != NULL)

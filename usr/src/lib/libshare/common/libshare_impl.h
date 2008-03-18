@@ -61,7 +61,8 @@ struct sa_plugin_ops {
 	void	(*sa_fini)();
 	int	(*sa_share)(sa_share_t);	/* start sharing */
 	int	(*sa_unshare)(sa_share_t, char *);	/* stop sharing */
-	int	(*sa_valid_prop)(sa_property_t, sa_optionset_t); /* validate */
+	int	(*sa_valid_prop)(sa_handle_t, sa_property_t,
+	    sa_optionset_t); /* validate */
 	int	(*sa_valid_space)(char *);	/* is name valid optionspace? */
 	int	(*sa_security_prop)(char *);	/* property is security */
 	int	(*sa_legacy_opts)(sa_group_t, char *); /* parse legacy opts */
@@ -115,7 +116,8 @@ typedef struct sa_handle_impl {
 
 extern int sa_proto_share(char *, sa_share_t);
 extern int sa_proto_unshare(sa_share_t, char *, char *);
-extern int sa_proto_valid_prop(char *, sa_property_t, sa_optionset_t);
+extern int sa_proto_valid_prop(sa_handle_t, char *, sa_property_t,
+    sa_optionset_t);
 extern int sa_proto_security_prop(char *, char *);
 extern int sa_proto_legacy_opts(char *, sa_group_t, char *);
 extern int sa_proto_share_resource(char *, sa_resource_t);

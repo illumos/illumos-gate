@@ -222,7 +222,7 @@ extern int sa_add_property(void *, sa_property_t);
 extern int sa_update_property(sa_property_t, char *);
 extern int sa_remove_property(sa_property_t);
 extern int sa_commit_properties(sa_optionset_t, int);
-extern int sa_valid_property(void *, char *, sa_property_t);
+extern int sa_valid_property(sa_handle_t, void *, char *, sa_property_t);
 extern int sa_is_persistent(void *);
 
 /* security control */
@@ -251,7 +251,8 @@ extern char *sa_get_protocol_status(char *);
 extern void sa_format_free(char *);
 extern sa_protocol_properties_t sa_create_protocol_properties(char *);
 extern int sa_add_protocol_property(sa_protocol_properties_t, sa_property_t);
-extern int sa_proto_valid_prop(char *, sa_property_t, sa_optionset_t);
+extern int sa_proto_valid_prop(sa_handle_t, char *, sa_property_t,
+    sa_optionset_t);
 extern int sa_proto_valid_space(char *, char *);
 extern char *sa_proto_space_alias(char *, char *);
 extern int sa_proto_get_transients(sa_handle_t, char *);

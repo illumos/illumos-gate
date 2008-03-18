@@ -62,7 +62,7 @@ static int smb_share_changed(sa_share_t);
 static int smb_resource_changed(sa_resource_t);
 static int smb_rename_resource(sa_handle_t, sa_resource_t, char *);
 static int smb_disable_share(sa_share_t share, char *);
-static int smb_validate_property(sa_property_t, sa_optionset_t);
+static int smb_validate_property(sa_handle_t, sa_property_t, sa_optionset_t);
 static int smb_set_proto_prop(sa_property_t);
 static sa_protocol_properties_t smb_get_proto_set(void);
 static char *smb_get_status(void);
@@ -699,13 +699,16 @@ done:
 }
 
 /*
- * smb_validate_property(property, parent)
+ * smb_validate_property(handle, property, parent)
  *
  * Check that the property has a legitimate value for its type.
+ * Handle isn't currently used but may need to be in the future.
  */
 
+/*ARGSUSED*/
 static int
-smb_validate_property(sa_property_t property, sa_optionset_t parent)
+smb_validate_property(sa_handle_t handle, sa_property_t property,
+    sa_optionset_t parent)
 {
 	int ret = SA_OK;
 	char *propname;

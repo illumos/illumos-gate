@@ -1626,19 +1626,20 @@ update_legacy_config(sa_handle_t handle)
 }
 
 /*
- * sa_valid_property(object, proto, property)
+ * sa_valid_property(handle, object, proto, property)
  *
  * check to see if the specified property is valid relative to the
  * specified protocol. The protocol plugin is called to do the work.
  */
 
 int
-sa_valid_property(void *object, char *proto, sa_property_t property)
+sa_valid_property(sa_handle_t handle, void *object, char *proto,
+    sa_property_t property)
 {
 	int ret = SA_OK;
 
 	if (proto != NULL && property != NULL) {
-		ret = sa_proto_valid_prop(proto, property, object);
+		ret = sa_proto_valid_prop(handle, proto, property, object);
 	}
 
 	return (ret);

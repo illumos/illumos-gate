@@ -305,19 +305,20 @@ sa_proto_unshare_resource(char *proto, sa_resource_t resource)
 }
 
 /*
- * sa_proto_valid_prop(proto, prop, opt)
+ * sa_proto_valid_prop(handle, proto, prop, opt)
  *
  * Check to see if the specified prop is valid for this protocol.
  */
 
 int
-sa_proto_valid_prop(char *proto, sa_property_t prop, sa_optionset_t opt)
+sa_proto_valid_prop(sa_handle_t handle, char *proto, sa_property_t prop,
+    sa_optionset_t opt)
 {
 	struct sa_plugin_ops *ops = find_protocol(proto);
 	int ret = 0;
 
 	if (ops != NULL && ops->sa_valid_prop != NULL)
-		ret = ops->sa_valid_prop(prop, opt);
+		ret = ops->sa_valid_prop(handle, prop, opt);
 	return (ret);
 }
 

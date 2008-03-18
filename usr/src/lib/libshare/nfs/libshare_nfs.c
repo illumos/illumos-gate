@@ -64,7 +64,7 @@ static int nfs_init();
 static void nfs_fini();
 static int nfs_enable_share(sa_share_t);
 static int nfs_disable_share(sa_share_t, char *);
-static int nfs_validate_property(sa_property_t, sa_optionset_t);
+static int nfs_validate_property(sa_handle_t, sa_property_t, sa_optionset_t);
 static int nfs_validate_security_mode(char *);
 static int nfs_is_security_opt(char *);
 static int nfs_parse_legacy_options(sa_group_t, char *);
@@ -1592,25 +1592,25 @@ check_public(sa_group_t group, sa_share_t skipshare)
 }
 
 /*
- * public_exists(share)
+ * public_exists(handle, share)
  *
  * check to see if public option is set on any other share than the
  * one specified. Need to check zfs sub-groups as well as the top
  * level groups.
  */
 static int
-public_exists(sa_share_t skipshare)
+public_exists(sa_handle_t handle, sa_share_t skipshare)
 {
-	sa_group_t group;
-	sa_handle_t handle;
+	sa_group_t group = NULL;
 
-	group = sa_get_parent_group(skipshare);
-	if (group == NULL)
-		return (SA_NO_SUCH_GROUP);
-
-	handle = sa_find_group_handle(group);
 	if (handle == NULL)
 		return (SA_SYSTEM_ERR);
+
+	if (skipshare != NULL) {
+		group = sa_get_parent_group(skipshare);
+		if (group == NULL)
+			return (SA_NO_SUCH_GROUP);
+	}
 
 	for (group = sa_get_group(handle, NULL); group != NULL;
 	    group = sa_get_next_group(group)) {
@@ -1652,6 +1652,7 @@ nfs_enable_share(sa_share_t share)
 	int err = SA_OK;
 	int i;
 	int iszfs;
+	sa_handle_t handle;
 
 	/* Don't drop core if the NFS module isn't loaded. */
 	(void) signal(SIGSYS, SIG_IGN);
@@ -1700,7 +1701,8 @@ nfs_enable_share(sa_share_t share)
 	 * no other share has it set. If it is already used, fail.
 	 */
 
-	if (export.ex_flags & EX_PUBLIC && public_exists(share)) {
+	handle = sa_find_group_handle((sa_group_t)share);
+	if (export.ex_flags & EX_PUBLIC && public_exists(handle, share)) {
 		(void) printf(dgettext(TEXT_DOMAIN,
 		    "NFS: Cannot share more than one file "
 		    "system with 'public' property\n"));
@@ -1986,13 +1988,14 @@ check_rorw(char *v1, char *v2)
 }
 
 /*
- * nfs_validate_property(property, parent)
+ * nfs_validate_property(handle, property, parent)
  *
  * Check that the property has a legitimate value for its type.
  */
 
 static int
-nfs_validate_property(sa_property_t property, sa_optionset_t parent)
+nfs_validate_property(sa_handle_t handle, sa_property_t property,
+    sa_optionset_t parent)
 {
 	int ret = SA_OK;
 	char *propname;
@@ -2011,10 +2014,22 @@ nfs_validate_property(sa_property_t property, sa_optionset_t parent)
 
 	if (ret == SA_OK) {
 		parent_group = sa_get_parent_group((sa_share_t)parent);
-		if (optdefs[optindex].share && !sa_is_share(parent_group))
+		if (optdefs[optindex].share && parent_group != NULL &&
+		    !sa_is_share(parent_group))
 			ret = SA_PROP_SHARE_ONLY;
 	}
 	if (ret == SA_OK) {
+		if (optdefs[optindex].index == OPT_PUBLIC) {
+			/*
+			 * Public is special in that only one instance can
+			 * be in the repository at the same time.
+			 */
+			if (public_exists(handle, parent_group)) {
+				if (propname != NULL)
+					sa_free_attr_string(propname);
+				return (SA_VALUE_CONFLICT);
+			}
+		}
 		value = sa_get_property_attr(property, "value");
 		if (value != NULL) {
 			/* first basic type checking */
@@ -2137,7 +2152,7 @@ nfs_validate_property(sa_property_t property, sa_optionset_t parent)
 
 			if (ret == SA_OK && optdefs[optindex].check != NULL) {
 				/* do the property specific check */
-				ret = optdefs[optindex].check(property);
+				ret = optdefs[optindex].check(handle, property);
 			}
 		}
 	}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ struct option_defs {
 	int index;
 	int type;
 	int share;	/* share only option */
-	int (*check)(char *);
+	int (*check)(sa_handle_t, char *);
 };
 
 /*

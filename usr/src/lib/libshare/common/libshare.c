@@ -69,7 +69,6 @@ extern struct sa_proto_plugin *sap_proto_list;
 /* current SMF/SVC repository handle */
 extern void getlegacyconfig(sa_handle_t, char *, xmlNodePtr *);
 extern int gettransients(sa_handle_impl_t, xmlNodePtr *);
-extern int sa_valid_property(void *, char *, sa_property_t);
 extern char *sa_fstype(char *);
 extern int sa_is_share(void *);
 extern int sa_is_resource(void *);
@@ -3201,11 +3200,15 @@ sa_add_property(void *object, sa_property_t property)
 	sa_group_t parent;
 	sa_group_t group;
 	char *proto;
+	sa_handle_t handle;
 
-	proto = sa_get_optionset_attr(object, "type");
 	if (property != NULL) {
-		if ((ret = sa_valid_property(object, proto, property)) ==
-		    SA_OK) {
+		handle = sa_find_group_handle((sa_group_t)object);
+		if (handle == NULL)
+			return (SA_CONFIG_ERR);
+		proto = sa_get_optionset_attr(object, "type");
+		if ((ret = sa_valid_property(handle, object, proto,
+		    property)) == SA_OK) {
 			property = (sa_property_t)xmlAddChild(
 			    (xmlNodePtr)object, (xmlNodePtr)property);
 		} else {
@@ -3213,10 +3216,10 @@ sa_add_property(void *object, sa_property_t property)
 				sa_free_attr_string(proto);
 			return (ret);
 		}
+		if (proto != NULL)
+			sa_free_attr_string(proto);
 	}
 
-	if (proto != NULL)
-		sa_free_attr_string(proto);
 
 	parent = sa_get_parent_group(object);
 	if (!sa_is_persistent(parent))
