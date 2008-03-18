@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,11 +247,18 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 	    pnode != DI_NODE_NIL;
 	    pnode = di_drv_next_node(pnode)) {
 		int psb = -1;
+		int a, lsb, hb, rc;
+
+		/* Get the bus address */
 		char *ba = di_bus_addr(pnode);
-		int a = OPL_PX_STR2BA(ba);
-		int lsb = OPL_PX_LSB(a);
-		int hb = OPL_PX_HB(a);
-		int rc = OPL_PX_RC(a);
+		if (ba == NULL || (*ba == '\0')) {
+			return (-1); /* Return if it's not assigned */
+		}
+
+		a = OPL_PX_STR2BA(ba);
+		lsb = OPL_PX_LSB(a);
+		hb = OPL_PX_HB(a);
+		rc = OPL_PX_RC(a);
 		/* Map logical system board to physical system board */
 		if (lsb >= 0 && lsb <= OPL_IOB_MAX) {
 			psb = lsb_to_psb[lsb];
