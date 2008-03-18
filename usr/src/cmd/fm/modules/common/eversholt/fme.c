@@ -2909,13 +2909,45 @@ publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 }
 
 static void
+fme_undiagnosble_pci(struct fme *f, nvlist_t *rc_detector) {
+	nvlist_t *defect, *asru;
+	char *path;
+
+	(void) nvlist_lookup_string(rc_detector, FM_FMRI_DEV_PATH, &path);
+	out(O_ALTFP, "[solving/closing PCIE FME%d PATH %s]", f->id, path);
+
+	(void) nvlist_xalloc(&asru, NV_UNIQUE_NAME, &Eft_nv_hdl);
+	(void) nvlist_add_uint8(asru, FM_VERSION, FM_HC_SCHEME_VERSION);
+	(void) nvlist_add_string(asru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_DEV);
+	(void) nvlist_add_string(asru, FM_FMRI_DEV_PATH, path);
+
+	defect = fmd_nvl_create_fault(f->hdl,
+	    "fault.sunos.eft.unknown_pci_fault", 100,
+	    asru, NULL, NULL);
+
+	(void) nvlist_add_string(defect, UNDIAG_REASON, UD_PCIUNSOLVD);
+	fmd_case_pci_undiagnosable(f->hdl, f->fmcase, defect);
+
+	fmd_case_add_suspect(f->hdl, f->fmcase, defect);
+	fmd_case_solve(f->hdl, f->fmcase);
+	fmd_case_close(f->hdl, f->fmcase);
+}
+
+static void
 fme_undiagnosable(struct fme *f)
 {
 	nvlist_t *defect;
+	nvlist_t *rc_detector;
 
 	out(O_ALTFP, "[solving/closing FME%d, case %s (%s)]",
 	    f->id, fmd_case_uuid(f->hdl, f->fmcase),
 	    Undiag_reason ? Undiag_reason : "undiagnosable");
+
+	if ((strcmp(Undiag_reason, UD_UNSOLVD) == 0) &&
+	    fmd_case_is_pcie(f->hdl, f->fmcase, &rc_detector)) {
+		fme_undiagnosble_pci(f, rc_detector);
+		return;
+	}
 
 	defect = fmd_nvl_create_fault(f->hdl, UNDIAGNOSABLE_DEFECT, 100,
 	    NULL, NULL, NULL);

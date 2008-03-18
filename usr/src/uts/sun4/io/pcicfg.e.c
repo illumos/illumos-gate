@@ -3634,7 +3634,7 @@ pcicfg_enable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
 
 	/* restore original settings */
 	if (regs->pcie_dev) {
-		pcie_clear_errors(dip, h);
+		pcie_clear_errors(dip);
 		pci_config_put16(h, regs->pcie_cap_off + PCIE_DEVCTL,
 		    regs->devctl);
 	}

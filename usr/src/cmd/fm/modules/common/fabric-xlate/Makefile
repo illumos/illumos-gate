@@ -25,17 +25,16 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = cpumem-retire \
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	io-retire	\
-	ip-transport	\
-	snmp-trapgen	\
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-retire	\
-	fabric-xlate
+MODULE = fabric-xlate
+CLASS = common
+SRCS = fabric-xlate.c
 
-include ../../Makefile.subdirs
+include ../../Makefile.plugin
+
+CPPFLAGS += -I/usr/include/libxml2 -I$(KMFDIR)/include -I.
+INCDIRS = $(SRC)/uts/common
+CFLAGS += -I$(INCDIRS)
+LINTFLAGS += -I$(INCDIRS)
+
+LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
+LDLIBS += -luutil -lxml2 -L$(ROOTLIB)/fm -ltopo

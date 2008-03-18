@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/sunddi.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
+#include <sys/fm/io/pci.h>
 #include <sys/membar.h>
 #include "px_obj.h"
 
@@ -43,19 +44,24 @@
 	(PCIE_AER_UCE_TRAINING | PCIE_AER_UCE_SD | PCIE_AER_UCE_CA | \
 	PCIE_AER_UCE_UC | PCIE_AER_UCE_UR)
 
-static void px_err_fill_pfd(dev_info_t *rpdip, px_err_pcie_t *regs);
+/*
+ * Global panicing state variabled used to control if further error handling
+ * should occur.  If the system is already panic'ing or if PX itself has
+ * recommended panic'ing the system, no further error handling should occur to
+ * prevent the system from hanging.
+ */
+boolean_t px_panicing = B_FALSE;
+
+static pf_data_t *px_get_pfd(px_t *px_p);
+
 static int px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr,
     px_err_pcie_t *regs);
 
 #if defined(DEBUG)
-static void px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs, int severity);
+static void px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs);
 #else	/* DEBUG */
 #define	px_pcie_log 0 &&
 #endif	/* DEBUG */
-
-/* external functions */
-extern int pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p);
-extern int pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p);
 
 /*
  * Initialize px FMA support
@@ -63,6 +69,10 @@ extern int pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p);
 int
 px_fm_attach(px_t *px_p)
 {
+	int		i;
+	dev_info_t	*dip = px_p->px_dip;
+	pcie_bus_t	*bus_p;
+
 	px_p->px_fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
 	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
@@ -75,7 +85,7 @@ px_fm_attach(px_t *px_p)
 	/*
 	 * check parents' capability
 	 */
-	ddi_fm_init(px_p->px_dip, &px_p->px_fm_cap, &px_p->px_fm_ibc);
+	ddi_fm_init(dip, &px_p->px_fm_cap, &px_p->px_fm_ibc);
 
 	/*
 	 * parents need to be ereport and error handling capable
@@ -89,10 +99,22 @@ px_fm_attach(px_t *px_p)
 	mutex_init(&px_p->px_fm_mutex, NULL, MUTEX_DRIVER,
 	    (void *)px_p->px_fm_ibc);
 
+
+	pcie_rc_init_bus(dip);
+
+	px_p->px_pfd_idx = 0;
+	for (i = 0; i < 5; i++)
+		pcie_rc_init_pfd(dip, &px_p->px_pfd_arr[i]);
+	PCIE_DIP2PFD(dip) = px_p->px_pfd_arr;
+
+	bus_p = PCIE_DIP2BUS(dip);
+	bus_p->bus_rp_bdf = px_p->px_bdf;
+	bus_p->bus_rp_dip = dip;
+
 	/*
 	 * register error callback in parent
 	 */
-	ddi_fm_handler_register(px_p->px_dip, px_fm_callback, px_p);
+	ddi_fm_handler_register(dip, px_fm_callback, px_p);
 
 	return (DDI_SUCCESS);
 }
@@ -103,9 +125,14 @@ px_fm_attach(px_t *px_p)
 void
 px_fm_detach(px_t *px_p)
 {
+	int i;
+
 	ddi_fm_handler_unregister(px_p->px_dip);
 	mutex_destroy(&px_p->px_fm_mutex);
 	ddi_fm_fini(px_p->px_dip);
+	for (i = 0; i < 5; i++)
+		pcie_rc_fini_pfd(&px_p->px_pfd_arr[i]);
+	pcie_rc_fini_bus(px_p->px_dip);
 }
 
 /*
@@ -113,9 +140,10 @@ px_fm_detach(px_t *px_p)
  * protection.
  */
 void
-px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip)
+px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip, pci_regspec_t *rp)
 {
 	uchar_t fflag;
+	ndi_err_t *errp;
 	ddi_acc_hdl_t *hp;
 	ddi_acc_impl_t *ap;
 
@@ -143,6 +171,13 @@ px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip)
 			ap->ahi_rep_put16 = i_ddi_prot_rep_put16;
 			ap->ahi_rep_put32 = i_ddi_prot_rep_put32;
 			ap->ahi_rep_put64 = i_ddi_prot_rep_put64;
+			impl_acc_err_init(hp);
+			errp = ((ddi_acc_impl_t *)hp)->ahi_err;
+			if ((rp->pci_phys_hi & PCI_REG_ADDR_M) ==
+			    PCI_ADDR_CONFIG)
+				errp->err_cf = px_err_cfg_hdl_check;
+			else
+				errp->err_cf = px_err_pio_hdl_check;
 			break;
 		case DDI_CAUTIOUS_ACC :
 			ap->ahi_get8 = i_ddi_caut_get8;
@@ -161,6 +196,13 @@ px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip)
 			ap->ahi_rep_put16 = i_ddi_caut_rep_put16;
 			ap->ahi_rep_put32 = i_ddi_caut_rep_put32;
 			ap->ahi_rep_put64 = i_ddi_caut_rep_put64;
+			impl_acc_err_init(hp);
+			errp = ((ddi_acc_impl_t *)hp)->ahi_err;
+			if ((rp->pci_phys_hi & PCI_REG_ADDR_M) ==
+			    PCI_ADDR_CONFIG)
+				errp->err_cf = px_err_cfg_hdl_check;
+			else
+				errp->err_cf = px_err_pio_hdl_check;
 			break;
 		default:
 			break;
@@ -221,6 +263,24 @@ px_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle)
 	mutex_exit(&pec_p->pec_pokefault_mutex);
 }
 
+static uint64_t
+px_in_addr_range(dev_info_t *dip, px_ranges_t *ranges_p, uint64_t addr)
+{
+	uint64_t	addr_low, addr_high;
+
+	addr_low = ((uint64_t)ranges_p->parent_high << 32) |
+	    (uint64_t)ranges_p->parent_low;
+	addr_high = addr_low + ((uint64_t)ranges_p->size_high << 32) +
+	    (uint64_t)ranges_p->size_low;
+
+	DBG(DBG_ERR_INTR, dip, "Addr: 0x%llx high: 0x%llx low: 0x%llx\n",
+	    addr, addr_high, addr_low);
+
+	if ((addr < addr_high) && (addr >= addr_low))
+		return (addr_low);
+
+	return (0);
+}
 
 /*
  * PCI error callback which is registered with our parent to call
@@ -234,8 +294,9 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	dev_info_t	*pdip = ddi_get_parent(dip);
 	px_t		*px_p = (px_t *)impl_data;
 	int		i, acc_type = 0;
-	int		lookup, rc_err, fab_err = PF_NO_PANIC;
-	uint32_t	addr, addr_high, addr_low;
+	int		lookup, rc_err, fab_err;
+	uint64_t	addr, base_addr;
+	uint64_t	fault_addr = (uint64_t)derr->fme_bus_specific;
 	pcie_req_id_t	bdf;
 	px_ranges_t	*ranges_p;
 	int		range_len;
@@ -250,11 +311,10 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 		return (DDI_FM_FATAL);
 
 	i_ddi_fm_handler_exit(pdip);
-	mutex_enter(&px_p->px_fm_mutex);
-	px_p->px_fm_mutex_owner = curthread;
-
-	addr_high = (uint32_t)((uint64_t)derr->fme_bus_specific >> 32);
-	addr_low = (uint32_t)((uint64_t)derr->fme_bus_specific);
+	if (px_fm_enter(px_p) != DDI_SUCCESS) {
+		i_ddi_fm_handler_enter(pdip);
+		return (DDI_FM_FATAL);
+	}
 
 	/*
 	 * Make sure this failed load came from this PCIe port.	 Check by
@@ -263,21 +323,20 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
 	i = 0;
 	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
-		if (ranges_p->parent_high == addr_high) {
+		base_addr = px_in_addr_range(dip, ranges_p, fault_addr);
+		if (base_addr) {
 			switch (ranges_p->child_high & PCI_ADDR_MASK) {
 			case PCI_ADDR_CONFIG:
-				acc_type = PF_CFG_ADDR;
+				acc_type = PF_ADDR_CFG;
 				addr = NULL;
-				bdf = (pcie_req_id_t)(addr_low >> 12);
+				bdf = (pcie_req_id_t)((fault_addr >> 12) &
+				    0xFFFF);
 				break;
 			case PCI_ADDR_IO:
-				acc_type = PF_IO_ADDR;
-				addr = addr_low;
-				bdf = NULL;
-				break;
+			case PCI_ADDR_MEM64:
 			case PCI_ADDR_MEM32:
-				acc_type = PF_DMA_ADDR;
-				addr = addr_low;
+				acc_type = PF_ADDR_PIO;
+				addr = fault_addr - base_addr;
 				bdf = NULL;
 				break;
 			}
@@ -287,39 +346,31 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 
 	/* This address doesn't belong to this leaf, just return with OK */
 	if (!acc_type) {
-		px_p->px_fm_mutex_owner = NULL;
-		mutex_exit(&px_p->px_fm_mutex);
+		px_fm_exit(px_p);
 		i_ddi_fm_handler_enter(pdip);
 		return (DDI_FM_OK);
-	} else if (acc_type == PF_IO_ADDR) {
-		px_p->px_fm_mutex_owner = NULL;
-		mutex_exit(&px_p->px_fm_mutex);
-		i_ddi_fm_handler_enter(pdip);
-		return (DDI_FM_FATAL);
 	}
 
 	rc_err = px_err_cmn_intr(px_p, derr, PX_TRAP_CALL, PX_FM_BLOCK_ALL);
-	lookup = pf_hdl_lookup(dip, derr->fme_ena, acc_type, addr, bdf);
+	lookup = pf_hdl_lookup(dip, derr->fme_ena, acc_type, (uint64_t)addr,
+	    bdf);
 
-	if (!px_lib_is_in_drain_state(px_p)) {
-		/*
-		 * This is to ensure that device corresponding to the addr of
-		 * the failed PIO/CFG load gets scanned.
-		 */
-		px_rp_en_q(px_p, bdf, addr,
-		    (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB));
-		fab_err = pf_scan_fabric(dip, derr, px_p->px_dq_p,
-		    &px_p->px_dq_tail);
-	}
+	px_rp_en_q(px_p, bdf, addr,
+	    (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB));
 
-	px_p->px_fm_mutex_owner = NULL;
-	mutex_exit(&px_p->px_fm_mutex);
+	fab_err = px_scan_fabric(px_p, dip, derr);
+
+	px_fm_exit(px_p);
 	i_ddi_fm_handler_enter(pdip);
 
-	if ((rc_err & (PX_PANIC | PX_PROTECTED)) || (fab_err & PF_PANIC) ||
+	if (!px_die)
+		return (DDI_FM_OK);
+
+	if ((rc_err & (PX_PANIC | PX_PROTECTED)) ||
+	    (fab_err & PF_ERR_FATAL_FLAGS) ||
 	    (lookup == PF_HDL_NOTFOUND))
 		return (DDI_FM_FATAL);
-	else if ((rc_err == PX_NO_ERROR) && (fab_err == PF_NO_ERROR))
+	else if ((rc_err == PX_NO_ERROR) && (fab_err == PF_ERR_NO_ERROR))
 		return (DDI_FM_OK);
 
 	return (DDI_FM_NONFATAL);
@@ -341,11 +392,13 @@ uint_t
 px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 {
 	dev_info_t	*rpdip = px_p->px_dip;
-	int		rc_err, fab_err = PF_NO_PANIC;
+	int		rc_err, fab_err;
 	ddi_fm_error_t	derr;
+	uint32_t	rp_status;
+	uint16_t	ce_source, ue_source;
 
-	mutex_enter(&px_p->px_fm_mutex);
-	px_p->px_fm_mutex_owner = curthread;
+	if (px_fm_enter(px_p) != DDI_SUCCESS)
+		goto done;
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -353,23 +406,69 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
+	px_err_safeacc_check(px_p, &derr);
+
+	if (msg_code == PCIE_MSG_CODE_ERR_COR) {
+		rp_status = PCIE_AER_RE_STS_CE_RCVD;
+		ce_source = rid;
+		ue_source = 0;
+	} else {
+		rp_status = PCIE_AER_RE_STS_FE_NFE_RCVD;
+		ce_source = 0;
+		ue_source = rid;
+		if (msg_code == PCIE_MSG_CODE_ERR_NONFATAL)
+			rp_status |= PCIE_AER_RE_STS_NFE_MSGS_RCVD;
+		else {
+			rp_status |= PCIE_AER_RE_STS_FE_MSGS_RCVD;
+			rp_status |= PCIE_AER_RE_STS_FIRST_UC_FATAL;
+		}
+	}
+
+	if (derr.fme_flag == DDI_FM_ERR_UNEXPECTED) {
+		ddi_fm_ereport_post(rpdip, PCI_ERROR_SUBCLASS "." PCIEX_FABRIC,
+		    derr.fme_ena,
+		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+		    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+		    "pcie_adv_rp_status", DATA_TYPE_UINT32, rp_status,
+		    "pcie_adv_rp_command", DATA_TYPE_UINT32, 0,
+		    "pcie_adv_rp_ce_src_id", DATA_TYPE_UINT16, ce_source,
+		    "pcie_adv_rp_ue_src_id", DATA_TYPE_UINT16, ue_source,
+		    NULL);
+	}
+
 	/* Ensure that the rid of the fabric message will get scanned. */
 	px_rp_en_q(px_p, rid, NULL, NULL);
 
 	rc_err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_PCIE);
 
 	/* call rootport dispatch */
-	if (!px_lib_is_in_drain_state(px_p)) {
-		fab_err = pf_scan_fabric(rpdip, &derr, px_p->px_dq_p,
-		    &px_p->px_dq_tail);
+	fab_err = px_scan_fabric(px_p, rpdip, &derr);
+
+	px_err_panic(rc_err, PX_RC, fab_err, B_TRUE);
+	px_fm_exit(px_p);
+	px_err_panic(rc_err, PX_RC, fab_err, B_FALSE);
+
+done:
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
+ * px_scan_fabric:
+ *
+ * Check for drain state and if there is anything to scan.
+ */
+int
+px_scan_fabric(px_t *px_p, dev_info_t *rpdip, ddi_fm_error_t *derr) {
+	int fab_err = 0;
+
+	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
+
+	if (!px_lib_is_in_drain_state(px_p) && px_p->px_pfd_idx) {
+		fab_err = pf_scan_fabric(rpdip, derr, px_p->px_pfd_arr);
+		px_p->px_pfd_idx = 0;
 	}
 
-	px_p->px_fm_mutex_owner = NULL;
-	mutex_exit(&px_p->px_fm_mutex);
-
-	px_err_panic(rc_err, PX_RC, fab_err);
-
-	return (DDI_INTR_CLAIMED);
+	return (fab_err);
 }
 
 /*
@@ -456,103 +555,75 @@ px_err_check_eq(dev_info_t *dip)
 	return (PX_NO_PANIC);
 }
 
-static void
-px_err_fill_pfd(dev_info_t *rpdip, px_err_pcie_t *regs)
+/* ARGSUSED */
+int
+px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 {
-	px_t		*px_p = DIP_TO_STATE(rpdip);
-	pf_data_t	pf_data = {0};
-	pcie_req_id_t	fault_bdf = 0;
-	uint32_t	fault_addr = 0;
-	uint16_t	s_status = 0;
-
-	pf_data.rp_bdf = px_p->px_bdf;
+	px_t		*px_p = DIP_TO_STATE(dip);
+	pf_data_t	*pfd_p = px_get_pfd(px_p);
+	int		i;
+	pf_pcie_adv_err_regs_t *adv_reg = PCIE_ADV_REG(pfd_p);
 
 	/*
 	 * set RC s_status in PCI term to coordinate with downstream fabric
 	 * errors ananlysis.
 	 */
 	if (regs->primary_ue & PCIE_AER_UCE_UR)
-		s_status = PCI_STAT_R_MAST_AB;
+		PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = PCI_STAT_R_MAST_AB;
 	if (regs->primary_ue & PCIE_AER_UCE_CA)
-		s_status = PCI_STAT_R_TARG_AB;
+		PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = PCI_STAT_R_TARG_AB;
 	if (regs->primary_ue & (PCIE_AER_UCE_PTLP | PCIE_AER_UCE_ECRC))
-		s_status = PCI_STAT_PERROR;
+		PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = PCI_STAT_PERROR;
+
+	adv_reg->pcie_ce_status = regs->ce_reg;
+	adv_reg->pcie_ue_status = regs->ue_reg | regs->primary_ue;
+	PCIE_ADV_HDR(pfd_p, 0) = regs->rx_hdr1;
+	PCIE_ADV_HDR(pfd_p, 1) = regs->rx_hdr2;
+	PCIE_ADV_HDR(pfd_p, 2) = regs->rx_hdr3;
+	PCIE_ADV_HDR(pfd_p, 3) = regs->rx_hdr4;
+	for (i = regs->primary_ue; i != 1; i = i >> 1)
+		adv_reg->pcie_adv_ctl++;
 
 	if (regs->primary_ue & (PCIE_AER_UCE_UR | PCIE_AER_UCE_CA)) {
-		pf_data.aer_h0 = regs->rx_hdr1;
-		pf_data.aer_h1 = regs->rx_hdr2;
-		pf_data.aer_h2 = regs->rx_hdr3;
-		pf_data.aer_h3 = regs->rx_hdr4;
-
-		pf_tlp_decode(rpdip, &pf_data, &fault_bdf, NULL, NULL);
+		if (pf_tlp_decode(PCIE_DIP2BUS(dip), adv_reg) == DDI_SUCCESS)
+			PCIE_ROOT_FAULT(pfd_p)->fault_bdf =
+			    adv_reg->pcie_ue_tgt_bdf;
 	} else if (regs->primary_ue & PCIE_AER_UCE_PTLP) {
-		pcie_tlp_hdr_t	*tlp_p;
+		if (pf_tlp_decode(PCIE_DIP2BUS(dip), adv_reg) == DDI_SUCCESS) {
+			PCIE_ROOT_FAULT(pfd_p)->fault_bdf =
+			    adv_reg->pcie_ue_tgt_bdf;
+			if (adv_reg->pcie_ue_tgt_trans ==
+			    PF_ADDR_PIO)
+				PCIE_ROOT_FAULT(pfd_p)->fault_addr =
+				    adv_reg->pcie_ue_tgt_addr;
+		}
 
-		pf_data.aer_h0 = regs->rx_hdr1;
-		pf_data.aer_h1 = regs->rx_hdr2;
-		pf_data.aer_h2 = regs->rx_hdr3;
-		pf_data.aer_h3 = regs->rx_hdr4;
-
-		tlp_p = (pcie_tlp_hdr_t *)&pf_data.aer_h0;
-		if (tlp_p->type == PCIE_TLP_TYPE_CPL)
-			pf_tlp_decode(rpdip, &pf_data, &fault_bdf, NULL, NULL);
-
-		pf_data.aer_h0 = regs->tx_hdr1;
-		pf_data.aer_h1 = regs->tx_hdr2;
-		pf_data.aer_h2 = regs->tx_hdr3;
-		pf_data.aer_h3 = regs->tx_hdr4;
-
-		pf_tlp_decode(rpdip, &pf_data, NULL, &fault_addr, NULL);
+		/*
+		 * Normally for Poisoned Completion TLPs we can look at the
+		 * transmit log header for the original request and the original
+		 * address, however this doesn't seem to be working.  HW BUG.
+		 */
 	}
 
-	px_rp_en_q(px_p, fault_bdf, fault_addr, s_status);
-}
+	px_pcie_log(dip, regs);
 
-int
-px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
-{
-	uint32_t ce_reg, ue_reg;
-	int err = PX_NO_ERROR;
-
-	ce_reg = regs->ce_reg;
-	if (ce_reg)
-		err |= (ce_reg & px_fabric_die_rc_ce) ? PX_PANIC : PX_NO_ERROR;
-
-	ue_reg = regs->ue_reg;
-	if (!ue_reg)
-		goto done;
-
-	if (ue_reg & PCIE_AER_UCE_PTLP)
-		err |= px_pcie_ptlp(dip, derr, regs);
-
-	if (ue_reg & PX_PCIE_PANIC_BITS)
-		err |= PX_PANIC;
-
-	if (ue_reg & PX_PCIE_NO_PANIC_BITS)
-		err |= PX_NO_PANIC;
-
-	/* Scan the fabric to clean up error bits, for the following errors. */
-	if (ue_reg & (PCIE_AER_UCE_PTLP | PCIE_AER_UCE_CA | PCIE_AER_UCE_UR))
-		px_err_fill_pfd(dip, regs);
-done:
-	px_pcie_log(dip, regs, err);
-	return (err);
+	/* Return No Error here and let the pcie misc module analyse it */
+	return (PX_NO_ERROR);
 }
 
 #if defined(DEBUG)
 static void
-px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs, int severity)
+px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs)
 {
 	DBG(DBG_ERR_INTR, dip,
-	    "A PCIe RC error has occured with a severity of \"%s\"\n"
+	    "A PCIe RC error has occured\n"
 	    "\tCE: 0x%x UE: 0x%x Primary UE: 0x%x\n"
 	    "\tTX Hdr: 0x%x 0x%x 0x%x 0x%x\n\tRX Hdr: 0x%x 0x%x 0x%x 0x%x\n",
-	    (severity & PX_PANIC) ? "PANIC" : "NO PANIC", regs->ce_reg,
-	    regs->ue_reg, regs->primary_ue, regs->tx_hdr1, regs->tx_hdr2,
-	    regs->tx_hdr3, regs->tx_hdr4, regs->rx_hdr1, regs->rx_hdr2,
-	    regs->rx_hdr3, regs->rx_hdr4);
+	    regs->ce_reg, regs->ue_reg, regs->primary_ue,
+	    regs->tx_hdr1, regs->tx_hdr2, regs->tx_hdr3, regs->tx_hdr4,
+	    regs->rx_hdr1, regs->rx_hdr2, regs->rx_hdr3, regs->rx_hdr4);
 }
-#endif	/* DEBUG */
+#endif
 
 /*
  * look through poisoned TLP cases and suggest panic/no panic depend on
@@ -561,12 +632,12 @@ px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs, int severity)
 static int
 px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 {
-	px_t		*px_p = DIP_TO_STATE(dip);
-	pf_data_t	pf_data;
+	pf_pcie_adv_err_regs_t adv_reg;
 	pcie_req_id_t	bdf;
-	uint32_t	addr, trans_type;
+	uint64_t	addr;
+	uint32_t	trans_type;
 	int		tlp_sts, tlp_cmd;
-	int		sts = PF_HDL_NOTFOUND;
+	int		lookup = PF_HDL_NOTFOUND;
 
 	if (regs->primary_ue != PCIE_AER_UCE_PTLP)
 		return (PX_PANIC);
@@ -574,17 +645,20 @@ px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 	if (!regs->rx_hdr1)
 		goto done;
 
-	pf_data.rp_bdf = px_p->px_bdf;
-	pf_data.aer_h0 = regs->rx_hdr1;
-	pf_data.aer_h1 = regs->rx_hdr2;
-	pf_data.aer_h2 = regs->rx_hdr3;
-	pf_data.aer_h3 = regs->rx_hdr4;
+	adv_reg.pcie_ue_hdr[0] = regs->rx_hdr1;
+	adv_reg.pcie_ue_hdr[1] = regs->rx_hdr2;
+	adv_reg.pcie_ue_hdr[2] = regs->rx_hdr3;
+	adv_reg.pcie_ue_hdr[3] = regs->rx_hdr4;
 
-	tlp_sts = pf_tlp_decode(dip, &pf_data, &bdf, &addr, &trans_type);
-	tlp_cmd = ((pcie_tlp_hdr_t *)(&pf_data.aer_h0))->type;
+	tlp_sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
+	tlp_cmd = ((pcie_tlp_hdr_t *)(adv_reg.pcie_ue_hdr))->type;
 
 	if (tlp_sts == DDI_FAILURE)
 		goto done;
+
+	bdf = adv_reg.pcie_ue_tgt_bdf;
+	addr = adv_reg.pcie_ue_tgt_addr;
+	trans_type = adv_reg.pcie_ue_tgt_trans;
 
 	switch (tlp_cmd) {
 	case PCIE_TLP_TYPE_CPL:
@@ -594,24 +668,58 @@ px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 		 * from the RX TLP, and the original address from the TX TLP.
 		 */
 		if (regs->tx_hdr1) {
-			pf_data.aer_h0 = regs->tx_hdr1;
-			pf_data.aer_h1 = regs->tx_hdr2;
-			pf_data.aer_h2 = regs->tx_hdr3;
-			pf_data.aer_h3 = regs->tx_hdr4;
+			adv_reg.pcie_ue_hdr[0] = regs->tx_hdr1;
+			adv_reg.pcie_ue_hdr[1] = regs->tx_hdr2;
+			adv_reg.pcie_ue_hdr[2] = regs->tx_hdr3;
+			adv_reg.pcie_ue_hdr[3] = regs->tx_hdr4;
 
-			sts = pf_tlp_decode(dip, &pf_data, NULL, &addr,
-			    &trans_type);
+			lookup = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
+			if (lookup != DDI_SUCCESS)
+				break;
+			addr = adv_reg.pcie_ue_tgt_addr;
+			trans_type = adv_reg.pcie_ue_tgt_trans;
 		} /* FALLTHRU */
 	case PCIE_TLP_TYPE_IO:
 	case PCIE_TLP_TYPE_MEM:
 	case PCIE_TLP_TYPE_MEMLK:
-		sts = pf_hdl_lookup(dip, derr->fme_ena, trans_type, addr, bdf);
+		lookup = pf_hdl_lookup(dip, derr->fme_ena, trans_type, addr,
+		    bdf);
 		break;
 	default:
-		sts = PF_HDL_NOTFOUND;
+		lookup = PF_HDL_NOTFOUND;
 	}
 done:
-	return (sts == PF_HDL_NOTFOUND ? PX_PANIC : PX_NO_PANIC);
+	return (lookup == PF_HDL_FOUND ? PX_NO_PANIC : PX_PANIC);
+}
+
+/*
+ * px_get_pdf automatically allocates a RC pf_data_t and returns a pointer to
+ * it.  This function should be used when an error requires a fabric scan.
+ */
+static pf_data_t *
+px_get_pfd(px_t *px_p) {
+	int		idx = px_p->px_pfd_idx++;
+	pf_data_t	*pfd_p = &px_p->px_pfd_arr[idx];
+
+	/* Clear Old Data */
+	PCIE_ROOT_FAULT(pfd_p)->fault_bdf = 0;
+	PCIE_ROOT_FAULT(pfd_p)->fault_addr = 0;
+	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = 0;
+	PCIE_ADV_REG(pfd_p)->pcie_ce_status = 0;
+	PCIE_ADV_REG(pfd_p)->pcie_ue_status = 0;
+
+	pfd_p->pe_next = NULL;
+
+	if (idx > 0) {
+		px_p->px_pfd_arr[idx - 1].pe_next = pfd_p;
+		pfd_p->pe_prev = &px_p->px_pfd_arr[idx - 1];
+	} else {
+		pfd_p->pe_prev = NULL;
+	}
+
+	pfd_p->pe_valid = B_TRUE;
+
+	return (pfd_p);
 }
 
 /*
@@ -627,47 +735,208 @@ done:
  *	     (ie S-TA/MA, R-TA)
  * Either the fault bdf or addr may be NULL, but not both.
  */
-int px_foo = 0;
 void
 px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf, uint32_t fault_addr,
     uint16_t s_status)
 {
-	pf_data_t pf_data = {0};
+	pf_data_t	*pfd_p;
 
 	if (!fault_bdf && !fault_addr)
 		return;
 
-	pf_data.dev_type = PCIE_PCIECAP_DEV_TYPE_ROOT;
-	if (px_foo) {
-		pf_data.fault_bdf = px_foo;
-		px_foo = 0;
-	} else
-		pf_data.fault_bdf = fault_bdf;
+	pfd_p = px_get_pfd(px_p);
 
-	pf_data.bdf = px_p->px_bdf;
-	pf_data.rp_bdf = px_p->px_bdf;
-	pf_data.fault_addr = fault_addr;
-	pf_data.s_status = s_status;
-	pf_data.send_erpt = PF_SEND_ERPT_NO;
+	PCIE_ROOT_FAULT(pfd_p)->fault_bdf = fault_bdf;
+	PCIE_ROOT_FAULT(pfd_p)->fault_addr = (uint64_t)fault_addr;
+	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
+}
 
-	(void) pf_en_dq(&pf_data, px_p->px_dq_p, &px_p->px_dq_tail, -1);
+
+/*
+ * Find and Mark CFG Handles as failed associated with the given BDF. We should
+ * always know the BDF for CFG accesses, since it is encoded in the address of
+ * the TLP.  Since there can be multiple cfg handles, mark them all as failed.
+ */
+/* ARGSUSED */
+int
+px_err_cfg_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
+    const void *arg2)
+{
+	int			status = DDI_FM_FATAL;
+	uint32_t		addr = *(uint32_t *)arg1;
+	uint16_t		bdf = *(uint16_t *)arg2;
+	pcie_bus_t		*bus_p;
+
+	DBG(DBG_ERR_INTR, dip, "Check CFG Hdl: dip 0x%p addr 0x%x bdf=0x%x\n",
+	    dip, addr, bdf);
+
+	bus_p = PCIE_DIP2BUS(dip);
+
+	/*
+	 * Because CFG and IO Acc Handlers are on the same cache list and both
+	 * types of hdls gets called for both types of errors.  For this checker
+	 * only mark the device as "Non-Fatal" if the addr == NULL and bdf !=
+	 * NULL.
+	 */
+	status = (!addr && (bus_p->bus_bdf == bdf)) ? DDI_FM_NONFATAL :
+	    DDI_FM_FATAL;
+
+	return (status);
+}
+
+/*
+ * Find and Mark all ACC Handles associated with a give address and BDF as
+ * failed.  If the BDF != NULL, then check to see if the device has a ACC Handle
+ * associated with ADDR.  If the handle is not found, mark all the handles as
+ * failed.  If the BDF == NULL, mark the handle as failed if it is associated
+ * with ADDR.
+ */
+int
+px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
+    const void *arg2)
+{
+	dev_info_t		*px_dip = PCIE_DIP2BUS(dip)->bus_rp_dip;
+	px_t			*px_p = INST_TO_STATE(ddi_get_instance(px_dip));
+	px_ranges_t		*ranges_p;
+	int			range_len;
+	ddi_acc_handle_t	ap = (ddi_acc_handle_t)handle;
+	ddi_acc_hdl_t		*hp = impl_acc_hdl_get(ap);
+	int			i, status = DDI_FM_FATAL;
+	uint64_t		fault_addr = *(uint64_t *)arg1;
+	uint16_t		bdf = *(uint16_t *)arg2;
+	uint64_t		base_addr, range_addr;
+	uint_t			size;
+
+	DBG(DBG_ERR_INTR, dip, "Check PIO Hdl: dip 0x%x addr 0x%x bdf=0x%x\n",
+	    dip, fault_addr, bdf);
+
+	/* Normalize the base addr to the addr and strip off the HB info. */
+	base_addr = (hp->ah_pfn << MMU_PAGESHIFT) + hp->ah_offset;
+	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	i = 0;
+	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
+		range_addr = px_in_addr_range(dip, ranges_p, base_addr);
+		if (range_addr) {
+			switch (ranges_p->child_high & PCI_ADDR_MASK) {
+			case PCI_ADDR_IO:
+			case PCI_ADDR_MEM64:
+			case PCI_ADDR_MEM32:
+				base_addr = base_addr - range_addr;
+				break;
+			}
+			break;
+		}
+	}
+
+	/*
+	 * Mark the handle as failed if the ADDR is mapped, or if we
+	 * know the BDF and ADDR == 0.
+	 */
+	size = hp->ah_len;
+	if (((fault_addr >= base_addr) && (fault_addr < (base_addr + size))) ||
+	    ((fault_addr == NULL) && (bdf == PCIE_DIP2BUS(dip)->bus_bdf)))
+		status = DDI_FM_NONFATAL;
+
+	return (status);
+}
+
+/*
+ * Find and Mark all DNA Handles associated with a give address and BDF as
+ * failed.  If the BDF != NULL, then check to see if the device has a DMA Handle
+ * associated with ADDR.  If the handle is not found, mark all the handles as
+ * failed.  If the BDF == NULL, mark the handle as failed if it is associated
+ * with ADDR.
+ */
+int
+px_err_dma_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
+    const void *arg2)
+{
+	ddi_dma_impl_t		*pcie_dp;
+	int			status = DDI_FM_FATAL;
+	uint32_t		addr = *(uint32_t *)arg1;
+	uint16_t		bdf = *(uint16_t *)arg2;
+	uint32_t		base_addr;
+	uint_t			size;
+
+	DBG(DBG_ERR_INTR, dip, "Check PIO Hdl: dip 0x%x addr 0x%x bdf=0x%x\n",
+	    dip, addr, bdf);
+
+	pcie_dp = (ddi_dma_impl_t *)handle;
+	base_addr = (uint32_t)pcie_dp->dmai_mapping;
+	size = pcie_dp->dmai_size;
+
+	/*
+	 * Mark the handle as failed if the ADDR is mapped, or if we
+	 * know the BDF and ADDR == 0.
+	 */
+	if (((addr >= base_addr) && (addr < (base_addr + size))) ||
+	    ((addr == NULL) && (bdf != NULL)))
+		status = DDI_FM_NONFATAL;
+
+	return (status);
+}
+
+int
+px_fm_enter(px_t *px_p) {
+	if (px_panicing || (px_p->px_fm_mutex_owner == curthread))
+		return (DDI_FAILURE);
+
+	mutex_enter(&px_p->px_fm_mutex);
+	/*
+	 * In rare cases when trap occurs and in the middle of scanning the
+	 * fabric, a PIO will fail in the scan fabric.  The CPU error handling
+	 * code will correctly panic the system, while a mondo for the failed
+	 * PIO may also show up.  Normally the mondo will try to grab the mutex
+	 * and wait until the callback finishes.  But in this rare case,
+	 * mutex_enter actually suceeds also continues to scan the fabric.
+	 *
+	 * This code below is designed specifically to check for this case.  If
+	 * we successfully grab the px_fm_mutex, the px_fm_mutex_owner better be
+	 * NULL.  If it isn't that means we are in the rare corner case.  Return
+	 * DDI_FAILURE, this should prevent PX from doing anymore error
+	 * handling.
+	 */
+	if (px_p->px_fm_mutex_owner) {
+		return (DDI_FAILURE);
+	}
+
+	px_p->px_fm_mutex_owner = curthread;
+
+	if (px_panicing) {
+		px_fm_exit(px_p);
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+void
+px_fm_exit(px_t *px_p) {
+	px_p->px_fm_mutex_owner = NULL;
+	mutex_exit(&px_p->px_fm_mutex);
 }
 
 /*
  * Panic if the err tunable is set and that we are not already in the middle
  * of panic'ing.
+ *
+ * rc_err = Error severity of PX specific errors
+ * msg = Where the error was detected
+ * fabric_err = Error severity of PCIe Fabric errors
+ * isTest = Test if error severity causes panic
  */
 #define	MSZ (sizeof (fm_msg) -strlen(fm_msg) - 1)
 void
-px_err_panic(int err, int msg, int fab_err)
+px_err_panic(int rc_err, int msg, int fabric_err, boolean_t isTest)
 {
 	char fm_msg[96] = "";
 	int ferr = PX_NO_ERROR;
 
-	if (panicstr)
+	if (panicstr) {
+		px_panicing = B_TRUE;
 		return;
+	}
 
-	if (!(err & px_die))
+	if (!(rc_err & px_die))
 		goto fabric;
 	if (msg & PX_RC)
 		(void) strncat(fm_msg, px_panic_rc_msg, MSZ);
@@ -677,17 +946,22 @@ px_err_panic(int err, int msg, int fab_err)
 		(void) strncat(fm_msg, px_panic_hb_msg, MSZ);
 
 fabric:
-	if (fab_err & PF_PANIC)
+	if (fabric_err & PF_ERR_FATAL_FLAGS)
 		ferr = PX_PANIC;
-	else if (fab_err & ~(PF_PANIC | PF_NO_ERROR))
+	else if (fabric_err & ~(PF_ERR_FATAL_FLAGS | PF_ERR_NO_ERROR))
 		ferr = PX_NO_PANIC;
 
 	if (ferr & px_die) {
-		if (strlen(fm_msg))
+		if (strlen(fm_msg)) {
 			(void) strncat(fm_msg, " and", MSZ);
+		}
 		(void) strncat(fm_msg, px_panic_fab_msg, MSZ);
 	}
 
-	if (strlen(fm_msg))
-		fm_panic("Fatal error has occured in:%s.", fm_msg);
+	if (strlen(fm_msg)) {
+		px_panicing = B_TRUE;
+		if (!isTest)
+			fm_panic("Fatal error has occured in:%s.(0x%x)(0x%x)",
+			    fm_msg, rc_err, fabric_err);
+	}
 }

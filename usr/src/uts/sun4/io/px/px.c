@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,7 +245,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_soft_state_zalloc(px_state_p, instance)
 		    != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s%d: can't allocate px state",
-				ddi_driver_name(dip), instance);
+			    ddi_driver_name(dip), instance);
 			goto err_bad_px_softstate;
 		}
 		px_p = INST_TO_STATE(instance);
@@ -255,7 +255,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		px_p->px_open_count = 0;
 
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
-				"device_type", "pciex");
+		    "device_type", "pciex");
 
 		/* Initialize px_dbg for high pil printing */
 		px_dbg_attach(dip, &px_p->px_dbg_hdl);
@@ -275,12 +275,6 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Cache the BDF of the root port nexus */
 		px_p->px_bdf = px_lib_get_bdf(px_p);
-
-		px_p->px_dq_p = (pf_data_t *)
-		    kmem_zalloc(sizeof (pf_data_t) * pf_get_dq_size(),
-		    KM_SLEEP);
-
-		px_p->px_dq_tail = -1;
 
 		/*
 		 * Initialize interrupt block.  Note that this
@@ -482,9 +476,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_ib_detach(px_p);
 		(void) px_lib_dev_fini(dip);
 
-		kmem_free(px_p->px_dq_p, sizeof (pf_data_t) *
-		    pf_get_dq_size());
-
 		/*
 		 * Free the px soft state structure and the rest of the
 		 * resources it's using.
@@ -494,7 +485,8 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&px_p->px_mutex);
 		mutex_destroy(&px_p->px_mutex);
 
-		/* Free the interrupt-priorities prop if we created it. */ {
+		/* Free the interrupt-priorities prop if we created it. */
+		{
 			int len;
 
 			if (ddi_getproplen(DDI_DEV_T_ANY, dip,
@@ -683,7 +675,7 @@ px_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	pci_regspec_t reloc_reg, *rp = &reloc_reg;
 
 	DBG(DBG_MAP, dip, "rdip=%s%d:",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	if (mp->map_flags & DDI_MF_USER_MAPPING)
 		return (DDI_ME_UNIMPLEMENTED);
@@ -698,8 +690,8 @@ px_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		DBG(DBG_MAP | DBG_CONT, dip, " r#=%x", r_no);
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-			"reg", (caddr_t)&rp, &reglen) != DDI_SUCCESS)
-				return (DDI_ME_RNUMBER_RANGE);
+		    "reg", (caddr_t)&rp, &reglen) != DDI_SUCCESS)
+			return (DDI_ME_RNUMBER_RANGE);
 
 		if (r_no < 0 || r_no >= reglen / sizeof (pci_regspec_t)) {
 			kmem_free(rp, reglen);
@@ -721,8 +713,8 @@ px_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 * px_pci bridge nexus driver.
 		 */
 		if ((off >= PCIE_CONF_HDR_SIZE) ||
-				(len > PCIE_CONF_HDR_SIZE) ||
-				(off + len > PCIE_CONF_HDR_SIZE))
+		    (len > PCIE_CONF_HDR_SIZE) ||
+		    (off + len > PCIE_CONF_HDR_SIZE))
 			return (DDI_ME_INVAL);
 		/*
 		 * the following function returning a DDI_FAILURE assumes
@@ -763,10 +755,8 @@ px_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		/*
 		 * Set-up access functions for FM access error capable drivers.
 		 */
-		if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
-		    mp->map_handlep->ah_acc.devacc_attr_access !=
-		    DDI_DEFAULT_ACC)
-			px_fm_acc_setup(mp, rdip);
+		if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)))
+			px_fm_acc_setup(mp, rdip, rp);
 	}
 
 done:
@@ -796,8 +786,8 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 	int ret;
 
 	DBG(DBG_DMA_MAP, dip, "mapping - rdip=%s%d type=%s\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip),
-		handlep ? "alloc" : "advisory");
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    handlep ? "alloc" : "advisory");
 
 	if (!(mp = px_dma_lmts2hdl(dip, rdip, mmu_p, dmareq)))
 		return (DDI_DMA_NORESOURCES);
@@ -831,8 +821,8 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 	case PX_DMAI_FLAGS_BYPASS:
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_setup: bad dma type 0x%x",
-			ddi_driver_name(rdip), ddi_get_instance(rdip),
-			PX_DMA_TYPE(mp));
+		    ddi_driver_name(rdip), ddi_get_instance(rdip),
+		    PX_DMA_TYPE(mp));
 		/*NOTREACHED*/
 	}
 	*handlep = (ddi_dma_handle_t)mp;
@@ -861,7 +851,7 @@ px_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	int rval;
 
 	DBG(DBG_DMA_ALLOCH, dip, "rdip=%s%d\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	if (attrp->dma_attr_version != DMA_ATTR_V0)
 		return (DDI_DMA_BADATTR);
@@ -895,7 +885,7 @@ int
 px_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 {
 	DBG(DBG_DMA_FREEH, dip, "rdip=%s%d mp=%p\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
 	px_dma_freemp((ddi_dma_impl_t *)handle);
 
 	if (px_kmem_clid) {
@@ -920,7 +910,7 @@ px_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	int ret;
 
 	DBG(DBG_DMA_BINDH, dip, "rdip=%s%d mp=%p dmareq=%p\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip), mp, dmareq);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), mp, dmareq);
 
 	if (mp->dmai_flags & PX_DMAI_FLAGS_INUSE)
 		return (DDI_DMA_INUSE);
@@ -961,17 +951,17 @@ mapped:
 		break;
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_bindhdl(%p): bad dma type",
-			ddi_driver_name(rdip), ddi_get_instance(rdip), mp);
+		    ddi_driver_name(rdip), ddi_get_instance(rdip), mp);
 		/*NOTREACHED*/
 	}
 	DBG(DBG_DMA_BINDH, dip, "cookie %" PRIx64 "+%x\n",
-		cookiep->dmac_address, cookiep->dmac_size);
+	    cookiep->dmac_address, cookiep->dmac_size);
 	px_dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
 	/* insert dma handle into FMA cache */
 	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
 		(void) ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
-		mp->dmai_error.err_cf = impl_dma_check;
+		mp->dmai_error.err_cf = px_err_dma_hdl_check;
 	}
 
 	return (mp->dmai_nwin == 1 ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);
@@ -995,7 +985,7 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	px_mmu_t *mmu_p = px_p->px_mmu_p;
 
 	DBG(DBG_DMA_UNBINDH, dip, "rdip=%s%d, mp=%p\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
 	if ((mp->dmai_flags & PX_DMAI_FLAGS_INUSE) == 0) {
 		DBG(DBG_DMA_UNBINDH, dip, "handle not inuse\n");
 		return (DDI_FAILURE);
@@ -1025,7 +1015,7 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 		break;
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_unbindhdl:bad dma type %p",
-			ddi_driver_name(rdip), ddi_get_instance(rdip), mp);
+		    ddi_driver_name(rdip), ddi_get_instance(rdip), mp);
 		/*NOTREACHED*/
 	}
 	if (mmu_p->mmu_dvma_clid != 0) {
@@ -1053,7 +1043,7 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 	int		ret;
 
 	DBG(DBG_DMA_WIN, dip, "rdip=%s%d\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	px_dump_dma_handle(DBG_DMA_WIN, dip, mp);
 	if (win >= mp->dmai_nwin) {
@@ -1076,7 +1066,7 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		}
 		if (cookiep)
 			MAKE_DMA_COOKIE(cookiep, mp->dmai_mapping,
-				mp->dmai_size);
+			    mp->dmai_size);
 		if (ccountp)
 			*ccountp = 1;
 		break;
@@ -1086,7 +1076,7 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		ddi_dma_cookie_t *ck_p;
 		px_dma_win_t *win_p = mp->dmai_winlst;
 
-		for (i = 0; i < win; win_p = win_p->win_next, i++);
+		for (i = 0; i < win; win_p = win_p->win_next, i++) {};
 		ck_p = (ddi_dma_cookie_t *)(win_p + 1);
 		*cookiep = *ck_p;
 		mp->dmai_offset = win_p->win_offset;
@@ -1100,14 +1090,14 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		break;
 	default:
 		cmn_err(CE_WARN, "%s%d: px_dma_win:bad dma type 0x%x",
-			ddi_driver_name(rdip), ddi_get_instance(rdip),
-			PX_DMA_TYPE(mp));
+		    ddi_driver_name(rdip), ddi_get_instance(rdip),
+		    PX_DMA_TYPE(mp));
 		return (DDI_FAILURE);
 	}
 	if (cookiep)
 		DBG(DBG_DMA_WIN, dip,
-			"cookie - dmac_address=%x dmac_size=%x\n",
-			cookiep->dmac_address, cookiep->dmac_size);
+		    "cookie - dmac_address=%x dmac_size=%x\n",
+		    cookiep->dmac_address, cookiep->dmac_size);
 	if (offp)
 		*offp = (off_t)mp->dmai_offset;
 	if (lenp)
@@ -1153,7 +1143,7 @@ px_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 
 #ifdef	DEBUG
 	DBG(DBG_DMA_CTL, dip, "%s: rdip=%s%d\n", px_dmactl_str[cmd],
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 #endif	/* DEBUG */
 
 	switch (cmd) {
@@ -1164,7 +1154,7 @@ px_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	case DDI_DMA_RESERVE: {
 		px_t *px_p = DIP_TO_STATE(dip);
 		return (px_fdvma_reserve(dip, rdip, px_p,
-			(ddi_dma_req_t *)offp, (ddi_dma_handle_t *)objp));
+		    (ddi_dma_req_t *)offp, (ddi_dma_handle_t *)objp));
 		}
 	case DDI_DMA_RELEASE: {
 		px_t *px_p = DIP_TO_STATE(dip);
@@ -1177,15 +1167,15 @@ px_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	switch (PX_DMA_TYPE(mp)) {
 	case PX_DMAI_FLAGS_DVMA:
 		return (px_dvma_ctl(dip, rdip, mp, cmd, offp, lenp, objp,
-			cache_flags));
+		    cache_flags));
 	case PX_DMAI_FLAGS_PTP:
 	case PX_DMAI_FLAGS_BYPASS:
 		return (px_dma_ctl(dip, rdip, mp, cmd, offp, lenp, objp,
-			cache_flags));
+		    cache_flags));
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_ctlops(%x):bad dma type %x",
-			ddi_driver_name(rdip), ddi_get_instance(rdip), cmd,
-			mp->dmai_flags);
+		    ddi_driver_name(rdip), ddi_get_instance(rdip), cmd,
+		    mp->dmai_flags);
 		/*NOTREACHED*/
 	}
 	return (0);
@@ -1236,16 +1226,11 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				return (pcie_pm_hold(dip));
 			}
 			if (as->cmd == DDI_RESUME) {
-				ddi_acc_handle_t	config_handle;
 				DBG(DBG_PWR, dip, "PRE_RESUME for %s@%d\n",
 				    ddi_driver_name(rdip),
 				    ddi_get_instance(rdip));
 
-				if (pci_config_setup(rdip, &config_handle) ==
-				    DDI_SUCCESS) {
-					pcie_clear_errors(rdip, config_handle);
-					pci_config_teardown(&config_handle);
-				}
+				pcie_clear_errors(rdip);
 			}
 			return (DDI_SUCCESS);
 
@@ -1324,7 +1309,7 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	 * Now pass the request up to our parent.
 	 */
 	DBG(DBG_CTLOPS, dip, "passing request to parent: rdip=%s%d\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 	return (ddi_ctlops(dip, rdip, op, arg, result));
 }
 

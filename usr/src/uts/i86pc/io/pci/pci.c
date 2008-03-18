@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,7 @@ static int	pci_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int	pci_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
 		    caddr_t, int *);
 static int	pci_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static void	pci_peekpoke_cb(dev_info_t *, ddi_fm_error_t *);
 
 struct cb_ops pci_cb_ops = {
 	pci_open,			/* open */
@@ -594,7 +595,7 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(dip));
 		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
 		    pci_common_peekpoke, &pcip->pci_err_mutex,
-		    &pcip->pci_peek_poke_mutex));
+		    &pcip->pci_peek_poke_mutex, pci_peekpoke_cb));
 
 	/* for now only X86 systems support PME wakeup from suspended state */
 	case DDI_CTLOPS_ATTACH:
@@ -790,6 +791,10 @@ static int
 pci_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	return (pcihp_info(dip, cmd, arg, result));
+}
+
+void pci_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
+	(void) pci_ereport_post(dip, derr, NULL);
 }
 
 /*ARGSUSED*/

@@ -35,6 +35,7 @@
 #include <syslog.h>
 #include <alloca.h>
 #include <stddef.h>
+#include <search.h>
 
 #include <fmd_module.h>
 #include <fmd_api.h>
@@ -1277,6 +1278,139 @@ fmd_case_prev(fmd_hdl_t *hdl, fmd_case_t *cp)
 
 	fmd_module_unlock(mp);
 	return (cp);
+}
+
+/*
+ * This function returns TRUE IFF all the ereports relating to a case is from a
+ * PCI/PCIe device.  If true, the rc_detector variable will be returned in DEV
+ * Scheme format.
+ */
+boolean_t
+fmd_case_is_pcie(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t **rc_detector) {
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_item_t *cit;
+	fmd_event_impl_t *ep;
+	nvlist_t	*nvl, *detector;
+	char		*scheme, *path, rcpath[PATH_MAX];
+	int		err, i;
+	boolean_t ret = B_FALSE;
+
+	syslog(LOG_ERR | LOG_DAEMON, "[PCIE] Checking if case is PCI/PCIe\n");
+
+	for (cit = cip->ci_items; cit != NULL; cit = cit->cit_next) {
+		ep = (fmd_event_impl_t *)cit->cit_event;
+		nvl = ep->ev_nvl;
+
+		if (!fmd_nvl_class_match(hdl, nvl, "ereport.io.pci.*") &&
+		    !fmd_nvl_class_match(hdl, nvl, "ereport.io.pciex.*"))
+			return (B_FALSE);
+
+		if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR,
+		    &detector) != 0) {
+			syslog(LOG_ERR | LOG_DAEMON,
+			    "[PCIE] Getting detector failed \n");
+			return (B_FALSE);
+		}
+
+		/* Find the RC PATH, this only works for dev scheme ereports */
+		err = nvlist_lookup_string(detector, FM_FMRI_SCHEME, &scheme);
+		if (ret == B_TRUE || err || strcmp(scheme, FM_FMRI_SCHEME_DEV))
+			continue;
+
+		ret = B_TRUE;
+		(void) nvlist_lookup_string(detector, FM_FMRI_DEV_PATH, &path);
+
+		(void) strncpy(rcpath, path, PATH_MAX);
+		for (i = 1; (i < PATH_MAX) && (rcpath[i] != '/') &&
+		    (rcpath[i] != '\0'); i++);
+
+		if (i == PATH_MAX) {
+			rcpath[i-1] = '\0';
+			syslog(LOG_ERR | LOG_DAEMON,
+			    "[PCIE] Could not get full RC path %s\n", rcpath);
+		} else {
+			rcpath[i] = '\0';
+		}
+
+		syslog(LOG_ERR | LOG_DAEMON, "[PCIE] Got RC Path %s\n", rcpath);
+
+		if (nvlist_dup(detector, rc_detector, NV_UNIQUE_NAME) != 0)
+			return (B_FALSE);
+		(void) nvlist_remove(*rc_detector, FM_FMRI_DEV_PATH,
+		    DATA_TYPE_STRING);
+		(void) nvlist_add_string(*rc_detector, FM_VERSION,
+		    FM_DEV_SCHEME_VERSION);
+		(void) nvlist_add_string(*rc_detector, FM_FMRI_DEV_PATH,
+		    rcpath);
+	}
+
+	return (ret);
+}
+
+/*
+ * Path comparison function used in fmd_case_pci_undiagnosable
+ */
+int
+fmd_case_pci_cmp(const void *path1, const void *path2) {
+	return (strcmp((const char *)path1, (const char *)path2));
+}
+
+/*
+ * Populates an unknown pci defect/fault with a list of suspects. This is
+ * temporary code until a generic way to do this for all "UNDIAG FAULTS"
+ * is designed.
+ */
+/* ARGSUSED */
+void
+fmd_case_pci_undiagnosable(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *defect) {
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_item_t *cit;
+	fmd_event_impl_t *ep;
+	nvlist_t	*nvl, *detector;
+	char		*scheme, *path, **tbl;
+	int		err, i = 0;
+	size_t		tbl_sz = 0;
+
+	syslog(LOG_ERR | LOG_DAEMON, "[PCIE UNDIAG] START %d\n",
+	    cip->ci_nitems);
+
+	tbl = alloca(cip->ci_nitems * sizeof (char *));
+	path = alloca(cip->ci_nitems * sizeof (char *) * PATH_MAX);
+
+	for (i = 0; i < cip->ci_nitems; i++) {
+		tbl[i] = path + (i * PATH_MAX);
+	}
+
+	for (cit = cip->ci_items; cit != NULL; cit = cit->cit_next) {
+		ep = (fmd_event_impl_t *)cit->cit_event;
+		nvl = ep->ev_nvl;
+
+		(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR,
+		    &detector);
+
+		/* Only get dev scheme paths */
+		err = nvlist_lookup_string(detector, FM_FMRI_SCHEME, &scheme);
+		if (err || strcmp(scheme, FM_FMRI_SCHEME_DEV) != 0)
+			continue;
+
+		if (nvlist_lookup_string(detector, FM_FMRI_DEV_PATH,
+		    &path) != 0) {
+			syslog(LOG_ERR | LOG_DAEMON,
+			    "[PCIE UNDIAG] Path is NULL");
+			continue;
+		}
+		scheme = lsearch(path, *tbl, &tbl_sz, PATH_MAX,
+		    fmd_case_pci_cmp);
+	}
+
+	qsort((void *)*tbl, tbl_sz, PATH_MAX, fmd_case_pci_cmp);
+
+	for (i = 0; i < tbl_sz; i++) {
+		syslog(LOG_ERR | LOG_DAEMON, "[PCIE UNDIAG] Path %s size %d %d",
+		    tbl[i], tbl_sz, strlen(tbl[i]));
+	}
+
+	(void) nvlist_add_string_array(defect, "suspect-devices", tbl, tbl_sz);
 }
 
 /*

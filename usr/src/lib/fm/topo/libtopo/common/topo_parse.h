@@ -155,6 +155,7 @@ typedef struct tf_info {
 #define	Topology "topology"
 #define	Type "type"
 #define	UInt32 "uint32"
+#define	UInt32_Arr "uint32arr"
 #define	UInt64 "uint64"
 #define	Value "value"
 #define	Verify "verify"

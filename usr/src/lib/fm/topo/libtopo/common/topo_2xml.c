@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, topo_propval_t *pv)
 {
 	int err;
 	char *fmri = NULL;
-	char vbuf[INT64BUFSZ], tbuf[10], *pval;
+	char vbuf[INT64BUFSZ], tbuf[10], *pval, *aval;
 	nvpair_t *nvp;
 
 	nvp = nvlist_next_nvpair(pv->tp_val, NULL);
@@ -167,6 +167,25 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, topo_propval_t *pv)
 				return;
 
 			(void) snprintf(tbuf, 10, "%s", FMRI);
+			break;
+		}
+		case TOPO_TYPE_UINT32_ARRAY: {
+			uint32_t *val;
+			uint_t nelem, i;
+
+			(void) nvpair_value_uint32_array(nvp, &val, &nelem);
+
+			if (nelem > 0) {
+				aval = calloc((nelem*9-1), sizeof (uchar_t));
+
+				(void) sprintf(aval, "0x%x", val[0]);
+				for (i = 1; i < nelem; i++) {
+					(void) sprintf(vbuf, " 0x%x", val[i]);
+					(void) strcat(aval, vbuf);
+				}
+				(void) snprintf(tbuf, 10, "%s", UInt32_Arr);
+				pval = aval;
+			}
 			break;
 		}
 	}

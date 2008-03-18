@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,6 +194,9 @@ extern fmd_event_t *fmd_case_getprincipal(fmd_hdl_t *, fmd_case_t *);
 
 extern fmd_case_t *fmd_case_next(fmd_hdl_t *, fmd_case_t *);
 extern fmd_case_t *fmd_case_prev(fmd_hdl_t *, fmd_case_t *);
+
+extern boolean_t fmd_case_is_pcie(fmd_hdl_t *, fmd_case_t *, nvlist_t **);
+extern void fmd_case_pci_undiagnosable(fmd_hdl_t *, fmd_case_t *, nvlist_t *);
 
 extern void fmd_buf_create(fmd_hdl_t *, fmd_case_t *, const char *, size_t);
 extern void fmd_buf_destroy(fmd_hdl_t *, fmd_case_t *, const char *);

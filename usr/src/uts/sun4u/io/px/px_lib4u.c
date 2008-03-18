@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/modctl.h>
@@ -86,7 +87,7 @@ px_lib_map_regs(pxu_t *pxu_p, dev_info_t *dip)
 	px_reg_bank_t		reg_bank = PX_REG_CSR;
 
 	DBG(DBG_ATTACH, dip, "px_lib_map_regs: pxu_p:0x%p, dip 0x%p\n",
-		pxu_p, dip);
+	    pxu_p, dip);
 
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
@@ -241,7 +242,6 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 			    ILU_ERROR_LOG_ENABLE_SPARE3);
 
 		px_err_reg_setup_pcie(chip_mask, csr_base, PX_ERR_ENABLE);
-		px_fabric_die_rc_ue |= PCIE_AER_UCE_UC;
 		break;
 
 	case PX_CHIP_FIRE:
@@ -1452,7 +1452,8 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 		ndi_fm_acc_err_set(pec_p->pec_acc_hdl, &derr);
 	}
 
-	mutex_enter(&px_p->px_fm_mutex);
+	if (px_fm_enter(px_p) != DDI_SUCCESS)
+		return;
 
 	/* send ereport/handle/clear fire registers */
 	rc_err = px_err_cmn_intr(px_p, &derr, PX_LIB_CALL, PX_FM_BLOCK_ALL);
@@ -1471,8 +1472,7 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 				break;
 			case PCI_ADDR_MEM32:
 				if (rdip)
-					(void) pcie_get_bdf_from_dip(rdip,
-					    &bdf);
+					bdf = PCI_GET_BDF(rdip);
 				else
 					bdf = NULL;
 				break;
@@ -1487,12 +1487,11 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 	 * XXX - Current code scans the fabric for all px_tool accesses.
 	 * In future, do not scan fabric for px_tool access to IO Root Nexus
 	 */
-	fab_err = pf_scan_fabric(rpdip, &derr, px_p->px_dq_p,
-	    &px_p->px_dq_tail);
+	fab_err = px_scan_fabric(px_p, rpdip, &derr);
 
-	mutex_exit(&px_p->px_fm_mutex);
-
-	px_err_panic(rc_err, PX_RC, fab_err);
+	px_err_panic(rc_err, PX_RC, fab_err, B_TRUE);
+	px_fm_exit(px_p);
+	px_err_panic(rc_err, PX_RC, fab_err, B_FALSE);
 }
 
 #ifdef  DEBUG
@@ -1641,9 +1640,10 @@ px_lib_do_peek(dev_info_t *dip, peekpoke_ctlops_t *in_args)
 	on_trap_data_t otd;
 
 	mutex_enter(&pec_p->pec_pokefault_mutex);
-	mutex_enter(&px_p->px_fm_mutex);
+	if (px_fm_enter(px_p) != DDI_SUCCESS)
+		return (DDI_FAILURE);
 	pec_p->pec_safeacc_type = DDI_FM_ERR_PEEK;
-	mutex_exit(&px_p->px_fm_mutex);
+	px_fm_exit(px_p);
 
 	if (!on_trap(&otd, OT_DATA_ACCESS)) {
 		uintptr_t tramp = otd.ot_trampoline;
@@ -2038,7 +2038,7 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	px_t		*px_p = DIP_TO_STATE(dip);
 
 	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
-		IB_INTR_WAIT);
+	    IB_INTR_WAIT);
 
 	VERIFY(rem_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
 }
@@ -2120,7 +2120,7 @@ px_cb_add_intr(px_fault_t *fault_p)
 		/* px_lib_dev_init allows only FIRE and OBERON */
 		px_err_reg_enable(
 		    (pxu_p->chip_type == PX_CHIP_FIRE) ?
-			PX_ERR_JBC : PX_ERR_UBC,
+		    PX_ERR_JBC : PX_ERR_UBC,
 		    pxu_p->px_address[PX_REG_XBC]);
 	} else
 		pxu_p->px_cb_p = cb_p;
@@ -2146,7 +2146,7 @@ px_cb_add_intr(px_fault_t *fault_p)
 		 * both.
 		 */
 		pxl = cb_p->pxl;
-		for (; !(pxl->pxp == px_p) && pxl->next; pxl = pxl->next);
+		for (; !(pxl->pxp == px_p) && pxl->next; pxl = pxl->next) {};
 		ASSERT(pxl->pxp != px_p);
 
 		/* add to linked list */
@@ -2193,7 +2193,8 @@ px_cb_rem_intr(px_fault_t *fault_p)
 	} else {
 		prev = pxl;
 		pxl = pxl->next;
-		for (; pxl && (pxl->pxp != px_p); prev = pxl, pxl = pxl->next);
+		for (; pxl && (pxl->pxp != px_p); prev = pxl, pxl = pxl->next) {
+		};
 		if (!pxl) {
 			cmn_err(CE_WARN, "px_cb_rem_intr: can't find px_p 0x%p "
 			    "in registered CB list.", (void *)px_p);
@@ -2455,7 +2456,7 @@ px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
 
 	mask = px_get_rng_parent_hi_mask(px_p);
 	range_prop = (((uint64_t)(rp[bank].parent_high & mask)) << 32) |
-		rp[bank].parent_low;
+	    rp[bank].parent_low;
 
 	return (range_prop);
 }
@@ -2467,7 +2468,7 @@ void
 px_cpr_add_callb(px_t *px_p)
 {
 	px_p->px_cprcb_id = callb_add(px_cpr_callb, (void *)px_p,
-	CB_CL_CPR_POST_USER, "px_cpr");
+	    CB_CL_CPR_POST_USER, "px_cpr");
 }
 
 /*
@@ -2491,9 +2492,9 @@ px_hp_intr(caddr_t arg1, caddr_t arg2)
 
 #ifdef  DEBUG
 	if (rval == DDI_INTR_UNCLAIMED)
-	    cmn_err(CE_WARN, "%s%d: UNCLAIMED intr\n",
-		ddi_driver_name(px_p->px_dip),
-		ddi_get_instance(px_p->px_dip));
+		cmn_err(CE_WARN, "%s%d: UNCLAIMED intr\n",
+		    ddi_driver_name(px_p->px_dip),
+		    ddi_get_instance(px_p->px_dip));
 #endif
 
 	/* Set the interrupt state to idle */

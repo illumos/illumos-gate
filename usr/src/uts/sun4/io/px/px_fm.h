@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ extern int px_fm_attach(px_t *px_p);
 extern void px_fm_detach(px_t *px_p);
 extern int px_fm_init_child(dev_info_t *, dev_info_t *, int,
     ddi_iblock_cookie_t *);
-extern void px_fm_acc_setup(ddi_map_req_t *, dev_info_t *);
+extern void px_fm_acc_setup(ddi_map_req_t *, dev_info_t *, pci_regspec_t *rp);
 extern int px_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
 extern int px_err_cmn_intr(px_t *, ddi_fm_error_t *, int, int);
 
@@ -118,13 +118,26 @@ extern uint_t px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
 /*
  * Common error handling functions
  */
+extern int px_scan_fabric(px_t *px_p, dev_info_t *rdip, ddi_fm_error_t *derr);
 extern void px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr);
 extern int px_err_check_eq(dev_info_t *dip);
 extern int px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr,
     px_err_pcie_t *regs);
-extern void px_err_panic(int err, int msg, int fab_err);
+extern int px_fm_enter(px_t *px_p);
+extern void px_fm_exit(px_t *px_p);
+extern void px_err_panic(int err, int msg, int fab_err, boolean_t isTest);
 extern void px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf,
     uint32_t fault_addr, uint16_t s_status);
+
+/*
+ * Sparc specific cfg, pio and dma handle lookup/check functions
+ */
+extern int px_err_cfg_hdl_check(dev_info_t *dip, const void *handle,
+    const void *addr, const void *not_used);
+extern int px_err_pio_hdl_check(dev_info_t *dip, const void *handle,
+    const void *addr, const void *not_used);
+extern int px_err_dma_hdl_check(dev_info_t *dip, const void *handle,
+    const void *addr, const void *not_used);
 
 #ifdef	__cplusplus
 }
