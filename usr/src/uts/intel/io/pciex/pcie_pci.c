@@ -198,13 +198,13 @@ typedef struct {
 	/*
 	 * interrupt support
 	 */
-        ddi_intr_handle_t       *htable;        /* interrupt handles */
-        int                     htable_size;    /* htable size */
-        int                     intr_count;     /* Num of Intr */
-        uint_t                  intr_priority;  /* Intr Priority */
-        int                     intr_type;      /* (MSI | FIXED) */
-        uint32_t                soft_state;     /* soft state flags */
-        kmutex_t                pepb_mutex;     /* Mutex for this ctrl */
+	ddi_intr_handle_t	*htable;	/* interrupt handles */
+	int			htable_size;    /* htable size */
+	int			intr_count;	/* Num of Intr */
+	uint_t			intr_priority;	/* Intr Priority */
+	int			intr_type;	/* (MSI | FIXED) */
+	uint32_t		soft_state;	/* soft state flags */
+	kmutex_t		pepb_mutex;	/* Mutex for this ctrl */
 	kmutex_t		pepb_err_mutex;	/* Error handling mutex */
 	kmutex_t		pepb_peek_poke_mutex;
 	int			pepb_fmcap;
@@ -213,15 +213,15 @@ typedef struct {
 } pepb_devstate_t;
 
 /* soft state flags */
-#define PEPB_SOFT_STATE_INIT_HTABLE     0x01    /* htable kmem_alloced */
-#define PEPB_SOFT_STATE_INIT_ALLOC      0x02    /* ddi_intr_alloc called */
-#define PEPB_SOFT_STATE_INIT_HANDLER    0x04    /* ddi_intr_add_handler done */
-#define PEPB_SOFT_STATE_INIT_ENABLE     0x08    /* ddi_intr_enable called */
-#define PEPB_SOFT_STATE_INIT_BLOCK      0x10    /* ddi_intr_block_enable done */
-#define PEPB_SOFT_STATE_INIT_MUTEX      0x20    /* mutex initialized */
+#define	PEPB_SOFT_STATE_INIT_HTABLE	0x01    /* htable kmem_alloced */
+#define	PEPB_SOFT_STATE_INIT_ALLOC	0x02    /* ddi_intr_alloc called */
+#define	PEPB_SOFT_STATE_INIT_HANDLER	0x04    /* ddi_intr_add_handler done */
+#define	PEPB_SOFT_STATE_INIT_ENABLE	0x08    /* ddi_intr_enable called */
+#define	PEPB_SOFT_STATE_INIT_BLOCK	0x10    /* ddi_intr_block_enable done */
+#define	PEPB_SOFT_STATE_INIT_MUTEX	0x20    /* mutex initialized */
 
 /* default interrupt priority for all interrupts (hotplug or non-hotplug */
-#define PEPB_INTR_PRI   1
+#define	PEPB_INTR_PRI	1
 
 /* flag to turn on MSI support */
 static int pepb_enable_msi = 1;
@@ -238,16 +238,16 @@ static void	pepb_uninitchild(dev_info_t *);
 static int 	pepb_initchild(dev_info_t *child);
 static void 	pepb_save_config_regs(pepb_devstate_t *pepb_p);
 static void	pepb_restore_config_regs(pepb_devstate_t *pepb_p);
-static int      pepb_pcie_device_type(dev_info_t *dip, int *port_type);
-static int      pepb_pcie_port_type(dev_info_t *dip,
-                        ddi_acc_handle_t config_handle);
+static int	pepb_pcie_device_type(dev_info_t *dip, int *port_type);
+static int	pepb_pcie_port_type(dev_info_t *dip,
+		    ddi_acc_handle_t config_handle);
 /* interrupt related declarations */
 static uint_t   pepb_intx_intr(caddr_t arg, caddr_t arg2);
 static uint_t   pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
 static uint_t   pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
-static int      pepb_intr_on_root_port(dev_info_t *);
-static int      pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
-static void     pepb_intr_fini(pepb_devstate_t *pepb_p);
+static int	pepb_intr_on_root_port(dev_info_t *);
+static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
+static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
 
 int
 _init(void)
@@ -365,7 +365,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * Initialize interrupt handlers.
 	 */
 	if (ddi_intr_get_supported_types(devi, &intr_types) != DDI_SUCCESS)
-		goto next_step;	
+		goto next_step;
 
 	PEPB_DEBUG((CE_NOTE, "%s#%d: intr_types = 0x%x\n",
 	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
@@ -401,7 +401,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			    ddi_driver_name(devi), ddi_get_instance(devi)));
 	}
 
-next_step:	
+next_step:
 	/*
 	 * Initialize hotplug support on this bus. At minimum
 	 * (for non hotplug bus) this would create ":devctl" minor
