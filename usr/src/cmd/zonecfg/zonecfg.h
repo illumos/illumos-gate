@@ -39,11 +39,6 @@ extern "C" {
 
 #include <unistd.h>
 
-#define	FALSE	0
-#define	TRUE	1
-
-typedef int bool;
-
 #define	Z_ERR		1
 #define	Z_USAGE		2
 #define	Z_REPEAT	3
@@ -221,7 +216,7 @@ extern void free_complex(complex_property_ptr_t complex);
 extern void free_list(list_property_ptr_t list);
 extern void free_outer_list(list_property_ptr_t list);
 
-extern void usage(bool verbose, uint_t flags);
+extern void usage(boolean_t verbose, uint_t flags);
 
 extern FILE *yyin;
 

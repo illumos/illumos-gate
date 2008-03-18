@@ -34,8 +34,8 @@
 
 int lex_lineno = 1;	/* line number for error reporting */
 static int state = INITIAL;
-extern bool cmd_file_mode;
-extern bool saw_error;
+extern boolean_t cmd_file_mode;
+extern boolean_t saw_error;
 extern void yyerror(char *s);
 char *safe_strdup(char *s);
 %}
@@ -373,19 +373,19 @@ yyerror(char *s)
 	/* feof(yyin) is not an error; anything else is, so we set saw_error */
 	if (yytext[0] == '\0') {
 		if (!feof(yyin)) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			(void) fprintf(stderr, gettext("%s, token expected\n"),
 			    s);
 		}
 		return;
 	}
 
-	saw_error = TRUE;
+	saw_error = B_TRUE;
 	if (cmd_file_mode)
 		(void) fprintf(stderr, gettext("%s on line %d at '%s'\n"), s,
 		    lex_lineno, (yytext[0] == '\n') ? "\\n" : yytext);
 	else
 		(void) fprintf(stderr, gettext("%s at '%s'\n"), s,
 		    (yytext[0] == '\n') ? "\\n" : yytext);
-	usage(FALSE, HELP_SUBCMDS);
+	usage(B_FALSE, HELP_SUBCMDS);
 }

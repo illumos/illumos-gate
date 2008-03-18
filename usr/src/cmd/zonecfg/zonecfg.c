@@ -498,37 +498,38 @@ static char revert_zone[ZONENAME_MAX];
 static brand_handle_t brand;
 
 /* set in modifying functions, checked in read_input() */
-static bool need_to_commit = FALSE;
-bool saw_error;
+static boolean_t need_to_commit = B_FALSE;
+boolean_t saw_error;
 
 /* set in yacc parser, checked in read_input() */
-bool newline_terminated;
+boolean_t newline_terminated;
 
 /* set in main(), checked in lex error handler */
-bool cmd_file_mode;
+boolean_t cmd_file_mode;
 
 /* set in exit_func(), checked in read_input() */
-static bool time_to_exit = FALSE, force_exit = FALSE;
+static boolean_t time_to_exit = B_FALSE, force_exit = B_FALSE;
 
 /* used in short_usage() and zerr() */
 static char *cmd_file_name = NULL;
 
 /* checked in read_input() and other places */
-static bool ok_to_prompt = FALSE;
+static boolean_t ok_to_prompt = B_FALSE;
 
 /* set and checked in initialize() */
-static bool got_handle = FALSE;
+static boolean_t got_handle = B_FALSE;
 
 /* initialized in do_interactive(), checked in initialize() */
-static bool interactive_mode;
+static boolean_t interactive_mode;
 
 /* set if configuring the global zone */
-static bool global_zone = FALSE;
+static boolean_t global_zone = B_FALSE;
 
 /* set in main(), checked in multiple places */
-static bool read_only_mode;
+static boolean_t read_only_mode;
 
-static bool global_scope = TRUE; /* scope is outer/global or inner/resource */
+/* scope is outer/global or inner/resource */
+static boolean_t global_scope = B_TRUE;
 static int resource_scope;	/* should be in the RT_ list from zonecfg.h */
 static int end_op = -1;		/* operation on end is either add or modify */
 
@@ -555,11 +556,11 @@ static void bytes_to_units(char *str, char *buf, int bufsize);
 
 /* Functions begin here */
 
-static bool
+static boolean_t
 initial_match(const char *line1, const char *line2, int word_end)
 {
 	if (word_end <= 0)
-		return (TRUE);
+		return (B_TRUE);
 	return (strncmp(line1, line2, word_end) == 0);
 }
 
@@ -859,10 +860,10 @@ long_help(int cmd_num)
  */
 
 void
-usage(bool verbose, uint_t flags)
+usage(boolean_t verbose, uint_t flags)
 {
 	FILE *fp = verbose ? stdout : stderr, *newfp;
-	bool need_to_close = FALSE;
+	boolean_t need_to_close = B_FALSE;
 	char *pager;
 	int i;
 
@@ -871,7 +872,7 @@ usage(bool verbose, uint_t flags)
 		if ((pager = getenv("PAGER")) == NULL)
 			pager = PAGER;
 		if ((newfp = popen(pager, "w")) != NULL) {
-			need_to_close = TRUE;
+			need_to_close = B_TRUE;
 			fp = newfp;
 		}
 	}
@@ -1207,11 +1208,11 @@ zerr(const char *fmt, ...)
 }
 
 static void
-zone_perror(char *prefix, int err, bool set_saw)
+zone_perror(char *prefix, int err, boolean_t set_saw)
 {
 	zerr("%s: %s", prefix, zonecfg_strerror(err));
 	if (set_saw)
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 }
 
 /*
@@ -1221,24 +1222,24 @@ zone_perror(char *prefix, int err, bool set_saw)
  */
 
 static void
-z_cmd_rt_perror(int cmd_num, int res_num, int err, bool set_saw)
+z_cmd_rt_perror(int cmd_num, int res_num, int err, boolean_t set_saw)
 {
 	zerr("%s %s: %s", cmd_to_str(cmd_num), rt_to_str(res_num),
 	    zonecfg_strerror(err));
 	if (set_saw)
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 }
 
 /* returns Z_OK if successful, Z_foo from <libzonecfg.h> otherwise */
 static int
-initialize(bool handle_expected)
+initialize(boolean_t handle_expected)
 {
 	int err;
 	char brandname[MAXNAMELEN];
 
 	if (zonecfg_check_handle(handle) != Z_OK) {
 		if ((err = zonecfg_get_handle(zone, handle)) == Z_OK) {
-			got_handle = TRUE;
+			got_handle = B_TRUE;
 			if (zonecfg_get_brand(handle, brandname,
 			    sizeof (brandname)) != Z_OK) {
 				zerr("Zone %s is inconsistent: missing "
@@ -1259,7 +1260,7 @@ initialize(bool handle_expected)
 			zone_dochandle_t tmphandle;
 
 			if ((tmphandle = zonecfg_init_handle()) == NULL) {
-				zone_perror(execname, Z_NOMEM, TRUE);
+				zone_perror(execname, Z_NOMEM, B_TRUE);
 				exit(Z_ERR);
 			}
 
@@ -1268,14 +1269,14 @@ initialize(bool handle_expected)
 
 			if (err != Z_OK) {
 				zonecfg_fini_handle(tmphandle);
-				zone_perror("SUNWblank", err, TRUE);
+				zone_perror("SUNWblank", err, B_TRUE);
 				return (err);
 			}
 
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 			zonecfg_fini_handle(handle);
 			handle = tmphandle;
-			got_handle = TRUE;
+			got_handle = B_TRUE;
 
 		} else {
 			zone_perror(zone, err, handle_expected || got_handle);
@@ -1290,7 +1291,7 @@ initialize(bool handle_expected)
 	return (Z_OK);
 }
 
-static bool
+static boolean_t
 state_atleast(zone_state_t state)
 {
 	zone_state_t state_num;
@@ -1327,7 +1328,7 @@ short_usage(int command)
 	}
 	(void) fprintf(stderr, "%s:\n%s\n", gettext("usage"),
 	    helptab[command].short_usage);
-	saw_error = TRUE;
+	saw_error = B_TRUE;
 }
 
 /*
@@ -1336,13 +1337,13 @@ short_usage(int command)
  */
 
 void
-long_usage(uint_t cmd_num, bool set_saw)
+long_usage(uint_t cmd_num, boolean_t set_saw)
 {
 	(void) fprintf(set_saw ? stderr : stdout, "%s:\n%s\n", gettext("usage"),
 	    helptab[cmd_num].short_usage);
 	(void) fprintf(set_saw ? stderr : stdout, "\t%s\n", long_help(cmd_num));
 	if (set_saw)
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 }
 
 /*
@@ -1353,10 +1354,10 @@ long_usage(uint_t cmd_num, bool set_saw)
 void
 longer_usage(uint_t cmd_num)
 {
-	long_usage(cmd_num, FALSE);
+	long_usage(cmd_num, B_FALSE);
 	if (helptab[cmd_num].flags != 0) {
 		(void) printf("\n");
-		usage(TRUE, helptab[cmd_num].flags);
+		usage(B_TRUE, helptab[cmd_num].flags);
 	}
 }
 
@@ -1370,21 +1371,21 @@ scope_usage(uint_t cmd_num)
 	zerr(gettext("The %s command only makes sense in the %s scope."),
 	    cmd_to_str(cmd_num),
 	    global_scope ?  gettext("resource") : gettext("global"));
-	saw_error = TRUE;
+	saw_error = B_TRUE;
 }
 
 /*
- * On input, TRUE => yes, FALSE => no.
- * On return, TRUE => 1, FALSE => no, could not ask => -1.
+ * On input, B_TRUE => yes, B_FALSE => no.
+ * On return, B_TRUE => 1, B_FALSE => no, could not ask => -1.
  */
 
 static int
-ask_yesno(bool default_answer, const char *question)
+ask_yesno(boolean_t default_answer, const char *question)
 {
 	char line[64];	/* should be enough to answer yes or no */
 
 	if (!ok_to_prompt) {
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		return (-1);
 	}
 	for (;;) {
@@ -1413,14 +1414,14 @@ ask_yesno(bool default_answer, const char *question)
  */
 
 static int
-check_if_zone_already_exists(bool force)
+check_if_zone_already_exists(boolean_t force)
 {
 	char line[ZONENAME_MAX + 128];	/* enough to ask a question */
 	zone_dochandle_t tmphandle;
 	int res, answer;
 
 	if ((tmphandle = zonecfg_init_handle()) == NULL) {
-		zone_perror(execname, Z_NOMEM, TRUE);
+		zone_perror(execname, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
 	res = zonecfg_get_handle(zone, tmphandle);
@@ -1442,7 +1443,7 @@ check_if_zone_already_exists(bool force)
 	(void) snprintf(line, sizeof (line),
 	    gettext("Zone %s already exists; %s anyway"), zone,
 	    cmd_to_str(CMD_CREATE));
-	if ((answer = ask_yesno(FALSE, line)) == -1) {
+	if ((answer = ask_yesno(B_FALSE, line)) == -1) {
 		zerr(gettext("Zone exists, input not from terminal and -F not "
 		    "specified:\n%s command ignored, exiting."),
 		    cmd_to_str(CMD_CREATE));
@@ -1451,22 +1452,22 @@ check_if_zone_already_exists(bool force)
 	return (answer == 1 ? Z_OK : Z_ERR);
 }
 
-static bool
+static boolean_t
 zone_is_read_only(int cmd_num)
 {
 	if (strncmp(zone, "SUNW", 4) == 0) {
 		zerr(gettext("%s: zones beginning with SUNW are read-only."),
 		    zone);
-		saw_error = TRUE;
-		return (TRUE);
+		saw_error = B_TRUE;
+		return (B_TRUE);
 	}
 	if (read_only_mode) {
 		zerr(gettext("%s: cannot %s in read-only mode."), zone,
 		    cmd_to_str(cmd_num));
-		saw_error = TRUE;
-		return (TRUE);
+		saw_error = B_TRUE;
+		return (B_TRUE);
 	}
-	return (FALSE);
+	return (B_FALSE);
 }
 
 /*
@@ -1479,9 +1480,9 @@ create_func(cmd_t *cmd)
 	char zone_template[ZONENAME_MAX];
 	char attach_path[MAXPATHLEN];
 	zone_dochandle_t tmphandle;
-	bool force = FALSE;
-	bool attach = FALSE;
-	bool arg_err = FALSE;
+	boolean_t force = B_FALSE;
+	boolean_t attach = B_FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	assert(cmd != NULL);
 
@@ -1497,19 +1498,19 @@ create_func(cmd_t *cmd)
 				longer_usage(CMD_CREATE);
 			else
 				short_usage(CMD_CREATE);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		case 'a':
 			(void) strlcpy(attach_path, optarg,
 			    sizeof (attach_path));
-			attach = TRUE;
+			attach = B_TRUE;
 			break;
 		case 'b':
 			(void) strlcpy(zone_template, "SUNWblank",
 			    sizeof (zone_template));
 			break;
 		case 'F':
-			force = TRUE;
+			force = B_TRUE;
 			break;
 		case 't':
 			(void) strlcpy(zone_template, optarg,
@@ -1517,7 +1518,7 @@ create_func(cmd_t *cmd)
 			break;
 		default:
 			short_usage(CMD_CREATE);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -1543,7 +1544,7 @@ create_func(cmd_t *cmd)
 	 * create -[b|t] works.
 	 */
 	if ((tmphandle = zonecfg_init_handle()) == NULL) {
-		zone_perror(execname, Z_NOMEM, TRUE);
+		zone_perror(execname, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
 
@@ -1563,14 +1564,14 @@ create_func(cmd_t *cmd)
 			(void) fprintf(stderr, gettext("Cannot attach to an "
 			    "earlier release of the operating system\n"));
 		else
-			zone_perror(zone_template, err, TRUE);
+			zone_perror(zone_template, err, B_TRUE);
 		return;
 	}
 
-	need_to_commit = TRUE;
+	need_to_commit = B_TRUE;
 	zonecfg_fini_handle(handle);
 	handle = tmphandle;
-	got_handle = TRUE;
+	got_handle = B_TRUE;
 }
 
 /*
@@ -1583,7 +1584,7 @@ quoteit(char *instr)
 	size_t outstrsize = strlen(instr) + 3;	/* 2 quotes + '\0' */
 
 	if ((outstr = malloc(outstrsize)) == NULL) {
-		zone_perror(zone, Z_NOMEM, FALSE);
+		zone_perror(zone, Z_NOMEM, B_FALSE);
 		exit(Z_ERR);
 	}
 	if (strchr(instr, ' ') == NULL) {
@@ -1628,8 +1629,8 @@ export_func(cmd_t *cmd)
 	FILE *of;
 	boolean_t autoboot;
 	zone_iptype_t iptype;
-	bool need_to_close = FALSE;
-	bool arg_err = FALSE;
+	boolean_t need_to_close = B_FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	assert(cmd != NULL);
 
@@ -1642,14 +1643,14 @@ export_func(cmd_t *cmd)
 				longer_usage(CMD_EXPORT);
 			else
 				short_usage(CMD_EXPORT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		case 'f':
 			(void) strlcpy(outfile, optarg, sizeof (outfile));
 			break;
 		default:
 			short_usage(CMD_EXPORT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -1669,10 +1670,10 @@ export_func(cmd_t *cmd)
 			goto done;
 		}
 		setbuf(of, NULL);
-		need_to_close = TRUE;
+		need_to_close = B_TRUE;
 	}
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		goto done;
 
 	(void) fprintf(of, "%s -b\n", cmd_to_str(CMD_CREATE));
@@ -1728,7 +1729,7 @@ export_func(cmd_t *cmd)
 	}
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
@@ -1740,7 +1741,7 @@ export_func(cmd_t *cmd)
 	(void) zonecfg_endipdent(handle);
 
 	if ((err = zonecfg_setfsent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getfsent(handle, &fstab) == Z_OK) {
@@ -1776,7 +1777,7 @@ export_func(cmd_t *cmd)
 	(void) zonecfg_endfsent(handle);
 
 	if ((err = zonecfg_setnwifent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
@@ -1790,7 +1791,7 @@ export_func(cmd_t *cmd)
 	(void) zonecfg_endnwifent(handle);
 
 	if ((err = zonecfg_setdevent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getdevent(handle, &devtab) == Z_OK) {
@@ -1802,7 +1803,7 @@ export_func(cmd_t *cmd)
 	(void) zonecfg_enddevent(handle);
 
 	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getrctlent(handle, &rctltab) == Z_OK) {
@@ -1822,7 +1823,7 @@ export_func(cmd_t *cmd)
 	(void) zonecfg_endrctlent(handle);
 
 	if ((err = zonecfg_setattrent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getattrent(handle, &attrtab) == Z_OK) {
@@ -1836,7 +1837,7 @@ export_func(cmd_t *cmd)
 	(void) zonecfg_endattrent(handle);
 
 	if ((err = zonecfg_setdsent(handle)) != Z_OK) {
-		zone_perror(zone, err, FALSE);
+		zone_perror(zone, err, B_FALSE);
 		goto done;
 	}
 	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
@@ -1888,21 +1889,21 @@ void
 exit_func(cmd_t *cmd)
 {
 	int arg, answer;
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?F")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_EXIT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		case 'F':
-			force_exit = TRUE;
+			force_exit = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_EXIT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -1915,18 +1916,18 @@ exit_func(cmd_t *cmd)
 	}
 
 	if (global_scope || force_exit) {
-		time_to_exit = TRUE;
+		time_to_exit = B_TRUE;
 		return;
 	}
 
-	answer = ask_yesno(FALSE, "Resource incomplete; really quit");
+	answer = ask_yesno(B_FALSE, "Resource incomplete; really quit");
 	if (answer == -1) {
 		zerr(gettext("Resource incomplete, input "
 		    "not from terminal and -F not specified:\n%s command "
 		    "ignored, but exiting anyway."), cmd_to_str(CMD_EXIT));
 		exit(Z_ERR);
 	} else if (answer == 1) {
-		time_to_exit = TRUE;
+		time_to_exit = B_TRUE;
 	}
 	/* (answer == 0) => just return */
 }
@@ -1957,7 +1958,7 @@ add_resource(cmd_t *cmd)
 	char pool[MAXNAMELEN];
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
-		long_usage(CMD_ADD, TRUE);
+		long_usage(CMD_ADD, B_TRUE);
 		goto bad;
 	}
 
@@ -2035,7 +2036,7 @@ add_resource(cmd_t *cmd)
 		switch (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp)) {
 		case Z_ALIAS_DISALLOW:
 			zone_perror(rt_to_str(RT_PCAP), Z_ALIAS_DISALLOW,
-			    FALSE);
+			    B_FALSE);
 			goto bad;
 
 		case Z_OK:
@@ -2070,12 +2071,12 @@ add_resource(cmd_t *cmd)
 		bzero(&in_progress_mcaptab, sizeof (in_progress_mcaptab));
 		return;
 	default:
-		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
-		long_usage(CMD_ADD, TRUE);
-		usage(FALSE, HELP_RESOURCES);
+		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
+		long_usage(CMD_ADD, B_TRUE);
+		usage(B_FALSE, HELP_RESOURCES);
 	}
 bad:
-	global_scope = TRUE;
+	global_scope = B_TRUE;
 	end_op = -1;
 }
 
@@ -2084,12 +2085,13 @@ do_complex_rctl_val(complex_property_ptr_t cp)
 {
 	struct zone_rctlvaltab *rctlvaltab;
 	complex_property_ptr_t cx;
-	bool seen_priv = FALSE, seen_limit = FALSE, seen_action = FALSE;
+	boolean_t seen_priv = B_FALSE, seen_limit = B_FALSE,
+	    seen_action = B_FALSE;
 	rctlblk_t *rctlblk;
 	int err;
 
 	if ((rctlvaltab = alloc_rctlvaltab()) == NULL) {
-		zone_perror(zone, Z_NOMEM, TRUE);
+		zone_perror(zone, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
 	for (cx = cp; cx != NULL; cx = cx->cp_next) {
@@ -2103,7 +2105,7 @@ do_complex_rctl_val(complex_property_ptr_t cp)
 			(void) strlcpy(rctlvaltab->zone_rctlval_priv,
 			    cx->cp_value,
 			    sizeof (rctlvaltab->zone_rctlval_priv));
-			seen_priv = TRUE;
+			seen_priv = B_TRUE;
 			break;
 		case PT_LIMIT:
 			if (seen_limit) {
@@ -2114,7 +2116,7 @@ do_complex_rctl_val(complex_property_ptr_t cp)
 			(void) strlcpy(rctlvaltab->zone_rctlval_limit,
 			    cx->cp_value,
 			    sizeof (rctlvaltab->zone_rctlval_limit));
-			seen_limit = TRUE;
+			seen_limit = B_TRUE;
 			break;
 		case PT_ACTION:
 			if (seen_action) {
@@ -2125,13 +2127,13 @@ do_complex_rctl_val(complex_property_ptr_t cp)
 			(void) strlcpy(rctlvaltab->zone_rctlval_action,
 			    cx->cp_value,
 			    sizeof (rctlvaltab->zone_rctlval_action));
-			seen_action = TRUE;
+			seen_action = B_TRUE;
 			break;
 		default:
 			zone_perror(pt_to_str(PT_VALUE),
-			    Z_NO_PROPERTY_TYPE, TRUE);
-			long_usage(CMD_ADD, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			zonecfg_free_rctl_value_list(rctlvaltab);
 			return;
 		}
@@ -2159,7 +2161,7 @@ do_complex_rctl_val(complex_property_ptr_t cp)
 	}
 	err = zonecfg_add_rctl_value(&in_progress_rctltab, rctlvaltab);
 	if (err != Z_OK)
-		zone_perror(pt_to_str(PT_VALUE), err, TRUE);
+		zone_perror(pt_to_str(PT_VALUE), err, B_TRUE);
 	return;
 
 bad:
@@ -2177,25 +2179,25 @@ add_property(cmd_t *cmd)
 	res_type = resource_scope;
 	prop_type = cmd->cmd_prop_name[0];
 	if (res_type == RT_UNKNOWN || prop_type == PT_UNKNOWN) {
-		long_usage(CMD_ADD, TRUE);
+		long_usage(CMD_ADD, B_TRUE);
 		return;
 	}
 
 	if (cmd->cmd_prop_nv_pairs != 1) {
-		long_usage(CMD_ADD, TRUE);
+		long_usage(CMD_ADD, B_TRUE);
 		return;
 	}
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (res_type) {
 	case RT_FS:
 		if (prop_type != PT_OPTIONS) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_ADD, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		pp = cmd->cmd_property_ptr[0];
@@ -2204,19 +2206,19 @@ add_property(cmd_t *cmd)
 			zerr(gettext("A %s or %s value was expected here."),
 			    pvt_to_str(PROP_VAL_SIMPLE),
 			    pvt_to_str(PROP_VAL_LIST));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (pp->pv_type == PROP_VAL_SIMPLE) {
 			if (pp->pv_simple == NULL) {
-				long_usage(CMD_ADD, TRUE);
+				long_usage(CMD_ADD, B_TRUE);
 				return;
 			}
 			prop_id = pp->pv_simple;
 			err = zonecfg_add_fs_option(&in_progress_fstab,
 			    prop_id);
 			if (err != Z_OK)
-				zone_perror(pt_to_str(prop_type), err, TRUE);
+				zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		} else {
 			list_property_ptr_t list;
 
@@ -2229,16 +2231,16 @@ add_property(cmd_t *cmd)
 				    &in_progress_fstab, prop_id);
 				if (err != Z_OK)
 					zone_perror(pt_to_str(prop_type), err,
-					    TRUE);
+					    B_TRUE);
 			}
 		}
 		return;
 	case RT_RCTL:
 		if (prop_type != PT_VALUE) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_ADD, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		pp = cmd->cmd_property_ptr[0];
@@ -2247,7 +2249,7 @@ add_property(cmd_t *cmd)
 			zerr(gettext("A %s or %s value was expected here."),
 			    pvt_to_str(PROP_VAL_COMPLEX),
 			    pvt_to_str(PROP_VAL_LIST));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (pp->pv_type == PROP_VAL_COMPLEX) {
@@ -2258,9 +2260,9 @@ add_property(cmd_t *cmd)
 			do_complex_rctl_val(l->lp_complex);
 		return;
 	default:
-		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, TRUE);
-		long_usage(CMD_ADD, TRUE);
-		usage(FALSE, HELP_RESOURCES);
+		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
+		long_usage(CMD_ADD, B_TRUE);
+		usage(B_FALSE, HELP_RESOURCES);
 		return;
 	}
 }
@@ -2295,7 +2297,7 @@ void
 add_func(cmd_t *cmd)
 {
 	int arg;
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	assert(cmd != NULL);
 
@@ -2304,11 +2306,11 @@ add_func(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_ADD);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_ADD);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -2323,17 +2325,17 @@ add_func(cmd_t *cmd)
 	if (zone_is_read_only(CMD_ADD))
 		return;
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 	if (global_scope) {
 		if (gz_invalid_resource(cmd->cmd_res_type)) {
 			zerr(gettext("Cannot add a %s resource to the "
 			    "global zone."), rt_to_str(cmd->cmd_res_type));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
-		global_scope = FALSE;
+		global_scope = B_FALSE;
 		resource_scope = cmd->cmd_res_type;
 		end_op = CMD_ADD;
 		add_resource(cmd);
@@ -2354,22 +2356,22 @@ delete_func(cmd_t *cmd)
 {
 	int err, arg, answer;
 	char line[ZONENAME_MAX + 128];	/* enough to ask a question */
-	bool force = FALSE;
-	bool arg_err = FALSE;
+	boolean_t force = B_FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?F")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_DELETE);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		case 'F':
-			force = TRUE;
+			force = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_DELETE);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -2393,12 +2395,12 @@ delete_func(cmd_t *cmd)
 		 * zonename).  However, we also have to take care to emulate the
 		 * messages spit out by initialize; see below.
 		 */
-		if (initialize(TRUE) != Z_OK)
+		if (initialize(B_TRUE) != Z_OK)
 			return;
 
 		(void) snprintf(line, sizeof (line),
 		    gettext("Are you sure you want to delete zone %s"), zone);
-		if ((answer = ask_yesno(FALSE, line)) == -1) {
+		if ((answer = ask_yesno(B_FALSE, line)) == -1) {
 			zerr(gettext("Input not from terminal and -F not "
 			    "specified:\n%s command ignored, exiting."),
 			    cmd_to_str(CMD_DELETE));
@@ -2415,10 +2417,10 @@ delete_func(cmd_t *cmd)
 			    zone, zone_state_str(ZONE_STATE_CONFIGURED),
 			    cmd_to_str(CMD_DELETE), cmd_to_str(CMD_DELETE));
 		} else {
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		}
 	}
-	need_to_commit = FALSE;
+	need_to_commit = B_FALSE;
 
 	/*
 	 * Emulate initialize's messaging; if there wasn't a valid handle to
@@ -2439,25 +2441,25 @@ delete_func(cmd_t *cmd)
 	if (got_handle) {
 		zonecfg_fini_handle(handle);
 		if ((handle = zonecfg_init_handle()) == NULL) {
-			zone_perror(execname, Z_NOMEM, TRUE);
+			zone_perror(execname, Z_NOMEM, B_TRUE);
 			exit(Z_ERR);
 		}
 		if ((err = zonecfg_get_handle(zone, handle)) != Z_OK) {
 			/* If there was no zone before, that's OK */
 			if (err != Z_NO_ZONE)
-				zone_perror(zone, err, TRUE);
-			got_handle = FALSE;
+				zone_perror(zone, err, B_TRUE);
+			got_handle = B_FALSE;
 		}
 	}
 }
 
 static int
-fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, bool fill_in_only)
+fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	bzero(fstab, sizeof (*fstab));
@@ -2465,7 +2467,7 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2487,7 +2489,7 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2497,12 +2499,12 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, bool fill_in_only)
 }
 
 static int
-fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, bool fill_in_only)
+fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	bzero(ipdtab, sizeof (*ipdtab));
@@ -2510,7 +2512,7 @@ fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2520,7 +2522,7 @@ fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2530,12 +2532,13 @@ fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, bool fill_in_only)
 }
 
 static int
-fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab, bool fill_in_only)
+fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
+    boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	bzero(nwiftab, sizeof (*nwiftab));
@@ -2543,7 +2546,7 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2563,7 +2566,7 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2574,12 +2577,12 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab, bool fill_in_only)
 }
 
 static int
-fill_in_devtab(cmd_t *cmd, struct zone_devtab *devtab, bool fill_in_only)
+fill_in_devtab(cmd_t *cmd, struct zone_devtab *devtab, boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	bzero(devtab, sizeof (*devtab));
@@ -2587,7 +2590,7 @@ fill_in_devtab(cmd_t *cmd, struct zone_devtab *devtab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2597,7 +2600,7 @@ fill_in_devtab(cmd_t *cmd, struct zone_devtab *devtab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2608,12 +2611,13 @@ fill_in_devtab(cmd_t *cmd, struct zone_devtab *devtab, bool fill_in_only)
 }
 
 static int
-fill_in_rctltab(cmd_t *cmd, struct zone_rctltab *rctltab, bool fill_in_only)
+fill_in_rctltab(cmd_t *cmd, struct zone_rctltab *rctltab,
+    boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	bzero(rctltab, sizeof (*rctltab));
@@ -2621,7 +2625,7 @@ fill_in_rctltab(cmd_t *cmd, struct zone_rctltab *rctltab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2631,7 +2635,7 @@ fill_in_rctltab(cmd_t *cmd, struct zone_rctltab *rctltab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2642,12 +2646,13 @@ fill_in_rctltab(cmd_t *cmd, struct zone_rctltab *rctltab, bool fill_in_only)
 }
 
 static int
-fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab, bool fill_in_only)
+fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab,
+    boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	bzero(attrtab, sizeof (*attrtab));
@@ -2655,7 +2660,7 @@ fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2673,7 +2678,7 @@ fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2684,12 +2689,12 @@ fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab, bool fill_in_only)
 }
 
 static int
-fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, bool fill_in_only)
+fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, boolean_t fill_in_only)
 {
 	int err, i;
 	property_value_ptr_t pp;
 
-	if ((err = initialize(TRUE)) != Z_OK)
+	if ((err = initialize(B_TRUE)) != Z_OK)
 		return (err);
 
 	dstab->zone_dataset_name[0] = '\0';
@@ -2697,7 +2702,7 @@ fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, bool fill_in_only)
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
 			zerr(gettext("A simple value was expected here."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (Z_INSUFFICIENT_SPEC);
 		}
 		switch (cmd->cmd_prop_name[i]) {
@@ -2707,7 +2712,7 @@ fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, bool fill_in_only)
 			break;
 		default:
 			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, TRUE);
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
 			return (Z_INSUFFICIENT_SPEC);
 		}
 	}
@@ -2725,15 +2730,15 @@ remove_aliased_rctl(int type, char *name)
 	if ((err = zonecfg_get_aliased_rctl(handle, name, &tmp)) != Z_OK) {
 		zerr("%s %s: %s", cmd_to_str(CMD_CLEAR), pt_to_str(type),
 		    zonecfg_strerror(err));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		return;
 	}
 	if ((err = zonecfg_rm_aliased_rctl(handle, name)) != Z_OK) {
 		zerr("%s %s: %s", cmd_to_str(CMD_CLEAR), pt_to_str(type),
 		    zonecfg_strerror(err));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 	} else {
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 	}
 }
 
@@ -2745,7 +2750,7 @@ prompt_remove_resource(cmd_t *cmd, char *rsrc)
 	int arg;
 	boolean_t force = B_FALSE;
 	char prompt[128];
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "F")) != EOF) {
@@ -2754,7 +2759,7 @@ prompt_remove_resource(cmd_t *cmd, char *rsrc)
 			force = B_TRUE;
 			break;
 		default:
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -2766,7 +2771,7 @@ prompt_remove_resource(cmd_t *cmd, char *rsrc)
 
 	if (num == 0) {
 		z_cmd_rt_perror(CMD_REMOVE, cmd->cmd_res_type, Z_NO_ENTRY,
-		    TRUE);
+		    B_TRUE);
 		return (B_FALSE);
 	}
 	if (num > 1 && !force) {
@@ -2775,13 +2780,13 @@ prompt_remove_resource(cmd_t *cmd, char *rsrc)
 			    "resource.  Either qualify the resource to\n"
 			    "remove a single instance or use the -F option to "
 			    "remove all instances."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return (B_FALSE);
 		}
 		(void) snprintf(prompt, sizeof (prompt), gettext(
 		    "Are you sure you want to remove ALL '%s' resources"),
 		    rsrc);
-		answer = ask_yesno(FALSE, prompt);
+		answer = ask_yesno(B_FALSE, prompt);
 		if (answer == -1) {
 			zerr(gettext("Resource incomplete."));
 			return (B_FALSE);
@@ -2801,14 +2806,14 @@ remove_fs(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_fstab fstab;
 
-		if ((err = fill_in_fstab(cmd, &fstab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, TRUE);
+		if ((err = fill_in_fstab(cmd, &fstab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_filesystem(handle, &fstab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		zonecfg_free_fs_option_list(fstab.zone_fs_options);
 		return;
 	}
@@ -2821,9 +2826,9 @@ remove_fs(cmd_t *cmd)
 		return;
 
 	if ((err = zonecfg_del_all_resources(handle, "fs")) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -2841,14 +2846,14 @@ remove_ipd(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_fstab fstab;
 
-		if ((err = fill_in_ipdtab(cmd, &fstab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, TRUE);
+		if ((err = fill_in_ipdtab(cmd, &fstab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_ipd(handle, &fstab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	}
 
@@ -2861,9 +2866,9 @@ remove_ipd(cmd_t *cmd)
 
 	if ((err = zonecfg_del_all_resources(handle, "inherit-pkg-dir"))
 	    != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -2875,14 +2880,14 @@ remove_net(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_nwiftab nwiftab;
 
-		if ((err = fill_in_nwiftab(cmd, &nwiftab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, TRUE);
+		if ((err = fill_in_nwiftab(cmd, &nwiftab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_nwif(handle, &nwiftab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	}
 
@@ -2894,9 +2899,9 @@ remove_net(cmd_t *cmd)
 		return;
 
 	if ((err = zonecfg_del_all_resources(handle, "net")) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -2908,14 +2913,14 @@ remove_device(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_devtab devtab;
 
-		if ((err = fill_in_devtab(cmd, &devtab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, TRUE);
+		if ((err = fill_in_devtab(cmd, &devtab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_dev(handle, &devtab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	}
 
@@ -2927,9 +2932,9 @@ remove_device(cmd_t *cmd)
 		return;
 
 	if ((err = zonecfg_del_all_resources(handle, "device")) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -2941,14 +2946,14 @@ remove_attr(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_attrtab attrtab;
 
-		if ((err = fill_in_attrtab(cmd, &attrtab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+		if ((err = fill_in_attrtab(cmd, &attrtab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_attr(handle, &attrtab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	}
 
@@ -2960,9 +2965,9 @@ remove_attr(cmd_t *cmd)
 		return;
 
 	if ((err = zonecfg_del_all_resources(handle, "attr")) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -2974,14 +2979,14 @@ remove_dataset(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_dstab dstab;
 
-		if ((err = fill_in_dstab(cmd, &dstab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+		if ((err = fill_in_dstab(cmd, &dstab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_ds(handle, &dstab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	}
 
@@ -2993,9 +2998,9 @@ remove_dataset(cmd_t *cmd)
 		return;
 
 	if ((err = zonecfg_del_all_resources(handle, "dataset")) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -3007,14 +3012,14 @@ remove_rctl(cmd_t *cmd)
 	if (cmd->cmd_prop_nv_pairs > 0) {
 		struct zone_rctltab rctltab;
 
-		if ((err = fill_in_rctltab(cmd, &rctltab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, TRUE);
+		if ((err = fill_in_rctltab(cmd, &rctltab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, B_TRUE);
 			return;
 		}
 		if ((err = zonecfg_delete_rctl(handle, &rctltab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		zonecfg_free_rctl_value_list(rctltab.zone_rctl_valptr);
 		return;
 	}
@@ -3027,9 +3032,9 @@ remove_rctl(cmd_t *cmd)
 		return;
 
 	if ((err = zonecfg_del_all_resources(handle, "rctl")) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -3039,13 +3044,13 @@ remove_pset()
 	struct zone_psettab psettab;
 
 	if ((err = zonecfg_lookup_pset(handle, &psettab)) != Z_OK) {
-		z_cmd_rt_perror(CMD_REMOVE, RT_DCPU, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_DCPU, err, B_TRUE);
 		return;
 	}
 	if ((err = zonecfg_delete_pset(handle)) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_DCPU, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_DCPU, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -3057,14 +3062,14 @@ remove_pcap()
 	if (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp) != Z_OK) {
 		zerr("%s %s: %s", cmd_to_str(CMD_REMOVE), rt_to_str(RT_PCAP),
 		    zonecfg_strerror(Z_NO_RESOURCE_TYPE));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		return;
 	}
 
 	if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_CPUCAP)) != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_PCAP, err, TRUE);
+		z_cmd_rt_perror(CMD_REMOVE, RT_PCAP, err, B_TRUE);
 	else
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 }
 
 static void
@@ -3083,38 +3088,38 @@ remove_mcap()
 	if (res1 != Z_OK && res2 != Z_OK && res3 != Z_OK) {
 		zerr("%s %s: %s", cmd_to_str(CMD_REMOVE), rt_to_str(RT_MCAP),
 		    zonecfg_strerror(Z_NO_RESOURCE_TYPE));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		return;
 	}
 	if (res1 == Z_OK) {
 		if ((err = zonecfg_delete_mcap(handle)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, B_TRUE);
 			revert = B_TRUE;
 		} else {
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		}
 	}
 	if (res2 == Z_OK) {
 		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXSWAP))
 		    != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, B_TRUE);
 			revert = B_TRUE;
 		} else {
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		}
 	}
 	if (res3 == Z_OK) {
 		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM))
 		    != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, TRUE);
+			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, B_TRUE);
 			revert = B_TRUE;
 		} else {
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		}
 	}
 
 	if (revert)
-		need_to_commit = FALSE;
+		need_to_commit = B_FALSE;
 }
 
 static void
@@ -3122,10 +3127,10 @@ remove_resource(cmd_t *cmd)
 {
 	int type;
 	int arg;
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
-		long_usage(CMD_REMOVE, TRUE);
+		long_usage(CMD_REMOVE, B_TRUE);
 		return;
 	}
 
@@ -3134,20 +3139,20 @@ remove_resource(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_REMOVE);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		case 'F':
 			break;
 		default:
 			short_usage(CMD_REMOVE);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
 	if (arg_err)
 		return;
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (type) {
@@ -3182,9 +3187,9 @@ remove_resource(cmd_t *cmd)
 		remove_mcap();
 		return;
 	default:
-		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
-		long_usage(CMD_REMOVE, TRUE);
-		usage(FALSE, HELP_RESOURCES);
+		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
+		long_usage(CMD_REMOVE, B_TRUE);
+		usage(B_FALSE, HELP_RESOURCES);
 		return;
 	}
 }
@@ -3201,25 +3206,25 @@ remove_property(cmd_t *cmd)
 	res_type = resource_scope;
 	prop_type = cmd->cmd_prop_name[0];
 	if (res_type == RT_UNKNOWN || prop_type == PT_UNKNOWN) {
-		long_usage(CMD_REMOVE, TRUE);
+		long_usage(CMD_REMOVE, B_TRUE);
 		return;
 	}
 
 	if (cmd->cmd_prop_nv_pairs != 1) {
-		long_usage(CMD_ADD, TRUE);
+		long_usage(CMD_ADD, B_TRUE);
 		return;
 	}
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (res_type) {
 	case RT_FS:
 		if (prop_type != PT_OPTIONS) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_REMOVE, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_REMOVE, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		pp = cmd->cmd_property_ptr[0];
@@ -3227,19 +3232,19 @@ remove_property(cmd_t *cmd)
 			zerr(gettext("A %s or %s value was expected here."),
 			    pvt_to_str(PROP_VAL_SIMPLE),
 			    pvt_to_str(PROP_VAL_LIST));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (pp->pv_type == PROP_VAL_SIMPLE) {
 			if (pp->pv_simple == NULL) {
-				long_usage(CMD_ADD, TRUE);
+				long_usage(CMD_ADD, B_TRUE);
 				return;
 			}
 			prop_id = pp->pv_simple;
 			err = zonecfg_remove_fs_option(&in_progress_fstab,
 			    prop_id);
 			if (err != Z_OK)
-				zone_perror(pt_to_str(prop_type), err, TRUE);
+				zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		} else {
 			list_property_ptr_t list;
 
@@ -3252,27 +3257,27 @@ remove_property(cmd_t *cmd)
 				    &in_progress_fstab, prop_id);
 				if (err != Z_OK)
 					zone_perror(pt_to_str(prop_type), err,
-					    TRUE);
+					    B_TRUE);
 			}
 		}
 		return;
 	case RT_RCTL:
 		if (prop_type != PT_VALUE) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_REMOVE, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_REMOVE, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		pp = cmd->cmd_property_ptr[0];
 		if (pp->pv_type != PROP_VAL_COMPLEX) {
 			zerr(gettext("A %s value was expected here."),
 			    pvt_to_str(PROP_VAL_COMPLEX));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if ((rctlvaltab = alloc_rctlvaltab()) == NULL) {
-			zone_perror(zone, Z_NOMEM, TRUE);
+			zone_perror(zone, Z_NOMEM, B_TRUE);
 			exit(Z_ERR);
 		}
 		for (cx = pp->pv_complex; cx != NULL; cx = cx->cp_next) {
@@ -3294,9 +3299,9 @@ remove_property(cmd_t *cmd)
 				break;
 			default:
 				zone_perror(pt_to_str(prop_type),
-				    Z_NO_PROPERTY_TYPE, TRUE);
-				long_usage(CMD_ADD, TRUE);
-				usage(FALSE, HELP_PROPS);
+				    Z_NO_PROPERTY_TYPE, B_TRUE);
+				long_usage(CMD_ADD, B_TRUE);
+				usage(B_FALSE, HELP_PROPS);
 				zonecfg_free_rctl_value_list(rctlvaltab);
 				return;
 			}
@@ -3305,15 +3310,15 @@ remove_property(cmd_t *cmd)
 		err = zonecfg_remove_rctl_value(&in_progress_rctltab,
 		    rctlvaltab);
 		if (err != Z_OK)
-			zone_perror(pt_to_str(prop_type), err, TRUE);
+			zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		zonecfg_free_rctl_value_list(rctlvaltab);
 		return;
 	case RT_NET:
 		if (prop_type != PT_DEFROUTER) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_REMOVE, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_REMOVE, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		} else {
 			bzero(&in_progress_nwiftab.zone_nwif_defrouter,
@@ -3321,9 +3326,9 @@ remove_property(cmd_t *cmd)
 			return;
 		}
 	default:
-		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, TRUE);
-		long_usage(CMD_REMOVE, TRUE);
-		usage(FALSE, HELP_RESOURCES);
+		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
+		long_usage(CMD_REMOVE, B_TRUE);
+		usage(B_FALSE, HELP_RESOURCES);
 		return;
 	}
 }
@@ -3340,7 +3345,7 @@ remove_func(cmd_t *cmd)
 		if (gz_invalid_resource(cmd->cmd_res_type)) {
 			zerr(gettext("%s is not a valid resource for the "
 			    "global zone."), rt_to_str(cmd->cmd_res_type));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		remove_resource(cmd);
@@ -3357,25 +3362,25 @@ clear_property(cmd_t *cmd)
 	res_type = resource_scope;
 	prop_type = cmd->cmd_res_type;
 	if (res_type == RT_UNKNOWN || prop_type == PT_UNKNOWN) {
-		long_usage(CMD_CLEAR, TRUE);
+		long_usage(CMD_CLEAR, B_TRUE);
 		return;
 	}
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (res_type) {
 	case RT_FS:
 		if (prop_type == PT_RAW) {
 			in_progress_fstab.zone_fs_raw[0] = '\0';
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 			return;
 		}
 		break;
 	case RT_DCPU:
 		if (prop_type == PT_IMPORTANCE) {
 			in_progress_psettab.zone_importance[0] = '\0';
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 			return;
 		}
 		break;
@@ -3383,7 +3388,7 @@ clear_property(cmd_t *cmd)
 		switch (prop_type) {
 		case PT_PHYSICAL:
 			in_progress_mcaptab.zone_physmem_cap[0] = '\0';
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 			return;
 		case PT_SWAP:
 			remove_aliased_rctl(PT_SWAP, ALIAS_MAXSWAP);
@@ -3397,7 +3402,7 @@ clear_property(cmd_t *cmd)
 		break;
 	}
 
-	zone_perror(pt_to_str(prop_type), Z_CLEAR_DISALLOW, TRUE);
+	zone_perror(pt_to_str(prop_type), Z_CLEAR_DISALLOW, B_TRUE);
 }
 
 static void
@@ -3406,11 +3411,11 @@ clear_global(cmd_t *cmd)
 	int err, type;
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
-		long_usage(CMD_CLEAR, TRUE);
+		long_usage(CMD_CLEAR, B_TRUE);
 		return;
 	}
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (type) {
@@ -3419,45 +3424,45 @@ clear_global(cmd_t *cmd)
 	case PT_ZONEPATH:
 		/* FALLTHRU */
 	case PT_BRAND:
-		zone_perror(pt_to_str(type), Z_CLEAR_DISALLOW, TRUE);
+		zone_perror(pt_to_str(type), Z_CLEAR_DISALLOW, B_TRUE);
 		return;
 	case PT_AUTOBOOT:
 		/* false is default; we'll treat as equivalent to clearing */
 		if ((err = zonecfg_set_autoboot(handle, B_FALSE)) != Z_OK)
-			z_cmd_rt_perror(CMD_CLEAR, RT_AUTOBOOT, err, TRUE);
+			z_cmd_rt_perror(CMD_CLEAR, RT_AUTOBOOT, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case PT_POOL:
 		if ((err = zonecfg_set_pool(handle, NULL)) != Z_OK)
-			z_cmd_rt_perror(CMD_CLEAR, RT_POOL, err, TRUE);
+			z_cmd_rt_perror(CMD_CLEAR, RT_POOL, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case PT_LIMITPRIV:
 		if ((err = zonecfg_set_limitpriv(handle, NULL)) != Z_OK)
-			z_cmd_rt_perror(CMD_CLEAR, RT_LIMITPRIV, err, TRUE);
+			z_cmd_rt_perror(CMD_CLEAR, RT_LIMITPRIV, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case PT_BOOTARGS:
 		if ((err = zonecfg_set_bootargs(handle, NULL)) != Z_OK)
-			z_cmd_rt_perror(CMD_CLEAR, RT_BOOTARGS, err, TRUE);
+			z_cmd_rt_perror(CMD_CLEAR, RT_BOOTARGS, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case PT_SCHED:
 		if ((err = zonecfg_set_sched(handle, NULL)) != Z_OK)
-			z_cmd_rt_perror(CMD_CLEAR, RT_SCHED, err, TRUE);
+			z_cmd_rt_perror(CMD_CLEAR, RT_SCHED, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case PT_IPTYPE:
 		/* shared is default; we'll treat as equivalent to clearing */
 		if ((err = zonecfg_set_iptype(handle, ZS_SHARED)) != Z_OK)
-			z_cmd_rt_perror(CMD_CLEAR, RT_IPTYPE, err, TRUE);
+			z_cmd_rt_perror(CMD_CLEAR, RT_IPTYPE, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case PT_MAXLWPS:
 		remove_aliased_rctl(PT_MAXLWPS, ALIAS_MAXLWPS);
@@ -3478,9 +3483,9 @@ clear_global(cmd_t *cmd)
 		remove_aliased_rctl(PT_SHARES, ALIAS_SHARES);
 		return;
 	default:
-		zone_perror(pt_to_str(type), Z_NO_PROPERTY_TYPE, TRUE);
-		long_usage(CMD_CLEAR, TRUE);
-		usage(FALSE, HELP_PROPS);
+		zone_perror(pt_to_str(type), Z_NO_PROPERTY_TYPE, B_TRUE);
+		long_usage(CMD_CLEAR, B_TRUE);
+		usage(B_FALSE, HELP_PROPS);
 		return;
 	}
 }
@@ -3497,7 +3502,7 @@ clear_func(cmd_t *cmd)
 		if (gz_invalid_property(cmd->cmd_res_type)) {
 			zerr(gettext("%s is not a valid property for the "
 			    "global zone."), pt_to_str(cmd->cmd_res_type));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -3520,7 +3525,7 @@ select_func(cmd_t *cmd)
 	assert(cmd != NULL);
 
 	if (global_scope) {
-		global_scope = FALSE;
+		global_scope = B_FALSE;
 		resource_scope = cmd->cmd_res_type;
 		end_op = CMD_SELECT;
 	} else {
@@ -3529,18 +3534,18 @@ select_func(cmd_t *cmd)
 	}
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
-		long_usage(CMD_SELECT, TRUE);
+		long_usage(CMD_SELECT, B_TRUE);
 		return;
 	}
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (type) {
 	case RT_FS:
-		if ((err = fill_in_fstab(cmd, &old_fstab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_FS, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_fstab(cmd, &old_fstab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_FS, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_fstab, &in_progress_fstab,
 		    sizeof (struct zone_fstab));
@@ -3551,61 +3556,64 @@ select_func(cmd_t *cmd)
 			    "allowed."), zone,
 			    zone_state_str(ZONE_STATE_CONFIGURED),
 			    cmd_to_str(CMD_SELECT), rt_to_str(RT_IPD));
-			global_scope = TRUE;
+			global_scope = B_TRUE;
 			end_op = -1;
 			return;
 		}
-		if ((err = fill_in_ipdtab(cmd, &old_ipdtab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_IPD, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_ipdtab(cmd, &old_ipdtab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_IPD, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_ipdtab, &in_progress_ipdtab,
 		    sizeof (struct zone_fstab));
 		return;
 	case RT_NET:
-		if ((err = fill_in_nwiftab(cmd, &old_nwiftab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_NET, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_nwiftab(cmd, &old_nwiftab, B_FALSE))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_NET, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_nwiftab, &in_progress_nwiftab,
 		    sizeof (struct zone_nwiftab));
 		return;
 	case RT_DEVICE:
-		if ((err = fill_in_devtab(cmd, &old_devtab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_DEVICE, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_devtab(cmd, &old_devtab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_DEVICE, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_devtab, &in_progress_devtab,
 		    sizeof (struct zone_devtab));
 		return;
 	case RT_RCTL:
-		if ((err = fill_in_rctltab(cmd, &old_rctltab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_RCTL, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_rctltab(cmd, &old_rctltab, B_FALSE))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_RCTL, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_rctltab, &in_progress_rctltab,
 		    sizeof (struct zone_rctltab));
 		return;
 	case RT_ATTR:
-		if ((err = fill_in_attrtab(cmd, &old_attrtab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_ATTR, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_attrtab(cmd, &old_attrtab, B_FALSE))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_ATTR, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_attrtab, &in_progress_attrtab,
 		    sizeof (struct zone_attrtab));
 		return;
 	case RT_DATASET:
-		if ((err = fill_in_dstab(cmd, &old_dstab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_DATASET, err, TRUE);
-			global_scope = TRUE;
+		if ((err = fill_in_dstab(cmd, &old_dstab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_DATASET, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_dstab, &in_progress_dstab,
 		    sizeof (struct zone_dstab));
 		return;
 	case RT_DCPU:
 		if ((err = zonecfg_lookup_pset(handle, &old_psettab)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_DCPU, err, TRUE);
-			global_scope = TRUE;
+			z_cmd_rt_perror(CMD_SELECT, RT_DCPU, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		bcopy(&old_psettab, &in_progress_psettab,
 		    sizeof (struct zone_psettab));
@@ -3613,8 +3621,8 @@ select_func(cmd_t *cmd)
 	case RT_PCAP:
 		if ((err = zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp))
 		    != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_PCAP, err, TRUE);
-			global_scope = TRUE;
+			z_cmd_rt_perror(CMD_SELECT, RT_PCAP, err, B_TRUE);
+			global_scope = B_TRUE;
 		}
 		return;
 	case RT_MCAP:
@@ -3625,8 +3633,8 @@ select_func(cmd_t *cmd)
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &limit)
 		    != Z_OK) {
 			z_cmd_rt_perror(CMD_SELECT, RT_MCAP, Z_NO_RESOURCE_TYPE,
-			    TRUE);
-			global_scope = TRUE;
+			    B_TRUE);
+			global_scope = B_TRUE;
 		}
 		if (res == Z_OK)
 			bcopy(&old_mcaptab, &in_progress_mcaptab,
@@ -3636,9 +3644,9 @@ select_func(cmd_t *cmd)
 			    sizeof (in_progress_mcaptab));
 		return;
 	default:
-		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
-		long_usage(CMD_SELECT, TRUE);
-		usage(FALSE, HELP_RESOURCES);
+		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
+		long_usage(CMD_SELECT, B_TRUE);
+		usage(B_FALSE, HELP_RESOURCES);
 		return;
 	}
 }
@@ -3708,16 +3716,16 @@ validate_net_address_syntax(char *address)
 	if (!isalnum(part1[0])) {
 		zerr(gettext("%s: bogus host name or network address syntax"),
 		    part1);
-		saw_error = TRUE;
-		usage(FALSE, HELP_NETADDR);
+		saw_error = B_TRUE;
+		usage(B_FALSE, HELP_NETADDR);
 		return (Z_ERR);
 	}
 	for (i = 1; part1[i]; i++)
 		if (!isalnum(part1[i]) && part1[i] != '-' && part1[i] != '.') {
 			zerr(gettext("%s: bogus host name or "
 			    "network address syntax"), part1);
-			saw_error = TRUE;
-			usage(FALSE, HELP_NETADDR);
+			saw_error = B_TRUE;
+			usage(B_FALSE, HELP_NETADDR);
 			return (Z_ERR);
 		}
 	return (Z_OK);
@@ -3797,7 +3805,7 @@ set_aliased_rctl(char *alias, int prop_type, char *s)
 		if (!zonecfg_valid_memlimit(s, &limit)) {
 			zerr(gettext("A non-negative number with a required "
 			    "scale suffix (K, M, G or T) was expected\nhere."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -3806,18 +3814,18 @@ set_aliased_rctl(char *alias, int prop_type, char *s)
 	}
 
 	if (!zonecfg_aliased_rctl_ok(handle, alias)) {
-		zone_perror(pt_to_str(prop_type), Z_ALIAS_DISALLOW, FALSE);
-		saw_error = TRUE;
+		zone_perror(pt_to_str(prop_type), Z_ALIAS_DISALLOW, B_FALSE);
+		saw_error = B_TRUE;
 	} else if (!zonecfg_valid_alias_limit(alias, s, &limit)) {
 		zerr(gettext("%s property is out of range."),
 		    pt_to_str(prop_type));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 	} else if ((err = zonecfg_set_aliased_rctl(handle, alias, limit))
 	    != Z_OK) {
-		zone_perror(zone, err, TRUE);
-		saw_error = TRUE;
+		zone_perror(zone, err, B_TRUE);
+		saw_error = B_TRUE;
 	} else {
-		need_to_commit = TRUE;
+		need_to_commit = B_TRUE;
 	}
 }
 
@@ -3829,13 +3837,13 @@ set_func(cmd_t *cmd)
 	property_value_ptr_t pp;
 	boolean_t autoboot;
 	zone_iptype_t iptype;
-	boolean_t force_set = FALSE;
+	boolean_t force_set = B_FALSE;
 	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
 	uint64_t mem_cap, mem_limit;
 	float cap;
 	char *unitp;
 	struct zone_psettab tmp_psettab;
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	if (zone_is_read_only(CMD_SET))
 		return;
@@ -3846,14 +3854,14 @@ set_func(cmd_t *cmd)
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "F")) != EOF) {
 		switch (arg) {
 		case 'F':
-			force_set = TRUE;
+			force_set = B_TRUE;
 			break;
 		default:
 			if (optopt == '?')
 				longer_usage(CMD_SET);
 			else
 				short_usage(CMD_SET);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -3865,7 +3873,7 @@ set_func(cmd_t *cmd)
 		if (gz_invalid_property(prop_type)) {
 			zerr(gettext("%s is not a valid property for the "
 			    "global zone."), pt_to_str(prop_type));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -3902,7 +3910,7 @@ set_func(cmd_t *cmd)
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 	} else {
@@ -3912,13 +3920,13 @@ set_func(cmd_t *cmd)
 	if (force_set) {
 		if (res_type != RT_ZONEPATH) {
 			zerr(gettext("Only zonepath setting can be forced."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (!zonecfg_in_alt_root()) {
 			zerr(gettext("Zonepath is changeable only in an "
 			    "alternate root."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 	}
@@ -3936,11 +3944,11 @@ set_func(cmd_t *cmd)
 	    (prop_id = pp->pv_simple) == NULL)) {
 		zerr(gettext("A %s value was expected here."),
 		    pvt_to_str(PROP_VAL_SIMPLE));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		return;
 	}
 	if (prop_type == PT_UNKNOWN) {
-		long_usage(CMD_SET, TRUE);
+		long_usage(CMD_SET, B_TRUE);
 		return;
 	}
 
@@ -3949,18 +3957,18 @@ set_func(cmd_t *cmd)
 	 * if the zone already exists, we fall through letting initialize()
 	 * and the rest of the logic run.
 	 */
-	if (res_type == RT_ZONENAME && got_handle == FALSE &&
+	if (res_type == RT_ZONENAME && got_handle == B_FALSE &&
 	    !state_atleast(ZONE_STATE_CONFIGURED)) {
 		if ((err = zonecfg_validate_zonename(prop_id)) != Z_OK) {
-			zone_perror(prop_id, err, TRUE);
-			usage(FALSE, HELP_SYNTAX);
+			zone_perror(prop_id, err, B_TRUE);
+			usage(B_FALSE, HELP_SYNTAX);
 			return;
 		}
 		(void) strlcpy(zone, prop_id, sizeof (zone));
 		return;
 	}
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	switch (res_type) {
@@ -3970,10 +3978,10 @@ set_func(cmd_t *cmd)
 			 * Use prop_id instead of 'zone' here, since we're
 			 * reporting a problem about the *new* zonename.
 			 */
-			zone_perror(prop_id, err, TRUE);
-			usage(FALSE, HELP_SYNTAX);
+			zone_perror(prop_id, err, B_TRUE);
+			usage(B_FALSE, HELP_SYNTAX);
 		} else {
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 			(void) strlcpy(zone, prop_id, sizeof (zone));
 		}
 		return;
@@ -3985,13 +3993,13 @@ set_func(cmd_t *cmd)
 			return;
 		}
 		if (validate_zonepath_syntax(prop_id) != Z_OK) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if ((err = zonecfg_set_zonepath(handle, prop_id)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_BRAND:
 		if (state_atleast(ZONE_STATE_INSTALLED)) {
@@ -4001,9 +4009,9 @@ set_func(cmd_t *cmd)
 			return;
 		}
 		if ((err = zonecfg_set_brand(handle, prop_id)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_AUTOBOOT:
 		if (strcmp(prop_id, "true") == 0) {
@@ -4013,20 +4021,20 @@ set_func(cmd_t *cmd)
 		} else {
 			zerr(gettext("%s value must be '%s' or '%s'."),
 			    pt_to_str(PT_AUTOBOOT), "true", "false");
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if ((err = zonecfg_set_autoboot(handle, autoboot)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_POOL:
 		/* don't allow use of the reserved temporary pool names */
 		if (strncmp("SUNW", prop_id, 4) == 0) {
 			zerr(gettext("pool names starting with SUNW are "
 			    "reserved."));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -4036,32 +4044,32 @@ set_func(cmd_t *cmd)
 			    "A persistent pool is incompatible\nwith the %s "
 			    "resource."), rt_to_str(RT_DCPU),
 			    rt_to_str(RT_DCPU));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
 		if ((err = zonecfg_set_pool(handle, prop_id)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_LIMITPRIV:
 		if ((err = zonecfg_set_limitpriv(handle, prop_id)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_BOOTARGS:
 		if ((err = zonecfg_set_bootargs(handle, prop_id)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_SCHED:
 		if ((err = zonecfg_set_sched(handle, prop_id)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_IPTYPE:
 		if (strcmp(prop_id, "shared") == 0) {
@@ -4071,17 +4079,17 @@ set_func(cmd_t *cmd)
 		} else {
 			zerr(gettext("%s value must be '%s' or '%s'."),
 			    pt_to_str(PT_IPTYPE), "shared", "exclusive");
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (iptype == ZS_EXCLUSIVE && !allow_exclusive()) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if ((err = zonecfg_set_iptype(handle, iptype)) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_MAXLWPS:
 		set_aliased_rctl(ALIAS_MAXLWPS, prop_type, prop_id);
@@ -4120,7 +4128,7 @@ set_func(cmd_t *cmd)
 			if (!valid_fs_type(prop_id)) {
 				zerr(gettext("\"%s\" is not a valid %s."),
 				    prop_id, pt_to_str(PT_TYPE));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			(void) strlcpy(in_progress_fstab.zone_fs_type, prop_id,
@@ -4132,7 +4140,7 @@ set_func(cmd_t *cmd)
 				zerr(gettext("A %s or %s value was expected "
 				    "here."), pvt_to_str(PROP_VAL_SIMPLE),
 				    pvt_to_str(PROP_VAL_LIST));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			zonecfg_free_fs_option_list(
@@ -4145,9 +4153,9 @@ set_func(cmd_t *cmd)
 		default:
 			break;
 		}
-		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
-		long_usage(CMD_SET, TRUE);
-		usage(FALSE, HELP_PROPS);
+		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, B_TRUE);
+		long_usage(CMD_SET, B_TRUE);
+		usage(B_FALSE, HELP_PROPS);
 		return;
 	case RT_IPD:
 		switch (prop_type) {
@@ -4158,15 +4166,15 @@ set_func(cmd_t *cmd)
 		default:
 			break;
 		}
-		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
-		long_usage(CMD_SET, TRUE);
-		usage(FALSE, HELP_PROPS);
+		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, B_TRUE);
+		long_usage(CMD_SET, B_TRUE);
+		usage(B_FALSE, HELP_PROPS);
 		return;
 	case RT_NET:
 		switch (prop_type) {
 		case PT_ADDRESS:
 			if (validate_net_address_syntax(prop_id) != Z_OK) {
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			(void) strlcpy(in_progress_nwiftab.zone_nwif_address,
@@ -4175,7 +4183,7 @@ set_func(cmd_t *cmd)
 			break;
 		case PT_PHYSICAL:
 			if (validate_net_physical_syntax(prop_id) != Z_OK) {
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			(void) strlcpy(in_progress_nwiftab.zone_nwif_physical,
@@ -4184,7 +4192,7 @@ set_func(cmd_t *cmd)
 			break;
 		case PT_DEFROUTER:
 			if (validate_net_address_syntax(prop_id) != Z_OK) {
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			(void) strlcpy(in_progress_nwiftab.zone_nwif_defrouter,
@@ -4193,9 +4201,9 @@ set_func(cmd_t *cmd)
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_SET, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		return;
@@ -4208,9 +4216,9 @@ set_func(cmd_t *cmd)
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_SET, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		return;
@@ -4232,7 +4240,7 @@ set_func(cmd_t *cmd)
 				zerr(gettext("A %s or %s value was expected "
 				    "here."), pvt_to_str(PROP_VAL_COMPLEX),
 				    pvt_to_str(PROP_VAL_LIST));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			zonecfg_free_rctl_value_list(
@@ -4244,9 +4252,9 @@ set_func(cmd_t *cmd)
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_SET, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		return;
@@ -4269,9 +4277,9 @@ set_func(cmd_t *cmd)
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_SET, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 		return;
@@ -4285,9 +4293,9 @@ set_func(cmd_t *cmd)
 		default:
 			break;
 		}
-		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
-		long_usage(CMD_SET, TRUE);
-		usage(FALSE, HELP_PROPS);
+		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, B_TRUE);
+		long_usage(CMD_SET, B_TRUE);
+		usage(B_FALSE, HELP_PROPS);
 		return;
 	case RT_DCPU:
 		switch (prop_type) {
@@ -4304,7 +4312,7 @@ set_func(cmd_t *cmd)
 			if (!zonecfg_valid_ncpus(lowp, highp)) {
 				zerr(gettext("%s property is out of range."),
 				    pt_to_str(PT_NCPUS));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 
@@ -4320,7 +4328,7 @@ set_func(cmd_t *cmd)
 			if (!zonecfg_valid_importance(prop_id)) {
 				zerr(gettext("%s property is out of range."),
 				    pt_to_str(PT_IMPORTANCE));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 
@@ -4331,16 +4339,16 @@ set_func(cmd_t *cmd)
 		default:
 			break;
 		}
-		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
-		long_usage(CMD_SET, TRUE);
-		usage(FALSE, HELP_PROPS);
+		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, B_TRUE);
+		long_usage(CMD_SET, B_TRUE);
+		usage(B_FALSE, HELP_PROPS);
 		return;
 	case RT_PCAP:
 		if (prop_type != PT_NCPUS) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_SET, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 
@@ -4353,15 +4361,15 @@ set_func(cmd_t *cmd)
 		    (int)(cap * 100) < 1) {
 			zerr(gettext("%s property is out of range."),
 			    pt_to_str(PT_NCPUS));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
 		if ((err = zonecfg_set_aliased_rctl(handle, ALIAS_CPUCAP,
 		    (int)(cap * 100))) != Z_OK)
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 		else
-			need_to_commit = TRUE;
+			need_to_commit = B_TRUE;
 		return;
 	case RT_MCAP:
 		switch (prop_type) {
@@ -4370,11 +4378,11 @@ set_func(cmd_t *cmd)
 				zerr(gettext("A positive number with a "
 				    "required scale suffix (K, M, G or T) was "
 				    "expected here."));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 			} else if (mem_cap < ONE_MB) {
 				zerr(gettext("%s value is too small.  It must "
 				    "be at least 1M."), pt_to_str(PT_PHYSICAL));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 			} else {
 				snprintf(in_progress_mcaptab.zone_physmem_cap,
 				    physmem_size, "%llu", mem_cap);
@@ -4388,8 +4396,8 @@ set_func(cmd_t *cmd)
 			 */
 			if (!zonecfg_aliased_rctl_ok(handle, ALIAS_MAXSWAP)) {
 				zone_perror(pt_to_str(PT_MAXSWAP),
-				    Z_ALIAS_DISALLOW, FALSE);
-				saw_error = TRUE;
+				    Z_ALIAS_DISALLOW, B_FALSE);
+				saw_error = B_TRUE;
 				return;
 			}
 
@@ -4402,7 +4410,7 @@ set_func(cmd_t *cmd)
 				zerr(gettext("A positive number with a "
 				    "required scale suffix (K, M, G or T) was "
 				    "expected here."));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 			} else if (mem_cap < mem_limit) {
 				char buf[128];
 
@@ -4412,13 +4420,13 @@ set_func(cmd_t *cmd)
 				zerr(gettext("%s value is too small.  It must "
 				    "be at least %s."), pt_to_str(PT_SWAP),
 				    buf);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 			} else {
 				if ((err = zonecfg_set_aliased_rctl(handle,
 				    ALIAS_MAXSWAP, mem_cap)) != Z_OK)
-					zone_perror(zone, err, TRUE);
+					zone_perror(zone, err, B_TRUE);
 				else
-					need_to_commit = TRUE;
+					need_to_commit = B_TRUE;
 			}
 			break;
 		case PT_LOCKED:
@@ -4430,8 +4438,8 @@ set_func(cmd_t *cmd)
 			if (!zonecfg_aliased_rctl_ok(handle,
 			    ALIAS_MAXLOCKEDMEM)) {
 				zone_perror(pt_to_str(PT_LOCKED),
-				    Z_ALIAS_DISALLOW, FALSE);
-				saw_error = TRUE;
+				    Z_ALIAS_DISALLOW, B_FALSE);
+				saw_error = B_TRUE;
 				return;
 			}
 
@@ -4439,34 +4447,34 @@ set_func(cmd_t *cmd)
 				zerr(gettext("A non-negative number with a "
 				    "required scale suffix (K, M, G or T) was "
 				    "expected\nhere."));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 			} else {
 				if ((err = zonecfg_set_aliased_rctl(handle,
 				    ALIAS_MAXLOCKEDMEM, mem_cap)) != Z_OK)
-					zone_perror(zone, err, TRUE);
+					zone_perror(zone, err, B_TRUE);
 				else
-					need_to_commit = TRUE;
+					need_to_commit = B_TRUE;
 			}
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    TRUE);
-			long_usage(CMD_SET, TRUE);
-			usage(FALSE, HELP_PROPS);
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
 
 		return;
 	default:
-		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, TRUE);
-		long_usage(CMD_SET, TRUE);
-		usage(FALSE, HELP_RESOURCES);
+		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
+		long_usage(CMD_SET, B_TRUE);
+		usage(B_FALSE, HELP_RESOURCES);
 		return;
 	}
 }
 
 static void
-output_prop(FILE *fp, int pnum, char *pval, bool print_notspec)
+output_prop(FILE *fp, int pnum, char *pval, boolean_t print_notspec)
 {
 	char *qstr;
 
@@ -4533,7 +4541,7 @@ info_autoboot(zone_dochandle_t handle, FILE *fp)
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_AUTOBOOT),
 		    autoboot ? "true" : "false");
 	else
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 }
 
 static void
@@ -4545,7 +4553,7 @@ info_pool(zone_dochandle_t handle, FILE *fp)
 	if ((err = zonecfg_get_pool(handle, pool, sizeof (pool))) == Z_OK)
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_POOL), pool);
 	else
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 }
 
 static void
@@ -4559,7 +4567,7 @@ info_limitpriv(zone_dochandle_t handle, FILE *fp)
 		    limitpriv);
 		free(limitpriv);
 	} else {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 	}
 }
 
@@ -4574,7 +4582,7 @@ info_bootargs(zone_dochandle_t handle, FILE *fp)
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_BOOTARGS),
 		    bootargs);
 	} else {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 	}
 }
 
@@ -4588,7 +4596,7 @@ info_sched(zone_dochandle_t handle, FILE *fp)
 	    == Z_OK) {
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_SCHED), sched);
 	} else {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 	}
 }
 
@@ -4610,7 +4618,7 @@ info_iptype(zone_dochandle_t handle, FILE *fp)
 			break;
 		}
 	} else {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 	}
 }
 
@@ -4648,7 +4656,7 @@ static void
 info_fs(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_fstab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setfsent(handle) != Z_OK)
 		return;
@@ -4657,7 +4665,7 @@ info_fs(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 			output_fs(fp, &lookup);
 			goto loopend;
 		}
-		if (fill_in_fstab(cmd, &user, TRUE) != Z_OK)
+		if (fill_in_fstab(cmd, &user, B_TRUE) != Z_OK)
 			goto loopend;
 		if (strlen(user.zone_fs_dir) > 0 &&
 		    strcmp(user.zone_fs_dir, lookup.zone_fs_dir) != 0)
@@ -4669,7 +4677,7 @@ info_fs(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    strcmp(user.zone_fs_type, lookup.zone_fs_type) != 0)
 			goto loopend;	/* no match */
 		output_fs(fp, &lookup);
-		output = TRUE;
+		output = B_TRUE;
 loopend:
 		zonecfg_free_fs_option_list(lookup.zone_fs_options);
 	}
@@ -4687,7 +4695,7 @@ static void
 info_ipd(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_fstab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setipdent(handle) != Z_OK)
 		return;
@@ -4696,13 +4704,13 @@ info_ipd(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 			output_ipd(fp, &lookup);
 			continue;
 		}
-		if (fill_in_ipdtab(cmd, &user, TRUE) != Z_OK)
+		if (fill_in_ipdtab(cmd, &user, B_TRUE) != Z_OK)
 			continue;
 		if (strlen(user.zone_fs_dir) > 0 &&
 		    strcmp(user.zone_fs_dir, lookup.zone_fs_dir) != 0)
 			continue;	/* no match */
 		output_ipd(fp, &lookup);
-		output = TRUE;
+		output = B_TRUE;
 	}
 	(void) zonecfg_endipdent(handle);
 	/*
@@ -4727,7 +4735,7 @@ static void
 info_net(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_nwiftab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setnwifent(handle) != Z_OK)
 		return;
@@ -4736,7 +4744,7 @@ info_net(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 			output_net(fp, &lookup);
 			continue;
 		}
-		if (fill_in_nwiftab(cmd, &user, TRUE) != Z_OK)
+		if (fill_in_nwiftab(cmd, &user, B_TRUE) != Z_OK)
 			continue;
 		if (strlen(user.zone_nwif_physical) > 0 &&
 		    strcmp(user.zone_nwif_physical,
@@ -4748,7 +4756,7 @@ info_net(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    lookup.zone_nwif_address))
 			continue;	/* no match */
 		output_net(fp, &lookup);
-		output = TRUE;
+		output = B_TRUE;
 	}
 	(void) zonecfg_endnwifent(handle);
 	/*
@@ -4771,7 +4779,7 @@ static void
 info_dev(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_devtab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setdevent(handle) != Z_OK)
 		return;
@@ -4780,13 +4788,13 @@ info_dev(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 			output_dev(fp, &lookup);
 			continue;
 		}
-		if (fill_in_devtab(cmd, &user, TRUE) != Z_OK)
+		if (fill_in_devtab(cmd, &user, B_TRUE) != Z_OK)
 			continue;
 		if (strlen(user.zone_dev_match) > 0 &&
 		    strcmp(user.zone_dev_match, lookup.zone_dev_match) != 0)
 			continue;	/* no match */
 		output_dev(fp, &lookup);
-		output = TRUE;
+		output = B_TRUE;
 	}
 	(void) zonecfg_enddevent(handle);
 	/*
@@ -4819,18 +4827,18 @@ static void
 info_rctl(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_rctltab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setrctlent(handle) != Z_OK)
 		return;
 	while (zonecfg_getrctlent(handle, &lookup) == Z_OK) {
 		if (cmd->cmd_prop_nv_pairs == 0) {
 			output_rctl(fp, &lookup);
-		} else if (fill_in_rctltab(cmd, &user, TRUE) == Z_OK &&
+		} else if (fill_in_rctltab(cmd, &user, B_TRUE) == Z_OK &&
 		    (strlen(user.zone_rctl_name) == 0 ||
 		    strcmp(user.zone_rctl_name, lookup.zone_rctl_name) == 0)) {
 			output_rctl(fp, &lookup);
-			output = TRUE;
+			output = B_TRUE;
 		}
 		zonecfg_free_rctl_value_list(lookup.zone_rctl_valptr);
 	}
@@ -4857,7 +4865,7 @@ static void
 info_attr(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_attrtab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setattrent(handle) != Z_OK)
 		return;
@@ -4866,7 +4874,7 @@ info_attr(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 			output_attr(fp, &lookup);
 			continue;
 		}
-		if (fill_in_attrtab(cmd, &user, TRUE) != Z_OK)
+		if (fill_in_attrtab(cmd, &user, B_TRUE) != Z_OK)
 			continue;
 		if (strlen(user.zone_attr_name) > 0 &&
 		    strcmp(user.zone_attr_name, lookup.zone_attr_name) != 0)
@@ -4878,7 +4886,7 @@ info_attr(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    strcmp(user.zone_attr_value, lookup.zone_attr_value) != 0)
 			continue;	/* no match */
 		output_attr(fp, &lookup);
-		output = TRUE;
+		output = B_TRUE;
 	}
 	(void) zonecfg_endattrent(handle);
 	/*
@@ -4901,7 +4909,7 @@ static void
 info_ds(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_dstab lookup, user;
-	bool output = FALSE;
+	boolean_t output = B_FALSE;
 
 	if (zonecfg_setdsent(handle) != Z_OK)
 		return;
@@ -4910,14 +4918,14 @@ info_ds(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 			output_ds(fp, &lookup);
 			continue;
 		}
-		if (fill_in_dstab(cmd, &user, TRUE) != Z_OK)
+		if (fill_in_dstab(cmd, &user, B_TRUE) != Z_OK)
 			continue;
 		if (strlen(user.zone_dataset_name) > 0 &&
 		    strcmp(user.zone_dataset_name,
 		    lookup.zone_dataset_name) != 0)
 			continue;	/* no match */
 		output_ds(fp, &lookup);
-		output = TRUE;
+		output = B_TRUE;
 	}
 	(void) zonecfg_enddsent(handle);
 	/*
@@ -5069,7 +5077,7 @@ void
 info_func(cmd_t *cmd)
 {
 	FILE *fp = stdout;
-	bool need_to_close = FALSE;
+	boolean_t need_to_close = B_FALSE;
 	char *pager;
 	int type;
 	int res1, res2;
@@ -5078,7 +5086,7 @@ info_func(cmd_t *cmd)
 
 	assert(cmd != NULL);
 
-	if (initialize(TRUE) != Z_OK)
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	/* don't page error output */
@@ -5086,7 +5094,7 @@ info_func(cmd_t *cmd)
 		if ((pager = getenv("PAGER")) == NULL)
 			pager = PAGER;
 		if ((fp = popen(pager, "w")) != NULL)
-			need_to_close = TRUE;
+			need_to_close = B_TRUE;
 		setbuf(fp, NULL);
 	}
 
@@ -5258,7 +5266,7 @@ info_func(cmd_t *cmd)
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
-		    TRUE);
+		    B_TRUE);
 	}
 
 cleanup:
@@ -5276,7 +5284,7 @@ check_reqd_prop(char *attr, int rt, int pt, int *ret_val)
 	if (strlen(attr) == 0) {
 		zerr(gettext("%s: %s not specified"), rt_to_str(rt),
 		    pt_to_str(pt));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		if (*ret_val == Z_OK)
 			*ret_val = Z_REQD_PROPERTY_MISSING;
 	}
@@ -5395,8 +5403,8 @@ verify_func(cmd_t *cmd)
 	char brand[MAXNAMELEN];
 	int err, ret_val = Z_OK, arg;
 	int pset_res;
-	bool save = FALSE;
-	bool arg_err = FALSE;
+	boolean_t save = B_FALSE;
+	boolean_t arg_err = B_FALSE;
 	zone_iptype_t iptype;
 	boolean_t has_cpu_shares = B_FALSE;
 	boolean_t has_cpu_cap = B_FALSE;
@@ -5406,11 +5414,11 @@ verify_func(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_VERIFY);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_VERIFY);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -5428,29 +5436,29 @@ verify_func(cmd_t *cmd)
 	assert(cmd != NULL);
 
 	if (cmd->cmd_argc > 0 && (strcmp(cmd->cmd_argv[0], "save") == 0))
-		save = TRUE;
-	if (initialize(TRUE) != Z_OK)
+		save = B_TRUE;
+	if (initialize(B_TRUE) != Z_OK)
 		return;
 
 	if (zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath)) != Z_OK &&
 	    !global_zone) {
 		zerr(gettext("%s not specified"), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 	}
 	if (strlen(zonepath) == 0 && !global_zone) {
 		zerr(gettext("%s cannot be empty."), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 	}
 
 	if ((err = zonecfg_get_brand(handle, brand, sizeof (brand))) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	if (strcmp(brand, NATIVE_BRAND_NAME) != 0) {
 		if ((err = brand_verify(handle)) != Z_OK) {
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 			return;
 		}
 	}
@@ -5458,10 +5466,10 @@ verify_func(cmd_t *cmd)
 	if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
 		zerr("%s %s", gettext("cannot get"), pt_to_str(PT_IPTYPE));
 		ret_val = Z_REQD_RESOURCE_MISSING;
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 	}
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
@@ -5470,7 +5478,7 @@ verify_func(cmd_t *cmd)
 	(void) zonecfg_endipdent(handle);
 
 	if ((err = zonecfg_setfsent(handle)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	while (zonecfg_getfsent(handle, &fstab) == Z_OK) {
@@ -5484,7 +5492,7 @@ verify_func(cmd_t *cmd)
 	(void) zonecfg_endfsent(handle);
 
 	if ((err = zonecfg_setnwifent(handle)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
@@ -5508,7 +5516,7 @@ verify_func(cmd_t *cmd)
 				zerr(gettext("%s: %s cannot be specified "
 				    "for an exclusive IP type"),
 				    rt_to_str(RT_NET), pt_to_str(PT_ADDRESS));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				if (ret_val == Z_OK)
 					ret_val = Z_INVAL;
 			}
@@ -5516,7 +5524,7 @@ verify_func(cmd_t *cmd)
 				zerr(gettext("%s: %s cannot be specified "
 				    "for an exclusive IP type"),
 				    rt_to_str(RT_NET), pt_to_str(PT_DEFROUTER));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				if (ret_val == Z_OK)
 					ret_val = Z_INVAL;
 			}
@@ -5526,7 +5534,7 @@ verify_func(cmd_t *cmd)
 	(void) zonecfg_endnwifent(handle);
 
 	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	while (zonecfg_getrctlent(handle, &rctltab) == Z_OK) {
@@ -5542,7 +5550,7 @@ verify_func(cmd_t *cmd)
 		if (rctltab.zone_rctl_valptr == NULL) {
 			zerr(gettext("%s: no %s specified"),
 			    rt_to_str(RT_RCTL), pt_to_str(PT_VALUE));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			if (ret_val == Z_OK)
 				ret_val = Z_REQD_PROPERTY_MISSING;
 		} else {
@@ -5555,7 +5563,7 @@ verify_func(cmd_t *cmd)
 	    has_cpu_shares) {
 		zerr(gettext("%s zone.cpu-shares and %s are incompatible."),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_DCPU));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		if (ret_val == Z_OK)
 			ret_val = Z_INCOMPATIBLE;
 	}
@@ -5566,7 +5574,7 @@ verify_func(cmd_t *cmd)
 		zerr(gettext("WARNING: %s zone.cpu-shares and %s=%s are "
 		    "incompatible"),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_SCHED), sched);
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		if (ret_val == Z_OK)
 			ret_val = Z_INCOMPATIBLE;
 	}
@@ -5574,13 +5582,13 @@ verify_func(cmd_t *cmd)
 	if (pset_res == Z_OK && has_cpu_cap) {
 		zerr(gettext("%s zone.cpu-cap and the %s are incompatible."),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_DCPU));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		if (ret_val == Z_OK)
 			ret_val = Z_INCOMPATIBLE;
 	}
 
 	if ((err = zonecfg_setattrent(handle)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	while (zonecfg_getattrent(handle, &attrtab) == Z_OK) {
@@ -5594,21 +5602,21 @@ verify_func(cmd_t *cmd)
 	(void) zonecfg_endattrent(handle);
 
 	if ((err = zonecfg_setdsent(handle)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 		return;
 	}
 	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
 		if (strlen(dstab.zone_dataset_name) == 0) {
 			zerr("%s: %s %s", rt_to_str(RT_DATASET),
 			    pt_to_str(PT_NAME), gettext("not specified"));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			if (ret_val == Z_OK)
 				ret_val = Z_REQD_PROPERTY_MISSING;
 		} else if (!zfs_name_valid(dstab.zone_dataset_name,
 		    ZFS_TYPE_FILESYSTEM)) {
 			zerr("%s: %s %s", rt_to_str(RT_DATASET),
 			    pt_to_str(PT_NAME), gettext("invalid"));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			if (ret_val == Z_OK)
 				ret_val = Z_BAD_PROPERTY;
 		}
@@ -5618,7 +5626,7 @@ verify_func(cmd_t *cmd)
 
 	if (!global_scope) {
 		zerr(gettext("resource specification incomplete"));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		if (ret_val == Z_OK)
 			ret_val = Z_INSUFFICIENT_SPEC;
 	}
@@ -5626,7 +5634,7 @@ verify_func(cmd_t *cmd)
 	if (save) {
 		if (ret_val == Z_OK) {
 			if ((ret_val = zonecfg_save(handle)) == Z_OK) {
-				need_to_commit = FALSE;
+				need_to_commit = B_FALSE;
 				(void) strlcpy(revert_zone, zone,
 				    sizeof (revert_zone));
 			}
@@ -5635,14 +5643,14 @@ verify_func(cmd_t *cmd)
 		}
 	}
 	if (ret_val != Z_OK)
-		zone_perror(zone, ret_val, TRUE);
+		zone_perror(zone, ret_val, B_TRUE);
 }
 
 void
 cancel_func(cmd_t *cmd)
 {
 	int arg;
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	assert(cmd != NULL);
 
@@ -5651,11 +5659,11 @@ cancel_func(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_CANCEL);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_CANCEL);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -5669,7 +5677,7 @@ cancel_func(cmd_t *cmd)
 
 	if (global_scope)
 		scope_usage(CMD_CANCEL);
-	global_scope = TRUE;
+	global_scope = B_TRUE;
 	zonecfg_free_fs_option_list(in_progress_fstab.zone_fs_options);
 	bzero(&in_progress_fstab, sizeof (in_progress_fstab));
 	bzero(&in_progress_nwiftab, sizeof (in_progress_nwiftab));
@@ -5753,10 +5761,10 @@ validate_attr_type_val(struct zone_attrtab *attrtab)
  * and emits a message if not specified.
  */
 static int
-end_check_reqd(char *attr, int pt, bool *validation_failed)
+end_check_reqd(char *attr, int pt, boolean_t *validation_failed)
 {
 	if (strlen(attr) == 0) {
-		*validation_failed = TRUE;
+		*validation_failed = B_TRUE;
 		zerr(gettext("%s not specified"), pt_to_str(pt));
 		return (Z_ERR);
 	}
@@ -5766,8 +5774,8 @@ end_check_reqd(char *attr, int pt, bool *validation_failed)
 void
 end_func(cmd_t *cmd)
 {
-	bool validation_failed = FALSE;
-	bool arg_err = FALSE;
+	boolean_t validation_failed = B_FALSE;
+	boolean_t arg_err = B_FALSE;
 	struct zone_fstab tmp_fstab;
 	struct zone_nwiftab tmp_nwiftab;
 	struct zone_devtab tmp_devtab;
@@ -5786,11 +5794,11 @@ end_func(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_END);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_END);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -5818,7 +5826,7 @@ end_func(cmd_t *cmd)
 				zerr(gettext("%s %s is not an absolute path."),
 				    pt_to_str(PT_DIR),
 				    in_progress_fstab.zone_fs_dir);
-				validation_failed = TRUE;
+				validation_failed = B_TRUE;
 			}
 		}
 
@@ -5830,14 +5838,14 @@ end_func(cmd_t *cmd)
 			zerr(gettext("%s %s is not an absolute path."),
 			    pt_to_str(PT_RAW),
 			    in_progress_fstab.zone_fs_raw);
-			validation_failed = TRUE;
+			validation_failed = B_TRUE;
 		}
 
 		(void) end_check_reqd(in_progress_fstab.zone_fs_type, PT_TYPE,
 		    &validation_failed);
 
 		if (validation_failed) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -5854,7 +5862,7 @@ end_func(cmd_t *cmd)
 				    "with the %s '%s' already exists."),
 				    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 				    in_progress_fstab.zone_fs_dir);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_filesystem(handle,
@@ -5875,11 +5883,11 @@ end_func(cmd_t *cmd)
 				zerr(gettext("%s %s is not an absolute path."),
 				    pt_to_str(PT_DIR),
 				    in_progress_ipdtab.zone_fs_dir);
-				validation_failed = TRUE;
+				validation_failed = B_TRUE;
 			}
 		}
 		if (validation_failed) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -5895,7 +5903,7 @@ end_func(cmd_t *cmd)
 				    "with the %s '%s' already exists."),
 				    rt_to_str(RT_IPD), pt_to_str(PT_DIR),
 				    in_progress_ipdtab.zone_fs_dir);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_ipd(handle, &in_progress_ipdtab);
@@ -5915,7 +5923,7 @@ end_func(cmd_t *cmd)
 		    PT_PHYSICAL, &validation_failed);
 
 		if (validation_failed) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (end_op == CMD_ADD) {
@@ -5935,7 +5943,7 @@ end_func(cmd_t *cmd)
 				    in_progress_nwiftab.zone_nwif_physical,
 				    pt_to_str(PT_ADDRESS),
 				    in_progress_nwiftab.zone_nwif_address);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_nwif(handle, &in_progress_nwiftab);
@@ -5951,7 +5959,7 @@ end_func(cmd_t *cmd)
 		    PT_MATCH, &validation_failed);
 
 		if (validation_failed) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -5965,7 +5973,7 @@ end_func(cmd_t *cmd)
 				    "already exists."), rt_to_str(RT_DEVICE),
 				    pt_to_str(PT_MATCH),
 				    in_progress_devtab.zone_dev_match);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_dev(handle, &in_progress_devtab);
@@ -5982,11 +5990,11 @@ end_func(cmd_t *cmd)
 
 		if (in_progress_rctltab.zone_rctl_valptr == NULL) {
 			zerr(gettext("no %s specified"), pt_to_str(PT_VALUE));
-			validation_failed = TRUE;
+			validation_failed = B_TRUE;
 		}
 
 		if (validation_failed) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -6004,7 +6012,7 @@ end_func(cmd_t *cmd)
 				    "with the %s '%s' already exists."),
 				    rt_to_str(RT_RCTL), pt_to_str(PT_NAME),
 				    in_progress_rctltab.zone_rctl_name);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_rctl(handle, &in_progress_rctltab);
@@ -6030,13 +6038,13 @@ end_func(cmd_t *cmd)
 
 		if (validate_attr_name(in_progress_attrtab.zone_attr_name) !=
 		    Z_OK)
-			validation_failed = TRUE;
+			validation_failed = B_TRUE;
 
 		if (validate_attr_type_val(&in_progress_attrtab) != Z_OK)
-			validation_failed = TRUE;
+			validation_failed = B_TRUE;
 
 		if (validation_failed) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 		if (end_op == CMD_ADD) {
@@ -6050,7 +6058,7 @@ end_func(cmd_t *cmd)
 				    "with the %s '%s' already exists."),
 				    rt_to_str(RT_ATTR), pt_to_str(PT_NAME),
 				    in_progress_attrtab.zone_attr_name);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_attr(handle, &in_progress_attrtab);
@@ -6064,8 +6072,8 @@ end_func(cmd_t *cmd)
 		if (strlen(in_progress_dstab.zone_dataset_name) == 0) {
 			zerr("%s %s", pt_to_str(PT_NAME),
 			    gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
+			saw_error = B_TRUE;
+			validation_failed = B_TRUE;
 		}
 		if (validation_failed)
 			return;
@@ -6081,7 +6089,7 @@ end_func(cmd_t *cmd)
 				    "with the %s '%s' already exists."),
 				    rt_to_str(RT_DATASET), pt_to_str(PT_NAME),
 				    in_progress_dstab.zone_dataset_name);
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 			err = zonecfg_add_ds(handle, &in_progress_dstab);
@@ -6094,7 +6102,7 @@ end_func(cmd_t *cmd)
 		/* Make sure everything was filled in. */
 		if (end_check_reqd(in_progress_psettab.zone_ncpu_min,
 		    PT_NCPUS, &validation_failed) != Z_OK) {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -6109,8 +6117,8 @@ end_func(cmd_t *cmd)
 		if (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &proc_cap)
 		    != Z_OK) {
 			zerr(gettext("%s not specified"), pt_to_str(PT_NCPUS));
-			saw_error = TRUE;
-			validation_failed = TRUE;
+			saw_error = B_TRUE;
+			validation_failed = B_TRUE;
 			return;
 		}
 		err = Z_OK;
@@ -6128,7 +6136,7 @@ end_func(cmd_t *cmd)
 			zerr(gettext("No property was specified.  One of %s, "
 			    "%s or %s is required."), pt_to_str(PT_PHYSICAL),
 			    pt_to_str(PT_SWAP), pt_to_str(PT_LOCKED));
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 			return;
 		}
 
@@ -6144,7 +6152,7 @@ end_func(cmd_t *cmd)
 				    "equal to the %s cap."),
 				    pt_to_str(PT_LOCKED),
 				    pt_to_str(PT_PHYSICAL));
-				saw_error = TRUE;
+				saw_error = B_TRUE;
 				return;
 			}
 		}
@@ -6170,16 +6178,16 @@ end_func(cmd_t *cmd)
 		break;
 	default:
 		zone_perror(rt_to_str(resource_scope), Z_NO_RESOURCE_TYPE,
-		    TRUE);
-		saw_error = TRUE;
+		    B_TRUE);
+		saw_error = B_TRUE;
 		return;
 	}
 
 	if (err != Z_OK) {
-		zone_perror(zone, err, TRUE);
+		zone_perror(zone, err, B_TRUE);
 	} else {
-		need_to_commit = TRUE;
-		global_scope = TRUE;
+		need_to_commit = B_TRUE;
+		global_scope = B_TRUE;
 		end_op = -1;
 	}
 }
@@ -6188,18 +6196,18 @@ void
 commit_func(cmd_t *cmd)
 {
 	int arg;
-	bool arg_err = FALSE;
+	boolean_t arg_err = B_FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_COMMIT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_COMMIT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -6225,7 +6233,7 @@ commit_func(cmd_t *cmd)
 	 * something that can't be.
 	 */
 	if ((cmd->cmd_argv[0] = strdup("save")) == NULL) {
-		zone_perror(zone, Z_NOMEM, TRUE);
+		zone_perror(zone, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
 	cmd->cmd_argv[1] = NULL;
@@ -6236,8 +6244,8 @@ void
 revert_func(cmd_t *cmd)
 {
 	char line[128];	/* enough to ask a question */
-	bool force = FALSE;
-	bool arg_err = FALSE;
+	boolean_t force = B_FALSE;
+	boolean_t arg_err = B_FALSE;
 	int err, arg, answer;
 
 	optind = 0;
@@ -6245,14 +6253,14 @@ revert_func(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_REVERT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		case 'F':
-			force = TRUE;
+			force = B_TRUE;
 			break;
 		default:
 			short_usage(CMD_REVERT);
-			arg_err = TRUE;
+			arg_err = B_TRUE;
 			break;
 		}
 	}
@@ -6269,14 +6277,14 @@ revert_func(cmd_t *cmd)
 
 	if (zonecfg_check_handle(handle) != Z_OK) {
 		zerr(gettext("No changes to revert."));
-		saw_error = TRUE;
+		saw_error = B_TRUE;
 		return;
 	}
 
 	if (!force) {
 		(void) snprintf(line, sizeof (line),
 		    gettext("Are you sure you want to revert"));
-		if ((answer = ask_yesno(FALSE, line)) == -1) {
+		if ((answer = ask_yesno(B_FALSE, line)) == -1) {
 			zerr(gettext("Input not from terminal and -F not "
 			    "specified:\n%s command ignored, exiting."),
 			    cmd_to_str(CMD_REVERT));
@@ -6292,17 +6300,17 @@ revert_func(cmd_t *cmd)
 	 */
 	zonecfg_fini_handle(handle);
 	if ((handle = zonecfg_init_handle()) == NULL) {
-		zone_perror(execname, Z_NOMEM, TRUE);
+		zone_perror(execname, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
 	if ((err = zonecfg_get_handle(revert_zone, handle)) != Z_OK) {
-		saw_error = TRUE;
-		got_handle = FALSE;
+		saw_error = B_TRUE;
+		got_handle = B_FALSE;
 		if (err == Z_NO_ZONE)
 			zerr(gettext("%s: no such saved zone to revert to."),
 			    revert_zone);
 		else
-			zone_perror(zone, err, TRUE);
+			zone_perror(zone, err, B_TRUE);
 	}
 	(void) strlcpy(zone, revert_zone, sizeof (zone));
 }
@@ -6315,19 +6323,19 @@ help_func(cmd_t *cmd)
 	assert(cmd != NULL);
 
 	if (cmd->cmd_argc == 0) {
-		usage(TRUE, global_scope ? HELP_SUBCMDS : HELP_RES_SCOPE);
+		usage(B_TRUE, global_scope ? HELP_SUBCMDS : HELP_RES_SCOPE);
 		return;
 	}
 	if (strcmp(cmd->cmd_argv[0], "usage") == 0) {
-		usage(TRUE, HELP_USAGE);
+		usage(B_TRUE, HELP_USAGE);
 		return;
 	}
 	if (strcmp(cmd->cmd_argv[0], "commands") == 0) {
-		usage(TRUE, HELP_SUBCMDS);
+		usage(B_TRUE, HELP_SUBCMDS);
 		return;
 	}
 	if (strcmp(cmd->cmd_argv[0], "syntax") == 0) {
-		usage(TRUE, HELP_SYNTAX | HELP_RES_PROPS);
+		usage(B_TRUE, HELP_SYNTAX | HELP_RES_PROPS);
 		return;
 	}
 	if (strcmp(cmd->cmd_argv[0], "-?") == 0) {
@@ -6344,22 +6352,22 @@ help_func(cmd_t *cmd)
 	/* We do not use zerr() here because we do not want its extra \n. */
 	(void) fprintf(stderr, gettext("Unknown help subject %s.  "),
 	    cmd->cmd_argv[0]);
-	usage(FALSE, HELP_META);
+	usage(B_FALSE, HELP_META);
 }
 
 static int
 string_to_yyin(char *string)
 {
 	if ((yyin = tmpfile()) == NULL) {
-		zone_perror(execname, Z_TEMP_FILE, TRUE);
+		zone_perror(execname, Z_TEMP_FILE, B_TRUE);
 		return (Z_ERR);
 	}
 	if (fwrite(string, strlen(string), 1, yyin) != 1) {
-		zone_perror(execname, Z_TEMP_FILE, TRUE);
+		zone_perror(execname, Z_TEMP_FILE, B_TRUE);
 		return (Z_ERR);
 	}
 	if (fseek(yyin, 0, SEEK_SET) != 0) {
-		zone_perror(execname, Z_TEMP_FILE, TRUE);
+		zone_perror(execname, Z_TEMP_FILE, B_TRUE);
 		return (Z_ERR);
 	}
 	return (Z_OK);
@@ -6383,7 +6391,7 @@ cleanup()
 		 * yyparse() above, but "really quit?" makes no sense in this
 		 * context.  So disable prompting.
 		 */
-		ok_to_prompt = FALSE;
+		ok_to_prompt = B_FALSE;
 	}
 	if (!global_scope) {
 		if (!time_to_exit) {
@@ -6392,7 +6400,7 @@ cleanup()
 			 * since exit_func() already handles that case, and
 			 * EOF means we are finished anyway.
 			 */
-			answer = ask_yesno(FALSE,
+			answer = ask_yesno(B_FALSE,
 			    gettext("Resource incomplete; really quit"));
 			if (answer == -1) {
 				zerr(gettext("Resource incomplete."));
@@ -6403,7 +6411,7 @@ cleanup()
 				return (Z_REPEAT);
 			}
 		} else {
-			saw_error = TRUE;
+			saw_error = B_TRUE;
 		}
 	}
 	/*
@@ -6412,7 +6420,7 @@ cleanup()
 	 */
 	if (need_to_commit && zonecfg_check_handle(handle) == Z_OK) {
 		if ((cmd = alloc_cmd()) == NULL) {
-			zone_perror(zone, Z_NOMEM, TRUE);
+			zone_perror(zone, Z_NOMEM, B_TRUE);
 			return (Z_ERR);
 		}
 		cmd->cmd_argc = 0;
@@ -6428,14 +6436,14 @@ cleanup()
 				zerr(gettext("Configuration not saved."));
 				return (Z_ERR);
 			}
-			answer = ask_yesno(FALSE,
+			answer = ask_yesno(B_FALSE,
 			    gettext("Configuration not saved; really quit"));
 			if (answer == -1) {
 				zerr(gettext("Configuration not saved."));
 				return (Z_ERR);
 			}
 			if (answer != 1) {
-				time_to_exit = FALSE;
+				time_to_exit = B_FALSE;
 				yyin = stdin;
 				return (Z_REPEAT);
 			}
@@ -6457,7 +6465,7 @@ cleanup()
 static int
 read_input()
 {
-	bool yyin_is_a_tty = isatty(fileno(yyin));
+	boolean_t yyin_is_a_tty = isatty(fileno(yyin));
 	/*
 	 * The prompt is "e:z> " or "e:z:r> " where e is execname, z is zone
 	 * and r is resource_scope: 5 is for the two ":"s + "> " + terminator.
@@ -6465,7 +6473,7 @@ read_input()
 	char prompt[MAXPATHLEN + ZONENAME_MAX + MAX_RT_STRLEN + 5], *line;
 
 	/* yyin should have been set to the appropriate (FILE *) if not stdin */
-	newline_terminated = TRUE;
+	newline_terminated = B_TRUE;
 	for (;;) {
 		if (yyin_is_a_tty) {
 			if (newline_terminated) {
@@ -6497,7 +6505,7 @@ read_input()
 		}
 		/* Bail out on an error in command file mode. */
 		if (saw_error && cmd_file_mode && !interactive_mode)
-			time_to_exit = TRUE;
+			time_to_exit = B_TRUE;
 		if (time_to_exit || (!yyin_is_a_tty && feof(yyin)))
 			break;
 	}
@@ -6514,14 +6522,14 @@ do_interactive(void)
 {
 	int err;
 
-	interactive_mode = TRUE;
+	interactive_mode = B_TRUE;
 	if (!read_only_mode) {
 		/*
 		 * Try to set things up proactively in interactive mode, so
 		 * that if the zone in question does not exist yet, we can
 		 * provide the user with a clue.
 		 */
-		(void) initialize(FALSE);
+		(void) initialize(B_FALSE);
 	}
 	do {
 		err = read_input();
@@ -6541,14 +6549,14 @@ cmd_file(char *file)
 	FILE *infile;
 	int err;
 	struct stat statbuf;
-	bool using_real_file = (strcmp(file, "-") != 0);
+	boolean_t using_real_file = (strcmp(file, "-") != 0);
 
 	if (using_real_file) {
 		/*
 		 * zerr() prints a line number in cmd_file_mode, which we do
 		 * not want here, so temporarily unset it.
 		 */
-		cmd_file_mode = FALSE;
+		cmd_file_mode = B_FALSE;
 		if ((infile = fopen(file, "r")) == NULL) {
 			zerr(gettext("could not open file %s: %s"),
 			    file, strerror(errno));
@@ -6566,14 +6574,14 @@ cmd_file(char *file)
 			goto done;
 		}
 		yyin = infile;
-		cmd_file_mode = TRUE;
-		ok_to_prompt = FALSE;
+		cmd_file_mode = B_TRUE;
+		ok_to_prompt = B_FALSE;
 	} else {
 		/*
 		 * "-f -" is essentially the same as interactive mode,
 		 * so treat it that way.
 		 */
-		interactive_mode = TRUE;
+		interactive_mode = B_TRUE;
 	}
 	/* Z_REPEAT is for interactive mode; treat it like Z_ERR here. */
 	if ((err = read_input()) == Z_REPEAT)
@@ -6604,7 +6612,7 @@ one_command_at_a_time(int argc, char *argv[])
 	for (i = 0; i < argc; i++)
 		len += strlen(argv[i]) + 1;
 	if ((command = malloc(len)) == NULL) {
-		zone_perror(execname, Z_NOMEM, TRUE);
+		zone_perror(execname, Z_NOMEM, B_TRUE);
 		return (Z_ERR);
 	}
 	(void) strlcpy(command, argv[0], len);
@@ -6654,8 +6662,8 @@ main(int argc, char *argv[])
 	/* This must be before anything goes to stdout. */
 	setbuf(stdout, NULL);
 
-	saw_error = FALSE;
-	cmd_file_mode = FALSE;
+	saw_error = B_FALSE;
+	cmd_file_mode = B_FALSE;
 	execname = get_execbasename(argv[0]);
 
 	(void) setlocale(LC_ALL, "");
@@ -6668,7 +6676,7 @@ main(int argc, char *argv[])
 	}
 
 	if (argc < 2) {
-		usage(FALSE, HELP_USAGE | HELP_SUBCMDS);
+		usage(B_FALSE, HELP_USAGE | HELP_SUBCMDS);
 		exit(Z_USAGE);
 	}
 	if (strcmp(argv[1], cmd_to_str(CMD_HELP)) == 0) {
@@ -6680,14 +6688,14 @@ main(int argc, char *argv[])
 		switch (arg) {
 		case '?':
 			if (optopt == '?')
-				usage(TRUE, HELP_USAGE | HELP_SUBCMDS);
+				usage(B_TRUE, HELP_USAGE | HELP_SUBCMDS);
 			else
-				usage(FALSE, HELP_USAGE);
+				usage(B_FALSE, HELP_USAGE);
 			exit(Z_USAGE);
 			/* NOTREACHED */
 		case 'f':
 			cmd_file_name = optarg;
-			cmd_file_mode = TRUE;
+			cmd_file_mode = B_TRUE;
 			break;
 		case 'R':
 			if (*optarg != '/') {
@@ -6705,30 +6713,30 @@ main(int argc, char *argv[])
 			break;
 		case 'z':
 			if (strcmp(optarg, GLOBAL_ZONENAME) == 0) {
-				global_zone = TRUE;
+				global_zone = B_TRUE;
 			} else if (zonecfg_validate_zonename(optarg) != Z_OK) {
-				zone_perror(optarg, Z_BOGUS_ZONE_NAME, TRUE);
-				usage(FALSE, HELP_SYNTAX);
+				zone_perror(optarg, Z_BOGUS_ZONE_NAME, B_TRUE);
+				usage(B_FALSE, HELP_SYNTAX);
 				exit(Z_USAGE);
 			}
 			(void) strlcpy(zone, optarg, sizeof (zone));
 			(void) strlcpy(revert_zone, optarg, sizeof (zone));
 			break;
 		default:
-			usage(FALSE, HELP_USAGE);
+			usage(B_FALSE, HELP_USAGE);
 			exit(Z_USAGE);
 		}
 	}
 
 	if (optind > argc || strcmp(zone, "") == 0) {
-		usage(FALSE, HELP_USAGE);
+		usage(B_FALSE, HELP_USAGE);
 		exit(Z_USAGE);
 	}
 
 	if ((err = zonecfg_access(zone, W_OK)) == Z_OK) {
-		read_only_mode = FALSE;
+		read_only_mode = B_FALSE;
 	} else if (err == Z_ACCES) {
-		read_only_mode = TRUE;
+		read_only_mode = B_TRUE;
 		/* skip this message in one-off from command line mode */
 		if (optind == argc)
 			(void) fprintf(stderr, gettext("WARNING: you do not "
@@ -6741,7 +6749,7 @@ main(int argc, char *argv[])
 	}
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
-		zone_perror(execname, Z_NOMEM, TRUE);
+		zone_perror(execname, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
 
@@ -6750,7 +6758,7 @@ main(int argc, char *argv[])
 	 * is a "real" file as opposed to "-" (i.e. meaning use stdin).
 	 */
 	if (isatty(STDIN_FILENO))
-		ok_to_prompt = TRUE;
+		ok_to_prompt = B_TRUE;
 	if ((gl = new_GetLine(MAX_LINE_LEN, MAX_CMD_HIST)) == NULL)
 		exit(Z_ERR);
 	if (gl_customize_completion(gl, NULL, cmd_cpl_fn) != 0)

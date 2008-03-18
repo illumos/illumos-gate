@@ -37,7 +37,7 @@ static list_property_ptr_t new_list = NULL, tmp_list, last,
     list[MAX_EQ_PROP_PAIRS];
 static property_value_t property[MAX_EQ_PROP_PAIRS];
 
-extern bool newline_terminated;
+extern boolean_t newline_terminated;
 extern int num_prop_vals;		/* # of property values */
 
 /* yacc externals */
@@ -145,14 +145,14 @@ command: add_command
 	| set_command
 	| verify_command
 
-terminator:	'\n'	{ newline_terminated = TRUE; }
-	|	';'	{ newline_terminated = FALSE; }
+terminator:	'\n'	{ newline_terminated = B_TRUE; }
+	|	';'	{ newline_terminated = B_FALSE; }
 
 add_command: ADD
 	{
 		short_usage(CMD_ADD);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_RES_PROPS);
+		usage(B_FALSE, HELP_RES_PROPS);
 		YYERROR;
 	}
 	| ADD TOKEN
@@ -394,7 +394,7 @@ info_command:	INFO
 	{
 		short_usage(CMD_INFO);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_RES_PROPS);
+		usage(B_FALSE, HELP_RES_PROPS);
 		free($2);
 		YYERROR;
 	}
@@ -586,14 +586,14 @@ remove_command: REMOVE
 	{
 		short_usage(CMD_REMOVE);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_RES_PROPS);
+		usage(B_FALSE, HELP_RES_PROPS);
 		YYERROR;
 	}
 	| REMOVE TOKEN
 	{
 		short_usage(CMD_REMOVE);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_RES_PROPS);
+		usage(B_FALSE, HELP_RES_PROPS);
 		YYERROR;
 	}
 	| REMOVE resource_type
@@ -689,7 +689,7 @@ select_command: SELECT
 	{
 		short_usage(CMD_SELECT);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_RES_PROPS);
+		usage(B_FALSE, HELP_RES_PROPS);
 		YYERROR;
 	}
 	| SELECT PSET
@@ -765,7 +765,7 @@ set_command: SET
 	{
 		short_usage(CMD_SET);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_PROPS);
+		usage(B_FALSE, HELP_PROPS);
 		YYERROR;
 	}
 	| SET property_name EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
@@ -808,7 +808,7 @@ clear_command: CLEAR
 	{
 		short_usage(CMD_CLEAR);
 		(void) fputs("\n", stderr);
-		usage(FALSE, HELP_PROPS);
+		usage(B_FALSE, HELP_PROPS);
 		YYERROR;
 	}
 	| CLEAR property_name
