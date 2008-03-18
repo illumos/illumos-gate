@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,9 +246,6 @@ audit_start(
 	int error,
 	klwp_t *lwp)
 {
-	int			ctrl;
-	au_event_t		event;
-	au_state_t		estate;
 	struct t_audit_data	*tad;
 	au_kcontext_t		*kctx;
 
@@ -275,32 +272,35 @@ audit_start(
 	if (scid >= num_syscall)
 		scid = 0;
 
-	/* we can no longer ber guarantied a valid lwp_ap */
-	/* so we need to force it valid a lot of stuff needs it */
+	/*
+	 * we can no longer depend on a valid lwp_ap, so we need to
+	 * copy the syscall args as future audit stuff may need them.
+	 */
 	(void) save_syscall_args();
-
-	/* get control information */
-	ctrl  = audit_s2e[scid].au_ctrl;
 
 	/*
 	 * We need to gather paths for certain system calls even if they are
 	 * not audited so that we can audit the various f* calls and be
 	 * sure to have a CWD and CAR. Thus we thus set tad_ctrl over the
 	 * system call regardless if the call is audited or not.
-	 * We allow the au_init() routine to adjust the tad_ctrl.
+	 * We allow the event specific initial processing routines (au_init)
+	 * to adjust the tad_ctrl as necessary.
 	 */
-	tad->tad_ctrl   = ctrl;
+	tad->tad_ctrl   = audit_s2e[scid].au_ctrl;
 	tad->tad_scid   = scid;
 
 	/* get basic event for system call */
-	event = (*audit_s2e[scid].au_init)(audit_s2e[scid].au_event);
+	tad->tad_event = audit_s2e[scid].au_event;
+	if (audit_s2e[scid].au_init != NULL) {
+		/* get specific event */
+		tad->tad_event = (*audit_s2e[scid].au_init)(tad->tad_event);
+	}
 
 	kctx = GET_KCTX_PZ;
 
-	estate = kctx->auk_ets[event];
-
 	/* now do preselection. Audit or not to Audit, that is the question */
-	if ((tad->tad_flag = auditme(kctx, tad, estate)) == 0) {
+	if ((tad->tad_flag = auditme(kctx, tad,
+	    kctx->auk_ets[tad->tad_event])) == 0) {
 		/*
 		 * we assume that audit_finish will always be called.
 		 */
@@ -338,10 +338,12 @@ audit_start(
 		}
 	}
 
-	tad->tad_event  = event;
 	tad->tad_evmod  = 0;
 
-	(*audit_s2e[scid].au_start)(tad);
+	if (audit_s2e[scid].au_start != NULL) {
+		/* do start of system call processing */
+		(*audit_s2e[scid].au_start)(tad);
+	}
 
 	return (0);
 }
@@ -399,7 +401,10 @@ audit_finish(
 	 * Perform any extra processing and determine if we are
 	 * really going to generate any audit record.
 	 */
-	(*audit_s2e[scid].au_finish)(tad, error, rval);
+	if (audit_s2e[scid].au_finish != NULL) {
+		/* do any post system call processing */
+		(*audit_s2e[scid].au_finish)(tad, error, rval);
+	}
 	if (tad->tad_flag) {
 		tad->tad_flag = 0;
 
@@ -413,54 +418,62 @@ audit_finish(
 			/* Add subject information */
 			AUDIT_SETSUBJ(&(u_ad), cr, ainfo, kctx);
 
-			if (tad->tad_evmod & PAD_SPRIVUSE)
+			if (tad->tad_evmod & PAD_SPRIVUSE) {
 				au_write(&(u_ad),
-					au_to_privset("", &tad->tad_sprivs,
-					    AUT_UPRIV, 1));
+				    au_to_privset("", &tad->tad_sprivs,
+				    AUT_UPRIV, 1));
+			}
 
-			if (tad->tad_evmod & PAD_FPRIVUSE)
+			if (tad->tad_evmod & PAD_FPRIVUSE) {
 				au_write(&(u_ad),
-					au_to_privset("", &tad->tad_fprivs,
-					    AUT_UPRIV, 0));
+				    au_to_privset("", &tad->tad_fprivs,
+				    AUT_UPRIV, 0));
+			}
 
 			/* Add a return token */
-#ifdef _SYSCALL32_IMPL
-			if (lwp_getdatamodel(
-				ttolwp(curthread)) == DATAMODEL_NATIVE)
-			    sy_flags = sysent[scid].sy_flags & SE_RVAL_MASK;
-			else
-			    sy_flags = sysent32[scid].sy_flags & SE_RVAL_MASK;
-#else
+#ifdef	_SYSCALL32_IMPL
+			if (lwp_getdatamodel(ttolwp(curthread)) ==
+			    DATAMODEL_NATIVE) {
+				sy_flags = sysent[scid].sy_flags & SE_RVAL_MASK;
+			} else {
+				sy_flags =
+				    sysent32[scid].sy_flags & SE_RVAL_MASK;
+			}
+#else	/* _SYSCALL64_IMPL */
 			sy_flags = sysent[scid].sy_flags & SE_RVAL_MASK;
-#endif
+#endif   /* _SYSCALL32_IMPL */
 
 			if (sy_flags == SE_32RVAL1) {
-			    if (type == 0) {
-				au_write(&(u_ad), au_to_return32(error, 0));
-			    } else {
-				au_write(&(u_ad), au_to_return32(error,
-								rval->r_val1));
-			    }
+				if (type == 0) {
+					au_write(&(u_ad),
+					    au_to_return32(error, 0));
+				} else {
+					au_write(&(u_ad), au_to_return32(error,
+					    rval->r_val1));
+				}
 			}
 			if (sy_flags == (SE_32RVAL2|SE_32RVAL1)) {
-			    if (type == 0) {
-				au_write(&(u_ad), au_to_return32(error, 0));
-			    } else {
-				au_write(&(u_ad), au_to_return32(error,
-								rval->r_val1));
+				if (type == 0) {
+					au_write(&(u_ad),
+					    au_to_return32(error, 0));
+				} else {
+					au_write(&(u_ad),
+					    au_to_return32(error,
+					    rval->r_val1));
 #ifdef NOTYET	/* for possible future support */
-				au_write(&(u_ad), au_to_return32(error,
-								rval->r_val2));
+					au_write(&(u_ad), au_to_return32(error,
+					    rval->r_val2));
 #endif
-			    }
+				}
 			}
 			if (sy_flags == SE_64RVAL) {
-			    if (type == 0) {
-				au_write(&(u_ad), au_to_return64(error, 0));
-			    } else {
-				au_write(&(u_ad), au_to_return64(error,
-								rval->r_vals));
-			    }
+				if (type == 0) {
+					au_write(&(u_ad),
+					    au_to_return64(error, 0));
+				} else {
+					au_write(&(u_ad), au_to_return64(error,
+					    rval->r_vals));
+				}
 			}
 
 			AS_INC(as_generated, 1, kctx);
@@ -558,11 +571,11 @@ auditme(au_kcontext_t *kctx, struct t_audit_data *tad, au_state_t estate)
 	if (amask.as_success & estate || amask.as_failure & estate) {
 		flag = 1;
 	} else if ((tad->tad_scid == SYS_putmsg) ||
-		(tad->tad_scid == SYS_getmsg)) {
+	    (tad->tad_scid == SYS_getmsg)) {
 		estate = kctx->auk_ets[AUE_SOCKCONNECT]	|
-			kctx->auk_ets[AUE_SOCKACCEPT]	|
-			kctx->auk_ets[AUE_SOCKSEND]		|
-			kctx->auk_ets[AUE_SOCKRECEIVE];
+		    kctx->auk_ets[AUE_SOCKACCEPT]	|
+		    kctx->auk_ets[AUE_SOCKSEND]		|
+		    kctx->auk_ets[AUE_SOCKRECEIVE];
 		if (amask.as_success & estate || amask.as_failure & estate)
 			flag = 1;
 	}
