@@ -1170,11 +1170,12 @@ is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
 		ushort_t devid;
 	} *entry;
 
-	/* XXX SATA devices: need a way to add dynamically */
+	/* XXX SATA and other devices: need a way to add dynamically */
 	static struct ide_table ide_other[] = {
 		{0x1095, 0x3112},
 		{0x1095, 0x3114},
 		{0x1095, 0x3512},
+		{0x1283, 0x8211},	/* ITE 8211F is subcl PCI_MASS_OTHER */
 		{0, 0}
 	};
 

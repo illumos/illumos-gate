@@ -101,6 +101,13 @@ pcibl_t	ata_pciide_blacklist[] = {
 	{ 0x8086, 0xffff, 0x2921, 0xffff, ATA_BL_NO_SIMPLEX},
 	{ 0x8086, 0xffff, 0x2926, 0xffff, ATA_BL_NO_SIMPLEX},
 
+	/*
+	 * The ITE 8211F requires some special initialization to get DMA
+	 * working that does not fit into the current ata driver model.
+	 * This makes it work in PIO mode.
+	 */
+	{ 0x1283, 0xffff, 0x8211, 0xffff, ATA_BL_NODMA},
+
 	{ 0, 0, 0, 0, 0 }
 };
 
