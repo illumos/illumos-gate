@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -940,13 +940,17 @@ acpi_restore_link_devices(void)
 	mutex_enter(&acpi_irq_cache_mutex);
 	for (irqcachep = irq_cache_table, i = 0; i < irq_cache_valid;
 	    irqcachep++, i++) {
-		/* only field used from psmlnk in set_irq is lnkobj */
-		psmlnk.lnkobj = irqcachep->lnkobj;
-		status = acpi_set_irq_resource(&psmlnk, irqcachep->irq);
-		/* warn if set_irq failed; soldier on */
-		if (status != ACPI_PSM_SUCCESS)
-			cmn_err(CE_WARN, "restore_link failed for IRQ 0x%x\n",
-			    irqcachep->irq);
+		if (irqcachep->lnkobj != NULL) {
+			/* only field used from psmlnk in set_irq is lnkobj */
+			psmlnk.lnkobj = irqcachep->lnkobj;
+			status = acpi_set_irq_resource(&psmlnk, irqcachep->irq);
+			/* warn if set_irq failed; soldier on */
+			if (status != ACPI_PSM_SUCCESS)
+				cmn_err(CE_WARN, "Could not restore interrupt "
+				    "link device for IRQ 0x%x: Devices using "
+				    "this IRQ may no longer function properly."
+				    "\n", irqcachep->irq);
+		}
 	}
 	mutex_exit(&acpi_irq_cache_mutex);
 }

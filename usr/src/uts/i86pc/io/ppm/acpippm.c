@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@
  *	acpippm driver is loaded because it is listed as a platform driver
  *	It is initially configured as a pseudo driver.
  */
+extern void pc_tod_set_rtc_offsets(FADT_DESCRIPTOR *);
 
 /*
  * Configuration Function prototypes and data structures
@@ -104,7 +105,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"ACPI ppm driver v1.8",
+	"ACPI ppm driver v1.9",
 	&appm_ops,
 };
 
@@ -251,6 +252,8 @@ appm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rv = ddi_create_minor_node(dip, "acpi-ppm", S_IFCHR, instance, 0, 0);
 	if (rv != DDI_SUCCESS)
 		goto doerrs;
+
+	pc_tod_set_rtc_offsets(AcpiGbl_FADT); /* init the RTC offsets */
 
 	return (rv);
 
