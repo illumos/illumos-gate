@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2261,7 +2261,7 @@ get_progbits(struct module *mp, struct _buf *file)
 	Shdr *shp;
 	reloc_dest_t dest = NULL;
 	uintptr_t bits_ptr;
-	uintptr_t text = 0, data, sdata = 0, textptr;
+	uintptr_t text = 0, data, textptr;
 	uint_t shn;
 	int err = -1;
 
@@ -2380,8 +2380,6 @@ get_progbits(struct module *mp, struct _buf *file)
 
 		if ((shp->sh_flags & SHF_WRITE) == 0)
 			bits_ptr = text;
-		else if (shp->sh_flags & SHF_NEUT_SHORT)
-			bits_ptr = sdata;
 		else
 			bits_ptr = data;
 
@@ -2410,8 +2408,6 @@ get_progbits(struct module *mp, struct _buf *file)
 		bits_ptr += shp->sh_size;
 		if ((shp->sh_flags & SHF_WRITE) == 0)
 			text = bits_ptr;
-		else if (shp->sh_flags & SHF_NEUT_SHORT)
-			sdata = bits_ptr;
 		else
 			data = bits_ptr;
 	}

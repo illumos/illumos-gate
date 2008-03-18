@@ -33,6 +33,9 @@
  * displacement calculations on the program headers and sections headers,
  * and generate any new output section information.
  */
+
+#define	ELF_TARGET_AMD64
+
 #include	<stdio.h>
 #include	<string.h>
 #include	<unistd.h>
@@ -180,7 +183,7 @@ update_osym(Ofl_desc *ofl)
 	Word		bssndx, etext_ndx, edata_ndx = 0, end_ndx, start_ndx;
 	Word		end_abs = 0, etext_abs = 0, edata_abs;
 	Word		tlsbssndx = 0, sunwbssndx = 0, sunwdata1ndx;
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 	Word		lbssndx = 0;
 	Addr		lbssaddr = 0;
 #endif
@@ -643,17 +646,13 @@ update_osym(Ofl_desc *ofl)
 			sdp = ifl->ifl_oldndx[lndx];
 			sym = sdp->sd_sym;
 
-#if	defined(__sparc)
 			/*
 			 * Assign a got offset if necessary.
 			 */
-			if (ld_assign_got(ofl, sdp) == S_ERROR)
+			if ((ld_targ.t_mr.mr_assign_got != NULL) &&
+			    (*ld_targ.t_mr.mr_assign_got)(ofl, sdp) == S_ERROR)
 				return ((Addr)S_ERROR);
-#elif	defined(__x86)
-/* nothing to do */
-#else
-#error Unknown architecture!
-#endif
+
 			if (DBG_ENABLED) {
 				for (LIST_TRAVERSE(&sdp->sd_GOTndxs,
 				    lnp2, gnp)) {
@@ -897,11 +896,12 @@ update_osym(Ofl_desc *ofl)
 		bssndx = elf_ndxscn(osp->os_scn);
 	}
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(_ELF64)
 	/*
-	 * Assign .lbss information for use with updating LCOMMON symbols.
+	 * For amd64 target, assign .lbss information for use
+	 * with updating LCOMMON symbols.
 	 */
-	if (ofl->ofl_islbss) {
+	if ((ld_targ.t_m.m_mach == EM_AMD64) && ofl->ofl_islbss) {
 		osp = ofl->ofl_islbss->is_osdesc;
 
 		lbssaddr = osp->os_shdr->sh_addr +
@@ -1063,8 +1063,9 @@ update_osym(Ofl_desc *ofl)
 				 */
 				symptr->st_value -= ofl->ofl_tlsphdr->p_vaddr;
 			}
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-		} else if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
+#if	defined(_ELF64)
+		} else if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+		    (sdp->sd_flags & FLG_SY_SPECSEC) &&
 		    ((sdp->sd_shndx = symptr->st_shndx) ==
 		    SHN_X86_64_LCOMMON) &&
 		    ((local || !(flags & FLG_OF_RELOBJ)))) {
@@ -1125,14 +1126,9 @@ update_osym(Ofl_desc *ofl)
 		/*
 		 * Assign a got offset if necessary.
 		 */
-#if	defined(__sparc)
-		if (ld_assign_got(ofl, sdp) == S_ERROR)
+		if ((ld_targ.t_mr.mr_assign_got != NULL) &&
+		    (*ld_targ.t_mr.mr_assign_got)(ofl, sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
-#elif	defined(__x86)
-/* nothing to do */
-#else
-#error Unknown architecture!
-#endif
 
 		if (DBG_ENABLED) {
 			for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
@@ -1691,7 +1687,8 @@ update_osym(Ofl_desc *ofl)
 		    (ELF_ST_TYPE(sym->st_info) == STT_FUNC) &&
 		    !(flags & FLG_OF_BFLAG)) {
 			if (sap->sa_PLTndx)
-				sym->st_value = ld_calc_plt_addr(sdp, ofl);
+				sym->st_value =
+				    (*ld_targ.t_mr.mr_calc_plt_addr)(sdp, ofl);
 		}
 
 		/*
@@ -1833,7 +1830,8 @@ update_osym(Ofl_desc *ofl)
 	/*
 	 * Now display GOT debugging information if required.
 	 */
-	DBG_CALL(Dbg_got_display(ofl, 0, 0));
+	DBG_CALL(Dbg_got_display(ofl, 0, 0,
+	    ld_targ.t_m.m_got_xnumber, ld_targ.t_m.m_got_entsize));
 
 	/*
 	 * Update the section headers information. sh_info is
@@ -2223,7 +2221,7 @@ update_odynamic(Ofl_desc *ofl)
 		}
 
 		if ((ofl->ofl_flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt) {
-			dyn->d_tag = M_REL_DT_COUNT;
+			dyn->d_tag = ld_targ.t_m.m_rel_dt_count;
 			dyn->d_un.d_val = ofl->ofl_relocrelcnt;
 			dyn++;
 		}
@@ -2280,7 +2278,7 @@ update_odynamic(Ofl_desc *ofl)
 			dyn->d_un.d_ptr = shdr->sh_size;
 			dyn++;
 			dyn->d_tag = DT_PLTREL;
-			dyn->d_un.d_ptr = M_REL_DT_TYPE;
+			dyn->d_un.d_ptr = ld_targ.t_m.m_rel_dt_type;
 			dyn++;
 			dyn->d_tag = DT_JMPREL;
 			dyn->d_un.d_ptr = shdr->sh_addr;
@@ -2292,23 +2290,24 @@ update_odynamic(Ofl_desc *ofl)
 			dyn->d_tag = DT_PLTPAD;
 			if (ofl->ofl_pltcnt) {
 				dyn->d_un.d_ptr = shdr->sh_addr +
-				    M_PLT_RESERVSZ +
-				    ofl->ofl_pltcnt * M_PLT_ENTSIZE;
+				    ld_targ.t_m.m_plt_reservsz +
+				    ofl->ofl_pltcnt * ld_targ.t_m.m_plt_entsize;
 			} else
 				dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
 			dyn->d_tag = DT_PLTPADSZ;
-			dyn->d_un.d_val = ofl->ofl_pltpad * M_PLT_ENTSIZE;
+			dyn->d_un.d_val = ofl->ofl_pltpad *
+			    ld_targ.t_m.m_plt_entsize;
 			dyn++;
 		}
 		if (ofl->ofl_relocsz) {
-			dyn->d_tag = M_REL_DT_TYPE;
+			dyn->d_tag = ld_targ.t_m.m_rel_dt_type;
 			dyn->d_un.d_ptr = ofl->ofl_osrelhead->os_shdr->sh_addr;
 			dyn++;
-			dyn->d_tag = M_REL_DT_SIZE;
+			dyn->d_tag = ld_targ.t_m.m_rel_dt_size;
 			dyn->d_un.d_ptr = ofl->ofl_relocsz;
 			dyn++;
-			dyn->d_tag = M_REL_DT_ENT;
+			dyn->d_tag = ld_targ.t_m.m_rel_dt_ent;
 			if (ofl->ofl_osrelhead->os_shdr->sh_type == SHT_REL)
 				dyn->d_un.d_ptr = sizeof (Rel);
 			else
@@ -2348,7 +2347,7 @@ update_odynamic(Ofl_desc *ofl)
 				if ((sdp = ofl->ofl_regsyms[ndx]) == 0)
 					continue;
 
-				dyn->d_tag = M_DT_REGISTER;
+				dyn->d_tag = ld_targ.t_m.m_dt_register;
 				dyn->d_un.d_val = sdp->sd_symndx;
 				dyn++;
 			}
@@ -2411,7 +2410,11 @@ update_odynamic(Ofl_desc *ofl)
 	dyn->d_un.d_val = DYNSTR_EXTRA_PAD;
 	dyn++;
 
-	ld_mach_update_odynamic(ofl, &dyn);
+	dyn->d_tag = DT_SUNW_LDMACH;
+	dyn->d_un.d_val = ld_sunw_ldmach();
+	dyn++;
+
+	(*ld_targ.t_mr.mr_mach_update_odynamic)(ofl, &dyn);
 
 	for (cnt = 1 + DYNAMIC_EXTRA_ELTS; cnt--; dyn++) {
 		dyn->d_tag = DT_NULL;
@@ -2794,15 +2797,15 @@ update_oehdr(Ofl_desc * ofl)
 	 * Note. it may be necessary to update the `e_flags' field in the
 	 * machine dependent section.
 	 */
-	ehdr->e_ident[EI_DATA] = M_DATA;
+	ehdr->e_ident[EI_DATA] = ld_targ.t_m.m_data;
 	ehdr->e_machine = ofl->ofl_dehdr->e_machine;
 	ehdr->e_flags = ofl->ofl_dehdr->e_flags;
 	ehdr->e_version = ofl->ofl_dehdr->e_version;
 
-	if (ehdr->e_machine != M_MACH) {
-		if (ehdr->e_machine != M_MACHPLUS)
+	if (ehdr->e_machine != ld_targ.t_m.m_mach) {
+		if (ehdr->e_machine != ld_targ.t_m.m_machplus)
 			return (S_ERROR);
-		if ((ehdr->e_flags & M_FLAGSPLUS) == 0)
+		if ((ehdr->e_flags & ld_targ.t_m.m_flagsplus) == 0)
 			return (S_ERROR);
 	}
 
@@ -3284,7 +3287,7 @@ ld_update_outfile(Ofl_desc *ofl)
 				phdr->p_vaddr = shdr->sh_addr;
 				phdr->p_offset = shdr->sh_offset;
 				phdr->p_filesz = shdr->sh_size;
-				phdr->p_flags = M_DATASEG_PERM;
+				phdr->p_flags = ld_targ.t_m.m_dataseg_perm;
 
 				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
@@ -3298,8 +3301,9 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * information for the .eh_frame output section will have been
 		 * figured out by now.
 		 */
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-		if (phdr->p_type == PT_SUNW_UNWIND) {
+#if	defined(_ELF64)
+		if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+		    (phdr->p_type == PT_SUNW_UNWIND)) {
 			Shdr	    *shdr;
 
 			if (ofl->ofl_unwindhdr == 0)

@@ -347,6 +347,7 @@ CHKHDRS=			\
 	lwp_upimutex_impl.h	\
 	mac.h			\
 	mac_impl.h		\
+	machelf.h		\
 	map.h			\
 	md4.h			\
 	md5.h			\

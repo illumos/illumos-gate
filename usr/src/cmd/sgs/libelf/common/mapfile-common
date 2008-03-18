@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -180,6 +180,7 @@ SUNWprivate_1.1 {
 	_elf_rawdata =		NODYNSORT;
 	_elf_rawfile =		NODYNSORT;
 	_elf_strptr =		NODYNSORT;
+	_elf_swap_wrimage;
 	_elf_update =		NODYNSORT;
 	_elf32_fsize =		NODYNSORT;
 	_elf32_xlatetof =	NODYNSORT;

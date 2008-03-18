@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,6 @@
 
 
 
-#include	<machdep.h>
 #include	<sys/elf_amd64.h>
 #include	<stdio.h>
 #include	<unistd.h>
@@ -156,13 +155,28 @@ typedef struct {
 	Elf_Type	libelf_type;
 } SINFO_DATA;
 
+/*
+ * Many of these sections use an alignment given by M_WORD_ALIGN, a
+ * value that varies depending on the object target machine. Since we
+ * don't know that value at compile time, we settle for a value of
+ * 4 for ELFCLASS32 objects, and 8 for ELFCLASS64. This matches the
+ * platforms we current support (sparc and x86), and is good enough for
+ * a fake section header in any event, as the resulting object is only
+ * analyzed, and is not executed.
+ */
+#ifdef _ELF64
+#define	FAKE_M_WORD_ALIGN 8
+#else
+#define	FAKE_M_WORD_ALIGN 4
+#endif
+
 static SINFO_DATA sinfo_data[SINFO_T_NUM] = {
 	/* SINFO_T_NULL */
 	{ 0 },
 
 	/* SINFO_T_DYN */
 	{ MSG_ORIG(MSG_PHDRNAM_DYN), SHT_DYNAMIC, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Dyn), ELF_T_DYN },
+	    FAKE_M_WORD_ALIGN, sizeof (Dyn), ELF_T_DYN },
 
 	/* SINFO_T_DYNSTR */
 	{ MSG_ORIG(MSG_PHDRNAM_DYNSTR), SHT_STRTAB, SHF_ALLOC,
@@ -170,39 +184,39 @@ static SINFO_DATA sinfo_data[SINFO_T_NUM] = {
 
 	/* SINFO_T_DYNSYM */
 	{ MSG_ORIG(MSG_PHDRNAM_DYNSYM), SHT_DYNSYM, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Sym), ELF_T_SYM },
+	    FAKE_M_WORD_ALIGN, sizeof (Sym), ELF_T_SYM },
 
 	/* SINFO_T_LDYNSYM */
 	{ MSG_ORIG(MSG_PHDRNAM_LDYNSYM), SHT_SUNW_LDYNSYM, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Sym), ELF_T_SYM },
+	    FAKE_M_WORD_ALIGN, sizeof (Sym), ELF_T_SYM },
 
 	/* SINFO_T_HASH */
 	{ MSG_ORIG(MSG_PHDRNAM_HASH), SHT_HASH, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Word), ELF_T_WORD },
+	    FAKE_M_WORD_ALIGN, sizeof (Word), ELF_T_WORD },
 
 	/* SINFO_T_SYMINFO */
 	{ MSG_ORIG(MSG_PHDRNAM_SYMINFO),  SHT_SUNW_syminfo, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Syminfo), ELF_T_SYMINFO },
+	    FAKE_M_WORD_ALIGN, sizeof (Syminfo), ELF_T_SYMINFO },
 
 	/* SINFO_T_SYMSORT */
 	{ MSG_ORIG(MSG_PHDRNAM_SYMSORT), SHT_SUNW_symsort, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Word), ELF_T_WORD },
+	    FAKE_M_WORD_ALIGN, sizeof (Word), ELF_T_WORD },
 
 	/* SINFO_T_TLSSORT */
 	{ MSG_ORIG(MSG_PHDRNAM_TLSSORT), SHT_SUNW_tlssort, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Word), ELF_T_WORD },
+	    FAKE_M_WORD_ALIGN, sizeof (Word), ELF_T_WORD },
 
 	/* SINFO_T_VERNEED */
 	{ MSG_ORIG(MSG_PHDRNAM_VER), SHT_SUNW_verneed, SHF_ALLOC,
-	    M_WORD_ALIGN, 1, ELF_T_VNEED },
+	    FAKE_M_WORD_ALIGN, 1, ELF_T_VNEED },
 
 	/* SINFO_T_VERDEF */
 	{ MSG_ORIG(MSG_PHDRNAM_VER), SHT_SUNW_verdef, SHF_ALLOC,
-	    M_WORD_ALIGN, 1, ELF_T_VDEF },
+	    FAKE_M_WORD_ALIGN, 1, ELF_T_VDEF },
 
 	/* SINFO_T_VERSYM */
 	{ MSG_ORIG(MSG_PHDRNAM_VER), SHT_SUNW_versym, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Versym), ELF_T_HALF },
+	    FAKE_M_WORD_ALIGN, sizeof (Versym), ELF_T_HALF },
 
 	/* SINFO_T_INTERP */
 	{ MSG_ORIG(MSG_PHDRNAM_INTERP), SHT_PROGBITS, SHF_ALLOC,
@@ -222,11 +236,11 @@ static SINFO_DATA sinfo_data[SINFO_T_NUM] = {
 
 	/* SINFO_T_REL */
 	{ MSG_ORIG(MSG_PHDRNAM_REL), SHT_REL, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Rel), ELF_T_REL },
+	    FAKE_M_WORD_ALIGN, sizeof (Rel), ELF_T_REL },
 
 	/* SINFO_T_RELA */
 	{ MSG_ORIG(MSG_PHDRNAM_RELA), SHT_RELA, SHF_ALLOC,
-	    M_WORD_ALIGN, sizeof (Rela), ELF_T_RELA },
+	    FAKE_M_WORD_ALIGN, sizeof (Rela), ELF_T_RELA },
 
 	/* SINFO_T_PREINITARR */
 	{ MSG_ORIG(MSG_PHDRNAM_PREINITARR), SHT_PREINIT_ARRAY, SHF_ALLOC,
@@ -242,7 +256,7 @@ static SINFO_DATA sinfo_data[SINFO_T_NUM] = {
 
 	/* SINFO_T_NOTE */
 	{ MSG_ORIG(MSG_PHDRNAM_NOTE), SHT_NOTE, 0,
-	    M_WORD_ALIGN, 1, ELF_T_NOTE }
+	    FAKE_M_WORD_ALIGN, 1, ELF_T_NOTE }
 };
 
 

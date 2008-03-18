@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +155,8 @@ typedef struct {
 
 #define	DT_SUNW_STRPAD		0x60000019	/* # of unused bytes at the */
 						/*	end of dynstr */
+#define	DT_SUNW_LDMACH		0x6000001b	/* EM_ machine code of linker */
+						/*	that produced object */
 
 /*
  * DT_* encoding rules do not apply between DT_HIOS and DT_LOPROC

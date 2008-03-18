@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -359,8 +359,9 @@ conv_dyn_tag(Xword tag, Half mach, Conv_fmt_flags_t fmt_flags,
 	};
 
 	/*
-	 * SUNW: DT_LOOS -> DT_HIOS range. Note hole between DT_SUNW_TLSSORTSZ
-	 * and DT_SUNW_STRPAD. We handle DT_SUNW_STRPAD as a single value below.
+	 * SUNW: DT_LOOS -> DT_HIOS range. Note hole between DT_SUNW_TLSSORTSZ,
+	 * DT_SUNW_STRPAD, and DT_SUNW_LDMACH. We handle the outliers
+	 * separately below as single values.
 	 */
 	static const Msg	tags_sunw_auxiliary[] = {
 		MSG_DYN_SUNW_AUXILIARY,	MSG_DYN_SUNW_RTLDINF,
@@ -425,6 +426,8 @@ conv_dyn_tag(Xword tag, Half mach, Conv_fmt_flags_t fmt_flags,
 	DYN_RANGE(DT_SUNW_AUXILIARY, tags_sunw_auxiliary);
 	if (tag == DT_SUNW_STRPAD)
 		return (MSG_ORIG(MSG_DYN_SUNW_STRPAD));
+	if (tag == DT_SUNW_LDMACH)
+		return (MSG_ORIG(MSG_DYN_SUNW_LDMACH));
 	DYN_RANGE(DT_CHECKSUM, tags_checksum);
 	DYN_RANGE(DT_CONFIG, tags_config);
 	if (tag == DT_VERSYM)

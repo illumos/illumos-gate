@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -392,7 +392,8 @@ conv_ehdr_osabi(uchar_t osabi, Conv_fmt_flags_t fmt_flags,
  * terms of a string.
  */
 const char *
-conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf)
+conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf,
+    Half mach)
 {
 	ushort_t	type = rej->rej_type;
 	uint_t		info = rej->rej_info;
@@ -415,10 +416,7 @@ conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf)
 		    &reject_desc_buf->inv_buf));
 	else if ((type == SGS_REJ_BADFLAG) || (type == SGS_REJ_MISFLAG) ||
 	    (type == SGS_REJ_HAL) || (type == SGS_REJ_US3))
-		/*
-		 * Only called from ld.so.1, thus M_MACH is hardcoded.
-		 */
-		return (conv_ehdr_flags(M_MACH, (Word)info, 0,
+		return (conv_ehdr_flags(mach, (Word)info, 0,
 		    &reject_desc_buf->flags_buf));
 	else if (type == SGS_REJ_UNKFILE)
 		return ((const char *)0);

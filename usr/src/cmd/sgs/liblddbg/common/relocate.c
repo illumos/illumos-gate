@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -594,14 +594,14 @@ Elf_reloc_entry_1(Lm_list *lml, int caller, const char *prestr, Half mach,
 	if (type == SHT_RELA) {
 		Rela	*rela = (Rela *)reloc;
 
-		str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info),
+		str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info, mach),
 		    0, &inv_buf);
 		off = rela->r_offset;
 		add = rela->r_addend;
 	} else {
 		Rel	*rel = (Rel *)reloc;
 
-		str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info),
+		str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info, mach),
 		    0, &inv_buf);
 		off = rel->r_offset;
 		add = 0;

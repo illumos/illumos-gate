@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@
 #define	wrt		wrt64
 #define	elf_xlatetof	elf64_xlatetof
 #define	_elfxx_update	_elf64_update
+#define	_elfxx_swap_wrimage	_elf64_swap_wrimage
 
 #else	/* ELF32 */
 
@@ -81,6 +82,7 @@
 #define	wrt		wrt32
 #define	elf_xlatetof	elf32_xlatetof
 #define	_elfxx_update	_elf32_update
+#define	_elfxx_swap_wrimage	_elf32_swap_wrimage
 
 #endif /* ELF64 */
 
@@ -358,7 +360,7 @@ _elf_upd_usr(Elf * elf)
 			d->db_osz = (size_t)fsz;
 
 			if ((sh->sh_type != SHT_NOBITS) &&
-			((j = (Xword)(d->db_data.d_off + d->db_osz)) > sz))
+			    ((j = (Xword)(d->db_data.d_off + d->db_osz)) > sz))
 				sz = j;
 		}
 		if (sh->sh_size < sz) {
@@ -404,8 +406,22 @@ wrt(Elf * elf, Xword outsz, unsigned fill, int update_cmd)
 	Elf_Scn		*s;
 	Ehdr		*eh = elf->ed_ehdr;
 	unsigned	ver = eh->e_version;
-	unsigned	encode = eh->e_ident[EI_DATA];
+	unsigned	encode;
 	int		byte;
+
+	/*
+	 * If this is an ELF_C_WRIMAGE write, then we encode into the
+	 * byte order of the system we are running on rather than that of
+	 * of the object. For ld.so.1, this is the same order, but
+	 * for 'ld', it might not be in the case where we are cross
+	 * linking an object for a different target. In this later case,
+	 * the linker-host byte order is necessary so that the linker can
+	 * manipulate the resulting  image. It is expected that the linker
+	 * will call elf_swap_wrimage() if necessary to convert the image
+	 * to the target byte order.
+	 */
+	encode = (update_cmd == ELF_C_WRIMAGE) ? _elf_sys_encoding() :
+	    eh->e_ident[EI_DATA];
 
 	/*
 	 * Two issues can cause trouble for the output file.
@@ -695,8 +711,8 @@ _elfxx_update(Elf * elf, Elf_Cmd cmd)
 				return ((off_t)sz);
 			}
 			sz = _elf_outsync(elf->ed_fd, elf->ed_wrimage,
-				elf->ed_wrimagesz,
-				(elf->ed_myflags & EDF_IMALLOC ? 0 : 1));
+			    elf->ed_wrimagesz,
+			    (elf->ed_myflags & EDF_IMALLOC ? 0 : 1));
 			elf->ed_myflags &= ~EDF_IMALLOC;
 			elf->ed_wrimage = 0;
 			elf->ed_wrimagesz = 0;
@@ -756,6 +772,105 @@ _elfxx_update(Elf * elf, Elf_Cmd cmd)
 }
 
 
+/*
+ * When wrt() processes an ELF_C_WRIMAGE request, the resulting image
+ * gets the byte order (encoding) of the platform running the linker
+ * rather than that of the target host. This allows the linker to modify
+ * the image, prior to flushing it to the output file. This routine
+ * is used to re-translate such an image into the byte order of the
+ * target host.
+ */
+int
+_elfxx_swap_wrimage(Elf * elf)
+{
+	NOTE(ASSUMING_PROTECTED(*elf))
+	Elf_Data	dst, src;
+	Elf_Scn		*s;
+	Ehdr		*eh = elf->ed_ehdr;
+	Half		e_phnum = eh->e_phnum;
+	unsigned	ver = eh->e_version;
+	unsigned	encode = eh->e_ident[EI_DATA];
+
+	/*
+	 * Ehdr first
+	 */
+
+	src.d_buf = dst.d_buf = (Elf_Void *)eh;
+	src.d_type = dst.d_type = ELF_T_EHDR;
+	src.d_size = dst.d_size = sizeof (Ehdr);
+	src.d_version = dst.d_version = ver;
+	if (elf_xlatetof(&dst, &src, encode) == 0)
+		return (1);
+
+	/*
+	 * Phdr table if one exists
+	 */
+
+	if (e_phnum != 0) {
+		unsigned	work;
+		/*
+		 * Unlike other library data, phdr table is
+		 * in the user version.
+		 */
+
+		src.d_buf = dst.d_buf = (Elf_Void *)elf->ed_phdr;
+		src.d_type = dst.d_type = ELF_T_PHDR;
+		src.d_size = dst.d_size = elf->ed_phdrsz;
+		ELFACCESSDATA(work, _elf_work)
+		src.d_version = dst.d_version = work;
+		if (elf_xlatetof(&dst, &src, encode) == 0) {
+			return (1);
+		}
+	}
+
+	/*
+	 * Loop through sections
+	 */
+
+	for (s = elf->ed_hdscn; s != 0; s = s->s_next) {
+		register Dnode	*d, *prevd;
+		Shdr		*sh = s->s_shdr;
+
+		if ((sh->sh_type == SHT_NOBITS) || (sh->sh_type == SHT_NULL))
+			continue;
+
+		for (d = s->s_hdnode, prevd = 0;
+		    d != 0; prevd = d, d = d->db_next) {
+
+			if ((d->db_myflags & DBF_READY) == 0) {
+				SCNLOCK(s);
+				if (_elf_locked_getdata(s, &prevd->db_data) !=
+				    &d->db_data) {
+					SCNUNLOCK(s);
+					return (1);
+				}
+				SCNUNLOCK(s);
+			}
+
+			dst = d->db_data;
+			if (elf_xlatetof(&dst, &d->db_data, encode) == 0)
+				return (1);
+		}
+	}
+
+	/*
+	 * Shdr table
+	 */
+
+	src.d_type = dst.d_type = ELF_T_SHDR;
+	src.d_version = dst.d_version = ver;
+	for (s = elf->ed_hdscn; s != 0; s = s->s_next) {
+		src.d_buf = dst.d_buf = s->s_shdr;
+		src.d_size = dst.d_size = sizeof (Shdr);
+		if (elf_xlatetof(&dst, &src, encode) == 0)
+			return (1);
+	}
+
+	return (0);
+}
+
+
+
 #ifndef _ELF64
 /* class-independent, only needs to be compiled once */
 
@@ -773,6 +888,22 @@ elf_update(Elf *elf, Elf_Cmd cmd)
 
 	_elf_seterr(EREQ_CLASS, 0);
 	return (-1);
+}
+
+int
+_elf_swap_wrimage(Elf *elf)
+{
+	if (elf == 0)
+		return (0);
+
+	if (elf->ed_class == ELFCLASS32)
+		return (_elf32_swap_wrimage(elf));
+
+	if (elf->ed_class == ELFCLASS64)
+		return (_elf64_swap_wrimage(elf));
+
+	_elf_seterr(EREQ_CLASS, 0);
+	return (0);
 }
 
 /*

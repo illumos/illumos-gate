@@ -234,14 +234,16 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 		 */
 		if (type == CA_SUNW_HW_1) {
 			if ((number = (Xword)elfcap_hw1_from_str(
-			    ELFCAP_STYLE_LC, Start_tok, M_MACH)) != 0) {
+			    ELFCAP_STYLE_LC, Start_tok,
+			    ld_targ.t_m.m_mach)) != 0) {
 				ofl->ofl_hwcap_1 |= number;
 				used++;
 				continue;
 			}
 		} else {
 			if ((number = (Xword)elfcap_sf1_from_str(
-			    ELFCAP_STYLE_LC, Start_tok, M_MACH)) != 0) {
+			    ELFCAP_STYLE_LC, Start_tok,
+			    ld_targ.t_m.m_mach)) != 0) {
 				ofl->ofl_sfcap_1 |= number;
 				used++;
 				continue;
@@ -807,7 +809,7 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 			else if ((strcmp(Start_tok,
 			    MSG_ORIG(MSG_STR_REL)) == 0) ||
 			    (strcmp(Start_tok, MSG_ORIG(MSG_STR_RELA)) == 0))
-				enp->ec_type = M_REL_SHT_TYPE;
+				enp->ec_type = ld_targ.t_m.m_rel_sht_type;
 			else if (strcmp(Start_tok, MSG_ORIG(MSG_STR_HASH)) == 0)
 				enp->ec_type = SHT_HASH;
 			else if (strcmp(Start_tok, MSG_ORIG(MSG_STR_LIB)) == 0)
@@ -2491,7 +2493,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 				    ofl) == S_ERROR)
 					return (S_ERROR);
 				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
-				    CA_SUNW_HW_1, ofl->ofl_hwcap_1, M_MACH));
+				    CA_SUNW_HW_1, ofl->ofl_hwcap_1,
+				    ld_targ.t_m.m_mach));
 				continue;
 
 			} else if (strcmp(sgp1->sg_name,
@@ -2500,7 +2503,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 				    ofl) == S_ERROR)
 					return (S_ERROR);
 				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
-				    CA_SUNW_SF_1, ofl->ofl_sfcap_1, M_MACH));
+				    CA_SUNW_SF_1, ofl->ofl_sfcap_1,
+				    ld_targ.t_m.m_mach));
 				continue;
 
 			} else {
@@ -2592,7 +2596,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 					/*
 					 * Default to segment alignment
 					 */
-					sgp1->sg_phdr.p_align = M_SEGM_ALIGN;
+					sgp1->sg_phdr.p_align =
+					    ld_targ.t_m.m_segm_align;
 					sgp1->sg_flags |= FLG_SG_ALIGN;
 				}
 			}

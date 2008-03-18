@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,11 @@
 #include	<sys/types.h>
 #include	"krtld/reloc.h"
 #else
+#define	ELF_TARGET_SPARC
+#if defined(DO_RELOC_LIBLD)
+#undef DO_RELOC_LIBLD
+#define	DO_RELOC_LIBLD_SPARC
+#endif
 #include	<stdio.h>
 #include	"sgs.h"
 #include	"machdep.h"
@@ -40,11 +45,25 @@
 #endif
 
 /*
+ * We need to build this code differently when it is used for
+ * cross linking:
+ *	- Data alignment requirements can differ from those
+ *		of the running system, so we can't access data
+ *		in units larger than a byte
+ *	- We have to include code to do byte swapping when the
+ *		target and linker host use different byte ordering,
+ *		but such code is a waste when running natively.
+ */
+#if !defined(DO_RELOC_LIBLD) || defined(__sparc)
+#define	DORELOC_NATIVE
+#endif
+
+/*
  * This table represents the current relocations that do_reloc() is able to
  * process.  The relocations below that are marked SPECIAL are relocations that
  * take special processing and shouldn't actually ever be passed to do_reloc().
  */
-const Rel_entry	reloc_table[R_SPARC_NUM] = {
+const Rel_entry reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_NONE */	{0x0, FLG_RE_NOTREL, 0, 0, 0},
 /* R_SPARC_8 */		{0x0, FLG_RE_VERIFY, 1, 0, 0},
 /* R_SPARC_16 */	{0x0, FLG_RE_VERIFY, 2, 0, 0},
@@ -350,6 +369,7 @@ int
 do_reloc_krtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file)
 #elif defined(DO_RELOC_LIBLD)
+/*ARGSUSED5*/
 int
 do_reloc_ld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, int bswap, void *lml)
@@ -359,23 +379,12 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, void *lml)
 #endif
 {
-	Xword			uvalue = 0;
-	Xword			basevalue, sigbit_mask, sigfit_mask;
-	Xword			corevalue = *value;
-	uchar_t			bshift;
-	int			field_size, re_flags;
-	const Rel_entry *	rep;
-
-#if defined(DO_RELOC_LIBLD)
-	/*
-	 * We do not support building the sparc linker as a cross linker
-	 * at this time.
-	 */
-	if (bswap) {
-		REL_ERR_NOSWAP(lml, file, sym, rtype);
-		return (0);
-	}
-#endif
+	Xword	uvalue = 0;
+	Xword	basevalue, sigbit_mask, sigfit_mask;
+	Xword	corevalue = *value;
+	uchar_t	bshift;
+	int	field_size, re_flags;
+	const	Rel_entry	*rep;
 
 	rep = &reloc_table[rtype];
 	bshift = rep->re_bshift;
@@ -398,22 +407,62 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		return (0);
 	}
 
-	if (re_flags & FLG_RE_UNALIGN) {
+	/*
+	 * We have two ways to retrieve the base value, a general one
+	 * that will work with data of any alignment, and another that is
+	 * fast, but which requires the data to be aligned according to
+	 * sparc alignment rules.
+	 *
+	 * For non-native linking, we always use the general path. For
+	 * native linking, the FLG_RE_UNALIGN determines it.
+	 */
+#if defined(DORELOC_NATIVE)
+	if (re_flags & FLG_RE_UNALIGN)
+#endif
+	{
 		int	i;
 		uchar_t	*dest = (uchar_t *)&basevalue;
 
-		/*
-		 * Adjust the offset.
-		 */
-		/* LINTED */
-		i = (int)(sizeof (Xword) - field_size);
-		if (i > 0)
-			dest += i;
-
 		basevalue = 0;
-		for (i = field_size - 1; i >= 0; i--)
-			dest[i] = off[i];
-	} else {
+#if !defined(DORELOC_NATIVE)
+		if (bswap) {
+			int j = field_size - 1;
+
+			for (i = 0; i < field_size; i++, j--)
+				dest[i] = off[j];
+
+		} else
+#endif
+		{
+			/*
+			 * Adjust the offset
+			 */
+			/* LINTED */
+			i = (int)(sizeof (Xword) - field_size);
+			if (i > 0)
+				dest += i;
+			for (i = field_size - 1; i >= 0; i--)
+				dest[i] = off[i];
+		}
+	}
+
+	/*
+	 * Non-native linker: We have already fetched the value above,
+	 *	but if the relocation does not have the FLG_RE_UNALIGN
+	 *	flag set, we still need to do the same error checking we
+	 *	would do on a native linker.
+	 * Native-linker: If this is an aligned relocation, we need to
+	 *	fetch the value and also do the error checking.
+	 *
+	 * The FETCH macro is used to conditionalize the fetching so that
+	 * it only happens in the native case.
+	 */
+#if defined(DORELOC_NATIVE)
+#define	FETCH(_type) basevalue = (Xword)*((_type *)off);
+#else
+#define	FETCH(_type)
+#endif
+	if ((re_flags & FLG_RE_UNALIGN) == 0) {
 		if (((field_size == 2) && ((uintptr_t)off & 0x1)) ||
 		    ((field_size == 4) && ((uintptr_t)off & 0x3)) ||
 		    ((field_size == 8) && ((uintptr_t)off & 0x7))) {
@@ -422,19 +471,20 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		}
 		switch (field_size) {
 		case 1:
-			basevalue = (Xword)*((uchar_t *)off);
+			/* LINTED */
+			FETCH(uchar_t);
 			break;
 		case 2:
 			/* LINTED */
-			basevalue = (Xword)*((Half *)off);
+			FETCH(Half);
 			break;
 		case 4:
 			/* LINTED */
-			basevalue = (Xword)*((Word *)off);
+			FETCH(Word);
 			break;
 		case 8:
 			/* LINTED */
-			basevalue = (Xword)*((Xword *)off);
+			FETCH(Xword);
 			break;
 		default:
 			REL_ERR_UNNOBITS(lml, file, sym, rtype,
@@ -442,6 +492,7 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 			return (0);
 		}
 	}
+#undef FETCH
 
 	if (sigbit_mask) {
 		/*
@@ -543,37 +594,68 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 	}
 	*value = corevalue;
 
-	if (re_flags & FLG_RE_UNALIGN) {
+	/*
+	 * Now, we store uvalue back at the location given by off.
+	 * This is similar to the fetch case above:
+	 *	- We have general (unaligned) and fast (aligned) cases
+	 *	- Cross linkers need to use the unaligned case even
+	 *		when the relocation does not specify FLG_RE_UNALIGN.
+	 *	- A cross linker that processes a relocation that does not
+	 *		have FLG_RE_UNALIGN set has to do the same error
+	 *		checking that a native linker would do, while avoiding
+	 *		the aligned store (accomplished with the STORE macro).
+	 */
+#if defined(DORELOC_NATIVE)
+	if (re_flags & FLG_RE_UNALIGN)
+#endif
+	{
 		int	i;
 		uchar_t	*src = (uchar_t *)&uvalue;
 
-		/*
-		 * Adjust the offset.
-		 */
-		/* LINTED */
-		i = (int)(sizeof (Xword) - field_size);
-		if (i > 0)
-			src += i;
+#if !defined(DORELOC_NATIVE)
+		if (bswap) {
+			int j = field_size - 1;
 
-		for (i = field_size - 1; i >= 0; i--)
-			off[i] = src[i];
-	} else {
+			for (i = 0; i < field_size; i++, j--)
+				off[i] = src[j];
+
+		} else
+#endif
+		{
+			/*
+			 * Adjust the offset.
+			 */
+			/* LINTED */
+			i = (int)(sizeof (Xword) - field_size);
+			if (i > 0)
+				src += i;
+			for (i = field_size - 1; i >= 0; i--)
+				off[i] = src[i];
+		}
+	}
+
+#if defined(DORELOC_NATIVE)
+#define	STORE(_type) *((_type *)off) = (_type)uvalue
+#else
+#define	STORE(_type)
+#endif
+	if ((re_flags & FLG_RE_UNALIGN) == 0) {
 		switch (rep->re_fsize) {
 		case 1:
 			/* LINTED */
-			*((uchar_t *)off) = (uchar_t)uvalue;
+			STORE(uchar_t);
 			break;
 		case 2:
 			/* LINTED */
-			*((Half *)off) = (Half)uvalue;
+			STORE(Half);
 			break;
 		case 4:
 			/* LINTED */
-			*((Word *)off) = uvalue;
+			STORE(Word);
 			break;
 		case 8:
 			/* LINTED */
-			*((Xword *)off) = uvalue;
+			STORE(Xword);
 			break;
 		default:
 			/*
@@ -583,5 +665,7 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 			return (0);
 		}
 	}
+#undef STORE
+
 	return (1);
 }

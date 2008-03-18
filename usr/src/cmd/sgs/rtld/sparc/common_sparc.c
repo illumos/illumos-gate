@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -201,7 +201,7 @@ elf_reloc_relative(ulong_t relbgn, ulong_t relend, ulong_t relsiz,
 		if (relbgn >= relend)
 			break;
 
-		rtype = (Byte)ELF_R_TYPE(((Rela *)relbgn)->r_info);
+		rtype = (Byte)ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
 		roffset = ((Rela *)relbgn)->r_offset;
 
 	} while (rtype == R_SPARC_RELATIVE);

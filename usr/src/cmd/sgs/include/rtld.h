@@ -36,7 +36,7 @@
 #include <sgs.h>
 #include <thread.h>
 #include <synch.h>
-#include <machdep.h>
+#include <link.h>
 #include <sys/avl.h>
 #include <alist.h>
 #include <libc_int.h>

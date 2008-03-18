@@ -23,10 +23,14 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Processing of relocatable objects and shared objects.
+ */
 
 /*
  * ld -- link/editor main program
@@ -40,6 +44,14 @@
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
+
+/*
+ * All target specific code is referenced via this global variable, which
+ * is initialized in ld_main(). This allows the linker to function as
+ * a cross linker, by vectoring to the target-specific code for the
+ * current target machine.
+ */
+Target		ld_targ;
 
 /*
  * A default library search path is used if one was not supplied on the command
@@ -56,13 +68,47 @@ static char	def_Plibpath[] = "/usr/ccs/lib:/lib:/usr/lib";
  * A default elf header provides for simplifying diagnostic processing.
  */
 static Ehdr	def_ehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
-			    M_CLASS, M_DATA }, 0, M_MACH, EV_CURRENT };
+			    ELFCLASSNONE, ELFDATANONE }, 0, EM_NONE,
+			    EV_CURRENT };
+
+/*
+ * Establish the global state necessary to link the desired machine
+ * target, as reflected by the ld_targ global variable.
+ */
+int
+ld_init_target(Lm_list *lml, Half mach)
+{
+	switch (mach) {
+	case EM_386:
+	case EM_AMD64:
+		ld_targ = *ld_targ_init_x86();
+		break;
+
+	case EM_SPARC:
+	case EM_SPARC32PLUS:
+	case EM_SPARCV9:
+		ld_targ = *ld_targ_init_sparc();
+		break;
+
+	default:
+		{
+			Conv_inv_buf_t	inv_buf;
+
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_TARG_UNSUPPORTED),
+			    conv_ehdr_mach(mach, 0, &inv_buf));
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
 
 /*
  * The main program
  */
 int
-ld_main(int argc, char **argv)
+ld_main(int argc, char **argv, Half mach)
 {
 	char		*sgs_support;	/* SGS_SUPPORT environment string */
 	Half		etype;
@@ -76,7 +122,18 @@ ld_main(int argc, char **argv)
 	if ((ofl = libld_calloc(1, sizeof (Ofl_desc))) == 0)
 		return (1);
 
+	/* Initilize target state */
+	if (ld_init_target(NULL, mach) != 0)
+		return (1);
+
+	/*
+	 * Set up the output ELF header, and initialize the machine
+	 * and class details.
+	 */
 	ofl->ofl_dehdr = &def_ehdr;
+	def_ehdr.e_ident[EI_CLASS] = ld_targ.t_m.m_class;
+	def_ehdr.e_ident[EI_DATA] = ld_targ.t_m.m_data;
+	def_ehdr.e_machine = ld_targ.t_m.m_mach;
 
 	ld_init(ofl);
 
@@ -199,7 +256,7 @@ ld_main(int argc, char **argv)
 			ofl->ofl_rpath = rpath;
 	}
 	if (ofl->ofl_flags & FLG_OF_EXEC)
-		ofl->ofl_segorigin = M_SEGM_ORIGIN;
+		ofl->ofl_segorigin = ld_targ.t_m.m_segm_origin;
 
 	/*
 	 * Argument pass two.  Input all libraries and objects.
@@ -309,18 +366,31 @@ ld_main(int argc, char **argv)
 	if (ld_reloc_process(ofl) == S_ERROR)
 		return (ld_exit(ofl));
 
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 	/*
 	 * Fill in contents for Unwind Header
 	 */
-	if (populate_amd64_unwindhdr(ofl) == S_ERROR)
+	if ((ld_targ.t_uw.uw_populate_unwindhdr != NULL) &&
+	    ((*ld_targ.t_uw.uw_populate_unwindhdr)(ofl) == S_ERROR))
 		return (ld_exit(ofl));
 #endif
+
 	/*
 	 * Finally create the files elf checksum.
 	 */
 	if (ofl->ofl_checksum)
 		*ofl->ofl_checksum = (Xword)elf_checksum(ofl->ofl_elf);
+
+	/*
+	 * If this is a cross link to a target with a different byte
+	 * order than the linker, swap the data to the target byte order.
+	 */
+	if (((ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0) &&
+	    (_elf_swap_wrimage(ofl->ofl_elf) != 0)) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_SWAP_WRIMAGE),
+		    ofl->ofl_name);
+		return (ld_exit(ofl));
+	}
 
 	/*
 	 * We're done, so make sure the updates are flushed to the output file.

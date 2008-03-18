@@ -20,29 +20,15 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-E_TOOLOBJS =	leb128.o
-L_MACHOBJS32 =	machrel.intel32.o	machsym.intel32.o
-L_MACHOBJS64 =	machrel.amd64.o		machsym.intel64.o	unwind.amd64.o
-
 include		../Makefile.com
 
 .KEEP_STATE:
-
-SGSMSGCHK =	../common/libld.chk.msg
-SGSMSGTARG +=	$(SGSMSGINTEL)
-
-#
-# For cross-compilation, it is necessary to trigger the correct include files
-# (see sys/elf.h).
-#
-ELFTARGET64 =	-DELF_TARGET_AMD64
-ELFTARGET32 =	-DELF_TARGET_386
 
 all:		$(DYNLIB) $(LIBLINKS)
 
@@ -50,37 +36,3 @@ install \
 package:	all $(ROOTFS_DYNLIB)
 
 include		../Makefile.targ
-
-# Associate ELF32 and ELF64 objects to the appropriate headers.
-
-pics/%32.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld
-pics/%64.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld
-
-# Associate the various lint targets with the appropriate headers/files.
-
-$(LINTOUT32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld \
-		    $(ELFTARGET32)
-$(LINTOUT64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld \
-		    $(ELFTARGET64) -D_ELF64
-$(LINTLIB32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld \
-		    $(ELFTARGET32)
-$(LINTLIB64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld \
-		    $(ELFTARGET64) -D_ELF64
-
-LINTSRCS32 +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld/%.c)
-LINTSRCS64 +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld/%.c)
-
-# Compensate chkmsg with the doreloc family.
-
-CHKSRCS +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld/%.c)
-CHKSRCS +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld/%.c)
-
-pics/%32.o: \
-		$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld/%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
-		$(POST_PROCESS_O)
-
-pics/%64.o: \
-		$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld/%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
-		$(POST_PROCESS_O)

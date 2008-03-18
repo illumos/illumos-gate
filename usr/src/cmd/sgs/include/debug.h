@@ -696,11 +696,11 @@ extern	void	Dbg_file_needed(Rt_map *, const char *);
 extern	void	Dbg_file_output(Ofl_desc *);
 extern	void	Dbg_file_preload(Lm_list *, const char *);
 extern	void	Dbg_file_prot(Rt_map *, int);
-extern	void	Dbg_file_rejected(Lm_list *, Rej_desc *);
+extern	void	Dbg_file_rejected(Lm_list *, Rej_desc *, Half mach);
 extern	void	Dbg_file_reuse(Lm_list *, const char *, const char *);
 extern	void	Dbg_file_skip(Lm_list *, const char *, const char *);
 
-extern	void	Dbg_got_display(Ofl_desc *, Off, int);
+extern	void	Dbg_got_display(Ofl_desc *, Off, int, Word, size_t);
 
 extern	void	Dbg_libs_audit(Lm_list *, const char *, const char *);
 extern	void	Dbg_libs_find(Lm_list *, const char *);
@@ -973,8 +973,8 @@ extern	void	Elf_dyn_title(Lm_list *);
 
 extern	void	Elf_ehdr(Lm_list *, Ehdr *, Shdr *);
 
-extern	void	Elf_got_entry(Lm_list *, Sword, Addr, Xword, Half, Word, void *,
-		    const char *);
+extern	void	Elf_got_entry(Lm_list *, Sword, Addr, Xword, Half,
+		    uchar_t, uchar_t, Word, void *, const char *);
 extern	void	Elf_got_title(Lm_list *);
 
 extern	void	Elf_phdr(Lm_list *, Half, Phdr *);

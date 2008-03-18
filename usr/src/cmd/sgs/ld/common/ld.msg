@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +39,8 @@
 @ MSG_SYS_ALLOC		"alloc failed: %s"
 @ MSG_SYS_64		"unable to execute 64-bit version of ld"
 
+@ MSG_ERR_BADTARG	"unknown target platform: %s"
+
 # Generic error diagnostic labels
 
 @ MSG_ERR_WARNING	"warning: "
@@ -49,7 +51,7 @@
 
 
 # The following strings represent reserved words, files, pathnames and symbols.
-# Reference to this strings is via the MSG_ORIG() macro, and thus no message
+# Reference to these strings is via the MSG_ORIG() macro, and thus no message
 # translation is required.
 
 @ MSG_STR_EMPTY		""
@@ -62,8 +64,13 @@
 
 @ MSG_ARG_FOUR		"4"
 @ MSG_ARG_ALTEXEC64	"altexec64"
+@ MSG_ARG_TARGET	"target="
 
 @ MSG_LD_OPTIONS	"LD_OPTIONS"
 @ MSG_LD_ALTEXEC	"LD_ALTEXEC="
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
+
+@ MSG_TARG_SPARC	"sparc"
+@ MSG_TARG_X86		"x86"
+

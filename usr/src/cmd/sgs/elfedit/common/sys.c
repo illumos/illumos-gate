@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,8 +45,8 @@
  *		as a sharable object.
  *	- It must be avaialble before the ELFCLASS of the object
  *		is known, so it is not ELFCLASS specific. We don't build
- *		it twice with machdep.h, as we do for the loadable modules.
- *		This means that commands need to test for the type
+ *		it twice with <sys/machelf.h>, as we do for the loadable
+ *		modules. This means that commands need to test for the type
  *		of their obj_state argument at runtime.
  *	- The init function signature is different. We build an entire
  *		module definition statically.

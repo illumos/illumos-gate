@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,6 @@
 #include <dlfcn.h>
 #include <libld.h>
 #include <sgs.h>
-#include <machdep.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -785,7 +784,8 @@ extern	const char	*conv_phdr_flags(Word, Conv_fmt_flags_t fmt_flags,
 			    Conv_phdr_flags_buf_t *);
 extern	const char	*conv_phdr_type(Half, Word, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
-extern	const char	*conv_reject_desc(Rej_desc *, Conv_reject_desc_buf_t *);
+extern	const char	*conv_reject_desc(Rej_desc *, Conv_reject_desc_buf_t *,
+			    Half mach);
 extern	const char	*conv_reloc_type(Half, Word, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_reloc_type_static(Half, Word, Conv_fmt_flags_t);

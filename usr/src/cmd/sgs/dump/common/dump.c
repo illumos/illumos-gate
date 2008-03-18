@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,7 @@
 #include <locale.h>
 #include <unistd.h>
 #include <libelf.h>
-#include <link.h>
+#include <sys/link.h>
 #include <sys/elf.h>
 #include <sys/machelf.h>
 #include <fcntl.h>
@@ -1232,12 +1232,14 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 				break;
 
 			/*
-			 * Items that are bitmasks
+			 * Integer items that are bitmasks, or which
+			 * can be otherwise formatted in symbolic form.
 			 */
 			case DT_FLAGS:
 			case DT_FEATURE_1:
 			case DT_POSFLAG_1:
 			case DT_FLAGS_1:
+			case DT_SUNW_LDMACH:
 				str = NULL;
 				if (v_flag) {
 					switch (p_dyn.d_tag) {
@@ -1263,6 +1265,11 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 						str = conv_dyn_flag1(
 						    p_dyn.d_un.d_val, 0,
 						    &conv_buf.dyn_flag1);
+						break;
+					case DT_SUNW_LDMACH:
+						str = conv_ehdr_mach(
+						    p_dyn.d_un.d_val, 0,
+						    &conv_buf.inv);
 						break;
 					}
 				}

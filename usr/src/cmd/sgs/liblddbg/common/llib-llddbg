@@ -22,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,15 +148,17 @@ void	Dbg32_file_preload(Lm_list *, const char *);
 void	Dbg64_file_preload(Lm_list *, const char *);
 void	Dbg32_file_prot(Rt_map *, int);
 void	Dbg64_file_prot(Rt_map *, int);
-void	Dbg32_file_rejected(Lm_list *, Rej_desc *);
-void	Dbg64_file_rejected(Lm_list *, Rej_desc *);
+void	Dbg32_file_rejected(Lm_list *, Rej_desc *, Elf32_Half);
+void	Dbg64_file_rejected(Lm_list *, Rej_desc *, Elf32_Half);
 void	Dbg32_file_reuse(Lm_list *, const char *, const char *);
 void	Dbg64_file_reuse(Lm_list *, const char *, const char *);
 void	Dbg32_file_skip(Lm_list *, const char *, const char *);
 void	Dbg64_file_skip(Lm_list *, const char *, const char *);
 
-void	Dbg32_got_display(Ofl_desc *, Elf32_Off, int);
-void	Dbg64_got_display(Ofl_desc *, Elf64_Off, int);
+void	Dbg32_got_display(Ofl_desc *, Elf32_Off, int,
+	    Elf32_Word, size_t m_got_entsize);
+void	Dbg64_got_display(Ofl_desc *, Elf64_Off, int,
+	    Elf64_Word, size_t m_got_entsize);
 
 void	Dbg32_libs_audit(Lm_list *, const char *, const char *);
 void	Dbg64_libs_audit(Lm_list *, const char *, const char *);
@@ -464,9 +466,9 @@ void Elf64_ehdr(Lm_list *, Elf64_Ehdr *, Elf64_Shdr *);
 void Elf32_ehdr(Lm_list *, Elf32_Ehdr *, Elf32_Shdr *);
 
 void Elf64_got_entry(Lm_list *, Elf64_Sword, Elf64_Addr, Elf64_Xword,
-    Elf64_Half, Elf64_Word, void *, const char *);
+    Elf64_Half, uchar_t, uchar_t, Elf64_Word, void *, const char *);
 void Elf32_got_entry(Lm_list *, Elf32_Sword, Elf32_Addr, Elf32_Word,
-    Elf32_Half, Elf32_Word, void *, const char *);
+    Elf32_Half, uchar_t, uchar_t, Elf32_Word, void *, const char *);
 void Elf64_got_title(Lm_list *);
 void Elf32_got_title(Lm_list *);
 

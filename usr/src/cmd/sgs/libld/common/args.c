@@ -185,6 +185,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRREL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRS));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTARG));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZT));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTW));
@@ -539,7 +540,7 @@ check_flags(Ofl_desc * ofl, int argc)
 	 * it is only at this point we're sure what the output image will be
 	 * (static or dynamic).
 	 */
-	if (ld_ent_setup(ofl, M_SEGM_ALIGN) == S_ERROR)
+	if (ld_ent_setup(ofl, ld_targ.t_m.m_segm_align) == S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -548,7 +549,7 @@ check_flags(Ofl_desc * ofl, int argc)
 	 * If not, set FLG_OF1_ENCDIFF so relocation code will know
 	 * to check.
 	 */
-	if (_elf_sys_encoding() != M_DATA)
+	if (_elf_sys_encoding() != ld_targ.t_m.m_data)
 		ofl->ofl_flags1 |= FLG_OF1_ENCDIFF;
 
 	/*
@@ -740,11 +741,22 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 {
 	int	c;
 
+	/*
+	 * The -64 and -ztarget options are special, in that we validate
+	 * them, but otherwise ignore them. libld.so (this code) is called
+	 * from the ld front end program. ld has already examined the
+	 * arguments to determine the output class and machine type of the
+	 * output object, as reflected in the version (32/64) of ld_main()
+	 * that was called and the value of the 'mach' argument passed.
+	 * By time execution reaches this point, these options have already
+	 * been seen and acted on.
+	 */
+
 	while ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
 		DBG_CALL(Dbg_args_flags(ofl->ofl_lml, (optind - 1), c));
 
 		switch (c) {
-		case '6':			/* Processed by ld to */
+		case '6':
 			/*
 			 * -64 is processed by ld to determine the output class.
 			 * Here we sanity check the option incase some other
@@ -1137,7 +1149,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOLAZYLOAD)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_RECORD)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64)) &&
-			    strcmp(optarg, MSG_ORIG(MSG_ARG_WEAKEXT))) {
+			    strcmp(optarg, MSG_ORIG(MSG_ARG_WEAKEXT)) &&
+			    strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
+			    MSG_ARG_TARGET_SIZE)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_Z), optarg);
@@ -1584,7 +1598,8 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
 			    MSG_INTL(MSG_STR_UNKNOWN),
-			    conv_reject_desc(&rej, &rej_buf));
+			    conv_reject_desc(&rej, &rej_buf,
+			    ld_targ.t_m.m_mach));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}

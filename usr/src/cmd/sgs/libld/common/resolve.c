@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4 6.2/18.2 */
@@ -31,6 +31,8 @@
 /*
  * Symbol table resolution
  */
+#define	ELF_TARGET_AMD64
+
 #include	<stdio.h>
 #include	<debug.h>
 #include	"msg.h"
@@ -274,7 +276,8 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Perform any machine specific type checking.
 	 */
-	if (ld_mach_sym_typecheck(sdp, nsym, ifl, ofl))
+	if ((ld_targ.t_ms.ms_mach_sym_typecheck != NULL) &&
+	    (*ld_targ.t_ms.ms_mach_sym_typecheck)(sdp, nsym, ifl, ofl))
 		return;
 
 	/*
@@ -301,7 +304,9 @@ sym_mach_check(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Perform any machine specific type checking.
 	 */
-	(void) ld_mach_sym_typecheck(sdp, nsym, ifl, ofl);
+	if (ld_targ.t_ms.ms_mach_sym_typecheck != NULL)
+		(void) (*ld_targ.t_ms.ms_mach_sym_typecheck)(sdp, nsym,
+		    ifl, ofl);
 }
 
 /*
@@ -574,7 +579,8 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Perform any machine specific type checking.
 	 */
-	if (ld_mach_sym_typecheck(sdp, nsym, ifl, ofl))
+	if ((ld_targ.t_ms.ms_mach_sym_typecheck != NULL) &&
+	    (*ld_targ.t_ms.ms_mach_sym_typecheck)(sdp, nsym, ifl, ofl))
 		return;
 
 	/*
@@ -835,25 +841,28 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	size_t	size = 0;
 	Xword	value = 0;
 
-#if	defined(__x86) && defined(_ELF64)
-	/*
-	 * If the original and new symbols are both COMMON, but of a different
-	 * size model, take the small one.
-	 */
-	if ((sdp->sd_sym->st_shndx == SHN_COMMON) &&
-	    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
+#if	defined(_ELF64)
+	if (ld_targ.t_m.m_mach == EM_AMD64) {
 		/*
-		 * Take the original symbol.
+		 * If the original and new symbols are both COMMON, but of
+		 * a different size model, take the small one.
 		 */
-		return;
+		if ((sdp->sd_sym->st_shndx == SHN_COMMON) &&
+		    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
+			/*
+			 * Take the original symbol.
+			 */
+			return;
 
-	} else if ((sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
-	    (nsym->st_shndx == SHN_COMMON)) {
-		/*
-		 * Take the new symbol.
-		 */
-		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
-		return;
+		} else if ((sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
+		    (nsym->st_shndx == SHN_COMMON)) {
+			/*
+			 * Take the new symbol.
+			 */
+			sym_override(sdp, nsym, ifl, ofl, ndx, nshndx,
+			    nsymflags);
+			return;
+		}
 	}
 #endif
 
@@ -869,9 +878,10 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_COMMON) &&
 	    (nsymflags & FLG_SY_SPECSEC) &&
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 	    (nsym->st_shndx == SHN_COMMON)) ||
-	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
+	    ((ld_targ.t_m.m_mach == EM_AMD64) &&
+	    (sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
 	    (nsymflags & FLG_SY_SPECSEC) &&
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON))) {
@@ -1126,8 +1136,9 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	    (nsym->st_shndx == SHN_COMMON)) {
 		column = SYM_TENTATIVE;
 		nsymflags |= FLG_SY_TENTSYM;
-#if	defined(__x86) && defined(_ELF64)
-	} else if ((nsymflags & FLG_SY_SPECSEC) &&
+#if	defined(_ELF64)
+	} else if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+	    (nsymflags & FLG_SY_SPECSEC) &&
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
 		column = SYM_TENTATIVE;
 		nsymflags |= FLG_SY_TENTSYM;

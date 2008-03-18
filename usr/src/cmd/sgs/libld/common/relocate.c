@@ -31,13 +31,47 @@
 /*
  * set-up for relocations
  */
+
+#define	ELF_TARGET_AMD64
+#define	ELF_TARGET_SPARC
+
 #include	<string.h>
 #include	<stdio.h>
 #include	<alloca.h>
-#include	<reloc.h>
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
+
+/*
+ * Set up the relocation table flag test macros so that they use the
+ * relocation table for the current target machine.
+ */
+#define	IS_PLT(X)	RELTAB_IS_PLT(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_GOT_RELATIVE(X) \
+	RELTAB_IS_GOT_RELATIVE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_GOT_PC(X)	RELTAB_IS_GOT_PC(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_GOTPCREL(X)	RELTAB_IS_GOTPCREL(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_GOT_BASED(X)	RELTAB_IS_GOT_BASED(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_GOT_OPINS(X)	RELTAB_IS_GOT_OPINS(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_GOT_REQUIRED(X) \
+	RELTAB_IS_GOT_REQUIRED(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_PC_RELATIVE(X) RELTAB_IS_PC_RELATIVE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_ADD_RELATIVE(X) \
+	RELTAB_IS_ADD_RELATIVE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_REGISTER(X)	RELTAB_IS_REGISTER(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_NOTSUP(X)	RELTAB_IS_NOTSUP(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_SEG_RELATIVE(X) \
+	RELTAB_IS_SEG_RELATIVE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_EXTOFFSET(X)	RELTAB_IS_EXTOFFSET(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_SEC_RELATIVE(X) \
+	RELTAB_IS_SEC_RELATIVE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_TLS_INS(X)	RELTAB_IS_TLS_INS(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_TLS_GD(X)	RELTAB_IS_TLS_GD(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_TLS_LD(X)	RELTAB_IS_TLS_LD(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_TLS_IE(X)	RELTAB_IS_TLS_IE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_TLS_LE(X)	RELTAB_IS_TLS_LE(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_LOCALBND(X)	RELTAB_IS_LOCALBND(X, ld_targ.t_mr.mr_reloc_table)
+#define	IS_SIZE(X)	RELTAB_IS_SIZE(X, ld_targ.t_mr.mr_reloc_table)
 
 /*
  * Structure to hold copy relocation items.
@@ -73,8 +107,9 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 	if ((ifl->ifl_flags & FLG_IF_DISPDONE) &&
 	    (ofl->ofl_flags & FLG_OF_VERBOSE))
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_DISPREL2),
-		    conv_reloc_type(ifl->ifl_ehdr->e_machine, M_R_COPY,
-		    0, &inv_buf), ifl->ifl_name, demangle(sdp->sd_name));
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine,
+		    ld_targ.t_m.m_r_copy, 0, &inv_buf),
+		    ifl->ifl_name, demangle(sdp->sd_name));
 
 	if ((ifl->ifl_flags & FLG_IF_DISPPEND) == 0)
 		return;
@@ -112,7 +147,8 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 			const char	*str;
 			Word		rstndx;
 
-			if (IS_PC_RELATIVE(ELF_R_TYPE(reloc->r_info)) == 0)
+			if (IS_PC_RELATIVE(ELF_R_TYPE(reloc->r_info,
+			    ld_targ.t_m.m_mach)) == 0)
 				continue;
 
 			/*
@@ -131,7 +167,8 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 				eprintf(ofl->ofl_lml,
 				    ERR_WARNING, MSG_INTL(MSG_REL_DISPREL1),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-				    (uint_t)ELF_R_TYPE(reloc->r_info),
+				    (uint_t)ELF_R_TYPE(reloc->r_info,
+				    ld_targ.t_m.m_mach),
 				    0, &inv_buf), ifl->ifl_name, str,
 				    MSG_INTL(MSG_STR_UNKNOWN),
 				    EC_XWORD(reloc->r_offset),
@@ -160,7 +197,8 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_REL_DISPREL1),
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-			    (uint_t)ELF_R_TYPE(reloc->r_info), 0, &inv_buf),
+			    (uint_t)ELF_R_TYPE(reloc->r_info,
+			    ld_targ.t_m.m_mach), 0, &inv_buf),
 			    ifl->ifl_name, demangle(rsdp->sd_name), str,
 			    EC_XWORD(reloc->r_offset), str);
 		}
@@ -503,32 +541,27 @@ ld_add_actrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	}
 
 	DBG_CALL(Dbg_reloc_ars_entry(ofl->ofl_lml, ELF_DBG_LD,
-	    arsp->rel_isdesc->is_shdr->sh_type, M_MACH, arsp));
+	    arsp->rel_isdesc->is_shdr->sh_type, ld_targ.t_m.m_mach, arsp));
 	return (1);
 }
 
 /*
  * In the platform specific machrel.XXX.c files, we sometimes write
- * a value directly into the GOT. This function can be used when
+ * a value directly into the got/plt. These function can be used when
  * the running linker has the opposite byte order of the object being
  * produced.
  */
-Xword
-ld_byteswap_Xword(Xword v)
+Word
+ld_bswap_Word(Word v)
 {
-#ifdef _ELF64
-	return ((v << 56) |
-	    ((v & 0x0000ff00) << 40) |
-	    ((v & 0x00ff0000) << 24) |
-	    ((v & 0xff000000) << 8) |
-	    ((v >> 8)  & 0xff000000) |
-	    ((v >> 24) & 0x00ff0000) |
-	    ((v >> 40) & 0x0000ff00) |
-	    (v >> 56));		/* Xword is unsigned - 0 bits enter from left */
-#else
-	return (((v << 24) | ((v & 0xff00) << 8) |
-	    ((v >> 8) & 0xff00) | (v >> 24)));
-#endif
+	return (BSWAP_WORD(v));
+}
+
+
+Xword
+ld_bswap_Xword(Xword v)
+{
+	return (BSWAP_XWORD(v));
 }
 
 
@@ -546,12 +579,12 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 * relocation we need to assign it a GOT token.  Once we've got
 	 * all of the GOT's assigned we can assign the actual indexes.
 	 */
-	if ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs), GOT_REF_GENERIC,
-	    ofl, rsp)) == 0) {
+	if ((gnp = (*ld_targ.t_mr.mr_find_gotndx)(&(sdp->sd_GOTndxs),
+	    GOT_REF_GENERIC, ofl, rsp)) == 0) {
 		Word	rtype = rsp->rel_rtype;
 
-		if (ld_assign_got_ndx(&(sdp->sd_GOTndxs), 0, GOT_REF_GENERIC,
-		    ofl, rsp, sdp) == S_ERROR)
+		if ((*ld_targ.t_mr.mr_assign_got_ndx)(&(sdp->sd_GOTndxs), 0,
+		    GOT_REF_GENERIC, ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 
 		/*
@@ -584,9 +617,10 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 				if ((((sdp->sd_flags & FLG_SY_SPECSEC) == 0) ||
 				    (sdp->sd_sym->st_shndx != SHN_ABS)) ||
 				    (sdp->sd_aux && sdp->sd_aux->sa_symspec)) {
-					rsp->rel_rtype = M_R_RELATIVE;
-					if (ld_add_outrel((FLG_REL_GOT |
-					    FLG_REL_ADVAL), rsp,
+					rsp->rel_rtype =
+					    ld_targ.t_m.m_r_relative;
+					if ((*ld_targ.t_mr.mr_add_outrel)
+					    ((FLG_REL_GOT | FLG_REL_ADVAL), rsp,
 					    ofl) == S_ERROR)
 						return (S_ERROR);
 					rsp->rel_rtype = rtype;
@@ -597,14 +631,15 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 					return (S_ERROR);
 			}
 		} else {
-			rsp->rel_rtype = M_R_GLOB_DAT;
-			if (ld_add_outrel(FLG_REL_GOT, rsp, ofl) == S_ERROR)
+			rsp->rel_rtype = ld_targ.t_m.m_r_glob_dat;
+			if ((*ld_targ.t_mr.mr_add_outrel)(FLG_REL_GOT,
+			    rsp, ofl) == S_ERROR)
 				return (S_ERROR);
 			rsp->rel_rtype = rtype;
 		}
 	} else {
-		if (ld_assign_got_ndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_GENERIC,
-		    ofl, rsp, sdp) == S_ERROR)
+		if ((*ld_targ.t_mr.mr_assign_got_ndx)(&(sdp->sd_GOTndxs), gnp,
+		    GOT_REF_GENERIC, ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -623,27 +658,29 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Sym_desc	*sdp = rsp->rel_sym;
 
-#if	defined(__x86)
-#if	defined(_ELF64)
-	/*
-	 * AMD64 TLS code sequences do not use a unique TLS relocation to
-	 * reference the __tls_get_addr() function call.
-	 */
-	if ((ofl->ofl_flags & FLG_OF_EXEC) &&
-	    (strcmp(sdp->sd_name, MSG_ORIG(MSG_SYM_TLSGETADDR_U)) == 0)) {
-		return (ld_add_actrel(FLG_REL_TLSFIX, rsp, ofl));
+	switch (ld_targ.t_m.m_mach) {
+	case EM_AMD64:
+		/*
+		 * AMD64 TLS code sequences do not use a unique TLS
+		 * relocation to reference the __tls_get_addr() function call.
+		 */
+		if ((ofl->ofl_flags & FLG_OF_EXEC) &&
+		    (strcmp(sdp->sd_name, MSG_ORIG(MSG_SYM_TLSGETADDR_U)) ==
+		    0))
+			return (ld_add_actrel(FLG_REL_TLSFIX, rsp, ofl));
+		break;
+
+	case EM_386:
+		/*
+		 * GNUC IA32 TLS code sequences do not use a unique TLS
+		 * relocation to reference the ___tls_get_addr() function call.
+		 */
+		if ((ofl->ofl_flags & FLG_OF_EXEC) &&
+		    (strcmp(sdp->sd_name, MSG_ORIG(MSG_SYM_TLSGETADDR_UU)) ==
+		    0))
+			return (ld_add_actrel(FLG_REL_TLSFIX, rsp, ofl));
+		break;
 	}
-#else
-	/*
-	 * GNUC IA32 TLS code sequences do not use a unique TLS relocation to
-	 * reference the ___tls_get_addr() function call.
-	 */
-	if ((ofl->ofl_flags & FLG_OF_EXEC) &&
-	    (strcmp(sdp->sd_name, MSG_ORIG(MSG_SYM_TLSGETADDR_UU)) == 0)) {
-		return (ld_add_actrel(FLG_REL_TLSFIX, rsp, ofl));
-	}
-#endif
-#endif	/* __x86 */
 
 	/*
 	 * if (not PLT yet assigned)
@@ -655,7 +692,7 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 	if (sdp->sd_aux->sa_PLTndx == 0) {
 		Word	ortype = rsp->rel_rtype;
 
-		ld_assign_plt_ndx(sdp, ofl);
+		(*ld_targ.t_mr.mr_assign_plt_ndx)(sdp, ofl);
 
 		/*
 		 * If this symbol is binding to a LAZYLOADED object then
@@ -667,8 +704,9 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 		    (sdp->sd_file->ifl_flags & FLG_IF_LAZYLD)))
 			sdp->sd_flags |= FLG_SY_LAZYLD;
 
-		rsp->rel_rtype = M_R_JMP_SLOT;
-		if (ld_add_outrel(FLG_REL_PLT, rsp, ofl) == S_ERROR)
+		rsp->rel_rtype = ld_targ.t_m.m_r_jmp_slot;
+		if ((*ld_targ.t_mr.mr_add_outrel)(FLG_REL_PLT, rsp, ofl) ==
+		    S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = ortype;
 	}
@@ -680,8 +718,9 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 	    IS_ADD_RELATIVE(rsp->rel_rtype)) {
 		Word	ortype	= rsp->rel_rtype;
 
-		rsp->rel_rtype = M_R_RELATIVE;
-		if (ld_add_outrel(FLG_REL_ADVAL, rsp, ofl) == S_ERROR)
+		rsp->rel_rtype = ld_targ.t_m.m_r_relative;
+		if ((*ld_targ.t_mr.mr_add_outrel)(FLG_REL_ADVAL, rsp, ofl) ==
+		    S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = ortype;
 		return (1);
@@ -711,7 +750,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	if ((sdp->sd_flags & FLG_SY_SPECSEC) && (sym->st_shndx == SHN_ABS)) {
 		if ((ofl->ofl_flags1 & FLG_OF1_ABSEXEC) == 0)
-			return (ld_add_outrel(NULL, rsp, ofl));
+			return ((*ld_targ.t_mr.mr_add_outrel)(NULL, rsp, ofl));
 
 		/*
 		 * If -zabsexec is set then promote the ABSOLUTE symbol to
@@ -734,7 +773,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		if (sdp->sd_flags & FLG_SY_MVTOCOMM)
 			return (ld_add_actrel(NULL, rsp, ofl));
 		else
-			return (ld_add_outrel(NULL, rsp, ofl));
+			return ((*ld_targ.t_mr.mr_add_outrel)(NULL, rsp, ofl));
 	}
 
 	/*
@@ -751,7 +790,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		    ELF_ST_TYPE(sym->st_info), 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), sdp->sd_file->ifl_name);
-		return (ld_add_outrel(NULL, rsp, ofl));
+		return ((*ld_targ.t_mr.mr_add_outrel)(NULL, rsp, ofl));
 	}
 
 	/*
@@ -864,8 +903,8 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		_sdp->sd_shndx = _sdp->sd_sym->st_shndx = SHN_COMMON;
 		_sdp->sd_flags |= FLG_SY_SPECSEC;
 		_sdp->sd_sym->st_value =
-		    (_sdp->sd_sym->st_size < (M_WORD_ALIGN * 2)) ?
-		    M_WORD_ALIGN : M_WORD_ALIGN * 2;
+		    (_sdp->sd_sym->st_size < (ld_targ.t_m.m_word_align * 2)) ?
+		    ld_targ.t_m.m_word_align : ld_targ.t_m.m_word_align * 2;
 
 		/*
 		 * Whether or not the symbol references initialized
@@ -893,8 +932,9 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		if (list_appendc(&ofl->ofl_copyrels, cpy_rel) == 0)
 			return (S_ERROR);
 
-		rsp->rel_rtype = M_R_COPY;
-		if (ld_add_outrel(FLG_REL_BSS, rsp, ofl) == S_ERROR)
+		rsp->rel_rtype = ld_targ.t_m.m_r_copy;
+		if ((*ld_targ.t_mr.mr_add_outrel)(FLG_REL_BSS, rsp, ofl) ==
+		    S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = rtype;
 
@@ -907,8 +947,8 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_REL_COPY),
 			    conv_reloc_type(_sdp->sd_file->ifl_ehdr->e_machine,
-			    M_R_COPY, 0, &inv_buf), _sdp->sd_file->ifl_name,
-			    _sdp->sd_name);
+			    ld_targ.t_m.m_r_copy, 0, &inv_buf),
+			    _sdp->sd_file->ifl_name, _sdp->sd_name);
 		}
 		DBG_CALL(Dbg_syms_reloc(ofl, sdp));
 	}
@@ -935,7 +975,7 @@ reloc_generic(Rel_desc *rsp, Ofl_desc *ofl)
 	 * until runtime.
 	 */
 	if (ofl->ofl_flags & FLG_OF_SHAROBJ)
-		return (ld_add_outrel(NULL, rsp, ofl));
+		return ((*ld_targ.t_mr.mr_add_outrel)(NULL, rsp, ofl));
 
 	/*
 	 * Otherwise process relocation now.
@@ -963,8 +1003,9 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 *	the relocation is pc-relative, and
 	 *	the relocation is against a symbol in same section
 	 */
-	if (local && !IS_GOT_RELATIVE(rtype) && !IS_GOT_BASED(rtype) &&
-	    !IS_GOT_PC(rtype) && IS_PC_RELATIVE(rtype) &&
+	if (local && !IS_GOT_RELATIVE(rtype) &&
+	    !IS_GOT_BASED(rtype) && !IS_GOT_PC(rtype) &&
+	    IS_PC_RELATIVE(rtype) &&
 	    ((sdp->sd_isc) && (sdp->sd_isc->is_osdesc == isp->is_osdesc)))
 		return (ld_add_actrel(NULL, rsp, ofl));
 
@@ -994,31 +1035,31 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 
 		/*
 		 * Indicate that this relocation should be processed the same
-		 * as a section symbol.  For SPARC and AMD64 (Rela), indicate
-		 * that the addend also needs to be applied to this relocation.
+		 * as a section symbol.  For RELA, indicate that the addend
+		 * also needs to be applied to this relocation.
 		 */
-#if	(defined(__i386) || defined(__amd64)) && !defined(_ELF64)
-		oflags = FLG_REL_SCNNDX;
-#else
-		oflags = FLG_REL_SCNNDX | FLG_REL_ADVAL;
-#endif
+		if ((rsp->rel_flags & FLG_REL_RELA) == FLG_REL_RELA)
+			oflags = FLG_REL_SCNNDX | FLG_REL_ADVAL;
+		else
+			oflags = FLG_REL_SCNNDX;
 	}
 
-#if	(defined(__i386) || defined(__amd64)) && !defined(_ELF64)
-	/*
-	 * Intel (Rel) relocations do not contain an addend.  Any addend is
-	 * contained within the file at the location identified by the
-	 * relocation offset.  Therefore, if we're processing a section symbol,
-	 * or a -zredlocsym relocation (that basically transforms a local symbol
-	 * reference into a section reference), perform an active relocation to
-	 * propagate any addend.
-	 */
-	if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) ||
-	    (oflags == FLG_REL_SCNNDX))
-		if (ld_add_actrel(NULL, rsp, ofl) == S_ERROR)
-			return (S_ERROR);
-#endif
-	return (ld_add_outrel(oflags, rsp, ofl));
+	if ((rsp->rel_flags & FLG_REL_RELA) == 0) {
+		/*
+		 * Intel (Rel) relocations do not contain an addend.  Any
+		 * addend is contained within the file at the location
+		 * identified by the relocation offset.  Therefore, if we're
+		 * processing a section symbol, or a -zredlocsym relocation
+		 * (that basically transforms a local symbol reference into
+		 * a section reference), perform an active relocation to
+		 * propagate any addend.
+		 */
+		if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) ||
+		    (oflags == FLG_REL_SCNNDX))
+			if (ld_add_actrel(NULL, rsp, ofl) == S_ERROR)
+				return (S_ERROR);
+	}
+	return ((*ld_targ.t_mr.mr_add_outrel)(oflags, rsp, ofl));
 }
 
 /*
@@ -1093,7 +1134,8 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			    ifl->ifl_name, demangle(rsp->rel_sname));
 			return (S_ERROR);
 
-		} else if ((IS_TLS_IE(rtype)) && (flags & FLG_OF_VERBOSE)) {
+		} else if ((IS_TLS_IE(rtype)) &&
+		    (flags & FLG_OF_VERBOSE)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_REL_TLSIE),
 			    conv_reloc_type(mach, rtype, 0, &inv_buf1),
@@ -1101,7 +1143,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 		}
 	}
 
-	return (ld_reloc_TLS(local, rsp, ofl));
+	return ((*ld_targ.t_mr.mr_reloc_TLS)(local, rsp, ofl));
 }
 
 uintptr_t
@@ -1115,8 +1157,9 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	Boolean		local;
 	Conv_inv_buf_t	inv_buf;
 
-	DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD, M_MACH, M_REL_SHT_TYPE,
-	    (void *)reloc, isname, reld->rel_sname));
+	DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD, ld_targ.t_m.m_mach,
+	    ld_targ.t_m.m_rel_sht_type, (void *)reloc, isname,
+	    reld->rel_sname));
 
 	/*
 	 * Indicate this symbol is being used for relocation and therefore must
@@ -1192,7 +1235,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		    reld->rel_isdesc->is_shdr->sh_type == SHT_SUNW_dof) {
 			local = TRUE;
 		} else if (!(flags & FLG_OF_RELOBJ) &&
-		    (IS_LOCALBND(rtype) || IS_SEG_RELATIVE(rtype))) {
+		    (IS_LOCALBND(rtype) ||
+		    IS_SEG_RELATIVE(rtype))) {
 			local = TRUE;
 		} else if (sdp->sd_ref == REF_REL_NEED) {
 			/*
@@ -1220,8 +1264,10 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	 * relocated symbol (PSARC 1999/636, bugid 4187211).  Scan the input
 	 * files symbol table to cross reference this relocation offset.
 	 */
-	if ((ofl->ofl_flags & FLG_OF_SHAROBJ) && IS_PC_RELATIVE(rtype) &&
-	    (IS_GOT_PC(rtype) == 0) && (IS_PLT(rtype) == 0)) {
+	if ((ofl->ofl_flags & FLG_OF_SHAROBJ) &&
+	    IS_PC_RELATIVE(rtype) &&
+	    (IS_GOT_PC(rtype) == 0) &&
+	    (IS_PLT(rtype) == 0)) {
 		if (disp_inspect(ofl, reld, local) == S_ERROR)
 			return (S_ERROR);
 	}
@@ -1231,7 +1277,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	 * they are relevant to the current GOT.  If not building a relocatable
 	 * object - give a appropriate error message.
 	 */
-	if (!local && !(flags & FLG_OF_RELOBJ) && IS_GOT_BASED(rtype)) {
+	if (!local && !(flags & FLG_OF_RELOBJ) &&
+	    IS_GOT_BASED(rtype)) {
 		Ifl_desc	*ifl = reld->rel_isdesc->is_file;
 
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTBASED),
@@ -1264,8 +1311,14 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	/*
 	 * Select the relocation to perform.
 	 */
-	if (IS_REGISTER(rtype))
-		return (ld_reloc_register(reld, isp, ofl));
+	if (IS_REGISTER(rtype)) {
+		if (ld_targ.t_mr.mr_reloc_register == NULL) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_NOREG));
+			return (S_ERROR);
+		}
+		return ((*ld_targ.t_mr.mr_reloc_register)(reld, isp, ofl));
+	}
 
 	if (flags & FLG_OF_RELOBJ)
 		return (reloc_relobj(local, reld, ofl));
@@ -1273,14 +1326,19 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	if (IS_TLS_INS(rtype))
 		return (reloc_TLS(local, reld, ofl));
 
-	if (IS_GOT_OPINS(rtype))
-		return (ld_reloc_GOTOP(local, reld, ofl));
+	if (IS_GOT_OPINS(rtype)) {
+		if (ld_targ.t_mr.mr_reloc_GOTOP == NULL) {
+			assert(0);
+			return (S_ERROR);
+		}
+		return ((*ld_targ.t_mr.mr_reloc_GOTOP)(local, reld, ofl));
+	}
 
 	if (IS_GOT_RELATIVE(rtype))
 		return (ld_reloc_GOT_relative(local, reld, ofl));
 
 	if (local)
-		return (ld_reloc_local(reld, ofl));
+		return ((*ld_targ.t_mr.mr_reloc_local)(reld, ofl));
 
 	if ((IS_PLT(rtype)) && ((flags & FLG_OF_BFLAG) == 0))
 		return (ld_reloc_plt(reld, ofl));
@@ -1288,7 +1346,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	if ((sdp->sd_ref == REF_REL_NEED) ||
 	    (flags & FLG_OF_BFLAG) || (flags & FLG_OF_SHAROBJ) ||
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_NOTYPE))
-		return (ld_add_outrel(NULL, reld, ofl));
+		return ((*ld_targ.t_mr.mr_add_outrel)(NULL, reld, ofl));
 
 	if (sdp->sd_ref == REF_DYN_NEED)
 		return (reloc_exec(reld, ofl));
@@ -1553,7 +1611,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	/*
 	 * Make sure the relocation is in the valid range.
 	 */
-	if (rtype >= M_R_NUM) {
+	if (rtype >= ld_targ.t_m.m_r_num) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_INVALRELT),
 		    ifl->ifl_name, isp->is_name, rtype);
 		return (S_ERROR);
@@ -1570,10 +1628,15 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		reld->rel_sym = 0;
 		reld->rel_sname = MSG_ORIG(MSG_STR_EMPTY);
 
-		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD, M_MACH,
-		    isp->is_shdr->sh_type, (void *)reloc, isp->is_name,
-		    reld->rel_sname));
-		return (ld_reloc_register(reld, isp, ofl));
+		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD,
+		    ld_targ.t_m.m_mach, isp->is_shdr->sh_type,
+		    (void *)reloc, isp->is_name, reld->rel_sname));
+		if (ld_targ.t_mr.mr_reloc_register == NULL) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_NOREG));
+			return (S_ERROR);
+		}
+		return ((*ld_targ.t_mr.mr_reloc_register)(reld, isp, ofl));
 	}
 
 	/*
@@ -1607,16 +1670,17 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 * warning and continue (the compiler folks can get into this
 	 * state some time).  Normal users should never see this error.
 	 */
-	if (rtype == M_R_NONE) {
-		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD, M_MACH,
-		    M_REL_SHT_TYPE, (void *)reloc, isp->is_name,
-		    reld->rel_sname));
+	if (rtype == ld_targ.t_m.m_r_none) {
+		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD,
+		    ld_targ.t_m.m_mach, ld_targ.t_m.m_rel_sht_type,
+		    (void *)reloc, isp->is_name, reld->rel_sname));
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_NULL),
 		    ifl->ifl_name, isp->is_name);
 		return (1);
 	}
 
-	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) && IS_NOTSUP(rtype)) {
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
+	    IS_NOTSUP(rtype)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOTSUP),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, isp->is_name);
@@ -1783,7 +1847,7 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 		 * relocation records processing.
 		 */
 		reld.rel_flags = flags;
-		rsndx = ld_init_rel(&reld, (void *)reloc);
+		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld, (void *)reloc);
 
 		if (process_reld(ofl, rsect, &reld, rsndx, reloc) == S_ERROR)
 			ret = S_ERROR;
@@ -1926,7 +1990,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 		 * Initialize the relocation record information.
 		 */
 		reld.rel_flags = FLG_REL_LOAD;
-		rsndx = ld_init_rel(&reld, (void *)reloc);
+		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld, (void *)reloc);
 
 		if (((mp = get_move_entry(rsect, reloc->r_offset)) == 0) ||
 		    ((reld.rel_move = libld_malloc(sizeof (Mv_desc))) == 0))
@@ -2018,7 +2082,7 @@ ld_reloc_init(Ofl_desc *ofl)
 	if (ld_sym_spec(ofl) == S_ERROR)
 		return (S_ERROR);
 
-	ofl->ofl_gotcnt = M_GOT_XNumber;
+	ofl->ofl_gotcnt = ld_targ.t_m.m_got_xnumber;
 
 	/*
 	 * First process all of the relocations against NON-writable
@@ -2086,14 +2150,10 @@ ld_reloc_init(Ofl_desc *ofl)
 		if (ld_make_got(ofl) == S_ERROR)
 			return (S_ERROR);
 
-#if	defined(__sparc)
-		if (ld_allocate_got(ofl) == S_ERROR)
+		/* Allocate the GOT if required by target */
+		if ((ld_targ.t_mr.mr_allocate_got != NULL) &&
+		    ((*ld_targ.t_mr.mr_allocate_got)(ofl) == S_ERROR))
 			return (S_ERROR);
-#elif	defined(__x86)
-/* nothing to do */
-#else
-#error Unknown architecture!
-#endif
 	}
 
 	return (1);
@@ -2181,7 +2241,7 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 		    orsp < rcp->rc_free; orsp++) {
 			if (debug == 0) {
 				DBG_CALL(Dbg_reloc_dooutrel(ofl->ofl_lml,
-				    M_REL_SHT_TYPE));
+				    ld_targ.t_m.m_rel_sht_type));
 				debug = 1;
 			}
 
@@ -2190,13 +2250,14 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 			 * order that it was originally processed.
 			 */
 			if (orsp->rel_flags & FLG_REL_PLT) {
-				if (ld_perform_outreloc(orsp, ofl) == S_ERROR)
+				if ((*ld_targ.t_mr.mr_perform_outreloc)(orsp,
+				    ofl) == S_ERROR)
 					error = S_ERROR;
 				continue;
 			}
 
-			if ((orsp->rel_rtype == M_R_RELATIVE) ||
-			    (orsp->rel_rtype == M_R_REGISTER)) {
+			if ((orsp->rel_rtype == ld_targ.t_m.m_r_relative) ||
+			    (orsp->rel_rtype == ld_targ.t_m.m_r_register)) {
 				sorted_list[index].rl_key1 = 0;
 				sorted_list[index].rl_key2 =
 				    /* LINTED */
@@ -2210,9 +2271,10 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 
 			if (orsp->rel_flags & FLG_REL_GOT)
 				sorted_list[index].rl_key3 =
-				    ld_calc_got_offset(orsp, ofl);
+				    (*ld_targ.t_mr.mr_calc_got_offset)(orsp,
+				    ofl);
 			else {
-				if (orsp->rel_rtype == M_R_REGISTER)
+				if (orsp->rel_rtype == ld_targ.t_m.m_r_register)
 					sorted_list[index].rl_key3 = 0;
 				else {
 					sorted_list[index].rl_key3 =
@@ -2236,8 +2298,8 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 	 * and process each relocation.
 	 */
 	for (index = 0; index < ofl->ofl_reloccnt; index++) {
-		if (ld_perform_outreloc(sorted_list[index].rl_rsp, ofl) ==
-		    S_ERROR)
+		if ((*ld_targ.t_mr.mr_perform_outreloc)
+		    (sorted_list[index].rl_rsp, ofl) == S_ERROR)
 			error = S_ERROR;
 	}
 
@@ -2283,7 +2345,7 @@ ld_reloc_process(Ofl_desc *ofl)
 	if (do_sorted_outrelocs(ofl) == S_ERROR)
 		return (S_ERROR);
 
-	if (ld_do_activerelocs(ofl) == S_ERROR)
+	if ((*ld_targ.t_mr.mr_do_activerelocs)(ofl) == S_ERROR)
 		return (S_ERROR);
 
 	if ((ofl->ofl_flags & FLG_OF_COMREL) == 0) {
@@ -2355,7 +2417,7 @@ ld_reloc_process(Ofl_desc *ofl)
 	 * .dynamic section (_DYNAMIC).
 	 */
 	if (flags & FLG_OF_DYNAMIC) {
-		if (ld_fillin_gotplt(ofl) == S_ERROR)
+		if ((*ld_targ.t_mr.mr_fillin_gotplt)(ofl) == S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -2364,7 +2426,8 @@ ld_reloc_process(Ofl_desc *ofl)
 	 * information if required.
 	 */
 	if ((osp = ofl->ofl_osgot) != NULL)
-		DBG_CALL(Dbg_got_display(ofl, osp->os_shdr->sh_addr, 1));
+		DBG_CALL(Dbg_got_display(ofl, osp->os_shdr->sh_addr, 1,
+		    ld_targ.t_m.m_got_xnumber, ld_targ.t_m.m_got_entsize));
 
 	return (1);
 }
@@ -2416,7 +2479,7 @@ ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl)
 	/*
 	 * Only give relocation errors against loadable read-only segments.
 	 */
-	if ((orsp->rel_rtype == M_R_REGISTER) || (!osp) ||
+	if ((orsp->rel_rtype == ld_targ.t_m.m_r_register) || (!osp) ||
 	    (osp->os_sgdesc->sg_phdr.p_type != PT_LOAD) ||
 	    (osp->os_sgdesc->sg_phdr.p_flags & PF_W))
 		return;
@@ -2457,8 +2520,8 @@ ld_assign_got_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl, Sym_desc *sdp,
 {
 	Word	rflags;
 
-	if (ld_assign_got_ndx(&(sdp->sd_GOTndxs), gnp, gref, ofl,
-	    rsp, sdp) == S_ERROR)
+	if ((*ld_targ.t_mr.mr_assign_got_ndx)(&(sdp->sd_GOTndxs), gnp,
+	    gref, ofl, rsp, sdp) == S_ERROR)
 		return (S_ERROR);
 
 	rflags = FLG_REL_GOT | rflag;
@@ -2466,7 +2529,7 @@ ld_assign_got_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl, Sym_desc *sdp,
 		rflags |= FLG_REL_SCNNDX;
 	rsp->rel_rtype = rtype1;
 
-	if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
+	if ((*ld_targ.t_mr.mr_add_outrel)(rflags, rsp, ofl) == S_ERROR)
 		return (S_ERROR);
 
 	if (local && (gref == GOT_REF_TLSIE)) {
@@ -2488,7 +2551,8 @@ ld_assign_got_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl, Sym_desc *sdp,
 			if (ld_add_actrel(rflags, rsp, ofl) == S_ERROR)
 				return (S_ERROR);
 		} else {
-			if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
+			if ((*ld_targ.t_mr.mr_add_outrel)(rflags, rsp, ofl) ==
+			    S_ERROR)
 				return (S_ERROR);
 		}
 	}
@@ -2591,6 +2655,49 @@ ld_am_I_partial(Rel_desc *reld, Xword val)
 }
 
 
+
+/*
+ * Return True (1) if the code processing the given relocation
+ * needs to perform byte swapping when accessing the section data.
+ */
+int
+ld_swap_reloc_data(Ofl_desc *ofl, Rel_desc *rsp)
+{
+	/*
+	 * In a cross-link situation where the linker host and target
+	 * have opposite byte orders, it can be necessary to swap bytes
+	 * when doing relocation processing. This is indicated by the
+	 * presence of the FLG_OF1_ENCDIFF flag bit. However, swapping
+	 * is only needed for the section types that libelf doesn't
+	 * automatically xlate.
+	 */
+	if ((ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0) {
+		switch (rsp->rel_osdesc->os_shdr->sh_type) {
+		case SHT_PROGBITS:
+			return (1);
+
+		case SHT_SPARC_GOTDATA:
+			if (ld_targ.t_m.m_mach ==
+			    LD_TARG_BYCLASS(EM_SPARC, EM_SPARCV9))
+				return (1);
+			break;
+
+		case SHT_AMD64_UNWIND:
+			if (ld_targ.t_m.m_mach == EM_AMD64)
+				return (1);
+			break;
+		}
+	}
+
+	/*
+	 * If FLG_OF1_ENCDIFF isn't set, or the section isn't
+	 * progbits (or similar), then no swapping is needed.
+	 */
+	return (0);
+}
+
+
+
 /*
  * Obtain the current value at the given relocation target.
  *
@@ -2609,15 +2716,7 @@ ld_reloc_targval_get(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword *value)
 {
 	const Rel_entry	*rep;
 
-	/* We do not currently support running as a cross linker */
-	if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
-		REL_ERR_NOSWAP(ofl->ofl_lml,
-		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
-		    rsp->rel_rtype);
-		return (0);
-	}
-
-	rep = &reloc_table[rsp->rel_rtype];
+	rep = &ld_targ.t_mr.mr_reloc_table[rsp->rel_rtype];
 
 	switch (rep->re_fsize) {
 	case 1:
@@ -2625,20 +2724,41 @@ ld_reloc_targval_get(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword *value)
 		*value = (Xword) *((uchar_t *)data);
 		break;
 	case 2:
-		/* LINTED */
-		*value = (Xword) *((Half *)data);
+		{
+			Half	v;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
+				UL_ASSIGN_BSWAP_HALF(v_bytes, data);
+			} else {
+				UL_ASSIGN_HALF(v_bytes, data);
+			}
+			*value = (Xword) v;
+		}
 		break;
 	case 4:
-		/* LINTED */
-		*value = *((Xword *)data);
+		{
+			Word	v;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
+				UL_ASSIGN_BSWAP_WORD(v_bytes, data);
+			} else {
+				UL_ASSIGN_WORD(v_bytes, data);
+			}
+			*value = (Xword) v;
+		}
 		break;
 	default:
-		/*
-		 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
-		 */
-		REL_ERR_UNSUPSZ(ofl->ofl_lml,
-		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
-		    rsp->rel_rtype, rep->re_fsize);
+		{
+			Conv_inv_buf_t inv_buf;
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_UNSUPSZ),
+			    conv_reloc_type(ld_targ.t_m.m_mach, rsp->rel_rtype,
+			    0, &inv_buf), rsp->rel_isdesc->is_file->ifl_name,
+			    (rsp->rel_sname ? demangle(rsp->rel_sname) :
+			    MSG_INTL(MSG_STR_UNKNOWN)), (int)rep->re_fsize);
+		}
 		return (0);
 	}
 	return (1);
@@ -2663,15 +2783,7 @@ ld_reloc_targval_set(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword value)
 {
 	const Rel_entry	*rep;
 
-	/* We do not currently support running as a cross linker */
-	if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
-		REL_ERR_NOSWAP(ofl->ofl_lml,
-		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
-		    rsp->rel_rtype);
-		return (0);
-	}
-
-	rep = &reloc_table[rsp->rel_rtype];
+	rep = &ld_targ.t_mr.mr_reloc_table[rsp->rel_rtype];
 
 	switch (rep->re_fsize) {
 	case 1:
@@ -2679,20 +2791,39 @@ ld_reloc_targval_set(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword value)
 		*((uchar_t *)data) = (uchar_t)value;
 		break;
 	case 2:
-		/* LINTED */
-		*((Half *)data) = (Half)value;
+		{
+			Half	v = (Half)value;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
+				UL_ASSIGN_BSWAP_HALF(data, v_bytes);
+			} else {
+				UL_ASSIGN_HALF(data, v_bytes);
+			}
+		}
 		break;
 	case 4:
-		/* LINTED */
-		*((Xword *)data) = value;
+		{
+			Word	v = (Word)value;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
+				UL_ASSIGN_BSWAP_WORD(data, v_bytes);
+			} else {
+				UL_ASSIGN_WORD(data, v_bytes);
+			}
+		}
 		break;
 	default:
-		/*
-		 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
-		 */
-		REL_ERR_UNSUPSZ(ofl->ofl_lml,
-		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
-		    rsp->rel_rtype, rep->re_fsize);
+		{
+			Conv_inv_buf_t inv_buf;
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_UNSUPSZ),
+			    conv_reloc_type(ld_targ.t_m.m_mach, rsp->rel_rtype,
+			    0, &inv_buf), rsp->rel_isdesc->is_file->ifl_name,
+			    (rsp->rel_sname ? demangle(rsp->rel_sname) :
+			    MSG_INTL(MSG_STR_UNKNOWN)), (int)rep->re_fsize);
+		}
 		return (0);
 	}
 	return (1);

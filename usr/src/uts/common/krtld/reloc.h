@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,17 +30,15 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(_KERNEL)
-#include <sys/machelf.h>
 #include <sys/bootconf.h>
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
 #else
-#include <machdep.h>
 #include <rtld.h>
 #include <conv.h>
 #endif /* _KERNEL */
 
-#include <relmach.h>
+#include "reloc_defs.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -48,107 +46,81 @@ extern "C" {
 
 /*
  * Global include file for relocation common code.
- *
- * Flags for reloc_entry->re_flags
  */
-#define	FLG_RE_NOTREL		0x00000000
-#define	FLG_RE_GOTADD		0x00000001	/* create a GOT entry */
-#define	FLG_RE_GOTREL		0x00000002	/* GOT based */
-#define	FLG_RE_GOTPC		0x00000004	/* GOT - P */
-#define	FLG_RE_GOTOPINS		0x00000008	/* GOTOP instruction */
-#define	FLG_RE_PCREL		0x00000010
-#define	FLG_RE_PLTREL		0x00000020
-#define	FLG_RE_VERIFY		0x00000040	/* verify value fits */
-#define	FLG_RE_UNALIGN		0x00000080	/* offset is not aligned */
-#define	FLG_RE_WDISP16		0x00000100	/* funky sparc DISP16 rel */
-#define	FLG_RE_SIGN		0x00000200	/* value is signed */
-#define	FLG_RE_ADDRELATIVE	0x00000400	/* RELATIVE relocation */
-						/*	required for non- */
-						/*	fixed objects */
-#define	FLG_RE_EXTOFFSET	0x00000800	/* extra offset required */
-#define	FLG_RE_REGISTER		0x00001000	/* relocation initializes */
-						/*    a REGISTER by OLO10 */
-#define	FLG_RE_SIZE		0x00002000	/* symbol size required */
-
-#define	FLG_RE_NOTSUP		0x00010000	/* relocation not supported */
-
-#define	FLG_RE_SEGREL		0x00040000	/* segment relative */
-#define	FLG_RE_SECREL		0x00080000	/* section relative */
-
-#define	FLG_RE_TLSGD		0x00200000	/* TLS GD relocation */
-#define	FLG_RE_TLSLD		0x00400000	/* TLS LD relocation */
-#define	FLG_RE_TLSIE		0x00800000	/* TLS IE relocation */
-#define	FLG_RE_TLSLE		0x01000000	/* TLS LE relocation */
-#define	FLG_RE_LOCLBND		0x02000000	/* relocation must bind */
-						/*    locally */
 
 /*
  * In user land, redefine the relocation table and relocation engine to be
- * class specific if necessary.  This allows both engines to reside in the
- * intel/amd version of libld.
+ * class/machine specific if necessary.  This allows multiple engines to
+ * reside within a single instance of libld.
  */
 #if	!defined(_KERNEL)
+
+#if defined(DO_RELOC_LIBLD)
+#undef DO_RELOC_LIBLD
+#endif
+
+#if	defined(DO_RELOC_LIBLD_X86)
+
+#define	DO_RELOC_LIBLD
 #if	defined(_ELF64)
-#define	do_reloc_ld		do64_reloc_ld
+#define	do_reloc_ld		do64_reloc_ld_x86
+#define	reloc_table		reloc64_table_x86
+#else
+#define	do_reloc_ld		do32_reloc_ld_x86
+#define	reloc_table		reloc32_table_x86
+#endif
+
+#elif	defined(DO_RELOC_LIBLD_SPARC)
+
+#define	DO_RELOC_LIBLD
+#if	defined(_ELF64)
+#define	do_reloc_ld		do64_reloc_ld_sparc
+#define	reloc_table		reloc64_table_sparc
+#else
+#define	do_reloc_ld		do32_reloc_ld_sparc
+#define	reloc_table		reloc32_table_sparc
+#endif
+
+#else				/* rtld */
+
+#if	defined(_ELF64)
 #define	do_reloc_rtld		do64_reloc_rtld
 #define	reloc_table		reloc64_table
 #else
-#define	do_reloc_ld		do32_reloc_ld
 #define	do_reloc_rtld		do32_reloc_rtld
 #define	reloc_table		reloc32_table
 #endif
+
 #endif
+
+#endif	/* !_KERNEL */
 
 /*
  * Relocation table and macros for testing relocation table flags.
  */
-extern	const Rel_entry		reloc_table[];
+extern	const Rel_entry	reloc_table[];
 
-#define	IS_PLT(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_PLTREL) != 0)
-#define	IS_GOT_RELATIVE(X)	((reloc_table[(X)].re_flags & \
-					FLG_RE_GOTADD) != 0)
-#define	IS_GOT_PC(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_GOTPC) != 0)
-#define	IS_GOTPCREL(X)		((reloc_table[(X)].re_flags & \
-					(FLG_RE_GOTPC | FLG_RE_GOTADD)) == \
-					(FLG_RE_GOTPC | FLG_RE_GOTADD))
-#define	IS_GOT_BASED(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_GOTREL) != 0)
-#define	IS_GOT_OPINS(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_GOTOPINS) != 0)
-#define	IS_GOT_REQUIRED(X)	((reloc_table[(X)].re_flags & \
-					(FLG_RE_GOTADD | FLG_RE_GOTREL | \
-					FLG_RE_GOTPC | FLG_RE_GOTOPINS)) != 0)
-#define	IS_PC_RELATIVE(X)	((reloc_table[(X)].re_flags & \
-					FLG_RE_PCREL) != 0)
-#define	IS_ADD_RELATIVE(X)	((reloc_table[(X)].re_flags & \
-					FLG_RE_ADDRELATIVE) != 0)
-#define	IS_REGISTER(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_REGISTER) != 0)
-#define	IS_NOTSUP(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_NOTSUP) != 0)
-#define	IS_SEG_RELATIVE(X)	((reloc_table[(X)].re_flags & \
-					FLG_RE_SEGREL) != 0)
-#define	IS_EXTOFFSET(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_EXTOFFSET) != 0)
-#define	IS_SEC_RELATIVE(X)	((reloc_table[(X)].re_flags & \
-					FLG_RE_SECREL) != 0)
-#define	IS_TLS_INS(X)		((reloc_table[(X)].re_flags & \
-					(FLG_RE_TLSGD | FLG_RE_TLSLD | \
-					FLG_RE_TLSIE | FLG_RE_TLSLE)) != 0)
-#define	IS_TLS_GD(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_TLSGD) != 0)
-#define	IS_TLS_LD(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_TLSLD) != 0)
-#define	IS_TLS_IE(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_TLSIE) != 0)
-#define	IS_TLS_LE(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_TLSLE) != 0)
-#define	IS_LOCALBND(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_LOCLBND) != 0)
-#define	IS_SIZE(X)		((reloc_table[(X)].re_flags &\
-					FLG_RE_SIZE) != 0)
+#define	IS_PLT(X)		RELTAB_IS_PLT(X, reloc_table)
+#define	IS_GOT_RELATIVE(X)	RELTAB_IS_GOT_RELATIVE(X, reloc_table)
+#define	IS_GOT_PC(X)		RELTAB_IS_GOT_PC(X, reloc_table)
+#define	IS_GOTPCREL(X)		RELTAB_IS_GOTPCREL(X, reloc_table)
+#define	IS_GOT_BASED(X)		RELTAB_IS_GOT_BASED(X, reloc_table)
+#define	IS_GOT_OPINS(X)		RELTAB_IS_GOT_OPINS(X, reloc_table)
+#define	IS_GOT_REQUIRED(X)	RELTAB_IS_GOT_REQUIRED(X, reloc_table)
+#define	IS_PC_RELATIVE(X)	RELTAB_IS_PC_RELATIVE(X, reloc_table)
+#define	IS_ADD_RELATIVE(X)	RELTAB_IS_ADD_RELATIVE(X, reloc_table)
+#define	IS_REGISTER(X)		RELTAB_IS_REGISTER(X, reloc_table)
+#define	IS_NOTSUP(X)		RELTAB_IS_NOTSUP(X, reloc_table)
+#define	IS_SEG_RELATIVE(X)	RELTAB_IS_SEG_RELATIVE(X, reloc_table)
+#define	IS_EXTOFFSET(X)		RELTAB_IS_EXTOFFSET(X, reloc_table)
+#define	IS_SEC_RELATIVE(X)	RELTAB_IS_SEC_RELATIVE(X, reloc_table)
+#define	IS_TLS_INS(X)		RELTAB_IS_TLS_INS(X, reloc_table)
+#define	IS_TLS_GD(X)		RELTAB_IS_TLS_GD(X, reloc_table)
+#define	IS_TLS_LD(X)		RELTAB_IS_TLS_LD(X, reloc_table)
+#define	IS_TLS_IE(X)		RELTAB_IS_TLS_IE(X, reloc_table)
+#define	IS_TLS_LE(X)		RELTAB_IS_TLS_LE(X, reloc_table)
+#define	IS_LOCALBND(X)		RELTAB_IS_LOCALBND(X, reloc_table)
+#define	IS_SIZE(X)		RELTAB_IS_SIZE(X, reloc_table)
 
 /*
  * Relocation engine.
@@ -161,6 +133,11 @@ extern	const Rel_entry		reloc_table[];
  *		the relocation engine that the data it is relocating
  *		has the opposite byte order of the system running the
  *		linker.
+ *	- The linker is a cross-linker, meaning that it can examine
+ *		relocation records for target hosts other than that of
+ *		the currently running system. This means that multiple
+ *		versions of the relocation code must be able to reside
+ *		in a single program, without namespace clashes.
  *
  * To ensure that there is never any confusion about which version is
  * being linked to, we give each variant a different name, even though
@@ -170,7 +147,7 @@ extern	const Rel_entry		reloc_table[];
  *	The kernel version is provided if the _KERNEL macro is defined.
  *
  *	do_reloc_ld()
- *	The ld version is provided if the DO_RELOC_LIBLD macro is defined.
+ *	The ld version is provided if the DO_RELOC_LIBLD_ macro is defined.
  *
  *	do_reloc_rtld()
  *	The rtld version is provided if neither _KERNEL or DO_RELOC_LIBLD
@@ -239,6 +216,7 @@ extern const char	*conv_reloc_SPARC_type(Word);
 #else
 #error platform not defined!
 #endif
+
 
 /*
  * Note:  dlerror() only keeps track of a single error string, and therefore
@@ -319,11 +297,6 @@ extern	const char *demangle(const char *);
 	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue))))
-
-#define	REL_ERR_NOSWAP(lml, file, sym, rtype) \
-	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSWAP), \
-	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
-	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN))))
 
 #endif	/* _KERNEL */
 

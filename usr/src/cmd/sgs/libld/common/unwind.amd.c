@@ -20,20 +20,23 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#define	ELF_TARGET_AMD64
 
 #include	<string.h>
 #include	<stdio.h>
 #include	<sys/types.h>
 #include	<sgs.h>
 #include	<debug.h>
+#include	<i386/machdep_x86.h>
 #include	<_libld.h>
-#include	<sys/elf_amd64.h>
 #include	<dwarf.h>
 #include	<stdlib.h>
+#include	"unwind.amd.h"
 
 /*
  * A EH_FRAME_HDR consists of the following:
@@ -170,7 +173,7 @@
  *  6. Data Align Factor      sleb128    To be multiplied with all offset
  *                                       in the Call Frame Instructions
  *
- *  7. Ret Address Reg          1        A "virtual' register representation
+ *  7. Ret Address Reg          1        A "virtual" register representation
  *                                       of the return address. In Dwarf V2,
  *                                       this is a byte, otherwise it is
  *                                       uleb128. It is a byte in gcc 3.3.x
@@ -392,6 +395,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 					 */
 					cieversion = data[off + ndx];
 					ndx += 1;
+					/* BEGIN CSTYLED */
 					if (cieversion != 1) {
 					    eprintf(ofl->ofl_lml, ERR_FATAL,
 						MSG_INTL(MSG_UNW_BADCIEVERS),
@@ -399,8 +403,10 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 						isp->is_name, off);
 					    return (S_ERROR);
 					}
-				} else
+					/* END CSTYLED */
+				} else {
 					fde_cnt++;
+				}
 				off += length + 4;
 			}
 		}
@@ -461,16 +467,17 @@ bintabcompare(const void *p1, const void *p2)
 uintptr_t
 populate_amd64_unwindhdr(Ofl_desc *ofl)
 {
-	unsigned char	    *hdrdata;
-	uint_t		    *binarytable;
-	uint_t		    hdroff;
-	Listnode	    *lnp;
-	Addr		    hdraddr;
-	Os_desc		    *hdrosp;
-	Os_desc		    *osp;
-	Os_desc		    *first_unwind;
-	uint_t		    fde_count;
-	uint_t		    *uint_ptr;
+	unsigned char	*hdrdata;
+	uint_t		*binarytable;
+	uint_t		hdroff;
+	Listnode	*lnp;
+	Addr		hdraddr;
+	Os_desc		*hdrosp;
+	Os_desc		*osp;
+	Os_desc		*first_unwind;
+	uint_t		fde_count;
+	uint_t		*uint_ptr;
+	int		bswap = (ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0;
 
 	/*
 	 * Are we building the unwind hdr?
@@ -595,6 +602,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 				 */
 				for (cieaugndx = 0; cieaugstr[cieaugndx];
 				    cieaugndx++) {
+					/* BEGIN CSTYLED */
 					switch (cieaugstr[cieaugndx]) {
 					case 'z':
 					    /* size */
@@ -626,6 +634,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 					    fndx++;
 					    break;
 					}
+					/* END CSTYLED */
 				}
 			} else {
 				uint_t	    bintabndx;
@@ -645,10 +654,10 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 				initloc = dwarf_ehe_extract(&fdata[foff],
 				    &fndx, cieRflag, ofl->ofl_dehdr->e_ident,
 				    shdr->sh_addr + foff + fndx);
-				binarytable[bintabndx] = (uint_t)(initloc -
-					hdraddr);
-				binarytable[bintabndx + 1] = (uint_t)(fdeaddr -
-					hdraddr);
+				binarytable[bintabndx] =
+				    (uint_t)(initloc - hdraddr);
+				binarytable[bintabndx + 1] =
+				    (uint_t)(fdeaddr - hdraddr);
 			}
 
 			/*
@@ -660,11 +669,21 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 	}
 
 	/*
-	 * Do a quick sort on the binary table
+	 * Do a quick sort on the binary table. If this is a cross
+	 * link from a system with the opposite byte order, xlate
+	 * the resulting values into LSB order.
 	 */
 	framehdr_addr = hdraddr;
 	qsort((void *)binarytable, (size_t)fde_count,
-		(size_t)(sizeof (uint_t) * 2), bintabcompare);
+	    (size_t)(sizeof (uint_t) * 2), bintabcompare);
+	if (bswap) {
+		uint_t	*btable = binarytable;
+		uint_t	cnt;
+
+		for (cnt = fde_count * 2; cnt-- > 0; btable++)
+			*btable = ld_bswap_Word(*btable);
+	}
+
 	/*
 	 * Fill in:
 	 *	first_frame_ptr
@@ -674,12 +693,16 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 	/* LINTED */
 	uint_ptr = (uint_t *)(&hdrdata[hdroff]);
 	*uint_ptr = first_unwind->os_shdr->sh_addr -
-		hdrosp->os_shdr->sh_addr + hdroff;
+	    hdrosp->os_shdr->sh_addr + hdroff;
+	if (bswap)
+		*uint_ptr = ld_bswap_Word(*uint_ptr);
 
 	hdroff += 4;
 	/* LINTED */
 	uint_ptr = (uint_t *)&hdrdata[hdroff];
 	*uint_ptr = fde_count;
+	if (bswap)
+		*uint_ptr = ld_bswap_Word(*uint_ptr);
 
 	return (1);
 }
@@ -695,12 +718,12 @@ append_amd64_unwind(Os_desc *osp, Ofl_desc * ofl)
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, _osp))
 		if (osp == _osp)
-		    return (1);
+			return (1);
 
 	/*
 	 * Append output section to unwind list
 	 */
 	if (list_appendc(&ofl->ofl_unwind, osp) == 0)
-	    return (S_ERROR);
+		return (S_ERROR);
 	return (1);
 }

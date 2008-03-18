@@ -32,6 +32,9 @@
 /*
  * Symbol table management routines
  */
+
+#define	ELF_TARGET_AMD64
+
 #include	<stdio.h>
 #include	<string.h>
 #include	<debug.h>
@@ -78,7 +81,6 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
     int symndx, Word shndx, const char *symsecname, const char *strsecname,
     Word *flags)
 {
-	const char	*regname;
 	Word		name = sym->st_name;
 
 	if (name) {
@@ -101,12 +103,16 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 	 * Determine if we're dealing with a register and if so validate it.
 	 * If it's a scratch register, a fabricated name will be returned.
 	 */
-	if ((regname = ld_is_regsym(ofl, ifl, sym, strs, symndx, shndx,
-	    symsecname, flags)) == (const char *)S_ERROR) {
-		return (0);
+	if (ld_targ.t_ms.ms_is_regsym != NULL) {
+		const char *regname = (*ld_targ.t_ms.ms_is_regsym)(ofl, ifl,
+		    sym, strs, symndx, shndx, symsecname, flags);
+
+		if (regname == (const char *)S_ERROR) {
+			return (0);
+		}
+		if (regname)
+			return (regname);
 	}
-	if (regname)
-		return (regname);
 
 	/*
 	 * If this isn't a register, but we have a global symbol with a null
@@ -121,6 +127,69 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 		    ifl->ifl_name, symsecname, symndx, EC_XWORD(name));
 	}
 	return (strs + name);
+}
+
+
+/*
+ * For producing symbol names strings to use in error messages.
+ * If the symbol has a non-null name, then the string returned by
+ * this function is the output from demangle(), surrounded by
+ * single quotes. For null names, a descriptive string giving
+ * the symbol section and index is generated.
+ *
+ * This function uses an internal static buffer to hold the resulting
+ * string. The value returned is usable by the caller until the next
+ * call, at which point it is overwritten.
+ */
+static const char *
+demangle_symname(const char *name, const char *symtab_name, Word symndx)
+{
+#define	INIT_BUFSIZE 256
+
+	static char *buf;
+	static size_t bufsize = 0;
+
+	size_t		len;
+	int		use_name;
+
+
+	use_name = (name != NULL) && (*name != '\0');
+
+	if (use_name) {
+		name = demangle(name);
+		len = strlen(name) + 2;   /* Include room for quotes */
+	} else {
+		name = MSG_ORIG(MSG_STR_EMPTY);
+		len = strlen(symtab_name) + 2 + CONV32_INV_BUFSIZE;
+	}
+	len++;			/* Null termination */
+
+	/* If our buffer is too small, double it until it is big enough */
+	if (len > bufsize) {
+		size_t	new_bufsize = bufsize;
+		char	*new_buf;
+
+		if (new_bufsize == 0)
+			new_bufsize = INIT_BUFSIZE;
+		while (len > new_bufsize)
+			new_bufsize *= 2;
+		new_buf = libld_malloc(new_bufsize);
+		if (new_buf == NULL)
+			return (name);
+		buf = new_buf;
+		bufsize = new_bufsize;
+	}
+
+	if (use_name) {
+		(void) snprintf(buf, bufsize, MSG_ORIG(MSG_FMT_SYMNAM), name);
+	} else {
+		(void) snprintf(buf, bufsize, MSG_ORIG(MSG_FMT_NULLSYMNAM),
+		    symtab_name, EC_WORD(symndx));
+	}
+
+	return (buf);
+
+#undef INIT_BUFSIZE
 }
 
 /*
@@ -356,8 +425,9 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	if (sdflags & FLG_SY_SPECSEC) {
 		if (nsym->st_shndx == SHN_COMMON)
 			sdp->sd_flags |= FLG_SY_TENTSYM;
-#if	defined(__x86) && defined(_ELF64)
-		else if (nsym->st_shndx == SHN_X86_64_LCOMMON)
+#if	defined(_ELF64)
+		else if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+		    (nsym->st_shndx == SHN_X86_64_LCOMMON))
 			sdp->sd_flags |= FLG_SY_TENTSYM;
 #endif
 	}
@@ -464,9 +534,10 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	if ((etype == ET_REL) &&
 	    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL) &&
 	    ((nsym->st_shndx == SHN_UNDEF) || ((sdflags & FLG_SY_SPECSEC) &&
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 	    ((nsym->st_shndx == SHN_COMMON) ||
-	    (nsym->st_shndx == SHN_X86_64_LCOMMON)))))
+	    ((ld_targ.t_m.m_mach == EM_AMD64) &&
+	    (nsym->st_shndx == SHN_X86_64_LCOMMON))))))
 #else
 	/* BEGIN CSTYLED */
 	    (nsym->st_shndx == SHN_COMMON))))
@@ -1022,7 +1093,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	Word		undef = 0, needed = 0, verdesc = 0;
 	Xword		bssalign = 0, tlsalign = 0;
 	Xword		bsssize = 0, tlssize = 0;
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 	Xword		lbssalign = 0, lbsssize = 0;
 #endif
 	int		ret;
@@ -1381,13 +1452,14 @@ ld_sym_validate(Ofl_desc *ofl)
 			}
 		}
 
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 		/*
 		 * Calculate the size and alignment requirement for the global
 		 * .lbss. TLS or partially initialized symbols do not need to be
 		 * considered yet.
 		 */
-		if (sym->st_shndx == SHN_X86_64_LCOMMON) {
+		if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+		    (sym->st_shndx == SHN_X86_64_LCOMMON)) {
 			lbsssize = (Xword)S_ROUND(lbsssize, sym->st_value) +
 			    sym->st_size;
 			if (sym->st_value > lbssalign)
@@ -1529,8 +1601,9 @@ ld_sym_validate(Ofl_desc *ofl)
 		if (ld_make_bss(ofl, tlssize, tlsalign, MAKE_TLS) == S_ERROR)
 			return (S_ERROR);
 	}
-#if	defined(__x86) && defined(_ELF64)
-	if (lbsssize && !(oflags & FLG_OF_RELOBJ)) {
+#if	defined(_ELF64)
+	if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+	    lbsssize && !(oflags & FLG_OF_RELOBJ)) {
 		if (ld_make_bss(ofl, lbsssize, lbssalign, MAKE_LBSS) == S_ERROR)
 			return (S_ERROR);
 	}
@@ -1844,14 +1917,19 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			Word		shndx, sdflags = FLG_SY_CLEAN;
 			const char	*name;
 			Sym_desc	*rsdp;
+			int		shndx_bad = 0;
 
 			/*
-			 * Determine the associated section index.
+			 * Determine and validate the associated section index.
 			 */
-			if (symshndx && (sym->st_shndx == SHN_XINDEX))
+			if (symshndx && (sym->st_shndx == SHN_XINDEX)) {
 				shndx = symshndx[ndx];
-			else if ((shndx = sym->st_shndx) >= SHN_LORESERVE)
+			} else if ((shndx = sym->st_shndx) >= SHN_LORESERVE) {
 				sdflags |= FLG_SY_SPECSEC;
+			} else if (shndx > ifl->ifl_ehdr->e_shnum) {
+				/* We need the name before we can issue error */
+				shndx_bad = 1;
+			}
 
 			/*
 			 * Check if st_name has a valid value or not.
@@ -1859,6 +1937,19 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			if ((name = string(ofl, ifl, sym, strs, strsize, ndx,
 			    shndx, symsecname, strsecname, &sdflags)) == 0) {
 				ofl->ofl_flags |= FLG_OF_FATAL;
+				continue;
+			}
+
+			/*
+			 * Now that we have the name, if the section index
+			 * was bad, report it.
+			 */
+			if (shndx_bad) {
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_SYM_INVSHNDX),
+				    demangle_symname(name, isc->is_name, ndx),
+				    ifl->ifl_name,
+				    conv_sym_shndx(sym->st_shndx, &inv_buf));
 				continue;
 			}
 
@@ -1873,15 +1964,20 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 */
 			rsdp = sdp = 0;
 			if (sdflags & FLG_SY_REGSYM) {
-				if ((rsdp = ld_reg_find(sym, ofl)) != 0) {
+				/*
+				 * The presence of FLG_SY_REGSYM means that
+				 * the pointers in ld_targ.t_ms are non-NULL.
+				 */
+				rsdp = (*ld_targ.t_ms.ms_reg_find)(sym, ofl);
+				if (rsdp != 0) {
 					/*
 					 * The fact that another register def-
 					 * inition has been found is fatal.
 					 * Call the verification routine to get
 					 * the error message and move on.
 					 */
-					(void) ld_reg_check(rsdp, sym, name,
-					    ifl, ofl);
+					(void) (*ld_targ.t_ms.ms_reg_check)
+					    (rsdp, sym, name, ifl, ofl);
 					continue;
 				}
 
@@ -1936,9 +2032,13 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				/*
 				 * If this register symbol hasn't already been
 				 * recorded, enter it now.
+				 *
+				 * The presence of FLG_SY_REGSYM means that
+				 * the pointers in ld_targ.t_ms are non-NULL.
 				 */
 				if ((rsdp == 0) &&
-				    (ld_reg_enter(sdp, ofl) == 0))
+				    ((*ld_targ.t_ms.ms_reg_enter)(sdp, ofl) ==
+				    0))
 					return (S_ERROR);
 			}
 
@@ -1969,8 +2069,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				if (sym->st_shndx == SHN_UNDEF) {
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_SYM_INVSHNDX),
-					    demangle(sdp->sd_name),
-					    ifl->ifl_name,
+					    demangle_symname(name, isc->is_name,
+					    ndx), ifl->ifl_name,
 					    conv_sym_shndx(sym->st_shndx,
 					    &inv_buf));
 				}
@@ -2022,7 +2122,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    (sdp->sd_isc && (sdp->sd_isc->is_osdesc == 0))) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
-				    demangle(sdp->sd_name), ifl->ifl_name,
+				    demangle_symname(name, isc->is_name, ndx),
+				    ifl->ifl_name,
 				    conv_sym_shndx(sym->st_shndx, &inv_buf));
 				sdp->sd_isc = NULL;
 				sdp->sd_flags |= FLG_SY_INVALID;
@@ -2080,16 +2181,18 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	for (ndx = (int)local; ndx < total; sym++, ndx++) {
 		const char	*name;
 		Word		shndx, sdflags = 0;
+		int		shndx_bad = 0;
 
 		/*
-		 * Determine the associated section index.
+		 * Determine and validate the associated section index.
 		 */
 		if (symshndx && (sym->st_shndx == SHN_XINDEX)) {
 			shndx = symshndx[ndx];
-		} else {
-			shndx = sym->st_shndx;
-			if (sym->st_shndx >= SHN_LORESERVE)
-				sdflags |= FLG_SY_SPECSEC;
+		} else if ((shndx = sym->st_shndx) >= SHN_LORESERVE) {
+			sdflags |= FLG_SY_SPECSEC;
+		} else if (shndx > ifl->ifl_ehdr->e_shnum) {
+			/* We need the name before we can issue error */
+			shndx_bad = 1;
 		}
 
 		/*
@@ -2100,6 +2203,20 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
+
+		/*
+		 * Now that we have the name, if the section index
+		 * was bad, report it.
+		 */
+		if (shndx_bad) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_SYM_INVSHNDX),
+			    demangle_symname(name, isc->is_name, ndx),
+			    ifl->ifl_name,
+			    conv_sym_shndx(sym->st_shndx, &inv_buf));
+			continue;
+		}
+
 
 		/*
 		 * Test for the GNU hidden bit, and ignore symbols that
@@ -2136,7 +2253,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		bind = ELF_ST_BIND(sym->st_info);
 		if ((bind != STB_GLOBAL) && (bind != STB_WEAK)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_SYM_NONGLOB), demangle(name),
+			    MSG_INTL(MSG_SYM_NONGLOB),
+			    demangle_symname(name, isc->is_name, ndx),
 			    ifl->ifl_name,
 			    conv_sym_info_bind(bind, 0, &inv_buf));
 			continue;
@@ -2158,7 +2276,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				 * unless a relocation is required against it.
 				 */
 				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_SYM_INVSHNDX), demangle(name),
+				    MSG_INTL(MSG_SYM_INVSHNDX),
+				    demangle_symname(name, isc->is_name, ndx),
 				    ifl->ifl_name,
 				    conv_sym_shndx(sym->st_shndx, &inv_buf));
 				continue;
@@ -2229,12 +2348,17 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		if (sdp->sd_flags & FLG_SY_REGSYM) {
 			Sym_desc	*rsdp;
 
-			if ((rsdp = ld_reg_find(sdp->sd_sym, ofl)) == 0) {
-				if (ld_reg_enter(sdp, ofl) == 0)
+			/*
+			 * The presence of FLG_SY_REGSYM means that
+			 * the pointers in ld_targ.t_ms are non-NULL.
+			 */
+			rsdp = (*ld_targ.t_ms.ms_reg_find)(sdp->sd_sym, ofl);
+			if (rsdp == 0) {
+				if ((*ld_targ.t_ms.ms_reg_enter)(sdp, ofl) == 0)
 					return (S_ERROR);
 			} else if (rsdp != sdp) {
-				(void) ld_reg_check(rsdp, sdp->sd_sym,
-				    sdp->sd_name, ifl, ofl);
+				(void) (*ld_targ.t_ms.ms_reg_check)(rsdp,
+				    sdp->sd_sym, sdp->sd_name, ifl, ofl);
 			}
 		}
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -91,6 +91,7 @@
 @ MSG_DESC_FLAGS1	"DT_FLAGS_1 bit values"
 @ MSG_DESC_FEATURE1	"DT_FEATURE_1 bit values"
 @ MSG_DESC_CHECKSUM	"Recompute DT_CHECKSUM"
+@ MSG_DESC_SUNW_LDMACH	"Linker machine type"
 
 
 # Commmand option description strings
@@ -188,6 +189,11 @@
    Feature values. This can be an integer value, or any of\n\
    the DTF_1_ symbolic constants defined in\n\
    /usr/include/sys/link.h\n"
+
+@ MSG_A1_SUNW_LDMACH_VALUE	"\
+   Machine type of link-editor that built the object being edited.\n\
+   This can be an integer value, or any of the EM_ symbolic\n\
+   constants defined in /usr/include/elf.h\n"
 
 
 # Help strings
@@ -386,6 +392,22 @@
    DT_CHECKSUM element, and room for it exists at the end\n\
    of the section, a new one is inserted.\n"
 
+@ MSG_HELP_SUNW_LDMACH	"   \
+   The dyn:sunw_ldmach command is used to display or alter the\n\
+   DT_SUNW_LDMACH dynamic element of the ELF object. This dynamic\n\
+   element records the ELF machine type of the link-editor that produced\n\
+   the object. This is of special interest if the object was built\n\
+   by a cross link-editor instead of being linked on a machine of the\n\
+   same type as the object.\n\
+   \n\
+   If dyn:sunw_ldmach is called without arguments, the current\n\
+   value is shown. If called with the value argument, the\n\
+   DT_SUNW_LDMACH dynamic element is set to the specified machine type.\n\
+   \n\
+   If the current dynamic section does not have a current\n\
+   DT_SUNW_LDMACH element, and room for it exists at the end\n\
+   of the section, a new one is inserted.\n"
+
 @ _END_
 
 
@@ -429,3 +451,4 @@
 @ MSG_CMD_FLAGS1	"flags1"
 @ MSG_CMD_FEATURE1	"feature1"
 @ MSG_CMD_CHECKSUM	"checksum"
+@ MSG_CMD_SUNW_LDMACH	"sunw_ldmach"

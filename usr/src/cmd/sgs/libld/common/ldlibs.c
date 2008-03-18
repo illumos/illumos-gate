@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -313,7 +313,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(reject[rej.rej_type]),
 		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-		    conv_reject_desc(&rej, &rej_buf));
+		    conv_reject_desc(&rej, &rej_buf, ld_targ.t_m.m_mach));
 	} else {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_NOTFOUND),
 		    name);

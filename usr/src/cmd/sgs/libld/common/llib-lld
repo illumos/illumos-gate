@@ -22,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,8 @@ uintptr_t	ld64_ent_setup(Ofl_desc *, Xword);
 uintptr_t	ld32_init_strings(Ofl_desc *);
 uintptr_t	ld64_init_strings(Ofl_desc *);
 
-int		ld32_main(int, char **);
-int		ld64_main(int, char **);
+int		ld32_main(int, char **, Elf32_Half);
+int		ld64_main(int, char **, Elf64_Half);
 uintptr_t	ld32_make_sections(Ofl_desc *);
 uintptr_t	ld64_make_sections(Ofl_desc *);
 

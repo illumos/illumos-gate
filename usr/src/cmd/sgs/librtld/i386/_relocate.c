@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,7 @@ undo_reloc(void *vrel, uchar_t *oaddr, uchar_t *iaddr, Reloc *reloc)
 	/* LINTED */
 	ulong_t	*_iaddr = (ulong_t *)iaddr;
 
-	switch (ELF_R_TYPE(rel->r_info)) {
+	switch (ELF_R_TYPE(rel->r_info, M_MACH)) {
 	case R_386_NONE:
 		break;
 
@@ -85,7 +85,7 @@ inc_reloc(void *vnrel, void *vorel, Reloc *reloc, uchar_t *oaddr,
 	/* LINTED */
 	ulong_t	*_iaddr = (ulong_t *)iaddr;
 
-	if (ELF_R_TYPE(nrel->r_info) == R_386_JMP_SLOT) {
+	if (ELF_R_TYPE(nrel->r_info, M_MACH) == R_386_JMP_SLOT) {
 		if (_iaddr)
 			*_oaddr = *_iaddr + reloc->r_value;
 		else
@@ -118,7 +118,7 @@ apply_reloc(void *vrel, Reloc *reloc, const char *name, uchar_t *oaddr,
     Rt_map *lmp)
 {
 	Rel	*rel = vrel;
-	Xword	type = ELF_R_TYPE(rel->r_info);
+	Xword	type = ELF_R_TYPE(rel->r_info, M_MACH);
 	Word	value = reloc->r_value;
 
 	if (type == R_386_JMP_SLOT) {

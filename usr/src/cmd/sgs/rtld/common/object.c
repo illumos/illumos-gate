@@ -79,8 +79,15 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 		return (0);
 
 	/*
-	 * Obtain a generic set of entrance criteria (this is the first call to
-	 * libld.so, which will effectively lazyload it).
+	 * Configure libld.so to process objects of the desired target
+	 * type (this is the first call to libld.so, which will effectively
+	 * lazyload it).
+	 */
+	if (ld_init_target(lml, M_MACH) != 0)
+		return (0);
+
+	/*
+	 * Obtain a generic set of entrance criteria
 	 */
 	if (ld_ent_setup(ofl, syspagsz) == S_ERROR)
 		return (0);

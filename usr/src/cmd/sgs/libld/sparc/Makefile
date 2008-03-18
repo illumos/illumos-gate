@@ -20,20 +20,15 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-L_MACHOBJS32 =	machrel.sparc32.o	machsym.sparc32.o
-L_MACHOBJS64 =	machrel.sparc64.o	machsym.sparc64.o
-
 include		../Makefile.com
 
 .KEEP_STATE:
-
-SGSMSGTARG +=	$(SGSMSGSPARC)
 
 all:		$(DYNLIB) $(LIBLINKS)
 
@@ -41,37 +36,3 @@ install \
 package:	all $(ROOTFS_DYNLIB)
 
 include		../Makefile.targ
-
-# Associate ELF32 and ELF64 objects to the appropriate headers.
-
-pics/%32.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
-pics/%64.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
-
-# Associate the various lint targets with the appropriate headers/files.
-
-$(LINTOUT32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
-		    $(ELFTARGET32)
-$(LINTOUT64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
-		    $(ELFTARGET64) -D_ELF64
-$(LINTLIB32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
-		    $(ELFTARGET32)
-$(LINTLIB64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
-		    $(ELFTARGET64) -D_ELF64
-
-LINTSRCS32 +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
-LINTSRCS64 +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
-
-# Compensate chkmsg with the doreloc family.
-
-CHKSRCS +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
-CHKSRCS +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
-
-pics/%32.o: \
-		$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
-		$(POST_PROCESS_O)
-
-pics/%64.o: \
-		$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
-		$(POST_PROCESS_O)

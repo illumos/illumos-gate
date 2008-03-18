@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,7 @@ undo_reloc(void *vrel, uchar_t *oaddr, uchar_t *iaddr, Reloc *reloc)
 {
 	Rela		*rel = vrel;
 	const Rel_entry	*rep;
-	Xword		rtype = ELF_R_TYPE(rel->r_info);
+	Xword		rtype = ELF_R_TYPE(rel->r_info, M_MACH);
 	ulong_t		*_oaddr;
 	ulong_t		*_iaddr;
 
@@ -117,7 +117,7 @@ apply_reloc(void *vrel, Reloc *reloc, const char *name, uchar_t *oaddr,
     Rt_map *lmp)
 {
 	Rela	*rel = vrel;
-	Xword	type = ELF_R_TYPE(rel->r_info);
+	Xword	type = ELF_R_TYPE(rel->r_info, M_MACH);
 	Xword	value = reloc->r_value + rel->r_addend;
 
 	if (type == R_AMD64_JUMP_SLOT) {

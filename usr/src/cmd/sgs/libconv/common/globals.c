@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<strings.h>
-#include	<sys/machelf.h>
+#include	<_machelf.h>
 #include	"_conv.h"
 #include	"globals_msg.h"
 

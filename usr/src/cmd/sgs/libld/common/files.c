@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,10 @@
 /*
  * Processing of relocatable objects and shared objects.
  */
+
+#define	ELF_TARGET_AMD64
+#define	ELF_TARGET_SPARC
+
 #include	<stdio.h>
 #include	<string.h>
 #include	<fcntl.h>
@@ -53,14 +57,14 @@ ifl_verify(Ehdr * ehdr, Ofl_desc * ofl, Rej_desc * rej)
 	 * Check the validity of the elf header information for compatibility
 	 * with this machine and our own internal elf library.
 	 */
-	if ((ehdr->e_machine != M_MACH) &&
-	    ((ehdr->e_machine != M_MACHPLUS) &&
-	    ((ehdr->e_flags & M_FLAGSPLUS) == 0))) {
+	if ((ehdr->e_machine != ld_targ.t_m.m_mach) &&
+	    ((ehdr->e_machine != ld_targ.t_m.m_machplus) &&
+	    ((ehdr->e_flags & ld_targ.t_m.m_flagsplus) == 0))) {
 		rej->rej_type = SGS_REJ_MACH;
 		rej->rej_info = (uint_t)ehdr->e_machine;
 		return (0);
 	}
-	if (ehdr->e_ident[EI_DATA] != M_DATA) {
+	if (ehdr->e_ident[EI_DATA] != ld_targ.t_m.m_data) {
 		rej->rej_type = SGS_REJ_DATA;
 		rej->rej_info = (uint_t)ehdr->e_ident[EI_DATA];
 		return (0);
@@ -87,7 +91,8 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
 
 	if (ifl_verify(ehdr, ofl, &_rej) == 0) {
 		_rej.rej_name = name;
-		DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
+		DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
+		    ld_targ.t_m.m_mach));
 		if (rej->rej_type == 0) {
 			*rej = _rej;
 			rej->rej_name = strdup(_rej.rej_name);
@@ -251,7 +256,7 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_OVSFCAP) {
 		Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_IGNORE, CA_SUNW_SF_1,
-		    val, M_MACH);
+		    val, ld_targ.t_m.m_mach);
 		return;
 	}
 
@@ -278,9 +283,9 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 	}
 
 	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_OLD, CA_SUNW_SF_1,
-	    ofl->ofl_sfcap_1, M_MACH);
+	    ofl->ofl_sfcap_1, ld_targ.t_m.m_mach);
 	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_SF_1,
-	    val, M_MACH);
+	    val, ld_targ.t_m.m_mach);
 
 	/*
 	 * Determine the resolution of the present frame pointer and the
@@ -305,7 +310,7 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 	}
 
 	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_RESOLVED, CA_SUNW_SF_1,
-	    ofl->ofl_sfcap_1, M_MACH);
+	    ofl->ofl_sfcap_1, ld_targ.t_m.m_mach);
 }
 
 /*
@@ -323,7 +328,7 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_OVHWCAP) {
 		Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_IGNORE, CA_SUNW_HW_1,
-		    val, M_MACH);
+		    val, ld_targ.t_m.m_mach);
 		return;
 	}
 
@@ -335,13 +340,14 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 		return;
 
 	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_OLD, CA_SUNW_HW_1,
-	    ofl->ofl_hwcap_1, M_MACH);
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_HW_1, val, M_MACH);
+	    ofl->ofl_hwcap_1, ld_targ.t_m.m_mach);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_HW_1, val,
+	    ld_targ.t_m.m_mach);
 
 	ofl->ofl_hwcap_1 |= val;
 
 	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_RESOLVED, CA_SUNW_HW_1,
-	    ofl->ofl_hwcap_1, M_MACH);
+	    ofl->ofl_hwcap_1, ld_targ.t_m.m_mach);
 }
 
 /*
@@ -395,7 +401,8 @@ static uintptr_t
 process_input(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Word ndx, int ident, Ofl_desc *ofl)
 {
-	return (process_section(name, ifl, shdr, scn, ndx, M_ID_NULL, ofl));
+	return (process_section(name, ifl, shdr, scn, ndx,
+	    ld_targ.t_id.id_null, ofl));
 }
 
 /*
@@ -410,7 +417,7 @@ process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Word ndx, int ident, Ofl_desc *ofl)
 {
 	if (process_section(name, ifl,
-	    shdr, scn, ndx, M_ID_NULL, ofl) == S_ERROR)
+	    shdr, scn, ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 		return (S_ERROR);
 
 	if (ifl->ifl_ehdr->e_type == ET_REL) {
@@ -453,9 +460,9 @@ process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * be null.  Otherwise make sure we don't have a .strtab section as this
 	 * should not be added to the output section list either.
 	 */
-	if ((ident != M_ID_NULL) &&
+	if ((ident != ld_targ.t_id.id_null) &&
 	    (strcmp(name, MSG_ORIG(MSG_SCN_STRTAB)) == 0))
-		ident = M_ID_NULL;
+		ident = ld_targ.t_id.id_null;
 
 	error = process_section(name, ifl, shdr, scn, ndx, ident, ofl);
 	if ((error == 0) || (error == S_ERROR))
@@ -538,14 +545,14 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 */
 	if (ident) {
 		if (shdr->sh_flags & SHF_TLS)
-			ident = M_ID_TLS;
+			ident = ld_targ.t_id.id_tls;
 		else if ((shdr->sh_flags & ~ALL_SHF_IGNORE) ==
 		    (SHF_ALLOC | SHF_EXECINSTR))
-			ident = M_ID_TEXT;
+			ident = ld_targ.t_id.id_text;
 		else if (shdr->sh_flags & SHF_ALLOC) {
 			if ((strcmp(name, MSG_ORIG(MSG_SCN_PLT)) == 0) ||
 			    (strcmp(name, MSG_ORIG(MSG_SCN_GOT)) == 0))
-				ident = M_ID_NULL;
+				ident = ld_targ.t_id.id_null;
 			else if (stab_index) {
 				/*
 				 * This is a work-around for x86 compilers that
@@ -559,11 +566,11 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 				 * strip (ld -s) against a shared object whose
 				 * last section in the text segment is a .stab.
 				 */
-				ident = M_ID_INTERP;
+				ident = ld_targ.t_id.id_interp;
 			} else
-				ident = M_ID_DATA;
+				ident = ld_targ.t_id.id_data;
 		} else
-			ident = M_ID_NOTE;
+			ident = ld_targ.t_id.id_note;
 	}
 	return (process_section(name, ifl, shdr, scn, ndx, ident, ofl));
 }
@@ -593,13 +600,14 @@ process_nobits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 {
 	if (ident) {
 		if (shdr->sh_flags & SHF_TLS)
-			ident = M_ID_TLSBSS;
-#if	defined(__x86) && defined(_ELF64)
-		else if (shdr->sh_flags & SHF_AMD64_LARGE)
-			ident = M_ID_LBSS;
+			ident = ld_targ.t_id.id_tlsbss;
+#if	defined(_ELF64)
+		else if ((shdr->sh_flags & SHF_AMD64_LARGE) &&
+		    (ld_targ.t_m.m_mach == EM_AMD64))
+			ident = ld_targ.t_id.id_lbss;
 #endif
 		else
-			ident = M_ID_BSS;
+			ident = ld_targ.t_id.id_bss;
 	}
 	return (process_section(name, ifl, shdr, scn, ndx, ident, ofl));
 }
@@ -615,7 +623,7 @@ process_array(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Is_desc	*isp;
 
 	if (ident)
-		ident = M_ID_ARRAY;
+		ident = ld_targ.t_id.id_array;
 
 	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) == S_ERROR)
 		return (S_ERROR);
@@ -1227,7 +1235,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	/*
 	 * Make sure this is a valid relocation we can handle.
 	 */
-	if (shdr->sh_type != M_REL_SHT_TYPE) {
+	if (shdr->sh_type != ld_targ.t_m.m_rel_sht_type) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
 		    ifl->ifl_name, isc->is_name,
 		    conv_sec_type(ifl->ifl_ehdr->e_machine,
@@ -1320,7 +1328,7 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	return (process_section(name, ifl, shdr, scn, ndx, 0, ofl));
 }
 
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 
 static uintptr_t
 process_amd64_unwind(const char *name, Ifl_desc *ifl, Shdr *shdr,
@@ -1506,11 +1514,11 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	if (ifl->ifl_ehdr->e_type == ET_DYN) {
 		column = 1;
 		ofl->ofl_soscnt++;
-		ident = M_ID_NULL;
+		ident = ld_targ.t_id.id_null;
 	} else {
 		column = 0;
 		ofl->ofl_objscnt++;
-		ident = M_ID_UNKNOWN;
+		ident = ld_targ.t_id.id_unknown;
 	}
 
 	DBG_CALL(Dbg_file_generic(ofl->ofl_lml, ifl));
@@ -1603,7 +1611,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				break;
 			case SHT_SUNW_cap:
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_NULL, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				capisp = ifl->ifl_isdesc[ndx];
 				break;
@@ -1615,12 +1623,12 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				break;
 			case SHT_SUNW_move:
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_NULL, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				break;
 			case SHT_SUNW_syminfo:
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_NULL, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				sifisp = ifl->ifl_isdesc[ndx];
 				break;
@@ -1632,45 +1640,67 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				break;
 			case SHT_SUNW_verdef:
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_NULL, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				vdfisp = ifl->ifl_isdesc[ndx];
 				break;
 			case SHT_SUNW_verneed:
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_NULL, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				vndisp = ifl->ifl_isdesc[ndx];
 				break;
 			case SHT_SUNW_versym:
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_NULL, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				vsyisp = ifl->ifl_isdesc[ndx];
 				break;
-#if	defined(__sparc)
 			case SHT_SPARC_GOTDATA:
+				/*
+				 * SHT_SPARC_GOTDATA (0x70000000) is in the
+				 * SHT_LOPROC - SHT_HIPROC range reserved
+				 * for processor-specific semantics. It is
+				 * only meaningful for sparc targets.
+				 */
+				if (ld_targ.t_m.m_mach !=
+				    LD_TARG_BYCLASS(EM_SPARC, EM_SPARCV9))
+					goto do_default;
 				if (process_section(name, ifl, shdr, scn,
-				    ndx, M_ID_GOTDATA, ofl) == S_ERROR)
+				    ndx, ld_targ.t_id.id_gotdata, ofl) ==
+				    S_ERROR)
 					return (S_ERROR);
 				break;
-#endif
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 			case SHT_AMD64_UNWIND:
+				/*
+				 * SHT_AMD64_UNWIND (0x70000001) is in the
+				 * SHT_LOPROC - SHT_HIPROC range reserved
+				 * for processor-specific semantics. It is
+				 * only meaningful for amd64 targets.
+				 */
+				if (ld_targ.t_m.m_mach != EM_AMD64)
+					goto do_default;
+				/*
+				 * Target is x86, so this really is
+				 * SHT_AMD64_UNWIND
+				 */
 				if (column == 0) {
 					/*
 					 * column == ET_REL
 					 */
 					if (process_amd64_unwind(name, ifl,
-					    shdr, scn, ndx, M_ID_UNWIND,
-					    ofl) == S_ERROR)
+					    shdr, scn, ndx,
+					    ld_targ.t_id.id_unwind, ofl) ==
+					    S_ERROR)
 						return (S_ERROR);
 				}
 				break;
 #endif
 			default:
-				if (ident != M_ID_NULL)
-					ident = M_ID_USER;
+			do_default:
+				if (ident != ld_targ.t_id.id_null)
+					ident = ld_targ.t_id.id_user;
 				if (process_section(name, ifl, shdr, scn,
 				    ndx, ident, ofl) == S_ERROR)
 					return (S_ERROR);
@@ -1717,7 +1747,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			    ifl->ifl_shnum)) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
 
-#if	defined(__x86) && defined(_ELF64)
+#if	defined(_ELF64)
 			/*
 			 * If this section is 'ordered' then it was not
 			 * caught in the previous 'place_section' operation.
@@ -1727,7 +1757,9 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			 */
 			if (osp &&
 			    (osp->os_shdr->sh_type == SHT_AMD64_UNWIND) &&
-			    (append_amd64_unwind(osp, ofl) == S_ERROR))
+			    (ld_targ.t_uw.uw_append_unwind != NULL) &&
+			    ((*ld_targ.t_uw.uw_append_unwind)(osp, ofl) ==
+			    S_ERROR))
 				return (S_ERROR);
 #endif
 		}
@@ -1936,7 +1968,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			 * also occur, such as from a truncated or corrupt file.
 			 * Here we try and get the best error message possible.
 			 */
-			if (M_CLASS != _class) {
+			if (ld_targ.t_m.m_class != _class) {
 				_rej.rej_type = SGS_REJ_CLASS;
 				_rej.rej_info = (uint_t)_class;
 			} else {
@@ -1944,7 +1976,8 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				_rej.rej_str = elf_errmsg(-1);
 			}
 			_rej.rej_name = name;
-			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
+			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
+			    ld_targ.t_m.m_mach));
 			if (rej->rej_type == 0) {
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
@@ -2035,7 +2068,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 
 		switch (ehdr->e_type) {
 		case ET_REL:
-			ld_mach_eflags(ehdr, ofl);
+			(*ld_targ.t_mr.mr_mach_eflags)(ehdr, ofl);
 			error = process_elf(ifl, elf, ofl);
 			break;
 		case ET_DYN:
@@ -2085,7 +2118,8 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			(void) elf_errno();
 			_rej.rej_type = SGS_REJ_UNKFILE;
 			_rej.rej_name = name;
-			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
+			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
+			    ld_targ.t_m.m_mach));
 			if (rej->rej_type == 0) {
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
@@ -2097,7 +2131,8 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		(void) elf_errno();
 		_rej.rej_type = SGS_REJ_UNKFILE;
 		_rej.rej_name = name;
-		DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
+		DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
+		    ld_targ.t_m.m_mach));
 		if (rej->rej_type == 0) {
 			*rej = _rej;
 			rej->rej_name = strdup(_rej.rej_name);
@@ -2293,7 +2328,8 @@ ld_finish_libs(Ofl_desc *ofl)
 					    MSG_INTL(reject[_rej.rej_type]),
 					    _rej.rej_name ? rej.rej_name :
 					    MSG_INTL(MSG_STR_UNKNOWN),
-					    conv_reject_desc(&_rej, &rej_buf));
+					    conv_reject_desc(&_rej, &rej_buf,
+					    ld_targ.t_m.m_mach));
 				} else
 					sdf->sdf_file = ifl;
 			}
@@ -2404,7 +2440,8 @@ ld_finish_libs(Ofl_desc *ofl)
 			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
 			    MSG_INTL(MSG_STR_UNKNOWN),
-			    conv_reject_desc(&rej, &rej_buf));
+			    conv_reject_desc(&rej, &rej_buf,
+			    ld_targ.t_m.m_mach));
 		} else {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_NOTFOUND), file, sdf->sdf_rfile);

@@ -20,10 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#define	ELF_TARGET_SPARC
 
 #include	<stdio.h>
 #include	<string.h>
@@ -32,6 +34,7 @@
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
+#include	"machsym.sparc.h"
 
 /*
  * Matrix of legal combinations of usage of a given register:
@@ -55,7 +58,7 @@
  *
  */
 int
-ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
+ld_reg_check_sparc(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
     Ofl_desc * ofl)
 {
 	Sym		*osym = sdp->sd_sym;
@@ -129,7 +132,8 @@ ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 }
 
 int
-ld_mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
+ld_mach_sym_typecheck_sparc(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl,
+    Ofl_desc *ofl)
 {
 	Conv_inv_buf_t	inv_buf1, inv_buf2;
 	Sym		*osym = sdp->sd_sym;
@@ -152,7 +156,7 @@ ld_mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 			return (1);
 		}
 	} else if (otype == STT_SPARC_REGISTER)
-		return (ld_reg_check(sdp, nsym, sdp->sd_name, ifl, ofl));
+		return (ld_reg_check_sparc(sdp, nsym, sdp->sd_name, ifl, ofl));
 
 	return (0);
 }
@@ -165,7 +169,7 @@ static const char *registers[] = { 0,
 };
 
 const char *
-ld_is_regsym(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
+ld_is_regsym_sparc(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
     int symndx, Word shndx, const char *symsecname, Word * flags)
 {
 	const char	*name;
@@ -229,7 +233,7 @@ ld_is_regsym(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
 }
 
 Sym_desc *
-ld_reg_find(Sym * sym, Ofl_desc * ofl)
+ld_reg_find_sparc(Sym * sym, Ofl_desc * ofl)
 {
 	if (ofl->ofl_regsyms == 0)
 		return (0);
@@ -238,7 +242,7 @@ ld_reg_find(Sym * sym, Ofl_desc * ofl)
 }
 
 int
-ld_reg_enter(Sym_desc * sdp, Ofl_desc * ofl)
+ld_reg_enter_sparc(Sym_desc * sdp, Ofl_desc * ofl)
 {
 	if (ofl->ofl_regsyms == 0) {
 		ofl->ofl_regsymsno = STO_SPARC_REGISTER_G7 + 1;

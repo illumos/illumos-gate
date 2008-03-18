@@ -412,7 +412,8 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	for (APLIST_TRAVERSE(sgp->sg_osdescs, idx1, osp)) {
 		Shdr	*_shdr = osp->os_shdr;
 
-		if ((ident == osp->os_scnsymndx) && (ident != M_ID_REL) &&
+		if ((ident == osp->os_scnsymndx) &&
+		    (ident != ld_targ.t_id.id_rel) &&
 		    (isp->is_namehash == osp->os_namehash) &&
 		    (shdr->sh_type != SHT_GROUP) &&
 		    (shdr->sh_type != SHT_SUNW_dof) &&

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,19 +30,19 @@ pics/%.o:	../common/%.c
 		$(POST_PROCESS_O)
 
 pics/%32.o:	../common/%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%64.o:	../common/%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
+		$(COMPILE.c) -o $@ -D_ELF64 $<
 		$(POST_PROCESS_O)
 
 pics/%32.o:	%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%64.o:	%.c
-		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
+		$(COMPILE.c) -o $@ -D_ELF64 $<
 		$(POST_PROCESS_O)
 
 pics/%.o:	$(SGSTOOLS)/common/%.c
@@ -53,17 +53,39 @@ pics/%.o:	$(VAR_AVLDIR)/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-#pics/%32.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
-#		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
-#		$(POST_PROCESS_O)
 #
-#pics/%64.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
-#		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
-#		$(POST_PROCESS_O)
-
+# We use the shared elfcap code under usr/src/common/elfcap
+#
 pics/elfcap.o:	$(ELFCAP)/elfcap.c
 		$(COMPILE.c) -o  $@ $(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
+
+# Rules for compiling the shared relocation engines (doreloc.c) maintained
+# under usr/src/uts. To support cross linking, We compile and link
+# all of these into every copy of libld. Each one requires a separate rule:
+#	- The source files are in different subtrees under usr/src/uts
+#	- The output file needs to include the platform name to
+#		keep the object files from colliding
+# The DO_RELOC_LIBLD definition is needed to generate the libld version
+# of the doreloc code.
+#
+pics/%_x86_32.o: $(KRTLD_I386)/%.c
+		$(COMPILE.c) -o $@ -DDO_RELOC_LIBLD $<
+		$(POST_PROCESS_O)
+
+pics/%_x86_64.o: $(KRTLD_AMD64)/%.c
+		$(COMPILE.c) -o $@ -D_ELF64 -DDO_RELOC_LIBLD $<
+		$(POST_PROCESS_O)
+
+pics/%_sparc_32.o: $(KRTLD_SPARC)/%.c
+		$(COMPILE.c) -o $@ -DDO_RELOC_LIBLD $<
+		$(POST_PROCESS_O)
+
+pics/%_sparc_64.o: \
+		$(KRTLD_SPARC)/%.c
+		$(COMPILE.c) -o $@ -D_ELF64 -DDO_RELOC_LIBLD $<
+		$(POST_PROCESS_O)
+
 
 $(LIBLINKS):
 		$(RM) $@; $(SYMLINK) $(DYNLIB) $@

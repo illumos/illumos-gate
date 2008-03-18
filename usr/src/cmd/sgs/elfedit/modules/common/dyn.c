@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
-#include	<machdep.h>
 #include	<elfedit.h>
 #include	<sys/elf_SPARC.h>
 #include	<strings.h>
@@ -63,7 +62,8 @@ typedef enum {
 	DYN_CMD_T_FLAGS =	7,	/* dyn:flags */
 	DYN_CMD_T_FLAGS1 =	8,	/* dyn:flags1 */
 	DYN_CMD_T_FEATURE1 =	9,	/* dyn:feature1 */
-	DYN_CMD_T_CHECKSUM =	10	/* dyn:checksum */
+	DYN_CMD_T_CHECKSUM =	10,	/* dyn:checksum */
+	DYN_CMD_T_SUNW_LDMACH =	11	/* dyn:sunw_ldmach */
 } DYN_CMD_T;
 
 
@@ -320,6 +320,7 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	dyn = &argstate->dyn.data[ndx];
 	for (; cnt--; dyn++, ndx++) {
 		union {
+			Conv_inv_buf_t		inv;
 			Conv_dyn_flag_buf_t	flag;
 			Conv_dyn_flag1_buf_t	flag1;
 			Conv_dyn_posflag1_buf_t	posflag1;
@@ -414,6 +415,10 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 			break;
 		case DT_DEPRECATED_SPARC_REGISTER:
 			name = MSG_INTL(MSG_STR_DEPRECATED);
+			break;
+		case DT_SUNW_LDMACH:
+			name = conv_ehdr_mach((Half)dyn->d_un.d_val, 0,
+			    &c_buf.inv);
 			break;
 		}
 
@@ -1045,6 +1050,15 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
 		break;
 
+	case DYN_CMD_T_SUNW_LDMACH:
+		if (argstate.argc > 1)
+			elfedit_command_usage();
+		print_only = (argstate.argc == 0);
+		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
+		    ELFEDIT_CONST_DT, DT_SUNW_LDMACH, 1),
+		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		break;
+
 	default:
 		/* Note expected: All commands should have been caught above */
 		elfedit_command_usage();
@@ -1318,6 +1332,36 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 			}
 
 		}
+		break;
+
+	case DYN_CMD_T_SUNW_LDMACH:
+		{
+			Conv_inv_buf_t buf1, buf2;
+			Half ldmach;
+
+			ldmach = (Half) elfedit_atoconst(argstate.argv[0],
+			    ELFEDIT_CONST_EM);
+
+			/* Set the value */
+			if (dyn[ndx].d_un.d_val == ldmach) {
+				elfedit_msg(ELFEDIT_MSG_DEBUG,
+				    MSG_INTL(MSG_DEBUG_S_OK), dyn_ndx,
+				    dyn_name, EC_WORD(ndx),
+				    conv_ehdr_mach(dyn[ndx].d_un.d_val, 0,
+				    &buf1));
+			} else {
+				elfedit_msg(ELFEDIT_MSG_DEBUG,
+				    MSG_INTL(MSG_DEBUG_S_CHG),
+				    dyn_ndx, dyn_name, EC_WORD(ndx),
+				    conv_ehdr_mach(dyn[ndx].d_un.d_val, 0,
+				    &buf1),
+				    conv_ehdr_mach(ldmach, 0, &buf2));
+				ret = ELFEDIT_CMDRET_MOD;
+				dyn[ndx].d_un.d_val = ldmach;
+			}
+		}
+		break;
+
 	}
 
 	/*
@@ -1454,6 +1498,22 @@ cpl_feature1(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 	elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_DTF_1);
 }
 
+/*ARGSUSED*/
+static void
+cpl_sunw_ldmach(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
+    const char *argv[], int num_opt)
+{
+	/*
+	 * This command doesn't accept options, so num_opt should be
+	 * 0. This is a defensive measure, in case that should change.
+	 */
+	argc -= num_opt;
+	argv += num_opt;
+
+	if (argc == 1)
+		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_EM);
+}
+
 
 /*
  * Implementation functions for the commands
@@ -1522,6 +1582,12 @@ static elfedit_cmdret_t
 cmd_checksum(elfedit_obj_state_t *obj_state, int argc, const char *argv[])
 {
 	return (cmd_body(DYN_CMD_T_CHECKSUM, obj_state, argc, argv));
+}
+
+static elfedit_cmdret_t
+cmd_sunw_ldmach(elfedit_obj_state_t *obj_state, int argc, const char *argv[])
+{
+	return (cmd_body(DYN_CMD_T_SUNW_LDMACH, obj_state, argc, argv));
 }
 
 
@@ -1718,6 +1784,17 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_checksum[] = { MSG_ORIG(MSG_CMD_CHECKSUM),
 	    NULL };
 
+	/* dyn:sunw_ldmach */
+	static const char *name_sunw_ldmach[] = { MSG_ORIG(MSG_CMD_SUNW_LDMACH),
+	    NULL };
+	static elfedit_cmd_optarg_t arg_sunw_ldmach[] = {
+		{ MSG_ORIG(MSG_STR_VALUE),
+		    /* MSG_INTL(MSG_A1_SUNW_LDMACH_VALUE) */
+		    ELFEDIT_I18NHDL(MSG_A1_SUNW_LDMACH_VALUE),
+		    ELFEDIT_CMDOA_F_OPT },
+		{ NULL }
+	};
+
 
 
 	static elfedit_cmd_t cmds[] = {
@@ -1808,6 +1885,14 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_HELP_CHECKSUM) */
 		    ELFEDIT_I18NHDL(MSG_HELP_CHECKSUM),
 		    NULL, NULL },
+
+		/* dyn:sunw_ldmach */
+		{ cmd_sunw_ldmach, cpl_sunw_ldmach, name_sunw_ldmach,
+		    /* MSG_INTL(MSG_DESC_SUNW_LDMACH) */
+		    ELFEDIT_I18NHDL(MSG_DESC_SUNW_LDMACH),
+		    /* MSG_INTL(MSG_HELP_SUNW_LDMACH) */
+		    ELFEDIT_I18NHDL(MSG_HELP_SUNW_LDMACH),
+		    opt_ostyle, arg_sunw_ldmach },
 
 		{ NULL }
 	};

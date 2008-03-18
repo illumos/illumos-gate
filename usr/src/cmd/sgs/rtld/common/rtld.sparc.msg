@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -37,8 +37,6 @@
 			 value 0x%llx loses %d bits at offset 0x%llx"
 @ MSG_REL_NOFIT		"relocation error: %s: file %s: symbol %s: \
 			 value 0x%llx does not fit"
-@ MSG_REL_NOSWAP	"relocation error: %s: file %s: symbol %s: \
-			 linker does not support byte swapping relocated data"
 @ MSG_REL_BADREG	"relocation error: file %s: REGISTER relocation \
 			 against bad register offset: 0x%llx"
 

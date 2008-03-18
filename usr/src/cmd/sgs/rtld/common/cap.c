@@ -166,7 +166,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		_rej.rej_type = SGS_REJ_STR;
 		_rej.rej_name = name;
 		_rej.rej_str = strerror(errno);
-		DBG_CALL(Dbg_file_rejected(lml, &_rej));
+		DBG_CALL(Dbg_file_rejected(lml, &_rej, M_MACH));
 		rejection_inherit(rej, &_rej);
 		return (0);
 	}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,11 @@
 #include	<sys/types.h>
 #include	"reloc.h"
 #else
+#define	ELF_TARGET_AMD64
+#if defined(DO_RELOC_LIBLD)
+#undef DO_RELOC_LIBLD
+#define	DO_RELOC_LIBLD_X86
+#endif
 #include	<stdio.h>
 #include	"sgs.h"
 #include	"machdep.h"
@@ -40,46 +45,64 @@
 #endif
 
 /*
+ * We need to build this code differently when it is used for
+ * cross linking:
+ *	- Data alignment requirements can differ from those
+ *		of the running system, so we can't access data
+ *		in units larger than a byte
+ *	- We have to include code to do byte swapping when the
+ *		target and linker host use different byte ordering,
+ *		but such code is a waste when running natively.
+ */
+#if !defined(DO_RELOC_LIBLD) || defined(__i386) || defined(__amd64)
+#define	DORELOC_NATIVE
+#endif
+
+/*
  * This table represents the current relocations that do_reloc() is able to
  * process.  The relocations below that are marked SPECIAL are relocations that
  * take special processing and shouldn't actually ever be passed to do_reloc().
  */
 const Rel_entry	reloc_table[R_AMD64_NUM] = {
-/* R_AMD64_NONE */	{FLG_RE_NOTREL, 0},
-/* R_AMD64_64 */	{FLG_RE_NOTREL, 8},
-/* R_AMD64_PC32 */	{FLG_RE_PCREL, 4},
-/* R_AMD64_GOT32 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_PLT32 */	{FLG_RE_PCREL | FLG_RE_PLTREL |
-			    FLG_RE_VERIFY | FLG_RE_SIGN, 4},
-/* R_AMD64_COPY */	{FLG_RE_NOTSUP, 0},		/* SPECIAL */
-/* R_AMD64_GLOB_DAT */	{FLG_RE_NOTREL, 8},
-/* R_AMD64_JUMP_SLOT */	{FLG_RE_NOTSUP, 0},		/* SPECIAL */
-/* R_AMD64_RELATIVE */	{FLG_RE_NOTREL, 8},
-/* R_AMD64_GOTPCREL */	{FLG_RE_GOTPC | FLG_RE_GOTADD, 4},
-/* R_AMD64_32 */	{FLG_RE_NOTREL, 4},
-/* R_AMD64_32S */	{FLG_RE_NOTREL, 4},
-/* R_AMD64_16 */	{FLG_RE_NOTREL, 2},
-/* R_AMD64_PC16 */	{FLG_RE_PCREL, 2},
-/* R_AMD64_8 */		{FLG_RE_NOTREL, 1},
-/* R_AMD64_PC8 */	{FLG_RE_PCREL, 1},
-/* R_AMD64_DTPMOD64 */	{FLG_RE_NOTREL, 8},
-/* R_AMD64_DTPOFF64 */	{FLG_RE_NOTREL, 8},
-/* R_AMD64_TPOFF64 */	{FLG_RE_NOTREL, 8},
-/* R_AMD64_TLSGD */	{FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSGD, 4},
-/* R_AMD64_TLSLD */	{FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSLD, 4},
-/* R_AMD64_DTPOFF32 */	{FLG_RE_TLSLD, 4},
-/* R_AMD64_GOTTPOFF */	{FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSIE, 4},
-/* R_AMD64_TPOFF32 */	{FLG_RE_TLSLE, 4},
-/* R_AMD64_PC64 */	{FLG_RE_PCREL, 8},
-/* R_AMD64_GOTOFF64 */	{FLG_RE_GOTREL, 8},
-/* R_AMD64_GOTPC32 */	{FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND, 4},
-/* R_AMD64_GOT64 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_GOTPCREL64 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_GOTPC6 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_GOTPLT64 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_PLTOFF64 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_SIZE32 */	{FLG_RE_SIZE, 4},
-/* R_AMD64_SIZE64 */	{FLG_RE_SIZE, 8}
+/* R_AMD64_NONE */	{0, FLG_RE_NOTREL, 0, 0, 0},
+/* R_AMD64_64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
+/* R_AMD64_PC32 */	{0, FLG_RE_PCREL, 4, 0, 0},
+/* R_AMD64_GOT32 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_AMD64_PLT32 */	{0, FLG_RE_PCREL | FLG_RE_PLTREL |
+			    FLG_RE_VERIFY | FLG_RE_SIGN, 4, 0, 0},
+/* R_AMD64_COPY */	{0, FLG_RE_NOTSUP, 0, 0, 0},	/* SPECIAL */
+/* R_AMD64_GLOB_DAT */	{0, FLG_RE_NOTREL, 8, 0, 0},
+/* R_AMD64_JUMP_SLOT */	{0, FLG_RE_NOTSUP, 0, 0, 0},	/* SPECIAL */
+/* R_AMD64_RELATIVE */	{0, FLG_RE_NOTREL, 8, 0, 0},
+/* R_AMD64_GOTPCREL */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD, 4, 0, 0},
+/* R_AMD64_32 */	{0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_AMD64_32S */	{0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_AMD64_16 */	{0, FLG_RE_NOTREL, 2, 0, 0},
+/* R_AMD64_PC16 */	{0, FLG_RE_PCREL, 2, 0, 0},
+/* R_AMD64_8 */		{0, FLG_RE_NOTREL, 1, 0, 0},
+/* R_AMD64_PC8 */	{0, FLG_RE_PCREL, 1, 0, 0},
+/* R_AMD64_DTPMOD64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
+/* R_AMD64_DTPOFF64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
+/* R_AMD64_TPOFF64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
+/* R_AMD64_TLSGD */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSGD,
+			    4, 0, 0},
+/* R_AMD64_TLSLD */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSLD,
+			    4, 0, 0},
+/* R_AMD64_DTPOFF32 */	{0, FLG_RE_TLSLD, 4},
+/* R_AMD64_GOTTPOFF */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSIE,
+			    4, 0, 0},
+/* R_AMD64_TPOFF32 */	{0, FLG_RE_TLSLE, 4, 0, 0},
+/* R_AMD64_PC64 */	{0, FLG_RE_PCREL, 8, 0, 0},
+/* R_AMD64_GOTOFF64 */	{0, FLG_RE_GOTREL, 8, 0, 0},
+/* R_AMD64_GOTPC32 */	{0, FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND,
+			    4, 0, 0},
+/* R_AMD64_GOT64 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_AMD64_GOTPCREL64 */	{FLG_RE_NOTSUP, 0, 0, 0},
+/* R_AMD64_GOTPC6 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_AMD64_GOTPLT64 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_AMD64_PLTOFF64 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_AMD64_SIZE32 */	{0, FLG_RE_SIZE, 4, 0, 0},
+/* R_AMD64_SIZE64 */	{0, FLG_RE_SIZE, 8, 0, 0}
 };
 #if	(R_AMD64_NUM != (R_AMD64_SIZE64 + 1))
 #error	"R_AMD64_NUM has grown"
@@ -163,6 +186,7 @@ int
 do_reloc_krtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file)
 #elif defined(DO_RELOC_LIBLD)
+/*ARGSUSED5*/
 int
 do_reloc_ld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, int bswap, void *lml)
@@ -174,17 +198,6 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 {
 	const Rel_entry	*rep;
 
-#if defined(DO_RELOC_LIBLD)
-	/*
-	 * We do not support building the amd64 linker as a cross linker
-	 * at this time.
-	 */
-	if (bswap) {
-		REL_ERR_NOSWAP(lml, file, sym, rtype);
-		return (0);
-	}
-#endif
-
 	rep = &reloc_table[rtype];
 
 	switch (rep->re_fsize) {
@@ -192,10 +205,25 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		/* LINTED */
 		*((uchar_t *)off) = (uchar_t)(*value);
 		break;
+
 	case 2:
+#if defined(DORELOC_NATIVE)
 		/* LINTED */
 		*((Half *)off) = (Half)(*value);
+#else
+		{
+			Half	v = (Half)(*value);
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (bswap) {
+				UL_ASSIGN_BSWAP_HALF(off, v_bytes);
+			} else {
+				UL_ASSIGN_HALF(off, v_bytes);
+			}
+		}
+#endif
 		break;
+
 	case 4:
 		/*
 		 * The amd64 psABI requires that we perform the following
@@ -242,12 +270,48 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 				return (0);
 			}
 		}
+
+#if defined(DORELOC_NATIVE)
 		/* LINTED */
 		*((Word *)off) += *value;
+#else
+		{
+			Word	v;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (bswap) {
+				UL_ASSIGN_BSWAP_WORD(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_BSWAP_WORD(off, v_bytes);
+			} else {
+				UL_ASSIGN_WORD(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_WORD(off, v_bytes);
+			}
+		}
+#endif
 		break;
+
 	case 8:
+#if defined(DORELOC_NATIVE)
 		/* LINTED */
 		*((Xword *)off) += *value;
+#else
+		{
+			Xword	v;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (bswap) {
+				UL_ASSIGN_BSWAP_XWORD(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_BSWAP_XWORD(off, v_bytes);
+			} else {
+				UL_ASSIGN_XWORD(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_XWORD(off, v_bytes);
+			}
+		}
+#endif
 		break;
 	default:
 		/*

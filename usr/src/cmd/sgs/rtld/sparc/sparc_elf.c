@@ -642,7 +642,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		Addr		vaddr;
 		uint_t		sb_flags = 0;
 
-		rtype = ELF_R_TYPE(((Rela *)relbgn)->r_info);
+		rtype = ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
 
 		/*
 		 * If this is a RELATIVE relocation in a shared object (the
@@ -677,7 +677,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			}
 			if (relbgn >= relend)
 				break;
-			rtype = ELF_R_TYPE(((Rela *)relbgn)->r_info);
+			rtype = ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
 		}
 
 		roffset = ((Rela *)relbgn)->r_offset;

@@ -28,7 +28,6 @@
 #include	<stdio.h>
 #include	<ctype.h>
 #include	<unistd.h>
-#include	<machdep.h>
 #include	<elfedit.h>
 #include	<strings.h>
 #include	<debug.h>

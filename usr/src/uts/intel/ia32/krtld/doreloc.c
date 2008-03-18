@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,11 @@
 #include	<sys/types.h>
 #include	"reloc.h"
 #else
+#define	ELF_TARGET_386
+#if defined(DO_RELOC_LIBLD)
+#undef DO_RELOC_LIBLD
+#define	DO_RELOC_LIBLD_X86
+#endif
 #include	<stdio.h>
 #include	"sgs.h"
 #include	"machdep.h"
@@ -40,50 +45,67 @@
 #endif
 
 /*
+ * We need to build this code differently when it is used for
+ * cross linking:
+ *	- Data alignment requirements can differ from those
+ *		of the running system, so we can't access data
+ *		in units larger than a byte
+ *	- We have to include code to do byte swapping when the
+ *		target and linker host use different byte ordering,
+ *		but such code is a waste when running natively.
+ */
+#if !defined(DO_RELOC_LIBLD) || defined(__i386) || defined(__amd64)
+#define	DORELOC_NATIVE
+#endif
+
+/*
  * This table represents the current relocations that do_reloc() is able to
  * process.  The relocations below that are marked SPECIAL are relocations that
  * take special processing and shouldn't actually ever be passed to do_reloc().
  */
 const Rel_entry	reloc_table[R_386_NUM] = {
-/* R_386_NONE */	{FLG_RE_NOTREL, 0},
-/* R_386_32 */		{FLG_RE_NOTREL, 4},
-/* R_386_PC32 */	{FLG_RE_PCREL, 4},
-/* R_386_GOT32 */	{FLG_RE_GOTADD, 4},
-/* R_386_PLT32 */	{FLG_RE_PLTREL | FLG_RE_PCREL, 4},
-/* R_386_COPY */	{FLG_RE_NOTREL, 0},			/* SPECIAL */
-/* R_386_GLOB_DAT */	{FLG_RE_NOTREL, 4},
-/* R_386_JMP_SLOT */	{FLG_RE_NOTREL, 4},			/* SPECIAL */
-/* R_386_RELATIVE */	{FLG_RE_NOTREL, 4},
-/* R_386_GOTOFF */	{FLG_RE_GOTREL, 4},
-/* R_386_GOTPC */	{FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND, 4},
-/* R_386_32PLT */	{FLG_RE_PLTREL, 4},
-/* R_386_TLS_GD_PLT */	{FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_TLSGD, 4},
-/* R_386_TLS_LDM_PLT */	{FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_TLSLD, 4},
-/* R_386_TLS_TPOFF */	{FLG_RE_NOTREL, 4},
-/* R_386_TLS_IE */	{FLG_RE_GOTADD | FLG_RE_TLSIE, 4},
-/* R_386_TLS_GOTIE */	{FLG_RE_GOTADD | FLG_RE_TLSIE, 4},
-/* R_386_TLS_LE */	{FLG_RE_TLSLE, 4},
-/* R_386_TLS_GD */	{FLG_RE_GOTADD | FLG_RE_TLSGD, 4},
-/* R_386_TLS_LDM */	{FLG_RE_GOTADD | FLG_RE_TLSLD, 4},
-/* R_386_16 */		{FLG_RE_NOTREL, 2},
-/* R_386_PC16 */	{FLG_RE_PCREL, 2},
-/* R_386_8 */		{FLG_RE_NOTREL, 1},
-/* R_386_PC8 */		{FLG_RE_PCREL, 1},
-/* R_386_UNKNOWN24 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN25 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN26 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN27 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN28 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN29 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN30 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN31 */	{FLG_RE_NOTSUP, 0},
-/* R_386_TLS_LDO_32 */	{FLG_RE_TLSLD, 4},
-/* R_386_UNKNOWN33 */	{FLG_RE_NOTSUP, 0},
-/* R_386_UNKNOWN34 */	{FLG_RE_NOTSUP, 0},
-/* R_386_TLS_DTPMOD32 */ {FLG_RE_NOTREL, 4},
-/* R_386_TLS_DTPOFF32 */ {FLG_RE_NOTREL, 4},
-/* R_386_UNKONWN37 */	{FLG_RE_NOTSUP, 0},
-/* R_386_SIZE32 */	{FLG_RE_SIZE | FLG_RE_VERIFY, 4}
+/* R_386_NONE */	{0, FLG_RE_NOTREL, 0, 0, 0},
+/* R_386_32 */		{0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_386_PC32 */	{0, FLG_RE_PCREL, 4, 0, 0},
+/* R_386_GOT32 */	{0, FLG_RE_GOTADD, 4, 0, 0},
+/* R_386_PLT32 */	{0, FLG_RE_PLTREL | FLG_RE_PCREL, 4, 0, 0},
+/* R_386_COPY */	{0, FLG_RE_NOTREL, 0, 0, 0},		/* SPECIAL */
+/* R_386_GLOB_DAT */	{0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_386_JMP_SLOT */	{0, FLG_RE_NOTREL, 4, 0, 0},		/* SPECIAL */
+/* R_386_RELATIVE */	{0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_386_GOTOFF */	{0, FLG_RE_GOTREL, 4, 0, 0},
+/* R_386_GOTPC */	{0, FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND, 4,
+			    0, 0},
+/* R_386_32PLT */	{0, FLG_RE_PLTREL, 4, 0, 0},
+/* R_386_TLS_GD_PLT */	{0, FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_TLSGD, 4,
+			    0, 0},
+/* R_386_TLS_LDM_PLT */	{0, FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_TLSLD, 4,
+			    0, 0},
+/* R_386_TLS_TPOFF */	{0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_386_TLS_IE */	{0, FLG_RE_GOTADD | FLG_RE_TLSIE, 4, 0, 0},
+/* R_386_TLS_GOTIE */	{0, FLG_RE_GOTADD | FLG_RE_TLSIE, 4, 0, 0},
+/* R_386_TLS_LE */	{0, FLG_RE_TLSLE, 4, 0, 0},
+/* R_386_TLS_GD */	{0, FLG_RE_GOTADD | FLG_RE_TLSGD, 4, 0, 0},
+/* R_386_TLS_LDM */	{0, FLG_RE_GOTADD | FLG_RE_TLSLD, 4, 0, 0},
+/* R_386_16 */		{0, FLG_RE_NOTREL, 2, 0, 0},
+/* R_386_PC16 */	{0, FLG_RE_PCREL, 2, 0, 0},
+/* R_386_8 */		{0, FLG_RE_NOTREL, 1, 0, 0},
+/* R_386_PC8 */		{0, FLG_RE_PCREL, 1, 0, 0},
+/* R_386_UNKNOWN24 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN25 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN26 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN27 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN28 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN29 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN30 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN31 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_TLS_LDO_32 */	{0, FLG_RE_TLSLD, 4, 0, 0},
+/* R_386_UNKNOWN33 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_UNKNOWN34 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_TLS_DTPMOD32 */ {0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_386_TLS_DTPOFF32 */ {0, FLG_RE_NOTREL, 4, 0, 0},
+/* R_386_UNKONWN37 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
+/* R_386_SIZE32 */	{0, FLG_RE_SIZE | FLG_RE_VERIFY, 4, 0, 0}
 };
 
 /*
@@ -168,6 +190,7 @@ int
 do_reloc_krtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file)
 #elif defined(DO_RELOC_LIBLD)
+/*ARGSUSED5*/
 int
 do_reloc_ld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, int bswap, void *lml)
@@ -179,17 +202,6 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 {
 	const Rel_entry	*rep;
 
-#if defined(DO_RELOC_LIBLD)
-	/*
-	 * We do not support building the X86 linker as a cross linker
-	 * at this time.
-	 */
-	if (bswap) {
-		REL_ERR_NOSWAP(lml, file, sym, rtype);
-		return (0);
-	}
-#endif
-
 	rep = &reloc_table[rtype];
 
 	switch (rep->re_fsize) {
@@ -197,13 +209,49 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		/* LINTED */
 		*((uchar_t *)off) += (uchar_t)(*value);
 		break;
+
 	case 2:
+#if defined(DORELOC_NATIVE)
 		/* LINTED */
 		*((Half *)off) += (Half)(*value);
+#else
+		{
+			Half	v;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (bswap) {
+				UL_ASSIGN_BSWAP_HALF(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_BSWAP_HALF(off, v_bytes);
+			} else {
+				UL_ASSIGN_HALF(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_HALF(off, v_bytes);
+			}
+		}
+#endif
 		break;
+
 	case 4:
+#if defined(DORELOC_NATIVE)
 		/* LINTED */
 		*((Xword *)off) += *value;
+#else
+		{
+			Word	v;
+			uchar_t	*v_bytes = (uchar_t *)&v;
+
+			if (bswap) {
+				UL_ASSIGN_BSWAP_WORD(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_BSWAP_WORD(off, v_bytes);
+			} else {
+				UL_ASSIGN_WORD(v_bytes, off);
+				v += *value;
+				UL_ASSIGN_WORD(off, v_bytes);
+			}
+		}
+#endif
 		break;
 	default:
 		/*

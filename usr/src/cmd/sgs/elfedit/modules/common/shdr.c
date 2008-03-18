@@ -27,7 +27,6 @@
 
 #include	<stdio.h>
 #include	<unistd.h>
-#include	<machdep.h>
 #include	<elfedit.h>
 #include	<sys/elf_SPARC.h>
 #include	<sys/elf_amd64.h>

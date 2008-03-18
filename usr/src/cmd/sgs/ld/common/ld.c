@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,7 @@
 #include	<unistd.h>
 #include	<stdarg.h>
 #include	<string.h>
+#include	<strings.h>
 #include	<errno.h>
 #include	<fcntl.h>
 #include	<libintl.h>
@@ -38,6 +39,7 @@
 #include	<fcntl.h>
 #include	"conv.h"
 #include	"libld.h"
+#include	"machdep.h"
 #include	"msg.h"
 
 /*
@@ -68,13 +70,14 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	if (error > ERR_NONE) {
 		if (error == ERR_WARNING) {
 			if (strings[ERR_WARNING] == 0)
-			    strings[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
+				strings[ERR_WARNING] =
+				    MSG_INTL(MSG_ERR_WARNING);
 		} else if (error == ERR_FATAL) {
 			if (strings[ERR_FATAL] == 0)
-			    strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
+				strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
 		} else if (error == ERR_ELF) {
 			if (strings[ERR_ELF] == 0)
-			    strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
+				strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
 		}
 		(void) fputs(MSG_ORIG(MSG_STR_LDDIAG), stderr);
 	}
@@ -96,26 +99,45 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 
 
 /*
- * Determine whether we need the Elf32 or Elf64 libld.
+ * Determine:
+ *	- ELFCLASS of resulting object (aoutclass)
+ *	- Whether we need the 32 or 64-bit libld (ldclass)
+ *	- ELF machine type of resulting object (m_mach)
  */
 static int
-determine_class(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass)
+process_args(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass,
+    Half *mach)
 {
-#if	defined(__sparcv9) || defined(__amd64)
-	uchar_t aclass = 0, lclass = ELFCLASS64;
+#if	defined(_LP64)
+	uchar_t lclass = ELFCLASS64;
 #else
-	uchar_t	aclass = 0, lclass = 0;
+	uchar_t	lclass = ELFCLASSNONE;
 #endif
+	uchar_t	aclass = ELFCLASSNONE;
+	Half	mach32 = EM_NONE, mach64 = EM_NONE;
 	int	c;
 
 getmore:
 	/*
-	 * Skip options.
+	 * In general, libld.so is responsible for processing the
+	 * command line options. The exception to this are those options
+	 * that contain information about which linker to run and the
+	 * class/machine of the output object. We examine the options
+	 * here looking for the following:
 	 *
-	 * The only options we're interested in is -64 or -altzexec64.  The -64
-	 * option is used when the only input to ld() is a mapfile or archive,
-	 * and a 64-bit a.out is required.  The -zaltexec64 option requests the
-	 * 64-bit version of ld() is used regardless of the required a.out.
+	 *	-64
+	 *		Produce an ELFCLASS64 object. Use the 64-bit linker.
+	 *
+	 *	-zaltexec64
+	 *		Use the 64-bit linker regardless of the class
+	 *		of the output object.
+	 *
+	 *	-z target=platform
+	 *		Produce output object for the specified platform.
+	 *
+	 * The -64 and -ztarget options are used when the only input to
+	 * ld() is a mapfile or archive, and a 64-bit or non-native output
+	 * object is required.
 	 *
 	 * If we've already processed a 32-bit object and we find -64, we have
 	 * an error condition, but let this fall through to libld to obtain the
@@ -129,13 +151,40 @@ getmore:
 				    MSG_ARG_FOUR_SIZE) == 0)
 					aclass = ELFCLASS64;
 				break;
-#if	!defined(__sparcv9) && !defined(__amd64)
+
 			case 'z':
+#if	!defined(_LP64)
+				/* -z altexec64 */
 				if (strncmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64),
-				    MSG_ARG_ALTEXEC64_SIZE) == 0)
+				    MSG_ARG_ALTEXEC64_SIZE) == 0) {
 					lclass = ELFCLASS64;
-				break;
+					break;
+				}
 #endif
+
+				/* -z target=platform */
+				if (strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
+				    MSG_ARG_TARGET_SIZE) == 0) {
+					char *pstr =
+					    optarg + MSG_ARG_TARGET_SIZE;
+
+					if (strcasecmp(pstr,
+					    MSG_ORIG(MSG_TARG_SPARC)) == 0) {
+						mach32 = EM_SPARC;
+						mach64 = EM_SPARCV9;
+					} else if (strcasecmp(pstr,
+					    MSG_ORIG(MSG_TARG_X86)) == 0) {
+						mach32 = EM_386;
+						mach64 = EM_AMD64;
+					} else {
+						eprintf(0, ERR_FATAL,
+						    MSG_INTL(MSG_ERR_BADTARG),
+						    pstr);
+						return (1);
+					}
+				}
+				break;
+
 			default:
 				break;
 		}
@@ -147,7 +196,7 @@ getmore:
 	 */
 	for (; optind < argc; optind++) {
 		int		fd;
-		unsigned char	ident[EI_NIDENT];
+		Elf32_Ehdr	ehdr32;
 
 		/*
 		 * If we detect some more options return to getopt().
@@ -162,11 +211,15 @@ getmore:
 		}
 
 		/*
-		 * If we've already determined the object class, continue.
-		 * We're only interested in skipping all files to check for
-		 * more options, and specifically if the -64 option is set.
+		 * If we've already determined the object class and
+		 * machine type, continue to the next argument. Only
+		 * the first object contributes to this decision, and
+		 * there's no value to opening or examing the subsequent
+		 * ones. We do need to keep going though, because there
+		 * may be additional options that might affect our
+		 * class/machine decision.
 		 */
-		if (aclass)
+		if ((aclass != ELFCLASSNONE) && (mach32 != EM_NONE))
 			continue;
 
 		/*
@@ -180,28 +233,82 @@ getmore:
 			return (1);
 		}
 
-		if ((read(fd, ident, EI_NIDENT) == EI_NIDENT) &&
-		    (ident[EI_MAG0] == ELFMAG0) &&
-		    (ident[EI_MAG1] == ELFMAG1) &&
-		    (ident[EI_MAG2] == ELFMAG2) &&
-		    (ident[EI_MAG3] == ELFMAG3)) {
-			if (((aclass = ident[EI_CLASS]) != ELFCLASS32) &&
-			    (aclass != ELFCLASS64))
-				aclass = 0;
+		/*
+		 * Note that we read an entire 32-bit ELF header struct
+		 * here, even though we have yet to determine that the
+		 * file is an ELF object or that it is ELFCLASS32. We
+		 * do this because:
+		 *	- Any valid ELF object of any class must
+		 *		have at least this number of bytes in it,
+		 *		since an ELF header is manditory, and since
+		 *		a 32-bit header is smaller than a 64-bit one.
+		 *	- The 32 and 64-bit ELF headers are identical
+		 *		up through the e_version field, so we can
+		 *		obtain the e_machine value of a 64-bit
+		 *		object via the e_machine value we read into
+		 *		the 32-bit version. This cannot change, because
+		 *		the layout of an ELF header is fixed by the ABI.
+		 *
+		 * Note however that we do have to worry about the byte
+		 * order difference between the object and the system
+		 * running this program when we read the e_machine value,
+		 * since it is a multi-byte value;
+		 */
+		if ((read(fd, &ehdr32, sizeof (ehdr32)) == sizeof (ehdr32)) &&
+		    (ehdr32.e_ident[EI_MAG0] == ELFMAG0) &&
+		    (ehdr32.e_ident[EI_MAG1] == ELFMAG1) &&
+		    (ehdr32.e_ident[EI_MAG2] == ELFMAG2) &&
+		    (ehdr32.e_ident[EI_MAG3] == ELFMAG3)) {
+			if (aclass == ELFCLASSNONE) {
+				aclass = ehdr32.e_ident[EI_CLASS];
+				if ((aclass != ELFCLASS32) &&
+				    (aclass != ELFCLASS64))
+					aclass = ELFCLASSNONE;
+			}
+
+			if (mach32 == EM_NONE) {
+				int	one = 1;
+				uchar_t	*one_p = (uchar_t *)&one;
+				int	ld_elfdata;
+
+				ld_elfdata = (one_p[0] == 1) ?
+				    ELFDATA2LSB : ELFDATA2MSB;
+				/*
+				 * Both the 32 and 64-bit versions get the
+				 * type from the object. If the user has
+				 * asked for an inconsistant class/machine
+				 * combination, libld will catch it.
+				 */
+				mach32 = mach64 =
+				    (ld_elfdata == ehdr32.e_ident[EI_DATA]) ?
+				    ehdr32.e_machine :
+				    BSWAP_HALF(ehdr32.e_machine);
+			}
 		}
+
 		(void) close(fd);
 	}
 
 	/*
-	 * If we couldn't establish a class default to 32-bit.
+	 * If we couldn't establish a class, default to 32-bit.
 	 */
-	if (aclass == 0)
+	if (aclass == ELFCLASSNONE)
 		aclass = ELFCLASS32;
-	if (lclass == 0)
-		lclass = ELFCLASS32;
-
 	*aoutclass = aclass;
+
+	if (lclass == ELFCLASSNONE)
+		lclass = ELFCLASS32;
 	*ldclass = lclass;
+
+	/*
+	 * Use the machine type that goes with the class we've determined.
+	 * If we didn't find a usable machine type, use the native
+	 * machine.
+	 */
+	*mach = (aclass == ELFCLASS64) ? mach64 : mach32;
+	if (*mach == EM_NONE)
+		*mach = (aclass == ELFCLASS64) ? M_MACH_64 : M_MACH_32;
+
 	return (0);
 }
 
@@ -356,6 +463,7 @@ main(int argc, char **argv, char **envp)
 {
 	char		*ld_options, **oargv = argv;
 	uchar_t 	aoutclass, ldclass, checkclass;
+	Half		mach;
 
 	/*
 	 * XX64 -- Strip "-Wl," from the head of each argument.  This is to
@@ -400,9 +508,12 @@ main(int argc, char **argv, char **envp)
 	}
 
 	/*
-	 * Determine the object class, and link-editor class required.
+	 * Examine the command arguments to determine:
+	 *	- object class
+	 *	- link-editor class
+	 *	- target machine
 	 */
-	if (determine_class(argc, argv, &aoutclass, &ldclass))
+	if (process_args(argc, argv, &aoutclass, &ldclass, &mach))
 		return (1);
 
 	/*
@@ -425,9 +536,9 @@ main(int argc, char **argv, char **envp)
 	 */
 	optind = opterr = 1;
 	if (aoutclass == ELFCLASS64)
-		return (ld64_main(argc, argv));
+		return (ld64_main(argc, argv, mach));
 	else
-		return (ld32_main(argc, argv));
+		return (ld32_main(argc, argv, mach));
 }
 
 /*

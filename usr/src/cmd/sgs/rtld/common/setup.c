@@ -418,7 +418,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 			eprintf(&lml_main, ERR_FATAL,
 			    MSG_INTL(err_reject[rej.rej_type]), argvname,
-			    conv_reject_desc(&rej, &rej_buf));
+			    conv_reject_desc(&rej, &rej_buf, M_MACH));
 			return (0);
 		}
 

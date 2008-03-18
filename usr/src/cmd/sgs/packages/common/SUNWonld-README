@@ -1321,3 +1321,5 @@ Bugid   Risk Synopsis
 6668050 First trip through PLT does not preserve args in xmm registers
 6672394 ldd(1) unused dependency processing is tricked by relocations errors
 6672544 elf_rtbndr must support non-ABI aligned stacks on amd64
+6671255 link-editor should support cross linking
+	PSARC 2008/179 cross link-editor

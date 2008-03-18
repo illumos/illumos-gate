@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +37,7 @@
 # definitions see:
 #	Policy for Shared Library Version Names and Interface Definitions
 
-SUNWprivate_4.2 {
+SUNWprivate_4.3 {
 	global:
 		dbg_print  = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
 
@@ -50,6 +50,8 @@ SUNWprivate_4.2 {
 		ld64_ent_setup;
 		ld32_init_strings;
 		ld64_init_strings;
+		ld32_init_target;
+		ld64_init_target;
 		ld32_make_sections;
 		ld64_make_sections;
 		ld32_ofl_cleanup;

@@ -31,6 +31,9 @@
 /*
  * Module sections. Initialize special sections
  */
+
+#define	ELF_TARGET_AMD64
+
 #include	<string.h>
 #include	<strings.h>
 #include	<stdio.h>
@@ -302,7 +305,7 @@ ignore_section_processing(Ofl_desc *ofl)
 			if (!(flags & FLG_REL_PLT))
 				ofl->ofl_reloccntsub++;
 
-			if (rsp->rel_rtype == M_R_RELATIVE)
+			if (rsp->rel_rtype == ld_targ.t_m.m_r_relative)
 				ofl->ofl_relocrelcnt--;
 		}
 	}
@@ -358,11 +361,21 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	 * containing those values and generates code to set the sec_info
 	 * pointer to refer to it. The pointer in sec_info remains valid
 	 * outside of the declaration scope because the info_s struct is static.
+	 *
+	 * We can't determine the value of M_WORD_ALIGN at compile time, so
+	 * a different variant is used for those cases.
 	 */
 #define	SET_SEC_INFO(d_type, d_align, sh_flags, sh_entsize) \
 	{ \
 		static const SEC_INFO_T info_s = { d_type, d_align, sh_flags, \
 		    sh_entsize}; \
+		sec_info = &info_s; \
+	}
+#define	SET_SEC_INFO_WORD_ALIGN(d_type, sh_flags, sh_entsize) \
+	{ \
+		static SEC_INFO_T info_s = { d_type, 0, sh_flags, \
+		    sh_entsize}; \
+		info_s.align = ld_targ.t_m.m_word_align; \
 		sec_info = &info_s; \
 	}
 
@@ -376,16 +389,16 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * that they are correct or complete for any specific
 		 * purpose. The caller must provide the correct values.
 		 */
-		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN, SHF_ALLOC, 0)
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_BYTE, SHF_ALLOC, 0)
 		break;
 
 	case SHT_SYMTAB:
-		SET_SEC_INFO(ELF_T_SYM, M_WORD_ALIGN, 0, sizeof (Sym))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_SYM, 0, sizeof (Sym))
 		break;
 
 	case SHT_DYNSYM:
 	case SHT_SUNW_LDYNSYM:
-		SET_SEC_INFO(ELF_T_SYM, M_WORD_ALIGN, SHF_ALLOC, sizeof (Sym))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_SYM, SHF_ALLOC, sizeof (Sym))
 		break;
 
 	case SHT_STRTAB:
@@ -405,7 +418,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * Relocations with an addend (Everything except 32-bit X86).
 		 * The caller is expected to set all section header flags.
 		 */
-		SET_SEC_INFO(ELF_T_RELA, M_WORD_ALIGN, 0, sizeof (Rela))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_RELA, 0, sizeof (Rela))
 		break;
 
 	case SHT_REL:
@@ -413,13 +426,13 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * Relocations without an addend (32-bit X86 only).
 		 * The caller is expected to set all section header flags.
 		 */
-		SET_SEC_INFO(ELF_T_REL, M_WORD_ALIGN, 0, sizeof (Rel))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_REL, 0, sizeof (Rel))
 		break;
 
 	case SHT_HASH:
 	case SHT_SUNW_symsort:
 	case SHT_SUNW_tlssort:
-		SET_SEC_INFO(ELF_T_WORD, M_WORD_ALIGN, SHF_ALLOC, sizeof (Word))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_WORD, SHF_ALLOC, sizeof (Word))
 		break;
 
 	case SHT_DYNAMIC:
@@ -428,7 +441,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * on context, so we leave that flag unset and leave it to
 		 * the caller to add it if necessary.
 		 */
-		SET_SEC_INFO(ELF_T_DYN, M_WORD_ALIGN, SHF_WRITE, sizeof (Dyn))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_DYN, SHF_WRITE, sizeof (Dyn))
 		break;
 
 	case SHT_NOBITS:
@@ -455,11 +468,11 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * linker has no need for this information. It is purely
 		 * informational, used by elfdump(1), debuggers, etc.
 		 */
-		SET_SEC_INFO(ELF_T_WORD, M_WORD_ALIGN, 0, sizeof (Word));
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_WORD, 0, sizeof (Word));
 		break;
 
 	case SHT_SUNW_cap:
-		SET_SEC_INFO(ELF_T_CAP, M_WORD_ALIGN, SHF_ALLOC, sizeof (Cap));
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_CAP, SHF_ALLOC, sizeof (Cap));
 		break;
 
 	case SHT_SUNW_move:
@@ -478,7 +491,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * to the header index of the associated .dynamic section,
 		 * so we also set SHF_INFO_LINK.
 		 */
-		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN,
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_BYTE,
 		    SHF_ALLOC | SHF_INFO_LINK, sizeof (Syminfo));
 		break;
 
@@ -489,11 +502,11 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		 * The entries in these sections are not of uniform size,
 		 * so we set the entsize to 0.
 		 */
-		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN, SHF_ALLOC, 0);
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_BYTE, SHF_ALLOC, 0);
 		break;
 
 	case SHT_SUNW_versym:
-		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN, SHF_ALLOC,
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_BYTE, SHF_ALLOC,
 		    sizeof (Versym));
 		break;
 
@@ -503,6 +516,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		return (S_ERROR);
 	}
 #undef	SET_SEC_INFO
+#undef	SET_SEC_INFO_WORD_ALIGN
 
 	size = entcnt * sec_info->sh_entsize;
 
@@ -641,20 +655,20 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 
 	if (which == MAKE_TLS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_TBSS);
-		ident = M_ID_TLSBSS;
+		ident = ld_targ.t_id.id_tlsbss;
 		ofl->ofl_istlsbss = isec;
 		shdr->sh_flags |= SHF_TLS;
 
 	} else if (which == MAKE_BSS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_BSS);
 		ofl->ofl_isbss = isec;
-		ident = M_ID_BSS;
+		ident = ld_targ.t_id.id_bss;
 
-#if	defined(__x86) && defined(_ELF64)
-	} else if (which == MAKE_LBSS) {
+#if	defined(_ELF64)
+	} else if ((ld_targ.t_m.m_mach == EM_AMD64) && (which == MAKE_LBSS)) {
 		isec->is_name = MSG_ORIG(MSG_SCN_LBSS);
 		ofl->ofl_islbss = isec;
-		ident = M_ID_LBSS;
+		ident = ld_targ.t_id.id_lbss;
 		shdr->sh_flags |= SHF_AMD64_LARGE;
 #endif
 	}
@@ -722,7 +736,8 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	if ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == 0)
 		return (S_ERROR);
 
-	if (ld_place_section(ofl, isec, M_ID_ARRAY, 0) == (Os_desc *)S_ERROR)
+	if (ld_place_section(ofl, isec, ld_targ.t_id.id_array, 0) ==
+	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	osp = isec->is_osdesc;
@@ -747,7 +762,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	 * Fabricate the relocation information (as if a relocation record had
 	 * been input - see init_rel()).
 	 */
-	reld.rel_rtype = M_R_ARRAYADDR;
+	reld.rel_rtype = ld_targ.t_m.m_r_arrayaddr;
 	reld.rel_roffset = 0;
 	reld.rel_raddend = 0;
 	reld.rel_typedata = 0;
@@ -757,10 +772,11 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	 * debugging requirements.
 	 */
 	reloc.r_offset = 0;
-	reloc.r_info = ELF_R_INFO(0, M_R_ARRAYADDR);
+	reloc.r_info = ELF_R_INFO(0, ld_targ.t_m.m_r_arrayaddr);
 	reloc.r_addend = 0;
 
-	DBG_CALL(Dbg_reloc_generate(ofl->ofl_lml, osp, M_REL_SHT_TYPE));
+	DBG_CALL(Dbg_reloc_generate(ofl->ofl_lml, osp,
+	    ld_targ.t_m.m_rel_sht_type));
 	for (LIST_TRAVERSE(list, lnp, sdp)) {
 		reld.rel_sname = sdp->sd_name;
 		reld.rel_sym = sdp;
@@ -800,7 +816,8 @@ make_comment(Ofl_desc *ofl)
 	shdr->sh_flags = 0;
 	shdr->sh_addralign = 1;
 
-	return ((uintptr_t)ld_place_section(ofl, isec, M_ID_NOTE, 0));
+	return ((uintptr_t)ld_place_section(ofl, isec,
+	    ld_targ.t_id.id_note, 0));
 }
 
 /*
@@ -831,7 +848,8 @@ make_dynamic(Ofl_desc *ofl)
 	if (!(flags & FLG_OF_RELOBJ))
 		shdr->sh_flags |= SHF_ALLOC;
 
-	osp = ofl->ofl_osdynamic = ld_place_section(ofl, isec, M_ID_DYNAMIC, 0);
+	osp = ofl->ofl_osdynamic =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynamic, 0);
 
 	/*
 	 * Reserve entries for any needed dependencies.
@@ -1103,7 +1121,7 @@ make_dynamic(Ofl_desc *ofl)
 	/*
 	 * Account for Architecture dependent .dynamic entries, and defaults.
 	 */
-	ld_mach_make_dynamic(ofl, &cnt);
+	(*ld_targ.t_mr.mr_mach_make_dynamic)(ofl, &cnt);
 
 	/*
 	 * DT_FLAGS, DT_FLAGS_1, DT_SUNW_STRPAD, and DT_NULL. Also,
@@ -1111,6 +1129,16 @@ make_dynamic(Ofl_desc *ofl)
 	 * to allow an ELF editor room to add items later.
 	 */
 	cnt += 4 + DYNAMIC_EXTRA_ELTS;
+
+	/*
+	 * DT_SUNW_LDMACH. Used to hold the ELF machine code of the
+	 * linker that produced the output object. This information
+	 * allows us to determine whether a given object was linked
+	 * natively, or by a linker running on a different type of
+	 * system. This information can be valuable if one suspects
+	 * that a problem might be due to alignment or byte order issues.
+	 */
+	cnt++;
 
 	/*
 	 * Determine the size of the section from the number of entries.
@@ -1129,11 +1157,11 @@ make_dynamic(Ofl_desc *ofl)
 uintptr_t
 ld_make_got(Ofl_desc *ofl)
 {
-	Shdr		*shdr;
 	Elf_Data	*data;
-	Is_desc		*isec;
-	size_t		size = (size_t)ofl->ofl_gotcnt * M_GOT_ENTSIZE;
-	size_t		rsize = (size_t)ofl->ofl_relocgotsz;
+	Shdr	*shdr;
+	Is_desc	*isec;
+	size_t	size = (size_t)ofl->ofl_gotcnt * ld_targ.t_m.m_got_entsize;
+	size_t	rsize = (size_t)ofl->ofl_relocgotsz;
 
 	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_GOT), 0,
 	    &isec, &shdr, &data) == S_ERROR)
@@ -1143,10 +1171,10 @@ ld_make_got(Ofl_desc *ofl)
 
 	shdr->sh_flags |= SHF_WRITE;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_entsize = M_GOT_ENTSIZE;
+	shdr->sh_entsize = ld_targ.t_m.m_got_entsize;
 
-	if ((ofl->ofl_osgot = ld_place_section(ofl, isec, M_ID_GOT, 0)) ==
-	    (Os_desc *)S_ERROR)
+	ofl->ofl_osgot = ld_place_section(ofl, isec, ld_targ.t_id.id_got, 0);
+	if (ofl->ofl_osgot == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	ofl->ofl_osgot->os_szoutrels = (Xword)rsize;
@@ -1186,16 +1214,8 @@ make_interp(Ofl_desc *ofl)
 	 * In the case of a dynamic executable supply a default interpreter
 	 * if a specific interpreter has not been specified.
 	 */
-	if (iname == 0) {
-		if (ofl->ofl_dehdr->e_machine == EM_SPARCV9)
-			iname = ofl->ofl_interp =
-			    MSG_ORIG(MSG_PTH_RTLD_SPARCV9);
-		else if (ofl->ofl_dehdr->e_machine == EM_AMD64)
-			iname = ofl->ofl_interp =
-			    MSG_ORIG(MSG_PTH_RTLD_AMD64);
-		else
-			iname = ofl->ofl_interp = MSG_ORIG(MSG_PTH_RTLD);
-	}
+	if (iname == NULL)
+		iname = ofl->ofl_interp = ld_targ.t_m.m_def_interp;
 
 	size = strlen(iname) + 1;
 
@@ -1207,7 +1227,8 @@ make_interp(Ofl_desc *ofl)
 	shdr->sh_size = (Xword)size;
 	data->d_align = shdr->sh_addralign = 1;
 
-	ofl->ofl_osinterp = ld_place_section(ofl, isec, M_ID_INTERP, 0);
+	ofl->ofl_osinterp =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_interp, 0);
 	return ((uintptr_t)ofl->ofl_osinterp);
 }
 
@@ -1260,7 +1281,7 @@ make_cap(Ofl_desc *ofl)
 	 * If we're not creating a relocatable object, save the output section
 	 * to trigger the creation of an associated program header.
 	 */
-	osec = ld_place_section(ofl, isec, M_ID_CAP, 0);
+	osec = ld_place_section(ofl, isec, ld_targ.t_id.id_cap, 0);
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
 		ofl->ofl_oscap = osec;
 
@@ -1276,32 +1297,31 @@ make_plt(Ofl_desc *ofl)
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
-	size_t		size = (size_t)M_PLT_RESERVSZ +
+	size_t		size = ld_targ.t_m.m_plt_reservsz +
 	    (((size_t)ofl->ofl_pltcnt + (size_t)ofl->ofl_pltpad) *
-	    M_PLT_ENTSIZE);
+	    ld_targ.t_m.m_plt_entsize);
 	size_t		rsize = (size_t)ofl->ofl_relocpltsz;
 
-#if	defined(__sparc)
 	/*
-	 * Account for the NOP at the end of the plt.
+	 * On sparc, account for the NOP at the end of the plt.
 	 */
-	size += sizeof (Word);
-#endif
+	if (ld_targ.t_m.m_mach == LD_TARG_BYCLASS(EM_SPARC, EM_SPARCV9))
+		size += sizeof (Word);
 
 	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_PLT), 0,
 	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
 	data->d_size = size;
-	data->d_align = M_PLT_ALIGN;
+	data->d_align = ld_targ.t_m.m_plt_align;
 
-	shdr->sh_flags = M_PLT_SHF_FLAGS;
+	shdr->sh_flags = ld_targ.t_m.m_plt_shf_flags;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_PLT_ALIGN;
-	shdr->sh_entsize = M_PLT_ENTSIZE;
+	shdr->sh_addralign = ld_targ.t_m.m_plt_align;
+	shdr->sh_entsize = ld_targ.t_m.m_plt_entsize;
 
-	if ((ofl->ofl_osplt = ld_place_section(ofl, isec, M_ID_PLT, 0)) ==
-	    (Os_desc *)S_ERROR)
+	ofl->ofl_osplt = ld_place_section(ofl, isec, ld_targ.t_id.id_plt, 0);
+	if (ofl->ofl_osplt == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	ofl->ofl_osplt->os_szoutrels = (Xword)rsize;
@@ -1336,8 +1356,8 @@ make_hash(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	if ((ofl->ofl_oshash = ld_place_section(ofl, isec, M_ID_HASH, 0)) ==
-	    (Os_desc *)S_ERROR)
+	ofl->ofl_oshash = ld_place_section(ofl, isec, ld_targ.t_id.id_hash, 0);
+	if (ofl->ofl_oshash == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -1394,8 +1414,9 @@ make_symtab(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	if ((ofl->ofl_ossymtab = ld_place_section(ofl, isec, M_ID_SYMTAB, 0)) ==
-	    (Os_desc *)S_ERROR)
+	ofl->ofl_ossymtab =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_symtab, 0);
+	if (ofl->ofl_ossymtab == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -1413,7 +1434,7 @@ make_symtab(Ofl_desc *ofl)
 			return (S_ERROR);
 
 		if ((ofl->ofl_ossymshndx = ld_place_section(ofl, xisec,
-		    M_ID_SYMTAB_NDX, 0)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_symtab_ndx, 0)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 	/*
@@ -1498,10 +1519,11 @@ make_dynsym(Ofl_desc *ofl)
 	 */
 	if (allow_ldynsym &&
 	    ((ofl->ofl_osldynsym = ld_place_section(ofl, lisec,
-	    M_ID_LDYNSYM, 0)) == (Os_desc *)S_ERROR))
+	    ld_targ.t_id.id_ldynsym, 0)) == (Os_desc *)S_ERROR))
 		return (S_ERROR);
-	if ((ofl->ofl_osdynsym = ld_place_section(ofl, isec, M_ID_DYNSYM, 0))
-	    == (Os_desc *)S_ERROR)
+	ofl->ofl_osdynsym =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynsym, 0);
+	if (ofl->ofl_osdynsym == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -1558,7 +1580,7 @@ make_dynsort(Ofl_desc *ofl)
 		return (S_ERROR);
 
 		if ((ofl->ofl_osdynsymsort = ld_place_section(ofl, isec,
-		    M_ID_DYNSORT, 0)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_dynsort, 0)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -1570,7 +1592,7 @@ make_dynsort(Ofl_desc *ofl)
 		return (S_ERROR);
 
 		if ((ofl->ofl_osdyntlssort = ld_place_section(ofl, isec,
-		    M_ID_DYNSORT, 0)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_dynsort, 0)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -1600,7 +1622,7 @@ make_dyn_shndx(Ofl_desc *ofl, const char *shname, Os_desc *symtab,
 		return (S_ERROR);
 
 	if ((*ret_os = ld_place_section(ofl, isec,
-	    M_ID_DYNSYM_NDX, 0)) == (Os_desc *)S_ERROR)
+	    ld_targ.t_id.id_dynsym_ndx, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	assert(*ret_os);
@@ -1652,8 +1674,9 @@ make_shstrtab(Ofl_desc *ofl)
 	 * Place the section first, as it may effect the number of section
 	 * headers to account for.
 	 */
-	if ((ofl->ofl_osshstrtab = ld_place_section(ofl, isec, M_ID_NOTE, 0)) ==
-	    (Os_desc *)S_ERROR)
+	ofl->ofl_osshstrtab =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_note, 0);
+	if (ofl->ofl_osshstrtab == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	size = st_getstrtab_sz(ofl->ofl_shdrsttab);
@@ -1695,7 +1718,8 @@ make_strtab(Ofl_desc *ofl)
 	data->d_size = size;
 	shdr->sh_size = (Xword)size;
 
-	ofl->ofl_osstrtab = ld_place_section(ofl, isec, M_ID_STRTAB, 0);
+	ofl->ofl_osstrtab =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_strtab, 0);
 	return ((uintptr_t)ofl->ofl_osstrtab);
 }
 
@@ -1774,7 +1798,8 @@ make_dynstr(Ofl_desc *ofl)
 
 	shdr->sh_size = (Xword)size;
 
-	ofl->ofl_osdynstr = ld_place_section(ofl, isec, M_ID_DYNSTR, 0);
+	ofl->ofl_osdynstr =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynstr, 0);
 	return ((uintptr_t)ofl->ofl_osdynstr);
 }
 
@@ -1799,7 +1824,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	const char	*rel_prefix;
 
 	/* LINTED */
-	if (M_REL_SHT_TYPE == SHT_REL) {
+	if (ld_targ.t_m.m_rel_sht_type == SHT_REL) {
 		/* REL */
 		relsize = sizeof (Rel);
 		rel_prefix = MSG_ORIG(MSG_SCN_REL);
@@ -1834,8 +1859,8 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	/* LINTED */
 	ofl->ofl_relocsz += (Xword)size;
 
-	if (new_section(ofl, M_REL_SHT_TYPE, sectname, 0, &isec, &shdr, &data)
-	    == S_ERROR)
+	if (new_section(ofl, ld_targ.t_m.m_rel_sht_type, sectname, 0, &isec,
+	    &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
 	data->d_size = size;
@@ -1856,8 +1881,8 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	 * Associate this relocation section to the section its going to
 	 * relocate.
 	 */
-	if ((rosp = ld_place_section(ofl, isec, M_ID_REL, 0)) ==
-	    (Os_desc *)S_ERROR)
+	rosp = ld_place_section(ofl, isec, ld_targ.t_id.id_rel, 0);
+	if (rosp == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	if (osp) {
@@ -1921,7 +1946,8 @@ make_verneed(Ofl_desc *ofl)
 	data->d_size = ofl->ofl_verneedsz;
 	shdr->sh_size = (Xword)ofl->ofl_verneedsz;
 
-	ofl->ofl_osverneed = ld_place_section(ofl, isec, M_ID_VERSION, 0);
+	ofl->ofl_osverneed =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_version, 0);
 	return ((uintptr_t)ofl->ofl_osverneed);
 }
 
@@ -1966,7 +1992,8 @@ make_verdef(Ofl_desc *ofl)
 	data->d_size = ofl->ofl_verdefsz;
 	shdr->sh_size = (Xword)ofl->ofl_verdefsz;
 
-	ofl->ofl_osverdef = ld_place_section(ofl, isec, M_ID_VERSION, 0);
+	ofl->ofl_osverdef =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_version, 0);
 	return ((uintptr_t)ofl->ofl_osverdef);
 }
 
@@ -2061,8 +2088,8 @@ ld_make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
 	 * symbol references are added.
 	 */
 	ofl->ofl_issunwdata1 = isec;
-	if ((osp = ld_place_section(ofl, isec, M_ID_DATA, 0)) ==
-	    (Os_desc *)S_ERROR)
+	osp = ld_place_section(ofl, isec, ld_targ.t_id.id_data, 0);
+	if (osp == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	if (!(osp->os_flags & FLG_OS_OUTREL)) {
@@ -2625,7 +2652,7 @@ ld_make_sections(Ofl_desc *ofl)
 			return (S_ERROR);
 		if ((ofl->ofl_osversym = make_sym_sec(ofl,
 		    MSG_ORIG(MSG_SCN_SUNWVERSYM), SHT_SUNW_versym,
-		    M_ID_VERSION)) == (Os_desc*)S_ERROR)
+		    ld_targ.t_id.id_version)) == (Os_desc*)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -2635,7 +2662,7 @@ ld_make_sections(Ofl_desc *ofl)
 	if (ofl->ofl_flags & FLG_OF_SYMINFO) {
 		if ((ofl->ofl_ossyminfo = make_sym_sec(ofl,
 		    MSG_ORIG(MSG_SCN_SUNWSYMINFO), SHT_SUNW_syminfo,
-		    M_ID_SYMINFO)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_syminfo)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -2708,8 +2735,9 @@ ld_make_sections(Ofl_desc *ofl)
 				return (S_ERROR);
 			if (make_dynsym(ofl) == S_ERROR)
 				return (S_ERROR);
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-			if (make_amd64_unwindhdr(ofl) == S_ERROR)
+#if	defined(_ELF64)
+			if ((ld_targ.t_uw.uw_make_unwindhdr != NULL) &&
+			    ((*ld_targ.t_uw.uw_make_unwindhdr)(ofl) == S_ERROR))
 				return (S_ERROR);
 #endif
 			if (make_dynsort(ofl) == S_ERROR)
@@ -2811,47 +2839,13 @@ ld_make_data(Ofl_desc *ofl, size_t size)
 	shdr->sh_size = (Xword)size;
 	shdr->sh_flags |= SHF_WRITE;
 
-	if (ld_place_section(ofl, isec, M_ID_DATA, 0) == (Os_desc *)S_ERROR)
+	if (ld_place_section(ofl, isec, ld_targ.t_id.id_data, 0) ==
+	    (Os_desc *)S_ERROR)
 		return ((Is_desc *)S_ERROR);
 
 	return (isec);
 }
 
-/*
- * Define a set of templates for generating "void (*)(void)" function
- * definitions.
- */
-#if	defined(__i386) || defined(__amd64)
-#if	defined(__lint)
-static const uchar_t ret_template[] = { 0 };
-#else	/* __lint */
-#if	defined(_ELF64)
-#define	ret_template	ret64_template
-#else
-#define	ret_template	ret32_template
-#endif
-
-static const uchar_t ret32_template[] = {
-/* 0x00 */	0xc3				/* ret */
-};
-
-static const uchar_t ret64_template[] = {
-/* 0x00 */	0x55,				/* pushq  %rbp */
-/* 0x01 */	0x48, 0x8b, 0xec,		/* movq   %rsp,%rbp */
-/* 0x04 */	0x48, 0x8b, 0xe5,		/* movq   %rbp,%rsp */
-/* 0x07 */	0x5d,				/* popq   %rbp */
-/* 0x08 */	0xc3				/* ret */
-};
-#endif	/* __lint */
-
-#elif	defined(__sparc)
-static const uchar_t ret_template[] = {
-/* 0x00 */	0x81, 0xc3, 0xe0, 0x08,		/* retl */
-/* 0x04 */	0x01, 0x00, 0x00, 0x00		/* nop */
-};
-#else
-#error	unsupported architecture!
-#endif
 
 /*
  * Build an additional text section - used to back FUNC symbol definitions
@@ -2868,8 +2862,8 @@ ld_make_text(Ofl_desc *ofl, size_t size)
 	 * Insure the size is sufficient to contain the minimum return
 	 * instruction.
 	 */
-	if (size < sizeof (ret_template))
-		size = sizeof (ret_template);
+	if (size < ld_targ.t_nf.nf_size)
+		size = ld_targ.t_nf.nf_size;
 
 	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_TEXT), 0,
 	    &isec, &shdr, &data) == S_ERROR)
@@ -2879,12 +2873,18 @@ ld_make_text(Ofl_desc *ofl, size_t size)
 	shdr->sh_size = (Xword)size;
 	shdr->sh_flags |= SHF_EXECINSTR;
 
-	/* Fill the buffer with the appropriate return instruction. */
+	/*
+	 * Fill the buffer with the appropriate return instruction.
+	 * Note that there is no need to swap bytes on a non-native,
+	 * link, as the data being copied is given in bytes.
+	 */
 	if ((data->d_buf = libld_calloc(size, 1)) == 0)
 		return ((Is_desc *)S_ERROR);
-	(void) memcpy(data->d_buf, ret_template, sizeof (ret_template));
+	(void) memcpy(data->d_buf, ld_targ.t_nf.nf_template,
+	    ld_targ.t_nf.nf_size);
 
-	if (ld_place_section(ofl, isec, M_ID_TEXT, 0) == (Os_desc *)S_ERROR)
+	if (ld_place_section(ofl, isec, ld_targ.t_id.id_text, 0) ==
+	    (Os_desc *)S_ERROR)
 		return ((Is_desc *)S_ERROR);
 
 	return (isec);

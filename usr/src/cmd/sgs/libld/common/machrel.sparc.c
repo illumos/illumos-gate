@@ -23,18 +23,27 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/* Get the sparc version of the relocation engine */
+#define	DO_RELOC_LIBLD_SPARC
 
 #include	<string.h>
 #include	<stdio.h>
 #include	<sys/elf_SPARC.h>
 #include	<debug.h>
 #include	<reloc.h>
+#include	<sparc/machdep_sparc.h>
 #include	"msg.h"
 #include	"_libld.h"
+#include	"machsym.sparc.h"
+
+/* Forward declarations */
+static Xword ld_calc_got_offset(Rel_desc *, Ofl_desc *);
+static Gotndx *ld_find_gotndx(List *, Gotref, Ofl_desc *, Rel_desc *);
 
 /*
  * Local Variable Definitions
@@ -43,13 +52,13 @@ static Sword neggotoffset = 0;		/* off. of GOT table from GOT symbol */
 static Sword smlgotcnt = M_GOT_XNumber;	/* no. of small GOT symbols */
 static Sword mixgotcnt = 0;		/* # syms with both large/small GOT */
 
-Word
+static Word
 ld_init_rel(Rel_desc *reld, void *reloc)
 {
 	Rela *	rela = (Rela *)reloc;
 
 	/* LINTED */
-	reld->rel_rtype = (Word)ELF_R_TYPE(rela->r_info);
+	reld->rel_rtype = (Word)ELF_R_TYPE(rela->r_info, M_MACH);
 	reld->rel_roffset = rela->r_offset;
 	reld->rel_raddend = rela->r_addend;
 	reld->rel_typedata = (Word)ELF_R_TYPE_DATA(rela->r_info);
@@ -59,7 +68,7 @@ ld_init_rel(Rel_desc *reld, void *reloc)
 	return ((Word)ELF_R_SYM(rela->r_info));
 }
 
-void
+static void
 ld_mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 {
 	Word		eflags = ofl->ofl_dehdr->e_flags;
@@ -111,7 +120,7 @@ ld_mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 	ofl->ofl_dehdr->e_flags = eflags;
 }
 
-void
+static void
 ld_mach_make_dynamic(Ofl_desc *ofl, size_t *cnt)
 {
 	if (!(ofl->ofl_flags & FLG_OF_RELOBJ)) {
@@ -123,7 +132,7 @@ ld_mach_make_dynamic(Ofl_desc *ofl, size_t *cnt)
 	}
 }
 
-void
+static void
 ld_mach_update_odynamic(Ofl_desc *ofl, Dyn **dyn)
 {
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) && ofl->ofl_pltcnt) {
@@ -138,7 +147,7 @@ ld_mach_update_odynamic(Ofl_desc *ofl, Dyn **dyn)
 
 #if	defined(_ELF64)
 
-Xword
+static Xword
 ld_calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Xword	value, pltndx, farpltndx;
@@ -177,13 +186,13 @@ ld_calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 /*
  * Instructions required for Far PLT's
  */
-static uint32_t farplt_instrs[6] = {
-	0x8a10000f,			/* mov   %o7, %g5	*/
-	0x40000002,			/* call  . + 0x8	*/
-	0x01000000,			/* nop			*/
-	0xc25be000,			/* ldx   [%o7 + 0], %g1	*/
-	0x83c3c001,			/* jmpl  %o7 + %g1, %g1	*/
-	0x9e100005			/* mov   %g5, %o7	*/
+static uchar_t farplt_instrs[24] = {
+	0x8a, 0x10, 0x00, 0x0f,		/* mov   %o7, %g5	*/
+	0x40, 0x00, 0x00, 0x02,		/* call  . + 0x8	*/
+	0x01, 0x00, 0x00, 0x00,		/* nop			*/
+	0xc2, 0x5b, 0xe0, 0x00,		/* ldx   [%o7 + 0], %g1	*/
+	0x83, 0xc3, 0xc0, 0x01,		/* jmpl  %o7 + %g1, %g1	*/
+	0x9e, 0x10, 0x00, 0x05		/* mov   %g5, %o7	*/
 };
 
 /*
@@ -217,7 +226,7 @@ static uint32_t farplt_instrs[6] = {
  *		.xword .PLT0-(.PLT32927+4)
  *
  */
-void
+static void
 plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 {
 	uint_t		blockndx;	/* # of far PLT blocks */
@@ -336,8 +345,9 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 static void
 plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 {
-	uchar_t		*pltent;	/* PLT entry being created. */
-	Sxword		pltoff;		/* Offset of this entry from PLT top */
+	uchar_t	*pltent;	/* PLT entry being created. */
+	Sxword	pltoff;		/* Offset of this entry from PLT top */
+	int	bswap = (ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0;
 
 	/*
 	 *  The second part of the V9 ABI (sec. 5.2.4)
@@ -360,6 +370,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	 */
 	/* LINTED */
 	*(Word *)pltent = M_SETHIG1 | pltoff;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[1]: ba,a %xcc, .PLT1 (.PLT1 accessed as a
@@ -371,6 +384,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	/* LINTED */
 	*(Word *)pltent = M_BA_A_XCC |
 	    (((pltoff + M_PLT_ENTSIZE) >> 2) & S_MASK(19));
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[2]: sethi 0, %g0 (NOP for delay slot of eventual CTI).
@@ -378,6 +394,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_NOP;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[3]: sethi 0, %g0 (NOP for PLT padding).
@@ -385,6 +404,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_NOP;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[4]: sethi 0, %g0 (NOP for PLT padding).
@@ -392,6 +414,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_NOP;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[5]: sethi 0, %g0 (NOP for PLT padding).
@@ -399,6 +424,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_NOP;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[6]: sethi 0, %g0 (NOP for PLT padding).
@@ -406,6 +434,9 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_NOP;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[7]: sethi 0, %g0 (NOP for PLT padding).
@@ -413,12 +444,15 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_NOP;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 }
 
 
 #else  /* Elf 32 */
 
-Xword
+static Xword
 ld_calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Xword	value, pltndx;
@@ -446,6 +480,7 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 {
 	Byte *	pltent;	/* PLT entry being created. */
 	Sxword	pltoff;	/* Offset of this entry from PLT top */
+	int	bswap = (ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0;
 
 	pltoff = M_PLT_RESERVSZ + (pltndx - 1) * M_PLT_ENTSIZE;
 	pltent = (Byte *)ofl->ofl_osplt->os_outdata->d_buf + pltoff;
@@ -458,6 +493,9 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	 */
 	/* LINTED */
 	*(Word *)pltent = M_SETHIG1 | pltoff;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[1]: ba,a .L0 (.L0 accessed as a PC-relative index of longwords)
@@ -467,6 +505,9 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltoff = -pltoff;
 	/* LINTED */
 	*(Word *)pltent = M_BA_A | ((pltoff >> 2) & S_MASK(22));
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[2]: sethi 0, %g0 (NOP for delay slot of eventual CTI).
@@ -474,6 +515,9 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_SETHIG0;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 
 	/*
 	 * PLT[3]: sethi 0, %g0 (NOP for PLT padding).
@@ -481,23 +525,26 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltent += M_PLT_INSSIZE;
 	/* LINTED */
 	*(Word *)pltent = M_SETHIG0;
+	if (bswap)
+		/* LINTED */
+		*(Word *)pltent = ld_bswap_Word(*(Word *)pltent);
 }
 
 #endif /* _ELF64 */
 
-uintptr_t
+static uintptr_t
 ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 {
-	Os_desc *		relosp, * osp = 0;
-	Xword			ndx, roffset, value;
-	Sxword			raddend;
-	const Rel_entry *	rep;
-	Rela			rea;
-	char			*relbits;
-	Sym_desc *		sdp, * psym = (Sym_desc *)0;
-	int			sectmoved = 0;
-	Word			dtflags1 = ofl->ofl_dtflags_1;
-	Word			flags = ofl->ofl_flags;
+	Os_desc *	relosp, * osp = 0;
+	Xword		ndx, roffset, value;
+	Sxword		raddend;
+	const Rel_entry	*rep;
+	Rela		rea;
+	char		*relbits;
+	Sym_desc *	sdp, * psym = (Sym_desc *)0;
+	int		sectmoved = 0;
+	Word		dtflags1 = ofl->ofl_dtflags_1;
+	Word		flags = ofl->ofl_flags;
 
 	raddend = orsp->rel_raddend;
 	sdp = orsp->rel_sym;
@@ -742,9 +789,11 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 {
 	Sym_desc	*sdp = arsp->rel_sym;
 	Word		rtype = arsp->rel_rtype;
-	uint_t		*offset;
+	Word		*offset, w;
+	int		bswap = OFL_SWAP_RELOC_DATA(ofl, arsp);
 
-	offset = (uint_t *)((uintptr_t)arsp->rel_roffset +
+
+	offset = (Word *)((uintptr_t)arsp->rel_roffset +
 	    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
 	    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
@@ -768,14 +817,18 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		case R_SPARC_TLS_GD_ADD:
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 			    R_SPARC_NONE, arsp));
-			*offset = (TLS_GD_IE_LD |
-			    (*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RS2)));
+			w = bswap ? ld_bswap_Word(*offset) : *offset;
+			w = (TLS_GD_IE_LD |
+			    (w & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RS2)));
+			*offset = bswap ? ld_bswap_Word(w) : w;
 			return (FIX_DONE);
 
 		case R_SPARC_TLS_GD_CALL:
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 			    R_SPARC_NONE, arsp));
 			*offset = TLS_GD_IE_ADD;
+			if (bswap)
+				*offset = ld_bswap_Word(*offset);
 			return (FIX_DONE);
 		}
 		return (FIX_RELOC);
@@ -815,8 +868,10 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_SPARC_TLS_LE_LOX10, arsp));
-		*offset = TLS_GD_LE_XOR |
-		    (*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RD));
+		w = bswap ? ld_bswap_Word(*offset) : *offset;
+		w = TLS_GD_LE_XOR |
+		    (w & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RD));
+		*offset = bswap ? ld_bswap_Word(w) : w;
 		arsp->rel_rtype = R_SPARC_TLS_LE_LOX10;
 		return (FIX_RELOC);
 
@@ -832,8 +887,9 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_SPARC_NONE, arsp));
-		*offset = ((*offset) & (FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) |
-		    TLS_IE_LE_OR;
+		w = bswap ? ld_bswap_Word(*offset) : *offset;
+		w = (w & (FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) | TLS_IE_LE_OR;
+		*offset = bswap ? ld_bswap_Word(w) : w;
 		return (FIX_DONE);
 
 	case R_SPARC_TLS_LDO_ADD:
@@ -849,14 +905,18 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_SPARC_NONE, arsp));
-		*offset = *offset & (~FM3_REG_MSK_RS1);
-		*offset = *offset | (REG_G7 << 14);
+		w = bswap ? ld_bswap_Word(*offset) : *offset;
+		w = w & (~FM3_REG_MSK_RS1);
+		w = w | (REG_G7 << 14);
+		*offset = bswap ? ld_bswap_Word(w) : w;
 		return (FIX_DONE);
 
 	case R_SPARC_TLS_LDM_CALL:
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_SPARC_NONE, arsp));
 		*offset = TLS_LD_LE_CLRO0;
+		if (bswap)
+			*offset = ld_bswap_Word(*offset);
 		return (FIX_DONE);
 
 	case R_SPARC_TLS_LDM_HI22:
@@ -867,6 +927,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_SPARC_NONE, arsp));
 		*offset = M_NOP;
+		if (bswap)
+			*offset = ld_bswap_Word(*offset);
 		return (FIX_DONE);
 	}
 	return (FIX_RELOC);
@@ -878,9 +940,10 @@ static Fixupret
 gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 {
 	Word		rtype = arsp->rel_rtype;
-	uint_t		*offset;
+	Word		*offset, w;
 	const char	*ifl_name;
 	Conv_inv_buf_t	inv_buf;
+	int		bswap;
 
 	switch (rtype) {
 	case R_SPARC_GOTDATA_OP_HIX22:
@@ -906,12 +969,14 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_SPARC_NONE, arsp));
-		offset = (uint_t *)(uintptr_t)(arsp->rel_roffset +
+		offset = (Word *)(uintptr_t)(arsp->rel_roffset +
 		    _elf_getxoff(arsp->rel_isdesc->is_indata) +
 		    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
-
-		*offset = ((*offset) & (FM3_REG_MSK_RS1 |
+		bswap = OFL_SWAP_RELOC_DATA(ofl, arsp);
+		w = bswap ? ld_bswap_Word(*offset) : *offset;
+		w = (w & (FM3_REG_MSK_RS1 |
 		    FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) | GOTOP_ADDINST;
+		*offset = bswap ? ld_bswap_Word(w) : w;
 		return (FIX_DONE);
 	}
 	/*
@@ -930,7 +995,7 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	return (FIX_ERROR);
 }
 
-uintptr_t
+static uintptr_t
 ld_do_activerelocs(Ofl_desc *ofl)
 {
 	Rel_desc	*arsp;
@@ -1150,7 +1215,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				 */
 				if (ofl->ofl_flags1 & FLG_OF1_ENCDIFF)
 					*(Xword *)R2addr =
-					    ld_byteswap_Xword(value);
+					    ld_bswap_Xword(value);
 				else
 					*(Xword *)R2addr = value;
 				continue;
@@ -1288,7 +1353,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	return (return_code);
 }
 
-uintptr_t
+static uintptr_t
 ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Rel_desc	*orsp;
@@ -1493,7 +1558,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
  * search the input files global symbols to determine if this relocation is
  * appropriate.
  */
-uintptr_t
+static uintptr_t
 ld_reloc_register(Rel_desc * rsp, Is_desc * isp, Ofl_desc * ofl)
 {
 	if (ofl->ofl_flags & FLG_OF_MULDEFS) {
@@ -1521,7 +1586,7 @@ ld_reloc_register(Rel_desc * rsp, Is_desc * isp, Ofl_desc * ofl)
 /*
  * process relocation for a LOCAL symbol
  */
-uintptr_t
+static uintptr_t
 ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 {
 	Word		flags = ofl->ofl_flags;
@@ -1621,7 +1686,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
  * value is passed to the final relocation engine, a verification ("V")
  * relocation should trigger a fatal error condition.
  */
-uintptr_t
+static uintptr_t
 ld_reloc_GOTOP(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Word	rtype = rsp->rel_rtype;
@@ -1646,7 +1711,7 @@ ld_reloc_GOTOP(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	return (ld_add_actrel(FLG_REL_GOTFIX, rsp, ofl));
 }
 
-uintptr_t
+static uintptr_t
 ld_reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Word		rtype = rsp->rel_rtype;
@@ -1795,7 +1860,7 @@ static	Sword small_index;	/* starting index for small GOT entries */
 static	Sword mixed_index;	/* starting index for mixed GOT entries */
 static	Sword large_index;	/* starting index for large GOT entries */
 
-uintptr_t
+static uintptr_t
 ld_assign_got(Ofl_desc *ofl, Sym_desc * sdp)
 {
 	Listnode *	lnp;
@@ -1838,7 +1903,7 @@ ld_assign_got(Ofl_desc *ofl, Sym_desc * sdp)
 /*
  * Search the GOT index list for a GOT entry with the proper addend.
  */
-Gotndx *
+static Gotndx *
 ld_find_gotndx(List * lst, Gotref gref, Ofl_desc * ofl, Rel_desc * rdesc)
 {
 	Listnode *	lnp;
@@ -1855,7 +1920,7 @@ ld_find_gotndx(List * lst, Gotref gref, Ofl_desc * ofl, Rel_desc * rdesc)
 	return ((Gotndx *)0);
 }
 
-Xword
+static Xword
 ld_calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
 {
 	Os_desc		*osp = ofl->ofl_osgot;
@@ -1886,7 +1951,7 @@ ld_calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
 	    (-neggotoffset * M_GOT_ENTSIZE)));
 }
 
-uintptr_t
+static uintptr_t
 ld_assign_got_ndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
     Rel_desc * rsp, Sym_desc * sdp)
 {
@@ -1996,14 +2061,14 @@ ld_assign_got_ndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
 	return (1);
 }
 
-void
+static void
 ld_assign_plt_ndx(Sym_desc * sdp, Ofl_desc *ofl)
 {
 	sdp->sd_aux->sa_PLTndx = 1 + ofl->ofl_pltcnt++;
 }
 
 
-uintptr_t
+static uintptr_t
 ld_allocate_got(Ofl_desc * ofl)
 {
 	const Sword	first_large_ndx = M_GOT_MAXSMALL / 2;
@@ -2077,7 +2142,7 @@ ld_allocate_got(Ofl_desc * ofl)
 /*
  * Initializes .got[0] with the _DYNAMIC symbol value.
  */
-uintptr_t
+static uintptr_t
 ld_fillin_gotplt(Ofl_desc *ofl)
 {
 	if (ofl->ofl_osgot) {
@@ -2092,7 +2157,154 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 			    (M_GOT_XDYNAMIC * M_GOT_ENTSIZE));
 			/* LINTED */
 			*((Xword *)genptr) = sdp->sd_sym->st_value;
+			if (ofl->ofl_flags1 & FLG_OF1_ENCDIFF)
+				/* LINTED */
+				*((Xword *)genptr) =
+				    /* LINTED */
+				    ld_bswap_Xword(*((Xword *)genptr));
 		}
 	}
 	return (1);
+}
+
+
+
+/*
+ * Template for generating "void (*)(void)" function
+ */
+static const uchar_t nullfunc_tmpl[] = {
+/* 0x00 */	0x81, 0xc3, 0xe0, 0x08,		/* retl */
+/* 0x04 */	0x01, 0x00, 0x00, 0x00		/* nop */
+};
+
+
+
+/*
+ * Return the ld_targ definition for this target.
+ */
+const Target *
+ld_targ_init_sparc(void)
+{
+	static const Target _ld_targ = {
+		{			/* Target_mach */
+			M_MACH,			/* m_mach */
+			M_MACHPLUS,		/* m_machplus */
+			M_FLAGSPLUS,		/* m_flagsplus */
+			M_CLASS,		/* m_class */
+			M_DATA,			/* m_data */
+
+			M_SEGM_ALIGN,		/* m_segm_align */
+			M_SEGM_ORIGIN,		/* m_segm_origin */
+			M_DATASEG_PERM,		/* m_dataseg_perm */
+			M_WORD_ALIGN,		/* m_word_align */
+						/* m_def_interp */
+#if	defined(_ELF64)
+			MSG_ORIG(MSG_PTH_RTLD_SPARCV9),
+#else
+			MSG_ORIG(MSG_PTH_RTLD),
+#endif
+
+			/* Relocation type codes */
+			M_R_ARRAYADDR,		/* m_r_arrayaddr */
+			M_R_COPY,		/* m_r_copy */
+			M_R_GLOB_DAT,		/* m_r_glob_dat */
+			M_R_JMP_SLOT,		/* m_r_jmp_slot */
+			M_R_NUM,		/* m_r_num */
+			M_R_NONE,		/* m_r_none */
+			M_R_RELATIVE,		/* m_r_relative */
+			M_R_REGISTER,		/* m_r_register */
+
+			/* Relocation related constants */
+			M_REL_DT_COUNT,		/* m_rel_dt_count */
+			M_REL_DT_ENT,		/* m_rel_dt_ent */
+			M_REL_DT_SIZE,		/* m_rel_dt_size */
+			M_REL_DT_TYPE,		/* m_rel_dt_type */
+			M_REL_SHT_TYPE,		/* m_rel_sht_type */
+
+			/* GOT related constants */
+			M_GOT_ENTSIZE,		/* m_got_entsize */
+			M_GOT_XNumber,		/* m_got_xnumber */
+
+			/* PLT related constants */
+			M_PLT_ALIGN,		/* m_plt_align */
+			M_PLT_ENTSIZE,		/* m_plt_entsize */
+			M_PLT_RESERVSZ,		/* m_plt_reservsz */
+			M_PLT_SHF_FLAGS,	/* m_plt_shf_flags */
+
+			M_DT_REGISTER,		/* m_dt_register */
+		},
+		{			/* Target_machid */
+			M_ID_ARRAY,		/* id_array */
+			M_ID_BSS,		/* id_bss */
+			M_ID_CAP,		/* id_cap */
+			M_ID_DATA,		/* id_data */
+			M_ID_DYNAMIC,		/* id_dynamic */
+			M_ID_DYNSORT,		/* id_dynsort */
+			M_ID_DYNSTR,		/* id_dynstr */
+			M_ID_DYNSYM,		/* id_dynsym */
+			M_ID_DYNSYM_NDX,	/* id_dynsym_ndx */
+			M_ID_GOT,		/* id_got */
+			M_ID_GOTDATA,		/* id_gotdata */
+			M_ID_HASH,		/* id_hash */
+			M_ID_INTERP,		/* id_interp */
+			M_ID_UNKNOWN,		/* id_lbss (unused) */
+			M_ID_LDYNSYM,		/* id_ldynsym */
+			M_ID_NOTE,		/* id_note */
+			M_ID_NULL,		/* id_null */
+			M_ID_PLT,		/* id_plt */
+			M_ID_REL,		/* id_rel */
+			M_ID_STRTAB,		/* id_strtab */
+			M_ID_SYMINFO,		/* id_syminfo */
+			M_ID_SYMTAB,		/* id_symtab */
+			M_ID_SYMTAB_NDX,	/* id_symtab_ndx */
+			M_ID_TEXT,		/* id_text */
+			M_ID_TLS,		/* id_tls */
+			M_ID_TLSBSS,		/* id_tlsbss */
+			M_ID_UNKNOWN,		/* id_unknown */
+			M_ID_UNKNOWN,		/* id_unwind (unused) */
+			M_ID_USER,		/* id_user */
+			M_ID_VERSION,		/* id_version */
+		},
+		{			/* Target_nullfunc */
+			nullfunc_tmpl,		/* nf_template */
+			sizeof (nullfunc_tmpl),	/* nf_size */
+		},
+		{			/* Target_machrel */
+			reloc_table,
+
+			ld_init_rel,		/* mr_init_rel */
+			ld_mach_eflags,		/* mr_mach_eflags */
+			ld_mach_make_dynamic,	/* mr_mach_make_dynamic */
+			ld_mach_update_odynamic, /* mr_mach_update_odynamic */
+			ld_calc_plt_addr,	/* mr_calc_plt_addr */
+			ld_perform_outreloc,	/* mr_perform_outreloc */
+			ld_do_activerelocs,	/* mr_do_activerelocs */
+			ld_add_outrel,		/* mr_add_outrel */
+			ld_reloc_register,	/* mr_reloc_register */
+			ld_reloc_local,		/* mr_reloc_local */
+			ld_reloc_GOTOP,		/* mr_reloc_GOTOP */
+			ld_reloc_TLS,		/* mr_reloc_TLS */
+			ld_assign_got,		/* mr_assign_got */
+			ld_find_gotndx,		/* mr_find_gotndx */
+			ld_calc_got_offset,	/* mr_calc_got_offset */
+			ld_assign_got_ndx,	/* mr_assign_got_ndx */
+			ld_assign_plt_ndx,	/* mr_assign_plt_ndx */
+			ld_allocate_got,	/* mr_allocate_got */
+			ld_fillin_gotplt,	/* mr_fillin_gotplt */
+		},
+		{			/* Target_machsym */
+			ld_reg_check_sparc,	/* ms_reg_check */
+			ld_mach_sym_typecheck_sparc, /* ms_mach_sym_typecheck */
+			ld_is_regsym_sparc,	/* ms_is_regsym */
+			ld_reg_find_sparc,	/* ms_reg_find */
+			ld_reg_enter_sparc	/* ms_reg_enter */
+		},
+		{			/* Target_unwind */
+			NULL,		/* uw_make_unwindhdr */
+			NULL,		/* uw_populate_unwindhdr */
+			NULL,		/* uw_append_unwind */
+		}
+	};
+
+	return (&_ld_targ);
 }

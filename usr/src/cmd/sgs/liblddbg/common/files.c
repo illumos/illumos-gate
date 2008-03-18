@@ -672,7 +672,7 @@ reject[] = {
 };
 
 void
-Dbg_file_rejected(Lm_list *lml, Rej_desc *rej)
+Dbg_file_rejected(Lm_list *lml, Rej_desc *rej, Half mach)
 {
 	Conv_reject_desc_buf_t rej_buf;
 
@@ -682,7 +682,7 @@ Dbg_file_rejected(Lm_list *lml, Rej_desc *rej)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(reject[rej->rej_type]), rej->rej_name ?
 	    rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-	    conv_reject_desc(rej, &rej_buf));
+	    conv_reject_desc(rej, &rej_buf, mach));
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
 

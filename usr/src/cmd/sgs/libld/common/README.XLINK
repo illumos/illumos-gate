@@ -1,0 +1,373 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+
+
+
+Notes On Cross Link-Editor Support in libld.so
+-----------------------------------------
+
+The Solaris link-editor is used in two contexts:
+
+	1) The standard ld command
+	2) Via the runtime linker (ld.so.1), when a program
+	   calls dlopen() on a relocatable object (ET_REL).
+
+To support both uses, it is packaged as a sharable library (libld.so).
+The ld command is therefore a simple wrapper that uses libld.
+
+libld.so is a cross linker. This means that it can link objects for
+a system other than the system running the link-editor (e.g. A link-editor
+running on an amd64 system processing sparc objects). This means that every
+instance of libld.so contains code for building objects for every supported
+target. This unlike GNU ld, where you build gld specifically for the
+platform you're targeting. This is possible because unlike gld, we only
+support Solaris, with a small number of platforms. 
+
+At initialization, the caller of libld.so specifies the type of objects
+being linked. By default, the ld command determines the machine type and
+class of the object being generated from the first ELF object processed
+from the command line. The -64 and -ztarget options exists to change this
+default, which is useful when creating an object entirely from an archive
+library or a mapfile. During initialization, the link-editor configures
+itself to build an output object of the specified type. This is done via
+indirection, using the global ld_targ structure to access code, data, and
+constants for the specified target.
+
+There are two types of source files used to build libld.so:
+
+	1) Common code used for all targets
+	2) Target specific code used only when linking for
+	  a given target.
+
+All of these files reside in usr/src/cmd/sgs/libld/common. However,
+it is easy to see which files belong in each category by examining
+the object lists maintained in usr/src/cmd/sgs/libld/Makefile.com.
+In addition, the target-specific files usually include the target
+in their name (i.e. machrel.sparc.c).
+
+Although the target dependent and independent (common) code is well separated,
+they are interdependent. For example, the common code is aware of
+the target-specific section types that can occur only for some targets
+(i.e. SHT_AMD64_UNWIND). This is not an architecture that allows
+for arbitrary target support to be dynamically plugged into an unchanged
+platform independent core. Rather, it is an organization that allows
+a common core to support all the targets it knows about in a way that
+is understandable and maintainable. A truly pluggable architecture
+would be considerably more opaque and complex, and is neither necessary,
+nor desirable, given the wide commonality between modern computer
+architectures.
+
+It is possible to add support for new targets to libld.so. The process
+of doing so is largely a matter of examining the files for existing
+platforms, studying the ABI for the new target platform, and then
+filling in the missing pieces for the new target. The remainder of this
+file consists of sections that describe some of the issues and steps
+that you will encounter in adding a new target.
+
+-----------------------------------------------------------------------------
+The relocation code used by ld is shared by the runtime linker (ld.so.1)
+and by the kernel module loader (ktrld), and is therefore found under
+usr/src/uts. You must add code for a relocation engine to support the
+new target. To do so, examine the common header files:
+
+	usr/src/uts/common/krtld/reloc.h
+	usr/src/uts/common/krtld/reloc_defs.h
+
+   and the existing relocation engines:
+
+	usr/src/uts/intel/amd64/krtld/doreloc.c
+	usr/src/uts/intel/ia32/krtld/doreloc.c
+	usr/src/uts/sparc/krtld/doreloc.c
+
+The ABI for the target platform will be the primary information
+you require. If your new system has attributes not found in an existing
+target, you may have to add/modify fields in the Rel_entry struct typedef
+(reloc_defs.h), or you may have to add new flags. Either sort of change
+may require you to also modify the existing relocation engines, and
+undoubtedly the common code in libld.so as well.
+
+When compiled for use by libld, the relocation engine requires an
+argument named "bswap". Each relocation engine must be prepared to
+swap the data bytes it is operating on. This support allows a link-editor
+running on a platform with a different byte order than the target to
+build objects for that target. To see how this is implemented, and how
+to ifdef that support so it only exists in the libld version of
+the engine, examine the code for the existing engines.
+
+-----------------------------------------------------------------------------
+You must create a target subdirectory in usr/src/cmd/sgs/include,
+and construct a machdep_XXX.h file (where XXX is the name of the
+target). The machdep files for the current platforms can be helpful:
+
+	usr/src/cmd/sgs/include/sparc/machdep_sparc.h
+	usr/src/cmd/sgs/include/i386/machdep_x86.h
+
+Note that these files support both the 32 and 64-bit versions of
+a given platform, so there is only one subdirectory and machdep
+file for each platform (i.e. "sparc", instead of "sparc" and "sparcv9").
+
+Once you have created the target machdep_XXX.h file, you must edit:
+
+	usr/src/cmd/sgs/include/machdep.h
+
+and add a #include for your new file to it, surrounded by the
+appropriate #ifdef for the target platform.
+
+This two level structure allows us to #include machdep information
+in two different ways:
+
+	1) Code that wants support for the current platform,
+	   regardless of which platform that is, can include
+	   usr/src/cmd/sgs/include/machdep.h. The runtime linker
+	   (ld.so.1) is the primary consumer of this form.
+
+	2) Code that needs to support multiple targets must never
+	   include the generic machdep.h from (1) above. Instead,
+	   such code explicitly includes the machdep file for the target
+	   it is interested in. For example:
+
+		#include <sparc/machdep_sparc.h>
+
+	   libld.so uses this form to build non-native target
+	   code.
+
+You will find that most of the constants defined in the target
+machdep file end up as initialization for the information that
+libld.so accesses via the ld_targ global variable.
+
+-----------------------------------------------------------------------------
+Study the definition of the Target typedef in
+
+	usr/src/cmd/sgs/libld/common/_libld.h
+
+This is the type of the ld_targ global variable. Filling in a complete
+copy of this definition is the primary task involved in adding support
+for a new target to libld.so, so it will be helpful to be familiar with
+it before you dive deeper. libld follows two simple rules with regards
+to ld_targ, and the Target type:
+
+	1) The target-independent common code can only access
+	   target-dependent code or data via the ld_targ global
+	   variable.
+
+	2) The target-dependent code can access the common
+	   code or data freely.
+
+A given link-editor invocation is always for a single target. The choice
+of target is made at initialization, and does not change within a
+single link. Code for the other targets is present, but is not
+accessed.
+
+-----------------------------------------------------------------------------
+Files containing the target-specific code to support the new
+platform must be added to libld.so. Examine the object lists
+in usr/src/cmd/sgs/libld/Makefile.com to see the files for existing
+platforms, and read those files to get a sense of what is required.
+
+Among the other files, every platform will have a file named
+machrel.XXX.c. This file contains the relocation-related functions,
+and it also contains an init function for the target. This init function
+is responsible for initializing the ld_targ global variable so that
+the common code will use the code and definitions for your
+target.
+
+You should start by creating a machrel.XXX.c file for your new
+target. Add other files as needed. Be aware that any functions or
+variables you place in these target-dependent files must either
+be static, or must have names that will not collide with the names
+used by the rest of libld.so. The easiest way to do this is to
+add a target suffix to the end of all such non-local names
+(i.e. foo_sparc() instead of foo()).
+
+The existing code is the documentation for this phase of things: The
+best way to determine what a given function should do is to read the
+code for other platforms, taking into account the similarities and
+differences in the ABI for your new target and those existing ones.
+
+-----------------------------------------------------------------------------
+You may find that your new target requires support for new concepts
+not found in other targets. A common example of this might be
+a new target specific ELF section type (i.e. SHT_AMD64_UNWIND). Another
+might be details involving PIC code and PLT generation (as found for
+sparc). It may be necessary to add new fields to the ld_targ global
+variable, and to modify the libld.so common code to use these new
+fields.
+
+It is a standard convention that NULL function pointers are used to
+represent functionality not required by a given target. Although the
+common code can consult ld_targ.t_m.m_mach to determine the target it
+is linking for, and although there is some code that does this, it
+is generally undesirable and unnecessary. Instead, the common code
+should test for such pointers, as with this sparc-specific example
+from update.c:
+
+	/*
+	 * Assign a got offset if necessary.
+	 */
+	if ((ld_targ.t_mr.mr_assign_got != NULL) &&
+	    (*ld_targ.t_mr.mr_assign_got)(ofl, sdp) == S_ERROR)
+		return ((Addr)S_ERROR);
+
+It may be tempting to include information in the comment that explains
+the target specific nature of this, and that may even be appropriate.
+Consider however, that a new target may come along with the same feature
+later, and if that occurs, your comments will instantly be dated. In general,
+the use of ld_targ is a strong hint to the reader that they should go read
+the target-specific code referenced to understand what is going on. It is
+best to supply comments at the call site that describe the operation
+in generic terms (i.e. "assign a got if necessary") instead of in
+explicit target terms (i.e. "Assign a sparc got if necessary"). Of
+course, some features are extremely target-specific (like amd64 unwind
+sections), and it doesn't really help to be obscure in such cases.
+This is a judgement call.
+
+If you do add a new field to ld_targ that uses NULL to represent
+an option feature *YOU MUST DOCUMENT IT AS SUCH*. You will find
+comments in _libld.h for existing optional fields. It suffices to
+add a comment for your new field. In the absence of such a comment,
+the common code assumes that all function pointers are safe to call
+through (dereference) without first testing them.
+
+-----------------------------------------------------------------------------
+Byte swapping is a big issue in cross linking, as the system running
+the link-editor may have the opposite byte order from the target. It is
+important to know when, and when not, to swap bytes.
+
+If the build system and target have different byte orders, the
+FLG_OF1_ENCDIFF bit of the ofl_flags field of the output file
+descriptor will be set. If this bit is not set, the target and
+system byte orders are the same, and no byte swapping
+is required.
+
+libld uses libelf to read and write objects. libelf automatically
+swaps bytes for the sections it knows about, such as symbol tables,
+relocation records, and the usual ELF plumbing. It is therefore never
+necessary for your code to swap the bytes in this data. If you find that
+this is not the case, you have probably uncovered a bug in libelf that
+you should look into.
+
+The big exception to libelf transparently handling byte swapping is
+progbits sections (SHT_PROGBITS). libelf does not understand program
+code or data as anything other than a series of byte values, and as such,
+cannot do byte swapping for them. If your code examines or modifies
+such data, you are responsible for handling the byte swapping required.
+
+The OFL_SWAP_RELOC macros found in _libld.h can be helpful in making such
+determinations. You should use these macros instead of writing your own
+tests for this, as they have high documentation value. If you find they
+don't handle your target, add a new one that does.
+
+GOT and PLT sections are SHT_PROGBITS. You will probably find
+that the vast majority of byte swapping you have to handle
+concern the handling of these items.
+
+libld contains generic functions for byte swapping:
+
+	ld_bswap_Word();
+	ld_bswap_Xword();
+
+These functions are built on top of the of the BSWAP_ macros found
+in usr/src/cmd/sgs/include/_machelf.h:
+
+	BSWAP_HALF
+	BSWAP_WORD
+	BSWAP_XWORD
+
+When copying data from one address to another in a cross link environment,
+the source and/or destination addresses may not have adequate alignment for
+the data type being copied. For example, a sparc platform cannot access
+8-byte data types on 4-byte boundaries, but it might need to do so when
+linking X86 objects where the alignment of such data can be 4. The
+UL_ASSIGN macros can be used to copy potentially unaligned data:
+
+	UL_ASSIGN_HALF
+	UL_ASSIGN_WORD
+	UL_ASSIGN_XWORD
+
+The UL_ASSIGN_BSWAP macros do unaligned copies, and also perform
+byte swapping when the linker host and target byte orders are
+different:
+
+	UL_ASSIGN_BSWAP_HALF
+	UL_ASSIGN_BSWAP_WORD
+	UL_ASSIGN_BSWAP_XWORD
+
+If you are reading/writing to relocation data, the following
+routines understand relocation records and will get/set the
+proper amount of data while handling any needed swapping:
+
+	ld_reloc_targval_get()
+	ld_reloc_targval_set()
+
+Byte swapping is a fertile area for mistakes. If you're having trouble
+getting a successful link in a cross link situation, you should always
+do the experiment of doing the link on a platform with the same byte
+order as the target. If that link succeeds, then you are looking at
+a bug involving incorrect byte swapping.
+
+-----------------------------------------------------------------------------
+   As mentioned above, incorrect byte swapping is a common
+error when developing libld target specific code. In addition to
+trying a build machine with the same byte order as the target, elfdump
+can also be a powerful tool for debugging. The first step with
+elfdump is to simply dump everything and read it looking for obviously
+bad information:
+
+	% elfdump outobj 2>&1 | more
+
+elfdump tries to do sanity checking on the objects it
+displays. Hence, the following command is a a common
+idiom:
+
+	% elfdump outobj > /dev/null
+
+Any problems with the file that elfdump can detect will be
+written to stderr.
+
+-----------------------------------------------------------------------------
+Once you have the target-specific code in place, you must modify the
+libld initialization code so that it will know how to use it. This
+logic is found in
+
+	usr/src/cmd/sgs/libld/common/ldmain.c
+
+in the function ld_init_target().
+
+-----------------------------------------------------------------------------
+The ld front end program that uses libld must be modified so that
+the "-z target=platform" command line option recognizes your
+new target. This code is found in
+
+	usr/src/cmd/sgs/ld/common
+
+The change consists of adding an additional strcasecmp() to the
+command line processing for -ztarget.
+
+-----------------------------------------------------------------------------
+You probably changed things getting your target integrated.
+Please update this document to reflect your changes.

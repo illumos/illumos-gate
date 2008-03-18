@@ -29,7 +29,7 @@
 #include	<stdio.h>
 #include	<unistd.h>
 #include	<libintl.h>
-#include	<machdep.h>
+#include	<_machelf.h>
 #include	<libelf.h>
 #include	<link.h>
 #include	<strings.h>

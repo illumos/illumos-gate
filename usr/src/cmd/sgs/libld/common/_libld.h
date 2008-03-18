@@ -41,27 +41,206 @@
 #include <debug.h>
 #include <conv.h>
 #include <msg.h>
+#include <reloc_defs.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * Types of segment index.
+ * In order to allow for cross linking, we need to be able to build
+ * libld with support for multiple targets within a single object.
+ * This is done using a global variable (ld_targ) of type Target to
+ * access target-specific code for the current target via indirection.
  */
-typedef enum {
-	LD_PHDR,	LD_INTERP,	LD_SUNWCAP,	LD_TEXT,
-	LD_DATA,	LD_BSS,
-#if	defined(__x86) && defined(_ELF64)
-	LD_LRODATA,	LD_LDATA,
-#endif
-	LD_DYN,		LD_DTRACE,	 LD_SUNWBSS,	LD_TLS,
-#if	defined(__x86) && defined(_ELF64)
-	LD_UNWIND,
-#endif
-	LD_NOTE,	LD_EXTRA,
-	LD_NUM
-} Segment_ndx;
+
+/*
+ * Machine information for target
+ */
+typedef struct {
+	Half		m_mach;		/* ELF machine code for target */
+	Half		m_machplus;	/* Alt ELF machine code for target */
+					/*	Used for EM_SPARC32PLUS */
+	Word		m_flagsplus;	/* ELF header flags used to identify */
+					/*	a machplus object */
+	uchar_t		m_class;	/* Target ELFCLASS */
+	uchar_t		m_data;		/* Target byte order */
+
+	Xword		m_segm_align;	/* segment alignment */
+	Xword		m_segm_origin;	/* Default 1st segment offset */
+	Word		m_dataseg_perm;	/* data segment permission mask */
+	Word		m_word_align;	/* alignment to use for Word sections */
+	const char	*m_def_interp;	/* Def. interpreter for dyn objects */
+
+	/* Relocation type codes */
+	Word		m_r_arrayaddr;
+	Word		m_r_copy;
+	Word		m_r_glob_dat;
+	Word		m_r_jmp_slot;
+	Word		m_r_num;
+	Word		m_r_none;
+	Word		m_r_relative;
+	Word		m_r_register;
+
+	/* Relocation related constants */
+	Word		m_rel_dt_count;	/* Either DT_REL or DT_RELA */
+	Word		m_rel_dt_ent;	/* Either DT_RELENT or DT_RELAENT */
+	Word		m_rel_dt_size;	/* Either DT_RELSZ or DT_RELASZ */
+	Word		m_rel_dt_type;	/* Either DT_RELCOUNT or DT_RELACOUNT */
+	Word		m_rel_sht_type;	/* Either SHT_REL or SHT_RELA */
+
+	/* GOT related constants */
+	Word		m_got_entsize;
+	Word		m_got_xnumber;	/* reserved # of got ents */
+
+	/* PLT related constants */
+	Word		m_plt_align;
+	Word		m_plt_entsize;
+	Word		m_plt_reservsz;
+	Word		m_plt_shf_flags;
+
+	Word		m_dt_register;
+} Target_mach;
+
+
+/*
+ * Section identifiers, used to order sections in output object
+ */
+typedef struct {
+	Word		id_array;
+	Word		id_bss;
+	Word		id_cap;
+	Word		id_data;
+	Word		id_dynamic;
+	Word		id_dynsort;
+	Word		id_dynstr;
+	Word		id_dynsym;
+	Word		id_dynsym_ndx;
+	Word		id_got;
+	Word		id_gotdata;
+	Word		id_hash;
+	Word		id_interp;
+	Word		id_lbss;
+	Word		id_ldynsym;
+	Word		id_note;
+	Word		id_null;
+	Word		id_plt;
+	Word		id_rel;
+	Word		id_strtab;
+	Word		id_syminfo;
+	Word		id_symtab;
+	Word		id_symtab_ndx;
+	Word		id_text;
+	Word		id_tls;
+	Word		id_tlsbss;
+	Word		id_unknown;
+	Word		id_unwind;
+	Word		id_user;
+	Word		id_version;
+} Target_machid;
+
+/*
+ * Target_nullfunc supplies machine code for generating a
+ *
+ *	void (*)(void)
+ *
+ * unnamed function. Such a function can be called, and returns
+ * immediately without doing any work. This is used to back FUNC
+ * symbol definitions added with a mapfile.
+ *
+ * The machine instructions are specified as an array of bytes rather
+ * than a larger integer type in order to avoid byte order issues that
+ * can otherwise occur in cross linking.
+ */
+typedef struct {
+	const uchar_t	*nf_template;	/* Array of machine inst. bytes */
+	size_t		nf_size;	/* # bytes in nf_template */
+} Target_nullfunc;
+
+/*
+ * Target_machrel holds pointers to the reloc_table and machrel functions
+ * for a given target machine.
+ *
+ * The following function pointers are allowed to be NULL, if the
+ * underlying target does not require the specified operation. All
+ * other functions must be supplied:
+ *
+ *	mr_assign_got
+ *	mr_reloc_register
+ *	mr_reloc_GOTOP
+ *	mr_allocate_got
+ */
+typedef struct {
+	const Rel_entry	*mr_reloc_table;
+
+	Word		(* mr_init_rel)(Rel_desc *, void *);
+	void 		(* mr_mach_eflags)(Ehdr *, Ofl_desc *);
+	void		(* mr_mach_make_dynamic)(Ofl_desc *, size_t *);
+	void		(* mr_mach_update_odynamic)(Ofl_desc *, Dyn **);
+	Xword		(* mr_calc_plt_addr)(Sym_desc *, Ofl_desc *);
+	uintptr_t	(* mr_perform_outreloc)(Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_do_activerelocs)(Ofl_desc *);
+	uintptr_t	(* mr_add_outrel)(Word, Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_reloc_register)(Rel_desc *, Is_desc *,
+			    Ofl_desc *);
+	uintptr_t	(* mr_reloc_local)(Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_reloc_GOTOP)(Boolean, Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_reloc_TLS)(Boolean, Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_assign_got)(Ofl_desc *, Sym_desc *);
+
+	Gotndx *	(* mr_find_gotndx)(List *, Gotref, Ofl_desc *,
+			    Rel_desc *);
+	Xword		(* mr_calc_got_offset)(Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_assign_got_ndx)(List *, Gotndx *, Gotref,
+			    Ofl_desc *, Rel_desc *, Sym_desc *);
+	void		(* mr_assign_plt_ndx)(Sym_desc *, Ofl_desc *);
+	uintptr_t	(* mr_allocate_got)(Ofl_desc *);
+	uintptr_t	(* mr_fillin_gotplt)(Ofl_desc *);
+} Target_machrel;
+
+
+/*
+ * Target_machsym holds pointers to the machsym functions
+ * for a given target machine.
+ *
+ * These fields are allowed to be NULL for targets that do not require
+ * special handling of register symbols. Register symbols are used by
+ * sparc targets. If any of these fields are non-NULL, all of them are
+ * required to be present (use empty stub routines if necessary).
+ */
+typedef struct {
+	int		(* ms_reg_check)(Sym_desc *, Sym *, const char *,
+			    Ifl_desc *, Ofl_desc *);
+	int		(* ms_mach_sym_typecheck)(Sym_desc *, Sym *,
+			    Ifl_desc *, Ofl_desc *);
+	const char	*(* ms_is_regsym)(Ofl_desc *, Ifl_desc *, Sym *,
+			    const char *, int, Word, const char *, Word *);
+	Sym_desc	*(* ms_reg_find)(Sym * sym, Ofl_desc * ofl);
+	int		(* ms_reg_enter)(Sym_desc *, Ofl_desc *);
+} Target_machsym;
+
+/*
+ * amd64 unwind header support
+ *
+ * These fields are allowed to be NULL for targets that do not support
+ * amd64 unwind headers. If any of these fields are non-NULL, all of them are
+ * required to be present (use empty stub routines if necessary).
+ */
+typedef struct {
+	uintptr_t	(* uw_make_unwindhdr)(Ofl_desc *);
+	uintptr_t	(* uw_populate_unwindhdr)(Ofl_desc *);
+	uintptr_t	(* uw_append_unwind)(Os_desc *, Ofl_desc *);
+} Target_unwind;
+
+typedef struct {
+	Target_mach	t_m;
+	Target_machid	t_id;
+	Target_nullfunc	t_nf;
+	Target_machrel	t_mr;
+	Target_machsym	t_ms;
+	Target_unwind	t_uw;
+} Target;
+
 
 /*
  * Types of bss sections
@@ -203,6 +382,7 @@ extern int		Verbose;
 extern const int	ldynsym_symtype[STT_NUM];
 extern const int	dynsymsort_symtype[STT_NUM];
 
+
 /*
  * Given a symbol of a type that is allowed within a .SUNW_dynsymsort or
  * .SUNW_dyntlssort section, examine the symbol attributes to determine
@@ -293,6 +473,18 @@ extern const int	dynsymsort_symtype[STT_NUM];
 
 
 /*
+ * The OFL_SWAP_RELOC macros are used to determine whether
+ * relocation processing needs to swap the data being relocated.
+ * It is an optimization to ld_swap_reloc_data(), as it avoids
+ * the function call in the case where the linker host and the
+ * target have the same byte order.
+ */
+
+#define	OFL_SWAP_RELOC_DATA(_ofl, _rel) \
+	(((_ofl)->ofl_flags1 & FLG_OF1_ENCDIFF) && \
+	ld_swap_reloc_data(_ofl, _rel))
+
+/*
  * For backward compatibility provide a /dev/zero file descriptor.
  */
 extern int		dz_fd;
@@ -321,40 +513,23 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 
 #define	ld_add_actrel		ld64_add_actrel
 #define	ld_add_libdir		ld64_add_libdir
-#define	ld_add_outrel		ld64_add_outrel
 #define	ld_adj_movereloc	ld64_adj_movereloc
-#if	defined(__sparc)
-#define	ld_allocate_got		ld64_allocate_got
-#endif
 #define	ld_am_I_partial		ld64_am_I_partial
 #define	ld_append_isp		ld64_append_isp
 #define	ld_ar_member		ld64_ar_member
 #define	ld_ar_setup		ld64_ar_setup
-#define	ld_assign_got		ld64_assign_got
-#define	ld_assign_got_ndx	ld64_assign_got_ndx
 #define	ld_assign_got_TLS	ld64_assign_got_TLS
-#define	ld_assign_plt_ndx	ld64_assign_plt_ndx
-#define	ld_byteswap_Xword	ld64_byteswap_Xword
-#define	ld_calc_got_offset	ld64_calc_got_offset
-#define	ld_calc_plt_addr	ld64_calc_plt_addr
+#define	ld_bswap_Word		ld64_bswap_Word
+#define	ld_bswap_Xword		ld64_bswap_Xword
 #define	ld_disp_errmsg		ld64_disp_errmsg
-#define	ld_do_activerelocs	ld64_do_activerelocs
 #define	ld_ent_check		ld64_ent_check
 #define	ld_exit			ld64_exit
-#define	ld_fillin_gotplt	ld64_fillin_gotplt
-#define	ld_find_gotndx		ld64_find_gotndx
 #define	ld_find_library		ld64_find_library
 #define	ld_finish_libs		ld64_finish_libs
 #define	ld_get_group		ld64_get_group
 #define	ld_lib_setup		ld64_lib_setup
 #define	ld_init			ld64_init
-#define	ld_init_rel		ld64_init_rel
-#define	ld_is_regsym		ld64_is_regsym
 #define	ld_lcm			ld64_lcm
-#define	ld_mach_update_odynamic	ld64_mach_update_odynamic
-#define	ld_mach_eflags		ld64_mach_eflags
-#define	ld_mach_make_dynamic	ld64_mach_make_dynamic
-#define	ld_mach_sym_typecheck	ld64_mach_sym_typecheck
 #define	ld_make_bss		ld64_make_bss
 #define	ld_make_data		ld64_make_data
 #define	ld_make_got		ld64_make_got
@@ -365,7 +540,6 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_map_out		ld64_map_out
 #define	ld_map_parse		ld64_map_parse
 #define	ld_open_outfile		ld64_open_outfile
-#define	ld_perform_outreloc	ld64_perform_outreloc
 #define	ld_place_section	ld64_place_section
 #define	ld_process_archive	ld64_process_archive
 #define	ld_process_files	ld64_process_files
@@ -373,22 +547,16 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_ifl		ld64_process_ifl
 #define	ld_process_ordered	ld64_process_ordered
 #define	ld_process_sym_reloc	ld64_process_sym_reloc
-#define	ld_reloc_local		ld64_reloc_local
 #define	ld_reloc_GOT_relative	ld64_reloc_GOT_relative
-#define	ld_reloc_GOTOP		ld64_reloc_GOTOP
 #define	ld_reloc_plt		ld64_reloc_plt
-#define	ld_reloc_register	ld64_reloc_register
 #define	ld_reloc_remain_entry	ld64_reloc_remain_entry
-#define	ld_reloc_TLS		ld64_reloc_TLS
 #define	ld_reloc_targval_get	ld64_reloc_targval_get
 #define	ld_reloc_targval_set	ld64_reloc_targval_set
-#define	ld_reg_check		ld64_reg_check
-#define	ld_reg_enter		ld64_reg_enter
-#define	ld_reg_find		ld64_reg_find
 #define	ld_sec_validate		ld64_sec_validate
 #define	ld_section_reld_name	ld64_section_reld_name
 #define	ld_sort_ordered		ld64_sort_ordered
 #define	ld_sort_seg_list	ld64_sort_seg_list
+#define	ld_sunw_ldmach		ld64_sunw_ldmach
 #define	ld_sunwmove_preprocess	ld64_sunwmove_preprocess
 #define	ld_sup_atexit		ld64_sup_atexit
 #define	ld_sup_open		ld64_sup_open
@@ -398,6 +566,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sup_input_section	ld64_sup_input_section
 #define	ld_sup_section		ld64_sup_section
 #define	ld_sup_start		ld64_sup_start
+#define	ld_swap_reloc_data	ld64_swap_reloc_data
 #define	ld_sym_add_u		ld64_sym_add_u
 #define	ld_sym_adjust_vis	ld64_sym_adjust_vis
 #define	ld_sym_avl_comp		ld64_sym_avl_comp
@@ -408,6 +577,9 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sym_process		ld64_sym_process
 #define	ld_sym_resolve		ld64_sym_resolve
 #define	ld_sym_spec		ld64_sym_spec
+#define	ld_targ			ld64_targ
+#define	ld_targ_init_sparc	ld64_targ_init_sparc
+#define	ld_targ_init_x86	ld64_targ_init_x86
 #define	ld_vers_base		ld64_vers_base
 #define	ld_vers_check_defs	ld64_vers_check_defs
 #define	ld_vers_check_need	ld64_vers_check_need
@@ -423,41 +595,24 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 
 #define	ld_add_actrel		ld32_add_actrel
 #define	ld_add_libdir		ld32_add_libdir
-#define	ld_add_outrel		ld32_add_outrel
 #define	ld_adj_movereloc	ld32_adj_movereloc
-#if	defined(__sparc)
-#define	ld_allocate_got		ld32_allocate_got
-#endif
 #define	ld_am_I_partial		ld32_am_I_partial
 #define	ld_append_isp		ld32_append_isp
 #define	ld_ar_member		ld32_ar_member
 #define	ld_ar_setup		ld32_ar_setup
-#define	ld_assign_got		ld32_assign_got
-#define	ld_assign_got_ndx	ld32_assign_got_ndx
 #define	ld_assign_got_TLS	ld32_assign_got_TLS
-#define	ld_assign_plt_ndx	ld32_assign_plt_ndx
-#define	ld_byteswap_Xword	ld32_byteswap_Xword
-#define	ld_calc_got_offset	ld32_calc_got_offset
-#define	ld_calc_plt_addr	ld32_calc_plt_addr
+#define	ld_bswap_Word		ld32_bswap_Word
+#define	ld_bswap_Xword		ld32_bswap_Xword
 #define	ld_disp_errmsg		ld32_disp_errmsg
-#define	ld_do_activerelocs	ld32_do_activerelocs
 #define	ld_ent_check		ld32_ent_check
 #define	ld_exit			ld32_exit
-#define	ld_fillin_gotplt	ld32_fillin_gotplt
-#define	ld_find_gotndx		ld32_find_gotndx
 #define	ld_find_library		ld32_find_library
 #define	ld_finish_libs		ld32_finish_libs
 #define	ld_section_reld_name	ld32_section_reld_name
 #define	ld_get_group		ld32_get_group
 #define	ld_lib_setup		ld32_lib_setup
 #define	ld_init			ld32_init
-#define	ld_init_rel		ld32_init_rel
-#define	ld_is_regsym		ld32_is_regsym
 #define	ld_lcm			ld32_lcm
-#define	ld_mach_update_odynamic	ld32_mach_update_odynamic
-#define	ld_mach_eflags		ld32_mach_eflags
-#define	ld_mach_make_dynamic	ld32_mach_make_dynamic
-#define	ld_mach_sym_typecheck	ld32_mach_sym_typecheck
 #define	ld_make_bss		ld32_make_bss
 #define	ld_make_data		ld32_make_data
 #define	ld_make_got		ld32_make_got
@@ -468,7 +623,6 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_map_out		ld32_map_out
 #define	ld_map_parse		ld32_map_parse
 #define	ld_open_outfile		ld32_open_outfile
-#define	ld_perform_outreloc	ld32_perform_outreloc
 #define	ld_place_section	ld32_place_section
 #define	ld_process_archive	ld32_process_archive
 #define	ld_process_files	ld32_process_files
@@ -476,21 +630,15 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_ifl		ld32_process_ifl
 #define	ld_process_ordered	ld32_process_ordered
 #define	ld_process_sym_reloc	ld32_process_sym_reloc
-#define	ld_reloc_local		ld32_reloc_local
 #define	ld_reloc_GOT_relative	ld32_reloc_GOT_relative
-#define	ld_reloc_GOTOP		ld32_reloc_GOTOP
 #define	ld_reloc_plt		ld32_reloc_plt
-#define	ld_reloc_register	ld32_reloc_register
 #define	ld_reloc_remain_entry	ld32_reloc_remain_entry
-#define	ld_reloc_TLS		ld32_reloc_TLS
 #define	ld_reloc_targval_get	ld32_reloc_targval_get
 #define	ld_reloc_targval_set	ld32_reloc_targval_set
-#define	ld_reg_check		ld32_reg_check
-#define	ld_reg_enter		ld32_reg_enter
-#define	ld_reg_find		ld32_reg_find
 #define	ld_sec_validate		ld32_sec_validate
 #define	ld_sort_ordered		ld32_sort_ordered
 #define	ld_sort_seg_list	ld32_sort_seg_list
+#define	ld_sunw_ldmach		ld32_sunw_ldmach
 #define	ld_sunwmove_preprocess	ld32_sunwmove_preprocess
 #define	ld_sup_atexit		ld32_sup_atexit
 #define	ld_sup_open		ld32_sup_open
@@ -500,6 +648,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sup_input_section	ld32_sup_input_section
 #define	ld_sup_section		ld32_sup_section
 #define	ld_sup_start		ld32_sup_start
+#define	ld_swap_reloc_data	ld32_swap_reloc_data
 #define	ld_sym_add_u		ld32_sym_add_u
 #define	ld_sym_adjust_vis	ld32_sym_adjust_vis
 #define	ld_sym_avl_comp		ld32_sym_avl_comp
@@ -510,6 +659,9 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sym_process		ld32_sym_process
 #define	ld_sym_resolve		ld32_sym_resolve
 #define	ld_sym_spec		ld32_sym_spec
+#define	ld_targ			ld32_targ
+#define	ld_targ_init_sparc	ld32_targ_init_sparc
+#define	ld_targ_init_x86	ld32_targ_init_x86
 #define	ld_vers_base		ld32_vers_base
 #define	ld_vers_check_defs	ld32_vers_check_defs
 #define	ld_vers_check_need	ld32_vers_check_need
@@ -527,36 +679,24 @@ extern uintptr_t	dbg_setup(const char *, Dbg_desc *, const char **, int);
 
 extern uintptr_t	ld_add_actrel(Word, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_add_libdir(Ofl_desc *, const char *);
-extern uintptr_t	ld_add_outrel(Word, Rel_desc *, Ofl_desc *);
 extern void 		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
 extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
 extern int		ld_append_isp(Ofl_desc *, Os_desc *, Is_desc *, int);
 extern void		ld_ar_member(Ar_desc *, Elf_Arsym *, Ar_aux *,
 			    Ar_mem *);
 extern Ar_desc		*ld_ar_setup(const char *, Elf *, Ofl_desc *);
-#if	defined(__sparc)
-extern uintptr_t	ld_allocate_got(Ofl_desc *);
-#endif
-extern uintptr_t	ld_assign_got(Ofl_desc *, Sym_desc *);
-extern uintptr_t	ld_assign_got_ndx(List *, Gotndx *, Gotref, Ofl_desc *,
-			    Rel_desc *, Sym_desc *);
 extern uintptr_t	ld_assign_got_TLS(Boolean, Rel_desc *, Ofl_desc *,
 			    Sym_desc *, Gotndx *, Gotref, Word, Word,
 			    Word, Word);
-extern void		ld_assign_plt_ndx(Sym_desc *, Ofl_desc *);
 
-extern Xword		ld_byteswap_Xword(Xword);
-extern Xword		ld_calc_got_offset(Rel_desc *, Ofl_desc *);
-extern Xword		ld_calc_plt_addr(Sym_desc *, Ofl_desc *);
+extern Word		ld_bswap_Word(Word);
+extern Xword		ld_bswap_Xword(Xword);
 
 extern void		ld_disp_errmsg(const char *, Rel_desc *, Ofl_desc *);
-extern uintptr_t	ld_do_activerelocs(Ofl_desc *);
 
 extern void		ld_ent_check(Ofl_desc *);
 extern int		ld_exit(Ofl_desc *);
 
-extern uintptr_t	ld_fillin_gotplt(Ofl_desc *);
-extern Gotndx *		ld_find_gotndx(List *, Gotref, Ofl_desc *, Rel_desc *);
 extern uintptr_t	ld_find_library(const char *, Ofl_desc *);
 extern uintptr_t	ld_finish_libs(Ofl_desc *);
 
@@ -567,17 +707,9 @@ extern Group_desc	*ld_get_group(Ofl_desc *, Is_desc *);
 extern uintptr_t	ld_lib_setup(Ofl_desc *);
 
 extern void		ld_init(Ofl_desc *);
-extern Word		ld_init_rel(Rel_desc *, void *);
-extern const char	*ld_is_regsym(Ofl_desc *, Ifl_desc *, Sym *,
-			    const char *, int, Word, const char *, Word *);
 
 extern Xword		ld_lcm(Xword, Xword);
 
-extern void		ld_mach_update_odynamic(Ofl_desc *, Dyn **);
-extern void		ld_mach_eflags(Ehdr *, Ofl_desc *);
-extern void		ld_mach_make_dynamic(Ofl_desc *, size_t *);
-extern int		ld_mach_sym_typecheck(Sym_desc *, Sym *, Ifl_desc *,
-			    Ofl_desc *);
 extern uintptr_t	ld_make_bss(Ofl_desc *, Xword, Xword, Bss_Type);
 extern Is_desc		*ld_make_data(Ofl_desc *, size_t);
 extern uintptr_t	ld_make_got(Ofl_desc *);
@@ -590,7 +722,6 @@ extern uintptr_t	ld_map_parse(const char *, Ofl_desc *);
 
 extern uintptr_t	ld_open_outfile(Ofl_desc *);
 
-extern uintptr_t	ld_perform_outreloc(Rel_desc *, Ofl_desc *);
 extern Os_desc *	ld_place_section(Ofl_desc *, Is_desc *, int, Word);
 extern uintptr_t	ld_process_archive(const char *, int, Ar_desc *,
 			    Ofl_desc *);
@@ -602,26 +733,19 @@ extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *);
 
-extern uintptr_t	ld_reloc_local(Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_reloc_GOT_relative(Boolean, Rel_desc *, Ofl_desc *);
-extern uintptr_t	ld_reloc_GOTOP(Boolean, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_reloc_plt(Rel_desc *, Ofl_desc *);
-extern uintptr_t	ld_reloc_register(Rel_desc *, Is_desc *, Ofl_desc *);
 extern void		ld_reloc_remain_entry(Rel_desc *, Os_desc *,
 			    Ofl_desc *);
-extern uintptr_t	ld_reloc_TLS(Boolean, Rel_desc *, Ofl_desc *);
 extern int		ld_reloc_targval_get(Ofl_desc *, Rel_desc *,
 			    uchar_t *, Xword *);
 extern int		ld_reloc_targval_set(Ofl_desc *, Rel_desc *,
 			    uchar_t *, Xword);
-extern int		ld_reg_check(Sym_desc *, Sym *, const char *,
-			    Ifl_desc *, Ofl_desc *);
-extern int		ld_reg_enter(Sym_desc *, Ofl_desc *);
-extern Sym_desc *	ld_reg_find(Sym *, Ofl_desc *);
 
 extern void		ld_sec_validate(Ofl_desc *);
 extern uintptr_t	ld_sort_ordered(Ofl_desc *);
 extern uintptr_t	ld_sort_seg_list(Ofl_desc *);
+extern Half		ld_sunw_ldmach();
 extern uintptr_t	ld_sunwmove_preprocess(Ofl_desc *);
 extern void		ld_sup_atexit(Ofl_desc *, int);
 extern void		ld_sup_open(Ofl_desc *, const char **, const char **,
@@ -636,6 +760,7 @@ extern void		ld_sup_section(Ofl_desc *, const char *, Shdr *, Word,
 extern uintptr_t	ld_sup_input_section(Ofl_desc*, Ifl_desc *,
 			    const char *, Shdr **, Word, Elf_Scn *, Elf *);
 extern void		ld_sup_start(Ofl_desc *, const Half, const char *);
+extern int		ld_swap_reloc_data(Ofl_desc *, Rel_desc *);
 extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *, Msg);
 extern void		ld_sym_adjust_vis(Sym_desc *, Ofl_desc *);
 extern int		ld_sym_avl_comp(const void *, const void *);
@@ -649,6 +774,10 @@ extern uintptr_t	ld_sym_process(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern uintptr_t	ld_sym_resolve(Sym_desc *, Sym *, Ifl_desc *,
 			    Ofl_desc *, int, Word, Word);
 extern uintptr_t	ld_sym_spec(Ofl_desc *);
+
+extern Target		ld_targ;
+extern const Target	*ld_targ_init_sparc(void);
+extern const Target	*ld_targ_init_x86(void);
 
 extern Ver_desc		*ld_vers_base(Ofl_desc *);
 extern uintptr_t	ld_vers_check_defs(Ofl_desc *);
@@ -667,11 +796,22 @@ extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
 extern Listnode *	list_where(List *, Word);
 
-#if	defined(__x86) && defined(_ELF64)
-extern uintptr_t	append_amd64_unwind(Os_desc *, Ofl_desc *);
-extern uintptr_t	make_amd64_unwindhdr(Ofl_desc *);
-extern uintptr_t	populate_amd64_unwindhdr(Ofl_desc *);
+
+/*
+ * Most platforms have both a 32 and 64-bit variant (e.g. EM_SPARC and
+ * EM_SPARCV9). To support this, there many files in libld that are built
+ * twice, once for ELFCLASS64 (_ELF64), and once for ELFCLASS32. In these
+ * files, we sometimes want to supply one value for the ELFCLASS32 case
+ * and another for ELFCLASS64. The LD_TARG_BYCLASS macro is used to do
+ * this. It is called with both both alternatives, and yields the one
+ * that applies to the current compilation environment.
+ */
+#ifdef	_ELF64
+#define	LD_TARG_BYCLASS(_ec32, _ec64) (_ec64)
+#else
+#define	LD_TARG_BYCLASS(_ec32, _ec64) (_ec32)
 #endif
+
 
 #ifdef	__cplusplus
 }

@@ -897,7 +897,7 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 		/* LINTED */
 		(void) snprintf(_reject, PATH_MAX,
 		    MSG_INTL(ldd_reject[rej->rej_type]),
-		    conv_reject_desc(rej, &rej_buf));
+		    conv_reject_desc(rej, &rej_buf, M_MACH));
 		if (rej->rej_name)
 			path = rej->rej_name;
 		reject = (char *)_reject;
@@ -1162,7 +1162,7 @@ file_notfound(Lm_list *lml, const char *name, Rt_map *clmp, uint_t flags,
 
 		eprintf(lml, ERR_FATAL, MSG_INTL(err_reject[rej->rej_type]),
 		    rej->rej_name ? rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-		    conv_reject_desc(rej, &rej_buf));
+		    conv_reject_desc(rej, &rej_buf, M_MACH));
 		return;
 	}
 
@@ -1364,7 +1364,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 		}
 		rej->rej_name = nname;
 		rej->rej_flag = (fdesc->fd_flags & FLG_FD_ALTER);
-		DBG_CALL(Dbg_file_rejected(lml, rej));
+		DBG_CALL(Dbg_file_rejected(lml, rej, M_MACH));
 	}
 	return (0);
 }
@@ -2232,7 +2232,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 			_rej.rej_name = name;
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = MSG_INTL(MSG_GEN_NOOPEN);
-			DBG_CALL(Dbg_file_rejected(lml, &_rej));
+			DBG_CALL(Dbg_file_rejected(lml, &_rej, M_MACH));
 			rejection_inherit(rej, &_rej);
 			remove_so(lml, nlmp);
 			return (0);
@@ -2266,7 +2266,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 			_rej.rej_name = name;
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = strerror(ENOENT);
-			DBG_CALL(Dbg_file_rejected(lml, &_rej));
+			DBG_CALL(Dbg_file_rejected(lml, &_rej, M_MACH));
 			rejection_inherit(rej, &_rej);
 			return (0);
 		}

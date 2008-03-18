@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
@@ -30,7 +30,7 @@
 
 #include	<stdlib.h>
 #include	<libelf.h>
-#include	<sys/machelf.h>
+#include	<_machelf.h>
 #include	<sgs.h>
 #include	<libld.h>
 #include	<conv.h>
@@ -122,8 +122,10 @@ const char	*conv64_phdr_flags(Word,  Conv_fmt_flags_t,
 		    Conv64_phdr_flags_buf_t *);
 const char	*conv32_phdr_type(Elf32_Half, Word, int, Conv32_inv_buf_t *);
 const char	*conv64_phdr_type(Elf64_Half, Word, int, Conv64_inv_buf_t *);
-const char	*conv32_reject_desc(Rej_desc *, Conv32_reject_desc_buf_t *);
-const char	*conv64_reject_desc(Rej_desc *, Conv64_reject_desc_buf_t *);
+const char	*conv32_reject_desc(Rej_desc *, Conv32_reject_desc_buf_t *,
+		    Elf32_Half);
+const char	*conv64_reject_desc(Rej_desc *, Conv64_reject_desc_buf_t *,
+		    Elf64_Half);
 const char	*conv32_reloc_type(Half, Word, int, Conv32_inv_buf_t *);
 const char	*conv64_reloc_type(Half, Word, int, Conv64_inv_buf_t *);
 const char	*conv32_reloc_type_static(Half, Word, int);

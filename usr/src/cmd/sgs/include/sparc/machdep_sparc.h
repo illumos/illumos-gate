@@ -23,15 +23,15 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs SPARC machine dependent macros, constants
  * and declarations.
  */
 
-#ifndef	_MACHDEP_H
-#define	_MACHDEP_H
+#ifndef	_MACHDEP_SPARC_H
+#define	_MACHDEP_SPARC_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -45,6 +45,9 @@ extern "C" {
 /*
  * Elf header information.
  */
+#define	M_MACH_32		EM_SPARC
+#define	M_MACH_64		EM_SPARCV9
+
 #ifdef _ELF64
 #define	M_MACH			EM_SPARCV9
 #define	M_CLASS			ELFCLASS64
@@ -179,54 +182,6 @@ extern "C" {
 #endif
 
 /*
- * Make machine class dependent functions transparent to the common code
- */
-#ifdef _ELF64
-#define	ELF_R_TYPE		ELF64_R_TYPE_ID
-#define	ELF_R_INFO		ELF64_R_INFO
-#define	ELF_R_SYM		ELF64_R_SYM
-#define	ELF_R_TYPE_DATA		ELF64_R_TYPE_DATA
-#define	ELF_R_TYPE_INFO		ELF64_R_TYPE_INFO
-#define	ELF_ST_BIND		ELF64_ST_BIND
-#define	ELF_ST_TYPE		ELF64_ST_TYPE
-#define	ELF_ST_INFO		ELF64_ST_INFO
-#define	ELF_ST_VISIBILITY	ELF64_ST_VISIBILITY
-#define	ELF_M_SYM		ELF64_M_SYM
-#define	ELF_M_SIZE		ELF64_M_SIZE
-#define	ELF_M_INFO		ELF64_M_INFO
-#define	elf_checksum		elf64_checksum
-#define	elf_fsize		elf64_fsize
-#define	elf_getehdr		elf64_getehdr
-#define	elf_getphdr		elf64_getphdr
-#define	elf_newehdr		elf64_newehdr
-#define	elf_newphdr		elf64_newphdr
-#define	elf_getshdr		elf64_getshdr
-#define	elf_xlatetom		elf64_xlatetom
-#else	/* Elf32 */
-#define	ELF_R_TYPE		ELF32_R_TYPE
-#define	ELF_R_INFO		ELF32_R_INFO
-#define	ELF_R_SYM		ELF32_R_SYM
-#define	ELF_M_SYM		ELF32_M_SYM
-#define	ELF_M_SIZE		ELF32_M_SIZE
-#define	ELF_M_INFO		ELF32_M_INFO
-/* Elf64 can hide extra offset in r_info */
-#define	ELF_R_TYPE_DATA(x)	(0)
-#define	ELF_R_TYPE_INFO(xoff, type)	(type)
-#define	ELF_ST_BIND		ELF32_ST_BIND
-#define	ELF_ST_TYPE		ELF32_ST_TYPE
-#define	ELF_ST_INFO		ELF32_ST_INFO
-#define	ELF_ST_VISIBILITY	ELF32_ST_VISIBILITY
-#define	elf_checksum		elf32_checksum
-#define	elf_fsize		elf32_fsize
-#define	elf_getehdr		elf32_getehdr
-#define	elf_getphdr		elf32_getphdr
-#define	elf_newehdr		elf32_newehdr
-#define	elf_newphdr		elf32_newphdr
-#define	elf_getshdr		elf32_getshdr
-#define	elf_xlatetom		elf32_xlatetom
-#endif	/* Elf32 */
-
-/*
  * Make common relocation information transparent to the common code
  */
 #define	M_REL_DT_TYPE	DT_RELA		/* .dynamic entry */
@@ -345,8 +300,9 @@ extern "C" {
 #define	M_ID_DYNSYM_NDX	0x05
 #define	M_ID_NOTE	0x06
 
+
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _MACHDEP_H */
+#endif /* _MACHDEP_SPARC_H */

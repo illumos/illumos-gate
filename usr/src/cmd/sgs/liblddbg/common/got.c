@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,8 @@ Dbg_got_compare(Gottable *gtp1, Gottable *gtp2)
 }
 
 void
-Dbg_got_display(Ofl_desc *ofl, Off goff, int stage)
+Dbg_got_display(Ofl_desc *ofl, Off goff, int stage,
+    Word m_got_xnumber, size_t m_got_entsize)
 {
 	Lm_list		*lml = ofl->ofl_lml;
 	Gottable	*gtp = ofl->ofl_gottable;
@@ -56,7 +57,7 @@ Dbg_got_display(Ofl_desc *ofl, Off goff, int stage)
 	if (DBG_NOTCLASS(DBG_C_GOT))
 		return;
 
-	if (ofl->ofl_gotcnt == M_GOT_XNumber)
+	if (ofl->ofl_gotcnt == m_got_xnumber)
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
@@ -80,7 +81,7 @@ Dbg_got_display(Ofl_desc *ofl, Off goff, int stage)
 		const char	*refstr, *name;
 		Gotndx		*gnp = &gtp->gt_gndx;
 		Lword		gotaddval;
-		Off		off = goff + (gotndx * M_GOT_ENTSIZE);
+		Off		off = goff + (gotndx * m_got_entsize);
 		char		index[INDEX_STR_SIZE];
 
 		(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_GOT_INDEX),
@@ -125,7 +126,8 @@ Elf_got_title(Lm_list *lml)
 
 void
 Elf_got_entry(Lm_list *lml, Sword ndx, Addr addr, Xword value, Half mach,
-    Word type, void *reloc, const char *name)
+    uchar_t ei_target_data, uchar_t ei_host_data, Word type, void *reloc,
+    const char *name)
 {
 	Rela		*rela;
 	Rel		*rel;
@@ -136,15 +138,24 @@ Elf_got_entry(Lm_list *lml, Sword ndx, Addr addr, Xword value, Half mach,
 	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_GOT_INDEX),
 	    EC_SWORD(ndx));
 
+	/*
+	 * Got sections are SHT_PROGBITS, and are therefore not xlated by
+	 * libelf. If the target system has a different byte order than
+	 * the system displaying the data, swap the bytes so they are
+	 * presented properly.
+	 */
+	if (ei_target_data != ei_host_data)
+		value = BSWAP_XWORD(value);
+
 	if (reloc) {
 		if (type == SHT_RELA) {
 			rela = (Rela *)reloc;
-			str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info),
-			    0, &inv_buf);
+			str = conv_reloc_type(mach,
+			    ELF_R_TYPE(rela->r_info, mach), 0, &inv_buf);
 		} else {
 			rel = (Rel *)reloc;
-			str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info),
-			    0, &inv_buf);
+			str = conv_reloc_type(mach,
+			    ELF_R_TYPE(rel->r_info, mach), 0, &inv_buf);
 		}
 
 		if (name)

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -78,3 +78,5 @@
 @ MSG_STO_REGISTERG5	"<SCRATCH REGISTER 5>"
 @ MSG_STO_REGISTERG6	"<SCRATCH REGISTER 6>"
 @ MSG_STO_REGISTERG7	"<SCRATCH REGISTER 7>"
+
+@ MSG_PTH_RTLD_SPARCV9	"/usr/lib/sparcv9/ld.so.1"

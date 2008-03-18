@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -486,6 +486,7 @@ extern const Dnode	_elf_dnode_init;
 extern unsigned		_elf_work;
 extern mutex_t		_elf_globals_mutex;
 extern off_t		_elf64_update(Elf * elf, Elf_Cmd cmd);
+extern int		_elf64_swap_wrimage(Elf *elf);
 
 /* CSTYLED */
 NOTE(MUTEX_PROTECTS_DATA(_elf_globals_mutex, \
