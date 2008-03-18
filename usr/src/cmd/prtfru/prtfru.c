@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1207,7 +1207,10 @@ prtfru(const char *searchpath, int containers_only_flag, int list_only_flag,
 
 	/* Get the root node */
 	if ((status = fru_get_root(&frutree)) == FRU_NODENOTFOUND) {
-		error(gettext("This system does not provide FRU ID data\n"));
+		error(gettext("This system does not support PICL "
+		    "infrastructure to provide FRUID data\n"
+		    "Please use the platform SP to access the FRUID "
+		    "information\n"));
 		return (1);
 	} else if (status != FRU_SUCCESS) {
 		error(gettext("Unable to access FRU ID data:  %s\n"),

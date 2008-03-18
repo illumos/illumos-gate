@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -856,25 +856,6 @@ walk_tree(fru_nodehdl_t node, const char *prior_path, int process_tree)
 		exit(1);
 }
 
-static int
-has_system_controller()
-{
-	char platform[PATH_MAX];
-
-	int size;
-
-	if (((size = sysinfo(SI_PLATFORM, platform, sizeof (platform)))
-	    < 0) || (size > sizeof (platform)))
-		return (-1);
-
-	if ((strcmp("SUNW,Sun-Fire", platform) == 0) ||
-	    (strcmp("SUNW,Sun-Fire-15000", platform) == 0)) {
-		return (1);
-	}
-
-	return (0);
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -960,16 +941,11 @@ main(int argc, char *argv[])
 	}
 
 	if ((status = fru_get_root(&root)) == FRU_NODENOTFOUND) {
-		if (has_system_controller() == 1) {
-			(void) fprintf(stderr,
-			    gettext("Access FRUs from the "
-			    "System Controller\n"));
-		} else {
-			(void) fprintf(stderr,
-			    gettext("This system does not provide "
-			    "FRU ID data\n"));
-
-		}
+		(void) fprintf(stderr,
+		    gettext("This system does not support PICL "
+		    "infrastructure to provide FRUID data\n"
+		    "Please use the platform SP to access the FRUID "
+		    "information\n"));
 		return (1);
 	} else if (status != FRU_SUCCESS) {
 		(void) fprintf(stderr,
