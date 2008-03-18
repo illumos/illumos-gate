@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,9 +189,17 @@ cmd_page_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		fmd_hdl_debug(hdl, "restoring page from %s\n", ptr->ptr_name);
 
 		if ((pagesz = fmd_buf_size(hdl, NULL, ptr->ptr_name)) == 0) {
-			fmd_hdl_abort(hdl, "page referenced by case %s does "
-			    "not exist in saved state\n",
-			    fmd_case_uuid(hdl, cp));
+			if (fmd_case_solved(hdl, cp) ||
+			    fmd_case_closed(hdl, cp)) {
+				fmd_hdl_debug(hdl, "page %s from case %s not "
+				    "found. Case is already solved or closed\n",
+				    ptr->ptr_name, fmd_case_uuid(hdl, cp));
+				return (NULL);
+			} else {
+				fmd_hdl_abort(hdl, "page referenced by case %s "
+				    "does not exist in saved state\n",
+				    fmd_case_uuid(hdl, cp));
+			}
 		} else if (pagesz > CMD_PAGE_MAXSIZE ||
 		    pagesz < CMD_PAGE_MINSIZE) {
 			fmd_hdl_abort(hdl, "page buffer referenced by case %s "

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +81,7 @@ cmd_dp_lookup_fault(fmd_hdl_t *hdl, uint32_t cpuid)
 	 * a fault event present that impacts 'cpuid'
 	 */
 	for (ptr = cmd_list_next(&cmd.cmd_datapaths); ptr != NULL;
-		ptr = cmd_list_next(ptr)) {
+	    ptr = cmd_list_next(ptr)) {
 		if (ptr->dp_erpt_type == DP_FAULT) {
 			for (i = 0; i < ptr->dp_ncpus; i++) {
 				if (ptr->dp_cpuid_list[i] == cpuid) {
@@ -128,7 +127,7 @@ cmd_dp_lookup_error(cmd_dp_t *dp)
 	 * both dp_err and the base cpuid are identical
 	 */
 	for (ptr = cmd_list_next(&cmd.cmd_datapaths); ptr != NULL;
-		ptr = cmd_list_next(ptr)) {
+	    ptr = cmd_list_next(ptr)) {
 		if (ptr->dp_erpt_type == DP_ERROR) {
 			if ((ptr->dp_err == dp->dp_err) &&
 			    (ptr->dp_cpuid_list[0] == dp->dp_cpuid_list[0]))
@@ -159,7 +158,7 @@ cmd_dp_setasru(fmd_hdl_t *hdl, cmd_dp_t *dpt)
 			return (NULL);
 
 		err = nvlist_add_string(hcelem[i], FM_FMRI_HC_NAME,
-			FM_FMRI_CPU_ID);
+		    FM_FMRI_CPU_ID);
 		err |= nvlist_add_string(hcelem[i], FM_FMRI_HC_ID, buf);
 		if (err != 0) {
 			for (j = 0; j < i + 1; j++)
@@ -179,7 +178,7 @@ cmd_dp_setasru(fmd_hdl_t *hdl, cmd_dp_t *dpt)
 	err |= nvlist_add_string(asru, FM_FMRI_HC_ROOT, "");
 	err |= nvlist_add_uint32(asru, FM_FMRI_HC_LIST_SZ, sz);
 	err |= nvlist_add_nvlist_array(asru, FM_FMRI_HC_LIST, &hcelem[0],
-		dpt->dp_ncpus);
+	    dpt->dp_ncpus);
 	if (err != 0) {
 		for (j = 0; j < sz; j++)
 			nvlist_free(hcelem[j]);
@@ -241,9 +240,17 @@ cmd_dp_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		fmd_hdl_debug(hdl, "restoring dp from %s\n", ptr->ptr_name);
 
 		if ((dpsz = fmd_buf_size(hdl, NULL, ptr->ptr_name)) == 0) {
-			fmd_hdl_abort(hdl, "dp referenced by case %s "
-			    "does not exist in saved state\n",
-			    fmd_case_uuid(hdl, cp));
+			if (fmd_case_solved(hdl, cp) ||
+			    fmd_case_closed(hdl, cp)) {
+				fmd_hdl_debug(hdl, "dp %s from case %s not "
+				    "found. Case is already solved or closed\n",
+				    ptr->ptr_name, fmd_case_uuid(hdl, cp));
+				return (NULL);
+			} else {
+				fmd_hdl_abort(hdl, "dp referenced by case %s "
+				    "does not exist in saved state\n",
+				    fmd_case_uuid(hdl, cp));
+			}
 		} else if (dpsz > CMD_DP_MAXSIZE ||
 		    dpsz < CMD_DP_MINSIZE) {
 			fmd_hdl_abort(hdl, "dp buffer referenced by "
@@ -298,7 +305,7 @@ cmd_dp_timeout(fmd_hdl_t *hdl, id_t id)
 
 	/* close case associated with the timer */
 	for (dp = cmd_list_next(&cmd.cmd_datapaths); dp != NULL;
-		dp = cmd_list_next(dp)) {
+	    dp = cmd_list_next(dp)) {
 		if (dp->dp_id == id) {
 			cmd_dp_destroy(hdl, dp);
 			break;
