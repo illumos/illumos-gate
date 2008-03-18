@@ -746,10 +746,7 @@ cb_dispatch(struct svc_req *req, SVCXPRT *xprt)
 	if (svc_sendreply(xprt, xdr_res, (caddr_t)&res) == FALSE) {
 
 		CB_WARN("cb_dispatch: bad sendreply\n");
-
-		/*
-		 * svcerr_systemerr(xprt);
-		 */
+		svcerr_systemerr(xprt);
 	}
 
 	if (freeproc)

@@ -395,6 +395,7 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 		DTRACE_NFSV4_1(null__start, struct svc_req *, req);
 		if (!svc_sendreply(xprt, xdr_void, NULL)) {
 			DTRACE_NFSV4_1(null__done, struct svc_req *, req);
+			svcerr_systemerr(xprt);
 			return (1);
 		}
 		DTRACE_NFSV4_1(null__done, struct svc_req *, req);
@@ -489,6 +490,7 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 		DTRACE_PROBE2(nfss__e__dispatch_sendfail,
 		    struct svc_req *, xprt,
 		    char *, rbp);
+		svcerr_systemerr(xprt);
 		error++;
 	}
 
@@ -549,6 +551,7 @@ rfs4_minorvers_mismatch(struct svc_req *req, SVCXPRT *xprt, void *args)
 	if (!svc_sendreply(xprt,  xdr_COMPOUND4res_srv, (char *)resp)) {
 		DTRACE_PROBE2(nfss__e__minorvers_mismatch,
 		    SVCXPRT *, xprt, char *, resp);
+		svcerr_systemerr(xprt);
 	}
 	rfs4_compound_free(resp);
 	return (TRUE);
