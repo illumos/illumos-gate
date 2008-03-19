@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/mem_config.h>
 #include <sys/lgrp.h>
 #include <sys/rwlock.h>
+#include <sys/cpupart.h>
 
 extern pri_t maxclsyspri;
 
@@ -1729,10 +1730,10 @@ again:
 			pass += 1;
 			/*
 			 * Did a complete walk of kernel cage, but didn't free
-			 * any pages.  If only one cpu is online then
+			 * any pages.  If only one cpu is active then
 			 * stop kernel cage walk and try expanding.
 			 */
-			if (ncpus_online == 1 && did_something == 0) {
+			if (cp_default.cp_ncpus == 1 && did_something == 0) {
 				KCAGE_STAT_INCR(kt_cageout_break);
 				break;
 			}
@@ -1892,10 +1893,10 @@ again:
 		 * unable to expand the cage. This is the case when the
 		 * the growth list is exausted, therefore no work was done
 		 * and there is no reason to scan the cage again.
-		 * Note: Kernel cage scan is not repeated on single-cpu
-		 * system to avoid kernel cage thread hogging cpu.
+		 * Note: Kernel cage scan is not repeated when only one
+		 * cpu is active to avoid kernel cage thread hogging cpu.
 		 */
-		if (pass <= 3 && pages_skipped && ncpus_online > 1)
+		if (pass <= 3 && pages_skipped && cp_default.cp_ncpus > 1)
 			scan_again = 1;
 		else
 			(void) kcage_expand(); /* don't scan again */
@@ -1918,7 +1919,7 @@ again:
 		}
 	}
 
-	if (scan_again && ncpus_online > 1)
+	if (scan_again && cp_default.cp_ncpus > 1)
 		goto again;
 	else {
 		if (shared_level > 8)
