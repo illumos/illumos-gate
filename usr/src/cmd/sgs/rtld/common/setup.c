@@ -1074,6 +1074,44 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		rtldexit(&lml_main, 0);
 	}
 
+#ifdef	AT_SUN_AUXFLAGS
+	/*
+	 * Check if this instance of the linker should have a primary link
+	 * map.  This flag allows multiple copies of the -same- -version-
+	 * of the linker (and libc) to run in the same address space.
+	 *
+	 * Without this flag we only support one copy of the linker in a
+	 * process because by default the linker will always try to
+	 * initialize at one primary link map  The copy of libc which is
+	 * initialized on a primary link map will initalize global TLS
+	 * data which can be shared with other copies of libc in the
+	 * process.  The problem is that if there is more than one copy
+	 * of the linker, only one copy should link libc onto a primary
+	 * link map, otherwise libc will attempt to re-initialize global
+	 * TLS data.  So when a copy of the linker is loaded with this
+	 * flag set, it will not initialize any primary link maps since
+	 * persumably another copy of the linker will do this.
+	 *
+	 * Note that this flag only allows multiple copies of the -same-
+	 * -version- of the linker (and libc) to coexist.  This approach
+	 * will not work if we are trying to load different versions of
+	 * the linker and libc into the same process.  The reason for
+	 * this is that the format of the global TLS data may not be
+	 * the same for different versions of libc.  In this case each
+	 * different version of libc must have it's own primary link map
+	 * and be able to maintain it's own TLS data.  The only way this
+	 * can be done is by carefully managing TLS pointers on transitions
+	 * between code associated with each of the different linkers.
+	 * Note that this is actually what is done for processes in lx
+	 * branded zones.  Although in the lx branded zone case, the
+	 * other linker and libc are actually gld and glibc.  But the
+	 * same general TLS management mechanism used by the lx brand
+	 * would apply to any attempts to run multiple versions of the
+	 * solaris linker and libc in a single process.
+	 */
+	if (auxflags & AF_SUN_NOPLM)
+		rtld_flags2 |= RT_FL2_NOPLM;
+#endif
 	/*
 	 * Establish any static TLS for this primary link-map.  Note, regardless
 	 * of whether TLS is available, an initial handshake occurs with libc to
@@ -1082,12 +1120,16 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 */
 	if (rt_get_extern(&lml_main, mlmp) == 0)
 		return (0);
-	if (tls_statmod(&lml_main, mlmp) == 0)
-		return (0);
 
-	rt_thr_init(&lml_main);
+	if ((rtld_flags2 & RT_FL2_NOPLM) == 0) {
+		if (tls_statmod(&lml_main, mlmp) == 0)
+			return (0);
+		rt_thr_init(&lml_main);
+		rtld_flags2 |= RT_FL2_PLMSETUP;
+	} else {
+		rt_thr_init(&lml_main);
+	}
 
-	rtld_flags2 |= RT_FL2_PLMSETUP;
 	rtld_flags |= RT_FL_APPLIC;
 
 	/*

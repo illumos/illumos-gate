@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +107,7 @@ typedef struct uarg {
 	vnode_t	*ex_vp;
 	char	*emulator;
 	char	*brandname;
+	char	*auxp_auxflags; /* addr of auxflags auxv on the user stack */
 	char	*auxp_brand; /* address of first brand auxv on user stack */
 } uarg_t;
 

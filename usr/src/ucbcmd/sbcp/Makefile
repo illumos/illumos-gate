@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,18 +31,13 @@ include ../Makefile.ucbcmd
 
 CLEANFILES=	sysent.s
 POFILE=
- 
+
+OBJS=		sbcp.o sbcp_util.o
+
 FILEMODE=	755
 
 .KEEP_STATE:
 
-all:	$(PROG)
-
-install: all $(ROOT4LIBPROG)
-
-clean:
-	$(RM) $(OBJS) $(CLEANFILES)
- 
 # Preserve the relationship of libraries as they are defined in libc.so.1.9
 LIBBC=		../../lib/libbc/sparc/libc.so.1.9
 LIBUCB=		../../ucblib/libucb/sparc/libucb.so.1
@@ -50,9 +45,16 @@ LIBUCB=		../../ucblib/libucb/sparc/libucb.so.1
 # need libc/sparc/inc for PIC.h
 ASFLAGS=	-P -D_ASM -DPIC -K pic
 LDFLAGS=	-R /usr/4lib:/usr/ucblib -e _start -G -t \
-		$(ZDEFS) $(ZTEXT) $(ZCOMBRELOC) -I /usr/lib/ld.so.1
-OBJS=		sbcp.o
+		$(BLOCAL) $(ZNOVERSION) $(ZDEFS) $(ZTEXT) $(ZCOMBRELOC) \
+		-I/usr/lib/ld.so.1
 LIBS=		$(LDLIBS.lib) -lmapmalloc $(LIBBC) $(LIBUCB) -lnsl -lc
+
+all:	$(PROG)
+
+install: all $(ROOT4LIBPROG)
+
+clean:
+	$(RM) $(OBJS) $(CLEANFILES)
 
 $(PROG):	$(OBJS)
 	$(LDOPTS) $(LD) $(LDFLAGS) -o sbcp $(OBJS) $(LIBS)

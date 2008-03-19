@@ -315,6 +315,7 @@ typedef struct {
 #define	RT_FL2_BINDLAZY	0x00000200	/* disable RTLD_NOW (and LD_BIND_NOW) */
 #define	RT_FL2_PLMSETUP	0x00000400	/* primary link-map set up complete */
 #define	RT_FL2_BRANDED	0x00000800	/* Process is branded */
+#define	RT_FL2_NOPLM	0x00001000	/* Process has no primary link map */
 
 /*
  * Information flags for env_info.

@@ -699,9 +699,17 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * don't treat this as a set-uid exec.  So we care about
 		 * the EXECSETID_UGIDS flag but not the ...SETID flag.
 		 */
-		setid &= ~EXECSETID_SETID;
-		ADDAUX(aux, AT_SUN_AUXFLAGS,
-		    setid ? AF_SUN_SETUGID | auxf : auxf);
+		if ((setid &= ~EXECSETID_SETID) != 0)
+			auxf |= AF_SUN_SETUGID;
+		/*
+		 * Record the user addr of the auxflags aux vector entry
+		 * since brands may optionally want to manipulate this field.
+		 */
+		args->auxp_auxflags =
+		    (char *)((char *)args->stackend +
+		    ((char *)&aux->a_type -
+		    (char *)bigwad->elfargs));
+		ADDAUX(aux, AT_SUN_AUXFLAGS, auxf);
 		/*
 		 * Hardware capability flag word (performance hints)
 		 * Used for choosing faster library routines.

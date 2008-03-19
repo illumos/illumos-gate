@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,6 +197,13 @@ extern uint_t getisax(uint32_t *, uint_t);
  * against the AT_SUN_HWCAP value.
  */
 #define	AF_SUN_HWCAPVERIFY	0x00000002
+
+/*
+ * If set, this flag indicates that the the linker should not initialize
+ * any of its link maps as primary link wrt the unified libc threading
+ * interfaces.
+ */
+#define	AF_SUN_NOPLM		0x00000004
 
 #ifdef	__cplusplus
 }

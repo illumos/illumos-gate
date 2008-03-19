@@ -932,8 +932,8 @@ load_completion(Rt_map *nlmp)
 	if (nlmp)
 		nlml = LIST(nlmp);
 
-	if (nlmp && nlml->lm_init &&
-	    ((nlml != &lml_main) || (rtld_flags2 & RT_FL2_PLMSETUP))) {
+	if (nlmp && nlml->lm_init && ((nlml != &lml_main) ||
+	    (rtld_flags2 & (RT_FL2_PLMSETUP | RT_FL2_NOPLM)))) {
 		if ((tobj = tsort(nlmp, LIST(nlmp)->lm_init,
 		    RT_SORT_REV)) == (Rt_map **)S_ERROR)
 			tobj = 0;
@@ -954,8 +954,8 @@ load_completion(Rt_map *nlmp)
 	 * link-map, and for any objects added to the primary link-map after
 	 * static TLS has been registered.
 	 */
-	if (nlmp && nlml->lm_tls &&
-	    ((nlml != &lml_main) || (rtld_flags2 & RT_FL2_PLMSETUP))) {
+	if (nlmp && nlml->lm_tls && ((nlml != &lml_main) ||
+	    (rtld_flags2 & (RT_FL2_PLMSETUP | RT_FL2_NOPLM)))) {
 		Rt_map	*lmp;
 
 		for (lmp = nlmp; lmp; lmp = (Rt_map *)NEXT(lmp)) {

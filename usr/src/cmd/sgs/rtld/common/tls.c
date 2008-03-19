@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -140,7 +140,7 @@ tls_modaddrem(Rt_map *lmp, uint_t flag)
 
 	if (!(FLAGS(lmp) & FLG_RT_FIXED))
 		tmi.tm_tlsblock = (void *)((uintptr_t)tmi.tm_tlsblock +
-			ADDR(lmp));
+		    ADDR(lmp));
 
 	tmi.tm_filesz = tlsphdr->p_filesz;
 	tmi.tm_memsz = tlsphdr->p_memsz;
@@ -183,7 +183,8 @@ tls_assign(Lm_list *lml, Rt_map *lmp, Phdr *phdr)
 		 * Static TLS is only available to objects on the primary
 		 * link-map list.
 		 */
-		if ((lml->lm_flags & LML_FLG_BASELM) == 0) {
+		if (((lml->lm_flags & LML_FLG_BASELM) == 0) ||
+		    ((rtld_flags2 & RT_FL2_NOPLM) != 0)) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_TLS_STATBASE),
 			    NAME(lmp));
 			return (0);

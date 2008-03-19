@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,17 +60,10 @@ static int get_aout_head(struct vnode **vpp, struct exdata *edp, long *execsz,
     int *isdyn);
 static int aoutcore(vnode_t *vp, proc_t *pp, cred_t *credp,
     rlim64_t rlimit, int sig, core_content_t content);
-#ifdef	_LP64
 extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 extern int elf32core(vnode_t *, proc_t *, cred_t *, rlim64_t, int,
     core_content_t);
-#else	/* _LP64 */
-extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int);
-extern int elfcore(vnode_t *, proc_t *, cred_t *, rlim64_t, int,
-    core_content_t);
-#endif	/* _LP64 */
 
 char _depends_on[] = "exec/elfexec";
 
@@ -142,6 +135,7 @@ aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idatap, int level, long *execsz, int setid,
     caddr_t exec_file, cred_t *cred, int brand_action)
 {
+	auxv32_t auxflags_auxv32;
 	int error;
 	struct exdata edp, edpout;
 	struct execenv exenv;
@@ -151,6 +145,7 @@ aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	int dataprot = PROT_ALL;
 	int textprot = PROT_ALL & ~PROT_WRITE;
 	int isdyn;
+
 
 	args->to_model = DATAMODEL_ILP32;
 	*execsz = btopr(SINCR) + btopr(SSIZE) + btopr(NCARGS32-1);
@@ -198,14 +193,8 @@ aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	    NULLVPP, &nvp)) {
 		goto done;
 	}
-#ifdef	_LP64
 	if (error = elf32exec(nvp, uap, args, idatap, level, execsz,
-	    setid, exec_file, cred, brand_action))
-#else	/* _LP64 */
-	if (error = elfexec(nvp, uap, args, idatap, level, execsz,
-	    setid, exec_file, cred, brand_action))
-#endif	/* _LP64 */
-	{
+	    setid, exec_file, cred, brand_action)) {
 		VN_RELE(nvp);
 		return (error);
 	}
@@ -232,6 +221,21 @@ aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	exenv.ex_magic = edp.ux_mag;
 	exenv.ex_vp = edp.vp;
 	setexecenv(&exenv);
+
+	/*
+	 * It's time to manipulate the process aux vectors.
+	 * We need to update the AT_SUN_AUXFLAGS aux vector to set
+	 * the AF_SUN_NOPLM flag.
+	 */
+	if (copyin(args->auxp_auxflags, &auxflags_auxv32,
+	    sizeof (auxflags_auxv32)) != 0)
+		return (EFAULT);
+
+	ASSERT(auxflags_auxv32.a_type == AT_SUN_AUXFLAGS);
+	auxflags_auxv32.a_un.a_val |= AF_SUN_NOPLM;
+	if (copyout(&auxflags_auxv32, args->auxp_auxflags,
+	    sizeof (auxflags_auxv32)) != 0)
+		return (EFAULT);
 
 done:
 	if (error != 0)
@@ -342,9 +346,5 @@ static int
 aoutcore(vnode_t *vp, proc_t *pp, struct cred *credp, rlim64_t rlimit, int sig,
     core_content_t content)
 {
-#ifdef	_LP64
 	return (elf32core(vp, pp, credp, rlimit, sig, content));
-#else
-	return (elfcore(vp, pp, credp, rlimit, sig, content));
-#endif
 }
