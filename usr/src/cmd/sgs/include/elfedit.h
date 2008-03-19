@@ -346,6 +346,7 @@ typedef elfedit_cmdret_t elfedit64_cmd_func_t(elfedit64_obj_state_t *state,
  *	elfedit_cpl_atoconst() - Enter matches for well known constants
  *	elfedit_cpl_command() - enter matches for all known commands
  *	elfedit_cpl_mod() - enter matches for all known modules.
+ *	elfedit_cpl_ndx() - enter numeric index as a match
  *
  * The completion function is passed the following arguments:
  *
@@ -606,6 +607,7 @@ typedef void elfedit_write_func_t(const void *ptr, size_t size);
 extern void elfedit_command_usage(void);
 extern void elfedit_cpl_command(void *cpldata);
 extern void elfedit_cpl_match(void *cpldata, const char *str, int casefold);
+extern void elfedit_cpl_ndx(void *cpldata, uint_t ndx);
 extern void elfedit_elferr(const char *file, const char *libelf_rtn_name);
 extern elfedit_flag_t elfedit_flags(void);
 extern void *elfedit_malloc(const char *item_name, size_t size);
@@ -947,9 +949,9 @@ extern elfedit64_section_t *elfedit64_sec_getdyn(
     elfedit64_obj_state_t *obj_state, Elf64_Dyn **dyn, Elf64_Word *num);
 
 extern elfedit32_section_t *elfedit32_sec_getstr(
-    elfedit32_obj_state_t *obj_state, Elf32_Word shndx);
+    elfedit32_obj_state_t *obj_state, Elf32_Word shndx, int);
 extern elfedit64_section_t *elfedit64_sec_getstr(
-    elfedit64_obj_state_t *obj_state, Elf64_Word shndx);
+    elfedit64_obj_state_t *obj_state, Elf64_Word shndx, int);
 
 extern elfedit32_section_t *elfedit32_sec_getsyminfo(
     elfedit32_obj_state_t *obj_state, Elf32_Syminfo **syminfo, Elf32_Word *num);

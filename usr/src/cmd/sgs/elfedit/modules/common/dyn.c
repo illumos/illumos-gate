@@ -110,10 +110,15 @@ typedef enum {
 					/*	modifying an existing one */
 	DYN_OPT_F_AND =		2,	/* -and: AND (&) values to dest */
 	DYN_OPT_F_CMP =		4,	/* -cmp: Complement (~) values */
-	DYN_OPT_F_DYNNDX =	8,	/* -dynndx: elt is tag index, */
-					/*	not name */
-	DYN_OPT_F_OR =		16,	/* -or: OR (|) values to dest */
-	DYN_OPT_F_STRVAL =	32	/* -s: value is string, not integer */
+	DYN_OPT_F_DYNNDX_ELT =	8,	/* -dynndx: 1st plain arg is tag */
+					/*	index, not name */
+	DYN_OPT_F_DYNNDX_VAL =	16,	/* -dynndx ndx: Index is value to */
+					/*	option rather than 1st plain */
+					/*	arg. Used for dyn:posflag1 */
+	DYN_OPT_F_NEEDED =	32,	/* -needed str: Locate DT_POSFLAG_1 */
+					/*	relative to DT_NEEDED element */
+	DYN_OPT_F_OR =		64,	/* -or: OR (|) values to dest */
+	DYN_OPT_F_STRVAL =	128	/* -s: value is string, not integer */
 } dyn_opt_t;
 
 
@@ -135,6 +140,9 @@ typedef struct {
 	dyn_opt_t		optmask;   	/* Mask of options used */
 	int			argc;		/* # of plain arguments */
 	const char		**argv;		/* Plain arguments */
+	const char		*dyn_elt_str;	/* Value string for */
+						/*	DYN_OPT_F_DYNNDX_VAL */
+						/*	or DYN_OPT_F_NEEDED */
 } ARGSTATE;
 
 
@@ -233,8 +241,15 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 	elfedit_getopt_init(&getopt_state, &argc, &argv);
 
 	/* Add each new option to the options mask */
-	while ((getopt_ret = elfedit_getopt(&getopt_state)) != NULL)
+	while ((getopt_ret = elfedit_getopt(&getopt_state)) != NULL) {
 		argstate->optmask |= getopt_ret->gor_idmask;
+		switch (getopt_ret->gor_idmask) {
+		case DYN_OPT_F_DYNNDX_VAL:
+		case DYN_OPT_F_NEEDED:
+			argstate->dyn_elt_str = getopt_ret->gor_value;
+			break;
+		}
+	}
 
 	/* If there may be an arbitrary amount of output, use a pager */
 	if (argc == 0)
@@ -248,7 +263,7 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 	argstate->dyn.sec = elfedit_sec_getdyn(obj_state, &argstate->dyn.data,
 	    &argstate->dyn.num);
 	argstate->strsec = elfedit_sec_getstr(obj_state,
-	    argstate->dyn.sec->sec_shdr->sh_link);
+	    argstate->dyn.sec->sec_shdr->sh_link, 0);
 
 	/* Index of first DT_NULL */
 	set_null_ndx(argstate);
@@ -288,6 +303,7 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	Dyn	*dyn;
 	int	header_done = 0;
 	Xword	last_d_val;
+	int	one_shot;
 
 	if (autoprint && ((elfedit_flags() & ELFEDIT_F_AUTOPRINT) == 0))
 		return;
@@ -317,8 +333,16 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 		cnt = argstate->dyn.num;
 	}
 
+	/*
+	 * one_shot is used by positional elements (e.g. DT_POSFLAG_1)
+	 * to get the item following them to be shown even if they
+	 * are not of the desired tag type or the count of elements
+	 * to be displayed is only 1.
+	 */
+	one_shot = 0;
+
 	dyn = &argstate->dyn.data[ndx];
-	for (; cnt--; dyn++, ndx++) {
+	for (; (one_shot && (ndx < argstate->dyn.num)) || cnt--; dyn++, ndx++) {
 		union {
 			Conv_inv_buf_t		inv;
 			Conv_dyn_flag_buf_t	flag;
@@ -328,20 +352,24 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 		} c_buf;
 		const char	*name;
 
-		/*
-		 * If we are only displaying certain tag types and
-		 * this isn't one of those, move on to next element.
-		 */
-		switch (print_type) {
-		case PRINT_DYN_T_TAG:
-			if (dyn->d_tag != arg)
-				continue;
-			break;
-		case PRINT_DYN_T_RUNPATH:
-			if ((dyn->d_tag != DT_RPATH) &&
-			    (dyn->d_tag != DT_RUNPATH))
-				continue;
-			break;
+		if (one_shot) {
+			one_shot = 0;
+		} else {
+			/*
+			 * If we are only displaying certain tag types and
+			 * this isn't one of those, move on to next element.
+			 */
+			switch (print_type) {
+			case PRINT_DYN_T_TAG:
+				if (dyn->d_tag != arg)
+					continue;
+				break;
+			case PRINT_DYN_T_RUNPATH:
+				if ((dyn->d_tag != DT_RPATH) &&
+				    (dyn->d_tag != DT_RUNPATH))
+					continue;
+				break;
+			}
 		}
 
 		/*
@@ -406,8 +434,36 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 			    flags_fmt_flags, &c_buf.flag1);
 			break;
 		case DT_POSFLAG_1:
+			/*
+			 * If this is dyn:posflag1, and the print_type
+			 * is PRINT_DYN_T_TAG, and the -needed option is
+			 * used, then don't show any DT_POSFLAG_1 elements
+			 * that are not followed by a DT_NEEDED element
+			 * that matches the -needed string.
+			 */
+			if ((cmd == DYN_CMD_T_POSFLAG1) &&
+			    (print_type == PRINT_DYN_T_TAG) &&
+			    ((argstate->optmask & DYN_OPT_F_NEEDED) != 0) &&
+			    ((ndx + 1) < argstate->dyn.num)) {
+				Dyn *dyn1 = &argstate->dyn.data[ndx + 1];
+
+				if (dyn1->d_tag != DT_NEEDED)
+					continue;
+				name = elfedit_offset_to_str(argstate->strsec,
+				    dyn1->d_un.d_val, ELFEDIT_MSG_DEBUG, 0);
+				if (strncmp(name, argstate->dyn_elt_str,
+				    strlen(argstate->dyn_elt_str)) != 0)
+					continue;
+			}
+
 			name = conv_dyn_posflag1(dyn->d_un.d_val,
 			    flags_fmt_flags, &c_buf.posflag1);
+			/*
+			 * DT_POSFLAG_1 is a positional element that affects
+			 * the following item. If using the default output
+			 * style, then show the following item as well.
+			 */
+			one_shot = (outstyle == ELFEDIT_OUTSTYLE_DEFAULT);
 			break;
 		case DT_FEATURE_1:
 			name = conv_dyn_feature1(dyn->d_un.d_val,
@@ -442,9 +498,19 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 			 */
 			switch (print_type) {
 			case PRINT_DYN_T_TAG:
+				/*
+				 * Positional flags don't count, because
+				 * each one affects a different item. So don't
+				 * skip those.
+				 */
+				if (dyn->d_tag != DT_POSFLAG_1)
+					continue;
+				break;
+
 			case PRINT_DYN_T_RUNPATH:
 				if (printed && (last_d_val == dyn->d_un.d_val))
 					continue;
+				break;
 			}
 
 			if ((name != NULL) &&
@@ -485,49 +551,88 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 
 
 /*
- * Process the elt argument: This will be a tag type if -dynndx is
- * not present and this is a print request. It will be an index otherwise.
+ * Determine the index(s) of the dynamic element(s) to be displayed and/or
+ * manipulated.
  *
  * entry:
  *	argstate - Argument state block
- *	arg - Argument string to be converted into an index
- *	argname - String giving the name by which the argument is
- *		referred in the online help for the command.
+ *	arg - If the command being called accepts a first plain argument
+ *		named 'elt' which is used to specify the dynamic element,
+ *		arg is the value of argv[0] for that command. If the
+ *		command does not accept an 'elt' argument and instead
+ *		implicitly assumes a tag type, arg is the constant string
+ *		for that type (e.g. "DT_POSFLAG_1").
  *	print_request - True if the command is to print the current
  *		value(s) and return without changing anything.
  *	print_type - Address of variable containing PRINT_DYN_T_
  *		code specifying how the elements will be displayed.
  *
  * exit:
- *	If print_request is False: arg is converted into an integer value.
- *	If -dynndx was used, we convert it into an integer. If it was not
- *	used, then arg is a tag name --- we find the first dynamic entry
- *	that matches. If no entry matches, and there is an extra DT_NULL,
- *	it is added. Otherwise an error is issued. *print_type is set
- *	to PRINT_DYN_T_NDX.
+ *	If print_request is False: This routine always returns the index
+ *	of a single dynamic element. *print_type is set to PRINT_DYN_T_NDX.
+ *	The 'elt' argument as well as any modifier options (-dynndx, -needed)
+ *	are examined to determine this index. If there are no modifier options,
+ *	the dynamic section contains no element of the desired type, and there
+ *	is an extra DT_NULL element in the section, then a new element of
+ *	the desired type is created and its index returned. Otherwise an
+ *	error is issued.
  *
- *	If print_request is True: If -dynndx was used, arg is converted into
- *	an integer value, *print_type is set to PRINT_DYN_T_NDX, and
- *	the value is returned. If -dynndx was not used, *print_type is set to
- *	PRINT_DYN_T_TAG, and the tag value is returned.
+ *	If print_request is True: If a modifier (-dynndx, -needed) was used,
+ *	*print_type is set to PRINT_DYN_T_NDX and the index of the
+ *	corresponding single dynamic element is returned. If no modifier
+ *	was used, *print_type is set to PRINT_DYN_T_TAG, and the tag
+ *	type code is returned.
  */
 static Word
-arg_to_index(ARGSTATE *argstate, const char *arg, const char *argname,
+arg_to_index(ARGSTATE *argstate, const char *arg,
     int print_request, PRINT_DYN_T *print_type)
 {
 	Word	ndx, dt_value;
+	Dyn	*dyn;
 
 
 	/* Assume we are returning an index, alter as needed below */
 	*print_type = PRINT_DYN_T_NDX;
 
-	/* If -dynndx was used, this is a simple numeric index */
-	if ((argstate->optmask & DYN_OPT_F_DYNNDX) != 0)
-		return ((Word) elfedit_atoui_range(arg, argname, 0,
-		    argstate->dyn.num - 1, NULL));
+	/*
+	 * All the commands that accept the DYN_OPT_F_DYNNDX_ELT form
+	 * of -dynndx require a plain argument named 'elt' as their first
+	 * argument. -dynndx is a modifier that means that 'elt' is a
+	 * simple numeric section index. Routines that accept this form
+	 * of -dynndx are willing to handle any tag type, so all we need
+	 * to check is that the value is in range.
+	 */
+	if ((argstate->optmask & DYN_OPT_F_DYNNDX_ELT) != 0)
+		return ((Word) elfedit_atoui_range(arg, MSG_ORIG(MSG_STR_ELT),
+		    0, argstate->dyn.num - 1, NULL));
 
-	/* The argument is a DT_ tag type, not a numeric index */
+	/* arg is a DT_ tag type, not a numeric index */
 	dt_value = (Word) elfedit_atoconst(arg, ELFEDIT_CONST_DT);
+
+	/*
+	 * Commands that accept the DYN_OPT_F_DYNNDX_VAL form  of
+	 * dynndx do not accept the 'elt' argument. The index is a
+	 * value that follows the option, and was saved in argstate by
+	 * process_args(). Routines that accept this form of -dynndx
+	 * require the specified element to have a specific tag type,
+	 * so we test for this as well as for the index being in range.
+	 */
+	if ((argstate->optmask & DYN_OPT_F_DYNNDX_VAL) != 0) {
+		ndx = ((Word) elfedit_atoui_range(argstate->dyn_elt_str,
+		    MSG_ORIG(MSG_STR_INDEX), 0, argstate->dyn.num - 1, NULL));
+		if (argstate->dyn.data[ndx].d_tag != dt_value) {
+			Half	mach = argstate->obj_state->os_ehdr->e_machine;
+			Conv_inv_buf_t	is, want;
+
+			elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_WRONGTAG),
+			    EC_WORD(argstate->dyn.sec->sec_shndx),
+			    argstate->dyn.sec->sec_name, ndx,
+			    conv_dyn_tag(dt_value, mach, 0, &want),
+			    conv_dyn_tag(argstate->dyn.data[ndx].d_tag, mach,
+			    0, &is));
+		}
+		return (ndx);
+	}
 
 	/*
 	 * If this is a printing request, then we let print_dyn() show
@@ -536,6 +641,52 @@ arg_to_index(ARGSTATE *argstate, const char *arg, const char *argname,
 	if (print_request) {
 		*print_type = PRINT_DYN_T_TAG;
 		return (dt_value);
+	}
+
+	/*
+	 * Commands that accept -needed are looking for the dt_value element
+	 * (usually DT_POSFLAG_1) that immediately preceeds the DT_NEEDED
+	 * element with the string given by argstate->dyn_elt_str.
+	 */
+	if ((argstate->optmask & DYN_OPT_F_NEEDED) != 0) {
+		Word	retndx = argstate->dyn.num;	/* Out of range value */
+		const char	*name;
+		size_t		len;
+
+		len = strlen(argstate->dyn_elt_str);
+		for (ndx = 0, dyn = argstate->dyn.data;
+		    ndx < argstate->dyn.num; dyn++, ndx++) {
+			/*
+			 * If the immediately preceeding item has the
+			 * tag type we're looking for, and the current item
+			 * is a DT_NEEDED with a string that matches,
+			 * then the preceeding item is the one we want.
+			 */
+			if ((dyn->d_tag == DT_NEEDED) &&
+			    (ndx > 0) && (retndx == (ndx - 1))) {
+				name = elfedit_offset_to_str(argstate->strsec,
+				    dyn->d_un.d_val, ELFEDIT_MSG_DEBUG, 0);
+
+				if (strncmp(name,
+				    argstate->dyn_elt_str, len) == 0)
+					return (retndx);
+				continue;
+			}
+
+			/*
+			 * If the current item has the tag type we're
+			 * looking for, make it our current candidate.
+			 * If the next item is a DT_NEEDED with the right
+			 * string value, we'll use it then.
+			 */
+			if (dyn->d_tag == dt_value)
+				retndx = ndx;
+		}
+
+		/* If we get here, no matching DT_NEEDED was found */
+		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_NEEDEDNOMATCH),
+		    EC_WORD(argstate->dyn.sec->sec_shndx),
+		    argstate->dyn.sec->sec_name, argstate->dyn_elt_str);
 	}
 
 	/* Locate the first entry with the given tag type */
@@ -579,13 +730,14 @@ cmd_body_value(ARGSTATE *argstate, Word *ret_ndx)
 	Word	i;
 	Dyn	*dyn = argstate->dyn.data;
 	Word	numdyn = argstate->dyn.num;
-	int	minus_add = ((argstate->optmask & DYN_OPT_F_ADD) != 0);
-	int	minus_s = ((argstate->optmask & DYN_OPT_F_STRVAL) != 0);
-	int	minus_dynndx = ((argstate->optmask & DYN_OPT_F_DYNNDX) != 0);
+	int	minus_add, minus_s, minus_dynndx;
 	Word	arg1, tmp_val;
 	Xword	arg2;
 	int	arg2_known = 1;
 
+	minus_add = ((argstate->optmask & DYN_OPT_F_ADD) != 0);
+	minus_s = ((argstate->optmask & DYN_OPT_F_STRVAL) != 0);
+	minus_dynndx = ((argstate->optmask & DYN_OPT_F_DYNNDX_ELT) != 0);
 
 	elfedit_dyn_elt_init(&strpad_elt);
 
@@ -959,7 +1111,7 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		print_only = 1;
 		if (argstate.argc == 1)
 			ndx = arg_to_index(&argstate, argstate.argv[0],
-			    MSG_ORIG(MSG_STR_ELT), print_only, &print_type);
+			    print_only, &print_type);
 		break;
 
 	case DYN_CMD_T_TAG:
@@ -968,7 +1120,7 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 			if (argstate.argc > 2)
 				elfedit_command_usage();
 			ndx = arg_to_index(&argstate, argstate.argv[0],
-			    MSG_ORIG(MSG_STR_ELT), print_only, &print_type);
+			    print_only, &print_type);
 		}
 		break;
 
@@ -979,7 +1131,6 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		if (argstate.argc > 0) {
 			if (print_only) {
 				ndx = arg_to_index(&argstate, argstate.argv[0],
-				    MSG_ORIG(MSG_STR_ELT),
 				    print_only, &print_type);
 			} else {
 				print_type = PRINT_DYN_T_NDX;
@@ -991,7 +1142,6 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		if ((argstate.argc < 1) || (argstate.argc > 2))
 			elfedit_command_usage();
 		ndx = arg_to_index(&argstate, argstate.argv[0],
-		    MSG_ORIG(MSG_STR_ELT),
 		    0, &print_type);
 		do_autoprint = 0;
 		break;
@@ -1000,7 +1150,7 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		if ((argstate.argc < 2) || (argstate.argc > 3))
 			elfedit_command_usage();
 		ndx = arg_to_index(&argstate, argstate.argv[0],
-		    MSG_ORIG(MSG_STR_ELT), 0, &print_type);
+		    0, &print_type);
 		do_autoprint = 0;
 		break;
 
@@ -1020,34 +1170,34 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		print_only = (argstate.argc == 0);
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_POSFLAG_1, 1),
-		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		    print_only, &print_type);
 		break;
 
 	case DYN_CMD_T_FLAGS:
 		print_only = (argstate.argc == 0);
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_FLAGS, 1),
-		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		    print_only, &print_type);
 		break;
 
 	case DYN_CMD_T_FLAGS1:
 		print_only = (argstate.argc == 0);
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_FLAGS_1, 1),
-		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		    print_only, &print_type);
 		break;
 
 	case DYN_CMD_T_FEATURE1:
 		print_only = (argstate.argc == 0);
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_FEATURE_1, 1),
-		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		    print_only, &print_type);
 		break;
 
 	case DYN_CMD_T_CHECKSUM:
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_CHECKSUM, 1),
-		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		    print_only, &print_type);
 		break;
 
 	case DYN_CMD_T_SUNW_LDMACH:
@@ -1056,7 +1206,7 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		print_only = (argstate.argc == 0);
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_SUNW_LDMACH, 1),
-		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		    print_only, &print_type);
 		break;
 
 	default:
@@ -1467,6 +1617,58 @@ static void
 cpl_posflag1(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
     const char *argv[], int num_opt)
 {
+	/*
+	 * dyn:posflag1 accepts two mutually exclusive options that have
+	 * a corresponding value argument: -dynndx and -needed. If we
+	 * are being called to supply options for the value, handle that here.
+	 */
+	if ((num_opt > 1) && (argc == num_opt)) {
+		elfedit_section_t	*dynsec, *strsec;
+		const char		*opt = argv[num_opt - 2];
+		dyn_opt_t		type;
+		Dyn			*dyn;
+		Word			i, num;
+
+		/*
+		 * If there is no object available, or if the object has no
+		 * dynamic section, then there is nothing to report.
+		 */
+		if ((obj_state == NULL) || obj_state->os_dynndx == SHN_UNDEF)
+			return;
+
+		/*
+		 * Determine which option it is, bail if it isn't one of
+		 * the ones we are concerned with.
+		 */
+		if ((strcmp(opt, MSG_ORIG(MSG_STR_MINUS_NEEDED)) == 0))
+			type = DYN_OPT_F_NEEDED;
+		else if ((strcmp(opt, MSG_ORIG(MSG_STR_MINUS_DYNNDX)) == 0))
+			type = DYN_OPT_F_DYNNDX_VAL;
+		else
+			return;
+
+		dynsec = elfedit_sec_getdyn(obj_state, &dyn, &num);
+		switch (type) {
+		case DYN_OPT_F_NEEDED:
+			strsec = elfedit_sec_getstr(obj_state,
+			    dynsec->sec_shdr->sh_link, 0);
+			for (; num-- > 0; dyn++)
+				if (dyn->d_tag == DT_NEEDED)
+					elfedit_cpl_match(cpldata,
+					    elfedit_offset_to_str(strsec,
+					    dyn->d_un.d_val, ELFEDIT_MSG_DEBUG,
+					    0), 0);
+			break;
+
+		case DYN_OPT_F_DYNNDX_VAL:
+			for (i = 0; i < num; i++, dyn++)
+				if (dyn->d_tag == DT_POSFLAG_1)
+					elfedit_cpl_ndx(cpldata, i);
+			break;
+		}
+		return;
+	}
+
 	/* This routine allows multiple flags to be specified */
 	elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_DF_P1);
 }
@@ -1619,9 +1821,9 @@ elfedit_init(elfedit_module_version_t version)
 	/* For commands that only accept -dynndx */
 	static elfedit_cmd_optarg_t opt_minus_dynndx[] = {
 		{ MSG_ORIG(MSG_STR_MINUS_DYNNDX),
-		    /* MSG_INTL(MSG_OPTDESC_DYNNDX) */
-		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX), 0,
-		    DYN_OPT_F_DYNNDX, 0 },
+		    /* MSG_INTL(MSG_OPTDESC_DYNNDX_ELT) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX_ELT), 0,
+		    DYN_OPT_F_DYNNDX_ELT, 0 },
 		{ NULL }
 	};
 
@@ -1644,9 +1846,9 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_tag[] = { MSG_ORIG(MSG_CMD_TAG), NULL };
 	static elfedit_cmd_optarg_t opt_tag[] = {
 		{ MSG_ORIG(MSG_STR_MINUS_DYNNDX),
-		    /* MSG_INTL(MSG_OPTDESC_DYNNDX) */
-		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX), 0,
-		    DYN_OPT_F_DYNNDX, 0 },
+		    /* MSG_INTL(MSG_OPTDESC_DYNNDX_ELT) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX_ELT), 0,
+		    DYN_OPT_F_DYNNDX_ELT, 0 },
 		{ ELFEDIT_STDOA_OPT_O, NULL,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ NULL }
@@ -1670,11 +1872,11 @@ elfedit_init(elfedit_module_version_t version)
 		{ MSG_ORIG(MSG_STR_MINUS_ADD),
 		    /* MSG_INTL(MSG_OPTDESC_ADD) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_ADD), 0,
-		    DYN_OPT_F_ADD, DYN_OPT_F_DYNNDX },
+		    DYN_OPT_F_ADD, DYN_OPT_F_DYNNDX_ELT },
 		{ MSG_ORIG(MSG_STR_MINUS_DYNNDX),
-		    /* MSG_INTL(MSG_OPTDESC_DYNNDX) */
-		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX), 0,
-		    DYN_OPT_F_DYNNDX, DYN_OPT_F_ADD },
+		    /* MSG_INTL(MSG_OPTDESC_DYNNDX_ELT) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX_ELT), 0,
+		    DYN_OPT_F_DYNNDX_ELT, DYN_OPT_F_ADD },
 		{ ELFEDIT_STDOA_OPT_O, NULL,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_S),
@@ -1741,6 +1943,29 @@ elfedit_init(elfedit_module_version_t version)
 	/* dyn:posflag1 */
 	static const char *name_posflag1[] = { MSG_ORIG(MSG_CMD_POSFLAG1),
 	    NULL };
+	static elfedit_cmd_optarg_t opt_posflag1[] = {
+		{ ELFEDIT_STDOA_OPT_AND, NULL,
+		    ELFEDIT_CMDOA_F_INHERIT, DYN_OPT_F_AND, DYN_OPT_F_OR },
+		{ ELFEDIT_STDOA_OPT_CMP, NULL,
+		    ELFEDIT_CMDOA_F_INHERIT, DYN_OPT_F_CMP, 0 },
+		{ MSG_ORIG(MSG_STR_MINUS_DYNNDX),
+		    /* MSG_INTL(MSG_OPTDESC_DYNNDX_VAL) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_DYNNDX_VAL),
+		    ELFEDIT_CMDOA_F_VALUE,
+		    DYN_OPT_F_DYNNDX_VAL, DYN_OPT_F_NEEDED },
+		{ MSG_ORIG(MSG_STR_INDEX), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_MINUS_NEEDED),
+		    /* MSG_INTL(MSG_OPTDESC_NEEDED) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_NEEDED),
+		    ELFEDIT_CMDOA_F_VALUE,
+		    DYN_OPT_F_NEEDED, DYN_OPT_F_DYNNDX_VAL },
+		{ MSG_ORIG(MSG_STR_PREFIX), NULL, 0, 0 },
+		{ ELFEDIT_STDOA_OPT_O, NULL,
+		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
+		{ ELFEDIT_STDOA_OPT_OR, NULL,
+		    ELFEDIT_CMDOA_F_INHERIT, DYN_OPT_F_OR, DYN_OPT_F_AND },
+		{ NULL }
+	};
 	static elfedit_cmd_optarg_t arg_posflag1[] = {
 		{ MSG_ORIG(MSG_STR_VALUE),
 		    /* MSG_INTL(MSG_A1_POSFLAG1_VALUE) */
@@ -1852,7 +2077,7 @@ elfedit_init(elfedit_module_version_t version)
 		    ELFEDIT_I18NHDL(MSG_DESC_POSFLAG1),
 		    /* MSG_INTL(MSG_HELP_POSFLAG1) */
 		    ELFEDIT_I18NHDL(MSG_HELP_POSFLAG1),
-		    opt_ostyle_bitop, arg_posflag1 },
+		    opt_posflag1, arg_posflag1 },
 
 		/* dyn:flags */
 		{ cmd_flags, cpl_flags, name_flags,

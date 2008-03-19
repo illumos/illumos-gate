@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -600,7 +600,6 @@
 @ MSG_FMT_BKTSTR	"[%s]"
 @ MSG_FMT_BKTINT	"[%d]"
 @ MSG_FMT_STRNL		"%s\n"
-@ MSG_FMT_WORDVAL	"%u"
 @ MSG_FMT_DECNUMNL	"%d\n"
 @ MSG_FMT_HEXNUM	"%#x"
 @ MSG_FMT_HEXNUMNL	"%#x\n"

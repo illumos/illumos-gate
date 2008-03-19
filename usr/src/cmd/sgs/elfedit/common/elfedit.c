@@ -3090,6 +3090,21 @@ elfedit_cpl_match(void *cpldata, const char *str, int casefold)
 
 
 /*
+ * Convenience wrapper on elfedit_cpl_match(): Format an unsigned
+ * 32-bit integer as a string and enter the result for command completion.
+ */
+void
+elfedit_cpl_ndx(void *cpldata, uint_t ndx)
+{
+	Conv_inv_buf_t	buf;
+
+	(void) snprintf(buf.buf, sizeof (buf.buf),
+	    MSG_ORIG(MSG_FMT_WORDVAL), ndx);
+	elfedit_cpl_match(cpldata, buf.buf, 0);
+}
+
+
+/*
  * Compare the token to the names of the commands from the given module,
  * and if they share a common initial sequence, add the tail of string
  * to the tecla command completion buffer:

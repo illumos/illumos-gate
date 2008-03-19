@@ -232,7 +232,7 @@ argstate_add_str(ARGSTATE *argstate)
 
 	argstate_add_sym(argstate);
 	argstate->str.sec = elfedit_sec_getstr(argstate->obj_state,
-	    argstate->sym.sec->sec_shdr->sh_link);
+	    argstate->sym.sec->sec_shdr->sh_link, 0);
 }
 static void
 argstate_add_dynamic(ARGSTATE *argstate)

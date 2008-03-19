@@ -1324,3 +1324,4 @@ Bugid   Risk Synopsis
 6671255 link-editor should support cross linking
 	PSARC 2008/179 cross link-editor
 6606203 link editor ought to allow creation of >2gb sized objects
+6674666 elfedit dyn:posflag1 needs option to locate element via NEEDED item

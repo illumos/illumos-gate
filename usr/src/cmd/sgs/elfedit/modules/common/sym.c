@@ -208,7 +208,7 @@ symstate_add_str(ARGSTATE *argstate, SYMSTATE *symstate)
 		return;
 
 	symstate->str.sec = elfedit_sec_getstr(argstate->obj_state,
-	    symstate->sym.sec->sec_shdr->sh_link);
+	    symstate->sym.sec->sec_shdr->sh_link, 0);
 }
 static void
 symstate_add_versym(ARGSTATE *argstate, SYMSTATE *symstate)
@@ -1497,14 +1497,7 @@ cpl_sh_opt(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 			elfedit_cpl_match(cpldata, sec->sec_name, 0);
 			break;
 		case INDEX:
-			{
-				char index[MAXNDXSIZE];
-
-				(void) snprintf(index, sizeof (index),
-				    MSG_ORIG(MSG_FMT_WORDVAL),
-				    symtab->symt_shndx);
-				elfedit_cpl_match(cpldata, index, 1);
-			}
+			elfedit_cpl_ndx(cpldata, symtab->symt_shndx);
 			break;
 		case TYPE:
 			{

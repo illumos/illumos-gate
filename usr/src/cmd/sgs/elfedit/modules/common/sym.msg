@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -386,7 +386,6 @@
 
 # Format strings
 
-@ MSG_FMT_WORDVAL		"%u"
 @ MSG_FMT_WORDVALNL		"%u\n"
 @ MSG_FMT_XWORDVALNL_32		"0x%8.8x\n"
 @ MSG_FMT_XWORDVALNL_64		"0x%16.16llx\n"

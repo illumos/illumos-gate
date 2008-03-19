@@ -96,6 +96,7 @@ foo()
 	(void) elfedit_cpl_atoi(NULL, NULL);
 	(void) elfedit_cpl_atoui(NULL, NULL);
 	(void) elfedit_cpl_atoconst(NULL, 0);
+	(void) elfedit_cpl_ndx(NULL, 0);
 
 	(void) elfedit_dyn_offset_to_str(NULL, NULL);
 	(void) elfedit_dynstr_insert(NULL, NULL, NULL, NULL);
@@ -110,7 +111,7 @@ foo()
 	(void) elfedit_sec_get(NULL, NULL);
 	(void) elfedit_sec_getcap(NULL, NULL, NULL);
 	(void) elfedit_sec_getdyn(NULL, NULL, NULL);
-	(void) elfedit_sec_getstr(NULL, 0);
+	(void) elfedit_sec_getstr(NULL, 0, 0);
 	(void) elfedit_sec_getsyminfo(NULL, NULL, NULL);
 	(void) elfedit_sec_getsymtab(NULL, 0, 0, NULL, NULL, NULL, NULL);
 	(void) elfedit_sec_getversym(NULL, NULL, NULL, NULL);

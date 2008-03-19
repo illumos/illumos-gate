@@ -719,11 +719,27 @@ elfedit_sec_getversym(elfedit_obj_state_t *obj_state,
 /*
  * Locate the string table specified by shndx for this object.
  *
+ * entry:
+ *	obj_state - Object state.
+ *	shndx - Section index for string table section
+ *	allow_shflags - If False (0), only sections of type SHT_STRTAB
+ *		are accepted as being string tables, and any other type
+ *		will fail. If True (1), non-stringtable sections with
+ *		their SHF_STRINGS flag set are also accepted.
+ *
  * exit:
  *	Returns section descriptor on success. On failure, does not return.
+ *
+ * note:
+ *	At this time, we can only support SHF_STRINGS sections that
+ *	use single byte characters and which do not require alignment >1.
+ *	SHF_STRINGS sections that have multi-byte characters or alignment
+ *	are not currently supported and will draw an error even if
+ *	allow_shflags is True.
  */
 elfedit_section_t *
-elfedit_sec_getstr(elfedit_obj_state_t *obj_state, Word shndx)
+elfedit_sec_getstr(elfedit_obj_state_t *obj_state, Word shndx,
+    int allow_shflags)
 {
 	elfedit_section_t *strsec;
 
@@ -732,12 +748,20 @@ elfedit_sec_getstr(elfedit_obj_state_t *obj_state, Word shndx)
 		    EC_WORD(shndx), EC_WORD(obj_state->os_shnum - 1));
 
 	strsec = &obj_state->os_secarr[shndx];
-	if (strsec->sec_shdr->sh_type != SHT_STRTAB)
+	if (strsec->sec_shdr->sh_type == SHT_STRTAB) {
+		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_FNDSTRTAB),
+		    EC_WORD(shndx), strsec->sec_name);
+	} else if (allow_shflags &&
+	    ((strsec->sec_shdr->sh_flags & SHF_STRINGS) != 0) &&
+	    (strsec->sec_shdr->sh_entsize <= 1) &&
+	    (strsec->sec_shdr->sh_addralign <= 1)) {
+		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_FNDSTRTABFL),
+		    EC_WORD(shndx), strsec->sec_name);
+	} else {
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_NOTSTRSH),
 		    EC_WORD(shndx), strsec->sec_name);
+	}
 
-	elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_FNDSTRTAB),
-	    EC_WORD(shndx), strsec->sec_name);
 	return (strsec);
 }
 

@@ -70,6 +70,8 @@
 @ MSG_ERR_NODYNELT	"[%d: %s]: no elements of type %s found\n"
 @ MSG_ERR_STRPADSTRVAL	"[%d: %s]: -s option cannot be used with \
 			 DT_SUNW_STRPAD dynamic element\n"
+@ MSG_ERR_WRONGTAG	"[%d: %s][%d]: expected %s dynamic element: %s\n"
+@ MSG_ERR_NEEDEDNOMATCH	"[%d: %s]: matching DT_NEEDED element not found: %s\n";
 
 
 # Module description
@@ -112,9 +114,19 @@
    but there is room to add it, the new string is added and then\n\
    the offset is placed in the dynamic entry.\n"
 
-@ MSG_OPTDESC_DYNNDX		"\
+@ MSG_OPTDESC_DYNNDX_ELT	"\
    Interpret the elt argument as a direct index into the dynamic\n\
    section, rather than as a DT_ tag value.\n"
+
+@ MSG_OPTDESC_DYNNDX_VAL	"\
+   Use the dynamic element with the specified index.\n"
+
+@ MSG_OPTDESC_NEEDED	"\
+   Select the first DT_POSFLAG_1 dynamic element that corresponds\n\
+   to the DT_NEEDED element with a value that starts with the\n\
+   string given by prefix. If present, the DT_POSFLAG_1 element\n\
+   will be in the dynamic element directly in front of the\n\
+   DT_NEEDED element.\n"
 
 
 # Command argument description strings
@@ -287,28 +299,45 @@
    for it exists.\n"
 
 @ MSG_HELP_POSFLAG1	"   \
-   The dyn:posflag1 command is used to display or alter the\n\
-   DT_POSFLAG_1 flags values.\n\
+   The dyn:posflag1 command is used to display or alter\n\
+   DT_POSFLAG_1 flags values. DT_POSFLAG_1 is a positional\n\
+   dynamic element that affects the interpretation of the item\n\
+   that follows it. Therefore, when displaying DT_POSFLAG_1 elements\n\
+   using the default output style, dyn:posflag1 also displays the\n\
+   dynamic element that follows it.\n\
    \n\
    If dyn:posflag1 is called without arguments, the current\n\
-   value is shown. If one or more value arguments are present,\n\
-   the following steps are taken:\n\
+   value of all DT_POSFLAG_1 elements are shown. It is possible\n\
+   to display the value of a single specific DT_POSFLAG_1 element\n\
+   by using the -dynndx or -needed option to specify it.\n\
+   \n\
+   If one or more value arguments are present, the default is to\n\
+   modify the first DT_POSFLAG_1 element. The -dynndx or -needed\n\
+   option can be used to specify a specific DT_POSFLAG_1_element\n\
+   instead. The following steps are taken to compute the new value:\n\
    \n   \
    o\tAll the value arguments are OR'd together.\n\
    \n   \
    o\tIf the -cmp option has been specified, the new value\n\
    \tis complemented.\n\
    \n   \
-   o\tThe DT_POSFLAG_1 element of the dynamic section is updated\n\
-   \twith the new value. If -and is specified, the new value is\n\
-   \tAND'd against the existing value. If -or is specified,\n\
-   \tthe new value is OR'd against the existing value. If\n\
-   \tneither -and or -or are specified, the new value replaces\n\
-   \tthe existing value.\n\
+   o\tThe DT_POSFLAG_1 element is updated with the new value.\n\
+   \tIf -and is specified, the new value is AND'd against the\n\
+   \texisting value. If -or is specified, the new value is OR'd\n\
+   \tagainst the existing value. If neither -and or -or are\n\
+   \tspecified, the new value replaces the existing value.\n\
    \n\
-   If the current dynamic section does not have a current\n\
-   DT_POSFLAG_1 element, and room for it exists at the end\n\
-   of the section, a new one is inserted.\n"
+   A new DT_POSFLAG_1 element is inserted in the dynamic section\n\
+   when all of the following are true:\n\
+   \n   \
+   o\tOne or more value arguments are present.\n\
+   \n   \
+   o\tThe -dynndx and -needed options are not used.\n\
+   \n   \
+   o\tThe current dynamic section does not have a current\n\
+   \tDT_POSFLAG_1 element.\n\
+   \n   \
+   o\tThere is available space at the end of the dynamic section.\n"
 
 @ MSG_HELP_FLAGS	"   \
    The dyn:flags command is used to display or alter the\n\
@@ -421,10 +450,13 @@
 @ MSG_STR_COUNT		"count"
 @ MSG_STR_ELT		"elt"
 @ MSG_STR_DST_INDEX	"dst_index"
+@ MSG_STR_INDEX		"index"
 @ MSG_STR_MINUS_ADD	"-add"
 @ MSG_STR_MINUS_DYNNDX	"-dynndx"
+@ MSG_STR_MINUS_NEEDED	"-needed"
 @ MSG_STR_MINUS_S	"-s"
 @ MSG_STR_NEWPATH	"newpath"
+@ MSG_STR_PREFIX	"prefix"
 @ MSG_STR_VALUE		"value"
 
 # Format strings

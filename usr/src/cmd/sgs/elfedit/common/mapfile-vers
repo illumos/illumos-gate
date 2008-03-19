@@ -39,9 +39,10 @@
 
 		# Core API
 		elfedit_command_usage;
+		elfedit_cpl_command;
 		elfedit_cpl_match;
 		elfedit_cpl_module;
-		elfedit_cpl_command;
+		elfedit_cpl_ndx;
 		elfedit_elferr;
 		elfedit_flags;
 		elfedit_malloc;

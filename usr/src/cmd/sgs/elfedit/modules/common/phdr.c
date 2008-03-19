@@ -611,7 +611,7 @@ cmd_body_set_interp(ARGSTATE *argstate)
 
 		dynsec = elfedit_sec_getdyn(obj_state, &dyn, &numdyn);
 		strsec = elfedit_sec_getstr(obj_state,
-		    dynsec->sec_shdr->sh_link);
+		    dynsec->sec_shdr->sh_link, 0);
 
 		/* Does string exist in the table already, or can we add it? */
 		str_offset = elfedit_strtab_insert(obj_state, strsec,

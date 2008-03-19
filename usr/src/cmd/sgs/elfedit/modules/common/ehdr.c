@@ -38,11 +38,6 @@
 
 
 
-#define	MAXNDXSIZE	10
-
-
-
-
 /*
  * This module handles changes to the ELF header
  */
@@ -1489,14 +1484,7 @@ cpl_e_shstrndx(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 			elfedit_cpl_match(cpldata, sec->sec_name, 0);
 			break;
 		case INDEX:
-			{
-				char index[MAXNDXSIZE];
-
-				(void) snprintf(index, sizeof (index),
-				    MSG_ORIG(MSG_FMT_WORDVAL),
-				    ndx);
-				elfedit_cpl_match(cpldata, index, 1);
-			}
+			elfedit_cpl_ndx(cpldata, ndx);
 			break;
 		case TYPE:
 			elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_SHT_STRTAB);

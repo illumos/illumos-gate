@@ -48,6 +48,7 @@ SUNWprivate_1.1 {
 		# Core API
 		elfedit_command_usage =		PARENT;
 		elfedit_cpl_match =		PARENT;
+		elfedit_cpl_ndx =		PARENT;
 		elfedit_elferr =		PARENT;
 		elfedit_flags =			PARENT;
 		elfedit_malloc =		PARENT;

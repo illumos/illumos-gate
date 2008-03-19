@@ -83,10 +83,12 @@
 
 @ MSG_OPTDESC_ANY		"\
    Normally, only string table sections (section type SHT_STRTAB)\n\
-   are allowed. If -any is set, then the specified section is\n\
-   used without checking its section type, and will be treated as\n\
-   if it is a string table. This can be used to examine sections\n\
-   that are known to be in string table format (i.e. SHT_PROGBITS).\n"
+   or sections with the SHF_STRINGS section flag set are allowed.\n\
+   If -any is set, then the specified section is used without\n\
+   checking its section type, and will be treated as if it is a\n\
+   string table. This can be used to examine sections that are\n\
+   known to be in string table format even though they are not\n\
+   properly marked as such (i.e. SHT_PROGBITS).\n"
 
 @ MSG_OPTDESC_END		"\
    Zero to the end of the string table. The count argument\n\
@@ -309,7 +311,6 @@
 @ MSG_FMT_INDEX			"[%lld]"
 @ MSG_FMT_INDEXRANGE		"[%lld-%lld]"
 @ MSG_FMT_DUMPENTRY		"%15s  "
-@ MSG_FMT_WORDVAL		"%u"
 
 
 # Module name

@@ -140,15 +140,27 @@ typedef enum {
 	SHTOSTR_STRTAB = 1,		/* type is SHT_STRTAB */
 	SHTOSTR_LINK_STRTAB = 2,	/* sh_link for type yields strtab */
 	SHTOSTR_LINK_SYMTAB = 3,	/* sh_link for type yields symtab */
+	SHTOSTR_SHF_STRINGS = 4,	/* Not strtab, but SHF_STRINGS set */
 } SHTOSTR_T;
 
-static int
-shtype_to_strtab(Word sh_type)
+static SHTOSTR_T
+shtype_to_strtab(Word sh_type, Word sh_flags)
 {
-	switch (sh_type) {
-	case SHT_STRTAB:
+	/*
+	 * A string table section always leads to itself. A
+	 * non-string table that has it's SHF_STRINGS section flag
+	 * set trumps anything else.
+	 */
+	if (sh_type == SHT_STRTAB)
 		return (SHTOSTR_STRTAB);
+	if (sh_flags & SHF_STRINGS)
+		return (SHTOSTR_SHF_STRINGS);
 
+	/*
+	 * Look at non-stringtable section types that can lead to
+	 * string tables via sh_link.
+	 */
+	switch (sh_type) {
 	/* These sections reference a string table via sh_link */
 	case SHT_DYNAMIC:
 	case SHT_SYMTAB:
@@ -193,12 +205,13 @@ shndx_to_strtab(elfedit_obj_state_t *obj_state, Word ndx)
 	 * table, we will use the referenced table.
 	 */
 	if (ndx < obj_state->os_shnum) {
-		switch (shtype_to_strtab(
-		    obj_state->os_secarr[ndx].sec_shdr->sh_type)) {
+		Shdr *shdr = obj_state->os_secarr[ndx].sec_shdr;
+
+		switch (shtype_to_strtab(shdr->sh_type, shdr->sh_flags)) {
 
 		/* Sections that reference a string table via sh_link */
 		case SHTOSTR_LINK_STRTAB:
-			ndx = obj_state->os_secarr[ndx].sec_shdr->sh_link;
+			ndx = shdr->sh_link;
 			break;
 
 		/*
@@ -206,7 +219,7 @@ shndx_to_strtab(elfedit_obj_state_t *obj_state, Word ndx)
 		 * which in turn reference a string table via their sh_link.
 		 */
 		case SHTOSTR_LINK_SYMTAB:
-			ndx = obj_state->os_secarr[ndx].sec_shdr->sh_link;
+			ndx = shdr->sh_link;
 			if (ndx < obj_state->os_shnum)
 				ndx =
 				    obj_state->os_secarr[ndx].sec_shdr->sh_link;
@@ -330,7 +343,7 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 		 * proper debug messages. If it is out of range, or of any
 		 * other type, an error is issued and it doesn't return.
 		 */
-		argstate->str.sec = elfedit_sec_getstr(obj_state, ndx);
+		argstate->str.sec = elfedit_sec_getstr(obj_state, ndx, 1);
 	}
 
 	/*
@@ -756,7 +769,7 @@ cpl_sh_opt(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 
 			atoui_sym = elfedit_const_to_atoui(ELFEDIT_CONST_SHT);
 			for (; atoui_sym->sym_name != NULL; atoui_sym++)
-				if (shtype_to_strtab(atoui_sym->sym_value) !=
+				if (shtype_to_strtab(atoui_sym->sym_value, 0) !=
 				    SHTOSTR_NONE)
 					elfedit_cpl_match(cpldata,
 					    atoui_sym->sym_name, 1);
@@ -774,9 +787,11 @@ cpl_sh_opt(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 	 */
 	sec = obj_state->os_secarr;
 	for (ndx = 0; ndx < obj_state->os_shnum; ndx++, sec++) {
-		Word sh_type = sec->sec_shdr->sh_type;
+		Shdr		*shdr = sec->sec_shdr;
+		SHTOSTR_T	shtostr_type;
 
-		if (shtype_to_strtab(sh_type) == SHTOSTR_NONE)
+		shtostr_type = shtype_to_strtab(shdr->sh_type, shdr->sh_flags);
+		if (shtostr_type == SHTOSTR_NONE)
 			continue;
 
 		switch (op) {
@@ -784,17 +799,11 @@ cpl_sh_opt(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 			elfedit_cpl_match(cpldata, sec->sec_name, 0);
 			break;
 		case INDEX:
-			{
-				char index[MAXNDXSIZE];
-
-				(void) snprintf(index, sizeof (index),
-				    MSG_ORIG(MSG_FMT_WORDVAL),
-				    sec->sec_shndx);
-				elfedit_cpl_match(cpldata, index, 1);
-			}
+			elfedit_cpl_ndx(cpldata, sec->sec_shndx);
 			break;
 		case TYPE:
-			add_shtyp_match(sh_type, cpldata);
+			if (shtostr_type != SHTOSTR_SHF_STRINGS)
+				add_shtyp_match(shdr->sh_type, cpldata);
 			break;
 		}
 	}
