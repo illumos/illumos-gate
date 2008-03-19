@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@ extern "C" {
 #endif
 
 #include "device.h"
+#include <hal/libhal.h>
 
 extern int debug;
 
@@ -56,15 +56,18 @@ extern uid_t		ruid, cur_uid;
 extern int		device_type;
 extern int		write_mode;
 
+typedef enum {DBUS_CONNECTION, HAL_CONTEXT, HAL_PAIRED,
+    HAL_INITIALIZED} hal_state_t;
+
 #define	TAO_MODE	0
-#define	DAO_MODE	1	/* not implimented for CD yet only DVD */
+#define	DAO_MODE	1	/* not implemented for CD yet only DVD */
 
 #define	CD_RW		1		/* CD_RW/CD-R	*/
 #define	DVD_MINUS	2		/* DVD-RW/DVD-R	*/
 
 /*
  * DVD+RW is listed differently from DVD+R since DVD+RW requires
- * that we format the media priot to writing, this cannot be
+ * that we format the media prior to writing, this cannot be
  * done for DVD+R since it is write once media, we treat the
  * media as pre-formatted.
  */
@@ -77,7 +80,14 @@ extern int		write_mode;
 #define	LEADOUT		5	/* erases the leadout of the media */
 #define	CLEAR		1	/* same as fast, used for fixing media */
 
+#define	HAL_RDSK_PROP	"block.solaris.raw_device"
+#define	HAL_SYMDEV_PROP	"storage.solaris.legacy.symdev"
+
 int setup_target(int flag);
+
+int hald_running(void);
+LibHalContext *attach_to_hald(void);
+void detach_from_hald(LibHalContext *ctx, hal_state_t state);
 
 void info(void);
 void list(void);

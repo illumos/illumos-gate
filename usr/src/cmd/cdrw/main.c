@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +32,8 @@
 #include <unistd.h>
 #include <libintl.h>
 #include <locale.h>
-#include <volmgt.h>
+#include <dbus/dbus.h>
+#include <hal/libhal.h>
 
 #include "msgs.h"
 #include "device.h"
@@ -109,6 +109,90 @@ check_invalid_option(options *specified, char *opstr)
 	}
 }
 
+LibHalContext *
+attach_to_hald(void)
+{
+	LibHalContext *ctx = NULL;
+	DBusConnection *con = NULL;
+	DBusError error;
+	hal_state_t state;
+
+	/* Initialize the dbus error states */
+	dbus_error_init(&error);
+
+	if ((con = dbus_bus_get(DBUS_BUS_SYSTEM, &error)) == NULL) {
+		return (NULL);
+	}
+	state = DBUS_CONNECTION;
+
+	/* Allocate a new hal context to work with the dbus */
+	if ((ctx = libhal_ctx_new()) == NULL)
+		return (NULL);
+	state = HAL_CONTEXT;
+
+	/* Pair up the context with the connection */
+	if (!libhal_ctx_set_dbus_connection(ctx, con))
+		goto fail;
+	state = HAL_PAIRED;
+
+	/* If libhal_ctx_init fails hald is not present */
+	if (!libhal_ctx_init(ctx, &error)) {
+		goto fail;
+	}
+	state = HAL_INITIALIZED;
+
+	return (ctx);
+fail:
+	if (dbus_error_is_set(&error))
+		dbus_error_free(&error);
+	detach_from_hald(ctx, state);
+	return (NULL);
+
+}
+
+void
+detach_from_hald(LibHalContext *ctx, hal_state_t state)
+{
+	DBusError error;
+	DBusConnection *con = libhal_ctx_get_dbus_connection(ctx);
+
+	dbus_error_init(&error);
+
+	switch (state) {
+	case HAL_INITIALIZED:
+		if (libhal_ctx_shutdown(ctx, &error) == FALSE)
+			if (dbus_error_is_set(&error))
+				dbus_error_free(&error);
+	/*FALLTHROUGH*/
+	case HAL_PAIRED:
+		(void) libhal_ctx_free(ctx);
+		dbus_connection_unref(con);
+		break;
+	case HAL_CONTEXT:
+		(void) libhal_ctx_free(ctx);
+		break;
+	case DBUS_CONNECTION:
+	default:
+		break;
+	}
+}
+
+/*
+ * This function returns one if hald is running and
+ * zero if hald is not running
+ */
+int
+hald_running(void)
+{
+	LibHalContext *ctx;
+
+	if ((ctx = attach_to_hald()) == NULL)
+		return (0);
+
+	detach_from_hald(ctx, HAL_INITIALIZED);
+	return (1);
+}
+
 int
 setup_target(int flag)
 {
@@ -160,7 +244,7 @@ main(int argc, char **argv)
 		lower_priv();
 	}
 
-	vol_running = volmgt_running();
+	vol_running = hald_running();
 
 	tgtdev = NULL;
 	operations = 0;

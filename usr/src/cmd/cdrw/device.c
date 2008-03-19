@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,6 @@
 
 #include <sys/types.h>
 #include <fcntl.h>
-#include <volmgt.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/dkio.h>
@@ -37,6 +36,8 @@
 #include <stdlib.h>
 #include <libintl.h>
 #include <limits.h>
+#include <dbus/dbus.h>
+#include <hal/libhal.h>
 
 #include "transport.h"
 #include "mmc.h"
@@ -299,6 +300,106 @@ fini_device(cd_device *dev)
 	free(dev);
 }
 
+/*
+ * Given a /dev path resolve that path to a symbolic
+ * name such as cdrom0 if hald is running. If hald is
+ * not running, or does not have a symbolic name for the
+ * the specified /dev path return NULL.
+ */
+static char *
+hald_symname(char *path)
+{
+	LibHalContext *ctx = NULL;
+	DBusError error;
+
+	char **udi, *p = NULL;
+	int ndevs = 0, i;
+
+	/* Make sure hald is running */
+	if (vol_running == 0)
+		return (p);
+
+	dbus_error_init(&error);
+
+	if ((ctx = attach_to_hald()) == NULL)
+		return (p);
+
+	if ((udi = libhal_manager_find_device_string_match(ctx,
+	    HAL_RDSK_PROP, path, &ndevs, &error)) == NULL)
+		goto done;
+
+	/* Look for the node that contains the valid (non-null) symdev */
+	for (i = 0; i < ndevs; i++) {
+		if ((p = libhal_device_get_property_string(ctx, udi[i],
+		    HAL_SYMDEV_PROP, NULL)) != NULL)
+			break;
+		else
+			libhal_free_string(p);
+	}
+
+done:
+	if (udi != NULL)
+		libhal_free_string_array(udi);
+	if (dbus_error_is_set(&error))
+		dbus_error_free(&error);
+	detach_from_hald(ctx, HAL_INITIALIZED);
+	return (p);
+}
+
+/*
+ * Given a name resolve that name to a raw device in the case
+ * that it is a symbolic name or just return what is given if
+ * we are given a /dev path or hald is not running.
+ */
+static char *
+hald_findname(char *symname)
+{
+	LibHalContext *ctx = NULL;
+	DBusError error;
+
+	char **udi, *path = NULL;
+	int ndevs = 0, i;
+
+	/* We already have a raw path just return that */
+	if (symname[0] == '/')
+		return (symname);
+
+	/* Get the raw device from the hal record */
+	if (vol_running != 0) {
+		dbus_error_init(&error);
+
+		if ((ctx = attach_to_hald()) == NULL)
+			return (path);
+
+		if ((udi = libhal_manager_find_device_string_match(ctx,
+		    HAL_SYMDEV_PROP, symname, &ndevs,
+		    &error)) == NULL)
+			goto done;
+
+		/*
+		 * Loop over the returned UDIs to access the raw
+		 * device path.
+		 */
+		for (i = 0; i < ndevs; i++) {
+			if ((path = libhal_device_get_property_string(ctx,
+			    udi[i], HAL_RDSK_PROP, NULL)) != NULL)
+				break;
+			else
+				libhal_free_string(path);
+		}
+
+done:
+		if (udi != NULL)
+			libhal_free_string_array(udi);
+		if (dbus_error_is_set(&error))
+			dbus_error_free(&error);
+		detach_from_hald(ctx, HAL_INITIALIZED);
+		return (path);
+	} else {
+		return (NULL);
+	}
+}
+
 static int
 vol_name_to_dev_node(char *vname, char *found)
 {
@@ -308,13 +409,13 @@ vol_name_to_dev_node(char *vname, char *found)
 
 	if (vname == NULL)
 		return (0);
-	if (vol_running)
-		(void) volmgt_check(vname);
-	p1 = media_findname(vname);
+
+	p1 = hald_findname(vname);
+
 	if (p1 == NULL)
 		return (0);
 	if (stat(p1, &statbuf) < 0) {
-		free(p1);
+		libhal_free_string(p1);
 		return (0);
 	}
 	if (S_ISDIR(statbuf.st_mode)) {
@@ -324,42 +425,14 @@ vol_name_to_dev_node(char *vname, char *found)
 				break;
 		}
 		if (i == 16) {
-			free(p1);
+			libhal_free_string(p1);
 			return (0);
 		}
 	} else {
 		(void) strlcpy(found, p1, PATH_MAX);
 	}
-	free(p1);
+	libhal_free_string(p1);
 	return (1);
-}
-
-/*
- * Searches for volume manager's equivalent char device for the
- * supplied pathname which is of the form of /dev/rdsk/cxtxdxsx
- */
-static int
-vol_lookup(char *supplied, char *found)
-{
-	char tmpstr[PATH_MAX], tmpstr1[PATH_MAX], *p;
-	int i, ret;
-
-	(void) strlcpy(tmpstr, supplied, PATH_MAX);
-	if ((p = volmgt_symname(tmpstr)) == NULL) {
-		if (strrchr(tmpstr, 's') == NULL)
-			return (0);
-		*((char *)(strrchr(tmpstr, 's') + 1)) = 0;
-		for (i = 0; i < 16; i++) {
-			(void) snprintf(tmpstr1, PATH_MAX, "%s%d", tmpstr, i);
-			if ((p = volmgt_symname(tmpstr1)) != NULL)
-				break;
-		}
-		if (p == NULL)
-			return (0);
-	}
-	ret = vol_name_to_dev_node(p, found);
-	free(p);
-	return (ret);
 }
 
 /*
@@ -382,9 +455,19 @@ lookup_device(char *supplied, char *found)
 		(void) strlcpy(found, supplied, PATH_MAX);
 		return (1);
 	}
-	if (strncmp(supplied, "/dev/rdsk/", 10) == 0)
-		return (vol_lookup(supplied, found));
-	if (strncmp(supplied, "/dev/dsk/", 9) == 0) {
+
+	/*
+	 * Hal only allows access to a device when the user is
+	 * on the console, therefore if hal is running and we can't
+	 * open the /dev/rdsk or /dev/removable-media/rdsk device
+	 * file we will return 0 marking this device as not avaiable.
+	 */
+	if (fd < 0 && ((strncmp(supplied, "/dev/rdsk/", 10) == 0) ||
+	    (strncmp(supplied, "/dev/removable-media/rdsk/", 26) == 0)))
+		return (0);
+
+	if ((strncmp(supplied, "/dev/dsk/", 9) == 0) ||
+	    (strncmp(supplied, "/dev/removable-media/dsk/", 25) == 0)) {
 		(void) snprintf(tmpstr, PATH_MAX, "/dev/rdsk/%s",
 		    (char *)strrchr(supplied, '/'));
 
@@ -393,10 +476,9 @@ lookup_device(char *supplied, char *found)
 			(void) strlcpy(found, supplied, PATH_MAX);
 			return (1);
 		}
-		if ((access(tmpstr, F_OK) == 0) && vol_running)
-			return (vol_lookup(tmpstr, found));
-		else
-			return (0);
+
+		/* This device can't be opened mark it as unavailable. */
+		return (0);
 	}
 	if ((strncmp(supplied, "cdrom", 5) != 0) &&
 	    (strlen(supplied) < 32)) {
@@ -410,8 +492,9 @@ lookup_device(char *supplied, char *found)
 			(void) strlcpy(found, tmpstr, PATH_MAX);
 			return (1);
 		}
-		if ((access(tmpstr, F_OK) == 0) && vol_running)
-			return (vol_lookup(tmpstr, found));
+
+		/* This device can't be opened mark it as unavailable. */
+		return (0);
 	}
 	return (vol_name_to_dev_node(supplied, found));
 }
@@ -473,21 +556,13 @@ scan_for_cd_device(int mode, cd_device **found)
 	int writers_found = 0;
 	int header_printed = 0;
 	int is_writer;
-	int retry = 0;
 	int total_devices_found;
-	int total_devices_found_last_time = 0;
-	int defer = 0;
-
-#define	MAX_RETRIES_FOR_SCANNING 5
 
 	TRACE(traceall_msg("scan_for_cd_devices (mode=%d) called\n", mode));
 
 	if (mode) {
-		if (vol_running)
-			defer = 1;
 		(void) printf(gettext("Looking for CD devices...\n"));
 	}
-try_again:
 
 	dir = opendir("/dev/rdsk");
 	if (dir == NULL)
@@ -527,10 +602,10 @@ try_again:
 			*found = t_dev;
 		}
 
-		if ((mode == SCAN_LISTDEVS) && (!defer)) {
+		if (mode == SCAN_LISTDEVS) {
 			char *sn;
 
-			sn = volmgt_symname(sdev);
+			sn = hald_symname(sdev);
 			if (!header_printed) {
 				print_header();
 				header_printed = 1;
@@ -550,44 +625,6 @@ try_again:
 
 	(void) closedir(dir);
 
-
-	/*
-	 * If volume manager is running we'll do a retry in case the
-	 * user has just inserted media, This should allow vold
-	 * enough time to create the device links. If we cannot
-	 * find any devices, or we find any new devices we'll retry
-	 * again up to MAX_RETRIES_FOR_SCANNING
-	 */
-
-	retry++;
-
-	if ((retry <= MAX_RETRIES_FOR_SCANNING) && vol_running) {
-		if (defer || ((mode != SCAN_LISTDEVS) &&
-		    (writers_found == 0))) {
-
-			if ((total_devices_found == 0) ||
-			    (total_devices_found !=
-			    total_devices_found_last_time)) {
-
-				/* before we rescan remove the device found */
-				if (total_devices_found != 0 && t_dev) {
-					fini_device(t_dev);
-				}
-
-				total_devices_found_last_time =
-				    total_devices_found;
-					(void) sleep(2);
-					goto try_again;
-			} else {
-
-				/* Do the printing this time */
-				defer = 0;
-				goto try_again;
-
-			}
-
-		}
-	}
 	if ((mode & SCAN_WRITERS) || writers_found)
 		return (writers_found);
 	else
@@ -743,7 +780,8 @@ list(void)
 	if (scan_for_cd_device(SCAN_LISTDEVS, NULL) == 0) {
 		if (vol_running) {
 			err_msg(gettext(
-			    "No CD writers found or no media in the drive.\n"));
+			    "No CD writers found, no media in the drive "
+			    "or not on the console.\n"));
 		} else {
 			if (cur_uid != 0) {
 				err_msg(gettext(
@@ -818,7 +856,7 @@ get_media_type(int fd)
 				break;
 
 			case 0x13: /* DVD-RW restricted overwrite */
-			case 0x14: /* DVD-RW sequencial */
+			case 0x14: /* DVD-RW sequential */
 				if (debug)
 					(void) printf("DVD-RW found\n");
 				device_type = DVD_MINUS;
@@ -839,8 +877,8 @@ get_media_type(int fd)
 			default:
 				if (debug)
 					(void) printf(
-					"unknown drive found\n type = 0x%x",
-					cap[7]);
+					    "unknown drive found\n type = 0x%x",
+					    cap[7]);
 				/*
 				 * Treat as CD_RW to avoid regression, may
 				 * be a legacy drive.

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,12 +32,13 @@ OBJS= main.o mmc.o device.o transport.o util.o msgs.o misc_scsi.o dumpinfo.o \
       write_audio.o dae.o copycd.o
 
 include ../Makefile.cmd
+include ../hal/Makefile.hal
 
 SRCS= $(OBJS:.o=.c)
 
-LDLIBS +=	-lvolmgt -lsecdb
+LDLIBS +=	-ldbus-1 -lhal -lsecdb
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
 LINTFLAGS += 	-um
 
 $(ROOTBIN)/cdrw := FILEMODE = 04755
