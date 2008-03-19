@@ -67,6 +67,8 @@ int zopt_objects = 0;
 int zdb_advance = ADVANCE_PRE;
 zbookmark_t zdb_noread = { 0, 0, ZB_NO_LEVEL, 0 };
 libzfs_handle_t *g_zfs;
+boolean_t zdb_sig_user_data = B_TRUE;
+int zdb_sig_cksumalg = ZIO_CHECKSUM_SHA256;
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -89,7 +91,7 @@ usage(void)
 {
 	(void) fprintf(stderr,
 	    "Usage: %s [-udibcsvL] [-U cachefile_path] [-O order] "
-	    "[-B os:obj:level:blkid] "
+	    "[-B os:obj:level:blkid] [-S user:cksumalg] "
 	    "dataset [object...]\n"
 	    "       %s -C [pool]\n"
 	    "       %s -l dev\n"
@@ -105,6 +107,8 @@ usage(void)
 	(void) fprintf(stderr, "	-b block statistics\n");
 	(void) fprintf(stderr, "	-c checksum all data blocks\n");
 	(void) fprintf(stderr, "	-s report stats on zdb's I/O\n");
+	(void) fprintf(stderr, "	-S <user|all>:<cksum_alg|all> -- "
+	    "dump blkptr signatures\n");
 	(void) fprintf(stderr, "	-v verbose (applies to all others)\n");
 	(void) fprintf(stderr, "        -l dump label contents\n");
 	(void) fprintf(stderr, "	-L live pool (allows some errors)\n");
@@ -114,7 +118,7 @@ usage(void)
 	    "cachefile\n");
 	(void) fprintf(stderr, "	-B objset:object:level:blkid -- "
 	    "simulate bad block\n");
-	(void) fprintf(stderr, "        -R read and display block from a"
+	(void) fprintf(stderr, "        -R read and display block from a "
 	    "device\n");
 	(void) fprintf(stderr, "        -e Pool is exported/destroyed/"
 	    "has altroot\n");
@@ -1494,6 +1498,31 @@ zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, int type)
 		zb->zb_count++;
 	}
 
+	if (dump_opt['S']) {
+		boolean_t print_sig;
+
+		print_sig  = !zdb_sig_user_data || (BP_GET_LEVEL(bp) == 0 &&
+		    BP_GET_TYPE(bp) == DMU_OT_PLAIN_FILE_CONTENTS);
+
+		if (BP_GET_CHECKSUM(bp) < zdb_sig_cksumalg)
+			print_sig = B_FALSE;
+
+		if (print_sig) {
+			(void) printf("%llu\t%lld\t%lld\t%s\t%s\t%s\t"
+			    "%llx:%llx:%llx:%llx\n",
+			    (u_longlong_t)BP_GET_LEVEL(bp),
+			    (longlong_t)BP_GET_PSIZE(bp),
+			    (longlong_t)BP_GET_NDVAS(bp),
+			    dmu_ot[BP_GET_TYPE(bp)].ot_name,
+			    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
+			    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name,
+			    (u_longlong_t)bp->blk_cksum.zc_word[0],
+			    (u_longlong_t)bp->blk_cksum.zc_word[1],
+			    (u_longlong_t)bp->blk_cksum.zc_word[2],
+			    (u_longlong_t)bp->blk_cksum.zc_word[3]);
+		}
+	}
+
 	if (dump_opt['L'])
 		return;
 
@@ -1536,15 +1565,17 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 		else
 			blkbuf[0] = '\0';
 
-		(void) printf("zdb_blkptr_cb: Got error %d reading "
-		    "<%llu, %llu, %lld, %llx> %s -- %s\n",
-		    bc->bc_errno,
-		    (u_longlong_t)zb->zb_objset,
-		    (u_longlong_t)zb->zb_object,
-		    (u_longlong_t)zb->zb_level,
-		    (u_longlong_t)zb->zb_blkid,
-		    blkbuf,
-		    error == EAGAIN ? "retrying" : "skipping");
+		if (!dump_opt['S']) {
+			(void) printf("zdb_blkptr_cb: Got error %d reading "
+			    "<%llu, %llu, %lld, %llx> %s -- %s\n",
+			    bc->bc_errno,
+			    (u_longlong_t)zb->zb_objset,
+			    (u_longlong_t)zb->zb_object,
+			    (u_longlong_t)zb->zb_level,
+			    (u_longlong_t)zb->zb_blkid,
+			    blkbuf,
+			    error == EAGAIN ? "retrying" : "skipping");
+		}
 
 		return (error);
 	}
@@ -1582,14 +1613,16 @@ dump_block_stats(spa_t *spa)
 
 	zcb.zcb_cache = &dummy_cache;
 
-	if (dump_opt['c'])
+	if (dump_opt['c'] || dump_opt['S'])
 		advance |= ADVANCE_DATA;
 
 	advance |= ADVANCE_PRUNE | ADVANCE_ZIL;
 
-	(void) printf("\nTraversing all blocks to %sverify"
-	    " nothing leaked ...\n",
-	    dump_opt['c'] ? "verify checksums and " : "");
+	if (!dump_opt['S']) {
+		(void) printf("\nTraversing all blocks to %sverify"
+		    " nothing leaked ...\n",
+		    dump_opt['c'] ? "verify checksums and " : "");
+	}
 
 	/*
 	 * Load all space maps.  As we traverse the pool, if we find a block
@@ -1642,7 +1675,7 @@ dump_block_stats(spa_t *spa)
 
 	traverse_fini(th);
 
-	if (zcb.zcb_haderrors) {
+	if (zcb.zcb_haderrors && !dump_opt['S']) {
 		(void) printf("\nError counts:\n\n");
 		(void) printf("\t%5s  %s\n", "errno", "count");
 		for (e = 0; e < 256; e++) {
@@ -1658,6 +1691,14 @@ dump_block_stats(spa_t *spa)
 	 */
 	if (!dump_opt['L'])
 		zdb_space_map_unload(spa);
+
+	/*
+	 * If we're interested in printing out the blkptr signatures,
+	 * return now as we don't print out anything else (including
+	 * errors and leaks).
+	 */
+	if (dump_opt['S'])
+		return (zcb.zcb_haderrors ? 3 : 0);
 
 	if (dump_opt['L'])
 		(void) printf("\n\n *** Live pool traversal; "
@@ -1807,7 +1848,7 @@ dump_zpool(spa_t *spa)
 		    DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 	}
 
-	if (dump_opt['b'] || dump_opt['c'])
+	if (dump_opt['b'] || dump_opt['c'] || dump_opt['S'])
 		rc = dump_block_stats(spa);
 
 	if (dump_opt['s'])
@@ -2283,7 +2324,7 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcsvCLO:B:U:lRep:")) != -1) {
+	while ((c = getopt(argc, argv, "udibcsvCLO:B:S:U:lRep:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
@@ -2351,6 +2392,24 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			vdev_dir = optarg;
+			break;
+		case 'S':
+			dump_opt[c]++;
+			dump_all = 0;
+			zdb_sig_user_data = (strncmp(optarg, "user:", 5) == 0);
+			if (!zdb_sig_user_data && strncmp(optarg, "all:", 4))
+				usage();
+			endstr = strchr(optarg, ':') + 1;
+			if (strcmp(endstr, "fletcher2") == 0)
+				zdb_sig_cksumalg = ZIO_CHECKSUM_FLETCHER_2;
+			else if (strcmp(endstr, "fletcher4") == 0)
+				zdb_sig_cksumalg = ZIO_CHECKSUM_FLETCHER_4;
+			else if (strcmp(endstr, "sha256") == 0)
+				zdb_sig_cksumalg = ZIO_CHECKSUM_SHA256;
+			else if (strcmp(endstr, "all") == 0)
+				zdb_sig_cksumalg = ZIO_CHECKSUM_FLETCHER_2;
+			else
+				usage();
 			break;
 		default:
 			usage();
