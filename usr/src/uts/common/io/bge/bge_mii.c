@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,9 +117,9 @@ bge_phydump(bge_t *bgep, uint16_t mii_status, uint16_t aux)
 
 	for (i = 0; i < 32; i += 8)
 		BGE_DEBUG(("bge_phydump: "
-				"0x%04x %04x %04x %04x %04x %04x %04x %04x",
-			regs[i+0], regs[i+1], regs[i+2], regs[i+3],
-			regs[i+4], regs[i+5], regs[i+6], regs[i+7]));
+		    "0x%04x %04x %04x %04x %04x %04x %04x %04x",
+		    regs[i+0], regs[i+1], regs[i+2], regs[i+3],
+		    regs[i+4], regs[i+5], regs[i+6], regs[i+7]));
 }
 
 #endif	/* BGE_DEBUGGING */
@@ -132,35 +132,48 @@ bge_phydump(bge_t *bgep, uint16_t mii_status, uint16_t aux)
 static boolean_t
 bge_phy_probe(bge_t *bgep)
 {
-	uint16_t phy_status;
+	uint16_t miicfg;
+	uint32_t nicsig, niccfg;
 
 	BGE_TRACE(("bge_phy_probe($%p)", (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
-	/*
-	 * Read the MII_STATUS register twice, in
-	 * order to clear any sticky bits (but they should
-	 * have been cleared by the RESET, I think).
-	 */
-	phy_status = bge_mii_get16(bgep, MII_STATUS);
-	phy_status = bge_mii_get16(bgep, MII_STATUS);
-	BGE_DEBUG(("bge_phy_probe: status 0x%x", phy_status));
+	nicsig = bge_nic_read32(bgep, BGE_NIC_DATA_SIG_ADDR);
+	if (nicsig == BGE_NIC_DATA_SIG) {
+		niccfg = bge_nic_read32(bgep, BGE_NIC_DATA_NIC_CFG_ADDR);
+		switch (niccfg & BGE_NIC_CFG_PHY_TYPE_MASK) {
+		default:
+		case BGE_NIC_CFG_PHY_TYPE_COPPER:
+			return (B_TRUE);
+		case BGE_NIC_CFG_PHY_TYPE_FIBER:
+			return (B_FALSE);
+		}
+	} else {
+		/*
+		 * Read the MII_STATUS register twice, in
+		 * order to clear any sticky bits (but they should
+		 * have been cleared by the RESET, I think).
+		 */
+		miicfg = bge_mii_get16(bgep, MII_STATUS);
+		miicfg = bge_mii_get16(bgep, MII_STATUS);
+		BGE_DEBUG(("bge_phy_probe: status 0x%x", miicfg));
 
-	/*
-	 * Now check the value read; it should have at least one bit set
-	 * (for the device capabilities) and at least one clear (one of
-	 * the error bits). So if we see all 0s or all 1s, there's a
-	 * problem.  In particular, bge_mii_get16() returns all 1s if
-	 * communications fails ...
-	 */
-	switch (phy_status) {
-	case 0x0000:
-	case 0xffff:
-		return (B_FALSE);
+		/*
+		 * Now check the value read; it should have at least one bit set
+		 * (for the device capabilities) and at least one clear (one of
+		 * the error bits). So if we see all 0s or all 1s, there's a
+		 * problem.  In particular, bge_mii_get16() returns all 1s if
+		 * communications fails ...
+		 */
+		switch (miicfg) {
+		case 0x0000:
+		case 0xffff:
+			return (B_FALSE);
 
-	default :
-		return (B_TRUE);
+		default :
+			return (B_TRUE);
+		}
 	}
 }
 
@@ -604,15 +617,15 @@ bge_update_copper(bge_t *bgep)
 	ASSERT(mutex_owned(bgep->genlock));
 
 	BGE_DEBUG(("bge_update_copper: autoneg %d "
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d "
-			"100fdx %d 100hdx %d "
-			"10fdx %d 10hdx %d ",
-		bgep->param_adv_autoneg,
-		bgep->param_adv_pause, bgep->param_adv_asym_pause,
-		bgep->param_adv_1000fdx, bgep->param_adv_1000hdx,
-		bgep->param_adv_100fdx, bgep->param_adv_100hdx,
-		bgep->param_adv_10fdx, bgep->param_adv_10hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d "
+	    "100fdx %d 100hdx %d "
+	    "10fdx %d 10hdx %d ",
+	    bgep->param_adv_autoneg,
+	    bgep->param_adv_pause, bgep->param_adv_asym_pause,
+	    bgep->param_adv_1000fdx, bgep->param_adv_1000hdx,
+	    bgep->param_adv_100fdx, bgep->param_adv_100hdx,
+	    bgep->param_adv_10fdx, bgep->param_adv_10hdx));
 
 	control = gigctrl = auxctrl = anar = 0;
 
@@ -684,15 +697,15 @@ bge_update_copper(bge_t *bgep)
 	}
 
 	BGE_DEBUG(("bge_update_copper: autoneg %d "
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d "
-			"100fdx %d 100hdx %d "
-			"10fdx %d 10hdx %d ",
-		adv_autoneg,
-		adv_pause, adv_asym_pause,
-		adv_1000fdx, adv_1000hdx,
-		adv_100fdx, adv_100hdx,
-		adv_10fdx, adv_10hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d "
+	    "100fdx %d 100hdx %d "
+	    "10fdx %d 10hdx %d ",
+	    adv_autoneg,
+	    adv_pause, adv_asym_pause,
+	    adv_1000fdx, adv_1000hdx,
+	    adv_100fdx, adv_100hdx,
+	    adv_10fdx, adv_10hdx));
 
 	/*
 	 * We should have at least one technology capability set;
@@ -792,9 +805,9 @@ bge_update_copper(bge_t *bgep)
 		 */
 		if (bgep->param_loop_mode == BGE_LOOP_NONE)
 			bge_mii_put16(bgep, MII_AUX_CONTROL,
-					MII_AUX_CTRL_MISC_WRITE_ENABLE |
-					MII_AUX_CTRL_MISC_WIRE_SPEED |
-					MII_AUX_CTRL_MISC);
+			    MII_AUX_CTRL_MISC_WRITE_ENABLE |
+			    MII_AUX_CTRL_MISC_WIRE_SPEED |
+			    MII_AUX_CTRL_MISC);
 		break;
 	}
 #endif	/* BGE_COPPER_WIRESPEED */
@@ -820,9 +833,9 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	bge_reg_put32(bgep, ETHERNET_MAC_STATUS_REG, emac_status);
 
 	BGE_DEBUG(("bge_check_copper: link %d/%s, MII status 0x%x "
-			"(was 0x%x), Ethernet MAC status 0x%x",
-		bgep->link_state, UPORDOWN(bgep->param_link_up), mii_status,
-		bgep->phy_gen_status, emac_status));
+	    "(was 0x%x), Ethernet MAC status 0x%x",
+	    bgep->link_state, UPORDOWN(bgep->param_link_up), mii_status,
+	    bgep->phy_gen_status, emac_status));
 
 	/*
 	 * If the PHY status hasn't changed since last we looked, and
@@ -851,9 +864,9 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		linkup &= BIS(mii_status, MII_STATUS_LINKUP);
 
 		BGE_DEBUG(("bge_check_copper: MII status 0x%x aux 0x%x "
-				"=> mode %d (%s)",
-			mii_status, aux,
-			mode, UPORDOWN(linkup)));
+		    "=> mode %d (%s)",
+		    mii_status, aux,
+		    mode, UPORDOWN(linkup)));
 
 		/*
 		 * Record current register values, then reread status
@@ -914,9 +927,9 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	 * been stable for several seconds.
 	 */
 	BGE_DEBUG(("bge_check_copper: link was %s speed %d duplex %d",
-		UPORDOWN(bgep->param_link_up),
-		bgep->param_link_speed,
-		bgep->param_link_duplex));
+	    UPORDOWN(bgep->param_link_up),
+	    bgep->param_link_speed,
+	    bgep->param_link_duplex));
 
 	if (!linkup)
 		mode = MII_AUX_STATUS_MODE_NONE;
@@ -926,9 +939,9 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	bgep->link_state = LINK_STATE_UNKNOWN;
 
 	BGE_DEBUG(("bge_check_copper: link now %s speed %d duplex %d",
-		UPORDOWN(bgep->param_link_up),
-		bgep->param_link_speed,
-		bgep->param_link_duplex));
+	    UPORDOWN(bgep->param_link_up),
+	    bgep->param_link_speed,
+	    bgep->param_link_duplex));
 
 	return (B_TRUE);
 }
@@ -1030,15 +1043,15 @@ bge_update_serdes(bge_t *bgep)
 	ASSERT(mutex_owned(bgep->genlock));
 
 	BGE_DEBUG(("bge_update_serdes: autoneg %d "
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d "
-			"100fdx %d 100hdx %d "
-			"10fdx %d 10hdx %d ",
-		bgep->param_adv_autoneg,
-		bgep->param_adv_pause, bgep->param_adv_asym_pause,
-		bgep->param_adv_1000fdx, bgep->param_adv_1000hdx,
-		bgep->param_adv_100fdx, bgep->param_adv_100hdx,
-		bgep->param_adv_10fdx, bgep->param_adv_10hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d "
+	    "100fdx %d 100hdx %d "
+	    "10fdx %d 10hdx %d ",
+	    bgep->param_adv_autoneg,
+	    bgep->param_adv_pause, bgep->param_adv_asym_pause,
+	    bgep->param_adv_1000fdx, bgep->param_adv_1000hdx,
+	    bgep->param_adv_100fdx, bgep->param_adv_100hdx,
+	    bgep->param_adv_10fdx, bgep->param_adv_10hdx));
 
 	serdes = advert = 0;
 
@@ -1079,11 +1092,11 @@ bge_update_serdes(bge_t *bgep)
 	}
 
 	BGE_DEBUG(("bge_update_serdes: autoneg %d "
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d ",
-		adv_autoneg,
-		adv_pause, adv_asym_pause,
-		adv_1000fdx, adv_1000hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d ",
+	    adv_autoneg,
+	    adv_pause, adv_asym_pause,
+	    adv_1000fdx, adv_1000hdx));
 
 	/*
 	 * We should have at least one gigabit technology capability
@@ -1130,7 +1143,7 @@ bge_update_serdes(bge_t *bgep)
 	bge_reg_set32(bgep, SERDES_CONTROL_REG, serdes);
 
 	BGE_DEBUG(("bge_update_serdes: serdes |= 0x%x, advert 0x%x",
-		serdes, advert));
+	    serdes, advert));
 	return (DDI_SUCCESS);
 }
 
@@ -1157,9 +1170,9 @@ bge_autoneg_serdes(bge_t *bgep)
 		 * any.  So here we send ours, with ACK already set.
 		 */
 		bge_reg_put32(bgep, TX_1000BASEX_AUTONEG_REG,
-			bgep->serdes_advert | AUTONEG_CODE_ACKNOWLEDGE);
+		    bgep->serdes_advert | AUTONEG_CODE_ACKNOWLEDGE);
 		bge_reg_set32(bgep, ETHERNET_MAC_MODE_REG,
-			ETHERNET_MODE_SEND_CFGS);
+		    ETHERNET_MODE_SEND_CFGS);
 	} else {
 		/*
 		 * Phase 2: partner has ACKed our configs, so now we can
@@ -1167,13 +1180,13 @@ bge_autoneg_serdes(bge_t *bgep)
 		 * can resolve the Tx/Rx configs.
 		 */
 		bge_reg_clr32(bgep, ETHERNET_MAC_MODE_REG,
-			ETHERNET_MODE_SEND_CFGS);
+		    ETHERNET_MODE_SEND_CFGS);
 	}
 
 	BGE_DEBUG(("bge_autoneg_serdes: Rx 0x%x %s Tx 0x%x",
-		bgep->serdes_lpadv,
-		ack ? "stop" : "send",
-		bgep->serdes_advert));
+	    bgep->serdes_lpadv,
+	    ack ? "stop" : "send",
+	    bgep->serdes_advert));
 }
 
 static boolean_t
@@ -1192,9 +1205,9 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 		bge_reg_put32(bgep, ETHERNET_MAC_STATUS_REG, emac_status);
 
 		BGE_DEBUG(("bge_check_serdes: link %d/%s, "
-				"MAC status 0x%x (was 0x%x)",
-			bgep->link_state, UPORDOWN(bgep->param_link_up),
-			emac_status, bgep->serdes_status));
+		    "MAC status 0x%x (was 0x%x)",
+		    bgep->link_state, UPORDOWN(bgep->param_link_up),
+		    emac_status, bgep->serdes_status));
 
 		/*
 		 * We will only consider the link UP if all the readings
@@ -1220,7 +1233,7 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 				emac_status &= ~ETHERNET_STATUS_LINK_CHANGED;
 
 		BGE_DEBUG(("bge_check_serdes: status 0x%x => 0x%x %s",
-			bgep->serdes_status, emac_status, UPORDOWN(linkup)));
+		    bgep->serdes_status, emac_status, UPORDOWN(linkup)));
 
 		/*
 		 * If we're receiving configs, run the autoneg protocol
@@ -1313,9 +1326,9 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 	 * been stable for several seconds.
 	 */
 	BGE_DEBUG(("bge_check_serdes: link was %s speed %d duplex %d",
-		UPORDOWN(bgep->param_link_up),
-		bgep->param_link_speed,
-		bgep->param_link_duplex));
+	    UPORDOWN(bgep->param_link_up),
+	    bgep->param_link_speed,
+	    bgep->param_link_duplex));
 
 	if (linkup) {
 		bgep->param_link_up = B_TRUE;
@@ -1334,9 +1347,9 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 	bgep->link_state = LINK_STATE_UNKNOWN;
 
 	BGE_DEBUG(("bge_check_serdes: link now %s speed %d duplex %d",
-		UPORDOWN(bgep->param_link_up),
-		bgep->param_link_speed,
-		bgep->param_link_duplex));
+	    UPORDOWN(bgep->param_link_up),
+	    bgep->param_link_speed,
+	    bgep->param_link_duplex));
 
 	return (B_TRUE);
 }
