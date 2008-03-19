@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * raidctl.c is the entry file of RAID configuration utility.
@@ -1701,6 +1701,9 @@ snapshot_array(raid_obj_handle_t array_handle, uint8_t indent, uint8_t is_sub,
 		case ARRAY_STATE_SYNC:
 			(void) fprintf(stdout, gettext("SYNC"));
 			break;
+		case ARRAY_STATE_MISSING:
+			(void) fprintf(stdout, gettext("MISSING"));
+			break;
 		default:
 			(void) fprintf(stdout, gettext("N/A"));
 			break;
@@ -2091,6 +2094,9 @@ print_array_attr(raidcfg_array_t *attrp)
 		break;
 	case ARRAY_STATE_SYNC:
 		(void) printf("%-8s", gettext("SYNC"));
+		break;
+	case ARRAY_STATE_MISSING:
+		(void) printf("%-8s", gettext("MISSING"));
 		break;
 	default:
 		(void) printf("%-8s", gettext("N/A"));

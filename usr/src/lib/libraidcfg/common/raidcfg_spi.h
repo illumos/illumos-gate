@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,7 @@ extern "C" {
 #define	ARRAY_STATE_OPTIMAL	0
 #define	ARRAY_STATE_DEGRADED	1
 #define	ARRAY_STATE_FAILED	2
+#define	ARRAY_STATE_MISSING	3
 
 /*
  * Disk state
