@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,7 +339,7 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 		error = dmu_read(os, smo->smo_object, offset, size, entry_map);
 		mutex_enter(sm->sm_lock);
 		if (error != 0)
-			goto out;
+			break;
 
 		entry_map_end = entry_map + (size / sizeof (uint64_t));
 		for (entry = entry_map; entry < entry_map_end; entry++) {
@@ -354,19 +354,23 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 			    SM_RUN_DECODE(e) << sm->sm_shift);
 		}
 	}
-	VERIFY3U(sm->sm_space, ==, space);
 
-	sm->sm_loaded = B_TRUE;
-	sm->sm_ops = ops;
-out:
+	if (error == 0) {
+		VERIFY3U(sm->sm_space, ==, space);
+
+		sm->sm_loaded = B_TRUE;
+		sm->sm_ops = ops;
+		if (ops != NULL)
+			ops->smop_load(sm);
+	} else {
+		space_map_vacate(sm, NULL, NULL);
+	}
+
 	zio_buf_free(entry_map, bufsize);
 
 	sm->sm_loading = B_FALSE;
 
 	cv_broadcast(&sm->sm_load_cv);
-
-	if (!error && ops != NULL)
-		ops->smop_load(sm);
 
 	return (error);
 }
