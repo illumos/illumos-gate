@@ -1323,3 +1323,4 @@ Bugid   Risk Synopsis
 6672544 elf_rtbndr must support non-ABI aligned stacks on amd64
 6671255 link-editor should support cross linking
 	PSARC 2008/179 cross link-editor
+6606203 link editor ought to allow creation of >2gb sized objects

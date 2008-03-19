@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,7 @@ LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPTS) \
 		'-R$$ORIGIN/../lib'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lelf $(DLLIB)
 LINTFLAGS +=	-x
+LINTFLAGS64 +=	-x
 
 BLTDEFS=        msg.h
 BLTDATA=        msg.c

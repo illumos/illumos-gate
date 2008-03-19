@@ -29,9 +29,12 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-install \
-package:	$(ROOTPROG)
+CONVLIBDIR =	$(CONVLIBDIR64)
+LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
-lint:		$(LINTOUT32) $(SGSLINTOUT)
+ROOTPROG =	$(ROOTPROG64)
+
+lint:		$(LINTOUT64) $(SGSLINTOUT)
 
 include		../Makefile.targ
+include		../../Makefile.sub.64

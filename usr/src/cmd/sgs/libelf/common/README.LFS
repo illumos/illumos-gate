@@ -1,0 +1,159 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+
+
+
+Why 32-bit libelf is not Large File Aware
+-----------------------------------------
+
+The ELF format uses unsigned 32-bit integers for offsets, so the
+theoretical limit on a 32-bit ELF object is 4GB. However, libelf
+imposes a 2GB limit on the objects it can create. The Solaris
+link-editor and related tools are all based on libelf, so the
+32-bit version of the link-editor also has a 2GB limit, despite
+the theoretical limit of 4GB.
+
+Large file support (LFS) is a half step between the 32 and 64-bit
+worlds, in which an otherwise 32-bit limited process is allowed to
+read and write data to a file that can be larger than 2GB (the extent
+of a signed 32-bit integer, as represented by the system type off_t).
+LFS is useful if the program only needs to access a small subset of
+the file data at any given time (e.g. /usr/bin/cat). It is less useful
+if the program needs to access a large amount of data at once --- having
+been freed from the file limit, the program will simply hit the virtual
+memory limit (4GB).
+
+In particular, the link-editor generally requires twice as much
+memory as the size of the output object, half to hold the input
+objects, and half to hold the result. This means that a 32-bit
+link-editor process will hit the 2GB file size limit and the 4GB
+address space limit at roughly the same time. As a result, a
+large file aware 32-bit version of libelf has no significant value.
+Despite this, the question of what it would take to make libelf
+large file aware comes up from time to time.
+
+The first step would be to provide alternative versions of
+all public data structures that involve the off_t data type.
+These structs, found in /usr/include/libelf.h, are:
+
+	/*
+	 * Archive member header
+	 */
+	typedef struct {
+		char		*ar_name;
+		time_t		ar_date;
+		uid_t		ar_uid;
+		gid_t 		ar_gid;
+		mode_t		ar_mode;
+		off_t		ar_size;
+		char 		*ar_rawname;
+	} Elf_Arhdr;
+
+
+	/*
+	 * Data descriptor
+	 */
+	typedef struct {
+		Elf_Void	*d_buf;
+		Elf_Type	d_type;
+		size_t		d_size;
+		off_t		d_off;		/* offset into section */
+		size_t		d_align;	/* alignment in section */
+		unsigned	d_version;	/* elf version */
+	} Elf_Data;
+
+As off_t is a signed type, these alternative versions would have to use
+an off64_t type instead.
+
+In addition to providing alternative large file aware Elf_Arhdr and
+Elf_Data types, it would be necessary to implement large file aware
+versions of the public functions that use them, also found in
+/usr/include/libelf.h:
+
+	/*
+	 * Function declarations
+	 */
+	unsigned  elf_flagdata(Elf_Data *, Elf_Cmd, unsigned);
+	Elf_Arhdr *elf_getarhdr(Elf *);
+	off_t	  elf_getbase(Elf *);
+	Elf_Data  *elf_getdata(Elf_Scn *, Elf_Data *);
+	Elf_Data  *elf_newdata(Elf_Scn *);
+	Elf_Data  *elf_rawdata(Elf_Scn *, Elf_Data *);
+	off_t	  elf_update(Elf *, Elf_Cmd);
+	Elf_Data  *elf32_xlatetof(Elf_Data *, const Elf_Data *, unsigned);
+	Elf_Data  *elf32_xlatetom(Elf_Data *, const Elf_Data *, unsigned);
+	Elf_Data  *elf64_xlatetof(Elf_Data *, const Elf_Data *, unsigned);
+	Elf_Data  *elf64_xlatetom(Elf_Data *, const Elf_Data *, unsigned);
+
+It is important to note that these new versions cannot replace the
+original definitions. Those must continue to be available to support
+non-largefile-aware programs. These new types and functions would be in
+addition to the pre-existing versions.
+
+When you make code like this large file aware, it is necessary to undertake
+a careful analysis of the code to ensure that all the surrounding code uses
+variable types large enough to handle the increased range. Hence, this work
+is more complicated than simply supplying variants that use a bigger
+off_t and rebuilding --- that is just the first step.
+
+There are two standard preprocessor definitions used to control
+large file support:
+
+	_LARGEFILE64_SOURCE
+	_FILE_OFFSET_BITS
+
+These preprocessor definitions would be used to determine whether 
+a given program linked against libelf would see the regular, or
+the large file aware versons of the above types and routines.
+This is the same approach used in other large file capable software,
+such as libc.
+
+Finally, all the applications that rely on libelf would need to be made
+large file aware. As with libelf itself, there is more to such an effort
+than recompiling with preprocessor macros set. The code in these
+applications would need to be examined carefully. Some of these programs
+are very old, and were not originally written with such type portability
+in mind. Such code can be difficult to transition.
+
+To work around the 2GB limit in 32-bit libelf:
+
+    - The fundamental limits of a 32-bit address space mean
+      that a program this large should be 64-bit. Only a 64-bit
+      address space has enough room for that much code, plus the
+      stack and heap needed to do useful work with it.
+
+    - The 64-bit version of libelf is also able to process
+      32-bit objects, and does not have a 2GB file size limit.
+      Therefore, the 64-bit link-editor can be used to build a 32-bit
+      executable which is >2GB. The resulting program will consume over
+      half the available address space just to start running. However,
+      there may be enough address space left for it to do useful work.
+
+      Note that the 32-bit limit for sharable objects remains at
+      2GB --- imposed by the runtime linker, which is also not large
+      file aware.

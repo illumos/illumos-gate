@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1991 by Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,6 +48,29 @@ struct exec {
 };
 
 /*
+ * Version of struct exec intended to allow LP64 code to
+ * examine a 32-bit definition.
+ */
+struct exec32 {
+#ifdef	sun
+	unsigned char	a_dynamic:1;	/* has a __DYNAMIC */
+	unsigned char	a_toolversion:7; /* version of toolset used to create */
+					/*	this file */
+	unsigned char	a_machtype;	/* machine type */
+	unsigned short	a_magic;	/* magic number */
+#else
+	unsigned int	a_magic;	/* magic number */
+#endif
+	unsigned int	a_text;		/* size of text segment */
+	unsigned int	a_data;		/* size of initialized data */
+	unsigned int	a_bss;		/* size of uninitialized data */
+	unsigned int	a_syms;		/* size of symbol table */
+	unsigned int	a_entry;	/* entry point */
+	unsigned int	a_trsize;	/* size of text relocation */
+	unsigned int	a_drsize;	/* size of data relocation */
+};
+
+/*
  * Macros for identifying an a.out format file.
  */
 #define	M_SPARC	3			/* runs only on SPARC */
@@ -66,4 +89,4 @@ struct exec {
 #define	M_SEGSIZE	0x2000		/* 8k */
 #endif
 
-#endif
+#endif	/* A_DOT_OUT_DOT_H */

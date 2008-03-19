@@ -19,19 +19,32 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include		../Makefile.com
+PROG= strings
+SRCS= ../$(PROG).c
+
+include ../../Makefile.cmd
+
+LDLIBS += -lelf
+
+CFLAGS += $(CCVERBOSE)
+CFLAGS64 += $(CCVERBOSE)
 
 .KEEP_STATE:
 
-install \
-package:	$(ROOTPROG)
+all: $(PROG)
 
-lint:		$(LINTOUT32) $(SGSLINTOUT)
+$(PROG): $(SRCS)
+	$(LINK.c) -o $(PROG) $(SRCS) $(LDLIBS)
+	$(POST_PROCESS)
 
-include		../Makefile.targ
+clean:
+
+lint:	lint_SRCS
+
+include ../../Makefile.targ

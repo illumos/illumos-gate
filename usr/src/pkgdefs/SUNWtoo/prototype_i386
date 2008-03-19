@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,11 +51,14 @@
 d none usr/bin/i86 755 root bin
 f none usr/bin/i86/gcore 555 root bin
 f none usr/bin/i86/plimit 555 root bin
+f none usr/bin/i86/strings 555 root bin
 f none usr/bin/i86/truss 555 root bin
 d none usr/bin/amd64 755 root bin
 f none usr/bin/amd64/gcore 555 root bin
+f none usr/bin/amd64/ldd 555 root bin
 f none usr/bin/amd64/plimit 555 root bin
 f none usr/bin/amd64/pvs 555 root bin
+f none usr/bin/amd64/strings 555 root bin
 f none usr/bin/amd64/truss 555 root bin
 d none usr/ccs/bin/amd64 755 root bin
 f none usr/bin/amd64/ld 755 root bin

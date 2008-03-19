@@ -174,7 +174,7 @@ list_append(List *lst, const void *item)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char **envp)
 {
 	char	*str, *cname = argv[0];
 
@@ -184,6 +184,16 @@ main(int argc, char **argv)
 	int	pflag = 0, vflag = 0, wflag = 0, nfile, var, error = 0;
 
 	Listnode	*lnp;
+
+	/*
+	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
+	 * the binary.  If successful, conv_check_native() won't return.
+	 *
+	 * This is done to ensure that ldd can handle objects >2GB.
+	 * ldd uses libelf, which is not large file capable. The
+	 * 64-bit ldd can handle any sized object.
+	 */
+	(void) conv_check_native(argv, envp);
 
 	/*
 	 * Establish locale.
@@ -399,7 +409,7 @@ main(int argc, char **argv)
 static int
 is_runnable(GElf_Ehdr *ehdr)
 {
-	if ((ehdr->e_ident[EI_CLASS] == M_CLASS) &&
+	if ((ehdr->e_ident[EI_CLASS] == ELFCLASS32) &&
 	    (ehdr->e_ident[EI_DATA] == M_DATA))
 		return (ELFCLASS32);
 
@@ -576,7 +586,7 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 static int
 aout_check(int nfile, char *fname, char *cname, int fd, int fflag)
 {
-	struct exec	aout;
+	struct exec32	aout;
 	int		err;
 
 	if (lseek(fd, 0, SEEK_SET) != 0) {
@@ -585,8 +595,7 @@ aout_check(int nfile, char *fname, char *cname, int fd, int fflag)
 		    strerror(err));
 		return (1);
 	}
-	if (read(fd, (char *)&aout, sizeof (struct exec)) !=
-	    sizeof (struct exec)) {
+	if (read(fd, (char *)&aout, sizeof (aout)) != sizeof (aout)) {
 		err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_READ), cname, fname,
 		    strerror(err));
@@ -609,8 +618,7 @@ aout_check(int nfile, char *fname, char *cname, int fd, int fflag)
 	/*
 	 * Run the required program.
 	 */
-	if ((aout.a_magic == ZMAGIC) &&
-	    (aout.a_entry <= sizeof (struct exec))) {
+	if ((aout.a_magic == ZMAGIC) && (aout.a_entry <= sizeof (aout))) {
 		load = load_elf;
 		return (run(nfile, cname, fname, conv_lddstub(ELFCLASS32),
 		    ELFCLASS32));

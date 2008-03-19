@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,7 +56,7 @@ f none usr/bin/od 555 root bin
 l none usr/bin/plimit=../../usr/lib/isaexec
 f none usr/bin/pvs 555 root bin
 f none usr/bin/sotruss 755 root bin
-f none usr/bin/strings 555 root bin
+l none usr/bin/strings=../../usr/lib/isaexec
 l none usr/bin/truss=../../usr/lib/isaexec
 f none usr/bin/whocalls 755 root bin
 d none usr/ccs 755 root bin

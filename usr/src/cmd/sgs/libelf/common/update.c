@@ -87,6 +87,64 @@
 #endif /* ELF64 */
 
 
+#if	!(defined(_LP64) && defined(_ELF64))
+#define	TEST_SIZE
+
+/*
+ * Handle the decision of whether the current linker can handle the
+ * desired object size, and if not, which error to issue.
+ *
+ * Input is the desired size. On failure, an error has been issued
+ * and 0 is returned. On success, 1 is returned.
+ */
+static int
+test_size(Lword hi)
+{
+#ifndef _LP64			/* 32-bit linker */
+	/*
+	 * A 32-bit libelf is limited to a 2GB output file. This limit
+	 * is due to the fact that off_t is a signed value, and that
+	 * libelf cannot support large file support:
+	 *	- ABI reasons
+	 *	- Memory use generally is 2x output file size anyway,
+	 *		so lifting the file size limit will just send
+	 *		you crashing into the 32-bit VM limit.
+	 * If the output is an ELFCLASS64 object, or an ELFCLASS32 object
+	 * under 4GB, switching to the 64-bit version of libelf will help.
+	 * However, an ELFCLASS32 object must not exceed 4GB.
+	 */
+	if (hi > INT_MAX) {	/* Bigger than 2GB */
+#ifndef _ELF64
+		/* ELFCLASS32 object is fundamentally too big? */
+		if (hi > UINT_MAX) {
+			_elf_seterr(EFMT_FBIG_CLASS32, 0);
+			return (0);
+		}
+#endif				/* _ELF64 */
+
+		/* Should switch to the 64-bit libelf? */
+		_elf_seterr(EFMT_FBIG_LARGEFILE, 0);
+		return (0);
+	}
+#endif				/* !_LP64 */
+
+
+#if	defined(_LP64) && !defined(_ELF64)   /* 64-bit linker, ELFCLASS32 */
+	/*
+	 * A 64-bit linker can produce any size output
+	 * file, but if the resulting file is ELFCLASS32,
+	 * it must not exceed 4GB.
+	 */
+	if (hi > UINT_MAX) {
+		_elf_seterr(EFMT_FBIG_CLASS32, 0);
+		return (0);
+	}
+#endif
+
+	return (1);
+}
+#endif				/* TEST_SIZE */
+
 /*
  * Output file update
  *	These functions walk an Elf structure, update its information,
@@ -107,7 +165,7 @@ _elf_upd_lib(Elf * elf)
 	Lword		hi;
 	Lword		hibit;
 	Elf_Scn *	s;
-	register Xword	sz;
+	register Lword	sz;
 	Ehdr *		eh = elf->ed_ehdr;
 	unsigned	ver = eh->e_version;
 	register char	*p = (char *)eh->e_ident;
@@ -175,7 +233,7 @@ _elf_upd_lib(Elf * elf)
 			(void) _elfxx_cookscn(s);
 
 		sh->sh_addralign = 1;
-		if ((sz = (Xword)_elf_entsz(elf, sh->sh_type, ver)) != 0)
+		if ((sz = (Lword)_elf_entsz(elf, sh->sh_type, ver)) != 0)
 			/* LINTED */
 			sh->sh_entsize = (Half)sz;
 		sz = 0;
@@ -196,10 +254,10 @@ _elf_upd_lib(Elf * elf)
 			}
 			d->db_data.d_off = (off_t)sz;
 			d->db_xoff = sz;
-			sz += (Xword)fsz;
+			sz += fsz;
 		}
 
-		sh->sh_size = sz;
+		sh->sh_size = (Xword) sz;
 		/*
 		 * We want to take into account the offsets for NOBITS
 		 * sections and let the "sh_offsets" point to where
@@ -275,11 +333,9 @@ _elf_upd_lib(Elf * elf)
 		eh->e_shentsize = 0;
 	}
 
-#if	!(defined(_LP64) && defined(_ELF64))
-	if (hi > INT_MAX) {
-		_elf_seterr(EFMT_FBIG, 0);
+#ifdef TEST_SIZE
+	if (test_size(hi) == 0)
 		return (0);
-	}
 #endif
 
 	return ((size_t)hi);
@@ -293,7 +349,7 @@ _elf_upd_usr(Elf * elf)
 	NOTE(ASSUMING_PROTECTED(*elf))
 	Lword		hi;
 	Elf_Scn *	s;
-	register Xword	sz;
+	register Lword	sz;
 	Ehdr *		eh = elf->ed_ehdr;
 	unsigned	ver = eh->e_version;
 	register char	*p = (char *)eh->e_ident;
@@ -343,7 +399,7 @@ _elf_upd_usr(Elf * elf)
 	}
 	for (; s != 0; s = s->s_next) {
 		register Dnode	*d;
-		register Xword	fsz, j;
+		register Lword	fsz, j;
 		Shdr *sh = s->s_shdr;
 
 		if ((s->s_myflags & SF_READY) == 0)
@@ -352,15 +408,15 @@ _elf_upd_usr(Elf * elf)
 		++eh->e_shnum;
 		sz = 0;
 		for (d = s->s_hdnode; d != 0; d = d->db_next) {
-			if ((fsz = (Xword)elf_fsize(d->db_data.d_type, 1,
+			if ((fsz = elf_fsize(d->db_data.d_type, 1,
 			    ver)) == 0)
 				return (0);
-			j = (Xword)_elf_msize(d->db_data.d_type, ver);
-			fsz *= (Xword)(d->db_data.d_size / j);
+			j = _elf_msize(d->db_data.d_type, ver);
+			fsz *= (d->db_data.d_size / j);
 			d->db_osz = (size_t)fsz;
 
 			if ((sh->sh_type != SHT_NOBITS) &&
-			    ((j = (Xword)(d->db_data.d_off + d->db_osz)) > sz))
+			    ((j = (d->db_data.d_off + d->db_osz)) > sz))
 				sz = j;
 		}
 		if (sh->sh_size < sz) {
@@ -384,11 +440,9 @@ _elf_upd_usr(Elf * elf)
 	if ((sz = eh->e_shoff + eh->e_shentsize * eh->e_shnum) > hi)
 		hi = sz;
 
-#if	!(defined(_LP64) && defined(_ELF64))
-	if (hi > INT_MAX) {
-		_elf_seterr(EFMT_FBIG, 0);
+#ifdef TEST_SIZE
+	if (test_size(hi) == 0)
 		return (0);
-	}
 #endif
 
 	return ((size_t)hi);

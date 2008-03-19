@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,6 +51,7 @@ f none $SGSDIR/lib/sparcv9/librtld_db.so.1=lib/sparcv9/librtld_db.so.1 755 root 
 s none $SGSDIR/lib/sparcv9/librtld_db.so=librtld_db.so.1
 d none $SGSDIR/usr/bin/sparcv9 755 root bin
 f none $SGSDIR/usr/bin/sparcv9/crle=usr/bin/sparcv9/crle 555 root bin
+f none $SGSDIR/usr/bin/sparcv9/ldd=usr/bin/sparcv9/ldd 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/moe=usr/bin/sparcv9/moe 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/pvs=usr/bin/sparcv9/pvs 555 root bin
 d none $SGSDIR/usr/ccs/bin/sparcv9 755 root bin

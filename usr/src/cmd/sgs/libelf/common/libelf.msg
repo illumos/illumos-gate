@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -66,7 +65,9 @@
 @ EFMT_SHTAB		"Format error: shdr table truncated"
 @ EFMT_VER2		"Format error: ehdr EI_VERSION/e_version mismatch"
 @ EFMT_VM		"Format error: reference outside file"
-@ EFMT_FBIG		"Format error: file size exceeds 32-bit limit"
+@ EFMT_FBIG_CLASS32	"Format error: file size exceeds 4GB 32-bit limit"
+@ EFMT_FBIG_LARGEFILE	"Format error: file size exceeds 2GB limit of 32-bit \
+			 linker. 64-bit linker is recommended."
 
 @ EFMT_ARSTRNM		"Format error: archive strtab name"
 @ EFMT_ARUNKNM		"Format error: archive special name unknown"
