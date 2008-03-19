@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4435,4 +4435,20 @@ vfs_has_feature(vfs_t *vfsp, vfs_feature_t feature)
 		ret = 1;
 
 	return (ret);
+}
+
+/*
+ * Propagate feature set from one vfs to another
+ */
+void
+vfs_propagate_features(vfs_t *from, vfs_t *to)
+{
+	int i;
+
+	if (to->vfs_implp == NULL || from->vfs_implp == NULL)
+		return;
+
+	for (i = 1; i <= to->vfs_featureset[0]; i++) {
+		to->vfs_featureset[i] = from->vfs_featureset[i];
+	}
 }

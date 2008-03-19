@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,8 +344,8 @@ makelfsnode(struct vfs *vfsp, struct loinfo *li)
 		VFS_INIT(&lfs->lfs_vfs, lo_vfsops, (caddr_t)li);
 		lfs->lfs_vfs.vfs_fstype = li->li_mountvfs->vfs_fstype;
 		lfs->lfs_vfs.vfs_flag =
-			((vfsp->vfs_flag | li->li_mflag) & ~li->li_dflag) &
-			INHERIT_VFS_FLAG;
+		    ((vfsp->vfs_flag | li->li_mflag) & ~li->li_dflag) &
+		    INHERIT_VFS_FLAG;
 		lfs->lfs_vfs.vfs_bsize = vfsp->vfs_bsize;
 		lfs->lfs_vfs.vfs_dev = vfsp->vfs_dev;
 		lfs->lfs_vfs.vfs_fsid = vfsp->vfs_fsid;
@@ -366,6 +366,7 @@ makelfsnode(struct vfs *vfsp, struct loinfo *li)
 		VFS_HOLD(&lfs->lfs_vfs);
 		lfs->lfs_next = li->li_lfs;
 		li->li_lfs = lfs;
+		vfs_propagate_features(vfsp, &lfs->lfs_vfs);
 	}
 
 found_lfs:
@@ -606,7 +607,7 @@ lsave(lnode_t *lp, struct loinfo *li)
 
 #ifdef LODEBUG
 	lo_dprint(4, "lsave lp %p hash %d\n",
-			lp, ltablehash(lp->lo_vp, li));
+	    lp, ltablehash(lp->lo_vp, li));
 #endif
 
 	TABLE_COUNT(lp->lo_vp, li)++;
@@ -651,7 +652,7 @@ freelonode(lnode_t *lp)
 
 #ifdef LODEBUG
 	lo_dprint(4, "freelonode lp %p hash %d\n",
-			lp, ltablehash(lp->lo_vp, li));
+	    lp, ltablehash(lp->lo_vp, li));
 #endif
 	TABLE_LOCK_ENTER(lp->lo_vp, li);
 
@@ -669,7 +670,7 @@ freelonode(lnode_t *lp)
 		if (lt == lp) {
 #ifdef LODEBUG
 			lo_dprint(4, "freeing %p, vfsp %p\n",
-					vp, vp->v_vfsp);
+			    vp, vp->v_vfsp);
 #endif
 			atomic_add_32(&li->li_refct, -1);
 			vfsp = vp->v_vfsp;

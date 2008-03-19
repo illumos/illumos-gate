@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,9 +189,9 @@ lo_mount(struct vfs *vfsp,
 	/*
 	 * Find real root, and make vfs point to real vfs
 	 */
+
 	if (error = lookupname(uap->spec, (uap->flags & MS_SYSSPACE) ?
-		UIO_SYSSPACE : UIO_USERSPACE, FOLLOW, NULLVPP,
-	    &realrootvp))
+	    UIO_SYSSPACE : UIO_USERSPACE, FOLLOW, NULLVPP, &realrootvp))
 		return (error);
 
 	/*
@@ -379,6 +379,12 @@ lo_mount(struct vfs *vfsp,
 	if (vfs_optionisset(vfsp, MNTOPT_LOFS_NOSUB, NULL)) {
 		li->li_flag |= LO_NOSUB;
 	}
+
+	/*
+	 * Propagate any VFS features
+	 */
+
+	vfs_propagate_features(li->li_realvfs, vfsp);
 
 	/*
 	 * Setup the hashtable. If the root of this mount isn't a directory,
