@@ -652,6 +652,18 @@ fmd_gc(fmd_t *dp, id_t id, hrtime_t hrt)
 	    (fmd_timer_f *)fmd_gc, dp, NULL, delta);
 }
 
+/*ARGSUSED*/
+static void
+fmd_clear_aged_rsrcs(fmd_t *dp, id_t id, hrtime_t hrt)
+{
+	hrtime_t delta;
+
+	fmd_asru_clear_aged_rsrcs();
+	(void) fmd_conf_getprop(dp->d_conf, "rsrc.age", &delta);
+	(void) fmd_timerq_install(dp->d_timers, dp->d_rmod->mod_timerids,
+	    (fmd_timer_f *)fmd_clear_aged_rsrcs, dp, NULL, delta/10);
+}
+
 /*
  * Events are committed to the errlog after cases are checkpointed.  If fmd
  * crashes before an event is ever associated with a module, this function will
@@ -927,6 +939,7 @@ fmd_run(fmd_t *dp, int pfd)
 	 */
 	fmd_xprt_resume_all();
 	fmd_gc(dp, 0, 0);
+	fmd_clear_aged_rsrcs(dp, 0, 0);
 
 	dp->d_booted = 1;
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,6 @@ fmd_hdl_t *Hdl;		/* handle in global for platform.c */
 
 int Debug = 1;	/* turn on here and let fmd_hdl_debug() decide if really on */
 char *Autoclose;	/* close cases automatically after solving */
-int Dupclose;		/* close cases on duplicate diagosis */
 hrtime_t Hesitate;	/* hesitation time in ns */
 char *Serd_Override;	/* override for Serd engines */
 int Verbose;
@@ -137,7 +136,6 @@ eft_close(fmd_hdl_t *hdl, fmd_case_t *fmcase)
  */
 static const fmd_prop_t eft_props[] = {
 	{ "autoclose", FMD_TYPE_STRING, NULL },
-	{ "dupclose", FMD_TYPE_BOOL, "false" },
 	{ "estats", FMD_TYPE_BOOL, "false" },
 	{ "hesitate", FMD_TYPE_INT64, "10000000000" },
 	{ "serd_override", FMD_TYPE_STRING, NULL },
@@ -309,7 +307,6 @@ _fmd_init(fmd_hdl_t *hdl)
 	Verbose = fmd_prop_get_int32(hdl, "verbose");
 	Warn = fmd_prop_get_int32(hdl, "warn");
 	Autoclose = fmd_prop_get_string(hdl, "autoclose");
-	Dupclose = fmd_prop_get_int32(hdl, "dupclose");
 	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
 	Serd_Override = fmd_prop_get_string(hdl, "serd_override");
 	Max_fme = fmd_prop_get_int32(hdl, "maxfme");
@@ -332,9 +329,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	}
 
 	out(O_DEBUG, "initialized, verbose %d warn %d autoclose %s "
-	    "dupclose %d maxfme %d",
-	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose,
-	    Dupclose, Max_fme);
+	    "maxfme %d", Verbose, Warn, Autoclose == NULL ? "(NULL)" :
+	    Autoclose, Max_fme);
 
 	fme_istat_load(hdl);
 	fme_serd_load(hdl);

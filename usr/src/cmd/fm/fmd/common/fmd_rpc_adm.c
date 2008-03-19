@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -468,49 +468,26 @@ fmd_adm_rsrcinfo_1_svc(char *fmri,
 bool_t
 fmd_adm_rsrcflush_1_svc(char *name, int *rvp, struct svc_req *req)
 {
-	if (fmd_rpc_deny(req))
-		*rvp = FMD_ADM_ERR_PERM;
-	else if (fmd_asru_hash_delete_name(fmd.d_asrus, name) != 0)
-		*rvp = FMD_ADM_ERR_RSRCSRCH;
-	else
-		*rvp = 0;
-
-	return (TRUE);
-}
-
-static void
-fmd_adm_repair_containee(fmd_asru_t *ee, void *er)
-{
-	if ((ee->asru_flags & FMD_ASRU_FAULTY) &&
-	    fmd_fmri_contains(er, ee->asru_fmri) > 0)
-		(void) fmd_asru_clrflags(ee, FMD_ASRU_FAULTY, NULL, NULL);
+	return (fmd_adm_rsrcrepair_1_svc(name, rvp, req));
 }
 
 bool_t
 fmd_adm_rsrcrepair_1_svc(char *name, int *rvp, struct svc_req *req)
 {
-	fmd_asru_t *ap = NULL;
-	int err = 0;
+	int err = FMD_ADM_ERR_RSRCNOTF;
 
 	if (fmd_rpc_deny(req))
 		err = FMD_ADM_ERR_PERM;
-	else if ((ap = fmd_asru_hash_lookup_name(fmd.d_asrus, name)) == NULL)
-		err = FMD_ADM_ERR_RSRCSRCH;
-	else if (!fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL))
-		err = FMD_ADM_ERR_RSRCNOTF;
 	else {
-		/*
-		 * We've located the requested ASRU, and have repaired it.  Now
-		 * traverse the ASRU cache, looking for any faulty entries that
-		 * are contained by this one.  If we find any, repair them too.
-		 */
-		fmd_asru_hash_apply(fmd.d_asrus,
-		    fmd_adm_repair_containee, ap->asru_fmri);
+		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
+		    fmd_asru_repair, &err);
+		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
+		    fmd_asru_repair, &err);
+		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
+		    fmd_asru_repair, &err);
+		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
+		    fmd_asru_repair, &err);
 	}
-
-	if (ap != NULL)
-		fmd_asru_hash_release(fmd.d_asrus, ap);
-
 	*rvp = err;
 	return (TRUE);
 }

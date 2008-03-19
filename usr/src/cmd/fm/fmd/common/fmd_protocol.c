@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,7 +196,8 @@ fmd_protocol_rsrc_asru(const char *class,
 
 	err |= nvlist_add_uint8(nvl, FM_VERSION, FM_RSRC_VERSION);
 	err |= nvlist_add_string(nvl, FM_CLASS, class);
-	err |= nvlist_add_nvlist(nvl, FM_RSRC_RESOURCE, fmri);
+	if (fmri != NULL)
+		err |= nvlist_add_nvlist(nvl, FM_RSRC_RESOURCE, fmri);
 
 	if (uuid != NULL)
 		err |= nvlist_add_string(nvl, FM_RSRC_ASRU_UUID, uuid);

@@ -55,6 +55,7 @@ typedef struct fmd_case_susp {
 typedef struct fmd_case_impl {
 	fmd_list_t ci_list;		/* linked list next/prev pointers */
 	struct fmd_case_impl *ci_next;	/* next pointer for hash bucket chain */
+	struct fmd_case_impl *ci_code_next;	/* ci_code hash bucket chain */
 	char *ci_uuid;			/* uuid string for this case */
 	uint_t ci_uuidlen;		/* length of ci_uuid (not incl. \0) */
 	char *ci_code;			/* code associated with this case */
@@ -96,6 +97,7 @@ typedef struct fmd_case_impl {
 typedef struct fmd_case_hash {
 	pthread_rwlock_t ch_lock;	/* lock protecting case hash */
 	fmd_case_impl_t **ch_hash;	/* hash bucket array for cases */
+	fmd_case_impl_t **ch_code_hash;	/* ci_code hash bucket array */
 	uint_t ch_hashlen;		/* size of hash bucket array */
 	uint_t ch_count;		/* number of cases in hash */
 } fmd_case_hash_t;
@@ -113,6 +115,8 @@ extern void fmd_case_destroy(fmd_case_t *, int);
 extern void fmd_case_hold(fmd_case_t *);
 extern void fmd_case_hold_locked(fmd_case_t *);
 extern void fmd_case_rele(fmd_case_t *);
+extern void fmd_case_rele_locked(fmd_case_t *);
+extern void fmd_case_update(fmd_case_t *);
 
 extern int fmd_case_insert_principal(fmd_case_t *, fmd_event_t *);
 extern int fmd_case_insert_event(fmd_case_t *, fmd_event_t *);

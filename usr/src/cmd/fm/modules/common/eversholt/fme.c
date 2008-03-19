@@ -58,7 +58,6 @@
 
 /* imported from eft.c... */
 extern char *Autoclose;
-extern int Dupclose;
 extern hrtime_t Hesitate;
 extern char *Serd_Override;
 extern nv_alloc_t Eft_nv_hdl;
@@ -2812,13 +2811,12 @@ publish_suspects(struct fme *fmep)
 		}
 
 		/*
-		 * if "dupclose" tunable is set, check if the asru is
-		 * already marked as "faulty".
+		 * check if the asru is already marked as "faulty".
 		 */
-		if (Dupclose && allfaulty) {
+		if (allfaulty) {
 			nvlist_t *asru;
 
-			out(O_ALTFP|O_VERB, "FMD%d dupclose check ", fmep->id);
+			out(O_ALTFP|O_VERB, "FMD%d dup check ", fmep->id);
 			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, rp->suspect);
 			out(O_ALTFP|O_VERB|O_NONL, " ");
 			if (nvlist_lookup_nvlist(fault,
@@ -2836,15 +2834,13 @@ publish_suspects(struct fme *fmep)
 	}
 
 	/*
-	 * Close the case if all asrus are already known to be faulty and if
-	 * Dupclose is enabled.  Otherwise we are going to publish so take
-	 * any pre-publication actions.
+	 * We are going to publish so take any pre-publication actions.
 	 */
-	if (Dupclose && allfaulty) {
-		out(O_ALTFP, "[dupclose FME%d, case %s]", fmep->id,
-		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
-		fmd_case_close(fmep->hdl, fmep->fmcase);
-	} else {
+	if (!allfaulty) {
+		/*
+		 * don't update the count stat if all asrus are already
+		 * present and unrepaired in the asru cache
+		 */
 		for (rp = erl; rp >= srl; rp--) {
 			struct event *suspect = rp->suspect;
 
@@ -2864,11 +2860,11 @@ publish_suspects(struct fme *fmep)
 			}
 		}
 		istat_save();	/* write out any istat changes */
-
-		out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
-		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
-		fmd_case_solve(fmep->hdl, fmep->fmcase);
 	}
+
+	out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
+	    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+	fmd_case_solve(fmep->hdl, fmep->fmcase);
 
 	/*
 	 * revert to the original suspect list

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1045,6 +1045,7 @@ fmd_ckpt_restore_case(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 	fmd_module_lock(mp);
 
 	if ((cp = fmd_case_recreate(mp, NULL,
+	    fcfc->fcfc_state != FCF_CASE_UNSOLVED ? FCF_CASE_SOLVED :
 	    FMD_CASE_UNSOLVED, uuid, NULL)) == NULL) {
 		fmd_ckpt_error(ckp, EFMD_CKPT_INVAL,
 		    "duplicate case uuid: %s\n", uuid);

@@ -1932,7 +1932,7 @@ fmd_nvl_fmri_faulty(fmd_hdl_t *hdl, nvlist_t *nvl)
 		    "invalid nvlist %p\n", (void *)nvl);
 	}
 
-	if ((ap = fmd_asru_hash_lookup_nvl(ahp, nvl, FMD_B_FALSE)) != NULL) {
+	if ((ap = fmd_asru_hash_lookup_nvl(ahp, nvl)) != NULL) {
 		rv = (ap->asru_flags & FMD_ASRU_FAULTY) != 0;
 		fmd_asru_hash_release(ahp, ap);
 	}

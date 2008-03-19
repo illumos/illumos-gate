@@ -1062,6 +1062,7 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 		name = get_nvl2str_topo(lfru);
 		if (name != NULL) {
 			nlp = alloc_name_list(name, lpct);
+			nlp->status = status & ~FM_SUSPECT_UNUSABLE;
 			free(name);
 			if (nvlist_lookup_string(nvl, FM_FAULT_LOCATION,
 			    &label) == 0)
@@ -1084,6 +1085,7 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 		name = get_nvl2str_topo(rsrc);
 		if (name != NULL) {
 			nlp = alloc_name_list(name, lpct);
+			nlp->status = status;
 			free(name);
 			(void) merge_name_list(resource_p, nlp, 1);
 		}
@@ -1331,6 +1333,20 @@ print_asru_status(int status, char *label)
 }
 
 static void
+print_fru_status(int status, char *label)
+{
+	char *msg = NULL;
+
+	if (status & FM_SUSPECT_NOT_PRESENT)
+		msg = dgettext("FMD", "not present");
+	else if (status & FM_SUSPECT_FAULTY)
+		msg = dgettext("FMD", "faulty");
+	else
+		msg = dgettext("FMD", "repaired");
+	(void) printf("%s     %s\n", label, msg);
+}
+
+static void
 print_name_list(name_list_t *list, char *label, char *(func)(char *),
     int limit, int pct, void (func1)(int, char *), int full)
 {
@@ -1512,14 +1528,23 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		if (srp->resource) {
 			print_name_list(srp->resource,
 			    dgettext("FMD", "Problem in  :"),
-			    NULL, full ? 0 : max_display, 0, NULL, full);
+			    NULL, full ? 0 : max_display, 0, print_fru_status,
+			    full);
 		}
 	}
 	if (srp->fru) {
-		print_name_list(srp->fru, dgettext("FMD", "FRU         :"),
-		    get_fmri_label, 0,
-		    srp->fru->pct == 100 ? 100 : srp->fru->max_pct,
-		    NULL, full);
+		status = asru_same_status(srp->fru);
+		if (status != -1) {
+			print_name_list(srp->fru, dgettext("FMD",
+			    "FRU         :"), get_fmri_label, 0,
+			    srp->fru->pct == 100 ? 100 : srp->fru->max_pct,
+			    NULL, full);
+			print_fru_status(status, "             ");
+		} else
+			print_name_list(srp->fru, dgettext("FMD",
+			    "FRU         :"), get_fmri_label, 0,
+			    srp->fru->pct == 100 ? 100 : srp->fru->max_pct,
+			    print_fru_status, full);
 	}
 	if (srp->serial && !serial_in_fru(srp->fru, srp->serial) &&
 	    !serial_in_fru(srp->asru, srp->serial)) {
@@ -1649,6 +1674,7 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 	char *msgid, *fru_label;
 	uurec_t *uurp;
 	name_list_t *fru;
+	int status;
 	ari_list_t *ari_list;
 
 	while (tp) {
@@ -1666,20 +1692,43 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 				fru = find_fru(srp, tp->resource);
 				if (fru) {
 					if (fru->label)
-						(void) printf("\"%s\" (%s)\n",
+						(void) printf("\"%s\" (%s) ",
 						    fru->label, fru->name);
-					else if (fru_label =
-					    get_fmri_label(fru->name)) {
-						(void) printf("\"%s\" (%s)\n",
+					else if ((fru_label = get_fmri_label(
+					    fru->name)) != NULL) {
+						(void) printf("\"%s\" (%s) ",
 						    fru_label, fru->name);
 						free(fru_label);
 					} else
-						(void) printf("%s\n",
+						(void) printf("%s ",
 						    fru->name);
 					break;
 				}
 				slp = slp->next;
 			} while (slp != end);
+
+			slp = tp->status_rec_list;
+			end = slp;
+			status = 0;
+			do {
+				srp = slp->status_record;
+				fru = srp->fru;
+				while (fru) {
+					if (strcmp(tp->resource,
+					    fru->name) == 0)
+						status |= fru->status;
+					fru = fru->next;
+					if (fru == srp->fru)
+						break;
+				}
+				slp = slp->next;
+			} while (slp != end);
+			if (status & FM_SUSPECT_NOT_PRESENT)
+				(void) printf(dgettext("FMD", "not present\n"));
+			else if (status & FM_SUSPECT_FAULTY)
+				(void) printf(dgettext("FMD", "faulty\n"));
+			else
+				(void) printf(dgettext("FMD", "repaired\n"));
 
 			slp = tp->status_rec_list;
 			end = slp;
@@ -1968,15 +2017,12 @@ cmd_repair(fmd_adm_t *adm, int argc, char *argv[])
 		return (FMADM_EXIT_USAGE);
 
 	/*
-	 * For now, we assume that if the input string contains a colon, it is
-	 * an FMRI and if it does not it is a UUID.  If things get more complex
-	 * in the future with multiple UUID formats, an FMRI parser can be
-	 * added here to differentiate the input argument appropriately.
+	 * argument could be a uuid, and fmri (asru, fru or resource)
+	 * or a label. Try uuid first, If that fails try the others.
 	 */
-	if (strchr(argv[optind], ':') != NULL)
+	err = fmd_adm_case_repair(adm, argv[optind]);
+	if (err != 0)
 		err = fmd_adm_rsrc_repair(adm, argv[optind]);
-	else
-		err = fmd_adm_case_repair(adm, argv[optind]);
 
 	if (err != 0)
 		die("failed to record repair to %s", argv[optind]);
