@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1694,7 +1694,6 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 	nfs4_ephemeral_tree_t	*net;
 	int			is_derooting = FALSE;
 	int			is_recursed = FALSE;
-	int			was_locked = FALSE;
 
 	/*
 	 * The active vnodes on this file system may be ephemeral
@@ -1724,178 +1723,192 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 	 * enclosing root node.
 	 */
 	*pnet = net = mi->mi_ephemeral_tree;
-	eph = mi->mi_ephemeral;
-	if (net) {
-		is_recursed = mi->mi_flags & MI4_EPHEMERAL_RECURSED;
-		is_derooting = (eph == NULL);
+	if (net == NULL) {
 		mutex_exit(&mi->mi_lock);
+		return (0);
+	}
 
-		/*
-		 * If this is not recursion, then we need to
-		 * grab a ref count.
-		 *
-		 * But wait, we also do not want to do that
-		 * if a harvester thread has already grabbed
-		 * the lock.
-		 */
+	eph = mi->mi_ephemeral;
+	is_recursed = mi->mi_flags & MI4_EPHEMERAL_RECURSED;
+	is_derooting = (eph == NULL);
+
+	/*
+	 * If this is not recursion, then we need to
+	 * grab a ref count.
+	 *
+	 * But wait, we also do not want to do that
+	 * if a harvester thread has already grabbed
+	 * the lock.
+	 */
+	if (!is_recursed) {
+		mutex_enter(&net->net_cnt_lock);
+		if (net->net_status &
+		    NFS4_EPHEMERAL_TREE_LOCKED) {
+			mutex_exit(&net->net_cnt_lock);
+			mutex_exit(&mi->mi_lock);
+
+			/*
+			 * Someone is already working on
+			 * it. We need to back off and
+			 * let them proceed.
+			 *
+			 * We return EBUSY so that the
+			 * caller knows something is
+			 * going on. Note that by that
+			 * time, the umount in the other
+			 * thread may have already occured.
+			 */
+			return (EBUSY);
+		} else
+			net->net_refcnt++;
+		mutex_exit(&net->net_cnt_lock);
+	}
+	mutex_exit(&mi->mi_lock);
+
+	/*
+	 * If we grab the lock, it means that no other
+	 * operation is working on the tree. If we don't
+	 * grab it, we need to decide if this is because
+	 * we are a recursive call or a new operation.
+	 *
+	 * If we are a recursive call, we proceed without
+	 * the lock.
+	 *
+	 * Else we have to wait until the lock becomes free.
+	 */
+	if (!mutex_tryenter(&net->net_tree_lock)) {
 		if (!is_recursed) {
 			mutex_enter(&net->net_cnt_lock);
 			if (net->net_status &
-			    NFS4_EPHEMERAL_TREE_LOCKED)
-				was_locked = TRUE;
-			else
-				net->net_refcnt++;
-			mutex_exit(&net->net_cnt_lock);
-		}
-
-		/*
-		 * If we grab the lock, it means that no other
-		 * operation is working on the tree. If we don't
-		 * grab it, we need to decide if this is because
-		 * we are a recursive call or a new operation.
-		 *
-		 * If we are a recursive call, we proceed without
-		 * the lock.
-		 *
-		 * Else we have to wait until the lock becomes free.
-		 */
-		if (was_locked == FALSE &&
-		    !mutex_tryenter(&net->net_tree_lock)) {
-			if (!is_recursed) {
-				mutex_enter(&net->net_cnt_lock);
-				if (net->net_status &
-				    (NFS4_EPHEMERAL_TREE_DEROOTING
-				    | NFS4_EPHEMERAL_TREE_INVALID)) {
-					net->net_refcnt--;
-					mutex_exit(&net->net_cnt_lock);
-					goto is_busy;
-				}
+			    (NFS4_EPHEMERAL_TREE_DEROOTING
+			    | NFS4_EPHEMERAL_TREE_INVALID)) {
+				net->net_refcnt--;
 				mutex_exit(&net->net_cnt_lock);
-
-				/*
-				 * We can't hold any other locks whilst
-				 * we wait on this to free up.
-				 */
-				mutex_enter(&net->net_tree_lock);
-
-				/*
-				 * Note that while mi->mi_ephemeral
-				 * may change and thus we have to
-				 * update eph, it is the case that
-				 * we have tied down net and
-				 * do not care if mi->mi_ephemeral_tree
-				 * has changed.
-				 */
-				mutex_enter(&mi->mi_lock);
-				eph = mi->mi_ephemeral;
-				mutex_exit(&mi->mi_lock);
-
-				/*
-				 * Okay, we need to see if either the
-				 * tree got nuked or the current node
-				 * got nuked. Both of which will cause
-				 * an error.
-				 *
-				 * Note that a subsequent retry of the
-				 * umount shall work.
-				 */
-				mutex_enter(&net->net_cnt_lock);
-				if (net->net_status &
-				    NFS4_EPHEMERAL_TREE_INVALID ||
-				    (!is_derooting && eph == NULL)) {
-					net->net_refcnt--;
-					mutex_exit(&net->net_cnt_lock);
-					mutex_exit(&net->net_tree_lock);
-					goto is_busy;
-				}
-				mutex_exit(&net->net_cnt_lock);
-				*pmust_unlock = TRUE;
+				goto is_busy;
 			}
-		} else if (was_locked == FALSE) {
-			/*
-			 * If we grab it right away, everything must
-			 * be great!
-			 */
-			*pmust_unlock = TRUE;
-		}
-
-		/*
-		 * Only once we have grabbed the lock can we mark what we
-		 * are planning on doing to the ephemeral tree.
-		 */
-		if (*pmust_unlock) {
-			mutex_enter(&net->net_cnt_lock);
-			net->net_status |= NFS4_EPHEMERAL_TREE_UMOUNTING;
-
-			/*
-			 * Check to see if we are nuking the root.
-			 */
-			if (is_derooting)
-				net->net_status |=
-				    NFS4_EPHEMERAL_TREE_DEROOTING;
-			mutex_exit(&net->net_cnt_lock);
-		}
-
-		if (!is_derooting) {
-			/*
-			 * Only work on children if the caller has not already
-			 * done so.
-			 */
-			if (!is_recursed) {
-				ASSERT(eph != NULL);
-
-				error = nfs4_ephemeral_unmount_engine(eph,
-				    FALSE, flag, cr);
-				if (error)
-					goto is_busy;
-			}
-		} else {
-			eph = net->net_root;
-
-			/*
-			 * Only work if there is something there.
-			 */
-			if (eph) {
-				error = nfs4_ephemeral_unmount_engine(eph, TRUE,
-				    flag, cr);
-				if (error) {
-					mutex_enter(&net->net_cnt_lock);
-					net->net_status &=
-					    ~NFS4_EPHEMERAL_TREE_DEROOTING;
-					mutex_exit(&net->net_cnt_lock);
-					goto is_busy;
-				}
-
-				/*
-				 * Nothing else which goes wrong will
-				 * invalidate the blowing away of the
-				 * ephmeral tree.
-				 */
-				net->net_root = NULL;
-			}
-
-			/*
-			 * We have derooted and we have caused the tree to be
-			 * invalid.
-			 */
-			mutex_enter(&net->net_cnt_lock);
-			net->net_status &= ~NFS4_EPHEMERAL_TREE_DEROOTING;
-			net->net_status |= NFS4_EPHEMERAL_TREE_INVALID;
-			net->net_refcnt--;
 			mutex_exit(&net->net_cnt_lock);
 
 			/*
-			 * At this point, the tree should no
-			 * longer be associated with the
-			 * mntinfo4. We need to pull it off
-			 * there and let the harvester take
-			 * care of it once the refcnt drops.
+			 * We can't hold any other locks whilst
+			 * we wait on this to free up.
+			 */
+			mutex_enter(&net->net_tree_lock);
+
+			/*
+			 * Note that while mi->mi_ephemeral
+			 * may change and thus we have to
+			 * update eph, it is the case that
+			 * we have tied down net and
+			 * do not care if mi->mi_ephemeral_tree
+			 * has changed.
 			 */
 			mutex_enter(&mi->mi_lock);
-			mi->mi_ephemeral_tree = NULL;
+			eph = mi->mi_ephemeral;
 			mutex_exit(&mi->mi_lock);
+
+			/*
+			 * Okay, we need to see if either the
+			 * tree got nuked or the current node
+			 * got nuked. Both of which will cause
+			 * an error.
+			 *
+			 * Note that a subsequent retry of the
+			 * umount shall work.
+			 */
+			mutex_enter(&net->net_cnt_lock);
+			if (net->net_status &
+			    NFS4_EPHEMERAL_TREE_INVALID ||
+			    (!is_derooting && eph == NULL)) {
+				net->net_refcnt--;
+				mutex_exit(&net->net_cnt_lock);
+				mutex_exit(&net->net_tree_lock);
+				goto is_busy;
+			}
+			mutex_exit(&net->net_cnt_lock);
+			*pmust_unlock = TRUE;
 		}
 	} else {
+		/*
+		 * If we grab it right away, everything must
+		 * be great!
+		 */
+		*pmust_unlock = TRUE;
+	}
+
+	/*
+	 * Only once we have grabbed the lock can we mark what we
+	 * are planning on doing to the ephemeral tree.
+	 */
+	if (*pmust_unlock) {
+		mutex_enter(&net->net_cnt_lock);
+		net->net_status |= NFS4_EPHEMERAL_TREE_UMOUNTING;
+
+		/*
+		 * Check to see if we are nuking the root.
+		 */
+		if (is_derooting)
+			net->net_status |=
+			    NFS4_EPHEMERAL_TREE_DEROOTING;
+		mutex_exit(&net->net_cnt_lock);
+	}
+
+	if (!is_derooting) {
+		/*
+		 * Only work on children if the caller has not already
+		 * done so.
+		 */
+		if (!is_recursed) {
+			ASSERT(eph != NULL);
+
+			error = nfs4_ephemeral_unmount_engine(eph,
+			    FALSE, flag, cr);
+			if (error)
+				goto is_busy;
+		}
+	} else {
+		eph = net->net_root;
+
+		/*
+		 * Only work if there is something there.
+		 */
+		if (eph) {
+			error = nfs4_ephemeral_unmount_engine(eph, TRUE,
+			    flag, cr);
+			if (error) {
+				mutex_enter(&net->net_cnt_lock);
+				net->net_status &=
+				    ~NFS4_EPHEMERAL_TREE_DEROOTING;
+				mutex_exit(&net->net_cnt_lock);
+				goto is_busy;
+			}
+
+			/*
+			 * Nothing else which goes wrong will
+			 * invalidate the blowing away of the
+			 * ephmeral tree.
+			 */
+			net->net_root = NULL;
+		}
+
+		/*
+		 * We have derooted and we have caused the tree to be
+		 * invalid.
+		 */
+		mutex_enter(&net->net_cnt_lock);
+		net->net_status &= ~NFS4_EPHEMERAL_TREE_DEROOTING;
+		net->net_status |= NFS4_EPHEMERAL_TREE_INVALID;
+		net->net_refcnt--;
+		mutex_exit(&net->net_cnt_lock);
+
+		/*
+		 * At this point, the tree should no
+		 * longer be associated with the
+		 * mntinfo4. We need to pull it off
+		 * there and let the harvester take
+		 * care of it once the refcnt drops.
+		 */
+		mutex_enter(&mi->mi_lock);
+		mi->mi_ephemeral_tree = NULL;
 		mutex_exit(&mi->mi_lock);
 	}
 

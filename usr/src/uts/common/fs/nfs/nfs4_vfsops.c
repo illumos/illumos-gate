@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2376,8 +2376,27 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	r4flush(vfsp, cr);
 
-	(void) nfs4_ephemeral_umount(mi, flag, cr,
-	    &must_unlock, &eph_tree);
+	/*
+	 * About the only reason that this would fail would be
+	 * that the harvester is already busy tearing down this
+	 * node. So we fail back to the caller and let them try
+	 * again when needed.
+	 */
+	if (nfs4_ephemeral_umount(mi, flag, cr,
+	    &must_unlock, &eph_tree)) {
+
+		/*
+		 * Note that we ignore must_unlock
+		 * because it is garbage at this point.
+		 * I.e., it only has meaning upon
+		 * success.
+		 */
+		mutex_enter(&mi->mi_async_lock);
+		mi->mi_max_threads = omax;
+		mutex_exit(&mi->mi_async_lock);
+
+		return (EBUSY);
+	}
 
 	/*
 	 * If there are any active vnodes on this file system,
@@ -4009,7 +4028,6 @@ nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 		sp = NULL;
 	}
 
-
 	mutex_enter(&mi->mi_lock);
 	while (mi->mi_in_recovery != 0) {
 		if (async_thread) {
@@ -4026,9 +4044,23 @@ nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 	}
 	mutex_exit(&mi->mi_lock);
 
-	(void) nfs4_ephemeral_umount(mi, flag, cr,
-	    &must_unlock, &eph_tree);
-	nfs4_ephemeral_umount_activate(mi, &must_unlock, &eph_tree);
+	/*
+	 * If we got an error, then do not nuke the
+	 * tree. Either the harvester is busy reclaiming
+	 * this node or we ran into some busy condition.
+	 *
+	 * The harvester will eventually come along and cleanup.
+	 * The only problem would be the root mount point.
+	 *
+	 * Since the busy node can occur for a variety
+	 * of reasons and can result in an entry staying
+	 * in df output but no longer accessible from the
+	 * directory tree, we are okay.
+	 */
+	if (!nfs4_ephemeral_umount(mi, flag, cr,
+	    &must_unlock, &eph_tree))
+		nfs4_ephemeral_umount_activate(mi, &must_unlock,
+		    &eph_tree);
 
 	/*
 	 * The original purge of the dnlc via 'dounmount'

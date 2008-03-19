@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1356,6 +1356,13 @@ typedef struct nfs4_ephemeral {
  * algorithm to get the net_tree_lock. Once it has that, then it is okay to
  * grab the net_cnt_lock and change the status. The status can only be
  * changed if the caller has the net_tree_lock held as well.
+ *
+ * Note that the initial grab of net_cnt_lock must occur whilst
+ * mi_lock is being held. This prevents stale data in that if the
+ * ephemeral tree is non-NULL, then the harvester can not remove
+ * the tree from the mntinfo node until it grabs that lock. I.e.,
+ * we get the pointer to the tree and hold the lock atomically
+ * with respect to being in mi_lock.
  *
  * When a caller is done with net_tree_lock, it can decrement the net_refcnt
  * either before it releases net_tree_lock or after.
