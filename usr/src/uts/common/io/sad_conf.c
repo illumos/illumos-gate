@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,19 @@ sad_hash_keycmp(mod_hash_key_t key1, mod_hash_key_t key2)
 			return (1);
 	}
 	return (0);
+}
+
+/*ARGSUSED*/
+static uint_t
+sad_hash_free_value(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	struct autopush *ap = (struct autopush *)val;
+
+	ASSERT(ap->ap_cnt > 0);
+	if (--(ap->ap_cnt) == 0)
+		kmem_free(ap, sizeof (struct autopush));
+
+	return (MH_WALK_CONTINUE);
 }
 
 /*
@@ -296,8 +309,11 @@ sad_freespace(str_stack_t *ss)
 	kmem_free(ss->ss_saddev, ss->ss_sadcnt * sizeof (struct saddev));
 	ss->ss_saddev = NULL;
 
+	mutex_enter(&ss->ss_sad_lock);
+	mod_hash_walk(ss->ss_sad_hash, sad_hash_free_value, NULL);
 	mod_hash_destroy_hash(ss->ss_sad_hash);
 	ss->ss_sad_hash = NULL;
+	mutex_exit(&ss->ss_sad_lock);
 
 	mutex_destroy(&ss->ss_sad_lock);
 }

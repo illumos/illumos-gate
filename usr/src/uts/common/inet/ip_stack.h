@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,27 +33,8 @@
 extern "C" {
 #endif
 
-#include <sys/isa_defs.h>
-#include <sys/md5.h>
-#include <sys/types.h>
-#include <inet/mib2.h>
-#include <inet/nd.h>
-#include <sys/atomic.h>
-#include <sys/socket.h>
 #include <sys/netstack.h>
-#include <net/if_dl.h>
-#include <net/if.h>
-#include <netinet/ip.h>
 #include <netinet/igmp_var.h>
-#include <inet/ip.h>
-#include <sys/taskq.h>
-
-#ifdef _KERNEL
-#include <netinet/ip6.h>
-#include <sys/avl.h>
-#include <sys/vmem.h>
-#include <sys/squeue.h>
-#endif	/* _KERNEL */
 
 #ifdef _KERNEL
 
