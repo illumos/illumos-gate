@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,8 @@ WORKLOADS = \
 	filemicro_rwrite.f \
 	filemicro_rwritedsync.f \
 	filemicro_rwritefsync.f \
+	filemicro_seqwriterandvargam.f \
+	filemicro_seqwriterandvartab.f \
 	filemicro_seqread.f \
 	filemicro_seqwrite.f \
 	filemicro_seqwriterand.f \
