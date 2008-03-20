@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1938,6 +1938,8 @@ snf_async_read(snf_req_t *sr)
 	int error;
 	file_t *fp;
 	mblk_t *mp;
+	struct vnode *vp;
+	int extra = 0;
 
 	fp = sr->sr_fp;
 	size = sr->sr_file_size;
@@ -1949,11 +1951,22 @@ snf_async_read(snf_req_t *sr)
 	(void) VOP_IOCTL(fp->f_vnode, _FIODIRECTIO, DIRECTIO_ON, 0,
 	    kcred, NULL, NULL);
 
+	vp = fp->f_vnode;
+	if (vp->v_type == VSOCK) {
+		stdata_t *stp;
+
+		/*
+		 * Get the extra space to insert a header and a trailer.
+		 */
+		stp = vp->v_stream;
+		extra = (int)(stp->sd_wroff + stp->sd_tail);
+	}
+
 	while ((size != 0) && (sr->sr_write_error == 0)) {
 
 		iosize = (int)MIN(sr->sr_maxpsz, size);
 
-		if ((mp = allocb(iosize, BPRI_MED)) == NULL) {
+		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
 			error = EAGAIN;
 			break;
 		}
@@ -2340,6 +2353,7 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	struct vnode *vp;
 	mblk_t *mp;
 	int iosize;
+	int extra = 0;
 	int error;
 	short fflag;
 	int ksize;
@@ -2349,6 +2363,16 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	struct vattr va;
 
 	vp = fp->f_vnode;
+	if (vp->v_type == VSOCK) {
+		stdata_t *stp;
+
+		/*
+		 * Get the extra space to insert a header and a trailer.
+		 */
+		stp = vp->v_stream;
+		extra = (int)(stp->sd_wroff + stp->sd_tail);
+	}
+
 	fflag = fp->f_flag;
 	ksize = 0;
 	auio.uio_iov = &aiov;
@@ -2367,7 +2391,7 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			break;
 		}
 		iosize = (int)MIN(maxpsz, size);
-		if ((mp = allocb(iosize, BPRI_MED)) == NULL) {
+		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
 			error = EAGAIN;
 			break;
 		}

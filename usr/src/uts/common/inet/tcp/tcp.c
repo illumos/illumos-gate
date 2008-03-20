@@ -10448,6 +10448,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly) {
 				/* we only allow enable at most once for now */
 				if (tcp->tcp_loopback ||
+				    (tcp->tcp_kssl_ctx != NULL) ||
 				    (!tcp->tcp_snd_zcopy_aware &&
 				    (onoff != 1 || !tcp_zcopy_check(tcp)))) {
 					*outlenp = 0;
@@ -18092,6 +18093,9 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 
 		stropt->so_flags |= SO_TAIL;
 		stropt->so_tail = SSL3_MAX_TAIL_LEN;
+
+		stropt->so_flags |= SO_COPYOPT;
+		stropt->so_copyopt = ZCVMUNSAFE;
 
 		stropt->so_maxblk = SSL3_MAX_RECORD_LEN;
 	}
