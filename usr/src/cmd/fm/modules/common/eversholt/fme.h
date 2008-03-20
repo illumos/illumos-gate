@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.h -- public definitions for fme module
@@ -55,7 +55,6 @@ extern "C" {
 #define	UD_NOPATH	"no path to component found in ereport"
 #define	UD_NOCONF	"no configuration information to build instance tree"
 #define	UD_MAXFME	"reached the maximum number of open FMEs (maxfme)"
-#define	UD_PCIUNSOLVD	"all hypotheses for PCI/PCIe failed"
 
 #define	WOBUF_CFGLEN	"rawcfglen"
 #define	WOBUF_POSTD	"posted"

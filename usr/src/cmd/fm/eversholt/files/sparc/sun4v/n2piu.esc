@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /* 
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -87,6 +87,16 @@ event upset.io.fire.nodiag@hostbridge;
 
 /*
  * Additional "DMC" errors to fire.
+ * Driver errors.
+ */
+event ereport.io.n2.dmu.sun4v_va_oor@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.n2.dmu.sun4v_adj_va_uf@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.n2.dmu.sun4v_inv_pg_sz@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.n2.dmu.sun4v_key_err@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.n2.dmu.iotsbdesc_inv@hostbridge/pciexrc{within(5s)}; 
+
+/*
+ * Additional "DMC" errors to fire.
  * N2 asic parity error
  */
 event ereport.io.n2.dmu.iotsbdesc_dpe@hostbridge/pciexrc{within(5s)}; 
@@ -150,6 +160,28 @@ event ereport.io.device.badint_limit@niu/niufn{within(5s)};
 event ereport.io.device.intern_corr@niu/niufn{within(5s)};
 event ereport.io.device.intern_uncorr@niu/niufn{within(5s)};
 event ereport.io.device.nf-device@niu/niufn;
+
+
+/*
+ * Bad DMA requests
+ */
+event error.io.fire.dmc.fabric_diag@hostbridge/pciexrc;
+
+prop error.io.fire.dmc.fabric_diag@hostbridge/pciexrc(0) ->
+    ereport.io.n2.dmu.iotsbdesc_inv@hostbridge/pciexrc{ IS_PRIMARY },
+    ereport.io.n2.dmu.sun4v_adj_va_uf@hostbridge/pciexrc{ IS_PRIMARY },
+    ereport.io.n2.dmu.sun4v_inv_pg_sz@hostbridge/pciexrc{ IS_PRIMARY },
+    ereport.io.n2.dmu.sun4v_key_err@hostbridge/pciexrc{ IS_PRIMARY },
+    ereport.io.n2.dmu.sun4v_va_oor@hostbridge/pciexrc{ IS_PRIMARY };
+
+event error.io.fire.dmc.secondary@hostbridge/pciexrc; 
+
+prop error.io.fire.dmc.secondary@hostbridge/pciexrc (0) ->
+    ereport.io.n2.dmu.iotsbdesc_inv@hostbridge/pciexrc{ IS_SECONDARY },
+    ereport.io.n2.dmu.sun4v_adj_va_uf@hostbridge/pciexrc{ IS_SECONDARY },
+    ereport.io.n2.dmu.sun4v_inv_pg_sz@hostbridge/pciexrc{ IS_SECONDARY },
+    ereport.io.n2.dmu.sun4v_key_err@hostbridge/pciexrc{ IS_SECONDARY },
+    ereport.io.n2.dmu.sun4v_va_oor@hostbridge/pciexrc{ IS_SECONDARY };
 
 /*
  * Fault at the adjacent node which is right below the Fire ASIC

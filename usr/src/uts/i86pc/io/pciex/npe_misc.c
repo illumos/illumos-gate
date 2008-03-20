@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
 #include <sys/acpi/acpi.h>
 #include <sys/acpi/acpi_pci.h>
 #include <sys/acpica.h>
-#include <sys/pci_cap.h>
-#include <sys/pcie_impl.h>
 #include <io/pciex/pcie_nvidia.h>
 
 /*
@@ -46,15 +44,11 @@
 void	npe_query_acpi_mcfg(dev_info_t *dip);
 void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 int	npe_disable_empty_bridges_workaround(dev_info_t *child);
-void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
 
 /*
  * Default ecfga base address
  */
 int64_t npe_default_ecfga_base = 0xE0000000;
-
-extern uint32_t	npe_aer_uce_mask;
-extern boolean_t pcie_full_scan;
 
 /*
  * Query the MCFG table using ACPI.  If MCFG is found, setup the
@@ -124,6 +118,7 @@ npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl)
 	}
 }
 
+
 /*
  * If the bridge is empty, disable it
  */
@@ -141,24 +136,4 @@ npe_disable_empty_bridges_workaround(dev_info_t *child)
 		return (1);
 
 	return (0);
-}
-
-void
-npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl) {
-	uint32_t regs;
-	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
-	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
-
-	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(dev_id)) {
-		/* Disable ECRC for all devices */
-		regs = pcie_get_aer_uce_mask() | npe_aer_uce_mask |
-		    PCIE_AER_UCE_ECRC;
-		pcie_set_aer_uce_mask(regs);
-
-		/*
-		 * Turn full scan on since the Error Source ID register may not
-		 * have the correct ID.
-		 */
-		pcie_full_scan = B_TRUE;
-	}
 }

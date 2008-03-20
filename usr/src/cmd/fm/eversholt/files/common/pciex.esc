@@ -151,8 +151,7 @@ event fault.io.pciex.device-invreq@pciexbus/pciexdev/pciexfn,
 	FITrate=PCIEX_DEV_INV_FIT, FRU=pciexbus/pciexdev,
 	ASRU=pciexbus/pciexdev/pciexfn;
 
-event fault.io.pciex.device-invreq@pciexrc,
-	FITrate=PCIEX_RC_FIT, FRU=pciexrc, ASRU=pciexrc;
+event upset.io.pciex.device-invreq@pciexrc;
 
 event fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn,
 	FITrate=PCIEX_DEV_NR_FIT, FRU=pciexbus/pciexdev,
@@ -374,7 +373,7 @@ event error.io.pciex.fatlink@pciexrc/pciexbus/pciexdev/pciexfn;
 prop fault.io.pciex.device-noresp@pciexrc (1)->
     error.io.pciex.nr-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
 
-prop fault.io.pciex.device-invreq@pciexrc (1)->
+prop upset.io.pciex.device-invreq@pciexrc (1)->
     error.io.pciex.badreq-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
 
 prop fault.io.pciex.device-interr@pciexrc (1)->
@@ -2128,15 +2127,13 @@ prop error.io.pci.perr-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
  * If the bridge receives data with bad ecc/parity from pci/pci-x, it will
  * propagate onto pci express as a poisoned tlp
  */
-prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
+prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (3)->
     ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn,
+    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn,
     error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn;
 
 prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn,
+    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
     ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn;
 
 prop error.io.pci.dpdata-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->

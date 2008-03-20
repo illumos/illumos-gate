@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -267,16 +267,6 @@ ndi_devi_unconfig_one(dev_info_t *dip, char *devnm, dev_info_t **dipp,
 
 int
 ndi_devi_unconfig_driver(dev_info_t *dip, int flags, major_t major);
-
-void
-ndi_set_bus_private(dev_info_t *dip, boolean_t up, uint32_t port_type,
-    void *data);
-
-void *
-ndi_get_bus_private(dev_info_t *dip, boolean_t up);
-
-boolean_t
-ndi_port_type(dev_info_t *dip, boolean_t up, uint32_t port_type);
 
 /*
  * Take a device node "Offline".

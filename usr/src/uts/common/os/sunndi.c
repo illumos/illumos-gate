@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2468,42 +2468,4 @@ i_ddi_rootnex_post_event(dev_info_t *dip, dev_info_t *rdip,
 	}
 	return (ndi_event_run_callbacks(rootnex_event_hdl, rdip,
 		eventid, impl_data));
-}
-
-/*
- * ndi_set_bus_private/ndi_get_bus_private:
- * Get/set device bus private data in devinfo.
- */
-void
-ndi_set_bus_private(dev_info_t *dip, boolean_t up, uint32_t port_type,
-    void *data)
-{
-	if (up) {
-		DEVI(dip)->devi_bus.port_up.info.port.type = port_type;
-		DEVI(dip)->devi_bus.port_up.priv_p = data;
-	} else {
-		DEVI(dip)->devi_bus.port_down.info.port.type = port_type;
-		DEVI(dip)->devi_bus.port_down.priv_p = data;
-	}
-}
-
-void *
-ndi_get_bus_private(dev_info_t *dip, boolean_t up)
-{
-	if (up)
-		return (DEVI(dip)->devi_bus.port_up.priv_p);
-	else
-		return (DEVI(dip)->devi_bus.port_down.priv_p);
-}
-
-boolean_t
-ndi_port_type(dev_info_t *dip, boolean_t up, uint32_t port_type)
-{
-	if (up) {
-		return ((DEVI(dip)->devi_bus.port_up.info.port.type) ==
-		    port_type);
-	} else {
-		return ((DEVI(dip)->devi_bus.port_down.info.port.type) ==
-		    port_type);
-	}
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,23 @@ extern uint32_t px_max_l1_tries;
 /* Print and Log tunables */
 extern uint32_t px_log;
 extern uint32_t px_die;
+
+/* Fabric Error that should cause panics */
+extern boolean_t px_fabric_die;
+extern uint32_t px_fabric_die_rc_ce;
+extern uint32_t px_fabric_die_rc_ue;
+extern uint32_t px_fabric_forgive_rc_ce;
+extern uint32_t px_fabric_forgive_rc_ue;
+extern uint32_t px_fabric_die_ce;
+extern uint32_t px_fabric_die_ue;
+extern uint32_t px_fabric_die_ce_gos;
+extern uint32_t px_fabric_die_ue_gos;
+extern uint16_t px_fabric_die_bdg_sts;
+extern uint16_t px_fabric_die_bdg_sts_gos;
+extern uint16_t px_fabric_die_sw_sts;
+extern uint16_t px_fabric_die_sw_sts_gos;
+extern uint32_t px_fabric_die_sue;
+extern uint32_t px_fabric_die_sue_gos;
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2319,8 +2319,7 @@ peekpoke_mem(ddi_ctl_enum_t cmd, peekpoke_ctlops_t *in_args)
  * calling pci_ereport_post() on all puts and for any gets that return -1
  */
 static int
-pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop,
-    void (*scan)(dev_info_t *, ddi_fm_error_t *))
+pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop)
 {
 	int	rval = DDI_SUCCESS;
 	peekpoke_ctlops_t *in_args = (peekpoke_ctlops_t *)arg;
@@ -2390,7 +2389,7 @@ pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop,
 		 */
 		de.fme_flag = DDI_FM_ERR_UNEXPECTED;
 	}
-	(void) scan(dip, &de);
+	pci_ereport_post(dip, &de, NULL);
 	if (hdlp->ah_acc.devacc_attr_access != DDI_DEFAULT_ACC &&
 	    de.fme_status != DDI_FM_OK) {
 		ndi_err_t *errp = (ndi_err_t *)hp->ahi_err;
@@ -2454,8 +2453,7 @@ int
 pci_peekpoke_check(dev_info_t *dip, dev_info_t *rdip,
 	ddi_ctl_enum_t ctlop, void *arg, void *result,
 	int (*handler)(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *,
-	void *), kmutex_t *err_mutexp, kmutex_t *peek_poke_mutexp,
-	void (*scan)(dev_info_t *, ddi_fm_error_t *))
+	void *), kmutex_t *err_mutexp, kmutex_t *peek_poke_mutexp)
 {
 	int rval;
 	peekpoke_ctlops_t *in_args = (peekpoke_ctlops_t *)arg;
@@ -2496,7 +2494,7 @@ pci_peekpoke_check(dev_info_t *dip, dev_info_t *rdip,
 	rval = handler(dip, rdip, ctlop, arg, result);
 	if (rval == DDI_SUCCESS) {
 		mutex_enter(err_mutexp);
-		rval = pci_peekpoke_check_fma(dip, arg, ctlop, scan);
+		rval = pci_peekpoke_check_fma(dip, arg, ctlop);
 		mutex_exit(err_mutexp);
 	}
 	mutex_exit(peek_poke_mutexp);

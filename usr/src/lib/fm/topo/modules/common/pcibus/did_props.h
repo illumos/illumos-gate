@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,6 @@ typedef struct txprop {
 #define	DI_CCPROP	"class-code"
 #define	DI_PHYSPROP	"physical-slot#"
 #define	DI_SLOTPROP	"slot-names"
-#define	DI_AADDRPROP	"assigned-addresses"
 
 extern int did_props_set(tnode_t *, did_t *, txprop_t[], int);
 

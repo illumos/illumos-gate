@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,17 +71,17 @@ px_get_props(px_t *px_p, dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 	DBG(DBG_ATTACH, dip, "get_px_properties: bus-range (%x,%x)\n",
-	    px_p->px_bus_range.lo, px_p->px_bus_range.hi);
+		px_p->px_bus_range.lo, px_p->px_bus_range.hi);
 
 	/*
 	 * Get the interrupts property.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "interrupts", (caddr_t)&px_p->px_inos,
-	    &px_p->px_inos_len) != DDI_SUCCESS) {
+		"interrupts", (caddr_t)&px_p->px_inos,
+		&px_p->px_inos_len) != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN, "%s%d: no interrupts property\n",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
+			ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 
@@ -99,11 +99,11 @@ px_get_props(px_t *px_p, dev_info_t *dip)
 	 * Get the ranges property.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "ranges",
-	    (caddr_t)&px_p->px_ranges_p, &px_p->px_ranges_length) !=
-	    DDI_SUCCESS) {
+		(caddr_t)&px_p->px_ranges_p, &px_p->px_ranges_length) !=
+		DDI_SUCCESS) {
 
 		cmn_err(CE_WARN, "%s%d: no ranges property\n",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
+			ddi_driver_name(dip), ddi_get_instance(dip));
 		kmem_free(px_p->px_inos, px_p->px_inos_len);
 		return (DDI_FAILURE);
 	}
@@ -151,8 +151,8 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	uint32_t space_type = phys_hi & PCI_REG_ADDR_M;	/* 28-bit */
 
 	DBG(DBG_MAP | DBG_CONT, dip, "\tpx_reloc_reg fr: %x.%x.%x %x.%x\n",
-	    rp->pci_phys_hi, rp->pci_phys_mid, rp->pci_phys_low,
-	    rp->pci_size_hi, rp->pci_size_low);
+		rp->pci_phys_hi, rp->pci_phys_mid, rp->pci_phys_low,
+		rp->pci_size_hi, rp->pci_size_low);
 
 	if (space_type == PCI_ADDR_CONFIG || phys_hi & PCI_RELOCAT_B)
 		return (DDI_SUCCESS);
@@ -508,9 +508,7 @@ px_init_child(px_t *px_p, dev_info_t *child)
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
-	ddi_set_parent_data(child, NULL);
-	if (pcie_init_bus(child))
-		(void) pcie_initchild(child);
+	pcie_initchild(child);
 
 	/*
 	 * Handle chip specific init-child tasks.
@@ -551,7 +549,7 @@ px_get_reg_set_size(dev_info_t *child, int rnumber)
 		goto done;
 
 	size = pci_rp[rnumber].pci_size_low |
-	    ((uint64_t)pci_rp[rnumber].pci_size_hi << 32);
+		((uint64_t)pci_rp[rnumber].pci_size_hi << 32);
 done:
 	kmem_free(pci_rp, i);
 	return (size);

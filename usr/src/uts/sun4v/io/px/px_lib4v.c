@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1131,15 +1131,15 @@ px_lib_config_put(dev_info_t *dip, pci_device_t bdf, pci_config_offset_t off,
 static uint32_t
 px_pci_config_get(ddi_acc_impl_t *handle, uint32_t *addr, int size)
 {
-	px_config_acc_pvt_t *px_pvt = (px_config_acc_pvt_t *)
-	    handle->ahi_common.ah_bus_private;
+	px_config_acc_pvt_t	*px_pvt = (px_config_acc_pvt_t *)
+					handle->ahi_common.ah_bus_private;
 	uint32_t pci_dev_addr = px_pvt->raddr;
 	uint32_t vaddr = px_pvt->vaddr;
 	uint16_t off = (uint16_t)(uintptr_t)(addr - vaddr) & 0xfff;
 	uint32_t rdata = 0;
 
 	if (px_lib_config_get(px_pvt->dip, pci_dev_addr, off,
-	    size, (pci_cfg_data_t *)&rdata) != DDI_SUCCESS)
+				size, (pci_cfg_data_t *)&rdata) != DDI_SUCCESS)
 		/* XXX update error kstats */
 		return (0xffffffff);
 	return (rdata);
@@ -1149,14 +1149,14 @@ static void
 px_pci_config_put(ddi_acc_impl_t *handle, uint32_t *addr,
 		int size, pci_cfg_data_t wdata)
 {
-	px_config_acc_pvt_t *px_pvt = (px_config_acc_pvt_t *)
-	    handle->ahi_common.ah_bus_private;
+	px_config_acc_pvt_t	*px_pvt = (px_config_acc_pvt_t *)
+					handle->ahi_common.ah_bus_private;
 	uint32_t pci_dev_addr = px_pvt->raddr;
 	uint32_t vaddr = px_pvt->vaddr;
 	uint16_t off = (uint16_t)(uintptr_t)(addr - vaddr) & 0xfff;
 
 	if (px_lib_config_put(px_pvt->dip, pci_dev_addr, off,
-	    size, wdata) != DDI_SUCCESS) {
+				size, wdata) != DDI_SUCCESS) {
 		/*EMPTY*/
 		/* XXX update error kstats */
 	}
@@ -1187,7 +1187,7 @@ px_pci_config_get64(ddi_acc_impl_t *handle, uint64_t *addr)
 
 	rdatal = (uint32_t)px_pci_config_get(handle, (uint32_t *)addr, 4);
 	rdatah = (uint32_t)px_pci_config_get(handle,
-	    (uint32_t *)((char *)addr+4), 4);
+				(uint32_t *)((char *)addr+4), 4);
 	return (((uint64_t)rdatah << 32) | rdatal);
 }
 
@@ -1367,9 +1367,6 @@ px_lib_map_vconfig(dev_info_t *dip,
 	ddi_map_req_t *mp, pci_config_offset_t off,
 	pci_regspec_t *rp, caddr_t *addrp)
 {
-	int fmcap;
-	ndi_err_t *errp;
-	on_trap_data_t *otp;
 	ddi_acc_hdl_t *hp;
 	ddi_acc_impl_t *ap;
 	uchar_t busnum;	/* bus number */
@@ -1382,24 +1379,13 @@ px_lib_map_vconfig(dev_info_t *dip,
 
 	/* Check for mapping teardown operation */
 	if ((mp->map_op == DDI_MO_UNMAP) ||
-	    (mp->map_op == DDI_MO_UNLOCK)) {
+			(mp->map_op == DDI_MO_UNLOCK)) {
 		/* free up memory allocated for the private access handle. */
 		px_pvt = (px_config_acc_pvt_t *)hp->ah_bus_private;
 		kmem_free((void *)px_pvt, sizeof (px_config_acc_pvt_t));
 
 		/* unmap operation of PCI IO/config space. */
 		return (DDI_SUCCESS);
-	}
-
-	fmcap = ddi_fm_capable(dip);
-	if (DDI_FM_ACC_ERR_CAP(fmcap)) {
-		errp = ((ddi_acc_impl_t *)hp)->ahi_err;
-		otp = (on_trap_data_t *)errp->err_ontrap;
-		otp->ot_handle = (void *)(hp);
-		otp->ot_prot = OT_DATA_ACCESS;
-		errp->err_status = DDI_FM_OK;
-		errp->err_expected = DDI_FM_ERR_UNEXPECTED;
-		errp->err_cf = px_err_cfg_hdl_check;
 	}
 
 	ap->ahi_get8 = px_pci_config_get8;
@@ -1426,7 +1412,7 @@ px_lib_map_vconfig(dev_info_t *dip,
 
 	/* allocate memory for our private handle */
 	px_pvt = (px_config_acc_pvt_t *)
-	    kmem_zalloc(sizeof (px_config_acc_pvt_t), KM_SLEEP);
+			kmem_zalloc(sizeof (px_config_acc_pvt_t), KM_SLEEP);
 	hp->ah_bus_private = (void *)px_pvt;
 
 	busnum = PCI_REG_BUS_G(rp->pci_phys_hi);
@@ -1450,7 +1436,7 @@ px_lib_map_vconfig(dev_info_t *dip,
 	px_pvt->dip = dip;
 
 	DBG(DBG_LIB_CFG, dip, "px_config_setup: raddr 0x%x, vaddr 0x%x\n",
-	    px_pvt->raddr, px_pvt->vaddr);
+				px_pvt->raddr, px_pvt->vaddr);
 	*addrp = (caddr_t)(uintptr_t)px_pvt->vaddr;
 	return (DDI_SUCCESS);
 }
@@ -1508,12 +1494,20 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 		}
 	}
 
-	px_rp_en_q(px_p, bdf, addr, NULL);
+	mutex_enter(&px_p->px_fm_mutex);
 
-	if (px_fm_enter(px_p) == DDI_SUCCESS) {
-		(void) px_scan_fabric(px_p, px_p->px_dip, &derr);
-		px_fm_exit(px_p);
+	if (!px_lib_is_in_drain_state(px_p)) {
+		/*
+		 * This is to ensure that device corresponding to the addr of
+		 * the failed PIO/CFG load gets scanned.
+		 */
+		px_rp_en_q(px_p, bdf, addr,
+		    (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB));
+		(void) pf_scan_fabric(px_p->px_dip, &derr,
+		    px_p->px_dq_p, &px_p->px_dq_tail);
 	}
+
+	mutex_exit(&px_p->px_fm_mutex);
 }
 
 

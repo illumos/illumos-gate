@@ -64,8 +64,6 @@ static int maybe_di_chars_copy(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int maybe_di_uint_to_str(tnode_t *, did_t *,
     const char *, const char *, const char *);
-static int AADDR_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
 
 /*
  * Arrays of "property translation routines" to set the properties a
@@ -103,7 +101,6 @@ txprop_t Fn_common_props[] = {
 	{ NULL, &pci_pgroup, TOPO_PCI_EXCAP, EXCAP_set },
 	{ DI_CLASSPROP, &pci_pgroup, TOPO_PCI_CLASS, maybe_di_uint_to_str },
 	{ DI_VENDIDPROP, &pci_pgroup, TOPO_PCI_VENDID, maybe_di_uint_to_str },
-	{ DI_AADDRPROP, &pci_pgroup, TOPO_PCI_AADDR, AADDR_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
@@ -793,29 +790,6 @@ maybe_di_uint_to_str(tnode_t *tn, did_t *pd,
 		return (0);
 
 	return (uint_to_strprop(did_mod(pd), v, tn, tpgrp, tpnm));
-}
-
-static int
-AADDR_set(tnode_t *tn, did_t *pd, const char *dpnm, const char *tpgrp,
-    const char *tpnm)
-{
-	topo_mod_t *mp;
-	uchar_t *typbuf;
-	int sz = -1;
-	int err, e;
-
-	if (di_bytes_get(did_mod(pd), did_dinode(pd), dpnm, &sz, &typbuf) < 0)
-		return (0);
-
-	mp = did_mod(pd);
-
-	e = topo_prop_set_uint32_array(tn, tpgrp, tpnm, TOPO_PROP_IMMUTABLE,
-	    /*LINTED*/
-	    (uint32_t *)typbuf, sz/4, &err);
-
-	if (e != 0)
-		return (topo_mod_seterrno(mp, err));
-	return (0);
 }
 
 /*ARGSUSED*/

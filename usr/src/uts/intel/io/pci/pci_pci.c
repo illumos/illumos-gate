@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/pci.h>
-#include <sys/pcie_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -136,7 +135,6 @@ static int	ppb_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int	ppb_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
 		    caddr_t, int *);
 static int	ppb_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
-static void	ppb_peekpoke_cb(dev_info_t *, ddi_fm_error_t *);
 
 struct cb_ops ppb_cb_ops = {
 	ppb_open,			/* open */
@@ -218,8 +216,6 @@ typedef struct {
 		uchar_t sec_latency_timer;
 		ushort_t bridge_control;
 	} config_state[PCI_MAX_CHILDREN];
-
-	uint8_t parent_bus;
 } ppb_devstate_t;
 
 
@@ -280,12 +276,9 @@ ppb_probe(dev_info_t *devi)
 static int
 ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	dev_info_t *root = ddi_root_node();
 	int instance;
 	ppb_devstate_t *ppb;
-	dev_info_t *pdip;
 	ddi_acc_handle_t config_handle;
-	char *bus;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -337,22 +330,6 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			ddi_fm_fini(devi);
 			ddi_soft_state_free(ppb_state, instance);
 			return (DDI_FAILURE);
-		}
-
-		ppb->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
-		for (pdip = ddi_get_parent(devi); pdip && (pdip != root) &&
-		    (ppb->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV);
-		    pdip = ddi_get_parent(pdip)) {
-			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
-			    DDI_PROP_DONTPASS, "device_type", &bus) !=
-			    DDI_PROP_SUCCESS)
-				break;
-
-			if (strcmp(bus, "pciex") == 0)
-				ppb->parent_bus =
-				    PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
-
-			ddi_prop_free(bus);
 		}
 
 		if (ppb_support_ht_msimap == 1)
@@ -455,9 +432,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int	reglen;
 	int	rn;
 	int	totreg;
-	ppb_devstate_t *ppb = ddi_get_soft_state(ppb_state,
-	    ddi_get_instance(dip));
-	struct detachspec *dsp;
+	ppb_devstate_t *ppb;
 	struct attachspec *asp;
 
 	switch (ctlop) {
@@ -488,42 +463,28 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	/* X86 systems support PME wakeup from suspend */
 	case DDI_CTLOPS_ATTACH:
-		if (!pcie_is_child(dip, rdip))
-			return (DDI_SUCCESS);
-
 		asp = (struct attachspec *)arg;
-		if ((ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
-		    (asp->when == DDI_POST) && (asp->result == DDI_SUCCESS))
-			pf_init(rdip, (void *)ppb->ppb_fm_ibc, asp->cmd);
-
 		if (asp->cmd == DDI_RESUME && asp->when == DDI_PRE)
 			if (pci_pre_resume(rdip) != DDI_SUCCESS)
 				return (DDI_FAILURE);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
-		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_DETACH:
-		if (!pcie_is_child(dip, rdip))
-			return (DDI_SUCCESS);
-
-		dsp = (struct detachspec *)arg;
-		if ((ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
-		    (dsp->when == DDI_PRE))
-			pf_fini(rdip, dsp->cmd);
-
-		if (dsp->cmd == DDI_SUSPEND && dsp->when == DDI_POST)
+		asp = (struct attachspec *)arg;
+		if (asp->cmd == DDI_SUSPEND && asp->when == DDI_POST)
 			if (pci_post_suspend(rdip) != DDI_SUCCESS)
 				return (DDI_FAILURE);
-
-		return (DDI_SUCCESS);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
 	case DDI_CTLOPS_PEEK:
 	case DDI_CTLOPS_POKE:
+		ppb = ddi_get_soft_state(ppb_state, ddi_get_instance(dip));
 		if (strcmp(ddi_driver_name(ddi_get_parent(dip)), "npe") != 0)
 			return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
 		    ddi_ctlops, &ppb->ppb_err_mutex,
-		    &ppb->ppb_peek_poke_mutex, ppb_peekpoke_cb));
+		    &ppb->ppb_peek_poke_mutex));
 
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
@@ -605,13 +566,9 @@ static int
 ppb_initchild(dev_info_t *child)
 {
 	struct ddi_parent_private_data *pdptr;
-	ppb_devstate_t *ppb;
 	char name[MAXNAMELEN];
 	ddi_acc_handle_t config_handle;
 	ushort_t command_preserve, command;
-
-	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-	    ddi_get_instance(ddi_get_parent(child)));
 
 	if (ppb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -656,20 +613,6 @@ ppb_initchild(dev_info_t *child)
 		return (DDI_NOT_WELL_FORMED);
 	}
 
-	ddi_set_parent_data(child, NULL);
-
-	/*
-	 * PCIe FMA specific
-	 *
-	 * Note: parent_data for parent is created only if this is PCI-E
-	 * platform, for which, SG take a different route to handle device
-	 * errors.
-	 */
-	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
-		if (pcie_init_bus(child) == NULL)
-			return (DDI_FAILURE);
-	}
-
 	/* transfer select properties from PROM to kernel */
 	if (ddi_getprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
 	    "interrupts", -1) != -1) {
@@ -702,14 +645,8 @@ static void
 ppb_removechild(dev_info_t *dip)
 {
 	struct ddi_parent_private_data *pdptr;
-	ppb_devstate_t *ppb;
 
-	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-	    ddi_get_instance(ddi_get_parent(dip)));
-
-	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
-		pcie_fini_bus(dip);
-	else if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
+	if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
 		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));
 		ddi_set_parent_data(dip, NULL);
 	}
@@ -966,10 +903,6 @@ static int
 ppb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	return (pcihp_info(dip, cmd, arg, result));
-}
-
-void ppb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
-	(void) pci_ereport_post(dip, derr, NULL);
 }
 
 /*ARGSUSED*/

@@ -76,8 +76,6 @@ f none usr/lib/fm/fmd/plugins/disk-monitor.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/disk-monitor.so 555 root bin
 f none usr/lib/fm/fmd/plugins/eft.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/eft.so 555 root bin
-f none usr/lib/fm/fmd/plugins/fabric-xlate.conf 644 root bin
-f none usr/lib/fm/fmd/plugins/fabric-xlate.so 555 root bin
 f none usr/lib/fm/fmd/plugins/io-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/io-retire.so 555 root bin
 f none usr/lib/fm/fmd/plugins/ip-transport.so 555 root bin

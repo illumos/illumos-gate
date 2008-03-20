@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/sunndi.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/pcie.h>
@@ -662,18 +661,18 @@ px_err_cb_intr(caddr_t arg)
 	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
-	if (px_fm_enter(px_p) != DDI_SUCCESS)
-		goto done;
+	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_HOST);
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE);
 
-	px_err_panic(err, PX_HB, PX_NO_ERROR, B_TRUE);
-	px_fm_exit(px_p);
-	px_err_panic(err, PX_HB, PX_NO_ERROR, B_FALSE);
+	px_p->px_fm_mutex_owner = NULL;
+	mutex_exit(&px_p->px_fm_mutex);
 
-done:
+	px_err_panic(err, PX_HB, PX_NO_ERROR);
+
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -693,7 +692,7 @@ px_err_dmc_pec_intr(caddr_t arg)
 	px_fault_t	*px_fault_p = (px_fault_t *)arg;
 	dev_info_t	*rpdip = px_fault_p->px_fh_dip;
 	px_t		*px_p = DIP_TO_STATE(rpdip);
-	int		rc_err, fab_err;
+	int		rc_err, fab_err = PF_NO_PANIC;
 	ddi_fm_error_t	derr;
 
 	/* Create the derr */
@@ -702,24 +701,27 @@ px_err_dmc_pec_intr(caddr_t arg)
 	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
-	if (px_fm_enter(px_p) != DDI_SUCCESS)
-		goto done;
+	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	/* send ereport/handle/clear fire registers */
 	rc_err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_PCIE);
 
 	/* Check all child devices for errors */
-	fab_err = px_scan_fabric(px_p, rpdip, &derr);
+	if (!px_lib_is_in_drain_state(px_p)) {
+		fab_err = pf_scan_fabric(rpdip, &derr, px_p->px_dq_p,
+		    &px_p->px_dq_tail);
+	}
 
 	/* Set the interrupt state to idle */
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE);
 
-	px_err_panic(rc_err, PX_RC, fab_err, B_TRUE);
-	px_fm_exit(px_p);
-	px_err_panic(rc_err, PX_RC, fab_err, B_FALSE);
+	px_p->px_fm_mutex_owner = NULL;
+	mutex_exit(&px_p->px_fm_mutex);
 
-done:
+	px_err_panic(rc_err, PX_RC, fab_err);
+
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -1795,7 +1797,7 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 		goto done;
 
 	bdf = (pcie_req_id_t)CSR_FR(csr_base, MMU_TRANSLATION_FAULT_STATUS, ID);
-	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA, NULL,
+	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_DMA_ADDR, NULL,
 	    bdf);
 
 done:
@@ -1826,7 +1828,7 @@ px_err_mmu_tfa_handle(dev_info_t *rpdip, caddr_t csr_base,
 		goto done;
 
 	bdf = (pcie_req_id_t)CSR_FR(csr_base, MMU_TRANSLATION_FAULT_STATUS, ID);
-	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA, NULL,
+	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_DMA_ADDR, NULL,
 	    bdf);
 
 done:
@@ -1858,7 +1860,7 @@ px_err_mmu_parity_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	mmu_tfa = CSR_XR(csr_base, MMU_TRANSLATION_FAULT_ADDRESS);
 	bdf = (pcie_req_id_t)CSR_FR(csr_base, MMU_TRANSLATION_FAULT_STATUS, ID);
-	status = pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA,
+	status = pf_hdl_lookup(rpdip, derr->fme_ena, PF_DMA_ADDR,
 	    (uint32_t)mmu_tfa, bdf);
 
 done:
@@ -1882,22 +1884,33 @@ px_err_wuc_ruc_handle(dev_info_t *rpdip, caddr_t csr_base,
 	px_t		*px_p = DIP_TO_STATE(rpdip);
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	uint64_t 	data;
-	pf_pcie_adv_err_regs_t adv_reg;
-	int		sts;
+	uint32_t	addr, hdr;
+	pcie_tlp_hdr_t	*tlp;
+	int		sts = PF_HDL_NOTFOUND;
 
 	if (!PX_ERR_IS_PRI(err_bit_descr->bit))
 		goto done;
 
 	data = CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG);
-	adv_reg.pcie_ue_hdr[0] = (uint32_t)(data >> 32);
-	adv_reg.pcie_ue_hdr[1] = (uint32_t)(data & 0xFFFFFFFF);
+	hdr = (uint32_t)(data >> 32);
+	tlp = (pcie_tlp_hdr_t *)&hdr;
 	data = CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG);
-	adv_reg.pcie_ue_hdr[2] = (uint32_t)(data >> 32);
-	adv_reg.pcie_ue_hdr[3] = (uint32_t)(data & 0xFFFFFFFF);
+	addr = (uint32_t)(data >> 32);
 
-	pf_tlp_decode(PCIE_DIP2BUS(rpdip), &adv_reg);
-	sts = pf_hdl_lookup(rpdip, derr->fme_ena, adv_reg.pcie_ue_tgt_trans,
-	    adv_reg.pcie_ue_tgt_addr, adv_reg.pcie_ue_tgt_bdf);
+	switch (tlp->type) {
+	case PCIE_TLP_TYPE_IO:
+	case PCIE_TLP_TYPE_MEM:
+	case PCIE_TLP_TYPE_MEMLK:
+		sts = pf_hdl_lookup(rpdip, derr->fme_ena, PF_PIO_ADDR,
+		    addr, NULL);
+		break;
+	case PCIE_TLP_TYPE_CFG0:
+	case PCIE_TLP_TYPE_CFG1:
+		sts = pf_hdl_lookup(rpdip, derr->fme_ena, PF_CFG_ADDR,
+		    addr, (addr >> 16));
+		break;
+	}
+
 done:
 	if ((sts == PF_HDL_NOTFOUND) && (pxu_p->cpr_flag == PX_NOT_CPR))
 		return (px_err_protected_handle(rpdip, csr_base, derr,
@@ -1985,19 +1998,32 @@ px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
 		regs.primary_ue = err_bit;
 
 		/*
-		 * Log the Received Log for PTLP, UR and UC.
+		 * Log the Received Log for PTLP and UR.  The PTLP most likely
+		 * is a poisoned completion.  The original transaction will be
+		 * logged inthe Transmit Log.
 		 */
-		if ((PCIE_AER_UCE_PTLP | PCIE_AER_UCE_UR | PCIE_AER_UCE_UC) &
-		    err_bit) {
+		if (err_bit & (PCIE_AER_UCE_PTLP | PCIE_AER_UCE_UR)) {
 			log = CSR_XR(csr_base,
 			    TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER1_LOG);
 			regs.rx_hdr1 = (uint32_t)(log >> 32);
-			regs.rx_hdr2 = (uint32_t)(log & 0xFFFFFFFF);
+			regs.rx_hdr2 = (uint32_t)(log && 0xFFFFFFFF);
 
 			log = CSR_XR(csr_base,
 			    TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER2_LOG);
 			regs.rx_hdr3 = (uint32_t)(log >> 32);
-			regs.rx_hdr4 = (uint32_t)(log & 0xFFFFFFFF);
+			regs.rx_hdr4 = (uint32_t)(log && 0xFFFFFFFF);
+		}
+
+		if (err_bit & (PCIE_AER_UCE_PTLP)) {
+			log = CSR_XR(csr_base,
+			    TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER1_LOG);
+			regs.tx_hdr1 = (uint32_t)(log >> 32);
+			regs.tx_hdr2 = (uint32_t)(log && 0xFFFFFFFF);
+
+			log = CSR_XR(csr_base,
+			    TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER2_LOG);
+			regs.tx_hdr3 = (uint32_t)(log >> 32);
+			regs.tx_hdr4 = (uint32_t)(log && 0xFFFFFFFF);
 		}
 	} else {
 		regs.ue_reg = (uint32_t)BITMASK(err_bit_descr->bit - 32);
@@ -2204,11 +2230,13 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 	char		buf[FM_MAX_CLASS];
 	boolean_t	pri = PX_ERR_IS_PRI(bit);
 	px_t		*px_p = DIP_TO_STATE(rpdip);
+	uint32_t	trans_type, fault_addr = 0;
 	uint64_t	rx_h1, rx_h2, tx_h1, tx_h2;
 	uint16_t	s_status;
 	int		sts;
+	pcie_req_id_t	fault_bdf = 0;
 	pcie_cpl_t	*cpl;
-	pf_pcie_adv_err_regs_t adv_reg;
+	pf_data_t	pf_data = {0};
 
 	rx_h1 = CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG);
 	rx_h2 = CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG);
@@ -2217,13 +2245,14 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 
 	if ((bit == TLU_OTHER_EVENT_STATUS_SET_RUC_P) ||
 	    (bit == TLU_OTHER_EVENT_STATUS_SET_WUC_P)) {
-		adv_reg.pcie_ue_hdr[0] = (uint32_t)(rx_h1 >> 32);
-		adv_reg.pcie_ue_hdr[1] = (uint32_t)rx_h1;
-		adv_reg.pcie_ue_hdr[2] = (uint32_t)(rx_h2 >> 32);
-		adv_reg.pcie_ue_hdr[3] = (uint32_t)rx_h2;
+		pf_data.aer_h0 = (uint32_t)(rx_h1 >> 32);
+		pf_data.aer_h1 = (uint32_t)rx_h1;
+		pf_data.aer_h2 = (uint32_t)(rx_h2 >> 32);
+		pf_data.aer_h3 = (uint32_t)rx_h2;
 
 		/* get completer bdf (fault bdf) from rx logs */
-		cpl = (pcie_cpl_t *)&adv_reg.pcie_ue_hdr[1];
+		cpl = (pcie_cpl_t *)&pf_data.aer_h1;
+		fault_bdf = cpl->cid;
 
 		/* Figure out if UR/CA from rx logs */
 		if (cpl->status == PCIE_CPL_STS_UR)
@@ -2231,17 +2260,19 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 		else if (cpl->status == PCIE_CPL_STS_CA)
 			s_status = PCI_STAT_R_TARG_AB;
 
-		adv_reg.pcie_ue_hdr[0] = (uint32_t)(tx_h1 >> 32);
-		adv_reg.pcie_ue_hdr[1] = (uint32_t)tx_h1;
-		adv_reg.pcie_ue_hdr[2] = (uint32_t)(tx_h2 >> 32);
-		adv_reg.pcie_ue_hdr[3] = (uint32_t)tx_h2;
+
+		pf_data.aer_h0 = (uint32_t)(tx_h1 >> 32);
+		pf_data.aer_h1 = (uint32_t)tx_h1;
+		pf_data.aer_h2 = (uint32_t)(tx_h2 >> 32);
+		pf_data.aer_h3 = (uint32_t)tx_h2;
 
 		/* get fault addr from tx logs */
-		sts = pf_tlp_decode(PCIE_DIP2BUS(rpdip), &adv_reg);
+		sts = pf_tlp_decode(rpdip, &pf_data, 0, &fault_addr,
+		    &trans_type);
 
 		if (sts == DDI_SUCCESS)
-			(void) px_rp_en_q(px_p, adv_reg.pcie_ue_tgt_bdf,
-			    adv_reg.pcie_ue_tgt_addr, s_status);
+			(void) px_rp_en_q(px_p, fault_bdf, fault_addr,
+			    s_status);
 	}
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);

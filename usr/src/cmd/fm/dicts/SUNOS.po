@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -217,19 +217,3 @@ msgid "SUNOS-8000-CF.impact"
 msgstr "Future reboots could fail until this problem is corrected.\n"
 msgid "SUNOS-8000-CF.action"
 msgstr "Examine /boot/grub/menu.lst and revise as\ndescribed in Details.\n"
-#
-# code: SUNOS-8000-DM
-# keys: fault.sunos.eft.unknown_pci_fault
-#
-msgid "SUNOS-8000-DM.type"
-msgstr "Fault"
-msgid "SUNOS-8000-DM.severity"
-msgstr "Critical"
-msgid "SUNOS-8000-DM.description"
-msgstr "A Solaris Fault Manager has received telemetry for which no proper diagnosis\ncan be generated.\n  Refer to %s for more information."
-msgid "SUNOS-8000-DM.response"
-msgstr "All related information has been saved in logs for examination.\n"
-msgid "SUNOS-8000-DM.impact"
-msgstr "The fault information will need to be examined by Service personnel.\n"
-msgid "SUNOS-8000-DM.action"
-msgstr "Follow the steps found at http://sun.com/msg/%MSGID%\nto obtain the necessary data for presentation to your authorized service\nprovider.\n"

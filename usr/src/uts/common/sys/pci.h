@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,6 @@ extern "C" {
  */
 #define	PCI_BCNF_BCNTRL_PARITY_ENABLE	0x1
 #define	PCI_BCNF_BCNTRL_SERR_ENABLE	0x2
-#define	PCI_BCNF_BCNTRL_ISA_ENABLE	0x4
 #define	PCI_BCNF_BCNTRL_VGA_ENABLE	0x8
 #define	PCI_BCNF_BCNTRL_MAST_AB_MODE	0x20
 #define	PCI_BCNF_BCNTRL_DTO_STAT	0x400

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,9 @@ typedef struct {
 
 	ddi_acc_handle_t	pxb_config_handle;
 
+	/* Bridge or Switch, upstream or downstream */
+	int			pxb_port_type;
+
 	/* Interrupt */
 	ddi_intr_handle_t	*pxb_htable;		/* Intr Handlers */
 	int			pxb_htable_size;	/* htable size */
@@ -120,6 +123,7 @@ typedef struct {
 	int			pxb_init_flags;
 
 	/* FMA */
+	int pxb_fm_cap;
 	ddi_iblock_cookie_t pxb_fm_ibc;
 
 	/* Vendor Device Id */

@@ -45,15 +45,21 @@
 
 /*
  * Expected PCI Express error mask values
- *
- * !!NOTE!! All PCI Express functionality including PCIe initialization, PCIe
- * error handling has been moved to the common pcie misc module.  All functions
- * and variables dealting with PCIe in this file have been deprecated and will
- * be eventually removed.  All Legacy PCI and PCI-X related code should remain
- * as is.
  */
+uint32_t pcie_expected_ce_mask = 0x0;
+uint32_t pcie_expected_ue_mask = PCIE_AER_UCE_UC;
+#if defined(__sparc)
+uint32_t pcie_expected_sue_mask = 0x0;
+#else
+uint32_t pcie_expected_sue_mask = PCIE_AER_SUCE_RCVD_MA;
+#endif
 uint32_t pcie_aer_uce_log_bits = PCIE_AER_UCE_LOG_BITS;
+#if defined(__sparc)
 uint32_t pcie_aer_suce_log_bits = PCIE_AER_SUCE_LOG_BITS;
+#else
+uint32_t pcie_aer_suce_log_bits = \
+	    PCIE_AER_SUCE_LOG_BITS & ~PCIE_AER_SUCE_RCVD_MA;
+#endif
 
 errorq_t *pci_target_queue = NULL;
 
@@ -703,6 +709,7 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 	uint8_t pcie_cap_ptr;
 	uint16_t pcie_ecap_ptr;
 	uint16_t dev_type = 0;
+	uint32_t mask = pcie_expected_ue_mask;
 
 	/*
 	 * The following sparc specific code should be removed once the pci_cap
@@ -876,6 +883,37 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 	if (erpt_p->pe_dflags & PCIEX_RC_DEV)
 		pcie_adv_regs->pcie_adv_rc_regs = kmem_zalloc(
 		    sizeof (pcie_adv_rc_error_regs_t), KM_SLEEP);
+
+	/*
+	 * Check that mask values are as expected, if not
+	 * change them to what we desire.
+	 */
+	pci_regs_gather(dip, erpt_p, DDI_FM_ERR_UNEXPECTED);
+	pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
+	if (pcie_regs->pcie_adv_regs->pcie_ce_mask != pcie_expected_ce_mask) {
+		pci_config_put32(erpt_p->pe_hdl,
+		    pcie_ecap_ptr + PCIE_AER_CE_MASK, pcie_expected_ce_mask);
+	}
+
+	/* Disable PTLP/ECRC (or mask these two) for Switches */
+	if (dev_type == PCIE_PCIECAP_DEV_TYPE_UP ||
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN) {
+		erpt_p->pe_dflags |= PCIEX_SWITCH_DEV;
+		mask |= PCIE_AER_UCE_PTLP | PCIE_AER_UCE_ECRC;
+	}
+
+	if (pcie_regs->pcie_adv_regs->pcie_ue_mask != mask) {
+		pci_config_put32(erpt_p->pe_hdl,
+		    pcie_ecap_ptr + PCIE_AER_UCE_MASK, mask);
+	}
+	if (erpt_p->pe_dflags & PCIEX_2PCI_DEV) {
+		if (pcie_regs->pcie_adv_regs->pcie_adv_bdg_regs->pcie_sue_mask
+		    != pcie_expected_sue_mask) {
+			pci_config_put32(erpt_p->pe_hdl,
+			    pcie_ecap_ptr + PCIE_AER_SUCE_MASK,
+			    pcie_expected_sue_mask);
+		}
+	}
 }
 
 /*
@@ -947,6 +985,7 @@ pci_ereport_setup(dev_info_t *dip)
 		erpt_p->pe_bdf = (uint16_t)(PCI_REG_BDFR_G(phys_hi) >>
 		    PCI_REG_FUNC_SHIFT);
 	}
+
 
 	if (!(pci_status & PCI_STAT_CAP)) {
 		goto done;
@@ -1079,7 +1118,6 @@ pci_ereport_teardown(dev_info_t *dip)
 	kmem_free(erpt_p->pe_pci_regs, sizeof (pci_error_regs_t));
 	kmem_free(erpt_p, sizeof (pci_erpt_t));
 	fmhdl->fh_bus_specific = NULL;
-
 	/*
 	 * The following sparc specific code should be removed once the pci_cap
 	 * interfaces create the necessary properties for us.
@@ -2244,20 +2282,6 @@ pci_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *xx_status)
 	pci_erpt_t *erpt_p;
 	ddi_fm_error_t de;
 	pci_fme_bus_specific_t pci_fme_bs;
-
-	/*
-	 * On PCI Express systems, all error handling and ereport are done via
-	 * the PCIe misc module.  This function is a no-op for PCIe Systems.  In
-	 * order to tell if a system is a PCI or PCIe system, check that the
-	 * bus_private_data exists.  If it exists, this is a PCIe system.
-	 */
-	if (ndi_get_bus_private(dip, B_TRUE)) {
-		derr->fme_status = DDI_FM_OK;
-		if (xx_status != NULL)
-			*xx_status = 0x0;
-
-		return;
-	}
 
 	fmhdl = DEVI(dip)->devi_fmhdl;
 	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(dip)) &&

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,22 +73,6 @@ typedef enum {
  * devi_driver_data includes whatever the driver wants to place there.
  */
 struct devinfo_audit;
-
-typedef struct devi_port {
-	union {
-		struct {
-			uint32_t type;
-			uint32_t pad;
-		} port;
-		uint64_t type64;
-	} info;
-	void	 *priv_p;
-} devi_port_t;
-
-typedef struct devi_bus_priv {
-	devi_port_t port_up;
-	devi_port_t port_down;
-} devi_bus_priv_t;
 
 struct dev_info  {
 
@@ -216,9 +200,6 @@ struct dev_info  {
 	int		devi_ct_count;		/* # of outstanding responses */
 	int		devi_ct_neg;		/* neg. occurred on dip */
 	list_t		devi_ct;
-
-	/* owned by bus framework */
-	devi_bus_priv_t	devi_bus;		/* bus private data */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

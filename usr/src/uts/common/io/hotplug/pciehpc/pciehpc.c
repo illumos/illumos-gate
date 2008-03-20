@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -47,8 +47,13 @@
 #include <sys/callb.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#if defined(__sparc)
 #include <sys/pcie_impl.h>
+#endif
 #include <sys/hotplug/pci/pciehpc_impl.h>
+#if	defined(__i386) || defined(__amd64)
+#include <io/pciex/pcie_error.h>
+#endif
 
 /*
  * Local data/functions
@@ -1968,7 +1973,7 @@ static void
 pciehpc_disable_errors(pciehpc_t *ctrl_p)
 {
 	if (ctrl_p->soft_state & PCIEHPC_SOFT_STATE_PCIE_DEV) {
-		PCIE_DISABLE_ERRORS(ctrl_p->dip);
+		PCIE_DISABLE_ERRORS(ctrl_p->dip, ctrl_p->cfghdl);
 		PCIEHPC_DEBUG3((CE_NOTE, "%s%d: pciehpc_disable_errors\n",
 		    ddi_driver_name(ctrl_p->dip),
 		    ddi_get_instance(ctrl_p->dip)));
@@ -1979,7 +1984,7 @@ static void
 pciehpc_enable_errors(pciehpc_t *ctrl_p)
 {
 	if (ctrl_p->soft_state & PCIEHPC_SOFT_STATE_PCIE_DEV) {
-		(void) PCIE_ENABLE_ERRORS(ctrl_p->dip);
+		(void) PCIE_ENABLE_ERRORS(ctrl_p->dip, ctrl_p->cfghdl);
 		PCIEHPC_DEBUG3((CE_NOTE, "%s%d: pciehpc_enable_errors\n",
 		    ddi_driver_name(ctrl_p->dip),
 		    ddi_get_instance(ctrl_p->dip)));

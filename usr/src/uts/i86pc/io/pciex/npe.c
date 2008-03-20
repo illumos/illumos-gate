@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,8 @@
 
 #include <sys/conf.h>
 #include <sys/modctl.h>
+#include <sys/pcie.h>
 #include <sys/pci_impl.h>
-#include <sys/pcie_impl.h>
 #include <sys/sysmacros.h>
 #include <sys/ddi_intr.h>
 #include <sys/sunndi.h>
@@ -42,9 +42,9 @@
 #include <sys/ndifm.h>
 #include <sys/fm/util.h>
 #include <sys/hotplug/pci/pcihp.h>
-#include <io/pci/pci_tools_ext.h>
 #include <io/pci/pci_common.h>
-#include <io/pciex/pcie_nvidia.h>
+#include <io/pci/pci_tools_ext.h>
+#include <io/pciex/pcie_error.h>
 
 /*
  * Bus Operation functions
@@ -59,16 +59,6 @@ static int	npe_fm_init(dev_info_t *, dev_info_t *, int,
 		    ddi_iblock_cookie_t *);
 
 static int	npe_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
-
-/*
- * Disable URs and Received MA for all PCIe devices.  Until x86 SW is changed so
- * that random drivers do not do PIO accesses on devices that it does not own,
- * these error bits must be disabled.  SERR must also be disabled if URs have
- * been masked.
- */
-uint32_t	npe_aer_uce_mask = PCIE_AER_UCE_UR;
-uint32_t	npe_aer_ce_mask = 0;
-uint32_t	npe_aer_suce_mask = PCIE_AER_SUCE_RCVD_MA;
 
 struct bus_ops npe_bus_ops = {
 	BUSO_REV,
@@ -168,7 +158,6 @@ static int npe_initchild(dev_info_t *child);
 extern void	npe_query_acpi_mcfg(dev_info_t *dip);
 extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
-extern void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
 
 /*
  * Module linkage information for the kernel.
@@ -187,6 +176,7 @@ static struct modlinkage modlinkage = {
 
 /* Save minimal state. */
 void *npe_statep;
+
 
 int
 _init(void)
@@ -254,8 +244,6 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	pcip->pci_dip = devi;
 
-	pcie_rc_init_bus(devi);
-
 	/*
 	 * Initialize hotplug support on this bus. At minimum
 	 * (for non hotplug bus) this would create ":devctl" minor
@@ -274,23 +262,19 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ddi_soft_state_free(npe_statep, instance);
 		return (DDI_FAILURE);
 	}
-
 	pcip->pci_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
 	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 	ddi_fm_init(devi, &pcip->pci_fmcap, &pcip->pci_fm_ibc);
 
-	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE) {
+	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
 		ddi_fm_handler_register(devi, npe_fm_callback, NULL);
-	}
-
-	PCIE_DIP2PFD(devi) = kmem_zalloc(sizeof (pf_data_t), KM_SLEEP);
-	pcie_rc_init_pfd(devi, PCIE_DIP2PFD(devi));
 
 	npe_query_acpi_mcfg(devi);
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);
 
 }
+
 
 /*ARGSUSED*/
 static int
@@ -314,10 +298,6 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 		if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
 			ddi_fm_handler_unregister(devi);
-
-		pcie_rc_fini_bus(devi);
-		pcie_rc_fini_pfd(PCIE_DIP2PFD(devi));
-		kmem_free(PCIE_DIP2PFD(devi), sizeof (pf_data_t));
 
 		ddi_fm_fini(devi);
 		ddi_soft_state_free(npe_statep, instance);
@@ -630,10 +610,7 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int		totreg;
 	uint_t		reglen;
 	pci_regspec_t	*drv_regp;
-	struct attachspec *asp;
-	struct detachspec *dsp;
-	pci_state_t	*pci_p = ddi_get_soft_state(npe_statep,
-	    ddi_get_instance(dip));
+	struct	attachspec *asp;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -700,15 +677,7 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	/* X86 systems support PME wakeup from suspended state */
 	case DDI_CTLOPS_ATTACH:
-		if (!pcie_is_child(dip, rdip))
-			return (DDI_SUCCESS);
-
 		asp = (struct attachspec *)arg;
-		if ((asp->when == DDI_POST) && (asp->result == DDI_SUCCESS)) {
-			pf_init(rdip, (void *)pci_p->pci_fm_ibc, asp->cmd);
-			(void) pcie_postattach_child(rdip);
-		}
-
 		/* only do this for immediate children */
 		if (asp->cmd == DDI_RESUME && asp->when == DDI_PRE &&
 		    ddi_get_parent(rdip) == dip)
@@ -719,25 +688,16 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				    (void *) dip);
 				/* NOTREACHED */
 			}
-
-		return (DDI_SUCCESS);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
 	case DDI_CTLOPS_DETACH:
-		if (!pcie_is_child(dip, rdip))
-			return (DDI_SUCCESS);
-
-		dsp = (struct detachspec *)arg;
-
-		if (dsp->when == DDI_PRE)
-			pf_fini(rdip, dsp->cmd);
-
+		asp = (struct attachspec *)arg;
 		/* only do this for immediate children */
-		if (dsp->cmd == DDI_SUSPEND && dsp->when == DDI_POST &&
+		if (asp->cmd == DDI_SUSPEND && asp->when == DDI_POST &&
 		    ddi_get_parent(rdip) == dip)
 			if (pci_post_suspend(rdip) != DDI_SUCCESS)
 				return (DDI_FAILURE);
-
-		return (DDI_SUCCESS);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
 	default:
 		break;
@@ -762,9 +722,7 @@ npe_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 static int
 npe_initchild(dev_info_t *child)
 {
-	char		name[80];
-	pcie_bus_t	*bus_p;
-	uint32_t	regs;
+	char			name[80];
 	ddi_acc_handle_t	cfg_hdl;
 
 	/*
@@ -839,53 +797,13 @@ npe_initchild(dev_info_t *child)
 	else
 		ddi_set_parent_data(child, NULL);
 
-	/* Disable certain errors on PCIe drivers for x86 platforms */
-	regs = pcie_get_aer_uce_mask() | npe_aer_uce_mask;
-	pcie_set_aer_uce_mask(regs);
-	regs = pcie_get_aer_ce_mask() | npe_aer_ce_mask;
-	pcie_set_aer_ce_mask(regs);
-	regs = pcie_get_aer_suce_mask() | npe_aer_suce_mask;
-	pcie_set_aer_suce_mask(regs);
-
 	/*
-	 * If URs are disabled, mask SERRs as well, otherwise the system will
-	 * still be notified of URs
+	 * Enable AER next pointer being displayed and PCIe Error initilization
 	 */
-	if (npe_aer_uce_mask & PCIE_AER_UCE_UR)
-		pcie_set_serr_mask(1);
-
 	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
 		npe_ck804_fix_aer_ptr(cfg_hdl);
-		npe_nvidia_error_mask(cfg_hdl);
+		(void) pcie_error_enable(child, cfg_hdl);
 		pci_config_teardown(&cfg_hdl);
-	}
-
-	bus_p = pcie_init_bus(child);
-	if (bus_p) {
-		uint16_t device_id = (uint16_t)(bus_p->bus_dev_ven_id >> 16);
-		uint16_t vendor_id = (uint16_t)(bus_p->bus_dev_ven_id & 0xFFFF);
-		uint16_t rev_id = bus_p->bus_rev_id;
-
-		/* Disable AER for certain NVIDIA Chipsets */
-		if ((vendor_id == NVIDIA_VENDOR_ID) &&
-		    (device_id == NVIDIA_CK804_DEVICE_ID) &&
-		    (rev_id < NVIDIA_CK804_AER_VALID_REVID))
-			bus_p->bus_aer_off = 0;
-
-		(void) pcie_initchild(child);
-
-		/* If device is an NVIDIA RC do device specific error setup */
-		if ((vendor_id == NVIDIA_VENDOR_ID) &&
-		    NVIDIA_PCIE_RC_DEV_ID(device_id)) {
-			ddi_acc_handle_t cfg_hdl = bus_p->bus_cfg_hdl;
-			uint16_t rc_ctl;
-
-			rc_ctl = pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF +
-			    0x2);
-			pci_config_put16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2,
-			    rc_ctl | NVIDIA_INTR_BCR_SERR_FORWARD_BIT);
-		}
-
 	}
 
 	return (DDI_SUCCESS);
@@ -895,8 +813,22 @@ npe_initchild(dev_info_t *child)
 static int
 npe_removechild(dev_info_t *dip)
 {
-	pcie_uninitchild(dip);
+	ddi_acc_handle_t		cfg_hdl;
+	struct ddi_parent_private_data	*pdptr;
 
+	/*
+	 * Do it way early.
+	 * Otherwise ddi_map() call form pcie_error_fini crashes
+	 */
+	if (pci_config_setup(dip, &cfg_hdl) == DDI_SUCCESS) {
+		pcie_error_disable(dip, cfg_hdl);
+		pci_config_teardown(&cfg_hdl);
+	}
+
+	if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
+		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));
+		ddi_set_parent_data(dip, NULL);
+	}
 	ddi_set_name_addr(dip, NULL);
 
 	/*
@@ -940,7 +872,6 @@ npe_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (ENXIO);
 
 	dip = pci_p->pci_dip;
-
 	return (pci_common_ioctl(dip, dev, cmd, arg, mode, credp, rvalp));
 }
 
@@ -976,13 +907,5 @@ npe_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 static int
 npe_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
 {
-	/*
-	 * On current x86 systems, npe's callback does not get called for failed
-	 * loads.  If in the future this feature is used, the fault PA should be
-	 * logged in the derr->fme_bus_specific field.  The appropriate PCIe
-	 * error handling code should be called and needs to be coordinated with
-	 * safe access handling.
-	 */
-
-	return (DDI_FM_OK);
+	return (ndi_fm_handler_dispatch(dip, NULL, derr));
 }

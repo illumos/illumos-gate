@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,8 +70,6 @@ extern "C" {
 #define	PCIE_PCIECAP_DEV_TYPE_DOWN	0x60	/* Downstream Port of Switch */
 #define	PCIE_PCIECAP_DEV_TYPE_PCIE2PCI	0x70	/* PCI-E to PCI Bridge */
 #define	PCIE_PCIECAP_DEV_TYPE_PCI2PCIE	0x80	/* PCI to PCI-E Bridge */
-#define	PCIE_PCIECAP_DEV_TYPE_RC_IEP	0x90	/* RootComplex Integrated Dev */
-#define	PCIE_PCIECAP_DEV_TYPE_RC_EC	0xA0	/* RootComplex Evt Collector */
 #define	PCIE_PCIECAP_DEV_TYPE_MASK	0xF0	/* Device/Port Type Mask */
 #define	PCIE_PCIECAP_SLOT_IMPL		0x100	/* Slot Impl vs Integrated */
 #define	PCIE_PCIECAP_INT_MSG_NUM	0x3700	/* Interrupt Message Number */
@@ -482,7 +480,7 @@ extern "C" {
 #define	PCIE_AER_ERR_SRC_ID_CE_SHIFT	0	/* ERR_COR Source ID */
 #define	PCIE_AER_ERR_SRC_ID_CE_MASK	0xFFFF
 #define	PCIE_AER_ERR_SRC_ID_UE_SHIFT	16	/* ERR_FATAL/NONFATAL Src ID */
-#define	PCIE_AER_ERR_SRC_ID_UE_MASK	0xFFFF
+#define	PCIE_AER_ERR_SRC_ID_UE_MASK	0xFFF
 
 /*
  * AER Secondary Uncorrectable Error Register

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ static void pcie_add_comps(dev_info_t *dip, dev_info_t *cdip,
 static void pcie_remove_comps(dev_info_t *dip, dev_info_t *cdip,
     pcie_pwr_t *pwr_p);
 static void pcie_pm_subrelease(dev_info_t *dip, pcie_pwr_t *pwr_p);
-static boolean_t pcie_is_pcie(dev_info_t *dip);
+static boolean_t pcie_is_pcie(ddi_acc_handle_t config_handle);
 #ifdef DEBUG
 static char *pcie_decode_pwr_op(pm_bus_power_op_t op);
 #else
@@ -528,7 +528,7 @@ pcie_add_comps(dev_info_t *dip, dev_info_t *cdip, pcie_pwr_t *pwr_p)
 		PCIE_SET_PMINFO(cdip, pcie_pm_p);
 	}
 	cpwr_p = (pcie_pwr_child_t *)kmem_zalloc(sizeof (pcie_pwr_child_t),
-	    KM_SLEEP);
+		    KM_SLEEP);
 	pcie_pm_p->pcie_par_pminfo = cpwr_p;
 	(cpwr_p->pwr_child_counters)[PCIE_UNKNOWN_INDEX] += comps;
 }
@@ -631,7 +631,7 @@ pwr_common_teardown(dev_info_t *dip)
 		return;
 
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
-	    "pm-want-child-notification?");
+		    "pm-want-child-notification?");
 	mutex_destroy(&pwr_p->pwr_lock);
 	pcie_pm_p->pcie_pwr_p = NULL;
 	kmem_free(pwr_p, sizeof (pcie_pwr_t));
@@ -794,8 +794,8 @@ pcie_pm_remove_child(dev_info_t *dip, dev_info_t *cdip)
 		return (DDI_SUCCESS);
 	}
 	total = (counters[PCIE_D0_INDEX] + counters[PCIE_UNKNOWN_INDEX] +
-	    counters[PCIE_D1_INDEX] + counters[PCIE_D2_INDEX] +
-	    counters[PCIE_D3_INDEX]);
+		    counters[PCIE_D1_INDEX] + counters[PCIE_D2_INDEX] +
+		    counters[PCIE_D3_INDEX]);
 	/*
 	 * Mark idle if either there are no children or our lowest
 	 * possible level is less than the current level. Mark idle
@@ -814,11 +814,19 @@ pcie_pm_remove_child(dev_info_t *dip, dev_info_t *cdip)
 }
 
 boolean_t
-pcie_is_pcie(dev_info_t *dip)
+pcie_is_pcie(ddi_acc_handle_t config_handle)
 {
-	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
-	ASSERT(bus_p);
-	return (bus_p->bus_pcie_off != 0);
+	uint8_t cap_ptr, cap_id;
+
+	cap_ptr = pci_config_get8(config_handle, PCI_BCNF_CAP_PTR);
+	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		cap_id = pci_config_get8(config_handle, cap_ptr + PCI_CAP_ID);
+		if (cap_id == PCI_CAP_ID_PCI_E)
+			return (B_TRUE);
+		cap_ptr = pci_config_get8(config_handle,
+		    cap_ptr + PCI_CAP_NEXT_PTR);
+	}
+	return (B_FALSE);
 }
 
 /*
@@ -829,6 +837,7 @@ pcie_pwr_resume(dev_info_t *dip)
 {
 	dev_info_t *cdip;
 	pcie_pwr_t *pwr_p = NULL;
+	ddi_acc_handle_t	config_handle;
 
 	if (PCIE_PMINFO(dip))
 		pwr_p = PCIE_NEXUS_PMINFO(dip);
@@ -875,17 +884,25 @@ pcie_pwr_resume(dev_info_t *dip)
 		    "DDI_RESUME: nexus restoring %s%d config regs\n",
 		    ddi_driver_name(cdip), ddi_get_instance(cdip));
 
+		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS) {
+			DBG(dip, "DDI_RESUME: "
+			    "pci_config_setup for %s%d failed\n",
+			    ddi_driver_name(cdip), ddi_get_instance(cdip));
+			continue;
+		}
+
 		/* clear errors left by OBP scrubbing */
-		pcie_clear_errors(cdip);
+		pcie_clear_errors(cdip, config_handle);
 
 		/* PCIe workaround: disable errors during 4K config resore */
-		if (is_pcie = pcie_is_pcie(cdip))
-			pcie_disable_errors(cdip);
+		if (is_pcie = pcie_is_pcie(config_handle))
+			pcie_disable_errors(cdip, config_handle);
 		(void) pci_restore_config_regs(cdip);
 		if (is_pcie) {
-			pcie_enable_errors(cdip);
-			(void) pcie_enable_ce(cdip);
+			pcie_enable_errors(cdip, config_handle);
+			(void) pcie_enable_ce(cdip, config_handle);
 		}
+		pci_config_teardown(&config_handle);
 
 		if (ndi_prop_remove(DDI_DEV_T_NONE, cdip,
 		    "nexus-saved-config-regs") != DDI_PROP_SUCCESS) {
@@ -904,6 +921,7 @@ int
 pcie_pwr_suspend(dev_info_t *dip)
 {
 	dev_info_t *cdip;
+	ddi_acc_handle_t	config_handle;
 	int i, *counters; /* per nexus counters */
 	int *child_counters = NULL; /* per child dip counters */
 	pcie_pwr_t *pwr_p = NULL;
@@ -1002,13 +1020,21 @@ pcie_pwr_suspend(dev_info_t *dip)
 		    " %s%d\n", ddi_driver_name(cdip), ddi_get_instance(cdip));
 
 		/* PCIe workaround: disable errors during 4K config save */
-		if (is_pcie = pcie_is_pcie(cdip))
-			pcie_disable_errors(cdip);
+		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS) {
+			DBG(dip, "DDI_SUSPEND: pci_config_setup "
+			    "for %s%d failed\n",
+			    ddi_driver_name(cdip), ddi_get_instance(cdip));
+			continue;
+		}
+
+		if (is_pcie = pcie_is_pcie(config_handle))
+			pcie_disable_errors(cdip, config_handle);
 		(void) pci_save_config_regs(cdip);
 		if (is_pcie) {
-			pcie_enable_errors(cdip);
-			(void) pcie_enable_ce(cdip);
+			pcie_enable_errors(cdip, config_handle);
+			(void) pcie_enable_ce(cdip, config_handle);
 		}
+		pci_config_teardown(&config_handle);
 	}
 	return (DDI_SUCCESS);
 }

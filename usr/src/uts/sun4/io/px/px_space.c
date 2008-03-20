@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,3 +164,83 @@ uint32_t px_log = PX_PANIC | PX_NO_PANIC | PX_PROTECTED | PX_HW_RESET;
 uint32_t px_log = PX_PANIC;
 #endif
 uint32_t px_die = PX_PANIC | PX_PROTECTED | PX_HW_RESET;
+
+/* Fire PCIe Error that should cause panics */
+boolean_t px_fabric_die = B_TRUE;
+
+/* Root Complex PCIe Error bit flags that should cause panics */
+uint32_t px_fabric_die_rc_ce = 0;
+uint32_t px_fabric_die_rc_ue = 0;
+
+/* Root Complex PCIe Error bit flags that should cause forgiven */
+uint32_t px_fabric_forgive_rc_ce = 0;
+uint32_t px_fabric_forgive_rc_ue = 0;
+
+/* Fabric Error that should cause panics */
+uint32_t px_fabric_die_ce = 0;
+uint32_t px_fabric_die_ue = PCIE_AER_UCE_UR |
+    PCIE_AER_UCE_UC |
+    PCIE_AER_UCE_TO |
+    PCIE_AER_UCE_RO |
+    PCIE_AER_UCE_FCP |
+    PCIE_AER_UCE_DLP |
+    PCIE_AER_UCE_TRAINING;
+
+/* Fabric Error that should cause panics even under protected access */
+uint32_t px_fabric_die_ce_gos = 0;
+uint32_t px_fabric_die_ue_gos = PCIE_AER_UCE_UC |
+    PCIE_AER_UCE_TO |
+    PCIE_AER_UCE_RO |
+    PCIE_AER_UCE_FCP |
+    PCIE_AER_UCE_DLP |
+    PCIE_AER_UCE_TRAINING;
+
+/* Fabric Bridge Sec. Error that should cause panics */
+uint16_t px_fabric_die_bdg_sts = PCI_STAT_S_PERROR |
+    PCI_STAT_R_TARG_AB |
+    PCI_STAT_R_MAST_AB |
+    PCI_STAT_S_SYSERR |
+    PCI_STAT_PERROR;
+
+/*
+ * Fabric Bridge Sec. Error that should cause panics even under
+ * protected access
+ */
+uint16_t px_fabric_die_bdg_sts_gos = PCI_STAT_S_PERROR |
+    PCI_STAT_PERROR;
+
+/* Fabric Switch Sec. Error that should cause panics */
+uint16_t px_fabric_die_sw_sts = PCI_STAT_R_TARG_AB |
+    PCI_STAT_R_MAST_AB;
+
+/*
+ * Fabric Switch Sec. Error that should cause panics even under
+ * protected access
+ */
+uint16_t px_fabric_die_sw_sts_gos = 0;
+
+uint32_t px_fabric_die_sue = PCIE_AER_SUCE_TA_ON_SC |
+    PCIE_AER_SUCE_MA_ON_SC |
+    PCIE_AER_SUCE_RCVD_TA |
+    PCIE_AER_SUCE_RCVD_MA |
+    PCIE_AER_SUCE_USC_ERR |
+    PCIE_AER_SUCE_USC_MSG_DATA_ERR |
+    PCIE_AER_SUCE_UC_DATA_ERR |
+    PCIE_AER_SUCE_UC_ATTR_ERR |
+    PCIE_AER_SUCE_UC_ADDR_ERR |
+    PCIE_AER_SUCE_TIMER_EXPIRED |
+    PCIE_AER_SUCE_PERR_ASSERT |
+    PCIE_AER_SUCE_SERR_ASSERT |
+    PCIE_AER_SUCE_INTERNAL_ERR;
+
+uint32_t px_fabric_die_sue_gos = PCIE_AER_SUCE_TA_ON_SC |
+    PCIE_AER_SUCE_MA_ON_SC |
+    PCIE_AER_SUCE_USC_ERR |
+    PCIE_AER_SUCE_USC_MSG_DATA_ERR |
+    PCIE_AER_SUCE_UC_DATA_ERR |
+    PCIE_AER_SUCE_UC_ATTR_ERR |
+    PCIE_AER_SUCE_UC_ADDR_ERR |
+    PCIE_AER_SUCE_TIMER_EXPIRED |
+    PCIE_AER_SUCE_PERR_ASSERT |
+    PCIE_AER_SUCE_SERR_ASSERT |
+    PCIE_AER_SUCE_INTERNAL_ERR;
