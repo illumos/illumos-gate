@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,7 +47,7 @@ i depend
 #
 d none usr 755 root sys
 d none usr/bin 755 root bin 
-f none usr/bin/lpc 0555 root bin
-f none usr/bin/lpq 0555 root bin
-f none usr/bin/lpr 0555 root bin
-f none usr/bin/lprm 0555 root bin
+s none usr/bin/lpc=../sbin/print-service
+s none usr/bin/lpq=../sbin/print-service
+s none usr/bin/lpr=../sbin/print-service
+s none usr/bin/lprm=../sbin/print-service

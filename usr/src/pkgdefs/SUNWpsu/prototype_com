@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,13 +48,26 @@ d none usr/lib 755 root bin
 f none usr/lib/lpsched 555 root lp
 d none usr/lib/lp 755 root lp
 d none usr/lib/lp/bin 755 root lp
+f none usr/lib/lp/bin/accept 0555 root bin
 f none usr/lib/lp/bin/alert.proto 444 root lp
+f none usr/lib/lp/bin/cancel 0555 root bin
+f none usr/lib/lp/bin/disable 0555 root bin
 f none usr/lib/lp/bin/drain.output 555 root lp
+f none usr/lib/lp/bin/enable 0555 root bin
+f none usr/lib/lp/bin/lp 0555 root bin
 f none usr/lib/lp/bin/lp.cat 555 root lp
 f none usr/lib/lp/bin/lp.set 555 root lp
 f none usr/lib/lp/bin/lp.tell 555 root lp
-f none usr/lib/lp/bin/slow.filter 555 root lp
+f none usr/lib/lp/bin/lpadmin 0555 root bin
+f none usr/lib/lp/bin/lpc 0555 root bin
+f none usr/lib/lp/bin/lpmove 0555 root bin
+f none usr/lib/lp/bin/lpq 0555 root bin
+f none usr/lib/lp/bin/lpr 0555 root bin
+f none usr/lib/lp/bin/lprm 0555 root bin
+f none usr/lib/lp/bin/lpstat 0555 root bin
 f none usr/lib/lp/bin/netpr 4511 root bin
+f none usr/lib/lp/bin/reject 0555 root bin
+f none usr/lib/lp/bin/slow.filter 555 root lp
 d none usr/lib/lp/model 755 root lp
 f none usr/lib/lp/model/standard 555 root lp
 f none usr/lib/lp/model/netstandard 555 root lp
@@ -64,17 +77,23 @@ d none usr/lib/lp/local 755 root lp
 f none usr/lib/lp/local/lpsched 555 root lp
 f none usr/lib/lp/local/lpadmin 555 root lp
 f none usr/lib/lp/local/lpshut 555 root lp
-#	links maintianed for convenience
+#	links maintained for backward compatibility
+s none usr/lib/accept=../sbin/accept
+s none usr/lib/lpadmin=../sbin/lpadmin
 s none usr/lib/lpfilter=../sbin/lpfilter
 s none usr/lib/lpforms=../sbin/lpforms
+s none usr/lib/lpmove=../sbin/lpmove
 s none usr/lib/lpusers=../sbin/lpusers
 s none usr/lib/lpshut=../sbin/lpshut
+s none usr/lib/lpsystem=../sbin/lpsystem
+s none usr/lib/reject=../sbin/reject
 #	lp specific admin commands
 d none usr/sbin 755 root bin
 f none usr/sbin/lpfilter 555 root lp
 f none usr/sbin/lpforms 555 root lp
-f none usr/sbin/lpusers 555 root lp
 f none usr/sbin/lpshut 555 root lp
+f none usr/sbin/lpsystem 0555 root lp
+f none usr/sbin/lpusers 555 root lp
 #	PAPI lpsched service module
 d none usr/lib/print 0755 root lp
 f none usr/lib/print/psm-lpsched.so.1 0755 root lp

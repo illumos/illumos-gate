@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,8 +50,6 @@ f none usr/bin/lptest 555 root lp
 d none usr/lib 0755 root bin
 f none usr/lib/libprint.so.2 0755 root bin
 s none usr/lib/libprint.so=./libprint.so.2
-s none usr/lib/lpadmin=../sbin/lpadmin
-s none usr/lib/lpsystem=../sbin/lpsystem
 d none usr/lib/print 0755 root lp
 f none usr/lib/print/Makefile.yp 0444 root lp
 f none usr/lib/print/in.lpd 0555 root bin
@@ -59,5 +57,5 @@ f none usr/lib/print/conv_fix 0555 root lp
 f none usr/lib/print/conv_lp 0555 root lp
 f none usr/lib/print/conv_lpd 0555 root lp
 d none usr/sbin 0755 root bin
-f none usr/sbin/lpadmin 0555 root lp
-f none usr/sbin/lpsystem 0555 root lp
+s none usr/sbin/lpadmin=./print-service
+f none usr/sbin/print-service 0555 root bin

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,16 +29,21 @@ include		../Makefile.sp
 
 UCBPROGS =	lpr lpq lprm lpc
 BINPROGS =	lp lpstat cancel enable disable $(UCBPROGS)
-
 SBINPROGS =	accept reject lpmove
+
 LIBPRINTPROGS =	in.lpd
+
+LIBLPPROGS = $(BINPROGS) $(SBINPROGS)
 
 
 OBJS =	$(BINPROGS:=.o) $(SBINPROGS:=.o) $(LIBPRINTPROGS:=.o) common.o
 
+ROOTLIBLPBIN=$(ROOTLIBLP)/bin
+
 ROOTBINPROGS =		$(BINPROGS:%=$(ROOTBIN)/%)
 ROOTUSRSBINPROGS =	$(SBINPROGS:%=$(ROOTUSRSBIN)/%)
 ROOTLIBPRINTPROGS =	$(LIBPRINTPROGS:%=$(ROOTLIBPRINT)/%)
+ROOTLIBLPPROGS =	$(LIBLPPROGS:%=$(ROOTLIBLPBIN)/%)
 
 
 FILEMODE =	0555
@@ -58,6 +63,8 @@ LDLIBS +=	-lpapi -lc
 in.lpd:=	CFLAGS +=	-DSOLARIS_PRIVATE_POST_0_9
 in.lpd:=	LDLIBS +=	-lnsl -lsocket
 
+all:	$(BINPROGS) $(SBINPROGS)
+
 #	each program needs common.o as well
 $(BINPROGS) $(SBINPROGS) $(LIBPRINTPROGS):	$(BINPROGS:%=%.c) $(SBINPROGS:%=%.c)  $(LIBPRINTPROGS:%=%.c) common.o
 	$(LINK.c) -o $@ $@.c common.o $(LDLIBS)
@@ -67,6 +74,9 @@ $(BINPROGS) $(SBINPROGS) $(LIBPRINTPROGS):	$(BINPROGS:%=%.c) $(SBINPROGS:%=%.c) 
 ROOTUSRUCB =		$(ROOT)/usr/ucb
 ROOTUCBSYMLINKS =	$(UCBPROGS:%=$(ROOTUSRUCB)/%)
 $(ROOTUSRUCB)/%:	$(ROOTUSRUCB) %
+
+$(ROOTLIBLPBIN)/%:	%
+	$(INS.file)
 
 $(ROOTUCBSYMLINKS):	
 	$(RM) $@; $(SYMLINK) ../bin/$(@F) $@
@@ -80,9 +90,7 @@ $(ROOTUSRLIBSYMLINKS):
 
 .KEEP_STATE:
 
-all:	$(BINPROGS) $(SBINPROGS)
-
-install:	$(BINPROGS) $(SBINPROGS) $(ROOTBINPROGS) $(ROOTUSRSBINPROGS) \
+install:	$(ROOTLIBLPPROGS) \
 		$(ROOTLIBPRINT) $(ROOTLIBPRINTPROGS) $(ROOTMANIFEST) \
 		$(ROOTUCBSYMLINKS) $(ROOTUSRLIBSYMLINKS)
 

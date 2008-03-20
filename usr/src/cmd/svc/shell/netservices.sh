@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,6 +34,8 @@ XSERVER_FMRI=svc:/application/x11/x11-server
 SENDMAIL_FMRI=svc:/network/smtp:sendmail
 PRINTSERVER_FMRI=svc:/application/print/server
 RFC1179_FMRI=svc:/application/print/rfc1179
+CUPSSERVER_FMRI=svc:/application/cups/scheduler
+CUPSRFC1179_FMRI=svc:/application/cups/in-lpd
 IPPLISTENER_FMRI=svc:/application/print/ipp-listener
 TTDB_FMRI=svc:/network/rpc/cde-ttdbserver
 DTLOGIN_FMRI=svc:/application/graphical-login/cde-login
@@ -206,6 +208,43 @@ set_smcwbem() {
 	svcadm refresh $SMCWBEM_FMRI
 }
 
+set_printing() {
+	use_cups=`svcprop -C -p general/active $CUPSSERVER_FMRI:default \
+		  2>/dev/null`
+
+	case "$1" in
+	"open")
+		cups_options="--remote-admin --remote-printers"
+		cups_options="$cups_options --share-printers --remote-any"
+		svc_operation="enable"
+		;;
+	"local")
+		cups_options="--no-remote-admin --no-remote-printers"
+		cups_options="$cups_options --no-share-printers --no-remote-any"
+		svc_operation="disable"
+		;;
+	esac
+
+	case "$use_cups" in
+	"true")
+		if [ -x /usr/sbin/cupsctl ] ; then
+			# only run cupsctl with elevated privilege to avoid
+			# being prompted for a password
+			[ `/usr/bin/id -u` = 0 ] && 
+				/usr/sbin/cupsctl $cups_options
+		fi
+		svcadm $svc_operation $CUPSRFC1179_FMRI
+		;;
+	*)
+		if [ "`svcprop -p restarter/state $PRINTSERVER_FMRI:default`" \
+		     != "disabled" ] ; then
+			svcadm $svc_operation $RFC1179_FMRI:default
+			svcadm $svc_operation $IPPLISTENER_FMRI:default
+		fi
+		;;
+	esac
+}
+
 if [ $# -ne 1 ]; then
 	usage
 fi
@@ -241,6 +280,7 @@ set_ttdbserver $keyword
 set_dtlogin $keyword
 set_webconsole $keyword
 set_smcwbem $keyword
+set_printing $keyword
 
 #
 # put the new profile into place, and apply it
@@ -251,17 +291,6 @@ if [ $profile = "generic_open.xml" ]
 then
 	# generic_open may not start inetd services on upgraded systems
 	svccfg apply /var/svc/profile/inetd_generic.xml
-
-	# disable rfc1179 and ipp-listener services if server is disabled
-	if [ "`svcprop -p restarter/state $PRINTSERVER_FMRI:default`" = \
-	    "disabled" ]
-	then
-		# need restart since refresh won't pick up new command-line
-		echo "print/server not enabled: disabling print/rfc1779"
-		svcadm disable $RFC1179_FMRI:default
-		echo "print/server not enabled: disabling print/ipp-listener"
-		svcadm disable $IPPLISTENER_FMRI:default
-	fi
 fi
 
 #

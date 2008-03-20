@@ -22,31 +22,33 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
+include ../../Makefile.cmd
 
-TMPLFILES += preremove
-DATAFILES += depend
+SBINPROG =	print-service
+LPBINLINKS =	lp lpstat cancel enable disable
+LPRBINLINKS =	lpr lpq lprm lpc
+BINLINKS =	$(LPBINLINKS) $(LPRBINLINKS)
+SBINLINKS =	accept reject lpmove lpadmin
 
-ACTION=grep SUNWpcr depend > /dev/null || \
-	( chmod 666 depend; \
-	echo "P SUNWpcr       Solaris Print - Client, (root)" >> depend; \
-	echo "P SUNWpapi      Free Standards Group Open Printing API" >> depend; \
-	echo "P SUNWperl584core SUNWperl584core Perl 5.8.4 (core)" >> depend; \
-	echo "I SUNWlpu       LP Print Service, (usr)" >> depend; \
-	chmod 444 depend );
+ROOTUSRSBINPROG =	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
+ROOTUSRBINLINKS =	$(BINLINKS:%=$(ROOTBIN)/%)
+ROOTUSRSBINLINKS =	$(SBINLINKS:%=$(ROOTUSRSBIN)/%)
+
+FILEMODE =	0555
+OWNER =		root
+
+$(ROOTUSRBINLINKS):
+	$(RM) $@; $(SYMLINK) ../sbin/$(SBINPROG) $@
+
+$(ROOTUSRSBINLINKS):
+	$(RM) $@; $(SYMLINK) $(SBINPROG) $@
 
 .KEEP_STATE:
 
-all: $(FILES) action
-install: all pkg
+all check clean clobber lint:
 
-# action is a pseudotarget denoting completed work on the depend file
-action: depend
-	$(ACTION)
-	touch $@
+install:	$(ROOTUSRSBINPROG) $(ROOTUSRBINLINKS) $(ROOTUSRSBINLINKS)
 
-include ../Makefile.targ
-include ../Makefile.prtarg

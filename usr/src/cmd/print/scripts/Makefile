@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,7 @@ ROOTLIBPRINTPROG=	$(PROG:%=$(ROOTPRINTLIB)/%)
 $(ROOTLIBPRINTPROG)	:= FILEMODE=0555
 $(ROOTPRINTLIB)/Makefile.yp		:= FILEMODE=0444
 
-USRSBINPROG=		lpsystem lpadmin ppdmgr
+USRSBINPROG=		lpsystem ppdmgr
 ROOTUSRSBINPROG=	$(USRSBINPROG:%=$(ROOTUSRSBIN)/%)
 $(ROOTUSRSBINPROG)		:= FILEMODE=555
 
@@ -66,11 +66,12 @@ $(ROOTMANUFALIASES)	:= OWNER=root
 $(ROOTMANUFALIASES)	:= GROUP=lp
 $(ROOTMANUFALIASES)	:= FILEMODE=444
 
-PPDPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp	
-ROOTPPDPROGS=		$(PPDPROGS:%=$(ROOTLIBLPBIN)/%)
-$(ROOTPPDPROGS)		:= OWNER=root
-$(ROOTPPDPROGS)		:= GROUP=lp
-$(ROOTPPDPROGS)		:= FILEMODE=555
+LIBLPPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp \
+			lpadmin
+ROOTLIBLPPROGS=		$(LIBLPPROGS:%=$(ROOTLIBLPBIN)/%)
+$(ROOTLIBLPPROGS)		:= OWNER=root
+$(ROOTLIBLPPROGS)		:= GROUP=lp
+$(ROOTLIBLPPROGS)		:= FILEMODE=555
 
 LIBLINKS=		$(ROOTLIB)/lpadmin $(ROOTLIB)/lpsystem
 
@@ -121,7 +122,7 @@ install:		$(ROOTLNKPROGS) \
 			$(ROOTLIBPRINTPROG) $(ROOTSTARTPROG) \
 			$(ROOTUSRSBIN) $(ROOTUSRSBINPROG) \
 			$(ROOTVARSPOOLPRINT) $(ROOTPCONF) \
-			$(ROOTPPDPROGS) $(LIBLINKS) \
+			$(ROOTLIBLPPROGS) $(LIBLINKS) \
 			$(ROOTVARLP) $(ROOTVARLPPPD) \
 			$(ROOTMANUFALIASES)
 

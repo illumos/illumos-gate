@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,17 +48,13 @@ i depend
 # SUNWpapi-lp-cmds
 #
 d none usr 755 root sys
-d none usr/bin 755 root bin 
-f none usr/bin/cancel 0555 root bin
-f none usr/bin/disable 0555 root bin
-f none usr/bin/enable 0555 root bin
-f none usr/bin/lp 0555 root bin
-f none usr/bin/lpstat 0555 root bin
-d none usr/lib 755 root bin
-s none usr/lib/accept=../sbin/accept
-s none usr/lib/lpmove=../sbin/lpmove
-s none usr/lib/reject=../sbin/reject
+d none usr/bin 755 root bin
+s none usr/bin/cancel=../sbin/print-service
+s none usr/bin/disable=../sbin/print-service
+s none usr/bin/enable=../sbin/print-service
+s none usr/bin/lp=../sbin/print-service
+s none usr/bin/lpstat=../sbin/print-service
 d none usr/sbin 755 root bin
-f none usr/sbin/accept 0555 root bin
-f none usr/sbin/lpmove 0555 root bin
-f none usr/sbin/reject 0555 root bin
+s none usr/sbin/accept=./print-service
+s none usr/sbin/lpmove=./print-service
+s none usr/sbin/reject=./print-service

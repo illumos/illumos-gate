@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,7 @@ PRINT_SUBDIRS  =		\
 		conv_fix	\
 		printer-info	\
 		ppdmgr		\
+		selector	\
 		bsd-sysv-commands
 
 SUBDIRS = $(PRINT_SUBDIRS) $(JAVA_SUBDIRS)

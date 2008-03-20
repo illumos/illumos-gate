@@ -183,6 +183,9 @@
   <service name='application/print/rfc1179' version='1' type='service'>
     <instance name='default' enabled='false' />
   </service>
+  <service name='application/cups/in-lpd' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
   <service name='application/stosreg' version='1' type='service'>
     <instance name='default' enabled='true' />
   </service>
