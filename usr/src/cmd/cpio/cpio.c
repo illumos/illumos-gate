@@ -5172,6 +5172,7 @@ openout(int dirfd)
 			}
 		} else if ((G_p->g_mode & Ftype) == S_IFLNK) {
 			if ((!(Args & OCp)) && !(Hdr_type == USTAR)) {
+				FILL(G_p->g_filesz);
 				(void) strncpy(Symlnk_p,
 				    Buffr.b_out_p, G_p->g_filesz);
 				*(Symlnk_p + G_p->g_filesz) = '\0';
@@ -6605,6 +6606,7 @@ verbose(char *nam_p)
 				(void) strcpy(Symlnk_p,
 				    Thdr_p->tbuf.t_linkname);
 			else {
+				FILL(Gen.g_filesz);
 				(void) strncpy(Symlnk_p, Buffr.b_out_p,
 				    Gen.g_filesz);
 				*(Symlnk_p + Gen.g_filesz) = '\0';
