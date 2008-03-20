@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,12 @@ typedef struct dsl_pool {
 	/* No lock needed - sync context only */
 	blkptr_t dp_meta_rootbp;
 	list_t dp_synced_datasets;
+	uint64_t dp_write_limit;
+
+	/* Uses dp_lock */
+	kmutex_t dp_lock;
+	uint64_t dp_space_towrite[TXG_SIZE];
+	uint64_t dp_tempreserved[TXG_SIZE];
 
 	/* Has its own locking */
 	tx_state_t dp_tx;
@@ -74,6 +80,10 @@ void dsl_pool_sync(dsl_pool_t *dp, uint64_t txg);
 void dsl_pool_zil_clean(dsl_pool_t *dp);
 int dsl_pool_sync_context(dsl_pool_t *dp);
 uint64_t dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree);
+int dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx);
+void dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
+void dsl_pool_memory_pressure(dsl_pool_t *dp);
+void dsl_pool_willuse_space(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
 
 #ifdef	__cplusplus
 }

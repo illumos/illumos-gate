@@ -672,6 +672,7 @@ dsl_dir_space_available(dsl_dir_t *dd,
 
 struct tempreserve {
 	list_node_t tr_node;
+	dsl_pool_t *tr_dp;
 	dsl_dir_t *tr_ds;
 	uint64_t tr_size;
 };
@@ -768,7 +769,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	    asize - ref_rsrv);
 	mutex_exit(&dd->dd_lock);
 
-	tr = kmem_alloc(sizeof (struct tempreserve), KM_SLEEP);
+	tr = kmem_zalloc(sizeof (struct tempreserve), KM_SLEEP);
 	tr->tr_ds = dd;
 	tr->tr_size = asize;
 	list_insert_tail(tr_list, tr);
@@ -794,7 +795,7 @@ int
 dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize, uint64_t asize,
     uint64_t fsize, uint64_t usize, void **tr_cookiep, dmu_tx_t *tx)
 {
-	int err = 0;
+	int err;
 	list_t *tr_list;
 
 	if (asize == 0) {
@@ -808,25 +809,40 @@ dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize, uint64_t asize,
 	ASSERT3S(asize, >, 0);
 	ASSERT3S(fsize, >=, 0);
 
-	err = dsl_dir_tempreserve_impl(dd, asize, fsize >= asize, FALSE,
-	    asize > usize, tr_list, tx);
+	err = arc_tempreserve_space(lsize, tx->tx_txg);
+	if (err == 0) {
+		struct tempreserve *tr;
+
+		tr = kmem_zalloc(sizeof (struct tempreserve), KM_SLEEP);
+		tr->tr_size = lsize;
+		list_insert_tail(tr_list, tr);
+
+		err = dsl_pool_tempreserve_space(dd->dd_pool, asize, tx);
+	} else {
+		if (err == EAGAIN) {
+			txg_delay(dd->dd_pool, tx->tx_txg, 1);
+			err = ERESTART;
+		}
+		dsl_pool_memory_pressure(dd->dd_pool);
+	}
 
 	if (err == 0) {
 		struct tempreserve *tr;
 
-		err = arc_tempreserve_space(lsize);
-		if (err == 0) {
-			tr = kmem_alloc(sizeof (struct tempreserve), KM_SLEEP);
-			tr->tr_ds = NULL;
-			tr->tr_size = lsize;
-			list_insert_tail(tr_list, tr);
-		}
+		tr = kmem_zalloc(sizeof (struct tempreserve), KM_SLEEP);
+		tr->tr_dp = dd->dd_pool;
+		tr->tr_size = asize;
+		list_insert_tail(tr_list, tr);
+
+		err = dsl_dir_tempreserve_impl(dd, asize, fsize >= asize,
+		    FALSE, asize > usize, tr_list, tx);
 	}
 
 	if (err)
 		dsl_dir_tempreserve_clear(tr_list, tx);
 	else
 		*tr_cookiep = tr_list;
+
 	return (err);
 }
 
@@ -847,14 +863,16 @@ dsl_dir_tempreserve_clear(void *tr_cookie, dmu_tx_t *tx)
 		return;
 
 	while (tr = list_head(tr_list)) {
-		if (tr->tr_ds == NULL) {
-			arc_tempreserve_clear(tr->tr_size);
-		} else {
+		if (tr->tr_dp) {
+			dsl_pool_tempreserve_clear(tr->tr_dp, tr->tr_size, tx);
+		} else if (tr->tr_ds) {
 			mutex_enter(&tr->tr_ds->dd_lock);
 			ASSERT3U(tr->tr_ds->dd_tempreserved[txgidx], >=,
 			    tr->tr_size);
 			tr->tr_ds->dd_tempreserved[txgidx] -= tr->tr_size;
 			mutex_exit(&tr->tr_ds->dd_lock);
+		} else {
+			arc_tempreserve_clear(tr->tr_size);
 		}
 		list_remove(tr_list, tr);
 		kmem_free(tr, sizeof (struct tempreserve));
@@ -863,13 +881,8 @@ dsl_dir_tempreserve_clear(void *tr_cookie, dmu_tx_t *tx)
 	kmem_free(tr_list, sizeof (list_t));
 }
 
-/*
- * Call in open context when we think we're going to write/free space,
- * eg. when dirtying data.  Be conservative (ie. OK to write less than
- * this or free more than this, but don't write more or free less).
- */
-void
-dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx)
+static void
+dsl_dir_willuse_space_impl(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx)
 {
 	int64_t parent_space;
 	uint64_t est_used;
@@ -887,7 +900,19 @@ dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx)
 
 	/* XXX this is potentially expensive and unnecessary... */
 	if (parent_space && dd->dd_parent)
-		dsl_dir_willuse_space(dd->dd_parent, parent_space, tx);
+		dsl_dir_willuse_space_impl(dd->dd_parent, parent_space, tx);
+}
+
+/*
+ * Call in open context when we think we're going to write/free space,
+ * eg. when dirtying data.  Be conservative (ie. OK to write less than
+ * this or free more than this, but don't write more or free less).
+ */
+void
+dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx)
+{
+	dsl_pool_willuse_space(dd->dd_pool, space, tx);
+	dsl_dir_willuse_space_impl(dd, space, tx);
 }
 
 /* call from syncing context when we actually write/free space for this dd */

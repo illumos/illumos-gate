@@ -157,7 +157,7 @@ dmu_tx_check_ioerr(zio_t *zio, dnode_t *dn, int level, uint64_t blkid)
 	rw_exit(&dn->dn_struct_rwlock);
 	if (db == NULL)
 		return (EIO);
-	err = dbuf_read(db, zio, DB_RF_CANFAIL);
+	err = dbuf_read(db, zio, DB_RF_CANFAIL | DB_RF_NOPREFETCH);
 	dbuf_rele(db, FTAG);
 	return (err);
 }

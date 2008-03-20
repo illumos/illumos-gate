@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,7 +356,13 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"spa_max_replication_override",
 		"spa_mode",
 		"zfs_flags",
-		"txg_time",
+		"zfs_txg_synctime",
+		"zfs_txg_timeout",
+		"zfs_write_limit_min",
+		"zfs_write_limit_max",
+		"zfs_write_limit_shift",
+		"zfs_write_limit_override",
+		"zfs_no_write_throttle",
 		"zfs_vdev_cache_max",
 		"zfs_vdev_cache_size",
 		"zfs_vdev_cache_bshift",
@@ -372,7 +378,7 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"zfs_read_chunk_size",
 		"zil_disable",
 		"zfs_nocacheflush",
-		"zio_gang_bang",
+		"metaslab_gang_bang",
 		"zio_injection_enabled",
 		"zvol_immediate_write_sz",
 	};

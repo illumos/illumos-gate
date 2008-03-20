@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,9 @@
 #include <sys/zio.h>
 #include <sys/zfs_context.h>
 #include <sys/fs/zfs.h>
+
+int zfs_no_write_throttle = 0;
+uint64_t zfs_write_limit_override = 0;
 
 static int
 dsl_pool_open_mos_dir(dsl_pool_t *dp, dsl_dir_t **ddp)
@@ -57,11 +60,13 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 {
 	dsl_pool_t *dp;
 	blkptr_t *bp = spa_get_rootblkptr(spa);
+	extern uint64_t zfs_write_limit_min;
 
 	dp = kmem_zalloc(sizeof (dsl_pool_t), KM_SLEEP);
 	dp->dp_spa = spa;
 	dp->dp_meta_rootbp = *bp;
 	rw_init(&dp->dp_config_rwlock, NULL, RW_DEFAULT, NULL);
+	dp->dp_write_limit = zfs_write_limit_min;
 	txg_init(dp, txg);
 
 	txg_list_create(&dp->dp_dirty_datasets,
@@ -72,6 +77,8 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	    offsetof(dsl_sync_task_group_t, dstg_node));
 	list_create(&dp->dp_synced_datasets, sizeof (dsl_dataset_t),
 	    offsetof(dsl_dataset_t, ds_synced_link));
+
+	mutex_init(&dp->dp_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	return (dp);
 }
@@ -134,6 +141,7 @@ dsl_pool_close(dsl_pool_t *dp)
 	arc_flush(dp->dp_spa);
 	txg_fini(dp);
 	rw_destroy(&dp->dp_config_rwlock);
+	mutex_destroy(&dp->dp_lock);
 	kmem_free(dp, sizeof (dsl_pool_t));
 }
 
@@ -252,4 +260,80 @@ dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree)
 		resv >>= 1;
 
 	return (space - resv);
+}
+
+int
+dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx)
+{
+	uint64_t reserved = 0;
+	uint64_t write_limit = (zfs_write_limit_override ?
+	    zfs_write_limit_override : dp->dp_write_limit);
+
+	if (zfs_no_write_throttle) {
+		dp->dp_tempreserved[tx->tx_txg & TXG_MASK] += space;
+		return (0);
+	}
+
+	/*
+	 * Check to see if we have exceeded the maximum allowed IO for
+	 * this transaction group.  We can do this without locks since
+	 * a little slop here is ok.  Note that we do the reserved check
+	 * with only half the requested reserve: this is because the
+	 * reserve requests are worst-case, and we really don't want to
+	 * throttle based off of worst-case estimates.
+	 */
+	if (write_limit > 0) {
+		reserved = dp->dp_space_towrite[tx->tx_txg & TXG_MASK]
+		    + dp->dp_tempreserved[tx->tx_txg & TXG_MASK] / 2;
+
+		if (reserved && reserved > write_limit)
+			return (ERESTART);
+	}
+
+	atomic_add_64(&dp->dp_tempreserved[tx->tx_txg & TXG_MASK], space);
+
+	/*
+	 * If this transaction group is over 7/8ths capacity, delay
+	 * the caller 1 clock tick.  This will slow down the "fill"
+	 * rate until the sync process can catch up with us.
+	 */
+	if (reserved && reserved > (write_limit - write_limit << 3))
+		txg_delay(dp, tx->tx_txg, 1);
+
+	return (0);
+}
+
+void
+dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx)
+{
+	ASSERT(dp->dp_tempreserved[tx->tx_txg & TXG_MASK] >= space);
+	atomic_add_64(&dp->dp_tempreserved[tx->tx_txg & TXG_MASK], -space);
+}
+
+void
+dsl_pool_memory_pressure(dsl_pool_t *dp)
+{
+	extern uint64_t zfs_write_limit_min;
+	uint64_t space_inuse = 0;
+	int i;
+
+	if (dp->dp_write_limit == zfs_write_limit_min)
+		return;
+
+	for (i = 0; i < TXG_SIZE; i++) {
+		space_inuse += dp->dp_space_towrite[i];
+		space_inuse += dp->dp_tempreserved[i];
+	}
+	dp->dp_write_limit = MAX(zfs_write_limit_min,
+	    MIN(dp->dp_write_limit, space_inuse / 4));
+}
+
+void
+dsl_pool_willuse_space(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx)
+{
+	if (space > 0) {
+		mutex_enter(&dp->dp_lock);
+		dp->dp_space_towrite[tx->tx_txg & TXG_MASK] += space;
+		mutex_exit(&dp->dp_lock);
+	}
 }
