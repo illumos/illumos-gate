@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,11 +29,11 @@
 PATH=/usr/bin:/usr/sbin
 CLEANUP=/tmp/CLEANUP
 
-LBLMOD1=$BASEDIR/kernel/sys/lbl_edition
-LBLMOD2=$BASEDIR/kernel/sys/amd64/lbl_edition
-LBLMOD3=$BASEDIR/kernel/sys/sparcv9/lbl_edition
+LMOD1=/kernel/sys/lbl_edition
+LMOD2=/kernel/sys/amd64/lbl_edition
+LMOD3=/kernel/sys/sparcv9/lbl_edition
 
-if [ -f $LBLMOD1 -o -f $LBLMOD2 -o -f $LBLMOD3 ]; then
+if [ -f $BASEDIR/$LMOD1 -o -f $BASEDIR/$LMOD2 -o -f $BASEDIR/$LMOD3 ]; then
 	# Set sys_labeling in etc/system
 	grep -v "sys_labeling=" $BASEDIR/etc/system > /tmp/etc.system.$$
 	echo "set sys_labeling=1" >> /tmp/etc.system.$$
@@ -44,9 +44,9 @@ if [ -f $LBLMOD1 -o -f $LBLMOD2 -o -f $LBLMOD3 ]; then
 		exit 1
 	fi
 
-	rm -f $LBLMOD1 > /dev/null 2>&1
-	rm -f $LBLMOD2 > /dev/null 2>&1
-	rm -f $LBLMOD3 > /dev/null 2>&1
+	removef $PKGINST $LMOD1 $LMOD2 $LMOD3 >/dev/null 2>&1
+	rm -f $BASEDIR/$LMOD1 $BASEDIR/$LMOD2 $BASEDIR/$LMOD3 > /dev/null 2>&1
+	removef -f $PKGINST >/dev/null 2>&1
 
 	cat >> $BASEDIR/var/svc/profile/upgrade <<\__SMF_ENABLE
 		/usr/sbin/svcadm enable -s svc:/system/labeld:default
