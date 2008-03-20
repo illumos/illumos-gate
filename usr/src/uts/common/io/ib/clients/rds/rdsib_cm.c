@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -145,7 +145,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 
 	RDS_DPRINTF2("rds_handle_cm_req",
 	    "REQ Received: From IP: 0x%x To IP: 0x%x type: %d",
-	    ipcm_info.SRCIP, ipcm_info.DSTIP, cmp.cmp_eptype);
+	    ntohl(ipcm_info.SRCIP), ntohl(ipcm_info.DSTIP), cmp.cmp_eptype);
 
 	if (cmp.cmp_version != RDS_VERSION) {
 		RDS_DPRINTF0(LABEL, "Version Mismatch: Local version: %d "
@@ -194,7 +194,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 
 	/* Is there a session to the destination node? */
 	rw_enter(&statep->rds_sessionlock, RW_READER);
-	sp = rds_session_lkup(statep, ipcm_info.SRCIP, rgid.gid_guid);
+	sp = rds_session_lkup(statep, ntohl(ipcm_info.SRCIP), rgid.gid_guid);
 	rw_exit(&statep->rds_sessionlock);
 
 	if (sp == NULL) {
@@ -203,12 +203,12 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		 * remote ip in the private data is the local ip and vice
 		 * versa
 		 */
-		sp = rds_session_create(statep, ipcm_info.DSTIP,
-		    ipcm_info.SRCIP, reqp, RDS_SESSION_PASSIVE);
+		sp = rds_session_create(statep, ntohl(ipcm_info.DSTIP),
+		    ntohl(ipcm_info.SRCIP), reqp, RDS_SESSION_PASSIVE);
 		if (sp == NULL) {
 			/* Check the list anyway. */
 			rw_enter(&statep->rds_sessionlock, RW_READER);
-			sp = rds_session_lkup(statep, ipcm_info.SRCIP,
+			sp = rds_session_lkup(statep, ntohl(ipcm_info.SRCIP),
 			    rgid.gid_guid);
 			rw_exit(&statep->rds_sessionlock);
 			if (sp == NULL) {
@@ -263,7 +263,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		/* move the session to init state */
 		rw_enter(&sp->session_lock, RW_WRITER);
 		ret = rds_session_reinit(sp, lgid);
-		sp->session_myip = ipcm_info.DSTIP;
+		sp->session_myip = ntohl(ipcm_info.DSTIP);
 		sp->session_lgid = lgid;
 		sp->session_rgid = rgid;
 		if (ret != 0) {
@@ -852,10 +852,10 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 
 	bzero(&ipcm_info, sizeof (ibt_ip_cm_info_t));
 	ipcm_info.src_addr.family = AF_INET;
-	ipcm_info.SRCIP = sp->session_myip;
+	ipcm_info.SRCIP = htonl(sp->session_myip);
 	ipcm_info.dst_addr.family = AF_INET;
-	ipcm_info.DSTIP = sp->session_remip;
-	ipcm_info.src_port = 6556; /* based on OFED RDS */
+	ipcm_info.DSTIP = htonl(sp->session_remip);
+	ipcm_info.src_port = htons(6556); /* based on OFED RDS */
 	ret = ibt_format_ip_private_data(&ipcm_info,
 	    sizeof (rds_cm_private_data_t), &cmp);
 	if (ret != IBT_SUCCESS) {

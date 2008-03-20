@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6226,7 +6226,7 @@ ibt_status_t
 ibt_format_ip_private_data(ibt_ip_cm_info_t *ip_cm_info,
     ibt_priv_data_len_t priv_data_len, void *priv_data_p)
 {
-	ibcm_ip_pvtdata_t	*ip_data;
+	ibcm_ip_pvtdata_t	ip_data;
 
 	IBTF_DPRINTF_L4(cmlog, "ibt_format_ip_private_data(%p, %d, %p)",
 	    ip_cm_info, priv_data_len, priv_data_p);
@@ -6238,30 +6238,30 @@ ibt_format_ip_private_data(ibt_ip_cm_info_t *ip_cm_info,
 		return (IBT_INVALID_PARAM);
 	}
 
-	/* bzero'ing just IP_HDR part */
-	bzero(priv_data_p, IBT_IP_HDR_PRIV_DATA_SZ);
-	ip_data = (ibcm_ip_pvtdata_t *)priv_data_p;
-	ip_data->ip_srcport = b2h16(ip_cm_info->src_port); /* Source Port */
+	bzero(&ip_data, sizeof (ibcm_ip_pvtdata_t));
+	ip_data.ip_srcport = ip_cm_info->src_port; /* Source Port */
 
 	/* IPV = 0x4, if IP-Addr are IPv4 format, else 0x6 for IPv6 */
 	if (ip_cm_info->src_addr.family == AF_INET) {
-		ip_data->ip_ipv = IBT_CM_IP_IPV_V4;
-		ip_data->ip_srcv4 = ntohl(ip_cm_info->src_addr.un.ip4addr);
-		ip_data->ip_dstv4 = ntohl(ip_cm_info->dst_addr.un.ip4addr);
+		ip_data.ip_ipv = IBT_CM_IP_IPV_V4;
+		ip_data.ip_srcv4 = ip_cm_info->src_addr.un.ip4addr;
+		ip_data.ip_dstv4 = ip_cm_info->dst_addr.un.ip4addr;
 	} else if (ip_cm_info->src_addr.family == AF_INET6) {
-		ip_data->ip_ipv = IBT_CM_IP_IPV_V6;
+		ip_data.ip_ipv = IBT_CM_IP_IPV_V6;
 		bcopy(&ip_cm_info->src_addr.un.ip6addr,
-		    &ip_data->ip_srcv6, sizeof (in6_addr_t));
+		    &ip_data.ip_srcv6, sizeof (in6_addr_t));
 		bcopy(&ip_cm_info->dst_addr.un.ip6addr,
-		    &ip_data->ip_dstv6, sizeof (in6_addr_t));
+		    &ip_data.ip_dstv6, sizeof (in6_addr_t));
 	} else {
 		IBTF_DPRINTF_L2(cmlog, "ibt_format_ip_private_data: ERROR "
 		    "IP Addr needs to be either AF_INET or AF_INET6 family.");
 		return (IBT_INVALID_PARAM);
 	}
 
-	ip_data->ip_MajV = IBT_CM_IP_MAJ_VER;
-	ip_data->ip_MinV = IBT_CM_IP_MIN_VER;
+	ip_data.ip_MajV = IBT_CM_IP_MAJ_VER;
+	ip_data.ip_MinV = IBT_CM_IP_MIN_VER;
+
+	bcopy(&ip_data, priv_data_p, IBT_IP_HDR_PRIV_DATA_SZ);
 
 	return (IBT_SUCCESS);
 }
@@ -6271,7 +6271,7 @@ ibt_status_t
 ibt_get_ip_data(ibt_priv_data_len_t priv_data_len, void *priv_data,
     ibt_ip_cm_info_t *ip_cm_infop)
 {
-	ibcm_ip_pvtdata_t	*ip_data;
+	ibcm_ip_pvtdata_t	ip_data;
 
 	IBTF_DPRINTF_L4(cmlog, "ibt_get_ip_data(%d, %p, %p)",
 	    priv_data_len, priv_data, ip_cm_infop);
@@ -6282,25 +6282,23 @@ ibt_get_ip_data(ibt_priv_data_len_t priv_data_len, void *priv_data,
 		return (IBT_INVALID_PARAM);
 	}
 
-	bzero(ip_cm_infop, sizeof (ibt_ip_cm_info_t));
-
-	ip_data = (ibcm_ip_pvtdata_t *)priv_data;
-	ip_cm_infop->src_port = b2h16(ip_data->ip_srcport); /* Source Port */
+	bcopy(priv_data, &ip_data, IBT_IP_HDR_PRIV_DATA_SZ);
+	ip_cm_infop->src_port = ip_data.ip_srcport; /* Source Port */
 
 	/* IPV = 0x4, if IP Address are IPv4 format, else 0x6 for IPv6 */
-	if (ip_data->ip_ipv == IBT_CM_IP_IPV_V4) {
+	if (ip_data.ip_ipv == IBT_CM_IP_IPV_V4) {
 		/* Copy IPv4 Addr */
 		ip_cm_infop->src_addr.family = AF_INET;
-		ip_cm_infop->src_addr.un.ip4addr = ntohl(ip_data->ip_srcv4);
+		ip_cm_infop->src_addr.un.ip4addr = ip_data.ip_srcv4;
 		ip_cm_infop->dst_addr.family = AF_INET;
-		ip_cm_infop->dst_addr.un.ip4addr = ntohl(ip_data->ip_dstv4);
-	} else if (ip_data->ip_ipv == IBT_CM_IP_IPV_V6) {
+		ip_cm_infop->dst_addr.un.ip4addr = ip_data.ip_dstv4;
+	} else if (ip_data.ip_ipv == IBT_CM_IP_IPV_V6) {
 		/* Copy IPv6 Addr */
 		ip_cm_infop->src_addr.family = AF_INET6;
-		bcopy(&ip_data->ip_srcv6, &ip_cm_infop->src_addr.un.ip6addr,
+		bcopy(&ip_data.ip_srcv6, &ip_cm_infop->src_addr.un.ip6addr,
 		    sizeof (in6_addr_t));
 		ip_cm_infop->dst_addr.family = AF_INET6;
-		bcopy(&ip_data->ip_dstv6, &ip_cm_infop->dst_addr.un.ip6addr,
+		bcopy(&ip_data.ip_dstv6, &ip_cm_infop->dst_addr.un.ip6addr,
 		    sizeof (in6_addr_t));
 	} else {
 		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_data: ERROR: IP Addr needs"
