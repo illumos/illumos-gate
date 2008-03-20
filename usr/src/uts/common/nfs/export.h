@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,6 +278,89 @@ struct log_buffer {
 	log_buffer_rele(lbp); \
 }
 
+/* Forward declarations */
+struct exportinfo;
+struct exp_visible;
+
+/*
+ * Treenodes are used to build tree representing every node which is part
+ * of nfs server pseudo namespace.
+ * This tree is interconnected with both exportinfo and exp_visible struct.
+ * When there is a need to walk the namespace (either starting in
+ * exportinfo or in exp_visible) we first make a step aside (to the left),
+ * walk up or down as needed, and then we step back (to the right).
+ *
+ *
+ *
+ *     NEW DATA STRUCT         ORIGINAL DATA STRUCT
+ *
+ * ns_root +---+               +----------+
+ *         | / |               |PSEUDO EXP|-->+---+   +---+   +---+
+ *         +---+---------  ----+----------+   | a |-->| k |-->| b |
+ *          /\                                +---+   +---+   +---+
+ *         /  \                                .       .       .
+ *     +---+...\.........  .....................       .       .
+ *    *| a |    \              +----------+            .       .
+ *     +---+-----\-------  ----|REAL EXP a|            .       .
+ *       /        \            +----------+            .       .
+ *      /        +===+...  .............................       .
+ *     /        *| k |         +----------+                    .
+ *    /          +===+---  ----|REAL EXP k|                    .
+ *   /                         +----------+                    .
+ *  +===+................  .....................................
+ * *| b |                      +----------+
+ *  +===+----------------  ----|REAL EXP b|-->+---+
+ *     \                       +----------+   | d |
+ *     +===+.............  ...................+---+
+ *     | d |                   +----------+
+ *     +===+-------------  ----|PSEUDO EXP|-->+---+   +---+
+ *     /                       +----------+   | e |-->| g |
+ * +---+.................  ...................+---+   +---+
+ * | e |                                              .
+ * +---+                                              .
+ *    \                                               .
+ *    +---+..............  ............................
+ *   *| g |                    +----------+
+ *    +---+--------------  ----|REAL EXP g|
+ *                             +----------+
+ *
+ *
+ *
+ * +===+               +---+                    +---+
+ * | b |..mountpoint   | e |..directory/file   *| a |..node is shared
+ * +===+  (VROOT)      +---+                    +---+
+ *
+ *
+ * Bi-directional interconnect:
+ *
+ * treenode_t::tree_exi ---------  exportinfo_t::exi_tree
+ * treenode_t::tree_vis ......... exp_visible_t::vis_tree
+ */
+/* Access to treenodei_t is under under protection of exported_lock RW_LOCK */
+typedef struct treenode {
+	/* support for generic n-ary trees */
+	struct treenode *tree_parent;
+	struct treenode *tree_child_first;
+	struct treenode *tree_sibling; /* next sibling */
+	/* private, nfs specific part */
+	struct exportinfo  *tree_exi;
+	struct exp_visible *tree_vis;
+} treenode_t;
+
+/*
+ * TREE_ROOT checks if the node corresponds to a filesystem root
+ * TREE_EXPORTED checks if the node is explicitly shared
+ */
+
+#define	TREE_ROOT(t) \
+	((t)->tree_exi && (t)->tree_exi->exi_vp->v_flag & VROOT)
+
+#define	TREE_EXPORTED(t) \
+	((t)->tree_exi && !PSEUDO((t)->tree_exi))
+
+/* Root of nfs pseudo namespace */
+treenode_t *ns_root;
+
 #define	EXPTABLESIZE	16
 
 /*
@@ -300,6 +383,7 @@ struct exportinfo {
 	fsid_t			exi_fsid;
 	struct fid		exi_fid;
 	struct exportinfo	*exi_hash;
+	struct treenode		*exi_tree;
 	fhandle_t		exi_fh;
 	krwlock_t		exi_cache_lock;
 	kmutex_t		exi_lock;
@@ -347,6 +431,7 @@ struct exp_visible {
 	int			vis_count;
 	int			vis_exported;
 	struct exp_visible	*vis_next;
+	struct treenode		*vis_tree;
 	struct secinfo		*vis_secinfo;
 	int			vis_seccnt;
 };
@@ -409,15 +494,16 @@ extern vnode_t *untraverse(vnode_t *);
 /*
  * Functions that handle the NFSv4 server namespace
  */
+extern exportinfo_t *vis2exi(struct exp_visible *);
 extern int	treeclimb_export(struct exportinfo *);
-extern int	treeclimb_unexport(struct exportinfo *);
+extern void	treeclimb_unexport(struct exportinfo *);
 extern int	nfs_visible(struct exportinfo *, vnode_t *, int *);
 extern int	nfs_visible_inode(struct exportinfo *, ino64_t, int *);
 extern int	has_visible(struct exportinfo *, vnode_t *);
 extern void	free_visible(struct exp_visible *);
 extern int	nfs_exported(struct exportinfo *, vnode_t *);
 extern int	pseudo_exportfs(vnode_t *, struct exp_visible *,
-					struct exportdata *);
+    struct exportdata *, struct exportinfo **);
 extern int	vop_fid_pseudo(vnode_t *, fid_t *fidp);
 extern int	nfs4_vget_pseudo(struct exportinfo *, vnode_t **, fid_t *);
 /*

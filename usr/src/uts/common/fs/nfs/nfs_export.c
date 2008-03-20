@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,10 +80,7 @@ extern void	sec_svc_freerootnames(int, int, caddr_t *);
 static int build_seclist_nodups(exportdata_t *, secinfo_t *, int);
 static void srv_secinfo_add(secinfo_t **, int *, secinfo_t *, int, int);
 static void srv_secinfo_remove(secinfo_t **, int *, secinfo_t *, int);
-static void pseudo_secinfo_add(exportinfo_t *, exp_visible_t *, exportinfo_t *);
-static void pseudo_secinfo_remove(exportinfo_t *, exp_visible_t *);
-static void free_pseudoanc(struct exp_visible *);
-static int srv_secinfo_treeclimb(exportinfo_t *, secinfo_t *, int, int);
+static void srv_secinfo_treeclimb(exportinfo_t *, secinfo_t *, int, int);
 
 #ifdef VOLATILE_FH_TEST
 static struct ex_vol_rename *find_volrnm_fh(exportinfo_t *, nfs_fh4 *);
@@ -111,7 +108,7 @@ fhandle_t nullfh2;	/* for comparing V2 filehandles */
  * macro for static dtrace probes to trace server namespace ref count mods.
  */
 #define	SECREF_TRACE(seclist, tag, flav, aftcnt) \
-	DTRACE_PROBE4(nfss__d__nmspc__secref, struct secinfo *, (seclist), \
+	DTRACE_PROBE4(nfss__i__nmspc__secref, struct secinfo *, (seclist), \
 		char *, (tag), int, (int)(flav), int, (int)(aftcnt))
 
 
@@ -486,129 +483,6 @@ srv_secinfo_remove(secinfo_t **pcursec, int *pcurcnt, secinfo_t *remsec,
 
 
 /*
- * pseudo_secinfo_add
- *	ancexi: ancestor exportinfo
- *	ancpseudo: linked list of ancestor pseudnodes
- *	newexi: new export that needs to inherit implicitly allowed flavors
- *
- * Increment secflavor ref counts in ancestor pseudonodes.  If newexi
- * is non-NULL, then also set newexi's implicitly allowed flavors by
- * copy the flavors in its pseudonode.
- *
- * There's no work to do if either the ancexi's pseudonode list
- * or ancpseudo is empty.
- *
- * ancexi->exi_visible could be NULL because sec flavor refs are
- * propagated after the namespace has been changed for the new
- * share/unshare.  In the unshare case, the pseudnodes leading to
- * this export have already been dereferenced and possibly destroyed.
- * If the parent export had no other shared descendants, then its
- * pseudonode list would be empty.
- */
-static void
-pseudo_secinfo_add(exportinfo_t *ancexi, exp_visible_t *ancpseudo,
-    exportinfo_t *newexi)
-{
-	exp_visible_t	*av, *v;
-	fid_t		*nxfid = NULL;
-	secinfo_t	**pnewsec = NULL;
-	int		*pnewcnt = NULL;
-	int		is_pseudo;
-
-
-	if (ancexi->exi_visible == NULL || ancpseudo == NULL)
-		return;
-
-	is_pseudo = PSEUDO(ancexi);
-
-	/*
-	 * Prepare to set newexi's implicitly allowed flavors by
-	 * inheriting flavors from newexi's pseudnode.
-	 *	nxfid  : used to find the newexi's pseudonode
-	 *	pnewsec: newexi's secinfo array
-	 *	pnewcnt: newexi's secinfo count
-	 */
-	if (newexi) {
-		nxfid = &newexi->exi_fid;
-		pnewsec = &newexi->exi_export.ex_secinfo;
-		pnewcnt = &newexi->exi_export.ex_seccnt;
-	}
-
-	/*
-	 * find the pseudonodes which correspond to the ones in ancvis.
-	 */
-	for (av = ancpseudo; av != NULL; av = av->vis_next) {
-		for (v = ancexi->exi_visible; v != NULL; v = v->vis_next) {
-
-			if (EQFID(&av->vis_fid, &v->vis_fid)) {
-				/*
-				 * It's a match.  First check to see if newexi
-				 * needs to get implicitly allowed flavors from
-				 * its pseudonode.
-				 *
-				 * ancpseudo is built [by srv_secinfo_treeclimb]
-				 * such that vis_exported is only set for the
-				 * pseudonode corresponding to newexi's root.
-				 */
-				if (nxfid && av->vis_exported &&
-				    v->vis_seccnt > 0) {
-
-					srv_secinfo_add(pnewsec, pnewcnt,
-					    v->vis_secinfo, v->vis_seccnt,
-					    is_pseudo);
-
-					nxfid = NULL;
-				}
-
-				/*
-				 * Apply flavor refs for the new export to
-				 * each of the parexi's pseudonodes
-				 */
-				srv_secinfo_add(&v->vis_secinfo, &v->vis_seccnt,
-				    av->vis_secinfo, av->vis_seccnt, is_pseudo);
-
-				break;
-			}
-		}
-	}
-}
-
-
-/*
- * pseudo_secinfo_remove
- *	ancexi: ancestor exportinfo
- *	ancpseudo: linked list of ancestor pseudnodes
- *
- * Decrement secflavor ref counts in ancestor pseudonodes.
- */
-static void
-pseudo_secinfo_remove(exportinfo_t *ancexi, exp_visible_t *ancpseudo)
-{
-	exp_visible_t	*av, *v;
-
-	if (ancexi->exi_visible == NULL || ancpseudo == NULL)
-		return;
-
-	/*
-	 * find the pseudonodes which correspond to the ones in ancvis.
-	 */
-	for (av = ancpseudo; av != NULL; av = av->vis_next) {
-		for (v = ancexi->exi_visible; v != NULL; v = v->vis_next) {
-			if (EQFID(&av->vis_fid, &v->vis_fid)) {
-
-				srv_secinfo_remove(&v->vis_secinfo,
-				    &v->vis_seccnt, av->vis_secinfo,
-				    av->vis_seccnt);
-
-				break;
-			}
-		}
-	}
-}
-
-
-
-/*
  * For the reshare case, sec flavor accounting happens in 3 steps:
  * 1) propagate addition of new flavor refs up the ancestor tree
  * 2) transfer flavor refs of descendants to new/reshared exportdata
@@ -621,7 +495,11 @@ pseudo_secinfo_remove(exportinfo_t *ancexi, exp_visible_t *ancpseudo)
  * If there is more than 1 export reference to an old flavor (i.e. some
  * of its children shared with this flavor), this flavor information
  * needs to be transferred to the new exportdata struct.  A flavor in
- * the old exportdata has descendant refs when s_refcnt > 1.
+ * the old exportdata has descendant refs when its s_refcnt > 1 or it
+ * is implicitly shared (M_SEC4_EXPORTED not set in s_flags).
+ *
+ * SEC_REF_EXPORTED() is only true when  M_SEC4_EXPORTED is set
+ * SEC_REF_SELF() is only true when both M_SEC4_EXPORTED is set and s_refcnt==1
  *
  * Transferring descendant flavor refcnts happens in 2 passes:
  * a) flavors used before (oldsecinfo) and after (curdata->ex_secinfo) reshare
@@ -817,168 +695,96 @@ srv_secinfo_exp2pseu(exportdata_t *curdata, exportdata_t *olddata)
 	curdata->ex_secinfo = msec;
 }
 
+/*
+ * Find for given exp_visible the exportinfo which has it
+ * linked on its exi_visible list.
+ *
+ * Note: We could add new pointer either to treenode or
+ * to exp_visible, which will point there directly.
+ * This would buy some speed for some memory.
+ */
+exportinfo_t *
+vis2exi(struct exp_visible *vis)
+{
+	exportinfo_t *exi_ret = NULL;
+	treenode_t *tnode = vis->vis_tree;
+
+	for (;;) {
+		tnode = tnode->tree_parent;
+		if (TREE_ROOT(tnode)) {
+			exi_ret = tnode->tree_exi;
+			break;
+		}
+	}
+
+	ASSERT(exi_ret); /* Every visible should have its home exportinfo */
+	return (exi_ret);
+}
 
 /*
  * For NFS V4.
  * Add or remove the newly exported or unexported security flavors of the
  * given exportinfo from its ancestors upto the system root.
  */
-int
+void
 srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 {
-	vnode_t *dvp, *vp;
-	fid_t fid;
-	int error = 0;
-	int exportdir, set_implicit_flav;
-	struct exportinfo *exi = NULL;
-	exp_visible_t *anc_head = NULL, *anc;
+	treenode_t *tnode = exip->exi_tree;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
+	ASSERT(tnode);
 
 	if (seccnt == 0)
-		return (0);
-
-	vp = exip->exi_vp;
-	VN_HOLD(vp);
-	exportdir = 1;
+		return;
 
 	/*
 	 * If flavors are being added and the new export root isn't
 	 * also VROOT, its implicitly allowed flavors are inherited from
 	 * from its pseudonode.
+	 * Note - for VROOT exports the implicitly allowed flavors were
+	 * transferred from the PSEUDO export in exportfs()
 	 */
-	set_implicit_flav = (isadd && !(vp->v_flag & VROOT)) ? 1 : 0;
-
-	anc_head = NULL;
-	anc = NULL;
-	for (;;) {
-		bzero(&fid, sizeof (fid));
-		fid.fid_len = MAXFIDSZ;
-		error = vop_fid_pseudo(vp, &fid);
-		if (error)
-			break;
-
-		if (! exportdir) {
-
-			exi = checkexport4(&vp->v_vfsp->vfs_fsid, &fid, vp);
-
-			if (exi != NULL) {
-				secinfo_t **pxsec = &exi->exi_export.ex_secinfo;
-				int *pxcnt = &exi->exi_export.ex_seccnt;
-
-				if (isadd)
-					srv_secinfo_add(pxsec, pxcnt, sec,
-					    seccnt, PSEUDO(exi));
-				else
-					srv_secinfo_remove(pxsec, pxcnt, sec,
-					    seccnt);
-			}
-		}
-
-		/*
-		 * If we're at the root of the filesystem:
-		 *   - manage pseudnode sec flavors
-		 *   - traverse mountpoint and continue treeclimb from the stub
-		 */
-		if (vp->v_flag & VROOT) {
-
-			if (exi != NULL) {
-				if (isadd) {
-					if (set_implicit_flav) {
-						pseudo_secinfo_add(exi,
-						    anc_head, exip);
-						set_implicit_flav = 0;
-					} else
-						pseudo_secinfo_add(exi,
-						    anc_head, NULL);
-				} else
-					pseudo_secinfo_remove(exi, anc_head);
-			}
-
-			if (anc_head) {
-				free_pseudoanc(anc_head);
-				anc_head = NULL;
-			}
-
-			if (VN_CMP(vp, rootdir)) {
-				/* at system root */
-				break;
-			}
-
-			vp = untraverse(vp);
-			exportdir = 0;
-			continue;
-		}
-
-		/*
-		 * Build a temporary list of ancestor pseudonodes leading to
-		 * the ancestor VROOT export.  vis_exported identifies the
-		 * pseudonode that corresponds to root of export being
-		 * shared/unshared.
-		 */
-		anc = kmem_alloc(sizeof (exp_visible_t), KM_SLEEP);
-		anc->vis_next = anc_head;
-		VN_HOLD(vp);
-		anc->vis_vp = vp;
-		anc->vis_fid = fid;
-		anc->vis_ino = 0;
-		anc->vis_count = 1;
-		anc->vis_seccnt = seccnt;
-		anc->vis_secinfo = sec;
-		anc->vis_exported = exportdir;
-		anc_head = anc;
-
-		/*
-		 * Now, do a ".." to find parent dir of vp.
-		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
-		    NULL, NULL, NULL);
-
-		if (error == ENOTDIR && exportdir) {
-			dvp = exip->exi_dvp;
-			ASSERT(dvp != NULL);
-			VN_HOLD(dvp);
-			error = 0;
-		}
-
-		if (error)
-			break;
-
-		exportdir = 0;
-		VN_RELE(vp);
-		vp = dvp;
+	if (isadd && !(exip->exi_vp->v_flag & VROOT) &&
+	    tnode->tree_vis->vis_seccnt > 0) {
+		srv_secinfo_add(&exip->exi_export.ex_secinfo,
+		    &exip->exi_export.ex_seccnt, tnode->tree_vis->vis_secinfo,
+		    tnode->tree_vis->vis_seccnt, FALSE);
 	}
 
-	VN_RELE(vp);
+	/*
+	 * Move to parent node and propagate sec flavor
+	 * to exportinfo and to visible structures.
+	 */
+	tnode = tnode->tree_parent;
 
-	if (anc_head)
-		free_pseudoanc(anc_head);
+	while (tnode) {
 
-	return (error);
-}
+		/* If there is exportinfo, update it */
+		if (tnode->tree_exi) {
+			secinfo_t **pxsec =
+			    &tnode->tree_exi->exi_export.ex_secinfo;
+			int *pxcnt = &tnode->tree_exi->exi_export.ex_seccnt;
+			int is_pseudo = PSEUDO(tnode->tree_exi);
+			if (isadd)
+				srv_secinfo_add(pxsec, pxcnt, sec, seccnt,
+				    is_pseudo);
+			else
+				srv_secinfo_remove(pxsec, pxcnt, sec, seccnt);
+		}
 
-/*
- * Free a list of visible directories
- */
-static void
-free_pseudoanc(struct exp_visible *head)
-{
-	struct exp_visible *visp, *next;
-
-	for (visp = head; visp; visp = next) {
-		if (visp->vis_vp != NULL)
-			VN_RELE(visp->vis_vp);
-		/*
-		 * we don't free vis_secinfo from the temporary pseudonode
-		 * ancestor list because it was never kmem_alloc'd.
-		 * srv_secinfo_treeclimb set it to point to the nodups
-		 * secinfo array (which is a stack var).
-		 */
-		next = visp->vis_next;
-		kmem_free(visp, sizeof (*visp));
+		/* Update every visible - only root node has no visible */
+		if (tnode->tree_vis) {
+			secinfo_t **pxsec = &tnode->tree_vis->vis_secinfo;
+			int *pxcnt = &tnode->tree_vis->vis_seccnt;
+			if (isadd)
+				srv_secinfo_add(pxsec, pxcnt, sec, seccnt,
+				    FALSE);
+			else
+				srv_secinfo_remove(pxsec, pxcnt, sec, seccnt);
+		}
+		tnode = tnode->tree_parent;
 	}
 }
-
 
 void
 export_link(exportinfo_t *exi) {
@@ -1038,6 +844,7 @@ nfs_exportinit(void)
 	export_link(exi_root);
 
 	nfslog_init();
+	ns_root = NULL;
 
 	return (0);
 }
@@ -1238,6 +1045,74 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		}
 		error = ENOENT;
 	}
+
+	if (error) {
+		/*
+		 * If this is a request to unexport, indicated by the
+		 * uex pointer being NULL, it is possible that the
+		 * directory has already been removed. In which case
+		 * we scan the export list which records the pathname
+		 * originally exported.
+		 */
+		if (STRUCT_FGETP(uap, uex) == NULL) {
+			char namebuf[TYPICALMAXPATHLEN];
+			struct pathname lookpn;
+			int i;
+
+			/* Read in pathname from userspace */
+			error = pn_get_buf(STRUCT_FGETP(uap, dname),
+			    UIO_USERSPACE, &lookpn, namebuf, sizeof (namebuf));
+			if (error == ENAMETOOLONG) {
+				/*
+				 * pathname > TYPICALMAXPATHLEN, use
+				 * pn_get() instead. Remember to
+				 * pn_free() afterwards.
+				 */
+				error = pn_get(STRUCT_FGETP(uap, dname),
+				    UIO_USERSPACE, &lookpn);
+			}
+
+			if (error)
+				return (error);
+
+			/* Walk the export list looking for that pathname */
+			rw_enter(&exported_lock, RW_READER);
+			for (i = 0; i < EXPTABLESIZE; i++) {
+				exi = exptable[i];
+				while (exi) {
+					if (strcmp(exi->exi_export.ex_path,
+					    lookpn.pn_path) == 0) {
+						goto exi_scan_end;
+					}
+					exi = exi->exi_hash;
+				}
+			}
+exi_scan_end:
+			rw_exit(&exported_lock);
+			if (exi) {
+				/* Found a match, use it. */
+				vp = exi->exi_vp;
+				dvp = exi->exi_dvp;
+				DTRACE_PROBE2(nfss__i__nmspc__tree,
+				    char *, "unsharing_removed_dir",
+				    char *, lookpn.pn_path);
+				VN_HOLD(vp);
+				VN_HOLD(dvp);
+				error = 0;
+			} else {
+				/* Still no match, set error */
+				error = ENOENT;
+			}
+			if (lookpn.pn_buf != namebuf) {
+				/*
+				 * We didn't use namebuf, so make
+				 * sure we free the allocated memory
+				 */
+				pn_free(&lookpn);
+			}
+		}
+	}
+
 	if (error)
 		return (error);
 
@@ -1616,8 +1491,15 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	 * need to be created to provide a path for
 	 * NFS v4 clients.
 	 */
-	if (ex == NULL)
+	if (ex == NULL) {
 		error = treeclimb_export(exi);
+		if (error)
+			goto out7;
+	} else {
+	/* If it's a re-export update namespace tree */
+		exi->exi_tree = ex->exi_tree;
+		exi->exi_tree->tree_exi = exi;
+	}
 
 	/*
 	 * build a unique flavor list from the flavors specified
@@ -1626,14 +1508,13 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	 */
 	newcnt = build_seclist_nodups(&exi->exi_export, newsec, FALSE);
 
-	if (!error)
-		error = srv_secinfo_treeclimb(exi, newsec, newcnt, TRUE);
+	srv_secinfo_treeclimb(exi, newsec, newcnt, TRUE);
 
 	/*
 	 * If re-sharing an old export entry, update the secinfo data
 	 * depending on if the old entry is a pseudo node or not.
 	 */
-	if (!error && ex != NULL) {
+	if (ex != NULL) {
 		oldcnt = build_seclist_nodups(&ex->exi_export, oldsec, FALSE);
 		if (PSEUDO(ex)) {
 			/*
@@ -1652,16 +1533,12 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 			 * Remove old flavor refs last.
 			 */
 			srv_secinfo_exp2exp(&exi->exi_export, oldsec, oldcnt);
-			error = srv_secinfo_treeclimb(ex, oldsec, oldcnt,
-			    FALSE);
+			srv_secinfo_treeclimb(ex, oldsec, oldcnt, FALSE);
 		}
 	}
 
-	if (error)
-		goto out7;
-
 	/*
-	 * If it's a re-export and the old entry has a pseudnode list,
+	 * If it's a re-export and the old entry has a pseudonode list,
 	 * transfer it to the new export.
 	 */
 	if (ex != NULL && (ex->exi_visible != NULL)) {
@@ -1684,13 +1561,6 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	return (0);
 
 out7:
-	/*
-	 * Cleaning up the tree. Assuming *treeclimb* routines
-	 * will fail at the same place in the tree.
-	 */
-	(void) treeclimb_unexport(exi);
-	(void) srv_secinfo_treeclimb(exi, newsec, newcnt, FALSE);
-
 	/*
 	 * Unlink and re-link the new and old export in exptable.
 	 */
@@ -1801,28 +1671,37 @@ unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 	}
 
 	/*
+	 * Remove security flavors before treeclimb_unexport() is called
+	 * because srv_secinfo_treeclimb needs the namespace tree
+	 */
+	curcnt = build_seclist_nodups(&exi->exi_export, cursec, TRUE);
+
+	srv_secinfo_treeclimb(exi, cursec, curcnt, FALSE);
+
+	/*
 	 * If there's a visible list, then need to leave
 	 * a pseudo export here to retain the visible list
 	 * for paths to exports below.
 	 */
 	if (exi->exi_visible) {
+		struct exportinfo *newexi;
+
 		error = pseudo_exportfs(exi->exi_vp, exi->exi_visible,
-		    &exi->exi_export);
+		    &exi->exi_export, &newexi);
 		if (error)
 			goto done;
 
 		exi->exi_visible = NULL;
+		/*
+		 * pseudo_exportfs() has allocated new exportinfo,
+		 * update the treenode.
+		 */
+		newexi->exi_tree = exi->exi_tree;
+		newexi->exi_tree->tree_exi = newexi;
+
 	} else {
-		error = treeclimb_unexport(exi);
-		if (error)
-			goto done;
+		treeclimb_unexport(exi);
 	}
-
-	curcnt = build_seclist_nodups(&exi->exi_export, cursec, TRUE);
-
-	error = srv_secinfo_treeclimb(exi, cursec, curcnt, FALSE);
-	if (error)
-		goto done;
 
 	rw_exit(&exported_lock);
 

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,7 +142,7 @@ nfs4_vget_pseudo(struct exportinfo *exi, vnode_t **vpp, fid_t *fidp)
  */
 int
 pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
-					struct exportdata *exdata)
+	    struct exportdata *exdata, struct exportinfo **exi_retp)
 {
 	struct exportinfo *exi;
 	struct exportdata *kex;
@@ -215,6 +215,13 @@ pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
 	 */
 	export_link(exi);
 
+	/*
+	 * If exi_retp is non-NULL return a pointer to the new
+	 * exportinfo structure.
+	 */
+	if (exi_retp)
+		*exi_retp = exi;
+
 	return (0);
 }
 
@@ -234,6 +241,73 @@ free_visible(struct exp_visible *head)
 		srv_secinfo_list_free(visp->vis_secinfo, visp->vis_seccnt);
 		kmem_free(visp, sizeof (*visp));
 	}
+}
+
+/*
+ * Connects newchild (or subtree with newchild in head)
+ * to the parent node. We always add it to the beginning
+ * of sibling list.
+ */
+static void
+tree_add_child(treenode_t *parent, treenode_t *newchild)
+{
+	newchild->tree_parent = parent;
+	newchild->tree_sibling = parent->tree_child_first;
+	parent->tree_child_first = newchild;
+}
+
+/*
+ * Add new node to the head of subtree pointed by 'n'. n can be NULL.
+ * Interconnects the new treenode with exp_visible and exportinfo
+ * if needed.
+ */
+static treenode_t *
+tree_prepend_node(treenode_t *n, exp_visible_t *v, exportinfo_t *e)
+{
+	treenode_t *tnode = kmem_zalloc(sizeof (*tnode), KM_SLEEP);
+
+	if (n) {
+		tnode->tree_child_first = n;
+		n->tree_parent = tnode;
+	}
+	if (v) {
+		tnode->tree_vis = v;
+		v->vis_tree = tnode;
+	}
+	if (e) {
+		tnode->tree_exi = e;
+		e->exi_tree = tnode;
+	}
+	return (tnode);
+}
+
+/*
+ * Removes node from the tree and frees the treenode struct.
+ * Does not free structures pointed by tree_exi and tree_vis,
+ * they should be already freed.
+ */
+static void
+tree_remove_node(treenode_t *node)
+{
+	treenode_t *parent = node->tree_parent;
+	treenode_t *s; /* s for sibling */
+
+	if (parent == NULL) {
+		kmem_free(node, sizeof (*node));
+		ns_root = NULL;
+		return;
+	}
+	/* This node is first child */
+	if (parent->tree_child_first == node) {
+		parent->tree_child_first = node->tree_sibling;
+	/* This node is not first child */
+	} else {
+		s = parent->tree_child_first;
+		while (s->tree_sibling != node)
+			s = s->tree_sibling;
+		s->tree_sibling = s->tree_sibling->tree_sibling;
+	}
+	kmem_free(node, sizeof (*node));
 }
 
 /*
@@ -259,7 +333,11 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 {
 	struct exp_visible *vp1, *vp2;
 	struct exp_visible *tail, *new;
+	treenode_t *subtree_head, *dupl, *dest;
 	int found;
+
+	dest = exi->exi_tree;
+	subtree_head = vis_head->vis_tree;
 
 	/*
 	 * If exportinfo doesn't already have a visible
@@ -267,6 +345,7 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 	 */
 	if (exi->exi_visible == NULL) {
 		exi->exi_visible = vis_head;
+		tree_add_child(dest, subtree_head);
 		return;
 	}
 
@@ -315,6 +394,21 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 				 */
 				if (vp1->vis_exported && !vp2->vis_exported)
 					vp2->vis_exported = 1;
+				/*
+				 * Assuming that visibles in vis_head are sorted
+				 * in same order as they appear in the shared
+				 * path. If /a/b/c/d is being shared we will
+				 * see 'a' before 'b' etc.
+				 */
+				dupl = vp1->vis_tree;
+				dest = vp2->vis_tree;
+				/* If node is shared, transfer exportinfo ptr */
+				if (dupl->tree_exi) {
+					dest->tree_exi = dupl->tree_exi;
+					dest->tree_exi->exi_tree = dest;
+				}
+				subtree_head = dupl->tree_child_first;
+				kmem_free(dupl, sizeof (*dupl));
 				break;
 			}
 		}
@@ -326,6 +420,8 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 			tail->vis_next = new;
 			new->vis_next = NULL;
 			vp1->vis_vp = NULL;
+			/* Tell treenode that new visible is kmem_zalloc-ated */
+			new->vis_tree->tree_vis = new;
 		}
 	}
 
@@ -335,16 +431,18 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 	 * There is no need to VN_RELE in free_visible for this vis_head.
 	 */
 	free_visible(vis_head);
+	if (subtree_head)
+		tree_add_child(dest, subtree_head);
 }
 
 /*
- * Remove a list of visible directories from the pseudo exportfs.
+ * Remove one visible entry from the pseudo exportfs.
  *
  * When we unexport a directory, we have to remove path
  * components from the visible list in the pseudo exportfs
- * entry.  The supplied visible list contains the fids of the path
- * to the unexported directory.  The visible list of the export
- * is checked against this list any matching fids have their
+ * entry. The supplied visible contains one fid of one path
+ * component. The visible list of the export
+ * is checked against provided visible, matching fid has its
  * reference count decremented.  If a reference count drops to
  * zero, then it means no paths now use this directory, so its
  * fid can be removed from the visible list.
@@ -352,74 +450,56 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
  * When the last path is removed, the visible list will be null.
  */
 static void
-less_visible(struct exportinfo *exi, struct exp_visible *vis_head)
+less_visible(struct exportinfo *exi, struct exp_visible *vp1)
 {
-	struct exp_visible *vp1, *vp2;
+	struct exp_visible *vp2;
 	struct exp_visible *prev, *next;
 
-	/*
-	 * The outer loop traverses the supplied list.
-	 */
-	for (vp1 = vis_head; vp1; vp1 = vp1->vis_next) {
+	for (vp2 = exi->exi_visible, prev = NULL; vp2; vp2 = next) {
 
-		/*
-		 * Given an element from the list to be removed,
-		 * search the exportinfo list looking for a match.
-		 * If a match is found, decrement the reference
-		 * count and drop the element if the count drops
-		 * to zero.
-		 */
-		for (vp2 = exi->exi_visible, prev = NULL; vp2; vp2 = next) {
+		next = vp2->vis_next;
 
-			next = vp2->vis_next;
-
-			if (EQFID(&vp1->vis_fid, &vp2->vis_fid)) {
-
+		if (EQFID(&vp1->vis_fid, &vp2->vis_fid)) {
+			/*
+			 * Decrement the ref count.
+			 * Remove the entry if it's zero.
+			 */
+			if (--vp2->vis_count <= 0) {
+				if (prev == NULL)
+					exi->exi_visible = next;
+				else
+					prev->vis_next = next;
+				VN_RELE(vp2->vis_vp);
+				srv_secinfo_list_free(vp2->vis_secinfo,
+				    vp2->vis_seccnt);
+				kmem_free(vp2, sizeof (*vp1));
+			} else {
 				/*
-				 * Decrement the ref count.
-				 * Remove the entry if it's zero.
+				 * If we're here, then the vp2 will
+				 * remain in the vis list.  If the
+				 * vis entry corresponds to the object
+				 * being unshared, then vis_exported
+				 * needs to be set to 0.
+				 *
+				 * vp1 is a node from caller's list
+				 * vp2 is node from exportinfo's list
+				 *
+				 * Only 1 node in the caller's list
+				 * will have vis_exported set to 1,
+				 * and it corresponds to the obj being
+				 * unshared.  It should always be the
+				 * last element of the caller's list.
 				 */
-				if (--vp2->vis_count <= 0) {
-					if (prev == NULL)
-						exi->exi_visible = next;
-					else
-						prev->vis_next = next;
-
-					VN_RELE(vp2->vis_vp);
-					srv_secinfo_list_free(vp2->vis_secinfo,
-					    vp2->vis_seccnt);
-					kmem_free(vp2, sizeof (*vp1));
-				} else {
-					/*
-					 * If we're here, then the vp2 will
-					 * remain in the vis list.  If the
-					 * vis entry corresponds to the object
-					 * being unshared, then vis_exported
-					 * needs to be set to 0.
-					 *
-					 * vp1 is a node from caller's list
-					 * vp2 is node from exportinfo's list
-					 *
-					 * Only 1 node in the caller's list
-					 * will have vis_exported set to 1,
-					 * and it corresponds to the obj being
-					 * unshared.  It should always be the
-					 * last element of the caller's list.
-					 */
-					if (vp1->vis_exported &&
-					    vp2->vis_exported) {
-						vp2->vis_exported = 0;
-					}
+				if (vp1->vis_exported &&
+				    vp2->vis_exported) {
+					vp2->vis_exported = 0;
 				}
-
-				break;
 			}
 
-			prev = vp2;
+			break;
 		}
+		prev = vp2;
 	}
-
-	free_visible(vis_head);
 }
 
 /*
@@ -481,9 +561,11 @@ treeclimb_export(struct exportinfo *exip)
 	int error;
 	int exportdir;
 	struct exportinfo *exi = NULL;
+	struct exportinfo *new_exi = exip;
 	struct exp_visible *visp;
 	struct exp_visible *vis_head = NULL;
 	struct vattr va;
+	treenode_t *tree_head = NULL;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
 
@@ -516,7 +598,6 @@ treeclimb_export(struct exportinfo *exip)
 				 * or a real export.
 				 */
 				more_visible(exi, vis_head);
-				vis_head = NULL;
 				break;	/* and climb no further */
 			}
 		}
@@ -536,7 +617,8 @@ treeclimb_export(struct exportinfo *exip)
 				 * this as a pseudo export so that an NFS v4
 				 * client can do lookups in it.
 				 */
-				error = pseudo_exportfs(vp, vis_head, NULL);
+				error = pseudo_exportfs(vp, vis_head, NULL,
+				    &new_exi);
 				if (error)
 					break;
 				vis_head = NULL;
@@ -544,6 +626,13 @@ treeclimb_export(struct exportinfo *exip)
 
 			if (VN_CMP(vp, rootdir)) {
 				/* at system root */
+				/*
+				 * If sharing "/", new_exi is shared exportinfo
+				 * (exip). Otherwise, new_exi is exportinfo
+				 * created in pseudo_exportfs() above.
+				 */
+				ns_root = tree_prepend_node(tree_head, 0,
+				    new_exi);
 				break;
 			}
 
@@ -558,8 +647,18 @@ treeclimb_export(struct exportinfo *exip)
 		 */
 		va.va_mask = AT_NODEID;
 		error = VOP_GETATTR(vp, &va, 0, CRED(), NULL);
-		if (error)
+		if (error) {
+			if (new_exi && new_exi != exip) {
+				/*
+				 * This exportinfo is not connected with
+				 * treenode yet. Free it here.
+				 */
+				(void) export_unlink(&new_exi->exi_fsid,
+				    &new_exi->exi_fid, new_exi->exi_vp, NULL);
+				exi_rele(new_exi);
+			}
 			break;
+		}
 
 		/*
 		 *  Add this directory fid to visible list
@@ -575,6 +674,16 @@ treeclimb_export(struct exportinfo *exip)
 		visp->vis_seccnt = 0;
 		visp->vis_next = vis_head;
 		vis_head = visp;
+
+
+		/*
+		 * Will set treenode's pointer to exportinfo to
+		 * 1. shared exportinfo (exip) - if first visit here
+		 * 2. freshly allocated pseudo export (if any)
+		 * 3. null otherwise
+		 */
+		tree_head = tree_prepend_node(tree_head, visp, new_exi);
+		new_exi = NULL;
 
 		/*
 		 * Now, do a ".." to find parent dir of vp.
@@ -598,139 +707,96 @@ treeclimb_export(struct exportinfo *exip)
 	}
 
 	VN_RELE(vp);
+
+	/*
+	 * We can have set error due to error in:
+	 * 1. vop_fid_pseudo()
+	 * 2. pseudo_exportfs() which can fail only in vop_fid_pseudo()
+	 * 3. VOP_GETATTR()
+	 * 4. VOP_LOOKUP()
+	 * To cleanup, free pseudo exportinfos, visibles and treenodes.
+	 */
+	if (error) {
+		while (tree_head) {
+			treenode_t *t2 = tree_head;
+			exportinfo_t *e  = tree_head->tree_exi;
+			exp_visible_t *v = tree_head->tree_vis;
+			/* exip will be freed in exportfs() */
+			if (e && e != exip) {
+				(void) export_unlink(&e->exi_fsid, &e->exi_fid,
+				    e->exi_vp, NULL);
+				exi_rele(e);
+			}
+			if (v) {
+				VN_RELE(v->vis_vp);
+				kmem_free(v, sizeof (*v));
+			}
+			tree_head = tree_head->tree_child_first;
+			kmem_free(t2, sizeof (*t2));
+		}
+	}
+
 	return (error);
 }
 
 /*
- * Walk up the tree looking for pseudo export entries.
+ * Walk up the tree and:
+ * 1. release pseudo exportinfo if it has no child
+ * 2. release visible in parent's exportinfo
+ * 3. delete non-exported leaf nodes from tree
  *
- * If a pseudo export is found, remove the path we've
- * climbed from its visible list. If the visible list
- * still has entries after the removal, then we can stop.
- * If it becomes null, then remove the pseudo export entry
- * and carry on up the tree to see if there's any more.
+ * Deleting of nodes will start only if the unshared
+ * node was a leaf node.
+ * Deleting of nodes will finish when we reach a node which
+ * has children or is a real export, then we might still need
+ * to continue releasing visibles, until we reach VROOT node.
  */
-int
+void
 treeclimb_unexport(struct exportinfo *exip)
 {
-	vnode_t *dvp, *vp;
-	fid_t fid;
-	int error = 0;
-	int exportdir;
-	struct exportinfo *exi = NULL;
-	struct exp_visible *vis_head = NULL, *visp;
+	struct exportinfo *exi;
+	treenode_t *tnode, *old_nd;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
 
-	exportdir = 1;
-	vp = exip->exi_vp;
-	VN_HOLD(vp);
+	tnode = exip->exi_tree;
+	/*
+	 * The unshared exportinfo was unlinked in unexport().
+	 * Zeroing tree_exi ensures that we will skip it.
+	 */
+	tnode->tree_exi = NULL;
 
-	for (;;) {
+	while (tnode) {
 
-		bzero(&fid, sizeof (fid));
-		fid.fid_len = MAXFIDSZ;
-		error = vop_fid_pseudo(vp, &fid);
-		if (error)
+		/* Stop at VROOT node which is exported or has child */
+		if (TREE_ROOT(tnode) &&
+		    (TREE_EXPORTED(tnode) || tnode->tree_child_first))
 			break;
 
-		if (! exportdir) {
-
-			/*
-			 * We need to use checkexport4() here because it
-			 * doesn't acquire exported_lock and it doesn't
-			 * manipulate exi_count.
-			 *
-			 * Remove directories from the visible
-			 * list that are unique to the path
-			 * for this export.  (Only VROOT exportinfos
-			 * have can have visible entries).
-			 */
-			exi = checkexport4(&vp->v_vfsp->vfs_fsid, &fid, vp);
-			if (exi != NULL && (vp->v_flag & VROOT)) {
-
-				less_visible(exi, vis_head);
-				vis_head = NULL;
-
-				/*
-				 * If the visible list has entries
-				 * or if it's a real export, then
-				 * there's no need to keep climbing.
-				 */
-				if (exi->exi_visible || ! PSEUDO(exi))
-					break;
-
-				/*
-				 * Otherwise, we have a pseudo export
-				 * with an empty list (no exports below
-				 * it) so we must remove and continue
-				 * the climb to remove its name from
-				 * the parent export.
-				 */
-				error = export_unlink(&vp->v_vfsp->vfs_fsid,
-				    &fid, vp, NULL);
-				if (error)
-					break;
-
-				exi_rele(exi);
-			}
+		/* Release pseudo export if it has no child */
+		if (TREE_ROOT(tnode) && !TREE_EXPORTED(tnode) &&
+		    tnode->tree_child_first == 0) {
+			exi = tnode->tree_exi;
+			(void) export_unlink(&exi->exi_fsid, &exi->exi_fid,
+			    exi->exi_vp, NULL);
+			exi_rele(tnode->tree_exi);
 		}
 
-		/*
-		 * If at the root of the filesystem, need
-		 * to traverse across the mountpoint
-		 * and continue the climb on the mounted-on
-		 * filesystem.
-		 */
-		if (vp->v_flag & VROOT) {
-			if (VN_CMP(vp, rootdir)) {
-				/* at system root */
-				break;
-			}
-			vp = untraverse(vp);
-			exportdir = 0;
-			continue;
+		/* Release visible in parent's exportinfo */
+		if (tnode->tree_vis) {
+			exi = vis2exi(tnode->tree_vis);
+			less_visible(exi, tnode->tree_vis);
 		}
 
-		/*
-		 *  Add this directory fid to path list
-		 */
-		visp = kmem_alloc(sizeof (*visp), KM_SLEEP);
-		VN_HOLD(vp);
-		visp->vis_vp = vp;
-		visp->vis_fid = fid;		/* structure copy */
-		visp->vis_ino = 0;
-		visp->vis_count = 1;
-		visp->vis_exported = exportdir;
-		visp->vis_secinfo = NULL;
-		visp->vis_seccnt = 0;
-		visp->vis_next = vis_head;
-		vis_head = visp;
+		/* Continue with parent */
+		old_nd = tnode;
+		tnode = tnode->tree_parent;
 
-		/*
-		 * Do a ".." to find parent dir of vp.
-		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
-		    NULL, NULL, NULL);
-
-		if (error == ENOTDIR && exportdir) {
-			dvp = exip->exi_dvp;
-			ASSERT(dvp != NULL);
-			VN_HOLD(dvp);
-			error = 0;
-		}
-		if (error)
-			break;
-
-		exportdir = 0;
-		VN_RELE(vp);
-		vp = dvp;
+		/* Remove itself, if this is a leaf and non-exported node */
+		if (old_nd->tree_child_first == NULL && !TREE_EXPORTED(old_nd))
+			tree_remove_node(old_nd);
 	}
-
-	VN_RELE(vp);
-	return (error);
 }
-
 
 /*
  * Traverse backward across mountpoint from the
