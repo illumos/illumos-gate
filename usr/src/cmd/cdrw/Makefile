@@ -36,7 +36,8 @@ include ../hal/Makefile.hal
 
 SRCS= $(OBJS:.o=.c)
 
-LDLIBS +=	-ldbus-1 -lhal -lsecdb
+LDLIBS +=	-lhal -lsecdb
+NONLINTLDLIBS =	-ldbus-1
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
 LINTFLAGS += 	-um
@@ -48,7 +49,7 @@ $(ROOTBIN)/cdrw := FILEMODE = 04755
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS) $(CFLAGS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS) $(NONLINTLDLIBS) $(CFLAGS)
 	$(POST_PROCESS)
 
 install: all $(ROOTPROG) 
