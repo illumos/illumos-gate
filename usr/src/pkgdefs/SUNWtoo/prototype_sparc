@@ -53,14 +53,15 @@ f none usr/bin/sparcv7/gcore 555 root bin
 f none usr/bin/sparcv7/strings 555 root bin
 f none usr/bin/sparcv7/truss 555 root bin
 d none usr/bin/sparcv9 755 root bin
-f none usr/bin/sparcv9/ldd 555 root bin
+f none usr/bin/sparcv9/elfwrap 555 root bin
 f none usr/bin/sparcv9/gcore 555 root bin
+f none usr/bin/sparcv9/ld 755 root bin
+f none usr/bin/sparcv9/ldd 555 root bin
 f none usr/bin/sparcv9/plimit 555 root bin
 f none usr/bin/sparcv9/pvs 555 root bin
 f none usr/bin/sparcv9/strings 555 root bin
 f none usr/bin/sparcv9/truss 555 root bin
 d none usr/ccs/bin/sparcv9 755 root bin
-f none usr/bin/sparcv9/ld 755 root bin
 s none usr/ccs/bin/sparcv9/ld=../../../bin/sparcv9/ld
 d none usr/lib/ld/sparcv9 755 root bin
 f none usr/lib/ld/sparcv9/map.above4G 444 root bin

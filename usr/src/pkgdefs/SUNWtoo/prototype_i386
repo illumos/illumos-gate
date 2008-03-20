@@ -54,14 +54,15 @@ f none usr/bin/i86/plimit 555 root bin
 f none usr/bin/i86/strings 555 root bin
 f none usr/bin/i86/truss 555 root bin
 d none usr/bin/amd64 755 root bin
+f none usr/bin/amd64/elfwrap 555 root bin
 f none usr/bin/amd64/gcore 555 root bin
+f none usr/bin/amd64/ld 755 root bin
 f none usr/bin/amd64/ldd 555 root bin
 f none usr/bin/amd64/plimit 555 root bin
 f none usr/bin/amd64/pvs 555 root bin
 f none usr/bin/amd64/strings 555 root bin
 f none usr/bin/amd64/truss 555 root bin
 d none usr/ccs/bin/amd64 755 root bin
-f none usr/bin/amd64/ld 755 root bin
 s none usr/ccs/bin/amd64/ld=../../../bin/amd64/ld
 f none usr/lib/ld/map.noexdata 444 root bin
 d none usr/lib/ld/amd64 755 root bin

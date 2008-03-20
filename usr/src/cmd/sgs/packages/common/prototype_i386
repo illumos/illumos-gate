@@ -60,6 +60,7 @@ s none $SGSDIR/usr/ccs/bin/amd64/dump=../../../bin/amd64/dump
 f none $SGSDIR/usr/bin/amd64/elfdump=usr/bin/amd64/elfdump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/amd64/elfdump=../../../bin/amd64/elfdump
 f none $SGSDIR/usr/bin/amd64/elfedit=usr/bin/amd64/elfedit 0555 root bin
+f none $SGSDIR/usr/bin/amd64/elfwrap=usr/bin/amd64/elfwrap 0555 root bin
 f none $SGSDIR/usr/bin/amd64/ld=usr/bin/amd64/ld 755 root bin
 s none $SGSDIR/usr/ccs/bin/amd64/ld=../../../bin/amd64/ld
 f none $SGSDIR/usr/bin/amd64/nm=usr/bin/amd64/nm 0555 root bin

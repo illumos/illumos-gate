@@ -77,6 +77,7 @@ PKGDIRS=	../libcrle \
 		../elfdump \
 		../elfedit \
 		../elfedit/modules \
+		../elfwrap \
 		../crle \
 		../dump \
 		../lari \

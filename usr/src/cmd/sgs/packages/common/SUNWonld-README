@@ -707,7 +707,7 @@ All the above changes are incorporated in the following patches:
         Solaris/SunOS 5.8_x86           patch T109148-24
 --------------------------------------------------------------------------------
 4470917 Solaris Process Model Unification (link-editor components only)
-	PSARC/2002/117
+	PSARC/2002/117 Solaris Process Model Unification
 4744411 Bloomberg wants a faster linker.
 4811969 64-bit links can be much slower than 32-bit.
 4825065 ld(1) should ignore consecutive empty sections.
@@ -1027,7 +1027,7 @@ All the above changes are incorporated in the following patches:
 6273875 gcc and sgs/rtld don't get along
 6272563 gcc and amd64/krtld/doreloc.c don't get along
 6290157 gcc and sgs/librtld_db/rdb_demo don't get along
-6301218 Matlab dumps core on startup when running on 112963-22  (D)
+6301218 Matlab dumps core on startup when running on 112963-22 (D)
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-06
@@ -1051,7 +1051,7 @@ All the above changes are incorporated in the following patches:
 6324019 ld.so.1: malloc alignment is insufficient for new compilers
 6324589 psh coredumps on x86 machines on snv_23
 6236594 AMD64: Linker needs to handle the new .lbss section (D)
-PSARC 2005/514 - AMD64 - large section support
+	PSARC 2005/514 AMD64 - large section support
 6314743 Linker: incorrect resolution for R_AMD64_GOTPC32
 6311865 Linker: x86 medium model; invalid ELF program header
 --------------------------------------------------------------------------------
@@ -1163,7 +1163,8 @@ However, the associated feature has not been enabled in Solaris 10 or earlier
 releases:
 
 6174390 crle configuration files are inconsistent across platforms (D, P)
-6432984 ld(1) output file removal - change default behavior (PSARC 2006/353) (D)
+6432984 ld(1) output file removal - change default behavior (D)
+	PSARC/2006/353 ld(1) output file removal - change default behavior
 --------------------------------------------------------------------------------
 
 -------------------------------------
@@ -1236,7 +1237,7 @@ Bugid   Risk Synopsis
 	PSARC/2007/026 ELF symbol sort sections
 6518480 ld -melf_i386 doesn't complain (D)
 6519951 bfu is just another word for exit today (RPATH -> RUNPATH conversion
-	bites us)  (D) 
+	bites us) (D) 
 6521504 ld: hardware capabilities processing from relocatables objects needs
 	hardening.
 6518322 Some ELF utilities need updating for .SUNW_ldynsym section (D)
@@ -1278,6 +1279,7 @@ Bugid   Risk Synopsis
 6589819 ld generated reference to __tls_get_addr() fails when resolving to a
 	shared object reference
 6595139 various applications should export yy* global variables for libl
+	PSARC/2007/474 new ldd(1) -w option
 6597841 gelf_getdyn() reads one too many dynamic entries
 6603313 dlclose() can fail to unload objects after fix for 6573641
 6234471 need a way to edit ELF objects (D)
@@ -1304,7 +1306,7 @@ Bugid   Risk Synopsis
 6626135 elfedit capabilities str->value mapping should come from
 	usr/src/common/elfcap
 6642769 ld(1) -z combreloc should become default behavior (D)
-	PSARC/2008/006: make ld(1) -z combreloc become default behavior
+	PSARC/2008/006 make ld(1) -z combreloc become default behavior
 6634436 XFFLAG should be updated.  (link-editor components only)
 6492726 Merge SHF_MERGE|SHF_STRINGS input sections
 4947191 OSNet should use direct bindings  (link-editor components only)
@@ -1316,12 +1318,15 @@ Bugid   Risk Synopsis
 	executables
 6667661 Direct bindings can compromise executables with insufficient copy
 	relocation information
-6357282 ldd should recognize PARENT and EXTERN symbols
-	PSARC/2008/148: new ldd(1) -p option
+6357282 ldd should recognize PARENT and EXTERN symbols (D)
+	PSARC/2008/148 new ldd(1) -p option
 6668050 First trip through PLT does not preserve args in xmm registers
 6672394 ldd(1) unused dependency processing is tricked by relocations errors
 6672544 elf_rtbndr must support non-ABI aligned stacks on amd64
-6671255 link-editor should support cross linking
-	PSARC 2008/179 cross link-editor
-6606203 link editor ought to allow creation of >2gb sized objects
+6671255 link-editor should support cross linking (D)
+	PSARC/2008/179 cross link-editor
+6606203 link editor ought to allow creation of >2gb sized objects (P)
 6674666 elfedit dyn:posflag1 needs option to locate element via NEEDED item
+6568447 bcp is broken by 6551627 (link-editor components only)
+6675591 elfwrap - wrap data in an ELF file (D,P)
+	PSARC/2008/198 elfwrap - wrap data in an ELF file

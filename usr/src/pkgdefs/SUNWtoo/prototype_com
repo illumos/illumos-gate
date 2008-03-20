@@ -50,6 +50,7 @@ d none usr/bin 755 root bin
 f none usr/bin/ctags 555 root bin
 f none usr/bin/exstr 555 root bin
 f none usr/bin/elfsign 555 root bin
+f none usr/bin/elfwrap 555 root bin
 l none usr/bin/gcore=../../usr/lib/isaexec
 f none usr/bin/ldd 555 root bin
 f none usr/bin/od 555 root bin

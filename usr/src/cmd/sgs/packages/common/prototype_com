@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,6 +75,7 @@ s none $SGSDIR/usr/ccs/bin/dump=../../bin/dump
 f none $SGSDIR/usr/bin/elfdump=usr/bin/elfdump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/elfdump=../../bin/elfdump
 f none $SGSDIR/usr/bin/elfedit=usr/bin/elfedit 0555 root bin
+f none $SGSDIR/usr/bin/elfwrap=usr/bin/elfwrap 0555 root bin
 f none $SGSDIR/usr/bin/lari=usr/bin/lari 0555 root bin
 s none $SGSDIR/usr/ccs/bin/lari=../../bin/lari
 f none $SGSDIR/usr/bin/ld=usr/bin/ld 755 root bin

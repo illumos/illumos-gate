@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -50,7 +50,6 @@ MSG_ID_PVS		22	SUNW_OST_SGS		/* sgs/pvs */
 MSG_ID_CRLE		23	SUNW_OST_SGS		/* sgs/crle */
 MSG_ID_ELFDUMP		24	SUNW_OST_SGS		/* sgs/elfdump */
 MSG_ID_MOE		25	SUNW_OST_SGS		/* sgs/moe */
-
 MSG_ID_ELFEDIT		26	SUNW_OST_SGS		/* sgs/elfedit */
 MSG_ID_ELFEDIT_CAP	27	SUNW_OST_SGS		/* 	cap: */
 MSG_ID_ELFEDIT_DYN	27	SUNW_OST_SGS		/*	dyn: */
@@ -60,3 +59,4 @@ MSG_ID_ELFEDIT_SHDR	27	SUNW_OST_SGS		/*	shdr: */
 MSG_ID_ELFEDIT_STR	27	SUNW_OST_SGS		/*	str: */
 MSG_ID_ELFEDIT_SYM	27	SUNW_OST_SGS		/*	sym: */
 MSG_ID_ELFEDIT_SYMINFO	27	SUNW_OST_SGS		/*	syminfo: */
+MSG_ID_ELFWRAP		28	SUNW_OST_SGS		/* sgs/elfwrap */

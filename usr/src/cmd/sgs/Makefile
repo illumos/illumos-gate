@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,7 @@ SUBDIRS-common= libconv		\
 		dump		\
 		elfdump		\
 		elfedit		\
+		elfwrap		\
 		error		\
 		gprof		\
 		lari		\
@@ -88,7 +89,7 @@ MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 		libldstab	librtld		rtld		libelf \
 		ldprof		libcrle		pvs		elfdump	\
 		elfedit		crle		moe 		lari \
-		librtld_db
+		librtld_db	elfwrap
 
 MSGDIR=		messages
 
