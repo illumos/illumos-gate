@@ -840,6 +840,7 @@ usr/platform/SUNW,Netra-T5220/lib/llib-lpcp.ln		sparc
 usr/platform/SUNW,USBRDT-5240/lib/llib-lpcp.ln		sparc
 usr/platform/SUNW,Netra-T5220/lib/llib-lpcp.ln		sparc
 usr/platform/SUNW,Netra-T5440/lib/llib-lpcp.ln		sparc
+usr/platform/SUNW,USBRDT-5440/lib/llib-lpcp.ln		sparc
 #
 # ZFS internal tools and lint libraries
 #

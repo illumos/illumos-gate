@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -434,3 +434,9 @@ d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libpicl.so.1 755 root bin
 s none usr/lib/sparcv9/libpicl.so=./libpicl.so.1 755 root bin
 f none usr/lib/sparcv9/llib-lpicl.ln 644 root bin
+d none usr/platform/SUNW,USBRDT-5440 755 root sys
+d none usr/platform/SUNW,USBRDT-5440/lib 755 root bin
+d none usr/platform/SUNW,USBRDT-5440/lib/picl 755 root sys
+d none usr/platform/SUNW,USBRDT-5440/lib/picl/plugins 755 root sys
+s none usr/platform/SUNW,USBRDT-5440/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
+s none usr/platform/SUNW,USBRDT-5440/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1

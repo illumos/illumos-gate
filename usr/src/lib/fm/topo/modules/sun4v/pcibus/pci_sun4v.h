@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,17 @@ physnm_t blade_t6340_pnms[] = {
 	{   1, "SYS/EM1" }
 };
 
+physnm_t usbrdt5440_pnms[] = {
+	/* Slot #, Label */
+	{   0, "MB/RISER0/EM0" },
+	{   1, "MB/RISER0/EM1" },
+	{   2, "MB/RISER0/EM2" },
+	{   3, "MB/RISER0/EM3" },
+	{   4, "MB/RISER1/EM4" },
+	{   5, "MB/RISER1/EM5" },
+	{   6, "MB/RISER1/EM6" }
+};
+
 pphysnm_t plat_pnames[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_pnms) / sizeof (physnm_t),
@@ -143,7 +154,10 @@ pphysnm_t plat_pnames[] = {
 	    netra_t5440_pnms },
 	{ "Sun-Blade-T6340",
 	    sizeof (blade_t6340_pnms) / sizeof (physnm_t),
-	    blade_t6340_pnms }
+	    blade_t6340_pnms },
+	{ "USBRDT-5440",
+	    sizeof (usbrdt5440_pnms) / sizeof (physnm_t),
+	    usbrdt5440_pnms },
 };
 
 physlot_names_t PhyslotNMs = {

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -81,6 +81,7 @@ LINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T5120
 LINKED_PLATFORMS	+= SUNW,Netra-T5220
 LINKED_PLATFORMS	+= SUNW,USBRDT-5240
 LINKED_PLATFORMS	+= SUNW,Netra-T5440
+LINKED_PLATFORMS	+= SUNW,USBRDT-5440
 
 LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)

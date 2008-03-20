@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,7 @@ PLATLINKS	+= SUNW,T5140
 PLATLINKS	+= SUNW,USBRDT-5240
 PLATLINKS	+= SUNW,Netra-T5220
 PLATLINKS	+= SUNW,Netra-T5440
+PLATLINKS	+= SUNW,USBRDT-5440
 
 LINKED_DIRS	= $(PLATLINKS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS	= $(PLATLINKS:%=$(USR_PLAT_DIR)/%/lib)

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,6 +47,7 @@ LINKED_PLATFORMS += SUNW,Netra-T5220
 LINKED_PLATFORMS += SUNW,USBRDT-5240
 LINKED_PLATFORMS += SUNW,Netra-T5440
 LINKED_PLATFORMS += SUNW,Sun-Blade-T6340
+LINKED_PLATFORMS += SUNW,USBRDT-5440
 PROMIF		 = ieee1275
 PSMBASE		 = $(UTSBASE)/../psm
 

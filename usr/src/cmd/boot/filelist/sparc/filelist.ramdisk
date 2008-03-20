@@ -55,6 +55,7 @@ platform/SUNW,T5140
 platform/SUNW,T5240
 platform/SUNW,T5440
 platform/SUNW,USBRDT-5240
+platform/SUNW,USBRDT-5440
 platform/SUNW,Ultra-2
 platform/SUNW,Ultra-250/kernel
 platform/SUNW,Ultra-30

@@ -44,6 +44,15 @@ prc_t t5140_prcs[] = {
 	{ 1, 0x500 }
 };
 
+/* A list of physical root complexes of the SUNW,USBRDT-5440 platform */
+prc_t usbrdt_5440_prcs[] = {
+	/* physical id, bus address */
+	{ 0, 0x400 },
+	{ 1, 0x500 },
+	{ 1, 0x600 },
+	{ 1, 0x700 }
+};
+
 pprc_t plat_prcids[] = {
 	/*
 	 * platforms that have the same map with T200
@@ -87,7 +96,10 @@ pprc_t plat_prcids[] = {
 	    t5140_prcs },
 	{ "SUNW,USBRDT-5240",
 	    sizeof (t5140_prcs) / sizeof (prc_t),
-	    t5140_prcs }
+	    t5140_prcs },
+	{ "SUNW,USBRDT-5440",
+	    sizeof (usbrdt_5440_prcs) / sizeof (prc_t),
+	    usbrdt_5440_prcs }
 };
 
 pprcs_t prcids = {

@@ -19,35 +19,15 @@
 # CDDL HEADER END
 #
 
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		sparc \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140 \
-		SUNW,Netra-T2000 \
-		SUNW,Netra-CP3060 \
-		SUNW,Netra-CP3260 \
-		SUNW,USBRDT-5240 \
-		SUNW,Netra-T5220 \
-		SUNW,Netra-T5440 \
-		SUNW,USBRDT-5440
+PLATFORMS = SUNW,USBRDT-5440
+CLASS = platform
+DTDFILE =
+TOPOFILE = USBRDT-5440-hc-topology.xml
+SRCDIR = ../SUNW,USBRDT-5440
 
-i386_SUBDIRS = i86pc \
-		i386 \
-		SUNW,Sun-Fire-X4500 \
-		SUNW,Sun-Fire-X4540
-
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-include ../../Makefile.subdirs
+include ../Makefile.map

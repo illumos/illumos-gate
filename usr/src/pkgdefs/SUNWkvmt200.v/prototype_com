@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,6 +56,7 @@ d none usr/platform/SUNW,T5140 755 root sys
 d none usr/platform/SUNW,USBRDT-5240 755 root sys
 d none usr/platform/SUNW,Netra-T5220 755 root sys
 d none usr/platform/SUNW,Netra-T5440 755 root sys
+d none usr/platform/SUNW,USBRDT-5440 755 root sys
 #
 # create links to sun4v platform
 #
@@ -67,6 +68,7 @@ s none usr/platform/SUNW,T5140/sbin=../sun4v/sbin
 s none usr/platform/SUNW,USBRDT-5240/sbin=../sun4v/sbin
 s none usr/platform/SUNW,Netra-T5220/sbin=../sun4v/sbin
 s none usr/platform/SUNW,Netra-T5440/sbin=../sun4v/sbin
+s none usr/platform/SUNW,USBRDT-5440/sbin=../sun4v/sbin
 #
 # create lib directory 
 #
@@ -78,9 +80,9 @@ d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib 755 root bin
 d none usr/platform/SUNW,T5140/lib 755 root bin
 d none usr/platform/SUNW,USBRDT-5240/lib 755 root bin
-
 d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
 d none usr/platform/SUNW,Netra-T5440/lib 755 root bin
+d none usr/platform/SUNW,USBRDT-5440/lib 755 root bin
 #
 # add binary and libraries for prtdiag
 #
@@ -101,6 +103,7 @@ s none usr/platform/SUNW,T5140/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,USBRDT-5240/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Netra-T5220/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Netra-T5440/lib/libpcp.so=../../sun4v/lib/libpcp.so
+s none usr/platform/SUNW,USBRDT-5440/lib/libpcp.so=../../sun4v/lib/libpcp.so
 
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
@@ -112,6 +115,7 @@ s none usr/platform/SUNW,T5140/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,USBRDT-5240/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-T5220/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-T5440/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
+s none usr/platform/SUNW,USBRDT-5440/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 
 #
 # platform-dependent boot object
@@ -126,6 +130,7 @@ s none usr/platform/SUNW,T5140/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,USBRDT-5240/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Netra-T5220/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Netra-T5440/lib/fs=../../sun4v/lib/fs
+s none usr/platform/SUNW,USBRDT-5440/lib/fs=../../sun4v/lib/fs
 #
 # add erie link
 #
