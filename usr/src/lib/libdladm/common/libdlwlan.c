@@ -530,12 +530,10 @@ dladm_wlan_connect(datalink_id_t linkid, dladm_wlan_attr_t *attrp,
 	dladm_status_t		status;
 
 	if ((status = dladm_wlan_validate(linkid)) != DLADM_STATUS_OK)
-		goto done;
+		return (status);
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL) {
-		status = DLADM_STATUS_NOMEM;
-		goto done;
-	}
+	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+		return (DLADM_STATUS_NOMEM);
 
 	if ((status = do_get_linkstatus(linkid, gbuf)) != DLADM_STATUS_OK)
 		goto done;

@@ -1772,13 +1772,13 @@ get_link_list(icfg_if_t **listp, int *numif) {
 	if (list == NULL)
 		goto done;
 
+	*listp = list;
 	for (entry = lw.lw_list; entry != NULL; entry = entry->ll_next) {
 		(void) strlcpy(list->if_name, entry->ll_name,
 		    sizeof (list->if_name));
 		list->if_protocol = AF_UNSPEC;
 		list++;
 	}
-	*listp = list;
 	*numif = lw.lw_num;
 	ret = ICFG_SUCCESS;
 

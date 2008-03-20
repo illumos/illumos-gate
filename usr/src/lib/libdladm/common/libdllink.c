@@ -252,7 +252,11 @@ dladm_linkduplex2str(link_duplex_t duplex, char *buf)
 }
 
 /*
- * Set zoneid of a given link
+ * Set zoneid of a given link. Note that this function takes a link name
+ * argument instead of a linkid, because a data-link (and its linkid) could
+ * be created implicitly as the result of this function. For example, a VLAN
+ * could be created if a VLAN PPA hack name is assigned to an exclusive
+ * non-global zone.
  */
 dladm_status_t
 dladm_setzid(const char *link, zoneid_t zoneid)
