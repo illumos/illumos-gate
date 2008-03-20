@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,7 +213,7 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 			start = kpmptop(ptokpmp(base));
 			nkpmpgs = ptokpmp(end - start);
 			kpm_pages_off = ptsz +
-				(nkpmpgs_prelim - nkpmpgs) * KPMPAGE_T_SZ;
+			    (nkpmpgs_prelim - nkpmpgs) * KPMPAGE_T_SZ;
 		}
 	}
 
@@ -1690,7 +1690,7 @@ delete_memory_thread(caddr_t amhp)
 		ASSERT(mdsp->mds_bitmap == NULL);
 		mdsp->mds_bitmap = kmem_zalloc(MDS_BITMAPBYTES(mdsp), KM_SLEEP);
 		mdsp->mds_bitmap_retired = kmem_zalloc(MDS_BITMAPBYTES(mdsp),
-							KM_SLEEP);
+		    KM_SLEEP);
 	}
 
 	first_scan = 1;
@@ -1720,7 +1720,7 @@ delete_memory_thread(caddr_t amhp)
 
 			if (first_scan) {
 				mem_node_pre_del_slice(mdsp->mds_base,
-					mdsp->mds_base + mdsp->mds_npgs - 1);
+				    mdsp->mds_base + mdsp->mds_npgs - 1);
 			}
 
 			p_end = mdsp->mds_base + mdsp->mds_npgs;
@@ -1877,7 +1877,7 @@ delete_memory_thread(caddr_t amhp)
 						MDSTAT_INCR(mhp, npplocked);
 						pp_targ =
 						    page_get_replacement_page(
-							pp, NULL, 0);
+						    pp, NULL, 0);
 						if (pp_targ != NULL) {
 #ifdef MEM_DEL_STATS
 							ntick_pgrp =
@@ -1944,7 +1944,7 @@ delete_memory_thread(caddr_t amhp)
 #ifdef MEM_DEL_STATS
 						ntick_pgrp =
 						    (uint64_t)ddi_get_lbolt() -
-							start_pgrp;
+						    start_pgrp;
 #endif /* MEM_DEL_STATS */
 						MDSTAT_PGRP(mhp, ntick_pgrp);
 						goto reloc;
@@ -2104,9 +2104,9 @@ delete_memory_thread(caddr_t amhp)
 				 * large enough.
 				 */
 				while ((freemem_left < pgcnt) &&
-					(!mhp->mh_cancel)) {
+				    (!mhp->mh_cancel)) {
 					freemem_left +=
-						delthr_get_freemem(mhp);
+					    delthr_get_freemem(mhp);
 				}
 
 				/*
@@ -2160,14 +2160,14 @@ delete_memory_thread(caddr_t amhp)
 					page_delete_collect(tpp, mhp);
 					bit = pfn - mdsp->mds_base;
 					mdsp->mds_bitmap[bit / NBPBMW] |=
-					(1 << (bit % NBPBMW));
+					    (1 << (bit % NBPBMW));
 				}
 				ASSERT(pp_targ == NULL);
 			}
 		}
 		first_scan = 0;
 		if ((mhp->mh_cancel == 0) && (mhp->mh_hold_todo != 0) &&
-			(collected == 0)) {
+		    (collected == 0)) {
 			/*
 			 * This code is needed as we cannot wait
 			 * for a page to be locked OR the delete to
@@ -2190,12 +2190,6 @@ delete_memory_thread(caddr_t amhp)
 		/* Return any surplus. */
 		page_create_putback(freemem_left);
 		freemem_left = 0;
-	}
-	for (mdsp = mhp->mh_transit.trl_spans; mdsp != NULL;
-	    mdsp = mdsp->mds_next) {
-		mem_node_post_del_slice(mdsp->mds_base,
-				mdsp->mds_base + mdsp->mds_npgs - 1,
-				(mhp->mh_cancel != 0));
 	}
 #ifdef MEM_DEL_STATS
 	ntick_total = (uint64_t)ddi_get_lbolt() - start_total;
@@ -2309,6 +2303,16 @@ refused:
 	mhp->mh_deleted = NULL;
 
 	kphysm_del_cleanup(mhp);
+
+	/*
+	 * mem_node_post_del_slice needs to be after kphysm_del_cleanup so
+	 * that the mem_node_config[] will remain intact for the cleanup.
+	 */
+	for (mdsp = mhp->mh_transit.trl_spans; mdsp != NULL;
+	    mdsp = mdsp->mds_next) {
+		mem_node_post_del_slice(mdsp->mds_base,
+		    mdsp->mds_base + mdsp->mds_npgs - 1, 0);
+	}
 
 	comp_code = KPHYSM_OK;
 
@@ -2460,8 +2464,7 @@ memseg_remap_init()
 		 * that matches the state of deleted pages.
 		 */
 		memseg_remap_init_pages((page_t *)pp_dummy,
-					(page_t *)(pp_dummy +
-					    ptob(pp_dummy_npages)));
+		    (page_t *)(pp_dummy + ptob(pp_dummy_npages)));
 		/* Remove kmem mappings for the pages for safety. */
 		hat_unload(kas.a_hat, pp_dummy, ptob(pp_dummy_npages),
 		    HAT_UNLOAD_UNLOCK);
@@ -3138,5 +3141,5 @@ void
 mem_config_init()
 {
 	memseg_cache = kmem_cache_create("memseg_cache", sizeof (struct memseg),
-		0, NULL, NULL, NULL, NULL, static_arena, KMC_NOHASH);
+	    0, NULL, NULL, NULL, NULL, static_arena, KMC_NOHASH);
 }
