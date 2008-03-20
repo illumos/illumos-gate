@@ -477,15 +477,15 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		ulwp.ul_ustack.ss_size,
 		stack_flags(&ulwp.ul_ustack));
 
-	HD("ix         lwpid      pri        mappedpri  policy     pri_mapped");
+	HD("ix         lwpid      pri        epri       policy     cid");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
 		OFFSET(ul_ix),
 		ulwp.ul_ix,
 		ulwp.ul_lwpid,
 		ulwp.ul_pri,
-		ulwp.ul_mappedpri,
+		ulwp.ul_epri,
 		ulwp.ul_policy,
-		ulwp.ul_pri_mapped);
+		ulwp.ul_cid);
 
 	HD("cursig     pleasestop stop       signalled  dead       unwind");
 	mdb_printf(OFFSTR "%-10d ",
@@ -520,15 +520,15 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		ulwp.ul_max_spinners,
 		ulwp.ul_door_noreserve);
 
-	HD("queue_fifo c'w'defer  e'detect'  async_safe pad1       save_state");
+	HD("queue_fifo c'w'defer  e'detect'  async_safe rt         rtqueued");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
 		OFFSET(ul_queue_fifo),
 		ulwp.ul_queue_fifo,
 		ulwp.ul_cond_wait_defer,
 		ulwp.ul_error_detection,
 		ulwp.ul_async_safe,
-		ulwp.ul_pad1,
-		ulwp.ul_save_state);
+		ulwp.ul_rt,
+		ulwp.ul_rtqueued);
 
 	HD("adapt'spin queue_spin critical   sigdefer   vfork");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %d\n",
@@ -607,12 +607,11 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr(ulwp.ul_sleepq, 1),
 		prt_addr(ulwp.ul_cvmutex, 0));
 
-	HD("mxchain               epri       emappedpri");
-	mdb_printf(OFFSTR "%s %-10d %d\n",
+	HD("mxchain               save_state");
+	mdb_printf(OFFSTR "%s %d\n",
 		OFFSET(ul_mxchain),
 		prt_addr(ulwp.ul_mxchain, 1),
-		ulwp.ul_epri,
-		ulwp.ul_emappedpri);
+		ulwp.ul_save_state);
 
 	HD("rdlockcnt             rd_rwlock             rd_count");
 	mdb_printf(OFFSTR "%-21d %s %d\n",
@@ -629,13 +628,20 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr(ulwp.ul_tpdp, 0));
 
 	HD("siglink               s'l'spin   s'l'spin2  s'l'sleep  s'l'wakeup");
-	mdb_printf(OFFSTR "%s %-10d %-10d %-10d %-10d\n",
+	mdb_printf(OFFSTR "%s %-10d %-10d %-10d %d\n",
 		OFFSET(ul_siglink),
 		prt_addr(ulwp.ul_siglink, 1),
 		ulwp.ul_spin_lock_spin,
 		ulwp.ul_spin_lock_spin2,
 		ulwp.ul_spin_lock_sleep,
 		ulwp.ul_spin_lock_wakeup);
+
+	HD("&queue_root           rtclassid  pilocks");
+	mdb_printf(OFFSTR "%s %-10d %d\n",
+		OFFSET(ul_queue_root),
+		prt_addr((void *)(addr + OFFSET(ul_queue_root)), 1),
+		ulwp.ul_rtclassid,
+		ulwp.ul_pilocks);
 
 	/*
 	 * The remainder of the ulwp_t structure

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,8 +88,8 @@ int
 main(int argc, char *argv[])
 {
 	int		c;
-	int		lflag, dflag, sflag, pflag, tflag, rflag, eflag, iflag;
-	int		qflag;
+	int		lflag, dflag, sflag, pflag;
+	int		tflag, rflag, eflag, iflag, qflag;
 	pri_t		rtpri;
 	long		tqntm;
 	long		res;
@@ -101,8 +101,8 @@ main(int argc, char *argv[])
 
 	(void) strlcpy(cmdpath, argv[0], MAXPATHLEN);
 	(void) strlcpy(basenm, basename(argv[0]), BASENMSZ);
-	qflag =
-	lflag = dflag = sflag = pflag = tflag = rflag = eflag = iflag = 0;
+	lflag = dflag = sflag = pflag = 0;
+	tflag = rflag = eflag = iflag = qflag = 0;
 	while ((c = getopt(argc, argv, "ldsp:t:r:q:ec:i:")) != -1) {
 		switch (c) {
 
@@ -246,7 +246,7 @@ main(int argc, char *argv[])
 
 
 /*
- * Print our class name and the maximum configured real-time priority.
+ * Print our class name and the configured user priority range.
  */
 static void
 print_rtinfo(void)
@@ -260,7 +260,7 @@ print_rtinfo(void)
 	if (priocntl(0, 0, PC_GETCID, (caddr_t)&pcinfo) == -1)
 		fatalerr("\tCan't get maximum configured RT priority\n");
 
-	(void) printf("\tMaximum Configured RT Priority: %d\n",
+	(void) printf("\tConfigured RT User Priority Range: 0 through %d\n",
 	    ((rtinfo_t *)pcinfo.pc_clinfo)->rt_maxpri);
 }
 

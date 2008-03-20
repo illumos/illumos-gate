@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,6 +224,7 @@ static void	fss_sleep(kthread_t *);
 static void	fss_tick(kthread_t *);
 static void	fss_wakeup(kthread_t *);
 static int	fss_donice(kthread_t *, cred_t *, int, int *);
+static int	fss_doprio(kthread_t *, cred_t *, int, int *);
 static pri_t	fss_globpri(kthread_t *);
 static void	fss_yield(kthread_t *);
 static void	fss_nullsys();
@@ -263,7 +264,8 @@ static struct classfuncs fss_classfuncs = {
 	fss_donice,
 	fss_globpri,
 	fss_nullsys,	/* set_process_group */
-	fss_yield
+	fss_yield,
+	fss_doprio,
 };
 
 int
@@ -954,6 +956,7 @@ fss_change_priority(kthread_t *t, fssproc_t *fssproc)
 	new_pri = fssproc->fss_umdpri;
 	ASSERT(new_pri >= 0 && new_pri <= fss_maxglobpri);
 
+	t->t_cpri = fssproc->fss_upri;
 	fssproc->fss_flags &= ~FSSRESTORE;
 	if (t == curthread || t->t_state == TS_ONPROC) {
 		/*
@@ -1271,11 +1274,14 @@ fss_vaparmsout(void *parmsp, pc_vaparms_t *vaparmsp)
 	return (0);
 }
 
+/*
+ * Return the user mode scheduling priority range.
+ */
 static int
 fss_getclpri(pcpri_t *pcprip)
 {
-	pcprip->pc_clpmax = fss_maxumdpri;
-	pcprip->pc_clpmin = 0;
+	pcprip->pc_clpmax = fss_maxupri;
+	pcprip->pc_clpmin = -fss_maxupri;
 	return (0);
 }
 
@@ -1881,8 +1887,7 @@ fss_swapout(kthread_t *t, int flags)
 	if (INHERITED(t) ||
 	    (fssproc->fss_flags & FSSKPRI) ||
 	    (t->t_proc_flag & TP_LWPEXIT) ||
-	    (t->t_state & (TS_ZOMB | TS_FREE | TS_STOPPED |
-		TS_ONPROC | TS_WAIT)) ||
+	    (t->t_state & (TS_ZOMB|TS_FREE|TS_STOPPED|TS_ONPROC|TS_WAIT)) ||
 	    !(t->t_schedflag & TS_LOAD) ||
 	    !(SWAP_OK(t)))
 		return (-1);
@@ -2237,7 +2242,7 @@ fss_tick(kthread_t *t)
 				call_cpu_surrender = B_TRUE;
 			}
 		} else if (t->t_state == TS_ONPROC &&
-			    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
 			/*
 			 * If there is a higher-priority thread which is
 			 * waiting for a processor, then thread surrenders
@@ -2389,6 +2394,38 @@ fss_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 	if (retvalp)
 		*retvalp = newnice - NZERO;
 	return (0);
+}
+
+/*
+ * Increment the priority of the specified thread by incr and
+ * return the new value in *retvalp.
+ */
+static int
+fss_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
+{
+	int newpri;
+	fssproc_t *fssproc = FSSPROC(t);
+	fssparms_t fssparms;
+
+	/*
+	 * If there is no change to priority, just return current setting.
+	 */
+	if (incr == 0) {
+		*retvalp = fssproc->fss_upri;
+		return (0);
+	}
+
+	newpri = fssproc->fss_upri + incr;
+	if (newpri > fss_maxupri || newpri < -fss_maxupri)
+		return (EINVAL);
+
+	*retvalp = newpri;
+	fssparms.fss_uprilim = fssparms.fss_upri = newpri;
+
+	/*
+	 * Reset the uprilim and upri values of the thread.
+	 */
+	return (fss_parmsset(t, &fssparms, (id_t)0, cr));
 }
 
 /*
@@ -2618,12 +2655,12 @@ fss_changepset(kthread_t *t, void *newcp, fssbuf_t *projbuf,
 	thread_lock(t);
 	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
 	    t->t_state == TS_WAIT)
-	    fss_inactive(t);
+		fss_inactive(t);
 	fssproc->fss_proj = fssproj_new;
 	fssproc->fss_fsspri = 0;
 	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
 	    t->t_state == TS_WAIT)
-	    fss_active(t);
+		fss_active(t);
 	thread_unlock(t);
 	mutex_exit(&fsspset_new->fssps_lock);
 

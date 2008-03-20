@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,7 +123,6 @@ sema_wait_impl(sema_t *sp, timespec_t *tsp)
 	} else {				/* multithreaded or blocking */
 		queue_head_t *qp;
 		ulwp_t *ulwp;
-		int more;
 		lwpid_t lwpid = 0;
 
 		qp = queue_lock(lsp, CV);
@@ -132,7 +131,7 @@ sema_wait_impl(sema_t *sp, timespec_t *tsp)
 			 * SUSV3 requires FIFO queueing for semaphores,
 			 * at least for SCHED_FIFO and SCHED_RR scheduling.
 			 */
-			enqueue(qp, self, lsp, CV | FIFOQ);
+			enqueue(qp, self, 1);
 			lsp->sema_waiters = 1;
 			set_parking_flag(self, 1);
 			queue_unlock(qp);
@@ -148,18 +147,17 @@ sema_wait_impl(sema_t *sp, timespec_t *tsp)
 			set_parking_flag(self, 0);
 			qp = queue_lock(lsp, CV);
 			if (self->ul_sleepq)	/* timeout or spurious wakeup */
-				lsp->sema_waiters = dequeue_self(qp, lsp);
+				lsp->sema_waiters = dequeue_self(qp);
 		}
 		if (error == 0)
 			lsp->count--;
 		if (lsp->count != 0 && lsp->sema_waiters) {
-			if ((ulwp = dequeue(qp, lsp, &more)) == NULL)
-				lsp->sema_waiters = 0;
-			else {
+			int more;
+			if ((ulwp = dequeue(qp, &more)) != NULL) {
 				no_preempt(self);
 				lwpid = ulwp->ul_lwpid;
-				lsp->sema_waiters = (more? 1 : 0);
 			}
+			lsp->sema_waiters = more;
 		}
 		queue_unlock(qp);
 		if (lwpid) {
@@ -245,20 +243,18 @@ _sema_trywait(sema_t *sp)
 	} else {				/* multithreaded */
 		queue_head_t *qp;
 		ulwp_t *ulwp;
-		int more;
 		lwpid_t lwpid = 0;
 
 		qp = queue_lock(lsp, CV);
 		if (lsp->count == 0)
 			error = EBUSY;
 		else if (--lsp->count != 0 && lsp->sema_waiters) {
-			if ((ulwp = dequeue(qp, lsp, &more)) == NULL)
-				lsp->sema_waiters = 0;
-			else {
+			int more;
+			if ((ulwp = dequeue(qp, &more)) != NULL) {
 				no_preempt(self);
 				lwpid = ulwp->ul_lwpid;
-				lsp->sema_waiters = (more? 1 : 0);
 			}
+			lsp->sema_waiters = more;
 		}
 		queue_unlock(qp);
 		if (lwpid) {
@@ -314,20 +310,18 @@ _sema_post(sema_t *sp)
 	} else {				/* multithreaded */
 		queue_head_t *qp;
 		ulwp_t *ulwp;
-		int more;
 		lwpid_t lwpid = 0;
 
 		qp = queue_lock(lsp, CV);
 		if (lsp->count >= _semvaluemax)
 			error = EOVERFLOW;
 		else if (lsp->count++ == 0 && lsp->sema_waiters) {
-			if ((ulwp = dequeue(qp, lsp, &more)) == NULL)
-				lsp->sema_waiters = 0;
-			else {
+			int more;
+			if ((ulwp = dequeue(qp, &more)) != NULL) {
 				no_preempt(self);
 				lwpid = ulwp->ul_lwpid;
-				lsp->sema_waiters = (more? 1 : 0);
 			}
+			lsp->sema_waiters = more;
 		}
 		queue_unlock(qp);
 		if (lwpid) {

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -27,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -57,6 +57,7 @@
 #include <sys/prsystm.h>
 #include <sys/modctl.h>
 #include <sys/vmparam.h>
+#include <sys/door.h>
 #include <sys/schedctl.h>
 #include <sys/utrap.h>
 #include <sys/systeminfo.h>
@@ -1441,12 +1442,10 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 		if ((error = stk_add(args, args->pathname, UIO_SYSSPACE)) != 0)
 			return (error);
 		if (args->brandname != NULL &&
-		    (error = stk_add(args, args->brandname,
-		    UIO_SYSSPACE)) != 0)
+		    (error = stk_add(args, args->brandname, UIO_SYSSPACE)) != 0)
 			return (error);
 		if (args->emulator != NULL &&
-		    (error = stk_add(args, args->emulator,
-		    UIO_SYSSPACE)) != 0)
+		    (error = stk_add(args, args->emulator, UIO_SYSSPACE)) != 0)
 			return (error);
 	}
 

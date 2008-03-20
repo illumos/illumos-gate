@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,9 +157,9 @@ td_read_uberdata(td_thragent_t *ta_p)
 			return (TD_DBERR);
 		ta_p->primary_map = uberdata.primary_map;
 		ta_p->tdb_eventmask_addr = ta_p->uberdata_addr +
-			offsetof(uberdata_t, tdb.tdb_ev_global_mask);
+		    offsetof(uberdata_t, tdb.tdb_ev_global_mask);
 		ta_p->tdb_register_sync_addr = ta_p->uberdata_addr +
-			offsetof(uberdata_t, uberflags.uf_tdb_register_sync);
+		    offsetof(uberdata_t, uberflags.uf_tdb_register_sync);
 		ta_p->hash_table_addr = (psaddr_t)uberdata.thr_hash_table;
 		ta_p->hash_size = uberdata.hash_size;
 		if (ps_pdread(ph_p, (psaddr_t)uberdata.tdb.tdb_events,
@@ -177,9 +177,9 @@ td_read_uberdata(td_thragent_t *ta_p)
 			return (TD_DBERR);
 		ta_p->primary_map = uberdata.primary_map;
 		ta_p->tdb_eventmask_addr = ta_p->uberdata_addr +
-			offsetof(uberdata32_t, tdb.tdb_ev_global_mask);
+		    offsetof(uberdata32_t, tdb.tdb_ev_global_mask);
 		ta_p->tdb_register_sync_addr = ta_p->uberdata_addr +
-			offsetof(uberdata32_t, uberflags.uf_tdb_register_sync);
+		    offsetof(uberdata32_t, uberflags.uf_tdb_register_sync);
 		ta_p->hash_table_addr = (psaddr_t)uberdata.thr_hash_table;
 		ta_p->hash_size = uberdata.hash_size;
 		if (ps_pdread(ph_p, (psaddr_t)uberdata.tdb.tdb_events,
@@ -580,15 +580,15 @@ __td_ta_get_nthreads(td_thragent_t *ta_p, int *nthread_p)
 
 	if (ta_p->model == PR_MODEL_NATIVE) {
 		nthreads_addr = ta_p->uberdata_addr +
-			offsetof(uberdata_t, nthreads);
+		    offsetof(uberdata_t, nthreads);
 		nzombies_addr = ta_p->uberdata_addr +
-			offsetof(uberdata_t, nzombies);
+		    offsetof(uberdata_t, nzombies);
 	} else {
 #if defined(_LP64) && defined(_SYSCALL32)
 		nthreads_addr = ta_p->uberdata_addr +
-			offsetof(uberdata32_t, nthreads);
+		    offsetof(uberdata32_t, nthreads);
 		nzombies_addr = ta_p->uberdata_addr +
-			offsetof(uberdata32_t, nzombies);
+		    offsetof(uberdata32_t, nzombies);
 #else
 		nthreads_addr = 0;
 		nzombies_addr = 0;
@@ -673,9 +673,9 @@ __td_ta_map_id2thr(td_thragent_t *ta_p, thread_t tid,
 	data.tid = tid;
 	data.found = 0;
 	return_val = __td_ta_thr_iter(ta_p,
-		(td_thr_iter_f *)td_mapper_id2thr, (void *)&data,
-		TD_THR_ANY_STATE, TD_THR_LOWEST_PRIORITY,
-		TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
+	    (td_thr_iter_f *)td_mapper_id2thr, (void *)&data,
+	    TD_THR_ANY_STATE, TD_THR_LOWEST_PRIORITY,
+	    TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
 	if (return_val == TD_OK) {
 		if (data.found == 0)
 			return_val = TD_NOTHR;
@@ -835,10 +835,11 @@ __td_ta_tsd_iter(td_thragent_t *ta_p, td_key_iter_f *cb, void *cbdata_p)
 int
 sigequalset(const sigset_t *s1, const sigset_t *s2)
 {
-	return (s1->__sigbits[0] == s2->__sigbits[0] &&
-		s1->__sigbits[1] == s2->__sigbits[1] &&
-		s1->__sigbits[2] == s2->__sigbits[2] &&
-		s1->__sigbits[3] == s2->__sigbits[3]);
+	return (
+	    s1->__sigbits[0] == s2->__sigbits[0] &&
+	    s1->__sigbits[1] == s2->__sigbits[1] &&
+	    s1->__sigbits[2] == s2->__sigbits[2] &&
+	    s1->__sigbits[3] == s2->__sigbits[3]);
 }
 
 /*
@@ -986,9 +987,9 @@ __td_ta_thr_iter(td_thragent_t *ta_p, td_thr_iter_f *cb,
 			next_lwp_addr = (psaddr_t)ulwp.ul_forw;
 
 			ts_state = ulwp.ul_dead? TD_THR_ZOMBIE :
-				ulwp.ul_stop? TD_THR_STOPPED :
-				ulwp.ul_wchan? TD_THR_SLEEP :
-				TD_THR_ACTIVE;
+			    ulwp.ul_stop? TD_THR_STOPPED :
+			    ulwp.ul_wchan? TD_THR_SLEEP :
+			    TD_THR_ACTIVE;
 			userpri = ulwp.ul_pri;
 			userflags = ulwp.ul_usropts;
 			if (ulwp.ul_dead)
@@ -1010,9 +1011,9 @@ __td_ta_thr_iter(td_thragent_t *ta_p, td_thr_iter_f *cb,
 			next_lwp_addr = (psaddr_t)ulwp.ul_forw;
 
 			ts_state = ulwp.ul_dead? TD_THR_ZOMBIE :
-				ulwp.ul_stop? TD_THR_STOPPED :
-				ulwp.ul_wchan? TD_THR_SLEEP :
-				TD_THR_ACTIVE;
+			    ulwp.ul_stop? TD_THR_STOPPED :
+			    ulwp.ul_wchan? TD_THR_SLEEP :
+			    TD_THR_ACTIVE;
 			userpri = ulwp.ul_pri;
 			userflags = ulwp.ul_usropts;
 			if (ulwp.ul_dead)
@@ -1284,11 +1285,11 @@ td_thr2to(td_thragent_t *ta_p, psaddr_t ts_addr,
 	}
 	ti_p->ti_ro_area = ts_addr;
 	ti_p->ti_ro_size = ulwp->ul_replace?
-		REPLACEMENT_SIZE : sizeof (ulwp_t);
+	    REPLACEMENT_SIZE : sizeof (ulwp_t);
 	ti_p->ti_state = ulwp->ul_dead? TD_THR_ZOMBIE :
-		ulwp->ul_stop? TD_THR_STOPPED :
-		ulwp->ul_wchan? TD_THR_SLEEP :
-		TD_THR_ACTIVE;
+	    ulwp->ul_stop? TD_THR_STOPPED :
+	    ulwp->ul_wchan? TD_THR_SLEEP :
+	    TD_THR_ACTIVE;
 	ti_p->ti_db_suspended = 0;
 	ti_p->ti_type = TD_THR_USER;
 	ti_p->ti_sp = ulwp->ul_sp;
@@ -1328,11 +1329,11 @@ td_thr2to32(td_thragent_t *ta_p, psaddr_t ts_addr,
 	}
 	ti_p->ti_ro_area = ts_addr;
 	ti_p->ti_ro_size = ulwp->ul_replace?
-		REPLACEMENT_SIZE32 : sizeof (ulwp32_t);
+	    REPLACEMENT_SIZE32 : sizeof (ulwp32_t);
 	ti_p->ti_state = ulwp->ul_dead? TD_THR_ZOMBIE :
-		ulwp->ul_stop? TD_THR_STOPPED :
-		ulwp->ul_wchan? TD_THR_SLEEP :
-		TD_THR_ACTIVE;
+	    ulwp->ul_stop? TD_THR_STOPPED :
+	    ulwp->ul_wchan? TD_THR_SLEEP :
+	    TD_THR_ACTIVE;
 	ti_p->ti_db_suspended = 0;
 	ti_p->ti_type = TD_THR_USER;
 	ti_p->ti_sp = (uint32_t)ulwp->ul_sp;
@@ -1394,7 +1395,7 @@ __td_thr_get_info(td_thrhandle_t *th_p, td_thrinfo_t *ti_p)
 		if (ps_pdread(ph_p, psaddr, &ulwp, sizeof (ulwp)) != PS_OK &&
 		    ((void) memset(&ulwp, 0, sizeof (ulwp)),
 		    ps_pdread(ph_p, psaddr, &ulwp, REPLACEMENT_SIZE32)) !=
-				PS_OK)
+		    PS_OK)
 			return_val = TD_DBERR;
 		else
 			td_thr2to32(ta_p, psaddr, &ulwp, ti_p);
@@ -2086,9 +2087,9 @@ __td_thr_validate(const td_thrhandle_t *th_p)
 
 	searcher_data.addr = th_p->th_unique;
 	return_val = __td_ta_thr_iter(th_p->th_ta_p,
-		td_searcher, &searcher_data,
-		TD_THR_ANY_STATE, TD_THR_LOWEST_PRIORITY,
-		TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
+	    td_searcher, &searcher_data,
+	    TD_THR_ANY_STATE, TD_THR_LOWEST_PRIORITY,
+	    TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
 
 	if (return_val == TD_OK && searcher_data.status == 0)
 		return_val = TD_NOTHR;
@@ -2321,38 +2322,11 @@ __td_thr_tlsbase(td_thrhandle_t *th_p, ulong_t moduleid, psaddr_t *base)
  * Currently unused by dbx.
  */
 #pragma weak td_thr_setprio = __td_thr_setprio
+/* ARGSUSED */
 td_err_e
 __td_thr_setprio(td_thrhandle_t *th_p, int ti_pri)
 {
-	struct ps_prochandle *ph_p;
-	pri_t		priority = ti_pri;
-	td_err_e	return_val = TD_OK;
-
-	if (ti_pri < THREAD_MIN_PRIORITY || ti_pri > THREAD_MAX_PRIORITY)
-		return (TD_ERR);
-	if ((ph_p = ph_lock_th(th_p, &return_val)) == NULL)
-		return (return_val);
-
-	if (th_p->th_ta_p->model == PR_MODEL_NATIVE) {
-		ulwp_t *ulwp = (ulwp_t *)th_p->th_unique;
-
-		if (ps_pdwrite(ph_p, (psaddr_t)&ulwp->ul_pri,
-		    &priority, sizeof (priority)) != PS_OK)
-			return_val = TD_DBERR;
-	} else {
-#if defined(_LP64) && defined(_SYSCALL32)
-		ulwp32_t *ulwp = (ulwp32_t *)th_p->th_unique;
-
-		if (ps_pdwrite(ph_p, (psaddr_t)&ulwp->ul_pri,
-		    &priority, sizeof (priority)) != PS_OK)
-			return_val = TD_DBERR;
-#else
-		return_val = TD_ERR;
-#endif	/* _SYSCALL32 */
-	}
-
-	ph_unlock(th_p->th_ta_p);
-	return (return_val);
+	return (TD_NOCAPAB);
 }
 
 /*
@@ -2526,7 +2500,7 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		if (si_p->si_state.mutex_locked) {
 			if (si_p->si_shared_type & USYNC_PROCESS)
 				si_p->si_ownerpid =
-					generic_so.lock.mutex_ownerpid;
+				    generic_so.lock.mutex_ownerpid;
 			si_p->si_owner.th_ta_p = sh_p->sh_ta_p;
 			si_p->si_owner.th_unique = generic_so.lock.mutex_owner;
 		}
@@ -2539,8 +2513,8 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		    sizeof (generic_so.condition.flags.flag));
 		si_p->si_size = sizeof (generic_so.condition);
 		si_p->si_has_waiters =
-			(generic_so.condition.cond_waiters_user |
-			generic_so.condition.cond_waiters_kernel)? 1 : 0;
+		    (generic_so.condition.cond_waiters_user |
+		    generic_so.condition.cond_waiters_kernel)? 1 : 0;
 		break;
 	case SEMA_MAGIC:
 		if (trunc && ps_pdread(ph_p, sh_p->sh_unique,
@@ -2558,7 +2532,7 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		si_p->si_data = (psaddr_t)generic_so.semaphore.count;
 		break;
 	case RWL_MAGIC:
-	    {
+	{
 		uint32_t rwstate;
 
 		if (trunc && ps_pdread(ph_p, sh_p->sh_unique,
@@ -2575,10 +2549,10 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 			si_p->si_is_wlock = 1;
 			si_p->si_owner.th_ta_p = sh_p->sh_ta_p;
 			si_p->si_owner.th_unique =
-				generic_so.rwlock.rwlock_owner;
+			    generic_so.rwlock.rwlock_owner;
 			if (si_p->si_shared_type & USYNC_PROCESS)
 				si_p->si_ownerpid =
-					generic_so.rwlock.rwlock_ownerpid;
+				    generic_so.rwlock.rwlock_ownerpid;
 		} else {
 			si_p->si_state.nreaders = (rwstate & URW_READERS_MASK);
 		}
@@ -2587,7 +2561,7 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		/* this is useless but the old interface provided it */
 		si_p->si_data = (psaddr_t)generic_so.rwlock.readers;
 		break;
-	    }
+	}
 	default:
 		return (TD_BADSH);
 	}
@@ -2756,7 +2730,7 @@ __td_sync_get_stats(const td_synchandle_t *sh_p, td_syncstats_t *ss_p)
 		return_val = TD_BADSH;
 	else
 		return_val = read_sync_stats(ta_p, hashaddr,
-			sh_p->sh_unique, &sync_stats);
+		    sh_p->sh_unique, &sync_stats);
 	if (return_val != TD_OK)
 		goto out;
 
@@ -2766,103 +2740,103 @@ __td_sync_get_stats(const td_synchandle_t *sh_p, td_syncstats_t *ss_p)
 	 */
 	switch (sync_stats.un.type) {
 	case TDB_MUTEX:
-	    {
+	{
 		td_mutex_stats_t *msp = &ss_p->ss_un.mutex;
 
 		ss_p->ss_info.si_type = TD_SYNC_MUTEX;
 		ss_p->ss_info.si_size = sizeof (mutex_t);
 		msp->mutex_lock =
-			sync_stats.un.mutex.mutex_lock;
+		    sync_stats.un.mutex.mutex_lock;
 		msp->mutex_sleep =
-			sync_stats.un.mutex.mutex_sleep;
+		    sync_stats.un.mutex.mutex_sleep;
 		msp->mutex_sleep_time =
-			sync_stats.un.mutex.mutex_sleep_time;
+		    sync_stats.un.mutex.mutex_sleep_time;
 		msp->mutex_hold_time =
-			sync_stats.un.mutex.mutex_hold_time;
+		    sync_stats.un.mutex.mutex_hold_time;
 		msp->mutex_try =
-			sync_stats.un.mutex.mutex_try;
+		    sync_stats.un.mutex.mutex_try;
 		msp->mutex_try_fail =
-			sync_stats.un.mutex.mutex_try_fail;
+		    sync_stats.un.mutex.mutex_try_fail;
 		if (sync_stats.sync_addr >= ta_p->hash_table_addr &&
 		    (ix = sync_stats.sync_addr - ta_p->hash_table_addr)
 		    < ta_p->hash_size * sizeof (thr_hash_table_t))
 			msp->mutex_internal =
-				ix / sizeof (thr_hash_table_t) + 1;
+			    ix / sizeof (thr_hash_table_t) + 1;
 		break;
-	    }
+	}
 	case TDB_COND:
-	    {
+	{
 		td_cond_stats_t *csp = &ss_p->ss_un.cond;
 
 		ss_p->ss_info.si_type = TD_SYNC_COND;
 		ss_p->ss_info.si_size = sizeof (cond_t);
 		csp->cond_wait =
-			sync_stats.un.cond.cond_wait;
+		    sync_stats.un.cond.cond_wait;
 		csp->cond_timedwait =
-			sync_stats.un.cond.cond_timedwait;
+		    sync_stats.un.cond.cond_timedwait;
 		csp->cond_wait_sleep_time =
-			sync_stats.un.cond.cond_wait_sleep_time;
+		    sync_stats.un.cond.cond_wait_sleep_time;
 		csp->cond_timedwait_sleep_time =
-			sync_stats.un.cond.cond_timedwait_sleep_time;
+		    sync_stats.un.cond.cond_timedwait_sleep_time;
 		csp->cond_timedwait_timeout =
-			sync_stats.un.cond.cond_timedwait_timeout;
+		    sync_stats.un.cond.cond_timedwait_timeout;
 		csp->cond_signal =
-			sync_stats.un.cond.cond_signal;
+		    sync_stats.un.cond.cond_signal;
 		csp->cond_broadcast =
-			sync_stats.un.cond.cond_broadcast;
+		    sync_stats.un.cond.cond_broadcast;
 		if (sync_stats.sync_addr >= ta_p->hash_table_addr &&
 		    (ix = sync_stats.sync_addr - ta_p->hash_table_addr)
 		    < ta_p->hash_size * sizeof (thr_hash_table_t))
 			csp->cond_internal =
-				ix / sizeof (thr_hash_table_t) + 1;
+			    ix / sizeof (thr_hash_table_t) + 1;
 		break;
-	    }
+	}
 	case TDB_RWLOCK:
-	    {
+	{
 		td_rwlock_stats_t *rwsp = &ss_p->ss_un.rwlock;
 
 		ss_p->ss_info.si_type = TD_SYNC_RWLOCK;
 		ss_p->ss_info.si_size = sizeof (rwlock_t);
 		rwsp->rw_rdlock =
-			sync_stats.un.rwlock.rw_rdlock;
+		    sync_stats.un.rwlock.rw_rdlock;
 		rwsp->rw_rdlock_try =
-			sync_stats.un.rwlock.rw_rdlock_try;
+		    sync_stats.un.rwlock.rw_rdlock_try;
 		rwsp->rw_rdlock_try_fail =
-			sync_stats.un.rwlock.rw_rdlock_try_fail;
+		    sync_stats.un.rwlock.rw_rdlock_try_fail;
 		rwsp->rw_wrlock =
-			sync_stats.un.rwlock.rw_wrlock;
+		    sync_stats.un.rwlock.rw_wrlock;
 		rwsp->rw_wrlock_hold_time =
-			sync_stats.un.rwlock.rw_wrlock_hold_time;
+		    sync_stats.un.rwlock.rw_wrlock_hold_time;
 		rwsp->rw_wrlock_try =
-			sync_stats.un.rwlock.rw_wrlock_try;
+		    sync_stats.un.rwlock.rw_wrlock_try;
 		rwsp->rw_wrlock_try_fail =
-			sync_stats.un.rwlock.rw_wrlock_try_fail;
+		    sync_stats.un.rwlock.rw_wrlock_try_fail;
 		break;
-	    }
+	}
 	case TDB_SEMA:
-	    {
+	{
 		td_sema_stats_t *ssp = &ss_p->ss_un.sema;
 
 		ss_p->ss_info.si_type = TD_SYNC_SEMA;
 		ss_p->ss_info.si_size = sizeof (sema_t);
 		ssp->sema_wait =
-			sync_stats.un.sema.sema_wait;
+		    sync_stats.un.sema.sema_wait;
 		ssp->sema_wait_sleep =
-			sync_stats.un.sema.sema_wait_sleep;
+		    sync_stats.un.sema.sema_wait_sleep;
 		ssp->sema_wait_sleep_time =
-			sync_stats.un.sema.sema_wait_sleep_time;
+		    sync_stats.un.sema.sema_wait_sleep_time;
 		ssp->sema_trywait =
-			sync_stats.un.sema.sema_trywait;
+		    sync_stats.un.sema.sema_trywait;
 		ssp->sema_trywait_fail =
-			sync_stats.un.sema.sema_trywait_fail;
+		    sync_stats.un.sema.sema_trywait_fail;
 		ssp->sema_post =
-			sync_stats.un.sema.sema_post;
+		    sync_stats.un.sema.sema_post;
 		ssp->sema_max_count =
-			sync_stats.un.sema.sema_max_count;
+		    sync_stats.un.sema.sema_max_count;
 		ssp->sema_min_count =
-			sync_stats.un.sema.sema_min_count;
+		    sync_stats.un.sema.sema_min_count;
 		break;
-	    }
+	}
 	default:
 		return_val = TD_BADSH;
 		break;
@@ -3064,8 +3038,8 @@ __td_sync_waiters(const td_synchandle_t *sh_p, td_thr_iter_f *cb, void *cb_data)
 	wcb.waiter_cb_arg = cb_data;
 	wcb.errcode = TD_OK;
 	return_val = __td_ta_thr_iter(sh_p->sh_ta_p, waiters_cb, &wcb,
-		TD_THR_SLEEP, TD_THR_LOWEST_PRIORITY,
-		TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
+	    TD_THR_SLEEP, TD_THR_LOWEST_PRIORITY,
+	    TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
 
 	if (return_val != TD_OK)
 		return (return_val);

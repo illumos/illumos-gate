@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@ def_thrattr(void)
 		PTHREAD_SCOPE_PROCESS,		/* scope */
 		0,				/* prio */
 		SCHED_OTHER,			/* policy */
-		PTHREAD_EXPLICIT_SCHED,		/* inherit */
+		PTHREAD_INHERIT_SCHED,		/* inherit */
 		0				/* guardsize */
 	};
 	if (thrattr.guardsize == 0)
@@ -94,7 +94,7 @@ _pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
 {
 	thrattr_t *ap;
 	const thrattr_t *old_ap =
-		old_attr? old_attr->__pthread_attrp : def_thrattr();
+	    old_attr? old_attr->__pthread_attrp : def_thrattr();
 
 	if (old_ap == NULL)
 		return (EINVAL);
@@ -336,8 +336,7 @@ _pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)
 }
 
 /*
- * pthread_attr_setschedpolicy: sets the scheduling policy to SCHED_RR,
- * SCHED_FIFO or SCHED_OTHER.
+ * pthread_attr_setschedpolicy: sets the scheduling policy.
  */
 #pragma weak pthread_attr_setschedpolicy = _pthread_attr_setschedpolicy
 int
@@ -346,9 +345,7 @@ _pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
 	thrattr_t *ap;
 
 	if (attr != NULL && (ap = attr->__pthread_attrp) != NULL &&
-	    (policy == SCHED_OTHER ||
-	    policy == SCHED_FIFO ||
-	    policy == SCHED_RR)) {
+	    policy != SCHED_SYS && get_info_by_policy(policy) != NULL) {
 		ap->policy = policy;
 		return (0);
 	}
@@ -382,23 +379,13 @@ _pthread_attr_setschedparam(pthread_attr_t *attr,
 	const struct sched_param *param)
 {
 	thrattr_t *ap;
-	int	policy;
-	int	pri;
 
-	if (attr == NULL || (ap = attr->__pthread_attrp) == NULL)
-		return (EINVAL);
-
-	policy = ap->policy;
-	pri = param->sched_priority;
-	if (policy == SCHED_OTHER) {
-		if ((pri < THREAD_MIN_PRIORITY || pri > THREAD_MAX_PRIORITY) &&
-		    _validate_rt_prio(policy, pri))
-			return (EINVAL);
-	} else if (_validate_rt_prio(policy, pri)) {
-		return (EINVAL);
+	if (attr != NULL && (ap = attr->__pthread_attrp) != NULL &&
+	    param != NULL) {
+		ap->prio = param->sched_priority;
+		return (0);
 	}
-	ap->prio = pri;
-	return (0);
+	return (EINVAL);
 }
 
 /*

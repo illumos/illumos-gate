@@ -207,7 +207,6 @@ typedef union {
  * to be optimized for speed.
  */
 
-
 /* double the default stack size for 64-bit processes */
 #ifdef _LP64
 #define	MINSTACK	(8 * 1024)
@@ -216,18 +215,10 @@ typedef union {
 #define	MINSTACK	(4 * 1024)
 #define	DEFAULTSTACK	(1024 * 1024)
 #endif
-#define	TSD_NKEYS	_POSIX_THREAD_KEYS_MAX
-
-#define	THREAD_MIN_PRIORITY	0
-#define	THREAD_MAX_PRIORITY	127
-
-#define	PRIO_SET	0	/* set priority and policy */
-#define	PRIO_SET_PRIO	1	/* set priority only */
-#define	PRIO_INHERIT	2
-#define	PRIO_DISINHERIT	3
 
 #define	MUTEX_TRY	0
 #define	MUTEX_LOCK	1
+#define	MUTEX_NOCEIL	0x40
 
 #if defined(__x86)
 
@@ -359,35 +350,83 @@ typedef struct {
 
 
 /*
- * Sleep queues for USYNC_THREAD condvars and mutexes.
- * The size and alignment is 64 bytes to reduce cache conflicts.
+ * Sleep queue root for USYNC_THREAD condvars and mutexes.
+ * There is a default queue root for each queue head (see below).
+ * Also, each ulwp_t contains a queue root that can be used
+ * when the thread is enqueued on the queue, if necessary
+ * (when more than one wchan hashes to the same queue head).
+ */
+typedef struct queue_root {
+	struct queue_root	*qr_next;
+	struct queue_root	*qr_prev;
+	struct ulwp		*qr_head;
+	struct ulwp		*qr_tail;
+	void			*qr_wchan;
+	uint32_t		qr_rtcount;
+	uint32_t		qr_qlen;
+	uint32_t		qr_qmax;
+} queue_root_t;
+
+#ifdef _SYSCALL32
+typedef struct queue_root32 {
+	caddr32_t		qr_next;
+	caddr32_t		qr_prev;
+	caddr32_t		qr_head;
+	caddr32_t		qr_tail;
+	caddr32_t		qr_wchan;
+	uint32_t		qr_rtcount;
+	uint32_t		qr_qlen;
+	uint32_t		qr_qmax;
+} queue_root32_t;
+#endif
+
+/*
+ * Sleep queue heads for USYNC_THREAD condvars and mutexes.
+ * The size and alignment is 128 bytes to reduce cache conflicts.
+ * Each queue head points to a list of queue roots, defined above.
+ * Each queue head contains a default queue root for use when only one
+ * is needed.  It is always at the tail of the queue root hash chain.
  */
 typedef union {
-	uint64_t	qh_64[8];
+	uint64_t		qh_64[16];
 	struct {
 		mutex_t		q_lock;
 		uint8_t		q_qcnt;
-		uint8_t		q_pad[7];
-		uint64_t	q_lockcount;
+		uint8_t		q_type;		/* MX or CV */
+		uint8_t		q_pad1[2];
+		uint32_t	q_lockcount;
 		uint32_t	q_qlen;
 		uint32_t	q_qmax;
-		struct ulwp	*q_head;
-		struct ulwp	*q_tail;
+		void		*q_wchan;	/* valid only while locked */
+		struct queue_root *q_root;	/* valid only while locked */
+		struct queue_root *q_hlist;
+#if !defined(_LP64)
+		caddr_t		q_pad2[3];
+#endif
+		queue_root_t	q_def_root;
+		uint32_t	q_hlen;
+		uint32_t	q_hmax;
 	} qh_qh;
 } queue_head_t;
 
 #define	qh_lock		qh_qh.q_lock
 #define	qh_qcnt		qh_qh.q_qcnt
+#define	qh_type		qh_qh.q_type
+#if defined(THREAD_DEBUG)
 #define	qh_lockcount	qh_qh.q_lockcount
 #define	qh_qlen		qh_qh.q_qlen
 #define	qh_qmax		qh_qh.q_qmax
-#define	qh_head		qh_qh.q_head
-#define	qh_tail		qh_qh.q_tail
+#endif
+#define	qh_wchan	qh_qh.q_wchan
+#define	qh_root		qh_qh.q_root
+#define	qh_hlist	qh_qh.q_hlist
+#define	qh_def_root	qh_qh.q_def_root
+#define	qh_hlen		qh_qh.q_hlen
+#define	qh_hmax		qh_qh.q_hmax
 
-/* queue types passed to queue_lock() and enqueue() */
+/* queue types passed to queue_lock() */
 #define	MX	0
 #define	CV	1
-#define	FIFOQ	0x10	/* or'ing with FIFOQ asks for FIFO queueing */
 #define	QHASHSHIFT	9			/* number of hashing bits */
 #define	QHASHSIZE	(1 << QHASHSHIFT)	/* power of 2 (1<<9 == 512) */
 #define	QUEUE_HASH(wchan, type)	((uint_t)			\
@@ -397,15 +436,27 @@ typedef union {
 
 extern	queue_head_t	*queue_lock(void *, int);
 extern	void		queue_unlock(queue_head_t *);
-extern	void		enqueue(queue_head_t *, struct ulwp *, void *, int);
-extern	struct ulwp	*dequeue(queue_head_t *, void *, int *);
-extern	struct ulwp	*queue_waiter(queue_head_t *, void *);
-extern	struct ulwp	*queue_unlink(queue_head_t *,
+extern	void		enqueue(queue_head_t *, struct ulwp *, int);
+extern	struct ulwp	*dequeue(queue_head_t *, int *);
+extern	struct ulwp	**queue_slot(queue_head_t *, struct ulwp **, int *);
+extern	struct ulwp	*queue_waiter(queue_head_t *);
+extern	int		dequeue_self(queue_head_t *);
+extern	void		queue_unlink(queue_head_t *,
 				struct ulwp **, struct ulwp *);
-extern	uint8_t		dequeue_self(queue_head_t *, void *);
 extern	void		unsleep_self(void);
 extern	void		spin_lock_set(mutex_t *);
 extern	void		spin_lock_clear(mutex_t *);
+
+/*
+ * Scheduling class information structure.
+ */
+typedef struct {
+	short		pcc_state;
+	short		pcc_policy;
+	pri_t		pcc_primin;
+	pri_t		pcc_primax;
+	pcinfo_t	pcc_info;
+} pcclass_t;
 
 /*
  * Memory block for chain of owned ceiling mutexes.
@@ -491,10 +542,10 @@ typedef struct ulwp {
 	stack_t		ul_ustack;	/* current stack boundaries */
 	int		ul_ix;		/* hash index */
 	lwpid_t		ul_lwpid;	/* thread id, aka the lwp id */
-	pri_t		ul_pri;		/* priority known to the library */
-	pri_t		ul_mappedpri;	/* priority known to the application */
+	pri_t		ul_pri;		/* scheduling priority */
+	pri_t		ul_epri;	/* real-time ceiling priority */
 	char		ul_policy;	/* scheduling policy */
-	char		ul_pri_mapped;	/* != 0 means ul_mappedpri is valid */
+	char		ul_cid;		/* scheduling class id */
 	union {
 		struct {
 			char	cursig;	/* deferred signal number */
@@ -524,8 +575,8 @@ typedef struct ulwp {
 	char		ul_cond_wait_defer;	/* thread_cond_wait_defer */
 	char		ul_error_detection;	/* thread_error_detection */
 	char		ul_async_safe;		/* thread_async_safe */
-	char		ul_pad1;
-	char		ul_save_state;	/* bind_guard() interface to ld.so.1 */
+	char		ul_rt;			/* found on an RT queue */
+	char		ul_rtqueued;		/* was RT when queued */
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	volatile int	ul_critical;	/* non-zero == in a critical region */
@@ -543,8 +594,8 @@ typedef struct ulwp {
 	int		ul_errno;	/* per-thread errno */
 	int		*ul_errnop;	/* pointer to errno or self->ul_errno */
 	__cleanup_t	*ul_clnup_hdr;	/* head of cleanup handlers list */
-	uberflags_t *volatile ul_schedctl_called; /* ul_schedctl is set up */
-	volatile sc_shared_t *volatile ul_schedctl;	/* schedctl data */
+	uberflags_t	*ul_schedctl_called;	/* ul_schedctl is set up */
+	volatile sc_shared_t *ul_schedctl;	/* schedctl data */
 	int		ul_bindflags;	/* bind_guard() interface to ld.so.1 */
 	uint_t		ul_libc_locks;	/* count of cancel_safe_mutex_lock()s */
 	tsd_t		*ul_stsd;	/* slow TLS for keys >= TSD_NFAST */
@@ -562,8 +613,7 @@ typedef struct ulwp {
 	queue_head_t	*ul_sleepq;	/* sleep queue thread is waiting on */
 	mutex_t		*ul_cvmutex;	/* mutex dropped when waiting on a cv */
 	mxchain_t	*ul_mxchain;	/* chain of owned ceiling mutexes */
-	pri_t		ul_epri;	/* effective scheduling priority */
-	pri_t		ul_emappedpri;	/* effective mapped priority */
+	int		ul_save_state;	/* bind_guard() interface to ld.so.1 */
 	uint_t		ul_rdlockcnt;	/* # entries in ul_readlock array */
 				/* 0 means there is but a single entry */
 	union {				/* single entry or pointer to array */
@@ -584,6 +634,9 @@ typedef struct ulwp {
 	uint_t		ul_spin_lock_spin2;
 	uint_t		ul_spin_lock_sleep;
 	uint_t		ul_spin_lock_wakeup;
+	queue_root_t	ul_queue_root;	/* root of a sleep queue */
+	id_t		ul_rtclassid;	/* real-time class id */
+	uint_t		ul_pilocks;	/* count of PI locks held */
 		/* the following members *must* be last in the structure */
 		/* they are discarded when ulwp is replaced on thr_exit() */
 	sigset_t	ul_sigmask;	/* thread's current signal mask */
@@ -889,10 +942,10 @@ typedef struct ulwp32 {
 	stack32_t	ul_ustack;	/* current stack boundaries */
 	int		ul_ix;		/* hash index */
 	lwpid_t		ul_lwpid;	/* thread id, aka the lwp id */
-	pri_t		ul_pri;		/* priority known to the library */
-	pri_t		ul_mappedpri;	/* priority known to the application */
+	pri_t		ul_pri;		/* scheduling priority */
+	pri_t		ul_epri;	/* real-time ceiling priority */
 	char		ul_policy;	/* scheduling policy */
-	char		ul_pri_mapped;	/* != 0 means ul_mappedpri is valid */
+	char		ul_cid;		/* scheduling class id */
 	union {
 		struct {
 			char	cursig;	/* deferred signal number */
@@ -922,8 +975,8 @@ typedef struct ulwp32 {
 	char		ul_cond_wait_defer;	/* thread_cond_wait_defer */
 	char		ul_error_detection;	/* thread_error_detection */
 	char		ul_async_safe;		/* thread_async_safe */
-	char		ul_pad1;
-	char		ul_save_state;	/* bind_guard() interface to ld.so.1 */
+	char		ul_rt;			/* found on an RT queue */
+	char		ul_rtqueued;		/* was RT when queued */
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	int		ul_critical;	/* non-zero == in a critical region */
@@ -960,8 +1013,7 @@ typedef struct ulwp32 {
 	caddr32_t	ul_sleepq;	/* sleep queue thread is waiting on */
 	caddr32_t	ul_cvmutex;	/* mutex dropped when waiting on a cv */
 	caddr32_t	ul_mxchain;	/* chain of owned ceiling mutexes */
-	pri_t		ul_epri;	/* effective scheduling priority */
-	pri_t		ul_emappedpri;	/* effective mapped priority */
+	int		ul_save_state;	/* bind_guard() interface to ld.so.1 */
 	uint_t		ul_rdlockcnt;	/* # entries in ul_readlock array */
 				/* 0 means there is but a single entry */
 	union {				/* single entry or pointer to array */
@@ -982,6 +1034,9 @@ typedef struct ulwp32 {
 	uint_t		ul_spin_lock_spin2;
 	uint_t		ul_spin_lock_sleep;
 	uint_t		ul_spin_lock_wakeup;
+	queue_root32_t	ul_queue_root;	/* root of a sleep queue */
+	id_t		ul_rtclassid;	/* real-time class id */
+	uint_t		ul_pilocks;	/* count of PI locks held */
 		/* the following members *must* be last in the structure */
 		/* they are discarded when ulwp is replaced on thr_exit() */
 	sigset32_t	ul_sigmask;	/* thread's current signal mask */
@@ -1096,6 +1151,10 @@ extern	greg_t		stkptr(void);
 #define	__attribute__(string)
 #endif
 
+/* Fetch the dispatch (kernel) priority of a thread */
+#define	real_priority(ulwp)	\
+	((ulwp)->ul_schedctl? (ulwp)->ul_schedctl->sc_priority : 0)
+
 /*
  * Implementation functions.  Not visible outside of the library itself.
  */
@@ -1105,8 +1164,8 @@ extern	void	setgregs(ulwp_t *, gregset_t);
 extern	void	thr_panic(const char *);
 #pragma rarely_called(thr_panic)
 extern	ulwp_t	*find_lwp(thread_t);
-extern	int	real_priority(ulwp_t *);
 extern	void	finish_init(void);
+extern	void	update_sched(ulwp_t *);
 extern	void	queue_alloc(void);
 extern	void	tsd_exit(void);
 extern	void	tsd_free(ulwp_t *);
@@ -1356,6 +1415,8 @@ extern	int	__mutex_lock(mutex_t *);
 extern	int	__mutex_trylock(mutex_t *);
 extern	int	__mutex_unlock(mutex_t *);
 extern	int	mutex_is_held(mutex_t *);
+extern	int	mutex_lock_internal(mutex_t *, timespec_t *, int);
+extern	int	mutex_unlock_internal(mutex_t *, int);
 
 extern	int	_cond_init(cond_t *, int, void *);
 extern	int	_cond_signal(cond_t *);
@@ -1385,8 +1446,7 @@ extern	int	_thr_continue(thread_t);
 extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
 			thread_t *);
 extern	int	_thrp_create(void *, size_t, void *(*)(void *), void *, long,
-			thread_t *, pri_t, int, size_t);
-extern	int	_thr_getprio(thread_t, int *);
+			thread_t *, size_t);
 extern	int	_thr_getspecific(thread_key_t, void **);
 extern	int	_thr_join(thread_t, thread_t *, void **);
 extern	int	_thr_keycreate(thread_key_t *, PFrV);
@@ -1407,13 +1467,15 @@ extern	void	_thr_terminate(void *);
 extern	void	_thr_exit(void *);
 extern	void	_thrp_exit(void);
 
+extern	const pcclass_t *get_info_by_class(id_t);
+extern	const pcclass_t *get_info_by_policy(int);
+extern	void	_membar_producer(void);
+extern	void	_membar_consumer(void);
 extern	const thrattr_t *def_thrattr(void);
-extern	int	_thread_setschedparam_main(pthread_t, int,
-			const struct sched_param *, int);
-extern	int	_validate_rt_prio(int, int);
-extern	int	_thrp_setlwpprio(lwpid_t, int, int);
-extern	pri_t	map_rtpri_to_gp(pri_t);
-extern	int	get_info_by_policy(int);
+extern	id_t	setparam(idtype_t, id_t, int, int);
+extern	id_t	setprio(idtype_t, id_t, int, int *);
+extern	id_t	getparam(idtype_t, id_t, int *, struct sched_param *);
+extern	long	_private_priocntl(idtype_t, id_t, int, void *);
 
 /*
  * System call wrappers (direct interfaces to the kernel)

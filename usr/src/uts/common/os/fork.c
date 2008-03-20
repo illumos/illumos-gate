@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -592,6 +592,7 @@ cfork(int isvfork, int isfork1, int flags)
 		 * and disappear before CL_FORKRET() is called.
 		 */
 		CL_FORKRET(curthread, cp->p_tlist);
+		schedctl_set_cidpri(curthread);
 		ASSERT(MUTEX_NOT_HELD(&pidlock));
 	}
 
@@ -602,8 +603,7 @@ forklwperr:
 		if (avl_numnodes(&p->p_wpage) != 0) {
 			/* restore watchpoints to parent */
 			as = p->p_as;
-			AS_LOCK_ENTER(as, &as->a_lock,
-			    RW_WRITER);
+			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
 			as->a_wpage = p->p_wpage;
 			avl_create(&p->p_wpage, wp_compare,
 			    sizeof (struct watched_page),

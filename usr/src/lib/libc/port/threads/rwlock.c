@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,7 @@ rwl_entry(rwlock_t *rwlp)
 	 */
 	readlockp = lmalloc(nlocks * 2 * sizeof (readlock_t));
 	(void) _memcpy(readlockp, self->ul_readlock.array,
-		nlocks * sizeof (readlock_t));
+	    nlocks * sizeof (readlock_t));
 	lfree(self->ul_readlock.array, nlocks * sizeof (readlock_t));
 	self->ul_readlock.array = readlockp;
 	self->ul_rdlockcnt *= 2;
@@ -254,7 +254,7 @@ read_lock_try(rwlock_t *rwlp, int ignore_waiters_flag)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	uint32_t mask = ignore_waiters_flag?
-		URW_WRITE_LOCKED : (URW_HAS_WAITERS | URW_WRITE_LOCKED);
+	    URW_WRITE_LOCKED : (URW_HAS_WAITERS | URW_WRITE_LOCKED);
 	uint32_t readers;
 	ulwp_t *self = curthread;
 
@@ -298,8 +298,8 @@ write_lock_try(rwlock_t *rwlp, int ignore_waiters_flag)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	uint32_t mask = ignore_waiters_flag?
-		(URW_WRITE_LOCKED | URW_READERS_MASK) :
-		(URW_HAS_WAITERS | URW_WRITE_LOCKED | URW_READERS_MASK);
+	    (URW_WRITE_LOCKED | URW_READERS_MASK) :
+	    (URW_HAS_WAITERS | URW_WRITE_LOCKED | URW_READERS_MASK);
 	ulwp_t *self = curthread;
 	uint32_t readers;
 
@@ -347,12 +347,12 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	uint32_t readers;
 	uint32_t writers;
-	int nlwpid = 0;
-	int maxlwps = MAXLWPS;
-	ulwp_t *self;
 	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev = NULL;
+	ulwp_t *prev;
+	int nlwpid = 0;
+	int more;
+	int maxlwps = MAXLWPS;
 	lwpid_t buffer[MAXLWPS];
 	lwpid_t *lwpid = buffer;
 
@@ -366,9 +366,9 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 	writers = 0;
 
 	/*
-	 * Walk the list of waiters and prepare to wake up as
-	 * many readers as we encounter before encountering
-	 * a writer.  If the first thread on the list is a
+	 * Examine the queue of waiters in priority order and prepare
+	 * to wake up as many readers as we encounter before encountering
+	 * a writer.  If the highest priority thread on the queue is a
 	 * writer, stop there and wake it up.
 	 *
 	 * We keep track of lwpids that are to be unparked in lwpid[].
@@ -383,13 +383,9 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 	 * alloc_lwpids() to allocate a bigger buffer using the mmap()
 	 * system call directly since that path acquires no locks.
 	 */
-	ulwpp = &qp->qh_head;
-	while ((ulwp = *ulwpp) != NULL) {
-		if (ulwp->ul_wchan != rwlp) {
-			prev = ulwp;
-			ulwpp = &ulwp->ul_link;
-			continue;
-		}
+	while ((ulwpp = queue_slot(qp, &prev, &more)) != NULL) {
+		ulwp = *ulwpp;
+		ASSERT(ulwp->ul_wchan == rwlp);
 		if (ulwp->ul_writer) {
 			if (writers != 0 || readers != 0)
 				break;
@@ -403,15 +399,17 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 			if (nlwpid == maxlwps)
 				lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
 		}
-		(void) queue_unlink(qp, ulwpp, prev);
+		queue_unlink(qp, ulwpp, prev);
+		ulwp->ul_sleepq = NULL;
+		ulwp->ul_wchan = NULL;
 		lwpid[nlwpid++] = ulwp->ul_lwpid;
 	}
-	if (ulwp == NULL)
+	if (ulwpp == NULL)
 		atomic_and_32(rwstate, ~URW_HAS_WAITERS);
 	if (nlwpid == 0) {
 		queue_unlock(qp);
 	} else {
-		self = curthread;
+		ulwp_t *self = curthread;
 		no_preempt(self);
 		queue_unlock(qp);
 		if (nlwpid == 1)
@@ -440,7 +438,6 @@ shared_rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	mutex_t *mp = &rwlp->mutex;
-	/* LINTED set but not used */
 	uint32_t readers;
 	int try_flag;
 	int error;
@@ -517,6 +514,7 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 	queue_head_t *qp;
 	ulwp_t *ulwp;
 	int try_flag;
+	int ignore_waiters_flag;
 	int error = 0;
 
 	try_flag = (rd_wr & TRY_FLAG);
@@ -528,15 +526,18 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 	}
 
 	qp = queue_lock(rwlp, MX);
-retry:
+	/* initial attempt to acquire the lock fails if there are waiters */
+	ignore_waiters_flag = 0;
 	while (error == 0) {
 		if (rd_wr == READ_LOCK) {
-			if (read_lock_try(rwlp, 0))
-				goto out;
+			if (read_lock_try(rwlp, ignore_waiters_flag))
+				break;
 		} else {
-			if (write_lock_try(rwlp, 0))
-				goto out;
+			if (write_lock_try(rwlp, ignore_waiters_flag))
+				break;
 		}
+		/* subsequent attempts do not fail due to waiters */
+		ignore_waiters_flag = 1;
 		atomic_or_32(rwstate, URW_HAS_WAITERS);
 		readers = *rwstate;
 		ASSERT_CONSISTENT_STATE(readers);
@@ -544,10 +545,15 @@ retry:
 		    (rd_wr == WRITE_LOCK &&
 		    (readers & URW_READERS_MASK) != 0))
 			/* EMPTY */;	/* somebody holds the lock */
-		else if ((ulwp = queue_waiter(qp, rwlp)) == NULL) {
+		else if ((ulwp = queue_waiter(qp)) == NULL) {
 			atomic_and_32(rwstate, ~URW_HAS_WAITERS);
-			break;		/* no queued waiters */
+			continue;	/* no queued waiters, try again */
 		} else {
+			/*
+			 * Do a priority check on the queued waiter (the
+			 * highest priority thread on the queue) to see
+			 * if we should defer to him or just grab the lock.
+			 */
 			int our_pri = real_priority(self);
 			int his_pri = real_priority(ulwp);
 
@@ -557,7 +563,7 @@ retry:
 				 * a higher priority than ours.
 				 */
 				if (his_pri <= our_pri)
-					break;
+					continue;	/* try again */
 			} else {
 				/*
 				 * We defer to a queued thread that has
@@ -566,7 +572,7 @@ retry:
 				 */
 				if (his_pri < our_pri ||
 				    (his_pri == our_pri && !ulwp->ul_writer))
-					break;
+					continue;	/* try again */
 			}
 		}
 		/*
@@ -578,33 +584,21 @@ retry:
 			break;
 		}
 		/*
-		 * Enqueue writers ahead of readers of the
-		 * same priority.
+		 * Enqueue writers ahead of readers.
 		 */
 		self->ul_writer = rd_wr;	/* *must* be 0 or 1 */
-		enqueue(qp, self, rwlp, MX);
+		enqueue(qp, self, 0);
 		set_parking_flag(self, 1);
 		queue_unlock(qp);
 		if ((error = __lwp_park(tsp, 0)) == EINTR)
-			error = 0;
-		self->ul_writer = 0;
+			error = ignore_waiters_flag = 0;
 		set_parking_flag(self, 0);
 		qp = queue_lock(rwlp, MX);
-		if (self->ul_sleepq && dequeue_self(qp, rwlp) == 0)
+		if (self->ul_sleepq && dequeue_self(qp) == 0)
 			atomic_and_32(rwstate, ~URW_HAS_WAITERS);
+		self->ul_writer = 0;
 	}
 
-	if (error == 0) {
-		if (rd_wr == READ_LOCK) {
-			if (!read_lock_try(rwlp, 1))
-				goto retry;
-		} else {
-			if (!write_lock_try(rwlp, 1))
-				goto retry;
-		}
-	}
-
-out:
 	queue_unlock(qp);
 
 	if (!try_flag) {

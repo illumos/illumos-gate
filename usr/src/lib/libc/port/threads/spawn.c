@@ -30,14 +30,9 @@
 #include "thr_uberdata.h"
 #include <sys/libc_kernel.h>
 #include <sys/procset.h>
-#include <sys/rtpriocntl.h>
-#include <sys/tspriocntl.h>
 #include <sys/fork.h>
-#include <sys/rt.h>
-#include <sys/ts.h>
 #include <alloca.h>
 #include <spawn.h>
-#include "rtsched.h"
 
 #define	ALL_POSIX_SPAWN_FLAGS			\
 		(POSIX_SPAWN_RESETIDS |		\
@@ -50,8 +45,8 @@
 		POSIX_SPAWN_WAITPID_NP)
 
 typedef struct {
-	short		sa_psflags;	/* POSIX_SPAWN_* flags */
-	pri_t		sa_priority;
+	int		sa_psflags;	/* POSIX_SPAWN_* flags */
+	int		sa_priority;
 	int		sa_schedpolicy;
 	pid_t		sa_pgroup;
 	sigset_t	sa_sigdefault;
@@ -70,8 +65,6 @@ typedef struct file_attr {
 	int		fa_newfiledes;	/* new file descriptor for dup2() */
 } file_attr_t;
 
-extern struct pcclass ts_class, rt_class;
-
 extern	pid_t	_vforkx(int);
 #pragma unknown_control_flow(_vforkx)
 extern	void	*_private_memset(void *, int, size_t);
@@ -88,95 +81,6 @@ extern	gid_t	_private_getgid(void);
 extern	uid_t	_private_getuid(void);
 extern	uid_t	_private_geteuid(void);
 extern	void	_private_exit(int);
-
-/*
- * We call this function rather than priocntl() because we must not call
- * any function that is exported from libc while in the child of vfork().
- * Also, we are not using PC_GETXPARMS or PC_SETXPARMS so we can use
- * the simple call to __priocntlset() rather than the varargs version.
- */
-static long
-_private_priocntl(idtype_t idtype, id_t id, int cmd, caddr_t arg)
-{
-	extern long _private__priocntlset(int, procset_t *, int, caddr_t, ...);
-	procset_t procset;
-
-	setprocset(&procset, POP_AND, idtype, id, P_ALL, 0);
-	return (_private__priocntlset(PC_VERSION, &procset, cmd, arg, 0));
-}
-
-/*
- * The following two functions are blatently stolen from
- * sched_setscheduler() and sched_setparam() in librt.
- * This would be a lot easier if librt were folded into libc.
- */
-static int
-setscheduler(int policy, pri_t prio)
-{
-	pcparms_t	pcparm;
-	tsinfo_t	*tsi;
-	tsparms_t	*tsp;
-	int		scale;
-
-	switch (policy) {
-	case SCHED_FIFO:
-	case SCHED_RR:
-		if (prio < rt_class.pcc_primin || prio > rt_class.pcc_primax) {
-			errno = EINVAL;
-			return (-1);
-		}
-		pcparm.pc_cid = rt_class.pcc_info.pc_cid;
-		((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
-		((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs =
-		    (policy == SCHED_RR ? RT_TQDEF : RT_TQINF);
-		break;
-
-	case SCHED_OTHER:
-		pcparm.pc_cid = ts_class.pcc_info.pc_cid;
-		tsi = (tsinfo_t *)ts_class.pcc_info.pc_clinfo;
-		scale = tsi->ts_maxupri;
-		tsp = (tsparms_t *)pcparm.pc_clparms;
-		tsp->ts_uprilim = tsp->ts_upri = -(scale * prio) / 20;
-		break;
-
-	default:
-		errno = EINVAL;
-		return (-1);
-	}
-
-	return (_private_priocntl(P_PID, P_MYID,
-	    PC_SETPARMS, (caddr_t)&pcparm));
-}
-
-static int
-setparam(pcparms_t *pcparmp, pri_t prio)
-{
-	tsparms_t	*tsp;
-	tsinfo_t	*tsi;
-	int		scale;
-
-	if (pcparmp->pc_cid == rt_class.pcc_info.pc_cid) {
-		/* SCHED_FIFO or SCHED_RR policy */
-		if (prio < rt_class.pcc_primin || prio > rt_class.pcc_primax) {
-			errno = EINVAL;
-			return (-1);
-		}
-		((rtparms_t *)pcparmp->pc_clparms)->rt_tqnsecs = RT_NOCHANGE;
-		((rtparms_t *)pcparmp->pc_clparms)->rt_pri = prio;
-	} else if (pcparmp->pc_cid == ts_class.pcc_info.pc_cid) {
-		/* SCHED_OTHER policy */
-		tsi = (tsinfo_t *)ts_class.pcc_info.pc_clinfo;
-		scale = tsi->ts_maxupri;
-		tsp = (tsparms_t *)pcparmp->pc_clparms;
-		tsp->ts_uprilim = tsp->ts_upri = -(scale * prio) / 20;
-	} else {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	return (_private_priocntl(P_PID, P_MYID,
-	    PC_SETPARMS, (caddr_t)pcparmp));
-}
 
 static int
 perform_flag_actions(spawn_attr_t *sap)
@@ -209,20 +113,11 @@ perform_flag_actions(spawn_attr_t *sap)
 	}
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETSCHEDULER) {
-		if (setscheduler(sap->sa_schedpolicy, sap->sa_priority) != 0)
+		if (setparam(P_LWPID, P_MYID,
+		    sap->sa_schedpolicy, sap->sa_priority) == -1)
 			return (errno);
 	} else if (sap->sa_psflags & POSIX_SPAWN_SETSCHEDPARAM) {
-		/*
-		 * Get the process's current scheduling parameters,
-		 * then modify to set the new priority.
-		 */
-		pcparms_t pcparm;
-
-		pcparm.pc_cid = PC_CLNULL;
-		if (_private_priocntl(P_PID, P_MYID,
-		    PC_GETPARMS, (caddr_t)&pcparm) == -1)
-			return (errno);
-		if (setparam(&pcparm, sap->sa_priority) != 0)
+		if (setprio(P_LWPID, P_MYID, sap->sa_priority, NULL) == -1)
 			return (errno);
 	}
 
@@ -682,17 +577,6 @@ _posix_spawnattr_setflags(
 	    (flags & ~ALL_POSIX_SPAWN_FLAGS))
 		return (EINVAL);
 
-	if (flags & (POSIX_SPAWN_SETSCHEDPARAM | POSIX_SPAWN_SETSCHEDULER)) {
-		/*
-		 * Populate ts_class and rt_class.
-		 * We will need them in the child of vfork().
-		 */
-		if (rt_class.pcc_state == 0)
-			(void) get_info_by_policy(SCHED_FIFO);
-		if (ts_class.pcc_state == 0)
-			(void) get_info_by_policy(SCHED_OTHER);
-	}
-
 	sap->sa_psflags = flags;
 	return (0);
 }
@@ -789,17 +673,15 @@ _posix_spawnattr_setschedpolicy(
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
-	if (sap == NULL)
+	if (sap == NULL || schedpolicy == SCHED_SYS)
 		return (EINVAL);
 
-	switch (schedpolicy) {
-	case SCHED_OTHER:
-	case SCHED_FIFO:
-	case SCHED_RR:
-		break;
-	default:
-		return (EINVAL);
-	}
+	/*
+	 * Cache the policy information for later use
+	 * by the vfork() child of posix_spawn().
+	 */
+	if (get_info_by_policy(schedpolicy) == NULL)
+		return (errno);
 
 	sap->sa_schedpolicy = schedpolicy;
 	return (0);

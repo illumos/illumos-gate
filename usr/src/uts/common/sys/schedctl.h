@@ -43,13 +43,6 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/processor.h>
-#ifdef	_KERNEL
-#include <sys/mutex.h>
-#include <sys/thread.h>
-#include <sys/vnode.h>
-#include <sys/cpuvar.h>
-#include <sys/door.h>
-#endif	/* _KERNEL */
 
 /*
  * This "public" portion of the sc_shared data is used by libsched/libc.
@@ -69,7 +62,10 @@ typedef struct sc_shared {
 	volatile char	sc_sigblock;	/* all signals blocked */
 	volatile uchar_t sc_flgs;	/* set only by curthread; see below */
 	volatile processorid_t sc_cpu;	/* last CPU on which LWP ran */
-	int		sc_pad;
+	volatile char	sc_cid;		/* scheduling class id */
+	volatile char	sc_cpri;	/* class priority, -128..127 */
+	volatile uchar_t sc_priority;	/* dispatch priority, 0..255 */
+	char		sc_pad;
 	sc_public_t	sc_preemptctl;	/* preemption control data */
 } sc_shared_t;
 
@@ -100,6 +96,7 @@ void	schedctl_proc_cleanup(void);
 int	schedctl_get_nopreempt(kthread_t *);
 void	schedctl_set_nopreempt(kthread_t *, short);
 void	schedctl_set_yield(kthread_t *, short);
+void	schedctl_set_cidpri(kthread_t *);
 int	schedctl_sigblock(kthread_t *);
 void	schedctl_finish_sigblock(kthread_t *);
 int	schedctl_cancel_pending(void);

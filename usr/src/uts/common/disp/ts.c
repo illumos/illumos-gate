@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.23 */
 
@@ -196,6 +195,7 @@ static int	ts_vaparmsout(void *, pc_vaparms_t *);
 static int	ts_parmsset(kthread_t *, void *, id_t, cred_t *);
 static void	ts_exit(kthread_t *);
 static int	ts_donice(kthread_t *, cred_t *, int, int *);
+static int	ts_doprio(kthread_t *, cred_t *, int, int *);
 static void	ts_exitclass(void *);
 static int	ts_canexit(kthread_t *, cred_t *);
 static void	ts_forkret(kthread_t *, kthread_t *);
@@ -221,6 +221,7 @@ static void	ts_free(void *);
 
 pri_t		ia_init(id_t, int, classfuncs_t **);
 static int	ia_getclinfo(void *);
+static int	ia_getclpri(pcpri_t *);
 static int	ia_parmsin(void *);
 static int	ia_vaparmsin(void *, pc_vaparms_t *);
 static int	ia_vaparmsout(void *, pc_vaparms_t *);
@@ -274,6 +275,7 @@ static struct classfuncs ts_classfuncs = {
 	ts_globpri,
 	ts_nullsys,	/* set_process_group */
 	ts_yield,
+	ts_doprio,
 };
 
 /*
@@ -290,7 +292,7 @@ static struct classfuncs ia_classfuncs = {
 	ts_parmsout,
 	ia_vaparmsin,
 	ia_vaparmsout,
-	ts_getclpri,
+	ia_getclpri,
 	ts_alloc,
 	ts_free,
 
@@ -318,6 +320,7 @@ static struct classfuncs ia_classfuncs = {
 	ts_globpri,
 	ia_set_process_group,
 	ts_yield,
+	ts_doprio,
 };
 
 
@@ -615,8 +618,7 @@ ts_enterclass(kthread_t *t, id_t cid, void *parmsp,
 
 		tspp->ts_uprilim = reqtsuprilim;
 		tspp->ts_upri = reqtsupri;
-		tspp->ts_nice = NZERO - (NZERO * reqtsupri)
-			/ ts_maxupri;
+		tspp->ts_nice = NZERO - (NZERO * reqtsupri) / ts_maxupri;
 	}
 	TS_NEWUMDPRI(tspp);
 
@@ -788,14 +790,22 @@ ia_getclinfo(void *infop)
 
 
 /*
- * Return the global scheduling priority ranges for the timesharing
- * class in pcpri_t structure.
+ * Return the user mode scheduling priority range.
  */
 static int
 ts_getclpri(pcpri_t *pcprip)
 {
-	pcprip->pc_clpmax = ts_dptbl[ts_maxumdpri].ts_globpri;
-	pcprip->pc_clpmin = ts_dptbl[0].ts_globpri;
+	pcprip->pc_clpmax = ts_maxupri;
+	pcprip->pc_clpmin = -ts_maxupri;
+	return (0);
+}
+
+
+static int
+ia_getclpri(pcpri_t *pcprip)
+{
+	pcprip->pc_clpmax = ia_maxupri;
+	pcprip->pc_clpmin = -ia_maxupri;
 	return (0);
 }
 
@@ -833,7 +843,6 @@ ia_parmsget(kthread_t *t, void *parmsp)
 		iaparmsp->ia_mode = IA_SET_INTERACTIVE;
 	else
 		iaparmsp->ia_mode = IA_INTERACTIVE_OFF;
-	iaparmsp->ia_nice = tspp->ts_nice;
 }
 
 
@@ -1759,7 +1768,7 @@ ts_tick(kthread_t *t)
 			TRACE_2(TR_FAC_DISP, TR_TICK,
 			    "tick:tid %p old pri %d", t, oldpri);
 		} else if (t->t_state == TS_ONPROC &&
-			    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
 			call_cpu_surrender = B_TRUE;
 		}
 	}
@@ -2107,7 +2116,7 @@ ts_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 		newnice = 0;
 
 	tsparms.ts_uprilim = tsparms.ts_upri =
-		-((newnice - NZERO) * ts_maxupri) / NZERO;
+	    -((newnice - NZERO) * ts_maxupri) / NZERO;
 	/*
 	 * Reset the uprilim and upri values of the thread.
 	 * Call ts_parmsset even if thread is interactive since we're
@@ -2130,6 +2139,38 @@ ts_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 	return (0);
 }
 
+/*
+ * Increment the priority of the specified thread by incr and
+ * return the new value in *retvalp.
+ */
+static int
+ts_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
+{
+	int		newpri;
+	tsproc_t	*tspp = (tsproc_t *)(t->t_cldata);
+	tsparms_t	tsparms;
+
+	ASSERT(MUTEX_HELD(&(ttoproc(t))->p_lock));
+
+	/* If there's no change to the priority, just return current setting */
+	if (incr == 0) {
+		*retvalp = tspp->ts_upri;
+		return (0);
+	}
+
+	newpri = tspp->ts_upri + incr;
+	if (newpri > ts_maxupri || newpri < -ts_maxupri)
+		return (EINVAL);
+
+	*retvalp = newpri;
+	tsparms.ts_uprilim = tsparms.ts_upri = newpri;
+	/*
+	 * Reset the uprilim and upri values of the thread.
+	 * Call ts_parmsset even if thread is interactive since we're
+	 * not changing mode.
+	 */
+	return (ts_parmsset(t, &tsparms, 0, cr));
+}
 
 /*
  * ia_set_process_group marks foreground processes as interactive
@@ -2324,6 +2365,7 @@ ts_change_priority(kthread_t *t, tsproc_t *tspp)
 	new_pri = ts_dptbl[tspp->ts_umdpri].ts_globpri;
 	ASSERT(new_pri >= 0 && new_pri <= ts_maxglobpri);
 	tspp->ts_flags &= ~TSRESTORE;
+	t->t_cpri = tspp->ts_upri;
 	if (t == curthread || t->t_state == TS_ONPROC) {
 		/* curthread is always onproc */
 		cpu_t	*cp = t->t_disp_queue->disp_cpu;

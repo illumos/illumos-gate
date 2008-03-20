@@ -813,7 +813,6 @@ THREADSOBJS=			\
 	pthr_mutex.o		\
 	pthr_rwlock.o		\
 	pthread.o		\
-	rtsched.o		\
 	rwlock.o		\
 	scalls.o		\
 	sema.o			\
@@ -984,8 +983,6 @@ CFLAGS += -xinline=
 THREAD_DEBUG =
 $(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG
 
-CFLAGS += $(THREAD_DEBUG)
-
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
@@ -994,7 +991,7 @@ $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
 MAPFILES =	../port/mapfile-vers mapfile-vers
 
 CFLAGS +=	$(EXTN_CFLAGS)
-CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) \
+CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
 ASFLAGS=	-K pic -P -D__STDC__ -D_ASM $(CPPFLAGS) $(sparc_AS_XARCH)
 
@@ -1105,9 +1102,9 @@ TIL=				\
 	pthr_rwlock.o		\
 	pthread.o		\
 	rand.o			\
-	rtsched.o		\
 	rwlock.o		\
 	scalls.o		\
+	sched.o			\
 	sema.o			\
 	sigaction.o		\
 	sigev_thread.o		\

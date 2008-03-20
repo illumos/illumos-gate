@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +37,7 @@
 #include <sys/modctl.h>
 #include <sys/disp.h>
 #include <sys/sysmacros.h>
+#include <sys/schedctl.h>
 
 static int getcidbyname_locked(char *, id_t *);
 
@@ -178,7 +180,7 @@ getcidbyname(char *clname, id_t *cidp)
  * tp into the buffer pointed to by parmsp.
  */
 void
-parmsget(kthread_id_t tp, pcparms_t *parmsp)
+parmsget(kthread_t *tp, pcparms_t *parmsp)
 {
 	parmsp->pc_cid = tp->t_cid;
 	CL_PARMSGET(tp, parmsp->pc_clparms);
@@ -225,7 +227,7 @@ int
 parmsout(pcparms_t *parmsp, pc_vaparms_t *vaparmsp)
 {
 	return (CL_PARMSOUT(&sclass[parmsp->pc_cid], parmsp->pc_clparms,
-		vaparmsp));
+	    vaparmsp));
 }
 
 
@@ -238,7 +240,7 @@ parmsout(pcparms_t *parmsp, pc_vaparms_t *vaparmsp)
  * has the appropriate permissions.
  */
 int
-parmsset(pcparms_t *parmsp, kthread_id_t targtp)
+parmsset(pcparms_t *parmsp, kthread_t *targtp)
 {
 	caddr_t	clprocp;
 	int	error;
@@ -310,11 +312,12 @@ parmsset(pcparms_t *parmsp, kthread_id_t targtp)
 		 * Not changing class
 		 */
 		error = CL_PARMSSET(targtp, parmsp->pc_clparms,
-					curthread->t_cid, reqpcredp);
+		    curthread->t_cid, reqpcredp);
 		crfree(reqpcredp);
 		if (error)
 			return (error);
 	}
+	schedctl_set_cidpri(targtp);
 	return (0);
 }
 

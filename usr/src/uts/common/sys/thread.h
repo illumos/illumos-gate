@@ -121,6 +121,7 @@ typedef struct _kthread {
 	uint_t	t_state;	/* thread state	(protected by thread_lock) */
 	pri_t	t_pri;		/* assigned thread priority */
 	pri_t	t_epri;		/* inherited thread priority */
+	pri_t	t_cpri;		/* thread scheduling class priority */
 	char	t_writer;	/* sleeping in lwp_rwlock_lock(RW_WRITE_LOCK) */
 	label_t	t_pcb;		/* pcb, save area when switching */
 	lwpchan_t t_lwpchan;	/* reason for blocking */
@@ -584,6 +585,7 @@ caddr_t	thread_stk_init(caddr_t);	/* init thread stack */
 	pri_t __new_pri = (pri);					\
 	DTRACE_SCHED2(change__pri, kthread_t *, (t), pri_t, __new_pri);	\
 	(t)->t_pri = __new_pri;						\
+	schedctl_set_cidpri(t);						\
 }
 
 /*

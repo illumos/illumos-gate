@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,10 +109,11 @@ _pthread_mutexattr_getpshared(const pthread_mutexattr_t *attr, int *pshared)
 int
 _pthread_mutexattr_setprioceiling(pthread_mutexattr_t *attr, int prioceiling)
 {
+	const pcclass_t *pccp = get_info_by_policy(SCHED_FIFO);
 	mattr_t	*ap;
 
 	if (attr == NULL || (ap = attr->__pthread_mutexattrp) == NULL ||
-	    _validate_rt_prio(SCHED_FIFO, prioceiling))
+	    prioceiling < pccp->pcc_primin || prioceiling > pccp->pcc_primax)
 		return (EINVAL);
 	ap->prioceiling = prioceiling;
 	return (0);
@@ -238,23 +239,29 @@ _pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
 
 /*
  * pthread_mutex_setprioceiling: sets the prioceiling.
+ * From the SUSv3 (POSIX) specification for pthread_mutex_setprioceiling():
+ *	The process of locking the mutex need not
+ *	adhere to the priority protect protocol.
+ * We pass the MUTEX_NOCEIL flag to mutex_lock_internal() so that
+ * a non-realtime thread can successfully execute this operation.
  */
 #pragma weak pthread_mutex_setprioceiling =  _pthread_mutex_setprioceiling
 int
 _pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int ceil, int *oceil)
 {
 	mutex_t *mp = (mutex_t *)mutex;
+	const pcclass_t *pccp = get_info_by_policy(SCHED_FIFO);
 	int error;
 
 	if (!(mp->mutex_type & PTHREAD_PRIO_PROTECT) ||
-	    _validate_rt_prio(SCHED_FIFO, ceil) != 0)
+	    ceil < pccp->pcc_primin || ceil > pccp->pcc_primax)
 		return (EINVAL);
-	error = _private_mutex_lock(mp);
+	error = mutex_lock_internal(mp, NULL, MUTEX_LOCK | MUTEX_NOCEIL);
 	if (error == 0) {
 		if (oceil)
 			*oceil = mp->mutex_ceiling;
-		mp->mutex_ceiling = (uint8_t)ceil;
-		error = _private_mutex_unlock(mp);
+		mp->mutex_ceiling = ceil;
+		error = mutex_unlock_internal(mp, 0);
 	}
 	return (error);
 }

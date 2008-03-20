@@ -788,7 +788,6 @@ THREADSOBJS=			\
 	pthr_mutex.o		\
 	pthr_rwlock.o		\
 	pthread.o		\
-	rtsched.o		\
 	rwlock.o		\
 	scalls.o		\
 	sema.o			\
@@ -964,8 +963,6 @@ CFLAGS += $(XINLINE)
 THREAD_DEBUG =
 $(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG
 
-CFLAGS += $(THREAD_DEBUG)
-
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
@@ -977,7 +974,7 @@ MAPFILES =	../port/mapfile-vers ../i386/mapfile-vers
 # EXTN_CPPFLAGS and EXTN_CFLAGS set in enclosing Makefile
 #
 CFLAGS +=	$(EXTN_CFLAGS)
-CPPFLAGS=	-D_REENTRANT -Di386 $(EXTN_CPPFLAGS) \
+CPPFLAGS=	-D_REENTRANT -Di386 $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(i386_AS_XARCH)
 
@@ -1085,9 +1082,9 @@ TIL=				\
 	pthr_rwlock.o		\
 	pthread.o		\
 	rand.o			\
-	rtsched.o		\
 	rwlock.o		\
 	scalls.o		\
+	sched.o			\
 	sema.o			\
 	sigaction.o		\
 	sigev_thread.o		\

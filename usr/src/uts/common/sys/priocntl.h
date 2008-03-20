@@ -19,13 +19,13 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #ifndef _SYS_PRIOCNTL_H
 #define	_SYS_PRIOCNTL_H
@@ -58,14 +58,15 @@ extern long	priocntl(), priocntlset();
 #define	PC_SETPARMS	2	/* Set scheduling parameters */
 #define	PC_GETPARMS	3	/* Get scheduling parameters */
 #define	PC_ADMIN	4	/* Scheduler administration (used by */
-				/*   dispadmin(1M), not for general use) */
-#define	PC_GETPRIRANGE	5	/* Get global priority range for a class */
+				/* dispadmin(1M), not for general use) */
+#define	PC_GETPRIRANGE	5	/* Get priority range for a class */
 				/* posix.4 scheduling, not for general use */
 #define	PC_DONICE	6	/* Set or get nice value */
 #define	PC_SETXPARMS	7	/* Set extended scheduling parameters */
 #define	PC_GETXPARMS	8	/* Get extended scheduling parameters */
 #define	PC_SETDFLCL	9	/* Set default class, not for general use */
 #define	PC_GETDFLCL	10	/* Get default class, not for general use */
+#define	PC_DOPRIO	11	/* Set or get priority, not for general use */
 
 #define	PC_CLNULL	-1
 
@@ -75,6 +76,9 @@ extern long	priocntl(), priocntlset();
 
 #define	PC_GETNICE	0
 #define	PC_SETNICE	1
+
+#define	PC_GETPRIO	0
+#define	PC_SETPRIO	1
 
 typedef struct pcinfo {
 	id_t	pc_cid;			/* class id */
@@ -91,6 +95,12 @@ typedef struct pcnice {
 	int	pc_val;			/* nice value */
 	int	pc_op;			/* type of operation, set or get */
 } pcnice_t;
+
+typedef struct pcprio {
+	int	pc_op;			/* type of operation, set or get */
+	id_t	pc_cid;			/* class id */
+	int	pc_val;			/* priority value */
+} pcprio_t;
 
 /*
  * The following is used by the priocntl(2) varargs interface (command
@@ -141,8 +151,8 @@ typedef struct {
 
 typedef struct pcpri {
 	id_t	pc_cid;			/* process class */
-	pri_t	pc_clpmax;		/* class global priority max */
-	pri_t	pc_clpmin;		/* class global priority min */
+	pri_t	pc_clpmax;		/* class priority max */
+	pri_t	pc_clpmin;		/* class priority min */
 } pcpri_t;
 
 /*

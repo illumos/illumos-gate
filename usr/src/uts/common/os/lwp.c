@@ -410,6 +410,11 @@ grow:
 		if (p != curproc || curthread->t_cid != cid) {
 			err = CL_ENTERCLASS(t, cid, NULL, NULL, bufp);
 			t->t_pri = pri;	/* CL_ENTERCLASS may have changed it */
+			/*
+			 * We don't call schedctl_set_cidpri(t) here
+			 * because the schedctl data is not yet set
+			 * up for the newly-created lwp.
+			 */
 		} else {
 			t->t_clfuncs = &(sclass[cid].cl_funcs->thread);
 			err = CL_FORK(curthread, t, bufp);

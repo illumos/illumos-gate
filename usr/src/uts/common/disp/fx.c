@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,6 +192,7 @@ static void	fx_sleep(kthread_t *);
 static void	fx_tick(kthread_t *);
 static void	fx_wakeup(kthread_t *);
 static int	fx_donice(kthread_t *, cred_t *, int, int *);
+static int	fx_doprio(kthread_t *, cred_t *, int, int *);
 static pri_t	fx_globpri(kthread_t *);
 static void	fx_yield(kthread_t *);
 static void	fx_nullsys();
@@ -238,6 +240,7 @@ static struct classfuncs fx_classfuncs = {
 	fx_globpri,
 	fx_nullsys,	/* set_process_group */
 	fx_yield,
+	fx_doprio,
 };
 
 
@@ -282,7 +285,7 @@ fx_init(id_t cid, int clparmsz, classfuncs_t **clfuncspp)
 	 */
 	for (i = 0; i < FX_CB_LISTS; i++) {
 		fx_cb_plisthead[i].fx_cb_next = fx_cb_plisthead[i].fx_cb_prev =
-			&fx_cb_plisthead[i];
+		    &fx_cb_plisthead[i];
 	}
 
 	/*
@@ -498,8 +501,7 @@ fx_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 		fxpp->fx_uprilim = reqfxuprilim;
 		fxpp->fx_pri = reqfxupri;
 
-		fxpp->fx_nice = NZERO - (NZERO * reqfxupri)
-			/ fx_maxupri;
+		fxpp->fx_nice = NZERO - (NZERO * reqfxupri) / fx_maxupri;
 
 		if (((fxkparmsp->fx_cflags & FX_DOTQ) == 0) ||
 		    (fxkparmsp->fx_tqntm == FX_TQDEF)) {
@@ -694,14 +696,13 @@ fx_getclinfo(void *infop)
 
 
 /*
- * Return the global scheduling priority ranges for the fixed-priority
- * class in pcpri_t structure.
+ * Return the user mode scheduling priority range.
  */
 static int
 fx_getclpri(pcpri_t *pcprip)
 {
-	pcprip->pc_clpmax = fx_dptbl[fx_maxumdpri].fx_globpri;
-	pcprip->pc_clpmin = fx_dptbl[0].fx_globpri;
+	pcprip->pc_clpmax = fx_maxupri;
+	pcprip->pc_clpmin = 0;
 	return (0);
 }
 
@@ -753,7 +754,7 @@ fx_parmsin(void *parmsp)
 		return (EINVAL);
 
 	if ((fxparmsp->fx_tqsecs == 0 && fxparmsp->fx_tqnsecs == 0) ||
-		fxparmsp->fx_tqnsecs >= NANOSEC)
+	    fxparmsp->fx_tqnsecs >= NANOSEC)
 		return (EINVAL);
 
 	cflags = (fxparmsp->fx_upri != FX_NOCHANGE ? FX_DOUPRI : 0);
@@ -1158,7 +1159,7 @@ fx_preempt(kthread_t *t)
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;
 		pri_t	newpri = fxpp->fx_pri;
 		FX_CB_PREEMPT(FX_CALLB(fxpp), fxpp->fx_cookie,
-			&new_quantum, &newpri);
+		    &new_quantum, &newpri);
 		FX_ADJUST_QUANTUM(new_quantum);
 		if ((int)new_quantum != fxpp->fx_pquantum) {
 			fxpp->fx_pquantum = (int)new_quantum;
@@ -1299,7 +1300,7 @@ fx_tick(kthread_t *t)
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;
 		pri_t	newpri = fxpp->fx_pri;
 		FX_CB_TICK(FX_CALLB(fxpp), fxpp->fx_cookie,
-			&new_quantum, &newpri);
+		    &new_quantum, &newpri);
 		FX_ADJUST_QUANTUM(new_quantum);
 		if ((int)new_quantum != fxpp->fx_pquantum) {
 			fxpp->fx_pquantum = (int)new_quantum;
@@ -1359,7 +1360,7 @@ fx_tick(kthread_t *t)
 			call_cpu_surrender = B_TRUE;
 		}
 	} else if (t->t_state == TS_ONPROC &&
-		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+	    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
 		call_cpu_surrender = B_TRUE;
 	}
 
@@ -1398,7 +1399,7 @@ fx_wakeup(kthread_t *t)
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;
 		pri_t	newpri = fxpp->fx_pri;
 		FX_CB_WAKEUP(FX_CALLB(fxpp), fxpp->fx_cookie,
-			&new_quantum, &newpri);
+		    &new_quantum, &newpri);
 		FX_ADJUST_QUANTUM(new_quantum);
 		if ((int)new_quantum != fxpp->fx_pquantum) {
 			fxpp->fx_pquantum = (int)new_quantum;
@@ -1441,7 +1442,7 @@ fx_yield(kthread_t *t)
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;
 		pri_t	newpri = fxpp->fx_pri;
 		FX_CB_PREEMPT(FX_CALLB(fxpp), fxpp->fx_cookie,
-				&new_quantum, &newpri);
+		    &new_quantum, &newpri);
 		FX_ADJUST_QUANTUM(new_quantum);
 		if ((int)new_quantum != fxpp->fx_pquantum) {
 			fxpp->fx_pquantum = (int)new_quantum;
@@ -1473,7 +1474,6 @@ fx_yield(kthread_t *t)
 	fxpp->fx_flags &= ~FXBACKQ;
 	setbackdq(t);
 }
-
 
 /*
  * Increment the nice value of the specified thread by incr and
@@ -1517,7 +1517,7 @@ fx_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 		newnice = 0;
 
 	fxkparms.fx_uprilim = fxkparms.fx_upri =
-		-((newnice - NZERO) * fx_maxupri) / NZERO;
+	    -((newnice - NZERO) * fx_maxupri) / NZERO;
 
 	fxkparms.fx_cflags = FX_DOUPRILIM | FX_DOUPRI;
 
@@ -1546,6 +1546,40 @@ fx_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 	return (0);
 }
 
+/*
+ * Increment the priority of the specified thread by incr and
+ * return the new value in *retvalp.
+ */
+static int
+fx_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
+{
+	int		newpri;
+	fxproc_t	*fxpp = (fxproc_t *)(t->t_cldata);
+	fxkparms_t	fxkparms;
+
+	ASSERT(MUTEX_HELD(&(ttoproc(t))->p_lock));
+
+	/* If there's no change to priority, just return current setting */
+	if (incr == 0) {
+		*retvalp = fxpp->fx_pri;
+		return (0);
+	}
+
+	newpri = fxpp->fx_pri + incr;
+	if (newpri > fx_maxupri || newpri < 0)
+		return (EINVAL);
+
+	*retvalp = newpri;
+	fxkparms.fx_uprilim = fxkparms.fx_upri = newpri;
+	fxkparms.fx_tqntm = FX_NOCHANGE;
+	fxkparms.fx_cflags = FX_DOUPRILIM | FX_DOUPRI;
+
+	/*
+	 * Reset the uprilim and upri values of the thread.
+	 */
+	return (fx_parmsset(t, (void *)&fxkparms, (id_t)0, cr));
+}
+
 static void
 fx_change_priority(kthread_t *t, fxproc_t *fxpp)
 {
@@ -1554,6 +1588,7 @@ fx_change_priority(kthread_t *t, fxproc_t *fxpp)
 	ASSERT(THREAD_LOCK_HELD(t));
 	new_pri = fx_dptbl[fxpp->fx_pri].fx_globpri;
 	ASSERT(new_pri >= 0 && new_pri <= fx_maxglobpri);
+	t->t_cpri = fxpp->fx_pri;
 	if (t == curthread || t->t_state == TS_ONPROC) {
 		/* curthread is always onproc */
 		cpu_t	*cp = t->t_disp_queue->disp_cpu;

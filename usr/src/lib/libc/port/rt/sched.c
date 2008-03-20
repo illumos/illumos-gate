@@ -20,245 +20,314 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "synonyms.h"
-#include "mtlib.h"
-#include <sys/types.h>
+#include "thr_uberdata.h"
 #include <sched.h>
-#include <errno.h>
-#include <limits.h>
-#include <unistd.h>
-#include <sys/priocntl.h>
-#include <sys/rtpriocntl.h>
 #include <sys/tspriocntl.h>
-#include <sys/rt.h>
-#include <sys/ts.h>
-#include <thread.h>
-#include <string.h>
-#include <stdlib.h>
-#include "rtsched.h"
+#include <sys/rtpriocntl.h>
+#include <sys/fxpriocntl.h>
 
 /*
- * The following variables are used for caching information
+ * The following array is used for caching information
  * for priocntl scheduling classes.
  */
-struct pcclass ts_class;
-struct pcclass rt_class;
-struct pcclass ia_class;
-struct pcclass sys_class;
+static pcclass_t sched_class[] = {
+	{0, SCHED_OTHER, 0, 0, {-1, "TS",  0}},
+	{0, SCHED_FIFO,	 0, 0, {-1, "RT",  0}},
+	{0, SCHED_RR,	 0, 0, {-1, "RT",  0}},
+	{0, SCHED_SYS,	 0, 0, {0,  "SYS", 0}},
+	{0, SCHED_IA,	 0, 0, {-1, "IA",  0}},
+	{0, SCHED_FSS,	 0, 0, {-1, "FSS", 0}},
+	{0, SCHED_FX,	 0, 0, {-1, "FX",  0}},
+	/*
+	 * Allow unknown (to us) scheduling classes.
+	 * The kernel allows space for exactly 10 scheduling classes
+	 * (see the definitions of 'sclass' and 'nclass' in the kernel).
+	 * We need that number of available slots here.
+	 * If the kernel space is changed, this has to change too.
+	 */
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+	{0, -1,		 0, 0, {-1, "",	   0}},
+};
 
-static rtdpent_t	*rt_dptbl;	/* RT class parameter table */
+#define	NPOLICY	(sizeof (sched_class) / sizeof (pcclass_t))
 
-typedef struct { /* type definition for generic class-specific parameters */
-	int	pc_clparms[PC_CLINFOSZ];
-} pc_clparms_t;
+#if _SCHED_NEXT != SCHED_FX + 1
+#error "fatal: _SCHED_NEXT != SCHED_FX + 1"
+#endif
 
-static int	map_gp_to_rtpri(pri_t);
+static mutex_t class_lock = DEFAULTMUTEX;	/* protects sched_class[] */
 
 /*
- * cache priocntl information on scheduling classes by policy
+ * Helper function for get_info_by_policy(), below.
+ * Don't let a manufactured policy number duplicate
+ * the class of one of our base policy numbers.
  */
-int
+static int
+is_base_class(const char *clname)
+{
+	const pcclass_t	*pccp;
+	int		policy;
+
+	for (policy = 0, pccp = sched_class;
+	    policy < _SCHED_NEXT;
+	    policy++, pccp++) {
+		if (strcmp(clname, pccp->pcc_info.pc_clname) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+/*
+ * Cache priocntl information on scheduling class by policy.
+ */
+const pcclass_t *
 get_info_by_policy(int policy)
 {
-	char		*pccname;
-	struct pcclass	*pccp;
+	pcclass_t *pccp = &sched_class[policy];
+	pcpri_t pcpri;
+	pri_t prio;
+	int base = 0;
 
-	if (policy < 0) {
+	if ((uint_t)policy >= NPOLICY || pccp->pcc_state < 0) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	if (pccp->pcc_state > 0)
+		return (pccp);
+
+	lmutex_lock(&class_lock);
+
+	/* get class info (the system class is known to have class-id == 0) */
+	if (pccp->pcc_policy == -1) {
+		/* policy number not defined in <sched.h> */
+		ASSERT(policy >= _SCHED_NEXT);
+		pccp->pcc_info.pc_cid = policy - _SCHED_NEXT;
+		if (_private_priocntl(0, 0, PC_GETCLINFO, &pccp->pcc_info)
+		    == -1 ||
+		    (base = is_base_class(pccp->pcc_info.pc_clname)) != 0) {
+			pccp->pcc_info.pc_clname[0] = '\0';
+			pccp->pcc_info.pc_cid = -1;
+			/*
+			 * If we duplicated a base class, permanently
+			 * disable this policy entry.  Else allow for
+			 * dynamic loading of scheduling classes.
+			 */
+			if (base) {
+				_membar_producer();
+				pccp->pcc_state = -1;
+			}
+			errno = EINVAL;
+			lmutex_unlock(&class_lock);
+			return (NULL);
+		}
+		pccp->pcc_policy = policy;
+	} else if (policy != SCHED_SYS &&
+	    _private_priocntl(0, 0, PC_GETCID, &pccp->pcc_info) == -1) {
+		_membar_producer();
+		pccp->pcc_state = -1;
+		errno = EINVAL;
+		lmutex_unlock(&class_lock);
+		return (NULL);
+	}
+
+	switch (policy) {
+	case SCHED_OTHER:
+		prio = ((tsinfo_t *)pccp->pcc_info.pc_clinfo)->ts_maxupri;
+		pccp->pcc_primin = -prio;
+		pccp->pcc_primax = prio;
+		break;
+	case SCHED_FIFO:
+	case SCHED_RR:
+		prio = ((rtinfo_t *)pccp->pcc_info.pc_clinfo)->rt_maxpri;
+		pccp->pcc_primin = 0;
+		pccp->pcc_primax = prio;
+		break;
+	default:
+		/*
+		 * All other policy numbers, including policy numbers
+		 * not defined in <sched.h>.
+		 */
+		pcpri.pc_cid = pccp->pcc_info.pc_cid;
+		if (_private_priocntl(0, 0, PC_GETPRIRANGE, &pcpri) == 0) {
+			pccp->pcc_primin = pcpri.pc_clpmin;
+			pccp->pcc_primax = pcpri.pc_clpmax;
+		}
+		break;
+	}
+
+	_membar_producer();
+	pccp->pcc_state = 1;
+	lmutex_unlock(&class_lock);
+	return (pccp);
+}
+
+const pcclass_t *
+get_info_by_class(id_t classid)
+{
+	pcinfo_t	pcinfo;
+	pcclass_t	*pccp;
+	int		policy;
+
+	if (classid < 0) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	/* determine if we already know this classid */
+	for (policy = 0, pccp = sched_class;
+	    policy < NPOLICY;
+	    policy++, pccp++) {
+		if (pccp->pcc_state > 0 && pccp->pcc_info.pc_cid == classid)
+			return (pccp);
+	}
+
+	pcinfo.pc_cid = classid;
+	if (_private_priocntl(0, 0, PC_GETCLINFO, &pcinfo) == -1) {
+		if (classid == 0)	/* no kernel info for sys class */
+			return (get_info_by_policy(SCHED_SYS));
+		return (NULL);
+	}
+
+	for (policy = 0, pccp = sched_class;
+	    policy < NPOLICY;
+	    policy++, pccp++) {
+		if (pccp->pcc_state == 0 &&
+		    strcmp(pcinfo.pc_clname, pccp->pcc_info.pc_clname) == 0)
+			return (get_info_by_policy(pccp->pcc_policy));
+	}
+
+	/*
+	 * We have encountered an unknown (to us) scheduling class.
+	 * Manufacture a policy number for it.  Hopefully we still
+	 * have room in the sched_class[] table.
+	 */
+	policy = _SCHED_NEXT + classid;
+	if (policy >= NPOLICY) {
+		errno = EINVAL;
+		return (NULL);
+	}
+	lmutex_lock(&class_lock);
+	pccp = &sched_class[policy];
+	pccp->pcc_policy = policy;
+	(void) strlcpy(pccp->pcc_info.pc_clname, pcinfo.pc_clname, PC_CLNMSZ);
+	lmutex_unlock(&class_lock);
+	return (get_info_by_policy(pccp->pcc_policy));
+}
+
+/*
+ * Helper function: get process or lwp current scheduling policy.
+ */
+static const pcclass_t *
+get_parms(idtype_t idtype, id_t id, pcparms_t *pcparmp)
+{
+	pcparmp->pc_cid = PC_CLNULL;
+	if (_private_priocntl(idtype, id, PC_GETPARMS, pcparmp) == -1)
+		return (NULL);
+	return (get_info_by_class(pcparmp->pc_cid));
+}
+
+/*
+ * Helper function for setprio() and setparam(), below.
+ */
+static int
+set_priority(idtype_t idtype, id_t id, int policy, int prio,
+    pcparms_t *pcparmp, int settq)
+{
+	int rv;
+
+	switch (policy) {
+	case SCHED_OTHER:
+	{
+		tsparms_t *tsp = (tsparms_t *)pcparmp->pc_clparms;
+		tsp->ts_uprilim = prio;
+		tsp->ts_upri = prio;
+		break;
+	}
+	case SCHED_FIFO:
+	case SCHED_RR:
+	{
+		rtparms_t *rtp = (rtparms_t *)pcparmp->pc_clparms;
+		rtp->rt_tqnsecs = settq?
+		    (policy == SCHED_FIFO? RT_TQINF : RT_TQDEF) :
+		    RT_NOCHANGE;
+		rtp->rt_pri = prio;
+		break;
+	}
+	default:
+	{
+		/*
+		 * Class-independent method for setting the priority.
+		 */
+		pcprio_t pcprio;
+
+		pcprio.pc_op = PC_SETPRIO;
+		pcprio.pc_cid = pcparmp->pc_cid;
+		pcprio.pc_val = prio;
+		do {
+			rv = _private_priocntl(idtype, id, PC_DOPRIO, &pcprio);
+		} while (rv == -1 && errno == ENOMEM);
+		return (rv);
+	}
+	}
+
+	do {
+		rv = _private_priocntl(idtype, id, PC_SETPARMS, pcparmp);
+	} while (rv == -1 && errno == ENOMEM);
+	return (rv);
+}
+
+/*
+ * Utility function, private to libc, used by sched_setparam()
+ * and posix_spawn().  Because it is called by the vfork() child of
+ * posix_spawn(), we must not call any functions exported from libc.
+ */
+id_t
+setprio(idtype_t idtype, id_t id, int prio, int *policyp)
+{
+	pcparms_t	pcparm;
+	int		policy;
+	const pcclass_t	*pccp;
+
+	if ((pccp = get_parms(idtype, id, &pcparm)) == NULL)
+		return (-1);
+	if (prio < pccp->pcc_primin || prio > pccp->pcc_primax) {
 		errno = EINVAL;
 		return (-1);
 	}
 
-	switch (policy) {
-	case SCHED_FIFO:
-	case SCHED_RR:
-		pccp = &rt_class;
-		pccname = "RT";
-		break;
-	case SCHED_OTHER:
-		pccp = &ts_class;
-		pccname = "TS";
-		break;
-	case SCHED_SYS:
-		pccp = &sys_class;
-		pccname = "sys";
-		break;
-	case SCHED_IA:
-		pccp = &ia_class;
-		pccname = "IA";
-		break;
-	default:
-		return (policy);
-	}
-	if (pccp->pcc_state != 0) {
-		if (pccp->pcc_state < 0)
-			errno = ENOSYS;
-		return (pccp->pcc_state);
+	policy = pccp->pcc_policy;
+	if (policyp != NULL &&
+	    (policy == SCHED_FIFO || policy == SCHED_RR)) {
+		rtparms_t *rtp = (rtparms_t *)pcparm.pc_clparms;
+		policy = (rtp->rt_tqnsecs == RT_TQINF? SCHED_FIFO : SCHED_RR);
 	}
 
-	/* get class's info */
-	(void) strcpy(pccp->pcc_info.pc_clname, pccname);
-	if (policy == SCHED_SYS)
-		pccp->pcc_info.pc_cid = 0;
-	else if (priocntl(P_PID, 0, PC_GETCID, (caddr_t)&(pccp->pcc_info)) < 0)
+	if (set_priority(idtype, id, policy, prio, &pcparm, 0) == -1)
 		return (-1);
-
-	if (policy == SCHED_FIFO || policy == SCHED_RR) {
-		pcadmin_t	pcadmin;
-		rtadmin_t	rtadmin;
-		size_t		rtdpsize;
-
-		/* get RT class dispatch table in rt_dptbl */
-		pcadmin.pc_cid = rt_class.pcc_info.pc_cid;
-		pcadmin.pc_cladmin = (caddr_t)&rtadmin;
-		rtadmin.rt_cmd = RT_GETDPSIZE;
-		if (priocntl(P_PID, 0, PC_ADMIN, (caddr_t)&pcadmin) < 0)
-			return (-1);
-		rtdpsize = (size_t)(rtadmin.rt_ndpents * sizeof (rtdpent_t));
-		if (rt_dptbl == NULL &&
-		    (rt_dptbl = lmalloc(rtdpsize)) == NULL) {
-			errno = EAGAIN;
-			return (-1);
-		}
-		rtadmin.rt_dpents = rt_dptbl;
-		rtadmin.rt_cmd = RT_GETDPTBL;
-		if (priocntl(P_PID, 0, PC_ADMIN, (caddr_t)&pcadmin) < 0)
-			return (-1);
-		pccp->pcc_primin = 0;
-		pccp->pcc_primax = ((rtinfo_t *)rt_class.pcc_info.pc_clinfo)->
-		    rt_maxpri;
-	} else if (policy == SCHED_OTHER) {
-		pri_t		prio;
-
-		prio = ((tsinfo_t *)ts_class.pcc_info.pc_clinfo)->ts_maxupri/3;
-		pccp->pcc_primin = -prio;
-		pccp->pcc_primax = prio;
-	} else {
-		/* non-RT scheduling class */
-		pcpri_t		pcpri;
-
-		/*
-		 * get class's global priority's min, max, and
-		 * translate them into RT priority level (index) via rt_dptbl.
-		 */
-		pcpri.pc_cid = pccp->pcc_info.pc_cid;
-		if (priocntl(0, 0, PC_GETPRIRANGE, (caddr_t)&pcpri) < 0)
-			return (-1);
-		pccp->pcc_primax = map_gp_to_rtpri(pcpri.pc_clpmax);
-		pccp->pcc_primin = map_gp_to_rtpri(pcpri.pc_clpmin);
-	}
-
-	pccp->pcc_state = 1;
-	return (1);
-}
-
-/*
- * Translate global scheduling priority to RT class's user priority.
- * Use the gp values in the rt_dptbl to do a reverse mapping
- * of a given gpri value relative to the index range of rt_dptbl.
- */
-static int
-map_gp_to_rtpri(pri_t gpri)
-{
-	rtdpent_t	*rtdp;
-	pri_t		pri;
-
-	/* need RT class info before we can translate priorities */
-	if (rt_dptbl == NULL && get_info_by_policy(SCHED_FIFO) < 0)
-		return (-1);
-
-	if (gpri <= rt_dptbl[rt_class.pcc_primin].rt_globpri) {
-		pri = gpri - rt_dptbl[rt_class.pcc_primin].rt_globpri + \
-		    rt_class.pcc_primin;
-	} else if (gpri >= rt_dptbl[rt_class.pcc_primax].rt_globpri) {
-		pri = gpri - rt_dptbl[rt_class.pcc_primax].rt_globpri + \
-		    rt_class.pcc_primax;
-	} else {
-		pri = rt_class.pcc_primin + 1;
-		for (rtdp = rt_dptbl+1; rtdp->rt_globpri < gpri; ++rtdp, ++pri)
-			;
-		if (rtdp->rt_globpri > gpri)
-			--pri;
-	}
-
-	return (pri);
-}
-
-/*
- * Translate RT class's user priority to global scheduling priority.
- */
-pri_t
-map_rtpri_to_gp(pri_t pri)
-{
-	rtdpent_t	*rtdp;
-	pri_t		gpri;
-
-	if (rt_class.pcc_state == 0)
-		(void) get_info_by_policy(SCHED_FIFO);
-
-	/* First case is the default case, other two are seldomly taken */
-	if (pri <= rt_dptbl[rt_class.pcc_primin].rt_globpri) {
-		gpri = pri + rt_dptbl[rt_class.pcc_primin].rt_globpri -
-		    rt_class.pcc_primin;
-	} else if (pri >= rt_dptbl[rt_class.pcc_primax].rt_globpri) {
-		gpri = pri + rt_dptbl[rt_class.pcc_primax].rt_globpri -
-		    rt_class.pcc_primax;
-	} else {
-		gpri =  rt_dptbl[rt_class.pcc_primin].rt_globpri + 1;
-		for (rtdp = rt_dptbl+1; rtdp->rt_globpri < pri; ++rtdp, ++gpri)
-			;
-		if (rtdp->rt_globpri > pri)
-			--gpri;
-	}
-	return (gpri);
-}
-
-static int
-get_info_by_class(id_t classid)
-{
-	pcinfo_t	pcinfo;
-
-	/* determine if we already know this classid */
-	if (rt_class.pcc_state > 0 && rt_class.pcc_info.pc_cid == classid)
-		return (1);
-	if (ts_class.pcc_state > 0 && ts_class.pcc_info.pc_cid == classid)
-		return (1);
-	if (sys_class.pcc_state > 0 && sys_class.pcc_info.pc_cid == classid)
-		return (1);
-	if (ia_class.pcc_state > 0 && ia_class.pcc_info.pc_cid == classid)
-		return (1);
-
-	pcinfo.pc_cid = classid;
-	if (priocntl(0, 0, PC_GETCLINFO, (caddr_t)&pcinfo) < 0) {
-		if (classid == 0)	/* no kernel info for sys class */
-			return (get_info_by_policy(SCHED_SYS));
-		return (-1);
-	}
-
-	if (rt_class.pcc_state == 0 && strcmp(pcinfo.pc_clname, "RT") == 0)
-		return (get_info_by_policy(SCHED_FIFO));
-	if (ts_class.pcc_state == 0 && strcmp(pcinfo.pc_clname, "TS") == 0)
-		return (get_info_by_policy(SCHED_OTHER));
-	if (ia_class.pcc_state == 0 && strcmp(pcinfo.pc_clname, "IA") == 0)
-		return (get_info_by_policy(SCHED_IA));
-
-	return (1);
+	if (policyp != NULL)
+		*policyp = policy;
+	return (pccp->pcc_info.pc_cid);
 }
 
 int
 sched_setparam(pid_t pid, const struct sched_param *param)
 {
-	pri_t		prio = param->sched_priority;
-	pcparms_t	pcparm;
-	tsparms_t	*tsp;
-	tsinfo_t	*tsi;
-	int		scale;
-
 	if (pid < 0) {
 		errno = ESRCH;
 		return (-1);
@@ -266,48 +335,66 @@ sched_setparam(pid_t pid, const struct sched_param *param)
 	if (pid == 0)
 		pid = P_MYID;
 
-	/* get process's current scheduling policy */
-	pcparm.pc_cid = PC_CLNULL;
-	if (priocntl(P_PID, pid, PC_GETPARMS, (caddr_t)&pcparm) == -1)
+	if (setprio(P_PID, pid, param->sched_priority, NULL) == -1)
 		return (-1);
-	if (get_info_by_class(pcparm.pc_cid) < 0)
+	return (0);
+}
+
+id_t
+getparam(idtype_t idtype, id_t id, int *policyp, struct sched_param *param)
+{
+	pcparms_t pcparm;
+	const pcclass_t *pccp;
+	int policy;
+	int priority;
+
+	if ((pccp = get_parms(idtype, id, &pcparm)) == NULL)
 		return (-1);
 
-	if (pcparm.pc_cid == rt_class.pcc_info.pc_cid) {
-		/* SCHED_FIFO or SCHED_RR policy */
-		if (prio < rt_class.pcc_primin || prio > rt_class.pcc_primax) {
-			errno = EINVAL;
-			return (-1);
-		}
-		((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs = RT_NOCHANGE;
-		((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
-	} else if (pcparm.pc_cid == ts_class.pcc_info.pc_cid) {
-		/* SCHED_OTHER policy */
-		tsi = (tsinfo_t *)ts_class.pcc_info.pc_clinfo;
-		scale = tsi->ts_maxupri;
-		tsp = (tsparms_t *)pcparm.pc_clparms;
-		tsp->ts_uprilim = tsp->ts_upri = -(scale * prio) / 20;
-	} else {
+	switch (policy = pccp->pcc_policy) {
+	case SCHED_OTHER:
+	{
+		tsparms_t *tsp = (tsparms_t *)pcparm.pc_clparms;
+		priority = tsp->ts_upri;
+		break;
+	}
+	case SCHED_FIFO:
+	case SCHED_RR:
+	{
+		rtparms_t *rtp = (rtparms_t *)pcparm.pc_clparms;
+		priority = rtp->rt_pri;
+		policy = (rtp->rt_tqnsecs == RT_TQINF? SCHED_FIFO : SCHED_RR);
+		break;
+	}
+	default:
+	{
 		/*
-		 * policy is not defined by POSIX.4.
-		 * just pass parameter data through to priocntl.
-		 * param should contain an image of class-specific parameters
-		 * (after the sched_priority member).
+		 * Class-independent method for getting the priority.
 		 */
-		*((pc_clparms_t *)pcparm.pc_clparms) =
-		    *((pc_clparms_t *)(&(param->sched_priority)+1));
+		pcprio_t pcprio;
+
+		pcprio.pc_op = PC_GETPRIO;
+		pcprio.pc_cid = 0;
+		pcprio.pc_val = 0;
+		if (_private_priocntl(idtype, id, PC_DOPRIO, &pcprio) == 0)
+			priority = pcprio.pc_val;
+		else
+			priority = 0;
+		break;
+	}
 	}
 
-	return ((int)priocntl(P_PID, pid, PC_SETPARMS, (caddr_t)&pcparm));
+	*policyp = policy;
+	(void) memset(param, 0, sizeof (*param));
+	param->sched_priority = priority;
+
+	return (pcparm.pc_cid);
 }
 
 int
 sched_getparam(pid_t pid, struct sched_param *param)
 {
-	pcparms_t	pcparm;
-	pri_t		prio;
-	int		scale;
-	tsinfo_t	*tsi;
+	int policy;
 
 	if (pid < 0) {
 		errno = ESRCH;
@@ -316,49 +403,40 @@ sched_getparam(pid_t pid, struct sched_param *param)
 	if (pid == 0)
 		pid = P_MYID;
 
-	pcparm.pc_cid = PC_CLNULL;
-	if (priocntl(P_PID, pid, PC_GETPARMS, (caddr_t)&pcparm) == -1)
+	if (getparam(P_PID, pid, &policy, param) == -1)
 		return (-1);
-	if (get_info_by_class(pcparm.pc_cid) < 0)
-		return (-1);
+	return (0);
+}
 
-	if (pcparm.pc_cid == rt_class.pcc_info.pc_cid) {
-		param->sched_priority =
-			((rtparms_t *)pcparm.pc_clparms)->rt_pri;
-	} else if (pcparm.pc_cid == ts_class.pcc_info.pc_cid) {
-		param->sched_nicelim =
-			((tsparms_t *)pcparm.pc_clparms)->ts_uprilim;
-		prio = param->sched_nice =
-			((tsparms_t *)pcparm.pc_clparms)->ts_upri;
-		tsi = (tsinfo_t *)ts_class.pcc_info.pc_clinfo;
-		scale = tsi->ts_maxupri;
-		if (scale == 0)
-			param->sched_priority = 0;
-		else
-			param->sched_priority = -(prio * 20) / scale;
-	} else {
-		/*
-		 * policy is not defined by POSIX.4
-		 * just return a copy of pcparams_t image in param.
-		 */
-		*((pc_clparms_t *)(&(param->sched_priority)+1)) =
-		    *((pc_clparms_t *)pcparm.pc_clparms);
-		param->sched_priority =
-		    sched_get_priority_min((int)(pcparm.pc_cid + _SCHED_NEXT));
+/*
+ * Utility function, private to libc, used by sched_setscheduler()
+ * and posix_spawn().  Because it is called by the vfork() child of
+ * posix_spawn(), we must not call any functions exported from libc.
+ */
+id_t
+setparam(idtype_t idtype, id_t id, int policy, int prio)
+{
+	pcparms_t	pcparm;
+	const pcclass_t	*pccp;
+
+	if (policy == SCHED_SYS ||
+	    (pccp = get_info_by_policy(policy)) == NULL ||
+	    prio < pccp->pcc_primin || prio > pccp->pcc_primax) {
+		errno = EINVAL;
+		return (-1);
 	}
 
-	return (0);
+	pcparm.pc_cid = pccp->pcc_info.pc_cid;
+	if (set_priority(idtype, id, policy, prio, &pcparm, 1) == -1)
+		return (-1);
+	return (pccp->pcc_info.pc_cid);
 }
 
 int
 sched_setscheduler(pid_t pid, int policy, const struct sched_param *param)
 {
 	pri_t		prio = param->sched_priority;
-	pcparms_t	pcparm;
 	int		oldpolicy;
-	tsinfo_t	*tsi;
-	tsparms_t	*tsp;
-	int		scale;
 
 	if ((oldpolicy = sched_getscheduler(pid)) < 0)
 		return (-1);
@@ -366,56 +444,7 @@ sched_setscheduler(pid_t pid, int policy, const struct sched_param *param)
 	if (pid == 0)
 		pid = P_MYID;
 
-	if (get_info_by_policy(policy) < 0) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	switch (policy) {
-	case SCHED_FIFO:
-	case SCHED_RR:
-		if (prio < rt_class.pcc_primin || prio > rt_class.pcc_primax) {
-			errno = EINVAL;
-			return (-1);
-		}
-		pcparm.pc_cid = rt_class.pcc_info.pc_cid;
-		((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
-		((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs =
-		    (policy == SCHED_RR ? RT_TQDEF : RT_TQINF);
-		break;
-
-	case SCHED_OTHER:
-		pcparm.pc_cid = ts_class.pcc_info.pc_cid;
-		tsi = (tsinfo_t *)ts_class.pcc_info.pc_clinfo;
-		scale = tsi->ts_maxupri;
-		tsp = (tsparms_t *)pcparm.pc_clparms;
-		tsp->ts_uprilim = tsp->ts_upri = -(scale * prio) / 20;
-		break;
-
-	default:
-		switch (policy) {
-		case SCHED_SYS:
-			pcparm.pc_cid = sys_class.pcc_info.pc_cid;
-			break;
-		case SCHED_IA:
-			pcparm.pc_cid = ia_class.pcc_info.pc_cid;
-			break;
-		default:
-			pcparm.pc_cid = policy - _SCHED_NEXT;
-			break;
-		}
-		/*
-		 * policy is not defined by POSIX.4.
-		 * just pass parameter data through to priocntl.
-		 * param should contain an image of class-specific parameters
-		 * (after the sched_priority member).
-		 */
-		*((pc_clparms_t *)pcparm.pc_clparms) =
-		    *((pc_clparms_t *)&(param->sched_priority)+1);
-	}
-
-	/* setting scheduling policy & parameters for the process */
-	if (priocntl(P_PID, pid, PC_SETPARMS, (caddr_t)&pcparm) == -1)
+	if (setparam(P_PID, pid, policy, prio) == -1)
 		return (-1);
 
 	return (oldpolicy);
@@ -425,6 +454,7 @@ int
 sched_getscheduler(pid_t pid)
 {
 	pcparms_t	pcparm;
+	const pcclass_t	*pccp;
 	int		policy;
 
 	if (pid < 0) {
@@ -434,28 +464,13 @@ sched_getscheduler(pid_t pid)
 	if (pid == 0)
 		pid = P_MYID;
 
-	/* get scheduling policy & parameters for the process */
-	pcparm.pc_cid = PC_CLNULL;
-	if (priocntl(P_PID, pid, PC_GETPARMS, (caddr_t)&pcparm) == -1)
-		return (-1);
-	if (get_info_by_class(pcparm.pc_cid) < 0)
+	if ((pccp = get_parms(P_PID, pid, &pcparm)) == NULL)
 		return (-1);
 
-	if (pcparm.pc_cid == rt_class.pcc_info.pc_cid)
-		policy = ((((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs ==
-		    RT_TQINF ? SCHED_FIFO : SCHED_RR));
-	else if (pcparm.pc_cid == ts_class.pcc_info.pc_cid)
-		policy = SCHED_OTHER;
-	else if (pcparm.pc_cid == sys_class.pcc_info.pc_cid)
-		policy = SCHED_SYS;
-	else if (pcparm.pc_cid == ia_class.pcc_info.pc_cid)
-		policy = SCHED_IA;
-	else {
-		/*
-		 * policy is not defined by POSIX.4
-		 * return a unique dot4 policy id.
-		 */
-		policy = (int)(_SCHED_NEXT + pcparm.pc_cid);
+	if ((policy = pccp->pcc_policy) == SCHED_FIFO || policy == SCHED_RR) {
+		policy =
+		    (((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs == RT_TQINF?
+		    SCHED_FIFO : SCHED_RR);
 	}
 
 	return (policy);
@@ -471,25 +486,10 @@ sched_yield(void)
 int
 sched_get_priority_max(int policy)
 {
-	pcpri_t	pcpri;
+	const pcclass_t *pccp;
 
-	if (get_info_by_policy(policy) < 0)
-		return (-1);
-
-	if (policy == SCHED_FIFO || policy == SCHED_RR)
-		return (rt_class.pcc_primax);
-	else if (policy == SCHED_OTHER)
-		return (ts_class.pcc_primax);
-	else if (policy == SCHED_SYS)
-		return (sys_class.pcc_primax);
-	else if (policy == SCHED_IA)
-		return (ia_class.pcc_primax);
-	else { /* policy not in POSIX.4 */
-		pcpri.pc_cid = policy - _SCHED_NEXT;
-		if (priocntl(0, 0, PC_GETPRIRANGE, (caddr_t)&pcpri) == 0)
-			return (map_gp_to_rtpri(pcpri.pc_clpmax));
-	}
-
+	if ((pccp = get_info_by_policy(policy)) != NULL)
+		return (pccp->pcc_primax);
 	errno = EINVAL;
 	return (-1);
 }
@@ -497,25 +497,10 @@ sched_get_priority_max(int policy)
 int
 sched_get_priority_min(int policy)
 {
-	pcpri_t pcpri;
+	const pcclass_t *pccp;
 
-	if (get_info_by_policy(policy) < 0)
-		return (-1);
-
-	if (policy == SCHED_FIFO || policy == SCHED_RR)
-		return (rt_class.pcc_primin);
-	else if (policy == SCHED_OTHER)
-		return (ts_class.pcc_primin);
-	else if (policy == SCHED_SYS)
-		return (sys_class.pcc_primin);
-	else if (policy == SCHED_IA)
-		return (ia_class.pcc_primin);
-	else { /* policy not in POSIX.4 */
-		pcpri.pc_cid = policy - _SCHED_NEXT;
-		if (priocntl(0, 0, PC_GETPRIRANGE, (caddr_t)&pcpri) == 0)
-			return (map_gp_to_rtpri(pcpri.pc_clpmin));
-	}
-
+	if ((pccp = get_info_by_policy(policy)) != NULL)
+		return (pccp->pcc_primin);
 	errno = EINVAL;
 	return (-1);
 }
@@ -524,6 +509,7 @@ int
 sched_rr_get_interval(pid_t pid, timespec_t *interval)
 {
 	pcparms_t pcparm;
+	const pcclass_t *pccp;
 
 	if (pid < 0) {
 		errno = ESRCH;
@@ -532,22 +518,119 @@ sched_rr_get_interval(pid_t pid, timespec_t *interval)
 	if (pid == 0)
 		pid = P_MYID;
 
-	if (get_info_by_policy(SCHED_RR) < 0)
+	if ((pccp = get_parms(P_PID, pid, &pcparm)) == NULL)
 		return (-1);
 
-	pcparm.pc_cid = PC_CLNULL;
-	if (priocntl(P_PID, pid, PC_GETPARMS, (caddr_t)&pcparm) == -1)
-		return (-1);
+	/*
+	 * At the moment, we have no class-independent method to fetch
+	 * the process/lwp time quantum.  Since SUSv3 does not restrict
+	 * this operation to the real-time class, we return an indefinite
+	 * quantum (tv_sec == 0 and tv_nsec == 0) for scheduling policies
+	 * for which this information isn't available.
+	 */
+	interval->tv_sec = 0;
+	interval->tv_nsec = 0;
 
-	if (pcparm.pc_cid == rt_class.pcc_info.pc_cid &&
-	    (((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs != RT_TQINF)) {
-		/* SCHED_RR */
-		interval->tv_sec = ((rtparms_t *)pcparm.pc_clparms)->rt_tqsecs;
-		interval->tv_nsec =
-		    ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs;
-		return (0);
+	switch (pccp->pcc_policy) {
+	case SCHED_FIFO:
+	case SCHED_RR:
+		{
+			rtparms_t *rtp = (rtparms_t *)pcparm.pc_clparms;
+			if (rtp->rt_tqnsecs != RT_TQINF) {
+				interval->tv_sec = rtp->rt_tqsecs;
+				interval->tv_nsec = rtp->rt_tqnsecs;
+			}
+		}
+		break;
+	case SCHED_FX:
+		{
+			fxparms_t *fxp = (fxparms_t *)pcparm.pc_clparms;
+			if (fxp->fx_tqnsecs != FX_TQINF) {
+				interval->tv_sec = fxp->fx_tqsecs;
+				interval->tv_nsec = fxp->fx_tqnsecs;
+			}
+		}
+		break;
 	}
 
-	errno = EINVAL;
-	return (-1);
+	return (0);
+}
+
+/*
+ * Initialize or update ul_policy, ul_cid, and ul_pri.
+ */
+void
+update_sched(ulwp_t *self)
+{
+	volatile sc_shared_t *scp;
+	pcparms_t pcparm;
+	pcprio_t pcprio;
+	const pcclass_t *pccp;
+	int priority;
+	int policy;
+
+	ASSERT(self == curthread);
+
+	enter_critical(self);
+
+	if ((scp = self->ul_schedctl) == NULL &&
+	    (scp = setup_schedctl()) == NULL) {		/* can't happen? */
+		if (self->ul_policy < 0) {
+			self->ul_cid = 0;
+			self->ul_pri = 0;
+			_membar_producer();
+			self->ul_policy = SCHED_OTHER;
+		}
+		exit_critical(self);
+		return;
+	}
+
+	if (self->ul_policy >= 0 &&
+	    self->ul_cid == scp->sc_cid &&
+	    (self->ul_pri == scp->sc_cpri ||
+	    (self->ul_epri > 0 && self->ul_epri == scp->sc_cpri))) {
+		exit_critical(self);
+		return;
+	}
+
+	pccp = get_parms(P_LWPID, P_MYID, &pcparm);
+	if (pccp == NULL) {		/* can't happen? */
+		self->ul_cid = scp->sc_cid;
+		self->ul_pri = scp->sc_cpri;
+		_membar_producer();
+		self->ul_policy = SCHED_OTHER;
+		exit_critical(self);
+		return;
+	}
+
+	switch (policy = pccp->pcc_policy) {
+	case SCHED_OTHER:
+		priority = ((tsparms_t *)pcparm.pc_clparms)->ts_upri;
+		break;
+	case SCHED_FIFO:
+	case SCHED_RR:
+		priority = ((rtparms_t *)pcparm.pc_clparms)->rt_pri;
+		policy =
+		    ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs == RT_TQINF?
+		    SCHED_FIFO : SCHED_RR;
+		break;
+	default:
+		/*
+		 * Class-independent method for getting the priority.
+		 */
+		pcprio.pc_op = PC_GETPRIO;
+		pcprio.pc_cid = 0;
+		pcprio.pc_val = 0;
+		if (_private_priocntl(P_LWPID, P_MYID, PC_DOPRIO, &pcprio) == 0)
+			priority = pcprio.pc_val;
+		else
+			priority = 0;
+	}
+
+	self->ul_cid = pcparm.pc_cid;
+	self->ul_pri = priority;
+	_membar_producer();
+	self->ul_policy = policy;
+
+	exit_critical(self);
 }

@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +45,7 @@
 #include <sys/atomic.h>
 #include <sys/zone.h>
 #include <sys/policy.h>
+#include <sys/schedctl.h>
 
 /*
  * RESOURCE POOLS
@@ -1217,6 +1219,7 @@ pool_change_class(proc_t *p, id_t cid)
 			ret = CL_ENTERCLASS(t, cid, NULL, NULL, *buf);
 			ASSERT(ret == 0);
 			CL_EXITCLASS(oldcid, cldata);
+			schedctl_set_cidpri(t);
 			*buf++ = NULL;
 		}
 	} while ((t = t->t_forw) != p->p_tlist);

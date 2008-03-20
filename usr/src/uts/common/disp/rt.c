@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -48,6 +47,7 @@
 #include <sys/rtpriocntl.h>
 #include <sys/kmem.h>
 #include <sys/systm.h>
+#include <sys/schedctl.h>
 #include <sys/errno.h>
 #include <sys/cpuvar.h>
 #include <sys/vmsystm.h>
@@ -122,6 +122,7 @@ static int	rt_vaparmsin(void *, pc_vaparms_t *);
 static int	rt_vaparmsout(void *, pc_vaparms_t *);
 static int	rt_parmsset(kthread_t *, void *, id_t, cred_t *);
 static int	rt_donice(kthread_t *, cred_t *, int, int *);
+static int	rt_doprio(kthread_t *, cred_t *, int, int *);
 static void	rt_exitclass(void *);
 static int	rt_canexit(kthread_t *, cred_t *);
 static void	rt_forkret(kthread_t *, kthread_t *);
@@ -182,6 +183,7 @@ static struct classfuncs rt_classfuncs = {
 	rt_globpri,
 	rt_nullsys,	/* set_process_group */
 	rt_yield,
+	rt_doprio,
 };
 
 /*
@@ -534,16 +536,16 @@ rt_getclinfo(void *infop)
 }
 
 /*
- * Return the global scheduling priority ranges of the realtime
- * class in pcpri_t structure.
+ * Return the user mode scheduling priority range.
  */
 static int
 rt_getclpri(pcpri_t *pcprip)
 {
-	pcprip->pc_clpmax = rt_dptbl[rt_maxpri].rt_globpri;
-	pcprip->pc_clpmin = rt_dptbl[0].rt_globpri;
+	pcprip->pc_clpmax = rt_maxpri;
+	pcprip->pc_clpmin = 0;
 	return (0);
 }
+
 static void
 rt_nullsys()
 {
@@ -1041,6 +1043,35 @@ rt_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 	return (EINVAL);
 }
 
+/*
+ * Increment the priority of the specified thread by incr and
+ * return the new value in *retvalp.
+ */
+static int
+rt_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
+{
+	int newpri;
+	rtproc_t *rtpp = (rtproc_t *)(t->t_cldata);
+	rtkparms_t rtkparms;
+
+	/* If there's no change to the priority, just return current setting */
+	if (incr == 0) {
+		*retvalp = rtpp->rt_pri;
+		return (0);
+	}
+
+	newpri = rtpp->rt_pri + incr;
+	if (newpri > rt_maxpri || newpri < 0)
+		return (EINVAL);
+
+	*retvalp = newpri;
+	rtkparms.rt_pri = newpri;
+	rtkparms.rt_tqntm = RT_NOCHANGE;
+	rtkparms.rt_tqsig = 0;
+	rtkparms.rt_cflags = RT_DOPRI;
+	return (rt_parmsset(t, &rtkparms, rt_cid, cr));
+}
+
 static int
 rt_alloc(void **p, int flag)
 {
@@ -1070,6 +1101,7 @@ rt_change_priority(kthread_t *t, rtproc_t *rtpp)
 
 	new_pri = rt_dptbl[rtpp->rt_pri].rt_globpri;
 
+	t->t_cpri = rtpp->rt_pri;
 	if (t == curthread || t->t_state == TS_ONPROC) {
 		cpu_t	*cp = t->t_disp_queue->disp_cpu;
 		THREAD_CHANGE_PRI(t, new_pri);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -658,8 +658,16 @@ prldap_nspr_idle_primordial_thread(void *arg) {
 	 * Make sure PR_Init finishes before any other thread can continue
 	 */
 	(void) mutex_lock(&nspr_idle_lock);
-	if (PR_Initialized() == PR_FALSE)
+	if (PR_Initialized() == PR_FALSE) {
+		/*
+		 * PR_Init() changes the current thread's
+		 * priority.  Save and restore the priority.
+		 */
+		int priority;
+		(void) thr_getprio(thr_self(), &priority);
 		PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
+		(void) thr_setprio(thr_self(), priority);
+	}
 	nspr_pr_init_is_done = 1;
 	(void) cond_signal(&nspr_idle_cond);
 	(void) mutex_unlock(&nspr_idle_lock);
@@ -714,8 +722,16 @@ prldap_nspr_init(void) {
 
 		if (thr_self() == 1) {
 			/* main thread */
-			if (PR_Initialized() == PR_FALSE)
- 				PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
+			if (PR_Initialized() == PR_FALSE) {
+				/*
+				 * PR_Init() changes the current thread's
+				 * priority.  Save and restore the priority.
+				 */
+				int priority;
+				(void) thr_getprio(thr_self(), &priority);
+				PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
+				(void) thr_setprio(thr_self(), priority);
+			}
 			nspr_initialized = 1;
 		} else {
 			if (thr_create(NULL, NULL,

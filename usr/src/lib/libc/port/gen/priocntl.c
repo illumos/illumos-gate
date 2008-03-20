@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,32 +29,25 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#include	"synonyms.h"
-#include	<sys/types.h>
-#include	<sys/procset.h>
-#include	<sys/priocntl.h>
-#include	<stdarg.h>
-#include	<errno.h>
+#include "synonyms.h"
+#include <sys/types.h>
+#include <sys/procset.h>
+#include <sys/priocntl.h>
+#include <stdarg.h>
+#include <errno.h>
 
 /*
- * The declaration of __priocntlset() and __priocntl() was in prior releases
- * in <sys/priocntl.h>. They are used to define PC_VERSION at compile time,
- * based on the contents of the header file. This behavior is now changed.
- * Old binaries call __priocntl() and __priocntlset() instead priocntl() and
- * priocntlset(). New binaries call priocntl() and priocntlset().
+ * The declarations of __priocntlset() and __priocntl() were in prior releases
+ * in <sys/priocntl.h>.  They are used to define PC_VERSION at compile time,
+ * based on the contents of the header file.  This behavior is now changed.
+ * Old binaries call __priocntl() and __priocntlset() instead of priocntl()
+ * and priocntlset().  New binaries call priocntl() and priocntlset().
  */
 
 /*
  * defined in priocntlset.s
  */
 extern long __priocntlset(int, procset_t *, int, caddr_t, ...);
-
-/*
- * prototype declaration
- */
-long __priocntl(int, idtype_t, id_t, int, caddr_t);
-
 
 static int pc_vaargs2parms(va_list valist, pc_vaparms_t *vp);
 
@@ -66,6 +59,23 @@ __priocntl(int pc_version, idtype_t idtype, id_t id, int cmd, caddr_t arg)
 	setprocset(&procset, POP_AND, idtype, id, P_ALL, 0);
 
 	return (__priocntlset(pc_version, &procset, cmd, arg, 0));
+}
+
+/*
+ * Internally to libc, we call this function rather than priocntl()
+ * when the cmd is not PC_GETXPARMS or PC_SETXPARMS.  We do this
+ * for the sake of calling common code in various places.  One of
+ * these places is in spawn() and spawnp(), where we must not call
+ * any function that is exported from libc while in the child of vfork().
+ */
+long
+_private_priocntl(idtype_t idtype, id_t id, int cmd, void *arg)
+{
+	extern long _private__priocntlset(int, procset_t *, int, caddr_t, ...);
+	procset_t procset;
+
+	setprocset(&procset, POP_AND, idtype, id, P_ALL, 0);
+	return (_private__priocntlset(PC_VERSION, &procset, cmd, arg, 0));
 }
 
 

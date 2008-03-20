@@ -119,6 +119,9 @@ schedctl(void)
 		thread_lock(t);	/* protect against ts_tick and ts_update */
 		t->t_schedctl = ssp;
 		t->t_sc_uaddr = uaddr;
+		ssp->sc_cid = t->t_cid;
+		ssp->sc_cpri = t->t_cpri;
+		ssp->sc_priority = DISP_PRIO(t);
 		thread_unlock(t);
 	}
 
@@ -204,7 +207,7 @@ schedctl_proc_cleanup(void)
  * Called by resume just before switching away from the current thread.
  * Save new thread state.
  */
-void
+static void
 schedctl_save(sc_shared_t *ssp)
 {
 	ssp->sc_state = curthread->t_state;
@@ -215,7 +218,7 @@ schedctl_save(sc_shared_t *ssp)
  * Called by resume after switching to the current thread.
  * Save new thread state and CPU.
  */
-void
+static void
 schedctl_restore(sc_shared_t *ssp)
 {
 	ssp->sc_state = SC_ONPROC;
@@ -227,7 +230,7 @@ schedctl_restore(sc_shared_t *ssp)
  * On fork, remove inherited mappings from the child's address space.
  * The child's threads must call schedctl() to get new shared mappings.
  */
-void
+static void
 schedctl_fork(kthread_t *pt, kthread_t *ct)
 {
 	proc_t *pp = ttoproc(pt);
@@ -253,7 +256,7 @@ schedctl_fork(kthread_t *pt, kthread_t *ct)
 
 /*
  * Returns non-zero if the specified thread shouldn't be preempted at this time.
- * Called by ts_preempt, ts_tick, and ts_update.
+ * Called by ts_preempt(), ts_tick(), and ts_update().
  */
 int
 schedctl_get_nopreempt(kthread_t *t)
@@ -265,7 +268,7 @@ schedctl_get_nopreempt(kthread_t *t)
 
 /*
  * Sets the value of the nopreempt field for the specified thread.
- * Called by ts_preempt to clear the field on preemption.
+ * Called by ts_preempt() to clear the field on preemption.
  */
 void
 schedctl_set_nopreempt(kthread_t *t, short val)
@@ -276,16 +279,35 @@ schedctl_set_nopreempt(kthread_t *t, short val)
 
 
 /*
- * Sets the value of the yield field for the specified thread.  Called by
- * ts_preempt and ts_tick to set the field, and ts_yield to clear it.
- * The kernel never looks at this field so we don't need a schedctl_get_yield
- * function.
+ * Sets the value of the yield field for the specified thread.
+ * Called by ts_preempt() and ts_tick() to set the field, and
+ * ts_yield() to clear it.
+ * The kernel never looks at this field so we don't need a
+ * schedctl_get_yield() function.
  */
 void
 schedctl_set_yield(kthread_t *t, short val)
 {
 	ASSERT(THREAD_LOCK_HELD(t));
 	t->t_schedctl->sc_preemptctl.sc_yield = val;
+}
+
+
+/*
+ * Sets the values of the cid and priority fields for the specified thread.
+ * Called from thread_change_pri(), thread_change_epri(), THREAD_CHANGE_PRI().
+ * Called following calls to CL_FORKRET() and CL_ENTERCLASS().
+ */
+void
+schedctl_set_cidpri(kthread_t *t)
+{
+	sc_shared_t *tdp = t->t_schedctl;
+
+	if (tdp != NULL) {
+		tdp->sc_cid = t->t_cid;
+		tdp->sc_cpri = t->t_cpri;
+		tdp->sc_priority = DISP_PRIO(t);
+	}
 }
 
 
@@ -443,7 +465,7 @@ schedctl_init(void)
 }
 
 
-int
+static int
 schedctl_shared_alloc(sc_shared_t **kaddrp, uintptr_t *uaddrp)
 {
 	proc_t		*p = curproc;

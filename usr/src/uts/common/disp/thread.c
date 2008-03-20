@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -71,6 +72,7 @@
 #include <sys/sdt.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
+#include <sys/schedctl.h>
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
 #include <sys/kiconv.h>
@@ -1760,25 +1762,17 @@ thread_change_epri(kthread_t *t, pri_t disp_pri)
 	state = t->t_state;
 
 	/*
-	 * If it's not on a queue, change the priority with
-	 * impunity.
+	 * If it's not on a queue, change the priority with impunity.
 	 */
 	if ((state & (TS_SLEEP | TS_RUN | TS_WAIT)) == 0) {
 		t->t_epri = disp_pri;
-
 		if (state == TS_ONPROC) {
 			cpu_t *cp = t->t_disp_queue->disp_cpu;
 
 			if (t == cp->cpu_dispthread)
 				cp->cpu_dispatch_pri = DISP_PRIO(t);
 		}
-		return;
-	}
-
-	/*
-	 * It's either on a sleep queue or a run queue.
-	 */
-	if (state == TS_SLEEP) {
+	} else if (state == TS_SLEEP) {
 		/*
 		 * Take the thread out of its sleep queue.
 		 * Change the inherited priority.
@@ -1805,7 +1799,8 @@ thread_change_epri(kthread_t *t, pri_t disp_pri)
 		t->t_epri = disp_pri;
 		setbackdq(t);
 	}
-}	/* end of thread_change_epri */
+	schedctl_set_cidpri(t);
+}
 
 /*
  * Function: Change the t_pri field of a thread.
@@ -1825,8 +1820,7 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 	THREAD_WILLCHANGE_PRI(t, disp_pri);
 
 	/*
-	 * If it's not on a queue, change the priority with
-	 * impunity.
+	 * If it's not on a queue, change the priority with impunity.
 	 */
 	if ((state & (TS_SLEEP | TS_RUN | TS_WAIT)) == 0) {
 		t->t_pri = disp_pri;
@@ -1837,13 +1831,7 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 			if (t == cp->cpu_dispthread)
 				cp->cpu_dispatch_pri = DISP_PRIO(t);
 		}
-		return (0);
-	}
-
-	/*
-	 * It's either on a sleep queue or a run queue.
-	 */
-	if (state == TS_SLEEP) {
+	} else if (state == TS_SLEEP) {
 		/*
 		 * If the priority has changed, take the thread out of
 		 * its sleep queue and change the priority.
@@ -1880,5 +1868,6 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 			setbackdq(t);
 		}
 	}
+	schedctl_set_cidpri(t);
 	return (on_rq);
 }

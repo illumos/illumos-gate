@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.12 */
 
@@ -59,14 +58,15 @@
 
 pri_t		sys_init(id_t, int, classfuncs_t **);
 static int	sys_getclpri(pcpri_t *);
-static int	sys_fork(kthread_id_t, kthread_id_t, void *);
-static int	sys_enterclass(kthread_id_t, id_t, void *, cred_t *, void *);
-static int	sys_canexit(kthread_id_t, cred_t *);
+static int	sys_fork(kthread_t *, kthread_t *, void *);
+static int	sys_enterclass(kthread_t *, id_t, void *, cred_t *, void *);
+static int	sys_canexit(kthread_t *, cred_t *);
 static int	sys_nosys();
-static int	sys_donice(kthread_id_t, cred_t *, int, int *);
-static void	sys_forkret(kthread_id_t, kthread_id_t);
+static int	sys_donice(kthread_t *, cred_t *, int, int *);
+static int	sys_doprio(kthread_t *, cred_t *, int, int *);
+static void	sys_forkret(kthread_t *, kthread_t *);
 static void	sys_nullsys();
-static pri_t	sys_swappri(kthread_id_t, int);
+static pri_t	sys_swappri(kthread_t *, int);
 static int	sys_alloc(void **, int);
 
 struct classfuncs sys_classfuncs = {
@@ -107,6 +107,7 @@ struct classfuncs sys_classfuncs = {
 		(pri_t (*)())sys_nosys,	/* globpri */
 		sys_nullsys,	/* set_process_group */
 		sys_nullsys,	/* yield */
+		sys_doprio,
 	}
 
 };
@@ -130,14 +131,14 @@ static int
 sys_getclpri(pcpri_t *pcprip)
 {
 	pcprip->pc_clpmax = maxclsyspri;
-	pcprip->pc_clpmin = 0;
+	pcprip->pc_clpmin = minclsyspri;
 	return (0);
 }
 
 /* ARGSUSED */
 static int
 sys_enterclass(t, cid, parmsp, reqpcredp, bufp)
-	kthread_id_t	t;
+	kthread_t	*t;
 	id_t		cid;
 	void		*parmsp;
 	cred_t		*reqpcredp;
@@ -148,7 +149,7 @@ sys_enterclass(t, cid, parmsp, reqpcredp, bufp)
 
 /* ARGSUSED */
 static int
-sys_canexit(kthread_id_t t, cred_t *reqpcredp)
+sys_canexit(kthread_t *t, cred_t *reqpcredp)
 {
 	return (0);
 }
@@ -156,8 +157,8 @@ sys_canexit(kthread_id_t t, cred_t *reqpcredp)
 /* ARGSUSED */
 static int
 sys_fork(t, ct, bufp)
-	kthread_id_t t;
-	kthread_id_t ct;
+	kthread_t *t;
+	kthread_t *ct;
 	void	*bufp;
 {
 	/*
@@ -170,8 +171,8 @@ sys_fork(t, ct, bufp)
 /* ARGSUSED */
 static void
 sys_forkret(t, ct)
-	kthread_id_t t;
-	kthread_id_t ct;
+	kthread_t *t;
+	kthread_t *ct;
 {
 	register proc_t *pp = ttoproc(t);
 	register proc_t *cp = ttoproc(ct);
@@ -196,7 +197,7 @@ sys_forkret(t, ct)
 /* ARGSUSED */
 static pri_t
 sys_swappri(t, flags)
-	kthread_id_t	t;
+	kthread_t	*t;
 	int		flags;
 {
 	return (-1);
@@ -216,11 +217,14 @@ sys_nullsys()
 
 /* ARGSUSED */
 static int
-sys_donice(t, cr, incr, retvalp)
-	kthread_id_t	t;
-	cred_t		*cr;
-	int		incr;
-	int		*retvalp;
+sys_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
+{
+	return (EINVAL);
+}
+
+/* ARGSUSED */
+static int
+sys_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 {
 	return (EINVAL);
 }

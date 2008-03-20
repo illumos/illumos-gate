@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2969,7 +2970,9 @@ main(int argc, char **argv)
 		if (pmclose) {
 			(void) pthread_attr_init(&attr);
 			(void) pthread_attr_setscope(&attr,
-				PTHREAD_SCOPE_SYSTEM | PTHREAD_CREATE_DETACHED);
+			    PTHREAD_SCOPE_SYSTEM);
+			(void) pthread_attr_setdetachstate(&attr,
+			    PTHREAD_CREATE_DETACHED);
 			if (pthread_create(NULL, &attr, closedown, NULL) != 0) {
 				syslog(LOG_ERR, gettext(
 					"cannot create closedown thread"));
@@ -2998,7 +3001,9 @@ main(int argc, char **argv)
 		svcstart_level = get_run_level();
 		(void) pthread_attr_init(&attr);
 		(void) pthread_attr_setscope(&attr,
-			PTHREAD_SCOPE_SYSTEM | PTHREAD_CREATE_DETACHED);
+		    PTHREAD_SCOPE_SYSTEM);
+		(void) pthread_attr_setdetachstate(&attr,
+		    PTHREAD_CREATE_DETACHED);
 		if (pthread_create(NULL, &attr, closedown, NULL) != 0) {
 			syslog(LOG_ERR, gettext(
 				"cannot create closedown thread"));

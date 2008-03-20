@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef _SYS_CLASS_H
 #define	_SYS_CLASS_H
@@ -72,29 +72,30 @@ typedef struct class_ops {
 } class_ops_t;
 
 typedef struct thread_ops {
-	int	(*cl_enterclass)(kthread_id_t, id_t, void *, cred_t *, void *);
+	int	(*cl_enterclass)(kthread_t *, id_t, void *, cred_t *, void *);
 	void	(*cl_exitclass)(void *);
-	int	(*cl_canexit)(kthread_id_t, cred_t *);
-	int	(*cl_fork)(kthread_id_t, kthread_id_t, void *);
-	void	(*cl_forkret)(kthread_id_t, kthread_id_t);
-	void	(*cl_parmsget)(kthread_id_t, void *);
-	int	(*cl_parmsset)(kthread_id_t, void *, id_t, cred_t *);
-	void	(*cl_stop)(kthread_id_t, int, int);
-	void	(*cl_exit)(kthread_id_t);
-	void	(*cl_active)(kthread_id_t);
-	void	(*cl_inactive)(kthread_id_t);
-	pri_t	(*cl_swapin)(kthread_id_t, int);
-	pri_t 	(*cl_swapout)(kthread_id_t, int);
-	void 	(*cl_trapret)(kthread_id_t);
-	void	(*cl_preempt)(kthread_id_t);
-	void	(*cl_setrun)(kthread_id_t);
-	void	(*cl_sleep)(kthread_id_t);
-	void	(*cl_tick)(kthread_id_t);
-	void	(*cl_wakeup)(kthread_id_t);
-	int	(*cl_donice)(kthread_id_t, cred_t *, int, int *);
-	pri_t	(*cl_globpri)(kthread_id_t);
+	int	(*cl_canexit)(kthread_t *, cred_t *);
+	int	(*cl_fork)(kthread_t *, kthread_t *, void *);
+	void	(*cl_forkret)(kthread_t *, kthread_t *);
+	void	(*cl_parmsget)(kthread_t *, void *);
+	int	(*cl_parmsset)(kthread_t *, void *, id_t, cred_t *);
+	void	(*cl_stop)(kthread_t *, int, int);
+	void	(*cl_exit)(kthread_t *);
+	void	(*cl_active)(kthread_t *);
+	void	(*cl_inactive)(kthread_t *);
+	pri_t	(*cl_swapin)(kthread_t *, int);
+	pri_t 	(*cl_swapout)(kthread_t *, int);
+	void 	(*cl_trapret)(kthread_t *);
+	void	(*cl_preempt)(kthread_t *);
+	void	(*cl_setrun)(kthread_t *);
+	void	(*cl_sleep)(kthread_t *);
+	void	(*cl_tick)(kthread_t *);
+	void	(*cl_wakeup)(kthread_t *);
+	int	(*cl_donice)(kthread_t *, cred_t *, int, int *);
+	pri_t	(*cl_globpri)(kthread_t *);
 	void	(*cl_set_process_group)(pid_t, pid_t, pid_t);
-	void	(*cl_yield)(kthread_id_t);
+	void	(*cl_yield)(kthread_t *);
+	int	(*cl_doprio)(kthread_t *, cred_t *, int, int *);
 } thread_ops_t;
 
 typedef struct classfuncs {
@@ -134,8 +135,8 @@ extern int	getcid(char *, id_t *);
 extern int	getcidbyname(char *, id_t *);
 extern int	parmsin(pcparms_t *, pc_vaparms_t *);
 extern int	parmsout(pcparms_t *, pc_vaparms_t *);
-extern int	parmsset(pcparms_t *, kthread_id_t);
-extern void	parmsget(kthread_id_t, pcparms_t *);
+extern int	parmsset(pcparms_t *, kthread_t *);
+extern void	parmsget(kthread_t *, pcparms_t *);
 extern int	vaparmsout(char *, pcparms_t *, pc_vaparms_t *, uio_seg_t);
 
 #endif
@@ -206,6 +207,9 @@ extern int	vaparmsout(char *, pcparms_t *, pc_vaparms_t *, uio_seg_t);
 
 #define	CL_DONICE(t, cr, inc, ret) \
 	(*(t)->t_clfuncs->cl_donice)(t, cr, inc, ret)
+
+#define	CL_DOPRIO(t, cr, inc, ret) \
+	(*(t)->t_clfuncs->cl_doprio)(t, cr, inc, ret)
 
 #define	CL_GLOBPRI(t)		(*(t)->t_clfuncs->cl_globpri)(t)
 

@@ -30,8 +30,21 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include <sys/rtpriocntl.h>
 #include <sys/sdt.h>
 #include <atomic.h>
+
+#if defined(THREAD_DEBUG)
+#define	INCR32(x)	(((x) != UINT32_MAX)? (x)++ : 0)
+#define	INCR(x)		((x)++)
+#define	DECR(x)		((x)--)
+#define	MAXINCR(m, x)	((m < ++x)? (m = x) : 0)
+#else
+#define	INCR32(x)
+#define	INCR(x)
+#define	DECR(x)
+#define	MAXINCR(m, x)
+#endif
 
 /*
  * This mutex is initialized to be held by lwp#1.
@@ -120,7 +133,9 @@ int
 __mutex_init(mutex_t *mp, int type, void *arg)
 {
 	int basetype = (type & ~ALL_ATTRIBUTES);
+	const pcclass_t *pccp;
 	int error = 0;
+	int ceil;
 
 	if (basetype == USYNC_PROCESS_ROBUST) {
 		/*
@@ -134,9 +149,14 @@ __mutex_init(mutex_t *mp, int type, void *arg)
 		basetype = USYNC_PROCESS;
 	}
 
-	if (!(basetype == USYNC_THREAD || basetype == USYNC_PROCESS) ||
+	if (type & LOCK_PRIO_PROTECT)
+		pccp = get_info_by_policy(SCHED_FIFO);
+	if ((basetype != USYNC_THREAD && basetype != USYNC_PROCESS) ||
 	    (type & (LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT))
-	    == (LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT)) {
+	    == (LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT) ||
+	    ((type & LOCK_PRIO_PROTECT) &&
+	    ((ceil = *(int *)arg) < pccp->pcc_primin ||
+	    ceil > pccp->pcc_primax))) {
 		error = EINVAL;
 	} else if (type & LOCK_ROBUST) {
 		/*
@@ -156,8 +176,7 @@ __mutex_init(mutex_t *mp, int type, void *arg)
 			_atomic_or_16(&mp->mutex_flag, LOCK_INITED);
 			mp->mutex_magic = MUTEX_MAGIC;
 		} else if (type != mp->mutex_type ||
-		    ((type & LOCK_PRIO_PROTECT) &&
-		    mp->mutex_ceiling != (*(int *)arg))) {
+		    ((type & LOCK_PRIO_PROTECT) && mp->mutex_ceiling != ceil)) {
 			error = EINVAL;
 		} else if (__mutex_consistent(mp) != 0) {
 			error = EBUSY;
@@ -172,14 +191,15 @@ __mutex_init(mutex_t *mp, int type, void *arg)
 		mp->mutex_magic = MUTEX_MAGIC;
 	}
 
-	if (error == 0 && (type & LOCK_PRIO_PROTECT))
-		mp->mutex_ceiling = (uint8_t)(*(int *)arg);
+	if (error == 0 && (type & LOCK_PRIO_PROTECT)) {
+		mp->mutex_ceiling = ceil;
+	}
 
 	return (error);
 }
 
 /*
- * Delete mp from list of ceil mutexes owned by curthread.
+ * Delete mp from list of ceiling mutexes owned by curthread.
  * Return 1 if the head of the chain was updated.
  */
 int
@@ -189,17 +209,20 @@ _ceil_mylist_del(mutex_t *mp)
 	mxchain_t **mcpp;
 	mxchain_t *mcp;
 
-	mcpp = &self->ul_mxchain;
-	while ((*mcpp)->mxchain_mx != mp)
-		mcpp = &(*mcpp)->mxchain_next;
-	mcp = *mcpp;
-	*mcpp = mcp->mxchain_next;
-	lfree(mcp, sizeof (*mcp));
-	return (mcpp == &self->ul_mxchain);
+	for (mcpp = &self->ul_mxchain;
+	    (mcp = *mcpp) != NULL;
+	    mcpp = &mcp->mxchain_next) {
+		if (mcp->mxchain_mx == mp) {
+			*mcpp = mcp->mxchain_next;
+			lfree(mcp, sizeof (*mcp));
+			return (mcpp == &self->ul_mxchain);
+		}
+	}
+	return (0);
 }
 
 /*
- * Add mp to head of list of ceil mutexes owned by curthread.
+ * Add mp to the list of ceiling mutexes owned by curthread.
  * Return ENOMEM if no memory could be allocated.
  */
 int
@@ -217,26 +240,30 @@ _ceil_mylist_add(mutex_t *mp)
 }
 
 /*
- * Inherit priority from ceiling.  The inheritance impacts the effective
- * priority, not the assigned priority.  See _thread_setschedparam_main().
+ * Helper function for _ceil_prio_inherit() and _ceil_prio_waive(), below.
+ */
+static void
+set_rt_priority(ulwp_t *self, int prio)
+{
+	pcparms_t pcparm;
+
+	pcparm.pc_cid = self->ul_rtclassid;
+	((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs = RT_NOCHANGE;
+	((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
+	(void) _private_priocntl(P_LWPID, self->ul_lwpid, PC_SETPARMS, &pcparm);
+}
+
+/*
+ * Inherit priority from ceiling.
+ * This changes the effective priority, not the assigned priority.
  */
 void
-_ceil_prio_inherit(int ceil)
+_ceil_prio_inherit(int prio)
 {
 	ulwp_t *self = curthread;
-	struct sched_param param;
 
-	(void) _memset(&param, 0, sizeof (param));
-	param.sched_priority = ceil;
-	if (_thread_setschedparam_main(self->ul_lwpid,
-	    self->ul_policy, &param, PRIO_INHERIT)) {
-		/*
-		 * Panic since unclear what error code to return.
-		 * If we do return the error codes returned by above
-		 * called routine, update the man page...
-		 */
-		thr_panic("_thread_setschedparam_main() fails");
-	}
+	self->ul_epri = prio;
+	set_rt_priority(self, prio);
 }
 
 /*
@@ -248,30 +275,17 @@ void
 _ceil_prio_waive(void)
 {
 	ulwp_t *self = curthread;
-	struct sched_param param;
+	mxchain_t *mcp = self->ul_mxchain;
+	int prio;
 
-	(void) _memset(&param, 0, sizeof (param));
-	if (self->ul_mxchain == NULL) {
-		/*
-		 * No ceil locks held.  Zero the epri, revert back to ul_pri.
-		 * Since thread's hash lock is not held, one cannot just
-		 * read ul_pri here...do it in the called routine...
-		 */
-		param.sched_priority = self->ul_pri;	/* ignored */
-		if (_thread_setschedparam_main(self->ul_lwpid,
-		    self->ul_policy, &param, PRIO_DISINHERIT))
-			thr_panic("_thread_setschedparam_main() fails");
+	if (mcp == NULL) {
+		prio = self->ul_pri;
+		self->ul_epri = 0;
 	} else {
-		/*
-		 * Set priority to that of the mutex at the head
-		 * of the ceilmutex chain.
-		 */
-		param.sched_priority =
-		    self->ul_mxchain->mxchain_mx->mutex_ceiling;
-		if (_thread_setschedparam_main(self->ul_lwpid,
-		    self->ul_policy, &param, PRIO_INHERIT))
-			thr_panic("_thread_setschedparam_main() fails");
+		prio = mcp->mxchain_mx->mutex_ceiling;
+		self->ul_epri = prio;
 	}
+	set_rt_priority(self, prio);
 }
 
 /*
@@ -386,8 +400,7 @@ spin_lock_set(mutex_t *mp)
 	/*
 	 * Spin for a while, attempting to acquire the lock.
 	 */
-	if (self->ul_spin_lock_spin != UINT_MAX)
-		self->ul_spin_lock_spin++;
+	INCR32(self->ul_spin_lock_spin);
 	if (mutex_queuelock_adaptive(mp) == 0 ||
 	    set_lock_byte(&mp->mutex_lockw) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
@@ -397,8 +410,7 @@ spin_lock_set(mutex_t *mp)
 	 * Try harder if we were previously at a no premption level.
 	 */
 	if (self->ul_preempt > 1) {
-		if (self->ul_spin_lock_spin2 != UINT_MAX)
-			self->ul_spin_lock_spin2++;
+		INCR32(self->ul_spin_lock_spin2);
 		if (mutex_queuelock_adaptive(mp) == 0 ||
 		    set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
@@ -408,8 +420,7 @@ spin_lock_set(mutex_t *mp)
 	/*
 	 * Give up and block in the kernel for the mutex.
 	 */
-	if (self->ul_spin_lock_sleep != UINT_MAX)
-		self->ul_spin_lock_sleep++;
+	INCR32(self->ul_spin_lock_sleep);
 	(void) ___lwp_mutex_timedlock(mp, NULL);
 	mp->mutex_owner = (uintptr_t)self;
 }
@@ -422,8 +433,7 @@ spin_lock_clear(mutex_t *mp)
 	mp->mutex_owner = 0;
 	if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK) {
 		(void) ___lwp_mutex_wakeup(mp, 0);
-		if (self->ul_spin_lock_wakeup != UINT_MAX)
-			self->ul_spin_lock_wakeup++;
+		INCR32(self->ul_spin_lock_wakeup);
 	}
 	preempt(self);
 }
@@ -436,7 +446,7 @@ queue_alloc(void)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
-	mutex_t *mp;
+	queue_head_t *qp;
 	void *data;
 	int i;
 
@@ -449,11 +459,16 @@ queue_alloc(void)
 	    PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, (off_t)0))
 	    == MAP_FAILED)
 		thr_panic("cannot allocate thread queue_head table");
-	udp->queue_head = (queue_head_t *)data;
-	for (i = 0; i < 2 * QHASHSIZE; i++) {
-		mp = &udp->queue_head[i].qh_lock;
-		mp->mutex_flag = LOCK_INITED;
-		mp->mutex_magic = MUTEX_MAGIC;
+	udp->queue_head = qp = (queue_head_t *)data;
+	for (i = 0; i < 2 * QHASHSIZE; qp++, i++) {
+		qp->qh_type = (i < QHASHSIZE)? MX : CV;
+		qp->qh_lock.mutex_flag = LOCK_INITED;
+		qp->qh_lock.mutex_magic = MUTEX_MAGIC;
+		qp->qh_hlist = &qp->qh_def_root;
+#if defined(THREAD_DEBUG)
+		qp->qh_hlen = 1;
+		qp->qh_hmax = 1;
+#endif
 	}
 }
 
@@ -467,31 +482,43 @@ QVERIFY(queue_head_t *qp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
+	queue_root_t *qrp;
 	ulwp_t *ulwp;
 	ulwp_t *prev;
 	uint_t index;
-	uint32_t cnt = 0;
+	uint32_t cnt;
 	char qtype;
 	void *wchan;
 
 	ASSERT(qp >= udp->queue_head && (qp - udp->queue_head) < 2 * QHASHSIZE);
 	ASSERT(MUTEX_OWNED(&qp->qh_lock, self));
-	ASSERT((qp->qh_head != NULL && qp->qh_tail != NULL) ||
-	    (qp->qh_head == NULL && qp->qh_tail == NULL));
+	for (cnt = 0, qrp = qp->qh_hlist; qrp != NULL; qrp = qrp->qr_next) {
+		cnt++;
+		ASSERT((qrp->qr_head != NULL && qrp->qr_tail != NULL) ||
+		    (qrp->qr_head == NULL && qrp->qr_tail == NULL));
+	}
+	ASSERT(qp->qh_hlen == cnt && qp->qh_hmax >= cnt);
+	qtype = ((qp - udp->queue_head) < QHASHSIZE)? MX : CV;
+	ASSERT(qp->qh_type == qtype);
 	if (!thread_queue_verify)
 		return;
 	/* real expensive stuff, only for _THREAD_QUEUE_VERIFY */
-	qtype = ((qp - udp->queue_head) < QHASHSIZE)? MX : CV;
-	for (prev = NULL, ulwp = qp->qh_head; ulwp != NULL;
-	    prev = ulwp, ulwp = ulwp->ul_link, cnt++) {
-		ASSERT(ulwp->ul_qtype == qtype);
-		ASSERT(ulwp->ul_wchan != NULL);
-		ASSERT(ulwp->ul_sleepq == qp);
-		wchan = ulwp->ul_wchan;
-		index = QUEUE_HASH(wchan, qtype);
-		ASSERT(&udp->queue_head[index] == qp);
+	for (cnt = 0, qrp = qp->qh_hlist; qrp != NULL; qrp = qrp->qr_next) {
+		for (prev = NULL, ulwp = qrp->qr_head; ulwp != NULL;
+		    prev = ulwp, ulwp = ulwp->ul_link) {
+			cnt++;
+			if (ulwp->ul_writer)
+				ASSERT(prev == NULL || prev->ul_writer);
+			ASSERT(ulwp->ul_qtype == qtype);
+			ASSERT(ulwp->ul_wchan != NULL);
+			ASSERT(ulwp->ul_sleepq == qp);
+			wchan = ulwp->ul_wchan;
+			ASSERT(qrp->qr_wchan == wchan);
+			index = QUEUE_HASH(wchan, qtype);
+			ASSERT(&udp->queue_head[index] == qp);
+		}
+		ASSERT(qrp->qr_tail == prev);
 	}
-	ASSERT(qp->qh_tail == prev);
 	ASSERT(qp->qh_qlen == cnt);
 }
 
@@ -509,6 +536,7 @@ queue_lock(void *wchan, int qtype)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	queue_head_t *qp;
+	queue_root_t *qrp;
 
 	ASSERT(qtype == MX || qtype == CV);
 
@@ -522,11 +550,20 @@ queue_lock(void *wchan, int qtype)
 	}
 	qp += QUEUE_HASH(wchan, qtype);
 	spin_lock_set(&qp->qh_lock);
-	/*
-	 * At once per nanosecond, qh_lockcount will wrap after 512 years.
-	 * Were we to care about this, we could peg the value at UINT64_MAX.
-	 */
-	qp->qh_lockcount++;
+	for (qrp = qp->qh_hlist; qrp != NULL; qrp = qrp->qr_next)
+		if (qrp->qr_wchan == wchan)
+			break;
+	if (qrp == NULL && qp->qh_def_root.qr_head == NULL) {
+		/* the default queue root is available; use it */
+		qrp = &qp->qh_def_root;
+		qrp->qr_wchan = wchan;
+		ASSERT(qrp->qr_next == NULL);
+		ASSERT(qrp->qr_tail == NULL &&
+		    qrp->qr_rtcount == 0 && qrp->qr_qlen == 0);
+	}
+	qp->qh_wchan = wchan;	/* valid until queue_unlock() is called */
+	qp->qh_root = qrp;	/* valid until queue_unlock() is called */
+	INCR32(qp->qh_lockcount);
 	QVERIFY(qp);
 	return (qp);
 }
@@ -549,18 +586,32 @@ queue_unlock(queue_head_t *qp)
 #define	CMP_PRIO(ulwp)	((real_priority(ulwp) << 1) + (ulwp)->ul_writer)
 
 void
-enqueue(queue_head_t *qp, ulwp_t *ulwp, void *wchan, int qtype)
+enqueue(queue_head_t *qp, ulwp_t *ulwp, int force_fifo)
 {
+	queue_root_t *qrp;
 	ulwp_t **ulwpp;
 	ulwp_t *next;
 	int pri = CMP_PRIO(ulwp);
-	int force_fifo = (qtype & FIFOQ);
-	int do_fifo;
 
-	qtype &= ~FIFOQ;
-	ASSERT(qtype == MX || qtype == CV);
 	ASSERT(MUTEX_OWNED(&qp->qh_lock, curthread));
 	ASSERT(ulwp->ul_sleepq != qp);
+
+	if ((qrp = qp->qh_root) == NULL) {
+		/* use the thread's queue root for the linkage */
+		qrp = &ulwp->ul_queue_root;
+		qrp->qr_next = qp->qh_hlist;
+		qrp->qr_prev = NULL;
+		qrp->qr_head = NULL;
+		qrp->qr_tail = NULL;
+		qrp->qr_wchan = qp->qh_wchan;
+		qrp->qr_rtcount = 0;
+		qrp->qr_qlen = 0;
+		qrp->qr_qmax = 0;
+		qp->qh_hlist->qr_prev = qrp;
+		qp->qh_hlist = qrp;
+		qp->qh_root = qrp;
+		MAXINCR(qp->qh_hmax, qp->qh_hlen);
+	}
 
 	/*
 	 * LIFO queue ordering is unfair and can lead to starvation,
@@ -580,30 +631,28 @@ enqueue(queue_head_t *qp, ulwp_t *ulwp, void *wchan, int qtype)
 	 * This breaks live lock conditions that occur in applications
 	 * that are written assuming (incorrectly) that threads acquire
 	 * locks fairly, that is, in roughly round-robin order.
-	 * In any event, the queue is maintained in priority order.
+	 * In any event, the queue is maintained in kernel priority order.
 	 *
-	 * If we are given the FIFOQ flag in qtype, fifo queueing is forced.
+	 * If force_fifo is non-zero, fifo queueing is forced.
 	 * SUSV3 requires this for semaphores.
 	 */
-	do_fifo = (force_fifo ||
-	    ((++qp->qh_qcnt << curthread->ul_queue_fifo) & 0xff) == 0);
-
-	if (qp->qh_head == NULL) {
+	if (qrp->qr_head == NULL) {
 		/*
 		 * The queue is empty.  LIFO/FIFO doesn't matter.
 		 */
-		ASSERT(qp->qh_tail == NULL);
-		ulwpp = &qp->qh_head;
-	} else if (do_fifo) {
+		ASSERT(qrp->qr_tail == NULL);
+		ulwpp = &qrp->qr_head;
+	} else if (force_fifo |
+	    (((++qp->qh_qcnt << curthread->ul_queue_fifo) & 0xff) == 0)) {
 		/*
 		 * Enqueue after the last thread whose priority is greater
 		 * than or equal to the priority of the thread being queued.
 		 * Attempt first to go directly onto the tail of the queue.
 		 */
-		if (pri <= CMP_PRIO(qp->qh_tail))
-			ulwpp = &qp->qh_tail->ul_link;
+		if (pri <= CMP_PRIO(qrp->qr_tail))
+			ulwpp = &qrp->qr_tail->ul_link;
 		else {
-			for (ulwpp = &qp->qh_head; (next = *ulwpp) != NULL;
+			for (ulwpp = &qrp->qr_head; (next = *ulwpp) != NULL;
 			    ulwpp = &next->ul_link)
 				if (pri > CMP_PRIO(next))
 					break;
@@ -614,174 +663,262 @@ enqueue(queue_head_t *qp, ulwp_t *ulwp, void *wchan, int qtype)
 		 * than or equal to the priority of the thread being queued.
 		 * Hopefully we can go directly onto the head of the queue.
 		 */
-		for (ulwpp = &qp->qh_head; (next = *ulwpp) != NULL;
+		for (ulwpp = &qrp->qr_head; (next = *ulwpp) != NULL;
 		    ulwpp = &next->ul_link)
 			if (pri >= CMP_PRIO(next))
 				break;
 	}
 	if ((ulwp->ul_link = *ulwpp) == NULL)
-		qp->qh_tail = ulwp;
+		qrp->qr_tail = ulwp;
 	*ulwpp = ulwp;
 
 	ulwp->ul_sleepq = qp;
-	ulwp->ul_wchan = wchan;
-	ulwp->ul_qtype = qtype;
-	if (qp->qh_qmax < ++qp->qh_qlen)
-		qp->qh_qmax = qp->qh_qlen;
+	ulwp->ul_wchan = qp->qh_wchan;
+	ulwp->ul_qtype = qp->qh_type;
+	if ((ulwp->ul_schedctl != NULL &&
+	    ulwp->ul_schedctl->sc_cid == ulwp->ul_rtclassid) |
+	    ulwp->ul_pilocks) {
+		ulwp->ul_rtqueued = 1;
+		qrp->qr_rtcount++;
+	}
+	MAXINCR(qrp->qr_qmax, qrp->qr_qlen);
+	MAXINCR(qp->qh_qmax, qp->qh_qlen);
 }
 
 /*
- * Return a pointer to the queue slot of the
- * highest priority thread on the queue.
- * On return, prevp, if not NULL, will contain a pointer
- * to the thread's predecessor on the queue
+ * Helper function for queue_slot() and queue_slot_rt().
+ * Try to find a non-suspended thread on the queue.
  */
 static ulwp_t **
-queue_slot(queue_head_t *qp, void *wchan, int *more, ulwp_t **prevp)
+queue_slot_runnable(ulwp_t **ulwpp, ulwp_t **prevp, int rt)
 {
+	ulwp_t *ulwp;
+	ulwp_t **foundpp = NULL;
+	int priority = -1;
+	ulwp_t *prev;
+	int tpri;
+
+	for (prev = NULL;
+	    (ulwp = *ulwpp) != NULL;
+	    prev = ulwp, ulwpp = &ulwp->ul_link) {
+		if (ulwp->ul_stop)	/* skip suspended threads */
+			continue;
+		tpri = rt? CMP_PRIO(ulwp) : 0;
+		if (tpri > priority) {
+			foundpp = ulwpp;
+			*prevp = prev;
+			priority = tpri;
+			if (!rt)
+				break;
+		}
+	}
+	return (foundpp);
+}
+
+/*
+ * For real-time, we search the entire queue because the dispatch
+ * (kernel) priorities may have changed since enqueueing.
+ */
+static ulwp_t **
+queue_slot_rt(ulwp_t **ulwpp_org, ulwp_t **prevp)
+{
+	ulwp_t **ulwpp = ulwpp_org;
+	ulwp_t *ulwp = *ulwpp;
+	ulwp_t **foundpp = ulwpp;
+	int priority = CMP_PRIO(ulwp);
+	ulwp_t *prev;
+	int tpri;
+
+	for (prev = ulwp, ulwpp = &ulwp->ul_link;
+	    (ulwp = *ulwpp) != NULL;
+	    prev = ulwp, ulwpp = &ulwp->ul_link) {
+		tpri = CMP_PRIO(ulwp);
+		if (tpri > priority) {
+			foundpp = ulwpp;
+			*prevp = prev;
+			priority = tpri;
+		}
+	}
+	ulwp = *foundpp;
+
+	/*
+	 * Try not to return a suspended thread.
+	 * This mimics the old libthread's behavior.
+	 */
+	if (ulwp->ul_stop &&
+	    (ulwpp = queue_slot_runnable(ulwpp_org, prevp, 1)) != NULL) {
+		foundpp = ulwpp;
+		ulwp = *foundpp;
+	}
+	ulwp->ul_rt = 1;
+	return (foundpp);
+}
+
+ulwp_t **
+queue_slot(queue_head_t *qp, ulwp_t **prevp, int *more)
+{
+	queue_root_t *qrp;
 	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev = NULL;
-	ulwp_t **suspp = NULL;
-	ulwp_t *susprev;
+	int rt;
 
 	ASSERT(MUTEX_OWNED(&qp->qh_lock, curthread));
 
+	if ((qrp = qp->qh_root) == NULL || (ulwp = qrp->qr_head) == NULL) {
+		*more = 0;
+		return (NULL);		/* no lwps on the queue */
+	}
+	rt = (qrp->qr_rtcount != 0);
+	*prevp = NULL;
+	if (ulwp->ul_link == NULL) {	/* only one lwp on the queue */
+		*more = 0;
+		ulwp->ul_rt = rt;
+		return (&qrp->qr_head);
+	}
+	*more = 1;
+
+	if (rt)		/* real-time queue */
+		return (queue_slot_rt(&qrp->qr_head, prevp));
 	/*
-	 * Find a waiter on the sleep queue.
+	 * Try not to return a suspended thread.
+	 * This mimics the old libthread's behavior.
 	 */
-	for (ulwpp = &qp->qh_head; (ulwp = *ulwpp) != NULL;
-	    prev = ulwp, ulwpp = &ulwp->ul_link) {
-		if (ulwp->ul_wchan == wchan) {
-			if (!ulwp->ul_stop)
-				break;
-			/*
-			 * Try not to return a suspended thread.
-			 * This mimics the old libthread's behavior.
-			 */
-			if (suspp == NULL) {
-				suspp = ulwpp;
-				susprev = prev;
-			}
-		}
-	}
-
-	if (ulwp == NULL && suspp != NULL) {
-		ulwp = *(ulwpp = suspp);
-		prev = susprev;
-		suspp = NULL;
-	}
-	if (ulwp == NULL) {
-		if (more != NULL)
-			*more = 0;
-		return (NULL);
-	}
-
-	if (prevp != NULL)
-		*prevp = prev;
-	if (more == NULL)
-		return (ulwpp);
-
-	/*
-	 * Scan the remainder of the queue for another waiter.
-	 */
-	if (suspp != NULL) {
-		*more = 1;
+	if (ulwp->ul_stop &&
+	    (ulwpp = queue_slot_runnable(&qrp->qr_head, prevp, 0)) != NULL) {
+		ulwp = *ulwpp;
+		ulwp->ul_rt = 0;
 		return (ulwpp);
 	}
-	for (ulwp = ulwp->ul_link; ulwp != NULL; ulwp = ulwp->ul_link) {
-		if (ulwp->ul_wchan == wchan) {
-			*more = 1;
-			return (ulwpp);
-		}
-	}
-
-	*more = 0;
-	return (ulwpp);
+	/*
+	 * The common case; just pick the first thread on the queue.
+	 */
+	ulwp->ul_rt = 0;
+	return (&qrp->qr_head);
 }
 
-ulwp_t *
+/*
+ * Common code for unlinking an lwp from a user-level sleep queue.
+ */
+void
 queue_unlink(queue_head_t *qp, ulwp_t **ulwpp, ulwp_t *prev)
 {
-	ulwp_t *ulwp;
+	queue_root_t *qrp = qp->qh_root;
+	queue_root_t *nqrp;
+	ulwp_t *ulwp = *ulwpp;
+	ulwp_t *next;
 
-	ulwp = *ulwpp;
-	*ulwpp = ulwp->ul_link;
+	ASSERT(MUTEX_OWNED(&qp->qh_lock, curthread));
+	ASSERT(qp->qh_wchan != NULL && ulwp->ul_wchan == qp->qh_wchan);
+
+	DECR(qp->qh_qlen);
+	DECR(qrp->qr_qlen);
+	if (ulwp->ul_rtqueued) {
+		ulwp->ul_rtqueued = 0;
+		qrp->qr_rtcount--;
+	}
+	next = ulwp->ul_link;
+	*ulwpp = next;
 	ulwp->ul_link = NULL;
-	if (qp->qh_tail == ulwp)
-		qp->qh_tail = prev;
-	qp->qh_qlen--;
-	ulwp->ul_sleepq = NULL;
-	ulwp->ul_wchan = NULL;
+	if (qrp->qr_tail == ulwp)
+		qrp->qr_tail = prev;
+	if (qrp == &ulwp->ul_queue_root) {
+		/*
+		 * We can't continue to use the unlinked thread's
+		 * queue root for the linkage.
+		 */
+		queue_root_t *qr_next = qrp->qr_next;
+		queue_root_t *qr_prev = qrp->qr_prev;
 
-	return (ulwp);
+		if (qrp->qr_tail) {
+			/* switch to using the last thread's queue root */
+			ASSERT(qrp->qr_qlen != 0);
+			nqrp = &qrp->qr_tail->ul_queue_root;
+			*nqrp = *qrp;
+			if (qr_next)
+				qr_next->qr_prev = nqrp;
+			if (qr_prev)
+				qr_prev->qr_next = nqrp;
+			else
+				qp->qh_hlist = nqrp;
+			qp->qh_root = nqrp;
+		} else {
+			/* empty queue root; just delete from the hash list */
+			ASSERT(qrp->qr_qlen == 0);
+			if (qr_next)
+				qr_next->qr_prev = qr_prev;
+			if (qr_prev)
+				qr_prev->qr_next = qr_next;
+			else
+				qp->qh_hlist = qr_next;
+			qp->qh_root = NULL;
+			DECR(qp->qh_hlen);
+		}
+	}
 }
 
 ulwp_t *
-dequeue(queue_head_t *qp, void *wchan, int *more)
+dequeue(queue_head_t *qp, int *more)
 {
 	ulwp_t **ulwpp;
+	ulwp_t *ulwp;
 	ulwp_t *prev;
 
-	if ((ulwpp = queue_slot(qp, wchan, more, &prev)) == NULL)
+	if ((ulwpp = queue_slot(qp, &prev, more)) == NULL)
 		return (NULL);
-	return (queue_unlink(qp, ulwpp, prev));
+	ulwp = *ulwpp;
+	queue_unlink(qp, ulwpp, prev);
+	ulwp->ul_sleepq = NULL;
+	ulwp->ul_wchan = NULL;
+	return (ulwp);
 }
 
 /*
  * Return a pointer to the highest priority thread sleeping on wchan.
  */
 ulwp_t *
-queue_waiter(queue_head_t *qp, void *wchan)
+queue_waiter(queue_head_t *qp)
 {
 	ulwp_t **ulwpp;
+	ulwp_t *prev;
+	int more;
 
-	if ((ulwpp = queue_slot(qp, wchan, NULL, NULL)) == NULL)
+	if ((ulwpp = queue_slot(qp, &prev, &more)) == NULL)
 		return (NULL);
 	return (*ulwpp);
 }
 
-uint8_t
-dequeue_self(queue_head_t *qp, void *wchan)
+int
+dequeue_self(queue_head_t *qp)
 {
 	ulwp_t *self = curthread;
+	queue_root_t *qrp;
 	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev = NULL;
+	ulwp_t *prev;
 	int found = 0;
-	int more = 0;
 
 	ASSERT(MUTEX_OWNED(&qp->qh_lock, self));
 
 	/* find self on the sleep queue */
-	for (ulwpp = &qp->qh_head; (ulwp = *ulwpp) != NULL;
-	    prev = ulwp, ulwpp = &ulwp->ul_link) {
-		if (ulwp == self) {
-			/* dequeue ourself */
-			ASSERT(self->ul_wchan == wchan);
-			(void) queue_unlink(qp, ulwpp, prev);
-			self->ul_cvmutex = NULL;
-			self->ul_cv_wake = 0;
-			found = 1;
-			break;
+	if ((qrp = qp->qh_root) != NULL) {
+		for (prev = NULL, ulwpp = &qrp->qr_head;
+		    (ulwp = *ulwpp) != NULL;
+		    prev = ulwp, ulwpp = &ulwp->ul_link) {
+			if (ulwp == self) {
+				queue_unlink(qp, ulwpp, prev);
+				self->ul_cvmutex = NULL;
+				self->ul_sleepq = NULL;
+				self->ul_wchan = NULL;
+				found = 1;
+				break;
+			}
 		}
-		if (ulwp->ul_wchan == wchan)
-			more = 1;
 	}
 
 	if (!found)
 		thr_panic("dequeue_self(): curthread not found on queue");
 
-	if (more)
-		return (1);
-
-	/* scan the remainder of the queue for another waiter */
-	for (ulwp = *ulwpp; ulwp != NULL; ulwp = ulwp->ul_link) {
-		if (ulwp->ul_wchan == wchan)
-			return (1);
-	}
-
-	return (0);
+	return ((qrp = qp->qh_root) != NULL && qrp->qr_head != NULL);
 }
 
 /*
@@ -807,12 +944,11 @@ unsleep_self(void)
 		 * If so, just loop around and try again.
 		 * dequeue_self() clears self->ul_sleepq.
 		 */
-		if (qp == self->ul_sleepq) {
-			(void) dequeue_self(qp, self->ul_wchan);
-			self->ul_writer = 0;
-		}
+		if (qp == self->ul_sleepq)
+			(void) dequeue_self(qp);
 		queue_unlock(qp);
 	}
+	self->ul_writer = 0;
 	self->ul_critical--;
 }
 
@@ -1423,9 +1559,9 @@ static lwpid_t
 mutex_wakeup(mutex_t *mp)
 {
 	lwpid_t lwpid = 0;
+	int more;
 	queue_head_t *qp;
 	ulwp_t *ulwp;
-	int more;
 
 	/*
 	 * Dequeue a waiter from the sleep queue.  Don't touch the mutex
@@ -1433,9 +1569,9 @@ mutex_wakeup(mutex_t *mp)
 	 * might have been deallocated or reallocated for another purpose.
 	 */
 	qp = queue_lock(mp, MX);
-	if ((ulwp = dequeue(qp, mp, &more)) != NULL) {
+	if ((ulwp = dequeue(qp, &more)) != NULL) {
 		lwpid = ulwp->ul_lwpid;
-		mp->mutex_waiters = (more? 1 : 0);
+		mp->mutex_waiters = more;
 	}
 	queue_unlock(qp);
 	return (lwpid);
@@ -1448,11 +1584,10 @@ static void
 mutex_wakeup_all(mutex_t *mp)
 {
 	queue_head_t *qp;
+	queue_root_t *qrp;
 	int nlwpid = 0;
 	int maxlwps = MAXLWPS;
-	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev = NULL;
 	lwpid_t buffer[MAXLWPS];
 	lwpid_t *lwpid = buffer;
 
@@ -1473,17 +1608,17 @@ mutex_wakeup_all(mutex_t *mp)
 	 * system call directly since that path acquires no locks.
 	 */
 	qp = queue_lock(mp, MX);
-	ulwpp = &qp->qh_head;
-	while ((ulwp = *ulwpp) != NULL) {
-		if (ulwp->ul_wchan != mp) {
-			prev = ulwp;
-			ulwpp = &ulwp->ul_link;
-		} else {
-			if (nlwpid == maxlwps)
-				lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
-			(void) queue_unlink(qp, ulwpp, prev);
-			lwpid[nlwpid++] = ulwp->ul_lwpid;
-		}
+	for (;;) {
+		if ((qrp = qp->qh_root) == NULL ||
+		    (ulwp = qrp->qr_head) == NULL)
+			break;
+		ASSERT(ulwp->ul_wchan == mp);
+		queue_unlink(qp, &qrp->qr_head, NULL);
+		ulwp->ul_sleepq = NULL;
+		ulwp->ul_wchan = NULL;
+		if (nlwpid == maxlwps)
+			lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
+		lwpid[nlwpid++] = ulwp->ul_lwpid;
 	}
 
 	if (nlwpid == 0) {
@@ -1555,17 +1690,6 @@ mutex_unlock_process(mutex_t *mp, int release_all)
 	}
 }
 
-/*
- * Return the real priority of a thread.
- */
-int
-real_priority(ulwp_t *ulwp)
-{
-	if (ulwp->ul_epri == 0)
-		return (ulwp->ul_mappedpri? ulwp->ul_mappedpri : ulwp->ul_pri);
-	return (ulwp->ul_emappedpri? ulwp->ul_emappedpri : ulwp->ul_epri);
-}
-
 void
 stall(void)
 {
@@ -1608,12 +1732,12 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 	 * The waiter bit can be set/cleared only while holding the queue lock.
 	 */
 	qp = queue_lock(mp, MX);
-	enqueue(qp, self, mp, MX);
+	enqueue(qp, self, 0);
 	mp->mutex_waiters = 1;
 	for (;;) {
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
-			mp->mutex_waiters = dequeue_self(qp, mp);
+			mp->mutex_waiters = dequeue_self(qp);
 			break;
 		}
 		set_parking_flag(self, 1);
@@ -1635,7 +1759,7 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		qp = queue_lock(mp, MX);
 		if (self->ul_sleepq == NULL) {
 			if (error) {
-				mp->mutex_waiters = queue_waiter(qp, mp)? 1 : 0;
+				mp->mutex_waiters = queue_waiter(qp)? 1 : 0;
 				if (error != EINTR)
 					break;
 				error = 0;
@@ -1644,7 +1768,7 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 				mp->mutex_owner = (uintptr_t)self;
 				break;
 			}
-			enqueue(qp, self, mp, MX);
+			enqueue(qp, self, 0);
 			mp->mutex_waiters = 1;
 		}
 		ASSERT(self->ul_sleepq == qp &&
@@ -1652,7 +1776,7 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		    self->ul_wchan == mp);
 		if (error) {
 			if (error != EINTR) {
-				mp->mutex_waiters = dequeue_self(qp, mp);
+				mp->mutex_waiters = dequeue_self(qp);
 				break;
 			}
 			error = 0;
@@ -1812,7 +1936,7 @@ unregister_locks(void)
 /*
  * Returns with mutex_owner set correctly.
  */
-static int
+int
 mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 {
 	ulwp_t *self = curthread;
@@ -1820,9 +1944,11 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 	int mtype = mp->mutex_type;
 	tdb_mutex_stats_t *msp = MUTEX_STATS(mp, udp);
 	int error = 0;
+	int noceil = try & MUTEX_NOCEIL;
 	uint8_t ceil;
 	int myprio;
 
+	try &= ~MUTEX_NOCEIL;
 	ASSERT(try == MUTEX_TRY || try == MUTEX_LOCK);
 
 	if (!self->ul_schedctl_called)
@@ -1838,10 +1964,14 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 	    tsp == NULL && mutex_is_held(mp))
 		lock_error(mp, "mutex_lock", NULL, NULL);
 
-	if (mtype & LOCK_PRIO_PROTECT) {
+	if ((mtype & LOCK_PRIO_PROTECT) && noceil == 0) {
+		update_sched(self);
+		if (self->ul_cid != self->ul_rtclassid) {
+			DTRACE_PROBE2(plockstat, mutex__error, mp, EPERM);
+			return (EPERM);
+		}
 		ceil = mp->mutex_ceiling;
-		ASSERT(_validate_rt_prio(SCHED_FIFO, ceil) == 0);
-		myprio = real_priority(self);
+		myprio = self->ul_epri? self->ul_epri : self->ul_pri;
 		if (myprio > ceil) {
 			DTRACE_PROBE2(plockstat, mutex__error, mp, EINVAL);
 			return (EINVAL);
@@ -1871,10 +2001,12 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 		 */
 		switch (error) {
 		case 0:
+			self->ul_pilocks++;
 			mp->mutex_lockw = LOCKSET;
 			break;
 		case EOWNERDEAD:
 		case ELOCKUNMAPPED:
+			self->ul_pilocks++;
 			mp->mutex_lockw = LOCKSET;
 			/* FALLTHROUGH */
 		case ENOTRECOVERABLE:
@@ -1906,7 +2038,7 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 			record_begin_hold(msp);
 		break;
 	default:
-		if (mtype & LOCK_PRIO_PROTECT) {
+		if ((mtype & LOCK_PRIO_PROTECT) && noceil == 0) {
 			(void) _ceil_mylist_del(mp);
 			if (myprio < ceil)
 				_ceil_prio_waive();
@@ -1967,9 +2099,8 @@ static int
 mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 {
 	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
+	int mtype = mp->mutex_type;
 	uberflags_t *gflags;
-	int mtype;
 
 	/*
 	 * Optimize the case of USYNC_THREAD, including
@@ -1978,8 +2109,8 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	 * and the process has only a single thread.
 	 * (Most likely a traditional single-threaded application.)
 	 */
-	if ((((mtype = mp->mutex_type) & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) |
-	    udp->uberflags.uf_all) == 0) {
+	if (((mtype & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) |
+	    self->ul_uberdata->uberflags.uf_all) == 0) {
 		/*
 		 * Only one thread exists so we don't need an atomic operation.
 		 */
@@ -2099,10 +2230,11 @@ __mutex_trylock(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
+	int mtype = mp->mutex_type;
 	uberflags_t *gflags;
-	int mtype;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
+
 	/*
 	 * Optimize the case of USYNC_THREAD, including
 	 * the LOCK_RECURSIVE and LOCK_ERRORCHECK cases,
@@ -2110,7 +2242,7 @@ __mutex_trylock(mutex_t *mp)
 	 * and the process has only a single thread.
 	 * (Most likely a traditional single-threaded application.)
 	 */
-	if ((((mtype = mp->mutex_type) & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) |
+	if (((mtype & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) |
 	    udp->uberflags.uf_all) == 0) {
 		/*
 		 * Only one thread exists so we don't need an atomic operation.
@@ -2194,6 +2326,7 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 		/* mp->mutex_ownerpid is cleared by ___lwp_mutex_unlock() */
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 		mp->mutex_lockw = LOCKCLEAR;
+		self->ul_pilocks--;
 		error = ___lwp_mutex_unlock(mp);
 		preempt(self);
 	} else if (mtype & USYNC_PROCESS) {
@@ -2223,10 +2356,9 @@ int
 __mutex_unlock(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
+	int mtype = mp->mutex_type;
 	uberflags_t *gflags;
 	lwpid_t lwpid;
-	int mtype;
 	short el;
 
 	/*
@@ -2236,8 +2368,8 @@ __mutex_unlock(mutex_t *mp)
 	 * and the process has only a single thread.
 	 * (Most likely a traditional single-threaded application.)
 	 */
-	if ((((mtype = mp->mutex_type) & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) |
-	    udp->uberflags.uf_all) == 0) {
+	if (((mtype & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) |
+	    self->ul_uberdata->uberflags.uf_all) == 0) {
 		if (mtype) {
 			/*
 			 * At this point we know that one or both of the
@@ -2872,6 +3004,7 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	lwpid_t lwpid;
 	int signalled;
 	int error;
+	int cv_wake;
 	int release_all;
 
 	/*
@@ -2882,10 +3015,10 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	 */
 	self->ul_sp = stkptr();
 	qp = queue_lock(cvp, CV);
-	enqueue(qp, self, cvp, CV);
+	enqueue(qp, self, 0);
 	cvp->cond_waiters_user = 1;
 	self->ul_cvmutex = mp;
-	self->ul_cv_wake = (tsp != NULL);
+	self->ul_cv_wake = cv_wake = (tsp != NULL);
 	self->ul_signalled = 0;
 	if (mp->mutex_flag & LOCK_OWNERDEAD) {
 		mp->mutex_flag &= ~LOCK_OWNERDEAD;
@@ -2924,7 +3057,8 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 		 * or we may just have gotten a spurious wakeup.
 		 */
 		qp = queue_lock(cvp, CV);
-		mqp = queue_lock(mp, MX);
+		if (!cv_wake)
+			mqp = queue_lock(mp, MX);
 		if (self->ul_sleepq == NULL)
 			break;
 		/*
@@ -2933,15 +3067,15 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 		 * were interrupted or we timed out (EINTR or ETIME).
 		 * Else this is a spurious wakeup; continue the loop.
 		 */
-		if (self->ul_sleepq == mqp) {		/* mutex queue */
+		if (!cv_wake && self->ul_sleepq == mqp) { /* mutex queue */
 			if (error) {
-				mp->mutex_waiters = dequeue_self(mqp, mp);
+				mp->mutex_waiters = dequeue_self(mqp);
 				break;
 			}
 			tsp = NULL;	/* no more timeout */
 		} else if (self->ul_sleepq == qp) {	/* condvar queue */
 			if (error) {
-				cvp->cond_waiters_user = dequeue_self(qp, cvp);
+				cvp->cond_waiters_user = dequeue_self(qp);
 				break;
 			}
 			/*
@@ -2951,18 +3085,21 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 		} else {
 			thr_panic("cond_sleep_queue(): thread not on queue");
 		}
-		queue_unlock(mqp);
+		if (!cv_wake)
+			queue_unlock(mqp);
 	}
 
 	self->ul_sp = 0;
-	ASSERT(self->ul_cvmutex == NULL && self->ul_cv_wake == 0);
+	self->ul_cv_wake = 0;
+	ASSERT(self->ul_cvmutex == NULL);
 	ASSERT(self->ul_sleepq == NULL && self->ul_link == NULL &&
 	    self->ul_wchan == NULL);
 
 	signalled = self->ul_signalled;
 	self->ul_signalled = 0;
 	queue_unlock(qp);
-	queue_unlock(mqp);
+	if (!cv_wake)
+		queue_unlock(mqp);
 
 	/*
 	 * If we were concurrently cond_signal()d and any of:
@@ -3034,8 +3171,10 @@ cond_sleep_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	self->ul_wchan = cvp;
 	mp->mutex_owner = 0;
 	/* mp->mutex_ownerpid is cleared by ___lwp_cond_wait() */
-	if (mtype & LOCK_PRIO_INHERIT)
+	if (mtype & LOCK_PRIO_INHERIT) {
 		mp->mutex_lockw = LOCKCLEAR;
+		self->ul_pilocks--;
+	}
 	/*
 	 * ___lwp_cond_wait() returns immediately with EINTR if
 	 * set_parking_flag(self,0) is called on this lwp before it
@@ -3356,15 +3495,14 @@ cond_signal_internal(cond_t *cvp)
 	uberdata_t *udp = self->ul_uberdata;
 	tdb_cond_stats_t *csp = COND_STATS(cvp, udp);
 	int error = 0;
+	int more;
+	lwpid_t lwpid;
 	queue_head_t *qp;
 	mutex_t *mp;
 	queue_head_t *mqp;
 	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev = NULL;
-	ulwp_t *next;
-	ulwp_t **suspp = NULL;
-	ulwp_t *susprev;
+	ulwp_t *prev;
 
 	if (csp)
 		tdb_incr(csp->cond_signal);
@@ -3383,43 +3521,13 @@ cond_signal_internal(cond_t *cvp)
 	 * is set, just dequeue and unpark him.
 	 */
 	qp = queue_lock(cvp, CV);
-	for (ulwpp = &qp->qh_head; (ulwp = *ulwpp) != NULL;
-	    prev = ulwp, ulwpp = &ulwp->ul_link) {
-		if (ulwp->ul_wchan == cvp) {
-			if (!ulwp->ul_stop)
-				break;
-			/*
-			 * Try not to dequeue a suspended thread.
-			 * This mimics the old libthread's behavior.
-			 */
-			if (suspp == NULL) {
-				suspp = ulwpp;
-				susprev = prev;
-			}
-		}
-	}
-	if (ulwp == NULL && suspp != NULL) {
-		ulwp = *(ulwpp = suspp);
-		prev = susprev;
-		suspp = NULL;
-	}
-	if (ulwp == NULL) {	/* no one on the sleep queue */
-		cvp->cond_waiters_user = 0;
+	ulwpp = queue_slot(qp, &prev, &more);
+	cvp->cond_waiters_user = more;
+	if (ulwpp == NULL) {	/* no one on the sleep queue */
 		queue_unlock(qp);
 		return (error);
 	}
-	/*
-	 * Scan the remainder of the CV queue for another waiter.
-	 */
-	if (suspp != NULL) {
-		next = *suspp;
-	} else {
-		for (next = ulwp->ul_link; next != NULL; next = next->ul_link)
-			if (next->ul_wchan == cvp)
-				break;
-	}
-	if (next == NULL)
-		cvp->cond_waiters_user = 0;
+	ulwp = *ulwpp;
 
 	/*
 	 * Inform the thread that he was the recipient of a cond_signal().
@@ -3434,29 +3542,25 @@ cond_signal_internal(cond_t *cvp)
 	 * while we move him to the mutex queue so that he can
 	 * deal properly with spurious wakeups.
 	 */
-	*ulwpp = ulwp->ul_link;
-	ulwp->ul_link = NULL;
-	if (qp->qh_tail == ulwp)
-		qp->qh_tail = prev;
-	qp->qh_qlen--;
+	queue_unlink(qp, ulwpp, prev);
 
 	mp = ulwp->ul_cvmutex;		/* the mutex he will acquire */
 	ulwp->ul_cvmutex = NULL;
 	ASSERT(mp != NULL);
 
 	if (ulwp->ul_cv_wake || !MUTEX_OWNED(mp, self)) {
-		lwpid_t lwpid = ulwp->ul_lwpid;
-
+		/* just wake him up */
+		lwpid = ulwp->ul_lwpid;
 		no_preempt(self);
 		ulwp->ul_sleepq = NULL;
 		ulwp->ul_wchan = NULL;
-		ulwp->ul_cv_wake = 0;
 		queue_unlock(qp);
 		(void) __lwp_unpark(lwpid);
 		preempt(self);
 	} else {
+		/* move him to the mutex queue */
 		mqp = queue_lock(mp, MX);
-		enqueue(mqp, ulwp, mp, MX);
+		enqueue(mqp, ulwp, 0);
 		mp->mutex_waiters = 1;
 		queue_unlock(mqp);
 		queue_unlock(qp);
@@ -3525,12 +3629,11 @@ cond_broadcast_internal(cond_t *cvp)
 	tdb_cond_stats_t *csp = COND_STATS(cvp, udp);
 	int error = 0;
 	queue_head_t *qp;
+	queue_root_t *qrp;
 	mutex_t *mp;
 	mutex_t *mp_cache = NULL;
 	queue_head_t *mqp = NULL;
-	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev = NULL;
 	int nlwpid = 0;
 	int maxlwps = MAXLWPS;
 	lwpid_t buffer[MAXLWPS];
@@ -3566,36 +3669,31 @@ cond_broadcast_internal(cond_t *cvp)
 	 */
 	qp = queue_lock(cvp, CV);
 	cvp->cond_waiters_user = 0;
-	ulwpp = &qp->qh_head;
-	while ((ulwp = *ulwpp) != NULL) {
-		if (ulwp->ul_wchan != cvp) {
-			prev = ulwp;
-			ulwpp = &ulwp->ul_link;
-			continue;
-		}
-		*ulwpp = ulwp->ul_link;
-		ulwp->ul_link = NULL;
-		if (qp->qh_tail == ulwp)
-			qp->qh_tail = prev;
-		qp->qh_qlen--;
+	for (;;) {
+		if ((qrp = qp->qh_root) == NULL ||
+		    (ulwp = qrp->qr_head) == NULL)
+			break;
+		ASSERT(ulwp->ul_wchan == cvp);
+		queue_unlink(qp, &qrp->qr_head, NULL);
 		mp = ulwp->ul_cvmutex;		/* his mutex */
 		ulwp->ul_cvmutex = NULL;
 		ASSERT(mp != NULL);
 		if (ulwp->ul_cv_wake || !MUTEX_OWNED(mp, self)) {
+			/* just wake him up */
 			ulwp->ul_sleepq = NULL;
 			ulwp->ul_wchan = NULL;
-			ulwp->ul_cv_wake = 0;
 			if (nlwpid == maxlwps)
 				lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
 			lwpid[nlwpid++] = ulwp->ul_lwpid;
 		} else {
+			/* move him to the mutex queue */
 			if (mp != mp_cache) {
 				mp_cache = mp;
 				if (mqp != NULL)
 					queue_unlock(mqp);
 				mqp = queue_lock(mp, MX);
 			}
-			enqueue(mqp, ulwp, mp, MX);
+			enqueue(mqp, ulwp, 0);
 			mp->mutex_waiters = 1;
 		}
 	}
@@ -3634,7 +3732,6 @@ assert_no_libc_locks_held(void)
 {
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 }
-#endif
 
 /* protected by link_lock */
 uint64_t spin_lock_spin;
@@ -3680,26 +3777,28 @@ dump_queue_statistics(void)
 		return;
 
 	if (fprintf(stderr, "\n%5d mutex queues:\n", QHASHSIZE) < 0 ||
-	    fprintf(stderr, "queue#   lockcount    max qlen\n") < 0)
+	    fprintf(stderr, "queue#   lockcount    max qlen    max hlen\n") < 0)
 		return;
 	for (qn = 0, qp = udp->queue_head; qn < QHASHSIZE; qn++, qp++) {
 		if (qp->qh_lockcount == 0)
 			continue;
 		spin_lock_total += qp->qh_lockcount;
-		if (fprintf(stderr, "%5d %12llu%12u\n", qn,
-		    (u_longlong_t)qp->qh_lockcount, qp->qh_qmax) < 0)
+		if (fprintf(stderr, "%5d %12llu%12u%12u\n", qn,
+		    (u_longlong_t)qp->qh_lockcount,
+		    qp->qh_qmax, qp->qh_hmax) < 0)
 			return;
 	}
 
 	if (fprintf(stderr, "\n%5d condvar queues:\n", QHASHSIZE) < 0 ||
-	    fprintf(stderr, "queue#   lockcount    max qlen\n") < 0)
+	    fprintf(stderr, "queue#   lockcount    max qlen    max hlen\n") < 0)
 		return;
 	for (qn = 0; qn < QHASHSIZE; qn++, qp++) {
 		if (qp->qh_lockcount == 0)
 			continue;
 		spin_lock_total += qp->qh_lockcount;
-		if (fprintf(stderr, "%5d %12llu%12u\n", qn,
-		    (u_longlong_t)qp->qh_lockcount, qp->qh_qmax) < 0)
+		if (fprintf(stderr, "%5d %12llu%12u%12u\n", qn,
+		    (u_longlong_t)qp->qh_lockcount,
+		    qp->qh_qmax, qp->qh_hmax) < 0)
 			return;
 	}
 
@@ -3714,3 +3813,4 @@ dump_queue_statistics(void)
 	(void) fprintf(stderr, "  spin_lock_wakeup = %10llu\n",
 	    (u_longlong_t)spin_lock_wakeup);
 }
+#endif

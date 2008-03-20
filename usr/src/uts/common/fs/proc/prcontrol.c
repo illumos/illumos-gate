@@ -338,11 +338,11 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 				break;
 			}
 
-		timeo = (cmd == PCTWSTOP)? (time_t)argp->timeo : 0;
-		if ((error = pr_wait_stop(pnp, timeo)) != 0)
-			return (error);
+			timeo = (cmd == PCTWSTOP)? (time_t)argp->timeo : 0;
+			if ((error = pr_wait_stop(pnp, timeo)) != 0)
+				return (error);
 
-		break;
+			break;
 		}
 
 	case PCRUN:	/* make lwp or process runnable */
@@ -960,10 +960,8 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 		}
 
 	case PCSPRIV:	/* set the process privileges */
-		{
-			error = pr_spriv(p, &argp->prpriv, cr);
-			break;
-		}
+		error = pr_spriv(p, &argp->prpriv, cr);
+		break;
 
 	case PCSZONE:	/* set the process's zoneid */
 		error = pr_szoneid(p, (zoneid_t)argp->przoneid, cr);
@@ -1548,6 +1546,7 @@ pr_nice(proc_t *p, int nice, cred_t *cr)
 	do {
 		ASSERT(!(t->t_proc_flag & TP_LWPEXIT));
 		err = CL_DONICE(t, cr, nice, (int *)NULL);
+		schedctl_set_cidpri(t);
 		if (error == 0)
 			error = err;
 	} while ((t = t->t_forw) != p->p_tlist);
@@ -1925,7 +1924,7 @@ pr_watch(prnode_t *pnp, prwatch_t *pwp, int *unlocked)
 	pwa->wa_eaddr = (caddr_t)vaddr + size;
 	pwa->wa_flags = (ulong_t)wflags;
 
-	error = ((pwa->wa_flags & ~WA_TRAPAFTER) == 0) ?
+	error = ((pwa->wa_flags & ~WA_TRAPAFTER) == 0)?
 	    clear_watched_area(p, pwa) : set_watched_area(p, pwa);
 
 	if (p == curproc) {

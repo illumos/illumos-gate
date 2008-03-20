@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -52,6 +52,7 @@
 #include <sys/uadmin.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
+#include <sys/schedctl.h>
 
 /*
  * Structure used to pass arguments to the proccmp() function.
@@ -62,7 +63,7 @@
 struct pcmpargs {
 	id_t	*pcmp_cidp;
 	int	*pcmp_cntp;
-	kthread_id_t	*pcmp_retthreadp;
+	kthread_t **pcmp_retthreadp;
 };
 
 /*
@@ -115,9 +116,10 @@ copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap, uio_seg_t seg)
 #endif
 
 static int donice(procset_t *, pcnice_t *);
+static int doprio(procset_t *, pcprio_t *);
 static int proccmp(proc_t *, struct pcmpargs *);
 static int setparms(proc_t *, struct stprmargs *);
-extern int threadcmp(struct pcmpargs *, kthread_id_t);
+extern int threadcmp(struct pcmpargs *, kthread_t *);
 
 /*
  * The priocntl system call.
@@ -129,6 +131,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	pcinfo_t		pcinfo;
 	pcparms_t		pcparms;
 	pcnice_t		pcnice;
+	pcprio_t		pcprio;
 	pcadmin_t		pcadmin;
 	pcpri_t			pcpri;
 	procset_t		procset;
@@ -138,7 +141,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	char			clname[PC_CLNMSZ];
 	char			*outstr;
 	int			count;
-	kthread_id_t		retthreadp;
+	kthread_t		*retthreadp;
 	proc_t			*initpp;
 	int			clnullflag;
 	int			error = 0;
@@ -340,7 +343,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			 * call parmsset() (which does the real work).
 			 */
 			if ((procset.p_lidtype != P_LWPID) ||
-				(procset.p_ridtype != P_LWPID)) {
+			    (procset.p_ridtype != P_LWPID)) {
 				error1 = dotoprocs(&procset, setparms,
 				    (char *)&stprmargs);
 			}
@@ -524,6 +527,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 				error = error1;
 			if (error) {
 				if (retthreadp != NULL)
+				    /* CSTYLED */
 				    mutex_exit(&(ttoproc(retthreadp)->p_lock));
 				ASSERT(MUTEX_NOT_HELD(&(curproc)->p_lock));
 				return (set_errno(error));
@@ -644,7 +648,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		 */
 		mutex_enter(&ualock);
 		error = CL_ADMIN(&sclass[pcadmin.pc_cid], pcadmin.pc_cladmin,
-				CRED());
+		    CRED());
 		mutex_exit(&ualock);
 		break;
 
@@ -674,6 +678,22 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 
 		if (!error && (pcnice.pc_op == PC_GETNICE)) {
 			if ((*copyoutfn)(&pcnice, arg, sizeof (pcnice)))
+				return (set_errno(EFAULT));
+		}
+		break;
+
+	case PC_DOPRIO:
+		/*
+		 * Get pcprio and procset structures from the user.
+		 */
+		if ((*copyinfn)(arg, &pcprio, sizeof (pcprio)) ||
+		    (*copyinfn)(psp, &procset, sizeof (procset)))
+			return (set_errno(EFAULT));
+
+		error = doprio(&procset, &pcprio);
+
+		if (!error && (pcprio.pc_op == PC_GETPRIO)) {
+			if ((*copyoutfn)(&pcprio, arg, sizeof (pcprio)))
 				return (set_errno(EFAULT));
 		}
 		break;
@@ -738,7 +758,8 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 static int
 proccmp(proc_t *pp, struct pcmpargs *argp)
 {
-	kthread_id_t	tx, ty;
+	kthread_t	*tx;
+	kthread_t	*ty;
 	int		last_pri = -1;
 	int		tx_pri;
 	int		found = 0;
@@ -800,9 +821,9 @@ proccmp(proc_t *pp, struct pcmpargs *argp)
 
 
 int
-threadcmp(struct pcmpargs *argp, kthread_id_t tp)
+threadcmp(struct pcmpargs *argp, kthread_t *tp)
 {
-	kthread_id_t	tx;
+	kthread_t	*tx;
 	proc_t		*pp;
 
 	ASSERT(MUTEX_HELD(&(ttoproc(tp))->p_lock));
@@ -857,7 +878,7 @@ static int
 setparms(proc_t *targpp, struct stprmargs *stprmp)
 {
 	int error = 0;
-	kthread_id_t t;
+	kthread_t *t;
 	int err;
 
 	mutex_enter(&targpp->p_lock);
@@ -885,7 +906,7 @@ setparms(proc_t *targpp, struct stprmargs *stprmp)
 int
 setthreadnice(pcnice_t *pcnice, kthread_t *tp)
 {
-	int error = 0;
+	int error;
 	int nice;
 	int inc;
 	id_t rtcid;
@@ -898,9 +919,9 @@ setthreadnice(pcnice_t *pcnice, kthread_t *tp)
 	 * must be unaffected by a call to setpriority().
 	 */
 	error = getcidbyname("RT", &rtcid);
-	if ((error == 0) && (tp->t_cid == rtcid)) {
+	if (error == 0 && tp->t_cid == rtcid) {
 		if (pcnice->pc_op == PC_SETNICE)
-			return (error);
+			return (0);
 	}
 
 	if ((error = CL_DONICE(tp, CRED(), 0, &nice)) != 0)
@@ -922,6 +943,7 @@ setthreadnice(pcnice_t *pcnice, kthread_t *tp)
 		inc = pcnice->pc_val - nice;
 
 		error = CL_DONICE(tp, CRED(), inc, &inc);
+		schedctl_set_cidpri(tp);
 	}
 
 	return (error);
@@ -932,7 +954,7 @@ setprocnice(proc_t *pp, pcnice_t *pcnice)
 {
 	kthread_t *tp;
 	int retval = 0;
-	int error = 0;
+	int error;
 
 	ASSERT(MUTEX_HELD(&pidlock));
 	mutex_enter(&pp->p_lock);
@@ -1026,6 +1048,173 @@ donice(procset_t *procset, pcnice_t *pcnice)
 	/*
 	 * We're returning the latest error here that we've got back from
 	 * the setthreadnice() or setprocnice(). That is, err_thread and/or
+	 * err_proc can be replaced by err.
+	 */
+	if (!err)
+		err = err_thread ? err_thread : err_proc;
+
+	return (err);
+}
+
+int
+setthreadprio(pcprio_t *pcprio, kthread_t *tp)
+{
+	int prio = 0;
+	int incr;
+	int error;
+
+	ASSERT(MUTEX_HELD(&pidlock));
+	ASSERT(MUTEX_HELD(&(ttoproc(tp)->p_lock)));
+
+	if (pcprio->pc_op == PC_SETPRIO && pcprio->pc_cid != tp->t_cid) {
+		/*
+		 * Target thread must change to new class.
+		 * See comments in parmsset(), from where this code was copied.
+		 */
+		void *bufp = NULL;
+		caddr_t clprocp = (caddr_t)tp->t_cldata;
+		id_t oldcid = tp->t_cid;
+
+		error = CL_CANEXIT(tp, NULL);
+		if (error)
+			return (error);
+		if (CL_ALLOC(&bufp, pcprio->pc_cid, KM_NOSLEEP) != 0)
+			return (ENOMEM);
+		error = CL_ENTERCLASS(tp, pcprio->pc_cid, NULL, CRED(), bufp);
+		if (error) {
+			CL_FREE(pcprio->pc_cid, bufp);
+			return (error);
+		}
+		CL_EXITCLASS(oldcid, clprocp);
+		schedctl_set_cidpri(tp);
+	}
+
+	if ((error = CL_DOPRIO(tp, CRED(), 0, &prio)) != 0)
+		return (error);
+
+	if (pcprio->pc_op == PC_GETPRIO) {
+		/*
+		 * If we are not setting the priority, we should return the
+		 * highest priority pertaining to any of the specified threads.
+		 */
+		if (prio > pcprio->pc_val) {
+			pcprio->pc_cid = tp->t_cid;
+			pcprio->pc_val = prio;
+		}
+	} else if (prio != pcprio->pc_val) {
+		/*
+		 * Try to change the priority of the thread.
+		 */
+		incr = pcprio->pc_val - prio;
+		error = CL_DOPRIO(tp, CRED(), incr, &prio);
+		schedctl_set_cidpri(tp);
+	}
+
+	return (error);
+}
+
+int
+setprocprio(proc_t *pp, pcprio_t *pcprio)
+{
+	kthread_t *tp;
+	int retval = 0;
+	int error;
+
+	ASSERT(MUTEX_HELD(&pidlock));
+	mutex_enter(&pp->p_lock);
+
+	if ((tp = pp->p_tlist) == NULL) {
+		mutex_exit(&pp->p_lock);
+		return (ESRCH);
+	}
+
+	/*
+	 * Check permissions before changing the prio value.
+	 */
+	if (pcprio->pc_op == PC_SETPRIO) {
+		if (!prochasprocperm(pp, curproc, CRED())) {
+			mutex_exit(&pp->p_lock);
+			return (EPERM);
+		}
+	}
+
+	do {
+		error = setthreadprio(pcprio, tp);
+		if (error)
+			retval = error;
+	} while ((tp = tp->t_forw) != pp->p_tlist);
+
+	mutex_exit(&pp->p_lock);
+	return (retval);
+}
+
+/*
+ * Set the class and priority of the specified LWP or set of processes.
+ */
+static int
+doprio(procset_t *procset, pcprio_t *pcprio)
+{
+	int err_proc = 0;
+	int err_thread = 0;
+	int err = 0;
+
+	/*
+	 * Sanity check.
+	 */
+	if (pcprio->pc_op != PC_GETPRIO && pcprio->pc_op != PC_SETPRIO)
+		return (EINVAL);
+	if (pcprio->pc_op == PC_SETPRIO &&
+	    (pcprio->pc_cid >= loaded_classes || pcprio->pc_cid < 1))
+		return (EINVAL);
+
+	/*
+	 * If it is a PC_GETPRIO operation then set pc_val to the smallest
+	 * possible prio value to help us find the highest priority
+	 * pertaining to any of the specified processes.
+	 */
+	if (pcprio->pc_op == PC_GETPRIO)
+		pcprio->pc_val = SHRT_MIN;
+
+	if (procset->p_lidtype != P_LWPID ||
+	    procset->p_ridtype != P_LWPID)
+		err_proc = dotoprocs(procset, setprocprio, (char *)pcprio);
+
+	if (procset->p_lidtype == P_LWPID || procset->p_ridtype == P_LWPID) {
+		err_thread = dotolwp(procset, setthreadprio, (char *)pcprio);
+		/*
+		 * dotolwp() can return with p_lock held.  This is required
+		 * for the priocntl GETPARMS case.  So, here we just release
+		 * the p_lock.
+		 */
+		if (MUTEX_HELD(&curproc->p_lock))
+			mutex_exit(&curproc->p_lock);
+
+		/*
+		 * If we were called for a single LWP, then ignore ESRCH
+		 * returned by the previous dotoprocs() call.
+		 */
+		if (err_proc == ESRCH)
+			err_proc = 0;
+	}
+
+	/*
+	 * dotoprocs() ignores the init process if it is in the set, unless
+	 * it was the only process found. We want to make sure init is not
+	 * excluded if we're going PC_GETPRIO operation.
+	 */
+	if (pcprio->pc_op == PC_GETPRIO) {
+		proc_t *initpp;
+
+		mutex_enter(&pidlock);
+		initpp = prfind(P_INITPID);
+		if (initpp != NULL && procinset(initpp, procset))
+			err = setprocprio(initpp, pcprio);
+		mutex_exit(&pidlock);
+	}
+
+	/*
+	 * We're returning the latest error here that we've got back from
+	 * the setthreadprio() or setprocprio(). That is, err_thread and/or
 	 * err_proc can be replaced by err.
 	 */
 	if (!err)
