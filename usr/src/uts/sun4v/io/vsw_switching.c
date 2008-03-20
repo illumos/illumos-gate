@@ -318,8 +318,6 @@ vsw_setup_layer2(vsw_t *vswp)
 		 */
 		rv = vsw_get_hw_maddr(vswp);
 		if (rv != 0) {
-			cmn_err(CE_WARN, "!vsw%d: Unable to setup "
-			    "layer2 switching", vswp->instance);
 			goto exit_error;
 		}
 	}

@@ -682,7 +682,7 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&vswp->mac_lock);
 
 	if (vsw_detach_ports(vswp) != 0) {
-		cmn_err(CE_WARN, "!vsw%d: Unable to detach ports",
+		cmn_err(CE_WARN, "!vsw%d: Unable to unconfigure ports",
 		    vswp->instance);
 		return (DDI_FAILURE);
 	}
@@ -941,9 +941,9 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 		} else if (strcmp(curr_mode, "routed") == 0) {
 			modes[smode_num++] = VSW_LAYER3;
 		} else {
-			cmn_err(CE_WARN, "!vsw%d: Unknown switch mode %s, "
-			    "setting to default switched mode",
-			    vswp->instance, curr_mode);
+			DWARN(vswp, "%s: Unknown switch mode %s, "
+			    "setting to default 'switched' mode",
+			    __func__, curr_mode);
 			modes[smode_num++] = VSW_LAYER2;
 		}
 		curr_mode += strlen(curr_mode) + 1;
@@ -1167,7 +1167,7 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			if (vswp->mh != NULL) {
 				ret = mac_multicst_add(vswp->mh, mca);
 				if (ret != 0) {
-					cmn_err(CE_WARN, "!vsw%d: unable to "
+					cmn_err(CE_NOTE, "!vsw%d: unable to "
 					    "add multicast address",
 					    vswp->instance);
 					mutex_exit(&vswp->mac_lock);
@@ -1185,7 +1185,7 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			vswp->mcap = mcst_p;
 			mutex_exit(&vswp->mca_lock);
 		} else {
-			cmn_err(CE_WARN, "!vsw%d: unable to add multicast "
+			cmn_err(CE_NOTE, "!vsw%d: unable to add multicast "
 			    "address", vswp->instance);
 		}
 		return (ret);
@@ -1463,6 +1463,7 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	md_t		*mdp;
 	mde_cookie_t	node;
 	uint64_t	inst;
+	int		rv;
 
 	if ((resp == NULL) || (cb_argp == NULL))
 		return (MDEG_FAILURE);
@@ -1481,9 +1482,9 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 		D2(vswp, "%s: adding node(%d) 0x%lx", __func__, idx, node);
 
-		if (vsw_port_add(vswp, mdp, &node) != 0) {
+		if ((rv = vsw_port_add(vswp, mdp, &node)) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: Unable to add new port "
-			    "(0x%lx)", vswp->instance, node);
+			    "(0x%lx), err=%d", vswp->instance, node, rv);
 		}
 	}
 
@@ -1647,9 +1648,9 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	vsw_save_lmacaddr(vswp, macaddr);
 
 	if (vsw_get_md_smodes(vswp, mdp, node, vswp->smode, &vswp->smode_num)) {
-		cmn_err(CE_WARN, "vsw%d: Unable to read %s property from "
-		    "MD, defaulting to programmed mode", vswp->instance,
-		    smode_propname);
+		DWARN(vswp, "%s: Unable to read %s property from MD, "
+		    "defaulting to 'switched' mode",
+		    __func__, smode_propname);
 
 		for (i = 0; i < NUM_SMODES; i++)
 			vswp->smode[i] = VSW_LAYER2;
@@ -1771,7 +1772,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		if ((strlen(physname) != 0) &&
 		    (ddi_parse(physname, drv,
 		    &ddi_instance) != DDI_SUCCESS)) {
-			cmn_err(CE_WARN, "!vsw%d: new device name %s is not"
+			cmn_err(CE_WARN, "!vsw%d: physical device %s is not"
 			    " a valid device name/instance",
 			    vswp->instance, physname);
 			goto fail_reconf;
@@ -1976,7 +1977,7 @@ fail_reconf:
 	return;
 
 fail_update:
-	cmn_err(CE_WARN, "!vsw%d: update of configuration failed",
+	cmn_err(CE_WARN, "!vsw%d: re-configuration failed",
 	    vswp->instance);
 }
 

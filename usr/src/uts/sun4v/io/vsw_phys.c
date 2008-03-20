@@ -122,8 +122,8 @@ vsw_get_hw_maddr(vsw_t *vswp)
 		return (1);
 
 	if (!mac_capab_get(vswp->mh, MAC_CAPAB_MULTIADDRESS, &vswp->maddr)) {
-		cmn_err(CE_WARN, "!vsw%d: device (%s) does not support "
-		    "setting multiple unicast addresses", vswp->instance,
+		cmn_err(CE_NOTE, "!vsw%d: device (%s) does not support "
+		    "programming multiple addresses", vswp->instance,
 		    vswp->physname);
 		return (1);
 	}
@@ -179,7 +179,7 @@ vsw_set_addrs(vsw_t *vswp)
 			if (rv == 0) {
 				mcap->mac_added = B_TRUE;
 			} else {
-				cmn_err(CE_WARN, "!vsw%d: unable to add "
+				cmn_err(CE_NOTE, "!vsw%d: unable to add "
 				    "multicast address: %s\n", vswp->instance,
 				    ether_sprintf((void *)&mcap->mca));
 			}
@@ -217,7 +217,7 @@ vsw_set_addrs(vsw_t *vswp)
 			if (rv == 0) {
 				mcap->mac_added = B_TRUE;
 			} else {
-				cmn_err(CE_WARN, "!vsw%d: unable to add "
+				cmn_err(CE_NOTE, "!vsw%d: unable to add "
 				    "multicast address: %s\n", vswp->instance,
 				    ether_sprintf((void *)&mcap->mca));
 			}
@@ -340,7 +340,7 @@ vsw_mac_open(vsw_t *vswp)
 		if (rv == ENOENT || rv == EBADF) {
 			return (EAGAIN);
 		} else {
-			cmn_err(CE_WARN, "vsw%d: mac_open %s failed rv:%x",
+			cmn_err(CE_WARN, "vsw%d: device (%s) open failed rv:%x",
 			    vswp->instance, vswp->physname, rv);
 			return (EIO);
 		}
@@ -653,7 +653,7 @@ vsw_set_hw_addr(vsw_t *vswp, mac_multi_addr_t *mac)
 	 * we want to flag.
 	 */
 	if (rv != ENOSPC) {
-		cmn_err(CE_WARN, "!vsw%d: error programming "
+		cmn_err(CE_NOTE, "!vsw%d: error programming "
 		    "address %s into HW err (%d)",
 		    vswp->instance, ether_sprintf((void *)mac->mma_addr), rv);
 	}
@@ -685,9 +685,9 @@ vsw_unset_hw_addr(vsw_t *vswp, int slot)
 
 	rv = vswp->maddr.maddr_remove(mah, slot);
 	if (rv != 0) {
-		cmn_err(CE_WARN, "!vsw%d: unable to remove address "
+		DWARN(vswp, "%s: unable to remove address "
 		    "from slot %d in device %s (err %d)",
-		    vswp->instance, slot, vswp->physname, rv);
+		    __func__, slot, vswp->physname, rv);
 		return (1);
 	}
 
