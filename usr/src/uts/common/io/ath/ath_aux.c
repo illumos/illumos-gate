@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,35 @@ static const char *acnames[] = {
 
 extern void ath_setup_desc(ath_t *asc, struct ath_buf *bf);
 
+
+const char *
+ath_get_hal_status_desc(HAL_STATUS status)
+{
+	static const char *hal_status_desc[] = {
+	    "No error",
+	    "No hardware present or device not yet supported",
+	    "Memory allocation failed",
+	    "Hardware didn't respond as expected",
+	    "EEPROM magic number invalid",
+	    "EEPROM version invalid",
+	    "EEPROM unreadable",
+	    "EEPROM checksum invalid",
+	    "EEPROM read problem",
+	    "EEPROM mac address invalid",
+	    "EEPROM size not supported",
+	    "Attempt to change write-locked EEPROM",
+	    "Invalid parameter to function",
+	    "Hardware revision not supported",
+	    "Hardware self-test failed",
+	    "Operation incomplete"
+	};
+
+	if (status >= 0 && status < sizeof (hal_status_desc)/sizeof (char *))
+		return (hal_status_desc[status]);
+	else
+		return ("");
+}
+
 uint32_t
 ath_calcrxfilter(ath_t *asc)
 {
@@ -92,9 +121,8 @@ ath_calcrxfilter(ath_t *asc)
 	    | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
 	if (ic->ic_opmode != IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
-	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
-	    (asc->asc_promisc & GLD_MAC_PROMISC_PHYS))	/* promiscuous */
-		rfilt |= HAL_RX_FILTER_PROM;
+	if (ic->ic_opmode != IEEE80211_M_HOSTAP && asc->asc_promisc)
+		rfilt |= HAL_RX_FILTER_PROM;	/* promiscuous */
 	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    ic->ic_opmode == IEEE80211_M_IBSS ||
 	    ic->ic_state == IEEE80211_S_SCAN)
@@ -220,13 +248,13 @@ ath_mode_init(ath_t *asc)
 	rfilt = ath_calcrxfilter(asc);
 	ATH_HAL_SETRXFILTER(ah, rfilt);
 	ATH_HAL_SETOPMODE(ah);
-	ATH_HAL_SETMCASTFILTER(ah, asc->asc_mfilt[0], asc->asc_mfilt[1]);
+	ATH_HAL_SETMCASTFILTER(ah, asc->asc_mcast_hash[0],
+	    asc->asc_mcast_hash[1]);
 	ATH_DEBUG((ATH_DBG_AUX, "ath: ath_mode_init(): "
 	    "mode =%d RX filter 0x%x, MC filter %08x:%08x\n",
 	    ic->ic_opmode, rfilt,
-	    asc->asc_mfilt[0], asc->asc_mfilt[1]));
+	    asc->asc_mcast_hash[0], asc->asc_mcast_hash[1]));
 }
-
 
 /*
  * Disable the receive h/w in preparation for a reset.
@@ -275,8 +303,8 @@ ath_getchannels(ath_t *asc, uint32_t cc, HAL_BOOL outdoor, HAL_BOOL xchanmode)
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
 	    NULL, 0, NULL, cc, HAL_MODE_ALL, outdoor, xchanmode)) {
 		ATH_DEBUG((ATH_DBG_AUX, "ath: ath_getchannels(): "
-		    "unable to get channel list\n");
-		kmem_free(chans, IEEE80211_CHAN_MAX * sizeof (HAL_CHANNEL)));
+		    "unable to get channel list\n"));
+		kmem_free(chans, IEEE80211_CHAN_MAX * sizeof (HAL_CHANNEL));
 		return (EINVAL);
 	}
 
@@ -455,8 +483,11 @@ ath_chan_set(ath_t *asc, struct ieee80211_channel *chan)
 		if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode,
 		    &hchan, AH_TRUE, &status)) {
 			ATH_DEBUG((ATH_DBG_AUX, "ath: ath_chan_set():"
-			    "unable to reset channel %u (%uMhz)\n",
-			    ieee80211_chan2ieee(ic, chan), chan->ich_freq));
+			    "unable to reset channel %u (%uMhz)\n"
+			    "flags 0x%x: '%s' (HAL status %u)\n",
+			    ieee80211_chan2ieee(ic, chan), hchan.channel,
+			    hchan.channelFlags,
+			    ath_get_hal_status_desc(status), status));
 			return (EIO);
 		}
 		asc->asc_curchan = hchan;
@@ -867,7 +898,6 @@ ath_reset(ieee80211com_t *ic)
 	struct ath_hal *ah = asc->asc_ah;
 	struct ieee80211_channel *ch;
 	HAL_STATUS status;
-	HAL_CHANNEL hchan;
 
 	/*
 	 * Convert to a HAL channel description with the flags
@@ -882,11 +912,11 @@ ath_reset(ieee80211com_t *ic)
 	if (ATH_IS_RUNNING(asc)) {
 		ath_stoprecv(asc);		/* stop recv side */
 		/* indicate channel change so we do a full reset */
-		if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode, &hchan,
-		    AH_TRUE, &status)) {
+		if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode,
+		    &asc->asc_curchan, AH_TRUE, &status)) {
 			ath_problem("ath: ath_reset(): "
-			    "resetting hardware failed, HAL status %u\n",
-			    status);
+			    "resetting hardware failed, '%s' (HAL status %u)\n",
+			    ath_get_hal_status_desc(status), status);
 		}
 		ath_chan_change(asc, ch);
 	}

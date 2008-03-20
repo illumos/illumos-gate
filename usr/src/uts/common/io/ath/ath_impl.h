@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,7 @@ extern "C" {
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 #define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
+#define	ATH_MCHASH	64		/* multicast hash table size */
 
 #define	ATH_DEF_CACHE_BYTES	32	/* default cache line size */
 
@@ -298,9 +299,9 @@ typedef struct ath {
 	uint8_t			asc_rixmap[256]; /* IEEE to h/w rate table ix */
 	HAL_INT			asc_imask;	/* interrupt mask copy */
 	struct ath_stats	asc_stats;	/* interface statistics */
-	int32_t			asc_promisc;	/* Promiscuous mode enabled */
-	uint8_t			asc_mcast_cnt[64];
-	uint32_t		asc_mfilt[2];
+	boolean_t		asc_promisc;	/* Promiscuous mode enabled */
+	uint8_t			asc_mcast_refs[ATH_MCHASH]; /* refer count */
+	uint32_t		asc_mcast_hash[2]; /* multicast hash table */
 	kmutex_t		asc_genlock;
 
 	boolean_t		asc_resched_needed;

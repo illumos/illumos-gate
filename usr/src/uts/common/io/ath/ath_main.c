@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,19 +178,34 @@ static ddi_device_acc_attr_t ath_desc_accattr = {
 /*
  * Describes the chip's DMA engine
  */
-static ddi_dma_attr_t dma_attr = {
-	DMA_ATTR_V0,			/* dma_attr version */
-	0x0000000000000000ull,		/* dma_attr_addr_lo */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi */
-	0x00000000FFFFFFFFull,		/* dma_attr_count_max */
-	0x0000000000000001ull,		/* dma_attr_align */
-	0x00000FFF,			/* dma_attr_burstsizes */
-	0x00000001,			/* dma_attr_minxfer */
-	0x000000000000FFFFull,		/* dma_attr_maxxfer */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_seg */
-	1,				/* dma_attr_sgllen */
-	0x00000001,			/* dma_attr_granular */
-	0				/* dma_attr_flags */
+static ddi_dma_attr_t ath_dma_attr = {
+	DMA_ATTR_V0,		/* version number */
+	0,			/* low address */
+	0xffffffffU,		/* high address */
+	0x3ffffU,		/* counter register max */
+	1,			/* alignment */
+	0xFFF,			/* burst sizes */
+	1,			/* minimum transfer size */
+	0x3ffffU,		/* max transfer size */
+	0xffffffffU,		/* address register max */
+	1,			/* no scatter-gather */
+	1,			/* granularity of device */
+	0,			/* DMA flags */
+};
+
+static ddi_dma_attr_t ath_desc_dma_attr = {
+	DMA_ATTR_V0,		/* version number */
+	0,			/* low address */
+	0xffffffffU,		/* high address */
+	0xffffffffU,		/* counter register max */
+	0x1000,			/* alignment */
+	0xFFF,			/* burst sizes */
+	1,			/* minimum transfer size */
+	0xffffffffU,		/* max transfer size */
+	0xffffffffU,		/* address register max */
+	1,			/* no scatter-gather */
+	1,			/* granularity of device */
+	0,			/* DMA flags */
 };
 
 static kmutex_t ath_loglock;
@@ -297,16 +312,16 @@ ath_setup_desc(ath_t *asc, struct ath_buf *bf)
  * Allocate an area of memory and a DMA handle for accessing it
  */
 static int
-ath_alloc_dma_mem(dev_info_t *devinfo, size_t memsize,
-	ddi_device_acc_attr_t *attr_p, uint_t alloc_flags,
-	uint_t bind_flags, dma_area_t *dma_p)
+ath_alloc_dma_mem(dev_info_t *devinfo, ddi_dma_attr_t *dma_attr, size_t memsize,
+    ddi_device_acc_attr_t *attr_p, uint_t alloc_flags,
+    uint_t bind_flags, dma_area_t *dma_p)
 {
 	int err;
 
 	/*
 	 * Allocate handle
 	 */
-	err = ddi_dma_alloc_handle(devinfo, &dma_attr,
+	err = ddi_dma_alloc_handle(devinfo, dma_attr,
 	    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -365,9 +380,9 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 
 	size = sizeof (struct ath_desc) * (ATH_TXBUF + ATH_RXBUF);
 
-	err = ath_alloc_dma_mem(devinfo, size, &ath_desc_accattr,
-	    DDI_DMA_CONSISTENT, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-	    &asc->asc_desc_dma);
+	err = ath_alloc_dma_mem(devinfo, &ath_desc_dma_attr, size,
+	    &ath_desc_accattr, DDI_DMA_CONSISTENT,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, &asc->asc_desc_dma);
 
 	/* virtual address of the first descriptor */
 	asc->asc_desc = (struct ath_desc *)asc->asc_desc_dma.mem_va;
@@ -399,8 +414,8 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 		list_insert_tail(&asc->asc_rxbuf_list, bf);
 
 		/* alloc DMA memory */
-		err = ath_alloc_dma_mem(devinfo, asc->asc_dmabuf_size,
-		    &ath_desc_accattr,
+		err = ath_alloc_dma_mem(devinfo, &ath_dma_attr,
+		    asc->asc_dmabuf_size, &ath_desc_accattr,
 		    DDI_DMA_STREAMING, DDI_DMA_READ | DDI_DMA_STREAMING,
 		    &bf->bf_dma);
 		if (err != DDI_SUCCESS)
@@ -417,8 +432,8 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 		list_insert_tail(&asc->asc_txbuf_list, bf);
 
 		/* alloc DMA memory */
-		err = ath_alloc_dma_mem(devinfo, asc->asc_dmabuf_size,
-		    &ath_desc_accattr,
+		err = ath_alloc_dma_mem(devinfo, &ath_dma_attr,
+		    asc->asc_dmabuf_size, &ath_desc_accattr,
 		    DDI_DMA_STREAMING, DDI_DMA_STREAMING, &bf->bf_dma);
 		if (err != DDI_SUCCESS)
 			return (err);
@@ -1590,7 +1605,8 @@ ath_m_start(void *arg)
 	if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode,
 	    &asc->asc_curchan, AH_FALSE, &status)) {
 		ATH_DEBUG((ATH_DBG_HAL, "ath: ath_m_start(): "
-		    "reset hardware failed, hal status %u\n", status));
+		    "reset hardware failed: '%s' (HAL status %u)\n",
+		    ath_get_hal_status_desc(status), status));
 		ATH_UNLOCK(asc);
 		return (ENOTACTIVE);
 	}
@@ -1652,6 +1668,7 @@ ath_m_promisc(void *arg, boolean_t on)
 		rfilt |= HAL_RX_FILTER_PROM;
 	else
 		rfilt &= ~HAL_RX_FILTER_PROM;
+	asc->asc_promisc = on;
 	ATH_HAL_SETRXFILTER(ah, rfilt);
 	ATH_UNLOCK(asc);
 
@@ -1663,31 +1680,27 @@ ath_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
 	ath_t *asc = arg;
 	struct ath_hal *ah = asc->asc_ah;
-	uint32_t mfilt[2], val, rfilt;
+	uint32_t val, index, bit;
 	uint8_t pos;
+	uint32_t *mfilt = asc->asc_mcast_hash;
 
 	ATH_LOCK(asc);
-	rfilt = ATH_HAL_GETRXFILTER(ah);
-
-	/* disable multicast */
-	if (!add) {
-		ATH_HAL_SETRXFILTER(ah, rfilt & (~HAL_RX_FILTER_MCAST));
-		ATH_UNLOCK(asc);
-		return (0);
-	}
-
-	/* enable multicast */
-	ATH_HAL_SETRXFILTER(ah, rfilt | HAL_RX_FILTER_MCAST);
-
-	mfilt[0] = mfilt[1] = 0;
-
 	/* calculate XOR of eight 6bit values */
 	val = ATH_LE_READ_4(mca + 0);
 	pos = (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
 	val = ATH_LE_READ_4(mca + 3);
 	pos ^= (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
 	pos &= 0x3f;
-	mfilt[pos / 32] |= (1 << (pos % 32));
+	index = pos / 32;
+	bit = 1 << (pos % 32);
+
+	if (add) {	/* enable multicast */
+		asc->asc_mcast_refs[pos]++;
+		mfilt[index] |= bit;
+	} else {	/* disable multicast */
+		if (--asc->asc_mcast_refs[pos] == 0)
+			mfilt[index] &= ~bit;
+	}
 	ATH_HAL_SETMCASTFILTER(ah, mfilt[0], mfilt[1]);
 
 	ATH_UNLOCK(asc);
@@ -1878,7 +1891,8 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ah = ath_hal_attach(device_id, asc, 0, regs, &status);
 	if (ah == NULL) {
 		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
-		    "unable to attach hw; HAL status %u\n", status));
+		    "unable to attach hw: '%s' (HAL status %u)\n",
+		    ath_get_hal_status_desc(status), status));
 		goto attach_fail2;
 	}
 	ATH_HAL_INTRSET(ah, 0);
@@ -2118,6 +2132,9 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 	asc->asc_invalid = 1;
+	asc->asc_promisc = B_FALSE;
+	bzero(asc->asc_mcast_refs, sizeof (asc->asc_mcast_refs));
+	bzero(asc->asc_mcast_hash, sizeof (asc->asc_mcast_hash));
 	return (DDI_SUCCESS);
 attach_fail7:
 	ddi_remove_intr(devinfo, 0, asc->asc_iblock);
@@ -2212,7 +2229,7 @@ DDI_DEFINE_STREAM_OPS(ath_dev_ops, nulldev, nulldev, ath_attach, ath_detach,
 
 static struct modldrv ath_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ath driver 1.3/HAL 0.9.17.2",	/* short description */
+	"ath driver 1.3.1/HAL 0.9.17.2",	/* short description */
 	&ath_dev_ops		/* driver specific ops */
 };
 

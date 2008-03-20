@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ int ath_key_delete(ieee80211com_t *ic, const struct ieee80211_key *k);
 int ath_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
     const uint8_t mac[IEEE80211_ADDR_LEN]);
 void ath_set_shortslot(ieee80211com_t *ic, int onoff);
+const char *ath_get_hal_status_desc(HAL_STATUS status);
 
 #ifdef __cplusplus
 }
