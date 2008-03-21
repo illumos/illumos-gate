@@ -263,6 +263,15 @@ nxge_vpd_info_get(p_nxge_t nxgep)
 	    ((nxgep->function_num == 2) || (nxgep->function_num == 3))) {
 		(void) strcpy(nxgep->vpd_info.phy_type, "mif");
 	}
+
+	/* If ARTM card, replace "mif" for the last 2 ports phy-type */
+	if ((strncmp(nxgep->vpd_info.bd_model,
+	    NXGE_ARTM_BM_STR, strlen(NXGE_ARTM_BM_STR)) == 0) &&
+	    ((nxgep->function_num == 2) || (nxgep->function_num == 3))) {
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "Replaced phy type as mif"));
+		(void) strcpy(nxgep->vpd_info.phy_type, "mif");
+	}
 }
 
 static void

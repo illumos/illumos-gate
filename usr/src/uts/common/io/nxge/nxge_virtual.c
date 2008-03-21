@@ -1981,6 +1981,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			ch_arr_p = &tx_2_10G[0];
 			break;
 		case NEPTUNE_2_10GF_2_1GC:
+		case NEPTUNE_2_10GF_2_1GRF:
 			ch_arr_p = &tx_2_10G_2_1G[0];
 			break;
 		case NEPTUNE_1_10GF_3_1GC:
@@ -2023,6 +2024,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			tx_ndmas = tx_2_10G[nxgep->function_num];
 			break;
 		case NEPTUNE_2_10GF_2_1GC:
+		case NEPTUNE_2_10GF_2_1GRF:
 			tx_ndmas = tx_2_10G_2_1G[nxgep->function_num];
 			break;
 		case NEPTUNE_1_10GF_3_1GC:
@@ -2067,6 +2069,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			ch_arr_p = &rx_2_10G[0];
 			break;
 		case NEPTUNE_2_10GF_2_1GC:
+		case NEPTUNE_2_10GF_2_1GRF:
 			ch_arr_p = &rx_2_10G_2_1G[0];
 			break;
 		case NEPTUNE_1_10GF_3_1GC:
@@ -2110,6 +2113,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			rx_ndmas = rx_2_10G[nxgep->function_num];
 			break;
 		case NEPTUNE_2_10GF_2_1GC:
+		case NEPTUNE_2_10GF_2_1GRF:
 			rx_ndmas = rx_2_10G_2_1G[nxgep->function_num];
 			break;
 		case NEPTUNE_1_10GF_3_1GC:

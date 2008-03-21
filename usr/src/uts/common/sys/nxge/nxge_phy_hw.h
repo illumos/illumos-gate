@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,8 +60,10 @@ extern "C" {
 #define	BCM8704_DEV_ID			0x206033
 #define	BCM5464R_PHY_ID			0x2060b1
 #define	BCM8706_DEV_ID			0x206035
+#define	BCM5482_PHY_ID			0x143bcb1
 #define	PHY_BCM8704_FAMILY		(BCM8704_DEV_ID & BCM_PHY_ID_MASK)
 #define	PHY_BCM5464R_FAMILY		(BCM5464R_PHY_ID & BCM_PHY_ID_MASK)
+#define	PHY_BCM5482_FAMILY		(BCM5482_PHY_ID & BCM_PHY_ID_MASK)
 
 #define	CLAUSE_45_TYPE	1
 #define	CLAUSE_22_TYPE	2

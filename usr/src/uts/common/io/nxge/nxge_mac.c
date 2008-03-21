@@ -61,7 +61,7 @@ static ether_addr_st etherzeroaddr =
  * Supported chip types
  */
 static uint32_t nxge_supported_cl45_ids[] = {BCM8704_DEV_ID, BCM8706_DEV_ID};
-static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID};
+static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID, BCM5482_PHY_ID};
 
 #define	NUM_CLAUSE_45_IDS	(sizeof (nxge_supported_cl45_ids) /	\
 				sizeof (uint32_t))
@@ -527,19 +527,6 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 					break;
 				default:
 					return (NXGE_ERROR);
-				}
-				break;
-			case P_NEPTUNE_ALONSO:
-			/*
-			 * The Alonso Neptune, xcvr port numbers for
-			 * ports 2 and 3 are not swapped. Port 2 has
-			 * the BCM5464_PORT_BASE_ADDR and port 3 has
-			 * next address.
-			 */
-				nxgep->xcvr_addr =
-				    BCM5464_NEPTUNE_PORT_ADDR_BASE;
-				if (portn == 3) {
-					nxgep->xcvr_addr += 1;
 				}
 				break;
 			default:
@@ -5309,7 +5296,7 @@ exit:
 nxge_status_t
 nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 {
-	int		i, j, k, l;
+	int		i, j, l;
 	uint32_t	pma_pmd_dev_id = 0;
 	uint32_t	pcs_dev_id = 0;
 	uint32_t	phy_id = 0;
@@ -5328,7 +5315,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	    "==> nxge_scan_ports_phy: nxge niu_type[0x%x]",
 	    nxgep->niu_type));
 
-	j = k = l = 0;
+	j = l = 0;
 	total_port_fd = total_phy_fd = 0;
 	/*
 	 * Clause 45 and Clause 22 port/phy addresses 0 through 7 are reserved
@@ -5358,11 +5345,16 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			pcs_dev_fd[i] = 1;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PCS "
 			    "dev found", i));
-			if (k < NXGE_PORTS_NEPTUNE) {
-				port_pcs_dev_id[k] = pcs_dev_id &
+			if (pma_pmd_dev_fd[i] == 1) {
+				port_pcs_dev_id[j - 1] = pcs_dev_id &
 				    BCM_PHY_ID_MASK;
-				port_fd_arr[k] = (uint8_t)i;
-				k++;
+			} else {
+				if (j < NXGE_PORTS_NEPTUNE) {
+					port_pcs_dev_id[j] = pcs_dev_id &
+					    BCM_PHY_ID_MASK;
+					port_fd_arr[j] = (uint8_t)i;
+					j++;
+				}
 			}
 		} else {
 			pcs_dev_fd[i] = 0;
@@ -5390,9 +5382,33 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	case 2:
 		switch (total_phy_fd) {
 		case 2:
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			    "Unsupported neptune type 1"));
-			goto error_exit;
+			/* 2 10G, 2 1G RGMII Fiber */
+			if ((((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
+			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY))) &&
+			    ((port_phy_id[0] == PHY_BCM5482_FAMILY) &&
+			    (port_phy_id[1] == PHY_BCM5482_FAMILY))) {
+
+				hw_p->platform_type =
+					    P_NEPTUNE_GENERIC;
+
+				hw_p->niu_type = NEPTUNE_2_10GF_2_1GRF;
+
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[1];
+				hw_p->xcvr_addr[2] = phy_fd_arr[0];
+				hw_p->xcvr_addr[3] = phy_fd_arr[1];
+
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "ARTM card with 2 10G, 2 1G"));
+			} else {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "Unsupported neptune type 1"));
+				goto error_exit;
+			}
+			break;
+
 		case 1:
 			/* TODO - 2 10G, 1 1G */
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -5688,9 +5704,21 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			goto error_exit;
 		case 2:
 			/* TODO 2 1G mode */
+			if ((port_phy_id[0] == PHY_BCM5482_FAMILY) &&
+			    (port_phy_id[1] == PHY_BCM5482_FAMILY)) {
+				hw_p->platform_type = P_NEPTUNE_GENERIC;
+				hw_p->niu_type = NEPTUNE_2_1GRF;
+				hw_p->xcvr_addr[2] = phy_fd_arr[0];
+				hw_p->xcvr_addr[3] = phy_fd_arr[1];
+			} else {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "Unsupported neptune type 16"));
+				goto error_exit;
+			}
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			    "Unsupported neptune type 16"));
-			goto error_exit;
+			    "2 RGMII Fiber ports - RTM"));
+			break;
+
 		case 1:
 			/* TODO 1 1G mode */
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,

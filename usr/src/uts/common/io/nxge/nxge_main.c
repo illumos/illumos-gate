@@ -4931,6 +4931,7 @@ nxge_get_nports(p_nxge_t nxgep)
 	case NEPTUNE_2_10GF_2_1GC:
 	case NEPTUNE_1_10GF_3_1GC:
 	case NEPTUNE_1_1GC_1_10GF_2_1GC:
+	case NEPTUNE_2_10GF_2_1GRF:
 		nports = 4;
 		break;
 	default:

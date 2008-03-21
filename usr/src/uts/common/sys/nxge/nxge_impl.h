@@ -338,6 +338,18 @@ typedef enum {
 	    (NXGE_PORT_1G_COPPER << 8) |
 	    (NXGE_PORT_1G_COPPER << 12)),
 
+	NEPTUNE_2_1GRF =
+	    (NXGE_PORT_NONE |
+	    (NXGE_PORT_NONE << 4) |
+	    (NXGE_PORT_1G_RGMII_FIBER << 8) |
+	    (NXGE_PORT_1G_RGMII_FIBER << 12)),
+
+	NEPTUNE_2_10GF_2_1GRF =
+	    (NXGE_PORT_10G_FIBRE |
+	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_1G_RGMII_FIBER << 8) |
+	    (NXGE_PORT_1G_RGMII_FIBER << 12)),
+
 	N2_NIU =
 	    (NXGE_PORT_RSVD |
 	    (NXGE_PORT_RSVD << 4) |
@@ -660,6 +672,8 @@ typedef struct _nxge_mmac_stats_t {
 #define	NXGE_ALONSO_MODEL_STR		"SUNW,CP3220"
 #define	NXGE_RFEM_BM_STR		"501-7961-01"
 #define	NXGE_RFEM_MODEL_STR		"SUNW,pcie-rfem"
+#define	NXGE_ARTM_BM_STR		"375-3544-01"
+#define	NXGE_ARTM_MODEL_STR		"SUNW,pcie-artm"
 #define	NXGE_EROM_LEN			1048576
 
 #endif
