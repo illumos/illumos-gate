@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -810,6 +810,237 @@ ipf_stack_t *ifs;
 	fr_setstatequeue(is, rev, ifs);
 }
 
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_match_ipv4addrs					    */
+/* Returns:	int -	2 strong match (same addresses, same direction)	    */
+/*			1 weak match (same address, opposite direction)	    */
+/*			0 no match					    */
+/*									    */
+/* Function matches IPv4 addresses.					    */
+/* ------------------------------------------------------------------------ */
+static int fr_match_ipv4addrs(is1, is2)
+ipstate_t *is1;
+ipstate_t *is2;
+{
+	int	rv;
+
+	if (is1->is_saddr == is2->is_saddr && is1->is_daddr == is2->is_daddr)
+		rv = 2;
+	else if (is1->is_saddr == is2->is_daddr && 
+	    is1->is_daddr == is2->is_saddr)
+		rv = 1;
+	else
+		rv = 0;
+	
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_match_ipv6addrs					    */
+/* Returns:	int - 	2 strong match (same addresses, same direction)	    */
+/*			1 weak match (same addresses, opposite direction)   */
+/*			0 no match					    */
+/*									    */
+/* Function matches IPv6 addresses.					    */
+/* ------------------------------------------------------------------------ */
+static int fr_match_ipv6addrs(is1, is2)
+ipstate_t *is1;
+ipstate_t *is2;
+{
+	int	rv;
+
+	if (IP6_EQ(&is1->is_src, &is2->is_src) && 
+	    IP6_EQ(&is1->is_dst, &is2->is_dst))  
+		rv = 2;
+	else if (IP6_EQ(&is1->is_src, &is2->is_dst) &&
+	    IP6_EQ(&is1->is_dst, &is2->is_src)) {
+		rv = 1;
+	}
+	else
+		rv = 0;
+
+	return (rv);
+}
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_match_addresses					    */
+/* Returns:	int - 	2 strong match (same addresses, same direction)	    */
+/*			1 weak match (same address, opposite directions)    */ 
+/* 			0 no match					    */
+/* Parameters:	is1, is2 pointers to states we are checking		    */
+/*									    */
+/* Matches addresses, function uses fr_match_ipvXaddrs() to deal with IPv4  */
+/* and IPv6 address format.						    */
+/* ------------------------------------------------------------------------ */
+static int fr_match_addresses(is1, is2)
+ipstate_t *is1;
+ipstate_t *is2;
+{
+	int	rv;
+
+	if (is1->is_v == 4) {
+		rv = fr_match_ipv4addrs(is1, is2);
+	}
+	else {
+		rv = fr_match_ipv6addrs(is1, is2);
+	}
+	
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_match_ppairs						    */
+/* Returns:	int - 	2 strong match (same ports, same direction)	    */
+/*			1 weak match (same ports, different direction)	    */
+/*			0 no match					    */
+/* Parameters	ppairs1, ppairs - src, dst ports we want to match.	    */
+/*									    */
+/* Matches two port_pair_t types (port pairs). Each port pair contains	    */
+/* src, dst port, which belong to session (state entry).		    */
+/* ------------------------------------------------------------------------ */
+static int fr_match_ppairs(ppairs1, ppairs2)
+port_pair_t *ppairs1;
+port_pair_t *ppairs2;
+{
+	int	rv;
+
+	if (ppairs1->pp_sport == ppairs2->pp_sport && 
+	    ppairs1->pp_dport == ppairs2->pp_dport)
+		rv = 2;
+	else if (ppairs1->pp_sport == ppairs2->pp_dport && 
+		    ppairs1->pp_dport == ppairs2->pp_sport)
+		rv = 1;
+	else
+		rv = 0;
+
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_match_l4_hdr						    */
+/* Returns:	int - 	0 no match, 					    */
+/*			1 weak match (same ports, different directions)	    */
+/*			2 strong match (same ports, same direction)	    */
+/* Parameters	is1, is2 - states we want to match			    */
+/*									    */
+/* Function matches L4 header data (source ports for TCP, UDP, CallIds for  */
+/* GRE protocol).							    */
+/* ------------------------------------------------------------------------ */
+static int fr_match_l4_hdr(is1, is2)
+ipstate_t *is1;
+ipstate_t *is2;
+{
+	int	rv = 0;
+	port_pair_t	pp1;
+	port_pair_t	pp2;
+
+	if (is1->is_p != is2->is_p)
+		return (0);
+
+	switch (is1->is_p) {
+		case	IPPROTO_TCP:
+			pp1.pp_sport = is1->is_ps.is_ts.ts_sport;
+			pp1.pp_dport = is1->is_ps.is_ts.ts_dport;
+			pp2.pp_sport = is2->is_ps.is_ts.ts_sport;
+			pp2.pp_dport = is2->is_ps.is_ts.ts_dport;
+			rv = fr_match_ppairs(&pp1, &pp2);
+			break;
+		case	IPPROTO_UDP:
+			pp1.pp_sport = is1->is_ps.is_us.us_sport;
+			pp1.pp_dport = is1->is_ps.is_us.us_dport;
+			pp2.pp_sport = is2->is_ps.is_us.us_sport;
+			pp2.pp_dport = is2->is_ps.is_us.us_dport;
+			rv = fr_match_ppairs(&pp1, &pp2);
+			break;
+		case	IPPROTO_GRE:
+			/* greinfo_t can be also interprted as port pair */
+			pp1.pp_sport = is1->is_ps.is_ug.gs_call[0];
+			pp1.pp_dport = is1->is_ps.is_ug.gs_call[1];
+			pp2.pp_sport = is2->is_ps.is_ug.gs_call[0];
+			pp2.pp_dport = is2->is_ps.is_ug.gs_call[1];
+			rv = fr_match_ppairs(&pp1, &pp2);
+			break;
+		case	IPPROTO_ICMP:
+		case	IPPROTO_ICMPV6:
+			if (bcmp(&is1->is_ps, &is2->is_ps, sizeof(icmpinfo_t)))
+				rv = 1;
+			else
+				rv = 0;
+			break;
+		default:
+			rv = 0;
+	}
+
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchstates						    */
+/* Returns:	int - nonzero match, zero no match			    */
+/* Parameters	is1, is2 - states we want to match			    */
+/*									    */
+/* The state entries are equal (identical match) if they belong to the same */
+/* session. Any time new state entry is being added the fr_addstate() 	    */
+/* function creates temporal state entry from the data it gets from IP and  */
+/* L4 header. The fr_matchstats() must be also aware of packet direction,   */
+/* which is also stored within the state entry. We should keep in mind the  */
+/* information about packet direction is spread accross L3 (addresses) and  */
+/* L4 (ports). There are three possible relationships betwee is1, is2:	    */
+/* 		- no match (match(is1, is2) == 0))			    */
+/*		- weak match same addresses (ports), but different 	    */
+/*			directions (1)	(fr_match_xxxx(is1, is2) == 1)	    */
+/*		- strong match same addresses (ports) and same directions   */
+/*			 (2) (fr_match_xxxx(is1, is2) == 2)		    */
+/*									    */
+/* There are functions, which match match addresses (L3 header) in is1, is2 */
+/* and functions, which are used to compare ports (L4 header) data. We say  */
+/* the is1 and is2 are same (identical) if there is a match		    */
+/* (fr_match_l4_hdr(is1, is2) != 0) and matchlevels are same for entries    */
+/* (fr_match_l3_hdr(is1, is2) == fr_match_l4_hdr(is1, is2)) for is1, is2.   */
+/* Such requirement deals with case as follows:				    */
+/*	suppose there are two connections between hosts A, B. Connection 1: */
+/*			a.a.a.a:12345 <=> b.b.b.b:54321			    */
+/*		Connection 2:						    */
+/*			a.a.a.a:54321 <=> b.b.b.b:12345			    */		
+/* since we've introduced match levels into our fr_matchstates(), we are    */
+/* able to identify, which packets belong to connection A and which belong  */
+/* to connection B.	Assume there are two entries is1, is2. is1 has been */
+/* from con. 1 packet, which travelled from A to B:			    */
+/*			a.a.a.a:12345 -> b.b.b.b:54321			    */
+/* while s2, has been created from packet which belongs to con. 2 and is    */
+/* also coming from A to B:						    */
+/*			a.a.a.a:54321 -> b.b.b.b:12345			    */
+/* fr_match_l3_hdr(is1, is2) == 2 -> strong match, while		    */
+/* fr_match_l4_hdr(is1, is2) == 1 -> weak match. Since match levels are	    */
+/* different the state entries are not identical -> no match as a final	    */
+/* result.								    */
+/* ------------------------------------------------------------------------ */
+static int fr_matchstates(is1, is2)
+ipstate_t *is1; 
+ipstate_t *is2;
+{
+	int	rv;
+	int	amatch;
+	int	pmatch;
+
+	if (bcmp(&is1->is_pass, &is2->is_pass,
+		 offsetof(struct ipstate, is_ps) -
+		 offsetof(struct ipstate, is_pass)) == 0) {
+		
+		pmatch = fr_match_l4_hdr(is1, is2);
+		amatch = fr_match_addresses(is1, is2);
+		/* 
+		 * If addresses match (amatch != 0), then 'match levels'
+		 * must be same for matching entries. If amatch and pmatch
+		 * have different values (different match levels), then
+		 * is1 and is2 belong to different sessions.
+		 */
+		rv = (amatch != 0) && (amatch == pmatch);
+	}
+	else
+		rv = 0;
+
+	return (rv);
+}
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_addstate                                                 */
@@ -871,14 +1102,40 @@ u_int flags;
 		}
 	}
 
-	pass = (fr == NULL) ? 0 : fr->fr_flags;
-
 	ic = NULL;
 	tcp = NULL;
 	out = fin->fin_out;
 	is = &ips;
 	bzero((char *)is, sizeof(*is));
+
+	if (fr == NULL) {
+		pass = ifs->ifs_fr_flags;
+		is->is_tag = FR_NOLOGTAG;
+	}
+	else {
+		pass = fr->fr_flags;
+	}
+
 	is->is_die = 1 + ifs->ifs_fr_ticks;
+	/*
+	 * We want to check everything that is a property of this packet,
+	 * but we don't (automatically) care about it's fragment status as
+	 * this may change.
+	 */
+	is->is_pass = pass;
+	is->is_v = fin->fin_v;
+	is->is_opt[0] = fin->fin_optmsk;
+	is->is_optmsk[0] = 0xffffffff;
+	is->is_optmsk[1] = 0xffffffff;
+	if (is->is_v == 6) {
+		is->is_opt[0] &= ~0x8;
+		is->is_optmsk[0] &= ~0x8;
+		is->is_optmsk[1] &= ~0x8;
+	}
+	is->is_sec = fin->fin_secmsk;
+	is->is_secmsk = 0xffff;
+	is->is_auth = fin->fin_auth;
+	is->is_authmsk = 0xffff;
 
 	/*
 	 * Copy and calculate...
@@ -1066,11 +1323,14 @@ u_int flags;
 	for (is = ifs->ifs_ips_table[is->is_hv % ifs->ifs_fr_statesize];
 	     is != NULL;
 	     is = is->is_hnext) {
-		if (bcmp(&ips.is_src, &is->is_src,
-			 offsetof(struct ipstate, is_ps) -
-			 offsetof(struct ipstate, is_src)) == 0)
+		if (fr_matchstates(&ips, is) == 1)
 			break;
 	}
+	
+	/*
+	 * we've found a matching state -> state already exists,
+	 * we are not going to add a duplicate record.
+	 */
 	if (is != NULL)
 		return NULL;
 
@@ -1119,9 +1379,6 @@ u_int flags;
 		    (ifp != (void *)-1)) {
 			COPYIFNAME(ifp, is->is_ifname[((1 - out) << 1) + 1], fr->fr_v);
 		}
-	} else {
-		pass = ifs->ifs_fr_flags;
-		is->is_tag = FR_NOLOGTAG;
 	}
 
 	is->is_ifp[out << 1] = fin->fin_ifp;
@@ -1135,7 +1392,6 @@ u_int flags;
 	 * have it exist at the end of fr_check() with is_ref == 1.
 	 */
 	is->is_ref = 2;
-	is->is_pass = pass;
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
 	is->is_pkts[2] = 0, is->is_bytes[2] = 0;
@@ -1153,24 +1409,6 @@ u_int flags;
 	if (pass & FR_STATESYNC)
 		is->is_flags |= IS_STATESYNC;
 
-	/*
-	 * We want to check everything that is a property of this packet,
-	 * but we don't (automatically) care about it's fragment status as
-	 * this may change.
-	 */
-	is->is_v = fin->fin_v;
-	is->is_opt[0] = fin->fin_optmsk;
-	is->is_optmsk[0] = 0xffffffff;
-	is->is_optmsk[1] = 0xffffffff;
-	if (is->is_v == 6) {
-		is->is_opt[0] &= ~0x8;
-		is->is_optmsk[0] &= ~0x8;
-		is->is_optmsk[1] &= ~0x8;
-	}
-	is->is_sec = fin->fin_secmsk;
-	is->is_secmsk = 0xffff;
-	is->is_auth = fin->fin_auth;
-	is->is_authmsk = 0xffff;
 	if (flags & (SI_WILDP|SI_WILDA)) {
 		ATOMIC_INCL(ifs->ifs_ips_stats.iss_wild);
 	}

@@ -6,7 +6,7 @@
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.68.2.5 2005/08/11 19:58:04 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -222,6 +222,11 @@ typedef	struct	ips_stat {
 	ipstate_t *iss_list;
 	u_long	*iss_bucketlen;
 } ips_stat_t;
+
+typedef struct port_pair {
+	uint16_t	pp_sport;
+	uint16_t	pp_dport;
+} port_pair_t;
 
 extern	int	fr_stateinit __P((ipf_stack_t *));
 extern	ipstate_t *fr_addstate __P((fr_info_t *, ipstate_t **, u_int));
