@@ -948,7 +948,8 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
 	}
 
 	diroff++;
-	for (dv = ddv->dv_dot; dv; dv = dv->dv_next, diroff++) {
+	for (dv = DV_FIRST_ENTRY(ddv); dv;
+	    dv = DV_NEXT_ENTRY(ddv, dv), diroff++) {
 		/*
 		 * although DDM_INTERNAL_PATH minor nodes are skipped for
 		 * readdirs outside the kernel, they still occupy directory

@@ -270,8 +270,8 @@ devnet_filldir(struct sdev_node *ddv)
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
 	}
 
-	for (dv = ddv->sdev_dot; dv; dv = next) {
-		next = dv->sdev_next;
+	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
+		next = SDEV_NEXT_ENTRY(ddv, dv);
 
 		/* skip stale nodes */
 		if (dv->sdev_flags & SDEV_STALE)

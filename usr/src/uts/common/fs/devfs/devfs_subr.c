@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -267,6 +267,18 @@ dv_mkino(dev_info_t *devi, vtype_t typ, dev_t dev)
 }
 
 /*
+ * Compare two nodes lexographically to balance avl tree
+ */
+static int
+dv_compare_nodes(const struct dv_node *dv1, const struct dv_node *dv2)
+{
+	int rv;
+	if ((rv = strcmp(dv1->dv_name, dv2->dv_name)) == 0)
+		return (0);
+	return ((rv < 0) ? -1 : 1);
+}
+
+/*
  * dv_mkroot
  *
  * Build the first VDIR dv_node.
@@ -308,6 +320,10 @@ dv_mkroot(struct vfs *vfsp, dev_t devfsdev)
 	dv->dv_busy = 0;
 	dv->dv_dflt_mode = 0;
 
+	avl_create(&dv->dv_entries,
+	    (int (*)(const void *, const void *))dv_compare_nodes,
+	    sizeof (struct dv_node), offsetof(struct dv_node, dv_avllink));
+
 	return (dv);
 }
 
@@ -332,6 +348,7 @@ dv_mkdir(struct dv_node *ddv, dev_info_t *devi, char *nm)
 	dv->dv_name = kmem_alloc(nmlen, KM_SLEEP);
 	bcopy(nm, dv->dv_name, nmlen);
 	dv->dv_namelen = nmlen - 1;	/* '\0' not included */
+
 	vp = DVTOV(dv);
 	vn_reinit(vp);
 	vp->v_flag = 0;
@@ -353,6 +370,10 @@ dv_mkdir(struct dv_node *ddv, dev_info_t *devi, char *nm)
 	dv->dv_priv = NULL;
 	dv->dv_busy = 0;
 	dv->dv_dflt_mode = 0;
+
+	avl_create(&dv->dv_entries,
+	    (int (*)(const void *, const void *))dv_compare_nodes,
+	    sizeof (struct dv_node), offsetof(struct dv_node, dv_avllink));
 
 	return (dv);
 }
@@ -378,6 +399,7 @@ dv_mknod(struct dv_node *ddv, dev_info_t *devi, char *nm,
 	dv->dv_name = kmem_alloc(nmlen, KM_SLEEP);
 	bcopy(nm, dv->dv_name, nmlen);
 	dv->dv_namelen = nmlen - 1;	/* no '\0' */
+
 	vp = DVTOV(dv);
 	vn_reinit(vp);
 	vp->v_flag = 0;
@@ -433,7 +455,6 @@ dv_destroy(struct dv_node *dv, uint_t flags)
 {
 	vnode_t *vp = DVTOV(dv);
 	ASSERT(dv->dv_nlink == 0);		/* no references */
-	ASSERT(dv->dv_next == NULL);		/* unlinked from directory */
 
 	dcmn_err4(("dv_destroy: %s\n", dv->dv_name));
 
@@ -448,6 +469,11 @@ dv_destroy(struct dv_node *dv, uint_t flags)
 		ASSERT(flags & DV_CLEAN_FORCE);
 		ASSERT(DV_STALE(dv));
 		return;
+	}
+
+	if (vp->v_type == VDIR) {
+		ASSERT(DV_FIRST_ENTRY(dv) == NULL);
+		avl_destroy(&dv->dv_entries);
 	}
 
 	if (dv->dv_attrvp != NULLVP)
@@ -469,21 +495,23 @@ dv_destroy(struct dv_node *dv, uint_t flags)
 /*
  * Find and hold dv_node by name
  */
-struct dv_node *
+static struct dv_node *
 dv_findbyname(struct dv_node *ddv, char *nm)
 {
-	struct dv_node	*dv;
-	size_t		nmlen = strlen(nm);
+	struct dv_node  *dv;
+	avl_index_t	where;
+	struct dv_node	dvtmp;
 
 	ASSERT(RW_LOCK_HELD(&ddv->dv_contents));
 	dcmn_err3(("dv_findbyname: %s\n", nm));
-	for (dv = ddv->dv_dot; dv; dv = dv->dv_next) {
-		if (dv->dv_namelen != nmlen)
-			continue;
-		if (strcmp(dv->dv_name, nm) == 0) {
-			VN_HOLD(DVTOV(dv));
-			return (dv);
-		}
+
+	dvtmp.dv_name = nm;
+	dv = avl_find(&ddv->dv_entries, &dvtmp, &where);
+	if (dv) {
+		ASSERT(dv->dv_dotdot == ddv);
+		ASSERT(strcmp(dv->dv_name, nm) == 0);
+		VN_HOLD(DVTOV(dv));
+		return (dv);
 	}
 	return (NULL);
 }
@@ -494,6 +522,8 @@ dv_findbyname(struct dv_node *ddv, char *nm)
 void
 dv_insert(struct dv_node *ddv, struct dv_node *dv)
 {
+	avl_index_t where;
+
 	ASSERT(RW_WRITE_HELD(&ddv->dv_contents));
 	ASSERT(DVTOV(ddv)->v_type == VDIR);
 	ASSERT(ddv->dv_nlink >= 2);
@@ -502,26 +532,27 @@ dv_insert(struct dv_node *ddv, struct dv_node *dv)
 	dcmn_err3(("dv_insert: %s\n", dv->dv_name));
 
 	dv->dv_dotdot = ddv;
-	dv->dv_next = ddv->dv_dot;
-	ddv->dv_dot = dv;
 	if (DVTOV(dv)->v_type == VDIR) {
 		ddv->dv_nlink++;	/* .. to containing directory */
 		dv->dv_nlink = 2;	/* name + . */
 	} else {
 		dv->dv_nlink = 1;	/* name */
 	}
+
+	/* enter node in the avl tree */
+	VERIFY(avl_find(&ddv->dv_entries, dv, &where) == NULL);
+	avl_insert(&ddv->dv_entries, dv, where);
 }
 
 /*
  * Unlink a dv_node from a perent directory
  */
 void
-dv_unlink(struct dv_node *ddv, struct dv_node *dv, struct dv_node **dv_pprev)
+dv_unlink(struct dv_node *ddv, struct dv_node *dv)
 {
 	/* verify linkage of arguments */
-	ASSERT(ddv && dv && dv_pprev);
+	ASSERT(ddv && dv);
 	ASSERT(dv->dv_dotdot == ddv);
-	ASSERT(*dv_pprev == dv);
 	ASSERT(RW_WRITE_HELD(&ddv->dv_contents));
 	ASSERT(DVTOV(ddv)->v_type == VDIR);
 
@@ -536,12 +567,10 @@ dv_unlink(struct dv_node *ddv, struct dv_node *dv, struct dv_node **dv_pprev)
 	ASSERT(ddv->dv_nlink >= 2);
 	ASSERT(dv->dv_nlink == 0);
 
-	/* update ddv->dv_dot/dv_next */
-	*dv_pprev = dv->dv_next;
-
 	dv->dv_dotdot = NULL;
-	dv->dv_next = NULL;
-	dv->dv_dot = NULL;
+
+	/* remove from avl tree */
+	avl_remove(&ddv->dv_entries, dv);
 }
 
 /*
@@ -824,10 +853,10 @@ dv_find_leafnode(dev_info_t *devi, char *minor_nm, struct ddi_minor_data *r_mi)
 		 * Skip alias nodes and nodes without a name.
 		 */
 		if ((dmd->type == DDM_ALIAS) || (dmd->ddm_name == NULL))
-			    continue;
+			continue;
 
 		dcmn_err4(("dv_find_leafnode: (%s,%s)\n",
-			minor_nm, dmd->ddm_name));
+		    minor_nm, dmd->ddm_name));
 		if (strcmp(minor_nm, dmd->ddm_name) == 0) {
 			r_mi->ddm_dev = dmd->ddm_dev;
 			r_mi->ddm_spec_type = dmd->ddm_spec_type;
@@ -1164,7 +1193,7 @@ found:
 		 * sp->s_devvp, and sp->s_dip)
 		 */
 		*vpp = specvp_devfs(vp, vp->v_rdev, vp->v_type, cred,
-			dv->dv_devi);
+		    dv->dv_devi);
 		VN_RELE(vp);
 		if (*vpp == NULLVP)
 			rv = ENOSYS;
@@ -1205,7 +1234,7 @@ dv_filldir(struct dv_node *ddv)
 
 	if (ndi_devi_config(pdevi, NDI_NO_EVENT) != NDI_SUCCESS) {
 		dcmn_err3(("dv_filldir: config error %s\n",
-			ddv->dv_name));
+		    ddv->dv_name));
 	}
 
 	ndi_devi_enter(pdevi, &circ);
@@ -1277,7 +1306,7 @@ int
 dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 {
 	struct dv_node *dv;
-	struct dv_node **pprev, **npprev;
+	struct dv_node *next;
 	struct vnode *vp;
 	int busy = 0;
 
@@ -1299,9 +1328,8 @@ dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 	    !rw_tryenter(&ddv->dv_contents, RW_WRITER))
 		return (EBUSY);
 
-	for (pprev = &ddv->dv_dot, dv = *pprev; dv;
-	    pprev = npprev, dv = *pprev) {
-		npprev = &dv->dv_next;
+	for (dv = DV_FIRST_ENTRY(ddv); dv; dv = next) {
+		next = DV_NEXT_ENTRY(ddv, dv);
 
 		/*
 		 * If devnm is specified, the non-minor portion of the
@@ -1361,7 +1389,7 @@ dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 		}
 
 		/* unlink from directory */
-		dv_unlink(ddv, dv, pprev);
+		dv_unlink(ddv, dv);
 
 		/* drop locks */
 		mutex_exit(&vp->v_lock);
@@ -1372,8 +1400,6 @@ dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 		if (vp->v_count == 0)
 			dv_destroy(dv, flags);
 
-		/* pointer to previous stays unchanged */
-		npprev = pprev;
 		continue;
 
 		/*
@@ -1407,7 +1433,7 @@ set_busy:	busy++;
 static int
 dv_reset_perm_dir(struct dv_node *ddv, uint_t flags)
 {
-	struct dv_node *dv, *next = NULL;
+	struct dv_node *dv;
 	struct vnode *vp;
 	int retval = 0;
 	struct vattr *attrp;
@@ -1418,9 +1444,8 @@ dv_reset_perm_dir(struct dv_node *ddv, uint_t flags)
 	mode_t old_mode;
 
 	rw_enter(&ddv->dv_contents, RW_WRITER);
-	for (dv = ddv->dv_dot; dv; dv = next) {
+	for (dv = DV_FIRST_ENTRY(ddv); dv; dv = DV_NEXT_ENTRY(ddv, dv)) {
 		int error = 0;
-		next = dv->dv_next;
 		nm = dv->dv_name;
 
 		rw_enter(&dv->dv_contents, RW_READER);
@@ -1454,7 +1479,7 @@ dv_reset_perm_dir(struct dv_node *ddv, uint_t flags)
 				 * No attribute vp, try to find one.
 				 */
 				dv_shadow_node(DVTOV(ddv), nm, vp,
-					NULL, NULLVP, kcred, 0);
+				    NULL, NULLVP, kcred, 0);
 			}
 			if (dv->dv_attrvp != NULLVP || dv->dv_attr == NULL) {
 				rw_exit(&dv->dv_contents);
@@ -1577,7 +1602,7 @@ devfs_remdrv_rmdir(vnode_t *dirvp, const char *dir, vnode_t *rvp)
 			break;
 
 		for (dp = dbuf; ((intptr_t)dp < (intptr_t)dbuf + dbuflen);
-			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
+		    dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
 
 			nm = dp->d_name;
 
@@ -1595,7 +1620,7 @@ devfs_remdrv_rmdir(vnode_t *dirvp, const char *dir, vnode_t *rvp)
 				continue;
 
 			ASSERT(vp->v_type == VDIR ||
-				vp->v_type == VCHR || vp->v_type == VBLK);
+			    vp->v_type == VCHR || vp->v_type == VBLK);
 
 			if (vp->v_type == VDIR) {
 				error = devfs_remdrv_rmdir(vp, nm, rvp);
@@ -1717,7 +1742,7 @@ devfs_remdrv_cleanup(const char *dir, const char *nodename)
 			break;
 
 		for (dp = dbuf; ((intptr_t)dp < (intptr_t)dbuf + dbuflen);
-			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
+		    dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
 
 			nm = dp->d_name;
 
@@ -1738,7 +1763,7 @@ devfs_remdrv_cleanup(const char *dir, const char *nodename)
 				continue;
 
 			ASSERT(vp->v_type == VDIR ||
-				vp->v_type == VCHR || vp->v_type == VBLK);
+			    vp->v_type == VCHR || vp->v_type == VBLK);
 
 			if (vp->v_type == VDIR) {
 				error = devfs_remdrv_rmdir(vp, nm, rvp);
@@ -1799,7 +1824,7 @@ dv_walk(
 
 	rw_enter(&ddv->dv_contents, RW_READER);
 	mutex_enter(&dvp->v_lock);
-	for (dv = ddv->dv_dot; dv; dv = dv->dv_next) {
+	for (dv = DV_FIRST_ENTRY(ddv); dv; dv = DV_NEXT_ENTRY(ddv, dv)) {
 		/*
 		 * If devnm is not NULL and is not the empty string,
 		 * select only dv_nodes with matching non-minor name

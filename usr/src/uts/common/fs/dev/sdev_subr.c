@@ -243,6 +243,18 @@ sdev_node_cache_fini()
 	sdev_node_cache = NULL;
 }
 
+/*
+ * Compare two nodes lexographically to balance avl tree
+ */
+static int
+sdev_compare_nodes(const struct sdev_node *dv1, const struct sdev_node *dv2)
+{
+	int rv;
+	if ((rv = strcmp(dv1->sdev_name, dv2->sdev_name)) == 0)
+		return (0);
+	return ((rv < 0) ? -1 : 1);
+}
+
 void
 sdev_set_nodestate(struct sdev_node *dv, sdev_node_state_t state)
 {
@@ -312,8 +324,6 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 	vn_exists(vp);
 
 	dv->sdev_dotdot = NULL;
-	dv->sdev_dot = NULL;
-	dv->sdev_next = NULL;
 	dv->sdev_attrvp = NULL;
 	if (vap) {
 		sdev_attrinit(dv, vap);
@@ -378,6 +388,10 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 		ASSERT(dv->sdev_dotdot);
 		ASSERT(SDEVTOV(dv->sdev_dotdot)->v_type == VDIR);
 		vp->v_rdev = SDEVTOV(dv->sdev_dotdot)->v_rdev;
+		avl_create(&dv->sdev_entries,
+		    (int (*)(const void *, const void *))sdev_compare_nodes,
+		    sizeof (struct sdev_node),
+		    offsetof(struct sdev_node, sdev_avllink));
 	} else if (type == VLNK) {
 		ASSERT(args);
 		dv->sdev_nlink = 1;
@@ -481,6 +495,11 @@ sdev_mkroot(struct vfs *vfsp, dev_t devdev, struct vnode *mvp,
 		dv->sdev_ldir_gen = 0;
 		dv->sdev_devtree_gen = 0;
 	}
+
+	avl_create(&dv->sdev_entries,
+	    (int (*)(const void *, const void *))sdev_compare_nodes,
+	    sizeof (struct sdev_node),
+	    offsetof(struct sdev_node, sdev_avllink));
 
 	rw_enter(&dv->sdev_contents, RW_WRITER);
 	sdev_set_nodestate(dv, SDEV_READY);
@@ -963,6 +982,11 @@ sdev_nodedestroy(struct sdev_node *dv, uint_t flags)
 	if (!SDEV_IS_GLOBAL(dv))
 		sdev_prof_free(dv);
 
+	if (SDEVTOV(dv)->v_type == VDIR) {
+		ASSERT(SDEV_FIRST_ENTRY(dv) == NULL);
+		avl_destroy(&dv->sdev_entries);
+	}
+
 	mutex_destroy(&dv->sdev_lookup_lock);
 	cv_destroy(&dv->sdev_lookup_cv);
 
@@ -980,25 +1004,21 @@ struct sdev_node *
 sdev_findbyname(struct sdev_node *ddv, char *nm)
 {
 	struct sdev_node *dv;
-	size_t	nmlen = strlen(nm);
+	struct sdev_node dvtmp;
+	avl_index_t	where;
 
 	ASSERT(RW_LOCK_HELD(&ddv->sdev_contents));
-	for (dv = ddv->sdev_dot; dv; dv = dv->sdev_next) {
-		if (dv->sdev_namelen != nmlen) {
-			continue;
-		}
 
-		/*
-		 * Can't lookup stale nodes
-		 */
+	dvtmp.sdev_name = nm;
+	dv = avl_find(&ddv->sdev_entries, &dvtmp, &where);
+	if (dv) {
+		ASSERT(dv->sdev_dotdot == ddv);
+		ASSERT(strcmp(dv->sdev_name, nm) == 0);
+		/* Can't lookup stale nodes */
 		if (dv->sdev_flags & SDEV_STALE) {
 			sdcmn_err9((
-			    "sdev_findbyname: skipped stale node: %s\n",
-			    dv->sdev_name));
-			continue;
-		}
-
-		if (strcmp(dv->sdev_name, nm) == 0) {
+			    "sdev_findbyname: skipped stale node: %s\n", nm));
+		} else {
 			SDEV_HOLD(dv);
 			return (dv);
 		}
@@ -1012,14 +1032,16 @@ sdev_findbyname(struct sdev_node *ddv, char *nm)
 void
 sdev_direnter(struct sdev_node *ddv, struct sdev_node *dv)
 {
+	avl_index_t where;
+
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
 	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
 	ASSERT(ddv->sdev_nlink >= 2);
 	ASSERT(dv->sdev_nlink == 0);
 
 	dv->sdev_dotdot = ddv;
-	dv->sdev_next = ddv->sdev_dot;
-	ddv->sdev_dot = dv;
+	VERIFY(avl_find(&ddv->sdev_entries, dv, &where) == NULL);
+	avl_insert(&ddv->sdev_entries, dv, where);
 	ddv->sdev_nlink++;
 }
 
@@ -1048,8 +1070,6 @@ decr_link(struct sdev_node *dv)
 static int
 sdev_dirdelete(struct sdev_node *ddv, struct sdev_node *dv)
 {
-	struct sdev_node *idv;
-	struct sdev_node *prev = NULL;
 	struct vnode *vp;
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
@@ -1079,15 +1099,7 @@ sdev_dirdelete(struct sdev_node *ddv, struct sdev_node *dv)
 		decr_link(dv);		/* . to self */
 	}
 
-	for (idv = ddv->sdev_dot; idv && idv != dv;
-	    prev = idv, idv = idv->sdev_next)
-		;
-	ASSERT(idv == dv);	/* node to be deleted must exist */
-	if (prev == NULL)
-		ddv->sdev_dot = dv->sdev_next;
-	else
-		prev->sdev_next = dv->sdev_next;
-	dv->sdev_next = NULL;
+	avl_remove(&ddv->sdev_entries, dv);
 	decr_link(dv);	/* name, back to zero */
 	vp->v_count--;
 	mutex_exit(&vp->v_lock);
@@ -1289,16 +1301,15 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 
 	/* move dir contents */
 	if (doingdir) {
-		for (idv = odv->sdev_dot; idv; idv = idv->sdev_next) {
+		for (idv = SDEV_FIRST_ENTRY(odv); idv;
+		    idv = SDEV_NEXT_ENTRY(odv, idv)) {
 			error = sdev_rnmnode(odv, idv,
 			    (struct sdev_node *)(*ndvp), &ndv,
 			    idv->sdev_name, cred);
-
 			if (error)
 				goto err_out;
 			ndv = NULL;
 		}
-
 	}
 
 	if ((*ndvp)->sdev_attrvp) {
@@ -2501,7 +2512,7 @@ sdev_stale(struct sdev_node *ddv)
 	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
 
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
-	for (dv = ddv->sdev_dot; dv; dv = dv->sdev_next) {
+	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = SDEV_NEXT_ENTRY(ddv, dv)) {
 		vp = SDEVTOV(dv);
 		if (vp->v_type == VDIR)
 			sdev_stale(dv);
@@ -2537,8 +2548,8 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 	 * We try our best to destroy all unused sdev_node's
 	 */
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
-	for (dv = ddv->sdev_dot; dv; dv = next) {
-		next = dv->sdev_next;
+	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
+		next = SDEV_NEXT_ENTRY(ddv, dv);
 		vp = SDEVTOV(dv);
 
 		if (expr && gmatch(dv->sdev_name, expr) == 0)
@@ -2845,7 +2856,8 @@ get_cache:
 
 	/* gets the cache */
 	diroff++;
-	for (dv = ddv->sdev_dot; dv; dv = dv->sdev_next, diroff++) {
+	for (dv = SDEV_FIRST_ENTRY(ddv); dv;
+	    dv = SDEV_NEXT_ENTRY(ddv, dv), diroff++) {
 		sdcmn_err3(("sdev_readdir: diroff %lld soff %lld for '%s' \n",
 		    diroff, soff, dv->sdev_name));
 
@@ -3728,8 +3740,6 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 	int clean;
 	struct sdev_node *dv = VTOSDEV(vp);
 	struct sdev_node *ddv = dv->sdev_dotdot;
-	struct sdev_node *idv;
-	struct sdev_node *prev = NULL;
 	int state;
 	struct devname_nsmap *map = NULL;
 	struct devname_ops *dirops = NULL;
@@ -3765,15 +3775,7 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 		if (vp->v_type == VDIR) {
 			dv->sdev_nlink--;
 		}
-		for (idv = ddv->sdev_dot; idv && idv != dv;
-		    prev = idv, idv = idv->sdev_next)
-			;
-		ASSERT(idv == dv);
-		if (prev == NULL)
-			ddv->sdev_dot = dv->sdev_next;
-		else
-			prev->sdev_next = dv->sdev_next;
-		dv->sdev_next = NULL;
+		avl_remove(&ddv->sdev_entries, dv);
 		dv->sdev_nlink--;
 		--vp->v_count;
 		mutex_exit(&vp->v_lock);

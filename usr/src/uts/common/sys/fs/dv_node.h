@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/fs/sdev_node.h>
 #include <sys/devpolicy.h>
+#include <sys/avl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +58,6 @@ extern "C" {
 typedef struct dv_node {
 	char		*dv_name;	/* pointer to name */
 	size_t		dv_namelen;	/* strlen(dv_name) */
-
 	struct vnode	*dv_vnode;	/* vnode for this dv_node */
 
 	/*
@@ -70,8 +70,8 @@ typedef struct dv_node {
 					/* has ndi_devi_hold on device */
 
 	struct dv_node	*dv_dotdot;	/* parent: my parent dv_node */
-	struct dv_node	*dv_dot;	/* child: VDIR: head of children */
-	struct dv_node	*dv_next;	/* sibling: next in this directory */
+	avl_tree_t	dv_entries;	/* VDIR: contents as avl tree */
+	avl_node_t	dv_avllink;	/* avl node linkage */
 
 	struct vnode	*dv_attrvp;	/* persistent attribute store */
 	struct vattr	*dv_attr;	/* attributes not yet persistent */
@@ -151,6 +151,11 @@ struct dv_fid {
 #define	DV_SHADOW_CREATE	0x01		/* create attribute node */
 #define	DV_SHADOW_WRITE_HELD	0x02		/* dv_contents write held */
 
+/*
+ * Directory tree traversal
+ */
+#define	DV_FIRST_ENTRY(ddv)	avl_first(&(ddv)->dv_entries)
+#define	DV_NEXT_ENTRY(ddv, dv)	AVL_NEXT(&(ddv)->dv_entries, (dv))
 
 extern uint_t devfs_clean_key;	/* tsd key */
 extern const char dvnm[];	/* share some space.. */
@@ -161,7 +166,6 @@ extern void dv_node_cache_fini(void);
 extern struct dv_node *dv_mkdir(struct dv_node *, dev_info_t *, char *);
 extern struct dv_node *dv_mkroot(struct vfs *, dev_t);
 extern void dv_destroy(struct dv_node *, uint_t);
-extern struct dv_node *dv_findbyname(struct dv_node *, char *);
 extern void dv_insert(struct dv_node *, struct dv_node *);
 extern void dv_shadow_node(struct vnode *, char *nm, struct vnode *,
     struct pathname *, struct vnode *, struct cred *, int);

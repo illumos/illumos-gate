@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -650,7 +650,8 @@ apply_dir_pattern(struct sdev_node *dir, char *expr, char *pathleft, int type)
 
 	/* directory pattern */
 	rw_enter(&dir->sdev_contents, RW_WRITER);
-	for (dv = dir->sdev_dot; dv; dv = dv->sdev_next) {
+
+	for (dv = SDEV_FIRST_ENTRY(dir); dv; dv = SDEV_NEXT_ENTRY(dir, dv)) {
 		if (gmatch(dv->sdev_name, expr) == 0 ||
 		    SDEVTOV(dv)->v_type != VDIR)
 			continue;

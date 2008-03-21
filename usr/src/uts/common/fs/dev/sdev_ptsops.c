@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -236,8 +236,8 @@ devpts_prunedir(struct sdev_node *ddv)
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
 	}
 
-	for (dv = ddv->sdev_dot; dv; dv = next) {
-		next = dv->sdev_next;
+	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
+		next = SDEV_NEXT_ENTRY(ddv, dv);
 
 		/* skip stale nodes */
 		if (dv->sdev_flags & SDEV_STALE)
@@ -399,7 +399,7 @@ devpts_setattr(struct vnode *vp, struct vattr *vap, int flags,
 {
 	ASSERT((vp->v_type == VCHR) || (vp->v_type == VDIR));
 	return (devname_setattr_func(vp, vap, flags, cred,
-		    devpts_set_id, AT_UID|AT_GID));
+	    devpts_set_id, AT_UID|AT_GID));
 }
 
 

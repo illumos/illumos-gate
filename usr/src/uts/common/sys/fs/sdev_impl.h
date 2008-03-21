@@ -173,8 +173,9 @@ typedef struct sdev_node {
 
 	krwlock_t	sdev_contents;	/* rw lock for this data structure */
 	struct sdev_node *sdev_dotdot;	/* parent */
-	struct sdev_node *sdev_dot;	/* child: VDIR: head of children */
-	struct sdev_node *sdev_next;	/* sibling: next in this directory */
+
+	avl_tree_t	sdev_entries;	/* VDIR: contents as avl tree */
+	avl_node_t	sdev_avllink;	/* avl node linkage */
 
 	struct vnode	*sdev_attrvp;	/* backing store vnode if persisted */
 	struct vattr	*sdev_attr;	/* memory copy of the vattr */
@@ -208,6 +209,12 @@ typedef struct sdev_node {
 #define	sdev_devtree_gen	sdev_ldata.sdev_devtree_lgen
 #define	sdev_origin		sdev_ldata.sdev_lorigin
 #define	sdev_prof		sdev_ldata.sdev_lprof
+
+/*
+ * Directory contents traversal
+ */
+#define	SDEV_FIRST_ENTRY(ddv)		avl_first(&(ddv)->sdev_entries)
+#define	SDEV_NEXT_ENTRY(ddv, dv)	AVL_NEXT(&(ddv)->sdev_entries, (dv))
 
 /*
  * sdev_state
