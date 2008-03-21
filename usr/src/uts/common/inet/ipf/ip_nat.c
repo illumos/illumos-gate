@@ -189,6 +189,10 @@ static	const int	idletime_tab[] = {
 	IPF_TTLVAL(345600),	/* 4 days */
 };
 
+#define NAT_HAS_L4_CHANGED(n)	\
+	(((n)->nat_flags & (IPN_TCPUDPICMP | IPN_ICMPQUERY)) && \
+	(n)->nat_inport != (n)->nat_outport)
+
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_natinit                                                  */
@@ -1283,6 +1287,157 @@ finished:
 	return error;
 }
 
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_calc_chksum_diffs					    */
+/* Returns:     void							    */
+/* Parameters:  nat	-	pointer to NAT table entry		    */
+/*                                                                          */
+/* Function calculates chksum deltas for IP header (nat_ipsumd) and TCP/UDP */
+/* headers (nat_sumd). The things for L4 (UDP/TCP) get complicated when     */
+/* we are dealing with partial chksum offload. For these cases we need to   */
+/* compute a 'partial chksum delta'. The 'partial chksum delta'is stored    */
+/* into nat_sumd[1], while ordinary chksum delta for TCP/UDP is in 	    */
+/* nat_sumd[0]. 							    */
+/*									    */
+/* The function accepts initialized NAT table entry and computes the deltas */
+/* from nat_inip/nat_outip members. The function is called right before	    */
+/* the new entry is inserted into the table.				    */
+/*									    */
+/* The ipsumd (IP hedaer chksum delta adjustment) is computed as a chksum   */
+/* of delta between original and new IP addresses.			    */
+/*									    */
+/* the nat_sumd[0] (TCP/UDP header chksum delta adjustment) is computed as  */
+/* a chkusm of delta between original an new IP addrress:port tupples.	    */
+/*									    */
+/* Some facts about chksum, we should remember:				    */
+/*	IP header chksum covers IP header only				    */
+/*									    */	
+/*	TCP/UDP chksum covers data payload and so called pseudo header	    */
+/*		SRC, DST IP address					    */
+/*		SRC, DST Port						    */
+/*		length of payload					    */
+/*									    */
+/* The partial chksum delta (nat_sumd[1] is used to adjust db_ckusm16	    */
+/* member of dblk_t structure. The db_ckusm16 member is not part of 	    */
+/* IP/UDP/TCP header it is 16 bit value computed by NIC driver with partial */
+/* chksum offload capacbility for every inbound packet. The db_cksum16 is   */
+/* stored along with other IP packet data in dblk_t structure and used in   */
+/* for IP/UDP/TCP chksum validation later in ip.c. 			    */
+/*									    */
+/* The partial chksum delta (adjustment, nat_sumd[1]) is computed as chksum */
+/* of delta between new and orig address. NOTE: the order of operands for   */
+/* partial delta operation is swapped compared to computing the IP/TCP/UDP  */
+/* header adjustment. It is by design see (IP_CKSUM_RECV() macro in ip.c).  */
+/*									    */
+/* ------------------------------------------------------------------------ */
+static void nat_calc_chksum_diffs(nat)
+nat_t *nat;
+{
+	u_32_t	sum_orig = 0;
+	u_32_t	sum_changed = 0;
+	u_32_t	sumd;
+	u_32_t	ipsum_orig = 0;
+	u_32_t	ipsum_changed = 0;
+
+	/*
+	 * the switch calculates operands for CALC_SUMD(),
+	 * which will compute the partial chksum delta.
+	 */
+	switch (nat->nat_dir) 
+	{
+	case NAT_INBOUND:
+		/* 
+		 * we are dealing with RDR rule (DST address gets
+		 * modified on packet from client)
+		 */
+		sum_changed = LONG_SUM(ntohl(nat->nat_inip.s_addr));
+		sum_orig = LONG_SUM(ntohl(nat->nat_outip.s_addr));
+		break;
+	case NAT_OUTBOUND:
+		/* 
+		 * we are dealing with MAP rule (SRC address gets
+		 * modified on packet from client)
+		 */
+		sum_changed = LONG_SUM(ntohl(nat->nat_outip.s_addr));
+		sum_orig = LONG_SUM(ntohl(nat->nat_inip.s_addr));
+		break;
+	default: ;
+		break;
+	}
+
+	/*
+	 * we also preserve CALC_SUMD() operands here, for IP chksum delta 
+	 * calculation, which happens at the end of function.
+	 */
+	ipsum_changed = sum_changed;
+	ipsum_orig = sum_orig;
+	/*
+	 * NOTE: the order of operands for partial chksum adjustment 
+	 * computation has to be swapped!
+	 */
+	CALC_SUMD(sum_changed, sum_orig, sumd);
+	nat->nat_sumd[1] = (sumd & 0xffff) + (sumd >> 16);
+
+	if (nat->nat_p == IPPROTO_TCP || nat->nat_p == IPPROTO_UDP) {
+		
+		/*
+		 * switch calculates operands for CALC_SUMD(), which will
+		 * compute the full chksum delta.
+		 */
+		switch (nat->nat_dir) 
+		{
+		case NAT_INBOUND:
+			sum_changed = LONG_SUM(
+					ntohl(nat->nat_inip.s_addr) +
+					ntohs(nat->nat_inport)
+				    );
+			sum_orig = LONG_SUM(
+					ntohl(nat->nat_outip.s_addr) +
+					ntohs(nat->nat_outport)
+				    );
+			break;
+		case NAT_OUTBOUND:
+			sum_changed = LONG_SUM(
+					ntohl(nat->nat_outip.s_addr) +
+					ntohs(nat->nat_outport)
+				);
+			sum_orig = LONG_SUM(
+					ntohl(nat->nat_inip.s_addr) +
+					ntohs(nat->nat_inport)
+				);
+			break;
+		default: ;
+			break;
+		}
+
+		CALC_SUMD(sum_orig, sum_changed, sumd);
+		nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
+	}
+	else
+		nat->nat_sumd[0] = nat->nat_sumd[1];
+
+	/*
+	 * we may reuse the already computed nat_sumd[0] for IP header chksum
+	 * adjustment in case the L4 (TCP/UDP header) is not changed by NAT.
+	 */
+	if (NAT_HAS_L4_CHANGED(nat)) {
+		/*
+		 * bad luck, NAT changes also the L4 header, use IP addresses
+		 * to compute chksum adjustment for IP header. 
+		 */
+		CALC_SUMD(ipsum_orig, ipsum_changed, sumd);
+		nat->nat_ipsumd = (sumd & 0xffff) + (sumd >> 16);
+	}
+	else {
+		/* 
+		 * the NAT does not change L4 hdr -> reuse chksum adjustment
+		 * for IP hdr.
+		 */
+		nat->nat_ipsumd = nat->nat_sumd[0];
+	}
+
+	return;
+}
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_natputent                                                */
@@ -1521,6 +1676,8 @@ ipf_stack_t *ifs;
 		ipnn = NULL;
 	}
 
+	nat_calc_chksum_diffs(nat);
+
 	if (getlock) {
 		WRITE_ENTER(&ifs->ifs_ipf_nat);
 	}
@@ -1713,7 +1870,6 @@ ipf_stack_t *ifs;
 		j++;
 	}
 
-	ifs->ifs_nat_stats.ns_inuse = 0;
 	return j;
 }
 
@@ -1982,17 +2138,6 @@ natinfo_t *ni;
 		nat->nat_hm = nat_hostmap(np, fin->fin_src, fin->fin_dst,
 					  nat->nat_outip, 0, ifs);
 
-	/*
-	 * The ICMP checksum does not have a pseudo header containing
-	 * the IP addresses
-	 */
-	ni->nai_sum1 = LONG_SUM(ntohl(fin->fin_saddr));
-	ni->nai_sum2 = LONG_SUM(in.s_addr);
-	if ((flags & IPN_TCPUDP)) {
-		ni->nai_sum1 += ntohs(sport);
-		ni->nai_sum2 += ntohs(port);
-	}
-
 	if (flags & IPN_TCPUDP) {
 		nat->nat_inport = sport;
 		nat->nat_outport = port;	/* sport */
@@ -2166,9 +2311,6 @@ natinfo_t *ni;
 	nat->nat_inip.s_addr = htonl(in.s_addr);
 	nat->nat_outip = fin->fin_dst;
 	nat->nat_oip = fin->fin_src;
-
-	ni->nai_sum1 = LONG_SUM(ntohl(fin->fin_daddr)) + ntohs(dport);
-	ni->nai_sum2 = LONG_SUM(in.s_addr) + ntohs(nport);
 
 	ni->nai_ip.s_addr = in.s_addr;
 	ni->nai_nport = nport;
@@ -2356,49 +2498,12 @@ int direction;
 		dport = 0;
 	}
 
-	/*
-	 * nat_sumd[0] stores adjustment value including both IP address and
-	 * port number changes. nat_sumd[1] stores adjustment value only for
-	 * IP address changes, to be used for pseudo header adjustment, in
-	 * case hardware partial checksum offload is offered.
-	 */
-	CALC_SUMD(ni.nai_sum1, ni.nai_sum2, sumd);
-	nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-	if (flags & IPN_TCPUDP) {
-		ni.nai_sum1 = LONG_SUM(in.s_addr);
-		if (direction == NAT_OUTBOUND)
-			ni.nai_sum2 = LONG_SUM(ntohl(fin->fin_saddr));
-		else
-			ni.nai_sum2 = LONG_SUM(ntohl(fin->fin_daddr));
-
-		CALC_SUMD(ni.nai_sum1, ni.nai_sum2, sumd);
-		nat->nat_sumd[1] = (sumd & 0xffff) + (sumd >> 16);
-	} else
-#endif
-		nat->nat_sumd[1] = nat->nat_sumd[0];
-
-	if ((flags & IPN_TCPUDPICMP) && ((sport != port) || (dport != nport))) {
-		if (direction == NAT_OUTBOUND)
-			ni.nai_sum1 = LONG_SUM(ntohl(fin->fin_saddr));
-		else
-			ni.nai_sum1 = LONG_SUM(ntohl(fin->fin_daddr));
-
-		ni.nai_sum2 = LONG_SUM(in.s_addr);
-
-		CALC_SUMD(ni.nai_sum1, ni.nai_sum2, sumd);
-		nat->nat_ipsumd = (sumd & 0xffff) + (sumd >> 16);
-	} else {
-		nat->nat_ipsumd = nat->nat_sumd[0];
-		if (!(flags & IPN_TCPUDPICMP)) {
-			nat->nat_sumd[0] = 0;
-			nat->nat_sumd[1] = 0;
-		}
-	}
-
 	if (nat_finalise(fin, nat, &ni, tcp, natsave, direction) == -1) {
 		goto badnat;
 	}
+
+	nat_calc_chksum_diffs(nat);
+
 	if (flags & SI_WILDP)
 		ifs->ifs_nat_stats.ns_wilds++;
 	goto done;
