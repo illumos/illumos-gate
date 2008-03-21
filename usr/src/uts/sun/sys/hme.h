@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -399,7 +399,7 @@ struct	hme {
 	uint64_t hme_tlcol;
 	uint64_t hme_toolong_errors;
 	uint64_t hme_runt;
-
+	uint64_t hme_carrier_errors;
 	uint64_t hme_jab;
 
 	uint32_t hme_cvc;
@@ -432,11 +432,6 @@ struct	hme {
 	uint32_t hme_txhung;
 	time_t hme_msg_time;
 	struct hmesave hmesave;
-
-	/*
-	 * MIB II variables
-	 */
-	uint32_t hme_newfree;
 
 	/*
 	 * Debuging kstats
@@ -483,8 +478,6 @@ struct	hmekstat {
 	struct kstat_named	hk_notmds;	/* tmd errors */
 	struct kstat_named	hk_notbufs;	/* tx buf errors */
 	struct kstat_named	hk_norbufs;	/* rx buf errors */
-
-	struct	kstat_named	hk_newfree;	/* new freemsg */
 
 	struct kstat_named	hk_inits;		/* global inits */
 	struct kstat_named	hk_rxinits;		/* recv inits */

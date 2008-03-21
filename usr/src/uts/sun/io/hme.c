@@ -244,9 +244,6 @@ static	int	hme_adv_10hdx_cap = HME_NOTUSR | 0;
  * All strings used by hme messaging functions
  */
 
-static	char *busy_msg =
-	"Driver is BUSY with upper layer";
-
 static	char *par_detect_msg =
 	"Parallel detection fault.";
 
@@ -3140,21 +3137,13 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	/*
-	 * Bug ID 4013267
-	 * This bug manifests  by allowing the driver to allow detach
-	 * while the driver is busy and subsequent packets cause
-	 * the driver to panic.
-	 */
-	if (hmep->hme_flags & (HMERUNNING | HMESUSPENDED)) {
-		HME_FAULT_MSG1(hmep, SEVERITY_LOW, CONFIG_MSG, busy_msg);
-		return (DDI_FAILURE);
-	}
-
-	/*
 	 * Make driver quiescent, we don't want to prevent the
-	 * detach on failure.
+	 * detach on failure.  Note that this should be redundant,
+	 * since mac_stop should already have called hmeuninit().
 	 */
-	(void) hmestop(hmep);
+	if (!(hmep->hme_flags & HMESUSPENDED)) {
+		(void) hmestop(hmep);
+	}
 
 	/*
 	 * Remove instance of the intr
@@ -3443,11 +3432,11 @@ hmestat_kstat_update(kstat_t *ksp, int rw)
 	 */
 
 	mutex_enter(&hmep->hme_xmitlock);
-	if (hmep->hme_flags & HMERUNNING)
+	if (hmep->hme_flags & HMERUNNING) {
 		hmereclaim(hmep);
+		hmesavecntrs(hmep);
+	}
 	mutex_exit(&hmep->hme_xmitlock);
-
-	hmesavecntrs(hmep);
 
 	hkp->hk_cvc.value.ul		= hmep->hme_cvc;
 	hkp->hk_lenerr.value.ul		= hmep->hme_lenerr;
@@ -3470,10 +3459,6 @@ hmestat_kstat_update(kstat_t *ksp, int rw)
 	hkp->hk_notmds.value.ul		= hmep->hme_notmds;
 	hkp->hk_notbufs.value.ul	= hmep->hme_notbufs;
 	hkp->hk_norbufs.value.ul	= hmep->hme_norbufs;
-	/*
-	 * MIB II kstat variables
-	 */
-	hkp->hk_newfree.value.ul	= hmep->hme_newfree;
 
 	/*
 	 * Debug kstats
@@ -3564,9 +3549,6 @@ hmestatinit(struct hme *hmep)
 	kstat_named_init(&hkp->hk_notbufs,		"no_tbufs",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_norbufs,		"no_rbufs",
-	    KSTAT_DATA_ULONG);
-
-	kstat_named_init(&hkp->hk_newfree,		"newfree",
 	    KSTAT_DATA_ULONG);
 
 	/*
@@ -3799,11 +3781,12 @@ hme_m_stat(void *arg, uint_t stat, uint64_t *val)
 	struct hme	*hmep = arg;
 
 	mutex_enter(&hmep->hme_xmitlock);
-	if (hmep->hme_flags & HMERUNNING)
+	if (hmep->hme_flags & HMERUNNING) {
 		hmereclaim(hmep);
+		hmesavecntrs(hmep);
+	}
 	mutex_exit(&hmep->hme_xmitlock);
 
-	hmesavecntrs(hmep);
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -3883,6 +3866,9 @@ hme_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 	case ETHER_STAT_TOOSHORT_ERRORS:
 		*val = hmep->hme_runt;
+		break;
+	case ETHER_STAT_CARRIER_ERRORS:
+		*val = hmep->hme_carrier_errors;
 		break;
 	case ETHER_STAT_XCVR_ADDR:
 		*val = hmep->hme_phyad;
@@ -4045,6 +4031,12 @@ hmestart_dma(struct hme *hmep, mblk_t *mp)
 	}
 
 	mutex_enter(&hmep->hme_xmitlock);
+
+	if (hmep->hme_flags & HMESUSPENDED) {
+		hmep->hme_carrier_errors++;
+		hmep->hme_oerrors++;
+		goto bad;
+	}
 
 	if (hmep->hme_tnextp > hmep->hme_tcurp) {
 		if ((hmep->hme_tnextp - hmep->hme_tcurp) > HMETPENDING)
@@ -4295,6 +4287,16 @@ hmestart(struct hme *hmep, mblk_t *mp)
 	}
 
 	mutex_enter(&hmep->hme_xmitlock);
+
+	if (hmep->hme_flags & HMESUSPENDED) {
+		/*
+		 * If trying to send while suspended, just drop the packet
+		 * on the floor.  Ethernet is best effort only.
+		 */
+		hmep->hme_carrier_errors++;
+		hmep->hme_oerrors++;
+		goto bad;
+	}
 
 	/*
 	 * reclaim if there are more than HMETPENDING descriptors

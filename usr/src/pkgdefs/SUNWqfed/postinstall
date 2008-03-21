@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -95,7 +95,8 @@ check_add_drv()
 		then
 			for i in $alias
 			do
-				/usr/bin/egrep "^$drvname[ 	]+$i" $BASEDIR/etc/driver_aliases>/dev/null 2>&1
+				a=`echo $i | sed -e 's/"//g'`
+				/usr/bin/egrep "^$drvname[ 	\"]+$a" $BASEDIR/etc/driver_aliases>/dev/null 2>&1
 				if [ $? -ne 0 ]
 				then
 					echo "$drvname $i" >> $BASEDIR/etc/driver_aliases	
