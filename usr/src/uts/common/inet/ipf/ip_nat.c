@@ -2356,14 +2356,11 @@ nat_t **natsave;
 u_int flags;
 int direction;
 {
-	u_short port = 0, sport = 0, dport = 0, nport = 0;
 	tcphdr_t *tcp = NULL;
 	hostmap_t *hm = NULL;
-	struct in_addr in;
 	nat_t *nat, *natl;
 	u_int nflags;
 	natinfo_t ni;
-	u_32_t sumd;
 	int move;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
@@ -2457,7 +2454,6 @@ int direction;
 			goto badnat;
 
 		np = ni.nai_np;
-		in = ni.nai_ip;
 	} else {
 		/*
 		 * NAT_INBOUND is used only for redirects rules
@@ -2475,10 +2471,7 @@ int direction;
 			goto badnat;
 
 		np = ni.nai_np;
-		in = ni.nai_ip;
 	}
-	port = ni.nai_port;
-	nport = ni.nai_nport;
 
 	if ((move == 1) && (np->in_flags & IPN_ROUNDR)) {
 		if (np->in_redir == NAT_REDIRECT) {
@@ -2488,14 +2481,6 @@ int direction;
 			nat_delnat(np);
 			nat_addnat(np, ifs);
 		}
-	}
-
-	if (flags & IPN_TCPUDP) {
-		sport = ni.nai_sport;
-		dport = ni.nai_dport;
-	} else if (flags & IPN_ICMPQUERY) {
-		sport = ni.nai_sport;
-		dport = 0;
 	}
 
 	if (nat_finalise(fin, nat, &ni, tcp, natsave, direction) == -1) {
