@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 #include <sys/atomic.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
+#include <sys/archsystm.h>
 
 #include <vm/as.h>
 
@@ -965,45 +966,70 @@ swtch_from_zombie()
 }
 
 #if defined(DEBUG) && (defined(DISP_DEBUG) || defined(lint))
+
+/*
+ * search_disp_queues()
+ *	Search the given dispatch queues for thread tp.
+ *	Return 1 if tp is found, otherwise return 0.
+ */
+static int
+search_disp_queues(disp_t *dp, kthread_t *tp)
+{
+	dispq_t		*dq;
+	dispq_t		*eq;
+
+	disp_lock_enter_high(&dp->disp_lock);
+
+	for (dq = dp->disp_q, eq = dp->disp_q_limit; dq < eq; ++dq) {
+		kthread_t	*rp;
+
+		ASSERT(dq->dq_last == NULL || dq->dq_last->t_link == NULL);
+
+		for (rp = dq->dq_first; rp; rp = rp->t_link)
+			if (tp == rp) {
+				disp_lock_exit_high(&dp->disp_lock);
+				return (1);
+			}
+	}
+	disp_lock_exit_high(&dp->disp_lock);
+
+	return (0);
+}
+
+/*
+ * thread_on_queue()
+ *	Search all per-CPU dispatch queues and all partition-wide kpreempt
+ *	queues for thread tp. Return 1 if tp is found, otherwise return 0.
+ */
 static int
 thread_on_queue(kthread_t *tp)
 {
-	cpu_t	*cp;
-	cpu_t	*self;
-	disp_t	*dp;
+	cpu_t		*cp;
+	struct cpupart	*part;
 
-	self = CPU;
-	cp = self->cpu_next_onln;
-	dp = cp->cpu_disp;
-	for (;;) {
-		dispq_t		*dq;
-		dispq_t		*eq;
+	ASSERT(getpil() >= DISP_LEVEL);
 
-		disp_lock_enter_high(&dp->disp_lock);
-		for (dq = dp->disp_q, eq = dp->disp_q_limit; dq < eq; ++dq) {
-			kthread_t	*rp;
+	/*
+	 * Search the per-CPU dispatch queues for tp.
+	 */
+	cp = CPU;
+	do {
+		if (search_disp_queues(cp->cpu_disp, tp))
+			return (1);
+	} while ((cp = cp->cpu_next_onln) != CPU);
 
-			ASSERT(dq->dq_last == NULL ||
-			    dq->dq_last->t_link == NULL);
-			for (rp = dq->dq_first; rp; rp = rp->t_link)
-				if (tp == rp) {
-					disp_lock_exit_high(&dp->disp_lock);
-					return (1);
-				}
-		}
-		disp_lock_exit_high(&dp->disp_lock);
-		if (cp == NULL)
-			break;
-		if (cp == self) {
-			cp = NULL;
-			dp = &cp->cpu_part->cp_kp_queue;
-		} else {
-			cp = cp->cpu_next_onln;
-			dp = cp->cpu_disp;
-		}
-	}
+	/*
+	 * Search the partition-wide kpreempt queues for tp.
+	 */
+	part = CPU->cpu_part;
+	do {
+		if (search_disp_queues(&part->cp_kp_queue, tp))
+			return (1);
+	} while ((part = part->cp_next) != CPU->cpu_part);
+
 	return (0);
-}	/* end of thread_on_queue */
+}
+
 #else
 
 #define	thread_on_queue(tp)	0	/* ASSERT must be !thread_on_queue */
