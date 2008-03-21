@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,18 +66,31 @@ static const char *project_attrs[] = {
 static int
 _nss_ldap_proj2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int nss_result, buflen;
-	unsigned long len = 0;
-	char *buffer, *comment, *user_str, *group_str, *attr_str;
-	ns_ldap_result_t *result = be->result;
-	char **name, **id, **descr, **users, **groups, **attr;
+	int			i;
+	int			nss_result;
+	int			buflen = 0, len;
+	int			firsttime;
+	char			*buffer, *comment, *attr_str;
+	ns_ldap_result_t	*result = be->result;
+	char			**name, **id, **descr, **attr;
+	ns_ldap_attr_t		*users, *groups;
 
 	if (result == NULL)
 		return (NSS_STR_PARSE_PARSE);
 	buflen = argp->buf.buflen;
 
+	if (argp->buf.result != NULL) {
+		/* In all cases it must be deallocated by caller */
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_proj2str;
+		}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+
 	nss_result = NSS_STR_PARSE_SUCCESS;
-	(void) memset(argp->buf.buffer, 0, buflen);
+	(void) memset(buffer, 0, buflen);
 
 	name = __ns_ldap_getAttr(result->entry, _PROJ_NAME);
 	if (name == NULL || name[0] == NULL || (strlen(name[0]) < 1)) {
@@ -92,23 +105,53 @@ _nss_ldap_proj2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	descr = __ns_ldap_getAttr(result->entry, _PROJ_DESCR);
 	if (descr == NULL || descr[0] == NULL || (strlen(descr[0]) < 1))
 		comment = _NO_VALUE;
-
 	else
 		comment = descr[0];
+	len = snprintf(buffer, buflen, "%s:%s:%s:", name[0], id[0],
+	    comment);
+	TEST_AND_ADJUST(len, buffer, buflen, result_proj2str);
 
-	users = __ns_ldap_getAttr(result->entry, _PROJ_USERS);
-	if (users == NULL || users[0] == NULL || (strlen(users[0]) < 1))
-		user_str = _NO_VALUE;
+	users = __ns_ldap_getAttrStruct(result->entry, _PROJ_USERS);
+	if (!(users == NULL || users->attrvalue == NULL)) {
+		firsttime = 1;
+		for (i = 0; i < users->value_count; i++) {
+			if (users->attrvalue[i] == NULL) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_proj2str;
+			}
+			if (firsttime) {
+				len = snprintf(buffer, buflen, "%s",
+				    users->attrvalue[i]);
+				firsttime = 0;
+			} else {
+				len = snprintf(buffer, buflen, ",%s",
+				    users->attrvalue[i]);
+			}
+			TEST_AND_ADJUST(len, buffer, buflen, result_proj2str);
+		}
+	}
+	len = snprintf(buffer, buflen, ":");
+	TEST_AND_ADJUST(len, buffer, buflen, result_proj2str);
 
-	else
-		user_str = users[0];
-
-	groups = __ns_ldap_getAttr(result->entry, _PROJ_GROUPS);
-	if (groups == NULL || groups[0] == NULL || (strlen(groups[0]) < 1))
-		group_str = _NO_VALUE;
-
-	else
-		group_str = groups[0];
+	groups = __ns_ldap_getAttrStruct(result->entry, _PROJ_GROUPS);
+	if (!(groups == NULL || groups->attrvalue == NULL)) {
+		firsttime = 1;
+		for (i = 0; i < groups->value_count; i++) {
+			if (groups->attrvalue[i] == NULL) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_proj2str;
+			}
+			if (firsttime) {
+				len = snprintf(buffer, buflen, "%s",
+				    groups->attrvalue[i]);
+				firsttime = 0;
+			} else {
+				len = snprintf(buffer, buflen, ",%s",
+				    groups->attrvalue[i]);
+			}
+			TEST_AND_ADJUST(len, buffer, buflen, result_proj2str);
+		}
+	}
 
 	attr = __ns_ldap_getAttr(result->entry, _PROJ_ATTR);
 	if (attr == NULL || attr[0] == NULL || (strlen(attr[0]) < 1))
@@ -116,28 +159,12 @@ _nss_ldap_proj2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 
 	else
 		attr_str = attr[0];
+	len = snprintf(buffer, buflen, ":%s", attr_str);
+	TEST_AND_ADJUST(len, buffer, buflen, result_proj2str);
 
-	/* 6 = 5 ':' + 1 '\0' */
-	len = strlen(name[0]) + strlen(id[0]) + strlen(comment) +
-		strlen(user_str) + strlen(group_str) + strlen(attr_str) + 6;
-	if (len >= buflen) {
-		nss_result = NSS_STR_PARSE_ERANGE;
-		goto result_proj2str;
-	}
-	if (argp->buf.result != NULL) {
-		if ((be->buffer = calloc(1, len)) == NULL) {
-			nss_result = NSS_STR_PARSE_PARSE;
-			goto result_proj2str;
-		}
-		buffer = be->buffer;
-		/* The front end marshaller does not need trailing nulls */
-		be->buflen = len - 1;
-	} else
-		buffer = argp->buf.buffer;
-
-	(void) snprintf(buffer, len, "%s:%s:%s:%s:%s:%s", name[0], id[0],
-			comment, user_str, group_str, attr_str);
-
+	/* The front end marshaller doesn't need the trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 result_proj2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
@@ -158,10 +185,10 @@ getbyname(ldap_backend_ptr be, void *a)
 	char searchfilter[SEARCHFILTERLEN];
 
 	if (snprintf(searchfilter, SEARCHFILTERLEN,
-		_F_GETPROJNAME, argp->key.name) < 0)
+	    _F_GETPROJNAME, argp->key.name) < 0)
 		return (NSS_NOTFOUND);
-	return (_nss_ldap_lookup(be, argp, _PROJECT, searchfilter, NULL,
-			NULL, NULL));
+	return (_nss_ldap_lookup(be, argp, _PROJECT, searchfilter, NULL, NULL,
+	    NULL));
 }
 
 
@@ -178,11 +205,11 @@ getbyprojid(ldap_backend_ptr be, void *a)
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
 	char searchfilter[SEARCHFILTERLEN];
 
-	if (snprintf(searchfilter, SEARCHFILTERLEN,
-		_F_GETPROJID, (long)argp->key.projid) < 0)
+	if (snprintf(searchfilter, SEARCHFILTERLEN, _F_GETPROJID,
+	    (long)argp->key.projid) < 0)
 		return (NSS_NOTFOUND);
-	return (_nss_ldap_lookup(be, argp, _PROJECT, searchfilter, NULL,
-			NULL, NULL));
+	return (_nss_ldap_lookup(be, argp, _PROJECT, searchfilter, NULL, NULL,
+	    NULL));
 }
 
 static ldap_backend_op_t project_ops[] = {
