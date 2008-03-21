@@ -131,6 +131,7 @@ static int	nd_ill_forward_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static int	nd_ill_forward_set(queue_t *q, mblk_t *mp,
 		    char *value, caddr_t cp, cred_t *ioc_cr);
 
+static boolean_t ill_is_quiescent(ill_t *);
 static boolean_t ip_addr_ok_v4(ipaddr_t addr, ipaddr_t subnet_mask);
 static ip_m_t	*ip_m_lookup(t_uscalar_t mac_type);
 static int	ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q,
@@ -6216,7 +6217,7 @@ ipif_lookup_remote(ill_t *ill, ipaddr_t addr, zoneid_t zoneid)
  * the caller has taken steps to that effect, then this func
  * can be used to determine whether the ill has become quiescent
  */
-boolean_t
+static boolean_t
 ill_is_quiescent(ill_t *ill)
 {
 	ipif_t	*ipif;
@@ -6224,12 +6225,29 @@ ill_is_quiescent(ill_t *ill)
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-		if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0) {
+		if (ipif->ipif_refcnt != 0 || !IPIF_DOWN_OK(ipif)) {
 			return (B_FALSE);
 		}
 	}
-	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0 ||
-	    ill->ill_nce_cnt != 0) {
+	if (!ILL_DOWN_OK(ill) || ill->ill_refcnt != 0) {
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+boolean_t
+ill_is_freeable(ill_t *ill)
+{
+	ipif_t	*ipif;
+
+	ASSERT(MUTEX_HELD(&ill->ill_lock));
+
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		if (ipif->ipif_refcnt != 0 || !IPIF_FREE_OK(ipif)) {
+			return (B_FALSE);
+		}
+	}
+	if (!ILL_FREE_OK(ill) || ill->ill_refcnt != 0) {
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -6247,7 +6265,7 @@ ipif_is_quiescent(ipif_t *ipif)
 
 	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 
-	if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0) {
+	if (ipif->ipif_refcnt != 0 || !IPIF_DOWN_OK(ipif)) {
 		return (B_FALSE);
 	}
 
@@ -6258,7 +6276,37 @@ ipif_is_quiescent(ipif_t *ipif)
 	}
 
 	/* This is the last ipif going down or being deleted on this ill */
-	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0) {
+	if (!ILL_DOWN_OK(ill) || ill->ill_refcnt != 0) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * return true if the ipif can be destroyed: the ipif has to be quiescent
+ * with zero references from ire/nce/ilm to it.
+ */
+static boolean_t
+ipif_is_freeable(ipif_t *ipif)
+{
+
+	ill_t *ill;
+
+	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
+
+	if (ipif->ipif_refcnt != 0 || !IPIF_FREE_OK(ipif)) {
+		return (B_FALSE);
+	}
+
+	ill = ipif->ipif_ill;
+	if (ill->ill_ipif_up_count != 0 || ill->ill_ipif_dup_count != 0 ||
+	    ill->ill_logical_down) {
+		return (B_TRUE);
+	}
+
+	/* This is the last ipif going down or being deleted on this ill */
+	if (!ILL_FREE_OK(ill) || ill->ill_refcnt != 0) {
 		return (B_FALSE);
 	}
 
@@ -6280,7 +6328,8 @@ ill_quiescent_to_move(ill_t *ill)
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		if (ipif->ipif_state_flags & IPIF_MOVING) {
-			if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0) {
+			if (ipif->ipif_refcnt != 0 ||
+			    !IPIF_DOWN_OK(ipif)) {
 				return (ipif);
 			}
 		}
@@ -6306,7 +6355,7 @@ ipif_ill_refrele_tail(ill_t *ill)
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 
 	if ((ill->ill_state_flags & ILL_CONDEMNED) &&
-	    ill_is_quiescent(ill)) {
+	    ill_is_freeable(ill)) {
 		/* ill_close may be waiting */
 		cv_broadcast(&ill->ill_cv);
 	}
@@ -6322,7 +6371,7 @@ ipif_ill_refrele_tail(ill_t *ill)
 	    ipsq->ipsq_pending_ipif != NULL);
 	/*
 	 * ipif->ipif_refcnt must go down to zero for restarting REMOVEIF.
-	 * Last ipif going down needs to down the ill, so ill_ire_cnt must
+	 * Last ipif going down needs to down the ill, so ill_cnt_ire must
 	 * be zero for restarting an ioctl that ends up downing the ill.
 	 */
 	ipif = ipsq->ipsq_pending_ipif;
@@ -6334,25 +6383,34 @@ ipif_ill_refrele_tail(ill_t *ill)
 
 	switch (ipsq->ipsq_waitfor) {
 	case IPIF_DOWN:
-	case IPIF_FREE:
 		if (!ipif_is_quiescent(ipif)) {
+			mutex_exit(&ill->ill_lock);
+			return;
+		}
+		break;
+	case IPIF_FREE:
+		if (!ipif_is_freeable(ipif)) {
 			mutex_exit(&ill->ill_lock);
 			return;
 		}
 		break;
 
 	case ILL_DOWN:
+		if (!ill_is_quiescent(ill)) {
+			mutex_exit(&ill->ill_lock);
+			return;
+		}
+		break;
 	case ILL_FREE:
 		/*
 		 * case ILL_FREE arises only for loopback. otherwise ill_delete
 		 * waits synchronously in ip_close, and no message is queued in
 		 * ipsq_pending_mp at all in this case
 		 */
-		if (!ill_is_quiescent(ill)) {
+		if (!ill_is_freeable(ill)) {
 			mutex_exit(&ill->ill_lock);
 			return;
 		}
-
 		break;
 
 	case ILL_MOVE_OK:
@@ -6360,7 +6418,6 @@ ipif_ill_refrele_tail(ill_t *ill)
 			mutex_exit(&ill->ill_lock);
 			return;
 		}
-
 		break;
 	default:
 		cmn_err(CE_PANIC, "ipsq: %p unknown ipsq_waitfor %d\n",
@@ -6372,11 +6429,10 @@ ipif_ill_refrele_tail(ill_t *ill)
 	 * does a refrele
 	 */
 	ill_refhold_locked(ill);
+	mp = ipsq_pending_mp_get(ipsq, &connp);
 	mutex_exit(&ill->ill_lock);
 
-	mp = ipsq_pending_mp_get(ipsq, &connp);
 	ASSERT(mp != NULL);
-
 	/*
 	 * NOTE: all of the qwriter_ip() calls below use CUR_OP since
 	 * we can only get here when the current operation decides it
@@ -10795,7 +10851,7 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			ASSERT(ill->ill_group == NULL);
 
 			/* Are any references to this ill active */
-			if (ill_is_quiescent(ill)) {
+			if (ill_is_freeable(ill)) {
 				mutex_exit(&ill->ill_lock);
 				mutex_exit(&connp->conn_lock);
 				ill_delete_tail(ill);
@@ -10901,13 +10957,14 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	mutex_enter(&connp->conn_lock);
 	mutex_enter(&ill->ill_lock);
 
+
 	/* Are any references to this ipif active */
-	if (ipif->ipif_refcnt == 0 && ipif->ipif_ire_cnt == 0) {
+	if (ipif_is_freeable(ipif)) {
 		mutex_exit(&ill->ill_lock);
 		mutex_exit(&connp->conn_lock);
 		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
-		ipif_free_tail(ipif);
+		ipif_free_tail(ipif); /* frees ipif */
 		return (0);
 	}
 	success = ipsq_pending_mp_add(connp, ipif, CONNP_TO_WQ(connp), mp,
@@ -15266,7 +15323,9 @@ redo:
 		new_lb_ire_used = B_TRUE;
 		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_inserted);
 		new_lb_ire->ire_bucket->irb_ire_cnt++;
-		new_lb_ire->ire_ipif->ipif_ire_cnt++;
+		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), new_lb_ire->ire_ipif,
+		    (char *), "ire", (void *), new_lb_ire);
+		new_lb_ire->ire_ipif->ipif_cnt_ire++;
 
 		if (clear_ire_stq != NULL) {
 			/* Set the max_frag before adding the ire */
@@ -15289,8 +15348,14 @@ redo:
 			BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
 			    ire_stats_inserted);
 			new_nlb_ire->ire_bucket->irb_ire_cnt++;
-			new_nlb_ire->ire_ipif->ipif_ire_cnt++;
-			((ill_t *)new_nlb_ire->ire_stq->q_ptr)->ill_ire_cnt++;
+			DTRACE_PROBE3(ipif__incr__cnt,
+			    (ipif_t *), new_nlb_ire->ire_ipif,
+			    (char *), "ire", (void *), new_nlb_ire);
+			new_nlb_ire->ire_ipif->ipif_cnt_ire++;
+			DTRACE_PROBE3(ill__incr__cnt,
+			    (ill_t *), new_nlb_ire->ire_stq->q_ptr,
+			    (char *), "ire", (void *), new_nlb_ire);
+			((ill_t *)(new_nlb_ire->ire_stq->q_ptr))->ill_cnt_ire++;
 		}
 	}
 	rw_exit(&irb->irb_lock);
@@ -16573,9 +16638,11 @@ conn_move(conn_t *connp, caddr_t arg)
 				continue;
 			}
 
+			mutex_enter(&to_ill->ill_lock);
 			ret_ilm = ilm_lookup_ill_index_v6(to_ill,
 			    &ilg->ilg_v6group, ilg->ilg_orig_ifindex,
 			    connp->conn_zoneid);
+			mutex_exit(&to_ill->ill_lock);
 
 			if (ret_ilm != NULL)
 				connp->conn_ilg[i].ilg_ill = to_ill;
@@ -18370,11 +18437,14 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  *
  * The following members in ipif_t track references to the ipif.
  *	int     ipif_refcnt;    Active reference count
- *	uint_t  ipif_ire_cnt;   Number of ire's referencing this ipif
+ *	uint_t  ipif_cnt_ire;   Number of ire's referencing this ipif
+ *	uint_t  ipif_cnt_ilm;   Number of ilms's references this ipif.
+ *
  * The following members in ill_t track references to the ill.
  *	int             ill_refcnt;     active refcnt
- *	uint_t          ill_ire_cnt;	Number of ires referencing ill
- *	uint_t          ill_nce_cnt;	Number of nces referencing ill
+ *	uint_t          ill_cnt_ire;	Number of ires referencing ill
+ *	uint_t          ill_cnt_nce;	Number of nces referencing ill
+ *	uint_t          ill_cnt_ilm;	Number of ilms referencing ill
  *
  * Reference to an ipif or ill can be obtained in any of the following ways.
  *
@@ -18388,17 +18458,21 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  * references to the ipif / ill. Pointers from other structures do not
  * count towards this reference count.
  *
- * ipif_ire_cnt/ill_ire_cnt is the number of ire's associated with the
- * ipif/ill. This is incremented whenever a new ire is created referencing the
- * ipif/ill. This is done atomically inside ire_add_v[46] where the ire is
- * actually added to the ire hash table. The count is decremented in
- * ire_inactive where the ire is destroyed.
+ * ipif_cnt_ire/ill_cnt_ire is the number of ire's
+ * associated with the ipif/ill. This is incremented whenever a new
+ * ire is created referencing the ipif/ill. This is done atomically inside
+ * ire_add_v[46] where the ire is actually added to the ire hash table.
+ * The count is decremented in ire_inactive where the ire is destroyed.
  *
  * nce's reference ill's thru nce_ill and the count of nce's associated with
- * an ill is recorded in ill_nce_cnt. This is incremented atomically in
+ * an ill is recorded in ill_cnt_nce. This is incremented atomically in
  * ndp_add_v4()/ndp_add_v6() where the nce is actually added to the
  * table. Similarly it is decremented in ndp_inactive() where the nce
  * is destroyed.
+ *
+ * ilm's reference to the ipif (for IPv4 ilm's) or the ill (for IPv6 ilm's)
+ * is incremented in ilm_add_v6() and decremented before the ilm is freed
+ * in ilm_walker_cleanup() or ilm_delete().
  *
  * Flow of ioctls involving interface down/up
  *
@@ -18431,8 +18505,9 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  * zero and the ipif will quiesce, once all threads that currently hold a
  * reference to the ipif refrelease the ipif. The ipif is quiescent after the
  * ipif_refcount has dropped to zero and all ire's associated with this ipif
- * have also been ire_inactive'd. i.e. when ipif_ire_cnt and ipif_refcnt both
- * drop to zero.
+ * have also been ire_inactive'd. i.e. when ipif_cnt_{ire, ill} and
+ * ipif_refcnt both drop to zero. See also: comments above IPIF_DOWN_OK()
+ * in ip.h
  *
  * Lookups during the IPIF_CHANGING/ILL_CHANGING interval.
  *
@@ -18964,18 +19039,7 @@ ipif_free_tail(ipif_t *ipif)
 	 * of ipifs hanging off the ill.
 	 */
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
-	/*
-	 * Remove all IPv4 multicast memberships on the interface now.
-	 * IPv6 is not handled here as the multicast memberships are
-	 * tied to the ill rather than the ipif.
-	 */
-	ilm_free(ipif);
 
-	/*
-	 * Since we held the ill_g_lock while doing the ilm_free above,
-	 * we can assert the ilms were really deleted and not just marked
-	 * ILM_DELETED.
-	 */
 	ASSERT(ilm_walk_ipif(ipif) == 0);
 
 #ifdef DEBUG

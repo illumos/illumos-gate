@@ -6309,12 +6309,12 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	}
 
 	if (CLASSD(dst)) {
-		ilm_t *ilm;
+		boolean_t ilm_exists;
 
 		ILM_WALKER_HOLD(ill);
-		ilm = ilm_lookup_ill(ill, dst, ALL_ZONES);
+		ilm_exists = (ilm_lookup_ill(ill, dst, ALL_ZONES) != NULL);
 		ILM_WALKER_RELE(ill);
-		if (ilm != NULL) {
+		if (ilm_exists) {
 			ip_multicast_loopback(q, ill, mp,
 			    connp->conn_multicast_loop ? 0 :
 			    IP_FF_NO_MCAST_LOOP, zoneid);

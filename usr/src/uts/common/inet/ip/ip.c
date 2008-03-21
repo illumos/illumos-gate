@@ -5431,7 +5431,7 @@ ip_modclose(ill_t *ill)
 	/*
 	 * Call ill_delete to bring down the ipifs, ilms and ill on
 	 * this ill. Then wait for the refcnts to drop to zero.
-	 * ill_is_quiescent checks whether the ill is really quiescent.
+	 * ill_is_freeable checks whether the ill is really quiescent.
 	 * Then make sure that threads that are waiting to enter the
 	 * ipsq have seen the error returned by ipsq_enter and have
 	 * gone away. Then we call ill_delete_tail which does the
@@ -5439,7 +5439,7 @@ ip_modclose(ill_t *ill)
 	 */
 	ill_delete(ill);
 	mutex_enter(&ill->ill_lock);
-	while (!ill_is_quiescent(ill))
+	while (!ill_is_freeable(ill))
 		cv_wait(&ill->ill_cv, &ill->ill_lock);
 	while (ill->ill_waiters)
 		cv_wait(&ill->ill_cv, &ill->ill_lock);

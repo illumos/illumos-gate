@@ -196,7 +196,7 @@ extern	void	ill_set_ndmp(ill_t *, mblk_t *, uint_t, uint_t);
 
 extern mblk_t	*ill_pending_mp_get(ill_t *, conn_t **, uint_t);
 extern boolean_t ill_pending_mp_add(ill_t *, conn_t *, mblk_t *);
-extern	boolean_t ill_is_quiescent(ill_t *ill);
+extern	boolean_t ill_is_freeable(ill_t *ill);
 extern	void	ill_unlock_ills(ill_t **, int);
 extern	void	ill_lock_ills(ill_t **, int);
 extern	void	ill_refhold(ill_t *);

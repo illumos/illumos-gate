@@ -571,7 +571,17 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
 	else
 		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
 
+	mutex_enter(&ill->ill_lock);
 	ilm = ilm_lookup_ipif(ipif, group);
+	mutex_exit(&ill->ill_lock);
+	/*
+	 * Since we are writer, we know the ilm_flags itself cannot
+	 * change at this point, and ilm_lookup_ipif would not have
+	 * returned a DELETED ilm. However, the data path can free
+	 * ilm->next via ilm_walker_cleanup() so we can safely
+	 * access anything in ilm except ilm_next (for safe access to
+	 * ilm_next we'd have  to take the ill_lock).
+	 */
 	if (ilm != NULL)
 		return (ilm_update_add(ilm, ilgstat, ilg_flist, B_FALSE));
 
@@ -666,7 +676,9 @@ ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 	 * In order to track orig_ill, we store orig_ifindex in the
 	 * ilm and ilg.
 	 */
+	mutex_enter(&ill->ill_lock);
 	ilm = ilm_lookup_ill_index_v6(ill, v6group, orig_ifindex, zoneid);
+	mutex_exit(&ill->ill_lock);
 	if (ilm != NULL)
 		return (ilm_update_add(ilm, ilgstat, ilg_flist, B_TRUE));
 
@@ -844,7 +856,9 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 	 * Look for a match on the ipif.
 	 * (IP_DROP_MEMBERSHIP specifies an ipif using an IP address).
 	 */
+	mutex_enter(&ill->ill_lock);
 	ilm = ilm_lookup_ipif(ipif, group);
+	mutex_exit(&ill->ill_lock);
 	if (ilm == NULL)
 		return (ENOENT);
 
@@ -934,7 +948,9 @@ ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 	 *
 	 * Thus, always lookup using orig_ifindex.
 	 */
+	mutex_enter(&ill->ill_lock);
 	ilm = ilm_lookup_ill_index_v6(ill, v6group, orig_ifindex, zoneid);
+	mutex_exit(&ill->ill_lock);
 	if (ilm == NULL)
 		return (ENOENT);
 
@@ -1123,9 +1139,7 @@ ip_join_allmulti(ipif_t *ipif)
 		ill_dlpi_send(ill, mp);
 	}
 
-	mutex_enter(&ill->ill_lock);
 	ill->ill_join_allmulti = B_TRUE;
-	mutex_exit(&ill->ill_lock);
 	return (0);
 }
 
@@ -1169,9 +1183,7 @@ ip_leave_allmulti(ipif_t *ipif)
 		ill_dlpi_send(ill, mp);
 	}
 
-	mutex_enter(&ill->ill_lock);
 	ill->ill_join_allmulti = B_FALSE;
-	mutex_exit(&ill->ill_lock);
 	return (0);
 }
 
@@ -1422,7 +1434,7 @@ ill_recover_multicast(ill_t *ill)
 	char    addrbuf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
-
+	ILM_WALKER_HOLD(ill);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		/*
 		 * Check how many ipif's that have members in this group -
@@ -1451,6 +1463,7 @@ ill_recover_multicast(ill_t *ill)
 			    &ilm->ilm_v6addr);
 		}
 	}
+	ILM_WALKER_RELE(ill);
 }
 
 /*
@@ -1466,7 +1479,7 @@ ill_leave_multicast(ill_t *ill)
 	char    addrbuf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
-
+	ILM_WALKER_HOLD(ill);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		/*
 		 * Check how many ipif's that have members in this group -
@@ -1492,6 +1505,7 @@ ill_leave_multicast(ill_t *ill)
 			    &ilm->ilm_v6addr);
 		}
 	}
+	ILM_WALKER_RELE(ill);
 }
 
 /* Find an ilm for matching the ill */
@@ -1500,8 +1514,7 @@ ilm_lookup_ill(ill_t *ill, ipaddr_t group, zoneid_t zoneid)
 {
 	in6_addr_t	v6group;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock) ||
-	    IAM_WRITER_ILL(ill));
+	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
 	/*
 	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
 	 */
@@ -1525,8 +1538,7 @@ ilm_lookup_ill_v6(ill_t *ill, const in6_addr_t *v6group, zoneid_t zoneid)
 {
 	ilm_t	*ilm;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock) ||
-	    IAM_WRITER_ILL(ill));
+	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
 
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		if (ilm->ilm_flags & ILM_DELETED)
@@ -1544,8 +1556,7 @@ ilm_lookup_ill_index_v6(ill_t *ill, const in6_addr_t *v6group, int index,
 {
 	ilm_t *ilm;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock) ||
-	    IAM_WRITER_ILL(ill));
+	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
 
 	for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 		if (ilm->ilm_flags & ILM_DELETED)
@@ -1559,23 +1570,6 @@ ilm_lookup_ill_index_v6(ill_t *ill, const in6_addr_t *v6group, int index,
 	return (NULL);
 }
 
-ilm_t *
-ilm_lookup_ill_index_v4(ill_t *ill, ipaddr_t group, int index, zoneid_t zoneid)
-{
-	in6_addr_t	v6group;
-
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock) ||
-	    IAM_WRITER_ILL(ill));
-	/*
-	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
-	 */
-	if (group == INADDR_ANY)
-		v6group = ipv6_all_zeros;
-	else
-		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
-
-	return (ilm_lookup_ill_index_v6(ill, &v6group, index, zoneid));
-}
 
 /*
  * Found an ilm for the ipif. Only needed for IPv4 which does
@@ -1588,9 +1582,7 @@ ilm_lookup_ipif(ipif_t *ipif, ipaddr_t group)
 	ilm_t	*ilm;
 	in6_addr_t	v6group;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock) ||
-	    IAM_WRITER_ILL(ill));
-
+	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
 	/*
 	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
 	 */
@@ -1618,9 +1610,7 @@ ilm_numentries_v6(ill_t *ill, const in6_addr_t *v6group)
 	ilm_t	*ilm;
 	int i = 0;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock) ||
-	    IAM_WRITER_ILL(ill));
-
+	mutex_enter(&ill->ill_lock);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		if (ilm->ilm_flags & ILM_DELETED)
 			continue;
@@ -1628,6 +1618,7 @@ ilm_numentries_v6(ill_t *ill, const in6_addr_t *v6group)
 			i++;
 		}
 	}
+	mutex_exit(&ill->ill_lock);
 	return (i);
 }
 
@@ -1667,10 +1658,16 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 	if (ill->ill_isv6) {
 		ilm->ilm_ill = ill;
 		ilm->ilm_ipif = NULL;
+		DTRACE_PROBE3(ill__incr__cnt, (ill_t *), ill,
+		    (char *), "ilm", (void *), ilm);
+		ill->ill_cnt_ilm++;
 	} else {
 		ASSERT(ilm->ilm_zoneid == ipif->ipif_zoneid);
 		ilm->ilm_ipif = ipif;
 		ilm->ilm_ill = NULL;
+		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), ipif,
+		    (char *), "ilm", (void *), ilm);
+		ipif->ipif_cnt_ilm++;
 	}
 	ASSERT(ill->ill_ipst);
 	ilm->ilm_ipst = ill->ill_ipst;	/* No netstack_hold */
@@ -1724,11 +1721,23 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 	return (ilm);
 }
 
+static void
+ilm_inactive(ilm_t *ilm)
+{
+	FREE_SLIST(ilm->ilm_filter);
+	FREE_SLIST(ilm->ilm_pendsrcs);
+	FREE_SLIST(ilm->ilm_rtx.rtx_allow);
+	FREE_SLIST(ilm->ilm_rtx.rtx_block);
+	ilm->ilm_ipst = NULL;
+	mi_free((char *)ilm);
+}
+
 void
 ilm_walker_cleanup(ill_t *ill)
 {
 	ilm_t	**ilmp;
 	ilm_t	*ilm;
+	boolean_t need_wakeup = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 	ASSERT(ill->ill_ilm_walker_cnt == 0);
@@ -1738,17 +1747,42 @@ ilm_walker_cleanup(ill_t *ill)
 		if ((*ilmp)->ilm_flags & ILM_DELETED) {
 			ilm = *ilmp;
 			*ilmp = ilm->ilm_next;
-			FREE_SLIST(ilm->ilm_filter);
-			FREE_SLIST(ilm->ilm_pendsrcs);
-			FREE_SLIST(ilm->ilm_rtx.rtx_allow);
-			FREE_SLIST(ilm->ilm_rtx.rtx_block);
-			ilm->ilm_ipst = NULL;
-			mi_free((char *)ilm);
+			/*
+			 * check if there are any pending FREE or unplumb
+			 * operations that need to be restarted.
+			 */
+			if (ilm->ilm_ipif != NULL) {
+				/*
+				 * IPv4 ilms hold a ref on the ipif.
+				 */
+				DTRACE_PROBE3(ipif__decr__cnt,
+				    (ipif_t *), ilm->ilm_ipif,
+				    (char *), "ilm", (void *), ilm);
+				ilm->ilm_ipif->ipif_cnt_ilm--;
+				if (IPIF_FREE_OK(ilm->ilm_ipif))
+					need_wakeup = B_TRUE;
+			} else {
+				/*
+				 * IPv6 ilms hold a ref on the ill.
+				 */
+				ASSERT(ilm->ilm_ill == ill);
+				DTRACE_PROBE3(ill__decr__cnt,
+				    (ill_t *), ill,
+				    (char *), "ilm", (void *), ilm);
+				ill->ill_cnt_ilm--;
+				if (ILL_FREE_OK(ill))
+					need_wakeup = B_TRUE;
+			}
+			ilm_inactive(ilm); /* frees ilm */
 		} else {
 			ilmp = &(*ilmp)->ilm_next;
 		}
 	}
 	ill->ill_ilm_cleanup_reqd = 0;
+	if (need_wakeup)
+		ipif_ill_refrele_tail(ill);
+	else
+		mutex_exit(&ill->ill_lock);
 }
 
 /*
@@ -1757,8 +1791,10 @@ ilm_walker_cleanup(ill_t *ill)
 static void
 ilm_delete(ilm_t *ilm)
 {
-	ill_t	*ill;
-	ilm_t	**ilmp;
+	ill_t		*ill;
+	ilm_t		**ilmp;
+	boolean_t	need_wakeup;
+
 
 	if (ilm->ilm_ipif != NULL) {
 		ASSERT(IAM_WRITER_IPIF(ilm->ilm_ipif));
@@ -1786,32 +1822,37 @@ ilm_delete(ilm_t *ilm)
 	for (ilmp = &ill->ill_ilm; *ilmp != ilm; ilmp = &(*ilmp)->ilm_next)
 				;
 	*ilmp = ilm->ilm_next;
-	mutex_exit(&ill->ill_lock);
 
-	FREE_SLIST(ilm->ilm_filter);
-	FREE_SLIST(ilm->ilm_pendsrcs);
-	FREE_SLIST(ilm->ilm_rtx.rtx_allow);
-	FREE_SLIST(ilm->ilm_rtx.rtx_block);
-	ilm->ilm_ipst = NULL;
-	mi_free((char *)ilm);
-}
+	/*
+	 * if we are the last reference to the ipif (for IPv4 ilms)
+	 * or the ill (for IPv6 ilms), we may need to wakeup any
+	 * pending FREE or unplumb operations.
+	 */
+	need_wakeup = B_FALSE;
+	if (ilm->ilm_ipif != NULL) {
+		DTRACE_PROBE3(ipif__decr__cnt, (ipif_t *), ilm->ilm_ipif,
+		    (char *), "ilm", (void *), ilm);
+		ilm->ilm_ipif->ipif_cnt_ilm--;
+		if (IPIF_FREE_OK(ilm->ilm_ipif))
+			need_wakeup = B_TRUE;
+	} else {
+		DTRACE_PROBE3(ill__decr__cnt, (ill_t *), ill,
+		    (char *), "ilm", (void *), ilm);
+		ill->ill_cnt_ilm--;
+		if (ILL_FREE_OK(ill))
+			need_wakeup = B_TRUE;
+	}
 
-/* Free all ilms for this ipif */
-void
-ilm_free(ipif_t *ipif)
-{
-	ill_t	*ill = ipif->ipif_ill;
-	ilm_t	*ilm;
-	ilm_t	 *next_ilm;
+	ilm_inactive(ilm); /* frees this ilm */
 
-	ASSERT(IAM_WRITER_IPIF(ipif));
-
-	for (ilm = ill->ill_ilm; ilm; ilm = next_ilm) {
-		next_ilm = ilm->ilm_next;
-		if (ilm->ilm_ipif == ipif)
-			ilm_delete(ilm);
+	if (need_wakeup) {
+		/* drops ill lock */
+		ipif_ill_refrele_tail(ill);
+	} else {
+		mutex_exit(&ill->ill_lock);
 	}
 }
+
 
 /*
  * Looks up the appropriate ipif given a v4 multicast group and interface
@@ -4003,11 +4044,13 @@ ilm_walk_ill(ill_t *ill)
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	till = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; till != NULL; till = ill_next(&ctx, till)) {
+		mutex_enter(&till->ill_lock);
 		for (ilm = till->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (ilm->ilm_ill == ill) {
 				cnt++;
 			}
 		}
+		mutex_exit(&till->ill_lock);
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
 
@@ -4028,11 +4071,13 @@ ilm_walk_ipif(ipif_t *ipif)
 
 	till = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; till != NULL; till = ill_next(&ctx, till)) {
+		mutex_enter(&till->ill_lock);
 		for (ilm = till->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (ilm->ilm_ipif == ipif) {
 					cnt++;
 			}
 		}
+		mutex_exit(&till->ill_lock);
 	}
 	return (cnt);
 }

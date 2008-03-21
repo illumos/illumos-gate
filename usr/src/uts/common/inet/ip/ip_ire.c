@@ -3149,10 +3149,14 @@ insert_ire:
 		irb_ptr->irb_tmp_ire_cnt++;
 
 	if (ire->ire_ipif != NULL) {
-		ire->ire_ipif->ipif_ire_cnt++;
+		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), ire->ire_ipif,
+		    (char *), "ire", (void *), ire);
+		ire->ire_ipif->ipif_cnt_ire++;
 		if (ire->ire_stq != NULL) {
 			stq_ill = (ill_t *)ire->ire_stq->q_ptr;
-			stq_ill->ill_ire_cnt++;
+			DTRACE_PROBE3(ill__incr__cnt, (ill_t *), stq_ill,
+			    (char *), "ire", (void *), ire);
+			stq_ill->ill_cnt_ire++;
 		}
 	} else {
 		ASSERT(ire->ire_stq == NULL);
@@ -3602,16 +3606,16 @@ ire_inactive(ire_t *ire)
 	}
 
 	/*
-	 * ipif_ire_cnt on this ipif goes down by 1. If the ire_stq is
+	 * ipif_cnt_ire on this ipif goes down by 1. If the ire_stq is
 	 * non-null ill_ire_count also goes down by 1.
 	 *
 	 * The ipif that is associated with an ire is ire->ire_ipif and
-	 * hence when the ire->ire_ipif->ipif_ire_cnt drops to zero we call
+	 * hence when the ire->ire_ipif->ipif_cnt_ire drops to zero we call
 	 * ipif_ill_refrele_tail. Usually stq_ill is null or the same as
 	 * ire->ire_ipif->ipif_ill. So nothing more needs to be done. Only
 	 * in the case of IRE_CACHES when IPMP is used, stq_ill can be
 	 * different. If this is different from ire->ire_ipif->ipif_ill and
-	 * if the ill_ire_cnt on the stq_ill also has dropped to zero, we call
+	 * if the ill_cnt_ire on the stq_ill also has dropped to zero, we call
 	 * ipif_ill_refrele_tail on the stq_ill.
 	 */
 
@@ -3621,14 +3625,18 @@ ire_inactive(ire_t *ire)
 	if (stq_ill == NULL || stq_ill == ill) {
 		/* Optimize the most common case */
 		mutex_enter(&ill->ill_lock);
-		ASSERT(ipif->ipif_ire_cnt != 0);
-		ipif->ipif_ire_cnt--;
-		if (ipif->ipif_ire_cnt == 0)
+		ASSERT(ipif->ipif_cnt_ire != 0);
+		DTRACE_PROBE3(ipif__decr__cnt, (ipif_t *), ipif,
+		    (char *), "ire", (void *), ire);
+		ipif->ipif_cnt_ire--;
+		if (IPIF_DOWN_OK(ipif))
 			need_wakeup = B_TRUE;
 		if (stq_ill != NULL) {
-			ASSERT(stq_ill->ill_ire_cnt != 0);
-			stq_ill->ill_ire_cnt--;
-			if (stq_ill->ill_ire_cnt == 0)
+			ASSERT(stq_ill->ill_cnt_ire != 0);
+			DTRACE_PROBE3(ill__decr__cnt, (ill_t *), stq_ill,
+			    (char *), "ire", (void *), ire);
+			stq_ill->ill_cnt_ire--;
+			if (ILL_DOWN_OK(stq_ill))
 				need_wakeup = B_TRUE;
 		}
 		if (need_wakeup) {
@@ -3645,9 +3653,11 @@ ire_inactive(ire_t *ire)
 		 * a time.
 		 */
 		mutex_enter(&ill->ill_lock);
-		ASSERT(ipif->ipif_ire_cnt != 0);
-		ipif->ipif_ire_cnt--;
-		if (ipif->ipif_ire_cnt == 0) {
+		ASSERT(ipif->ipif_cnt_ire != 0);
+		DTRACE_PROBE3(ipif__decr__cnt, (ipif_t *), ipif,
+		    (char *), "ire", (void *), ire);
+		ipif->ipif_cnt_ire--;
+		if (IPIF_DOWN_OK(ipif)) {
 			/* Drops the lock */
 			ipif_ill_refrele_tail(ill);
 		} else {
@@ -3655,9 +3665,11 @@ ire_inactive(ire_t *ire)
 		}
 		if (stq_ill != NULL) {
 			mutex_enter(&stq_ill->ill_lock);
-			ASSERT(stq_ill->ill_ire_cnt != 0);
-			stq_ill->ill_ire_cnt--;
-			if (stq_ill->ill_ire_cnt == 0)  {
+			ASSERT(stq_ill->ill_cnt_ire != 0);
+			DTRACE_PROBE3(ill__decr__cnt, (ill_t *), stq_ill,
+			    (char *), "ire", (void *), ire);
+			stq_ill->ill_cnt_ire--;
+			if (ILL_DOWN_OK(stq_ill)) {
 				/* Drops the ill lock */
 				ipif_ill_refrele_tail(stq_ill);
 			} else {

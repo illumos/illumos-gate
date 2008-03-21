@@ -253,7 +253,9 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 	NCE_REFHOLD(*newnce);
 
 	/* Bump up the number of nce's referencing this ill */
-	ill->ill_nce_cnt++;
+	DTRACE_PROBE3(ill__incr__cnt, (ill_t *), ill,
+	    (char *), "nce", (void *), nce);
+	ill->ill_cnt_nce++;
 	mutex_exit(&ill->ill_lock);
 
 	err = 0;
@@ -492,13 +494,15 @@ ndp_inactive(nce_t *nce)
 
 	ill = nce->nce_ill;
 	mutex_enter(&ill->ill_lock);
-	ill->ill_nce_cnt--;
+	DTRACE_PROBE3(ill__decr__cnt, (ill_t *), ill,
+	    (char *), "nce", (void *), nce);
+	ill->ill_cnt_nce--;
 	/*
 	 * If the number of nce's associated with this ill have dropped
 	 * to zero, check whether we need to restart any operation that
 	 * is waiting for this to happen.
 	 */
-	if (ill->ill_nce_cnt == 0) {
+	if (ILL_DOWN_OK(ill)) {
 		/* ipif_ill_refrele_tail drops the ill_lock */
 		ipif_ill_refrele_tail(ill);
 	} else {
@@ -3624,7 +3628,9 @@ ndp_add_v4(ill_t *ill, const in_addr_t *addr, uint16_t flags,
 	NCE_REFHOLD(*newnce);
 
 	/* Bump up the number of nce's referencing this ill */
-	ill->ill_nce_cnt++;
+	DTRACE_PROBE3(ill__incr__cnt, (ill_t *), ill,
+	    (char *), "nce", (void *), nce);
+	ill->ill_cnt_nce++;
 	mutex_exit(&ill->ill_lock);
 	DTRACE_PROBE1(ndp__add__v4, nce_t *, nce);
 	return (0);
