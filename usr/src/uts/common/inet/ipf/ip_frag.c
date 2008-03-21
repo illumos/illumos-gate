@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -236,7 +236,7 @@ ipfr_t *table[];
 	u_int idx, off;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (ifs->ifs_ipfr_inuse >= IPFT_SIZE)
+	if (ifs->ifs_ipfr_inuse >= ifs->ifs_ipfr_size)
 		return NULL;
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
@@ -256,7 +256,7 @@ ipfr_t *table[];
 	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= IPFT_SIZE;
+	idx %= ifs->ifs_ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
