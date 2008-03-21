@@ -118,6 +118,7 @@ static uint_t priv_hcl_8;
  * Olympus error log
  */
 static opl_errlog_t	*opl_err_log;
+static int		opl_cpu0_log_setup;
 
 /*
  * OPL ta 3 save area.
@@ -558,6 +559,7 @@ cpu_setup(void)
 
 	cpu0_log = va_to_pa(&opl_cpu0_err_log);
 	opl_error_setup(cpu0_log);
+	opl_cpu0_log_setup = 1;
 
 	/*
 	 * Enable MMU translating multiple page sizes for
@@ -1735,14 +1737,19 @@ opl_cpu_reg_init()
 {
 	uint64_t	this_cpu_log;
 
-	/*
-	 * We do not need to re-initialize cpu0 registers.
-	 */
-	if (cpu[getprocessorid()] == &cpu0) {
+	if (cpu[getprocessorid()] == &cpu0 && opl_cpu0_log_setup == 1) {
 		/*
 		 * Support for "ta 3"
 		 */
 		opl_ta3();
+
+		/*
+		 * If we are being called at boot time on cpu0 the error
+		 * log is already set up in cpu_setup. Clear the
+		 * opl_cpu0_log_setup flag so that a subsequent DR of cpu0 will
+		 * do the proper initialization.
+		 */
+		opl_cpu0_log_setup = 0;
 		return;
 	}
 
@@ -2219,7 +2226,12 @@ typedef struct win_regs {
 static void
 opl_ta3(void)
 {
-	opl_ta3_save = (char *)kmem_alloc(NCPU * sizeof (win_regs_t), KM_SLEEP);
+	/*
+	 * opl_ta3 should only be called once at boot time.
+	 */
+	if (opl_ta3_save == NULL)
+		opl_ta3_save = (char *)kmem_alloc(NCPU * sizeof (win_regs_t),
+		    KM_SLEEP);
 }
 
 /*
