@@ -78,6 +78,7 @@
 #define	IWK_DEBUG_TX		(1 << 11)
 #define	IWK_DEBUG_RATECTL	(1 << 12)
 #define	IWK_DEBUG_RADIO		(1 << 13)
+#define	IWK_DEBUG_RESUME	(1 << 14)
 uint32_t iwk_dbg_flags = 0;
 #define	IWK_DBG(x) \
 	iwk_dbg x
@@ -243,6 +244,8 @@ static int	iwk_alloc_tx_ring(iwk_sc_t *, iwk_tx_ring_t *,
 static void	iwk_reset_tx_ring(iwk_sc_t *, iwk_tx_ring_t *);
 static void	iwk_free_tx_ring(iwk_sc_t *, iwk_tx_ring_t *);
 
+static ieee80211_node_t *iwk_node_alloc(ieee80211com_t *);
+static void	iwk_node_free(ieee80211_node_t *);
 static int	iwk_newstate(ieee80211com_t *, enum ieee80211_state, int);
 static int	iwk_key_set(ieee80211com_t *, const struct ieee80211_key *,
     const uint8_t mac[IEEE80211_ADDR_LEN]);
@@ -275,6 +278,9 @@ static int	iwk_power_up(iwk_sc_t *);
 static int	iwk_preinit(iwk_sc_t *);
 static int	iwk_init(iwk_sc_t *);
 static void	iwk_stop(iwk_sc_t *);
+static void	iwk_amrr_init(iwk_amrr_t *);
+static void	iwk_amrr_timeout(iwk_sc_t *);
+static void	iwk_amrr_ratectl(void *, ieee80211_node_t *);
 
 static int iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -588,6 +594,8 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = iwk_newstate;
+	ic->ic_node_alloc = iwk_node_alloc;
+	ic->ic_node_free = iwk_node_free;
 	ic->ic_crypto.cs_key_set = iwk_key_set;
 	ieee80211_media_init(ic);
 	/*
@@ -716,6 +724,7 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
+
 	if (!(sc->sc_flags & IWK_F_ATTACHED))
 		return (DDI_FAILURE);
 
@@ -1330,11 +1339,35 @@ iwk_ring_free(iwk_sc_t *sc)
 	}
 }
 
+/* ARGSUSED */
+static ieee80211_node_t *
+iwk_node_alloc(ieee80211com_t *ic)
+{
+	iwk_amrr_t *amrr;
+
+	amrr = kmem_zalloc(sizeof (iwk_amrr_t), KM_SLEEP);
+	if (amrr != NULL)
+		iwk_amrr_init(amrr);
+	return (&amrr->in);
+}
+
+static void
+iwk_node_free(ieee80211_node_t *in)
+{
+	ieee80211com_t *ic = in->in_ic;
+
+	ic->ic_node_cleanup(in);
+	if (in->in_wpa_ie != NULL)
+		ieee80211_free(in->in_wpa_ie);
+	kmem_free(in, sizeof (iwk_amrr_t));
+}
+
 /*ARGSUSED*/
 static int
 iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 {
 	iwk_sc_t *sc = (iwk_sc_t *)ic;
+	ieee80211_node_t *in = ic->ic_bss;
 	iwk_tx_power_table_cmd_t txpower;
 	enum ieee80211_state ostate = ic->ic_state;
 	int i, err = IWK_SUCCESS;
@@ -1357,6 +1390,7 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			}
 		}
 		ic->ic_state = nstate;
+		sc->sc_clk = 0;
 		mutex_exit(&sc->sc_glock);
 		return (IWK_SUCCESS);
 
@@ -1450,6 +1484,20 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			    "set txpower\n");
 			return (err);
 		}
+
+		/* start automatic rate control */
+		mutex_enter(&sc->sc_mt_lock);
+		if (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) {
+			sc->sc_flags |= IWK_F_RATE_AUTO_CTL;
+			/* set rate to some reasonable initial value */
+			i = in->in_rates.ir_nrates - 1;
+			while (i > 0 && IEEE80211_RATE(i) > 72)
+				i--;
+			in->in_txrate = i;
+		} else {
+			sc->sc_flags &= ~IWK_F_RATE_AUTO_CTL;
+		}
+		mutex_exit(&sc->sc_mt_lock);
 
 		/* set LED on after associated */
 		iwk_set_led(sc, 2, 0, 1);
@@ -1771,6 +1819,7 @@ iwk_tx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	ieee80211com_t *ic = &sc->sc_ic;
 	iwk_tx_ring_t *ring = &sc->sc_txq[desc->hdr.qid & 0x3];
 	iwk_tx_stat_t *stat = (iwk_tx_stat_t *)(desc + 1);
+	iwk_amrr_t *amrr = (iwk_amrr_t *)ic->ic_bss;
 
 	IWK_DBG((IWK_DEBUG_TX, "tx done: qid=%d idx=%d"
 	    " retries=%d frame_count=%x nkill=%d "
@@ -1779,7 +1828,10 @@ iwk_tx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	    stat->bt_kill_count, stat->rate.r.s.rate,
 	    LE_32(stat->duration), LE_32(stat->status)));
 
+	amrr->txcnt++;
+	IWK_DBG((IWK_DEBUG_RATECTL, "tx: %d cnt\n", amrr->txcnt));
 	if (stat->ntries > 0) {
+		amrr->retrycnt++;
 		sc->sc_tx_retries++;
 		IWK_DBG((IWK_DEBUG_TX, "tx: %d retries\n",
 		    sc->sc_tx_retries));
@@ -1977,9 +2029,19 @@ iwk_rx_softintr(caddr_t arg)
 			    LE_32(*status)));
 
 			if (LE_32(*status) & 1) {
-				/* the radio button has to be pushed */
+				/*
+				 * the radio button has to be pushed(OFF). It
+				 * is considered as a hw error, the
+				 * iwk_thread() tries to recover it after the
+				 * button is pushed again(ON)
+				 */
 				cmn_err(CE_NOTE,
 				    "iwk: Radio transmitter is off\n");
+				sc->sc_ostate = sc->sc_ic.ic_state;
+				ieee80211_new_state(&sc->sc_ic,
+				    IEEE80211_S_INIT, -1);
+				sc->sc_flags |=
+				    (IWK_F_HW_ERR_RECOVER | IWK_F_RADIO_OFF);
 			}
 			break;
 		}
@@ -2270,7 +2332,8 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		rate = in->in_rates.ir_rates[0];
 	} else {
 		/*
-		 * do it later: rate scaling in hardware.
+		 * do it here for the software way rate control.
+		 * later for rate scaling in hardware.
 		 * maybe like the following, for management frame:
 		 * tx->initial_rate_index = LINK_QUAL_MAX_RETRY_NUM - 1;
 		 * for data frame:
@@ -2285,7 +2348,6 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		if (ic->ic_fixed_rate != IEEE80211_FIXED_RATE_NONE) {
 			rate = ic->ic_fixed_rate;
 		} else {
-			in->in_txrate = in->in_rates.ir_nrates - 1;
 			rate = in->in_rates.ir_rates[in->in_txrate];
 		}
 	}
@@ -2406,8 +2468,18 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 
 	err = ieee80211_ioctl(ic, wq, mp);
 	if (err == ENETRESET) {
-		(void) ieee80211_new_state(ic,
-		    IEEE80211_S_SCAN, -1);
+		/*
+		 * This is special for the hidden AP connection.
+		 * In any case, we should make sure only one 'scan'
+		 * in the driver for a 'connect' CLI command. So
+		 * when connecting to a hidden AP, the scan is just
+		 * sent out to the air when we know the desired
+		 * essid of the AP we want to connect.
+		 */
+		if (ic->ic_des_esslen) {
+			(void) ieee80211_new_state(ic,
+			    IEEE80211_S_SCAN, -1);
+		}
 	}
 }
 
@@ -2487,11 +2559,24 @@ iwk_m_start(void *arg)
 	err = iwk_init(sc);
 
 	if (err != IWK_SUCCESS) {
-		return (err);
+		/*
+		 * The hw init err(eg. RF is OFF). Return Success to make
+		 * the 'plumb' succeed. The iwk_thread() tries to re-init
+		 * background.
+		 */
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags |= IWK_F_HW_ERR_RECOVER;
+		mutex_exit(&sc->sc_glock);
+		return (IWK_SUCCESS);
 	}
+
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
-	return (err);
+	mutex_enter(&sc->sc_glock);
+	sc->sc_flags |= IWK_F_RUNNING;
+	mutex_exit(&sc->sc_glock);
+
+	return (IWK_SUCCESS);
 }
 
 static void
@@ -2504,7 +2589,11 @@ iwk_m_stop(void *arg)
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 	mutex_enter(&sc->sc_mt_lock);
 	sc->sc_flags &= ~IWK_F_HW_ERR_RECOVER;
+	sc->sc_flags &= ~IWK_F_RATE_AUTO_CTL;
 	mutex_exit(&sc->sc_mt_lock);
+	mutex_enter(&sc->sc_glock);
+	sc->sc_flags &= ~IWK_F_RUNNING;
+	mutex_exit(&sc->sc_glock);
 }
 
 /*ARGSUSED*/
@@ -2550,10 +2639,28 @@ static void
 iwk_thread(iwk_sc_t *sc)
 {
 	ieee80211com_t	*ic = &sc->sc_ic;
+	clock_t clk;
 	int times = 0, err, n = 0, timeout = 0;
+	uint32_t tmp;
 
 	mutex_enter(&sc->sc_mt_lock);
 	while (sc->sc_mf_thread_switch) {
+		tmp = IWK_READ(sc, CSR_GP_CNTRL);
+		if (tmp & CSR_GP_CNTRL_REG_FLAG_HW_RF_KILL_SW) {
+			sc->sc_flags &= ~IWK_F_RADIO_OFF;
+		} else {
+			sc->sc_flags |= IWK_F_RADIO_OFF;
+		}
+		/*
+		 * If the RF is OFF, do nothing.
+		 */
+		if (sc->sc_flags & IWK_F_RADIO_OFF) {
+			mutex_exit(&sc->sc_mt_lock);
+			delay(drv_usectohz(100000));
+			mutex_enter(&sc->sc_mt_lock);
+			continue;
+		}
+
 		/*
 		 * recovery fatal error
 		 */
@@ -2577,12 +2684,25 @@ iwk_thread(iwk_sc_t *sc)
 					continue;
 			}
 			n = 0;
+			if (!err)
+				sc->sc_flags |= IWK_F_RUNNING;
 			sc->sc_flags &= ~IWK_F_HW_ERR_RECOVER;
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(2000000));
 			if (sc->sc_ostate != IEEE80211_S_INIT)
 				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 			mutex_enter(&sc->sc_mt_lock);
+		}
+
+		/*
+		 * rate ctl
+		 */
+		if (ic->ic_mach &&
+		    (sc->sc_flags & IWK_F_RATE_AUTO_CTL)) {
+			clk = ddi_get_lbolt();
+			if (clk > sc->sc_clk + drv_usectohz(500000)) {
+				iwk_amrr_timeout(sc);
+			}
 		}
 
 		mutex_exit(&sc->sc_mt_lock);
@@ -2952,10 +3072,7 @@ iwk_scan(iwk_sc_t *sc)
 		sc->sc_shared->queues_byte_cnt_tbls[ring->qid]
 		    .tfd_offset[IWK_QUEUE_SIZE + ring->cur].val = 8;
 	}
-#if 0
-	IWK_DMA_SYNC(data->dma_data, DDI_DMA_SYNC_FORDEV);
-	IWK_DMA_SYNC(ring->dma_desc, DDI_DMA_SYNC_FORDEV);
-#endif
+
 	/* kick cmd ring */
 	ring->cur = (ring->cur + 1) % ring->count;
 	IWK_WRITE(sc, HBUS_TARG_WRPTR, ring->qid << 8 | ring->cur);
@@ -3332,11 +3449,18 @@ iwk_init(iwk_sc_t *sc)
 {
 	int qid, n, err;
 	clock_t clk;
+	uint32_t tmp;
 
 	mutex_enter(&sc->sc_glock);
 	sc->sc_flags &= ~IWK_F_FW_INIT;
 
 	(void) iwk_preinit(sc);
+
+	tmp = IWK_READ(sc, CSR_GP_CNTRL);
+	if (!(tmp & CSR_GP_CNTRL_REG_FLAG_HW_RF_KILL_SW)) {
+		cmn_err(CE_WARN, "iwk_init(): Radio transmitter is off\n");
+		goto fail1;
+	}
 
 	/* init Rx ring */
 	iwk_mac_access_enter(sc);
@@ -3481,4 +3605,100 @@ iwk_stop(iwk_sc_t *sc)
 	tmp = IWK_READ(sc, CSR_RESET);
 	IWK_WRITE(sc, CSR_RESET, tmp | CSR_RESET_REG_FLAG_SW_RESET);
 	mutex_exit(&sc->sc_glock);
+}
+
+/*
+ * Naive implementation of the Adaptive Multi Rate Retry algorithm:
+ * "IEEE 802.11 Rate Adaptation: A Practical Approach"
+ * Mathieu Lacage, Hossein Manshaei, Thierry Turletti
+ * INRIA Sophia - Projet Planete
+ * http://www-sop.inria.fr/rapports/sophia/RR-5208.html
+ */
+#define	is_success(amrr)	\
+	((amrr)->retrycnt < (amrr)->txcnt / 10)
+#define	is_failure(amrr)	\
+	((amrr)->retrycnt > (amrr)->txcnt / 3)
+#define	is_enough(amrr)		\
+	((amrr)->txcnt > 100)
+#define	is_min_rate(in)		\
+	((in)->in_txrate == 0)
+#define	is_max_rate(in)		\
+	((in)->in_txrate == (in)->in_rates.ir_nrates - 1)
+#define	increase_rate(in)	\
+	((in)->in_txrate++)
+#define	decrease_rate(in)	\
+	((in)->in_txrate--)
+#define	reset_cnt(amrr)		\
+	{ (amrr)->txcnt = (amrr)->retrycnt = 0; }
+
+#define	IWK_AMRR_MIN_SUCCESS_THRESHOLD	 1
+#define	IWK_AMRR_MAX_SUCCESS_THRESHOLD	15
+
+static void
+iwk_amrr_init(iwk_amrr_t *amrr)
+{
+	amrr->success = 0;
+	amrr->recovery = 0;
+	amrr->txcnt = amrr->retrycnt = 0;
+	amrr->success_threshold = IWK_AMRR_MIN_SUCCESS_THRESHOLD;
+}
+
+static void
+iwk_amrr_timeout(iwk_sc_t *sc)
+{
+	ieee80211com_t *ic = &sc->sc_ic;
+
+	IWK_DBG((IWK_DEBUG_RATECTL, "iwk_amrr_timeout() enter\n"));
+	if (ic->ic_opmode == IEEE80211_M_STA)
+		iwk_amrr_ratectl(NULL, ic->ic_bss);
+	else
+		ieee80211_iterate_nodes(&ic->ic_sta, iwk_amrr_ratectl, NULL);
+	sc->sc_clk = ddi_get_lbolt();
+}
+
+/* ARGSUSED */
+static void
+iwk_amrr_ratectl(void *arg, ieee80211_node_t *in)
+{
+	iwk_amrr_t *amrr = (iwk_amrr_t *)in;
+	int need_change = 0;
+
+	if (is_success(amrr) && is_enough(amrr)) {
+		amrr->success++;
+		if (amrr->success >= amrr->success_threshold &&
+		    !is_max_rate(in)) {
+			amrr->recovery = 1;
+			amrr->success = 0;
+			increase_rate(in);
+			IWK_DBG((IWK_DEBUG_RATECTL,
+			    "AMRR increasing rate %d (txcnt=%d retrycnt=%d)\n",
+			    in->in_txrate, amrr->txcnt, amrr->retrycnt));
+			need_change = 1;
+		} else {
+			amrr->recovery = 0;
+		}
+	} else if (is_failure(amrr)) {
+		amrr->success = 0;
+		if (!is_min_rate(in)) {
+			if (amrr->recovery) {
+				amrr->success_threshold++;
+				if (amrr->success_threshold >
+				    IWK_AMRR_MAX_SUCCESS_THRESHOLD)
+					amrr->success_threshold =
+					    IWK_AMRR_MAX_SUCCESS_THRESHOLD;
+			} else {
+				amrr->success_threshold =
+				    IWK_AMRR_MIN_SUCCESS_THRESHOLD;
+			}
+			decrease_rate(in);
+			IWK_DBG((IWK_DEBUG_RATECTL,
+			    "AMRR decreasing rate %d (txcnt=%d retrycnt=%d)\n",
+			    in->in_txrate, amrr->txcnt, amrr->retrycnt));
+			need_change = 1;
+		}
+		amrr->recovery = 0;	/* paper is incorrect */
+	}
+
+	if (is_enough(amrr) || need_change)
+		reset_cnt(amrr);
 }

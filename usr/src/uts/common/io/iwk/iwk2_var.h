@@ -83,6 +83,15 @@ typedef struct iwk_rx_ring {
 	int			cur;
 } iwk_rx_ring_t;
 
+typedef struct iwk_amrr {
+	ieee80211_node_t in;	/* must be the first */
+	int	txcnt;
+	int	retrycnt;
+	int	success;
+	int	success_threshold;
+	int	recovery;
+} iwk_amrr_t;
+
 typedef struct iwk_softc {
 	struct ieee80211com	sc_ic;
 	dev_info_t		*sc_dip;
@@ -148,6 +157,8 @@ typedef struct iwk_softc {
 	uint32_t		sc_rx_softint_pending;
 	uint32_t		sc_need_reschedule;
 
+	clock_t			sc_clk;
+
 	/* kstats */
 	uint32_t		sc_tx_nobuf;
 	uint32_t		sc_rx_nobuf;
@@ -159,13 +170,15 @@ typedef struct iwk_softc {
 #define	IWK_F_ATTACHED		(1 << 0)
 #define	IWK_F_CMD_DONE		(1 << 1)
 #define	IWK_F_FW_INIT		(1 << 2)
-#define	IWK_F_HW_ERR_RECOVER		(1 << 3)
-#define	IWK_F_RATE_AUTO_CTL		(1 << 4)
+#define	IWK_F_HW_ERR_RECOVER	(1 << 3)
+#define	IWK_F_RATE_AUTO_CTL	(1 << 4)
 #define	IWK_F_RUNNING		(1 << 5)
 #define	IWK_F_SCANNING		(1 << 6)
+#define	IWK_F_SUSPEND		(1 << 7)
+#define	IWK_F_RADIO_OFF		(1 << 8)
 
 #define	IWK_SUCCESS		0
-#define	IWK_FAIL		1
+#define	IWK_FAIL		EIO
 #ifdef __cplusplus
 }
 #endif
