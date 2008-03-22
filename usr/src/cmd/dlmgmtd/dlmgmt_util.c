@@ -473,30 +473,30 @@ dlmgmt_destroy_common(dlmgmt_link_t *linkp, uint32_t flags)
 	return (0);
 }
 
-int
+void
 dlmgmt_getattr_common(dlmgmt_linkattr_t **headp, const char *attr,
-    dlmgmt_getattr_retval_t **retvalpp, size_t *retszp)
+    dlmgmt_getattr_retval_t *retvalp)
 {
 	int			err;
 	void			*attrval;
 	size_t			attrsz;
 	dladm_datatype_t	attrtype;
-	dlmgmt_getattr_retval_t	*retvalp;
 
 	err = linkattr_get(headp, attr, &attrval, &attrsz, &attrtype);
 	if (err != 0)
-		return (err);
+		goto done;
 
 	assert(attrsz > 0);
-	*retszp = sizeof (dlmgmt_getattr_retval_t) + attrsz - 1;
-	if ((retvalp = malloc(*retszp)) == NULL)
-		return (ENOMEM);
+	if (attrsz > MAXLINKATTRVALLEN) {
+		err = EINVAL;
+		goto done;
+	}
 
-	retvalp->lr_err = 0;
 	retvalp->lr_type = attrtype;
-	bcopy(attrval, retvalp->lr_attr, attrsz);
-	*retvalpp = retvalp;
-	return (0);
+	retvalp->lr_attrsz = attrsz;
+	bcopy(attrval, retvalp->lr_attrval, attrsz);
+done:
+	retvalp->lr_err = err;
 }
 
 void

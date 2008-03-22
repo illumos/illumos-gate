@@ -196,11 +196,11 @@ write_uint64(char *buffer, size_t buffer_length, char *name, void *value)
 static size_t
 read_str(char *buffer, void **value)
 {
-	char		*ptr = calloc(MAXLINKATTRLEN, sizeof (char));
+	char		*ptr = calloc(MAXLINKATTRVALLEN, sizeof (char));
 	ssize_t		len;
 
-	if (ptr == NULL || (len = snprintf(ptr, MAXLINKATTRLEN, "%s", buffer))
-	    >= MAXLINKATTRLEN) {
+	if (ptr == NULL || (len = strlcpy(ptr, buffer, MAXLINKATTRVALLEN))
+	    >= MAXLINKATTRVALLEN) {
 		free(ptr);
 		return (0);
 	}

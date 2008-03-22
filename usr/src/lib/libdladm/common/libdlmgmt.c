@@ -52,10 +52,9 @@ static size_t dladm_datatype_size[] = {
 };
 
 static dladm_status_t
-dladm_door_call(void *arg, size_t asize, void *rbuf, size_t *rsizep)
+dladm_door_call(void *arg, size_t asize, void *rbuf, size_t rsize)
 {
 	door_arg_t	darg;
-	dlmgmt_retval_t	*retvalp = rbuf;
 	int		fd;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
@@ -67,7 +66,7 @@ dladm_door_call(void *arg, size_t asize, void *rbuf, size_t *rsizep)
 	darg.desc_ptr	= NULL;
 	darg.desc_num	= 0;
 	darg.rbuf	= rbuf;
-	darg.rsize	= *rsizep;
+	darg.rsize	= rsize;
 
 	if (door_call(fd, &darg) == -1)
 		status = dladm_errno2status(errno);
@@ -85,14 +84,10 @@ dladm_door_call(void *arg, size_t asize, void *rbuf, size_t *rsizep)
 		(void) munmap(darg.rbuf, darg.rsize);
 		return (DLADM_STATUS_TOOSMALL);
 	}
-	if (darg.rsize > *rsizep || darg.rsize < sizeof (uint_t))
+	if (darg.rsize != rsize)
 		return (DLADM_STATUS_FAILED);
 
-	if (retvalp->lr_err != 0)
-		status = dladm_errno2status(retvalp->lr_err);
-	else
-		*rsizep = darg.rsize;
-	return (status);
+	return (dladm_errno2status(((dlmgmt_retval_t *)rbuf)->lr_err));
 }
 
 /*
@@ -102,13 +97,12 @@ dladm_status_t
 dladm_create_datalink_id(const char *link, datalink_class_t class,
     uint32_t media, uint32_t flags, datalink_id_t *linkidp)
 {
-	dlmgmt_door_createid_t createid;
+	dlmgmt_door_createid_t	createid;
 	dlmgmt_createid_retval_t retval;
-	uint32_t dlmgmt_flags;
-	dladm_status_t status;
-	size_t rsize;
+	uint32_t		dlmgmt_flags;
+	dladm_status_t		status;
 
-	if (link == NULL || *link == '\0' || class == DATALINK_CLASS_ALL ||
+	if (link == NULL || class == DATALINK_CLASS_ALL ||
 	    !(flags & (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST)) ||
 	    linkidp == NULL) {
 		return (DLADM_STATUS_BADARG);
@@ -123,17 +117,12 @@ dladm_create_datalink_id(const char *link, datalink_class_t class,
 	createid.ld_flags = dlmgmt_flags;
 	createid.ld_cmd = DLMGMT_CMD_CREATE_LINKID;
 	createid.ld_prefix = (flags & DLADM_OPT_PREFIX);
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&createid, sizeof (createid), &retval, &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	*linkidp = retval.lr_linkid;
-	return (DLADM_STATUS_OK);
+	if ((status = dladm_door_call(&createid, sizeof (createid), &retval,
+	    sizeof (retval))) == DLADM_STATUS_OK) {
+		*linkidp = retval.lr_linkid;
+	}
+	return (status);
 }
 
 /*
@@ -145,8 +134,6 @@ dladm_destroy_datalink_id(datalink_id_t linkid, uint32_t flags)
 	dlmgmt_door_destroyid_t		destroyid;
 	dlmgmt_destroyid_retval_t	retval;
 	uint32_t			dlmgmt_flags;
-	size_t				rsize;
-	dladm_status_t			status;
 
 	dlmgmt_flags = (flags & DLADM_OPT_ACTIVE) ? DLMGMT_ACTIVE : 0;
 	dlmgmt_flags |= ((flags & DLADM_OPT_PERSIST) ? DLMGMT_PERSIST : 0);
@@ -154,17 +141,9 @@ dladm_destroy_datalink_id(datalink_id_t linkid, uint32_t flags)
 	destroyid.ld_cmd = DLMGMT_CMD_DESTROY_LINKID;
 	destroyid.ld_linkid = linkid;
 	destroyid.ld_flags = dlmgmt_flags;
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&destroyid, sizeof (destroyid), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	return (DLADM_STATUS_OK);
+	return (dladm_door_call(&destroyid, sizeof (destroyid),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -175,22 +154,13 @@ dladm_remap_datalink_id(datalink_id_t linkid, const char *link)
 {
 	dlmgmt_door_remapid_t	remapid;
 	dlmgmt_remapid_retval_t	retval;
-	size_t			rsize;
-	dladm_status_t		status;
 
 	remapid.ld_cmd = DLMGMT_CMD_REMAP_LINKID;
 	remapid.ld_linkid = linkid;
 	(void) strlcpy(remapid.ld_link, link, MAXLINKNAMELEN);
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&remapid, sizeof (remapid), &retval, &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	return (DLADM_STATUS_OK);
+	return (dladm_door_call(&remapid, sizeof (remapid),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -199,23 +169,14 @@ dladm_remap_datalink_id(datalink_id_t linkid, const char *link)
 dladm_status_t
 dladm_up_datalink_id(datalink_id_t linkid)
 {
-	dlmgmt_door_upid_t		upid;
-	dlmgmt_upid_retval_t		retval;
-	size_t				rsize;
-	dladm_status_t			status;
+	dlmgmt_door_upid_t	upid;
+	dlmgmt_upid_retval_t	retval;
 
 	upid.ld_cmd = DLMGMT_CMD_UP_LINKID;
 	upid.ld_linkid = linkid;
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&upid, sizeof (upid), &retval, &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	return (DLADM_STATUS_OK);
+	return (dladm_door_call(&upid, sizeof (upid),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -225,12 +186,11 @@ dladm_status_t
 dladm_create_conf(const char *link, datalink_id_t linkid,
     datalink_class_t class, uint32_t media, dladm_conf_t *confp)
 {
-	dlmgmt_door_createconf_t createconf;
-	dlmgmt_createconf_retval_t retval;
-	dladm_status_t status;
-	size_t rsize;
+	dlmgmt_door_createconf_t	createconf;
+	dlmgmt_createconf_retval_t	retval;
+	dladm_status_t			status;
 
-	if (link == NULL || *link == '\0' || confp == NULL)
+	if (link == NULL || confp == NULL)
 		return (DLADM_STATUS_BADARG);
 
 	(void) strlcpy(createconf.ld_link, link, MAXLINKNAMELEN);
@@ -238,18 +198,12 @@ dladm_create_conf(const char *link, datalink_id_t linkid,
 	createconf.ld_media = media;
 	createconf.ld_linkid = linkid;
 	createconf.ld_cmd = DLMGMT_CMD_CREATECONF;
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&createconf, sizeof (createconf), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	*confp = retval.lr_conf;
-	return (DLADM_STATUS_OK);
+	if ((status = dladm_door_call(&createconf, sizeof (createconf),
+	    &retval, sizeof (retval))) == DLADM_STATUS_OK) {
+		*confp = retval.lr_conf;
+	}
+	return (status);
 }
 
 /*
@@ -292,7 +246,6 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
 	dlmgmt_door_getnext_t	getnext;
 	dlmgmt_getnext_retval_t	retval;
 	uint32_t 		dlmgmt_flags;
-	size_t			rsize;
 	datalink_id_t		linkid = DATALINK_INVALID_LINKID;
 	dladm_status_t		status = DLADM_STATUS_OK;
 
@@ -306,21 +259,14 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
 	getnext.ld_class = class;
 	getnext.ld_dmedia = dmedia;
 	getnext.ld_flags = dlmgmt_flags;
-	rsize = sizeof (retval);
 
 	do {
 		getnext.ld_linkid = linkid;
-		status = dladm_door_call(&getnext, sizeof (getnext),
-		    &retval, &rsize);
-		if (status != DLADM_STATUS_OK) {
+		if ((status = dladm_door_call(&getnext, sizeof (getnext),
+		    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
 			/*
 			 * done with walking
 			 */
-			break;
-		}
-
-		if (rsize != sizeof (retval)) {
-			status = DLADM_STATUS_BADARG;
 			break;
 		}
 
@@ -354,28 +300,21 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
 dladm_status_t
 dladm_read_conf(datalink_id_t linkid, dladm_conf_t *confp)
 {
-	dlmgmt_door_readconf_t 		readconf;
+	dlmgmt_door_readconf_t		readconf;
 	dlmgmt_readconf_retval_t	retval;
 	dladm_status_t			status;
-	size_t				rsize;
 
 	if (linkid == DATALINK_INVALID_LINKID || confp == NULL)
 		return (DLADM_STATUS_BADARG);
 
 	readconf.ld_linkid = linkid;
 	readconf.ld_cmd = DLMGMT_CMD_READCONF;
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&readconf, sizeof (readconf), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	*confp = retval.lr_conf;
-	return (DLADM_STATUS_OK);
+	if ((status = dladm_door_call(&readconf, sizeof (readconf),
+	    &retval, sizeof (retval))) == DLADM_STATUS_OK) {
+		*confp = retval.lr_conf;
+	}
+	return (status);
 }
 
 /*
@@ -387,25 +326,15 @@ dladm_write_conf(dladm_conf_t conf)
 {
 	dlmgmt_door_writeconf_t		writeconf;
 	dlmgmt_writeconf_retval_t	retval;
-	dladm_status_t			status;
-	size_t				rsize;
 
 	if (conf == DLADM_INVALID_CONF)
 		return (DLADM_STATUS_BADARG);
 
 	writeconf.ld_cmd = DLMGMT_CMD_WRITECONF;
 	writeconf.ld_conf = conf;
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&writeconf, sizeof (writeconf), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	return (DLADM_STATUS_OK);
+	return (dladm_door_call(&writeconf, sizeof (writeconf),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -416,13 +345,12 @@ dladm_status_t
 dladm_get_conf_field(dladm_conf_t conf, const char *attr, void *attrval,
     size_t attrsz)
 {
-	dlmgmt_door_getattr_t getattr;
-	dlmgmt_getattr_retval_t *retvalp;
-	dladm_status_t status = DLADM_STATUS_OK;
-	size_t oldsize, size;
+	dlmgmt_door_getattr_t	getattr;
+	dlmgmt_getattr_retval_t	retval;
+	dladm_status_t		status;
 
 	if (conf == DLADM_INVALID_CONF || attrval == NULL ||
-	    attrsz == 0 || attr == NULL || *attr == '\0') {
+	    attrsz == 0 || attr == NULL) {
 		return (DLADM_STATUS_BADARG);
 	}
 
@@ -430,20 +358,16 @@ dladm_get_conf_field(dladm_conf_t conf, const char *attr, void *attrval,
 	getattr.ld_conf = conf;
 	(void) strlcpy(getattr.ld_attr, attr, MAXLINKATTRLEN);
 
-	oldsize = size = attrsz + sizeof (dlmgmt_getattr_retval_t) - 1;
-	if ((retvalp = calloc(1, oldsize)) == NULL)
-		return (DLADM_STATUS_NOMEM);
+	if ((status = dladm_door_call(&getattr, sizeof (getattr), &retval,
+	    sizeof (retval))) != DLADM_STATUS_OK) {
+		return (status);
+	}
 
-	status = dladm_door_call(&getattr, sizeof (getattr), retvalp, &size);
-	if (status != DLADM_STATUS_OK)
-		goto done;
+	if (retval.lr_attrsz > attrsz)
+		return (DLADM_STATUS_TOOSMALL);
 
-	assert(size <= oldsize);
-	size = size + 1 - sizeof (dlmgmt_getattr_retval_t);
-	bcopy(retvalp->lr_attr, attrval, size);
-done:
-	free(retvalp);
-	return (status);
+	bcopy(retval.lr_attrval, attrval, retval.lr_attrsz);
+	return (DLADM_STATUS_OK);
 }
 
 /*
@@ -456,20 +380,15 @@ dladm_name2info(const char *link, datalink_id_t *linkidp, uint32_t *flagp,
 	dlmgmt_door_getlinkid_t		getlinkid;
 	dlmgmt_getlinkid_retval_t	retval;
 	datalink_id_t			linkid;
-	size_t				rsize;
 	dladm_status_t			status;
 
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&getlinkid, sizeof (getlinkid), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
+	if ((status = dladm_door_call(&getlinkid, sizeof (getlinkid),
+	    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
 		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
+	}
 
 	linkid = retval.lr_linkid;
 	if (retval.lr_class == DATALINK_CLASS_PHYS &&
@@ -505,10 +424,9 @@ dladm_status_t
 dladm_datalink_id2info(datalink_id_t linkid, uint32_t *flagp,
     datalink_class_t *classp, uint32_t *mediap, char *link, size_t len)
 {
-	dlmgmt_door_getname_t		getname;
-	dlmgmt_getname_retval_t		retval;
-	size_t				rsize;
-	dladm_status_t			status;
+	dlmgmt_door_getname_t	getname;
+	dlmgmt_getname_retval_t	retval;
+	dladm_status_t		status;
 
 	if ((linkid == DATALINK_INVALID_LINKID) || (link != NULL && len == 0) ||
 	    (link == NULL && len != 0)) {
@@ -517,15 +435,13 @@ dladm_datalink_id2info(datalink_id_t linkid, uint32_t *flagp,
 
 	getname.ld_cmd = DLMGMT_CMD_GETNAME;
 	getname.ld_linkid = linkid;
-	rsize = sizeof (retval);
-	status = dladm_door_call(&getname, sizeof (getname), &retval, &rsize);
-	if (status != DLADM_STATUS_OK)
+	if ((status = dladm_door_call(&getname, sizeof (getname), &retval,
+	    sizeof (retval))) != DLADM_STATUS_OK) {
 		return (status);
-
-	if ((rsize != sizeof (retval)) ||
-	    (len != 0 && (strlen(retval.lr_link) + 1 > len))) {
-		return (DLADM_STATUS_TOOSMALL);
 	}
+
+	if (len != 0 && (strlen(retval.lr_link) + 1 > len))
+		return (DLADM_STATUS_TOOSMALL);
 
 	if (retval.lr_class == DATALINK_CLASS_PHYS &&
 	    retval.lr_flags & DLMGMT_ACTIVE) {
@@ -560,12 +476,11 @@ dladm_status_t
 dladm_set_conf_field(dladm_conf_t conf, const char *attr,
     dladm_datatype_t type, const void *attrval)
 {
-	dlmgmt_door_setattr_t		*setattrp;
-	dlmgmt_setattr_retval_t		retval;
-	dladm_status_t			status;
-	size_t				asize, attrsz, rsize;
+	dlmgmt_door_setattr_t	setattr;
+	dlmgmt_setattr_retval_t	retval;
+	size_t			attrsz;
 
-	if (attr == NULL || attr == '\0' || attrval == NULL)
+	if (attr == NULL || attrval == NULL)
 		return (DLADM_STATUS_BADARG);
 
 	if (type == DLADM_TYPE_STR)
@@ -573,28 +488,18 @@ dladm_set_conf_field(dladm_conf_t conf, const char *attr,
 	else
 		attrsz = dladm_datatype_size[type];
 
-	asize = sizeof (dlmgmt_door_setattr_t) + attrsz - 1;
-	if ((setattrp = calloc(1, asize)) == NULL)
-		return (DLADM_STATUS_NOMEM);
+	if (attrsz > MAXLINKATTRVALLEN)
+		return (DLADM_STATUS_TOOSMALL);
 
-	setattrp->ld_cmd = DLMGMT_CMD_SETATTR;
-	setattrp->ld_conf = conf;
-	(void) strlcpy(setattrp->ld_attr, attr, MAXLINKATTRLEN);
-	setattrp->ld_attrsz = attrsz;
-	setattrp->ld_type = type;
-	bcopy(attrval, &setattrp->ld_attrval, attrsz);
-	rsize = sizeof (retval);
+	setattr.ld_cmd = DLMGMT_CMD_SETATTR;
+	setattr.ld_conf = conf;
+	(void) strlcpy(setattr.ld_attr, attr, MAXLINKATTRLEN);
+	setattr.ld_attrsz = attrsz;
+	setattr.ld_type = type;
+	bcopy(attrval, &setattr.ld_attrval, attrsz);
 
-	status = dladm_door_call(setattrp, asize, &retval, &rsize);
-	if (status != DLADM_STATUS_OK)
-		goto done;
-
-	if (rsize != sizeof (retval))
-		status = DLADM_STATUS_BADARG;
-
-done:
-	free(setattrp);
-	return (status);
+	return (dladm_door_call(&setattr, sizeof (setattr),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -605,26 +510,16 @@ dladm_unset_conf_field(dladm_conf_t conf, const char *attr)
 {
 	dlmgmt_door_unsetattr_t		unsetattr;
 	dlmgmt_unsetattr_retval_t	retval;
-	dladm_status_t			status;
-	size_t				rsize;
 
-	if (attr == NULL || attr == '\0')
+	if (attr == NULL)
 		return (DLADM_STATUS_BADARG);
 
 	unsetattr.ld_cmd = DLMGMT_CMD_UNSETATTR;
 	unsetattr.ld_conf = conf;
 	(void) strlcpy(unsetattr.ld_attr, attr, MAXLINKATTRLEN);
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&unsetattr, sizeof (unsetattr), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	return (DLADM_STATUS_OK);
+	return (dladm_door_call(&unsetattr, sizeof (unsetattr),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -636,22 +531,12 @@ dladm_remove_conf(datalink_id_t linkid)
 {
 	dlmgmt_door_removeconf_t	removeconf;
 	dlmgmt_removeconf_retval_t	retval;
-	size_t				rsize;
-	dladm_status_t			status;
 
 	removeconf.ld_cmd = DLMGMT_CMD_REMOVECONF;
 	removeconf.ld_linkid = linkid;
-	rsize = sizeof (retval);
 
-	status = dladm_door_call(&removeconf, sizeof (removeconf), &retval,
-	    &rsize);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (rsize != sizeof (retval))
-		return (DLADM_STATUS_BADARG);
-
-	return (DLADM_STATUS_OK);
+	return (dladm_door_call(&removeconf, sizeof (removeconf),
+	    &retval, sizeof (retval)));
 }
 
 /*
@@ -662,15 +547,13 @@ dladm_destroy_conf(dladm_conf_t conf)
 {
 	dlmgmt_door_destroyconf_t	destroyconf;
 	dlmgmt_destroyconf_retval_t	retval;
-	size_t				rsize;
 
 	if (conf == DLADM_INVALID_CONF)
 		return;
 
 	destroyconf.ld_cmd = DLMGMT_CMD_DESTROYCONF;
 	destroyconf.ld_conf = conf;
-	rsize = sizeof (retval);
 
-	(void) dladm_door_call(&destroyconf, sizeof (destroyconf), &retval,
-	    &rsize);
+	(void) dladm_door_call(&destroyconf, sizeof (destroyconf),
+	    &retval, sizeof (retval));
 }

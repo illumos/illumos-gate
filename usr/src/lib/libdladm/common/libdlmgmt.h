@@ -100,7 +100,7 @@ typedef struct dlmgmt_door_setattr_s {
 	char			ld_attr[MAXLINKATTRLEN];
 	size_t			ld_attrsz;
 	dladm_datatype_t	ld_type;
-	char			ld_attrval[1];
+	char			ld_attrval[MAXLINKATTRVALLEN];
 } dlmgmt_door_setattr_t;
 
 typedef struct dlmgmt_door_unsetattr_s {
@@ -135,62 +135,21 @@ typedef struct dlmgmt_door_getattr_s {
 	char		ld_attr[MAXLINKATTRLEN];
 } dlmgmt_door_getattr_t;
 
-typedef union dlmgmt_door_arg_s {
-	int				ld_cmd;
-	dlmgmt_upcall_arg_create_t	kcreate;
-	dlmgmt_upcall_arg_destroy_t	kdestroy;
-	dlmgmt_upcall_arg_getattr_t	kgetattr;
-	dlmgmt_door_getlinkid_t		getlinkid;
-	dlmgmt_door_getnext_t		getnext;
-	dlmgmt_door_createid_t		createid;
-	dlmgmt_door_destroyid_t		destroyid;
-	dlmgmt_door_remapid_t		remapid;
-	dlmgmt_door_upid_t		upid;
-	dlmgmt_door_createconf_t	createconf;
-	dlmgmt_door_getname_t		getname;
-	dlmgmt_door_getattr_t		getattr;
-	dlmgmt_door_setattr_t		setattr;
-	dlmgmt_door_writeconf_t		writeconf;
-	dlmgmt_door_removeconf_t	removeconf;
-	dlmgmt_door_destroyconf_t	destroyconf;
-	dlmgmt_door_readconf_t		readconf;
-} dlmgmt_door_arg_t;
-
 typedef struct dlmgmt_handle_retval_s {
 	uint_t			lr_err;
 	dladm_conf_t		lr_conf;
 } dlmgmt_createconf_retval_t, dlmgmt_readconf_retval_t;
 
-typedef struct dlmgmt_null_retval_s	dlmgmt_remapid_retval_t,
-	dlmgmt_upid_retval_t,
-	dlmgmt_destroyid_retval_t,
-	dlmgmt_setattr_retval_t,
-	dlmgmt_unsetattr_retval_t,
-	dlmgmt_writeconf_retval_t,
-	dlmgmt_removeconf_retval_t,
-	dlmgmt_destroyconf_retval_t;
+typedef struct dlmgmt_retval_s	dlmgmt_remapid_retval_t,
+				dlmgmt_upid_retval_t,
+				dlmgmt_destroyid_retval_t,
+				dlmgmt_setattr_retval_t,
+				dlmgmt_unsetattr_retval_t,
+				dlmgmt_writeconf_retval_t,
+				dlmgmt_removeconf_retval_t,
+				dlmgmt_destroyconf_retval_t;
 
 typedef struct dlmgmt_linkid_retval_s	dlmgmt_createid_retval_t;
-
-typedef union dlmgmt_retval {
-	uint_t				lr_err; /* return error code */
-	dlmgmt_create_retval_t		kcreate;
-	dlmgmt_destroy_retval_t		kdestroy;
-	dlmgmt_getattr_retval_t		getattr;
-	dlmgmt_getname_retval_t		getname;
-	dlmgmt_getlinkid_retval_t	getlinkid;
-	dlmgmt_getnext_retval_t		getnext;
-	dlmgmt_createid_retval_t	createid;
-	dlmgmt_destroyid_retval_t	destroyid;
-	dlmgmt_remapid_retval_t		remapid;
-	dlmgmt_upid_retval_t		upid;
-	dlmgmt_createconf_retval_t	createconf;
-	dlmgmt_readconf_retval_t	readconf;
-	dlmgmt_setattr_retval_t		setattr;
-	dlmgmt_writeconf_retval_t	writeconf;
-	dlmgmt_removeconf_retval_t	removeconf;
-	dlmgmt_destroyconf_retval_t	destroyconf;
-} dlmgmt_retval_t;
 
 #ifdef __cplusplus
 }

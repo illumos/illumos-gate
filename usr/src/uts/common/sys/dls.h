@@ -88,6 +88,7 @@ typedef uint64_t	datalink_media_t;
 	B_TRUE : ((uint32_t)((dmedia) & 0xfffffffful) == (media)))
 
 #define	MAXLINKATTRLEN		32
+#define	MAXLINKATTRVALLEN	1024
 
 /*
  * Link attributes used by the kernel.
@@ -131,6 +132,10 @@ typedef uint64_t	datalink_media_t;
 #define	DLMGMT_PERSIST		0x02
 
 /* upcall argument */
+typedef struct dlmgmt_door_arg {
+	uint_t			ld_cmd;
+} dlmgmt_door_arg_t;
+
 typedef struct dlmgmt_upcall_arg_create {
 	int			ld_cmd;
 	datalink_class_t	ld_class;
@@ -141,18 +146,23 @@ typedef struct dlmgmt_upcall_arg_create {
 	char			ld_devname[MAXNAMELEN];
 } dlmgmt_upcall_arg_create_t;
 
+/*
+ * Note: ld_padding is necessary to keep the size of the structure the
+ * same on amd64 and i386.  The same note applies to other ld_padding
+ * and lr_paddding fields in structures throughout this file.
+ */
 typedef struct dlmgmt_upcall_arg_destroy {
 	int			ld_cmd;
 	datalink_id_t		ld_linkid;
 	boolean_t		ld_persist;
-	int			ld_reserved;
+	int			ld_padding;
 } dlmgmt_upcall_arg_destroy_t;
 
 typedef struct dlmgmt_upcall_arg_update {
 	int			ld_cmd;
 	boolean_t		ld_novanity;
 	uint32_t		ld_media;
-	uint32_t		ld_reserved;
+	uint32_t		ld_padding;
 	char			ld_devname[MAXNAMELEN];
 } dlmgmt_upcall_arg_update_t;
 
@@ -181,13 +191,19 @@ typedef struct dlmgmt_door_getnext_s {
 } dlmgmt_door_getnext_t;
 
 /* upcall return value */
+typedef struct dlmgmt_retval_s {
+	uint_t			lr_err; /* return error code */
+} dlmgmt_retval_t;
+
+typedef dlmgmt_retval_t	dlmgmt_destroy_retval_t;
+
 struct dlmgmt_linkid_retval_s {
 	uint_t			lr_err;
 	datalink_id_t		lr_linkid;
 	uint32_t		lr_flags;
 	datalink_class_t	lr_class;
 	uint32_t		lr_media;
-	uint32_t		lr_reserved;
+	uint32_t		lr_padding;
 };
 
 typedef struct dlmgmt_linkid_retval_s	dlmgmt_create_retval_t,
@@ -203,16 +219,12 @@ typedef struct dlmgmt_getname_retval_s {
 	uint32_t		lr_flags;
 } dlmgmt_getname_retval_t;
 
-struct dlmgmt_null_retval_s {
-	uint_t			lr_err;
-};
-
-typedef struct dlmgmt_null_retval_s	dlmgmt_destroy_retval_t;
-
 typedef struct dlmgmt_getattr_retval_s {
 	uint_t			lr_err;
 	uint_t			lr_type;
-	char			lr_attr[1];
+	uint_t			lr_attrsz;
+	uint_t			lr_padding;
+	char			lr_attrval[MAXLINKATTRVALLEN];
 } dlmgmt_getattr_retval_t;
 
 #ifdef	_KERNEL

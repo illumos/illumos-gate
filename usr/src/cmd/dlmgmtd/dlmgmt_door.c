@@ -29,16 +29,28 @@
 /*
  * Main door handler functions used by dlmgmtd to process the different door
  * call requests. Door call requests can come from the user-land applications,
- * which will be handled by dlmgmt_call_handler(); or they can come from the
- * kernel, which will be handled by dlmgmt_upcall_handler().
+ * or from the kernel.
  */
 
 #include <assert.h>
-#include <stdlib.h>
 #include <alloca.h>
+#include <errno.h>
+#include <priv_utils.h>
+#include <stdlib.h>
 #include <strings.h>
 #include <libdlmgmt.h>
 #include "dlmgmt_impl.h"
+
+typedef void dlmgmt_door_handler_t(void *, void *);
+
+typedef struct dlmgmt_door_info_s {
+	uint_t			di_cmd;
+	boolean_t		di_set;
+	size_t			di_reqsz;
+	size_t			di_acksz;
+	dlmgmt_door_handler_t	*di_handler;
+} dlmgmt_door_info_t;
+
 
 static dlmgmt_link_t *
 dlmgmt_getlink_by_dev(char *devname)
@@ -56,9 +68,10 @@ dlmgmt_getlink_by_dev(char *devname)
 }
 
 static void
-dlmgmt_upcall_create(dlmgmt_upcall_arg_create_t *create,
-    dlmgmt_create_retval_t *retvalp)
+dlmgmt_upcall_create(void *argp, void *retp)
 {
+	dlmgmt_upcall_arg_create_t *create = argp;
+	dlmgmt_create_retval_t	*retvalp = retp;
 	datalink_class_t	class;
 	uint32_t		media;
 	dlmgmt_link_t		*linkp;
@@ -157,12 +170,13 @@ done:
 }
 
 static void
-dlmgmt_upcall_update(dlmgmt_upcall_arg_update_t *update,
-    dlmgmt_update_retval_t *retvalp)
+dlmgmt_upcall_update(void *argp, void *retp)
 {
-	uint32_t	media = update->ld_media;
-	dlmgmt_link_t	*linkp;
-	int		err = 0;
+	dlmgmt_upcall_arg_update_t	*update = argp;
+	dlmgmt_update_retval_t		*retvalp = retp;
+	uint32_t			media = update->ld_media;
+	dlmgmt_link_t			*linkp;
+	int				err = 0;
 
 	/*
 	 * Hold the writer lock to update the link table.
@@ -224,13 +238,14 @@ done:
 }
 
 static void
-dlmgmt_upcall_destroy(dlmgmt_upcall_arg_destroy_t *destroy,
-    dlmgmt_destroy_retval_t *retvalp)
+dlmgmt_upcall_destroy(void *argp, void *retp)
 {
-	datalink_id_t	linkid = destroy->ld_linkid;
-	dlmgmt_link_t	*linkp = NULL;
-	uint32_t	flags, dflags = 0;
-	int		err = 0;
+	dlmgmt_upcall_arg_destroy_t	*destroy = argp;
+	dlmgmt_destroy_retval_t		*retvalp = retp;
+	datalink_id_t			linkid = destroy->ld_linkid;
+	dlmgmt_link_t			*linkp = NULL;
+	uint32_t			flags, dflags = 0;
+	int				err = 0;
 
 	flags = DLMGMT_ACTIVE | (destroy->ld_persist ? DLMGMT_PERSIST : 0);
 
@@ -267,10 +282,12 @@ done:
 }
 
 static void
-dlmgmt_getname(dlmgmt_door_getname_t *getname, dlmgmt_getname_retval_t *retvalp)
+dlmgmt_getname(void *argp, void *retp)
 {
-	dlmgmt_link_t	*linkp;
-	int		err = 0;
+	dlmgmt_door_getname_t	*getname = argp;
+	dlmgmt_getname_retval_t	*retvalp = retp;
+	dlmgmt_link_t		*linkp;
+	int			err = 0;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -299,11 +316,12 @@ done:
 }
 
 static void
-dlmgmt_getlinkid(dlmgmt_door_getlinkid_t *getlinkid,
-    dlmgmt_getlinkid_retval_t *retvalp)
+dlmgmt_getlinkid(void *argp, void *retp)
 {
-	dlmgmt_link_t	*linkp;
-	int		err = 0;
+	dlmgmt_door_getlinkid_t	*getlinkid = argp;
+	dlmgmt_getlinkid_retval_t *retvalp = retp;
+	dlmgmt_link_t		*linkp;
+	int			err = 0;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -328,12 +346,14 @@ done:
 }
 
 static void
-dlmgmt_getnext(dlmgmt_door_getnext_t *getnext, dlmgmt_getnext_retval_t *retvalp)
+dlmgmt_getnext(void *argp, void *retp)
 {
-	dlmgmt_link_t	link, *linkp;
-	datalink_id_t	linkid = getnext->ld_linkid;
-	avl_index_t	where;
-	int		err = 0;
+	dlmgmt_door_getnext_t	*getnext = argp;
+	dlmgmt_getnext_retval_t	*retvalp = retp;
+	dlmgmt_link_t		link, *linkp;
+	datalink_id_t		linkid = getnext->ld_linkid;
+	avl_index_t		where;
+	int			err = 0;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -366,16 +386,12 @@ dlmgmt_getnext(dlmgmt_door_getnext_t *getnext, dlmgmt_getnext_retval_t *retvalp)
 	retvalp->lr_err = err;
 }
 
-/*
- * Note that the caller needs to free the memory of *retvalp, when it returns
- * success.
- */
-static int
-dlmgmt_upcall_getattr(dlmgmt_upcall_arg_getattr_t *getattr,
-    dlmgmt_getattr_retval_t **retvalpp, size_t *retszp)
+static void
+dlmgmt_upcall_getattr(void *argp, void *retp)
 {
-	dlmgmt_link_t	*linkp;
-	int		err = 0;
+	dlmgmt_upcall_arg_getattr_t	*getattr = argp;
+	dlmgmt_getattr_retval_t		*retvalp = retp;
+	dlmgmt_link_t			*linkp;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -385,108 +401,25 @@ dlmgmt_upcall_getattr(dlmgmt_upcall_arg_getattr_t *getattr,
 		/*
 		 * The link does not exist.
 		 */
-		err = ENOENT;
+		retvalp->lr_err = ENOENT;
 		goto done;
 	}
 
-	err = dlmgmt_getattr_common(&linkp->ll_head, getattr->ld_attr,
-	    retvalpp, retszp);
+	dlmgmt_getattr_common(&linkp->ll_head, getattr->ld_attr, retvalp);
 
 done:
 	dlmgmt_table_unlock();
-	return (err);
 }
 
 static void
-dlmgmt_upcall_handler(void *arg, int cmd)
+dlmgmt_createid(void *argp, void *retp)
 {
-	switch (cmd) {
-	case DLMGMT_CMD_DLS_CREATE: {
-		dlmgmt_create_retval_t retval;
-
-		dlmgmt_upcall_create(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_DLS_UPDATE: {
-		dlmgmt_update_retval_t retval;
-
-		dlmgmt_upcall_update(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_DLS_GETATTR: {
-		dlmgmt_getattr_retval_t retval;
-		dlmgmt_getattr_retval_t *retvalp = NULL;
-		dlmgmt_getattr_retval_t *tmp;
-		size_t retsz = 0;
-		int err;
-
-		if ((err = dlmgmt_upcall_getattr(arg, &retvalp, &retsz)) != 0) {
-			retval.lr_err = err;
-			retvalp = &retval;
-			retsz = sizeof (retval);
-		} else {
-			/*
-			 * For the successful case, retvalp points to
-			 * memory that was allocated with malloc.  But, since
-			 * door_return never returns, that memory gets leaked.
-			 * Use alloca and free retvalp.
-			 */
-			tmp = alloca(retsz);
-			bcopy(retvalp, tmp, retsz);
-			free(retvalp);
-			retvalp = tmp;
-		}
-		(void) door_return((char *)retvalp, retsz, NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_DLS_DESTROY: {
-		dlmgmt_destroy_retval_t retval;
-
-		dlmgmt_upcall_destroy(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_GETNAME: {
-		dlmgmt_getname_retval_t retval;
-
-		dlmgmt_getname(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_GETLINKID: {
-		dlmgmt_getlinkid_retval_t retval;
-
-		dlmgmt_getlinkid(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_GETNEXT: {
-		dlmgmt_getnext_retval_t retval;
-
-		dlmgmt_getnext(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	default: {
-		struct dlmgmt_null_retval_s retval;
-
-		retval.lr_err = EINVAL;
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	}
-}
-
-static void
-dlmgmt_createid(dlmgmt_door_createid_t *createid,
-    dlmgmt_createid_retval_t *retvalp)
-{
-	dlmgmt_link_t	*linkp;
-	datalink_id_t	linkid = DATALINK_INVALID_LINKID;
-	char		link[MAXLINKNAMELEN];
-	int		err;
+	dlmgmt_door_createid_t	*createid = argp;
+	dlmgmt_createid_retval_t *retvalp = retp;
+	dlmgmt_link_t		*linkp;
+	datalink_id_t		linkid = DATALINK_INVALID_LINKID;
+	char			link[MAXLINKNAMELEN];
+	int			err;
 
 	/*
 	 * Hold the writer lock to update the dlconf table.
@@ -523,13 +456,14 @@ done:
 }
 
 static void
-dlmgmt_destroyid(dlmgmt_door_destroyid_t *destroyid,
-    dlmgmt_destroyid_retval_t *retvalp)
+dlmgmt_destroyid(void *argp, void *retp)
 {
-	datalink_id_t	linkid = destroyid->ld_linkid;
-	uint32_t	flags = destroyid->ld_flags;
-	dlmgmt_link_t	*linkp = NULL;
-	int		err = 0;
+	dlmgmt_door_destroyid_t	*destroyid = argp;
+	dlmgmt_destroyid_retval_t *retvalp = retp;
+	datalink_id_t		linkid = destroyid->ld_linkid;
+	uint32_t		flags = destroyid->ld_flags;
+	dlmgmt_link_t		*linkp = NULL;
+	int			err = 0;
 
 	/*
 	 * Hold the writer lock to update the link table.
@@ -560,13 +494,14 @@ done:
  * the given link name.
  */
 static void
-dlmgmt_remapid(dlmgmt_door_remapid_t *remapid,
-    dlmgmt_remapid_retval_t *retvalp)
+dlmgmt_remapid(void *argp, void *retp)
 {
-	datalink_id_t	linkid1 = remapid->ld_linkid;
-	dlmgmt_link_t	link, *linkp1, *tmp;
-	avl_index_t	where;
-	int		err = 0;
+	dlmgmt_door_remapid_t	*remapid = argp;
+	dlmgmt_remapid_retval_t	*retvalp = retp;
+	datalink_id_t		linkid1 = remapid->ld_linkid;
+	dlmgmt_link_t		link, *linkp1, *tmp;
+	avl_index_t		where;
+	int			err = 0;
 
 	if (!dladm_valid_linkname(remapid->ld_link)) {
 		retvalp->lr_err = EINVAL;
@@ -606,10 +541,12 @@ done:
 }
 
 static void
-dlmgmt_upid(dlmgmt_door_upid_t *upid, dlmgmt_upid_retval_t *retvalp)
+dlmgmt_upid(void *argp, void *retp)
 {
-	dlmgmt_link_t	*linkp;
-	int		err = 0;
+	dlmgmt_door_upid_t	*upid = argp;
+	dlmgmt_upid_retval_t	*retvalp = retp;
+	dlmgmt_link_t		*linkp;
+	int			err = 0;
 
 	/*
 	 * Hold the writer lock to update the link table.
@@ -633,12 +570,13 @@ done:
 }
 
 static void
-dlmgmt_createconf(dlmgmt_door_createconf_t *createconf,
-    dlmgmt_createconf_retval_t *retvalp)
+dlmgmt_createconf(void *argp, void *retp)
 {
-	dlmgmt_dlconf_t	dlconf, *dlconfp, *tmp;
-	avl_index_t	where;
-	int		err;
+	dlmgmt_door_createconf_t *createconf = argp;
+	dlmgmt_createconf_retval_t *retvalp = retp;
+	dlmgmt_dlconf_t		dlconf, *dlconfp, *tmp;
+	avl_index_t		where;
+	int			err;
 
 	/*
 	 * Hold the writer lock to update the dlconf table.
@@ -663,17 +601,12 @@ done:
 }
 
 static void
-dlmgmt_setattr(dlmgmt_door_setattr_t *setattr, size_t argsz,
-    dlmgmt_setattr_retval_t *retvalp)
+dlmgmt_setattr(void *argp, void *retp)
 {
-	dlmgmt_dlconf_t	dlconf, *dlconfp;
-	int		err = 0;
-
-	if (argsz < sizeof (dlmgmt_door_setattr_t) ||
-	    argsz != sizeof (dlmgmt_door_setattr_t) + setattr->ld_attrsz - 1) {
-		retvalp->lr_err = EINVAL;
-		return;
-	}
+	dlmgmt_door_setattr_t	*setattr = argp;
+	dlmgmt_setattr_retval_t	*retvalp = retp;
+	dlmgmt_dlconf_t		dlconf, *dlconfp;
+	int			err = 0;
 
 	/*
 	 * Hold the writer lock to update the dlconf table.
@@ -696,11 +629,12 @@ done:
 }
 
 static void
-dlmgmt_unsetattr(dlmgmt_door_unsetattr_t *unsetattr,
-    dlmgmt_unsetattr_retval_t *retvalp)
+dlmgmt_unsetconfattr(void *argp, void *retp)
 {
-	dlmgmt_dlconf_t	dlconf, *dlconfp;
-	int		err = 0;
+	dlmgmt_door_unsetattr_t	*unsetattr = argp;
+	dlmgmt_unsetattr_retval_t *retvalp = retp;
+	dlmgmt_dlconf_t		dlconf, *dlconfp;
+	int			err = 0;
 
 	/*
 	 * Hold the writer lock to update the dlconf table.
@@ -734,9 +668,10 @@ done:
  * across the pair of dladm_read_conf() and dladm_write_conf() calls.
  */
 static void
-dlmgmt_writeconf(dlmgmt_door_writeconf_t *writeconf,
-    dlmgmt_writeconf_retval_t *retvalp)
+dlmgmt_writeconf(void *argp, void *retp)
 {
+	dlmgmt_door_writeconf_t	*writeconf = argp;
+	dlmgmt_writeconf_retval_t *retvalp = retp;
 	dlmgmt_dlconf_t		dlconf, *dlconfp;
 	dlmgmt_link_t		*linkp;
 	dlmgmt_linkattr_t	*attrp, *next;
@@ -809,10 +744,11 @@ done:
 }
 
 static void
-dlmgmt_removeconf(dlmgmt_door_removeconf_t *removeconf,
-    dlmgmt_removeconf_retval_t *retvalp)
+dlmgmt_removeconf(void *argp, void *retp)
 {
-	int err;
+	dlmgmt_door_removeconf_t 	*removeconf = argp;
+	dlmgmt_removeconf_retval_t	*retvalp = retp;
+	int				err;
 
 	dlmgmt_table_lock(B_TRUE);
 	err = dlmgmt_delete_db_entry(removeconf->ld_linkid, DLMGMT_PERSIST);
@@ -821,11 +757,12 @@ dlmgmt_removeconf(dlmgmt_door_removeconf_t *removeconf,
 }
 
 static void
-dlmgmt_destroyconf(dlmgmt_door_destroyconf_t *destroyconf,
-    dlmgmt_destroyconf_retval_t *retvalp)
+dlmgmt_destroyconf(void *argp, void *retp)
 {
-	dlmgmt_dlconf_t	dlconf, *dlconfp;
-	int		err = 0;
+	dlmgmt_door_destroyconf_t	*destroyconf = argp;
+	dlmgmt_destroyconf_retval_t	*retvalp = retp;
+	dlmgmt_dlconf_t			dlconf, *dlconfp;
+	int				err = 0;
 
 	/*
 	 * Hold the writer lock to update the dlconf table.
@@ -852,9 +789,10 @@ done:
  * ensure atomicity across the {dlmgmt_readconf(), dlmgmt_writeconf()} pair.
  */
 static void
-dlmgmt_readconf(dlmgmt_door_readconf_t *readconf,
-    dlmgmt_readconf_retval_t *retvalp)
+dlmgmt_readconf(void *argp, void *retp)
 {
+	dlmgmt_door_readconf_t	*readconf = argp;
+	dlmgmt_readconf_retval_t *retvalp = retp;
 	dlmgmt_link_t 		*linkp;
 	datalink_id_t		linkid = readconf->ld_linkid;
 	dlmgmt_dlconf_t		*dlconfp, *tmp, dlconf;
@@ -910,166 +848,126 @@ done:
 /*
  * Note: the caller must free *retvalpp in case of success.
  */
-static int
-dlmgmt_getattr(dlmgmt_door_getattr_t *getattr,
-    dlmgmt_getattr_retval_t **retvalpp, size_t *retszp)
+static void
+dlmgmt_getattr(void *argp, void *retp)
 {
+	dlmgmt_door_getattr_t	*getattr = argp;
+	dlmgmt_getattr_retval_t	*retvalp = retp;
 	dlmgmt_dlconf_t		dlconf, *dlconfp;
-	int			err = 0;
 
 	/*
-	 * Hold the writer lock to update the dlconf table.
+	 * Hold the read lock to access the dlconf table.
 	 */
 	dlmgmt_dlconf_table_lock(B_FALSE);
 
 	dlconf.ld_id = (int)getattr->ld_conf;
 	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
 	if (dlconfp == NULL) {
-		err = ENOENT;
+		retvalp->lr_err = ENOENT;
 		goto done;
 	}
 
-	err = dlmgmt_getattr_common(&dlconfp->ld_head, getattr->ld_attr,
-	    retvalpp, retszp);
+	dlmgmt_getattr_common(&dlconfp->ld_head, getattr->ld_attr, retvalp);
 
 done:
 	dlmgmt_dlconf_table_unlock();
-	return (err);
 }
 
-static void
-dlmgmt_call_handler(void *arg, size_t argsz, int cmd)
-{
-	switch (cmd) {
-	case DLMGMT_CMD_CREATE_LINKID: {
-		dlmgmt_createid_retval_t retval;
+static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
+	{ DLMGMT_CMD_DLS_CREATE, B_TRUE, sizeof (dlmgmt_upcall_arg_create_t),
+	    sizeof (dlmgmt_create_retval_t), dlmgmt_upcall_create },
+	{ DLMGMT_CMD_DLS_GETATTR, B_FALSE, sizeof (dlmgmt_upcall_arg_getattr_t),
+	    sizeof (dlmgmt_getattr_retval_t), dlmgmt_upcall_getattr },
+	{ DLMGMT_CMD_DLS_DESTROY, B_TRUE, sizeof (dlmgmt_upcall_arg_destroy_t),
+	    sizeof (dlmgmt_destroy_retval_t), dlmgmt_upcall_destroy },
+	{ DLMGMT_CMD_GETNAME, B_FALSE, sizeof (dlmgmt_door_getname_t),
+	    sizeof (dlmgmt_getname_retval_t), dlmgmt_getname },
+	{ DLMGMT_CMD_GETLINKID,	B_FALSE, sizeof (dlmgmt_door_getlinkid_t),
+	    sizeof (dlmgmt_getlinkid_retval_t), dlmgmt_getlinkid },
+	{ DLMGMT_CMD_GETNEXT, B_FALSE, sizeof (dlmgmt_door_getnext_t),
+	    sizeof (dlmgmt_getnext_retval_t), dlmgmt_getnext },
+	{ DLMGMT_CMD_DLS_UPDATE, B_TRUE, sizeof (dlmgmt_upcall_arg_update_t),
+	    sizeof (dlmgmt_update_retval_t), dlmgmt_upcall_update },
+	{ DLMGMT_CMD_CREATE_LINKID, B_TRUE, sizeof (dlmgmt_door_createid_t),
+	    sizeof (dlmgmt_createid_retval_t), dlmgmt_createid },
+	{ DLMGMT_CMD_DESTROY_LINKID, B_TRUE, sizeof (dlmgmt_door_destroyid_t),
+	    sizeof (dlmgmt_destroyid_retval_t), dlmgmt_destroyid },
+	{ DLMGMT_CMD_REMAP_LINKID, B_TRUE, sizeof (dlmgmt_door_remapid_t),
+	    sizeof (dlmgmt_remapid_retval_t), dlmgmt_remapid },
+	{ DLMGMT_CMD_CREATECONF, B_TRUE, sizeof (dlmgmt_door_createconf_t),
+	    sizeof (dlmgmt_createconf_retval_t), dlmgmt_createconf },
+	{ DLMGMT_CMD_READCONF, B_FALSE, sizeof (dlmgmt_door_readconf_t),
+	    sizeof (dlmgmt_readconf_retval_t), dlmgmt_readconf },
+	{ DLMGMT_CMD_WRITECONF, B_TRUE, sizeof (dlmgmt_door_writeconf_t),
+	    sizeof (dlmgmt_writeconf_retval_t), dlmgmt_writeconf },
+	{ DLMGMT_CMD_UP_LINKID, B_TRUE, sizeof (dlmgmt_door_upid_t),
+	    sizeof (dlmgmt_upid_retval_t), dlmgmt_upid },
+	{ DLMGMT_CMD_SETATTR, B_TRUE, sizeof (dlmgmt_door_setattr_t),
+	    sizeof (dlmgmt_setattr_retval_t), dlmgmt_setattr },
+	{ DLMGMT_CMD_UNSETATTR, B_TRUE, sizeof (dlmgmt_door_unsetattr_t),
+	    sizeof (dlmgmt_unsetattr_retval_t), dlmgmt_unsetconfattr },
+	{ DLMGMT_CMD_REMOVECONF, B_TRUE, sizeof (dlmgmt_door_removeconf_t),
+	    sizeof (dlmgmt_removeconf_retval_t), dlmgmt_removeconf },
+	{ DLMGMT_CMD_DESTROYCONF, B_TRUE, sizeof (dlmgmt_door_destroyconf_t),
+	    sizeof (dlmgmt_destroyconf_retval_t), dlmgmt_destroyconf },
+	{ DLMGMT_CMD_GETATTR, B_FALSE, sizeof (dlmgmt_door_getattr_t),
+	    sizeof (dlmgmt_getattr_retval_t), dlmgmt_getattr }
+};
 
-		dlmgmt_createid(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_DESTROY_LINKID: {
-		dlmgmt_destroyid_retval_t retval;
-
-		dlmgmt_destroyid(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_REMAP_LINKID: {
-		dlmgmt_remapid_retval_t retval;
-
-		dlmgmt_remapid(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_UP_LINKID: {
-		dlmgmt_upid_retval_t retval;
-
-		dlmgmt_upid(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_CREATECONF: {
-		dlmgmt_createconf_retval_t retval;
-
-		dlmgmt_createconf(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_SETATTR: {
-		dlmgmt_setattr_retval_t retval;
-
-		dlmgmt_setattr(arg, argsz, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_UNSETATTR: {
-		dlmgmt_unsetattr_retval_t retval;
-
-		dlmgmt_unsetattr(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_WRITECONF: {
-		dlmgmt_writeconf_retval_t retval;
-
-		dlmgmt_writeconf(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_REMOVECONF: {
-		dlmgmt_removeconf_retval_t retval;
-
-		dlmgmt_removeconf(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_DESTROYCONF: {
-		dlmgmt_destroyconf_retval_t retval;
-
-		dlmgmt_destroyconf(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_READCONF: {
-		dlmgmt_readconf_retval_t retval;
-
-		dlmgmt_readconf(arg, &retval);
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	case DLMGMT_CMD_GETATTR: {
-		dlmgmt_getattr_retval_t retval;
-		dlmgmt_getattr_retval_t *retvalp = NULL;
-		dlmgmt_getattr_retval_t *tmp;
-		int err;
-		size_t retsz = 0;
-
-		if ((err = dlmgmt_getattr(arg, &retvalp, &retsz)) != 0) {
-			retval.lr_err = err;
-			retvalp = &retval;
-			retsz = sizeof (retval);
-		} else {
-			/*
-			 * For the successful case, retvalp points to memory
-			 * that was allocated in dlmgmt_getattr().  Since
-			 * door_return never returns, that memory would get
-			 * leaked. So we use alloca instead, and free retvalp.
-			 */
-			tmp = alloca(retsz);
-			bcopy(retvalp, tmp, retsz);
-			free(retvalp);
-			retvalp = tmp;
-		}
-		(void) door_return((char *)retvalp, retsz, NULL, 0);
-		break;
-	}
-	default: {
-		struct dlmgmt_null_retval_s retval;
-
-		retval.lr_err = EINVAL;
-		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
-		break;
-	}
-	}
-}
+#define	DLMGMT_INFO_TABLE_SIZE	(sizeof (i_dlmgmt_door_info_tbl) /	\
+    sizeof (i_dlmgmt_door_info_tbl[0]))
 
 /* ARGSUSED */
 void
 dlmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
     uint_t n_desc)
 {
-	int cmd = ((dlmgmt_door_arg_t *)(void *)argp)->ld_cmd;
+	dlmgmt_door_info_t	*infop = NULL;
+	dlmgmt_retval_t		retval;
+	void			*retvalp;
+	int			err;
+	int			i;
 
-	if (cmd < DLMGMT_CMD_BASE) {
-		/*
-		 * Upcall request from the dls module.
-		 */
-		dlmgmt_upcall_handler(argp, cmd);
-	} else {
-		/*
-		 * Door call request from libdladm.
-		 */
-		dlmgmt_call_handler(argp, argsz, cmd);
+	for (i = 0; i < DLMGMT_INFO_TABLE_SIZE; i++) {
+		if (i_dlmgmt_door_info_tbl[i].di_cmd ==
+		    ((dlmgmt_door_arg_t *)(void *)argp)->ld_cmd) {
+			infop = i_dlmgmt_door_info_tbl + i;
+			break;
+		}
 	}
+
+	if (infop == NULL || argsz != infop->di_reqsz) {
+		err = EINVAL;
+		goto fail;
+	}
+
+	if (infop->di_set) {
+		ucred_t	*cred = NULL;
+		const priv_set_t *eset;
+
+		if (door_ucred(&cred) != 0) {
+			err = errno;
+			goto fail;
+		}
+
+		eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+		if (eset == NULL || !priv_ismember(eset, PRIV_SYS_NET_CONFIG)) {
+			ucred_free(cred);
+			err = EACCES;
+			goto fail;
+		}
+	}
+
+	/*
+	 * We cannot use malloc() here because door_return never returns, and
+	 * memory allocated by malloc() would get leaked. Use alloca() instead.
+	 */
+	retvalp = alloca(infop->di_acksz);
+	infop->di_handler(argp, retvalp);
+	(void) door_return(retvalp, infop->di_acksz, NULL, 0);
+	return;
+
+fail:
+	retval.lr_err = err;
+	(void) door_return((char *)&retval, sizeof (retval), NULL, 0);
 }

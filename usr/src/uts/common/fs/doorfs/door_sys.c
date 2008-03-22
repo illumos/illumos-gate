@@ -1639,10 +1639,18 @@ door_ucred(struct ucred_s *uch)
 	DOOR_T_HOLD(ct);
 	mutex_exit(&door_knob);
 
-	/* Get the credentials of the calling process */
 	p = ttoproc(caller);
 
-	res = pgetucred(p);
+	/*
+	 * If the credentials are not specified by the client, get the one
+	 * associated with the calling process.
+	 */
+	if (ct->d_cred == NULL) {
+		res = pgetucred(p);
+	} else {
+		res = cred2ucred(ct->d_cred, ct->d_upcall ?
+		    p0.p_pid : p->p_pid, NULL, CRED());
+	}
 
 	mutex_enter(&door_knob);
 	DOOR_T_RELEASE(ct);
@@ -2114,7 +2122,7 @@ door_unref(void)
 		dp->door_flags |= DOOR_UNREF_ACTIVE;
 		mutex_exit(&door_knob);
 
-		(void) door_upcall(DTOV(dp), &unref_args);
+		(void) door_upcall(DTOV(dp), &unref_args, NULL);
 
 		mutex_enter(&door_knob);
 		ASSERT(dp->door_flags & DOOR_UNREF_ACTIVE);
@@ -3005,10 +3013,11 @@ door_copy(struct as *as, caddr_t src, caddr_t dest, uint_t len)
  *	in the event of an error, and passed without duplication
  *	otherwise.  Note that param->rbuf must be 64-bit aligned in
  *	a 64-bit kernel, since it may be used to store door descriptors
- *	if they are returned by the server.
+ *	if they are returned by the server.  The caller is responsible
+ *	for holding a reference to the cred passed in.
  */
 int
-door_upcall(vnode_t *vp, door_arg_t *param)
+door_upcall(vnode_t *vp, door_arg_t *param, struct cred *cred)
 {
 	/* Locals */
 	door_node_t	*dp;
@@ -3096,6 +3105,7 @@ door_upcall(vnode_t *vp, door_arg_t *param)
 	}
 
 	ct->d_upcall = 1;
+	ct->d_cred = cred;
 	if (param->rsize == 0)
 		ct->d_noresults = 1;
 	else
@@ -3253,6 +3263,7 @@ out:
 		ct->d_fpp_size = 0;
 	}
 
+	ct->d_cred = NULL;
 	ct->d_upcall = 0;
 	ct->d_noresults = 0;
 	ct->d_buf = NULL;
@@ -3304,17 +3315,29 @@ door_list_delete(door_node_t *dp)
  */
 
 /*
- * door_ki_upcall invokes a user-level door server from the kernel.
+ * door_ki_upcall invokes a user-level door server from the kernel, with
+ * the credentials associated with curthread.
  */
 int
 door_ki_upcall(door_handle_t dh, door_arg_t *param)
+{
+	return (door_ki_upcall_cred(dh, param, NULL));
+}
+
+/*
+ * door_ki_upcall_cred invokes a user-level door server from the kernel with
+ * the given credentials. If the "cred" argument is NULL, uses the credentials
+ * associated with current thread.
+ */
+int
+door_ki_upcall_cred(door_handle_t dh, door_arg_t *param, struct cred *cred)
 {
 	file_t *fp = DHTOF(dh);
 	vnode_t *realvp;
 
 	if (VOP_REALVP(fp->f_vnode, &realvp, NULL))
 		realvp = fp->f_vnode;
-	return (door_upcall(realvp, param));
+	return (door_upcall(realvp, param, cred));
 }
 
 /*
