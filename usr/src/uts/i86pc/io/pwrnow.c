@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,22 +229,23 @@ pwrnow_init(cpudrv_devstate_t *cpudsp)
 	 */
 	cpu_regs.cp_eax = 0x80000007;
 	(void) __cpuid_insn(&cpu_regs);
+
+	/*
+	 * We currently only support CPU power management of
+	 * processors that are P-state TSC invariant.
+	 */
 	if (!(cpu_regs.cp_edx & AMD_CPUID_TSC_CONSTANT)) {
 		PWRNOW_DEBUG(("No support for CPUs that are not P-state "
 		    "TSC invariant.\n"));
 		return (PWRNOW_RET_NO_PM);
 	}
-	if (!(cpu_regs.cp_edx & AMD_CPUID_PSTATE_HARDWARE)) {
-		PWRNOW_DEBUG(("Hardware P-State control is not supported.\n"));
-		return (PWRNOW_RET_NO_PM);
-	}
 
 	/*
-	 * Just greyhound at this point.
+	 * We only support the "Fire and Forget" style of PowerNow! (i.e.,
+	 * single MSR write to change speed).
 	 */
-	family = cpuid_getfamily(CPU);
-	if (family != 0x10) {
-		PWRNOW_DEBUG(("CPUPM currently only supported for 0x10.\n"));
+	if (!(cpu_regs.cp_edx & AMD_CPUID_PSTATE_HARDWARE)) {
+		PWRNOW_DEBUG(("Hardware P-State control is not supported.\n"));
 		return (PWRNOW_RET_NO_PM);
 	}
 
