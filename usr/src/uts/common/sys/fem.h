@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -241,14 +241,14 @@ struct fem_head {
 	int (*femop_poll)(femarg_t *vf, short events, int anyyet,	\
 			short *reventsp, struct pollhead **phpp,	\
 			caller_context_t *ct);				\
-	int (*femop_dump)(femarg_t *vf, caddr_t addr, int lbdn,		\
-			int dblks, caller_context_t *ct);		\
+	int (*femop_dump)(femarg_t *vf, caddr_t addr, offset_t lbdn,	\
+			offset_t dblks, caller_context_t *ct);		\
 	int (*femop_pathconf)(femarg_t *vf, int cmd, ulong_t *valp,	\
 			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_pageio)(femarg_t *vf, struct page *pp,		\
 			u_offset_t io_off, size_t io_len, int flags,	\
 			cred_t *cr, caller_context_t *ct);		\
-	int (*femop_dumpctl)(femarg_t *vf, int action, int *blkp,	\
+	int (*femop_dumpctl)(femarg_t *vf, int action, offset_t *blkp,	\
 			caller_context_t *ct);				\
 	void (*femop_dispose)(femarg_t *vf, struct page *pp, int flag,	\
 			int dn, cred_t *cr, caller_context_t *ct);	\
@@ -373,14 +373,14 @@ extern int vnext_delmap(femarg_t *vf, offset_t off, struct as *as,
 extern int vnext_poll(femarg_t *vf, short events, int anyyet,
 			short *reventsp, struct pollhead **phpp,
 			caller_context_t *ct);
-extern int vnext_dump(femarg_t *vf, caddr_t addr, int lbdn, int dblks,
-			caller_context_t *ct);
+extern int vnext_dump(femarg_t *vf, caddr_t addr, offset_t lbdn,
+    offset_t dblks, caller_context_t *ct);
 extern int vnext_pathconf(femarg_t *vf, int cmd, ulong_t *valp, cred_t *cr,
 			caller_context_t *ct);
 extern int vnext_pageio(femarg_t *vf, struct page *pp, u_offset_t io_off,
 			size_t io_len, int flags, cred_t *cr,
 			caller_context_t *ct);
-extern int vnext_dumpctl(femarg_t *vf, int action, int *blkp,
+extern int vnext_dumpctl(femarg_t *vf, int action, offset_t *blkp,
 			caller_context_t *ct);
 extern void vnext_dispose(femarg_t *vf, struct page *pp, int flag, int dn,
 			cred_t *cr, caller_context_t *ct);

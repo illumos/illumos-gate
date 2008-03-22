@@ -167,12 +167,13 @@ static	int ufs_delmap(struct vnode *, offset_t, struct as *, caddr_t,  size_t,
 		uint_t, uint_t, uint_t, struct cred *, caller_context_t *);
 static	int ufs_poll(vnode_t *, short, int, short *, struct pollhead **,
 		caller_context_t *);
-static	int ufs_dump(vnode_t *, caddr_t, int, int, caller_context_t *);
+static	int ufs_dump(vnode_t *, caddr_t, offset_t, offset_t,
+    caller_context_t *);
 static	int ufs_l_pathconf(struct vnode *, int, ulong_t *, struct cred *,
 		caller_context_t *);
 static	int ufs_pageio(struct vnode *, struct page *, u_offset_t, size_t, int,
 		struct cred *, caller_context_t *);
-static	int ufs_dumpctl(vnode_t *, int, int *, caller_context_t *);
+static	int ufs_dumpctl(vnode_t *, int, offset_t *, caller_context_t *);
 static	daddr32_t *save_dblks(struct inode *, struct ufsvfs *, daddr32_t *,
 		daddr32_t *, int, int);
 static	int ufs_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
@@ -6104,7 +6105,8 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
  */
 /*ARGSUSED*/
 static int
-ufs_dump(vnode_t *vp, caddr_t addr, int ldbn, int dblks, caller_context_t *ct)
+ufs_dump(vnode_t *vp, caddr_t addr, offset_t ldbn, offset_t dblks,
+    caller_context_t *ct)
 {
 	u_offset_t	file_size;
 	struct inode    *ip = VTOI(vp);
@@ -6138,7 +6140,7 @@ ufs_dump(vnode_t *vp, caddr_t addr, int ldbn, int dblks, caller_context_t *ct)
 	 */
 	UFS_GET_ISIZE(&file_size, ip);
 
-	if (ldbtob((offset_t)(ldbn + dblks)) > file_size)
+	if (ldbtob(ldbn + dblks) > file_size)
 		return (ENOSPC);
 
 	/*
@@ -6147,7 +6149,7 @@ ufs_dump(vnode_t *vp, caddr_t addr, int ldbn, int dblks, caller_context_t *ct)
 	 * in contiguous block lumps
 	 */
 	while (dblks > 0 && !error) {
-		lfsbn = (daddr_t)lblkno(fs, ldbtob((offset_t)ldbn));
+		lfsbn = (daddr_t)lblkno(fs, ldbtob(ldbn));
 		dbn = fsbtodb(fs, dump_info->dblk[lfsbn]) + ldbn % disk_blks;
 		nfsbs = 1;
 		ndbs = disk_blks - ldbn % disk_blks;
@@ -6184,7 +6186,7 @@ ufs_dump(vnode_t *vp, caddr_t addr, int ldbn, int dblks, caller_context_t *ct)
  */
 /*ARGSUSED*/
 static int
-ufs_dumpctl(vnode_t *vp, int action, int *blkp, caller_context_t *ct)
+ufs_dumpctl(vnode_t *vp, int action, offset_t *blkp, caller_context_t *ct)
 {
 	struct inode	*ip = VTOI(vp);
 	ufsvfs_t	*ufsvfsp = ip->i_ufsvfs;

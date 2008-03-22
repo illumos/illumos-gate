@@ -139,7 +139,8 @@ static int spec_delmap(struct vnode *, offset_t, struct as *, caddr_t, size_t,
 
 static int spec_poll(struct vnode *, short, int, short *, struct pollhead **,
 	caller_context_t *);
-static int spec_dump(struct vnode *, caddr_t, int, int, caller_context_t *);
+static int spec_dump(struct vnode *, caddr_t, offset_t, offset_t,
+    caller_context_t *);
 static int spec_pageio(struct vnode *, page_t *, u_offset_t, size_t, int,
     cred_t *, caller_context_t *);
 
@@ -2533,14 +2534,14 @@ static int
 spec_dump(
 	struct vnode *vp,
 	caddr_t addr,
-	int bn,
-	int count,
+	offset_t bn,
+	offset_t count,
 	caller_context_t *ct)
 {
 	/* allow dump to succeed even if device fenced off */
 
 	ASSERT(vp->v_type == VBLK);
-	return (bdev_dump(vp->v_rdev, addr, bn, count));
+	return (bdev_dump(vp->v_rdev, addr, (daddr_t)bn, (int)count));
 }
 
 

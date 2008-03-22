@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +97,8 @@ nd_log(const char *fmt, ...)
 
 /* ARGSUSED */
 int
-nfs_dump(vnode_t *dumpvp, caddr_t addr, int bn, int count, caller_context_t *ct)
+nfs_dump(vnode_t *dumpvp, caddr_t addr, offset_t bn, offset_t count,
+    caller_context_t *ct)
 {
 	static TIUSER	*tiptr;
 	XDR		xdrs;
@@ -108,7 +109,8 @@ nfs_dump(vnode_t *dumpvp, caddr_t addr, int bn, int count, caller_context_t *ct)
 	int		error;
 	int		i;
 
-	nd_log("nfs_dump: addr=%p bn=%d count=%d\n", (void *)addr, bn, count);
+	nd_log("nfs_dump: addr=%p bn=%lld count=%lld\n",
+	    (void *)addr, bn, count);
 
 	if (error = nd_init(dumpvp, &tiptr))
 		return (error);
@@ -174,7 +176,7 @@ nd_init(vnode_t *dumpvp, TIUSER **tiptr)
 			nd_log("nfs_dump: not connectionless!\n");
 			if ((strcmp(nfsdump_cf.knc_protofmly, NC_INET) == 0) ||
 			    ((v6 = strcmp(nfsdump_cf.knc_protofmly, NC_INET6))\
-				    == 0)) {
+			    == 0)) {
 				major_t clone_maj;
 
 				nfsdump_cf.knc_proto = NC_UDP;
@@ -183,7 +185,7 @@ nd_init(vnode_t *dumpvp, TIUSER **tiptr)
 				clone_maj = ddi_name_to_major("clone");
 				nd_log("nfs_dump: making UDP device\n");
 				nfsdump_cf.knc_rdev = makedevice(clone_maj,
-					ddi_name_to_major(v6?"udp":"udp6"));
+				    ddi_name_to_major(v6?"udp":"udp6"));
 			} else {
 				error = EIO;
 				nfs_perror(error, "\nnfs_dump: cannot dump over"
@@ -196,7 +198,7 @@ nd_init(vnode_t *dumpvp, TIUSER **tiptr)
 	nd_log("nfs_dump: calling t_kopen\n");
 
 	if (error = t_kopen(NULL, nfsdump_cf.knc_rdev,
-			FREAD|FWRITE|FNDELAY, tiptr, CRED())) {
+	    FREAD|FWRITE|FNDELAY, tiptr, CRED())) {
 		nfs_perror(error, "\nnfs_dump: t_kopen failed: %m\n");
 		return (EIO);
 	}
@@ -206,7 +208,7 @@ nd_init(vnode_t *dumpvp, TIUSER **tiptr)
 		nd_log("nfs_dump: calling bindresvport\n");
 		if (error = bindresvport(*tiptr, NULL, NULL, FALSE)) {
 			nfs_perror(error,
-				"\nnfs_dump: bindresvport failed: %m\n");
+			    "\nnfs_dump: bindresvport failed: %m\n");
 			return (EIO);
 		}
 	} else {

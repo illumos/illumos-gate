@@ -229,7 +229,7 @@ static int cachefs_getsecattr_connected(vnode_t *vp, vsecattr_t *vsec, int flag,
 static int cachefs_getsecattr_disconnected(vnode_t *vp, vsecattr_t *vsec,
     int flag, cred_t *cr);
 
-static int	cachefs_dump(struct vnode *, caddr_t, int, int,
+static int	cachefs_dump(struct vnode *, caddr_t, offset_t, offset_t,
 			caller_context_t *);
 static int	cachefs_pageio(struct vnode *, page_t *,
 		    u_offset_t, size_t, int, cred_t *, caller_context_t *);
@@ -311,7 +311,7 @@ int
 cachefs_init_vnops(char *name)
 {
 	return (vn_make_ops(name,
-		    cachefs_vnodeops_template, &cachefs_vnodeops));
+	    cachefs_vnodeops_template, &cachefs_vnodeops));
 }
 
 struct vnodeops *
@@ -405,7 +405,7 @@ cachefs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 			 */
 			if (crcmp(cp->c_cred, CRED()) != 0 &&
 			    secpolicy_vnode_access(CRED(), *vpp,
-					    cp->c_attr.va_uid, VWRITE) != 0) {
+			    cp->c_attr.va_uid, VWRITE) != 0) {
 				mutex_exit(&cp->c_statelock);
 				connected = 1;
 				continue;
@@ -427,8 +427,8 @@ cachefs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 			if (cp->c_backvp) {
 				cp->c_flags &= ~CN_NEEDOPEN;
 				CFS_DPRINT_BACKFS_NFSV4(fscp,
-					("cachefs_open (nfsv4): cnode %p, "
-					"backvp %p\n", cp, cp->c_backvp));
+				    ("cachefs_open (nfsv4): cnode %p, "
+				    "backvp %p\n", cp, cp->c_backvp));
 				error = VOP_OPEN(&cp->c_backvp, flag, cr, ct);
 				if (CFS_TIMEOUT(fscp, error)) {
 					mutex_exit(&cp->c_statelock);
@@ -566,8 +566,8 @@ cachefs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 			mutex_enter(&cp->c_statelock);
 			if (cp->c_backvp) {
 				CFS_DPRINT_BACKFS_NFSV4(fscp,
-					("cachefs_close (nfsv4): cnode %p, "
-					"backvp %p\n", cp, cp->c_backvp));
+				    ("cachefs_close (nfsv4): cnode %p, "
+				    "backvp %p\n", cp, cp->c_backvp));
 				error = VOP_CLOSE(cp->c_backvp, flag, count,
 				    offset, cr, ct);
 				if (CFS_TIMEOUT(fscp, error)) {
@@ -601,7 +601,7 @@ cachefs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 
 		/* force dirty data to stable storage */
 		else if ((vp->v_type == VREG) && (flag & FWRITE) &&
-				!CFS_ISFS_BACKFS_NFSV4(fscp)) {
+		    !CFS_ISFS_BACKFS_NFSV4(fscp)) {
 			/* clean the cachefs pages synchronously */
 			error = cachefs_putpage_common(vp, (offset_t)0,
 			    0, 0, cr);
@@ -724,7 +724,7 @@ cachefs_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 
 	if (MANDLOCK(vp, cp->c_attr.va_mode)) {
 		error = chklock(vp, FREAD, (offset_t)uiop->uio_loffset,
-			    uiop->uio_resid, uiop->uio_fmode, ct);
+		    uiop->uio_resid, uiop->uio_fmode, ct);
 		if (error)
 			return (error);
 	}
@@ -774,7 +774,7 @@ cachefs_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 		base = segmap_getmapflt(segkmap, vp, off, (uint_t)n, 1, S_READ);
 
 		error = segmap_fault(kas.a_hat, segkmap, base, n,
-			F_SOFTLOCK, S_READ);
+		    F_SOFTLOCK, S_READ);
 		if (error) {
 			(void) segmap_release(segkmap, base, 0);
 			if (FC_CODE(error) == FC_OBJERR)
@@ -785,14 +785,14 @@ cachefs_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 		}
 		error = uiomove(base+mapoff, n, UIO_READ, uiop);
 		(void) segmap_fault(kas.a_hat, segkmap, base, n,
-				F_SOFTUNLOCK, S_READ);
+		    F_SOFTUNLOCK, S_READ);
 		if (error == 0) {
 			/*
 			 * if we read a whole page(s), or to eof,
 			 *  we won't need this page(s) again soon.
 			 */
 			if (n + mapoff == MAXBSIZE ||
-				uiop->uio_loffset == cp->c_size)
+			    uiop->uio_loffset == cp->c_size)
 				flags |= SM_DONTNEED;
 		}
 		(void) segmap_release(segkmap, base, flags);
@@ -802,7 +802,7 @@ out:
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf("cachefs_read: EXIT error %d resid %ld\n", error,
-			uiop->uio_resid);
+		    uiop->uio_resid);
 #endif
 	return (error);
 }
@@ -837,7 +837,7 @@ cachefs_read_backfs_nfsv4(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp, ("cachefs_read_backfs_nfsv4: cnode %p, "
-					"backvp %p\n", cp, backvp));
+	    "backvp %p\n", cp, backvp));
 
 	(void) VOP_RWLOCK(backvp, V_WRITELOCK_FALSE, ct);
 	error = VOP_READ(backvp, uiop, ioflag, cr, ct);
@@ -871,8 +871,8 @@ cachefs_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf(
 		"cachefs_write: ENTER vp %p offset %llu count %ld cflags %x\n",
-			(void *)vp, uiop->uio_loffset, uiop->uio_resid,
-			cp->c_flags);
+		    (void *)vp, uiop->uio_loffset, uiop->uio_resid,
+		    cp->c_flags);
 #endif
 	if (getzoneid() != GLOBAL_ZONEID) {
 		error = EPERM;
@@ -897,7 +897,7 @@ cachefs_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 
 	if (MANDLOCK(vp, cp->c_attr.va_mode)) {
 		error = chklock(vp, FWRITE, (offset_t)uiop->uio_loffset,
-			    uiop->uio_resid, uiop->uio_fmode, ct);
+		    uiop->uio_resid, uiop->uio_fmode, ct);
 		if (error)
 			goto out;
 	}
@@ -1064,7 +1064,7 @@ cachefs_write_backfs_nfsv4(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp, ("cachefs_write_backfs_nfsv4: cnode %p, "
-					"backvp %p\n", cp, backvp));
+	    "backvp %p\n", cp, backvp));
 	(void) VOP_RWLOCK(backvp, V_WRITELOCK_TRUE, ct);
 	error = VOP_WRITE(backvp, uiop, ioflag, cr, ct);
 	VOP_RWUNLOCK(backvp, V_WRITELOCK_TRUE, ct);
@@ -1197,9 +1197,9 @@ cachefs_writepage(vnode_t *vp, caddr_t base, int tcount, uio_t *uiop)
 		 * end of file from the beginning of the mapping.
 		 */
 		if ((offset > (lastpage_off + PAGEOFFSET)) ||
-			((cp->c_size == 0) && (offset < PAGESIZE)) ||
-			((uintptr_t)base & PAGEOFFSET) == 0 && (n == PAGESIZE ||
-			((offset + n) >= cp->c_size))) {
+		    ((cp->c_size == 0) && (offset < PAGESIZE)) ||
+		    ((uintptr_t)base & PAGEOFFSET) == 0 && (n == PAGESIZE ||
+		    ((offset + n) >= cp->c_size))) {
 			pagecreate = 1;
 
 			/*
@@ -1224,9 +1224,9 @@ cachefs_writepage(vnode_t *vp, caddr_t base, int tcount, uio_t *uiop)
 			 */
 			if (newpage)
 				segmap_pageunlock(segkmap,
-					(caddr_t)((uintptr_t)base &
-						(uintptr_t)PAGEMASK),
-					PAGESIZE, S_WRITE);
+				    (caddr_t)((uintptr_t)base &
+				    (uintptr_t)PAGEMASK),
+				    PAGESIZE, S_WRITE);
 		} else {
 			/*
 			 * KLUDGE ! Use segmap_fault instead of faulting and
@@ -1289,7 +1289,7 @@ cachefs_writepage(vnode_t *vp, caddr_t base, int tcount, uio_t *uiop)
 				if (cachefs_charge_page(cp, offset) == 0) {
 					cachefs_update_allocmap(cp,
 					    offset & (offset_t)PAGEMASK,
-							(size_t)PAGESIZE);
+					    (size_t)PAGESIZE);
 				}
 
 				/* else we ran out of space */
@@ -1370,7 +1370,7 @@ cachefs_push(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 	 */
 
 	pp = pvn_write_kluster(vp, pp, &iooff, &iolen, lbn_off,
-			roundup(bsize, PAGESIZE), flags);
+	    roundup(bsize, PAGESIZE), flags);
 
 	/*
 	 * The CN_CMODINPROG flag makes sure that we use a correct
@@ -1562,7 +1562,7 @@ cachefs_push_connected(vnode_t *vp, struct buf *bp, size_t iolen,
 #ifdef CFSDEBUG
 		CFS_DEBUG(CFSDEBUG_VOPS | CFSDEBUG_BACK)
 			printf("cachefspush: error %d cr %p\n",
-				error, (void *)cr);
+			    error, (void *)cr);
 #endif
 		bp->b_flags |= B_ERROR;
 	}
@@ -1694,7 +1694,7 @@ cachefs_push_front(vnode_t *vp, struct buf *bp, size_t iolen,
 
 	(void) cachefs_update_allocmap(cp, iooff, iolen);
 	cp->c_flags |= (CN_UPDATED | CN_NEED_FRONT_SYNC |
-		CN_POPULATION_PENDING);
+	    CN_POPULATION_PENDING);
 	if (fscp->fs_cdconnected != CFS_CD_CONNECTED) {
 		gethrestime(&cp->c_metadata.md_localmtime);
 		cp->c_metadata.md_flags |= MD_LOCALMTIME;
@@ -1723,7 +1723,7 @@ out:
 
 /*ARGSUSED*/
 static int
-cachefs_dump(struct vnode *vp, caddr_t foo1, int foo2, int foo3,
+cachefs_dump(struct vnode *vp, caddr_t foo1, offset_t foo2, offset_t foo3,
     caller_context_t *ct)
 {
 	return (ENOSYS); /* should we panic if we get here? */
@@ -1843,8 +1843,8 @@ cachefs_ioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cred,
 		 * daemon requests
 		 */
 		ASSERT(CFS_ISFS_BACKFS_NFSV4(fscp) == 0 ||
-			STRUCT_FGET(dcmd, d_cmd) == CFSDCMD_DAEMONID ||
-			STRUCT_FGET(dcmd, d_cmd) == CFSDCMD_GETSTATS);
+		    STRUCT_FGET(dcmd, d_cmd) == CFSDCMD_DAEMONID ||
+		    STRUCT_FGET(dcmd, d_cmd) == CFSDCMD_GETSTATS);
 
 		/* get the routine to execute */
 		dcmd_routine = NULL;
@@ -2216,7 +2216,7 @@ cachefs_getattr_backfs_nfsv4(vnode_t *vp, vattr_t *vap,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp, ("cachefs_getattr_backfs_nfsv4: cnode %p,"
-					" backvp %p\n", cp, backvp));
+	    " backvp %p\n", cp, backvp));
 	error = VOP_GETATTR(backvp, vap, flags, cr, ct);
 
 	/* Update attributes */
@@ -2385,7 +2385,7 @@ cachefs_setattr_common(
 		if (bcnt)
 			pvn_vpzero(vp, cp->c_size, PAGESIZE - bcnt);
 		(void) pvn_vplist_dirty(vp, cp->c_size, cachefs_push,
-			B_TRUNC | B_INVAL, cr);
+		    B_TRUNC | B_INVAL, cr);
 	}
 
 out:
@@ -2427,7 +2427,7 @@ cachefs_setattr_connected(
 		goto out;
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp, ("cachefs_setattr (nfsv4): cnode %p, "
-					"backvp %p\n", cp, cp->c_backvp));
+	    "backvp %p\n", cp, cp->c_backvp));
 	error = VOP_SETATTR(cp->c_backvp, vap, flags, cr, ct);
 	if (error) {
 		goto out;
@@ -2524,7 +2524,7 @@ cachefs_setattr_disconnected(
 	mutex_enter(&cp->c_statelock);
 
 	error = secpolicy_vnode_setattr(cr, vp, vap, &cp->c_attr, flags,
-			    cachefs_access_local, cp);
+	    cachefs_access_local, cp);
 
 	if (error)
 		goto out;
@@ -2860,8 +2860,8 @@ cachefs_access_connected(struct vnode *vp, int mode, int flags, cred_t *cr)
 		}
 
 		CFS_DPRINT_BACKFS_NFSV4(fscp,
-			("cachefs_access (nfsv4): cnode %p, backvp %p\n",
-			cp, cp->c_backvp));
+		    ("cachefs_access (nfsv4): cnode %p, backvp %p\n",
+		    cp, cp->c_backvp));
 		error = VOP_ACCESS(cp->c_backvp, mode, flags, cr, NULL);
 
 		/*
@@ -3055,7 +3055,7 @@ cachefs_readlink_connected(vnode_t *vp, uio_t *uiop, cred_t *cr)
 			/* read symlink data from frontfile */
 			uiop->uio_offset = 0;
 			(void) VOP_RWLOCK(cp->c_frontvp,
-						V_WRITELOCK_FALSE, NULL);
+			    V_WRITELOCK_FALSE, NULL);
 			error = VOP_READ(cp->c_frontvp, uiop, 0, kcred, NULL);
 			VOP_RWUNLOCK(cp->c_frontvp, V_WRITELOCK_FALSE, NULL);
 
@@ -3124,7 +3124,7 @@ cachefs_readlink_disconnected(vnode_t *vp, uio_t *uiop)
 			/* read symlink data from frontfile */
 			uiop->uio_offset = 0;
 			(void) VOP_RWLOCK(cp->c_frontvp,
-						V_WRITELOCK_FALSE, NULL);
+			    V_WRITELOCK_FALSE, NULL);
 			error = VOP_READ(cp->c_frontvp, uiop, 0, kcred, NULL);
 			VOP_RWUNLOCK(cp->c_frontvp, V_WRITELOCK_FALSE, NULL);
 			readcache = 1;
@@ -3234,8 +3234,8 @@ cachefs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 			mutex_enter(&cp->c_statelock);
 			if (cp->c_backvp) {
 				CFS_DPRINT_BACKFS_NFSV4(fscp,
-					("cachefs_fsync (nfsv4): cnode %p, "
-					"backvp %p\n", cp, cp->c_backvp));
+				    ("cachefs_fsync (nfsv4): cnode %p, "
+				    "backvp %p\n", cp, cp->c_backvp));
 				error = VOP_FSYNC(cp->c_backvp, syncflag, cr,
 				    ct);
 				if (CFS_TIMEOUT(fscp, error)) {
@@ -3292,7 +3292,7 @@ cachefs_sync_metadata(cnode_t *cp)
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf("c_sync_metadata: ENTER cp %p cflag %x\n",
-			(void *)cp, cp->c_flags);
+		    (void *)cp, cp->c_flags);
 #endif
 
 	mutex_enter(&cp->c_statelock);
@@ -3332,16 +3332,17 @@ cachefs_sync_metadata(cnode_t *cp)
 			} else {
 				va.va_mask = AT_MTIME;
 				error = VOP_GETATTR(cp->c_frontvp, &va, 0,
-					kcred, NULL);
+				    kcred, NULL);
 				if (error)
 					goto out;
 				cp->c_metadata.md_timestamp = va.va_mtime;
 				cp->c_flags &=
-				~(CN_NEED_FRONT_SYNC | CN_POPULATION_PENDING);
+				    ~(CN_NEED_FRONT_SYNC |
+				    CN_POPULATION_PENDING);
 			}
 		} else {
 			cp->c_flags &=
-				~(CN_NEED_FRONT_SYNC | CN_POPULATION_PENDING);
+			    ~(CN_NEED_FRONT_SYNC | CN_POPULATION_PENDING);
 		}
 	}
 
@@ -3350,9 +3351,9 @@ cachefs_sync_metadata(cnode_t *cp)
 	 * XXX tony: How can CN_UPDATED not be set?????
 	 */
 	if ((cp->c_flags & CN_ALLOC_PENDING) == 0 &&
-			(cp->c_flags & CN_UPDATED)) {
+	    (cp->c_flags & CN_UPDATED)) {
 		error = filegrp_write_metadata(fgp, &cp->c_id,
-				&cp->c_metadata);
+		    &cp->c_metadata);
 		if (error)
 			goto out;
 	}
@@ -3386,7 +3387,7 @@ out:
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf("c_sync_metadata: EXIT cp %p cflag %x\n",
-			(void *)cp, cp->c_flags);
+		    (void *)cp, cp->c_flags);
 #endif
 
 	return (error);
@@ -3670,7 +3671,7 @@ cachefs_lookup_common(vnode_t *dvp, char *nm, vnode_t **vpp,
 
 	ASSERT((dcp->c_flags & CN_ASYNC_POPULATE) == 0);
 	error = cachefs_dir_look(dcp, nm, &cookie, &flag,
-			&d_offset, &cid);
+	    &d_offset, &cid);
 	mutex_exit(&dcp->c_statelock);
 
 	if (error) {
@@ -3762,8 +3763,8 @@ cachefs_lookup_back(vnode_t *dvp, char *nm, vnode_t **vpp,
 	}
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_lookup (nfsv4): dcp %p, dbackvp %p, name %s\n",
-		dcp, dcp->c_backvp, nm));
+	    ("cachefs_lookup (nfsv4): dcp %p, dbackvp %p, name %s\n",
+	    dcp, dcp->c_backvp, nm));
 	error = VOP_LOOKUP(dcp->c_backvp, nm, &backvp, (struct pathname *)NULL,
 	    0, (vnode_t *)NULL, cr, NULL, NULL, NULL);
 	if (error)
@@ -3802,8 +3803,8 @@ out:
 	/* create the cnode */
 	if (error == 0) {
 		error = cachefs_cnode_make(&cid, fscp,
-					(valid_fid ? &cookie : NULL),
-					&va, backvp, cr, 0, &cp);
+		    (valid_fid ? &cookie : NULL),
+		    &va, backvp, cr, 0, &cp);
 		if (error == 0) {
 			*vpp = CTOV(cp);
 		}
@@ -4001,8 +4002,8 @@ cachefs_create_connected(vnode_t *dvp, char *nm, vattr_t *vap,
 
 	/* create the file on the back fs */
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_create (nfsv4): dcp %p, dbackvp %p,"
-		"name %s\n", dcp, dcp->c_backvp, nm));
+	    ("cachefs_create (nfsv4): dcp %p, dbackvp %p,"
+	    "name %s\n", dcp, dcp->c_backvp, nm));
 	error = VOP_CREATE(dcp->c_backvp, nm, vap, exclusive, mode,
 	    &devvp, cr, 0, NULL, NULL);
 	mutex_exit(&dcp->c_statelock);
@@ -4025,7 +4026,7 @@ cachefs_create_connected(vnode_t *dvp, char *nm, vattr_t *vap,
 	cid.cid_fileno = va.va_nodeid;
 	cid.cid_flags = 0;
 	error = cachefs_cnode_make(&cid, fscp, (valid_fid ? &cookie : NULL),
-					&va, tvp, cr, 0, &ncp);
+	    &va, tvp, cr, 0, &ncp);
 	if (error)
 		goto out;
 
@@ -4438,7 +4439,7 @@ cachefs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 			}
 		} else {
 			error = cachefs_remove_disconnected(dvp, nm, cr,
-				vp);
+			    vp);
 			if (CFS_TIMEOUT(fscp, error)) {
 				connected = 1;
 				continue;
@@ -4666,8 +4667,8 @@ cachefs_remove_backfs_nfsv4(vnode_t *dvp, char *nm, cred_t *cr, vnode_t *vp)
 	mutex_exit(&dcp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_remove (nfsv4): dcp %p, dbackvp %p, name %s\n",
-		dcp, dbackvp, nm));
+	    ("cachefs_remove (nfsv4): dcp %p, dbackvp %p, name %s\n",
+	    dcp, dbackvp, nm));
 	error = VOP_REMOVE(dbackvp, nm, cr, NULL, 0);
 	if (error) {
 		mutex_exit(&cp->c_statelock);
@@ -4831,7 +4832,7 @@ cachefs_link(vnode_t *tdvp, vnode_t *fvp, char *tnm, cred_t *cr,
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf("cachefs_link: ENTER fvp %p tdvp %p tnm %s\n",
-			(void *)fvp, (void *)tdvp, tnm);
+		    (void *)fvp, (void *)tdvp, tnm);
 #endif
 
 	if (getzoneid() != GLOBAL_ZONEID) {
@@ -4886,7 +4887,7 @@ cachefs_link(vnode_t *tdvp, vnode_t *fvp, char *tnm, cred_t *cr,
 			}
 		} else {
 			error = cachefs_link_disconnected(tdvp, fvp, tnm,
-				cr);
+			    cr);
 			if (CFS_TIMEOUT(fscp, error)) {
 				connected = 1;
 				continue;
@@ -4907,7 +4908,7 @@ out:
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf("cachefs_link: EXIT fvp %p tdvp %p tnm %s\n",
-			(void *)fvp, (void *)tdvp, tnm);
+		    (void *)fvp, (void *)tdvp, tnm);
 #endif
 	return (error);
 }
@@ -4966,8 +4967,8 @@ cachefs_link_connected(vnode_t *tdvp, vnode_t *fvp, char *tnm, cred_t *cr)
 
 	/* perform the link on the back fs */
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_link (nfsv4): tdcp %p, tdbackvp %p, "
-		"name %s\n", tdcp, tdcp->c_backvp, tnm));
+	    ("cachefs_link (nfsv4): tdcp %p, tdbackvp %p, "
+	    "name %s\n", tdcp, tdcp->c_backvp, tnm));
 	error = VOP_LINK(tdcp->c_backvp, backvp, tnm, cr, NULL, 0);
 	if (error) {
 		mutex_exit(&tdcp->c_statelock);
@@ -5162,8 +5163,8 @@ cachefs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp,
 	 * if the fs NOFILL or NOCACHE flags are on, then the old and new
 	 * directory cnodes better indicate NOCACHE mode as well.
 	 */
-	ASSERT
-	    ((fscp->fs_cache->c_flags & (CACHE_NOFILL | CACHE_NOCACHE)) == 0 ||
+	ASSERT(
+	    (fscp->fs_cache->c_flags & (CACHE_NOFILL | CACHE_NOCACHE)) == 0 ||
 	    ((VTOC(odvp)->c_flags & CN_NOCACHE) &&
 	    (VTOC(ndvp)->c_flags & CN_NOCACHE)));
 
@@ -5255,7 +5256,7 @@ cachefs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp,
 
 		/* get the cnode if file being deleted */
 		error = cachefs_lookup_common(ndvp, nnm, &delvp, NULL, 0,
-			NULL, cr);
+		    NULL, cr);
 		if (error) {
 			delvp = NULL;
 			if (fscp->fs_cdconnected == CFS_CD_CONNECTED) {
@@ -5291,7 +5292,7 @@ cachefs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp,
 
 		if (fscp->fs_cdconnected == CFS_CD_CONNECTED) {
 			error = cachefs_rename_connected(odvp, onm,
-				ndvp, nnm, cr, delvp);
+			    ndvp, nnm, cr, delvp);
 			if (CFS_TIMEOUT(fscp, error)) {
 				cachefs_cd_release(fscp);
 				held = 0;
@@ -5301,7 +5302,7 @@ cachefs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp,
 			}
 		} else {
 			error = cachefs_rename_disconnected(odvp, onm,
-				ndvp, nnm, cr, delvp);
+			    ndvp, nnm, cr, delvp);
 			if (CFS_TIMEOUT(fscp, error)) {
 				connected = 1;
 				continue;
@@ -5434,9 +5435,9 @@ cachefs_rename_connected(vnode_t *odvp, char *onm, vnode_t *ndvp,
 
 	/* do the rename on the back fs */
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_rename (nfsv4): odcp %p, odbackvp %p, "
-		" ndcp %p, ndbackvp %p, onm %s, nnm %s\n",
-		odcp, odcp->c_backvp, ndcp, ndcp->c_backvp, onm, nnm));
+	    ("cachefs_rename (nfsv4): odcp %p, odbackvp %p, "
+	    " ndcp %p, ndbackvp %p, onm %s, nnm %s\n",
+	    odcp, odcp->c_backvp, ndcp, ndcp->c_backvp, onm, nnm));
 	error = VOP_RENAME(odcp->c_backvp, onm, ndcp->c_backvp, nnm, cr, NULL,
 	    0);
 	if (error)
@@ -5469,7 +5470,7 @@ cachefs_rename_connected(vnode_t *odvp, char *onm, vnode_t *ndvp,
 	if (CFS_ISFS_NONSHARED(fscp) &&
 	    (odcp->c_metadata.md_flags & MD_POPULATED)) {
 		error = cachefs_dir_look(odcp, onm, &cookie,
-			NULL, NULL, &cid);
+		    NULL, NULL, &cid);
 		if (error == 0 || error == EINVAL) {
 			gotdirent = 1;
 			if (error == 0)
@@ -5865,7 +5866,7 @@ cachefs_mkdir(vnode_t *dvp, char *nm, vattr_t *vap, vnode_t **vpp,
 
 		if (fscp->fs_cdconnected == CFS_CD_CONNECTED) {
 			error = cachefs_mkdir_connected(dvp, nm, vap,
-				vpp, cr);
+			    vpp, cr);
 			if (CFS_TIMEOUT(fscp, error)) {
 				rw_exit(&dcp->c_rwlock);
 				cachefs_cd_release(fscp);
@@ -5876,7 +5877,7 @@ cachefs_mkdir(vnode_t *dvp, char *nm, vattr_t *vap, vnode_t **vpp,
 			}
 		} else {
 			error = cachefs_mkdir_disconnected(dvp, nm, vap,
-				vpp, cr);
+			    vpp, cr);
 			if (CFS_TIMEOUT(fscp, error)) {
 				connected = 1;
 				continue;
@@ -5956,8 +5957,8 @@ cachefs_mkdir_connected(vnode_t *dvp, char *nm, vattr_t *vap,
 
 	/* make the dir on the back fs */
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_mkdir (nfsv4): dcp %p, dbackvp %p, "
-		"name %s\n", dcp, dcp->c_backvp, nm));
+	    ("cachefs_mkdir (nfsv4): dcp %p, dbackvp %p, "
+	    "name %s\n", dcp, dcp->c_backvp, nm));
 	error = VOP_MKDIR(dcp->c_backvp, nm, vap, &vp, cr, NULL, 0, NULL);
 	mutex_exit(&dcp->c_statelock);
 	if (error) {
@@ -5974,7 +5975,7 @@ cachefs_mkdir_connected(vnode_t *dvp, char *nm, vattr_t *vap,
 	cid.cid_flags = 0;
 	cid.cid_fileno = attr.va_nodeid;
 	error = cachefs_cnode_make(&cid, fscp, (valid_fid ? &cookie : NULL),
-					&attr, vp, cr, 0, &newcp);
+	    &attr, vp, cr, 0, &newcp);
 	if (error) {
 		goto out;
 	}
@@ -6147,7 +6148,7 @@ cachefs_mkdir_disconnected(vnode_t *dvp, char *nm, vattr_t *vap,
 
 	/* enter the new file in the directory */
 	error = cachefs_dir_enter(dcp, nm, &newcp->c_metadata.md_cookie,
-		&newcp->c_id, SM_ASYNC);
+	    &newcp->c_id, SM_ASYNC);
 	if (error) {
 		mutex_exit(&dcp->c_statelock);
 		goto out;
@@ -6321,7 +6322,7 @@ cachefs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 
 		if (fscp->fs_cdconnected == CFS_CD_CONNECTED) {
 			error = cachefs_rmdir_connected(dvp, nm, cdir,
-				cr, vp);
+			    cr, vp);
 			if (CFS_TIMEOUT(fscp, error)) {
 				cachefs_cd_release(fscp);
 				held = 0;
@@ -6331,7 +6332,7 @@ cachefs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 			}
 		} else {
 			error = cachefs_rmdir_disconnected(dvp, nm, cdir,
-				cr, vp);
+			    cr, vp);
 			if (CFS_TIMEOUT(fscp, error)) {
 				connected = 1;
 				continue;
@@ -6404,8 +6405,8 @@ cachefs_rmdir_connected(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 
 	/* rmdir on the back fs */
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_rmdir (nfsv4): dcp %p, dbackvp %p, "
-		"name %s\n", dcp, dcp->c_backvp, nm));
+	    ("cachefs_rmdir (nfsv4): dcp %p, dbackvp %p, "
+	    "name %s\n", dcp, dcp->c_backvp, nm));
 	error = VOP_RMDIR(dcp->c_backvp, nm, cdir, cr, NULL, 0);
 	if (error)
 		goto out;
@@ -6596,7 +6597,7 @@ cachefs_symlink(vnode_t *dvp, char *lnm, vattr_t *tva,
 
 		if (fscp->fs_cdconnected == CFS_CD_CONNECTED) {
 			error = cachefs_symlink_connected(dvp, lnm, tva,
-				tnm, cr);
+			    tnm, cr);
 			if (CFS_TIMEOUT(fscp, error)) {
 				rw_exit(&dcp->c_rwlock);
 				cachefs_cd_release(fscp);
@@ -6607,7 +6608,7 @@ cachefs_symlink(vnode_t *dvp, char *lnm, vattr_t *tva,
 			}
 		} else {
 			error = cachefs_symlink_disconnected(dvp, lnm, tva,
-				tnm, cr);
+			    tnm, cr);
 			if (CFS_TIMEOUT(fscp, error)) {
 				connected = 1;
 				continue;
@@ -6668,8 +6669,8 @@ cachefs_symlink_connected(vnode_t *dvp, char *lnm, vattr_t *tva,
 		goto out;
 	}
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_symlink (nfsv4): dcp %p, dbackvp %p, "
-		"lnm %s, tnm %s\n", dcp, dcp->c_backvp, lnm, tnm));
+	    ("cachefs_symlink (nfsv4): dcp %p, dbackvp %p, "
+	    "lnm %s, tnm %s\n", dcp, dcp->c_backvp, lnm, tnm));
 	error = VOP_SYMLINK(dcp->c_backvp, lnm, tva, tnm, cr, NULL, 0);
 	if (error) {
 		mutex_exit(&dcp->c_statelock);
@@ -6719,7 +6720,7 @@ cachefs_symlink_connected(vnode_t *dvp, char *lnm, vattr_t *tva,
 
 	/* make the cnode for the sym link */
 	error = cachefs_cnode_make(&cid, fscp, (valid_fid ? &cookie : NULL),
-						&va, backvp, cr, 0, &newcp);
+	    &va, backvp, cr, 0, &newcp);
 	if (error) {
 		ASSERT(CFS_ISFS_BACKFS_NFSV4(fscp) == 0);
 		cachefs_nocache(dcp);
@@ -6891,7 +6892,7 @@ cachefs_symlink_disconnected(vnode_t *dvp, char *lnm, vattr_t *tva,
 	}
 	cachefs_modified(dcp);
 	error = cachefs_dir_enter(dcp, lnm, &newcp->c_metadata.md_cookie,
-		&newcp->c_id, SM_ASYNC);
+	    &newcp->c_id, SM_ASYNC);
 	if (error) {
 		mutex_exit(&dcp->c_statelock);
 		goto out;
@@ -7016,8 +7017,8 @@ cachefs_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
 
 	if (CACHEFS_LOG_LOGGING(cachep, CACHEFS_LOG_READDIR))
 		cachefs_log_readdir(cachep, error, fscp->fs_cfsvfsp,
-		&dcp->c_metadata.md_cookie, dcp->c_id.cid_fileno,
-		crgetuid(cr), uiop->uio_loffset, *eofp);
+		    &dcp->c_metadata.md_cookie, dcp->c_id.cid_fileno,
+		    crgetuid(cr), uiop->uio_loffset, *eofp);
 
 	if (held) {
 		rw_exit(&dcp->c_rwlock);
@@ -7106,7 +7107,7 @@ cachefs_readdir_connected(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
 	    ((dcp->c_metadata.md_flags & MD_POPULATED) == 0)) {
 
 		if (error && !(dcp->c_flags & CN_NOCACHE) &&
-			!CFS_ISFS_BACKFS_NFSV4(fscp))
+		    !CFS_ISFS_BACKFS_NFSV4(fscp))
 			cachefs_nocache(dcp);
 
 		/* get the back vp */
@@ -7121,10 +7122,10 @@ cachefs_readdir_connected(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
 		} else {
 			/* do the dir read from the back fs */
 			(void) VOP_RWLOCK(dcp->c_backvp,
-						V_WRITELOCK_FALSE, NULL);
+			    V_WRITELOCK_FALSE, NULL);
 			CFS_DPRINT_BACKFS_NFSV4(fscp,
-				("cachefs_readdir (nfsv4): "
-				"dcp %p, dbackvp %p\n", dcp, dcp->c_backvp));
+			    ("cachefs_readdir (nfsv4): "
+			    "dcp %p, dbackvp %p\n", dcp, dcp->c_backvp));
 			error = VOP_READDIR(dcp->c_backvp, uiop, cr, eofp,
 			    NULL, 0);
 			VOP_RWUNLOCK(dcp->c_backvp, V_WRITELOCK_FALSE, NULL);
@@ -7340,7 +7341,7 @@ cachefs_getpage(struct vnode *vp, offset_t off, size_t len,
 	/* Call backfilesystem if NFSv4 */
 	if (CFS_ISFS_BACKFS_NFSV4(fscp)) {
 		error = cachefs_getpage_backfs_nfsv4(vp, off, len, protp, pl,
-						plsz, seg, addr, rw, cr);
+		    plsz, seg, addr, rw, cr);
 		goto out;
 	}
 
@@ -7370,7 +7371,7 @@ cachefs_getpage(struct vnode *vp, offset_t off, size_t len,
 		 * In this case we want to be able to return pages of zeroes.
 		 */
 		if ((u_offset_t)off + len >
-			((cp->c_size + PAGEOFFSET) & (offset_t)PAGEMASK)) {
+		    ((cp->c_size + PAGEOFFSET) & (offset_t)PAGEMASK)) {
 			if (seg != segkmap) {
 				error = EFAULT;
 				break;
@@ -7480,10 +7481,10 @@ cachefs_getpage_backfs_nfsv4(struct vnode *vp, offset_t off, size_t len,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_getpage_backfs_nfsv4: cnode %p, backvp %p\n",
-		cp, backvp));
+	    ("cachefs_getpage_backfs_nfsv4: cnode %p, backvp %p\n",
+	    cp, backvp));
 	error = VOP_GETPAGE(backvp, off, len, protp, pl, plsz, seg,
-				    addr, rw, cr, NULL);
+	    addr, rw, cr, NULL);
 
 	return (error);
 }
@@ -7548,8 +7549,8 @@ again:
 					goto out;
 			}
 			error = VOP_GETPAGE(cp->c_backvp, off,
-					PAGESIZE, protp, ourpl, PAGESIZE, seg,
-					addr, S_READ, cr, NULL);
+			    PAGESIZE, protp, ourpl, PAGESIZE, seg,
+			    addr, S_READ, cr, NULL);
 			/*
 			 * backfs returns EFAULT when we are trying for a
 			 * page beyond EOF but cachefs has the knowledge that
@@ -7629,8 +7630,8 @@ again:
 			}
 			/* else XXX assert CN_NOCACHE? */
 			error = VOP_GETPAGE(cp->c_backvp, (offset_t)off,
-					PAGESIZE, protp, ourpl, popsize,
-					seg, addr, S_READ, cr, NULL);
+			    PAGESIZE, protp, ourpl, popsize,
+			    seg, addr, S_READ, cr, NULL);
 			if (error)
 				goto out;
 			fscp->fs_stats.st_misses++;
@@ -7760,8 +7761,8 @@ again:
 				goto out;
 		}
 		error = VOP_GETPAGE(cp->c_backvp, (offset_t)off,
-			PAGESIZE, protp, ourpl, PAGESIZE, seg,
-			addr, S_READ, cr, NULL);
+		    PAGESIZE, protp, ourpl, PAGESIZE, seg,
+		    addr, S_READ, cr, NULL);
 		if (error)
 			goto out;
 
@@ -7917,8 +7918,8 @@ cachefs_putpage_backfs_nfsv4(vnode_t *vp, offset_t off, size_t len, int flags,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_putpage_backfs_nfsv4: cnode %p, backvp %p\n",
-		cp, backvp));
+	    ("cachefs_putpage_backfs_nfsv4: cnode %p, backvp %p\n",
+	    cp, backvp));
 	error = VOP_PUTPAGE(backvp, off, len, flags, cr, NULL);
 
 	return (error);
@@ -8040,7 +8041,7 @@ again:
 		 */
 		eoff = (u_offset_t)off + len;
 		for (io_off = off; io_off < eoff && io_off < cp->c_size;
-			io_off += io_len) {
+		    io_off += io_len) {
 			/*
 			 * If we are not invalidating, synchronously
 			 * freeing or writing pages use the routine
@@ -8049,19 +8050,19 @@ again:
 			 */
 			if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 				pp = page_lookup(vp, io_off,
-					(flags & (B_INVAL | B_FREE)) ?
-					    SE_EXCL : SE_SHARED);
+				    (flags & (B_INVAL | B_FREE)) ?
+				    SE_EXCL : SE_SHARED);
 			} else {
 				/* XXX this looks like dead code */
 				pp = page_lookup_nowait(vp, io_off,
-					(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 			}
 
 			if (pp == NULL || pvn_getdirty(pp, flags) == 0)
 				io_len = PAGESIZE;
 			else {
 				error = cachefs_push(vp, pp, &io_off,
-					&io_len, flags, cr);
+				    &io_len, flags, cr);
 				if (error != 0)
 					break;
 				/*
@@ -8107,7 +8108,7 @@ cachefs_map(struct vnode *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 	CFS_DEBUG(CFSDEBUG_VOPS)
 		printf("cachefs_map: ENTER vp %p off %lld len %lu flags %d\n",
-			(void *)vp, offx, len, flags);
+		    (void *)vp, offx, len, flags);
 #endif
 	if (getzoneid() != GLOBAL_ZONEID) {
 		error = EPERM;
@@ -8148,7 +8149,7 @@ cachefs_map(struct vnode *vp, offset_t off, struct as *as, caddr_t *addrp,
 	/* call backfilesystem if NFSv4 */
 	if (CFS_ISFS_BACKFS_NFSV4(fscp)) {
 		error = cachefs_map_backfs_nfsv4(vp, off, as, addrp, len, prot,
-						maxprot, flags, cr);
+		    maxprot, flags, cr);
 		goto out;
 	}
 
@@ -8260,8 +8261,8 @@ cachefs_map_backfs_nfsv4(struct vnode *vp, offset_t off, struct as *as,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_map_backfs_nfsv4: cnode %p, backvp %p\n",
-		cp, backvp));
+	    ("cachefs_map_backfs_nfsv4: cnode %p, backvp %p\n",
+	    cp, backvp));
 	error = VOP_MAP(backvp, off, as, addrp, len, prot, maxprot, flags, cr,
 	    NULL);
 
@@ -8491,8 +8492,8 @@ cachefs_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
 
 		/* do lock on the back file */
 		CFS_DPRINT_BACKFS_NFSV4(fscp,
-			("cachefs_frlock (nfsv4): cp %p, backvp %p\n",
-			cp, backvp));
+		    ("cachefs_frlock (nfsv4): cp %p, backvp %p\n",
+		    cp, backvp));
 		error = VOP_FRLOCK(backvp, cmd, bfp, flag, offset, NULL, cr,
 		    ct);
 		VN_RELE(backvp);
@@ -8553,7 +8554,7 @@ cachefs_space(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
 	/* call backfilesystem if NFSv4 */
 	if (CFS_ISFS_BACKFS_NFSV4(fscp)) {
 		error = cachefs_space_backfs_nfsv4(vp, cmd, bfp, flag,
-						offset, cr, ct);
+		    offset, cr, ct);
 		goto out;
 	}
 
@@ -8603,8 +8604,8 @@ cachefs_space_backfs_nfsv4(struct vnode *vp, int cmd, struct flock64 *bfp,
 	mutex_exit(&cp->c_statelock);
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_space_backfs_nfsv4: cnode %p, backvp %p\n",
-		cp, backvp));
+	    ("cachefs_space_backfs_nfsv4: cnode %p, backvp %p\n",
+	    cp, backvp));
 	error = VOP_SPACE(backvp, cmd, bfp, flag, offset, cr, ct);
 
 	return (error);
@@ -8657,8 +8658,8 @@ cachefs_setsecattr_connected(cnode_t *cp,
 
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_setsecattr (nfsv4): cp %p, backvp %p",
-		cp, cp->c_backvp));
+	    ("cachefs_setsecattr (nfsv4): cp %p, backvp %p",
+	    cp, cp->c_backvp));
 	error = VOP_SETSECATTR(cp->c_backvp, vsec, flag, cr, NULL);
 	if (error) {
 		goto out;
@@ -8796,7 +8797,7 @@ cachefs_setsecattr(vnode_t *vp, vsecattr_t *vsec, int flag, cred_t *cr,
 
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_VOPS)
-	    printf("cachefs_setsecattr: ENTER vp %p\n", (void *)vp);
+		printf("cachefs_setsecattr: ENTER vp %p\n", (void *)vp);
 #endif
 	if (getzoneid() != GLOBAL_ZONEID) {
 		error = EPERM;
@@ -9057,8 +9058,8 @@ cachefs_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr,
 
 	if (error == 0) {
 		CFS_DPRINT_BACKFS_NFSV4(fscp,
-			("cachefs_shrlock (nfsv4): cp %p, backvp %p",
-			cp, backvp));
+		    ("cachefs_shrlock (nfsv4): cp %p, backvp %p",
+		    cp, backvp));
 		error = VOP_SHRLOCK(backvp, cmd, shr, flag, cr, ct);
 	}
 
@@ -9108,8 +9109,8 @@ cachefs_getsecattr_connected(vnode_t *vp, vsecattr_t *vsec, int flag,
 		goto out;
 
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_getsecattr (nfsv4): cp %p, backvp %p",
-		cp, cp->c_backvp));
+	    ("cachefs_getsecattr (nfsv4): cp %p, backvp %p",
+	    cp, cp->c_backvp));
 	error = VOP_GETSECATTR(cp->c_backvp, vsec, flag, cr, NULL);
 	if (error)
 		goto out;
@@ -9251,7 +9252,7 @@ cachefs_cacheacl(cnode_t *cp, vsecattr_t *vsecp)
 			switch (aclp->a_type) {
 			case CLASS_OBJ:
 				cp->c_metadata.md_aclclass =
-			    aclp->a_perm;
+				    aclp->a_perm;
 				/*FALLTHROUGH*/
 			case USER_OBJ:
 			case GROUP_OBJ:
@@ -9405,7 +9406,7 @@ cachefs_getacldirvp(cnode_t *cp)
 		    AT_UID | AT_GID;
 		error =
 		    VOP_MKDIR(cp->c_filegrp->fg_dirvp,
-			name, &va, &cp->c_acldirvp, kcred, NULL, 0, NULL);
+		    name, &va, &cp->c_acldirvp, kcred, NULL, 0, NULL);
 		if (error != 0)
 			goto out;
 	}
@@ -9934,7 +9935,7 @@ again:
 			owner = aclp->a_id;
 			if (crgetuid(cr) == owner) {
 				error = ACL_MODE_CHECK(mode, aclp->a_perm << 6,
-							cr, cp);
+				    cr, cp);
 				goto out;
 			}
 			break;
@@ -9953,7 +9954,7 @@ again:
 		case USER:
 			if (crgetuid(cr) == aclp->a_id) {
 				error = ACL_MODE_CHECK(mode,
-					(aclp->a_perm & mask) << 6, cr, cp);
+				    (aclp->a_perm & mask) << 6, cr, cp);
 				goto out;
 			}
 			break;
@@ -9964,8 +9965,8 @@ again:
 				gperm |= aclp->a_perm;
 				if (! ismask) {
 					error = ACL_MODE_CHECK(mode,
-							aclp->a_perm << 6,
-							cr, cp);
+					    aclp->a_perm << 6,
+					    cr, cp);
 					goto out;
 				}
 			}
@@ -9981,7 +9982,7 @@ again:
 		case OTHER_OBJ:
 			if (ngroup == 0) {
 				error = ACL_MODE_CHECK(mode, aclp->a_perm << 6,
-						cr, cp);
+				    cr, cp);
 				goto out;
 			}
 			break;

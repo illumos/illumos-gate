@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -871,14 +871,14 @@ struct pollhead;
 	int	(*vop_poll)(vnode_t *, short, int, short *,		\
 				struct pollhead **,			\
 				caller_context_t *);			\
-	int	(*vop_dump)(vnode_t *, caddr_t, int, int,		\
+	int	(*vop_dump)(vnode_t *, caddr_t, offset_t, offset_t,	\
 				caller_context_t *);			\
 	int	(*vop_pathconf)(vnode_t *, int, ulong_t *, cred_t *,	\
 				caller_context_t *);			\
 	int	(*vop_pageio)(vnode_t *, struct page *,			\
 				u_offset_t, size_t, int, cred_t *,	\
 				caller_context_t *);			\
-	int	(*vop_dumpctl)(vnode_t *, int, int *,			\
+	int	(*vop_dumpctl)(vnode_t *, int, offset_t *,		\
 				caller_context_t *);			\
 	void	(*vop_dispose)(vnode_t *, struct page *,		\
 				int, int, cred_t *,			\
@@ -970,12 +970,13 @@ extern int	fop_delmap(vnode_t *, offset_t, struct as *, caddr_t, size_t,
 				caller_context_t *);
 extern int	fop_poll(vnode_t *, short, int, short *, struct pollhead **,
 				caller_context_t *);
-extern int	fop_dump(vnode_t *, caddr_t, int, int, caller_context_t *);
+extern int	fop_dump(vnode_t *, caddr_t, offset_t, offset_t,
+    caller_context_t *);
 extern int	fop_pathconf(vnode_t *, int, ulong_t *, cred_t *,
 				caller_context_t *);
 extern int	fop_pageio(vnode_t *, struct page *, u_offset_t, size_t, int,
 				cred_t *, caller_context_t *);
-extern int	fop_dumpctl(vnode_t *, int, int *, caller_context_t *);
+extern int	fop_dumpctl(vnode_t *, int, offset_t *, caller_context_t *);
 extern void	fop_dispose(vnode_t *, struct page *, int, int, cred_t *,
 				caller_context_t *);
 extern int	fop_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *,

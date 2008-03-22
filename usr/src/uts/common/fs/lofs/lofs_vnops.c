@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@ lo_open(vnode_t **vpp, int flag, struct cred *cr, caller_context_t *ct)
 
 #ifdef LODEBUG
 	lo_dprint(4, "lo_open vp %p cnt=%d realvp %p cnt=%d\n",
-		vp, vp->v_count, realvp(vp), realvp(vp)->v_count);
+	    vp, vp->v_count, realvp(vp), realvp(vp)->v_count);
 #endif
 
 	oldvp = vp;
@@ -654,7 +654,7 @@ out:
 #ifdef LODEBUG
 	lo_dprint(4,
 	"lo_lookup dvp %x realdvp %x nm '%s' newvp %x real vp %x error %d\n",
-		dvp, realvp(dvp), nm, *vpp, vp, error);
+	    dvp, realvp(dvp), nm, *vpp, vp, error);
 #endif
 	return (error);
 }
@@ -685,7 +685,7 @@ lo_create(
 	}
 
 	error = VOP_CREATE(realvp(dvp), nm, va, exclusive, mode, &vp, cr, flag,
-		ct, vsecp);
+	    ct, vsecp);
 	if (!error) {
 		*vpp = makelonode(vp, vtoli(dvp->v_vfsp), 0);
 		if (IS_DEVVP(*vpp)) {
@@ -1036,7 +1036,7 @@ lo_getpage(
 {
 	vp = realvp(vp);
 	return (VOP_GETPAGE(vp, off, len, prot, parr, psz, seg, addr, rw, cr,
-		ct));
+	    ct));
 }
 
 static int
@@ -1084,7 +1084,7 @@ lo_addmap(
 {
 	vp = realvp(vp);
 	return (VOP_ADDMAP(vp, off, as, addr, len, prot, maxprot, flags, cr,
-		ct));
+	    ct));
 }
 
 static int
@@ -1102,7 +1102,7 @@ lo_delmap(
 {
 	vp = realvp(vp);
 	return (VOP_DELMAP(vp, off, as, addr, len, prot, maxprot, flags, cr,
-		ct));
+	    ct));
 }
 
 static int
@@ -1119,7 +1119,8 @@ lo_poll(
 }
 
 static int
-lo_dump(vnode_t *vp, caddr_t addr, int bn, int count, caller_context_t *ct)
+lo_dump(vnode_t *vp, caddr_t addr, offset_t bn, offset_t count,
+    caller_context_t *ct)
 {
 	vp = realvp(vp);
 	return (VOP_DUMP(vp, addr, bn, count, ct));

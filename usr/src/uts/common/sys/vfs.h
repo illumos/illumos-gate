@@ -406,18 +406,18 @@ typedef struct vfssw {
  * number requires a change in sys/modctl.h.
  */
 
-typedef struct vfsdef_v4 {
+typedef struct vfsdef_v5 {
 	int		def_version;	/* structure version, must be first */
 	char		*name;		/* filesystem type name */
 	int		(*init) (int, char *);	/* init routine */
 	int		flags;		/* filesystem flags */
 	mntopts_t	*optproto;	/* mount options table prototype */
-} vfsdef_v4;
+} vfsdef_v5;
 
-typedef struct vfsdef_v4 vfsdef_t;
+typedef struct vfsdef_v5 vfsdef_t;
 
 enum {
-	VFSDEF_VERSION = 4
+	VFSDEF_VERSION = 5
 };
 
 /*

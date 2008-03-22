@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -907,7 +907,8 @@ extern int	nfsinit(int, char *);
 extern void	nfsfini(void);
 extern int	nfs_vfsinit(void);
 extern void	nfs_vfsfini(void);
-extern int	nfs_dump(vnode_t *, caddr_t, int, int, caller_context_t *);
+extern int	nfs_dump(vnode_t *, caddr_t, offset_t, offset_t,
+    caller_context_t *);
 extern void	nfs_perror(int error, char *fmt, ...);
 extern void	nfs_cmn_err(int error, int level, char *fmt, ...);
 extern int	nfs_addcllock(vnode_t *vp, struct flock64 *bfp);
