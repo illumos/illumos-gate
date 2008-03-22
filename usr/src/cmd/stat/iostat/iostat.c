@@ -276,6 +276,9 @@ main(int argc, char **argv)
 
 	forever = (iter == 0);
 	do {
+		if (do_conversions && show_mountpts)
+			do_mnttab();
+
 		if (do_tty || do_cpu) {
 			kstat_t *oldks;
 			oldks = oldss ? &oldss->s_sys.ss_agg_sys : NULL;
@@ -887,11 +890,15 @@ show_disk(void *v1, void *v2, void *data)
 			if (show_mountpts && new->is_dname) {
 				mnt_t *mount_pt;
 				char *lu;
+				char *dnlu;
 				char lub[SMALL_SCRATCH_BUFLEN];
 
 				lu = strrchr(new->is_dname, '/');
 				if (lu) {
-					if (strcmp(disk_name, lu) == 0)
+					/* only the part after a possible '/' */
+					dnlu = strrchr(disk_name, '/');
+					if (dnlu != NULL &&
+					    strcmp(dnlu, lu) == 0)
 						lu = new->is_dname;
 					else {
 						*lu = 0;
