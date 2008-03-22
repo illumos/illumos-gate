@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/systm.h>
 #include <sys/taskq.h>
 #include <sys/ib/mgt/ibdm/ibdm_impl.h>
+#include <sys/ib/mgt/ibmf/ibmf_impl.h>
 #include <sys/modctl.h>
 
 /* Function Prototype declarations */
@@ -52,6 +53,10 @@ static int	ibdm_get_reachable_ports(ibdm_port_attr_t *,
 			ibdm_hca_list_t *);
 static ibdm_dp_gidinfo_t *ibdm_check_dgid(ib_guid_t, ib_sn_prefix_t);
 static ibdm_dp_gidinfo_t *ibdm_check_dest_nodeguid(ibdm_dp_gidinfo_t *);
+static boolean_t ibdm_is_cisco(ib_guid_t);
+static boolean_t ibdm_is_cisco_switch(ibdm_dp_gidinfo_t *);
+static void	ibdm_wait_cisco_probe_completion(ibdm_dp_gidinfo_t *);
+static int	ibdm_set_classportinfo(ibdm_dp_gidinfo_t *);
 static int	ibdm_send_classportinfo(ibdm_dp_gidinfo_t *);
 static int	ibdm_send_iounitinfo(ibdm_dp_gidinfo_t *);
 static int	ibdm_is_dev_mgt_supported(ibdm_dp_gidinfo_t *);
@@ -85,6 +90,8 @@ static void	ibdm_free_send_buffers(ibmf_msg_t *);
 static void	ibdm_handle_hca_detach(ib_guid_t);
 static int	ibdm_fini_port(ibdm_port_attr_t *);
 static int	ibdm_uninit_hca(ibdm_hca_list_t *);
+static void	ibdm_handle_setclassportinfo(ibmf_handle_t, ibmf_msg_t *,
+		    ibdm_dp_gidinfo_t *, int *);
 static void	ibdm_handle_iounitinfo(ibmf_handle_t,
 		    ibmf_msg_t *, ibdm_dp_gidinfo_t *, int *);
 static void	ibdm_handle_ioc_profile(ibmf_handle_t,
@@ -106,6 +113,8 @@ static ibdm_port_attr_t		*ibdm_get_port_attr(ibt_async_event_t *,
 				    ibdm_hca_list_t **);
 static sa_node_record_t		*ibdm_get_node_records(ibmf_saa_handle_t,
 				    size_t *, ib_guid_t);
+static int			ibdm_get_node_record_by_port(ibmf_saa_handle_t,
+				    ib_guid_t, sa_node_record_t **, size_t *);
 static sa_portinfo_record_t	*ibdm_get_portinfo(ibmf_saa_handle_t, size_t *,
 				    ib_lid_t);
 static ibdm_dp_gidinfo_t	*ibdm_create_gid_info(ibdm_port_attr_t *,
@@ -383,6 +392,11 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info, ibdm_iou_info_t **ioup)
 			ioc->ioc_serv = NULL;
 		}
 	}
+	/*
+	 * Clear the IBDM_CISCO_PROBE_DONE flag to get the IO Unit information
+	 * via the switch during the probe process.
+	 */
+	gid_info->gl_flag &= ~IBDM_CISCO_PROBE_DONE;
 
 	IBTF_DPRINTF_L4("ibdm", "\tibdm_free_iou_info: deleting IOU & IOC");
 	size = sizeof (ibdm_iou_info_t) + niocs * sizeof (ibdm_ioc_info_t);
@@ -528,7 +542,7 @@ ibdm_event_hdlr(void *clnt_hdl,
 		port = ibdm_get_port_attr(event, &hca_list);
 		if (port == NULL) {
 			IBTF_DPRINTF_L2("ibdm",
-				"\tevent_hdlr: HCA not present");
+			    "\tevent_hdlr: HCA not present");
 			mutex_exit(&ibdm.ibdm_hl_mutex);
 			break;
 		}
@@ -543,7 +557,7 @@ ibdm_event_hdlr(void *clnt_hdl,
 		port = ibdm_get_port_attr(event, &hca_list);
 		if (port == NULL) {
 			IBTF_DPRINTF_L2("ibdm",
-				"\tevent_hdlr: HCA not present");
+			    "\tevent_hdlr: HCA not present");
 			mutex_exit(&ibdm.ibdm_hl_mutex);
 			break;
 		}
@@ -1146,6 +1160,22 @@ ibdm_wait_probe_completion(void)
 
 
 /*
+ * ibdm_wait_cisco_probe_completion:
+ *	wait for the reply from the Cisco FC GW switch after a setclassportinfo
+ *	request is sent. This wait can be achieved on each gid.
+ */
+static void
+ibdm_wait_cisco_probe_completion(ibdm_dp_gidinfo_t *gidinfo)
+{
+	ASSERT(MUTEX_HELD(&gidinfo->gl_mutex));
+	IBTF_DPRINTF_L4("ibdm",	"\twait for cisco probe complete");
+	gidinfo->gl_flag |= IBDM_CISCO_PROBE;
+	while (gidinfo->gl_flag & IBDM_CISCO_PROBE)
+		cv_wait(&gidinfo->gl_probe_cv, &gidinfo->gl_mutex);
+}
+
+
+/*
  * ibdm_wakeup_probe_gid_cv:
  *	wakeup waiting threads (based on ibdm_ngid_probes_in_progress)
  */
@@ -1337,6 +1367,53 @@ ibdm_sweep_fabric(int reprobe_flag)
 
 
 /*
+ * ibdm_is_cisco:
+ * 	Check if this is a Cisco device or not.
+ */
+static boolean_t
+ibdm_is_cisco(ib_guid_t guid)
+{
+	if ((guid >> IBDM_OUI_GUID_SHIFT) == IBDM_CISCO_COMPANY_ID)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+
+/*
+ * ibdm_is_cisco_switch:
+ * 	Check if this switch is a CISCO switch or not.
+ * 	Note that if this switch is already activated, ibdm_is_cisco_switch()
+ * 	returns B_FALSE not to re-activate it again.
+ */
+static boolean_t
+ibdm_is_cisco_switch(ibdm_dp_gidinfo_t *gid_info)
+{
+	int company_id, device_id;
+	ASSERT(gid_info != 0);
+	ASSERT(MUTEX_HELD(&gid_info->gl_mutex));
+
+	/*
+	 * If this switch is already activated, don't re-activate it.
+	 */
+	if (gid_info->gl_flag & IBDM_CISCO_PROBE_DONE)
+		return (B_FALSE);
+
+	/*
+	 * Check if this switch is a Cisco FC GW or not.
+	 * Use the node guid (the OUI part) instead of the vendor id
+	 * since the vendor id is zero in practice.
+	 */
+	company_id = gid_info->gl_nodeguid >> IBDM_OUI_GUID_SHIFT;
+	device_id = gid_info->gl_devid;
+
+	if (company_id == IBDM_CISCO_COMPANY_ID &&
+	    device_id == IBDM_CISCO_DEVICE_ID)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+
+/*
  * ibdm_probe_gid_thread:
  *	thread that does the actual work for sweeping the fabric
  *	for a given GID
@@ -1374,7 +1451,7 @@ ibdm_probe_gid_thread(void *args)
 			mutex_exit(&gid_info->gl_mutex);
 			if (ibdm_send_iounitinfo(gid_info) != IBDM_SUCCESS) {
 				mutex_enter(&gid_info->gl_mutex);
-				gid_info->gl_pending_cmds = 0;
+				--gid_info->gl_pending_cmds;
 				mutex_exit(&gid_info->gl_mutex);
 				mutex_enter(&ibdm.ibdm_mutex);
 				--ibdm.ibdm_ngid_probes_in_progress;
@@ -1454,11 +1531,6 @@ ibdm_probe_gid_thread(void *args)
 		return;
 	}
 
-	mutex_enter(&gid_info->gl_mutex);
-	gid_info->gl_pending_cmds++;
-	gid_info->gl_state = IBDM_GET_CLASSPORTINFO;
-	mutex_exit(&gid_info->gl_mutex);
-
 	/*
 	 * Check whether the destination GID supports DM agents. If
 	 * not, stop probing the GID and continue with the next GID
@@ -1466,7 +1538,6 @@ ibdm_probe_gid_thread(void *args)
 	 */
 	if (ibdm_is_dev_mgt_supported(gid_info) != IBDM_SUCCESS) {
 		mutex_enter(&gid_info->gl_mutex);
-		gid_info->gl_pending_cmds = 0;
 		gid_info->gl_state = IBDM_GID_PROBING_FAILED;
 		mutex_exit(&gid_info->gl_mutex);
 		ibdm_delete_glhca_list(gid_info);
@@ -1481,7 +1552,6 @@ ibdm_probe_gid_thread(void *args)
 	if (ibdm_get_node_port_guids(gid_info->gl_sa_hdl, gid_info->gl_dlid,
 	    &node_guid, &port_guid) != IBDM_SUCCESS) {
 		mutex_enter(&gid_info->gl_mutex);
-		gid_info->gl_pending_cmds = 0;
 		gid_info->gl_state = IBDM_GID_PROBING_FAILED;
 		mutex_exit(&gid_info->gl_mutex);
 		ibdm_delete_glhca_list(gid_info);
@@ -1504,7 +1574,6 @@ ibdm_probe_gid_thread(void *args)
 	if (ibdm_check_dest_nodeguid(gid_info) != NULL) {
 		mutex_exit(&ibdm.ibdm_mutex);
 		mutex_enter(&gid_info->gl_mutex);
-		gid_info->gl_pending_cmds = 0;
 		gid_info->gl_state = IBDM_GID_PROBING_SKIPPED;
 		mutex_exit(&gid_info->gl_mutex);
 		ibdm_delete_glhca_list(gid_info);
@@ -1522,21 +1591,67 @@ ibdm_probe_gid_thread(void *args)
 	 */
 	mutex_enter(&gid_info->gl_mutex);
 	gid_info->gl_reprobe_flag = 1;
+
+	/*
+	 * A Cisco FC GW needs the special handling to get IOUnitInfo.
+	 */
+	if (ibdm_is_cisco_switch(gid_info)) {
+		gid_info->gl_pending_cmds++;
+		gid_info->gl_state = IBDM_SET_CLASSPORTINFO;
+		mutex_exit(&gid_info->gl_mutex);
+
+		if (ibdm_set_classportinfo(gid_info) != IBDM_SUCCESS) {
+			mutex_enter(&gid_info->gl_mutex);
+			gid_info->gl_state = IBDM_GID_PROBING_FAILED;
+			--gid_info->gl_pending_cmds;
+			mutex_exit(&gid_info->gl_mutex);
+
+			/* free the hca_list on this gid_info */
+			ibdm_delete_glhca_list(gid_info);
+
+			mutex_enter(&ibdm.ibdm_mutex);
+			--ibdm.ibdm_ngid_probes_in_progress;
+			ibdm_wakeup_probe_gid_cv();
+			mutex_exit(&ibdm.ibdm_mutex);
+
+			return;
+		}
+
+		mutex_enter(&gid_info->gl_mutex);
+		ibdm_wait_cisco_probe_completion(gid_info);
+
+		IBTF_DPRINTF_L4("ibdm", "\tibdm_probe_gid_thread: "
+		    "CISCO Wakeup signal received");
+	}
+
+	/* move on to the 'GET_CLASSPORTINFO' stage */
+	gid_info->gl_pending_cmds++;
+	gid_info->gl_state = IBDM_GET_CLASSPORTINFO;
 	mutex_exit(&gid_info->gl_mutex);
+
+	IBTF_DPRINTF_L3(ibdm_string, "\tibdm_probe_gid_thread: "
+	    "%d: gid_info %p gl_state %d pending_cmds %d",
+	    __LINE__, gid_info, gid_info->gl_state,
+	    gid_info->gl_pending_cmds);
 
 	/*
 	 * Send ClassPortInfo request to the GID asynchronously.
 	 */
 	if (ibdm_send_classportinfo(gid_info) != IBDM_SUCCESS) {
+
 		mutex_enter(&gid_info->gl_mutex);
 		gid_info->gl_state = IBDM_GID_PROBING_FAILED;
-		gid_info->gl_pending_cmds = 0;
+		--gid_info->gl_pending_cmds;
 		mutex_exit(&gid_info->gl_mutex);
+
+		/* free the hca_list on this gid_info */
 		ibdm_delete_glhca_list(gid_info);
+
 		mutex_enter(&ibdm.ibdm_mutex);
 		--ibdm.ibdm_ngid_probes_in_progress;
 		ibdm_wakeup_probe_gid_cv();
 		mutex_exit(&ibdm.ibdm_mutex);
+
 		return;
 	}
 }
@@ -1711,6 +1826,9 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 	}
 
 	for (ii = 0; ii < nrecs; ii++) {
+		sa_node_record_t *nrec;
+		size_t length;
+
 		precp = &result[ii];
 		if ((gid_info = ibdm_check_dgid(precp->DGID.gid_guid,
 		    precp->DGID.gid_prefix)) != NULL) {
@@ -1727,6 +1845,7 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 		 */
 		gid_info = kmem_zalloc(sizeof (ibdm_dp_gidinfo_t), KM_SLEEP);
 		mutex_init(&gid_info->gl_mutex, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&gid_info->gl_probe_cv, NULL, CV_DRIVER, NULL);
 		gid_info->gl_dgid_hi		= precp->DGID.gid_prefix;
 		gid_info->gl_dgid_lo		= precp->DGID.gid_guid;
 		gid_info->gl_sgid_hi		= precp->SGID.gid_prefix;
@@ -1741,6 +1860,20 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 		gid_info->gl_min_transactionID  = gid_info->gl_transactionID;
 		gid_info->gl_max_transactionID  = (ibdm.ibdm_transactionID +1)
 		    << IBDM_GID_TRANSACTIONID_SHIFT;
+
+		/*
+		 * get the node record with this guid if the destination
+		 * device is a Cisco one.
+		 */
+		if (ibdm_is_cisco(precp->DGID.gid_guid) &&
+		    (gid_info->gl_nodeguid == 0 || gid_info->gl_devid == 0) &&
+		    ibdm_get_node_record_by_port(portinfo->pa_sa_hdl,
+		    precp->DGID.gid_guid, &nrec, &length) == IBDM_SUCCESS) {
+			gid_info->gl_nodeguid = nrec->NodeInfo.NodeGUID;
+			gid_info->gl_devid = nrec->NodeInfo.DeviceID;
+			kmem_free(nrec, length);
+		}
+
 		ibdm_addto_glhcalist(gid_info,  hca);
 
 		ibdm_dump_path_info(precp);
@@ -1835,6 +1968,92 @@ ibdm_find_gid(ib_guid_t nodeguid, ib_guid_t portguid)
 
 
 /*
+ * ibdm_set_classportinfo()
+ *	ibdm_set_classportinfo() is a function to activate a Cisco FC GW
+ *	by sending the setClassPortInfo request with the trapLID, trapGID
+ *	and etc. to the gateway since the gateway doesn't provide the IO
+ *	Unit Information othewise. This behavior is the Cisco specific one,
+ *	and this function is called to a Cisco FC GW only.
+ *	Returns IBDM_SUCCESS/IBDM_FAILURE
+ */
+static int
+ibdm_set_classportinfo(ibdm_dp_gidinfo_t *gid_info)
+{
+	ibmf_msg_t		*msg;
+	ib_mad_hdr_t		*hdr;
+	ibdm_timeout_cb_args_t	*cb_args;
+	void			*data;
+	ib_mad_classportinfo_t *cpi;
+
+	IBTF_DPRINTF_L4("ibdm",
+	    "\tset_classportinfo: gid info 0x%p", gid_info);
+
+	/*
+	 * Send command to set classportinfo attribute. Allocate a IBMF
+	 * packet and initialize the packet.
+	 */
+	if (ibmf_alloc_msg(gid_info->gl_ibmf_hdl, IBMF_ALLOC_SLEEP,
+	    &msg) != IBMF_SUCCESS) {
+		IBTF_DPRINTF_L4("ibdm", "\tset_classportinfo: pkt alloc fail");
+		return (IBDM_FAILURE);
+	}
+
+	ibdm_alloc_send_buffers(msg);
+
+	msg->im_local_addr.ia_local_lid		= gid_info->gl_slid;
+	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
+	msg->im_local_addr.ia_remote_qno	= 1;
+	msg->im_local_addr.ia_p_key		= gid_info->gl_p_key;
+	msg->im_local_addr.ia_q_key		= IB_GSI_QKEY;
+
+	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
+	hdr->BaseVersion	= MAD_CLASS_BASE_VERS_1;
+	hdr->MgmtClass		= MAD_MGMT_CLASS_DEV_MGT;
+	hdr->ClassVersion	= IB_DM_CLASS_VERSION_1;
+	hdr->R_Method		= IB_DM_DEVMGT_METHOD_SET;
+	hdr->Status		= 0;
+	hdr->TransactionID	= h2b64(gid_info->gl_transactionID);
+	hdr->AttributeID	= h2b16(IB_DM_ATTR_CLASSPORTINFO);
+	hdr->AttributeModifier	= 0;
+
+	data = msg->im_msgbufs_send.im_bufs_cl_data;
+	cpi = (ib_mad_classportinfo_t *)data;
+
+	/*
+	 * Set the classportinfo values to activate this Cisco FC GW.
+	 */
+	cpi->TrapGID_hi = h2b64(gid_info->gl_sgid_hi);
+	cpi->TrapGID_lo = h2b64(gid_info->gl_sgid_lo);
+	cpi->TrapLID = h2b16(gid_info->gl_slid);
+	cpi->TrapSL = 0;
+	cpi->TrapP_Key = h2b16(gid_info->gl_p_key);
+	cpi->TrapQP = h2b32((((ibmf_alt_qp_t *)gid_info->gl_qp_hdl)->isq_qpn));
+	cpi->TrapQ_Key = h2b32((((ibmf_alt_qp_t *)
+	    gid_info->gl_qp_hdl)->isq_qkey));
+
+	cb_args = &gid_info->gl_cpi_cb_args;
+	cb_args->cb_gid_info = gid_info;
+	cb_args->cb_retry_count	= ibdm_dft_retry_cnt;
+	cb_args->cb_req_type = IBDM_REQ_TYPE_CLASSPORTINFO;
+
+	gid_info->gl_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
+	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+
+	IBTF_DPRINTF_L5("ibdm", "\tset_classportinfo: "
+	    "timeout id %x", gid_info->gl_timeout_id);
+
+	if (ibmf_msg_transport(gid_info->gl_ibmf_hdl, gid_info->gl_qp_hdl,
+	    msg, NULL, ibdm_ibmf_send_cb, cb_args, 0) != IBMF_SUCCESS) {
+		IBTF_DPRINTF_L2("ibdm",
+		    "\tset_classportinfo: ibmf send failed");
+		ibdm_ibmf_send_cb(gid_info->gl_ibmf_hdl, msg, cb_args);
+	}
+
+	return (IBDM_SUCCESS);
+}
+
+
+/*
  * ibdm_send_classportinfo()
  *	Send classportinfo request. When the request is completed
  *	IBMF calls ibdm_classportinfo_cb routine to inform about
@@ -1902,6 +2121,63 @@ ibdm_send_classportinfo(ibdm_dp_gidinfo_t *gid_info)
 
 
 /*
+ * ibdm_handle_setclassportinfo()
+ *	Invoked by the IBMF when setClassPortInfo request is completed.
+ */
+static void
+ibdm_handle_setclassportinfo(ibmf_handle_t ibmf_hdl,
+    ibmf_msg_t *msg, ibdm_dp_gidinfo_t *gid_info, int *flag)
+{
+	void			*data;
+	timeout_id_t		timeout_id;
+	ib_mad_classportinfo_t *cpi;
+
+	IBTF_DPRINTF_L4("ibdm", "\thandle_setclassportinfo:ibmf hdl "
+	    "%p msg %p gid info %p", ibmf_hdl, msg, gid_info);
+
+	if (IBDM_IN_IBMFMSG_ATTR(msg) != IB_DM_ATTR_CLASSPORTINFO) {
+		IBTF_DPRINTF_L4("ibdm", "\thandle_setclassportinfo: "
+		    "Not a ClassPortInfo resp");
+		*flag |= IBDM_IBMF_PKT_UNEXP_RESP;
+		return;
+	}
+
+	/*
+	 * Verify whether timeout handler is created/active.
+	 * If created/ active,  cancel the timeout  handler
+	 */
+	mutex_enter(&gid_info->gl_mutex);
+	if (gid_info->gl_state != IBDM_SET_CLASSPORTINFO) {
+		IBTF_DPRINTF_L2("ibdm", "\thandle_setclassportinfo:DUP resp");
+		*flag |= IBDM_IBMF_PKT_DUP_RESP;
+		mutex_exit(&gid_info->gl_mutex);
+		return;
+	}
+	ibdm_bump_transactionID(gid_info);
+
+	gid_info->gl_iou_cb_args.cb_req_type = 0;
+	if (gid_info->gl_timeout_id) {
+		timeout_id = gid_info->gl_timeout_id;
+		mutex_exit(&gid_info->gl_mutex);
+		IBTF_DPRINTF_L5("ibdm", "handle_setlassportinfo: "
+		    "gl_timeout_id = 0x%x", timeout_id);
+		if (untimeout(timeout_id) == -1) {
+			IBTF_DPRINTF_L2("ibdm", "handle_setclassportinfo: "
+			    "untimeout gl_timeout_id failed");
+		}
+		mutex_enter(&gid_info->gl_mutex);
+		gid_info->gl_timeout_id = 0;
+	}
+	mutex_exit(&gid_info->gl_mutex);
+
+	data = msg->im_msgbufs_recv.im_bufs_cl_data;
+	cpi = (ib_mad_classportinfo_t *)data;
+
+	ibdm_dump_classportinfo(cpi);
+}
+
+
+/*
  * ibdm_handle_classportinfo()
  *	Invoked by the IBMF when the classportinfo request is completed.
  */
@@ -1912,7 +2188,7 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	void			*data;
 	timeout_id_t		timeout_id;
 	ib_mad_hdr_t		*hdr;
-	ibdm_mad_classportinfo_t *cpi;
+	ib_mad_classportinfo_t *cpi;
 
 	IBTF_DPRINTF_L4("ibdm", "\thandle_classportinfo:ibmf hdl "
 	    "%p msg %p gid info %p", ibmf_hdl, msg, gid_info);
@@ -1954,7 +2230,7 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	mutex_exit(&gid_info->gl_mutex);
 
 	data = msg->im_msgbufs_recv.im_bufs_cl_data;
-	cpi = (ibdm_mad_classportinfo_t *)data;
+	cpi = (ib_mad_classportinfo_t *)data;
 
 	/*
 	 * Cache the "RespTimeValue" and redirection information in the
@@ -1962,7 +2238,7 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	 * be used to send any further requests to the GID.
 	 */
 	gid_info->gl_resp_timeout	=
-		(b2h32(cpi->RespTimeValue) & 0x1F);
+	    (b2h32(cpi->RespTimeValue) & 0x1F);
 
 	gid_info->gl_redirected		= ((IBDM_IN_IBMFMSG_STATUS(msg) &
 	    MAD_STATUS_REDIRECT_REQUIRED) ? B_TRUE: B_FALSE);
@@ -1988,7 +2264,7 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	if (gid_info->gl_redirected == B_TRUE) {
 		if (gid_info->gl_redirect_dlid != 0) {
 			msg->im_local_addr.ia_remote_lid =
-					gid_info->gl_redirect_dlid;
+			    gid_info->gl_redirect_dlid;
 		}
 		msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 		msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
@@ -2203,14 +2479,13 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 	gid_info->gl_iou = (ibdm_iou_info_t *)kmem_zalloc(size, KM_SLEEP);
 	giou_info = &gid_info->gl_iou->iou_info;
 	gid_info->gl_iou->iou_ioc_info = (ibdm_ioc_info_t *)
-		((char *)gid_info->gl_iou + sizeof (ibdm_iou_info_t));
+	    ((char *)gid_info->gl_iou + sizeof (ibdm_iou_info_t));
 
 	giou_info->iou_num_ctrl_slots	= gid_info->gl_num_iocs	= num_iocs;
 	giou_info->iou_flag		= iou_info->iou_flag;
 	bcopy(iou_info->iou_ctrl_list, giou_info->iou_ctrl_list, 128);
 	giou_info->iou_changeid	= b2h16(iou_info->iou_changeid);
-	gid_info->gl_pending_cmds += num_iocs;
-	gid_info->gl_pending_cmds += 1; /* for diag code */
+	gid_info->gl_pending_cmds++; /* for diag code */
 	mutex_exit(&gid_info->gl_mutex);
 
 	if (ibdm_get_diagcode(gid_info, 0) != IBDM_SUCCESS) {
@@ -2247,9 +2522,6 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 			IBTF_DPRINTF_L4("ibdm", "\thandle_iouintinfo: "
 			    "No IOC is present in the slot = %d", ii);
 			ioc_info->ioc_state = IBDM_IOC_STATE_PROBE_FAILED;
-			mutex_enter(&gid_info->gl_mutex);
-			gid_info->gl_pending_cmds--;
-			mutex_exit(&gid_info->gl_mutex);
 			continue;
 		}
 
@@ -2268,9 +2540,6 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 			    &msg) != IBMF_SUCCESS) {
 				IBTF_DPRINTF_L4("ibdm", "\thandle_iouintinfo: "
 				    "IBMF packet allocation failed");
-				mutex_enter(&gid_info->gl_mutex);
-				gid_info->gl_pending_cmds--;
-				mutex_exit(&gid_info->gl_mutex);
 				continue;
 			}
 
@@ -2284,14 +2553,14 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 		if (gid_info->gl_redirected == B_TRUE) {
 			if (gid_info->gl_redirect_dlid != 0) {
 				msg->im_local_addr.ia_remote_lid =
-						gid_info->gl_redirect_dlid;
+				    gid_info->gl_redirect_dlid;
 			}
 			msg->im_local_addr.ia_remote_qno =
-						gid_info->gl_redirect_QP;
+			    gid_info->gl_redirect_QP;
 			msg->im_local_addr.ia_p_key =
-						gid_info->gl_redirect_pkey;
+			    gid_info->gl_redirect_pkey;
 			msg->im_local_addr.ia_q_key =
-						gid_info->gl_redirect_qkey;
+			    gid_info->gl_redirect_qkey;
 		} else {
 			msg->im_local_addr.ia_remote_qno = 1;
 			msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
@@ -2314,6 +2583,10 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 		cb_args->cb_retry_count	= ibdm_dft_retry_cnt;
 		cb_args->cb_req_type	= IBDM_REQ_TYPE_IOCINFO;
 		cb_args->cb_ioc_num	= ii;
+
+		mutex_enter(&gid_info->gl_mutex);
+		gid_info->gl_pending_cmds++; /* for diag code */
+		mutex_exit(&gid_info->gl_mutex);
 
 		ioc_info->ioc_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 		    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
@@ -2364,7 +2637,7 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 	 */
 	if (ibdm_is_ioc_present(ioc->ioc_guid, gid_info, flag) != NULL) {
 		IBTF_DPRINTF_L4("ibdm", "\thandle_ioc_profile:"
-			"IOC guid %llx is present", ioc->ioc_guid);
+		    "IOC guid %llx is present", ioc->ioc_guid);
 		return;
 	}
 	ioc_no = IBDM_IN_IBMFMSG_ATTRMOD(msg);
@@ -2457,14 +2730,16 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 		ioc_info->ioc_diagdeviceid = (IB_DM_IOU_DEVICEID_MASK &
 		    gid_info->gl_iou->iou_info.iou_flag) ? B_TRUE : B_FALSE;
 
-		if (ioc_info->ioc_diagdeviceid == B_TRUE)
+		if (ioc_info->ioc_diagdeviceid == B_TRUE) {
 			gid_info->gl_pending_cmds++;
+			IBTF_DPRINTF_L3(ibdm_string,
+			    "\tibdm_handle_ioc_profile: "
+			    "%d: gid_info %p gl_state %d pending_cmds %d",
+			    __LINE__, gid_info, gid_info->gl_state,
+			    gid_info->gl_pending_cmds);
+		}
 	}
 	gioc->ioc_service_entries	= ioc->ioc_service_entries;
-	gid_info->gl_pending_cmds += (gioc->ioc_service_entries/4);
-	if (gioc->ioc_service_entries % 4)
-		gid_info->gl_pending_cmds++;
-
 	mutex_exit(&gid_info->gl_mutex);
 
 	ibdm_dump_ioc_profile(gioc);
@@ -2489,6 +2764,7 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 	ii = 0;
 	while (nserv_entries) {
 		mutex_enter(&gid_info->gl_mutex);
+		gid_info->gl_pending_cmds++;
 		ibdm_bump_transactionID(gid_info);
 		mutex_exit(&gid_info->gl_mutex);
 
@@ -2624,7 +2900,7 @@ ibdm_handle_srventry_mad(ibmf_msg_t *msg,
 	mutex_enter(&gid_info->gl_mutex);
 	if (gsrv_ents->se_state != IBDM_SE_INVALID) {
 		IBTF_DPRINTF_L2("ibdm", "\thandle_srventry_mad: "
-			"already known, ioc %d, srv %d, se_state %x",
+		    "already known, ioc %d, srv %d, se_state %x",
 		    ioc_no - 1, start, gsrv_ents->se_state);
 		mutex_exit(&gid_info->gl_mutex);
 		(*flag) |= IBDM_IBMF_PKT_DUP_RESP;
@@ -3019,7 +3295,7 @@ ibdm_process_incoming_mad(ibmf_handle_t ibmf_hdl, ibmf_msg_t *msg, void *arg)
 
 	/* Handle redirection for all the MAD's, except ClassPortInfo */
 	if (((IBDM_IN_IBMFMSG_STATUS(msg) & MAD_STATUS_REDIRECT_REQUIRED)) &&
-		(IBDM_IN_IBMFMSG_ATTR(msg) != IB_DM_ATTR_CLASSPORTINFO)) {
+	    (IBDM_IN_IBMFMSG_ATTR(msg) != IB_DM_ATTR_CLASSPORTINFO)) {
 		ret = ibdm_handle_redirection(msg, gid_info, &flag);
 		if (ret == IBDM_SUCCESS) {
 			return;
@@ -3032,6 +3308,12 @@ ibdm_process_incoming_mad(ibmf_handle_t ibmf_hdl, ibmf_msg_t *msg, void *arg)
 		mutex_exit(&gid_info->gl_mutex);
 
 		switch (gl_state) {
+
+		case IBDM_SET_CLASSPORTINFO:
+			ibdm_handle_setclassportinfo(
+			    ibmf_hdl, msg, gid_info, &flag);
+			break;
+
 		case IBDM_GET_CLASSPORTINFO:
 			ibdm_handle_classportinfo(
 			    ibmf_hdl, msg, gid_info, &flag);
@@ -3098,18 +3380,30 @@ ibdm_process_incoming_mad(ibmf_handle_t ibmf_hdl, ibmf_msg_t *msg, void *arg)
 		    gid_info, gid_info->gl_pending_cmds);
 		mutex_exit(&gid_info->gl_mutex);
 	} else {
+		uint_t prev_state;
 		IBTF_DPRINTF_L4("ibdm", "\tprocess_incoming_mad: Probing DONE");
+		prev_state = gid_info->gl_state;
 		gid_info->gl_state = IBDM_GID_PROBING_COMPLETE;
-		mutex_exit(&gid_info->gl_mutex);
-		ibdm_notify_newgid_iocs(gid_info);
-		mutex_enter(&ibdm.ibdm_mutex);
-		if (--ibdm.ibdm_ngid_probes_in_progress == 0) {
+		if (prev_state == IBDM_SET_CLASSPORTINFO) {
 			IBTF_DPRINTF_L4("ibdm",
-			    "\tprocess_incoming_mad: Wakeup");
-			ibdm.ibdm_busy &= ~IBDM_PROBE_IN_PROGRESS;
-			cv_broadcast(&ibdm.ibdm_probe_cv);
+			    "\tprocess_incoming_mad: "
+			    "Setclassportinfo for Cisco FC GW is done.");
+			gid_info->gl_flag &= ~IBDM_CISCO_PROBE;
+			gid_info->gl_flag |= IBDM_CISCO_PROBE_DONE;
+			mutex_exit(&gid_info->gl_mutex);
+			cv_broadcast(&gid_info->gl_probe_cv);
+		} else {
+			mutex_exit(&gid_info->gl_mutex);
+			ibdm_notify_newgid_iocs(gid_info);
+			mutex_enter(&ibdm.ibdm_mutex);
+			if (--ibdm.ibdm_ngid_probes_in_progress == 0) {
+				IBTF_DPRINTF_L4("ibdm",
+				    "\tprocess_incoming_mad: Wakeup");
+				ibdm.ibdm_busy &= ~IBDM_PROBE_IN_PROGRESS;
+				cv_broadcast(&ibdm.ibdm_probe_cv);
+			}
+			mutex_exit(&ibdm.ibdm_mutex);
 		}
-		mutex_exit(&ibdm.ibdm_mutex);
 	}
 
 	/*
@@ -3169,7 +3463,7 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 	ib_mad_hdr_t		*hdr;
 	ibdm_ioc_info_t		*ioc = NULL;
 	ibdm_timeout_cb_args_t	*cb_args;
-	ibdm_mad_classportinfo_t	*cpi;
+	ib_mad_classportinfo_t	*cpi;
 
 	IBTF_DPRINTF_L4("ibdm", "\thandle_redirection: Enter");
 	mutex_enter(&gid_info->gl_mutex);
@@ -3267,10 +3561,10 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 	}
 
 	data = msg->im_msgbufs_recv.im_bufs_cl_data;
-	cpi = (ibdm_mad_classportinfo_t *)data;
+	cpi = (ib_mad_classportinfo_t *)data;
 
 	gid_info->gl_resp_timeout	=
-		(b2h32(cpi->RespTimeValue) & 0x1F);
+	    (b2h32(cpi->RespTimeValue) & 0x1F);
 
 	gid_info->gl_redirected		= B_TRUE;
 	gid_info->gl_redirect_dlid	= b2h16(cpi->RedirectLID);
@@ -3282,7 +3576,7 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 
 	if (gid_info->gl_redirect_dlid != 0) {
 		msg->im_local_addr.ia_remote_lid =
-				gid_info->gl_redirect_dlid;
+		    gid_info->gl_redirect_dlid;
 	}
 	ibdm_bump_transactionID(gid_info);
 	mutex_exit(&gid_info->gl_mutex);
@@ -3297,9 +3591,9 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 	hdr->Status		= 0;
 	hdr->TransactionID	= h2b64(gid_info->gl_transactionID);
 	hdr->AttributeID	=
-		msg->im_msgbufs_recv.im_bufs_mad_hdr->AttributeID;
+	    msg->im_msgbufs_recv.im_bufs_mad_hdr->AttributeID;
 	hdr->AttributeModifier	=
-		msg->im_msgbufs_recv.im_bufs_mad_hdr->AttributeModifier;
+	    msg->im_msgbufs_recv.im_bufs_mad_hdr->AttributeModifier;
 
 	msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 	msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
@@ -3434,6 +3728,13 @@ ibdm_pkt_timeout_hdlr(void *arg)
 			ioc->ioc_dc_timeout_id = 0;
 #endif
 		break;
+	default: /* ERROR State */
+		IBTF_DPRINTF_L2("ibdm",
+		    "\tpkt_timeout_hdlr: wrong request type.");
+		new_gl_state = IBDM_GID_PROBING_FAILED;
+		if (gid_info->gl_timeout_id)
+			gid_info->gl_timeout_id = 0;
+		break;
 	}
 	if (probe_done == B_TRUE) {
 		gid_info->gl_state = new_gl_state;
@@ -3509,7 +3810,7 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 	if (gid_info->gl_redirected == B_TRUE) {
 		if (gid_info->gl_redirect_dlid != 0) {
 			msg->im_local_addr.ia_remote_lid =
-					gid_info->gl_redirect_dlid;
+			    gid_info->gl_redirect_dlid;
 		}
 		msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 		msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
@@ -3599,6 +3900,7 @@ ibdm_update_ioc_port_gidlist(ibdm_ioc_info_t *dest,
 	ibdm_gid_t	*tmp;
 	ibdm_hca_list_t	*gid_hca_head, *temp;
 	ibdm_hca_list_t	*ioc_head = NULL;
+	ASSERT(MUTEX_HELD(&gid_info->gl_mutex));
 
 	IBTF_DPRINTF_L5("ibdm", "\tupdate_ioc_port_gidlist: Enter");
 
@@ -3626,17 +3928,23 @@ ibdm_update_ioc_port_gidlist(ibdm_ioc_info_t *dest,
 
 /*
  * ibdm_alloc_send_buffers()
- *	Allocates memory for the IBMF send buffer
+ *	Allocates memory for the IBMF send buffer to send and/or receive
+ *	the Device Management MAD packet.
  */
 static void
 ibdm_alloc_send_buffers(ibmf_msg_t *msgp)
 {
 	msgp->im_msgbufs_send.im_bufs_mad_hdr =
 	    kmem_zalloc(IBDM_MAD_SIZE, KM_SLEEP);
-	msgp->im_msgbufs_send.im_bufs_cl_data = (uchar_t *)
+
+	msgp->im_msgbufs_send.im_bufs_cl_hdr = (uchar_t *)
 	    msgp->im_msgbufs_send.im_bufs_mad_hdr + sizeof (ib_mad_hdr_t);
+	msgp->im_msgbufs_send.im_bufs_cl_hdr_len = IBDM_DM_MAD_HDR_SZ;
+
+	msgp->im_msgbufs_send.im_bufs_cl_data =
+	    ((char *)msgp->im_msgbufs_send.im_bufs_cl_hdr + IBDM_DM_MAD_HDR_SZ);
 	msgp->im_msgbufs_send.im_bufs_cl_data_len =
-	    IBDM_MAD_SIZE - sizeof (ib_mad_hdr_t);
+	    IBDM_MAD_SIZE - sizeof (ib_mad_hdr_t) - IBDM_DM_MAD_HDR_SZ;
 }
 
 
@@ -3693,78 +4001,90 @@ ibdm_probe_ioc(ib_guid_t nodeguid, ib_guid_t ioc_guid, int reprobe_flag)
 		}
 		nrecords = (nr_len / sizeof (sa_node_record_t));
 		for (tmp = nr, ii = 0;  (ii < nrecords); ii++, tmp++) {
-			pi = ibdm_get_portinfo(
-			    port->pa_sa_hdl, &pi_len, tmp->LID);
-
-			if ((pi) && (pi->PortInfo.CapabilityMask &
-			    SM_CAP_MASK_IS_DM_SUPPD)) {
-				/*
-				 * For reprobes: Check if GID, already in
-				 * the list. If so, set the state to SKIPPED
-				 */
-				if (((temp_gidinfo = ibdm_find_gid(nodeguid,
-				    tmp->NodeInfo.PortGUID)) != NULL) &&
-				    temp_gidinfo->gl_state ==
-				    IBDM_GID_PROBING_COMPLETE) {
-					ASSERT(reprobe_gid == NULL);
-					ibdm_addto_glhcalist(temp_gidinfo,
-					    hca_list);
-					reprobe_gid = temp_gidinfo;
-					kmem_free(pi, pi_len);
-					continue;
-				} else if (temp_gidinfo != NULL) {
-					kmem_free(pi, pi_len);
-					ibdm_addto_glhcalist(temp_gidinfo,
-					    hca_list);
-					continue;
-				}
-
-				IBTF_DPRINTF_L4("ibdm", "\tprobe_ioc : "
-				    "create_gid : prefix %llx, guid %llx\n",
-				    pi->PortInfo.GidPrefix,
-				    tmp->NodeInfo.PortGUID);
-
-				sgid.gid_prefix = port->pa_sn_prefix;
-				sgid.gid_guid = port->pa_port_guid;
-				dgid.gid_prefix = pi->PortInfo.GidPrefix;
-				dgid.gid_guid = tmp->NodeInfo.PortGUID;
-				new_gid = ibdm_create_gid_info(port, sgid,
-				    dgid);
-				if (new_gid == NULL) {
-					IBTF_DPRINTF_L2("ibdm", "\tprobe_ioc: "
-					    "create_gid_info failed\n");
-					kmem_free(pi, pi_len);
-					continue;
-				}
-				if (node_gid == NULL) {
-					node_gid = new_gid;
-					ibdm_add_to_gl_gid(node_gid, node_gid);
-				} else {
-					IBTF_DPRINTF_L4("ibdm",
-					    "\tprobe_ioc: new gid");
-					temp_gid = kmem_zalloc(
-					    sizeof (ibdm_gid_t), KM_SLEEP);
-					temp_gid->gid_dgid_hi =
-					    new_gid->gl_dgid_hi;
-					temp_gid->gid_dgid_lo =
-					    new_gid->gl_dgid_lo;
-					temp_gid->gid_next = node_gid->gl_gid;
-					node_gid->gl_gid = temp_gid;
-					node_gid->gl_ngids++;
-				}
-				new_gid->gl_nodeguid = nodeguid;
-				new_gid->gl_portguid = dgid.gid_guid;
-				ibdm_addto_glhcalist(new_gid, hca_list);
-
-				/*
-				 * Set the state to skipped as all these
-				 * gids point to the same node.
-				 * We (re)probe only one GID below and reset
-				 * state appropriately
-				 */
-				new_gid->gl_state = IBDM_GID_PROBING_SKIPPED;
-				kmem_free(pi, pi_len);
+			if ((pi = ibdm_get_portinfo(
+			    port->pa_sa_hdl, &pi_len, tmp->LID)) ==  NULL) {
+				IBTF_DPRINTF_L4("ibdm",
+				    "\tibdm_get_portinfo: no portinfo recs");
+				continue;
 			}
+
+			/*
+			 * If Device Management is not supported on
+			 * this port, skip the rest.
+			 */
+			if (!(pi->PortInfo.CapabilityMask &
+			    SM_CAP_MASK_IS_DM_SUPPD)) {
+				kmem_free(pi, pi_len);
+				continue;
+			}
+
+			/*
+			 * For reprobes: Check if GID, already in
+			 * the list. If so, set the state to SKIPPED
+			 */
+			if (((temp_gidinfo = ibdm_find_gid(nodeguid,
+			    tmp->NodeInfo.PortGUID)) != NULL) &&
+			    temp_gidinfo->gl_state ==
+			    IBDM_GID_PROBING_COMPLETE) {
+				ASSERT(reprobe_gid == NULL);
+				ibdm_addto_glhcalist(temp_gidinfo,
+				    hca_list);
+				reprobe_gid = temp_gidinfo;
+				kmem_free(pi, pi_len);
+				continue;
+			} else if (temp_gidinfo != NULL) {
+				kmem_free(pi, pi_len);
+				ibdm_addto_glhcalist(temp_gidinfo,
+				    hca_list);
+				continue;
+			}
+
+			IBTF_DPRINTF_L4("ibdm", "\tprobe_ioc : "
+			    "create_gid : prefix %llx, guid %llx\n",
+			    pi->PortInfo.GidPrefix,
+			    tmp->NodeInfo.PortGUID);
+
+			sgid.gid_prefix = port->pa_sn_prefix;
+			sgid.gid_guid = port->pa_port_guid;
+			dgid.gid_prefix = pi->PortInfo.GidPrefix;
+			dgid.gid_guid = tmp->NodeInfo.PortGUID;
+			new_gid = ibdm_create_gid_info(port, sgid,
+			    dgid);
+			if (new_gid == NULL) {
+				IBTF_DPRINTF_L2("ibdm", "\tprobe_ioc: "
+				    "create_gid_info failed\n");
+				kmem_free(pi, pi_len);
+				continue;
+			}
+			if (node_gid == NULL) {
+				node_gid = new_gid;
+				ibdm_add_to_gl_gid(node_gid, node_gid);
+			} else {
+				IBTF_DPRINTF_L4("ibdm",
+				    "\tprobe_ioc: new gid");
+				temp_gid = kmem_zalloc(
+				    sizeof (ibdm_gid_t), KM_SLEEP);
+				temp_gid->gid_dgid_hi =
+				    new_gid->gl_dgid_hi;
+				temp_gid->gid_dgid_lo =
+				    new_gid->gl_dgid_lo;
+				temp_gid->gid_next = node_gid->gl_gid;
+				node_gid->gl_gid = temp_gid;
+				node_gid->gl_ngids++;
+			}
+			new_gid->gl_nodeguid = nodeguid;
+			new_gid->gl_portguid = dgid.gid_guid;
+			ibdm_addto_glhcalist(new_gid, hca_list);
+
+			/*
+			 * Set the state to skipped as all these
+			 * gids point to the same node.
+			 * We (re)probe only one GID below and reset
+			 * state appropriately
+			 */
+			new_gid->gl_state = IBDM_GID_PROBING_SKIPPED;
+			new_gid->gl_devid = (*tmp).NodeInfo.DeviceID;
+			kmem_free(pi, pi_len);
 		}
 		kmem_free(nr, nr_len);
 
@@ -3854,25 +4174,60 @@ static void
 ibdm_probe_gid(ibdm_dp_gidinfo_t *gid_info)
 {
 	IBTF_DPRINTF_L4("ibdm", "\tprobe_gid:");
+
+	/*
+	 * A Cisco FC GW needs the special handling to get IOUnitInfo.
+	 */
 	mutex_enter(&gid_info->gl_mutex);
+	if (ibdm_is_cisco_switch(gid_info)) {
+		gid_info->gl_pending_cmds++;
+		gid_info->gl_state = IBDM_SET_CLASSPORTINFO;
+		mutex_exit(&gid_info->gl_mutex);
+
+		if (ibdm_set_classportinfo(gid_info) != IBDM_SUCCESS) {
+
+			mutex_enter(&gid_info->gl_mutex);
+			gid_info->gl_state = IBDM_GID_PROBING_FAILED;
+			--gid_info->gl_pending_cmds;
+			mutex_exit(&gid_info->gl_mutex);
+
+			/* free the hca_list on this gid_info */
+			ibdm_delete_glhca_list(gid_info);
+			gid_info = gid_info->gl_next;
+			return;
+		}
+
+		mutex_enter(&gid_info->gl_mutex);
+		ibdm_wait_cisco_probe_completion(gid_info);
+
+		IBTF_DPRINTF_L4("ibdm",
+		    "\tprobe_gid: CISCO Wakeup signal received");
+	}
+
+	/* move on to the 'GET_CLASSPORTINFO' stage */
 	gid_info->gl_pending_cmds++;
 	gid_info->gl_state = IBDM_GET_CLASSPORTINFO;
 	mutex_exit(&gid_info->gl_mutex);
+
 	if (ibdm_send_classportinfo(gid_info) != IBDM_SUCCESS) {
+
 		mutex_enter(&gid_info->gl_mutex);
 		gid_info->gl_state = IBDM_GID_PROBING_FAILED;
 		--gid_info->gl_pending_cmds;
 		mutex_exit(&gid_info->gl_mutex);
+
+		/* free the hca_list on this gid_info */
 		ibdm_delete_glhca_list(gid_info);
 		gid_info = gid_info->gl_next;
 		return;
 	}
+
 	mutex_enter(&ibdm.ibdm_mutex);
 	ibdm.ibdm_ngid_probes_in_progress++;
 	gid_info = gid_info->gl_next;
-
 	ibdm_wait_probe_completion();
 	mutex_exit(&ibdm.ibdm_mutex);
+
 	IBTF_DPRINTF_L4("ibdm", "\tprobe_gid: Wakeup signal received");
 }
 
@@ -3910,6 +4265,7 @@ ibdm_create_gid_info(ibdm_port_attr_t *port, ib_gid_t sgid, ib_gid_t dgid)
 		gid_info = kmem_zalloc(
 		    sizeof (ibdm_dp_gidinfo_t), KM_SLEEP);
 		mutex_init(&gid_info->gl_mutex, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&gid_info->gl_probe_cv, NULL, CV_DRIVER, NULL);
 		gid_info->gl_dgid_hi		= path->DGID.gid_prefix;
 		gid_info->gl_dgid_lo		= path->DGID.gid_guid;
 		gid_info->gl_sgid_hi		= path->SGID.gid_prefix;
@@ -4098,9 +4454,9 @@ ibdm_ibnex_get_waittime(ib_guid_t hca_guid, int *dft_wait)
 			if ((hca_guid == hca->hl_hca_guid) &&
 			    (hca->hl_nports != hca->hl_nports_active)) {
 				wait_time =
-					ddi_get_time() - hca->hl_attach_time;
+				    ddi_get_time() - hca->hl_attach_time;
 				wait_time = ((wait_time >= *dft_wait) ?
-					0 : (*dft_wait - wait_time));
+				    0 : (*dft_wait - wait_time));
 				break;
 			}
 			hca = hca->hl_next;
@@ -4188,7 +4544,7 @@ ibdm_ibnex_get_port_attrs(ib_guid_t port_guid)
 	for (ii = 0; ii < ibdm.ibdm_hca_count; ii++) {
 		for (jj = 0; jj < hca_list->hl_nports; jj++) {
 			if (hca_list->hl_port_attr[jj].pa_port_guid ==
-				    port_guid) {
+			    port_guid) {
 				break;
 			}
 		}
@@ -4300,13 +4656,13 @@ ibdm_dup_hca_attr(ibdm_hca_list_t *in_hca)
 	IBTF_DPRINTF_L4("ibdm", "\tdup_hca_attr len %d", len);
 	out_hca = (ibdm_hca_list_t *)kmem_alloc(len, KM_SLEEP);
 	bcopy((char *)in_hca,
-		(char *)out_hca, sizeof (ibdm_hca_list_t));
+	    (char *)out_hca, sizeof (ibdm_hca_list_t));
 	if (in_hca->hl_nports) {
 		out_hca->hl_port_attr = (ibdm_port_attr_t *)
-			((char *)out_hca + sizeof (ibdm_hca_list_t));
+		    ((char *)out_hca + sizeof (ibdm_hca_list_t));
 		bcopy((char *)in_hca->hl_port_attr,
-			(char *)out_hca->hl_port_attr,
-			(in_hca->hl_nports * sizeof (ibdm_port_attr_t)));
+		    (char *)out_hca->hl_port_attr,
+		    (in_hca->hl_nports * sizeof (ibdm_port_attr_t)));
 		for (len = 0; len < out_hca->hl_nports; len++)
 			ibdm_update_port_attr(&out_hca->hl_port_attr[len]);
 	}
@@ -4338,7 +4694,7 @@ ibdm_ibnex_free_hca_list(ibdm_hca_list_t *hca_list)
 				kmem_free(port->pa_pkey_tbl, len);
 		}
 		len = sizeof (ibdm_hca_list_t) + (temp->hl_nports *
-			sizeof (ibdm_port_attr_t));
+		    sizeof (ibdm_port_attr_t));
 		kmem_free(temp, len);
 	}
 }
@@ -4637,6 +4993,7 @@ ibdm_dup_ioc_info(ibdm_ioc_info_t *in_ioc, ibdm_dp_gidinfo_t *gid_list)
 {
 	ibdm_ioc_info_t	*out_ioc;
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*out_ioc));
+	ASSERT(MUTEX_HELD(&gid_list->gl_mutex));
 
 	out_ioc = kmem_alloc(sizeof (ibdm_ioc_info_t), KM_SLEEP);
 	bcopy(in_ioc, out_ioc, sizeof (ibdm_ioc_info_t));
@@ -4876,17 +5233,42 @@ ibdm_send_ioc_profile(ibdm_dp_gidinfo_t *gid_info, uint8_t ioc_no)
 
 /*
  * ibdm_port_reachable
+ *	Returns B_TRUE if the port GID is reachable by sending
+ *	a SA query to get the NODE record for this port GUID.
+ */
+static boolean_t
+ibdm_port_reachable(ibmf_saa_handle_t sa_hdl, ib_guid_t guid)
+{
+	sa_node_record_t *resp;
+	size_t length;
+
+	/*
+	 * Verify if it's reachable by getting the node record.
+	 */
+	if (ibdm_get_node_record_by_port(sa_hdl, guid, &resp, &length) ==
+	    IBDM_SUCCESS) {
+		kmem_free(resp, length);
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * ibdm_get_node_record_by_port
  *	Sends a SA query to get the NODE record for port GUID
- *	Returns IBDM_SUCCESS if the port GID is reachable
+ *	Returns IBDM_SUCCESS if the port GID is reachable.
+ *
+ *      Note: the caller must be responsible for freeing the resource
+ *      by calling kmem_free(resp, length) later.
  */
 static int
-ibdm_port_reachable(ibmf_saa_handle_t sa_hdl, ib_guid_t guid,
-    ib_guid_t *node_guid)
+ibdm_get_node_record_by_port(ibmf_saa_handle_t sa_hdl, ib_guid_t guid,
+    sa_node_record_t **resp, size_t *length)
 {
-	sa_node_record_t	req, *resp = NULL;
+	sa_node_record_t	req;
 	ibmf_saa_access_args_t	args;
 	int			ret;
-	size_t		length;
+	ASSERT(resp != NULL && length != NULL);
 
 	IBTF_DPRINTF_L4("ibdm", "\tport_reachable: port_guid %llx",
 	    guid);
@@ -4901,25 +5283,25 @@ ibdm_port_reachable(ibmf_saa_handle_t sa_hdl, ib_guid_t guid,
 	args.sq_callback	= NULL;
 	args.sq_callback_arg 	= NULL;
 
-	ret = ibmf_sa_access(sa_hdl, &args, 0, &length, (void **) &resp);
+	ret = ibmf_sa_access(sa_hdl, &args, 0, length, (void **) resp);
 	if (ret != IBMF_SUCCESS) {
 		IBTF_DPRINTF_L2("ibdm", "\tport_reachable:"
 		    " SA Retrieve Failed: %d", ret);
 		return (IBDM_FAILURE);
 	}
+	/*
+	 * There is one NodeRecord on each endport on a subnet.
+	 */
+	ASSERT(*length == sizeof (sa_node_record_t));
 
-	if ((resp == NULL) || (length == 0)) {
+	if (*resp == NULL || *length == 0) {
 		IBTF_DPRINTF_L2("ibdm", "\tport_reachable: No records");
 		return (IBDM_FAILURE);
 	}
 
-	if (node_guid != NULL)
-		*node_guid = resp->NodeInfo.NodeGUID;
-
-	kmem_free(resp, length);
-
 	return (IBDM_SUCCESS);
 }
+
 
 /*
  * Update the gidlist for all affected IOCs when GID becomes
@@ -5028,7 +5410,8 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 	ib_gid_t		sgid, dgid;
 	ibdm_port_attr_t	*hca_port;
 	ibdm_dp_gidinfo_t	*gid_info, *node_gid_info = NULL;
-	ib_guid_t		nodeguid;
+	sa_node_record_t *nrec;
+	size_t length;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*event_arg));
 
@@ -5092,8 +5475,8 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 		mutex_exit(&gid_info->gl_mutex);
 
 		/* Get the node GUID */
-		if (ibdm_port_reachable(ibmf_saa_handle, dgid.gid_guid,
-		    &nodeguid) != IBDM_SUCCESS) {
+		if (ibdm_get_node_record_by_port(ibmf_saa_handle, dgid.gid_guid,
+		    &nrec, &length) != IBDM_SUCCESS) {
 			/*
 			 * Set the state to PROBE_NOT_DONE for the
 			 * next sweep to probe it
@@ -5109,8 +5492,9 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 			mutex_exit(&ibdm.ibdm_mutex);
 			return;
 		}
-
-		gid_info->gl_nodeguid = nodeguid;
+		gid_info->gl_nodeguid = nrec->NodeInfo.NodeGUID;
+		gid_info->gl_devid = nrec->NodeInfo.DeviceID;
+		kmem_free(nrec, length);
 		gid_info->gl_portguid = dgid.gid_guid;
 
 		/*
@@ -5204,8 +5588,7 @@ ibdm_saa_handle_new_gid(void *arg)
 	for (ibdm_get_next_port(&hca_list, &port, 1); port;
 	    ibdm_get_next_port(&hca_list, &port, 1)) {
 		if (ibdm_port_reachable(port->pa_sa_hdl,
-		    gid_info->gl_portguid, NULL) ==
-		    IBDM_SUCCESS) {
+		    gid_info->gl_portguid) == B_TRUE) {
 			ibdm_addto_glhcalist(gid_info, hca_list);
 		}
 	}
@@ -5341,8 +5724,7 @@ ibdm_saa_event_taskq(void *arg)
 	for (ibdm_get_next_port(&hca_list, &port, 1); port;
 	    ibdm_get_next_port(&hca_list, &port, 1)) {
 		if (ibdm_port_reachable(port->pa_sa_hdl,
-		    event_details->ie_gid.gid_guid, NULL) ==
-		    IBDM_SUCCESS) {
+		    event_details->ie_gid.gid_guid) == B_TRUE) {
 			mutex_exit(&ibdm.ibdm_hl_mutex);
 			ibdm_free_saa_event_arg(event_arg);
 			return;
@@ -5423,6 +5805,9 @@ ibdm_saa_event_taskq(void *arg)
 	cv_broadcast(&ibdm.ibdm_busy_cv);
 	mutex_exit(&ibdm.ibdm_mutex);
 
+	/* free the hca_list on this gid_info */
+	ibdm_delete_glhca_list(gid_info);
+
 	mutex_destroy(&gid_info->gl_mutex);
 	kmem_free(gid_info, sizeof (ibdm_dp_gidinfo_t));
 
@@ -5435,7 +5820,7 @@ ibdm_saa_event_taskq(void *arg)
 		mutex_enter(&ibdm.ibdm_ibnex_mutex);
 		if (ibdm.ibdm_ibnex_callback != NULL) {
 			(*ibdm.ibdm_ibnex_callback)((void *)
-		    ioc_list, IBDM_EVENT_IOC_PROP_UPDATE);
+			    ioc_list, IBDM_EVENT_IOC_PROP_UPDATE);
 		}
 		mutex_exit(&ibdm.ibdm_ibnex_mutex);
 	}
@@ -5702,7 +6087,7 @@ ibdm_rescan_gidlist(ib_guid_t *ioc_guidp)
 		for (ibdm_get_next_port(&hca_list, &port, 1); port;
 		    ibdm_get_next_port(&hca_list, &port, 1)) {
 			if (ibdm_port_reachable(port->pa_sa_hdl,
-			    gid_info->gl_dgid_lo, NULL) == IBDM_SUCCESS) {
+			    gid_info->gl_dgid_lo) == B_TRUE) {
 				found = 1;
 				break;
 			}
@@ -5755,6 +6140,7 @@ ibdm_rescan_gidlist(ib_guid_t *ioc_guidp)
 			(void) ibdm_free_iou_info(gid_info, &gid_info->gl_iou);
 			mutex_exit(&gid_info->gl_mutex);
 		}
+
 		tmp = gid_info->gl_next;
 		if (gid_info->gl_prev != NULL)
 			gid_info->gl_prev->gl_next = gid_info->gl_next;
@@ -5766,12 +6152,15 @@ ibdm_rescan_gidlist(ib_guid_t *ioc_guidp)
 		if (gid_info == ibdm.ibdm_dp_gidlist_tail)
 			ibdm.ibdm_dp_gidlist_tail = gid_info->gl_prev;
 		ibdm.ibdm_ngids--;
+		mutex_exit(&ibdm.ibdm_mutex);
+
+		/* free the hca_list on this gid_info */
+		ibdm_delete_glhca_list(gid_info);
 
 		mutex_destroy(&gid_info->gl_mutex);
 		kmem_free(gid_info, sizeof (ibdm_dp_gidinfo_t));
-		gid_info = tmp;
 
-		mutex_exit(&ibdm.ibdm_mutex);
+		gid_info = tmp;
 
 		/*
 		 * Pass on the IOCs with updated GIDs to IBnexus
@@ -5925,6 +6314,7 @@ ibdm_addto_glhcalist(ibdm_dp_gidinfo_t *gid_info,
 	IBTF_DPRINTF_L4(ibdm_string, "\taddto_glhcalist(%p, %p) "
 	    ": gl_hca_list %p", gid_info, hca, gid_info->gl_hca_list);
 	ASSERT(!MUTEX_HELD(&gid_info->gl_mutex));
+
 	mutex_enter(&gid_info->gl_mutex);
 	head = gid_info->gl_hca_list;
 	if (head == NULL) {
@@ -5955,7 +6345,6 @@ ibdm_addto_glhcalist(ibdm_dp_gidinfo_t *gid_info,
 	temp =  ibdm_dup_hca_attr(hca);
 	temp->hl_next = NULL;
 	prev->hl_next = temp;
-
 	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L4(ibdm_string, "\tadd_to_glhcalist: "
@@ -6137,6 +6526,7 @@ ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 		gidinfo->gl_dlid	= path->DLID;
 		/* Reset redirect info, next MAD will set if redirected */
 		gidinfo->gl_redirected = 0;
+		gidinfo->gl_devid = (*tmp).NodeInfo.DeviceID;
 
 		gidinfo->gl_qp_hdl = IBMF_QP_HANDLE_DEFAULT;
 		for (ii = 0; ii < port->pa_npkeys; ii++) {
@@ -6218,6 +6608,7 @@ ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 	mutex_exit(&ibdm.ibdm_mutex);
 
 	mutex_destroy(&gidinfo->gl_mutex);
+	cv_destroy(&gidinfo->gl_probe_cv);
 	kmem_free(gidinfo, sizeof (ibdm_dp_gidinfo_t));
 
 	/*
@@ -6310,7 +6701,9 @@ ibdm_handle_prev_iou()
 				    "/thandle_prev_iou modified IOC: "
 				    "current ioc %p, old ioc %p",
 				    ioc, prev_ioc);
+				mutex_enter(&gid_info->gl_mutex);
 				ioc_list = ibdm_dup_ioc_info(ioc, gid_info);
+				mutex_exit(&gid_info->gl_mutex);
 				ioc_list->ioc_info_updated.ib_prop_updated
 				    = 0;
 				ioc_list->ioc_info_updated.ib_srv_prop_updated
@@ -6347,9 +6740,9 @@ ibdm_serv_cmp(ibdm_srvents_info_t *serv1, ibdm_srvents_info_t *serv2,
 	IBTF_DPRINTF_L4(ibdm_string, "\tserv_cmp: enter");
 	for (ii = 0; ii < nserv; ii++, serv1++, serv2++) {
 		if (serv1->se_attr.srv_id != serv2->se_attr.srv_id ||
-			bcmp(serv1->se_attr.srv_name,
-			    serv2->se_attr.srv_name,
-			    IB_DM_MAX_SVC_NAME_LEN) != 0) {
+		    bcmp(serv1->se_attr.srv_name,
+		    serv2->se_attr.srv_name,
+		    IB_DM_MAX_SVC_NAME_LEN) != 0) {
 			IBTF_DPRINTF_L4(ibdm_string, "\tserv_cmp: ret 1");
 			return (1);
 		}
@@ -6360,6 +6753,26 @@ ibdm_serv_cmp(ibdm_srvents_info_t *serv1, ibdm_srvents_info_t *serv2,
 
 /* For debugging purpose only */
 #ifdef	DEBUG
+void
+ibdm_dump_mad_hdr(ib_mad_hdr_t	*mad_hdr)
+{
+	IBTF_DPRINTF_L4("ibdm", "\t\t MAD Header info");
+	IBTF_DPRINTF_L4("ibdm", "\t\t ---------------");
+
+	IBTF_DPRINTF_L4("ibdm", "\tBase version  : 0x%x"
+	    "\tMgmt Class : 0x%x", mad_hdr->BaseVersion, mad_hdr->MgmtClass);
+	IBTF_DPRINTF_L4("ibdm", "\tClass version : 0x%x"
+	    "\tR Method           : 0x%x",
+	    mad_hdr->ClassVersion, mad_hdr->R_Method);
+	IBTF_DPRINTF_L4("ibdm", "\tMAD  Status   : 0x%x"
+	    "\tTransaction ID     : 0x%llx",
+	    b2h16(mad_hdr->Status), b2h64(mad_hdr->TransactionID));
+	IBTF_DPRINTF_L4("ibdm", "\t Attribute ID  : 0x%x"
+	    "\tAttribute Modified : 0x%lx",
+	    b2h16(mad_hdr->AttributeID), b2h32(mad_hdr->AttributeModifier));
+}
+
+
 void
 ibdm_dump_ibmf_msg(ibmf_msg_t *ibmf_msg, int flag)
 {
@@ -6380,20 +6793,7 @@ ibdm_dump_ibmf_msg(ibmf_msg_t *ibmf_msg, int flag)
 	else
 		mad_hdr = IBDM_IN_IBMFMSG_MADHDR(ibmf_msg);
 
-	IBTF_DPRINTF_L4("ibdm", "\t\t MAD Header info");
-	IBTF_DPRINTF_L4("ibdm", "\t\t ---------------");
-
-	IBTF_DPRINTF_L4("ibdm", "\tBase version  : 0x%x"
-	    "\tMgmt Class : 0x%x", mad_hdr->BaseVersion, mad_hdr->MgmtClass);
-	IBTF_DPRINTF_L4("ibdm", "\tClass version : 0x%x"
-	    "\tR Method           : 0x%x",
-	    mad_hdr->ClassVersion, mad_hdr->R_Method);
-	IBTF_DPRINTF_L4("ibdm", "\tMAD  Status   : 0x%x"
-	    "\tTransaction ID     : 0x%llx",
-	    mad_hdr->Status, mad_hdr->TransactionID);
-	IBTF_DPRINTF_L4("ibdm", "\t Attribute ID  : 0x%x"
-	    "\tAttribute Modified : 0x%lx",
-	    mad_hdr->AttributeID, mad_hdr->AttributeModifier);
+	ibdm_dump_mad_hdr(mad_hdr);
 }
 
 void
@@ -6413,7 +6813,7 @@ ibdm_dump_path_info(sa_path_record_t *path)
 
 
 void
-ibdm_dump_classportinfo(ibdm_mad_classportinfo_t *classportinfo)
+ibdm_dump_classportinfo(ib_mad_classportinfo_t *classportinfo)
 {
 	IBTF_DPRINTF_L4("ibdm", "\t\t CLASSPORT INFO");
 	IBTF_DPRINTF_L4("ibdm", "\t\t --------------");
@@ -6427,10 +6827,24 @@ ibdm_dump_classportinfo(ibdm_mad_classportinfo_t *classportinfo)
 	    b2h16(classportinfo->RedirectP_Key));
 	IBTF_DPRINTF_L4("ibdm", "\t Redirected Q KEY    : 0x%x",
 	    b2h16(classportinfo->RedirectQ_Key));
-	IBTF_DPRINTF_L4("ibdm", "\t Redirected GID hi   : 0x%x",
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected GID hi   : 0x%llx",
 	    b2h64(classportinfo->RedirectGID_hi));
-	IBTF_DPRINTF_L4("ibdm", "\t Redirected GID lo   : 0x%x",
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected GID lo   : 0x%llx",
 	    b2h64(classportinfo->RedirectGID_lo));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapGID hi   : 0x%llx",
+	    b2h64(classportinfo->TrapGID_hi));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapGID lo   : 0x%llx",
+	    b2h64(classportinfo->TrapGID_lo));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapTC       : 0x%x",
+	    b2h32(classportinfo->TrapTC));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapLID      : 0x%x",
+	    b2h16(classportinfo->TrapLID));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapP_Key    : 0x%x",
+	    b2h16(classportinfo->TrapP_Key));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapHL       : 0x%x",
+	    b2h16(classportinfo->TrapHL));
+	IBTF_DPRINTF_L4("ibdm", "\t TrapQ_Key    : 0x%x",
+	    b2h32(classportinfo->TrapQ_Key));
 }
 
 
@@ -6472,11 +6886,11 @@ ibdm_dump_ioc_profile(ib_dm_ioc_ctrl_profile_t *ioc)
 	IBTF_DPRINTF_L4("ibdm", "\tProtocolV   : 0x%x", ioc->ioc_protocol_ver);
 	IBTF_DPRINTF_L4("ibdm", "\tmsg qdepth  : %d", ioc->ioc_send_msg_qdepth);
 	IBTF_DPRINTF_L4("ibdm", "\trdma qdepth : %d",
-						ioc->ioc_rdma_read_qdepth);
+	    ioc->ioc_rdma_read_qdepth);
 	IBTF_DPRINTF_L4("ibdm", "\tsndmsg sz   : %d", ioc->ioc_send_msg_sz);
 	IBTF_DPRINTF_L4("ibdm", "\trdma xfersz : %d", ioc->ioc_rdma_xfer_sz);
 	IBTF_DPRINTF_L4("ibdm", "\topcal mask  : 0x%x",
-						ioc->ioc_ctrl_opcap_mask);
+	    ioc->ioc_ctrl_opcap_mask);
 	IBTF_DPRINTF_L4("ibdm", "\tsrventries  : %x", ioc->ioc_service_entries);
 }
 

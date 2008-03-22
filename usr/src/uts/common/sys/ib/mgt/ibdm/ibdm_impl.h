@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,31 +41,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct ibdm_mad_classportinfo_s {
-	uint8_t		BaseVersion;		/* ver. of MAD base format */
-	uint8_t		ClassVersion;		/* ver. of MAD class format */
-	uint16_t	CapabilityMask;		/* capabilities of this class */
-	uint32_t	RespTimeValue;		/* reserved : 27 bits */
-						/* resptime value : 5 bits */
-	uint64_t	RedirectGID_hi;		/* dest gid of redirect msgs */
-	uint64_t	RedirectGID_lo;		/* dest gid of redirect msgs */
-	uint32_t	RedirectTC;		/* traffic class: 8 bits */
-						/* SL: 4 bits */
-						/* Flow label: 20 bits */
-	ib_lid_t	RedirectLID;		/* dlid for class services */
-	ib_pkey_t	RedirectP_Key;		/* p_key for class services */
-	uint32_t	RedirectQP;		/* Reserved: 8 bits */
-						/* QPN: 24 bits */
-	ib_qkey_t	RedirectQ_Key;		/* q_key for class services */
-	uint64_t	TrapGID_hi;		/* dest gid of trap msgs */
-	uint64_t	TrapGID_lo;		/* dest gid of trap msgs */
-	uint32_t	TrapTC;			/* Trap traffic class, etc., */
-	ib_lid_t	TrapLID;		/* dlid for traps */
-	ib_pkey_t	TrapP_Key;		/* p_key for traps */
-	uint32_t	TrapHL;			/* Trap hop limit,etc., */
-	ib_qkey_t	TrapQ_Key;		/* q_key for traps */
-} ibdm_mad_classportinfo_t;
 
 /* values for "cb_req_type" */
 #define	IBDM_REQ_TYPE_INVALID		0x0
@@ -107,11 +82,36 @@ typedef struct ibdm_gid_s {
 #define	IBDM_GID_PROBING_COMPLETE	0x08
 #define	IBDM_GID_PROBING_SKIPPED	0x10
 #define	IBDM_GID_PROBING_FAILED		0x20
+#define	IBDM_SET_CLASSPORTINFO		0x40
+
+/*
+ * Identifiers to distinguish a Cisco FC GW from others.
+ * Used to filter a setclassportinfo request.
+ */
+#define	IBDM_CISCO_COMPANY_ID		(0x5ad)
+#define	IBDM_CISCO_DEVICE_ID		(0xa87c)
+
+/*
+ * the bit-shift value for OUI in GUID
+ * A 64 bit globally unique identifier (GUID) composed of a 24 bit company id
+ * and an 48 bit extension identifier, and this value is used to extract
+ * the company id from the GUID.
+ */
+#define	IBDM_OUI_GUID_SHIFT		(40)
 
 /*
  * The state diagram for the gl_state
  *
- * IBDM_GID_PROBE_NOT_DONE  --- 1 -> IBDM_GID_GET_CLASSPORTINFO
+ *                          (in case of Cisco FC GW)
+ * IBDM_GID_PROBE_NOT_DONE  ---------- 40 -> IBDM_SET_CLASSPORTINFO
+ *                          ----.	        |
+ *    |      |			| (others)      |
+ *    |      |			1		|
+ *    |      |			|               1
+ *    |      |			`-------------.	|
+ *    |      |                                v v
+ *    |	     |				     IBDM_GET_CLASSPORTINFO
+ *    |      |
  *    |      |                                  |
  *    |      2                                  3
  *    |      |                                  |
@@ -129,7 +129,8 @@ typedef struct ibdm_gid_s {
  *                                           IBDM_GID_PROBE_COMPLETE
  *
  * Initial state : IBDM_GID_PROBE_NOT_DONE
- *	1 = Port supports DM MAD's and a request to ClassportInfor is sent
+ *     40 = Port sends setClassPortInfo to activate Cisco FC GW
+ *	1 = Port supports DM MAD's and a request to ClassportInfo is sent
  *	3 = Received ClassPortInfo and sent IOUnitInfo
  *	4 = Recevied IOUunitInfo and sent IOC profile, diagcodes, and
  *		service entries requests
@@ -197,6 +198,9 @@ typedef struct ibdm_dp_gidinfo_s {
 	uint64_t		gl_min_transactionID;
 	uint64_t		gl_max_transactionID;
 	ibdm_iou_info_t		*gl_prev_iou;
+	uint16_t		gl_devid;	/* device ID info */
+	kcondvar_t		gl_probe_cv;	/* sync for Cisco FC GW */
+	uint32_t		gl_flag;
 } ibdm_dp_gidinfo_t;
 _NOTE(MUTEX_PROTECTS_DATA(ibdm_dp_gidinfo_s::gl_mutex,
 	ibdm_dp_gidinfo_s::{gl_state gl_timeout_id gl_pending_cmds}))
@@ -268,9 +272,49 @@ _NOTE(LOCK_ORDER(ibdm_s::ibdm_mutex ibdm_dp_gidinfo_s::gl_mutex))
 
 #define	IBDM_BUSY		0x1
 #define	IBDM_PROBE_IN_PROGRESS	0x2
+#define	IBDM_CISCO_PROBE	0x4
+#define	IBDM_CISCO_PROBE_DONE	0x8
 
+/*
+ * Device Management MAD packet format
+ * +--------+------------+------------+------------+------------+
+ * | offset |   byte 0   |   byte 1   |   byte 2   |   byte 3   |
+ * +--------+------------+------------+------------+------------+ --
+ * |   0    |                                                   |  ^
+ * +--------+                                                   | sizeof(
+ * |   ...  |              Common MAD Header                    | ib_mad_hdr_t)
+ * +--------+                                                   |  | (A)
+ * |   20   |                                                   |  v
+ * +--------+------------+------------+------------+------------+ --
+ * |   24   |                                                   |  ^
+ * +--------+                                                   |  |
+ * |   ...  |              RMPP Header                          |  |
+ * +--------+                                                   |  |
+ * |   32   |                                                   |  |
+ * +--------+------------+------------+------------+------------+  |
+ * |   36   |                                                   |  |
+ * +--------+              Access_Key                           |
+ * |   40   |                                                   | IBDM_DM_MAD_
+ * +--------+------------+------------+------------+------------+ HDR_SZ
+ * |   44   |  KeyType   |              reserved                |    (B)
+ * +--------+------------+------------+------------+------------+  |
+ * |   48   |                                                   |  |
+ * +--------+                                                   |  |
+ * |   52   |              Reserved                             |  |
+ * +--------+                                                   |  |
+ * |   56   |                                                   |  |
+ * +--------+------------+------------+------------+------------+  |
+ * |   60   |       Change_ID         |     ComponentMask       |  v
+ * +--------+------------+------------+------------+------------+ --
+ * |   64   |                                                   |  ^
+ * +--------+                                                   | IBDM_MAD_SIZE
+ * |   ...  |              Device Management Data               | - (A) - (B)
+ * +--------+                                                   |  |
+ * |  252   |                                                   |  v
+ * +--------+------------+------------+------------+------------+ --
+ */
 #define	IBDM_MAD_SIZE		256
-#define	DM_CLASSPORTINFO_SZ	72
+#define	IBDM_DM_MAD_HDR_SZ	40
 
 #define	IBDM_DFT_TIMEOUT	4
 #define	IBDM_DFT_NRETRIES	3
@@ -327,14 +371,16 @@ typedef struct ibdm_saa_event_arg_s {
 
 #ifdef DEBUG
 
+void	ibdm_dump_mad_hdr(ib_mad_hdr_t *);
 void	ibdm_dump_ibmf_msg(ibmf_msg_t *, int);
 void	ibdm_dump_path_info(sa_path_record_t *);
-void	ibdm_dump_classportinfo(ibdm_mad_classportinfo_t *);
+void	ibdm_dump_classportinfo(ib_mad_classportinfo_t *);
 void	ibdm_dump_iounitinfo(ib_dm_io_unitinfo_t *);
 void	ibdm_dump_ioc_profile(ib_dm_ioc_ctrl_profile_t *);
 void	ibdm_dump_service_entries(ib_dm_srv_t *);
 void	ibdm_dump_sweep_fabric_timestamp(int);
 
+#define	ibdm_dump_mad_hdr(a)		ibdm_dump_mad_hdr(a)
 #define	ibdm_dump_ibmf_msg(a, b)	ibdm_dump_ibmf_msg(a, b)
 #define	ibdm_dump_path_info(a)		ibdm_dump_path_info(a)
 #define	ibdm_dump_classportinfo(a)	ibdm_dump_classportinfo(a)
@@ -344,6 +390,7 @@ void	ibdm_dump_sweep_fabric_timestamp(int);
 
 #else
 
+#define	ibdm_dump_mad_hdr(a)
 #define	ibdm_dump_ibmf_msg(a, b)
 #define	ibdm_dump_path_info(a)
 #define	ibdm_dump_classportinfo(a)
