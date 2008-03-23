@@ -208,7 +208,6 @@ pwrnow_init(cpudrv_devstate_t *cpudsp)
 	pwrnow_state_t *pwrnow_state;
 	cpu_acpi_handle_t handle;
 	cpu_acpi_pct_t *pct_stat;
-	uint_t family;
 	struct cpuid_regs cpu_regs;
 	cpu_t *cp;
 	int domain;
