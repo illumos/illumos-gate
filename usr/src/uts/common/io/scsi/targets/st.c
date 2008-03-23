@@ -7416,6 +7416,7 @@ st_cmd(struct scsi_tape *un, int com, int64_t count, int wait)
 {
 	struct buf *bp;
 	int err;
+	uint_t last_err_resid;
 
 	ST_FUNC(ST_DEVINFO, st_cmd);
 
@@ -7475,12 +7476,14 @@ st_cmd(struct scsi_tape *un, int com, int64_t count, int wait)
 	if (((com == SCMD_SPACE) || (com == SCMD_SPACE_G4)) &&
 	    (un->un_pos.pmode != invalid)) {
 		un->un_running.pmode = invalid;
+		last_err_resid = un->un_err_resid;
 		(void) st_update_block_pos(un, st_cmd, 1);
 		/*
 		 * Set running position to invalid so it updates on the
 		 * next command.
 		 */
 		un->un_running.pmode = invalid;
+		un->un_err_resid = last_err_resid;
 	}
 
 	cv_signal(&un->un_sbuf_cv);
