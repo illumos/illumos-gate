@@ -3200,12 +3200,11 @@ sa_add_property(void *object, sa_property_t property)
 	sa_group_t parent;
 	sa_group_t group;
 	char *proto;
-	sa_handle_t handle;
 
 	if (property != NULL) {
+		sa_handle_t handle;
 		handle = sa_find_group_handle((sa_group_t)object);
-		if (handle == NULL)
-			return (SA_CONFIG_ERR);
+		/* It is legitimate to not find a handle */
 		proto = sa_get_optionset_attr(object, "type");
 		if ((ret = sa_valid_property(handle, object, proto,
 		    property)) == SA_OK) {

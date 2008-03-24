@@ -1603,8 +1603,13 @@ public_exists(sa_handle_t handle, sa_share_t skipshare)
 {
 	sa_group_t group = NULL;
 
+	/*
+	 * If we don't have a handle, we can only do syntax check. We
+	 * can't check against other shares so we assume OK and will
+	 * catch the problem only when we actually try to apply it.
+	 */
 	if (handle == NULL)
-		return (SA_SYSTEM_ERR);
+		return (SA_OK);
 
 	if (skipshare != NULL) {
 		group = sa_get_parent_group(skipshare);
