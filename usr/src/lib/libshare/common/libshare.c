@@ -4032,6 +4032,119 @@ sa_get_resource(sa_group_t group, char *resource)
 }
 
 /*
+ * get_protocol_list(optionset, object)
+ *
+ * Get the protocol optionset list for the object and add them as
+ * properties to optionset.
+ */
+static int
+get_protocol_list(sa_optionset_t optionset, void *object)
+{
+	sa_property_t prop;
+	sa_optionset_t opts;
+	int ret = SA_OK;
+
+	for (opts = sa_get_optionset(object, NULL);
+	    opts != NULL;
+	    opts = sa_get_next_optionset(opts)) {
+		char *type;
+		type = sa_get_optionset_attr(opts, "type");
+		/*
+		 * It is possible to have a non-protocol optionset. We
+		 * skip any of those found.
+		 */
+		if (type == NULL)
+			continue;
+		prop = sa_create_property(type, "true");
+		sa_free_attr_string(type);
+		if (prop != NULL)
+			prop = (sa_property_t)xmlAddChild((xmlNodePtr)optionset,
+			    (xmlNodePtr)prop);
+		/* If prop is NULL, don't bother continuing */
+		if (prop == NULL) {
+			ret = SA_NO_MEMORY;
+			break;
+		}
+	}
+	return (ret);
+}
+
+/*
+ * sa_free_protoset(optionset)
+ *
+ * Free the protocol property optionset.
+ */
+static void
+sa_free_protoset(sa_optionset_t optionset)
+{
+	if (optionset != NULL) {
+		xmlUnlinkNode((xmlNodePtr) optionset);
+		xmlFreeNode((xmlNodePtr) optionset);
+	}
+}
+
+/*
+ * sa_optionset_t sa_get_active_protocols(object)
+ *
+ * Return a list of the protocols that are active for the object.
+ * This is currently an internal helper function, but could be
+ * made visible if there is enough demand for it.
+ *
+ * The function finds the parent group and extracts the protocol
+ * optionsets creating a new optionset with the protocols as properties.
+ *
+ * The caller must free the returned optionset.
+ */
+
+static sa_optionset_t
+sa_get_active_protocols(void *object)
+{
+	sa_optionset_t options;
+	sa_share_t share = NULL;
+	sa_group_t group = NULL;
+	sa_resource_t resource = NULL;
+	int ret = SA_OK;
+
+	if (object == NULL)
+		return (NULL);
+	options = (sa_optionset_t)xmlNewNode(NULL, (xmlChar *)"optionset");
+	if (options == NULL)
+		return (NULL);
+
+	/*
+	 * Find the objects up the tree that might have protocols
+	 * enabled on them.
+	 */
+	if (sa_is_resource(object)) {
+		resource = (sa_resource_t)object;
+		share = sa_get_resource_parent(resource);
+		group = sa_get_parent_group(share);
+	} else if (sa_is_share(object)) {
+		share = (sa_share_t)object;
+		group = sa_get_parent_group(share);
+	} else {
+		group = (sa_group_t)group;
+	}
+	if (resource != NULL)
+		ret = get_protocol_list(options, resource);
+	if (ret == SA_OK && share != NULL)
+		ret = get_protocol_list(options, share);
+	if (ret == SA_OK && group != NULL)
+		ret = get_protocol_list(options, group);
+
+	/*
+	 * If there was an error, we won't have a complete list so
+	 * abandon everything.  The caller will have to deal with the
+	 * issue.
+	 */
+	if (ret != SA_OK) {
+		sa_free_protoset(options);
+		options = NULL;
+	}
+	return (options);
+}
+
+/*
  * sa_enable_resource, protocol)
  *	Disable the specified share to the specified protocol.
  *	If protocol is NULL, then all protocols.
@@ -4040,23 +4153,33 @@ int
 sa_enable_resource(sa_resource_t resource, char *protocol)
 {
 	int ret = SA_OK;
-	char **protocols;
-	int numproto;
 
 	if (protocol != NULL) {
 		ret = sa_proto_share_resource(protocol, resource);
 	} else {
+		sa_optionset_t protoset;
+		sa_property_t prop;
+		char *proto;
+		int err;
+
 		/* need to do all protocols */
-		if ((numproto = sa_get_protocols(&protocols)) >= 0) {
-			int i, err;
-			for (i = 0; i < numproto; i++) {
-				err = sa_proto_share_resource(
-				    protocols[i], resource);
-				if (err != SA_OK)
-					ret = err;
+		protoset = sa_get_active_protocols(resource);
+		if (protoset == NULL)
+			return (SA_NO_MEMORY);
+		for (prop = sa_get_property(protoset, NULL);
+		    prop != NULL;
+		    prop = sa_get_next_property(prop)) {
+			proto = sa_get_property_attr(prop, "type");
+			if (proto == NULL) {
+				ret = SA_NO_MEMORY;
+				continue;
 			}
-			free(protocols);
+			err = sa_proto_share_resource(proto, resource);
+			if (err != SA_OK)
+				ret = err;
+			sa_free_attr_string(proto);
 		}
+		sa_free_protoset(protoset);
 	}
 	if (ret == SA_OK)
 		(void) sa_set_resource_attr(resource, "shared", NULL);
@@ -4076,8 +4199,6 @@ int
 sa_disable_resource(sa_resource_t resource, char *protocol)
 {
 	int ret = SA_OK;
-	char **protocols;
-	int numproto;
 
 	if (protocol != NULL) {
 		ret = sa_proto_unshare_resource(protocol, resource);
@@ -4096,27 +4217,37 @@ sa_disable_resource(sa_resource_t resource, char *protocol)
 				ret = SA_CONFIG_ERR;
 		}
 	} else {
+		sa_optionset_t protoset;
+		sa_property_t prop;
+		char *proto;
+		int err;
+
 		/* need to do all protocols */
-		if ((numproto = sa_get_protocols(&protocols)) >= 0) {
-			int i, err;
-			for (i = 0; i < numproto; i++) {
-				err = sa_proto_unshare_resource(protocols[i],
-				    resource);
-				if (err == SA_NOT_SUPPORTED) {
-					sa_share_t parent;
-					parent = sa_get_resource_parent(
-					    resource);
-					if (parent != NULL)
-						err = sa_disable_share(parent,
-						    protocols[i]);
-					else
-						err = SA_CONFIG_ERR;
-				}
-				if (err != SA_OK)
-					ret = err;
+		protoset = sa_get_active_protocols(resource);
+		if (protoset == NULL)
+			return (SA_NO_MEMORY);
+		for (prop = sa_get_property(protoset, NULL);
+		    prop != NULL;
+		    prop = sa_get_next_property(prop)) {
+			proto = sa_get_property_attr(prop, "type");
+			if (proto == NULL) {
+				ret = SA_NO_MEMORY;
+				continue;
 			}
-			free(protocols);
+			err = sa_proto_unshare_resource(proto, resource);
+			if (err == SA_NOT_SUPPORTED) {
+				sa_share_t parent;
+				parent = sa_get_resource_parent(resource);
+				if (parent != NULL)
+					err = sa_disable_share(parent, proto);
+				else
+					err = SA_CONFIG_ERR;
+			}
+			if (err != SA_OK)
+				ret = err;
+			sa_free_attr_string(proto);
 		}
+		sa_free_protoset(protoset);
 	}
 	if (ret == SA_OK)
 		(void) sa_set_resource_attr(resource, "shared", NULL);

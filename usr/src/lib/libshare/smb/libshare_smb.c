@@ -330,6 +330,21 @@ smb_enable_share(sa_share_t share)
 	priv_set_t *priv_effective;
 	boolean_t online;
 
+	/*
+	 * We only start in the global zone and only run if we aren't
+	 * running Trusted Extensions.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "SMB: service not supported in local zone\n"));
+		return (SA_NOT_SUPPORTED);
+	}
+	if (is_system_labeled()) {
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "SMB: service not supported with Trusted Extensions\n"));
+		return (SA_NOT_SUPPORTED);
+	}
+
 	priv_effective = priv_allocset();
 	(void) getppriv(PRIV_EFFECTIVE, priv_effective);
 	privileged = (priv_isfullset(priv_effective) == B_TRUE);
