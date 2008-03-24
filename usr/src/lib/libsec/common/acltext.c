@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1075,6 +1075,7 @@ value_table_t inherit_table[] = {
 };
 
 #define	IFLAG_COUNT (sizeof (inherit_table) / sizeof (value_table_t))
+#define	IFLAG_COUNT_V1 6 /* Older version compatibility */
 
 /*
  * compute value from a permission table or inheritance table
@@ -1120,25 +1121,47 @@ compute_values(value_table_t *permtab, int count,
 	return (0);
 }
 
+
+int
+ace_inherit_helper(char *str, uint32_t *imask, int table_length)
+{
+	int rc = 0;
+
+	if (strlen(str) == table_length) {
+		/*
+		 * If the string == table_length then first check to see it's
+		 * in positional format.  If that fails then see if it's in
+		 * non-positional format.
+		 */
+		if (compute_values(inherit_table, table_length, str,
+		    1, imask) && compute_values(inherit_table,
+		    table_length, str, 0, imask)) {
+			rc = 1;
+		}
+	} else {
+		rc = compute_values(inherit_table, table_length, str, 0, imask);
+	}
+
+	return (rc ? EACL_INHERIT_ERROR : 0);
+}
+
 /*
  * compute value for inheritance flags.
  */
 int
 compute_ace_inherit(char *str, uint32_t *imask)
 {
-	int error;
-	int positional = 0;
+	int rc = 0;
 
-	if (strlen(str) == IFLAG_COUNT)
-		positional = 1;
+	rc = ace_inherit_helper(str, imask, IFLAG_COUNT);
 
-	error = compute_values(inherit_table, IFLAG_COUNT,
-	    str, positional, imask);
+	if (rc && strlen(str) != IFLAG_COUNT) {
 
-	if (error)
-		return (EACL_INHERIT_ERROR);
+		/* is it an old formatted inherit string? */
+		rc = ace_inherit_helper(str, imask, IFLAG_COUNT_V1);
+	}
 
-	return (error);
+	return (rc);
 }
 
 
