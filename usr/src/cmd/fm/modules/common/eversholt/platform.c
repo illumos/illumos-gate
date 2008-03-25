@@ -18,9 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * platform.c -- interfaces to the platform's configuration information
@@ -371,7 +370,7 @@ hc_path(tnode_t *node)
 
 		(void) strlcat(tmpbuf, "/", MAXPATHLEN);
 		(void) strlcat(tmpbuf, name, MAXPATHLEN);
-		(void) snprintf(numbuf, MAXPATHLEN, "%u", ul);
+		(void) snprintf(numbuf, MAXPATHLEN, "%lu", ul);
 		(void) strlcat(tmpbuf, numbuf, MAXPATHLEN);
 		lastcomp = stable(name);
 	}

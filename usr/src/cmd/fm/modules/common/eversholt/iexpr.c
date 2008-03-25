@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iexpr.c -- instanced expression cache module
@@ -75,7 +75,7 @@ iexpr_hash(struct node *np)
 
 	switch (np->t) {
 	case T_GLOBID:
-		return ((int)np->u.globid.s);
+		return ((uintptr_t)np->u.globid.s);
 
 	case T_ASSIGN:
 	case T_CONDIF:
@@ -106,18 +106,18 @@ iexpr_hash(struct node *np)
 		    iexpr_hash(np->u.expr.right)));
 
 	case T_NAME:
-		return ((int)np->u.name.s);
+		return ((uintptr_t)np->u.name.s);
 
 	case T_EVENT:
 		return (iexpr_hash(np->u.event.ename) +
 		    iexpr_hash(np->u.event.epname));
 
 	case T_FUNC:
-		return ((int)np->u.func.s +
+		return ((uintptr_t)np->u.func.s +
 		    iexpr_hash(np->u.func.arglist));
 
 	case T_QUOTE:
-		return ((int)np->u.quote.s);
+		return ((uintptr_t)np->u.quote.s);
 
 	case T_NUM:
 		return ((int)np->u.ull);

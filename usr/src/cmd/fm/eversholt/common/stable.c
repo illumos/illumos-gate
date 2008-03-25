@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * stable.c -- string table module
@@ -156,7 +155,7 @@ stable(const char *s)
 	for (sptr = &s[1]; *sptr; sptr++) {
 		slen++;
 		hash ^= (((unsigned)*sptr) << (slen % 3)) +
-			((unsigned)*(sptr - 1) << ((slen % 3 + 7)));
+		    ((unsigned)*(sptr - 1) << ((slen % 3 + 7)));
 	}
 	hash ^= slen;
 	if (slen > CHUNK_SIZE - sizeof (char *) - 1 - 4)
@@ -177,7 +176,7 @@ stable(const char *s)
 		while (*eptr)
 			eptr++;
 		eptr++;		/* move past '\0' */
-		while ((unsigned)eptr % MINPTR_ALIGN)
+		while ((uintptr_t)eptr % MINPTR_ALIGN)
 			eptr++;
 		/* pull in next pointer in bucket */
 		ptrp = (char **)(void *)eptr;
@@ -187,7 +186,7 @@ stable(const char *s)
 
 	/* string wasn't in table, add it and point ptr to it */
 	if (Stablenext == NULL || (&Stableblock[CHUNK_SIZE] - Stablenext) <
-		(slen + sizeof (char *) + MINPTR_ALIGN + 4)) {
+	    (slen + sizeof (char *) + MINPTR_ALIGN + 4)) {
 		/* need more room */
 		Stablenext = Stableblock = stable_newchunk();
 	}
@@ -196,7 +195,7 @@ stable(const char *s)
 	sptr = s;
 	while (*Stablenext++ = *sptr++)
 		;
-	while ((unsigned)Stablenext % MINPTR_ALIGN)
+	while ((uintptr_t)Stablenext % MINPTR_ALIGN)
 		Stablenext++;
 	ptrp = (char **)(void *)Stablenext;
 	Stablenext += sizeof (char *);

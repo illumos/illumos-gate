@@ -841,7 +841,7 @@ globals_destructor(void *left, void *right, void *arg)
 	struct evalue *evp = (struct evalue *)right;
 	if (evp->t == NODEPTR)
 		tree_free((struct node *)(uintptr_t)evp->v);
-	evp->v = NULL;
+	evp->v = (uintptr_t)NULL;
 	FREE(evp);
 }
 
@@ -985,7 +985,7 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 	serdinst = eventprop_lookup(sp, L_engine);
 
 	if (serdinst == NULL)
-		return (NULL);
+		return (0);
 
 	serdname = ipath2str(serdinst->u.stmt.np->u.event.ename->u.name.s,
 	    ipath(serdinst->u.stmt.np->u.event.epname));

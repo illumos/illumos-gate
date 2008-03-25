@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eftread.c -- routines for reading .eft files
@@ -51,7 +51,9 @@
 #include <netinet/in.h>
 #include <inttypes.h>
 
+#ifndef MIN
 #define	MIN(x, y) ((x) <= (y) ? (x) : (y))
+#endif
 
 static int Showheader;
 

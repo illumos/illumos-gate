@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * escparse.y -- parser for esc
@@ -89,7 +89,7 @@
 %type <tok> enameid
 %type <np> root stmtlist stmt nvpairlist nvpair nvname nvexpr
 %type <np> exprlist expr iterid ename pname epname eexprlist ipname iname
-%type <np> numexpr cexpr func pfunc parglist, parg
+%type <np> numexpr cexpr func pfunc parglist parg
 %type <np> eventlist event nork norkexpr globid propbody
 
 %%

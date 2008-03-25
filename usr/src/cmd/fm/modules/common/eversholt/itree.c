@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.c -- instance tree creation and manipulation
@@ -1394,7 +1394,7 @@ itree_pevent(struct event *lhs, struct event *ep, void *arg)
 {
 	struct plut_wlk_data propd;
 	struct bubble *bp;
-	int flags = (int)arg;
+	int flags = (int)(intptr_t)arg;
 
 	itree_pevent_brief(flags, ep);
 	if (ep->t == N_EREPORT)
@@ -1504,7 +1504,7 @@ itree_pbubble(int flags, struct bubble *bp)
 void
 itree_ptree(int flags, struct lut *itp)
 {
-	lut_walk(itp, (lut_cb)itree_pevent, (void *)flags);
+	lut_walk(itp, (lut_cb)itree_pevent, (void *)(intptr_t)flags);
 }
 
 /*ARGSUSED*/

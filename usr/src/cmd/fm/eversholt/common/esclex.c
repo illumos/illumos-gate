@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * esclex.c -- lexer for esc
@@ -175,7 +175,7 @@ static const struct {
  */
 
 static struct lut *
-lex_s2i_lut_add(struct lut *root, const char *s, int i)
+lex_s2i_lut_add(struct lut *root, const char *s, intptr_t i)
 {
 	return (lut_add(root, (void *)s, (void *)i, NULL));
 }
@@ -183,7 +183,7 @@ lex_s2i_lut_add(struct lut *root, const char *s, int i)
 static int
 lex_s2i_lut_lookup(struct lut *root, const char *s)
 {
-	return ((int)lut_lookup(root, (void *)s, NULL));
+	return ((intptr_t)lut_lookup(root, (void *)s, NULL));
 }
 
 static struct lut *
@@ -442,8 +442,8 @@ yylex()
 					if (c == '\n')
 						Line++;
 					else if (c == '*' &&
-						(((c = getc(Fp)) == EOF) ||
-						(c == '/')))
+					    (((c = getc(Fp)) == EOF) ||
+					    (c == '/')))
 						break;
 				}
 				if (c == EOF) {
@@ -638,7 +638,7 @@ yylex()
 				for (;;) {
 					c = getc(Fp);
 					if ((isalnum(c) || c == '_') &&
-						ptr < eptr)
+					    ptr < eptr)
 						*ptr++ = c;
 					else {
 						(void) ungetc(c, Fp);
@@ -712,12 +712,12 @@ dumpline(int flags)
 			switch (Recorded[i].tok) {
 			case T_QUOTE:
 				out(flags|O_NONL, " \"%s\"",
-					Recorded[i].s);
+				    Recorded[i].s);
 				break;
 
 			default:
 				out(flags|O_NONL, " %s",
-					Recorded[i].s);
+				    Recorded[i].s);
 				break;
 			}
 		else
@@ -727,7 +727,7 @@ dumpline(int flags)
 				break;
 			case ARROW:
 				out(flags|O_NONL, " ->%s",
-					Recorded[i].s);
+				    Recorded[i].s);
 				break;
 			case EQ:
 				out(flags|O_NONL, " ==");
@@ -756,10 +756,10 @@ dumpline(int flags)
 			default:
 				if (isprint(Recorded[i].tok))
 					out(flags|O_NONL, " %c",
-						Recorded[i].tok);
+					    Recorded[i].tok);
 				else
 					out(flags|O_NONL, " '\\%03o'",
-						Recorded[i].tok);
+					    Recorded[i].tok);
 				break;
 			}
 	out(flags, NULL);
@@ -903,7 +903,7 @@ doallow_cycles()
 	(void) check_cycle_level(newlevel);
 	outfl(O_VERB, File, Line,
 	    "pragma set: allow_cycles (%s)",
-		    newlevel ? "no warnings" : "with warnings");
+	    newlevel ? "no warnings" : "with warnings");
 }
 
 /*
