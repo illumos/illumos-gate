@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
-#include <sys/rwlock.h>
+#include <sys/ksynch.h>
 
 #if defined(_KERNEL) && defined(_MULTI_DATAMODEL)
 #include <sys/types32.h>
@@ -140,6 +140,8 @@ struct _kcpc_ctx {
 	struct _kthread	*kc_thread;	/* thread this context is measuring */
 	int		kc_cpuid;	/* CPU this context is measuring */
 	kcpc_ctx_t	*kc_next;	/* Global list of all contexts */
+	kmutex_t	kc_lock;	/* protects kc_flags */
+	kcondvar_t	kc_condv;	/* wait for kcpc_restore completion */
 };
 
 typedef struct __cpc_args {
@@ -172,6 +174,7 @@ typedef struct __cpc_args32 {
 #define	KCPC_CTX_LWPINHERIT	0x8	/* => lwp_create inherits ctx */
 #define	KCPC_CTX_INVALID	0x100	/* => context stolen; discard */
 #define	KCPC_CTX_INVALID_STOPPED 0x200	/* => invalid ctx has been stopped */
+#define	KCPC_CTX_RESTORE	0x400	/* => kcpc_restore in progress */
 
 /*
  * PIC flags.

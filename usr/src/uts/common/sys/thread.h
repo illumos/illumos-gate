@@ -101,6 +101,8 @@ struct upimutex;
 struct kproject;
 struct on_trap_data;
 struct waitq;
+struct _kcpc_ctx;
+struct _kcpc_set;
 
 /* Definition for kernel thread identifier type */
 typedef uint64_t kt_did_t;
@@ -149,8 +151,8 @@ typedef struct _kthread {
 	uint64_t	t_intr_start;	/* timestamp when time slice began */
 	kt_did_t	t_did;	/* thread id for kernel debuggers */
 	caddr_t t_tnf_tpdp;	/* Trace facility data pointer */
-	kcpc_ctx_t	*t_cpc_ctx;	/* performance counter context */
-	kcpc_set_t	*t_cpc_set;	/* set this thread has bound */
+	struct _kcpc_ctx *t_cpc_ctx;	/* performance counter context */
+	struct _kcpc_set *t_cpc_set;	/* set this thread has bound */
 
 	/*
 	 * non swappable part of the lwp state.

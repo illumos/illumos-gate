@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpc_impl.h>
+#include <sys/ksynch.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -51,12 +52,17 @@ struct cpu;
 typedef struct _kcpc_request kcpc_request_t;
 struct __pcbe_ops;
 
+#define	KCPC_SET_BOUND		0x0001		/* Used in ks_state */
+
 struct _kcpc_set {
 	int			ks_flags;
 	int			ks_nreqs;	/* Number of reqs */
 	kcpc_request_t		*ks_req;	/* Pointer to reqs */
 	uint64_t		*ks_data;	/* Data store for this set */
 	kcpc_ctx_t		*ks_ctx;	/* ctx this set belongs to */
+	ushort_t		ks_state;	/* Set is bound or unbound */
+	kmutex_t		ks_lock;	/* Protects ks_state */
+	kcondvar_t		ks_condv;	/* Wait for bind to complete */
 };
 
 struct _kcpc_request {

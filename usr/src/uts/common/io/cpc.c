@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -638,8 +637,10 @@ kcpc_copyin_set(kcpc_set_t **inset, void *ubuf, size_t len)
 
 	/*
 	 * The requests are now stored in the nvlist array at reqlist.
+	 * Note that the use of kmem_zalloc() to alloc the kcpc_set_t means
+	 * we don't need to call the init routines for ks_lock and ks_condv.
 	 */
-	set = kmem_alloc(sizeof (kcpc_set_t), KM_SLEEP);
+	set = kmem_zalloc(sizeof (kcpc_set_t), KM_SLEEP);
 	set->ks_req = (kcpc_request_t *)kmem_zalloc(sizeof (kcpc_request_t) *
 	    nreqs, KM_SLEEP);
 	set->ks_nreqs = nreqs;
@@ -648,6 +649,10 @@ kcpc_copyin_set(kcpc_set_t **inset, void *ubuf, size_t len)
 	 * with an illegal value and this set will fail sanity checks later on.
 	 */
 	set->ks_flags = setflags;
+	/*
+	 * Initialize bind/unbind set synchronization.
+	 */
+	set->ks_state &= ~KCPC_SET_BOUND;
 
 	/*
 	 * Build the set up one request at a time, always keeping it self-
