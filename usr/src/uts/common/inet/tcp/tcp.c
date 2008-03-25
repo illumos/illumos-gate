@@ -9534,17 +9534,16 @@ tcp_parse_options(tcph_t *tcph, tcp_opt_t *tcpopt)
  * and a new one passed in. Observe minimums and maximums, and reset
  * other state variables that we want to view as multiples of mss.
  *
- * This function is called in various places mainly because
- * 1) Various stuffs, tcp_mss, tcp_cwnd, ... need to be adjusted when the
- *    other side's SYN/SYN-ACK packet arrives.
- * 2) PMTUd may get us a new MSS.
- * 3) If the other side stops sending us timestamp option, we need to
- *    increase the MSS size to use the extra bytes available.
+ * This function is called mainly because values like tcp_mss, tcp_cwnd,
+ * highwater marks etc. need to be initialized or adjusted.
+ * 1) From tcp_process_options() when the other side's SYN/SYN-ACK
+ *    packet arrives.
+ * 2) We need to set a new MSS when ICMP_FRAGMENTATION_NEEDED or
+ *    ICMP6_PACKET_TOO_BIG arrives.
+ * 3) From tcp_paws_check() if the other side stops sending the timestamp,
+ *    to increase the MSS to use the extra bytes available.
  *
- * do_ss is used to control whether we will be doing slow start or
- * not if there is a change in the mss. Note that for some events like
- * tcp_paws_check() we allow the tcp_cwnd to adjust to the new mss but
- * do not perform a slow start specifically.
+ * Callers except tcp_paws_check() ensure that they only reduce mss.
  */
 static void
 tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
@@ -9575,31 +9574,26 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
 	if ((mss << 2) > tcp->tcp_xmit_hiwater)
 		tcp->tcp_xmit_hiwater = mss << 2;
 
-	/*
-	 * Check if we need to apply the tcp_init_cwnd here.  If
-	 * it is set and the MSS gets bigger (should not happen
-	 * normally), we need to adjust the resulting tcp_cwnd properly.
-	 * The new tcp_cwnd should not get bigger.
-	 */
-	/*
-	 * We need to avoid setting tcp_cwnd to its slow start value
-	 * unnecessarily. However we have to let the tcp_cwnd adjust
-	 * to the modified mss.
-	 */
-	if (tcp->tcp_init_cwnd == 0 && do_ss) {
-		tcp->tcp_cwnd = MIN(tcps->tcps_slow_start_initial *
-		    mss, MIN(4 * mss, MAX(2 * mss, 4380 / mss * mss)));
+	if (do_ss) {
+		/*
+		 * Either the tcp_cwnd is as yet uninitialized, or mss is
+		 * changing due to a reduction in MTU, presumably as a
+		 * result of a new path component, reset cwnd to its
+		 * "initial" value, as a multiple of the new mss.
+		 */
+		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_initial);
 	} else {
-		if (tcp->tcp_mss < mss) {
-			tcp->tcp_cwnd = MAX(1,
-			    (tcp->tcp_init_cwnd * tcp->tcp_mss /
-			    mss)) * mss;
-		} else {
-			tcp->tcp_cwnd = tcp->tcp_init_cwnd * mss;
-		}
+		/*
+		 * Called by tcp_paws_check(), the mss increased
+		 * marginally to allow use of space previously taken
+		 * by the timestamp option. It would be inappropriate
+		 * to apply slow start or tcp_init_cwnd values to
+		 * tcp_cwnd, simply adjust to a multiple of the new mss.
+		 */
+		tcp->tcp_cwnd = (tcp->tcp_cwnd / tcp->tcp_mss) * mss;
+		tcp->tcp_cwnd_cnt = 0;
 	}
 	tcp->tcp_mss = mss;
-	tcp->tcp_cwnd_cnt = 0;
 	(void) tcp_maxpsz_set(tcp, B_TRUE);
 }
 
