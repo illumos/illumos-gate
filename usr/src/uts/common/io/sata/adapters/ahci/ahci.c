@@ -4108,11 +4108,22 @@ ahci_alloc_cmd_list(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_address);
 
 	if (ahci_alloc_cmd_tables(ahci_ctlp, ahci_portp) != AHCI_SUCCESS) {
-		ahci_dealloc_cmd_list(ahci_ctlp, ahci_portp);
-		return (AHCI_FAILURE);
+		goto err_out;
 	}
 
 	return (AHCI_SUCCESS);
+
+err_out:
+	/* Unbind the cmd list dma handle first. */
+	(void) ddi_dma_unbind_handle(ahci_portp->ahciport_cmd_list_dma_handle);
+
+	/* Then free the underlying memory. */
+	ddi_dma_mem_free(&ahci_portp->ahciport_cmd_list_acc_handle);
+
+	/* Now free the handle itself. */
+	ddi_dma_free_handle(&ahci_portp->ahciport_cmd_list_dma_handle);
+
+	return (AHCI_FAILURE);
 }
 
 /*
