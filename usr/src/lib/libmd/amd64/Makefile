@@ -29,22 +29,19 @@ LIBRARY= libmd.a
 
 MD5_PSR_OBJECTS = md5_amd64.o
 SHA1_PSR_OBJECTS = sha1-x86_64.o
+SHA2_PSR_OBJECTS = sha512-x86_64.o sha256-x86_64.o
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-CLEANFILES += md5_amd64.s sha1-x86_64.s
+CLEANFILES += md5_amd64.s sha1-x86_64.s sha512-x86_64.s sha256-x86_64.s
 
 # This prevents <sys/asm_linkage.h> from including C source:
 AS_CPPFLAGS += -D_ASM
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
 
-pics/md5_amd64.o: md5_amd64.s
-	$(COMPILE.s) -o $@ ${@F:.o=.s}
-	$(POST_PROCESS_O)
-
-pics/sha1-x86_64.o: sha1-x86_64.s
+pics/%.o: %.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}
 	$(POST_PROCESS_O)
 
@@ -52,4 +49,10 @@ md5_amd64.s: $(COMDIR)/md5/amd64/md5_amd64.pl
 	$(PERL) $? $@
 
 sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
+	$(PERL) $? $@
+
+sha512-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
+	$(PERL) $? $@
+
+sha256-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 	$(PERL) $? $@

@@ -98,7 +98,7 @@ f none usr/bin/devattr 555 root bin
 f none usr/bin/devfree 555 root bin
 f none usr/bin/devreserv 555 root bin
 s none usr/bin/df=../sbin/df
-f none usr/bin/digest 555 root bin
+l none usr/bin/digest=../../usr/lib/isaexec
 f none usr/bin/dirname 555 root bin
 l none usr/bin/dispgid=../../usr/bin/ckgid
 l none usr/bin/dispuid=../../usr/bin/ckuid
@@ -177,7 +177,7 @@ f none usr/bin/login 4555 root bin
 f none usr/bin/logins 750 root bin
 f none usr/bin/ls 555 root bin
 l none usr/bin/m68k=../../usr/bin/i286
-l none usr/bin/mac=../../usr/bin/digest
+l none usr/bin/mac=../../usr/lib/isaexec
 f none usr/bin/mach 555 root bin
 f none usr/bin/mail 2511 root mail
 f none usr/bin/mailx 2511 root mail
@@ -971,7 +971,7 @@ f none usr/share/lib/terminfo/a/ansi+tabs 644 root bin
 f none usr/share/lib/terminfo/a/at386 644 root bin
 f none usr/share/lib/terminfo/a/at386-m 644 root bin
 d none usr/share/lib/terminfo/s 755 root bin
-f none usr/share/lib/terminfo/s/screen 644 root bin 
+f none usr/share/lib/terminfo/s/screen 644 root bin
 f none usr/share/lib/terminfo/s/screen-w 644 root bin
 f none usr/share/lib/terminfo/s/sun 644 root bin
 f none usr/share/lib/terminfo/s/sun-1 644 root bin

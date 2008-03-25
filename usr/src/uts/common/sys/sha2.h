@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ extern "C" {
  * The contents of this structure are a private interface between the
  * Init/Update/Final calls of the functions defined below.
  * Callers must never attempt to read or write any of the fields
- * in this strucutre directly.
+ * in this structure directly.
  */
 typedef struct 	{
 	uint32_t algotype;		/* Algorithm Type */

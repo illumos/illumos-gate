@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,11 +50,15 @@ d none usr/bin/sparcv7 755 root bin
 f none usr/bin/sparcv7/ksh93 555 root bin
 l none usr/bin/sparcv7/rksh93=ksh93
 f none usr/bin/sparcv7/savecore 555 root bin
+f none usr/bin/sparcv7/digest 555 root bin
+l none usr/bin/sparcv7/mac=digest
 d none usr/bin/sparcv9 755 root bin
 f none usr/bin/sparcv9/amt 555 root bin
 f none usr/bin/sparcv9/crle 555 root bin
+f none usr/bin/sparcv9/digest 555 root bin
 f none usr/bin/sparcv9/ksh93 555 root bin
 f none usr/bin/sparcv9/ls 555 root bin
+l none usr/bin/sparcv9/mac=digest
 f none usr/bin/sparcv9/moe 555 root bin
 f none usr/bin/sparcv9/newtask 4555 root sys
 f none usr/bin/sparcv9/nohup 555 root bin

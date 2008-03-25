@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,13 +33,17 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+COMDIR	= $(COMMONBASE)/crypto/sha2
 
 #
 #	Define the module and object file sets.
 #
 MODULE		= sha2
-OBJECTS		= $(SHA2_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SHA2_OBJS:%.o=$(LINTS_DIR)/%.ln)
+SHA2_OBJS_32    =
+SHA2_OBJS_64    = sha512-x86_64.o sha256-x86_64.o
+SHA2_OBJS       += $(SHA2_OBJS_$(CLASS))
+OBJECTS		= $(SHA2_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_MISC_DIR)/$(MODULE)
 
@@ -51,7 +55,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Override defaults
 #
-
+CLEANFILES += sha512-x86_64.s sha256-x86_64.s
 
 #
 #	Define targets
@@ -98,3 +102,16 @@ $(ROOTLINK):	$(ROOT_MISC_DIR) $(ROOTMODULE)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+$(OBJS_DIR)/%.o: %.s
+	$(COMPILE.s) -o $@ ${@F:.o=.s}
+	$(POST_PROCESS_O)
+
+$(OBJS_DIR)/%.ln: %.s
+	@($(LHEAD) $(LINT.c) ${@F:.ln=.s} $(LTAIL))
+
+sha512-x86_64.s: $(COMDIR)/amd64/sha512-x86_64.pl
+	$(PERL) $? $@
+
+sha256-x86_64.s: $(COMDIR)/amd64/sha512-x86_64.pl
+	$(PERL) $? $@

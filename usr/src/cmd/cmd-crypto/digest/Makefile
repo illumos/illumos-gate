@@ -19,39 +19,45 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG = digest
+PROG= digest
+ROOTLINK= $(ROOTBIN)/mac
+DCFILE= $(PROG).dc
 
-OBJS = digest.o
+include ../../Makefile.cmd
 
-SRCS = $(OBJS:.o=.c)
+SUBDIRS= $(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-include ../../Makefile.cmd 
-
-CFLAGS += $(CCVERBOSE) -D_FILE_OFFSET_BITS=64
-
-LDLIBS += -lkmf -lpkcs11 -lcryptoutil
+all	:=	TARGET = all
+install	:=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
+lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all:    $(PROG)
+all clean clobber lint:    $(SUBDIRS)
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(DYNFLAGS)
-	$(POST_PROCESS)
+install:	$(SUBDIRS)
+	-$(RM) $(ROOTPROG) $(ROOTLINK)
+	-$(LN) $(ISAEXEC) $(ROOTPROG)
+	-$(LN) $(ISAEXEC) $(ROOTLINK)
 
-install: all $(ROOTPROG)
-	$(RM) $(ROOTBIN)/mac
-	$(LN) $(ROOTPROG) $(ROOTBIN)/mac
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-clean:
-	$(RM) -f $(OBJS) $(PROG)
+$(DCFILE):
+	$(RM) messages.po
+	$(XGETTEXT) $(XGETFLAGS) -t $(PROG).c
+	$(SED) -e '/^domain/d' messages.po > $@
+	$(RM) messages.po
 
-lint:   lint_SRCS
+FRC:
 
 include ../../Makefile.targ

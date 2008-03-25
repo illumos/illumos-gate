@@ -41,7 +41,7 @@ COM_DIR = $(COMMONBASE)/crypto/arcfour
 MODULE		= arcfour
 LINTS		= $(ARCFOURPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ARCFOURPROV_OBJS_32 =
-ARCFOURPROV_OBJS_64 = arcfour_crypt_amd64.o
+ARCFOURPROV_OBJS_64 = arcfour-x86_64.o
 ARCFOURPROV_OBJS += $(ARCFOURPROV_OBJS_$(CLASS))
 OBJECTS		= $(ARCFOURPROV_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
@@ -65,6 +65,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Overrides
 #
 CPPFLAGS	+= -I$(COM_DIR)
+CLEANFILES	+= arcfour-x86_64.s
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -99,10 +100,12 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
-$(OBJS_DIR)/arcfour_crypt_amd64.o: $(COM_DIR)/amd64/arcfour_crypt_amd64.s
-	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/arcfour_crypt_amd64.s
+$(OBJS_DIR)/arcfour-x86_64.o: arcfour-x86_64.s
+	$(COMPILE.s) -o $@ ${@F:.o=.s}
 	$(POST_PROCESS_O)
 
-$(OBJS_DIR)/arcfour_crypt_amd64.ln: $(COM_DIR)/amd64/arcfour_crypt_amd64.s
-	@($(LHEAD) $(LINT.c) $(COM_DIR)/amd64/arcfour_crypt_amd64.s $(LTAIL))
+$(OBJS_DIR)/arcfour-x86_64.ln: arcfour-x86_64.s
+	@($(LHEAD) $(LINT.s) ${@F:.ln=.s} $(LTAIL))
 
+arcfour-x86_64.s: $(COM_DIR)/amd64/arcfour-x86_64.pl
+	$(PERL) $? $@

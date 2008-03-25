@@ -24,32 +24,47 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/pkcs11/pkcs11_softtoken/i386/Makefile
 
-AES_PSR_OBJECTS =
-ARCFOUR_PSR_OBJECTS =
-DES_PSR_OBJECTS =
-RSA_PSR_OBJECTS =
-BIGNUM_PSR_OBJECTS = bignum_i386.o bignum_i386_asm.o
-BIGNUM_CFG = -DPSR_MUL -DHWCAP
-BIGNUM_PSR_SRCS = \
-	$(BIGNUMDIR)/i386/bignum_i386.c \
-	$(BIGNUMDIR)/i386/bignum_i386_asm.s
+PROG = digest
 
-include ../Makefile.com
+ROOTLINK32= $(ROOTBIN32)/mac
+ROOTLINK64= $(ROOTBIN64)/mac
 
-CPPFLAGS += -DMP_USE_UINT_DIGIT
+OBJS = digest.o
 
-install: all $(ROOTLIBS) $(ROOTLINKS)
+SRCS = $(OBJS:%.o=../%.c)
 
-DYNFLAGS += -M $(BIGNUMDIR)/i386/cap_mapfile
+include ../../../Makefile.cmd
 
-pics/bignum_i386.o := COPTFLAG = -xO3
+CFLAGS += $(CCVERBOSE)
+CFLAGS64 += $(CCVERBOSE)
+CPPFLAGS +=-D_FILE_OFFSET_BITS=64
 
-pics/%.o:	$(BIGNUMDIR)/$(MACH)/%.c
-	$(COMPILE.c) -o $@ $(BIGNUM_CFG) $<
-	$(POST_PROCESS_O)
+LDLIBS += -lkmf -lpkcs11 -lcryptoutil
 
-pics/%.o:	$(BIGNUMDIR)/$(MACH)/%.s
-	$(COMPILE.s) -o $@ $(BIGNUM_CFG) $<
-	$(POST_PROCESS_O)
+.KEEP_STATE:
+
+all:	$(PROG)
+
+lint: lint_SRCS
+
+include ../../../Makefile.targ
+
+%.o:	../%.c
+	$(COMPILE.c) $<
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(DYNFLAGS)
+	$(POST_PROCESS)
+
+$(ROOTLINK32): $(ROOTPROG32)
+	$(RM) $@
+	$(LN) $(ROOTPROG32) $@
+
+$(ROOTLINK64): $(ROOTPROG64)
+	$(RM) $@
+	$(LN) $(ROOTPROG64) $@
+
+clean:
+	$(RM) $(PROG) $(OBJS)
+

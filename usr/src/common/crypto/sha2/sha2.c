@@ -1,10 +1,9 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * The basic framework for this code came from the reference
@@ -43,8 +42,10 @@
 #include <sys/sha2.h>
 #include <sys/sha2_consts.h>
 
-#ifndef _KERNEL
+#ifdef _KERNEL
+#include <sys/cmn_err.h>
 
+#else
 #include <strings.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -57,16 +58,22 @@
 #pragma weak SHA384Final = SHA2Final
 #pragma weak SHA512Final = SHA2Final
 
-#endif	/* !_KERNEL */
-
-#ifdef _KERNEL
-#include <sys/cmn_err.h>
-#endif /* _KERNEL */
+#endif	/* _KERNEL */
 
 static void Encode(uint8_t *, uint32_t *, size_t);
 static void Encode64(uint8_t *, uint64_t *, size_t);
+
+#if	defined(__amd64)
+#define	SHA512Transform(ctx, in) SHA512TransformBlocks((ctx), (in), 1)
+#define	SHA256Transform(ctx, in) SHA256TransformBlocks((ctx), (in), 1)
+
+void SHA512TransformBlocks(SHA2_CTX *ctx, const void *in, size_t num);
+void SHA256TransformBlocks(SHA2_CTX *ctx, const void *in, size_t num);
+
+#else
 static void SHA256Transform(SHA2_CTX *, const uint8_t *);
 static void SHA512Transform(SHA2_CTX *, const uint8_t *);
+#endif	/* __amd64 */
 
 static uint8_t PADDING[128] = { 0x80, /* all zeros */ };
 
@@ -135,16 +142,15 @@ static uint8_t PADDING[128] = { 0x80, /* all zeros */ };
 	    ((uint64_t)(addr)[2] << 40) | ((uint64_t)(addr)[3] << 32) |	\
 	    ((uint64_t)(addr)[4] << 24) | ((uint64_t)(addr)[5] << 16) |	\
 	    ((uint64_t)(addr)[6] << 8) | (uint64_t)(addr)[7])
-
 #endif
 
 
+#if	!defined(__amd64)
 /* SHA256 Transform */
 
 static void
 SHA256Transform(SHA2_CTX *ctx, const uint8_t *blk)
 {
-
 	uint32_t a = ctx->state.s32[0];
 	uint32_t b = ctx->state.s32[1];
 	uint32_t c = ctx->state.s32[2];
@@ -183,7 +189,7 @@ SHA256Transform(SHA2_CTX *ctx, const uint8_t *blk)
 		SHA256_CONST_60, SHA256_CONST_61, SHA256_CONST_62,
 		SHA256_CONST_63
 	};
-#endif
+#endif	/* __sparc */
 
 	if ((uintptr_t)blk & 0x3) {		/* not 4-byte aligned? */
 		bcopy(blk, ctx->buf_un.buf32,  sizeof (ctx->buf_un.buf32));
@@ -398,7 +404,7 @@ SHA512Transform(SHA2_CTX *ctx, const uint8_t *blk)
 		SHA512_CONST_75, SHA512_CONST_76, SHA512_CONST_77,
 		SHA512_CONST_78, SHA512_CONST_79
 	};
-#endif
+#endif	/* __sparc */
 
 
 	if ((uintptr_t)blk & 0x7) {		/* not 8-byte aligned? */
@@ -597,6 +603,7 @@ SHA512Transform(SHA2_CTX *ctx, const uint8_t *blk)
 	ctx->state.s64[7] += h;
 
 }
+#endif	/* !__amd64 */
 
 
 /*
@@ -749,21 +756,26 @@ SHA512Init(SHA512_CTX *ctx)
  *          to update the context.
  *   input: SHA2_CTX *	: the context to update
  *          void *	: the message block
- *          size_t    : the length of the message block in bytes
+ *          size_t      : the length of the message block, in bytes
  *  output: void
  */
 
 void
 SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 {
-	uint32_t i, buf_index, buf_len, buf_limit;
-	const uint8_t *input = inptr;
+	uint32_t	i, buf_index, buf_len, buf_limit;
+	const uint8_t	*input = inptr;
+	uint32_t	algotype = ctx->algotype;
+#if defined(__amd64)
+	uint32_t	block_count;
+#endif	/* !__amd64 */
+
 
 	/* check for noop */
 	if (input_len == 0)
 		return;
 
-	if (ctx->algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+	if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
 		buf_limit = 64;
 
 		/* compute number of bytes mod 64 */
@@ -805,7 +817,7 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 		 */
 		if (buf_index) {
 			bcopy(input, &ctx->buf_un.buf8[buf_index], buf_len);
-			if (ctx->algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE)
+			if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE)
 				SHA256Transform(ctx, ctx->buf_un.buf8);
 			else
 				SHA512Transform(ctx, ctx->buf_un.buf8);
@@ -813,20 +825,41 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 			i = buf_len;
 		}
 
-
-		for (; i + buf_limit - 1 < input_len; i += buf_limit) {
-			if (ctx->algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE)
+#if !defined(__amd64)
+		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+			for (; i + buf_limit - 1 < input_len; i += buf_limit) {
 				SHA256Transform(ctx, &input[i]);
-			else
+			}
+		} else {
+			for (; i + buf_limit - 1 < input_len; i += buf_limit) {
 				SHA512Transform(ctx, &input[i]);
+			}
 		}
+
+#else
+		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+			block_count = (input_len - i) >> 6;
+			if (block_count > 0) {
+				SHA256TransformBlocks(ctx, &input[i],
+				    block_count);
+				i += block_count << 6;
+			}
+		} else {
+			block_count = (input_len - i) >> 7;
+			if (block_count > 0) {
+				SHA512TransformBlocks(ctx, &input[i],
+				    block_count);
+				i += block_count << 7;
+			}
+		}
+#endif	/* !__amd64 */
 
 		/*
 		 * general optimization:
 		 *
 		 * if i and input_len are the same, return now instead
 		 * of calling bcopy(), since the bcopy() in this case
-		 * will be an expensive nop.
+		 * will be an expensive noop.
 		 */
 
 		if (input_len == i)
@@ -845,7 +878,7 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
  *
  * purpose: ends an sha2 digest operation, finalizing the message digest and
  *          zeroing the context.
- *   input: uchar_t *	: a buffer to store the digest in
+ *   input: uchar_t *	: a buffer to store the digest
  *			: The function actually uses void* because many
  *			: callers pass things other than uchar_t here.
  *          SHA2_CTX *  : the context to finalize, save, and zero
@@ -858,9 +891,9 @@ SHA2Final(void *digest, SHA2_CTX *ctx)
 	uint8_t		bitcount_be[sizeof (ctx->count.c32)];
 	uint8_t		bitcount_be64[sizeof (ctx->count.c64)];
 	uint32_t	index;
+	uint32_t	algotype = ctx->algotype;
 
-
-	if (ctx->algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+	if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
 		index  = (ctx->count.c32[1] >> 3) & 0x3f;
 		Encode(bitcount_be, ctx->count.c32, sizeof (bitcount_be));
 		SHA2Update(ctx, PADDING, ((index < 56) ? 56 : 120) - index);
@@ -873,7 +906,7 @@ SHA2Final(void *digest, SHA2_CTX *ctx)
 		    sizeof (bitcount_be64));
 		SHA2Update(ctx, PADDING, ((index < 112) ? 112 : 240) - index);
 		SHA2Update(ctx, bitcount_be64, sizeof (bitcount_be64));
-		if (ctx->algotype <= SHA384_HMAC_GEN_MECH_INFO_TYPE) {
+		if (algotype <= SHA384_HMAC_GEN_MECH_INFO_TYPE) {
 			ctx->state.s64[6] = ctx->state.s64[7] = 0;
 			Encode64(digest, ctx->state.s64,
 			    sizeof (uint64_t) * 6);

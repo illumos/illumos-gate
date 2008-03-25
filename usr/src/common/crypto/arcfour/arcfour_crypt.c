@@ -28,13 +28,16 @@
 #include "arcfour.h"
 
 #if defined(__amd64)
-/*
- * Use hand-tuned, processor-specific assembly version of arcfour_crypt()
- * for 64-bit x86:
- */
-#define	USE_PSR_VERSION_OF_ARCFOUR_CRYPT
-#endif /* __amd64 */
+#ifdef _KERNEL
+#include <sys/x86_archext.h>
+#include <sys/cpuvar.h>
 
+#else
+#include <sys/auxv.h>
+#endif	/* _KERNEL */
+#endif	/* __amd64 */
+
+#if !defined(__amd64)
 /* Initialize the key stream 'key' using the key value */
 void
 arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
@@ -45,12 +48,13 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 	uchar_t tmp;
 	int i, j;
 
+	/* Normalize key length to 256 */
 	for (i = j = 0; i < 256; i++, j++) {
 		if (j == keyvallen)
 			j = 0;
-
 		ext_keyval[i] = keyval[j];
 	}
+
 	for (i = 0; i < 256; i++)
 		key->arr[i] = (uchar_t)i;
 
@@ -68,7 +72,6 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 }
 
 
-#if !defined(USE_PSR_VERSION_OF_ARCFOUR_CRYPT)
 /*
  * Encipher 'in' using 'key'.
  * in and out can point to the same location
@@ -138,4 +141,21 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 /* EXPORT DELETE END */
 }
-#endif	/* !USE_PSR_VERSION_OF_ARCFOUR_CRYPT */
+
+#else
+
+/*
+ * Return 1 if executing on Intel, otherwise 0 (e.g., AMD64).
+ */
+int
+arcfour_crypt_on_intel(void)
+{
+#ifdef _KERNEL
+	return (cpuid_getvendor(CPU) == X86_VENDOR_Intel);
+#else
+	uint_t	ui;
+	(void) getisax(&ui, 1);
+	return ((ui & AV_386_AMD_MMX) == 0);
+#endif	/* _KERNEL */
+}
+#endif	/* !__amd64 */

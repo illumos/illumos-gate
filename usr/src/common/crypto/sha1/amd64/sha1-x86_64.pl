@@ -176,7 +176,6 @@ sub PROLOGUE {
 my $func=shift;
 $code.=<<___;
 ENTRY_NP($func)
-	/* EXPORT DELETE START */
 	push	%rbx
 	push	%rbp
 	push	%r12
@@ -203,7 +202,6 @@ $code.=<<___;
 	pop	%r12
 	pop	%rbp
 	pop	%rbx
-        /* EXPORT DELETE END */
 	ret
 SET_SIZE($func)
 ___

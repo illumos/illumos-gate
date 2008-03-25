@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -371,7 +371,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	CK_ULONG resultlen;
 	CK_BYTE_PTR	pkeydata = NULL;
 	CK_OBJECT_HANDLE key = (CK_OBJECT_HANDLE) 0;
-	int keylen = 0;		/* key length */
+	size_t keylen = 0;		/* key length */
 	char *resultstr = NULL;	/* result in hex string */
 	int resultstrlen;	/* result string length */
 	int i;
@@ -417,16 +417,16 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 				}
 
 				status = pkcs11_get_pass(token_label,
-				    (char **)&pkeydata, (size_t *)&keylen,
+				    (char **)&pkeydata, &keylen,
 				    0, B_FALSE);
 			} else if (keyfile != NULL) {
 				/* get the key file */
 				status = pkcs11_read_data(keyfile,
-				    (void **)&pkeydata, (size_t *)&keylen);
+				    (void **)&pkeydata, &keylen);
 			} else {
 				/* get the key from input */
 				status = pkcs11_get_pass(NULL,
-				    (char **)&pkeydata, (size_t *)&keylen,
+				    (char **)&pkeydata, &keylen,
 				    0, B_FALSE);
 			}
 

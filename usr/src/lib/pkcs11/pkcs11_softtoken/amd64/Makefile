@@ -27,10 +27,9 @@
 # lib/pkcs11/pkcs11_softtoken/amd64/Makefile
 
 AES_PSR_OBJECTS =
-ARCFOUR_PSR_OBJECTS =  arcfour_crypt_amd64.o
+ARCFOUR_PSR_OBJECTS =  arcfour-x86_64.o
 DES_PSR_OBJECTS =
 RSA_PSR_OBJECTS =
-SHA1_PSR_OBJECTS =
 BIGNUM_PSR_OBJECTS = bignum_amd64.o bignum_amd64_asm.o
 BIGNUM_PSR_PICS = $(BIGNUM_PSR_OBJECTS:%=pics/%)
 BIGNUM_CFG = -DPSR_MUL
@@ -43,16 +42,23 @@ pics/bignum_amd64.o := amd64_COPTFLAG = -xO3
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
+#
+# Overrides
+#
+CLEANFILES	+= arcfour-x86_64.s
+
 install: all $(ROOTLIBS64) $(ROOTLINKS64)
 
 $(BIGNUM_PSR_PICS) := CFLAGS += $(C_BIGPICFLAGS) $(BIGNUM_CFG)
 
 LINTFLAGS64 += $(BIGNUM_CFG)
 
-pics/arcfour_crypt_amd64.o: $(ARCFOURDIR)/amd64/arcfour_crypt_amd64.s
-	$(COMPILE.s) -o $@ $(AS_BIGPICFLAGS) \
-		$(ARCFOURDIR)/amd64/arcfour_crypt_amd64.s
+pics/arcfour-x86_64.o: arcfour-x86_64.s
+	$(COMPILE.s) -o $@ $(AS_BIGPICFLAGS) ${@F:.o=.s}
 	$(POST_PROCESS_O)
+
+arcfour-x86_64.s: $(ARCFOURDIR)/amd64/arcfour-x86_64.pl
+	$(PERL) $? $@
 
 pics/%.o: $(BIGNUMDIR)/$(MACH64)/%.c
 	$(COMPILE.c) -o $@ $(C_BIGPICFLAGS) $(BIGNUM_CFG) $<

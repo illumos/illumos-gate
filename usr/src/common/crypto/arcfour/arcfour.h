@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,9 @@ void arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len);
 void arcfour_crypt_aligned(ARCFour_key *key, size_t len, uchar_t *in,
     uchar_t *out);
 #endif	/* sun4u */
+#ifdef	__amd64
+int arcfour_crypt_on_intel(void);
+#endif	/* _amd64 */
 
 #ifdef	__cplusplus
 }
