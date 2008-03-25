@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -98,3 +98,19 @@ msgid "FMD-8000-3F.impact"
 msgstr "Automated diagnosis and response for subsequent events associated with this module will not occur."
 msgid "FMD-8000-3F.action"
 msgstr "Use fmdump -v -u <EVENT-ID> to locate the module.  Use fmadm load <module> to load the module after repairing its configuration."
+#
+# code: FMD-8000-4M
+# keys: list.repaired
+#
+msgid "FMD-8000-4M.type"
+msgstr "Repair"
+msgid "FMD-8000-4M.severity"
+msgstr "Minor"
+msgid "FMD-8000-4M.description"
+msgstr "All faults associated with an event id have been addressed.  Refer to %s for more information."
+msgid "FMD-8000-4M.response"
+msgstr "Any system components offlined becase of the original fault have been brought back online."
+msgid "FMD-8000-4M.impact"
+msgstr "Performance degradation of the system due to the original fault has been recovered."
+msgid "FMD-8000-4M.action"
+msgstr "Use fmdump -v -u <EVENT-ID> to identify the repaired components."

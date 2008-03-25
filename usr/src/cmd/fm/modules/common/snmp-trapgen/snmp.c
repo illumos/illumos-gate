@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -398,6 +398,7 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	fmd_prop_free_string(hdl, rootdir);
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
 }
 
 void

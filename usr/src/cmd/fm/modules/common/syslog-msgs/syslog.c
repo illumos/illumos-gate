@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,6 +344,11 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	if ((template = dgettext(dict, SYSLOG_TEMPLATE)) == SYSLOG_TEMPLATE)
 		template = dgettext(SYSLOG_DOMAIN, SYSLOG_TEMPLATE);
 
+	syslog_ctl.pri &= LOG_FACMASK;
+	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
+		syslog_ctl.pri |= LOG_NOTICE;
+	else
+		syslog_ctl.pri |= LOG_ERR;
 	syslog_emit(hdl, msg, sizeof (msg),
 	    template, code, dgettext(dict, typ),
 	    dgettext(dict, sev), date, platform, chassis, server, src_name,
@@ -462,7 +467,7 @@ _fmd_init(fmd_hdl_t *hdl)
 		fmd_hdl_abort(hdl, "invalid 'facility' setting: %s\n", facname);
 
 	fmd_prop_free_string(hdl, facname);
-	syslog_ctl.pri = fp->fac_value | LOG_ERR;
+	syslog_ctl.pri = fp->fac_value;
 	syslog_ctl.flags = SL_CONSOLE | SL_LOGONLY;
 
 	/*
@@ -499,6 +504,7 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	fmd_prop_free_string(hdl, rootdir);
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
 }
 
 void

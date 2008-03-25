@@ -333,6 +333,7 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 	nvlist_t **nva, *nvl;
 	uint8_t *ba;
 	int msg = B_TRUE;
+	const char *code;
 	fmd_case_lst_t fcl;
 	int count = 0;
 
@@ -357,12 +358,20 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 
 	if (cip->ci_code == NULL)
 		(void) fmd_case_mkcode(cp);
+	/*
+	 * For repair event, we lookup diagcode from dict using key
+	 * "list.repaired".
+	 */
+	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
+		(void) fmd_conf_getprop(fmd.d_conf, "repaircode", &code);
+	else
+		code = cip->ci_code;
 
 	if (msg == B_FALSE)
 		cip->ci_flags |= FMD_CF_INVISIBLE;
 
 	nvl = fmd_protocol_list(class, cip->ci_mod->mod_fmri, cip->ci_uuid,
-	    cip->ci_code, cip->ci_nsuspects, nva, ba, msg, &cip->ci_tv);
+	    code, cip->ci_nsuspects, nva, ba, msg, &cip->ci_tv);
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 	return (nvl);
@@ -610,6 +619,9 @@ fmd_case_publish(fmd_case_t *cp, uint_t state)
 		nvl = fmd_case_mkevent(cp, FM_LIST_REPAIRED_CLASS);
 		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
+		(void) pthread_rwlock_rdlock(&fmd.d_log_lock);
+		fmd_log_append(fmd.d_fltlog, e, cp);
+		(void) pthread_rwlock_unlock(&fmd.d_log_lock);
 		fmd_dispq_dispatch(fmd.d_disp, e, class);
 		break;
 	}

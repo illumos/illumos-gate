@@ -271,6 +271,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "log.xprt", &fmd_conf_string, "var/fm/fmd/xprt" }, /* transport log dir */
 { "machine", &fmd_conf_string, _fmd_uts.machine }, /* machine name (uname -m) */
 { "nodiagcode", &fmd_conf_string, "-" },	/* diagcode to use if error */
+{ "repaircode", &fmd_conf_string, "-" },	/* diagcode for list.repaired */
 { "osrelease", &fmd_conf_string, _fmd_uts.release }, /* release (uname -r) */
 { "osversion", &fmd_conf_string, _fmd_uts.version }, /* version (uname -v) */
 { "platform", &fmd_conf_string, _fmd_plat },	/* platform string (uname -i) */
@@ -744,7 +745,8 @@ void
 fmd_run(fmd_t *dp, int pfd)
 {
 	char *nodc_key[] = { FMD_FLT_NODC, NULL };
-	char nodc_str[128];
+	char *repair_key[] = { FM_LIST_REPAIRED_CLASS, NULL };
+	char code_str[128];
 	struct sigaction act;
 
 	int status = FMD_EXIT_SUCCESS;
@@ -884,9 +886,16 @@ fmd_run(fmd_t *dp, int pfd)
 	(void) fmd_conf_getprop(dp->d_conf, "self.name", &name);
 	dp->d_self = fmd_modhash_lookup(dp->d_mod_hash, name);
 
-	if (dp->d_self != NULL && fmd_module_dc_key2code(dp->d_self,
-	    nodc_key, nodc_str, sizeof (nodc_str)) == 0)
-		(void) fmd_conf_setprop(dp->d_conf, "nodiagcode", nodc_str);
+	if (dp->d_self != NULL) {
+		if (fmd_module_dc_key2code(dp->d_self, nodc_key, code_str,
+		    sizeof (code_str)) == 0)
+			(void) fmd_conf_setprop(dp->d_conf, "nodiagcode",
+			    code_str);
+		if (fmd_module_dc_key2code(dp->d_self, repair_key, code_str,
+		    sizeof (code_str)) == 0)
+			(void) fmd_conf_setprop(dp->d_conf, "repaircode",
+			    code_str);
+	}
 
 	fmd_rpc_init();
 	dp->d_running = 1; /* we are now officially an active fmd */

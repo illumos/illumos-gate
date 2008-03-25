@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,10 +33,17 @@
 static int
 flt_short(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
-	char buf[32], *uuid = "-", *code = "-";
+	char buf[32], str[32];
+	char *class = NULL, *uuid = "-", *code = "-";
 
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_UUID, &uuid);
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_DIAG_CODE, &code);
+
+	(void) nvlist_lookup_string(rp->rec_nvl, FM_CLASS, &class);
+	if (class != NULL && strcmp(class, FM_LIST_REPAIRED_CLASS) == 0) {
+		(void) snprintf(str, sizeof (str), "%s %s", code, "Repaired");
+		code = str;
+	}
 
 	fmdump_printf(fp, "%-20s %-32s %s\n",
 	    fmdump_date(buf, sizeof (buf), rp), uuid, code);
