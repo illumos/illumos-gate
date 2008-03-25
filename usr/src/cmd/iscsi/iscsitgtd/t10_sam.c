@@ -341,8 +341,8 @@ t10_handle_destroy(t10_targ_handle_t tp)
 					    t->s_targ_num);
 				}
 			}
-			(void) pthread_mutex_unlock(&l->l_cmd_mutex);
 			avl_destroy(&l->l_cmds);
+			(void) pthread_mutex_unlock(&l->l_cmd_mutex);
 			free(l);
 		}
 	}
@@ -737,6 +737,7 @@ t10_task_mgmt(t10_targ_handle_t t1, TaskOp_t op, int opt_lun, void *tag)
 
 	switch (op) {
 	case InventoryChange:
+		(void) pthread_mutex_lock(&t->s_mutex);
 		if ((lu = avl_first(&t->s_open_lu)) != NULL) {
 			do {
 				/*CSTYLED*/
@@ -744,40 +745,53 @@ t10_task_mgmt(t10_targ_handle_t t1, TaskOp_t op, int opt_lun, void *tag)
 				    0, msg_targ_inventory_change, (void *)lu);
 			} while ((lu = AVL_NEXT(&t->s_open_lu, lu)) != NULL);
 		}
+		(void) pthread_mutex_unlock(&t->s_mutex);
 		return (True);
 
 	case ResetTarget:
+		(void) pthread_mutex_lock(&t->s_mutex);
 		if ((lu = avl_first(&t->s_open_lu)) != NULL) {
 			do {
 				/*CSTYLED*/
 				queue_message_set(lu->l_common->l_from_transports,
 				    Q_HIGH, msg_reset_lu, (void *)lu);
 			} while ((lu = AVL_NEXT(&t->s_open_lu, lu)) != NULL);
+			(void) pthread_mutex_unlock(&t->s_mutex);
 			return (True);
-		} else
+		} else {
+			(void) pthread_mutex_unlock(&t->s_mutex);
 			return (False);
+		}
 
 	case ResetLun:
 		search.l_targ_lun = opt_lun;
+		(void) pthread_mutex_lock(&t->s_mutex);
 		if ((lu = avl_find(&t->s_open_lu, (void *)&search, NULL)) !=
 		    NULL) {
 			queue_message_set(lu->l_common->l_from_transports,
 			    Q_HIGH, msg_reset_lu, (void *)lu);
+			(void) pthread_mutex_unlock(&t->s_mutex);
 			return (True);
-		} else
+		} else {
+			(void) pthread_mutex_unlock(&t->s_mutex);
 			return (False);
+		}
 		break;
 
 	case CapacityChange:
 		search.l_targ_lun = opt_lun;
+		(void) pthread_mutex_lock(&t->s_mutex);
 		if ((lu = avl_find(&t->s_open_lu, (void *)&search, NULL)) !=
 		    NULL) {
 			queue_message_set(lu->l_common->l_from_transports,
 			    Q_HIGH, msg_lu_capacity_change,
 			    (void *)(uintptr_t)opt_lun);
+			(void) pthread_mutex_unlock(&t->s_mutex);
 			return (True);
-		} else
+		} else {
+			(void) pthread_mutex_unlock(&t->s_mutex);
 			return (False);
+		}
 		break;
 
 	default:
@@ -806,6 +820,7 @@ t10_targ_stat(t10_targ_handle_t t1, char **buf)
 	if (t == NULL)
 		return;
 
+	(void) pthread_mutex_lock(&t->s_mutex);
 	itl = avl_first(&t->s_open_lu);
 	while (itl) {
 		tgt_buf_add_tag(buf, XML_ELEMENT_LUN, Tag_Start);
@@ -837,6 +852,7 @@ t10_targ_stat(t10_targ_handle_t t1, char **buf)
 		tgt_buf_add_tag(buf, XML_ELEMENT_LUN, Tag_End);
 		itl = AVL_NEXT(&t->s_open_lu, itl);
 	}
+	(void) pthread_mutex_unlock(&t->s_mutex);
 }
 
 /*
@@ -1380,6 +1396,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	 */
 	search.l_targ_lun = lun;
 
+	(void) pthread_mutex_lock(&t->s_mutex);
 	if ((l = avl_find(&t->s_open_lu, (void *)&search, &wt)) != NULL) {
 
 		/*
@@ -1390,8 +1407,10 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		 * even faster than an AVL tree and not take up to much space.
 		 */
 		cmd->c_lu = l;
+		(void) pthread_mutex_unlock(&t->s_mutex);
 		return (True);
 	}
+	(void) pthread_mutex_unlock(&t->s_mutex);
 
 	/*
 	 * First access for this I_T_L so we need to allocate space for it.
@@ -1615,7 +1634,9 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	 * We wait to add the LU to the target list until now so that we don't
 	 * have to delete the node in case an error occurs.
 	 */
+	(void) pthread_mutex_lock(&t->s_mutex);
 	avl_insert(&t->s_open_lu, (void *)l, wt);
+	(void) pthread_mutex_unlock(&t->s_mutex);
 
 	(void) pthread_mutex_lock(&l->l_mutex);
 	l->l_common = common;

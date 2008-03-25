@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,8 +738,10 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 * and subtract one since the first is accounted for in
 	 * rtpg_targ_desc_t
 	 */
+	(void) pthread_mutex_lock(&lu->l_common_mutex);
 	alloc_len = ((avl_numnodes(&lu->l_all_open) - 1) *
 	    sizeof (rtpg_targ_desc_t)) + sizeof (rtpg_hdr_t);
+	(void) pthread_mutex_unlock(&lu->l_common_mutex);
 
 	/*
 	 * Make sure that we have enough room to store everything
@@ -768,7 +770,9 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	r->len[2]	= hibyte(loword(i));
 	r->len[3]	= lobyte(loword(i));
 	dp		= &r->desc_list[0];
+	(void) pthread_mutex_lock(&lu->l_common_mutex);
 	dp->tpg_cnt	= avl_numnodes(&lu->l_all_open);
+	(void) pthread_mutex_unlock(&lu->l_common_mutex);
 	dp->status_code	= 0;
 	dp->access_state	= 0; /* Active/optimized */
 	dp->pref	= 1;
@@ -782,6 +786,7 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	dp->tpg[1]	= lobyte(loword(i));
 
 	tp		= &dp->targ_list[0];
+	(void) pthread_mutex_lock(&lu->l_common_mutex);
 	lu_per		= avl_first(&lu->l_all_open);
 	do {
 		tp->rel_tpi[0] = hibyte(loword(lu_per->l_targ->s_tpgt));
@@ -789,6 +794,7 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		lu_per = AVL_NEXT(&lu->l_all_open, lu_per);
 		tp++;
 	} while (lu_per != NULL);
+	(void) pthread_mutex_unlock(&lu->l_common_mutex);
 
 	if (trans_send_datain(cmd, (char *)r, MIN(rqst_len, alloc_len), 0,
 	    spc_free, True, (char *)r) == False) {

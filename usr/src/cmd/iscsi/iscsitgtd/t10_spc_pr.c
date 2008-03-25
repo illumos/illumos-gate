@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -891,6 +891,7 @@ spc_pr_out_register(t10_cmd_t *cmd, void *data, size_t data_len)
 	/*
 	 * We may need register all initiators, depending on ALL_TG_TP
 	 */
+	(void) pthread_mutex_lock(&cmd->c_lu->l_common->l_common_mutex);
 	lu = avl_first(&cmd->c_lu->l_common->l_all_open);
 	do {
 		/*
@@ -981,6 +982,7 @@ spc_pr_out_register(t10_cmd_t *cmd, void *data, size_t data_len)
 		}
 		lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
 	} while (lu != NULL);
+	(void) pthread_mutex_unlock(&cmd->c_lu->l_common->l_common_mutex);
 
 	/*
 	 * Apply the last valid APTPL bit

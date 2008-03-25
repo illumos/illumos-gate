@@ -310,9 +310,12 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 				 */
 				if (cmd->c_state == CmdAlloc) {
 					cmd->c_state = CmdCanceled;
-
-					t10_cmd_shoot_event(cmd->c_t10_cmd,
-					    T10_Cmd_T6);
+					if (cmd->c_t10_cmd != NULL) {
+						t10_cmd_shoot_event(
+						    cmd->c_t10_cmd,
+						    T10_Cmd_T6);
+						cmd->c_t10_cmd = NULL;
+					}
 				}
 
 			}
