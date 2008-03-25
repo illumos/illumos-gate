@@ -89,6 +89,11 @@ convert_ret_t mgmt_convert_conf();
 Boolean_t check_auth_modify(ucred_t *cred);
 Boolean_t check_auth_addremove(ucred_t *cred);
 
+int get_zfs_shareiscsi(char *, tgt_node_t **, uint64_t *, ucred_t *);
+int put_zfs_shareiscsi(char *, tgt_node_t *);
+#define	ZFS_PROP_SIZE	(2 * 1024)
+
+
 #ifdef __cplusplus
 }
 #endif

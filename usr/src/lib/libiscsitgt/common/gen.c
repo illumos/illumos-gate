@@ -168,10 +168,14 @@ is_online(void)
 	char		*s;
 	Boolean_t	rval = False;
 
-	if ((s = smf_get_state(service)) != NULL) {
-		if (strcmp(s, SCF_STATE_STRING_ONLINE) == 0)
-			rval = True;
-		free(s);
+	if (getenv("iscsitgt_no_daemon") != NULL) {
+		rval = True;
+	} else {
+		if ((s = smf_get_state(service)) != NULL) {
+			if (strcmp(s, SCF_STATE_STRING_ONLINE) == 0)
+				rval = True;
+			free(s);
+		}
 	}
 
 	return (rval);

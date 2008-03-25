@@ -73,7 +73,6 @@ static Boolean_t setup_disk_backing(err_code_t *code, char *path, char *backing,
     tgt_node_t *n, uint64_t *size);
 static Boolean_t setup_raw_backing(err_code_t *code, char *path, char *backing,
     uint64_t *size);
-static void zfs_lun(tgt_node_t *l, uint64_t size, char *dataset);
 
 #define	ZVOL_PATH	"/dev/zvol/rdsk/"
 
@@ -413,211 +412,150 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL;
 	char		*dataset	= NULL;
-	char		*node_name	= NULL;
-	char		*prop		= NULL;
+	char		*cptr		= NULL;
 	char		path[MAXPATHLEN];
-	char		*cp;	/* current pair */
-	char		*np;	/* next pair */
-	char		*vp;	/* value pointer */
-	tgt_node_t	*dnode		= NULL;
-	tgt_node_t	*n;
+	tgt_node_t	*n = NULL;
 	tgt_node_t	*c;
-	tgt_node_t	*attr;
-	tgt_node_t	*ll;
 	tgt_node_t	*l;
-	libzfs_handle_t	*zh		= NULL;
-	zfs_handle_t	*zfsh		= NULL;
 	uint64_t	size;
-	size_t		prop_len;
-	int		lun		= 0;
-	xmlTextReaderPtr	r;
-	const priv_set_t	*eset;
+	int		status;
 
+	/*
+	 * Extract the dataset name from the arguments passed in
+	 */
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
 	}
 
-	if (((zh = libzfs_init()) == NULL) ||
-	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
-		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-		goto error;
-	}
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		/*
-		 * See if user has ZFS dataset permissions to do operation
-		 */
-		if (zfs_iscsi_perm_check(zh, dataset, cred) != 0) {
-			xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-			free(dataset);
-			libzfs_fini(zh);
-			goto error;
-		}
-	}
-
-	while ((dnode = tgt_node_next(targets_config, XML_ELEMENT_TARG,
-	    dnode)) != NULL) {
-		if (strcmp(dnode->x_value, dataset) == 0) {
+	/*
+	 * Since this is a create, assure that an existing dataset with the
+	 * same name does not exists
+	 */
+	c = NULL;
+	while ((c = tgt_node_next(targets_config, XML_ELEMENT_TARG, c))) {
+		if (strcmp(c->x_value, dataset) == 0) {
 			xml_rtn_msg(&msg, ERR_LUN_EXISTS);
 			goto error;
 		}
 	}
 
-	prop_len = 1024;
-	if ((prop = malloc(prop_len)) == NULL) {
-		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+	/*
+	 * See if this is a re-create of a previously create ZVOL target
+	 * If no shareiscsi properties exists, create a new set of properties
+	 */
+	status = get_zfs_shareiscsi(dataset, &n, &size, cred);
+	if ((status != ERR_SUCCESS) && (status != ERR_NULL_XML_MESSAGE)) {
+		xml_rtn_msg(&msg, status);
 		goto error;
-	}
+	} else if (status == ERR_NULL_XML_MESSAGE) {
 
-	/*
-	 * In case zfs_prop_get returns no contents.
-	 */
-	*prop = '\0';
+		char	*name;
+		int	lun = 0;
+		int	guid = 0;
+		int	rpm = DEFAULT_RPM;
+		int	heads = DEFAULT_HEADS;
+		int	cylinders = DEFAULT_CYLINDERS;
+		int	spt = DEFAULT_SPT;
+		int	bytes_sect = DEFAULT_BYTES_PER;
+		int	interleave = DEFAULT_INTERLEAVE;
 
-	/*
-	 * If we fail to get the shareiscsi property or the property is
-	 * set to "off" return an error.
-	 */
-	if (zfs_prop_get(zfsh, ZFS_PROP_SHAREISCSI, prop, prop_len, NULL,
-	    NULL, 0, B_TRUE)) {
-		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-		goto error;
-	}
+		n = tgt_node_alloc(XML_ELEMENT_TARG, String, NULL);
+		c = tgt_node_alloc(XML_ELEMENT_INCORE, String, XML_VALUE_TRUE);
+		tgt_node_add_attr(n, c);
 
-	/*
-	 * The options property is a string with name/value pairs separated
-	 * by comma characters. Stand alone values of 'on' and 'off' are
-	 * also permitted, but having the property set to off when share()
-	 * is called is an error.
-	 * Currently we only look for 'type=<value>' and ignore others.
-	 */
-	cp = prop;
-	while (cp) {
-		if (np = strchr(cp, ','))
-			*np++ = '\0';
-		if (strcmp(cp, "on") == 0) {
-			cp = np;
-			continue;
-		}
-		if (strcmp(cp, "off") == 0) {
-			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-			goto error;
-		}
-		if (vp = strchr(cp, '='))
-			*vp++ = '\0';
-		/*
-		 * Only support 'disk' emulation at this point.
-		 */
-		if ((strcmp(cp, "type") == 0) && (strcmp(vp, "disk") != 0)) {
-			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-			goto error;
-		}
-
-		cp = np;
-	}
-
-	/*
-	 * In case zfs_prop_get returns no contents.
-	 */
-	*prop = '\0';
-
-	if (zfs_prop_get(zfsh, ZFS_PROP_ISCSIOPTIONS, prop, prop_len, NULL,
-	    NULL, 0, B_TRUE)) {
-		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-		goto error;
-	}
-
-	/*
-	 * Pick up the current size of the volume.
-	 */
-	size = zfs_prop_get_int(zfsh, ZFS_PROP_VOLSIZE);
-	if (strlen(prop)) {
-		n = NULL;
-		if ((r = (xmlTextReaderPtr)xmlReaderForMemory(prop,
-		    strlen(prop), NULL, NULL, 0)) != NULL) {
-			while (xmlTextReaderRead(r)) {
-				if (tgt_node_process(r, &n) == False)
-					break;
-			}
-			xmlTextReaderClose(r);
-			xmlFreeTextReader(r);
-			xmlCleanupParser();
-
-			/*
-			 * Pick up the LU node from the LU List which hangs
-			 * off of the target node. If either is NULL there's
-			 * an internal error someplace.
-			 * 'l' will be used later.
-			 */
-			if (((ll = tgt_node_next(n, XML_ELEMENT_LUNLIST, NULL))
-			    == NULL) ||
-			    ((l = tgt_node_next(ll, XML_ELEMENT_LUN, NULL)) ==
-			    NULL)) {
-				xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-				goto error;
-			}
-
+		if (name = create_node_name(NULL, NULL)) {
+			c = tgt_node_alloc(XML_ELEMENT_INAME, String, name);
+			tgt_node_add(n, c);
+			free(name);
 		} else {
-			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-			goto error;
-		}
-	} else {
-		if ((node_name = create_node_name(NULL, NULL)) == NULL) {
 			xml_rtn_msg(&msg, ERR_CREATE_NAME_TO_LONG);
 			goto error;
 		}
-
-		n = tgt_node_alloc(XML_ELEMENT_TARG, String, NULL);
-		attr = tgt_node_alloc(XML_ELEMENT_INCORE, String,
-		    XML_VALUE_TRUE);
-		tgt_node_add_attr(n, attr);
-		attr = tgt_node_alloc(XML_ELEMENT_VERS, String, "1.0");
-		tgt_node_add_attr(n, attr);
-
-		c = tgt_node_alloc(XML_ELEMENT_INAME, String, node_name);
-		tgt_node_add(n, c);
-		free(node_name);
 
 		c = tgt_node_alloc(XML_ELEMENT_LUNLIST, String, "");
 		tgt_node_add(n, c);
 
 		l = tgt_node_alloc(XML_ELEMENT_LUN, Int, &lun);
 		tgt_node_add(c, l);
-		attr = tgt_node_alloc(XML_ELEMENT_VERS, String, "1.0");
-		tgt_node_add_attr(l, attr);
 
-		zfs_lun(l, size, dataset);
+		c = tgt_node_alloc(XML_ELEMENT_VERS, String, "1.0");
+		tgt_node_add_attr(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_GUID, Int, &guid);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_PID, String, DEFAULT_PID);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_VID, String, DEFAULT_VID);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_DTYPE, String, TGT_TYPE_DISK);
+		tgt_node_add(l, c);
+
+		create_geom(size, &cylinders, &heads, &spt);
+
+		c = tgt_node_alloc(XML_ELEMENT_RPM, Int, &rpm);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_HEADS, Int, &heads);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_CYLINDERS, Int, &cylinders);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_SPT, Int, &spt);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_BPS, Int, &bytes_sect);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_INTERLEAVE, Int, &interleave);
+		tgt_node_add(l, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_STATUS, String,
+		    TGT_STATUS_ONLINE);
+		tgt_node_add(l, c);
 
 		/*
-		 * Now store this information on the ZVOL property so that
-		 * next time we get a share request the same data will be
-		 * used.
+		 * Set the ZFS persisted shareiscsi options
 		 */
-		free(prop);
-		prop = NULL;
-		tgt_dump2buf(n, &prop);
-		if (zfs_prop_set(zfsh, zfs_prop_to_name(ZFS_PROP_ISCSIOPTIONS),
-		    prop)) {
-			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		if ((status = put_zfs_shareiscsi(dataset, n)) != ERR_SUCCESS) {
+			xml_rtn_msg(&msg, status);
 			goto error;
+		}
+	} else {
+		/*
+		 * If the was a recreate of a ZVOL iSCSI Target, 'n' is expected
+		 * to contain the properties for this iSCSI target node
+		 *
+		 * Make sure these properties have the "in-core" attribute
+		 */
+		if (tgt_find_attr_str(n, XML_ELEMENT_INCORE, &cptr) == True) {
+			if (strcmp(cptr, "true") != 0) {
+				xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+				goto error;
+			}
 		}
 	}
 
 	/*
-	 * NOTE: 'n' is expected to be the target node for this
-	 * ZVOL at this point.
+	 * Pick up the LU node from the LU List which hangs off of the target
+	 * node. If either is NULL there's an internal error someplace.
 	 */
+	if (((l = tgt_node_next(n, XML_ELEMENT_LUNLIST, NULL)) == NULL) ||
+	    ((l = tgt_node_next(l, XML_ELEMENT_LUN, NULL)) == NULL)) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+			goto error;
+	}
 
 	/*
-	 * Several elements can change everytime we share
-	 * the dataset. The TargetAlias and backing store
-	 * can change since these are based on the dataset
-	 * and the size of the volume. Therefore, these
-	 * pieces of information are not stored as part
-	 * of the iscsioptions properity.
+	 * With ZVOLS, some elements can change everytime we share the dataset.
+	 * The TargetAlias and backing store can change since these are based on
+	 * the dataset and the size of the volume. Therefore, these pieces of
+	 * information are not stored as part of the iscsioptions properity, but
+	 * are retained in the in-core targets_config
 	 */
 	tgt_update_value_str(n, XML_ELEMENT_TARG, dataset);
 	c = tgt_node_alloc(XML_ELEMENT_ALIAS, String, dataset);
@@ -631,30 +569,33 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &size);
 	tgt_node_add(l, c);
 
-	tgt_node_add(targets_config, n);
-
 	/* register with iSNS */
-	node_name = NULL;
 	if (isns_enabled() == True) {
-		(void) tgt_find_value_str(n, XML_ELEMENT_INAME, &node_name);
-		if (isns_reg(node_name) != 0) {
-			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
-			goto error;
+		cptr = NULL;
+		if (tgt_find_value_str(n, XML_ELEMENT_INAME, &cptr) == True) {
+			if (isns_reg(cptr) != 0) {
+				xml_rtn_msg(&msg, ERR_ISNS_ERROR);
+				goto error;
+			}
 		}
 	}
 
+	/*
+	 * Add ZVOL target to config of all targets
+	 */
+	tgt_node_add(targets_config, n);
+	n = NULL;
+
 	xml_rtn_msg(&msg, ERR_SUCCESS);
+
 error:
-	if (zfsh)
-		zfs_close(zfsh);
-	if (zh)
-		libzfs_fini(zh);
+	if (cptr)
+		free(cptr);
 	if (dataset)
 		free(dataset);
-	if (node_name)
-		free(node_name);
-	if (prop)
-		free(prop);
+	if (n)
+		tgt_node_free(n);
+
 	return (msg);
 }
 
@@ -1290,48 +1231,196 @@ error:
 	return (rval);
 }
 
-static void
-zfs_lun(tgt_node_t *l, uint64_t size, char *dataset)
+/*
+ * get_zfs_shareiscsi -- given a dataset, get the ZFS properties
+ *
+ * This function is called when "set shareiscsi=on" calles into libiscsitgt,
+ * such that the iSCSI Target can get the ZFS_PROP_ISCSIOPTIONS. This is in
+ * lieu of properties being stored in SCF.
+ */
+int
+get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 {
-	tgt_node_t	*c;
-	int		cylinders, heads, spt, val, guid;
+	libzfs_handle_t		*zh;
+	zfs_handle_t		*zfsh;
+	const priv_set_t	*eset;
+	tgt_node_t		*c;
+	char			*prop = NULL;
+	char			*cp;	/* current pair */
+	char			*np;	/* next pair */
+	char			*vp;	/* value pointer */
+	int			status;
 
-	create_geom(size, &cylinders, &heads, &spt);
+	if (((zh = libzfs_init()) == NULL) ||
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
+		status = ERR_INTERNAL_ERROR;
+		goto error;
+	}
 
-	guid = 0;
-	c = tgt_node_alloc(XML_ELEMENT_GUID, Int, &guid);
-	tgt_node_add(l, c);
+	if (((eset = ucred_getprivset(cred, PRIV_EFFECTIVE)) != NULL)
+	    ? !priv_ismember(eset, PRIV_SYS_CONFIG)
+	    : ucred_geteuid(cred) != 0) {
+		/*
+		 * See if user has ZFS dataset permissions to do operation
+		 */
+		if (zfs_iscsi_perm_check(zh, dataset, cred) != 0) {
+			status = ERR_NO_PERMISSION;
+			goto error;
+		}
+	}
 
-	c = tgt_node_alloc(XML_ELEMENT_PID, String, DEFAULT_PID);
-	tgt_node_add(l, c);
+	/*
+	 * Get the current size of the volume, return to caller
+	 */
+	*size = zfs_prop_get_int(zfsh, ZFS_PROP_VOLSIZE);
 
-	c = tgt_node_alloc(XML_ELEMENT_VID, String, DEFAULT_VID);
-	tgt_node_add(l, c);
+	/*
+	 * Allocate a local buffer to read the ZFS properties into
+	 */
+	if ((prop = malloc(ZFS_PROP_SIZE)) == NULL) {
+		status = ERR_INTERNAL_ERROR;
+		goto error;
+	}
 
-	c = tgt_node_alloc(XML_ELEMENT_DTYPE, String, TGT_TYPE_DISK);
-	tgt_node_add(l, c);
+	/*
+	 * Get the shareiscsi property
+	 */
+	*prop = '\0';
+	if (zfs_prop_get(zfsh, ZFS_PROP_SHAREISCSI, prop, ZFS_PROP_SIZE, NULL,
+	    NULL, 0, B_TRUE)) {
+		status = ERR_INTERNAL_ERROR;
+		goto error;
+	}
 
-	val = DEFAULT_RPM;
-	c = tgt_node_alloc(XML_ELEMENT_RPM, Int, &val);
-	tgt_node_add(l, c);
+	/*
+	 * The options property is a string with name/value pairs separated
+	 * by comma characters. Stand alone values of 'on' and 'off' are
+	 * also permitted, but having the property set to off when share()
+	 * is called is an error.
+	 * Currently we only look for 'type=<value>' and ignore others.
+	 */
+	for (cp = prop; cp; cp = np) {
+		if (np = strchr(cp, ','))
+			*np++ = '\0';
+		if (strcmp(cp, "on") == 0) {
+			cp = np;
+			continue;
+		}
+		if (strcmp(cp, "off") == 0) {
+			status = ERR_INTERNAL_ERROR;
+			goto error;
+		}
+		if (vp = strchr(cp, '='))
+			*vp++ = '\0';
+		/*
+		 * Only support 'disk' emulation at this point.
+		 */
+		if ((strcmp(cp, "type") == 0) && (strcmp(vp, "disk") != 0)) {
+			status = ERR_INTERNAL_ERROR;
+			goto error;
+		}
+	}
 
-	c = tgt_node_alloc(XML_ELEMENT_HEADS, Int, &heads);
-	tgt_node_add(l, c);
+	/*
+	 * Now get the ZFS persisted shareiscsi options
+	 */
+	*prop = '\0';
+	if (zfs_prop_get(zfsh, ZFS_PROP_ISCSIOPTIONS, prop, ZFS_PROP_SIZE, NULL,
+	    NULL, 0, B_TRUE)) {
+		status = ERR_INTERNAL_ERROR;
+		goto error;
+	}
 
-	c = tgt_node_alloc(XML_ELEMENT_CYLINDERS, Int, &cylinders);
-	tgt_node_add(l, c);
+	/*
+	 * Now move the ZFS persisted shareiscsi options into XML, then into
+	 * iSCSI Target properties
+	 */
+	if (strlen(prop)) {
+		xmlTextReaderPtr xml_ptr = (xmlTextReaderPtr)xmlReaderForMemory(
+		    prop, strlen(prop), NULL, NULL, 0);
 
-	c = tgt_node_alloc(XML_ELEMENT_SPT, Int, &spt);
-	tgt_node_add(l, c);
+		if (xml_ptr != NULL) {
+			*n = NULL;
+			while (xmlTextReaderRead(xml_ptr)) {
+				if (tgt_node_process(xml_ptr, n) == False) {
+					break;
+				}
+			}
 
-	val = DEFAULT_BYTES_PER;
-	c = tgt_node_alloc(XML_ELEMENT_BPS, Int, &val);
-	tgt_node_add(l, c);
+			/* Cleanup XML data */
+			xmlTextReaderClose(xml_ptr);
+			xmlFreeTextReader(xml_ptr);
+			xmlCleanupParser();
 
-	val = DEFAULT_INTERLEAVE;
-	c = tgt_node_alloc(XML_ELEMENT_INTERLEAVE, Int, &val);
-	tgt_node_add(l, c);
+			/* Assure these XML elements are tagged as in-core */
+			if (tgt_find_attr_str(*n, XML_ELEMENT_INCORE, &cp)
+			    == False) {
+				c = tgt_node_alloc(XML_ELEMENT_INCORE, String,
+				    XML_VALUE_TRUE);
+				tgt_node_add_attr(*n, c);
+			} else {
+				free(cp);
+			}
 
-	c = tgt_node_alloc(XML_ELEMENT_STATUS, String, TGT_STATUS_ONLINE);
-	tgt_node_add(l, c);
+			status = ERR_SUCCESS;
+		} else {
+			status = ERR_NULL_XML_MESSAGE;
+		}
+	} else {
+		status = ERR_NULL_XML_MESSAGE;
+	}
+
+error:
+	if (prop)
+		free(prop);
+	if (zh) {
+		if (zfsh)
+			zfs_close(zfsh);
+		libzfs_fini(zh);
+	}
+	return (status);
+}
+
+/*
+ * put_zfs_shareiscsi -- given a dataset, put the ZFS properties
+ *
+ * This function is called whenever persistence is needed to the set of
+ * iSCSI Target properties stored in ZFS_PROP_ISCSIOPTIONS. This is in lieu
+ * of properties being stored in SCF.
+ */
+int
+put_zfs_shareiscsi(char *dataset, tgt_node_t *n)
+{
+	libzfs_handle_t		*zh;
+	zfs_handle_t		*zfsh;
+	char			*prop = NULL;
+	int			status;
+
+	if (((zh = libzfs_init()) == NULL) ||
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
+		status = ERR_INTERNAL_ERROR;
+		goto error;
+	}
+
+	/*
+	 * Now store this information on the ZVOL property so that
+	 * next time we get a shareiscsi request the same data will be
+	 * used.
+	 */
+	tgt_dump2buf(n, &prop);
+	if (zfs_prop_set(zfsh, zfs_prop_to_name(ZFS_PROP_ISCSIOPTIONS), prop)) {
+		status = ERR_INTERNAL_ERROR;
+	} else {
+		status = ERR_SUCCESS;
+	}
+
+error:
+	if (prop)
+		free(prop);
+	if (zh) {
+		if (zfsh)
+			zfs_close(zfsh);
+		libzfs_fini(zh);
+	}
+	return (status);
 }

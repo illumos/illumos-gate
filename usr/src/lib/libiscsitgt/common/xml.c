@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,89 +78,6 @@ tgt_node_free(tgt_node_t *n)
 	}
 	node_free(n);
 
-}
-
-/*
- * []----
- * | xml_update_config -- dump out in core node tree to XML parsable file
- * |
- * | The depth argument is only used to pad the output with white space
- * | for indentation. This is meant to help the readability of the file
- * | for humans.
- * []----
- */
-static void
-xml_update_config(tgt_node_t *t, int depth, FILE *output)
-{
-	int		i;
-	tgt_node_t	*c;
-
-	if (t == NULL)
-		return;
-
-	/*
-	 * If this node has an attribute which indicates it's incore only
-	 * we don't dump it out to a file.
-	 */
-	for (c = t->x_attr; c; c = c->x_sibling)
-		if ((strcmp(c->x_name, XML_ELEMENT_INCORE) == 0) &&
-		    (strcmp(c->x_value, XML_VALUE_TRUE) == 0))
-			return;
-
-	for (i = 0; i < depth; i++)
-		(void) fprintf(output, "    ");
-	if (strcmp(t->x_name, XML_COMMENT_STR) == 0) {
-		(void) fprintf(output, "<%s%s%s>\n", XML_COMMENT_STR,
-		    t->x_value, XML_COMMENT_END);
-		return;
-	}
-	if ((t->x_child == NULL) && (t->x_value != NULL) &&
-	    (t->x_attr == NULL) &&
-	    (((depth * 4) + ((strlen(t->x_name) * 2) + 5) +
-	    strlen(t->x_value)) < 80)) {
-
-		(void) fprintf(output, "<%s>%s</%s>\n", t->x_name, t->x_value,
-		    t->x_name);
-
-	} else {
-		(void) fprintf(output, "<%s", t->x_name);
-		for (c = t->x_attr; c; c = c->x_sibling)
-			(void) fprintf(output, " %s='%s'", c->x_name,
-			    c->x_value);
-		(void) fprintf(output, ">\n");
-		if (t->x_value) {
-			for (i = 0; i < depth + 1; i++)
-				(void) fprintf(output, "    ");
-			(void) fprintf(output, "%s\n", t->x_value);
-		}
-		for (c = t->x_child; c; c = c->x_sibling)
-			xml_update_config(c, depth + 1, output);
-		for (i = 0; i < depth; i++)
-			(void) fprintf(output, "    ");
-		(void) fprintf(output, "</%s>\n", t->x_name);
-	}
-}
-
-Boolean_t
-tgt_dump2file(tgt_node_t *root, char *path)
-{
-	FILE	*output;
-
-	if ((output = fopen(path, "wb")) == NULL) {
-		syslog(LOG_ERR, "Cannot open the file: %s\n", path);
-		return (False);
-	} else {
-		xml_update_config(root, 0, output);
-		(void) fclose(output);
-
-		/*
-		 * Make sure only root can access the file since we're
-		 * optionally keeping CHAP secrets located here.
-		 */
-		(void) chmod(path, 0600);
-
-		return (True);
-	}
 }
 
 /*

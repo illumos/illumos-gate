@@ -91,7 +91,7 @@ File System Management:suser:cmd:::/usr/sbin/fsck:euid=0
 File System Management:suser:cmd:::/usr/sbin/fsdb:euid=0
 File System Management:suser:cmd:::/usr/sbin/fstyp:euid=0
 File System Management:suser:cmd:::/usr/sbin/fuser:euid=0
-File System Management:suser:cmd:::/usr/sbin/iscsitgtadm:euid=0,privs=basic
+File System Management:suser:cmd:::/usr/sbin/iscsitadm:euid=0,privs=basic
 File System Management:suser:cmd:::/usr/sbin/mkfile:euid=0
 File System Management:suser:cmd:::/usr/sbin/mkfs:euid=0
 File System Management:suser:cmd:::/usr/sbin/mount:uid=0

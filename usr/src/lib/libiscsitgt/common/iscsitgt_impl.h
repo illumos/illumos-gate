@@ -171,7 +171,6 @@ typedef enum val_type { Tag_String, Tag_Start, Tag_End } val_type_t;
 typedef enum xml_val_type { String, Int, Uint64 } xml_val_type_t;
 
 tgt_node_t *tgt_door_call(char *str, int smf_flags);
-Boolean_t tgt_dump2file(tgt_node_t *t, char *path);
 void tgt_dump2buf(tgt_node_t *t, char **buf);
 
 tgt_node_t *tgt_node_alloc(char *name, xml_val_type_t type, void *value);

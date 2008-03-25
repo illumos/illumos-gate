@@ -38,7 +38,6 @@
 #include <assert.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <libzfs.h>
 #include <libgen.h>
 
 #include <iscsitgt_impl.h>
@@ -50,11 +49,11 @@
 #include "isns_client.h"
 #include "mgmt_scf.h"
 
-static char *modify_target(tgt_node_t *x);
+static char *modify_target(tgt_node_t *x, ucred_t *cred);
 static char *modify_initiator(tgt_node_t *x);
 static char *modify_admin(tgt_node_t *x);
 static char *modify_tpgt(tgt_node_t *x);
-static char *modify_zfs(tgt_node_t *x);
+static char *modify_zfs(tgt_node_t *x, ucred_t *cred);
 static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
 
 /*
@@ -75,14 +74,14 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 	if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 	} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
-		reply_msg = modify_zfs(x);
+		reply_msg = modify_zfs(x, cred);
 	} else if (check_auth_modify(cred) != True) {
 		xml_rtn_msg(&reply_msg, ERR_NO_PERMISSION);
 	} else {
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = modify_target(x);
+			reply_msg = modify_target(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
 			reply_msg = modify_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ADMIN) == 0) {
@@ -102,7 +101,7 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
  * []----
  */
 static char *
-modify_target(tgt_node_t *x)
+modify_target(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL;
 	char		*name		= NULL;
@@ -123,7 +122,7 @@ modify_target(tgt_node_t *x)
 	int		fd;
 	uint64_t	val, new_lu_size, cur_lu_size;
 	struct stat	st;
-	uint32_t		isns_mods	= 0;
+	uint32_t	isns_mods	= 0;
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -135,6 +134,19 @@ modify_target(tgt_node_t *x)
 		if (strcmp(t->x_value, name) == 0) {
 			break;
 		}
+	}
+	if (t == NULL) {
+		free(name);
+		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		return (msg);
+	}
+
+	if (tgt_find_attr_str(t, XML_ELEMENT_INCORE, &m) == True) {
+		if (strcmp(m, "true") == 0) {
+			free(m);
+			return (modify_zfs(x, cred));
+		}
+		free(m);
 	}
 
 	/*
@@ -151,11 +163,6 @@ modify_target(tgt_node_t *x)
 	/* ---- Finished with these so go ahead and release the memory ---- */
 	strncpy(targ_name, name, sizeof (targ_name));
 	free(name);
-
-	if (t == NULL) {
-		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
-		return (msg);
-	}
 
 	/*
 	 * Grow the LU. We currently do not support shrinking the LU and
@@ -329,7 +336,6 @@ modify_target(tgt_node_t *x)
 
 		free(prop);
 		prop = NULL;
-
 		change_made = True;
 	}
 
@@ -624,53 +630,186 @@ error:
  * Called when someone uses the iscsitgt_is_shared() function from libiscsitgt.
  * All that
  */
-/*ARGSUSED*/
 static char *
-modify_zfs(tgt_node_t *x)
+modify_zfs(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL;
-	char		*prop		= NULL;
 	char		*dataset	= NULL;
-	libzfs_handle_t	*zh		= NULL;
-	zfs_handle_t	*zfsh		= NULL;
+	char		*prop;
+	char		*m;
 	tgt_node_t	*n		= NULL;
-
-	/*
-	 * No need to check the credentials of the user for this function.
-	 * There's no harm is allowing everyone to know whether or not
-	 * a dataset is shared.
-	 */
+	tgt_node_t	*t		= NULL;
+	tgt_node_t	*list		= NULL;
+	tgt_node_t	*c1, *c2;
+	Boolean_t	change_made	= False;
+	uint64_t	size;
+	int		status;
+	int		val;
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
 
-	if (((zh = libzfs_init()) == NULL) ||
-	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
+	/*
+	 * Check for existance of ZFS shareiscsi properties
+	 */
+	status = get_zfs_shareiscsi(dataset, &n, &size, cred);
+	if ((status != ERR_SUCCESS) && (status != ERR_NULL_XML_MESSAGE)) {
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
 		goto error;
 	}
 
-	while ((n = tgt_node_next(targets_config, XML_ELEMENT_TARG, n)) !=
-	    NULL) {
-		if (strcmp(n->x_value, dataset) == 0)
+	while ((t = tgt_node_next(targets_config, XML_ELEMENT_TARG, t))
+	    != NULL) {
+		if (strcmp(t->x_value, dataset) == 0)
 			break;
 	}
-	if (n == NULL) {
+	if (t == NULL) {
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
 		goto error;
 	}
 
-	xml_rtn_msg(&msg, ERR_SUCCESS);
+	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
+		if (prop == NULL) {
+			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
+			goto error;
+		}
+
+		/*
+		 * Validate that the Target Portal Group Tag is reasonable.
+		 */
+		val = strtoll(prop, &m, 0);
+		if ((val < TPGT_MIN) || (val > TPGT_MAX) ||
+		    ((m != NULL) && (*m != '\0'))) {
+			xml_rtn_msg(&msg, ERR_INVALID_TPGT);
+			goto error;
+		}
+
+		if ((c1 = tgt_node_alloc(XML_ELEMENT_TPGT, String, prop)) ==
+		    NULL) {
+			xml_rtn_msg(&msg, ERR_NO_MEM);
+			goto error;
+		}
+
+		/*
+		 * Due to the fact that the targets_config differs from the
+		 * ZVOL properties stored in zfs_shareiscsi, two lists need to
+		 * be updated
+		 */
+		c2 = tgt_node_dup(c1);
+		if ((list = tgt_node_next(t, XML_ELEMENT_TPGTLIST, NULL))
+		    != NULL) {
+			/*
+			 * tgt_node_replace will duplicate the child node
+			 * tgt_node_add which is used below just links it
+			 * into the tree.
+			 */
+			tgt_node_replace(list, c1, MatchBoth);
+			tgt_node_free(c1);
+		} else {
+			list = tgt_node_alloc(XML_ELEMENT_TPGTLIST, String, "");
+			if (list == NULL) {
+				xml_rtn_msg(&msg, ERR_NO_MEM);
+				goto error;
+			}
+			tgt_node_add(list, c1);
+			tgt_node_add(t, list);
+		}
+		if ((list = tgt_node_next(n, XML_ELEMENT_TPGTLIST, NULL))
+		    != NULL) {
+			/*
+			 * tgt_node_replace will duplicate the child node
+			 * tgt_node_add which is used below just links it
+			 * into the tree.
+			 */
+			tgt_node_replace(list, c2, MatchBoth);
+			tgt_node_free(c2);
+		} else {
+			list = tgt_node_alloc(XML_ELEMENT_TPGTLIST, String, "");
+			if (list == NULL) {
+				xml_rtn_msg(&msg, ERR_NO_MEM);
+				goto error;
+			}
+			tgt_node_add(list, c2);
+			tgt_node_add(n, list);
+		}
+		change_made = True;
+	}
+
+	if (tgt_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
+		if (prop == NULL) {
+			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
+			goto error;
+		}
+
+		c1 = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
+		if (c1 == NULL) {
+			xml_rtn_msg(&msg, ERR_NO_MEM);
+			goto error;
+		}
+
+		/*
+		 * Due to the fact that the targets_config differs from the
+		 * ZVOL properties stored in zfs_shareiscsi, two lists need to
+		 * be updated
+		 */
+		c2 = tgt_node_dup(c1);
+		if ((list = tgt_node_next(t, XML_ELEMENT_ACLLIST, NULL))
+		    != NULL) {
+			/*
+			 * tgt_node_replace will duplicate the child node
+			 * tgt_node_add which is used below just links it
+			 * into the tree.
+			 */
+			tgt_node_replace(list, c1, MatchBoth);
+			tgt_node_free(c1);
+		} else {
+			list = tgt_node_alloc(XML_ELEMENT_ACLLIST, String, "");
+			if (list == NULL) {
+				xml_rtn_msg(&msg, ERR_NO_MEM);
+				goto error;
+			}
+			tgt_node_add(list, c1);
+			tgt_node_add(t, list);
+		}
+		if ((list = tgt_node_next(n, XML_ELEMENT_ACLLIST, NULL))
+		    != NULL) {
+			/*
+			 * tgt_node_replace will duplicate the child node
+			 * tgt_node_add which is used below just links it
+			 * into the tree.
+			 */
+			tgt_node_replace(list, c2, MatchBoth);
+			tgt_node_free(c2);
+		} else {
+			list = tgt_node_alloc(XML_ELEMENT_ACLLIST, String, "");
+			if (list == NULL) {
+				xml_rtn_msg(&msg, ERR_NO_MEM);
+				goto error;
+			}
+			tgt_node_add(list, c2);
+			tgt_node_add(n, list);
+		}
+
+		change_made = True;
+	}
+
+	if (change_made == True) {
+		status = put_zfs_shareiscsi(dataset, n);
+		if (status != ERR_SUCCESS) {
+			xml_rtn_msg(&msg, status);
+			goto error;
+		} else {
+			xml_rtn_msg(&msg, ERR_SUCCESS);
+		}
+	} else {
+		xml_rtn_msg(&msg, ERR_SUCCESS);
+	}
 
 error:
-	if (zfsh)
-		zfs_close(zfsh);
-	if (prop)
-		free(prop);
-	if (zh)
-		libzfs_fini(zh);
+	if (n)
+		tgt_node_free(n);
 	if (dataset)
 		free(dataset);
 
@@ -716,47 +855,49 @@ char *
 update_basedir(char *name, char *prop)
 {
 	tgt_node_t	*targ	= NULL;
-	int		count	= 0;
 	char		*msg	= NULL;
-	char		*val	= NULL;
+	char		*v;
 
 	if ((prop == NULL) || (strlen(prop) == 0) || (prop[0] != '/')) {
 		xml_rtn_msg(&msg, ERR_INVALID_BASEDIR);
 		return (msg);
 	}
 
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG,
-	    targ)) != NULL) {
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
+	    != NULL) {
 		/*
-		 * If the target does not have the "in-core" attribute, or
-		 * if it does have the attribute, but is set to "false" then
-		 * count the target.
-		 * Targets that are marked as in-core simply mean that some
-		 * other entity is storing the configuration data. Since that's
-		 * the case there's no trouble in change the base directory
-		 * because nothing will be lost.
+		 * Traverse the list of configured targets, serching for any
+		 * target that is using the current base-directory. Fail the
+		 * update if found.
+		 *
+		 * The only targets that do not use the base-directory at this
+		 * time are those targets persisted in ZFS.
 		 */
-		if ((tgt_find_attr_str(targ, XML_ELEMENT_INCORE, &val) ==
-		    False) ||
-		    ((val != NULL) && (strcmp(val, XML_VALUE_TRUE) != 0))) {
-			count++;
+		if (tgt_find_attr_str(targ, XML_ELEMENT_INCORE, &v) == True) {
+			if (v != NULL) {
+				if (strcmp(v, XML_VALUE_TRUE) == 0) {
+					free(v);
+					continue;
+				}
+				free(v);
+			}
 		}
-		if (val) {
-			free(val);
-			val = NULL;
-		}
+
+		/*
+		 * Found at least one target, so fail
+		 */
+		xml_rtn_msg(&msg, ERR_VALID_TARG_EXIST);
+		return (msg);
 	}
 
-	if (target_basedir == NULL) {
-		target_basedir = strdup(prop);
-	} else if (count == 0) {
+	if (target_basedir) {
 		free(target_basedir);
-		target_basedir = strdup(prop);
-		if ((mkdir(target_basedir, 0700) != 0) && (errno != EEXIST)) {
-			xml_rtn_msg(&msg, ERR_CREATE_TARGET_DIR_FAILED);
-		}
-	} else {
-		xml_rtn_msg(&msg, ERR_VALID_TARG_EXIST);
+	}
+	target_basedir = strdup(prop);
+	if ((mkdir(target_basedir, 0700) != 0) && (errno != EEXIST)) {
+		xml_rtn_msg(&msg, ERR_CREATE_TARGET_DIR_FAILED);
+		free(target_basedir);
+		target_basedir = NULL;
 	}
 	return (msg);
 }

@@ -45,7 +45,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/ucontext.h>
-#include <libzfs.h>
 #include <assert.h>
 #include <umem.h>
 #include <time.h>
@@ -1370,11 +1369,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	tgt_node_t		*n1;
 	tgt_node_t		*targ;
 	tgt_node_t		*ll;
-	xmlTextReaderPtr	r		= NULL;
 	char			path[MAXPATHLEN];
-	int			xml_fd		= -1;
-	libzfs_handle_t		*zh;
-	zfs_handle_t		*zfsh;
 	Boolean_t		okay_to_free	= True;
 
 	bzero(&lc, sizeof (lc));
@@ -1455,12 +1450,10 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 
 	if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
 		/*
-		 * Set the targ variable back to NULL to indicate that
-		 * we don't have an incore copy of the information.
-		 * If the guid is currently 0, we'll update that value
-		 * If the guid is currently 0, we'll update that value
-		 * and update the ZFS property if targ is not NULL.
-		 * Otherwise will update parameter file.
+		 * Set the targ variable back to NULL to indicate that we don't
+		 * have an incore copy of the information. If the guid is 0,
+		 * we'll update that value and update the ZFS property if targ
+		 * is not NULL, otherwise will update parameter file.
 		 */
 		targ = NULL;
 
@@ -1500,34 +1493,22 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 			goto error;
 		}
 		if (targ != NULL) {
-			str = NULL;
-			tgt_dump2buf(targ, &str);
-
+			/*
+			 * Get the dataset for this shareiscsi target
+			 */
 			if (tgt_find_value_str(targ, XML_ELEMENT_ALIAS,
-			    &dataset) == False ||
-			    (zh = libzfs_init()) == NULL)
+			    &dataset) == False)
 				goto error;
 
-			if ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) ==
-			    NULL) {
-				libzfs_fini(zh);
-				goto error;
-			}
-
-			if (zfs_prop_set(zfsh,
-			    zfs_prop_to_name(ZFS_PROP_ISCSIOPTIONS),
-			    str) != 0) {
-				zfs_close(zfsh);
-				libzfs_fini(zh);
+			/*
+			 * Set the ZFS persisted shareiscsi options
+			 */
+			if (put_zfs_shareiscsi(dataset, targ) != ERR_SUCCESS) {
 				goto error;
 			}
 
-			zfs_close(zfsh);
-			libzfs_fini(zh);
 			free(dataset);
-			free(str);
 			dataset = NULL;
-			str = NULL;
 
 		} else if (mgmt_param_save2scf(n, local_name, lun) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
@@ -1656,12 +1637,6 @@ error:
 	cmd->c_cmd_status = STATUS_CHECK;
 	if (guid)
 		free(guid);
-	if (xml_fd != -1)
-		(void) close(xml_fd);
-	if (r) {
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
-	}
 	if (n)
 		tgt_node_free(n);
 	if (l)

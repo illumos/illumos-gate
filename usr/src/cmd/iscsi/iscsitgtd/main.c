@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -411,6 +411,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	xmlTextReaderPtr	r;
 	char			*err_rply	= NULL;
 	ucred_t			*uc		= NULL;
+	size_t			cur_space;
 
 	/*
 	 * A well written application will always give us enough space
@@ -464,20 +465,19 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 			 * Check to see if the response can fit into the
 			 * incoming argument buffer. If so, copy the response
 			 * to that buffer so that we can free the data.
-			 * If it's not big enough we'll return the pointer to
-			 * the message response and have to free the data
-			 * at another time.
+			 * If it's not big enough we'll request an updated
+			 * space message, then delete the current data, allowing
+			 * the request to be requeued again.
 			 */
-			if (strlen(msg->msg_data) < arg_size) {
+			if ((cur_space = strlen(msg->msg_data)) < arg_size) {
 				(void) strlcpy(argp, msg->msg_data, arg_size);
-				free(msg->msg_data);
 			} else {
-				space_message(&err_rply,
-				    strlen(msg->msg_data) + 1);
 				/*
 				 * err_rply will be copied to argp at the end
 				 */
+				space_message(&err_rply, cur_space + 1);
 			}
+			free(msg->msg_data);
 			queue_message_free(msg);
 		} else {
 			xml_rtn_msg(&err_rply, ERR_NULL_XML_MESSAGE);
