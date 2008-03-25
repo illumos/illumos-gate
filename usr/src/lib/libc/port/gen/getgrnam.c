@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +45,8 @@
 
 #ifdef	NSS_INCLUDE_UNSAFE
 
+extern size_t _nss_get_bufsizes(int arg);
+
 /*
  * Ye olde non-reentrant interface (MT-unsafe, caveat utor)
  */
@@ -59,40 +60,70 @@ free_grbuf(void *arg)
 }
 
 static nss_XbyY_buf_t *
-get_grbuf()
+get_grbuf(int max_buf)
 {
 	nss_XbyY_buf_t **buffer =
 	    tsdalloc(_T_GRBUF, sizeof (nss_XbyY_buf_t *), free_grbuf);
 	nss_XbyY_buf_t *b;
+	size_t	blen;
 
 	if (buffer == NULL)
 		return (NULL);
-	b = NSS_XbyY_ALLOC(buffer, sizeof (struct group), NSS_BUFLEN_GROUP);
+	if (max_buf == 0)
+		blen = _nss_get_bufsizes(0);		/* default size */
+	else
+		blen = sysconf(_SC_GETGR_R_SIZE_MAX);	/* max size */
+	if (*buffer) {
+		if ((*buffer)->buflen >= blen)	/* existing size fits */
+			return (*buffer);
+		NSS_XbyY_FREE(buffer);		/* existing is too small */
+	}
+	b = NSS_XbyY_ALLOC(buffer, sizeof (struct group), blen);
 	return (b);
 }
 
 struct group *
 getgrgid(gid_t gid)
 {
-	nss_XbyY_buf_t	*b = get_grbuf();
+	nss_XbyY_buf_t	*b = get_grbuf(0);
+	struct group *ret;
 
-	return (b == NULL ? NULL :
-	    getgrgid_r(gid, b->result, b->buffer, b->buflen));
+	if (b == NULL)
+		return (NULL);
+
+	ret = getgrgid_r(gid, b->result, b->buffer, b->buflen);
+	if (ret == NULL && errno == ERANGE) {
+		b = get_grbuf(1);
+		if (b == NULL)
+			return (NULL);
+		ret = getgrgid_r(gid, b->result, b->buffer, b->buflen);
+	}
+	return (ret);
 }
 
 struct group *
 getgrnam(const char *nam)
 {
-	nss_XbyY_buf_t	*b = get_grbuf();
+	nss_XbyY_buf_t	*b = get_grbuf(0);
+	struct group *ret;
 
-	return (b == NULL ? NULL :
-	    getgrnam_r(nam, b->result, b->buffer, b->buflen));
+	if (b == NULL)
+		return (NULL);
+
+	ret = getgrnam_r(nam, b->result, b->buffer, b->buflen);
+	if (ret == NULL && errno == ERANGE && nam != NULL) {
+		b = get_grbuf(1);
+		if (b == NULL)
+			return (NULL);
+		ret = getgrnam_r(nam, b->result, b->buffer, b->buflen);
+	}
+	return (ret);
 }
 
 struct group *
 getgrent(void)
 {
-	nss_XbyY_buf_t	*b = get_grbuf();
+	nss_XbyY_buf_t	*b = get_grbuf(1);
 
 	return (b == NULL ? NULL :
 	    getgrent_r(b->result, b->buffer, b->buflen));
@@ -101,7 +132,7 @@ getgrent(void)
 struct group *
 fgetgrent(FILE *f)
 {
-	nss_XbyY_buf_t	*b = get_grbuf();
+	nss_XbyY_buf_t	*b = get_grbuf(1);
 
 	return (b == NULL ? NULL :
 	    fgetgrent_r(f, b->result, b->buffer, b->buflen));

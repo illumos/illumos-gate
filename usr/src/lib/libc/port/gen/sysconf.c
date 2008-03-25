@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,9 @@
 #include <xti.h>
 #include "libc.h"
 #include "xpg6.h"
+
+/* from nss_common.c */
+extern size_t _nss_get_bufsizes(int);
 
 long
 sysconf(int name)
@@ -363,7 +366,7 @@ sysconf(int name)
 			return (-1L);
 
 		case _SC_GETGR_R_SIZE_MAX:
-			return ((long)NSS_BUFLEN_GROUP);
+			return ((long)_nss_get_bufsizes(_SC_GETGR_R_SIZE_MAX));
 
 		case _SC_GETPW_R_SIZE_MAX:
 			return ((long)NSS_BUFLEN_PASSWD);

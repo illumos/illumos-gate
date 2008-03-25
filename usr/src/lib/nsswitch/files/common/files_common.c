@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common code and structures used by name-service-switch "files" backends.
@@ -150,13 +150,16 @@ _nss_files_do_all(be, args, filter, func)
 	const char		*filter;
 	files_do_all_func_t	func;
 {
+	long			grlen;
 	char			*buffer;
 	int			buflen;
 	nss_status_t		res;
 
-	if (be->buf == 0 &&
-		(be->buf = malloc(be->minbuf)) == 0) {
-		return (NSS_UNAVAIL);
+	if (be->buf == 0) {
+		if ((grlen = sysconf(_SC_GETGR_R_SIZE_MAX)) > 0)
+			be->minbuf = grlen;
+		if ((be->buf = malloc(be->minbuf)) == 0)
+			return (NSS_UNAVAIL);
 	}
 	buffer = be->buf;
 	buflen = be->minbuf;
@@ -205,15 +208,26 @@ _nss_files_XY_all(be, args, netdb, filter, check)
 						/* string search */
 	files_XY_check_func	check;	/* NULL means one-shot, for getXXent */
 {
+	char			*r;
 	nss_status_t		res;
 	int	parsestat;
 	int (*func)();
 
 	if (filter != NULL && *filter == '\0')
 		return (NSS_NOTFOUND);
-	if (be->buf == 0 &&
-		(be->buf = malloc(be->minbuf)) == 0) {
-		return (NSS_UNAVAIL); /* really panic, malloc failed */
+	if (be->buf == 0 || (be->minbuf < args->buf.buflen)) {
+		if (be->minbuf < args->buf.buflen) {
+			if (be->buf == 0) {
+				be->minbuf = args->buf.buflen;
+			} else if (
+			    (r = realloc(be->buf, args->buf.buflen)) != NULL) {
+				be->buf = r;
+				be->minbuf = args->buf.buflen;
+			}
+		}
+		if (be->buf == 0 &&
+			(be->buf = malloc(be->minbuf)) == 0)
+				return (NSS_UNAVAIL);
 	}
 
 	if (check != 0 || be->f == 0) {
@@ -670,7 +684,7 @@ _nss_files_check_name_aliases(nss_XbyY_args_t *argp, const char *line,
 		/* compare with the alias name */
 		keyp = argp->key.name;
 		while (*keyp && linep < limit && !isspace(*linep) &&
-				*keyp == *linep) {
+		    *keyp == *linep) {
 			keyp++;
 			linep++;
 		}
