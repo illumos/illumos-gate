@@ -3116,14 +3116,11 @@ ipf_stack_t *ifs;
 
 	is->is_ref = 0;
 
-	if (is->is_tqehead[0] != NULL) {
-		if (fr_deletetimeoutqueue(is->is_tqehead[0]) == 0)
-			fr_freetimeoutqueue(is->is_tqehead[0], ifs);
-	}
-	if (is->is_tqehead[1] != NULL) {
-		if (fr_deletetimeoutqueue(is->is_tqehead[1]) == 0)
-			fr_freetimeoutqueue(is->is_tqehead[1], ifs);
-	}
+	if (is->is_tqehead[0] != NULL)
+		(void) fr_deletetimeoutqueue(is->is_tqehead[0]);
+
+	if (is->is_tqehead[1] != NULL)
+		(void) fr_deletetimeoutqueue(is->is_tqehead[1]);
 
 #ifdef	IPFILTER_SYNC
 	if (is->is_sync)
@@ -3176,9 +3173,7 @@ ipf_stack_t *ifs;
 			fr_delstate(is, ISL_EXPIRE, ifs);
 		}
 
-	for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifqnext) {
-		ifqnext = ifq->ifq_next;
-
+	for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifq->ifq_next) {
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
 			if (tqe->tqe_die > ifs->ifs_fr_ticks)
 				break;

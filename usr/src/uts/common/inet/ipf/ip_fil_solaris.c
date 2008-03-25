@@ -771,30 +771,29 @@ int enable;
 {
 	int error;
 
-	if (enable) {
-		if (ifs->ifs_fr_running > 0)
-			error = 0;
-		else
-			error = iplattach(ifs, ns);
-		if (error == 0) {
-			if (ifs->ifs_fr_timer_id == NULL) {
-				int hz = drv_usectohz(500000);
-
-				ifs->ifs_fr_timer_id = timeout(fr_slowtimer,
-							       (void *)ifs,
-							       hz);
-			}
-			ifs->ifs_fr_running = 1;
-		} else {
-			(void) ipldetach(ifs);
-		}
-	} else {
+	if (!enable) {
 		error = ipldetach(ifs);
 		if (error == 0)
 			ifs->ifs_fr_running = -1;
+		return (error);
 	}
 
-	return error;
+	if (ifs->ifs_fr_running > 0)
+		error = 0;
+
+	error = iplattach(ifs, ns);
+	if (error == 0) {
+		if (ifs->ifs_fr_timer_id == NULL) {
+			int hz = drv_usectohz(500000);
+
+			ifs->ifs_fr_timer_id = timeout(fr_slowtimer,
+						    (void *)ifs, hz);
+		}
+		ifs->ifs_fr_running = 1;
+	} else {
+		(void) ipldetach(ifs);
+	}
+	return (error);
 }
 
 
@@ -1482,21 +1481,19 @@ void fr_slowtimer __P((void *arg))
 {
 	ipf_stack_t *ifs = arg;
 
-	WRITE_ENTER(&ifs->ifs_ipf_global);
-	if (ifs->ifs_fr_running == -1 || ifs->ifs_fr_running == 0) {
-		ifs->ifs_fr_timer_id = timeout(fr_slowtimer, arg, drv_usectohz(500000));
+	READ_ENTER(&ifs->ifs_ipf_global);
+	if (ifs->ifs_fr_running != 1) {
+		ifs->ifs_fr_timer_id = NULL;
 		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return;
 	}
-	MUTEX_DOWNGRADE(&ifs->ifs_ipf_global);
-
 	ipf_expiretokens(ifs);
 	fr_fragexpire(ifs);
 	fr_timeoutstate(ifs);
 	fr_natexpire(ifs);
 	fr_authexpire(ifs);
 	ifs->ifs_fr_ticks++;
-	if (ifs->ifs_fr_running == -1 || ifs->ifs_fr_running == 1)
+	if (ifs->ifs_fr_running == 1)
 		ifs->ifs_fr_timer_id = timeout(fr_slowtimer, arg,
 		    drv_usectohz(500000));
 	else
