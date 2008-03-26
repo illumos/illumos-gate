@@ -529,30 +529,6 @@ mmu_init(void)
 	if ((x86_feature & X86_CX8) == 0)
 		panic("Processor does not support cmpxchg8b instruction");
 
-	/*
-	 * Initialize parameters based on the 64 or 32 bit kernels and
-	 * for the 32 bit kernel decide if we should use PAE.
-	 */
-	if (kbm_largepage_support) {
-		if (x86_feature & X86_1GPG) {
-			mmu.max_page_level = 2;
-			mmu.umax_page_level = (enable_1gpg) ? 2 : 1;
-		} else {
-			mmu.max_page_level = 1;
-			mmu.umax_page_level = 1;
-		}
-	} else {
-		mmu.max_page_level = 0;
-		mmu.umax_page_level = 0;
-	}
-	mmu_page_sizes = mmu.max_page_level + 1;
-	mmu_exported_page_sizes = mmu.umax_page_level + 1;
-
-	/* restrict legacy applications from using pagesizes 1g and above */
-	mmu_legacy_page_sizes =
-	    (mmu_exported_page_sizes > 2) ? 2 : mmu_exported_page_sizes;
-
-
 #if defined(__amd64)
 
 	mmu.num_level = 4;
@@ -594,6 +570,32 @@ mmu_init(void)
 		mmu.level_offset[i] = mmu.level_size[i] - 1;
 		mmu.level_mask[i] = ~mmu.level_offset[i];
 	}
+
+	/*
+	 * Initialize parameters based on the 64 or 32 bit kernels and
+	 * for the 32 bit kernel decide if we should use PAE.
+	 */
+	if (kbm_largepage_support) {
+
+		if ((x86_feature & X86_1GPG) &&
+		    plat_mnode_xcheck((LEVEL_SIZE(2) >> LEVEL_SHIFT(0))) == 0) {
+			mmu.max_page_level = 2;
+			mmu.umax_page_level = (enable_1gpg) ? 2 : 1;
+		} else {
+			mmu.max_page_level = 1;
+			mmu.umax_page_level = 1;
+		}
+	} else {
+		mmu.max_page_level = 0;
+		mmu.umax_page_level = 0;
+	}
+	mmu_page_sizes = mmu.max_page_level + 1;
+	mmu_exported_page_sizes = mmu.umax_page_level + 1;
+
+	/* restrict legacy applications from using pagesizes 1g and above */
+	mmu_legacy_page_sizes =
+	    (mmu_exported_page_sizes > 2) ? 2 : mmu_exported_page_sizes;
+
 
 	for (i = 0; i <= mmu.max_page_level; ++i) {
 		mmu.pte_bits[i] = PT_VALID | pt_kern;

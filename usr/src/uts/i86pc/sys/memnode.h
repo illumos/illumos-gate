@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,8 @@ extern void mem_node_pre_del_slice(pfn_t, pfn_t);
 extern void mem_node_post_del_slice(pfn_t, pfn_t, int);
 extern int mem_node_alloc(void);
 extern pgcnt_t mem_node_memlist_pages(int, struct memlist *);
+
+extern int plat_mnode_xcheck(pfn_t);
 
 extern struct mem_node_conf	mem_node_config[];
 extern uint64_t			mem_node_physalign;

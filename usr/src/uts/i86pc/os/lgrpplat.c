@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/var.h>
 #include <sys/x86_archext.h>	/* for x86_feature and X86_AMD */
+#include <sys/sysmacros.h>
 #include <vm/hat_i86.h>
 #include <vm/seg_kmem.h>
 #include <vm/vm_dep.h>
@@ -408,6 +409,70 @@ plat_mem_node_to_lgrphand(int mnode)
 		return (LGRP_DEFAULT_HANDLE);
 
 	return ((lgrp_handle_t)mnode);
+}
+
+
+/*
+ * plat_mnode_xcheck: checks the node memory ranges to see if there is a pfncnt
+ * range of pages aligned on pfncnt that crosses an node boundary. Returns 1 if
+ * a crossing is found and returns 0 otherwise.
+ */
+int
+plat_mnode_xcheck(pfn_t pfncnt)
+{
+	int	node, prevnode = -1, basenode;
+	pfn_t	ea, sa;
+
+	for (node = 0; node < lgrp_plat_node_cnt; node++) {
+
+		if (lgrp_plat_node_memory[node].exists == 0)
+			continue;
+
+		if (prevnode == -1) {
+			prevnode = node;
+			basenode = node;
+			continue;
+		}
+
+		/* assume x86 node pfn ranges are in increasing order */
+		ASSERT(lgrp_plat_node_memory[node].start >
+		    lgrp_plat_node_memory[prevnode].end);
+
+		/*
+		 * continue if the starting address of node is not contiguous
+		 * with the previous node.
+		 */
+
+		if (lgrp_plat_node_memory[node].start !=
+		    (lgrp_plat_node_memory[prevnode].end + 1)) {
+			basenode = node;
+			prevnode = node;
+			continue;
+		}
+
+		/* check if the starting address of node is pfncnt aligned */
+		if ((lgrp_plat_node_memory[node].start & (pfncnt - 1)) != 0) {
+
+			/*
+			 * at this point, node starts at an unaligned boundary
+			 * and is contiguous with the previous node(s) to
+			 * basenode. Check if there is an aligned contiguous
+			 * range of length pfncnt that crosses this boundary.
+			 */
+
+			sa = P2ALIGN(lgrp_plat_node_memory[prevnode].end,
+			    pfncnt);
+			ea = P2ROUNDUP((lgrp_plat_node_memory[node].start),
+			    pfncnt);
+
+			ASSERT((ea - sa) == pfncnt);
+			if (sa >= lgrp_plat_node_memory[basenode].start &&
+			    ea <= (lgrp_plat_node_memory[node].end + 1))
+				return (1);
+		}
+		prevnode = node;
+	}
+	return (0);
 }
 
 int
