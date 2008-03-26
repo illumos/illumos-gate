@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1995-2003 by Darren Reed.
+ * Copyright (C) 1995-2004 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -190,9 +190,8 @@ static	const int	idletime_tab[] = {
 };
 
 #define NAT_HAS_L4_CHANGED(n)	\
-	(((n)->nat_flags & (IPN_TCPUDPICMP | IPN_ICMPQUERY)) && \
-	(n)->nat_inport != (n)->nat_outport)
-
+ 	(((n)->nat_flags & (IPN_TCPUDPICMP)) && \
+ 	(n)->nat_inport != (n)->nat_outport)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_natinit                                                  */
@@ -1378,7 +1377,7 @@ nat_t *nat;
 	CALC_SUMD(sum_changed, sum_orig, sumd);
 	nat->nat_sumd[1] = (sumd & 0xffff) + (sumd >> 16);
 
-	if (nat->nat_p == IPPROTO_TCP || nat->nat_p == IPPROTO_UDP) {
+	if (nat->nat_flags & (IPN_TCPUDP | IPN_ICMPQUERY)) {
 		
 		/*
 		 * switch calculates operands for CALC_SUMD(), which will
@@ -1412,6 +1411,14 @@ nat_t *nat;
 
 		CALC_SUMD(sum_orig, sum_changed, sumd);
 		nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
+
+		if (!(nat->nat_flags & IPN_TCPUDP)) {
+			/*
+			 * partial HW chksum offload works for TCP/UDP headers only,
+			 * so we need to enforce full chksum adjustment for ICMP
+			 */
+			nat->nat_sumd[1] = nat->nat_sumd[0];
+		}
 	}
 	else
 		nat->nat_sumd[0] = nat->nat_sumd[1];
@@ -1434,6 +1441,14 @@ nat_t *nat;
 		 * for IP hdr.
 		 */
 		nat->nat_ipsumd = nat->nat_sumd[0];
+
+		/*
+		 * if L4 header does not use chkusm - zero out deltas
+		 */
+		if (!(nat->nat_flags & IPN_TCPUDPICMP)) {
+			nat->nat_sumd[0] = 0;
+			nat->nat_sumd[1] = 0;
+		}
 	}
 
 	return;
