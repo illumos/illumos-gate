@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,6 +76,13 @@ SUNW_1.1 {
 	libhal_device_get_all_properties;
 	libhal_free_property_set;
 	libhal_property_set_get_num_elems;
+	libhal_ps_get_type;
+	libhal_ps_get_string;
+	libhal_ps_get_int32;
+	libhal_ps_get_uint64;
+	libhal_ps_get_double;
+	libhal_ps_get_bool;
+	libhal_ps_get_strlist;
 	libhal_psi_init;
 	libhal_psi_has_more;
 	libhal_psi_next;

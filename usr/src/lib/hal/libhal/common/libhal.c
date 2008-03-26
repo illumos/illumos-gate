@@ -4,6 +4,7 @@
  * libhal.c : HAL daemon C convenience library
  *
  * Copyright (C) 2003 David Zeuthen, <david@fubar.dk>
+ * Copyright (C) 2007 Codethink Ltd. Author Rob Taylor <rob.taylor@codethink.co.uk>
  *
  * Licensed under the Academic Free License version 2.1
  *
@@ -52,6 +53,25 @@
 # define _(String)
 # define N_(String) (String)
 #endif
+
+/**
+ * LIBHAL_CHECK_PARAM_VALID:
+ * @_param_: the prameter to check for 
+ * @_name_:  the name of the prameter (for debug output) 
+ * @_ret_:   what to use for return value if the prameter is NULL
+ *
+ * Handy macro for checking whether a parameter is valid and not NULL.
+ */
+#define LIBHAL_CHECK_PARAM_VALID(_param_,_name_,_ret_)				\
+	do {									\
+		if (_param_ == NULL) {						\
+			fprintf (stderr,					\
+				 "%s %d : invalid paramater. %s is NULL.\n",  	\
+				 __FILE__, __LINE__, _name_);	 		\
+			return _ret_;						\
+		}								\
+	} while(0)
+
 
 static char **libhal_get_string_array_from_iter (DBusMessageIter *iter, int *num_elements);
 
@@ -542,6 +562,184 @@ libhal_property_set_get_num_elems (LibHalPropertySet *set)
 		num_elems++;
 
 	return num_elems;
+}
+
+static LibHalProperty *
+property_set_lookup (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", NULL);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", NULL);
+
+	for (p = set->properties_head; p != NULL; p = p->next)
+		if (strcmp (key, p->key) == 0)
+			return p;
+
+	return NULL;
+}
+
+/**
+ * libhal_ps_get_type:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the type of a given property. 
+ *
+ * Returns: the #LibHalPropertyType of the given property, 
+ * LIBHAL_PROPERTY_TYPE_INVALID if property is not in the set
+ */
+LibHalPropertyType
+libhal_ps_get_type (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p = property_set_lookup (set, key);
+
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", LIBHAL_PROPERTY_TYPE_INVALID);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", LIBHAL_PROPERTY_TYPE_INVALID);
+
+	p = property_set_lookup (set, key);
+	if (p) return p->type;
+	else return LIBHAL_PROPERTY_TYPE_INVALID;
+}
+
+/**
+ * libhal_ps_get_string:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the value of a property of type string.
+ *
+ * Returns: UTF8 nul-terminated string. This pointer is only valid
+ * until libhal_free_property_set() is invoked on the property set
+ * this property belongs to. NULL if property is not in the set or not a string
+ */
+const char *
+libhal_ps_get_string  (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+	
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", NULL);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", NULL);
+
+	p = property_set_lookup (set, key);
+	if (p && p->type == LIBHAL_PROPERTY_TYPE_STRING)
+		return p->v.str_value;
+	else return NULL;
+}
+
+/**
+ * libhal_ps_get_int:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the value of a property of type signed integer. 
+ *
+ * Returns: property value (32-bit signed integer)
+ */
+dbus_int32_t
+libhal_ps_get_int32 (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+	
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", 0);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", 0);
+	
+	p = property_set_lookup (set, key);
+	if (p && p->type == LIBHAL_PROPERTY_TYPE_INT32)
+		return p->v.int_value;
+	else return 0;
+}
+
+/**
+ * libhal_ps_get_uint64:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the value of a property of type unsigned integer. 
+ *
+ * Returns: property value (64-bit unsigned integer)
+ */
+dbus_uint64_t
+libhal_ps_get_uint64 (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", 0);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", 0);
+
+	p = property_set_lookup (set, key);
+	if (p && p->type == LIBHAL_PROPERTY_TYPE_UINT64)
+		return p->v.uint64_value;
+	else return 0;
+}
+
+/**
+ * libhal_ps_get_double:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the value of a property of type double.
+ *
+ * Returns: property value (IEEE754 double precision float)
+ */
+double
+libhal_ps_get_double (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", 0.0);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", 0.0);
+
+	p = property_set_lookup (set, key);
+	if (p && p->type == LIBHAL_PROPERTY_TYPE_DOUBLE)
+		return p->v.double_value;
+	else return 0.0;
+}
+
+/**
+ * libhal_ps_get_bool:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the value of a property of type bool. 
+ *
+ * Returns: property value (bool)
+ */
+dbus_bool_t
+libhal_ps_get_bool (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", FALSE);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
+	
+	p = property_set_lookup (set, key);
+	if (p && p->type == LIBHAL_PROPERTY_TYPE_BOOLEAN)
+		return p->v.bool_value;
+	else return FALSE;
+}
+
+/**
+ * libhal_ps_get_strlist:
+ * @set: property set
+ * @key: name of property to inspect
+ *
+ * Get the value of a property of type string list. 
+ *
+ * Returns: pointer to array of strings, this is owned by the property set
+ */
+const char *const *
+libhal_ps_get_strlist (const LibHalPropertySet *set, const char *key)
+{
+	LibHalProperty *p;
+
+	LIBHAL_CHECK_PARAM_VALID(set, "*set", NULL);
+	LIBHAL_CHECK_PARAM_VALID(key, "*key", NULL);
+	
+	p = property_set_lookup (set, key);
+	if (p && p->type == LIBHAL_PROPERTY_TYPE_STRLIST)
+		return (const char *const *) p->v.strlist_value;
+	else return NULL;
 }
 
 

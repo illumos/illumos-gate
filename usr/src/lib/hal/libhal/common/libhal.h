@@ -4,6 +4,7 @@
  * libhal.h : HAL daemon C convenience library headers
  *
  * Copyright (C) 2003 David Zeuthen, <david@fubar.dk>
+ * Copyright (C) 2007 Codethink Ltd. Author Rob Taylor <rob.taylor@codethink.co.uk>
  *
  * Licensed under the Academic Free License version 2.1
  *
@@ -417,6 +418,28 @@ void libhal_free_property_set (LibHalPropertySet *set);
 
 /* Get the number of properties in a property set. */
 unsigned int libhal_property_set_get_num_elems (LibHalPropertySet *set);
+
+/* Get type of property. */
+LibHalPropertyType libhal_ps_get_type (const LibHalPropertySet *set, const char *key);
+
+/* Get the value of a property of type string. */
+const char *libhal_ps_get_string  (const LibHalPropertySet *set, const char *key);
+
+/* Get the value of a property of type signed integer. */
+dbus_int32_t libhal_ps_get_int32 (const LibHalPropertySet *set, const char *key);
+
+/* Get the value of a property of type unsigned integer. */
+dbus_uint64_t libhal_ps_get_uint64 (const LibHalPropertySet *set, const char *key);
+
+/* Get the value of a property of type double. */
+double libhal_ps_get_double (const LibHalPropertySet *set, const char *key);
+
+/* Get the value of a property of type bool. */
+dbus_bool_t libhal_ps_get_bool (const LibHalPropertySet *set, const char *key);
+
+/* Get the value of a property of type string list. */
+const char * const *libhal_ps_get_strlist (const LibHalPropertySet *set, const char *key);
+
 
 /** 
  * LibHalPropertySetIterator: 
