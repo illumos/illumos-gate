@@ -183,6 +183,30 @@ smb_usr_ioc2sharespec(struct smbioc_oshare *dp, struct smb_sharespec *spec)
 }
 
 int
+smb_usr_findvc(struct smbioc_lookup *dp, struct smb_cred *scred,
+	struct smb_vc **vcpp)
+{
+	struct smb_vc *vcp = NULL;
+	struct smb_vcspec *vspec = NULL;
+	int error = 0;
+
+	if (dp->ioc_flags & SMBLK_CREATE)
+		return (EINVAL);
+	if (dp->ioc_level != SMBL_VC)
+		return (EINVAL);
+	vspec = kmem_zalloc(sizeof (struct smb_vcspec), KM_SLEEP);
+	error = smb_usr_ioc2vcspec(&dp->ioc_ssn, vspec);
+	if (error)
+		goto out;
+	error = smb_sm_findvc(vspec, scred, &vcp);
+	if (error == 0)
+		*vcpp =  vcp;
+out:
+	smb_usr_vcspec_free(vspec);
+	return (error);
+}
+
+int
 smb_usr_negotiate(struct smbioc_lookup *dp, struct smb_cred *scred,
 	struct smb_vc **vcpp)
 {

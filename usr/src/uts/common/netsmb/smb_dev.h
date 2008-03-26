@@ -77,9 +77,9 @@
  * make them incompatible with an old driver.
  */
 #define	NSMB_VERMAJ	1
-#define	NSMB_VERMIN	3500
+#define	NSMB_VERMIN	3600
 #define	NSMB_VERSION	(NSMB_VERMAJ * 100000 + NSMB_VERMIN)
-#define	NSMB_VER_STR "1.35"
+#define	NSMB_VER_STR "1.36"
 
 #define	NSMBFL_OPEN		0x0001
 #define	NSMBFL_NEWVC		0x0002
@@ -358,6 +358,7 @@ typedef enum nsmb_ioc {
 	SMBIOC_LOOKUP,
 	SMBIOC_READ,
 	SMBIOC_WRITE,
+	SMBIOC_FINDVC,
 	SMBIOC_NEGOTIATE,
 	SMBIOC_SSNSETUP,
 	SMBIOC_TCON,
@@ -402,6 +403,8 @@ typedef struct smb_dev {
 /*
  * Compound user interface
  */
+int smb_usr_findvc(struct smbioc_lookup *dp, struct smb_cred *scred,
+	struct smb_vc **vcpp);
 int  smb_usr_negotiate(struct smbioc_lookup *dp, struct smb_cred *scred,
 	struct smb_vc **vcpp);
 int  smb_usr_ssnsetup(struct smbioc_lookup *dp, struct smb_cred *scred,

@@ -1049,6 +1049,14 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	bcopy(salocal, &ssn->ioc_local.nb,
 	    sizeof (struct sockaddr_nb));
 
+	error = smb_ctx_findvc(ctx, SMBL_VC, 0);
+	if (error == 0) {
+		/* re-use and existing VC */
+		ctx->ct_flags |= SMBCF_RESOLVED | SMBCF_SSNACTIVE;
+		return (0);
+	}
+
+	/* Make a new connection via smb_ctx_negotiate()... */
 	error = smb_ctx_negotiate(ctx, SMBL_SHARE, SMBLK_CREATE,
 	    ssn->ioc_workgroup);
 	if (error)
@@ -1251,6 +1259,24 @@ out:
 	return (rc);
 }
 
+int
+smb_ctx_findvc(struct smb_ctx *ctx, int level, int flags)
+{
+	struct smbioc_lookup	rq;
+	int	error = 0;
+
+	if ((error = smb_ctx_gethandle(ctx)))
+		return (error);
+
+	bzero(&rq, sizeof (rq));
+	bcopy(&ctx->ct_ssn, &rq.ioc_ssn, sizeof (struct smbioc_ossn));
+	bcopy(&ctx->ct_sh, &rq.ioc_sh, sizeof (struct smbioc_oshare));
+
+	rq.ioc_flags = flags;
+	rq.ioc_level = level;
+
+	return (smb_ctx_ioctl(ctx, SMBIOC_FINDVC, &rq));
+}
 
 /*
  * adds a GSSAPI wrapper

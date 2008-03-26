@@ -256,6 +256,7 @@ int  smb_ctx_setworkgroup(struct smb_ctx *, const char *, int);
 int  smb_ctx_setpassword(struct smb_ctx *, const char *, int);
 int  smb_ctx_setsrvaddr(struct smb_ctx *, const char *);
 int  smb_ctx_opt(struct smb_ctx *, int, const char *);
+int  smb_ctx_findvc(struct smb_ctx *, int, int);
 int  smb_ctx_negotiate(struct smb_ctx *, int, int, char *);
 int  smb_ctx_tdis(struct smb_ctx *ctx);
 int  smb_ctx_lookup(struct smb_ctx *, int, int);

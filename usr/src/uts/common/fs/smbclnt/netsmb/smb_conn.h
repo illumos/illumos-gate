@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -421,6 +421,8 @@ int  smb_sm_init(void);
 int  smb_sm_idle(void);
 void smb_sm_done(void);
 
+int  smb_sm_findvc(struct smb_vcspec *vcspec,
+	struct smb_cred *scred,	struct smb_vc **vcpp);
 int  smb_sm_negotiate(struct smb_vcspec *vcspec,
 	struct smb_cred *scred,	struct smb_vc **vcpp);
 int  smb_sm_ssnsetup(struct smb_vcspec *vcspec,

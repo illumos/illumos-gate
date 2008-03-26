@@ -447,6 +447,36 @@ nsmb_ioctl(dev_t dev,
 			    SMBIOC_RW_COPYOUT_SIZE, mode);
 			break;
 
+		case SMBIOC_FINDVC:
+			/* Should be no VC and no share */
+			if (sdp->sd_vc || sdp->sd_share) {
+				error = EISCONN;
+				break;
+			}
+			sioc = kmem_alloc(sizeof (*sioc), KM_SLEEP);
+			if (ddi_copyin((void *)arg, sioc,
+			    sizeof (*sioc), mode)) {
+				error = EFAULT;
+				break;
+			}
+			vcp = NULL;
+			ssp = NULL;
+			error = smb_usr_findvc(sioc, &scred, &vcp);
+			if (error)
+				break;
+			if (vcp) {
+				/*
+				 * The VC has a hold from _findvc
+				 * which we keep until nsmb_close().
+				 */
+				sdp->sd_level = SMBL_VC;
+				sdp->sd_vc = vcp;
+			}
+			(void) ddi_copyout(sioc, (void *)arg,
+			    SMBIOC_LOOK_COPYOUT_SIZE, mode);
+
+			break;
+
 		case SMBIOC_NEGOTIATE:
 			/* Should be no VC (and no share) */
 			if (sdp->sd_vc || sdp->sd_share) {
@@ -735,6 +765,7 @@ nsmb_ioctl(dev_t dev,
 	if (rwrq)
 		kmem_free(rwrq, sizeof (*rwrq));
 
+	/* SMBIOC_FINDVC */
 	/* SMBIOC_NEGOTIATE */
 	/* SMBIOC_SSNSETUP */
 	/* SMBIOC_TCON */

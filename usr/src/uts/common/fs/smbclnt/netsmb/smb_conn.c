@@ -198,6 +198,35 @@ smb_sm_lookupvc(
 	return (ENOENT);
 }
 
+int
+smb_sm_findvc(
+	struct smb_vcspec *vcspec,
+	struct smb_cred *scred,
+	struct smb_vc **vcpp)
+{
+	struct smb_vc *vcp;
+	int error;
+
+	*vcpp = vcp = NULL;
+
+	SMB_CO_LOCK(&smb_vclist);
+	error = smb_sm_lookupvc(vcspec, scred, &vcp);
+	SMB_CO_UNLOCK(&smb_vclist);
+
+	/* Return if smb_sm_lookupvc fails */
+	if (error != 0)
+		return (error);
+
+	/* Ingore any VC that's not active. */
+	if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
+		smb_vc_rele(vcp);
+		return (ENOENT);
+	}
+
+	/* Active VC. Return it held. */
+	*vcpp = vcp;
+	return (error);
+}
 
 int
 smb_sm_negotiate(
