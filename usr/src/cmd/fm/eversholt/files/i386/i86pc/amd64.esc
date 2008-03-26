@@ -20,7 +20,7 @@
  */
 
 /* 
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -224,14 +224,14 @@ engine stat.sbpgflt@chip/memory-controller/dimm/rank;
 engine stat.ckpgflt@chip/memory-controller/dimm/rank;
 
 event fault.memory.page_sb@chip/memory-controller/dimm/rank,
-    FITrate=PAGE_FIT, ASRU=dimm/rank, message=0,
+    FITrate=PAGE_FIT, FRU=dimm, ASRU=dimm/rank, message=0,
     count=stat.sbpgflt@chip/memory-controller/dimm/rank,
     action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
 
 #define	SB_PGFLTS (count(stat.sbpgflt@chip/memory-controller/dimm/rank))
 
 event fault.memory.page_ck@chip/memory-controller/dimm/rank,
-    FITrate=PAGE_FIT, ASRU=dimm/rank, message=0,
+    FITrate=PAGE_FIT, FRU=dimm, ASRU=dimm/rank, message=0,
     count=stat.ckpgflt@chip/memory-controller/dimm/rank,
     action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
 
@@ -434,7 +434,7 @@ event fault.memory.dimm_ue@chip/memory-controller/dimm/rank,
     action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
 
 event fault.memory.page_ue@chip/memory-controller/dimm/rank,
-    FITrate=PAGE_FIT, ASRU=dimm/rank, message=0,
+    FITrate=PAGE_FIT, FRU=dimm, ASRU=dimm/rank, message=0,
     action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
 
 event ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank{within(5s)};

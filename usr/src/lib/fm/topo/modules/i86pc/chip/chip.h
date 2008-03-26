@@ -71,9 +71,16 @@ extern "C" {
 #define	SIMPLE_DIMM_LBL		"simple_dimm_label"
 #define	SIMPLE_DIMM_LBL_MP	"simple_dimm_label_mp"
 #define	SEQ_DIMM_LBL		"seq_dimm_label"
+#define	G4_DIMM_LBL		"g4_dimm_label"
 #define	SIMPLE_CHIP_LBL		"simple_chip_label"
 #define	G4_CHIP_LBL		"g4_chip_label"
+#define	A4FPLUS_CHIP_LBL	"a4fplus_chip_label"
 #define	SIMPLE_CS_LBL_MP	"simple_cs_label_mp"
+
+/*
+ * DIMM serial number property methods
+ */
+#define	GET_DIMM_SERIAL		"get_dimm_serial"
 
 typedef struct chip {
 	kstat_ctl_t *chip_kc;
@@ -90,14 +97,23 @@ extern int simple_dimm_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
 extern int seq_dimm_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
+extern int g4_dimm_label(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
+
 extern int simple_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 extern int g4_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
+extern int a4fplus_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
 extern int simple_cs_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+
+extern int get_dimm_serial(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
 
 /*
  * Support functions of chip_subr.c
@@ -116,6 +132,8 @@ extern nvlist_t *cpu_fmri_create(topo_mod_t *, uint32_t, char *, uint8_t);
 extern nvlist_t *mem_fmri_create(topo_mod_t *, const char *);
 extern int mem_asru_compute(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+extern int rank_fmri_present(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);
 
 /*
@@ -129,6 +147,10 @@ extern void amd_mc_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *,
  */
 extern int mc_offchip_open(void);
 extern int mc_offchip_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *);
+
+extern char *get_fmtstr(topo_mod_t *, nvlist_t *);
+extern int store_prop_val(topo_mod_t *, char *, char *, nvlist_t **out);
+
 
 #ifdef __cplusplus
 }

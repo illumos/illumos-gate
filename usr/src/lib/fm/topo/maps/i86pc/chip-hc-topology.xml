@@ -48,7 +48,7 @@
 
         </set> 
         <set type='product'
-	    setlist='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2|Sun-Blade-X8440-Server-Module|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+	    setlist='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
@@ -91,6 +91,22 @@
 		            propname='label' proptype='string' >
               
                     <argval name='format' type='string' value='CPU %c' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </set> 
+        <set type='product'
+	    setlist='Sun-Blade-X8420-Server-Module|Sun-Blade-X8440-Server-Module|SUN-BLADE-X8440-SERVER-MODULE'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='a4fplus_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
 
                 </propmethod>
 
@@ -167,7 +183,7 @@
                     </propgroup>
 
                 </set> 
-                <set type='product' setlist='Sun-Fire-V20z|Sun-Fire-V40z|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E'>
+                <set type='product' setlist='Sun-Fire-V20z|Sun-Fire-V40z'>
 		    
                     <propgroup name='protocol' version='1'
                                name-stability='Private'
@@ -183,6 +199,87 @@
 			        value='forward' />
                             <argval name='dimms_per_chip' type='uint32'
 			        value='4' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='cpu%d.mem%d.vpd' />
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+
+                    </propgroup>
+                </set>
+                <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='CPU %d DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='forward' />
+                            <argval name='dimms_per_chip' type='uint32'
+			        value='4' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='p%d.d%d.fru' />
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+                </set>
+                <set type='product' setlist='Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='p%d.d%d.fru' />
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+                </set>
+                <set type='product' setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='g4_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='%s DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+
+                        </propmethod>
+                        <propmethod name='get_dimm_serial' version='0'
+			            propname='serial' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='p%d.d%d.fru' />
+                            <argval name='offset' type='uint32' value='0' />
 
                         </propmethod>
 

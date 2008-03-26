@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,8 @@
 #ifdef	sparc
 #include <sys/fm/ldom.h>
 ldom_hdl_t *mem_scheme_lhp;
+#else
+#include <fm/libtopo.h>
 #endif	/* sparc */
 
 mem_t mem;
@@ -169,6 +171,7 @@ fmd_fmri_expand(nvlist_t *nvl)
 		return (0);
 }
 
+#ifdef sparc
 static int
 serids_eq(char **serids1, uint_t nserids1, char **serids2, uint_t nserids2)
 {
@@ -184,19 +187,28 @@ serids_eq(char **serids1, uint_t nserids1, char **serids2, uint_t nserids2)
 
 	return (1);
 }
+#endif /* sparc */
 
 int
 fmd_fmri_present(nvlist_t *nvl)
 {
-	char *unum, **nvlserids, **serids;
+	char *unum = NULL;
+	int rc;
+#ifdef sparc
+	char **nvlserids, **serids;
 	uint_t nnvlserids;
 	size_t nserids;
 	uint64_t memconfig;
-	int rc;
+#else
+	struct topo_hdl *thp;
+	nvlist_t *unum_nvl;
+	int err;
+#endif /* sparc */
 
 	if (mem_fmri_get_unum(nvl, &unum) < 0)
 		return (-1); /* errno is set for us */
 
+#ifdef sparc
 	if (nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &nvlserids,
 	    &nnvlserids) != 0) {
 		/*
@@ -246,7 +258,27 @@ fmd_fmri_present(nvlist_t *nvl)
 	rc = serids_eq(serids, nserids, nvlserids, nnvlserids);
 
 	mem_strarray_free(serids, nserids);
+#else
+	/*
+	 * On X86 we will invoke the topo is_present method passing in the
+	 * unum, which is in hc scheme.  The libtopo hc-scheme is_present method
+	 * will invoke the node-specific is_present method, which is implemented
+	 * by the chip enumerator for rank nodes.  The rank node's is_present
+	 * method will compare the serial number in the unum with the current
+	 * serial to determine if the same DIMM is present.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL) {
+		fmd_fmri_warn("failed to get handle to topology");
+		return (-1);
+	}
+	if (topo_fmri_str2nvl(thp, unum, &unum_nvl, &err) == 0) {
+		rc = topo_fmri_present(thp, unum_nvl, &err);
+		nvlist_free(unum_nvl);
+	} else
+		rc = fmd_fmri_set_errno(EINVAL);
+	fmd_fmri_topo_rele(thp);
 
+#endif	/* sparc */
 	return (rc);
 }
 

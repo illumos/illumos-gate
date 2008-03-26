@@ -55,6 +55,7 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 	uint8_t count, devid;
 	uint16_t sz, offset = 0;
 	ipmi_fru_read_t cmd_data_in;
+	char *tmp;
 
 	devid = fru_loc->_devid_or_slaveaddr._logical._is_fl_devid;
 	/*
@@ -76,7 +77,7 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 	}
 
 	(void) memcpy(&sz, resp->ic_data, sizeof (uint16_t));
-	if ((*buf = malloc(sz)) == NULL) {
+	if ((tmp = malloc(sz)) == NULL) {
 		(void) ipmi_set_error(ihp, EIPMI_NOMEM, NULL);
 		return (-1);
 	}
@@ -96,18 +97,22 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 		cmd.ic_dlen = sizeof (ipmi_fru_read_t);
 		cmd.ic_lun = 0;
 
-		if ((resp = ipmi_send(ihp, &cmd)) == NULL)
+		if ((resp = ipmi_send(ihp, &cmd)) == NULL) {
+			free(tmp);
 			return (-1);
+		}
 
 		(void) memcpy(&count, resp->ic_data, sizeof (uint8_t));
 		if (count != cmd_data_in.ifr_count) {
 			(void) ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH,
 			    NULL);
+			free(tmp);
 			return (-1);
 		}
-		(void) memcpy((*buf)+offset, (char *)(resp->ic_data)+1, count);
+		(void) memcpy(tmp+offset, (char *)(resp->ic_data)+1, count);
 		offset += count;
 	}
+	*buf = tmp;
 	return (sz);
 }
 
@@ -136,35 +141,35 @@ ipmi_fru_parse_product(ipmi_handle_t *ihp, char *fru_area,
 	tmp = fru_area + (fru_hdr.ifh_product_info_off * 8) + 3;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifpi_manuf_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1,
 	    buf->ifpi_product_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifpi_part_number);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1,
 	    buf->ifpi_product_version);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1,
 	    buf->ifpi_product_serial);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifpi_asset_tag);
 
 	return (0);
@@ -202,23 +207,23 @@ ipmi_fru_parse_board(ipmi_handle_t *ihp, char *fru_area,
 	tmp += 3;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifbi_manuf_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifbi_board_name);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1,
 	    buf->ifbi_product_serial);
 	tmp += len + 1;
 
 	(void) memcpy(&typelen, tmp, sizeof (uint8_t));
-	len = BITX(typelen, 4, 0);
+	len = BITX(typelen, 5, 0);
 	ipmi_decode_string((typelen >> 6), len, tmp+1, buf->ifbi_part_number);
 
 	return (0);

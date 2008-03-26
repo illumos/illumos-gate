@@ -1684,7 +1684,7 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
 	fmd_module_t *mp;
 	topo_hdl_t *thp;
 	nvlist_t *nvl;
-	char *loc = NULL;
+	char *loc = NULL, *serial = NULL;
 	int err;
 
 	mp = fmd_api_module_lock(hdl);
@@ -1698,6 +1698,21 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
 	 */
 	(void) topo_fmri_label(thp, fru, &loc, &err);
 
+	/*
+	 * In some cases, serial information for the resource will not be
+	 * available at enumeration but may instead be available by invoking
+	 * a dynamic property method on the FRU.  In order to ensure the serial
+	 * number is persisted properly in the ASRU cache, we'll fetch the
+	 * property, if it exists, and add it to the resource and fru fmris.
+	 */
+	if (fru != NULL) {
+		(void) topo_fmri_serial(thp, fru, &serial, &err);
+		if (serial != NULL) {
+			(void) nvlist_add_string(rsrc, "serial", serial);
+			(void) nvlist_add_string(fru, "serial", serial);
+			topo_hdl_strfree(thp, serial);
+		}
+	}
 	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, loc);
 
 	if (loc != NULL)

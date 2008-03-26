@@ -40,6 +40,7 @@ SUNWprivate {
 	topo_fmri_label;
 	topo_fmri_nvl2str;
 	topo_fmri_present;
+	topo_fmri_serial;
 	topo_fmri_setprop;
 	topo_fmri_str2nvl;
 	topo_fmri_unusable;

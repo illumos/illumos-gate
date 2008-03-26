@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +32,14 @@
 #include <string.h>
 #include <strings.h>
 #include <libnvpair.h>
+#include <kstat.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <fm/topo_mod.h>
 
 #define	BUFSZ	128
 
-static char *
+char *
 get_fmtstr(topo_mod_t *mod, nvlist_t *in)
 {
 	char *fmtstr;
@@ -61,7 +63,7 @@ get_fmtstr(topo_mod_t *mod, nvlist_t *in)
 	return (fmtstr);
 }
 
-static int
+int
 store_prop_val(topo_mod_t *mod, char *buf, char *propname, nvlist_t **out)
 {
 	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0) {
@@ -471,6 +473,110 @@ g4_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 }
 
 /*
+ * Utility function used by a4fplus_chip_label to determine the number of chips
+ * (as opposed to processors) that are installed in the system by dividing the
+ * number of installed processors (cores) by the number of cores per chip
+ * (from kstat).  This assumes that an an A4F+ blade won't have some weird
+ * configuration of mixed chip models with differing numbers of cores per chip,
+ * which I think is a relatively safe assumption here.
+ */
+static int
+get_num_chips(topo_mod_t *mod)
+{
+	kstat_t *ksp;
+	kstat_ctl_t *kctl;
+	kstat_named_t *k;
+
+	if ((kctl = kstat_open()) == NULL) {
+		topo_mod_dprintf(mod, NULL, "kstat_open failed (%s)\n",
+		    strerror(errno));
+		return (-1);
+	}
+	if ((ksp = kstat_lookup(kctl, "cpu_info", -1, NULL)) == NULL) {
+		topo_mod_dprintf(mod, NULL, "kstat_lookup failed (%s)\n",
+		    strerror(errno));
+		(void) kstat_close(kctl);
+		return (-1);
+	}
+	if (kstat_read(kctl, ksp, NULL) < 0) {
+		topo_mod_dprintf(mod, NULL, "kstat_read failed (%s)\n",
+		    strerror(errno));
+		(void) kstat_close(kctl);
+		return (-1);
+	}
+	if ((k = kstat_data_lookup(ksp, "ncore_per_chip")) == NULL) {
+		topo_mod_dprintf(mod, NULL, "kstat_data_lookup failed (%s)\n",
+		    strerror(errno));
+		(void) kstat_close(kctl);
+		return (-1);
+	}
+	(void) kstat_close(kctl);
+	return (sysconf(_SC_NPROCESSORS_CONF) / k->value.l);
+}
+
+/*
+ * This is a custom property method for generating the CPU slot label for the
+ * Andromeda Fplus platforms.
+ *
+ * format:	a string containing a printf-like format with a single %d token
+ *              which this method computes
+ *
+ *              i.e.: CPU %d
+ */
+/* ARGSUSED */
+int
+a4fplus_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *fmtstr, buf[BUFSZ];
+	int num_nodes;
+
+	topo_mod_dprintf(mod, "a4fplus_chip_label() called\n");
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	/*
+	 * Normally we'd figure out the total number of chip nodes by looking
+	 * at the CoherentNodes property.  However, due to the lack of a memory
+	 * controller driver for family 0x10, this property wont exist on the
+	 * chip nodes on A4Fplus.
+	 */
+	if ((num_nodes = get_num_chips(mod)) < 0) {
+		topo_mod_dprintf(mod, "Failed to determine number of chip "
+		    "nodes\n");
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+	switch (num_nodes) {
+		case (2):
+			/* LINTED: E_SEC_PRINTF_VAR_FMT */
+			(void) snprintf(buf, BUFSZ, fmtstr,
+			    topo_node_instance(node) + 2);
+			break;
+		case (4):
+			/* LINTED: E_SEC_PRINTF_VAR_FMT */
+			(void) snprintf(buf, BUFSZ, fmtstr,
+			    topo_node_instance(node));
+			break;
+		default:
+			topo_mod_dprintf(mod, "Invalid number of chip nodes:"
+			    " %d\n", num_nodes);
+			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+
+	if (store_prop_val(mod, buf, "label", out) != 0) {
+		topo_mod_dprintf(mod, "Failed to set label\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
  * This is a somewhat generic property method for labelling the chip-select
  * nodes on multi-socket AMD family 0x10 platforms.  This is necessary because
  * these platforms are not supported by the current AMD memory controller driver
@@ -533,6 +639,64 @@ simple_cs_label_mp(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	/* LINTED: E_SEC_PRINTF_VAR_FMT */
 	(void) snprintf(buf, BUFSZ, fmtstr, topo_node_instance(chip),
 	    dimm_num);
+
+	if (store_prop_val(mod, buf, "label", out) != 0) {
+		topo_mod_dprintf(mod, "Failed to set label\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+int
+g4_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *fmtstr, *chip_lbl, buf[BUFSZ];
+	tnode_t *chip;
+	int ret, err = 0;
+	uint32_t offset;
+	nvlist_t *args;
+
+	topo_mod_dprintf(mod, "g4_dimm_label() called\n");
+
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	/*
+	 * The 4600/4600M2 have a weird way of labeling the chip nodes, so
+	 * instead of trying to recompute it, we'll simply look it up and
+	 * prepend it to our dimm label.
+	 */
+	chip = topo_node_parent(topo_node_parent(node));
+	if (topo_prop_get_string(chip, TOPO_PGROUP_PROTOCOL, "label", &chip_lbl,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup label prop on %s=%d\n",
+		    topo_node_name(chip), topo_node_instance(chip),
+		    topo_strerror(err));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) snprintf(buf, BUFSZ, fmtstr, chip_lbl,
+	    (topo_node_instance(node) + offset));
+
+	topo_mod_strfree(mod, chip_lbl);
 
 	if (store_prop_val(mod, buf, "label", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set label\n");

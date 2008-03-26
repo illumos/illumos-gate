@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ extern int topo_fmri_asru(topo_hdl_t *, nvlist_t *, nvlist_t **, int *);
 extern int topo_fmri_fru(topo_hdl_t *, nvlist_t *, nvlist_t **,
     int *);
 extern int topo_fmri_label(topo_hdl_t *, nvlist_t *, char **, int *);
+extern int topo_fmri_serial(topo_hdl_t *, nvlist_t *, char **, int *);
 extern int topo_fmri_compare(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
 
 /*

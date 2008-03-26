@@ -20,7 +20,7 @@
  */
 
 /* 
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -315,6 +315,7 @@ event ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller{within(12s)};
 event fault.memory.intel.page_ue@
     motherboard/memory-controller/dram-channel/dimm/rank,
     FITrate=PAGE_FIT,
+    FRU=motherboard/memory-controller/dram-channel/dimm,
     ASRU=motherboard/memory-controller/dram-channel/dimm/rank, message=0,
     action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
 event ereport.memory.page_ue_trip@motherboard/memory-controller{within(12s)};
@@ -442,6 +443,7 @@ event upset.memory.intel.page_ce@
 event fault.memory.intel.page_ce@
     motherboard/memory-controller/dram-channel/dimm/rank,
     FITrate=PAGE_FIT,
+    FRU=motherboard/memory-controller/dram-channel/dimm,
     ASRU=motherboard/memory-controller/dram-channel/dimm/rank, message=0,
     count=stat.ce_pgflt@motherboard/memory-controller/dram-channel/dimm,
     action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */

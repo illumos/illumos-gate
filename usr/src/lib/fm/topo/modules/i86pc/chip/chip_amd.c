@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,10 @@ static const topo_method_t dimm_methods[] = {
 	    TOPO_STABILITY_INTERNAL, simple_dimm_label_mp},
 	{ SEQ_DIMM_LBL, "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, seq_dimm_label},
+	{ G4_DIMM_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, g4_dimm_label},
+	{ GET_DIMM_SERIAL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, get_dimm_serial},
 	{ NULL }
 };
 
@@ -72,6 +76,9 @@ static const topo_method_t rank_methods[] = {
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
 	    mem_asru_compute },
+	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC,
+	    TOPO_METH_PRESENT_VERSION, TOPO_STABILITY_INTERNAL,
+	    rank_fmri_present },
 	{ NULL }
 };
 
@@ -391,7 +398,7 @@ amd_dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		}
 
 		if (topo_method_register(mod, dimmnode, dimm_methods) < 0)
-			whinge(mod, &nerr, "dimm_create: "
+			whinge(mod, &nerr, "amd_dimm_create: "
 			    "topo_method_register failed");
 
 		/*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -393,6 +393,29 @@ topo_fmri_label(topo_hdl_t *thp, nvlist_t *nvl, char **label, int *err)
 	if ((*label = topo_hdl_strdup(thp, lp)) == NULL)
 		return (set_error(thp, ETOPO_PROP_NOMEM, err, "topo_fmri_label",
 		    prop));
+
+	nvlist_free(prop);
+
+	return (0);
+}
+
+int
+topo_fmri_serial(topo_hdl_t *thp, nvlist_t *nvl, char **serial, int *err)
+{
+	nvlist_t *prop = NULL;
+	char *sp;
+
+	if (fmri_prop(thp, nvl, TOPO_PGROUP_PROTOCOL, FM_FMRI_HC_SERIAL_ID,
+	    NULL, &prop, err) < 0)
+		return (set_error(thp, *err, err, "topo_fmri_serial", NULL));
+
+	if (nvlist_lookup_string(prop, TOPO_PROP_VAL_VAL, &sp) != 0)
+		return (set_error(thp, ETOPO_PROP_NVL, err, "topo_fmri_serial",
+		    prop));
+
+	if ((*serial = topo_hdl_strdup(thp, sp)) == NULL)
+		return (set_error(thp, ETOPO_PROP_NOMEM, err,
+		    "topo_fmri_serial", prop));
 
 	nvlist_free(prop);
 
