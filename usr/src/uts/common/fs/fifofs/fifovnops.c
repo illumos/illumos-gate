@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1636,12 +1636,15 @@ fifo_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 	/*
 	 * remove fifo from fifo list so that no other process
 	 * can grab it.
+	 * Drop the reference count on the fifo node's
+	 * underlying vfs.
 	 */
 	if (fnp->fn_realvp) {
 		(void) fiforemove(fnp);
 		mutex_exit(&ftable_lock);
 		(void) fifo_fsync(vp, FSYNC, crp, ct);
 		VN_RELE(fnp->fn_realvp);
+		VFS_RELE(vp->v_vfsp);
 		vp->v_vfsp = NULL;
 	} else
 		mutex_exit(&ftable_lock);

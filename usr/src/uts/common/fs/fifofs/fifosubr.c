@@ -468,13 +468,17 @@ fifovp(vnode_t *vp, cred_t *crp)
 
 	newvp = FTOV(fnp);
 	fifo_reinit_vp(newvp);
-
 	/*
-	 * Store the'generic' fifovfs pointer in the fifo vnode.
-	 * It gets used in the VOPSTATS macros for accounting IO.
+	 * Since the fifo vnode's v_vfsp needs to point to the
+	 * underlying filesystem's vfsp we need to bump up the
+	 * underlying filesystem's vfs reference count.
+	 * The count is decremented when the fifo node is
+	 * inactivated.
 	 */
-	newvp->v_vfsp = fifovfsp;
-	newvp->v_rdev = fifodev;
+
+	VFS_HOLD(vp->v_vfsp);
+	newvp->v_vfsp = vp->v_vfsp;
+	newvp->v_rdev = vp->v_rdev;
 	newvp->v_flag |= (vp->v_flag & VROOT);
 
 	fifoinsert(fnp);
