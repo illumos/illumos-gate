@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1127,12 +1127,10 @@ hat_swapout(hat_t *hat)
 
 		/*
 		 * If the page table is shared skip its entire range.
-		 * This code knows that only level 0 page tables are shared
 		 */
 		l = ht->ht_level;
 		if (ht->ht_flags & HTABLE_SHARED_PFN) {
-			ASSERT(l == 0);
-			vaddr = ht->ht_vaddr + LEVEL_SIZE(1);
+			vaddr = ht->ht_vaddr + LEVEL_SIZE(l + 1);
 			htable_release(ht);
 			ht = NULL;
 			continue;
