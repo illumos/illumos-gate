@@ -149,6 +149,7 @@ static	char	*local_patches[] = {
 	"23321 [perl #31459] Bug in read()",
 	"27722 perlio.c breaks on Solaris/gcc when > 256 FDs are available",
  	"SPRINTF0 - fixes for sprintf formatting issues - CVE-2005-3962",
+	"6663288 Upgrade to CGI.pm 3.33",
 	NULL
 };
 

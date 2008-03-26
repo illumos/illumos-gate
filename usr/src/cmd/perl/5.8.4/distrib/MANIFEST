@@ -793,12 +793,14 @@ lib/CGI/eg/save_state.cgi
 lib/CGI/eg/tryit.cgi
 lib/CGI/eg/wilogo_gif.uu
 lib/CGI/t/apache.t
+lib/CGI/t/can.t
 lib/CGI/t/carp.t
 lib/CGI/t/cookie.t
 lib/CGI/t/fast.t
 lib/CGI/t/form.t
 lib/CGI/t/function.t
 lib/CGI/t/html.t
+lib/CGI/t/no_tabindex.t
 lib/CGI/t/pretty.t
 lib/CGI/t/push.t
 lib/CGI/t/request.t
