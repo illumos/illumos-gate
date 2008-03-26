@@ -335,7 +335,8 @@ flowoplib_fdnum(threadflow_t *threadflow, flowop_t *flowop)
 	/* Rotate the fd on each flowop invocation */
 	if (entries > (THREADFLOW_MAXFD / 2)) {
 		filebench_log(LOG_ERROR, "Out of file descriptors in flowop %s"
-		    " (too many files : %d", flowop->fo_name, entries);
+		    " (too many files : %llu",
+		    flowop->fo_name, (u_longlong_t)entries);
 		return (FILEBENCH_ERROR);
 	}
 
@@ -522,10 +523,10 @@ flowoplib_read(threadflow_t *threadflow, flowop_t *flowop)
 		    iosize, (off64_t)fileoffset)) == -1) {
 			(void) flowop_endop(threadflow, flowop, 0);
 			filebench_log(LOG_ERROR,
-			    "read file %s failed, offset %lld "
+			    "read file %s failed, offset %llu "
 			    "io buffer %zd: %s",
 			    avd_get_str(flowop->fo_fileset->fs_name),
-			    fileoffset, iobuf, strerror(errno));
+			    (u_longlong_t)fileoffset, iobuf, strerror(errno));
 			flowop_endop(threadflow, flowop, 0);
 			return (FILEBENCH_ERROR);
 		}
@@ -682,8 +683,8 @@ flowoplib_aiowrite(threadflow_t *threadflow, flowop_t *flowop)
 		aiocb->aio_reqprio = 0;
 
 		filebench_log(LOG_DEBUG_IMPL,
-		    "aio fd=%d, bytes=%lld, offset=%lld",
-		    filedesc, iosize, fileoffset);
+		    "aio fd=%d, bytes=%llu, offset=%llu",
+		    filedesc, (u_longlong_t)iosize, (u_longlong_t)fileoffset);
 
 		flowop_beginop(threadflow, flowop);
 		if (aio_write64(aiocb) < 0) {
@@ -1191,8 +1192,8 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	bytes = flowop->fo_tputbucket * -1;
 	events = (bytes / MB) + 1;
 
-	filebench_log(LOG_DEBUG_IMPL, "%lld bytes, %lld events",
-	    bytes, events);
+	filebench_log(LOG_DEBUG_IMPL, "%llu bytes, %llu events",
+	    (u_longlong_t)bytes, (u_longlong_t)events);
 
 	flowop_beginop(threadflow, flowop);
 	while (filebench_shm->eventgen_hz) {
@@ -2134,8 +2135,8 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
 		if (pwrite64(filedesc, iobuf,
 		    iosize, (off64_t)fileoffset) == -1) {
 			filebench_log(LOG_ERROR, "write failed, "
-			    "offset %lld io buffer %zd: %s",
-			    fileoffset, iobuf, strerror(errno));
+			    "offset %llu io buffer %zd: %s",
+			    (u_longlong_t)fileoffset, iobuf, strerror(errno));
 			flowop_endop(threadflow, flowop, 0);
 			return (FILEBENCH_ERROR);
 		}
@@ -2273,8 +2274,8 @@ flowoplib_appendfile(threadflow_t *threadflow, flowop_t *flowop)
 	ret = write(filedesc, iobuf, iosize);
 	if (ret != iosize) {
 		filebench_log(LOG_ERROR,
-		    "Failed to write %d bytes on fd %d: %s",
-		    iosize, filedesc, strerror(errno));
+		    "Failed to write %llu bytes on fd %d: %s",
+		    (u_longlong_t)iosize, filedesc, strerror(errno));
 		flowop_endop(threadflow, flowop, ret);
 		return (FILEBENCH_ERROR);
 	}
@@ -2338,8 +2339,8 @@ flowoplib_appendfilerand(threadflow_t *threadflow, flowop_t *flowop)
 	ret = write(filedesc, iobuf, appendsize);
 	if (ret != appendsize) {
 		filebench_log(LOG_ERROR,
-		    "Failed to write %d bytes on fd %d: %s",
-		    appendsize, filedesc, strerror(errno));
+		    "Failed to write %llu bytes on fd %d: %s",
+		    (u_longlong_t)appendsize, filedesc, strerror(errno));
 		flowop_endop(threadflow, flowop, 0);
 		return (FILEBENCH_ERROR);
 	}
@@ -2431,8 +2432,8 @@ flowoplib_testrandvar_destruct(flowop_t *flowop)
 	std_dev = sqrt((mystats->sqr_sum / dbl_count) - (mean * mean)) / mean;
 
 	filebench_log(LOG_VERBOSE,
-	    "testrandvar: ops = %lld, mean = %8.2lf, stddev = %8.2lf",
-	    mystats->sample_count, mean, std_dev);
+	    "testrandvar: ops = %llu, mean = %8.2lf, stddev = %8.2lf",
+	    (u_longlong_t)mystats->sample_count, mean, std_dev);
 	free(mystats);
 }
 

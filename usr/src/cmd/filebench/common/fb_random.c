@@ -312,9 +312,9 @@ randdist_init_one(randdist_t *rndp)
 	rndp->rnd_vint_round  = avd_get_int(rndp->rnd_round);
 
 	filebench_log(LOG_DEBUG_IMPL,
-	    "init random var %s: Mean = %6.0llf, Gamma = %6.3llf, Min = %lld",
+	    "init random var %s: Mean = %6.0llf, Gamma = %6.3llf, Min = %llu",
 	    rndp->rnd_var->var_name, rndp->rnd_dbl_mean, rndp->rnd_dbl_gamma,
-	    rndp->rnd_vint_min);
+	    (u_longlong_t)rndp->rnd_vint_min);
 
 	/* initialize distribution to apply */
 	switch (rndp->rnd_type & RAND_TYPE_MASK) {

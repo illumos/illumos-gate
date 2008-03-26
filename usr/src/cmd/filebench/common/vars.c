@@ -413,7 +413,8 @@ avd_int_alloc(fbint_t integer)
 	avd->avd_type = AVD_VAL_INT;
 	avd->avd_val.intval = integer;
 
-	filebench_log(LOG_DEBUG_IMPL, "Alloc integer %lld", integer);
+	filebench_log(LOG_DEBUG_IMPL, "Alloc integer %llu",
+	    (u_longlong_t)integer);
 
 	return (avd);
 }
@@ -676,8 +677,8 @@ var_assign_integer(char *name, fbint_t integer)
 
 	VAR_SET_INT(var, integer);
 
-	filebench_log(LOG_DEBUG_SCRIPT, "Assign integer %s=%lld",
-	    name, integer);
+	filebench_log(LOG_DEBUG_SCRIPT, "Assign integer %s=%llu",
+	    name, (u_longlong_t)integer);
 
 	return (0);
 }
@@ -826,8 +827,8 @@ var_to_string(char *name)
 	}
 
 	if (VAR_HAS_INTEGER(var)) {
-		(void) snprintf(tmp, sizeof (tmp), "%lld",
-		    var->var_val.integer);
+		(void) snprintf(tmp, sizeof (tmp), "%llu",
+		    (u_longlong_t)var->var_val.integer);
 		return (fb_stralloc(tmp));
 	}
 
@@ -950,7 +951,8 @@ var_randvar_to_string(char *name, int param_name)
 	{
 		char tmp[128];
 
-		(void) snprintf(tmp, sizeof (tmp), "%lld", value);
+		(void) snprintf(tmp, sizeof (tmp), "%llu",
+		    (u_longlong_t)value);
 		return (fb_stralloc(tmp));
 	}
 }
@@ -1002,7 +1004,8 @@ var_assign_var(char *name, char *src_name)
 	if (VAR_HAS_INTEGER(src_var)) {
 		VAR_SET_INT(dst_var, src_var->var_val.integer);
 		filebench_log(LOG_VERBOSE,
-		    "Assign var %s=%lld", name, src_var->var_val.integer);
+		    "Assign var %s=%llu",
+		    name, (u_longlong_t)src_var->var_val.integer);
 	}
 
 	if (VAR_HAS_DOUBLE(src_var)) {

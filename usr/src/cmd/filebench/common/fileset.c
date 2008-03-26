@@ -359,7 +359,8 @@ fileset_alloc_file(filesetentry_t *entry)
 	free(buf);
 
 	filebench_log(LOG_DEBUG_IMPL,
-	    "Pre-allocated file %s size %lld", path, entry->fse_size);
+	    "Pre-allocated file %s size %llu",
+	    path, (u_longlong_t)entry->fse_size);
 
 	return (0);
 }
@@ -618,9 +619,10 @@ fileset_create(fileset_t *fileset)
 			(void) snprintf(cmd, sizeof (cmd), "rm -rf %s", path);
 			(void) system(cmd);
 			filebench_log(LOG_VERBOSE,
-			    "Removed any existing %s %s in %lld seconds",
+			    "Removed any existing %s %s in %llu seconds",
 			    fileset_entity_name(fileset), fileset_name,
-			    ((gethrtime() - start) / 1000000000) + 1);
+			    (u_longlong_t)(((gethrtime() - start) /
+			    1000000000) + 1));
 		} else {
 			/* we are re-using */
 			reusing = 1;
@@ -700,11 +702,11 @@ fileset_create(fileset_t *fileset)
 
 exit:
 	filebench_log(LOG_VERBOSE,
-	    "Preallocated %d of %lld of %s %s in %lld seconds",
+	    "Preallocated %d of %llu of %s %s in %llu seconds",
 	    preallocated,
-	    fileset->fs_constentries,
+	    (u_longlong_t)fileset->fs_constentries,
 	    fileset_entity_name(fileset), fileset_name,
-	    ((gethrtime() - start) / 1000000000) + 1);
+	    (u_longlong_t)(((gethrtime() - start) / 1000000000) + 1));
 
 	return (0);
 }
@@ -981,16 +983,16 @@ fileset_populate(fileset_t *fileset)
 
 exists:
 	if (fileset->fs_attrs & FILESET_IS_FILE) {
-		filebench_log(LOG_VERBOSE, "File %s: mbytes=%lld",
+		filebench_log(LOG_VERBOSE, "File %s: mbytes=%llu",
 		    avd_get_str(fileset->fs_name),
-		    fileset->fs_bytes / 1024UL / 1024UL);
+		    (u_longlong_t)(fileset->fs_bytes / 1024UL / 1024UL));
 	} else {
-		filebench_log(LOG_VERBOSE, "Fileset %s: %lld files, "
-		    "avg dir = %d, avg depth = %.1lf, mbytes=%lld",
+		filebench_log(LOG_VERBOSE, "Fileset %s: %d files, "
+		    "avg dir = %d, avg depth = %.1lf, mbytes=%llu",
 		    avd_get_str(fileset->fs_name), entries,
 		    meandirwidth,
 		    fileset->fs_meandepth,
-		    fileset->fs_bytes / 1024UL / 1024UL);
+		    (u_longlong_t)(fileset->fs_bytes / 1024UL / 1024UL));
 	}
 	return (0);
 }
@@ -1193,17 +1195,17 @@ fileset_print(fileset_t *fileset, int first)
 			    fileset_path, fileset_name, &pad[pathlength]);
 		} else {
 			filebench_log(LOG_INFO,
-			    "%s/%s%s%9lld     (Single File)",
+			    "%s/%s%s%9llu     (Single File)",
 			    fileset_path, fileset_name, &pad[pathlength],
-			    avd_get_int(fileset->fs_size));
+			    (u_longlong_t)avd_get_int(fileset->fs_size));
 		}
 	} else {
-		filebench_log(LOG_INFO, "%s/%s%s%9lld%12lld%10lld",
+		filebench_log(LOG_INFO, "%s/%s%s%9llu%12llu%10llu",
 		    fileset_path, fileset_name,
 		    &pad[pathlength],
-		    avd_get_int(fileset->fs_size),
-		    avd_get_int(fileset->fs_dirwidth),
-		    fileset->fs_constentries);
+		    (u_longlong_t)avd_get_int(fileset->fs_size),
+		    (u_longlong_t)avd_get_int(fileset->fs_dirwidth),
+		    (u_longlong_t)fileset->fs_constentries);
 	}
 	return (0);
 }

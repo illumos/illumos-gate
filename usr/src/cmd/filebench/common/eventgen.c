@@ -104,7 +104,8 @@ eventgen_thread(void)
 		count = (filebench_shm->eventgen_hz * delta) / 1000000000;
 
 		filebench_log(LOG_DEBUG_SCRIPT,
-		    "delta %lldms count %d", delta / 1000000, count);
+		    "delta %llums count %d",
+		    (u_longlong_t)(delta / 1000000), count);
 
 		/* Send 'count' events */
 		(void) ipc_mutex_lock(&filebench_shm->eventgen_lock);

@@ -414,8 +414,9 @@ procflow_init(void)
 	int ret = 0;
 
 	filebench_log(LOG_DEBUG_IMPL,
-	    "procflow_init %s, %lld",
-	    procflow->pf_name, avd_get_int(procflow->pf_instances));
+	    "procflow_init %s, %llu",
+	    procflow->pf_name,
+	    (u_longlong_t)avd_get_int(procflow->pf_instances));
 
 #ifdef USE_PROCESS_MODEL
 	if ((ret = pthread_cond_init(&procflow_procs_created, NULL)) != 0)
@@ -458,7 +459,7 @@ procflow_wait(pid_t pid)
 
 	(void) waitpid(pid, &stat, 0);
 	while ((wpid = waitpid(getpid() * -1, &stat, WNOHANG)) > 0)
-		filebench_log(LOG_DEBUG_IMPL, "Waited for pid %lld", wpid);
+		filebench_log(LOG_DEBUG_IMPL, "Waited for pid %d", (int)wpid);
 }
 #endif
 

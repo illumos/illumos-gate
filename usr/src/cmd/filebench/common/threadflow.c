@@ -169,7 +169,7 @@ threadflow_init(procflow_t *procflow)
 
 		instances = avd_get_int(threadflow->tf_instances);
 		filebench_log(LOG_VERBOSE,
-		    "Starting %lld %s threads",
+		    "Starting %d %s threads",
 		    instances, threadflow->tf_name);
 
 		for (i = 1; i < instances; i++) {

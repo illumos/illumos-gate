@@ -214,11 +214,11 @@ io_stats_ohead(void)
 	flowstat_t *glstat = &globalstats[FLOW_TYPE_GLOBAL];
 
 	filebench_log(LOG_DEBUG_NEVER,
-	    "Computing overhead as %lld + %lld - %lld - %lld",
-	    glstat->fs_mstate[FLOW_MSTATE_OHEAD],
-	    glstat->fs_mstate[FLOW_MSTATE_CPU],
-	    iostat->fs_mstate[FLOW_MSTATE_CPU],
-	    aiostat->fs_mstate[FLOW_MSTATE_CPU]);
+	    "Computing overhead as %llu + %llu - %llu - %llu",
+	    (u_longlong_t)glstat->fs_mstate[FLOW_MSTATE_OHEAD],
+	    (u_longlong_t)glstat->fs_mstate[FLOW_MSTATE_CPU],
+	    (u_longlong_t)iostat->fs_mstate[FLOW_MSTATE_CPU],
+	    (u_longlong_t)aiostat->fs_mstate[FLOW_MSTATE_CPU]);
 
 	return ((glstat->fs_mstate[FLOW_MSTATE_OHEAD] +
 	    glstat->fs_mstate[FLOW_MSTATE_CPU] -
@@ -259,8 +259,8 @@ stats_findvar(var_t *var, char *name)
 
 		stat = iostat->fs_count + aiostat->fs_count;
 		VAR_SET_INT(var, stat);
-		filebench_log(LOG_DEBUG_IMPL, "reading stats %s = %lld",
-		    name, stat);
+		filebench_log(LOG_DEBUG_IMPL, "reading stats %s = %llu",
+		    name, (u_longlong_t)stat);
 		return (var);
 	}
 
@@ -502,9 +502,9 @@ stats_snap(void)
 #endif /* HAVE_LIBKSTAT */
 
 	filebench_log(LOG_DEBUG_IMPL,
-	    "cputime = %lld, ohead = %lld",
-	    cputime / 1000000000,
-	    io_stats_ohead() / 1000000000);
+	    "cputime = %llu, ohead = %llu",
+	    (u_longlong_t)(cputime / 1000000000),
+	    (u_longlong_t)(io_stats_ohead() / 1000000000));
 	iostat->fs_syscpu =
 	    (cputime > io_stats_ohead()) ?
 	    (cputime - io_stats_ohead()) : 0;

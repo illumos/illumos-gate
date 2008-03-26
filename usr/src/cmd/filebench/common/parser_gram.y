@@ -307,9 +307,10 @@ foreach_command: FSC_FOREACH
 		    inner_cmd != NULL;
 		    inner_cmd = inner_cmd->cmd_next) {
 			filebench_log(LOG_DEBUG_IMPL,
-			    "packing foreach: %zx %s=%lld, cmd %zx",
+			    "packing foreach: %zx %s=%llu, cmd %zx",
 			    $$, $$->cmd_tgt1,
-			    avd_get_int(list->list_integer), inner_cmd);
+			    (u_longlong_t)avd_get_int(list->list_integer),
+			    inner_cmd);
 		}
 	}
 }| foreach_command FSV_VARIABLE FSK_IN string_seplist FSK_OPENLST inner_commands FSK_CLOSELST
@@ -1826,7 +1827,8 @@ parser_eventgen(cmd_t *cmd)
 		if (attr->attr_avd) {
 			rate = avd_get_int(attr->attr_avd);
 			filebench_log(LOG_VERBOSE,
-			    "Eventgen: %lld per second", rate);
+			    "Eventgen: %llu per second",
+			    (u_longlong_t)rate);
 			eventgen_setrate(rate);
 		}
 	}
@@ -1850,8 +1852,8 @@ parser_foreach_integer(cmd_t *cmd)
 		fbint_t list_int = avd_get_int(list->list_integer);
 
 		var_assign_integer(cmd->cmd_tgt1, list_int);
-		filebench_log(LOG_VERBOSE, "Iterating %s=%lld",
-		    cmd->cmd_tgt1, list_int);
+		filebench_log(LOG_VERBOSE, "Iterating %s=%llu",
+		    cmd->cmd_tgt1, (u_longlong_t)list_int);
 		for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
 		    inner_cmd = inner_cmd->cmd_next) {
 			inner_cmd->cmd(inner_cmd);
@@ -1940,7 +1942,7 @@ parser_proc_define(cmd_t *cmd)
 		var_instances = attr->attr_avd;
 		instances = avd_get_int(var_instances);
 		filebench_log(LOG_DEBUG_IMPL,
-		    "Setting instances = %lld", instances);
+		    "Setting instances = %llu", (u_longlong_t)instances);
 	} else {
 		filebench_log(LOG_DEBUG_IMPL,
 		    "Defaulting to instances = 1");
@@ -1962,8 +1964,8 @@ parser_proc_define(cmd_t *cmd)
 			    "proc_define: priority cannot be random");
 			filebench_shutdown(1);
 		}
-		filebench_log(LOG_DEBUG_IMPL, "Setting pri = %lld",
-		    avd_get_int(attr->attr_avd));
+		filebench_log(LOG_DEBUG_IMPL, "Setting pri = %llu",
+		    (u_longlong_t)avd_get_int(attr->attr_avd));
 		procflow->pf_nice = attr->attr_avd;
 	} else
 		procflow->pf_nice = avd_int_alloc(0);
@@ -2015,8 +2017,8 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 			filebench_shutdown(1);
 		}
 		filebench_log(LOG_DEBUG_IMPL,
-		    "define thread: Setting instances = %lld",
-		    avd_get_int(attr->attr_avd));
+		    "define thread: Setting instances = %llu",
+		    (u_longlong_t)avd_get_int(attr->attr_avd));
 		instances = attr->attr_avd;
 	} else
 		instances = avd_int_alloc(1);
@@ -2029,8 +2031,8 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 			filebench_shutdown(1);
 		}
 		filebench_log(LOG_DEBUG_IMPL,
-		    "define thread: Setting memsize = %lld",
-		    avd_get_int(attr->attr_avd));
+		    "define thread: Setting memsize = %llu",
+		    (u_longlong_t)avd_get_int(attr->attr_avd));
 		template.tf_memsize = attr->attr_avd;
 	} else
 		template.tf_memsize = avd_int_alloc(0);
@@ -2587,7 +2589,7 @@ parser_pause(int ptime)
 		}
 	}
 
-	filebench_log(LOG_INFO, "Run took %lld seconds...", timeslept);
+	filebench_log(LOG_INFO, "Run took %d seconds...", timeslept);
 }
 
 /*
@@ -3119,7 +3121,7 @@ parser_statssnap(cmd_t *cmd)
 		/* Wait for cmd and all its children */
 		while ((pid = waitpid(pidlistent->pl_pid * -1, &stat, 0)) > 0)
 			filebench_log(LOG_DEBUG_IMPL,
-			"Waited for pid %lld", pid);
+			"Waited for pid %d", (int)pid);
 	}
 
 	for (pidlistent = pidlist; pidlistent != NULL;
