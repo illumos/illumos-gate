@@ -3197,13 +3197,32 @@ report_mount_progress(int current, int total)
 	(void) fflush(stdout);
 }
 
+static void
+append_options(char *mntopts, char *newopts)
+{
+	int len = strlen(mntopts);
+
+	/* original length plus new string to append plus 1 for the comma */
+	if (len + 1 + strlen(newopts) >= MNT_LINE_MAX) {
+		(void) fprintf(stderr, gettext("the opts argument for "
+		    "'%c' option is too long (more than %d chars)\n"),
+		    "-o", MNT_LINE_MAX);
+		usage(B_FALSE);
+	}
+
+	if (*mntopts)
+		mntopts[len++] = ',';
+
+	(void) strcpy(&mntopts[len], newopts);
+}
+
 static int
 share_mount(int op, int argc, char **argv)
 {
 	int do_all = 0;
 	boolean_t verbose = B_FALSE;
 	int c, ret = 0;
-	const char *options = NULL;
+	char *options = NULL;
 	int types, flags = 0;
 
 	/* check options */
@@ -3217,14 +3236,17 @@ share_mount(int op, int argc, char **argv)
 			verbose = B_TRUE;
 			break;
 		case 'o':
-			if (strlen(optarg) <= MNT_LINE_MAX) {
-				options = optarg;
-				break;
+			if (*optarg == '\0') {
+				(void) fprintf(stderr, gettext("empty mount "
+				    "options (-o) specified\n"));
+				usage(B_FALSE);
 			}
-			(void) fprintf(stderr, gettext("the opts argument for "
-			    "'%c' option is too long (more than %d chars)\n"),
-			    optopt, MNT_LINE_MAX);
-			usage(B_FALSE);
+
+			if (options == NULL)
+				options = safe_malloc(MNT_LINE_MAX + 1);
+
+			/* option validation is done later */
+			append_options(options, optarg);
 			break;
 
 		case 'O':
@@ -3396,8 +3418,7 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 	struct stat64 statbuf;
 	struct extmnttab entry;
 	const char *cmdname = (op == OP_SHARE) ? "unshare" : "unmount";
-	char nfs_mnt_prop[ZFS_MAXPROPLEN];
-	char smbshare_prop[ZFS_MAXPROPLEN];
+	ino_t path_inode;
 
 	/*
 	 * Search for the path in /etc/mnttab.  Rather than looking for the
@@ -3410,6 +3431,7 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 		    cmdname, path, strerror(errno));
 		return (1);
 	}
+	path_inode = statbuf.st_ino;
 
 	/*
 	 * Search for the given (major,minor) pair in the mount table.
@@ -3444,38 +3466,49 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 	    ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (1);
 
-	verify(zfs_prop_get(zhp, op == OP_SHARE ?
-	    ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT, nfs_mnt_prop,
-	    sizeof (nfs_mnt_prop), NULL, NULL, 0, B_FALSE) == 0);
-	verify(zfs_prop_get(zhp, op == OP_SHARE ?
-	    ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT, smbshare_prop,
-	    sizeof (smbshare_prop), NULL, NULL, 0, B_FALSE) == 0);
 
+	ret = 1;
 	if (op == OP_SHARE) {
+		char nfs_mnt_prop[ZFS_MAXPROPLEN];
+		char smbshare_prop[ZFS_MAXPROPLEN];
+
+		verify(zfs_prop_get(zhp, ZFS_PROP_SHARENFS, nfs_mnt_prop,
+		    sizeof (nfs_mnt_prop), NULL, NULL, 0, B_FALSE) == 0);
+		verify(zfs_prop_get(zhp, ZFS_PROP_SHARESMB, smbshare_prop,
+		    sizeof (smbshare_prop), NULL, NULL, 0, B_FALSE) == 0);
+
 		if (strcmp(nfs_mnt_prop, "off") == 0 &&
 		    strcmp(smbshare_prop, "off") == 0) {
 			(void) fprintf(stderr, gettext("cannot unshare "
 			    "'%s': legacy share\n"), path);
 			(void) fprintf(stderr, gettext("use "
 			    "unshare(1M) to unshare this filesystem\n"));
-			ret = 1;
 		} else if (!zfs_is_shared(zhp)) {
 			(void) fprintf(stderr, gettext("cannot unshare '%s': "
 			    "not currently shared\n"), path);
-			ret = 1;
 		} else {
 			ret = zfs_unshareall_bypath(zhp, path);
 		}
 	} else {
-		if (is_manual) {
+		char mtpt_prop[ZFS_MAXPROPLEN];
+
+		verify(zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mtpt_prop,
+		    sizeof (mtpt_prop), NULL, NULL, 0, B_FALSE) == 0);
+
+		if (stat64(entry.mnt_mountp, &statbuf) != 0) {
+			(void) fprintf(stderr, gettext("cannot %s '%s': %s\n"),
+			    cmdname, path, strerror(errno));
+		} else if (statbuf.st_ino != path_inode) {
+			(void) fprintf(stderr, gettext("cannot "
+			    "unmount '%s': not a mountpoint\n"), path);
+		} else if (is_manual) {
 			ret = zfs_unmount(zhp, NULL, flags);
-		} else if (strcmp(nfs_mnt_prop, "legacy") == 0) {
+		} else if (strcmp(mtpt_prop, "legacy") == 0) {
 			(void) fprintf(stderr, gettext("cannot unmount "
 			    "'%s': legacy mountpoint\n"),
 			    zfs_get_name(zhp));
 			(void) fprintf(stderr, gettext("use umount(1M) "
 			    "to unmount this filesystem\n"));
-			ret = 1;
 		} else {
 			ret = zfs_unmountall(zhp, flags);
 		}
