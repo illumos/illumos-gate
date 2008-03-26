@@ -2213,10 +2213,10 @@ long contig_search_failed;	/* count of contig alloc failures */
  * contiguous free pages.  Return a list of the found pages or NULL.
  */
 page_t *
-find_contig_free(uint_t npages, uint_t flags)
+find_contig_free(uint_t npages, uint_t flags, uint64_t pfnseg)
 {
 	page_t *pp, *plist = NULL;
-	mfn_t mfn, prev_mfn;
+	mfn_t mfn, prev_mfn, start_mfn;
 	pfn_t pfn;
 	int pages_needed, pages_requested;
 	int search_start;
@@ -2240,15 +2240,23 @@ retry:
 	 */
 	pages_requested = pages_needed = npages;
 	search_start = next_alloc_pfn;
-	prev_mfn = 0;
+	start_mfn = prev_mfn = 0;
 	while (pages_needed) {
 		pfn = contig_pfn_list[next_alloc_pfn];
 		mfn = pfn_to_mfn(pfn);
+		/*
+		 * Check if mfn is first one or contig to previous one and
+		 * if page corresponding to mfn is free and that mfn
+		 * range is not crossing a segment boundary.
+		 */
 		if ((prev_mfn == 0 || mfn == prev_mfn + 1) &&
-		    (pp = page_numtopp_alloc(pfn)) != NULL) {
+		    (pp = page_numtopp_alloc(pfn)) != NULL &&
+		    !((mfn & pfnseg) < (start_mfn & pfnseg))) {
 			PP_CLRFREE(pp);
 			page_io_pool_add(&plist, pp);
 			pages_needed--;
+			if (prev_mfn == 0)
+				start_mfn = mfn;
 			prev_mfn = mfn;
 		} else {
 			contig_search_restarts++;
@@ -2261,7 +2269,7 @@ retry:
 				page_free(pp, 1);
 			}
 			pages_needed = pages_requested;
-			prev_mfn = 0;
+			start_mfn = prev_mfn = 0;
 		}
 		if (++next_alloc_pfn == contig_pfn_cnt)
 			next_alloc_pfn = 0;
@@ -2609,11 +2617,11 @@ page_get_contigpages(
 		/*
 		 * We could just want unconstrained but contig pages.
 		 */
-		if (anyaddr && contig && pfnseg >= max_mfn) {
+		if (anyaddr && contig) {
 			/*
 			 * Look for free contig pages to satisfy the request.
 			 */
-			mcpl = find_contig_free(minctg, flags);
+			mcpl = find_contig_free(minctg, flags, pfnseg);
 		}
 		/*
 		 * Try the reserved io pools next
