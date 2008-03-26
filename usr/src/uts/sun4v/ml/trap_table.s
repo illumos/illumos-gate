@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,7 +182,7 @@
  */
 #define	SYSCALL_NOTT(which)		\
 	set	(which), %g1		;\
-	ba,pt	%xcc, sys_trap		;\
+	ba,pt	%xcc, user_trap		;\
 	sub	%g0, 1, %g4		;\
 	.align	32
 
