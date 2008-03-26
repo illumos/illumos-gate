@@ -1,20 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*	$OpenBSD: myproposal.h,v 1.14 2002/04/03 09:26:11 markus Exp $	*/
-
-#ifndef	_MYPROPOSAL_H
-#define	_MYPROPOSAL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-/*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,22 +21,36 @@ extern "C" {
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#define KEX_DEFAULT_KEX		"diffie-hellman-group-exchange-sha1,diffie-hellman-group1-sha1"
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	$OpenBSD: myproposal.h,v 1.14 2002/04/03 09:26:11 markus Exp $	*/
+
+#ifndef	_MYPROPOSAL_H
+#define	_MYPROPOSAL_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+#define	KEX_DEFAULT_KEX		"diffie-hellman-group-exchange-sha1," \
+				"diffie-hellman-group1-sha1"
+
 #define	KEX_DEFAULT_PK_ALG	"ssh-rsa,ssh-dss"
-#if 0
+
 #define	KEX_DEFAULT_ENCRYPT \
-	"aes128-cbc,3des-cbc,blowfish-cbc,cast128-cbc,arcfour," \
-	"aes192-cbc,aes256-cbc,rijndael-cbc@lysator.liu.se"
-#define	KEX_DEFAULT_MAC \
-	"hmac-md5,hmac-sha1,hmac-ripemd160," \
-	"hmac-ripemd160@openssh.com," \
-	"hmac-sha1-96,hmac-md5-96"
-#else
-#define	KEX_DEFAULT_ENCRYPT \
-	"aes128-ctr,aes128-cbc,arcfour,3des-cbc,blowfish-cbc"
+	"aes128-ctr,aes128-cbc,arcfour,3des-cbc,blowfish-cbc," \
+	"aes192-ctr,aes192-cbc,aes256-ctr,aes256-cbc"
+
 #define	KEX_DEFAULT_MAC \
 	"hmac-md5,hmac-sha1,hmac-sha1-96,hmac-md5-96"
-#endif
+
 #define	KEX_DEFAULT_COMP	"none,zlib"
 #define	KEX_DEFAULT_LANG	""
 

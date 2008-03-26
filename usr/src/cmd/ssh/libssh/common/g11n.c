@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,13 +274,14 @@ g11n_getlocales()
 		list[n_elems++] = xstrdup(locale);
 	}
 
+	(void) pclose(locale_out);
+
 	if (n_elems == 0) {
 		xfree(list);
 		return (NULL);
 	}
 
 	list[n_elems] = NULL;
-	(void) pclose(locale_out);
 
 	qsort(list, n_elems - 1, sizeof (char *), locale_cmp);
 	return (list);

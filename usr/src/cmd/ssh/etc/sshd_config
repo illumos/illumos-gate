@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -85,8 +85,8 @@ HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_dsa_key
 
 # Default Encryption algorithms and Message Authentication codes
-#Ciphers	aes128-ctr,aes128-cbc,arcfour,3des-cbc,blowfish-cbc
-#MACS	hmac-md5,hmac-sha1,hmac-sha1-96,hmac-md5-96
+#Ciphers   aes128-ctr,aes128-cbc,arcfour,3des-cbc,blowfish-cbc,aes192-ctr,aes192-cbc,aes256-ctr,aes256-cbc
+#MACS   hmac-md5,hmac-sha1,hmac-sha1-96,hmac-md5-96
 
 # Length of the server key
 # Default 768, Minimum 512

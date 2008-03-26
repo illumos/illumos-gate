@@ -1,8 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -38,6 +34,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #include "includes.h"
 RCSID("$OpenBSD: cipher.c,v 1.61 2002/07/12 15:50:17 markus Exp $");
 
@@ -57,10 +58,6 @@ RCSID("$OpenBSD: cipher.c,v 1.61 2002/07/12 15:50:17 markus Exp $");
 extern const EVP_CIPHER *evp_aes_128_ctr(void);
 extern void ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, u_int);
 
-#if (OPENSSL_VERSION_NUMBER < 0x00907000L)
-#include "rijndael.h"
-static const EVP_CIPHER *evp_rijndael(void);
-#endif
 static const EVP_CIPHER *evp_ssh1_3des(void);
 static const EVP_CIPHER *evp_ssh1_bf(void);
 
@@ -81,36 +78,12 @@ struct Cipher {
 	{ "cast128-cbc", 	SSH_CIPHER_SSH2, 8, 16, EVP_cast5_cbc },
 #endif /* SOLARIS_SSH_ENABLE_CAST5_128 */
 	{ "arcfour", 		SSH_CIPHER_SSH2, 8, 16, EVP_rc4 },
-#if (OPENSSL_VERSION_NUMBER < 0x00907000L)
-	{ "aes128-cbc", 	SSH_CIPHER_SSH2, 16, 16, evp_rijndael },
-#ifdef SOLARIS_SSH_ENABLE_AES192
-	{ "aes192-cbc", 	SSH_CIPHER_SSH2, 16, 24, evp_rijndael },
-#endif /* SOLARIS_SSH_ENABLE_AES192 */
-#ifdef SOLARIS_SSH_ENABLE_AES256
-	{ "aes256-cbc", 	SSH_CIPHER_SSH2, 16, 32, evp_rijndael },
-	{ "rijndael-cbc@lysator.liu.se",
-				SSH_CIPHER_SSH2, 16, 32, evp_rijndael },
-#endif /* SOLARIS_SSH_ENABLE_AES256 */
-#else
 	{ "aes128-cbc",		SSH_CIPHER_SSH2, 16, 16, EVP_aes_128_cbc },
-#ifdef SOLARIS_SSH_ENABLE_AES192
 	{ "aes192-cbc",		SSH_CIPHER_SSH2, 16, 24, EVP_aes_192_cbc },
-#endif /* SOLARIS_SSH_ENABLE_AES192 */
-#ifdef SOLARIS_SSH_ENABLE_AES256
 	{ "aes256-cbc",		SSH_CIPHER_SSH2, 16, 32, EVP_aes_256_cbc },
-	{ "rijndael-cbc@lysator.liu.se",
-				SSH_CIPHER_SSH2, 16, 32, EVP_aes_256_cbc },
-#endif /* SOLARIS_SSH_ENABLE_AES256 */
-#endif
-#if OPENSSL_VERSION_NUMBER >= 0x00905000L
         { "aes128-ctr",         SSH_CIPHER_SSH2, 16, 16, evp_aes_128_ctr },
-#ifdef SOLARIS_SSH_ENABLE_AES192
         { "aes192-ctr",         SSH_CIPHER_SSH2, 16, 24, evp_aes_128_ctr },
-#endif /* SOLARIS_SSH_ENABLE_AES192 */
-#ifdef SOLARIS_SSH_ENABLE_AES192
         { "aes256-ctr",         SSH_CIPHER_SSH2, 16, 32, evp_aes_128_ctr },
-#endif /* SOLARIS_SSH_ENABLE_AES192 */
-#endif
 	{ NULL,			SSH_CIPHER_ILLEGAL, 0, 0, NULL }
 };
 
