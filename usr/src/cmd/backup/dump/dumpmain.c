@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <limits.h>
 #include <priv_utils.h>
 #include "roll_log.h"
+#include <unistd.h>
 
 int	notify = 0;		/* notify operator flag */
 int	blockswritten = 0;	/* number of blocks written on current tape */
@@ -612,11 +613,12 @@ main(int argc, char *argv[])
 	 */
 
 	/*
-	 * Attempt to roll the log before doing the dump.  There's nothing
-	 * the user can do if we are unable to roll the log, so we'll silently
-	 * ignore failures.
+	 * Attempt to roll the log if its root user before doing the dump.
+	 * There's nothing the user can do if we are unable to roll the log,
+	 * so we'll silently ignore failures.
 	 */
-	if ((rl_roll_log(disk) != RL_SUCCESS) && (disk[0] != '/')) {
+	if (getuid() == 0 && rl_roll_log(disk) != RL_SUCCESS &&
+	    disk[0] != '/') {
 		/* Try it again with leading '/'. */
 		char	*slashed;
 
