@@ -326,7 +326,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	char 		*arname, *arpath;
 	Xword		ndx;
 	int		found, again;
-	int		allexrt = ofl->ofl_flags1 & FLG_OF1_ALLEXRT;
+	int		allexrt = (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) != 0;
 	uintptr_t	err;
 	Rej_desc	rej = { 0 };
 

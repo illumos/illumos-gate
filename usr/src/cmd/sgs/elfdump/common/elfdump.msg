@@ -148,6 +148,8 @@
 			 shdr[%d: %s].sh_size (%#llx)\n"
 @ MSG_ERR_DYNBADENTSIZE	"%s: DT_%s (%#llx) does not match \
 			 shdr[%d: %s].sh_entsize (%#llx)\n"
+@ MSG_ERR_DYNSYMVAL	"%s: %s: symbol value does not match \
+			 DT_%s entry: %s: value: %#llx\n"
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
@@ -274,7 +276,9 @@
 @ MSG_ELF_XLATETOM	"elf_xlatetom"
 @ MSG_ELF_ARSYM		"ARSYM"
 
-@ MSG_GOT_SYM		"_GLOBAL_OFFSET_TABLE_"
+@ MSG_SYM_INIT		"_init"
+@ MSG_SYM_FINI		"_fini"
+@ MSG_SYM_GOT		"_GLOBAL_OFFSET_TABLE_"
 
 @ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nPprSsT:uvw:y"
 

@@ -951,7 +951,7 @@ ld_sym_spec(Ofl_desc *ofl)
 void
 ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 {
-	Word	oflags = ofl->ofl_flags, oflags1 = ofl->ofl_flags1;
+	ofl_flag_t	oflags = ofl->ofl_flags, oflags1 = ofl->ofl_flags1;
 	Sym	*sym = sdp->sd_sym;
 
 	if ((sdp->sd_ref == REF_REL_NEED) &&
@@ -984,8 +984,7 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 				sdp->sd_flags1 |= FLG_SY1_HIDDEN;
 			}
 
-			if (ofl->ofl_flags1 &
-			    (FLG_OF1_REDLSYM | FLG_OF1_AUTOELM)) {
+			if (oflags1 & (FLG_OF1_REDLSYM | FLG_OF1_AUTOELM)) {
 				sdp->sd_flags1 |= FLG_SY1_ELIM;
 				sym->st_other = STV_ELIMINATE |
 				    (sym->st_other & ~MSK_SYM_VISIBILITY);
@@ -1089,8 +1088,8 @@ ld_sym_validate(Ofl_desc *ofl)
 	Sym_avlnode	*sav;
 	Sym_desc	*sdp;
 	Sym		*sym;
-	Word		oflags = ofl->ofl_flags;
-	Word		undef = 0, needed = 0, verdesc = 0;
+	ofl_flag_t	oflags = ofl->ofl_flags;
+	ofl_flag_t	undef = 0, needed = 0, verdesc = 0;
 	Xword		bssalign = 0, tlsalign = 0;
 	Xword		bsssize = 0, tlssize = 0;
 #if	defined(_ELF64)
@@ -1746,9 +1745,9 @@ static void
 issue_badaddr_msg(Ifl_desc *ifl, Ofl_desc *ofl, Sym_desc *sdp,
     Sym *sym, Word shndx)
 {
-	Lword	flag;
-	Error	err;
-	const char *msg;
+	ofl_flag_t	flag;
+	Error		err;
+	const char	*msg;
 
 	if ((sdp->sd_isc->is_shdr->sh_flags & (SHF_WRITE | SHF_ALLOC)) ==
 	    SHF_ALLOC) {

@@ -606,7 +606,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	Rel_cache	*rcp;
 	Listnode	*lnp;
 	uintptr_t	return_code = 1;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 
 	if (ofl->ofl_actrels.head)
 		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
@@ -1137,7 +1137,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 static uintptr_t
 ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 {
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Sym_desc	*sdp = rsp->rel_sym;
 	Word		shndx = sdp->sd_sym->st_shndx;
 	Word		ortype = rsp->rel_rtype;
@@ -1163,7 +1163,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		 * simplify it to a RELATIVE relocation.
 		 */
 		if (reloc_table[ortype].re_fsize != sizeof (Addr)) {
-			return (ld_add_outrel(NULL, rsp, ofl));
+			return (ld_add_outrel(0, rsp, ofl));
 		}
 
 		rsp->rel_rtype = R_AMD64_RELATIVE;
@@ -1222,7 +1222,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 {
 	Word		rtype = rsp->rel_rtype;
 	Sym_desc	*sdp = rsp->rel_sym;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Gotndx		*gnp;
 
 	/*

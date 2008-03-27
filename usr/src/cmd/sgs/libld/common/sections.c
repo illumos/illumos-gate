@@ -686,7 +686,7 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 	 * the .dynsym symbol table.
 	 */
 	if (!(osp->os_flags & FLG_OS_OUTREL)) {
-		Word	flagtotest;
+		ofl_flag_t	flagtotest;
 		if (which == MAKE_TLS)
 			flagtotest = FLG_OF1_TLSOREL;
 		else
@@ -824,6 +824,9 @@ make_comment(Ofl_desc *ofl)
  * Make the dynamic section.  Calculate the size of any strings referenced
  * within this structure, they will be added to the global string table
  * (.dynstr).  This routine should be called before make_dynstr().
+ *
+ * This routine must be maintained in parallel with update_odynamic()
+ * in update.c
  */
 static uintptr_t
 make_dynamic(Ofl_desc *ofl)
@@ -837,15 +840,22 @@ make_dynamic(Ofl_desc *ofl)
 	Ifl_desc	*ifl;
 	Sym_desc	*sdp;
 	size_t		size;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
+	int		not_relobj = !(flags & FLG_OF_RELOBJ);
 	int		unused = 0;
+
+	/*
+	 * Only a limited subset of DT_ entries apply to relocatable
+	 * objects. See the comment at the head of update_odynamic() in
+	 * update.c for details.
+	 */
 
 	if (new_section(ofl, SHT_DYNAMIC, MSG_ORIG(MSG_SCN_DYNAMIC), 0,
 	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
 	/* new_section() does not set SHF_ALLOC. Add it if needed */
-	if (!(flags & FLG_OF_RELOBJ))
+	if (not_relobj)
 		shdr->sh_flags |= SHF_ALLOC;
 
 	osp = ofl->ofl_osdynamic =
@@ -892,9 +902,10 @@ make_dynamic(Ofl_desc *ofl)
 			ifl->ifl_soname = sdf->sdf_soname;
 
 		/*
-		 * If this object is a lazyload reserve a DT_POSFLAG1 entry.
+		 * If this object is a lazyload reserve a DT_POSFLAG_1 entry.
 		 */
-		if (ifl->ifl_flags & (FLG_IF_LAZYLD | FLG_IF_GRPPRM))
+		if ((ifl->ifl_flags & (FLG_IF_LAZYLD | FLG_IF_GRPPRM)) &&
+		    not_relobj)
 			cnt++;
 
 		if (st_insert(ofl->ofl_dynstrtab, ifl->ifl_soname) == -1)
@@ -914,50 +925,58 @@ make_dynamic(Ofl_desc *ofl)
 	if (unused)
 		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
-	/*
-	 * Reserve entries for any per-symbol auxiliary/filter strings.
-	 */
-	cnt += alist_nitems(ofl->ofl_dtsfltrs);
-
-	/*
-	 * Reserve entries for any _init() and _fini() section addresses.
-	 */
-	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
-	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-		sdp->sd_flags |= FLG_SY_UPREQD;
-		cnt++;
-	}
-	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
-	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-		sdp->sd_flags |= FLG_SY_UPREQD;
-		cnt++;
-	}
-
-	/*
-	 * Reserve entries for any soname, filter name (shared libs only),
-	 * run-path pointers, cache names and audit requirements..
-	 */
-	if (ofl->ofl_soname) {
-		cnt++;
-		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_soname) == -1)
-			return (S_ERROR);
-	}
-	if (ofl->ofl_filtees) {
-		cnt++;
-		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_filtees) == -1)
-			return (S_ERROR);
+	if (not_relobj) {
+		/*
+		 * Reserve entries for any per-symbol auxiliary/filter strings.
+		 */
+		cnt += alist_nitems(ofl->ofl_dtsfltrs);
 
 		/*
-		 * If the filtees entry contains the $ORIGIN token make sure
-		 * the associated DT_1_FLAGS entry is created.
+		 * Reserve entries for _init() and _fini() section addresses.
 		 */
-		if (strstr(ofl->ofl_filtees, MSG_ORIG(MSG_STR_ORIGIN))) {
-			ofl->ofl_dtflags_1 |= DF_1_ORIGIN;
-			ofl->ofl_dtflags |= DF_ORIGIN;
+		if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
+		    SYM_NOHASH, 0, ofl)) != NULL) &&
+		    (sdp->sd_ref == REF_REL_NEED) &&
+		    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
+			sdp->sd_flags |= FLG_SY_UPREQD;
+			cnt++;
+		}
+		if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
+		    SYM_NOHASH, 0, ofl)) != NULL) &&
+		    (sdp->sd_ref == REF_REL_NEED) &&
+		    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
+			sdp->sd_flags |= FLG_SY_UPREQD;
+			cnt++;
+		}
+
+		/*
+		 * Reserve entries for any soname, filter name (shared libs
+		 * only), run-path pointers, cache names and audit requirements.
+		 */
+		if (ofl->ofl_soname) {
+			cnt++;
+			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_soname) ==
+			    -1)
+				return (S_ERROR);
+		}
+		if (ofl->ofl_filtees) {
+			cnt++;
+			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_filtees) ==
+			    -1)
+				return (S_ERROR);
+
+			/*
+			 * If the filtees entry contains the $ORIGIN token
+			 * make sure the associated DT_1_FLAGS entry is created.
+			 */
+			if (strstr(ofl->ofl_filtees,
+			    MSG_ORIG(MSG_STR_ORIGIN))) {
+				ofl->ofl_dtflags_1 |= DF_1_ORIGIN;
+				ofl->ofl_dtflags |= DF_ORIGIN;
+			}
 		}
 	}
+
 	if (ofl->ofl_rpath) {
 		cnt += 2;	/* DT_RPATH & DT_RUNPATH */
 		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_rpath) == -1)
@@ -972,36 +991,35 @@ make_dynamic(Ofl_desc *ofl)
 			ofl->ofl_dtflags |= DF_ORIGIN;
 		}
 	}
-	if (ofl->ofl_config) {
-		cnt++;
-		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_config) == -1)
-			return (S_ERROR);
 
-		/*
-		 * If the config entry contains the $ORIGIN token make sure
-		 * the associated DT_1_FLAGS entry is created.
-		 */
-		if (strstr(ofl->ofl_config, MSG_ORIG(MSG_STR_ORIGIN))) {
-			ofl->ofl_dtflags_1 |= DF_1_ORIGIN;
-			ofl->ofl_dtflags |= DF_ORIGIN;
+	if (not_relobj) {
+		if (ofl->ofl_config) {
+			cnt++;
+			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_config) ==
+			    -1)
+				return (S_ERROR);
+
+			/*
+			 * If the config entry contains the $ORIGIN token
+			 * make sure the associated DT_1_FLAGS entry is created.
+			 */
+			if (strstr(ofl->ofl_config, MSG_ORIG(MSG_STR_ORIGIN))) {
+				ofl->ofl_dtflags_1 |= DF_1_ORIGIN;
+				ofl->ofl_dtflags |= DF_ORIGIN;
+			}
 		}
-	}
-	if (ofl->ofl_depaudit) {
-		cnt++;
-		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_depaudit) == -1)
-			return (S_ERROR);
-	}
-	if (ofl->ofl_audit) {
-		cnt++;
-		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_audit) == -1)
-			return (S_ERROR);
-	}
+		if (ofl->ofl_depaudit) {
+			cnt++;
+			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_depaudit) ==
+			    -1)
+				return (S_ERROR);
+		}
+		if (ofl->ofl_audit) {
+			cnt++;
+			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_audit) == -1)
+				return (S_ERROR);
+		}
 
-
-	/*
-	 * The following DT_* entries do not apply to relocatable objects
-	 */
-	if (!(ofl->ofl_flags & FLG_OF_RELOBJ)) {
 		/*
 		 * Reserve entries for the HASH, STRTAB, STRSZ, SYMTAB, SYMENT,
 		 * and CHECKSUM.
@@ -1034,7 +1052,7 @@ make_dynamic(Ofl_desc *ofl)
 		    FLG_OF_VERNEED)
 			cnt += 2;		/* DT_VERNEED & DT_VERNEEDNUM */
 
-		if ((ofl->ofl_flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt)
+		if ((flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt)
 			cnt++;			/* RELACOUNT */
 
 		if (flags & FLG_OF_TEXTREL)	/* TEXTREL */
@@ -1072,7 +1090,7 @@ make_dynamic(Ofl_desc *ofl)
 		 * If a syminfo section is required create SYMINFO, SYMINSZ,
 		 * and SYMINENT entries.
 		 */
-		if (ofl->ofl_flags & FLG_OF_SYMINFO)
+		if (flags & FLG_OF_SYMINFO)
 			cnt += 3;
 
 		/*
@@ -1113,10 +1131,10 @@ make_dynamic(Ofl_desc *ofl)
 		 */
 		if (ofl->ofl_oscap)
 			cnt++;			/* SUNW_CAP */
-	}
 
-	if (flags & FLG_OF_SYMBOLIC)
-		cnt++;				/* SYMBOLIC */
+		if (flags & FLG_OF_SYMBOLIC)
+			cnt++;			/* SYMBOLIC */
+	}
 
 	/*
 	 * Account for Architecture dependent .dynamic entries, and defaults.
@@ -2553,7 +2571,7 @@ return_s_error:
 uintptr_t
 ld_make_sections(Ofl_desc *ofl)
 {
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Listnode	*lnp1;
 	Sg_desc		*sgp;
 
@@ -2659,14 +2677,14 @@ ld_make_sections(Ofl_desc *ofl)
 	/*
 	 * Create a syminfo section if necessary.
 	 */
-	if (ofl->ofl_flags & FLG_OF_SYMINFO) {
+	if (flags & FLG_OF_SYMINFO) {
 		if ((ofl->ofl_ossyminfo = make_sym_sec(ofl,
 		    MSG_ORIG(MSG_SCN_SUNWSYMINFO), SHT_SUNW_syminfo,
 		    ld_targ.t_id.id_syminfo)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
-	if (ofl->ofl_flags & FLG_OF_COMREL) {
+	if (flags & FLG_OF_COMREL) {
 		/*
 		 * If -zcombreloc is enabled then all relocations (except for
 		 * the PLT's) are coalesced into a single relocation section.

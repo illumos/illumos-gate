@@ -1330,3 +1330,4 @@ Bugid   Risk Synopsis
 6568447 bcp is broken by 6551627 (link-editor components only)
 6675591 elfwrap - wrap data in an ELF file (D,P)
 	PSARC/2008/198 elfwrap - wrap data in an ELF file
+6678244 elfdump dymamic section sanity checking needs refinement

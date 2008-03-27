@@ -544,7 +544,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	Sym_desc *	sdp, * psym = (Sym_desc *)0;
 	int		sectmoved = 0;
 	Word		dtflags1 = ofl->ofl_dtflags_1;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 
 	raddend = orsp->rel_raddend;
 	sdp = orsp->rel_sym;
@@ -1002,7 +1002,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	Rel_cache	*rcp;
 	Listnode	*lnp;
 	uintptr_t	return_code = 1;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 
 	if (ofl->ofl_actrels.head)
 		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
@@ -1589,7 +1589,7 @@ ld_reloc_register(Rel_desc * rsp, Is_desc * isp, Ofl_desc * ofl)
 static uintptr_t
 ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 {
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Sym_desc	*sdp = rsp->rel_sym;
 	Word		shndx = sdp->sd_sym->st_shndx;
 
@@ -1716,7 +1716,7 @@ ld_reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Word		rtype = rsp->rel_rtype;
 	Sym_desc	*sdp = rsp->rel_sym;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Gotndx		*gnp;
 
 	/*

@@ -569,7 +569,7 @@ uintptr_t
 ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Sym_desc	*sdp;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Gotndx		*gnp;
 
 	sdp = rsp->rel_sym;
@@ -1070,7 +1070,8 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 static uintptr_t
 reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
-	Word		rtype = rsp->rel_rtype, flags = ofl->ofl_flags;
+	Word		rtype = rsp->rel_rtype;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
 	Half		mach = ifl->ifl_ehdr->e_machine;
 	Sym_desc	*sdp = rsp->rel_sym;
@@ -1151,7 +1152,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
     const char *isname)
 {
 	Word		rtype = reld->rel_rtype;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Sym_desc	*sdp = reld->rel_sym;
 	Sym_aux		*sap;
 	Boolean		local;
@@ -2316,7 +2317,8 @@ ld_reloc_process(Ofl_desc *ofl)
 	Listnode	*lnp1;
 	Sg_desc		*sgp;
 	Os_desc		*osp;
-	Word		ndx = 0, flags = ofl->ofl_flags;
+	Word		ndx = 0;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Shdr		*shdr;
 
 	/*
@@ -2348,7 +2350,7 @@ ld_reloc_process(Ofl_desc *ofl)
 	if ((*ld_targ.t_mr.mr_do_activerelocs)(ofl) == S_ERROR)
 		return (S_ERROR);
 
-	if ((ofl->ofl_flags & FLG_OF_COMREL) == 0) {
+	if ((flags & FLG_OF_COMREL) == 0) {
 		/*
 		 * Process the relocation sections:
 		 *

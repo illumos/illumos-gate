@@ -130,9 +130,11 @@ typedef struct {
 	Gotndx		gt_gndx;
 } Gottable;
 
+
 /*
  * Output file processing structure
  */
+typedef Lword ofl_flag_t;
 struct ofl_desc {
 	char		*ofl_sgsid;	/* link-editor identification */
 	const char	*ofl_name;	/* full file name */
@@ -187,8 +189,8 @@ struct ofl_desc {
 	Word		ofl_regsymcnt;	/* no. of output register symbols */
 	Word		ofl_lregsymcnt;	/* no. of local register symbols */
 	Sym_desc	*ofl_dtracesym;	/* ld -zdtrace= */
-	Lword		ofl_flags;	/* various state bits, args etc. */
-	Lword		ofl_flags1;	/*	more flags */
+	ofl_flag_t	ofl_flags;	/* various state bits, args etc. */
+	ofl_flag_t	ofl_flags1;	/*	more flags */
 	Xword		ofl_segorigin;	/* segment origin (start) */
 	void		*ofl_entry;	/* entry point (-e and Sym_desc *) */
 	char		*ofl_filtees;	/* shared objects we are a filter for */
@@ -1067,7 +1069,7 @@ typedef struct ar_desc {
 	Ar_aux		*ad_aux;	/* auxiliary symbol information */
 	dev_t		ad_stdev;	/* device id and inode number for */
 	ino_t		ad_stino;	/*	multiple inclusion checks */
-	Word		ad_flags;	/* archive specific cmd line flags */
+	ofl_flag_t	ad_flags;	/* archive specific cmd line flags */
 } Ar_desc;
 
 /*

@@ -216,7 +216,7 @@ update_osym(Ofl_desc *ofl)
 	Word		hashval;	/* value of hash function */
 	Wk_desc		*wkp;
 	List		weak = {NULL, NULL};
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Word		dtflags_1 = ofl->ofl_dtflags_1;
 	Versym		*versym;
 	Gottable	*gottable;	/* used for display got debugging */
@@ -510,7 +510,7 @@ update_osym(Ofl_desc *ofl)
 			etext = (Addr)0;
 			etext_ndx = SHN_ABS;
 			etext_abs = 1;
-			if (ofl->ofl_flags & FLG_OF_VERBOSE)
+			if (flags & FLG_OF_VERBOSE)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_UPD_NOREADSEG));
 		}
@@ -520,7 +520,7 @@ update_osym(Ofl_desc *ofl)
 			edata = (Addr)0;
 			edata_ndx = SHN_ABS;
 			edata_abs = 1;
-			if (ofl->ofl_flags & FLG_OF_VERBOSE)
+			if (flags & FLG_OF_VERBOSE)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_UPD_NORDWRSEG));
 		}
@@ -776,7 +776,7 @@ update_osym(Ofl_desc *ofl)
 
 				sym->st_shndx = sunwdata1ndx;
 				sdp->sd_isc = ofl->ofl_issunwdata1;
-				if (ofl->ofl_flags & FLG_OF_RELOBJ) {
+				if (flags & FLG_OF_RELOBJ) {
 					sym->st_value = sunwdata1addr;
 				} else {
 					sym->st_value = laddr;
@@ -1025,7 +1025,7 @@ update_osym(Ofl_desc *ofl)
 				sdp->sd_flags |= FLG_SY_COMMEXP;
 
 			} else if ((sdp->sd_psyminfo != (Psym_info *)NULL) &&
-			    (ofl->ofl_flags & FLG_OF_SHAROBJ) &&
+			    (flags & FLG_OF_SHAROBJ) &&
 			    (ELF_ST_BIND(symptr->st_info) != STB_LOCAL)) {
 				restore = 1;
 				sdp->sd_shndx = sunwbssndx;
@@ -1953,6 +1953,9 @@ update_osym(Ofl_desc *ofl)
 
 /*
  * Build the dynamic section.
+ *
+ * This routine must be maintained in parallel with make_dynamic()
+ * in sections.c
  */
 static int
 update_odynamic(Ofl_desc *ofl)
@@ -1965,8 +1968,26 @@ update_odynamic(Ofl_desc *ofl)
 	Dyn		*dyn;
 	Str_tbl		*dynstr;
 	size_t		stoff;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
+	int		not_relobj = !(flags & FLG_OF_RELOBJ);
 	Word		cnt;
+
+
+	/*
+	 * A relocatable object with a dynamic section is possible, though
+	 * rare. One use for this feature is to produce drivers
+	 * for the kernel, loaded by krtld.
+	 *
+	 * Only a limited subset of DT_ entries apply to relocatable
+	 * objects:
+	 *
+	 *	DT_NEEDED
+	 *	DT_RUNPATH/DT_RPATH
+	 *	DT_FLAGS
+	 *	DT_FLAGS1
+	 *	DT_SUNW_STRPAD
+	 *	DT_LDMACH
+	 */
 
 	dynstr = ofl->ofl_dynstrtab;
 	ofl->ofl_osdynamic->os_shdr->sh_link =
@@ -1984,7 +2005,7 @@ update_odynamic(Ofl_desc *ofl)
 		 * Create and set up the DT_POSFLAG_1 entry here if required.
 		 */
 		if ((ifl->ifl_flags & (FLG_IF_LAZYLD|FLG_IF_GRPPRM)) &&
-		    (ifl->ifl_flags & (FLG_IF_NEEDED))) {
+		    (ifl->ifl_flags & (FLG_IF_NEEDED)) && not_relobj) {
 			dyn->d_tag = DT_POSFLAG_1;
 			if (ifl->ifl_flags & FLG_IF_LAZYLD)
 				dyn->d_un.d_val = DF_P1_LAZYLOAD;
@@ -2006,53 +2027,59 @@ update_odynamic(Ofl_desc *ofl)
 		dyn++;
 	}
 
-	if (ofl->ofl_dtsfltrs != NULL) {
-		Dfltr_desc	*dftp;
-		Aliste		idx;
+	if (not_relobj) {
+		if (ofl->ofl_dtsfltrs != NULL) {
+			Dfltr_desc	*dftp;
+			Aliste		idx;
 
-		for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, idx, dftp)) {
-			if (dftp->dft_flag == FLG_SY_AUXFLTR)
-				dyn->d_tag = DT_SUNW_AUXILIARY;
-			else
-				dyn->d_tag = DT_SUNW_FILTER;
+			for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, idx, dftp)) {
+				if (dftp->dft_flag == FLG_SY_AUXFLTR)
+					dyn->d_tag = DT_SUNW_AUXILIARY;
+				else
+					dyn->d_tag = DT_SUNW_FILTER;
 
-			(void) st_setstring(dynstr, dftp->dft_str, &stoff);
+				(void) st_setstring(dynstr, dftp->dft_str,
+				    &stoff);
+				dyn->d_un.d_val = stoff;
+				dftp->dft_ndx = (Half)(((uintptr_t)dyn -
+				    (uintptr_t)_dyn) / sizeof (Dyn));
+				dyn++;
+			}
+		}
+		if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
+		    SYM_NOHASH, 0, ofl)) != NULL) &&
+		    (sdp->sd_ref == REF_REL_NEED) &&
+		    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
+			dyn->d_tag = DT_INIT;
+			dyn->d_un.d_ptr = sdp->sd_sym->st_value;
+			dyn++;
+		}
+		if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
+		    SYM_NOHASH, 0, ofl)) != NULL) &&
+		    (sdp->sd_ref == REF_REL_NEED) &&
+		    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
+			dyn->d_tag = DT_FINI;
+			dyn->d_un.d_ptr = sdp->sd_sym->st_value;
+			dyn++;
+		}
+		if (ofl->ofl_soname) {
+			dyn->d_tag = DT_SONAME;
+			(void) st_setstring(dynstr, ofl->ofl_soname, &stoff);
 			dyn->d_un.d_val = stoff;
-			dftp->dft_ndx = (Half)(((uintptr_t)dyn -
-			    (uintptr_t)_dyn) / sizeof (Dyn));
+			dyn++;
+		}
+		if (ofl->ofl_filtees) {
+			if (flags & FLG_OF_AUX) {
+				dyn->d_tag = DT_AUXILIARY;
+			} else {
+				dyn->d_tag = DT_FILTER;
+			}
+			(void) st_setstring(dynstr, ofl->ofl_filtees, &stoff);
+			dyn->d_un.d_val = stoff;
 			dyn++;
 		}
 	}
-	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
-	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-		dyn->d_tag = DT_INIT;
-		dyn->d_un.d_ptr = sdp->sd_sym->st_value;
-		dyn++;
-	}
-	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
-	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-		dyn->d_tag = DT_FINI;
-		dyn->d_un.d_ptr = sdp->sd_sym->st_value;
-		dyn++;
-	}
-	if (ofl->ofl_soname) {
-		dyn->d_tag = DT_SONAME;
-		(void) st_setstring(dynstr, ofl->ofl_soname, &stoff);
-		dyn->d_un.d_val = stoff;
-		dyn++;
-	}
-	if (ofl->ofl_filtees) {
-		if (flags & FLG_OF_AUX) {
-			dyn->d_tag = DT_AUXILIARY;
-		} else {
-			dyn->d_tag = DT_FILTER;
-		}
-		(void) st_setstring(dynstr, ofl->ofl_filtees, &stoff);
-		dyn->d_un.d_val = stoff;
-		dyn++;
-	}
+
 	if (ofl->ofl_rpath) {
 		(void) st_setstring(dynstr, ofl->ofl_rpath, &stoff);
 		dyn->d_tag = DT_RUNPATH;
@@ -2062,29 +2089,26 @@ update_odynamic(Ofl_desc *ofl)
 		dyn->d_un.d_val = stoff;
 		dyn++;
 	}
-	if (ofl->ofl_config) {
-		dyn->d_tag = DT_CONFIG;
-		(void) st_setstring(dynstr, ofl->ofl_config, &stoff);
-		dyn->d_un.d_val = stoff;
-		dyn++;
-	}
-	if (ofl->ofl_depaudit) {
-		dyn->d_tag = DT_DEPAUDIT;
-		(void) st_setstring(dynstr, ofl->ofl_depaudit, &stoff);
-		dyn->d_un.d_val = stoff;
-		dyn++;
-	}
-	if (ofl->ofl_audit) {
-		dyn->d_tag = DT_AUDIT;
-		(void) st_setstring(dynstr, ofl->ofl_audit, &stoff);
-		dyn->d_un.d_val = stoff;
-		dyn++;
-	}
 
-	/*
-	 * The following DT_* entries do not apply to relocatable objects.
-	 */
-	if (!(flags & FLG_OF_RELOBJ)) {
+	if (not_relobj) {
+		if (ofl->ofl_config) {
+			dyn->d_tag = DT_CONFIG;
+			(void) st_setstring(dynstr, ofl->ofl_config, &stoff);
+			dyn->d_un.d_val = stoff;
+			dyn++;
+		}
+		if (ofl->ofl_depaudit) {
+			dyn->d_tag = DT_DEPAUDIT;
+			(void) st_setstring(dynstr, ofl->ofl_depaudit, &stoff);
+			dyn->d_un.d_val = stoff;
+			dyn++;
+		}
+		if (ofl->ofl_audit) {
+			dyn->d_tag = DT_AUDIT;
+			(void) st_setstring(dynstr, ofl->ofl_audit, &stoff);
+			dyn->d_un.d_val = stoff;
+			dyn++;
+		}
 
 		dyn->d_tag = DT_HASH;
 		dyn->d_un.d_ptr = ofl->ofl_oshash->os_shdr->sh_addr;
@@ -2220,7 +2244,7 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 
-		if ((ofl->ofl_flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt) {
+		if ((flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt) {
 			dyn->d_tag = ld_targ.t_m.m_rel_dt_count;
 			dyn->d_un.d_val = ofl->ofl_relocrelcnt;
 			dyn++;
@@ -2380,13 +2404,14 @@ update_odynamic(Ofl_desc *ofl)
 			dyn->d_un.d_val = ofl->ofl_oscap->os_shdr->sh_addr;
 			dyn++;
 		}
+
+		if (flags & FLG_OF_SYMBOLIC) {
+			dyn->d_tag = DT_SYMBOLIC;
+			dyn->d_un.d_val = 0;
+			dyn++;
+		}
 	}
 
-	if (flags & FLG_OF_SYMBOLIC) {
-		dyn->d_tag = DT_SYMBOLIC;
-		dyn->d_un.d_val = 0;
-		dyn++;
-	}
 	dyn->d_tag = DT_FLAGS;
 	dyn->d_un.d_val = ofl->ofl_dtflags;
 	dyn++;
@@ -2888,7 +2913,7 @@ update_move(Ofl_desc *ofl)
 {
 	Word		ndx = 0;
 	Is_desc *	isp;
-	Word		flags = ofl->ofl_flags;
+	ofl_flag_t	flags = ofl->ofl_flags;
 	Move *		mv1, * mv2;
 	Listnode *	lnp1;
 	Psym_info *	psym;
@@ -2926,7 +2951,7 @@ update_move(Ofl_desc *ofl)
 		if (psym->psym_symd->sd_flags & FLG_SY_PAREXPN) {
 			const char	*s;
 
-			if (ofl->ofl_flags & FLG_OF_STATIC)
+			if (flags & FLG_OF_STATIC)
 				s = MSG_INTL(MSG_PSYM_EXPREASON1);
 			else if (ofl->ofl_flags1 & FLG_OF1_NOPARTI)
 				s = MSG_INTL(MSG_PSYM_EXPREASON2);
@@ -2966,7 +2991,7 @@ update_move(Ofl_desc *ofl)
 			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, mv2, sdp));
 
 			*mv1 = *mv2;
-			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
+			if ((flags & FLG_OF_RELOBJ) == 0) {
 				if (ELF_ST_BIND(sym->st_info) == STB_LOCAL) {
 					Half	symbssndx = ofl->ofl_isbss->
 					    is_osdesc->os_scnsymndx;
@@ -3194,7 +3219,8 @@ ld_update_outfile(Ofl_desc *ofl)
 	Shdr		*hshdr;
 	Phdr		*_phdr = 0;
 	Word		phdrsz = (ehdr->e_phnum * ehdr->e_phentsize), shscnndx;
-	Word		flags = ofl->ofl_flags, ehdrsz = ehdr->e_ehsize;
+	ofl_flag_t	flags = ofl->ofl_flags;
+	Word		ehdrsz = ehdr->e_ehsize;
 	Boolean		nobits;
 	Off		offset;
 	Aliste		idx;
@@ -3383,7 +3409,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * Segments are only created for dynamic objects, thus this
 		 * checking can be skipped when building a relocatable object.
 		 */
-		if (!(ofl->ofl_flags & FLG_OF_RELOBJ) &&
+		if (!(flags & FLG_OF_RELOBJ) &&
 		    (sgp->sg_flags & FLG_SG_EMPTY)) {
 			int	i;
 			Addr	v_e;

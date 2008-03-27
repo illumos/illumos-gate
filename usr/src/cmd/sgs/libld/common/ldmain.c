@@ -222,7 +222,7 @@ ld_main(int argc, char **argv, Half mach)
 	}
 
 	DBG_CALL(Dbg_ent_print(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
-	    &ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC)));
+	    &ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC) != 0));
 	DBG_CALL(Dbg_seg_list(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
 	    &ofl->ofl_segs));
 
