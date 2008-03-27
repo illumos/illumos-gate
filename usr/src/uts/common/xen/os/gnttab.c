@@ -553,7 +553,7 @@ gnttab_map(void)
 		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp) != 0)
 			panic("Couldn't map grant table");
 		hat_devload(kas.a_hat, va, MMU_PAGESIZE, pfn,
-		    PROT_READ | PROT_WRITE,
+		    PROT_READ | PROT_WRITE | HAT_STORECACHING_OK,
 		    HAT_LOAD | HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
 		va += MMU_PAGESIZE;
 	}
@@ -592,7 +592,8 @@ gnttab_init(void)
 	    MMU_PAGESIZE, 0, 0, 0, 0, VM_SLEEP);
 	for (i = 0; i < set.nr_frames; i++) {
 		hat_devload(kas.a_hat, (caddr_t)GT_PGADDR(i), PAGESIZE,
-		    xen_assign_pfn(frames[i]), PROT_READ | PROT_WRITE,
+		    xen_assign_pfn(frames[i]),
+		    PROT_READ | PROT_WRITE | HAT_STORECACHING_OK,
 		    HAT_LOAD_LOCK);
 	}
 #endif
