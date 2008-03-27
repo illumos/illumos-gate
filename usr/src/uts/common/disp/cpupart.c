@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,9 @@ static uint_t		cp_max_numparts;
  */
 #define	PSTOCP(psid)	((cpupartid_t)((psid) == PS_NONE ? CP_DEFAULT : (psid)))
 #define	CPTOPS(cpid)	((psetid_t)((cpid) == CP_DEFAULT ? PS_NONE : (cpid)))
+
+
+static int cpupart_unbind_threads(cpupart_t *, boolean_t);
 
 /*
  * Find a CPU partition given a processor set ID.
@@ -284,6 +287,7 @@ cpupart_move_cpu(cpu_t *cp, cpupart_t *newpp, int forced)
 	int lgrp_diff_lpl;
 	lpl_t	*cpu_lpl;
 	int	ret;
+	boolean_t unbind_all_threads = (forced != 0);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(newpp != NULL);
@@ -309,11 +313,38 @@ cpupart_move_cpu(cpu_t *cp, cpupart_t *newpp, int forced)
 		 */
 		move_threads = 0;
 	} else if (oldpp->cp_ncpus == 1) {
-		cpu_state_change_notify(cp->cpu_id, CPU_CPUPART_IN);
-		return (EBUSY);
+		/*
+		 * The last CPU is removed from a partition which has threads
+		 * running in it. Some of these threads may be bound to this
+		 * CPU.
+		 *
+		 * Attempt to unbind threads from the CPU and from the processor
+		 * set. Note that no threads should be bound to this CPU since
+		 * cpupart_move_threads will refuse to move bound threads to
+		 * other CPUs.
+		 */
+		(void) cpu_unbind(oldpp->cp_cpulist->cpu_id, B_FALSE);
+		(void) cpupart_unbind_threads(oldpp, B_FALSE);
+
+		if (!disp_bound_partition(cp, 0)) {
+			/*
+			 * No bound threads in this partition any more
+			 */
+			move_threads = 0;
+		} else {
+			/*
+			 * There are still threads bound to the partition
+			 */
+			cpu_state_change_notify(cp->cpu_id, CPU_CPUPART_IN);
+			return (EBUSY);
+		}
 	}
 
-	if (forced && (ret = cpu_unbind(cp->cpu_id)) != 0) {
+	/*
+	 * If forced flag is set unbind any threads from this CPU.
+	 * Otherwise unbind soft-bound threads only.
+	 */
+	if ((ret = cpu_unbind(cp->cpu_id, unbind_all_threads)) != 0) {
 		cpu_state_change_notify(cp->cpu_id, CPU_CPUPART_IN);
 		return (ret);
 	}
@@ -798,26 +829,23 @@ cpupart_create(psetid_t *psid)
 	return (0);
 }
 
-
 /*
- * Destroy a partition.
+ * Move threads from specified partition to cp_default. If `force' is specified,
+ * move all threads, otherwise move only soft-bound threads.
  */
-int
-cpupart_destroy(psetid_t psid)
+static int
+cpupart_unbind_threads(cpupart_t *pp, boolean_t unbind_all)
 {
-	cpu_t	*cp, *first_cp;
-	cpupart_t *pp, *newpp;
-	int	err = 0;
 	void 	*projbuf, *zonebuf;
 	kthread_t *t;
 	proc_t	*p;
+	int	err = 0;
+	psetid_t psid = pp->cp_id;
 
 	ASSERT(pool_lock_held());
-	mutex_enter(&cpu_lock);
+	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	pp = cpupart_find(psid);
 	if (pp == NULL || pp == &cp_default) {
-		mutex_exit(&cpu_lock);
 		return (EINVAL);
 	}
 
@@ -829,10 +857,6 @@ cpupart_destroy(psetid_t psid)
 	projbuf = fss_allocbuf(FSS_NPROJ_BUF, FSS_ALLOC_PROJ);
 	zonebuf = fss_allocbuf(FSS_NPROJ_BUF, FSS_ALLOC_ZONE);
 
-	/*
-	 * First need to unbind all the threads currently bound to the
-	 * partition.  Then do the actual destroy (which moves the CPUs).
-	 */
 	mutex_enter(&pidlock);
 	t = curthread;
 	do {
@@ -847,17 +871,23 @@ again:			p = ttoproc(t);
 				mutex_exit(&p->p_lock);
 				goto again;
 			}
-			err = cpupart_bind_thread(t, PS_NONE, 1,
-			    projbuf, zonebuf);
-			if (err) {
-				mutex_exit(&p->p_lock);
-				mutex_exit(&pidlock);
-				mutex_exit(&cpu_lock);
-				fss_freebuf(projbuf, FSS_ALLOC_PROJ);
-				fss_freebuf(zonebuf, FSS_ALLOC_ZONE);
-				return (err);
+
+			/*
+			 * Can only unbind threads which have revocable binding
+			 * unless force unbinding requested.
+			 */
+			if (unbind_all || TB_PSET_IS_SOFT(t)) {
+				err = cpupart_bind_thread(t, PS_NONE, 1,
+				    projbuf, zonebuf);
+				if (err) {
+					mutex_exit(&p->p_lock);
+					mutex_exit(&pidlock);
+					fss_freebuf(projbuf, FSS_ALLOC_PROJ);
+					fss_freebuf(zonebuf, FSS_ALLOC_ZONE);
+					return (err);
+				}
+				t->t_bind_pset = PS_NONE;
 			}
-			t->t_bind_pset = PS_NONE;
 			mutex_exit(&p->p_lock);
 		}
 		t = t->t_next;
@@ -866,6 +896,36 @@ again:			p = ttoproc(t);
 	mutex_exit(&pidlock);
 	fss_freebuf(projbuf, FSS_ALLOC_PROJ);
 	fss_freebuf(zonebuf, FSS_ALLOC_ZONE);
+	return (err);
+}
+
+/*
+ * Destroy a partition.
+ */
+int
+cpupart_destroy(psetid_t psid)
+{
+	cpu_t	*cp, *first_cp;
+	cpupart_t *pp, *newpp;
+	int	err = 0;
+
+	ASSERT(pool_lock_held());
+	mutex_enter(&cpu_lock);
+
+	pp = cpupart_find(psid);
+	if (pp == NULL || pp == &cp_default) {
+		mutex_exit(&cpu_lock);
+		return (EINVAL);
+	}
+
+	/*
+	 * Unbind all the threads currently bound to the partition.
+	 */
+	err = cpupart_unbind_threads(pp, B_TRUE);
+	if (err) {
+		mutex_exit(&cpu_lock);
+		return (err);
+	}
 
 	newpp = &cp_default;
 	while ((cp = pp->cp_cpulist) != NULL) {

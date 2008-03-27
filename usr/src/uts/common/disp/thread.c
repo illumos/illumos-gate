@@ -107,6 +107,9 @@ int lwp_cache_sz = 32;
 int t_cache_sz = 8;
 static kt_did_t next_t_id = 1;
 
+/* Default mode for thread binding to CPUs and processor sets */
+int default_binding_mode = TB_ALLHARD;
+
 /*
  * Min/Max stack sizes for stack size parameters
  */
@@ -419,6 +422,7 @@ thread_create(
 	t->t_stime = lbolt;
 	t->t_schedflag = TS_LOAD | TS_DONT_SWAP;
 	t->t_bind_cpu = PBIND_NONE;
+	t->t_bindflag = (uchar_t)default_binding_mode;
 	t->t_bind_pset = PS_NONE;
 	t->t_plockp = &pp->p_lock;
 	t->t_copyops = NULL;

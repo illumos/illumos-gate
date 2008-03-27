@@ -1231,6 +1231,7 @@ cpu_offline(cpu_t *cp, int flags)
 	lpl_t	*cpu_lpl;
 	proc_t	*p;
 	int	lgrp_diff_lpl;
+	boolean_t unbind_all_threads = (flags & CPU_FORCED) != 0;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
@@ -1258,9 +1259,11 @@ cpu_offline(cpu_t *cp, int flags)
 	if (ncpus_online <= 1 || pp->cp_ncpus <= 1 || cpu_intr_count(cp) < 2)
 		return (EBUSY);
 	/*
-	 * Unbind all thread bound to our CPU if we were asked to.
+	 * Unbind all soft-bound threads bound to our CPU and hard bound threads
+	 * if we were asked to.
 	 */
-	if (flags & CPU_FORCED && (error = cpu_unbind(cp->cpu_id)) != 0)
+	error = cpu_unbind(cp->cpu_id, unbind_all_threads);
+	if (error != 0)
 		return (error);
 	/*
 	 * We shouldn't be bound to this CPU ourselves.
@@ -2434,7 +2437,7 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
     int *error)
 {
 	processorid_t	binding;
-	cpu_t		*cp;
+	cpu_t		*cp = NULL;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(MUTEX_HELD(&ttoproc(tp)->p_lock));
@@ -2447,12 +2450,47 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 	 * reporting PBIND_NONE for a process when some LWPs are bound.
 	 */
 	binding = tp->t_bind_cpu;
-	if (binding != PBIND_NONE)
-		*obind = binding;	/* record old binding */
 
-	if (bind == PBIND_QUERY) {
+	switch (bind) {
+	case PBIND_QUERY:
+		/* Just return the old binding */
+		*obind = binding;
 		thread_unlock(tp);
 		return (0);
+
+	case PBIND_QUERY_TYPE:
+		/* Return the binding type */
+		*obind = TB_CPU_IS_SOFT(tp) ? PBIND_SOFT : PBIND_HARD;
+		thread_unlock(tp);
+		return (0);
+
+	case PBIND_SOFT:
+		/*
+		 *  Set soft binding for this thread and return the actual
+		 *  binding
+		 */
+		TB_CPU_SOFT_SET(tp);
+		*obind = binding;
+		thread_unlock(tp);
+		return (0);
+
+	case PBIND_HARD:
+		/*
+		 *  Set hard binding for this thread and return the actual
+		 *  binding
+		 */
+		TB_CPU_HARD_SET(tp);
+		*obind = binding;
+		thread_unlock(tp);
+		return (0);
+
+	case PBIND_NONE:
+		break;
+
+	default:
+		/* record old binding */
+		*obind = binding;
+		break;
 	}
 
 	/*
@@ -2472,11 +2510,11 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 
 	binding = bind;
 	if (binding != PBIND_NONE) {
-		cp = cpu[binding];
+		cp = cpu_get((processorid_t)binding);
 		/*
-		 * Make sure binding is in right partition.
+		 * Make sure binding is valid and is in right partition.
 		 */
-		if (tp->t_cpupart != cp->cpu_part) {
+		if (cp == NULL || tp->t_cpupart != cp->cpu_part) {
 			*error = EINVAL;
 			thread_unlock(tp);
 			return (0);
@@ -2702,10 +2740,13 @@ cpuset_bounds(cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 #endif	/* CPUSET_WORDS */
 
 /*
- * Unbind all user threads bound to a given CPU.
+ * Unbind threads bound to specified CPU.
+ *
+ * If `unbind_all_threads' is true, unbind all user threads bound to a given
+ * CPU. Otherwise unbind all soft-bound user threads.
  */
 int
-cpu_unbind(processorid_t cpu)
+cpu_unbind(processorid_t cpu, boolean_t unbind_all_threads)
 {
 	processorid_t obind;
 	kthread_t *tp;
@@ -2730,6 +2771,12 @@ cpu_unbind(processorid_t cpu)
 		}
 		do {
 			if (tp->t_bind_cpu != cpu)
+				continue;
+			/*
+			 * Skip threads with hard binding when
+			 * `unbind_all_threads' is not specified.
+			 */
+			if (!unbind_all_threads && TB_CPU_IS_HARD(tp))
 				continue;
 			err = cpu_bind_thread(tp, PBIND_NONE, &obind, &berr);
 			if (ret == 0)

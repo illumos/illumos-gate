@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,9 @@ typedef struct {
  */
 #define	PBIND_NONE	-1	/* LWP/thread is not bound */
 #define	PBIND_QUERY	-2	/* don't set, just return the binding */
+#define	PBIND_HARD	-3	/* prevents offlining CPU (default) */
+#define	PBIND_SOFT	-4	/* allows offlining CPU */
+#define	PBIND_QUERY_TYPE	-5	/* Return binding type */
 
 /*
  * User-level system call interface prototypes

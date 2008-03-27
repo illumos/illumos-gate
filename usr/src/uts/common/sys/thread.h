@@ -125,6 +125,7 @@ typedef struct _kthread {
 	pri_t	t_epri;		/* inherited thread priority */
 	pri_t	t_cpri;		/* thread scheduling class priority */
 	char	t_writer;	/* sleeping in lwp_rwlock_lock(RW_WRITE_LOCK) */
+	uchar_t	t_bindflag;	/* CPU and pset binding type */
 	label_t	t_pcb;		/* pcb, save area when switching */
 	lwpchan_t t_lwpchan;	/* reason for blocking */
 #define	t_wchan0	t_lwpchan.lc_wchan0
@@ -415,6 +416,21 @@ typedef struct _kthread {
 #define	TS_ANYWAITQ	(TS_PROJWAITQ|TS_ZONEWAITQ)
 
 /*
+ * Thread binding types
+ */
+#define	TB_ALLHARD	0
+#define	TB_CPU_SOFT	0x01		/* soft binding to CPU */
+#define	TB_PSET_SOFT	0x02		/* soft binding to pset */
+
+#define	TB_CPU_SOFT_SET(t)		((t)->t_bindflag |= TB_CPU_SOFT)
+#define	TB_CPU_HARD_SET(t)		((t)->t_bindflag &= ~TB_CPU_SOFT)
+#define	TB_PSET_SOFT_SET(t)		((t)->t_bindflag |= TB_PSET_SOFT)
+#define	TB_PSET_HARD_SET(t)		((t)->t_bindflag &= ~TB_PSET_SOFT)
+#define	TB_CPU_IS_SOFT(t)		((t)->t_bindflag & TB_CPU_SOFT)
+#define	TB_CPU_IS_HARD(t)		(!TB_CPU_IS_SOFT(t))
+#define	TB_PSET_IS_SOFT(t)		((t)->t_bindflag & TB_PSET_SOFT)
+
+/*
  * No locking needed for AST field.
  */
 #define	aston(t)		((t)->t_astflag = 1)
@@ -563,6 +579,8 @@ extern disp_lock_t transition_lock;	/* lock protecting transiting threads */
 extern disp_lock_t stop_lock;		/* lock protecting stopped threads */
 
 caddr_t	thread_stk_init(caddr_t);	/* init thread stack */
+
+extern int default_binding_mode;
 
 #endif	/* _KERNEL */
 

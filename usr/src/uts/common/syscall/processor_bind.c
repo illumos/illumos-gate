@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,6 +219,9 @@ processor_bind(idtype_t idtype, id_t id, processorid_t bind,
 
 	case PBIND_NONE:
 	case PBIND_QUERY:
+	case PBIND_HARD:
+	case PBIND_SOFT:
+	case PBIND_QUERY_TYPE:
 		break;
 	}
 
@@ -333,7 +336,7 @@ processor_bind(idtype_t idtype, id_t id, processorid_t bind,
 		if (id == P_MYID || bind != PBIND_NONE || cpu_get(id) == NULL)
 			ret = EINVAL;
 		else
-			ret = cpu_unbind(id);
+			ret = cpu_unbind(id, B_TRUE);
 		break;
 
 	case P_ALL:
@@ -345,7 +348,7 @@ processor_bind(idtype_t idtype, id_t id, processorid_t bind,
 			do {
 				if ((cp->cpu_flags & CPU_EXISTS) == 0)
 					continue;
-				i = cpu_unbind(cp->cpu_id);
+				i = cpu_unbind(cp->cpu_id, B_TRUE);
 				if (ret == 0)
 					ret = i;
 			} while ((cp = cp->cpu_next) != cpu_list);

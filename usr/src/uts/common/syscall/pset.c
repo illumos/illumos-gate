@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,7 +251,24 @@ pset_bind_thread(kthread_t *tp, psetid_t pset, psetid_t *oldpset, void *projbuf,
 	ASSERT(MUTEX_HELD(&ttoproc(tp)->p_lock));
 
 	*oldpset = tp->t_bind_pset;
-	if (pset != PS_QUERY) {
+
+	switch (pset) {
+	case PS_SOFT:
+		TB_PSET_SOFT_SET(tp);
+		break;
+
+	case PS_HARD:
+		TB_PSET_HARD_SET(tp);
+		break;
+
+	case PS_QUERY:
+		break;
+
+	case PS_QUERY_TYPE:
+		*oldpset = TB_PSET_IS_SOFT(tp) ? PS_SOFT : PS_HARD;
+		break;
+
+	default:
 		/*
 		 * Must have the same UID as the target process or
 		 * have PRIV_PROC_OWNER privilege.
@@ -273,7 +290,10 @@ pset_bind_thread(kthread_t *tp, psetid_t pset, psetid_t *oldpset, void *projbuf,
 		if ((error = cpupart_bind_thread(tp, pset, 0,
 		    projbuf, zonebuf)) == 0)
 			tp->t_bind_pset = pset;
+
+		break;
 	}
+
 	return (error);
 }
 
@@ -285,7 +305,7 @@ pset_bind_process(proc_t *pp, psetid_t pset, psetid_t *oldpset, void *projbuf,
 	kthread_t *tp;
 
 	/* skip kernel processes */
-	if (pset != PS_QUERY && pp->p_flag & SSYS) {
+	if ((pset != PS_QUERY) && pp->p_flag & SSYS) {
 		*oldpset = PS_NONE;
 		return (0);
 	}
@@ -463,7 +483,8 @@ pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset)
 	void		*projbuf, *zonebuf;
 
 	pool_lock();
-	if (pset != PS_QUERY) {
+	if ((pset != PS_QUERY) && (pset != PS_SOFT) &&
+	    (pset != PS_HARD) && (pset != PS_QUERY_TYPE)) {
 		/*
 		 * Check if the set actually exists before checking
 		 * permissions.  This is the historical error
