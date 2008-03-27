@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2007
+ * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2008
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -157,9 +157,10 @@ static struct dev_ops mc_ops = {
  */
 
 static enum {
-	MODEL_FF1 = 0,
-	MODEL_FF2 = 1,
-	MODEL_DC = 2
+	MODEL_FF1,
+	MODEL_FF2,
+	MODEL_DC,
+	MODEL_IKKAKU
 } plat_model = MODEL_DC;	/* The default behaviour is DC */
 
 static struct plat_model_names {
@@ -168,7 +169,8 @@ static struct plat_model_names {
 } model_names[] = {
 	{ "MBU_A", "MEMB" },
 	{ "MBU_B", "MEMB" },
-	{ "CMU", "" }
+	{ "CMU", "" },
+	{ "MBU_A", "" }
 };
 
 /*
@@ -191,7 +193,7 @@ static char *mc_dc_dimm_unum_table[OPL_MAX_DIMMS] = {
 };
 
 /*
- * The DIMM Names for FF1/FF2 platforms.
+ * The DIMM Names for FF1/FF2/IKKAKU platforms.
  * The index into this table is made up of (board, bank, dslot),
  * Where dslot occupies bits 0-1, bank occupies 2-4 and
  * board occupies the bit 5.
@@ -384,6 +386,8 @@ _init(void)
 			plat_model = MODEL_FF2;
 		else if (strncmp(model, "DC", 2) == 0)
 			plat_model = MODEL_DC;
+		else if (strcmp(model, "IKKAKU") == 0)
+			plat_model = MODEL_IKKAKU;
 	}
 
 	error =  mod_install(&modlinkage);
@@ -816,10 +820,15 @@ pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr)
  *	y = 0..3 (slot info).
  *	Z = 'A' or 'B'
  *
- * UNUM format for FF2 is "/MBU_B/MEMBx/MEMyZ"
+ * UNUM format for FF2 is "/MBU_B/MEMBx/MEMyZ", where
  *	x = 0..7 (MEMB number)
  *	y = 0..3 (slot info).
  *	Z = 'A' or 'B'
+ *
+ * UNUM format for IKKAKU is "/MBU_A/MEMyZ", where
+ *	y = 0..3 (slot info).
+ *	Z = 'A' or 'B'
+ *
  */
 int
 mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
@@ -833,7 +842,8 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 
 	cs = SLOT_TO_CS(d_slot);
 
-	if (plat_model == MODEL_DC) {
+	switch (plat_model) {
+	case MODEL_DC:
 		if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
 		    mf_type == FLT_TYPE_PERMANENT_CE) {
 			i = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
@@ -848,7 +858,9 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 			    mc_dc_dimm_unum_table[j],
 			    mc_dc_dimm_unum_table[j + 1]);
 		}
-	} else {
+		break;
+	case MODEL_FF1:
+	case MODEL_FF2:
 		if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
 		    mf_type == FLT_TYPE_PERMANENT_CE) {
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
@@ -868,6 +880,26 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 			    &mc_ff_dimm_unum_table[j][1],
 			    &mc_ff_dimm_unum_table[j + 1][1]);
 		}
+		break;
+	case MODEL_IKKAKU:
+		if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
+		    mf_type == FLT_TYPE_PERMANENT_CE) {
+			i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
+			dimmnm = mc_ff_dimm_unum_table[i];
+			snprintf(buf, buflen, "/%s/MEM%s",
+			    model_names[plat_model].unit_name, &dimmnm[1]);
+		} else {
+			i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
+			j = (cs == 0) ?  i : i + 2;
+			memb_num = mc_ff_dimm_unum_table[i][0],
+			    snprintf(buf, buflen, "/%s/MEM%s MEM%s",
+			    model_names[plat_model].unit_name,
+			    &mc_ff_dimm_unum_table[j][1],
+			    &mc_ff_dimm_unum_table[j + 1][1]);
+		}
+		break;
+	default:
+		return (-1);
 	}
 	return (0);
 }
@@ -2133,11 +2165,11 @@ mc_check_errors_func(mc_opl_t *mcp)
 			if (wrapped) {
 				MAC_CLEAR_MAX(mcp, i);
 				mcp->mc_period[ebk]++;
-				if (IS_MIRROR(mcp, i))
+				if (IS_MIRROR(mcp, i)) {
 					MC_LOG("mirror mc period %ld on "
 					    "/LSB%d/B%d\n", mcp->mc_period[ebk],
 					    mcp->mc_board_num, i);
-				else {
+				} else {
 					MC_LOG("mc period %ld on "
 					    "/LSB%d/B%d\n", mcp->mc_period[ebk],
 					    mcp->mc_board_num, i);
@@ -2913,6 +2945,7 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	int sb;
 	int bank;
 	int cs;
+	int rv = 0;
 	mc_opl_t *mcp;
 	char memb_num;
 
@@ -2939,14 +2972,17 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 		return (ENXIO);
 	}
 
-	if (plat_model == MODEL_DC) {
+	switch (plat_model) {
+	case MODEL_DC:
 		i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
 		j = (cs == 0) ? i : i + 2;
 		snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
 		    model_names[plat_model].unit_name, sb,
 		    mc_dc_dimm_unum_table[j],
 		    mc_dc_dimm_unum_table[j + 1]);
-	} else {
+		break;
+	case MODEL_FF2:
+	case MODEL_FF1:
 		i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
 		j = (cs == 0) ? i : i + 2;
 		memb_num = mc_ff_dimm_unum_table[i][0];
@@ -2955,12 +2991,23 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 		    model_names[plat_model].mem_name, memb_num,
 		    &mc_ff_dimm_unum_table[j][1],
 		    &mc_ff_dimm_unum_table[j + 1][1]);
+		break;
+	case MODEL_IKKAKU:
+		i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
+		j = (cs == 0) ? i : i + 2;
+		snprintf(buf, buflen, "/%s/MEM%s MEM%s",
+		    model_names[plat_model].unit_name,
+		    &mc_ff_dimm_unum_table[j][1],
+		    &mc_ff_dimm_unum_table[j + 1][1]);
+		break;
+	default:
+		rv = ENXIO;
 	}
 	if (lenp) {
 		*lenp = strlen(buf);
 	}
 	mutex_exit(&mcmutex);
-	return (0);
+	return (rv);
 }
 
 int
@@ -3368,18 +3415,26 @@ parse_unum_memory(char *unum, int *board, char *dname)
 		y = c[1];
 		z = c[2];
 	} else if ((c = strstr(unum, "MBU_")) != NULL) {
-		/*  FF1/FF2 Model */
+		/*  FF1/FF2/Ikkaku Model */
 		c += 4;
 		if ((c[0] != 'A') && (c[0] != 'B')) {
 			return (4);
 		}
-		if ((c = strstr(c, "MEMB")) == NULL) {
-			return (5);
-		}
-		c += 4;
+		if (plat_model == MODEL_IKKAKU) {
+			/* Ikkaku Model */
+			x = '0';
+			*board = 0;
+		} else {
+			/* FF1/FF2 Model */
+			if ((c = strstr(c, "MEMB")) == NULL) {
+				return (5);
+			}
+			c += 4;
 
-		x = c[0];
-		*board =  ((uint8_t)stoi(&c)) / 4;
+			x = c[0];
+			*board =  ((uint8_t)stoi(&c)) / 4;
+		}
+
 		if ((c = strstr(c, "MEM")) == NULL) {
 			return (6);
 		}
@@ -3453,9 +3508,15 @@ mc_set_mem_sid(mc_opl_t *mcp, char *buf, int buflen, int sb,
 	if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
 	    mf_type == FLT_TYPE_PERMANENT_CE) {
 		if (plat_model == MODEL_DC) {
+			/*
+			 * All DC models
+			 */
 			id = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
 			dimmnm = mc_dc_dimm_unum_table[id];
 		} else {
+			/*
+			 * All FF and Ikkaku models
+			 */
 			id = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
 			dimmnm = mc_ff_dimm_unum_table[id];
 		}
@@ -3561,10 +3622,16 @@ dname_to_bankslot(char *dname, int *bank, int *slot)
 	int tsz;
 	char **tbl;
 
-	if (plat_model == MODEL_DC) { /* DC */
+	if (plat_model == MODEL_DC) {
+		/*
+		 * All DC models
+		 */
 		tbl = mc_dc_dimm_unum_table;
 		tsz = OPL_MAX_DIMMS;
 	} else {
+		/*
+		 * All FF and Ikkaku models
+		 */
 		tbl = mc_ff_dimm_unum_table;
 		tsz = 2 * OPL_MAX_DIMMS;
 	}

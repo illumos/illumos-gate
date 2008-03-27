@@ -86,6 +86,7 @@ static opl_model_info_t opl_models[] = {
 	{ "DC1", OPL_MAX_BOARDS_DC1, DC1, STD_DISPATCH_TABLE },
 	{ "DC2", OPL_MAX_BOARDS_DC2, DC2, EXT_DISPATCH_TABLE },
 	{ "DC3", OPL_MAX_BOARDS_DC3, DC3, EXT_DISPATCH_TABLE },
+	{ "IKKAKU", OPL_MAX_BOARDS_IKKAKU, IKKAKU, STD_DISPATCH_TABLE },
 };
 static	int	opl_num_models = sizeof (opl_models)/sizeof (opl_model_info_t);
 
@@ -156,7 +157,7 @@ set_model_info()
 
 	/*
 	 * If model not matched, it's an unknown model.
-	 * just return.
+	 * Just return.  It will default to standard dispatch tables.
 	 */
 	if (i == opl_num_models)
 		return;
@@ -167,7 +168,8 @@ set_model_info()
 		 * Based on a platform model, select a dispatch table.
 		 * Only DC2 and DC3 systems uses the alternate/extended
 		 * TS dispatch table.
-		 * FF1, FF2 and DC1 systems used standard dispatch tables.
+		 * IKKAKU, FF1, FF2 and DC1 systems use standard dispatch
+		 * tables.
 		 */
 		ts_dispatch_extended = 1;
 	}
@@ -886,6 +888,10 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 	case DC3:
 		plen = snprintf(buf, buflen, "/%s%02d/CPUM%d", "CMU", sb,
 		    CHIP_ID(cpuid));
+		break;
+
+	case IKKAKU:
+		plen = snprintf(buf, buflen, "/%s", "MBU_A");
 		break;
 
 	default:

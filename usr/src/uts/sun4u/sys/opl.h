@@ -70,6 +70,7 @@ extern "C" {
 /*
  * Max. boards supported in a domain per model.
  */
+#define	OPL_MAX_BOARDS_IKKAKU	1
 #define	OPL_MAX_BOARDS_FF1	1
 #define	OPL_MAX_BOARDS_FF2	2
 #define	OPL_MAX_BOARDS_DC1	4
@@ -78,7 +79,12 @@ extern "C" {
 
 /* OPL model type */
 typedef enum {
-	FF1 = 0, FF2, DC1, DC2, DC3
+	FF1,
+	FF2,
+	DC1,
+	DC2,
+	DC3,
+	IKKAKU
 } opl_type_t;
 
 /* OPL model specific cmds selection  */

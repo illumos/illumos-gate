@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,6 +166,9 @@ opl_cpursrc_create(fmd_hdl_t *hdl, uint32_t cpuid)
 		comp = frustr + sizeof (OPL_CPU_FRU_FMRI_FF2) - 1;
 		(void) sscanf(comp, "%d", &cmu_num);
 		cmu_num /= 2;
+	} else if (strncmp(frustr, OPL_CPU_FRU_FMRI_IKKAKU,
+	    sizeof (OPL_CPU_FRU_FMRI_IKKAKU) - 1) == 0) {
+		cmu_num = 0;
 	} else {
 		CMD_STAT_BUMP(bad_cpu_asru);
 		fmd_hdl_strfree(hdl, frustr);

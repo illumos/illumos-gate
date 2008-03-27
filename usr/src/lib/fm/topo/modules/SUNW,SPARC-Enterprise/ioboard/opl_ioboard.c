@@ -42,6 +42,10 @@
 #define	LABEL		FRUNAME "#%d"
 #define	IOBDFRU		"hc:///component=" LABEL
 
+#define	IKKAKU_FRUNAME	"MBU_A"
+#define	IKKAKU_LABEL	IKKAKU_FRUNAME
+#define	IKKAKU_IOBDFRU	"hc:///component=" IKKAKU_LABEL
+
 static int opl_iob_enum(topo_mod_t *hdl, tnode_t *parent, const char *name,
     topo_instance_t imin, topo_instance_t imax, void *notused1, void *notused2);
 
@@ -53,6 +57,13 @@ static const topo_modinfo_t IobInfo = {
 	FM_FMRI_SCHEME_HC,
 	IOB_ENUMR_VERS,
 	&Iobops};
+
+/* OPL model type */
+typedef enum {
+	MODEL_FF,
+	MODEL_DC,
+	MODEL_IKKAKU
+} opl_model_t;
 
 void
 _topo_init(topo_mod_t *modhdl)
@@ -148,9 +159,12 @@ opl_map_boards(topo_mod_t *mod, di_node_t opl_devtree,
 /*
  * Create the ioboard node. Add fru and label properties, and create room
  * for child hostbridge nodes.
+ *
+ * Only IKKAKU model has different IO topology.
  */
 static tnode_t *
-opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
+opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst,
+    opl_model_t opl_model)
 {
 	int err;
 	tnode_t *ion;
@@ -182,13 +196,19 @@ opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 	}
 	nvlist_free(fmri);
 	/* Create and add FRU fmri for this ioboard */
-	(void) snprintf(fmri_str, sizeof (fmri_str), IOBDFRU, inst);
+	if (opl_model == MODEL_IKKAKU)
+		(void) snprintf(fmri_str, sizeof (fmri_str), IKKAKU_IOBDFRU);
+	else
+		(void) snprintf(fmri_str, sizeof (fmri_str), IOBDFRU, inst);
 	if (topo_mod_str2nvl(mp, fmri_str, &fmri) == 0) {
 		(void) topo_node_fru_set(ion, fmri, 0, &err);
 		nvlist_free(fmri);
 	}
 	/* Add label for this ioboard */
-	(void) snprintf(label, sizeof (label), LABEL, inst);
+	if (opl_model == MODEL_IKKAKU)
+		(void) snprintf(label, sizeof (label), IKKAKU_LABEL);
+	else
+		(void) snprintf(label, sizeof (label), LABEL, inst);
 	(void) topo_node_label_set(ion, label, &err);
 
 	/* Create range of hostbridges on this ioboard */
@@ -199,6 +219,29 @@ opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 	}
 
 	return (ion);
+}
+
+/*
+ * get the OPL model name from rootnode property "model"
+ */
+static int
+opl_get_model(topo_mod_t *mp, di_node_t opl_devtree, char *model)
+{
+	char *bufp;
+	di_prom_handle_t promh = DI_PROM_HANDLE_NIL;
+
+	if (opl_devtree == DI_NODE_NIL ||
+	    (promh = topo_mod_prominfo(mp)) == DI_PROM_HANDLE_NIL)
+		return (-1);
+
+	if (di_prom_prop_lookup_bytes(promh, opl_devtree, "model",
+	    (unsigned char **)&bufp) != -1) {
+		(void) strlcpy(model, bufp, MAXNAMELEN);
+		return (0);
+	} else {
+		return (-1);
+	}
+
 }
 
 /*ARGSUSED*/
@@ -213,6 +256,8 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 	int lsb_to_psb[OPL_IOB_MAX];
 	ioboard_contents_t ioboard_list[OPL_IOB_MAX];
 	int retval = 0;
+	char model[MAXNAMELEN];
+	opl_model_t opl_model = MODEL_FF;
 
 	/* Validate the name is correct */
 	if (strcmp(name, "ioboard") != 0) {
@@ -230,6 +275,19 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 		(void) topo_mod_seterrno(mp, errno);
 		topo_mod_dprintf(mp, "devinfo init failed.\n");
 		return (-1);
+	}
+
+	if (opl_get_model(mp, opl_devtree, model) == -1) {
+		topo_mod_dprintf(mp, "opl_get_model failed.\n");
+	} else {
+		if (strncmp(model, "FF", 2) == 0)
+			opl_model = MODEL_FF;
+		else if (strncmp(model, "DC", 2) == 0)
+			opl_model = MODEL_DC;
+		else if (strcmp(model, "IKKAKU") == 0)
+			opl_model = MODEL_IKKAKU;
+
+		topo_mod_dprintf(mp, "opl_get_model %s found.\n", model);
 	}
 
 	/*
@@ -280,7 +338,7 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 			continue;
 		}
 		/* Create node for this ioboard */
-		ion = opl_iob_node_create(mp, parent, inst);
+		ion = opl_iob_node_create(mp, parent, inst, opl_model);
 		if (ion == NULL) {
 			topo_mod_dprintf(mp,
 			    "enumeration of ioboard failed: %s\n",

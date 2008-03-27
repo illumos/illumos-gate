@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +116,8 @@ extern cmd_list_t opl_cpu_list;
     FM_FMRI_LEGACY_HC"=/MBU_A/CPUM"
 #define	OPL_CPU_FRU_FMRI_FF2	FM_FMRI_SCHEME_HC":///" \
     FM_FMRI_LEGACY_HC"=/MBU_B/CPUM"
+#define	OPL_CPU_FRU_FMRI_IKKAKU	FM_FMRI_SCHEME_HC":///" \
+    FM_FMRI_LEGACY_HC"=/MBU_A"
 #define	STR_BUFLEN		32
 #define	NPAIRS			5
 
