@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1888,6 +1888,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t opt_f = FALSE;		/* File-mode off by default */
 	uint_t opt_w = FALSE;		/* Window mode off by default */
 	uint_t opt_a = FALSE;		/* Raw-address mode off by default */
+	uint_t opt_b = FALSE;		/* Address & symbols off by default */
 	uintptr_t n = -1UL;		/* Length of window in instructions */
 	uintptr_t eaddr = 0;		/* Ending address; 0 if limited by n */
 
@@ -1895,6 +1896,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'f', MDB_OPT_SETBITS, TRUE, &opt_f,
 	    'w', MDB_OPT_SETBITS, TRUE, &opt_w,
 	    'a', MDB_OPT_SETBITS, TRUE, &opt_a,
+	    'b', MDB_OPT_SETBITS, TRUE, &opt_b,
 	    'n', MDB_OPT_UINTPTR, &n, NULL);
 
 	/*
@@ -1971,6 +1973,9 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				return (DCMD_ERR);
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", addr, buf);
+			else if (opt_b)
+				mdb_printf("%-#10p%-#32a%8T%s\n",
+				    addr, addr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", addr, buf);
 			addr = naddr;
@@ -1992,6 +1997,9 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				return (DCMD_ERR);
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", oaddr, buf);
+			else if (opt_b)
+				mdb_printf("%-#10p%-#32a%8T%s\n",
+				    oaddr, oaddr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", oaddr, buf);
 		}
@@ -2004,6 +2012,8 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_flush();
 		if (opt_a)
 			mdb_printf("%-#32p%8T%s%", addr, buf);
+		else if (opt_b)
+			mdb_printf("%-#10p%-#32a%8T%s", addr, addr, buf);
 		else
 			mdb_printf("%-#32a%8T%s%", addr, buf);
 		mdb_printf("%</b>\n");
@@ -2015,6 +2025,9 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				return (DCMD_ERR);
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", addr, buf);
+			else if (opt_b)
+				mdb_printf("%-#10p%-#32a%8T%s\n",
+				    addr, addr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", addr, buf);
 		}
@@ -2853,7 +2866,7 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    "specified addresses or symbols", cmd_bp, bp_help },
 	{ "dcmds", NULL, "list available debugger commands", cmd_dcmds },
 	{ "delete", "?[id|all]", "delete traced software events", cmd_delete },
-	{ "dis", "?[-afw] [-n cnt] [addr]", "disassemble near addr", cmd_dis },
+	{ "dis", "?[-abfw] [-n cnt] [addr]", "disassemble near addr", cmd_dis },
 	{ "disasms", NULL, "list available disassemblers", cmd_disasms },
 	{ "dismode", "[mode]", "get/set disassembly mode", cmd_dismode },
 	{ "dmods", "[-l] [mod]", "list loaded debugger modules", cmd_dmods },
