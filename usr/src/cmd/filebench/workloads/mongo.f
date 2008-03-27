@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,8 @@ set $filesize=16k
 set $nthreads=1
 set $meaniosize=16k
 set $readiosize=1m
+
+set mode quit alldone
 
 define fileset name=postset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
 define fileset name=postsetdel,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
@@ -49,7 +51,7 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "Mongo-like Version 2.1 personality successfully loaded"
+echo  "Mongo-like Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"
@@ -57,4 +59,5 @@ usage "       set \$dirwidth=<value>   defaults to $dirwidth"
 usage "       set \$nthreads=<value>   defaults to $nthreads"
 usage "       set \$meaniosize=<value> defaults to $meaniosize"
 usage "       set \$readiosize=<size>  defaults to $readiosize"
-usage "       run runtime (e.g. run 60)"
+usage " "
+usage "       run"

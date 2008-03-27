@@ -318,15 +318,15 @@ ipc_init(void)
 #endif /* USE_PROCESS_MODEL */
 
 	c1 = (caddr_t)filebench_shm;
-	c2 = (caddr_t)&filebench_shm->marker;
+	c2 = (caddr_t)&filebench_shm->shm_marker;
 
 	(void) memset(filebench_shm, 0, c2 - c1);
 	filebench_shm->epoch = gethrtime();
 	filebench_shm->debug_level = LOG_VERBOSE;
 	filebench_shm->shm_rmode = FILEBENCH_MODE_TIMEOUT;
-	filebench_shm->string_ptr = &filebench_shm->strings[0];
+	filebench_shm->shm_string_ptr = &filebench_shm->shm_strings[0];
 	filebench_shm->shm_ptr = (char *)filebench_shm->shm_addr;
-	filebench_shm->path_ptr = &filebench_shm->filesetpaths[0];
+	filebench_shm->shm_path_ptr = &filebench_shm->shm_filesetpaths[0];
 
 	/* Setup mutexes for object lists */
 	(void) pthread_mutex_init(&filebench_shm->fileset_lock,
@@ -339,15 +339,17 @@ ipc_init(void)
 	(void) pthread_mutex_init(&filebench_shm->msg_lock, ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->eventgen_lock,
 	    ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->malloc_lock, ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->ism_lock, ipc_mutexattr());
+	(void) pthread_mutex_init(&filebench_shm->shm_malloc_lock,
+	    ipc_mutexattr());
+	(void) pthread_mutex_init(&filebench_shm->shm_ism_lock,
+	    ipc_mutexattr());
 	(void) pthread_cond_init(&filebench_shm->eventgen_cv, ipc_condattr());
 	(void) pthread_rwlock_init(&filebench_shm->flowop_find_lock,
 	    ipc_rwlockattr());
 	(void) pthread_rwlock_init(&filebench_shm->run_lock, ipc_rwlockattr());
 	(void) pthread_rwlock_rdlock(&filebench_shm->run_lock);
 
-	(void) ipc_mutex_lock(&filebench_shm->ism_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_ism_lock);
 
 	/* Create semaphore */
 	if ((key = ftok(shmpath, 1)) < 0) {
@@ -433,69 +435,77 @@ ipc_malloc(int type)
 {
 	int i;
 	int max = filebench_sizes[type];
+	int start_idx = filebench_shm->shm_lastbitmapindex[type];
 
-	(void) ipc_mutex_lock(&filebench_shm->malloc_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_malloc_lock);
 
-	for (i = 0; i < max; i++) {
-		if (filebench_shm->bitmap[type][i] == 0)
+	i = start_idx;
+	do {
+		i++;
+		if (i >= max)
+			i = 0;
+
+		if (filebench_shm->shm_bitmap[type][i] == 0)
 			break;
-	}
 
-	if (i >= max) {
+	} while (i != start_idx);
+
+	if (i == start_idx) {
 		filebench_log(LOG_ERROR, "Out of shared memory (%d)!", type);
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
 		return (NULL);
 	}
 
-	filebench_shm->bitmap[type][i] = 1;
+	filebench_shm->shm_bitmap[type][i] = 1;
+	filebench_shm->shm_lastbitmapindex[type] = i;
 
 	switch (type) {
 	case FILEBENCH_FILESET:
-		(void) memset((char *)&filebench_shm->fileset[i], 0,
+		(void) memset((char *)&filebench_shm->shm_fileset[i], 0,
 		    sizeof (fileset_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->fileset[i]);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
+		return ((char *)&filebench_shm->shm_fileset[i]);
 
 	case FILEBENCH_FILESETENTRY:
-		(void) memset((char *)&filebench_shm->filesetentry[i], 0,
+		(void) memset((char *)&filebench_shm->shm_filesetentry[i], 0,
 		    sizeof (filesetentry_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->filesetentry[i]);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
+		return ((char *)&filebench_shm->shm_filesetentry[i]);
 
 	case FILEBENCH_PROCFLOW:
-		(void) memset((char *)&filebench_shm->procflow[i], 0,
+		(void) memset((char *)&filebench_shm->shm_procflow[i], 0,
 		    sizeof (procflow_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->procflow[i]);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
+		return ((char *)&filebench_shm->shm_procflow[i]);
 
 	case FILEBENCH_THREADFLOW:
-		(void) memset((char *)&filebench_shm->threadflow[i], 0,
+		(void) memset((char *)&filebench_shm->shm_threadflow[i], 0,
 		    sizeof (threadflow_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->threadflow[i]);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
+		return ((char *)&filebench_shm->shm_threadflow[i]);
 
 	case FILEBENCH_FLOWOP:
-		(void) memset((char *)&filebench_shm->flowop[i], 0,
+		(void) memset((char *)&filebench_shm->shm_flowop[i], 0,
 		    sizeof (flowop_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->flowop[i]);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
+		return ((char *)&filebench_shm->shm_flowop[i]);
 
 	case FILEBENCH_AVD:
 		filebench_shm->shm_avd_ptrs[i].avd_type = AVD_INVALID;
 		filebench_shm->shm_avd_ptrs[i].avd_val.varptr = NULL;
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
 		return ((char *)&filebench_shm->shm_avd_ptrs[i]);
 
 	case FILEBENCH_VARIABLE:
-		(void) memset((char *)&filebench_shm->var[i], 0,
+		(void) memset((char *)&filebench_shm->shm_var[i], 0,
 		    sizeof (var_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->var[i]);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
+		return ((char *)&filebench_shm->shm_var[i]);
 
 	case FILEBENCH_RANDDIST:
 		(void) memset((char *)&filebench_shm->shm_randdist[i], 0,
 		    sizeof (randdist_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
 		return ((char *)&filebench_shm->shm_randdist[i]);
 	}
 
@@ -526,27 +536,27 @@ ipc_free(int type, char *addr)
 	switch (type) {
 
 	case FILEBENCH_FILESET:
-		base = (caddr_t)&filebench_shm->fileset[0];
+		base = (caddr_t)&filebench_shm->shm_fileset[0];
 		size = sizeof (fileset_t);
 		break;
 
 	case FILEBENCH_FILESETENTRY:
-		base = (caddr_t)&filebench_shm->filesetentry[0];
+		base = (caddr_t)&filebench_shm->shm_filesetentry[0];
 		size = sizeof (filesetentry_t);
 		break;
 
 	case FILEBENCH_PROCFLOW:
-		base = (caddr_t)&filebench_shm->procflow[0];
+		base = (caddr_t)&filebench_shm->shm_procflow[0];
 		size = sizeof (procflow_t);
 		break;
 
 	case FILEBENCH_THREADFLOW:
-		base = (caddr_t)&filebench_shm->threadflow[0];
+		base = (caddr_t)&filebench_shm->shm_threadflow[0];
 		size = sizeof (threadflow_t);
 		break;
 
 	case FILEBENCH_FLOWOP:
-		base = (caddr_t)&filebench_shm->flowop[0];
+		base = (caddr_t)&filebench_shm->shm_flowop[0];
 		size = sizeof (flowop_t);
 		break;
 
@@ -556,7 +566,7 @@ ipc_free(int type, char *addr)
 		break;
 
 	case FILEBENCH_VARIABLE:
-		base = (caddr_t)&filebench_shm->var[0];
+		base = (caddr_t)&filebench_shm->shm_var[0];
 		size = sizeof (var_t);
 		break;
 
@@ -569,9 +579,9 @@ ipc_free(int type, char *addr)
 	offset = ((size_t)addr - (size_t)base);
 	item = offset / size;
 
-	(void) ipc_mutex_lock(&filebench_shm->malloc_lock);
-	filebench_shm->bitmap[type][item] = 0;
-	(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_malloc_lock);
+	filebench_shm->shm_bitmap[type][item] = 0;
+	(void) ipc_mutex_unlock(&filebench_shm->shm_malloc_lock);
 }
 
 /*
@@ -583,11 +593,11 @@ ipc_free(int type, char *addr)
 char *
 ipc_stralloc(char *string)
 {
-	char *allocstr = filebench_shm->string_ptr;
+	char *allocstr = filebench_shm->shm_string_ptr;
 
-	filebench_shm->string_ptr += strlen(string) + 1;
+	filebench_shm->shm_string_ptr += strlen(string) + 1;
 
-	if ((filebench_shm->string_ptr - &filebench_shm->strings[0]) >
+	if ((filebench_shm->shm_string_ptr - &filebench_shm->shm_strings[0]) >
 	    FILEBENCH_STRINGMEMORY) {
 		filebench_log(LOG_ERROR, "Out of ipc string memory");
 		return (NULL);
@@ -611,11 +621,12 @@ ipc_stralloc(char *string)
 char *
 ipc_pathalloc(char *path)
 {
-	char *allocpath = filebench_shm->path_ptr;
+	char *allocpath = filebench_shm->shm_path_ptr;
 
-	filebench_shm->path_ptr += strlen(path) + 1;
+	filebench_shm->shm_path_ptr += strlen(path) + 1;
 
-	if ((filebench_shm->path_ptr - &filebench_shm->filesetpaths[0]) >
+	if ((filebench_shm->shm_path_ptr -
+	    &filebench_shm->shm_filesetpaths[0]) >
 	    FILEBENCH_FILESETPATHMEMORY) {
 		filebench_log(LOG_ERROR, "Out of fileset path memory");
 		return (NULL);
@@ -634,7 +645,7 @@ ipc_pathalloc(char *path)
 void
 ipc_freepaths(void)
 {
-	filebench_shm->path_ptr = &filebench_shm->filesetpaths[0];
+	filebench_shm->shm_path_ptr = &filebench_shm->shm_filesetpaths[0];
 }
 
 /*
@@ -717,7 +728,7 @@ ipc_ismcreate(size_t size)
 	    size, filebench_shm->shm_addr);
 
 	/* Locked until allocated to block allocs */
-	(void) ipc_mutex_unlock(&filebench_shm->ism_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_ism_lock);
 
 	return (0);
 }
@@ -770,7 +781,7 @@ ipc_ismmalloc(size_t size)
 {
 	char *allocstr;
 
-	(void) ipc_mutex_lock(&filebench_shm->ism_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_ism_lock);
 
 	/* Map in shared memory */
 	(void) ipc_ismattach();
@@ -780,7 +791,7 @@ ipc_ismmalloc(size_t size)
 	filebench_shm->shm_ptr += size;
 	filebench_shm->shm_allocated += size;
 
-	(void) ipc_mutex_unlock(&filebench_shm->ism_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_ism_lock);
 
 	return (allocstr);
 }
@@ -797,12 +808,12 @@ ipc_ismdelete(void)
 
 	filebench_log(LOG_VERBOSE, "Deleting ISM...");
 
-	(void) ipc_mutex_lock(&filebench_shm->ism_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_ism_lock);
 #ifdef HAVE_SEM_RMID
 	(void) shmctl(filebench_shm->shm_id, IPC_RMID, 0);
 #endif
 	filebench_shm->shm_ptr = (char *)filebench_shm->shm_addr;
 	filebench_shm->shm_id = -1;
 	filebench_shm->shm_allocated = 0;
-	(void) ipc_mutex_unlock(&filebench_shm->ism_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_ism_lock);
 }

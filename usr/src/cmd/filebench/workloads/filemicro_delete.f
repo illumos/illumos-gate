@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,6 +33,8 @@ set $filesize=16k
 set $nthreads=16
 set $count=1000
 
+set mode quit alldone
+
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100
 
 define process name=filedelete,instances=1
@@ -45,7 +47,7 @@ define process name=filedelete,instances=1
   }
 }
 
-echo  "FileMicro-Delete Version 2.0 personality successfully loaded"
+echo  "FileMicro-Delete Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>     defaults to $filesize"
 usage "       set \$nfiles=<value>      defaults to $nfiles"
@@ -54,4 +56,5 @@ usage "       set \$count=<value>       defaults to $count"
 usage "       set \$meandirwidth=<size> defaults to $meandirwidth"
 usage "(sets mean dir width and dir depth is calculated as log (width, nfiles)"
 usage " "
-usage "       run runtime (e.g. run 60)"
+usage "       run"
+

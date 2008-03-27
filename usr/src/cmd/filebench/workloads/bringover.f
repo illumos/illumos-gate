@@ -50,7 +50,7 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "Bringover Version 2.2 personality successfully loaded"
+echo  "Bringover Version 2.3 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$nfiles=<value>    defaults to $nfiles"
@@ -58,4 +58,4 @@ usage "       set \$iosize=<size>     defaults to $iosize"
 usage "       set \$dirwidth=<value>  defaults to $dirwidth"
 usage "       set \$nthreads=<value>  defaults to $nthreads"
 usage " "
-usage "       run 0"
+usage "       run"

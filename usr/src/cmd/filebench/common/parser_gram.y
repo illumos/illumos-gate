@@ -2342,14 +2342,6 @@ parser_file_define(cmd_t *cmd)
 	fileset->fs_dirgamma = avd_int_alloc(0);
 	fileset->fs_sizegamma = avd_int_alloc(0);
 
-	/* if a raw device, all done */
-	if (fileset_checkraw(fileset)) {
-		filebench_log(LOG_VERBOSE, "File %s/%s is RAW device",
-		    avd_get_str(fileset->fs_path),
-		    avd_get_str(fileset->fs_name));
-		return;
-	}
-
 	/* Does file need to be preallocated? */
 	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
 		/* yes */
@@ -2378,16 +2370,6 @@ parser_fileset_define(cmd_t *cmd)
 		filebench_log(LOG_ERROR,
 		    "define fileset: failed to instantiate fileset");
 		filebench_shutdown(1);
-		return;
-	}
-
-	/* if a raw device, Error */
-	if (fileset_checkraw(fileset)) {
-		filebench_log(LOG_ERROR,
-		    "Fileset %s/%s: Cannot create a fileset on a RAW device",
-		    avd_get_str(fileset->fs_path),
-		    avd_get_str(fileset->fs_name));
-		filebench_shutdown(0);
 		return;
 	}
 
@@ -2500,7 +2482,7 @@ parser_proc_create(cmd_t *cmd)
 		return;
 	}
 
-	filebench_shm->starttime = gethrtime();
+	filebench_shm->shm_starttime = gethrtime();
 	eventgen_reset();
 }
 
@@ -2556,7 +2538,7 @@ static void
 parser_filebench_shutdown(cmd_t *cmd)
 {
 	ipc_cleanup();
-	filebench_shutdown(1);
+	filebench_shutdown(0);
 }
 
 /*

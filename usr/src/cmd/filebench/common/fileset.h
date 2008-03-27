@@ -137,8 +137,6 @@ char *fileset_resolvepath(filesetentry_t *entry);
 void fileset_usage(void);
 void fileset_iter(int (*cmd)(fileset_t *fileset, int first));
 int fileset_print(fileset_t *fileset, int first);
-int fileset_checkraw(fileset_t *fileset);
-
 
 #ifdef	__cplusplus
 }

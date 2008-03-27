@@ -46,6 +46,8 @@
  * corresponding to the fileset's filesetentry tree.
  */
 
+static int fileset_checkraw(fileset_t *fileset);
+
 /* parallel allocation control */
 #define	MAX_PARALLOC_THREADS 32
 static pthread_mutex_t	paralloc_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -1065,6 +1067,15 @@ fileset_createset(fileset_t *fileset)
 
 	if (fileset && avd_get_bool(fileset->fs_prealloc)) {
 
+		/* check for raw files */
+		if (fileset_checkraw(fileset)) {
+			filebench_log(LOG_INFO,
+			    "file %s/%s is a RAW device",
+			    avd_get_str(fileset->fs_path),
+			    avd_get_str(fileset->fs_name));
+			return (0);
+		}
+
 		filebench_log(LOG_INFO,
 		    "creating/pre-allocating %s %s",
 		    fileset_entity_name(fileset),
@@ -1082,6 +1093,16 @@ fileset_createset(fileset_t *fileset)
 
 		list = filebench_shm->filesetlist;
 		while (list) {
+			/* check for raw files */
+			if (fileset_checkraw(list)) {
+				filebench_log(LOG_INFO,
+				    "file %s/%s is a RAW device",
+				    avd_get_str(list->fs_path),
+				    avd_get_str(list->fs_name));
+				list = list->fs_next;
+				continue;
+			}
+
 			if ((ret = fileset_populate(list)) != 0)
 				return (ret);
 			if ((ret = fileset_create(list)) != 0)
@@ -1220,17 +1241,33 @@ fileset_checkraw(fileset_t *fileset)
 {
 	char path[MAXPATHLEN];
 	struct stat64 sb;
+	char *pathname;
+	char *setname;
 
 	fileset->fs_attrs &= (~FILESET_IS_RAW_DEV);
 
 #ifdef HAVE_RAW_SUPPORT
 	/* check for raw device */
-	(void) strcpy(path, avd_get_str(fileset->fs_path));
+	if ((pathname = avd_get_str(fileset->fs_path)) == NULL)
+		return (0);
+
+	if ((setname = avd_get_str(fileset->fs_name)) == NULL)
+		return (0);
+
+	(void) strcpy(path, pathname);
 	(void) strcat(path, "/");
-	(void) strcat(path, avd_get_str(fileset->fs_name));
+	(void) strcat(path, setname);
 	if ((stat64(path, &sb) == 0) &&
 	    ((sb.st_mode & S_IFMT) == S_IFBLK) && sb.st_rdev) {
 		fileset->fs_attrs |= FILESET_IS_RAW_DEV;
+		if (!(fileset->fs_attrs & FILESET_IS_FILE)) {
+			filebench_log(LOG_ERROR,
+			    "WARNING Fileset %s/%s Cannot be RAW device",
+			    avd_get_str(fileset->fs_path),
+			    avd_get_str(fileset->fs_name));
+			filebench_shutdown(1);
+		}
+
 		return (1);
 	}
 #endif /* HAVE_RAW_SUPPORT */

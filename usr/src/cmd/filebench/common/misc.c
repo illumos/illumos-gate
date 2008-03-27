@@ -271,7 +271,7 @@ fatal:
 	va_end(args);
 
 	if (level == LOG_FATAL) {
-		(void) fprintf(stdout, "%s\n", line);
+		(void) fprintf(stderr, "%s\n", line);
 		return;
 	}
 
@@ -283,6 +283,8 @@ fatal:
 			(void) snprintf(buf, sizeof (buf), "%s\n", line);
 			(void) write(filebench_shm->log_fd, buf, strlen(buf));
 			(void) fsync(filebench_shm->log_fd);
+			(void) ipc_mutex_unlock(&filebench_shm->msg_lock);
+			return;
 		}
 
 	} else if (level == LOG_DUMP) {
@@ -290,24 +292,31 @@ fatal:
 			(void) snprintf(buf, sizeof (buf), "%s\n", line);
 			(void) write(filebench_shm->dump_fd, buf, strlen(buf));
 			(void) fsync(filebench_shm->dump_fd);
+			(void) ipc_mutex_unlock(&filebench_shm->msg_lock);
+			return;
 		}
 
 	} else if (filebench_shm->debug_level > LOG_INFO) {
-		(void) fprintf(stdout, "%5d: %4.3f: %s",
-		    (int)my_pid, (now - filebench_shm->epoch) / FSECS,
+		if (level < LOG_INFO)
+			(void) fprintf(stderr, "%5d: ", (int)my_pid);
+		else
+			(void) fprintf(stdout, "%5d: ", (int)my_pid);
+	}
+
+	if (level < LOG_INFO) {
+		(void) fprintf(stderr, "%4.3f: %s",
+		    (now - filebench_shm->epoch) / FSECS,
 		    line);
+
+		if (my_procflow == NULL)
+			(void) fprintf(stderr, " on line %d", lex_lineno);
+
+		(void) fprintf(stderr, "\n");
+		(void) fflush(stderr);
 	} else {
 		(void) fprintf(stdout, "%4.3f: %s",
 		    (now - filebench_shm->epoch) / FSECS,
 		    line);
-	}
-
-	if (level == LOG_ERROR) {
-		if (my_procflow == NULL)
-			(void) fprintf(stdout, " on line %d", lex_lineno);
-	}
-
-	if ((level != LOG_LOG) && (level != LOG_DUMP)) {
 		(void) fprintf(stdout, "\n");
 		(void) fflush(stdout);
 	}

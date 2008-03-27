@@ -109,7 +109,7 @@ void filebench_shutdown(int error);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.2.1"
+#define	FILEBENCH_VERSION	"1.2.2"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024

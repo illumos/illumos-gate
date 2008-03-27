@@ -85,13 +85,13 @@ typedef struct filebench_shm {
 	pthread_mutex_t threadflow_lock;
 	pthread_mutex_t flowop_lock;
 	pthread_mutex_t msg_lock;
-	pthread_mutex_t malloc_lock;
-	pthread_mutex_t ism_lock;
+	pthread_mutex_t shm_malloc_lock;
+	pthread_mutex_t shm_ism_lock;
 	pthread_rwlock_t run_lock;
 	pthread_rwlock_t flowop_find_lock;
 
-	char		*string_ptr;
-	char		*path_ptr;
+	char		*shm_string_ptr;
+	char		*shm_path_ptr;
 	fileset_t	*filesetlist;
 	flowop_t	*flowoplist;
 	procflow_t	*proclist;
@@ -100,7 +100,7 @@ typedef struct filebench_shm {
 	randdist_t	*shm_rand_list;
 	int		debug_level;
 	hrtime_t	epoch;
-	hrtime_t	starttime;
+	hrtime_t	shm_starttime;
 	int		bequiet;
 	key_t		semkey;
 	int		seminit;
@@ -123,21 +123,22 @@ typedef struct filebench_shm {
 	int		f_abort;
 	int		shm_rmode;
 	int		shm_1st_err;
+	int		shm_bitmap[FILEBENCH_TYPES][FILEBENCH_MAXBITMAP];
+	int		shm_lastbitmapindex[FILEBENCH_TYPES];
 
-	int		marker;
+	int		shm_marker;
 
-	fileset_t	fileset[FILEBENCH_NFILESETS];
-	filesetentry_t	filesetentry[FILEBENCH_NFILESETENTRIES];
-	char		filesetpaths[FILEBENCH_FILESETPATHMEMORY];
-	procflow_t	procflow[FILEBENCH_NPROCFLOWS];
-	threadflow_t	threadflow[FILEBENCH_NTHREADFLOWS];
-	flowop_t	flowop[FILEBENCH_NFLOWOPS];
-	var_t		var[FILEBENCH_NVARS];
+	fileset_t	shm_fileset[FILEBENCH_NFILESETS];
+	filesetentry_t	shm_filesetentry[FILEBENCH_NFILESETENTRIES];
+	char		shm_filesetpaths[FILEBENCH_FILESETPATHMEMORY];
+	procflow_t	shm_procflow[FILEBENCH_NPROCFLOWS];
+	threadflow_t	shm_threadflow[FILEBENCH_NTHREADFLOWS];
+	flowop_t	shm_flowop[FILEBENCH_NFLOWOPS];
+	var_t		shm_var[FILEBENCH_NVARS];
 	randdist_t	shm_randdist[FILEBENCH_NRANDDISTS];
 	struct avd	shm_avd_ptrs[FILEBENCH_NVARS * 2];
-	char		strings[FILEBENCH_STRINGMEMORY];
+	char		shm_strings[FILEBENCH_STRINGMEMORY];
 	char		semids[FILEBENCH_NSEMS];
-	int		bitmap[FILEBENCH_TYPES][FILEBENCH_MAXBITMAP];
 } filebench_shm_t;
 
 extern char *shmpath;
