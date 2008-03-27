@@ -827,8 +827,14 @@ sa_init(int init_service)
 	handle = calloc(sizeof (struct sa_handle_impl), 1);
 
 	if (handle != NULL) {
-		/* get protocol specific structures */
-		(void) proto_plugin_init();
+		/*
+		 * Get protocol specific structures, but only if this
+		 * is the only handle.
+		 */
+		(void) mutex_lock(&sa_global_lock);
+		if (sa_global_handles == NULL)
+			(void) proto_plugin_init();
+		(void) mutex_unlock(&sa_global_lock);
 		if (init_service & SA_INIT_SHARE_API) {
 			/*
 			 * initialize access into libzfs. We use this
@@ -1030,10 +1036,13 @@ sa_fini(sa_handle_t handle)
 
 		/*
 		 * If this was the last handle to release, unload the
-		 * plugins that were loaded.
+		 * plugins that were loaded. Use a mutex in case
+		 * another thread is reinitializing.
 		 */
+		(void) mutex_lock(&sa_global_lock);
 		if (sa_global_handles == NULL)
 			(void) proto_plugin_fini();
+		(void) mutex_unlock(&sa_global_lock);
 
 	}
 }

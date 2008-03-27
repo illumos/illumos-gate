@@ -39,6 +39,8 @@
 #include <dirent.h>
 #include <libintl.h>
 #include <sys/systeminfo.h>
+#include <thread.h>
+#include <synch.h>
 
 #define	MAXISALEN	257	/* based on sysinfo(2) man page */
 
@@ -72,7 +74,6 @@ proto_plugin_init()
 {
 	struct sa_proto_plugin *proto;
 	int num_protos = 0;
-	int err;
 	struct sa_plugin_ops *plugin_ops;
 	void *dlhandle;
 	DIR *dir;
@@ -119,6 +120,9 @@ proto_plugin_init()
 					sap_proto_list = proto;
 				} else {
 					ret = SA_NO_MEMORY;
+					/* Don't leak a dlhandle */
+					(void) dlclose(dlhandle);
+					break;
 				}
 			} else {
 				(void) fprintf(stderr,
@@ -143,7 +147,8 @@ proto_plugin_init()
 			for (i = 0, tmp = sap_proto_list;
 			    i < num_protos && tmp != NULL;
 			    tmp = tmp->plugin_next) {
-				err = 0;
+				int err;
+				err = SA_OK;
 				if (tmp->plugin_ops->sa_init != NULL)
 					err = tmp->plugin_ops->sa_init();
 				if (err == SA_OK) {
@@ -159,13 +164,17 @@ proto_plugin_init()
 					i++;
 				}
 			}
+		} else {
+			ret = SA_NO_MEMORY;
 		}
-	} else {
-		/*
-		 * There was an error, so cleanup prior to return of failure.
-		 */
-		proto_plugin_fini();
 	}
+
+	/*
+	 * There was an error, so cleanup prior to return of failure.
+	 */
+	if (ret != SA_OK)
+		proto_plugin_fini();
+
 	return (ret);
 }
 
@@ -214,14 +223,20 @@ static struct sa_plugin_ops *
 find_protocol(char *proto)
 {
 	int i;
+	struct sa_plugin_ops *ops = NULL;
+	extern mutex_t sa_global_lock;
 
+	(void) mutex_lock(&sa_global_lock);
 	if (proto != NULL) {
 		for (i = 0; i < sa_proto_handle.sa_num_proto; i++) {
-			if (strcmp(proto, sa_proto_handle.sa_proto[i]) == 0)
-				return (sa_proto_handle.sa_ops[i]);
+			if (strcmp(proto, sa_proto_handle.sa_proto[i]) == 0) {
+				ops = sa_proto_handle.sa_ops[i];
+				break;
+			}
 		}
 	}
-	return (NULL);
+	(void) mutex_unlock(&sa_global_lock);
+	return (ops);
 }
 
 /*
