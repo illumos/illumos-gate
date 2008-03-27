@@ -609,6 +609,7 @@ update_sched(ulwp_t *self)
 		break;
 	case SCHED_FIFO:
 	case SCHED_RR:
+		self->ul_rtclassid = pccp->pcc_info.pc_cid;
 		priority = ((rtparms_t *)pcparm.pc_clparms)->rt_pri;
 		policy =
 		    ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs == RT_TQINF?

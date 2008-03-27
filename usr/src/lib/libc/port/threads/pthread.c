@@ -57,7 +57,6 @@ _thr_setparam(pthread_t tid, int policy, int prio)
 	} else {
 		if (policy == ulwp->ul_policy &&
 		    (policy == SCHED_FIFO || policy == SCHED_RR) &&
-		    ulwp->ul_cid == ulwp->ul_rtclassid &&
 		    ulwp->ul_epri != 0) {
 			/*
 			 * Don't change the ceiling priority,
@@ -70,6 +69,8 @@ _thr_setparam(pthread_t tid, int policy, int prio)
 		} else if ((cid = setparam(P_LWPID, tid, policy, prio)) == -1) {
 			error = errno;
 		} else {
+			if (policy == SCHED_FIFO || policy == SCHED_RR)
+				ulwp->ul_rtclassid = cid;
 			ulwp->ul_cid = cid;
 			ulwp->ul_pri = prio;
 			_membar_producer();
@@ -214,6 +215,8 @@ _pthread_getschedparam(pthread_t tid, int *policy, struct sched_param *param)
 			 */
 			param->sched_priority = ulwp->ul_pri;
 		} else {
+			if (*policy == SCHED_FIFO || *policy == SCHED_RR)
+				ulwp->ul_rtclassid = cid;
 			ulwp->ul_cid = cid;
 			ulwp->ul_pri = param->sched_priority;
 			_membar_producer();

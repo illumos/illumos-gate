@@ -1320,6 +1320,7 @@ libc_init(void)
 	self->ul_policy = -1;		/* initialize only when needed */
 	self->ul_pri = 0;
 	self->ul_cid = 0;
+	self->ul_rtclassid = -1;
 	self->ul_uberdata = udp;
 	if (oldself != NULL) {
 		int i;
@@ -1397,7 +1398,6 @@ libc_init(void)
 		/* tls_size was zero when oldself was allocated */
 		lfree(oldself, sizeof (ulwp_t));
 	}
-	self->ul_rtclassid = get_info_by_policy(SCHED_FIFO)->pcc_info.pc_cid;
 	mutex_setup();
 	atfork_init();
 	signal_init();
