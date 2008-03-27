@@ -680,7 +680,7 @@ struct tempreserve {
 static int
 dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
     boolean_t ignorequota, boolean_t checkrefquota, list_t *tr_list,
-    dmu_tx_t *tx)
+    dmu_tx_t *tx, boolean_t first)
 {
 	uint64_t txg = tx->tx_txg;
 	uint64_t est_inflight, used_on_disk, quota, parent_rsrv;
@@ -705,9 +705,11 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	used_on_disk = dd->dd_used_bytes;
 
 	/*
-	 * Check for dataset reference quota on first iteration.
+	 * On the first iteration, fetch the dataset's used-on-disk and
+	 * refreservation values. Also, if checkrefquota is set, test if
+	 * allocating this space would exceed the dataset's refquota.
 	 */
-	if (list_head(tr_list) == NULL && tx->tx_objset) {
+	if (first && tx->tx_objset) {
 		int error;
 		dsl_dataset_t *ds = tx->tx_objset->os->os_dsl_dataset;
 
@@ -779,7 +781,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 		boolean_t ismos = (dd->dd_phys->dd_head_dataset_obj == 0);
 
 		return (dsl_dir_tempreserve_impl(dd->dd_parent,
-		    parent_rsrv, netfree, ismos, TRUE, tr_list, tx));
+		    parent_rsrv, netfree, ismos, TRUE, tr_list, tx, FALSE));
 	} else {
 		return (0);
 	}
@@ -835,7 +837,7 @@ dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize, uint64_t asize,
 		list_insert_tail(tr_list, tr);
 
 		err = dsl_dir_tempreserve_impl(dd, asize, fsize >= asize,
-		    FALSE, asize > usize, tr_list, tx);
+		    FALSE, asize > usize, tr_list, tx, TRUE);
 	}
 
 	if (err)
