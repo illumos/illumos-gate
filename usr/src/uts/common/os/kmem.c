@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,7 +295,7 @@ verify_and_copy_pattern(uint64_t old, uint64_t new, void *buf_arg, size_t size)
 	for (buf = buf_arg; buf < bufend; buf++) {
 		if (*buf != old) {
 			copy_pattern(old, buf_arg,
-				(char *)buf - (char *)buf_arg);
+			    (char *)buf - (char *)buf_arg);
 			return (buf);
 		}
 		*buf = new;
@@ -564,7 +564,7 @@ kmem_log_enter(kmem_log_header_t *lhp, void *data, size_t size)
 		clhp->clh_chunk = lhp->lh_free[lhp->lh_head];
 		lhp->lh_head = (lhp->lh_head + 1) % lhp->lh_nchunks;
 		clhp->clh_current = lhp->lh_base +
-			clhp->clh_chunk * lhp->lh_chunksize;
+		    clhp->clh_chunk * lhp->lh_chunksize;
 		clhp->clh_avail = lhp->lh_chunksize;
 		if (size > lhp->lh_chunksize)
 			size = lhp->lh_chunksize;
@@ -736,6 +736,8 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 	sp = cp->cache_freelist;
 	ASSERT(sp->slab_cache == cp);
 	if (sp->slab_head == NULL) {
+		ASSERT(cp->cache_bufslab == 0);
+
 		/*
 		 * The freelist is empty.  Create a new slab.
 		 */
@@ -746,6 +748,7 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 		cp->cache_slab_create++;
 		if ((cp->cache_buftotal += sp->slab_chunks) > cp->cache_bufmax)
 			cp->cache_bufmax = cp->cache_buftotal;
+		cp->cache_bufslab += sp->slab_chunks;
 		sp->slab_next = cp->cache_freelist;
 		sp->slab_prev = cp->cache_freelist->slab_prev;
 		sp->slab_next->slab_prev = sp;
@@ -753,6 +756,7 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 		cp->cache_freelist = sp;
 	}
 
+	cp->cache_bufslab--;
 	sp->slab_refcnt++;
 	ASSERT(sp->slab_refcnt <= sp->slab_chunks);
 
@@ -831,7 +835,7 @@ kmem_slab_free(kmem_cache_t *cp, void *buf)
 		if (cp->cache_flags & KMF_CONTENTS)
 			((kmem_bufctl_audit_t *)bcp)->bc_contents =
 			    kmem_log_enter(kmem_content_log, buf,
-				cp->cache_contents);
+			    cp->cache_contents);
 		KMEM_AUDIT(kmem_transaction_log, cp, bcp);
 	}
 
@@ -853,6 +857,7 @@ kmem_slab_free(kmem_cache_t *cp, void *buf)
 	bcp->bc_next = sp->slab_head;
 	sp->slab_head = bcp;
 
+	cp->cache_bufslab++;
 	ASSERT(sp->slab_refcnt >= 1);
 	if (--sp->slab_refcnt == 0) {
 		/*
@@ -865,6 +870,7 @@ kmem_slab_free(kmem_cache_t *cp, void *buf)
 			cp->cache_freelist = sp->slab_next;
 		cp->cache_slab_destroy++;
 		cp->cache_buftotal -= sp->slab_chunks;
+		cp->cache_bufslab -= sp->slab_chunks;
 		mutex_exit(&cp->cache_lock);
 		kmem_slab_destroy(cp, sp);
 		return;
@@ -1860,7 +1866,6 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 {
 	struct kmem_cache_kstat *kmcp = &kmem_cache_kstat;
 	kmem_cache_t *cp = ksp->ks_private;
-	kmem_slab_t *sp;
 	uint64_t cpu_buf_avail;
 	uint64_t buf_avail = 0;
 	int cpu_seqid;
@@ -1918,9 +1923,7 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 	kmcp->kmc_chunk_size.value.ui64	= cp->cache_chunksize;
 	kmcp->kmc_slab_size.value.ui64	= cp->cache_slabsize;
 	kmcp->kmc_buf_constructed.value.ui64 = buf_avail;
-	for (sp = cp->cache_freelist; sp != &cp->cache_nullslab;
-	    sp = sp->slab_next)
-		buf_avail += sp->slab_chunks - sp->slab_refcnt;
+	buf_avail += cp->cache_bufslab;
 	kmcp->kmc_buf_avail.value.ui64	= buf_avail;
 	kmcp->kmc_buf_inuse.value.ui64	= cp->cache_buftotal - buf_avail;
 	kmcp->kmc_buf_total.value.ui64	= cp->cache_buftotal;
