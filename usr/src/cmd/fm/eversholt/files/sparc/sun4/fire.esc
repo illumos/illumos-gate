@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /* 
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -57,6 +57,11 @@
 #define	PF_CE (1 << 1)
 #define	MATCH_CE ((payloadprop("severity") == PF_CE) || \
     (payloadprop("severity") == (PF_CE | PF_NO_ERROR)))
+
+
+#define MATCH_UNRECOGNIZED ((payloadprop("sysino") == 0) && \
+    (payloadprop("ehdl") == 0) && \
+    (payloadprop("stick") == 0))
 
 /*
  * Test for primary or secondary ereports
@@ -113,8 +118,6 @@ event ereport.io.fire.jbc.wr_dpe@hostbridge/pciexrc{within(5s)};
 /***************
  * DMC ereports
  ***************/
-event ereport.io.fire.dmc.byp_err@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.dmc.byp_oor@hostbridge/pciexrc{within(5s)}; 
 event ereport.io.fire.dmc.cor_not_en@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.eq_not_en@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.eq_over@hostbridge/pciexrc{within(5s)};
@@ -130,11 +133,8 @@ event ereport.io.fire.dmc.tbw_dpe@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.tbw_err@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.tbw_ude@hostbridge/pciexrc{within(5s)}; 
 event ereport.io.fire.dmc.trn_err@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.dmc.trn_oor@hostbridge/pciexrc{within(5s)}; 
 event ereport.io.fire.dmc.ttc_cae@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.ttc_dpe@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.dmc.tte_inv@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.dmc.tte_prt@hostbridge/pciexrc{within(5s)}; 
 
 /***************
  * TLU Other Event ereports
@@ -143,11 +143,7 @@ event ereport.io.fire.pec.crs@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.edp@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.ehp@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.eip@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.pec.emp@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.pec.epe@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.pec.ero@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.erp@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.pec.eru@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.ihb_pe@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.iip@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.ldn@hostbridge/pciexrc{within(5s)};
@@ -155,27 +151,6 @@ event ereport.io.fire.pec.lin@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.lrs@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.lup@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.mrc@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.pec.ruc@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.pec.wuc@hostbridge/pciexrc{within(5s)};
-
-/***************
- * TLU Uncorrectable and Correctable ereports
- ***************/
-event ereport.io.fire.pec.ur@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.uc@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.cto@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.rof@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.mfc@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.mfp@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.pois@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.fcp@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.dlp@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.te@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.re@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.bdp@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.btp@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.rnr@hostbridge/pciexrc {within(5s)};
-event ereport.io.fire.pec.rto@hostbridge/pciexrc {within(5s)};
 
 /***************
  * Fire Fabric ereport
@@ -252,7 +227,7 @@ event error.io.fire.dmc.bad_state@hostbridge/pciexrc;
 prop fault.io.fire.sw-epkt@hostbridge/pciexrc,
 	fault.io.fire.fw-epkt@hostbridge/pciexrc,
 	fault.io.fire.sw-fw-mismatch@hostbridge/pciexrc->(A)
-    ereport.io.fire.epkt@hostbridge/pciexrc;
+    ereport.io.fire.epkt@hostbridge/pciexrc { MATCH_UNRECOGNIZED };
 
 prop fault.io.fire.hb.sw-config@hostbridge/pciexrc (0)->
     error.io.fire.jbc.driver@hostbridge/pciexrc;
@@ -414,7 +389,6 @@ prop error.io.fire.dmc.driver@hostbridge/pciexrc (1)->
  * The px driver should not have been in this state.  Defect the px driver.
  ***************/
 event error.io.fire.dmc.bad_state-mmu@hostbridge/pciexrc;
-event error.io.fire.dmc.bad_state-no_fab@hostbridge/pciexrc;
 
 prop error.io.fire.dmc.bad_state@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.cor_not_en@hostbridge/pciexrc,
@@ -423,14 +397,7 @@ prop error.io.fire.dmc.bad_state@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.msi_not_en@hostbridge/pciexrc,
     ereport.io.fire.dmc.nonfatal_not_en@hostbridge/pciexrc,
     ereport.io.fire.dmc.pmeack_not_en@hostbridge/pciexrc,
-    ereport.io.fire.dmc.pmpme_not_en@hostbridge/pciexrc,
-    error.io.fire.dmc.bad_state-no_fab@hostbridge/pciexrc;
-
-prop error.io.fire.dmc.bad_state-no_fab@hostbridge/pciexrc (1)->
-    error.io.fire.dmc.bad_state-mmu@hostbridge/pciexrc;
-
-prop error.io.fire.dmc.bad_state-no_fab@hostbridge/pciexrc (1)->
-    error.io.fire.fabric-sib@hostbridge/pciexrc;
+    ereport.io.fire.dmc.pmpme_not_en@hostbridge/pciexrc;
 
 prop error.io.fire.dmc.bad_state-mmu@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.tbw_dme@hostbridge/pciexrc,
@@ -452,50 +419,16 @@ prop error.io.fire.dmc.asic@hostbridge/pciexrc (1)->
  * -------------
  * Fire asic error.
  ***************/
-event error.io.fire.dmc.bad_parity-no_fab@hostbridge/pciexrc;
 event error.io.fire.dmc.bad_parity-mmu@hostbridge/pciexrc;
 
 prop error.io.fire.dmc.bad_parity@hostbridge/pciexrc (1)-> 
-    ereport.io.fire.dmc.msi_par_err@hostbridge/pciexrc,
-    error.io.fire.dmc.bad_parity-no_fab@hostbridge/pciexrc;
-
-prop error.io.fire.dmc.bad_parity-no_fab@hostbridge/pciexrc (1)->
-    error.io.fire.dmc.bad_parity-mmu@hostbridge/pciexrc;
-
-prop error.io.fire.dmc.bad_parity-no_fab@hostbridge/pciexrc (1)->
-    error.io.fire.fabric-sib@hostbridge/pciexrc;
+    ereport.io.fire.dmc.msi_par_err@hostbridge/pciexrc;
 
 prop error.io.fire.dmc.bad_parity-mmu@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.tbw_dpe@hostbridge/pciexrc,
     ereport.io.fire.dmc.tbw_ude@hostbridge/pciexrc,
     ereport.io.fire.dmc.ttc_dpe@hostbridge/pciexrc;
 	
-
-/***************
- * Bad DMA requests
- * -------------
- * Errors caused by bad leaf drivers, which will end up sending fire.fabric
- * ereport, which will be diagnosed in itself.  Do not diagnose the bad DMA
- * requests and rely on the fire.fabric error being there.  Propagate to a
- * fault.io.fire.pciex.device.
- *
- * Atleast 1 PCIe device will be faulted.  PCI devices will also be if the
- * DMA came from a PCI device.
- ***************/
-event error.io.fire.dmc.fabric_diag@hostbridge/pciexrc;
-
-prop error.io.fire.dmc.fabric_diag@hostbridge/pciexrc(0) ->
-    ereport.io.fire.dmc.byp_err@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.dmc.byp_oor@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.dmc.trn_oor@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.dmc.tte_inv@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.dmc.tte_prt@hostbridge/pciexrc{ IS_PRIMARY };
-
-prop error.io.fire.fabric@pciexbus/pciexdev/pciexfn (0) ->
-	error.io.fire.dmc.fabric_diag@hostbridge/pciexrc {
-		is_under(hostbridge/pciexrc, pciexbus/pciexdev/pciexfn)
-	};
-
 /***************
  * Malformed MSI
  * -------------
@@ -556,21 +489,14 @@ prop fault.io.fire.pci.device@pcibus[b]/pcidev[d]/pcifn[0] (0) ->
 event error.io.fire.dmc.secondary@hostbridge/pciexrc; 
 
 prop error.io.fire.dmc.secondary@hostbridge/pciexrc (0) ->
-    ereport.io.fire.dmc.byp_err@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.dmc.byp_oor@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.dmc.msi_mal_err@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.dmc.trn_oor@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.dmc.tte_inv@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.dmc.tte_prt@hostbridge/pciexrc{ IS_SECONDARY };
+    ereport.io.fire.dmc.msi_mal_err@hostbridge/pciexrc{ IS_SECONDARY };
 
 /******************************
  * PEC Rules Begin Here       *
  ******************************/
 
 event error.io.fire.pec.buffer-parity@hostbridge/pciexrc;
-event error.io.fire.pec.misc-egress@hostbridge/pciexrc ; 
 event error.io.fire.pec.adjacentnode@hostbridge/pciexrc ; 
-event error.io.fire.pec.fabric_error@hostbridge/pciexrc ; 
 
 /***************
  * Fire PX SW error
@@ -589,7 +515,6 @@ prop fault.io.fire.pec.sw-algorithm@hostbridge/pciexrc (0) ->
  ***************/
 prop error.io.fire.pec.asic@hostbridge/pciexrc (1)->
     error.io.fire.pec.buffer-parity@hostbridge/pciexrc,
-    error.io.fire.pec.misc-egress@hostbridge/pciexrc,
     error.io.fire.pec.adjacentnode@hostbridge/pciexrc; 
 
 prop error.io.fire.pec.buffer-parity@hostbridge/pciexrc (1) ->
@@ -599,37 +524,6 @@ prop error.io.fire.pec.buffer-parity@hostbridge/pciexrc (1) ->
     ereport.io.fire.pec.erp@hostbridge/pciexrc,
     ereport.io.fire.pec.ihb_pe@hostbridge/pciexrc,
     ereport.io.fire.pec.iip@hostbridge/pciexrc;
-
-prop error.io.fire.pec.misc-egress@hostbridge/pciexrc (1) ->
-    ereport.io.fire.pec.emp@hostbridge/pciexrc,
-    ereport.io.fire.pec.epe@hostbridge/pciexrc,
-    ereport.io.fire.pec.ero@hostbridge/pciexrc,
-    ereport.io.fire.pec.eru@hostbridge/pciexrc;
-
-/***************
- * Bad IO requests
- * -------------
- * Errors caused by bad leaf drivers, which will end up sending fire.fabric
- * ereport, which will be diagnosed in itself.  Do not diagnose the bad IO
- * requests and rely on the fire.fabric error being there.  Propagate to a
- * fault.io.fire.pciex.device.
- *
- * Atleast 1 PCIe device will be fauled.  PCI will be fault as well if the
- * DMA came from a PCI device.
- ***************/
-event error.io.fire.pec.fabric_diag@hostbridge/pciexrc;
-
-prop error.io.fire.pec.fabric_diag@hostbridge/pciexrc(1) ->
-    ereport.io.fire.pec.wuc@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.pec.ruc@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.pec.pois@hostbridge/pciexrc{ IS_PRIMARY },
-    ereport.io.fire.pec.ur@hostbridge/pciexrc{ IS_PRIMARY };
-
-
-prop error.io.fire.fabric@pciexbus/pciexdev/pciexfn (0) ->
-	error.io.fire.pec.fabric_diag@hostbridge/pciexrc {
-		is_under(hostbridge/pciexrc, pciexbus/pciexdev/pciexfn)
-	};
 
 /***************
  * Failed Links
@@ -680,39 +574,6 @@ prop fault.io.fire.pciex.device@hostbridge/pciexrc/pciexbus/pciexdev/pciexfn
 prop error.io.fire.pec.adjacentnode@hostbridge/pciexrc (0) ->
     ereport.io.fire.link-events-trip@hostbridge/pciexrc;
 
-/***************
- * Undiagnosible Secondary Errors
- * -------------
- * Secondary errors of the ereport that the device is at fault.
- * Undiagnosed the secondary errors since the payload is invalid.
- ***************/
-event error.io.fire.pec.secondary@hostbridge/pciexrc; 
-
-prop error.io.fire.pec.secondary@hostbridge/pciexrc (1) ->
-    ereport.io.fire.pec.ruc@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.pec.wuc@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.pec.pois@hostbridge/pciexrc{ IS_SECONDARY },
-    ereport.io.fire.pec.ur@hostbridge/pciexrc{ IS_SECONDARY };
-
-/*
- * For logging purpose only.
- * The Fire nexus driver generates equivalent pciex ereports for the 
- * common pciex rules to diagnose.
- */
-prop error.io.fire.pec.fabric_error@hostbridge/pciexrc (0) ->
-    ereport.io.fire.pec.bdp@hostbridge/pciexrc,
-    ereport.io.fire.pec.btp@hostbridge/pciexrc,
-    ereport.io.fire.pec.cto@hostbridge/pciexrc, 
-    ereport.io.fire.pec.dlp@hostbridge/pciexrc,
-    ereport.io.fire.pec.fcp@hostbridge/pciexrc,
-    ereport.io.fire.pec.mfc@hostbridge/pciexrc,
-    ereport.io.fire.pec.mfp@hostbridge/pciexrc,
-    ereport.io.fire.pec.re@hostbridge/pciexrc,
-    ereport.io.fire.pec.rnr@hostbridge/pciexrc,
-    ereport.io.fire.pec.rof@hostbridge/pciexrc,
-    ereport.io.fire.pec.rto@hostbridge/pciexrc,
-    ereport.io.fire.pec.te@hostbridge/pciexrc,
-    ereport.io.fire.pec.uc@hostbridge/pciexrc;
 
 /******************************
  * Fabric Rules Begin Here       *
@@ -786,9 +647,6 @@ event error.io.fire.dmc.nodiag@hostbridge/pciexrc;
 prop error.io.fire.dmc.nodiag@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.tbw_err@hostbridge/pciexrc;
 
-prop error.io.fire.dmc.nodiag@hostbridge/pciexrc (1)->
-    error.io.fire.fabric-sib@hostbridge/pciexrc;
-
 prop upset.io.fire.nodiag@hostbridge/pciexrc (0)-> 
     ereport.io.fire.jbc.ce_asyn@hostbridge/pciexrc, /* CPU */
     ereport.io.fire.jbc.jbe@hostbridge/pciexrc, /* CPU */
@@ -798,8 +656,6 @@ prop upset.io.fire.nodiag@hostbridge/pciexrc (0)->
     ereport.io.fire.jbc.unsol_rd@hostbridge/pciexrc, /* CPU */
     ereport.io.fire.pec.lin@hostbridge/pciexrc,
     ereport.io.fire.pec.lup@hostbridge/pciexrc,
-    error.io.fire.pec.fabric_error@hostbridge/pciexrc,
-    error.io.fire.pec.secondary@hostbridge/pciexrc,
     error.io.fire.dmc.nodiag@hostbridge/pciexrc,
-    error.io.fire.dmc.fabric_diag@hostbridge/pciexrc,
-    error.io.fire.dmc.secondary@hostbridge/pciexrc; 
+    error.io.fire.dmc.secondary@hostbridge/pciexrc,
+    ereport.io.fire.epkt@hostbridge/pciexrc { !MATCH_UNRECOGNIZED };

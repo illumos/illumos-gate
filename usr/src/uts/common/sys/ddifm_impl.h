@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@ struct i_ddi_fmtgt {
 
 struct i_ddi_fmhdl {
 	kmutex_t fh_lock;		/* error handler lock */
+	kthread_t *fh_lock_owner;
 	struct i_ddi_fmc *fh_dma_cache;	/* fm dma handle cache */
 	struct i_ddi_fmc *fh_acc_cache;	/* fm access handle cache */
 	dev_info_t *fh_dip;
@@ -114,6 +115,7 @@ void i_ddi_drv_ereport_post(dev_info_t *, const char *, nvlist_t *, int);
 /* target error handler add/remove/dispatch */
 extern void i_ddi_fm_handler_enter(dev_info_t *);
 extern void i_ddi_fm_handler_exit(dev_info_t *);
+extern boolean_t i_ddi_fm_handler_owned(dev_info_t *);
 
 /* access and dma handle protection support */
 extern void i_ddi_fm_acc_err_set(ddi_acc_handle_t, uint64_t, int, int);

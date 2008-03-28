@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/membar.h>
@@ -45,6 +46,9 @@ static int  px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr,
 
 static void px_err_log_handle(dev_info_t *dip, px_rc_err_t *epkt,
     boolean_t is_block_pci, char *msg);
+static void px_err_send_epkt_erpt(dev_info_t *dip, px_rc_err_t *epkt,
+    boolean_t is_block_pci, int err, ddi_fm_error_t *derr,
+    boolean_t is_valid_epkt);
 static int px_cb_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_mmu_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
@@ -133,10 +137,10 @@ px_err_cmn_intr(px_t *px_p, ddi_fm_error_t *derr, int caller, int block)
  */
 static void
 px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
-	pf_data_t	pf_data = {0};
+	pf_pcie_adv_err_regs_t adv_reg;
 	int		sts = DDI_SUCCESS;
 	pcie_req_id_t	fault_bdf = 0;
-	uint32_t	fault_addr = 0;
+	uint64_t	fault_addr = 0;
 	uint16_t	s_status = 0;
 
 	/* Add an PCIE PF_DATA Entry */
@@ -151,14 +155,12 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 			sts = DDI_FAILURE;
 	} else {
 		px_pec_err_t	*pec_p = (px_pec_err_t *)epkt;
-		uint32_t	trans_type;
 		uint32_t	dir = pec_p->pec_descr.dir;
 
-		pf_data.rp_bdf = px_p->px_bdf;
-		pf_data.aer_h0 = (uint32_t)(pec_p->hdr[0]);
-		pf_data.aer_h1 = (uint32_t)(pec_p->hdr[0] >> 32);
-		pf_data.aer_h2 = (uint32_t)(pec_p->hdr[1]);
-		pf_data.aer_h3 = (uint32_t)(pec_p->hdr[1] >> 32);
+		adv_reg.pcie_ue_hdr[0] = (uint32_t)(pec_p->hdr[0]);
+		adv_reg.pcie_ue_hdr[1] = (uint32_t)(pec_p->hdr[0] >> 32);
+		adv_reg.pcie_ue_hdr[2] = (uint32_t)(pec_p->hdr[1]);
+		adv_reg.pcie_ue_hdr[3] = (uint32_t)(pec_p->hdr[1] >> 32);
 
 		/* translate RC UR/CA to legacy secondary errors */
 		if ((dir == DIR_READ || dir == DIR_WRITE) &&
@@ -175,8 +177,9 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 		if (pec_p->ue_reg_status & PCIE_AER_UCE_CA)
 			s_status |= PCI_STAT_S_TARG_AB;
 
-		sts = pf_tlp_decode(dip, &pf_data, &fault_bdf, &fault_addr,
-		    &trans_type);
+		sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
+		fault_bdf = adv_reg.pcie_ue_tgt_bdf;
+		fault_addr = adv_reg.pcie_ue_tgt_bdf;
 	}
 
 	if (sts == DDI_SUCCESS)
@@ -200,11 +203,11 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 {
 	px_t		*px_p = DIP_TO_STATE(fault_p->px_fh_dip);
 	dev_info_t	*rpdip = px_p->px_dip;
-	int		rc_err, fab_err = PF_NO_PANIC, msg;
+	int		rc_err, fab_err, msg;
 	ddi_fm_error_t	derr;
 
-	mutex_enter(&px_p->px_fm_mutex);
-	px_p->px_fm_mutex_owner = curthread;
+	if (px_fm_enter(px_p) != DDI_SUCCESS)
+		goto done;
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -219,20 +222,14 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	rc_err = px_err_epkt_severity(px_p, &derr, epkt, PX_INTR_CALL);
 
 	/* Scan the fabric if the root port is not in drain state. */
-	if (!px_lib_is_in_drain_state(px_p))
-		fab_err = pf_scan_fabric(rpdip, &derr, px_p->px_dq_p,
-		    &px_p->px_dq_tail);
+	fab_err = px_scan_fabric(px_p, rpdip, &derr);
 
 	/* Set the intr state to idle for the leaf that received the mondo */
 	if (px_lib_intr_setstate(rpdip, fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE) != DDI_SUCCESS) {
-		px_p->px_fm_mutex_owner = NULL;
-		mutex_exit(&px_p->px_fm_mutex);
+		px_fm_exit(px_p);
 		return (DDI_INTR_UNCLAIMED);
 	}
-
-	px_p->px_fm_mutex_owner = NULL;
-	mutex_exit(&px_p->px_fm_mutex);
 
 	switch (epkt->rc_descr.block) {
 	case BLOCK_MMU: /* FALLTHROUGH */
@@ -248,8 +245,11 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 		break;
 	}
 
-	px_err_panic(rc_err, msg, fab_err);
+	px_err_panic(rc_err, msg, fab_err, B_TRUE);
+	px_fm_exit(px_p);
+	px_err_panic(rc_err, msg, fab_err, B_FALSE);
 
+done:
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -269,7 +269,7 @@ px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 	dev_info_t	*dip = px_p->px_dip;
 	boolean_t	is_safeacc = B_FALSE;
 	boolean_t	is_block_pci = B_FALSE;
-	char		buf[FM_MAX_CLASS], descr_buf[1024];
+	boolean_t	is_valid_epkt = B_FALSE;
 	int		err = 0;
 
 	/* Cautious access error handling  */
@@ -334,80 +334,107 @@ px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 	if ((err & PX_HW_RESET) || (err & PX_PANIC)) {
 		if (px_log & PX_PANIC)
 			px_err_log_handle(dip, epkt, is_block_pci, "PANIC");
+		is_valid_epkt = B_TRUE;
 	} else if (err & PX_PROTECTED) {
 		if (px_log & PX_PROTECTED)
 			px_err_log_handle(dip, epkt, is_block_pci, "PROTECTED");
+		is_valid_epkt = B_TRUE;
 	} else if (err & PX_NO_PANIC) {
 		if (px_log & PX_NO_PANIC)
 			px_err_log_handle(dip, epkt, is_block_pci, "NO PANIC");
+		is_valid_epkt = B_TRUE;
 	} else if (err & PX_NO_ERROR) {
 		if (px_log & PX_NO_ERROR)
 			px_err_log_handle(dip, epkt, is_block_pci, "NO ERROR");
+		is_valid_epkt = B_TRUE;
 	} else if (err == 0) {
 		px_err_log_handle(dip, epkt, is_block_pci, "UNRECOGNIZED");
+		is_valid_epkt = B_FALSE;
 
-		/* Unrecognized epkt. send ereport */
-		(void) snprintf(buf, FM_MAX_CLASS, "%s", PX_FM_RC_UNRECOG);
-
-		if (is_block_pci) {
-			px_pec_err_t	*pec = (px_pec_err_t *)epkt;
-
-			(void) snprintf(descr_buf, sizeof (descr_buf),
-			    "Epkt contents:\n"
-			    "Block: 0x%x, Dir: 0x%x, Flags: Z=%d, S=%d, R=%d\n"
-			    "I=%d, H=%d, C=%d, U=%d, E=%d, P=%d\n"
-			    "PCI Err Status: 0x%x, PCIe Err Status: 0x%x\n"
-			    "CE Status Reg: 0x%x, UE Status Reg: 0x%x\n"
-			    "HDR1: 0x%lx, HDR2: 0x%lx\n"
-			    "Err Src Reg: 0x%x, Root Err Status: 0x%x\n",
-			    pec->pec_descr.block, pec->pec_descr.dir,
-			    pec->pec_descr.Z, pec->pec_descr.S,
-			    pec->pec_descr.R, pec->pec_descr.I,
-			    pec->pec_descr.H, pec->pec_descr.C,
-			    pec->pec_descr.U, pec->pec_descr.E,
-			    pec->pec_descr.P, pec->pci_err_status,
-			    pec->pcie_err_status, pec->ce_reg_status,
-			    pec->ue_reg_status, pec->hdr[0],
-			    pec->hdr[1], pec->err_src_reg,
-			    pec->root_err_status);
-
-			ddi_fm_ereport_post(dip, buf, derr->fme_ena,
-			    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-			    EPKT_SYSINO, DATA_TYPE_UINT64, pec->sysino,
-			    EPKT_EHDL, DATA_TYPE_UINT64, pec->ehdl,
-			    EPKT_STICK, DATA_TYPE_UINT64, pec->stick,
-			    EPKT_PEC_DESCR, DATA_TYPE_STRING, descr_buf);
-		} else {
-			(void) snprintf(descr_buf, sizeof (descr_buf),
-			    "Epkt contents:\n"
-			    "Block: 0x%x, Op: 0x%x, Phase: 0x%x, Cond: 0x%x\n"
-			    "Dir: 0x%x, Flags: STOP=%d, H=%d, R=%d, D=%d\n"
-			    "M=%d, S=%d, Size: 0x%x, Addr: 0x%lx\n"
-			    "Hdr1: 0x%lx, Hdr2: 0x%lx, Res: 0x%lx\n",
-			    epkt->rc_descr.block, epkt->rc_descr.op,
-			    epkt->rc_descr.phase, epkt->rc_descr.cond,
-			    epkt->rc_descr.dir, epkt->rc_descr.STOP,
-			    epkt->rc_descr.H, epkt->rc_descr.R,
-			    epkt->rc_descr.D, epkt->rc_descr.M,
-			    epkt->rc_descr.S, epkt->size, epkt->addr,
-			    epkt->hdr[0], epkt->hdr[1], epkt->reserved);
-
-			ddi_fm_ereport_post(dip, buf, derr->fme_ena,
-			    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-			    EPKT_SYSINO, DATA_TYPE_UINT64, epkt->sysino,
-			    EPKT_EHDL, DATA_TYPE_UINT64, epkt->ehdl,
-			    EPKT_STICK, DATA_TYPE_UINT64, epkt->stick,
-			    EPKT_RC_DESCR, DATA_TYPE_STRING, descr_buf);
-		}
-
+		/* Panic on a unrecognized epkt */
 		err = PX_PANIC;
 	}
+
+	px_err_send_epkt_erpt(dip, epkt, is_block_pci, err, derr,
+	    is_valid_epkt);
 
 	/* Readjust the severity as a result of safe access */
 	if (is_safeacc && !(err & PX_PANIC) && !(px_die & PX_PROTECTED))
 		err = PX_NO_PANIC;
 
 	return (err);
+}
+
+static void
+px_err_send_epkt_erpt(dev_info_t *dip, px_rc_err_t *epkt,
+    boolean_t is_block_pci, int err, ddi_fm_error_t *derr,
+    boolean_t is_valid_epkt)
+{
+	char buf[FM_MAX_CLASS], descr_buf[1024];
+
+	/* send ereport for debug purposes */
+	(void) snprintf(buf, FM_MAX_CLASS, "%s", PX_FM_RC_UNRECOG);
+
+	if (is_block_pci) {
+		px_pec_err_t *pec = (px_pec_err_t *)epkt;
+		(void) snprintf(descr_buf, sizeof (descr_buf),
+		    "%s Epkt contents:\n"
+		    "Block: 0x%x, Dir: 0x%x, Flags: Z=%d, S=%d, R=%d\n"
+		    "I=%d, H=%d, C=%d, U=%d, E=%d, P=%d\n"
+		    "PCI Err Status: 0x%x, PCIe Err Status: 0x%x\n"
+		    "CE Status Reg: 0x%x, UE Status Reg: 0x%x\n"
+		    "HDR1: 0x%lx, HDR2: 0x%lx\n"
+		    "Err Src Reg: 0x%x, Root Err Status: 0x%x\n"
+		    "Err Severity: 0x%x\n",
+		    is_valid_epkt ? "Valid" : "Invalid",
+		    pec->pec_descr.block, pec->pec_descr.dir,
+		    pec->pec_descr.Z, pec->pec_descr.S,
+		    pec->pec_descr.R, pec->pec_descr.I,
+		    pec->pec_descr.H, pec->pec_descr.C,
+		    pec->pec_descr.U, pec->pec_descr.E,
+		    pec->pec_descr.P, pec->pci_err_status,
+		    pec->pcie_err_status, pec->ce_reg_status,
+		    pec->ue_reg_status, pec->hdr[0],
+		    pec->hdr[1], pec->err_src_reg,
+		    pec->root_err_status, err);
+
+		ddi_fm_ereport_post(dip, buf, derr->fme_ena,
+		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+		    EPKT_SYSINO, DATA_TYPE_UINT64,
+		    is_valid_epkt ? pec->sysino : 0,
+		    EPKT_EHDL, DATA_TYPE_UINT64,
+		    is_valid_epkt ? pec->ehdl : 0,
+		    EPKT_STICK, DATA_TYPE_UINT64,
+		    is_valid_epkt ? pec->stick : 0,
+		    EPKT_PEC_DESCR, DATA_TYPE_STRING, descr_buf);
+	} else {
+		(void) snprintf(descr_buf, sizeof (descr_buf),
+		    "%s Epkt contents:\n"
+		    "Block: 0x%x, Op: 0x%x, Phase: 0x%x, Cond: 0x%x\n"
+		    "Dir: 0x%x, Flags: STOP=%d, H=%d, R=%d, D=%d\n"
+		    "M=%d, S=%d, Size: 0x%x, Addr: 0x%lx\n"
+		    "Hdr1: 0x%lx, Hdr2: 0x%lx, Res: 0x%lx\n"
+		    "Err Severity: 0x%x\n",
+		    is_valid_epkt ? "Valid" : "Invalid",
+		    epkt->rc_descr.block, epkt->rc_descr.op,
+		    epkt->rc_descr.phase, epkt->rc_descr.cond,
+		    epkt->rc_descr.dir, epkt->rc_descr.STOP,
+		    epkt->rc_descr.H, epkt->rc_descr.R,
+		    epkt->rc_descr.D, epkt->rc_descr.M,
+		    epkt->rc_descr.S, epkt->size, epkt->addr,
+		    epkt->hdr[0], epkt->hdr[1], epkt->reserved,
+		    err);
+
+		ddi_fm_ereport_post(dip, buf, derr->fme_ena,
+		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+		    EPKT_SYSINO, DATA_TYPE_UINT64,
+		    is_valid_epkt ? epkt->sysino : 0,
+		    EPKT_EHDL, DATA_TYPE_UINT64,
+		    is_valid_epkt ? epkt->ehdl : 0,
+		    EPKT_STICK, DATA_TYPE_UINT64,
+		    is_valid_epkt ? epkt->stick : 0,
+		    EPKT_RC_DESCR, DATA_TYPE_STRING, descr_buf);
+	}
 }
 
 static void
@@ -559,40 +586,45 @@ px_intr_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 static int
 px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 {
-	px_t		*px_p = DIP_TO_STATE(dip);
-	px_pec_err_t	*pec = (px_pec_err_t *)epkt;
+	px_pec_err_t	*pec_p = (px_pec_err_t *)epkt;
 	px_err_pcie_t	*pcie = (px_err_pcie_t *)epkt;
-	pf_data_t	pf_data;
-	int		x;
+	pf_pcie_adv_err_regs_t adv_reg;
+	int		sts;
 	uint32_t	temp;
 
 	/*
 	 * Check for failed PIO Read/Writes, which are errors that are not
 	 * defined in the PCIe spec.
 	 */
-	pf_data.rp_bdf = px_p->px_bdf;
 	temp = PCIE_AER_UCE_UR | PCIE_AER_UCE_CA;
-	if (((pec->pec_descr.dir == DIR_READ) || (pec->pec_descr.dir ==
-	    DIR_WRITE)) && pec->pec_descr.U && (pec->ue_reg_status & temp)) {
-		pf_data.aer_h0 = (uint32_t)(pec->hdr[0]);
-		pf_data.aer_h1 = (uint32_t)(pec->hdr[0] >> 32);
-		pf_data.aer_h2 = (uint32_t)(pec->hdr[1]);
-		pf_data.aer_h3 = (uint32_t)(pec->hdr[1] >> 32);
+	if (((pec_p->pec_descr.dir == DIR_READ) ||
+	    (pec_p->pec_descr.dir == DIR_WRITE)) &&
+	    pec_p->pec_descr.U && (pec_p->ue_reg_status & temp)) {
+		adv_reg.pcie_ue_hdr[0] = (uint32_t)(pec_p->hdr[0]);
+		adv_reg.pcie_ue_hdr[1] = (uint32_t)(pec_p->hdr[0] >> 32);
+		adv_reg.pcie_ue_hdr[2] = (uint32_t)(pec_p->hdr[1]);
+		adv_reg.pcie_ue_hdr[3] = (uint32_t)(pec_p->hdr[1] >> 32);
 
-		if (pf_tlp_hdl_lookup(dip, derr, &pf_data) == PF_HDL_FOUND)
+		sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
+
+		if (sts == DDI_SUCCESS &&
+		    pf_hdl_lookup(dip, derr->fme_ena,
+		    adv_reg.pcie_ue_tgt_trans,
+		    adv_reg.pcie_ue_tgt_addr,
+		    adv_reg.pcie_ue_tgt_bdf) == PF_HDL_FOUND)
 			return (PX_NO_PANIC);
 		else
 			return (PX_PANIC);
 	}
 
-	if (!pec->pec_descr.C)
-		pec->ce_reg_status = 0;
-	if (!pec->pec_descr.U)
-		pec->ue_reg_status = 0;
-	if (!pec->pec_descr.H)
-		pec->hdr[0] = 0;
-	if (!pec->pec_descr.I)
-		pec->hdr[1] = 0;
+	if (!pec_p->pec_descr.C)
+		pec_p->ce_reg_status = 0;
+	if (!pec_p->pec_descr.U)
+		pec_p->ue_reg_status = 0;
+	if (!pec_p->pec_descr.H)
+		pec_p->hdr[0] = 0;
+	if (!pec_p->pec_descr.I)
+		pec_p->hdr[1] = 0;
 
 	/*
 	 * According to the PCIe spec, there is a first error pointer.  If there
@@ -606,6 +638,7 @@ px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	 */
 	temp = pcie->ue_reg;
 	if (temp) {
+		int x;
 		for (x = 0; !(temp & 0x1); x++) {
 			temp = temp >> 1;
 		}
@@ -637,13 +670,13 @@ px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 static int
 px_mmu_handle_lookup(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 {
-	uint32_t addr = (uint32_t)epkt->addr;
+	uint64_t addr = (uint64_t)epkt->addr;
 	pcie_req_id_t bdf = NULL;
 
 	if (epkt->rc_descr.H) {
 		bdf = (uint32_t)((epkt->hdr[0] >> 16) && 0xFFFF);
 	}
 
-	return (pf_hdl_lookup(dip, derr->fme_ena, PF_DMA_ADDR, addr,
+	return (pf_hdl_lookup(dip, derr->fme_ena, PF_ADDR_DMA, addr,
 	    bdf));
 }

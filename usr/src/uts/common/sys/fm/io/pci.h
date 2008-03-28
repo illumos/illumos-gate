@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +155,9 @@ extern "C" {
 #define	PCIEX_SUE_HDR1		"sue_hdr1"
 #define	PCIEX_SUE_HDR2		"sue_hdr2"
 #define	PCIEX_SUE_HDR3		"sue_hdr3"
+
+/* Common fabric class names */
+#define	PCIEX_FABRIC		"fabric"
 
 #ifdef	__cplusplus
 }

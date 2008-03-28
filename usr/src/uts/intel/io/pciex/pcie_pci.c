@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,11 +48,10 @@
 #include <sys/pcie_impl.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/hotplug/pci/pciehpc.h>
-#include <io/pciex/pcie_error.h>
 #include <io/pciex/pcie_nvidia.h>
 #include <io/pciex/pcie_nb5000.h>
 
-#ifdef DEBUG
+#ifdef	DEBUG
 static int pepb_debug = 0;
 #define	PEPB_DEBUG(args)	if (pepb_debug) cmn_err args
 #else
@@ -68,8 +67,6 @@ static int	pepb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *,
 		    void *);
 static int	pepb_fm_init(dev_info_t *, dev_info_t *, int,
 		    ddi_iblock_cookie_t *);
-
-static int	pepb_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
 
 struct bus_ops pepb_bus_ops = {
 	BUSO_REV,
@@ -113,6 +110,7 @@ static int	pepb_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int	pepb_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
 		    caddr_t, int *);
 static int	pepb_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static void	pepb_peekpoke_cb(dev_info_t *, ddi_fm_error_t *);
 
 struct cb_ops pepb_cb_ops = {
 	pepb_open,			/* open */
@@ -176,7 +174,7 @@ static struct modlinkage modlinkage = {
 static void *pepb_state;
 
 typedef struct {
-	dev_info_t *dip;
+	dev_info_t		*dip;
 
 	/*
 	 * cpr support:
@@ -223,13 +221,13 @@ typedef struct {
 #define	PEPB_SOFT_STATE_INIT_MUTEX	0x20	/* mutex initialized */
 
 /* default interrupt priority for all interrupts (hotplug or non-hotplug */
-#define	PEPB_INTR_PRI	1
+#define	PEPB_INTR_PRI   1
 
 /* flag to turn on MSI support */
 static int pepb_enable_msi = 1;
-/* panic on unknown flag, defaulted to on */
-int pepb_panic_unknown = 1;
-int pepb_panic_fatal = 1;
+
+/* panic on PF_PANIC flag */
+static int pepb_die = PF_ERR_FATAL_FLAGS;
 
 extern errorq_t *pci_target_queue;
 
@@ -242,12 +240,11 @@ static void 	pepb_save_config_regs(pepb_devstate_t *pepb_p);
 static void	pepb_restore_config_regs(pepb_devstate_t *pepb_p);
 static int	pepb_pcie_device_type(dev_info_t *dip, int *port_type);
 static int	pepb_pcie_port_type(dev_info_t *dip,
-			ddi_acc_handle_t config_handle);
-
+		    ddi_acc_handle_t config_handle);
 /* interrupt related declarations */
-static uint_t	pepb_intx_intr(caddr_t arg, caddr_t arg2);
-static uint_t	pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
-static uint_t	pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
+static uint_t   pepb_intx_intr(caddr_t arg, caddr_t arg2);
+static uint_t   pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
+static uint_t   pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
 static int	pepb_intr_on_root_port(dev_info_t *);
 static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
 static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
@@ -333,27 +330,22 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	instance = ddi_get_instance(devi);
 	if (ddi_soft_state_zalloc(pepb_state, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
+
 	pepb = ddi_get_soft_state(pepb_state, instance);
 	pepb->dip = devi;
 
 	/*
-	 * initalise fma support before we start accessing config space
+	 * initialize fma support before we start accessing config space
 	 */
 	pci_targetq_init();
-	pepb->pepb_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	pepb->pepb_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	    DDI_FM_DMACHK_CAPABLE;
 	ddi_fm_init(devi, &pepb->pepb_fmcap, &pepb->pepb_fm_ibc);
 
 	mutex_init(&pepb->pepb_err_mutex, NULL, MUTEX_DRIVER,
 	    (void *)pepb->pepb_fm_ibc);
 	mutex_init(&pepb->pepb_peek_poke_mutex, NULL, MUTEX_DRIVER,
 	    (void *)pepb->pepb_fm_ibc);
-
-	if (pepb->pepb_fmcap & (DDI_FM_ERRCB_CAPABLE|DDI_FM_EREPORT_CAPABLE))
-		pci_ereport_setup(devi);
-
-	if (pepb->pepb_fmcap & DDI_FM_ERRCB_CAPABLE)
-		ddi_fm_handler_register(devi, pepb_fm_callback, NULL);
 
 	/*
 	 * Make sure the "device_type" property exists.
@@ -468,11 +460,6 @@ pepb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	 * Uninitialize hotplug support on this bus.
 	 */
 	(void) pcihp_uninit(devi);
-	if (pepb->pepb_fmcap & DDI_FM_ERRCB_CAPABLE)
-		ddi_fm_handler_unregister(devi);
-
-	if (pepb->pepb_fmcap & (DDI_FM_ERRCB_CAPABLE|DDI_FM_EREPORT_CAPABLE))
-		pci_ereport_teardown(devi);
 
 	mutex_destroy(&pepb->pepb_err_mutex);
 	mutex_destroy(&pepb->pepb_peek_poke_mutex);
@@ -505,7 +492,10 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	int	reglen;
 	int	rn;
 	int	totreg;
-	pepb_devstate_t		*pepb;
+	pepb_devstate_t	*pepb = ddi_get_soft_state(pepb_state,
+	    ddi_get_instance(dip));
+	struct detachspec *ds;
+	struct attachspec *as;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -535,13 +525,32 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 	case DDI_CTLOPS_PEEK:
 	case DDI_CTLOPS_POKE:
-		pepb = ddi_get_soft_state(pepb_state, ddi_get_instance(dip));
 		if (pepb->port_type != PCIE_PCIECAP_DEV_TYPE_ROOT)
 			return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
 		    ddi_ctlops, &pepb->pepb_err_mutex,
-		    &pepb->pepb_peek_poke_mutex));
+		    &pepb->pepb_peek_poke_mutex,
+		    pepb_peekpoke_cb));
+	case DDI_CTLOPS_ATTACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
 
+		as = (struct attachspec *)arg;
+		if ((as->when == DDI_POST) && (as->result == DDI_SUCCESS)) {
+			pf_init(rdip, (void *)pepb->pepb_fm_ibc, as->cmd);
+			(void) pcie_postattach_child(rdip);
+		}
+
+		return (DDI_SUCCESS);
+	case DDI_CTLOPS_DETACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
+		ds = (struct detachspec *)arg;
+		if (ds->when == DDI_PRE)
+			pf_fini(rdip, ds->cmd);
+
+		return (DDI_SUCCESS);
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 	}
@@ -622,7 +631,7 @@ static int
 pepb_initchild(dev_info_t *child)
 {
 	struct ddi_parent_private_data *pdptr;
-	ddi_acc_handle_t cfg_hdl;
+	struct pcie_bus *bus_p;
 	char name[MAXNAMELEN];
 
 	if (pepb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS)
@@ -678,10 +687,9 @@ pepb_initchild(dev_info_t *child)
 	} else
 		ddi_set_parent_data(child, NULL);
 
-	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
-		(void) pcie_error_enable(child, cfg_hdl);
-		pci_config_teardown(&cfg_hdl);
-	}
+	bus_p = pcie_init_bus(child);
+	if (!bus_p || pcie_initchild(child) != DDI_SUCCESS)
+		return (DDI_FAILURE);
 
 	return (DDI_SUCCESS);
 }
@@ -689,22 +697,15 @@ pepb_initchild(dev_info_t *child)
 static void
 pepb_uninitchild(dev_info_t *dip)
 {
-	ddi_acc_handle_t		cfg_hdl;
 	struct ddi_parent_private_data	*pdptr;
 
-	/*
-	 * Do it way early.
-	 * Otherwise ddi_map() call form pcie_error_fini crashes
-	 */
-	if (pci_config_setup(dip, &cfg_hdl) == DDI_SUCCESS) {
-		pcie_error_disable(dip, cfg_hdl);
-		pci_config_teardown(&cfg_hdl);
-	}
+	pcie_uninitchild(dip);
 
 	if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
 		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));
 		ddi_set_parent_data(dip, NULL);
 	}
+
 	ddi_set_name_addr(dip, NULL);
 
 	/*
@@ -975,7 +976,6 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	pepb_p->intr_type = intr_type;
 
 	return (DDI_SUCCESS);
-
 fail:
 	pepb_intr_fini(pepb_p);
 
@@ -1132,24 +1132,13 @@ pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 }
 
 /*ARGSUSED*/
-int
-pepb_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
-{
-	pepb_devstate_t *pepb_p = (pepb_devstate_t *)
-	    ddi_get_soft_state(pepb_state, ddi_get_instance(dip));
-
-	mutex_enter(&pepb_p->pepb_err_mutex);
-	pci_ereport_post(dip, derr, NULL);
-	mutex_exit(&pepb_p->pepb_err_mutex);
-	return (derr->fme_status);
-}
-
-/*ARGSUSED*/
 static uint_t
 pepb_err_msi_intr(caddr_t arg, caddr_t arg2)
 {
 	pepb_devstate_t *pepb_p = (pepb_devstate_t *)arg;
-	ddi_fm_error_t derr;
+	dev_info_t	*dip = pepb_p->dip;
+	ddi_fm_error_t	derr;
+	int		sts;
 
 	bzero(&derr, sizeof (ddi_fm_error_t));
 	derr.fme_version = DDI_FME_VERSION;
@@ -1162,18 +1151,15 @@ pepb_err_msi_intr(caddr_t arg, caddr_t arg2)
 	PEPB_DEBUG((CE_NOTE, "pepb_err_msi_intr: received intr number %d\n",
 	    (int)(uintptr_t)arg2));
 
-	/* if HPC is initialized then call the interrupt handler */
 	if (pepb_p->pepb_fmcap & DDI_FM_EREPORT_CAPABLE)
-		pci_ereport_post(pepb_p->dip, &derr, NULL);
-
-	if ((pepb_panic_fatal && derr.fme_status == DDI_FM_FATAL) ||
-	    (pepb_panic_unknown && derr.fme_status == DDI_FM_UNKNOWN))
-		fm_panic("%s-%d: PCI(-X) Express Fatal Error",
-		    ddi_driver_name(pepb_p->dip),
-		    ddi_get_instance(pepb_p->dip));
+		sts = pf_scan_fabric(dip, &derr, NULL);
 
 	mutex_exit(&pepb_p->pepb_err_mutex);
 	mutex_exit(&pepb_p->pepb_peek_poke_mutex);
+
+	if (pepb_die & sts)
+		fm_panic("%s-%d: PCI(-X) Express Fatal Error",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -1233,4 +1219,9 @@ static int
 pepb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	return (pcihp_info(dip, cmd, arg, result));
+}
+
+void
+pepb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
+	(void) pf_scan_fabric(dip, derr, NULL);
 }

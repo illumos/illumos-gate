@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -185,7 +185,7 @@ BALLOON_OBJS += balloon_drv.o
 EVTCHN_OBJS += evtchn_dev.o
 GFX_PRIVATE_OBJS += gfx_private.o gfxp_pci.o gfxp_segmap.o \
 		    gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
-PCI_E_MISC_OBJS += pcie_error.o
+PCI_E_MISC_OBJS += pcie.o pcie_fault.o
 PCI_E_NEXUS_OBJS += npe.o npe_misc.o
 PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o

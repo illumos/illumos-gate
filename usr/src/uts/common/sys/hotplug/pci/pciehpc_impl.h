@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,15 +221,10 @@ extern int pciehpc_debug;
 /* default interrupt priority for Hot Plug interrupts */
 #define	PCIEHPC_INTR_PRI	1
 
-#if	defined(__sparc)
-#define	PCIE_ENABLE_ERRORS(arg1, arg2)	\
-	pcie_enable_errors(arg1, arg2);	\
-	(void) pcie_enable_ce(arg1, arg2)
-#define	PCIE_DISABLE_ERRORS(arg1, arg2)	pcie_disable_errors(arg1, arg2)
-#else
-#define	PCIE_ENABLE_ERRORS(arg1, arg2)	pcie_error_enable(arg1, arg2)
-#define	PCIE_DISABLE_ERRORS(arg1, arg2)	pcie_error_disable(arg1, arg2)
-#endif
+#define	PCIE_ENABLE_ERRORS(arg1)	\
+	pcie_enable_errors(arg1);	\
+	(void) pcie_enable_ce(arg1)
+#define	PCIE_DISABLE_ERRORS(arg1)	pcie_disable_errors(arg1)
 
 #ifdef	__cplusplus
 }

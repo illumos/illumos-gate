@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -467,6 +467,7 @@ i_ddi_fm_handler_enter(dev_info_t *dip)
 	struct i_ddi_fmhdl *hdl = DEVI(dip)->devi_fmhdl;
 
 	mutex_enter(&hdl->fh_lock);
+	hdl->fh_lock_owner = curthread;
 }
 
 /*
@@ -480,7 +481,16 @@ i_ddi_fm_handler_exit(dev_info_t *dip)
 {
 	struct i_ddi_fmhdl *hdl = DEVI(dip)->devi_fmhdl;
 
+	hdl->fh_lock_owner = NULL;
 	mutex_exit(&hdl->fh_lock);
+}
+
+boolean_t
+i_ddi_fm_handler_owned(dev_info_t *dip)
+{
+	struct i_ddi_fmhdl *hdl = DEVI(dip)->devi_fmhdl;
+
+	return (hdl->fh_lock_owner == curthread);
 }
 
 /*

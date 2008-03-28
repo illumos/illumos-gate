@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,11 +130,13 @@ struct px {
 	kmutex_t	px_fm_mutex;
 	kthread_t	*px_fm_mutex_owner;
 	ddi_iblock_cookie_t px_fm_ibc;
+	pf_data_t	px_pfd_arr[5];
+	int		px_pfd_idx;
 
 	uint32_t	px_dev_caps;
 
 	/* Platform specific information */
-	void	*px_plat_p;
+	void		*px_plat_p;
 
 	/* Power Management fields */
 	kmutex_t	px_l23ready_lock; /* used in PME_To_ACK interrupt */
@@ -150,10 +152,6 @@ struct px {
 
 	/* Handle for soft intr */
 	ddi_softint_handle_t    px_dbg_hdl; /* HDL for dbg printing */
-
-	/* array to keep track of register snapshots during error handling */
-	int		px_dq_tail; /* last valid index in cs array */
-	pf_data_t	*px_dq_p;
 };
 
 /* px soft state flag */
