@@ -1813,11 +1813,15 @@ ire_expire(ire_t *ire, char *arg)
 
 	if (flush_flags & FLUSH_ARP_TIME) {
 		/*
-		 * Remove all IRE_CACHE.
-		 * Verify that create time is more than
-		 * ip_ire_arp_interval milliseconds ago.
+		 * Remove all IRE_CACHE except IPv4 multicast ires. These
+		 * ires will be deleted by ip_trash_ire_reclaim_stack()
+		 * when system runs low in memory.
+		 * Verify that create time is more than ip_ire_arp_interval
+		 * milliseconds ago.
 		 */
-		if (NCE_EXPIRED(ire->ire_nce, ipst)) {
+
+		if (!(ire->ire_ipversion == IPV4_VERSION &&
+		    CLASSD(ire->ire_addr)) && NCE_EXPIRED(ire->ire_nce, ipst)) {
 			ire_delete(ire);
 			return;
 		}
