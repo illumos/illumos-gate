@@ -2674,6 +2674,8 @@ mcp55_intr_port(nv_port_t *nvp)
 			if (mcp55_packet_complete_intr(nvc, nvp) ==
 			    NV_FAILURE) {
 				clear = MCP55_INT_COMPLETE;
+			} else {
+				intr_cycles = 0;
 			}
 		}
 
