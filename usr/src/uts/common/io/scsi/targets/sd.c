@@ -9615,15 +9615,17 @@ sd_ready_and_valid(struct sd_lun *un)
 		mutex_enter(SD_MUTEX(un));
 
 		if (err != 0) {
-			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-			    "offline or reservation conflict\n");
 			mutex_exit(SD_MUTEX(un));
 			cmlb_invalidate(un->un_cmlbhandle,
 			    (void *)SD_PATH_DIRECT);
 			mutex_enter(SD_MUTEX(un));
 			if (err == EACCES) {
+				scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+				    "reservation conflict\n");
 				rval = SD_RESERVED_BY_OTHERS;
 			} else {
+				scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+				    "drive offline\n");
 				rval = SD_NOT_READY_VALID;
 			}
 			goto done;
