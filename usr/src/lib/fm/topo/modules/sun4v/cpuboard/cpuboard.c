@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,25 +103,26 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 	char *dn = NULL;
 	ldom_hdl_t *lhp;
 	uint64_t id;
+	int cpuboards_found = 0;
 
 	lhp = ldom_init(cpuboard_topo_alloc, cpuboard_topo_free);
 	if (lhp == NULL) {
 		topo_mod_dprintf(mod, "ldom_init failed\n");
-		return (-1);
+		return (0);
 	}
 
 	(void) sysinfo(SI_MACHINE, isa, MAXNAMELEN);
 	if (strcmp(isa, "sun4v") != 0) {
 		topo_mod_dprintf(mod, "not sun4v architecture%s\n", isa);
 		ldom_fini(lhp);
-		return (-1);
+		return (0);
 	}
 
 	if ((bufsize = ldom_get_core_md(lhp, &bufp)) < 1) {
 		topo_mod_dprintf(mod, "ldom_get_core_md error, bufsize=%d\n",
 		    bufsize);
 		ldom_fini(lhp);
-		return (-1);
+		return (0);
 	}
 	topo_mod_dprintf(mod, "pri bufsize=%d\n", bufsize);
 
@@ -131,7 +132,7 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 		topo_mod_dprintf(mod, "md_init_intern error\n");
 		cpuboard_topo_free(bufp, (size_t)bufsize);
 		ldom_fini(lhp);
-		return (-1);
+		return (0);
 	}
 	topo_mod_dprintf(mod, "num_nodes=%d\n", num_nodes);
 
@@ -141,7 +142,7 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 		cpuboard_topo_free(bufp, (size_t)bufsize);
 		(void) md_fini(mdp);
 		ldom_fini(lhp);
-		return (-1);
+		return (0);
 	}
 	ncomp = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
 	    md_find_name(mdp, "component"),
@@ -152,11 +153,8 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 		cpuboard_topo_free(bufp, (size_t)bufsize);
 		(void) md_fini(mdp);
 		ldom_fini(lhp);
-		return (-1);
+		return (0);
 	}
-	for (id = 0; id < CPUBOARD_MAX; id++)
-		cpubs[id].present = 0;
-
 	for (i = 0; i < ncomp; i++) {
 		/*
 		 * PRI nodes are still named "cpu-board", but the canonical
@@ -178,6 +176,7 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 				continue;
 			}
 			cpubs[id].present = 1;
+			cpuboards_found++;
 
 			topo_mod_dprintf(mod, "got cpu-board: %llx\n", id);
 
@@ -205,7 +204,7 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 	(void) md_fini(mdp);
 	ldom_fini(lhp);
 
-	return (0);
+	return (cpuboards_found);
 }
 
 /*ARGSUSED*/
@@ -460,7 +459,26 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 
 	/* Scan PRI for cpu-boards. */
 	cpuboard_mod_hdl = mod;
-	(void) cpuboard_get_pri_info(mod, cpuboard_list);
+	if (cpuboard_get_pri_info(mod, cpuboard_list) == 0) {
+		int cpuboards_found = 0;
+		/*
+		 * if no PRI available (i.e. not in Control Domain),
+		 * use px driver to determine cpuboard presence.
+		 * NOTE: with this approach there will be no
+		 * identity information - no SN nor PN.
+		 */
+		bzero(cpuboard_list, sizeof (cpuboard_list));
+		for (i = min; i <= max; i++) {
+			if (cpuboard_findrc(mod, i) != NULL) {
+				cpuboard_list[i].present = 1;
+				cpuboards_found++;
+			}
+		}
+		if (cpuboards_found == 0) {
+			topo_mod_dprintf(mod, "No cpuboards found.\n");
+			return (-1);
+		}
+	}
 
 	if (chip_enum_load(mod) == NULL)
 		return (-1);
