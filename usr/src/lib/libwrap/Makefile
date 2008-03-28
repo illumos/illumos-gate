@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -12,8 +12,6 @@ CHECKHDRS =
 HDRDIR =	.
 SUBDIRS	=	$(MACH)
 
-ROOTHDRDIR =	$(ROOTSFWINCLUDE)
-
 all := 		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
@@ -24,6 +22,8 @@ lint :=		TARGET = lint
 
 all clean clobber install lint: $(SUBDIRS)
 
+all install: THIRDPARTYLICENSE
+
 install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
@@ -33,12 +33,9 @@ $(SUBDIRS): FRC
 
 FRC:
 
-$(ROOTHDRS): $(ROOTHDRDIR)
+THIRDPARTYLICENSE: DISCLAIMER
+	$(GREP) -v '\*\*\*\*' DISCLAIMER > $@
 
-$(ROOTHDRDIR): $(ROOTSFW)
-	$(INS.dir)
-
-$(ROOTSFW):
-	$(INS.dir)
+CLOBBERFILES += THIRDPARTYLICENSE
 
 include ../Makefile.targ

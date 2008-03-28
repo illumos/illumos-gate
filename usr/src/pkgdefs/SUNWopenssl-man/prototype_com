@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,6 +46,7 @@ i depend
 #
 d none usr 0755 root sys
 d none usr/sfw 0755 root bin
+s none usr/sfw/man=share/man
 d none usr/sfw/share 0755 root bin
 d none usr/sfw/share/man 0755 root bin
 d none usr/sfw/share/man/man1 0755 root bin

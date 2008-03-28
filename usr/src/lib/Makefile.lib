@@ -138,7 +138,6 @@ $(ROOTDEMODIRS) :=	DIRMODE =	755
 #
 ROOTSFW=	$(ROOT)/usr/sfw
 ROOTSFWBIN=	$(ROOT)/usr/sfw/bin
-ROOTSFWSBIN=	$(ROOT)/usr/sfw/sbin
 ROOTSFWETC=	$(ROOT)/etc/sfw
 ROOTSFWVAR=	$(ROOT)/var/sfw
 ROOTSFWSHARE=	$(ROOT)/usr/sfw/share

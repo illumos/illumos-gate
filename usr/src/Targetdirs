@@ -410,7 +410,6 @@ UUCP.UUCP= \
 
 ROOT.SFW= \
 	/usr/sfw/bin \
-	/usr/sfw/sbin \
 	/usr/sfw/include \
 	/usr/sfw/lib \
 	/usr/sfw/share

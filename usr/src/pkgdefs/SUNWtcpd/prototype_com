@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -22,25 +22,23 @@ i depend
 # SUNWtcpd
 #
 d none usr 755 root sys
-d none usr/sfw 755 root bin
-s none usr/sfw/man=share/man
-d none usr/sfw/sbin 755 root bin
-f none usr/sfw/sbin/safe_finger 555 root bin
-f none usr/sfw/sbin/tcpd 555 root bin
-f none usr/sfw/sbin/tcpdchk 555 root bin
-f none usr/sfw/sbin/tcpdmatch 555 root bin
-f none usr/sfw/sbin/try-from 555 root bin
-d none usr/sfw/share 755 root bin
-d none usr/sfw/share/man 755 root bin
-d none usr/sfw/share/man/man1m 755 root bin
-f none usr/sfw/share/man/man1m/tcpd.1m 444 root bin
-f none usr/sfw/share/man/man1m/tcpdchk.1m 444 root bin
-f none usr/sfw/share/man/man1m/tcpdmatch.1m 444 root bin
-d none usr/sfw/share/man/man3 755 root bin
-f none usr/sfw/share/man/man3/hosts_access.3 444 root bin
-f none usr/sfw/share/man/man3/libwrap.3 444 root bin
-d none usr/sfw/share/man/man4 755 root bin
-f none usr/sfw/share/man/man4/hosts_access.4 444 root bin
-f none usr/sfw/share/man/man4/hosts.allow.4 444 root bin
-f none usr/sfw/share/man/man4/hosts.deny.4 444 root bin
-f none usr/sfw/share/man/man4/hosts_options.4 444 root bin
+d none usr/sbin 755 root bin
+f none usr/sbin/safe_finger 555 root bin
+f none usr/sbin/tcpd 555 root bin
+f none usr/sbin/tcpdchk 555 root bin
+f none usr/sbin/tcpdmatch 555 root bin
+f none usr/sbin/try-from 555 root bin
+d none usr/share 755 root sys
+d none usr/share/man 755 root bin
+d none usr/share/man/man1m 755 root bin
+f none usr/share/man/man1m/tcpd.1m 444 root bin
+f none usr/share/man/man1m/tcpdchk.1m 444 root bin
+f none usr/share/man/man1m/tcpdmatch.1m 444 root bin
+d none usr/share/man/man3 755 root bin
+f none usr/share/man/man3/hosts_access.3 444 root bin
+f none usr/share/man/man3/libwrap.3 444 root bin
+d none usr/share/man/man4 755 root bin
+f none usr/share/man/man4/hosts_access.4 444 root bin
+f none usr/share/man/man4/hosts.allow.4 444 root bin
+f none usr/share/man/man4/hosts.deny.4 444 root bin
+f none usr/share/man/man4/hosts_options.4 444 root bin

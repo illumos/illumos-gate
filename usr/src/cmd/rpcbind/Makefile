@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/rpcbind/Makefile
@@ -43,10 +43,8 @@ include ../Makefile.cmd
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 
 CPPFLAGS= -I. -DPORTMAP $(CPPFLAGS.master)
-CPPFLAGS += -I$(ROOTSFWINCLUDE) -D_REENTRANT
-LDLIBS += -lsocket -lnsl
-LDLIBS += -L$(ROOTSFWLIB) -lwrap -lscf
-LDFLAGS += -R$(SFW_ROOT)/lib 
+CPPFLAGS += -D_REENTRANT
+LDLIBS += -lsocket -lnsl -lwrap -lscf
 
 .KEEP_STATE:
 

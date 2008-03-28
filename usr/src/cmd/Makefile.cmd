@@ -114,7 +114,6 @@ ROOTAUDIOSAMPAU=$(ROOTAUDIOSAMP)/au
 #
 ROOTSFW=	$(ROOT)/usr/sfw
 ROOTSFWBIN=	$(ROOT)/usr/sfw/bin
-ROOTSFWSBIN=	$(ROOT)/usr/sfw/sbin
 ROOTSFWSHARE=	$(ROOT)/usr/sfw/share
 ROOTSFWSHSRC=	$(ROOT)/usr/sfw/share/src
 ROOTSFWINFO=	$(ROOT)/usr/sfw/share/info

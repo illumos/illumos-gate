@@ -219,6 +219,8 @@ s none usr/lib/llib-lthread=../../lib/llib-lthread
 s none usr/lib/llib-lthread.ln=../../lib/llib-lthread.ln
 s none usr/lib/llib-lthread_db=../../lib/llib-lc_db
 s none usr/lib/llib-lthread_db.ln=../../lib/llib-lc_db.ln
+f none usr/lib/llib-lwrap 644 root bin
+f none usr/lib/llib-lwrap.ln 644 root bin
 s none usr/lib/llib-lxnet=../../lib/llib-lxnet
 s none usr/lib/llib-lxnet.ln=../../lib/llib-lxnet.ln
 f none usr/lib/llib-lmalloc 644 root bin
@@ -247,10 +249,6 @@ f none usr/lib/llib-lpanel 644 root bin
 s none usr/ccs/lib/llib-lpanel=../../lib/llib-lpanel
 f none usr/lib/llib-lpanel.ln 644 root bin
 s none usr/ccs/lib/llib-lpanel.ln=../../lib/llib-lpanel.ln
-d none usr/sfw 755 root bin
-d none usr/sfw/lib 755 root bin
-f none usr/sfw/lib/llib-lwrap 644 root bin
-f none usr/sfw/lib/llib-lwrap.ln 644 root bin
 d none usr/xpg4 755 root bin
 d none usr/xpg4/lib 755 root bin
 f none usr/xpg4/lib/llib-lcurses 644 root bin

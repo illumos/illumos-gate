@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +36,6 @@ OBJECTS =	hosts_access.o options.o shell_cmd.o rfc931.o eval.o \
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-ROOTLIBDIR =	$(ROOTSFWLIB)
 SONAME =	$(LIBRARY:.a=.so)$(MAJOR)
 ROOTLINKS +=	$(ROOTLIBDIR)/$(LIBLINKS)$(MAJOR)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
@@ -61,8 +59,10 @@ DISTFILES =	clean_exit.c diag.c eval.c fix_options.c fromhost.c \
 		setenv.c shell_cmd.c socket.c tcpd.h tli.c update.c \
 		workarounds.c
 
-ROOTSFWSRC =	$(ROOTSFWSHSRC)/tcp_wrappers
-ROOTSFWSRCFILES = $(DISTFILES:%=$(ROOTSFWSRC)/%)
+ROOTSRC =	$(ROOT)/usr/share/src/tcp_wrappers
+$(ROOTSRC) :=   OWNER = root
+$(ROOTSRC) :=   GROUP = bin
+ROOTSRCFILES = $(DISTFILES:%=$(ROOTSRC)/%)
 
 .KEEP_STATE:
 
@@ -70,31 +70,17 @@ all: $(LIBS)
 
 lint: lintcheck
 
-$(ROOTLIBS): $(ROOTLIBDIR)
-
-$(ROOTLIBDIR): $(ROOTSFW)
-	$(INS.dir)
-
 $(ROOTLIBDIR)/$(LIBLINKS)$(MAJOR): $(ROOTLIBDIR)/$(LIBLINKS)$(VERS)
 	$(INS.liblink)
 
-$(ROOTSFWSRCFILES) := FILEMODE = 0444
-$(ROOTSFWSRCFILES): $(ROOTSFWSRC)
+$(ROOTSRCFILES) := FILEMODE = 0444
+$(ROOTSRCFILES): $(ROOTSRC)
 
-$(ROOTSFWSRC): $(ROOTSFWSHSRC)
+$(ROOTSRC):
 	$(INS.dir)
 
-$(ROOTSFWSHSRC): $(ROOTSFW)/share
-	$(INS.dir)
-
-$(ROOTSFWSRC)/%: $(SRCDIR)/%
+$(ROOTSRC)/%: $(SRCDIR)/%
 	$(INS.file)
-
-$(ROOTSFW)/share: $(ROOTSFW)
-	$(INS.dir)
-
-$(ROOTSFW):
-	$(INS.dir)
 
 include ../../Makefile.targ
 
@@ -103,7 +89,7 @@ include ../../Makefile.targ
 # original Makefile of the tcp_wrappers distribution.
 
 ##############################
-# System parameters appropriate for Solaris 9
+# System parameters appropriate for Solaris 9 and later
 
 TLI		= -DTLI
 BUGS		= -DGETPEERNAME_BUG -DBROKEN_FGETS -DLIBC_CALLS_STRTOK

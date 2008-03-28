@@ -169,5 +169,3 @@ s none usr/ccs/lib/amd64/values-Xs.o=../../../lib/amd64/values-Xs.o
 s none usr/ccs/lib/amd64/values-Xt.o=../../../lib/amd64/values-Xt.o
 s none usr/ccs/lib/amd64/values-xpg4.o=../../../lib/amd64/values-xpg4.o
 s none usr/ccs/lib/amd64/values-xpg6.o=../../../lib/amd64/values-xpg6.o
-d none usr/sfw/lib/amd64 755 root bin
-s none usr/sfw/lib/64=amd64

@@ -1,26 +1,5 @@
 #
-# CDDL HEADER START
-#
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
-#
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-#
-
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,11 +18,11 @@ CPPFLAGS +=	$(ACCESS) $(PARANOID) $(NETGROUP) $(TLI) \
 		-DRFC931_TIMEOUT=$(RFC931_TIMEOUT) \
 		-DFACILITY=$(FACILITY) -DSEVERITY=$(SEVERITY) \
 		-DREAL_DAEMON_DIR=\"$(REAL_DAEMON_DIR)\" \
-		-I$(ROOTSFWINCLUDE) -I../../lib/libwrap
+		-I../../lib/libwrap
 tcpd tcpdmatch try-from := \
-	LDLIBS += -R$(SFW_ROOT)/lib -L$(ROOTSFWLIB) -lwrap
+	LDLIBS += -lwrap
 tcpdchk := \
-	LDLIBS += -R$(SFW_ROOT)/lib -L$(ROOTSFWLIB) -lwrap -lnsl
+	LDLIBS += -lwrap -lnsl
 
 # Various components must export interfaces, but also contain name-space
 # clashes with system libraries.
@@ -75,29 +54,25 @@ DISTFILES =	environ.c fakelog.c hosts_access.3 hosts_access.4 \
 		scaffold.h tcpd.1m tcpd.c tcpdchk.1m tcpdchk.c tcpdmatch.1m \
 		tcpdmatch.c try-from.c README.sfw $(SRCONLY)
 
-ROOTSFWSRC =	$(ROOTSFWSHSRC)/tcp_wrappers
-ROOTSFWSBINPROG = $(PROG:%=$(ROOTSFWSBIN)/%)
-ROOTSFWMANPAGES = $(MANPAGES:%=$(ROOTSFWMAN)/%)
-ROOTSFWMANDIRS = $(MANDIRS:%=$(ROOTSFWMAN)/%)
-ROOTSFWSRCFILES = $(DISTFILES:%=$(ROOTSFWSRC)/%)
+ROOTSRC =	$(ROOT)/usr/share/src/tcp_wrappers
+$(ROOTSRC) :=	OWNER = root
+$(ROOTSRC) :=	GROUP = bin
+ROOTMAN = $(ROOT)/usr/share/man
+ROOTMANPAGES = $(MANPAGES:%=$(ROOTMAN)/%)
+ROOTMANDIRS = $(MANDIRS:%=$(ROOTMAN)/%)
+ROOTSRCFILES = $(DISTFILES:%=$(ROOTSRC)/%)
 
 .KEEP_STATE:
 
 all: $(PROG) THIRDPARTYLICENSE
 
-install: all $(ROOTSFWSBINPROG) $(ROOTSFWMANPAGES) $(ROOTSFWSRCFILES)
+install: all $(ROOTUSRSBINPROG) $(ROOTMANPAGES) $(ROOTSRCFILES)
 
 clean:
 	$(RM) *.o
 	$(RM) -r sunman
 
 lint:	lint_PROG
-
-$(ROOTSFWSBINPROG): $(ROOTSFWSBIN)
-$(ROOTSFWSBIN): $(ROOTSFW)
-	$(INS.dir)
-$(ROOTSFWSBIN)/% : %
-	$(INS.file)
 
 # These Solaris-specific man page aliases are installed verbatim.
 sunman/libwrap.3: libwrap.3
@@ -109,7 +84,7 @@ sunman/hosts.deny.4: hosts.deny.4
 
 # The rest of the man pages are in the form provided in the original
 # distribution, but get edited and renamed to follow Solaris man page
-# conventions.  E.g. tcpd.8 gets installed as /usr/sfw/man/man1m/tcpd.1m.
+# conventions.  E.g. tcpd.8 gets installed as /usr/share/man/man1m/tcpd.1m.
 # Create temporary copies in the sunman directory with modified names
 # and contents.  The sed program man.sed contains the content edits.
 
@@ -120,34 +95,29 @@ sunman/%.4: %.5
 sunman/%.3: %.3
 	mkdir -p sunman; sed -f man.sed < $< > $@
 
-$(ROOTSFWMANPAGES) := FILEMODE = 0444
-$(ROOTSFWMANPAGES): $(ROOTSFWMANDIRS) $(ROOTSFW)/man
-$(ROOTSFWMANDIRS): $(ROOTSFWMAN)
+$(ROOTMANPAGES) := FILEMODE = 0444
+$(ROOTMANPAGES): $(ROOTMANDIRS) $(ROOT)/usr/share/man
+$(ROOTMANDIRS): $(ROOTMAN)
 	$(INS.dir)
-$(ROOTSFWMAN): $(ROOTSFW)/share
+$(ROOTMAN):
 	$(INS.dir)
-$(ROOTSFW)/man: $(ROOTSFW)
-	$(RM) $@
-	$(SYMLINK) share/man $@ $(CHOWNLINK) $(CHGRPLINK)
-$(ROOTSFWMAN)/man1m/% $(ROOTSFWMAN)/man3/% $(ROOTSFWMAN)/man4/%: sunman/%
+$(ROOTMAN1M)/% $(ROOTMAN3)/% $(ROOTMAN)/man4/%: sunman/%
 	$(INS.file)
 
-$(ROOTSFWSRCFILES) := FILEMODE = 0444
-$(ROOTSFWSRCFILES): $(ROOTSFWSRC)
-$(ROOTSFWSRC): $(ROOTSFWSHSRC)
+$(ROOTSRCFILES) := FILEMODE = 0444
+$(ROOTSRCFILES): $(ROOTSRC)
+$(ROOTSRC): 
 	$(INS.dir)
-$(ROOTSFWSHSRC): $(ROOTSFW)/share
-	$(INS.dir)
-$(ROOTSFWSRC)/%: %.sfwsrc
+$(ROOTSRC)/%: %.sfwsrc
 	$(INS.rename)
-$(ROOTSFWSRC)/%: sunman/%
+$(ROOTSRC)/%: sunman/%
 	$(INS.file)
-$(ROOTSFWSRC)/%: %
+$(ROOTSRC)/%: %
 	$(INS.file)
 
-$(ROOTSFW)/share: $(ROOTSFW)
+$(ROOT)/usr/share: $(ROOT)/usr
 	$(INS.dir)
-$(ROOTSFW):
+$(ROOT)/usr: $(ROOT)
 	$(INS.dir)
 
 TCPDMATCH_OBJ = tcpdmatch.o fakelog.o inetcf.o scaffold.o

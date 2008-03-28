@@ -1357,6 +1357,7 @@ f none usr/include/sys/zone.h 644 root bin
 f none usr/include/sysexits.h 644 root bin
 f none usr/include/syslog.h 644 root bin
 f none usr/include/tar.h 644 root bin
+f none usr/include/tcpd.h 644 root bin
 f none usr/include/term.h 644 root bin
 f none usr/include/termio.h 644 root bin
 f none usr/include/termios.h 644 root bin
@@ -1416,9 +1417,6 @@ f none usr/include/wordexp.h 644 root bin
 f none usr/include/xti.h 644 root bin
 f none usr/include/xti_inet.h 644 root bin
 f none usr/include/zone.h 644 root bin
-d none usr/sfw 755 root bin
-d none usr/sfw/include 755 root bin
-f none usr/sfw/include/tcpd.h 644 root bin
 d none usr/share 755 root sys
 d none usr/share/src 755 root sys
 d none usr/share/src/uts 755 root bin

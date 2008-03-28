@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,7 +75,7 @@ LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	-lz \
 	-lpam \
 	-lbsm \
-	-L$(ROOTSFWLIB) -lwrap \
+	-lwrap \
 	$(OPENSSL_LDFLAGS) -lcrypto \
 	-lgss \
 	-lcontract
@@ -85,8 +85,6 @@ LDFLAGS += $(MAPFILES:%=-M%)
 DYNFLAGS += $(OPENSSL_DYNFLAGS) $(C99_DISABLE)
 
 POFILE_DIR= ..
-
-CPPFLAGS += -I$(ROOTSFWINCLUDE)
 
 .KEEP_STATE:
 

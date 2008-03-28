@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +50,7 @@
 #
 #
 d none usr/sfw/lib/amd64 755 root bin
+s none usr/sfw/lib/64=amd64
 f none usr/sfw/lib/amd64/libcrypto.so.0.9.8 755 root bin
 s none usr/sfw/lib/amd64/libcrypto.so=./libcrypto.so.0.9.8
 f none usr/sfw/lib/amd64/libssl.so.0.9.8 755 root bin

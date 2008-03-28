@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,13 +40,11 @@ include ../../../svc/Makefile.ctf
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 
-CPPFLAGS  += -D_FILE_OFFSET_BITS=64 -I$(CMDINETCOMMONDIR) -I$(ROOTSFWINCLUDE) \
-		-D_REENTRANT
+CPPFLAGS  += -D_FILE_OFFSET_BITS=64 -I$(CMDINETCOMMONDIR) -D_REENTRANT
 $(RELEASE_BUILD)CPPFLAGS +=     -DNDEBUG
 
-LDFLAGS   += -R$(SFW_ROOT)/lib
 LDLIBS    += -lsocket -lnsl -lrestart -lscf -lcontract -linetutil \
-		-L$(ROOTSFWLIB) -lwrap -linetsvc -luutil -lumem -lbsm
+		-lwrap -linetsvc -luutil -lumem -lbsm
 
 CLOBBERFILES += $(SVCMETHOD)
 

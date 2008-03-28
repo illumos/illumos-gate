@@ -18,8 +18,6 @@
 #
 # CDDL HEADER END
 
-
-#
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -285,6 +283,9 @@ f none usr/lib/libvt0.so.1 755 root bin
 s none usr/lib/libvt0.so=./libvt0.so.1
 s none usr/lib/libw.so=../../lib/libw.so.1
 s none usr/lib/libw.so.1=../../lib/libw.so.1
+f none usr/lib/libwrap.so.1.0 755 root bin
+s none usr/lib/libwrap.so.1=libwrap.so.1.0
+s none usr/lib/libwrap.so=libwrap.so.1.0
 s none usr/lib/libxnet.so=../../lib/libxnet.so.1
 s none usr/lib/libxnet.so.1=../../lib/libxnet.so.1
 s none usr/lib/libzoneinfo.so=./libzoneinfo.so.1
@@ -365,11 +366,6 @@ s none usr/ccs/lib/liby.so=../../lib/liby.so.1
 f none usr/lib/liby.so.1 0755 root bin
 s none usr/lib/libpam.so.1=../../lib/libpam.so.1
 s none usr/lib/libpam.so=../../lib/libpam.so.1
-d none usr/sfw 755 root bin
-d none usr/sfw/lib 755 root bin
-f none usr/sfw/lib/libwrap.so.1.0 755 root bin
-s none usr/sfw/lib/libwrap.so.1=libwrap.so.1.0
-s none usr/sfw/lib/libwrap.so=libwrap.so.1.0
 d none usr/xpg4 755 root bin
 d none usr/xpg4/lib 755 root bin
 s none usr/xpg4/lib/libcurses.so=./libcurses.so.2

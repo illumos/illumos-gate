@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -411,11 +411,15 @@ $(ROOTOPENSSL):
 $(ROOTSFWMANPAGES) := FILEMODE = 0444
 $(ROOTSFWMANPAGES): $(ROOTSFWMANDIRS)
 
-$(ROOTSFWMANDIRS): $(ROOTSFWMAN)
+$(ROOTSFWMANDIRS): $(ROOTSFWMAN) $(ROOTSFW)/man
 	$(INS.dir)
 
 $(ROOTSFWMAN): $(ROOTSFW)/share
 	$(INS.dir)
+
+$(ROOTSFW)/man: $(ROOTSFW)
+	$(RM) $@
+	$(SYMLINK) share/man $@
 
 $(ROOTSFW)/share: $(ROOTSFW)
 	$(INS.dir)

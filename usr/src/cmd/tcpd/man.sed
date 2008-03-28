@@ -1,7 +1,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This sed command script edits the man pages distrubuted with tcp_wrappers
@@ -21,8 +21,7 @@ s/#include "tcpd.h"/#include <tcpd.h>/
 /#include <tcpd.h>/a\
 \.\\" Begin Sun update\
 \
-cc [ flag  ... ]  \-I/usr/sfw/include file ...  [ library ... ]\
-\-L/usr/sfw/lib \-R/usr/sfw/lib \-lwrap\
+cc [ flag  ... ] file ...  [ library ... ] \-lwrap\
 \.\\" End Sun update
 
 s/or \\fItlid\\fR//
@@ -59,7 +58,7 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE\
 =\
 Availability	SUNWtcpd\
 =\
-Interface Stability	External\
+Interface Stability	Committed\
 .TE \
 .PP\
 .SH NOTES\
