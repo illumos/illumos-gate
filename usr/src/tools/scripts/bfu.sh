@@ -3667,14 +3667,14 @@ remove_eof_SUNWcry()
 	rm -f $rootprefix/platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9/aes256
 	rm -f $rootprefix/platform/SUNW,Sun-Fire-V240/kernel/crypto/sparcv9/aes256
 	rm -f $rootprefix/platform/SUNW,Sun-Fire-V250/kernel/crypto/sparcv9/aes256
-	rm -f $rootprefix/platform/SUNW,Sun-Fire-V440/kernel/crypto/sparcv9/aes25
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-V440/kernel/crypto/sparcv9/aes256
 	rm -f $rootprefix/platform/SUNW,Sun-Fire-V445/kernel/crypto/sparcv9/aes256
 	rm -f $rootprefix/platform/SUNW,Sun-Fire/kernel/crypto/sparcv9/aes256
 	rm -f $rootprefix/platform/sun4u-us3/kernel/crypto/sparcv9/aes256
 	rm -f $rootprefix/kernel/crypto/arcfour2048
 	rm -f $rootprefix/kernel/crypto/sparcv9/arcfour2048
 	rm -f $rootprefix/kernel/crypto/amd64/arcfour2048
-	rm -f $rootprefix/platform/sun4u/kernel/crypto/sparcv9/arcfour208
+	rm -f $rootprefix/platform/sun4u/kernel/crypto/sparcv9/arcfour2048
 	rm -f $rootprefix/kernel/crypto/blowfish448
 	rm -f $rootprefix/kernel/crypto/sparcv9/blowfish448
 	rm -f $rootprefix/kernel/crypto/amd64/blowfish448
