@@ -319,6 +319,7 @@ ROOT.BIN= \
 	/usr/xpg4/lib \
 	/usr/xpg6 \
 	/usr/xpg6/bin \
+	/var/games \
 	/var/ld \
 	/var/news \
 	/var/preserve \

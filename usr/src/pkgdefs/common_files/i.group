@@ -198,6 +198,23 @@ do
                             "$MYSQLGROUP_LINE" | ed -s $dest > /dev/null
                 fi
                 #
+		# Add the 'games' group if it doesn't already exist.
+		#
+		GAMESGROUP_LINE="games::20:"
+		cur_name=`awk -F: '$3 == 20 {print $1}' $dest`
+		cur_id=`awk -F: '$1 == "games" {print $3}' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "games" ]; then
+			echo "ERROR: Reserved GID 20 already assigned" \
+			"to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "20" ]; then
+			echo "NOTE: games group already assigned" \
+			"to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$GAMESGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^smmsp::25:\ni\n%s\n.\nw\nq\n' \
+			"$GAMESGROUP_LINE" | ed -s $dest > /dev/null
+		fi
 	fi
 done
 exit 0

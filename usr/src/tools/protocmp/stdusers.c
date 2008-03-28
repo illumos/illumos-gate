@@ -66,6 +66,7 @@ const struct stdlist groupnames[] = {
 	{ "staff", 10 },
 	{ "daemon", 12 },
 	{ "sysadmin", 14 },
+	{ "games", 20 },
 	{ "smmsp", 25 },
 	{ "gdm", 50 },
 	{ "mysql", 70 },

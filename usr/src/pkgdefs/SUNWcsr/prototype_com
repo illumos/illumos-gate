@@ -447,6 +447,7 @@ e preserve var/adm/utmpx 644 root bin
 e preserve var/adm/wtmpx 644 adm adm
 d none var/audit 755 root sys
 d none var/cron 755 root sys
+d none var/games 755 root bin
 d none var/idmap 755 daemon daemon
 d none var/inet 755 root sys
 d none var/ld 755 root bin
