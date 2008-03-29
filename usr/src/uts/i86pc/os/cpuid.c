@@ -1391,7 +1391,7 @@ cpuid_pass2(cpu_t *cpu)
 			dp = cpi->cpi_cacheinfo;
 			if (BITX(cp->cp_eax, 31, 31) == 0) {
 				uint8_t *p = (void *)&cp->cp_eax;
-				for (i = 1; i < 3; i++)
+				for (i = 1; i < 4; i++)
 					if (p[i] != 0)
 						*dp++ = p[i];
 			}
@@ -1602,7 +1602,7 @@ intel_cpubrand(const struct cpuid_info *cpi)
 			celeron = xeon = 0;
 			cp = &cpi->cpi_std[2];	/* cache info */
 
-			for (i = 1; i < 3; i++) {
+			for (i = 1; i < 4; i++) {
 				uint_t tmp;
 
 				tmp = (cp->cp_eax >> (8 * i)) & 0xff;
@@ -3446,7 +3446,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
-		create = CPI_MODEL(cpi) == 0xf;
+		create = IS_EXTENDED_MODEL_INTEL(cpi);
 		break;
 	case X86_VENDOR_AMD:
 		create = CPI_FAMILY(cpi) == 0xf;
