@@ -583,6 +583,17 @@ f none usr/include/sasl/prop.h 0644 root bin
 f none usr/include/sasl/sasl.h 0644 root bin
 f none usr/include/sasl/saslplug.h 0644 root bin
 f none usr/include/sasl/saslutil.h 0644 root bin
+d none usr/include/scsi 755 root bin
+f none usr/include/scsi/libscsi.h 644 root bin
+f none usr/include/scsi/libses.h 644 root bin
+f none usr/include/scsi/libses_plugin.h 644 root bin
+d none usr/include/scsi/plugins 755 root bin
+d none usr/include/scsi/plugins/ses 755 root bin
+d none usr/include/scsi/plugins/ses/framework 755 root bin
+f none usr/include/scsi/plugins/ses/framework/libses.h 644 root bin
+f none usr/include/scsi/plugins/ses/framework/ses2.h 644 root bin
+f none usr/include/scsi/plugins/ses/framework/ses2_impl.h 644 root bin
+d none usr/include/scsi/plugins/ses/vendor 755 root bin
 f none usr/include/search.h 644 root bin
 f none usr/include/secdb.h 644 root bin
 d none usr/include/security 755 root bin
@@ -1162,6 +1173,7 @@ f none usr/include/sys/scsi/impl/sas_transport.h 644 root bin
 f none usr/include/sys/scsi/impl/scsi_reset_notify.h 644 root bin
 f none usr/include/sys/scsi/impl/sense.h 644 root bin
 f none usr/include/sys/scsi/impl/services.h 644 root bin
+f none usr/include/sys/scsi/impl/spc3_types.h 644 root bin
 f none usr/include/sys/scsi/impl/status.h 644 root bin
 f none usr/include/sys/scsi/impl/transport.h 644 root bin
 f none usr/include/sys/scsi/impl/types.h 644 root bin

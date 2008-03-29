@@ -238,6 +238,7 @@ SUBDIRS += \
 	libexacct/demo	\
 	libvscan	\
 	smbsrv		\
+	scsi		\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -432,6 +433,7 @@ HDRSUBDIRS=		\
 	libidmap	\
 	libvscan	\
 	smbsrv		\
+	scsi		\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
@@ -561,6 +563,7 @@ libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11 libsqlite
 libvscan:	libscf
+scsi:		libnvpair
 
 #
 # The reason this rule checks for the existence of the

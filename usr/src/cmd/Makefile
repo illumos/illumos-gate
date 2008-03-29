@@ -339,6 +339,7 @@ COMMON_SUBDIRS=		\
 	saf		\
 	savecore	\
 	script		\
+	scsi		\
 	sdiff		\
 	sdpadm		\
 	sendmail	\
@@ -653,6 +654,7 @@ MSGSUBDIRS=		\
 	rmvolmgr	\
 	scadm		\
 	script		\
+	scsi		\
 	sdiff		\
 	sdpadm		\
 	sgs		\

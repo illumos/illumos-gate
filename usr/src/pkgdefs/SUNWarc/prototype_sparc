@@ -165,3 +165,6 @@ s none usr/ccs/lib/sparcv9/values-Xt.o=../../../lib/sparcv9/values-Xt.o
 s none usr/ccs/lib/sparcv9/values-xpg4.o=../../../lib/sparcv9/values-xpg4.o
 s none usr/ccs/lib/sparcv9/values-xpg6.o=../../../lib/sparcv9/values-xpg6.o
 f none usr/lib/sparcv9/llib-lpasswdutil.ln 644 root bin
+d none usr/lib/scsi/sparcv9 755 root bin
+f none usr/lib/scsi/sparcv9/llib-lscsi.ln 644 root bin
+f none usr/lib/scsi/sparcv9/llib-lses.ln 644 root bin

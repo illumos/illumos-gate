@@ -360,6 +360,20 @@ f none usr/lib/security/pkcs11_kernel.so.1 755 root bin
 s none usr/lib/security/pkcs11_kernel.so=./pkcs11_kernel.so.1
 f none usr/lib/security/pkcs11_softtoken.so.1 755 root bin
 s none usr/lib/security/pkcs11_softtoken.so=./pkcs11_softtoken.so.1
+d none usr/lib/scsi 755 root bin
+f none usr/lib/scsi/libscsi.so.1 755 root bin
+s none usr/lib/scsi/libscsi.so=./libscsi.so.1
+f none usr/lib/scsi/libses.so.1 755 root bin
+s none usr/lib/scsi/libses.so=./libses.so.1
+d none usr/lib/scsi/plugins 755 root bin
+d none usr/lib/scsi/plugins/scsi 755 root bin
+d none usr/lib/scsi/plugins/scsi/engines 755 root bin
+f none usr/lib/scsi/plugins/scsi/engines/uscsi.so 755 root bin
+d none usr/lib/scsi/plugins/ses 755 root bin
+d none usr/lib/scsi/plugins/ses/framework 755 root bin
+f none usr/lib/scsi/plugins/ses/framework/libses.so 755 root bin
+f none usr/lib/scsi/plugins/ses/framework/ses2.so 755 root bin
+d none usr/lib/scsi/plugins/ses/vendor 755 root bin
 f none usr/lib/watchmalloc.so.1 755 root bin
 s none usr/lib/liby.so=./liby.so.1
 s none usr/ccs/lib/liby.so=../../lib/liby.so.1

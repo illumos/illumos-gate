@@ -1,0 +1,60 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+SRCS = $(OBJECTS:%.o=../common/%.c)
+C99MODE = $(C99_ENABLE)
+CPPFLAGS += -I../common -I. -D_REENTRANT
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CFLAGS += $(CCVERBOSE)
+
+ROOTLIBDIR = $(ROOTSCSILIBDIR)
+ROOTLIBDIR64 = $(ROOTSCSILIBDIR)/$(MACH64)
+
+DYNFLAGS32 += -R$(SCSILIBDIR)
+DYNFLAGS64 += -R$(SCSILIBDIR)/$(MACH64)
+
+LDLIBS32 += -L$(ROOTSCSILIBDIR)
+LDLIBS64 += -L$(ROOTSCSILIBDIR)/$(MACH64)
+
+LDLIBS += \
+	-lnvpair \
+	-lscsi \
+	-lc
+
+LIBS =		$(DYNLIB) $(LINTLIB)
+
+CLEANFILES += \
+	../common/ses_errno.c
+
+#
+# On SPARC, gcc emits DWARF assembler directives for TLS data that are not
+# understood by the Sun assembler.  Until this problem is fixed, we turn down
+# the amount of generated debugging information, which seems to do the trick.
+#
+$(SPARC_BLD)CTF_FLAGS += -_gcc=-g1
+
+$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

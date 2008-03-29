@@ -1,0 +1,77 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+SUNWprivate_1.1 {
+	global:
+		ses_close;
+		ses_errno;
+		ses_errmsg;
+		ses_node_child;
+		ses_node_ctl;
+		ses_node_id;
+		ses_node_lookup;
+		ses_node_parent;
+		ses_node_props;
+		ses_node_prev_sibling;
+		ses_node_sibling;
+		ses_node_snapshot;
+		ses_node_target;
+		ses_node_type;
+		ses_open;
+		ses_open_scsi;
+		ses_root_node;
+		ses_scsi_target;
+		ses_snap_generation;
+		ses_snap_hold;
+		ses_snap_new;
+		ses_snap_rele;
+		ses_strerror;
+		ses_walk;
+
+		nvlist_add_fixed_string;
+		nvlist_add_fixed_string_trunc;
+
+		ses_alloc;
+		ses_assert;
+		ses_error;
+		ses_free;
+		ses_nverror;
+		ses_panic;
+		ses_realloc;
+		ses_set_errno;
+		ses_set_nverrno;
+		ses_strdup;
+		ses_zalloc;
+
+		ses_plugin_ctlpage_lookup;
+		ses_plugin_page_lookup;
+		ses_plugin_register;
+		ses_plugin_setspecific;
+		ses_plugin_getspecific;
+	local:
+		*;
+};

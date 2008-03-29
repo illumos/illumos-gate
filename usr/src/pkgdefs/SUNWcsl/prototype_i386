@@ -89,6 +89,16 @@ s none usr/lib/lwp/amd64/libthread.so.1=../../amd64/libthread.so.1
 s none usr/lib/lwp/amd64/libthread_db.so.1=../../amd64/libthread_db.so.1
 d none usr/lib/raidcfg/amd64 755 root bin
 f none usr/lib/raidcfg/amd64/mpt.so.1 755 root bin
+d none usr/lib/scsi/amd64 755 root bin
+f none usr/lib/scsi/amd64/libscsi.so.1 755 root bin
+s none usr/lib/scsi/amd64/libscsi.so=./libscsi.so.1
+f none usr/lib/scsi/amd64/libses.so.1 755 root bin
+s none usr/lib/scsi/amd64/libses.so=./libses.so.1
+d none usr/lib/scsi/plugins/scsi/engines/amd64 755 root bin
+f none usr/lib/scsi/plugins/scsi/engines/amd64/uscsi.so 755 root bin
+d none usr/lib/scsi/plugins/ses/framework/amd64 755 root bin
+f none usr/lib/scsi/plugins/ses/framework/amd64/libses.so 755 root bin
+f none usr/lib/scsi/plugins/ses/framework/amd64/ses2.so 755 root bin
 d none usr/lib/security/amd64 755 root bin
 s none usr/lib/security/64=amd64
 f none usr/lib/security/amd64/crypt_bsdmd5.so.1 755 root bin

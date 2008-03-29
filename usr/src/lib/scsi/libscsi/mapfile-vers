@@ -1,0 +1,72 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+SUNWprivate_1.1 {
+	global:
+		libscsi_init;
+		libscsi_fini;
+		libscsi_open;
+		libscsi_close;
+		libscsi_action_alloc;
+		libscsi_action_get_status;
+		libscsi_action_set_status;
+		libscsi_action_get_timeout;
+		libscsi_action_set_timeout;
+		libscsi_action_get_cdb;
+		libscsi_action_get_flags;
+		libscsi_action_get_buffer;
+		libscsi_action_get_sense;
+		libscsi_action_set_datalen;
+		libscsi_action_set_senselen;
+		libscsi_action_parse_sense;
+		libscsi_sense_key_name;
+		libscsi_sense_code_name;
+		libscsi_action_free;
+		libscsi_exec;
+		libscsi_errno;
+		libscsi_errmsg;
+		libscsi_strerror;
+		libscsi_errname;
+		libscsi_errcode;
+		libscsi_assert;
+		libscsi_cmd_cdblen;
+		libscsi_vendor;
+		libscsi_product;
+		libscsi_revision;
+		libscsi_get_handle;
+
+		libscsi_alloc;
+		libscsi_zalloc;
+		libscsi_strdup;
+		libscsi_free;
+		libscsi_set_errno;
+		libscsi_verror;
+		libscsi_error;
+
+	local:
+		*;
+};

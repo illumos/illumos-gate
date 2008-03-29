@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2001 by Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,7 @@ typedef struct sgen_state {
 #define	SGEN_FL_OPEN	0x01	/* instance is open */
 #define	SGEN_FL_SUSP	0x02	/* instance suspended */
 #define	SGEN_FL_BUSY	0x04	/* command buffer busy */
+#define	SGEN_FL_EXCL	0x08	/* exclusive open */
 
 #define	SGEN_SET_OPEN(stp) \
 	(((sgen_state_t *)(stp))->sgen_flags |= SGEN_FL_OPEN)
@@ -119,6 +120,13 @@ typedef struct sgen_state {
 	(((sgen_state_t *)(stp))->sgen_flags &= ~SGEN_FL_BUSY)
 #define	SGEN_IS_BUSY(stp) \
 	((((sgen_state_t *)(stp))->sgen_flags & SGEN_FL_BUSY) == SGEN_FL_BUSY)
+
+#define	SGEN_SET_EXCL(stp) \
+	(((sgen_state_t *)(stp))->sgen_flags |= SGEN_FL_EXCL)
+#define	SGEN_CLR_EXCL(stp) \
+	(((sgen_state_t *)(stp))->sgen_flags &= ~SGEN_FL_EXCL)
+#define	SGEN_IS_EXCL(stp) \
+	((((sgen_state_t *)(stp))->sgen_flags & SGEN_FL_EXCL) == SGEN_FL_EXCL)
 
 /*
  * These structures form the driver's database of binding information.

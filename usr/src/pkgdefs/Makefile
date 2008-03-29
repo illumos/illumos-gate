@@ -362,6 +362,7 @@ COMMON_SUBDIRS= \
 	SUNWscpu  \
 	SUNWscplp  \
 	SUNWscsa1394  \
+	SUNWscsip \
 	SUNWses \
 	SUNWsfe \
 	SUNWslpr \

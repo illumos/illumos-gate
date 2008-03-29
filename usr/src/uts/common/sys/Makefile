@@ -843,6 +843,7 @@ SCSIIMPLHDRS=		\
 	status.h	\
 	transport.h	\
 	scsi_reset_notify.h \
+	spc3_types.h	\
 	types.h		\
 	uscsi.h		\
 	usmp.h

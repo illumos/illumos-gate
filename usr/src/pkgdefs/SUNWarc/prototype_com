@@ -257,3 +257,8 @@ f none usr/lib/llib-lpasswdutil 644 root bin
 f none usr/lib/llib-lpasswdutil.ln 644 root bin
 f none usr/lib/llib-lgss 644 root bin
 f none usr/lib/llib-lgss.ln 644 root bin
+d none usr/lib/scsi 755 root bin
+f none usr/lib/scsi/llib-lscsi 644 root bin
+f none usr/lib/scsi/llib-lscsi.ln 644 root bin
+f none usr/lib/scsi/llib-lses 644 root bin
+f none usr/lib/scsi/llib-lses.ln 644 root bin

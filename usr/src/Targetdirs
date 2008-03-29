@@ -246,6 +246,7 @@ ROOT.BIN= \
 	/usr/include/libmilter \
 	/usr/include/libpolkit \
 	/usr/include/sasl \
+	/usr/include/scsi \
 	/usr/include/tsol \
 	/usr/include/security \
 	/usr/lib \
@@ -288,6 +289,7 @@ ROOT.BIN= \
 	/usr/lib/sasl \
 	/usr/lib/secure \
 	/usr/lib/security \
+	/usr/lib/scsi \
 	/usr/lib/smbsrv \
 	/usr/lib/term \
 	/usr/lib/vscan \
@@ -361,6 +363,7 @@ ROOT.BIN64= \
 	/usr/lib/sasl/$(MACH64) \
 	/usr/lib/secure/$(MACH64) \
 	/usr/lib/security/$(MACH64) \
+	/usr/lib/scsi/$(MACH64) \
 	/usr/lib/smbsrv/$(MACH64) \
 	/usr/lib/abi/$(MACH64) \
 	/usr/sbin/$(MACH64) \

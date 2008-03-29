@@ -403,6 +403,7 @@ COMMON_SUBDIRS = \
 	lib/pkcs11 \
 	lib/print \
 	lib/raidcfg_plugins \
+	lib/scsi \
 	lib/smbsrv \
 	lib/fm \
 	lib/udapl \

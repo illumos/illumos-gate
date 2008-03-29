@@ -21,7 +21,7 @@
 /*
  * Enclosure Services Device target driver
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -255,23 +255,23 @@ ses_probe(dev_info_t *dip)
 	}
 	/* SES_LOG(NULL, SES_CE_DEBUG1, "ses_probe: OK"); */
 	if (ddi_dev_is_sid(dip) == DDI_SUCCESS) {
-	    return (DDI_PROBE_DONTCARE);
+		return (DDI_PROBE_DONTCARE);
 	}
 	devp = ddi_get_driver_private(dip);
 	switch (err = scsi_probe(devp, SLEEP_FUNC)) {
 	case SCSIPROBE_EXISTS:
-	    if (is_enc_dev(NULL, devp->sd_inq, SUN_INQSIZE, &ep)) {
-		break;
-	    }
+		if (is_enc_dev(NULL, devp->sd_inq, SUN_INQSIZE, &ep)) {
+			break;
+		}
 		/* FALLTHROUGH */
 	case SCSIPROBE_NORESP:
-	    scsi_unprobe(devp);
-	    return (DDI_PROBE_FAILURE);
+		scsi_unprobe(devp);
+		return (DDI_PROBE_FAILURE);
 	default:
-	    SES_LOG(NULL, SES_CE_DEBUG9,
-		"ses_probe: probe error %d", err);
-	    scsi_unprobe(devp);
-	    return (DDI_PROBE_FAILURE);
+		SES_LOG(NULL, SES_CE_DEBUG9,
+		    "ses_probe: probe error %d", err);
+		scsi_unprobe(devp);
+		return (DDI_PROBE_FAILURE);
 	}
 	scsi_unprobe(devp);
 	return (DDI_PROBE_SUCCESS);
@@ -428,7 +428,7 @@ ses_doattach(dev_info_t *dip)
 	devp->sd_private = (opaque_t)ssc;
 	ssc->ses_devp = devp;
 	err = ddi_create_minor_node(dip, "0", S_IFCHR, inst,
-		DDI_NT_SCSI_ENCLOSURE, NULL);
+	    DDI_NT_SCSI_ENCLOSURE, NULL);
 	if (err == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		SES_LOG(ssc, CE_NOTE, "minor node creation failed");
@@ -914,6 +914,7 @@ ses_uscsi_cmd(ses_softc_t *ssc, Uscmd *Uc, int Uf)
 		bcopy(uscmd->uscsi_cdb, &ssc->ses_srqcdb,
 		    (size_t)(uscmd->uscsi_cdblen));
 	}
+	ssc->ses_uscsicmd.uscsi_status = 0;
 
 	bp = ssc->ses_sbufp;
 	bp->av_back = (struct buf *)NULL;
@@ -1022,7 +1023,7 @@ ses_start(struct buf *bp)
 
 	case TRAN_BUSY:
 		SES_LOG(ssc, SES_CE_DEBUG2,
-			"ses_start: TRANSPORT BUSY");
+		    "ses_start: TRANSPORT BUSY");
 		SES_ENABLE_RESTART(SES_RESTART_TIME, BP_PKT(bp));
 		return (0);
 		/* break; */
@@ -1094,9 +1095,9 @@ ses_restart(void *arg)
 		SES_LOG(ssc, SES_CE_DEBUG1,
 		    "RESTART %d TRANSPORT BUSY\n", ssc->ses_retries);
 		if (ssc->ses_retries > SES_NO_RETRY) {
-		    ssc->ses_retries -= SES_BUSY_RETRY;
-		    SES_ENABLE_RESTART(SES_RESTART_TIME, pkt);
-		    return;
+			ssc->ses_retries -= SES_BUSY_RETRY;
+			SES_ENABLE_RESTART(SES_RESTART_TIME, pkt);
+			return;
 		}
 		SET_BP_ERROR(bp, EBUSY);
 		break;
@@ -1138,11 +1139,12 @@ ses_callback(struct scsi_pkt *pkt)
 	if (pkt->pkt_reason == CMD_CMPLT &&
 	    !SCBP_C(pkt) &&
 	    !(pkt->pkt_flags & FLAG_SENSING) &&
-	    !pkt->pkt_resid) {
-	    scsi_destroy_pkt(pkt);
-	    SET_BP_PKT(bp, NULL);
-	    biodone(bp);
-	    return;
+	    !pkt->pkt_resid &&
+	    !(scmd->uscsi_flags & USCSI_READ)) {
+		scsi_destroy_pkt(pkt);
+		SET_BP_PKT(bp, NULL);
+		biodone(bp);
+		return;
 	}
 
 
@@ -1167,7 +1169,8 @@ CHECK_PKT:
 			 * reset the target.
 			 */
 			if (! (pkt->pkt_statistics & HBA_RESET)) {
-			    (void) scsi_reset(&pkt->pkt_address, RESET_TARGET);
+				(void) scsi_reset(&pkt->pkt_address,
+				    RESET_TARGET);
 			}
 			err = ETIMEDOUT;
 			break;
@@ -1201,7 +1204,7 @@ CHECK_PKT:
 			 */
 			if ((bp->b_bcount - pkt->pkt_resid) > 0) {
 				SES_LOG(ssc, SES_CE_DEBUG6,
-					"ignoring overrun");
+				    "ignoring overrun");
 				pkt->pkt_reason = CMD_CMPLT;
 				err = EOK;
 				goto CHECK_PKT;
@@ -1221,17 +1224,17 @@ CHECK_PKT:
 		}
 		if (pkt == ssc->ses_rqpkt) {
 			SES_LOG(ssc, CE_WARN, fail_msg,
-				"Request Sense ",
-				scsi_rname(pkt->pkt_reason),
-				(ssc->ses_retries > 0)?
-					"retrying": "giving up");
+			    "Request Sense ",
+			    scsi_rname(pkt->pkt_reason),
+			    (ssc->ses_retries > 0)?
+			    "retrying": "giving up");
 			pkt = (struct scsi_pkt *)bp->av_back;
 			action = QUE_SENSE;
 		} else {
 			SES_LOG(ssc, CE_WARN, fail_msg,
-				"", scsi_rname(pkt->pkt_reason),
-				(ssc->ses_retries > 0)?
-					"retrying": "giving up");
+			    "", scsi_rname(pkt->pkt_reason),
+			    (ssc->ses_retries > 0)?
+			    "retrying": "giving up");
 			action = QUE_COMMAND;
 		}
 		/* Device exists, allow full error recovery. */
@@ -1256,33 +1259,35 @@ CHECK_PKT:
 	case QUE_COMMAND_NOW:
 		/* SES_LOG(ssc, SES_CE_DEBUG1, "retrying cmd now"); */
 		if (ssc->ses_retries > SES_NO_RETRY) {
-		    ssc->ses_retries -= SES_CMD_RETRY;
-		    scmd->uscsi_status = 0;
-		    if (ssc->ses_arq)
-			bzero(pkt->pkt_scbp, sizeof (struct scsi_arq_status));
+			ssc->ses_retries -= SES_CMD_RETRY;
+			scmd->uscsi_status = 0;
+			if (ssc->ses_arq)
+				bzero(pkt->pkt_scbp,
+				    sizeof (struct scsi_arq_status));
 
-		    if (scsi_transport((struct scsi_pkt *)bp->av_back)
-			!= TRAN_ACCEPT) {
-			SES_ENABLE_RESTART(SES_RESTART_TIME,
-				(struct scsi_pkt *)bp->av_back);
-		    }
-		    return;
+			if (scsi_transport((struct scsi_pkt *)bp->av_back)
+			    != TRAN_ACCEPT) {
+				SES_ENABLE_RESTART(SES_RESTART_TIME,
+				    (struct scsi_pkt *)bp->av_back);
+			}
+			return;
 		}
 		break;
 
 	case QUE_COMMAND:
 		SES_LOG(ssc, SES_CE_DEBUG1, "retrying cmd");
 		if (ssc->ses_retries > SES_NO_RETRY) {
-		    ssc->ses_retries -=
-			(err == EBUSY)? SES_BUSY_RETRY: SES_CMD_RETRY;
-		    scmd->uscsi_status = 0;
-		    if (ssc->ses_arq)
-			bzero(pkt->pkt_scbp, sizeof (struct scsi_arq_status));
+			ssc->ses_retries -=
+			    (err == EBUSY)? SES_BUSY_RETRY: SES_CMD_RETRY;
+			scmd->uscsi_status = 0;
+			if (ssc->ses_arq)
+				bzero(pkt->pkt_scbp,
+				    sizeof (struct scsi_arq_status));
 
-		    SES_ENABLE_RESTART(
-			(err == EBUSY)? SES_BUSY_TIME: SES_RESTART_TIME,
-			(struct scsi_pkt *)bp->av_back);
-		    return;
+			SES_ENABLE_RESTART(
+			    (err == EBUSY)? SES_BUSY_TIME: SES_RESTART_TIME,
+			    (struct scsi_pkt *)bp->av_back);
+			return;
 		}
 		break;
 
@@ -1298,7 +1303,7 @@ CHECK_PKT:
 				SES_ENABLE_RESTART(SES_RESTART_TIME,
 				    ssc->ses_rqpkt);
 			}
-		    return;
+			return;
 		}
 		break;
 
@@ -1307,9 +1312,9 @@ CHECK_PKT:
 		pkt = (struct scsi_pkt *)bp->av_back;
 		bp->b_resid = pkt->pkt_resid;
 		if (bp->b_resid) {
-		    SES_LOG(ssc, SES_CE_DEBUG6,
-			"transfer residue %ld(%ld)",
-			bp->b_bcount - bp->b_resid, bp->b_bcount);
+			SES_LOG(ssc, SES_CE_DEBUG6,
+			    "transfer residue %ld(%ld)",
+			    bp->b_bcount - bp->b_resid, bp->b_bcount);
 		}
 		break;
 	}
@@ -1367,7 +1372,7 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 	 */
 	} else if (ssc->ses_arq && pkt->pkt_state & STATE_ARQ_DONE) {
 		struct scsi_arq_status *arq =
-			(struct scsi_arq_status *)(pkt->pkt_scbp);
+		    (struct scsi_arq_status *)(pkt->pkt_scbp);
 		int amt = min(sizeof (arq->sts_sensedata), SENSE_LENGTH);
 		uchar_t *arq_status = (uchar_t *)&arq->sts_rqpkt_status;
 
@@ -1473,9 +1478,9 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 		break;
 	}
 	SES_LOG(ssc, SES_CE_DEBUG1,
-		"cdb[0]= 0x%x %s,  key=0x%x, ASC/ASCQ=0x%x/0x%x",
-		scmd->uscsi_cdb[0], err_action,
-		sense->es_key, sense->es_add_code, sense->es_qual_code);
+	    "cdb[0]= 0x%x %s,  key=0x%x, ASC/ASCQ=0x%x/0x%x",
+	    scmd->uscsi_cdb[0], err_action,
+	    sense->es_key, sense->es_add_code, sense->es_qual_code);
 
 #ifdef 	not
 	/*

@@ -1,0 +1,75 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+.KEEP_STATE:
+.SUFFIXES:
+
+include ../../../../../../cmd/Makefile.cmd
+include ../../../../Makefile.defs
+
+#
+# Set PROG and OBJS based on the values of MODULE and SRCS.  We expect that
+# these macros to be defined by the Makefile that is including this file.
+#
+PROG = $(MODULE:%=%.so)
+YOBJS = $(YSRCS:%.y=%.o)
+OBJS = $(YOBJS) $(SRCS:%.c=%.o)
+
+#
+# A module may set DMOD and DMOD_SRCS if it has a mdb proc module.
+# DMOD, if set, must match PROG above (for mdb autoloading) so it will
+# be built in a subdirectory.
+#
+ROOTDMOD = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/%.so)
+ROOTDMOD64 = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/$(MACH64)/%.so)
+DMODPROG = $(DMOD:%=dmod/%)
+DMOD_OBJS = $(DMOD_SRCS:%.c=%.o)
+
+ROOTPROG = $(ROOTPLUGINLIBDIR)/ses/$(PLUGINTYPE)/$(PROG)
+ROOTPROG64 = $(ROOTPLUGINLIBDIR)/ses/$(PLUGINTYPE)/$(MACH64)/$(PROG)
+
+LINTFLAGS += -mu
+LINTFILES = $(SRCS:%.c=%.ln)
+
+DMODLINTTGT = $(DMOD:%=lint_dmod)
+DMODLINTFILES = $(DMOD_SRCS:%.c=%.ln)
+
+APIMAP = ../../../../libses/libses_api.map
+
+C99MODE = $(C99_ENABLE)
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
+CFLAGS += -G $(XREGSFLAG) 
+CFLAGS64 += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
+CFLAGS64 += -G $(XREGSFLAG) 
+CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZIGNORE)
+
+$(PROG) := LDFLAGS += $(ZDEFS) -M$(APIMAP)
+$(PROG) := LDLIBS += -lc -lnvpair
+
+$(DMODPROG) := LDFLAGS += $(ZNODEFS)

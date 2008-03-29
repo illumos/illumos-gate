@@ -81,6 +81,17 @@ s none usr/lib/lwp/sparcv9/libthread.so.1=../../sparcv9/libthread.so.1
 s none usr/lib/lwp/sparcv9/libthread_db.so.1=../../sparcv9/libthread_db.so.1
 d none usr/lib/raidcfg/sparcv9 755 root bin
 f none usr/lib/raidcfg/sparcv9/mpt.so.1 755 root bin
+d none usr/lib/scsi/sparcv9 755 root bin
+f none usr/lib/scsi/sparcv9/libscsi.so.1 755 root bin
+s none usr/lib/scsi/sparcv9/libscsi.so=./libscsi.so.1
+f none usr/lib/scsi/sparcv9/libses.so.1 755 root bin
+s none usr/lib/scsi/sparcv9/libses.so=./libses.so.1
+d none usr/lib/scsi/plugins/scsi/engines/sparcv9 755 root bin
+f none usr/lib/scsi/plugins/scsi/engines/sparcv9/uscsi.so 755 root bin
+d none usr/lib/scsi/plugins/ses/framework/sparcv9 755 root bin
+f none usr/lib/scsi/plugins/ses/framework/sparcv9/libses.so 755 root bin
+f none usr/lib/scsi/plugins/ses/framework/sparcv9/ses2.so 755 root bin
+d none usr/lib/scsi/plugins/ses/vendor/sparcv9 755 root bin
 d none usr/lib/security/sparcv9 755 root bin
 s none usr/lib/security/64=sparcv9
 f none usr/lib/security/sparcv9/crypt_bsdmd5.so.1 755 root bin

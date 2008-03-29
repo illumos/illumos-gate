@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,50 +282,109 @@ union scsi_cdb {		/* scsi command description block */
 
 #define	SCSI_READ16(Sr16_Addr) \
 	(((uint16_t)*((uint8_t *)(Sr16_Addr)) << 8) | \
-	    ((uint16_t)*((uint8_t *)((Sr16_Addr)+1))))
+	    ((uint16_t)*((uint8_t *)(Sr16_Addr)+1)))
+
+#define	SCSI_READ24(Sr32_Addr)	\
+	(((uint32_t)*((uint8_t *)(Sr32_Addr)) << 16) | \
+	    ((uint32_t)*((uint8_t *)(Sr32_Addr)+1) << 8) | \
+	    ((uint32_t)*((uint8_t *)(Sr32_Addr)+2)))
 
 #define	SCSI_READ32(Sr32_Addr) \
 	(((uint32_t)*((uint8_t *)(Sr32_Addr)) << 24) | \
-	    ((uint32_t)*((uint8_t *)((Sr32_Addr)+1)) << 16) | \
-	    ((uint32_t)*((uint8_t *)((Sr32_Addr)+2)) << 8) | \
-	    ((uint32_t)*((uint8_t *)((Sr32_Addr)+3))))
+	    ((uint32_t)*((uint8_t *)(Sr32_Addr)+1) << 16) | \
+	    ((uint32_t)*((uint8_t *)(Sr32_Addr)+2) << 8) | \
+	    ((uint32_t)*((uint8_t *)(Sr32_Addr)+3)))
+
+#define	SCSI_READ40(Sr64_Addr)	\
+	(((uint64_t)*((uint8_t *)(Sr64_Addr)) << 32) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+1) << 24) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+2) << 16) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+3) << 8) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+4)))
+
+#define	SCSI_READ48(Sr64_Addr)	\
+	(((uint64_t)*((uint8_t *)(Sr64_Addr)) << 40) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+1) << 32) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+2) << 24) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+3) << 16) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+4) << 8) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+5)))
 
 #define	SCSI_READ64(Sr64_Addr) \
 	(((uint64_t)*((uint8_t *)(Sr64_Addr)) << 56) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+1)) << 48) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+2)) << 40) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+3)) << 32) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+4)) << 24) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+5)) << 16) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+6)) << 8) | \
-	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+7))))
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+1) << 48) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+2) << 40) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+3) << 32) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+4) << 24) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+5) << 16) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+6) << 8) | \
+	    ((uint64_t)*((uint8_t *)(Sr64_Addr)+7)))
 
 #define	SCSI_WRITE16(Sr16_Addr, Sr16_Val) \
-	*((uint8_t *)(Sr16_Addr)) = (((uint16_t)(Sr16_Val) >> 8) & 0xff); \
-	*(((uint8_t *)(Sr16_Addr))+1) = ((uint16_t)(Sr16_Val) & 0xff);
+	*((uint8_t *)(Sr16_Addr)) = (((uint16_t)(Sr16_Val) >> 8) & 0xff), \
+	*((uint8_t *)(Sr16_Addr)+1) = ((uint16_t)(Sr16_Val) & 0xff)
+
+#define	SCSI_WRITE24(Sr24_Addr, Sr24_Val) \
+	SCSI_WRITE16((Sr24_Addr), ((Sr24_Val) & 0xffff00) >> 8),	\
+	*((uint8_t *)(Sr24_Addr)+2) = ((uint8_t)((Sr24_Val) & 0xff))
 
 #define	SCSI_WRITE32(Sr32_Addr, Sr32_Val) \
-	*(uint8_t *)(Sr32_Addr) = (((uint32_t)(Sr32_Val) >> 24) & 0xff); \
-	*(((uint8_t *)(Sr32_Addr))+1) = \
-	    (((uint32_t)(Sr32_Val) >> 16) & 0xff); \
-	*(((uint8_t *)(Sr32_Addr))+2) = (((uint32_t)(Sr32_Val) >> 8) & 0xff); \
-	*(((uint8_t *)(Sr32_Addr))+3) = (((uint32_t)(Sr32_Val)) & 0xff);
+	*(uint8_t *)(Sr32_Addr) = (((uint32_t)(Sr32_Val) >> 24) & 0xff), \
+	*((uint8_t *)(Sr32_Addr)+1) = \
+	    (((uint32_t)(Sr32_Val) >> 16) & 0xff), \
+	*((uint8_t *)(Sr32_Addr)+2) = (((uint32_t)(Sr32_Val) >> 8) & 0xff), \
+	*((uint8_t *)(Sr32_Addr)+3) = (((uint32_t)(Sr32_Val)) & 0xff)
+
+#define	SCSI_WRITE40(Sr40_Addr, Sr40_Val) \
+	SCSI_WRITE32((Sr40_Addr), ((Sr40_Val) & 0xffffffff00ULL) >> 8),	\
+	*((uint8_t *)(Sr40_Addr)+4) = ((uint8_t)(Sr40_Val) & 0xff)
+
+#define	SCSI_WRITE48(Sr48_Addr, Sr40_Val) \
+	SCSI_WRITE32((Sr48_Addr), ((Sr48_Val) & 0xffffffff0000ULL) >> 16), \
+	SCSI_WRITE16((uint8_t *)(Sr48_Addr)+4, (Sr40_Val) & 0xffff)
 
 #define	SCSI_WRITE64(Sr64_Addr, Sr64_Val) \
-	*(uint8_t *)(Sr64_Addr) = (((uint64_t)(Sr64_Val) >> 56) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+1) = \
-	    (((uint64_t)(Sr64_Val) >> 48) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+2) = \
-	    (((uint64_t)(Sr64_Val) >> 40) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+3) = \
-	    (((uint64_t)(Sr64_Val) >> 32) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+4) = \
-	    (((uint64_t)(Sr64_Val) >> 24) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+5) = \
-	    (((uint64_t)(Sr64_Val) >> 16) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+6) = \
-	    (((uint64_t)(Sr64_Val) >> 8) & 0xff); \
-	*(((uint8_t *)(Sr64_Addr))+7) = (((uint64_t)(Sr64_Val)) & 0xff);
+	*(uint8_t *)(Sr64_Addr) = (((uint64_t)(Sr64_Val) >> 56) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+1) = \
+	    (((uint64_t)(Sr64_Val) >> 48) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+2) = \
+	    (((uint64_t)(Sr64_Val) >> 40) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+3) = \
+	    (((uint64_t)(Sr64_Val) >> 32) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+4) = \
+	    (((uint64_t)(Sr64_Val) >> 24) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+5) = \
+	    (((uint64_t)(Sr64_Val) >> 16) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+6) = \
+	    (((uint64_t)(Sr64_Val) >> 8) & 0xff), \
+	*((uint8_t *)(Sr64_Addr)+7) = (((uint64_t)(Sr64_Val)) & 0xff)
+
+/*
+ * These macros deal with unaligned data that crosses a byte boundary.
+ */
+#define	SCSI_MK8(ms, ls)	\
+	(((uint8_t)(ms) << 4) | (uint8_t)ls)
+
+#define	SCSI_MK12_4_8(ms, ls)	\
+	(((uint16_t)(ms) << 8) | (uint16_t)(ls))
+#define	SCSI_MK12_8_4(ms, ls)	\
+	(((uint16_t)(ms) << 4) | (uint16_t)(ls))
+
+#define	SCSI_MK16_4_8_4(hi, mid, lo)	\
+	(((uint16_t)(hi) << 12) | ((uint16_t)(mid) << 4) | (uint16_t)(lo))
+
+#define	SCSI_MK20_4_16(ms, ls)	\
+	(((uint32_t)(ms) << 16) | ((uint32_t)(ls)))
+#define	SCSI_MK20_16_4(ms, ls)	\
+	(((uint32_t)(ms) << 4) | ((uint32_t)(ls)))
+
+#define	SCSI_MK24_4_16_4(hi, mid, lo)	\
+	(((uint32_t)(hi) << 20) | ((uint32_t)(mid) << 4) | (uint32_t)(lo))
+
+#define	SCSI_MK36_4_32(ms, ls)	\
+	(((uint64_t)(ms) << 32) | (uint64_t)(ls))
+#define	SCSI_MK36_32_4(ms, ls)	\
+	(((uint64_t)(ms) << 4) | (uint64_t)(ls))
 
 /*
  * defines for getting/setting fields within the various command groups

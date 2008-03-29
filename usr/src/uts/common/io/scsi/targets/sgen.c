@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,7 +133,7 @@ static void sgen_cleanup_binddb();
  */
 static int  sgen_uscsi_cmd(dev_t, struct uscsi_cmd *, int);
 static int sgen_start(struct buf *);
-static void sgen_hold_cmdbuf(sgen_state_t *);
+static int sgen_hold_cmdbuf(sgen_state_t *);
 static void sgen_rele_cmdbuf(sgen_state_t *);
 static int sgen_make_uscsi_cmd(sgen_state_t *, struct buf *);
 static void sgen_restart(void *);
@@ -772,7 +772,7 @@ sgen_setup_sense(sgen_state_t *sg_state)
 
 /*
  * sgen_create_errstats()
- * 	create named kstats for tracking occurence of errors.
+ * 	create named kstats for tracking occurrence of errors.
  */
 static void
 sgen_create_errstats(sgen_state_t *sg_state, int instance)
@@ -1060,19 +1060,30 @@ sgen_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 
 	mutex_enter(&sg_state->sgen_mutex);
 
-	if (SGEN_IS_OPEN(sg_state)) {
+	/*
+	 * Don't allow new opens of a suspended device until the last close has
+	 * happened.  This is rather simplistic, but keeps the implementation
+	 * straightforward.
+	 */
+	if (SGEN_IS_SUSP(sg_state)) {
+		mutex_exit(&sg_state->sgen_mutex);
+		return (EIO);
+	}
+
+	/*
+	 * Enforce exclusive access.
+	 */
+	if (SGEN_IS_EXCL(sg_state) ||
+	    (SGEN_IS_OPEN(sg_state) && (flag & FEXCL))) {
 		mutex_exit(&sg_state->sgen_mutex);
 		return (EBUSY);
 	}
 
+	if (flag & FEXCL)
+		SGEN_SET_EXCL(sg_state);
+
 	SGEN_SET_OPEN(sg_state);
 
-	/*
-	 * At this point, sgen cannot have the suspended bit set,
-	 * since each target is exclusive-access; when the previous
-	 * close occurred, it cleared the flag.
-	 */
-	ASSERT(!SGEN_IS_SUSP(sg_state));
 	mutex_exit(&sg_state->sgen_mutex);
 
 	return (0);
@@ -1099,6 +1110,7 @@ sgen_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	mutex_enter(&sg_state->sgen_mutex);
 	SGEN_CLR_OPEN(sg_state);
+	SGEN_CLR_EXCL(sg_state);
 	SGEN_CLR_SUSP(sg_state); /* closing clears the 'I was suspended' bit */
 	mutex_exit(&sg_state->sgen_mutex);
 
@@ -1186,7 +1198,6 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 	struct buf	*bp;
 	sgen_state_t	*sg_state;
 	enum uio_seg	uioseg;
-	int	cmdbufhold = 0;
 	int	instance;
 	int	flags;
 	int	err;
@@ -1199,9 +1210,19 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 	sgen_log(sg_state, SGEN_DIAG2, "in sgen_uscsi_cmd(): instance = %d",
 	    instance);
 
+	/*
+	 * At this point, we start affecting state relevant to the target,
+	 * so access needs to be serialized.
+	 */
+	if (sgen_hold_cmdbuf(sg_state) != 0) {
+		sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: interrupted");
+		return (EINTR);
+	}
+
 	err = scsi_uscsi_alloc_and_copyin((intptr_t)ucmd, flag,
 	    &sg_state->sgen_scsiaddr, &uscmd);
 	if (err != 0) {
+		sgen_rele_cmdbuf(sg_state);
 		sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: "
 		    "scsi_uscsi_alloc_and_copyin failed\n");
 		return (err);
@@ -1217,13 +1238,6 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 		    "unsafe uscsi_flags 0x%x", uscmd->uscsi_flags & ~flags);
 		uscmd->uscsi_flags = flags;
 	}
-
-	/*
-	 * At this point, we start affecting state relevant to the target,
-	 * so access needs to be serialized.
-	 */
-	sgen_hold_cmdbuf(sg_state);	/* lock command buf for this target */
-	cmdbufhold = 1;
 
 	if (uscmd->uscsi_cdb != NULL) {
 		sgen_dump_cdb(sg_state, "sgen_uscsi_cmd: ",
@@ -1268,9 +1282,7 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 	/*
 	 * After this point, we can't touch per-target state.
 	 */
-	if (cmdbufhold) {
-		sgen_rele_cmdbuf(sg_state);
-	}
+	sgen_rele_cmdbuf(sg_state);
 
 	sgen_log(sg_state, SGEN_DIAG2, "done sgen_uscsi_cmd()");
 
@@ -1279,16 +1291,23 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 
 /*
  * sgen_hold_cmdbuf()
- * 	Aquire a lock on the command buffer for the given target.
+ * 	Acquire a lock on the command buffer for the given target.  Returns
+ * 	non-zero if interrupted.
  */
-static void
+static int
 sgen_hold_cmdbuf(sgen_state_t *sg_state)
 {
 	mutex_enter(&sg_state->sgen_mutex);
-	while (SGEN_IS_BUSY(sg_state))
-		cv_wait(&sg_state->sgen_cmdbuf_cv, &sg_state->sgen_mutex);
+	while (SGEN_IS_BUSY(sg_state)) {
+		if (!cv_wait_sig(&sg_state->sgen_cmdbuf_cv,
+		    &sg_state->sgen_mutex)) {
+			mutex_exit(&sg_state->sgen_mutex);
+			return (-1);
+		}
+	}
 	SGEN_SET_BUSY(sg_state);
 	mutex_exit(&sg_state->sgen_mutex);
+	return (0);
 }
 
 /*

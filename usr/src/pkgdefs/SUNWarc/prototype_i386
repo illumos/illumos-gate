@@ -169,3 +169,6 @@ s none usr/ccs/lib/amd64/values-Xs.o=../../../lib/amd64/values-Xs.o
 s none usr/ccs/lib/amd64/values-Xt.o=../../../lib/amd64/values-Xt.o
 s none usr/ccs/lib/amd64/values-xpg4.o=../../../lib/amd64/values-xpg4.o
 s none usr/ccs/lib/amd64/values-xpg6.o=../../../lib/amd64/values-xpg6.o
+d none usr/lib/scsi/amd64 755 root bin
+f none usr/lib/scsi/amd64/llib-lscsi.ln 644 root bin
+f none usr/lib/scsi/amd64/llib-lses.ln 644 root bin
