@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,10 +183,6 @@ static ndi_event_set_t xpvd_ndi_events = {
 
 static ndi_event_hdl_t xpvd_ndi_event_handle;
 
-#ifdef XPV_HVM_DRIVER
-static int hvm_vdev_num[26];
-#endif
-
 /*
  * Hypervisor interrupt capabilities
  */
@@ -259,7 +255,7 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 	}
-#endif
+#endif /* XPV_HVM_DRIVER */
 
 	if (ndi_event_alloc_hdl(devi, 0, &xpvd_ndi_event_handle,
 	    NDI_SLEEP) != NDI_SUCCESS) {
@@ -272,6 +268,10 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		xpvd_dip = NULL;
 		return (DDI_FAILURE);
 	}
+
+#ifdef XPV_HVM_DRIVER
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi, DDI_NO_AUTODETACH, 1);
+#endif /* XPV_HVM_DRIVER */
 
 	/* watch both frontend and backend for new devices */
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
@@ -715,16 +715,11 @@ xpvd_ctlops(dev_info_t *dip, dev_info_t *rdip,
  * Assign the address portion of the node name
  */
 static int
-xpvd_name_child(dev_info_t *child, char *name, int namelen)
+xpvd_name_child(dev_info_t *child, char *addr, int addrlen)
 {
 	int *domain, *vdev;
 	uint_t ndomain, nvdev;
-	char *unit_address;
-	int devno;
-#ifdef XPV_HVM_DRIVER
-	char *xip;
-	int xenstore_id;
-#endif
+	char *prop_str;
 
 	/*
 	 * i_xpvd_parse_devname() knows the formats used by this
@@ -748,7 +743,7 @@ xpvd_name_child(dev_info_t *child, char *name, int namelen)
 		}
 		ASSERT(nvdev == 1);
 
-		(void) snprintf(name, namelen, "%d,%d", domain[0], vdev[0]);
+		(void) snprintf(addr, addrlen, "%d,%d", domain[0], vdev[0]);
 		ddi_prop_free(vdev);
 		ddi_prop_free(domain);
 		return (DDI_SUCCESS);
@@ -757,56 +752,19 @@ xpvd_name_child(dev_info_t *child, char *name, int namelen)
 
 	/*
 	 * Use "unit-address" property (frontend/softdev drivers).
-	 *
-	 * For PV domains, the disk name should be a simple number.  In an
-	 * HVM domain, it will be a string of the form hdX.  In the latter
-	 * case we convert hda to 0, hdb to 1, and so on.
 	 */
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
-	    DDI_PROP_DONTPASS, "unit-address", &unit_address)
-	    == DDI_PROP_SUCCESS) {
-		devno = -1;
-		if (unit_address[0] >= '0' && unit_address[0] <= '9')
-			(void) sscanf(unit_address, "%d", &devno);
-#ifdef XPV_HVM_DRIVER
-		/*
-		 * XXX: we should really check the device class here.  We
-		 * always want to set hvm_vdev_num[] - even if we somehow
-		 * end up with a non-hdX device name.
-		 */
-		else if (strlen(unit_address) == 3 &&
-		    unit_address[0] == 'h' && unit_address[1] == 'd') {
-			devno = unit_address[2] - 'a';
-			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
-			    DDI_PROP_DONTPASS, "xenstore-id", &xip)
-			    == DDI_PROP_SUCCESS) {
-				(void) sscanf(xip, "%d", &xenstore_id);
-				ddi_prop_free(xip);
-				hvm_vdev_num[devno] = xenstore_id;
-			} else {
-				devno = -1;
-			}
-		}
-#endif
-
-		if (devno < 0) {
-			cmn_err(CE_WARN, "Unrecognized device: %s",
-			    unit_address);
-			ddi_prop_free(unit_address);
-			return (DDI_FAILURE);
-		}
-		(void) snprintf(name, namelen, "%x", devno);
-		ddi_prop_free(unit_address);
-		return (DDI_SUCCESS);
-	}
-
-	return (DDI_FAILURE);
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
+	    "unit-address", &prop_str) != DDI_PROP_SUCCESS)
+		return (DDI_FAILURE);
+	(void) strlcpy(addr, prop_str, addrlen);
+	ddi_prop_free(prop_str);
+	return (DDI_SUCCESS);
 }
 
 static int
 xpvd_initchild(dev_info_t *child)
 {
-	char name[80];
+	char addr[80];
 
 	/*
 	 * Pseudo nodes indicate a prototype node with per-instance
@@ -842,11 +800,11 @@ xpvd_initchild(dev_info_t *child)
 	if (xvdi_init_dev(child) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	if (xpvd_name_child(child, name, 80) != DDI_SUCCESS) {
+	if (xpvd_name_child(child, addr, sizeof (addr)) != DDI_SUCCESS) {
 		xvdi_uninit_dev(child);
 		return (DDI_FAILURE);
 	}
-	ddi_set_name_addr(child, name);
+	ddi_set_name_addr(child, addr);
 
 	return (DDI_SUCCESS);
 }
@@ -916,15 +874,6 @@ i_xpvd_parse_devname(char *name, xendev_devclass_t *devclassp,
 	/* Frontend format is "<vdev>". */
 	*domp = DOMID_SELF;
 	if (sscanf(caddr, "%x", vdevp) == 1) {
-#ifdef XPV_HVM_DRIVER
-		if (*devclassp == XEN_VBLK) {
-			if (*vdevp < 0 || *vdevp > 26) {
-				*vdevp = -1;
-				goto done;
-			}
-			*vdevp = hvm_vdev_num[*vdevp];
-		}
-#endif
 		ret = B_TRUE;
 		goto done;
 	}

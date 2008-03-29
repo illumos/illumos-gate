@@ -88,6 +88,9 @@
 #include <sys/dld.h>
 #include <sys/fs/zfs.h>
 #include <inet/kssl/kssl.h>
+#include <sys/dkio.h>
+#include <sys/dumpadm.h>
+#include <sys/mntio.h>
 
 #include "ramdata.h"
 #include "proto.h"
@@ -955,6 +958,34 @@ const struct ioc {
 		"kssl_params_t"},
 	{ (uint_t)KSSL_DELETE_ENTRY,		"KSSL_DELETE_ENTRY",
 		"sockaddr_in"},
+
+	/* dkio ioctls - (0x04 << 8) */
+	{ (uint_t)DKIOCGGEOM,		"DKIOCGGEOM",
+		"struct dk_geom"},
+	{ (uint_t)DKIOCSGEOM,		"DKIOCSGEOM",
+		"struct dk_geom"},
+	{ (uint_t)DKIOCINFO,		"DKIOCINFO",
+		"struct dk_info"},
+	{ (uint_t)DKIOCGVTOC,		"DKIOCGVTOC",
+		"struct vtoc"},
+	{ (uint_t)DKIOCSVTOC,		"DKIOCSVTOC",
+		"struct vtoc"},
+	{ (uint_t)DKIOCADDBAD,		"DKIOCADDBAD",
+		NULL},
+	{ (uint_t)DKIOCG_PHYGEOM,	"DKIOCG_PHYGEOM",
+		"struct dk_geom"},
+	{ (uint_t)DKIOCG_VIRTGEOM,	"DKIOCG_VIRTGEOM",
+		"struct dk_geom"},
+	{ (uint_t)DKIOCGMEDIAINFO,	"DKIOCGMEDIAINFO",
+		"struct dk_minfo"},
+
+	/* dumpadm ioctls - (0xdd << 8) */
+	{ (uint_t)DIOCGETDEV,	"DIOCGETDEV",
+		"char *"},
+
+	/* mntio ioctls - ('m' << 8) */
+	{ (uint_t)MNTIOC_GETMNTENT,	"MNTIOC_GETMNTENT",
+		"struct extmnttab"},
 
 	{ (uint_t)0, NULL, NULL	}
 };

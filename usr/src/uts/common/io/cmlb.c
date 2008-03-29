@@ -140,8 +140,13 @@ static struct driver_minor_data dk_minor_data_efi[] = {
 };
 
 
-
+/*
+ * External kernel interfaces
+ */
 extern struct mod_ops mod_miscops;
+
+extern int ddi_create_internal_pathname(dev_info_t *dip, char *name,
+    int spec_type, minor_t minor_num);
 
 /*
  * Global buffer and mutex for debug logging
@@ -1150,6 +1155,18 @@ cmlb_check_update_blockcount(struct cmlb_lun *cl, void *tg_cookie)
 		return (0);
 }
 
+static int
+cmlb_create_minor(dev_info_t *dip, char *name, int spec_type,
+    minor_t minor_num, char *node_type, int flag, boolean_t internal)
+{
+	if (internal)
+		return (ddi_create_internal_pathname(dip,
+		    name, spec_type, minor_num));
+	else
+		return (ddi_create_minor_node(dip,
+		    name, spec_type, minor_num, node_type, flag));
+}
+
 /*
  *    Function: cmlb_create_minor_nodes
  *
@@ -1173,10 +1190,12 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 	int				instance;
 	char				name[48];
 	cmlb_label_t			newlabeltype;
+	boolean_t			internal;
 
 	ASSERT(cl != NULL);
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 
+	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 	/* check the most common case */
 	if (cl->cl_cur_labeltype != CMLB_LABEL_UNDEF &&
@@ -1203,10 +1222,10 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 
 			(void) sprintf(name, "%s", dmdp->name);
 
-			if (ddi_create_minor_node(CMLB_DEVINFO(cl), name,
+			if (cmlb_create_minor(CMLB_DEVINFO(cl), name,
 			    dmdp->type,
 			    (instance << CMLBUNIT_SHIFT) | dmdp->minor,
-			    cl->cl_node_type, NULL) == DDI_FAILURE) {
+			    cl->cl_node_type, NULL, internal) == DDI_FAILURE) {
 				/*
 				 * Clean up any nodes that may have been
 				 * created, in case this fails in the middle
@@ -1258,22 +1277,22 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 		/* from vtoc to EFI */
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "h");
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "h,raw");
-		(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "wd",
+		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd",
 		    S_IFBLK, (instance << CMLBUNIT_SHIFT) | WD_NODE,
-		    cl->cl_node_type, NULL);
-		(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "wd,raw",
+		    cl->cl_node_type, NULL, internal);
+		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd,raw",
 		    S_IFCHR, (instance << CMLBUNIT_SHIFT) | WD_NODE,
-		    cl->cl_node_type, NULL);
+		    cl->cl_node_type, NULL, internal);
 	} else {
 		/* from efi to vtoc */
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd");
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd,raw");
-		(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h",
+		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 		    S_IFBLK, (instance << CMLBUNIT_SHIFT) | WD_NODE,
-		    cl->cl_node_type, NULL);
-		(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h,raw",
+		    cl->cl_node_type, NULL, internal);
+		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h,raw",
 		    S_IFCHR, (instance << CMLBUNIT_SHIFT) | WD_NODE,
-		    cl->cl_node_type, NULL);
+		    cl->cl_node_type, NULL, internal);
 	}
 
 	cl->cl_last_labeltype = newlabeltype;
@@ -3472,6 +3491,9 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 {
 	struct vtoc	user_vtoc;
 	int		rval = 0;
+	boolean_t	internal;
+
+	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 #ifdef _MULTI_DATAMODEL
 	switch (ddi_model_convert_from(flag & FMODELS)) {
@@ -3522,12 +3544,12 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	cmlb_clear_efi(cl, tg_cookie);
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd");
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd,raw");
-	(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h",
+	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 	    S_IFBLK, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
-	    cl->cl_node_type, NULL);
-	(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h,raw",
+	    cl->cl_node_type, NULL, internal);
+	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h,raw",
 	    S_IFCHR, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
-	    cl->cl_node_type, NULL);
+	    cl->cl_node_type, NULL, internal);
 	mutex_enter(CMLB_MUTEX(cl));
 
 	if ((rval = cmlb_build_label_vtoc(cl, &user_vtoc)) == 0) {
@@ -3984,9 +4006,12 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	int		rval = 0;
 	void		*buffer;
 	diskaddr_t	tgt_lba;
+	boolean_t	internal;
 
 	if (ddi_copyin(arg, &user_efi, sizeof (dk_efi_t), flag))
 		return (EFAULT);
+
+	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
 
@@ -4008,14 +4033,14 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 			mutex_exit(CMLB_MUTEX(cl));
 			ddi_remove_minor_node(CMLB_DEVINFO(cl), "h");
 			ddi_remove_minor_node(CMLB_DEVINFO(cl), "h,raw");
-			(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "wd",
+			(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd",
 			    S_IFBLK,
 			    (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
-			    cl->cl_node_type, NULL);
-			(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "wd,raw",
+			    cl->cl_node_type, NULL, internal);
+			(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd,raw",
 			    S_IFCHR,
 			    (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
-			    cl->cl_node_type, NULL);
+			    cl->cl_node_type, NULL, internal);
 		} else
 			mutex_exit(CMLB_MUTEX(cl));
 

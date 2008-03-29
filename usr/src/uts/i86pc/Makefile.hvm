@@ -21,7 +21,7 @@
 #
 # uts/i86pc/Makefile.hvm
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +35,9 @@ ROOT_HVM_MOD_DIR	= $(ROOT_HVM_DIR)/kernel
 ROOT_HVM_DRV_DIR_32	= $(ROOT_HVM_MOD_DIR)/drv
 ROOT_HVM_DRV_DIR_64	= $(ROOT_HVM_MOD_DIR)/drv/$(MACH64)
 ROOT_HVM_DRV_DIR	= $(ROOT_HVM_DRV_DIR_$(CLASS))
+ROOT_HVM_MISC_DIR_32	= $(ROOT_HVM_MOD_DIR)/misc
+ROOT_HVM_MISC_DIR_64	= $(ROOT_HVM_MOD_DIR)/misc/$(MACH64)
+ROOT_HVM_MISC_DIR	= $(ROOT_HVM_MISC_DIR_$(CLASS))
 USR_HVM_DIR		= $(ROOT)/usr/platform/i86hvm
 
 #
@@ -55,10 +58,16 @@ $(ROOT_HVM_MOD_DIR):		$(ROOT_HVM_DIR)
 $(ROOT_HVM_DRV_DIR):		$(ROOT_MOD_DIR)
 	-$(INS.dir.root.sys)
 
+$(ROOT_HVM_MISC_DIR):		$(ROOT_MOD_DIR)
+	-$(INS.dir.root.sys)
+
 $(ROOT_HVM_MOD_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MOD_DIR) FRC
 	$(INS.file)
 
 $(ROOT_HVM_DRV_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_DRV_DIR) FRC
+	$(INS.file)
+
+$(ROOT_HVM_MISC_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MISC_DIR) FRC
 	$(INS.file)
 
 $(USR_HVM_DIR):

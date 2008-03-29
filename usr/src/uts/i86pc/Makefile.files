@@ -106,7 +106,7 @@ CORE_OBJS += $(SMBIOS_OBJS)
 
 #
 # These get compiled twice:
-# - once in the dboot (direct boot) identity mapped code 
+# - once in the dboot (direct boot) identity mapped code
 # - once for use during early startup in unix
 #
 BOOT_DRIVER_OBJS =		\
@@ -163,7 +163,7 @@ GFX_PRIVATE_OBJS	+= gfx_private.o gfxp_pci.o gfxp_segmap.o \
 			   gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
 ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
 PCI_E_MISC_OBJS += pcie.o pcie_fault.o
-PCI_E_NEXUS_OBJS += npe.o npe_misc.o 
+PCI_E_NEXUS_OBJS += npe.o npe_misc.o
 PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
 PCPLUSMP_OBJS += apic.o psm_common.o apic_introp.o mp_platform_common.o
@@ -186,11 +186,14 @@ ROOTNEX_OBJS += rootnex.o
 TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
+PV_CMDK_OBJS	+= pv_cmdk.o
+HVM_BOOTSTRAP_OBJS	+= hvm_bootstrap.o
+XDF_OBJS	+= xdf.o
 XNF_OBJS	+= xnf.o
 XPV_OBJS	+= xpv_support.o xvdi.o gnttab.o evtchn.o \
 		xenbus_comms.o xenbus_client.o xenbus_probe.o xenbus_xs.o \
 		hypercall.o hypersubr.o
-XPVD_OBJS   	+= xpvd.o
+XPVD_OBJS	+= xpvd.o
 
 #
 #	Build up defines and paths.

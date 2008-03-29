@@ -56,6 +56,22 @@ extern "C" {
 #define	XB_MAX_XFER	(XB_MAX_SEGLEN * BLKIF_MAX_SEGMENTS_PER_REQUEST)
 #define	XB_MAXPHYS	(XB_MAX_XFER * BLKIF_RING_SIZE)
 
+
+/*
+ * Slice for absolute disk transaction.
+ *
+ * Hack Alert.  XB_SLICE_NONE is a magic value that can be written into the
+ * b_private field of buf structures passed to xdf_strategy().  When present
+ * it indicates that the I/O is using an absolute offset.  (ie, the I/O is
+ * not bound to any one partition.)  This magic value is currently used by
+ * the pv_cmdk driver.  This hack is shamelessly stolen from the sun4v vdc
+ * driver, another virtual disk device driver.  (Although in the case of
+ * vdc the hack is less egregious since it is self contained within the
+ * vdc driver, where as here it is used as an interface between the pv_cmdk
+ * driver and the xdf driver.)
+ */
+#define	XB_SLICE_NONE	0xFF
+
 /*
  * blkif status
  */
@@ -177,6 +193,7 @@ typedef struct v_req {
  */
 typedef struct xdf {
 	dev_info_t	*xdf_dip;
+	ddi_iblock_cookie_t xdf_ibc; /* mutex iblock cookie */
 	domid_t		xdf_peer; /* otherend's dom ID */
 	xendev_ring_t	*xdf_xb_ring; /* I/O ring buffer */
 	ddi_acc_handle_t xdf_xb_ring_hdl; /* access handler for ring buffer */
@@ -188,11 +205,13 @@ typedef struct xdf {
 	ulong_t		xdf_vd_open[OTYPCNT];
 	ulong_t		xdf_vd_lyropen[XDF_PEXT];
 	ulong_t		xdf_vd_exclopen;
+	kmutex_t	xdf_iostat_lk; /* muxes lock for the iostat ptr */
 	kmutex_t	xdf_dev_lk; /* mutex lock for I/O path */
 	kmutex_t	xdf_cb_lk; /* mutex lock for event handling path */
 	kcondvar_t	xdf_dev_cv; /* cv used in I/O path */
 	uint_t		xdf_xdev_info; /* disk info from backend xenstore */
 	diskaddr_t	xdf_xdev_nblocks; /* total size in block */
+	cmlb_geom_t	xdf_pgeom;
 	kstat_t		*xdf_xdev_iostat;
 	cmlb_handle_t	xdf_vd_lbl;
 	ddi_softintr_t	xdf_softintr_id;
@@ -264,6 +283,14 @@ extern int xdfdebug;
 #define	IOCTL_DBG	0x20
 #define	SUSRES_DBG	0x40
 #define	LBL_DBG		0x80
+
+#if defined(XPV_HVM_DRIVER)
+extern dev_info_t *xdf_hvm_hold(char *);
+extern int xdf_hvm_connect(dev_info_t *);
+extern int xdf_hvm_setpgeom(dev_info_t *, cmlb_geom_t *);
+extern int xdf_kstat_create(dev_info_t *, char *, int);
+extern void xdf_kstat_delete(dev_info_t *);
+#endif /* XPV_HVM_DRIVER */
 
 #ifdef __cplusplus
 }

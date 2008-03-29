@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +61,7 @@ typedef struct tg_attribute {
 #define	CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8		0x00000002
 #define	CMLB_OFF_BY_ONE					0x00000004
 #define	CMLB_FAKE_LABEL_ONE_PARTITION			0x00000008
-
+#define	CMLB_INTERNAL_MINOR_NODES			0x00000010
 
 /* bit definitions of flag passed to cmlb_validate */
 #define	CMLB_SILENT					0x00000001

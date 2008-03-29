@@ -87,6 +87,10 @@
 #include <xen/public/io/xs_wire.h>
 
 
+#define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
+#define	isxdigit(ch)	(isdigit(ch) || ((ch) >= 'a' && (ch) <= 'f') || \
+			((ch) >= 'A' && (ch) <= 'F'))
+
 static void xvdi_ring_init_sring(xendev_ring_t *);
 static void xvdi_ring_init_front_ring(xendev_ring_t *, size_t, size_t);
 #ifndef XPV_HVM_DRIVER
@@ -304,13 +308,15 @@ xvdi_init_dev(dev_info_t *dip)
 	 * the bus address, which will be set here
 	 */
 	if (!backend) {
-		void *prop_str;
-		unsigned int prop_len, addr;
+		char *prop_str;
+		unsigned int prop_len, addr, i;
+		boolean_t use_vdev;
+		char addr_str[9]; /* hold 32-bit hex */
 
 		switch (devcls) {
 		case XEN_VNET:
-			if (xenbus_read(XBT_NULL, xsname, "mac", &prop_str,
-			    &prop_len) == 0) {
+			if (xenbus_read(XBT_NULL, xsname,
+			    "mac", (void *)&prop_str, &prop_len) == 0) {
 				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
 				    dip, "mac", prop_str);
 				kmem_free(prop_str, prop_len);
@@ -318,33 +324,64 @@ xvdi_init_dev(dev_info_t *dip)
 			prop_str = NULL;
 			if (xenbus_scanf(XBT_NULL, xsname, "handle", "%u",
 			    &addr) == 0) {
-				char unitaddr[9]; /* hold 32-bit hex */
 
-				(void) snprintf(unitaddr, 9, "%x", addr);
+				(void) snprintf(addr_str, sizeof (addr_str),
+				    "%x", addr);
 				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    dip, "unit-address", unitaddr);
+				    dip, "unit-address", addr_str);
 			}
 			break;
 		case XEN_VBLK:
 			if (xenbus_read(XBT_NULL, pdp->xd_xsdev.otherend,
-			    "dev", &prop_str, &prop_len) == 0) {
-				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    dip, "unit-address", prop_str);
-				kmem_free(prop_str, prop_len);
-			}
-#ifdef XPV_HVM_DRIVER
+			    "dev", (void *)&prop_str, &prop_len) != 0)
+				break;
+
 			/*
-			 * The mapping between the 'dev' name and the
-			 * device ID maintained by Xenstore has to be
-			 * tracked explicitly in HVM domains.
+			 * Save a copy of the xenstore "dev" property
+			 * on the device node.
 			 */
-			prop_str = strrchr(pdp->xd_xsdev.otherend, '/');
-			if (prop_str != NULL) {
-				prop_str = ((caddr_t)prop_str) + 1;
-				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    dip, "xenstore-id", prop_str);
+			(void) ndi_prop_update_string(DDI_DEV_T_NONE,
+			    dip, "xenstore-dev", prop_str);
+
+			/*
+			 * Verify that the "dev" property associated with the
+			 * otherend device is a 32-bit hex value.  Normally
+			 * we use this value as the "unit-address" (which is
+			 * the same as the solaris device bus address).  If
+			 * the "dev" property is not a32-bit hex value then
+			 * that usually means we're in an HVM environment
+			 * where the disk names have been specified via
+			 * non-integer values.  In this case we'll fall
+			 * back to using the devices vdev value (which is
+			 * really just its xenstore id) as its unit-address.
+			 */
+			i = 0;
+			use_vdev = B_FALSE;
+			while (prop_str[i] != '\0') {
+				if ((!isxdigit(prop_str[i++])) ||
+				    (prop_str[i++] >= 8)) {
+					use_vdev = B_TRUE;
+					break;
+				}
 			}
-#endif /* XPV_HVM_DRIVER */
+			if (use_vdev) {
+				/*
+				 * Use the xenstore device id as the
+				 * devices "unit-address".
+				 */
+				addr = vdevnum;
+			} else {
+				/*
+				 * Use the xenstore "dev" property as the
+				 * devices "unit-address".
+				 */
+				(void) sscanf(prop_str, "%x", &addr);
+			}
+			kmem_free(prop_str, prop_len);
+			(void) snprintf(addr_str, sizeof (addr_str),
+			    "%x", addr);
+			(void) ndi_prop_update_string(DDI_DEV_T_NONE,
+			    dip, "unit-address", addr_str);
 			break;
 		default:
 			break;

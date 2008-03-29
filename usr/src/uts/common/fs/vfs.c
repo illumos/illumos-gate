@@ -4287,6 +4287,10 @@ vfs_root_redev(vfs_t *vfsp, dev_t ndev, int fstype)
 
 #else /* x86 NEWBOOT */
 
+#if defined(__x86)
+extern int hvmboot_rootconf();
+#endif /* __x86 */
+
 int
 rootconf()
 {
@@ -4296,6 +4300,19 @@ rootconf()
 	char *fstyp, *fsmod;
 
 	getrootfs(&fstyp, &fsmod);
+
+#if defined(__x86)
+	/*
+	 * hvmboot_rootconf() is defined in the hvm_bootstrap misc module,
+	 * which lives in /platform/i86hvm, and hence is only available when
+	 * booted in an x86 hvm environment.  If the hvm_bootstrap misc module
+	 * is not available then the modstub for this function will return 0.
+	 * If the hvm_bootstrap misc module is available it will be loaded
+	 * and hvmboot_rootconf() will be invoked.
+	 */
+	if (error = hvmboot_rootconf())
+		return (error);
+#endif /* __x86 */
 
 	if (error = clboot_rootconf())
 		return (error);

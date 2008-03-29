@@ -33,24 +33,19 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <sys/conf.h>
 #include <sys/ddi.h>
-#include <sys/dditypes.h>
 #include <sys/sunddi.h>
-#include <sys/list.h>
+#include <sys/conf.h>
 #include <sys/cmlb.h>
 #include <sys/dkio.h>
-#include <sys/vtoc.h>
-#include <sys/modctl.h>
-#include <sys/bootconf.h>
 #include <sys/promif.h>
 #include <sys/sysmacros.h>
 #include <sys/kstat.h>
 #include <sys/mach_mmu.h>
 #ifdef XPV_HVM_DRIVER
 #include <sys/xpv_support.h>
-#endif
+#include <sys/sunndi.h>
+#endif /* XPV_HVM_DRIVER */
 #include <public/io/xenbus.h>
 #include <xen/sys/xenbus_impl.h>
 #include <xen/sys/xendev.h>
@@ -129,6 +124,16 @@ static void gs_free(xdf_t *, ge_slot_t *);
 static grant_ref_t gs_grant(ge_slot_t *, mfn_t);
 static void unexpectedie(xdf_t *);
 static void xdfmin(struct buf *);
+static void xdf_synthetic_pgeom(dev_info_t *, cmlb_geom_t *);
+extern int xdf_kstat_create(dev_info_t *, char *, int);
+extern void xdf_kstat_delete(dev_info_t *);
+
+#if defined(XPV_HVM_DRIVER)
+static void xdf_hvm_add(dev_info_t *);
+static void xdf_hvm_rm(dev_info_t *);
+static void xdf_hvm_init(void);
+static void xdf_hvm_fini(void);
+#endif /* XPV_HVM_DRIVER */
 
 static 	struct cb_ops xdf_cbops = {
 	xdf_open,
@@ -201,9 +206,8 @@ static ddi_device_acc_attr_t xc_acc_attr = {
 
 /* callbacks from commmon label */
 
-static int xdf_lb_rdwr(dev_info_t *, uchar_t, void *, diskaddr_t, size_t,
-	void *);
-static int xdf_lb_getinfo(dev_info_t *, int, void *, void *);
+int xdf_lb_rdwr(dev_info_t *, uchar_t, void *, diskaddr_t, size_t, void *);
+int xdf_lb_getinfo(dev_info_t *, int, void *, void *);
 
 static cmlb_tg_ops_t xdf_lb_ops = {
 	TG_DK_OPS_VERSION_1,
@@ -216,18 +220,26 @@ _init(void)
 {
 	int rc;
 
-	if ((rc = ddi_soft_state_init(&vbd_ss, sizeof (xdf_t), 0)) == 0) {
-		xdf_vreq_cache = kmem_cache_create("xdf_vreq_cache",
-		    sizeof (v_req_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
-		ASSERT(xdf_vreq_cache != NULL);
-		xdf_gs_cache = kmem_cache_create("xdf_gs_cache",
-		    sizeof (ge_slot_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
-		ASSERT(xdf_gs_cache != NULL);
-		if ((rc = mod_install(&xdf_modlinkage)) != 0) {
-			kmem_cache_destroy(xdf_vreq_cache);
-			kmem_cache_destroy(xdf_gs_cache);
-			ddi_soft_state_fini(&vbd_ss);
-		}
+	if ((rc = ddi_soft_state_init(&vbd_ss, sizeof (xdf_t), 0)) != 0)
+		return (rc);
+
+	xdf_vreq_cache = kmem_cache_create("xdf_vreq_cache",
+	    sizeof (v_req_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	xdf_gs_cache = kmem_cache_create("xdf_gs_cache",
+	    sizeof (ge_slot_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+
+#if defined(XPV_HVM_DRIVER)
+	xdf_hvm_init();
+#endif /* XPV_HVM_DRIVER */
+
+	if ((rc = mod_install(&xdf_modlinkage)) != 0) {
+#if defined(XPV_HVM_DRIVER)
+		xdf_hvm_fini();
+#endif /* XPV_HVM_DRIVER */
+		kmem_cache_destroy(xdf_vreq_cache);
+		kmem_cache_destroy(xdf_gs_cache);
+		ddi_soft_state_fini(&vbd_ss);
+		return (rc);
 	}
 
 	return (rc);
@@ -236,10 +248,14 @@ _init(void)
 int
 _fini(void)
 {
-	int err;
 
+	int err;
 	if ((err = mod_remove(&xdf_modlinkage)) != 0)
 		return (err);
+
+#if defined(XPV_HVM_DRIVER)
+	xdf_hvm_fini();
+#endif /* XPV_HVM_DRIVER */
 
 	kmem_cache_destroy(xdf_vreq_cache);
 	kmem_cache_destroy(xdf_gs_cache);
@@ -323,7 +339,6 @@ static int
 xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	xdf_t *vdp;
-	ddi_iblock_cookie_t ibc;
 	ddi_iblock_cookie_t softibc;
 	int instance;
 
@@ -347,53 +362,58 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	DPRINTF(DDI_DBG, ("xdf%d: attaching\n", instance));
 	vdp = ddi_get_soft_state(vbd_ss, instance);
+	ddi_set_driver_private(devi, vdp);
 	vdp->xdf_dip = devi;
-	if (ddi_get_iblock_cookie(devi, 0, &ibc) != DDI_SUCCESS) {
+	cv_init(&vdp->xdf_dev_cv, NULL, CV_DEFAULT, NULL);
+
+	if (ddi_get_iblock_cookie(devi, 0, &vdp->xdf_ibc) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xdf@%s: failed to get iblock cookie",
 		    ddi_get_name_addr(devi));
-		goto errout1;
+		goto errout0;
 	}
-
-	mutex_init(&vdp->xdf_dev_lk, NULL, MUTEX_DRIVER, (void *)ibc);
-	mutex_init(&vdp->xdf_cb_lk, NULL, MUTEX_DRIVER, (void *)ibc);
-	cv_init(&vdp->xdf_dev_cv, NULL, CV_DEFAULT, NULL);
-	ddi_set_driver_private(devi, vdp);
+	mutex_init(&vdp->xdf_dev_lk, NULL, MUTEX_DRIVER, (void *)vdp->xdf_ibc);
+	mutex_init(&vdp->xdf_cb_lk, NULL, MUTEX_DRIVER, (void *)vdp->xdf_ibc);
+	mutex_init(&vdp->xdf_iostat_lk, NULL, MUTEX_DRIVER,
+	    (void *)vdp->xdf_ibc);
 
 	if (ddi_get_soft_iblock_cookie(devi, DDI_SOFTINT_LOW, &softibc)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xdf@%s: failed to get softintr iblock cookie",
 		    ddi_get_name_addr(devi));
-		goto errout2;
+		goto errout0;
 	}
 	if (ddi_add_softintr(devi, DDI_SOFTINT_LOW, &vdp->xdf_softintr_id,
 	    &softibc, NULL, xdf_iorestart, (caddr_t)vdp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xdf@%s: failed to add softintr",
 		    ddi_get_name_addr(devi));
-		goto errout2;
+		goto errout0;
 	}
 
-	/*
-	 * create kstat for iostat(1M)
-	 */
-	if ((vdp->xdf_xdev_iostat = kstat_create("xdf", instance, NULL, "disk",
-	    KSTAT_TYPE_IO, 1, KSTAT_FLAG_PERSISTENT)) != NULL) {
-		vdp->xdf_xdev_iostat->ks_lock = &vdp->xdf_dev_lk;
-		kstat_install(vdp->xdf_xdev_iostat);
-	} else {
+#if !defined(XPV_HVM_DRIVER)
+	/* create kstat for iostat(1M) */
+	if (xdf_kstat_create(devi, "xdf", instance) != 0) {
 		cmn_err(CE_WARN, "xdf@%s: failed to create kstat",
 		    ddi_get_name_addr(devi));
-		goto errout3;
+		goto errout0;
 	}
+#endif /* !XPV_HVM_DRIVER */
 
-	/*
-	 * driver handles kernel-issued IOCTLs
-	 */
+	/* driver handles kernel-issued IOCTLs */
 	if (ddi_prop_create(DDI_DEV_T_NONE, devi, DDI_PROP_CANSLEEP,
 	    DDI_KERNEL_IOCTL, NULL, 0) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "xdf@%s: cannot create DDI_KERNEL_IOCTL prop",
 		    ddi_get_name_addr(devi));
-		goto errout4;
+		goto errout0;
 	}
+
+	/*
+	 * Initialize the physical geometry stucture.  Note that currently
+	 * we don't know the size of the backend device so the number
+	 * of blocks on the device will be initialized to zero.  Once
+	 * we connect to the backend device we'll update the physical
+	 * geometry to reflect the real size of the device.
+	 */
+	xdf_synthetic_pgeom(devi, &vdp->xdf_pgeom);
 
 	/*
 	 * create default device minor nodes: non-removable disk
@@ -401,10 +421,16 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 	cmlb_alloc_handle(&vdp->xdf_vd_lbl);
 	if (cmlb_attach(devi, &xdf_lb_ops, DTYPE_DIRECT, 0, 1, DDI_NT_BLOCK,
-	    CMLB_FAKE_LABEL_ONE_PARTITION, vdp->xdf_vd_lbl, NULL) != 0) {
+#if defined(XPV_HVM_DRIVER)
+	    CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT |
+	    CMLB_INTERNAL_MINOR_NODES,
+#else /* !XPV_HVM_DRIVER */
+	    CMLB_FAKE_LABEL_ONE_PARTITION,
+#endif /* !XPV_HVM_DRIVER */
+	    vdp->xdf_vd_lbl, NULL) != 0) {
 		cmn_err(CE_WARN, "xdf@%s: default cmlb attach failed",
 		    ddi_get_name_addr(devi));
-		goto errout5;
+		goto errout0;
 	}
 
 	/*
@@ -418,7 +444,7 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (xvdi_add_event_handler(devi, XS_OE_STATE,
 	    xdf_oe_change) != DDI_SUCCESS) {
 		mutex_exit(&vdp->xdf_cb_lk);
-		goto errout6;
+		goto errout0;
 	}
 
 	if (xdf_start_connect(vdp) != DDI_SUCCESS) {
@@ -426,7 +452,7 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		    ddi_get_name_addr(devi));
 		(void) xdf_start_disconnect(vdp);
 		mutex_exit(&vdp->xdf_cb_lk);
-		goto errout7;
+		goto errout1;
 	}
 
 	mutex_exit(&vdp->xdf_cb_lk);
@@ -436,30 +462,39 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	list_create(&vdp->xdf_gs_act, sizeof (ge_slot_t),
 	    offsetof(ge_slot_t, link));
 
+#if defined(XPV_HVM_DRIVER)
+	xdf_hvm_add(devi);
+
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi, DDI_NO_AUTODETACH, 1);
+#endif /* XPV_HVM_DRIVER */
+
 	ddi_report_dev(devi);
+
 	DPRINTF(DDI_DBG, ("xdf%d: attached\n", instance));
 
 	return (DDI_SUCCESS);
 
-errout7:
-	xvdi_remove_event_handler(devi, XS_OE_STATE);
-errout6:
-	cmlb_detach(vdp->xdf_vd_lbl, NULL);
-errout5:
-	cmlb_free_handle(&vdp->xdf_vd_lbl);
-	ddi_prop_remove_all(devi);
-errout4:
-	kstat_delete(vdp->xdf_xdev_iostat);
-errout3:
-	ddi_remove_softintr(vdp->xdf_softintr_id);
-errout2:
-	ddi_set_driver_private(devi, NULL);
-	cv_destroy(&vdp->xdf_dev_cv);
-	mutex_destroy(&vdp->xdf_cb_lk);
-	mutex_destroy(&vdp->xdf_dev_lk);
 errout1:
-	cmn_err(CE_WARN, "xdf@%s: attach failed", ddi_get_name_addr(devi));
+	xvdi_remove_event_handler(devi, XS_OE_STATE);
+errout0:
+	if (vdp->xdf_vd_lbl != NULL) {
+		cmlb_detach(vdp->xdf_vd_lbl, NULL);
+		cmlb_free_handle(&vdp->xdf_vd_lbl);
+	}
+#if !defined(XPV_HVM_DRIVER)
+	xdf_kstat_delete(devi);
+#endif /* !XPV_HVM_DRIVER */
+	if (vdp->xdf_softintr_id != NULL)
+		ddi_remove_softintr(vdp->xdf_softintr_id);
+	if (vdp->xdf_ibc != NULL) {
+		mutex_destroy(&vdp->xdf_cb_lk);
+		mutex_destroy(&vdp->xdf_dev_lk);
+	}
+	cv_destroy(&vdp->xdf_dev_cv);
 	ddi_soft_state_free(vbd_ss, instance);
+	ddi_set_driver_private(devi, NULL);
+	ddi_prop_remove_all(devi);
+	cmn_err(CE_WARN, "xdf@%s: attach failed", ddi_get_name_addr(devi));
 	return (DDI_FAILURE);
 }
 
@@ -502,6 +537,10 @@ xdf_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+#if defined(XPV_HVM_DRIVER)
+	xdf_hvm_rm(devi);
+#endif /* XPV_HVM_DRIVER */
+
 	ASSERT(!ISDMACBON(vdp));
 	mutex_exit(&vdp->xdf_dev_lk);
 
@@ -518,7 +557,7 @@ xdf_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	list_destroy(&vdp->xdf_vreq_act);
 	list_destroy(&vdp->xdf_gs_act);
 	ddi_prop_remove_all(devi);
-	kstat_delete(vdp->xdf_xdev_iostat);
+	xdf_kstat_delete(devi);
 	ddi_remove_softintr(vdp->xdf_softintr_id);
 	ddi_set_driver_private(devi, NULL);
 	cv_destroy(&vdp->xdf_dev_cv);
@@ -560,9 +599,9 @@ xdf_suspend(dev_info_t *devi)
 	if ((st == XD_INIT) || (st == XD_READY)) {
 #ifdef XPV_HVM_DRIVER
 		ec_unbind_evtchn(vdp->xdf_evtchn);
-#else
+#else /* !XPV_HVM_DRIVER */
 		(void) ddi_remove_intr(devi, 0, NULL);
-#endif
+#endif /* !XPV_HVM_DRIVER */
 		(void) xdf_drain_io(vdp);
 		/*
 		 * no need to teardown the ring buffer here
@@ -647,10 +686,11 @@ xdf_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	boolean_t firstopen;
 	boolean_t nodelay;
 
-	nodelay = (flag & (FNDELAY | FNONBLOCK));
 	minor = getminor(*devp);
 	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
+
+	nodelay = (flag & (FNDELAY | FNONBLOCK));
 
 	DPRINTF(DDI_DBG, ("xdf%d: opening\n", XDF_INST(minor)));
 
@@ -668,18 +708,14 @@ xdf_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 	part = XDF_PART(minor);
 	parbit = 1 << part;
-	if (vdp->xdf_vd_exclopen & parbit) {
+	if ((vdp->xdf_vd_exclopen & parbit) ||
+	    ((flag & FEXCL) && xdf_isopen(vdp, part))) {
 		mutex_exit(&vdp->xdf_dev_lk);
 		return (EBUSY);
 	}
 
 	/* are we the first one to open this node? */
 	firstopen = !xdf_isopen(vdp, -1);
-
-	if ((flag & FEXCL) && !firstopen) {
-		mutex_exit(&vdp->xdf_dev_lk);
-		return (EBUSY);
-	}
 
 	if (otyp == OTYP_LYR)
 		vdp->xdf_vd_lyropen[part]++;
@@ -730,11 +766,11 @@ xdf_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	}
 	parbit = 1 << part;
 
+	ASSERT((vdp->xdf_vd_open[otyp] & parbit) != 0);
 	if (otyp == OTYP_LYR) {
-		if (vdp->xdf_vd_lyropen[part] != 0)
-			vdp->xdf_vd_lyropen[part]--;
-		if (vdp->xdf_vd_lyropen[part] == 0)
-			vdp->xdf_vd_open[OTYP_LYR] &= ~parbit;
+		ASSERT(vdp->xdf_vd_lyropen[part] > 0);
+		if (--vdp->xdf_vd_lyropen[part] == 0)
+			vdp->xdf_vd_open[otyp] &= ~parbit;
 	} else {
 		vdp->xdf_vd_open[otyp] &= ~parbit;
 	}
@@ -755,16 +791,16 @@ xdf_strategy(struct buf *bp)
 
 	minor = getminor(bp->b_edev);
 	part = XDF_PART(minor);
-	if (!(vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) ||
-	    !xdf_isopen(vdp, part) ||
-	    cmlb_partinfo(vdp->xdf_vd_lbl, part, &p_blkct,
-	    &p_blkst, NULL, NULL, NULL)) {
+
+	vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor));
+	if ((vdp == NULL) || !xdf_isopen(vdp, part)) {
 		bioerror(bp, ENXIO);
 		bp->b_resid = bp->b_bcount;
 		biodone(bp);
 		return (0);
 	}
 
+	/* Check for writes to a read only device */
 	if (!IS_READ(bp) && XD_IS_RO(vdp)) {
 		bioerror(bp, EROFS);
 		bp->b_resid = bp->b_bcount;
@@ -772,9 +808,23 @@ xdf_strategy(struct buf *bp)
 		return (0);
 	}
 
-	/*
-	 * starting beyond partition
-	 */
+	/* Check if this I/O is accessing a partition or the entire disk */
+	if ((long)bp->b_private == XB_SLICE_NONE) {
+		/* This I/O is using an absolute offset */
+		p_blkct = vdp->xdf_xdev_nblocks;
+		p_blkst = 0;
+	} else {
+		/* This I/O is using a partition relative offset */
+		if (cmlb_partinfo(vdp->xdf_vd_lbl, part, &p_blkct,
+		    &p_blkst, NULL, NULL, NULL)) {
+			bioerror(bp, ENXIO);
+			bp->b_resid = bp->b_bcount;
+			biodone(bp);
+			return (0);
+		}
+	}
+
+	/* check for a starting block beyond the disk or partition limit */
 	if (bp->b_blkno > p_blkct) {
 		DPRINTF(IO_DBG, ("xdf: block %lld exceeds VBD size %"PRIu64,
 		    (longlong_t)bp->b_blkno, (uint64_t)p_blkct));
@@ -791,31 +841,32 @@ xdf_strategy(struct buf *bp)
 		return (0);
 	}
 
-	/*
-	 * adjust for partial transfer
-	 */
+	/* Adjust for partial transfer */
 	nblks = bp->b_bcount >> XB_BSHIFT;
 	if ((bp->b_blkno + nblks) > p_blkct) {
 		bp->b_resid = ((bp->b_blkno + nblks) - p_blkct) << XB_BSHIFT;
 		bp->b_bcount -= bp->b_resid;
 	}
 
-
 	DPRINTF(IO_DBG, ("xdf: strategy blk %lld len %lu\n",
 	    (longlong_t)bp->b_blkno, (ulong_t)bp->b_bcount));
 
+	/* Fix up the buf struct */
+	bp->b_flags |= B_BUSY;
+	bp->av_forw = bp->av_back = NULL; /* not tagged with a v_req */
+	bp->b_private = (void *)(uintptr_t)p_blkst;
+
 	mutex_enter(&vdp->xdf_dev_lk);
-	kstat_waitq_enter(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
+	if (vdp->xdf_xdev_iostat != NULL)
+		kstat_waitq_enter(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
 	if (vdp->xdf_f_act == NULL) {
 		vdp->xdf_f_act = vdp->xdf_l_act = bp;
 	} else {
 		vdp->xdf_l_act->av_forw = bp;
 		vdp->xdf_l_act = bp;
 	}
-	bp->av_forw = NULL;
-	bp->av_back = NULL; /* not tagged with a v_req */
-	bp->b_private = (void *)(uintptr_t)p_blkst;
 	mutex_exit(&vdp->xdf_dev_lk);
+
 	xdf_iostart(vdp);
 	if (do_polled_io)
 		(void) xdf_drain_io(vdp);
@@ -833,7 +884,7 @@ xdf_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	int part;
 
 	minor = getminor(dev);
-	if (!(vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))))
+	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
 
 	DPRINTF(IO_DBG, ("xdf: read offset 0x%"PRIx64"\n",
@@ -863,7 +914,7 @@ xdf_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	int part;
 
 	minor = getminor(dev);
-	if (!(vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))))
+	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
 
 	DPRINTF(IO_DBG, ("xdf: write offset 0x%"PRIx64"\n",
@@ -897,7 +948,7 @@ xdf_aread(dev_t dev, struct aio_req *aiop, cred_t *credp)
 	int part;
 
 	minor = getminor(dev);
-	if (!(vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))))
+	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
 
 	part = XDF_PART(minor);
@@ -928,7 +979,7 @@ xdf_awrite(dev_t dev, struct aio_req *aiop, cred_t *credp)
 	int part;
 
 	minor = getminor(dev);
-	if (!(vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))))
+	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
 
 	part = XDF_PART(minor);
@@ -959,7 +1010,7 @@ xdf_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	diskaddr_t p_blkcnt, p_blkst;
 
 	minor = getminor(dev);
-	if (!(vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))))
+	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
 
 	DPRINTF(IO_DBG, ("xdf: dump addr (0x%p) blk (%ld) nblks (%d)\n",
@@ -975,7 +1026,7 @@ xdf_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 	if ((blkno + nblk) > p_blkcnt) {
 		cmn_err(CE_WARN, "xdf: block %ld exceeds VBD size %"PRIu64,
-		    blkno + nblk, (uint64_t)vdp->xdf_xdev_nblocks);
+		    blkno + nblk, (uint64_t)p_blkcnt);
 		return (EINVAL);
 	}
 
@@ -983,14 +1034,14 @@ xdf_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	bioinit(dbp);
 	dbp->b_flags = B_BUSY;
 	dbp->b_un.b_addr = addr;
-	dbp->b_bcount	= nblk << DEV_BSHIFT;
-	dbp->b_resid = 0;
+	dbp->b_bcount = nblk << DEV_BSHIFT;
 	dbp->b_blkno = blkno;
 	dbp->b_edev = dev;
 	dbp->b_private = (void *)(uintptr_t)p_blkst;
 
 	mutex_enter(&vdp->xdf_dev_lk);
-	kstat_waitq_enter(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
+	if (vdp->xdf_xdev_iostat != NULL)
+		kstat_waitq_enter(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
 	if (vdp->xdf_f_act == NULL) {
 		vdp->xdf_f_act = vdp->xdf_l_act = dbp;
 	} else {
@@ -1034,7 +1085,7 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		struct dk_minfo	media_info;
 
 		media_info.dki_lbsize = DEV_BSIZE;
-		media_info.dki_capacity = vdp->xdf_xdev_nblocks;
+		media_info.dki_capacity = vdp->xdf_pgeom.g_capacity;
 		media_info.dki_media_type = DK_FIXED_DISK;
 
 		if (ddi_copyout(&media_info, (void *)arg,
@@ -1097,9 +1148,12 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case DKIOCGGEOM:
 	case DKIOCSGEOM:
 	case DKIOCGAPART:
+	case DKIOCSAPART:
 	case DKIOCGVTOC:
 	case DKIOCSVTOC:
 	case DKIOCPARTINFO:
+	case DKIOCGMBOOT:
+	case DKIOCSMBOOT:
 	case DKIOCGETEFI:
 	case DKIOCSETEFI:
 	case DKIOCPARTITION: {
@@ -1252,7 +1306,8 @@ xdf_iofini(xdf_t *vdp, uint64_t id, int bioerr)
 		return;
 
 	XDF_UPDATE_IO_STAT(vdp, bp);
-	kstat_runq_exit(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
+	if (vdp->xdf_xdev_iostat != NULL)
+		kstat_runq_exit(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
 
 	if (IS_ERROR(bp))
 		bp->b_resid = bp->b_bcount;
@@ -1312,7 +1367,9 @@ xdf_iostart(xdf_t *vdp)
 		retval = xdf_prepare_rreq(vdp, bp, rreq);
 		if (retval == XF_COMP) {
 			/* finish this bp, switch to next one */
-			kstat_waitq_to_runq(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
+			if (vdp->xdf_xdev_iostat != NULL)
+				kstat_waitq_to_runq(
+				    KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
 			vdp->xdf_f_act = bp->av_forw;
 			bp->av_forw = NULL;
 		}
@@ -1467,7 +1524,7 @@ xdf_drain_io(xdf_t *vdp)
 
 #ifndef	XPV_HVM_DRIVER
 		(void) HYPERVISOR_yield();
-#endif
+#endif /* XPV_HVM_DRIVER */
 		/*
 		 * file-backed devices can be slow
 		 */
@@ -1483,7 +1540,7 @@ out:
 }
 
 /* ARGSUSED5 */
-static int
+int
 xdf_lb_rdwr(dev_info_t *devi, uchar_t cmd, void *bufp,
     diskaddr_t start, size_t reqlen, void *tg_cookie)
 {
@@ -1495,7 +1552,7 @@ xdf_lb_rdwr(dev_info_t *devi, uchar_t cmd, void *bufp,
 	if (vdp == NULL)
 		return (ENXIO);
 
-	if ((start + (reqlen >> DEV_BSHIFT)) > vdp->xdf_xdev_nblocks)
+	if ((start + (reqlen >> DEV_BSHIFT)) > vdp->xdf_pgeom.g_capacity)
 		return (EINVAL);
 
 	bp = getrbuf(KM_SLEEP);
@@ -1505,14 +1562,12 @@ xdf_lb_rdwr(dev_info_t *devi, uchar_t cmd, void *bufp,
 		bp->b_flags = B_BUSY | B_WRITE;
 	bp->b_un.b_addr = bufp;
 	bp->b_bcount = reqlen;
-	bp->b_resid = 0;
 	bp->b_blkno = start;
-	bp->av_forw = NULL;
-	bp->av_back = NULL;
 	bp->b_edev = DDI_DEV_T_NONE; /* don't have dev_t */
 
 	mutex_enter(&vdp->xdf_dev_lk);
-	kstat_waitq_enter(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
+	if (vdp->xdf_xdev_iostat != NULL)
+		kstat_waitq_enter(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
 	if (vdp->xdf_f_act == NULL) {
 		vdp->xdf_f_act = vdp->xdf_l_act = bp;
 	} else {
@@ -1535,6 +1590,26 @@ xdf_lb_rdwr(dev_info_t *devi, uchar_t cmd, void *bufp,
 #define	XDF_NSECTS	256
 #define	XDF_NHEADS	16
 
+static void
+xdf_synthetic_pgeom(dev_info_t *devi, cmlb_geom_t *geomp)
+{
+	xdf_t *vdp;
+	uint_t ncyl;
+
+	vdp = ddi_get_soft_state(vbd_ss, ddi_get_instance(devi));
+
+	ncyl = vdp->xdf_xdev_nblocks / (XDF_NHEADS * XDF_NSECTS);
+
+	geomp->g_ncyl = ncyl == 0 ? 1 : ncyl;
+	geomp->g_acyl = 0;
+	geomp->g_nhead = XDF_NHEADS;
+	geomp->g_secsize = XB_BSIZE;
+	geomp->g_nsect = XDF_NSECTS;
+	geomp->g_intrlv = 0;
+	geomp->g_rpm = 7200;
+	geomp->g_capacity = vdp->xdf_xdev_nblocks;
+}
+
 static int
 xdf_lb_getcap(dev_info_t *devi, diskaddr_t *capp)
 {
@@ -1546,7 +1621,7 @@ xdf_lb_getcap(dev_info_t *devi, diskaddr_t *capp)
 		return (ENXIO);
 
 	mutex_enter(&vdp->xdf_dev_lk);
-	*capp = vdp->xdf_xdev_nblocks;
+	*capp = vdp->xdf_pgeom.g_capacity;
 	DPRINTF(LBL_DBG, ("capacity %llu\n", *capp));
 	mutex_exit(&vdp->xdf_dev_lk);
 	return (0);
@@ -1556,24 +1631,10 @@ static int
 xdf_lb_getpgeom(dev_info_t *devi, cmlb_geom_t *geomp)
 {
 	xdf_t *vdp;
-	uint_t ncyl;
-	uint_t spc = XDF_NHEADS * XDF_NSECTS;
 
-	vdp = ddi_get_soft_state(vbd_ss, ddi_get_instance(devi));
-
-	if (vdp == NULL)
+	if ((vdp = ddi_get_soft_state(vbd_ss, ddi_get_instance(devi))) == NULL)
 		return (ENXIO);
-
-	ncyl = vdp->xdf_xdev_nblocks / spc;
-
-	geomp->g_ncyl = ncyl == 0 ? 1 : ncyl;
-	geomp->g_acyl = 0;
-	geomp->g_nhead = XDF_NHEADS;
-	geomp->g_secsize = XB_BSIZE;
-	geomp->g_nsect = XDF_NSECTS;
-	geomp->g_intrlv = 0;
-	geomp->g_rpm = 7200;
-	geomp->g_capacity = vdp->xdf_xdev_nblocks;
+	*geomp = vdp->xdf_pgeom;
 	return (0);
 }
 
@@ -1603,7 +1664,7 @@ xdf_lb_getattribute(dev_info_t *devi, tg_attribute_t *tgattributep)
 }
 
 /* ARGSUSED3 */
-static int
+int
 xdf_lb_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
 {
 	switch (cmd) {
@@ -1649,14 +1710,14 @@ xdf_start_connect(xdf_t *vdp)
 	vdp->xdf_evtchn = xvdi_get_evtchn(dip);
 #ifdef XPV_HVM_DRIVER
 	ec_bind_evtchn_to_handler(vdp->xdf_evtchn, IPL_VBD, xdf_intr, vdp);
-#else
+#else /* !XPV_HVM_DRIVER */
 	if (ddi_add_intr(dip, 0, NULL, NULL, xdf_intr, (caddr_t)vdp) !=
 	    DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xdf_start_connect: xdf@%s: "
 		    "failed to add intr handler", ddi_get_name_addr(dip));
 		goto errout1;
 	}
-#endif
+#endif /* !XPV_HVM_DRIVER */
 
 	if (xvdi_alloc_ring(dip, BLKIF_RING_SIZE,
 	    sizeof (union blkif_sring_entry), &gref, &vdp->xdf_xb_ring) !=
@@ -1744,9 +1805,9 @@ fail_trans:
 errout2:
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(vdp->xdf_evtchn);
-#else
+#else /* !XPV_HVM_DRIVER */
 	(void) ddi_remove_intr(vdp->xdf_dip, 0, NULL);
-#endif
+#endif /* !XPV_HVM_DRIVER */
 errout1:
 	xvdi_free_evtchn(dip);
 errout:
@@ -1824,6 +1885,31 @@ xdf_post_connect(xdf_t *vdp)
 		return (DDI_FAILURE);
 	}
 
+	/*
+	 * Make sure that the device we're connecting isn't smaller than
+	 * the old connected device.
+	 */
+	if (vdp->xdf_xdev_nblocks < vdp->xdf_pgeom.g_capacity) {
+		cmn_err(CE_WARN, "xdf_post_connect: xdf@%s: "
+		    "backend disk device shrank", ddi_get_name_addr(devi));
+		/* XXX:  call xvdi_fatal_error() here? */
+		xvdi_fatal_error(devi, rv, "reading backend info");
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Only update the physical geometry to reflect the new device
+	 * size if this is the first time we're connecting to the backend
+	 * device.  Once we assign a physical geometry to a device it stays
+	 * fixed until:
+	 *	- we get detach and re-attached (at which point we
+	 *	  automatically assign a new physical geometry).
+	 *	- someone calls TG_SETPHYGEOM to explicity set the
+	 *	  physical geometry.
+	 */
+	if (vdp->xdf_pgeom.g_capacity == 0)
+		xdf_synthetic_pgeom(devi, &vdp->xdf_pgeom);
+
 	/* fix disk type */
 	if (xenbus_read(XBT_NULL, xvdi_get_xsname(devi), "device-type",
 	    (void **)&type, &len) != 0) {
@@ -1852,7 +1938,12 @@ xdf_post_connect(xdf_t *vdp)
 		if (cmlb_attach(devi, &xdf_lb_ops,
 		    XD_IS_CD(vdp) ? DTYPE_RODIRECT : DTYPE_DIRECT,
 		    XD_IS_RM(vdp), 1, DDI_NT_BLOCK,
+#if defined(XPV_HVM_DRIVER)
+		    CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT |
+		    CMLB_INTERNAL_MINOR_NODES,
+#else /* !XPV_HVM_DRIVER */
 		    CMLB_FAKE_LABEL_ONE_PARTITION,
+#endif /* !XPV_HVM_DRIVER */
 		    vdp->xdf_vd_lbl, NULL) != 0) {
 			cmn_err(CE_WARN, "xdf@%s: cmlb attach failed",
 			    ddi_get_name_addr(devi));
@@ -1911,9 +2002,9 @@ xdf_post_disconnect(xdf_t *vdp)
 {
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(vdp->xdf_evtchn);
-#else
+#else /* !XPV_HVM_DRIVER */
 	(void) ddi_remove_intr(vdp->xdf_dip, 0, NULL);
-#endif
+#endif /* !XPV_HVM_DRIVER */
 	xvdi_free_evtchn(vdp->xdf_dip);
 	xvdi_free_ring(vdp->xdf_xb_ring);
 	vdp->xdf_xb_ring = NULL;
@@ -2037,6 +2128,9 @@ xdf_isopen(xdf_t *vdp, int partition)
 	int i;
 	ulong_t parbit;
 	boolean_t rval = B_FALSE;
+
+	ASSERT((partition == -1) ||
+	    ((partition >= 0) || (partition < XDF_PEXT)));
 
 	if (partition == -1)
 		parbit = (ulong_t)-1;
@@ -2578,7 +2672,9 @@ unexpectedie(xdf_t *vdp)
 			bp->av_forw = vdp->xdf_f_act;
 			vdp->xdf_f_act = bp;
 		}
-		kstat_runq_back_to_waitq(KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
+		if (vdp->xdf_xdev_iostat != NULL)
+			kstat_runq_back_to_waitq(
+			    KSTAT_IO_PTR(vdp->xdf_xdev_iostat));
 		vreq_free(vdp, vreq);
 	}
 }
@@ -2589,3 +2685,218 @@ xdfmin(struct buf *bp)
 	if (bp->b_bcount > xdf_maxphys)
 		bp->b_bcount = xdf_maxphys;
 }
+
+void
+xdf_kstat_delete(dev_info_t *dip)
+{
+	xdf_t	*vdp = (xdf_t *)ddi_get_driver_private(dip);
+	kstat_t	*kstat;
+
+	/*
+	 * The locking order here is xdf_iostat_lk and then xdf_dev_lk.
+	 * xdf_dev_lk is used to protect the xdf_xdev_iostat pointer
+	 * and the contents of the our kstat.  xdf_iostat_lk is used
+	 * to protect the allocation and freeing of the actual kstat.
+	 * xdf_dev_lk can't be used for this purpose because kstat
+	 * readers use it to access the contents of the kstat and
+	 * hence it can't be held when calling kstat_delete().
+	 */
+	mutex_enter(&vdp->xdf_iostat_lk);
+	mutex_enter(&vdp->xdf_dev_lk);
+
+	if (vdp->xdf_xdev_iostat == NULL) {
+		mutex_exit(&vdp->xdf_dev_lk);
+		mutex_exit(&vdp->xdf_iostat_lk);
+		return;
+	}
+
+	kstat = vdp->xdf_xdev_iostat;
+	vdp->xdf_xdev_iostat = NULL;
+	mutex_exit(&vdp->xdf_dev_lk);
+
+	kstat_delete(kstat);
+	mutex_exit(&vdp->xdf_iostat_lk);
+}
+
+int
+xdf_kstat_create(dev_info_t *dip, char *ks_module, int ks_instance)
+{
+	xdf_t	*vdp = (xdf_t *)ddi_get_driver_private(dip);
+
+	/* See comment about locking in xdf_kstat_delete(). */
+	mutex_enter(&vdp->xdf_iostat_lk);
+	mutex_enter(&vdp->xdf_dev_lk);
+
+	if (vdp->xdf_xdev_iostat != NULL) {
+		mutex_exit(&vdp->xdf_dev_lk);
+		mutex_exit(&vdp->xdf_iostat_lk);
+		return (-1);
+	}
+
+	if ((vdp->xdf_xdev_iostat = kstat_create(
+	    ks_module, ks_instance, NULL, "disk",
+	    KSTAT_TYPE_IO, 1, KSTAT_FLAG_PERSISTENT)) == NULL) {
+		mutex_exit(&vdp->xdf_dev_lk);
+		mutex_exit(&vdp->xdf_iostat_lk);
+		return (-1);
+	}
+
+	vdp->xdf_xdev_iostat->ks_lock = &vdp->xdf_dev_lk;
+	kstat_install(vdp->xdf_xdev_iostat);
+	mutex_exit(&vdp->xdf_dev_lk);
+	mutex_exit(&vdp->xdf_iostat_lk);
+
+	return (0);
+}
+
+#if defined(XPV_HVM_DRIVER)
+
+typedef struct xdf_hvm_entry {
+	list_node_t	xdf_he_list;
+	char		*xdf_he_path;
+	dev_info_t	*xdf_he_dip;
+} xdf_hvm_entry_t;
+
+static list_t xdf_hvm_list;
+static kmutex_t xdf_hvm_list_lock;
+
+static xdf_hvm_entry_t *
+i_xdf_hvm_find(char *path, dev_info_t *dip)
+{
+	xdf_hvm_entry_t	*i;
+
+	ASSERT((path != NULL) || (dip != NULL));
+	ASSERT(MUTEX_HELD(&xdf_hvm_list_lock));
+
+	i = list_head(&xdf_hvm_list);
+	while (i != NULL) {
+		if ((path != NULL) && strcmp(i->xdf_he_path, path) != 0) {
+			i = list_next(&xdf_hvm_list, i);
+			continue;
+		}
+		if ((dip != NULL) && (i->xdf_he_dip != dip)) {
+			i = list_next(&xdf_hvm_list, i);
+			continue;
+		}
+		break;
+	}
+	return (i);
+}
+
+dev_info_t *
+xdf_hvm_hold(char *path)
+{
+	xdf_hvm_entry_t	*i;
+	dev_info_t	*dip;
+
+	mutex_enter(&xdf_hvm_list_lock);
+	i = i_xdf_hvm_find(path, NULL);
+	if (i == NULL) {
+		mutex_exit(&xdf_hvm_list_lock);
+		return (B_FALSE);
+	}
+	ndi_hold_devi(dip = i->xdf_he_dip);
+	mutex_exit(&xdf_hvm_list_lock);
+	return (dip);
+}
+
+static void
+xdf_hvm_add(dev_info_t *dip)
+{
+	xdf_hvm_entry_t	*i;
+	char		*path;
+
+	/* figure out the path for the dip */
+	path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+
+	i = kmem_alloc(sizeof (*i), KM_SLEEP);
+	i->xdf_he_dip = dip;
+	i->xdf_he_path = i_ddi_strdup(path, KM_SLEEP);
+
+	mutex_enter(&xdf_hvm_list_lock);
+	ASSERT(i_xdf_hvm_find(path, NULL) == NULL);
+	ASSERT(i_xdf_hvm_find(NULL, dip) == NULL);
+	list_insert_head(&xdf_hvm_list, i);
+	mutex_exit(&xdf_hvm_list_lock);
+
+	kmem_free(path, MAXPATHLEN);
+}
+
+static void
+xdf_hvm_rm(dev_info_t *dip)
+{
+	xdf_hvm_entry_t	*i;
+
+	mutex_enter(&xdf_hvm_list_lock);
+	VERIFY((i = i_xdf_hvm_find(NULL, dip)) != NULL);
+	list_remove(&xdf_hvm_list, i);
+	mutex_exit(&xdf_hvm_list_lock);
+
+	kmem_free(i->xdf_he_path, strlen(i->xdf_he_path) + 1);
+	kmem_free(i, sizeof (*i));
+}
+
+static void
+xdf_hvm_init(void)
+{
+	list_create(&xdf_hvm_list, sizeof (xdf_hvm_entry_t),
+	    offsetof(xdf_hvm_entry_t, xdf_he_list));
+	mutex_init(&xdf_hvm_list_lock, NULL, MUTEX_DEFAULT, NULL);
+}
+
+static void
+xdf_hvm_fini(void)
+{
+	ASSERT(list_head(&xdf_hvm_list) == NULL);
+	list_destroy(&xdf_hvm_list);
+	mutex_destroy(&xdf_hvm_list_lock);
+}
+
+int
+xdf_hvm_connect(dev_info_t *dip)
+{
+	xdf_t	*vdp = (xdf_t *)ddi_get_driver_private(dip);
+	int	rv;
+
+	/* do cv_wait until connected or failed */
+	mutex_enter(&vdp->xdf_dev_lk);
+	rv = xdf_connect(vdp, B_TRUE);
+	mutex_exit(&vdp->xdf_dev_lk);
+	return ((rv == XD_READY) ? 0 : -1);
+}
+
+int
+xdf_hvm_setpgeom(dev_info_t *dip, cmlb_geom_t *geomp)
+{
+	xdf_t	*vdp = (xdf_t *)ddi_get_driver_private(dip);
+
+	/* sanity check the requested physical geometry */
+	mutex_enter(&vdp->xdf_dev_lk);
+	if ((geomp->g_secsize != XB_BSIZE) ||
+	    (geomp->g_capacity == 0)) {
+		mutex_exit(&vdp->xdf_dev_lk);
+		return (EINVAL);
+	}
+
+	/*
+	 * If we've already connected to the backend device then make sure
+	 * we're not defining a physical geometry larger than our backend
+	 * device.
+	 */
+	if ((vdp->xdf_xdev_nblocks != 0) &&
+	    (geomp->g_capacity > vdp->xdf_xdev_nblocks)) {
+		mutex_exit(&vdp->xdf_dev_lk);
+		return (EINVAL);
+	}
+
+	vdp->xdf_pgeom = *geomp;
+	mutex_exit(&vdp->xdf_dev_lk);
+
+	/* force a re-validation */
+	cmlb_invalidate(vdp->xdf_vd_lbl, NULL);
+
+	return (0);
+}
+
+#endif /* XPV_HVM_DRIVER */

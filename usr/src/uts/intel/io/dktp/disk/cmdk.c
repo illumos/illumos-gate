@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,6 +218,26 @@ static cmlb_tg_ops_t cmdk_lb_ops = {
 	cmdk_lb_rdwr,
 	cmdk_lb_getinfo
 };
+
+static boolean_t
+cmdk_isopen(struct cmdk *dkp, dev_t dev)
+{
+	int		part, otyp;
+	ulong_t		partbit;
+
+	ASSERT(MUTEX_HELD((&dkp->dk_mutex)));
+
+	part = CMDKPART(dev);
+	partbit = 1 << part;
+
+	/* account for close */
+	if (dkp->dk_open_lyr[part] != 0)
+		return (B_TRUE);
+	for (otyp = 0; otyp < OTYPCNT; otyp++)
+		if (dkp->dk_open_reg[otyp] & partbit)
+			return (B_TRUE);
+	return (B_FALSE);
+}
 
 int
 _init(void)
@@ -1043,6 +1063,7 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 	mutex_enter(&dkp->dk_mutex);
 
 	/* check if device has been opened */
+	ASSERT(cmdk_isopen(dkp, dev));
 	if (!(dkp->dk_flag & CMDK_OPEN)) {
 		mutex_exit(&dkp->dk_mutex);
 		return (ENXIO);
@@ -1057,10 +1078,13 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 
 	/* account for close */
 	if (otyp == OTYP_LYR) {
+		ASSERT(dkp->dk_open_lyr[part] > 0);
 		if (dkp->dk_open_lyr[part])
 			dkp->dk_open_lyr[part]--;
-	} else
+	} else {
+		ASSERT((dkp->dk_open_reg[otyp] & partbit) != 0);
 		dkp->dk_open_reg[otyp] &= ~partbit;
+	}
 	dkp->dk_open_exl &= ~partbit;
 
 	for (i = 0; i < CMDK_MAXPART; i++)
@@ -1282,6 +1306,7 @@ cmdkstrategy(struct buf *bp)
 	}
 
 	mutex_enter(&dkp->dk_mutex);
+	ASSERT(cmdk_isopen(dkp, bp->b_edev));
 	while (dkp->dk_flag & CMDK_SUSPEND) {
 		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
 	}
