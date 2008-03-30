@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,6 +52,13 @@ d none etc/flash/preexit 700 root sys
 d none platform 755 root sys
 d none platform/sun4v 755 root sys
 d none platform/sun4v/lib 755 root bin
+d none platform/sun4v/lib/fs 755 root bin
+d none platform/sun4v/lib/fs/ufs 755 root bin
+f none platform/sun4v/lib/fs/ufs/bootblk 444 root sys
+d none platform/sun4v/lib/fs/hsfs 755 root bin
+f none platform/sun4v/lib/fs/hsfs/bootblk 444 root sys
+d none platform/sun4v/lib/fs/zfs 755 root bin
+f none platform/sun4v/lib/fs/zfs/bootblk 444 root sys
 d none platform/sun4v/lib/libc_psr 755 root bin
 v none platform/sun4v/lib/libc_psr.so.1 644 root bin
 f none platform/sun4v/lib/libc_psr/libc_psr_hwcap1.so.1 644 root bin

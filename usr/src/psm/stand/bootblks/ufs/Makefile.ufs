@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/ufs/Makefile.ufs
@@ -49,7 +49,9 @@ INSTALLBOOT		= installboot
 #
 # Where and how stuff gets installed
 #
+ROOT_PSM_BOOTBLOCK	= $(ROOT_PSM_LIB_UFS_DIR)/$(PROG)
 USR_PSM_BOOTBLOCK	= $(USR_PSM_LIB_UFS_DIR)/$(PROG)
+BOOTBLK_LINK		= $(BOOTBLK_LINK_PREFIX)/ufs/$(PROG)
 
 USR			= $(ROOT)/usr
 USR_SBIN		= $(USR)/sbin

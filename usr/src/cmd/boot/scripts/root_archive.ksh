@@ -455,7 +455,7 @@ packmedia()
 
 	if [ -d "$MINIROOT/platform/sun4u" ] ; then
 		mkdir -p "$MEDIA/boot"
-		dd if="$MINIROOT/usr/platform/sun4u/lib/fs/hsfs/bootblk" \
+		dd if="$MINIROOT/platform/sun4u/lib/fs/hsfs/bootblk" \
 		    of="$MEDIA/boot/hsfs.bootblock" \
 		    bs=1b oseek=1 count=15 conv=sync 2> /dev/null
 	fi
@@ -773,7 +773,7 @@ pack()
 
 	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
 		"$UNPACKED_ROOT/usr/sbin/installboot" \
-		    "$UNPACKED_ROOT/usr/platform/sun4u/lib/fs/ufs/bootblk" \
+		    "$UNPACKED_ROOT/platform/sun4u/lib/fs/ufs/bootblk" \
 		    $RLOFIDEV
 	fi
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,6 +367,9 @@ see %s\n")
 #define	FAILSAFE_MISSING \
 gettext("bootadm -m upgrade run, but the failsafe archives have not been\n\
 updated.  Not updating line %d\n")
+
+#define	INVALID_PLAT	\
+	gettext("invalid platform %s - must be one of sun4u, sun4v or i86pc\n")
 
 #ifdef	__cplusplus
 }

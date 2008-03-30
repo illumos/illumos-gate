@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -215,9 +215,19 @@ s none platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9/libmd_psr.so.1=../../../
 s none platform/SUNW,Netra-CP2300/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
 s none platform/TAD,SPARCLE/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
 #
-# lib/libc_psr.so.1 and links to it for each sun4u platform
+# platform/sun4u/lib/bootblks
 #
 d none platform/sun4u/lib 755 root bin
+d none platform/sun4u/lib/fs 755 root bin
+d none platform/sun4u/lib/fs/ufs 755 root bin
+f none platform/sun4u/lib/fs/ufs/bootblk 444 root sys
+d none platform/sun4u/lib/fs/hsfs 755 root bin
+f none platform/sun4u/lib/fs/hsfs/bootblk 444 root sys
+d none platform/sun4u/lib/fs/zfs 755 root bin
+f none platform/sun4u/lib/fs/zfs/bootblk 444 root sys
+#
+# lib/libc_psr.so.1 and links to it for each sun4u platform
+#
 d none platform/SUNW,Netra-T12/lib 755 root bin
 d none platform/SUNW,Netra-T4/lib 755 root bin
 d none platform/SUNW,Serverblade1/lib 755 root bin

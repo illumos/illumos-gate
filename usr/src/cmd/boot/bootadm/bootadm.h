@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,8 +188,8 @@ extern int is_grub(const char *);
 #define	DIRECT_BOOT_FAILSAFE_LINE	DIRECT_BOOT_FAILSAFE_KERNEL " -s"
 
 /* Boot archives */
-#define	SUN4U__ARCHIVE		"/platform/sun4u/boot_archive"
-#define	SUN4V__ARCHIVE		"/platform/sun4v/boot_archive"
+#define	SUN4U_ARCHIVE		"/platform/sun4u/boot_archive"
+#define	SUN4V_ARCHIVE		"/platform/sun4v/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE	"/platform/i86pc/$ISADIR/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_32	"/platform/i86pc/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_64	"/platform/i86pc/amd64/boot_archive"

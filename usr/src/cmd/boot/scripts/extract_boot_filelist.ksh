@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,35 +35,53 @@ else
 fi
 
 usage() {
-	echo "Usage: ${0##*/}: [-R \<root\>] <filelist> ..."
+	echo "This utility is a component of the bootadm(1M) implementation"
+	echo "and it is not recommended for stand-alone use."
+	echo "Please use bootadm(1M) instead."
+	echo ""
+	echo "Usage: ${0##*/}: [-R \<root\>] [-p \<platform\>] \<filelist\> ..."
+	echo "where \<platform\> is one of i86pc, sun4u or sun4v"
 	exit 2
 }
 
+# default platform is what we're running on
+PLATFORM=`uname -m`
+
 altroot=""
 filelists=
-while getopts R FLAG
+platform_provided=no
+
+OPTIND=1
+while getopts R:p: FLAG
 do
         case $FLAG in
-        R)	shift
-		if [ "$1" != "/" ]; then
-			altroot="$1"
+        R)	if [ "$OPTARG" != "/" ]; then
+			altroot="$OPTARG"
 		fi
+		;;
+	p)	platform_provided=yes
+		PLATFORM="$OPTARG"
 		;;
         *)      usage
 		;;
         esac
-	shift
 done
 
+shift `expr $OPTIND - 1`
 if [ $# -eq 0 ]; then
 	usage
 fi
 
 filelists=$*
 
+#
+# If the target platform is provided, as is the case for diskless,
+# or we're building an archive for this machine, we can build
+# a smaller archive by not including unnecessary components.
+#
 filtering=no
-if [ "$altroot" == "" ]; then
-	case `uname -m` in
+if [ "$altroot" == "" ] || [ $platform_provided = yes ]; then
+	case $PLATFORM in
 	i86pc)
 		filtering=no
 		;;
@@ -74,6 +92,9 @@ if [ "$altroot" == "" ]; then
 	sun4v)
 		filtering=yes
 		exclude_pattern="sun4u"
+		;;
+	*)
+		usage
 		;;
 	esac
 fi

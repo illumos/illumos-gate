@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,7 +56,9 @@ DBG_CLOBBER		+= $(DBGPROG) $(DBGFS_BB)
 #
 # Where and how stuff gets installed
 #
+ROOT_PSM_BOOTBLOCK	= $(ROOT_PSM_LIB_ZFS_DIR)/$(PROG)
 USR_PSM_BOOTBLOCK	= $(USR_PSM_LIB_ZFS_DIR)/$(PROG)
+BOOTBLK_LINK		= $(BOOTBLK_LINK_PREFIX)/zfs/$(PROG)
 
 %.fcode:	$(BASEDIR)/zfs/common/%.fth
 	$(TOKENIZE) $<

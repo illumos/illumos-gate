@@ -27,21 +27,25 @@
 
 format=ufs
 ALT_ROOT=
-ALTROOT_ARG=
+EXTRACT_ARGS=
 compress=yes
 SPLIT=unknown
 ERROR=0
 dirsize32=0
 dirsize64=0
 
-PLAT=`uname -m`
-if [ $PLAT = i86pc ] ; then
-	ARCH64=amd64
-else
-	ARCH64=sparcv9
-fi
-BOOT_ARCHIVE=platform/$PLAT/boot_archive
-BOOT_ARCHIVE_64=platform/$PLAT/$ARCH64/boot_archive
+usage() {
+	echo "This utility is a component of the bootadm(1M) implementation"
+	echo "and it is not recommended for stand-alone use."
+	echo "Please use bootadm(1M) instead."
+	echo ""
+	echo "Usage: ${0##*/}: [-R \<root\>] [-p \<platform\>] [--nocompress]"
+	echo "where \<platform\> is one of i86pc, sun4u or sun4v"
+	exit
+}
+
+# default platform is what we're running on
+PLATFORM=`uname -m`
 
 #
 # set path, but inherit /tmp/bfubin if owned by
@@ -68,14 +72,17 @@ do
 		ALT_ROOT="$1"
 		if [ "$ALT_ROOT" != "/" ]; then
 			echo "Creating boot_archive for $ALT_ROOT"
-			ALTROOT_ARG="-R $ALT_ROOT"
+			EXTRACT_ARGS="${EXTRACT_ARGS} -R ${ALT_ROOT}"
 			EXTRACT_FILELIST="${ALT_ROOT}${EXTRACT_FILELIST}"
 		fi
 		;;
 	-n|--nocompress) compress=no
 		;;
-        *)      echo Usage: ${0##*/}: [-R \<root\>] [--nocompress]
-		exit
+	-p)	shift
+		PLATFORM="$1"
+		EXTRACT_ARGS="${EXTRACT_ARGS} -p ${PLATFORM}"
+		;;
+        *)      usage
 		;;
         esac
 	shift
@@ -101,18 +108,50 @@ if [ $# -eq 1 ]; then
 	echo "Creating boot_archive for $ALT_ROOT"
 fi
 
-if [ $PLAT = i86pc ] ; then
-	rundir=`dirname $0`
-	if [ ! -x "$rundir"/symdef ]; then
+case $PLATFORM in
+i386)	PLATFORM=i86pc
+	ISA=i386
+	ARCH64=amd64
+	;;
+i86pc)	ISA=i386
+	ARCH64=amd64
+	;;
+sun4u)	ISA=sparc
+	ARCH64=sparcv9
+	;;
+sun4v)	ISA=sparc
+	ARCH64=sparcv9
+	;;
+*)	usage
+	;;
+esac
+
+BOOT_ARCHIVE=platform/$PLATFORM/boot_archive
+BOOT_ARCHIVE_64=platform/$PLATFORM/$ARCH64/boot_archive
+
+if [ $PLATFORM = i86pc ] ; then
+	NM=/bin/nm
+	SYMDEF=/boot/solaris/bin/symdef
+	if [ -x $NM ]; then
+		$NM "$ALT_ROOT"/platform/i86pc/kernel/unix | \
+		    grep dboot_image >/dev/null 2>&1
+		if [ $? = 0 ]; then
+			SPLIT=yes
+		else
+			SPLIT=no
+			compress=no
+		fi
+	elif [ ! -x $SYMDEF ]; then
 		# Shouldn't happen
-		echo "Warning: $rundir/symdef not present."
+		echo "Warning: both $NM and $SYMDEF not present."
 		echo "Creating single archive at $ALT_ROOT/$BOOT_ARCHIVE"
 		SPLIT=no
 		compress=no
-	elif "$rundir"/symdef "$ALT_ROOT"/platform/i86pc/kernel/unix \
+	elif $SYMDEF "$ALT_ROOT"/platform/i86pc/kernel/unix \
 	    dboot_image 2>/dev/null; then
 		SPLIT=yes
 	else
+		# no dboot
 		SPLIT=no
 		compress=no
 	fi
@@ -193,7 +232,7 @@ function copy_files
 		fi
 	done <"$list" | cpio -pdum "$rdmnt" 2>/dev/null
 
-	if [ `uname -p` = sparc ] ; then
+	if [ $ISA = sparc ] ; then
 		# copy links
 		find $filelist -type l -print 2>/dev/null |\
 		    cpio -pdum "$rdmnt" 2>/dev/null
@@ -245,10 +284,11 @@ function create_ufs
 	umount "$rdmnt"
 	rmdir "$rdmnt"
 
-	if [ `uname -p` = sparc ] ; then
+	if [ $ISA = sparc ] ; then
 		rlofidev=`echo "$lofidev" | sed -e "s/dev\/lofi/dev\/rlofi/"`
-		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/ufs/bootblk"
-	        installboot "$bb" $rlofidev
+		bb="$ALT_ROOT/platform/$PLATFORM/lib/fs/ufs/bootblk"
+		# installboot is not available on all platforms
+		dd if=$bb of=$rlofidev bs=1b oseek=1 count=15 conv=sync 2>&1
 	fi
 
 	#
@@ -260,7 +300,7 @@ function create_ufs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
-	if [ `uname -p` = i386 ] && [ $compress = no ] && \
+	if [ $ISA = i386 ] && [ $compress = no ] && \
 	    [ -x $GZIP_CMD ] ; then
 		gzip -c "$rdfile" > "${archive}-new"
 	else
@@ -300,8 +340,8 @@ function create_isofs
 	files=
 	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames"
 
-	if [ `uname -p` = sparc ] ; then
-		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/hsfs/bootblk"
+	if [ $ISA = sparc ] ; then
+		bb="$ALT_ROOT/platform/$PLATFORM/lib/fs/hsfs/bootblk"
 		isocmd="$isocmd -G \"$bb\""
 	fi
 
@@ -318,7 +358,7 @@ function create_isofs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
-	if [ `uname -p` = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]
+	if [ $ISA = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]
 	then
 		ksh -c "$isocmd" 2> "$errlog" | \
 		    gzip > "${archive}-new"
@@ -327,8 +367,8 @@ function create_isofs
 	fi
 
 	dd_ret=0
-	if [ `uname -p` = sparc ] ; then
-		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/hsfs/bootblk"
+	if [ $ISA = sparc ] ; then
+		bb="$ALT_ROOT/platform/$PLATFORM/lib/fs/hsfs/bootblk"
 		dd if="$bb" of="${archive}-new" bs=1b oseek=1 count=15 \
 		    conv=notrunc conv=sync >> "$errlog" 2>&1
 		dd_ret=$?
@@ -361,7 +401,7 @@ function create_archive
 	# sanity check the archive before moving it into place
 	#
 	ARCHIVE_SIZE=`ls -l "${archive}-new" | nawk '{ print $5 }'`
-	if [ $compress = yes ] || [ `uname -p` = sparc ] ; then
+	if [ $compress = yes ] || [ $ISA = sparc ] ; then
 		#
 		# 'file' will report "English text" for uncompressed
 		# boot_archives.  Checking for that doesn't seem stable,
@@ -408,8 +448,10 @@ then
 	print -u2 "Can't find filelist.ramdisk"
 	exit 1
 fi
-filelist=$($EXTRACT_FILELIST $ALTROOT_ARG /boot/solaris/filelist.ramdisk \
-    /etc/boot/solaris/filelist.ramdisk 2>/dev/null | sort -u)
+filelist=$($EXTRACT_FILELIST $EXTRACT_ARGS \
+	/boot/solaris/filelist.ramdisk \
+	/etc/boot/solaris/filelist.ramdisk \
+		2>/dev/null | sort -u)
 
 #
 # We use /tmp/ for scratch space now.  This may be changed later if there
@@ -541,6 +583,9 @@ grep "[	 ]/[	 ]*nfs[	 ]" "$ALT_ROOT/etc/vfstab" > /dev/null
 if [ $? = 0 ]; then
 	rm -f "$ALT_ROOT/boot/boot_archive" "$ALT_ROOT/boot/amd64/boot_archive"
 	ln "$ALT_ROOT/$BOOT_ARCHIVE" "$ALT_ROOT/boot/boot_archive"
-	ln "$ALT_ROOT/$BOOT_ARCHIVE_64" "$ALT_ROOT/boot/amd64/boot_archive"
+	if [ $SPLIT = yes ]; then
+		ln "$ALT_ROOT/$BOOT_ARCHIVE_64" \
+		    "$ALT_ROOT/boot/amd64/boot_archive"
+	fi
 fi
 [ -n "$rddir" ] && rm -rf "$rddir"

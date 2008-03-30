@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -114,6 +114,27 @@ $(ROOT_PSM_PCBE_DIR)/%:		$(OBJS_DIR)/% $(ROOT_PSM_PCBE_DIR) FRC
 $(ROOT_PSM_BRAND_DIR)/%:	$(OBJS_DIR)/% $(ROOT_PSM_BRAND_DIR) FRC
 	$(INS.file)
 
+$(ROOT_PSM_LIB_FS_DIR):	$(ROOT_PSM_LIB_DIR)
+	-$(INS.dir.root.bin)
+
+$(ROOT_PSM_LIB_UFS_DIR) \
+$(ROOT_PSM_LIB_NFS_DIR) \
+$(ROOT_PSM_LIB_HSFS_DIR) \
+$(ROOT_PSM_LIB_ZFS_DIR):	$(ROOT_PSM_LIB_FS_DIR)
+	$(INS.dir.root.bin)
+
+$(ROOT_PSM_LIB_UFS_DIR)/%:	% $(ROOT_PSM_LIB_UFS_DIR)
+	$(INS.file)
+
+$(ROOT_PSM_LIB_NFS_DIR)/%:	% $(ROOT_PSM_LIB_NFS_DIR)
+	$(INS.file)
+
+$(ROOT_PSM_LIB_HSFS_DIR)/%:	% $(ROOT_PSM_LIB_HSFS_DIR)
+	$(INS.file)
+
+$(ROOT_PSM_LIB_ZFS_DIR)/%:	% $(ROOT_PSM_LIB_ZFS_DIR)
+	$(INS.file)
+
 #
 #
 #
@@ -166,16 +187,16 @@ $(USR_PSM_LIB64_DIR)/%:		% $(USR_PSM_LIB64_DIR)
 	$(INS.file)
 
 $(USR_PSM_LIB_UFS_DIR)/%:	% $(USR_PSM_LIB_UFS_DIR)
-	$(INS.file)
+	$(RM) -r $@ ; $(SYMLINK) $(BOOTBLK_LINK) $@ $(CHOWNLINK) $(CHGRPLINK)
 
 $(USR_PSM_LIB_NFS_DIR)/%:	% $(USR_PSM_LIB_NFS_DIR)
 	$(INS.file)
 
 $(USR_PSM_LIB_HSFS_DIR)/%:	% $(USR_PSM_LIB_HSFS_DIR)
-	$(INS.file)
+	$(RM) -r $@ ; $(SYMLINK) $(BOOTBLK_LINK) $@ $(CHOWNLINK) $(CHGRPLINK)
 
 $(USR_PSM_LIB_ZFS_DIR)/%:	% $(USR_PSM_LIB_ZFS_DIR)
-	$(INS.file)
+	$(RM) -r $@ ; $(SYMLINK) $(BOOTBLK_LINK) $@ $(CHOWNLINK) $(CHGRPLINK)
 
 $(USR_PSM_MOD_DIR)/%:		% $(USR_PSM_MOD_DIR)
 	$(INS.file)

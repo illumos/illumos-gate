@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@
 # packaging files
 i pkginfo
 i copyright
+i depend
 #
 # source locations relative to the prototype file
 #
@@ -71,10 +72,10 @@ s none usr/platform/sun4v/lib/libpcp.so=./libpcp.so.1
 d none usr/platform/sun4v/lib/fs 755 root bin
 #
 d none usr/platform/sun4v/lib/fs/ufs 755 root bin
-f none usr/platform/sun4v/lib/fs/ufs/bootblk 444 root sys
+s none usr/platform/sun4v/lib/fs/ufs/bootblk=../../../../../../platform/sun4v/lib/fs/ufs/bootblk
 d none usr/platform/sun4v/lib/fs/hsfs 755 root bin
-f none usr/platform/sun4v/lib/fs/hsfs/bootblk 444 root sys
+s none usr/platform/sun4v/lib/fs/hsfs/bootblk=../../../../../../platform/sun4v/lib/fs/hsfs/bootblk
 d none usr/platform/sun4v/lib/fs/zfs 755 root bin
-f none usr/platform/sun4v/lib/fs/zfs/bootblk 444 root sys
+s none usr/platform/sun4v/lib/fs/zfs/bootblk=../../../../../../platform/sun4v/lib/fs/zfs/bootblk
 d none usr/platform/sun4v/lib/fs/nfs 755 root bin
 f none usr/platform/sun4v/lib/fs/nfs/inetboot 644 root sys

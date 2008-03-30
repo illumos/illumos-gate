@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,9 +62,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <device_info.h>
-
 #include <locale.h>
-
 #include <assert.h>
 
 #include "message.h"
@@ -201,6 +199,8 @@ static int bam_smf_check;
 static int bam_lock_fd = -1;
 static char rootbuf[PATH_MAX] = "/";
 static int bam_update_all;
+static int bam_alt_platform;
+static char *bam_platform;
 
 /* function prototypes */
 static void parse_args_internal(int, char *[]);
@@ -292,9 +292,10 @@ usage(void)
 
 
 	/* archive usage */
-	(void) fprintf(stderr, "\t%s update-archive [-vn] [-R altroot]\n",
-	    prog);
-	(void) fprintf(stderr, "\t%s list-archive [-R altroot]\n", prog);
+	(void) fprintf(stderr,
+	    "\t%s update-archive [-vn] [-R altroot [-p platform>]]\n", prog);
+	(void) fprintf(stderr,
+	    "\t%s list-archive [-R altroot [-p platform>]]\n", prog);
 #if !defined(_OPB)
 	/* x86 only */
 	(void) fprintf(stderr, "\t%s set-menu [-R altroot] key=value\n", prog);
@@ -418,7 +419,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:p:")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -489,6 +490,16 @@ parse_args_internal(int argc, char *argv[])
 			bam_root = rootbuf;
 			bam_rootlen = strlen(rootbuf);
 			break;
+		case 'p':
+			bam_alt_platform = 1;
+			bam_platform = optarg;
+			if ((strcmp(bam_platform, "i86pc") != 0) &&
+			    (strcmp(bam_platform, "sun4u") != 0) &&
+			    (strcmp(bam_platform, "sun4v") != 0)) {
+				error = 1;
+				bam_error(INVALID_PLAT, bam_platform);
+			}
+			break;
 		case '?':
 			error = 1;
 			bam_error(BAD_OPT, optopt);
@@ -498,6 +509,14 @@ parse_args_internal(int argc, char *argv[])
 			bam_error(BAD_OPT, c);
 			break;
 		}
+	}
+
+	/*
+	 * An alternate platform requires an alternate root
+	 */
+	if (bam_alt_platform && bam_alt_root == 0) {
+		usage();
+		bam_exit(0);
 	}
 
 	/*
@@ -1367,7 +1386,7 @@ cmpstat(
 		return (0);
 
 	/*
-	 * If we are invoked as part of system/filesyste/boot-archive, then
+	 * If we are invoked as part of system/filesystem/boot-archive, then
 	 * there are a number of things we should not worry about
 	 */
 	if (bam_smf_check) {
@@ -1467,14 +1486,13 @@ check_flags_and_files(char *root)
 	/*
 	 * If archive is missing, create archive
 	 */
-
-	if (is_sun4u())
+	if (is_sun4u()) {
 		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    SUN4U__ARCHIVE);
-	else if (is_sun4v())
+		    SUN4U_ARCHIVE);
+	} else if (is_sun4v()) {
 		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    SUN4V__ARCHIVE);
-	else {
+		    SUN4V_ARCHIVE);
+	} else {
 		if (bam_direct == BAM_DIRECT_DBOOT) {
 			(void) snprintf(path, sizeof (path), "%s%s", root,
 			    DIRECT_BOOT_ARCHIVE_64);
@@ -1552,13 +1570,29 @@ read_list(char *root, filelist_t  *flistp)
 		/*
 		 * build arguments to exec extract_boot_filelist.ksh
 		 */
+		char *rootarg, *platarg;
+		int platarglen = 1, rootarglen = 1;
+		if (strlen(root) > 1)
+			rootarglen += strlen(root) + strlen("-R ");
+		if (bam_alt_platform)
+			platarglen += strlen(bam_platform) + strlen("-p ");
+		platarg = s_calloc(1, platarglen);
+		rootarg = s_calloc(1, rootarglen);
+		*platarg = 0;
+		*rootarg = 0;
+
 		if (strlen(root) > 1) {
-			n = snprintf(cmd, sizeof (cmd), "%s -R %s /%s /%s",
-			    path, root, BOOT_FILE_LIST, ETC_FILE_LIST);
-		} else {
-			n = snprintf(cmd, sizeof (cmd), "%s /%s /%s",
-			    path, BOOT_FILE_LIST, ETC_FILE_LIST);
+			(void) snprintf(rootarg, rootarglen,
+			    "-R %s", root);
 		}
+		if (bam_alt_platform) {
+			(void) snprintf(platarg, platarglen,
+			    "-p %s", bam_platform);
+		}
+		n = snprintf(cmd, sizeof (cmd), "%s %s %s /%s /%s",
+		    path, rootarg, platarg, BOOT_FILE_LIST, ETC_FILE_LIST);
+		free(platarg);
+		free(rootarg);
 		if (n >= sizeof (cmd)) {
 			bam_error(NO_FLIST);
 			return (BAM_ERROR);
@@ -1893,9 +1927,17 @@ create_ramdisk(char *root)
 	}
 
 	len = strlen(path) + strlen(root) + 10;	/* room for space + -R */
+	if (bam_alt_platform)
+		len += strlen(bam_platform) + strlen("-p ");
 	cmdline = s_calloc(1, len);
 
-	if (strlen(root) > 1) {
+	if (bam_alt_platform) {
+		assert(strlen(root) > 1);
+		(void) snprintf(cmdline, len, "%s -p %s -R %s",
+		    path, bam_platform, root);
+		/* chop off / at the end */
+		cmdline[strlen(cmdline) - 1] = '\0';
+	} else if (strlen(root) > 1) {
 		(void) snprintf(cmdline, len, "%s -R %s", path, root);
 		/* chop off / at the end */
 		cmdline[strlen(cmdline) - 1] = '\0';
@@ -4560,12 +4602,19 @@ is_amd64(void)
 	if (amd64 != -1)
 		return (amd64);
 
-	if (sysinfo(SI_ISALIST, isabuf, sizeof (isabuf)) > 0 &&
-	    strncmp(isabuf, "amd64 ", strlen("amd64 ")) == 0)
-		amd64 = 1;
-	else if (strstr(isabuf, "i386") == NULL)
-		amd64 = 1;		/* diskless server */
-	else
+	if (bam_alt_platform) {
+		if (strcmp(bam_platform, "i86pc") == 0) {
+			amd64 = 1;		/* diskless server */
+		}
+	} else {
+		if (sysinfo(SI_ISALIST, isabuf, sizeof (isabuf)) > 0 &&
+		    strncmp(isabuf, "amd64 ", strlen("amd64 ")) == 0) {
+			amd64 = 1;
+		} else if (strstr(isabuf, "i386") == NULL) {
+			amd64 = 1;		/* diskless server */
+		}
+	}
+	if (amd64 == -1)
 		amd64 = 0;
 
 	return (amd64);
@@ -4574,12 +4623,24 @@ is_amd64(void)
 static int
 is_sun4u(void)
 {
-	static int sun4u = 0;
+	static int sun4u = -1;
 	char mbuf[257];	/* from sysinfo(2) manpage */
 
-	if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
-	    strncmp(mbuf, "sun4u", strlen("sun4u")) == 0)
-		sun4u = 1;
+	if (sun4u != -1)
+		return (sun4u);
+
+	if (bam_alt_platform) {
+		if (strcmp(bam_platform, "sun4u") == 0) {
+			sun4u = 1;
+		}
+	} else {
+		if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
+		    strncmp(mbuf, "sun4u", strlen("sun4u")) == 0) {
+			sun4u = 1;
+		}
+	}
+	if (sun4u == -1)
+		sun4u = 0;
 
 	return (sun4u);
 }
@@ -4587,12 +4648,24 @@ is_sun4u(void)
 static int
 is_sun4v(void)
 {
-	static int sun4v = 0;
+	static int sun4v = -1;
 	char mbuf[257];	/* from sysinfo(2) manpage */
 
-	if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
-	    strncmp(mbuf, "sun4v", strlen("sun4v")) == 0)
-		sun4v = 1;
+	if (sun4v != -1)
+		return (sun4v);
+
+	if (bam_alt_platform) {
+		if (strcmp(bam_platform, "sun4v") == 0) {
+			sun4v = 1;
+		}
+	} else {
+		if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
+		    strncmp(mbuf, "sun4v", strlen("sun4v")) == 0) {
+			sun4v = 1;
+		}
+	}
+	if (sun4v == -1)
+		sun4v = 0;
 
 	return (sun4v);
 }

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -118,6 +118,12 @@ ROOT_PSM_MOD_DIRS_32	+= $(ROOT_PSM_DACF_DIR_32)
 ROOT_PSM_MOD_DIRS_32	+= $(ROOT_PSM_CRYPTO_DIR_32)
 ROOT_PSM_MOD_DIRS_32	+= $(ROOT_PSM_PCBE_DIR_32)
 ROOT_PSM_MOD_DIRS_32	+= $(ROOT_PSM_BRAND_DIR_32)
+
+ROOT_PSM_LIB_FS_DIR	 = $(ROOT_PSM_LIB_DIR)/fs
+ROOT_PSM_LIB_UFS_DIR	 = $(ROOT_PSM_LIB_FS_DIR)/ufs
+ROOT_PSM_LIB_NFS_DIR	 = $(ROOT_PSM_LIB_FS_DIR)/nfs
+ROOT_PSM_LIB_HSFS_DIR	 = $(ROOT_PSM_LIB_FS_DIR)/hsfs
+ROOT_PSM_LIB_ZFS_DIR	 = $(ROOT_PSM_LIB_FS_DIR)/zfs
 
 USR_PLAT_DIR		 = $(ROOT)/usr/platform
 
