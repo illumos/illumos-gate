@@ -1214,7 +1214,7 @@ extern void __cleanup(void);
 extern void atfork_init(void);
 
 #ifdef __amd64
-extern void __amd64id(void);
+extern void __proc64id(void);
 #endif
 
 /*
@@ -1242,9 +1242,9 @@ libc_init(void)
 #ifdef __amd64
 	/*
 	 * Gather information about cache layouts for optimized
-	 * AMD assembler strfoo() and memfoo() functions.
+	 * AMD and Intel assembler strfoo() and memfoo() functions.
 	 */
-	__amd64id();
+	__proc64id();
 #endif
 
 	/*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,8 @@ extern "C" {
 	.equiv AMD64PAGEMASK, 4095
 
 	.extern .amd64cache1, .amd64cache1half, .amd64cache2, .amd64cache2half
+
+	.extern .largest_level_cache_size
 
 	.extern __amd64id
 

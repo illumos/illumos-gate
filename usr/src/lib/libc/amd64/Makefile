@@ -120,6 +120,8 @@ GENOBJS=			\
 	memcpy.o		\
 	memset.o		\
 	new_list.o		\
+	proc64_id.o		\
+	proc64_support.o	\
 	setjmp.o		\
 	siginfolst.o		\
 	siglongjmp.o		\
@@ -932,6 +934,9 @@ ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) \
 # /usr/bin/ksh is ksh93 or not
 include ../../../Makefile.ksh93switch
 CPPFLAGS += -DWORDEXP_KSH93=$(ON_BUILD_KSH93_AS_BINKSH)
+
+# proc64_id.o is built with defines in $(SRC)/uts/intel/sys/x86_archext.h
+pics/proc64_id.o	:= CFLAGS64 += -I$(SRC)/uts/intel
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo

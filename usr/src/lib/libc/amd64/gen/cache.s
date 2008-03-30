@@ -51,17 +51,22 @@
 
 #include "SYS.h"
 #include "cache.h"
+#include "proc64_id.h"
 
         .global .amd64cache1, .amd64cache1half, .amd64cache2, .amd64cache2half
+	.global .largest_level_cache_size
 
         .data
 
         .align  8
 
-.amd64cache1:	.quad	1024 * 64	# defaults to SledgeHammer
-.amd64cache1half: .quad	1024 * 32
-.amd64cache2:	.quad	1024 * 1024
-.amd64cache2half: .quad	1024 * 512
+// defaults to SledgeHammer
+.amd64cache1:	.quad	AMD_DFLT_L1_CACHE_SIZE
+.amd64cache1half: .quad	AMD_DFLT_L1_HALF_CACHE_SIZE
+.amd64cache2:	.quad	AMD_DFLT_L2_CACHE_SIZE
+.amd64cache2half: .quad	AMD_DFLT_L2_HALF_CACHE_SIZE
+.largest_level_cache_size:
+		.int	AMD_DFLT_L2_CACHE_SIZE
 
         .text
 
@@ -70,18 +75,6 @@
 	ENTRY(__amd64id)
 
         push    %rbx
-
-        mov     $CPUIDLARGESTFUNCTION, %eax		# get ID string
-        cpuid
-
-	cmp	$0x68747541, %ebx			# "Auth"
-	jne	1f
-
-	cmp	$0x69746e65, %edx			# "enti"
-	jne	1f
-
-	cmp	$0x444d4163, %ecx			# "cAMD"
-	jne	1f
 
         mov     $CPUIDLARGESTFUNCTIONEX, %eax           # get highest level of support
         cpuid
@@ -105,6 +98,7 @@
         shr     $16, %ecx
         shl     $10, %ecx
         mov     %rcx, _sref_(.amd64cache2)
+	mov	%ecx, _sref_(.largest_level_cache_size)
 
         shr     $1, %ecx
         mov     %rcx, _sref_(.amd64cache2half)
