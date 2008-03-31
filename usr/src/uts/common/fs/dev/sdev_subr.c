@@ -420,13 +420,18 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 
 		if ((SDEV_IS_PERSIST(dv) && (dv->sdev_attrvp == NULL)) ||
 		    ((SDEVTOV(dv)->v_type == VDIR) &&
-		    (dv->sdev_attrvp == NULL)))
+		    (dv->sdev_attrvp == NULL))) {
 			error = sdev_shadow_node(dv, cred);
+		}
 	}
 
-	/* transition to READY state */
-	sdev_set_nodestate(dv, SDEV_READY);
-	sdev_nc_node_exists(dv);
+	if (error == 0) {
+		/* transition to READY state */
+		sdev_set_nodestate(dv, SDEV_READY);
+		sdev_nc_node_exists(dv);
+	} else {
+		sdev_set_nodestate(dv, SDEV_ZOMBIE);
+	}
 	rw_exit(&dv->sdev_contents);
 	return (error);
 }
@@ -819,6 +824,7 @@ sdev_node_check(struct sdev_node *dv, struct vattr *nvap, void *nargs)
  *	- nm (child name)
  *	- newdv (sdev_node for nm is returned here)
  *	- vap (vattr for the node to be created, va_type should be set.
+ *	- avp (attribute vnode)
  *	  the defaults should be used if unknown)
  *	- cred
  *	- args
@@ -858,7 +864,7 @@ sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 			sdcmn_err9(("sdev_mknode: error %d,"
 			    " name %s can not be initialized\n",
 			    error, nm));
-			return (ENOENT);
+			return (error);
 		}
 		ASSERT(dv);
 
@@ -879,14 +885,10 @@ sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 		switch (node_state) {
 		case SDEV_INIT:
 			error = sdev_nodeready(dv, vap, avp, args, cred);
-			/*
-			 * masking the errors with ENOENT
-			 */
 			if (error) {
 				sdcmn_err9(("sdev_mknode: node %s can NOT"
 				    " be transitioned into READY state, "
 				    "error %d\n", nm, error));
-				error = ENOENT;
 			}
 			break;
 		case SDEV_READY:
@@ -914,7 +916,7 @@ sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 }
 
 /*
- * convenient wrapper to change vp's ATIME, CTIME and ATIME
+ * convenient wrapper to change vp's ATIME, CTIME and MTIME
  */
 void
 sdev_update_timestamps(struct vnode *vp, cred_t *cred, uint_t mask)
@@ -1241,6 +1243,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 
 			(void) sdev_dirdelete(nddv, *ndvp);
 			*ndvp = NULL;
+			ASSERT(nddv->sdev_attrvp);
 			error = VOP_RMDIR(nddv->sdev_attrvp, nnm,
 			    nddv->sdev_attrvp, cred, NULL, 0);
 			if (error)
@@ -1263,6 +1266,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			(void) sdev_dirdelete(nddv, *ndvp);
 			*ndvp = NULL;
 			if (bkstore) {
+				ASSERT(nddv->sdev_attrvp);
 				error = VOP_REMOVE(nddv->sdev_attrvp,
 				    nnm, cred, NULL, 0);
 				if (error)
@@ -1713,6 +1717,7 @@ lookup:
 	if (error == 0)
 		goto lookup;
 
+	sdcmn_err(("cannot persist %s - error %d\n", dv->sdev_path, error));
 	return (error);
 }
 
