@@ -1,0 +1,143 @@
+#!/usr/bin/perl -w
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+
+#
+# Generate a revision number for the sgs linker components, based
+# on usr/src/cmd/sgs/packages/common/SUNWonld-README.
+#
+#	usage: readme_revision [-d] [readme-file]
+#
+# This revision number used to be the SCCS revision id for that file,
+# in the form 1.xxx (where xxx was the revision). There were two benefits:
+#
+#	(1) You could examine the sccs revision log to determine the CR
+#		of the putback that created the revision.
+#	(2) The revisions were monotonically increasing.
+#
+# In order to remove the hard wired dependence on sccs, this script generates
+# a replacement revision number, by returning the string '1.xxx', where
+# xxx is an integer giving the number of unique CR lines found in the file.
+# This means that the revision goes up by one for each CR we fix, which
+# makes intutive sense, and is similar to the way the SCCS revision worked.
+#
+# If this is a debug/development build (-d option), then we include
+# additional information at the end of the revision:
+#
+#	- Workspace name
+#	- user
+#	- CR # of last item in the readme file
+#	- date,
+#
+# This extra information is useful when we need to identify SUNWonld
+# linker packages in the field, and provides the information previously
+# supplied by (1) above.
+#
+
+use vars qw($script $usage $readme $cnt);
+use vars qw($debug $last_cr $wsname $date);
+
+# Use the basename of the name we're invoked under as the script name
+@_ = split /\//, $0;
+$script = $_[$#_];
+$usage = "usage: $script [-d] [readme-file]\n";
+
+$debug = 0;
+# Process the options
+while ((scalar(@ARGV) > 0) && ($_ = $ARGV[0],/^-/)) {
+  ARG: {
+	if (/^-d$/) {
+		$debug = 1;
+		last ARG;
+	}
+
+
+      # If it gets here, the option is unknown.
+      die $usage;
+  }
+    shift;
+}
+
+# Plain argument
+$cnt = scalar @ARGV;
+{
+	if ($cnt == 0) {
+		$readme = 'SUNWonld-README';
+		next;
+	}
+
+	if ($cnt == 1) {
+		$readme = $ARGV[0];
+		next;
+	}
+
+	die $usage;
+}
+
+
+open(FILE, $readme) || die "$script: Unable to open $readme\n";
+
+# At the date this script was put into service, the SCCS revision
+# of SUNWonld-README was 1.627, and SUNWonld-README had 588 unique
+# CRs. Revisions are supposed to always increase monotonically, so
+# we add 1000 to the number of unique CRs.
+#
+# This means that any linker with a version <1000 was built using
+# the SCCS revision, and any linker with version >=1000 was built
+# with this script.
+$cnt = 1000;
+
+while ($_ = <FILE>) {
+	chomp $_;
+
+	# If the line starts with a number, it is taken as a CR.
+	if ($_ =~ /^(\d+)\s/) {
+		$cnt++;
+		$last_cr = $1;
+	}
+}
+close FILE;
+
+# If this is a standard build, the revision # is all we want
+if ($debug == 0) {
+	print "1.$cnt\n";
+	exit 0;
+}
+
+# For debug mode, add diagnostic data
+#
+# Note: CODEMGR_WS is a Teamware dependent environment variable. This
+#	will need to change to accommodate other revision control systems.
+# 
+($wsname = $ENV{'CODEMGR_WS'}) ne '' || ($wsname = 'unknown');
+@wsname = split /\//, $wsname;
+$wsname = $wsname[$#wsname];
+
+$date = `date +%m/%d/%y`;
+
+print "1.$cnt:$wsname-$ENV{USER}-$last_cr-$date\n";
+
+exit 0;

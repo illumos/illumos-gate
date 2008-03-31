@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 pkginfo: ../common/pkginfo.tmpl awk_pkginfo
@@ -38,8 +38,9 @@ pkg: FRC
 $(DATAFILES): ../common/$$@
 	$(RM) $@; cp ../common/$@ $@
 
-awk_pkginfo:	../bld_awk_pkginfo ../common/$(README)
-	../bld_awk_pkginfo -R ../common/$(README) $(VERDEBUG) \
+awk_pkginfo:	../bld_awk_pkginfo ../common/readme_revision ../common/$(README)
+	../bld_awk_pkginfo \
+		-R `perl ../common/readme_revision -d ../common/$(README)` \
 		-m $(MACH) -r "$(RELEASE)" -o $@
 
 clean: FRC

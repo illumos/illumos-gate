@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,6 +80,7 @@ include 	$(SRC)/cmd/sgs/Makefile.com
 
 CTFCONVERT_O=
 
+README_REVISION=../../packages/common/readme_revision
 ONLDREADME=	../../packages/common/SUNWonld-README
 
 PICS=		$(OBJECTS:%=pics/%)
@@ -101,7 +102,13 @@ LINTSRCS=	$(COMOBJS:%.o=../common/%.c) \
 LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c)
 LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c)
 
-VERNOTE_DEBUG= -D
+# INTERNAL_RELEASE_BUILD is defined by standard full builds (nightly),
+# but not for sgs builds we do for development. The result of these
+# two lines is that dev builds pass -d to the readme_revision script,
+# generating a more detailed version string for the linker components
+# that includes the workspace, user, CR, and date. Official builds get
+# a simpler uncluttered version string.
+VERNOTE_DEBUG= -d
 $(INTERNAL_RELEASE_BUILD)VERNOTE_DEBUG=
 
 SGSMSGTARG=	$(COMOBJS:%.o=../common/%.msg) \

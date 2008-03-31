@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,8 +22,8 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1993-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # Simple script which builds the awk_pkginfo awk script.  This awk script
 # is used to convert the pkginfo.tmpl files into pkginfo files
@@ -34,7 +33,7 @@
 
 usage()
 {
-   echo "usage: bld_awk_pkginfo -R <readme> -r <release> -m <mach> -o <awk_script>"
+   echo "usage: bld_awk_pkginfo -R <revision> -r <release> -m <mach> -o <awk_script>"
 }
 #
 # Awk strings
@@ -50,15 +49,11 @@ ARCH='ARCH=\"ISA\"'
 mach=""
 release=""
 awk_script=""
-readme=""
-debug=""
+revision=""
 
 while getopts DR:o:r:m: c
 do
    case $c in
-   D)
-   	debug=1
-	;;
    o)
       awk_script=$OPTARG
       ;;
@@ -69,7 +64,7 @@ do
       release=$OPTARG
       ;;
    R)
-   	readme=$OPTARG
+   	revision=$OPTARG
 	;;
    \?)
       usage
@@ -79,7 +74,7 @@ do
 done
 
 if [[ ( -z $release ) || ( -z $mach ) || ( -z $awk_script ) \
-    || ( -z $readme) ]]
+    || ( -z $revision) ]]
 then
    usage
    exit 1
@@ -98,32 +93,8 @@ rev=$(date "+%y.%m.%d.%H.%M")
 #
 # Build PRODVERS string - same as in libconv/common/bld_vernote.ksh
 #
-readmerev=$(grep '^#pragma ident' $readme | awk '{print $4;}')
+prodver="${release}-${revision}"
 
-if [[ ( -z $readmerev ) || ( $readmerev = "%""I""%" ) ]]; then
-	opwd=$(pwd)
-	readdir=$(dirname $readme)
-	readbase=$(basename $readme)
-	cd $readdir
-	readmerev=$(sccs get -p $readbase 2>/dev/null | \
-		grep '^#pragma ident' | \
-		awk '{print $4;}')
-	if [[ -z $readmerev ]]; then
-		readmerev='0.0'
-	fi
-	cd $opwd
-	debug="1"
-fi
-
-if [[ ! -z $debug ]]; then
-	wsname=
-	if [[ ! -z $CODEMGR_WS ]]; then
-		wsname=$(basename $CODEMGR_WS)
-	fi
-	readmerev=${readmerev}":"${wsname}"-${USER}-"$(date +%m/%d/%y)
-fi
-
-prodver="${release}-${readmerev}"
 #
 # Build awk script which will process all the
 # pkginfo.tmpl files.

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,8 +67,10 @@ $(SGSMSG):	FRC
 		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog
 		@ pwd
 
-vernote.s:	bld_vernote $(ONLDREADME)
-		./bld_vernote $(VERNOTE_DEBUG) -R $(ONLDREADME) \
+vernote.s:	bld_vernote $(README_REVISION) $(ONLDREADME)
+		./bld_vernote \
+			-R `perl $(README_REVISION) $(VERNOTE_DEBUG) \
+				$(ONLDREADME)` \
 			-r "$(RELEASE)" -o $@
 
 bld_vernote:	../common/bld_vernote.ksh
