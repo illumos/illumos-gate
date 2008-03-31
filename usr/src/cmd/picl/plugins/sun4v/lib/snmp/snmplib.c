@@ -334,6 +334,7 @@ snmp_get_str(picl_snmphdl_t hdl, char *prefix, int row, char **strp,
 	if (smd == NULL || prefix == NULL || strp == NULL)
 		return (-1);
 
+	*strp = NULL;
 	/*
 	 * Check if this item is cacheable or not. If not, call
 	 * fetch_single_* to get it directly from the agent
@@ -397,6 +398,7 @@ snmp_get_bitstr(picl_snmphdl_t hdl, char *prefix, int row, uchar_t **bitstrp,
 	if (smd == NULL || prefix == NULL || bitstrp == NULL || nbytes == NULL)
 		return (-1);
 
+	*bitstrp = NULL;
 	/*
 	 * Check if this item is cacheable or not. If not, call
 	 * fetch_single_* to get it directly from the agent
