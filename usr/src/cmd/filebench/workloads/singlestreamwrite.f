@@ -19,15 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 set $dir=/tmp
-set $nthreads=1
+set $directio=false
 set $iosize=1m
-set $directio=0
+set $nthreads=1
 
 define file name=largefile1,path=$dir,prealloc
 
@@ -40,11 +40,10 @@ define process name=seqwrite,instances=1
   }
 }
 
-echo  "Single Stream Write Version 2.1 personality successfully loaded"
+echo  "Single Stream Write Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$filesize=<size>    defaults to $filesize"
+usage "       set \$directio=<bool>    defaults to $directio"
+usage "       set \$iosize=<value>     defaults to $iosize"
 usage "       set \$nthreads=<value>   defaults to $nthreads"
-usage "       set \$iosize=<value> defaults to $iosize"
-usage "       set \$directio=<value> defaults to $directio"
 usage " "
 usage "       run runtime (e.g. run 60)"

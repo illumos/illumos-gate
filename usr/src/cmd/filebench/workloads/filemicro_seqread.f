@@ -19,35 +19,34 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-# 4- Sequential read(32K) of a 1G file, cached 
-# 5- Sequential read(32K) of a 1G file, uncached 
+# Single threaded sequential reads (1MB I/Os) on a 1G file.
 
 set $dir=/tmp
-set $nthreads=1
-set $iosize=1m
+set $cached=false
 set $filesize=1g
-set $cached=0
+set $iosize=1m
+set $nthreads=1
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nthreads,dirwidth=1024,prealloc=100,cached=$cached
+define file name=largefile,path=$dir,size=$filesize,prealloc,reuse,cached=$cached
 
 define process name=filereader,instances=1
 {
   thread name=filereaderthread,memsize=10m,instances=$nthreads
   {
-    flowop read name=append-file,filesetname=bigfileset,iosize=$iosize,fd=1
+    flowop read name=seqread-file,filename=largefile,iosize=$iosize
   }
 }
 
-echo  "FileMicro-SeqRead Version 2.0 personality successfully loaded"
+echo  "FileMicro-SeqRead Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$iosize=<size>    defaults to $iosize"
-usage "       set \$filesize=<size>  defaults to $filesize"
-usage "       set \$nthreads=<value> defaults to $nthreads"
 usage "       set \$cached=<bool>    defaults to $cached"
+usage "       set \$filesize=<size>  defaults to $filesize"
+usage "       set \$iosize=<size>    defaults to $iosize"
+usage "       set \$nthreads=<value> defaults to $nthreads"
 usage " "
 usage "       run runtime (e.g. run 60)"

@@ -19,18 +19,26 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
+# Creates a fileset with 20,000 entries ($nfiles), but only preallocates
+# 50% of the files.  Each file's size is set via a gamma distribution with
+# a median size of 1KB ($filesize).
+#
+# The single thread then creates a new file and writes the whole file with
+# 1MB I/Os.  The thread stops after 5000 files ($count/num of flowops) have
+been created and written to.
+
 set $dir=/tmp
-set $nfiles=20000
-set $meandirwidth=100000
+set $count=15000
 set $filesize=1k
 set $iosize=1m
+set $meandirwidth=100000
+set $nfiles=20000
 set $nthreads=1
-set $count=5000
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=50
 
@@ -45,12 +53,13 @@ define process name=filecreate,instances=1
   }
 }
 
-echo  "FileMicro-Createfiles Version 2.1 personality successfully loaded"
+echo  "FileMicro-Createfiles Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$filesize=<size>    defaults to $filesize"
-usage "       set \$iosize=<size>      defaults to $iosize"
-usage "       set \$nfiles=<value>     defaults to $nfiles"
-usage "       set \$count=<value>      defaults to $count"
-usage "       set \$nthreads=<value>   defaults to $nthreads"
+usage "       set \$count=<value>        defaults to $count"
+usage "       set \$filesize=<size>      defaults to $filesize"
+usage "       set \$iosize=<size>        defaults to $iosize"
+usage "       set \$meandirwidth=<value> defaults to $meandirwidth"
+usage "       set \$nfiles=<value>       defaults to $nfiles"
+usage "       set \$nthreads=<value>     defaults to $nthreads"
 usage " "
 usage "       run runtime (e.g. run 60)"

@@ -24,18 +24,21 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-# delete 1000 files
+# Create a fileset of 50,000 entries ($nfiles), where each file's size is set
+# via a gamma distribution with the median size of 16KB ($filesize).
+# Fire off 16 threads ($nthreads), where each thread stops after
+# deleting 1000 ($count) files.
 
 set $dir=/tmp
-set $nfiles=50000
-set $meandirwidth=100
-set $filesize=16k
-set $nthreads=16
 set $count=1000
+set $filesize=16k
+set $nfiles=5000
+set $meandirwidth=100
+set $nthreads=16
 
 set mode quit alldone
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100,paralloc
 
 define process name=filedelete,instances=1
 {
@@ -47,13 +50,13 @@ define process name=filedelete,instances=1
   }
 }
 
-echo  "FileMicro-Delete Version 2.1 personality successfully loaded"
+echo  "FileMicro-Delete Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
+usage "       set \$count=<value>       defaults to $count"
 usage "       set \$filesize=<size>     defaults to $filesize"
 usage "       set \$nfiles=<value>      defaults to $nfiles"
-usage "       set \$nthreads=<value>    defaults to $nthreads"
-usage "       set \$count=<value>       defaults to $count"
 usage "       set \$meandirwidth=<size> defaults to $meandirwidth"
+usage "       set \$nthreads=<value>    defaults to $nthreads"
 usage "(sets mean dir width and dir depth is calculated as log (width, nfiles)"
 usage " "
 usage "       run"

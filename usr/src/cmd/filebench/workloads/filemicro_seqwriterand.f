@@ -19,41 +19,40 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-# 7- Sequential write() of a 1G file, size picked uniformly in
-#    the [1K,8K] range, followed by close(), cached.
-
-
+# Single threaded appends/writes (I/Os of random size in the range
+# of [1B - 8KB]) to a 1GB file.
+# Stops after 128K ($count) writes have been done.
 
 set $dir=/tmp
-set $nthreads=1
-set $iosize=8k
-set $cached=0
-set $sync=0
+set $cached=false
 set $count=128k
+set $iosize=8k
+set $nthreads=1
+set $sync=false
 
-define fileset name=bigfileset,path=$dir,size=0,entries=$nthreads,dirwidth=1024,prealloc=100,cached=$cached
+define file name=bigfile,path=$dir,size=0,prealloc,cached=$cached
 
 define process name=filewriter,instances=1
 {
   thread name=filewriterthread,memsize=10m,instances=$nthreads
   {
-    flowop appendfilerand name=write-file,dsync=$sync,filesetname=bigfileset,iosize=$iosize,fd=1,iters=$count
+    flowop appendfilerand name=appendrand-file,dsync=$sync,filename=bigfile,iosize=$iosize,fd=1,iters=$count
     flowop closefile name=close,fd=1
     flowop finishoncount name=finish,value=1
   }
 }
 
-echo  "FileMicro-SeqWriteRand Version 2.0 personality successfully loaded"
+echo  "FileMicro-SeqWriteRand Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
+usage "       set \$cached=<bool>    defaults to $cached"
+usage "       set \$count=<bool>     defaults to $count"
 usage "       set \$iosize=<size>    defaults to $iosize"
 usage "       set \$nthreads=<value> defaults to $nthreads"
-usage "       set \$cached=<bool>    defaults to $cached"
-usage "       set \$count=<bool>     defaults to $cached"
-usage "       set \$sync=<bool>      defaults to $cached"
+usage "       set \$sync=<bool>      defaults to $sync"
 usage " "
 usage "       run runtime (e.g. run 60)"

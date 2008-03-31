@@ -19,21 +19,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-# 10- 128M worth of 2K write(2) (to random offset), open with
-#     O_DSYNC, uncached.
+# Single threaded asynchronous ($sync) random writes (2KB I/Os) on a 1GB file.
+# Stops when 128MB ($bytes) has been written.
 
 set $dir=/tmp
-set $nthreads=1
-set $iosize=2k
 set $bytes=128m
-set $iters=1
-set $cached=0
+set $cached=false
 set $filesize=1g
+set $iosize=2k
+set $iters=1
+set $nthreads=1
+set $sync=false
 
 define file name=bigfile1,path=$dir,size=$filesize,prealloc,reuse,cached=$cached
 
@@ -41,17 +42,19 @@ define process name=filewriter,instances=1
 {
   thread name=filewriterthread,memsize=10m,instances=$nthreads
   {
-    flowop write name=write-file,filename=bigfile1,random,dsync,iosize=$iosize,iters=$iters
+    flowop write name=write-file,filename=bigfile1,random,dsync=$sync,iosize=$iosize,iters=$iters
     flowop finishonbytes name=finish,value=$bytes
   }
 }
 
-echo  "FileMicro-WriteRandDsync Version 2.0 personality successfully loaded"
+echo  "FileMicro-WriteRand Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
+usage "       set \$bytes=<value>    defaults to $bytes"
+usage "       set \$cached=<bool>    defaults to $cached"
 usage "       set \$filesize=<size>  defaults to $filesize"
 usage "       set \$iosize=<size>    defaults to $iosize"
-usage "       set \$bytes=<value>    defaults to $bytes"
-usage "       set \$cached=<value>   defaults to $cached"
+usage "       set \$iters=<value>    defaults to $iters"
 usage "       set \$nthreads=<value> defaults to $nthreads"
+usage "       set \$sync=<bool>      defaults to $sync"
 usage " "
 usage "       run runtime (e.g. run 60)"

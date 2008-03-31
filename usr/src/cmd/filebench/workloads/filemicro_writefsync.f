@@ -19,37 +19,38 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-#  3- open() and allocation of a 1GB file with write()
-#     of size picked uniformly in [1K,8K] range and issuing
-#     fsync() every 10MB.
+# Single threaded appends/writes (8KB I/Os) to a 1GB file.
+# Each loop iteration does a fsync after 1250 ($iters) appends.
+# Stops after 128K ($count) appends have been done.
 
 set $dir=/tmp
-set $nthreads=1
-set $iosize=8k
 set $count=128k
+set $iosize=8k
 set $iters=1250
+set $nthreads=1
 
-define fileset name=bigfileset,path=$dir,size=0,entries=128,dirwidth=1024,prealloc=100
+define file name=bigfile,path=$dir,size=0,prealloc
 
 define process name=filecreater,instances=1
 {
   thread name=filecreaterthread,memsize=10m,instances=$nthreads
   {
-    flowop appendfile name=append-file,filesetname=bigfileset,iosize=$iosize,fd=1,iters=$iters
-    flowop fsync name=sync-file,fd=1
+    flowop appendfile name=append-file,filename=bigfile,iosize=$iosize,iters=$iters
+    flowop fsync name=sync-file
     flowop finishoncount name=finish,value=$count
   }
 }
 
-echo  "FileMicro-WriteFsync Version 2.0 personality successfully loaded"
+echo  "FileMicro-WriteFsync Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$iosize=<size>    defaults to $iosize"
 usage "       set \$count=<value>    defaults to $count"
+usage "       set \$iosize=<size>    defaults to $iosize"
+usage "       set \$iters=<value>    defaults to $iters"
 usage "       set \$nthreads=<value> defaults to $nthreads"
 usage " "
 usage "       run runtime (e.g. run 60)"

@@ -19,32 +19,35 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-set $dir=/tmp
-set $nthreads=1
-set $iosize=1m
-set $count=1024
-set $sync=0
+# Simple way to create a file.  Start off with a zero length file, and issue
+# 1024 ($count) 1MB appends.
 
-define fileset name=bigfileset,path=$dir,size=0,entries=128,dirwidth=1024,prealloc=100
+set $dir=/tmp
+set $count=1024
+set $iosize=1m
+set $nthreads=1
+set $sync=false
+
+define file name=largefile,path=$dir,size=0,prealloc
 
 define process name=filecreater,instances=1
 {
   thread name=filecreaterthread,memsize=10m,instances=$nthreads
   {
-    flowop appendfile name=append-file,filesetname=bigfileset,dsync=$sync,iosize=$iosize,fd=1
+    flowop appendfile name=append-file,filename=largefile,dsync=$sync,iosize=$iosize
     flowop finishoncount name=finish,value=$count
   }
 }
 
-echo  "FileMicro-Create Version 2.0 personality successfully loaded"
+echo  "FileMicro-Create Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
-usage "       set \$iosize=<size>    defaults to $iosize"
 usage "       set \$count=<value>    defaults to $count"
+usage "       set \$iosize=<size>    defaults to $iosize"
 usage "       set \$nthreads=<value> defaults to $nthreads"
 usage "       set \$sync=<bool>      defaults to $sync"
 usage " "

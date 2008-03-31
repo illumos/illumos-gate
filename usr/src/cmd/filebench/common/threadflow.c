@@ -200,13 +200,13 @@ threadflow_init(procflow_t *procflow)
 	(void) ipc_mutex_unlock(&filebench_shm->threadflow_lock);
 
 	while (threadflow) {
-		void *status;
-
 		/* wait for all threads to finish */
-		if (threadflow->tf_tid)
-			(void) pthread_join(threadflow->tf_tid, &status);
+		if (threadflow->tf_tid) {
+			void *status;
 
-		ret |= *(int *)status;
+			if (pthread_join(threadflow->tf_tid, &status) == 0)
+				ret += *(int *)status;
+		}
 		threadflow = threadflow->tf_next;
 	}
 
