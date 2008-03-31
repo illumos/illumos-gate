@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,6 +179,7 @@ typedef struct cmd_cpu_uec {
 	char uec_bufname[CMD_BUFNMLEN];	/* Name of buffer used for cache */
 } cmd_cpu_uec_t;
 
+extern const char *cmd_cpu_type2name(fmd_hdl_t *, cmd_cpu_type_t);
 extern void cmd_cpu_uec_add(fmd_hdl_t *, cmd_cpu_t *, uint64_t);
 extern int cmd_cpu_uec_match(cmd_cpu_t *, uint64_t);
 extern void cmd_cpu_uec_clear(fmd_hdl_t *, cmd_cpu_t *);
@@ -277,6 +278,15 @@ struct cmd_xr {
 	uint_t xr_hdlrid;	/* CMD_XR_HDLR_*, used for recalc of hdlr */
 	fmd_case_t *xr_case;	/* Throwaway case used to track redelivery */
 	uint_t xr_ref;		/* Number of references to this struct */
+#ifdef sun4u
+	uint64_t xr_afsr;	/* AFSR from ereport nvlist */
+	uint8_t  xr_num_ways;   /* Number of Cache ways reporting from nvlist */
+	uint32_t xr_error_way;  /* The way from the ereport nvlist payload */
+	uint64_t xr_error_tag;  /* The tag from the ereport nvlist payload */
+	uint32_t xr_error_index; /* the index from the ereport payload */
+	uint64_t *xr_cache_data; /* The cache data */
+	nvlist_t *xr_detector_nvlist; /* The detecting resource */
+#endif
 };
 
 #define	xr_rsrc_nvl		xr_rsrc.fmri_nvl
@@ -393,6 +403,8 @@ struct cmd_cpu {
 	uint_t cpu_uec_nflushes;	/* # of flushes since last restart/GC */
 	cmd_list_t cpu_xxu_retries;	/* List of pending xxU retries */
 	uint_t cpu_flags;
+	cmd_list_t cpu_Lxcaches;	/* List of Lxcache state structures */
+	fmd_stat_t Lxcache_creat;	/* num of Lxcache states created */
 };
 
 #define	CMD_CPU_MAXSIZE \
@@ -499,6 +511,16 @@ extern cmd_evdisp_t cmd_l2c(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_l2u(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
+
+/*
+ * Common Errdata structure for SERD engines
+ */
+typedef struct errdata {
+	cmd_serd_t *ed_serd;
+	const char *ed_fltnm;
+	const cmd_ptrsubtype_t ed_pst;
+} errdata_t;
+
 /*
  * L2$ and L3$ Tag errors
  *
@@ -712,6 +734,7 @@ extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *,
 extern void cmd_cpu_create_faultlist(fmd_hdl_t *, fmd_case_t *, cmd_cpu_t *,
     const char *, nvlist_t *, uint_t);
 
+extern cmd_cpu_t *cmd_restore_cpu_only(fmd_hdl_t *, fmd_case_t *, char *);
 extern void cmd_cpu_destroy(fmd_hdl_t *, cmd_cpu_t *);
 extern void *cmd_cpu_restore(fmd_hdl_t *, fmd_case_t *, cmd_case_ptr_t *);
 extern void cmd_cpu_validate(fmd_hdl_t *);
@@ -726,6 +749,7 @@ extern uint32_t cmd_cpu2core(uint32_t, cmd_cpu_type_t, uint8_t);
 #define	CMD_CPU_LEVEL_THREAD		0
 #define	CMD_CPU_LEVEL_CORE		1
 #define	CMD_CPU_LEVEL_CHIP		2
+#define	CMD_CPU_STAT_BUMP(cpu, name)    cpu->name.fmds_value.ui64++
 
 typedef enum {
     CMD_CPU_FAM_UNSUPPORTED,

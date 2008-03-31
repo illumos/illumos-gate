@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,6 +243,13 @@ extern "C" {
 #define	FM_FMRI_CPU_MASK		"cpumask"
 #define	FM_FMRI_CPU_VID			"cpuvid"
 #define	FM_FMRI_CPU_CPUFRU		"cpufru"
+#define	FM_FMRI_CPU_CACHE_INDEX		"cacheindex"
+#define	FM_FMRI_CPU_CACHE_WAY		"cacheway"
+#define	FM_FMRI_CPU_CACHE_BIT		"cachebit"
+#define	FM_FMRI_CPU_CACHE_TYPE		"cachetype"
+
+#define	FM_FMRI_CPU_CACHE_TYPE_L2	0
+#define	FM_FMRI_CPU_CACHE_TYPE_L3	1
 
 /* legacy-hc scheme member names */
 #define	FM_FMRI_LEGACY_HC		"component"

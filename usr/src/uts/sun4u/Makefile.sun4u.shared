@@ -397,6 +397,7 @@ DRV_KMODS	+= rmclomv
 DRV_KMODS	+= sf
 DRV_KMODS	+= nxge
 DRV_KMODS	+= i2bsc 
+DRV_KMODS	+= mem_cache
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ctsmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= m1535ppm

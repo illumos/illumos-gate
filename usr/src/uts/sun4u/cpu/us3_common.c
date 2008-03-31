@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,9 @@
 #include <sys/xc_impl.h>
 #endif	/* CHEETAHPLUS_ERRATUM_25 */
 
+ch_cpu_logout_t	clop_before_flush;
+ch_cpu_logout_t	clop_after_flush;
+uint_t	flush_retries_done = 0;
 /*
  * Note that 'Cheetah PRM' refers to:
  *   SPARC V9 JPS1 Implementation Supplement: Sun UltraSPARC-III
@@ -122,11 +125,11 @@ static int clear_ecc(struct async_flt *ecc);
 #if defined(CPU_IMP_ECACHE_ASSOC)
 static int cpu_ecache_line_valid(ch_async_flt_t *ch_flt);
 #endif
-static int cpu_ecache_set_size(struct cpu *cp);
+int cpu_ecache_set_size(struct cpu *cp);
 static int cpu_ectag_line_invalid(int cachesize, uint64_t tag);
-static int cpu_ectag_pa_to_subblk(int cachesize, uint64_t subaddr);
-static uint64_t cpu_ectag_to_pa(int setsize, uint64_t tag);
-static int cpu_ectag_pa_to_subblk_state(int cachesize,
+int cpu_ectag_pa_to_subblk(int cachesize, uint64_t subaddr);
+uint64_t cpu_ectag_to_pa(int setsize, uint64_t tag);
+int cpu_ectag_pa_to_subblk_state(int cachesize,
 				uint64_t subaddr, uint64_t tag);
 static void cpu_flush_ecache_line(ch_async_flt_t *ch_flt);
 static int afsr_to_afar_status(uint64_t afsr, uint64_t afsr_bit);
@@ -6534,7 +6537,7 @@ cpu_ectag_to_pa(int setsize, uint64_t tag)
 /*
  * Convert the E$ tag PA into an E$ subblock index.
  */
-static int
+int
 cpu_ectag_pa_to_subblk(int cachesize, uint64_t subaddr)
 {
 	if (IS_JAGUAR(cpunodes[CPU->cpu_id].implementation))
@@ -6565,7 +6568,7 @@ cpu_ectag_line_invalid(int cachesize, uint64_t tag)
  * Extract state bits for a subblock given the tag.  Note that for Panther
  * this works on both l2 and l3 tags.
  */
-static int
+int
 cpu_ectag_pa_to_subblk_state(int cachesize, uint64_t subaddr, uint64_t tag)
 {
 	if (IS_JAGUAR(cpunodes[CPU->cpu_id].implementation))

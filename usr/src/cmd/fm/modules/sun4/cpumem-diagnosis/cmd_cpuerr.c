@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <sys/async.h>
 #ifdef sun4u
 #include <sys/fm/cpu/UltraSPARC-III.h>
+#include <cmd_Lxcache.h>
 #include <cmd_opl.h>
 #endif
 
@@ -99,6 +100,30 @@ cmd_cpuerr_common(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_cpu_t *cpu,
 
 	return (CMD_EVD_OK);
 }
+#ifdef sun4u
+
+#define	CMD_CPU_TAGHANDLER(name, casenm, ptr, ntname, fltname)	\
+cmd_evdisp_t								\
+cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
+    const char *class, cmd_errcl_t clcode)				\
+{									\
+	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;		\
+	cmd_cpu_t *cpu;							\
+									\
+	clcode &= CMD_ERRCL_LEVEL_MASK;					\
+	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,	\
+	    level)) == NULL || cpu->cpu_faulting)			\
+		return (CMD_EVD_UNUSED);				\
+									\
+	if ((strstr(class, "ultraSPARC-IVplus.l3-thce") != 0) ||	\
+		(strstr(class, "ultraSPARC-IVplus.thce") != 0)) {	\
+		return (cmd_us4plus_tag_err(hdl, ep, nvl, class, cpu,	\
+		    ptr, ntname, ntname "_n", ntname "_t", fltname));	\
+	}								\
+	return (cmd_cpuerr_common(hdl, ep, cpu, &cpu->cpu_##casenm,	\
+	    ptr, ntname, ntname "_n", ntname "_t", fltname, clcode));	\
+}
+#endif
 
 #define	CMD_CPU_SIMPLEHANDLER(name, casenm, ptr, ntname, fltname)	\
 cmd_evdisp_t								\
@@ -117,8 +142,13 @@ cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
 	    ptr, ntname, ntname "_n", ntname "_t", fltname, clcode));	\
 }
 
+#ifdef sun4u
+CMD_CPU_TAGHANDLER(txce, l2tag, CMD_PTR_CPU_L2TAG, "l2tag", "l2cachetag")
+CMD_CPU_TAGHANDLER(l3_thce, l3tag, CMD_PTR_CPU_L3TAG, "l3tag", "l3cachetag")
+#else
 CMD_CPU_SIMPLEHANDLER(txce, l2tag, CMD_PTR_CPU_L2TAG, "l2tag", "l2cachetag")
 CMD_CPU_SIMPLEHANDLER(l3_thce, l3tag, CMD_PTR_CPU_L3TAG, "l3tag", "l3cachetag")
+#endif
 CMD_CPU_SIMPLEHANDLER(icache, icache, CMD_PTR_CPU_ICACHE, "icache", "icache")
 CMD_CPU_SIMPLEHANDLER(dcache, dcache, CMD_PTR_CPU_DCACHE, "dcache", "dcache")
 CMD_CPU_SIMPLEHANDLER(pcache, pcache, CMD_PTR_CPU_PCACHE, "pcache", "pcache")
@@ -232,12 +262,6 @@ CMD_OPL_UEHANDLER(oplmtlb, opl_mtlb, CMD_PTR_CPU_MTLB, "core", 1)
 CMD_OPL_UEHANDLER(opltlbp, opl_tlbp, CMD_PTR_CPU_TLBP, "core", 1)
 #endif	/* sun4u */
 
-typedef struct errdata {
-	cmd_serd_t *ed_serd;
-	const char *ed_fltnm;
-	const cmd_ptrsubtype_t ed_pst;
-} errdata_t;
-
 static const errdata_t l3errdata =
 	{ &cmd.cmd_l3data_serd, "l3cachedata", CMD_PTR_CPU_L3DATA  };
 static const errdata_t l2errdata =
@@ -324,6 +348,11 @@ cmd_xxc_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	const char *uuid;
 	nvlist_t *rsrc = NULL;
 
+#ifdef	sun4u
+	if (cmd_cache_ce_panther(hdl, ep, xr) == 0) {
+		return;
+	}
+#endif
 	if (CMD_ERRCL_ISMISCREGS(xr->xr_clcode)) {
 		ed = &miscregsdata;
 		cc = &cpu->cpu_misc_regs;

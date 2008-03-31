@@ -97,6 +97,7 @@ f none kernel/drv/kssl.conf 644 root sys
 f none kernel/drv/llc1.conf 644 root sys
 f none kernel/drv/lofi.conf 644 root sys
 e preserve kernel/drv/log.conf 644 root sys
+f none kernel/drv/mem_cache.conf 644 root sys
 f none kernel/drv/mm.conf 644 root sys
 f none kernel/drv/openeepr.conf 644 root sys
 f none kernel/drv/options.conf 644 root sys

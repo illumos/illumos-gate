@@ -31,13 +31,15 @@ SRCS = \
 	cma_cpu.c \
 	cma_cpu_arch.c \
 	cma_page.c \
-	cma_page_arch.c
+	cma_page_arch.c \
+	cma_cache.c
 
 include ../../Makefile.plugin
 
 CMA_VERSION = "1.1"
 
 INCDIRS = .
+INCDIRS += $(SRC)/uts/sun4u
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
 LDFLAGS += -R/usr/lib/fm

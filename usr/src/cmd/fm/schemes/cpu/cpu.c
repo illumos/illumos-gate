@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <kstat.h>
 
+
 /*
  * The scheme plugin for cpu FMRIs.
  */
@@ -43,10 +44,10 @@ ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	int err;
-	uint8_t version;
-	uint32_t cpuid;
+	uint8_t version, type;
+	uint32_t cpuid, index, way;
 	uint64_t serint;
-	char *serstr;
+	char *serstr = NULL;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
@@ -70,19 +71,54 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 		 */
 		if ((err = nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID,
 		    &serstr)) != 0)
+
+			if (err != ENOENT)
+				return (fmd_fmri_set_errno(EINVAL));
+
+		/*
+		 * Cache index, way and type are optional elements
+		 * But if we have one of them, we must have them all.
+		 */
+		err = nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_INDEX,
+		    &index);
+		err |= nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_WAY, &way);
+		err |= nvlist_lookup_uint8(nvl, FM_FMRI_CPU_CACHE_TYPE, &type);
+
+		/* Insure there were no errors accessing the nvl */
+		if (err != 0 && err != ENOENT)
+			return (fmd_fmri_set_errno(EINVAL));
+
+		if (serstr == NULL) {
+			/* If we have a serial string and no cache info */
 			if (err == ENOENT)
 				return (snprintf(buf, buflen, "cpu:///%s=%u",
 				    FM_FMRI_CPU_ID, cpuid));
-			else
-				return (fmd_fmri_set_errno(EINVAL));
-		else
-			return (snprintf(buf, buflen, "cpu:///%s=%u/%s=%s",
-			    FM_FMRI_CPU_ID, cpuid, FM_FMRI_CPU_SERIAL_ID,
-			    serstr));
-
-	} else {
+			else {
+				return (snprintf(buf, buflen,
+				    "cpu:///%s=%u/%s=%u/%s=%u/%s=%d",
+				    FM_FMRI_CPU_ID, cpuid,
+				    FM_FMRI_CPU_CACHE_INDEX, index,
+				    FM_FMRI_CPU_CACHE_WAY, way,
+				    FM_FMRI_CPU_CACHE_TYPE, type));
+			}
+		} else {
+			if (err == ENOENT) {
+				return (snprintf(buf, buflen,
+				    "cpu:///%s=%u/%s=%s",
+				    FM_FMRI_CPU_ID, cpuid,
+				    FM_FMRI_CPU_SERIAL_ID, serstr));
+			} else {
+				return (snprintf(buf, buflen,
+				    "cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%d",
+				    FM_FMRI_CPU_ID, cpuid,
+				    FM_FMRI_CPU_SERIAL_ID, serstr,
+				    FM_FMRI_CPU_CACHE_INDEX, index,
+				    FM_FMRI_CPU_CACHE_WAY, way,
+				    FM_FMRI_CPU_CACHE_TYPE, type));
+			}
+		}
+	} else
 		return (fmd_fmri_set_errno(EINVAL));
-	}
 }
 
 /*
@@ -278,7 +314,7 @@ fmd_fmri_present(nvlist_t *nvl)
 int
 fmd_fmri_unusable(nvlist_t *nvl)
 {
-	int rc, err;
+	int rc, err = 0;
 	uint8_t version;
 	uint32_t cpuid;
 	topo_hdl_t *thp;
@@ -299,4 +335,79 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		return (rc);
 
 	return (p_online(cpuid, P_STATUS) == P_FAULTED);
+}
+int
+fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
+{
+	int err;
+	char *erserstr, *eeserstr;
+	uint8_t  ertype, eetype, erversion, eeversion;
+	uint64_t erserint, eeserint;
+	uint32_t erval, eeval;
+	size_t count;
+
+	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_ID, &erval) != 0)
+		return (0);
+	if (nvlist_lookup_uint32(ee, FM_FMRI_CPU_ID, &eeval) != 0)
+		return (0);
+	if (erval != eeval)
+		return (0);
+
+	if (nvlist_lookup_uint8(er, FM_VERSION, &erversion) != 0)
+		return (0);
+
+	if (nvlist_lookup_uint8(ee, FM_VERSION, &eeversion) != 0)
+		return (0);
+
+	if (erversion != eeversion)
+		return (0);
+
+	if (erversion == CPU_SCHEME_VERSION0) {
+		if (nvlist_lookup_uint64(er, FM_FMRI_CPU_SERIAL_ID,
+		    &erserint) != 0)
+			return (0);
+		if (nvlist_lookup_uint64(ee, FM_FMRI_CPU_SERIAL_ID,
+		    &eeserint) != 0)
+			return (0);
+		if (erserint != eeserint)
+			return (0);
+	} else if (erversion == CPU_SCHEME_VERSION1) {
+		/* Serial ID is an optional element */
+		if ((err = nvlist_lookup_string(er, FM_FMRI_CPU_SERIAL_ID,
+		    &erserstr)) != 0)
+			if (err != ENOENT)
+				return (0);
+		if ((err = nvlist_lookup_string(ee, FM_FMRI_CPU_SERIAL_ID,
+		    &eeserstr)) != 0)
+			if (err != ENOENT)
+				return (0);
+		count = strlen(erserstr);
+		if (strncmp(erserstr, eeserstr, count) != 0)
+			return (0);
+	}
+	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_CACHE_INDEX, &erval) != 0)
+		return (0);
+	if (nvlist_lookup_uint32(ee, FM_FMRI_CPU_CACHE_INDEX, &eeval) != 0)
+		return (0);
+
+	if (erval != eeval)
+		return (0);
+
+	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_CACHE_WAY, &erval) != 0)
+		return (0);
+	if (nvlist_lookup_uint32(ee, FM_FMRI_CPU_CACHE_WAY, &eeval) != 0)
+		return (0);
+
+	if (erval != eeval)
+		return (0);
+
+	if (nvlist_lookup_uint8(er, FM_FMRI_CPU_CACHE_TYPE, &ertype) != 0)
+		return (0);
+	if (nvlist_lookup_uint8(ee, FM_FMRI_CPU_CACHE_TYPE, &eetype) != 0)
+		return (0);
+
+	if (eetype != ertype)
+		return (0);
+
+	return (1);
 }

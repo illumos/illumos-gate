@@ -118,6 +118,8 @@ extern void cma_page_retry(fmd_hdl_t *);
 extern void cma_page_fini(fmd_hdl_t *);
 extern int cma_set_errno(int);
 
+extern int cma_cache_way_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
+    const char *, boolean_t);
 /*
  * Platforms may have their own implementations of these functions
  */

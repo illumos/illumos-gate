@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -3817,3 +3817,67 @@ msgid "SUN4U-8007-E4.impact"
 msgstr "The system will not be functioning at the same performance level with the STRAND removal."
 msgid "SUN4U-8007-E4.action"
 msgstr "Schedule a repair procedure to replace the affected STRAND.  Use fmdump -v -u <EVENT_ID>\nto identify the smallest CPU/Strand ID of the affected CORE on this\nSTRAND.\n"
+#
+# code: SUN4U-8007-FQ
+# keys: fault.cpu.ultraSPARC-IVplus.l2cachedata-line
+#
+msgid "SUN4U-8007-FQ.type"
+msgstr "Fault"
+msgid "SUN4U-8007-FQ.severity"
+msgstr "Minor"
+msgid "SUN4U-8007-FQ.description"
+msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgid "SUN4U-8007-FQ.response"
+msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
+msgid "SUN4U-8007-FQ.impact"
+msgstr "The performace of the system may be minimally impacted as\na result of removing the cache line and way from service.\nLoss of service will be limited to this CPU's cache\nline and way.\n"
+msgid "SUN4U-8007-FQ.action"
+msgstr "No repair action is recommended at this time.\n"
+#
+# code: SUN4U-8007-GC
+# keys: fault.cpu.ultraSPARC-IVplus.l3cachedata-line
+#
+msgid "SUN4U-8007-GC.type"
+msgstr "Fault"
+msgid "SUN4U-8007-GC.severity"
+msgstr "Minor"
+msgid "SUN4U-8007-GC.description"
+msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgid "SUN4U-8007-GC.response"
+msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
+msgid "SUN4U-8007-GC.impact"
+msgstr "The performace of the system may be minimally impacted as\na result of removing the cache line and way from service.\nLoss of service will be limited to this CPU's cache\nline and way.\n"
+msgid "SUN4U-8007-GC.action"
+msgstr "No repair action is recommended at this time.\n"
+#
+# code: SUN4U-8007-HH
+# keys: fault.cpu.ultraSPARC-IVplus.l2cachetag-line
+#
+msgid "SUN4U-8007-HH.type"
+msgstr "Fault"
+msgid "SUN4U-8007-HH.severity"
+msgstr "Minor"
+msgid "SUN4U-8007-HH.description"
+msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgid "SUN4U-8007-HH.response"
+msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
+msgid "SUN4U-8007-HH.impact"
+msgstr "The performace of the system may be minimally impacted as\na result of removing the cache line and way from service.\nLoss of service will be limited to this CPU's cache\nline and way.\n"
+msgid "SUN4U-8007-HH.action"
+msgstr "No repair action is recommended at this time.\n"
+#
+# code: SUN4U-8007-JD
+# keys: fault.cpu.ultraSPARC-IVplus.l3cachetag-line
+#
+msgid "SUN4U-8007-JD.type"
+msgstr "Fault"
+msgid "SUN4U-8007-JD.severity"
+msgstr "Minor"
+msgid "SUN4U-8007-JD.description"
+msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgid "SUN4U-8007-JD.response"
+msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
+msgid "SUN4U-8007-JD.impact"
+msgstr "The performace of the system may be minimally impacted as\na result of removing the cache line and way from service.\nLoss of service will be limited to this CPU's cache\nline and way.\n"
+msgid "SUN4U-8007-JD.action"
+msgstr "No repair action is recommended at this time.\n"

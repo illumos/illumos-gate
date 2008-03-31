@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -225,6 +225,7 @@ f none usr/platform/sun4u/include/sys/machcpuvar.h 644 root bin
 f none usr/platform/sun4u/include/sys/machparam.h 644 root bin
 f none usr/platform/sun4u/include/sys/machsystm.h 644 root bin
 f none usr/platform/sun4u/include/sys/machthread.h 644 root bin
+f none usr/platform/sun4u/include/sys/mem_cache.h 644 root bin
 f none usr/platform/sun4u/include/sys/memlist_plat.h 644 root bin
 f none usr/platform/sun4u/include/sys/memnode.h 644 root bin
 f none usr/platform/sun4u/include/sys/mmu.h 644 root bin

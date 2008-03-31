@@ -97,6 +97,7 @@ extern "C" {
 #define	DCU_CV	INT64_C(0x0001000000000000) /* virt cacheability when DM=0   */
 #define	DCU_CP	INT64_C(0x0002000000000000) /* phys cacheable when DM,IM=0   */
 #define	DCU_CACHE (DCU_IC|DCU_DC|DCU_WE|DCU_SPE|DCU_HPE|DCU_PE)
+#define	DCU_IPS_MASK	INT64_C(0x0030000000000000)
 
 /*
  * bit shifts for the prefetch enable bit

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,7 @@ typedef struct cmd_stat {
 	fmd_stat_t dimm_creat;		/* # of DIMM state structs created */
 	fmd_stat_t bank_creat;		/* # of bank state structs created */
 	fmd_stat_t page_creat;		/* # of page state structs created */
+	fmd_stat_t cache_creat;		/* # of cache state structs created */
 	fmd_stat_t ce_unknown;		/* # of unknown CEs seen */
 	fmd_stat_t ce_interm;		/* # of intermittent CEs seen */
 	fmd_stat_t ce_ppersis;		/* # of possible persistent CEs seen */

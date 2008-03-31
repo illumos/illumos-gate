@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -265,3 +265,7 @@ fault.io.pci.device-invreq fault.io.tomatillo=234
 fault.cpu.SPARC64-VII.chip=235
 fault.cpu.SPARC64-VII.core=236
 fault.cpu.SPARC64-VII.strand=237
+fault.cpu.ultraSPARC-IVplus.l2cachedata-line=238
+fault.cpu.ultraSPARC-IVplus.l3cachedata-line=239
+fault.cpu.ultraSPARC-IVplus.l2cachetag-line=240
+fault.cpu.ultraSPARC-IVplus.l3cachetag-line=241

@@ -37,6 +37,7 @@
 #ifdef sun4u
 #include <cmd_dp.h>
 #include <cmd_dp_page.h>
+#include <cmd_Lxcache.h>
 #endif
 #include <cmd_bank.h>
 #include <cmd.h>
@@ -106,7 +107,9 @@ static cmd_case_closer_f *const cmd_case_closers[] = {
 #ifdef sun4v
 	cmd_branch_close	/* CMD_PTR_BRANCH_CASE */
 #else
-	NULL
+	NULL,
+	cmd_Lxcache_close,	/* CMD_PTR_CACHE_CASE */
+
 #endif
 };
 
@@ -178,7 +181,8 @@ static cmd_case_restorer_f *const cmd_case_restorers[] = {
 	cmd_bank_restore,	/* CMD_NT_BANK */
 	cmd_page_restore,	/* CMD_NT_PAGE */
 #ifdef sun4u
-	cmd_dp_restore		/* CMD_NT_DP */
+	cmd_dp_restore,		/* CMD_NT_DP */
+	cmd_Lxcache_restore,	/* CMD_NT_CACHE */
 #endif
 #ifdef sun4v
 	cmd_branch_restore	/* CMD_NT_BRANCH */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,6 @@
 #define	_SYS_US3_MODULE_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/async.h>
 
 #ifdef	__cplusplus
@@ -496,7 +495,6 @@ extern void shipit(int, int);
 extern void cpu_aflt_log(int ce_code, int tagnum, ch_async_flt_t *aflt,
     uint_t logflags, const char *endstr, const char *fmt, ...);
 extern uint8_t flt_to_trap_type(struct async_flt *aflt);
-extern char *tag_state_to_desc(uint64_t tagstate);
 extern void cpu_log_err(struct async_flt *aflt);
 extern void cpu_page_retire(ch_async_flt_t *ch_flt);
 extern int clear_errors(ch_async_flt_t *ch_flt);

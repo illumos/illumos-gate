@@ -51,6 +51,7 @@
 #include <sys/cheetahregs.h>
 #include <sys/fm/cpu/UltraSPARC-III.h>
 #include <cmd_opl.h>
+#include <cmd_Lxcache.h>
 #else /* sun4u */
 #include <sys/niagararegs.h>
 #include <sys/fm/cpu/UltraSPARC-T1.h>
@@ -90,8 +91,8 @@ static cmd_cpu_t *cpu_create(fmd_hdl_t *, nvlist_t *, uint32_t,
     uint8_t, cmd_cpu_type_t);
 static void cpu_buf_write(fmd_hdl_t *, cmd_cpu_t *);
 
-static const char *
-cpu_type2name(fmd_hdl_t *hdl, cmd_cpu_type_t type)
+const char *
+cmd_cpu_type2name(fmd_hdl_t *hdl, cmd_cpu_type_t type)
 {
 	if (type < 1 || type > sizeof (cpu_names) / sizeof (char *))
 		fmd_hdl_abort(hdl, "illegal CPU type %d\n", type);
@@ -354,8 +355,8 @@ cpu_uec_flush(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 		uint64_t *new = fmd_hdl_alloc(hdl, sizeof (uint64_t) * nent,
 		    FMD_SLEEP);
 
-		bcopy(cpu->cpu_olduec.uec_cache, new, sizeof (uint64_t) *
-		    cpu->cpu_olduec.uec_nent);
+		bcopy(cpu->cpu_olduec.uec_cache, new,
+		    sizeof (uint64_t) * cpu->cpu_olduec.uec_nent);
 		bcopy(cpu->cpu_uec.uec_cache, new + cpu->cpu_olduec.uec_nent,
 		    sizeof (uint64_t) * cpu->cpu_uec.uec_nent);
 
@@ -519,7 +520,9 @@ cmd_xr_create(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	 */
 	if (!CMD_ERRCL_ISMISCREGS(clcode))
 		err |= cmd_xr_fill(hdl, nvl, xr, clcode);
-
+#ifdef sun4u
+	err |= cmd_xr_pn_cache_fill(hdl, nvl, xr, cpu, clcode);
+#endif
 	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
 	    &rsrc);
 
@@ -1430,7 +1433,7 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 #endif
 
 	(void) snprintf(fltnm, sizeof (fltnm), "fault.cpu.%s.%s",
-	    cpu_type2name(hdl, cpu->cpu_type), type);
+	    cmd_cpu_type2name(hdl, cpu->cpu_type), type);
 
 	cpu->cpu_faulting = FMD_B_TRUE;
 	cpu_buf_write(hdl, cpu);
@@ -1507,6 +1510,9 @@ static void
 cmd_cpu_free(fmd_hdl_t *hdl, cmd_cpu_t *cpu, int destroy)
 {
 	int i;
+#ifdef sun4u
+	cmd_Lxcache_t *Lxcache;
+#endif
 
 	for (i = 0; i < sizeof (cmd_cpu_cases_t) / sizeof (cmd_case_t); i++) {
 		cmd_case_t *cc = &(((cmd_case_t *)&cpu->cpu_cases)[i]);
@@ -1523,6 +1529,14 @@ cmd_cpu_free(fmd_hdl_t *hdl, cmd_cpu_t *cpu, int destroy)
 	}
 
 #ifdef sun4u
+	/*
+	 * free Lxcache also.
+	 */
+
+	for (Lxcache = cmd_list_next(&cpu->cpu_Lxcaches); Lxcache != NULL;
+	    Lxcache = cmd_list_next(&cpu->cpu_Lxcaches)) {
+		(void) cmd_Lxcache_free(hdl, cpu, Lxcache, destroy);
+	}
 	cpu_uec_free(hdl, &cpu->cpu_uec, destroy);
 	cpu_uec_free(hdl, &cpu->cpu_olduec, destroy);
 #endif /* sun4u */
@@ -1902,14 +1916,14 @@ cpu_case_restore(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_case_t *cc, fmd_case_t *cp,
 	    serdbase));
 }
 
-void *
-cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
+cmd_cpu_t *
+cmd_restore_cpu_only(fmd_hdl_t *hdl, fmd_case_t *cp, char *cpu_hdr_bufname)
 {
 	cmd_cpu_t *cpu;
 
 	for (cpu = cmd_list_next(&cmd.cmd_cpus); cpu != NULL;
 	    cpu = cmd_list_next(cpu)) {
-		if (strcmp(cpu->cpu_bufname, ptr->ptr_name) == 0)
+		if (strcmp(cpu->cpu_bufname, cpu_hdr_bufname) == 0)
 			break;
 	}
 
@@ -1917,9 +1931,9 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		int migrated = 0;
 		size_t cpusz;
 
-		fmd_hdl_debug(hdl, "restoring cpu from %s\n", ptr->ptr_name);
+		fmd_hdl_debug(hdl, "restoring cpu from %s\n", cpu_hdr_bufname);
 
-		if ((cpusz = fmd_buf_size(hdl, NULL, ptr->ptr_name)) == 0) {
+		if ((cpusz = fmd_buf_size(hdl, NULL, cpu_hdr_bufname)) == 0) {
 			fmd_hdl_abort(hdl, "cpu referenced by case %s does "
 			    "not exist in saved state\n",
 			    fmd_case_uuid(hdl, cp));
@@ -1929,10 +1943,10 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 			    fmd_case_uuid(hdl, cp), cpusz);
 		}
 
-		if ((cpu = cmd_buf_read(hdl, NULL, ptr->ptr_name,
+		if ((cpu = cmd_buf_read(hdl, NULL, cpu_hdr_bufname,
 		    cpusz)) == NULL) {
 			fmd_hdl_abort(hdl, "failed to read buf %s",
-			    ptr->ptr_name);
+			    cpu_hdr_bufname);
 		}
 
 		fmd_hdl_debug(hdl, "found %d in version field\n",
@@ -1983,7 +1997,15 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 
 		cmd_list_append(&cmd.cmd_cpus, cpu);
 	}
+	return (cpu);
+}
 
+void *
+cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
+{
+	cmd_cpu_t *cpu;
+
+	cpu = cmd_restore_cpu_only(hdl, cp, ptr->ptr_name);
 	switch (ptr->ptr_subtype) {
 	case CMD_PTR_CPU_ICACHE:
 		cpu_case_restore(hdl, cpu, &cpu->cpu_icache, cp, "icache");

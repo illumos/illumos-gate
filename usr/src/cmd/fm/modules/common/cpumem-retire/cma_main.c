@@ -225,6 +225,22 @@ static const cma_subscriber_t cma_subrs[] = {
 	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
+#ifndef sun4v
+#ifndef opl
+	{ "fault.cpu.ultraSPARC-IVplus.l2cachedata-line",
+	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cache_way_retire },
+	{ "fault.cpu.ultraSPARC-IVplus.l3cachedata-line",
+	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cache_way_retire },
+	{ "fault.cpu.ultraSPARC-IVplus.l2cachetag-line",
+	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cache_way_retire },
+	{ "fault.cpu.ultraSPARC-IVplus.l3cachetag-line",
+	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cache_way_retire },
+#endif
+#endif
 	/*
 	 * Default "fault.cpu.*" for "mem" scheme ASRU dispatch.
 	 */

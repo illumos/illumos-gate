@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 
 #ifdef sun4u
 #include <cmd_ecache.h>
+#include <cmd_Lxcache.h>
 #endif /* sun4u */
 
 #include <cmd_mem.h>
@@ -133,9 +134,9 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.pdspe",	cmd_pcache },
 	{ "ereport.cpu.*.itlbpe",	cmd_itlb },
 	{ "ereport.cpu.*.dtlbpe",	cmd_dtlb },
-	{ "ereport.cpu.*.thce",		cmd_txce },
+	{ "ereport.cpu.*.thce",		cmd_txce, CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.tsce",		cmd_txce },
-	{ "ereport.cpu.*.l3-thce",	cmd_l3_thce },
+	{ "ereport.cpu.*.l3-thce",	cmd_l3_thce, CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.ce",		cmd_ce },
 	{ "ereport.cpu.*.emc",		cmd_ce },
 	{ "ereport.cpu.*.ue",		cmd_ue },
@@ -436,6 +437,9 @@ cmd_gc(fmd_hdl_t *hdl)
 {
 	cmd_cpu_gc(hdl);
 	cmd_mem_gc(hdl);
+#ifdef sun4u
+	cmd_Lxcache_gc(hdl);
+#endif
 }
 
 static cmd_stat_t cmd_stats = {

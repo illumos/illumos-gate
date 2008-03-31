@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sun4u/sys/Makefile
@@ -90,6 +90,7 @@ HDRS=	\
 	machparam.h		\
 	machsystm.h		\
 	machthread.h		\
+	mem_cache.h		\
 	mmu.h			\
 	opl_module.h		\
 	prom_plat.h		\

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,7 +196,7 @@ cpu_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	cpu_node_t *cpuip = (cpu_node_t *)arg;
 
 	if ((nmp = topo_mod_load(mod, PLATFORM_CPU_NAME,
-				PLATFORM_CPU_VERSION)) == NULL) {
+	    PLATFORM_CPU_VERSION)) == NULL) {
 		if (topo_mod_errno(mod) == ETOPO_MOD_NOENT) {
 			/*
 			 * There is no platform specific cpu module, so use
@@ -204,12 +204,12 @@ cpu_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			 * cpu module.
 			 */
 			if (topo_node_range_create(mod, pnode, name, 0,
-						cpuip->cn_ncpustats + 1) < 0) {
+			    cpuip->cn_ncpustats + 1) < 0) {
 				topo_mod_dprintf(mod,
-					"cpu enumeration failed to create "
-					"cpu range [0-%d]: %s\n",
-					cpuip->cn_ncpustats + 1,
-					topo_mod_errmsg(mod));
+				    "cpu enumeration failed to create "
+				    "cpu range [0-%d]: %s\n",
+				    cpuip->cn_ncpustats + 1,
+				    topo_mod_errmsg(mod));
 				return (-1); /* mod_errno set */
 			}
 			(void) topo_method_register(mod, pnode, cpu_methods);
@@ -218,19 +218,19 @@ cpu_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		} else {
 			/* Fail to load the module */
 			topo_mod_dprintf(mod,
-					"Failed to load module %s: %s",
-					PLATFORM_CPU_NAME,
-					topo_mod_errmsg(mod));
+			    "Failed to load module %s: %s",
+			    PLATFORM_CPU_NAME,
+			    topo_mod_errmsg(mod));
 			return (-1);
 		}
 	}
 
 	if (topo_mod_enumerate(nmp, pnode, PLATFORM_CPU_NAME, name,
-				min, max, NULL) < 0) {
+	    min, max, NULL) < 0) {
 		topo_mod_dprintf(mod,
-				"%s failed to enumerate: %s",
-				PLATFORM_CPU_NAME,
-				topo_mod_errmsg(mod));
+		    "%s failed to enumerate: %s",
+		    PLATFORM_CPU_NAME,
+		    topo_mod_errmsg(mod));
 		return (-1);
 	}
 	(void) topo_method_register(mod, pnode, cpu_methods);
@@ -248,9 +248,10 @@ ssize_t
 fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 {
 	int rc;
-	uint32_t cpuid;
+	uint8_t	type;
+	uint32_t cpuid, index, way;
 	uint64_t serint;
-	char *serstr;
+	char *serstr = NULL;
 
 	if (version == CPU_SCHEME_VERSION0) {
 		if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0 ||
@@ -261,6 +262,7 @@ fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 		return (snprintf(buf, buflen, "cpu:///%s=%u/%s=%llX",
 		    FM_FMRI_CPU_ID, cpuid, FM_FMRI_CPU_SERIAL_ID,
 		    (u_longlong_t)serint));
+
 	} else if (version == CPU_SCHEME_VERSION1) {
 		if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
 			return (0);
@@ -270,19 +272,54 @@ fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 		 */
 		if ((rc = nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID,
 		    &serstr)) != 0)
+
+			if (rc != ENOENT)
+				return (0);
+
+		/*
+		 * Cache index, way and type are optional elements
+		 * But if we have one of them, we must have them all.
+		 */
+		rc = nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_INDEX,
+		    &index);
+		rc |= nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_WAY, &way);
+		rc |= nvlist_lookup_uint8(nvl, FM_FMRI_CPU_CACHE_TYPE, &type);
+
+		/* Insure there were no errors accessing the nvl */
+		if (rc != 0 && rc != ENOENT)
+			return (0);
+
+		if (serstr == NULL) {
+			/* If we have a serial string and no cache info */
 			if (rc == ENOENT)
 				return (snprintf(buf, buflen, "cpu:///%s=%u",
 				    FM_FMRI_CPU_ID, cpuid));
-			else
-				return (0);
-		else
-			return (snprintf(buf, buflen, "cpu:///%s=%u/%s=%s",
-			    FM_FMRI_CPU_ID, cpuid, FM_FMRI_CPU_SERIAL_ID,
-			    serstr));
-
-	} else {
+			else {
+				return (snprintf(buf, buflen,
+				    "cpu:///%s=%u/%s=%u/%s=%u/%s=%d",
+				    FM_FMRI_CPU_ID, cpuid,
+				    FM_FMRI_CPU_CACHE_INDEX, index,
+				    FM_FMRI_CPU_CACHE_WAY, way,
+				    FM_FMRI_CPU_CACHE_TYPE, type));
+			}
+		} else {
+			if (rc == ENOENT) {
+				return (snprintf(buf, buflen,
+				    "cpu:///%s=%u/%s=%s",
+				    FM_FMRI_CPU_ID, cpuid,
+				    FM_FMRI_CPU_SERIAL_ID, serstr));
+			} else {
+				return (snprintf(buf, buflen,
+				    "cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%d",
+				    FM_FMRI_CPU_ID, cpuid,
+				    FM_FMRI_CPU_SERIAL_ID, serstr,
+				    FM_FMRI_CPU_CACHE_INDEX, index,
+				    FM_FMRI_CPU_CACHE_WAY, way,
+				    FM_FMRI_CPU_CACHE_TYPE, type));
+			}
+		}
+	} else
 		return (0);
-	}
 }
 
 /*ARGSUSED*/
@@ -326,7 +363,9 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 {
 	int err;
 	ulong_t cpuid;
-	char *str, *s, *end;
+	uint8_t	type;
+	uint32_t way, index = NULL;
+	char *str, *s, *end, *serial_end;
 	char *serial = NULL;
 	nvlist_t *fmri;
 
@@ -350,10 +389,40 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	if (cpuid == ULONG_MAX && errno == ERANGE)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 
+	/* If there is a serial #, then there might also be cache data */
 	if (*(s = end) == '/') {
 		s = strchr(s, '=');
 		++s;
 		serial = s;
+		serial_end = strchr(s, '/');
+		/* If there is cache data, all must be present */
+		if (s != NULL) {
+			s = strchr(s, '=');
+			++s;
+			index = strtoul(s, &end, 0);
+			if (*(s = end) != '/') {
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			}
+			s = strchr(s, '=');
+			++s;
+			way = strtoul(s, &end, 0);
+			if (*(s = end) != '/') {
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			}
+			s = strchr(s, '=');
+			++s;
+			type = strtoul(s, &end, 0);
+			if (*(s = end) != '/') {
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			}
+		}
+		/* Now terminate the serial string */
+		if (serial_end != NULL)
+			*serial_end = '\n';
+
 	}
 
 	if (topo_mod_nvalloc(mod, &fmri, NV_UNIQUE_NAME) != 0)
@@ -367,6 +436,14 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		err |= nvlist_add_string(fmri, FM_FMRI_CPU_SERIAL_ID,
 		    serial);
 
+	if (index != NULL) {
+		err |= nvlist_add_uint32(fmri, FM_FMRI_CPU_CACHE_INDEX,
+		    index);
+		err |= nvlist_add_uint32(fmri, FM_FMRI_CPU_CACHE_WAY,
+		    way);
+		err |= nvlist_add_uint8(fmri, FM_FMRI_CPU_CACHE_TYPE,
+		    type);
+	}
 	if (err != 0) {
 		nvlist_free(fmri);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
