@@ -2848,12 +2848,15 @@ static const char itlb4k_str[] = "itlb-4K";
 static const char dtlb4k_str[] = "dtlb-4K";
 static const char itlb4M_str[] = "itlb-4M";
 static const char dtlb4M_str[] = "dtlb-4M";
+static const char dtlb24_str[] = "dtlb0-2M-4M";
 static const char itlb424_str[] = "itlb-4K-2M-4M";
+static const char itlb24_str[] = "itlb-2M-4M";
 static const char dtlb44_str[] = "dtlb-4K-4M";
 static const char sl1_dcache_str[] = "sectored-l1-dcache";
 static const char sl2_cache_str[] = "sectored-l2-cache";
 static const char itrace_str[] = "itrace-cache";
 static const char sl3_cache_str[] = "sectored-l3-cache";
+static const char sh_l2_tlb4k_str[] = "shared-l2-tlb-4k";
 
 static const struct cachetab {
 	uint8_t 	ct_code;
@@ -2863,8 +2866,22 @@ static const struct cachetab {
 	const char	*ct_label;
 } intel_ctab[] = {
 	/* maintain descending order! */
+	{ 0xe4, 16, 64, 8*1024*1024, l3_cache_str},
+	{ 0xe3, 16, 64, 4*1024*1024, l3_cache_str},
+	{ 0xe2, 16, 64, 2*1024*1024, l3_cache_str},
+	{ 0xde, 12, 64, 6*1024*1024, l3_cache_str},
+	{ 0xdd, 12, 64, 3*1024*1024, l3_cache_str},
+	{ 0xdc, 12, 64, ((1*1024*1024)+(512*1024)), l3_cache_str},
+	{ 0xd8, 8, 64, 4*1024*1024, l3_cache_str},
+	{ 0xd7, 8, 64, 2*1024*1024, l3_cache_str},
+	{ 0xd6, 8, 64, 1*1024*1024, l3_cache_str},
+	{ 0xd2, 4, 64, 2*1024*1024, l3_cache_str},
+	{ 0xd1, 4, 64, 1*1024*1024, l3_cache_str},
+	{ 0xd0, 4, 64, 512*1024, l3_cache_str},
+	{ 0xca, 4, 0, 512, sh_l2_tlb4k_str},
 	{ 0xb4, 4, 0, 256, dtlb4k_str },
 	{ 0xb3, 4, 0, 128, dtlb4k_str },
+	{ 0xb2, 4, 0, 64, itlb4k_str },
 	{ 0xb0, 4, 0, 128, itlb4k_str },
 	{ 0x87, 8, 64, 1024*1024, l2_cache_str},
 	{ 0x86, 4, 64, 512*1024, l2_cache_str},
@@ -2890,6 +2907,8 @@ static const struct cachetab {
 	{ 0x5d, 0, 0, 256, dtlb44_str},
 	{ 0x5c, 0, 0, 128, dtlb44_str},
 	{ 0x5b, 0, 0, 64, dtlb44_str},
+	{ 0x5a, 4, 0, 32, dtlb24_str},
+	{ 0x55, 0, 0, 7, itlb24_str},
 	{ 0x52, 0, 0, 256, itlb424_str},
 	{ 0x51, 0, 0, 128, itlb424_str},
 	{ 0x50, 0, 0, 64, itlb424_str},
@@ -2917,6 +2936,7 @@ static const struct cachetab {
 	{ 0x25, 8, 64, 2048*1024, sl3_cache_str},
 	{ 0x23, 8, 64, 1024*1024, sl3_cache_str},
 	{ 0x22, 4, 64, 512*1024, sl3_cache_str},
+	{ 0x0d, 4, 32, 16*1024, l1_dcache_str},
 	{ 0x0c, 4, 32, 16*1024, l1_dcache_str},
 	{ 0x0b, 4, 0, 4, itlb4M_str},
 	{ 0x0a, 2, 32, 8*1024, l1_dcache_str},
