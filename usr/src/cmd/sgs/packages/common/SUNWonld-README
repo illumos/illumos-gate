@@ -1332,3 +1332,4 @@ Bugid   Risk Synopsis
 	PSARC/2008/198 elfwrap - wrap data in an ELF file
 6678244 elfdump dynamic section sanity checking needs refinement
 6679212 sgs use of SCCS id for versioning is obstacle to mercurial migration
+6681761 lies, darn lies, and linker README files

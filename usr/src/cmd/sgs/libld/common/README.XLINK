@@ -44,9 +44,10 @@ libld.so is a cross linker. This means that it can link objects for
 a system other than the system running the link-editor (e.g. A link-editor
 running on an amd64 system processing sparc objects). This means that every
 instance of libld.so contains code for building objects for every supported
-target. This unlike GNU ld, where you build gld specifically for the
-platform you're targeting. This is possible because unlike gld, we only
-support Solaris, with a small number of platforms. 
+target. It is not necessary to build libld specifically for the
+platform you're targeting. This is possible because we only support
+Solaris/ELF, with a small number of platforms, and the additional code
+required per target is small.
 
 At initialization, the caller of libld.so specifies the type of objects
 being linked. By default, the ld command determines the machine type and
