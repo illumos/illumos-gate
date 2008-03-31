@@ -27781,7 +27781,8 @@ nak:
 		ire = ire_ctable_lookup(fake_ire->ire_addr,
 		    fake_ire->ire_gateway_addr, IRE_CACHE,
 		    ipif, fake_ire->ire_zoneid, NULL,
-		    (MATCH_IRE_GW|MATCH_IRE_IPIF|MATCH_IRE_ZONEONLY), ipst);
+		    (MATCH_IRE_GW|MATCH_IRE_IPIF|MATCH_IRE_ZONEONLY|
+		    MATCH_IRE_TYPE), ipst);
 		ipif_refrele(ipif);
 		if (ire == NULL) {
 			/*
