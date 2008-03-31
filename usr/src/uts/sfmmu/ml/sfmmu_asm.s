@@ -3690,10 +3690,11 @@ tsb_user4m:
 	brlz,a,pn %g1, 5f				! if no shared 4TH TSB
 	  nop
         GET_4TH_TSBE_PTR(%g5, %g1, %g6, %g7)
-4:
+
 #else /* defined(sun4v) || defined(UTSB_PHYS) */
 	ldn   [%g6 + TSBMISS_TSBPTR4M], %g1             ! g1 = 2ND TSB ptr
 #endif /* defined(sun4v) || defined(UTSB_PHYS) */
+4:
 	brlz,pn %g1, 5f	/* Check to see if we have 2nd TSB programmed */
 	  nop
 
