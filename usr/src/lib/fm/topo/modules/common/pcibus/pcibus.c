@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,6 +370,7 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	tnode_t *fn;
 	uint_t class, subclass;
 	uint_t vid, did;
+	did_t *dp = NULL;
 
 	if (*dev == NULL) {
 		if (rc >= 0)
@@ -409,16 +410,55 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 		(void) pci_bridge_declare(mod, fn, din, board, bridge, rc,
 		    depth);
 	}
+
 	/*
-	 * Use xfp-hc-topology.xml to expand topology to include the XFP optical
-	 * module, which is a FRU on the Neptune based 10giga fiber NICs.
+	 * Check for a Neptune-based NIC. This could either be a Neptune
+	 * adapter card or an Neptune ASIC on a board (e.g. motherboard)
+	 *
+	 * For Netpune adapter cards, use xfp-hc-topology.xml to expand
+	 * topology to include the XFP optical module, which is a FRU on
+	 * the Neptune based 10giga fiber NICs.
+	 *
+	 * For Neptune ASICs, use the XAUI enumerator to expand topology.
+	 * The 10giga ports are externalized by a XAUI cards, which
+	 * are FRUs. The XAUI enumerator in turn instantiates the XFP
+	 * optical module FRUs.
 	 */
 	else if (class == PCI_CLASS_NET &&
 	    di_uintprop_get(mod, din, DI_VENDIDPROP, &vid) >= 0 &&
 	    di_uintprop_get(mod, din, DI_DEVIDPROP, &did) >= 0) {
 		if (vid == SUN_VENDOR_ID && did == NEPTUNE_DEVICE_ID) {
-			(void) topo_mod_enummap(mod, fn,
-			    "xfp", FM_FMRI_SCHEME_HC);
+			/*
+			 * Is this an adapter card? Check the bus's physlot
+			 */
+			dp = did_find(mod, topo_node_getspecific(bus));
+			if (did_physslot(dp) >= 0) {
+				topo_mod_dprintf(mod, "Found Neptune slot\n");
+				(void) topo_mod_enummap(mod, fn,
+				    "xfp", FM_FMRI_SCHEME_HC);
+			} else {
+				topo_mod_dprintf(mod, "Found Neptune ASIC\n");
+				if (topo_mod_load(mod, XAUI, TOPO_VERSION) ==
+				    NULL) {
+					topo_mod_dprintf(mod, "pcibus enum "
+					    "could not load xaui enum\n");
+					topo_mod_seterrno(mod,
+					    EMOD_PARTIAL_ENUM);
+					return;
+				} else {
+					if (topo_node_range_create(mod, fn,
+					    XAUI, 0, 1) < 0) {
+						topo_mod_dprintf(mod,
+						    "child_range_add for "
+						    "XAUI failed: %s\n",
+						    topo_strerror(
+						    topo_mod_errno(mod)));
+						return;
+					}
+					(void) topo_mod_enumerate(mod, fn,
+					    XAUI, XAUI, fnno, fnno, fn);
+				}
+			}
 		}
 	}
 }
