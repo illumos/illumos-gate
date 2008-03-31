@@ -661,6 +661,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
 	parbus = pci_bus_res[secbus].par_bus;
 	ASSERT(parbus == bus);
+	cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
 
 	/*
 	 * If we have a Cardbus bridge, but no bus space
@@ -775,16 +776,17 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	}
 
 	/*
-	 * io_base > io_limit means that the bridge was not configured
-	 * This may have been set by the BIOS or by add_ppb_props()
-	 * if I/O space is disabled in the Command register.
+	 * Check to see if we need to reprogram I/O space, either because the
+	 * parent bus needed reprogramming and so do we, or because I/O space is
+	 * disabled in base/limit or command register.
 	 */
 	io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
 	io_limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
 	io_base = (io_base & 0xf0) << 8;
 	io_limit = ((io_limit & 0xf0) << 8) | 0xfff;
 
-	if (pci_bus_res[parbus].io_reprogram || (io_base > io_limit)) {
+	if (pci_bus_res[parbus].io_reprogram || (io_base > io_limit) ||
+	    (!(cmd_reg & PCI_COMM_IO))) {
 		if (pci_bus_res[secbus].io_ports_used) {
 			memlist_merge(&pci_bus_res[secbus].io_ports_used,
 			    &pci_bus_res[secbus].io_ports);
@@ -848,13 +850,15 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	}
 
 	/*
-	 * mem_base > mem_limit
+	 * Check memory space as we did I/O space.
 	 */
 	mem_base = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_BASE);
 	mem_base = (mem_base & 0xfff0) << 16;
 	mem_limit = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_LIMIT);
-	mem_limit = ((mem_limit & 0xfff0) << 16) |0xfffff;
-	if (pci_bus_res[parbus].mem_reprogram || (mem_base > mem_limit)) {
+	mem_limit = ((mem_limit & 0xfff0) << 16) | 0xfffff;
+
+	if (pci_bus_res[parbus].mem_reprogram || (mem_base > mem_limit) ||
+	    (!(cmd_reg & PCI_COMM_MAE))) {
 		if (pci_bus_res[secbus].mem_space_used) {
 			memlist_merge(&pci_bus_res[secbus].mem_space_used,
 			    &pci_bus_res[secbus].mem_space);
@@ -917,7 +921,6 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	}
 
 cmd_enable:
-	cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
 	if (pci_bus_res[secbus].io_ports)
 		cmd_reg |= PCI_COMM_IO | PCI_COMM_ME;
 	if (pci_bus_res[secbus].mem_space)
