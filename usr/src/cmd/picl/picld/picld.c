@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -414,10 +413,10 @@ picld_set_attrval_by_name(picl_service_t *in)
 	(void) strcpy(ret.propname, in->req_setattrvalbyname.propname);
 
 	err = xptree_update_propval_by_name_with_cred(ptreeh,
-		in->req_setattrvalbyname.propname,
-		in->req_setattrvalbyname.valbuf,
-		(size_t)in->req_setattrvalbyname.bufsize,
-		cred);
+	    in->req_setattrvalbyname.propname,
+	    in->req_setattrvalbyname.valbuf,
+	    (size_t)in->req_setattrvalbyname.bufsize,
+	    cred);
 
 	if (err != PICL_SUCCESS)
 		picld_return_error(in->in.cnum, err);
@@ -879,7 +878,13 @@ setup_door(void)
 
 	if (stat(PICLD_DOOR, &stbuf) < 0) {
 		int newfd;
-		if ((newfd = creat(PICLD_DOOR, 0444)) < 0)
+		mode_t old_mask;
+		/* ensure that the door file is world-readable */
+		old_mask = umask(0);
+		newfd = creat(PICLD_DOOR, 0444);
+		/* restore the file mode creation mask */
+		(void) umask(old_mask);
+		if (newfd < 0)
 			return (-1);
 		(void) close(newfd);
 	}
