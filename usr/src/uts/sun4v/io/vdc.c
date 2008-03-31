@@ -1297,7 +1297,7 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	int	instance;
+	int	instance, nodelay;
 	int	slice, status = 0;
 	vdc_t	*vdc;
 
@@ -1317,6 +1317,13 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 
 	slice = VDCPART(*dev);
 
+	nodelay = flag & (FNDELAY | FNONBLOCK);
+
+	if ((flag & FWRITE) && (!nodelay) &&
+	    !(VD_OP_SUPPORTED(vdc->operations, VD_OP_BWRITE))) {
+		return (EROFS);
+	}
+
 	mutex_enter(&vdc->lock);
 
 	status = vdc_mark_opened(vdc, slice, flag, otyp);
@@ -1326,7 +1333,7 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 		return (status);
 	}
 
-	if (flag & (FNDELAY | FNONBLOCK)) {
+	if (nodelay) {
 
 		/* don't resubmit a validate request if there's already one */
 		if (vdc->validate_pending > 0) {
