@@ -197,6 +197,7 @@ appm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char	*str = "appm_attach";
 	int		instance;
 	appm_unit	*unitp;
+	FADT_DESCRIPTOR *fadt = NULL;
 	int		rv = DDI_SUCCESS;
 
 	switch (cmd) {
@@ -253,7 +254,14 @@ appm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (rv != DDI_SUCCESS)
 		goto doerrs;
 
-	pc_tod_set_rtc_offsets(AcpiGbl_FADT); /* init the RTC offsets */
+	/* Get the FADT */
+	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+		return (rv);
+
+	/* Init the RTC offsets */
+	if (fadt != NULL)
+		pc_tod_set_rtc_offsets(fadt);
 
 	return (rv);
 
