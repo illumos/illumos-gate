@@ -14902,10 +14902,16 @@ sdintr(struct scsi_pkt *pktp)
 					    xp->xb_sense_resid;
 				}
 				if (xp->xb_pkt_flags & SD_XB_USCSICMD) {
-					xp->xb_sense_resid =
-					    (int)(((struct uscsi_cmd *)
-					    (xp->xb_pktinfo))->
-					    uscsi_rqlen) - actual_len;
+					if ((((struct uscsi_cmd *)
+					    (xp->xb_pktinfo))->uscsi_rqlen) >
+					    actual_len) {
+						xp->xb_sense_resid =
+						    (((struct uscsi_cmd *)
+						    (xp->xb_pktinfo))->
+						    uscsi_rqlen) - actual_len;
+					} else {
+						xp->xb_sense_resid = 0;
+					}
 				}
 				bcopy(&asp->sts_sensedata, xp->xb_sense_data,
 				    SENSE_LENGTH);
@@ -15474,8 +15480,14 @@ sd_handle_auto_request_sense(struct sd_lun *un, struct buf *bp,
 			actual_len = SENSE_LENGTH - xp->xb_sense_resid;
 		}
 		if (xp->xb_pkt_flags & SD_XB_USCSICMD) {
-			xp->xb_sense_resid = (int)(((struct uscsi_cmd *)
-			    (xp->xb_pktinfo))->uscsi_rqlen) - actual_len;
+			if ((((struct uscsi_cmd *)
+			    (xp->xb_pktinfo))->uscsi_rqlen) > actual_len) {
+				xp->xb_sense_resid = (((struct uscsi_cmd *)
+				    (xp->xb_pktinfo))->uscsi_rqlen) -
+				    actual_len;
+			} else {
+				xp->xb_sense_resid = 0;
+			}
 		}
 		bcopy(&asp->sts_sensedata, xp->xb_sense_data, SENSE_LENGTH);
 	}
