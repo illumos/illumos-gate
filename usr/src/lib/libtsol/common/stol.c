@@ -67,6 +67,8 @@ unhex(char **h, uchar_t *l, int len)
 			byte = ch - (isupper(ch) ? 'A' - 10 : 'a' - 10);
 		byte <<= 4;
 		ch = *hx++;
+		if (!isxdigit(ch))
+			return (B_FALSE);
 		if (isdigit(ch))
 			byte |= ch - '0';
 		else
@@ -258,7 +260,7 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 #define	slret callp->param.aret.rvals.sl_ret
 	/* now try label server */
 
-	datasize = CALL_SIZE(sl_call_t, strlen(st) + 1);
+	datasize = CALL_SIZE_STR(sl_call_t, strlen(st) + 1);
 	if (datasize > bufsize) {
 		if ((callp = malloc(datasize)) == NULL) {
 			free(st);

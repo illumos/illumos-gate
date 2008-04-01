@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,6 +203,7 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 		if (!(_MTYPE(l, SUN_MAC_ID) ||
 		    _MTYPE(l, SUN_UCLR_ID))) {
 			errno = EINVAL;
+			*s = NULL;
 			return (-1);
 		}
 		if (_MEQUAL(&low, (_mac_label_impl_t *)l)) {

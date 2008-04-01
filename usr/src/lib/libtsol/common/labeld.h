@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,6 +400,7 @@ typedef	struct {
 
 #define	CALL_SIZE(type, buf)	(size_t)(sizeof (type) + sizeof (int) + (buf))
 #define	RET_SIZE(type, buf)	(size_t)(sizeof (type) + 2*sizeof (int) + (buf))
+#define	CALL_SIZE_STR(type, buf)	CALL_SIZE(type, (-BUFSIZE +(buf)))
 
 /* Labeld common client call function */
 
