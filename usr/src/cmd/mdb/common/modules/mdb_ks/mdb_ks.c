@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -594,6 +594,24 @@ mdb_cpu2cpuid(uintptr_t cpup)
 	return (cpu.cpu_id);
 }
 
+#if defined(__i386)
+/*
+ * See uts/common/sys/cpuvar.h.
+ * cpuset_t is 1 ulong_t in the i386 32-bit world and an array of ulong_t in
+ * the 64-bit world.
+ */
+int
+mdb_cpuset_find(uintptr_t cpusetp)
+{
+	size_t cpu;
+
+	for (cpu = 0; cpu < NCPU; cpu++)
+		if (BT_TEST((unsigned long *)cpusetp, cpu))
+			return (cpu);
+
+	return (-1);
+}
+#else	/* All 64 bit */
 int
 mdb_cpuset_find(uintptr_t cpusetp)
 {
@@ -605,7 +623,7 @@ mdb_cpuset_find(uintptr_t cpusetp)
 
 	cpuset = mdb_alloc(sz, UM_SLEEP);
 
-	if (mdb_vread(cpuset, sz, cpusetp) != sz)
+	if (mdb_vread((void *)cpuset, sz, cpusetp) != sz)
 		goto out;
 
 	for (i = 0; i < nr_words; i++) {
@@ -624,6 +642,7 @@ out:
 	mdb_free(cpuset, sz);
 	return (cpu);
 }
+#endif	/* defined(__i386) */
 
 uintptr_t
 mdb_vnode2page(uintptr_t vp, uintptr_t offset)
@@ -875,7 +894,7 @@ find_mbind(const char *name, uintptr_t *hashtab)
 		if (mdb_readstr(node_name, sizeof (node_name),
 		    (uintptr_t)mb_local.b_name) == -1) {
 			mdb_warn("failed to read node name string at %p",
-				mb_local.b_name);
+			    mb_local.b_name);
 			return (NULL);
 		}
 
@@ -1191,7 +1210,7 @@ asmap_step(uintptr_t addr, const struct seg *seg, asmap_arg_t *asmp)
 
 		if (svd.vp != NULL) {
 			if (mdb_vnode2path((uintptr_t)svd.vp, map.map_name,
-				    MDB_TGT_MAPSZ) != 0) {
+			    MDB_TGT_MAPSZ) != 0) {
 				(void) mdb_snprintf(map.map_name,
 				    MDB_TGT_MAPSZ, "[ vnode %p ]", svd.vp);
 			}

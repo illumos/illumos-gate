@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -443,8 +443,8 @@ typedef struct	apic_irq {
 	 */
 	major_t	airq_major;	/* major number corresponding to the device */
 	ushort_t airq_rdt_entry;	/* level, polarity & trig mode */
-	uchar_t	airq_cpu;		/* Which CPU are we bound to ? */
-	uchar_t	airq_temp_cpu; /* Could be diff from cpu due to disable_intr */
+	ushort_t airq_cpu;		/* Which CPU are we bound to ? */
+	ushort_t airq_temp_cpu; /* Could be diff from cpu due to disable_intr */
 	uchar_t	airq_vector;		/* Vector chosen for this irq */
 	uchar_t	airq_share;		/* number of interrupts at this irq */
 	uchar_t	airq_share_id;		/* id to identify source from irqno */
@@ -456,9 +456,9 @@ typedef struct	apic_irq {
 	struct apic_irq *airq_next;	/* chain of shared intpts */
 } apic_irq_t;
 
-#define	IRQ_USER_BOUND	0x80	/* user requested bind if set in airq_cpu */
-#define	IRQ_UNBOUND	(uchar_t)-1 /* set in airq_cpu and airq_temp_cpu */
-#define	IRQ_UNINIT	(uchar_t)-2 /* in airq_temp_cpu till addspl called */
+#define	IRQ_USER_BOUND	0x8000	/* user requested bind if set in airq_cpu */
+#define	IRQ_UNBOUND	(ushort_t)-1 /* set in airq_cpu and airq_temp_cpu */
+#define	IRQ_UNINIT	(ushort_t)-2 /* in airq_temp_cpu till addspl called */
 
 /* Macros to help deal with shared interrupts */
 #define	VIRTIRQ(irqno, share_id)	((irqno) | ((share_id) << 8))
@@ -691,7 +691,7 @@ extern uchar_t apic_xlate_vector(uchar_t vector);
 extern uchar_t apic_allocate_vector(int ipl, int irq, int pri);
 extern void apic_free_vector(uchar_t vector);
 extern int apic_allocate_irq(int irq);
-extern uchar_t apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid,
+extern ushort_t apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid,
     uchar_t intin);
 extern int apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
     struct ioapic_reprogram_data *drep);

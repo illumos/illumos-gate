@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,6 +104,7 @@
 #include <sys/pmem.h>
 #include <sys/smp_impldefs.h>
 #include <sys/x86_archext.h>
+#include <sys/cpuvar.h>
 #include <sys/segments.h>
 #include <sys/clconf.h>
 #include <sys/kobj.h>
@@ -651,6 +652,8 @@ startup(void)
 	extern void startup_bios_disk(void);
 	extern void startup_pci_bios(void);
 #endif
+	extern cpuset_t cpu_ready_set;
+
 	/*
 	 * Make sure that nobody tries to use sekpm until we have
 	 * initialized it properly.
@@ -659,6 +662,7 @@ startup(void)
 	kpm_desired = 1;
 #endif
 	kpm_enable = 0;
+	CPUSET_ONLY(cpu_ready_set, 0);	/* cpu 0 is boot cpu */
 
 #if defined(__xpv)	/* XXPV fix me! */
 	{

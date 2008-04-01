@@ -93,7 +93,8 @@ cpuset_t mp_cpus;
  * order to allow cross calls.
  */
 int flushes_require_xcalls;
-cpuset_t cpu_ready_set = 1;
+
+cpuset_t cpu_ready_set;		/* initialized in startup() */
 
 static 	void	mp_startup(void);
 

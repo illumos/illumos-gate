@@ -84,7 +84,7 @@ ushort_t	cpr_mach_type = CPR_MACHTYPE_X86;
 void		(*cpr_start_cpu_func)(void) = i_cpr_start_cpu;
 
 static wc_cpu_t	*wc_other_cpus = NULL;
-static cpuset_t procset = 1;
+static cpuset_t procset;
 
 static void
 init_real_mode_platter(int cpun, uint32_t offset, uint_t cr4, wc_desctbr_t gdt);
@@ -223,8 +223,8 @@ i_cpr_save_context(void *arg)
 		CPUSET_ATOMIC_ADD(cpu_ready_set, CPU->cpu_id);
 
 		PMD(PMD_SX,
-		    ("cpu_release() cpu_ready_set = %lx, CPU->cpu_id = %d\n",
-		    cpu_ready_set, CPU->cpu_id))
+		    ("i_cpr_save_context() resuming cpu %d in cpu_ready_set\n",
+		    CPU->cpu_id))
 	}
 	return (NULL);
 }
@@ -293,9 +293,11 @@ i_cpr_pre_resume_cpus()
 	affinity_set(CPU_CURRENT);
 
 	/*
-	 * mark the boot cpu as being ready, since we are running on that cpu
+	 * Mark the boot cpu as being ready and in the procset, since we are
+	 * running on that cpu.
 	 */
 	CPUSET_ONLY(cpu_ready_set, boot_cpuid);
+	CPUSET_ONLY(procset, boot_cpuid);
 
 	for (who = 0; who < ncpus; who++) {
 
@@ -329,8 +331,7 @@ i_cpr_pre_resume_cpus()
 			continue;
 		}
 
-		PMD(PMD_SX, ("%s() #1 waiting for procset 0x%lx\n", str,
-		    (ulong_t)procset))
+		PMD(PMD_SX, ("%s() #1 waiting for %d in procset\n", str, who))
 
 		if (!wait_for_set(&procset, who))
 			continue;
@@ -344,8 +345,8 @@ i_cpr_pre_resume_cpus()
 			tsc_sync_master(who);
 		}
 
-		PMD(PMD_SX, ("%s() waiting for cpu_ready_set %ld\n", str,
-		    cpu_ready_set))
+		PMD(PMD_SX, ("%s() waiting for %d in cpu_ready_set\n", str,
+		    who))
 		/*
 		 * Wait for cpu to declare that it is ready, we want the
 		 * cpus to start serially instead of in parallel, so that
@@ -464,7 +465,7 @@ i_cpr_power_down(int sleeptype)
 {
 	caddr_t		wakevirt = rm_platter_va;
 	uint64_t	wakephys = rm_platter_pa;
-	uint_t		saved_intr;
+	ulong_t		saved_intr;
 	uint32_t	code_length = 0;
 	wc_desctbr_t	gdt;
 	/*LINTED*/
@@ -482,8 +483,6 @@ i_cpr_power_down(int sleeptype)
 #endif
 	extern int	cpr_suspend_succeeded;
 	extern void	kernel_wc_code();
-	extern ulong_t	intr_clear(void);
-	extern void	intr_restore(ulong_t);
 
 	ASSERT(sleeptype == CPR_TORAM);
 	ASSERT(CPU->cpu_id == 0);
@@ -550,8 +549,6 @@ i_cpr_power_down(int sleeptype)
 	    (ulong_t)real_mode_platter->rm_longmode64_addr))
 
 #endif
-
-	PMD(PMD_SX, ("mp_cpus=%lx\n", (ulong_t)mp_cpus))
 
 	PT(PT_SC);
 	if (wc_save_context(cpup)) {
@@ -917,9 +914,6 @@ i_cpr_start_cpu(void)
 
 	PMD(PMD_SX, ("%s() #2 cp->cpu_base_spl %d\n", str,
 	    cp->cpu_base_spl))
-
-	/* XXX remove before integration */
-	PMD(PMD_SX, ("%s() procset 0x%lx\n", str, (ulong_t)procset))
 
 	if (tsc_gethrtime_enable) {
 		PMD(PMD_SX, ("%s() calling tsc_sync_slave\n", str))

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -577,7 +577,7 @@ static int
 apic_set_cpu(uint32_t vector, int cpu, int *result)
 {
 	apic_irq_t *irqp;
-	int iflag;
+	ulong_t iflag;
 	int ret;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "APIC_SET_CPU\n"));
@@ -620,7 +620,7 @@ apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
 {
 	dev_info_t *orig_dip;
 	uchar_t orig_cpu;
-	int iflag;
+	ulong_t iflag;
 	apic_irq_t *irqps[PCI_MSI_MAX_INTRS];
 	int i;
 	int cap_ptr;

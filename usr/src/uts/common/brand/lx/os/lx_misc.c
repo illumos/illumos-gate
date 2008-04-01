@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,7 +218,9 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_clear_ctidp = NULL;
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
-	lwpd->br_affinitymask = 0;
+	/*
+	 * lwpd->br_affinitymask was zeroed by kmem_zalloc().
+	 */
 
 	/*
 	 * The first thread in a process has ppid set to the parent

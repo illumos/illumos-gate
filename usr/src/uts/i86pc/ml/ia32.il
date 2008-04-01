@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,13 +95,17 @@
 / restore interrupt enable flag to value returned from 'clear_int_flag' above
 /
 	.inline restore_int_flag,4
-	pushl	(%esp)
-	popfl
+	testl	$0x200, (%esp)
+	jz	1f
+	sti
+1:
 	.end
 
 	.inline intr_restore,4
-	pushl	(%esp)
-	popfl
+	testl	$0x200, (%esp)
+	jz	1f
+	sti
+1:
 	.end
 
 /

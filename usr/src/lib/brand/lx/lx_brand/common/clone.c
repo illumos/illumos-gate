@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +109,7 @@ struct clone_state {
 	void		*c_ctidp;
 	uintptr_t	c_gs;		/* Linux's %gs */
 	sigset_t	c_sigmask;	/* signal mask */
-	uint64_t	c_affmask;	/* CPU affinity mask */
+	lx_affmask_t	c_affmask;	/* CPU affinity mask */
 	volatile int	*c_clone_res;	/* pid/error returned to cloner */
 };
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1423,7 +1423,8 @@ apic_addspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 int
 apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 {
-	uchar_t vector, bind_cpu;
+	uchar_t vector;
+	ushort_t bind_cpu;
 	int intin, irqindex;
 	int apic_ix;
 	apic_irq_t	*irqptr, *irqheadptr, *irqp;
@@ -1633,8 +1634,8 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	if (max_ipl == PSM_INVALID_IPL) {
 		ASSERT(irqheadptr == irqptr);
 		bind_cpu = irqptr->airq_temp_cpu;
-		if (((uchar_t)bind_cpu != IRQ_UNBOUND) &&
-		    ((uchar_t)bind_cpu != IRQ_UNINIT)) {
+		if (((ushort_t)bind_cpu != IRQ_UNBOUND) &&
+		    ((ushort_t)bind_cpu != IRQ_UNINIT)) {
 			ASSERT((bind_cpu & ~IRQ_USER_BOUND) < apic_nproc);
 			if (bind_cpu & IRQ_USER_BOUND) {
 				/* If hardbound, temp_cpu == cpu */
@@ -2247,12 +2248,12 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
  * bound to a specific CPU. If so, return the cpu id with high bit set.
  * If not, use the policy to choose a cpu and return the id.
  */
-uchar_t
+ushort_t
 apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 {
 	int	instance, instno, prop_len, bind_cpu, count;
 	uint_t	i, rc;
-	uchar_t	cpu;
+	ushort_t cpu;
 	major_t	major;
 	char	*name, *drv_name, *prop_val, *cptr;
 	char	prop_name[32];
@@ -2365,7 +2366,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
 		    psm_name, irq, ioapicid, intin, bind_cpu & ~IRQ_USER_BOUND);
 
-	return ((uchar_t)bind_cpu);
+	return ((ushort_t)bind_cpu);
 }
 
 static struct apic_io_intr *
@@ -2766,7 +2767,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
     struct ioapic_reprogram_data *drep)
 {
 	int			ioapicindex, intin_no;
-	uchar_t			airq_temp_cpu;
+	ushort_t		airq_temp_cpu;
 	apic_cpus_info_t	*cpu_infop;
 	uint32_t		rdt_entry;
 	int			which_irq;
@@ -2816,7 +2817,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		 * unmask the RDT entry.
 		 */
 
-		if ((uchar_t)bind_cpu == IRQ_UNBOUND) {
+		if ((ushort_t)bind_cpu == IRQ_UNBOUND) {
 			rdt_entry = AV_LDEST | AV_LOPRI |
 			    irq_ptr->airq_rdt_entry;
 
@@ -2892,7 +2893,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 			    irq_ptr->airq_origirq);
 		}
 	}
-	irq_ptr->airq_temp_cpu = (uchar_t)bind_cpu;
+	irq_ptr->airq_temp_cpu = (ushort_t)bind_cpu;
 	apic_redist_cpu_skip &= ~(1 << (bind_cpu & ~IRQ_USER_BOUND));
 	return (0);
 }
@@ -3014,7 +3015,8 @@ add_defer_repro_ent(apic_irq_t *irq_ptr, int which_irq, int new_bind_cpu)
 static void
 apic_try_deferred_reprogram(int prev_ipl, int irq)
 {
-	int reproirq, iflag;
+	int reproirq;
+	ulong_t iflag;
 	struct ioapic_reprogram_data *drep;
 
 	(*psm_intr_exit_fn())(prev_ipl, irq);
@@ -3294,7 +3296,8 @@ apic_intr_redistribute()
 	int cpu_free, cpu_busy, max_busy, min_busy;
 	int min_free, diff;
 	int average_busy, cpus_online;
-	int i, busy, iflag;
+	int i, busy;
+	ulong_t iflag;
 	apic_cpus_info_t *cpu_infop;
 	apic_irq_t *min_busy_irq = NULL;
 	apic_irq_t *max_busy_irq = NULL;
@@ -3425,7 +3428,7 @@ apic_intr_redistribute()
 				    most_free_cpu) == 0) {
 					/* Make change permenant */
 					max_busy_irq->airq_cpu =
-					    (uchar_t)most_free_cpu;
+					    (ushort_t)most_free_cpu;
 				}
 				lock_clear(&apic_ioapic_lock);
 			}
@@ -3445,7 +3448,7 @@ apic_intr_redistribute()
 				    most_free_cpu) == 0) {
 					/* Make change permenant */
 					min_busy_irq->airq_cpu =
-					    (uchar_t)most_free_cpu;
+					    (ushort_t)most_free_cpu;
 				}
 				lock_clear(&apic_ioapic_lock);
 			}
@@ -4058,7 +4061,7 @@ static void
 apic_restore_state(struct apic_state *sp)
 {
 	int	i;
-	int	iflag;
+	ulong_t	iflag;
 	apic_irq_t	*irqp;
 	int	rv;
 	int	retval = 0;

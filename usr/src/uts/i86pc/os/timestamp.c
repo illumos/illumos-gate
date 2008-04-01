@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,7 +205,7 @@ tsc_gethrtime_delta(void)
 {
 	uint32_t old_hres_lock;
 	hrtime_t tsc, hrt;
-	int flags;
+	ulong_t flags;
 
 	do {
 		old_hres_lock = hres_lock;
@@ -250,7 +250,7 @@ dtrace_gethrtime(void)
 {
 	uint32_t old_hres_lock;
 	hrtime_t tsc, hrt;
-	int flags;
+	ulong_t flags;
 
 	do {
 		old_hres_lock = hres_lock;
@@ -368,7 +368,7 @@ hrtime_t
 tsc_gethrtimeunscaled_delta(void)
 {
 	hrtime_t hrt;
-	int flags;
+	ulong_t flags;
 
 	/*
 	 * Similarly to tsc_gethrtime_delta, we need to disable preemption

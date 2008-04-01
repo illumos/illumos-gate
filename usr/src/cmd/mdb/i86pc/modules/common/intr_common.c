@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,15 +118,15 @@ soft_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 		do {
 			if (!avhp.av_vector ||
 			    (mdb_vread(&hdlp, sizeof (ddi_softint_hdl_impl_t),
-				(uintptr_t)avhp.av_intr_id) == -1) ||
+			    (uintptr_t)avhp.av_intr_id) == -1) ||
 			    (mdb_vread(&avsoftinfo, sizeof (av_softinfo_t),
-				(uintptr_t)hdlp.ih_pending) == -1))
+			    (uintptr_t)hdlp.ih_pending) == -1))
 				continue;
 
 			/* Print each soft interrupt entry */
 			mdb_printf("%-16p %-2d   %-2d  %-16p %-16p",
 			    avhp.av_intr_id, mdb_cpuset_find(
-			    (uintptr_t)avsoftinfo.av_pending) != -1 ? 1 : 0,
+			    (uintptr_t)&avsoftinfo.av_pending) != -1 ? 1 : 0,
 			    avhp.av_prilevel, avhp.av_intarg1, avhp.av_intarg2);
 			interrupt_print_isr((uintptr_t)avhp.av_vector,
 			    (uintptr_t)avhp.av_intarg1, (uintptr_t)hdlp.ih_dip);
@@ -207,7 +207,7 @@ apic_interrupt_dump(apic_irq_t *irqp, struct av_head *avp,
 	char		ipl[3];
 	char		cpu_assigned[4];
 	char		evtchn[8];
-	uchar_t		assigned_cpu;
+	ushort_t	assigned_cpu;
 	struct autovec	avhp;
 
 	/* If invalid index; continue */

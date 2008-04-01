@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,77 +131,6 @@
 	.data
 	.comm	t0stack, DEFAULTSTKSZ, 32
 	.comm	t0, 4094, 32
-
-#ifdef TRAPTRACE
-	/*
-	 * trap_trace_ctl must agree with the structure definition in
-	 * <sys/traptrace.h>
-	 */	
-	DGDEF3(trap_trace_bufsize, CLONGSIZE, CLONGSIZE)
-	.NWORD	TRAP_TSIZE
-
-	DGDEF3(trap_trace_freeze, 4, 4)
-	.long	0
-
-	DGDEF3(trap_trace_off, 4, 4)
-	.long	0
-
-	DGDEF3(trap_trace_ctl, _MUL(4, CLONGSIZE), 16)
-	.NWORD	trap_tr0		/* next record */
-	.NWORD	trap_tr0		/* first record */
-	.NWORD	trap_tr0 + TRAP_TSIZE	/* limit */
-	.NWORD	0			/* pad */
-
-	/*
-	 * Enough padding for 31 more CPUs (no .skip on x86 -- grrrr).
-	 */
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0
-
-#if defined(__amd64)
-
-#if NCPU != 64
-#error "NCPU != 64, Expand padding for trap_trace_ctl"
-#endif
-
-	/*
-	 * Enough padding for 32 more CPUs (no .skip on x86 -- grrrr).
-	 */
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-	.NWORD	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-
-#else	/* __amd64 */
-
-#if NCPU != 32
-#error "NCPU != 32, Expand padding for trap_trace_ctl"
-#endif
-
-#endif	/* __amd64 */
-
-	/*
-	 * CPU 0's preallocated TRAPTRACE buffer.
-	 */
-	.globl	trap_tr0
-	.comm	trap_tr0, TRAP_TSIZE
-
-	/*
-	 * A dummy TRAPTRACE entry to use after death.
-	 */
-	.globl	trap_trace_postmort
-	.comm	trap_trace_postmort, TRAP_ENT_SIZE
-#endif	/* TRAPTRACE */
 
 #endif	/* __lint */
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/cpuvar.h>
 #include <sys/cpupm.h>
 #include <sys/cpu_acpi.h>
 
@@ -40,7 +41,7 @@ extern "C" {
  * take cross calls (cross calls fail silently if CPU is not ready
  * for it).
  */
-extern ulong_t cpu_ready_set;
+extern cpuset_t cpu_ready_set;
 #define	CPUDRV_PM_XCALL_IS_READY(cpuid) CPU_IN_SET(cpu_ready_set, (cpuid))
 
 /*

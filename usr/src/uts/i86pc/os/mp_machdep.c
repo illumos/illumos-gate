@@ -890,10 +890,11 @@ mach_smpinit(void)
 	cpuset_t cpumask;
 
 	pops = mach_set[0];
+	CPUSET_ZERO(cpumask);
 
 	cpu_id = -1;
 	cpu_id = (*pops->psm_get_next_processorid)(cpu_id);
-	for (cnt = 0, CPUSET_ZERO(cpumask); cpu_id != -1; cnt++) {
+	for (cnt = 0; cpu_id != -1; cnt++) {
 		CPUSET_ADD(cpumask, cpu_id);
 		cpu_id = (*pops->psm_get_next_processorid)(cpu_id);
 	}

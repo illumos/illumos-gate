@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2074,8 +2074,8 @@ restore_int_flag(ulong_t i)
 
 	ENTRY(intr_restore)
 	ENTRY(restore_int_flag)
-	pushq	%rdi
-	popfq
+	testq	$PS_IE, %rdi
+	jz	1f
 #if defined(__xpv)
 	leaq	xpv_panicking, %rsi
 	movl	(%rsi), %esi
@@ -2087,8 +2087,10 @@ restore_int_flag(ulong_t i)
 	 * The virtual IF bit is tweaked by CLI and STI.
 	 */
 	IE_TO_EVENT_MASK(%rsi, %rdi)
-1:
+#else
+	sti
 #endif
+1:
 	ret
 	SET_SIZE(restore_int_flag)
 	SET_SIZE(intr_restore)
@@ -2097,9 +2099,8 @@ restore_int_flag(ulong_t i)
 
 	ENTRY(intr_restore)
 	ENTRY(restore_int_flag)
-	movl	4(%esp), %eax
-	pushl	%eax
-	popfl
+	testl	$PS_IE, 4(%esp)
+	jz	1f
 #if defined(__xpv)
 	leal	xpv_panicking, %edx
 	movl	(%edx), %edx
@@ -2111,8 +2112,10 @@ restore_int_flag(ulong_t i)
 	 * The virtual IF bit is tweaked by CLI and STI.
 	 */
 	IE_TO_EVENT_MASK(%edx, %eax)
-1:
+#else
+	sti
 #endif
+1:
 	ret
 	SET_SIZE(restore_int_flag)
 	SET_SIZE(intr_restore)

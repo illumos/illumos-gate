@@ -155,6 +155,32 @@ int faultdebug = 0;
 #endif /* defined(TRAPDEBUG) || defined(lint) */
 
 #if defined(TRAPTRACE)
+/*
+ * trap trace record for cpu0 is allocated here.
+ * trap trace records for non-boot cpus are allocated in mp_startup_init().
+ */
+static trap_trace_rec_t trap_tr0[TRAPTR_NENT];
+trap_trace_ctl_t trap_trace_ctl[NCPU] = {
+	{
+	    (uintptr_t)trap_tr0,			/* next record */
+	    (uintptr_t)trap_tr0,			/* first record */
+	    (uintptr_t)(trap_tr0 + TRAPTR_NENT),	/* limit */
+	    (uintptr_t)0				/* current */
+	},
+};
+
+/*
+ * default trap buffer size
+ */
+size_t trap_trace_bufsize = TRAPTR_NENT * sizeof (trap_trace_rec_t);
+int trap_trace_freeze = 0;
+int trap_trace_off = 0;
+
+/*
+ * A dummy TRAPTRACE entry to use after death.
+ */
+trap_trace_rec_t trap_trace_postmort;
+
 static void dump_ttrace(void);
 #endif	/* TRAPTRACE */
 static void dumpregs(struct regs *);

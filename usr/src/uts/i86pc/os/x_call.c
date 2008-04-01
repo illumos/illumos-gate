@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,8 +138,8 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 
 		arg2val = xc_mboxes[X_CALL_MEDPRI].arg2;
 
-		if (arg2val != CAPTURE_CPU_ARG &&
-		    !CPU_IN_SET((cpuset_t)arg2val, cpup->cpu_id))
+		if (arg2val != CAPTURE_CPU_ARG ||
+		    !CPU_IN_SET(xc_mboxes[X_CALL_MEDPRI].set, cpup->cpu_id))
 			goto unclaimed;
 
 		ASSERT(arg2val == CAPTURE_CPU_ARG);
@@ -156,6 +156,7 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 				break;
 			SMT_PAUSE();
 		}
+		CPUSET_DEL(xc_mboxes[X_CALL_MEDPRI].set, cpup->cpu_id);
 		XC_TRACE(TT_XC_SVC_END, pri, DDI_INTR_CLAIMED);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -296,8 +297,6 @@ xc_capture_cpus(cpuset_t set)
 	int lcx;
 	struct cpu *cpup;
 	int	i;
-	cpuset_t *cpus;
-	cpuset_t c;
 
 	CPU_STATS_ADDQ(CPU, sys, xcalls, 1);
 
@@ -317,15 +316,21 @@ xc_capture_cpus(cpuset_t set)
 	ASSERT(CPU->cpu_flags & CPU_READY);
 
 	/*
-	 * Wait for all cpus
+	 * Wait for all cpus.
 	 */
-	cpus = (cpuset_t *)&xc_mboxes[X_CALL_MEDPRI].arg2;
-	if (CPU_IN_SET(*cpus, CPU->cpu_id))
-		CPUSET_ATOMIC_DEL(*cpus, CPU->cpu_id);
+
+	/*
+	 * First remove ourself.
+	 */
+	if (CPU_IN_SET(xc_mboxes[X_CALL_MEDPRI].set, CPU->cpu_id))
+		CPUSET_ATOMIC_DEL(xc_mboxes[X_CALL_MEDPRI].set, CPU->cpu_id);
+	/*
+	 * We must wait for all cpus to clear their bit from
+	 * xc_mboxes[X_CALL_MEDPRI].set before we write to this set.
+	 */
 	for (;;) {
-		c = *(volatile cpuset_t *)cpus;
-		CPUSET_AND(c, cpu_ready_set);
-		if (CPUSET_ISNULL(c))
+		CPUSET_AND(xc_mboxes[X_CALL_MEDPRI].set, cpu_ready_set);
+		if (CPUSET_ISNULL(xc_mboxes[X_CALL_MEDPRI].set))
 			break;
 		SMT_PAUSE();
 	}
@@ -440,8 +445,10 @@ xc_common(
 	int sync)
 {
 	int cix;
-	int lcx = (int)(CPU->cpu_id);
+	int do_local = 0;
 	struct cpu *cpup;
+	cpuset_t tset;
+	int last_cpu = 0;
 
 	ASSERT(panicstr == NULL);
 
@@ -456,21 +463,27 @@ xc_common(
 	xc_mboxes[pri].arg2 = arg2;
 	xc_mboxes[pri].arg3 = arg3;
 
+	if (CPU_IN_SET(set, CPU->cpu_id)) {
+		do_local = 1;
+		CPUSET_DEL(set, CPU->cpu_id);
+	}
+
 	/*
 	 * Request service on all remote processors.
 	 */
-	for (cix = 0; cix < NCPU; cix++) {
+	tset = set;
+	for (cix = 0; cix < max_ncpus; cix++) {
+		if (!CPU_IN_SET(tset, cix))
+			continue;
+
 		if ((cpup = cpu[cix]) == NULL ||
 		    (cpup->cpu_flags & CPU_READY) == 0) {
 			/*
-			 * In case the non-local CPU is not ready but becomes
-			 * ready later, take it out of the set now. The local
-			 * CPU needs to remain in the set to complete the
-			 * requested function.
+			 * In case the CPU is not ready but becomes
+			 * ready later, take it out of the set now.
 			 */
-			if (cix != lcx)
-				CPUSET_DEL(set, cix);
-		} else if (cix != lcx && CPU_IN_SET(set, cix)) {
+			CPUSET_DEL(set, cix);
+		} else {
 			CPU_STATS_ADDQ(CPU, sys, xcalls, 1);
 			cpup->cpu_m.xc_ack[pri] = 0;
 			cpup->cpu_m.xc_wait[pri] = sync;
@@ -481,13 +494,18 @@ xc_common(
 			cpup->cpu_m.xc_pend[pri] = 1;
 			XC_TRACE(TT_XC_START, pri, cix);
 			send_dirint(cix, xc_xlat_xcptoipl[pri]);
+			last_cpu = cix;
 		}
+
+		CPUSET_DEL(tset, cix);
+		if (CPUSET_ISNULL(tset))
+			break;
 	}
 
 	/*
 	 * Run service locally
 	 */
-	if (CPU_IN_SET(set, lcx) && func != NULL) {
+	if (do_local && func != NULL) {
 		XC_TRACE(TT_XC_START, pri, CPU->cpu_id);
 		CPU->cpu_m.xc_retval[pri] = (*func)(arg1, arg2, arg3);
 	}
@@ -498,8 +516,8 @@ xc_common(
 	/*
 	 * Wait here until all remote calls acknowledge.
 	 */
-	for (cix = 0; cix < NCPU; cix++) {
-		if (lcx != cix && CPU_IN_SET(set, cix)) {
+	for (cix = 0; cix <= last_cpu; cix++) {
+		if (CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
 			while (cpup->cpu_m.xc_ack[pri] == 0)
 				SMT_PAUSE();
@@ -514,8 +532,8 @@ xc_common(
 	/*
 	 * Release any waiting CPUs
 	 */
-	for (cix = 0; cix < NCPU; cix++) {
-		if (lcx != cix && CPU_IN_SET(set, cix)) {
+	for (cix = 0; cix <= last_cpu; cix++) {
+		if (CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
 			if (cpup != NULL && (cpup->cpu_flags & CPU_READY)) {
 				cpup->cpu_m.xc_wait[pri] = 0;
@@ -532,8 +550,8 @@ xc_common(
 	 * the time xc_common() is next invoked with the sync flag set
 	 * resulting in a deadlock.
 	 */
-	for (cix = 0; cix < NCPU; cix++) {
-		if (lcx != cix && CPU_IN_SET(set, cix)) {
+	for (cix = 0; cix <= last_cpu; cix++) {
+		if (CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
 			if (cpup != NULL && (cpup->cpu_flags & CPU_READY)) {
 				while (cpup->cpu_m.xc_ack[pri] == 0)
@@ -606,7 +624,7 @@ kdi_xc_others(int this_cpu, void (*func)(void))
 			lp->m_spin.m_spinlock = 0; /* XXX */
 			break;
 		}
-		(void) xc_serv((caddr_t)X_CALL_MEDPRI, NULL);
+		SMT_PAUSE();
 	}
 	IGNORE_KERNEL_PREEMPTION = save_kernel_preemption;
 }

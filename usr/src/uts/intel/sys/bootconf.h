@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,9 +232,12 @@ extern void bop_no_more_mem(void);
 /*PRINTFLIKE2*/
 extern void bop_printf(struct bootops *, const char *, ...)
     __KPRINTFLIKE(2);
+
 /*PRINTFLIKE1*/
 extern void bop_panic(const char *, ...)
-    __KPRINTFLIKE(1);
+    __KPRINTFLIKE(1) __NORETURN;
+#pragma rarely_called(bop_panic)
+
 extern void boot_prop_finish(void);
 
 /*

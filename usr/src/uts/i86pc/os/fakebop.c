@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,8 +188,8 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 			high_phys = pa;
 		return (pa);
 	}
-	panic("do_bop_phys_alloc(0x%" PRIx64 ", 0x%" PRIx64 ") Out of memory\n",
-	    size, align);
+	bop_panic("do_bop_phys_alloc(0x%" PRIx64 ", 0x%" PRIx64
+	    ") Out of memory\n", size, align);
 	/*NOTREACHED*/
 }
 

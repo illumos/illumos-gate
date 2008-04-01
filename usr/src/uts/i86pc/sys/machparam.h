@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ extern "C" {
  */
 
 #if defined(__amd64)
-#define	NCPU 	64 	/* NBBY * sizeof (ulong_t) for simple cpuset_t */
+#define	NCPU	256
 #elif defined(__i386)
 #define	NCPU	32
 #endif

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,11 +160,18 @@ typedef struct lx_proc_data {
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
 } lx_proc_data_t;
 
-#ifdef __amd64
-typedef uint64_t lx_affmask_t;	/* Tolerates NCPU up to 64 */
-#else
-typedef uint32_t lx_affmask_t;	/* Tolerates NCPU up to 32 */
-#endif /* __amd64 */
+#endif	/* _KERNEL */
+
+/*
+ * A data type big enough to bitmap all Linux possible cpus.
+ * The bitmap size is defined as 1024 cpus in the Linux 2.4 and 2.6 man pages
+ * for sched_getaffinity() and sched_getaffinity().
+ */
+#define	LX_NCPU		(1024)
+#define	LX_AFF_ULONGS	(LX_NCPU / (8 * sizeof (ulong_t)))
+typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
+
+#ifdef	_KERNEL
 
 /*
  * lx-specific data in the klwp_t
