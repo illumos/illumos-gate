@@ -1048,9 +1048,11 @@ struct hc_walk {
 /*
  * Generic walker for the hc-scheme topo tree.  This function uses the
  * hierachical nature of the hc-scheme to step through efficiently through
- * the topo hc tree.  Node lookups are done by topo_walk_byid() at each
- * component level to avoid unnecessary traversal of the tree.
- *
+ * the topo hc tree.  Node lookups are done by topo_walk_byid() and
+ * topo_walk_bysibling()  at each component level to avoid unnecessary
+ * traversal of the tree.  hc_walker() never returns TOPO_WALK_NEXT, so
+ * whether TOPO_WALK_CHILD or TOPO_WALK_SIBLING is specified by
+ * topo_walk_step() doesn't affect the traversal.
  */
 static int
 hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
@@ -1084,7 +1086,7 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	if (i == 0) {
 		if (strcmp(name, topo_node_name(node)) != 0 ||
 		    inst != topo_node_instance(node)) {
-			return (TOPO_WALK_NEXT);
+			return (topo_walk_bysibling(hwp->hcw_wp, name, inst));
 		}
 	}
 
@@ -1228,7 +1230,7 @@ hc_fmri_prop_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	plp->pl_prop = NULL;
 	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_prop_get,
 	    (void *)plp)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1286,7 +1288,7 @@ hc_fmri_pgrp_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	plp->pl_prop = NULL;
 	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_pgrp_get,
 	    (void *)plp)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1358,7 +1360,7 @@ hc_fmri_prop_set(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_prop_setprop,
 	    (void *)plp)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1425,7 +1427,7 @@ hc_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	hap->ha_nvl = NULL;
 	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_is_present,
 	    (void *)hap)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1491,7 +1493,7 @@ hc_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	hap->ha_nvl = NULL;
 	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_unusable,
 	    (void *)hap)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else

@@ -190,8 +190,6 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 		cma_stats.page_fails.fmds_value.ui64++;
 
 		nvlist_free(asrucp);
-		if (uuid != NULL && cma.cma_page_maxretries != 0)
-			return (CMA_RA_SUCCESS);
 		return (CMA_RA_FAILURE);
 	}
 
@@ -261,9 +259,6 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 			    strerror(errno));
 		}
 
-		if (page->pg_uuid != NULL && cma.cma_page_maxretries != 0)
-			fmd_case_uuclose(hdl, page->pg_uuid);
-
 		cma_stats.page_fails.fmds_value.ui64++;
 		return (1); /* give up */
 	}
@@ -293,28 +288,9 @@ cma_page_retry(fmd_hdl_t *hdl)
 				fmd_hdl_strfree(hdl, page->pg_uuid);
 
 			cma_page_free(hdl, page);
-		} else if (cma.cma_page_maxretries == 0 ||
-		    page->pg_nretries < cma.cma_page_maxretries) {
+		} else {
 			page->pg_nretries++;
 			pagep = &page->pg_next;
-		} else {
-			/*
-			 * Tunable maxretries was set and we reached
-			 * the max, so just close the case.
-			 */
-			fmd_hdl_debug(hdl,
-			    "giving up page retire 0x%llx on retry %u\n",
-			    page->pg_addr, page->pg_nretries);
-			cma_stats.page_retmax.fmds_value.ui64++;
-
-			if (page->pg_uuid != NULL) {
-				fmd_case_uuclose(hdl, page->pg_uuid);
-				fmd_hdl_strfree(hdl, page->pg_uuid);
-			}
-
-			*pagep = page->pg_next;
-
-			cma_page_free(hdl, page);
 		}
 	}
 

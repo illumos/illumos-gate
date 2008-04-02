@@ -142,15 +142,17 @@ static int syslog_cons;		/* log to syslog_msgfd */
  * sysmsg(7D) device, which handles console redirection and also permits us
  * to output any characters we like to the console, including \n and \r.
  */
-/*PRINTFLIKE4*/
+/*PRINTFLIKE2*/
 static void
-syslog_emit(fmd_hdl_t *hdl, char *buf, size_t len, const char *msgformat, ...)
+syslog_emit(fmd_hdl_t *hdl, const char *msgformat, ...)
 {
 	struct strbuf ctl, dat;
 	uint32_t msgid;
 
-	char *format;
+	char *format, c;
+	char *buf = NULL;
 	size_t formatlen;
+	int len;
 	va_list ap;
 
 	formatlen = strlen(msgformat) + 64; /* +64 for prefix and \0 */
@@ -160,9 +162,18 @@ syslog_emit(fmd_hdl_t *hdl, char *buf, size_t len, const char *msgformat, ...)
 	(void) snprintf(format, formatlen,
 	    "fmd: [ID %u FACILITY_AND_PRIORITY] %s", msgid, msgformat);
 
+	/*
+	 * Figure out the length of the message then allocate a buffer
+	 * of adequate size.
+	 */
 	va_start(ap, msgformat);
-	(void) vsnprintf(buf, len, format, ap);
+	if ((len = vsnprintf(&c, 1, format, ap)) >= 0 &&
+	    (buf = fmd_hdl_alloc(hdl, len + 1, FMD_SLEEP)) != NULL)
+		(void) vsnprintf(buf, len + 1, format, ap);
 	va_end(ap);
+
+	if (buf == NULL)
+		return;
 
 	ctl.buf = (void *)&syslog_ctl;
 	ctl.len = sizeof (syslog_ctl);
@@ -185,6 +196,8 @@ syslog_emit(fmd_hdl_t *hdl, char *buf, size_t len, const char *msgformat, ...)
 		fmd_hdl_debug(hdl, "write failed: %s\n", strerror(errno));
 		syslog_stats.msg_err.fmds_value.ui64++;
 	}
+
+	fmd_hdl_free(hdl, buf, len + 1);
 }
 
 /*ARGSUSED*/
@@ -194,7 +207,7 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	char *uuid, *code, *dict, *url, *urlcode, *template, *p;
 	char *src_name, *src_vers, *platform, *chassis, *server;
 	char *typ, *sev, *fmt, *trfmt, *rsp, *imp, *act, *locdir;
-	char msg[1024], desc[1024], date[64];
+	char desc[1024], date[64];
 	boolean_t domsg;
 
 	nvlist_t *fmri, *auth;
@@ -349,8 +362,7 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		syslog_ctl.pri |= LOG_NOTICE;
 	else
 		syslog_ctl.pri |= LOG_ERR;
-	syslog_emit(hdl, msg, sizeof (msg),
-	    template, code, dgettext(dict, typ),
+	syslog_emit(hdl, template, code, dgettext(dict, typ),
 	    dgettext(dict, sev), date, platform, chassis, server, src_name,
 	    src_vers, uuid, desc, dgettext(dict, rsp), dgettext(dict, imp),
 	    dgettext(dict, act));

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,14 +50,15 @@ static const char *g_fmri = NULL;
 
 static const char *opt_R = "/";
 static const char *opt_s = FM_FMRI_SCHEME_HC;
-static const char optstr[] = "aCdeP:pR:s:StvVx";
+static const char optstr[] = "bCdeP:pR:s:StVx";
 
-static int opt_e = 0;
+static int opt_b = 0;
 static int opt_d = 0;
-static int opt_V = 0;
+static int opt_e = 0;
 static int opt_p = 0;
 static int opt_S = 0;
 static int opt_t = 0;
+static int opt_V = 0;
 static int opt_x = 0;
 static int opt_all = 0;
 
@@ -75,10 +76,11 @@ static int
 usage(FILE *fp)
 {
 	(void) fprintf(fp,
-	    "Usage: %s [-CedpSVx] [-P group.property[=type:value]] "
+	    "Usage: %s [-bCedpSVx] [-P group.property[=type:value]] "
 	    "[-R root] [-s scheme] [fmri]\n", g_pname);
 
 	(void) fprintf(fp,
+	    "\t-b  walk in sibling-first order (default is child-first)\n"
 	    "\t-C  dump core after completing execution\n"
 	    "\t-d  set debug mode for libtopo modules\n"
 	    "\t-e  display FMRIs as paths using esc/eft notation\n"
@@ -839,6 +841,7 @@ walk_topo(topo_hdl_t *thp, char *uuid)
 {
 	int err;
 	topo_walk_t *twp;
+	int flag;
 
 	if ((twp = topo_walk_init(thp, opt_s, walk_node, NULL, &err))
 	    == NULL) {
@@ -861,7 +864,9 @@ walk_topo(topo_hdl_t *thp, char *uuid)
 		(void) printf("\n");
 	}
 
-	if (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR) {
+	flag = opt_b != 0 ? TOPO_WALK_SIBLING : TOPO_WALK_CHILD;
+
+	if (topo_walk_step(twp, flag) == TOPO_WALK_ERR) {
 		(void) fprintf(stderr, "%s: failed to walk topology\n",
 		    g_pname);
 		topo_walk_fini(twp);
@@ -1073,6 +1078,9 @@ main(int argc, char *argv[])
 	while (optind < argc) {
 		while ((c = getopt(argc, argv, optstr)) != -1) {
 			switch (c) {
+			case 'b':
+				opt_b++;
+				break;
 			case 'C':
 				atexit(abort);
 				break;
@@ -1143,8 +1151,14 @@ main(int argc, char *argv[])
 		    g_pname);
 	}
 
-
 	if (opt_x) {
+		if (opt_b) {
+			(void) fprintf(stderr,
+			    "%s: -b and -x cannot be specified together\n",
+			    g_pname);
+			return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_USAGE));
+		}
+
 		err = 0;
 		if (topo_xml_print(thp, stdout, opt_s, &err) < 0)
 			(void) fprintf(stderr, "%s: failed to print xml "
