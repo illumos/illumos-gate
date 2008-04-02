@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Opl Platform header file.
@@ -60,6 +60,7 @@ extern "C" {
 
 /* PCI BUS types */
 
+#define	PCI_UNKN	-1
 #define	PCI	10
 #define	PCIX	20
 #define	PCIE	30

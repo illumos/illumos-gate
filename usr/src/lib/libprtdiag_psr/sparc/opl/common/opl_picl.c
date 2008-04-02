@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Opl platform specific PICL functions.
@@ -226,13 +226,12 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 		    &bus_type);
 
 		if (err != PICL_SUCCESS) {
-			/* Move on to next node */
-			log_printf("Getting lane width failed for path %s\n",
-			    pci_card.notes);
-			err = picl_get_propval_by_name
-			    (nodeh, PICL_PROP_PEER, &nodeh,
-			    sizeof (picl_nodehdl_t));
-			continue;
+			/*
+			 * get_lane_width will fail when run as non-root.
+			 * Set bus_type to PCI_UNKN so that bus frequency,
+			 * bus type and lane width will print as "--" or UNKN.
+			 */
+			bus_type = PCI_UNKN;
 		}
 
 
