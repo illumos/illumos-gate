@@ -30,7 +30,7 @@
 #
 # The single thread then creates a new file and writes the whole file with
 # 1MB I/Os.  The thread stops after 5000 files ($count/num of flowops) have
-been created and written to.
+# been created and written to.
 
 set $dir=/tmp
 set $count=15000
