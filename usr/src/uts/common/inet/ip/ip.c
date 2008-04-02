@@ -17434,6 +17434,29 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				}
 				ipha = (ipha_t *)mp->b_rptr;
 			}
+			if (hdr_length > sizeof (ipha_t)) {
+				/* We got options on the inner packet. */
+				ipaddr_t dst = ipha->ipha_dst;
+
+				if (ip_rput_options(q, mp, ipha, &dst, ipst) ==
+				    -1) {
+					/* Bad options! */
+					return;
+				}
+				if (dst != ipha->ipha_dst) {
+					/*
+					 * Someone put a source-route in
+					 * the inside header of a self-
+					 * encapsulated packet.  Drop it
+					 * with extreme prejudice and let
+					 * the sender know.
+					 */
+					icmp_unreachable(q, first_mp,
+					    ICMP_SOURCE_ROUTE_FAILED,
+					    recv_ill->ill_zoneid, ipst);
+					return;
+				}
+			}
 			if (!mctl_present) {
 				ASSERT(first_mp == mp);
 				/*
