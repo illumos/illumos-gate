@@ -265,9 +265,24 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 			    NULL) {
 				ipmi_free(ihp, ent->isc_sdr);
 				ipmi_free(ihp, ent);
+				return (-1);
 			}
 
 			ipmi_decode_string(type, namelen, name, ent->isc_name);
+		}
+
+		/*
+		 * This should never happen.  It means that the SP has returned
+		 * a SDR record twice, with the same name and ID.  This has
+		 * been observed on service processors that don't correctly
+		 * return SDR_LAST during iteration, so assume we've looped in
+		 * the SDR and return gracefully.
+		 */
+		if (ipmi_hash_lookup(ihp->ih_sdr_cache, ent) != NULL) {
+			ipmi_free(ihp, ent->isc_sdr);
+			ipmi_free(ihp, ent->isc_name);
+			ipmi_free(ihp, ent);
+			break;
 		}
 
 		ipmi_hash_insert(ihp->ih_sdr_cache, ent);
@@ -308,7 +323,22 @@ ipmi_sdr_hash_compare(const void *a, const void *b)
 	if (ap->isc_name == NULL || bp->isc_name == NULL)
 		return (-1);
 
-	return (strcmp(ap->isc_name, bp->isc_name));
+	if (strcmp(ap->isc_name, bp->isc_name) != 0)
+		return (-1);
+
+	/*
+	 * While it is strange for a service processor to report multiple
+	 * entries with the same name, we allow it by treating the (name, id)
+	 * as the unique identifier.  When looking up by name, the SDR pointer
+	 * is NULL, and we return the first matching name.
+	 */
+	if (ap->isc_sdr == NULL || bp->isc_sdr == NULL)
+		return (0);
+
+	if (ap->isc_sdr->is_id == bp->isc_sdr->is_id)
+		return (0);
+	else
+		return (-1);
 }
 
 int
@@ -420,6 +450,7 @@ ipmi_sdr_lookup(ipmi_handle_t *ihp, const char *idstr)
 		return (NULL);
 
 	search.isc_name = (char *)idstr;
+	search.isc_sdr = NULL;
 	if ((ent = ipmi_hash_lookup(ihp->ih_sdr_cache, &search)) == NULL) {
 		(void) ipmi_set_error(ihp, EIPMI_NOT_PRESENT, NULL);
 		return (NULL);
