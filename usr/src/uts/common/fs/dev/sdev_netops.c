@@ -273,10 +273,6 @@ devnet_filldir(struct sdev_node *ddv)
 	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
 		next = SDEV_NEXT_ENTRY(ddv, dv);
 
-		/* skip stale nodes */
-		if (dv->sdev_flags & SDEV_STALE)
-			continue;
-
 		/* validate and prune only ready nodes */
 		if (dv->sdev_state != SDEV_READY)
 			continue;

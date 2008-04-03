@@ -1016,14 +1016,8 @@ sdev_findbyname(struct sdev_node *ddv, char *nm)
 	if (dv) {
 		ASSERT(dv->sdev_dotdot == ddv);
 		ASSERT(strcmp(dv->sdev_name, nm) == 0);
-		/* Can't lookup stale nodes */
-		if (dv->sdev_flags & SDEV_STALE) {
-			sdcmn_err9((
-			    "sdev_findbyname: skipped stale node: %s\n", nm));
-		} else {
-			SDEV_HOLD(dv);
-			return (dv);
-		}
+		SDEV_HOLD(dv);
+		return (dv);
 	}
 	return (NULL);
 }
@@ -2506,7 +2500,10 @@ lookup_failed:
 /*
  * Given a directory node, mark all nodes beneath as
  * STALE, i.e. nodes that don't exist as far as new
- * consumers are concerned
+ * consumers are concerned.  Remove them from the
+ * list of directory entries so that no lookup or
+ * directory traversal will find them.  The node
+ * not deallocated so existing holds are not affected.
  */
 void
 sdev_stale(struct sdev_node *ddv)
@@ -2523,8 +2520,9 @@ sdev_stale(struct sdev_node *ddv)
 			sdev_stale(dv);
 
 		sdcmn_err9(("sdev_stale: setting stale %s\n",
-		    dv->sdev_name));
+		    dv->sdev_path));
 		dv->sdev_flags |= SDEV_STALE;
+		avl_remove(&ddv->sdev_entries, dv);
 	}
 	ddv->sdev_flags |= SDEV_BUILD;
 	rw_exit(&ddv->sdev_contents);
@@ -2869,13 +2867,6 @@ get_cache:
 		/* bypassing pre-matured nodes */
 		if (diroff < soff || (dv->sdev_state != SDEV_READY)) {
 			sdcmn_err3(("sdev_readdir: pre-mature node  "
-			    "%s\n", dv->sdev_name));
-			continue;
-		}
-
-		/* don't list stale nodes */
-		if (dv->sdev_flags & SDEV_STALE) {
-			sdcmn_err4(("sdev_readdir: STALE node  "
 			    "%s\n", dv->sdev_name));
 			continue;
 		}
@@ -3780,7 +3771,8 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 		if (vp->v_type == VDIR) {
 			dv->sdev_nlink--;
 		}
-		avl_remove(&ddv->sdev_entries, dv);
+		if ((dv->sdev_flags & SDEV_STALE) == 0)
+			avl_remove(&ddv->sdev_entries, dv);
 		dv->sdev_nlink--;
 		--vp->v_count;
 		mutex_exit(&vp->v_lock);
