@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,7 +266,7 @@ try_again:
 			tbc[i++] = dp->doorfd;
 			if ((dp->doorfd = dup(dp->doorfd)) < 0) {
 				while (i--)
-				    (void) close(tbc[i]);
+					(void) close(tbc[i]);
 				dp->doorfd = -1;
 				lmutex_unlock(&dp->door_lock);
 				return (NSS_ERROR);
@@ -274,7 +274,7 @@ try_again:
 		}
 
 		while (i--)
-		    (void) close(tbc[i]);
+			(void) close(tbc[i]);
 
 		/*
 		 * mark this door descriptor as close on exec
@@ -289,7 +289,7 @@ try_again:
 			(void) close(dp->doorfd);
 			dp->doorfd = -1;
 			(void) memset((void *)&dp->doori,
-					'\0', sizeof (door_info_t));
+			    '\0', sizeof (door_info_t));
 			lmutex_unlock(&dp->door_lock);
 			errno = ECONNREFUSED;
 			return (NSS_ERROR);
@@ -304,7 +304,7 @@ try_again:
 			 */
 			dp->doorfd = -1;
 			(void) memset((void *)&dp->doori,
-					'\0', sizeof (door_info_t));
+			    '\0', sizeof (door_info_t));
 			if (dp == &nsc_door[1]) {	/* reset back door */
 				/* flush invalid db list */
 				_nsc_flush_private_db();
@@ -318,7 +318,7 @@ try_again:
 			(void) close(dp->doorfd);	/* nscd exited .... */
 			dp->doorfd = -1;	/* try and restart connection */
 			(void) memset((void *)&dp->doori,
-					'\0', sizeof (door_info_t));
+			    '\0', sizeof (door_info_t));
 			if (dp == &nsc_door[1]) {	/* back door reset */
 				/* flush invalid db list */
 				_nsc_flush_private_db();
@@ -383,8 +383,8 @@ _nsc_try1door(nsc_door_t *dp, void **dptr, size_t *ndata,
 	}
 
 	if (rp->p_status == NSS_ALTRESET ||
-		rp->p_status == NSS_ALTRETRY ||
-		rp->p_status == NSS_TRYLOCAL)
+	    rp->p_status == NSS_ALTRETRY ||
+	    rp->p_status == NSS_TRYLOCAL)
 		return (rp->p_status);
 
 	return (NSS_SUCCESS);
@@ -438,7 +438,7 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 	while (ret == NSS_ALTRETRY || ret == NSS_ALTRESET) {
 		/* try private (back) door first if it exists and applies */
 		if (db != NULL && backd->doorfd > 0 && fb2frontd == 0 &&
-				_nsc_use_backdoor(db)) {
+		    _nsc_use_backdoor(db)) {
 			ret = _nsc_try1door(backd, dptr, ndata, adata, NULL);
 			if (ret == NSS_ALTRESET) {
 				/*
@@ -448,7 +448,7 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 				lmutex_lock(&backd->door_lock);
 				backd->doorfd = -1;
 				(void) memset((void *)&backd->doori,
-					'\0', sizeof (door_info_t));
+				    '\0', sizeof (door_info_t));
 				/* flush now invalid db list */
 				_nsc_flush_private_db();
 				lmutex_unlock(&backd->door_lock);
@@ -514,7 +514,7 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 			lmutex_lock(&frontd->door_lock);
 			frontd->doorfd = -1;
 			(void) memset((void *)&frontd->doori,
-				'\0', sizeof (door_info_t));
+			    '\0', sizeof (door_info_t));
 			lmutex_unlock(&frontd->door_lock);
 			/* error out */
 			ret = NSS_ERROR;
@@ -548,14 +548,14 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 			continue;
 		}
 		if (door_info(backd->doorfd, &backd->doori) < 0 ||
-				(backd->doori.di_attributes & DOOR_REVOKED) ||
-				backd->doori.di_data !=
-				(uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
+		    (backd->doori.di_attributes & DOOR_REVOKED) ||
+		    backd->doori.di_data !=
+		    (uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
 			/* doorfd bad, or must not really be open */
 			(void) close(backd->doorfd);
 			backd->doorfd = -1;
 			(void) memset((void *)&backd->doori,
-				'\0', sizeof (door_info_t));
+			    '\0', sizeof (door_info_t));
 		}
 		(void) fcntl(backd->doorfd, F_SETFD, FD_CLOEXEC);
 		lmutex_unlock(&backd->door_lock);
@@ -673,7 +673,7 @@ _nsc_getdoorbuf(void **doorptr, size_t *bufsize)
 		/* freshly malloc'd door bufs are 0'd */
 		/* 0 header for now.  Zero entire buf(?) TDB */
 		(void) memset((void *)tsdbuf->buffer, 0,
-				(size_t)sizeof (nss_pheader_t));
+		    (size_t)sizeof (nss_pheader_t));
 
 	}
 	*doorptr = (void *)tsdbuf->buffer;
@@ -718,7 +718,7 @@ _nsc_proc_is_cache()
 	}
 	ret = snprintf(fname, 128, "/proc/%d/psinfo", getpid());
 	if (ret > 0 && ret < 128) {
-		if ((fd = open(fname,  O_RDONLY)) > 0) {
+		if ((fd = open(fname,  O_RDONLY)) >= 0) {
 			ret = read(fd, &pinfo, sizeof (psinfo_t));
 			(void) close(fd);
 			if (ret == sizeof (psinfo_t) &&
