@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2148,6 +2148,7 @@ esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
 	uint32_t cksum;
 	uint16_t *arr;
 	mblk_t *udpmp = mp;
+	uint_t hlen = IPH_HDR_LENGTH(ipha);
 
 	ASSERT(MBLKL(mp) >= sizeof (ipha_t));
 
@@ -2160,12 +2161,12 @@ esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
 		arr = (uint16_t *)ipha;
 		IP_STAT(ns->netstack_ip, ip_out_sw_cksum);
 		IP_STAT_UPDATE(ns->netstack_ip, ip_udp_out_sw_cksum_bytes,
-		    ntohs(htons(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH));
+		    ntohs(htons(ipha->ipha_length) - hlen));
 		/* arr[6-9] are the IP addresses. */
 		cksum = IP_UDP_CSUM_COMP + arr[6] + arr[7] + arr[8] + arr[9] +
-		    ntohs(htons(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH);
-		cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH, cksum);
-		offset = IP_SIMPLE_HDR_LENGTH + UDP_CHECKSUM_OFFSET;
+		    ntohs(htons(ipha->ipha_length) - hlen);
+		cksum = IP_CSUM(mp, hlen, cksum);
+		offset = hlen + UDP_CHECKSUM_OFFSET;
 		while (offset >= MBLKL(udpmp)) {
 			offset -= MBLKL(udpmp);
 			udpmp = udpmp->b_cont;

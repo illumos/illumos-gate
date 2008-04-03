@@ -17158,7 +17158,11 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4) +
 	    IP_SIMPLE_HDR_LENGTH_IN_WORDS);
 
-	if (u1 || (!esp_in_udp_packet && !mctl_present)) {
+	/*
+	 * Don't verify header checksum if we just removed UDP header or
+	 * packet is coming back from AH/ESP.
+	 */
+	if (!esp_in_udp_packet && !mctl_present) {
 		if (u1) {
 			if (!ip_options_cksum(q, ill, mp, ipha, ire, ipst)) {
 				if (hada_mp != NULL)
