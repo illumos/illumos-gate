@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -380,7 +380,7 @@ dlpi_print_address(const char *linkname)
 
 	str = _link_ntoa(physaddr, NULL, physaddrlen, IFT_OTHER);
 
-	if (str != NULL) {
+	if (str != NULL && physaddrlen != 0) {
 		switch (dlinfo.di_mactype) {
 			case DL_IB:
 				(void) printf("\tipib %s \n", str);

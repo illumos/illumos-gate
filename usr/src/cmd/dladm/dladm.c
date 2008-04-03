@@ -473,7 +473,7 @@ static char *print_dev(print_field_t *, void *);
 typedef struct link_fields_buf_s {
 	char link_name[MAXLINKNAMELEN];
 	char link_class[DLADM_STRSIZE];
-	char link_mtu[6];
+	char link_mtu[11];
 	char link_state[DLADM_STRSIZE];
 	char link_over[MAXLINKNAMELEN];
 	char link_phys_state[6];
@@ -1805,7 +1805,7 @@ link_mtu:
 	(void) dladm_class2str(class, lbuf->link_class);
 	if (state->ls_flags == DLADM_OPT_ACTIVE) {
 		(void) snprintf(lbuf->link_mtu, sizeof (lbuf->link_mtu),
-		    "%d", mtu);
+		    "%u", mtu);
 		(void) get_linkstate(link, B_TRUE, lbuf->link_state);
 	}
 

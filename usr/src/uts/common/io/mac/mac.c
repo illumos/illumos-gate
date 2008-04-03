@@ -2780,7 +2780,7 @@ mactype_register(mactype_register_t *mtrp)
 	mactype_ops_t	*ops = mtrp->mtr_ops;
 
 	/* Do some sanity checking before we register this MAC type. */
-	if (mtrp->mtr_ident == NULL || ops == NULL || mtrp->mtr_addrlen == 0)
+	if (mtrp->mtr_ident == NULL || ops == NULL)
 		return (EINVAL);
 
 	/*

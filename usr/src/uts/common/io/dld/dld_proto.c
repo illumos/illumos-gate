@@ -885,23 +885,28 @@ proto_physaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	}
 
 	addr_length = dsp->ds_mip->mi_addr_length;
-	addr = kmem_alloc(addr_length, KM_NOSLEEP);
-	if (addr == NULL) {
+	if (addr_length > 0) {
+		addr = kmem_alloc(addr_length, KM_NOSLEEP);
+		if (addr == NULL) {
+			rw_exit(&dsp->ds_lock);
+			merror(q, mp, ENOSR);
+			return (B_FALSE);
+		}
+
+		/*
+		 * Copy out the address before we drop the lock; we don't
+		 * want to call dlphysaddrack() while holding ds_lock.
+		 */
+		bcopy((dlp->dl_addr_type == DL_CURR_PHYS_ADDR) ?
+		    dsp->ds_curr_addr : dsp->ds_fact_addr, addr, addr_length);
+
 		rw_exit(&dsp->ds_lock);
-		merror(q, mp, ENOSR);
-		return (B_FALSE);
+		dlphysaddrack(q, mp, addr, (t_uscalar_t)addr_length);
+		kmem_free(addr, addr_length);
+	} else {
+		rw_exit(&dsp->ds_lock);
+		dlphysaddrack(q, mp, NULL, 0);
 	}
-
-	/*
-	 * Copy out the address before we drop the lock; we don't
-	 * want to call dlphysaddrack() while holding ds_lock.
-	 */
-	bcopy((dlp->dl_addr_type == DL_CURR_PHYS_ADDR) ?
-	    dsp->ds_curr_addr : dsp->ds_fact_addr, addr, addr_length);
-
-	rw_exit(&dsp->ds_lock);
-	dlphysaddrack(q, mp, addr, (t_uscalar_t)addr_length);
-	kmem_free(addr, addr_length);
 	return (B_TRUE);
 failed:
 	rw_exit(&dsp->ds_lock);
