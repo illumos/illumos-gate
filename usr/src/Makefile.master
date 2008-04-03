@@ -514,8 +514,9 @@ XGETTEXT= /usr/bin/xgettext
 XGETFLAGS= -c TRANSLATION_NOTE
 BUILD.po= $(XGETTEXT) $(XGETFLAGS) -d $(<F) $<.i ;\
 	$(RM)	$@ ;\
-	sed "/^domain/d" < $(<F).po > $@ ;\
+	$(SED) "/^domain/d" < $(<F).po > $@ ;\
 	$(RM) $(<F).po $<.i
+
 #
 # This is overwritten by local Makefile when PROG is a list.
 #
@@ -983,15 +984,13 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 .java.class:
 	$(COMPILE.java) $<
 
-#
-# Rules to create message catalogue files from .sh, .ksh, .c, .y, and .l
-# files.  For .sh and .ksh files, we extract all gettext strings with
-# sed(1) (being careful to permit multiple gettext strings on the same
-# line), weed out the dups, and build the catalogue with awk(1).
-#
+# Bourne and Korn shell script message catalog build rules.
+# We extract all gettext strings with sed(1) (being careful to permit
+# multiple gettext strings on the same line), weed out the dups, and
+# build the catalogue with awk(1).
 
-.sh.po:
-	$(SED) -n -e ":a" 					\
+.sh.po .ksh.po:
+	$(SED) -n -e ":a" 				\
 		  -e "h" 					\
 		  -e "s/.*gettext *\(\"[^\"]*\"\).*/\1/p"	\
 		  -e "x"					\
@@ -999,14 +998,26 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 		  -e "t a"					\
 	       $< | sort -u | awk '{ print "msgid\t" $$0 "\nmsgstr" }' > $@
 
-.ksh.po:
-	$(SED) -n -e ":a" 					\
-		  -e "h" 					\
-		  -e "s/.*gettext *\(\"[^\"]*\"\).*/\1/p"	\
-		  -e "x"					\
-		  -e "s/\(.*\)gettext *\"[^\"]*\"\(.*\)/\1\2/"	\
-		  -e "t a"					\
-	       $< | sort -u | awk '{ print "msgid\t" $$0 "\nmsgstr" }' > $@
+#
+# Python and Perl executable and message catalog build rules.
+# Note that Python i18n isn't supported by this rule set yet,
+# as it requires a special build tool (pygettext.py).
+#
+.SUFFIXES: .pl .pm .py
+
+.pl:
+	$(RM) $@;
+	$(SED) -e "s@TEXT_DOMAIN@\"$(TEXT_DOMAIN)\"@" $< > $@;
+	$(CHMOD) +x $@
+
+.py:
+	$(RM) $@; $(CAT) $< > $@; $(CHMOD) +x $@
+
+.pl.po .pm.po:
+	$(XGETTEXT) $(XGETFLAGS) -d $(<F) $< ;
+	$(RM)	$@ ;
+	$(SED) "/^domain/d" < $(<F).po > $@ ;
+	$(RM) $(<F).po
 
 #
 # When using xgettext, we want messages to go to the default domain,
@@ -1051,7 +1062,7 @@ CPPFORPO=$(COMPILE.cpp:\"$(TEXT_DOMAIN)\"=TEXT_DOMAIN)
 #
 # Rules to perform stylistic checks
 #
-.SUFFIXES: $(SUFFIXES) .x .xml .check .xmlchk
+.SUFFIXES: .x .xml .check .xmlchk
 
 .h.check:
 	$(DOT_H_CHECK)

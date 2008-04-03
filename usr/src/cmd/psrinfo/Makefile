@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/psrinfo/Makefile
@@ -44,15 +44,8 @@ _msg: $(PROG).po
 
 clean:
 
-%: %.pl
-	$(SED) -e "s@TEXT_DOMAIN@\"$(TEXT_DOMAIN)\"@" $< > $@
-
-
 $(ROOTUSRSBINBINPROG): $(PROG)
 	$(INS.file)
-
-$(PROG).po: $(PROG).pl
-	$(XGETTEXT) -d $(PROG) $(PROG).pl 
 
 lint:
 

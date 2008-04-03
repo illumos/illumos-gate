@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # common target definitions for tool builds
@@ -34,13 +34,3 @@ lint_PROG:
 
 lint_SRCS:
 	$(LINT.c) $(SRCS)
-
-%:	%.pl
-	$(RM) $@
-	cat $< > $@
-	chmod +x $@
-
-%:	%.py
-	$(RM) $@
-	cat $< > $@
-	chmod +x $@

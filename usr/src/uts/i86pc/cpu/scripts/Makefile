@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,9 +31,6 @@ PERLFILES= \
 
 include ../../../Makefile.uts
 
-OWNER=		root
-GROUP=		bin
-
 .KEEP_STATE:
 
 def all install setup: $(PERLFILES)
@@ -42,8 +39,3 @@ clean clobber:
 	$(RM) $(PERLFILES)
 
 include ../../../Makefile.targ
-
-%:	%.pl
-	$(RM) $@
-	cat $< > $@
-	chmod +x $@

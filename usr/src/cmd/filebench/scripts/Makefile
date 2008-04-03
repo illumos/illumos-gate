@@ -19,13 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
-.SUFFIXES: .pl
 
 include ../../Makefile.cmd
 
@@ -33,11 +32,6 @@ SCRIPTS = filebench_compare fs_flush
 ROOTUSRBENCHDIR = $(ROOT)/usr/benchmarks
 ROOTUSRBENCHFBSCRIPTSDIR = $(ROOTUSRBENCHDIR)/filebench/scripts
 FBSCRIPTS = $(SCRIPTS:%=$(ROOTUSRBENCHFBSCRIPTSDIR)/%)
-
-.pl:
-	$(RM) $@
-	$(CAT) $< > $@
-	$(CHMOD) +x $@
 
 all clean lint:
 

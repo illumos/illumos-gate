@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,10 +59,6 @@ _msg: $(PROG).po
 
 clean:
 	$(RM) $(PROG) $(TEXT_DOMAIN).po $(ATTR) $(STRIPTEXT) $(AGETTEXT)
-
-%: %.pl
-	$(SED) -e "s@TEXT_DOMAIN@\"$(TEXT_DOMAIN)\"@" $< > $@
-	$(CHMOD) 755 $@
 
 $(ATTR): $(STRIPTEXT) $(ATTRPROC) $(ADTXMLFILE) $(ATTR).txt
 	./$(STRIPTEXT) < $(ATTR).txt > $(ATTR)
