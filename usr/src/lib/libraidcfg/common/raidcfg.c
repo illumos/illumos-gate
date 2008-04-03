@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +160,6 @@ typedef	struct {
 static int intcompare(const void *p1, const void *p2);
 static uint64_t raid_space_noalign(raid_obj_tab_t *, uint32_t, int,
 	raid_obj_id_t *, arraypart_attr_t *);
-static int raid_dev_config(cfga_cmd_t, uint32_t, uint32_t, uint8_t);
 static int raid_handle_init();
 static void raid_handle_fini();
 static raid_obj_handle_t raid_handle_new(raid_obj_type_id_t);
@@ -1298,39 +1297,6 @@ raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
 	}
 
 	return (capacity);
-}
-
-static int
-raid_dev_config(cfga_cmd_t cmd, uint32_t controller_id, uint32_t target_id,
-	uint8_t type)
-{
-	cfga_err_t cfga_err;
-	char *ap_id;
-	int count = 0;
-
-	ap_id = (char *)malloc(MAX_PATH_LEN);
-	if (ap_id == NULL)
-		return (ERR_NOMEM);
-
-	if (type == 0) {
-		(void) snprintf(ap_id, MAX_PATH_LEN, "c%d::dsk/c%dt%dd0",
-		    controller_id, controller_id, target_id);
-	} else
-		(void) snprintf(ap_id, MAX_PATH_LEN, "c%d", controller_id);
-
-	do {
-		cfga_err = config_change_state(cmd, 1, &ap_id, "disable_rcm",
-		    NULL, NULL, NULL, 0);
-		count++;
-	} while (cfga_err != CFGA_OK && count < 2);
-
-	if (cfga_err != CFGA_OK) {
-		free(ap_id);
-		return (ERR_ARRAY_CONFIG);
-	}
-
-	free(ap_id);
-	return (SUCCESS);
 }
 
 /*
@@ -3119,13 +3085,11 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	array_attr_t *array_attr, array_attr2;
 	disk_attr_t *disk_attr;
 	arraypart_attr_t *arraypart_attrs;
-	disk_tag_t *disk_tags;
 	raid_obj_id_t obj_id, controller_obj_id = OBJ_NONE;
 	raid_lib_t *raid_lib;
 	int i, j, ret, fd;
 	int disk_cnt = 0, disk_set_num = 0, set_num = 0, layer_cnt = 0;
 	uint64_t min_disk_capacity = 0;
-	uint32_t *diskid_list;
 
 	array_attr = raid_obj_get_data_ptr(raid_tab, array_obj_id);
 	if (array_attr == NULL)
@@ -3420,64 +3384,6 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	/* Add array object into device tree so that we can map the handle */
 	(void) raid_obj_add_org(raid_tab, array_obj_id, controller_obj_id);
 
-	/* unconfig disk minor nodes if it's hostraid */
-	if (controller_attr->capability & RAID_CAP_DISK_TRANS) {
-		diskid_list = (uint32_t *)calloc(num_of_comp,
-		    sizeof (uint32_t));
-		if (diskid_list == NULL) {
-			return (ERR_NOMEM);
-		}
-		disk_tags = (disk_tag_t *)calloc(num_of_comp,
-		    sizeof (disk_tag_t));
-		if (disk_tags == NULL) {
-			return (ERR_NOMEM);
-		}
-
-		for (i = 0; i < num_of_comp; ++i) {
-			if (*(disk_list + i) == OBJ_SEPARATOR_BEGIN) {
-				diskid_list[i] = (uint32_t)OBJ_SEPARATOR_BEGIN;
-			} else if (*(disk_list + i) == OBJ_SEPARATOR_END) {
-				diskid_list[i] = (uint32_t)OBJ_SEPARATOR_END;
-			} else {
-				ret = obj_get_attr(raid_tab, *(disk_list + i),
-				    (void **)(&disk_attr));
-				if (ret != SUCCESS) {
-					free(diskid_list);
-					return (ret);
-				}
-				diskid_list[i] = disk_attr->disk_id;
-				disk_tags[i] = disk_attr->tag;
-			}
-		}
-
-		for (i = 0; i < num_of_comp; ++i) {
-			if (diskid_list[i] == (uint32_t)OBJ_SEPARATOR_BEGIN ||
-			    diskid_list[i] == (uint32_t)OBJ_SEPARATOR_END) {
-				continue;
-			}
-
-			if ((disk_tags[i].cidl.target_id ==
-			    array_attr->tag.idl.target_id) &&
-			    (disk_tags[i].cidl.lun ==
-			    array_attr->tag.idl.lun))
-				continue;
-
-			ret = raid_dev_config(CFGA_CMD_UNCONFIGURE,
-			    controller_attr->controller_id, diskid_list[i], 0);
-			if (ret != SUCCESS) {
-				free(diskid_list);
-				free(disk_tags);
-				return (ret);
-			}
-		}
-		free(diskid_list);
-		free(disk_tags);
-	} else {
-		/* for HW raid */
-		ret = raid_dev_config(CFGA_CMD_CONFIGURE,
-		    controller_attr->controller_id, array_attr->array_id, 1);
-	}
-
 	return (ret);
 }
 
@@ -3488,11 +3394,8 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	raid_obj_id_t controller_obj_id;
 	controller_attr_t *controller_attr;
 	array_attr_t *array_attr;
-	arraypart_attr_t *arraypart_attr;
-	disk_attr_t *disk_attr;
-	raid_obj_id_t arraypart_obj_id;
 	raid_lib_t *raid_lib;
-	int i = 0, j = 0, ret, fd;
+	int ret, fd;
 	uint32_t *disk_ids = NULL;
 
 	controller_obj_id = obj_get_controller(raid_tab, array_obj_id);
@@ -3513,87 +3416,12 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	if ((raid_lib == NULL) || (fd == 0))
 		return (ERR_DRIVER_CLOSED);
 
-	/* change minor nodes state for disks */
-	if (controller_attr->capability & RAID_CAP_DISK_TRANS) {
-		arraypart_obj_id = obj_get_comp(raid_tab, array_obj_id,
-		    OBJ_TYPE_ARRAY_PART);
-		if (arraypart_obj_id < OBJ_NONE) {
-			return (arraypart_obj_id);
-		}
-
-		/*
-		 * Check how many disks in volume and malloc space for
-		 * disk_ids; note that the number should be the disk
-		 * number minors 1 since the primary disk should not
-		 * be counted in.
-		 */
-		while (arraypart_obj_id = obj_get_sibling(raid_tab,
-		    arraypart_obj_id)) {
-			if (arraypart_obj_id < OBJ_NONE)
-				return (arraypart_obj_id);
-			++i;
-		}
-		disk_ids = calloc(i, sizeof (uint32_t));
-		if (disk_ids == NULL)
-			return (ERR_NOMEM);
-
-		/* Stor all member disk ids into disk_ids */
-		arraypart_obj_id = obj_get_comp(raid_tab, array_obj_id,
-		    OBJ_TYPE_ARRAY_PART);
-
-		while (arraypart_obj_id > OBJ_NONE) {
-			ret = obj_get_attr(raid_tab, arraypart_obj_id,
-			    (void **)(&arraypart_attr));
-			if (ret != SUCCESS) {
-				return (ret);
-			}
-
-			ret = obj_get_attr(raid_tab, arraypart_obj_id,
-			    (void **)(&disk_attr));
-			if (ret != SUCCESS) {
-				return (ret);
-			}
-
-			if (array_attr->tag.idl.target_id ==
-			    disk_attr->tag.cidl.target_id &&
-			    array_attr->tag.idl.lun ==
-			    disk_attr->tag.cidl.target_id) {
-				arraypart_obj_id = obj_get_sibling(raid_tab,
-				    arraypart_obj_id);
-				continue;
-			}
-
-			disk_ids[j] = arraypart_attr->disk_id;
-			++j;
-			arraypart_obj_id = obj_get_sibling(raid_tab,
-			    arraypart_obj_id);
-		}
-	} else {
-		ret = raid_dev_config(CFGA_CMD_UNCONFIGURE,
-		    controller_attr->controller_id, array_attr->array_id, 1);
-		if (ret != SUCCESS)
-			return (ret);
-	}
-
 	ret = raid_lib->array_delete(controller_attr->controller_id,
 	    array_attr->array_id, plugin_err_str);
 	if (ret < SUCCESS) {
 		if (disk_ids)
 			free(disk_ids);
 		return (ret);
-	}
-
-	if (controller_attr->capability & RAID_CAP_DISK_TRANS) {
-		for (i = 0; i < j; ++i)
-			ret = raid_dev_config(CFGA_CMD_CONFIGURE,
-			    controller_attr->controller_id,
-			    disk_ids[i], 0);
-			if (ret == ERR_ARRAY_CONFIG)
-				ret = SUCCESS;
-			else if (ret < SUCCESS) {
-				free(disk_ids);
-				return (ret);
-			}
 	}
 
 	if (disk_ids)

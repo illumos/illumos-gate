@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,7 @@ OBJECTS =	raidcfg.o
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lcfgadm -ldevinfo -lc
+LDLIBS +=	-ldevinfo -lc
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(LINTSRC:%=$(SRCDIR)/%)
