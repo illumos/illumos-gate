@@ -1072,6 +1072,10 @@ $(OBJS_DIR)/zlib_obj.o:		$(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 	    $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 	$(CTFMERGE) -t -f -L VERSION -o $@ $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/hxge/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # SVM
 #
@@ -1859,3 +1863,6 @@ $(LINTS_DIR)/zlib_obj.ln:	$(ZLIB_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 				$(UTSBASE)/common/zmod/zlib_lint.c
 	@($(LHEAD) $(LINT.c) -C $(LINTS_DIR)/zlib_obj \
 	    $(UTSBASE)/common/zmod/zlib_lint.c $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/hxge/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))

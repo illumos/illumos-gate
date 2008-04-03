@@ -325,6 +325,7 @@ DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
 DRV_KMODS	+= chxge
 DRV_KMODS	+= nsmb
+DRV_KMODS	+= hxge
 
 #
 # Don't build some of these for OpenSolaris, since they will be

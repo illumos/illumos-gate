@@ -231,6 +231,7 @@ COMMON_SUBDIRS= \
 	SUNWhea  \
 	SUNWhermon  \
 	SUNWhwdata \
+	SUNWhxge \
 	SUNWib \
 	SUNWibsdpu \
 	SUNWibsdp \

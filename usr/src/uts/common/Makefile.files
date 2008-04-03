@@ -1607,3 +1607,12 @@ KICONV_TC_OBJS += kiconv_cck_common.o kiconv_tc.o
 #	AAC module
 #
 AAC_OBJS = aac.o aac_ioctl.o
+#
+#	hxge 10G driver module
+#
+HXGE_OBJS =	hxge_main.o hxge_vmac.o hxge_send.o		\
+		hxge_txdma.o hxge_rxdma.o hxge_virtual.o	\
+		hxge_fm.o hxge_fzc.o hxge_hw.o hxge_kstats.o	\
+		hxge_ndd.o hxge_pfc.o				\
+		hpi.o hpi_vmac.o hpi_rxdma.o hpi_txdma.o	\
+		hpi_vir.o hpi_pfc.o
