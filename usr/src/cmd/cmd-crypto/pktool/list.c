@@ -311,11 +311,13 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 	KMF_RETURN rv;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
 	int numattr = 0;
-	KMF_ATTRIBUTE attrlist[16];
+	KMF_ATTRIBUTE attrlist[18];
 	boolean_t token_bool = B_TRUE;
 	boolean_t private = B_FALSE;
 	KMF_KEY_CLASS keyclass;
 	KMF_ENCODE_FORMAT format;
+	int auth = 0;
+	KMF_CREDENTIAL cred = {NULL, 0};
 
 	/*
 	 * Symmetric keys and RSA/DSA private keys are always
@@ -331,6 +333,13 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 	if (rv != KMF_OK) {
 		return (rv);
 	}
+
+	rv = token_auth_needed(kmfhandle, token, &auth);
+	if (rv != KMF_OK)
+		return (rv);
+
+	if (tokencred != NULL)
+		cred = *tokencred;
 
 	if (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ)) {
 		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
@@ -409,6 +418,16 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 		if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
 			int num = numattr;
 
+			if (auth > 0 && (tokencred == NULL ||
+			    tokencred->cred == NULL) &&
+			    (cred.cred == NULL)) {
+				(void) get_token_password(kstype, token, &cred);
+				kmf_set_attr_at_index(attrlist, numattr,
+				    KMF_CREDENTIAL_ATTR,
+				    &cred, sizeof (KMF_CREDENTIAL));
+				numattr++;
+			}
+
 			private = B_FALSE;
 			keyclass = KMF_ASYM_PUB;
 			kmf_set_attr_at_index(attrlist, num,
@@ -429,7 +448,18 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 	if (oclass & (PK_CERT_OBJ | PK_PUBLIC_OBJ)) {
 		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
 		    &kstype, sizeof (kstype));
+
 		numattr++;
+		if (auth > 0 && (cred.cred == NULL)) {
+			(void) get_token_password(kstype, token, &cred);
+		}
+
+		if (cred.cred != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR,
+			    &cred, sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
 
 		if (objlabel != NULL) {
 			kmf_set_attr_at_index(attrlist, numattr,
@@ -452,7 +482,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			numattr++;
 		}
 
-		if (serial != NULL) {
+		if (serial != NULL && serial->val != NULL) {
 			kmf_set_attr_at_index(attrlist, numattr,
 			    KMF_BIGINT_ATTR, serial,
 			    sizeof (KMF_BIGINT));

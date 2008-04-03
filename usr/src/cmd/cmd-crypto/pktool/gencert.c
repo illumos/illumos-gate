@@ -119,7 +119,7 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 		numattr++;
 	}
 
-	if (tokencred != NULL && tokencred->credlen > 0) {
+	if (tokencred != NULL && tokencred->cred != NULL) {
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_CREDENTIAL_ATTR, tokencred,
 		    sizeof (KMF_CREDENTIAL));
@@ -537,7 +537,7 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 		numattr++;
 	}
 
-	if (tokencred != NULL && tokencred->credlen > 0) {
+	if (tokencred != NULL && tokencred->cred != NULL) {
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_CREDENTIAL_ATTR, tokencred,
 		    sizeof (KMF_CREDENTIAL));

@@ -1174,3 +1174,25 @@ verify_ekunames(char *ekuliststr, EKU_LIST **ekulist)
 
 	return (rv);
 }
+
+KMF_RETURN
+token_auth_needed(KMF_HANDLE_T handle, char *tokenlabel, int *auth)
+{
+	CK_TOKEN_INFO info;
+	CK_SLOT_ID slot;
+	CK_RV ckrv;
+	KMF_RETURN rv;
+
+	*auth = 0;
+	rv = kmf_pk11_token_lookup(handle, tokenlabel, &slot);
+	if (rv != KMF_OK)
+		return (rv);
+
+	ckrv = C_GetTokenInfo(slot, &info);
+	if (ckrv != KMF_OK)
+		return (KMF_ERR_INTERNAL);
+
+	*auth = (info.flags & CKF_LOGIN_REQUIRED);
+
+	return (KMF_OK);
+}

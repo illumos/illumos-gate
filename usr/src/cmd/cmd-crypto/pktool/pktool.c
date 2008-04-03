@@ -73,26 +73,26 @@ extern int	pk_signcsr(int argc, char *argv[]);
 static int	pk_help(int argc, char *argv[]);
 
 #define	TOKEN_IDX 0
-#define	TOKEN_VERB gettext("tokens")
+#define	TOKEN_VERB "tokens"
 #define	TOKEN_SUMM gettext("lists all visible PKCS#11 tokens")
-#define	TOKEN_SYN  gettext("tokens")
+#define	TOKEN_SYN  "tokens"
 
 #define	SETPIN_IDX 1
-#define	SETPIN_VERB gettext("setpin")
+#define	SETPIN_VERB "setpin"
 #define	SETPIN_SUMM gettext("changes user authentication passphrase "\
 	"for keystore access")
-#define	SETPIN_SYN gettext(\
+#define	SETPIN_SYN \
 	"setpin [ keystore=pkcs11 ]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t" \
 	"setpin keystore=nss\n\t\t" \
 	"[ token=token ]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
-	"[ prefix=DBprefix ]\n\t")
+	"[ prefix=DBprefix ]\n\t"
 
 #define	LIST_IDX 2
-#define	LIST_VERB gettext("list")
+#define	LIST_VERB "list"
 #define	LIST_SUMM gettext("lists a summary of objects in the keystore")
-#define	LIST_SYN gettext(\
+#define	LIST_SYN \
 	"list [ token=token[:manuf[:serial]]]\n\t\t" \
 	"[ objtype=private|public|both ]\n\t\t" \
 	"[ label=label ]\n\t" \
@@ -146,12 +146,12 @@ static int	pk_help(int argc, char *argv[]);
  \
 	"list keystore=file objtype=crl\n\t\t" \
 	"infile=crl-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t")
+	"[ dir=directory-path ]\n\t"
 
 #define	DELETE_IDX 3
-#define	DELETE_VERB gettext("delete")
+#define	DELETE_VERB "delete"
 #define	DELETE_SUMM gettext("deletes objects in the keystore")
-#define	DELETE_SYN gettext(\
+#define	DELETE_SYN \
 	"delete [ token=token[:manuf[:serial]]]\n\t\t" \
 	"[ objtype=private|public|both ]\n\t\t" \
 	"[ label=object-label ]\n\t" \
@@ -212,12 +212,12 @@ static int	pk_help(int argc, char *argv[]);
  \
 	"delete keystore=file objtype=crl\n\t\t" \
 	"infile=crl-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t")
+	"[ dir=directory-path ]\n\t"
 
 #define	IMPORT_IDX 4
-#define	IMPORT_VERB gettext("import")
+#define	IMPORT_VERB "import"
 #define	IMPORT_SUMM gettext("imports objects from an external source")
-#define	IMPORT_SYN gettext(\
+#define	IMPORT_SYN \
 	"import [token=token[:manuf[:serial]]]\n\t\t" \
 	"infile=input-fn\n\t" \
  \
@@ -263,12 +263,12 @@ static int	pk_help(int argc, char *argv[]);
 	"infile=input-crl-fn\n\t\t" \
 	"outcrl=output-crl-fn\n\t\t" \
 	"outformat=pem|der\n\t\t" \
-	"[ dir=output-crl-directory-path ]\n\t")
+	"[ dir=output-crl-directory-path ]\n\t"
 
 #define	EXPORT_IDX 5
-#define	EXPORT_VERB gettext("export")
+#define	EXPORT_VERB "export"
 #define	EXPORT_SUMM gettext("exports objects from the keystore to a file")
-#define	EXPORT_SYN gettext(\
+#define	EXPORT_SYN \
 	"export [token=token[:manuf[:serial]]]\n\t\t" \
 	"outfile=output-fn\n\t" \
  \
@@ -298,12 +298,12 @@ static int	pk_help(int argc, char *argv[]);
 	"certfile=cert-input-fn\n\t\t" \
 	"keyfile=key-input-fn\n\t\t" \
 	"outfile=output-pkcs12-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t")
+	"[ dir=directory-path ]\n\t"
 
 #define	GENCERT_IDX 6
-#define	GENCERT_VERB gettext("gencert")
+#define	GENCERT_VERB "gencert"
 #define	GENCERT_SUMM gettext("creates a self-signed X.509v3 certificate")
-#define	GENCERT_SYN gettext(\
+#define	GENCERT_SYN \
 	"gencert [-i] keystore=nss\n\t\t" \
 	"label=cert-nickname\n\t\t" \
 	"serial=serial number hex string]\n\t\t" \
@@ -344,14 +344,14 @@ static int	pk_help(int argc, char *argv[]);
 	"[ keytype=rsa|dsa ]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
-	"[ lifetime=number-hour|number-day|number-year ]\n\t")
+	"[ lifetime=number-hour|number-day|number-year ]\n\t"
 
 #define	GENCSR_IDX 7
-#define	GENCSR_VERB gettext("gencsr")
+#define	GENCSR_VERB "gencsr"
 #define	GENCSR_SUMM gettext("creates a PKCS#10 certificate signing " \
 	"request file")
 
-#define	GENCSR_SYN gettext(\
+#define	GENCSR_SYN \
 	"gencsr [-i] keystore=nss \n\t\t" \
 	"nickname=cert-nickname\n\t\t" \
 	"outcsr=csr-fn\n\t\t" \
@@ -388,22 +388,22 @@ static int	pk_help(int argc, char *argv[]);
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
-	"[ format=pem|der ]\n\t")
+	"[ format=pem|der ]\n\t"
 
 #define	DOWNLOAD_IDX 8
-#define	DOWNLOAD_VERB gettext("download")
+#define	DOWNLOAD_VERB "download"
 #define	DOWNLOAD_SUMM gettext("downloads a CRL or certificate file " \
 	"from an external source")
-#define	DOWNLOAD_SYN gettext(\
+#define	DOWNLOAD_SYN \
 	"download url=url_str\n\t\t" \
 	"[ objtype=crl|cert ]\n\t\t" \
 	"[ http_proxy=proxy_str ]\n\t\t" \
-	"[ outfile = outfile ]\n\t")
+	"[ outfile = outfile ]\n\t"
 
 #define	GENKEY_IDX 9
-#define	GENKEY_VERB gettext("genkey")
+#define	GENKEY_VERB "genkey"
 #define	GENKEY_SUMM gettext("creates a symmetric key in the keystore")
-#define	GENKEY_SYN gettext(\
+#define	GENKEY_SYN \
 	"genkey [ keystore=pkcs11 ]\n\t\t" \
 	"label=key-label\n\t\t" \
 	"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t" \
@@ -426,12 +426,12 @@ static int	pk_help(int argc, char *argv[]);
 	"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t" \
 	"[ keylen=key-size (AES, ARCFOUR or GENERIC only)]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
-	"[ print=y|n ]\n\t")
+	"[ print=y|n ]\n\t"
 
 #define	SIGNCSR_IDX 10
-#define	SIGNCSR_VERB gettext("signcsr")
+#define	SIGNCSR_VERB "signcsr"
 #define	SIGNCSR_SUMM gettext("Sign a PKCS#10 Certificate Signing Request")
-#define	SIGNCSR_SYN gettext(\
+#define	SIGNCSR_SYN \
 	"signcsr keystore=pkcs11\n\t\t" \
 	"signkey=label (label of signing key)\n\t\t" \
 	"csr=CSR filename\n\t\t" \
@@ -477,12 +477,12 @@ static int	pk_help(int argc, char *argv[]);
 	"[ lifetime=number-hour|number-day|number-year ]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
-	"[ prefix=DBprefix ]\n\t")
+	"[ prefix=DBprefix ]\n\t"
 
 #define	HELP_IDX 11
-#define	HELP_VERB gettext("help")
+#define	HELP_VERB "help"
 #define	HELP_SUMM gettext("displays help message")
-#define	HELP_SYN gettext("help\t(help and usage)")
+#define	HELP_SYN "help\t(help and usage)"
 
 /* Command structure for verbs and their actions.  Do NOT i18n/l10n. */
 static verbcmd	cmds[] = {
@@ -555,7 +555,6 @@ init_command_list()
 	cmds[HELP_IDX].verb = HELP_VERB;
 	cmds[HELP_IDX].summary = HELP_SUMM;
 	cmds[HELP_IDX].synopsis = HELP_SYN;
-
 }
 
 /*
@@ -583,9 +582,10 @@ usage(int idx)
 			(void) fprintf(stdout, "   %-8s	- %s\n",
 			    cmds[i].verb, cmds[i].summary);
 		}
-		(void) fprintf(stdout, gettext("\nFurther details on the "
-		    "subcommands can be found by adding \'help\'.\n"
-		    "Ex: pktool gencert help\n\n"));
+		(void) fprintf(stdout, "%s \'help\'.\n"
+		    "Ex: pktool gencert help\n\n",
+		    gettext("\nFurther details on the "
+		    "subcommands can be found by adding"));
 	} else {
 		(void) fprintf(stdout, "\t%s\n", cmds[idx].synopsis);
 	}

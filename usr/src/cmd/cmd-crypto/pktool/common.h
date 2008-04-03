@@ -128,6 +128,7 @@ KMF_RETURN verify_altname(char *arg, KMF_GENERALNAMECHOICES *, int *);
 KMF_RETURN verify_keyusage(char *arg, uint16_t *, int *);
 KMF_RETURN verify_file(char *);
 KMF_RETURN verify_ekunames(char *, EKU_LIST **);
+KMF_RETURN token_auth_needed(KMF_HANDLE_T, char *, int *);
 
 void free_eku_list(EKU_LIST *);
 
@@ -135,6 +136,7 @@ int yn_to_int(char *);
 
 int get_token_password(KMF_KEYSTORE_TYPE, char *, KMF_CREDENTIAL *);
 void display_error(void *, KMF_RETURN, char *);
+
 #define	DEFAULT_NSS_TOKEN	"internal"
 #define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,7 @@ genkey_nss(KMF_HANDLE_T kmfhandle, char *token, char *dir, char *prefix,
 		i++;
 	}
 
-	if (tokencred != NULL && tokencred->credlen > 0) {
+	if (tokencred != NULL && tokencred->cred != NULL) {
 		kmf_set_attr_at_index(attlist, i,
 		    KMF_CREDENTIAL_ATTR, tokencred,
 		    sizeof (KMF_CREDENTIAL));
@@ -191,7 +191,7 @@ genkey_pkcs11(KMF_HANDLE_T kmfhandle, char *token,
 		i++;
 	}
 
-	if (tokencred != NULL && tokencred->credlen > 0) {
+	if (tokencred != NULL && tokencred->cred != NULL) {
 		kmf_set_attr_at_index(attlist, i,
 		    KMF_CREDENTIAL_ATTR, tokencred,
 		    sizeof (KMF_CREDENTIAL));

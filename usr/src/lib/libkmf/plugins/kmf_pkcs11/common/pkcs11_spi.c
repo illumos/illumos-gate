@@ -207,7 +207,7 @@ pk11_authenticate(KMF_HANDLE_T handle,
 	if (hSession == NULL)
 		return (KMF_ERR_NO_TOKEN_SELECTED);
 
-	if (cred == NULL || cred->cred == NULL || cred->credlen == 0) {
+	if (cred == NULL || cred->cred == NULL) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
@@ -686,6 +686,7 @@ KMFPK11_FindCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	char *subject = NULL;
 	KMF_BIGINT *serial = NULL;
 	KMF_CERT_VALIDITY validity;
+	KMF_CREDENTIAL *cred = NULL;
 	boolean_t private;
 
 	if (kmfh == NULL)
@@ -727,6 +728,13 @@ KMFPK11_FindCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	if (rv != KMF_OK) {
 		private = B_FALSE;
 		rv = KMF_OK;
+	}
+
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred != NULL) {
+		rv = pk11_authenticate(handle, cred);
+		if (rv != KMF_OK)
+			return (rv);
 	}
 
 	/* Start searching */
@@ -805,16 +813,16 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 
 	SETATTR(rsaTemplate, 0, CKA_CLASS, &ckObjClass, sizeof (ckObjClass));
 	SETATTR(rsaTemplate, 1, CKA_KEY_TYPE, &ckKeyType, sizeof (ckKeyType));
-	SETATTR(rsaTemplate, 2, CKA_MODULUS, Modulus.Data, &Modulus.Length);
+	SETATTR(rsaTemplate, 2, CKA_MODULUS, Modulus.Data, Modulus.Length);
 	SETATTR(rsaTemplate, 3, CKA_PUBLIC_EXPONENT, Exponent.Data,
-	    &Exponent.Length);
+	    Exponent.Length);
 
 	SETATTR(dsaTemplate, 0, CKA_CLASS, &ckObjClass, sizeof (ckObjClass));
 	SETATTR(dsaTemplate, 1, CKA_KEY_TYPE, &ckKeyType, sizeof (ckKeyType));
-	SETATTR(dsaTemplate, 2, CKA_PRIME, Prime.Data, &Prime.Length);
-	SETATTR(dsaTemplate, 3, CKA_SUBPRIME, Subprime.Data, &Subprime.Length);
-	SETATTR(dsaTemplate, 4, CKA_BASE, Base.Data, &Base.Length);
-	SETATTR(dsaTemplate, 5, CKA_VALUE, Value.Data, &Value.Length);
+	SETATTR(dsaTemplate, 2, CKA_PRIME, Prime.Data, Prime.Length);
+	SETATTR(dsaTemplate, 3, CKA_SUBPRIME, Subprime.Data, Subprime.Length);
+	SETATTR(dsaTemplate, 4, CKA_BASE, Base.Data, Base.Length);
+	SETATTR(dsaTemplate, 5, CKA_VALUE, Value.Data, Value.Length);
 
 	switch (pKey->keyalg) {
 		case KMF_RSA:
@@ -1042,7 +1050,6 @@ cleanup:
 	return (ret);
 }
 
-
 static KMF_RETURN
 CreateCertObject(KMF_HANDLE_T handle, char *label, KMF_DATA *pcert)
 {
@@ -1127,7 +1134,6 @@ CreateCertObject(KMF_HANDLE_T handle, char *label, KMF_DATA *pcert)
 	    &Id);
 
 	if (rv != KMF_OK) {
-		SET_ERROR(kmfh, rv);
 		goto cleanup;
 	}
 
@@ -1152,8 +1158,17 @@ CreateCertObject(KMF_HANDLE_T handle, char *label, KMF_DATA *pcert)
 	 */
 	ckrv = C_CreateObject(kmfh->pk11handle, x509templ, i, &hCert);
 	if (ckrv != CKR_OK) {
-		SET_ERROR(kmfh, rv);
-		rv = KMF_ERR_INTERNAL;
+		/* Report authentication failures to the caller */
+		if (ckrv == CKR_USER_NOT_LOGGED_IN ||
+		    ckrv == CKR_PIN_INCORRECT ||
+		    ckrv == CKR_PIN_INVALID ||
+		    ckrv == CKR_PIN_EXPIRED ||
+		    ckrv == CKR_PIN_LOCKED ||
+		    ckrv == CKR_SESSION_READ_ONLY)
+			rv = KMF_ERR_AUTH_FAILED;
+		else
+			rv = KMF_ERR_INTERNAL;
+		SET_ERROR(kmfh, ckrv);
 	}
 	free(subject);
 	free(issuer);
@@ -1176,6 +1191,7 @@ KMFPK11_StoreCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	KMF_RETURN rv = 0;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	KMF_DATA *cert = NULL;
+	KMF_CREDENTIAL *cred = NULL;
 	char *label = NULL;
 
 	if (kmfh == NULL)
@@ -1191,6 +1207,13 @@ KMFPK11_StoreCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	/* label attribute is optional */
 	label = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
 
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred != NULL) {
+		rv = pk11_authenticate(handle, cred);
+		if (rv != KMF_OK)
+			return (rv);
+	}
+
 	rv = CreateCertObject(handle, label, cert);
 	return (rv);
 }
@@ -1203,6 +1226,7 @@ KMFPK11_ImportCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	char *certfile = NULL;
 	char *label = NULL;
 	KMF_ENCODE_FORMAT format;
+	KMF_CREDENTIAL *cred = NULL;
 	KMF_DATA  cert1 = { NULL, 0};
 	KMF_DATA  cert2 = { NULL, 0};
 
@@ -1245,6 +1269,13 @@ KMFPK11_ImportCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 			goto out;
 		}
 		cert2.Length = (size_t)derlen;
+	}
+
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred != NULL) {
+		rv = pk11_authenticate(handle, cred);
+		if (rv != KMF_OK)
+			return (rv);
 	}
 
 	rv = CreateCertObject(handle, label,
@@ -1350,7 +1381,6 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 	static CK_OBJECT_CLASS	priClass = CKO_PRIVATE_KEY;
 	static CK_OBJECT_CLASS	pubClass = CKO_PUBLIC_KEY;
 
-	static CK_ULONG	rsaKeyType = CKK_RSA;
 	static CK_ULONG	modulusBits = 1024;
 	uint32_t	modulusBits_size = sizeof (CK_ULONG);
 	static CK_BYTE	PubExpo[3] = {0x01, 0x00, 0x01};
@@ -1478,7 +1508,7 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 	if (keytype == KMF_RSA) {
 		CK_MECHANISM keyGenMech = {CKM_RSA_PKCS_KEY_PAIR_GEN, NULL, 0};
 		CK_BYTE *modulus;
-		CK_ULONG modulusLength;
+		CK_ULONG modulusLength = 0;
 		CK_ATTRIBUTE modattr[1];
 		KMF_BIGINT *rsaexp = NULL;
 		int numpubattr = 0, numpriattr = 0;
@@ -1491,18 +1521,10 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		if (rv != KMF_OK)
 			return (KMF_ERR_BAD_PARAMETER);
 
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_CLASS,
-		    &pubClass, sizeof (pubClass));
-		numpubattr++;
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_KEY_TYPE,
-		    &rsaKeyType, sizeof (rsaKeyType));
-		numpubattr++;
 		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_TOKEN,
 		    (storekey ? &true : &false), sizeof (CK_BBOOL));
 		numpubattr++;
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_PRIVATE,
-		    &false, sizeof (false));
-		numpubattr++;
+
 		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_MODULUS_BITS,
 		    &modulusBits, sizeof (modulusBits));
 		numpubattr++;
@@ -1526,13 +1548,10 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_VERIFY,
 		    &true, sizeof (true));
 		numpubattr++;
+		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_WRAP,
+		    &true, sizeof (true));
+		numpubattr++;
 
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_CLASS, &priClass,
-		    sizeof (priClass));
-		numpriattr++;
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_KEY_TYPE,
-		    &rsaKeyType, sizeof (rsaKeyType));
-		numpriattr++;
 		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_TOKEN,
 		    (storekey ? &true : &false), sizeof (CK_BBOOL));
 		numpriattr++;
@@ -1545,8 +1564,10 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_SIGN, &true,
 		    sizeof (true));
 		numpriattr++;
+		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_UNWRAP, &true,
+		    sizeof (true));
+		numpriattr++;
 
-		SETATTR(modattr, 0, CKA_MODULUS, NULL, &modulusLength);
 
 		pubKey = CK_INVALID_HANDLE;
 		priKey = CK_INVALID_HANDLE;
@@ -1569,10 +1590,11 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		pubkey->keyclass = KMF_ASYM_PUB;
 		pubkey->keyp = (void *)pubKey;
 
+		SETATTR(modattr, 0, CKA_MODULUS, NULL, modulusLength);
 		/* Get the Modulus field to use as input for creating the ID */
-		rv = C_GetAttributeValue(kmfh->pk11handle,
+		ckrv = C_GetAttributeValue(kmfh->pk11handle,
 		    (CK_OBJECT_HANDLE)pubKey, modattr, 1);
-		if (rv != CKR_OK) {
+		if (ckrv != CKR_OK) {
 			SET_ERROR(kmfh, ckrv);
 			return (KMF_ERR_BAD_PARAMETER);
 		}
@@ -1583,9 +1605,9 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 			return (KMF_ERR_MEMORY);
 
 		modattr[0].pValue = modulus;
-		rv = C_GetAttributeValue(kmfh->pk11handle,
+		ckrv = C_GetAttributeValue(kmfh->pk11handle,
 		    (CK_OBJECT_HANDLE)pubKey, modattr, 1);
-		if (rv != CKR_OK) {
+		if (ckrv != CKR_OK) {
 			SET_ERROR(kmfh, ckrv);
 			free(modulus);
 			return (KMF_ERR_BAD_PARAMETER);
@@ -1626,9 +1648,9 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		pubkey->keyp = (void *)pubKey;
 
 		/* Get the Public Value to use as input for creating the ID */
-		rv = C_GetAttributeValue(hSession,
+		ckrv = C_GetAttributeValue(hSession,
 		    (CK_OBJECT_HANDLE)pubKey, valattr, 1);
-		if (rv != CKR_OK) {
+		if (ckrv != CKR_OK) {
 			SET_ERROR(kmfh, ckrv);
 			return (KMF_ERR_BAD_PARAMETER);
 		}
@@ -1639,9 +1661,9 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 			return (KMF_ERR_MEMORY);
 
 		valattr[0].pValue = keyvalue;
-		rv = C_GetAttributeValue(hSession,
+		ckrv = C_GetAttributeValue(hSession,
 		    (CK_OBJECT_HANDLE)pubKey, valattr, 1);
-		if (rv != CKR_OK) {
+		if (ckrv != CKR_OK) {
 			SET_ERROR(kmfh, ckrv);
 			free(keyvalue);
 			return (KMF_ERR_BAD_PARAMETER);
@@ -1698,7 +1720,6 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 	free(IDInput.Data);
 
 	if (rv != CKR_OK) {
-		SET_ERROR(kmfh, rv);
 		goto cleanup;
 	}
 	SETATTR(idattr, 0, CKA_ID, IDOutput.Data, IDOutput.Length);
@@ -1975,7 +1996,6 @@ KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 	/* Generate an ID from the SPKI data */
 	rv = GetIDFromSPKI(pubkey, &Id);
 	if (rv != KMF_OK) {
-		SET_ERROR(kmfh, rv);
 		goto errout;
 	}
 
@@ -2002,7 +2022,7 @@ KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 		goto errout;
 	}
 
-	if ((rv = C_FindObjects(kmfh->pk11handle, &pri_obj, 1,
+	if ((ckrv = C_FindObjects(kmfh->pk11handle, &pri_obj, 1,
 	    &obj_count)) != CKR_OK) {
 		SET_ERROR(kmfh, ckrv);
 		rv = KMF_ERR_INTERNAL;
@@ -2253,9 +2273,9 @@ get_raw_rsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_RSA_KEY *rawrsa)
 		}
 	}
 	/* Now that we have space, really get the attributes */
-	if ((rv = C_GetAttributeValue(sess, obj,
+	if ((ckrv = C_GetAttributeValue(sess, obj,
 	    rsa_pri_attrs, count)) != CKR_OK) {
-		SET_ERROR(kmfh, rv);
+		SET_ERROR(kmfh, ckrv);
 		rv = KMF_ERR_INTERNAL;
 		goto end;
 	}
@@ -2413,9 +2433,9 @@ get_raw_dsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_DSA_KEY *rawdsa)
 			goto end;
 		}
 	}
-	if ((rv = C_GetAttributeValue(sess, obj,
+	if ((ckrv = C_GetAttributeValue(sess, obj,
 	    dsa_pri_attrs, count)) != CKR_OK) {
-		SET_ERROR(kmfh, rv);
+		SET_ERROR(kmfh, ckrv);
 		rv = KMF_ERR_INTERNAL;
 		goto end;
 	}
@@ -2474,8 +2494,8 @@ get_raw_sym(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_SYM_KEY *rawsym)
 	}
 
 	/* get the key data */
-	if ((rv = C_GetAttributeValue(sess, obj, sym_attr, 1)) != CKR_OK) {
-		SET_ERROR(kmfh, rv);
+	if ((ckrv = C_GetAttributeValue(sess, obj, sym_attr, 1)) != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
 		free(sym_attr[0].pValue);
 		return (KMF_ERR_INTERNAL);
 	}
@@ -2734,7 +2754,7 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 	 * a private or secred key, or if the user passed in credentials.
 	 */
 	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
-	if (cred != NULL && (cred->credlen > 0)) {
+	if (cred != NULL) {
 		rv = pk11_authenticate(handle, cred);
 		if (rv != KMF_OK)
 			return (rv);
@@ -2906,6 +2926,7 @@ store_raw_key(KMF_HANDLE_T handle,
 	char		*notbefore = NULL, *start = NULL;
 	char		*notafter = NULL, *end = NULL;
 	char		*keylabel = NULL;
+	KMF_CREDENTIAL	*cred = NULL;
 
 	if (kmfh == NULL)
 		return (KMF_ERR_UNINITIALIZED); /* Plugin Not Initialized */
@@ -2919,6 +2940,13 @@ store_raw_key(KMF_HANDLE_T handle,
 		keytype = CKK_DSA;
 	else
 		return (KMF_ERR_BAD_PARAMETER);
+
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred != NULL) {
+		rv = pk11_authenticate(handle, cred);
+		if (rv != KMF_OK)
+			return (rv);
+	}
 
 	keylabel = kmf_get_attr_ptr(KMF_KEYLABEL_ATTR, attrlist, numattr);
 	/*
@@ -3337,8 +3365,16 @@ KMFPK11_CreateSymKey(KMF_HANDLE_T handle,
 		    &keyhandle);
 	}
 	if (ckrv != CKR_OK) {
+		if (ckrv == CKR_USER_NOT_LOGGED_IN ||
+		    ckrv == CKR_PIN_INCORRECT ||
+		    ckrv == CKR_PIN_INVALID ||
+		    ckrv == CKR_PIN_EXPIRED ||
+		    ckrv == CKR_PIN_LOCKED ||
+		    ckrv == CKR_SESSION_READ_ONLY)
+			rv = KMF_ERR_AUTH_FAILED;
+		else
+			rv = KMF_ERR_KEYGEN_FAILED;
 		SET_ERROR(kmfh, ckrv);
-		rv = KMF_ERR_KEYGEN_FAILED;
 		goto out;
 	}
 
@@ -3781,8 +3817,16 @@ create_generic_secret_key(KMF_HANDLE_T handle,
 
 	ckrv = C_CreateObject(hSession, templ, i, key);
 	if (ckrv != CKR_OK) {
+		if (ckrv == CKR_USER_NOT_LOGGED_IN ||
+		    ckrv == CKR_PIN_INCORRECT ||
+		    ckrv == CKR_PIN_INVALID ||
+		    ckrv == CKR_PIN_EXPIRED ||
+		    ckrv == CKR_PIN_LOCKED ||
+		    ckrv == CKR_SESSION_READ_ONLY)
+			rv = KMF_ERR_AUTH_FAILED;
+		else
+			rv = KMF_ERR_KEYGEN_FAILED;
 		SET_ERROR(kmfh, ckrv);
-		rv = KMF_ERR_KEYGEN_FAILED;
 	}
 
 out:

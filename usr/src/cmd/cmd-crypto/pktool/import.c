@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -376,6 +376,7 @@ pk_import_cert(
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_ATTRIBUTE attrlist[32];
+	KMF_CREDENTIAL tokencred;
 	int i = 0;
 
 	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
@@ -416,6 +417,18 @@ pk_import_cert(
 	}
 
 	rv = kmf_import_cert(kmfhandle, i, attrlist);
+	if (rv == KMF_ERR_AUTH_FAILED) {
+		/*
+		 * The token requires a credential, prompt and try again.
+		 */
+		(void) get_token_password(kstype, token_spec, &tokencred);
+		kmf_set_attr_at_index(attrlist, i, KMF_CREDENTIAL_ATTR,
+		    &tokencred, sizeof (KMF_CREDENTIAL));
+		i++;
+
+		rv = kmf_import_cert(kmfhandle, i, attrlist);
+
+	}
 	return (rv);
 }
 
