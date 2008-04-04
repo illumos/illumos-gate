@@ -1157,13 +1157,10 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 			if (!(status & PCIE_LINKSTS_DLL_LINK_ACTIVE))
 				goto cleanup2;
 		}
-
-		/* wait 100ms after DLL_LINK_ACTIVE field reads 1b */
-		delay(drv_usectohz(100000));
-	} else {
-		/* wait 1 sec for link to come up */
-		delay(drv_usectohz(1000000));
 	}
+
+	/* wait 1 sec for link to come up */
+	delay(drv_usectohz(1000000));
 
 	/* check power is really turned ON */
 	control =  pciehpc_reg_get16(ctrl_p,
