@@ -188,9 +188,9 @@ ipmi_sunoem_uptime(ipmi_handle_t *ihp, uint32_t *uptime, uint32_t *gen)
 		return (ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL));
 
 	if (uptime)
-		*uptime = BE_32(((uint32_t *)resp->ic_data)[0]);
+		*uptime = BE_IN32(&((uint32_t *)resp->ic_data)[0]);
 	if (gen)
-		*gen = BE_32(((uint32_t *)resp->ic_data)[1]);
+		*gen = BE_IN32(&((uint32_t *)resp->ic_data)[1]);
 
 	return (0);
 }

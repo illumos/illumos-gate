@@ -67,6 +67,8 @@ static const topo_method_t dimm_methods[] = {
 	    TOPO_STABILITY_INTERNAL, seq_dimm_label},
 	{ G4_DIMM_LBL, "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, g4_dimm_label},
+	{ G12F_DIMM_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, g12f_dimm_label},
 	{ GET_DIMM_SERIAL, "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, get_dimm_serial},
 	{ NULL }

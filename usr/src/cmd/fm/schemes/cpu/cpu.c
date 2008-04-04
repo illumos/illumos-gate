@@ -339,7 +339,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 int
 fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 {
-	int err;
+	int ret1, ret2;
 	char *erserstr, *eeserstr;
 	uint8_t  ertype, eetype, erversion, eeversion;
 	uint64_t erserint, eeserint;
@@ -373,17 +373,19 @@ fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 			return (0);
 	} else if (erversion == CPU_SCHEME_VERSION1) {
 		/* Serial ID is an optional element */
-		if ((err = nvlist_lookup_string(er, FM_FMRI_CPU_SERIAL_ID,
+		if ((ret1 = nvlist_lookup_string(er, FM_FMRI_CPU_SERIAL_ID,
 		    &erserstr)) != 0)
-			if (err != ENOENT)
+			if (ret1 != ENOENT)
 				return (0);
-		if ((err = nvlist_lookup_string(ee, FM_FMRI_CPU_SERIAL_ID,
+		if ((ret2 = nvlist_lookup_string(ee, FM_FMRI_CPU_SERIAL_ID,
 		    &eeserstr)) != 0)
-			if (err != ENOENT)
+			if (ret2 != ENOENT)
 				return (0);
-		count = strlen(erserstr);
-		if (strncmp(erserstr, eeserstr, count) != 0)
-			return (0);
+		if (ret1 == 0 && ret2 == 0) {
+			count = strlen(erserstr);
+			if (strncmp(erserstr, eeserstr, count) != 0)
+				return (0);
+		}
 	}
 	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_CACHE_INDEX, &erval) != 0)
 		return (0);

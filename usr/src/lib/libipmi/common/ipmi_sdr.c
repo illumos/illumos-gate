@@ -71,10 +71,10 @@ ipmi_sdr_get_info(ipmi_handle_t *ihp)
 
 	sip = rsp->ic_data;
 
-	sip->isi_record_count = LE_16(sip->isi_record_count);
-	sip->isi_free_space = LE_16(sip->isi_free_space);
-	sip->isi_add_ts = LE_32(sip->isi_add_ts);
-	sip->isi_erase_ts = LE_32(sip->isi_erase_ts);
+	sip->isi_record_count = LE_IN16(&sip->isi_record_count);
+	sip->isi_free_space = LE_IN16(&sip->isi_free_space);
+	sip->isi_add_ts = LE_IN32(&sip->isi_add_ts);
+	sip->isi_erase_ts = LE_IN32(&sip->isi_erase_ts);
 
 	return (sip);
 }
@@ -187,11 +187,11 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				name = csp->is_cs_idstring;
 
 				csp->is_cs_assert_mask =
-				    LE_16(csp->is_cs_assert_mask);
+				    LE_IN16(&csp->is_cs_assert_mask);
 				csp->is_cs_deassert_mask =
-				    LE_16(csp->is_cs_deassert_mask);
+				    LE_IN16(&csp->is_cs_deassert_mask);
 				csp->is_cs_reading_mask =
-				    LE_16(csp->is_cs_reading_mask);
+				    LE_IN16(&csp->is_cs_reading_mask);
 				break;
 			}
 
@@ -205,11 +205,11 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				name = csp->is_fs_idstring;
 
 				csp->is_fs_assert_mask =
-				    LE_16(csp->is_fs_assert_mask);
+				    LE_IN16(&csp->is_fs_assert_mask);
 				csp->is_fs_deassert_mask =
-				    LE_16(csp->is_fs_deassert_mask);
+				    LE_IN16(&csp->is_fs_deassert_mask);
 				csp->is_fs_reading_mask =
-				    LE_16(csp->is_fs_reading_mask);
+				    LE_IN16(&csp->is_fs_reading_mask);
 				break;
 			}
 
@@ -241,7 +241,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				    (ipmi_sdr_management_confirmation_t *)
 				    sdr->is_record;
 				name = NULL;
-				mcp->is_mc_product = LE_16(mcp->is_mc_product);
+				mcp->is_mc_product =
+				    LE_IN16(&mcp->is_mc_product);
 				break;
 			}
 

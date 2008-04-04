@@ -164,9 +164,9 @@ topo_open(int version, const char *rootdir, int *errp)
 		if (len >= PATH_MAX)
 			return (set_open_errno(thp, errp, EINVAL));
 
-		if (rootdir[len] != '/') {
-			rpath = alloca(len + 1);
-			(void) snprintf(rpath, len + 1, "%s/", rootdir);
+		if (rootdir[len - 1] != '/') {
+			rpath = alloca(len + 2);
+			(void) snprintf(rpath, len + 2, "%s/", rootdir);
 		} else {
 			rpath = (char *)rootdir;
 		}

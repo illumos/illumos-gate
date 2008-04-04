@@ -35,6 +35,7 @@ ipmi_deviceid_t *
 ipmi_get_deviceid(ipmi_handle_t *ihp)
 {
 	ipmi_cmd_t cmd, *resp;
+	uint16_t id_prod;
 
 	if (ihp->ih_deviceid != NULL)
 		return (ihp->ih_deviceid);
@@ -61,7 +62,9 @@ ipmi_get_deviceid(ipmi_handle_t *ihp)
 		return (NULL);
 
 	(void) memcpy(ihp->ih_deviceid, resp->ic_data, resp->ic_dlen);
-	ihp->ih_deviceid->id_product = LE_16(ihp->ih_deviceid->id_product);
+	id_prod = LE_IN16(&ihp->ih_deviceid->id_product);
+	(void) memcpy(&id_prod, &ihp->ih_deviceid->id_product,
+	    sizeof (id_prod));
 	ihp->ih_deviceid_len = resp->ic_dlen;
 
 	return (ihp->ih_deviceid);

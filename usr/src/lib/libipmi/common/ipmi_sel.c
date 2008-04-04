@@ -53,10 +53,10 @@ ipmi_sel_get_info(ipmi_handle_t *ihp)
 
 	ip = (ipmi_sel_info_t *)rsp->ic_data;
 
-	ip->isel_entries = LE_16(ip->isel_entries);
-	ip->isel_free = LE_16(ip->isel_free);
-	ip->isel_add_ts = LE_32(ip->isel_add_ts);
-	ip->isel_erase_ts = LE_32(ip->isel_erase_ts);
+	ip->isel_entries = LE_IN16(&ip->isel_entries);
+	ip->isel_free = LE_IN16(&ip->isel_free);
+	ip->isel_add_ts = LE_IN32(&ip->isel_add_ts);
+	ip->isel_erase_ts = LE_IN32(&ip->isel_erase_ts);
 
 	return (ip);
 }
@@ -96,11 +96,11 @@ ipmi_sel_get_entry(ipmi_handle_t *ihp, uint16_t id)
 
 	evp = (ipmi_sel_event_t *)rsp->ic_data;
 
-	evp->isel_ev_next = LE_16(evp->isel_ev_next);
-	evp->isel_ev_recid = LE_16(evp->isel_ev_recid);
+	evp->isel_ev_next = LE_IN16(&evp->isel_ev_next);
+	evp->isel_ev_recid = LE_IN16(&evp->isel_ev_recid);
 	if (evp->isel_ev_rectype == IPMI_SEL_SYSTEM ||
 	    evp->isel_ev_rectype >= IPMI_SEL_OEM_LO)
-		evp->isel_ev_ts = LE_32(evp->isel_ev_ts);
+		evp->isel_ev_ts = LE_IN32(&evp->isel_ev_ts);
 
 	return (evp);
 }
@@ -127,7 +127,7 @@ ipmi_sel_get_time(ipmi_handle_t *ihp, uint32_t *tp)
 	if (rsp->ic_dlen < sizeof (uint32_t))
 		return (ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL));
 
-	*tp = LE_32(*((uint32_t *)rsp->ic_data));
+	*tp = LE_IN32(rsp->ic_data);
 
 	return (0);
 }
@@ -169,7 +169,7 @@ ipmi_sel_get_utc_offset(ipmi_handle_t *ihp, int *offp)
 	if (rsp->ic_dlen < sizeof (uint16_t))
 		return (ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL));
 
-	off16 = LE_16(*((int16_t *)rsp->ic_data));
+	off16 = LE_IN16(rsp->ic_data);
 	*offp = off16;
 
 	return (0);

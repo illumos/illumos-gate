@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ ipmi_get_sensor_reading(ipmi_handle_t *ihp, uint8_t id)
 		(void) memset((char *)srp + resp->ic_dlen, '\0',
 		    sizeof (ipmi_sensor_reading_t) - resp->ic_dlen);
 
-	srp->isr_state = LE_16(srp->isr_state);
+	srp->isr_state = LE_IN16(&srp->isr_state);
 	return (srp);
 }
 
@@ -75,8 +75,8 @@ ipmi_set_sensor_reading(ipmi_handle_t *ihp, ipmi_set_sensor_reading_t *req)
 	 */
 	(void) memcpy(&realreq, req, sizeof (realreq));
 
-	realreq.iss_assert_state = LE_16(realreq.iss_assert_state);
-	realreq.iss_deassert_state = LE_16(realreq.iss_deassert_state);
+	realreq.iss_assert_state = LE_IN16(&realreq.iss_assert_state);
+	realreq.iss_deassert_state = LE_IN16(&realreq.iss_deassert_state);
 
 	cmd.ic_netfn = IPMI_NETFN_SE;
 	cmd.ic_cmd = IPMI_CMD_SET_SENSOR_READING;

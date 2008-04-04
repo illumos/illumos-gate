@@ -706,3 +706,60 @@ g4_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 
 	return (0);
 }
+
+/*
+ * This method is used to compute the labels for DIMM slots on the Galaxy 1F and
+ * 2F platforms.  It results in following dimm node label assignments:
+ *
+ * chip/dimm instances      label
+ * -------------------      -----
+ * chip=0/dimm=0            CPU 1 DIMM A0
+ * chip=0/dimm=1            CPU 1 DIMM B0
+ * chip=0/dimm=2            CPU 1 DIMM A1
+ * chip=0/dimm=3            CPU 1 DIMM B1
+ *
+ * chip=1/dimm=0            CPU 2 DIMM A0
+ * chip=1/dimm=1            CPU 2 DIMM B0
+ * chip=1/dimm=2            CPU 2 DIMM A1
+ * chip=1/dimm=3            CPU 2 DIMM B1
+ */
+/* ARGSUSED */
+int
+g12f_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *fmtstr, buf[BUFSZ], chan;
+	tnode_t *chip;
+	int ret, dimm_inst, slot_num;
+	nvlist_t *args;
+
+	topo_mod_dprintf(mod, "g12f_dimm_label() called\n");
+
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	chip = topo_node_parent(topo_node_parent(node));
+	dimm_inst = topo_node_instance(node);
+	chan = dimm_inst == 0 || dimm_inst == 2 ? 'A': 'B';
+	slot_num = (dimm_inst <= 1 ? 0 : 1);
+
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) snprintf(buf, BUFSZ, fmtstr, topo_node_instance(chip) + 1, chan,
+	    slot_num);
+
+	if (store_prop_val(mod, buf, "label", out) != 0) {
+		topo_mod_dprintf(mod, "Failed to set label\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	return (0);
+}

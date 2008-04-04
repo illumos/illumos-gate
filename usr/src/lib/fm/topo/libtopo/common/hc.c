@@ -1141,8 +1141,10 @@ hc_walk_init(topo_mod_t *mod, tnode_t *node, nvlist_t *rsrc,
 	struct hc_walk *hwp;
 	topo_walk_t *wp;
 
-	if ((hwp = topo_mod_alloc(mod, sizeof (struct hc_walk))) == NULL)
+	if ((hwp = topo_mod_alloc(mod, sizeof (struct hc_walk))) == NULL) {
 		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		return (NULL);
+	}
 
 	if (nvlist_lookup_nvlist_array(rsrc, FM_FMRI_HC_LIST, &hwp->hcw_list,
 	    &sz) != 0) {
@@ -1236,11 +1238,10 @@ hc_fmri_prop_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		else
 			err = 0;
 		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 	} else {
 		err = -1;
 	}
-
-	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 
 	if (plp->pl_prop != NULL)
 		*out = plp->pl_prop;
@@ -1294,11 +1295,10 @@ hc_fmri_pgrp_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		else
 			err = 0;
 		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 	} else {
 		err = -1;
 	}
-
-	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 
 	if (plp->pl_prop != NULL)
 		*out = plp->pl_prop;
@@ -1366,11 +1366,11 @@ hc_fmri_prop_set(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		else
 			err = 0;
 		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 	} else {
 		err = -1;
 	}
 
-	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 	topo_mod_free(mod, plp, sizeof (struct prop_lookup));
 
 	return (err);
@@ -1433,11 +1433,10 @@ hc_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		else
 			err = 0;
 		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 	} else {
 		err = -1;
 	}
-
-	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 
 	if (hap->ha_nvl != NULL)
 		*out = hap->ha_nvl;
@@ -1499,11 +1498,10 @@ hc_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		else
 			err = 0;
 		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 	} else {
 		err = -1;
 	}
-
-	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 
 	if (hap->ha_nvl != NULL)
 		*out = hap->ha_nvl;
