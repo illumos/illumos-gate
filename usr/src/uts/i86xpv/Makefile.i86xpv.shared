@@ -22,7 +22,7 @@
 #
 # uts/i86xpv/Makefile.i86xpv.shared
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -296,7 +296,7 @@ DACF_KMODS	+= consconfig_dacf
 #
 #	'Mach' Modules (/kernel/mach):
 #
-MACH_KMODS     	+= xpv_psm
+MACH_KMODS     	+= xpv_psm xpv_uppc
 
 #
 #	'TOD' modules (/platform/.../kernel/tod):

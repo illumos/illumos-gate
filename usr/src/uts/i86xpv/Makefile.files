@@ -194,6 +194,7 @@ ROOTNEX_OBJS += rootnex.o
 XPVTOD_OBJS += xpvtod.o
 XPV_AUTOCONFIG_OBJS += xpv_autoconfig.o
 XPV_PSM_OBJS += xpv_psm.o mp_platform_common.o apic_introp.o psm_common.o
+XPV_UPPC_OBJS += xpv_uppc.o psm_common.o
 XENBUS_OBJS += xenbus_dev.o
 XENCONS_OBJS += xencons.o
 XPVD_OBJS += xpvd.o

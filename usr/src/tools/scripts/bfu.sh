@@ -750,6 +750,18 @@ update_mptconf_i386()
 	fi
 }
 
+# update x86 etc/mach file after xVM_uppc is added,
+# which makes xpv_psm a non-default psm module
+update_etc_mach_i386()
+{
+	etc_mach=$rootprefix/etc/mach
+	test -f $etc_mach || return
+	grep -w "xpv_psm" $etc_mach > /dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+	    echo 'xpv_psm' >> $etc_mach
+	fi
+}
+
 update_policy_conf() {
 	# update /etc/security/policy.conf with the default
 	# Solaris crypt(3c) policy.
@@ -7653,6 +7665,8 @@ mondo_loop() {
 
 	if [ $target_isa = i386 ]; then
 	    update_mptconf_i386
+
+	    update_etc_mach_i386
 	fi
 
 	if [ $zone != global ]; then

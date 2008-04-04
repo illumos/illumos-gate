@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,9 +56,11 @@ d none usr/platform/i86xpv/lib/mdb/kvm/amd64 755 root sys
 f none usr/platform/i86xpv/lib/mdb/kvm/amd64/unix.so 555 root sys
 f none usr/platform/i86xpv/lib/mdb/kvm/amd64/xpv.so 555 root sys
 f none usr/platform/i86xpv/lib/mdb/kvm/amd64/xpv_psm.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/amd64/xpv_uppc.so 555 root sys
 f none usr/platform/i86xpv/lib/mdb/kvm/unix.so 555 root sys
 f none usr/platform/i86xpv/lib/mdb/kvm/xpv.so 555 root sys
 f none usr/platform/i86xpv/lib/mdb/kvm/xpv_psm.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/xpv_uppc.so 555 root sys
 d none usr/lib/mdb/kvm/amd64 755 root sys
 f none usr/lib/mdb/kvm/amd64/arp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/audiosup.so 555 root sys

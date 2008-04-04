@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1205,7 +1205,7 @@ static struct psm_ops xen_psm_ops = {
 
 static struct psm_info xen_psm_info = {
 	PSM_INFO_VER01_5,	/* version				*/
-	PSM_OWN_SYS_DEFAULT,	/* ownership				*/
+	PSM_OWN_EXCLUSIVE,	/* ownership				*/
 	&xen_psm_ops,		/* operation				*/
 	"xVM_psm",		/* machine name				*/
 	"platform module %I%"	/* machine descriptions			*/

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -349,7 +349,7 @@ mod_infopsm(struct modlpsm *modl, struct modlinkage *modlp, int *p0)
 }
 
 #if defined(__xpv)
-#define	DEFAULT_PSM_MODULE	"xpv_psm"
+#define	DEFAULT_PSM_MODULE	"xpv_uppc"
 #else
 #define	DEFAULT_PSM_MODULE	"uppc"
 #endif

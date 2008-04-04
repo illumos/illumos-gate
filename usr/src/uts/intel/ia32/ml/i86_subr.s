@@ -2111,7 +2111,7 @@ restore_int_flag(ulong_t i)
 	 * to change the state of the IF bit will be ignored.
 	 * The virtual IF bit is tweaked by CLI and STI.
 	 */
-	IE_TO_EVENT_MASK(%edx, %eax)
+	IE_TO_EVENT_MASK(%edx, 4(%esp))
 #else
 	sti
 #endif
