@@ -619,8 +619,10 @@ prop fault.memory.intel.fbd.ch@
 
 event ereport.cpu.intel.nb.fbd.otf@motherboard/memory-controller/dram-channel
     {within(12s)};
+event ereport.cpu.intel.nb.otf@motherboard {within(12s)};
 event fault.memory.intel.fbd.otf@motherboard/memory-controller/dram-channel,
     FITrate=100, ASRU=motherboard/memory-controller/dram-channel;
+event fault.cpu.intel.nb.otf@motherboard, FITrate=100, ASRU=motherboard;
 event upset.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel,
     engine=serd.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel;
 event ereport.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel
@@ -638,14 +640,20 @@ prop fault.memory.intel.fbd.otf@
     motherboard/memory-controller/dram-channel (1)->
     ereport.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel;
 
+prop fault.cpu.intel.nb.otf@ motherboard (1)->
+    ereport.cpu.intel.nb.otf@motherboard;
+
 event ereport.cpu.intel.nb.unknown@motherboard/memory-controller {within(12s)};
 event ereport.cpu.intel.nb.unknown@motherboard/memory-controller/dram-channel
+    {within(12s)};
+event ereport.cpu.intel.nb.spd@motherboard/memory-controller/dram-channel
     {within(12s)};
 event upset.discard@motherboard/memory-controller;
 
 prop upset.discard@motherboard/memory-controller (0)->
     ereport.cpu.intel.nb.unknown@motherboard/memory-controller,
-    ereport.cpu.intel.nb.unknown@motherboard/memory-controller/dram-channel;
+    ereport.cpu.intel.nb.unknown@motherboard/memory-controller/dram-channel,
+    ereport.cpu.intel.nb.spd@motherboard/memory-controller/dram-channel;
 
 event ereport.cpu.intel.nb.mem_ds@motherboard/memory-controller{within(30s)};
 
@@ -731,4 +739,3 @@ prop upset.discard@motherboard/memory-controller/dram-channel/dimm/rank (0)->
     ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
     ereport.cpu.intel.bus_interconnect@chip/cpu,
     ereport.cpu.intel.external@chip/cpu;
-

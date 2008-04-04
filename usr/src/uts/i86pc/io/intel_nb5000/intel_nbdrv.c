@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,6 +173,7 @@ inb_dimm(nb_dimm_t *nb_dimm, uint8_t channel, uint32_t dimm)
 		    (int)(nb_dimm->dimm_size / (1024*1024)));
 	}
 	(void) nvlist_add_string(newdimm, "dimm-size", sbuf);
+	(void) nvlist_add_uint64(newdimm, "size", nb_dimm->dimm_size);
 	(void) nvlist_add_uint32(newdimm, "nbanks", (uint32_t)nb_dimm->nbanks);
 	(void) nvlist_add_uint32(newdimm, "ncolumn",
 	    (uint32_t)nb_dimm->ncolumn);
@@ -264,6 +265,15 @@ inb_mc_name()
 	switch (nb_chipset) {
 	case INTEL_NB_7300:
 		mc = "Intel 7300";
+		break;
+	case INTEL_NB_5400:
+		mc = "Intel 5400";
+		break;
+	case INTEL_NB_5400A:
+		mc = "Intel 5400A";
+		break;
+	case INTEL_NB_5400B:
+		mc = "Intel 5400B";
 		break;
 	case INTEL_NB_5000P:
 		mc = "Intel 5000P";

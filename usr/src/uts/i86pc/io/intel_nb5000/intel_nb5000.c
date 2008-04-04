@@ -48,7 +48,10 @@
 #include "dimm_phys.h"
 
 static uint32_t uerrcnt[2];
-static uint32_t cerrcnt[2];
+static uint32_t cerrcnta[2][2];
+static uint32_t cerrcntb[2][2];
+static uint32_t cerrcntc[2][2];
+static uint32_t cerrcntd[2][2];
 static nb_logout_t nb_log;
 
 struct mch_error_code {
@@ -95,7 +98,7 @@ fat_memory_error(const nb_regs_t *rp, void *data)
 {
 	int channel;
 	uint32_t ferr_fat_fbd, nrecmemb;
-	uint16_t nrecmema;
+	uint32_t nrecmema;
 	char *intr = "nb.unknown";
 	nb_mem_scatchpad_t *sp = &((nb_scatchpad_t *)data)->ms;
 
@@ -154,16 +157,19 @@ fat_memory_error(const nb_regs_t *rp, void *data)
 
 
 static struct mch_error_code nf_fbd_error_code[] = {
+	{ 29, EMASK_FBD_M29, ERR_NF_FBD_M29 },
 	{ 28, EMASK_FBD_M28, ERR_NF_FBD_M28 },
 	{ 27, EMASK_FBD_M27, ERR_NF_FBD_M27 },
 	{ 26, EMASK_FBD_M26, ERR_NF_FBD_M26 },
 	{ 25, EMASK_FBD_M25, ERR_NF_FBD_M25 },
+	{ 24, EMASK_FBD_M24, ERR_NF_FBD_M24 },
 	{ 22, EMASK_FBD_M22, ERR_NF_FBD_M22 },
 	{ 21, EMASK_FBD_M21, ERR_NF_FBD_M21 },
 	{ 20, EMASK_FBD_M20, ERR_NF_FBD_M20 },
 	{ 19, EMASK_FBD_M19, ERR_NF_FBD_M19 },
 	{ 18, EMASK_FBD_M18, ERR_NF_FBD_M18 },
 	{ 17, EMASK_FBD_M17, ERR_NF_FBD_M17 },
+	{ 16, EMASK_FBD_M16, ERR_NF_FBD_M16 },
 	{ 15, EMASK_FBD_M15, ERR_NF_FBD_M15 },
 	{ 14, EMASK_FBD_M14, ERR_NF_FBD_M14 },
 	{ 13, EMASK_FBD_M13, ERR_NF_FBD_M13 },
@@ -207,7 +213,7 @@ static char *
 nf_memory_error(const nb_regs_t *rp, void *data)
 {
 	uint32_t ferr_nf_fbd, recmemb, redmemb;
-	uint16_t recmema;
+	uint32_t recmema;
 	int branch, channel, ecc_locator;
 	char *intr = "nb.unknown";
 	nb_mem_scatchpad_t *sp = &((nb_scatchpad_t *)data)->ms;
@@ -290,6 +296,8 @@ nf_memory_error(const nb_regs_t *rp, void *data)
 				nb_used_spare_rank(sp->branch, sp->rank);
 				nb_config_gen++;
 			}
+		} else if ((ferr_nf_fbd & ERR_NF_FBD_M22) != 0) {
+			intr = "nb.spd";	/* SPD protocol */
 		}
 	}
 	if (sp->ras != -1) {
@@ -302,6 +310,11 @@ nf_memory_error(const nb_regs_t *rp, void *data)
 }
 
 static struct mch_error_code fat_int_error_code[] = {
+	{ 14, EMASK_INT_B14, ERR_FAT_INT_B14 },
+	{ 12, EMASK_INT_B12, ERR_FAT_INT_B12 },
+	{ 25, EMASK_INT_B25, ERR_FAT_INT_B25 },
+	{ 23, EMASK_INT_B23, ERR_FAT_INT_B23 },
+	{ 21, EMASK_INT_B21, ERR_FAT_INT_B21 },
 	{ 7, EMASK_INT_B7, ERR_FAT_INT_B7 },
 	{ 4, EMASK_INT_B4, ERR_FAT_INT_B4 },
 	{ 3, EMASK_INT_B3, ERR_FAT_INT_B3 },
@@ -310,17 +323,28 @@ static struct mch_error_code fat_int_error_code[] = {
 };
 
 static struct mch_error_code nf_int_error_code[] = {
+	{ 27, 0, ERR_NF_INT_B27 },
+	{ 24, 0, ERR_NF_INT_B24 },
+	{ 22, EMASK_INT_B22, ERR_NF_INT_B22 },
+	{ 20, EMASK_INT_B20, ERR_NF_INT_B20 },
+	{ 19, EMASK_INT_B19, ERR_NF_INT_B19 },
+	{ 18, 0, ERR_NF_INT_B18 },
+	{ 17, 0, ERR_NF_INT_B17 },
+	{ 16, 0, ERR_NF_INT_B16 },
+	{ 11, EMASK_INT_B11, ERR_NF_INT_B11 },
+	{ 10, EMASK_INT_B10, ERR_NF_INT_B10 },
+	{ 9, EMASK_INT_B9, ERR_NF_INT_B9 },
 	{ 8, EMASK_INT_B8, ERR_NF_INT_B8 },
 	{ 6, EMASK_INT_B6, ERR_NF_INT_B6 },
 	{ 5, EMASK_INT_B5, ERR_NF_INT_B5 }
 };
 
 static int
-intel_int_err(uint8_t err_fat_int, uint8_t err_nf_int)
+intel_int_err(uint16_t err_fat_int, uint16_t err_nf_int)
 {
 	int rt = -1;
 	int nerr = 0;
-	uint8_t emask_int = 0;
+	uint32_t emask_int = 0;
 	int i;
 	int sz;
 
@@ -332,6 +356,13 @@ intel_int_err(uint8_t err_fat_int, uint8_t err_nf_int)
 			emask_int |= fat_int_error_code[i].emask;
 			nerr++;
 		}
+	}
+
+	if (nb_chipset == INTEL_NB_5400 &&
+	    (err_nf_int & NERR_NF_5400_INT_B26) != 0) {
+		err_nf_int &= ~NERR_NF_5400_INT_B26;
+		rt = 26;
+		nerr++;
 	}
 
 	sz = sizeof (nf_int_error_code) / sizeof (struct mch_error_code);
@@ -387,17 +418,43 @@ log_int_err(nb_regs_t *rp, int *interpose)
 }
 
 static void
+log_thermal_err(nb_regs_t *rp, int *interpose)
+{
+	int t = 0;
+
+	rp->flag = NB_REG_LOG_THR;
+	rp->nb.thr_regs.ferr_fat_thr = FERR_FAT_THR_RD(interpose);
+	rp->nb.thr_regs.nerr_fat_thr = NERR_FAT_THR_RD(&t);
+	*interpose |= t;
+	rp->nb.thr_regs.ferr_nf_thr = FERR_NF_THR_RD(&t);
+	*interpose |= t;
+	rp->nb.thr_regs.nerr_nf_thr = NERR_NF_THR_RD(&t);
+	*interpose |= t;
+	rp->nb.thr_regs.ctsts = CTSTS_RD();
+	rp->nb.thr_regs.thrtsts = THRTSTS_RD();
+
+	if (rp->nb.thr_regs.ferr_fat_thr || *interpose)
+		FERR_FAT_THR_WR(rp->nb.thr_regs.ferr_fat_thr);
+	if (rp->nb.thr_regs.nerr_fat_thr || *interpose)
+		NERR_FAT_THR_WR(rp->nb.thr_regs.nerr_fat_thr);
+	if (rp->nb.thr_regs.ferr_nf_thr || *interpose)
+		FERR_NF_THR_WR(rp->nb.thr_regs.ferr_nf_thr);
+	if (rp->nb.thr_regs.nerr_nf_thr || *interpose)
+		NERR_NF_THR_WR(rp->nb.thr_regs.nerr_nf_thr);
+
+	if (*interpose) {
+		CTSTS_WR(rp->nb.thr_regs.ctsts);
+		THRTSTS_WR(rp->nb.thr_regs.thrtsts);
+	}
+}
+
+static void
 log_dma_err(nb_regs_t *rp, int *interpose)
 {
 	rp->flag = NB_REG_LOG_DMA;
 
 	rp->nb.dma_regs.pcists = PCISTS_RD(interpose);
 	rp->nb.dma_regs.pexdevsts = PCIDEVSTS_RD();
-
-	if (rp->nb.dma_regs.pcists)
-		PCISTS_WR(rp->nb.dma_regs.pcists);
-	if (rp->nb.dma_regs.pexdevsts)
-		PCIDEVSTS_WR(rp->nb.dma_regs.pexdevsts);
 }
 
 static struct mch_error_code fat_fsb_error_code[] = {
@@ -495,6 +552,37 @@ static struct mch_error_code fat_pex_error_code[] = {
 	{ 0, EMASK_UNCOR_PEX_IO0, PEX_FAT_IO0 }
 };
 
+static struct mch_error_code fat_unit_pex_5400_error_code[] = {
+	{ 32, EMASK_UNIT_PEX_IO32, PEX_5400_FAT_IO32 },
+	{ 31, EMASK_UNIT_PEX_IO31, PEX_5400_FAT_IO31 },
+	{ 30, EMASK_UNIT_PEX_IO30, PEX_5400_FAT_IO30 },
+	{ 29, EMASK_UNIT_PEX_IO29, PEX_5400_FAT_IO29 },
+	{ 27, EMASK_UNIT_PEX_IO27, PEX_5400_FAT_IO27 },
+	{ 26, EMASK_UNIT_PEX_IO26, PEX_5400_FAT_IO26 },
+	{ 25, EMASK_UNIT_PEX_IO25, PEX_5400_FAT_IO25 },
+	{ 24, EMASK_UNIT_PEX_IO24, PEX_5400_FAT_IO24 },
+	{ 23, EMASK_UNIT_PEX_IO23, PEX_5400_FAT_IO23 },
+	{ 22, EMASK_UNIT_PEX_IO22, PEX_5400_FAT_IO22 },
+};
+
+static struct mch_error_code fat_pex_5400_error_code[] = {
+	{ 19, EMASK_UNCOR_PEX_IO19, PEX_5400_FAT_IO19 },
+	{ 18, EMASK_UNCOR_PEX_IO18, PEX_5400_FAT_IO18 },
+	{ 10, EMASK_UNCOR_PEX_IO10, PEX_5400_FAT_IO10 },
+	{ 9, EMASK_UNCOR_PEX_IO9, PEX_5400_FAT_IO9 },
+	{ 8, EMASK_UNCOR_PEX_IO8, PEX_5400_FAT_IO8 },
+	{ 7, EMASK_UNCOR_PEX_IO7, PEX_5400_FAT_IO7 },
+	{ 6, EMASK_UNCOR_PEX_IO6, PEX_5400_FAT_IO6 },
+	{ 5, EMASK_UNCOR_PEX_IO5, PEX_5400_FAT_IO5 },
+	{ 4, EMASK_UNCOR_PEX_IO4, PEX_5400_FAT_IO4 },
+	{ 2, EMASK_UNCOR_PEX_IO2, PEX_5400_FAT_IO2 },
+	{ 0, EMASK_UNCOR_PEX_IO0, PEX_5400_FAT_IO0 }
+};
+
+static struct mch_error_code fat_rp_5400_error_code[] = {
+	{ 1, EMASK_RP_PEX_IO1, PEX_5400_FAT_IO1 }
+};
+
 static struct mch_error_code fat_rp_error_code[] = {
 	{ 1, EMASK_RP_PEX_IO1, PEX_FAT_IO1 }
 };
@@ -511,7 +599,22 @@ static struct mch_error_code uncor_pex_error_code[] = {
 	{ 0, EMASK_UNCOR_PEX_IO0, PEX_NF_IO0 }
 };
 
+static struct mch_error_code uncor_pex_5400_error_code[] = {
+	{ 33, EMASK_UNIT_PEX_IO33, PEX_5400_NF_IO33 },
+	{ 32, EMASK_UNIT_PEX_IO32, PEX_5400_NF_IO32 },
+	{ 31, EMASK_UNIT_PEX_IO31, PEX_5400_NF_IO31 },
+	{ 30, EMASK_UNIT_PEX_IO30, PEX_5400_NF_IO30 },
+	{ 29, EMASK_UNIT_PEX_IO29, PEX_5400_NF_IO29 },
+	{ 28, EMASK_UNIT_PEX_IO28, PEX_5400_NF_IO28 },
+	{ 27, EMASK_UNIT_PEX_IO27, PEX_5400_NF_IO27 },
+	{ 26, EMASK_UNIT_PEX_IO26, PEX_5400_NF_IO26 },
+	{ 25, EMASK_UNIT_PEX_IO25, PEX_5400_NF_IO25 },
+	{ 24, EMASK_UNIT_PEX_IO24, PEX_5400_NF_IO24 },
+	{ 23, EMASK_UNIT_PEX_IO23, PEX_5400_NF_IO23 },
+};
+
 static struct mch_error_code cor_pex_error_code[] = {
+	{ 20, EMASK_COR_PEX_IO20, PEX_5400_NF_IO20 },
 	{ 16, EMASK_COR_PEX_IO16, PEX_NF_IO16 },
 	{ 15, EMASK_COR_PEX_IO15, PEX_NF_IO15 },
 	{ 14, EMASK_COR_PEX_IO14, PEX_NF_IO14 },
@@ -519,6 +622,47 @@ static struct mch_error_code cor_pex_error_code[] = {
 	{ 12, EMASK_COR_PEX_IO12, PEX_NF_IO12 },
 	{ 10, 0, PEX_NF_IO10 },
 	{ 2, 0, PEX_NF_IO2 }
+};
+
+static struct mch_error_code rp_pex_5400_error_code[] = {
+	{ 17, EMASK_RP_PEX_IO17, PEX_5400_NF_IO17 },
+	{ 11, EMASK_RP_PEX_IO11, PEX_5400_NF_IO11 }
+};
+
+static struct mch_error_code cor_pex_5400_error_code1[] = {
+	{ 19, EMASK_UNCOR_PEX_IO19, PEX_5400_NF_IO19 },
+	{ 10, EMASK_UNCOR_PEX_IO10, PEX_5400_NF_IO10 },
+	{ 9, EMASK_UNCOR_PEX_IO9, PEX_5400_NF_IO9 },
+	{ 8, EMASK_UNCOR_PEX_IO8, PEX_5400_NF_IO8 },
+	{ 7, EMASK_UNCOR_PEX_IO7, PEX_5400_NF_IO7 },
+	{ 6, EMASK_UNCOR_PEX_IO6, PEX_5400_NF_IO6 },
+	{ 5, EMASK_UNCOR_PEX_IO5, PEX_5400_NF_IO5 },
+	{ 4, EMASK_UNCOR_PEX_IO4, PEX_5400_NF_IO4 },
+	{ 2, EMASK_UNCOR_PEX_IO2, PEX_5400_NF_IO2 },
+	{ 0, EMASK_UNCOR_PEX_IO0, PEX_5400_NF_IO0 }
+};
+
+static struct mch_error_code cor_pex_5400_error_code2[] = {
+	{ 20, EMASK_COR_PEX_IO20, PEX_5400_NF_IO20 },
+	{ 16, EMASK_COR_PEX_IO16, PEX_5400_NF_IO16 },
+	{ 15, EMASK_COR_PEX_IO15, PEX_5400_NF_IO15 },
+	{ 14, EMASK_COR_PEX_IO14, PEX_5400_NF_IO14 },
+	{ 13, EMASK_COR_PEX_IO13, PEX_5400_NF_IO13 },
+	{ 12, EMASK_COR_PEX_IO12, PEX_5400_NF_IO12 }
+};
+
+static struct mch_error_code cor_pex_5400_error_code3[] = {
+	{ 33, EMASK_UNIT_PEX_IO33, PEX_5400_NF_IO33 },
+	{ 32, EMASK_UNIT_PEX_IO32, PEX_5400_NF_IO32 },
+	{ 31, EMASK_UNIT_PEX_IO31, PEX_5400_NF_IO31 },
+	{ 30, EMASK_UNIT_PEX_IO30, PEX_5400_NF_IO30 },
+	{ 29, EMASK_UNIT_PEX_IO29, PEX_5400_NF_IO29 },
+	{ 28, EMASK_UNIT_PEX_IO28, PEX_5400_NF_IO28 },
+	{ 27, EMASK_UNIT_PEX_IO27, PEX_5400_NF_IO27 },
+	{ 26, EMASK_UNIT_PEX_IO26, PEX_5400_NF_IO26 },
+	{ 25, EMASK_UNIT_PEX_IO25, PEX_5400_NF_IO25 },
+	{ 24, EMASK_UNIT_PEX_IO24, PEX_5400_NF_IO24 },
+	{ 23, EMASK_UNIT_PEX_IO23, PEX_5400_NF_IO23 }
 };
 
 static struct mch_error_code rp_pex_error_code[] = {
@@ -580,6 +724,139 @@ intel_pex_err(uint32_t pex_fat, uint32_t pex_nf_cor)
 		rt = -1;
 	return (rt);
 }
+
+static struct mch_error_code fat_thr_error_code[] = {
+	{ 2, EMASK_THR_F2, ERR_FAT_THR_F2 },
+	{ 1, EMASK_THR_F1, ERR_FAT_THR_F1 }
+};
+
+static struct mch_error_code nf_thr_error_code[] = {
+	{ 5, EMASK_THR_F5, ERR_NF_THR_F5 },
+	{ 4, EMASK_THR_F4, ERR_NF_THR_F4 },
+	{ 3, EMASK_THR_F3, ERR_NF_THR_F3 }
+};
+
+static int
+intel_thr_err(uint8_t err_fat_thr, uint8_t err_nf_thr)
+{
+	int rt = -1;
+	int nerr = 0;
+	uint16_t emask_thr = 0;
+	int i;
+	int sz;
+
+	sz = sizeof (fat_thr_error_code) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (err_fat_thr & fat_thr_error_code[i].error_bit) {
+			rt = fat_thr_error_code[i].intel_error_list;
+			emask_thr |= fat_thr_error_code[i].emask;
+			nerr++;
+		}
+	}
+
+	sz = sizeof (nf_thr_error_code) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (err_nf_thr & nf_thr_error_code[i].error_bit) {
+			rt = nf_thr_error_code[i].intel_error_list;
+			emask_thr |= nf_thr_error_code[i].emask;
+			nerr++;
+		}
+	}
+
+	if (emask_thr)
+		nb_thr_mask_mc(emask_thr);
+	if (nerr > 1)
+		rt = -1;
+	return (rt);
+}
+
+static int
+intel_pex_5400_err(uint32_t pex_fat, uint32_t pex_nf_cor)
+{
+	int rt = -1;
+	int nerr = 0;
+	int i;
+	int sz;
+
+	sz = sizeof (fat_pex_5400_error_code) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_fat & fat_pex_5400_error_code[i].error_bit) {
+			rt = fat_pex_5400_error_code[i].intel_error_list;
+			nerr++;
+		}
+	}
+	sz = sizeof (fat_rp_5400_error_code) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_fat & fat_rp_5400_error_code[i].error_bit) {
+			rt = fat_rp_5400_error_code[i].intel_error_list;
+			nerr++;
+		}
+	}
+	sz = sizeof (fat_unit_pex_5400_error_code) /
+	    sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_fat &
+		    fat_unit_pex_5400_error_code[i].error_bit) {
+			rt = fat_unit_pex_5400_error_code[i].intel_error_list;
+			nerr++;
+		}
+	}
+	sz = sizeof (uncor_pex_5400_error_code) /
+	    sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_fat & uncor_pex_5400_error_code[i].error_bit) {
+			rt = uncor_pex_5400_error_code[i].intel_error_list;
+			nerr++;
+		}
+	}
+
+	sz = sizeof (rp_pex_5400_error_code) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_nf_cor & rp_pex_5400_error_code[i].error_bit) {
+			rt = rp_pex_5400_error_code[i].intel_error_list;
+			nerr++;
+		}
+	}
+
+	sz = sizeof (cor_pex_5400_error_code1) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_nf_cor & cor_pex_5400_error_code1[i].error_bit) {
+			rt = cor_pex_5400_error_code1[i].intel_error_list;
+			nerr++;
+		}
+	}
+
+	sz = sizeof (cor_pex_5400_error_code2) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_nf_cor & cor_pex_5400_error_code2[i].error_bit) {
+			rt = cor_pex_5400_error_code2[i].intel_error_list;
+			nerr++;
+		}
+	}
+
+	sz = sizeof (cor_pex_5400_error_code3) / sizeof (struct mch_error_code);
+
+	for (i = 0; i < sz; i++) {
+		if (pex_nf_cor & cor_pex_5400_error_code3[i].error_bit) {
+			rt = cor_pex_5400_error_code3[i].intel_error_list;
+			nerr++;
+		}
+	}
+
+	if (nerr > 1)
+		rt = -1;
+	return (rt);
+}
+
 static void
 log_pex_err(uint64_t ferr, nb_regs_t *rp, int *interpose)
 {
@@ -616,11 +893,9 @@ log_pex_err(uint64_t ferr, nb_regs_t *rp, int *interpose)
 		PEX_NF_FERR_WR(pex, rp->nb.pex_regs.pex_nf_corr_ferr);
 	if (rp->nb.pex_regs.pex_nf_corr_nerr)
 		PEX_NF_NERR_WR(pex, rp->nb.pex_regs.pex_nf_corr_nerr);
-	if (rp->nb.pex_regs.uncerrsts || *interpose)
+	if (*interpose)
 		UNCERRSTS_WR(pex, rp->nb.pex_regs.uncerrsts);
-	if (rp->nb.pex_regs.pexdevsts || *interpose)
-		PEXDEVSTS_WR(pex, rp->nb.pex_regs.pexdevsts);
-	if (rp->nb.pex_regs.rperrsts || *interpose)
+	if (*interpose)
 		RPERRSTS_WR(pex, rp->nb.pex_regs.rperrsts);
 	if (*interpose)
 		PEXDEVSTS_WR(pex, 0);
@@ -638,15 +913,15 @@ log_fat_fbd_err(nb_regs_t *rp, int *interpose)
 	branch = channel >> 1;
 	rp->nb.fat_fbd_regs.nerr_fat_fbd = NERR_FAT_FBD_RD(&t);
 	*interpose |= t;
-	rp->nb.fat_fbd_regs.nrecmema = NRECMEMA_RD();
-	rp->nb.fat_fbd_regs.nrecmemb = NRECMEMB_RD();
-	rp->nb.fat_fbd_regs.nrecfglog = NRECFGLOG_RD();
-	rp->nb.fat_fbd_regs.nrecfbda = NRECFBDA_RD();
-	rp->nb.fat_fbd_regs.nrecfbdb = NRECFBDB_RD();
-	rp->nb.fat_fbd_regs.nrecfbdc = NRECFBDC_RD();
-	rp->nb.fat_fbd_regs.nrecfbdd = NRECFBDD_RD();
-	rp->nb.fat_fbd_regs.nrecfbde = NRECFBDE_RD();
-	rp->nb.fat_fbd_regs.nrecfbdf = NRECFBDF_RD();
+	rp->nb.fat_fbd_regs.nrecmema = NRECMEMA_RD(branch);
+	rp->nb.fat_fbd_regs.nrecmemb = NRECMEMB_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfglog = NRECFGLOG_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfbda = NRECFBDA_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfbdb = NRECFBDB_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfbdc = NRECFBDC_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfbdd = NRECFBDD_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfbde = NRECFBDE_RD(branch);
+	rp->nb.fat_fbd_regs.nrecfbdf = NRECFBDF_RD(branch);
 	rp->nb.fat_fbd_regs.spcps = SPCPS_RD(branch);
 	rp->nb.fat_fbd_regs.spcpc = SPCPC_RD(branch);
 	rp->nb.fat_fbd_regs.uerrcnt = UERRCNT_RD(branch);
@@ -661,14 +936,15 @@ log_fat_fbd_err(nb_regs_t *rp, int *interpose)
 		NERR_FAT_FBD_WR(rp->nb.fat_fbd_regs.nerr_fat_fbd);
 	/* if interpose write read-only registers to clear from pcii cache */
 	if (*interpose) {
-		NRECMEMA_WR();
-		NRECMEMB_WR();
-		NRECFGLOG_WR();
-		NRECFBDA_WR();
-		NRECFBDB_WR();
-		NRECFBDC_WR();
-		NRECFBDD_WR();
-		NRECFBDE_WR();
+		NRECMEMA_WR(branch);
+		NRECMEMB_WR(branch);
+		NRECFGLOG_WR(branch);
+		NRECFBDA_WR(branch);
+		NRECFBDB_WR(branch);
+		NRECFBDC_WR(branch);
+		NRECFBDD_WR(branch);
+		NRECFBDE_WR(branch);
+		NRECFBDF_WR(branch);
 	}
 }
 
@@ -685,20 +961,36 @@ log_nf_fbd_err(nb_regs_t *rp, int *interpose)
 	rp->nb.nf_fbd_regs.nerr_nf_fbd = NERR_NF_FBD_RD(&t);
 	*interpose |= t;
 	rp->nb.nf_fbd_regs.redmemb = REDMEMB_RD();
-	rp->nb.nf_fbd_regs.recmema = RECMEMA_RD();
-	rp->nb.nf_fbd_regs.recmemb = RECMEMB_RD();
-	rp->nb.nf_fbd_regs.recfglog = RECFGLOG_RD();
-	rp->nb.nf_fbd_regs.recfbda = RECFBDA_RD();
-	rp->nb.nf_fbd_regs.recfbdb = RECFBDB_RD();
-	rp->nb.nf_fbd_regs.recfbdc = RECFBDC_RD();
-	rp->nb.nf_fbd_regs.recfbdd = RECFBDD_RD();
-	rp->nb.nf_fbd_regs.recfbde = RECFBDE_RD();
-	rp->nb.nf_fbd_regs.recfbdf = RECFBDF_RD();
+	rp->nb.nf_fbd_regs.recmema = RECMEMA_RD(branch);
+	rp->nb.nf_fbd_regs.recmemb = RECMEMB_RD(branch);
+	rp->nb.nf_fbd_regs.recfglog = RECFGLOG_RD(branch);
+	rp->nb.nf_fbd_regs.recfbda = RECFBDA_RD(branch);
+	rp->nb.nf_fbd_regs.recfbdb = RECFBDB_RD(branch);
+	rp->nb.nf_fbd_regs.recfbdc = RECFBDC_RD(branch);
+	rp->nb.nf_fbd_regs.recfbdd = RECFBDD_RD(branch);
+	rp->nb.nf_fbd_regs.recfbde = RECFBDE_RD(branch);
+	rp->nb.nf_fbd_regs.recfbdf = RECFBDF_RD(branch);
 	rp->nb.nf_fbd_regs.spcps = SPCPS_RD(branch);
 	rp->nb.nf_fbd_regs.spcpc = SPCPC_RD(branch);
-	rp->nb.nf_fbd_regs.cerrcnt = CERRCNT_RD(branch);
-	rp->nb.nf_fbd_regs.cerrcnt_last = cerrcnt[branch];
-	cerrcnt[branch] = rp->nb.nf_fbd_regs.cerrcnt;
+	if (nb_chipset == INTEL_NB_7300 || nb_chipset == INTEL_NB_5400) {
+		rp->nb.nf_fbd_regs.cerrcnta = CERRCNTA_RD(branch, channel);
+		rp->nb.nf_fbd_regs.cerrcntb = CERRCNTB_RD(branch, channel);
+		rp->nb.nf_fbd_regs.cerrcntc = CERRCNTC_RD(branch, channel);
+		rp->nb.nf_fbd_regs.cerrcntd = CERRCNTD_RD(branch, channel);
+	} else {
+		rp->nb.nf_fbd_regs.cerrcnta = CERRCNT_RD(branch);
+		rp->nb.nf_fbd_regs.cerrcntb = 0;
+		rp->nb.nf_fbd_regs.cerrcntc = 0;
+		rp->nb.nf_fbd_regs.cerrcntd = 0;
+	}
+	rp->nb.nf_fbd_regs.cerrcnta_last = cerrcnta[branch][channel & 1];
+	rp->nb.nf_fbd_regs.cerrcntb_last = cerrcntb[branch][channel & 1];
+	rp->nb.nf_fbd_regs.cerrcntc_last = cerrcntc[branch][channel & 1];
+	rp->nb.nf_fbd_regs.cerrcntd_last = cerrcntd[branch][channel & 1];
+	cerrcnta[branch][channel & 1] = rp->nb.nf_fbd_regs.cerrcnta;
+	cerrcntb[branch][channel & 1] = rp->nb.nf_fbd_regs.cerrcntb;
+	cerrcntc[branch][channel & 1] = rp->nb.nf_fbd_regs.cerrcntc;
+	cerrcntd[branch][channel & 1] = rp->nb.nf_fbd_regs.cerrcntd;
 	rp->nb.nf_fbd_regs.badrama = BADRAMA_RD(branch);
 	rp->nb.nf_fbd_regs.badramb = BADRAMB_RD(branch);
 	rp->nb.nf_fbd_regs.badcnt = BADCNT_RD(branch);
@@ -708,14 +1000,15 @@ log_nf_fbd_err(nb_regs_t *rp, int *interpose)
 		NERR_NF_FBD_WR(rp->nb.nf_fbd_regs.nerr_nf_fbd);
 	/* if interpose write read-only registers to clear from pcii cache */
 	if (*interpose) {
-		RECMEMA_WR();
-		RECMEMB_WR();
-		RECFGLOG_WR();
-		RECFBDA_WR();
-		RECFBDB_WR();
-		RECFBDC_WR();
-		RECFBDD_WR();
-		RECFBDE_WR();
+		RECMEMA_WR(branch);
+		RECMEMB_WR(branch);
+		RECFGLOG_WR(branch);
+		RECFBDA_WR(branch);
+		RECFBDB_WR(branch);
+		RECFBDC_WR(branch);
+		RECFBDD_WR(branch);
+		RECFBDE_WR(branch);
+		RECFBDF_WR(branch);
 		SPCPS_WR(branch);
 	}
 }
@@ -746,6 +1039,10 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 	} else if ((ferr & (GE_INT_FATAL | GE_INT_NF)) != 0) {
 		log_int_err(rp, &interpose);
 		*nerrp = nerr & ~(GE_INT_FATAL | GE_INT_NF);
+	} else if (nb_chipset == INTEL_NB_5400 &&
+	    (ferr & (GE_FERR_THERMAL_FATAL | GE_FERR_THERMAL_NF)) != 0) {
+		log_thermal_err(rp, &interpose);
+		*nerrp = nerr & ~(GE_FERR_THERMAL_FATAL | GE_FERR_THERMAL_NF);
 	}
 	if (interpose)
 		log->type = "inject";
@@ -907,13 +1204,13 @@ nb_int_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
 	char buf[32];
 
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_FERR_FAT_INT,
-	    DATA_TYPE_UINT8, nb_regs->nb.int_regs.ferr_fat_int, NULL);
+	    DATA_TYPE_UINT16, nb_regs->nb.int_regs.ferr_fat_int, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_FERR_NF_INT,
-	    DATA_TYPE_UINT8, nb_regs->nb.int_regs.ferr_nf_int, NULL);
+	    DATA_TYPE_UINT16, nb_regs->nb.int_regs.ferr_nf_int, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NERR_FAT_INT,
-	    DATA_TYPE_UINT8, nb_regs->nb.int_regs.nerr_fat_int, NULL);
+	    DATA_TYPE_UINT16, nb_regs->nb.int_regs.nerr_fat_int, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NERR_NF_INT,
-	    DATA_TYPE_UINT8, nb_regs->nb.int_regs.nerr_nf_int, NULL);
+	    DATA_TYPE_UINT16, nb_regs->nb.int_regs.nerr_nf_int, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NRECINT,
 	    DATA_TYPE_UINT32, nb_regs->nb.int_regs.nrecint, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RECINT,
@@ -961,7 +1258,7 @@ nb_fat_fbd_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NERR_FAT_FBD,
 	    DATA_TYPE_UINT32, nb_regs->nb.fat_fbd_regs.nerr_fat_fbd, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NRECMEMA,
-	    DATA_TYPE_UINT16, nb_regs->nb.fat_fbd_regs.nrecmema, NULL);
+	    DATA_TYPE_UINT32, nb_regs->nb.fat_fbd_regs.nrecmema, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NRECMEMB,
 	    DATA_TYPE_UINT32, nb_regs->nb.fat_fbd_regs.nrecmemb, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NRECFGLOG,
@@ -1035,7 +1332,7 @@ nb_nf_fbd_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NERR_NF_FBD,
 	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.nerr_nf_fbd, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RECMEMA,
-	    DATA_TYPE_UINT16, nb_regs->nb.nf_fbd_regs.recmema, NULL);
+	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.recmema, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RECMEMB,
 	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.recmemb, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RECFGLOG,
@@ -1056,10 +1353,44 @@ nb_nf_fbd_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
 	    DATA_TYPE_UINT8, nb_regs->nb.nf_fbd_regs.spcps, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SPCPC,
 	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.spcpc, NULL);
-	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNT,
-	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcnt, NULL);
-	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNT_LAST,
-	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcnt_last, NULL);
+	if (nb_chipset == INTEL_NB_7300 || nb_chipset == INTEL_NB_5400) {
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNTA,
+		    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcnta, NULL);
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNTB,
+		    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcntb, NULL);
+		if (nb_chipset == INTEL_NB_7300) {
+			fm_payload_set(payload,
+			    FM_EREPORT_PAYLOAD_NAME_CERRCNTC,
+			    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcntc,
+			    NULL);
+			fm_payload_set(payload,
+			    FM_EREPORT_PAYLOAD_NAME_CERRCNTD,
+			    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcntd,
+			    NULL);
+		}
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNTA_LAST,
+		    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcnta_last,
+		    NULL);
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNTB_LAST,
+		    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcntb_last,
+		    NULL);
+		if (nb_chipset == INTEL_NB_7300) {
+			fm_payload_set(payload,
+			    FM_EREPORT_PAYLOAD_NAME_CERRCNTC_LAST,
+			    DATA_TYPE_UINT32,
+			    nb_regs->nb.nf_fbd_regs.cerrcntc_last, NULL);
+			fm_payload_set(payload,
+			    FM_EREPORT_PAYLOAD_NAME_CERRCNTD_LAST,
+			    DATA_TYPE_UINT32,
+			    nb_regs->nb.nf_fbd_regs.cerrcntd_last, NULL);
+		}
+	} else {
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNT,
+		    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcnta, NULL);
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CERRCNT_LAST,
+		    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.cerrcnta_last,
+		    NULL);
+	}
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_BADRAMA,
 	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.badrama, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_BADRAMB,
@@ -1082,6 +1413,34 @@ nb_dma_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload)
 	    DATA_TYPE_UINT16, nb_regs->nb.dma_regs.pcists, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_PEXDEVSTS,
 	    DATA_TYPE_UINT16, nb_regs->nb.dma_regs.pexdevsts, NULL);
+}
+
+static void
+nb_thr_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
+    nb_scatchpad_t *data)
+{
+	char buf[32];
+
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_FERR_FAT_THR,
+	    DATA_TYPE_UINT8, nb_regs->nb.thr_regs.ferr_fat_thr, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NERR_FAT_THR,
+	    DATA_TYPE_UINT8, nb_regs->nb.thr_regs.nerr_fat_thr, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_FERR_NF_THR,
+	    DATA_TYPE_UINT8, nb_regs->nb.thr_regs.ferr_nf_thr, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NERR_NF_THR,
+	    DATA_TYPE_UINT8, nb_regs->nb.thr_regs.nerr_nf_thr, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_CTSTS,
+	    DATA_TYPE_UINT8, nb_regs->nb.thr_regs.ctsts, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_THRTSTS,
+	    DATA_TYPE_UINT16, nb_regs->nb.thr_regs.thrtsts, NULL);
+	if (data->intel_error_list >= 0) {
+		(void) snprintf(buf, sizeof (buf), "TH%d",
+		    data->intel_error_list);
+	} else {
+		(void) snprintf(buf, sizeof (buf), "Multiple or unknown error");
+	}
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_ERROR_NO,
+	    DATA_TYPE_STRING, buf, NULL);
 }
 
 static void
@@ -1110,6 +1469,9 @@ nb_ereport_add_logout(nvlist_t *payload, const nb_logout_t *acl,
 		break;
 	case NB_REG_LOG_DMA:
 		nb_dma_err_payload(nb_regs, payload);
+		break;
+	case NB_REG_LOG_THR:
+		nb_thr_err_payload(nb_regs, payload, data);
 		break;
 	default:
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_FERR_GLOBAL,
@@ -1153,7 +1515,6 @@ nb_pex_report(const nb_regs_t *nb_regs, char *class, nvlist_t *detector,
 {
 	int hostbridge;
 
-
 	if (nb_regs->nb.pex_regs.pex == 0) {
 		fm_fmri_hc_set(detector, FM_HC_SCHEME_VERSION, NULL, NULL, 1,
 		    "motherboard", 0);
@@ -1166,13 +1527,27 @@ nb_pex_report(const nb_regs_t *nb_regs, char *class, nvlist_t *detector,
 
 	if (nb_regs->nb.pex_regs.pex_fat_ferr == 0 &&
 	    nb_regs->nb.pex_regs.pex_nf_corr_ferr == 0) {
-		data->intel_error_list =
-		    intel_pex_err(nb_regs->nb.pex_regs.pex_fat_nerr,
-		    nb_regs->nb.pex_regs.pex_nf_corr_nerr);
+		if (nb_chipset == INTEL_NB_5400) {
+			data->intel_error_list =
+			    intel_pex_5400_err(
+			    nb_regs->nb.pex_regs.pex_fat_nerr,
+			    nb_regs->nb.pex_regs.pex_nf_corr_nerr);
+		} else {
+			data->intel_error_list =
+			    intel_pex_err(nb_regs->nb.pex_regs.pex_fat_nerr,
+			    nb_regs->nb.pex_regs.pex_nf_corr_nerr);
+		}
 	} else {
-		data->intel_error_list =
-		    intel_pex_err(nb_regs->nb.pex_regs.pex_fat_ferr,
-		    nb_regs->nb.pex_regs.pex_nf_corr_ferr);
+		if (nb_chipset == INTEL_NB_5400) {
+			data->intel_error_list =
+			    intel_pex_5400_err(
+			    nb_regs->nb.pex_regs.pex_fat_ferr,
+			    nb_regs->nb.pex_regs.pex_nf_corr_ferr);
+		} else {
+			data->intel_error_list =
+			    intel_pex_err(nb_regs->nb.pex_regs.pex_fat_ferr,
+			    nb_regs->nb.pex_regs.pex_nf_corr_ferr);
+		}
 	}
 
 	if (nb_regs->nb.pex_regs.pex == 0) {
@@ -1285,6 +1660,20 @@ nb_dma_report(char *class, nvlist_t *detector)
 	    FM_ERROR_CPU, FM_EREPORT_CPU_INTEL, "nb", "dma");
 }
 
+void
+nb_thr_report(const nb_regs_t *nb_regs, char *class, nvlist_t *detector,
+    void *data)
+{
+	((nb_scatchpad_t *)data)->intel_error_list =
+	    intel_thr_err(nb_regs->nb.thr_regs.ferr_fat_thr,
+	    nb_regs->nb.thr_regs.ferr_nf_thr);
+	fm_fmri_hc_set(detector, FM_HC_SCHEME_VERSION, NULL, NULL, 1,
+	    "motherboard", 0);
+
+	(void) snprintf(class, FM_MAX_CLASS, "%s.%s.%s.%s",
+	    FM_ERROR_CPU, FM_EREPORT_CPU_INTEL, "nb", "otf");
+}
+
 
 nvlist_t *
 nb_report(const nb_regs_t *nb_regs, char *class, nv_alloc_t *nva, void *scratch)
@@ -1309,6 +1698,9 @@ nb_report(const nb_regs_t *nb_regs, char *class, nv_alloc_t *nva, void *scratch)
 		break;
 	case NB_REG_LOG_DMA:
 		nb_dma_report(class, detector);
+		break;
+	case NB_REG_LOG_THR:
+		nb_thr_report(nb_regs, class, detector, scratch);
 		break;
 	default:
 		fm_fmri_hc_set(detector, FM_HC_SCHEME_VERSION, NULL, NULL, 1,

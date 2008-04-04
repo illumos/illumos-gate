@@ -127,9 +127,24 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDF			"recfbdf"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNT			"cerrcnt"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNT_LAST		"cerrcnt_last"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTA		"cerrcnta"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTB		"cerrcntb"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTC		"cerrcntc"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTD		"cerrcntd"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTA_LAST		"cerrcnta_last"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTB_LAST		"cerrcntb_last"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTC_LAST		"cerrcntc_last"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNTD_LAST		"cerrcntd_last"
 #define	FM_EREPORT_PAYLOAD_NAME_PCISTS			"pcists"
 #define	FM_EREPORT_PAYLOAD_NAME_PEXDEVSTS		"pexdevsts"
 #define	FM_EREPORT_PAYLOAD_NAME_ERROR_NO		"intel-error-list"
+
+#define	FM_EREPORT_PAYLOAD_NAME_CTSTS			"ctsts"
+#define	FM_EREPORT_PAYLOAD_NAME_THRTSTS			"thrtsts"
+#define	FM_EREPORT_PAYLOAD_NAME_FERR_FAT_THR		"ferr_fat_thr"
+#define	FM_EREPORT_PAYLOAD_NAME_NERR_FAT_THR		"nerr_fat_thr"
+#define	FM_EREPORT_PAYLOAD_NAME_FERR_NF_THR		"ferr_nf_thr"
+#define	FM_EREPORT_PAYLOAD_NAME_NERR_NF_THR		"nerr_nf_thr"
 
 #define	FM_EREPORT_PAYLOAD_NAME_ADDR			"addr"
 #define	FM_EREPORT_PAYLOAD_NAME_BANK_NUM		"bank-number"
@@ -179,6 +194,9 @@ extern "C" {
 #define	INTEL_NB_5000V	0x25d48086
 #define	INTEL_NB_5000X	0x25c08086
 #define	INTEL_NB_5000Z	0x25d08086
+#define	INTEL_NB_5400	0x40008086
+#define	INTEL_NB_5400A	0x40018086
+#define	INTEL_NB_5400B	0x40038086
 #define	INTEL_NB_7300	0x36008086
 
 #ifdef __cplusplus

@@ -71,10 +71,10 @@ typedef struct nb_pex_regs {
 /* North Bridge memory controller hub internal error registers */
 
 typedef struct nb_int {
-	uint8_t ferr_fat_int;	/* first fatal error */
-	uint8_t ferr_nf_int;	/* first non-fatal error */
-	uint8_t nerr_fat_int;	/* next fatal error */
-	uint8_t nerr_nf_int;	/* next non-fatal error */
+	uint16_t ferr_fat_int;	/* first fatal error */
+	uint16_t ferr_nf_int;	/* first non-fatal error */
+	uint16_t nerr_fat_int;	/* next fatal error */
+	uint16_t nerr_nf_int;	/* next non-fatal error */
 	uint32_t nrecint;	/* non recoverable error log */
 	uint32_t recint;	/* recoverable error log */
 	uint64_t nrecsf;	/* non recoverable control information */
@@ -86,7 +86,7 @@ typedef struct nb_int {
 typedef struct nb_fat_fbd {
 	uint32_t ferr_fat_fbd;	/* fb-dimm first fatal error */
 	uint32_t nerr_fat_fbd;	/* fb-dimm next fatal error */
-	uint16_t nrecmema;	/* non recoverable memory error log */
+	uint32_t nrecmema;	/* non recoverable memory error log */
 	uint32_t nrecmemb;	/* non recoverable memory error log */
 	uint32_t nrecfglog;	/* non recoverable dimm configuration */
 	uint32_t nrecfbda;	/* non recoverable dimm log A */
@@ -108,7 +108,7 @@ typedef struct nb_nf_fbd {
 	uint32_t ferr_nf_fbd;	/* fb-dimm first non-fatal error */
 	uint32_t nerr_nf_fbd;	/* fb-dimm next non-fatal error */
 	uint32_t redmemb;	/* recoverable dimm data error log */
-	uint16_t recmema;	/* recoverable memory error log A */
+	uint32_t recmema;	/* recoverable memory error log A */
 	uint32_t recmemb;	/* recoverable memory error log B */
 	uint32_t recfglog;	/* recoverable dimm configuration */
 	uint32_t recfbda;	/* recoverable dimm log A */
@@ -119,8 +119,14 @@ typedef struct nb_nf_fbd {
 	uint32_t recfbdf;	/* recoverable dimm log F */
 	uint32_t spcpc;		/* spare copy control */
 	uint8_t spcps;		/* spare copy status */
-	uint32_t cerrcnt;	/* correctable error count */
-	uint32_t cerrcnt_last;	/* saved copy of correctable error count */
+	uint32_t cerrcnta;	/* correctable error count A */
+	uint32_t cerrcntb;	/* correctable error count B */
+	uint32_t cerrcntc;	/* correctable error count C */
+	uint32_t cerrcntd;	/* correctable error count D */
+	uint32_t cerrcnta_last;	/* saved copy of correctable error count A */
+	uint32_t cerrcntb_last;	/* saved copy of correctable error count B */
+	uint32_t cerrcntc_last;	/* saved copy of correctable error count C */
+	uint32_t cerrcntd_last;	/* saved copy of correctable error count D */
 	uint32_t badrama;	/* bad dram marker A */
 	uint16_t badramb;	/* bad dram marker B */
 	uint32_t badcnt;	/* bad dram counter */
@@ -130,6 +136,15 @@ typedef struct nb_dma {
 	uint16_t pcists;
 	uint16_t pexdevsts;
 } nb_dma_t;
+
+typedef struct nb_thr {
+	uint8_t ferr_fat_thr;
+	uint8_t ferr_nf_thr;
+	uint8_t nerr_fat_thr;
+	uint8_t nerr_nf_thr;
+	uint8_t ctsts;
+	uint16_t thrtsts;
+} nb_thr_t;
 
 typedef struct nb_regs {
 	int flag;
@@ -143,6 +158,7 @@ typedef struct nb_regs {
 		nb_fat_fbd_t fat_fbd_regs;
 		nb_nf_fbd_t nf_fbd_regs;
 		nb_dma_t dma_regs;
+		nb_thr_t thr_regs;
 	} nb;
 } nb_regs_t;
 
@@ -153,6 +169,7 @@ typedef struct nb_regs {
 #define	NB_REG_LOG_FAT_FBD	4
 #define	NB_REG_LOG_NF_FBD	5
 #define	NB_REG_LOG_DMA		6
+#define	NB_REG_LOG_THR		7
 
 typedef struct nb_logout {
 	uint64_t acl_timestamp;
@@ -252,7 +269,8 @@ extern void nb_pci_putl(int, int, int, int, uint32_t);
 
 extern void nb_fsb_mask_mc(int, uint16_t);
 extern void nb_fbd_mask_mc(uint32_t);
-extern void nb_int_mask_mc(uint8_t);
+extern void nb_int_mask_mc(uint32_t);
+extern void nb_thr_mask_mc(uint16_t);
 extern void nb_mask_mc_reset(void);
 
 extern int nb_mask_mc_set;

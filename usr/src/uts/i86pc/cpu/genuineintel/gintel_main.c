@@ -63,6 +63,9 @@ gintel_init(cmi_hdl_t hdl, void **datap)
 	case INTEL_NB_5000X:
 	case INTEL_NB_5000V:
 	case INTEL_NB_5000Z:
+	case INTEL_NB_5400:
+	case INTEL_NB_5400A:
+	case INTEL_NB_5400B:
 		if (!gintel_ms_unconstrained)
 			gintel_error_action_return |= CMS_ERRSCOPE_POISONED;
 		break;

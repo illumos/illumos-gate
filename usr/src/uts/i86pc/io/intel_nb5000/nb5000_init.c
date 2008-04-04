@@ -74,7 +74,7 @@ static uint8_t nb_err0_int;
 static uint8_t nb_err1_int;
 static uint8_t nb_err2_int;
 static uint8_t nb_mcerr_int;
-static uint8_t nb_emask_int;
+static uint32_t nb_emask_int;
 
 static uint32_t nb_err0_fbd;
 static uint32_t nb_err1_fbd;
@@ -88,6 +88,12 @@ static uint16_t nb_err2_fsb;
 static uint16_t nb_mcerr_fsb;
 static uint16_t nb_emask_fsb;
 
+static uint16_t nb_err0_thr;
+static uint16_t nb_err1_thr;
+static uint16_t nb_err2_thr;
+static uint16_t nb_mcerr_thr;
+static uint16_t nb_emask_thr;
+
 static uint32_t	emask_uncor_pex[NB_PCI_DEV];
 static uint32_t emask_cor_pex[NB_PCI_DEV];
 static uint32_t emask_rp_pex[NB_PCI_DEV];
@@ -97,16 +103,22 @@ static uint32_t uncerrsev[NB_PCI_DEV];
 static uint8_t l_mcerr_int;
 static uint32_t l_mcerr_fbd;
 static uint16_t l_mcerr_fsb;
+static uint16_t l_mcerr_thr;
 
-uint_t nb5000_emask_fbd = EMASK_FBD_RES;
+uint_t nb5000_emask_fbd = EMASK_5000_FBD_RES;
+uint_t nb5400_emask_fbd = 0;
 int nb5000_reset_emask_fbd = 1;
 uint_t nb5000_mask_poll_fbd = EMASK_FBD_NF;
 uint_t nb5000_mask_bios_fbd = EMASK_FBD_FATAL;
+uint_t nb5400_mask_poll_fbd = EMASK_5400_FBD_NF;
+uint_t nb5400_mask_bios_fbd = EMASK_5400_FBD_FATAL;
 
 uint_t nb5000_emask_fsb = 0;
 int nb5000_reset_emask_fsb = 1;
 uint_t nb5000_mask_poll_fsb = EMASK_FSB_NF;
 uint_t nb5000_mask_bios_fsb = EMASK_FSB_FATAL;
+
+uint_t nb5400_emask_int = 0;
 
 uint_t nb7300_emask_int = EMASK_INT_7300;
 uint_t nb7300_emask_int_step0 = EMASK_INT_7300_STEP_0;
@@ -115,12 +127,18 @@ int nb5000_reset_emask_int = 1;
 uint_t nb5000_mask_poll_int = EMASK_INT_NF;
 uint_t nb5000_mask_bios_int = EMASK_INT_FATAL;
 
+uint_t nb_mask_poll_thr = EMASK_THR_NF;
+uint_t nb_mask_bios_thr = EMASK_THR_FATAL;
+
 int nb5000_reset_uncor_pex = 0;
 uint_t nb5000_mask_uncor_pex = 0;
-int nb5000_reset_cor_pex = 1;
+int nb5000_reset_cor_pex = 0;
 uint_t nb5000_mask_cor_pex = 0xffffffff;
+int nb_set_docmd = 1;
 uint32_t nb5000_docmd_pex_mask = DOCMD_PEX_MASK;
+uint32_t nb5400_docmd_pex_mask = DOCMD_5400_PEX_MASK;
 uint32_t nb5000_docmd_pex = DOCMD_PEX;
+uint32_t nb5400_docmd_pex = DOCMD_5400_PEX;
 
 int nb_mask_mc_set;
 
@@ -621,12 +639,13 @@ static void
 nb_pex_init()
 {
 	int i;
+	uint32_t mask;
 
 	for (i = 0; i < NB_PCI_DEV; i++) {
 		switch (nb_chipset) {
 		case INTEL_NB_5000P:
 		case INTEL_NB_5000X:
-			if (i == 1)
+			if (i == 1 || i > 8)
 				continue;
 			break;
 		case INTEL_NB_5000V:
@@ -637,7 +656,11 @@ nb_pex_init()
 			if (i == 1 || i > 5)
 				continue;
 			break;
+		case INTEL_NB_5400:
+			break;
 		case INTEL_NB_7300:
+			if (i > 8)
+				continue;
 			break;
 		}
 		emask_uncor_pex[i] = EMASK_UNCOR_PEX_RD(i);
@@ -650,8 +673,16 @@ nb_pex_init()
 			EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
 		if (nb5000_reset_cor_pex)
 			EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
-		PEX_ERR_DOCMD_WR(i, (docmd_pex[i] & nb5000_docmd_pex_mask) |
-		    (nb5000_docmd_pex & ~nb5000_docmd_pex_mask));
+		if (nb_set_docmd) {
+			if (nb_chipset == INTEL_NB_5400) {
+				mask = (docmd_pex[i] & nb5400_docmd_pex_mask) |
+				    (nb5400_docmd_pex & ~nb5400_docmd_pex_mask);
+			} else {
+				mask = (docmd_pex[i] & nb5000_docmd_pex_mask) |
+				    (nb5000_docmd_pex & ~nb5000_docmd_pex_mask);
+			}
+			PEX_ERR_DOCMD_WR(i, mask);
+		}
 	}
 }
 
@@ -664,7 +695,7 @@ nb_pex_fini()
 		switch (nb_chipset) {
 		case INTEL_NB_5000P:
 		case INTEL_NB_5000X:
-			if (i == 1)
+			if (i == 1 && i > 8)
 				continue;
 			break;
 		case INTEL_NB_5000V:
@@ -675,14 +706,17 @@ nb_pex_fini()
 			if (i == 1 || i > 5)
 				continue;
 			break;
+		case INTEL_NB_5400:
+			break;
 		case INTEL_NB_7300:
+			if (i > 8)
+				continue;
 			break;
 		}
 		EMASK_UNCOR_PEX_WR(i, emask_uncor_pex[i]);
 		EMASK_COR_PEX_WR(i, emask_cor_pex[i]);
 		EMASK_RP_PEX_WR(i, emask_rp_pex[i]);
 		PEX_ERR_DOCMD_WR(i, docmd_pex[i]);
-		UNCERRSEV_WR(i, uncerrsev[i]);
 
 		if (nb5000_reset_uncor_pex)
 			EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
@@ -698,7 +732,7 @@ nb_int_init()
 	uint8_t err1_int;
 	uint8_t err2_int;
 	uint8_t mcerr_int;
-	uint8_t emask_int;
+	uint32_t emask_int;
 	uint16_t stepping;
 
 	err0_int = ERR0_INT_RD();
@@ -735,11 +769,14 @@ nb_int_init()
 		if (nb_chipset == INTEL_NB_7300) {
 			stepping = NB5000_STEPPING();
 			if (stepping == 0)
-				EMASK_INT_WR(nb7300_emask_int_step0);
+				EMASK_5000_INT_WR(nb7300_emask_int_step0);
 			else
-				EMASK_INT_WR(nb7300_emask_int);
+				EMASK_5000_INT_WR(nb7300_emask_int);
+		} else if (nb_chipset == INTEL_NB_5400) {
+			EMASK_5400_INT_WR(nb5400_emask_int |
+			    (emask_int & EMASK_INT_RES));
 		} else {
-			EMASK_INT_WR(nb5000_emask_int);
+			EMASK_5000_INT_WR(nb5000_emask_int);
 		}
 	} else {
 		EMASK_INT_WR(nb_emask_int);
@@ -763,9 +800,9 @@ nb_int_fini()
 }
 
 void
-nb_int_mask_mc(uint8_t mc_mask_int)
+nb_int_mask_mc(uint32_t mc_mask_int)
 {
-	uint8_t emask_int;
+	uint32_t emask_int;
 
 	emask_int = MCERR_INT_RD();
 	if ((emask_int & mc_mask_int) != mc_mask_int) {
@@ -782,6 +819,8 @@ nb_fbd_init()
 	uint32_t err2_fbd;
 	uint32_t mcerr_fbd;
 	uint32_t emask_fbd;
+	uint32_t emask_bios_fbd;
+	uint32_t emask_poll_fbd;
 
 	err0_fbd = ERR0_FBD_RD();
 	err1_fbd = ERR1_FBD_RD();
@@ -803,25 +842,36 @@ nb_fbd_init()
 
 	if (nb_chipset == INTEL_NB_7300 && nb_mode == NB_MEMORY_MIRROR) {
 		/* MCH 7300 errata 34 */
-		nb5000_mask_bios_fbd &= ~EMASK_FBD_M23;
+		emask_bios_fbd = nb5000_mask_bios_fbd & ~EMASK_FBD_M23;
+		emask_poll_fbd = nb5000_mask_poll_fbd;
 		mcerr_fbd |= EMASK_FBD_M23;
+	} else if (nb_chipset == INTEL_NB_5400) {
+		emask_bios_fbd = nb5400_mask_bios_fbd;
+		emask_poll_fbd = nb5400_mask_poll_fbd;
+	} else {
+		emask_bios_fbd = nb5000_mask_bios_fbd;
+		emask_poll_fbd = nb5000_mask_poll_fbd;
 	}
-	mcerr_fbd &= ~nb5000_mask_bios_fbd;
-	mcerr_fbd |= nb5000_mask_bios_fbd & (~err0_fbd | ~err1_fbd | ~err2_fbd);
-	mcerr_fbd |= nb5000_mask_poll_fbd;
-	err0_fbd |= nb5000_mask_poll_fbd;
-	err1_fbd |= nb5000_mask_poll_fbd;
-	err2_fbd |= nb5000_mask_poll_fbd;
+	mcerr_fbd &= ~emask_bios_fbd;
+	mcerr_fbd |= emask_bios_fbd & (~err0_fbd | ~err1_fbd | ~err2_fbd);
+	mcerr_fbd |= emask_poll_fbd;
+	err0_fbd |= emask_poll_fbd;
+	err1_fbd |= emask_poll_fbd;
+	err2_fbd |= emask_poll_fbd;
 
 	l_mcerr_fbd = mcerr_fbd;
 	ERR0_FBD_WR(err0_fbd);
 	ERR1_FBD_WR(err1_fbd);
 	ERR2_FBD_WR(err2_fbd);
 	MCERR_FBD_WR(mcerr_fbd);
-	if (nb5000_reset_emask_fbd)
-		EMASK_FBD_WR(nb5000_emask_fbd);
-	else
+	if (nb5000_reset_emask_fbd) {
+		if (nb_chipset == INTEL_NB_5400)
+			EMASK_FBD_WR(nb5400_emask_fbd);
+		else
+			EMASK_FBD_WR(nb5000_emask_fbd);
+	} else {
 		EMASK_FBD_WR(nb_emask_fbd);
+	}
 }
 
 void
@@ -897,19 +947,21 @@ nb_fsb_init()
 	ERR1_FSB_WR(0, err1_fsb);
 	ERR2_FSB_WR(0, err2_fsb);
 	MCERR_FSB_WR(0, mcerr_fsb);
-	if (nb5000_reset_emask_fsb)
+	if (nb5000_reset_emask_fsb) {
 		EMASK_FSB_WR(0, nb5000_emask_fsb);
-	else
+	} else {
 		EMASK_FSB_WR(0, nb_emask_fsb);
+	}
 
 	ERR0_FSB_WR(1, err0_fsb);
 	ERR1_FSB_WR(1, err1_fsb);
 	ERR2_FSB_WR(1, err2_fsb);
 	MCERR_FSB_WR(1, mcerr_fsb);
-	if (nb5000_reset_emask_fsb)
+	if (nb5000_reset_emask_fsb) {
 		EMASK_FSB_WR(1, nb5000_emask_fsb);
-	else
+	} else {
 		EMASK_FSB_WR(1, nb_emask_fsb);
+	}
 
 	if (nb_chipset == INTEL_NB_7300) {
 		ERR0_FSB_WR(2, 0xffff);
@@ -928,19 +980,21 @@ nb_fsb_init()
 		ERR1_FSB_WR(2, err1_fsb);
 		ERR2_FSB_WR(2, err2_fsb);
 		MCERR_FSB_WR(2, mcerr_fsb);
-		if (nb5000_reset_emask_fsb)
+		if (nb5000_reset_emask_fsb) {
 			EMASK_FSB_WR(2, nb5000_emask_fsb);
-		else
+		} else {
 			EMASK_FSB_WR(2, nb_emask_fsb);
+		}
 
 		ERR0_FSB_WR(3, err0_fsb);
 		ERR1_FSB_WR(3, err1_fsb);
 		ERR2_FSB_WR(3, err2_fsb);
 		MCERR_FSB_WR(3, mcerr_fsb);
-		if (nb5000_reset_emask_fsb)
+		if (nb5000_reset_emask_fsb) {
 			EMASK_FSB_WR(3, nb5000_emask_fsb);
-		else
+		} else {
 			EMASK_FSB_WR(3, nb_emask_fsb);
+		}
 	}
 }
 
@@ -1009,6 +1063,81 @@ nb_fsb_mask_mc(int fsb, uint16_t mc_mask_fsb)
 	}
 }
 
+static void
+nb_thr_init()
+{
+	uint16_t err0_thr;
+	uint16_t err1_thr;
+	uint16_t err2_thr;
+	uint16_t mcerr_thr;
+	uint16_t emask_thr;
+
+	if (nb_chipset == INTEL_NB_5400) {
+		err0_thr = ERR0_THR_RD(0);
+		err1_thr = ERR1_THR_RD(0);
+		err2_thr = ERR2_THR_RD(0);
+		mcerr_thr = MCERR_THR_RD(0);
+		emask_thr = EMASK_THR_RD(0);
+
+		ERR0_THR_WR(0xffff);
+		ERR1_THR_WR(0xffff);
+		ERR2_THR_WR(0xffff);
+		MCERR_THR_WR(0xffff);
+		EMASK_THR_WR(0xffff);
+
+		nb_err0_thr = err0_thr;
+		nb_err1_thr = err1_thr;
+		nb_err2_thr = err2_thr;
+		nb_mcerr_thr = mcerr_thr;
+		nb_emask_thr = emask_thr;
+
+		mcerr_thr &= ~nb_mask_bios_thr;
+		mcerr_thr |= nb_mask_bios_thr &
+		    (~err2_thr | ~err1_thr | ~err0_thr);
+		mcerr_thr |= nb_mask_poll_thr;
+		err0_thr |= nb_mask_poll_thr;
+		err1_thr |= nb_mask_poll_thr;
+		err2_thr |= nb_mask_poll_thr;
+
+		l_mcerr_thr = mcerr_thr;
+		ERR0_THR_WR(err0_thr);
+		ERR1_THR_WR(err1_thr);
+		ERR2_THR_WR(err2_thr);
+		MCERR_THR_WR(mcerr_thr);
+		EMASK_THR_WR(nb_emask_thr);
+	}
+}
+
+static void
+nb_thr_fini()
+{
+	if (nb_chipset == INTEL_NB_5400) {
+		ERR0_THR_WR(0xffff);
+		ERR1_THR_WR(0xffff);
+		ERR2_THR_WR(0xffff);
+		MCERR_THR_WR(0xffff);
+		EMASK_THR_WR(0xffff);
+
+		ERR0_THR_WR(nb_err0_thr);
+		ERR1_THR_WR(nb_err1_thr);
+		ERR2_THR_WR(nb_err2_thr);
+		MCERR_THR_WR(nb_mcerr_thr);
+		EMASK_THR_WR(nb_emask_thr);
+	}
+}
+
+void
+nb_thr_mask_mc(uint16_t mc_mask_thr)
+{
+	uint16_t emask_thr;
+
+	emask_thr = MCERR_THR_RD(0);
+	if ((emask_thr & mc_mask_thr) != mc_mask_thr) {
+		MCERR_THR_WR(emask_thr|mc_mask_thr);
+		nb_mask_mc_set = 1;
+	}
+}
+
 void
 nb_mask_mc_reset()
 {
@@ -1019,6 +1148,9 @@ nb_mask_mc_reset()
 	if (nb_chipset == INTEL_NB_7300) {
 		MCERR_FSB_WR(2, l_mcerr_fsb);
 		MCERR_FSB_WR(3, l_mcerr_fsb);
+	}
+	if (nb_chipset == INTEL_NB_5400) {
+		MCERR_THR_WR(l_mcerr_thr);
 	}
 }
 
@@ -1036,6 +1168,7 @@ nb_dev_init()
 		return (EAGAIN);
 	}
 	nb_int_init();
+	nb_thr_init();
 	dimm_init();
 	nb_dimms_init(label_function_p);
 	nb_mc_init();
@@ -1064,6 +1197,11 @@ nb_init()
 	case INTEL_NB_5000Z:
 		nb_number_memory_controllers = 1;
 		break;
+	case INTEL_NB_5400:
+	case INTEL_NB_5400A:
+	case INTEL_NB_5400B:
+		nb_chipset = INTEL_NB_5400;
+		break;
 	}
 	return (0);
 }
@@ -1089,6 +1227,7 @@ nb_dev_reinit()
 	nb_mc_init();
 	nb_pex_init();
 	nb_int_init();
+	nb_thr_init();
 	nb_fbd_init();
 	nb_fsb_init();
 	nb_scrubber_enable();
@@ -1115,6 +1254,7 @@ nb_dev_unload()
 	nb_queue = NULL;
 	mutex_destroy(&nb_mutex);
 	nb_int_fini();
+	nb_thr_fini();
 	nb_fbd_fini();
 	nb_fsb_fini();
 	nb_pex_fini();

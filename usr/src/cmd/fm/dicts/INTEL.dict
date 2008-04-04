@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -70,3 +70,4 @@ fault.memory.intel.page_ce=39
 fault.memory.intel.page_ue=40
 fault.memory.intel.dimm_ce=41
 fault.memory.intel.dimm_ue=42
+fault.cpu.intel.nb.otf=43

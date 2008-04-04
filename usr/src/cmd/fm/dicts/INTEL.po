@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -697,3 +697,19 @@ msgid "INTEL-8001-AQ.impact"
 msgstr "Total system memory capacity will be reduced as pages are retired."
 msgid "INTEL-8001-AQ.action"
 msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u  to identify the module."
+#
+# code: INTEL-8001-CC
+# keys: fault.cpu.intel.nb.otf
+#
+msgid "INTEL-8001-CC.type"
+msgstr "Fault"
+msgid "INTEL-8001-CC.severity"
+msgstr "Major"
+msgid "INTEL-8001-CC.description"
+msgstr "Northbridge detected over temperature  Refer to %s for more information."
+msgid "INTEL-8001-CC.response"
+msgstr "System panic or reset by BIOS"
+msgid "INTEL-8001-CC.impact"
+msgstr "System may be unexpectedly reset"
+msgid "INTEL-8001-CC.action"
+msgstr "Supply more cooling"

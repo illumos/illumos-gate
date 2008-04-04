@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,9 @@ extern "C" {
 #define	INTEL_NB5000_PCIE_DEV_ID(did) (((did) >= 0x3600 && (did) <= 0x360a) || \
 	((did) == 0x25d8 || (did) == 0x25d4 || (did) == 0x25c0 || \
 	(did) == 0x25d0 || ((did) >= 0x25e2 && (did) <= 0x25e7)) || \
-	((did) >= 0x25f7 && (did) <= 0x25fa))
+	((did) >= 0x25f7 && (did) <= 0x25fa) || \
+	(did) == 0x4000 || (did) == 0x4001 || (did) == 0x4003 || \
+	((did) >= 0x4021 && (did) <= 0x402e))
 
 extern int pcie_intel_error_disable;
 
