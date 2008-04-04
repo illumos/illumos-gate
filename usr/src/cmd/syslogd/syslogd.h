@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,6 +277,8 @@ static void writemsg(int selection, struct filed *f);
 static void *writetodev(void *ap);
 static int shutdown_msg(void);
 static void server(void *, char *, size_t, door_desc_t *, uint_t);
+static void *create_door_thr(void *);
+static void door_server_pool(door_info_t *);
 static char *alloc_stacks(int);
 static void dealloc_stacks(int);
 static int checkm4(void);

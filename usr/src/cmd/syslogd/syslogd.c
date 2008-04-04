@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,6 +243,11 @@ static struct t_uderr **Errp;
 static int turnoff = 0;
 static int shutting_down;
 
+/* for managing door server threads */
+static pthread_mutex_t door_server_cnt_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint_t door_server_cnt = 0;
+static pthread_attr_t door_thr_attr;
+
 static struct hostname_cache **hnc_cache;
 static pthread_mutex_t hnc_mutex = PTHREAD_MUTEX_INITIALIZER;
 static size_t hnc_size = DEF_HNC_SIZE;
@@ -299,7 +304,7 @@ main(int argc, char **argv)
 #define	DEBUGDIR "/var/tmp"
 	if (chdir(DEBUGDIR))
 		DPRINT2(1, "main(%u): Unable to cd to %s\n", mythreadno,
-			DEBUGDIR);
+		    DEBUGDIR);
 #endif /* DEBUG */
 
 	(void) setlocale(LC_ALL, "");
@@ -340,15 +345,15 @@ main(int argc, char **argv)
 			for (pstr = optarg; *pstr; pstr++) {
 				if (! (isdigit(*pstr))) {
 					(void) fprintf(stderr,
-						"Illegal interval\n");
+					    "Illegal interval\n");
 					usage();
 				}
 			}
 			MarkInterval = atoi(optarg);
 			if (MarkInterval < 1 || MarkInterval > INT_MAX) {
 				(void) fprintf(stderr,
-					"Interval must be between 1 and %d\n",
-					INT_MAX);
+				    "Interval must be between 1 and %d\n",
+				    INT_MAX);
 				usage();
 			}
 			break;
@@ -413,7 +418,7 @@ main(int argc, char **argv)
 	(void) pthread_sigmask(SIG_BLOCK, &allsigs, NULL);
 
 	DPRINT2(1, "main(%u): Started at time %s", mythreadno,
-		ctime_r(&start_time, cbuf));
+	    ctime_r(&start_time, cbuf));
 
 	init();			/* read configuration, start threads */
 
@@ -456,13 +461,13 @@ main(int argc, char **argv)
 		switch (sig) {
 		case SIGALRM:
 			DPRINT1(1, "main(%u): Got SIGALRM\n",
-				mythreadno);
+			    mythreadno);
 			flushmsg(NOCOPY);
 			if (Marking && (++mcount % MARKCOUNT == 0)) {
 				if (logmymsg(LOG_INFO, "-- MARK --",
-					ADDDATE|MARK|NOCOPY, 0) == -1) {
+				    ADDDATE|MARK|NOCOPY, 0) == -1) {
 					MALLOC_FAIL(
-						"dropping MARK message");
+					    "dropping MARK message");
 				}
 
 				mcount = 0;
@@ -470,16 +475,16 @@ main(int argc, char **argv)
 			curalarm = MarkInterval * 60 / MARKCOUNT;
 			(void) alarm((unsigned)curalarm);
 			DPRINT2(2, "main(%u): Next alarm in %d "
-				"seconds\n", mythreadno, curalarm);
+			    "seconds\n", mythreadno, curalarm);
 			break;
 		case SIGHUP:
 			DPRINT1(1, "main(%u): got SIGHUP - "
-				"reconfiguring\n", mythreadno);
+			    "reconfiguring\n", mythreadno);
 
 			reconfigure();
 
 			DPRINT1(1, "main(%u): done processing SIGHUP\n",
-				mythreadno);
+			    mythreadno);
 			break;
 		case SIGQUIT:
 		case SIGINT:
@@ -490,7 +495,7 @@ main(int argc, char **argv)
 			/* FALLTHROUGH */
 		case SIGTERM:
 			DPRINT2(1, "main(%u): going down on signal %d\n",
-				mythreadno, sig);
+			    mythreadno, sig);
 			(void) alarm(0);
 			flushmsg(0);
 			errno = 0;
@@ -512,15 +517,15 @@ main(int argc, char **argv)
 			}
 			/* otherwise dump to a debug file */
 			if ((fd = open(DEBUGFILE,
-				(O_WRONLY|O_CREAT|O_TRUNC|O_EXCL),
-					0644)) < 0)
+			    (O_WRONLY|O_CREAT|O_TRUNC|O_EXCL),
+			    0644)) < 0)
 				break;
 			dumpstats(fd);
 			(void) close(fd);
 			break;
 		default:
 			DPRINT2(2, "main(%u): unexpected signal %d\n",
-				mythreadno, sig);
+			    mythreadno, sig);
 			break;
 		}
 	}
@@ -544,7 +549,7 @@ openklog(char *name, int mode)
 	if ((fd = open(name, mode)) < 0) {
 		logerror("cannot open %s", name);
 		DPRINT3(1, "openklog(%u): cannot create %s (%d)\n",
-			mythreadno, name, errno);
+		    mythreadno, name, errno);
 		return (-1);
 	}
 	str.ic_cmd = I_CONSLOG;
@@ -554,7 +559,7 @@ openklog(char *name, int mode)
 	if (ioctl(fd, I_STR, &str) < 0) {
 		logerror("cannot register to log console messages");
 		DPRINT2(1, "openklog(%u): cannot register to log "
-			"console messages (%d)\n", mythreadno, errno);
+		    "console messages (%d)\n", mythreadno, errno);
 		return (-1);
 	}
 	return (fd);
@@ -694,7 +699,7 @@ getkmsg(int timeout)
 		*lastline = '\0';
 
 		DPRINT2(5, "sys_poll:(%u): getmsg: dat.len = %d\n",
-			mythreadno, dat.len);
+		    mythreadno, dat.len);
 		buflen = strlen(buf);
 		len = findnl_bkwd(buf, buflen);
 
@@ -748,15 +753,15 @@ getkmsg(int timeout)
 		 * initial messages ready during startup.
 		 */
 		DPRINT2(5, "getkmsg(%u): getmsg: dat.maxlen = %d\n",
-			mythreadno, dat.maxlen);
+		    mythreadno, dat.maxlen);
 		DPRINT2(5, "getkmsg(%u): getmsg: dat.len = %d\n",
-			mythreadno, dat.len);
+		    mythreadno, dat.len);
 		DPRINT2(5, "getkmsg(%u): getmsg: strlen(dat.buf) = %d\n",
-			mythreadno, strlen(dat.buf));
+		    mythreadno, strlen(dat.buf));
 		DPRINT2(5, "getkmsg(%u): getmsg: dat.buf = \"%s\"\n",
-			mythreadno, dat.buf);
+		    mythreadno, dat.buf);
 		DPRINT2(5, "getkmsg(%u): buf len = %d\n",
-			mythreadno, strlen(buf));
+		    mythreadno, strlen(buf));
 		if (timeout == 0) {
 			formatsys(&hdr, buf, 0);
 			sys_init_msg_count++;
@@ -818,7 +823,7 @@ net_poll(void *ap)
 					pthread_exit(0);
 				}
 				if (Nfd[i].revents &
-					(POLLNVAL|POLLHUP|POLLERR)) {
+				    (POLLNVAL|POLLHUP|POLLERR)) {
 					logerror("POLLNVAL|POLLHUP|POLLERR");
 					(void) t_close(Nfd[i].fd);
 					Nfd[i].fd = -1;
@@ -862,12 +867,12 @@ net_poll(void *ap)
 					uap = NULL;
 					if (udp->addr.len > 0) {
 						uap = taddr2uaddr(&Ncf[i],
-							&udp->addr);
+						    &udp->addr);
 					}
 					DPRINT2(1, "net_poll(%u):"
-						" received empty packet"
-						" from %s\n", mythreadno,
-						uap ? uap : "<unknown>");
+					    " received empty packet"
+					    " from %s\n", mythreadno,
+					    uap ? uap : "<unknown>");
 					if (uap)
 						free(uap);
 				}
@@ -881,7 +886,7 @@ net_poll(void *ap)
 				 * we've already received MAXLINE.
 				 */
 				DPRINT1(1, "net_poll(%u): discarding packet "
-					"exceeds max line size\n", mythreadno);
+				    "exceeds max line size\n", mythreadno);
 				continue;
 			}
 
@@ -889,7 +894,7 @@ net_poll(void *ap)
 
 			if ((mp = new_msg()) == NULL) {
 				MALLOC_FAIL("dropping message from "
-					"remote");
+				    "remote");
 				continue;
 			}
 
@@ -899,15 +904,15 @@ net_poll(void *ap)
 			if (Debug) {
 				uap = taddr2uaddr(&Ncf[i], &udp->addr);
 				DPRINT2(1, "net_poll(%u): received message"
-					" from %s\n", mythreadno,
-					uap ? uap : "<unknown>");
+				    " from %s\n", mythreadno,
+				    uap ? uap : "<unknown>");
 				free(uap);
 			}
 			if ((hinfo = malloc(sizeof (*hinfo))) == NULL ||
-				(hinfo->addr.buf =
-					malloc(udp->addr.len)) == NULL) {
+			    (hinfo->addr.buf =
+			    malloc(udp->addr.len)) == NULL) {
 				MALLOC_FAIL("dropping message from "
-					"remote");
+				    "remote");
 				if (hinfo) {
 					free(hinfo);
 				}
@@ -918,19 +923,19 @@ net_poll(void *ap)
 			hinfo->ncp = &Ncf[i];
 			hinfo->addr.len = udp->addr.len;
 			(void) memcpy(hinfo->addr.buf, udp->addr.buf,
-					udp->addr.len);
+			    udp->addr.len);
 			mp->ptr = hinfo;
 			if (dataq_enqueue(&hnlq, (void *)mp) == -1) {
 				MALLOC_FAIL("dropping message from "
-					"remote");
+				    "remote");
 				free_msg(mp);
 				free(hinfo->addr.buf);
 				free(hinfo);
 				continue;
 			}
 			DPRINT3(5, "net_poll(%u): enqueued msg %p "
-				"on queue %p\n", mythreadno, (void *)mp,
-				(void *)&hnlq);
+			    "on queue %p\n", mythreadno, (void *)mp,
+			    (void *)&hnlq);
 		}
 	}
 	/*NOTREACHED*/
@@ -988,7 +993,7 @@ logmymsg(int pri, char *msg, int flags, int pending)
 	}
 
 	DPRINT3(5, "logmymsg(%u): enqueued msg %p on queue %p\n",
-		mythreadno, (void *)mp, (void *)qptr);
+	    mythreadno, (void *)mp, (void *)qptr);
 	DPRINT2(5, "logmymsg(%u): Message content: %s\n", mythreadno, msg);
 	return (0);
 }
@@ -1020,7 +1025,7 @@ shutdown_msg(void)
 	}
 
 	DPRINT3(5, "shutdown_msg(%u): enqueued msg %p on queue %p\n",
-		mythreadno, (void *)mp, (void *)&inputq);
+	    mythreadno, (void *)mp, (void *)&inputq);
 	return (0);
 }
 
@@ -1053,7 +1058,7 @@ flushmsg(int flags)
 	}
 
 	DPRINT4(5, "flush_msg(%u): enqueued msg %p on queue %p, flags "
-		"0x%x\n", mythreadno, (void *)mp, (void *)&inputq, flags);
+	    "0x%x\n", mythreadno, (void *)mp, (void *)&inputq, flags);
 }
 
 /*
@@ -1071,7 +1076,7 @@ formatnet(struct netbuf *nbp, log_message_t *mp)
 	}
 
 	DPRINT2(5, "formatnet(%u): called for msg %p\n", mythreadno,
-		(void *)mp);
+	    (void *)mp);
 
 	mp->flags = NETWORK;
 	(void) time(&mp->ts);
@@ -1080,7 +1085,7 @@ formatnet(struct netbuf *nbp, log_message_t *mp)
 	pri = DEFUPRI;
 	p = nbp->buf;
 	DPRINT2(9, "formatnet(%u): Message content:\n>%s<\n", mythreadno,
-		p);
+	    p);
 	if (*p == '<' && isdigit(*(p+1))) {
 		pri = 0;
 		while (isdigit(*++p))
@@ -1114,9 +1119,9 @@ formatsys(struct log_ctl *lp, char *msg, int sync)
 	}
 
 	DPRINT3(3, "formatsys(%u): log_ctl.mid = %d, log_ctl.sid = %d\n",
-		mythreadno, lp->mid, lp->sid);
+	    mythreadno, lp->mid, lp->sid);
 	DPRINT2(9, "formatsys(%u): Message Content:\n>%s<\n", mythreadno,
-		msg);
+	    msg);
 
 	/* msglen includes the null termination */
 	msglen = strlen(msg) + 1;
@@ -1151,7 +1156,7 @@ formatsys(struct log_ctl *lp, char *msg, int sync)
 		/* extract facility */
 		if ((lp->pri & LOG_FACMASK) == LOG_KERN) {
 			(void) sprintf(line, "%.15s ",
-				ctime_r(&mp->ts, cbuf) + 4);
+			    ctime_r(&mp->ts, cbuf) + 4);
 		} else {
 			(void) sprintf(line, "");
 		}
@@ -1162,7 +1167,7 @@ formatsys(struct log_ctl *lp, char *msg, int sync)
 		DPRINT2(5, "formatsys(%u): msglen = %d\n", mythreadno, msglen);
 		len = copynl_frwd(q, MAXLINE + 1 - linelen, p, msglen);
 		DPRINT2(5, "formatsys(%u): len (copynl_frwd) = %d\n",
-			mythreadno, len);
+		    mythreadno, len);
 
 		p += len;
 		msglen -= len;
@@ -1186,8 +1191,8 @@ formatsys(struct log_ctl *lp, char *msg, int sync)
 			}
 
 			DPRINT3(5, "formatsys(%u): sys_thread enqueued msg "
-				"%p on queue %p\n", mythreadno, (void *)mp,
-				(void *)&inputq);
+			    "%p on queue %p\n", mythreadno, (void *)mp,
+			    (void *)&inputq);
 		} else
 			free_msg(mp);
 	}
@@ -1229,8 +1234,8 @@ logmsg(void *ap)
 		}
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp))
 		DPRINT3(5, "logmsg(%u): msg dispatcher dequeued %p from "
-			"queue %p\n", mythreadno, (void *)mp,
-			(void *)&inputq);
+		    "queue %p\n", mythreadno, (void *)mp,
+		    (void *)&inputq);
 
 		/*
 		 * In most cases, if the message traffic is low, logmsg() wakes
@@ -1256,9 +1261,9 @@ logmsg(void *ap)
 		 * message arrives.
 		 */
 		if ((hup_state & HUP_SUSP_LOGMSG_REQD) &&
-			(mp->flags & SHUTDOWN) == 0) {
+		    (mp->flags & SHUTDOWN) == 0) {
 			DPRINT1(3, "logmsg(%u): suspend request\n",
-				mythreadno);
+			    mythreadno);
 
 			save_mp = mp;
 
@@ -1267,8 +1272,8 @@ logmsg(void *ap)
 				MALLOC_FAIL("dropping message");
 				if (mp->flags & SHUTDOWN) {
 					(void) logerror_to_console(1,
-						"unable to shutdown "
-						"logger thread");
+					    "unable to shutdown "
+					    "logger thread");
 				}
 				continue;
 			}
@@ -1277,7 +1282,7 @@ logmsg(void *ap)
 			fake_shutdown = 1;
 			skip_shutdown++;
 			DPRINT2(3, "logmsg(%u): pending SHUTDOWN %d\n",
-				mythreadno, skip_shutdown);
+			    mythreadno, skip_shutdown);
 		}
 
 		/*
@@ -1287,13 +1292,13 @@ logmsg(void *ap)
 			(void) pthread_mutex_lock(&mp->msg_mutex);
 
 			if ((mp->flags & SHUTDOWN) &&
-				!fake_shutdown && skip_shutdown > 0) {
+			    !fake_shutdown && skip_shutdown > 0) {
 				skip_shutdown--;
 				(void) pthread_mutex_unlock(&mp->msg_mutex);
 				free_msg(mp);
 				DPRINT2(3, "logmsg(%u): released late "
-					"arrived SHUTDOWN. pending %d\n",
-					mythreadno, skip_shutdown);
+				    "arrived SHUTDOWN. pending %d\n",
+				    mythreadno, skip_shutdown);
 				continue;
 			}
 
@@ -1310,7 +1315,7 @@ logmsg(void *ap)
 				mp->refcnt++;
 
 				if (dataq_enqueue(&f->f_queue,
-					(void *)mp) == -1) {
+				    (void *)mp) == -1) {
 					f->f_queue_count--;
 					mp->refcnt--;
 					(void) pthread_mutex_unlock(
@@ -1319,15 +1324,15 @@ logmsg(void *ap)
 
 					if (mp->flags & SHUTDOWN) {
 						(void) logerror_to_console(1,
-							"unable to shutdown "
-							"logger thread");
+						    "unable to shutdown "
+						    "logger thread");
 					}
 
 					continue;
 				}
 				DPRINT3(5, "logmsg(%u): enqueued msg %p "
-					"on queue %p\n", mythreadno,
-					(void *)mp, (void *)&f->f_queue);
+				    "on queue %p\n", mythreadno,
+				    (void *)mp, (void *)&f->f_queue);
 				(void) pthread_mutex_unlock(&f->filed_mutex);
 			}
 
@@ -1347,7 +1352,7 @@ logmsg(void *ap)
 				while (hup_state != HUP_COMPLETED) {
 					hup_state |= HUP_LOGMSG_SUSPENDED;
 					(void) pthread_cond_wait(&hup_done,
-						&hup_lock);
+					    &hup_lock);
 					hup_state &= ~HUP_LOGMSG_SUSPENDED;
 				}
 				hup_state = HUP_ACCEPTABLE;
@@ -1361,8 +1366,8 @@ logmsg(void *ap)
 		 * Check to see if msg looks non-standard.
 		 */
 		if ((int)strlen(mp->msg) < 16 || mp->msg[3] != ' ' ||
-			mp->msg[6] != ' ' || mp->msg[9] != ':' ||
-			mp->msg[12] != ':' || mp->msg[15] != ' ')
+		    mp->msg[6] != ' ' || mp->msg[9] != ':' ||
+		    mp->msg[12] != ':' || mp->msg[15] != ' ')
 			mp->flags |= ADDDATE;
 
 		/* extract facility and priority level */
@@ -1372,7 +1377,7 @@ logmsg(void *ap)
 		prilev = mp->pri & LOG_PRIMASK;
 
 		DPRINT3(3, "logmsg(%u): fac = %d, pri = %d\n",
-			mythreadno, fac, prilev);
+		    mythreadno, fac, prilev);
 
 		/*
 		 * Because different devices log at different speeds,
@@ -1388,13 +1393,13 @@ logmsg(void *ap)
 		for (f = Files; f < &Files[nlogs]; f++) {
 			/* skip messages that are incorrect priority */
 			if (f->f_pmask[fac] < (unsigned)prilev ||
-				f->f_pmask[fac] == NOPRI)
+			    f->f_pmask[fac] == NOPRI)
 				continue;
 			if (f->f_queue_count > Q_HIGHWATER_MARK) {
 				DPRINT4(5, "logmsg(%u): Dropping message "
-					"%p on file %p, count = %d\n",
-					mythreadno, (void *)mp, (void *)f,
-					f->f_queue_count);
+				    "%p on file %p, count = %d\n",
+				    mythreadno, (void *)mp, (void *)f,
+				    f->f_queue_count);
 				continue;
 			}
 
@@ -1409,7 +1414,7 @@ logmsg(void *ap)
 			if (f->f_type == F_UNUSED ||
 			    (f->f_type == F_FILE && (mp->flags & IGN_FILE)) ||
 			    (f->f_type == F_CONSOLE &&
-				(mp->flags & IGN_CONS))) {
+			    (mp->flags & IGN_CONS))) {
 				(void) pthread_mutex_unlock(&f->filed_mutex);
 				continue;
 			}
@@ -1426,8 +1431,8 @@ logmsg(void *ap)
 			}
 
 			DPRINT3(5, "logmsg(%u): enqueued msg %p on queue "
-				"%p\n", mythreadno, (void *)mp,
-				(void *)&f->f_queue);
+			    "%p\n", mythreadno, (void *)mp,
+			    (void *)&f->f_queue);
 			(void) pthread_mutex_unlock(&f->filed_mutex);
 		}
 		refcnt = mp->refcnt;
@@ -1457,14 +1462,14 @@ logit(void *ap)
 	assert(f != NULL);
 
 	DPRINT4(5, "logit(%u): logger started for \"%s\" (queue %p, filed "
-		"%p)\n", f->f_thread, f->f_un.f_fname, (void *)&f->f_queue,
-		(void *)f);
+	    "%p)\n", f->f_thread, f->f_un.f_fname, (void *)&f->f_queue,
+	    (void *)f);
 	_NOTE(COMPETING_THREADS_NOW);
 
 	while (f->f_type != F_UNUSED) {
 		(void) dataq_dequeue(&f->f_queue, (void **)&mp, 0);
 		DPRINT3(5, "logit(%u): logger dequeued msg %p from queue "
-			"%p\n", f->f_thread, (void *)mp, (void *)&f->f_queue);
+		    "%p\n", f->f_thread, (void *)mp, (void *)&f->f_queue);
 		(void) pthread_mutex_lock(&f->filed_mutex);
 		assert(f->f_queue_count > 0);
 		f->f_queue_count--;
@@ -1492,7 +1497,7 @@ logit(void *ap)
 				goto out;	/* nothing to do */
 			(void) close(f->f_file);
 			f->f_file = open64(f->f_un.f_fname,
-					O_WRONLY|O_APPEND|O_NOCTTY);
+			    O_WRONLY|O_APPEND|O_NOCTTY);
 			if (f->f_file < 0) {
 				f->f_type = F_UNUSED;
 				logerror(f->f_un.f_fname);
@@ -1509,8 +1514,8 @@ logit(void *ap)
 		    (FLUSHMSG | SYNC_FILE)) {
 			if (f->f_type == F_FILE) {
 				DPRINT2(5, "logit(%u): got FLUSH|SYNC "
-					"for filed %p\n", f->f_thread,
-					(void *)f);
+				    "for filed %p\n", f->f_thread,
+				    (void *)f);
 				(void) fsync(f->f_file);
 			}
 			goto out;
@@ -1528,7 +1533,7 @@ logit(void *ap)
 
 		(void) strlcpy(f->f_current.msg, mp->msg, MAXLINE+1);
 		(void) strlcpy(f->f_current.host, mp->hlp->hl_hosts[0],
-				SYS_NMLN);
+		    SYS_NMLN);
 		f->f_current.pri = mp->pri;
 		f->f_current.flags = mp->flags;
 		f->f_current.time = mp->ts;
@@ -1546,7 +1551,7 @@ logit(void *ap)
 
 			if (mp->flags & MARK) {
 				DPRINT1(1, "logit(%u): cannot forward "
-					"Mark\n", f->f_thread);
+				    "Mark\n", f->f_thread);
 				goto out;
 			}
 
@@ -1568,10 +1573,10 @@ logit(void *ap)
 			forwardingloop = 0;
 			for (i = 0; i < hlp->hl_cnt; i++) {
 				if (strcmp(hlp->hl_hosts[i],
-					f->f_un.f_forw.f_hname) == 0) {
+				    f->f_un.f_forw.f_hname) == 0) {
 					DPRINT3(1, errmsg, f->f_thread,
-						f->f_un.f_forw.f_hname,
-						hlp->hl_hosts[i]);
+					    f->f_un.f_forw.f_hname,
+					    hlp->hl_hosts[i]);
 					forwardingloop = 1;
 					break;
 				}
@@ -1587,18 +1592,18 @@ logit(void *ap)
 
 		/* check for dup message */
 		if (f->f_type != F_FORW &&
-			(f->f_msgflag & OLD_VALID) &&
-			prevofst == currofst &&
-			(strcmp(f->f_prevmsg.msg + prevofst,
-				f->f_current.msg + currofst) == 0) &&
-			(strcmp(f->f_prevmsg.host,
-				f->f_current.host) == 0)) {
+		    (f->f_msgflag & OLD_VALID) &&
+		    prevofst == currofst &&
+		    (strcmp(f->f_prevmsg.msg + prevofst,
+		    f->f_current.msg + currofst) == 0) &&
+		    (strcmp(f->f_prevmsg.host,
+		    f->f_current.host) == 0)) {
 			/* a dup */
 			DPRINT2(2, "logit(%u): msg is dup - %p\n",
-				f->f_thread, (void *)mp);
+			    f->f_thread, (void *)mp);
 			if (currofst == 16) {
 				(void) strncpy(f->f_prevmsg.msg,
-				f->f_current.msg, 15); /* update time */
+				    f->f_current.msg, 15); /* update time */
 			}
 			f->f_prevcount++;
 			f->f_stat.dups++;
@@ -1619,18 +1624,18 @@ logit(void *ap)
 					copy_msg(f);
 				if (f->f_current.flags & MARK) {
 					DPRINT2(2, "logit(%u): msg is "
-						"mark - %p)\n", f->f_thread,
-						(void *)mp);
+					    "mark - %p)\n", f->f_thread,
+					    (void *)mp);
 					f->f_msgflag &= ~OLD_VALID;
 				} else {
 					DPRINT2(2, "logit(%u): saving "
-						"message - %p\n", f->f_thread,
-						(void *)mp);
+					    "message - %p\n", f->f_thread,
+					    (void *)mp);
 				}
 				f->f_stat.total++;
 			} else { /* new message */
 				DPRINT2(2, "logit(%u): msg is new "
-					"- %p\n", f->f_thread, (void *)mp);
+				    "- %p\n", f->f_thread, (void *)mp);
 				writemsg(CURRENT, f);
 				if (!(mp->flags & NOCOPY))
 					copy_msg(f);
@@ -1662,8 +1667,8 @@ out:
 	while (f->f_queue_count > 0) {
 		(void) dataq_dequeue(&f->f_queue, (void **)&mp, 0);
 		DPRINT3(5, "logit(%u): logger dequeued msg %p from queue "
-			"%p\n",
-			f->f_thread, (void *)mp, (void *)&f->f_queue);
+		    "%p\n",
+		    f->f_thread, (void *)mp, (void *)&f->f_queue);
 		(void) pthread_mutex_lock(&mp->msg_mutex);
 		refcnt = --mp->refcnt;
 		(void) pthread_mutex_unlock(&mp->msg_mutex);
@@ -1675,7 +1680,7 @@ out:
 	(void) pthread_mutex_unlock(&f->filed_mutex);
 
 	if (f->f_type != F_USERS && f->f_type != F_WALL &&
-		f->f_type != F_UNUSED) {
+	    f->f_type != F_UNUSED) {
 		if (f->f_type == F_FORW)
 			(void) t_close(f->f_file);
 		else
@@ -1800,11 +1805,11 @@ writemsg(int selection, struct filed *f)
 		break;
 	case F_FORW:
 		DPRINT4(1, "writemsg(%u): Logging msg '%s' to %s %s\n",
-			mythreadno, msg, TypeNames[f->f_type],
-			f->f_un.f_forw.f_hname);
+		    mythreadno, msg, TypeNames[f->f_type],
+		    f->f_un.f_forw.f_hname);
 
 		hlen = snprintf(head, sizeof (head),
-			"<%d>%.15s ", pri, cp);
+		    "<%d>%.15s ", pri, cp);
 
 		DPRINT2(5, "writemsg(%u): head = \"%s\"\n", mythreadno, head);
 		DPRINT2(5, "writemsg(%u): hlen = %d\n", mythreadno, hlen);
@@ -1821,14 +1826,14 @@ writemsg(int selection, struct filed *f)
 			size_t	len;
 
 			len = copy_frwd(tmpbuf + hlen, sizeof (tmpbuf) - hlen,
-					p, l);
+			    p, l);
 
 			DPRINT2(5, "writemsg(%u): tmpbuf = \"%s\"\n",
-				mythreadno, tmpbuf);
+			    mythreadno, tmpbuf);
 			DPRINT2(5, "writemsg(%u): len = %d\n", mythreadno,
-				len);
+			    len);
 			DPRINT2(5, "writemsg(%u): strlen(tmpbuf) = %d\n",
-				mythreadno, strlen(tmpbuf));
+			    mythreadno, strlen(tmpbuf));
 
 			ud.opt.buf = NULL;
 			ud.opt.len = 0;
@@ -1839,7 +1844,7 @@ writemsg(int selection, struct filed *f)
 			ud.addr.len = f->f_un.f_forw.f_addr.len;
 			if (t_sndudata(f->f_file, &ud) < 0) {
 				if ((hup_state & HUP_INPROGRESS) &&
-					f->f_type == F_UNUSED) {
+				    f->f_type == F_UNUSED) {
 					break;
 				}
 				(void) t_close(f->f_file);
@@ -1863,9 +1868,9 @@ writemsg(int selection, struct filed *f)
 	case F_USERS:
 	case F_WALL:
 		DPRINT4(1, "writemsg(%u): Logging msg '%s' to %s %s\n",
-			mythreadno, msg, TypeNames[f->f_type],
-			((f->f_type == F_USERS) || (f->f_type == F_WALL)) ?
-			"" : f->f_un.f_fname);
+		    mythreadno, msg, TypeNames[f->f_type],
+		    ((f->f_type == F_USERS) || (f->f_type == F_WALL)) ?
+		    "" : f->f_un.f_fname);
 		/*
 		 * filter the string in preparation for writing it
 		 * save the original for possible forwarding.
@@ -1881,20 +1886,20 @@ writemsg(int selection, struct filed *f)
 			return;
 		}
 		DPRINT3(5, "writemsg(%u): "
-			"filtered allocated (%p: %d bytes)\n",
-			mythreadno, (void *)filtered, filter_len);
+		    "filtered allocated (%p: %d bytes)\n",
+		    mythreadno, (void *)filtered, filter_len);
 		/* -3 : we may add "\r\n" to ecomp(filtered) later */
 		filter_string(cp, filtered, filter_len - 3);
 
 		DPRINT2(5, "writemsg(%u): strlen(filtered) = %d\n",
-			mythreadno, strlen(filtered));
+		    mythreadno, strlen(filtered));
 		/*
 		 * If we're writing to the console, strip out the message ID
 		 * to reduce visual clutter.
 		 */
 		if ((msgid_start = strstr(filtered, "[ID ")) != NULL &&
-			(msgid_end = strstr(msgid_start, "] ")) != NULL &&
-			f->f_type == F_CONSOLE)
+		    (msgid_end = strstr(msgid_start, "] ")) != NULL &&
+		    f->f_type == F_CONSOLE)
 			(void) strcpy(msgid_start, msgid_end + 2);
 
 		eomp = filtered + strlen(filtered);
@@ -1934,7 +1939,7 @@ writemsg(int selection, struct filed *f)
 			int e = errno;
 
 			if ((hup_state & HUP_INPROGRESS) &&
-				f->f_type == F_UNUSED) {
+			    f->f_type == F_UNUSED) {
 				free(filtered);
 				break;
 			}
@@ -1945,7 +1950,7 @@ writemsg(int selection, struct filed *f)
 			 */
 			if (e == EBADF && f->f_type != F_FILE) {
 				f->f_file = open(f->f_un.f_fname,
-					O_WRONLY|O_APPEND|O_NOCTTY);
+				    O_WRONLY|O_APPEND|O_NOCTTY);
 				if (f->f_file < 0) {
 					f->f_type = F_UNUSED;
 					logerror(f->f_un.f_fname);
@@ -1963,7 +1968,7 @@ writemsg(int selection, struct filed *f)
 				(void) fsync(f->f_file);
 
 		DPRINT2(5, "writemsg(%u): freeing filtered (%p)\n",
-			mythreadno, (void *)filtered);
+		    mythreadno, (void *)filtered);
 
 		free(filtered);
 		break;
@@ -2000,12 +2005,12 @@ wallmsg(struct filed *f, char *from, char *msg)
 		return;
 	} else if (statbuf.st_uid != 0 || (statbuf.st_mode & 07777) != 0644) {
 		(void) snprintf(line, sizeof (line), "%s %s", UTMPX_FILE,
-			"not owned by root or not mode 644.\n"
-			"This file must be owned by root "
-			"and not writable by\n"
-			"anyone other than root.  This alert is being "
-			"dropped because of\n"
-			"this problem.");
+		    "not owned by root or not mode 644.\n"
+		    "This file must be owned by root "
+		    "and not writable by\n"
+		    "anyone other than root.  This alert is being "
+		    "dropped because of\n"
+		    "this problem.");
 		logerror(line);
 		return;
 	}
@@ -2013,8 +2018,8 @@ wallmsg(struct filed *f, char *from, char *msg)
 	if (f->f_type == F_WALL) {
 		(void) time(&now);
 		len = snprintf(line, sizeof (line),
-			"\r\n\7Message from syslogd@%s "
-			"at %.24s ...\r\n", from, ctime_r(&now, cbuf));
+		    "\r\n\7Message from syslogd@%s "
+		    "at %.24s ...\r\n", from, ctime_r(&now, cbuf));
 		len += strlen(msg + 16);
 		buf = (char *)malloc(len + 1);
 		if (!buf) {
@@ -2022,27 +2027,27 @@ wallmsg(struct filed *f, char *from, char *msg)
 			return;
 		}
 		DPRINT3(5, "wallmsg(%u): buf allocated (%p: %d bytes)\n",
-			mythreadno, (void *)buf, len + 1);
+		    mythreadno, (void *)buf, len + 1);
 		(void) strcpy(buf, line);
 		(void) strcat(buf, msg + 16);
 		clen = copy_frwd(cp, sizeof (cp), buf, len);
 		DPRINT2(5, "wallmsg(%u): clen = %d\n",
-			mythreadno, clen);
+		    mythreadno, clen);
 		DPRINT2(5, "wallmsg(%u): freeing buf (%p)\n",
-			mythreadno, (void *)buf);
+		    mythreadno, (void *)buf);
 		free(buf);
 	} else {
 		clen = copy_frwd(cp, sizeof (cp), msg, strlen(msg));
 		DPRINT2(5, "wallmsg(%u): clen = %d\n",
-			mythreadno, clen);
+		    mythreadno, clen);
 	}
 	/* scan the user login file */
 	setutxent();
 	while ((utxp = getutxent()) != NULL) {
 		/* is this slot used? */
 		if (utxp->ut_name[0] == '\0' ||
-			utxp->ut_line[0] == '\0' ||
-			utxp->ut_type != USER_PROCESS)
+		    utxp->ut_line[0] == '\0' ||
+		    utxp->ut_type != USER_PROCESS)
 			continue;
 		/* should we send the message to this user? */
 		if (f->f_type == F_USERS) {
@@ -2052,7 +2057,7 @@ wallmsg(struct filed *f, char *from, char *msg)
 					break;
 				}
 				if (strncmp(f->f_un.f_uname[i],
-					utxp->ut_name, UNAMESZ) == 0)
+				    utxp->ut_name, UNAMESZ) == 0)
 					break;
 			}
 			if (i >= MAXUNAMES)
@@ -2067,23 +2072,23 @@ wallmsg(struct filed *f, char *from, char *msg)
 			(void) strncat(dev, utxp->ut_line, UDEVSZ);
 		}
 		DPRINT2(1, "wallmsg(%u): write to '%s'\n", mythreadno,
-			dev);
+		    dev);
 
 		if ((w = malloc(sizeof (walldev_t))) != NULL) {
 			int rc;
 			(void) pthread_attr_init(&w->thread_attr);
 			(void) pthread_attr_setdetachstate(&w->thread_attr,
-				PTHREAD_CREATE_DETACHED);
+			    PTHREAD_CREATE_DETACHED);
 			(void) strncpy(w->dev, dev, PATH_MAX);
 			(void) strncpy(w->msg, cp, MAXLINE+1);
 			(void) strncpy(w->ut_name, utxp->ut_name,
 			    sizeof (w->ut_name));
 
 			if ((rc = pthread_create(&w->thread, &w->thread_attr,
-				writetodev, (void *) w)) != 0) {
+			    writetodev, (void *) w)) != 0) {
 				DPRINT2(5, "wallmsg(%u): wallmsg thread "
-					"create failed rc = %d\n",
-					mythreadno, rc);
+				    "create failed rc = %d\n",
+				    mythreadno, rc);
 				free(w);
 				break;
 			}
@@ -2118,7 +2123,7 @@ writetodev(void *ap)
 	}
 
 	DPRINT1(1, "writetodev(%u): Device writer thread started\n",
-		mythreadno);
+	    mythreadno);
 
 	len = strlen(w->msg);
 
@@ -2126,53 +2131,53 @@ writetodev(void *ap)
 	if (ttyf >= 0) {
 		if (fstat(ttyf, &statb) != 0) {
 			DPRINT2(1, "writetodev(%u): Can't stat '%s'\n",
-				mythreadno, w->dev);
+			    mythreadno, w->dev);
 			errno = 0;
 			logerror("Can't stat '%s'", w->dev);
 		} else if (!(statb.st_mode & S_IWRITE)) {
 			DPRINT2(1, "writetodev(%u): Can't write to "
-				"'%s'\n", mythreadno, w->dev);
+			    "'%s'\n", mythreadno, w->dev);
 		} else if (!isatty(ttyf)) {
 			DPRINT2(1, "writetodev(%u): '%s' not a tty\n",
-				mythreadno, w->dev);
+			    mythreadno, w->dev);
 			/*
 			 * We might hit dtremote here. Don't generate
 			 * error message.
 			 */
 		} else if (getpwuid_r(statb.st_uid, &pw, pwbuf,
-				sizeof (pwbuf), &pwp) != 0) {
+		    sizeof (pwbuf), &pwp) != 0) {
 			DPRINT2(1, "writetodev(%u): Can't determine owner "
-				"of '%s'\n", mythreadno, w->dev);
+			    "of '%s'\n", mythreadno, w->dev);
 			errno = 0;
 			logerror("Can't determine owner of '%s'", w->dev);
 		} else if (strncmp(pw.pw_name, w->ut_name, UNAMESZ) != 0) {
 			DPRINT2(1, "writetodev(%u): Bad terminal owner '%s'"
-				"\n", mythreadno, w->dev);
+			    "\n", mythreadno, w->dev);
 			errno = 0;
 			logerror("%s %s owns '%s' %s %.*s",
-				"Bad terminal owner;", pw.pw_name, w->dev,
-				"but utmpx says", UNAMESZ, w->ut_name);
+			    "Bad terminal owner;", pw.pw_name, w->dev,
+			    "but utmpx says", UNAMESZ, w->ut_name);
 		} else if (write(ttyf, w->msg, len) != len) {
 			DPRINT2(1, "writetodev(%u): Write failed to "
-				"'%s'\n", mythreadno, w->dev);
+			    "'%s'\n", mythreadno, w->dev);
 			errno = 0;
 			logerror("Write failed to '%s'", w->dev);
 		}
 
 		DPRINT2(1, "writetodev(%u): write to '%s' succeeded\n",
-			mythreadno, w->dev);
+		    mythreadno, w->dev);
 
 		(void) close(ttyf);
 	} else {
 		DPRINT2(1, "writetodev(%u): Can't open '%s'\n",
-			mythreadno, w->dev);
+		    mythreadno, w->dev);
 	}
 
 	(void) pthread_attr_destroy(&w->thread_attr);
 	free(w);
 
 	DPRINT1(1, "writetodev(%u): Device writer thread exiting\n",
-		mythreadno);
+	    mythreadno);
 
 	pthread_exit(0);
 	return (NULL);
@@ -2206,16 +2211,16 @@ cvthname(struct netbuf *nbp, struct netconfig *ncp, char *failsafe_addr)
 		uap = taddr2uaddr(ncp, nbp);
 
 	DPRINT2(2, "cvthname(%u): looking up hostname for %s\n",
-			mythreadno, uap ? uap : "<unknown>");
+	    mythreadno, uap ? uap : "<unknown>");
 
 	if ((h = hnc_lookup(nbp, ncp, &hindex)) != NULL) {
 		DPRINT4(2, "cvthname(%u): Cache found %p for %s (%s)\n",
-			mythreadno, (void *)h, uap ? uap : "<unknown>",
-				h->hl_hosts[0]);
+		    mythreadno, (void *)h, uap ? uap : "<unknown>",
+		    h->hl_hosts[0]);
 		return (h);
 	}
 	DPRINT2(2, "cvthname(%u): No cache found for %s\n",
-			mythreadno, uap ? uap : "<unknown>");
+	    mythreadno, uap ? uap : "<unknown>");
 
 	if (Debug)
 		free(uap);
@@ -2246,7 +2251,7 @@ out:			netdir_free((void *)hsp, ND_HOSTSERVLIST);
 		}
 
 		DPRINT2(2, "cvthname(%u): Found %d hostnames\n",
-					mythreadno, h->hl_cnt);
+		    mythreadno, h->hl_cnt);
 		for (i = 0; i < h->hl_cnt; i++) {
 			h->hl_hosts[i] = (char *)
 			    malloc(sizeof (char) * (strlen(hspp->h_host) + 1));
@@ -2281,8 +2286,8 @@ out:			netdir_free((void *)hsp, ND_HOSTSERVLIST);
 		/*LINTED*/
 		(void) sprintf(h->hl_hosts[0], "[%s]", failsafe_addr);
 		DPRINT2(1, "cvthname(%u): Hostname lookup failed "
-			"- using address %s instead\n",
-			mythreadno, h->hl_hosts[0]);
+		    "- using address %s instead\n",
+		    mythreadno, h->hl_hosts[0]);
 	}
 
 	h->hl_refcnt = 1;
@@ -2293,7 +2298,7 @@ out:			netdir_free((void *)hsp, ND_HOSTSERVLIST);
 	}
 	hnc_register(nbp, ncp, h, hindex);
 	DPRINT3(2, "cvthname(%u): returning %p for %s\n",
-		mythreadno, (void *)h, h->hl_hosts[0]);
+	    mythreadno, (void *)h, h->hl_hosts[0]);
 	return (h);
 }
 
@@ -2355,21 +2360,21 @@ logerror_format(const char *type, char *buf, va_list ap)
 
 		if (errno == 0) {
 			(void) snprintf(buf, MAXLINE, "syslogd: %.*s",
-				MAXLINE, tmpbuf);
+			    MAXLINE, tmpbuf);
 		} else if ((errstr = strerror(errno)) == (char *)NULL) {
 			(void) snprintf(buf, MAXLINE, "syslogd: %s: error"
-				" %d", tmpbuf, errno);
+			    " %d", tmpbuf, errno);
 		} else {
 			(void) snprintf(buf, MAXLINE, "syslogd: %s: %s",
-				tmpbuf, errstr);
+			    tmpbuf, errstr);
 		}
 	} else {
 		if (t_errno > t_nerr) {
 			(void) snprintf(buf, MAXLINE, "syslogd: %s:"
-				" t_error %d", tmpbuf, t_errno);
+			    " t_error %d", tmpbuf, t_errno);
 		} else {
 			(void) snprintf(buf, MAXLINE, "syslogd: %s: %s",
-				tmpbuf, t_errlist[t_errno]);
+			    tmpbuf, t_errlist[t_errno]);
 		}
 	}
 
@@ -2397,8 +2402,8 @@ logerror_to_console(int nonblock, const char *buf)
 	 */
 
 	modes = (nonblock) ?
-		O_WRONLY|O_APPEND|O_NOCTTY|O_NONBLOCK :
-		O_WRONLY|O_APPEND|O_NOCTTY;
+	    O_WRONLY|O_APPEND|O_NOCTTY|O_NONBLOCK :
+	    O_WRONLY|O_APPEND|O_NOCTTY;
 
 	if (((cfd = open(sysmsg, modes)) >= 0) ||
 	    ((cfd = open(ctty, modes)) >= 0)) {
@@ -2413,7 +2418,7 @@ logerror_to_console(int nonblock, const char *buf)
 
 		/* punt */
 		DPRINT1(1, "logerror_console(%u): can't open console\n",
-			mythreadno);
+		    mythreadno);
 	}
 	return (ret);
 }
@@ -2468,7 +2473,7 @@ freehl(host_list_t *h)
 
 	if (refcnt != 0) {
 		DPRINT3(5, "freehl(%u): %p has reference %d\n",
-			mythreadno, (void *)h, refcnt);
+		    mythreadno, (void *)h, refcnt);
 		return;
 	}
 
@@ -2519,20 +2524,20 @@ open_door(void)
 
 		if ((door = open(DoorFileName, O_RDONLY)) >= 0) {
 			DPRINT2(5, "open_door(%u): %s opened "
-				"successfully\n", mythreadno, DoorFileName);
+			    "successfully\n", mythreadno, DoorFileName);
 
 			if (door_info(door, &info) >= 0) {
 				DPRINT2(5, "open_door(%u): "
-					"door_info:info.di_target = %ld\n",
-					mythreadno, info.di_target);
+				    "door_info:info.di_target = %ld\n",
+				    mythreadno, info.di_target);
 
 				if (info.di_target > 0) {
 					(void) sprintf(line, "syslogd pid %ld"
-						" already running. Cannot "
-						"start another syslogd pid %ld",
-						info.di_target, getpid());
+					    " already running. Cannot "
+					    "start another syslogd pid %ld",
+					    info.di_target, getpid());
 					DPRINT2(5, "open_door(%u): error: "
-						"%s\n", mythreadno, line);
+					    "%s\n", mythreadno, line);
 					errno = 0;
 					logerror(line);
 					exit(1);
@@ -2545,8 +2550,8 @@ open_door(void)
 				err = errno;
 
 				DPRINT3(5, "open_door(%u): lstat() of %s "
-					"failed, errno=%d\n",
-					mythreadno, DoorFileName, err);
+				    "failed, errno=%d\n",
+				    mythreadno, DoorFileName, err);
 
 				if ((door = creat(DoorFileName, 0644)) < 0) {
 					err = errno;
@@ -2554,8 +2559,8 @@ open_door(void)
 					    "creat() of %s failed - fatal",
 					    DoorFileName);
 					DPRINT3(1, "open_door(%u): error: %s, "
-						"errno=%d\n", mythreadno, line,
-						err);
+					    "errno=%d\n", mythreadno, line,
+					    err);
 					errno = err;
 					logerror(line);
 					delete_doorfiles();
@@ -2563,11 +2568,11 @@ open_door(void)
 				}
 
 				(void) fchmod(door,
-					S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+				    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
 				DPRINT2(5, "open_door(%u): creat() of %s "
-					"succeeded\n", mythreadno,
-					DoorFileName);
+				    "succeeded\n", mythreadno,
+				    DoorFileName);
 
 				(void) close(door);
 			}
@@ -2576,15 +2581,15 @@ open_door(void)
 		if (strcmp(DoorFileName, DOORFILE) == 0) {
 			if (lstat(OLD_DOORFILE, &buf) == 0) {
 				DPRINT2(5, "open_door(%u): lstat() of %s "
-					"succeeded\n", mythreadno,
-					OLD_DOORFILE);
+				    "succeeded\n", mythreadno,
+				    OLD_DOORFILE);
 
 				if (S_ISDIR(buf.st_mode)) {
 					(void) snprintf(line, sizeof (line),
 					    "%s is a directory - fatal",
 					    OLD_DOORFILE);
 					DPRINT2(1, "open_door(%u): error: "
-						"%s\n", mythreadno, line);
+					    "%s\n", mythreadno, line);
 					errno = 0;
 					logerror(line);
 					delete_doorfiles();
@@ -2592,8 +2597,8 @@ open_door(void)
 				}
 
 				DPRINT2(5, "open_door(%u): %s is not a "
-					"directory\n",
-					mythreadno, OLD_DOORFILE);
+				    "directory\n",
+				    mythreadno, OLD_DOORFILE);
 
 				if (unlink(OLD_DOORFILE) < 0) {
 					err = errno;
@@ -2601,13 +2606,13 @@ open_door(void)
 					    "unlink() of %s failed",
 					    OLD_DOORFILE);
 					DPRINT2(5, "open_door(%u): %s\n",
-						mythreadno, line);
+					    mythreadno, line);
 
 					if (err != EROFS) {
 						DPRINT3(1, "open_door(%u): "
-							"error: %s, "
-							"errno=%d\n",
-							mythreadno, line, err);
+						    "error: %s, "
+						    "errno=%d\n",
+						    mythreadno, line, err);
 						(void) strcat(line, " - fatal");
 						errno = err;
 						logerror(line);
@@ -2616,12 +2621,12 @@ open_door(void)
 					}
 
 					DPRINT1(5, "open_door(%u): unlink "
-						"failure OK on RO file "
-						"system\n", mythreadno);
+					    "failure OK on RO file "
+					    "system\n", mythreadno);
 				}
 			} else {
 				DPRINT2(5, "open_door(%u): file %s doesn't "
-					"exist\n", mythreadno, OLD_DOORFILE);
+				    "exist\n", mythreadno, OLD_DOORFILE);
 			}
 
 			if (symlink(RELATIVE_DOORFILE, OLD_DOORFILE) < 0) {
@@ -2630,12 +2635,12 @@ open_door(void)
 				    "symlink %s -> %s failed", OLD_DOORFILE,
 				    RELATIVE_DOORFILE);
 				DPRINT2(5, "open_door(%u): %s\n", mythreadno,
-					line);
+				    line);
 
 				if (err != EROFS) {
 					DPRINT3(1, "open_door(%u): error: %s, "
-						"errno=%d\n", mythreadno, line,
-						err);
+					    "errno=%d\n", mythreadno, line,
+					    err);
 					errno = err;
 					(void) strcat(line, " - fatal");
 					logerror(line);
@@ -2644,11 +2649,11 @@ open_door(void)
 				}
 
 				DPRINT1(5, "open_door(%u): symlink failure OK "
-					"on RO file system\n", mythreadno);
+				    "on RO file system\n", mythreadno);
 			} else {
 				DPRINT3(5, "open_door(%u): symlink %s -> %s "
-					"succeeded\n", mythreadno,
-					OLD_DOORFILE, RELATIVE_DOORFILE);
+				    "succeeded\n", mythreadno,
+				    OLD_DOORFILE, RELATIVE_DOORFILE);
 			}
 		}
 
@@ -2657,7 +2662,7 @@ open_door(void)
 			err = errno;
 			(void) sprintf(line, "door_create() failed - fatal");
 			DPRINT3(1, "open_door(%u): error: %s, errno=%d\n",
-				mythreadno, line, err);
+			    mythreadno, line, err);
 			errno = err;
 			logerror(line);
 			delete_doorfiles();
@@ -2665,19 +2670,21 @@ open_door(void)
 		}
 		(void) door_setparam(DoorFd, DOOR_PARAM_DATA_MAX, 0);
 		DPRINT2(5, "open_door(%u): door_create() succeeded, "
-			"DoorFd=%d\n", mythreadno, DoorFd);
+		    "DoorFd=%d\n", mythreadno, DoorFd);
 
 		DoorCreated = 1;
 	}
 
 	(void) fdetach(DoorFileName);	/* just in case... */
 
+	(void) door_server_create(door_server_pool);
+
 	if (fattach(DoorFd, DoorFileName) < 0) {
 		err = errno;
 		(void) snprintf(line, sizeof (line), "fattach() of fd"
-			" %d to %s failed - fatal", DoorFd, DoorFileName);
+		    " %d to %s failed - fatal", DoorFd, DoorFileName);
 		DPRINT3(1, "open_door(%u): error: %s, errno=%d\n", mythreadno,
-			line, err);
+		    line, err);
 		errno = err;
 		logerror(line);
 		delete_doorfiles();
@@ -2685,7 +2692,7 @@ open_door(void)
 	}
 
 	DPRINT2(5, "open_door(%u): attached server() to %s\n", mythreadno,
-		DoorFileName);
+	    DoorFileName);
 
 	/*
 	 * create pidfile anyway, so those using it to control
@@ -2704,7 +2711,7 @@ open_door(void)
 			(void) snprintf(line, sizeof (line),
 			    "open() of %s failed", PidFileName);
 			DPRINT3(1, "open_door(%u): warning: %s, errno=%d\n",
-				mythreadno, line, err);
+			    mythreadno, line, err);
 			errno = err;
 			logerror(line);
 			return;
@@ -2718,7 +2725,7 @@ open_door(void)
 			(void) snprintf(line, sizeof (line),
 			    "write to %s on fd %d failed", PidFileName, pidfd);
 			DPRINT3(1, "open_door(%u): warning: %s, errno=%d\n",
-				mythreadno, line, err);
+			    mythreadno, line, err);
 			errno = err;
 			logerror(line);
 			return;
@@ -2727,19 +2734,19 @@ open_door(void)
 		(void) close(pidfd);
 
 		DPRINT2(5, "open_door(%u): %s created\n",
-			mythreadno, PidFileName);
+		    mythreadno, PidFileName);
 
 		if (strcmp(PidFileName, PIDFILE) == 0) {
 			if (lstat(OLD_PIDFILE, &buf) == 0) {
 				DPRINT2(5, "open_door(%u): lstat() of %s "
-					"succeded\n", mythreadno, OLD_PIDFILE);
+				    "succeded\n", mythreadno, OLD_PIDFILE);
 
 				if (S_ISDIR(buf.st_mode)) {
 					(void) snprintf(line, sizeof (line),
 					    "file %s is a directory",
 					    OLD_PIDFILE);
 					DPRINT2(1, "open_door(%u): warning: "
-						"%s\n", mythreadno, line);
+					    "%s\n", mythreadno, line);
 					errno = 0;
 					logerror(line);
 					return;
@@ -2751,52 +2758,52 @@ open_door(void)
 					    "unlink() of %s failed",
 					    OLD_PIDFILE);
 					DPRINT2(5, "open_door(%u): %s\n",
-						mythreadno, line);
+					    mythreadno, line);
 
 					if (err != EROFS) {
 						DPRINT3(1, "open_door (%u): "
-							"warning: %s, "
-							"errno=%d\n",
-							mythreadno, line, err);
+						    "warning: %s, "
+						    "errno=%d\n",
+						    mythreadno, line, err);
 						errno = err;
 						logerror(line);
 						return;
 					}
 
 					DPRINT1(5, "open_door(%u): unlink "
-						"failure OK on RO file "
-						"system\n", mythreadno);
+					    "failure OK on RO file "
+					    "system\n", mythreadno);
 				}
 			} else {
 				DPRINT2(5, "open_door(%u): file %s doesn't "
-					"exist\n", mythreadno, OLD_PIDFILE);
+				    "exist\n", mythreadno, OLD_PIDFILE);
 			}
 
 			if (symlink(RELATIVE_PIDFILE, OLD_PIDFILE) < 0) {
 				err = errno;
 				(void) snprintf(line, sizeof (line),
 				    "symlink %s -> %s failed", OLD_PIDFILE,
-					RELATIVE_PIDFILE);
+				    RELATIVE_PIDFILE);
 				DPRINT2(5, "open_door(%u): %s\n", mythreadno,
-					line);
+				    line);
 
 				if (err != EROFS) {
 					DPRINT3(1, "open_door(%u): warning: "
-						"%s, errno=%d\n", mythreadno,
-						line, err);
+					    "%s, errno=%d\n", mythreadno,
+					    line, err);
 					errno = err;
 					logerror(line);
 					return;
 				}
 
 				DPRINT1(5, "open_door(%u): symlink failure OK "
-					"on RO file system\n", mythreadno);
+				    "on RO file system\n", mythreadno);
 				return;
 			}
 
 			DPRINT3(5, "open_door(%u): symlink %s -> %s "
-				"succeeded\n", mythreadno, OLD_PIDFILE,
-				RELATIVE_PIDFILE);
+			    "succeeded\n", mythreadno, OLD_PIDFILE,
+			    RELATIVE_PIDFILE);
 		}
 	}
 }
@@ -2812,6 +2819,48 @@ server(void *cookie, char *argp, size_t arg_size,
 {
 	(void) door_return(NULL, 0, NULL, 0);
 	/* NOTREACHED */
+}
+
+/*ARGSUSED*/
+static void *
+create_door_thr(void *arg)
+{
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	(void) door_return(NULL, 0, NULL, 0);
+
+	/*
+	 * If there is an error in door_return(), it will return here and
+	 * the thread will exit. Hence we need to decrement door_server_cnt.
+	 */
+	(void) pthread_mutex_lock(&door_server_cnt_lock);
+	door_server_cnt--;
+	(void) pthread_mutex_unlock(&door_server_cnt_lock);
+	return (NULL);
+}
+
+/*
+ * Max number of door server threads for syslogd. Since door is used
+ * to check the health of syslogd, we don't need large number of
+ * server threads.
+ */
+#define	MAX_DOOR_SERVER_THR	3
+
+/*
+ * Manage door server thread pool.
+ */
+/*ARGSUSED*/
+static void
+door_server_pool(door_info_t *dip)
+{
+	(void) pthread_mutex_lock(&door_server_cnt_lock);
+	if (door_server_cnt <= MAX_DOOR_SERVER_THR &&
+	    pthread_create(NULL, &door_thr_attr, create_door_thr, NULL) == 0) {
+		door_server_cnt++;
+		(void) pthread_mutex_unlock(&door_server_cnt_lock);
+		return;
+	}
+
+	(void) pthread_mutex_unlock(&door_server_cnt_lock);
 }
 
 /*
@@ -2835,7 +2884,7 @@ checkm4(void)
 		saverrno = errno;
 		logerror("/usr/ccs/bin/m4");
 		DPRINT2(1, "checkm4(%u): /usr/ccs/bin/m4 - access "
-			"returned %d\n", mythreadno, saverrno);
+		    "returned %d\n", mythreadno, saverrno);
 		notfound++;
 	}
 
@@ -2920,7 +2969,8 @@ init(void)
 	if (pthread_attr_init(&sys_attr) != 0 ||
 	    pthread_attr_init(&log_attr) != 0 ||
 	    pthread_attr_init(&net_attr) != 0 ||
-	    pthread_attr_init(&hnl_attr) != 0) {
+	    pthread_attr_init(&hnl_attr) != 0 ||
+	    pthread_attr_init(&door_thr_attr) != 0) {
 		logerror("pthread_attr_init failed - fatal");
 		exit(1);
 	}
@@ -2929,6 +2979,9 @@ init(void)
 	(void) pthread_attr_setscope(&log_attr, PTHREAD_SCOPE_PROCESS);
 	(void) pthread_attr_setscope(&net_attr, PTHREAD_SCOPE_PROCESS);
 	(void) pthread_attr_setscope(&hnl_attr, PTHREAD_SCOPE_PROCESS);
+	(void) pthread_attr_setscope(&door_thr_attr, PTHREAD_SCOPE_SYSTEM);
+	(void) pthread_attr_setdetachstate(&door_thr_attr,
+	    PTHREAD_CREATE_DETACHED);
 
 	/* 1: logmsg thread */
 	(void) pthread_attr_setstacksize(&log_attr, stacksize);
@@ -2970,7 +3023,7 @@ init(void)
 	open_door();
 
 	DPRINT1(1, "init(%u): accepting messages from local system\n",
-			mythreadno);
+	    mythreadno);
 
 	if (turnoff == 0) {
 		/* init the hostname lookup queue */
@@ -2981,7 +3034,7 @@ init(void)
 		(void) pthread_attr_setstackaddr(&hnl_attr, stack_ptr);
 		stack_ptr += stacksize + redzonesize;
 		if (pthread_create(&hnl_thread, &hnl_attr,
-				hostname_lookup, NULL) != 0) {
+		    hostname_lookup, NULL) != 0) {
 			logerror("pthread_create failed - fatal");
 			exit(1);
 		}
@@ -2995,12 +3048,12 @@ init(void)
 		bindnet();
 
 		if (pthread_create(&net_thread, &net_attr, net_poll,
-					NULL) != 0) {
+		    NULL) != 0) {
 			logerror("pthread_create failed - fatal");
 			exit(1);
 		}
 		DPRINT1(1, "init(%u): accepting messages from remote\n",
-				mythreadno);
+		    mythreadno);
 	}
 
 	(void) pthread_attr_destroy(&sys_attr);
@@ -3011,7 +3064,7 @@ init(void)
 	curalarm = MarkInterval * 60 / MARKCOUNT;
 	(void) alarm((unsigned)curalarm);
 	DPRINT2(2, "init(%u): Next alarm in %d seconds\n",
-		mythreadno, curalarm);
+	    mythreadno, curalarm);
 	DPRINT1(1, "init(%u): syslogd: started\n", mythreadno);
 }
 
@@ -3035,11 +3088,11 @@ dumpstats(int fd)
 	(void) fprintf(out, "\n  syslogd: version %s\n", Version);
 	(void) fprintf(out, "  Started: %s", ctime_r(&start_time, cbuf));
 	(void) fprintf(out, "Input message count: system %d, network %d\n",
-		sys_msg_count, net_msg_count);
+	    sys_msg_count, net_msg_count);
 	(void) fprintf(out, "# Outputs: %d\n\n", nlogs);
 
 	(void) fprintf(out, "%s priority = [file, facility] %s\n\n",
-		dashes, dashes);
+	    dashes, dashes);
 
 	for (i = 0; i < LOG_NFACILITIES + 1; i++) {
 		(void) fprintf(out, "%d ", i / 10);
@@ -3060,7 +3113,7 @@ dumpstats(int fd)
 				(void) fprintf(out, "X ");
 			else
 				(void) fprintf(out, "%d ",
-					f->f_pmask[i]);
+				    f->f_pmask[i]);
 		}
 		(void) fprintf(out, "%s: ", TypeNames[f->f_type]);
 		switch (f->f_type) {
@@ -3074,13 +3127,13 @@ dumpstats(int fd)
 			break;
 		case F_USERS:
 			for (i = 0; i < MAXUNAMES &&
-				*f->f_un.f_uname[i]; i++) {
+			    *f->f_un.f_uname[i]; i++) {
 				if (!i)
 					(void) fprintf(out, "%s",
-						f->f_un.f_uname[i]);
+					    f->f_un.f_uname[i]);
 				else
 					(void) fprintf(out, ", %s",
-						f->f_un.f_uname[i]);
+					    f->f_un.f_uname[i]);
 			}
 			break;
 		}
@@ -3092,14 +3145,14 @@ dumpstats(int fd)
 
 		for (i = 0; FacNames[i].c_val != -1; i++) {
 			(void) fprintf(out, "  [%02d] %s: %3d\n", i,
-				FacNames[i].c_name, FacNames[i].c_val);
+			    FacNames[i].c_name, FacNames[i].c_val);
 		}
 
 		(void) fprintf(out, "\nPriorities:\n");
 
 		for (i = 0; PriNames[i].c_val != -1; i++) {
 			(void) fprintf(out, "  [%02d] %s: %3d\n", i,
-				PriNames[i].c_name, PriNames[i].c_val);
+			    PriNames[i].c_name, PriNames[i].c_val);
 		}
 
 		conversion_printed = 1;
@@ -3123,22 +3176,22 @@ dumpstats(int fd)
 			break;
 		case F_USERS:
 			for (i = 0; i < MAXUNAMES &&
-				*f->f_un.f_uname[i]; i++) {
+			    *f->f_un.f_uname[i]; i++) {
 				if (!i)
 					(void) strcpy(users,
-						f->f_un.f_uname[i]);
+					    f->f_un.f_uname[i]);
 				else {
 					(void) strcat(users, ",");
 					(void) strcat(users,
-						f->f_un.f_uname[i]);
+					    f->f_un.f_uname[i]);
 				}
 			}
 			(void) fprintf(out, "%-24s", users);
 			break;
 		}
 		(void) fprintf(out, "\t%d\t%d\t%d\t%d\n",
-			f->f_stat.total, f->f_stat.dups,
-			f->f_stat.cantfwd, f->f_stat.errs);
+		    f->f_stat.total, f->f_stat.dups,
+		    f->f_stat.cantfwd, f->f_stat.errs);
 	}
 	(void) fprintf(out, "\n\n");
 	if (Debug && fd == 1)
@@ -3167,7 +3220,7 @@ conf_init(void)
 	}
 
 	DPRINT1(2, "conf_init(%u): starting logger threads\n",
-		mythreadno);
+	    mythreadno);
 
 	m4argv[m4argc++] = "m4";
 
@@ -3187,7 +3240,7 @@ conf_init(void)
 
 	if (access(ConfFile, R_OK) == -1) {
 		DPRINT2(1, "conf_init(%u): %s does not exist\n", mythreadno,
-			ConfFile);
+		    ConfFile);
 		logerror("can't open configuration file");
 		/* CSTYLED */
 		Files = (struct filed *) &fallback; /*lint !e545 */
@@ -3199,7 +3252,7 @@ conf_init(void)
 
 	if (checkm4() != 0 || conf_open(&cf, "/usr/ccs/bin/m4", m4argv) == -1) {
 		DPRINT2(1, "conf_init(%u): cannot open %s\n", mythreadno,
-			ConfFile);
+		    ConfFile);
 		/* CSTYLED */
 		Files = (struct filed *) &fallback; /*lint !e545 */
 		cfline("*.ERR\t/dev/sysmsg", 0, &Files[0]);
@@ -3219,7 +3272,7 @@ conf_init(void)
 
 	if (!Files) {
 		DPRINT1(1, "conf_init(%u): malloc failed - can't "
-			"allocate 'Files' array\n", mythreadno);
+		    "allocate 'Files' array\n", mythreadno);
 		MALLOC_FAIL("loading minimum configuration");
 		/* CSTYLED */
 		Files = (struct filed *) &fallback; /*lint !e545 */
@@ -3278,7 +3331,7 @@ nofile:
 		(void) pthread_mutex_unlock(&cft);
 
 		if (f->f_type != F_UNUSED &&
-			f->f_pmask[LOG_NFACILITIES] != NOPRI)
+		    f->f_pmask[LOG_NFACILITIES] != NOPRI)
 			Marking = 1;
 	}
 }
@@ -3304,7 +3357,7 @@ filed_init(struct filed *f)
 	}
 
 	DPRINT2(5, "filed_init(%u): dataq_init for queue %p\n",
-		mythreadno, (void *)&f->f_queue);
+	    mythreadno, (void *)&f->f_queue);
 	(void) dataq_init(&f->f_queue);
 
 	if (pthread_attr_init(&stack_attr) != 0) {
@@ -3396,7 +3449,7 @@ cfline(char *line, int lineno, struct filed *f)
 		pri = decode(buf, PriNames);
 		if (pri < 0) {
 			logerror("line %d: unknown priority name \"%s\"",
-					lineno, buf);
+			    lineno, buf);
 			return;
 		}
 
@@ -3412,7 +3465,7 @@ cfline(char *line, int lineno, struct filed *f)
 				i = decode(buf, FacNames);
 				if (i < 0) {
 					logerror("line %d: unknown facility"
-						" name \"%s\"", lineno, buf);
+					    " name \"%s\"", lineno, buf);
 					return;
 				}
 				f->f_pmask[i >> 3] = (uchar_t)pri;
@@ -3569,7 +3622,7 @@ getnets(void)
 
 	if (turnoff) {
 		DPRINT1(1, "getnets(%u): network is being turned off\n",
-				mythreadno);
+		    mythreadno);
 		return;
 	}
 
@@ -3591,14 +3644,14 @@ getnets(void)
 
 		if (nap == NULL || nap->n_cnt <= 0) {
 			DPRINT1(1, "getnets(%u): found no address\n",
-					mythreadno);
+			    mythreadno);
 			netdir_free((void *)nap, ND_ADDRLIST);
 			continue;
 		}
 
 		if (Debug) {
 			DPRINT2(1, "getnets(%u): found %d addresses",
-				mythreadno, nap->n_cnt);
+			    mythreadno, nap->n_cnt);
 			DPRINT0(1, ", they are: ");
 			nbp = nap->n_addrs;
 
@@ -3625,7 +3678,7 @@ getnets(void)
 		 * all malloc failures here are fatal
 		 */
 		if (Nfd == NULL || Ncf == NULL || Myaddrs == NULL ||
-			Udp == NULL || Errp == NULL) {
+		    Udp == NULL || Errp == NULL) {
 			MALLOC_FAIL_EXIT;
 		}
 
@@ -3644,11 +3697,11 @@ getnets(void)
 			if ((uap = taddr2uaddr(ncp, nbp)) != NULL) {
 				size_t l = strlen(ebuf);
 				(void) snprintf(ebuf + l, sizeof (ebuf) - l,
-					" for %s", uap);
+				    " for %s", uap);
 			}
 
 			DPRINT2(1, "getnets(%u): %s",
-				mythreadno, ebuf);
+			    mythreadno, ebuf);
 
 			if (uap) {
 				free(uap);
@@ -3705,7 +3758,7 @@ addnet(struct netconfig *ncp, struct netbuf *nbp)
 	}
 
 	if ((bp = malloc(sizeof (struct netbuf))) == NULL ||
-		(bp->buf = malloc(nbp->len)) == NULL) {
+	    (bp->buf = malloc(nbp->len)) == NULL) {
 		MALLOC_FAIL("allocating address buffer");
 		(void) t_close(fd);
 		(void) t_free((char *)Udp[Ninputs], T_UNITDATA);
@@ -3776,7 +3829,7 @@ set_udp_buffer(int fd)
 		logerror("failed to allocate UDP buffer");
 	}
 	DPRINT3(1, "set_udp_buffer(%u): allocate %d for fd %d\n",
-		mythreadno, bsize, fd);
+	    mythreadno, bsize, fd);
 	free(opt);
 }
 
@@ -3823,11 +3876,11 @@ bindnet(void)
 		if (uap) {
 			i = strlen(ebuf);
 			(void) snprintf(ebuf + i, sizeof (ebuf) - i,
-				" for %s", uap);
+			    " for %s", uap);
 		}
 
 		DPRINT2(1, "bindnet(%u): failed to bind port (%s)\n",
-			mythreadno, uap ? uap : "<unknown>");
+		    mythreadno, uap ? uap : "<unknown>");
 
 		if (uap) {
 			free(uap);
@@ -3870,7 +3923,7 @@ logforward(struct filed *f, char *ebuf, size_t elen)
 
 	if ((handle = setnetconfig()) == NULL) {
 		(void) strlcpy(ebuf,
-			"unable to rewind the netconfig database", elen);
+		    "unable to rewind the netconfig database", elen);
 		errno = 0;
 		return (-1);
 	}
@@ -3982,7 +4035,7 @@ amiloghost(void)
 		for (i = 0; i < nap->n_cnt; i++) {
 			if ((uap = taddr2uaddr(ncp, nbp)) != (char *)NULL) {
 				DPRINT2(1, "amiloghost(%u): testing %s\n",
-					mythreadno, uap);
+				    mythreadno, uap);
 			}
 
 			free(uap);
@@ -4129,7 +4182,7 @@ filter_string(char *mbstr, char *filtered, size_t max)
 
 		while (*p != '\0') {
 			if ((mlen = mbtowc(&wc, (char *)p,
-				mb_cur_max)) == -1) {
+			    mb_cur_max)) == -1) {
 				/*
 				 * Invalid byte sequence found.
 				 *
@@ -4137,8 +4190,8 @@ filter_string(char *mbstr, char *filtered, size_t max)
 				 * in ASCII format.
 				 */
 				DPRINT2(9, "filter_string(%u): Invalid "
-					"MB sequence: %ld\n", mythreadno,
-					wc);
+				    "MB sequence: %ld\n", mythreadno,
+				    wc);
 
 				if (!putctrlc(*p++, &filtered, &cs, max)) {
 					/* not enough buffer */
@@ -4165,12 +4218,12 @@ filter_string(char *mbstr, char *filtered, size_t max)
 					char	*q = filtered;
 
 					DPRINT2(9, "filter_string(%u): MB"
-						" control character: %ld\n",
-						mythreadno, wc);
+					    " control character: %ld\n",
+					    mythreadno, wc);
 
 					while (mlen--) {
 						if (!putctrlc(*p++, &filtered,
-							&cs, max)) {
+						    &cs, max)) {
 							/*
 							 * not enough buffer in
 							 * filtered
@@ -4217,7 +4270,7 @@ filter_string(char *mbstr, char *filtered, size_t max)
 				 * in ASCII format.
 				 */
 				DPRINT2(9, "filter_string(%u): control "
-					"character: %d\n", mythreadno, *p);
+				    "character: %d\n", mythreadno, *p);
 
 				if (!putctrlc(*p++, &filtered, &cs, max)) {
 					/* not enough buffer */
@@ -4231,7 +4284,7 @@ filter_string(char *mbstr, char *filtered, size_t max)
 				 * this check is required for the C locale
 				 */
 				DPRINT2(9, "filter_string(%u): non-printable "
-					"character: %d\n", mythreadno, *p);
+				    "character: %d\n", mythreadno, *p);
 				if (!putctrlc(*p++, &filtered, &cs, max)) {
 					/* not enough buffer */
 					goto end;
@@ -4259,7 +4312,7 @@ end:
 	*filtered = '\0';
 
 	if (cs >= 2 &&
-		filtered[-2] == '\\' && filtered[-1] == 'n') {
+	    filtered[-2] == '\\' && filtered[-1] == 'n') {
 		filtered[-2] = '\0';
 	}
 }
@@ -4278,7 +4331,7 @@ alloc_stacks(int numstacks)
 	 * can be created elsewhere and refer to the sizes
 	 */
 	stacksize = (size_t)roundup(sysconf(_SC_THREAD_STACK_MIN) +
-		DEFAULT_STACKSIZE, pagesize);
+	    DEFAULT_STACKSIZE, pagesize);
 	redzonesize = (size_t)roundup(DEFAULT_REDZONESIZE, pagesize);
 
 	/*
@@ -4288,7 +4341,7 @@ alloc_stacks(int numstacks)
 	 */
 	mapsize = redzonesize + numstacks * (stacksize + redzonesize);
 	stack_top = mmap(NULL, mapsize, PROT_READ|PROT_WRITE,
-		MAP_PRIVATE|MAP_ANON, -1, 0);
+	    MAP_PRIVATE|MAP_ANON, -1, 0);
 	if (stack_top == MAP_FAILED)
 		return (NULL);
 
@@ -4339,7 +4392,7 @@ close_door(void)
 	(void) fdetach(DoorFileName);
 
 	DPRINT2(5, "close_door(%u): detached server() from %s\n",
-		mythreadno, DoorFileName);
+	    mythreadno, DoorFileName);
 }
 
 static void
@@ -4363,12 +4416,12 @@ delete_doorfiles(void)
 			errno = err;
 			logerror(line);
 			DPRINT3(1, "delete_doorfiles(%u): error: %s, "
-				"errno=%d\n", mythreadno, line, err);
+			    "errno=%d\n", mythreadno, line, err);
 			exit(1);
 		}
 
 		DPRINT2(5, "delete_doorfiles(%u): deleted %s\n",
-			mythreadno, DoorFileName);
+		    mythreadno, DoorFileName);
 	}
 
 	if (strcmp(DoorFileName, DOORFILE) == 0) {
@@ -4378,7 +4431,7 @@ delete_doorfiles(void)
 				(void) snprintf(line, sizeof (line),
 				    "unlink() of %s failed", OLD_DOORFILE);
 				DPRINT2(5, "delete_doorfiles(%u): %s\n",
-					mythreadno, line);
+				    mythreadno, line);
 
 				if (err != EROFS) {
 					errno = err;
@@ -4386,18 +4439,18 @@ delete_doorfiles(void)
 					    sizeof (line));
 					logerror(line);
 					DPRINT3(1, "delete_doorfiles(%u): "
-						"error: %s, errno=%d\n",
-						mythreadno, line, err);
+					    "error: %s, errno=%d\n",
+					    mythreadno, line, err);
 					exit(1);
 				}
 
 				DPRINT1(5, "delete_doorfiles(%u): unlink() "
-					"failure OK on RO file system\n",
-					mythreadno);
+				    "failure OK on RO file system\n",
+				    mythreadno);
 			}
 
 			DPRINT2(5, "delete_doorfiles(%u): deleted %s\n",
-				mythreadno, OLD_DOORFILE);
+			    mythreadno, OLD_DOORFILE);
 		}
 	}
 
@@ -4409,12 +4462,12 @@ delete_doorfiles(void)
 			errno = err;
 			logerror(line);
 			DPRINT3(1, "delete_doorfiles(%u): error: %s, "
-				"errno=%d\n", mythreadno, line, err);
+			    "errno=%d\n", mythreadno, line, err);
 			exit(1);
 		}
 
 		DPRINT2(5, "delete_doorfiles(%u): deleted %s\n", mythreadno,
-			PidFileName);
+		    PidFileName);
 	}
 
 	if (strcmp(PidFileName, PIDFILE) == 0) {
@@ -4424,7 +4477,7 @@ delete_doorfiles(void)
 				(void) snprintf(line, sizeof (line),
 				    "unlink() of %s failed", OLD_PIDFILE);
 				DPRINT2(5, "delete_doorfiles(%u): %s, \n",
-					mythreadno, line);
+				    mythreadno, line);
 
 				if (err != EROFS) {
 					errno = err;
@@ -4432,18 +4485,18 @@ delete_doorfiles(void)
 					    sizeof (line));
 					logerror(line);
 					DPRINT3(1, "delete_doorfiles(%u): "
-						"error: %s, errno=%d\n",
-						mythreadno, line, err);
+					    "error: %s, errno=%d\n",
+					    mythreadno, line, err);
 					exit(1);
 				}
 
 				DPRINT1(5, "delete_doorfiles(%u): unlink "
-					"failure OK on RO file system\n",
-					mythreadno);
+				    "failure OK on RO file system\n",
+				    mythreadno);
 			}
 
 			DPRINT2(5, "delete_doorfiles(%u): deleted %s\n",
-				mythreadno, OLD_PIDFILE);
+			    mythreadno, OLD_PIDFILE);
 		}
 	}
 
@@ -4452,7 +4505,7 @@ delete_doorfiles(void)
 	}
 
 	DPRINT2(1, "delete_doorfiles(%u): revoked door: DoorFd=%d\n",
-		mythreadno, DoorFd);
+	    mythreadno, DoorFd);
 }
 
 
@@ -4461,7 +4514,7 @@ static void
 signull(int sig, siginfo_t *sip, void *utp)
 {
 	DPRINT1(1, "signull(%u): THIS CALL SHOULD NEVER HAPPEN\n",
-		pthread_self());
+	    pthread_self());
 	/*
 	 * Do nothing, as this is a place-holder used in conjunction with
 	 * sigaction()/sigwait() to ensure that the proper disposition is
@@ -4569,7 +4622,7 @@ findnl_bkwd(const char *buf, const size_t len)
 				 * Invalid character found.
 				 */
 				DPRINT1(9, "findnl_bkwd(%u): Invalid MB "
-					"sequence\n", mythreadno);
+				    "sequence\n", mythreadno);
 				/*
 				 * handle as a single byte character.
 				 */
@@ -4662,7 +4715,7 @@ copynl_frwd(char *obuf, const size_t obuflen,
 				 * Invalid character found.
 				 */
 				DPRINT1(9, "copynl_frwd(%u): Invalid MB "
-					"sequence\n", mythreadno);
+				    "sequence\n", mythreadno);
 				/*
 				 * handle as a single byte character.
 				 */
@@ -4759,7 +4812,7 @@ copy_frwd(char *obuf, const size_t obuflen,
 				 * Invalid character found.
 				 */
 				DPRINT1(9, "copy_frwd(%u): Invalid MB "
-					"sequence\n", mythreadno);
+				    "sequence\n", mythreadno);
 				/*
 				 * handle as a single byte character.
 				 */
@@ -4850,14 +4903,14 @@ hostname_lookup(void *ap)
 	}
 
 	DPRINT1(1, "hostname_lookup(%u): hostname_lookup started\n",
-		mythreadno);
+	    mythreadno);
 
 	for (;;) {
 		(void) dataq_dequeue(&hnlq, (void **)&mp, 0);
 
 		DPRINT3(5, "hostname_lookup(%u): dequeued msg %p"
-			" from queue %p\n", mythreadno, (void *)mp,
-			(void *)&hnlq);
+		    " from queue %p\n", mythreadno, (void *)mp,
+		    (void *)&hnlq);
 
 		hip = (host_info_t *)mp->ptr;
 		if ((uap = taddr2uaddr(hip->ncp, &hip->addr)) != NULL) {
@@ -4884,7 +4937,7 @@ hostname_lookup(void *ap)
 		}
 
 		DPRINT3(5, "hostname_lookup(%u): enqueued msg %p on queue "
-			"%p\n", mythreadno, (void *)mp, (void *)&inputq);
+		    "%p\n", mythreadno, (void *)mp, (void *)&inputq);
 	}
 
 	/*NOTREACHED*/
@@ -4915,7 +4968,7 @@ reconfigure()
 	flushmsg(0);
 
 	if (logmymsg(LOG_SYSLOG|LOG_INFO, "syslogd: configuration restart",
-		ADDDATE, 0) == -1) {
+	    ADDDATE, 0) == -1) {
 		MALLOC_FAIL("dropping message");
 	}
 
@@ -4928,8 +4981,8 @@ reconfigure()
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: awaiting logmsg()"
-			" moving to the safe place\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    " moving to the safe place\n",
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	for (loop = 0; loop < LOOP_MAX; loop++) {
@@ -4945,7 +4998,7 @@ reconfigure()
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: logmsg() will accept HUP\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	/*
@@ -4966,7 +5019,7 @@ reconfigure()
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: sending SHUTDOWN\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	/* stop configured threads */
@@ -4989,8 +5042,8 @@ reconfigure()
 		if (Debug) {
 			tim = time(NULL);
 			DPRINT2(3, "reconfigure(%u): %.15s: logmsg() does not "
-				"stop. enforcing\n",
-				mythreadno, ctime_r(&tim, cbuf)+4);
+			    "stop. enforcing\n",
+			    mythreadno, ctime_r(&tim, cbuf)+4);
 		}
 
 		/* probably we have too long input queue, or really stuck */
@@ -5007,8 +5060,8 @@ reconfigure()
 			if (Debug) {
 				tim = time(NULL);
 				DPRINT2(3, "reconfigure(%u): %.15s: logmsg()"
-					" does not stop. give up\n",
-					mythreadno, ctime_r(&tim, cbuf)+4);
+				    " does not stop. give up\n",
+				    mythreadno, ctime_r(&tim, cbuf)+4);
 			}
 			logerror("could not suspend logmsg - fatal");
 			goto thread_stuck;
@@ -5018,7 +5071,7 @@ reconfigure()
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: logmsg() suspended\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	/*
@@ -5036,18 +5089,18 @@ reconfigure()
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: awaiting logit() to be"
-			" shutdown\n", mythreadno, ctime_r(&tim, cbuf)+4);
+		    " shutdown\n", mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	cnt = 0;
 	really_stuck = 0;
 	while (cnt < (LOOP_MAX/LOOP_INTERVAL) &&
-		conf_threads > really_stuck) {
+	    conf_threads > really_stuck) {
 
 		/* save initial queue count */
 		for (f = Files; f < &Files[nlogs]; f++) {
 			f->f_prev_queue_count = (f->f_type == F_UNUSED) ?
-				-1 : f->f_queue_count;
+			    -1 : f->f_queue_count;
 		}
 
 		for (loop = 0; loop < LOOP_INTERVAL; loop++) {
@@ -5062,9 +5115,9 @@ reconfigure()
 		if (Debug) {
 			tim = time(NULL);
 			DPRINT3(3, "reconfigure(%u): %.15s: "
-				"%d threads are still alive.\n",
-				mythreadno, ctime_r(&tim, cbuf)+4,
-				conf_threads);
+			    "%d threads are still alive.\n",
+			    mythreadno, ctime_r(&tim, cbuf)+4,
+			    conf_threads);
 		}
 
 		really_stuck = 0;
@@ -5077,13 +5130,13 @@ reconfigure()
 				really_stuck++;
 				f->f_prev_queue_count = 1;
 				DPRINT2(3, "reconfigure(%u): "
-					"tid=%d is really stuck.\n",
-					mythreadno, f->f_thread);
+				    "tid=%d is really stuck.\n",
+				    mythreadno, f->f_thread);
 			} else {
 				f->f_prev_queue_count = 0;
 				DPRINT2(3, "reconfigure(%u): "
-					"tid=%d is still active.\n",
-					mythreadno, f->f_thread);
+				    "tid=%d is still active.\n",
+				    mythreadno, f->f_thread);
 			}
 		}
 		/*
@@ -5100,11 +5153,11 @@ reconfigure()
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s:"
-			" complete awaiting logit()\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    " complete awaiting logit()\n",
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 		DPRINT3(3, "reconfigure(%u): %d threads alive."
-			" %d threads stuck\n",
-			mythreadno, conf_threads, really_stuck);
+		    " %d threads stuck\n",
+		    mythreadno, conf_threads, really_stuck);
 	}
 
 	/*
@@ -5115,12 +5168,12 @@ reconfigure()
 	if (conf_threads) {
 		for (f = Files; f < &Files[nlogs]; f++) {
 			if (f->f_type == F_CONSOLE &&
-				f->f_prev_queue_count == 1) {
+			    f->f_prev_queue_count == 1) {
 				/* console is really stuck */
 				console_stuck = 1;
 			}
 			if (f->f_type == F_USERS || f->f_type == F_WALL ||
-				f->f_type == F_UNUSED)
+			    f->f_type == F_UNUSED)
 				continue;
 			cnt = f->f_queue_count;
 			drops += (cnt > 0) ? cnt - 1: 0;
@@ -5135,7 +5188,7 @@ reconfigure()
 		if (Debug) {
 			tim = time(NULL);
 			DPRINT1(3, "reconfigure(%u): terminating logit()\n",
-				mythreadno);
+			    mythreadno);
 		}
 
 		/* last chance to exit */
@@ -5148,22 +5201,22 @@ reconfigure()
 		if (Debug) {
 			tim = time(NULL);
 			DPRINT3(3, "reconfigure(%u): %.15s: %d alive\n",
-				mythreadno, ctime_r(&tim, cbuf)+4,
-				conf_threads);
+			    mythreadno, ctime_r(&tim, cbuf)+4,
+			    conf_threads);
 		}
 	}
 
 	if (conf_threads == 0 && drops) {
 		errno = 0;
 		logerror("Could not completely output pending messages"
-			" while preparing re-configuration");
+		    " while preparing re-configuration");
 		logerror("discarded %d messages and restart configuration.",
-			drops);
+		    drops);
 		if (Debug) {
 			tim = time(NULL);
 			DPRINT3(3, "reconfigure(%u): %.15s: "
-				"discarded %d messages\n",
-				mythreadno, ctime_r(&tim, cbuf)+4, drops);
+			    "discarded %d messages\n",
+			    mythreadno, ctime_r(&tim, cbuf)+4, drops);
 		}
 	}
 
@@ -5177,7 +5230,7 @@ thread_stuck:
 		if (Debug) {
 			tim = time(NULL);
 			DPRINT2(3, "reconfigure(%u): %.15s: really stuck\n",
-				mythreadno, ctime_r(&tim, cbuf)+4);
+			    mythreadno, ctime_r(&tim, cbuf)+4);
 		}
 
 		shutdown_input();
@@ -5185,10 +5238,10 @@ thread_stuck:
 		(void) uname(&up);
 
 		(void) snprintf(buf, sizeof (buf),
-			"syslogd(%s): some logger thread(s) "
-			"are stuck%s; syslogd is shutting down.",
-			up.nodename,
-			console_stuck ? " (including the console)" : "");
+		    "syslogd(%s): some logger thread(s) "
+		    "are stuck%s; syslogd is shutting down.",
+		    up.nodename,
+		    console_stuck ? " (including the console)" : "");
 
 		if (console_stuck) {
 			FILE *m = popen(MAILCMD, "w");
@@ -5218,7 +5271,7 @@ thread_stuck:
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: cleanup complete\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	hnc_init(1);	/* purge hostname cache */
@@ -5233,7 +5286,7 @@ out:;
 	if (Debug) {
 		tim = time(NULL);
 		DPRINT2(3, "reconfigure(%u): %.15s: resuming logmsg()\n",
-			mythreadno, ctime_r(&tim, cbuf)+4);
+		    mythreadno, ctime_r(&tim, cbuf)+4);
 	}
 
 	(void) pthread_mutex_lock(&hup_lock);
@@ -5283,7 +5336,7 @@ hnc_init(int reinit)
 
 		(void) pthread_mutex_unlock(&hnc_mutex);
 		DPRINT1(2, "hnc_init(%u): hostname cache re-configured\n",
-			mythreadno);
+		    mythreadno);
 	} else {
 
 		hnc_cache = calloc(hnc_size, sizeof (struct hostname_cache *));
@@ -5295,7 +5348,7 @@ hnc_init(int reinit)
 		}
 
 		DPRINT3(1, "hnc_init(%u): hostname cache configured %d entry"
-			" ttl:%d\n", mythreadno, hnc_size, hnc_ttl);
+		    " ttl:%d\n", mythreadno, hnc_size, hnc_ttl);
 	}
 }
 
@@ -5322,12 +5375,12 @@ hnc_lookup(struct netbuf *nbp, struct netconfig *ncp, int *hindex)
 
 	for (hpp = &hnc_cache[index]; (hp = *hpp) != NULL; ) {
 		DPRINT4(10, "hnc_lookup(%u): check %p on %p for %s\n",
-			mythreadno, (void *)hp->h, (void *)hp,
-			hp->h->hl_hosts[0]);
+		    mythreadno, (void *)hp->h, (void *)hp,
+		    hp->h->hl_hosts[0]);
 
 		if (hp->expire < now) {
 			DPRINT2(9, "hnc_lookup(%u): purge %p\n",
-				mythreadno, (void *)hp);
+			    mythreadno, (void *)hp);
 			hnc_unreg(hpp);
 			continue;
 		}
@@ -5351,8 +5404,8 @@ hnc_lookup(struct netbuf *nbp, struct netconfig *ncp, int *hindex)
 			(void) pthread_mutex_unlock(&hp->h->hl_mutex);
 
 			DPRINT4(9, "hnc_lookup(%u): found %p on %p for %s\n",
-				mythreadno, (void *)hp->h, (void *)hp,
-				hp->h->hl_hosts[0]);
+			    mythreadno, (void *)hp->h, (void *)hp,
+			    hp->h->hl_hosts[0]);
 
 			(void) pthread_mutex_unlock(&hnc_mutex);
 			return (hp->h);
@@ -5410,7 +5463,7 @@ hnc_register(struct netbuf *nbp, struct netconfig *ncp,
 
 		if (hp->expire < now) {
 			DPRINT2(9, "hnc_register(%u): discard %p\n",
-				mythreadno, (void *)hp);
+			    mythreadno, (void *)hp);
 			hnc_unreg(hpp);
 		} else {
 			i++;
@@ -5444,7 +5497,7 @@ hnc_register(struct netbuf *nbp, struct netconfig *ncp,
 	 */
 	h->hl_refcnt++;
 	DPRINT4(9, "hnc_register(%u): reg %p onto %p for %s\n",
-		mythreadno, (void *)h, (void *)hp, hp->h->hl_hosts[0]);
+	    mythreadno, (void *)h, (void *)hp, hp->h->hl_hosts[0]);
 	(void) pthread_mutex_unlock(&hnc_mutex);
 }
 
@@ -5459,7 +5512,7 @@ hnc_unreg(struct hostname_cache **hpp)
 	}
 
 	DPRINT4(9, "hnc_unreg(%u): unreg %p on %p for %s\n",
-		mythreadno, (void *)hp->h, (void *)hp, hp->h->hl_hosts[0]);
+	    mythreadno, (void *)hp->h, (void *)hp, hp->h->hl_hosts[0]);
 	free(hp->addr.buf);
 	freehl(hp->h);
 
