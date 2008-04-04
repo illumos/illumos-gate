@@ -122,6 +122,7 @@ i386_SUBDIRS= \
 	SUNWdrmr \
 	SUNWgrub \
 	SUNWgrubS \
+	SUNWhxge \
 	SUNWipw \
 	SUNWiwi \
 	SUNWiwk \
@@ -231,7 +232,6 @@ COMMON_SUBDIRS= \
 	SUNWhea  \
 	SUNWhermon  \
 	SUNWhwdata \
-	SUNWhxge \
 	SUNWib \
 	SUNWibsdpu \
 	SUNWibsdp \
