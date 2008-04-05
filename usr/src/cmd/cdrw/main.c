@@ -82,12 +82,12 @@ print_usage(void)
 	err_msg(gettext(" [ -T audio-type ] audio-file1 audio-file2 ...\n"));
 	err_msg(gettext("\tcdrw -x [ -v ] [ -d device ] [ -T audio-type ]"));
 	err_msg(gettext(" track-number audio-file\n"));
-	err_msg(gettext("\tcdrw -c [ -cSC ] [ -d device ] [ -p speed ]"));
+	err_msg(gettext("\tcdrw -c [ -SC ] [ -d device ] [ -p speed ]"));
 	err_msg(gettext(" [ -m tmp-dir ] [ -s src-device ]\n"));
 	err_msg(
 	    gettext("\tcdrw -b [ -v ] [ -d device ] all | session | fast\n"));
 	err_msg(gettext("\tcdrw -M [ -v ] [ -d device ]\n"));
-	err_msg(gettext("\tcdrw -L [v] [ -d device ]\n"));
+	err_msg(gettext("\tcdrw -L [ -v ] [ -d device ]\n"));
 	err_msg(gettext("\tcdrw -l [ -v ]\n"));
 	err_msg(gettext("\tcdrw -h\n"));
 
