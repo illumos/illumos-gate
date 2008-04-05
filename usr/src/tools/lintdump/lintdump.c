@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,7 @@ static void die(const char *, ...);
 static void usage(void);
 static void indent(void);
 static void unindent(void);
-static void print_lintlib(const char *, FILE *, FLENS *);
+static void print_lintmod(const char *, FILE *, FLENS *);
 static void print_pass(const char *, FILE *);
 static void print_atype(ATYPE *, int, ATYPE *, const char *);
 static void print_mods(const char *, ATYPE *, int, ATYPE *, uint_t);
@@ -76,9 +76,10 @@ static lsu_t *lsu_lookup(unsigned long);
 int
 main(int argc, char **argv)
 {
-	int	i, c;
-	FILE	*fp;
-	FLENS	hdr;
+	int		i, c, mod;
+	FILE		*fp;
+	FLENS		hdr;
+	const char	*lnname;
 
 	progname = strrchr(argv[0], '/');
 	if (progname == NULL)
@@ -114,69 +115,69 @@ main(int argc, char **argv)
 			continue;
 		}
 
-		if (fread(&hdr, sizeof (hdr), 1, fp) < 1) {
-			warn("%s: cannot read lint library header\n", argv[i]);
-			(void) fclose(fp);
-			continue;
-		}
-
-		if (hdr.ver != LINTVER) {
-			warn("%s: lint library version %d unsupported\n",
-			    argv[i], hdr.ver);
-			(void) fclose(fp);
-			continue;
-		}
+		lnname = argv[i];
+		if (justrelpaths && lnname[0] == '/')
+			lnname = strrchr(lnname, '/') + 1;
 
 		/*
-		 * First build the table of structure/union names, then seek
-		 * back to the start and print the lint library.  Finally,
-		 * empty the table out before dumping the next library.
+		 * Dump out all of the modules in the lint object.
 		 */
-		lsu_build(fp);
-		(void) fseek(fp, sizeof (hdr), SEEK_SET);
-		print_lintlib(argv[i], fp, &hdr);
+		for (mod = 1; fread(&hdr, sizeof (hdr), 1, fp) == 1; mod++) {
+			if (hdr.ver != LINTVER) {
+				warn("%s: unsupported lint object version "
+				    "%d\n", argv[i], hdr.ver);
+				break;
+			}
+
+			if (mod == 1)
+				infohdr("LINTOBJ", "%s\n", lnname);
+
+			/*
+			 * First build the table of structure/union names,
+			 * then print the lint module.  Finally, empty the
+			 * table out before dumping the next module.
+			 */
+			lsu_build(fp);
+			print_lintmod(lnname, fp, &hdr);
+			lsu_empty();
+		}
 		(void) fclose(fp);
-		lsu_empty();
 	}
 
 	return (EXIT_SUCCESS);
 }
 
 /*
- * Print a lint library.
+ * Print a lint module and advance past it in the stream.
  */
 static void
-print_lintlib(const char *lnname, FILE *fp, FLENS *hp)
+print_lintmod(const char *lnname, FILE *fp, FLENS *hp)
 {
-	off_t		passoff = 0;
-	ulong_t		psizes[4];
+	ulong_t		psizes[5];
 	uint_t		pass;
 
 	psizes[0] = 0;
 	psizes[1] = hp->f1;
 	psizes[2] = hp->f2;
 	psizes[3] = hp->f3;
+	psizes[4] = hp->f4;
 
-	if (justrelpaths && lnname[0] == '/')
-		lnname = strrchr(lnname, '/') + 1;
+	infohdr("LINTMOD", "%hu: %lu+%lu+%lu+%lu = %lu bytes\n", hp->mno,
+	    hp->f1, hp->f2, hp->f3, hp->f4, hp->f1 + hp->f2 + hp->f3 + hp->f4);
 
-	infohdr("LINTLIB", "%s <mid %hu> %lu+%lu+%lu+%lu = %lu bytes\n", lnname,
-	    hp->mno, hp->f1, hp->f2, hp->f3, hp->f4,
-	    hp->f1 + hp->f2 + hp->f3 + hp->f4);
-
-	for (pass = 1; pass <= 3; pass++) {
-		if (justpass < 0 || justpass == pass) {
+	for (pass = 1; pass <= 4; pass++) {
+		if ((justpass < 0 || justpass == pass) && pass < 4) {
 			infohdr("SECTION", "PASS%u: %lu bytes\n", pass,
 			    psizes[pass]);
 			print_pass(lnname, fp);
+		} else {
+			(void) fseek(fp, psizes[pass], SEEK_CUR);
 		}
-		passoff += psizes[pass];
-		(void) fseek(fp, passoff, SEEK_SET);
 	}
 }
 
 /*
- * Print out a PASS section of a lint library.
+ * Print out a PASS section of a lint module.
  */
 static void
 print_pass(const char *lnname, FILE *fp)
@@ -451,6 +452,7 @@ lsu_lookup(T1WORD ty)
 /*
  * Read all LSU (structure and union definition) records in order to
  * build a structure and union name table, called the LSU table.
+ * Although `fp' is read from, the original file offset is preserved.
  */
 static void
 lsu_build(FILE *fp)
@@ -458,10 +460,11 @@ lsu_build(FILE *fp)
 	union rec	rec;
 	char		name[1024];
 	int		nargs;
+	off_t		curoff = ftello(fp);
 
 	for (;;) {
 		if (fread(&rec, sizeof (rec), 1, fp) != 1)
-			return;
+			break;
 
 		if (rec.l.decflag & LND)	/* end-of-pass marker */
 			break;
@@ -487,6 +490,8 @@ lsu_build(FILE *fp)
 			}
 		}
 	}
+
+	(void) fseek(fp, curoff, SEEK_SET);
 }
 
 /*
@@ -542,8 +547,8 @@ unindent(void)
 static void
 usage(void)
 {
-	(void) fprintf(stderr, "usage: %s [-i] [-p 1|2|3] [-r] lintlib"
-	    " [ lintlib ... ]\n", progname);
+	(void) fprintf(stderr, "usage: %s [-i] [-p 1|2|3] [-r] lintobj"
+	    " [ lintobj ... ]\n", progname);
 	exit(EXIT_FAILURE);
 }
 

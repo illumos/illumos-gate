@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -968,9 +968,9 @@ def compareByDumping(base, ptch, quiet, fileType) :
 
 	if fileType == "Lint Library" :
 		baseCmd = lintdump_cmd + " -ir " + base + \
-			  " | grep -v LINTLIB:" + " > " + tmpFile1
+			  " | egrep -v '(LINTOBJ|LINTMOD):'" + " > " + tmpFile1
 		ptchCmd = lintdump_cmd + " -ir " + ptch + \
-			  " | grep -v LINTLIB:" + " > " + tmpFile2
+			  " | egrep -v '(LINTOBJ|LINTMOD):'" + " > " + tmpFile2
 	elif fileType == "Sqlite Database" :
 		baseCmd = "echo .dump | " + sqlite_cmd + base + " > " + \
 			  tmpFile1

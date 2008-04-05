@@ -18,29 +18,37 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-.\" "Use is subject to license terms."
-.TH lintdump 1 "28 Jun 2007"
+.\" "Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" "Use is subject to license terms.
+.TH lintdump 1 "28 Mar 2008"
 .I lintdump
-\- dump the contents of one or more lint libraries
+\- dump the contents of one or more lint objects
 .SH SYNOPSIS
-\fBlintdump [-i] [-p 1|2|3] [-r] \fIlintlib\fP [ \fIlintlib\fP ... ]
+\fBlintdump [-i] [-p 1|2|3] [-r] \fIlintobj\fP [ \fIlintobj\fP ... ]
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "lintdump" "" "\fBlintdump\fP"
 .LP
 The lintdump utility dumps the contents of one or more lint
-libraries.  This is chiefly useful when trying to understand the cause of
+objects.  This is chiefly useful when trying to understand the cause of
 unexpected or obtuse lint warnings (see EXAMPLES), but can also be used to
-find differences between lint libraries across builds or releases, or to
+find differences between lint objects across builds or releases, or to
 debug problems in lint itself.
 .LP
-A lint library is a binary object constructed using the "-o" option to
-lint(1).  The format of a lint library is unstable and subject to change
-at any time, but its current structure is summarized here in order to aid
-in understanding the current output of lintdump.  A lint library is
+A lint object is a binary file (typically suffixed with ".ln") constructed
+from a C source file via the "-c" option to lint(1).  Multiple lint
+objects may be combined into a lint library object (typically prefixed
+with "llib-l" and suffixed with ".ln") using the "-o" option to lint.  (As
+a convenience, lint "-o" allows a lint library object to be built directly
+from C source files). The lintdump utility is capable of dumping both
+traditional lint objects and lint library objects.
+.LP
+The format of a lint object is unstable and subject to change at any time,
+but its current structure is summarized here in order to aid in
+understanding the current output of lintdump.  A lint object consists of
+one or more lint modules (one per C source file).  Each lint module
 consists of a header and four sections, called PASS1, PASS2, PASS3, and
-STRINGS.   Generally speaking, PASS1 contains definitions, PASS2 contains
+STRINGS.  Generally speaking, PASS1 contains definitions, PASS2 contains
 declarations, and PASS3 contains information on whether or how functions
 or variables are used.  The STRINGS section holds the strings for
 printf(3C)/scanf(3C) checking.
@@ -50,7 +58,7 @@ types.  The sequence of records is further partitioned by FILE records,
 which indicate the source or header file that is responsible for the
 records that follow.  The remaining record types provide lint with
 information about the functions, variables, and structures defined or used
-by the library. 
+by the object. 
 .SH OPTIONS
 .TP 10
 .B -i
@@ -64,10 +72,12 @@ Output records using relative paths (see EXAMPLES).
 .LP
 .SH OUTPUT
 .LP
-The contents of each specified \fIlintlib\fP is dumped in command-line
-order.  For each \fIlintlib\fP, lintdump outputs a single line beginning
-with "LINTLIB:" that provides its name, module ID, the size of its PASS1,
-PASS2, PASS3, STRING sections, and its total size, in that order.
+The contents of each specified \fIlintobj\fP is dumped in command-line
+order.  For each \fIlintobj\fP, lintdump outputs a single line beginning
+with "LINTOBJ:" that provides its name.  For each lint module within that
+object, lintdump outputs a single line beginning with "LINTMOD:" that
+provides its module ID, the size of its PASS1, PASS2, PASS3, STRING
+sections, and its total size, in that order.
 .LP
 Next, unless the -p option is used, the contents of the PASS1, PASS2, and
 PASS3 sections are dumped, in order.  Before each section is dumped,
@@ -262,7 +272,7 @@ struct msghdr {
 };
 .fi
 .LP
-Another use of lintdump is to compare two versions of a lint library to
+Another use of lintdump is to compare two versions of a lint object to
 see whether anything of significance has changed.  For instance, lintdump
 can be used to understand why a lint library is different between a
 project gate and a patch gate, and thus to determine whether the library
@@ -310,4 +320,6 @@ can be bundled with Sun Studio.  As such, any use of this utility in
 scripts or embedded inside programs should be done with knowledge that
 subsequent changes will be required in order to transition to the stable
 solution.
-
+.LP
+The lint object file format does not have a way to represent bitfields. As
+such, bitfield size information cannot be displayed by lintdump.
