@@ -8906,8 +8906,9 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 		goto out;
 	}
 
-	if (rfs4_clnt_in_grace(cp)) {
+	if (rfs4_clnt_in_grace(cp) && !(cp->can_reclaim)) {
 		*cs->statusp = resp->status = NFS4ERR_GRACE;
+		rfs4_client_rele(cp);
 		goto out;
 	}
 	rfs4_client_rele(cp);
