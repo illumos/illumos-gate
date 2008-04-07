@@ -494,6 +494,8 @@ cmd_xr_id2hdlr(fmd_hdl_t *hdl, uint_t id)
 		return (cmd_xxc_resolve);
 	case CMD_XR_HDLR_XXU:
 		return (cmd_xxu_resolve);
+	case CMD_XR_HDLR_NOP:
+		return (cmd_nop_resolve);
 	default:
 		fmd_hdl_abort(hdl, "cmd_xr_id2hdlr called with bad hdlrid %x\n",
 		    id);
@@ -514,12 +516,7 @@ cmd_xr_create(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	err |= nvlist_lookup_uint64(nvl, FM_EREPORT_ENA, &xr->xr_ena);
 
-	/*
-	 * Skip the cmd_xr_fill() for misc reg errors because
-	 * these data are not in the misc reg ereport
-	 */
-	if (!CMD_ERRCL_ISMISCREGS(clcode))
-		err |= cmd_xr_fill(hdl, nvl, xr, clcode);
+	err |= cmd_xr_fill(hdl, nvl, xr, clcode);
 #ifdef sun4u
 	err |= cmd_xr_pn_cache_fill(hdl, nvl, xr, cpu, clcode);
 #endif
@@ -550,20 +547,15 @@ cmd_xr_create(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 cmd_evdisp_t
 cmd_xr_reschedule(fmd_hdl_t *hdl, cmd_xr_t *xr, uint_t hdlrid)
 {
+
 	fmd_hdl_debug(hdl, "scheduling redelivery of %llx with xr %p\n",
 	    xr->xr_clcode, xr);
 
 	xr->xr_hdlrid = hdlrid;
 	xr->xr_hdlr = cmd_xr_id2hdlr(hdl, hdlrid);
 
-	if (CMD_ERRCL_ISMISCREGS(xr->xr_clcode))
-		xr->xr_id = fmd_timer_install(hdl,
-		    (void *)CMD_TIMERTYPE_CPU_XR_WAITER, NULL,
-		    cmd.cmd_miscregs_trdelay);
-	else
-		xr->xr_id = fmd_timer_install(hdl,
-		    (void *)CMD_TIMERTYPE_CPU_XR_WAITER,
-		    NULL, cmd.cmd_xxcu_trdelay);
+	xr->xr_id = fmd_timer_install(hdl, (void *)CMD_TIMERTYPE_CPU_XR_WAITER,
+	    NULL, cmd.cmd_xxcu_trdelay);
 
 	if (xr->xr_ref++ == 0)
 		cmd_list_append(&cmd.cmd_xxcu_redelivs, xr);
@@ -1268,15 +1260,49 @@ static const cmd_xxcu_train_t cmd_xxcu_trains[] = {
 	CMD_TRAIN(CMD_ERRCL_LDAC,	CMD_ERRCL_LDWC),
 	CMD_TRAIN(CMD_ERRCL_LDRC,	CMD_ERRCL_LDWC),
 	CMD_TRAIN(CMD_ERRCL_LDSC,	CMD_ERRCL_LDWC),
+	CMD_TRAIN(CMD_ERRCL_CBCE,	CMD_ERRCL_LDWC),
 	CMD_TRAIN(CMD_ERRCL_LDAU,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_LDAU,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_LDAU,	CMD_ERRCL_DCDP),
 	CMD_TRAIN(CMD_ERRCL_LDRU,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_LDRU,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_LDRU,	CMD_ERRCL_DCDP),
 	CMD_TRAIN(CMD_ERRCL_LDSU,	CMD_ERRCL_LDWU),
-	/* SBDLC: SBDPC */
+	CMD_TRAIN(CMD_ERRCL_LDSU,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_LDSU,	CMD_ERRCL_DCDP),
 	CMD_TRAIN(CMD_ERRCL_SBDLC,	CMD_ERRCL_SBDPC),
-	/* TCCP: TCCD */
 	CMD_TRAIN(CMD_ERRCL_TCCP,	CMD_ERRCL_TCCD),
-	/* TCCD: TCCD */
 	CMD_TRAIN(CMD_ERRCL_TCCD,	CMD_ERRCL_TCCD),
+	CMD_TRAIN(CMD_ERRCL_DBU,	CMD_ERRCL_DCDP),
+	CMD_TRAIN(CMD_ERRCL_DBU,	CMD_ERRCL_ICDP),
+	CMD_TRAIN(CMD_ERRCL_FBU,	CMD_ERRCL_DCDP),
+	CMD_TRAIN(CMD_ERRCL_FBU,	CMD_ERRCL_ICDP),
+	CMD_TRAIN(CMD_ERRCL_DAU,	CMD_ERRCL_DCDP),
+	CMD_TRAIN(CMD_ERRCL_DAU,	CMD_ERRCL_ICDP),
+	/*
+	 * sun4v also has the following trains, but the train
+	 * algorithm does an exhaustive search and compare
+	 * all pairs in the train mask, so we don't need
+	 * to define these trains
+	 *		dl2nd->ldwu (wbue), dcdp
+	 *		il2nd->ldwu (wbue), icdp
+	 *		dxl2u->ldwu (wbue), dcdp
+	 *		ixl2u->ldwu (wbue), icdp
+	 */
+	CMD_TRAIN(CMD_ERRCL_DL2ND,	CMD_ERRCL_DCDP),
+	CMD_TRAIN(CMD_ERRCL_DL2ND,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_DL2ND,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_IL2ND,	CMD_ERRCL_ICDP),
+	CMD_TRAIN(CMD_ERRCL_IL2ND,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_IL2ND,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_L2ND,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_L2ND,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_DL2U,	CMD_ERRCL_DCDP),
+	CMD_TRAIN(CMD_ERRCL_DL2U,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_DL2U,	CMD_ERRCL_WBUE),
+	CMD_TRAIN(CMD_ERRCL_IL2U,	CMD_ERRCL_ICDP),
+	CMD_TRAIN(CMD_ERRCL_IL2U,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_IL2U,	CMD_ERRCL_WBUE),
 #endif /* sun4u */
 	CMD_TRAIN(0, 0)
 };
@@ -1292,29 +1318,6 @@ cmd_xxcu_train_match(cmd_errcl_t mask)
 	}
 
 	return (0);
-}
-/*
- * Search for the entry that matches the ena and the AFAR
- * if we have a valid AFAR, otherwise just match the ENA
- */
-cmd_xxcu_trw_t *
-cmd_trw_lookup(uint64_t ena, uint8_t afar_status, uint64_t afar)
-{
-	int i;
-
-	if (afar_status == AFLT_STAT_VALID) {
-		for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
-			if (cmd.cmd_xxcu_trw[i].trw_ena == ena &&
-			    cmd.cmd_xxcu_trw[i].trw_afar == afar)
-				return (&cmd.cmd_xxcu_trw[i]);
-		}
-	} else  {
-		for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
-		if (cmd.cmd_xxcu_trw[i].trw_ena == ena)
-			return (&cmd.cmd_xxcu_trw[i]);
-		}
-	}
-	return (NULL);
 }
 
 cmd_xxcu_trw_t *
@@ -1482,6 +1485,8 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 				    CMD_CPU_LEVEL_THREAD, cpu->cpu_type);
 				nvlist_free(asru);
 			}
+			if (!fmd_nvl_fmri_present(hdl, cpui->cpu_asru_nvl))
+				continue;
 			cpui->cpu_faulting = FMD_B_TRUE;
 			cpu_buf_write(hdl, cpui);
 			flt = cmd_nvl_create_fault(hdl, fltnm, cert,

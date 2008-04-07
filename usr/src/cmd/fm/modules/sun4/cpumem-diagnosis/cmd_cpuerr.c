@@ -262,35 +262,36 @@ CMD_OPL_UEHANDLER(oplmtlb, opl_mtlb, CMD_PTR_CPU_MTLB, "core", 1)
 CMD_OPL_UEHANDLER(opltlbp, opl_tlbp, CMD_PTR_CPU_TLBP, "core", 1)
 #endif	/* sun4u */
 
-static const errdata_t l3errdata =
-	{ &cmd.cmd_l3data_serd, "l3cachedata", CMD_PTR_CPU_L3DATA  };
-static const errdata_t l2errdata =
-	{ &cmd.cmd_l2data_serd, "l2cachedata", CMD_PTR_CPU_L2DATA };
-static const errdata_t miscregsdata =
-	{ &cmd.cmd_miscregs_serd, "misc_reg", CMD_PTR_CPU_MISC_REGS };
-
+/*ARGSUSED*/
+static void
+cmd_nop_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
+{
+	fmd_hdl_debug(hdl, "nop train resolved for clcode %llx\n",
+	    xr->xr_clcode);
+}
 /*ARGSUSED*/
 static void
 cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 {
-	int isl3 = CMD_ERRCL_ISL3XXCU(xr->xr_clcode);
-	const errdata_t *ed = isl3 ? &l3errdata : &l2errdata;
+	const errdata_t *ed;
 	cmd_cpu_t *cpu = xr->xr_cpu;
-	cmd_case_t *cc = isl3 ? &cpu->cpu_l3data : &cpu->cpu_l2data;
+	cmd_case_t *cc;
 	const char *uuid;
 	nvlist_t *rsrc = NULL;
+
+	cmd_fill_errdata(xr->xr_clcode, cpu, &cc, &ed);
 
 	if (cpu->cpu_faulting) {
 		CMD_STAT_BUMP(xxu_retr_flt);
 		return;
 	}
 
-	if (xr->xr_afar_status != AFLT_STAT_VALID) {
+	if (cmd_afar_status_check(xr->xr_afar_status, xr->xr_clcode) < 0) {
 		fmd_hdl_debug(hdl, "xxU dropped, afar not VALID\n");
 		return;
 	}
 
-	if (cmd_cpu_synd_check(xr->xr_synd) < 0) {
+	if (cmd_cpu_synd_check(xr->xr_synd, xr->xr_clcode) < 0) {
 		fmd_hdl_debug(hdl, "xxU/LDxU dropped due to syndrome\n");
 		return;
 	}
@@ -353,16 +354,7 @@ cmd_xxc_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 		return;
 	}
 #endif
-	if (CMD_ERRCL_ISMISCREGS(xr->xr_clcode)) {
-		ed = &miscregsdata;
-		cc = &cpu->cpu_misc_regs;
-	} else if (CMD_ERRCL_ISL2XXCU(xr->xr_clcode)) {
-		ed = &l2errdata;
-		cc = &cpu->cpu_l2data;
-	} else {
-		ed = &l3errdata;
-		cc = &cpu->cpu_l3data;
-	}
+	cmd_fill_errdata(xr->xr_clcode, cpu, &cc, &ed);
 
 	if (cpu->cpu_faulting || (cc->cc_cp != NULL &&
 	    fmd_case_solved(hdl, cc->cc_cp)))
@@ -424,12 +416,19 @@ cmd_xxcu_resolve(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep,
 
 	trw->trw_flags |= CMD_TRW_F_DELETING;
 
+	/*
+	 * In sun4v, the matching train rule is changed. It matches only
+	 * a portion of the train mask, so can't discard the rest of
+	 * the error in the train mask.
+	 */
+#ifdef sun4u
 	if (trw->trw_flags & CMD_TRW_F_CAUSESEEN) {
 		fmd_hdl_debug(hdl, "cause already seen -- discarding\n");
 		goto done;
 	}
+#endif
 
-	if ((cause = cmd_xxcu_train_match(trw->trw_mask)) == 0) {
+	if ((cause = cmd_train_match(trw->trw_mask, xr->xr_clcode)) == 0) {
 		/*
 		 * We didn't match in a train, so we're going to process each
 		 * event individually.
@@ -467,7 +466,13 @@ cmd_xxu_resolve(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	cmd_xxcu_resolve(hdl, xr, ep, cmd_xxu_hdlr);
 }
 
-static cmd_evdisp_t
+void
+cmd_nop_resolve(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
+{
+	cmd_xxcu_resolve(hdl, xr, ep, cmd_nop_hdlr);
+}
+
+cmd_evdisp_t
 cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, cmd_errcl_t clcode, uint_t hdlrid)
 {
@@ -479,6 +484,7 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	uint64_t afar;
 	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;
 	uint8_t	afar_status;
+	const errdata_t *ed = NULL;
 
 	clcode &= CMD_ERRCL_LEVEL_MASK; /* keep level bits out of train masks */
 
@@ -486,12 +492,7 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    level)) == NULL || cpu->cpu_faulting)
 		return (CMD_EVD_UNUSED);
 
-	if (CMD_ERRCL_ISMISCREGS(clcode))
-		cc = &cpu->cpu_misc_regs;
-	else if (CMD_ERRCL_ISL2XXCU(clcode))
-		cc = &cpu->cpu_l2data;
-	else
-		cc = &cpu->cpu_l3data;
+	cmd_fill_errdata(clcode, cpu, &cc, &ed);
 
 	if (cc->cc_cp != NULL && fmd_case_solved(hdl, cc->cc_cp))
 		return (CMD_EVD_REDUND);
@@ -532,25 +533,19 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	fmd_hdl_debug(hdl, "trw rescheduled for train delivery\n");
 
 redeliver:
-	if ((xr = cmd_xr_create(hdl, ep, nvl, cpu, clcode)) == NULL)
+	if ((xr = cmd_xr_create(hdl, ep, nvl, cpu, clcode)) == NULL) {
+		fmd_hdl_debug(hdl, "cmd_xr_create failed");
 		return (CMD_EVD_BAD);
+	}
 
 	return (cmd_xr_reschedule(hdl, xr, hdlrid));
 }
 
-#ifdef sun4v
-#define		CMD_NIAGARA_1_CLASS	"ereport.cpu.ultraSPARC-T1."
-#endif /* sun4v */
 
 cmd_evdisp_t
 cmd_xxu(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
-#ifdef sun4v
-	if (strncmp(class, CMD_NIAGARA_1_CLASS,
-	    sizeof (CMD_NIAGARA_1_CLASS)) != 0)
-		return (cmd_l2u(hdl, ep, nvl, class, clcode));
-#endif /* sun4v */
 	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_XXU));
 }
 
@@ -558,12 +553,14 @@ cmd_evdisp_t
 cmd_xxc(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
-#ifdef sun4v
-	if (strncmp(class, CMD_NIAGARA_1_CLASS,
-	    sizeof (CMD_NIAGARA_1_CLASS)) != 0)
-		return (cmd_l2c(hdl, ep, nvl, class, clcode));
-#endif /* sun4v */
 	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_XXC));
+}
+
+cmd_evdisp_t
+cmd_nop_train(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    const char *class, cmd_errcl_t clcode)
+{
+	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_NOP));
 }
 
 cmd_evdisp_t

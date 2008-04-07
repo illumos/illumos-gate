@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -298,6 +298,30 @@ cmd_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 
 /*ARGSUSED*/
 cmd_evdisp_t
+cmd_ue_train(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	cmd_evdisp_t rc, rc1;
+
+	/*
+	 * The DAU is cause of the DAU->DCDP/ICDP train:
+	 * - process the cause of the event.
+	 * - register the error to the nop event train, so the effected errors
+	 * (DCDP/ICDP) will be dropped.
+	 */
+	rc = xe_common(hdl, ep, nvl, class, clcode, cmd_ue_common);
+
+	rc1 = cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_NOP);
+	if (rc1 != 0)
+		fmd_hdl_debug(hdl,
+		    "Fail to add error (%llx) to the train, rc = %d",
+		    clcode, rc1);
+
+	return (rc);
+}
+
+/*ARGSUSED*/
+cmd_evdisp_t
 cmd_ue(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
@@ -407,6 +431,30 @@ cmd_fb(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	cmd_branch_dirty(hdl, branch);
 
 	return (CMD_EVD_OK);
+}
+
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_fb_train(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	cmd_evdisp_t rc, rc1;
+
+	/*
+	 * The FBU is cause of the FBU->DCDP/ICDP train:
+	 * - process the cause of the event.
+	 * - register the error to the nop event train, so the effected errors
+	 * (DCDP/ICDP) will be dropped.
+	 */
+	rc = cmd_fb(hdl, ep, nvl, class, clcode);
+
+	rc1 = cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_NOP);
+	if (rc1 != 0)
+		fmd_hdl_debug(hdl,
+		    "Fail to add error (%llx) to the train, rc = %d",
+		    clcode, rc1);
+
+	return (rc);
 }
 
 void

@@ -47,6 +47,7 @@ extern "C" {
  * grow beyond that size.  As such, ereports should only be assigned class codes
  * when needed.  NEVER CHANGE the values of these constants once assigned.
  */
+#ifdef sun4u
 #define	CMD_ERRCL_UCC		0x0000000000000008ULL
 #define	CMD_ERRCL_UCU		0x0000000000000010ULL
 #define	CMD_ERRCL_CPC		0x0000000000000020ULL
@@ -73,6 +74,18 @@ extern "C" {
 #define	CMD_ERRCL_FRU		0x0000200000000000ULL
 #define	CMD_ERRCL_IOCE		0x0000400000000000ULL
 #define	CMD_ERRCL_IOUE		0x0000800000000000ULL
+#else /* sun4u */
+#define	CMD_ERRCL_IL2U		0x0000000000000008ULL
+#define	CMD_ERRCL_DL2U		0x0000000000000010ULL
+#define	CMD_ERRCL_L2ND		0x0000000000000020ULL
+#define	CMD_ERRCL_IL2ND		0x0000000000000040ULL
+#define	CMD_ERRCL_DL2ND		0x0000000000000080ULL
+#define	CMD_ERRCL_DBU		0x0000000000000100ULL
+#define	CMD_ERRCL_FBU		0x0000000000000200ULL
+#define	CMD_ERRCL_DCDP		0x0000000000000400ULL
+#define	CMD_ERRCL_ICDP		0x0000000000000800ULL
+#define	CMD_ERRCL_WBUE		0x0000000000001000ULL
+#define	CMD_ERRCL_CBCE		0x0000000000002000ULL
 #define	CMD_ERRCL_DAC		0x0001000000000000ULL
 #define	CMD_ERRCL_DSC		0x0002000000000000ULL
 #define	CMD_ERRCL_DAU		0x0004000000000000ULL
@@ -90,6 +103,7 @@ extern "C" {
 #define	CMD_ERRCL_SBDLC		0x2000000000000000ULL
 #define	CMD_ERRCL_TCCP		0x4000000000000000ULL
 #define	CMD_ERRCL_TCCD		0x8000000000000000ULL
+#endif /* sun4u */
 
 #ifdef sun4u
 #define	CMD_ERRCL_ISL2XXCU(clcode) \
@@ -100,14 +114,52 @@ extern "C" {
 #define	CMD_ERRCL_ISIOXE(clcode) \
 	(((clcode) & (CMD_ERRCL_IOCE | CMD_ERRCL_IOUE)) != 0)
 #else /* sun4u */
+/*
+ * If changing the CMD_ERRCL_ISL2XXCU definition, should also
+ * change all the lines below it.
+ */
 #define	CMD_ERRCL_ISL2XXCU(clcode) \
-	((clcode) >= CMD_ERRCL_LDAC && (clcode) <= CMD_ERRCL_LDSU)
-#define	CMD_ERRCL_ISL3XXCU(clcode) 0
-
-#endif /* sun4u */
+	(((clcode) >= CMD_ERRCL_LDAC && (clcode) <= CMD_ERRCL_LDSU) || \
+	((clcode) >= CMD_ERRCL_IL2U && (clcode) <= CMD_ERRCL_DL2U))
 
 #define	CMD_ERRCL_ISMISCREGS(clcode) \
 	((clcode) >= CMD_ERRCL_SBDPC && (clcode) <= CMD_ERRCL_TCCD)
+
+#define	CMD_ERRCL_ISL2CE(clcode) \
+	(((clcode) >= CMD_ERRCL_LDAC && (clcode) <= CMD_ERRCL_LDSC) || \
+	(clcode == CMD_ERRCL_CBCE))
+
+#define	CMD_ERRCL_ISL2ND(clcode) \
+	((clcode) >= CMD_ERRCL_L2ND && (clcode) <= CMD_ERRCL_DL2ND)
+
+#define	CMD_ERRCL_ISMEM(clcode) \
+	((clcode & (CMD_ERRCL_DAU | CMD_ERRCL_DBU | CMD_ERRCL_FBU)) != 0)
+
+#define	CMD_ERRCL_ISDCDP(clcode) \
+	(clcode == CMD_ERRCL_DCDP)
+
+#define	CMD_ERRCL_ISICDP(clcode) \
+	(clcode == CMD_ERRCL_ICDP)
+
+#define	CMD_ERRCL_L2UE_WRITEBACK(clcode) \
+	((clcode & (CMD_ERRCL_LDWU | CMD_ERRCL_WBUE)) != 0)
+
+#define	CMD_ERRCL_REMOTEL2(clcode) \
+	((clcode & (CMD_ERRCL_WBUE | CMD_ERRCL_CBCE)) != 0)
+
+#endif /* sun4u */
+
+#ifdef sun4v
+#define	L2_ERR		1
+#define	MISCREGS_ERR	2
+#define	L2ND_ERR	3
+#define	MEM_ERR		4
+#define	DCDP_ERR	5
+#define	ICDP_ERR	6
+#define	REMOTE_L2ERR	7
+#define	UNKNOWN_ERR	8
+#endif
+
 
 #define	CMD_ERRCL_MATCH(clcode, mask) \
 	(((clcode) & (mask)) != 0)
@@ -195,12 +247,14 @@ typedef struct cmd {
 	uint64_t cmd_thresh_abs_sysmem;	/* Pg ret warning thresh (# of pages) */
 	uint64_t cmd_thresh_abs_badrw;	/* Bad r/w retire thresh (# of pages) */
 	cmd_serd_t cmd_miscregs_serd;   /* params for misregs serd */
-	hrtime_t cmd_miscregs_trdelay;  /* delay for redelivery misregs */
+	cmd_serd_t cmd_dcache_serd;	/* params for dcache serd */
+	cmd_serd_t cmd_icache_serd;	/* params for icache serd */
 #ifdef sun4u
 	uint16_t cmd_dp_flag;		/* datapath error in progress if set */
 #endif
 #ifdef sun4v
 	cmd_list_t cmd_branches;	/* List of branches state structures */
+	uint64_t cmd_delta_ena;		/* the sun4v train delta ena */
 #endif
 	nvlist_t *cmd_auth;		/* DE's fault authority value */
 } cmd_t;

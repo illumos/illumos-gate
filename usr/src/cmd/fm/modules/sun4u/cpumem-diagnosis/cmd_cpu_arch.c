@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +68,67 @@ cmd_xr_fill(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_xr_t *xr, cmd_errcl_t clcode)
 	return (0);
 }
 
+/*
+ * Search for the entry that matches the ena and the AFAR
+ * if we have a valid AFAR, otherwise just match the ENA
+ */
+cmd_xxcu_trw_t *
+cmd_trw_lookup(uint64_t ena, uint8_t afar_status, uint64_t afar)
+{
+	int i;
+
+	if (afar_status == AFLT_STAT_VALID) {
+		for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
+			if (cmd.cmd_xxcu_trw[i].trw_ena == ena &&
+			    cmd.cmd_xxcu_trw[i].trw_afar == afar)
+				return (&cmd.cmd_xxcu_trw[i]);
+		}
+	} else  {
+		for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
+		if (cmd.cmd_xxcu_trw[i].trw_ena == ena)
+			return (&cmd.cmd_xxcu_trw[i]);
+		}
+	}
+	return (NULL);
+}
+
+/*ARGSUSED*/
+cmd_errcl_t
+cmd_train_match(cmd_errcl_t trw_mask, cmd_errcl_t resolved_err)
+{
+	return (cmd_xxcu_train_match(trw_mask));
+}
+
+/*ARGSUSED*/
 int
-cmd_cpu_synd_check(uint16_t synd)
+cmd_afar_status_check(uint8_t afar_status, cmd_errcl_t clcode)
+{
+	if (afar_status == AFLT_STAT_VALID)
+		return (0);
+	return (-1);
+}
+
+const errdata_t l3errdata =
+	{ &cmd.cmd_l3data_serd, "l3cachedata", CMD_PTR_CPU_L3DATA  };
+const errdata_t l2errdata =
+	{ &cmd.cmd_l2data_serd, "l2cachedata", CMD_PTR_CPU_L2DATA };
+
+void
+cmd_fill_errdata(cmd_errcl_t clcode, cmd_cpu_t *cpu, cmd_case_t **cc,
+    const errdata_t **ed)
+{
+	if (CMD_ERRCL_ISL2XXCU(clcode)) {
+		*ed = &l2errdata;
+		*cc = &cpu->cpu_l2data;
+	} else {
+		*ed = &l3errdata;
+		*cc = &cpu->cpu_l3data;
+	}
+}
+
+/*ARGSUSED*/
+int
+cmd_cpu_synd_check(uint16_t synd, cmd_errcl_t clcode)
 {
 	if (synd == CH_POISON_SYND_FROM_XXU_WRITE ||
 	    synd == CH_POISON_SYND_FROM_XXU_WRMERGE ||

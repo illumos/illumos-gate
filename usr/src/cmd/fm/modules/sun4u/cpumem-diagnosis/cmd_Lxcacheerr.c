@@ -68,9 +68,9 @@
 #define	PN_ECSTATE_NA	5
 
 
-static const errdata_t l3errdata =
+static const errdata_t clr_l3errdata =
 	{ &cmd.cmd_l3data_serd, "l3cachedata", CMD_PTR_LxCACHE_CASE };
-static const errdata_t l2errdata =
+static const errdata_t clr_l2errdata =
 	{ &cmd.cmd_l2data_serd, "l2cachedata", CMD_PTR_LxCACHE_CASE };
 
 
@@ -1060,11 +1060,11 @@ cmd_cache_ce_panther(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_xr_t *xr)
 	if (CMD_ERRCL_ISL2XXCU(xr->xr_clcode)) {
 		type = CMD_PTR_CPU_L2DATA;
 		cpu_cc = &cpu->cpu_l2data;
-		cache_ed = &l2errdata;
+		cache_ed = &clr_l2errdata;
 	} else {
 		type = CMD_PTR_CPU_L3DATA;
 		cpu_cc = &cpu->cpu_l3data;
-		cache_ed = &l3errdata;
+		cache_ed = &clr_l3errdata;
 	}
 
 	/* Ensure that our case is not solved */
@@ -1084,7 +1084,7 @@ cmd_cache_ce_panther(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_xr_t *xr)
 	}
 
 	/* Check for valid syndrome */
-	if (cmd_cpu_synd_check(xr->xr_synd) < 0) {
+	if (cmd_cpu_synd_check(xr->xr_synd, xr->xr_clcode) < 0) {
 		fmd_hdl_debug(hdl,
 		    "xxC/LDxC dropped due to syndrome\n");
 		return (0);

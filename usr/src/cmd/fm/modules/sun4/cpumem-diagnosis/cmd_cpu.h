@@ -250,6 +250,7 @@ typedef struct cmd_xr cmd_xr_t;
  */
 #define	CMD_XR_HDLR_XXC		1
 #define	CMD_XR_HDLR_XXU		2
+#define	CMD_XR_HDLR_NOP		3
 
 typedef void cmd_xr_hdlr_f(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
 
@@ -299,6 +300,9 @@ extern void cmd_xr_write(fmd_hdl_t *, cmd_xr_t *);
 
 extern void cmd_xxc_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
 extern void cmd_xxu_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
+extern void cmd_nop_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
+extern cmd_evdisp_t cmd_xxcu_initial(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t,  uint_t);
 
 /*
  * The master structure containing or referencing all of the state for a given
@@ -767,11 +771,18 @@ extern cpu_family_t cmd_cpu_check_support(void);
 extern boolean_t cmd_cpu_ecache_support(void);
 
 extern int cmd_xr_fill(fmd_hdl_t *, nvlist_t *, cmd_xr_t *, cmd_errcl_t);
+extern void cmd_fill_errdata(cmd_errcl_t, cmd_cpu_t *, cmd_case_t **,
+    const errdata_t **);
+extern cmd_xxcu_trw_t *cmd_trw_lookup(uint64_t, uint8_t, uint64_t);
+extern cmd_evdisp_t cmd_nop_train(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_errcl_t cmd_train_match(cmd_errcl_t, cmd_errcl_t);
+extern int cmd_afar_status_check(uint8_t, cmd_errcl_t);
 
 #ifdef sun4u
-extern int cmd_cpu_synd_check(uint16_t);
+extern int cmd_cpu_synd_check(uint16_t, cmd_errcl_t clcode);
 #else /* sun4u */
-extern int cmd_cpu_synd_check(uint32_t);
+extern int cmd_cpu_synd_check(uint32_t, cmd_errcl_t clcode);
 #endif /* sun4u */
 
 extern int cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t,

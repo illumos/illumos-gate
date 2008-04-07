@@ -255,11 +255,13 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.icvp",		cmd_icache,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.ictp",		cmd_icache,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.ictm",		cmd_icache,	CMD_CPU_LEVEL_CORE },
-	{ "ereport.cpu.*.icdp",		cmd_icache,	CMD_CPU_LEVEL_CORE },
+	{ "ereport.cpu.*.icdp",		cmd_xxc,
+	    CMD_ERRCL_ICDP | CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.dcvp",		cmd_dcache,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.dctp",		cmd_dcache,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.dctm",		cmd_dcache,	CMD_CPU_LEVEL_CORE },
-	{ "ereport.cpu.*.dcdp",		cmd_dcache,	CMD_CPU_LEVEL_CORE },
+	{ "ereport.cpu.*.dcdp",		cmd_xxc,
+	    CMD_ERRCL_DCDP | CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.itl2c",	cmd_xxc,	CMD_ERRCL_LDAC |
 		CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.dtl2c",	cmd_xxc,	CMD_ERRCL_LDAC |
@@ -273,13 +275,13 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.cwql2c",	cmd_xxc,	CMD_ERRCL_LDAC |
 		CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lvc",		cmd_txce,	CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.itl2u",	cmd_xxu,	CMD_ERRCL_LDAU |
+	{ "ereport.cpu.*.itl2u",	cmd_xxu,	CMD_ERRCL_IL2U |
 		CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.dtl2u",	cmd_xxu,	CMD_ERRCL_LDAU |
+	{ "ereport.cpu.*.dtl2u",	cmd_xxu,	CMD_ERRCL_DL2U |
 		CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.icl2u",	cmd_xxu,	CMD_ERRCL_LDAU |
+	{ "ereport.cpu.*.icl2u",	cmd_xxu,	CMD_ERRCL_IL2U |
 		CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.dcl2u",	cmd_xxu,	CMD_ERRCL_LDAU |
+	{ "ereport.cpu.*.dcl2u",	cmd_xxu,	CMD_ERRCL_DL2U |
 		CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.mal2u",	cmd_xxu,	CMD_ERRCL_LDAU |
 		CMD_CPU_LEVEL_CHIP },
@@ -288,15 +290,17 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.lvf",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lrf",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ltu",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.itl2nd",	cmd_nop },
-	{ "ereport.cpu.*.dtl2nd",	cmd_nop },
-	{ "ereport.cpu.*.icl2nd",	cmd_nop },
-	{ "ereport.cpu.*.l2nd",		cmd_nop },
-	{ "ereport.cpu.*.mal2nd",	cmd_nop },
-	{ "ereport.cpu.*.cwql2nd",	cmd_nop },
+	{ "ereport.cpu.*.itl2nd",	cmd_nop_train,	CMD_ERRCL_IL2ND },
+	{ "ereport.cpu.*.dtl2nd",	cmd_nop_train,	CMD_ERRCL_DL2ND },
+	{ "ereport.cpu.*.icl2nd",	cmd_nop_train,	CMD_ERRCL_IL2ND },
+	{ "ereport.cpu.*.dcl2nd",	cmd_nop_train,	CMD_ERRCL_DL2ND },
+	{ "ereport.cpu.*.l2nd",		cmd_nop_train,	CMD_ERRCL_L2ND },
+	{ "ereport.cpu.*.mal2nd",	cmd_nop_train,	CMD_ERRCL_L2ND },
+	{ "ereport.cpu.*.cwql2nd",	cmd_nop_train,	CMD_ERRCL_L2ND },
 	{ "ereport.cpu.*.ldac",		cmd_xxc, 	CMD_ERRCL_LDAC |
 	    CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.ldwc",		cmd_nop },
+	{ "ereport.cpu.*.ldwc",		cmd_xxc,	CMD_ERRCL_LDWC |
+	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldrc",		cmd_xxc,	CMD_ERRCL_LDRC |
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldsc", 	cmd_xxc,	CMD_ERRCL_LDSC |
@@ -304,7 +308,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.ltc",		cmd_txce,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldau",		cmd_xxu, 	CMD_ERRCL_LDAU |
 	    CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.ldwu",		cmd_nop },
+	{ "ereport.cpu.*.ldwu",		cmd_xxu,	CMD_ERRCL_LDWU |
+	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldru",		cmd_xxu,	CMD_ERRCL_LDRU |
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldsu",		cmd_xxu,	CMD_ERRCL_LDSU |
@@ -312,10 +317,11 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.lvu",		cmd_l2ctl, 	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lru",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.fbr",		cmd_fb },
-	{ "ereport.cpu.*.fbu",		cmd_fb },
+	{ "ereport.cpu.*.fbu",		cmd_fb_train,	CMD_ERRCL_FBU },
 	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },
 	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },
-	{ "ereport.cpu.*.dau",		cmd_ue,		CMD_ERRCL_DAU },
+	{ "ereport.cpu.*.dau",		cmd_ue_train,	CMD_ERRCL_DAU },
+	{ "ereport.cpu.*.dbu",		cmd_nop_train,	CMD_ERRCL_DBU },
 	{ "ereport.cpu.*.dsu",		cmd_ue,		CMD_ERRCL_DSU },
 	{ "ereport.cpu.*.sbdpc",	cmd_miscregs_train,
 	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },
@@ -347,9 +353,11 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.tsau",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
-	{ "ereport.cpu.*.cbce",		cmd_xxc,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.cbce",		cmd_xxc,	CMD_ERRCL_CBCE |
+	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.dce",		cmd_nop },
-	{ "ereport.cpu.*.wbue",		cmd_nop },
+	{ "ereport.cpu.*.wbue",		cmd_xxu,	CMD_ERRCL_WBUE |
+	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lfu-slf",	cmd_lfu_ce,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lfu-rtf",	cmd_lfu_ue,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lfu-tto",	cmd_lfu_ue,	CMD_CPU_LEVEL_CHIP },
@@ -523,17 +531,22 @@ static const fmd_prop_t fmd_props[] = {
 	{ "misc_regs_n", FMD_TYPE_UINT32, "8"},
 	{ "misc_regs_t", FMD_TYPE_TIME, "168h" },
 	{ "iorxefrx_window", FMD_TYPE_TIME, "3s" },
+#ifdef sun4u
 	{ "xxcu_trdelay", FMD_TYPE_TIME, "200ms" },
+#else
+	{ "xxcu_trdelay", FMD_TYPE_TIME, "15s"},
+#endif /* sun4u */
 	{ "xxcu_restart_delay", FMD_TYPE_TIME, "1s" },
 	{ "num_xxcu_waiters", FMD_TYPE_UINT32, "128" },
 	{ "thresh_tpct_sysmem", FMD_TYPE_UINT64, "100" },
 	{ "thresh_abs_sysmem", FMD_TYPE_UINT64, "0" },
 	{ "thresh_abs_badrw", FMD_TYPE_UINT64, "128" },
 	{ "max_perm_ce_dimm", FMD_TYPE_UINT32, "128" },
-	{ "miscregs_trdelay", FMD_TYPE_TIME, "45s"},
 #ifdef sun4v
 	{ "fbr_n", FMD_TYPE_UINT32, "14" },
 	{ "fbr_t", FMD_TYPE_TIME, "30min"},
+	/* delta_ena value = 0x500000000nsec ~= 22sec */
+	{ "delta_ena", FMD_TYPE_UINT64, "0x50000000000000"},
 #endif
 	{ NULL, 0, NULL }
 };
@@ -795,6 +808,9 @@ _fmd_init(fmd_hdl_t *hdl)
 	cmd.cmd_xxcu_ntrw = fmd_prop_get_int32(hdl, "num_xxcu_waiters");
 	cmd.cmd_xxcu_trw = fmd_hdl_zalloc(hdl, sizeof (cmd_xxcu_trw_t) *
 	    cmd.cmd_xxcu_ntrw, FMD_SLEEP);
+#ifdef sun4v
+	cmd.cmd_delta_ena = fmd_prop_get_int64(hdl, "delta_ena");
+#endif
 
 	cmd.cmd_l2data_serd.cs_name = "l2data";
 	cmd.cmd_l2data_serd.cs_n = fmd_prop_get_int32(hdl, "l2data_n");
@@ -804,10 +820,17 @@ _fmd_init(fmd_hdl_t *hdl)
 	cmd.cmd_l3data_serd.cs_n = fmd_prop_get_int32(hdl, "l3data_n");
 	cmd.cmd_l3data_serd.cs_t = fmd_prop_get_int64(hdl, "l3data_t");
 
-	cmd.cmd_miscregs_trdelay = fmd_prop_get_int64(hdl, "miscregs_trdelay");
 	cmd.cmd_miscregs_serd.cs_name = "misc_regs";
 	cmd.cmd_miscregs_serd.cs_n = fmd_prop_get_int32(hdl, "misc_regs_n");
 	cmd.cmd_miscregs_serd.cs_t = fmd_prop_get_int64(hdl, "misc_regs_t");
+
+	cmd.cmd_dcache_serd.cs_name = "dcache";
+	cmd.cmd_dcache_serd.cs_n = fmd_prop_get_int32(hdl, "dcache_n");
+	cmd.cmd_dcache_serd.cs_t = fmd_prop_get_int64(hdl, "dcache_t");
+
+	cmd.cmd_icache_serd.cs_name = "icache";
+	cmd.cmd_icache_serd.cs_n = fmd_prop_get_int32(hdl, "icache_n");
+	cmd.cmd_icache_serd.cs_t = fmd_prop_get_int64(hdl, "icache_t");
 
 	if (cmd_state_restore(hdl) < 0) {
 		_fmd_fini(hdl);
