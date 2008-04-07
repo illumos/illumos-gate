@@ -450,7 +450,7 @@ typedef struct {
  *	check for link status change
  */
 typedef struct {
-	void		(*phys_restart)(struct nge *);
+	boolean_t	(*phys_restart)(struct nge *);
 	void		(*phys_update)(struct nge *);
 	boolean_t	(*phys_check)(struct nge *);
 } phys_ops_t;

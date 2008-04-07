@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -244,7 +244,8 @@ nge_phy_reset(nge_t *ngep)
 	control = nge_mii_get16(ngep, MII_CONTROL);
 	control |= MII_CONTROL_RESET;
 	nge_mii_put16(ngep, MII_CONTROL, control);
-	drv_usecwait(30);
+	/* We should wait for 500ms. It's defined in the manual */
+	drv_usectohz(500000);
 	for (count = 0; ++count < 10; ) {
 		drv_usecwait(5);
 		control = nge_mii_get16(ngep, MII_CONTROL);
@@ -256,13 +257,16 @@ nge_phy_reset(nge_t *ngep)
 	return (B_FALSE);
 }
 
-static void
+static boolean_t
 nge_phy_restart(nge_t *ngep)
 {
 	uint16_t mii_reg;
 
-	(void) nge_phy_recover(ngep);
-	(void) nge_phy_reset(ngep);
+	if (!nge_phy_recover(ngep))
+		return (B_FALSE);
+	if (!nge_phy_reset(ngep))
+		return (B_FALSE);
+
 	if (PHY_MANUFACTURER(ngep->phy_id) == MII_ID_CICADA) {
 		if (ngep->phy_mode == RGMII_IN) {
 			mii_reg = nge_mii_get16(ngep,
@@ -291,6 +295,8 @@ nge_phy_restart(nge_t *ngep)
 			nge_mii_put16(ngep, MII_CICADA_BYPASS_CONTROL, mii_reg);
 		}
 	}
+
+	return (B_TRUE);
 }
 
 /*
@@ -460,8 +466,8 @@ nge_update_copper(nge_t *ngep)
 	nge_mii_put16(ngep, MII_AN_ADVERT, anar);
 	nge_mii_put16(ngep, MII_CONTROL, control);
 	nge_mii_put16(ngep, MII_1000BASE_T_CONTROL, gigctrl);
-	nge_phy_restart(ngep);
-
+	if (!nge_phy_restart(ngep))
+		nge_error(ngep, "nge_update_copper: failed to restart phy");
 	/*
 	 * Loopback bit in control register is not reset sticky
 	 * write it after PHY restart.

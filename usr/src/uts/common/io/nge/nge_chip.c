@@ -1095,7 +1095,8 @@ nge_chip_reset(nge_t *ngep)
 	/*
 	 * Reset the external phy
 	 */
-	(void) nge_phy_reset(ngep);
+	if (!nge_phy_reset(ngep))
+		return (DDI_FAILURE);
 	ngep->nge_chip_state = NGE_CHIP_RESET;
 	return (DDI_SUCCESS);
 }

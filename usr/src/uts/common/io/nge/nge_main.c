@@ -2115,6 +2115,7 @@ nge_restart(nge_t *ngep)
 {
 	int err = 0;
 	err = nge_reset(ngep);
+	nge_chip_sync(ngep);
 	if (!err)
 		err = nge_chip_start(ngep);
 
@@ -2521,13 +2522,6 @@ nge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	if (brp->rx_hold != 0)
 		return (DDI_FAILURE);
 
-	/* Recycle the multicast table */
-	for (p = ngep->pcur_mulist; p != NULL; p = nextp) {
-		nextp = p->next;
-		kmem_free(p, sizeof (mul_item));
-	}
-	ngep->pcur_mulist = NULL;
-
 	/*
 	 * Unregister from the GLD subsystem.  This can fail, in
 	 * particular if there are DLPI style-2 streams still open -
@@ -2536,6 +2530,17 @@ nge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 */
 	if (mac_unregister(ngep->mh) != DDI_SUCCESS)
 		return (DDI_FAILURE);
+
+	/*
+	 * Recycle the multicast table. mac_unregister() should be called
+	 * before it to ensure the multicast table can be used even if
+	 * mac_unregister() fails.
+	 */
+	for (p = ngep->pcur_mulist; p != NULL; p = nextp) {
+		nextp = p->next;
+		kmem_free(p, sizeof (mul_item));
+	}
+	ngep->pcur_mulist = NULL;
 
 	/*
 	 * All activity stopped, so we can clean up & exit
