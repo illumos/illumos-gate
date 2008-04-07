@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,13 +246,18 @@ typedef struct mr_column_ic {
 	mr_pw_reserve_t *un_pw_reserve;
 } mr_column_ic_t;
 
+/*
+ * Do not rearrange elements as mutexes must be aligned on
+ * an 8 byte boundary. Element _t_un_linlck_mx corresponds to
+ * _t_un_linlck_cv and element _t_un_mx corresponds to _t_un_cv
+ */
 typedef struct mr_unit_ic {
 	caddr_t			_t_un_pbuffer;
 	caddr_t			_t_un_dbuffer;
 	struct md_raidcs	*_t_un_linlck_chn;
 	kmutex_t		_t_un_linlck_mx;
-	kcondvar_t		_t_un_linlck_cv;
 	kmutex_t		_t_un_mx;
+	kcondvar_t		_t_un_linlck_cv;
 	kcondvar_t		_t_un_cv;
 	mr_column_ic_t		*_t_un_column_ic;
 } mr_unit_ic_t;
