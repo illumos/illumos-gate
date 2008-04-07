@@ -247,6 +247,7 @@ DRV_KMODS	+= mc-amd
 DRV_KMODS	+= tzmon
 DRV_KMODS	+= battery
 DRV_KMODS	+= pv_cmdk
+DRV_KMODS	+= pv_rtls
 DRV_KMODS	+= xdf
 DRV_KMODS	+= xnf
 DRV_KMODS	+= xpv

@@ -187,6 +187,7 @@ TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
 PV_CMDK_OBJS	+= pv_cmdk.o
+PV_RTLS_OBJS	+= pv_rtls.o
 HVM_BOOTSTRAP_OBJS	+= hvm_bootstrap.o
 XDF_OBJS	+= xdf.o
 XNF_OBJS	+= xnf.o

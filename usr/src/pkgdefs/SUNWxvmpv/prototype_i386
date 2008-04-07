@@ -51,11 +51,13 @@ d none platform/i86hvm/kernel				0755	root	sys
 d none platform/i86hvm/kernel/drv			0755	root	sys
 d none platform/i86hvm/kernel/drv/amd64			0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/cmdk		0755	root	sys
+f none platform/i86hvm/kernel/drv/amd64/rtls		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xdf		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xnf		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xpv		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xpvd		0755	root	sys
 f none platform/i86hvm/kernel/drv/cmdk			0755	root	sys
+f none platform/i86hvm/kernel/drv/rtls			0755	root	sys
 f none platform/i86hvm/kernel/drv/xdf			0755	root	sys
 f none platform/i86hvm/kernel/drv/xnf			0755	root	sys
 f none platform/i86hvm/kernel/drv/xpv			0755	root	sys
