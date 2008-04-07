@@ -2906,6 +2906,15 @@ st_tape_init(struct scsi_tape *un)
 			    "st_tape_init: RESERVATION CONFLICT\n");
 			rval = EACCES;
 			goto exit;
+		} else if ((un->un_rsvd_status &
+		    ST_APPLICATION_RESERVATIONS) != 0) {
+			if ((ST_RQSENSE != NULL) &&
+			    (ST_RQSENSE->es_add_code == 0x2a &&
+			    ST_RQSENSE->es_qual_code == 0x03)) {
+				un->un_state = ST_STATE_CLOSED;
+				rval = EACCES;
+				goto exit;
+			}
 		}
 	}
 
@@ -10744,6 +10753,29 @@ check_keys:
 			}
 			break; /* Don't set position invalid */
 		}
+
+		/*
+		 * If ST_APPLICATION_RESERVATIONS is set,
+		 * If the asc/ascq indicates that the reservation
+		 * has been cleared just allow the write to continue
+		 * which would force a scsi 2 reserve.
+		 * If preempted that persistent reservation
+		 * the scsi 2 reserve would get a reservation conflict.
+		 */
+		if ((un->un_rsvd_status &
+		    ST_APPLICATION_RESERVATIONS) != 0) {
+			if (ST_RQSENSE->es_add_code == 0x2a &&
+			    ST_RQSENSE->es_qual_code == 0x03) {
+				severity = SCSI_ERR_INFO;
+				rval = COMMAND_DONE_ERROR;
+				pos->pmode = invalid;
+			} else if (ST_RQSENSE->es_add_code == 0x2a &&
+			    ST_RQSENSE->es_qual_code == 0x04) {
+				rval = COMMAND_DONE;
+			}
+			break;
+		}
+
 		if (un->un_state <= ST_STATE_OPENING) {
 			/*
 			 * Look, the tape isn't open yet, now determine
