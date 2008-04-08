@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1339,7 +1339,12 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		}
 	}
 
-	if (!ubit && !isfrag && ssn != instr->nextseq) {
+	/*
+	 * Insert complete messages in correct order for ordered delivery.
+	 * tpfinished is true when the incoming chunk contains a complete
+	 * message or is the final missing fragment which completed a message.
+	 */
+	if (!ubit && tpfinished && ssn != instr->nextseq) {
 		/* Adjust rptr to point at the data chunk for compares */
 		dmp->b_rptr = (uchar_t *)dc;
 
