@@ -2572,6 +2572,7 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 	    sizeof (loopback_iftab.zone_nwif_physical));
 	(void) strlcpy(loopback_iftab.zone_nwif_address, "127.0.0.1",
 	    sizeof (loopback_iftab.zone_nwif_address));
+	loopback_iftab.zone_nwif_defrouter[0] = '\0';
 	if (configure_one_interface(zlogp, zoneid, &loopback_iftab, NULL, NULL)
 	    != Z_OK) {
 		return (-1);
