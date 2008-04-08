@@ -255,7 +255,7 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 	/* Bump up the number of nce's referencing this ill */
 	DTRACE_PROBE3(ill__incr__cnt, (ill_t *), ill,
 	    (char *), "nce", (void *), nce);
-	ill->ill_cnt_nce++;
+	ill->ill_nce_cnt++;
 	mutex_exit(&ill->ill_lock);
 
 	err = 0;
@@ -496,7 +496,7 @@ ndp_inactive(nce_t *nce)
 	mutex_enter(&ill->ill_lock);
 	DTRACE_PROBE3(ill__decr__cnt, (ill_t *), ill,
 	    (char *), "nce", (void *), nce);
-	ill->ill_cnt_nce--;
+	ill->ill_nce_cnt--;
 	/*
 	 * If the number of nce's associated with this ill have dropped
 	 * to zero, check whether we need to restart any operation that
@@ -3630,7 +3630,7 @@ ndp_add_v4(ill_t *ill, const in_addr_t *addr, uint16_t flags,
 	/* Bump up the number of nce's referencing this ill */
 	DTRACE_PROBE3(ill__incr__cnt, (ill_t *), ill,
 	    (char *), "nce", (void *), nce);
-	ill->ill_cnt_nce++;
+	ill->ill_nce_cnt++;
 	mutex_exit(&ill->ill_lock);
 	DTRACE_PROBE1(ndp__add__v4, nce_t *, nce);
 	return (0);

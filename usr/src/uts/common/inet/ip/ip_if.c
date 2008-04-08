@@ -6371,7 +6371,7 @@ ipif_ill_refrele_tail(ill_t *ill)
 	    ipsq->ipsq_pending_ipif != NULL);
 	/*
 	 * ipif->ipif_refcnt must go down to zero for restarting REMOVEIF.
-	 * Last ipif going down needs to down the ill, so ill_cnt_ire must
+	 * Last ipif going down needs to down the ill, so ill_ire_cnt must
 	 * be zero for restarting an ioctl that ends up downing the ill.
 	 */
 	ipif = ipsq->ipsq_pending_ipif;
@@ -15325,7 +15325,7 @@ redo:
 		new_lb_ire->ire_bucket->irb_ire_cnt++;
 		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), new_lb_ire->ire_ipif,
 		    (char *), "ire", (void *), new_lb_ire);
-		new_lb_ire->ire_ipif->ipif_cnt_ire++;
+		new_lb_ire->ire_ipif->ipif_ire_cnt++;
 
 		if (clear_ire_stq != NULL) {
 			/* Set the max_frag before adding the ire */
@@ -15351,11 +15351,11 @@ redo:
 			DTRACE_PROBE3(ipif__incr__cnt,
 			    (ipif_t *), new_nlb_ire->ire_ipif,
 			    (char *), "ire", (void *), new_nlb_ire);
-			new_nlb_ire->ire_ipif->ipif_cnt_ire++;
+			new_nlb_ire->ire_ipif->ipif_ire_cnt++;
 			DTRACE_PROBE3(ill__incr__cnt,
 			    (ill_t *), new_nlb_ire->ire_stq->q_ptr,
 			    (char *), "ire", (void *), new_nlb_ire);
-			((ill_t *)(new_nlb_ire->ire_stq->q_ptr))->ill_cnt_ire++;
+			((ill_t *)(new_nlb_ire->ire_stq->q_ptr))->ill_ire_cnt++;
 		}
 	}
 	rw_exit(&irb->irb_lock);
@@ -18437,14 +18437,14 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  *
  * The following members in ipif_t track references to the ipif.
  *	int     ipif_refcnt;    Active reference count
- *	uint_t  ipif_cnt_ire;   Number of ire's referencing this ipif
- *	uint_t  ipif_cnt_ilm;   Number of ilms's references this ipif.
+ *	uint_t  ipif_ire_cnt;   Number of ire's referencing this ipif
+ *	uint_t  ipif_ilm_cnt;   Number of ilms's references this ipif.
  *
  * The following members in ill_t track references to the ill.
  *	int             ill_refcnt;     active refcnt
- *	uint_t          ill_cnt_ire;	Number of ires referencing ill
- *	uint_t          ill_cnt_nce;	Number of nces referencing ill
- *	uint_t          ill_cnt_ilm;	Number of ilms referencing ill
+ *	uint_t          ill_ire_cnt;	Number of ires referencing ill
+ *	uint_t          ill_nce_cnt;	Number of nces referencing ill
+ *	uint_t          ill_ilm_cnt;	Number of ilms referencing ill
  *
  * Reference to an ipif or ill can be obtained in any of the following ways.
  *
@@ -18458,14 +18458,14 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  * references to the ipif / ill. Pointers from other structures do not
  * count towards this reference count.
  *
- * ipif_cnt_ire/ill_cnt_ire is the number of ire's
+ * ipif_ire_cnt/ill_ire_cnt is the number of ire's
  * associated with the ipif/ill. This is incremented whenever a new
  * ire is created referencing the ipif/ill. This is done atomically inside
  * ire_add_v[46] where the ire is actually added to the ire hash table.
  * The count is decremented in ire_inactive where the ire is destroyed.
  *
  * nce's reference ill's thru nce_ill and the count of nce's associated with
- * an ill is recorded in ill_cnt_nce. This is incremented atomically in
+ * an ill is recorded in ill_nce_cnt. This is incremented atomically in
  * ndp_add_v4()/ndp_add_v6() where the nce is actually added to the
  * table. Similarly it is decremented in ndp_inactive() where the nce
  * is destroyed.
@@ -18505,7 +18505,7 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  * zero and the ipif will quiesce, once all threads that currently hold a
  * reference to the ipif refrelease the ipif. The ipif is quiescent after the
  * ipif_refcount has dropped to zero and all ire's associated with this ipif
- * have also been ire_inactive'd. i.e. when ipif_cnt_{ire, ill} and
+ * have also been ire_inactive'd. i.e. when ipif_{ire, ill}_cnt and
  * ipif_refcnt both drop to zero. See also: comments above IPIF_DOWN_OK()
  * in ip.h
  *

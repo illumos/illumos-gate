@@ -852,12 +852,12 @@ failed:
 	if (ire->ire_ipif != NULL) {
 		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), ire->ire_ipif,
 		    (char *), "ire", (void *), ire);
-		ire->ire_ipif->ipif_cnt_ire++;
+		ire->ire_ipif->ipif_ire_cnt++;
 		if (ire->ire_stq != NULL) {
 			stq_ill = (ill_t *)ire->ire_stq->q_ptr;
 			DTRACE_PROBE3(ill__incr__cnt, (ill_t *), stq_ill,
 			    (char *), "ire", (void *), ire);
-			stq_ill->ill_cnt_ire++;
+			stq_ill->ill_ire_cnt++;
 		}
 	} else {
 		ASSERT(ire->ire_stq == NULL);

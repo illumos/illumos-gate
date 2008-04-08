@@ -1313,9 +1313,9 @@ typedef struct ipif_s {
 	uint_t	ipif_state_flags;	/* See IPIF_* flag defs above */
 	uint_t	ipif_refcnt;		/* active consistent reader cnt */
 
-	/* Number of ire's and ilm's referencing ipif */
-	uint_t	ipif_cnt_ire;
-	uint_t	ipif_cnt_ilm;
+	/* Number of ire's and ilm's referencing this ipif */
+	uint_t	ipif_ire_cnt;
+	uint_t	ipif_ilm_cnt;
 
 	uint_t  ipif_saved_ire_cnt;
 	zoneid_t ipif_zoneid;		/* zone ID number */
@@ -1328,7 +1328,7 @@ typedef struct ipif_s {
  * to the ipif. Incoming refs would prevent the ipif from being freed.
  */
 #define	IPIF_FREE_OK(ipif)	\
-	((ipif)->ipif_cnt_ire == 0 && (ipif)->ipif_cnt_ilm == 0)
+	((ipif)->ipif_ire_cnt == 0 && (ipif)->ipif_ilm_cnt == 0)
 /*
  * IPIF_DOWN_OK() determines whether the incoming pointer reference counts
  * would permit the ipif to be considered quiescent. In order for
@@ -1351,8 +1351,7 @@ typedef struct ipif_s {
  * down address. Therefore the ilm references are not included in
  * the _DOWN_OK macros.
  */
-#define	IPIF_DOWN_OK(ipif)		((ipif)->ipif_cnt_ire == 0)
-
+#define	IPIF_DOWN_OK(ipif)		((ipif)->ipif_ire_cnt == 0)
 
 /*
  * The following table lists the protection levels of the various members
@@ -1405,8 +1404,8 @@ typedef struct ipif_s {
  *
  * ipif_state_flags	ill_lock		ill_lock
  * ipif_refcnt		ill_lock		ill_lock
- * ipif_cnt_ire		ill_lock		ill_lock
- * ipif_cnt_ilm		ill_lock		ill_lock
+ * ipif_ire_cnt		ill_lock		ill_lock
+ * ipif_ilm_cnt		ill_lock		ill_lock
  * ipif_saved_ire_cnt
  */
 
@@ -1981,10 +1980,10 @@ typedef struct ill_s {
 	avl_node_t	ill_avl_byppa; /* avl node based on ppa */
 	void		*ill_fastpath_list; /* both ire and nce hang off this */
 	uint_t		ill_refcnt;	/* active refcnt by threads */
-	uint_t		ill_cnt_ire;	/* ires associated with this ill */
+	uint_t		ill_ire_cnt;	/* ires associated with this ill */
 	kcondvar_t	ill_cv;
 	uint_t		ill_ilm_walker_cnt;	/* snmp ilm walkers */
-	uint_t		ill_cnt_nce;	/* nces associated with this ill */
+	uint_t		ill_nce_cnt;	/* nces associated with this ill */
 	uint_t		ill_waiters;	/* threads waiting in ipsq_enter */
 	/*
 	 * Contains the upper read queue pointer of the module immediately
@@ -2001,16 +2000,16 @@ typedef struct ill_s {
 	zoneid_t	ill_zoneid;
 	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
 	uint32_t	ill_dhcpinit;	/* IP_DHCPINIT_IFs for ill */
-	uint_t		ill_cnt_ilm;
+	uint_t		ill_ilm_cnt;    /* ilms referencing this ill */
 } ill_t;
 
 /*
- * ILL_FREE_OK() means that there are no incoming references
+ * ILL_FREE_OK() means that there are no incoming pointer references
  * to the ill.
  */
 #define	ILL_FREE_OK(ill)					\
-	((ill)->ill_cnt_ire == 0 && (ill)->ill_cnt_ilm == 0 &&	\
-	(ill)->ill_cnt_nce == 0)
+	((ill)->ill_ire_cnt == 0 && (ill)->ill_ilm_cnt == 0 &&	\
+	(ill)->ill_nce_cnt == 0)
 
 /*
  * An ipif/ill can be marked down only when the ire and nce references
@@ -2018,7 +2017,7 @@ typedef struct ill_s {
  * quiescence checks. See comments above IPIF_DOWN_OK for details
  * on why ires and nces are selectively considered for this macro.
  */
-#define	ILL_DOWN_OK(ill)	(ill->ill_cnt_ire == 0 && ill->ill_cnt_nce == 0)
+#define	ILL_DOWN_OK(ill)	(ill->ill_ire_cnt == 0 && ill->ill_nce_cnt == 0)
 
 /*
  * The following table lists the protection levels of the various members
@@ -2113,11 +2112,11 @@ typedef struct ill_s {
  *
  * ill_fastpath_list		ill_lock		ill_lock
  * ill_refcnt			ill_lock		ill_lock
- * ill_cnt_ire			ill_lock		ill_lock
+ * ill_ire_cnt			ill_lock		ill_lock
  * ill_cv			ill_lock		ill_lock
  * ill_ilm_walker_cnt		ill_lock		ill_lock
- * ill_cnt_nce			ill_lock		ill_lock
- * ill_cnt_ilm			ill_lock		ill_lock
+ * ill_nce_cnt			ill_lock		ill_lock
+ * ill_ilm_cnt			ill_lock		ill_lock
  * ill_trace			ill_lock		ill_lock
  * ill_usesrc_grp_next		ill_g_usesrc_lock	ill_g_usesrc_lock
  * ill_dhcpinit			atomics			atomics

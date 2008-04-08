@@ -175,6 +175,7 @@ conn_ilg_reap(conn_t *connp)
 {
 	int	to;
 	int	from;
+	ilg_t	*ilg;
 
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
 
@@ -182,7 +183,9 @@ conn_ilg_reap(conn_t *connp)
 	from = 0;
 	while (from < connp->conn_ilg_inuse) {
 		if (connp->conn_ilg[from].ilg_flags & ILG_DELETED) {
-			FREE_SLIST(connp->conn_ilg[from].ilg_filter);
+			ilg = &connp->conn_ilg[from];
+			FREE_SLIST(ilg->ilg_filter);
+			ilg->ilg_flags &= ~ILG_DELETED;
 			from++;
 			continue;
 		}
@@ -217,7 +220,7 @@ conn_ilg_reap(conn_t *connp)
 static ilg_t *
 conn_ilg_alloc(conn_t *connp)
 {
-	ilg_t *new;
+	ilg_t *new, *ret;
 	int curcnt;
 
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
@@ -231,6 +234,17 @@ conn_ilg_alloc(conn_t *connp)
 		connp->conn_ilg_inuse = 0;
 	}
 	if (connp->conn_ilg_inuse == connp->conn_ilg_allocated) {
+		if (connp->conn_ilg_walker_cnt != 0) {
+			/*
+			 * XXX We cannot grow the array at this point
+			 * because a list walker could be in progress, and
+			 * we cannot wipe out the existing array until the
+			 * walker is done. Just return NULL for now.
+			 * ilg_delete_all() will have to be changed when
+			 * this logic is changed.
+			 */
+			return (NULL);
+		}
 		curcnt = connp->conn_ilg_allocated;
 		new = GETSTRUCT(ilg_t, curcnt + ILG_ALLOC_CHUNK);
 		if (new == NULL)
@@ -241,7 +255,10 @@ conn_ilg_alloc(conn_t *connp)
 		connp->conn_ilg_allocated += ILG_ALLOC_CHUNK;
 	}
 
-	return (&connp->conn_ilg[connp->conn_ilg_inuse++]);
+	ret = &connp->conn_ilg[connp->conn_ilg_inuse++];
+	ASSERT((ret->ilg_flags & ILG_DELETED) == 0);
+	bzero(ret, sizeof (*ret));
+	return (ret);
 }
 
 typedef struct ilm_fbld_s {
@@ -1660,14 +1677,14 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 		ilm->ilm_ipif = NULL;
 		DTRACE_PROBE3(ill__incr__cnt, (ill_t *), ill,
 		    (char *), "ilm", (void *), ilm);
-		ill->ill_cnt_ilm++;
+		ill->ill_ilm_cnt++;
 	} else {
 		ASSERT(ilm->ilm_zoneid == ipif->ipif_zoneid);
 		ilm->ilm_ipif = ipif;
 		ilm->ilm_ill = NULL;
 		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), ipif,
 		    (char *), "ilm", (void *), ilm);
-		ipif->ipif_cnt_ilm++;
+		ipif->ipif_ilm_cnt++;
 	}
 	ASSERT(ill->ill_ipst);
 	ilm->ilm_ipst = ill->ill_ipst;	/* No netstack_hold */
@@ -1758,7 +1775,7 @@ ilm_walker_cleanup(ill_t *ill)
 				DTRACE_PROBE3(ipif__decr__cnt,
 				    (ipif_t *), ilm->ilm_ipif,
 				    (char *), "ilm", (void *), ilm);
-				ilm->ilm_ipif->ipif_cnt_ilm--;
+				ilm->ilm_ipif->ipif_ilm_cnt--;
 				if (IPIF_FREE_OK(ilm->ilm_ipif))
 					need_wakeup = B_TRUE;
 			} else {
@@ -1769,7 +1786,7 @@ ilm_walker_cleanup(ill_t *ill)
 				DTRACE_PROBE3(ill__decr__cnt,
 				    (ill_t *), ill,
 				    (char *), "ilm", (void *), ilm);
-				ill->ill_cnt_ilm--;
+				ill->ill_ilm_cnt--;
 				if (ILL_FREE_OK(ill))
 					need_wakeup = B_TRUE;
 			}
@@ -1832,13 +1849,13 @@ ilm_delete(ilm_t *ilm)
 	if (ilm->ilm_ipif != NULL) {
 		DTRACE_PROBE3(ipif__decr__cnt, (ipif_t *), ilm->ilm_ipif,
 		    (char *), "ilm", (void *), ilm);
-		ilm->ilm_ipif->ipif_cnt_ilm--;
+		ilm->ilm_ipif->ipif_ilm_cnt--;
 		if (IPIF_FREE_OK(ilm->ilm_ipif))
 			need_wakeup = B_TRUE;
 	} else {
 		DTRACE_PROBE3(ill__decr__cnt, (ill_t *), ill,
 		    (char *), "ilm", (void *), ilm);
-		ill->ill_cnt_ilm--;
+		ill->ill_ilm_cnt--;
 		if (ILL_FREE_OK(ill))
 			need_wakeup = B_TRUE;
 	}
@@ -3515,9 +3532,9 @@ ilg_lookup_ill_withsrc(conn_t *connp, ipaddr_t group, ipaddr_t src, ill_t *ill)
 		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
 
 	for (i = 0; i < connp->conn_ilg_inuse; i++) {
-		/* ilg_ipif is NULL for v6; skip them */
 		ilg = &connp->conn_ilg[i];
-		if ((ipif = ilg->ilg_ipif) == NULL)
+		if ((ipif = ilg->ilg_ipif) == NULL ||
+		    (ilg->ilg_flags & ILG_DELETED) != 0)
 			continue;
 		ASSERT(ilg->ilg_ill == NULL);
 		ilg_ill = ipif->ipif_ill;
@@ -3570,7 +3587,8 @@ ilg_lookup_ill_withsrc_v6(conn_t *connp, const in6_addr_t *v6group,
 
 	for (i = 0; i < connp->conn_ilg_inuse; i++) {
 		ilg = &connp->conn_ilg[i];
-		if ((ilg_ill = ilg->ilg_ill) == NULL)
+		if ((ilg_ill = ilg->ilg_ill) == NULL ||
+		    (ilg->ilg_flags & ILG_DELETED) != 0)
 			continue;
 		ASSERT(ilg->ilg_ipif == NULL);
 		ASSERT(ilg_ill->ill_isv6);
@@ -3620,8 +3638,8 @@ ilg_lookup_ill_index_v6(conn_t *connp, const in6_addr_t *v6group, int ifindex)
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
 	for (i = 0; i < connp->conn_ilg_inuse; i++) {
 		ilg = &connp->conn_ilg[i];
-		/* ilg_ill is NULL for V4. Skip them */
-		if (ilg->ilg_ill == NULL)
+		if (ilg->ilg_ill == NULL ||
+		    (ilg->ilg_flags & ILG_DELETED) != 0)
 			continue;
 		/* ilg_ipif is NULL for V6 */
 		ASSERT(ilg->ilg_ipif == NULL);
@@ -3648,7 +3666,8 @@ ilg_lookup_ill_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill)
 
 	for (i = 0; i < connp->conn_ilg_inuse; i++) {
 		ilg = &connp->conn_ilg[i];
-		if ((mem_ill = ilg->ilg_ill) == NULL)
+		if ((mem_ill = ilg->ilg_ill) == NULL ||
+		    (ilg->ilg_flags & ILG_DELETED) != 0)
 			continue;
 		ASSERT(ilg->ilg_ipif == NULL);
 		ASSERT(mem_ill->ill_isv6);
@@ -3667,6 +3686,7 @@ ilg_lookup_ipif(conn_t *connp, ipaddr_t group, ipif_t *ipif)
 {
 	in6_addr_t v6group;
 	int	i;
+	ilg_t	*ilg;
 
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
 	ASSERT(!ipif->ipif_ill->ill_isv6);
@@ -3677,10 +3697,11 @@ ilg_lookup_ipif(conn_t *connp, ipaddr_t group, ipif_t *ipif)
 		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
 
 	for (i = 0; i < connp->conn_ilg_inuse; i++) {
-		if (IN6_ARE_ADDR_EQUAL(&connp->conn_ilg[i].ilg_v6group,
-		    &v6group) &&
-		    connp->conn_ilg[i].ilg_ipif == ipif)
-			return (&connp->conn_ilg[i]);
+		ilg = &connp->conn_ilg[i];
+		if ((ilg->ilg_flags & ILG_DELETED) == 0 &&
+		    IN6_ARE_ADDR_EQUAL(&ilg->ilg_v6group, &v6group) &&
+		    ilg->ilg_ipif == ipif)
+			return (ilg);
 	}
 	return (NULL);
 }
