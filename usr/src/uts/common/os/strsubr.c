@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -306,6 +306,7 @@ static int qprocsareon(queue_t *);
 
 static void set_nfsrv_ptr(queue_t *, queue_t *, queue_t *, queue_t *);
 static void reset_nfsrv_ptr(queue_t *, queue_t *);
+void set_qfull(queue_t *);
 
 static void sq_run_events(syncq_t *);
 static int propagate_syncq(queue_t *);
@@ -595,6 +596,7 @@ struct  qinit passthru_winit = {
 			qp->q_sqtail = mp;				\
 		}							\
 		ASSERT(qp->q_syncqmsgs > 0);				\
+		set_qfull(qp);						\
 	}
 
 #define	SQ_PUTCOUNT_SETFAST_LOCKED(sq) {				\
@@ -6843,8 +6845,6 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 void
 qfill_syncq(syncq_t *sq, queue_t *q, mblk_t *mp)
 {
-	queue_t		*fq = NULL;
-
 	ASSERT(MUTEX_NOT_HELD(SQLOCK(sq)));
 	ASSERT(MUTEX_NOT_HELD(QLOCK(q)));
 	ASSERT(sq->sq_count > 0);
@@ -6855,37 +6855,6 @@ qfill_syncq(syncq_t *sq, queue_t *q, mblk_t *mp)
 	    sq->sq_oprev != NULL));
 
 	mutex_enter(QLOCK(q));
-
-	/*
-	 * Set QFULL in next service procedure queue (that cares) if not
-	 * already set and if there are already more messages on the syncq
-	 * than sq_max_size.  If sq_max_size is 0, no flow control will be
-	 * asserted on any syncq.
-	 *
-	 * The fq here is the next queue with a service procedure.
-	 * This is where we would fail canputnext, so this is where we
-	 * need to set QFULL.
-	 *
-	 * LOCKING HIERARCHY: In the case when fq != q we need to
-	 *  a) Take QLOCK(fq) to set QFULL flag and
-	 *  b) Take sd_reflock in the case of the hot stream to update
-	 *  	sd_refcnt.
-	 * We already have QLOCK at this point. To avoid cross-locks with
-	 * freezestr() which grabs all QLOCKs and with strlock() which grabs
-	 * both SQLOCK and sd_reflock, we need to drop respective locks first.
-	 */
-	if ((sq_max_size != 0) && (!(q->q_nfsrv->q_flag & QFULL)) &&
-	    (q->q_syncqmsgs > sq_max_size)) {
-		if ((fq = q->q_nfsrv) == q) {
-			fq->q_flag |= QFULL;
-		} else {
-			mutex_exit(QLOCK(q));
-			mutex_enter(QLOCK(fq));
-			fq->q_flag |= QFULL;
-			mutex_exit(QLOCK(fq));
-			mutex_enter(QLOCK(q));
-		}
-	}
 
 #ifdef DEBUG
 	/*
@@ -7546,6 +7515,39 @@ set_qend(queue_t *q)
 	mutex_exit(QLOCK(q));
 }
 
+/*
+ * Set QFULL in next service procedure queue (that cares) if not already
+ * set and if there are already more messages on the syncq than
+ * sq_max_size.  If sq_max_size is 0, no flow control will be asserted on
+ * any syncq.
+ *
+ * The fq here is the next queue with a service procedure.  This is where
+ * we would fail canputnext, so this is where we need to set QFULL.
+ * In the case when fq != q we need to take QLOCK(fq) to set QFULL flag.
+ *
+ * We already have QLOCK at this point. To avoid cross-locks with
+ * freezestr() which grabs all QLOCKs and with strlock() which grabs both
+ * SQLOCK and sd_reflock, we need to drop respective locks first.
+ */
+void
+set_qfull(queue_t *q)
+{
+	queue_t		*fq = NULL;
+
+	ASSERT(MUTEX_HELD(QLOCK(q)));
+	if ((sq_max_size != 0) && (!(q->q_nfsrv->q_flag & QFULL)) &&
+	    (q->q_syncqmsgs > sq_max_size)) {
+		if ((fq = q->q_nfsrv) == q) {
+			fq->q_flag |= QFULL;
+		} else {
+			mutex_exit(QLOCK(q));
+			mutex_enter(QLOCK(fq));
+			fq->q_flag |= QFULL;
+			mutex_exit(QLOCK(fq));
+			mutex_enter(QLOCK(q));
+		}
+	}
+}
 
 void
 clr_qfull(queue_t *q)
