@@ -34,7 +34,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -956,14 +956,16 @@ server_loop2(Authctxt *authctxt)
 		if (!rekeying) {
 			channel_after_select(readset, writeset);
 			if (packet_need_rekeying()) {
-				debug("need rekeying");
+				debug("rekey limit reached, need rekeying");
 				xxx_kex->done = 0;
-				kex_send_kexinit(xxx_kex);
+				debug("poking the monitor to start "
+				    "key re-exchange");
+				altprivsep_start_rekex();
 			}
 		}
 #ifdef ALTPRIVSEP
 		else
-			altprivsep_process_input(xxx_kex, readset);
+			altprivsep_process_input(readset);
 #endif /* ALTPRIVSEP */
 
 		process_input(readset);

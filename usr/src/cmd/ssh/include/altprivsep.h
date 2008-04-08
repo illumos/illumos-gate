@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +39,7 @@ extern "C" {
 #define	APS_MSG_NEWKEYS_REP	1
 #define	APS_MSG_RECORD_LOGIN	2
 #define	APS_MSG_RECORD_LOGOUT	3
+#define	APS_MSG_START_REKEX	4
 
 pid_t	altprivsep_start_monitor(Authctxt *authctxt);
 
@@ -55,10 +55,11 @@ void	altprivsep_rekey(int type, u_int32_t seq, void *ctxt);
 void	altprivsep_shutdown_sock(void *arg);
 
 /* Calls _to_ monitor from unprivileged process */
-void	altprivsep_process_input(Kex *kex, fd_set *rset);
+void	altprivsep_process_input(fd_set *rset);
 void	altprivsep_get_newkeys(enum kex_modes mode);
 void	altprivsep_record_login(pid_t pid, const char *ttyname);
 void	altprivsep_record_logout(pid_t pid);
+void	altprivsep_start_rekex(void);
 
 /* Functions for use in the monitor */
 void	aps_input_altpriv_msg(int type, u_int32_t seq, void *ctxt);

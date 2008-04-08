@@ -1,8 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -60,6 +56,11 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include "includes.h"
@@ -1177,7 +1178,7 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 		if (!rekeying) {
 			channel_after_select(readset, writeset);
 			if (need_rekeying || packet_need_rekeying()) {
-				debug("need rekeying");
+				debug("rekey limit reached, need rekeying");
 				xxx_kex->done = 0;
 				kex_send_kexinit(xxx_kex);
 				need_rekeying = 0;

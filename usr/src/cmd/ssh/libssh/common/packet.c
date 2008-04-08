@@ -36,7 +36,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -557,7 +557,8 @@ set_newkeys(int mode)
 		max_blocks = &max_blocks_in;
 	}
 	if (newkeys[mode] != NULL) {
-		debug("set_newkeys: rekeying");
+		debug("set_newkeys: setting new keys for '%s' mode",
+		    mode == MODE_IN ? "in" : "out");
 		cipher_cleanup(cc);
 		free_keys(newkeys[mode]);
 	}

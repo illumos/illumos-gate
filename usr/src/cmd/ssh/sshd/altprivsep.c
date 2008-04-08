@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,6 +167,7 @@ static Authctxt *xxx_authctxt;
 extern void aps_monitor_loop(Authctxt *authctxt, int pipe, pid_t child_pid);
 static void aps_record_login(void);
 static void aps_record_logout(void);
+static void aps_start_rekex(void);
 
 /* Altprivsep packet utilities for communication with the monitor */
 static void	altprivsep_packet_start(u_char);
@@ -314,7 +315,7 @@ altprivsep_rekey(int type, u_int32_t seq, void *ctxt)
 }
 
 void
-altprivsep_process_input(Kex *kex, fd_set *rset)
+altprivsep_process_input(fd_set *rset)
 {
 	void	*data;
 	int	 type;
@@ -521,6 +522,15 @@ altprivsep_record_logout(pid_t pid)
 	altprivsep_packet_read_expect(SSH2_PRIV_MSG_ALTPRIVSEP);
 }
 
+void
+altprivsep_start_rekex(void)
+{
+	altprivsep_packet_start(SSH2_PRIV_MSG_ALTPRIVSEP);
+	altprivsep_packet_put_char(APS_MSG_START_REKEX);
+	altprivsep_packet_send();
+	altprivsep_packet_read_expect(SSH2_PRIV_MSG_ALTPRIVSEP);
+}
+
 static void aps_send_newkeys(void);
 
 /* Monitor side dispatch handler for SSH2_PRIV_MSG_ALTPRIVSEP */
@@ -541,6 +551,9 @@ aps_input_altpriv_msg(int type, u_int32_t seq, void *ctxt)
 		break;
 	case APS_MSG_RECORD_LOGOUT:
 		aps_record_logout();
+		break;
+	case APS_MSG_START_REKEX:
+		aps_start_rekex();
 		break;
 	default:
 		break;
@@ -666,6 +679,31 @@ aps_record_logout(void)
 	packet_start(SSH2_PRIV_MSG_ALTPRIVSEP);
 	packet_send();
 }
+
+static
+void
+aps_start_rekex(void)
+{
+	/*
+	 * Send confirmation. We could implement it without that but it doesn't
+	 * bring any harm to do that and we are consistent with other subtypes
+	 * of our private SSH2_PRIV_MSG_ALTPRIVSEP message type.
+	 */
+	packet_start(SSH2_PRIV_MSG_ALTPRIVSEP);
+	packet_send();
+
+	/*
+	 * KEX_INIT message could be the one that reached the limit. In that
+	 * case, it was already forwarded to us from the unnprivileged child,
+	 * and maybe even acted upon. Obviously we must not send another
+	 * KEX_INIT message.
+	 */
+	if (!(xxx_kex->flags & KEX_INIT_SENT))
+		kex_send_kexinit(xxx_kex);
+	else
+		debug2("rekeying already in progress");
+}
+
 
 /* Utilities for communication with the monitor */
 static
