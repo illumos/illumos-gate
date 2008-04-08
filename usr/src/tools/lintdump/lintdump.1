@@ -136,7 +136,8 @@ $ lint -oa liba.c
 Then lintdump will produce the following output:
 .LP
 .nf
-LINTLIB: llib-la.ln <mid 6484> 268+24+130+9 = 431 bytes
+LINTOBJ: llib-la.ln
+LINTMOD: 6484: 268+24+130+9 = 431 bytes
 SECTION: PASS1: 268 bytes
    FILE: /home/meem/hacks/liba.c
    FILE: liba.c
@@ -290,10 +291,10 @@ $ lintdump -ir $PATCHROOT/lib/llib-lkstat.ln > /tmp/patch-kstat.out
 .nf
 $ diff /tmp/patch-kstat.out /tmp/proj-kstat.out
 1,2c1,2
-< LINTLIB: llib-lkstat.ln <mid 3675> 4995+26812+1045+9 = 32861 bytes
+< LINTMOD: 3675: 4995+26812+1045+9 = 32861 bytes
 < SECTION: PASS1: 4995 bytes
 ---
-> LINTLIB: llib-lkstat.ln <mid 39982> 5144+27302+1057+9 = 33512 bytes
+> LINTMOD: 39982: 5144+27302+1057+9 = 33512 bytes
 > SECTION: PASS1: 5144 bytes
 19c19
 <              unsigned char _file;
