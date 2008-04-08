@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,7 +151,6 @@ cpuboard_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode,
 		if (topo_prop_set_string(rcn, TOPO_PGROUP_IO, TOPO_IO_DEV,
 		    TOPO_PROP_IMMUTABLE, dnpath, &err) != 0) {
 			topo_mod_dprintf(mp, "Failed to set DEV property\n");
-			di_devfs_path_free(dnpath);
 			topo_mod_seterrno(mp, err);
 		}
 		di_devfs_path_free(dnpath);
