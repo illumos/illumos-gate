@@ -1256,47 +1256,59 @@ record_ancestry(char *file, struct stat *pstatb, struct lbuf *rep,
  * entries with flags ACE_GROUP are considered. For each entry
  * with ACE_GROUP flag, the first occurance of a specific access
  * is checked if it is allowed.
- * We are not interested in perms for owner@ and other@, as they
+ * We are not interested in perms for user and other, as they
  * were taken from st_mode value.
  * We are not interested in a_who field of ACE, as we need just
  * unix mode bits for the group.
  */
+
+#define	OWNED_GROUP	(ACE_GROUP | ACE_IDENTIFIER_GROUP)
+#define	IS_TYPE_ALLOWED(type)	((type) == ACE_ACCESS_ALLOWED_ACE_TYPE)
+
 int
 grp_mask_to_mode(acl_t *acep)
 {
 	int mode = 0, seen = 0;
 	int acecnt;
+	int flags;
 	ace_t *ap;
 
 	acecnt = acl_cnt(acep);
 	for (ap = (ace_t *)acl_data(acep); acecnt--; ap++) {
-		if ((ap->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE ||
-		    ap->a_type == ACE_ACCESS_DENIED_ACE_TYPE) &&
-		    !(ap->a_flags & ACE_INHERIT_ONLY_ACE)) {
-			if (ap->a_flags & ACE_GROUP) {
-				if (ap->a_access_mask & ACE_READ_DATA) {
-					if (!(seen & S_IRGRP)) {
-						seen |= S_IRGRP;
-						if (ap->a_type ==
-						    ACE_ACCESS_ALLOWED_ACE_TYPE)
-							mode |= S_IRGRP;
-					}
+
+		if (ap->a_type != ACE_ACCESS_ALLOWED_ACE_TYPE &&
+		    ap->a_type != ACE_ACCESS_DENIED_ACE_TYPE)
+			continue;
+
+		if (ap->a_flags & ACE_INHERIT_ONLY_ACE)
+			continue;
+
+		/*
+		 * if it is first group@ or first everyone@
+		 * for each of read, write and execute, then
+		 * that will be the group mode bit.
+		 */
+		flags = ap->a_flags & ACE_TYPE_FLAGS;
+		if (flags == OWNED_GROUP || flags == ACE_EVERYONE) {
+			if (ap->a_access_mask & ACE_READ_DATA) {
+				if (!(seen & S_IRGRP)) {
+					seen |= S_IRGRP;
+					if (IS_TYPE_ALLOWED(ap->a_type))
+						mode |= S_IRGRP;
 				}
-				if (ap->a_access_mask & ACE_WRITE_DATA) {
-					if (!(seen & S_IWGRP)) {
-						seen |= S_IWGRP;
-						if (ap->a_type ==
-						    ACE_ACCESS_ALLOWED_ACE_TYPE)
-							mode |= S_IWGRP;
-					}
+			}
+			if (ap->a_access_mask & ACE_WRITE_DATA) {
+				if (!(seen & S_IWGRP)) {
+					seen |= S_IWGRP;
+					if (IS_TYPE_ALLOWED(ap->a_type))
+						mode |= S_IWGRP;
 				}
-				if (ap->a_access_mask & ACE_EXECUTE) {
-					if (!(seen & S_IXGRP)) {
-						seen |= S_IXGRP;
-						if (ap->a_type ==
-						    ACE_ACCESS_ALLOWED_ACE_TYPE)
-							mode |= S_IXGRP;
-					}
+			}
+			if (ap->a_access_mask & ACE_EXECUTE) {
+				if (!(seen & S_IXGRP)) {
+					seen |= S_IXGRP;
+					if (IS_TYPE_ALLOWED(ap->a_type))
+						mode |= S_IXGRP;
 				}
 			}
 		}
