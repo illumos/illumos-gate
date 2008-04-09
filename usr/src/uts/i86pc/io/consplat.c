@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@
 /* The names of currently supported graphics drivers on x86 */
 static char *
 gfxdrv_name[] = {
+	"radeon",
 	"vgatext",
 	"i915",
 	"atiatom",

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,8 @@
 PATH=/usr/bin:/usr/sbin:${PATH}
 export PATH
 
-# the following ids are sorted in numeric order
+# the following ids of Intel graphics hardware are
+# sorted in numeric order
 IGFX_ALIAS="\
 	\"pci8086,2562\" \
 	\"pci8086,2572\" \
@@ -46,6 +47,11 @@ IGFX_ALIAS="\
 	\"pci8086,2a12\" \
 	"
 DRVPERM='* 0644 root sys'
+
+# aliases for ATI radeon graphics cards
+RADEON_ALIAS="\
+	\"pci1002,5653\" \
+	"
 
 # Function: check_add_drv()
 #
@@ -138,6 +144,7 @@ else
 	ADD_DRV="check_add_drv -b ${BASEDIR}"
 fi
 
-${ADD_DRV} -m "${DRVPERM}" -i "${IGFX_ALIAS}" i915 || EXIT=1
+${ADD_DRV} -m "${DRVPERM}" -i "${IGFX_ALIAS}" i915 && \
+${ADD_DRV} -m "${DRVPERM}" -i "${RADEON_ALIAS}" radeon || EXIT=1
 
 exit ${EXIT}

@@ -282,6 +282,7 @@ DRV_KMODS	+= ptc
 DRV_KMODS	+= ptm
 DRV_KMODS	+= pts
 DRV_KMODS	+= ptsl
+DRV_KMODS	+= radeon
 DRV_KMODS	+= ral
 DRV_KMODS	+= ramdisk
 DRV_KMODS	+= random

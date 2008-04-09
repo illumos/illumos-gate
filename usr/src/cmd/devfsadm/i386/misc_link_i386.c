@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,7 +114,8 @@ typedef enum {
 	DRIVER_AGPPSEUDO = 0,
 	DRIVER_AGPTARGET,
 	DRIVER_CPUGART,
-	DRIVER_AGPMASTER_DRM,
+	DRIVER_AGPMASTER_DRM_I915,
+	DRIVER_AGPMASTER_DRM_RADEON,
 	DRIVER_AGPMASTER_VGATEXT,
 	DRIVER_UNKNOWN
 } driver_defs_t;
@@ -129,7 +130,8 @@ static driver_name_table_entry_t driver_name_table[] = {
 	{ "agptarget",		DRIVER_AGPTARGET },
 	{ "amd64_gart",		DRIVER_CPUGART },
 	/* AGP master device managed by drm driver */
-	{ "i915",		DRIVER_AGPMASTER_DRM },
+	{ "i915",		DRIVER_AGPMASTER_DRM_I915 },
+	{ "radeon",		DRIVER_AGPMASTER_DRM_RADEON },
 	{ "vgatext",		DRIVER_AGPMASTER_VGATEXT },
 	{ NULL,			DRIVER_UNKNOWN }
 };
@@ -425,7 +427,8 @@ agp_process(di_minor_t minor, di_node_t node)
 		rules[0] = cpugart_rules[0];
 		name = "cpugart";
 		break;
-	case DRIVER_AGPMASTER_DRM:
+	case DRIVER_AGPMASTER_DRM_I915:
+	case DRIVER_AGPMASTER_DRM_RADEON:
 	case DRIVER_AGPMASTER_VGATEXT:
 		devfsadm_print(debug_mid,
 		    "agp_process: agpmaster driver name\n");
