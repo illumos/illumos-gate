@@ -254,7 +254,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0,
 	    rsymndx, rsym, 0, LKUP_DEFT);
 
-	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
+	if ((nsym = lookup_sym(&sl, &nlmp, &binfo, NULL)) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
 		rtldexit(lml, 1);
@@ -426,7 +426,7 @@ elf_reloc_relacount(ulong_t relbgn, ulong_t relacount, ulong_t relsiz,
  * the file.
  */
 int
-elf_reloc(Rt_map *lmp, uint_t plt)
+elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 {
 	ulong_t		relbgn, relend, relsiz, basebgn;
 	ulong_t		pltbgn, pltend, _pltbgn, _pltend;
@@ -492,7 +492,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		SLOOKUP_INIT(sl, MSG_ORIG(MSG_SYM_PLT), lmp, lmp, ld_entry_cnt,
 		    elf_hash(MSG_ORIG(MSG_SYM_PLT)), 0, 0, 0, LKUP_DEFT);
 
-		if ((symdef = elf_find_sym(&sl, &_lmp, &binfo)) == 0)
+		if ((symdef = elf_find_sym(&sl, &_lmp, &binfo, NULL)) == 0)
 			return (1);
 
 		_pltbgn = symdef->st_value;
@@ -747,7 +747,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					    ld_entry_cnt, 0, rsymndx, symref,
 					    rtype, LKUP_STDRELOC);
 
-					symdef = lookup_sym(&sl, &_lmp, &binfo);
+					symdef = lookup_sym(&sl, &_lmp,
+					    &binfo, in_nfavl);
 
 					/*
 					 * If the symbol is not found and the
@@ -996,13 +997,13 @@ _elf_copy_reloc(const char *name, Rt_map *rlmp, Rt_map *dlmp)
 	SLOOKUP_INIT(sl, name, rlmp, rlmp, ld_entry_cnt, 0, 0, 0, 0,
 	    LKUP_FIRST);
 
-	if ((symref = lookup_sym(&sl, &_lmp, &binfo)) == 0)
+	if ((symref = lookup_sym(&sl, &_lmp, &binfo, NULL)) == 0)
 		return (1);
 
 	sl.sl_imap = dlmp;
 	sl.sl_flags = LKUP_DEFT;
 
-	if ((symdef = lookup_sym(&sl, &_lmp, &binfo)) == 0)
+	if ((symdef = lookup_sym(&sl, &_lmp, &binfo, NULL)) == 0)
 		return (1);
 	if (strcmp(NAME(_lmp), MSG_ORIG(MSG_PTH_LIBC)))
 		return (1);

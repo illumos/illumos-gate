@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,11 +44,11 @@ typedef struct link_dynamic	Link_dynamic;
  * Extern functions for a.out format file class.
  */
 extern	ulong_t	aout_bndr(caddr_t);
-extern	Sym	*aout_lookup_sym(Slookup *, Rt_map **, uint_t *);
+extern	Sym	*aout_lookup_sym(Slookup *, Rt_map **, uint_t *, int *);
 extern	Rt_map	*aout_new_lm(Lm_list *, const char *, const char *,
 		    Link_dynamic *, caddr_t, size_t, Aliste);
 extern	void	aout_plt_write(caddr_t, ulong_t);
-extern	int	aout_reloc(Rt_map *, uint_t);
+extern	int	aout_reloc(Rt_map *, uint_t, int *);
 extern	void	aout_rtbndr(caddr_t);
 extern	int	aout_set_prot(Rt_map *, int);
 

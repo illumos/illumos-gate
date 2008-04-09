@@ -514,15 +514,25 @@ typedef struct {
 #define	FLG_DI_LAZYFAIL	0x02000		/* the lazy loading of this entry */
 					/*    failed */
 /*
- * Data Structure to track AVL tree for pathnames of objects
- * loaded into memory
+ * Data structure to track AVL tree of pathnames.  This structure provides the
+ * basis of both the "not-found" node tree, and the "full-path" node tree.  Both
+ * of these trees persist for the life of a process, although the "not-found"
+ * tree may be moved aside during a dlopen() or dlsym() fall back operation.
  */
 typedef struct {
-	const char	*fpn_name;	/* object name */
+	const char	*pn_name;	/* path name */
+	avl_node_t	pn_avl;		/* avl book-keeping (see SGSOFFSETOF) */
+	uint_t		pn_hash;	/* path name hash value */
+} PathNode;
+
+/*
+ * Data structure to track AVL tree for full path names of objects that are
+ * loaded into memory.
+ */
+typedef struct {
+	PathNode	fpn_node;	/* path node */
 	Rt_map		*fpn_lmp;	/* object link-map */
-	avl_node_t	fpn_avl;	/* avl book-keeping (see SGSOFFSETOF) */
-	uint_t		fpn_hash;	/* object name hash value */
-} FullpathNode;
+} FullPathNode;
 
 /*
  * Define a mapping structure, which is maintained to describe each mapping
@@ -968,8 +978,8 @@ extern Lm_list		*lml_list[];
 
 extern Pltbindtype	elf_plt_write(uintptr_t, uintptr_t, void *, uintptr_t,
 			    Xword);
-extern Rt_map		*is_so_loaded(Lm_list *, const char *);
-extern Sym		*lookup_sym(Slookup *, Rt_map **, uint_t *);
+extern Rt_map		*is_so_loaded(Lm_list *, const char *, int *);
+extern Sym		*lookup_sym(Slookup *, Rt_map **, uint_t *, int *);
 extern int		rt_dldump(Rt_map *, const char *, int, Addr);
 
 #ifdef	__cplusplus

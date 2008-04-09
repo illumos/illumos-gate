@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ struct audit_list {
 /*
  * Link-Edit audit functions
  */
-extern int		audit_setup(Rt_map *, Audit_desc *, uint_t);
+extern int		audit_setup(Rt_map *, Audit_desc *, uint_t, int *);
 
 extern void		audit_desc_cleanup(Rt_map *);
 extern void		audit_info_cleanup(Rt_map *);

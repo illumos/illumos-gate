@@ -95,8 +95,9 @@ static int	elf_are_u(Rej_desc *);
 static void	elf_dladdr(ulong_t, Rt_map *, Dl_info *, void **, int);
 static ulong_t	elf_entry_pt(void);
 static char	*elf_get_so(const char *, const char *);
-static Rt_map	*elf_map_so(Lm_list *, Aliste, const char *, const char *, int);
-static int	elf_needed(Lm_list *, Aliste, Rt_map *);
+static Rt_map	*elf_map_so(Lm_list *, Aliste, const char *, const char *,
+		    int, int *);
+static int	elf_needed(Lm_list *, Aliste, Rt_map *, int *);
 static void	elf_unmap_so(Rt_map *);
 static int	elf_verify_vers(const char *, Rt_map *, Rt_map *);
 
@@ -152,7 +153,6 @@ elf_fix_name(const char *name, Rt_map *clmp, uint_t orig)
 			return (0);
 		}
 		pnp->p_len = MSG_PTH_LIBSYS_SIZE;
-		pnp->p_orig = (orig & PN_SER_MASK);
 		return (pnp);
 	}
 
@@ -250,7 +250,7 @@ elf_rtld_load()
 	 * As we need to refer to the DYNINFO() information, insure that it has
 	 * been initialized.
 	 */
-	if (elf_needed(lml, ALIST_OFF_DATA, lmp) == 0)
+	if (elf_needed(lml, ALIST_OFF_DATA, lmp, NULL) == 0)
 		return (0);
 
 #if	defined(__i386)
@@ -278,7 +278,8 @@ elf_rtld_load()
  * Lazy load an object.
  */
 Rt_map *
-elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym)
+elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
+    int *in_nfavl)
 {
 	Rt_map		*nlmp, *hlmp;
 	Dyninfo		*dip = &DYNINFO(clmp)[ndx], *pdip;
@@ -336,7 +337,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym)
 	/*
 	 * Expand the requested name if necessary.
 	 */
-	if ((pnp = elf_fix_name(name, clmp, PN_SER_NEEDED)) == 0)
+	if ((pnp = elf_fix_name(name, clmp, 0)) == 0)
 		return (0);
 
 	/*
@@ -360,7 +361,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym)
 	 * Load the associated object.
 	 */
 	dip->di_info = nlmp =
-	    load_one(lml, lmco, pnp, clmp, MODE(clmp), flags, 0);
+	    load_one(lml, lmco, pnp, clmp, MODE(clmp), flags, 0, in_nfavl);
 
 	/*
 	 * Remove any expanded pathname infrastructure.  Reduce the pending lazy
@@ -376,8 +377,8 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym)
 	 * create an association between the caller and this dependency.
 	 */
 	if (nlmp && ((bind_one(clmp, nlmp, BND_NEEDED) == 0) ||
-	    (analyze_lmc(lml, lmco, nlmp) == 0) ||
-	    (relocate_lmc(lml, lmco, clmp, nlmp) == 0)))
+	    (analyze_lmc(lml, lmco, nlmp, in_nfavl) == 0) ||
+	    (relocate_lmc(lml, lmco, clmp, nlmp, in_nfavl) == 0)))
 		dip->di_info = nlmp = 0;
 
 	/*
@@ -589,7 +590,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
  * link map the the dlopen list.
  */
 static int
-elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
+elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 {
 	Dyn		*dyn, *pdyn;
 	ulong_t		ndx = 0;
@@ -709,9 +710,9 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 		 * Establish the objects name, load it and establish a binding
 		 * with the caller.
 		 */
-		if (((pnp = elf_fix_name(name, clmp, PN_SER_NEEDED)) == 0) ||
-		    ((nlmp = load_one(lml, lmco, pnp, clmp, MODE(clmp),
-		    flags, 0)) == 0) || (bind_one(clmp, nlmp, BND_NEEDED) == 0))
+		if (((pnp = elf_fix_name(name, clmp, 0)) == 0) || ((nlmp =
+		    load_one(lml, lmco, pnp, clmp, MODE(clmp), flags, 0,
+		    in_nfavl)) == 0) || (bind_one(clmp, nlmp, BND_NEEDED) == 0))
 			nlmp = 0;
 
 		/*
@@ -1323,7 +1324,7 @@ elf_map_it(
  */
 /* ARGSUSED0 */
 static Sym *
-elf_null_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
+elf_null_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 {
 	return ((Sym *)0);
 }
@@ -1376,7 +1377,8 @@ elf_disable_filtee(Rt_map *lmp, Dyninfo *dip)
  * A symbol name of 0 is used to trigger filtee loading.
  */
 static Sym *
-_elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
+_elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
+    int *in_nfavl)
 {
 	const char	*name = slp->sl_name, *filtees;
 	Rt_map		*clmp = slp->sl_cmap;
@@ -1436,7 +1438,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				    NAME(ilmp), filtees);
 
 			if ((dip->di_info = (void *)expand_paths(ilmp,
-			    filtees, PN_SER_FILTEE, 0)) == 0) {
+			    filtees, 0, 0)) == 0) {
 				elf_disable_filtee(ilmp, dip);
 				return ((Sym *)0);
 			}
@@ -1494,7 +1496,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			}
 
 			pnp = hwcap_filtees(pnpp, lmco, lmc, dip, ilmp, filtees,
-			    mode, (FLG_RT_HANDLE | FLG_RT_HWCAP));
+			    mode, (FLG_RT_HANDLE | FLG_RT_HWCAP), in_nfavl);
 
 			/*
 			 * Now that any hardware capability objects have been
@@ -1590,7 +1592,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				 */
 				if ((nlmp = load_path(lml, lmco, &(pnp->p_name),
 				    ilmp, mode, FLG_RT_HANDLE, &ghp, 0,
-				    &rej)) == 0) {
+				    &rej, in_nfavl)) == 0) {
 					file_notfound(LIST(ilmp), filtee, ilmp,
 					    FLG_RT_HANDLE, &rej);
 					remove_rej(&rej);
@@ -1604,6 +1606,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				if (nlmp && ghp) {
 					ghp->gh_flags |= GPH_FILTEE;
 					pnp->p_info = (void *)ghp;
+
+					FLAGS1(nlmp) |= FL1_RT_USED;
 				}
 
 				/*
@@ -1627,9 +1631,9 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				 * provide sufficient information to tear down
 				 * this filtee if necessary.
 				 */
-				if (nlmp && ghp &&
-				    ((analyze_lmc(lml, lmco, nlmp) == 0) ||
-				    (relocate_lmc(lml, lmco, ilmp, nlmp) == 0)))
+				if (nlmp && ghp && ((analyze_lmc(lml, lmco,
+				    nlmp, in_nfavl) == 0) || (relocate_lmc(lml,
+				    lmco, ilmp, nlmp, in_nfavl) == 0)))
 					nlmp = 0;
 
 				/*
@@ -1783,7 +1787,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
  *	be suppressed.  All detailed ldd messages should still be produced.
  */
 Sym *
-elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
+elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
+    int *in_nfavl)
 {
 	Sym	*sym;
 	Dyninfo	*dip = &DYNINFO(slp->sl_imap)[ndx];
@@ -1808,7 +1813,7 @@ elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		silent = 1;
 	}
 
-	sym = _elf_lookup_filtee(slp, dlmp, binfo, ndx);
+	sym = _elf_lookup_filtee(slp, dlmp, binfo, ndx, in_nfavl);
 
 	if (silent)
 		rtld_flags &= ~RT_FL_SILENCERR;
@@ -1854,7 +1859,7 @@ elf_hash(const char *name)
  * routines do NOT set LKUP_SPEC in the flag.
  */
 Sym *
-elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
+elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*ilmp = slp->sl_imap;
@@ -2047,7 +2052,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			 * catch any object filtering that may be available.
 			 */
 			if ((fsym = elf_lookup_filtee(slp, dlmp, binfo,
-			    sip->si_boundto)) != 0)
+			    sip->si_boundto, in_nfavl)) != 0)
 				return (fsym);
 			if (sip->si_flags & SYMINFO_FLG_FILTER)
 				return ((Sym *)0);
@@ -2069,7 +2074,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			 * within the filter itself.
 			 */
 			if ((fsym = elf_lookup_filtee(slp, dlmp, binfo,
-			    OBJFLTRNDX(ilmp))) != 0)
+			    OBJFLTRNDX(ilmp), in_nfavl)) != 0)
 				return (fsym);
 		}
 
@@ -2086,7 +2091,8 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 Rt_map *
 elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
     ulong_t addr, ulong_t etext, Aliste lmco, ulong_t msize, ulong_t entry,
-    ulong_t paddr, ulong_t padimsize, Mmap *mmaps, uint_t mmapcnt)
+    ulong_t paddr, ulong_t padimsize, Mmap *mmaps, uint_t mmapcnt,
+    int *in_nfavl)
 {
 	Rt_map		*lmp;
 	ulong_t		base, fltr = 0, audit = 0, cfile = 0, crle = 0;
@@ -2599,7 +2605,8 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				return (0);
 			}
 			if (lml_main.lm_head) {
-				if (audit_setup(lmp, AUDITORS(lmp), 0) == 0) {
+				if (audit_setup(lmp, AUDITORS(lmp), 0,
+				    in_nfavl) == 0) {
 					remove_so(0, lmp);
 					return (0);
 				}
@@ -2650,7 +2657,7 @@ cap_assign(Cap *cap, Rt_map *lmp)
  */
 static Rt_map *
 elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
-    int fd)
+    int fd, int *in_nfavl)
 {
 	int		i; 		/* general temporary */
 	Off		memsize = 0;	/* total memory size of pathname */
@@ -2918,7 +2925,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 */
 	if (!(lmp = elf_new_lm(lml, pname, oname, mld, (ulong_t)faddr,
 	    fmap->fm_etext, lmco, memsize, mentry, (ulong_t)paddr, plen, mmaps,
-	    mmapcnt))) {
+	    mmapcnt, in_nfavl))) {
 		(void) munmap((caddr_t)faddr, memsize);
 		return (0);
 	}
@@ -3312,7 +3319,7 @@ elf_lazy_cleanup(APlist *alp)
  * search duplication.
  */
 Sym *
-elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
+elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 {
 	Sym		*sym = 0;
 	APlist		*alist = NULL;
@@ -3388,7 +3395,8 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 			 * search, whereas before the object might have been
 			 * skipped.
 			 */
-			if ((nlmp = elf_lazy_load(lmp, &sl, cnt, name)) == 0)
+			if ((nlmp = elf_lazy_load(lmp, &sl, cnt,
+			    name, in_nfavl)) == 0)
 				continue;
 
 			/*
@@ -3401,7 +3409,8 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 				continue;
 
 			sl.sl_imap = nlmp;
-			if (sym = LM_LOOKUP_SYM(sl.sl_cmap)(&sl, _lmp, binfo))
+			if (sym = LM_LOOKUP_SYM(sl.sl_cmap)(&sl, _lmp,
+			    binfo, in_nfavl))
 				break;
 
 			/*

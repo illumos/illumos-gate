@@ -178,7 +178,7 @@
 #		    detail shows layout of string tables
 # tls		display TLS processing
 # unused	display unused/unreferenced files; detail flag shows unused
-#		   sections (ld only)
+#		   sections (ld only), and unused search paths (ld.so.1 only)
 # versions	display version processing
 #
 #
@@ -379,7 +379,7 @@
 @ MSG_FIL_REUSE		"file=%s;  reusing: originally processed as %s"
 @ MSG_FIL_PROT		"file=%s;  modifying memory protections (%c PROT_WRITE)"
 @ MSG_FIL_DELETE	"file=%s;  deleting"
-@ MSG_FIL_DLOPEN	"file=%s;  dlopen() called from file=%s  %s"
+@ MSG_FIL_DLOPEN	"file=%s;  dlopen() called from file=%s %s %s"
 @ MSG_FIL_DLCLOSE	"file=%s;  dlclose()  %s"
 @ MSG_FIL_CLEANUP	"file=%s;  loading failed: cleaning up lmco 0x%llx"
 @ MSG_FIL_DLDUMP	"file=%s;  dldump() to file=%s  %s"
@@ -593,6 +593,15 @@
 @ MSG_USD_LCINTERFACE	"file=%s  unused interface [%s]: using interface \
 			 from previously loaded object: file=%s"
 
+@ MSG_USD_LDLIBPATH	" search path=%s  unused: LD_LIBRARY_PATH entry"
+@ MSG_DUP_LDLIBPATH	" search path=%s  unused: (duplicate) LD_LIBRARY_PATH \
+			 entry"
+@ MSG_USD_LDLIBPATHC	" search path=%s  unused: configuration \
+			 LD_LIBRARY_PATH entry - %s"
+@ MSG_DUP_LDLIBPATHC	" search path=%s  unused: (duplicate) configuration \
+			 LD_LIBRARY_PATH entry - %s"
+@ MSG_USD_RUNPATH	" search path=%s  unused: RUNPATH/RPATH from file %s"
+
 # Segment messages
 
 @ MSG_SEG_DESC_INUSE	"Segment Descriptor List (in use)"
@@ -652,9 +661,9 @@
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"
-@ MSG_SYM_DLSYM_1 	"symbol=%s;  dlsym() called from file=%s  %s"
-@ MSG_SYM_DLSYM_2	"symbol=%s;  dlsym() called from file=%s; starting at \
-			 file=%s  %s"
+@ MSG_SYM_DLSYM_1 	"symbol=%s;  dlsym() called from file=%s %s %s"
+@ MSG_SYM_DLSYM_2	"symbol=%s;  dlsym() called from file=%s; starting \
+			 at file=%s %s %s"
 
 @ MSG_SYM_LAZY_RESCAN	"rescanning for lazy dependencies for symbol: %s"
 
@@ -776,6 +785,7 @@
 @ MSG_STR_ALTER		"  (alternate)"
 @ MSG_STR_COPYZERO	"  (copy zero's unnecessary)"
 @ MSG_STR_TEMPORARY	"  (temporary)"
+@ MSG_STR_RETRY		" (retry) "
 
 # TLS related messages
 

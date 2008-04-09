@@ -258,17 +258,6 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 		if (aplist_append(alpp, ghp, AL_CNT_GROUPS) == 0)
 			return (0);
 
-		/*
-		 * Indicate that this object has been referenced.  In truth a
-		 * reference hasn't yet occurred, it's a dlsym() that makes the
-		 * reference.  However, we assume that anyone performing a
-		 * dlopen() will eventually call dlsym(), plus this makes for a
-		 * better diagnostic location rather than having to call
-		 * unused() after every dlsym() operation.
-		 */
-		if (nlmp)
-			FLAGS1(nlmp) |= FL1_RT_USED;
-
 		ghp->gh_refcnt = 1;
 		ghp->gh_flags = hflags;
 
@@ -588,7 +577,7 @@ newlmid(Lm_list *lml)
  */
 static Grp_hdl *
 dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
-    uint_t flags, uint_t orig)
+    uint_t flags, uint_t orig, int *in_nfavl)
 {
 	Rt_map	*nlmp;
 	Grp_hdl	*ghp;
@@ -597,7 +586,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	Lm_cntl	*lmc;
 
 	DBG_CALL(Dbg_file_dlopen(clmp,
-	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), mode));
+	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), in_nfavl, mode));
 
 	/*
 	 * If the path specified is null then we're operating on global
@@ -660,7 +649,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 		}
 		if (promote)
 			(void) relocate_lmc(lml, ALIST_OFF_DATA, clmp,
-			    lml->lm_head);
+			    lml->lm_head, in_nfavl);
 
 		return (ghp);
 	}
@@ -695,7 +684,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	olmco = nlmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
 
 	nlmp = load_one(lml, nlmco, pnp, clmp, mode,
-	    (flags | FLG_RT_HANDLE), &ghp);
+	    (flags | FLG_RT_HANDLE), &ghp, in_nfavl);
 
 	/*
 	 * Remove any expanded pathname infrastructure, and if the dependency
@@ -725,8 +714,8 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	/*
 	 * Finish processing the objects associated with this request.
 	 */
-	if ((analyze_lmc(lml, nlmco, nlmp) == 0) ||
-	    (relocate_lmc(lml, nlmco, clmp, nlmp) == 0)) {
+	if ((analyze_lmc(lml, nlmco, nlmp, in_nfavl) == 0) ||
+	    (relocate_lmc(lml, nlmco, clmp, nlmp, in_nfavl) == 0)) {
 		ghp = 0;
 		nlmp = 0;
 	}
@@ -749,16 +738,46 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 }
 
 /*
+ * dlopen() and dlsym() operations are the means by which a process can
+ * test for the existence of required dependencies.  If the necessary
+ * dependencies don't exist, then associated functionality can't be used.
+ * However, the lack of dependencies can be fixed, and the dlopen() and
+ * dlsym() requests can be repeated.  As we use a "not-found" AVL tree to
+ * cache any failed full path loads, secondary dlopen() and dlsym() requests
+ * will fail, even if the dependencies have been installed.
+ *
+ * dlopen() and dlsym() retry any failures by removing the "not-found" AVL
+ * tree.  Should any dependencies be found, their names are added to the
+ * FullPath AVL tree.  This routine removes any new "not-found" AVL tree,
+ * so that the dlopen() or dlsym() can replace the original "not-found" tree.
+ */
+inline static void
+nfavl_remove(avl_tree_t *avlt)
+{
+	PathNode	*pnp;
+	void		*cookie = NULL;
+
+	if (avlt) {
+		while ((pnp = avl_destroy_nodes(avlt, &cookie)) != NULL) {
+			free((void *)pnp->pn_name);
+			free(pnp);
+		}
+		avl_destroy(avlt);
+		free(avlt);
+	}
+}
+
+/*
  * Internal dlopen() activity.  Called from user level or directly for internal
  * opens that require a handle.
  */
 Grp_hdl *
 dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
-    uint_t flags, uint_t orig, int *loaded)
+    uint_t flags, uint_t orig)
 {
 	Rt_map	*dlmp = 0;
 	Grp_hdl	*ghp;
-	int	objcnt;
+	int	in_nfavl = 0;
 
 	/*
 	 * Check for magic link-map list values:
@@ -803,21 +822,38 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 			lml = &lml_rtld;
 	}
 
-	objcnt = lml->lm_obj;
-
 	/*
 	 * Open the required object on the associated link-map list.
 	 */
-	if ((ghp = dlmopen_core(lml, path, mode, clmp, flags,
-	    (orig | PN_SER_DLOPEN))) != 0) {
+	ghp = dlmopen_core(lml, path, mode, clmp, flags, orig, &in_nfavl);
+
+	/*
+	 * If the object could not be found it is possible that the "not-found"
+	 * AVL tree had indicated that the file does not exist.  In case the
+	 * file system has changes since this "not-found" recording was made,
+	 * retry the dlopen() with a clean "not-found" AVL tree.
+	 */
+	if ((ghp == 0) && in_nfavl) {
+		avl_tree_t	*oavlt = nfavl;
+
+		nfavl = NULL;
+		ghp = dlmopen_core(lml, path, mode, clmp, flags, orig, NULL);
+
 		/*
-		 * Establish the new link-map from which .init processing will
-		 * begin.  Ignore .init firing when constructing a configuration
-		 * file (crle(1)).
+		 * If the file is found, then its full path name will have been
+		 * registered in the FullPath AVL tree.  Remove any new
+		 * "not-found" AVL information, and restore the former AVL tree.
 		 */
-		if ((mode & RTLD_CONFGEN) == 0)
-			dlmp = ghp->gh_ownlmp;
+		nfavl_remove(nfavl);
+		nfavl = oavlt;
 	}
+
+	/*
+	 * Establish the new link-map from which .init processing will begin.
+	 * Ignore .init firing when constructing a configuration file (crle(1)).
+	 */
+	if (ghp && ((mode & RTLD_CONFGEN) == 0))
+		dlmp = ghp->gh_ownlmp;
 
 	/*
 	 * If loading an auditor was requested, and the auditor already existed,
@@ -828,13 +864,6 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 		remove_lml(lml);
 		lml = LIST(dlmp);
 	}
-
-	/*
-	 * Return the number of objects loaded if required.  This is used to
-	 * trigger used() processing on return from a dlopen().
-	 */
-	if (loaded)
-		*loaded = lml->lm_obj - objcnt;
 
 	/*
 	 * If this load failed, remove any alternative link-map list.
@@ -859,8 +888,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
  * Argument checking for dlopen.  Only called via external entry.
  */
 static Grp_hdl *
-dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
-    int *loaded)
+dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp)
 {
 	/*
 	 * Verify that a valid pathname has been supplied.
@@ -899,7 +927,7 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 		mode |= RTLD_LAZY;
 	}
 
-	return (dlmopen_intn(lml, path, mode, clmp, 0, 0, loaded));
+	return (dlmopen_intn(lml, path, mode, clmp, 0, 0));
 }
 
 #pragma weak dlopen = _dlopen
@@ -912,7 +940,7 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 void *
 _dlopen(const char *path, int mode)
 {
-	int	entry, loaded = 0;
+	int	entry;
 	Rt_map	*clmp;
 	Grp_hdl	*ghp;
 	Lm_list	*lml;
@@ -922,10 +950,7 @@ _dlopen(const char *path, int mode)
 	clmp = _caller(caller(), CL_EXECDEF);
 	lml = LIST(clmp);
 
-	ghp = dlmopen_check(lml, path, mode, clmp, &loaded);
-
-	if (entry && ghp && loaded)
-		unused(lml);
+	ghp = dlmopen_check(lml, path, mode, clmp);
 
 	if (entry)
 		leave(lml);
@@ -940,7 +965,7 @@ _dlopen(const char *path, int mode)
 void *
 _dlmopen(Lmid_t lmid, const char *path, int mode)
 {
-	int	entry, loaded = 0;
+	int	entry;
 	Rt_map	*clmp;
 	Grp_hdl	*ghp;
 
@@ -948,10 +973,7 @@ _dlmopen(Lmid_t lmid, const char *path, int mode)
 
 	clmp = _caller(caller(), CL_EXECDEF);
 
-	ghp = dlmopen_check((Lm_list *)lmid, path, mode, clmp, &loaded);
-
-	if (entry && ghp && ghp->gh_ownlmp && loaded)
-		unused(LIST(ghp->gh_ownlmp));
+	ghp = dlmopen_check((Lm_list *)lmid, path, mode, clmp);
 
 	if (entry)
 		leave(LIST(clmp));
@@ -962,7 +984,8 @@ _dlmopen(Lmid_t lmid, const char *path, int mode)
  * Handle processing for dlsym.
  */
 Sym *
-dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
+dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
+    int *in_nfavl)
 {
 	Rt_map		*nlmp, * lmp = ghp->gh_ownlmp;
 	Rt_map		*clmp = slp->sl_cmap;
@@ -1011,7 +1034,8 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 				continue;
 
 			sl.sl_imap = nlmp;
-			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo))
+			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo,
+			    in_nfavl))
 				return (sym);
 		}
 
@@ -1041,7 +1065,8 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 
 				lazy = 1;
 				sl.sl_imap = nlmp;
-				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo))
+				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo,
+				    in_nfavl))
 					return (sym);
 			}
 
@@ -1070,7 +1095,8 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 				continue;
 
 			sl.sl_imap = gdp->gd_depend;
-			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo))
+			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo,
+			    in_nfavl))
 				return (sym);
 
 			if (ghp->gh_flags & GPH_FIRST)
@@ -1097,7 +1123,8 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 
 				lazy = 1;
 				sl.sl_imap = nlmp;
-				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo))
+				if (sym = elf_lazy_find_sym(&sl, _lmp,
+				    binfo, in_nfavl))
 					return (sym);
 			}
 
@@ -1120,7 +1147,8 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
  * Core dlsym activity.  Selects symbol lookup method from handle.
  */
 void *
-dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
+dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
+    int *in_nfavl)
 {
 	Sym		*sym = NULL;
 	Syminfo		*sip;
@@ -1146,7 +1174,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	    0, 0, 0, LKUP_SYMNDX);
 
 	if ((FCT(clmp) == &elf_fct) &&
-	    ((sym = SYMINTP(clmp)(&sl, 0, 0)) != NULL)) {
+	    ((sym = SYMINTP(clmp)(&sl, 0, 0, NULL)) != NULL)) {
 		sl.sl_rsymndx = (((ulong_t)sym -
 		    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
 		sl.sl_rsym = sym;
@@ -1160,13 +1188,14 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * that the symbol is a singleton, then the search for the
 		 * symbol must follow the default search path.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_SINGLETON));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, 0,
+		    DBG_DLSYM_SINGLETON));
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = LKUP_SPEC;
 		if (handle == RTLD_PROBE)
 			sl.sl_flags |= LKUP_NOFALLBACK;
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_NEXT) {
 		Rt_map	*nlmp;
@@ -1186,7 +1215,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 			if ((sip->si_flags & SYMINFO_FLG_DIRECT) &&
 			    (sip->si_boundto < SYMINFO_BT_LOWRESERVE))
 				(void) elf_lazy_load(clmp, &sl,
-				    sip->si_boundto, name);
+				    sip->si_boundto, name, in_nfavl);
 
 			/*
 			 * Clear the symbol index, so as not to confuse
@@ -1205,25 +1234,26 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 */
 		sl.sl_imap = nlmp = (Rt_map *)NEXT(clmp);
 
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, (nlmp ? NAME(nlmp) :
-		    MSG_INTL(MSG_STR_NULL)), DBG_DLSYM_NEXT));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl,
+		    (nlmp ? NAME(nlmp) : MSG_INTL(MSG_STR_NULL)),
+		    DBG_DLSYM_NEXT));
 
 		if (nlmp == 0)
 			return (0);
 
 		sl.sl_flags = LKUP_NEXT;
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_SELF) {
 		/*
 		 * If the handle is RTLD_SELF start searching from the caller.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, NAME(clmp),
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, NAME(clmp),
 		    DBG_DLSYM_SELF));
 
 		sl.sl_imap = clmp;
 		sl.sl_flags = (LKUP_SPEC | LKUP_SELF);
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_DEFAULT) {
 		Rt_map	*hlmp = LIST(clmp)->lm_head;
@@ -1232,11 +1262,12 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * If the handle is RTLD_DEFAULT mimic the standard symbol
 		 * lookup as would be triggered by a relocation.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_DEFAULT));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, 0,
+		    DBG_DLSYM_DEFAULT));
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = LKUP_SPEC;
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_PROBE) {
 		Rt_map	*hlmp = LIST(clmp)->lm_head;
@@ -1250,11 +1281,12 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * loaded to satisfy this request, but no exhaustive lazy load
 		 * rescan is carried out.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_PROBE));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, 0,
+		    DBG_DLSYM_PROBE));
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALLBACK);
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
 
 	} else {
 		Grp_hdl *ghp = (Grp_hdl *)handle;
@@ -1263,10 +1295,10 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * Look in the shared object specified by the handle and in all
 		 * of its dependencies.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, NAME(ghp->gh_ownlmp),
-		    DBG_DLSYM_DEF));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl,
+		    NAME(ghp->gh_ownlmp), DBG_DLSYM_DEF));
 
-		sym = LM_DLSYM(clmp)(ghp, &sl, dlmp, &binfo);
+		sym = LM_DLSYM(clmp)(ghp, &sl, dlmp, &binfo, in_nfavl);
 	}
 
 	if (sym) {
@@ -1275,6 +1307,12 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 
 		if (!(FLAGS(*dlmp) & FLG_RT_FIXED))
 			addr += ADDR(*dlmp);
+
+		/*
+		 * Indicate that the defining object is now used.
+		 */
+		if (*dlmp != clmp)
+			FLAGS1(*dlmp) |= FL1_RT_USED;
 
 		DBG_CALL(Dbg_bind_global(clmp, 0, 0, (Xword)-1, PLT_T_NONE,
 		    *dlmp, addr, sym->st_value, name, binfo));
@@ -1303,6 +1341,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	void		*error;
 	Aliste		idx;
 	Grp_desc	*gdp;
+	int		in_nfavl = 0;
 
 	/*
 	 * While looking for symbols it's quite possible that additional objects
@@ -1326,7 +1365,31 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		}
 	}
 
-	if ((error = dlsym_core(handle, name, clmp, dlmp)) == 0) {
+	error = dlsym_core(handle, name, clmp, dlmp, &in_nfavl);
+
+	/*
+	 * If the symbol could not be found it is possible that the "not-found"
+	 * AVL tree had indicated that a required file does not exist.  In case
+	 * the file system has changed since this "not-found" recording was
+	 * made, retry the dlsym() with a clean "not-found" AVL tree.
+	 */
+	if ((error == 0) && in_nfavl) {
+		avl_tree_t	*oavlt = nfavl;
+
+		nfavl = NULL;
+		error = dlsym_core(handle, name, clmp, dlmp, NULL);
+
+		/*
+		 * If the symbol is found, then any file that was loaded will
+		 * have had its full path name registered in the FullPath AVL
+		 * tree.  Remove any new "not-found" AVL information, and
+		 * restore the former AVL tree.
+		 */
+		nfavl_remove(nfavl);
+		nfavl = oavlt;
+	}
+
+	if (error == 0) {
 		/*
 		 * Cache the error message, as Java tends to fall through this
 		 * code many times.
@@ -1520,7 +1583,7 @@ dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 	 * have to be revisited.
 	 */
 	if (ipath) {
-		if ((lmp = is_so_loaded(&lml_main, ipath)) == 0) {
+		if ((lmp = is_so_loaded(&lml_main, ipath, NULL)) == 0) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_NOFILE),
 			    ipath);
 			return (1);

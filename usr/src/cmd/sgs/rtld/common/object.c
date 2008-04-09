@@ -163,7 +163,7 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name, int fd)
  * the appropriate link-edit functionality (refer to sgs/ld/common/main.c).
  */
 Rt_map *
-elf_obj_fini(Lm_list *lml, Rt_map *lmp)
+elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 {
 	Ofl_desc	*ofl = (Ofl_desc *)lmp->rt_priv;
 	Rt_map		*nlmp;
@@ -221,7 +221,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp)
 	if ((nlmp = elf_new_lm(lml, ofl->ofl_name, ofl->ofl_name,
 	    ofl->ofl_osdynamic->os_outdata->d_buf, (ulong_t)ehdr,
 	    (ulong_t)ehdr + etext, CNTL(olmp), (ulong_t)ofl->ofl_size,
-	    0, 0, 0, mmaps, mmapcnt)) == 0)
+	    0, 0, 0, mmaps, mmapcnt, in_nfavl)) == 0)
 		return (0);
 
 	/*

@@ -349,25 +349,25 @@ rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
 }
 
 /*
- * Compare function for FullpathNode AVL tree.
+ * Compare function for PathNode AVL tree.
  */
 static int
-fpavl_compare(const void * n1, const void * n2)
+pnavl_compare(const void *n1, const void *n2)
 {
 	uint_t		hash1, hash2;
 	const char	*st1, *st2;
 	int		rc;
 
-	hash1 = ((FullpathNode *)n1)->fpn_hash;
-	hash2 = ((FullpathNode *)n2)->fpn_hash;
+	hash1 = ((PathNode *)n1)->pn_hash;
+	hash2 = ((PathNode *)n2)->pn_hash;
 
 	if (hash1 > hash2)
 		return (1);
 	if (hash1 < hash2)
 		return (-1);
 
-	st1 = ((FullpathNode *)n1)->fpn_name;
-	st2 = ((FullpathNode *)n2)->fpn_name;
+	st1 = ((PathNode *)n1)->pn_name;
+	st2 = ((PathNode *)n2)->pn_name;
 
 	rc = strcmp(st1, st2);
 	if (rc > 0)
@@ -377,17 +377,17 @@ fpavl_compare(const void * n1, const void * n2)
 	return (0);
 }
 
-
 /*
- * Determine if a given pathname has already been loaded in the AVL tree.
- * If the pathname does not exist in the AVL tree, the next insertion point
- * is deposited in "where".  This value can be used by fpavl_insert() to
- * expedite the insertion.
+ * Determine if a pathname has already been recorded on the full path name
+ * AVL tree.  This tree maintains a node for each path name that ld.so.1 has
+ * successfully loaded.  If the path name does not exist in this AVL tree, then
+ * the next insertion point is deposited in "where".  This value can be used by
+ * fpavl_insert() to expedite the insertion.
  */
 Rt_map *
-fpavl_loaded(Lm_list *lml, const char *name, avl_index_t *where)
+fpavl_recorded(Lm_list *lml, const char *name, avl_index_t *where)
 {
-	FullpathNode	fpn, *fpnp;
+	FullPathNode	fpn, *fpnp;
 	avl_tree_t	*avlt;
 
 	/*
@@ -396,13 +396,13 @@ fpavl_loaded(Lm_list *lml, const char *name, avl_index_t *where)
 	if ((avlt = lml->lm_fpavl) == NULL) {
 		if ((avlt = calloc(sizeof (avl_tree_t), 1)) == 0)
 			return (0);
-		avl_create(avlt, fpavl_compare, sizeof (FullpathNode),
-		    SGSOFFSETOF(FullpathNode, fpn_avl));
+		avl_create(avlt, pnavl_compare, sizeof (FullPathNode),
+		    SGSOFFSETOF(FullPathNode, fpn_node.pn_avl));
 		lml->lm_fpavl = avlt;
 	}
 
-	fpn.fpn_name = name;
-	fpn.fpn_hash = sgs_str_hash(name);
+	fpn.fpn_node.pn_name = name;
+	fpn.fpn_node.pn_hash = sgs_str_hash(name);
 
 	if ((fpnp = avl_find(lml->lm_fpavl, &fpn, where)) == NULL)
 		return (NULL);
@@ -410,22 +410,22 @@ fpavl_loaded(Lm_list *lml, const char *name, avl_index_t *where)
 	return (fpnp->fpn_lmp);
 }
 
-
 /*
- * Insert a name into the FullpathNode AVL tree for the link-map list.  The
+ * Insert a name into the FullPathNode AVL tree for the link-map list.  The
  * objects NAME() is the path that would have originally been searched for, and
  * is therefore the name to associate with any "where" value.  If the object has
  * a different PATHNAME(), perhaps because it has resolved to a different file
- * (see fullpath), then this name is recorded also.  See load_file().
+ * (see fullpath()), then this name will be recorded as a separate FullPathNode
+ * (see load_file()).
  */
 int
 fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 {
-	FullpathNode	*fpnp;
+	FullPathNode	*fpnp;
 
 	if (where == 0) {
 		/* LINTED */
-		Rt_map	*_lmp = fpavl_loaded(lml, name, &where);
+		Rt_map	*_lmp = fpavl_recorded(lml, name, &where);
 
 		/*
 		 * We better not get a hit now, we do not want duplicates in
@@ -435,13 +435,13 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 	}
 
 	/*
-	 * Insert new node in tree
+	 * Insert new node in tree.
 	 */
-	if ((fpnp = calloc(sizeof (FullpathNode), 1)) == 0)
+	if ((fpnp = calloc(sizeof (FullPathNode), 1)) == 0)
 		return (0);
 
-	fpnp->fpn_name = name;
-	fpnp->fpn_hash = sgs_str_hash(name);
+	fpnp->fpn_node.pn_name = name;
+	fpnp->fpn_node.pn_hash = sgs_str_hash(name);
 	fpnp->fpn_lmp = lmp;
 
 	if (aplist_append(&FPNODE(lmp), fpnp, AL_CNT_FPNODE) == NULL) {
@@ -455,14 +455,14 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 }
 
 /*
- * Remove an object from the Fullpath AVL tree.  Note, this is called *before*
+ * Remove an object from the FullPath AVL tree.  Note, this is called *before*
  * the objects link-map is torn down (remove_so), which is where any NAME() and
  * PATHNAME() strings will be deallocated.
  */
 void
 fpavl_remove(Rt_map *lmp)
 {
-	FullpathNode	*fpnp;
+	FullPathNode	*fpnp;
 	Aliste		idx;
 
 	for (APLIST_TRAVERSE(FPNODE(lmp), idx, fpnp)) {
@@ -473,6 +473,68 @@ fpavl_remove(Rt_map *lmp)
 	FPNODE(lmp) = NULL;
 }
 
+/*
+ * Determine if a pathname has already been recorded on the not-found AVL tree.
+ * This tree maintains a node for each path name that ld.so.1 has explicitly
+ * inspected, but has failed to load during a single ld.so.1 operation.  If the
+ * path name does not exist in this AVL tree, then the next insertion point is
+ * deposited in "where".  This value can be used by nfavl_insert() to expedite
+ * the insertion.
+ */
+int
+nfavl_recorded(const char *name, avl_index_t *where)
+{
+	PathNode	pn;
+	avl_tree_t	*avlt;
+
+	/*
+	 * Create the avl tree if required.
+	 */
+	if ((avlt = nfavl) == NULL) {
+		if ((avlt = calloc(sizeof (avl_tree_t), 1)) == 0)
+			return (0);
+		avl_create(avlt, pnavl_compare, sizeof (PathNode),
+		    SGSOFFSETOF(PathNode, pn_avl));
+		nfavl = avlt;
+	}
+
+	pn.pn_name = name;
+	pn.pn_hash = sgs_str_hash(name);
+
+	if (avl_find(avlt, &pn, where) == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
+ * Insert a name into the not-found AVL tree.
+ */
+void
+nfavl_insert(const char *name, avl_index_t where)
+{
+	PathNode	*pnp;
+
+	if (where == 0) {
+		/* LINTED */
+		int	in_nfavl = nfavl_recorded(name, &where);
+
+		/*
+		 * We better not get a hit now, we do not want duplicates in
+		 * the tree.
+		 */
+		ASSERT(in_nfavl == 0);
+	}
+
+	/*
+	 * Insert new node in tree.
+	 */
+	if ((pnp = calloc(sizeof (PathNode), 1)) != 0) {
+		pnp->pn_name = name;
+		pnp->pn_hash = sgs_str_hash(name);
+		avl_insert(nfavl, pnp, where);
+	}
+}
 
 /*
  * Prior to calling an object, either via a .plt or through dlsym(), make sure
@@ -484,9 +546,9 @@ fpavl_remove(Rt_map *lmp)
  * provides for dynamic .init firing.
  */
 void
-is_dep_init(Rt_map * dlmp, Rt_map * clmp)
+is_dep_init(Rt_map *dlmp, Rt_map *clmp)
 {
-	Rt_map **	tobj;
+	Rt_map	**tobj;
 
 	/*
 	 * If the caller is an auditor, and the destination isn't, then don't
@@ -541,7 +603,7 @@ is_dep_init(Rt_map * dlmp, Rt_map * clmp)
  *	block (see comments in load_completion()).
  */
 void
-is_dep_ready(Rt_map * dlmp, Rt_map * clmp, int what)
+is_dep_ready(Rt_map *dlmp, Rt_map *clmp, int what)
 {
 	thread_t	tid;
 
@@ -606,9 +668,9 @@ call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
  * (by default) will have been sorted.
  */
 void
-call_init(Rt_map ** tobj, int flag)
+call_init(Rt_map **tobj, int flag)
 {
-	Rt_map **	_tobj, ** _nobj;
+	Rt_map		**_tobj, **_nobj;
 	static List	pending = { NULL, NULL };
 
 	/*
@@ -626,8 +688,8 @@ call_init(Rt_map ** tobj, int flag)
 	 * Traverse the tobj array firing each objects init.
 	 */
 	for (_tobj = _nobj = tobj, _nobj++; *_tobj != NULL; _tobj++, _nobj++) {
-		Rt_map *	lmp = *_tobj;
-		void (*		iptr)() = INIT(lmp);
+		Rt_map	*lmp = *_tobj;
+		void	(*iptr)() = INIT(lmp);
 
 		if (FLAGS(lmp) & FLG_RT_INITCALL)
 			continue;
@@ -700,8 +762,8 @@ call_init(Rt_map ** tobj, int flag)
 		 */
 		if ((rtld_flags & RT_FL_INITFIRST) &&
 		    ((*_nobj == NULL) || !(FLAGS(*_nobj) & FLG_RT_INITFRST))) {
-			Listnode *	lnp;
-			Rt_map **	pobj;
+			Listnode	*lnp;
+			Rt_map		**pobj;
 
 			rtld_flags &= ~RT_FL_INITFIRST;
 
@@ -809,9 +871,9 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 void
 atexit_fini()
 {
-	Rt_map **	tobj, * lmp;
-	Lm_list *	lml;
-	Listnode *	lnp;
+	Rt_map		**tobj, *lmp;
+	Lm_list		*lml;
+	Listnode	*lnp;
 
 	(void) enter();
 
@@ -821,11 +883,6 @@ atexit_fini()
 	lml->lm_flags |= LML_FLG_ATEXIT;
 	lml->lm_flags &= ~LML_FLG_INTRPOSETSORT;
 	lmp = (Rt_map *)lml->lm_head;
-
-	/*
-	 * Display any objects that haven't been referenced so far.
-	 */
-	unused(lml);
 
 	/*
 	 * Reverse topologically sort the main link-map for .fini execution.
@@ -848,10 +905,7 @@ atexit_fini()
 
 	/*
 	 * Now that all .fini code has been run, see what unreferenced objects
-	 * remain.  Any difference between this and the above unused() would
-	 * indicate an object is only being used for .fini processing, which
-	 * might be fine, but might also indicate an overhead whose removal
-	 * would be worth considering.
+	 * remain.
 	 */
 	unused(lml);
 
@@ -979,7 +1033,7 @@ load_completion(Rt_map *nlmp)
 Listnode *
 list_append(List *lst, const void *item)
 {
-	Listnode *	_lnp;
+	Listnode	*_lnp;
 
 	if ((_lnp = malloc(sizeof (Listnode))) == 0)
 		return (0);
@@ -1004,7 +1058,7 @@ list_append(List *lst, const void *item)
 Listnode *
 list_insert(List *lst, const void *item, Listnode *lnp)
 {
-	Listnode *	_lnp;
+	Listnode	*_lnp;
 
 	if ((_lnp = malloc(sizeof (Listnode))) == (Listnode *)0)
 		return (0);
@@ -1024,7 +1078,7 @@ list_insert(List *lst, const void *item, Listnode *lnp)
 Listnode *
 list_prepend(List * lst, const void * item)
 {
-	Listnode *	_lnp;
+	Listnode	*_lnp;
 
 	if ((_lnp = malloc(sizeof (Listnode))) == (Listnode *)0)
 		return (0);
@@ -2329,8 +2383,8 @@ readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 int
 readenv_config(Rtc_env * envtbl, Addr addr, int aout)
 {
-	Word *	lmflags = &(lml_main.lm_flags);
-	Word *	lmtflags = &(lml_main.lm_tflags);
+	Word	*lmflags = &(lml_main.lm_flags);
+	Word	*lmtflags = &(lml_main.lm_tflags);
 
 	if (envtbl == (Rtc_env *)0)
 		return (0);
@@ -3102,10 +3156,68 @@ enter(void)
 {
 	if (rt_bind_guard(THR_FLG_RTLD)) {
 		(void) rt_mutex_lock(&rtldlock);
-		ld_entry_cnt++;
+		if (rtld_flags & RT_FL_OPERATION)
+			ld_entry_cnt++;
 		return (1);
 	}
 	return (0);
+}
+
+/*
+ * Determine whether a search path has been used.
+ */
+static void
+is_path_used(Lm_list *lml, Word unref, int *nl, Pnode *pnp, const char *obj)
+{
+	for (; pnp; pnp = pnp->p_next) {
+		const char	*fmt, *name;
+
+		if ((pnp->p_len == 0) || (pnp->p_orig & PN_FLG_USED))
+			continue;
+
+		/*
+		 * If this pathname originated from an expanded token, use the
+		 * original for any diagnostic output.
+		 */
+		if ((name = pnp->p_oname) == 0)
+			name = pnp->p_name;
+
+		if (unref == 0) {
+			if ((*nl)++ == 0)
+				DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
+			DBG_CALL(Dbg_unused_path(lml, name, pnp->p_orig,
+			    (pnp->p_orig & PN_FLG_DUPLICAT), obj));
+			continue;
+		}
+
+		/*
+		 * For now, disable any unused search path processing that has
+		 * been triggered for ldd(1).
+		 */
+		if (unref)
+			continue;
+
+		if (pnp->p_orig & LA_SER_LIBPATH) {
+			if (pnp->p_orig & LA_SER_CONFIG) {
+				if (pnp->p_orig & PN_FLG_DUPLICAT)
+					fmt = MSG_INTL(MSG_DUP_LDLIBPATHC);
+				else
+					fmt = MSG_INTL(MSG_USD_LDLIBPATHC);
+			} else {
+				if (pnp->p_orig & PN_FLG_DUPLICAT)
+					fmt = MSG_INTL(MSG_DUP_LDLIBPATH);
+				else
+					fmt = MSG_INTL(MSG_USD_LDLIBPATH);
+			}
+		} else if (pnp->p_orig & LA_SER_RUNPATH) {
+			fmt = MSG_INTL(MSG_USD_RUNPATH);
+		} else
+			continue;
+
+		if ((*nl)++ == 0)
+			(void) printf(MSG_ORIG(MSG_STR_NL));
+		(void) printf(fmt, name, obj);
+	}
 }
 
 /*
@@ -3114,44 +3226,70 @@ enter(void)
  * are unused when RTLD_NOW is in effect should be removed from future builds
  * of an object.  Dependencies that are unused without RTLD_NOW in effect are
  * candidates for lazy-loading.
+ *
  * Unreferenced objects identify objects that are defined as dependencies but
- * are unreferenced by the caller (they may however be referenced by other
- * objects within the process, and therefore don't qualify as completely unused.
+ * are unreferenced by the caller.  These unreferenced objects may however be
+ * referenced by other objects within the process, and therefore don't qualify
+ * as completely unused.  They are still an unnecessary overhead.
+ *
+ * Unreferenced runpaths are also captured under ldd -U, or "unused,detail"
+ * debugging.
  */
 void
 unused(Lm_list *lml)
 {
 	Rt_map		*lmp;
 	int		nl = 0;
-	Word		tracing;
+	Word		unref, unuse;
 
 	/*
 	 * If we're not tracing unused references or dependencies, or debugging
 	 * there's nothing to do.
 	 */
-	tracing = lml->lm_flags & (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED);
+	unref = lml->lm_flags & LML_FLG_TRC_UNREF;
+	unuse = lml->lm_flags & LML_FLG_TRC_UNUSED;
 
-	if ((tracing == 0) && (DBG_ENABLED == 0))
+	if ((unref == 0) && (unuse == 0) && (DBG_ENABLED == 0))
 		return;
+
+	/*
+	 * Detect unused global search paths.
+	 */
+	if (rpl_libdirs)
+		is_path_used(lml, unref, &nl, rpl_libdirs, config->c_name);
+	if (prm_libdirs)
+		is_path_used(lml, unref, &nl, prm_libdirs, config->c_name);
+
+	nl = 0;
+	lmp = lml->lm_head;
+	if (RLIST(lmp))
+		is_path_used(lml, unref, &nl, RLIST(lmp), NAME(lmp));
 
 	/*
 	 * Traverse the link-maps looking for unreferenced or unused
 	 * dependencies.  Ignore the first object on a link-map list, as this
-	 * is effectively always used.
+	 * is always used.
 	 */
-	for (lmp = (Rt_map *)NEXT(lml->lm_head); lmp;
-	    lmp = (Rt_map *)NEXT(lmp)) {
+	nl = 0;
+	for (lmp = (Rt_map *)NEXT(lmp); lmp; lmp = (Rt_map *)NEXT(lmp)) {
+		/*
+		 * Determine if this object contains any runpaths that have
+		 * not been used.
+		 */
+		if (RLIST(lmp))
+			is_path_used(lml, unref, &nl, RLIST(lmp), NAME(lmp));
+
 		/*
 		 * If tracing unreferenced objects, or under debugging,
 		 * determine whether any of this objects callers haven't
 		 * referenced it.
 		 */
-		if ((tracing & LML_FLG_TRC_UNREF) || DBG_ENABLED) {
+		if (unref || DBG_ENABLED) {
 			Bnd_desc	*bdp;
 			Aliste		idx;
 
 			for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
-				Rt_map *	clmp;
+				Rt_map	*clmp;
 
 				if (bdp->b_flags & BND_REFER)
 					continue;
@@ -3162,14 +3300,14 @@ unused(Lm_list *lml)
 
 				/* BEGIN CSTYLED */
 				if (nl++ == 0) {
-					if (tracing & LML_FLG_TRC_UNREF)
+					if (unref)
 					    (void) printf(MSG_ORIG(MSG_STR_NL));
 					else
 					    DBG_CALL(Dbg_util_nl(lml,
 						DBG_NL_STD));
 				}
 
-				if (tracing & LML_FLG_TRC_UNREF)
+				if (unref)
 				    (void) printf(MSG_INTL(MSG_LDD_UNREF_FMT),
 					NAME(lmp), NAME(clmp));
 				else
@@ -3186,20 +3324,20 @@ unused(Lm_list *lml)
 			continue;
 
 		if (nl++ == 0) {
-			if (tracing)
+			if (unref || unuse)
 				(void) printf(MSG_ORIG(MSG_STR_NL));
 			else
 				DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 		}
 		if (CYCGROUP(lmp)) {
-			if (tracing)
+			if (unref || unuse)
 				(void) printf(MSG_INTL(MSG_LDD_UNCYC_FMT),
 				    NAME(lmp), CYCGROUP(lmp));
 			else
 				DBG_CALL(Dbg_unused_file(lml, NAME(lmp), 0,
 				    CYCGROUP(lmp)));
 		} else {
-			if (tracing)
+			if (unref || unuse)
 				(void) printf(MSG_INTL(MSG_LDD_UNUSED_FMT),
 				    NAME(lmp));
 			else
@@ -3445,7 +3583,7 @@ set_environ(Lm_list *lml)
 	SLOOKUP_INIT(sl, MSG_ORIG(MSG_SYM_ENVIRON), lml->lm_head, lml->lm_head,
 	    ld_entry_cnt, 0, 0, 0, 0, LKUP_WEAK);
 
-	if (sym = LM_LOOKUP_SYM(lml->lm_head)(&sl, &dlmp, &binfo)) {
+	if (sym = LM_LOOKUP_SYM(lml->lm_head)(&sl, &dlmp, &binfo, 0)) {
 		lml->lm_environ = (char ***)sym->st_value;
 
 		if (!(FLAGS(dlmp) & FLG_RT_FIXED))

@@ -426,7 +426,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0,
 	    rsymndx, rsym, 0, LKUP_DEFT);
 
-	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
+	if ((nsym = lookup_sym(&sl, &nlmp, &binfo, NULL)) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
 		rtldexit(lml, 1);
@@ -533,7 +533,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
  * the file.
  */
 int
-elf_reloc(Rt_map *lmp, uint_t plt)
+elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 {
 	ulong_t		relbgn, relend, relsiz, basebgn, pltbgn, pltend;
 	ulong_t		roffset, rsymndx, psymndx = 0, etext = ETEXT(lmp);
@@ -832,7 +832,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					    ld_entry_cnt, 0, rsymndx, symref,
 					    rtype, LKUP_STDRELOC);
 
-					symdef = lookup_sym(&sl, &_lmp, &binfo);
+					symdef = lookup_sym(&sl, &_lmp,
+					    &binfo, in_nfavl);
 
 					/*
 					 * If the symbol is not found and the

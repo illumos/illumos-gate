@@ -862,7 +862,7 @@ static const Aud_info aud_info[] = {
 #define	AI_LAPLTEXIT	9
 
 static Addr
-audit_symget(Audit_list *alp, int info)
+audit_symget(Audit_list *alp, int info, int *in_nfavl)
 {
 	Rt_map		*_lmp, *lmp = alp->al_lmp;
 	const char	*sname = MSG_ORIG(aud_info[info].sname);
@@ -878,7 +878,7 @@ audit_symget(Audit_list *alp, int info)
 	SLOOKUP_INIT(sl, sname, lml_rtld.lm_head, lmp, ld_entry_cnt,
 	    0, 0, 0, 0, LKUP_FIRST);
 
-	if (sym = LM_LOOKUP_SYM(lmp)(&sl, &_lmp, &binfo)) {
+	if (sym = LM_LOOKUP_SYM(lmp)(&sl, &_lmp, &binfo, in_nfavl)) {
 		Addr	addr = sym->st_value;
 
 		if (!(FLAGS(lmp) & FLG_RT_FIXED))
@@ -916,7 +916,7 @@ audit_disable(char *name, Rt_map *clmp, Grp_hdl *ghp, Audit_list *alp)
  * a descriptor representing the entry points it provides.
  */
 int
-audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
+audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 {
 	char	*ptr, *next;
 	Lm_list	*clml = LIST(clmp);
@@ -945,7 +945,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 		 */
 		if ((ghp = dlmopen_intn((Lm_list *)LM_ID_NEWLM, ptr,
 		    (RTLD_FIRST | RTLD_GLOBAL | RTLD_WORLD), clmp,
-		    FLG_RT_AUDIT, orig, 0)) == 0) {
+		    FLG_RT_AUDIT, orig)) == 0) {
 			error = audit_disable(ptr, clmp, 0, 0);
 			continue;
 		}
@@ -994,8 +994,8 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 		 * Determine that the symbol exists, finish initializing the
 		 * object, and then call the function.
 		 */
-		if ((alp->al_version =
-		    (uint_t(*)())audit_symget(alp, AI_LAVERSION)) == 0) {
+		if ((alp->al_version = (uint_t(*)())audit_symget(alp,
+		    AI_LAVERSION, in_nfavl)) == 0) {
 			eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_GEN_NOSYM),
 			    MSG_ORIG(MSG_SYM_LAVERSION));
 			error = audit_disable(ptr, clmp, ghp, alp);
@@ -1031,24 +1031,24 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 		/*
 		 * Collect any remaining entry points.
 		 */
-		alp->al_preinit =
-		    (void(*)())audit_symget(alp, AI_LAPREINIT);
-		alp->al_objsearch =
-		    (char *(*)())audit_symget(alp, AI_LAOBJSEARCH);
-		alp->al_objopen =
-		    (uint_t(*)())audit_symget(alp, AI_LAOBJOPEN);
-		alp->al_objfilter =
-		    (int(*)())audit_symget(alp, AI_LAOBJFILTER);
-		alp->al_objclose =
-		    (uint_t(*)())audit_symget(alp, AI_LAOBJCLOSE);
-		alp->al_activity =
-		    (void (*)())audit_symget(alp, AI_LAACTIVITY);
-		alp->al_symbind =
-		    (uintptr_t(*)())audit_symget(alp, AI_LASYMBIND);
-		alp->al_pltenter =
-		    (uintptr_t(*)())audit_symget(alp, AI_LAPLTENTER);
-		alp->al_pltexit =
-		    (uintptr_t(*)())audit_symget(alp, AI_LAPLTEXIT);
+		alp->al_preinit = (void(*)())audit_symget(alp,
+		    AI_LAPREINIT, in_nfavl);
+		alp->al_objsearch = (char *(*)())audit_symget(alp,
+		    AI_LAOBJSEARCH, in_nfavl);
+		alp->al_objopen = (uint_t(*)())audit_symget(alp,
+		    AI_LAOBJOPEN, in_nfavl);
+		alp->al_objfilter = (int(*)())audit_symget(alp,
+		    AI_LAOBJFILTER, in_nfavl);
+		alp->al_objclose = (uint_t(*)())audit_symget(alp,
+		    AI_LAOBJCLOSE, in_nfavl);
+		alp->al_activity = (void (*)())audit_symget(alp,
+		    AI_LAACTIVITY, in_nfavl);
+		alp->al_symbind = (uintptr_t(*)())audit_symget(alp,
+		    AI_LASYMBIND, in_nfavl);
+		alp->al_pltenter = (uintptr_t(*)())audit_symget(alp,
+		    AI_LAPLTENTER, in_nfavl);
+		alp->al_pltexit = (uintptr_t(*)())audit_symget(alp,
+		    AI_LAPLTEXIT, in_nfavl);
 
 		/*
 		 * Collect the individual object flags, and assign this audit

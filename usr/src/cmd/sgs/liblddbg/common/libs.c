@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -105,7 +105,7 @@ Dbg_libs_l(Lm_list *lml, const char *name, const char *path)
 }
 
 void
-Dbg_libs_path(Lm_list *lml, const char *path, Half orig, const char *obj)
+Dbg_libs_path(Lm_list *lml, const char *path, uint_t orig, const char *obj)
 {
 	const char	*fmt;
 

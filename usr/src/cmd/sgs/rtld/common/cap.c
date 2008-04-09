@@ -145,7 +145,7 @@ remove_fdesc(Fdesc *fdp)
  */
 static int
 hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
-    uint_t flags, Rej_desc *rej)
+    uint_t flags, Rej_desc *rej, int *in_nfavl)
 {
 	char		path[PATH_MAX], *dst;
 	const char	*src;
@@ -217,7 +217,8 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		 * point for control keeps the number of stat()'s down, and
 		 * provides a single point for error diagnostics.
 		 */
-		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0) {
+		if (find_path(lml, name, clmp, flags, &fdesc,
+		    &_rej, in_nfavl) == 0) {
 			rejection_inherit(rej, &_rej);
 			if ((rej->rej_name != _rej.rej_name) &&
 			    (_rej.rej_name == name))
@@ -280,7 +281,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 
 static Pnode *
 _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
-    const char *ref, const char *dir, int mode, uint_t flags)
+    const char *ref, const char *dir, int mode, uint_t flags, int *in_nfavl)
 {
 	Alist		*fdalp = NULL;
 	Aliste		idx;
@@ -290,7 +291,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 	int		unused = 0;
 	Rej_desc	rej = { 0 };
 
-	if (hwcap_dir(&fdalp, lml, dir, flmp, flags, &rej) == 0) {
+	if (hwcap_dir(&fdalp, lml, dir, flmp, flags, &rej, in_nfavl) == 0) {
 		remove_rej(&rej);
 		return (0);
 	}
@@ -322,7 +323,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 		DBG_CALL(Dbg_file_filtee(lml, NAME(flmp), fdp->fd_nname, 0));
 
 		nlmp = load_path(lml, nlmco, &fdp->fd_nname, flmp, mode,
-		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej);
+		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej, in_nfavl);
 		remove_fdesc(fdp);
 		if (nlmp == 0)
 			continue;
@@ -393,8 +394,9 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 		/*
 		 * Finish processing the objects associated with this request.
 		 */
-		if (nlmp && ghp && ((analyze_lmc(lml, nlmco, nlmp) == 0) ||
-		    (relocate_lmc(lml, nlmco, flmp, nlmp) == 0)))
+		if (nlmp && ghp &&
+		    ((analyze_lmc(lml, nlmco, nlmp, in_nfavl) == 0) ||
+		    (relocate_lmc(lml, nlmco, flmp, nlmp, in_nfavl) == 0)))
 			nlmp = 0;
 
 		/*
@@ -440,7 +442,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 
 Pnode *
 hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Dyninfo *dip,
-    Rt_map *flmp, const char *ref, int mode, uint_t flags)
+    Rt_map *flmp, const char *ref, int mode, uint_t flags, int *in_nfavl)
 {
 	Pnode		*pnp = *pnpp;
 	const char	*dir = pnp->p_name;
@@ -449,7 +451,7 @@ hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Dyninfo *dip,
 	DBG_CALL(Dbg_cap_hw_filter(flml, dir, flmp));
 
 	if ((pnp = _hwcap_filtees(pnpp, nlmco, nlmc, flmp, ref, dir, mode,
-	    flags)) != 0)
+	    flags, in_nfavl)) != 0)
 		return (pnp);
 
 	/*
@@ -472,7 +474,7 @@ hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Dyninfo *dip,
  */
 Rt_map *
 load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
-    uint_t mode, uint_t flags, Grp_hdl **hdl, Rej_desc *rej)
+    uint_t mode, uint_t flags, Grp_hdl **hdl, Rej_desc *rej, int *in_nfavl)
 {
 	Alist		*fdalp = NULL;
 	Aliste		idx;
@@ -483,7 +485,7 @@ load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
 	/*
 	 * Obtain the sorted list of hardware capabilites objects available.
 	 */
-	if (hwcap_dir(&fdalp, lml, dir, clmp, flags, rej) == 0)
+	if (hwcap_dir(&fdalp, lml, dir, clmp, flags, rej, in_nfavl) == 0)
 		return (0);
 
 	/*
@@ -492,7 +494,7 @@ load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
 	 */
 	for (ALIST_TRAVERSE(fdalp, idx, fdp)) {
 		if ((found == 0) && ((lmp = load_path(lml, lmco, &fdp->fd_nname,
-		    clmp, mode, flags, hdl, fdp, rej)) != 0))
+		    clmp, mode, flags, hdl, fdp, rej, in_nfavl)) != 0))
 			found++;
 
 		/*

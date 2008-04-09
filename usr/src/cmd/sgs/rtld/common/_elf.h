@@ -43,21 +43,23 @@ extern "C" {
 /*
  * Common extern functions for ELF file class.
  */
-extern	int	elf_reloc(Rt_map *, uint_t);
+extern	int	elf_reloc(Rt_map *, uint_t, int *);
 extern	int	elf_reloc_error(Rt_map *, const char *, void *, uint_t);
 extern	void	elf_plt_init(void *, caddr_t);
 extern	int	elf_set_prot(Rt_map *, int);
 extern	Rt_map	*elf_obj_file(Lm_list *, Aliste, const char *, int);
-extern	Rt_map	*elf_obj_fini(Lm_list *, Rt_map *);
+extern	Rt_map	*elf_obj_fini(Lm_list *, Rt_map *, int *);
 extern	int	elf_copy_reloc(char *, Sym *, Rt_map *, void *, Sym *,
 		    Rt_map *, const void *);
-extern	Sym	*elf_find_sym(Slookup *, Rt_map **, uint_t *);
-extern	Sym	*elf_lazy_find_sym(Slookup *, Rt_map **, uint_t *);
-extern	Rt_map	*elf_lazy_load(Rt_map *, Slookup *, uint_t, const char *);
-extern	Sym	*elf_lookup_filtee(Slookup *, Rt_map **, uint_t *, uint_t);
+extern	Sym	*elf_find_sym(Slookup *, Rt_map **, uint_t *, int *);
+extern	Sym	*elf_lazy_find_sym(Slookup *, Rt_map **, uint_t *, int *);
+extern	Rt_map	*elf_lazy_load(Rt_map *, Slookup *, uint_t, const char *,
+		    int *);
+extern	Sym	*elf_lookup_filtee(Slookup *, Rt_map **, uint_t *, uint_t,
+		    int *);
 extern	Rt_map	*elf_new_lm(Lm_list *, const char *, const char *, Dyn *,
 		    ulong_t, ulong_t, Aliste, ulong_t, ulong_t, ulong_t,
-		    ulong_t, Mmap *, uint_t);
+		    ulong_t, Mmap *, uint_t, int *);
 extern	int	elf_rtld_load();
 
 #if	defined(__sparcv9)

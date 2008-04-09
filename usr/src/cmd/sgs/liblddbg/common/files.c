@@ -347,16 +347,29 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 }
 
 void
-Dbg_file_dlopen(Rt_map *clmp, const char *name, int mode)
+Dbg_file_dlopen(Rt_map *clmp, const char *name, int *in_nfavl, int mode)
 {
 	Conv_dl_mode_buf_t	dl_mode_buf;
 	Lm_list			*lml = LIST(clmp);
+	const char		*retry;
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
+	/*
+	 * The core functionality of dlopen() can be called twice.  The first
+	 * attempt can be affected by path names that exist in the "not-found"
+	 * AVL tree.  Should a "not-found" path name be found, a second attempt
+	 * is made to locate the required file (in_nfavl is NULL).  This fall-
+	 * back provides for file system changes while a process executes.
+	 */
+	if (in_nfavl)
+		retry = MSG_ORIG(MSG_STR_EMPTY);
+	else
+		retry = MSG_INTL(MSG_STR_RETRY);
+
 	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DLOPEN), name, NAME(clmp),
+	dbg_print(lml, MSG_INTL(MSG_FIL_DLOPEN), name, NAME(clmp), retry,
 	    conv_dl_mode(mode, 1, &dl_mode_buf));
 }
 

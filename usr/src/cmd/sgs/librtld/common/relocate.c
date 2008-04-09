@@ -282,7 +282,7 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 
 		_bound = _weak = 0;
 		_sym = sym;
-		if ((sym = lookup_sym(&sl, &_lmp, &binfo)) != 0) {
+		if ((sym = lookup_sym(&sl, &_lmp, &binfo, NULL)) != 0) {
 			/*
 			 * Determine from the various relocation requirements
 			 * whether this binding is appropriate.  If we're called

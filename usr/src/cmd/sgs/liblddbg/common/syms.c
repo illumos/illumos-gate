@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -70,13 +70,26 @@ Dbg_syms_ignore_gnuver(Rt_map *lmp, const char *name, Word symndx,
 }
 
 void
-Dbg_syms_dlsym(Rt_map *clmp, const char *sym, const char *next, int flag)
+Dbg_syms_dlsym(Rt_map *clmp, const char *sym, int *in_nfavl, const char *next,
+    int flag)
 {
-	const char	*str, *from = NAME(clmp);
+	const char	*str, *retry, *from = NAME(clmp);
 	Lm_list		*lml = LIST(clmp);
 
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
+
+	/*
+	 * The core functionality of dlsym() can be called twice.  The first
+	 * attempt can be affected by path names that exist in the "not-found"
+	 * AVL tree.  Should a "not-found" path name be found, a second attempt
+	 * is made to locate the required file (in_nfavl is NULL).  This fall-
+	 * back provides for file system changes while a process executes.
+	 */
+	if (in_nfavl)
+		retry = MSG_ORIG(MSG_STR_EMPTY);
+	else
+		retry = MSG_INTL(MSG_STR_RETRY);
 
 	switch (flag) {
 	case DBG_DLSYM_NEXT:
@@ -101,10 +114,10 @@ Dbg_syms_dlsym(Rt_map *clmp, const char *sym, const char *next, int flag)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	if (next == 0)
 		dbg_print(lml, MSG_INTL(MSG_SYM_DLSYM_1),
-		    Dbg_demangle_name(sym), from, str);
+		    Dbg_demangle_name(sym), from, retry, str);
 	else
 		dbg_print(lml, MSG_INTL(MSG_SYM_DLSYM_2),
-		    Dbg_demangle_name(sym), from, next, str);
+		    Dbg_demangle_name(sym), from, next, retry, str);
 }
 
 void

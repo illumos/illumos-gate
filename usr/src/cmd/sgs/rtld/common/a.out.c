@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -139,7 +139,6 @@ aout_fix_name(const char *name, Rt_map *clmp)
 
 	if (pnp->p_name) {
 		pnp->p_len = len;
-		pnp->p_orig = PN_SER_NEEDED;
 		DBG_CALL(Dbg_file_fixname(LIST(clmp), pnp->p_name, name));
 		return (pnp);
 	}
@@ -200,7 +199,7 @@ aout_verify_vers()
  * defined link map the the dlopen list.
  */
 static int
-aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
+aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 {
 	void	*need;
 
@@ -268,8 +267,7 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 				}
 				name = path;
 			}
-			if ((pnp = expand_paths(clmp, name,
-			    PN_SER_NEEDED, 0)) == 0)
+			if ((pnp = expand_paths(clmp, name, 0, 0)) == 0)
 				return (0);
 		} else {
 			/*
@@ -283,7 +281,8 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 
 		DBG_CALL(Dbg_file_needed(clmp, name));
 
-		nlmp = load_one(lml, lmco, pnp, clmp, MODE(clmp), 0, 0);
+		nlmp = load_one(lml, lmco, pnp, clmp, MODE(clmp), 0, 0,
+		    in_nfavl);
 		remove_pnode(pnp);
 		if (((nlmp == 0) || (bind_one(clmp, nlmp, BND_NEEDED) == 0)) &&
 		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
@@ -403,7 +402,7 @@ aout_findsb(const char *aname, Rt_map *lmp, int flag)
 	hval = hval & HASHMASK;
 
 	i = hval % (AOUTDYN(lmp)->v2->ld_buckets == 0 ? RTHS :
-		AOUTDYN(lmp)->v2->ld_buckets);
+	    AOUTDYN(lmp)->v2->ld_buckets);
 	p = LM2LP(lmp)->lp_hash + i;
 
 	if (p->fssymbno != -1)
@@ -441,7 +440,7 @@ aout_findsb(const char *aname, Rt_map *lmp, int flag)
  * iii.	    nuts	->	   .nuts
  */
 Sym *
-aout_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
+aout_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 {
 	char	name[PATH_MAX];
 	Slookup	sl = *slp;
@@ -462,14 +461,15 @@ aout_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * Call the generic lookup routine to cycle through the specified
 	 * link maps.
 	 */
-	return (lookup_sym(&sl, dlmp, binfo));
+	return (lookup_sym(&sl, dlmp, binfo, in_nfavl));
 }
 
 /*
  * Symbol lookup for an a.out format module.
  */
+/* ARGSUSED3 */
 static Sym *
-aout_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
+aout_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*ilmp = slp->sl_imap;
@@ -754,7 +754,7 @@ aout_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info,
 	struct nlist	*sym, *_sym;
 
 	cnt = ((int)LM2LP(lmp)->lp_symstr - (int)LM2LP(lmp)->lp_symtab) /
-		sizeof (struct nlist);
+	    sizeof (struct nlist);
 	sym = LM2LP(lmp)->lp_symtab;
 
 	if (FLAGS(lmp) & FLG_RT_FIXED)
@@ -809,7 +809,8 @@ aout_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info,
  * lookup routine (see lookup_sym():analyze.c).
  */
 Sym *
-aout_dlsym_handle(Grp_hdl * ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
+aout_dlsym_handle(Grp_hdl * ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
+    int *in_nfavl)
 {
 	Sym	*sym;
 	char	buffer[PATH_MAX];
@@ -818,7 +819,7 @@ aout_dlsym_handle(Grp_hdl * ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 	buffer[0] = '_';
 	(void) strcpy(&buffer[1], slp->sl_name);
 
-	if ((sym = dlsym_handle(ghp, slp, _lmp, binfo)) != 0)
+	if ((sym = dlsym_handle(ghp, slp, _lmp, binfo, in_nfavl)) != 0)
 		return (sym);
 
 	/*
@@ -830,5 +831,5 @@ aout_dlsym_handle(Grp_hdl * ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 	sl = *slp;
 	sl.sl_name = (const char *)buffer;
 
-	return (dlsym_handle(ghp, &sl, _lmp, binfo));
+	return (dlsym_handle(ghp, &sl, _lmp, binfo, in_nfavl));
 }

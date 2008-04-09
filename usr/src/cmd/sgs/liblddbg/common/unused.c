@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,4 +80,35 @@ Dbg_unused_file(Lm_list *lml, const char *name, int needstr, uint_t cycle)
 		dbg_print(lml, MSG_INTL(MSG_USD_FILECYCLIC), name, cycle);
 	else
 		dbg_print(lml, MSG_INTL(MSG_USD_FILE), name);
+}
+
+void
+Dbg_unused_path(Lm_list *lml, const char *path, uint_t orig, uint_t dup,
+    const char *obj)
+{
+	const char	*fmt;
+
+	if (DBG_NOTCLASS(DBG_C_UNUSED))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	if (orig & LA_SER_LIBPATH) {
+		if (orig & LA_SER_CONFIG) {
+			if (dup)
+				fmt = MSG_INTL(MSG_DUP_LDLIBPATHC);
+			else
+				fmt = MSG_INTL(MSG_USD_LDLIBPATHC);
+		} else {
+			if (dup)
+				fmt = MSG_INTL(MSG_DUP_LDLIBPATH);
+			else
+				fmt = MSG_INTL(MSG_USD_LDLIBPATH);
+		}
+	} else if (orig & LA_SER_RUNPATH) {
+		fmt = MSG_INTL(MSG_USD_RUNPATH);
+	} else
+		return;
+
+	dbg_print(lml, fmt, path, obj);
 }

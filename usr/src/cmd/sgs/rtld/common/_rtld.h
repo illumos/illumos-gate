@@ -72,13 +72,14 @@ typedef struct fct {
 	int	(*fct_are_u_this)(Rej_desc *);	/* determine type of object */
 	ulong_t	(*fct_entry_pt)(void);		/* get entry point */
 	Rt_map	*(*fct_map_so)(Lm_list *, Aliste, const char *, const char *,
-		    int);			/* map in a shared object */
+		    int, int *);		/* map in a shared object */
 	void	(*fct_unmap_so)(Rt_map *);	/* unmap a shared object */
-	int	(*fct_needed)(Lm_list *, Aliste, Rt_map *);
+	int	(*fct_needed)(Lm_list *, Aliste, Rt_map *, int *);
 						/* determine needed objects */
-	Sym	*(*fct_lookup_sym)(Slookup *, Rt_map **, uint_t *);
+	Sym	*(*fct_lookup_sym)(Slookup *, Rt_map **, uint_t *, int *);
 						/* initialize symbol lookup */
-	int	(*fct_reloc)(Rt_map *, uint_t);	/* relocate shared object */
+	int	(*fct_reloc)(Rt_map *, uint_t, int *);
+						/* relocate shared object */
 	Pnode	*fct_dflt_dirs;			/* list of default dirs to */
 						/*	search */
 	Pnode	*fct_secure_dirs;		/* list of secure dirs to */
@@ -89,8 +90,8 @@ typedef struct fct {
 						/* get shared object */
 	void	(*fct_dladdr)(ulong_t, Rt_map *, Dl_info *, void **, int);
 						/* get symbolic address */
-	Sym	*(*fct_dlsym)(Grp_hdl *, Slookup *, Rt_map **, uint_t *);
-						/* process dlsym request */
+	Sym	*(*fct_dlsym)(Grp_hdl *, Slookup *, Rt_map **, uint_t *,
+		    int *);			/* process dlsym request */
 	int	(*fct_verify_vers)(const char *, Rt_map *, Rt_map *);
 						/* verify versioning (ELF) */
 	int	(*fct_set_prot)(Rt_map *, int);
@@ -279,7 +280,7 @@ typedef struct {
 #define	RT_FL_CONFAPP	0x00000400	/* application specific configuration */
 					/*	cache required */
 #define	RT_FL_DEBUGGER	0x00000800	/* a debugger is monitoring us */
-
+#define	RT_FL_OPERATION	0x00001000	/* start recording operations */
 #define	RT_FL_NEWLOCALE	0x00002000	/* message locale has changed */
 #define	RT_FL_NOBAPLT	0x00004000	/* sparc: don't use ba plt's */
 #define	RT_FL_NOAUXFLTR	0x00008000	/* disable auxiliary filters */
@@ -314,8 +315,8 @@ typedef struct {
 #define	RT_FL2_BINDNOW	0x00000100	/* LD_BIND_NOW in effect */
 #define	RT_FL2_BINDLAZY	0x00000200	/* disable RTLD_NOW (and LD_BIND_NOW) */
 #define	RT_FL2_PLMSETUP	0x00000400	/* primary link-map set up complete */
-#define	RT_FL2_BRANDED	0x00000800	/* Process is branded */
-#define	RT_FL2_NOPLM	0x00001000	/* Process has no primary link map */
+#define	RT_FL2_BRANDED	0x00000800	/* process is branded */
+#define	RT_FL2_NOPLM	0x00001000	/* process has no primary link map */
 
 /*
  * Information flags for env_info.
@@ -340,8 +341,7 @@ typedef struct {
 #define	THR_FLG_RTLD	0x00000001	/* rtldlock bind_guard() flag */
 #define	THR_FLG_MASK	THR_FLG_RTLD	/* mask for all THR_FLG flags */
 
-#define	ROUND(x, a)	(((int)(x) + ((int)(a) - 1)) & \
-				~((int)(a) - 1))
+#define	ROUND(x, a)	(((int)(x) + ((int)(a) - 1)) & ~((int)(a) - 1))
 
 /*
  * Print buffer.
@@ -365,19 +365,19 @@ typedef struct {
  * in link.h).  Definitions here extend the path information to other uses of
  * pathname expansion, and are or'd together with any LA_SER_* flags.
  */
-#define	PN_SER_NEEDED	0x00001000	/* paths define DT_NEEDED entry */
-#define	PN_SER_FILTEE	0x00002000	/* paths define filtees */
-#define	PN_SER_EXTLOAD	0x00004000	/* paths define extra loaded objects */
+#define	PN_FLG_EXTLOAD	0x00001000	/* path defines extra loaded objects */
 					/*	(preload, audit etc.) */
-#define	PN_SER_DLOPEN	0x00008000	/* paths define dlopen() request */
+#define	PN_FLG_UNIQUE	0x00002000	/* ensure path is unique */
+#define	PN_FLG_USED	0x00004000	/* indicate that path is used */
+#define	PN_FLG_DUPLICAT	0x00008000	/* path is a duplicate */
 
-#define	PN_SER_MASK	0x000ff000	/* mask for p_orig incorporation */
+#define	PN_FLG_MASK	0x000ff000	/* mask for p_orig incorporation */
 
 /*
  * Define reserved path tokens.  These are used to prevent various expansions
  * from occurring, and record those expansions that do.  Note that any expansion
  * information is also recorded in the p_orig field of a Pnode, and thus is
- * or'd together with any LA_SER_* flags.
+ * or'd together with any LA_SER, and PN_FLG flags.
  */
 #define	PN_TKN_ORIGIN	0x00100000	/* $ORIGIN expansion has occurred */
 #define	PN_TKN_PLATFORM	0x00200000	/* $PLATFORM expansion has occurred */
@@ -388,6 +388,11 @@ typedef struct {
 
 #define	PN_TKN_MASK	0xfff00000	/* mask for p_orig incorporation */
 
+/*
+ * Additional token expansion information.  Although these flags may be set
+ * within a token data item they are masked off with PN_TKN_MASK prior to any
+ * expansion information being recorded in a Pnode for later diagnostics.
+ */
 #define	TKN_NONE	0x00000001	/* no token expansion has occurred */
 #define	TKN_DOTSLASH	0x00000002	/* path contains a "./" */
 
@@ -495,12 +500,14 @@ extern const char	*nosym_str;	/* MSG_GEN_NOSYM message cache */
 extern ulong_t		hwcap;		/* hardware capabilities */
 extern ulong_t		sfcap;		/* software capabilities */
 
+extern avl_tree_t	*nfavl;		/* not-found AVL path name tree */
+
 /*
  * Function declarations.
  */
 extern void		addfree(void *, size_t);
 extern int		append_alias(Rt_map *, const char *, int *);
-extern int		analyze_lmc(Lm_list *, Aliste, Rt_map *);
+extern int		analyze_lmc(Lm_list *, Aliste, Rt_map *, int *);
 extern Am_ret		anon_map(Lm_list *, caddr_t *, size_t, int, int);
 extern Fct		*are_u_this(Rej_desc *, int, struct stat *,
 			    const char *);
@@ -521,10 +528,10 @@ extern const char	*demangle(const char *);
 extern int		dlclose_intn(Grp_hdl *, Rt_map *);
 extern int		dlclose_core(Grp_hdl *, Rt_map *, Lm_list *);
 extern Sym		*dlsym_handle(Grp_hdl *, Slookup *, Rt_map **,
-			    uint_t *);
+			    uint_t *, int *);
 extern void		*dlsym_intn(void *, const char *, Rt_map *, Rt_map **);
 extern Grp_hdl		*dlmopen_intn(Lm_list *, const char *, int, Rt_map *,
-			    uint_t, uint_t, int *);
+			    uint_t, uint_t);
 extern size_t		doprf(const char *, va_list, Prfbuf *);
 extern int		dowrite(Prfbuf *);
 extern void		dz_init(int);
@@ -550,10 +557,10 @@ extern void		free_hdl(Grp_hdl *, Rt_map *, uint_t);
 extern void		file_notfound(Lm_list *, const char *, Rt_map *,
 			    uint_t, Rej_desc *);
 extern int		find_path(Lm_list *, const char *, Rt_map *, uint_t,
-			    Fdesc *, Rej_desc *);
+			    Fdesc *, Rej_desc *, int *);
 extern int		fpavl_insert(Lm_list *, Rt_map *, const char *,
 			    avl_index_t);
-extern Rt_map		*fpavl_loaded(Lm_list *, const char *, avl_index_t *);
+extern Rt_map		*fpavl_recorded(Lm_list *, const char *, avl_index_t *);
 extern void		fpavl_remove(Rt_map *);
 extern size_t		fullpath(Rt_map *, const char *);
 extern void		fmap_setup();
@@ -566,7 +573,7 @@ extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t,
 extern int		hdl_initialize(Grp_hdl *, Rt_map *, int, int);
 extern int		hwcap_check(Rej_desc *, Ehdr *);
 extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,
-			    Rt_map *, const char *, int, uint_t);
+			    Rt_map *, const char *, int, uint_t, int *);
 extern void		is_dep_ready(Rt_map *, Rt_map *, int);
 extern void		is_dep_init(Rt_map *, Rt_map *);
 extern int		is_sym_interposer(Rt_map *, Sym *);
@@ -582,12 +589,15 @@ extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,
 			    Lm_cntl *);
 extern void		load_completion(Rt_map *);
 extern Rt_map 		*load_hwcap(Lm_list *, Aliste, const char *, Rt_map *,
-			    uint_t, uint_t, Grp_hdl **, Rej_desc *);
+			    uint_t, uint_t, Grp_hdl **, Rej_desc *, int *);
 extern Rt_map		*load_path(Lm_list *, Aliste, const char **, Rt_map *,
-			    int, uint_t, Grp_hdl **, Fdesc *, Rej_desc *);
+			    int, uint_t, Grp_hdl **, Fdesc *, Rej_desc *,
+			    int *);
 extern Rt_map		*load_one(Lm_list *, Aliste, Pnode *, Rt_map *, int,
-			    uint_t, Grp_hdl **);
+			    uint_t, Grp_hdl **, int *);
 extern int		load_trace(Lm_list *, const char **, Rt_map *);
+extern void		nfavl_insert(const char *, avl_index_t);
+extern int		nfavl_recorded(const char *, avl_index_t *);
 extern caddr_t		nu_map(Lm_list *, caddr_t, size_t, int, int);
 extern void		*malloc(size_t);
 extern void		move_data(Rt_map *);
@@ -596,7 +606,8 @@ extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, Word *, Word *, int);
 extern int		readenv_config(Rtc_env *, Addr, int);
 extern void		rejection_inherit(Rej_desc *, Rej_desc *);
-extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *);
+extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *,
+			    int *);
 extern int		relocate_finish(Rt_map *, APlist *, int, int);
 extern void		remove_cntl(Lm_list *, Aliste);
 extern int		remove_hdl(Grp_hdl *, Rt_map *, int *);

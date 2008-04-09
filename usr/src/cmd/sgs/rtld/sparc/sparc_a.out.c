@@ -117,7 +117,7 @@ aout_bndr(caddr_t pc)
 	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0, 0, 0, 0,
 	    LKUP_DEFT);
 
-	if ((sym = aout_lookup_sym(&sl, &nlmp, &binfo)) == 0) {
+	if ((sym = aout_lookup_sym(&sl, &nlmp, &binfo, NULL)) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
 		rtldexit(lml, 1);
@@ -204,7 +204,7 @@ static const uchar_t pc_rel_type[] = {
 };
 
 int
-aout_reloc(Rt_map * lmp, uint_t plt)
+aout_reloc(Rt_map * lmp, uint_t plt, int *in_nfavl)
 {
 	int		k;		/* loop temporary */
 	int		nr;		/* number of relocations */
@@ -282,7 +282,8 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			SLOOKUP_INIT(sl, name, lmp, 0, ld_entry_cnt, 0, 0, 0, 0,
 			    LKUP_STDRELOC);
 
-			if ((sym = aout_lookup_sym(&sl, &_lmp, &binfo)) == 0) {
+			if ((sym = aout_lookup_sym(&sl, &_lmp,
+			    &binfo, in_nfavl)) == 0) {
 				if (lml->lm_flags & LML_FLG_TRC_WARN) {
 					(void)
 					    printf(MSG_INTL(MSG_LDD_SYM_NFOUND),

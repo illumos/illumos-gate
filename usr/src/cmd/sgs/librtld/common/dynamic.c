@@ -71,7 +71,7 @@ update_dynamic(Cache *cache, Cache *_cache, Rt_map *lmp, int flags,
 				 * to, undo any lazy-loading position flag.
 				 */
 				if (dlmp = is_so_loaded(LIST(lmp),
-				    (strs + dyn->d_un.d_val))) {
+				    (strs + dyn->d_un.d_val), NULL)) {
 					Bnd_desc	*bdp;
 					Aliste		idx;
 

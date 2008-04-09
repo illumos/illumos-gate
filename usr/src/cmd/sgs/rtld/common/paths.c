@@ -48,7 +48,7 @@
  * to the specified rule.
  */
 static Pnode *
-get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
+get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 {
 	Pnode *		dirlist = (Pnode *)0;
 	Lm_list *	lml = LIST(lmp);
@@ -74,7 +74,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 		 * be preceded with the appropriate search path information.
 		 */
 		if (rpl_libpath) {
-			Half	mode = LA_SER_LIBPATH;
+			uint_t	mode = (LA_SER_LIBPATH | PN_FLG_UNIQUE);
 
 			/*
 			 * Note, this path may have originated from the users
@@ -128,8 +128,11 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 		 * always call Dbg_libs_path().
 		 */
 		if (prm_libpath) {
-			DBG_CALL(Dbg_libs_path(lml, prm_libpath,
-			    (LA_SER_LIBPATH | LA_SER_CONFIG), config->c_name));
+			uint_t	mode =
+			    (LA_SER_LIBPATH | LA_SER_CONFIG | PN_FLG_UNIQUE);
+
+			DBG_CALL(Dbg_libs_path(lml, prm_libpath, mode,
+			    config->c_name));
 
 			/*
 			 * For ldd(1) -s, indicate the search paths that'll
@@ -153,8 +156,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 				 * be selective over what directories we use.
 				 */
 				prm_libdirs = expand_paths(lmp, prm_libpath,
-				    (LA_SER_LIBPATH | LA_SER_CONFIG),
-				    PN_TKN_HWCAP);
+				    mode, PN_TKN_HWCAP);
 			}
 			dirlist = prm_libdirs;
 		}
@@ -280,7 +282,6 @@ get_next_dir(Pnode ** dirlist, Rt_map * lmp, uint_t flags)
 	 */
 	return (NULL);
 }
-
 
 /*
  * Process a directory (runpath) or filename (needed or filter) string looking
@@ -667,7 +668,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 	 * A path that has been expanded, is typically used to create full
 	 * pathnames for objects that will be opened.  The final pathname is
 	 * resolved to simplify it, and set the stage for possible $ORIGIN
-	 * processing.  Therefore, it's usually unncessary to resolve the path
+	 * processing.  Therefore, it's usually unnecessary to resolve the path
 	 * at this point.  However, if a configuration file, containing
 	 * directory information is in use, then we might need to lookup this
 	 * path in the configuration file.  To keep the number of pathname
@@ -706,7 +707,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
  * Determine whether a pathname is secure.
  */
 static int
-is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
+is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 {
 	Pnode	*sdir = LM_SECURE_DIRS(LIST(clmp)->lm_head);
 	char	buffer[PATH_MAX], *npath;
@@ -741,7 +742,7 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 		 *   .	any relative path
 		 */
 		if (((str == 0) || ((*opath == '/') && (str != opath) &&
-		    ((info & PN_SER_EXTLOAD) == 0))) &&
+		    ((info & PN_FLG_EXTLOAD) == 0))) &&
 		    ((flags & PN_TKN_ORIGIN) == 0))
 			return (1);
 
@@ -786,7 +787,7 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 	 * diagnostic.  Preloaded, or audit libraries generate a warning, as
 	 * the process will run without them.
 	 */
-	if (info & PN_SER_EXTLOAD) {
+	if (info & PN_FLG_EXTLOAD) {
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
 			if ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)
 				(void) printf(MSG_INTL(MSG_LDD_FIL_ILLEGAL),
@@ -832,6 +833,19 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 }
 
 /*
+ * Determine whether a path already exists within the callers Pnode list.
+ */
+inline static uint_t
+is_path_unique(Pnode *pnp, const char *path)
+{
+	for (; pnp; pnp = pnp->p_next) {
+		if (pnp->p_len && (strcmp(pnp->p_name, path) == 0))
+			return (PN_FLG_DUPLICAT);
+	}
+	return (0);
+}
+
+/*
  * Expand one or more pathnames.  This routine is called for all path strings,
  * i.e., NEEDED, rpaths, default search paths, configuration file search paths,
  * filtees, etc.  The path may be a single pathname, or a colon separated list
@@ -851,6 +865,7 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 	char	*str, *olist = 0, *nlist = (char *)list;
 	Pnode	*pnp, *npnp, *opnp;
 	int	fnull = FALSE;	/* TRUE if empty final path segment seen */
+	uint_t	unique = 0;
 
 	for (pnp = opnp = 0, str = nlist; *nlist || fnull; str = nlist) {
 		char	*ostr;
@@ -919,8 +934,36 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 		 * pathname may be necessary.
 		 */
 		if (rtld_flags & RT_FL_SECURE) {
-			if (is_path_secure((const char *)str, clmp, orig,
-			    tkns) == 0) {
+			if (is_path_secure(str, clmp, orig, tkns) == 0) {
+				free(str);
+				continue;
+			}
+		}
+
+		/*
+		 * If required, ensure that the string is unique.  For search
+		 * paths such as LD_LIBRARY_PATH, users often inherit multiple
+		 * paths which result in unnecessary duplication.  Note, if
+		 * we're debugging, any duplicate entry is retained and flagged
+		 * so that the entry can be diagnosed later as part of unused
+		 * processing.
+		 */
+		if (orig & PN_FLG_UNIQUE) {
+			Word	tracing;
+
+			tracing = LIST(clmp)->lm_flags &
+			    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED);
+			unique = is_path_unique(pnp, str);
+
+			/*
+			 * Note, use the debug strings rpl_debug and prm_debug
+			 * as an indicator that debugging has been requested,
+			 * rather than DBG_ENABLE(), as the initial use of
+			 * LD_LIBRARY_PATH occurs in preparation for loading
+			 * our debugging library.
+			 */
+			if ((unique == PN_FLG_DUPLICAT) && (tracing == 0) &&
+			    (rpl_debug == 0) && (prm_debug == 0)) {
 				free(str);
 				continue;
 			}
@@ -938,7 +981,7 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 		else
 			opnp->p_next = npnp;
 
-		if ((orig & PN_SER_MASK) && (tkns & PN_TKN_MASK)) {
+		if (tkns & PN_TKN_MASK) {
 			char	*oname;
 
 			/*
@@ -956,7 +999,7 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 		}
 		npnp->p_name = str;
 		npnp->p_len = len;
-		npnp->p_orig = (orig & (LA_SER_MASK | PN_SER_MASK)) |
+		npnp->p_orig = (orig & LA_SER_MASK) | unique |
 		    (tkns & PN_TKN_MASK);
 
 		opnp = npnp;

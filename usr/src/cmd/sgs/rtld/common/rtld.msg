@@ -243,6 +243,18 @@
 @ MSG_STR_UNKNOWN	"(unknown)"
 @ MSG_STR_NULL		"(null)"
 
+# Unused errors - used by ldd.
+
+@ MSG_USD_LDLIBPATH	"   unused search path=%s  (LD_LIBRARY_PATH)\n"
+@ MSG_DUP_LDLIBPATH	"   unused (duplicate) search path=%s  \
+			 (LD_LIBRARY_PATH)\n"
+@ MSG_USD_LDLIBPATHC	"   unused search path=%s  (configuration \
+			 LD_LIBRARY_PATH - %s)\n"
+@ MSG_DUP_LDLIBPATHC	"   unused (duplicate) search path=%s  (configuration \
+			 LD_LIBRARY_PATH - %s)\n"
+@ MSG_USD_RUNPATH	"   unused search path=%s  (RUNPATH/RPATH from \
+			 file %s)\n"
+
 @ _END_
 
 @ MSG_LDD_FIL_PATH	"\t%s%s%s\n"

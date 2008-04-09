@@ -112,8 +112,8 @@ void	Dbg32_file_dlclose(Lm_list *, const char *, int);
 void	Dbg64_file_dlclose(Lm_list *, const char *, int);
 void	Dbg32_file_dldump(Rt_map *, const char *, int);
 void	Dbg64_file_dldump(Rt_map *, const char *, int);
-void	Dbg32_file_dlopen(Rt_map *, const char *, int);
-void	Dbg64_file_dlopen(Rt_map *, const char *, int);
+void	Dbg32_file_dlopen(Rt_map *, const char *, int *, int);
+void	Dbg64_file_dlopen(Rt_map *, const char *, int *, int);
 void	Dbg32_file_elf(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
 	    ulong_t, const char *, Aliste);
 void	Dbg64_file_elf(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
@@ -172,8 +172,8 @@ void	Dbg32_libs_init(Lm_list *, List *, List *);
 void	Dbg64_libs_init(Lm_list *, List *, List *);
 void	Dbg32_libs_l(Lm_list *, const char *, const char *);
 void	Dbg64_libs_l(Lm_list *, const char *, const char *);
-void	Dbg32_libs_path(Lm_list *, const char *, Half, const char *);
-void	Dbg64_libs_path(Lm_list *, const char *, Half, const char *);
+void	Dbg32_libs_path(Lm_list *, const char *, uint_t, const char *);
+void	Dbg64_libs_path(Lm_list *, const char *, uint_t, const char *);
 void	Dbg32_libs_req(Lm_list *, const char *, const char *, const char *);
 void	Dbg64_libs_req(Lm_list *, const char *, const char *, const char *);
 void	Dbg32_libs_update(Lm_list *, List *, List *);
@@ -346,8 +346,8 @@ void	Dbg32_syms_created(Lm_list *, const char *);
 void	Dbg64_syms_created(Lm_list *, const char *);
 void	Dbg32_syms_discarded(Lm_list *, Sym_desc *);
 void	Dbg64_syms_discarded(Lm_list *, Sym_desc *);
-void	Dbg32_syms_dlsym(Rt_map *, const char *, const char *, int);
-void	Dbg64_syms_dlsym(Rt_map *, const char *, const char *, int);
+void	Dbg32_syms_dlsym(Rt_map *, const char *, int *, const char *, int);
+void	Dbg64_syms_dlsym(Rt_map *, const char *, int *, const char *, int);
 void	Dbg32_syms_entered(Ofl_desc *, Sym *, Sym_desc *);
 void	Dbg64_syms_entered(Ofl_desc *, Sym *, Sym_desc *);
 void	Dbg32_syms_entry(Lm_list *, Elf32_Word, Sym_desc *);
@@ -427,6 +427,10 @@ void	Dbg32_unused_file(Lm_list *, const char *, int, uint_t);
 void	Dbg64_unused_file(Lm_list *, const char *, int, uint_t);
 void    Dbg32_unused_lcinterface(Rt_map *, Rt_map *, int);
 void    Dbg64_unused_lcinterface(Rt_map *, Rt_map *, int);
+void	Dbg32_unused_path(Lm_list *, const char *, uint_t, uint_t,
+	    const char *);
+void	Dbg64_unused_path(Lm_list *, const char *, uint_t, uint_t,
+	    const char *);
 void	Dbg32_unused_sec(Lm_list *, Is_desc *);
 void	Dbg64_unused_sec(Lm_list *, Is_desc *);
 void	Dbg32_unused_unref(Rt_map *, const char *);

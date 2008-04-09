@@ -48,15 +48,17 @@ Lm_list		lml_main =	{ 0 };		/* the `main's link map list */
 Lm_list		lml_rtld =	{ 0 };		/* rtld's link map list */
 
 /*
- * Entrance count.  Each time ld.so.1 is entered this count is bumped.  This
- * value serves to identify the present ld.so.1 operation.  Any ld.so.1
- * operation can result in many symbol lookup requests (ie. loading objects and
- * relocating all symbolic bindings).  This count is used to protect against
- * attempting to re-load a failed lazy load within a single call to ld.so.1,
- * while allowing such attempts across calls.  Should a lazy load fail, the
- * present operation identifier is saved in the current symbol lookup data
+ * Entrance count.  Each time ld.so.1 is entered following initial process
+ * setup, this count is bumped.  This value serves to identify the present
+ * ld.so.1 operation.
+ *
+ * An ld.so.1 operation can result in many symbol lookup requests (i.e., loading
+ * objects and relocating all symbolic bindings).  This count is used to protect
+ * against attempting to re-load a failed lazy load within a single call to
+ * ld.so.1, while allowing such attempts across calls.  Should a lazy load fail,
+ * the present operation identifier is saved in the current symbol lookup data
  * block (Slookup).  Should a lazy load fall back operation be triggered, the
- * identifier in the symbol lookup  block is compared to the current ld.so.1
+ * identifier in the symbol lookup block is compared to the current ld.so.1
  * entry count, and if the two are equal the fall back is skipped.
  *
  * With this count, there is a danger of wrap-around, although as an unsigned
@@ -64,9 +66,9 @@ Lm_list		lml_rtld =	{ 0 };		/* rtld's link map list */
  * 4.3 giga-calls into ld.so.1.  The worst that can occur is that a fall back
  * lazy load isn't triggered.  However, most lazy loads that fail typically
  * continue to fail unless the user takes corrective action (adds the necessary
- * (fixed) dependencies to the system.
+ * (fixed) dependencies to the system).
  */
-ulong_t		ld_entry_cnt = 0;
+ulong_t		ld_entry_cnt = 1;
 
 /*
  * BEGIN: Exposed to rtld_db, don't change without a coordinated handshake with
@@ -90,9 +92,8 @@ static Fmap	_fmap = { 0, 0, 0, 0, 0 };
 Fmap *		fmap = &_fmap;			/* initial file mapping info */
 
 /*
- * Set of integers to track how many of what type of
- * PLT's have been bound.  This is only really interesting
- * for SPARC since ia32 basically just has the one PLT.
+ * Set of integers to track how many of what type of PLT's have been bound.
+ * This is only really interesting for SPARC since ia32 has only one PLT.
  */
 uint32_t	pltcnt21d = 0;
 uint32_t	pltcnt24d = 0;
@@ -100,6 +101,11 @@ uint32_t	pltcntu32 = 0;
 uint32_t	pltcntu44 = 0;
 uint32_t	pltcntfull = 0;
 uint32_t	pltcntfar = 0;
+
+/*
+ * Provide for recording not-found path names.
+ */
+avl_tree_t	*nfavl = NULL;
 
 /*
  * Enable technology (via status flags for RTLD) dependent upon whether we're
