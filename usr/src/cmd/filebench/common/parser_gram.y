@@ -701,8 +701,8 @@ debug_command: FSC_DEBUG FSV_VAL_INT
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	$$->cmd = NULL;
-	filebench_shm->debug_level = $2;
-	if (filebench_shm->debug_level > 9)
+	filebench_shm->shm_debug_level = $2;
+	if (filebench_shm->shm_debug_level > 9)
 		yydebug = 1;
 };
 
@@ -1608,7 +1608,7 @@ main(int argc, char *argv[])
 	ipc_init();
 
 	if (fscriptname)
-		(void) strcpy(filebench_shm->fscriptname, fscriptname);
+		(void) strcpy(filebench_shm->shm_fscriptname, fscriptname);
 
 	flowop_init();
 	stats_init();
@@ -2073,21 +2073,6 @@ parser_flowop_get_attrs(cmd_t *cmd, flowop_t *flowop)
 			    "define flowop: no filename specfied");
 			filebench_shutdown(1);
 		}
-
-		if ((flowop->fo_filename->avd_type == AVD_VAL_STR) ||
-		    (flowop->fo_filename->avd_type == AVD_VARVAL_STR)) {
-			char *name;
-
-			name = avd_get_str(flowop->fo_filename);
-			flowop->fo_fileset = fileset_find(name);
-
-			if (flowop->fo_fileset == NULL) {
-				filebench_log(LOG_ERROR,
-				    "flowop %s: file %s not found",
-				    flowop->fo_name, name);
-				filebench_shutdown(1);
-			}
-		}
 	}
 
 	/* Get the iosize of the op */
@@ -2467,7 +2452,7 @@ parser_proc_create(cmd_t *cmd)
 	}
 
 	/* Release the read lock, allowing threads to start */
-	(void) pthread_rwlock_unlock(&filebench_shm->run_lock);
+	(void) pthread_rwlock_unlock(&filebench_shm->shm_run_lock);
 
 	/* Wait for all threads to start */
 	if (procflow_allstarted() != 0) {
@@ -2537,8 +2522,14 @@ parser_proc_shutdown(cmd_t *cmd)
 static void
 parser_filebench_shutdown(cmd_t *cmd)
 {
+	int f_abort = filebench_shm->shm_f_abort;
+
 	ipc_cleanup();
-	filebench_shutdown(0);
+
+	if (f_abort == FILEBENCH_ABORT_ERROR)
+		filebench_shutdown(1);
+	else
+		filebench_shutdown(0);
 }
 
 /*
@@ -2557,7 +2548,7 @@ parser_pause(int ptime)
 		while (timeslept < ptime) {
 			(void) sleep(1);
 			timeslept++;
-			if (filebench_shm->f_abort)
+			if (filebench_shm->shm_f_abort)
 				break;
 		}
 	} else {
@@ -2566,7 +2557,7 @@ parser_pause(int ptime)
 		while (1) {
 			(void) sleep(1);
 			timeslept++;
-			if (filebench_shm->f_abort)
+			if (filebench_shm->shm_f_abort)
 				break;
 		}
 	}
@@ -2592,7 +2583,7 @@ parser_run(cmd_t *cmd)
 	parser_proc_create(cmd);
 
 	/* check for startup errors */
-	if (filebench_shm->f_abort)
+	if (filebench_shm->shm_f_abort)
 		return;
 
 	filebench_log(LOG_INFO, "Running...");
@@ -2623,7 +2614,7 @@ parser_run_variable(cmd_t *cmd)
 	runtime = avd_get_int(integer);
 
 	/* check for startup errors */
-	if (filebench_shm->f_abort)
+	if (filebench_shm->shm_f_abort)
 		return;
 
 	filebench_log(LOG_INFO, "Running...");
@@ -2719,7 +2710,7 @@ parser_sleep(cmd_t *cmd)
 	int sleeptime;
 
 	/* check for startup errors */
-	if (filebench_shm->f_abort)
+	if (filebench_shm->shm_f_abort)
 		return;
 
 	sleeptime = cmd->cmd_qty;
@@ -2769,7 +2760,7 @@ parser_sleep_variable(cmd_t *cmd)
 	sleeptime = avd_get_int(integer);
 
 	/* check for startup errors */
-	if (filebench_shm->f_abort)
+	if (filebench_shm->shm_f_abort)
 		return;
 
 	filebench_log(LOG_INFO, "Running...");

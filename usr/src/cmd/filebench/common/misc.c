@@ -174,7 +174,7 @@ extern int lex_lineno;
  * and will open it on the first invocation. Other levels
  * print to the stdout device, with the amount of information
  * dependent on the error level and the current error level
- * setting in filebench_shm->debug_level.
+ * setting in filebench_shm->shm_debug_level.
  */
 void filebench_log
 __V((int level, const char *fmt, ...))
@@ -189,11 +189,11 @@ __V((int level, const char *fmt, ...))
 
 	/* open logfile if not already open and writing to it */
 	if ((level == LOG_LOG) &&
-	    (filebench_shm->log_fd < 0)) {
+	    (filebench_shm->shm_log_fd < 0)) {
 		char path[MAXPATHLEN];
 		char *s;
 
-		(void) strcpy(path, filebench_shm->fscriptname);
+		(void) strcpy(path, filebench_shm->shm_fscriptname);
 		if ((s = strstr(path, ".f")))
 			*s = 0;
 		else
@@ -201,7 +201,7 @@ __V((int level, const char *fmt, ...))
 
 		(void) strcat(path, ".csv");
 
-		filebench_shm->log_fd =
+		filebench_shm->shm_log_fd =
 		    open(path, O_RDWR | O_CREAT | O_TRUNC, 0666);
 	}
 
@@ -210,7 +210,7 @@ __V((int level, const char *fmt, ...))
 	 * it gets reported to stdout
 	 */
 	if ((level == LOG_LOG) &&
-	    (filebench_shm->log_fd < 0)) {
+	    (filebench_shm->shm_log_fd < 0)) {
 		(void) snprintf(line, sizeof (line),  "Open logfile failed: %s",
 		    strerror(errno));
 		level = LOG_ERROR;
@@ -218,19 +218,19 @@ __V((int level, const char *fmt, ...))
 
 	/* open dumpfile if not already open and writing to it */
 	if ((level == LOG_DUMP) &&
-	    (*filebench_shm->dump_filename == 0))
+	    (*filebench_shm->shm_dump_filename == 0))
 		return;
 
 	if ((level == LOG_DUMP) &&
-	    (filebench_shm->dump_fd < 0)) {
+	    (filebench_shm->shm_dump_fd < 0)) {
 
-		filebench_shm->dump_fd =
-		    open(filebench_shm->dump_filename,
+		filebench_shm->shm_dump_fd =
+		    open(filebench_shm->shm_dump_filename,
 		    O_RDWR | O_CREAT | O_TRUNC, 0666);
 	}
 
 	if ((level == LOG_DUMP) &&
-	    (filebench_shm->dump_fd < 0)) {
+	    (filebench_shm->shm_dump_fd < 0)) {
 		(void) snprintf(line, sizeof (line), "Open logfile failed: %s",
 		    strerror(errno));
 		level = LOG_ERROR;
@@ -251,7 +251,7 @@ __V((int level, const char *fmt, ...))
 
 	/* Only log greater than debug setting */
 	if ((level != LOG_DUMP) && (level != LOG_LOG) &&
-	    (level > filebench_shm->debug_level))
+	    (level > filebench_shm->shm_debug_level))
 		return;
 
 	now = gethrtime();
@@ -276,27 +276,29 @@ fatal:
 	}
 
 	/* Serialize messages to log */
-	(void) ipc_mutex_lock(&filebench_shm->msg_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_msg_lock);
 
 	if (level == LOG_LOG) {
-		if (filebench_shm->log_fd > 0) {
+		if (filebench_shm->shm_log_fd > 0) {
 			(void) snprintf(buf, sizeof (buf), "%s\n", line);
-			(void) write(filebench_shm->log_fd, buf, strlen(buf));
-			(void) fsync(filebench_shm->log_fd);
-			(void) ipc_mutex_unlock(&filebench_shm->msg_lock);
+			(void) write(filebench_shm->shm_log_fd, buf,
+			    strlen(buf));
+			(void) fsync(filebench_shm->shm_log_fd);
+			(void) ipc_mutex_unlock(&filebench_shm->shm_msg_lock);
 			return;
 		}
 
 	} else if (level == LOG_DUMP) {
-		if (filebench_shm->dump_fd != -1) {
+		if (filebench_shm->shm_dump_fd != -1) {
 			(void) snprintf(buf, sizeof (buf), "%s\n", line);
-			(void) write(filebench_shm->dump_fd, buf, strlen(buf));
-			(void) fsync(filebench_shm->dump_fd);
-			(void) ipc_mutex_unlock(&filebench_shm->msg_lock);
+			(void) write(filebench_shm->shm_dump_fd, buf,
+			    strlen(buf));
+			(void) fsync(filebench_shm->shm_dump_fd);
+			(void) ipc_mutex_unlock(&filebench_shm->shm_msg_lock);
 			return;
 		}
 
-	} else if (filebench_shm->debug_level > LOG_INFO) {
+	} else if (filebench_shm->shm_debug_level > LOG_INFO) {
 		if (level < LOG_INFO)
 			(void) fprintf(stderr, "%5d: ", (int)my_pid);
 		else
@@ -305,7 +307,7 @@ fatal:
 
 	if (level < LOG_INFO) {
 		(void) fprintf(stderr, "%4.3f: %s",
-		    (now - filebench_shm->epoch) / FSECS,
+		    (now - filebench_shm->shm_epoch) / FSECS,
 		    line);
 
 		if (my_procflow == NULL)
@@ -315,13 +317,13 @@ fatal:
 		(void) fflush(stderr);
 	} else {
 		(void) fprintf(stdout, "%4.3f: %s",
-		    (now - filebench_shm->epoch) / FSECS,
+		    (now - filebench_shm->shm_epoch) / FSECS,
 		    line);
 		(void) fprintf(stdout, "\n");
 		(void) fflush(stdout);
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->msg_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_msg_lock);
 }
 
 /*
@@ -331,11 +333,18 @@ fatal:
  */
 void
 filebench_shutdown(int error) {
-	filebench_log(LOG_DEBUG_IMPL, "Shutdown");
-	(void) unlink("/tmp/filebench_shm");
+
+	if (error) {
+		filebench_log(LOG_DEBUG_IMPL, "Shutdown on error");
+		filebench_shm->shm_f_abort = FILEBENCH_ABORT_ERROR;
+	} else {
+		filebench_log(LOG_DEBUG_IMPL, "Shutdown");
+	}
+
 	if (filebench_shm->shm_running)
 		procflow_shutdown();
-	filebench_shm->f_abort = 1;
+
+	(void) unlink("/tmp/filebench_shm");
 	ipc_ismdelete();
 	exit(error);
 }

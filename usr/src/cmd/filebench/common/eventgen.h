@@ -35,6 +35,7 @@
 extern "C" {
 #endif
 
+#define	FB_SEC2NSEC	1000000000UL
 void eventgen_init(void);
 void eventgen_setrate(fbint_t rate);
 var_t *eventgen_ratevar(var_t *var);

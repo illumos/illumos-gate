@@ -191,7 +191,7 @@ procflow_createproc(procflow_t *procflow)
 
 /*
  * Find a procflow of name "name" and instance "instance" on the
- * master procflow list, filebench_shm->proclist. Locks the list
+ * master procflow list, filebench_shm->shm_proclist. Locks the list
  * and scans through it searching for a procflow with matching
  * name and instance number. If found returns a pointer to the
  * procflow, otherwise returns NULL.
@@ -199,12 +199,12 @@ procflow_createproc(procflow_t *procflow)
 static procflow_t *
 procflow_find(char *name, int instance)
 {
-	procflow_t *procflow = filebench_shm->proclist;
+	procflow_t *procflow = filebench_shm->shm_proclist;
 
 	filebench_log(LOG_DEBUG_IMPL, "Find: (%s-%d) proclist = %zx",
 	    name, instance, procflow);
 
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
 	while (procflow) {
 		filebench_log(LOG_DEBUG_IMPL, "Find: (%s-%d) == (%s-%d)",
@@ -214,14 +214,15 @@ procflow_find(char *name, int instance)
 		if ((strcmp(name, procflow->pf_name) == 0) &&
 		    (instance == procflow->pf_instance)) {
 
-			(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_procflow_lock);
 
 			return (procflow);
 		}
 		procflow = procflow->pf_next;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	return (NULL);
 }
@@ -229,7 +230,7 @@ procflow_find(char *name, int instance)
 static int
 procflow_create_all_procs(void)
 {
-	procflow_t *procflow = filebench_shm->proclist;
+	procflow_t *procflow = filebench_shm->shm_proclist;
 	int	ret = 0;
 
 	while (procflow) {
@@ -245,7 +246,7 @@ procflow_create_all_procs(void)
 
 			/* Create processes */
 			newproc =
-			    procflow_define_common(&filebench_shm->proclist,
+			    procflow_define_common(&filebench_shm->shm_proclist,
 			    procflow->pf_name, procflow, i + 1);
 			if (newproc == NULL)
 				ret = -1;
@@ -330,9 +331,9 @@ procflow_exec(char *name, int instance)
 	}
 
 	procflow->pf_running = 0;
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 	filebench_shm->shm_running --;
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	return (ret);
 }
@@ -348,7 +349,7 @@ procflow_exec(char *name, int instance)
 static void *
 procflow_createnwait(void *nothing)
 {
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
 	if (procflow_create_all_procs() == 0)
 		cnw_wait = CNW_DONE;
@@ -358,7 +359,7 @@ procflow_createnwait(void *nothing)
 	if (pthread_cond_signal(&procflow_procs_created) != 0)
 		exit(1);
 
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	/* CONSTCOND */
 	while (1) {
@@ -369,7 +370,7 @@ procflow_createnwait(void *nothing)
 			pthread_exit(0);
 
 		/* if normal shutdown in progress, just quit */
-		if (filebench_shm->f_abort)
+		if (filebench_shm->shm_f_abort)
 			pthread_exit(0);
 
 		if (status.si_code == CLD_EXITED) {
@@ -390,7 +391,7 @@ procflow_createnwait(void *nothing)
 
 		/* nothing running, exit */
 		if (filebench_shm->shm_running == 0) {
-			filebench_shm->f_abort = FILEBENCH_ABORT_RSRC;
+			filebench_shm->shm_f_abort = FILEBENCH_ABORT_RSRC;
 			pthread_exit(0);
 		}
 	}
@@ -409,7 +410,7 @@ procflow_createnwait(void *nothing)
 int
 procflow_init(void)
 {
-	procflow_t *procflow = filebench_shm->proclist;
+	procflow_t *procflow = filebench_shm->shm_proclist;
 	pthread_t tid;
 	int ret = 0;
 
@@ -425,22 +426,22 @@ procflow_init(void)
 	if ((pthread_create(&tid, NULL, procflow_createnwait, NULL)) != 0)
 		return (ret);
 
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
 	if ((ret = pthread_cond_wait(&procflow_procs_created,
-	    &filebench_shm->procflow_lock)) != 0)
+	    &filebench_shm->shm_procflow_lock)) != 0)
 		return (ret);
 
 	if (cnw_wait == CNW_ERROR)
 		ret = -1;
 
 #else /* USE_PROCESS_MODEL */
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
 	ret = procflow_create_all_procs();
 #endif /* USE_PROCESS_MODEL */
 
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	return (ret);
 }
@@ -467,7 +468,7 @@ procflow_wait(pid_t pid)
  * Deletes the designated procflow and all its threadflows except
  * for FLOW_MASTER ones. Waits 10 seconds if the procflow is still
  * running, then kills the associated process. Finally it frees the
- * procflow entity. filebench_shm->procflow_lock must be held on entry.
+ * procflow entity. filebench_shm->shm_procflow_lock must be held on entry.
  *
  * If the designated procflow is not found on the list it returns -1 and
  * the procflow is not deleted. Otherwise it returns 0.
@@ -493,9 +494,11 @@ procflow_delete(procflow_t *procflow, int wait_cnt)
 		    procflow->pf_pid);
 
 		if (wait_cnt) {
-			(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_procflow_lock);
 			(void) sleep(1);
-			(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+			(void) ipc_mutex_lock(
+			    &filebench_shm->shm_procflow_lock);
 			wait_cnt--;
 			continue;
 		}
@@ -514,12 +517,12 @@ procflow_delete(procflow_t *procflow, int wait_cnt)
 	procflow_wait(procflow->pf_pid);
 #endif
 	/* remove entry from proclist */
-	entry = filebench_shm->proclist;
+	entry = filebench_shm->shm_proclist;
 
 	/* unlink procflow entity from proclist */
 	if (entry == procflow) {
 		/* at head of list */
-		filebench_shm->proclist = procflow->pf_next;
+		filebench_shm->shm_proclist = procflow->pf_next;
 	} else {
 		/* search list for procflow */
 		while (entry && entry->pf_next != procflow)
@@ -546,17 +549,17 @@ procflow_delete(procflow_t *procflow, int wait_cnt)
  * anyway after logging the fact. Once pf_running is set
  * to 1 for a given procflow or the timeout is reached,
  * threadflow_allstarted() is called to start the threads.
- * Returns 0 (OK), unless filebench_shm->f_abort is signaled,
+ * Returns 0 (OK), unless filebench_shm->shm_f_abort is signaled,
  * in which case it returns -1.
  */
 int
 procflow_allstarted()
 {
-	procflow_t *procflow = filebench_shm->proclist;
+	procflow_t *procflow = filebench_shm->shm_proclist;
 	int running_procs = 0;
 	int ret = 0;
 
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
 	(void) sleep(1);
 
@@ -571,8 +574,9 @@ procflow_allstarted()
 
 		waits = 10;
 		while (waits && procflow->pf_running == 0) {
-			(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
-			if (filebench_shm->f_abort == 1)
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_procflow_lock);
+			if (filebench_shm->shm_f_abort == 1)
 				return (-1);
 
 			if (waits < 3)
@@ -584,7 +588,8 @@ procflow_allstarted()
 
 			(void) sleep(3);
 			waits--;
-			(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+			(void) ipc_mutex_lock(
+			    &filebench_shm->shm_procflow_lock);
 		}
 
 		if (waits == 0)
@@ -600,7 +605,7 @@ procflow_allstarted()
 	}
 	filebench_shm->shm_running = running_procs;
 
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 
 	return (ret);
@@ -617,12 +622,12 @@ procflow_allstarted()
 void
 procflow_shutdown(void)
 {
-	procflow_t *procflow = filebench_shm->proclist;
+	procflow_t *procflow = filebench_shm->shm_proclist;
 	int wait_cnt;
 
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 	filebench_shm->shm_running = 0;
-	filebench_shm->f_abort = 1;
+	filebench_shm->shm_f_abort = 1;
 	wait_cnt = SHUTDOWN_WAIT_SECONDS;
 
 	while (procflow) {
@@ -642,9 +647,9 @@ procflow_shutdown(void)
 			wait_cnt--;
 	}
 
-	filebench_shm->f_abort = 0;
+	filebench_shm->shm_f_abort = 0;
 
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 }
 
 
@@ -657,7 +662,7 @@ procflow_shutdown(void)
  * procflow, or NULL if a name isn't supplied or the procflow
  * entity cannot be allocated.
  *
- * The calling routine must hold the filebench_shm->procflow_lock.
+ * The calling routine must hold the filebench_shm->shm_procflow_lock.
  */
 static procflow_t *
 procflow_define_common(procflow_t **list, char *name,
@@ -684,7 +689,7 @@ procflow_define_common(procflow_t **list, char *name,
 	filebench_log(LOG_DEBUG_IMPL, "defining process %s-%d", name, instance);
 
 	filebench_log(LOG_DEBUG_IMPL, "process %s-%d proclist %zx",
-	    name, instance, filebench_shm->proclist);
+	    name, instance, filebench_shm->shm_proclist);
 	/* Add procflow to list, lock is being held already */
 	if (*list == NULL) {
 		*list = procflow;
@@ -694,14 +699,14 @@ procflow_define_common(procflow_t **list, char *name,
 		*list = procflow;
 	}
 	filebench_log(LOG_DEBUG_IMPL, "process %s-%d proclist %zx",
-	    name, instance, filebench_shm->proclist);
+	    name, instance, filebench_shm->shm_proclist);
 
 	return (procflow);
 }
 
 /*
  * Create an in-memory process object as described by the syntax.
- * Acquires the filebench_shm->procflow_lock and calls
+ * Acquires the filebench_shm->shm_procflow_lock and calls
  * procflow_define_common() to create and initialize a
  * FLOW_MASTER procflow entity from the optional "inherit"
  * procflow with the given name and configured for "instances"
@@ -713,13 +718,13 @@ procflow_define(char *name, procflow_t *inherit, avd_t instances)
 {
 	procflow_t *procflow;
 
-	(void) ipc_mutex_lock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
-	procflow = procflow_define_common(&filebench_shm->proclist,
+	procflow = procflow_define_common(&filebench_shm->shm_proclist,
 	    name, inherit, FLOW_MASTER);
 	procflow->pf_instances = instances;
 
-	(void) ipc_mutex_unlock(&filebench_shm->procflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	return (procflow);
 }

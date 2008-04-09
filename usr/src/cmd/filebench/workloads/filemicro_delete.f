@@ -44,13 +44,13 @@ define process name=filedelete,instances=1
 {
   thread name=filedeletethread,memsize=10m,instances=$nthreads
   {
-    flowop deletefile name=deletefile1,filesetname=bigfileset,fd=1
+    flowop deletefile name=deletefile1,filesetname=bigfileset
     flowop opslimit name=limit
     flowop finishoncount name=finish,value=$count
   }
 }
 
-echo  "FileMicro-Delete Version 2.2 personality successfully loaded"
+echo  "FileMicro-Delete Version 2.3 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$count=<value>       defaults to $count"
 usage "       set \$filesize=<size>     defaults to $filesize"

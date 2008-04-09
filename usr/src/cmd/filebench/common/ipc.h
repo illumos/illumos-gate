@@ -80,51 +80,51 @@ extern "C" {
 #define	FILEBENCH_MODE_QALLDONE	0x2
 
 typedef struct filebench_shm {
-	pthread_mutex_t fileset_lock;
-	pthread_mutex_t procflow_lock;
-	pthread_mutex_t threadflow_lock;
-	pthread_mutex_t flowop_lock;
-	pthread_mutex_t msg_lock;
+	pthread_mutex_t shm_fileset_lock;
+	pthread_mutex_t shm_procflow_lock;
+	pthread_mutex_t shm_threadflow_lock;
+	pthread_mutex_t shm_flowop_lock;
+	pthread_mutex_t shm_msg_lock;
 	pthread_mutex_t shm_malloc_lock;
 	pthread_mutex_t shm_ism_lock;
-	pthread_rwlock_t run_lock;
-	pthread_rwlock_t flowop_find_lock;
+	pthread_rwlock_t shm_run_lock;
+	pthread_rwlock_t shm_flowop_find_lock;
 
 	char		*shm_string_ptr;
 	char		*shm_path_ptr;
-	fileset_t	*filesetlist;
-	flowop_t	*flowoplist;
-	procflow_t	*proclist;
-	var_t		*var_list;
-	var_t		*var_dyn_list;
+	fileset_t	*shm_filesetlist;
+	flowop_t	*shm_flowoplist;
+	procflow_t	*shm_proclist;
+	var_t		*shm_var_list;
+	var_t		*shm_var_dyn_list;
 	randdist_t	*shm_rand_list;
-	int		debug_level;
-	hrtime_t	epoch;
+	int		shm_debug_level;
+	hrtime_t	shm_epoch;
 	hrtime_t	shm_starttime;
-	int		bequiet;
-	key_t		semkey;
-	int		seminit;
-	int		semid_seq;
-	int		utid;
-	int		log_fd;
-	int		dump_fd;
-	char		dump_filename[MAXPATHLEN];
-	pthread_mutex_t	eventgen_lock;
-	pthread_cond_t	eventgen_cv;
-	int		eventgen_hz;
-	uint64_t	eventgen_q;
-	char		fscriptname[1024];
+	int		shm_bequiet;
+	key_t		shm_semkey;
+	int		shm_sys_semid;
+	int		shm_utid;
+	int		shm_log_fd;
+	int		shm_dump_fd;
+	char		shm_dump_filename[MAXPATHLEN];
+	pthread_mutex_t	shm_eventgen_lock;
+	pthread_cond_t	shm_eventgen_cv;
+	int		shm_eventgen_hz;
+	uint64_t	shm_eventgen_q;
+	char		shm_fscriptname[1024];
 	int		shm_id;
 	size_t		shm_required;
 	size_t		shm_allocated;
 	caddr_t		shm_addr;
 	char		*shm_ptr;
 	int		shm_running;
-	int		f_abort;
+	int		shm_f_abort;
 	int		shm_rmode;
 	int		shm_1st_err;
 	int		shm_bitmap[FILEBENCH_TYPES][FILEBENCH_MAXBITMAP];
 	int		shm_lastbitmapindex[FILEBENCH_TYPES];
+	char		shm_semids[FILEBENCH_NSEMS];
 
 	int		shm_marker;
 
@@ -138,7 +138,6 @@ typedef struct filebench_shm {
 	randdist_t	shm_randdist[FILEBENCH_NRANDDISTS];
 	struct avd	shm_avd_ptrs[FILEBENCH_NVARS * 2];
 	char		shm_strings[FILEBENCH_STRINGMEMORY];
-	char		semids[FILEBENCH_NSEMS];
 } filebench_shm_t;
 
 extern char *shmpath;

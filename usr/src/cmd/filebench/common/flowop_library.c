@@ -321,14 +321,20 @@ static int
 flowoplib_fdnum(threadflow_t *threadflow, flowop_t *flowop)
 {
 	fbint_t	entries;
+	int fdnumber = flowop->fo_fdnumber;
 
 	/* If the script sets the fd explicitly */
-	if (flowop->fo_fdnumber > 0)
-		return (flowop->fo_fdnumber);
+	if (fdnumber > 0)
+		return (fdnumber);
 
 	/* If the flowop defaults to persistent fd */
 	if (!avd_get_bool(flowop->fo_rotatefd))
-		return (flowop->fo_fdnumber);
+		return (fdnumber);
+
+	if (flowop->fo_fileset == NULL) {
+		filebench_log(LOG_ERROR, "flowop NULL file");
+		return (FILEBENCH_ERROR);
+	}
 
 	entries = flowop->fo_fileset->fs_constentries;
 
@@ -988,7 +994,7 @@ static int
 flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 {
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == 0)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -998,16 +1004,17 @@ flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 	}
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->eventgen_hz) {
-		(void) ipc_mutex_lock(&filebench_shm->eventgen_lock);
-		if (filebench_shm->eventgen_q > 0) {
-			filebench_shm->eventgen_q--;
-			(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+	while (filebench_shm->shm_eventgen_hz) {
+		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
+		if (filebench_shm->shm_eventgen_q > 0) {
+			filebench_shm->shm_eventgen_q--;
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_eventgen_lock);
 			break;
 		}
-		(void) pthread_cond_wait(&filebench_shm->eventgen_cv,
-		    &filebench_shm->eventgen_lock);
-		(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+		(void) pthread_cond_wait(&filebench_shm->shm_eventgen_cv,
+		    &filebench_shm->shm_eventgen_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_eventgen_lock);
 	}
 	flowop_endop(threadflow, flowop, 0);
 	return (FILEBENCH_OK);
@@ -1027,7 +1034,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == 0)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1061,18 +1068,19 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	events = iops;
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->eventgen_hz) {
+	while (filebench_shm->shm_eventgen_hz) {
 
-		(void) ipc_mutex_lock(&filebench_shm->eventgen_lock);
-		if (filebench_shm->eventgen_q >= events) {
-			filebench_shm->eventgen_q -= events;
-			(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
+		if (filebench_shm->shm_eventgen_q >= events) {
+			filebench_shm->shm_eventgen_q -= events;
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_eventgen_lock);
 			flowop->fo_tputbucket += events;
 			break;
 		}
-		(void) pthread_cond_wait(&filebench_shm->eventgen_cv,
-		    &filebench_shm->eventgen_lock);
-		(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+		(void) pthread_cond_wait(&filebench_shm->shm_eventgen_cv,
+		    &filebench_shm->shm_eventgen_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_eventgen_lock);
 	}
 	flowop_endop(threadflow, flowop, 0);
 
@@ -1093,7 +1101,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == 0)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1126,17 +1134,18 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	events = ops;
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->eventgen_hz) {
-		(void) ipc_mutex_lock(&filebench_shm->eventgen_lock);
-		if (filebench_shm->eventgen_q >= events) {
-			filebench_shm->eventgen_q -= events;
-			(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+	while (filebench_shm->shm_eventgen_hz) {
+		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
+		if (filebench_shm->shm_eventgen_q >= events) {
+			filebench_shm->shm_eventgen_q -= events;
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_eventgen_lock);
 			flowop->fo_tputbucket += events;
 			break;
 		}
-		(void) pthread_cond_wait(&filebench_shm->eventgen_cv,
-		    &filebench_shm->eventgen_lock);
-		(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+		(void) pthread_cond_wait(&filebench_shm->shm_eventgen_cv,
+		    &filebench_shm->shm_eventgen_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_eventgen_lock);
 	}
 	flowop_endop(threadflow, flowop, 0);
 
@@ -1159,7 +1168,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == 0)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1196,17 +1205,18 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	    (u_longlong_t)bytes, (u_longlong_t)events);
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->eventgen_hz) {
-		(void) ipc_mutex_lock(&filebench_shm->eventgen_lock);
-		if (filebench_shm->eventgen_q >= events) {
-			filebench_shm->eventgen_q -= events;
-			(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+	while (filebench_shm->shm_eventgen_hz) {
+		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
+		if (filebench_shm->shm_eventgen_q >= events) {
+			filebench_shm->shm_eventgen_q -= events;
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_eventgen_lock);
 			flowop->fo_tputbucket += (events * MB);
 			break;
 		}
-		(void) pthread_cond_wait(&filebench_shm->eventgen_cv,
-		    &filebench_shm->eventgen_lock);
-		(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+		(void) pthread_cond_wait(&filebench_shm->shm_eventgen_cv,
+		    &filebench_shm->shm_eventgen_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_eventgen_lock);
 	}
 	flowop_endop(threadflow, flowop, 0);
 
@@ -1295,7 +1305,7 @@ flowoplib_semblock_init(flowop_t *flowop)
 {
 
 #ifdef HAVE_SYSV_SEM
-	int semid;
+	int sys_semid;
 	struct sembuf sbuf[2];
 	int highwater;
 
@@ -1307,16 +1317,7 @@ flowoplib_semblock_init(flowop_t *flowop)
 	filebench_log(LOG_DEBUG_IMPL, "flow %s-%d semblock init semid=%x",
 	    flowop->fo_name, flowop->fo_instance, flowop->fo_semid_lw);
 
-	/*
-	 * Raise the number of the hw queue, causing the posting side to
-	 * block if queue is > 2 x blocking value
-	 */
-	if ((semid = semget(filebench_shm->semkey, FILEBENCH_NSEMS, 0)) == -1) {
-		filebench_log(LOG_ERROR, "semblock init lookup %x failed: %s",
-		    filebench_shm->semkey,
-		    strerror(errno));
-		return (FILEBENCH_ERROR);
-	}
+	sys_semid = filebench_shm->shm_sys_semid;
 
 	if ((highwater = flowop->fo_semid_hw) == 0)
 		highwater = flowop->fo_constvalue; /* use constant value */
@@ -1326,7 +1327,7 @@ flowoplib_semblock_init(flowop_t *flowop)
 	sbuf[0].sem_num = (short)highwater;
 	sbuf[0].sem_op = avd_get_int(flowop->fo_highwater);
 	sbuf[0].sem_flg = 0;
-	if ((semop(semid, &sbuf[0], 1) == -1) && errno) {
+	if ((semop(sys_semid, &sbuf[0], 1) == -1) && errno) {
 		filebench_log(LOG_ERROR, "semblock init post failed: %s (%d,"
 		    "%d)", strerror(errno), sbuf[0].sem_num, sbuf[0].sem_op);
 		return (FILEBENCH_ERROR);
@@ -1356,6 +1357,8 @@ flowoplib_semblock_destruct(flowop_t *flowop)
 #ifdef HAVE_SYSV_SEM
 	ipc_semidfree(flowop->fo_semid_lw);
 	ipc_semidfree(flowop->fo_semid_hw);
+	(void) semctl(filebench_shm->shm_sys_semid, 0, IPC_RMID);
+	filebench_shm->shm_sys_semid = -1;
 #else
 	sem_destroy(&flowop->fo_sem);
 #endif /* HAVE_SYSV_SEM */
@@ -1374,19 +1377,14 @@ flowoplib_semblock(threadflow_t *threadflow, flowop_t *flowop)
 #ifdef HAVE_SYSV_SEM
 	struct sembuf sbuf[2];
 	int value = avd_get_int(flowop->fo_value);
-	int semid;
+	int sys_semid;
 	struct timespec timeout;
 
-	if ((semid = semget(filebench_shm->semkey, FILEBENCH_NSEMS, 0)) == -1) {
-		filebench_log(LOG_ERROR, "lookup semop %x failed: %s",
-		    filebench_shm->semkey,
-		    strerror(errno));
-		return (FILEBENCH_ERROR);
-	}
+	sys_semid = filebench_shm->shm_sys_semid;
 
 	filebench_log(LOG_DEBUG_IMPL,
 	    "flow %s-%d sem blocking on id %x num %x value %d",
-	    flowop->fo_name, flowop->fo_instance, semid,
+	    flowop->fo_name, flowop->fo_instance, sys_semid,
 	    flowop->fo_semid_hw, value);
 
 	/* Post, decrement the increment the hw queue */
@@ -1405,11 +1403,11 @@ flowoplib_semblock(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_beginop(threadflow, flowop);
 
 #ifdef HAVE_SEMTIMEDOP
-	(void) semtimedop(semid, &sbuf[0], 1, &timeout);
-	(void) semtimedop(semid, &sbuf[1], 1, &timeout);
+	(void) semtimedop(sys_semid, &sbuf[0], 1, &timeout);
+	(void) semtimedop(sys_semid, &sbuf[1], 1, &timeout);
 #else
-	(void) semop(semid, &sbuf[0], 1);
-	(void) semop(semid, &sbuf[1], 1);
+	(void) semop(sys_semid, &sbuf[0], 1);
+	(void) semop(sys_semid, &sbuf[1], 1);
 #endif /* HAVE_SEMTIMEDOP */
 
 	if (avd_get_bool(flowop->fo_blocking))
@@ -1499,7 +1497,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 	while (target) {
 #ifdef HAVE_SYSV_SEM
 		struct sembuf sbuf[2];
-		int semid;
+		int sys_semid;
 		int blocking;
 #else
 		int i;
@@ -1520,15 +1518,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 		    target->fo_instance,
 		    target->fo_semid_lw);
 
-		if ((semid = semget(filebench_shm->semkey,
-		    FILEBENCH_NSEMS, 0)) == -1) {
-			filebench_log(LOG_ERROR,
-			    "lookup semop %x failed: %s",
-			    filebench_shm->semkey,
-			    strerror(errno));
-			return (FILEBENCH_ERROR);
-		}
-
+		sys_semid = filebench_shm->shm_sys_semid;
 		sbuf[0].sem_num = target->fo_semid_lw;
 		sbuf[0].sem_op = (short)value;
 		sbuf[0].sem_flg = 0;
@@ -1544,10 +1534,10 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 			blocking = 0;
 
 #ifdef HAVE_SEMTIMEDOP
-		if ((semtimedop(semid, &sbuf[0], blocking + 1,
+		if ((semtimedop(sys_semid, &sbuf[0], blocking + 1,
 		    &timeout) == -1) && (errno && (errno != EAGAIN))) {
 #else
-		if ((semop(semid, &sbuf[0], blocking + 1) == -1) &&
+		if ((semop(sys_semid, &sbuf[0], blocking + 1) == -1) &&
 		    (errno && (errno != EAGAIN))) {
 #endif /* HAVE_SEMTIMEDOP */
 			filebench_log(LOG_ERROR, "semop post failed: %s",
@@ -1641,6 +1631,11 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 	char *fileset_name;
 	int tid = 0;
 
+	if (flowop->fo_fileset == NULL) {
+		filebench_log(LOG_ERROR, "flowop NULL file");
+		return (FILEBENCH_ERROR);
+	}
+
 	if ((fileset_name =
 	    avd_get_str(flowop->fo_fileset->fs_name)) == NULL) {
 		filebench_log(LOG_ERROR,
@@ -1659,11 +1654,6 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted to open without closing on fd %d",
 		    flowop->fo_name, fd);
-		return (FILEBENCH_ERROR);
-	}
-
-	if (flowop->fo_fileset == NULL) {
-		filebench_log(LOG_ERROR, "flowop NULL file");
 		return (FILEBENCH_ERROR);
 	}
 
@@ -1807,8 +1797,10 @@ flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
 }
 
 /*
- * Emulates delete of a file. Picks an arbitrary filesetentry
- * whose file exists and uses unlink() to delete it. Clears
+ * Emulates delete of a file. If a valid fd is provided, it uses the
+ * filesetentry stored at that fd location to select the file to be
+ * deleted, otherwise it picks an arbitrary filesetentry
+ * whose file exists. It then uses unlink() to delete it and Clears
  * the FSE_EXISTS flag for the filesetentry. Returns FILEBENCH_ERROR if the
  * flowop has no associated fileset. Returns FILEBENCH_NORSC if an appropriate
  * filesetentry cannot be found, and FILEBENCH_OK on success.
@@ -1820,17 +1812,38 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	fileset_t *fileset;
 	char path[MAXPATHLEN];
 	char *pathtmp;
+	int fd = flowop->fo_fdnumber;
 
-	if (flowop->fo_fileset == NULL) {
+	/* if fd specified, use it to access file */
+	if ((fd > 0) && ((file = threadflow->tf_fse[fd]) != NULL)) {
+
+		/* check whether file still open */
+		if (threadflow->tf_fd[fd] > 0) {
+			filebench_log(LOG_DEBUG_SCRIPT,
+			    "flowop %s deleting still open file at fd = %d",
+			    flowop->fo_name, fd);
+		}
+
+		/* indicate that the file will be deleted */
+		threadflow->tf_fse[fd] = NULL;
+
+		/* if here, we still have a valid file pointer */
+		fileset = file->fse_fileset;
+	} else {
+		/* Otherwise, pick arbitrary file */
+		file = NULL;
+		fileset = flowop->fo_fileset;
+	}
+
+
+	if (fileset == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
 		return (FILEBENCH_ERROR);
 	}
 
-	fileset = flowop->fo_fileset;
-
 #ifdef HAVE_RAW_SUPPORT
 	/* can't be used with raw devices */
-	if (flowop->fo_fileset->fs_attrs & FILESET_IS_RAW_DEV) {
+	if (fileset->fs_attrs & FILESET_IS_RAW_DEV) {
 		filebench_log(LOG_ERROR,
 		    "flowop %s attempted a deletefile on RAW device",
 		    flowop->fo_name);
@@ -1838,11 +1851,15 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
-	if ((file = fileset_pick(flowop->fo_fileset,
-	    FILESET_PICKEXISTS, 0)) == NULL) {
-		filebench_log(LOG_DEBUG_SCRIPT, "flowop %s failed to pick file",
-		    flowop->fo_name);
-		return (FILEBENCH_NORSC);
+	if (file == NULL) {
+		if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0))
+		    == NULL) {
+			filebench_log(LOG_DEBUG_SCRIPT,
+			    "flowop %s failed to pick file", flowop->fo_name);
+			return (FILEBENCH_NORSC);
+		}
+	} else {
+		(void) ipc_mutex_lock(&file->fse_lock);
 	}
 
 	*path = 0;
@@ -1967,7 +1984,6 @@ flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
 	file = threadflow->tf_fse[fd];
 
 	threadflow->tf_fd[fd] = 0;
-	threadflow->tf_fse[fd] = NULL;
 
 	filebench_log(LOG_DEBUG_SCRIPT, "closed file %s", file->fse_path);
 
@@ -1989,16 +2005,14 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 	char path[MAXPATHLEN];
 	char *pathtmp;
 
-	if (flowop->fo_fileset == NULL) {
+	if ((fileset = flowop->fo_fileset) == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
 		return (FILEBENCH_ERROR);
 	}
 
-	fileset = flowop->fo_fileset;
-
-	if ((file = fileset_pick(flowop->fo_fileset,
-	    FILESET_PICKEXISTS, 0)) == NULL) {
-		filebench_log(LOG_DEBUG_SCRIPT, "flowop %s failed to pick file",
+	if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0)) == NULL) {
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s failed to pick file",
 		    flowop->fo_name);
 		return (FILEBENCH_NORSC);
 	}
@@ -2043,7 +2057,6 @@ flowoplib_readwholefile(threadflow_t *threadflow, flowop_t *flowop)
 {
 	caddr_t iobuf;
 	off64_t bytes = 0;
-	int fd = flowop->fo_fdnumber;
 	int filedesc;
 	uint64_t wss;
 	fbint_t iosize;
@@ -2084,8 +2097,8 @@ flowoplib_readwholefile(threadflow_t *threadflow, flowop_t *flowop)
 
 	if (ret < 0) {
 		filebench_log(LOG_ERROR,
-		    "Failed to read fd %d: %s",
-		    fd, strerror(errno));
+		    "readwhole fail Failed to read whole file: %s",
+		    strerror(errno));
 		return (FILEBENCH_ERROR);
 	}
 
@@ -2143,8 +2156,7 @@ flowoplib_write(threadflow_t *threadflow, flowop_t *flowop)
 		flowop_endop(threadflow, flowop, iosize);
 	} else {
 		flowop_beginop(threadflow, flowop);
-		if (write(filedesc, iobuf,
-		    iosize) == -1) {
+		if (write(filedesc, iobuf, iosize) == -1) {
 			filebench_log(LOG_ERROR,
 			    "write failed, io buffer %zd: %s",
 			    iobuf, strerror(errno));

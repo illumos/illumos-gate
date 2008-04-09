@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -524,12 +524,13 @@ get_next_tokval(ac_iter_t *iterp)
 }
 
 /*
- * Bind the iterator to filebench_shm->var_list
+ * Bind the iterator to filebench_shm->shm_var_list
  */
+/* ARGSUSED */
 static void
 varname_bind(ac_iter_t *iterp, void *listp, void * nlistpp)
 {
-	iterp->listp = filebench_shm->var_list;
+	iterp->listp = filebench_shm->shm_var_list;
 	iterp->nlistpp = nlistpp;
 }
 
@@ -599,6 +600,7 @@ get_next_rvarname(ac_iter_t *iterp)
  * and contains up-to-date workload file names. The function calls
  * search_loadfiles() to update the cache before the binding.
  */
+/* ARGSUSED */
 static void
 loadfile_bind(ac_iter_t *iterp, void *listp, void * nlistpp)
 {
@@ -711,6 +713,7 @@ search_loadfiles(ac_fname_cache_t *fnamecache)
  * parameters are passed from libtecla library. line points to user input
  * buffer, and word_end is the index of the last character of user input.
  */
+/* ARGSUSED */
 static void
 parse_user_input(const char *line, int word_end, ac_inputline_t *input)
 {
@@ -993,6 +996,7 @@ match_string(WordCompletion *cpl, const char *line, int word_end,
  * string in user input in sequence until either the last string
  * is reached and completed or the the matching fails.
  */
+/* ARGSUSED */
 CPL_MATCH_FN(command_complete)
 {
 	ac_inputline_t inputline;

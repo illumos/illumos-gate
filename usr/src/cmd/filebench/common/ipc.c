@@ -234,20 +234,23 @@ char *shmpath = NULL;
 void
 ipc_seminit(void)
 {
-	key_t key = filebench_shm->semkey;
+	key_t key = filebench_shm->shm_semkey;
+	int sys_semid;
 
 	/* Already done? */
-	if (filebench_shm->seminit)
+	if (filebench_shm->shm_sys_semid >= 0)
 		return;
 
-	if ((semget(key, FILEBENCH_NSEMS, IPC_CREAT |
+	if ((sys_semid = semget(key, FILEBENCH_NSEMS, IPC_CREAT |
 	    S_IRUSR | S_IWUSR)) == -1) {
 		filebench_log(LOG_ERROR,
 		    "could not create sysv semaphore set "
 		    "(need to increase sems?): %s",
 		    strerror(errno));
-		exit(1);
+		filebench_shutdown(1);
 	}
+
+	filebench_shm->shm_sys_semid = sys_semid;
 }
 
 /*
@@ -273,7 +276,7 @@ ipc_init(void)
 	caddr_t c1;
 	caddr_t c2;
 #ifdef HAVE_SEM_RMID
-	int semid;
+	int sys_semid;
 #endif
 
 #ifdef HAVE_MKSTEMP
@@ -321,33 +324,37 @@ ipc_init(void)
 	c2 = (caddr_t)&filebench_shm->shm_marker;
 
 	(void) memset(filebench_shm, 0, c2 - c1);
-	filebench_shm->epoch = gethrtime();
-	filebench_shm->debug_level = LOG_VERBOSE;
+	filebench_shm->shm_epoch = gethrtime();
+	filebench_shm->shm_debug_level = LOG_VERBOSE;
 	filebench_shm->shm_rmode = FILEBENCH_MODE_TIMEOUT;
 	filebench_shm->shm_string_ptr = &filebench_shm->shm_strings[0];
 	filebench_shm->shm_ptr = (char *)filebench_shm->shm_addr;
 	filebench_shm->shm_path_ptr = &filebench_shm->shm_filesetpaths[0];
 
 	/* Setup mutexes for object lists */
-	(void) pthread_mutex_init(&filebench_shm->fileset_lock,
+	(void) pthread_mutex_init(&filebench_shm->shm_fileset_lock,
 	    ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->procflow_lock,
+	(void) pthread_mutex_init(&filebench_shm->shm_procflow_lock,
 	    ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->threadflow_lock,
+	(void) pthread_mutex_init(&filebench_shm->shm_threadflow_lock,
 	    ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->flowop_lock, ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->msg_lock, ipc_mutexattr());
-	(void) pthread_mutex_init(&filebench_shm->eventgen_lock,
+	(void) pthread_mutex_init(&filebench_shm->shm_flowop_lock,
+	    ipc_mutexattr());
+	(void) pthread_mutex_init(&filebench_shm->shm_msg_lock,
+	    ipc_mutexattr());
+	(void) pthread_mutex_init(&filebench_shm->shm_eventgen_lock,
 	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->shm_malloc_lock,
 	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->shm_ism_lock,
 	    ipc_mutexattr());
-	(void) pthread_cond_init(&filebench_shm->eventgen_cv, ipc_condattr());
-	(void) pthread_rwlock_init(&filebench_shm->flowop_find_lock,
+	(void) pthread_cond_init(&filebench_shm->shm_eventgen_cv,
+	    ipc_condattr());
+	(void) pthread_rwlock_init(&filebench_shm->shm_flowop_find_lock,
 	    ipc_rwlockattr());
-	(void) pthread_rwlock_init(&filebench_shm->run_lock, ipc_rwlockattr());
-	(void) pthread_rwlock_rdlock(&filebench_shm->run_lock);
+	(void) pthread_rwlock_init(&filebench_shm->shm_run_lock,
+	    ipc_rwlockattr());
+	(void) pthread_rwlock_rdlock(&filebench_shm->shm_run_lock);
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_ism_lock);
 
@@ -359,14 +366,15 @@ ipc_init(void)
 	}
 
 #ifdef HAVE_SEM_RMID
-	if ((semid = semget(key, 0, 0)) != -1)
-		(void) semctl(semid, 0, IPC_RMID);
+	if ((sys_semid = semget(key, 0, 0)) != -1)
+		(void) semctl(sys_semid, 0, IPC_RMID);
 #endif
 
-	filebench_shm->semkey = key;
-	filebench_shm->log_fd = -1;
-	filebench_shm->dump_fd = -1;
-	filebench_shm->eventgen_hz = 0;
+	filebench_shm->shm_semkey = key;
+	filebench_shm->shm_sys_semid = -1;
+	filebench_shm->shm_log_fd = -1;
+	filebench_shm->shm_dump_fd = -1;
+	filebench_shm->shm_eventgen_hz = 0;
 	filebench_shm->shm_id = -1;
 
 	free(buf);
@@ -660,14 +668,14 @@ ipc_semidalloc(void)
 {
 	int semid;
 
-	for (semid = 0; filebench_shm->semids[semid] == 1; semid++)
+	for (semid = 0; filebench_shm->shm_semids[semid] == 1; semid++)
 		;
 	if (semid == FILEBENCH_NSEMS) {
 		filebench_log(LOG_ERROR,
 		    "Out of semaphores, increase system tunable limit");
 		filebench_shutdown(1);
 	}
-	filebench_shm->semids[semid] = 1;
+	filebench_shm->shm_semids[semid] = 1;
 	return (semid);
 }
 
@@ -678,7 +686,7 @@ ipc_semidalloc(void)
 void
 ipc_semidfree(int semid)
 {
-	filebench_shm->semids[semid] = 0;
+	filebench_shm->shm_semids[semid] = 0;
 }
 
 /*

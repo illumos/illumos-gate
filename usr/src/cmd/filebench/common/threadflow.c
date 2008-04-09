@@ -158,7 +158,7 @@ threadflow_init(procflow_t *procflow)
 	threadflow_t *threadflow = procflow->pf_threads;
 	int ret = 0;
 
-	(void) ipc_mutex_lock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
 
 	(void) signal(SIGUSR1, threadflow_cancel);
 
@@ -197,7 +197,7 @@ threadflow_init(procflow_t *procflow)
 
 	threadflow = procflow->pf_threads;
 
-	(void) ipc_mutex_unlock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_threadflow_lock);
 
 	while (threadflow) {
 		/* wait for all threads to finish */
@@ -313,7 +313,7 @@ threadflow_delete_all(threadflow_t **threadlist, int wait_cnt)
 {
 	threadflow_t *threadflow = *threadlist;
 
-	(void) ipc_mutex_lock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
 
 	filebench_log(LOG_DEBUG_IMPL, "Deleting all threads");
 
@@ -330,7 +330,7 @@ threadflow_delete_all(threadflow_t **threadlist, int wait_cnt)
 			wait_cnt--;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_threadflow_lock);
 }
 
 /*
@@ -343,7 +343,7 @@ threadflow_delete_all(threadflow_t **threadlist, int wait_cnt)
 void
 threadflow_allstarted(pid_t pid, threadflow_t *threadflow)
 {
-	(void) ipc_mutex_lock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
 
 	while (threadflow) {
 		int waits;
@@ -360,9 +360,10 @@ threadflow_allstarted(pid_t pid, threadflow_t *threadflow)
 		    threadflow->tf_instance);
 
 		waits = 10;
-		while (waits && threadflow->tf_running == 0) {
+		while (waits && (threadflow->tf_running == 0) &&
+		    (filebench_shm->shm_f_abort == 0)) {
 			(void) ipc_mutex_unlock(
-			    &filebench_shm->threadflow_lock);
+			    &filebench_shm->shm_threadflow_lock);
 			if (waits < 3)
 				filebench_log(LOG_INFO,
 				    "Waiting for pid %d thread %s-%d",
@@ -371,14 +372,15 @@ threadflow_allstarted(pid_t pid, threadflow_t *threadflow)
 				    threadflow->tf_instance);
 
 			(void) sleep(1);
-			(void) ipc_mutex_lock(&filebench_shm->threadflow_lock);
+			(void) ipc_mutex_lock(
+			    &filebench_shm->shm_threadflow_lock);
 			waits--;
 		}
 
 		threadflow = threadflow->tf_next;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_threadflow_lock);
 }
 
 /*
@@ -392,7 +394,7 @@ threadflow_allstarted(pid_t pid, threadflow_t *threadflow)
  * returned Otherwise a pointer to the newly allocated threadflow
  * is returned.
  *
- * The filebench_shm->threadflow_lock must be held by the caller.
+ * The filebench_shm->shm_threadflow_lock must be held by the caller.
  */
 static threadflow_t *
 threadflow_define_common(procflow_t *procflow, char *name,
@@ -414,7 +416,7 @@ threadflow_define_common(procflow_t *procflow, char *name,
 	else
 		(void) memset(threadflow, 0, sizeof (threadflow_t));
 
-	threadflow->tf_utid = ++filebench_shm->utid;
+	threadflow->tf_utid = ++filebench_shm->shm_utid;
 
 	threadflow->tf_instance = instance;
 	(void) strcpy(threadflow->tf_name, name);
@@ -437,7 +439,7 @@ threadflow_define_common(procflow_t *procflow, char *name,
 
 /*
  * Create an in memory FLOW_MASTER thread object as described
- * by the syntax. Acquire the  filebench_shm->threadflow_lock and
+ * by the syntax. Acquire the  filebench_shm->shm_threadflow_lock and
  * call threadflow_define_common() to create a threadflow entity.
  * Set the number of instances to create at runtime,
  * tf_instances, to "instances". Return the threadflow pointer
@@ -449,7 +451,7 @@ threadflow_define(procflow_t *procflow, char *name,
 {
 	threadflow_t *threadflow;
 
-	(void) ipc_mutex_lock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
 
 	if ((threadflow = threadflow_define_common(procflow, name,
 	    inherit, FLOW_MASTER)) == NULL)
@@ -457,7 +459,7 @@ threadflow_define(procflow_t *procflow, char *name,
 
 	threadflow->tf_instances = instances;
 
-	(void) ipc_mutex_unlock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_threadflow_lock);
 
 	return (threadflow);
 }
@@ -473,20 +475,20 @@ threadflow_find(threadflow_t *threadlist, char *name)
 {
 	threadflow_t *threadflow = threadlist;
 
-	(void) ipc_mutex_lock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
 
 	while (threadflow) {
 		if (strcmp(name, threadflow->tf_name) == 0) {
 
 			(void) ipc_mutex_unlock(
-			    &filebench_shm->threadflow_lock);
+			    &filebench_shm->shm_threadflow_lock);
 
 			return (threadflow);
 		}
 		threadflow = threadflow->tf_next;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->threadflow_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_threadflow_lock);
 
 
 	return (NULL);

@@ -78,7 +78,7 @@ flowop_printlist(flowop_t *list)
 void
 flowop_printall(void)
 {
-	flowop_t *flowop = filebench_shm->flowoplist;
+	flowop_t *flowop = filebench_shm->shm_flowoplist;
 
 	while (flowop) {
 		filebench_log(LOG_VERBOSE, "flowop-list %s-%d",
@@ -300,7 +300,7 @@ flowop_start(threadflow_t *threadflow)
 	flowop->fo_stats.fs_stime = gethrtime();
 
 	/* Hold the flowop find lock as reader to prevent lookups */
-	(void) pthread_rwlock_rdlock(&filebench_shm->flowop_find_lock);
+	(void) pthread_rwlock_rdlock(&filebench_shm->shm_flowop_find_lock);
 
 	/*
 	 * Block until all processes have started, acting like
@@ -312,11 +312,11 @@ flowop_start(threadflow_t *threadflow)
 	 * run_lock, allowing each waiting thread to lock
 	 * and then immediately unlock it, then begin running.
 	 */
-	(void) pthread_rwlock_wrlock(&filebench_shm->run_lock);
-	(void) pthread_rwlock_unlock(&filebench_shm->run_lock);
+	(void) pthread_rwlock_wrlock(&filebench_shm->shm_run_lock);
+	(void) pthread_rwlock_unlock(&filebench_shm->shm_run_lock);
 
 	/* Create the runtime flowops from those defined by the script */
-	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 	while (flowop) {
 		flowop_t *newflowop;
 
@@ -326,16 +326,32 @@ flowop_start(threadflow_t *threadflow)
 		    flowop, 1, 0);
 		if (newflowop == NULL)
 			return;
+
+		/* check for fo_filename attribute, and resolve if present */
+		if (flowop->fo_filename) {
+			char *name;
+
+			name = avd_get_str(flowop->fo_filename);
+			newflowop->fo_fileset = fileset_find(name);
+
+			if (newflowop->fo_fileset == NULL) {
+				filebench_log(LOG_ERROR,
+				    "flowop %s: file %s not found",
+				    newflowop->fo_name, name);
+				filebench_shutdown(1);
+			}
+		}
+
 		if (flowop_initflow(newflowop) < 0) {
 			filebench_log(LOG_ERROR, "Flowop init of %s failed",
 			    newflowop->fo_name);
 		}
 		flowop = flowop->fo_threadnext;
 	}
-	(void) ipc_mutex_unlock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 	/* Release the find lock as reader to allow lookups */
-	(void) pthread_rwlock_unlock(&filebench_shm->flowop_find_lock);
+	(void) pthread_rwlock_unlock(&filebench_shm->shm_flowop_find_lock);
 
 	/* Set to the start of the new flowop list */
 	flowop = threadflow->tf_ops;
@@ -369,18 +385,20 @@ flowop_start(threadflow_t *threadflow)
 		int i, count;
 
 		/* Abort if asked */
-		if (threadflow->tf_abort || filebench_shm->f_abort)
+		if (threadflow->tf_abort || filebench_shm->shm_f_abort)
 			break;
 
 		/* Be quiet while stats are gathered */
-		if (filebench_shm->bequiet) {
+		if (filebench_shm->shm_bequiet) {
 			(void) sleep(1);
 			continue;
 		}
 
 		/* Take it easy until everyone is ready to go */
-		if (!filebench_shm->shm_running)
+		if (!filebench_shm->shm_running) {
 			(void) sleep(1);
+			continue;
+		}
 
 		if (flowop == NULL) {
 			filebench_log(LOG_ERROR, "flowop_read null flowop");
@@ -413,7 +431,8 @@ flowop_start(threadflow_t *threadflow)
 				    flowop->fo_instance);
 				(void) ipc_mutex_lock(&threadflow->tf_lock);
 				threadflow->tf_abort = 1;
-				filebench_shm->f_abort = FILEBENCH_ABORT_ERROR;
+				filebench_shm->shm_f_abort =
+				    FILEBENCH_ABORT_ERROR;
 				(void) ipc_mutex_unlock(&threadflow->tf_lock);
 				break;
 			}
@@ -428,7 +447,7 @@ flowop_start(threadflow_t *threadflow)
 				threadflow->tf_abort = FILEBENCH_DONE;
 				if (filebench_shm->shm_rmode ==
 				    FILEBENCH_MODE_Q1STDONE) {
-					filebench_shm->f_abort =
+					filebench_shm->shm_f_abort =
 					    FILEBENCH_ABORT_RSRC;
 				} else if (filebench_shm->shm_rmode !=
 				    FILEBENCH_MODE_QALLDONE) {
@@ -441,7 +460,7 @@ flowop_start(threadflow_t *threadflow)
 					    "($nfiles), or switch modes.",
 					    flowop->fo_name,
 					    flowop->fo_instance);
-					filebench_shm->f_abort =
+					filebench_shm->shm_f_abort =
 					    FILEBENCH_ABORT_ERROR;
 				}
 				(void) ipc_mutex_unlock(&threadflow->tf_lock);
@@ -455,8 +474,24 @@ flowop_start(threadflow_t *threadflow)
 			if (ret == FILEBENCH_DONE) {
 				(void) ipc_mutex_lock(&threadflow->tf_lock);
 				threadflow->tf_abort = FILEBENCH_DONE;
-				filebench_shm->f_abort = FILEBENCH_ABORT_DONE;
+				filebench_shm->shm_f_abort =
+				    FILEBENCH_ABORT_DONE;
 				(void) ipc_mutex_unlock(&threadflow->tf_lock);
+				break;
+			}
+
+			/*
+			 * If we get here and the return is something other
+			 * than FILEBENCH_OK, it means a spurious code
+			 * was returned, so treat as major error. This
+			 * probably indicates a bug in the flowop.
+			 */
+			if (ret != FILEBENCH_OK) {
+				filebench_log(LOG_ERROR,
+				    "Flowop %s unexpected return value = %d\n",
+				    flowop->fo_name, ret);
+				filebench_shm->shm_f_abort =
+				    FILEBENCH_ABORT_ERROR;
 				break;
 			}
 		}
@@ -539,11 +574,11 @@ flowop_delete(flowop_t **flowoplist, flowop_t *flowop)
 #endif
 
 	/* Delete from global list */
-	entry = filebench_shm->flowoplist;
+	entry = filebench_shm->shm_flowoplist;
 
-	if (flowop == filebench_shm->flowoplist) {
+	if (flowop == filebench_shm->shm_flowoplist) {
 		/* First on list */
-		filebench_shm->flowoplist = flowop->fo_next;
+		filebench_shm->shm_flowoplist = flowop->fo_next;
 		found = 1;
 	} else {
 		while (entry->fo_next) {
@@ -594,7 +629,7 @@ flowop_delete_all(flowop_t **flowoplist)
 
 	flowop = *flowoplist;
 
-	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 
 	while (flowop) {
 		if (flowop->fo_instance &&
@@ -606,7 +641,7 @@ flowop_delete_all(flowop_t **flowoplist)
 		flowop = flowop->fo_threadnext;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 }
 
 /*
@@ -622,7 +657,7 @@ flowop_delete_all(flowop_t **flowoplist)
  * it returns a pointer to the allocated and initialized flowop,
  * otherwise NULL.
  *
- * filebench_shm->flowop_lock must be held by caller.
+ * filebench_shm->shm_flowop_lock must be held by caller.
  */
 static flowop_t *
 flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
@@ -651,12 +686,10 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 		(void) ipc_mutex_lock(&flowop->fo_lock);
 		flowop->fo_next = NULL;
 		flowop->fo_threadnext = NULL;
-		flowop->fo_fd = -1;
 		filebench_log(LOG_DEBUG_IMPL,
 		    "flowop %s-%d calling init", name, instance);
 	} else {
 		(void) memset(flowop, 0, sizeof (flowop_t));
-		flowop->fo_fd = -1;
 		flowop->fo_iters = avd_int_alloc(1);
 		flowop->fo_type = type;
 		(void) pthread_mutex_init(&flowop->fo_lock, ipc_mutexattr());
@@ -667,12 +700,12 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 	flowop->fo_thread = threadflow;
 
 	/* Add flowop to global list */
-	if (filebench_shm->flowoplist == NULL) {
-		filebench_shm->flowoplist = flowop;
+	if (filebench_shm->shm_flowoplist == NULL) {
+		filebench_shm->shm_flowoplist = flowop;
 		flowop->fo_next = NULL;
 	} else {
-		flowop->fo_next = filebench_shm->flowoplist;
-		filebench_shm->flowoplist = flowop;
+		flowop->fo_next = filebench_shm->shm_flowoplist;
+		filebench_shm->shm_flowoplist = flowop;
 	}
 
 	(void) strcpy(flowop->fo_name, name);
@@ -710,10 +743,10 @@ flowop_define(threadflow_t *threadflow, char *name, flowop_t *inherit,
 {
 	flowop_t	*flowop;
 
-	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 	flowop = flowop_define_common(threadflow, name,
 	    inherit, instance, type);
-	(void) ipc_mutex_unlock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 	if (flowop == NULL)
 		return (NULL);
@@ -736,8 +769,8 @@ static void
 flowop_find_barrier(void)
 {
 	/* Block on wrlock to ensure find waits for all creates */
-	(void) pthread_rwlock_wrlock(&filebench_shm->flowop_find_lock);
-	(void) pthread_rwlock_unlock(&filebench_shm->flowop_find_lock);
+	(void) pthread_rwlock_wrlock(&filebench_shm->shm_flowop_find_lock);
+	(void) pthread_rwlock_unlock(&filebench_shm->shm_flowop_find_lock);
 }
 
 /*
@@ -752,9 +785,9 @@ flowop_find(char *name)
 
 	flowop_find_barrier();
 
-	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 
 	while (flowop) {
 		if (strcmp(name, flowop->fo_name) == 0) {
@@ -771,7 +804,7 @@ flowop_find(char *name)
 		flowop = flowop->fo_next;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 
 	return (result);
@@ -788,9 +821,9 @@ flowop_find_one(char *name, int instance)
 
 	flowop_find_barrier();
 
-	(void) ipc_mutex_lock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 
-	test_flowop = filebench_shm->flowoplist;
+	test_flowop = filebench_shm->shm_flowoplist;
 
 	while (test_flowop) {
 		if ((strcmp(name, test_flowop->fo_name) == 0) &&
@@ -800,7 +833,7 @@ flowop_find_one(char *name, int instance)
 		test_flowop = test_flowop->fo_next;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->flowop_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 	return (test_flowop);
 }

@@ -434,7 +434,7 @@ stats_snap(void)
 	}
 
 	/* don't print out if run ended in error */
-	if (filebench_shm->f_abort == FILEBENCH_ABORT_ERROR) {
+	if (filebench_shm->shm_f_abort == FILEBENCH_ABORT_ERROR) {
 		filebench_log(LOG_ERROR,
 		    "NO VALID RESULTS! FileBench run terminated prematurely");
 		return;
@@ -446,9 +446,9 @@ stats_snap(void)
 	    (globalstats->fs_etime - globalstats->fs_stime) / 1000000000);
 
 	/* Freeze statistics during update */
-	filebench_shm->bequiet = 1;
+	filebench_shm->shm_bequiet = 1;
 
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 	while (flowop) {
 		flowop_t *flowop_master;
 
@@ -513,7 +513,7 @@ stats_snap(void)
 	    (cputime - gl_stats_ohead()) : 0;
 
 
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 	str = malloc(1048576);
 	*str = NULL;
 	(void) strcpy(str, "Per-Operation Breakdown\n");
@@ -568,7 +568,7 @@ stats_snap(void)
 	    ((iostat->fs_rcount + iostat->fs_wcount) * 1000000.0) : 0);
 
 
-	filebench_shm->bequiet = 0;
+	filebench_shm->shm_bequiet = 0;
 }
 
 /*
@@ -582,21 +582,21 @@ stats_dump(char *filename)
 	flowop_t *flowop;
 
 	/* don't dump stats if run ended in error */
-	if (filebench_shm->f_abort == FILEBENCH_ABORT_ERROR)
+	if (filebench_shm->shm_f_abort == FILEBENCH_ABORT_ERROR)
 		return;
 
-	(void) strcpy(filebench_shm->dump_filename, filename);
+	(void) strcpy(filebench_shm->shm_dump_filename, filename);
 
 	filebench_log(LOG_INFO, "in statsdump %s", filename);
 
-	if (filebench_shm->dump_fd > 0) {
-		(void) close(filebench_shm->dump_fd);
-		filebench_shm->dump_fd = -1;
+	if (filebench_shm->shm_dump_fd > 0) {
+		(void) close(filebench_shm->shm_dump_fd);
+		filebench_shm->shm_dump_fd = -1;
 	}
 
 	filebench_log(LOG_DUMP, "Flowop totals:");
 
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 	while (flowop) {
 
 		if (flowop->fo_instance != FLOW_MASTER) {
@@ -658,21 +658,21 @@ stats_xmldump(char *filename)
 	flowop_t *flowop;
 
 	/* don't dump stats if run ended in error */
-	if (filebench_shm->f_abort == FILEBENCH_ABORT_ERROR)
+	if (filebench_shm->shm_f_abort == FILEBENCH_ABORT_ERROR)
 		return;
 
-	(void) strcpy(filebench_shm->dump_filename, filename);
+	(void) strcpy(filebench_shm->shm_dump_filename, filename);
 
-	if (filebench_shm->dump_fd > 0) {
-		(void) close(filebench_shm->dump_fd);
-		filebench_shm->dump_fd = -1;
+	if (filebench_shm->shm_dump_fd > 0) {
+		(void) close(filebench_shm->shm_dump_fd);
+		filebench_shm->shm_dump_fd = -1;
 	}
 
 	filebench_log(LOG_DUMP, "<stat_doc name=\"Filebench Workload\">");
 	filebench_log(LOG_DUMP, "<stat_group name=\"Flowop totals\">");
 	filebench_log(LOG_DUMP, "<cell_list>");
 
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 	while (flowop) {
 		if (flowop->fo_instance != FLOW_MASTER) {
 			flowop = flowop->fo_next;
@@ -707,7 +707,7 @@ stats_xmldump(char *filename)
 	filebench_log(LOG_DUMP, "</dim>");
 
 	filebench_log(LOG_DUMP, "<dim>");
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 	while (flowop) {
 		if (flowop->fo_instance != FLOW_MASTER) {
 			flowop = flowop->fo_next;
@@ -782,7 +782,7 @@ stats_clear(void)
 
 	(void) memset(globalstats, 0, FLOW_TYPES * sizeof (flowstat_t));
 
-	flowop = filebench_shm->flowoplist;
+	flowop = filebench_shm->shm_flowoplist;
 
 	while (flowop) {
 		filebench_log(LOG_DEBUG_IMPL, "Clearing stats for %s-%d",

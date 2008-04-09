@@ -61,9 +61,9 @@ eventgen_usage(void)
  * Once eventgen_hz has been set by eventgen_setrate(),
  * the routine sends eventgen_hz events per second until
  * the program terminates. Events are posted by incrementing
- * filebench_shm->eventgen_q by the number of generated
+ * filebench_shm->shm_eventgen_q by the number of generated
  * events then signalling the condition variable
- * filebench_shm->eventgen_cv to indicate to event consumers
+ * filebench_shm->shm_eventgen_cv to indicate to event consumers
  * that more events are available.
  *
  * Eventgen_thread attempts to sleep for 10 event periods,
@@ -85,38 +85,42 @@ eventgen_thread(void)
 		hrtime_t delta;
 		int count;
 
-		if (filebench_shm->eventgen_hz == 0) {
+		if (filebench_shm->shm_eventgen_hz == 0) {
 			(void) sleep(1);
 			continue;
 		}
 		/* Sleep for 10xperiod */
 		sleeptime.tv_sec = 0;
-		sleeptime.tv_nsec = 1000000000UL / filebench_shm->eventgen_hz;
+		sleeptime.tv_nsec = FB_SEC2NSEC /
+		    filebench_shm->shm_eventgen_hz;
+
 		sleeptime.tv_nsec *= 10;
 		if (sleeptime.tv_nsec < 1000UL)
 			sleeptime.tv_nsec = 1000UL;
-		sleeptime.tv_sec = sleeptime.tv_nsec / 1000000000UL;
+
+		sleeptime.tv_sec = sleeptime.tv_nsec / FB_SEC2NSEC;
 		if (sleeptime.tv_sec > 0)
-			sleeptime.tv_nsec -= (sleeptime.tv_sec * 1000000000UL);
+			sleeptime.tv_nsec -= (sleeptime.tv_sec * FB_SEC2NSEC);
+
 		(void) nanosleep(&sleeptime, NULL);
 		delta = gethrtime() - last;
 		last = gethrtime();
-		count = (filebench_shm->eventgen_hz * delta) / 1000000000;
+		count = (filebench_shm->shm_eventgen_hz * delta) / FB_SEC2NSEC;
 
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "delta %llums count %d",
 		    (u_longlong_t)(delta / 1000000), count);
 
 		/* Send 'count' events */
-		(void) ipc_mutex_lock(&filebench_shm->eventgen_lock);
+		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		/* Keep the producer with a max of 5 second depth */
-		if (filebench_shm->eventgen_q <
-		    (5 * filebench_shm->eventgen_hz))
-			filebench_shm->eventgen_q += count;
+		if (filebench_shm->shm_eventgen_q <
+		    (5 * filebench_shm->shm_eventgen_hz))
+			filebench_shm->shm_eventgen_q += count;
 
-		(void) pthread_cond_signal(&filebench_shm->eventgen_cv);
+		(void) pthread_cond_signal(&filebench_shm->shm_eventgen_cv);
 
-		(void) ipc_mutex_unlock(&filebench_shm->eventgen_lock);
+		(void) ipc_mutex_unlock(&filebench_shm->shm_eventgen_lock);
 	}
 }
 
@@ -150,7 +154,7 @@ eventgen_init(void)
 var_t *
 eventgen_ratevar(var_t *var)
 {
-	VAR_SET_INT(var, filebench_shm->eventgen_hz);
+	VAR_SET_INT(var, filebench_shm->shm_eventgen_hz);
 	return (var);
 }
 
@@ -161,7 +165,7 @@ eventgen_ratevar(var_t *var)
 void
 eventgen_setrate(fbint_t rate)
 {
-	filebench_shm->eventgen_hz = (int)rate;
+	filebench_shm->shm_eventgen_hz = (int)rate;
 }
 
 /*
@@ -170,5 +174,5 @@ eventgen_setrate(fbint_t rate)
 void
 eventgen_reset(void)
 {
-	filebench_shm->eventgen_q = 0;
+	filebench_shm->shm_eventgen_q = 0;
 }

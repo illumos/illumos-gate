@@ -528,15 +528,15 @@ var_alloc_cmn(char *name, int var_type)
 	switch (var_type & VAR_TYPE_MASK) {
 	case VAR_TYPE_RANDOM:
 	case VAR_TYPE_GLOBAL:
-		var_listp = &filebench_shm->var_list;
+		var_listp = &filebench_shm->shm_var_list;
 		break;
 
 	case VAR_TYPE_DYNAMIC:
-		var_listp = &filebench_shm->var_dyn_list;
+		var_listp = &filebench_shm->shm_var_dyn_list;
 		break;
 
 	default:
-		var_listp = &filebench_shm->var_list;
+		var_listp = &filebench_shm->shm_var_list;
 		break;
 	}
 
@@ -585,7 +585,8 @@ var_find(char *name)
 {
 	var_t *var;
 
-	for (var = filebench_shm->var_list; var != NULL; var = var->var_next) {
+	for (var = filebench_shm->shm_var_list; var != NULL;
+	    var = var->var_next) {
 		if (strcmp(var->var_name, name) == 0)
 			return (var);
 	}
@@ -1208,14 +1209,14 @@ static var_t *
 var_find_dynamic(char *name)
 {
 	var_t *var = NULL;
-	var_t *v = filebench_shm->var_dyn_list;
+	var_t *v = filebench_shm->shm_var_dyn_list;
 	var_t *rtn;
 
 	/*
 	 * Lookup a reference to the var handle for this
 	 * special var
 	 */
-	for (v = filebench_shm->var_dyn_list; v != NULL; v = v->var_next) {
+	for (v = filebench_shm->shm_var_dyn_list; v != NULL; v = v->var_next) {
 		if (strcmp(v->var_name, name) == 0) {
 			var = v;
 			break;

@@ -469,6 +469,8 @@ fileset_openfile(fileset_t *fileset,
  * (FSE_EXISTS) state files are selected, while
  * FILESET_PICKNOEXIST insures that only non extant
  * (not FSE_EXISTS) state files are selected.
+ * Note that the selected fileset entry (file) is returned
+ * with its fse_lock field locked.
  */
 filesetentry_t *
 fileset_pick(fileset_t *fileset, int flags, int tid)
@@ -476,7 +478,7 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 	filesetentry_t *entry = NULL;
 	filesetentry_t *first = NULL;
 
-	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
 
 	while (entry == NULL) {
 
@@ -552,12 +554,12 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 		}
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
 	filebench_log(LOG_DEBUG_SCRIPT, "Picked file %s", entry->fse_path);
 	return (entry);
 
 empty:
-	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
 	return (NULL);
 }
 
@@ -1022,21 +1024,21 @@ fileset_define(avd_t name)
 	filebench_log(LOG_DEBUG_IMPL,
 	    "Defining file %s", avd_get_str(name));
 
-	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
 
 	fileset->fs_dirgamma = avd_int_alloc(1500);
 	fileset->fs_sizegamma = avd_int_alloc(1500);
 
 	/* Add fileset to global list */
-	if (filebench_shm->filesetlist == NULL) {
-		filebench_shm->filesetlist = fileset;
+	if (filebench_shm->shm_filesetlist == NULL) {
+		filebench_shm->shm_filesetlist = fileset;
 		fileset->fs_next = NULL;
 	} else {
-		fileset->fs_next = filebench_shm->filesetlist;
-		filebench_shm->filesetlist = fileset;
+		fileset->fs_next = filebench_shm->shm_filesetlist;
+		filebench_shm->shm_filesetlist = fileset;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
 
 	fileset->fs_name = name;
 
@@ -1091,7 +1093,7 @@ fileset_createset(fileset_t *fileset)
 		filebench_log(LOG_INFO,
 		    "Creating/pre-allocating files and filesets");
 
-		list = filebench_shm->filesetlist;
+		list = filebench_shm->shm_filesetlist;
 		while (list) {
 			/* check for raw files */
 			if (fileset_checkraw(list)) {
@@ -1133,18 +1135,19 @@ fileset_createset(fileset_t *fileset)
 fileset_t *
 fileset_find(char *name)
 {
-	fileset_t *fileset = filebench_shm->filesetlist;
+	fileset_t *fileset = filebench_shm->shm_filesetlist;
 
-	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
 
 	while (fileset) {
 		if (strcmp(name, avd_get_str(fileset->fs_name)) == 0) {
-			(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_fileset_lock);
 			return (fileset);
 		}
 		fileset = fileset->fs_next;
 	}
-	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
 
 	return (NULL);
 }
@@ -1159,10 +1162,10 @@ fileset_find(char *name)
 void
 fileset_iter(int (*cmd)(fileset_t *fileset, int first))
 {
-	fileset_t *fileset = filebench_shm->filesetlist;
+	fileset_t *fileset = filebench_shm->shm_filesetlist;
 	int count = 0;
 
-	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
 
 	while (fileset) {
 		cmd(fileset, count == 0);
@@ -1170,7 +1173,7 @@ fileset_iter(int (*cmd)(fileset_t *fileset, int first))
 		count++;
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
 }
 
 /*
