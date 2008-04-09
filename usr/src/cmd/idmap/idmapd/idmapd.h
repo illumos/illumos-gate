@@ -140,6 +140,7 @@ typedef struct list_cb_data {
 	uint64_t	next;
 	uint64_t	len;
 	uint64_t	limit;
+	int		flag;
 } list_cb_data_t;
 
 typedef struct msg_table {
@@ -244,7 +245,7 @@ extern idmap_retcode	gen_sql_expr_from_rule(idmap_namerule *, char **);
 extern idmap_retcode	validate_list_cb_data(list_cb_data_t *, int,
 				char **, int, uchar_t **, size_t);
 extern idmap_retcode	process_list_svc_sql(sqlite *, const char *, char *,
-				uint64_t, list_svc_cb, void *);
+				uint64_t, int, list_svc_cb, void *);
 extern idmap_retcode	sid2pid_first_pass(lookup_state_t *, sqlite *,
 				idmap_mapping *, idmap_id_res *);
 extern idmap_retcode	sid2pid_second_pass(lookup_state_t *, sqlite *,

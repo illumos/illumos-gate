@@ -57,8 +57,8 @@
 		return (1);\
 	}
 
-#define	PROCESS_LIST_SVC_SQL(rcode, db, dbname, sql, limit, cb, res, len)\
-	rcode = process_list_svc_sql(db, dbname, sql, limit, cb, res);\
+#define	PROCESS_LIST_SVC_SQL(rcode, db, dbname, sql, limit, flag, cb, res, len)\
+	rcode = process_list_svc_sql(db, dbname, sql, limit, flag, cb, res);\
 	if (rcode == IDMAP_ERR_BUSY)\
 		res->retcode = IDMAP_ERR_BUSY;\
 	else if (rcode == IDMAP_SUCCESS && len == 0)\
@@ -404,6 +404,9 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames)
 	int			w2u, u2w;
 	char			*end;
 	static int		validated_column_names = 0;
+	idmap_how		*how;
+
+	cb_data = (list_cb_data_t *)parg;
 
 	if (!validated_column_names) {
 		assert(strcmp(colnames[0], "rowid") == 0);
@@ -417,14 +420,20 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames)
 		assert(strcmp(colnames[8], "unixname") == 0);
 		assert(strcmp(colnames[9], "is_user") == 0);
 		assert(strcmp(colnames[10], "is_wuser") == 0);
+		assert(strcmp(colnames[11], "map_type") == 0);
+		assert(strcmp(colnames[12], "map_dn") == 0);
+		assert(strcmp(colnames[13], "map_attr") == 0);
+		assert(strcmp(colnames[14], "map_value") == 0);
+		assert(strcmp(colnames[15], "map_windomain") == 0);
+		assert(strcmp(colnames[16], "map_winname") == 0);
+		assert(strcmp(colnames[17], "map_unixname") == 0);
+		assert(strcmp(colnames[18], "map_is_nt4") == 0);
 		validated_column_names = 1;
 	}
 
-
-	cb_data = (list_cb_data_t *)parg;
 	result = (idmap_mappings_res *)cb_data->result;
 
-	_VALIDATE_LIST_CB_DATA(11, &result->mappings.mappings_val,
+	_VALIDATE_LIST_CB_DATA(19, &result->mappings.mappings_val,
 	    sizeof (idmap_mapping));
 
 	result->mappings.mappings_len++;
@@ -465,6 +474,55 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames)
 	STRDUP_OR_FAIL(result->mappings.mappings_val[cb_data->next].id2name,
 	    argv[8]);
 
+	if (cb_data->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
+		how = &result->mappings.mappings_val[cb_data->next].info.how;
+		how->map_type = strtoul(argv[11], &end, 10);
+		switch (how->map_type) {
+		case IDMAP_MAP_TYPE_DS_AD:
+			how->idmap_how_u.ad.dn =
+			    strdup(argv[12]);
+			how->idmap_how_u.ad.attr =
+			    strdup(argv[13]);
+			how->idmap_how_u.ad.value =
+			    strdup(argv[14]);
+			break;
+
+		case IDMAP_MAP_TYPE_DS_NLDAP:
+			how->idmap_how_u.nldap.dn =
+			    strdup(argv[12]);
+			how->idmap_how_u.nldap.attr =
+			    strdup(argv[13]);
+			how->idmap_how_u.nldap.value =
+			    strdup(argv[14]);
+			break;
+
+		case IDMAP_MAP_TYPE_RULE_BASED:
+			how->idmap_how_u.rule.windomain =
+			    strdup(argv[15]);
+			how->idmap_how_u.rule.winname =
+			    strdup(argv[16]);
+			how->idmap_how_u.rule.unixname =
+			    strdup(argv[17]);
+			how->idmap_how_u.rule.is_nt4 =
+			    strtoul(argv[18], &end, 10);
+			how->idmap_how_u.rule.is_user =
+			    strtol(argv[9], &end, 10);
+			how->idmap_how_u.rule.is_wuser =
+			    strtol(argv[10], &end, 10);
+			break;
+
+		case IDMAP_MAP_TYPE_EPHEMERAL:
+			break;
+
+		case IDMAP_MAP_TYPE_LOCAL_SID:
+			break;
+
+		default:
+			/* Unknow mapping type */
+			assert(FALSE);
+		}
+
+	}
 
 	result->lastrowid = strtoll(argv[0], &end, 10);
 	cb_data->next++;
@@ -475,7 +533,7 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames)
 
 /* ARGSUSED */
 bool_t
-idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit,
+idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit, int32_t flag,
     idmap_mappings_res *result, struct svc_req *rqstp)
 {
 	sqlite		*cache = NULL;
@@ -483,9 +541,19 @@ idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit,
 	uint64_t	maxlimit;
 	idmap_retcode	retcode;
 	char		*sql = NULL;
+	time_t		curtime;
 
 	(void) memset(result, 0, sizeof (*result));
 	lbuf[0] = rbuf[0] = 0;
+
+	/* Current time */
+	errno = 0;
+	if ((curtime = time(NULL)) == (time_t)-1) {
+		idmapdlog(LOG_ERR, "Failed to get current time (%s)",
+		    strerror(errno));
+		retcode = IDMAP_ERR_INTERNAL;
+		goto out;
+	}
 
 	RDLOCK_CONFIG();
 	maxlimit = _idmapdstate.cfg->pgcfg.list_size_limit;
@@ -511,11 +579,16 @@ idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit,
 	 * Combine all the above into a giant SELECT statement that
 	 * will return the requested mappings
 	 */
-	sql = sqlite_mprintf("SELECT rowid, sidprefix, rid, pid, w2u, u2w, "
-	    "windomain, canon_winname, unixname, is_user, is_wuser "
-	    " FROM idmap_cache WHERE "
-	    " %s %s;",
-	    rbuf, lbuf);
+
+	sql = sqlite_mprintf("SELECT rowid, sidprefix, rid, pid, w2u, "
+	    "u2w, windomain, canon_winname, unixname, is_user, is_wuser, "
+	    "map_type, map_dn, map_attr, map_value, map_windomain, "
+	    "map_winname, map_unixname, map_is_nt4 "
+	    "FROM idmap_cache WHERE %s AND "
+	    "(pid >= 2147483648 OR (expiration = 0 OR "
+	    "expiration ISNULL  OR expiration > %d)) "
+	    "%s;",
+	    rbuf, curtime, lbuf);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		goto out;
@@ -523,7 +596,7 @@ idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit,
 
 	/* Execute the SQL statement and update the return buffer */
 	PROCESS_LIST_SVC_SQL(retcode, cache, IDMAP_CACHENAME, sql, limit,
-	    list_mappings_cb, result, result->mappings.mappings_len);
+	    flag, list_mappings_cb, result, result->mappings.mappings_len);
 
 out:
 	if (sql)
@@ -683,7 +756,7 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 
 	/* Execute the SQL statement and update the return buffer */
 	PROCESS_LIST_SVC_SQL(retcode, db, IDMAP_DBNAME, sql, limit,
-	    list_namerules_cb, result, result->rules.rules_len);
+	    0, list_namerules_cb, result, result->rules.rules_len);
 
 out:
 	if (expr)

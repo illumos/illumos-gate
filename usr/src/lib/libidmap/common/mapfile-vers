@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,6 +74,14 @@ SUNWprivate {
 	idmap_getuidbywinname;
 	idmap_getgidbywinname;
 	idmap_namerule_cpy;
+	idmap_info_free;
+	idmap_info_cpy;
+	idmap_info_mov;
+	idmap_getext_sidbygid;
+	idmap_getext_uidbysid;
+	idmap_getext_pidbysid;
+	idmap_getext_gidbysid;
+	idmap_getext_sidbyuid;
     local:
 	*;
 };

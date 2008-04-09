@@ -131,6 +131,9 @@ typedef struct idmap_q {
 	rid_t			*rid;		/* RID */
 	int			*sid_type;	/* user or group SID? */
 	char			**unixname;	/* unixname for name mapping */
+	char			**dn;		/* DN of entry */
+	char			**attr;		/* Attr for name mapping */
+	char			**value;	/* value for name mapping */
 	idmap_retcode		*rc;
 
 	/* lookup state */
@@ -1076,8 +1079,8 @@ idmap_msgid2query(ad_host_t *adh, int msgid,
  */
 static
 void
-idmap_setqresults(idmap_q_t *q, char *san, char *dn, char *sid,
-	rid_t rid, int sid_type, char *unixname)
+idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
+	char *sid, rid_t rid, int sid_type, char *unixname)
 {
 	char *domain;
 	int err1, err2;
@@ -1101,6 +1104,16 @@ idmap_setqresults(idmap_q_t *q, char *san, char *dn, char *sid,
 		    U8_UNICODE_LATEST, &err2) != 0 || err2 != 0)
 			goto out;
 	}
+
+	/* Copy the DN and attr and value */
+	if (q->dn != NULL)
+		*q->dn = strdup(dn);
+
+	if (q->attr != NULL && attr != NULL)
+		*q->attr = strdup(attr);
+
+	if (q->value != NULL && unixname != NULL)
+		*q->value = strdup(unixname);
 
 	/* Set results */
 	if (q->sid) {
@@ -1353,6 +1366,7 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 			bvalues = ldap_get_values_len(adh->ld, res, attr);
 			unixuser = idmap_bv_name2str(bvalues);
 			has_unixuser = (unixuser != NULL);
+
 		} else if (!has_unixgroup && unixgroup_attr != NULL &&
 		    strcasecmp(attr, unixgroup_attr) == 0) {
 			bvalues = ldap_get_values_len(adh->ld, res, attr);
@@ -1389,7 +1403,9 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 		 * find some attributes that we were looking for. In either
 		 * case set the result with what we got.
 		 */
-		idmap_setqresults(q, san, dn, sid, rid, sid_type,
+		idmap_setqresults(q, san, dn,
+		    (unixuser != NULL) ? unixuser_attr : unixgroup_attr,
+		    sid, rid, sid_type,
 		    (unixuser != NULL) ? unixuser : unixgroup);
 	}
 
@@ -1587,10 +1603,12 @@ idmap_lookup_batch_end(idmap_query_state_t **state)
  */
 static
 idmap_retcode
-idmap_batch_add1(idmap_query_state_t *state,
-	const char *filter, char *ecanonname, char *edomain, int eunixtype,
-	char **canonname, char **dname, char **sid, rid_t *rid,
-	int *sid_type, char **unixname, idmap_retcode *rc)
+idmap_batch_add1(idmap_query_state_t *state, const char *filter,
+	char *ecanonname, char *edomain, int eunixtype,
+	char **dn, char **attr, char **value,
+	char **canonname, char **dname,
+	char **sid, rid_t *rid, int *sid_type, char **unixname,
+	idmap_retcode *rc)
 {
 	idmap_retcode	retcode = IDMAP_SUCCESS;
 	int		lrc, qid, i;
@@ -1625,6 +1643,9 @@ idmap_batch_add1(idmap_query_state_t *state,
 	q->sid_type = sid_type;
 	q->rc = rc;
 	q->unixname = unixname;
+	q->dn = dn;
+	q->attr = attr;
+	q->value = value;
 
 	/* Add unixuser/unixgroup attribute names to the attrs list */
 	if (unixname != NULL) {
@@ -1659,6 +1680,12 @@ idmap_batch_add1(idmap_query_state_t *state,
 		*dname = NULL;
 	if (rid != NULL)
 		*rid = 0;
+	if (dn != NULL)
+		*dn = NULL;
+	if (attr != NULL)
+		*attr = NULL;
+	if (value != NULL)
+		*value = NULL;
 
 	/* Send this lookup, don't wait for a result here */
 	(void) pthread_mutex_lock(&state->qadh->lock);
@@ -1701,8 +1728,9 @@ idmap_batch_add1(idmap_query_state_t *state,
 idmap_retcode
 idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	const char *name, const char *dname, int eunixtype,
-	char **canonname, char **sid, rid_t *rid, int *sid_type,
-	char **unixname, idmap_retcode *rc)
+	char **dn, char **attr, char **value,
+	char **canonname, char **sid, rid_t *rid,
+	int *sid_type, char **unixname, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	int		len, samAcctNameLen;
@@ -1771,7 +1799,8 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	(void) snprintf(filter, len, SANFILTER, samAcctNameLen, name);
 
 	retcode = idmap_batch_add1(state, filter, ecanonname, edomain,
-	    eunixtype, canonname, NULL, sid, rid, sid_type, unixname, rc);
+	    eunixtype, dn, attr, value, canonname, NULL, sid, rid, sid_type,
+	    unixname, rc);
 
 	free(filter);
 
@@ -1781,8 +1810,9 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 idmap_retcode
 idmap_sid2name_batch_add1(idmap_query_state_t *state,
 	const char *sid, const rid_t *rid, int eunixtype,
-	char **name, char **dname, int *sid_type, char **unixname,
-	idmap_retcode *rc)
+	char **dn, char **attr, char **value,
+	char **name, char **dname, int *sid_type,
+	char **unixname, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	int		flen, ret;
@@ -1808,7 +1838,7 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 	(void) snprintf(filter, flen, OBJSIDFILTER, cbinsid);
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL, eunixtype,
-	    name, dname, NULL, NULL, sid_type, unixname, rc);
+	    dn, attr, value, name, dname, NULL, NULL, sid_type, unixname, rc);
 
 	free(filter);
 
@@ -1818,8 +1848,9 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 idmap_retcode
 idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	const char *unixname, int is_user, int is_wuser,
-	char **sid, rid_t *rid, char **name, char **dname, int *sid_type,
-	idmap_retcode *rc)
+	char **dn, char **attr, char **value,
+	char **sid, rid_t *rid, char **name,
+	char **dname, int *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	int		len, ulen;
@@ -1842,7 +1873,22 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	    is_wuser ? "user" : "group", attrname, ulen, unixname);
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL,
-	    _IDMAP_T_UNDEF, name, dname, sid, rid, sid_type, NULL, rc);
+	    _IDMAP_T_UNDEF, dn, NULL, NULL, name, dname, sid, rid, sid_type,
+	    NULL, rc);
+
+	if (retcode == IDMAP_SUCCESS && attr != NULL) {
+		if ((*attr = strdup(attrname)) == NULL)
+			retcode = IDMAP_ERR_MEMORY;
+	}
+
+	if (retcode == IDMAP_SUCCESS && value != NULL) {
+		if (ulen > 0) {
+			if ((*value = strdup(unixname)) == NULL)
+				retcode = IDMAP_ERR_MEMORY;
+		}
+		else
+			*value = NULL;
+	}
 
 	free(filter);
 

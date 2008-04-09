@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,28 @@ enum idmap_id_type {
 	IDMAP_POSIXID
 };
 
+/* The type of ID mapping */
+enum idmap_map_type {
+	IDMAP_MAP_TYPE_UNKNOWN = 0, 
+	IDMAP_MAP_TYPE_DS_AD,
+	IDMAP_MAP_TYPE_DS_NLDAP,
+	IDMAP_MAP_TYPE_RULE_BASED,
+	IDMAP_MAP_TYPE_EPHEMERAL,
+	IDMAP_MAP_TYPE_LOCAL_SID,
+	IDMAP_MAP_TYPE_KNOWN_SID
+};
+
+
+/* Source of ID mapping */
+enum idmap_map_src {
+	IDMAP_MAP_SRC_UNKNOWN = 0,
+	IDMAP_MAP_SRC_NEW,
+	IDMAP_MAP_SRC_CACHE,
+	IDMAP_MAP_SRC_HARD_CODED,
+	IDMAP_MAP_SRC_ALGORITHMIC
+};
+
+
 /* SID */
 struct idmap_sid {
 	string		prefix<>;
@@ -58,44 +80,6 @@ union idmap_id switch(idmap_id_type idtype) {
 	case IDMAP_NONE: void;
 	case IDMAP_POSIXID: void;
 };
-struct idmap_id_res {
-	idmap_retcode	retcode;
-	idmap_id	id;
-	int		direction;
-};
-struct idmap_ids_res {
-	idmap_retcode	retcode;
-	idmap_id_res	ids<>;
-};
-
-
-/*
- * Flag supported by mapping requests
- */
-/* Don't allocate a new value for the mapping */
-const IDMAP_REQ_FLG_NO_NEW_ID_ALLOC	= 0x00000001;
-/* Validate the given identity before mapping */
-const IDMAP_REQ_FLG_VALIDATE		= 0x00000002;
-/* Avoid name service lookups to prevent looping */
-const IDMAP_REQ_FLG_NO_NAMESERVICE	= 0x00000004;
-
-/* Identity mappings (sid-posix) */
-struct idmap_mapping {
-	int32_t		flag;
-	int		direction;
-	idmap_id	id1;
-	idmap_utf8str	id1domain;
-	idmap_utf8str	id1name;
-	idmap_id	id2;
-	idmap_utf8str	id2domain;
-	idmap_utf8str	id2name;
-};
-struct idmap_mappings_res {
-	idmap_retcode		retcode;
-	uint64_t		lastrowid;
-	idmap_mapping		mappings<>;
-};
-typedef idmap_mapping	idmap_mapping_batch<>;
 
 
 /* Name-based mapping rules */
@@ -114,6 +98,76 @@ struct idmap_namerules_res {
 	idmap_namerule	rules<>;
 };
 
+/* How ID is mapped */ 
+struct idmap_how_ds_based {
+	idmap_utf8str	dn;
+	idmap_utf8str	attr;
+	idmap_utf8str	value;
+};
+ 
+union idmap_how switch(idmap_map_type map_type) {
+	case IDMAP_MAP_TYPE_UNKNOWN: void;
+	case IDMAP_MAP_TYPE_DS_AD: idmap_how_ds_based ad;
+	case IDMAP_MAP_TYPE_DS_NLDAP: idmap_how_ds_based nldap;
+	case IDMAP_MAP_TYPE_RULE_BASED: idmap_namerule rule;
+	case IDMAP_MAP_TYPE_EPHEMERAL: void;
+	case IDMAP_MAP_TYPE_LOCAL_SID: void;
+};
+
+struct idmap_info {
+	idmap_map_src	src;
+	idmap_how	how;
+};
+
+
+/* Id result */
+struct idmap_id_res {
+	idmap_retcode	retcode;
+	idmap_id	id;
+	int		direction;
+	idmap_info	info;
+};
+struct idmap_ids_res {
+	idmap_retcode	retcode;
+	idmap_id_res	ids<>;
+};
+
+
+/*
+ * Flag supported by mapping requests
+ */
+/* Don't allocate a new value for the mapping */
+const IDMAP_REQ_FLG_NO_NEW_ID_ALLOC	= 0x00000001;
+/* Validate the given identity before mapping */
+const IDMAP_REQ_FLG_VALIDATE		= 0x00000002;
+/* Avoid name service lookups to prevent looping */
+const IDMAP_REQ_FLG_NO_NAMESERVICE	= 0x00000004;
+/* Request how a mapping was formed */
+const IDMAP_REQ_FLG_MAPPING_INFO	= 0x00000008;
+
+/* Identity mappings (sid-posix) */
+struct idmap_mapping {
+	int32_t		flag;
+	int		direction;
+	idmap_id	id1;
+	idmap_utf8str	id1domain;
+	idmap_utf8str	id1name;
+	idmap_id	id2;
+	idmap_utf8str	id2domain;
+	idmap_utf8str	id2name;
+	idmap_info	info;
+};
+
+typedef idmap_mapping	idmap_mapping_batch<>;
+
+struct idmap_mappings_res {
+	idmap_retcode		retcode;
+	uint64_t		lastrowid;
+	idmap_mapping		mappings<>;
+};
+
+
+/* Update result */
 struct idmap_update_res {
 	idmap_retcode	retcode;
 	int64_t	error_index;
@@ -151,7 +205,7 @@ program IDMAP_PROG {
 		/* List all identity mappings */
 		idmap_mappings_res
 		IDMAP_LIST_MAPPINGS(int64_t lastrowid,
-			uint64_t limit) = 2;
+			uint64_t limit, int32_t flag) = 2;
 
 		/* List all name-based mapping rules */
 		idmap_namerules_res

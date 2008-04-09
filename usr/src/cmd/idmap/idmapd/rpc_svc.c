@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ _idmap_list_mappings_1(idmap_list_mappings_1_argument *argp,
 		idmap_mappings_res *result, struct svc_req *rqstp)
 {
 	return (idmap_list_mappings_1_svc(argp->lastrowid,
-	    argp->limit, result, rqstp));
+	    argp->limit, argp->flag, result, rqstp));
 }
 
 int

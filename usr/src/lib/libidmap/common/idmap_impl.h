@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@ typedef struct idmap_get_res {
 	char		**sidprefix;
 	idmap_rid_t	*rid;
 	idmap_stat	*stat;
+	idmap_info	*info;
 } idmap_get_res_t;
 
 struct idmap_get_handle {

@@ -57,7 +57,6 @@ typedef struct idmap_udt_handle idmap_udt_handle_t;
 /* Opaque iterator */
 typedef struct idmap_iter idmap_iter_t;
 
-
 /*
  * Update API
  */
@@ -100,12 +99,13 @@ extern idmap_stat idmap_udt_flush_namerules(idmap_udt_handle_t *);
  */
 
 /* Create a iterator to get SID to UID/GID mappings */
-extern idmap_stat idmap_iter_mappings(idmap_handle_t *,	idmap_iter_t **);
+extern idmap_stat idmap_iter_mappings(idmap_handle_t *,	idmap_iter_t **,
+	int flag);
 
 /* Iterate through the SID to UID/GID mappings */
 extern idmap_stat idmap_iter_next_mapping(idmap_iter_t *, char **,
 	idmap_rid_t *, uid_t *, char **, char **, char **, boolean_t *,
-	boolean_t *, int *);
+	boolean_t *, int *, idmap_info *);
 
 /* Create a iterator to get name-based mapping rules */
 extern idmap_stat idmap_iter_namerules(idmap_handle_t *, const char *,
@@ -127,11 +127,11 @@ extern void idmap_iter_destroy(idmap_iter_t *);
  */
 extern idmap_stat idmap_get_w2u_mapping(idmap_handle_t *, const char *,
 	idmap_rid_t *, const char *, const char *, int, int *, int *,
-	uid_t *, char **, int *);
+	uid_t *, char **, int *, idmap_info *);
 
 extern idmap_stat idmap_get_u2w_mapping(idmap_handle_t *, uid_t *,
 	const char *, int, int, int *, char **, idmap_rid_t *, char **,
-	char **, int *);
+	char **, int *, idmap_info *);
 
 
 /*
@@ -146,6 +146,42 @@ extern idmap_stat idmap_stat4prot(idmap_stat);
 
 /* copy idmap_namerule including strings */
 extern idmap_stat idmap_namerule_cpy(idmap_namerule *, idmap_namerule *);
+
+/* copy idmap_info info including strings */
+extern idmap_stat idmap_info_cpy(idmap_info *to, idmap_info *from);
+
+/* Move  idmap_info info including strings */
+extern idmap_stat idmap_info_mov(idmap_info *to, idmap_info *from);
+
+/* free idmap_info info from  user supplied struct */
+extern void idmap_info_free(idmap_info *);
+
+
+/*
+ * Extended API to batch SID to UID/GID mapping requests
+ */
+
+/* Given SID, get UID */
+extern idmap_stat idmap_getext_uidbysid(idmap_get_handle_t *, char *,
+	idmap_rid_t, int, uid_t *, idmap_info *, idmap_stat *);
+
+/* Given SID, get GID */
+extern idmap_stat idmap_getext_gidbysid(idmap_get_handle_t *, char *,
+	idmap_rid_t, int, gid_t *, idmap_info *, idmap_stat *);
+
+/* Given SID, get UID or GID */
+extern idmap_stat idmap_getext_pidbysid(idmap_get_handle_t *, char *,
+	idmap_rid_t, int, uid_t *, int *, idmap_info *, idmap_stat *);
+
+/* Given UID, get SID */
+extern idmap_stat idmap_getext_sidbyuid(idmap_get_handle_t *, uid_t, int,
+	char **, idmap_rid_t *, idmap_info *, idmap_stat *);
+
+/* Given GID, get SID */
+extern idmap_stat idmap_getext_sidbygid(idmap_get_handle_t *, gid_t, int,
+	char **, idmap_rid_t *, idmap_info *, idmap_stat *);
+
+
 
 #ifdef __cplusplus
 }

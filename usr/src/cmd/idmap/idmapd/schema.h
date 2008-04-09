@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,23 @@ extern "C" {
 	"	expiration INTEGER" \
 	")"
 
+#define	TABLE_IDMAP_CACHE_v2 \
+	"CREATE TABLE idmap_cache " \
+	"(" \
+	"	sidprefix TEXT," \
+	"	rid INTEGER," \
+	"	windomain TEXT," \
+	"	canon_winname TEXT," \
+	"	winname TEXT," \
+	"	pid INTEGER," \
+	"	unixname TEXT," \
+	"	is_user INTEGER," \
+	"	is_wuser INTEGER," \
+	"	w2u INTEGER," \
+	"	u2w INTEGER," \
+	"	expiration INTEGER" \
+	")"
+
 #define	TABLE_IDMAP_CACHE \
 	"CREATE TABLE idmap_cache " \
 	"(" \
@@ -119,6 +136,14 @@ extern "C" {
 	"	is_wuser INTEGER," \
 	"	w2u INTEGER," \
 	"	u2w INTEGER," \
+	"	map_type INTEGER," \
+	"	map_dn TEXT, "\
+	"	map_attr TEXT, "\
+	"	map_value TEXT, "\
+	"	map_windomain TEXT, "\
+	"	map_winname TEXT, "\
+	"	map_unixname TEXT, "\
+	"	map_is_nt4 INTEGER, "\
 	"	expiration INTEGER" \
 	")"
 
@@ -217,6 +242,18 @@ extern "C" {
 	"sql = '" INDEX_NAME_CACHE_SID "') " \
 	"WHEN 5 THEN 1 ELSE " \
 	"(CASE (SELECT count(*) FROM sqlite_master WHERE " \
+	"sql = '" TABLE_IDMAP_CACHE_v2"' OR " \
+	"sql = '" INDEX_IDMAP_CACHE_SID_W2U "' OR " \
+	"sql = '" INDEX_IDMAP_CACHE_PID_U2W "' OR " \
+	"sql = '" TRIGGER_IDMAP_CACHE_TOLOWER_INSERT "' OR " \
+	"sql = '" TRIGGER_IDMAP_CACHE_TOLOWER_UPDATE "' OR " \
+	"sql = '" TABLE_NAME_CACHE "' OR " \
+	"sql = '" INDEX_NAME_CACHE_SID "' OR " \
+	"sql = '" INDEX_NAME_CACHE_NAME "' OR " \
+	"sql = '" TRIGGER_NAME_CACHE_TOLOWER_INSERT "' OR " \
+	"sql = '" TRIGGER_NAME_CACHE_TOLOWER_UPDATE "') " \
+	"WHEN 10 THEN 2 ELSE " \
+	"(CASE (SELECT count(*) FROM sqlite_master WHERE " \
 	"sql = '" TABLE_IDMAP_CACHE"' OR " \
 	"sql = '" INDEX_IDMAP_CACHE_SID_W2U "' OR " \
 	"sql = '" INDEX_IDMAP_CACHE_PID_U2W "' OR " \
@@ -227,14 +264,19 @@ extern "C" {
 	"sql = '" INDEX_NAME_CACHE_NAME "' OR " \
 	"sql = '" TRIGGER_NAME_CACHE_TOLOWER_INSERT "' OR " \
 	"sql = '" TRIGGER_NAME_CACHE_TOLOWER_UPDATE "') " \
-	"WHEN 10 THEN 2 ELSE -1 END) END) END AS version;"
+	"WHEN 10 THEN 3 ELSE -1 END) END) END) END AS version;"
 
 #define	CACHE_UPGRADE_FROM_v1_SQL \
 	"DROP TABLE idmap_cache;" \
 	"DROP TABLE name_cache;" \
 	CACHE_INSTALL_SQL
 
-#define	CACHE_VERSION	2
+#define	CACHE_UPGRADE_FROM_v2_SQL \
+	"DROP TABLE idmap_cache;" \
+	"DROP TABLE name_cache;" \
+	CACHE_INSTALL_SQL
+
+#define	CACHE_VERSION	3
 
 
 #define	TABLE_NAMERULES_v1 \

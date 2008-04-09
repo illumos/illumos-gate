@@ -116,6 +116,7 @@ id_code_t identity2code[] = {
 #define	a_FLAG	'a'
 #define	n_FLAG	'n'
 #define	c_FLAG	'c'
+#define	v_FLAG	'v'
 
 
 /* used in the function do_import */
@@ -237,12 +238,12 @@ static int do_help(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static cmd_ops_t commands[] = {
 	{
 		"show",
-		"c(create)",
+		"c(create)v(verbose)",
 		do_show_mapping
 	},
 	{
 		"dump",
-		"n(names)",
+		"n(names)v(verbose)",
 		do_dump
 	},
 	{
@@ -404,8 +405,8 @@ help()
 	(void) fprintf(stderr,
 	    "idmap\n"
 	    "idmap -f command-file\n"
-	    "idmap show [-c] identity [targettype]\n"
-	    "idmap dump [-n]\n"
+	    "idmap show [-c] [-v] identity [targettype]\n"
+	    "idmap dump [-n] [-v]\n"
 	    "idmap add [-d] name1 name2\n"
 	    "idmap remove -a\n"
 	    "idmap remove [-f|-t] name\n"
@@ -1231,16 +1232,186 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 }
 
 
+static
+void
+print_how(idmap_how *how)
+{
+	idmap_namerule	*rule;
+	name_mapping_t	nm;
+	char		*rule_text;
+
+	switch (how->map_type) {
+	case IDMAP_MAP_TYPE_DS_AD:
+		(void) printf(gettext("Method:\tAD Directory\n"));
+		(void) printf(gettext("DN:\t%s\n"),
+		    how->idmap_how_u.ad.dn);
+		(void) printf(gettext("Attribute:\t%s=%s\n"),
+		    how->idmap_how_u.ad.attr,
+		    how->idmap_how_u.ad.value);
+		break;
+
+	case IDMAP_MAP_TYPE_DS_NLDAP:
+		(void) printf(gettext("Method:\tNative LDAP Directory\n"));
+		(void) printf(gettext("DN:\t%s\n"),
+		    how->idmap_how_u.nldap.dn);
+		(void) printf(gettext("Attribute:\t%s=%s\n"),
+		    how->idmap_how_u.nldap.attr,
+		    how->idmap_how_u.nldap.value);
+		break;
+
+	case IDMAP_MAP_TYPE_RULE_BASED:
+		(void) printf(gettext("Method:\tName Rule\n"));
+		rule = &how->idmap_how_u.rule;
+		/*
+		 * The name rules as specified by the user can have a
+		 * "winname", "winuser" or "wingroup". "Winname" rules are
+		 * decomposed to a "winuser" and "wingroup" rules by idmap.
+		 * Currently is_wuser  is a boolean. Due to these reasons
+		 * the returned is_wuser does not represent the original rule.
+		 * It is therefore better set is_wuser to unknown.
+		 */
+		nm.is_user = rule->is_user;
+		nm.is_wuser = I_UNKNOWN;
+		nm.direction = rule->direction;
+		nm.winname = rule->winname;
+		nm.windomain = rule->windomain;
+		nm.unixname = rule->unixname;
+		nm.is_nt4 = rule->is_nt4;
+		if (name_mapping_format(&nm, &rule_text) == 0) {
+			(void) printf(gettext("Rule:\t%s"), rule_text);
+			free(rule_text);
+		}
+		break;
+
+	case IDMAP_MAP_TYPE_EPHEMERAL:
+		(void) printf(gettext("Method:\tEphemeral\n"));
+		break;
+
+	case IDMAP_MAP_TYPE_LOCAL_SID:
+		(void) printf(gettext("Method:\tLocal SID\n"));
+		break;
+
+	case IDMAP_MAP_TYPE_KNOWN_SID:
+		(void) printf(gettext("Method:\tWell-Known mapping\n"));
+		break;
+	}
+}
+
+
+
+
+
+static
+void
+print_info(idmap_info *info)
+{
+	if (info->how.map_type != IDMAP_MAP_TYPE_UNKNOWN) {
+		switch (info->src) {
+		case IDMAP_MAP_SRC_NEW:
+			(void) printf(gettext("Source:\tNew\n"));
+			break;
+
+		case IDMAP_MAP_SRC_CACHE:
+			(void) printf(gettext("Source:\tCache\n"));
+			break;
+
+		case IDMAP_MAP_SRC_HARD_CODED:
+			(void) printf(gettext("Source:\tHard Coded\n"));
+			break;
+
+		case IDMAP_MAP_SRC_ALGORITHMIC:
+			(void) printf(gettext("Source:\tAlgorithmic\n"));
+			break;
+		}
+		print_how(&info->how);
+	}
+}
+
+
+static
+void
+print_error_info(idmap_info *info)
+{
+	idmap_how	*how = &info->how;
+	idmap_namerule	*rule;
+	name_mapping_t	nm;
+	char		*rule_text;
+
+	switch (how->map_type) {
+	case IDMAP_MAP_TYPE_DS_AD:
+		(void) fprintf(stderr,
+		    gettext("Failed Method:\tAD Directory\n"));
+		(void) fprintf(stderr, gettext("DN:\t%s\n"),
+		    how->idmap_how_u.ad.dn);
+		(void) fprintf(stderr, gettext("Attribute:\t%s=%s\n"),
+		    how->idmap_how_u.ad.attr,
+		    how->idmap_how_u.ad.value);
+		break;
+
+	case IDMAP_MAP_TYPE_DS_NLDAP:
+		(void) fprintf(stderr,
+		    gettext("Failed Method:\tNative LDAP Directory\n"));
+		(void) fprintf(stderr, gettext("DN:\t%s\n"),
+		    how->idmap_how_u.nldap.dn);
+		(void) fprintf(stderr, gettext("Attribute:\t%s=%s\n"),
+		    how->idmap_how_u.nldap.attr,
+		    how->idmap_how_u.nldap.value);
+		break;
+
+	case IDMAP_MAP_TYPE_RULE_BASED:
+		(void) fprintf(stderr, gettext("Failed Method:\tName Rule\n"));
+		rule = &how->idmap_how_u.rule;
+		/*
+		 * The name rules as specified by the user can have a
+		 * "winname", "winuser" or "wingroup". "Winname" rules are
+		 * decomposed to a "winuser" and "wingroup" rules by idmap.
+		 * Currently is_wuser  is a boolean. Due to these reasons
+		 * the returned is_wuser does not represent the original rule.
+		 * It is therefore better to set is_wuser to unknown.
+		 */
+		nm.is_user = rule->is_user;
+		nm.is_wuser = I_UNKNOWN;
+		nm.direction = rule->direction;
+		nm.winname = rule->winname;
+		nm.windomain = rule->windomain;
+		nm.unixname = rule->unixname;
+		nm.is_nt4 = rule->is_nt4;
+		if (name_mapping_format(&nm, &rule_text) == 0) {
+			(void) fprintf(stderr, gettext("Rule:\t%s"), rule_text);
+			free(rule_text);
+		}
+		break;
+
+	case IDMAP_MAP_TYPE_EPHEMERAL:
+		(void) fprintf(stderr, gettext("Failed Method:\tEphemeral\n"));
+		break;
+
+	case IDMAP_MAP_TYPE_LOCAL_SID:
+		(void) fprintf(stderr, gettext("Failed Method:\tLocal SID\n"));
+		break;
+
+	case IDMAP_MAP_TYPE_KNOWN_SID:
+		(void) fprintf(stderr,
+		    gettext("Failed Method:\tWell-Known mapping\n"));
+		break;
+	}
+}
+
+
+
 /* dump command handler */
 static int
 /* LINTED E_FUNC_ARG_UNUSED */
 do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 {
-	idmap_stat stat;
-	idmap_iter_t *ihandle;
-	int rc = 0;
-	boolean_t is_user, is_wuser;
-	print_handle_t *ph;
+	idmap_stat	stat;
+	idmap_iter_t	*ihandle;
+	int		rc = 0;
+	boolean_t	is_user;
+	boolean_t	is_wuser;
+	print_handle_t	*ph;
+	int		flag = 0;
+	idmap_info	info;
 
 	if (init_command())
 		return (-1);
@@ -1250,7 +1421,10 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (ph == NULL)
 		return (-1);
 
-	stat = idmap_iter_mappings(handle, &ihandle);
+	if (f[v_FLAG] != NULL)
+		flag = IDMAP_REQ_FLG_MAPPING_INFO;
+
+	stat = idmap_iter_mappings(handle, &ihandle, flag);
 	if (stat < 0) {
 		print_error(pos,
 		    gettext("Iteration handle not obtained (%s)\n"),
@@ -1270,14 +1444,16 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		    &nm->sidprefix, &nm->rid, &nm->pid,
 		    &nm->winname, &nm->windomain,
 		    &nm->unixname, &is_user, &is_wuser,
-		    &nm->direction);
+		    &nm->direction, &info);
 
 		nm->is_user = is_user ? I_YES : I_NO;
 		nm->is_wuser = is_wuser ? I_YES : I_NO;
 
-		if (stat >= 0)
+		if (stat >= 0) {
 			(void) print_mapping(ph, nm);
-
+			(void) print_how(&info.how);
+			idmap_info_free(&info);
+		}
 		name_mapping_fini(nm);
 
 	} while (stat > 0);
@@ -2154,7 +2330,7 @@ name2parts(char *name, name_mapping_t *nm, cmd_pos_t *pos)
 	} else {
 		if (code & IS_USER)
 			nm->is_user = I_YES;
-		else
+		else if (code & IS_GROUP)
 			nm->is_user = I_NO;
 	}
 
@@ -2545,6 +2721,9 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	name_mapping_t *nm = NULL;
 	char *fromname;
 	char *toname;
+	idmap_info info;
+
+	(void) memset(&info, 0, sizeof (info));
 
 	if (argc == 0) {
 		print_error(pos,
@@ -2557,6 +2736,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	}
 
 	flag = f[c_FLAG] != NULL ? 0 : IDMAP_REQ_FLG_NO_NEW_ID_ALLOC;
+	flag |= f[v_FLAG] == NULL ? 0 : IDMAP_REQ_FLG_MAPPING_INFO;
 
 	if (init_command())
 		return (-1);
@@ -2643,7 +2823,8 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 			    &nm->is_user, &nm->is_wuser,
 			    &nm->pid,
 			    &nm->unixname,
-			    &nm->direction);
+			    &nm->direction,
+			    &info);
 		} else {
 			map_stat = idmap_get_u2w_mapping(handle,
 			    &nm->pid,
@@ -2654,7 +2835,8 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 			    &nm->rid,
 			    &nm->winname,
 			    &nm->windomain,
-			    &nm->direction);
+			    &nm->direction,
+			    &info);
 		}
 
 	} else {
@@ -2679,40 +2861,45 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 		/* Schedule the request: */
 		if (type_to == TYPE_UID) {
-			stat = idmap_get_uidbysid(ghandle,
+			stat = idmap_getext_uidbysid(ghandle,
 			    nm->sidprefix,
 			    nm->rid,
 			    flag,
 			    &uid,
+			    &info,
 			    &map_stat);
 		} else if (type_to == TYPE_GID) {
-			stat =  idmap_get_gidbysid(ghandle,
+			stat =  idmap_getext_gidbysid(ghandle,
 			    nm->sidprefix,
 			    nm->rid,
 			    flag,
 			    &gid,
+			    &info,
 			    &map_stat);
 		} else if (type_to == TYPE_PID) {
-			stat = idmap_get_pidbysid(ghandle,
+			stat = idmap_getext_pidbysid(ghandle,
 			    nm->sidprefix,
 			    nm->rid,
 			    flag,
 			    &nm->pid,
 			    &nm->is_user,
+			    &info,
 			    &map_stat);
 		} else if (type_from == TYPE_UID) {
-			stat = idmap_get_sidbyuid(ghandle,
+			stat = idmap_getext_sidbyuid(ghandle,
 			    nm->pid,
 			    flag,
 			    &nm->sidprefix,
 			    &nm->rid,
+			    &info,
 			    &map_stat);
 		} else if (type_from == TYPE_GID) {
-			stat = idmap_get_sidbygid(ghandle,
+			stat = idmap_getext_sidbygid(ghandle,
 			    (gid_t)nm->pid,
 			    flag,
 			    &nm->sidprefix,
 			    &nm->rid,
+			    &info,
 			    &map_stat);
 		} else {
 			/* This can never happen: */
@@ -2754,14 +2941,8 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	 * If there was -c flag, we do output whatever we can even in
 	 * the case of error:
 	 */
-	if (map_stat < 0) {
-		print_error(pos,
-		    gettext("%s\n"),
-		    idmap_stat2string(handle, map_stat));
-		if (flag == IDMAP_REQ_FLG_NO_NEW_ID_ALLOC)
-			goto cleanup;
-	}
-
+	if (map_stat < 0 && flag & IDMAP_REQ_FLG_NO_NEW_ID_ALLOC)
+		goto errormsg;
 
 	/*
 	 * idmapd returns fallback uid/gid in case of errors. However
@@ -2771,27 +2952,34 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	 * is no fallback mapping.
 	 */
 
-	if (type_to == TYPE_UID && nm->pid == UNDEFINED_UID ||
-	    type_to == TYPE_GID && nm->pid == (uid_t)UNDEFINED_GID) {
-		goto cleanup;
-	}
+	if ((type_to == TYPE_UID || type_to == TYPE_GID ||
+	    type_to == TYPE_PID) && nm->pid == UNDEFINED_UID)
+		goto errormsg;
 
 	if (nm2type(nm, type_from, &fromname) < 0)
-		goto cleanup;
+		goto errormsg;
 
 	if (nm2type(nm, type_to, &toname) < 0) {
-		if (flag == 0)
+		if (!(flag & IDMAP_REQ_FLG_NO_NEW_ID_ALLOC))
 			(void) printf("%s -> %s:%u\n",
 			    fromname,
 			    type_to & IS_GROUP ? ID_GID : ID_UID,
 			    UID_NOBODY);
 		free(fromname);
-		goto cleanup;
+	} else {
+		(void) printf("%s -> %s\n", fromname, toname);
+		free(fromname);
+		free(toname);
 	}
 
-	(void) printf("%s -> %s\n", fromname, toname);
-	free(fromname);
-	free(toname);
+errormsg:
+	if (map_stat < 0) {
+		print_error(pos, gettext("Error:\t%s\n"),
+		    idmap_stat2string(handle, map_stat));
+		print_error_info(&info);
+	} else
+		print_info(&info);
+	idmap_info_free(&info);
 
 cleanup:
 	if (nm != NULL)

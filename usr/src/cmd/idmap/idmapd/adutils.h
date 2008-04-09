@@ -156,8 +156,9 @@ void idmap_lookup_release_batch(idmap_query_state_t **state);
  */
 idmap_retcode idmap_name2sid_batch_add1(idmap_query_state_t *state,
 		const char *name, const char *dname, int eunixtype,
-		char **canonname, char **sid, rid_t *rid, int *sid_type,
-		char **unixname, idmap_retcode *rc);
+		char **dn, char **attr, char **value, char **canonname,
+		char **sid, rid_t *rid, int *sid_type, char **unixname,
+		idmap_retcode *rc);
 /*
  * Add a SID->name lookup
  *
@@ -174,16 +175,17 @@ idmap_retcode idmap_name2sid_batch_add1(idmap_query_state_t *state,
  */
 idmap_retcode idmap_sid2name_batch_add1(idmap_query_state_t *state,
 		const char *sid, const rid_t *rid, int eunixtype,
-		char **name, char **dname, int *sid_type,
-		char **unixname, idmap_retcode *rc);
+		char **dn, char **attr, char **value, char **name,
+		char **dname, int *sid_type, char **unixname,
+		idmap_retcode *rc);
 
 /*
  * Add a unixname->SID lookup
  */
 idmap_retcode idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 		const char *unixname, int is_user, int is_wuser,
-		char **sid, rid_t *rid, char **name, char **dname,
-		int *sid_type, idmap_retcode *rc);
+		char **dn, char **attr, char **value, char **sid, rid_t *rid,
+		char **name, char **dname, int *sid_type, idmap_retcode *rc);
 
 /*
  * Set unixname attribute names for the batch for AD-based name mapping
