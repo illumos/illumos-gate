@@ -978,7 +978,7 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle,
 					goto fatal;
 				}
 				res = Z_ERR;
-				continue;
+				break;
 			}
 
 			/* Check if the dst patch is newer than the src patch */
@@ -1002,7 +1002,7 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle,
 					goto fatal;
 				}
 				res = Z_ERR;
-				continue;
+				break;
 			}
 
 			/*
