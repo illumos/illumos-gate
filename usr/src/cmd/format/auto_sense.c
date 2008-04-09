@@ -1175,46 +1175,46 @@ generic_disk_sense(
 		int		order;
 		char		msg[256];
 
-		order = ((ncyl > nhead)<<2) |
-			((ncyl > nsect)<<1) |
-			(nhead > nsect);
+		order = ((pcyl > nhead)<<2) |
+		    ((pcyl > nsect)<<1) |
+		    (nhead > nsect);
 		switch (order) {
-		case 0x7: /* ncyl > nhead > nsect */
+		case 0x7: /* pcyl > nhead > nsect */
 			nblocks =
 				square_box(nblocks,
 					&pcyl, MAXIMUM_NO_CYLINDERS,
 					&nhead, MAXIMUM_NO_HEADS,
 					&nsect, MAXIMUM_NO_SECTORS);
 			break;
-		case 0x6: /* ncyl > nsect > nhead */
+		case 0x6: /* pcyl > nsect > nhead */
 			nblocks =
 				square_box(nblocks,
 					&pcyl, MAXIMUM_NO_CYLINDERS,
 					&nsect, MAXIMUM_NO_SECTORS,
 					&nhead, MAXIMUM_NO_HEADS);
 			break;
-		case 0x4: /* nsect > ncyl > nhead */
+		case 0x4: /* nsect > pcyl > nhead */
 			nblocks =
 				square_box(nblocks,
 					&nsect, MAXIMUM_NO_SECTORS,
 					&pcyl, MAXIMUM_NO_CYLINDERS,
 					&nhead, MAXIMUM_NO_HEADS);
 			break;
-		case 0x0: /* nsect > nhead > ncyl */
+		case 0x0: /* nsect > nhead > pcyl */
 			nblocks =
 				square_box(nblocks,
 					&nsect, MAXIMUM_NO_SECTORS,
 					&nhead, MAXIMUM_NO_HEADS,
 					&pcyl, MAXIMUM_NO_CYLINDERS);
 			break;
-		case 0x3: /* nhead > ncyl > nsect */
+		case 0x3: /* nhead > pcyl > nsect */
 			nblocks =
 				square_box(nblocks,
 					&nhead, MAXIMUM_NO_HEADS,
 					&pcyl, MAXIMUM_NO_CYLINDERS,
 					&nsect, MAXIMUM_NO_SECTORS);
 			break;
-		case 0x1: /* nhead > nsect > ncyl */
+		case 0x1: /* nhead > nsect > pcyl */
 			nblocks =
 				square_box(nblocks,
 					&nhead, MAXIMUM_NO_HEADS,
