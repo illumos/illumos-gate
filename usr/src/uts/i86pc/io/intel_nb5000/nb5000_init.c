@@ -44,6 +44,7 @@
 #include <sys/cpu_module_impl.h>
 #include <sys/smbios.h>
 #include <sys/pci.h>
+#include <sys/pcie.h>
 #include <sys/machsystm.h>
 #include "nb5000.h"
 #include "nb_log.h"
@@ -135,6 +136,7 @@ uint_t nb5000_mask_uncor_pex = 0;
 int nb5000_reset_cor_pex = 0;
 uint_t nb5000_mask_cor_pex = 0xffffffff;
 int nb_set_docmd = 1;
+uint32_t nb5000_rp_pex = 0x1;
 uint32_t nb5000_docmd_pex_mask = DOCMD_PEX_MASK;
 uint32_t nb5400_docmd_pex_mask = DOCMD_5400_PEX_MASK;
 uint32_t nb5000_docmd_pex = DOCMD_PEX;
@@ -675,6 +677,9 @@ nb_pex_init()
 			EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
 		if (nb_set_docmd) {
 			if (nb_chipset == INTEL_NB_5400) {
+				/* disable masking of ERR pins used by DOCMD */
+				PEX_ERR_PIN_MASK_WR(i, 0x10);
+
 				mask = (docmd_pex[i] & nb5400_docmd_pex_mask) |
 				    (nb5400_docmd_pex & ~nb5400_docmd_pex_mask);
 			} else {
@@ -682,6 +687,26 @@ nb_pex_init()
 				    (nb5000_docmd_pex & ~nb5000_docmd_pex_mask);
 			}
 			PEX_ERR_DOCMD_WR(i, mask);
+		}
+
+		/* RP error message (CE/NFE/FE) detect mask */
+		EMASK_RP_PEX_WR(i, nb5000_rp_pex);
+
+		/* Setup ESI port registers to enable SERR for southbridge */
+		if (i == 0) {
+			uint16_t regw;
+
+			/* Command Register - Enable SERR */
+			regw = nb_pci_getw(0, i, 0, PCI_CONF_COMM, 0);
+			nb_pci_putw(0, i, 0, PCI_CONF_COMM,
+			    regw | PCI_COMM_SERR_ENABLE);
+
+			/* Root Control Register - SERR on NFE/FE */
+			PEXROOTCTL_WR(i, PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN);
+
+			/* AER UE Mask - Mask UR */
+			UNCERRMSK_WR(i, PCIE_AER_UCE_UR);
 		}
 	}
 }

@@ -1152,7 +1152,9 @@ extern "C" {
 #define	PEX_FAT_NERR_ESI_RD()	nb_pci_getl(0, 0, 0, 0x15c, 0)
 #define	PEX_NF_FERR_ESI_RD()	nb_pci_getl(0, 0, 0, 0x158, 0)
 #define	PEX_NF_NERR_ESI_RD()	nb_pci_getl(0, 0, 0, 0x160, 0)
-#define	PEX_ERR_DOCMD_RD(pex)	nb_pci_getl(0, pex, 0, 0x144, 0)
+#define	PEX_ERR_DOCMD_RD(pex)	((nb_chipset == INTEL_NB_5400) ? \
+    nb_pci_getw(0, pex, 0, 0x144, 0) : nb_pci_getl(0, pex, 0, 0x144, 0))
+#define	PEX_ERR_PIN_MASK_RD(pex)	nb_pci_getw(0, pex, 0, 0x146, 0)
 #define	EMASK_UNCOR_PEX_RD(pex)	nb_pci_getl(0, pex, 0, 0x148, 0)
 #define	EMASK_COR_PEX_RD(pex)	nb_pci_getl(0, pex, 0, 0x14c, 0)
 #define	EMASK_RP_PEX_RD(pex)	nb_pci_getl(0, pex, 0, 0x150, 0)
@@ -1163,7 +1165,9 @@ extern "C" {
 #define	PEX_FAT_NERR_ESI_WR(val) nb_pci_putl(0, 0, 0, 0x15c, val)
 #define	PEX_NF_FERR_ESI_WR(val)	nb_pci_putl(0, 0, 0, 0x158, val)
 #define	PEX_NF_NERR_ESI_WR(val)	nb_pci_putl(0, 0, 0, 0x160, val)
-#define	PEX_ERR_DOCMD_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x144, val)
+#define	PEX_ERR_DOCMD_WR(pex, val)	((nb_chipset == INTEL_NB_5400) ? \
+    nb_pci_putw(0, pex, 0, 0x144, val) : nb_pci_putl(0, pex, 0, 0x144, val))
+#define	PEX_ERR_PIN_MASK_WR(pex, val)	nb_pci_putw(0, pex, 0, 0x146, val)
 #define	EMASK_UNCOR_PEX_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x148, val)
 #define	EMASK_COR_PEX_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x14c, val)
 #define	EMASK_RP_PEX_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x150, val)
@@ -1178,6 +1182,7 @@ extern "C" {
 #define	RPERRSID_RD(pex)	nb_pci_getl(0, pex, 0, 0x134, 0)
 #define	AERRCAPCTRL_RD(pex)	nb_pci_getl(0, pex, 0, 0x118, 0)
 #define	PEXDEVSTS_RD(pex)	nb_pci_getw(0, pex, 0, 0x76, 0)
+#define	PEXROOTCTL_RD(pex)	nb_pci_getw(0, pex, 0, 0x88, 0)
 
 #define	PEX_FAT_FERR_WR(pex, val) nb_pci_putl(0, pex, 0, 0x154, val)
 #define	PEX_FAT_NERR_WR(pex, val) nb_pci_putl(0, pex, 0, 0x15c, val)
@@ -1187,6 +1192,7 @@ extern "C" {
 #define	UNCERRSEV_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x10c, val)
 #define	RPERRSTS_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x130, val)
 #define	PEXDEVSTS_WR(pex, val)	nb_pci_putl(0, pex, 0, 0x76, val)
+#define	PEXROOTCTL_WR(pex, val)	nb_pci_putw(0, pex, 0, 0x88, val)
 
 #define	PCISTS_RD(ip)		nb_pci_getw(0, 8, 0, 0x6, ip)
 #define	PCIDEVSTS_RD()		nb_pci_getw(0, 8, 0, 0x76, 0)

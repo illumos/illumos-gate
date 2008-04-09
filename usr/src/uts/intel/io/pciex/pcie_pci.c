@@ -45,13 +45,15 @@
 #include <sys/fm/util.h>
 #include <sys/fm/protocol.h>
 #include <sys/pcie.h>
+#include <sys/pci_cap.h>
 #include <sys/pcie_impl.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/hotplug/pci/pciehpc.h>
+#include <sys/hotplug/hpctrl.h>
 #include <io/pciex/pcie_nvidia.h>
 #include <io/pciex/pcie_nb5000.h>
 
-#ifdef	DEBUG
+#ifdef DEBUG
 static int pepb_debug = 0;
 #define	PEPB_DEBUG(args)	if (pepb_debug) cmn_err args
 #else
@@ -157,7 +159,7 @@ struct dev_ops pepb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe to PCI nexus driver 1.10",
+	"PCIe to PCI nexus driver %I%",
 	&pepb_ops,	/* driver ops */
 };
 
@@ -174,7 +176,7 @@ static struct modlinkage modlinkage = {
 static void *pepb_state;
 
 typedef struct {
-	dev_info_t		*dip;
+	dev_info_t *dip;
 
 	/*
 	 * cpr support:
@@ -221,7 +223,7 @@ typedef struct {
 #define	PEPB_SOFT_STATE_INIT_MUTEX	0x20	/* mutex initialized */
 
 /* default interrupt priority for all interrupts (hotplug or non-hotplug */
-#define	PEPB_INTR_PRI   1
+#define	PEPB_INTR_PRI	1
 
 /* flag to turn on MSI support */
 static int pepb_enable_msi = 1;
@@ -240,14 +242,24 @@ static void 	pepb_save_config_regs(pepb_devstate_t *pepb_p);
 static void	pepb_restore_config_regs(pepb_devstate_t *pepb_p);
 static int	pepb_pcie_device_type(dev_info_t *dip, int *port_type);
 static int	pepb_pcie_port_type(dev_info_t *dip,
-		    ddi_acc_handle_t config_handle);
+			ddi_acc_handle_t config_handle);
+
 /* interrupt related declarations */
-static uint_t   pepb_intx_intr(caddr_t arg, caddr_t arg2);
-static uint_t   pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
-static uint_t   pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
+static uint_t	pepb_intx_intr(caddr_t arg, caddr_t arg2);
+static uint_t	pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
+static uint_t	pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
 static int	pepb_intr_on_root_port(dev_info_t *);
 static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
 static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
+
+/* Intel Workarounds */
+static void	pepb_intel_serr_workaround(dev_info_t *dip);
+static void	pepb_intel_rber_workaround(dev_info_t *dip);
+static void	pepb_intel_sw_workaround(dev_info_t *dip);
+int pepb_intel_workaround_disable = 0;
+
+/* state variable used to apply workaround on current system to RBER devices */
+static boolean_t pepb_do_rber_sev = B_FALSE;
 
 int
 _init(void)
@@ -330,7 +342,6 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	instance = ddi_get_instance(devi);
 	if (ddi_soft_state_zalloc(pepb_state, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
-
 	pepb = ddi_get_soft_state(pepb_state, instance);
 	pepb->dip = devi;
 
@@ -424,6 +435,11 @@ next_step:
 		}
 	}
 
+	/* Must apply workaround only after all initialization is done */
+	pepb_intel_serr_workaround(devi);
+	pepb_intel_rber_workaround(devi);
+	pepb_intel_sw_workaround(devi);
+
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);
 }
@@ -492,7 +508,7 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	int	reglen;
 	int	rn;
 	int	totreg;
-	pepb_devstate_t	*pepb = ddi_get_soft_state(pepb_state,
+	pepb_devstate_t *pepb = ddi_get_soft_state(pepb_state,
 	    ddi_get_instance(dip));
 	struct detachspec *ds;
 	struct attachspec *as;
@@ -539,6 +555,14 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		if ((as->when == DDI_POST) && (as->result == DDI_SUCCESS)) {
 			pf_init(rdip, (void *)pepb->pepb_fm_ibc, as->cmd);
 			(void) pcie_postattach_child(rdip);
+
+			/*
+			 * For leaf devices supporting RBER and AER, we need
+			 * to apply this workaround on them after attach to be
+			 * notified of UEs that would otherwise be ignored
+			 * as CEs on Intel chipsets currently
+			 */
+			pepb_intel_rber_workaround(rdip);
 		}
 
 		return (DDI_SUCCESS);
@@ -976,6 +1000,7 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	pepb_p->intr_type = intr_type;
 
 	return (DDI_SUCCESS);
+
 fail:
 	pepb_intr_fini(pepb_p);
 
@@ -1122,7 +1147,7 @@ int
 pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
     ddi_iblock_cookie_t *ibc)
 {
-	pepb_devstate_t	 *pepb = ddi_get_soft_state(pepb_state,
+	pepb_devstate_t  *pepb = ddi_get_soft_state(pepb_state,
 	    ddi_get_instance(dip));
 
 	ASSERT(ibc != NULL);
@@ -1203,8 +1228,29 @@ static int
 pepb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
-	return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode, credp,
-	    rvalp));
+	int			rv, inst;
+	pepb_devstate_t		*pepb;
+	dev_info_t		*dip;
+
+	rv = (pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode, credp,
+	    rvalp);
+
+	/*
+	 * like in attach, since hotplugging can change error registers,
+	 * we need to ensure that the proper bits are set on this port
+	 * after a configure operation
+	 */
+	if (rv == HPC_SUCCESS && cmd == DEVCTL_AP_CONFIGURE) {
+		inst = PCIHP_AP_MINOR_NUM_TO_INSTANCE(getminor(dev));
+		pepb = ddi_get_soft_state(pepb_state, inst);
+		dip = pepb->dip;
+
+		pepb_intel_serr_workaround(dip);
+		pepb_intel_rber_workaround(dip);
+		pepb_intel_sw_workaround(dip);
+	}
+
+	return (rv);
 }
 
 static int
@@ -1224,4 +1270,392 @@ pepb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 void
 pepb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
 	(void) pf_scan_fabric(dip, derr, NULL);
+}
+
+typedef struct x86_error_reg {
+	uint32_t	offset;
+	uint_t		size;
+	uint32_t	mask;
+	uint32_t	value;
+} x86_error_reg_t;
+
+typedef struct x86_error_tbl {
+	uint16_t	vendor_id;
+	uint16_t	device_id_low;
+	uint16_t	device_id_high;
+	uint8_t		rev_id_low;
+	uint8_t		rev_id_high;
+	x86_error_reg_t	*error_regs;
+	int		error_regs_len;
+} x86_error_tbl_t;
+
+/*
+ * Chipset and device specific settings that are required for error handling
+ * (reporting, fowarding, and response at the RC) beyond the standard
+ * registers in the PCIE and AER caps.
+ *
+ * The Northbridge Root Port settings also apply to the ESI port.  The ESI
+ * port is a special leaf device but functions like a root port connected
+ * to the Southbridge and receives all the onboard Southbridge errors
+ * including those from Southbridge Root Ports.  However, this does not
+ * include the Southbridge Switch Ports which act like normal switch ports
+ * and is connected to the Northbridge through a separate link.
+ *
+ * PCIE errors from the ESB2 Southbridge RPs are simply fowarded to the ESI
+ * port on the Northbridge.
+ *
+ * Currently without FMA support, we want UEs (Fatal and Non-Fatal) to panic
+ * the system, except for URs.  We do this by having the Root Ports respond
+ * with a System Error and having that trigger a Machine Check (MCE).
+ */
+
+/*
+ * 7300 Northbridge Root Ports
+ */
+static x86_error_reg_t intel_7300_rp_regs[] = {
+	/* Command Register - Enable SERR */
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+
+	/* Root Control Register - SERR on NFE/FE */
+	{0x88,  16, 0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
+
+	/* AER UE Mask - Mask UR */
+	{0x108, 32, 0x0,	PCIE_AER_UCE_UR},
+
+	/* PEXCTRL[21] check for certain malformed TLP types */
+	{0x48,	32, 0xFFFFFFFF, 0x200000},
+
+	/* PEX_ERR_DOCMD[7:0] SERR on FE & NFE triggers MCE */
+	{0x144,	8,  0x0, 	0xF0},
+
+	/* EMASK_UNCOR_PEX[21:0] UE mask */
+	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR},
+
+	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
+	{0x150,	8,  0x0, 	0x1},
+};
+#define	INTEL_7300_RP_REGS_LEN \
+	(sizeof (intel_7300_rp_regs) / sizeof (x86_error_reg_t))
+
+
+/*
+ * 5000 Northbridge Root Ports
+ */
+#define	intel_5000_rp_regs		intel_7300_rp_regs
+#define	INTEL_5000_RP_REGS_LEN		INTEL_7300_RP_REGS_LEN
+
+
+/*
+ * 5400 Northbridge Root Ports
+ */
+static x86_error_reg_t intel_5400_rp_regs[] = {
+	/* Command Register - Enable SERR */
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+
+	/* Root Control Register - SERR on NFE/FE */
+	{0x88,  16, 0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
+
+	/* AER UE Mask - Mask UR */
+	{0x108, 32, 0x0,	PCIE_AER_UCE_UR},
+
+	/* PEXCTRL[21] check for certain malformed TLP types */
+	{0x48,	32, 0xFFFFFFFF, 0x200000},
+
+	/* PEX_ERR_DOCMD[11:0] SERR on FE, NFE from PCIE & Unit triggers MCE */
+	{0x144,	16,  0x0, 	0xFF0},
+
+	/* PEX_ERR_PIN_MASK[4:0] do not mask ERR[2:0] pins used by DOCMD */
+	{0x146,	16,  0x0, 	0x10},
+
+	/* EMASK_UNCOR_PEX[21:0] UE mask */
+	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR},
+
+	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
+	{0x150,	8,  0x0, 	0x1},
+};
+#define	INTEL_5400_RP_REGS_LEN \
+	(sizeof (intel_5400_rp_regs) / sizeof (x86_error_reg_t))
+
+
+/*
+ * ESB2 Southbridge Root Ports
+ */
+static x86_error_reg_t intel_esb2_rp_regs[] = {
+	/* Command Register - Enable SERR */
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+
+	/* Root Control Register - SERR on NFE/FE */
+	{0x5c,  16, 0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
+
+	/* UEM[20:0] UE mask (write-once) */
+	{0x148, 32, 0x0,	PCIE_AER_UCE_UR},
+};
+#define	INTEL_ESB2_RP_REGS_LEN \
+	(sizeof (intel_esb2_rp_regs) / sizeof (x86_error_reg_t))
+
+
+/*
+ * ESB2 Southbridge Switch Ports
+ */
+static x86_error_reg_t intel_esb2_sw_regs[] = {
+	/* Command Register - Enable SERR */
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+
+	/* AER UE Mask - Mask UR */
+	{0x108, 32, 0x0,	PCIE_AER_UCE_UR},
+};
+#define	INTEL_ESB2_SW_REGS_LEN \
+	(sizeof (intel_esb2_sw_regs) / sizeof (x86_error_reg_t))
+
+
+x86_error_tbl_t x86_error_init_tbl[] = {
+	/* Intel 7300: 3600 = ESI, 3604-360A = NB root ports */
+	{0x8086, 0x3600, 0x3600, 0x0, 0xFF,
+		intel_7300_rp_regs, INTEL_7300_RP_REGS_LEN},
+	{0x8086, 0x3604, 0x360A, 0x0, 0xFF,
+		intel_7300_rp_regs, INTEL_7300_RP_REGS_LEN},
+
+	/* Intel 5000: 25C0, 25D0, 25D4, 25D8 = ESI */
+	{0x8086, 0x25C0, 0x25C0, 0x0, 0xFF,
+		intel_5000_rp_regs, INTEL_5000_RP_REGS_LEN},
+	{0x8086, 0x25D0, 0x25D0, 0x0, 0xFF,
+		intel_5000_rp_regs, INTEL_5000_RP_REGS_LEN},
+	{0x8086, 0x25D4, 0x25D4, 0x0, 0xFF,
+		intel_5000_rp_regs, INTEL_5000_RP_REGS_LEN},
+	{0x8086, 0x25D8, 0x25D8, 0x0, 0xFF,
+		intel_5000_rp_regs, INTEL_5000_RP_REGS_LEN},
+
+	/* Intel 5000: 25E2-25E7 and 25F7-25FA = NB root ports */
+	{0x8086, 0x25E2, 0x25E7, 0x0, 0xFF,
+		intel_5000_rp_regs, INTEL_5000_RP_REGS_LEN},
+	{0x8086, 0x25F7, 0x25FA, 0x0, 0xFF,
+		intel_5000_rp_regs, INTEL_5000_RP_REGS_LEN},
+
+	/* Intel 5400: 4000-4001, 4003 = ESI and 4021-4029 = NB root ports */
+	{0x8086, 0x4000, 0x4001, 0x0, 0xFF,
+		intel_5400_rp_regs, INTEL_5400_RP_REGS_LEN},
+	{0x8086, 0x4003, 0x4003, 0x0, 0xFF,
+		intel_5400_rp_regs, INTEL_5400_RP_REGS_LEN},
+	{0x8086, 0x4021, 0x4029, 0x0, 0xFF,
+		intel_5400_rp_regs, INTEL_5400_RP_REGS_LEN},
+
+	/* Intel 631xESB/632xESB aka ESB2: 2690-2697 = SB root ports */
+	{0x8086, 0x2690, 0x2697, 0x0, 0xFF,
+		intel_esb2_rp_regs, INTEL_ESB2_RP_REGS_LEN},
+
+	/* Intel Switches on esb2: 3500-3503, 3510-351B */
+	{0x8086, 0x3500, 0x3503, 0x0, 0xFF,
+		intel_esb2_sw_regs, INTEL_ESB2_SW_REGS_LEN},
+	{0x8086, 0x3510, 0x351B, 0x0, 0xFF,
+		intel_esb2_sw_regs, INTEL_ESB2_SW_REGS_LEN},
+
+	/* XXX Intel PCIe-PCIx on esb2: 350C */
+};
+static int x86_error_init_tbl_len =
+	sizeof (x86_error_init_tbl) / sizeof (x86_error_tbl_t);
+
+
+static int
+pepb_get_bdf(dev_info_t *dip, int *busp, int *devp, int *funcp)
+{
+	pci_regspec_t	*regspec;
+	int		reglen;
+	int		rv;
+
+	rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (int **)&regspec, (uint_t *)&reglen);
+	if (rv != DDI_SUCCESS)
+		return (rv);
+
+	if (reglen < (sizeof (pci_regspec_t) / sizeof (int))) {
+		ddi_prop_free(regspec);
+		return (DDI_FAILURE);
+	}
+
+	/* Get phys_hi from first element.  All have same bdf. */
+	*busp = PCI_REG_BUS_G(regspec->pci_phys_hi);
+	*devp = PCI_REG_DEV_G(regspec->pci_phys_hi);
+	*funcp = PCI_REG_FUNC_G(regspec->pci_phys_hi);
+
+	ddi_prop_free(regspec);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Temporary workaround until there is full error handling support on Intel.
+ * The main goal of this workaround is to make the system Machine Check/Panic if
+ * an UE is detected in the fabric.
+ */
+static void
+pepb_intel_serr_workaround(dev_info_t *dip)
+{
+	uint16_t		vid, did;
+	uint8_t			rid;
+	int			bus, dev, func;
+	int			i, j;
+	x86_error_tbl_t		*tbl;
+	x86_error_reg_t		*reg;
+	uint32_t		data, value;
+	ddi_acc_handle_t	cfg_hdl;
+
+	if (pepb_intel_workaround_disable)
+		return;
+
+	(void) pci_config_setup(dip, &cfg_hdl);
+	vid = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+	did = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
+	rid = pci_config_get8(cfg_hdl, PCI_CONF_REVID);
+
+	if (pepb_get_bdf(dip, &bus, &dev, &func) != DDI_SUCCESS) {
+		PEPB_DEBUG((CE_WARN, "%s#%d: pepb_get_bdf() failed",
+		    ddi_driver_name(dip), ddi_get_instance(dip)));
+		return;
+	}
+
+	PEPB_DEBUG((CE_NOTE, "VID:0x%x DID:0x%x RID:0x%x bdf=%x.%x.%x, "
+	    "dip:0x%p", vid, did, rid, bus, dev, func, (void *)dip));
+
+	tbl = x86_error_init_tbl;
+	for (i = 0; i < x86_error_init_tbl_len; i++, tbl++) {
+		if (!((vid == tbl->vendor_id) &&
+		    (did >= tbl->device_id_low) &&
+		    (did <= tbl->device_id_high) &&
+		    (rid >= tbl->rev_id_low) &&
+		    (rid <= tbl->rev_id_high)))
+			continue;
+
+		reg = tbl->error_regs;
+		for (j = 0; j < tbl->error_regs_len; j++, reg++) {
+			data = 0xDEADBEEF;
+			value = 0xDEADBEEF;
+			switch (reg->size) {
+			case 32:
+				data = (uint32_t)pci_config_get32(cfg_hdl,
+				    reg->offset);
+				value = (data & reg->mask) | reg->value;
+				pci_config_put32(cfg_hdl, reg->offset, value);
+				value = (uint32_t)pci_config_get32(cfg_hdl,
+				    reg->offset);
+				break;
+			case 16:
+				data = (uint32_t)pci_config_get16(cfg_hdl,
+				    reg->offset);
+				value = (data & reg->mask) | reg->value;
+				pci_config_put16(cfg_hdl, reg->offset,
+				    (uint16_t)value);
+				value = (uint32_t)pci_config_get16(cfg_hdl,
+				    reg->offset);
+				break;
+			case 8:
+				data = (uint32_t)pci_config_get8(cfg_hdl,
+				    reg->offset);
+				value = (data & reg->mask) | reg->value;
+				pci_config_put8(cfg_hdl, reg->offset,
+				    (uint8_t)value);
+				value = (uint32_t)pci_config_get8(cfg_hdl,
+				    reg->offset);
+				break;
+			}
+			PEPB_DEBUG((CE_NOTE, "size:%d off:0x%x mask:0x%x "
+			    "value:0x%x + orig:0x%x -> 0x%x",
+			    reg->size, reg->offset, reg->mask, reg->value,
+			    data, value));
+		}
+
+		/*
+		 * Make sure on this platform that devices supporting RBER
+		 * will set their UE severity appropriately
+		 */
+		pepb_do_rber_sev = B_TRUE;
+	}
+
+	pci_config_teardown(&cfg_hdl);
+}
+
+/*
+ * For devices that support Role Base Errors, make several UE have a FATAL
+ * severity.  That way a Fatal Message will be sent instead of a Correctable
+ * Message.  Without full FMA support, CEs will be ignored.
+ */
+uint32_t pepb_rber_sev = (PCIE_AER_UCE_TRAINING | PCIE_AER_UCE_DLP |
+    PCIE_AER_UCE_SD | PCIE_AER_UCE_PTLP | PCIE_AER_UCE_FCP | PCIE_AER_UCE_TO |
+    PCIE_AER_UCE_CA | PCIE_AER_UCE_RO | PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC);
+
+static void
+pepb_intel_rber_workaround(dev_info_t *dip)
+{
+	uint16_t pcie_off, aer_off;
+	ddi_acc_handle_t cfg_hdl;
+	uint32_t rber;
+
+	if (pepb_intel_workaround_disable)
+		return;
+	if (!pepb_do_rber_sev)
+		return;
+
+	/* check config setup since it can be called on other dips */
+	if (pci_config_setup(dip, &cfg_hdl) != DDI_SUCCESS) {
+		PEPB_DEBUG((CE_NOTE, "pepb_intel_rber_workaround: config "
+		    "setup failed on dip 0x%p", (void *)dip));
+		return;
+	}
+
+	if (PCI_CAP_LOCATE(cfg_hdl, PCI_CAP_ID_PCI_E, &pcie_off) ==
+	    DDI_FAILURE)
+		goto done;
+
+	if (PCI_CAP_LOCATE(cfg_hdl, PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_AER),
+	    &aer_off) == DDI_FAILURE)
+		goto done;
+
+	rber = PCI_CAP_GET16(cfg_hdl, NULL, pcie_off, PCIE_DEVCAP) &
+	    PCIE_DEVCAP_ROLE_BASED_ERR_REP;
+	if (!rber)
+		goto done;
+
+	PCI_XCAP_PUT32(cfg_hdl, NULL, aer_off, PCIE_AER_UCE_SERV,
+	    pepb_rber_sev);
+
+done:
+	pci_config_teardown(&cfg_hdl);
+}
+
+/*
+ * Workaround for certain switches regardless of platform
+ */
+static void
+pepb_intel_sw_workaround(dev_info_t *dip)
+{
+	uint16_t		vid, regw;
+	int			port_type;
+	ddi_acc_handle_t	cfg_hdl;
+
+	if (pepb_intel_workaround_disable)
+		return;
+
+	(void) pepb_pcie_device_type(dip, &port_type);
+	if (!((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_DOWN)))
+		return;
+
+	(void) pci_config_setup(dip, &cfg_hdl);
+	vid = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+
+	/*
+	 * Intel and PLX switches require SERR in CMD reg to foward error
+	 * messages, though this is not PCIE spec-compliant behavior.
+	 * To prevent the switches themselves from reporting errors on URs
+	 * when the CMD reg has SERR enabled (which is expected according to
+	 * the PCIE spec) we rely on masking URs in the AER cap.
+	 */
+	if (vid == 0x8086 || vid == 0x10B5) {
+		regw = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
+		pci_config_put16(cfg_hdl, PCI_CONF_COMM,
+		    regw | PCI_COMM_SERR_ENABLE);
+	}
+
+	pci_config_teardown(&cfg_hdl);
 }

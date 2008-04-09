@@ -267,15 +267,9 @@ pcie_initchild(dev_info_t *cdip)
 		/* Setup the device's secondary command register */
 		reg16 = PCIE_GET(16, bus_p, PCI_BCNF_BCNTRL);
 		tmp16 = (reg16 & pcie_bdg_command_default_fw);
+		tmp16 |= PCI_BCNF_BCNTRL_SERR_ENABLE;
 		if (pcie_command_default & PCI_COMM_PARITY_DETECT)
 			tmp16 |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
-		if (pcie_command_default & PCI_COMM_SERR_ENABLE) {
-			if (pcie_serr_disable_flag && PCIE_IS_PCIE(bus_p) &&
-			    PCIE_IS_ROOT(bus_p))
-				tmp16 &= ~PCI_BCNF_BCNTRL_SERR_ENABLE;
-			else
-				tmp16 |= PCI_BCNF_BCNTRL_SERR_ENABLE;
-		}
 
 		/*
 		 * Enable Master Abort Mode only if URs have not been masked.
@@ -285,9 +279,9 @@ pcie_initchild(dev_info_t *cdip)
 		 * requests are returned with -1.
 		 */
 		if (pcie_aer_uce_mask & PCIE_AER_UCE_UR)
-			tmp16 |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
-		else
 			tmp16 &= ~PCI_BCNF_BCNTRL_MAST_AB_MODE;
+		else
+			tmp16 |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
 		PCIE_PUT(16, bus_p, PCI_BCNF_BCNTRL, tmp16);
 		PCIE_DBG_CFG(cdip, bus_p, "SEC CMD", 16, PCI_BCNF_BCNTRL,
 		    reg16);
