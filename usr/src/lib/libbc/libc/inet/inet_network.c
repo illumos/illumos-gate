@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 	 /* from UCB 4.2 82/10/07 */
 
@@ -47,7 +52,7 @@ again:
 		else
 			base = 8;
 	}
-	while (c = *cp) {
+	while ((c = *cp) != '\0') {
 		if (isdigit(c)) {
 			if ((c - '0') >= base)
 			    break;
@@ -62,21 +67,19 @@ again:
 		}
 		break;
 	}
-	if (*cp == '.') {
-		if (pp >= parts + 4)
-			return (-1);
-		*pp++ = val, cp++;
-		goto again;
-	}
-	if (*cp && !isspace(*cp))
+	if (pp >= parts + 4 || val > 0xff)
 		return (-1);
 	*pp++ = val;
-	n = pp - parts;
-	if (n > 4)
+	if (*cp == '.') {
+		cp++;
+		goto again;
+	}
+	if (*cp != '\0' && !isspace(*cp))
 		return (-1);
+	n = pp - parts;
 	for (val = 0, i = 0; i < n; i++) {
 		val <<= 8;
-		val |= parts[i] & 0xff;
+		val |= parts[i];
 	}
 	return (val);
 }
