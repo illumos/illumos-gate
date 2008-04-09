@@ -580,9 +580,13 @@ fab_prep_basic_erpt(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *erpt,
 	err |= nvlist_lookup_uint64_array(nvl, "__tod", &now, &nelem);
 	err |= nvlist_lookup_uint64(nvl, "ena", &ena);
 	err |= nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &detector);
+	if (err)
+		return (err);
 
 	/* Make a copy of the detector */
-	err |= nvlist_dup(detector, &new_detector, NV_UNIQUE_NAME);
+	err = nvlist_dup(detector, &new_detector, NV_UNIQUE_NAME);
+	if (err)
+		return (err);
 
 	/* Copy the tod and ena to erpt */
 	(void) nvlist_add_uint64(erpt, FM_EREPORT_ENA, ena);
@@ -606,6 +610,7 @@ fab_prep_basic_erpt(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *erpt,
 	/* Copy the FMRI to erpt */
 	(void) nvlist_add_nvlist(erpt, FM_EREPORT_DETECTOR, new_detector);
 
+	nvlist_free(new_detector);
 	return (err);
 }
 
@@ -650,7 +655,8 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 		int		err = 0;
 
 		/* Allocate space for new erpt */
-		(void) nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
+			goto done;
 
 		/* Generate the target ereport class */
 		(void) snprintf(fab_buf, FM_MAX_CLASS, "ereport.io.%s.%s",
@@ -666,7 +672,10 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 		(void) nvlist_add_uint64_array(erpt, "__tod", now, nelem);
 
 		/* Create the correct FMRI */
-		(void) nvlist_alloc(&detector, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&detector, NV_UNIQUE_NAME, 0) != 0) {
+			nvlist_free(erpt);
+			goto done;
+		}
 		(void) nvlist_add_string(detector, FM_VERSION,
 		    FM_DEV_SCHEME_VERSION);
 		(void) nvlist_add_string(detector, FM_FMRI_SCHEME,
@@ -686,6 +695,10 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 		fmd_hdl_debug(hdl, "Cannot find Target FMRI addr:0x%llx",
 		    tgt_addr);
 	}
+
+	return;
+done:
+	fmd_hdl_debug(hdl, "Failed  to send Target PCI ereport\n");
 }
 
 static void
@@ -707,7 +720,8 @@ fab_send_erpt(fmd_hdl_t *hdl, fab_data_t *data, fab_err_tbl_t *tbl)
 		if (!(reg & entry->reg_bit))
 			continue;
 
-		(void) nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
+			goto done;
 		if (tbl->fab_prep(hdl, data, erpt, entry) != 0) {
 			fmd_hdl_debug(hdl, "Prepping ereport failed\n");
 			nvlist_free(erpt);
@@ -721,6 +735,10 @@ fab_send_erpt(fmd_hdl_t *hdl, fab_data_t *data, fab_err_tbl_t *tbl)
 			return;
 		}
 	}
+
+	return;
+done:
+	fmd_hdl_debug(hdl, "Failed  to send PCI ereport\n");
 }
 
 static int
@@ -932,7 +950,8 @@ fab_send_pcix_ecc_erpt(fmd_hdl_t *hdl, fab_data_t *data)
 	}
 
 	if (ecc_phase) {
-		(void) nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
+			goto done;
 		(void) fab_prep_basic_erpt(hdl, data->nvl, erpt, B_FALSE);
 		(void) nvlist_add_string(erpt, FM_CLASS, fab_buf);
 		(void) nvlist_add_uint16(erpt, PCIX_COMMAND,
@@ -951,7 +970,8 @@ fab_send_pcix_ecc_erpt(fmd_hdl_t *hdl, fab_data_t *data)
 		(void) snprintf(fab_buf, FM_MAX_CLASS,
 		    "%s.%s", PCIX_ERROR_SUBCLASS,
 		    sec_ce ? PCIX_ECC_S_CE : PCIX_ECC_S_UE);
-		(void) nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
+			goto done;
 		(void) fab_prep_basic_erpt(hdl, data->nvl, erpt, B_FALSE);
 		(void) nvlist_add_string(erpt, FM_CLASS, fab_buf);
 		(void) nvlist_add_uint16(erpt, PCIX_COMMAND,
@@ -965,6 +985,10 @@ fab_send_pcix_ecc_erpt(fmd_hdl_t *hdl, fab_data_t *data)
 		if (fmd_xprt_error(hdl, fab_fmd_xprt))
 			fmd_hdl_debug(hdl, "Failed to send ECC ereport\n");
 	}
+
+	return;
+done:
+	fmd_hdl_debug(hdl, "Failed to send ECC ereport\n");
 }
 
 static int
@@ -1038,7 +1062,8 @@ fab_send_pcix_bdg_ecc_erpt(fmd_hdl_t *hdl, fab_data_t *data)
 		break;
 	}
 	if (ecc_phase) {
-		(void) nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
+			goto done;
 		(void) fab_prep_basic_erpt(hdl, data->nvl, erpt, B_FALSE);
 		(void) nvlist_add_string(erpt, FM_CLASS, fab_buf);
 		(void) nvlist_add_uint16(erpt, PCIX_SEC_STATUS,
@@ -1058,7 +1083,8 @@ fab_send_pcix_bdg_ecc_erpt(fmd_hdl_t *hdl, fab_data_t *data)
 		(void) snprintf(fab_buf, FM_MAX_CLASS,
 		    "%s.%s%s", PCIX_ERROR_SUBCLASS, PCIX_SEC_ERROR_SUBCLASS,
 		    sec_ce ? PCIX_ECC_S_CE : PCIX_ECC_S_UE);
-		(void) nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0);
+		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
+			goto done;
 		(void) fab_prep_basic_erpt(hdl, data->nvl, erpt, B_FALSE);
 		(void) nvlist_add_string(erpt, FM_CLASS, fab_buf);
 		(void) nvlist_add_uint16(erpt, PCIX_SEC_STATUS,
@@ -1073,6 +1099,9 @@ fab_send_pcix_bdg_ecc_erpt(fmd_hdl_t *hdl, fab_data_t *data)
 		if (fmd_xprt_error(hdl, fab_fmd_xprt))
 			fmd_hdl_debug(hdl, "Failed to send ECC ereport\n");
 	}
+	return;
+done:
+	fmd_hdl_debug(hdl, "Failed to send ECC ereport\n");
 }
 
 static int
@@ -1507,6 +1536,11 @@ fab_update_topo(fmd_hdl_t *hdl)
 	(void) fclose(fp);
 
 	fmd_hdl_topo_rele(hdl, thp);
+
+	if (fab_xpathCtx)
+		xmlXPathFreeContext(fab_xpathCtx);
+	if (fab_doc)
+		xmlFreeDoc(fab_doc);
 
 	/* Load xml document */
 	fab_doc = xmlParseFile(XMLTOPOFILE);
