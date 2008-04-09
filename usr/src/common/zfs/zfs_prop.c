@@ -96,8 +96,9 @@ zfs_prop_init(void)
 	static zprop_index_t acl_inherit_table[] = {
 		{ "discard",	ZFS_ACL_DISCARD },
 		{ "noallow",	ZFS_ACL_NOALLOW },
-		{ "secure",	ZFS_ACL_SECURE },
+		{ "restricted",	ZFS_ACL_RESTRICTED },
 		{ "passthrough", ZFS_ACL_PASSTHROUGH },
+		{ "secure",	ZFS_ACL_RESTRICTED }, /* bkwrd compatability */
 		{ NULL }
 	};
 
@@ -165,10 +166,10 @@ zfs_prop_init(void)
 	register_index(ZFS_PROP_ACLMODE, "aclmode", ZFS_ACL_GROUPMASK,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "discard | groupmask | passthrough", "ACLMODE", acl_mode_table);
-	register_index(ZFS_PROP_ACLINHERIT, "aclinherit", ZFS_ACL_SECURE,
+	register_index(ZFS_PROP_ACLINHERIT, "aclinherit", ZFS_ACL_RESTRICTED,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
-	    "discard | noallow | secure | passthrough", "ACLINHERIT",
-	    acl_inherit_table);
+	    "discard | noallow | restricted | passthrough",
+	    "ACLINHERIT", acl_inherit_table);
 	register_index(ZFS_PROP_COPIES, "copies", 1,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "1 | 2 | 3", "COPIES", copies_table);
