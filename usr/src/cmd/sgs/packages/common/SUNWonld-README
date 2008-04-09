@@ -1335,3 +1335,4 @@ Bugid   Risk Synopsis
 6681761 lies, darn lies, and linker README files
 6509323 Need to disable the Multiple Files loading - same name, different
 	directories (or its stat() use)
+6685125 ld/elfdump do not handle ZERO terminator .eh_frame amd64 unwind entry

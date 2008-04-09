@@ -310,6 +310,7 @@
 @ MSG_UNW_BINSRTAB1	"  Binary Search Table:"
 @ MSG_UNW_BINSRTAB2	"      InitialLoc          FdeLoc"
 @ MSG_UNW_BINSRTABENT	"    0x%016llx  0x%016llx"
+@ MSG_UNW_ZEROTERM	"ZERO terminator: [0x00000000]"
 @ MSG_UNW_CIE		"CIE: [0x%08llx]"
 @ MSG_UNW_CIELNGTH	" length: 0x%02x cieid: %d"
 @ MSG_UNW_CIEVERS	" version: %d  augstring: `%s'"

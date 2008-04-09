@@ -356,23 +356,29 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, osp)) {
 		Is_desc	    *isp;
 		Listnode    *_lnp;
+
 		for (LIST_TRAVERSE(&osp->os_isdescs, _lnp, isp)) {
-			unsigned char	*data;
+			uchar_t		*data;
 			size_t		datasize;
 			uint64_t	off;
 			uint_t		length, id;
 
-			data = (unsigned char *)isp->is_indata->d_buf;
+			data = (uchar_t *)isp->is_indata->d_buf;
 			datasize = isp->is_indata->d_size;
 			off = 0;
 			while (off < datasize) {
-				uint_t	    ndx;
+				uint_t	    ndx = 0;
 
-				ndx = 0;
 				/*
-				 * extract length in lsb format
+				 * Extract length in lsb format.  A zero length
+				 * indicates that this CIE is a terminator and
+				 * that processing for this unwind information
+				 * should end.
 				 */
-				length = LSB32EXTRACT(data + off + ndx);
+				if ((length =
+				    LSB32EXTRACT(data + off + ndx)) == 0)
+					break;
+
 				ndx += 4;
 
 				/*
@@ -467,7 +473,7 @@ bintabcompare(const void *p1, const void *p2)
 uintptr_t
 populate_amd64_unwindhdr(Ofl_desc *ofl)
 {
-	unsigned char	*hdrdata;
+	uchar_t		*hdrdata;
 	uint_t		*binarytable;
 	uint_t		hdroff;
 	Listnode	*lnp;
@@ -520,7 +526,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 	fde_count = 0;
 
 	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, osp)) {
-		unsigned char	*fdata;
+		uchar_t		*fdata;
 		uint64_t	fdatasize;
 		uint_t		foff;
 		uint64_t	fndx;

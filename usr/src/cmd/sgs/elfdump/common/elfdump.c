@@ -536,9 +536,22 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 
 			ndx = 0;
 			/*
-			 * extract length in lsb format
+			 * Extract length in lsb format.  A zero length
+			 * indicates that this CIE is a terminator and that
+			 * processing for this unwind information should end.
+			 * However, skip this entry and keep processing, just
+			 * in case there is any other information remaining in
+			 * this section.  Note, ld(1) will terminate the
+			 * processing of the .eh_frame contents for this file
+			 * after a zero length CIE, thus any information that
+			 * does follow is ignored by ld(1), and is therefore
+			 * questionable.
 			 */
-			length = LSB32EXTRACT(data + off + ndx);
+			if ((length = LSB32EXTRACT(data + off + ndx)) == 0) {
+				dbg_print(0, MSG_ORIG(MSG_UNW_ZEROTERM));
+				off += 4;
+				continue;
+			}
 			ndx += 4;
 
 			/*
