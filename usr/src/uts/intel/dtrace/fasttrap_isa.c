@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1377,7 +1377,11 @@ fasttrap_pid_probe(struct regs *rp)
 	case FASTTRAP_T_COMMON:
 	{
 		uintptr_t addr;
-		uint8_t scratch[2 * FASTTRAP_MAX_INSTR_SIZE + 5 + 2];
+#if defined(__amd64)
+		uint8_t scratch[2 * FASTTRAP_MAX_INSTR_SIZE + 22];
+#else
+		uint8_t scratch[2 * FASTTRAP_MAX_INSTR_SIZE + 7];
+#endif
 		uint_t i = 0;
 		klwp_t *lwp = ttolwp(curthread);
 
@@ -1395,7 +1399,7 @@ fasttrap_pid_probe(struct regs *rp)
 			addr = lwp->lwp_pcb.pcb_gsbase;
 			addr += sizeof (caddr32_t);
 		}
-#elif defined(__i386)
+#else
 		addr = USEGD_GETBASE(&lwp->lwp_pcb.pcb_gsdesc);
 		addr += sizeof (void *);
 #endif
@@ -1579,6 +1583,8 @@ fasttrap_pid_probe(struct regs *rp)
 		i += tp->ftt_size;
 		scratch[i++] = FASTTRAP_INT;
 		scratch[i++] = T_DTRACE_RET;
+
+		ASSERT(i <= sizeof (scratch));
 
 		if (fasttrap_copyout(scratch, (char *)addr, i)) {
 			fasttrap_sigtrap(p, curthread, pc);

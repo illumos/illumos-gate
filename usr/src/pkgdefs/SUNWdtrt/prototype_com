@@ -559,6 +559,8 @@ f none SUNWdtrt/tst/common/funcs/tst.strtok.d.out 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.strtok_null.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.substr.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.substr.d.out 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.substrminate.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.substrminate.d.out 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.system.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.system.d.out 0444 root bin
 d none SUNWdtrt/tst/common/grammar 0755 root bin
@@ -675,6 +677,7 @@ f none SUNWdtrt/tst/common/pid/err.D_PROC_NAME.globdash.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/err.D_PROC_NAME.globdash.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/err.D_PROC_OFF.toobig.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/err.D_PROC_OFF.toobig.exe 0555 root bin
+f none SUNWdtrt/tst/common/pid/tst.addprobes.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.args1.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.args1.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/tst.coverage.d 0444 root bin
@@ -690,6 +693,8 @@ f none SUNWdtrt/tst/common/pid/tst.gcc.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.gcc.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/tst.main.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.manypids.ksh 0444 root bin
+f none SUNWdtrt/tst/common/pid/tst.newprobes.ksh 0444 root bin
+f none SUNWdtrt/tst/common/pid/tst.newprobes.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.probemod.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.provregex1.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.provregex2.ksh 0444 root bin
@@ -698,7 +703,6 @@ f none SUNWdtrt/tst/common/pid/tst.provregex3.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.provregex3.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.provregex4.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.provregex4.ksh.out 0444 root bin
-f none SUNWdtrt/tst/common/pid/tst.addprobes.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.ret1.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.ret1.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/tst.ret2.d 0444 root bin
@@ -749,9 +753,11 @@ f none SUNWdtrt/tst/common/pointers/tst.basic1.d 0444 root bin
 f none SUNWdtrt/tst/common/pointers/tst.basic2.d 0444 root bin
 d none SUNWdtrt/tst/common/pragma 0755 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGERR.d 0444 root bin
+f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_DEPEND.main.d 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_INVAL.d 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_MALFORM.d 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_UNUSED.UnusedPragma.d 0444 root bin
+f none SUNWdtrt/tst/common/pragma/tst.libchain.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pragma/tst.libdep.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.circlibdep.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.invalidlibdep.ksh 0444 root bin

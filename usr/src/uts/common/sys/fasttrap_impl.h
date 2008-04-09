@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +47,9 @@ extern "C" {
  * providers. Those providers are each represented by a fasttrap_provider_t.
  * All providers for a given process have a pointer to a shared
  * fasttrap_proc_t. The fasttrap_proc_t has two states: active or defunct.
- * When the count of live providers goes to zero it becomes defunct; providers
- * drop their count when they are removed individually or en masse when a
- * process exits or performs an exec.
+ * When the count of active providers goes to zero it becomes defunct; a
+ * provider drops its active count when it is removed individually or as part
+ * of a mass removal when a process exits or performs an exec.
  *
  * Each probe is represented by a fasttrap_probe_t which has a pointer to
  * its associated provider as well as a list of fasttrap_id_tp_t structures
@@ -58,8 +58,8 @@ extern "C" {
  * and it contains two lists of fasttrap_id_t structures (to be fired pre-
  * and post-instruction emulation) that identify the probes attached to the
  * tracepoint. Tracepoints also have a pointer to the fasttrap_proc_t for the
- * process they trace which is used when looking up a tracepoint both at
- * probe fire time and when enabling and disabling probes.
+ * process they trace which is used when looking up a tracepoint both when a
+ * probe fires and when enabling and disabling probes.
  *
  * It's important to note that probes are preallocated with the necessary
  * number of tracepoints, but that tracepoints can be shared by probes and
@@ -73,8 +73,8 @@ extern "C" {
 typedef struct fasttrap_proc {
 	pid_t ftpc_pid;				/* process ID for this proc */
 	uint64_t ftpc_acount;			/* count of active providers */
-	uint64_t ftpc_rcount;			/* provider reference count */
-	kmutex_t ftpc_mtx;			/* proc lock */
+	uint64_t ftpc_rcount;			/* count of extant providers */
+	kmutex_t ftpc_mtx;			/* lock on all but acount */
 	struct fasttrap_proc *ftpc_next;	/* next proc in hash chain */
 } fasttrap_proc_t;
 
