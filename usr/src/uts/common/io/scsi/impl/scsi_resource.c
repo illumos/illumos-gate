@@ -52,7 +52,7 @@ scsi_alloc_consistent_buf(struct scsi_address *ap,
 	size_t		rlen;
 
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_ALLOC_CONSISTENT_BUF_START,
-		"scsi_alloc_consistent_buf_start");
+	    "scsi_alloc_consistent_buf_start");
 
 	if (!in_bp) {
 		kmflag = (callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP;
@@ -100,14 +100,14 @@ scsi_alloc_consistent_buf(struct scsi_address *ap,
 	bp->b_resid = 0;
 
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_ALLOC_CONSISTENT_BUF_END,
-		"scsi_alloc_consistent_buf_end");
+	    "scsi_alloc_consistent_buf_end");
 	return (bp);
 
 no_resource:
 
 	if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 		ddi_set_callback(callback, callback_arg,
-			&scsi_callback_id);
+		    &scsi_callback_id);
 	}
 	TRACE_0(TR_FAC_SCSI_RES,
 	    TR_SCSI_ALLOC_CONSISTENT_BUF_RETURN1_END,
@@ -119,7 +119,7 @@ void
 scsi_free_consistent_buf(struct buf *bp)
 {
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_FREE_CONSISTENT_BUF_START,
-		"scsi_free_consistent_buf_start");
+	    "scsi_free_consistent_buf_start");
 	if (!bp)
 		return;
 	if (bp->b_un.b_addr)
@@ -129,14 +129,14 @@ scsi_free_consistent_buf(struct buf *bp)
 		ddi_run_callback(&scsi_callback_id);
 	}
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_FREE_CONSISTENT_BUF_END,
-		"scsi_free_consistent_buf_end");
+	    "scsi_free_consistent_buf_end");
 }
 
 void
 scsi_dmafree_attr(struct scsi_pkt *pktp)
 {
 	struct scsi_pkt_cache_wrapper *pktw =
-		(struct scsi_pkt_cache_wrapper *)pktp;
+	    (struct scsi_pkt_cache_wrapper *)pktp;
 
 	if (pktw->pcw_flags & PCW_BOUND) {
 		if (ddi_dma_unbind_handle(pktp->pkt_handle) !=
@@ -172,8 +172,8 @@ scsi_dma_buf_bind_attr(struct scsi_pkt_cache_wrapper *pktw,
 	ASSERT(pktw->pcw_totalwin == 0);
 
 	status = ddi_dma_buf_bind_handle(pktp->pkt_handle, bp, dma_flags,
-		    callback, arg, &pktw->pcw_cookie,
-		    &pktp->pkt_numcookies);
+	    callback, arg, &pktw->pcw_cookie,
+	    &pktp->pkt_numcookies);
 
 	switch (status) {
 	case DDI_DMA_MAPPED:
@@ -229,9 +229,9 @@ scsi_dmaget_attr(struct scsi_pkt_cache_wrapper *pktw)
 		 * start the next window, and get its first cookie
 		 */
 		status = ddi_dma_getwin(pktp->pkt_handle,
-				pktw->pcw_curwin, &pktp->pkt_dma_offset,
-				&pktp->pkt_dma_len, &cookie,
-				&pktp->pkt_numcookies);
+		    pktw->pcw_curwin, &pktp->pkt_dma_offset,
+		    &pktp->pkt_dma_len, &cookie,
+		    &pktp->pkt_numcookies);
 		if (status != DDI_SUCCESS)
 			return (0);
 	}
@@ -287,7 +287,7 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		else
 			kf = KM_NOSLEEP;
 		pktw = kmem_cache_alloc(tranp->tran_pkt_cache_ptr,
-			    kf);
+		    kf);
 		if (pktw == NULL)
 			goto fail1;
 
@@ -338,7 +338,7 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 				goto fail4;
 		}
 		if ((*tranp->tran_setup_pkt) (in_pktp,
-			func, NULL) == -1) {
+		    func, NULL) == -1) {
 				goto fail5;
 		}
 		if (cmdlen)
@@ -369,19 +369,19 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		 * need to bother with this
 		 */
 		if (tranp->tran_dma_attr.dma_attr_granular !=
-			pktw->pcw_granular) {
+		    pktw->pcw_granular) {
 
 			ddi_dma_free_handle(&in_pktp->pkt_handle);
 			if (ddi_dma_alloc_handle(tranp->tran_hba_dip,
-				&tranp->tran_dma_attr,
-				func, NULL,
-				&in_pktp->pkt_handle) != DDI_SUCCESS) {
+			    &tranp->tran_dma_attr,
+			    func, NULL,
+			    &in_pktp->pkt_handle) != DDI_SUCCESS) {
 
 				in_pktp->pkt_handle = NULL;
 				return (NULL);
 			}
 			pktw->pcw_granular =
-				tranp->tran_dma_attr.dma_attr_granular;
+			    tranp->tran_dma_attr.dma_attr_granular;
 		}
 #endif
 
@@ -432,13 +432,13 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		pktw->pcw_total_xfer += in_pktp->pkt_dma_len;
 #endif
 		ASSERT(in_pktp->pkt_numcookies <=
-			tranp->tran_dma_attr.dma_attr_sgllen);
+		    tranp->tran_dma_attr.dma_attr_sgllen);
 		ASSERT(pktw->pcw_total_xfer <= bp->b_bcount);
 		in_pktp->pkt_resid = bp->b_bcount -
-			pktw->pcw_total_xfer;
+		    pktw->pcw_total_xfer;
 
 		ASSERT((in_pktp->pkt_resid % pktw->pcw_granular) ==
-			0);
+		    0);
 	} else {
 		/* !bp or no b_bcount */
 		in_pktp->pkt_resid = 0;
@@ -453,7 +453,7 @@ fail5:
 		    sizeof (struct scsi_pkt));
 		if ((A_TO_TRAN(ap))->tran_hba_flags & SCSI_HBA_TRAN_CDB)
 			in_pktp->pkt_scbp = (opaque_t)((in_pktp->pkt_scbp) +
-				DEFAULT_CDBLEN);
+			    DEFAULT_CDBLEN);
 		in_pktp->pkt_scblen = 0;
 	}
 fail4:
@@ -477,7 +477,7 @@ fail2:
 fail1:
 	if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 		ddi_set_callback(callback, callback_arg,
-			&scsi_callback_id);
+		    &scsi_callback_id);
 	}
 
 	return (NULL);
@@ -504,7 +504,7 @@ scsi_free_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pktp)
 		    DEFAULT_PRIVLEN + sizeof (struct scsi_pkt_cache_wrapper));
 		if ((A_TO_TRAN(ap))->tran_hba_flags & SCSI_HBA_TRAN_CDB)
 			pktp->pkt_scbp = (opaque_t)((pktp->pkt_scbp) +
-				DEFAULT_CDBLEN);
+			    DEFAULT_CDBLEN);
 		pktp->pkt_scblen = 0;
 	}
 	if (pktw->pcw_flags & PCW_NEED_EXT_TGT) {
@@ -553,16 +553,16 @@ scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
 
 	pktp = (*tranp->tran_init_pkt) (ap, in_pktp, bp, cmdlen,
-		statuslen, pplen, flags, func, NULL);
+	    statuslen, pplen, flags, func, NULL);
 	if (pktp == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 			ddi_set_callback(callback, callback_arg,
-				&scsi_callback_id);
+			    &scsi_callback_id);
 		}
 	}
 
 	TRACE_1(TR_FAC_SCSI_RES, TR_SCSI_INIT_PKT_END,
-		"scsi_init_pkt_end: pktp %p", pktp);
+	    "scsi_init_pkt_end: pktp %p", pktp);
 	return (pktp);
 }
 
@@ -572,7 +572,7 @@ scsi_destroy_pkt(struct scsi_pkt *pkt)
 	struct scsi_address	*ap = P_TO_ADDR(pkt);
 
 	TRACE_1(TR_FAC_SCSI_RES, TR_SCSI_DESTROY_PKT_START,
-		"scsi_destroy_pkt_start: pkt %p", pkt);
+	    "scsi_destroy_pkt_start: pkt %p", pkt);
 
 	(*A_TO_TRAN(ap)->tran_destroy_pkt)(ap, pkt);
 
@@ -581,7 +581,7 @@ scsi_destroy_pkt(struct scsi_pkt *pkt)
 	}
 
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_DESTROY_PKT_END,
-		"scsi_destroy_pkt_end");
+	    "scsi_destroy_pkt_end");
 }
 
 
@@ -600,7 +600,7 @@ scsi_resalloc(struct scsi_address *ap, int cmdlen, int statuslen,
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
 
 	pkt = (*tranp->tran_init_pkt) (ap, NULL, (struct buf *)dmatoken,
-		cmdlen, statuslen, 0, 0, func, NULL);
+	    cmdlen, statuslen, 0, 0, func, NULL);
 	if (pkt == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 			ddi_set_callback(callback, NULL, &scsi_callback_id);
@@ -621,7 +621,7 @@ scsi_pktalloc(struct scsi_address *ap, int cmdlen, int statuslen,
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
 
 	pkt = (*tran->tran_init_pkt) (ap, NULL, NULL, cmdlen,
-		statuslen, 0, 0, func, NULL);
+	    statuslen, 0, 0, func, NULL);
 	if (pkt == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 			ddi_set_callback(callback, NULL, &scsi_callback_id);
@@ -640,8 +640,8 @@ scsi_dmaget(struct scsi_pkt *pkt, opaque_t dmatoken, int (*callback)())
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
 
 	new_pkt = (*P_TO_TRAN(pkt)->tran_init_pkt) (&pkt->pkt_address,
-		pkt, (struct buf *)dmatoken,
-		0, 0, 0, 0, func, NULL);
+	    pkt, (struct buf *)dmatoken,
+	    0, 0, 0, 0, func, NULL);
 	ASSERT(new_pkt == pkt || new_pkt == NULL);
 	if (new_pkt == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
@@ -686,7 +686,9 @@ void
 scsi_sync_pkt(struct scsi_pkt *pkt)
 {
 	register struct scsi_address	*ap = P_TO_ADDR(pkt);
-	(*A_TO_TRAN(ap)->tran_sync_pkt)(ap, pkt);
+
+	if (pkt->pkt_state & STATE_XFERRED_DATA)
+		(*A_TO_TRAN(ap)->tran_sync_pkt)(ap, pkt);
 }
 
 /*ARGSUSED*/
