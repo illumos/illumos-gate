@@ -464,7 +464,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	 *    its block pointer is put in the log record.
 	 * WR_COPIED:
 	 *    If we know we'll immediately be committing the
-	 *    transaction (FDSYNC (O_DSYNC)), the we allocate a larger
+	 *    transaction (FSYNC or FDSYNC), the we allocate a larger
 	 *    log record here for the data and copy the data in.
 	 * WR_NEED_COPY:
 	 *    Otherwise we don't allocate a buffer, and *if* we need to
@@ -474,7 +474,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	slogging = spa_has_slogs(zilog->zl_spa);
 	if (resid > zfs_immediate_write_sz && !slogging)
 		write_state = WR_INDIRECT;
-	else if (ioflag & FDSYNC)
+	else if (ioflag & (FSYNC | FDSYNC))
 		write_state = WR_COPIED;
 	else
 		write_state = WR_NEED_COPY;
@@ -521,7 +521,8 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 		itx->itx_private = zp->z_zfsvfs;
 
-		if ((zp->z_sync_cnt != 0) || (fsync_cnt != 0))
+		if ((zp->z_sync_cnt != 0) || (fsync_cnt != 0) ||
+		    (ioflag & (FSYNC | FDSYNC)))
 			itx->itx_sync = B_TRUE;
 		else
 			itx->itx_sync = B_FALSE;
