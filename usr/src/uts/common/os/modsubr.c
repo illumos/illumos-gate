@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -703,6 +703,14 @@ init_syscallnames(int size)
 
 	for (hshndx = 0; hshndx < MOD_BIND_HASHSIZE; hshndx++) {
 		for (bp = sb_hashtab[hshndx]; bp; bp = bp->b_next) {
+			if (bp->b_num < 0 || bp->b_num >= size) {
+				cmn_err(CE_WARN,
+				    "!Couldn't add system call \"%s %d\". "
+				    "Value out of range (0..%d) in "
+				    "/etc/name_to_sysnum.",
+				    bp->b_name, bp->b_num, size - 1);
+				continue;
+			}
 			make_syscallname(bp->b_name, bp->b_num);
 		}
 	}
