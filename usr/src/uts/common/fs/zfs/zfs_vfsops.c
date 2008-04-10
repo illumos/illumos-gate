@@ -1627,8 +1627,6 @@ zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 	/*
 	 * Look up the file system's value for the property.  For the
 	 * version property, we look up a slightly different string.
-	 * Also, there is no default VERSION value, so if we don't
-	 * find it, return the error.
 	 */
 	if (prop == ZFS_PROP_VERSION)
 		pname = ZPL_VERSION_STR;
@@ -1637,13 +1635,12 @@ zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 
 	error = zap_lookup(os, MASTER_NODE_OBJ, pname, 8, 1, value);
 
-	if (!error) {
-		return (0);
-	} else if (prop == ZFS_PROP_VERSION || error != ENOENT) {
-		return (error);
-	} else {
+	if (error == ENOENT) {
 		/* No value set, use the default value */
 		switch (prop) {
+		case ZFS_PROP_VERSION:
+			*value = ZPL_VERSION;
+			break;
 		case ZFS_PROP_NORMALIZE:
 		case ZFS_PROP_UTF8ONLY:
 			*value = 0;
@@ -1652,10 +1649,11 @@ zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 			*value = ZFS_CASE_SENSITIVE;
 			break;
 		default:
-			return (ENOENT);
+			return (error);
 		}
+		error = 0;
 	}
-	return (0);
+	return (error);
 }
 
 static vfsdef_t vfw = {
