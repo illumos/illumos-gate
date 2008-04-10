@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -488,6 +488,7 @@ clnt_clts_kcallit_addr(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 			endpnt_rele(p->cku_endpnt);
 		p->cku_endpnt = NULL;
 	}
+	call->call_zoneid = rpc_zoneid();
 
 	mpdup = NULL;
 call_again:
@@ -579,7 +580,7 @@ call_again:
 	round_trip = lbolt;
 
 	error = clnt_clts_dispatch_send(p->cku_endpnt->e_wq, mp,
-					&p->cku_addr, call, p->cku_xid);
+	    &p->cku_addr, call, p->cku_xid);
 
 	if (error != 0) {
 		freemsg(mp);
@@ -590,7 +591,7 @@ call_again:
 	}
 
 	RPCLOG(64, "clnt_clts_kcallit_addr: sent call for xid 0x%x\n",
-		p->cku_xid);
+	    p->cku_xid);
 
 	/*
 	 * There are two reasons for which we go back to to tryread.
@@ -629,14 +630,16 @@ tryread:
 
 		if (h->cl_nosignal)
 			while ((cv_wait_ret =
-				cv_timedwait(&call->call_cv,
-				&call->call_lock, cv_timout)) > 0 &&
-				call->call_notified == FALSE);
+			    cv_timedwait(&call->call_cv,
+			    &call->call_lock, cv_timout)) > 0 &&
+			    call->call_notified == FALSE)
+				;
 		else
 			while ((cv_wait_ret =
-				cv_timedwait_sig(&call->call_cv,
-				&call->call_lock, cv_timout)) > 0 &&
-				call->call_notified == FALSE);
+			    cv_timedwait_sig(&call->call_cv,
+			    &call->call_lock, cv_timout)) > 0 &&
+			    call->call_notified == FALSE)
+				;
 
 		if (cv_wait_ret == 0)
 			interrupted = TRUE;
@@ -679,16 +682,16 @@ tryread:
 				call->call_reply = NULL;
 				mutex_exit(&call->call_lock);
 				RPCLOG(8, "clnt_clts_kcallit_addr: "
-				"response received for request "
-				"w/xid 0x%x after timeout\n",
-				p->cku_xid);
+				    "response received for request "
+				    "w/xid 0x%x after timeout\n",
+				    p->cku_xid);
 				goto getresponse;
 			}
 			mutex_exit(&call->call_lock);
 
 			RPCLOG(8, "clnt_clts_kcallit_addr: "
-				"request w/xid 0x%x timedout "
-				"waiting for reply\n", p->cku_xid);
+			    "request w/xid 0x%x timedout "
+			    "waiting for reply\n", p->cku_xid);
 #if 0 /* XXX not yet */
 			/*
 			 * Timeout may be due to a dead gateway. Send
@@ -698,8 +701,8 @@ tryread:
 			 */
 			if (stries == p->cku_retrys/2) {
 				t_kadvise(p->cku_endpnt->e_tiptr,
-					(uchar_t *)p->cku_addr.buf,
-					p->cku_addr.len);
+				    (uchar_t *)p->cku_addr.buf,
+				    p->cku_addr.len);
 			}
 #endif /* not yet */
 			p->cku_err.re_status = RPC_TIMEDOUT;
@@ -737,7 +740,7 @@ getresponse:
 
 		pptr = (union T_primitives *)resp->b_rptr;
 		bcopy(resp->b_rptr + pptr->unitdata_ind.SRC_offset, sin->buf,
-			pptr->unitdata_ind.SRC_length);
+		    pptr->unitdata_ind.SRC_length);
 		sin->len = pptr->unitdata_ind.SRC_length;
 	}
 
@@ -834,7 +837,7 @@ getresponse:
 		 * Reply is good, check auth.
 		 */
 		if (!AUTH_VALIDATE(h->cl_auth,
-				    &reply_msg.acpted_rply.ar_verf)) {
+		    &reply_msg.acpted_rply.ar_verf)) {
 			p->cku_err.re_status = RPC_AUTHERROR;
 			p->cku_err.re_why = AUTH_INVALIDRESP;
 			RCSTAT_INCR(p->cku_stats, rcbadverfs);
@@ -850,8 +853,7 @@ getresponse:
 	}
 	/* set errno in case we can't recover */
 	if (re_status != RPC_VERSMISMATCH &&
-			    re_status != RPC_AUTHERROR &&
-			    re_status != RPC_PROGVERSMISMATCH)
+	    re_status != RPC_AUTHERROR && re_status != RPC_PROGVERSMISMATCH)
 		p->cku_err.re_errno = EIO;
 	/*
 	 * Determine whether or not we're doing an RPC
@@ -974,7 +976,7 @@ done1:
 	}
 	mutex_exit(&call->call_lock);
 	RPCLOG(64, "clnt_clts_kcallit_addr: xid 0x%x taken off dispatch list",
-		p->cku_xid);
+	    p->cku_xid);
 
 done:
 	if (resp != NULL) {
@@ -1037,7 +1039,7 @@ clnt_clts_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	struct timeval wait)
 {
 	return (clnt_clts_kcallit_addr(h, procnum, xdr_args, argsp,
-				xdr_results, resultsp, wait, NULL));
+	    xdr_results, resultsp, wait, NULL));
 }
 
 /*
@@ -1300,9 +1302,9 @@ endpnt_type_create(struct knetconfig *config)
 	cv_init(&etype->e_async_cv, NULL, CV_DEFAULT, NULL);
 
 	list_create(&etype->e_pool, sizeof (endpnt_t),
-			offsetof(endpnt_t, e_node));
+	    offsetof(endpnt_t, e_node));
 	list_create(&etype->e_ilist, sizeof (endpnt_t),
-			offsetof(endpnt_t, e_idle));
+	    offsetof(endpnt_t, e_idle));
 
 	/*
 	 * Check to see if we need to create a taskq for endpoint
@@ -1314,7 +1316,7 @@ endpnt_type_create(struct knetconfig *config)
 		mutex_exit(&endpnt_taskq_lock);
 		ASSERT(endpnt_taskq == NULL);
 		endpnt_taskq = taskq_create("clts_endpnt_taskq", 1,
-						minclsyspri, 200, INT_MAX, 0);
+		    minclsyspri, 200, INT_MAX, 0);
 	} else
 		mutex_exit(&endpnt_taskq_lock);
 
@@ -1360,8 +1362,8 @@ check_endpnt(struct endpnt *endp, struct endpnt **newp)
 	 * thread(s) checking this endpoint will move on.
 	 */
 	if ((endp->e_flags & ENDPNT_ESTABLISHED) &&
-		(!(endp->e_flags & ENDPNT_BOUND) ||
-		(endp->e_flags & ENDPNT_STALE))) {
+	    (!(endp->e_flags & ENDPNT_BOUND) ||
+	    (endp->e_flags & ENDPNT_STALE))) {
 		/*
 		 * Clear the flags here since they will be
 		 * set again by this thread.  They need to be
@@ -1369,7 +1371,7 @@ check_endpnt(struct endpnt *endp, struct endpnt **newp)
 		 * the state for ENDPNT_ONIDLE.
 		 */
 		endp->e_flags &= ~(ENDPNT_ESTABLISHED |
-				ENDPNT_WAITING | ENDPNT_BOUND |	ENDPNT_STALE);
+		    ENDPNT_WAITING | ENDPNT_BOUND | ENDPNT_STALE);
 		mutex_exit(&endp->e_lock);
 		return (1);
 	}
@@ -1381,7 +1383,7 @@ check_endpnt(struct endpnt *endp, struct endpnt **newp)
 	 * ENDPNT_STALE.
 	 */
 	while (!(endp->e_flags & ENDPNT_BOUND) &&
-		!(endp->e_flags & ENDPNT_STALE)) {
+	    !(endp->e_flags & ENDPNT_STALE)) {
 		endp->e_flags |= ENDPNT_WAITING;
 		cv_wait(&endp->e_cv, &endp->e_lock);
 	}
@@ -1449,7 +1451,7 @@ top:
 		if ((np->e_zoneid == zoneid) &&
 		    (np->e_rdev == config->knc_rdev) &&
 		    (strcmp(np->e_protofmly,
-			    config->knc_protofmly) == 0))
+		    config->knc_protofmly) == 0))
 			break;
 
 	if (np == NULL && n_etype != NULL) {
@@ -1596,7 +1598,7 @@ top:
 			}
 			endp = np->e_pcurr;
 			if ((next = list_next(&np->e_pool, np->e_pcurr)) !=
-				NULL)
+			    NULL)
 				np->e_pcurr = next;
 			ASSERT(endp != NULL);
 			mutex_enter(&endp->e_lock);
@@ -1685,13 +1687,12 @@ top:
 
 	if (useresvport &&
 	    (strcmp(config->knc_protofmly, NC_INET) == 0 ||
-		strcmp(config->knc_protofmly, NC_INET6) == 0)) {
+	    strcmp(config->knc_protofmly, NC_INET6) == 0)) {
 
 		while ((error =
-			bindresvport(new->e_tiptr, NULL, NULL, FALSE)) != 0) {
+		    bindresvport(new->e_tiptr, NULL, NULL, FALSE)) != 0) {
 			RPCLOG(1,
-				"endpnt_get: bindresvport error %d\n",
-				error);
+			    "endpnt_get: bindresvport error %d\n", error);
 			if (error != EPROTO) {
 				if (rtries-- <= 0)
 					goto bad;
@@ -1804,7 +1805,7 @@ endpnt_reap_settimer(endpnt_type_t *etp)
 {
 	if (etp->e_itimer == (timeout_id_t)0)
 		etp->e_itimer = timeout(endpnt_reap_dispatch, (void *)etp,
-					clnt_clts_taskq_dispatch_interval);
+		    clnt_clts_taskq_dispatch_interval);
 }
 
 static void
@@ -1883,10 +1884,10 @@ endpnt_reclaim(zoneid_t zoneid)
 
 		mutex_enter(&np->e_plock);
 		RPCLOG(1, "endpnt_reclaim: protofmly %s, ",
-			np->e_protofmly);
+		    np->e_protofmly);
 		RPCLOG(1, "rdev %ld\n", np->e_rdev);
 		RPCLOG(1, "endpnt_reclaim: found %d endpoint(s)\n",
-			np->e_cnt);
+		    np->e_cnt);
 
 		if (np->e_cnt == 0) {
 			mutex_exit(&np->e_plock);
@@ -2062,8 +2063,8 @@ clnt_clts_dispatch_send(queue_t *q, mblk_t *mp, struct netbuf *addr,
 	cp->call_status = RPC_TIMEDOUT;
 	cp->call_notified = FALSE;
 	RPCLOG(64,
-		"clnt_clts_dispatch_send: putting xid 0x%x on "
-		"dispatch list\n", xid);
+	    "clnt_clts_dispatch_send: putting xid 0x%x on "
+	    "dispatch list\n", xid);
 	cp->call_hash = call_hash(xid, clnt_clts_hash_size);
 	cp->call_bucket = &clts_call_ht[cp->call_hash];
 	call_table_enter(cp);
@@ -2162,8 +2163,8 @@ clnt_clts_dispatch_notify(mblk_t *mp, int resp_off, zoneid_t zoneid)
 		ASSERT(tmp == NULL && i < sizeof (xid));
 
 		RPCLOG0(1,
-			"clnt_dispatch_notify(clts): message less than "
-			"size of xid\n");
+		    "clnt_dispatch_notify(clts): message less than "
+		    "size of xid\n");
 
 		freemsg(mp);
 		return;
@@ -2185,14 +2186,26 @@ done_xid_copy:
 
 	if (e != NULL) {
 		mutex_enter(&e->call_lock);
+
+		/*
+		 * verify that the reply is coming in on
+		 * the same zone that it was sent from.
+		 */
+		if (e->call_zoneid != zoneid) {
+			mutex_exit(&e->call_lock);
+			mutex_exit(&chtp->ct_lock);
+			freemsg(mp);
+			return;
+		}
+
 		/*
 		 * found thread waiting for this reply.
 		 */
 		if (e->call_reply) {
 			RPCLOG(8,
-				"clnt_dispatch_notify (clts): discarding old "
-				"reply for xid 0x%x\n",
-				xid);
+			    "clnt_dispatch_notify (clts): discarding old "
+			    "reply for xid 0x%x\n",
+			    xid);
 			freemsg(e->call_reply);
 		}
 		e->call_notified = TRUE;
@@ -2207,7 +2220,7 @@ done_xid_copy:
 
 		mutex_exit(&chtp->ct_lock);
 		RPCLOG(8, "clnt_dispatch_notify (clts): no caller for reply "
-			"0x%x\n", xid);
+		    "0x%x\n", xid);
 		freemsg(mp);
 		/*
 		 * This is unfortunate, but we need to lookup the zone so we
@@ -2276,15 +2289,14 @@ clnt_clts_init(void)
 
 	if (clnt_clts_endpoint_reap_interval < DEFAULT_ENDPOINT_REAP_INTERVAL)
 		clnt_clts_endpoint_reap_interval =
-			DEFAULT_ENDPOINT_REAP_INTERVAL;
+		    DEFAULT_ENDPOINT_REAP_INTERVAL;
 
 	/*
 	 * Dispatch the taskq at an interval which is offset from the
 	 * interval that the endpoints should be reaped.
 	 */
 	clnt_clts_taskq_dispatch_interval =
-		(clnt_clts_endpoint_reap_interval + DEFAULT_INTERVAL_SHIFT)
-		* hz;
+	    (clnt_clts_endpoint_reap_interval + DEFAULT_INTERVAL_SHIFT) * hz;
 
 	/*
 	 * Initialize the completion queue

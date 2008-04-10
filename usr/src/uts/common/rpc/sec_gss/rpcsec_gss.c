@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,8 +150,8 @@ gssauth_init(void)
 	 * Allocate gss auth cache handle
 	 */
 	ga_cache_handle = kmem_cache_create("ga_cache_handle",
-			sizeof (struct ga_cache_entry), 0, NULL, NULL,
-			gssauth_cache_reclaim, NULL, NULL, 0);
+	    sizeof (struct ga_cache_entry), 0, NULL, NULL,
+	    gssauth_cache_reclaim, NULL, NULL, 0);
 	zone_key_create(&gssauth_zone_key, NULL, NULL, gssauth_zone_fini);
 }
 
@@ -199,9 +199,9 @@ gssauth_zone_fini(zoneid_t zoneid, void *unused)
 				 */
 				now = gethrestime_sec();
 				if ((p->ref_time + rpc_gss_cache_time >
-					    now) || p->in_use) {
+				    now) || p->in_use) {
 					if ((p->ref_time + rpc_gss_cache_time <=
-						    now) && p->in_use) {
+					    now) && p->in_use) {
 						RPCGSS_LOG0(2, "gssauth_cache_"
 						    "reclaim: in_use\n");
 					}
@@ -217,7 +217,7 @@ gssauth_zone_fini(zoneid_t zoneid, void *unused)
 			}
 
 			RPCGSS_LOG(2, "gssauth_cache_reclaim: destroy auth "
-				"%p\n", (void *)p->auth);
+			    "%p\n", (void *)p->auth);
 			rpc_gss_destroy(p->auth);
 			kmem_cache_free(ga_cache_handle, (void *)p);
 			if (prev == NULL) {
@@ -404,10 +404,10 @@ rpc_gss_secfree(AUTH *auth)
 			next = cur->next;
 			NOT_DEAD(next);
 			if (cur->auth == auth) {
-			    ASSERT(cur->in_use == TRUE);
-			    cur->in_use = FALSE;
-			    rw_exit(&ga_cache_table_lock);
-			    return;
+				ASSERT(cur->in_use == TRUE);
+				cur->in_use = FALSE;
+				rw_exit(&ga_cache_table_lock);
+				return;
 			}
 		}
 	}
@@ -448,11 +448,11 @@ rpc_gss_seccreate(CLIENT *clnt,
 	input_name.length = strlen(principal);
 
 	gssstat = gss_import_name(&minor_stat, &input_name,
-			(gss_OID)GSS_C_NT_HOSTBASED_SERVICE, &target_name);
+	    (gss_OID)GSS_C_NT_HOSTBASED_SERVICE, &target_name);
 
 	if (gssstat != GSS_S_COMPLETE) {
 		RPCGSS_LOG0(1,
-			"rpc_gss_seccreate: unable to import gss name\n");
+		    "rpc_gss_seccreate: unable to import gss name\n");
 		return (ENOMEM);
 	}
 
@@ -494,14 +494,14 @@ rpc_gss_seccreate(CLIENT *clnt,
 	 * the information stashed away in the private data.
 	 */
 	if (error = rpc_gss_seccreate_pvt(&gssstat, &minor_stat, auth, ap,
-		    mechanism, &ap->mech_type, &ret_flags, &time_rec, cr, 0)) {
+	    mechanism, &ap->mech_type, &ret_flags, &time_rec, cr, 0)) {
 		if (ap->target_name) {
 			(void) gss_release_name(&minor_stat, &ap->target_name);
 		}
 		kmem_free((char *)ap, sizeof (*ap));
 		kmem_free((char *)auth, sizeof (*auth));
 		RPCGSS_LOG(1, "rpc_gss_seccreate: init context failed"
-				" errno=%d\n", error);
+		    " errno=%d\n", error);
 		return (error);
 	}
 
@@ -510,8 +510,8 @@ rpc_gss_seccreate(CLIENT *clnt,
 	 * cases, integrity service must be available.
 	 */
 	if ((ap->service == rpc_gss_svc_privacy &&
-			!(ret_flags & GSS_C_CONF_FLAG)) ||
-			!(ret_flags & GSS_C_INTEG_FLAG)) {
+	    !(ret_flags & GSS_C_CONF_FLAG)) ||
+	    !(ret_flags & GSS_C_INTEG_FLAG)) {
 		rpc_gss_destroy(auth);
 		RPCGSS_LOG0(1, "rpc_gss_seccreate: service not supported\n");
 		return (EPROTONOSUPPORT);
@@ -532,7 +532,7 @@ rpc_gss_seccreate(CLIENT *clnt,
 		 */
 		NOT_NULL(ap->mech_type);
 		__rpc_gss_dup_oid(ap->mech_type,
-			(gss_OID *)&options_ret->actual_mechanism);
+		    (gss_OID *)&options_ret->actual_mechanism);
 	}
 
 	*retauth = auth;
@@ -996,15 +996,15 @@ validate_seqwin(rpc_gss_data *ap)
 	tok_buf.length = ap->verifier->oa_length;
 	tok_buf.value = ap->verifier->oa_base;
 	major = kgss_verify(&minor, ap->context, &msg_buf, &tok_buf,
-				&qop_state);
+	    &qop_state);
 
 	if (major != GSS_S_COMPLETE) {
-	    RPCGSS_LOG1(1,
-		"validate_seqwin: kgss_verify failed GSS Major %x Minor %x\n",
-		major, minor);
-	    RPCGSS_LOG1(1, "seq_window %d, verf len %d ", ap->seq_window,
-				ap->verifier->oa_length);
-	    return (FALSE);
+		RPCGSS_LOG1(1,
+		    "validate_seqwin: kgss_verify failed GSS Major "
+		    "%x Minor %x\n", major, minor);
+		RPCGSS_LOG1(1, "seq_window %d, verf len %d ", ap->seq_window,
+		    ap->verifier->oa_length);
+		return (FALSE);
 	}
 	return (TRUE);
 }
@@ -1464,14 +1464,14 @@ rpc_gss_revauth(uid_t uid, rpc_gss_OID mech)
 			    (cur->zoneid == zoneid)) {
 				if (cur->in_use) {
 					RPCGSS_LOG(2, "rpc_gss_revauth:invalid "
-						"auth %p\n", (void *)cur->auth);
+					    "auth %p\n", (void *)cur->auth);
 					ap->invalid = TRUE;
 				} else {
 					RPCGSS_LOG(2, "rpc_gss_revauth:destroy "
-						"auth %p\n", (void *)cur->auth);
+					    "auth %p\n", (void *)cur->auth);
 					rpc_gss_destroy(cur->auth);
 					kmem_cache_free(ga_cache_handle,
-							(void *)cur);
+					    (void *)cur);
 				}
 				if (prev == NULL) {
 					ga_cache_table[i] = next;
@@ -1515,8 +1515,9 @@ rpc_gss_secpurge(void *cache_key)
 			NOT_DEAD(next);
 			if (cache_key == cur->cache_key) {
 				RPCGSS_LOG(2, "rpc_gss_secpurge: destroy auth "
-					"%p\n", (void *)cur->auth);
-				rpc_gss_destroy(cur->auth);
+				    "%p\n", (void *)cur->auth);
+				if (cur->in_use == FALSE)
+					rpc_gss_destroy(cur->auth);
 				kmem_cache_free(ga_cache_handle, (void *)cur);
 				if (prev == NULL) {
 					ga_cache_table[i] = next;

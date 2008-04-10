@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +171,11 @@ alloc_xid(void)
  * These functions are temporary and designed for the upgrade-workaround only.
  * They cannot be used for general zone-crossing RPC client support, and will
  * be removed shortly.
+ *
+ * Currently these functions route all nfs global clients to the global zone.
+ * When this upgrade-workaround is removed these function should return the
+ * correct zone or their calls should be changed (rpc_zone() to curproc->p_zone
+ * and rpc_zoneid() to getzoneid()).
  */
 struct zone *
 rpc_zone(void)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -276,6 +275,7 @@ typedef struct calllist_s {
 #define	call_status call_err.re_status	/* error on reply (rep is invalid) */
 #define	call_reason call_err.re_errno	/* reason code on T_DISCON_IND */
 	queue_t		*call_wq;	/* the write queue the call is using */
+	zoneid_t	call_zoneid;	/* zoneid the call was made from */
 } calllist_t;
 
 /*

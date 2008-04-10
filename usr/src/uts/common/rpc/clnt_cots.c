@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -812,6 +812,8 @@ call_again:
 	 */
 	if (p->cku_xid == 0) {
 		p->cku_xid = alloc_xid();
+		call->call_zoneid = rpc_zoneid();
+
 		/*
 		 * We need to ASSERT here that our xid != 0 because this
 		 * determines whether or not our call record gets placed on
@@ -1080,10 +1082,10 @@ call_again:
 
 	wq = cm_entry->x_wq;
 	clnt_dispatch_send(wq, mp, call, p->cku_xid,
-				(p->cku_flags & CKU_ONQUEUE));
+	    (p->cku_flags & CKU_ONQUEUE));
 
 	RPCLOG(64, "clnt_cots_kcallit: sent call for xid 0x%x\n",
-		(uint_t)p->cku_xid);
+	    (uint_t)p->cku_xid);
 	p->cku_flags = (CKU_ONQUEUE|CKU_SENT);
 	p->cku_recv_attempts = 1;
 
@@ -1128,12 +1130,14 @@ read_again:
 		if (h->cl_nosignal)
 			while ((cv_wait_ret = cv_timedwait(&call->call_cv,
 			    &call->call_lock, timout)) > 0 &&
-			    call->call_status == RPC_TIMEDOUT);
+			    call->call_status == RPC_TIMEDOUT)
+				;
 		else
 			while ((cv_wait_ret = cv_timedwait_sig(
 			    &call->call_cv,
 			    &call->call_lock, timout)) > 0 &&
-			    call->call_status == RPC_TIMEDOUT);
+			    call->call_status == RPC_TIMEDOUT)
+				;
 
 		switch (cv_wait_ret) {
 		case 0:
@@ -1290,10 +1294,10 @@ read_again:
 			 * Reply is good, check auth.
 			 */
 			if (!AUTH_VALIDATE(h->cl_auth,
-					&reply_msg.acpted_rply.ar_verf)) {
+			    &reply_msg.acpted_rply.ar_verf)) {
 				COTSRCSTAT_INCR(p->cku_stats, rcbadverfs);
 				RPCLOG0(1, "clnt_cots_kcallit: validation "
-					"failure\n");
+				    "failure\n");
 				freemsg(mp);
 				(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
 				mutex_enter(&call->call_lock);
@@ -1302,9 +1306,9 @@ read_again:
 				mutex_exit(&call->call_lock);
 				goto read_again;
 			} else if (!AUTH_UNWRAP(h->cl_auth, xdrs,
-						xdr_results, resultsp)) {
+			    xdr_results, resultsp)) {
 				RPCLOG0(1, "clnt_cots_kcallit: validation "
-					"failure (unwrap)\n");
+				    "failure (unwrap)\n");
 				p->cku_err.re_status = RPC_CANTDECODERES;
 				p->cku_err.re_errno = EIO;
 			}
@@ -1333,10 +1337,10 @@ read_again:
 
 				if ((refreshes > 0) &&
 				    AUTH_REFRESH(h->cl_auth, &reply_msg,
-						p->cku_cred)) {
+				    p->cku_cred)) {
 					refreshes--;
 					(void) xdr_rpc_free_verifier(xdrs,
-								&reply_msg);
+					    &reply_msg);
 					freemsg(mp);
 					mp = NULL;
 
@@ -1355,9 +1359,9 @@ read_again:
 					}
 
 					COTSRCSTAT_INCR(p->cku_stats,
-							rcbadcalls);
+					    rcbadcalls);
 					COTSRCSTAT_INCR(p->cku_stats,
-							rcnewcreds);
+					    rcnewcreds);
 					goto call_again;
 				}
 
@@ -1387,7 +1391,7 @@ read_again:
 						p->cku_useresvport = 1;
 						p->cku_xid = 0;
 						(void) xdr_rpc_free_verifier
-							    (xdrs, &reply_msg);
+						    (xdrs, &reply_msg);
 						freemsg(mp);
 						goto call_again;
 					}
@@ -1596,7 +1600,7 @@ conn_kstat_update(kstat_t *ksp, int rw)
 			    b[2] & 0xFF, b[3] & 0xFF);
 		}
 		KSTAT_NAMED_STR_BUFLEN(&cm_ksp_data->x_server) =
-			strlen(fbuf) + 1;
+		    strlen(fbuf) + 1;
 	}
 
 	return (0);
@@ -1886,7 +1890,7 @@ use_new_conn:
 			    device != cm_entry->x_rdev ||
 			    retryaddr->len != cm_entry->x_src.len ||
 			    bcmp(retryaddr->buf, cm_entry->x_src.buf,
-				    retryaddr->len) != 0) {
+			    retryaddr->len) != 0) {
 				cmp = &cm_entry->x_next;
 				continue;
 			}
@@ -1901,8 +1905,8 @@ use_new_conn:
 			 * since that port may never be released.
 			 */
 			if (destaddr->len != cm_entry->x_server.len ||
-				bcmp(destaddr->buf, cm_entry->x_server.buf,
-					destaddr->len) != 0) {
+			    bcmp(destaddr->buf, cm_entry->x_server.buf,
+			    destaddr->len) != 0) {
 				RPCLOG(1, "connmgr_get: tiptr %p"
 				    " is going to a different server"
 				    " with the port that belongs"
@@ -2012,7 +2016,7 @@ use_new_conn:
 	rpc_poptimod(tiptr->fp->f_vnode);
 
 	if (i = strioctl(tiptr->fp->f_vnode, I_PUSH, (intptr_t)"rpcmod", 0,
-			K_TO_K, kcred, &retval)) {
+	    K_TO_K, kcred, &retval)) {
 		RPCLOG(1, "connmgr_get: can't push cots module, %d\n", i);
 		(void) t_kclose(tiptr, 1);
 		rpcerr->re_errno = i;
@@ -2021,7 +2025,7 @@ use_new_conn:
 	}
 
 	if (i = strioctl(tiptr->fp->f_vnode, RPC_CLIENT, 0, 0, K_TO_K,
-		kcred, &retval)) {
+	    kcred, &retval)) {
 		RPCLOG(1, "connmgr_get: can't set client status with cots "
 		    "module, %d\n", i);
 		(void) t_kclose(tiptr, 1);
@@ -2038,7 +2042,7 @@ use_new_conn:
 	mutex_exit(&connmgr_lock);
 
 	if (i = strioctl(tiptr->fp->f_vnode, I_PUSH, (intptr_t)"timod", 0,
-			K_TO_K, kcred, &retval)) {
+	    K_TO_K, kcred, &retval)) {
 		RPCLOG(1, "connmgr_get: can't push timod, %d\n", i);
 		(void) t_kclose(tiptr, 1);
 		rpcerr->re_errno = i;
@@ -2068,7 +2072,7 @@ use_new_conn:
 		if ((i = bindresvport(tiptr, retryaddr, srcaddr, TRUE)) != 0) {
 			(void) t_kclose(tiptr, 1);
 			RPCLOG(1, "connmgr_get: couldn't bind, retryaddr: "
-				"%p\n", (void *)retryaddr);
+			    "%p\n", (void *)retryaddr);
 
 			/*
 			 * 1225408: If we allocated a source address, then it
@@ -2109,8 +2113,7 @@ use_new_conn:
 		 * This is a bound end-point so don't close it's stream.
 		 */
 		connected = connmgr_connect(cm_entry, wq, destaddr, addrfmly,
-						&call, &tidu_size, FALSE, waitp,
-						nosignal);
+		    &call, &tidu_size, FALSE, waitp, nosignal);
 		*rpcerr = call.call_err;
 		cv_destroy(&call.call_cv);
 
@@ -2243,9 +2246,8 @@ connmgr_wrapconnect(
 		cv_init(&call.call_cv, NULL, CV_DEFAULT, NULL);
 
 		connected = connmgr_connect(cm_entry, cm_entry->x_wq,
-					    destaddr, addrfmly, &call,
-					    &cm_entry->x_tidu_size,
-					    reconnect, waitp, nosignal);
+		    destaddr, addrfmly, &call, &cm_entry->x_tidu_size,
+		    reconnect, waitp, nosignal);
 
 		*rpcerr = call.call_err;
 		cv_destroy(&call.call_cv);
@@ -2327,8 +2329,8 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 	for (;;) {
 		while (cm_entry->x_needdis == TRUE) {
 			RPCLOG(8, "connmgr_dis_and_wait: need "
-				"T_DISCON_REQ for connection 0x%p\n",
-				(void *)cm_entry);
+			    "T_DISCON_REQ for connection 0x%p\n",
+			    (void *)cm_entry);
 			cm_entry->x_needdis = FALSE;
 			cm_entry->x_waitdis = TRUE;
 
@@ -2342,12 +2344,12 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 			clock_t timout;
 
 			RPCLOG(8, "connmgr_dis_and_wait waiting for "
-				"T_DISCON_REQ's ACK for connection %p\n",
-				(void *)cm_entry);
+			    "T_DISCON_REQ's ACK for connection %p\n",
+			    (void *)cm_entry);
 			curlbolt = ddi_get_lbolt();
 
 			timout = clnt_cots_min_conntout *
-				drv_usectohz(1000000) + curlbolt;
+			    drv_usectohz(1000000) + curlbolt;
 
 			/*
 			 * The TPI spec says that the T_DISCON_REQ
@@ -2356,7 +2358,7 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 			 * block forever.
 			 */
 			(void) cv_timedwait(&cm_entry->x_dis_cv,
-					    &connmgr_lock, timout);
+			    &connmgr_lock, timout);
 		}
 		/*
 		 * If we got the ACK, break. If we didn't,
@@ -2366,8 +2368,8 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 			break;
 		} else {
 			RPCLOG(8, "connmgr_dis_and_wait: did"
-				"not get T_DISCON_REQ's ACK for "
-				"connection  %p\n", (void *)cm_entry);
+			    "not get T_DISCON_REQ's ACK for "
+			    "connection  %p\n", (void *)cm_entry);
 			cm_entry->x_needdis = TRUE;
 		}
 	}
@@ -2422,9 +2424,9 @@ connmgr_close(struct cm_xprt *cm_entry)
 		    x_server.value.str.addr.ptr != NULL)
 			kmem_free(((struct cm_kstat_xprt *)(cm_entry->x_ksp->
 			    ks_data))->x_server.value.str.addr.ptr,
-				    INET6_ADDRSTRLEN);
+			    INET6_ADDRSTRLEN);
 		kmem_free(cm_entry->x_ksp->ks_data,
-			    cm_entry->x_ksp->ks_data_size);
+		    cm_entry->x_ksp->ks_data_size);
 		kstat_delete(cm_entry->x_ksp);
 	}
 
@@ -2630,19 +2632,19 @@ connmgr_connect(
 	    (uint_t)(sizeof (cm_kstat_xprt_t) / sizeof (kstat_named_t)),
 	    KSTAT_FLAG_VIRTUAL, cm_entry->x_zoneid)) == NULL) {
 		return (TRUE);
-	    }
+	}
 
 	cm_entry->x_ksp->ks_lock = &connmgr_lock;
 	cm_entry->x_ksp->ks_private = cm_entry;
 	cm_entry->x_ksp->ks_data_size = ((INET6_ADDRSTRLEN * sizeof (char))
-					    + sizeof (cm_kstat_template));
+	    + sizeof (cm_kstat_template));
 	cm_entry->x_ksp->ks_data = kmem_alloc(cm_entry->x_ksp->ks_data_size,
-					    KM_SLEEP);
+	    KM_SLEEP);
 	bcopy(&cm_kstat_template, cm_entry->x_ksp->ks_data,
 	    cm_entry->x_ksp->ks_data_size);
 	((struct cm_kstat_xprt *)(cm_entry->x_ksp->ks_data))->
-		    x_server.value.str.addr.ptr =
-		    kmem_alloc(INET6_ADDRSTRLEN, KM_SLEEP);
+	    x_server.value.str.addr.ptr =
+	    kmem_alloc(INET6_ADDRSTRLEN, KM_SLEEP);
 
 	cm_entry->x_ksp->ks_update = conn_kstat_update;
 	kstat_install(cm_entry->x_ksp);
@@ -2748,7 +2750,7 @@ connmgr_sndrel(struct cm_xprt *cm_entry)
 		cm_entry->x_needrel = TRUE;
 		mutex_exit(&connmgr_lock);
 		RPCLOG(1, "connmgr_sndrel: cannot alloc mp for sending ordrel "
-			"to queue %p\n", (void *)q);
+		    "to queue %p\n", (void *)q);
 		return;
 	}
 	mutex_exit(&connmgr_lock);
@@ -2825,7 +2827,7 @@ clnt_dispatch_send(queue_t *q, mblk_t *mp, calllist_t *e, uint_t xid,
 	 */
 	if (xid != 0) {
 		RPCLOG(64, "clnt_dispatch_send: putting xid 0x%x on "
-			"dispatch list\n", xid);
+		    "dispatch list\n", xid);
 		e->call_hash = call_hash(xid, clnt_cots_hash_size);
 		e->call_bucket = &cots_call_ht[e->call_hash];
 		call_table_enter(e);
@@ -2900,6 +2902,17 @@ done_xid_copy:
 		 * Found thread waiting for this reply
 		 */
 		mutex_enter(&e->call_lock);
+
+		/*
+		 * verify that the reply is coming in on
+		 * the same zone that it was sent from.
+		 */
+		if (e->call_zoneid != zoneid) {
+			mutex_exit(&e->call_lock);
+			mutex_exit(&chtp->ct_lock);
+			return (FALSE);
+		}
+
 		if (e->call_reply)
 			/*
 			 * This can happen under the following scenario:
@@ -3004,7 +3017,7 @@ clnt_dispatch_notifyconn(queue_t *q, mblk_t *mp)
 		 */
 		mutex_exit(&clnt_pending_lock);
 		ASSERT(mp->b_datap->db_lim - mp->b_datap->db_base >=
-			sizeof (struct T_info_req));
+		    sizeof (struct T_info_req));
 		mp->b_rptr = mp->b_datap->db_base;
 		((union T_primitives *)mp->b_rptr)->type = T_INFO_REQ;
 		mp->b_wptr = mp->b_rptr + sizeof (struct T_info_req);
@@ -3097,32 +3110,37 @@ clnt_dispatch_notifyall(queue_t *q, int32_t msg_type, int32_t reason)
 				 */
 				if (cm_entry->x_connected ||
 				    cm_entry->x_doomed) {
-				    if (cm_entry->x_ordrel) {
-					if (cm_entry->x_closing == TRUE) {
-					/*
-					 * The connection is obviously
-					 * wedged due to a bug or problem
-					 * with the transport. Mark it
-					 * as dead. Otherwise we can leak
-					 * connections.
-					 */
-					    cm_entry->x_dead = TRUE;
-					    mutex_exit(&connmgr_lock);
-					    have_connmgr_lock = 0;
-					    if (clnt_stop_idle != NULL)
-						(*clnt_stop_idle)(q);
-					    break;
+					if (cm_entry->x_ordrel) {
+						if (cm_entry->x_closing ==
+						    TRUE) {
+							/*
+							 * The connection is
+							 * obviously wedged due
+							 * to a bug or problem
+							 * with the transport.
+							 * Mark it as dead.
+							 * Otherwise we can
+							 * leak connections.
+							 */
+							cm_entry->x_dead = TRUE;
+							mutex_exit(
+							    &connmgr_lock);
+							have_connmgr_lock = 0;
+							if (clnt_stop_idle !=
+							    NULL)
+							(*clnt_stop_idle)(q);
+							break;
+						}
+						cm_entry->x_closing = TRUE;
+						connmgr_sndrel(cm_entry);
+						have_connmgr_lock = 0;
+					} else {
+						cm_entry->x_dead = TRUE;
+						mutex_exit(&connmgr_lock);
+						have_connmgr_lock = 0;
+						if (clnt_stop_idle != NULL)
+							(*clnt_stop_idle)(q);
 					}
-					cm_entry->x_closing = TRUE;
-					connmgr_sndrel(cm_entry);
-					have_connmgr_lock = 0;
-				    } else {
-					cm_entry->x_dead = TRUE;
-					mutex_exit(&connmgr_lock);
-					have_connmgr_lock = 0;
-					if (clnt_stop_idle != NULL)
-						(*clnt_stop_idle)(q);
-				    }
 				} else {
 					/*
 					 * We don't mark the connection
@@ -3235,14 +3253,14 @@ clnt_dispatch_notifyall(queue_t *q, int32_t msg_type, int32_t reason)
 		ctp = &cots_call_ht[i];
 		mutex_enter(&ctp->ct_lock);
 		for (e = ctp->ct_call_next;
-			e != (calllist_t *)ctp;
-			e = e->call_next) {
+		    e != (calllist_t *)ctp;
+		    e = e->call_next) {
 			if (e->call_wq == q && e->call_notified == FALSE) {
 				RPCLOG(1,
-				"clnt_dispatch_notifyall for queue %p ",
-					(void *)q);
+				    "clnt_dispatch_notifyall for queue %p ",
+				    (void *)q);
 				RPCLOG(1, "aborting clnt_pending call %p\n",
-					(void *)e);
+				    (void *)e);
 
 				if (msg_type == T_DISCON_IND)
 					e->call_reason = reason;
@@ -3322,7 +3340,7 @@ connmgr_cpr_reset(void *arg, int code)
 		return (B_FALSE);
 	for (cxp = cm_hd; cxp; cxp = cxp->x_next) {
 		if ((cxp->x_family == AF_INET || cxp->x_family == AF_INET6) &&
-			cxp->x_connected == TRUE) {
+		    cxp->x_connected == TRUE) {
 			if (cxp->x_thread)
 				cxp->x_early_disc = TRUE;
 			else
