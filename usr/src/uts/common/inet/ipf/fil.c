@@ -3645,7 +3645,7 @@ ipf_stack_t *ifs;
 		break;
 	case IPFSYNC_OLDIFP :
 		if (newifp == oldifp)
-			rval = (void *)-1;
+			rval = (oldifp) ? (void *)-1 : NULL;
 		break;
 	}
 
