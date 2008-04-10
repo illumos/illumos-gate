@@ -1719,7 +1719,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					continue;
 
 				if (((sym = SYMINTP(sl.sl_imap)(&sl, dlmp,
-				    binfo)) != 0) ||
+				    binfo, in_nfavl)) != 0) ||
 				    (ghp->gh_flags & GPH_FIRST))
 					break;
 			}

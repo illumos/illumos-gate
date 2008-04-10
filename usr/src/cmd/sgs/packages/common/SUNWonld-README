@@ -1336,3 +1336,4 @@ Bugid   Risk Synopsis
 6509323 Need to disable the Multiple Files loading - same name, different
 	directories (or its stat() use)
 6685125 ld/elfdump do not handle ZERO terminator .eh_frame amd64 unwind entry
+6686889 ld.so.1 regression - bad pointer created with 6509323 integration
