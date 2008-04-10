@@ -245,7 +245,7 @@ nge_phy_reset(nge_t *ngep)
 	control |= MII_CONTROL_RESET;
 	nge_mii_put16(ngep, MII_CONTROL, control);
 	/* We should wait for 500ms. It's defined in the manual */
-	drv_usectohz(500000);
+	delay(drv_usectohz(500000));
 	for (count = 0; ++count < 10; ) {
 		drv_usecwait(5);
 		control = nge_mii_get16(ngep, MII_CONTROL);
