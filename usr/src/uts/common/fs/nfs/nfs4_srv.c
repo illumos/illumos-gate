@@ -1505,6 +1505,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	cred_t *cr = cs->cr;
 	vnode_t *dvp = cs->vp;
 	vnode_t *vp = NULL;
+	vnode_t *realvp;
 	char *nm, *lnm;
 	uint_t len, llen;
 	int syncval = 0;
@@ -1804,7 +1805,15 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	else
 		resp->cinfo.atomic = FALSE;
 
-	(void) VOP_FSYNC(vp, syncval, cr, NULL);
+	/*
+	 * Force modified metadata out to stable storage.
+	 *
+	 * if a underlying vp exists, pass it to VOP_FSYNC
+	 */
+	if (VOP_REALVP(vp, &realvp, NULL) == 0)
+		(void) VOP_FSYNC(realvp, syncval, cr, NULL);
+	else
+		(void) VOP_FSYNC(vp, syncval, cr, NULL);
 
 	if (resp->status != NFS4_OK) {
 		VN_RELE(vp);

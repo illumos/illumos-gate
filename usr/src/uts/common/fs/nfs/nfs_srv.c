@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1731,6 +1731,7 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 	int in_crit = 0;
 	struct vattr va;
 	vnode_t *vp;
+	vnode_t *realvp;
 	vnode_t *dvp;
 	char *name = args->ca_da.da_name;
 	vnode_t *tvp = NULL;
@@ -1958,8 +1959,13 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 			}
 			/*
 			 * Force modified metadata out to stable storage.
+			 *
+			 * if a underlying vp exists, pass it to VOP_FSYNC
 			 */
-			(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+			if (VOP_REALVP(vp, &realvp, NULL) == 0)
+				(void) VOP_FSYNC(realvp, FNODSYNC, cr, NULL);
+			else
+				(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 			VN_RELE(vp);
 		}
 

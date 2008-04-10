@@ -2166,6 +2166,7 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 {
 	int error;
 	vnode_t *vp;
+	vnode_t *realvp;
 	vnode_t *dvp;
 	struct vattr *vap;
 	struct vattr va;
@@ -2335,8 +2336,13 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 
 	/*
 	 * Force modified metadata out to stable storage.
+	 *
+	 * if a underlying vp exists, pass it to VOP_FSYNC
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	if (VOP_REALVP(vp, &realvp, NULL) == 0)
+		(void) VOP_FSYNC(realvp, FNODSYNC, cr, NULL);
+	else
+		(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 
 	VN_RELE(vp);
 
