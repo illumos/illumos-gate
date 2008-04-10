@@ -779,7 +779,7 @@ int enable;
 	}
 
 	if (ifs->ifs_fr_running > 0)
-		error = 0;
+		return (0);
 
 	error = iplattach(ifs, ns);
 	if (error == 0) {
