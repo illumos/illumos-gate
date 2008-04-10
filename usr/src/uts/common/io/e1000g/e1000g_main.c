@@ -43,12 +43,13 @@
 
 #include <sys/dlpi.h>
 #include <sys/mac.h>
+#include <sys/dld.h>
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.6";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.7";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.6";
+static char e1000g_version[] = "Driver Ver. 5.2.7";
 
 /*
  * Proto types for DDI entry points
@@ -81,11 +82,20 @@ static int e1000g_m_unicst_modify(void *, mac_multi_addr_t *);
 static int e1000g_m_unicst_get(void *, mac_multi_addr_t *);
 static int e1000g_m_multicst(void *, boolean_t, const uint8_t *);
 static void e1000g_m_ioctl(void *, queue_t *, mblk_t *);
+static int e1000g_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+static int e1000g_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, void *);
+static int e1000g_set_priv_prop(struct e1000g *, const char *, uint_t,
+    const void *);
+static int e1000g_get_priv_prop(struct e1000g *, const char *, uint_t,
+    void *);
 static void e1000g_init_locks(struct e1000g *);
 static void e1000g_destroy_locks(struct e1000g *);
 static int e1000g_identify_hardware(struct e1000g *);
 static int e1000g_regs_map(struct e1000g *);
 static int e1000g_set_driver_params(struct e1000g *);
+static void e1000g_set_bufsize(struct e1000g *);
 static int e1000g_register_mac(struct e1000g *);
 static boolean_t e1000g_rx_drain(struct e1000g *);
 static boolean_t e1000g_tx_drain(struct e1000g *);
@@ -199,7 +209,8 @@ static ddi_device_acc_attr_t e1000g_regs_acc_attr = {
 	DDI_FLAGERR_ACC
 };
 
-#define	E1000G_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
+#define	E1000G_M_CALLBACK_FLAGS \
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t e1000g_m_callbacks = {
 	E1000G_M_CALLBACK_FLAGS,
@@ -212,7 +223,11 @@ static mac_callbacks_t e1000g_m_callbacks = {
 	e1000g_m_tx,
 	NULL,
 	e1000g_m_ioctl,
-	e1000g_m_getcapab
+	e1000g_m_getcapab,
+	NULL,
+	NULL,
+	e1000g_m_setprop,
+	e1000g_m_getprop
 };
 
 /*
@@ -559,11 +574,7 @@ e1000g_register_mac(struct e1000g *Adapter)
 	mac->m_src_addr = hw->mac.addr;
 	mac->m_callbacks = &e1000g_m_callbacks;
 	mac->m_min_sdu = 0;
-	mac->m_max_sdu =
-	    (hw->mac.max_frame_size > FRAME_SIZE_UPTO_8K) ?
-	    hw->mac.max_frame_size - 256 :
-	    (hw->mac.max_frame_size != ETHERMAX) ?
-	    hw->mac.max_frame_size - 24 : ETHERMTU;
+	mac->m_max_sdu = Adapter->default_mtu;
 	mac->m_margin = VLAN_TAGSZ;
 
 	err = mac_register(mac, &Adapter->mh);
@@ -663,10 +674,6 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	struct e1000_hw *hw;
 	e1000g_tx_ring_t *tx_ring;
 	uint32_t mem_bar, io_bar, bar64;
-#ifdef __sparc
-	dev_info_t *devinfo = Adapter->dip;
-	ulong_t iommu_pagesize;
-#endif
 
 	hw = &Adapter->shared;
 
@@ -741,70 +748,9 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 
 	/* Get Jumbo Frames settings in conf file */
 	e1000g_get_max_frame_size(Adapter);
-	hw->mac.min_frame_size =
-	    MINIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH;
-
-#ifdef __sparc
-	/* Get the system page size */
-	Adapter->sys_page_sz = ddi_ptob(devinfo, (ulong_t)1);
-	iommu_pagesize = dvma_pagesize(devinfo);
-	if (iommu_pagesize != 0) {
-		if (Adapter->sys_page_sz == iommu_pagesize) {
-			if (iommu_pagesize > 0x4000)
-				Adapter->sys_page_sz = 0x4000;
-		} else {
-			if (Adapter->sys_page_sz > iommu_pagesize)
-				Adapter->sys_page_sz = iommu_pagesize;
-		}
-	}
-	Adapter->dvma_page_num = hw->mac.max_frame_size /
-	    Adapter->sys_page_sz + E1000G_DEFAULT_DVMA_PAGE_NUM;
-	ASSERT(Adapter->dvma_page_num >= E1000G_DEFAULT_DVMA_PAGE_NUM);
-#endif
 
 	/* Set Rx/Tx buffer size */
-	switch (hw->mac.max_frame_size) {
-	case ETHERMAX:
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
-		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_2K;
-		break;
-	case FRAME_SIZE_UPTO_4K:
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
-		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_4K;
-		break;
-	case FRAME_SIZE_UPTO_8K:
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_8K;
-		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_8K;
-		break;
-	case FRAME_SIZE_UPTO_9K:
-	case FRAME_SIZE_UPTO_16K:
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_16K;
-		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_16K;
-		break;
-	default:
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
-		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_2K;
-		break;
-	}
-	Adapter->rx_buffer_size += E1000G_IPALIGNPRESERVEROOM;
-
-#ifndef NO_82542_SUPPORT
-	/*
-	 * For Wiseman adapters we have an requirement of having receive
-	 * buffers aligned at 256 byte boundary. Since Livengood does not
-	 * require this and forcing it for all hardwares will have
-	 * performance implications, I am making it applicable only for
-	 * Wiseman and for Jumbo frames enabled mode as rest of the time,
-	 * it is okay to have normal frames...but it does involve a
-	 * potential risk where we may loose data if buffer is not
-	 * aligned...so all wiseman boards to have 256 byte aligned
-	 * buffers
-	 */
-	if (hw->mac.type < e1000_82543)
-		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE;
-	else
-		Adapter->rx_buf_align = 1;
-#endif
+	e1000g_set_bufsize(Adapter);
 
 	/* Master Latency Timer */
 	Adapter->master_latency_timer = DEFAULT_MASTER_LATENCY_TIMER;
@@ -839,6 +785,79 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	Adapter->rx_bcopy_thresh = DEFAULT_RX_BCOPY_THRESHOLD;
 
 	return (DDI_SUCCESS);
+}
+
+static void
+e1000g_set_bufsize(struct e1000g *Adapter)
+{
+	struct e1000_mac_info *mac = &Adapter->shared.mac;
+	uint64_t rx_size;
+	uint64_t tx_size;
+
+#ifdef __sparc
+	dev_info_t *devinfo = Adapter->dip;
+	ulong_t iommu_pagesize;
+
+	/* Get the system page size */
+	Adapter->sys_page_sz = ddi_ptob(devinfo, (ulong_t)1);
+	iommu_pagesize = dvma_pagesize(devinfo);
+	if (iommu_pagesize != 0) {
+		if (Adapter->sys_page_sz == iommu_pagesize) {
+			if (iommu_pagesize > 0x4000)
+				Adapter->sys_page_sz = 0x4000;
+		} else {
+			if (Adapter->sys_page_sz > iommu_pagesize)
+				Adapter->sys_page_sz = iommu_pagesize;
+		}
+	}
+	Adapter->dvma_page_num = mac->max_frame_size /
+	    Adapter->sys_page_sz + E1000G_DEFAULT_DVMA_PAGE_NUM;
+	ASSERT(Adapter->dvma_page_num >= E1000G_DEFAULT_DVMA_PAGE_NUM);
+#endif
+
+	mac->min_frame_size = ETHERMIN + ETHERFCSL;
+
+	rx_size = mac->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
+	if ((rx_size > FRAME_SIZE_UPTO_2K) && (rx_size <= FRAME_SIZE_UPTO_4K))
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
+	else if ((rx_size > FRAME_SIZE_UPTO_4K) &&
+	    (rx_size <= FRAME_SIZE_UPTO_8K))
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_8K;
+	else if ((rx_size > FRAME_SIZE_UPTO_8K) &&
+	    (rx_size <= FRAME_SIZE_UPTO_16K))
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_16K;
+	else
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
+
+	tx_size = mac->max_frame_size;
+	if ((tx_size > FRAME_SIZE_UPTO_2K) && (tx_size <= FRAME_SIZE_UPTO_4K))
+		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_4K;
+	else if ((tx_size > FRAME_SIZE_UPTO_4K) &&
+	    (tx_size <= FRAME_SIZE_UPTO_8K))
+		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_8K;
+	else if ((tx_size > FRAME_SIZE_UPTO_8K) &&
+	    (tx_size <= FRAME_SIZE_UPTO_16K))
+		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_16K;
+	else
+		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_2K;
+
+#ifndef NO_82542_SUPPORT
+	/*
+	 * For Wiseman adapters we have an requirement of having receive
+	 * buffers aligned at 256 byte boundary. Since Livengood does not
+	 * require this and forcing it for all hardwares will have
+	 * performance implications, I am making it applicable only for
+	 * Wiseman and for Jumbo frames enabled mode as rest of the time,
+	 * it is okay to have normal frames...but it does involve a
+	 * potential risk where we may loose data if buffer is not
+	 * aligned...so all wiseman boards to have 256 byte aligned
+	 * buffers
+	 */
+	if (mac->type < e1000_82543)
+		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE;
+	else
+		Adapter->rx_buf_align = 1;
+#endif
 }
 
 /*
@@ -2571,9 +2590,635 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	return (B_TRUE);
 }
 
+static boolean_t
+e1000g_param_locked(mac_prop_id_t pr_num)
+{
+	/*
+	 * All en_* parameters are locked (read-only) while
+	 * the device is in any sort of loopback mode ...
+	 */
+	switch (pr_num) {
+		case DLD_PROP_EN_1000FDX_CAP:
+		case DLD_PROP_EN_1000HDX_CAP:
+		case DLD_PROP_EN_100FDX_CAP:
+		case DLD_PROP_EN_100HDX_CAP:
+		case DLD_PROP_EN_10FDX_CAP:
+		case DLD_PROP_EN_10HDX_CAP:
+		case DLD_PROP_AUTONEG:
+		case DLD_PROP_FLOWCTRL:
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * callback function for set/get of properties
+ */
+static int
+e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	struct e1000g *Adapter = arg;
+	struct e1000_mac_info *mac = &Adapter->shared.mac;
+	struct e1000_phy_info *phy = &Adapter->shared.phy;
+	e1000g_tx_ring_t *tx_ring;
+	int err = 0;
+	link_flowctrl_t fc;
+	uint64_t cur_mtu, new_mtu;
+	uint64_t tmp = 0;
+
+	rw_enter(&Adapter->chip_lock, RW_WRITER);
+	if (Adapter->loopback_mode != E1000G_LB_NONE &&
+	    e1000g_param_locked(pr_num)) {
+		/*
+		 * All en_* parameters are locked (read-only)
+		 * while the device is in any sort of loopback mode.
+		 */
+		rw_exit(&Adapter->chip_lock);
+		return (EBUSY);
+	}
+
+	switch (pr_num) {
+		case DLD_PROP_EN_1000FDX_CAP:
+			Adapter->param_en_1000fdx = *(uint8_t *)pr_val;
+			Adapter->param_adv_1000fdx = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_EN_1000HDX_CAP:
+			Adapter->param_en_1000hdx = *(uint8_t *)pr_val;
+			Adapter->param_adv_1000hdx = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_EN_100FDX_CAP:
+			Adapter->param_en_100fdx = *(uint8_t *)pr_val;
+			Adapter->param_adv_100fdx = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_EN_100HDX_CAP:
+			Adapter->param_en_100hdx = *(uint8_t *)pr_val;
+			Adapter->param_adv_100hdx = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_EN_10FDX_CAP:
+			Adapter->param_en_10fdx = *(uint8_t *)pr_val;
+			Adapter->param_adv_10fdx = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_EN_10HDX_CAP:
+			Adapter->param_en_10hdx = *(uint8_t *)pr_val;
+			Adapter->param_adv_10hdx = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_AUTONEG:
+			Adapter->param_adv_autoneg = *(uint8_t *)pr_val;
+			goto reset;
+		case DLD_PROP_FLOWCTRL:
+			mac->fc_send_xon = B_TRUE;
+			bcopy(pr_val, &fc, sizeof (fc));
+
+			switch (fc) {
+			default:
+				err = EINVAL;
+				break;
+			case LINK_FLOWCTRL_NONE:
+				mac->fc = e1000_fc_none;
+				break;
+			case LINK_FLOWCTRL_RX:
+				mac->fc = e1000_fc_rx_pause;
+				break;
+			case LINK_FLOWCTRL_TX:
+				mac->fc = e1000_fc_tx_pause;
+				break;
+			case LINK_FLOWCTRL_BI:
+				mac->fc = e1000_fc_full;
+				break;
+			}
+reset:
+			if (err == 0) {
+				if (e1000g_reset_link(Adapter) != DDI_SUCCESS)
+					err = EINVAL;
+			}
+			break;
+		case DLD_PROP_ADV_1000FDX_CAP:
+		case DLD_PROP_ADV_1000HDX_CAP:
+		case DLD_PROP_ADV_100FDX_CAP:
+		case DLD_PROP_ADV_100HDX_CAP:
+		case DLD_PROP_ADV_10FDX_CAP:
+		case DLD_PROP_ADV_10HDX_CAP:
+		case DLD_PROP_STATUS:
+		case DLD_PROP_SPEED:
+		case DLD_PROP_DUPLEX:
+			err = ENOTSUP; /* read-only prop. Can't set this. */
+			break;
+		case DLD_PROP_DEFMTU:
+			cur_mtu = Adapter->default_mtu;
+			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
+			if (new_mtu == cur_mtu) {
+				err = 0;
+				break;
+			}
+
+			tmp = new_mtu + sizeof (struct ether_vlan_header) +
+			    ETHERFCSL;
+			if ((tmp < DEFAULT_FRAME_SIZE) ||
+			    (tmp > MAXIMUM_FRAME_SIZE)) {
+				err = EINVAL;
+				break;
+			}
+
+			/* ich8 doed not support jumbo frames */
+			if ((mac->type == e1000_ich8lan) &&
+			    (tmp > DEFAULT_FRAME_SIZE)) {
+				err = EINVAL;
+				break;
+			}
+			/* ich9 does not do jumbo frames on one phy type */
+			if ((mac->type == e1000_ich9lan) &&
+			    (phy->type == e1000_phy_ife) &&
+			    (tmp > DEFAULT_FRAME_SIZE)) {
+				err = EINVAL;
+				break;
+			}
+			if (Adapter->chip_state != E1000G_STOP) {
+				err = EBUSY;
+				break;
+			}
+
+			err = mac_maxsdu_update(Adapter->mh, new_mtu);
+			if (err == 0) {
+				mac->max_frame_size = tmp;
+				Adapter->default_mtu = new_mtu;
+				e1000g_set_bufsize(Adapter);
+				tx_ring = Adapter->tx_ring;
+				tx_ring->frags_limit = (mac->max_frame_size /
+				    Adapter->tx_bcopy_thresh) + 2;
+				if (tx_ring->frags_limit >
+				    (MAX_TX_DESC_PER_PACKET >> 1))
+				tx_ring->frags_limit =
+				    (MAX_TX_DESC_PER_PACKET >> 1);
+			}
+			break;
+		case DLD_PROP_PRIVATE:
+			err = e1000g_set_priv_prop(Adapter, pr_name,
+			    pr_valsize, pr_val);
+			break;
+		default:
+			err = ENOTSUP;
+			break;
+	}
+	rw_exit(&Adapter->chip_lock);
+	return (err);
+}
+
+static int
+e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, void *pr_val)
+{
+	struct e1000g *Adapter = arg;
+	struct e1000_mac_info *mac = &Adapter->shared.mac;
+	int err = EINVAL;
+	link_flowctrl_t fc;
+	uint64_t tmp = 0;
+
+	bzero(pr_val, pr_valsize);
+	switch (pr_num) {
+		case DLD_PROP_DUPLEX:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->link_duplex;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_SPEED:
+			if (pr_valsize >= sizeof (uint64_t)) {
+				tmp = Adapter->link_speed * 1000000ull;
+				bcopy(&tmp, pr_val, sizeof (tmp));
+				err = 0;
+			}
+			break;
+		case DLD_PROP_STATUS:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->link_state;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_AUTONEG:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_autoneg;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_DEFMTU:
+			if (pr_valsize >= sizeof (uint64_t)) {
+				tmp = Adapter->default_mtu;
+				bcopy(&tmp, pr_val, sizeof (tmp));
+				err = 0;
+			}
+			break;
+		case DLD_PROP_FLOWCTRL:
+			if (pr_valsize >= sizeof (link_flowctrl_t)) {
+				switch (mac->fc) {
+					case e1000_fc_none:
+						fc = LINK_FLOWCTRL_NONE;
+						break;
+					case e1000_fc_rx_pause:
+						fc = LINK_FLOWCTRL_RX;
+						break;
+					case e1000_fc_tx_pause:
+						fc = LINK_FLOWCTRL_TX;
+						break;
+					case e1000_fc_full:
+						fc = LINK_FLOWCTRL_BI;
+						break;
+				}
+				bcopy(&fc, pr_val, sizeof (fc));
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_1000FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_1000fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_1000FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_en_1000fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_1000HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_1000hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_1000HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_en_1000hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_100FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_100fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_100FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_en_100fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_100HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_100hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_100HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_en_100hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_10FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_10fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_10FDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_en_10fdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_ADV_10HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_adv_10hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_EN_10HDX_CAP:
+			if (pr_valsize >= sizeof (uint8_t)) {
+				*(uint8_t *)pr_val = Adapter->param_en_10hdx;
+				err = 0;
+			}
+			break;
+		case DLD_PROP_PRIVATE:
+			err = e1000g_get_priv_prop(Adapter, pr_name,
+			    pr_valsize, pr_val);
+			break;
+		default:
+			err = ENOTSUP;
+			break;
+	}
+	return (err);
+}
+
+/* ARGUSED */
+static int
+e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
+    uint_t pr_valsize, const void *pr_val)
+{
+	int err = 0;
+	long result;
+	e1000g_tx_ring_t *tx_ring = Adapter->tx_ring;
+	struct e1000_hw *hw = &Adapter->shared;
+
+	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_BCOPY_THRESHOLD ||
+		    result > MAX_TX_BCOPY_THRESHOLD)
+			err = EINVAL;
+		else {
+			Adapter->tx_bcopy_thresh = (uint32_t)result;
+			tx_ring->frags_limit = (hw->mac.max_frame_size /
+			    Adapter->tx_bcopy_thresh) + 2;
+			if (tx_ring->frags_limit >
+			    (MAX_TX_DESC_PER_PACKET >> 1))
+				tx_ring->frags_limit =
+				    (MAX_TX_DESC_PER_PACKET >> 1);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_interrupt_enable") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 1)
+			err = EINVAL;
+		else {
+			Adapter->tx_intr_enable = (result == 1) ?
+			    B_TRUE: B_FALSE;
+			if (Adapter->tx_intr_enable)
+				e1000g_mask_tx_interrupt(Adapter);
+			else
+				e1000g_clear_tx_interrupt(Adapter);
+			if (e1000g_check_acc_handle(
+			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+				ddi_fm_service_impact(Adapter->dip,
+				    DDI_SERVICE_DEGRADED);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_intr_delay") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_INTR_DELAY ||
+		    result > MAX_TX_INTR_DELAY)
+			err = EINVAL;
+		else {
+			Adapter->tx_intr_delay = (uint32_t)result;
+			E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
+			if (e1000g_check_acc_handle(
+			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+				ddi_fm_service_impact(Adapter->dip,
+				    DDI_SERVICE_DEGRADED);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_intr_abs_delay") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_INTR_ABS_DELAY ||
+		    result > MAX_TX_INTR_ABS_DELAY)
+			err = EINVAL;
+		else {
+			Adapter->tx_intr_abs_delay = (uint32_t)result;
+			E1000_WRITE_REG(hw, E1000_TADV,
+			    Adapter->tx_intr_abs_delay);
+			if (e1000g_check_acc_handle(
+			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+				ddi_fm_service_impact(Adapter->dip,
+				    DDI_SERVICE_DEGRADED);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_RX_BCOPY_THRESHOLD ||
+		    result > MAX_RX_BCOPY_THRESHOLD)
+			err = EINVAL;
+		else
+			Adapter->rx_bcopy_thresh = (uint32_t)result;
+		return (err);
+	}
+	if (strcmp(pr_name, "_max_num_rcv_packets") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_RX_LIMIT_ON_INTR ||
+		    result > MAX_RX_LIMIT_ON_INTR)
+			err = EINVAL;
+		else
+			Adapter->rx_limit_onintr = (uint32_t)result;
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_intr_delay") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_RX_INTR_DELAY ||
+		    result > MAX_RX_INTR_DELAY)
+			err = EINVAL;
+		else {
+			Adapter->rx_intr_delay = (uint32_t)result;
+			E1000_WRITE_REG(hw, E1000_RDTR, Adapter->rx_intr_delay);
+			if (e1000g_check_acc_handle(
+			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+				ddi_fm_service_impact(Adapter->dip,
+				    DDI_SERVICE_DEGRADED);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_intr_abs_delay") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_RX_INTR_ABS_DELAY ||
+		    result > MAX_RX_INTR_ABS_DELAY)
+			err = EINVAL;
+		else {
+			Adapter->rx_intr_abs_delay = (uint32_t)result;
+			E1000_WRITE_REG(hw, E1000_RADV,
+			    Adapter->rx_intr_abs_delay);
+			if (e1000g_check_acc_handle(
+			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+				ddi_fm_service_impact(Adapter->dip,
+				    DDI_SERVICE_DEGRADED);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_intr_throttling_rate") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_INTR_THROTTLING ||
+		    result > MAX_INTR_THROTTLING)
+			err = EINVAL;
+		else {
+			if (hw->mac.type >= e1000_82540) {
+				Adapter->intr_throttling_rate =
+				    (uint32_t)result;
+				E1000_WRITE_REG(hw, E1000_ITR,
+				    Adapter->intr_throttling_rate);
+				if (e1000g_check_acc_handle(
+				    Adapter->osdep.reg_handle) != DDI_FM_OK)
+					ddi_fm_service_impact(Adapter->dip,
+					    DDI_SERVICE_DEGRADED);
+			} else
+				err = EINVAL;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_intr_adaptive") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 1)
+			err = EINVAL;
+		else {
+			if (hw->mac.type >= e1000_82540) {
+				Adapter->intr_adaptive = (result == 1) ?
+				    B_TRUE : B_FALSE;
+			} else {
+				err = EINVAL;
+			}
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_RECYCLE_THRESHOLD ||
+		    result > MAX_TX_RECYCLE_THRESHOLD)
+			err = EINVAL;
+		else
+			Adapter->tx_recycle_thresh = (uint32_t)result;
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_recycle_num") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_RECYCLE_NUM ||
+		    result > MAX_TX_RECYCLE_NUM)
+			err = EINVAL;
+		else
+			Adapter->tx_recycle_num = (uint32_t)result;
+		return (err);
+	}
+	return (ENOTSUP);
+}
+
+static int
+e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
+    uint_t pr_valsize, void *pr_val)
+{
+	char valstr[MAXNAMELEN];
+	int err = ENOTSUP;
+	uint_t strsize;
+
+	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->tx_bcopy_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_interrupt_enable") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->tx_intr_enable);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_intr_delay") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->tx_intr_delay);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_intr_abs_delay") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->tx_intr_abs_delay);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->rx_bcopy_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_max_num_rcv_packets") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->rx_limit_onintr);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_intr_delay") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->rx_intr_delay);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_intr_abs_delay") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->rx_intr_abs_delay);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_intr_throttling_rate") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->intr_throttling_rate);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_intr_adaptive") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->intr_adaptive);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->tx_recycle_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_recycle_num") == 0) {
+		(void) sprintf(valstr, "%d", Adapter->tx_recycle_num);
+		err = 0;
+		goto done;
+	}
+done:
+	if (err == 0) {
+		strsize = (uint_t)strlen(valstr);
+		if (pr_valsize < strsize)
+			err = ENOBUFS;
+		else
+			(void) strlcpy(pr_val, valstr, pr_valsize);
+	}
+	return (err);
+}
+
 /*
  * e1000g_get_conf - get configurations set in e1000g.conf
- *
  * This routine gets user-configured values out of the configuration
  * file e1000g.conf.
  *
@@ -2851,6 +3496,76 @@ e1000g_link_check(struct e1000g *Adapter)
 	return (link_changed);
 }
 
+/*
+ * e1000g_reset_link - Using the link properties to setup the link
+ */
+int
+e1000g_reset_link(struct e1000g *Adapter)
+{
+	struct e1000_mac_info *mac;
+	struct e1000_phy_info *phy;
+	boolean_t invalid;
+
+	mac = &Adapter->shared.mac;
+	phy = &Adapter->shared.phy;
+	invalid = B_FALSE;
+
+	if (Adapter->param_adv_autoneg == 1) {
+		mac->autoneg = B_TRUE;
+		phy->autoneg_advertised = 0;
+
+		/*
+		 * 1000hdx is not supported for autonegotiation
+		 */
+		if (Adapter->param_adv_1000fdx == 1)
+			phy->autoneg_advertised |= ADVERTISE_1000_FULL;
+
+		if (Adapter->param_adv_100fdx == 1)
+			phy->autoneg_advertised |= ADVERTISE_100_FULL;
+
+		if (Adapter->param_adv_100hdx == 1)
+			phy->autoneg_advertised |= ADVERTISE_100_HALF;
+
+		if (Adapter->param_adv_10fdx == 1)
+			phy->autoneg_advertised |= ADVERTISE_10_FULL;
+
+		if (Adapter->param_adv_10hdx == 1)
+			phy->autoneg_advertised |= ADVERTISE_10_HALF;
+
+		if (phy->autoneg_advertised == 0)
+			invalid = B_TRUE;
+	} else {
+		mac->autoneg = B_FALSE;
+
+		/*
+		 * 1000fdx and 1000hdx are not supported for forced link
+		 */
+		if (Adapter->param_adv_100fdx == 1)
+			mac->forced_speed_duplex = ADVERTISE_100_FULL;
+		else if (Adapter->param_adv_100hdx == 1)
+			mac->forced_speed_duplex = ADVERTISE_100_HALF;
+		else if (Adapter->param_adv_10fdx == 1)
+			mac->forced_speed_duplex = ADVERTISE_10_FULL;
+		else if (Adapter->param_adv_10hdx == 1)
+			mac->forced_speed_duplex = ADVERTISE_10_HALF;
+		else
+			invalid = B_TRUE;
+
+	}
+
+	if (invalid) {
+		e1000g_log(Adapter, CE_WARN,
+		    "Invalid link sets. Setup link to"
+		    "support autonegotiation with all link capabilities.");
+		mac->autoneg = B_TRUE;
+		phy->autoneg_advertised = ADVERTISE_1000_FULL |
+		    ADVERTISE_100_FULL | ADVERTISE_100_HALF |
+		    ADVERTISE_10_FULL | ADVERTISE_10_HALF;
+	}
+
+	return (e1000_setup_link(&Adapter->shared));
+}
+
 static void
 e1000g_local_timer(void *ws)
 {
@@ -3060,24 +3775,37 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 
 	switch (max_frame) {
 	case 0:
-		mac->max_frame_size = ETHERMAX;
+		Adapter->default_mtu = ETHERMTU;
 		break;
+	/*
+	 * To avoid excessive memory allocation for rx buffers,
+	 * the bytes of E1000G_IPALIGNPRESERVEROOM are reserved.
+	 */
 	case 1:
-		mac->max_frame_size = FRAME_SIZE_UPTO_4K;
+		Adapter->default_mtu = FRAME_SIZE_UPTO_4K -
+		    sizeof (struct ether_vlan_header) - ETHERFCSL -
+		    E1000G_IPALIGNPRESERVEROOM;
 		break;
 	case 2:
-		mac->max_frame_size = FRAME_SIZE_UPTO_8K;
+		Adapter->default_mtu = FRAME_SIZE_UPTO_8K -
+		    sizeof (struct ether_vlan_header) - ETHERFCSL -
+		    E1000G_IPALIGNPRESERVEROOM;
 		break;
 	case 3:
-		if (mac->type < e1000_82571)
-			mac->max_frame_size = FRAME_SIZE_UPTO_16K;
+		if (mac->type >= e1000_82571)
+			Adapter->default_mtu = MAXIMUM_MTU;
 		else
-			mac->max_frame_size = FRAME_SIZE_UPTO_9K;
+			Adapter->default_mtu = FRAME_SIZE_UPTO_16K -
+			    sizeof (struct ether_vlan_header) - ETHERFCSL -
+			    E1000G_IPALIGNPRESERVEROOM;
 		break;
 	default:
-		mac->max_frame_size = ETHERMAX;
+		Adapter->default_mtu = ETHERMTU;
 		break;
 	}	/* switch */
+
+	mac->max_frame_size = Adapter->default_mtu +
+	    sizeof (struct ether_vlan_header) + ETHERFCSL;
 
 	/* ich8 does not do jumbo frames */
 	if (mac->type == e1000_ich8lan) {
@@ -4477,6 +5205,74 @@ e1000g_get_phy_state(struct e1000g *Adapter)
 	e1000_read_phy_reg(hw, PHY_1000T_CTRL, &Adapter->phy_1000t_ctrl);
 	e1000_read_phy_reg(hw, PHY_1000T_STATUS, &Adapter->phy_1000t_status);
 	e1000_read_phy_reg(hw, PHY_LP_ABILITY, &Adapter->phy_lp_able);
+
+	Adapter->param_autoneg_cap =
+	    (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
+	Adapter->param_pause_cap =
+	    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+	Adapter->param_asym_pause_cap =
+	    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+	Adapter->param_1000fdx_cap =
+	    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+	    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+	Adapter->param_1000hdx_cap =
+	    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
+	    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
+	Adapter->param_100t4_cap =
+	    (Adapter->phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
+	Adapter->param_100fdx_cap =
+	    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+	    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+	Adapter->param_100hdx_cap =
+	    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
+	    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+	Adapter->param_10fdx_cap =
+	    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
+	Adapter->param_10hdx_cap =
+	    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
+
+	Adapter->param_adv_autoneg = hw->mac.autoneg;
+	Adapter->param_adv_pause =
+	    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+	Adapter->param_adv_asym_pause =
+	    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+	Adapter->param_adv_1000hdx =
+	    (Adapter->phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
+	Adapter->param_adv_100t4 =
+	    (Adapter->phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
+	if (Adapter->param_adv_autoneg == 1) {
+		Adapter->param_adv_1000fdx =
+		    (Adapter->phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
+		Adapter->param_adv_100fdx =
+		    (Adapter->phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
+		Adapter->param_adv_100hdx =
+		    (Adapter->phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
+		Adapter->param_adv_10fdx =
+		    (Adapter->phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
+		Adapter->param_adv_10hdx =
+		    (Adapter->phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+	}
+
+	Adapter->param_lp_autoneg =
+	    (Adapter->phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
+	Adapter->param_lp_pause =
+	    (Adapter->phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
+	Adapter->param_lp_asym_pause =
+	    (Adapter->phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
+	Adapter->param_lp_1000fdx =
+	    (Adapter->phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
+	Adapter->param_lp_1000hdx =
+	    (Adapter->phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
+	Adapter->param_lp_100t4 =
+	    (Adapter->phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
+	Adapter->param_lp_100fdx =
+	    (Adapter->phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
+	Adapter->param_lp_100hdx =
+	    (Adapter->phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
+	Adapter->param_lp_10fdx =
+	    (Adapter->phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
+	Adapter->param_lp_10hdx =
+	    (Adapter->phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
 }
 
 /*

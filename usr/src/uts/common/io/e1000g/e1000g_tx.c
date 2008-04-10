@@ -179,7 +179,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	}
 
 	/* Make sure packet is less than the max frame size */
-	if (msg_size > hw->mac.max_frame_size + VLAN_TAGSZ) {
+	if (msg_size > hw->mac.max_frame_size - ETHERFCSL) {
 		/*
 		 * For the over size packet, we'll just drop it.
 		 * So we return B_TRUE here.
@@ -224,7 +224,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * If the message size is less than the minimum ethernet packet size,
 	 * we'll use bcopy to send it, and padd it to 60 bytes later.
 	 */
-	if (msg_size < MINIMUM_ETHERNET_PACKET_SIZE) {
+	if (msg_size < ETHERMIN) {
 		E1000G_DEBUG_STAT(tx_ring->stat_under_size);
 		force_bcopy |= FORCE_BCOPY_UNDER_SIZE;
 	}
@@ -1001,11 +1001,11 @@ e1000g_tx_copy(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet,
 		 * for CRC.
 		 */
 		if (force_bcopy & FORCE_BCOPY_UNDER_SIZE) {
-			ASSERT(tx_buf->len < MINIMUM_ETHERNET_PACKET_SIZE);
+			ASSERT(tx_buf->len < ETHERMIN);
 
 			bzero(tx_buf->address + tx_buf->len,
-			    MINIMUM_ETHERNET_PACKET_SIZE - tx_buf->len);
-			tx_buf->len = MINIMUM_ETHERNET_PACKET_SIZE;
+			    ETHERMIN - tx_buf->len);
+			tx_buf->len = ETHERMIN;
 		}
 
 #ifdef __sparc

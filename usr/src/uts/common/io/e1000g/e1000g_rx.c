@@ -337,24 +337,17 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	if (Adapter->strip_crc)
 		reg_val |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
 
-	switch (hw->mac.max_frame_size) {
-	case ETHERMAX:
-		reg_val |= E1000_RCTL_SZ_2048;
-		break;
-	case FRAME_SIZE_UPTO_4K:
+	if ((hw->mac.max_frame_size > FRAME_SIZE_UPTO_2K) &&
+	    (hw->mac.max_frame_size <= FRAME_SIZE_UPTO_4K))
 		reg_val |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX;
-		break;
-	case FRAME_SIZE_UPTO_8K:
+	else if ((hw->mac.max_frame_size > FRAME_SIZE_UPTO_4K) &&
+	    (hw->mac.max_frame_size <= FRAME_SIZE_UPTO_8K))
 		reg_val |= E1000_RCTL_SZ_8192 | E1000_RCTL_BSEX;
-		break;
-	case FRAME_SIZE_UPTO_9K:
-	case FRAME_SIZE_UPTO_16K:
+	else if ((hw->mac.max_frame_size > FRAME_SIZE_UPTO_8K) &&
+	    (hw->mac.max_frame_size <= FRAME_SIZE_UPTO_16K))
 		reg_val |= E1000_RCTL_SZ_16384 | E1000_RCTL_BSEX;
-		break;
-	default:
+	else
 		reg_val |= E1000_RCTL_SZ_2048;
-		break;
-	}
 
 	if (e1000_tbi_sbp_enabled_82543(hw))
 		reg_val |= E1000_RCTL_SBP;
@@ -562,8 +555,8 @@ e1000g_receive(struct e1000g *Adapter)
 		 * we need to strip it before sending it up to the stack.
 		 */
 		if (end_of_packet && !Adapter->strip_crc) {
-			if (length > CRC_LENGTH) {
-				length -= CRC_LENGTH;
+			if (length > ETHERFCSL) {
+				length -= ETHERFCSL;
 			} else {
 				/*
 				 * If the fragment is smaller than the CRC,
@@ -572,9 +565,9 @@ e1000g_receive(struct e1000g *Adapter)
 				 */
 				ASSERT(rx_ring->rx_mblk_tail != NULL);
 				rx_ring->rx_mblk_tail->b_wptr -=
-				    CRC_LENGTH - length;
+				    ETHERFCSL - length;
 				rx_ring->rx_mblk_len -=
-				    CRC_LENGTH - length;
+				    ETHERFCSL - length;
 
 				QUEUE_POP_HEAD(&rx_ring->recv_list);
 

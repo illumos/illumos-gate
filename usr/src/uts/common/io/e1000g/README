@@ -566,3 +566,8 @@ Notes on packaging:
   This version has the following fix:
    6633239 e1000g: link flaps observed on Galaxy(X4100) systems running 64-bit kernel
 
+5.2.7
+======
+  This version has the following fix:
+   6673650 e1000g needs to support Brussels
+

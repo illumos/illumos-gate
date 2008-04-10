@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -33,6 +33,7 @@ static int e1000g_nd_set(queue_t *q, mblk_t *mp,
     char *value, caddr_t cp, cred_t *credp);
 static int e1000g_nd_get(queue_t *q, mblk_t *mp,
     caddr_t cp, cred_t *credp);
+static void e1000g_nd_param_sync(struct e1000g *Adapter);
 static void e1000g_nd_get_param_val(nd_param_t *ndp);
 static void e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value);
 
@@ -98,10 +99,6 @@ static const nd_param_t nd_template[] = {
 { PARAM_LP_100HDX_CAP,	    0, 1, 0,	NULL,	"-lp_100hdx_cap"	},
 { PARAM_LP_10FDX_CAP,	    0, 1, 0,	NULL,	"-lp_10fdx_cap"		},
 { PARAM_LP_10HDX_CAP,	    0, 1, 0,	NULL,	"-lp_10hdx_cap"		},
-
-/* Force Speed and Duplex */
-{ PARAM_FORCE_SPEED_DUPLEX, GDIAG_10_HALF, GDIAG_100_FULL, GDIAG_100_FULL,
-					NULL,	"?force_speed_duplex"	},
 
 /* Current operating modes */
 { PARAM_LINK_STATUS,	    0, 1, 0,	NULL,	"-link_status"		},
@@ -182,6 +179,25 @@ e1000g_nd_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 	e1000g_nd_set_param_val(ndp, new_value);
 
 	return (0);
+}
+
+/*
+ * synchronize the adv* and en* parameters.
+ *
+ * See comments in <sys/dld.h> for details of the *_en_*
+ * parameters. The usage of ndd for setting adv parameters will
+ * synchronize all the en parameters with the e1000g parameters,
+ * implicity disalbing any settings made via dladm.
+ */
+static void
+e1000g_nd_param_sync(struct e1000g *Adapter)
+{
+	Adapter->param_en_1000fdx = Adapter->param_adv_1000fdx;
+	Adapter->param_en_1000hdx = Adapter->param_adv_1000hdx;
+	Adapter->param_en_100fdx = Adapter->param_adv_100fdx;
+	Adapter->param_en_100hdx = Adapter->param_adv_100hdx;
+	Adapter->param_en_10fdx = Adapter->param_adv_10fdx;
+	Adapter->param_en_10hdx = Adapter->param_adv_10hdx;
 }
 
 static int
@@ -277,152 +293,6 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 	rw_enter(&Adapter->chip_lock, RW_READER);
 
 	switch (ndp->ndp_info) {
-	/* Hardware Capabilities */
-	case PARAM_AUTONEG_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
-		break;
-	case PARAM_PAUSE_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
-		break;
-	case PARAM_ASYM_PAUSE_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
-		break;
-	case PARAM_1000FDX_CAP:
-		ndp->ndp_val =
-		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
-		break;
-	case PARAM_1000HDX_CAP:
-		ndp->ndp_val =
-		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
-		    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
-		break;
-	case PARAM_100T4_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
-		break;
-	case PARAM_100FDX_CAP:
-		ndp->ndp_val =
-		    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
-		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
-		break;
-	case PARAM_100HDX_CAP:
-		ndp->ndp_val =
-		    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
-		    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
-		break;
-	case PARAM_10FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_10HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
-		break;
-
-	/* Auto-Negotiation Advertisement Capabilities */
-	case PARAM_ADV_AUTONEG_CAP:
-		ndp->ndp_val = hw->mac.autoneg;
-		break;
-	case PARAM_ADV_PAUSE_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
-		break;
-	case PARAM_ADV_ASYM_PAUSE_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
-		break;
-	case PARAM_ADV_1000FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_ADV_1000HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_ADV_100T4_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
-		break;
-	case PARAM_ADV_100FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_ADV_100HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_ADV_10FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_ADV_10HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
-		break;
-
-	/* Link-Partner's Advertisement Capabilities */
-	case PARAM_LP_AUTONEG_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_PAUSE_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
-		break;
-	case PARAM_LP_ASYM_PAUSE_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
-		break;
-	case PARAM_LP_1000FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_1000HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_100T4_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_100FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_100HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_10FDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
-		break;
-	case PARAM_LP_10HDX_CAP:
-		ndp->ndp_val =
-		    (Adapter->phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
-		break;
-
-	/* Force Speed and Duplex Parameter */
-	case PARAM_FORCE_SPEED_DUPLEX:
-		switch (hw->mac.forced_speed_duplex) {
-		case ADVERTISE_10_HALF:
-			ndp->ndp_val = GDIAG_10_HALF;
-			break;
-		case ADVERTISE_10_FULL:
-			ndp->ndp_val = GDIAG_10_FULL;
-			break;
-		case ADVERTISE_100_HALF:
-			ndp->ndp_val = GDIAG_100_HALF;
-			break;
-		case ADVERTISE_100_FULL:
-			ndp->ndp_val = GDIAG_100_FULL;
-			break;
-		}
-		break;
 	/* Link States */
 	case PARAM_LINK_STATUS:
 		ndp->ndp_val = (Adapter->link_state == LINK_STATE_UP) ? 1 : 0;
@@ -489,20 +359,11 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 	struct e1000g *Adapter;
 	struct e1000_hw *hw;
 	e1000g_tx_ring_t *tx_ring;
-	uint16_t autoneg_advertised;
-	uint8_t forced_speed_duplex;
-	boolean_t autoneg_enable;
-	boolean_t link_change;
 
 	Adapter = ndp->ndp_instance;
 	ASSERT(Adapter);
 	hw = &Adapter->shared;
 	tx_ring = Adapter->tx_ring;
-
-	autoneg_advertised = 0;
-	forced_speed_duplex = 0;
-	autoneg_enable = B_FALSE;
-	link_change = B_FALSE;
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
@@ -514,7 +375,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 		    Adapter->tx_bcopy_thresh) + 2;
 		if (tx_ring->frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
 			tx_ring->frags_limit = (MAX_TX_DESC_PER_PACKET >> 1);
-		goto finished;
+		break;
 	case PARAM_TX_INTR_ENABLE:
 		ndp->ndp_val = value;
 		Adapter->tx_intr_enable = (value == 1) ? B_TRUE : B_FALSE;
@@ -522,7 +383,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 			e1000g_mask_tx_interrupt(Adapter);
 		else
 			e1000g_clear_tx_interrupt(Adapter);
-		goto finished;
+		break;
 	case PARAM_TX_TIDV:
 		ndp->ndp_val = value;
 		Adapter->tx_intr_delay = value;
@@ -530,219 +391,42 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 		if (Adapter->tx_intr_delay) {
 			E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
 		}
-		goto finished;
+		break;
 	case PARAM_TX_TADV:
 		ndp->ndp_val = value;
 		Adapter->tx_intr_abs_delay = value;
 		E1000_WRITE_REG(hw, E1000_TADV, Adapter->tx_intr_abs_delay);
-		goto finished;
+		break;
 	case PARAM_RX_BCOPY_THRESHOLD:
 		ndp->ndp_val = value;
 		Adapter->rx_bcopy_thresh = value;
-		goto finished;
+		break;
 	case PARAM_RX_PKT_ON_INTR:
 		ndp->ndp_val = value;
 		Adapter->rx_limit_onintr = value;
-		goto finished;
+		break;
 	case PARAM_RX_RDTR:
 		ndp->ndp_val = value;
 		Adapter->rx_intr_delay = value;
 		E1000_WRITE_REG(hw, E1000_RDTR, value);
-		goto finished;
+		break;
 	case PARAM_RX_RADV:
 		ndp->ndp_val = value;
 		Adapter->rx_intr_abs_delay = value;
 		E1000_WRITE_REG(hw, E1000_RADV, value);
-		goto finished;
-	default:
 		break;
-	}
-
-	/*
-	 * ndd params that will impact link status
-	 */
-	if (Adapter->param_adv_1000fdx) {
-		autoneg_advertised |= ADVERTISE_1000_FULL;
-	}
-	if (Adapter->param_adv_100fdx) {
-		autoneg_advertised |= ADVERTISE_100_FULL;
-	}
-	if (Adapter->param_adv_100hdx) {
-		autoneg_advertised |= ADVERTISE_100_HALF;
-	}
-	if (Adapter->param_adv_10fdx) {
-		autoneg_advertised |= ADVERTISE_10_FULL;
-	}
-	if (Adapter->param_adv_10hdx) {
-		autoneg_advertised |= ADVERTISE_10_HALF;
-	}
-
-	switch (Adapter->param_force_speed_duplex) {
-	case GDIAG_10_HALF:
-		forced_speed_duplex = ADVERTISE_10_HALF;
-		break;
-	case GDIAG_10_FULL:
-		forced_speed_duplex = ADVERTISE_10_FULL;
-		break;
-	case GDIAG_100_HALF:
-		forced_speed_duplex = ADVERTISE_100_HALF;
-		break;
-	case GDIAG_100_FULL:
-		forced_speed_duplex = ADVERTISE_100_FULL;
-		break;
-	default:
-		ASSERT(B_FALSE);
-		break;
-	}
-
-	switch (ndp->ndp_info) {
-	/* Auto-Negotiation Advertisement Capabilities */
 	case PARAM_ADV_AUTONEG_CAP:
-		if (value != ndp->ndp_val) {
-			autoneg_enable = (value == 1) ? B_TRUE : B_FALSE;
-			link_change = B_TRUE;
-		}
-		break;
 	case PARAM_ADV_1000FDX_CAP:
-		if (value != ndp->ndp_val) {
-			if (Adapter->param_adv_autoneg == 0) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: adv_1000fdx requires "
-				    "adv_autoneg_cap enabled");
-				goto finished;
-			}
-			autoneg_enable = B_TRUE;
-			link_change = B_TRUE;
-			if (value == 1) {
-				autoneg_advertised |= ADVERTISE_1000_FULL;
-			} else {
-				autoneg_advertised &= ~ADVERTISE_1000_FULL;
-			}
-		}
-		break;
 	case PARAM_ADV_100FDX_CAP:
-		if (value != ndp->ndp_val) {
-			if (Adapter->param_adv_autoneg == 0) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: adv_100fdx requires "
-				    "adv_autoneg_cap enabled");
-				goto finished;
-			}
-			autoneg_enable = B_TRUE;
-			link_change = B_TRUE;
-			if (value == 1) {
-				autoneg_advertised |= ADVERTISE_100_FULL;
-			} else {
-				autoneg_advertised &= ~ADVERTISE_100_FULL;
-			}
-		}
-		break;
 	case PARAM_ADV_100HDX_CAP:
-		if (value != ndp->ndp_val) {
-			if (Adapter->param_adv_autoneg == 0) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: adv_100hdx requires "
-				    "adv_autoneg_cap enabled");
-				goto finished;
-			}
-			autoneg_enable = B_TRUE;
-			link_change = B_TRUE;
-			if (value == 1) {
-				autoneg_advertised |= ADVERTISE_100_HALF;
-			} else {
-				autoneg_advertised &= ~ADVERTISE_100_HALF;
-			}
-		}
-		break;
 	case PARAM_ADV_10FDX_CAP:
-		if (value != ndp->ndp_val) {
-			if (Adapter->param_adv_autoneg == 0) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: adv_10fdx requires "
-				    "adv_autoneg_cap enabled");
-				goto finished;
-			}
-			autoneg_enable = B_TRUE;
-			link_change = B_TRUE;
-			if (value == 1) {
-				autoneg_advertised |= ADVERTISE_10_FULL;
-			} else {
-				autoneg_advertised &= ~ADVERTISE_10_FULL;
-			}
-		}
-		break;
 	case PARAM_ADV_10HDX_CAP:
-		if (value != ndp->ndp_val) {
-			if (Adapter->param_adv_autoneg == 0) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: adv_10hdx requires "
-				    "adv_autoneg_cap enabled");
-				goto finished;
-			}
-			autoneg_enable = B_TRUE;
-			link_change = B_TRUE;
-			if (value == 1) {
-				autoneg_advertised |= ADVERTISE_10_HALF;
-			} else {
-				autoneg_advertised &= ~ADVERTISE_10_HALF;
-			}
-		}
-		break;
-	case PARAM_FORCE_SPEED_DUPLEX:
-		if (value != ndp->ndp_val) {
-			if (Adapter->param_adv_autoneg == 1) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: force_speed_duplex requires "
-				    "adv_autoneg_cap disabled");
-				goto finished;
-			}
-			autoneg_enable = B_FALSE;
-			link_change = B_TRUE;
-			switch (value) {
-			case GDIAG_10_HALF:
-				forced_speed_duplex = ADVERTISE_10_HALF;
-				break;
-			case GDIAG_10_FULL:
-				forced_speed_duplex = ADVERTISE_10_FULL;
-				break;
-			case GDIAG_100_HALF:
-				forced_speed_duplex = ADVERTISE_100_HALF;
-				break;
-			case GDIAG_100_FULL:
-				forced_speed_duplex = ADVERTISE_100_FULL;
-				break;
-			default:
-				ASSERT(B_FALSE);
-				break;
-			}
-		}
+		ndp->ndp_val = value;
+		(void) e1000g_reset_link(Adapter);
 		break;
 	default:
-		goto finished;
+		break;
 	}
-
-	if (link_change) {
-		if (autoneg_enable) {
-			if (autoneg_advertised == 0) {
-				e1000g_log(Adapter, CE_WARN,
-				    "ndd set: there must be at least one "
-				    "advertised capability enabled");
-				goto finished;
-			}
-
-			hw->mac.autoneg = B_TRUE;
-			hw->phy.autoneg_advertised = autoneg_advertised;
-		} else {
-			hw->mac.autoneg = B_FALSE;
-			hw->mac.forced_speed_duplex = forced_speed_duplex;
-		}
-
-		ndp->ndp_val = value;
-
-		e1000_setup_link(hw);
-	}
-
-finished:
 	rw_exit(&Adapter->chip_lock);
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
@@ -765,6 +449,8 @@ e1000g_nd_init(struct e1000g *Adapter)
 	 */
 	if (e1000g_nd_param_load(Adapter) != DDI_SUCCESS)
 		return (DDI_FAILURE);
+
+	e1000g_nd_param_sync(Adapter);
 
 	return (DDI_SUCCESS);
 }
@@ -816,6 +502,8 @@ e1000g_nd_ioctl(struct e1000g *Adapter, queue_t *wq,
 		}
 
 		ok = nd_getset(wq, Adapter->nd_data, mp);
+
+		e1000g_nd_param_sync(Adapter);
 
 		if (!ok)
 			return (IOC_INVAL);

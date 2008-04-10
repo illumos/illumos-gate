@@ -539,75 +539,71 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_CAP_1000FDX:
-		*val = ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+		*val = Adapter->param_1000fdx_cap;
 		break;
 
 	case ETHER_STAT_CAP_1000HDX:
-		*val = ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
-		    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
+		*val = Adapter->param_1000hdx_cap;
 		break;
 
 	case ETHER_STAT_CAP_100FDX:
-		*val = ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
-		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		*val = Adapter->param_100fdx_cap;
 		break;
 
 	case ETHER_STAT_CAP_100HDX:
-		*val = ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
-		    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+		*val = Adapter->param_100hdx_cap;
 		break;
 
 	case ETHER_STAT_CAP_10FDX:
-		*val = (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_10fdx_cap;
 		break;
 
 	case ETHER_STAT_CAP_10HDX:
-		*val = (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_10hdx_cap;
 		break;
 
 	case ETHER_STAT_CAP_ASMPAUSE:
-		*val = (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		*val = Adapter->param_asym_pause_cap;
 		break;
 
 	case ETHER_STAT_CAP_PAUSE:
-		*val = (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		*val = Adapter->param_pause_cap;
 		break;
 
 	case ETHER_STAT_CAP_AUTONEG:
-		*val = (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
+		*val = Adapter->param_autoneg_cap;
 		break;
 
 	case ETHER_STAT_ADV_CAP_1000FDX:
-		*val = (Adapter->phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_adv_1000fdx;
 		break;
 
 	case ETHER_STAT_ADV_CAP_1000HDX:
-		*val = (Adapter->phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_adv_1000hdx;
 		break;
 
 	case ETHER_STAT_ADV_CAP_100FDX:
-		*val = (Adapter->phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_adv_100fdx;
 		break;
 
 	case ETHER_STAT_ADV_CAP_100HDX:
-		*val = (Adapter->phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_adv_100hdx;
 		break;
 
 	case ETHER_STAT_ADV_CAP_10FDX:
-		*val = (Adapter->phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_adv_10fdx;
 		break;
 
 	case ETHER_STAT_ADV_CAP_10HDX:
-		*val = (Adapter->phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_adv_10hdx;
 		break;
 
 	case ETHER_STAT_ADV_CAP_ASMPAUSE:
-		*val = (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		*val = Adapter->param_adv_asym_pause;
 		break;
 
 	case ETHER_STAT_ADV_CAP_PAUSE:
-		*val = (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		*val = Adapter->param_adv_pause;
 		break;
 
 	case ETHER_STAT_ADV_CAP_AUTONEG:
@@ -615,58 +611,68 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_LP_CAP_1000FDX:
-		*val =
-		    (Adapter->phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_1000fdx;
 		break;
 
 	case ETHER_STAT_LP_CAP_1000HDX:
-		*val =
-		    (Adapter->phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_1000hdx;
 		break;
 
 	case ETHER_STAT_LP_CAP_100FDX:
-		*val = (Adapter->phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_100fdx;
 		break;
 
 	case ETHER_STAT_LP_CAP_100HDX:
-		*val = (Adapter->phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_100hdx;
 		break;
 
 	case ETHER_STAT_LP_CAP_10FDX:
-		*val = (Adapter->phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_10fdx;
 		break;
 
 	case ETHER_STAT_LP_CAP_10HDX:
-		*val = (Adapter->phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_10hdx;
 		break;
 
 	case ETHER_STAT_LP_CAP_ASMPAUSE:
-		*val = (Adapter->phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
+		*val = Adapter->param_lp_asym_pause;
 		break;
 
 	case ETHER_STAT_LP_CAP_PAUSE:
-		*val = (Adapter->phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
+		*val = Adapter->param_lp_pause;
 		break;
 
 	case ETHER_STAT_LP_CAP_AUTONEG:
-		*val = (Adapter->phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
+		*val = Adapter->param_lp_autoneg;
 		break;
 
 	case ETHER_STAT_LINK_ASMPAUSE:
-		*val = (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		*val = Adapter->param_asym_pause_cap;
 		break;
 
 	case ETHER_STAT_LINK_PAUSE:
-		*val = (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		*val = Adapter->param_pause_cap;
 		break;
 
 	case ETHER_STAT_LINK_AUTONEG:
-		*val = (Adapter->phy_ctrl & MII_CR_AUTO_NEG_EN) ? 1 : 0;
+		*val = hw->mac.autoneg;
 		break;
 
 	case ETHER_STAT_LINK_DUPLEX:
 		*val = (Adapter->link_duplex == FULL_DUPLEX) ?
 		    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
+		break;
+
+	case ETHER_STAT_CAP_100T4:
+		*val = Adapter->param_100t4_cap;
+		break;
+
+	case ETHER_STAT_ADV_CAP_100T4:
+		*val = Adapter->param_adv_100t4;
+		break;
+
+	case ETHER_STAT_LP_CAP_100T4:
+		*val = Adapter->param_lp_100t4;
 		break;
 
 	default:

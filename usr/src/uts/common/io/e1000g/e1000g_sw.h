@@ -122,7 +122,7 @@ extern "C" {
 #define	MIN_TX_INTR_ABS_DELAY		0
 #define	MIN_INTR_THROTTLING		0
 #define	MIN_RX_BCOPY_THRESHOLD		0
-#define	MIN_TX_BCOPY_THRESHOLD		MINIMUM_ETHERNET_PACKET_SIZE
+#define	MIN_TX_BCOPY_THRESHOLD		ETHERMIN
 #define	MIN_TX_RECYCLE_THRESHOLD	0
 #define	MIN_TX_RECYCLE_NUM		MAX_TX_DESC_PER_PACKET
 
@@ -255,15 +255,13 @@ extern "C" {
 #define	FRAME_SIZE_UPTO_16K	16384
 #define	FRAME_SIZE_UPTO_9K	9234
 
-/* The sizes (in bytes) of a ethernet packet */
-#define	MAXIMUM_ETHERNET_FRAME_SIZE	1518 /* With FCS */
-#define	MINIMUM_ETHERNET_FRAME_SIZE	64   /* With FCS */
-#define	ETHERNET_FCS_SIZE		4
-#define	MAXIMUM_ETHERNET_PACKET_SIZE	\
-	(MAXIMUM_ETHERNET_FRAME_SIZE - ETHERNET_FCS_SIZE)
-#define	MINIMUM_ETHERNET_PACKET_SIZE	\
-	(MINIMUM_ETHERNET_FRAME_SIZE - ETHERNET_FCS_SIZE)
-#define	CRC_LENGTH			ETHERNET_FCS_SIZE
+#define	MAXIMUM_MTU		9000
+#define	DEFAULT_MTU		ETHERMTU
+
+#define	DEFAULT_FRAME_SIZE	\
+	(DEFAULT_MTU + sizeof (struct ether_vlan_header) + ETHERFCSL)
+#define	MAXIMUM_FRAME_SIZE	\
+	(MAXIMUM_MTU + sizeof (struct ether_vlan_header) + ETHERFCSL)
 
 /* Defines for Tx stall check */
 #define	E1000G_STALL_WATCHDOG_COUNT	8
@@ -404,16 +402,38 @@ extern "C" {
 /*
  * Shorthand for the NDD parameters
  */
+#define	param_autoneg_cap	nd_params[PARAM_AUTONEG_CAP].ndp_val
+#define	param_pause_cap		nd_params[PARAM_PAUSE_CAP].ndp_val
+#define	param_asym_pause_cap	nd_params[PARAM_ASYM_PAUSE_CAP].ndp_val
+#define	param_1000fdx_cap	nd_params[PARAM_1000FDX_CAP].ndp_val
+#define	param_1000hdx_cap	nd_params[PARAM_1000HDX_CAP].ndp_val
+#define	param_100t4_cap		nd_params[PARAM_100T4_CAP].ndp_val
+#define	param_100fdx_cap	nd_params[PARAM_100FDX_CAP].ndp_val
+#define	param_100hdx_cap	nd_params[PARAM_100HDX_CAP].ndp_val
+#define	param_10fdx_cap		nd_params[PARAM_10FDX_CAP].ndp_val
+#define	param_10hdx_cap		nd_params[PARAM_10HDX_CAP].ndp_val
+
 #define	param_adv_autoneg	nd_params[PARAM_ADV_AUTONEG_CAP].ndp_val
 #define	param_adv_pause		nd_params[PARAM_ADV_PAUSE_CAP].ndp_val
 #define	param_adv_asym_pause	nd_params[PARAM_ADV_ASYM_PAUSE_CAP].ndp_val
 #define	param_adv_1000fdx	nd_params[PARAM_ADV_1000FDX_CAP].ndp_val
 #define	param_adv_1000hdx	nd_params[PARAM_ADV_1000HDX_CAP].ndp_val
+#define	param_adv_100t4		nd_params[PARAM_ADV_100T4_CAP].ndp_val
 #define	param_adv_100fdx	nd_params[PARAM_ADV_100FDX_CAP].ndp_val
 #define	param_adv_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
 #define	param_adv_10fdx		nd_params[PARAM_ADV_10FDX_CAP].ndp_val
 #define	param_adv_10hdx		nd_params[PARAM_ADV_10HDX_CAP].ndp_val
-#define	param_force_speed_duplex nd_params[PARAM_FORCE_SPEED_DUPLEX].ndp_val
+
+#define	param_lp_autoneg	nd_params[PARAM_LP_AUTONEG_CAP].ndp_val
+#define	param_lp_pause		nd_params[PARAM_LP_PAUSE_CAP].ndp_val
+#define	param_lp_asym_pause	nd_params[PARAM_LP_ASYM_PAUSE_CAP].ndp_val
+#define	param_lp_1000fdx	nd_params[PARAM_LP_1000FDX_CAP].ndp_val
+#define	param_lp_1000hdx	nd_params[PARAM_LP_1000HDX_CAP].ndp_val
+#define	param_lp_100t4		nd_params[PARAM_LP_100T4_CAP].ndp_val
+#define	param_lp_100fdx		nd_params[PARAM_LP_100FDX_CAP].ndp_val
+#define	param_lp_100hdx		nd_params[PARAM_LP_100HDX_CAP].ndp_val
+#define	param_lp_10fdx		nd_params[PARAM_LP_10FDX_CAP].ndp_val
+#define	param_lp_10hdx		nd_params[PARAM_LP_10HDX_CAP].ndp_val
 
 #ifdef E1000G_DEBUG
 /*
@@ -507,8 +527,6 @@ enum {
 	PARAM_LP_100HDX_CAP,
 	PARAM_LP_10FDX_CAP,
 	PARAM_LP_10HDX_CAP,
-
-	PARAM_FORCE_SPEED_DUPLEX,
 
 	PARAM_LINK_STATUS,
 	PARAM_LINK_SPEED,
@@ -910,6 +928,8 @@ typedef struct e1000g {
 	uint32_t rx_intr_abs_delay;
 	uint32_t intr_throttling_rate;
 
+	uint32_t default_mtu;
+
 	boolean_t watchdog_timer_enabled;
 	boolean_t watchdog_timer_started;
 	timeout_id_t watchdog_tid;
@@ -991,6 +1011,14 @@ typedef struct e1000g {
 	 * FMA capabilities
 	 */
 	int fm_capabilities;
+
+	uint32_t	param_en_1000fdx:1,
+			param_en_1000hdx:1,
+			param_en_100fdx:1,
+			param_en_100hdx:1,
+			param_en_10fdx:1,
+			param_en_10hdx:1,
+			param_pad_to_32:26;
 } e1000g_t;
 
 
@@ -1034,6 +1062,8 @@ int e1000g_check_acc_handle(ddi_acc_handle_t handle);
 int e1000g_check_dma_handle(ddi_dma_handle_t handle);
 void e1000g_fm_ereport(struct e1000g *Adapter, char *detail);
 void e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag);
+
+int e1000g_reset_link(struct e1000g *Adapter);
 
 #pragma inline(e1000_rar_set)
 
