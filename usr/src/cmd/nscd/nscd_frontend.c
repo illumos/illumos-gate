@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1080,6 +1080,14 @@ _nscd_setup_server(char *execname, char **argv)
 
 	main_execname = execname;
 	main_argv = argv;
+
+	/* Any nscd process is to ignore SIGPIPE */
+	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+		errnum = errno;
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+		(me, "signal (SIGPIPE): %s\n", strerror(errnum));
+		return (-1);
+	}
 
 	keep_open_dns_socket();
 
