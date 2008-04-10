@@ -441,7 +441,6 @@ main (int argc, char *argv[])
 	struct dk_minfo mi;
 	int i, dos_cnt;
 	fstyp_handle_t fstyp_handle;
-	int systid, relsect, numsect;
 	off_t probe_offset = 0;
 	int num_volumes;
 	char **volumes;
@@ -462,7 +461,7 @@ main (int argc, char *argv[])
 	if ((raw_device_file = getenv ("HAL_PROP_BLOCK_SOLARIS_RAW_DEVICE")) == NULL) {
 		goto out;
 	}
-	if (!dos_to_dev(device_file, &rdevpath, &dos_num)) {
+	if (!dos_to_dev(raw_device_file, &rdevpath, &dos_num)) {
 		rdevpath = raw_device_file;
 	}
 	if (!(is_dos = dos_to_dev(device_file, &devpath, &dos_num))) {
@@ -551,13 +550,12 @@ main (int argc, char *argv[])
 	 */
 	if (is_dos) {
 		/* for a dos drive find partition offset */
-		if (!find_dos_drive(fd, dos_num, &relsect, &numsect, &systid)) {
+		if (!find_dos_drive(fd, dos_num, block_size, &probe_offset)) {
 			goto out;
 		}
 		partition_scheme = "mbr";
-		partition_start = (dbus_uint64_t)relsect * 512;
+		partition_start = (dbus_uint64_t)probe_offset;
 		partition_number = dos_num;
-		probe_offset = (off_t)relsect * 512;
 	} else {
 		if ((partition_number = read_vtoc(rfd, &vtoc)) >= 0) {
 			if (!vtoc_one_slice_entire_disk(&vtoc)) {

@@ -338,6 +338,7 @@ main (int argc, char *argv[])
 	dbus_bool_t is_cdrom;
 	dbus_bool_t is_floppy;
 	struct dk_minfo minfo;
+	unsigned int block_size = 512;
 	dbus_bool_t only_check_for_media;
 	int got_media = FALSE;
 	dbus_bool_t is_write_protected = FALSE;
@@ -406,6 +407,7 @@ main (int argc, char *argv[])
 		if (!got_media) {
 			goto out_cs;
 		}
+		block_size = minfo.dki_lbsize;
 		/* XXX */
 		is_write_protected = TRUE;
 	} else if (is_floppy) {
@@ -417,6 +419,9 @@ main (int argc, char *argv[])
 		goto out_cs;
 	} else {
 		got_media = TRUE;
+		if (get_media_info(rfd, &minfo)) {
+			block_size = minfo.dki_lbsize;
+		}
 	}
 
 	HAL_DEBUG (("Checking for partitions on %s", device_file));
@@ -426,7 +431,7 @@ main (int argc, char *argv[])
 		goto out_cs;
 	}
 
-	dos_cnt = get_num_dos_drives(fd);
+	dos_cnt = get_num_dos_drives(fd, block_size);
 	is_mbr = (dos_cnt > 0);
 	if (is_mbr) {
 		scheme = "mbr";

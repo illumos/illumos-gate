@@ -2,7 +2,7 @@
  *
  * fsutils.c : filesystem utilities
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -112,8 +112,8 @@ enum { WALK_CONTINUE, WALK_TERMINATE };
  * Walk partition tables and invoke a callback for each.
  */
 static void
-walk_partitions(int fd, int startsec, int (*f)(void *, int, int, int),
-    void *arg)
+walk_partitions(int fd, int startsec, uint_t secsz,
+    int (*f)(void *, int, int, int), void *arg)
 {
 	uint32_t buf[1024/4];
 	int bufsize = 1024;
@@ -128,7 +128,7 @@ walk_partitions(int fd, int startsec, int (*f)(void *, int, int, int),
 	int i;
 
 	while (sec != lastsec) {
-		if (pread(fd, buf, bufsize, (off_t)sec * 512) != bufsize) {
+		if (pread(fd, buf, bufsize, (off_t)sec * secsz) != bufsize) {
 			break;
 		}
 		lastsec = sec;
@@ -182,18 +182,16 @@ find_dos_drive_cb(void *arg, int systid, int relsect, int numsect)
  * number of sectors in partition and the system id.
  */
 boolean_t
-find_dos_drive(int fd, int num, int *relsect, int *numsect, int *systid)
+find_dos_drive(int fd, int num, uint_t secsz, off_t *offset)
 {
 	struct part_find_s p = { 0, 0, 0, 0, 0, 0 };
 
 	p.num = num;
 
 	if (num > 0) {
-		walk_partitions(fd, 0, find_dos_drive_cb, &p);
+		walk_partitions(fd, 0, secsz, find_dos_drive_cb, &p);
 		if (p.count == num) {
-			*relsect = p.r_relsect;
-			*numsect = p.r_numsect;
-			*systid = p.r_systid;
+			*offset = (off_t)p.r_relsect * secsz;
 			return (B_TRUE);
 		}
 	}
@@ -211,11 +209,11 @@ get_num_dos_drives_cb(void *arg, int systid, int relsect, int numsect)
 }
 
 int
-get_num_dos_drives(int fd)
+get_num_dos_drives(int fd, uint_t secsz)
 {
 	int count = 0;
 
-	walk_partitions(fd, 0, get_num_dos_drives_cb, &count);
+	walk_partitions(fd, 0, secsz, get_num_dos_drives_cb, &count);
 
 	return (count);
 }
