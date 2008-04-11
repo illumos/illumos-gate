@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1544,6 +1544,9 @@ rt2560_mgmt_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	sc->sc_tx_timer = 5;
 
+	ic->ic_stats.is_tx_frags++;
+	ic->ic_stats.is_tx_bytes += pktlen;
+
 fail3:
 	ieee80211_free_node(ni);
 fail2:
@@ -1693,6 +1696,9 @@ rt2560_send(ieee80211com_t *ic, mblk_t *mp)
 	RAL_WRITE(sc, RT2560_TXCSR0, RT2560_KICK_TX);
 
 	sc->sc_tx_timer = 5;
+
+	ic->ic_stats.is_tx_frags++;
+	ic->ic_stats.is_tx_bytes += pktlen;
 
 	freemsg(mp);
 fail3:

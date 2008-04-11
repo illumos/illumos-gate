@@ -15,6 +15,7 @@
 
 #include <net/wpa.h>
 #include <libdladm.h>
+#include <libdllink.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -166,7 +167,7 @@ struct wpa_supplicant {
 	unsigned char		own_addr[IEEE80211_ADDR_LEN];
 
 	datalink_id_t		linkid;
-	char			kname[WPA_STRSIZE];
+	char			kname[DLADM_SECOBJ_NAME_MAX];
 
 	uint8_t			pmk[PMK_LEN];
 

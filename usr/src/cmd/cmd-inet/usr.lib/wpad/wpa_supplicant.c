@@ -22,6 +22,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <door.h>
+#include <libscf.h>
 #include <libdladm.h>
 #include <libdllink.h>
 #include <sys/ethernet.h>
@@ -31,9 +32,6 @@
 #include "driver.h"
 #include "eloop.h"
 #include "l2_packet.h"
-
-static const char *wpa_supplicant_version =
-"wpa_supplicant v1.0";
 
 extern struct wpa_driver_ops wpa_driver_wifi_ops;
 int wpa_debug_level = MSG_ERROR;
@@ -799,16 +797,16 @@ daemon(boolean_t nochdir, boolean_t noclose)
 	return (0);
 }
 
-static void
-usage(void)
+/*
+ * make sure wpad is running under SMF context.
+ */
+static boolean_t
+is_smf_context(void)
 {
-	(void) printf("%s\n\n"
-	    "usage:\n"
-	    "  wpa_supplicant [-hv] -i<ifname> -k<keyname>\n"
-	    "options:\n"
-	    "  -h = show this help text\n"
-	    "  -v = show version\n",
-	    wpa_supplicant_version);
+	char *fmri;
+
+	return (((fmri = getenv("SMF_FMRI")) != NULL) &&
+	    (strstr(fmri, SERVICE_NAME) != NULL));
 }
 
 int
@@ -822,31 +820,28 @@ main(int argc, char *argv[])
 	dladm_phys_attr_t dpa;
 	int c;
 	int exitcode;
-	char door_file[WPA_STRSIZE];
+	char door_file[MAXPATHLEN];
+
+	if (!is_smf_context()) {
+		(void) fprintf(stderr,
+		    "wpad is an smf(5) managed service and cannot be run from "
+		    "the command line; please use dladm(1M).\n");
+		return (SMF_EXIT_ERR_NOSMF);
+	}
 
 	for (;;) {
-		c = getopt(argc, argv, "Dk:hi:v");
+		c = getopt(argc, argv, "i:k:");
 		if (c < 0)
 			break;
 		switch (c) {
-		case 'D':
-			wpa_debug_level = MSG_DEBUG;
-			break;
-		case 'h':
-			usage();
-			return (-1);
 		case 'i':
 			link = optarg;
 			break;
 		case 'k':
 			key = optarg;
 			break;
-		case 'v':
-			(void) printf("%s\n", wpa_supplicant_version);
-			return (-1);
 		default:
-			usage();
-			return (-1);
+			return (SMF_EXIT_ERR_CONFIG);
 		}
 	}
 
@@ -895,7 +890,7 @@ main(int argc, char *argv[])
 		dlpi_close(dh);
 		return (-1);
 	}
-	(void) snprintf(door_file, WPA_STRSIZE, "%s_%s", WPA_DOOR, dpa.dp_dev);
+	(void) snprintf(door_file, MAXPATHLEN, "%s_%s", WPA_DOOR, dpa.dp_dev);
 
 	(void) memset(&wpa_s, 0, sizeof (wpa_s));
 	wpa_s.driver = &wpa_driver_wifi_ops;

@@ -633,6 +633,10 @@ usr/platform/sun4u/include/sys/fcode.h		sparc
 usr/include/net/pppoe.h			sparc
 usr/include/net/sppptun.h		sparc
 usr/include/net/wpa.h			sparc
+# Private net80211 headers
+usr/include/sys/net80211.h		sparc
+usr/include/sys/net80211_proto.h	sparc
+usr/include/sys/net80211_crypto.h	sparc
 #
 # User<->kernel interface used by cfgadm/USB only
 #

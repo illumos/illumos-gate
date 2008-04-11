@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,10 +35,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SYS_NET80211_CRYPTO_H
 #define	_SYS_NET80211_CRYPTO_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mac.h>
@@ -51,6 +51,20 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	IEEE80211_MAX_WPA_IE		40	/* IEEE802.11i */
+/*
+ * Max size of optional information elements.  We artificially
+ * constrain this; it's limited only by the max frame size (and
+ * the max parameter size of the wireless extensions).
+ */
+#define	IEEE80211_MAX_OPT_IE		256
+
+#define	IEEE80211_MLME_ASSOC		1	/* associate station */
+#define	IEEE80211_MLME_DISASSOC		2	/* disassociate station */
+#define	IEEE80211_MLME_DEAUTH		3	/* deauthenticate station */
+#define	IEEE80211_MLME_AUTHORIZE	4	/* authorize station */
+#define	IEEE80211_MLME_UNAUTHORIZE	5	/* unauthorize station */
 
 /*
  * NB: these values are ordered carefully; there are lots of
@@ -83,6 +97,8 @@ extern "C" {
 #define	IEEE80211_KEY_SWMIC		0x20	/* host-based enmic/demic */
 #define	IEEE80211_KEY_COMMON 		/* common flags passed in by apps */ \
 	(IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV | IEEE80211_KEY_GROUP)
+
+#define	IEEE80211_KEY_DEFAULT		0x80	/* default xmit key */
 
 /* WEP */
 #define	IEEE80211_WEP_KEYLEN		5	/* 40bit */

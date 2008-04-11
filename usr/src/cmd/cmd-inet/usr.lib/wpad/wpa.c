@@ -32,8 +32,7 @@ static void pmksa_cache_set_expiration(struct wpa_supplicant *);
  * IEEE 802.11i/D3.0
  */
 static const int WPA_SELECTOR_LEN = 4;
-static const uint8_t WPA_OUI_TYPE[] = { 0x00, 0x50, 0xf2, 1 };
-static const uint16_t WPA_VERSION = 1;
+static const uint8_t WPA_OUI_AND_TYPE[] = { 0x00, 0x50, 0xf2, 1 };
 static const uint8_t
 WPA_AUTH_KEY_MGMT_UNSPEC_802_1X[] 		= { 0x00, 0x50, 0xf2, 1 };
 static const uint8_t
@@ -361,7 +360,7 @@ wpa_parse_wpa_ie_wpa(struct wpa_supplicant *wpa_s, uint8_t *wpa_ie,
 
 	if (hdr->elem_id != GENERIC_INFO_ELEM ||
 	    hdr->len != wpa_ie_len - 2 ||
-	    memcmp(&hdr->oui, WPA_OUI_TYPE, WPA_SELECTOR_LEN) != 0 ||
+	    memcmp(&hdr->oui, WPA_OUI_AND_TYPE, WPA_SELECTOR_LEN) != 0 ||
 	    LE_16(hdr->version) != WPA_VERSION) {
 		wpa_printf(MSG_DEBUG, "%s: malformed ie or unknown version",
 		    "wpa_parse_wpa_ie_wpa");
@@ -570,7 +569,7 @@ wpa_gen_wpa_ie_wpa(struct wpa_supplicant *wpa_s, uint8_t *wpa_ie)
 
 	hdr = (struct wpa_ie_hdr *)wpa_ie;
 	hdr->elem_id = GENERIC_INFO_ELEM;
-	(void) memcpy(&hdr->oui, WPA_OUI_TYPE, WPA_SELECTOR_LEN);
+	(void) memcpy(&hdr->oui, WPA_OUI_AND_TYPE, WPA_SELECTOR_LEN);
 	hdr->version = LE_16(WPA_VERSION);
 	pos = (uint8_t *)(hdr + 1);
 
