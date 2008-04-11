@@ -354,7 +354,7 @@ idmap_sqlite_busy_handler(void *arg, const char *table_name, int count)
 		busy->sec = 2;
 	}
 	if (busy->total > 1000 * busy->sec) {
-		idmapdlog(LOG_ERR,
+		idmapdlog(LOG_DEBUG,
 		    "Thread %d waited %d sec for the %s database",
 		    pthread_self(), busy->sec, busy->name);
 		busy->sec++;

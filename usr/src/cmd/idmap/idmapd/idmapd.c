@@ -187,6 +187,7 @@ int
 main(int argc, char **argv)
 {
 	int c;
+	struct rlimit rl;
 
 	_idmapdstate.daemon_mode = TRUE;
 	_idmapdstate.debug_mode = FALSE;
@@ -211,6 +212,19 @@ main(int argc, char **argv)
 		    "with Trusted Extensions idmapd runs only in the "
 		    "global zone");
 		exit(1);
+	}
+
+	/*
+	 * Raise the fd limit to max
+	 */
+	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		idmapdlog(LOG_ERR, "getrlimit failed");
+	} else if (rl.rlim_cur < rl.rlim_max) {
+		rl.rlim_cur = rl.rlim_max;
+		if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
+			idmapdlog(LOG_ERR,
+			    "Unable to raise RLIMIT_NOFILE to %d",
+			    rl.rlim_cur);
 	}
 
 	(void) mutex_init(&_svcstate_lock, USYNC_THREAD, NULL);
