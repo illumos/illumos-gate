@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,7 @@ extern	void	timer_exit(void);
 extern	void	timer_lwpexit(void);
 extern	clock_t	hzto(struct timeval *);
 extern	clock_t	timespectohz(timespec_t *, timespec_t);
-extern	clock_t	timespectohz_adj(timespec_t *, timespec_t);
+extern	int64_t	timespectohz64(timespec_t *);
 extern	int	itimerspecfix(timespec_t *);
 extern	void	timespecadd(timespec_t *, timespec_t *);
 extern	void	timespecsub(timespec_t *, timespec_t *);

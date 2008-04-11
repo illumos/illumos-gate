@@ -1,5 +1,25 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -850,25 +870,43 @@ timespectohz(timespec_t *tv, timespec_t now)
 }
 
 /*
- * Same as timespectohz() except that we adjust the clock ticks down a bit.
- * If we will be waiting for a long time, we may encounter skewing problems
- * due to adjtime() system calls.  Since we can skew up to 1/16 lbolt rate
- * if adjtime is going crazy, we reduce the time delta since timeout() takes
- * clock ticks rather than wallclock elapsed time.  This may cause the caller
- * (who calls timeout()) to return with a timeout prematurely and callers
- * must accommodate this.  See lwp_timeout(), queue_lwptimer() and
- * cv_waituntil_sig(), currently the only callers of this function.
+ * Compute number of hz with the timespec tv specified.
+ * The return type must be 64 bit integer.
  */
-clock_t
-timespectohz_adj(timespec_t *tv, timespec_t now)
+int64_t
+timespectohz64(timespec_t *tv)
 {
-	timespec_t wait_time = *tv;
+	int64_t ticks;
+	int64_t sec;
+	int64_t nsec;
 
-	timespecsub(&wait_time, &now);
-	wait_time.tv_sec -= wait_time.tv_sec >> 4;
-	wait_time.tv_nsec -= wait_time.tv_nsec >> 4;
-	timespecadd(&wait_time, &now);
-	return (timespectohz(&wait_time, now));
+	sec = tv->tv_sec;
+	nsec = tv->tv_nsec + nsec_per_tick - 1;
+
+	if (nsec < 0) {
+		sec--;
+		nsec += NANOSEC;
+	} else if (nsec >= NANOSEC) {
+		sec++;
+		nsec -= NANOSEC;
+	}
+
+	ticks = NSEC_TO_TICK(nsec);
+
+	/*
+	 * Compute ticks, accounting for negative and overflow as above.
+	 * Overflow protection kicks in at about 70 weeks for hz=50
+	 * and at about 35 weeks for hz=100. (Rather longer for the 64-bit
+	 * kernel
+	 */
+	if (sec < 0 || (sec == 0 && ticks < 1))
+		ticks = 1;			/* protect vs nonpositive */
+	else if (sec > (((~0ULL) >> 1) - ticks) / hz)
+		ticks = (~0ULL) >> 1;		/* protect vs overflow */
+	else
+		ticks += sec * hz;		/* common case */
+
+	return (ticks);
 }
 
 /*
@@ -1326,49 +1364,49 @@ tod_to_utc(todinfo_t tod)
 #ifdef DEBUG
 	if (year_warn && (year < 70 || year > 8029)) {
 		cmn_err(CE_WARN,
-			"The hardware real-time clock appears to have the "
-			"wrong years value %d -- time needs to be reset\n",
-			year);
+		    "The hardware real-time clock appears to have the "
+		    "wrong years value %d -- time needs to be reset\n",
+		    year);
 		year_warn = 0;
 	}
 
 	if (month_warn && (tod.tod_month < 1 || tod.tod_month > 12)) {
 		cmn_err(CE_WARN,
-			"The hardware real-time clock appears to have the "
-			"wrong months value %d -- time needs to be reset\n",
-			tod.tod_month);
+		    "The hardware real-time clock appears to have the "
+		    "wrong months value %d -- time needs to be reset\n",
+		    tod.tod_month);
 		month_warn = 0;
 	}
 
 	if (day_warn && (tod.tod_day < 1 || tod.tod_day > days_diff)) {
 		cmn_err(CE_WARN,
-			"The hardware real-time clock appears to have the "
-			"wrong days value %d -- time needs to be reset\n",
-			tod.tod_day);
+		    "The hardware real-time clock appears to have the "
+		    "wrong days value %d -- time needs to be reset\n",
+		    tod.tod_day);
 		day_warn = 0;
 	}
 
 	if (hour_warn && (tod.tod_hour < 0 || tod.tod_hour > 23)) {
 		cmn_err(CE_WARN,
-			"The hardware real-time clock appears to have the "
-			"wrong hours value %d -- time needs to be reset\n",
-			tod.tod_hour);
+		    "The hardware real-time clock appears to have the "
+		    "wrong hours value %d -- time needs to be reset\n",
+		    tod.tod_hour);
 		hour_warn = 0;
 	}
 
 	if (min_warn && (tod.tod_min < 0 || tod.tod_min > 59)) {
 		cmn_err(CE_WARN,
-			"The hardware real-time clock appears to have the "
-			"wrong minutes value %d -- time needs to be reset\n",
-			tod.tod_min);
+		    "The hardware real-time clock appears to have the "
+		    "wrong minutes value %d -- time needs to be reset\n",
+		    tod.tod_min);
 		min_warn = 0;
 	}
 
 	if (sec_warn && (tod.tod_sec < 0 || tod.tod_sec > 59)) {
 		cmn_err(CE_WARN,
-			"The hardware real-time clock appears to have the "
-			"wrong seconds value %d -- time needs to be reset\n",
-			tod.tod_sec);
+		    "The hardware real-time clock appears to have the "
+		    "wrong seconds value %d -- time needs to be reset\n",
+		    tod.tod_sec);
 		sec_warn = 0;
 	}
 #endif

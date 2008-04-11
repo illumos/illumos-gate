@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,9 +70,10 @@ static callout_table_t *callout_table[CALLOUT_TABLES];
 		cthead = nextp;				\
 }
 
-#define	CALLOUT_HASH_UPDATE(INSDEL, ct, cp, id, runtime)		\
+#define	CALLOUT_HASH_UPDATE(INSDEL, ct, cp, id, runtime, runhrtime)	\
 	ASSERT(MUTEX_HELD(&ct->ct_lock));				\
-	ASSERT(cp->c_xid == id && cp->c_runtime == runtime);		\
+	ASSERT(cp->c_xid == id && ((cp->c_runtime == runtime) ||	\
+	    (cp->c_runhrtime <= runhrtime)));				\
 	CALLOUT_HASH_##INSDEL(ct->ct_idhash[CALLOUT_IDHASH(id)],	\
 	cp, c_idnext, c_idprev)						\
 	CALLOUT_HASH_##INSDEL(ct->ct_lbhash[CALLOUT_LBHASH(runtime)],	\
@@ -109,6 +109,10 @@ timeout_common(void (*func)(void *), void *arg, clock_t delta,
 	callout_t *cp;
 	callout_id_t id;
 	clock_t runtime;
+	timestruc_t start;
+	int64_t runhrtime;
+
+	gethrestime_lasttick(&start);
 
 	mutex_enter(&ct->ct_lock);
 
@@ -126,6 +130,7 @@ timeout_common(void (*func)(void *), void *arg, clock_t delta,
 	if (delta <= 0)
 		delta = 1;
 	cp->c_runtime = runtime = lbolt + delta;
+	cp->c_runhrtime = runhrtime = delta + timespectohz64(&start);
 
 	/*
 	 * Assign an ID to this callout
@@ -139,13 +144,13 @@ timeout_common(void (*func)(void *), void *arg, clock_t delta,
 
 	cp->c_xid = id;
 
-	CALLOUT_HASH_UPDATE(INSERT, ct, cp, id, runtime);
+	CALLOUT_HASH_UPDATE(INSERT, ct, cp, id, runtime, runhrtime);
 
 	mutex_exit(&ct->ct_lock);
 
 	TRACE_4(TR_FAC_CALLOUT, TR_TIMEOUT,
-		"timeout:%K(%p) in %ld ticks, cp %p",
-		func, arg, delta, cp);
+	    "timeout:%K(%p) in %ld ticks, cp %p",
+	    func, arg, delta, cp);
 
 	return ((timeout_id_t)id);
 }
@@ -181,9 +186,12 @@ untimeout(timeout_id_t id_arg)
 
 		if ((xid = cp->c_xid) == id) {
 			clock_t runtime = cp->c_runtime;
+			int64_t runhrtime = cp->c_runhrtime;
 			clock_t time_left = runtime - lbolt;
 
-			CALLOUT_HASH_UPDATE(DELETE, ct, cp, id, runtime);
+			CALLOUT_HASH_UPDATE(DELETE, ct, cp, id,
+			    runtime, runhrtime);
+
 			cp->c_idnext = ct->ct_freelist;
 			ct->ct_freelist = cp;
 			mutex_exit(&ct->ct_lock);
@@ -248,14 +256,23 @@ callout_execute(callout_table_t *ct)
 	callout_t *cp;
 	callout_id_t xid;
 	clock_t runtime;
+	int64_t curhrtime;
 
 	mutex_enter(&ct->ct_lock);
 
+	/*
+	 * Assuming the system time can be set forward and backward
+	 * at any time. If it is set backward, we will measure the
+	 * c_runtime; otherwise, we will compare c_runhrtime with
+	 * ct_curhrtime.
+	 */
+	curhrtime = ct->ct_curhrtime;
 	while (((runtime = ct->ct_runtime) - ct->ct_curtime) <= 0) {
 		for (cp = ct->ct_lbhash[CALLOUT_LBHASH(runtime)];
 		    cp != NULL; cp = cp->c_lbnext) {
 			xid = cp->c_xid;
-			if (cp->c_runtime != runtime ||
+			if ((cp->c_runtime != runtime &&
+			    cp->c_runhrtime > curhrtime) ||
 			    (xid & CALLOUT_EXECUTING))
 				continue;
 			cp->c_executor = curthread;
@@ -274,7 +291,9 @@ callout_execute(callout_table_t *ct)
 			 * newly-created timeouts can precede cp on ct_lbhash,
 			 * and those timeouts cannot be due on this tick.
 			 */
-			CALLOUT_HASH_UPDATE(DELETE, ct, cp, xid, runtime);
+			CALLOUT_HASH_UPDATE(DELETE, ct, cp, xid,
+			    runtime, curhrtime);
+
 			cp->c_idnext = ct->ct_freelist;
 			ct->ct_freelist = cp;
 			cp->c_xid = 0;	/* Indicate completion for c_done */
@@ -300,13 +319,28 @@ callout_schedule_1(callout_table_t *ct)
 {
 	callout_t *cp;
 	clock_t curtime, runtime;
+	timestruc_t now;
+	int64_t curhrtime;
+
+	gethrestime(&now);
+	curhrtime = timespectohz64(&now);
 
 	mutex_enter(&ct->ct_lock);
 	ct->ct_curtime = curtime = lbolt;
+
+	/*
+	 * We use both the conditions cp->c_runtime == runtime and
+	 * cp->c_runhrtime <= curhrtime to determine a timeout is
+	 * premature or not. If the system time has been set backwards,
+	 * then cp->c_runtime == runtime will become true first.
+	 * Otherwise, we test cp->c_runhrtime <= curhrtime
+	 */
+	ct->ct_curhrtime = curhrtime;
 	while (((runtime = ct->ct_runtime) - curtime) <= 0) {
 		for (cp = ct->ct_lbhash[CALLOUT_LBHASH(runtime)];
 		    cp != NULL; cp = cp->c_lbnext) {
-			if (cp->c_runtime != runtime ||
+			if ((cp->c_runtime != runtime &&
+			    cp->c_runhrtime > curhrtime) ||
 			    (cp->c_xid & CALLOUT_EXECUTING))
 				continue;
 			mutex_exit(&ct->ct_lock);
@@ -376,6 +410,14 @@ callout_init(void)
 			    CALLOUT_COUNTER_HIGH;
 			ct->ct_long_id = ct->ct_short_id | CALLOUT_LONGTERM;
 			ct->ct_curtime = ct->ct_runtime = lbolt;
+
+			/*
+			 * We can not call gethrestime() at this moment
+			 * since the system time has not been validated.
+			 * So Set ct_curhrtime to zero.
+			 */
+			ct->ct_curhrtime = 0;
+
 			if (t == CALLOUT_NORMAL) {
 				/*
 				 * Each callout thread consumes exactly one
