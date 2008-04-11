@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +48,8 @@ typedef uint64_t ldc_dring_handle_t;	/* Descriptor ring handle */
 typedef enum {
 	LDC_MODE_RAW,			/* Raw mode */
 	LDC_MODE_UNRELIABLE,		/* Unreliable packet mode */
-	LDC_MODE_RELIABLE,		/* Reliable packet mode */
-	LDC_MODE_STREAM			/* Reliable byte stream */
+	_LDC_MODE_RESERVED_,		/* reserved */
+	LDC_MODE_RELIABLE		/* Reliable packet mode */
 } ldc_mode_t;
 
 /* LDC message payload sizes */

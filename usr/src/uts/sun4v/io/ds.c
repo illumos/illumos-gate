@@ -610,7 +610,7 @@ ds_ldc_init(ds_port_t *port)
 
 	ldc_attr.devclass = LDC_DEV_GENERIC;
 	ldc_attr.instance = 0;
-	ldc_attr.mode = LDC_MODE_STREAM;
+	ldc_attr.mode = LDC_MODE_RELIABLE;
 	ldc_attr.mtu = DS_STREAM_MTU;
 
 	if ((rv = ldc_init(port->ldc.id, &ldc_attr, &port->ldc.hdl)) != 0) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,9 +44,10 @@ typedef struct cnex_regspec {
 /*
  * Channel nexus interrupt map
  */
-struct cnex_pil_map {
+struct cnex_intr_map {
 	ldc_dev_t	devclass;	/* LDC device class */
 	uint32_t	pil;		/* PIL for device class */
+	int32_t		weight;		/* Interrupt weight for device class */
 };
 
 /*
@@ -61,6 +62,7 @@ typedef struct cnex_intr {
 	uint_t		(*hdlr)();	/* intr handler */
 	caddr_t		arg1;		/* intr argument 1 */
 	caddr_t		arg2;		/* intr argument 2 */
+	int32_t		weight;		/* intr weight */
 } cnex_intr_t;
 
 /* cnex interrupt types */

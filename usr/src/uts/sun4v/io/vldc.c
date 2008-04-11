@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1100,12 +1100,11 @@ vldc_set_ldc_mode(vldc_port_t *vport, vldc_t *vldcp, int channel_mode)
 
 	/* validate mode */
 	switch (channel_mode) {
-	case LDC_MODE_STREAM:
+	case LDC_MODE_RELIABLE:
 		vport->is_stream = B_TRUE;
 		break;
 	case LDC_MODE_RAW:
 	case LDC_MODE_UNRELIABLE:
-	case LDC_MODE_RELIABLE:
 		vport->is_stream = B_FALSE;
 		break;
 	default:

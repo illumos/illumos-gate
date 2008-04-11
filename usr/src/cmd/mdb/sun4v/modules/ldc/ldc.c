@@ -40,7 +40,7 @@
 const mdb_bitmask_t ldc_mode_bits[] = {
 	{ "raw   ", ALLBITS, LDC_MODE_RAW },
 	{ "unrel ", ALLBITS, LDC_MODE_UNRELIABLE },
-	{ "stream", ALLBITS, LDC_MODE_STREAM },
+	{ "rel   ", ALLBITS, LDC_MODE_RELIABLE },
 	{ NULL, 0, 0}
 };
 
@@ -203,7 +203,7 @@ ldcinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("Rx Info: 0x%p len=0x%lx intr=%b\n",
 		    ldcp.rx_q_va, ldcp.rx_q_entries,
 		    ldcp.rx_intr_state, ldc_intrstate_bits);
-		if (ldcp.mode == LDC_MODE_STREAM) {
+		if (ldcp.mode == LDC_MODE_RELIABLE) {
 			mdb_printf("Rx Dq Info: 0x%p len=0x%lx hd=0x%lx "
 			    "tl=0x%lx ackhd=0x%lx", ldcp.rx_dq_va,
 			    ldcp.rx_dq_entries, ldcp.rx_dq_head,

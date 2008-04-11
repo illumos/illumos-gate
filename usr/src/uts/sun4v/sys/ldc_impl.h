@@ -509,6 +509,27 @@ typedef struct ldc_soft_state {
 	kmem_cache_t	*memseg_cache;	/* Memory segment cache */
 } ldc_soft_state_t;
 
+
+/*
+ * Debugging Utilities
+ */
+#define	DBG_ALL_LDCS	-1
+#ifdef	DEBUG
+#define	D1		\
+if (ldcdbg & 0x01)	\
+	ldcdebug
+#define	D2		\
+if (ldcdbg & 0x02)	\
+	ldcdebug
+#define	DWARN		\
+if (ldcdbg & 0x04)	\
+	ldcdebug
+#else
+#define	D1
+#define	D2
+#define	DWARN
+#endif
+
 #ifdef __cplusplus
 }
 #endif

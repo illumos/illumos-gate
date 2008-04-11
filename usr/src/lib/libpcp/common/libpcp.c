@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,7 @@ pcp_init(char *channel_name)
 
 		op.op_sel = VLDC_OP_SET;
 		op.opt_sel = VLDC_OPT_MODE;
-		op.opt_val = LDC_MODE_STREAM;
+		op.opt_val = LDC_MODE_RELIABLE;
 		if (ioctl(channel_fd, VLDC_IOCTL_OPT_OP, &op) != 0) {
 			(void) close(channel_fd);
 			return (PCPL_GLVC_ERROR);

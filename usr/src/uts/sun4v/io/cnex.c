@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,16 +61,18 @@
 /*
  * Internal functions/information
  */
-static struct cnex_pil_map cnex_class_to_pil[] = {
-	{LDC_DEV_GENERIC,	PIL_3},
-	{LDC_DEV_BLK,		PIL_4},
-	{LDC_DEV_BLK_SVC,	PIL_3},
-	{LDC_DEV_NT,		PIL_6},
-	{LDC_DEV_NT_SVC,	PIL_4},
-	{LDC_DEV_SERIAL,	PIL_6}
+static struct cnex_intr_map cnex_class_to_intr[] = {
+	{LDC_DEV_GENERIC,	PIL_3,	 0},
+	{LDC_DEV_BLK,		PIL_4,	10},
+	{LDC_DEV_BLK_SVC,	PIL_3,	10},
+	{LDC_DEV_NT,		PIL_6,	35},
+	{LDC_DEV_NT_SVC,	PIL_4,	35},
+	{LDC_DEV_SERIAL,	PIL_6,	 0}
 };
-#define	CNEX_MAX_DEVS (sizeof (cnex_class_to_pil) / \
-				sizeof (cnex_class_to_pil[0]))
+#define	CNEX_MAX_DEVS (sizeof (cnex_class_to_intr) / \
+				sizeof (cnex_class_to_intr[0]))
+
+#define	CNEX_TX_INTR_WEIGHT	0
 
 #define	SUN4V_REG_SPEC2CFG_HDL(x)	((x >> 32) & ~(0xfull << 28))
 
@@ -78,10 +80,41 @@ static clock_t cnex_wait_usecs = 1000; /* wait time in usecs */
 static int cnex_wait_retries = 3;
 static void *cnex_state;
 
-static void cnex_intr_redist(void *arg);
 static uint_t cnex_intr_wrapper(caddr_t arg);
 static dev_info_t *cnex_find_chan_dip(dev_info_t *dip, uint64_t chan_id,
     md_t *mdp, mde_cookie_t mde);
+
+/*
+ * Channel Interrupt Distribution
+ *
+ * In order to balance interrupts among available CPUs, we use
+ * the intr_dist_cpuid_{add,remove}_device_weight() interface to
+ * assign weights to channel interrupts. These weights, which are
+ * defined in the cnex_intr_map structure, influence which CPU
+ * is returned by intr_dist_cpuid() when called via the cnex
+ * interrupt redistribution callback cnex_intr_redist().
+ * Interrupts for VIO devclass channels are given more weight than
+ * other interrupts because they are expected to occur more
+ * frequently and have a larger impact on overall performance.
+ * Transmit interrupts are given a zero weight because they are
+ * not used.
+ *
+ * The interrupt weights influence the target CPU selection when
+ * interrupts are redistributed and when they are added. However,
+ * removal of interrupts can unbalance the distribution even if
+ * they are removed in converse order--compared to the order they
+ * are added. This can occur when interrupts are removed after
+ * redistribution occurs.
+ *
+ * Channel interrupt weights affect interrupt-CPU distribution
+ * relative to other weighted interrupts on the system. For VIO
+ * devclass channels, values are chosen to match those used by
+ * the PCI express nexus driver for net and storage devices.
+ */
+static void cnex_intr_redist(void *arg, int32_t weight_max, int32_t weight);
+static int cnex_intr_new_cpu(cnex_soft_state_t *ssp, cnex_intr_t *iinfo);
+static int cnex_intr_dis_wait(cnex_soft_state_t *ssp, cnex_intr_t *iinfo);
+static int32_t cnex_class_weight(ldc_dev_t devclass);
 
 /*
  * Debug info
@@ -280,15 +313,18 @@ _info(struct modinfo *modinfop)
  * Callback function invoked by the interrupt redistribution
  * framework. This will redirect interrupts at CPUs that are
  * currently available in the system.
+ *
+ * Note: any interrupts with weight greater than or equal to
+ * weight_max must be redistributed when this callback is
+ * invoked with (weight == weight_max) which will be once per
+ * redistribution.
  */
+/*ARGSUSED*/
 static void
-cnex_intr_redist(void *arg)
+cnex_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 {
 	cnex_ldc_t		*cldcp;
 	cnex_soft_state_t	*cnex_ssp = arg;
-	int			intr_state;
-	uint64_t		cpuid;
-	int 			rv, retries = 0;
 
 	ASSERT(cnex_ssp != NULL);
 	mutex_enter(&cnex_ssp->clist_lock);
@@ -298,130 +334,14 @@ cnex_intr_redist(void *arg)
 
 		mutex_enter(&cldcp->lock);
 
-		if (cldcp->tx.hdlr) {
-			/*
-			 * Don't do anything for disabled interrupts.
-			 */
-			rv = hvldc_intr_getvalid(cnex_ssp->cfghdl,
-			    cldcp->tx.ino, &intr_state);
-			if (rv) {
-				DWARN("cnex_intr_redist: tx ino=0x%llx, "
-				    "can't get valid\n", cldcp->tx.ino);
-				mutex_exit(&cldcp->lock);
-				mutex_exit(&cnex_ssp->clist_lock);
-				return;
-			}
-			if (intr_state == HV_INTR_NOTVALID) {
-				mutex_exit(&cldcp->lock);
-				cldcp = cldcp->next;
-				continue;
-			}
-
-			cpuid = intr_dist_cpuid();
-
-			/* disable interrupts */
-			rv = hvldc_intr_setvalid(cnex_ssp->cfghdl,
-			    cldcp->tx.ino, HV_INTR_NOTVALID);
-			if (rv) {
-				DWARN("cnex_intr_redist: tx ino=0x%llx, "
-				    "can't set valid\n", cldcp->tx.ino);
-				mutex_exit(&cldcp->lock);
-				mutex_exit(&cnex_ssp->clist_lock);
-				return;
-			}
-
-			/*
-			 * Make a best effort to wait for pending interrupts
-			 * to finish. There is not much we can do if we timeout.
-			 */
-			retries = 0;
-
-			do {
-				rv = hvldc_intr_getstate(cnex_ssp->cfghdl,
-				    cldcp->tx.ino, &intr_state);
-				if (rv) {
-					DWARN("cnex_intr_redist: tx ino=0x%llx,"
-					    "can't get state\n", cldcp->tx.ino);
-					mutex_exit(&cldcp->lock);
-					mutex_exit(&cnex_ssp->clist_lock);
-					return;
-				}
-
-				if (intr_state != HV_INTR_DELIVERED_STATE)
-					break;
-
-				drv_usecwait(cnex_wait_usecs);
-
-			} while (!panicstr && ++retries <= cnex_wait_retries);
-
-			cldcp->tx.cpuid = cpuid;
-			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
-			    cldcp->tx.ino, cpuid);
-			(void) hvldc_intr_setvalid(cnex_ssp->cfghdl,
-			    cldcp->tx.ino, HV_INTR_VALID);
+		if (cldcp->tx.hdlr && (cldcp->tx.weight == weight ||
+		    (weight_max == weight && cldcp->tx.weight > weight))) {
+			(void) cnex_intr_new_cpu(cnex_ssp, &cldcp->tx);
 		}
 
-		if (cldcp->rx.hdlr) {
-			/*
-			 * Don't do anything for disabled interrupts.
-			 */
-			rv = hvldc_intr_getvalid(cnex_ssp->cfghdl,
-			    cldcp->rx.ino, &intr_state);
-			if (rv) {
-				DWARN("cnex_intr_redist: rx ino=0x%llx, "
-				    "can't get valid\n", cldcp->rx.ino);
-				mutex_exit(&cldcp->lock);
-				mutex_exit(&cnex_ssp->clist_lock);
-				return;
-			}
-			if (intr_state == HV_INTR_NOTVALID) {
-				mutex_exit(&cldcp->lock);
-				cldcp = cldcp->next;
-				continue;
-			}
-
-			cpuid = intr_dist_cpuid();
-
-			/* disable interrupts */
-			rv = hvldc_intr_setvalid(cnex_ssp->cfghdl,
-			    cldcp->rx.ino, HV_INTR_NOTVALID);
-			if (rv) {
-				DWARN("cnex_intr_redist: rx ino=0x%llx, "
-				    "can't set valid\n", cldcp->rx.ino);
-				mutex_exit(&cldcp->lock);
-				mutex_exit(&cnex_ssp->clist_lock);
-				return;
-			}
-
-			/*
-			 * Make a best effort to wait for pending interrupts
-			 * to finish. There is not much we can do if we timeout.
-			 */
-			retries = 0;
-
-			do {
-				rv = hvldc_intr_getstate(cnex_ssp->cfghdl,
-				    cldcp->rx.ino, &intr_state);
-				if (rv) {
-					DWARN("cnex_intr_redist: rx ino=0x%llx,"
-					    "can't get state\n", cldcp->rx.ino);
-					mutex_exit(&cldcp->lock);
-					mutex_exit(&cnex_ssp->clist_lock);
-					return;
-				}
-
-				if (intr_state != HV_INTR_DELIVERED_STATE)
-					break;
-
-				drv_usecwait(cnex_wait_usecs);
-
-			} while (!panicstr && ++retries <= cnex_wait_retries);
-
-			cldcp->rx.cpuid = cpuid;
-			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
-			    cldcp->rx.ino, cpuid);
-			(void) hvldc_intr_setvalid(cnex_ssp->cfghdl,
-			    cldcp->rx.ino, HV_INTR_VALID);
+		if (cldcp->rx.hdlr && (cldcp->rx.weight == weight ||
+		    (weight_max == weight && cldcp->rx.weight > weight))) {
+			(void) cnex_intr_new_cpu(cnex_ssp, &cldcp->rx);
 		}
 
 		mutex_exit(&cldcp->lock);
@@ -431,6 +351,112 @@ cnex_intr_redist(void *arg)
 	}
 
 	mutex_exit(&cnex_ssp->clist_lock);
+}
+
+/*
+ * Internal function to replace the CPU used by an interrupt
+ * during interrupt redistribution.
+ */
+static int
+cnex_intr_new_cpu(cnex_soft_state_t *ssp, cnex_intr_t *iinfo)
+{
+	int	intr_state;
+	int 	rv;
+
+	/* Determine if the interrupt is enabled */
+	rv = hvldc_intr_getvalid(ssp->cfghdl, iinfo->ino, &intr_state);
+	if (rv) {
+		DWARN("cnex_intr_new_cpu: rx ino=0x%llx, can't get valid\n",
+		    iinfo->ino);
+		return (rv);
+	}
+
+	/* If it is enabled, disable it */
+	if (intr_state == HV_INTR_VALID) {
+		rv = cnex_intr_dis_wait(ssp, iinfo);
+		if (rv) {
+			return (rv);
+		}
+	}
+
+	/* Target the interrupt at a new CPU. */
+	iinfo->cpuid = intr_dist_cpuid();
+	(void) hvldc_intr_settarget(ssp->cfghdl, iinfo->ino, iinfo->cpuid);
+	intr_dist_cpuid_add_device_weight(iinfo->cpuid, iinfo->dip,
+	    iinfo->weight);
+
+	/* Re-enable the interrupt if it was enabled */
+	if (intr_state == HV_INTR_VALID) {
+		(void) hvldc_intr_setvalid(ssp->cfghdl, iinfo->ino,
+		    HV_INTR_VALID);
+	}
+
+	return (0);
+}
+
+/*
+ * Internal function to disable an interrupt and wait
+ * for any pending interrupts to finish.
+ */
+static int
+cnex_intr_dis_wait(cnex_soft_state_t *ssp, cnex_intr_t *iinfo)
+{
+	int rv, intr_state, retries;
+
+	/* disable interrupts */
+	rv = hvldc_intr_setvalid(ssp->cfghdl, iinfo->ino, HV_INTR_NOTVALID);
+	if (rv) {
+		DWARN("cnex_intr_dis_wait: ino=0x%llx, can't set valid\n",
+		    iinfo->ino);
+		return (ENXIO);
+	}
+
+	/*
+	 * Make a best effort to wait for pending interrupts
+	 * to finish. There is not much we can do if we timeout.
+	 */
+	retries = 0;
+
+	do {
+		rv = hvldc_intr_getstate(ssp->cfghdl, iinfo->ino, &intr_state);
+		if (rv) {
+			DWARN("cnex_intr_dis_wait: ino=0x%llx, can't get "
+			    "state\n", iinfo->ino);
+			return (ENXIO);
+		}
+
+		if (intr_state != HV_INTR_DELIVERED_STATE)
+			break;
+
+		drv_usecwait(cnex_wait_usecs);
+
+	} while (!panicstr && ++retries <= cnex_wait_retries);
+
+	return (0);
+}
+
+/*
+ * Returns the interrupt weight to use for the specified devclass.
+ */
+static int32_t
+cnex_class_weight(ldc_dev_t devclass)
+{
+	int idx;
+
+	for (idx = 0; idx < CNEX_MAX_DEVS; idx++) {
+		if (devclass == cnex_class_to_intr[idx].devclass) {
+			return (cnex_class_to_intr[idx].weight);
+		}
+	}
+
+	/*
+	 * If this code is reached, the specified devclass is
+	 * invalid. New devclasses should be added to
+	 * cnex_class_to_intr.
+	 */
+	ASSERT(0);
+
+	return (0);
 }
 
 /*
@@ -551,6 +577,8 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 	cldcp->tx.ino = txino;
 	cldcp->rx.ino = rxino;
 	cldcp->devclass = devclass;
+	cldcp->tx.weight = CNEX_TX_INTR_WEIGHT;
+	cldcp->rx.weight = cnex_class_weight(devclass);
 	cldcp->dip = chan_dip;
 
 	/* add channel to nexus channel list */
@@ -643,8 +671,8 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 
 	/* Pick a PIL on the basis of the channel's devclass */
 	for (idx = 0, pil = PIL_3; idx < CNEX_MAX_DEVS; idx++) {
-		if (cldcp->devclass == cnex_class_to_pil[idx].devclass) {
-			pil = cnex_class_to_pil[idx].pil;
+		if (cldcp->devclass == cnex_class_to_intr[idx].devclass) {
+			pil = cnex_class_to_intr[idx].pil;
 			break;
 		}
 	}
@@ -684,6 +712,9 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 		    iinfo->ino);
 		goto hv_error;
 	}
+
+	intr_dist_cpuid_add_device_weight(iinfo->cpuid, iinfo->dip,
+	    iinfo->weight);
 
 	mutex_exit(&cldcp->lock);
 	return (0);
@@ -834,11 +865,13 @@ cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 
 	/* Pick a PIL on the basis of the channel's devclass */
 	for (idx = 0, pil = PIL_3; idx < CNEX_MAX_DEVS; idx++) {
-		if (cldcp->devclass == cnex_class_to_pil[idx].devclass) {
-			pil = cnex_class_to_pil[idx].pil;
+		if (cldcp->devclass == cnex_class_to_intr[idx].devclass) {
+			pil = cnex_class_to_intr[idx].pil;
 			break;
 		}
 	}
+
+	intr_dist_cpuid_rem_device_weight(iinfo->cpuid, iinfo->dip);
 
 	/* remove interrupt */
 	(void) rem_ivintr(iinfo->icookie, pil);
@@ -1036,7 +1069,7 @@ cnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/* Add interrupt redistribution callback. */
-	intr_dist_add(cnex_intr_redist, cnex_ssp);
+	intr_dist_add_weighted(cnex_intr_redist, cnex_ssp);
 
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);
@@ -1074,7 +1107,7 @@ cnex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	(void) ldc_unregister(&cinfo);
 
 	/* Remove interrupt redistribution callback. */
-	intr_dist_rem(cnex_intr_redist, cnex_ssp);
+	intr_dist_rem_weighted(cnex_intr_redist, cnex_ssp);
 
 	/* destroy mutex */
 	mutex_destroy(&cnex_ssp->clist_lock);

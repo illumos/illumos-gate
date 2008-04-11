@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -839,7 +839,7 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_addr_t addr)
 		/* Set the channel to reliable mode */
 		op.op_sel = VLDC_OP_SET;
 		op.opt_sel = VLDC_OPT_MODE;
-		op.opt_val = LDC_MODE_STREAM;
+		op.opt_val = LDC_MODE_RELIABLE;
 
 		if (ioctl(_conn->fd, VLDC_IOCTL_OPT_OP, &op) != 0) {
 			/* errno assumed set by above call */

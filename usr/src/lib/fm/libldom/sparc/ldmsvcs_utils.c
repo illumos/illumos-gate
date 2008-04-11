@@ -1081,7 +1081,7 @@ channel_openreset(struct ldmsvcs_info *lsp)
 
 			op.op_sel = VLDC_OP_SET;
 			op.opt_sel = VLDC_OPT_MODE;
-			op.opt_val = LDC_MODE_STREAM;
+			op.opt_val = LDC_MODE_RELIABLE;
 
 			if (ioctl(lsp->fds_chan.fd, VLDC_IOCTL_OPT_OP,
 			    &op) != 0) {
