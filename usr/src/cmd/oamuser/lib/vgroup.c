@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -36,10 +36,15 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<ctype.h>
+#include	<errno.h>
+#include	<limits.h>
+#include	<sys/param.h>
 #include	<users.h>
 #include	<userdefs.h>
 
-extern int valid_gid();
+extern int valid_gid(gid_t, struct group **);
+
+static int isalldigit(char *);
 
 /*
  *	validate a group name or number and return the appropriate
@@ -48,20 +53,58 @@ extern int valid_gid();
 int
 valid_group(char *group, struct group **gptr, int *warning)
 {
-	gid_t gid;
+	int r, warn;
+	long l;
 	char *ptr;
+	struct group *grp;
 
 	*warning = 0;
-	if (isdigit(*group)) {
-		gid = (gid_t) strtol(group, &ptr, (int) 10);
-		if (! *ptr)
-		return (valid_gid(gid, gptr));
-	}
-	for (ptr = group; *ptr != NULL; ptr++) {
-		if (!isprint(*ptr) || (*ptr == ':') || (*ptr == '\n'))
-			return (INVALID);
-	}
 
-	/* length checking and other warnings are done in valid_gname() */
-	return (valid_gname(group, gptr, warning));
+	if (!isalldigit(group))
+		return (valid_gname(group, gptr, warning));
+
+	/*
+	 * There are only digits in group name.
+	 * strtol() doesn't return negative number here.
+	 */
+	errno = 0;
+	l = strtol(group, &ptr, 10);
+	if ((l == LONG_MAX && errno == ERANGE) || l > MAXUID) {
+		r = TOOBIG;
+	} else {
+		if ((r = valid_gid((gid_t)l, &grp)) == NOTUNIQUE) {
+			/* It is a valid existing gid */
+			if (gptr != NULL)
+				*gptr = grp;
+			return (NOTUNIQUE);
+		}
+	}
+	/*
+	 * It's all digit, but not a valid gid nor an existing gid.
+	 * There might be an existing group name of all digits.
+	 */
+	if (valid_gname(group, &grp, &warn) == NOTUNIQUE) {
+		/* It does exist */
+		*warning = warn;
+		if (gptr != NULL)
+			*gptr = grp;
+		return (NOTUNIQUE);
+	}
+	/*
+	 * It isn't either existing gid or group name. We return the
+	 * error code from valid_gid() assuming that given string
+	 * represents an integer GID.
+	 */
+	return (r);
+}
+
+static int
+isalldigit(char *str)
+{
+	while (*str != '\0') {
+		if (!isdigit((unsigned char)*str))
+			return (0);
+		str++;
+	}
+	return (1);
 }
