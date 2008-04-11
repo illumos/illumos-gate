@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@ static int ddi_cardreader(di_minor_t minor, di_node_t node);
 static int starcat_sbbc_node(di_minor_t minor, di_node_t node);
 static int lom(di_minor_t minor, di_node_t node);
 static int ntwdt_create(di_minor_t minor, di_node_t node);
+static int bmc(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "other", "ddi_other", NULL,
@@ -71,6 +72,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "ntwdt",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ntwdt_create
 	},
+	{ "pseudo", "ddi_pseudo", "bmc",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, bmc
+	}
 };
 
 DEVFSADM_CREATE_INIT_V0(misc_cbt);
@@ -294,5 +298,15 @@ static int
 ntwdt_create(di_minor_t minor, di_node_t node)
 {
 	(void) devfsadm_mklink("ntwdt", node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * Creates /dev/bmc node.
+ */
+static int
+bmc(di_minor_t minor, di_node_t node)
+{
+	(void) devfsadm_mklink("bmc", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }

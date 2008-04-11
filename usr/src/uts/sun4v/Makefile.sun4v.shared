@@ -327,6 +327,7 @@ MACH_NOT_YET_KMODS	 = $(AUTOCONF_OBJS)
 #	Machine Specific Driver Modules (/kernel/drv):
 #
 DRV_KMODS	+= bge
+DRV_KMODS	+= bmc
 DRV_KMODS	+= cnex
 DRV_KMODS	+= cpc
 DRV_KMODS	+= dma

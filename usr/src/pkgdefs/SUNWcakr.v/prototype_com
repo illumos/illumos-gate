@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,11 +56,13 @@ f none platform/sun4v/kernel/crypto/sparcv9/md5 755 root sys
 f none platform/sun4v/kernel/crypto/sparcv9/arcfour 755 root sys
 d none platform/sun4v/kernel/drv 755 root sys
 f none platform/sun4v/kernel/drv/bge.conf 644 root sys
+f none platform/sun4v/kernel/drv/bmc.conf 644 root sys
 f none platform/sun4v/kernel/drv/trapstat.conf 644 root sys
 f none platform/sun4v/kernel/drv/ncp.conf 644 root sys
 f none platform/sun4v/kernel/drv/n2rng.conf 644 root sys
 d none platform/sun4v/kernel/drv/sparcv9 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/bge 755 root sys
+f none platform/sun4v/kernel/drv/sparcv9/bmc 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/ebus 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/dma 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/px 755 root sys

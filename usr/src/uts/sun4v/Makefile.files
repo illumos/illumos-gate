@@ -135,6 +135,11 @@ MEMTEST_OBJS	+= memtest.o memtest_asm.o \
 			memtest_vf.o
 
 #
+#			sun4v /dev/bmc
+#
+BMC_OBJS	= bmc_fe.o bmc_vc.o
+
+#
 #			sun4v virtual devices
 #
 QCN_OBJS	= qcn.o

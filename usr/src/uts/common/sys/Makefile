@@ -101,6 +101,7 @@ CHKHDRS=			\
 	bitmap.h		\
 	bitset.h		\
 	bl.h			\
+	bmc_cmd.h		\
 	bmc_intf.h		\
 	bofi.h			\
 	bofi_impl.h		\
