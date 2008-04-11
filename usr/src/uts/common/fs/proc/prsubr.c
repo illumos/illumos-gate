@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1000,7 +1000,7 @@ prgetlwpstatus32(kthread_t *t, lwpstatus32_t *sp, zone_t *zp)
 	sp->pr_oldcontext = (caddr32_t)lwp->lwp_oldcontext;
 	sp->pr_ustack = (caddr32_t)lwp->lwp_ustack;
 	(void) strncpy(sp->pr_clname, sclass[t->t_cid].cl_name,
-		sizeof (sp->pr_clname) - 1);
+	    sizeof (sp->pr_clname) - 1);
 	if (flags & PR_STOPPED)
 		hrt2ts32(t->t_stoptime, &sp->pr_tstamp);
 	usr = ms->ms_acct[LMS_USER];
@@ -1033,7 +1033,7 @@ prgetlwpstatus32(kthread_t *t, lwpstatus32_t *sp, zone_t *zp)
 		int i;
 
 		sp->pr_syscall = get_syscall32_args(lwp,
-			(int *)sp->pr_sysarg, &i);
+		    (int *)sp->pr_sysarg, &i);
 		sp->pr_nsysarg = (ushort_t)i;
 	}
 	if ((flags & PR_STOPPED) || t == curthread)
@@ -1063,7 +1063,8 @@ prgetlwpstatus32(kthread_t *t, lwpstatus32_t *sp, zone_t *zp)
 			    i++, auxp++) {
 				if (auxp->a_type == AT_SUN_EXECNAME) {
 					sp->pr_sysarg[0] =
-					(caddr32_t)(uintptr_t)auxp->a_un.a_ptr;
+					    (caddr32_t)
+					    (uintptr_t)auxp->a_un.a_ptr;
 					break;
 				}
 			}
@@ -1227,7 +1228,7 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 	sp->pr_oldcontext = (uintptr_t)lwp->lwp_oldcontext;
 	sp->pr_ustack = lwp->lwp_ustack;
 	(void) strncpy(sp->pr_clname, sclass[t->t_cid].cl_name,
-		sizeof (sp->pr_clname) - 1);
+	    sizeof (sp->pr_clname) - 1);
 	if (flags & PR_STOPPED)
 		hrt2ts(t->t_stoptime, &sp->pr_tstamp);
 	usr = ms->ms_acct[LMS_USER];
@@ -1260,7 +1261,7 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 		int i;
 
 		sp->pr_syscall = get_syscall_args(lwp,
-			(long *)sp->pr_sysarg, &i);
+		    (long *)sp->pr_sysarg, &i);
 		sp->pr_nsysarg = (ushort_t)i;
 	}
 	if ((flags & PR_STOPPED) || t == curthread)
@@ -1287,7 +1288,7 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 			    i++, auxp++) {
 				if (auxp->a_type == AT_SUN_EXECNAME) {
 					sp->pr_sysarg[0] =
-						(uintptr_t)auxp->a_un.a_ptr;
+					    (uintptr_t)auxp->a_un.a_ptr;
 					break;
 				}
 			}
@@ -1686,7 +1687,7 @@ prgetmap(proc_t *p, int reserved, list_t *iolhead)
 					(void) strcpy(mp->pr_mapname, "a.out");
 				else
 					pr_object_name(mp->pr_mapname,
-						vp, &vattr);
+					    vp, &vattr);
 			}
 
 			/*
@@ -1798,7 +1799,7 @@ prgetmap32(proc_t *p, int reserved, list_t *iolhead)
 					(void) strcpy(mp->pr_mapname, "a.out");
 				else
 					pr_object_name(mp->pr_mapname,
-						vp, &vattr);
+					    vp, &vattr);
 			}
 
 			/*
@@ -2001,7 +2002,7 @@ again:
 					(void) strcpy(pmp->pr_mapname, "a.out");
 				else
 					pr_object_name(pmp->pr_mapname,
-						vp, &vattr);
+					    vp, &vattr);
 			}
 
 			/*
@@ -2148,7 +2149,7 @@ again:
 					(void) strcpy(pmp->pr_mapname, "a.out");
 				else
 					pr_object_name(pmp->pr_mapname,
-						vp, &vattr);
+					    vp, &vattr);
 			}
 
 			/*
@@ -2290,9 +2291,10 @@ prgetpsinfo(proc_t *p, psinfo_t *psp)
 		/*
 		 * If the controlling terminal is the real
 		 * or workstation console device, map to what the
-		 * user thinks is the console device.
+		 * user thinks is the console device. Handle case when
+		 * rwsconsdev or rconsdev is set to NODEV for Starfire.
 		 */
-		if (d == rwsconsdev || d == rconsdev)
+		if ((d == rwsconsdev || d == rconsdev) && d != NODEV)
 			d = uconsdev;
 		psp->pr_ttydev = (d == NODEV) ? PRNODEV : d;
 		psp->pr_start = up->u_start;
@@ -2420,9 +2422,10 @@ prgetpsinfo32(proc_t *p, psinfo32_t *psp)
 		/*
 		 * If the controlling terminal is the real
 		 * or workstation console device, map to what the
-		 * user thinks is the console device.
+		 * user thinks is the console device. Handle case when
+		 * rwsconsdev or rconsdev is set to NODEV for Starfire.
 		 */
-		if (d == rwsconsdev || d == rconsdev)
+		if ((d == rwsconsdev || d == rconsdev) && d != NODEV)
 			d = uconsdev;
 		(void) cmpldev(&psp->pr_ttydev, d);
 		TIMESPEC_TO_TIMESPEC32(&psp->pr_start, &up->u_start);
@@ -2459,9 +2462,9 @@ prgetpsinfo32(proc_t *p, psinfo32_t *psp)
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 			psp->pr_size = (size32_t)
-				(btopr(rm_assize(as)) * (PAGESIZE / 1024));
+			    (btopr(rm_assize(as)) * (PAGESIZE / 1024));
 			psp->pr_rssize = (size32_t)
-				(rm_asrss(as) * (PAGESIZE / 1024));
+			    (rm_asrss(as) * (PAGESIZE / 1024));
 			psp->pr_pctmem = rm_pctmemory(as);
 			AS_LOCK_EXIT(as, &as->a_lock);
 			mutex_enter(&p->p_lock);
@@ -2538,7 +2541,7 @@ prgetlwpsinfo(kthread_t *t, lwpsinfo_t *psp)
 		psp->pr_cpu = 99;
 
 	(void) strncpy(psp->pr_clname, sclass[t->t_cid].cl_name,
-		sizeof (psp->pr_clname) - 1);
+	    sizeof (psp->pr_clname) - 1);
 	bzero(psp->pr_name, sizeof (psp->pr_name));	/* XXX ??? */
 	psp->pr_onpro = t->t_cpu->cpu_id;
 	psp->pr_bindpro = t->t_bind_cpu;
@@ -2608,7 +2611,7 @@ prgetlwpsinfo32(kthread_t *t, lwpsinfo32_t *psp)
 		psp->pr_cpu = 99;
 
 	(void) strncpy(psp->pr_clname, sclass[t->t_cid].cl_name,
-		sizeof (psp->pr_clname) - 1);
+	    sizeof (psp->pr_clname) - 1);
 	bzero(psp->pr_name, sizeof (psp->pr_name));	/* XXX ??? */
 	psp->pr_onpro = t->t_cpu->cpu_id;
 	psp->pr_bindpro = t->t_bind_cpu;
@@ -3712,7 +3715,7 @@ pr_getsegsize(struct seg *seg, int reserved)
 	 */
 	if (seg->s_ops == &segdev_ops &&
 	    ((SEGOP_GETTYPE(seg, seg->s_base) &
-		(MAP_SHARED | MAP_PRIVATE)) == 0))
+	    (MAP_SHARED | MAP_PRIVATE)) == 0))
 		return (0);
 
 	/*
@@ -3982,7 +3985,7 @@ prgetxmap(proc_t *p, list_t *iolhead)
 				    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 				    vp != NULL && vp->v_type == VREG &&
 				    VOP_GETATTR(vp, &vattr, 0, CRED(),
-					NULL) == 0) {
+				    NULL) == 0) {
 					mp->pr_dev = vattr.va_fsid;
 					mp->pr_ino = vattr.va_nodeid;
 					if (vp == p->p_exec)
@@ -4166,7 +4169,7 @@ prgetxmap32(proc_t *p, list_t *iolhead)
 				    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 				    vp != NULL && vp->v_type == VREG &&
 				    VOP_GETATTR(vp, &vattr, 0, CRED(),
-					NULL) == 0) {
+				    NULL) == 0) {
 					(void) cmpldev(&mp->pr_dev,
 					    vattr.va_fsid);
 					mp->pr_ino = vattr.va_nodeid;

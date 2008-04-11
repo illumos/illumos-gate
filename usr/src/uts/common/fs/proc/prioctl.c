@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1421,7 +1421,7 @@ oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
 	TICK_TO_TIMESTRUC32(p->p_cutime, &sp->pr_cutime);
 	TICK_TO_TIMESTRUC32(p->p_cstime, &sp->pr_cstime);
 	(void) strncpy(sp->pr_clname, sclass[t->t_cid].cl_name,
-		sizeof (sp->pr_clname) - 1);
+	    sizeof (sp->pr_clname) - 1);
 	sp->pr_who = t->t_tid;
 	sp->pr_nlwp = p->p_lwpcnt;
 	sp->pr_brkbase = (caddr32_t)(uintptr_t)p->p_brkbase;
@@ -1456,7 +1456,7 @@ oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
 		auxv_t *auxp;
 
 		sp->pr_syscall = get_syscall32_args(lwp,
-			(int *)sp->pr_sysarg, &i);
+		    (int *)sp->pr_sysarg, &i);
 		sp->pr_nsysarg = (short)i;
 		if (t->t_whystop == PR_SYSEXIT &&
 		    (t->t_sysnum == SYS_exec || t->t_sysnum == SYS_execve)) {
@@ -1468,7 +1468,8 @@ oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
 			    i++, auxp++) {
 				if (auxp->a_type == AT_SUN_EXECNAME) {
 					sp->pr_sysarg[0] =
-					(caddr32_t)(uintptr_t)auxp->a_un.a_ptr;
+					    (caddr32_t)
+					    (uintptr_t)auxp->a_un.a_ptr;
 					break;
 				}
 			}
@@ -1589,7 +1590,7 @@ oprgetpsinfo32(proc_t *p, prpsinfo32_t *psp, kthread_t *tp)
 		psp->pr_wchan = 0;	/* cannot represent in 32 bits */
 		psp->pr_pri = t->t_pri;
 		(void) strncpy(psp->pr_clname, sclass[t->t_cid].cl_name,
-			sizeof (psp->pr_clname) - 1);
+		    sizeof (psp->pr_clname) - 1);
 		retval = CL_DONICE(t, NULL, 0, &niceval);
 		if (retval == 0) {
 			psp->pr_oldpri = v.v_maxsyspri - psp->pr_pri;
@@ -1605,9 +1606,10 @@ oprgetpsinfo32(proc_t *p, prpsinfo32_t *psp, kthread_t *tp)
 			/*
 			 * If the controlling terminal is the real
 			 * or workstation console device, map to what the
-			 * user thinks is the console device.
+			 * user thinks is the console device. Handle case when
+			 * rwsconsdev or rconsdev is set to NODEV for Starfire.
 			 */
-			if (d == rwsconsdev || d == rconsdev)
+			if ((d == rwsconsdev || d == rconsdev) && d != NODEV)
 				d = uconsdev;
 		}
 #endif
@@ -2864,7 +2866,7 @@ startover:
 			for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
 				un32.auxv[i].a_type = up->u_auxv[i].a_type;
 				un32.auxv[i].a_un.a_val =
-					(int32_t)up->u_auxv[i].a_un.a_val;
+				    (int32_t)up->u_auxv[i].a_un.a_val;
 			}
 			prunlock(pnp);
 			if (copyout(un32.auxv, cmaddr,
@@ -3251,7 +3253,7 @@ oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 	TICK_TO_TIMESTRUC(p->p_cutime, &sp->pr_cutime);
 	TICK_TO_TIMESTRUC(p->p_cstime, &sp->pr_cstime);
 	(void) strncpy(sp->pr_clname, sclass[t->t_cid].cl_name,
-		sizeof (sp->pr_clname) - 1);
+	    sizeof (sp->pr_clname) - 1);
 	sp->pr_who = t->t_tid;
 	sp->pr_nlwp = p->p_lwpcnt;
 	sp->pr_brkbase = p->p_brkbase;
@@ -3286,7 +3288,7 @@ oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 		auxv_t *auxp;
 
 		sp->pr_syscall = get_syscall_args(lwp,
-			(long *)sp->pr_sysarg, &i);
+		    (long *)sp->pr_sysarg, &i);
 		sp->pr_nsysarg = (short)i;
 		if (t->t_whystop == PR_SYSEXIT &&
 		    (t->t_sysnum == SYS_exec || t->t_sysnum == SYS_execve)) {
@@ -3298,7 +3300,7 @@ oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 			    i++, auxp++) {
 				if (auxp->a_type == AT_SUN_EXECNAME) {
 					sp->pr_sysarg[0] =
-						(uintptr_t)auxp->a_un.a_ptr;
+					    (uintptr_t)auxp->a_un.a_ptr;
 					break;
 				}
 			}
@@ -3422,7 +3424,7 @@ oprgetpsinfo(proc_t *p, prpsinfo_t *psp, kthread_t *tp)
 		psp->pr_wchan = t->t_wchan;
 		psp->pr_pri = t->t_pri;
 		(void) strncpy(psp->pr_clname, sclass[t->t_cid].cl_name,
-			sizeof (psp->pr_clname) - 1);
+		    sizeof (psp->pr_clname) - 1);
 		retval = CL_DONICE(t, NULL, 0, &niceval);
 		if (retval == 0) {
 			psp->pr_oldpri = v.v_maxsyspri - psp->pr_pri;
@@ -3438,9 +3440,10 @@ oprgetpsinfo(proc_t *p, prpsinfo_t *psp, kthread_t *tp)
 			/*
 			 * If the controlling terminal is the real
 			 * or workstation console device, map to what the
-			 * user thinks is the console device.
+			 * user thinks is the console device. Handle case when
+			 * rwsconsdev or rconsdev is set to NODEV for Starfire.
 			 */
-			if (d == rwsconsdev || d == rconsdev)
+			if ((d == rwsconsdev || d == rconsdev) && d != NODEV)
 				d = uconsdev;
 		}
 #endif
