@@ -111,30 +111,14 @@ static void
 vs_door_scan_req(void *cookie, char *ptr, size_t size, door_desc_t *dp,
     uint_t n_desc)
 {
-	int flags = 0;
-	vs_scan_req_t scan_rsp;
 	vs_scan_req_t *scan_req;
-	char devname[MAXPATHLEN];
-	vs_attr_t fattr;
+	uint32_t result = VS_STATUS_ERROR;
 
-	if (ptr == NULL) {
-		scan_rsp.vsr_result = VS_STATUS_ERROR;
-		scan_rsp.vsr_scanstamp[0] = '\0';
-	} else {
+	if (ptr != NULL) {
 		/* LINTED E_BAD_PTR_CAST_ALIGN - to be fixed with encoding */
 		scan_req = (vs_scan_req_t *)ptr;
-		(void) snprintf(devname, MAXPATHLEN, "%s%d",
-		    VS_DRV_PATH, scan_req->vsr_id);
-
-		fattr.vsa_size = scan_req->vsr_size;
-		fattr.vsa_modified = scan_req->vsr_modified;
-		fattr.vsa_quarantined = scan_req->vsr_quarantined;
-		(void) strlcpy(fattr.vsa_scanstamp, scan_req->vsr_scanstamp,
-		    sizeof (vs_scanstamp_t));
-
-		scan_rsp.vsr_result = vs_svc_scan_file(devname,
-		    scan_req->vsr_path, &fattr, flags, &scan_rsp.vsr_scanstamp);
+		result = vs_svc_queue_scan_req(scan_req);
 	}
 
-	(void) door_return((char *)&scan_rsp, sizeof (vs_scan_req_t), NULL, 0);
+	(void) door_return((char *)&result, sizeof (uint32_t), NULL, 0);
 }

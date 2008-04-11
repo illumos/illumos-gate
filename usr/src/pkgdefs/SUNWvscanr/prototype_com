@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,15 +32,11 @@ i depend
 i pkginfo
 i i.manifest
 i r.manifest
-i postinstall
 i preremove
 
 #
 # SUNWvscanr
 #
-d none kernel 0755 root sys
-d none kernel/drv 0755 root sys
-f none kernel/drv/vscan.conf 0644 root sys
 d none var 0755 root sys
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys

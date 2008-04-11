@@ -20,15 +20,10 @@
 #
 
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 !include prototype_com
-#
-# SUNWvscanr
-#
-d none kernel/drv/sparcv9 0755 root sys
-f none kernel/drv/sparcv9/vscan 0755 root sys

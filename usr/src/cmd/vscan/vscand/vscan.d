@@ -26,13 +26,43 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/*
 #pragma D option flowindent
+*/
 
 /*
  *** vscan kernel pseudo driver ***
  */
 
-/* vscan_svc.c */
+/*
+ * vscan_svc.c
+ */
+sdt:vscan::vscan-req-counts
+{
+	printf("%s reql: %d, node: %d, taskq: %d",
+	    stringof(arg0), 
+	    ((vscan_svc_counts_t *)arg1)->vsc_reql,
+	    ((vscan_svc_counts_t *)arg1)->vsc_node,
+	    ((vscan_svc_counts_t *)arg1)->vsc_tq);
+}
+
+sdt:vscan::vscan-svc-state-violation
+{
+	printf("%d %s", arg0,
+		arg0 == 0 ? "UNCONFIG" :
+		arg0 == 1 ? "IDLE" :
+		arg0 == 2 ? "ENABLED" :
+		arg0 == 3 ? "DISABLED" : "UNKNOWN");
+}
+
+sdt:vscan::vscan-scan-timeout
+{
+	printf("idx: %d, seqnum: %d - %s",
+	    ((vscan_req_t *)arg0)->vsr_idx,
+		((vscan_req_t *)arg0)->vsr_seqnum,
+		stringof(((vscan_req_t *)arg0)->vsr_vp->v_path));
+}
+
 sdt:vscan::vscan-scan-file
 {
 	printf("%s (%s)", stringof(arg0), arg1 ? "async" : "sync");
@@ -53,128 +83,194 @@ sdt:vscan::vscan-exempt-filetype
 	printf("%s EXEMPT", stringof(arg0));
 }
 
-sdt:vscan::vscan-wait-scan
-{
-	printf("%s (%d) waiters: %d",
-		stringof(((vscan_file_t *)arg0)->vsf_req.vsr_vp->v_path),
-		arg1, ((vscan_file_t *)arg0)->vsf_wait_count);
-}
-
-sdt:vscan::vscan-wait-slot
-{
-	printf("%s", stringof(arg0));
-}
-
-sdt:vscan::vscan-insert
-{
-	printf("idx: %d - %s", arg1, stringof(arg0));
-}
-
-sdt:vscan::vscan-release
-{
-	printf("idx: %d - %s", arg1, stringof(arg0));
-}
-
 sdt:vscan::vscan-getattr
 {
 	printf("%s, m: %d, q: %d, scanstamp: %s",
-		stringof(((vscan_file_t *)arg0)->vsf_req.vsr_vp->v_path),
-		((vscan_file_t *)arg0)->vsf_modified,
-		((vscan_file_t *)arg0)->vsf_quarantined,
-		stringof(((vscan_file_t *)arg0)->vsf_scanstamp));
+		stringof(((vscan_svc_node_t *)arg0)->vsn_req->vsr_vp->v_path),
+		((vscan_svc_node_t *)arg0)->vsn_modified,
+		((vscan_svc_node_t *)arg0)->vsn_quarantined,
+		stringof(((vscan_svc_node_t *)arg0)->vsn_scanstamp));
 }
 
 sdt:vscan::vscan-setattr
 {
 	/* XAT_AV_QUARANTINED */
 	printf("%s", (arg1 & 0x400) == 0 ? "" :
-	    ((vscan_file_t *)arg0)->vsf_quarantined ? "q: 1, " : "q: 0, ");
+	    ((vscan_svc_node_t *)arg0)->vsn_quarantined ? "q: 1, " : "q: 0, ");
 
 	/* XAT_AV_MODIFIED */
 	printf("%s", (arg1 & 0x800) == 0 ? "" :
-	    ((vscan_file_t *)arg0)->vsf_modified ? "m: 1, " : "m: 0, ");
+	    ((vscan_svc_node_t *)arg0)->vsn_modified ? "m: 1, " : "m: 0, ");
 
 	/* XAT_AV_SCANSTAMP */
 	printf("%s", (arg1 & 0x1000) == 0 ? "" : "scanstamp: ");
 	printf("%s", (arg1 & 0x1000) == 0 ? "" :
-	    stringof(((vscan_file_t *)arg0)->vsf_scanstamp));
+	    stringof(((vscan_svc_node_t *)arg0)->vsn_scanstamp));
 }
 
 
 sdt:vscan::vscan-mtime-changed
 {
 	printf("%s",
-		stringof(((vscan_file_t *)arg0)->vsf_req.vsr_vp->v_path));
+		stringof(((vscan_svc_node_t *)arg0)->vsn_req->vsr_vp->v_path));
 }
 
 
 sdt:vscan::vscan-result
 {
-	printf("VS_STATUS_%s - VS_ACCESS_%s",
-	    arg0 == 0 ? "UNDEFINED" :
-	    arg0 == 1 ? "NO_SCAN" :
-	    arg0 == 2 ? "ERROR" :
-	    arg0 == 3 ? "CLEAN" :
-	    arg0 == 4 ? "INFECTED" : "XXX unknown",
-	    arg1 == 0 ? "UNDEFINED" :
-	    arg1 == 1 ? "ALLOW" : "DENY");
+	printf("idx: %d, seqnum: %d, VS_STATUS_%s - VS_ACCESS_%s",
+		arg0, arg1,
+	    arg2 == 0 ? "UNDEFINED" :
+	    arg2 == 1 ? "NO_SCAN" :
+	    arg2 == 2 ? "ERROR" :
+	    arg2 == 3 ? "CLEAN" :
+	    arg2 == 4 ? "INFECTED" :
+	    arg2 == 5 ? "SCANNING" : "XXX unknown",
+	    arg3 == 0 ? "UNDEFINED" :
+	    arg3 == 1 ? "ALLOW" : "DENY");
 }
 
+/* insert request into request list */
+fbt:vscan:vscan_svc_reql_insert:entry
+{
+	printf("%s", stringof(args[0]->v_path));
+}
+fbt:vscan:vscan_svc_reql_insert:return
+/args[1] != 0/
+{
+	printf("seqnum %d %s", args[1]->vsr_seqnum,
+	    stringof(args[1]->vsr_vp->v_path));
+}
+fbt:vscan:vscan_svc_reql_insert:return
+/args[1] == 0/
+{
+	printf("request list full");
+}
+/* insert request into scan table */
+fbt:vscan:vscan_svc_insert_req:entry
+{
+	printf("seqnum: %d - %s",
+	    args[0]->vsr_seqnum, stringof(args[0]->vsr_vp->v_path));
+}
+fbt:vscan:vscan_svc_insert_req:return
+{
+	printf("idx: %d", args[1]);
+}
+/* remove request from request list and  scan table and delete it*/
+fbt:vscan:vscan_svc_delete_req:entry
+{
+	printf("idx: %d, seqnum: %d - %s",
+	    args[0]->vsr_idx, args[0]->vsr_seqnum,
+		stringof(args[0]->vsr_vp->v_path));
+}
+
+fbt:vscan:vscan_svc_delete_req:return,
+fbt:vscan:vscan_svc_reql_handler:entry,
+fbt:vscan:vscan_svc_reql_handler:return
+{
+}
+
+fbt:vscan:vscan_svc_taskq_callback:entry,
+fbt:vscan:vscan_svc_do_scan:entry
+{
+	printf("idx: %d, seqnum: %d - %s",
+	    ((vscan_req_t *)(args[0]))->vsr_idx,
+		((vscan_req_t *)(args[0]))->vsr_seqnum,
+		stringof(((vscan_req_t *)(args[0]))->vsr_vp->v_path));
+}
+fbt:vscan:vscan_svc_scan_complete:entry
+{
+	printf("idx: %d, seqnum: %d, state: %s - %s",
+	    args[0]->vsr_idx, args[0]->vsr_seqnum,
+		args[0]->vsr_state == 0 ? "INIT" :
+		args[0]->vsr_state == 1 ? "QUEUED" :
+		args[0]->vsr_state == 2 ? "IN_PROGRESS" :
+		args[0]->vsr_state == 3 ? "SCANNING" :
+		args[0]->vsr_state == 4 ? "ASYNC_COMPLETE" :
+		args[0]->vsr_state == 5 ? "COMPLETE" : "UNKNOWN",
+		stringof(args[0]->vsr_vp->v_path));
+}
+
+fbt:vscan:vscan_svc_taskq_callback:return,
+fbt:vscan:vscan_svc_do_scan:return,
+fbt:vscan:vscan_svc_scan_complete:return
+{
+}
+
+sdt:vscan::vscan-abort
+{
+	printf("idx: %d, seqnum: %d - %s",
+	    ((vscan_req_t *)(arg0))->vsr_idx,
+		((vscan_req_t *)(arg0))->vsr_seqnum,
+		stringof(((vscan_req_t *)(arg0))->vsr_vp->v_path));
+}
 
 fbt:vscan:vscan_svc_enable:entry,
 fbt:vscan:vscan_svc_enable:return,
 fbt:vscan:vscan_svc_disable:entry,
 fbt:vscan:vscan_svc_disable:return,
 fbt:vscan:vscan_svc_configure:entry,
-fbt:vscan:vscan_svc_configure:return,
-fbt:vscan:vscan_svc_exempt_filetype:entry,
-fbt:vscan:vscan_svc_scan_file:return,
-fbt:vscan:vscan_svc_taskq_callback:entry,
-fbt:vscan:vscan_svc_taskq_callback:return,
-fbt:vscan:vscan_svc_do_scan:return
+fbt:vscan:vscan_svc_configure:return
 {
 }
 
 /*
-fbt:vscan:vscan_svc_match_ext:entry
+ * vscan_door.c
+ */
+fbt:vscan:vscan_door_open:entry,
+fbt:vscan:vscan_door_open:return,
+fbt:vscan:vscan_door_close:entry,
+fbt:vscan:vscan_door_close:return
 {
-	printf("ext: %s, check: %s", stringof(args[1]), stringof(args[0]));
 }
 
-fbt:vscan:vscan_svc_match_ext:return
-{
-}
-*/
-
-/* vscan_door.c */
 fbt:vscan:vscan_door_scan_file:entry
 {
-	printf("%s (%d)", args[0]->vsr_path, args[0]->vsr_id);
+	printf("idx: %d, seqnum: %d - %s",
+	    args[0]->vsr_idx, args[0]->vsr_seqnum, args[0]->vsr_path);
 }
 fbt:vscan:vscan_door_scan_file:return
 {
-	printf("%s", args[1] == 0 ? "success" : "error");
+	printf("VS_STATUS_%s",
+	    args[1] == 0 ? "UNDEFINED" :
+	    args[1] == 1 ? "NO_SCAN" :
+	    args[1] == 2 ? "ERROR" :
+	    args[1] == 3 ? "CLEAN" :
+	    args[1] == 4 ? "INFECTED" :
+	    args[1] == 5 ? "SCANNING" : "XXX unknown");
 }
 
-/* vscan_drv.c */
+
+/*
+ * vscan_drv.c
+ */
+sdt:vscan::vscan-drv-state-violation
+{
+	printf("%d %s", arg0,
+		arg0 == 0 ? "UNCONFIG" :
+		arg0 == 1 ? "IDLE" :
+		arg0 == 2 ? "CONNECTED" :
+		arg0 == 3 ? "ENABLED" : 
+		arg0 == 4 ? "DELAYED_DISABLE" : "UNKNOWN");
+}
 
 sdt:vscan::vscan-minor-node
 {
 	printf("vscan%d %s", arg0, arg1 != 0 ? "created" : "error");
 }
 
-/*
- * unprivileged vscan driver access attempt
- */
+/* unprivileged vscan driver access attempt */
 sdt:vscan::vscan-priv
 /arg0 != 0/
 {
 	printf("vscan driver access attempt by unprivileged process");
 }
 
-/*
- * daemon-driver synchronization
- */
+/* daemon-driver synchronization */
+sdt:vscan::vscan-reconnect
+{
+}
+
 fbt:vscan:vscan_drv_open:entry
 / *(int *)args[0] == 0/
 {
@@ -193,37 +289,31 @@ fbt:vscan:vscan_drv_ioctl:entry
 	printf("vscan daemon ioctl %d %s", args[1],
 		args[1] == 1 ? "ENABLE" :
 		args[1] == 2 ? "DISABLE" :
-		args[1] == 4 ? "CONFIG" : "unknown");
+		args[1] == 3 ? "CONFIG" :
+		args[1] == 4 ? "RESULT" :
+		args[1] == 5 ? "MAX FILES" : "unknown");
 }
 
 fbt:vscan:vscan_drv_delayed_disable:entry,
-fbt:vscan:vscan_drv_delayed_disable:return
-{
-}
-
-sdt:vscan::vscan-reconnect
-{
-}
-
-/*
+fbt:vscan:vscan_drv_delayed_disable:return,
 fbt:vscan:vscan_drv_attach:entry,
+fbt:vscan:vscan_drv_detach:entry
+{
+}
+
 fbt:vscan:vscan_drv_attach:return,
-fbt:vscan:vscan_drv_detach:entry,
 fbt:vscan:vscan_drv_detach:return
 {
+	printf("%s", args[1] ? "DDI_FAILURE" : "DDI_SUCCESS");
 }
 
-fbt:vscan:vscan_drv_in_use:return,
-fbt:vscan:vscan_svc_in_use:return
+fbt:vscan:vscan_drv_in_use:return
 {
-	printf("%s", args[1] ? "in use" : "not in use");
+	printf("%s", args[1] ? "TRUE" : "FALSE");
 }
-*/
 
 
-/*
- * file access
- */
+/* file access */
 
 /*
 fbt:vscan:vscan_drv_open:entry
@@ -245,10 +335,27 @@ fbt:vscan:vscan_drv_read:entry
  *** vscan daemon - vscand ***
  */
 
+pid$target::vs_svc_init:entry
+{
+	printf("Max concurrent scan requests from kernel: %d", arg1);
+}
+
+pid$target::vs_svc_init:return
+{
+}
+
+
 pid$target::vs_door_scan_req:entry,
 pid$target::vs_svc_scan_file:entry,
+pid$target::vs_svc_queue_scan_req:entry,
+pid$target::vs_svc_async_scan:entry,
 pid$target::vs_eng_scanstamp_current:entry,
 pid$target::vs_icap_scan_file:entry
+{
+}
+
+pid$target::vs_svc_queue_scan_req:return,
+pid$target::vs_svc_async_scan:return
 {
 }
 
@@ -259,7 +366,8 @@ pid$target::vs_svc_scan_file:return
 	    arg1 == 1 ? "NO_SCAN" :
 	    arg1 == 2 ? "ERROR" :
 	    arg1 == 3 ? "CLEAN" :
-	    arg1 == 4 ? "INFECTED" : "XXX unknown");
+	    arg1 == 4 ? "INFECTED" :
+	    arg1 == 5 ? "SCANNING" : "XXX unknown");
 }
 
 pid$target::vs_eng_scanstamp_current:return
@@ -269,11 +377,11 @@ pid$target::vs_eng_scanstamp_current:return
 
 pid$target::vs_icap_scan_file:return
 {
-	printf("%ld VS_RESULT_%s", arg1,
-	    arg1 == 0 ? "UNDEFINED" :
-	    arg1 == 1 ? "CLEAN" :
-	    arg1 == 2 ? "CLEANED" :
-	    arg1 == 3 ? "FORBIDDEN" : "(SE)_ERROR");
+	printf("%d VS_RESULT_%s", (int)arg1,
+	    (int)arg1 == 0 ? "UNDEFINED" :
+	    (int)arg1 == 1 ? "CLEAN" :
+	    (int)arg1 == 2 ? "CLEANED" :
+	    (int)arg1 == 3 ? "FORBIDDEN" : "(SE)_ERROR");
 }
 
 pid$target::vs_stats_set:entry
@@ -289,7 +397,9 @@ pid$target::vs_stats_set:return
 
 /* get engine connection */
 pid$target::vs_eng_get:entry,
-pid$target::vs_eng_connect:entry
+pid$target::vs_eng_connect:entry,
+pid$target::vs_eng_release:entry,
+pid$target::vs_eng_release:return
 {
 }
 pid$target::vs_eng_get:return,
@@ -302,8 +412,34 @@ pid$target::vs_eng_connect:return
 pid$target::vs_eng_set_error:entry
 / arg1 == 1 /
 {
-	printf("scan engine %d error", arg0 + 1);
+	printf("scan engine error");
 }
+
+/* configuration */
+pid$target::vscand_cfg_init:entry,
+pid$target::vscand_cfg_fini:entry,
+pid$target::vscand_cfg_init:return,
+pid$target::vscand_cfg_fini:return,
+pid$target::vscand_cfg_handler:entry,
+pid$target::vscand_cfg_handler:return
+{
+}
+
+pid$target::vscand_dtrace_gen:entry
+{
+	printf("maxsize: %s action: %s\n",
+		copyinstr(arg0), (arg1 == 1) ? "allow" : "deny");
+	printf("types: %s\n", copyinstr(arg2));
+	printf("log: %s\n", copyinstr(arg3));
+}
+pid$target::vscand_dtrace_eng:entry
+{
+	printf("\n%s %s \nhost: %s \nport: %d \nmax connections: %d\n",
+		copyinstr(arg0), (arg1 == 1) ? "enabled" : "disabled",
+		copyinstr(arg2), arg3, arg4);
+}
+
+
 
 /* shutdown */
 pid$target::vscand_sig_handler:entry
@@ -317,6 +453,10 @@ pid$target::vscand_kernel_disable:entry,
 pid$target::vscand_kernel_disable:return,
 pid$target::vscand_kernel_unbind:entry,
 pid$target::vscand_kernel_unbind:return,
+pid$target::vscand_kernel_result:entry,
+pid$target::vscand_kernel_result:return,
+pid$target::vs_svc_terminate:entry,
+pid$target::vs_svc_terminate:return,
 pid$target::vs_eng_fini:entry,
 pid$target::vs_eng_fini:return,
 pid$target::vs_eng_close_connections:entry,
@@ -346,7 +486,7 @@ pid$target::vs_icap_send_preview:return,
 pid$target::vs_icap_send_respmod_hdr:return,
 pid$target::vs_icap_read_respmod_resp:return
 {
-	printf("%s", arg1 < 0 ? "error" : "success");
+	printf("%s", (int)arg1 < 0 ? "error" : "success");
 }
 
 pid$target::vs_icap_may_preview:return
@@ -368,7 +508,7 @@ pid$target::vs_icap_read:return,
 pid$target::vs_icap_readline:return,
 pid$target::vs_icap_send_chunk:return,
 pid$target::gethostname:return
-/arg1 < 0/
+/(int)arg1 == -1/
 {
 	printf("error");
 }
@@ -389,10 +529,12 @@ pid$target::vs_icap_resp_encap:return
 
 pid$target::write:return,
 pid$target::read:return,
-pid$target::recv:return,
 pid$target::open:return,
 pid$target::calloc:return
 /arg1 <= 0/
 {
 	printf("error");
 }
+/*
+pid$target::recv:return,
+*/

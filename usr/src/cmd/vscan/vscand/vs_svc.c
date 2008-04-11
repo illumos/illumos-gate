@@ -39,26 +39,183 @@
 #include <fcntl.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
+#include <pthread.h>
 
 #include "vs_incl.h"
 
+/*
+ * vs_svc_nodes - table of scan requests and their thread id and
+ * scan engine context.
+ * The table is sized by the value passed to vs_svc_init. This
+ * value is obtained from the kernel and represents the maximum
+ * request idx that the kernel will request vscand to process.
+ * The table is indexed by the vsr_idx value passed in
+ * the scan request - always non-zero. This value is also the index
+ * into the kernel scan request table and identifies the instance of
+ * the driver being used to access file data for the scan. Although
+ * this is of no consequence here, it is useful information for debug.
+ *
+ * When a scan request is received a response is sent indicating
+ * one of the following:
+ * VS_STATUS_ERROR - an error occurred
+ * VS_STATUS_NO_SCAN - no scan is required
+ * VS_STATUS_SCANNING - request has been queued for async processing
+ *
+ * If the scan is required (VS_STATUS_SCANNING) a thread is created
+ * to perform the scan. It's tid is saved in vs_svc_nodes.
+ *
+ * In the case of SHUTDOWN, vs_terminate requests that all scan
+ * engine connections be closed, thus termintaing any in-progress
+ * scans, then awaits completion of all scanning threads as identified
+ * in vs_svc_nodes.
+ */
+
+typedef struct vs_svc_node {
+	pthread_t vsn_tid;
+	vs_scan_req_t vsn_req;
+	vs_eng_ctx_t vsn_eng;
+} vs_svc_node_t;
+
+static vs_svc_node_t *vs_svc_nodes;
+static uint32_t vs_svc_max_node; /* max idx into vs_svc_nodes */
+static pthread_mutex_t vs_svc_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
 /* local functions */
+static void *vs_svc_async_scan(void *);
+static int vs_svc_scan_file(vs_svc_node_t *, vs_scanstamp_t *);
 static void vs_svc_vlog(char *, vs_result_t *);
 static void vs_svc_audit(char *, vs_result_t *);
+
 
 /*
  * vs_svc_init, vs_svc_fini
  *
  * Invoked on daemon load and unload
  */
-void
-vs_svc_init()
+int
+vs_svc_init(uint32_t max_req)
 {
+	vs_svc_max_node = max_req;
+	vs_svc_nodes = (vs_svc_node_t *)
+	    calloc(max_req + 1, sizeof (vs_svc_node_t));
+
+	return (vs_svc_nodes == NULL ? -1 : 0);
 }
 
 void
 vs_svc_fini()
 {
+	if (vs_svc_nodes)
+		free(vs_svc_nodes);
+}
+
+
+/*
+ * vs_svc_terminate
+ *
+ * Close all scan engine connections to terminate in-progress scan
+ * requests, and wait for all threads in vs_svc_nodes to complete
+ */
+void
+vs_svc_terminate()
+{
+	int i;
+	pthread_t tid;
+
+	/* close connections to abort requests */
+	vs_eng_close_connections();
+
+	/* wait for threads */
+	for (i = 1; i <= vs_svc_max_node; i++) {
+
+		(void) pthread_mutex_lock(&vs_svc_mutex);
+		tid = vs_svc_nodes[i].vsn_tid;
+		(void) pthread_mutex_unlock(&vs_svc_mutex);
+
+		if (tid != 0)
+			(void) pthread_join(tid, NULL);
+	}
+}
+
+
+/*
+ * vs_svc_queue_scan_req
+ *
+ * Determine if the file needs to be scanned - either it has
+ * been modified or its scanstamp is not current.
+ * Initiate a thread to process the request, saving the tid
+ * in vs_svc_nodes[idx].vsn_tid, where idx is the vsr_idx passed in
+ * the scan request.
+ *
+ * Returns: VS_STATUS_ERROR - error
+ *          VS_STATUS_NO_SCAN - no scan required
+ *          VS_STATUS_SCANNING - async scan initiated
+ */
+int
+vs_svc_queue_scan_req(vs_scan_req_t *req)
+{
+	pthread_t tid;
+	vs_svc_node_t *node;
+
+	/* No scan if file quarantined */
+	if (req->vsr_quarantined)
+		return (VS_STATUS_NO_SCAN);
+
+	/* No scan if file not modified AND scanstamp is current */
+	if ((req->vsr_modified == 0) &&
+	    vs_eng_scanstamp_current(req->vsr_scanstamp)) {
+		return (VS_STATUS_NO_SCAN);
+	}
+
+	/* scan required */
+	node = &(vs_svc_nodes[req->vsr_idx]);
+
+	(void) pthread_mutex_lock(&vs_svc_mutex);
+	if ((node->vsn_tid != 0) || (req->vsr_idx > vs_svc_max_node)) {
+		(void) pthread_mutex_unlock(&vs_svc_mutex);
+		return (VS_STATUS_ERROR);
+	}
+
+	node->vsn_req = *req;
+
+	if (pthread_create(&tid, NULL, vs_svc_async_scan, (void *)node) != 0) {
+		(void) pthread_mutex_unlock(&vs_svc_mutex);
+		return (VS_STATUS_ERROR);
+	}
+
+	node->vsn_tid = tid;
+	(void) pthread_mutex_unlock(&vs_svc_mutex);
+
+	return (VS_STATUS_SCANNING);
+}
+
+
+/*
+ * vs_svc_async_scan
+ *
+ * Initialize response structure, invoke vs_svc_scan_file to
+ * perform the scan, then send the result to the kernel.
+ */
+static void *
+vs_svc_async_scan(void *arg)
+{
+	vs_svc_node_t *node = (vs_svc_node_t *)arg;
+	vs_scan_req_t *scan_req = &(node->vsn_req);
+	vs_scan_rsp_t scan_rsp;
+
+	scan_rsp.vsr_idx = scan_req->vsr_idx;
+	scan_rsp.vsr_seqnum = scan_req->vsr_seqnum;
+	scan_rsp.vsr_result = vs_svc_scan_file(node, &scan_rsp.vsr_scanstamp);
+
+	/* clear node and send async response to kernel */
+	(void) pthread_mutex_lock(&vs_svc_mutex);
+	(void) memset(node, 0, sizeof (vs_svc_node_t));
+	(void) pthread_mutex_unlock(&vs_svc_mutex);
+
+	(void) vscand_kernel_result(&scan_rsp);
+
+	return (NULL);
 }
 
 
@@ -66,7 +223,6 @@ vs_svc_fini()
  * vs_svc_scan_file
  *
  * vs_svc_scan_file is responsible for:
- *  - determining if a scan is required
  *  - obtaining & releasing a scan engine connection
  *  - invoking the scan engine interface code to do the scan
  *  - retrying a failed scan (up to VS_MAX_RETRY times)
@@ -75,78 +231,66 @@ vs_svc_fini()
  *
  *
  * Returns:
- *  VS_STATUS_NO_SCAN - scan not reqd, or daemon shutting down
+ *  VS_STATUS_NO_SCAN - scan not reqd; daemon shutting down
  *  VS_STATUS_CLEAN - scan success. File clean.
  *                    new scanstamp returned in scanstamp param.
  *  VS_STATUS_INFECTED - scan success. File infected.
  *  VS_STATUS_ERROR - scan failure either in vscand or scan engine.
  */
-int
-vs_svc_scan_file(char *devname, char *fname, vs_attr_t *fattr, int flags,
-    vs_scanstamp_t *scanstamp)
+static int
+vs_svc_scan_file(vs_svc_node_t *node, vs_scanstamp_t *scanstamp)
 {
-	vs_eng_conn_t conn;
+	char devname[MAXPATHLEN];
+	int flags = 0;
 	int retries;
 	vs_result_t result;
+	vs_scan_req_t *req = &(node->vsn_req);
+	vs_eng_ctx_t *eng = &(node->vsn_eng);
+
+	(void) snprintf(devname, MAXPATHLEN, "%s%d", VS_DRV_PATH, req->vsr_idx);
 
 	/* initialize response scanstamp to current scanstamp value */
-	(void) strlcpy(*scanstamp, fattr->vsa_scanstamp,
-	    sizeof (vs_scanstamp_t));
-
-
-	/* No scan if file quarantined */
-	if (fattr->vsa_quarantined)
-		return (VS_STATUS_NO_SCAN);
-
-	/* No scan if file not modified AND scanstamp is current */
-	if ((fattr->vsa_modified == 0) &&
-	    vs_eng_scanstamp_current(fattr->vsa_scanstamp)) {
-		return (VS_STATUS_NO_SCAN);
-	}
+	(void) strlcpy(*scanstamp, req->vsr_scanstamp, sizeof (vs_scanstamp_t));
 
 	(void) memset(&result, 0, sizeof (vs_result_t));
 	result.vsr_rc = VS_RESULT_UNDEFINED;
 
 	for (retries = 0; retries <= VS_MAX_RETRY; retries++) {
-		/* identify available engine connection */
-		if (vs_eng_get(&conn, retries) != 0) {
+		/* get engine connection */
+		if (vs_eng_get(eng, (retries != 0)) != 0) {
 			result.vsr_rc = VS_RESULT_ERROR;
 			continue;
 		}
 
-		/* connect to engine and scan file */
-		if (vs_eng_connect(&conn) != 0) {
-			result.vsr_rc = VS_RESULT_SE_ERROR;
-		} else {
-			if (vscand_get_state() == VS_STATE_SHUTDOWN) {
-				vs_eng_release(&conn);
-				return (VS_STATUS_NO_SCAN);
-			}
-
-			(void) vs_icap_scan_file(&conn, devname, fname,
-			    fattr->vsa_size, flags, &result);
+		/* shutdown could occur while waiting for engine connection */
+		if (vscand_get_state() == VS_STATE_SHUTDOWN) {
+			vs_eng_release(eng);
+			return (VS_STATUS_NO_SCAN);
 		}
+
+		/* scan file */
+		(void) vs_icap_scan_file(eng, devname, req->vsr_path,
+		    req->vsr_size, flags, &result);
 
 		/* if no error, clear error state on engine and break */
 		if ((result.vsr_rc != VS_RESULT_SE_ERROR) &&
 		    (result.vsr_rc != VS_RESULT_ERROR)) {
-			vs_eng_set_error(&conn, 0);
-			vs_eng_release(&conn);
+			vs_eng_set_error(eng, 0);
+			vs_eng_release(eng);
 			break;
 		}
 
 		/* treat error on shutdown as scan not required */
 		if (vscand_get_state() == VS_STATE_SHUTDOWN) {
-			vs_eng_release(&conn);
+			vs_eng_release(eng);
 			return (VS_STATUS_NO_SCAN);
 		}
 
 		/* set engine's error state and update engine stats */
-		if (result.vsr_rc == VS_RESULT_SE_ERROR) {
-			vs_eng_set_error(&conn, 1);
-			vs_stats_eng_err(conn.vsc_engid);
-		}
-		vs_eng_release(&conn);
+		if (result.vsr_rc == VS_RESULT_SE_ERROR)
+			vs_eng_set_error(eng, 1);
+
+		vs_eng_release(eng);
 	}
 
 	vs_stats_set(result.vsr_rc);
@@ -158,8 +302,8 @@ vs_svc_scan_file(char *devname, char *fname, vs_attr_t *fattr, int flags,
 	 */
 	if (result.vsr_rc == VS_RESULT_CLEANED ||
 	    result.vsr_rc == VS_RESULT_FORBIDDEN) {
-		vs_svc_vlog(fname, &result);
-		vs_svc_audit(fname, &result);
+		vs_svc_vlog(req->vsr_path, &result);
+		vs_svc_audit(req->vsr_path, &result);
 		return (VS_STATUS_INFECTED);
 	}
 
@@ -177,8 +321,8 @@ vs_svc_scan_file(char *devname, char *fname, vs_attr_t *fattr, int flags,
 /*
  * vs_svc_vlog
  *
- * log details of infections detected in file
- * If virus log is not configured  or cannot be opened, use syslog.
+ * log details of infections detected in syslig
+ * If virus log is configured log details there too
  */
 static void
 vs_svc_vlog(char *filepath, vs_result_t *result)
@@ -190,40 +334,42 @@ vs_svc_vlog(char *filepath, vs_result_t *result)
 	int i;
 	char *log;
 
-	if ((log = vscand_viruslog()) != NULL)
-		fp = fopen(log, "a");
-
-	if (fp) {
-		(void) time(&sec);
-		timestamp = localtime(&sec);
-		(void) strftime(timebuf, sizeof (timebuf), "%D %T", timestamp);
-	}
-
+	/* syslog */
 	if (result->vsr_nviolations == 0) {
-		if (fp) {
-			(void) fprintf(fp, "%s quarantine %s",
-			    timebuf, filepath);
-		} else {
-			syslog(LOG_WARNING, "quarantine %s\n", filepath);
-		}
+		syslog(LOG_WARNING, "quarantine %s\n", filepath);
 	} else {
 		for (i = 0; i < result->vsr_nviolations; i++) {
-			if (fp) {
-				(void) fprintf(fp, "%s quarantine %s %d - %s\n",
-				    timebuf, filepath,
-				    result->vsr_vrec[i].vr_id,
-				    result->vsr_vrec[i].vr_desc);
-			} else {
-				syslog(LOG_WARNING, "quarantine %s %d - %s\n",
-				    filepath,
-				    result->vsr_vrec[i].vr_id,
-				    result->vsr_vrec[i].vr_desc);
-			}
+			syslog(LOG_WARNING, "quarantine %s %d - %s\n",
+			    filepath,
+			    result->vsr_vrec[i].vr_id,
+			    result->vsr_vrec[i].vr_desc);
 		}
 	}
 
-	if (fp)
-		(void) fclose(fp);
+	/* log file */
+	if (((log = vscand_viruslog()) == NULL) ||
+	    ((fp = fopen(log, "a")) == NULL)) {
+		return;
+	}
+
+	(void) time(&sec);
+	timestamp = localtime(&sec);
+	(void) strftime(timebuf, sizeof (timebuf), "%D %T", timestamp);
+
+	if (result->vsr_nviolations == 0) {
+		(void) fprintf(fp, "%s quarantine %d[%s]\n",
+		    timebuf, strlen(filepath), filepath);
+	} else {
+		for (i = 0; i < result->vsr_nviolations; i++) {
+			(void) fprintf(fp, "%s quarantine %d[%s] %d - %d[%s]\n",
+			    timebuf, strlen(filepath), filepath,
+			    result->vsr_vrec[i].vr_id,
+			    strlen(result->vsr_vrec[i].vr_desc),
+			    result->vsr_vrec[i].vr_desc);
+		}
+	}
+
+	(void) fclose(fp);
 }
 
 

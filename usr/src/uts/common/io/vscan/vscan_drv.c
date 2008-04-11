@@ -42,28 +42,109 @@
 #include <sys/policy.h>
 #include <sys/sdt.h>
 
-#define	VS_DRV_NODENAME_LEN	16
+
+/* seconds to wait for daemon to reconnect before disabling */
+#define	VS_DAEMON_WAIT_SEC	60
+
+/* length of minor node name - vscan%d */
+#define	VS_NODENAME_LEN		16
+
+/* global variables - tunable via /etc/system */
+uint32_t vs_reconnect_timeout = VS_DAEMON_WAIT_SEC;
+extern uint32_t vs_nodes_max;	/* max in-progress scan requests */
+
+/*
+ * vscan_drv_state
+ *
+ * Operations on instance 0 represent vscand initiated state
+ * transition events:
+ * open(0) - vscand connect
+ * close(0) - vscan disconnect
+ * enable(0) - vscand enable (ready to hand requests)
+ * disable(0) - vscand disable (shutting down)
+ *
+ *   +------------------------+
+ *   | VS_DRV_UNCONFIG        |
+ *   +------------------------+
+ *      |           ^
+ *      | attach    | detach
+ *      v           |
+ *   +------------------------+
+ *   | VS_DRV_IDLE            |<------|
+ *   +------------------------+       |
+ *      |           ^                 |
+ *      | open(0)   | close(0)        |
+ *      v           |                 |
+ *   +------------------------+       |
+ *   | VS_DRV_CONNECTED       |<-|    |
+ *   +------------------------+  |    |
+ *      |           ^            |    |
+ *      | enable(0) | disable(0) |    |
+ *      v           |            |    |
+ *   +------------------------+  |    |
+ *   | VS_DRV_ENABLED         |  |    |
+ *   +------------------------+  |    |
+ *      |                        |    |
+ *      | close(0)            open(0) |
+ *      v                        |    |
+ *   +------------------------+  |    | timeout
+ *   | VS_DRV_DELAYED_DISABLE | --    |
+ *   +------------------------+	------|
+ *
+ */
+typedef enum {
+	VS_DRV_UNCONFIG,
+	VS_DRV_IDLE,
+	VS_DRV_CONNECTED,
+	VS_DRV_ENABLED,
+	VS_DRV_DELAYED_DISABLE
+} vscan_drv_state_t;
+static vscan_drv_state_t vscan_drv_state = VS_DRV_UNCONFIG;
 
 
 /*
- * Instance States: VS_INIT (initial state), VS_OPEN, VS_READING
+ * vscan_drv_inst_state
  *
- * Instance 0 controls the state of the driver: vscan_drv_connected.
- *   vscan_drv_state[0] should NOT be used.
- * Actions:
- * open:	VS_INIT->VS_OPEN, otherwise ERROR
- * close:	any->VS_INIT
- * read:	VS_OPEN->VS_READING, otherwise ERROR
+ * Instance 0 controls the state of the driver: vscan_drv_state.
+ * vscan_drv_inst_state[0] should NOT be used.
+ *
+ * vscan_drv_inst_state[n] represents the state of driver
+ * instance n, used by vscand to access file data for the
+ * scan request with index n in vscan_svc_reqs.
+ * Minor nodes are created as required then all are destroyed
+ * during driver detach.
+ *
+ *   +------------------------+
+ *   | VS_DRV_INST_UNCONFIG   |
+ *   +------------------------+
+ *      |                 ^
+ *      | create_node(n)  | detach
+ *      v                 |
+ *   +------------------------+
+ *   | VS_DRV_INST_INIT       |<-|
+ *   +------------------------+  |
+ *      |                        |
+ *      | open(n)                |
+ *      v                        |
+ *   +------------------------+  |
+ *   | VS_DRV_INST_OPEN       |--|
+ *   +------------------------+  |
+ *      |                        |
+ *      | read(n)                |
+ *      v                        | close(n)
+ *   +------------------------+  |
+ *   | VS_DRV_INST_READING    |--|
+ *   +------------------------+
  */
 typedef enum {
-	VS_INIT,
-	VS_OPEN,
-	VS_READING
-} vscan_drv_state_t;
+	VS_DRV_INST_UNCONFIG = 0, /* minor node not created */
+	VS_DRV_INST_INIT,
+	VS_DRV_INST_OPEN,
+	VS_DRV_INST_READING
+} vscan_drv_inst_state_t;
 
-static vscan_drv_state_t vscan_drv_state[VS_DRV_MAX_FILES + 1];
-static boolean_t vscan_drv_nodes[VS_DRV_MAX_FILES + 1];
-static boolean_t vscan_drv_connected = B_FALSE; /* vscand daemon connected */
+static vscan_drv_inst_state_t *vscan_drv_inst_state;
+static int vscan_drv_inst_state_sz;
 
 static dev_info_t *vscan_drv_dip;
 static kmutex_t vscan_drv_mutex;
@@ -87,7 +168,6 @@ static void vscan_drv_delayed_disable(void);
 /*
  * module linkage info for the kernel
  */
-
 static struct cb_ops cbops = {
 	vscan_drv_open,		/* cb_open */
 	vscan_drv_close,	/* cb_close */
@@ -145,29 +225,30 @@ _init(void)
 {
 	int rc;
 
-	mutex_init(&vscan_drv_mutex, NULL, MUTEX_DRIVER, NULL);
+	vscan_drv_inst_state_sz =
+	    sizeof (vscan_drv_inst_state_t) * (vs_nodes_max + 1);
 
-	if (vscan_door_init() != 0) {
-		mutex_destroy(&vscan_drv_mutex);
+	if (vscan_door_init() != 0)
 		return (DDI_FAILURE);
-	}
 
 	if (vscan_svc_init() != 0) {
 		vscan_door_fini();
-		mutex_destroy(&vscan_drv_mutex);
 		return (DDI_FAILURE);
 	}
 
-	(void) memset(&vscan_drv_state, 0, sizeof (vscan_drv_state));
-	(void) memset(&vscan_drv_nodes, 0, sizeof (vscan_drv_nodes));
+	mutex_init(&vscan_drv_mutex, NULL, MUTEX_DRIVER, NULL);
+	vscan_drv_inst_state = kmem_zalloc(vscan_drv_inst_state_sz, KM_SLEEP);
+
+	cv_init(&vscan_drv_cv, NULL, CV_DEFAULT, NULL);
 
 	if ((rc  = mod_install(&modlinkage)) != 0) {
 		vscan_door_fini();
 		vscan_svc_fini();
+		kmem_free(vscan_drv_inst_state, vscan_drv_inst_state_sz);
+		cv_destroy(&vscan_drv_cv);
 		mutex_destroy(&vscan_drv_mutex);
 	}
 
-	cv_init(&vscan_drv_cv, NULL, CV_DEFAULT, NULL);
 	return (rc);
 }
 
@@ -196,6 +277,7 @@ _fini(void)
 	if ((rc = mod_remove(&modlinkage)) == 0) {
 		vscan_door_fini();
 		vscan_svc_fini();
+		kmem_free(vscan_drv_inst_state, vscan_drv_inst_state_sz);
 		cv_destroy(&vscan_drv_cv);
 		mutex_destroy(&vscan_drv_mutex);
 	}
@@ -247,6 +329,7 @@ vscan_drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (vscan_drv_create_node(0) == B_FALSE)
 		return (DDI_FAILURE);
 
+	vscan_drv_state = VS_DRV_IDLE;
 	return (DDI_SUCCESS);
 }
 
@@ -257,6 +340,8 @@ vscan_drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 vscan_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
+	int i;
+
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
@@ -269,8 +354,10 @@ vscan_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* remove all minor nodes */
 	vscan_drv_dip = NULL;
 	ddi_remove_minor_node(dip, NULL);
-	(void) memset(&vscan_drv_nodes, 0, sizeof (vscan_drv_nodes));
+	for (i = 0; i <= vs_nodes_max; i++)
+		vscan_drv_inst_state[i] = VS_DRV_INST_UNCONFIG;
 
+	vscan_drv_state = VS_DRV_UNCONFIG;
 	return (DDI_SUCCESS);
 }
 
@@ -278,35 +365,40 @@ vscan_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /*
  * vscan_drv_in_use
  *
- * If vscand is connected (vscan_drv_connected == B_TRUE) the
- * vscan driver is obviously in use. Otherwise invoke
- * vscan_svc_in_use() to determine if the driver is in use,
- * even though the daemon has disconnected.
- * For example, there may be requests not yet complete, or
- * the driver may still be enabled waiting for the daemon to
- * reconnect.
- * Used to determine whether the driver can be unloaded.
+ * If the driver state is not IDLE or UNCONFIG then the
+ * driver is in use. Otherwise, check the service interface
+ * (vscan_svc) to see if it is still in use - for example
+ * there there may be requests still in progress.
  */
 static boolean_t
 vscan_drv_in_use()
 {
-	boolean_t in_use;
+	boolean_t in_use = B_FALSE;
 
 	mutex_enter(&vscan_drv_mutex);
-	in_use = vscan_drv_connected;
+	if ((vscan_drv_state != VS_DRV_IDLE) &&
+	    (vscan_drv_state != VS_DRV_UNCONFIG)) {
+		in_use = B_TRUE;
+	}
 	mutex_exit(&vscan_drv_mutex);
 
-	if (in_use == B_FALSE)
-		in_use = vscan_svc_in_use();
-
-	return (in_use);
+	if (in_use)
+		return (B_TRUE);
+	else
+		return (vscan_svc_in_use());
 }
 
 
 /*
  * vscan_drv_open
- * if inst == 0, this is vscand initializing.
- * Otherwise, open the file associated with inst.
+ *
+ * If inst == 0, this is vscand initializing.
+ * If the driver is in DELAYED_DISABLE, ie vscand previously
+ * disconnected without a clean shutdown and the driver is
+ * waiting for a period to allow vscand to reconnect, signal
+ * vscan_drv_cv to cancel the delayed disable.
+ *
+ * If inst != 0, open the file associated with inst.
  */
 /* ARGSUSED */
 static int
@@ -315,7 +407,7 @@ vscan_drv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	int rc;
 	int inst = getminor(*devp);
 
-	if ((inst < 0) || (inst > VS_DRV_MAX_FILES))
+	if ((inst < 0) || (inst > vs_nodes_max))
 		return (EINVAL);
 
 	/* check if caller has privilege for virus scanning */
@@ -326,20 +418,27 @@ vscan_drv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 	mutex_enter(&vscan_drv_mutex);
 	if (inst == 0) {
-		if (vscan_drv_connected) {
+		switch (vscan_drv_state) {
+		case VS_DRV_IDLE:
+			vscan_drv_state = VS_DRV_CONNECTED;
+			break;
+		case VS_DRV_DELAYED_DISABLE:
+			cv_signal(&vscan_drv_cv);
+			vscan_drv_state = VS_DRV_CONNECTED;
+			break;
+		default:
+			DTRACE_PROBE1(vscan__drv__state__violation,
+			    int, vscan_drv_state);
 			mutex_exit(&vscan_drv_mutex);
 			return (EINVAL);
 		}
-		vscan_drv_connected = B_TRUE;
-		/* wake any pending delayed disable */
-		cv_signal(&vscan_drv_cv);
 	} else {
-		if ((!vscan_drv_connected) ||
-		    (vscan_drv_state[inst] != VS_INIT)) {
-				mutex_exit(&vscan_drv_mutex);
-				return (EINVAL);
+		if ((vscan_drv_state != VS_DRV_ENABLED) ||
+		    (vscan_drv_inst_state[inst] != VS_DRV_INST_INIT)) {
+			mutex_exit(&vscan_drv_mutex);
+			return (EINVAL);
 		}
-		vscan_drv_state[inst] = VS_OPEN;
+		vscan_drv_inst_state[inst] = VS_DRV_INST_OPEN;
 	}
 	mutex_exit(&vscan_drv_mutex);
 
@@ -349,8 +448,14 @@ vscan_drv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 /*
  * vscan_drv_close
- * if inst == 0, this is vscand detaching
- * Otherwise close the file associated with inst
+ *
+ * If inst == 0, this is vscand detaching.
+ * If the driver is in ENABLED state vscand has terminated without
+ * a clean shutdown (nod DISABLE received). Enter DELAYED_DISABLE
+ * state and initiate a delayed disable to allow vscand time to
+ * reconnect.
+ *
+ * If inst != 0, close the file associated with inst
  */
 /* ARGSUSED */
 static int
@@ -358,27 +463,46 @@ vscan_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	int i, inst = getminor(dev);
 
-	if ((inst < 0) || (inst > VS_DRV_MAX_FILES))
+	if ((inst < 0) || (inst > vs_nodes_max))
 		return (EINVAL);
 
 	mutex_enter(&vscan_drv_mutex);
-	if (inst == 0) {
-		for (i = 1; i <= VS_DRV_MAX_FILES; i++)
-			vscan_drv_state[i] = VS_INIT;
+	if (inst != 0) {
+		vscan_drv_inst_state[inst] = VS_DRV_INST_INIT;
+		mutex_exit(&vscan_drv_mutex);
+		return (0);
+	}
 
-		vscan_drv_connected = B_FALSE;
-		if (vscan_svc_is_enabled()) {
-			if (thread_create(NULL, 0, vscan_drv_delayed_disable,
-			    0, 0, &p0, TS_RUN, minclsyspri) == NULL) {
-				vscan_svc_enable();
-			}
+	/* instance 0 - daemon disconnect */
+	if ((vscan_drv_state != VS_DRV_CONNECTED) &&
+	    (vscan_drv_state != VS_DRV_ENABLED)) {
+		DTRACE_PROBE1(vscan__drv__state__violation,
+		    int, vscan_drv_state);
+		mutex_exit(&vscan_drv_mutex);
+		return (EINVAL);
+	}
+
+	for (i = 1; i <= vs_nodes_max; i++) {
+		if (vscan_drv_inst_state[i] != VS_DRV_INST_UNCONFIG)
+			vscan_drv_inst_state[i] = VS_DRV_INST_INIT;
+	}
+
+	if (vscan_drv_state == VS_DRV_CONNECTED) {
+		vscan_drv_state = VS_DRV_IDLE;
+	} else { /* VS_DRV_ENABLED */
+		cmn_err(CE_WARN, "Detected vscand exit without clean shutdown");
+		if (thread_create(NULL, 0, vscan_drv_delayed_disable,
+		    0, 0, &p0, TS_RUN, minclsyspri) == NULL) {
+			vscan_svc_disable();
+			vscan_drv_state = VS_DRV_IDLE;
+		} else {
+			vscan_drv_state = VS_DRV_DELAYED_DISABLE;
 		}
-		vscan_door_close();
-	} else {
-		vscan_drv_state[inst] = VS_INIT;
 	}
 	mutex_exit(&vscan_drv_mutex);
 
+	vscan_svc_scan_abort();
+	vscan_door_close();
 	return (0);
 }
 
@@ -388,22 +512,23 @@ vscan_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
  *
  * Invoked from vscan_drv_close if the daemon disconnects
  * without first sending disable (e.g. daemon crashed).
- * Delays for VS_DAEMON_WAIT_SEC before disabling, to allow
+ * Delays for vs_reconnect_timeout before disabling, to allow
  * the daemon to reconnect. During this time, scan requests
  * will be processed locally (see vscan_svc.c)
  */
 static void
 vscan_drv_delayed_disable(void)
 {
-	clock_t timeout = lbolt + SEC_TO_TICK(VS_DAEMON_WAIT_SEC);
+	clock_t timeout = lbolt + SEC_TO_TICK(vs_reconnect_timeout);
 
 	mutex_enter(&vscan_drv_mutex);
 	(void) cv_timedwait(&vscan_drv_cv, &vscan_drv_mutex, timeout);
 
-	if (vscan_drv_connected) {
-		DTRACE_PROBE(vscan__reconnect);
-	} else {
+	if (vscan_drv_state == VS_DRV_DELAYED_DISABLE) {
 		vscan_svc_disable();
+		vscan_drv_state = VS_DRV_IDLE;
+	} else {
+		DTRACE_PROBE(vscan__reconnect);
 	}
 	mutex_exit(&vscan_drv_mutex);
 }
@@ -420,15 +545,16 @@ vscan_drv_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	int inst = getminor(dev);
 	vnode_t *vp;
 
-	if ((inst <= 0) || (inst > VS_DRV_MAX_FILES))
+	if ((inst <= 0) || (inst > vs_nodes_max))
 		return (EINVAL);
 
 	mutex_enter(&vscan_drv_mutex);
-	if ((!vscan_drv_connected) || (vscan_drv_state[inst] != VS_OPEN)) {
+	if ((vscan_drv_state != VS_DRV_ENABLED) ||
+	    (vscan_drv_inst_state[inst] != VS_DRV_INST_OPEN)) {
 		mutex_exit(&vscan_drv_mutex);
 		return (EINVAL);
 	}
-	vscan_drv_state[inst] = VS_READING;
+	vscan_drv_inst_state[inst] = VS_DRV_INST_READING;
 	mutex_exit(&vscan_drv_mutex);
 
 	if ((vp = vscan_svc_get_vnode(inst)) == NULL)
@@ -439,8 +565,8 @@ vscan_drv_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
 	mutex_enter(&vscan_drv_mutex);
-	if (vscan_drv_state[inst] == VS_READING)
-		vscan_drv_state[inst] = VS_OPEN;
+	if (vscan_drv_inst_state[inst] == VS_DRV_INST_READING)
+		vscan_drv_inst_state[inst] = VS_DRV_INST_OPEN;
 	mutex_exit(&vscan_drv_mutex);
 
 	return (rc);
@@ -449,6 +575,15 @@ vscan_drv_read(dev_t dev, struct uio *uiop, cred_t *credp)
 
 /*
  * vscan_drv_ioctl
+ *
+ * Process ioctls from vscand:
+ * VS_IOCTL_ENABLE - vscand is ready to handle scan requests,
+ *    enable VFS interface.
+ * VS_IOCTL_DISABLE - vscand is shutting down, disable VFS interface
+ * VS_IOCTL_RESULT - scan response data
+ * VS_IOCTL_CONFIG - configuration data from vscand
+ * VS_IOCTL_MAX_REQ - provide the max request idx to vscand,
+ *    to allow vscand to set appropriate resource allocation limits
  */
 /* ARGSUSED */
 static int
@@ -457,31 +592,64 @@ vscan_drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 {
 	int inst = getminor(dev);
 	vs_config_t conf;
+	vs_scan_rsp_t rsp;
 
 	if (inst != 0)
 		return (EINVAL);
 
 	switch (cmd) {
-	case VS_DRV_IOCTL_ENABLE:
+	case VS_IOCTL_ENABLE:
 		mutex_enter(&vscan_drv_mutex);
-		if ((!vscan_drv_connected) ||
-		    (vscan_door_open((int)arg) != 0)) {
+		if (vscan_drv_state != VS_DRV_CONNECTED) {
+			DTRACE_PROBE1(vscan__drv__state__violation,
+			    int, vscan_drv_state);
 			mutex_exit(&vscan_drv_mutex);
 			return (EINVAL);
 		}
-		vscan_svc_enable();
+		if ((vscan_door_open((int)arg) != 0) ||
+		    (vscan_svc_enable() != 0)) {
+			mutex_exit(&vscan_drv_mutex);
+			return (EINVAL);
+		}
+		vscan_drv_state = VS_DRV_ENABLED;
 		mutex_exit(&vscan_drv_mutex);
 		break;
-	case VS_DRV_IOCTL_DISABLE:
+
+	case VS_IOCTL_DISABLE:
+		mutex_enter(&vscan_drv_mutex);
+		if (vscan_drv_state != VS_DRV_ENABLED) {
+			DTRACE_PROBE1(vscan__drv__state__violation,
+			    int, vscan_drv_state);
+			mutex_exit(&vscan_drv_mutex);
+			return (EINVAL);
+		}
 		vscan_svc_disable();
+		vscan_drv_state = VS_DRV_CONNECTED;
+		mutex_exit(&vscan_drv_mutex);
 		break;
-	case VS_DRV_IOCTL_CONFIG:
+
+	case VS_IOCTL_RESULT:
+		if (ddi_copyin((void *)arg, &rsp,
+		    sizeof (vs_scan_rsp_t), 0) == -1)
+			return (EFAULT);
+		else
+			vscan_svc_scan_result(&rsp);
+		break;
+
+	case VS_IOCTL_CONFIG:
 		if (ddi_copyin((void *)arg, &conf,
 		    sizeof (vs_config_t), 0) == -1)
 			return (EFAULT);
 		if (vscan_svc_configure(&conf) == -1)
 			return (EINVAL);
 		break;
+
+	case VS_IOCTL_MAX_REQ:
+		if (ddi_copyout(&vs_nodes_max, (void *)arg,
+		    sizeof (uint32_t), 0) == -1)
+			return (EFAULT);
+		break;
+
 	default:
 		return (ENOTTY);
 	}
@@ -503,22 +671,22 @@ vscan_drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 boolean_t
 vscan_drv_create_node(int idx)
 {
-	char name[VS_DRV_NODENAME_LEN];
-	boolean_t *pnode, rc;
+	char name[VS_NODENAME_LEN];
+	boolean_t rc = B_TRUE;
 
 	mutex_enter(&vscan_drv_mutex);
 
-	pnode = &vscan_drv_nodes[idx];
-	if (*pnode == B_FALSE) {
-		(void) snprintf(name, VS_DRV_NODENAME_LEN, "vscan%d", idx);
+	if (vscan_drv_inst_state[idx] == VS_DRV_INST_UNCONFIG) {
+		(void) snprintf(name, VS_NODENAME_LEN, "vscan%d", idx);
 		if (ddi_create_minor_node(vscan_drv_dip, name,
 		    S_IFCHR, idx, DDI_PSEUDO, 0) == DDI_SUCCESS) {
-			*pnode = B_TRUE;
+			vscan_drv_inst_state[idx] = VS_DRV_INST_INIT;
+		} else {
+			rc = B_FALSE;
 		}
-		DTRACE_PROBE2(vscan__minor__node, int, idx, int, *pnode);
+		DTRACE_PROBE2(vscan__minor__node, int, idx, int, rc);
 	}
 
-	rc = *pnode;
 	mutex_exit(&vscan_drv_mutex);
 
 	return (rc);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,11 +99,17 @@ extern "C" {
 /* statistics door interface */
 #define	VS_STATS_DOOR_NAME	"/var/run/vscan_stats_door"
 #define	VS_STATS_DOOR_VERSION	1
+#define	VS_STATS_DOOR_MAGIC		0x56535354	/* VSST - VScanStats */
 
 /* scan statistics door request type */
 typedef enum {
 	VS_STATS_GET,
 	VS_STATS_RESET
+} vs_stats_req_type_t;
+
+typedef struct vs_stats_req {
+	uint32_t vsr_magic;
+	vs_stats_req_type_t vsr_id;
 } vs_stats_req_t;
 
 typedef struct vs_stats {
@@ -116,6 +122,13 @@ typedef struct vs_stats {
 		uint64_t vss_errors;
 	} vss_eng[VS_SE_MAX];
 } vs_stats_t;
+
+typedef struct vs_stats_rsp {
+	uint32_t vsr_magic;
+	vs_stats_t vsr_stats;
+} vs_stats_rsp_t;
+
+
 
 /*
  *  General service configuration properties

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@ static pthread_mutex_t vs_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* function prototype */
 static int vs_stats_check_auth(void);
+static void vs_stats_reset(void);
 static void vs_stats_door_call(void *, char *, size_t, door_desc_t *, uint_t);
 
 
@@ -144,31 +145,63 @@ static void
 vs_stats_door_call(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		uint_t n_desc)
 {
-	/* LINTED E_BAD_PTR_CAST_ALIGN - to be fixed with encoding */
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	vs_stats_req_t *req = (vs_stats_req_t *)ptr;
-	vs_stats_t rsp;
+	vs_stats_rsp_t rsp;
 
-	switch (*req) {
+	if ((cookie != &vs_stats_door_cookie) ||
+	    (ptr == NULL) ||
+	    (size != sizeof (vs_stats_req_t)) ||
+	    (req->vsr_magic != VS_STATS_DOOR_MAGIC)) {
+		return;
+	}
+
+	rsp.vsr_magic = VS_STATS_DOOR_MAGIC;
+
+	switch (req->vsr_id) {
 	case VS_STATS_GET:
 		(void) pthread_mutex_lock(&vs_stats_mutex);
-		(void) memcpy(&rsp, &vscan_stats, sizeof (vs_stats_t));
+		rsp.vsr_stats = vscan_stats;
 		(void) pthread_mutex_unlock(&vs_stats_mutex);
-		(void) door_return((char *)&rsp, sizeof (vs_stats_t), NULL, 0);
+		(void) door_return((char *)&rsp, sizeof (vs_stats_rsp_t),
+		    NULL, 0);
 		break;
 
 	case VS_STATS_RESET:
-		if (vs_stats_check_auth() == 0) {
-			(void) pthread_mutex_lock(&vs_stats_mutex);
-			(void) memset(&vscan_stats, 0, sizeof (vs_stats_t));
-			(void) pthread_mutex_unlock(&vs_stats_mutex);
-		}
+		vs_stats_reset();
 		(void) door_return(NULL, 0, NULL, 0);
 		break;
 
 	default:
-		(void) door_return(NULL, 0, NULL, 0);
-		break;
+		return;
 	}
+}
+
+
+/*
+ * vs_stats_reset
+ *
+ * Reset totals and per-engine statistics to 0
+ */
+static void
+vs_stats_reset()
+{
+	int i;
+
+	if (vs_stats_check_auth() != 0)
+		return;
+
+	(void) pthread_mutex_lock(&vs_stats_mutex);
+
+	vscan_stats.vss_scanned = 0;
+	vscan_stats.vss_infected = 0;
+	vscan_stats.vss_cleaned = 0;
+	vscan_stats.vss_failed = 0;
+
+	for (i = 0; i < VS_SE_MAX; i++)
+		vscan_stats.vss_eng[i].vss_errors = 0;
+
+	(void) pthread_mutex_unlock(&vs_stats_mutex);
 }
 
 

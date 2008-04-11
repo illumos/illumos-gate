@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,24 +26,16 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PATH="/usr/bin:/usr/sbin:${PATH}"
-export PATH
+SRC=../..
 
-PKG_NAME=SUNWvscanr
-DMON=vscand
+include ../Makefile.com
 
-#
-# Make sure that the VSCAN client daemon (vscand) is not
-# running before removing this package.
-#
-if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
-	/usr/bin/pgrep -x "${DMON}" >/dev/null
-	if [ $? -ne 1 ]; then
-		echo "\nUnable to remove ${PKG_NAME}: the vscan service is enabled"
-		echo "Disable vscan service and try again:"
-		echo "\tsvcadm disable system/filesystem/vscan\n"
-		exit 1
-	fi
-fi
+DATAFILES += depend
 
-exit 0
+.KEEP_STATE:
+
+all: $(FILES) postinstall preremove
+
+install: all pkg
+
+include ../Makefile.targ

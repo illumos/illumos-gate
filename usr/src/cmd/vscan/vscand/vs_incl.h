@@ -90,51 +90,43 @@ typedef struct vs_result {
 } vs_result_t;
 
 
-/* scan engine connection */
-typedef struct vs_eng_conn {
-	int vsc_idx;
-	char vsc_engid[VS_SE_NAME_LEN];
-	char vsc_host[MAXHOSTNAMELEN];
-	int vsc_port;
-	int vsc_sockfd;
-	struct vs_eng_conn *vsc_next;
-	struct vs_eng_conn *vsc_prev;
-} vs_eng_conn_t;
-
-
-/* file attributes used by virus scanning */
-typedef struct vs_attr {
-	int vsa_modified;
-	int vsa_quarantined;
-	uint64_t vsa_size;
-	vs_scanstamp_t vsa_scanstamp;
-}vs_attr_t;
+/* scan engine connection context */
+typedef struct vs_eng_ctx {
+	int vse_eidx;	/* engine index */
+	int vse_cidx;	/* connection index */
+	char vse_engid[VS_SE_NAME_LEN];
+	char vse_host[MAXHOSTNAMELEN];
+	int vse_port;
+	int vse_sockfd;
+} vs_eng_ctx_t;
 
 
 /* Function Prototypes */
 vs_daemon_state_t vscand_get_state(void);
 char *vscand_viruslog(void);
+int vscand_kernel_result(vs_scan_rsp_t *);
 
 int vs_door_init(void);
 void vs_door_fini(void);
 
-void vs_svc_init(void);
+int vs_svc_init(uint32_t);
 void vs_svc_fini(void);
-int vs_svc_scan_file(char *, char *, vs_attr_t *, int, vs_scanstamp_t *);
+int vs_svc_queue_scan_req(vs_scan_req_t *);
+void vs_svc_terminate(void);
 
 void vs_eng_init(void);
 void vs_eng_fini(void);
 void vs_eng_config(vs_props_all_t *);
-void vs_eng_set_error(vs_eng_conn_t *, int);
-int vs_eng_get(vs_eng_conn_t *, int);
-int vs_eng_connect(vs_eng_conn_t *);
-void vs_eng_release(vs_eng_conn_t *);
+void vs_eng_set_error(vs_eng_ctx_t *, int);
+int vs_eng_get(vs_eng_ctx_t *, boolean_t);
+void vs_eng_release(const vs_eng_ctx_t *);
+void vs_eng_close_connections(void);
 int vs_eng_scanstamp_current(vs_scanstamp_t);
 
 void vs_icap_init(void);
 void vs_icap_fini(void);
 void vs_icap_config(int, char *, int);
-int vs_icap_scan_file(vs_eng_conn_t *, char *, char *, uint64_t,
+int vs_icap_scan_file(vs_eng_ctx_t *, char *, char *, uint64_t,
     int, vs_result_t *);
 void vs_icap_print_options(int);
 int vs_icap_compare_scanstamp(int, vs_scanstamp_t);

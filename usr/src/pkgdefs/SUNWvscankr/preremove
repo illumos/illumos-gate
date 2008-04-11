@@ -28,7 +28,8 @@
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
-PKG_NAME=SUNWvscanr
+PKG_NAME=SUNWvscankr
+DRV=vscan
 DMON=vscand
 
 #
@@ -41,6 +42,25 @@ if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
 		echo "\nUnable to remove ${PKG_NAME}: the vscan service is enabled"
 		echo "Disable vscan service and try again:"
 		echo "\tsvcadm disable system/filesystem/vscan\n"
+		exit 1
+	fi
+fi
+
+#
+# Remove driver, if this has not already been done
+#
+BASEDIR=${BASEDIR:-/}
+if [ "$BASEDIR" = "/" ]; then
+	REM_DRV="rem_drv"
+else
+	REM_DRV="rem_drv -b ${BASEDIR}"
+fi
+
+grep "^${DRV}" ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	${REM_DRV} ${DRV}
+	if [ $? -ne 0 ]; then
+		echo "${PKG_NAME}: rem_drv ${DRV} failed\n" >&2
 		exit 1
 	fi
 fi

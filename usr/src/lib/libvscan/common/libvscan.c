@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +48,8 @@
 
 /* SMF property group and property names */
 #define	VS_PGNAME_GENERAL		"vs_general"
-#define	VS_PGNAME_ENGINE		"vs_engine_%d"
-#define	VS_PGNAME_ENGINE_LEN		16
+#define	VS_PGNAME_ENGINE_PREFIX		"vs_engine_"
+#define	VS_PGNAME_ENGINE_LEN		VS_SE_NAME_LEN + 16
 
 #define	VS_PNAME_MAXSIZE		"maxsize"
 #define	VS_PNAME_MAXSIZE_ACTION		"maxsize_action"
@@ -166,6 +166,7 @@ static int vs_scf_get(const vs_propdef_t *, vs_prop_hd_t *, vs_scfctx_t *, int);
 static int vs_scf_values_set(const char *, vs_prop_hd_t *);
 static int vs_scf_set(const vs_propdef_t *, vs_prop_hd_t *, vs_scfctx_t *, int);
 static int vs_scf_pg_create(const char *, vs_prop_hd_t *);
+static int vs_scf_pg_delete(const char *);
 
 static int vs_scf_ctx_open(vs_scfctx_t *);
 static void vs_scf_ctx_close(vs_scfctx_t *);
@@ -175,8 +176,8 @@ static int vs_is_valid_types(const char *);
 static int vs_is_valid_host(const char *);
 static int vs_checkauth(char *);
 
-typedef char vs_engid_t[VS_SE_NAME_LEN];
-static int vs_props_get_engines(vs_engid_t *engids, int *count);
+static int vs_props_get_engines(char *[], int *);
+static void vs_engid_to_pgname(const char *, char [VS_PGNAME_ENGINE_LEN]);
 static int vs_scf_pg_count(void);
 static int vs_strtoshift(const char *);
 
@@ -199,8 +200,7 @@ int
 vs_props_get_all(vs_props_all_t *va)
 {
 	int i, rc, n;
-	char *engid;
-	vs_engid_t engids[VS_SE_MAX];
+	char *engids[VS_SE_MAX];
 
 	(void) memset(va, 0, sizeof (vs_props_all_t));
 	if ((rc = vs_props_get(&va->va_props, VS_PROPID_GEN_ALL))
@@ -211,17 +211,19 @@ vs_props_get_all(vs_props_all_t *va)
 	if ((rc = vs_props_get_engines(engids, &n)) != VS_ERR_NONE)
 		return (rc);
 
-	if (n > VS_SE_MAX)
-		n = VS_SE_MAX;
-
 	for (i = 0; i < n; i++) {
-		engid = engids[i];
-		rc = vs_props_se_get(engid, &va->va_se[i], VS_PROPID_SE_ALL);
-		if (rc != VS_ERR_NONE)
-			return (rc);
+		if ((rc = vs_props_se_get(engids[i],
+		    &va->va_se[i], VS_PROPID_SE_ALL)) != VS_ERR_NONE)
+			break;
 	}
 
-	return (VS_ERR_NONE);
+	/* free engids allocated in vs_props_get_engines */
+	for (i = 0; i < VS_SE_MAX; i++)	{
+		if (engids[i] != NULL)
+			free(engids[i]);
+	}
+
+	return (rc);
 }
 
 
@@ -311,6 +313,7 @@ int
 vs_props_se_get(char *engid, vs_props_se_t *sep, uint64_t propids)
 {
 	int rc;
+	char pgname[VS_PGNAME_ENGINE_LEN];
 	vs_prop_hd_t prop_hd;
 
 	/* VS_PGNAME_GENERAL is a reserved for GENERAL property group */
@@ -331,7 +334,8 @@ vs_props_se_get(char *engid, vs_props_se_t *sep, uint64_t propids)
 		prop_hd.vp_ids |= VS_PROPID_SE_HOST;
 
 	/* Load values from the repository */
-	rc = vs_scf_values_get(engid, &prop_hd);
+	vs_engid_to_pgname(engid, pgname);
+	rc = vs_scf_values_get(pgname, &prop_hd);
 	if (rc != VS_ERR_NONE)
 		return (rc);
 
@@ -371,6 +375,7 @@ int
 vs_props_se_set(char *engid, const vs_props_se_t *sep, uint64_t propids)
 {
 	int rc;
+	char pgname[VS_PGNAME_ENGINE_LEN];
 	vs_prop_hd_t prop_hd;
 
 	/* VS_PGNAME_GENERAL is a reserved for GENERAL property group */
@@ -384,6 +389,8 @@ vs_props_se_set(char *engid, const vs_props_se_t *sep, uint64_t propids)
 	prop_hd.vp_type = VS_PTYPE_SE;
 	prop_hd.vp_all = VS_PROPID_SE_ALL;
 
+	vs_engid_to_pgname(engid, pgname);
+
 	/*
 	 * if enabling a scan engine, ensure that a valid host
 	 * is also being set, or already exists in the repository
@@ -392,7 +399,7 @@ vs_props_se_set(char *engid, const vs_props_se_t *sep, uint64_t propids)
 	    !(propids & VS_PROPID_SE_HOST)) {
 
 		prop_hd.vp_ids = VS_PROPID_SE_HOST;
-		if ((rc = vs_scf_values_get(engid, &prop_hd)) != VS_ERR_NONE)
+		if ((rc = vs_scf_values_get(pgname, &prop_hd)) != VS_ERR_NONE)
 			return (rc);
 
 		if (vs_validate(&prop_hd, VS_PROPID_SE_HOST) != VS_ERR_NONE)
@@ -402,7 +409,7 @@ vs_props_se_set(char *engid, const vs_props_se_t *sep, uint64_t propids)
 	prop_hd.vp_ids = propids;
 	prop_hd.vp_se = *sep;
 
-	return (vs_scf_values_set(engid, &prop_hd));
+	return (vs_scf_values_set(pgname, &prop_hd));
 }
 
 
@@ -413,6 +420,7 @@ int
 vs_props_se_create(char *engid, const vs_props_se_t *sep, uint64_t propids)
 {
 	int n;
+	char pgname[VS_PGNAME_ENGINE_LEN];
 	vs_prop_hd_t prop_hd;
 
 	if ((propids & VS_PROPID_SE_ALL) != propids)
@@ -428,14 +436,21 @@ vs_props_se_create(char *engid, const vs_props_se_t *sep, uint64_t propids)
 	if (n == VS_SE_MAX)
 		return (VS_ERR_MAX_SE);
 
+	vs_engid_to_pgname(engid, pgname);
+
 	(void) memset(&prop_hd, 0, sizeof (vs_prop_hd_t));
 	prop_hd.vp_type = VS_PTYPE_SE;
 	prop_hd.vp_all = VS_PROPID_SE_ALL;
 	prop_hd.vp_ids = propids | VS_PROPID_VALUE_AUTH;
 	prop_hd.vp_se = *sep;
 
-	return (vs_scf_pg_create(engid, &prop_hd));
+	/* if hostname not specified, default it to engid */
+	if ((propids & VS_PROPID_SE_HOST) == 0) {
+		(void) strlcpy(prop_hd.vp_se.vep_host, engid, MAXHOSTNAMELEN);
+		prop_hd.vp_ids |= VS_PROPID_SE_HOST;
+	}
 
+	return (vs_scf_pg_create(pgname, &prop_hd));
 }
 
 
@@ -445,50 +460,15 @@ vs_props_se_create(char *engid, const vs_props_se_t *sep, uint64_t propids)
 int
 vs_props_se_delete(const char *engid)
 {
-	int rc;
-	vs_scfctx_t vsc;
+	char pgname[VS_PGNAME_ENGINE_LEN];
 
 	/* VS_PGNAME_GENERAL is a reserved for GENERAL property group */
 	if (strcmp(engid, VS_PGNAME_GENERAL) == 0)
 		return (VS_ERR_INVALID_SE);
 
-	/* ensure that caller has authorization to refresh service */
-	if ((rc = vs_checkauth(VS_ACTION_AUTH)) != VS_ERR_NONE)
-		return (rc);
+	vs_engid_to_pgname(engid, pgname);
 
-	if (vs_scf_ctx_open(&vsc) != 0) {
-		vs_scf_ctx_close(&vsc);
-		return (VS_ERR_SCF);
-	}
-
-	if (scf_instance_get_pg(vsc.vscf_inst, engid, vsc.vscf_pgroup) == -1) {
-		vs_scf_ctx_close(&vsc);
-		rc = scf_error();
-		if ((rc == SCF_ERROR_NOT_FOUND) ||
-		    (rc == SCF_ERROR_INVALID_ARGUMENT))
-			return (VS_ERR_INVALID_SE);
-		else
-			return (VS_ERR_SCF);
-	}
-
-	if (scf_pg_delete(vsc.vscf_pgroup) == -1) {
-		vs_scf_ctx_close(&vsc);
-		rc = scf_error();
-		if ((rc == SCF_ERROR_NOT_FOUND) ||
-		    (rc == SCF_ERROR_INVALID_ARGUMENT))
-			return (VS_ERR_INVALID_SE);
-
-		return (VS_ERR_SCF);
-	}
-
-	vs_scf_ctx_close(&vsc);
-
-	/* Notify the daemon that things have changed */
-	if ((smf_refresh_instance(VS_INSTANCE_FMRI)) == -1) {
-		return (VS_ERR_SCF);
-	}
-
-	return (VS_ERR_NONE);
+	return (vs_scf_pg_delete(pgname));
 }
 
 
@@ -769,7 +749,6 @@ vs_scf_pg_create(const char *pgname, vs_prop_hd_t *prop_hd)
 {
 	int rc;
 	uint64_t propid;
-	uint64_t propids = prop_hd->vp_ids;
 	vs_scfctx_t vsc;
 
 	/* ensure that caller has authorization to refresh service */
@@ -795,19 +774,64 @@ vs_scf_pg_create(const char *pgname, vs_prop_hd_t *prop_hd)
 		if ((propid & prop_hd->vp_all) && !(propid & prop_hd->vp_ids))
 			vs_default_value(prop_hd, propid);
 	}
+
 	prop_hd->vp_ids = prop_hd->vp_all;
-
-
-	if ((propids & VS_PROPID_SE_HOST) == 0)
-		(void) strlcpy(prop_hd->vp_se.vep_host, pgname, MAXHOSTNAMELEN);
-
 	prop_hd->vp_ids |= VS_PROPID_VALUE_AUTH;
 
 	rc = vs_scf_values_set(pgname, prop_hd);
 	if (rc != VS_ERR_NONE)
-		(void) vs_props_se_delete(pgname);
+		(void) vs_scf_pg_delete(pgname);
 
 	return (rc);
+}
+
+
+/*
+ * vs_scf_pg_delete
+ */
+static int
+vs_scf_pg_delete(const char *pgname)
+{
+	int rc;
+	vs_scfctx_t vsc;
+
+	/* ensure that caller has authorization to refresh service */
+	if ((rc = vs_checkauth(VS_ACTION_AUTH)) != VS_ERR_NONE)
+		return (rc);
+
+	if (vs_scf_ctx_open(&vsc) != 0) {
+		vs_scf_ctx_close(&vsc);
+		return (VS_ERR_SCF);
+	}
+
+	if (scf_instance_get_pg(vsc.vscf_inst, pgname, vsc.vscf_pgroup) == -1) {
+		vs_scf_ctx_close(&vsc);
+		rc = scf_error();
+		if ((rc == SCF_ERROR_NOT_FOUND) ||
+		    (rc == SCF_ERROR_INVALID_ARGUMENT))
+			return (VS_ERR_INVALID_SE);
+		else
+			return (VS_ERR_SCF);
+	}
+
+	if (scf_pg_delete(vsc.vscf_pgroup) == -1) {
+		vs_scf_ctx_close(&vsc);
+		rc = scf_error();
+		if ((rc == SCF_ERROR_NOT_FOUND) ||
+		    (rc == SCF_ERROR_INVALID_ARGUMENT))
+			return (VS_ERR_INVALID_SE);
+
+		return (VS_ERR_SCF);
+	}
+
+	vs_scf_ctx_close(&vsc);
+
+	/* Notify the daemon that things have changed */
+	if ((smf_refresh_instance(VS_INSTANCE_FMRI)) == -1) {
+		return (VS_ERR_SCF);
+	}
+
+	return (VS_ERR_NONE);
 }
 
 
@@ -831,7 +855,6 @@ vs_scf_values_set(const char *pgname, vs_prop_hd_t *prop_hd)
 	const vs_propdef_t *vpd;
 	uint64_t propid;
 	vs_scfctx_t vsc;
-
 
 	/* ensure that caller has authorization to refresh service */
 	if ((rc = vs_checkauth(VS_ACTION_AUTH)) != VS_ERR_NONE)
@@ -1321,41 +1344,44 @@ vs_statistics(vs_stats_t *stats)
 {
 	int door_fd, rc = VS_ERR_NONE;
 	vs_stats_req_t *req;
-	vs_stats_t *buf;
+	vs_stats_rsp_t *rsp;
 	door_arg_t arg;
 
 	if ((req = calloc(1, sizeof (vs_stats_req_t))) == NULL)
 		return (VS_ERR_SYS);
 
-	if ((buf = calloc(1, sizeof (vs_stats_t))) == NULL) {
+	if ((rsp = calloc(1, sizeof (vs_stats_rsp_t))) == NULL) {
 		free(req);
 		return (VS_ERR_SYS);
 	}
 
 	if ((door_fd = open(VS_STATS_DOOR_NAME, O_RDONLY)) < 0) {
 		free(req);
-		free(buf);
+		free(rsp);
 		return (VS_ERR_DAEMON_COMM);
 	}
 
-	*req = VS_STATS_GET;
+	req->vsr_magic = VS_STATS_DOOR_MAGIC;
+	req->vsr_id = VS_STATS_GET;
 
 	arg.data_ptr = (char *)req;
 	arg.data_size = sizeof (vs_stats_req_t);
 	arg.desc_ptr = NULL;
 	arg.desc_num = 0;
-	arg.rbuf = (char *)buf;
-	arg.rsize = sizeof (vs_stats_t);
+	arg.rbuf = (char *)rsp;
+	arg.rsize = sizeof (vs_stats_rsp_t);
 
-	if (door_call(door_fd, &arg) < 0)
+	if ((door_call(door_fd, &arg) < 0) ||
+	    (rsp->vsr_magic != VS_STATS_DOOR_MAGIC)) {
 		rc = VS_ERR_DAEMON_COMM;
-	else
-		*stats = *buf;
+	} else {
+		*stats = rsp->vsr_stats;
+	}
 
 	(void) close(door_fd);
 
 	free(req);
-	free(buf);
+	free(rsp);
 	return (rc);
 }
 
@@ -1382,7 +1408,8 @@ vs_statistics_reset()
 		return (VS_ERR_DAEMON_COMM);
 	}
 
-	*req = VS_STATS_RESET;
+	req->vsr_magic = VS_STATS_DOOR_MAGIC;
+	req->vsr_id = VS_STATS_RESET;
 
 	arg.data_ptr = (char *)req;
 	arg.data_size = sizeof (vs_stats_req_t);
@@ -1426,15 +1453,19 @@ vs_checkauth(char *auth)
 
 /*
  * vs_props_get_engines
+ *
  * On input, count specifies the maximum number of engine ids to
  * return. engids must be an array with count entries.
  * On return, count specifies the number of engine ids being
  * returned in engids.
+ *
+ * Caller is responsible for free'ing the engids allocated herein.
  */
 static int
-vs_props_get_engines(vs_engid_t *engids, int *count)
+vs_props_get_engines(char *engids[], int *count)
 {
-	int i = 0;
+	int i, prefix_len;
+	char pgname[VS_PGNAME_ENGINE_LEN];
 	vs_scfctx_t vsc;
 
 
@@ -1446,19 +1477,26 @@ vs_props_get_engines(vs_engid_t *engids, int *count)
 		return (VS_ERR_SCF);
 	}
 
+	for (i = 0; i < *count; i++)
+		engids[i] = NULL;
+
+	i = 0;
+	prefix_len = sizeof (VS_PGNAME_ENGINE_PREFIX) - 1;
+
 	while ((i < VS_SE_MAX) &&
 	    (scf_iter_next_pg(vsc.vscf_iter, vsc.vscf_pgroup) == 1)) {
-		if (scf_pg_get_name(vsc.vscf_pgroup, engids[i],
-		    VS_SE_NAME_LEN) < 0) {
+		if (scf_pg_get_name(vsc.vscf_pgroup, pgname,
+		    VS_PGNAME_ENGINE_LEN) < 0) {
 			vs_scf_ctx_close(&vsc);
 			return (VS_ERR_SCF);
 		}
 
-		if (strcmp(engids[i], VS_PGNAME_GENERAL) == 0)
-			*engids[i] = 0;
-		else
-			if (++i == *count)
-			break;
+		if (strncmp(pgname, VS_PGNAME_ENGINE_PREFIX, prefix_len) == 0) {
+			if ((engids[i] = strdup(pgname + prefix_len)) != NULL) {
+				if (++i == *count)
+					break;
+			}
+		}
 	}
 	vs_scf_ctx_close(&vsc);
 
@@ -1490,6 +1528,20 @@ vs_scf_pg_count(void)
 	vs_scf_ctx_close(&vsc);
 
 	return (count);
+}
+
+
+/*
+ * vs_engid_to_pgname
+ *
+ * To convert an engine id (engid) to a property group name (pgname),
+ * the engine id is prefixed with VS_PGNAME_ENGINE_PREFIX.
+ */
+static void
+vs_engid_to_pgname(const char *engid, char pgname[VS_PGNAME_ENGINE_LEN])
+{
+	(void) snprintf(pgname, VS_PGNAME_ENGINE_LEN, "%s%s",
+	    VS_PGNAME_ENGINE_PREFIX, engid);
 }
 
 

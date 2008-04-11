@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,13 +57,18 @@
 #include <pwd.h>
 #include <grp.h>
 #include <priv_utils.h>
+#include <rctl.h>
 #include "vs_incl.h"
+
+#define	VS_FILE_DESCRIPTORS	512
 
 static int vscand_fg = 0; /* daemon by default */
 static vs_daemon_state_t vscand_state = VS_STATE_INIT;
 static int vscand_sigval = 0;
 static int vscand_kdrv_fd = -1;
 static pthread_mutex_t vscand_cfg_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t vscand_cfg_cv;
+static pthread_t vscand_cfg_tid = 0;
 
 /* virus log path */
 static char vscand_vlog[MAXPATHLEN];
@@ -83,14 +88,20 @@ static int vscand_daemonize_init(void);
 static void vscand_daemonize_fini(int, int);
 static int vscand_init(void);
 static void vscand_fini(void);
+static int vscand_cfg_init(void);
+static void vscand_cfg_fini(void);
+static void *vscand_cfg_handler(void *);
 static int vscand_configure(void);
+static void vscand_dtrace_cfg(vs_props_all_t *);
 static int vscand_kernel_bind(void);
 static void vscand_kernel_unbind(void);
 static int vscand_kernel_enable(int);
 static void vscand_kernel_disable(void);
 static int vscand_kernel_config(vs_config_t *);
+static int vscand_kernel_max_req(uint32_t *);
 static void vscand_error(const char *);
 static int vscand_get_viruslog(void);
+static int vscand_set_resource_limits(void);
 
 
 /*
@@ -137,6 +148,8 @@ main(int argc, char **argv)
 	int err_stat = 0, pfd = -1;
 	sigset_t set;
 	struct sigaction act;
+	int sigval;
+
 	mode_t log_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 	mode_t door_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
@@ -172,14 +185,12 @@ main(int argc, char **argv)
 		*vscand_vlog = 0;
 	}
 
-	(void) unlink(VS_STATS_DOOR_NAME);
 	(void) vscand_init_file(VS_STATS_DOOR_NAME,
 	    daemon_uid, sys_gid, door_mode);
 
 	/*
 	 * Once we're done setting our global state up, set up signal handlers
-	 * for ensuring orderly termination on SIGTERM.  If we are starting in
-	 * the foreground, we also use the same handler for SIGINT and SIGHUP.
+	 * for ensuring orderly termination on SIGTERM.
 	 */
 	(void) sigfillset(&set);
 	(void) sigdelset(&set, SIGABRT); /* always unblocked for ASSERT() */
@@ -191,11 +202,11 @@ main(int argc, char **argv)
 	(void) sigaction(SIGTERM, &act, NULL);
 	(void) sigaction(SIGHUP, &act, NULL); /* Refresh config */
 	(void) sigaction(SIGINT, &act, NULL);
-	(void) sigaction(SIGUSR1, &act, NULL);
+	(void) sigaction(SIGPIPE, &act, NULL);
 	(void) sigdelset(&set, SIGTERM);
 	(void) sigdelset(&set, SIGHUP);
 	(void) sigdelset(&set, SIGINT);
-	(void) sigdelset(&set, SIGUSR1);
+	(void) sigdelset(&set, SIGPIPE);
 
 	if (vscand_fg) {
 		(void) sigdelset(&set, SIGTSTP);
@@ -227,23 +238,23 @@ main(int argc, char **argv)
 
 	/* Wait here until shutdown */
 	while (vscand_state == VS_STATE_RUNNING) {
+		if (vscand_sigval == 0)
+			(void) sigsuspend(&set);
 
-		(void) sigsuspend(&set);
+		sigval = vscand_sigval;
+		vscand_sigval = 0;
 
-		switch (vscand_sigval) {
+		switch (sigval) {
 		case 0:
-		case SIGUSR1:
+		case SIGPIPE:
 			break;
 		case SIGHUP:
-			if (vscand_configure() != 0)
-				vscand_state = VS_STATE_SHUTDOWN;
+			(void) pthread_cond_signal(&vscand_cfg_cv);
 			break;
 		default:
 			vscand_state = VS_STATE_SHUTDOWN;
 			break;
 		}
-
-		vscand_sigval = 0;
 	}
 
 	vscand_fini();
@@ -252,7 +263,7 @@ main(int argc, char **argv)
 
 
 /*
- * vscand_parse_args -
+ * vscand_parse_args
  * Routine to parse the arguments to the daemon program
  * 'f' argument runs process in the foreground instead of as a daemon
  */
@@ -424,20 +435,20 @@ vscand_daemonize_fini(int fd, int err_status)
  * create specified file and set its uid, gid and mode
  */
 static int
-vscand_init_file(char *filepath, uid_t uid, gid_t gid, mode_t mode)
+vscand_init_file(char *filepath, uid_t uid, gid_t gid, mode_t access_mode)
 {
 	int fd, rc = 0;
 	struct stat stat_buf;
 	char buf[MAXPATHLEN];
 
-	if ((fd = open(filepath, O_RDONLY | O_CREAT, mode)) == -1)
+	if ((fd = open(filepath, O_RDONLY | O_CREAT, access_mode)) == -1) {
 		rc = -1;
-	else {
-		if (fstat(fd, &stat_buf) != 0)
+	} else {
+		if (fstat(fd, &stat_buf) != 0) {
 			rc = -1;
-		else {
-			if (stat_buf.st_mode != mode) {
-				if (fchmod(fd, mode) != 0)
+		} else {
+			if ((stat_buf.st_mode & S_IAMB) != access_mode) {
+				if (fchmod(fd, access_mode) != 0)
 					rc = -1;
 			}
 
@@ -478,22 +489,32 @@ static int
 vscand_init(void)
 {
 	int door_fd = -1;
+	uint32_t max_req;
 
 	if (vscand_kernel_bind() < 0)
+		return (-1);
+
+	if (vscand_kernel_max_req(&max_req) == -1)
+		return (-1);
+
+	if (vs_svc_init(max_req) != 0)
 		return (-1);
 
 	if (vs_stats_init() != 0)
 		vscand_error(
 		    gettext("failed to initialize statistics interface"));
 
-	vs_svc_init();
 	vs_icap_init();
 	vs_eng_init();
 
-	if (vscand_configure() != 0) {
+	/* initialize configuration and handler thread */
+	if (vscand_cfg_init() != 0) {
 		vscand_error(gettext("failed to initialize configuration"));
+		vscand_fini();
 		return (-1);
 	}
+
+	(void) vscand_set_resource_limits();
 
 	if (((door_fd = vs_door_init()) < 0) ||
 	    (vscand_kernel_enable(door_fd) < 0)) {
@@ -510,8 +531,8 @@ vscand_init(void)
  *
  * vscand_kernel_disable - should be called first to ensure that no
  *	more scan requests are initiated from the kernel module
- * vs_door_fini - shouldn't be called until after the in-progress
- *	scans complete (vs_eng_fini waits for in progress scans)
+ * vs_svc_terminate - terminate requests and wait for thread completion
+ * vs_xxx_fini - module cleanup routines
  * vscand_kernel_unbind - should be called last to tell the kernel module
  *	that vscand is shutdown.
  */
@@ -520,14 +541,89 @@ vscand_fini(void)
 {
 	vscand_kernel_disable();
 
+	/* terminate reconfiguration handler thread */
+	vscand_cfg_fini();
+
+	/* terminate requests and wait for completion */
+	vs_svc_terminate();
+
+	/* clean up */
 	vs_svc_fini();
 	vs_eng_fini();
 	vs_icap_fini();
-
 	vs_door_fini();
 	vs_stats_fini();
 
 	vscand_kernel_unbind();
+}
+
+
+/*
+ * vscand_cfg_init
+ *
+ * initialize configuration and reconfiguration handler thread
+ */
+static int
+vscand_cfg_init(void)
+{
+	int rc;
+
+	(void) pthread_cond_init(&vscand_cfg_cv, NULL);
+
+	(void) pthread_mutex_lock(&vscand_cfg_mutex);
+	rc = vscand_configure();
+	(void) pthread_mutex_unlock(&vscand_cfg_mutex);
+
+	if (rc != 0)
+		return (-1);
+
+	if (pthread_create(&vscand_cfg_tid, NULL, vscand_cfg_handler, 0) != 0) {
+		vscand_cfg_tid = 0;
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+/*
+ * vscand_cfg_fini
+ *
+ * terminate reconfiguration handler thread
+ */
+static void
+vscand_cfg_fini()
+{
+	if (vscand_cfg_tid != 0) {
+		(void) pthread_cond_signal(&vscand_cfg_cv);
+		(void) pthread_join(vscand_cfg_tid, NULL);
+		vscand_cfg_tid = 0;
+	}
+	(void) pthread_cond_destroy(&vscand_cfg_cv);
+}
+
+
+/*
+ * vscand_cfg_handler
+ * wait for reconfiguration event and reload configuration
+ * exit on VS_STATE_SHUTDOWN
+ */
+/*ARGSUSED*/
+static void *
+vscand_cfg_handler(void *arg)
+{
+	(void) pthread_mutex_lock(&vscand_cfg_mutex);
+
+	while (pthread_cond_wait(&vscand_cfg_cv, &vscand_cfg_mutex) == 0) {
+		if (vscand_state == VS_STATE_SHUTDOWN)
+			break;
+
+		(void) vscand_configure();
+	}
+
+	(void) pthread_mutex_unlock(&vscand_cfg_mutex);
+
+	return (NULL);
 }
 
 
@@ -541,12 +637,9 @@ vscand_configure(void)
 	vs_config_t kconfig;
 	vs_props_all_t config;
 
-	(void) pthread_mutex_lock(&vscand_cfg_mutex);
-
 	(void) memset(&config, 0, sizeof (vs_props_all_t));
 	if (vs_props_get_all(&config) != VS_ERR_NONE) {
 		vscand_error(gettext("configuration data error"));
-		(void) pthread_mutex_unlock(&vscand_cfg_mutex);
 		return (-1);
 	}
 
@@ -555,7 +648,6 @@ vscand_configure(void)
 	if (vs_parse_types(config.va_props.vp_types,
 	    kconfig.vsc_types, &len) != 0) {
 		vscand_error(gettext("configuration data error - types"));
-		(void) pthread_mutex_unlock(&vscand_cfg_mutex);
 		return (-1);
 	}
 	kconfig.vsc_types_len = len;
@@ -564,24 +656,22 @@ vscand_configure(void)
 	if (vs_strtonum(config.va_props.vp_maxsize,
 	    &kconfig.vsc_max_size) != 0) {
 		vscand_error(gettext("configuration data error - max-size"));
-		(void) pthread_mutex_unlock(&vscand_cfg_mutex);
 		return (-1);
 	}
 	kconfig.vsc_allow = config.va_props.vp_maxsize_action ? 1LL : 0LL;
 
 	/* Send configuration update to kernel */
 	if (vscand_kernel_config(&kconfig) != 0) {
-		(void) pthread_mutex_unlock(&vscand_cfg_mutex);
 		return (-1);
 	}
 
-	/* Tell vs_eng things have changed. */
-	vs_eng_config(&config);
+	/* dtrace the configuration data */
+	vscand_dtrace_cfg(&config);
 
-	/* Tell vs_stats things have changed */
+	/* propagate configuration changes */
+	vs_eng_config(&config);
 	vs_stats_config(&config);
 
-	(void) pthread_mutex_unlock(&vscand_cfg_mutex);
 	return (0);
 }
 
@@ -667,7 +757,7 @@ vscand_kernel_unbind(void)
 static int
 vscand_kernel_enable(int door_fd)
 {
-	if (ioctl(vscand_kdrv_fd, VS_DRV_IOCTL_ENABLE, door_fd) < 0) {
+	if (ioctl(vscand_kdrv_fd, VS_IOCTL_ENABLE, door_fd) < 0) {
 		vscand_error(gettext("failed to bind to kernel"));
 		(void) close(vscand_kdrv_fd);
 		vscand_kdrv_fd = -1;
@@ -684,7 +774,7 @@ static void
 vscand_kernel_disable()
 {
 	if (vscand_kdrv_fd >= 0)
-		(void) ioctl(vscand_kdrv_fd, VS_DRV_IOCTL_DISABLE);
+		(void) ioctl(vscand_kdrv_fd, VS_IOCTL_DISABLE);
 }
 
 
@@ -694,15 +784,74 @@ vscand_kernel_disable()
 int
 vscand_kernel_config(vs_config_t *conf)
 {
-	if (vscand_kdrv_fd < 0)
-		return (-1);
-
-	if (ioctl(vscand_kdrv_fd, VS_DRV_IOCTL_CONFIG, conf) < 0) {
+	if ((vscand_kdrv_fd < 0) ||
+	    (ioctl(vscand_kdrv_fd, VS_IOCTL_CONFIG, conf) < 0)) {
 		vscand_error(gettext("failed to send config to kernel"));
 		return (-1);
 	}
 
 	return (0);
+}
+
+
+/*
+ * vscand_kernel_result
+ */
+int
+vscand_kernel_result(vs_scan_rsp_t *scan_rsp)
+{
+	if ((vscand_kdrv_fd < 0) ||
+	    (ioctl(vscand_kdrv_fd, VS_IOCTL_RESULT, scan_rsp) < 0)) {
+		vscand_error(gettext("failed to send result to kernel"));
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+/*
+ * vscand_kernel_max_req
+ */
+int
+vscand_kernel_max_req(uint32_t *max_req)
+{
+	if ((vscand_kdrv_fd < 0) ||
+	    (ioctl(vscand_kdrv_fd, VS_IOCTL_MAX_REQ, max_req) < 0)) {
+		vscand_error(gettext("failed to get config data from kernel"));
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+/*
+ * vscand_set_resource_limits
+ *
+ * If the process's max file descriptor limit is less than
+ * VS_FILE_DESCRIPTORS, increae it to VS_FILE_DESCRIPTORS.
+ */
+static int
+vscand_set_resource_limits(void)
+{
+	int rc = -1;
+	rctlblk_t *rblk;
+	char *limit = "process.max-file-descriptor";
+
+	rblk = (rctlblk_t *)malloc(rctlblk_size());
+
+	if (rblk != NULL) {
+		rc = getrctl(limit, NULL, rblk, 0);
+		if ((rc == 0) &&
+		    (rctlblk_get_value(rblk) < VS_FILE_DESCRIPTORS)) {
+			rctlblk_set_value(rblk, VS_FILE_DESCRIPTORS);
+			rc = setrctl(limit, NULL, rblk, 0);
+		}
+		(void) free(rblk);
+	}
+
+	return (rc);
 }
 
 
@@ -714,4 +863,43 @@ vscand_error(const char *errmsg)
 {
 	(void) fprintf(stderr, "vscand: %s", errmsg);
 	syslog(LOG_ERR, "%s\n", errmsg);
+}
+
+
+/*
+ * vscand_dtrace_cfg
+ * vscand_dtrace_gen
+ * vscand_dtrace_eng
+ *
+ * Support for dtracing vscand configuration when processing
+ * a reconfiguration event (SIGHUP)
+ */
+/*ARGSUSED*/
+static void
+vscand_dtrace_eng(char *id, boolean_t enable, char *host, int port, int conn)
+{
+}
+/*ARGSUSED*/
+static void
+vscand_dtrace_gen(char *size, boolean_t action, char *types, char *log)
+{
+}
+static void
+vscand_dtrace_cfg(vs_props_all_t *config)
+{
+	int i;
+
+	vscand_dtrace_gen(config->va_props.vp_maxsize,
+	    config->va_props.vp_maxsize_action,
+	    config->va_props.vp_types,
+	    config->va_props.vp_vlog);
+
+	for (i = 0; i < VS_SE_MAX; i++) {
+		if (config->va_se[i].vep_engid[0] != 0)
+				vscand_dtrace_eng(config->va_se[i].vep_engid,
+				    config->va_se[i].vep_enable,
+				    config->va_se[i].vep_host,
+				    config->va_se[i].vep_port,
+				    config->va_se[i].vep_maxconn);
+	}
 }

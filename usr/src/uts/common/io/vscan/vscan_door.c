@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,10 @@
 #include <sys/vscan.h>
 
 
-static int vscan_door_id = -1;
+/* max time (secs) to wait for door calls to complete during door_close */
+#define	VS_DOOR_CLOSE_TIMEOUT_DEFAULT	30
+uint32_t vs_door_close_timeout = VS_DOOR_CLOSE_TIMEOUT_DEFAULT;
+
 static door_handle_t vscan_door_handle = NULL;
 static kmutex_t vscan_door_mutex;
 static kcondvar_t vscan_door_cv;
@@ -74,19 +77,17 @@ vscan_door_open(int door_id)
 {
 	mutex_enter(&vscan_door_mutex);
 
-	if (vscan_door_handle == NULL) {
-		vscan_door_id = door_id;
+	if (vscan_door_handle == NULL)
 		vscan_door_handle = door_ki_lookup(door_id);
-	}
-
-	mutex_exit(&vscan_door_mutex);
 
 	if (vscan_door_handle == NULL) {
 		cmn_err(CE_WARN, "Internal communication error "
 		    "- failed to access vscan service daemon.");
+		mutex_exit(&vscan_door_mutex);
 		return (-1);
 	}
 
+	mutex_exit(&vscan_door_mutex);
 	return (0);
 }
 
@@ -97,12 +98,20 @@ vscan_door_open(int door_id)
 void
 vscan_door_close(void)
 {
+	clock_t timeout, time_left;
+
 	mutex_enter(&vscan_door_mutex);
 
 	/* wait for any in-progress requests to complete */
-	while (vscan_door_call_count > 0) {
-		cv_wait(&vscan_door_cv, &vscan_door_mutex);
+	time_left = SEC_TO_TICK(vs_door_close_timeout);
+	while ((vscan_door_call_count > 0) && (time_left > 0)) {
+		timeout = lbolt + time_left;
+		time_left = cv_timedwait(&vscan_door_cv,
+		    &vscan_door_mutex, timeout);
 	}
+
+	if (time_left == -1)
+		cmn_err(CE_WARN, "Timeout waiting for door calls to complete");
 
 	if (vscan_door_handle) {
 		door_ki_rele(vscan_door_handle);
@@ -115,16 +124,18 @@ vscan_door_close(void)
 
 /*
  * vscan_door_scan_file
+ *
+ * Returns: result returned in door response or VS_STATUS_ERROR
  */
 int
 vscan_door_scan_file(vs_scan_req_t *scan_req)
 {
-	int err, rc = 0;
+	int err;
 	door_arg_t arg;
+	uint32_t result = 0;
 
-	if (!vscan_door_handle &&
-	    vscan_door_open(vscan_door_id) != 0)
-		return (-1);
+	if (!vscan_door_handle)
+		return (VS_STATUS_ERROR);
 
 	mutex_enter(&vscan_door_mutex);
 	vscan_door_call_count++;
@@ -134,14 +145,13 @@ vscan_door_scan_file(vs_scan_req_t *scan_req)
 	arg.data_size = sizeof (vs_scan_req_t);
 	arg.desc_ptr = NULL;
 	arg.desc_num = 0;
-	arg.rbuf = (char *)scan_req;
-	arg.rsize = sizeof (vs_scan_req_t);
+	arg.rbuf = (char *)&result;
+	arg.rsize = sizeof (uint32_t);
 
 	if ((err = door_ki_upcall(vscan_door_handle, &arg)) != 0) {
 		cmn_err(CE_WARN, "Internal communication error (%d)"
 		    "- failed to send scan request to vscand", err);
-		vscan_door_close();
-		rc = -1;
+		result = VS_STATUS_ERROR;
 	}
 
 	mutex_enter(&vscan_door_mutex);
@@ -149,5 +159,5 @@ vscan_door_scan_file(vs_scan_req_t *scan_req)
 	cv_signal(&vscan_door_cv);
 	mutex_exit(&vscan_door_mutex);
 
-	return (rc);
+	return (result);
 }

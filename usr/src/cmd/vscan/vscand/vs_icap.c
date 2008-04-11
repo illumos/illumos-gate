@@ -235,24 +235,33 @@ vs_icap_config(int idx, char *host, int port)
  * Returns: result->vsr_rc
  */
 int
-vs_icap_scan_file(vs_eng_conn_t *conn, char *devname, char *fname,
+vs_icap_scan_file(vs_eng_ctx_t *eng, char *devname, char *fname,
     uint64_t fsize, int flags, vs_result_t *result)
 {
 	vs_scan_ctx_t ctx;
 	int fd;
 
-	if ((fd = open(devname, O_RDONLY)) == -1) {
-		syslog(LOG_ERR, "Failed to open device %s", devname);
+	fd = open(devname, O_RDONLY);
+
+	/* retry once on ENOENT as /dev link may not be created yet */
+	if ((fd == -1) && (errno == ENOENT)) {
+		(void) sleep(1);
+		fd = open(devname, O_RDONLY);
+	}
+
+	if (fd == -1) {
+		syslog(LOG_ERR, "Failed to open device %s - %s",
+		    devname, strerror(errno));
 		result->vsr_rc = VS_RESULT_ERROR;
 		return (result->vsr_rc);
 	}
 
 	/* initialize context */
 	(void) memset(&ctx, 0, sizeof (vs_scan_ctx_t));
-	ctx.vsc_idx = conn->vsc_idx;
-	(void) strlcpy(ctx.vsc_host, conn->vsc_host, sizeof (ctx.vsc_host));
-	ctx.vsc_port = conn->vsc_port;
-	ctx.vsc_sockfd = conn->vsc_sockfd;
+	ctx.vsc_idx = eng->vse_eidx;
+	(void) strlcpy(ctx.vsc_host, eng->vse_host, sizeof (ctx.vsc_host));
+	ctx.vsc_port = eng->vse_port;
+	ctx.vsc_sockfd = eng->vse_sockfd;
 	ctx.vsc_fd = fd;
 	ctx.vsc_fname = fname;
 	ctx.vsc_fsize = fsize;
@@ -1141,7 +1150,7 @@ vs_icap_write(int fd, char *buf, int buflen)
 
 	while (resid > 0) {
 		errno = 0;
-		bytes_sent = write(fd, buf, resid);
+		bytes_sent = write(fd, ptr, resid);
 		if (bytes_sent < 0) {
 			if (errno == EINTR)
 				continue;
@@ -1171,7 +1180,7 @@ vs_icap_read(int fd, char *buf, int len)
 
 	while (resid > 0) {
 		errno = 0;
-		bytes_read = read(fd, buf, resid);
+		bytes_read = read(fd, ptr, resid);
 		if (bytes_read < 0) {
 			if (errno == EINTR)
 				continue;
@@ -1275,9 +1284,10 @@ vs_icap_readline(vs_scan_ctx_t *ctx, char *buf, int buflen)
 			continue;
 
 		if (retval <= 0) {
-			syslog(LOG_ERR, "Error receiving data from Scan Engine:"
-			    " %s", retval == 0 ? "Scan Engine disconnected"
-			    : strerror(errno));
+			if (vscand_get_state() != VS_STATE_SHUTDOWN) {
+				syslog(LOG_ERR, "Error receiving data from "
+				    "Scan Engine: %s", strerror(errno));
+			}
 			return (-1);
 		}
 

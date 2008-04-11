@@ -52,4 +52,5 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWlibmsr	Math & Microtasking Libraries (Root)
+P SUNWvscankr	Virus Scan Service Kernel (Root)
 P SUNWvscanr	Virus Scan Service (Root)

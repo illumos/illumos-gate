@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -37,6 +37,9 @@ i preremove
 #
 d none usr 755 root sys
 d none usr/lib 755 root bin
+d none usr/lib/devfsadm 755 root sys
+d none usr/lib/devfsadm/linkmod 755 root sys
+f none usr/lib/devfsadm/linkmod/SUNW_vscan_link.so 755 root sys
 d none usr/lib/vscan 755 root bin
 f none usr/lib/vscan/libvscan.so.1 755 root bin
 s none usr/lib/vscan/libvscan.so=libvscan.so.1
