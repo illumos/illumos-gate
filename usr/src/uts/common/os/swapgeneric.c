@@ -906,6 +906,19 @@ load_bootpath_drivers(char *bootpath)
 		return (NULL);
 	}
 
+	/*
+	 * The PROM node for hubs have incomplete compatible
+	 * properties and therefore do not bind to the hubd driver.
+	 * As a result load_bootpath_drivers() loads the usb_mid driver
+	 * for hub nodes rather than the hubd driver. This causes
+	 * mountroot failures when booting off USB storage. To prevent
+	 * this, if we are booting via USB hubs, we preload the hubd driver.
+	 */
+	if (strstr(bootpath, "/hub@") && modloadonly("drv", "hubd") == -1) {
+		cmn_err(CE_WARN, "bootpath contains a USB hub, "
+		    "but cannot load hubd driver");
+	}
+
 	/* get rid of minor node at end of copy (if not already done above) */
 	p = strrchr(pathcopy, '/');
 	if (p) {

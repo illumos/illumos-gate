@@ -1295,8 +1295,15 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	/*
 	 * there must be a smarter way to do this but for
 	 * now, a hack for booting USB storage.
+	 *
+	 * NOTE: we want to delay the mountroot thread which
+	 * exclusively does a BUS_CONFIG_ONE, but not the
+	 * USB hotplug threads which do the asynchronous
+	 * enumeration exlusively via BUS_CONFIG_ALL. Having
+	 * a delay for USB hotplug threads negates the delay for
+	 * mountroot resulting in mountroot failing.
 	 */
-	if (!modrootloaded) {
+	if (!modrootloaded && op == BUS_CONFIG_ONE) {
 		delay(drv_usectohz(1000000));
 	}
 	ndi_devi_enter(hubd->h_dip, &circ);
