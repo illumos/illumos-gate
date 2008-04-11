@@ -27,6 +27,13 @@
 
 include ../Makefile.com
 
+LDIR = ../../lib/libsmbfs/smb
+LICENSEFILES += \
+	$(LDIR)/THIRDPARTYLICENSE.apple \
+	$(LDIR)/THIRDPARTYLICENSE.boris_popov \
+	$(LDIR)/THIRDPARTYLICENSE.bsd4 \
+	$(LDIR)/THIRDPARTYLICENSE.microsoft
+
 .KEEP_STATE:
 
 all: $(FILES) depend

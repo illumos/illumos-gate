@@ -1,13 +1,14 @@
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright 1995 by Sun Microsystems, Inc.
-# All rights reserved.
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
 
-DATAFILES +=
+LICENSEFILES += $(OSBL)
+CDDL=
 
 .KEEP_STATE:
 

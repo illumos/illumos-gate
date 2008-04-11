@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,6 +32,22 @@ DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
 
 MACHDATAFILES += i.sdconf
 CLOBBERFILES += $(MACHDATAFILES)
+
+LICENSEFILES_i386 = \
+	../../uts/intel/io/acpica/THIRDPARTYLICENSE \
+	../../common/crypto/arcfour/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/sha1/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/sha2/amd64/THIRDPARTYLICENSE
+
+LICENSEFILES += \
+	../../common/crypto/ecc/THIRDPARTYLICENSE \
+	../../common/mpi/THIRDPARTYLICENSE \
+	../../uts/common/inet/ip/THIRDPARTYLICENSE.rts \
+	../../uts/common/inet/tcp/THIRDPARTYLICENSE \
+	../../uts/common/io/THIRDPARTYLICENSE.etheraddr \
+	../../uts/common/sys/THIRDPARTYLICENSE.icu \
+	../../uts/common/sys/THIRDPARTYLICENSE.unicode \
+	$(LICENSEFILES_$(MACH))
 
 .KEEP_STATE:
 

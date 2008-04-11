@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,6 +29,11 @@ include ../Makefile.com
 DATAFILES += depend
 
 .KEEP_STATE:
+
+LICENSEFILES += \
+	../../uts/common/io/wpi/THIRDPARTYLICENSE \
+	../../uts/common/io/wpi/fw-wpi/LICENSE
+CDDL=
 
 all: $(FILES) postinstall postremove
 install: all pkg

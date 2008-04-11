@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,7 @@ include ../Makefile.com
 
 DATAFILES += depend i.initd i.preserve i.manifest r.manifest
 CHKINSTALLSRC=checkinstall.initd
+LICENSEFILES += $(OSBL)
 
 ACTION_all=grep SUNWter depend > /dev/null || \
 	( chmod 666 depend; \

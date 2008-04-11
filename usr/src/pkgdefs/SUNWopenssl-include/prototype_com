@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,7 @@
 
 # packaging files
 i pkginfo
-i copyright=../../common/openssl/LICENSE
+i copyright
 i depend
 d none usr 755 root sys 644 root bin
 d none usr/sfw 755 root bin 644 root bin

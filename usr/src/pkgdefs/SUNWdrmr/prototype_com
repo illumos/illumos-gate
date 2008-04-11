@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +37,7 @@
 
 # packaging files
 i pkginfo
-i copyright=./LICENSE
+i copyright
 i depend
 i postinstall
 i preremove

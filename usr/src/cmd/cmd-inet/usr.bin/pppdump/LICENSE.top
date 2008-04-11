@@ -1,16 +1,11 @@
 ident	"%Z%%M%	%I%	%E% SMI"
 
-Copyright (c) 2000 by Sun Microsystems, Inc.
-All rights reserved.
-
 This file contains a summary of the licenses on the software in this
 package.  Some of these source files are under GNU Public License.
 Those files may be redistributed under the terms of the GNU General
 Public License version 2 or (at your option) any later version.  See
 the COPYING file for details or the GNU web site at
 http://www.gnu.org/.
-
-Copyright (c) 2000 by Sun Microsystems, Inc.  All rights reserved.
 
 Copyright (C) 1999  Paul Mackerras.  All rights reserved.
 

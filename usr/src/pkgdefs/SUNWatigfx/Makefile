@@ -29,6 +29,9 @@ include ../Makefile.com
 
 DATAFILES += depend
 
+LICENSEFILES += $(OSBL)
+CDDL=
+
 .KEEP_STATE:
 
 all: $(FILES)

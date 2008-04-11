@@ -172,20 +172,6 @@
     The research unit in Software, Systems, Networks (LSR) is member of IMAG.
     */
 
-    * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
-    * Use is subject to license terms.
-    *
-    * Permission to use, copy, modify, and distribute this software and its
-    * documentation is hereby granted, provided that the above copyright
-    * notice appears in all copies.
-    *
-    * SUN MAKES NO REPRESENTATION OR WARRANTIES ABOUT THE SUITABILITY OF
-    * THE SOFTWARE, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-    * TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-    * PARTICULAR PURPOSE, OR NON-INFRINGEMENT.  SUN SHALL NOT BE LIABLE FOR
-    * ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING, MODIFYING OR
-    * DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES
-
     * Copyright (c) 2000 Paul Mackerras.
     * All rights reserved.
     *

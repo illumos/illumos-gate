@@ -21,13 +21,15 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.com
 
 .KEEP_STATE:
+
+LICENSEFILES += ../../cmd/backup/dump/THIRDPARTYLICENSE
 
 all: $(FILES)
 install: all pkg

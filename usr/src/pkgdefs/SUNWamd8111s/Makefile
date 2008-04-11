@@ -20,13 +20,16 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
  
 include ../Makefile.com
+
+LICENSEFILES += ../../uts/intel/io/amd8111s/THIRDPARTYLICENSE.amd8111s
+CDDL=
 
 DATAFILES += depend
 

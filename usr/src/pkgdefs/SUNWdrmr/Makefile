@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,11 +28,14 @@
 
 include ../Makefile.com
 
+LICENSEFILES += ../../uts/common/io/drm/THIRDPARTYLICENSE
+CDDL=
+
 DATAFILES += depend
 
 .KEEP_STATE:
 
-all: $(FILES) postinstall preremove LICENSE
+all: $(FILES) postinstall preremove
 install: all pkg
 
 include ../Makefile.targ

@@ -37,7 +37,7 @@
 
 # packaging files
 i pkginfo
-i copyright=../../common/openssl/LICENSE
+i copyright
 i depend
 #
 # source locations relative to the prototype file

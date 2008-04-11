@@ -1,15 +1,16 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 2000-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # pkgdefs/SUNWpppdu/Makefile
 #
 
 include ../Makefile.com
 
-DATAFILES=
+LICENSEFILES += ../../cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE
+CDDL=
 
 .KEEP_STATE:
 

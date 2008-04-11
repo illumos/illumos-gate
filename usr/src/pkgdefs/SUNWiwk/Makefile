@@ -27,6 +27,10 @@
 include ../Makefile.com
 
 DATAFILES += depend
+LICENSEFILES += \
+	../../uts/common/io/iwk/THIRDPARTYLICENSE \
+	../../uts/common/io/iwk/fw-iw/LICENSE
+CDDL=
 
 .KEEP_STATE:
 

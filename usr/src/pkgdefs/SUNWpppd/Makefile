@@ -1,15 +1,17 @@
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # pkgdefs/SUNWpppd/Makefile
 #
 
 include ../Makefile.com
 
-DATAFILES= depend
+DATAFILES += depend
+LICENSEFILES += ../../uts/common/io/ppp/THIRDPARTYLICENSE
+CDDL=
 
 .KEEP_STATE:
 

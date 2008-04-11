@@ -1,0 +1,43 @@
+#	List of PCI ID's
+#
+#	Maintained by Martin Mares <mj@ucw.cz> and other volunteers from the
+#	Linux PCI ID's Project at http://pciids.sf.net/.
+#
+#	New data are always welcome, especially if accurate. If you have
+#	anything to contribute, please follow the instructions at the web site
+#	or send a diff -u against the most recent pci.ids to pci-ids@ucw.cz.
+#
+#	This file can be distributed under either the GNU General Public License
+#	(version 2 or higher) or the 3-clause BSD License.
+#
+#	Daily snapshot on Fri 2006-08-04 01:05:03
+
+Sun chooses to license this file under the 3-clause BSD license, reproduced
+below.  For the purposes of this license, "copyright holder" should be
+considered to be Martin Mares and other volunteers from the Linux PCI ID's 
+Project, and "year" should be 2006
+
+* Copyright (c) <year>, <copyright holder>
+* All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*     * Redistributions of source code must retain the above copyright
+*       notice, this list of conditions and the following disclaimer.
+*     * Redistributions in binary form must reproduce the above copyright
+*       notice, this list of conditions and the following disclaimer in the
+*       documentation and/or other materials provided with the distribution.
+*     * Neither the name of the <organization> nor the
+*       names of its contributors may be used to endorse or promote products
+*       derived from this software without specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY <copyright holder> ``AS IS'' AND ANY
+* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+* DISCLAIMED. IN NO EVENT SHALL <copyright holder> BE LIABLE FOR ANY
+* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

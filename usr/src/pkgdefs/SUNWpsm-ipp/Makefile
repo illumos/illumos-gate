@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,8 +27,9 @@
 
 include ../Makefile.com
 
-DATAFILES=depend copyright
+DATAFILES += depend
 CLEANFILES += action
+LICENSEFILES += ../../lib/print/libhttp-core/common/LICENSE.txt
 
 ACTION=grep SUNWpapi depend > /dev/null || \
 	( chmod 666 depend; \

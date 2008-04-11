@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -9,7 +9,8 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-DATAFILES = depend
+DATAFILES += depend
+LICENSEFILES = ../../lib/libtecla/THIRDPARTYLICENSE
 
 all: $(FILES)
 install: all pkg

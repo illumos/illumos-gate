@@ -73,6 +73,11 @@ DATAFILES += \
 	i.ttysrch	\
 	i.vfstab
 
+LICENSEFILES += \
+	../../cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \
+	../../cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
+	../../cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
+
 CHKINSTALLSRC=checkinstall.initd
 
 .KEEP_STATE:

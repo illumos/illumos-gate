@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,29 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1993 by Sun Microsystems, Inc.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 include ../Makefile.com
+
+LICENSEFILES += \
+	../../cmd/checkeq/THIRDPARTYLICENSE \
+	../../cmd/checknr/THIRDPARTYLICENSE \
+	../../cmd/eqn/THIRDPARTYLICENSE \
+	../../cmd/man/src/THIRDPARTYLICENSE \
+	../../cmd/man/src/util/THIRDPARTYLICENSE \
+	../../cmd/man/src/util/instant.src/THIRDPARTYLICENSE \
+	../../cmd/man/src/util/nsgmls.src/COPYING \
+	../../cmd/man/src/util/solbookv2/THIRDPARTYLICENSE \
+	../../cmd/refer/THIRDPARTYLICENSE \
+	../../cmd/soelim/THIRDPARTYLICENSE \
+	../../cmd/tbl/THIRDPARTYLICENSE \
+	../../cmd/ul/THIRDPARTYLICENSE \
+	../../cmd/vgrind/THIRDPARTYLICENSE \
+	../../../closed/cmd/man/src/util/solbookv1/THIRDPARTYLICENSE
+
+CDDL=
 
 .KEEP_STATE:
 

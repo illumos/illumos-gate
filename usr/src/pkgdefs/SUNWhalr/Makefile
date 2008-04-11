@@ -20,13 +20,14 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.com
 
 DATAFILES += i.manifest r.manifest
+LICENSEFILES += ../../cmd/hal/LICENSE
 
 .KEEP_STATE:
 

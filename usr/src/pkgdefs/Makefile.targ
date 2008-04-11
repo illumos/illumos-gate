@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,17 +44,36 @@ $(CHKINSTALL): $(PKGDEFS)/common_files/$(CHKINSTALLSRC)
 	$(RM) $(CHKINSTALL)
 	cp $(PKGDEFS)/common_files/$(CHKINSTALLSRC) $(CHKINSTALL)
 
+LDELIM="--------------------------------------------------------------------"
+
+CURPKG :sh= basename `pwd`
+
+copyright: $(LICENSEFILES)
+	@[ ! -f SCCS/s.$@ ] || \
+		( $(ECHO) "$@ should not be under SCCS control">&2 && false )
+	@$(ECHO) "building $(CURPKG) copyright file from $(LICENSEFILES)"
+	@$(RM) $@
+	@$(NAWK) ' \
+		(FNR == 1) && (NR > 1)	{ print "\n" ldelim "\n" } \
+					{ print $$0 }' \
+	ldelim="$(LDELIM)" $(LICENSEFILES) /dev/null > $@
+	@[ -s copyright ] || \
+		( $(ECHO) "copyright file may not be empty">&2 && false )
+
 # If the file is under SCCS, then it should not be destroyed
 # by an install rule here.  This is a mistake in package makefile.
 $(DATAFILES): $(PKGDEFS)/common_files/$$@
 	@[ ! -f SCCS/s.$@ ] || \
-		( echo "DATAFILES list is incorrect for $@">&2 && false )
+		( $(ECHO) "DATAFILES list is incorrect for $@">&2 && false )
 	$(RM) $@; cp $(PKGDEFS)/common_files/$@ $@
 
 $(MACHDATAFILES): $(PKGDEFS)/common_files/$$@_$(MACH)
 	$(RM) $@; cp $(PKGDEFS)/common_files/$@_$(MACH) $@
 
-clobber clean:
-	-$(RM) $(CLOBBERFILES) $(CLEANFILES)
+clean: 
+	-$(RM) $(CLEANFILES)
+
+clobber: clean
+	-$(RM) $(CLOBBERFILES)
 
 FRC:

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -111,6 +111,15 @@ if [ -d $SRC/xmod ]; then
 	fi
 	validate_paths $excl_cry $SRC/xmod/cry_files
 	validate_paths $excl_xmod -b $SRC $SRC/xmod/xmod_files
+fi
+
+if [ -f $SRC/tools/opensolaris/license-list ]; then
+	excl=
+	if [ "$CLOSED_IS_PRESENT" = no ]; then
+		excl="-e ^usr/closed"
+	fi
+	sed -e 's/$/.descrip/' < $SRC/tools/opensolaris/license-list | \
+		validate_paths $excl 
 fi
 
 # Finally, make sure the that (req|inc).flg files are in good shape.

@@ -27,7 +27,7 @@ developing or running an Open Solaris distribution.
 (b) reproduce and distribute the Software (and also portions of Software 
 identified as Redistributable in the documentation accompanying Software), 
 provided that you (i) distribute the Software or Redistributables bundled 
-as part of, and for the sole purpose of running, an OpenSolaris code; 
+as part of, and for the sole purpose of running, OpenSolaris code; 
 (ii) do not remove or alter any proprietary legends or notices contained 
 in or on the Software or Redistributables, (iii) only distribute the 
 Software or Redistributables subject to a license agreement that protects 
@@ -73,6 +73,11 @@ such uses.
 (i) No right, title or interest in or to any trademark, service mark, 
 logo or trade name of Sun or its licensors is granted under this 
 Agreement. 
+
+(j) If your Permitted Use in this Agreement permits the distribution 
+Software or portions of the Software, you may only distribute the Software 
+subject to a license agreement that protects Sun's interests consistent 
+with the terms contained in this Agreement.
 
 4. Java Compatibility and Open Source.
 

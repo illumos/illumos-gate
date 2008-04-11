@@ -1,0 +1,158 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+OK, so you've got approval to integrate code, and you want to know how to
+properly communicate the license terms.  What do you do next?
+
+0. If everything is covered by a Sun copyright and the CDDL, you're done.
+
+1. Scan the source code and extract all of the third party licenses
+   into one or more separate files.
+
+   A. In general, you'll name these files "THIRDPARTYLICENSE," and
+      you'll put one in each source directory (i.e. one per library,
+      or one per command, or one per kernel module.)
+
+      EXAMPLE: usr/src/uts/common/io/pcan/THIRDPARTYLICENSE
+
+      If this file proves unmanageable, or you're adding licenses
+      that really are independent of each other, you may instead
+      create multiple "THIRDPARTYLICENSE.foo" files, where "foo"
+      obviously corresponds to the license in question.
+
+      EXAMPLE: usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.*
+
+   B. If you planned ahead and included graceful delimiters in your
+      source code, the THIRDPARTYLICENSE files may actually be build
+      targets in your Makefiles.
+
+      EXAMPLE: usr/src/cmd/perl/Makefile
+
+      This approach is usually overkill.  But if the third party license
+      will remain unchanged while the corresponding copyright will change
+      dates frequently, then this approach can work well, because you won't
+      need to update the license files manually.                                        
+
+2. Give each of the license files a corresponding ".descrip" file with
+   an extremely terse explanation of the contents.  Something like
+   "MJN DRIVER" or "PORTIONS OF ARCANE FUNCTIONALITY" is sufficient.
+
+   EXAMPLE: usr/src/cmd/refer/THIRDPARTYLICENSE.descrip
+
+3. Edit usr/src/tools/opensolaris/license-list and add the full path
+   of your new license file(s).
+
+4. Figure out which packages deliver objects that are built using the
+   new third party source, and add a reference to LICENSEFILES in the
+   pkg Makefile.
+
+   A. It's extremely rare for a package NOT to include a Sun copyright
+      statement.  If your package is one of the 99 percent that should
+      have a Sun copyright, then you should append to LICENSEFILES like
+      this:
+
+          LICENSEFILES += relative/path/to/my/new/license/file
+
+      or
+
+          LICENSEFILES += \
+                  path/to/first/file \
+                  path/to/other/file
+
+      These paths should be relative to the pkg build directory, for
+      example relative to usr/src/pkgdefs/SUNWbcp for pkg SUNWbcp.
+
+      EXAMPLE: usr/src/pkgdefs/SUNWpsm-ipp/Makefile
+      EXAMPLE: usr/src/pkgdefs/SUNWrcmdc/Makefile
+
+   B. If, on the other hand, you do NOT want a Sun copyright, then you
+      should follow the example above, but use "=" instead of "+=" when
+      you assign the LICENSEFILES macro.
+
+      EXAMPLE: usr/src/pkgdefs/SUNWrtls/Makefile
+
+   C. It's also unusual for a package NOT to reference the CDDL.  If you
+      used "+=" above, and you want the CDDL, then you don't need to do
+      anything else.  It will automatically be appended.
+
+   D. If you used "+=" above, because you want the Sun copyright, but you
+      do NOT want the CDDL, then you should also include the following line:
+
+          CDDL=
+
+      in your pkg Makefile.
+
+      EXAMPLE: usr/src/pkgdefs/SUNWwpi/Makefile
+
+   E. If you used "=" above, then you will not get the CDDL unless you
+      explicitly append it to LICENSEFILES:
+
+          LICENSEFILES = \
+                  path/to/first/file \
+                  path/to/other/file \
+                  $(CDDL)
+
+
+      EXAMPLE: usr/src/pkgdefs/SUNWhea/Makefile
+
+   F. If your package delivers ONLY header files, and has multiple different
+      copyrights or licenses, you can use
+
+          LICENSEFILES = $(LIC_IN_HDRS) \
+                  path/to/most/common/copyright/file \
+                  path/to/most/common/license/file
+
+      EXAMPLE: usr/src/pkgdefs/SUNWhea/Makefile
+
+   G. Empty packages: if your package delivers nothing (or, more strictly
+      speaking, nothing besides directories) you should keep the Sun
+      copyright but nix the CDDL.  As a reminder, that's done simply by
+      adding the single line
+
+          CDDL=
+
+      to your pkg Makefile.
+
+      EXAMPLE: usr/src/pkgdefs/SUNWdfb.i/Makefile
+
+   H. COPYRIGHT: Don't mess with this.  If you reset this, then you must
+      use the "copyright=" convention in your prototype_com.  As described
+      above, LICENSEFILES is the preferred mechanism.
+
+   I. Architecture dependent license files look like this:
+
+          LICENSEFILES_i386 = path/to/i386/only/license(s)
+
+          LICENSEFILES_sparc = path/to/sparc/only/license(s)
+
+          LICENSEFILES += \
+                  path/to/common/license/files(s) \
+                  $(LICENSEFILES_$(MACH))
+
+      EXAMPLE: usr/src/pkgdefs/SUNWcsl/Makefile
+      EXAMPLE: usr/src/pkgdefs/SUNWbcp/Makefile
+
