@@ -183,6 +183,8 @@ int
 atapi_init_drive(
 	ata_drv_t *ata_drvp)
 {
+	ata_ctl_t *ata_ctlp = ata_drvp->ad_ctlp;
+
 	ADBG_TRACE(("atapi_init_drive entered\n"));
 
 	/* Determine ATAPI CDB size */
@@ -205,6 +207,16 @@ atapi_init_drive(
 	if ((ata_drvp->ad_id.ai_config & ATAPI_ID_CFG_DRQ_TYPE) !=
 	    ATAPI_ID_CFG_DRQ_INTR)
 		ata_drvp->ad_flags |= AD_NO_CDB_INTR;
+
+	/*
+	 * Some devices may have no DMA mode enabled (UDMA or MWDMA)
+	 * by default, so here we need check and enable DMA if none
+	 * mode is selected.
+	 */
+	if (ata_set_dma_mode(ata_ctlp, ata_drvp) == TRUE) {
+		/* Update the IDENTIFY PACKET DEVICE data */
+		(void) atapi_id_update(ata_ctlp, ata_drvp, NULL);
+	}
 
 	return (TRUE);
 }
@@ -1119,6 +1131,7 @@ atapi_id_update(
 	caddr_t		 ioaddr1 = ata_ctlp->ac_ioaddr1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	caddr_t		 ioaddr2 = ata_ctlp->ac_ioaddr2;
+	struct ata_id	*aidp;
 	int	rc;
 
 	/*
@@ -1133,13 +1146,21 @@ atapi_id_update(
 	 */
 	if (!ata_wait(io_hdl2, ioaddr2, ATS_DRDY, ATS_BSY, 5 * 1000000)) {
 		ADBG_ERROR(("atapi_id_update: select failed\n"));
-		ata_pktp->ap_flags |= AP_ERROR;
+		if (ata_pktp != NULL)
+			ata_pktp->ap_flags |= AP_ERROR;
 		return (ATA_FSM_RC_FINI);
 	}
 
+	if (ata_pktp != NULL)
+		aidp = (struct ata_id *)ata_pktp->ap_v_addr;
+	else
+		aidp = &ata_drvp->ad_id;
+
 	rc = atapi_id(ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
-	    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
-	    (struct ata_id *)ata_pktp->ap_v_addr);
+	    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2, aidp);
+
+	if (ata_pktp == NULL)
+		return (ATA_FSM_RC_FINI);
 
 	if (!rc) {
 		ata_pktp->ap_flags |= AP_ERROR;

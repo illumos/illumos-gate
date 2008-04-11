@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3754,4 +3754,56 @@ ata_disable_DMA(ata_drv_t *ata_drvp)
 	    "?DMA disabled on %s target=%d, lun=%d due to DMA errors,",
 	    buf, ata_drvp->ad_targ, ata_drvp->ad_lun);
 	cmn_err(CE_CONT, "?most likely due to the CF-to-IDE adapter.");
+}
+
+/*
+ * Check and select DMA mode
+ *
+ * TRUE is returned when set feature is called successfully,
+ * otherwise return FALSE
+ */
+int
+ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
+{
+	struct ata_id *aidp;
+	int mode, rval = FALSE;
+	uint8_t subcmd;
+
+	aidp = &ata_drvp->ad_id;
+
+	/* Return directly if DMA is not supported */
+	if (!(aidp->ai_cap & ATAC_DMA_SUPPORT))
+		return (rval);
+
+	/* Return if DMA mode is already selected */
+	if (((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
+	    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK)) ||
+	    (aidp->ai_dworddma & ATAC_MDMA_SEL_MASK))
+		return (rval);
+
+	/* First check Ultra DMA mode if no DMA is selected */
+	if ((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
+	    (aidp->ai_ultradma & ATAC_UDMA_SUP_MASK)) {
+		for (mode = 6; mode >= 0; --mode) {
+			if (aidp->ai_ultradma & (1 << mode))
+				break;
+		}
+		subcmd = ATF_XFRMOD_UDMA;
+
+	} else if (aidp->ai_dworddma & ATAC_MDMA_SUP_MASK) {
+		/* Then check multi-word DMA mode */
+		for (mode = 2; mode >= 0; --mode) {
+			if (aidp->ai_dworddma & (1 << mode))
+				break;
+		}
+		subcmd = ATF_XFRMOD_MDMA;
+
+	} else {
+		return (rval);
+	}
+
+	rval = ata_set_feature(ata_ctlp, ata_drvp, ATSF_SET_XFRMOD,
+	    subcmd|mode);
+
+	return (rval);
 }

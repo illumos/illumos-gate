@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,6 +177,7 @@ extern "C" {
  * Feature register bits
  */
 #define	ATF_ATAPI_DMA	0x01	/* ATAPI DMA enable bit */
+#define	ATF_XFRMOD_MDMA	0x20	/* Multi-Word DMA mode */
 #define	ATF_XFRMOD_UDMA	0x40	/* Ultra DMA mode	*/
 #define	ATACM_UDMA_SEL(id)	(((id)->ai_ultradma >> 8) & 0x7f)
 
@@ -415,6 +416,7 @@ struct ata_id {
 
 /* Identify Drive: ai_dworddma (word 63) */
 
+#define	ATAC_MDMA_SUP_MASK	0x0007	/* Multiword DMA supported */
 #define	ATAC_MDMA_SEL_MASK	0x0700	/* Multiword DMA selected */
 #define	ATAC_MDMA_2_SEL		0x0400	/* Multiword DMA mode 2 selected */
 #define	ATAC_MDMA_1_SEL		0x0200	/* Multiword DMA mode 1 selected */
@@ -441,6 +443,11 @@ struct ata_id {
 
 /* Identify Drive: ai_features85 (word 85) */
 #define	ATAC_FEATURES85_WCE	0x0020	/* write cache enabled */
+
+/* Identify Drive: ai_ultradma (word 88) */
+#define	ATAC_UDMA_SUP_MASK	0x007f	/* UDMA modes supported */
+#define	ATAC_UDMA_SEL_MASK	0x7f00	/* UDMA modes selected */
+
 
 /* per-drive data struct */
 
@@ -667,6 +674,7 @@ int	ata_wait3(ddi_acc_handle_t io_hdl, caddr_t ioaddr, uchar_t onbits1,
 		uchar_t failure_offbits3, uint_t timeout_usec);
 int	ata_test_lba_support(struct ata_id *aidp);
 void	ata_nsecwait(clock_t count);
+int	ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp);
 
 
 /*
