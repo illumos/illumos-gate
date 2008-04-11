@@ -252,6 +252,7 @@ typedef struct dring_info {
 	void			*priv_addr;	/* base of private section */
 	void			*data_addr;	/* base of data section */
 	size_t			data_sz;	/* size of data section */
+	size_t			desc_data_sz;	/* size of descr data blk */
 } dring_info_t;
 
 /*
@@ -346,7 +347,6 @@ typedef struct vsw_ldc {
 typedef struct vsw_ldc_list {
 	vsw_ldc_t	*head;		/* head of the list */
 	krwlock_t	lockrw;		/* sync access(rw) to the list */
-	int		num_ldcs;	/* number of ldcs in the list */
 } vsw_ldc_list_t;
 
 /* multicast addresses port is interested in */
@@ -371,6 +371,8 @@ typedef struct vsw_port {
 	int			p_instance;	/* port instance */
 	struct vsw_port		*p_next;	/* next port in the list */
 	struct vsw		*p_vswp;	/* associated vsw */
+	int			num_ldcs;	/* # of ldcs in the port */
+	uint64_t		*ldc_ids;	/* ldc ids */
 	vsw_ldc_list_t		p_ldclist;	/* list of ldcs for this port */
 
 	kmutex_t		tx_lock;	/* transmit lock */
@@ -379,8 +381,6 @@ typedef struct vsw_port {
 	int			state;		/* port state */
 	kmutex_t		state_lock;
 	kcondvar_t		state_cv;
-
-	uint32_t		ref_cnt;	/* # of active references */
 
 	kmutex_t		mca_lock;	/* multicast lock */
 	mcst_addr_t		*mcap;		/* list of multicast addrs */
@@ -392,6 +392,12 @@ typedef struct vsw_port {
 	 * mac address of the port & connected device
 	 */
 	struct ether_addr	p_macaddr;
+	uint16_t		pvid;	/* port vlan id (untagged) */
+	uint16_t		*vids;	/* vlan ids (tagged) */
+	uint16_t		nvids;	/* # of vids */
+	uint32_t		vids_size; /* size alloc'd for vids list */
+	mod_hash_t		*vlan_hashp;	/* vlan hash table */
+	uint32_t		vlan_nchains;	/* # of vlan hash chains */
 } vsw_port_t;
 
 /* list of ports per vsw */

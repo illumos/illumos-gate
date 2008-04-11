@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,10 @@
 #include <sys/types.h>
 #include <sys/ethernet.h>
 #include <sys/vnet_common.h>
+#include <sys/vlan.h>
+#include <sys/stream.h>
+#include <sys/strsun.h>
+#include <sys/byteorder.h>
 
 /* convert mac address from string to uint64_t */
 uint64_t
@@ -57,4 +61,123 @@ vnet_macaddr_ultostr(uint64_t val, uint8_t *macaddr)
 		macaddr[i] = value & 0xFF;
 		value >>= 8;
 	}
+}
+
+mblk_t *
+vnet_vlan_insert_tag(mblk_t *mp, uint16_t vid)
+{
+	struct ether_vlan_header	*evhp;
+	mblk_t				*nmp;
+	size_t				n;
+	uint_t				pri = 0;
+
+	if (DB_REF(mp) == 1 && MBLKHEAD(mp) >= VLAN_TAGSZ) {
+
+		/* mblk has space to insert tag */
+
+		/*
+		 * move src and dst mac addrs in the header back by VLAN_TAGSZ.
+		 */
+		ovbcopy(mp->b_rptr, mp->b_rptr - VLAN_TAGSZ, 2 * ETHERADDRL);
+		mp->b_rptr -= VLAN_TAGSZ;
+
+		/* now insert tpid and tci */
+		evhp = (struct ether_vlan_header *)mp->b_rptr;
+		evhp->ether_tpid = htons(ETHERTYPE_VLAN);
+		evhp->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI, vid));
+
+	} else { /* no space in the mblk for tag */
+
+		/*
+		 * allocate a mblk to create a new frame hdr with the tag
+		 */
+		nmp = allocb(sizeof (struct  ether_vlan_header),
+		    BPRI_MED);
+		if (nmp == NULL) {
+			freemsg(mp);
+			return (NULL);
+		}
+
+		/*
+		 * copy the src and dst mac addrs in the header to the new mblk
+		 */
+		n = 2 * ETHERADDRL;
+		bcopy(mp->b_rptr, nmp->b_rptr, n);
+
+		/* initialize the vlan tag in the new mblk */
+		evhp = (struct ether_vlan_header *)nmp->b_rptr;
+		evhp->ether_tpid = htons(ETHERTYPE_VLAN);
+		evhp->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI, vid));
+
+		/* copy ethertype to new mblk */
+		bcopy(mp->b_rptr + n, nmp->b_rptr + n + VLAN_TAGSZ,
+		    sizeof (evhp->ether_type));
+
+		/* skip over the header in the original mblk */
+		mp->b_rptr += sizeof (struct ether_header);
+
+		/* fix the end of frame header in the new mblk */
+		nmp->b_wptr += sizeof (struct ether_vlan_header);
+
+		/*
+		 * now link the new mblk which contains just the frame
+		 * header with the original mblk which contains rest of
+		 * the frame.
+		 */
+		nmp->b_cont = mp;
+		mp = nmp;
+
+	}
+
+	return (mp);
+}
+
+mblk_t *
+vnet_vlan_remove_tag(mblk_t *mp)
+{
+	size_t				n;
+	mblk_t				*nmp;
+
+	if (DB_REF(mp) == 1) { /* mblk can be modified to untag(not shared) */
+
+		/* move src & dst addrs in the header forward by VLAN_TAGSZ */
+		ovbcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ, 2 * ETHERADDRL);
+		mp->b_rptr += VLAN_TAGSZ;
+
+	} else {
+
+		/* allocate a new header */
+		nmp = allocb(sizeof (struct  ether_header), BPRI_MED);
+		if (nmp == NULL) {
+			freemsg(mp);
+			return (NULL);
+		}
+
+		/*
+		 * copy the src and dst mac addrs in the header to the new mblk
+		 */
+		n = 2 * ETHERADDRL;
+		bcopy(mp->b_rptr, nmp->b_rptr, n);
+
+		/* skip over vlan tag and copy ethertype to new mblk */
+		bcopy(mp->b_rptr + n + VLAN_TAGSZ, nmp->b_rptr + n,
+		    sizeof (uint16_t));
+
+		/* skip over the header in the original mblk */
+		mp->b_rptr += sizeof (struct ether_vlan_header);
+
+		/* fix the end of frame header in the new mblk */
+		nmp->b_wptr += sizeof (struct ether_header);
+
+		/*
+		 * now link the new mblk which contains the frame header
+		 * without vlan tag and the original mblk which contains rest
+		 * of the frame.
+		 */
+		nmp->b_cont = mp;
+		mp = nmp;
+
+	}
+
+	return (mp);
 }

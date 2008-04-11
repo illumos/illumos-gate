@@ -72,6 +72,7 @@
 #include <sys/sdt.h>
 #include <sys/atomic.h>
 #include <sys/callb.h>
+#include <sys/vlan.h>
 
 /* Port add/deletion/etc routines */
 static	int vsw_port_delete(vsw_port_t *port);
@@ -90,10 +91,9 @@ int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
 mcst_addr_t *vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr);
 int vsw_port_detach(vsw_t *vswp, int p_instance);
 int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count);
-int vsw_port_attach(vsw_t *vswp, int p_instance,
-	uint64_t *ldcids, int nids, struct ether_addr *macaddr);
+int vsw_port_attach(vsw_port_t *portp);
 vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
-
+void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
 
 /* Interrupt routines */
 static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
@@ -171,8 +171,6 @@ static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 static int vsw_get_same_dest_list(struct ether_header *ehp,
     mblk_t **rhead, mblk_t **rtail, mblk_t **mpp);
 static mblk_t *vsw_dupmsgchain(mblk_t *mp);
-static void vsw_mac_rx(vsw_t *vswp, int caller, mac_resource_handle_t mrh,
-    mblk_t *mp, mblk_t *mpt, vsw_macrx_flags_t flags);
 
 /* Debugging routines */
 static void dump_flags(uint64_t);
@@ -186,15 +184,24 @@ static void display_ring(dring_info_t *);
 extern int vsw_set_hw(vsw_t *, vsw_port_t *, int);
 extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
 extern void vsw_reconfig_hw(vsw_t *);
-extern int vsw_add_fdb(vsw_t *vswp, vsw_port_t *port);
-extern int vsw_del_fdb(vsw_t *vswp, vsw_port_t *port);
 extern int vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port);
 extern void vsw_del_mcst_port(vsw_port_t *port);
 extern int vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg);
 extern int vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg);
+extern void vsw_fdbe_add(vsw_t *vswp, void *port);
+extern void vsw_fdbe_del(vsw_t *vswp, struct ether_addr *eaddr);
+extern void vsw_create_vlans(void *arg, int type);
+extern void vsw_destroy_vlans(void *arg, int type);
+extern void vsw_vlan_add_ids(void *arg, int type);
+extern void vsw_vlan_remove_ids(void *arg, int type);
+extern boolean_t vsw_frame_lookup_vid(void *arg, int caller,
+	struct ether_header *ehp, uint16_t *vidp);
+extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
+extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
+	mblk_t **npt);
+extern boolean_t vsw_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid);
 
 #define	VSW_NUM_VMPOOLS		3	/* number of vio mblk pools */
-#define	VSW_PORT_REF_DELAY	30	/* delay for port ref_cnt to become 0 */
 
 /*
  * Tunables used in this file.
@@ -236,8 +243,13 @@ extern boolean_t vsw_obp_ver_proto_workaround;
 	    ((ldcp)->lane_out.ver_major == (major) &&	\
 	    (ldcp)->lane_out.ver_minor < (minor)))
 
+#define	VSW_VER_GTEQ(ldcp, major, minor)	\
+	(((ldcp)->lane_out.ver_major > (major)) ||	\
+	    ((ldcp)->lane_out.ver_major == (major) &&	\
+	    (ldcp)->lane_out.ver_minor >= (minor)))
+
 /* supported versions */
-static	ver_sup_t	vsw_versions[] = { {1, 2} };
+static	ver_sup_t	vsw_versions[] = { {1, 3} };
 
 /*
  * For the moment the state dump routines have their own
@@ -279,33 +291,28 @@ static	ver_sup_t	vsw_versions[] = { {1, 2} };
  * Returns 0 on success, 1 on failure.
  */
 int
-vsw_port_attach(vsw_t *vswp, int p_instance, uint64_t *ldcids, int nids,
-struct ether_addr *macaddr)
+vsw_port_attach(vsw_port_t *port)
 {
+	vsw_t			*vswp = port->p_vswp;
 	vsw_port_list_t		*plist = &vswp->plist;
-	vsw_port_t		*port, **prev_port;
+	vsw_port_t		*p, **pp;
 	int			i;
+	int			nids = port->num_ldcs;
+	uint64_t		*ldcids;
 
-	D1(vswp, "%s: enter : port %d", __func__, p_instance);
+	D1(vswp, "%s: enter : port %d", __func__, port->p_instance);
 
 	/* port already exists? */
 	READ_ENTER(&plist->lockrw);
-	for (port = plist->head; port != NULL; port = port->p_next) {
-		if (port->p_instance == p_instance) {
+	for (p = plist->head; p != NULL; p = p->p_next) {
+		if (p->p_instance == port->p_instance) {
 			DWARN(vswp, "%s: port instance %d already attached",
-			    __func__, p_instance);
+			    __func__, p->p_instance);
 			RW_EXIT(&plist->lockrw);
 			return (1);
 		}
 	}
 	RW_EXIT(&plist->lockrw);
-
-	port = kmem_zalloc(sizeof (vsw_port_t), KM_SLEEP);
-	port->p_vswp = vswp;
-	port->p_instance = p_instance;
-	port->p_ldclist.num_ldcs = 0;
-	port->p_ldclist.head = NULL;
-	port->addr_set = VSW_ADDR_UNSET;
 
 	rw_init(&port->p_ldclist.lockrw, NULL, RW_DRIVER, NULL);
 
@@ -316,13 +323,8 @@ struct ether_addr *macaddr)
 	cv_init(&port->state_cv, NULL, CV_DRIVER, NULL);
 	port->state = VSW_PORT_INIT;
 
-	if (nids > VSW_PORT_MAX_LDCS) {
-		D2(vswp, "%s: using first of %d ldc ids",
-		    __func__, nids);
-		nids = VSW_PORT_MAX_LDCS;
-	}
-
 	D2(vswp, "%s: %d nids", __func__, nids);
+	ldcids = port->ldc_ids;
 	for (i = 0; i < nids; i++) {
 		D2(vswp, "%s: ldcid (%llx)", __func__, (uint64_t)ldcids[i]);
 		if (vsw_ldc_attach(port, (uint64_t)ldcids[i]) != 0) {
@@ -340,8 +342,6 @@ struct ether_addr *macaddr)
 		}
 	}
 
-	ether_copy(macaddr, &port->p_macaddr);
-
 	if (vswp->switching_setup_done == B_TRUE) {
 		/*
 		 * If the underlying physical device has been setup,
@@ -354,15 +354,17 @@ struct ether_addr *macaddr)
 		mutex_exit(&vswp->hw_lock);
 	}
 
+	/* create the fdb entry for this port/mac address */
+	vsw_fdbe_add(vswp, port);
+
+	vsw_create_vlans(port, VSW_VNETPORT);
+
 	WRITE_ENTER(&plist->lockrw);
 
-	/* create the fdb entry for this port/mac address */
-	(void) vsw_add_fdb(vswp, port);
-
 	/* link it into the list of ports for this vsw instance */
-	prev_port = (vsw_port_t **)(&plist->head);
-	port->p_next = *prev_port;
-	*prev_port = port;
+	pp = (vsw_port_t **)(&plist->head);
+	port->p_next = *pp;
+	*pp = port;
 	plist->num_ports++;
 
 	RW_EXIT(&plist->lockrw);
@@ -401,17 +403,18 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 		return (1);
 	}
 
-	/* Remove the fdb entry for this port/mac address */
-	(void) vsw_del_fdb(vswp, port);
-
-	/* Remove any multicast addresses.. */
-	vsw_del_mcst_port(port);
-
 	/*
 	 * No longer need to hold writer lock on port list now
 	 * that we have unlinked the target port from the list.
 	 */
 	RW_EXIT(&plist->lockrw);
+
+	/* Remove the fdb entry for this port/mac address */
+	vsw_fdbe_del(vswp, &(port->p_macaddr));
+	vsw_destroy_vlans(port, VSW_VNETPORT);
+
+	/* Remove any multicast addresses.. */
+	vsw_del_mcst_port(port);
 
 	/* Remove address if was programmed into HW. */
 	mutex_enter(&vswp->hw_lock);
@@ -467,7 +470,8 @@ vsw_detach_ports(vsw_t *vswp)
 		mutex_exit(&vswp->hw_lock);
 
 		/* Remove the fdb entry for this port/mac address */
-		(void) vsw_del_fdb(vswp, port);
+		vsw_fdbe_del(vswp, &(port->p_macaddr));
+		vsw_destroy_vlans(port, VSW_VNETPORT);
 
 		/* Remove any multicast addresses.. */
 		vsw_del_mcst_port(port);
@@ -502,6 +506,7 @@ vsw_port_delete(vsw_port_t *port)
 {
 	vsw_ldc_list_t 		*ldcl;
 	vsw_t			*vswp = port->p_vswp;
+	int			num_ldcs;
 
 	D1(vswp, "%s: enter : port id %d", __func__, port->p_instance);
 
@@ -515,27 +520,23 @@ vsw_port_delete(vsw_port_t *port)
 		return (1);
 
 	/*
-	 * Wait for port reference count to hit zero.
-	 */
-	while (port->ref_cnt != 0) {
-		delay(drv_usectohz(VSW_PORT_REF_DELAY));
-	}
-
-	/*
 	 * Wait for any active callbacks to finish
 	 */
 	if (vsw_drain_ldcs(port))
 		return (1);
 
 	ldcl = &port->p_ldclist;
+	num_ldcs = port->num_ldcs;
 	WRITE_ENTER(&ldcl->lockrw);
-	while (ldcl->num_ldcs > 0) {
+	while (num_ldcs > 0) {
 		if (vsw_ldc_detach(port, ldcl->head->ldc_id) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: unable to detach ldc %ld",
 			    vswp->instance, ldcl->head->ldc_id);
 			RW_EXIT(&ldcl->lockrw);
+			port->num_ldcs = num_ldcs;
 			return (1);
 		}
+		num_ldcs--;
 	}
 	RW_EXIT(&ldcl->lockrw);
 
@@ -543,9 +544,14 @@ vsw_port_delete(vsw_port_t *port)
 
 	mutex_destroy(&port->mca_lock);
 	mutex_destroy(&port->tx_lock);
+
 	cv_destroy(&port->state_cv);
 	mutex_destroy(&port->state_lock);
 
+	if (port->num_ldcs != 0) {
+		kmem_free(port->ldc_ids, port->num_ldcs * sizeof (uint64_t));
+		port->num_ldcs = 0;
+	}
 	kmem_free(port, sizeof (vsw_port_t));
 
 	D1(vswp, "%s: exit", __func__);
@@ -670,7 +676,7 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	 * allocate a message for ldc_read()s, big enough to hold ctrl and
 	 * data msgs, including raw data msgs used to recv priority frames.
 	 */
-	ldcp->msglen = VIO_PKT_DATA_HDRSIZE + ETHERMAX;
+	ldcp->msglen = VIO_PKT_DATA_HDRSIZE + vswp->max_frame_size;
 	ldcp->ldcmsg = kmem_alloc(ldcp->msglen, KM_SLEEP);
 
 	progress |= PROG_callback;
@@ -701,7 +707,6 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	WRITE_ENTER(&ldcl->lockrw);
 	ldcp->ldc_next = ldcl->head;
 	ldcl->head = ldcp;
-	ldcl->num_ldcs++;
 	RW_EXIT(&ldcl->lockrw);
 
 	D1(vswp, "%s: exit", __func__);
@@ -837,7 +842,6 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 
 	/* unlink it from the list */
 	prev_ldcp = ldcp->ldc_next;
-	ldcl->num_ldcs--;
 
 	mutex_destroy(&ldcp->ldc_txlock);
 	mutex_destroy(&ldcp->ldc_rxlock);
@@ -1182,6 +1186,41 @@ vsw_lookup_port(vsw_t *vswp, int p_instance)
 	return (NULL);
 }
 
+void
+vsw_vlan_unaware_port_reset(vsw_port_t *portp)
+{
+	vsw_ldc_list_t 	*ldclp;
+	vsw_ldc_t	*ldcp;
+
+	ldclp = &portp->p_ldclist;
+
+	READ_ENTER(&ldclp->lockrw);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->head == NULL) {
+		RW_EXIT(&ldclp->lockrw);
+		return;
+	}
+	ldcp = ldclp->head;
+
+	mutex_enter(&ldcp->ldc_cblock);
+
+	/*
+	 * If the peer is vlan_unaware(ver < 1.3), reset channel and terminate
+	 * the connection. See comments in vsw_set_vnet_proto_ops().
+	 */
+	if (ldcp->hphase == VSW_MILESTONE4 && VSW_VER_LT(ldcp, 1, 3) &&
+	    portp->nvids != 0) {
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+	}
+
+	mutex_exit(&ldcp->ldc_cblock);
+
+	RW_EXIT(&ldclp->lockrw);
+}
+
 /*
  * Search for and remove the specified port from the port
  * list. Returns 0 if able to locate and remove port, otherwise
@@ -1338,13 +1377,17 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 	ldcp->lane_in.lstate = 0;
 	ldcp->lane_out.lstate = 0;
 
+	/* Remove the fdb entry for this port/mac address */
+	vsw_fdbe_del(vswp, &(port->p_macaddr));
+
+	/* remove the port from vlans it has been assigned to */
+	vsw_vlan_remove_ids(port, VSW_VNETPORT);
+
 	/*
 	 * Remove parent port from any multicast groups
 	 * it may have registered with. Client must resend
 	 * multicast add command after handshake completes.
 	 */
-	(void) vsw_del_fdb(vswp, port);
-
 	vsw_del_mcst_port(port);
 
 	ldcp->peer_session = 0;
@@ -1745,7 +1788,7 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 			 * info, otherwise we just set up a private ring
 			 * which we use an internal buffer
 			 */
-			if ((VSW_VER_EQ(ldcp, 1, 2) &&
+			if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
 			    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
 			    (VSW_VER_LT(ldcp, 1, 2) &&
 			    (ldcp->lane_in.xfer_mode ==
@@ -1765,7 +1808,7 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * If peer is not using descriptor rings then just fall
 		 * through.
 		 */
-		if ((VSW_VER_EQ(ldcp, 1, 2) &&
+		if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
 		    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
 		    (VSW_VER_LT(ldcp, 1, 2) &&
 		    (ldcp->lane_in.xfer_mode ==
@@ -1888,8 +1931,33 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 	vsw_t	*vswp = ldcp->ldc_vswp;
 	lane_t	*lp = &ldcp->lane_out;
 
-	if (VSW_VER_EQ(ldcp, 1, 2)) {
-		/* Version 1.2 */
+	if (VSW_VER_GTEQ(ldcp, 1, 3)) {
+		/*
+		 * If the version negotiated with peer is >= 1.3,
+		 * set the mtu in our attributes to max_frame_size.
+		 */
+		lp->mtu = vswp->max_frame_size;
+	} else {
+		vsw_port_t	*portp = ldcp->ldc_port;
+		/*
+		 * Pre-1.3 peers expect max frame size of ETHERMAX.
+		 * We can negotiate that size with those peers provided the
+		 * following conditions are true:
+		 * - Our max_frame_size is greater only by VLAN_TAGSZ (4).
+		 * - Only pvid is defined for our peer and there are no vids.
+		 * If the above conditions are true, then we can send/recv only
+		 * untagged frames of max size ETHERMAX. Note that pvid of the
+		 * peer can be different, as vsw has to serve the vnet in that
+		 * vlan even if itself is not assigned to that vlan.
+		 */
+		if ((vswp->max_frame_size == ETHERMAX + VLAN_TAGSZ) &&
+		    portp->nvids == 0) {
+			lp->mtu = ETHERMAX;
+		}
+	}
+
+	if (VSW_VER_GTEQ(ldcp, 1, 2)) {
+		/* Versions >= 1.2 */
 
 		if (VSW_PRI_ETH_DEFINED(vswp)) {
 			/*
@@ -1909,8 +1977,8 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 
 			/* set xfer mode for vsw_send_attr() */
 			lp->xfer_mode = VIO_DRING_MODE_V1_2;
-
 		}
+
 	} else {
 		/* Versions prior to 1.2  */
 
@@ -2438,11 +2506,14 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		}
 
 		/* create the fdb entry for this port/mac address */
-		(void) vsw_add_fdb(vswp, port);
+		vsw_fdbe_add(vswp, port);
+
+		/* add the port to the specified vlans */
+		vsw_vlan_add_ids(port, VSW_VNETPORT);
 
 		/* setup device specifc xmit routines */
 		mutex_enter(&port->tx_lock);
-		if ((VSW_VER_EQ(ldcp, 1, 2) &&
+		if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
 		    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
 		    (VSW_VER_LT(ldcp, 1, 2) &&
 		    (ldcp->lane_in.xfer_mode == VIO_DRING_MODE_V1_0))) {
@@ -3276,6 +3347,12 @@ vsw_recheck_desc:
 			ldcp->ldc_stats.ipackets++;
 			ldcp->ldc_stats.rbytes += datalen;
 
+			/*
+			 * IPALIGN space can be used for VLAN_TAG
+			 */
+			(void) vsw_vlan_frame_pretag(ldcp->ldc_port,
+			    VSW_VNETPORT, mp);
+
 			/* build a chain of received packets */
 			if (bp == NULL) {
 				/* first pkt */
@@ -3529,18 +3606,19 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	mblk_t			*mp;
 	vsw_t			*vswp = ldcp->ldc_vswp;
 	vgen_stats_t		*statsp = &ldcp->ldc_stats;
+	lane_t			*lp = &ldcp->lane_out;
 
 	size = msglen - VIO_PKT_DATA_HDRSIZE;
-	if (size < ETHERMIN || size > ETHERMAX) {
+	if (size < ETHERMIN || size > lp->mtu) {
 		(void) atomic_inc_32(&statsp->rx_pri_fail);
 		DWARN(vswp, "%s(%lld) invalid size(%d)\n", __func__,
 		    ldcp->ldc_id, size);
 		return;
 	}
 
-	mp = vio_multipool_allocb(&ldcp->vmp, size);
+	mp = vio_multipool_allocb(&ldcp->vmp, size + VLAN_TAGSZ);
 	if (mp == NULL) {
-		mp = allocb(size, BPRI_MED);
+		mp = allocb(size + VLAN_TAGSZ, BPRI_MED);
 		if (mp == NULL) {
 			(void) atomic_inc_32(&statsp->rx_pri_fail);
 			DWARN(vswp, "%s(%lld) allocb failure, "
@@ -3550,6 +3628,9 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 		}
 	}
 
+	/* skip over the extra space for vlan tag */
+	mp->b_rptr += VLAN_TAGSZ;
+
 	/* copy the frame from the payload of raw data msg into the mblk */
 	bcopy(dpkt->data, mp->b_rptr, size);
 	mp->b_wptr = mp->b_rptr + size;
@@ -3557,6 +3638,11 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	/* update stats */
 	(void) atomic_inc_64(&statsp->rx_pri_packets);
 	(void) atomic_add_64(&statsp->rx_pri_bytes, size);
+
+	/*
+	 * VLAN_TAGSZ of extra space has been pre-alloc'd if tag is needed.
+	 */
+	(void) vsw_vlan_frame_pretag(ldcp->ldc_port, VSW_VNETPORT, mp);
 
 	/* switch the frame to destination */
 	vswp->vsw_switch_frame(vswp, mp, VSW_VNETPORT, ldcp->ldc_port, NULL);
@@ -3616,13 +3702,17 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 			nbytes += off;
 		}
 
-		mp = allocb(datalen, BPRI_MED);
+		/* alloc extra space for VLAN_TAG */
+		mp = allocb(datalen + 8, BPRI_MED);
 		if (mp == NULL) {
 			DERR(vswp, "%s(%lld): allocb failed",
 			    __func__, ldcp->ldc_id);
 			ldcp->ldc_stats.rx_allocb_fail++;
 			return;
 		}
+
+		/* skip over the extra space for VLAN_TAG */
+		mp->b_rptr += 8;
 
 		rv = ldc_mem_copy(ldcp->ldc_handle, (caddr_t)mp->b_rptr,
 		    0, &nbytes, ibnd_desc->memcookie, (uint64_t)ncookies,
@@ -3651,6 +3741,11 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		ibnd_desc->hdr.tag.vio_sid = ldcp->local_session;
 		(void) vsw_send_msg(ldcp, (void *)ibnd_desc,
 		    sizeof (vnet_ibnd_desc_t), B_TRUE);
+
+		/*
+		 * there is extra space alloc'd for VLAN_TAG
+		 */
+		(void) vsw_vlan_frame_pretag(ldcp->ldc_port, VSW_VNETPORT, mp);
 
 		/* send the packet to be switched */
 		vswp->vsw_switch_frame(vswp, mp, VSW_VNETPORT,
@@ -3797,6 +3892,7 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count)
 	vsw_ldc_list_t 	*ldcl = &port->p_ldclist;
 	vsw_ldc_t 	*ldcp;
 	int		status = 0;
+	uint32_t	n;
 
 	READ_ENTER(&ldcl->lockrw);
 	/*
@@ -3810,8 +3906,16 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count)
 		return (1);
 	}
 
+	n = vsw_vlan_frame_untag(port, VSW_VNETPORT, &mp, &mpt);
+
+	count -= n;
+	if (count == 0) {
+		goto vsw_portsend_exit;
+	}
+
 	status = ldcp->tx(ldcp, mp, mpt, count);
 
+vsw_portsend_exit:
 	RW_EXIT(&ldcl->lockrw);
 
 	return (status);
@@ -4124,7 +4228,7 @@ vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries)
 		}
 		READ_ENTER(&ldcp->lane_out.dlistrw);
 		if (((dp = ldcp->lane_out.dringp) != NULL) &&
-		    ((VSW_VER_EQ(ldcp, 1, 2) &&
+		    ((VSW_VER_GTEQ(ldcp, 1, 2) &&
 		    (ldcp->lane_out.xfer_mode & VIO_DRING_MODE_V1_2)) ||
 		    ((VSW_VER_LT(ldcp, 1, 2) &&
 		    (ldcp->lane_out.xfer_mode == VIO_DRING_MODE_V1_0))))) {
@@ -4168,6 +4272,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	int			idx;
 	int			status = LDC_TX_SUCCESS;
 	struct ether_header	*ehp = (struct ether_header *)mp->b_rptr;
+	lane_t			*lp = &ldcp->lane_out;
 
 	D1(vswp, "%s(%lld): enter\n", __func__, ldcp->ldc_id);
 
@@ -4195,7 +4300,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	}
 
 	size = msgsize(mp);
-	if (size > (size_t)ETHERMAX) {
+	if (size > (size_t)lp->mtu) {
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
 		    ldcp->ldc_id, size);
@@ -4329,6 +4434,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	int			idx, i;
 	int			status = LDC_TX_SUCCESS;
 	static int		warn_msg = 1;
+	lane_t			*lp = &ldcp->lane_out;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
@@ -4359,7 +4465,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	}
 
 	size = msgsize(mp);
-	if (size > (size_t)ETHERMAX) {
+	if (size > (size_t)lp->mtu) {
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
 		    ldcp->ldc_id, size);
@@ -4922,6 +5028,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	uint32_t		ncookies = 0;
 	static char		*name = "vsw_setup_ring";
 	int			i, j, nc, rv;
+	size_t			data_sz;
 
 	priv_addr = dp->priv_addr;
 	pub_addr = dp->pub_addr;
@@ -4933,14 +5040,17 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	 * Allocate the region of memory which will be used to hold
 	 * the data the descriptors will refer to.
 	 */
-	dp->data_sz = (vsw_ntxds * VSW_RING_EL_DATA_SZ);
+	data_sz = vswp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
+	data_sz = VNET_ROUNDUP_2K(data_sz);
+	dp->desc_data_sz = data_sz;
+	dp->data_sz = vsw_ntxds * data_sz;
 	dp->data_addr = kmem_alloc(dp->data_sz, KM_SLEEP);
 
 	D2(vswp, "%s: allocated %lld bytes at 0x%llx\n", name,
 	    dp->data_sz, dp->data_addr);
 
 	tmpp = (uint64_t *)dp->data_addr;
-	offset = VSW_RING_EL_DATA_SZ / sizeof (tmpp);
+	offset = dp->desc_data_sz/sizeof (tmpp);
 
 	/*
 	 * Initialise some of the private and public (if they exist)
@@ -4958,7 +5068,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 		priv_addr->datap = (void *)tmpp;
 
 		rv = ldc_mem_bind_handle(priv_addr->memhandle,
-		    (caddr_t)priv_addr->datap, VSW_RING_EL_DATA_SZ,
+		    (caddr_t)priv_addr->datap, dp->desc_data_sz,
 		    LDC_SHADOW_MAP, LDC_MEM_R|LDC_MEM_W,
 		    &(priv_addr->memcookie[0]), &ncookies);
 		if (rv != 0) {
@@ -5131,7 +5241,7 @@ vsw_set_lane_attr(vsw_t *vswp, lane_t *lp)
 	ether_copy(&(vswp->if_addr), &(lp->addr));
 	RW_EXIT(&vswp->if_lockrw);
 
-	lp->mtu = VSW_MTU;
+	lp->mtu = vswp->max_frame_size;
 	lp->addr_type = ADDR_TYPE_MAC;
 	lp->xfer_mode = VIO_DRING_MODE_V1_0;
 	lp->ack_freq = 0;	/* for shared mode */
@@ -5151,7 +5261,6 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
 	struct ether_addr	ea;
 	vsw_port_t		*port = ldcp->ldc_port;
 	lane_t			*lp = &ldcp->lane_out;
-
 
 	D1(NULL, "vsw_check_attr enter\n");
 
@@ -5185,7 +5294,7 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
 	 * mode the ring descriptors say whether or not to
 	 * send back an ACK.
 	 */
-	if ((VSW_VER_EQ(ldcp, 1, 2) &&
+	if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
 	    (pkt->xfer_mode & VIO_DRING_MODE_V1_2)) ||
 	    (VSW_VER_LT(ldcp, 1, 2) &&
 	    (pkt->xfer_mode == VIO_DRING_MODE_V1_0))) {
@@ -5200,7 +5309,7 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
 	 * Note: for the moment we only support ETHER
 	 * frames. This may change in the future.
 	 */
-	if ((pkt->mtu > VSW_MTU) || (pkt->mtu <= 0)) {
+	if ((pkt->mtu > lp->mtu) || (pkt->mtu <= 0)) {
 		D2(NULL, "vsw_check_attr: invalid MTU (0x%llx)\n",
 		    pkt->mtu);
 		ret = 1;
@@ -5644,7 +5753,7 @@ display_state(void)
 		for (port = plist->head; port != NULL; port = port->p_next) {
 			ldcl = &port->p_ldclist;
 			cmn_err(CE_CONT, "port %d : %d ldcs attached\n",
-			    port->p_instance, ldcl->num_ldcs);
+			    port->p_instance, port->num_ldcs);
 			READ_ENTER(&ldcl->lockrw);
 			ldcp = ldcl->head;
 			for (; ldcp != NULL; ldcp = ldcp->ldc_next) {

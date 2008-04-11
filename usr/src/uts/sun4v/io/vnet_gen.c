@@ -61,6 +61,7 @@
 #include <sys/sdt.h>
 #include <sys/intr.h>
 #include <sys/pattr.h>
+#include <sys/vlan.h>
 
 /*
  * Implementation of the mac functionality for vnet using the
@@ -71,7 +72,7 @@
  * Function prototypes.
  */
 /* vgen proxy entry points */
-int vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
+int vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	mac_register_t **vgenmacp);
 int vgen_uninit(void *arg);
 static int vgen_start(void *arg);
@@ -85,32 +86,37 @@ static int vgen_stat(void *arg, uint_t stat, uint64_t *val);
 static void vgen_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 
 /* externs - functions provided by vnet to add/remove/modify entries in fdb */
-void vnet_add_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
-void vnet_del_fdb(void *arg, uint8_t *macaddr);
-void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx,
-	void *txarg, boolean_t upgrade);
-void vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg);
-void vnet_del_def_rte(void *arg);
-void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
-void vnet_tx_update(void *arg);
+extern void vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr,
+	uint8_t type, mac_tx_t m_tx, void *port);
+extern void vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr);
+extern void vnet_fdbe_modify(vnet_t *vnetp, struct ether_addr *macaddr,
+	void *portp, boolean_t flag);
+extern void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
+extern void vnet_tx_update(void *arg);
 
 /* vgen internal functions */
+static int vgen_read_mdprops(vgen_t *vgenp);
+static void vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
+static void vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp,
+	mde_cookie_t node);
 static void vgen_detach_ports(vgen_t *vgenp);
 static void vgen_port_detach(vgen_port_t *portp);
 static void vgen_port_list_insert(vgen_port_t *portp);
 static void vgen_port_list_remove(vgen_port_t *portp);
 static vgen_port_t *vgen_port_lookup(vgen_portlist_t *plistp,
 	int port_num);
-static int vgen_read_mdprops(vgen_t *vgenp);
-static void vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp,
-	mde_cookie_t node);
 static int vgen_mdeg_reg(vgen_t *vgenp);
 static void vgen_mdeg_unreg(vgen_t *vgenp);
 static int vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp);
+static int vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp);
 static int vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
+static int vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
+	mde_cookie_t mdex);
+static void vgen_fdbe_modify(vgen_port_t *portp, boolean_t use_vsw_port,
+	boolean_t flag);
 static int vgen_remove_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
-static int vgen_port_attach_mdeg(vgen_t *vgenp, int port_num, uint64_t *ldcids,
-	int num_ids, struct ether_addr *macaddr, boolean_t vsw_port);
+static int vgen_port_attach(vgen_port_t *portp);
+static void vgen_port_detach_mdeg(vgen_port_t *portp);
 static void vgen_port_detach_mdeg(vgen_port_t *portp);
 static int vgen_update_port(vgen_t *vgenp, md_t *curr_mdp,
 	mde_cookie_t curr_mdex, md_t *prev_mdp, mde_cookie_t prev_mdex);
@@ -196,6 +202,22 @@ static void vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp);
 static void vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp);
 static void vgen_reset_vnet_proto_ops(vgen_ldc_t *ldcp);
 
+/* VLAN routines */
+static void vgen_vlan_read_ids(void *arg, int type, md_t *mdp,
+	mde_cookie_t node, uint16_t *pvidp, uint16_t **vidspp,
+	uint16_t *nvidsp, uint16_t *default_idp);
+static void vgen_vlan_create_hash(vgen_port_t *portp);
+static void vgen_vlan_destroy_hash(vgen_port_t *portp);
+static void vgen_vlan_add_ids(vgen_port_t *portp);
+static void vgen_vlan_remove_ids(vgen_port_t *portp);
+static boolean_t vgen_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid);
+static boolean_t vgen_frame_lookup_vid(vnet_t *vnetp, struct ether_header *ehp,
+	uint16_t *vidp);
+static mblk_t *vgen_vlan_frame_fixtag(vgen_port_t *portp, mblk_t *mp,
+	boolean_t is_tagged, uint16_t vid);
+static void vgen_vlan_unaware_port_reset(vgen_port_t *portp);
+static void vgen_reset_vlan_unaware_ports(vgen_t *vgenp);
+
 /*
  * The handshake process consists of 5 phases defined below, with VH_PHASE0
  * being the pre-handshake phase and VH_DONE is the phase to indicate
@@ -252,6 +274,20 @@ enum {
 				mutex_exit(&((ldcp)->rxlock));\
 				mutex_exit(&((ldcp)->cblock));
 
+#define	VGEN_VER_EQ(ldcp, major, minor)	\
+	((ldcp)->local_hparams.ver_major == (major) &&	\
+	    (ldcp)->local_hparams.ver_minor == (minor))
+
+#define	VGEN_VER_LT(ldcp, major, minor)	\
+	(((ldcp)->local_hparams.ver_major < (major)) ||	\
+	    ((ldcp)->local_hparams.ver_major == (major) &&	\
+	    (ldcp)->local_hparams.ver_minor < (minor)))
+
+#define	VGEN_VER_GTEQ(ldcp, major, minor)	\
+	(((ldcp)->local_hparams.ver_major > (major)) ||	\
+	    ((ldcp)->local_hparams.ver_major == (major) &&	\
+	    (ldcp)->local_hparams.ver_minor >= (minor)))
+
 static struct ether_addr etherbroadcastaddr = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
@@ -276,9 +312,14 @@ static char id_propname[] = "id";
 static char vdev_propname[] = "virtual-device";
 static char vnet_propname[] = "network";
 static char pri_types_propname[] = "priority-ether-types";
+static char vgen_pvid_propname[] = "port-vlan-id";
+static char vgen_vid_propname[] = "vlan-id";
+static char vgen_dvid_propname[] = "default-vlan-id";
+static char port_pvid_propname[] = "remote-port-vlan-id";
+static char port_vid_propname[] = "remote-vlan-id";
 
 /* versions supported - in decreasing order */
-static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 2} };
+static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 3} };
 
 /* Tunables */
 uint32_t vgen_hwd_interval = 5;		/* handshake watchdog freq in sec */
@@ -323,11 +364,27 @@ uint64_t vgen_pri_eth_type = 0;
  */
 uint32_t vgen_pri_tx_nmblks = 64;
 
+uint32_t	vgen_vlan_nchains = 4;	/* # of chains in vlan id hash table */
+
 #ifdef DEBUG
 /* flags to simulate error conditions for debugging */
 int vgen_trigger_txtimeout = 0;
 int vgen_trigger_rxlost = 0;
 #endif
+
+/*
+ * Matching criteria passed to the MDEG to register interest
+ * in changes to 'virtual-device' nodes (i.e. vnet nodes) identified
+ * by their 'name' and 'cfg-handle' properties.
+ */
+static md_prop_match_t vdev_prop_match[] = {
+	{ MDET_PROP_STR,    "name"   },
+	{ MDET_PROP_VAL,    "cfg-handle" },
+	{ MDET_LIST_END,    NULL    }
+};
+
+static mdeg_node_match_t vdev_match = { "virtual-device",
+						vdev_prop_match };
 
 /* MD update matching structure */
 static md_prop_match_t	vport_prop_match[] = {
@@ -347,7 +404,7 @@ static mdeg_prop_spec_t vgen_prop_template[] = {
 
 #define	VGEN_SET_MDEG_PROP_INST(specp, val)	(specp)[1].ps_val = (val)
 
-static int vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp);
+static int vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp);
 
 static mac_callbacks_t vgen_m_callbacks = {
 	0,
@@ -371,7 +428,8 @@ extern uint32_t vnet_ldcwd_interval;
 extern uint32_t vnet_ldcwd_txtimeout;
 extern uint32_t vnet_ldc_mtu;
 extern uint32_t vnet_nrbufs;
-
+extern uint32_t	vnet_ethermtu;
+extern uint16_t	vnet_default_vlan_id;
 
 #ifdef DEBUG
 
@@ -399,7 +457,7 @@ uint32_t vgen_hdbg;
  * the generic transport is returned in the last argument.
  */
 int
-vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
+vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
     mac_register_t **vgenmacp)
 {
 	vgen_t *vgenp;
@@ -430,7 +488,7 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	macp->m_src_addr = (uint8_t *)&(vgenp->macaddr);
 	macp->m_callbacks = &vgen_m_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = ETHERMTU;
+	macp->m_max_sdu = vnet_ethermtu;
 	vgenp->macp = macp;
 
 	/* allocate multicast table */
@@ -438,6 +496,8 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	    sizeof (struct ether_addr), KM_SLEEP);
 	vgenp->mccount = 0;
 	vgenp->mcsize = VGEN_INIT_MCTAB_SIZE;
+	vgenp->max_frame_size = vnet_ethermtu + sizeof (struct ether_header)
+	    + VLAN_TAGSZ;
 
 	mutex_init(&vgenp->lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&vgenp->vgenports.rwlock, NULL, RW_DRIVER, NULL);
@@ -603,14 +663,151 @@ vgen_tx(void *arg, mblk_t *mp)
 	return (NULL);
 }
 
+/*
+ * This function provides any necessary tagging/untagging of the frames
+ * that are being transmitted over the port. It first verifies the vlan
+ * membership of the destination(port) and drops the packet if the
+ * destination doesn't belong to the given vlan.
+ *
+ * Arguments:
+ *   portp:     port over which the frames should be transmitted
+ *   mp:        frame to be transmitted
+ *   is_tagged:
+ *              B_TRUE: indicates frame header contains the vlan tag already.
+ *              B_FALSE: indicates frame is untagged.
+ *   vid:       vlan in which the frame should be transmitted.
+ *
+ * Returns:
+ *              Sucess: frame(mblk_t *) after doing the necessary tag/untag.
+ *              Failure: NULL
+ */
+static mblk_t *
+vgen_vlan_frame_fixtag(vgen_port_t *portp, mblk_t *mp, boolean_t is_tagged,
+	uint16_t vid)
+{
+	vgen_t				*vgenp;
+	boolean_t			dst_tagged;
+	int				rv;
+
+	vgenp = portp->vgenp;
+
+	/*
+	 * If the packet is going to a vnet:
+	 *   Check if the destination vnet is in the same vlan.
+	 *   Check the frame header if tag or untag is needed.
+	 *
+	 * We do not check the above conditions if the packet is going to vsw:
+	 *   vsw must be present implicitly in all the vlans that a vnet device
+	 *   is configured into; even if vsw itself is not assigned to those
+	 *   vlans as an interface. For instance, the packet might be destined
+	 *   to another vnet(indirectly through vsw) or to an external host
+	 *   which is in the same vlan as this vnet and vsw itself may not be
+	 *   present in that vlan. Similarly packets going to vsw must be
+	 *   always tagged(unless in the default-vlan) if not already tagged,
+	 *   as we do not know the final destination. This is needed because
+	 *   vsw must always invoke its switching function only after tagging
+	 *   the packet; otherwise after switching function determines the
+	 *   destination we cannot figure out if the destination belongs to the
+	 *   the same vlan that the frame originated from and if it needs tag/
+	 *   untag. Note that vsw will tag the packet itself when it receives
+	 *   it over the channel from a client if needed. However, that is
+	 *   needed only in the case of vlan unaware clients such as obp or
+	 *   earlier versions of vnet.
+	 *
+	 */
+	if (portp != vgenp->vsw_portp) {
+		/*
+		 * Packet going to a vnet. Check if the destination vnet is in
+		 * the same vlan. Then check the frame header if tag/untag is
+		 * needed.
+		 */
+		rv = vgen_vlan_lookup(portp->vlan_hashp, vid);
+		if (rv == B_FALSE) {
+			/* drop the packet */
+			freemsg(mp);
+			return (NULL);
+		}
+
+		/* is the destination tagged or untagged in this vlan? */
+		(vid == portp->pvid) ? (dst_tagged = B_FALSE) :
+		    (dst_tagged = B_TRUE);
+
+		if (is_tagged == dst_tagged) {
+			/* no tagging/untagging needed */
+			return (mp);
+		}
+
+		if (is_tagged == B_TRUE) {
+			/* frame is tagged; destination needs untagged */
+			mp = vnet_vlan_remove_tag(mp);
+			return (mp);
+		}
+
+		/* (is_tagged == B_FALSE): fallthru to tag tx packet: */
+	}
+
+	/*
+	 * Packet going to a vnet needs tagging.
+	 * OR
+	 * If the packet is going to vsw, then it must be tagged in all cases:
+	 * unknown unicast, broadcast/multicast or to vsw interface.
+	 */
+
+	if (is_tagged == B_FALSE) {
+		mp = vnet_vlan_insert_tag(mp, vid);
+	}
+
+	return (mp);
+}
+
 /* transmit packets over the given port */
 static int
 vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 {
-	vgen_ldclist_t	*ldclp;
-	vgen_ldc_t *ldcp;
-	int status;
-	int rv = VGEN_SUCCESS;
+	vgen_ldclist_t		*ldclp;
+	vgen_ldc_t		*ldcp;
+	int			status;
+	int			rv = VGEN_SUCCESS;
+	vgen_t			*vgenp;
+	vnet_t			*vnetp;
+	boolean_t		is_tagged;
+	uint16_t		vlan_id;
+	struct ether_header	*ehp;
+
+	vgenp = portp->vgenp;
+	vnetp = vgenp->vnetp;
+
+	/*
+	 * Determine the vlan id that the frame belongs to.
+	 */
+	ehp = (struct ether_header *)mp->b_rptr;
+	is_tagged = vgen_frame_lookup_vid(vnetp, ehp, &vlan_id);
+
+	if (vlan_id == vnetp->default_vlan_id) {
+
+		/* Frames in default vlan must be untagged */
+		ASSERT(is_tagged == B_FALSE);
+
+		/*
+		 * If the destination is a vnet-port verify it belongs to the
+		 * default vlan; otherwise drop the packet. We do not need
+		 * this check for vsw-port, as it should implicitly belong to
+		 * this vlan; see comments in vgen_vlan_frame_fixtag().
+		 */
+		if (portp != vgenp->vsw_portp &&
+		    portp->pvid != vnetp->default_vlan_id) {
+			freemsg(mp);
+			return (VGEN_SUCCESS);
+		}
+
+	} else {	/* frame not in default-vlan */
+
+		mp = vgen_vlan_frame_fixtag(portp, mp, is_tagged, vlan_id);
+		if (mp == NULL) {
+			return (VGEN_SUCCESS);
+		}
+
+	}
 
 	ldclp = &portp->ldclist;
 	READ_ENTER(&ldclp->rwlock);
@@ -679,15 +876,15 @@ vgen_ldcsend_process_reset(vgen_ldc_t *ldcp)
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 
 	/*
-	 * Check if either callback thread or another tx thread is
-	 * already running. Calling mutex_enter() will result in a
-	 * deadlock if the other thread already holds cblock and is
-	 * blocked in vnet_modify_fdb() (which is called from
-	 * vgen_handle_evt_reset()) waiting for write access on rwlock,
-	 * as this transmit thread already holds that lock as a reader
-	 * in vnet_m_tx(). See comments in vnet_modify_fdb() in vnet.c.
-	 * If we cannot get the lock, the thread which holds it will
-	 * handle the reset.
+	 * Calling mutex_enter() will result in a deadlock, if the other thread
+	 * already holds cblock and is waiting for all references on the fdbe
+	 * to be dropped in vnet_fdbe_modify() which is called from
+	 * vgen_handle_evt_reset(). This transmit thread holds a reference to
+	 * that fdb entry and will not drop its reference unless it gets cblock
+	 * here, completes processing and returns.
+	 * To avoid this race condition, we check if either callback thread
+	 * or another tx thread is already holding cblock, if so just return
+	 * and the thread which already holds it will handle the reset.
 	 */
 	if (mutex_tryenter(&ldcp->cblock)) {
 		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
@@ -699,7 +896,7 @@ vgen_ldcsend_process_reset(vgen_ldc_t *ldcp)
 			/*
 			 * Second arg is TRUE, as we know that
 			 * the caller of this function - vnet_m_tx(),
-			 * already holds fdb-rwlock as a reader.
+			 * already has a ref on the fdb entry.
 			 */
 			vgen_handle_evt_reset(ldcp, B_TRUE);
 		}
@@ -818,14 +1015,15 @@ vgen_ldcsend_dring(void *arg, mblk_t *mp)
 	vio_dring_entry_hdr_t	*hdrp;
 	vgen_stats_t		*statsp;
 	struct ether_header	*ehp;
-	boolean_t	is_bcast = B_FALSE;
-	boolean_t	is_mcast = B_FALSE;
-	size_t		mblksz;
-	caddr_t		dst;
-	mblk_t		*bp;
-	size_t		size;
-	int		rv = 0;
-	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
+	boolean_t		is_bcast = B_FALSE;
+	boolean_t		is_mcast = B_FALSE;
+	size_t			mblksz;
+	caddr_t			dst;
+	mblk_t			*bp;
+	size_t			size;
+	int			rv = 0;
+	vgen_t			*vgenp = LDC_TO_VGEN(ldcp);
+	vgen_hparams_t		*lp = &ldcp->local_hparams;
 
 	statsp = &ldcp->stats;
 	size = msgsize(mp);
@@ -848,7 +1046,7 @@ vgen_ldcsend_dring(void *arg, mblk_t *mp)
 		goto send_dring_exit;
 	}
 
-	if (size > (size_t)ETHERMAX) {
+	if (size > (size_t)lp->mtu) {
 		DWARN(vgenp, ldcp, "invalid size(%d)\n", size);
 		goto send_dring_exit;
 	}
@@ -1167,6 +1365,8 @@ vgen_port_detach(vgen_port_t *portp)
 
 	DBG1(vgenp, NULL, "port(%d):enter\n", port_num);
 
+	vgen_vlan_destroy_hash(portp);
+
 	/* remove it from port list */
 	vgen_port_list_remove(portp);
 
@@ -1178,6 +1378,11 @@ vgen_port_detach(vgen_port_t *portp)
 	}
 	RW_EXIT(&ldclp->rwlock);
 	rw_destroy(&ldclp->rwlock);
+
+	if (portp->num_ldcs != 0) {
+		kmem_free(portp->ldc_ids, portp->num_ldcs * sizeof (uint64_t));
+		portp->num_ldcs = 0;
+	}
 
 	if (vgenp->vsw_portp == portp) {
 		vgenp->vsw_portp = NULL;
@@ -1274,38 +1479,37 @@ vgen_init_ports(vgen_t *vgenp)
 static void
 vgen_port_init(vgen_port_t *portp)
 {
-	vgen_t *vgenp;
+	vgen_t		*vgenp = portp->vgenp;
+	vgen_port_t	*tx_portp;
+	int		type;
 
-	vgenp = portp->vgenp;
 	/*
-	 * Create fdb entry in vnet, corresponding to the mac
-	 * address of this port. Note that the port specified
-	 * is vsw-port. This is done so that vsw-port acts
-	 * as the route to reach this macaddr, until the
-	 * channel for this port comes up (LDC_UP) and
-	 * handshake is done successfully.
-	 * eg, if the peer is OBP-vnet, it may not bring the
-	 * channel up for this port and may communicate via
-	 * vsw to reach this port.
-	 * Later, when Solaris-vnet comes up at the other end
-	 * of the channel for this port and brings up the channel,
-	 * it is an indication that peer vnet is capable of
-	 * distributed switching, so the direct route through this
-	 * port is specified in fdb, using vnet_modify_fdb(macaddr);
+	 * Add the mac address of the port into the fdb of the vnet device.
+	 *
+	 * If the port being added is a vnet-port:
+	 * In this case the tx_port arg specified to vnet_fdbe_add() is
+	 * vsw-port. This is done so that vsw-port acts as the route to reach
+	 * the macaddr corresponding to this port, until the channel for this
+	 * port comes up (LDC_UP) and handshake is done successfully. eg, if
+	 * the peer is OBP-vnet, it may not bring the channel up for this port
+	 * and may communicate via vsw to reach this port. Later, when
+	 * Solaris-vnet comes up at the other end of the channel for this port
+	 * and brings up the channel, it is an indication that peer vnet is
+	 * capable of distributed switching, so the direct route through this
+	 * port is specified in fdb (see func vgen_fdbe_modify()).
 	 */
-	vnet_add_fdb(vgenp->vnetp, (uint8_t *)&portp->macaddr,
-	    vgen_tx, vgenp->vsw_portp);
-
 	if (portp == vgenp->vsw_portp) {
-		/*
-		 * create the default route entry in vnet's fdb.
-		 * This is the entry used by vnet to reach
-		 * unknown destinations, which basically goes
-		 * through vsw on domain0 and out through the
-		 * physical device bound to vsw.
-		 */
-		vnet_add_def_rte(vgenp->vnetp, vgen_tx, portp);
+		type = VNET_VSWPORT;
+	} else {
+		type = VNET_VNETPORT;
 	}
+	tx_portp = vgenp->vsw_portp;
+
+	/* Add entry for the port's mac address into fdb */
+	vnet_fdbe_add(vgenp->vnetp, &portp->macaddr, type, vgen_tx, tx_portp);
+
+	/* Add the port to the specified vlans */
+	vgen_vlan_add_ids(portp);
 
 	/* Bring up the channels of this port */
 	vgen_init_ldcs(portp);
@@ -1331,20 +1535,15 @@ vgen_uninit_ports(vgen_t *vgenp)
 static void
 vgen_port_uninit(vgen_port_t *portp)
 {
-	vgen_t *vgenp;
-
-	vgenp = portp->vgenp;
+	vgen_t	*vgenp = portp->vgenp;
 
 	vgen_uninit_ldcs(portp);
-	/* delete the entry in vnet's fdb for this port */
-	vnet_del_fdb(vgenp->vnetp, (uint8_t *)&portp->macaddr);
-	if (portp == vgenp->vsw_portp) {
-		/*
-		 * if this is vsw-port, then delete the default
-		 * route entry in vnet's fdb.
-		 */
-		vnet_del_def_rte(vgenp->vnetp);
-	}
+
+	/* delete the entry in vnet's fdb for this macaddr/port */
+	vnet_fdbe_del(vgenp->vnetp, &portp->macaddr);
+
+	/* remove the port from vlans it has been assigned to */
+	vgen_vlan_remove_ids(portp);
 }
 
 /*
@@ -1355,6 +1554,7 @@ vgen_port_uninit(vgen_port_t *portp)
 static int
 vgen_read_mdprops(vgen_t *vgenp)
 {
+	vnet_t		*vnetp = vgenp->vnetp;
 	md_t		*mdp = NULL;
 	mde_cookie_t	rootnode;
 	mde_cookie_t	*listp = NULL;
@@ -1434,6 +1634,12 @@ vgen_read_mdprops(vgen_t *vgenp)
 
 		/* now read all properties of this vnet instance */
 		vgen_read_pri_eth_types(vgenp, mdp, listp[i]);
+
+		/* read vlan id properties of this vnet instance */
+		vgen_vlan_read_ids(vgenp, VGEN_LOCAL, mdp, listp[i],
+		    &vnetp->pvid, &vnetp->vids, &vnetp->nvids,
+		    &vnetp->default_vlan_id);
+
 		rv = 0;
 		break;
 	}
@@ -1443,6 +1649,259 @@ vgen_readmd_exit:
 	kmem_free(listp, listsz);
 	(void) md_fini_handle(mdp);
 	return (rv);
+}
+
+/*
+ * Read vlan id properties of the given MD node.
+ * Arguments:
+ *   arg:          device argument(vnet device or a port)
+ *   type:         type of arg; VGEN_LOCAL(vnet device) or VGEN_PEER(port)
+ *   mdp:          machine description
+ *   node:         md node cookie
+ *
+ * Returns:
+ *   pvidp:        port-vlan-id of the node
+ *   vidspp:       list of vlan-ids of the node
+ *   nvidsp:       # of vlan-ids in the list
+ *   default_idp:  default-vlan-id of the node(if node is vnet device)
+ */
+static void
+vgen_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
+	uint16_t *pvidp, uint16_t **vidspp, uint16_t *nvidsp,
+	uint16_t *default_idp)
+{
+	vgen_t		*vgenp;
+	vnet_t		*vnetp;
+	vgen_port_t	*portp;
+	char		*pvid_propname;
+	char		*vid_propname;
+	uint_t		nvids;
+	uint32_t	vids_size;
+	int		rv;
+	int		i;
+	uint64_t	*data;
+	uint64_t	val;
+	int		size;
+	int		inst;
+
+	if (type == VGEN_LOCAL) {
+
+		vgenp = (vgen_t *)arg;
+		vnetp = vgenp->vnetp;
+		pvid_propname = vgen_pvid_propname;
+		vid_propname = vgen_vid_propname;
+		inst = vnetp->instance;
+
+	} else if (type == VGEN_PEER) {
+
+		portp = (vgen_port_t *)arg;
+		vgenp = portp->vgenp;
+		vnetp = vgenp->vnetp;
+		pvid_propname = port_pvid_propname;
+		vid_propname = port_vid_propname;
+		inst = portp->port_num;
+
+	} else {
+		return;
+	}
+
+	if (type == VGEN_LOCAL && default_idp != NULL) {
+		rv = md_get_prop_val(mdp, node, vgen_dvid_propname, &val);
+		if (rv != 0) {
+			DWARN(vgenp, NULL, "prop(%s) not found",
+			    vgen_dvid_propname);
+
+			*default_idp = vnet_default_vlan_id;
+		} else {
+			*default_idp = val & 0xFFF;
+			DBG2(vgenp, NULL, "%s(%d): (%d)\n", vgen_dvid_propname,
+			    inst, *default_idp);
+		}
+	}
+
+	rv = md_get_prop_val(mdp, node, pvid_propname, &val);
+	if (rv != 0) {
+		DWARN(vgenp, NULL, "prop(%s) not found", pvid_propname);
+		*pvidp = vnet_default_vlan_id;
+	} else {
+
+		*pvidp = val & 0xFFF;
+		DBG2(vgenp, NULL, "%s(%d): (%d)\n",
+		    pvid_propname, inst, *pvidp);
+	}
+
+	rv = md_get_prop_data(mdp, node, vid_propname, (uint8_t **)&data,
+	    &size);
+	if (rv != 0) {
+		DBG2(vgenp, NULL, "prop(%s) not found", vid_propname);
+		size = 0;
+	} else {
+		size /= sizeof (uint64_t);
+	}
+	nvids = size;
+
+	if (nvids != 0) {
+		DBG2(vgenp, NULL, "%s(%d): ", vid_propname, inst);
+		vids_size = sizeof (uint16_t) * nvids;
+		*vidspp = kmem_zalloc(vids_size, KM_SLEEP);
+		for (i = 0; i < nvids; i++) {
+			(*vidspp)[i] = data[i] & 0xFFFF;
+			DBG2(vgenp, NULL, " %d ", (*vidspp)[i]);
+		}
+		DBG2(vgenp, NULL, "\n");
+	}
+
+	*nvidsp = nvids;
+}
+
+/*
+ * Create a vlan id hash table for the given port.
+ */
+static void
+vgen_vlan_create_hash(vgen_port_t *portp)
+{
+	char		hashname[MAXNAMELEN];
+
+	(void) snprintf(hashname, MAXNAMELEN, "port%d-vlan-hash",
+	    portp->port_num);
+
+	portp->vlan_nchains = vgen_vlan_nchains;
+	portp->vlan_hashp = mod_hash_create_idhash(hashname,
+	    portp->vlan_nchains, mod_hash_null_valdtor);
+}
+
+/*
+ * Destroy the vlan id hash table in the given port.
+ */
+static void
+vgen_vlan_destroy_hash(vgen_port_t *portp)
+{
+	if (portp->vlan_hashp != NULL) {
+		mod_hash_destroy_hash(portp->vlan_hashp);
+		portp->vlan_hashp = NULL;
+		portp->vlan_nchains = 0;
+	}
+}
+
+/*
+ * Add a port to the vlans specified in its port properites.
+ */
+static void
+vgen_vlan_add_ids(vgen_port_t *portp)
+{
+	int		rv;
+	int		i;
+
+	rv = mod_hash_insert(portp->vlan_hashp,
+	    (mod_hash_key_t)VLAN_ID_KEY(portp->pvid),
+	    (mod_hash_val_t)B_TRUE);
+	ASSERT(rv == 0);
+
+	for (i = 0; i < portp->nvids; i++) {
+		rv = mod_hash_insert(portp->vlan_hashp,
+		    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i]),
+		    (mod_hash_val_t)B_TRUE);
+		ASSERT(rv == 0);
+	}
+}
+
+/*
+ * Remove a port from the vlans it has been assigned to.
+ */
+static void
+vgen_vlan_remove_ids(vgen_port_t *portp)
+{
+	int		rv;
+	int		i;
+	mod_hash_val_t	vp;
+
+	rv = mod_hash_remove(portp->vlan_hashp,
+	    (mod_hash_key_t)VLAN_ID_KEY(portp->pvid),
+	    (mod_hash_val_t *)&vp);
+	ASSERT(rv == 0);
+
+	for (i = 0; i < portp->nvids; i++) {
+		rv = mod_hash_remove(portp->vlan_hashp,
+		    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i]),
+		    (mod_hash_val_t *)&vp);
+		ASSERT(rv == 0);
+	}
+}
+
+/*
+ * Lookup the vlan id of the given tx frame. If it is a vlan-tagged frame,
+ * then the vlan-id is available in the tag; otherwise, its vlan id is
+ * implicitly obtained from the port-vlan-id of the vnet device.
+ * The vlan id determined is returned in vidp.
+ * Returns: B_TRUE if it is a tagged frame; B_FALSE if it is untagged.
+ */
+static boolean_t
+vgen_frame_lookup_vid(vnet_t *vnetp, struct ether_header *ehp, uint16_t *vidp)
+{
+	struct ether_vlan_header	*evhp;
+
+	/* If it's a tagged frame, get the vlan id from vlan header */
+	if (ehp->ether_type == ETHERTYPE_VLAN) {
+
+		evhp = (struct ether_vlan_header *)ehp;
+		*vidp = VLAN_ID(ntohs(evhp->ether_tci));
+		return (B_TRUE);
+	}
+
+	/* Untagged frame, vlan-id is the pvid of vnet device */
+	*vidp = vnetp->pvid;
+	return (B_FALSE);
+}
+
+/*
+ * Find the given vlan id in the hash table.
+ * Return: B_TRUE if the id is found; B_FALSE if not found.
+ */
+static boolean_t
+vgen_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid)
+{
+	int		rv;
+	mod_hash_val_t	vp;
+
+	rv = mod_hash_find(vlan_hashp, VLAN_ID_KEY(vid), (mod_hash_val_t *)&vp);
+
+	if (rv != 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Modify fdb entries corresponding to the port's macaddr, to use a different
+ * port. This is done when the port's ldc channel goes down or comes up. When
+ * the channel state changes to RESET/DOWN, we modify the fdb entry for the
+ * port by specifying vsw-port as the port to be used for transmits.
+ * Similarly when the channel state changes to UP, we restore its fdb entry to
+ * start using the actual vnet-port for transmits.
+ *
+ * Arguments:
+ *
+ *   portp:          port for which fdb entry is being updated
+ *
+ *   use_vsw_port:
+ *                   B_TRUE:  update fdb entry to use vsw-port for transmits
+ *                   B_FALSE: update fdb entry to use the port itself for tx
+ *
+ *   flag:	     provides context info
+ *                   B_TRUE:  this func is being called from transmit routine
+ *                   B_FALSE: other contexts (callbacks)
+ */
+static void
+vgen_fdbe_modify(vgen_port_t *portp, boolean_t use_vsw_port,
+	boolean_t flag)
+{
+	vgen_t		*vgenp = portp->vgenp;
+	vnet_t		*vnetp = vgenp->vnetp;
+	vgen_port_t	*pp;
+
+	(use_vsw_port == B_TRUE) ? (pp = vgenp->vsw_portp) : (pp = portp);
+
+	vnet_fdbe_modify(vnetp, &portp->macaddr, pp, flag);
 }
 
 /*
@@ -1503,7 +1962,7 @@ vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp, mde_cookie_t node)
 	for (i = 0, types = vgenp->pri_types; i < size; i++) {
 		types[i] = data[i] & 0xFFFF;
 	}
-	mblk_sz = (VIO_PKT_DATA_HDRSIZE + ETHERMAX + 7) & ~7;
+	mblk_sz = (VIO_PKT_DATA_HDRSIZE + vgenp->max_frame_size + 7) & ~7;
 	(void) vio_create_mblks(vgen_pri_tx_nmblks, mblk_sz,
 	    &vgenp->pri_tx_vmp);
 }
@@ -1516,14 +1975,9 @@ vgen_mdeg_reg(vgen_t *vgenp)
 	mdeg_node_spec_t	*parentp;
 	uint_t			templatesz;
 	int			rv;
-	mdeg_handle_t		hdl;
-	int			i;
+	mdeg_handle_t		dev_hdl = NULL;
+	mdeg_handle_t		port_hdl = NULL;
 
-	i = ddi_prop_get_int(DDI_DEV_T_ANY, vgenp->vnetdip,
-	    DDI_PROP_DONTPASS, reg_propname, -1);
-	if (i == -1) {
-		return (DDI_FAILURE);
-	}
 	templatesz = sizeof (vgen_prop_template);
 	pspecp = kmem_zalloc(templatesz, KM_NOSLEEP);
 	if (pspecp == NULL) {
@@ -1541,7 +1995,7 @@ vgen_mdeg_reg(vgen_t *vgenp)
 	 * NOTE: The instance here refers to the value of "reg" property and
 	 * not the dev_info instance (ddi_get_instance()) of vnet.
 	 */
-	VGEN_SET_MDEG_PROP_INST(pspecp, i);
+	VGEN_SET_MDEG_PROP_INST(pspecp, vgenp->regprop);
 
 	parentp->namep = "virtual-device";
 	parentp->specp = pspecp;
@@ -1549,35 +2003,56 @@ vgen_mdeg_reg(vgen_t *vgenp)
 	/* save parentp in vgen_t */
 	vgenp->mdeg_parentp = parentp;
 
-	rv = mdeg_register(parentp, &vport_match, vgen_mdeg_cb, vgenp, &hdl);
+	/*
+	 * Register an interest in 'virtual-device' nodes with a
+	 * 'name' property of 'network'
+	 */
+	rv = mdeg_register(parentp, &vdev_match, vgen_mdeg_cb, vgenp, &dev_hdl);
 	if (rv != MDEG_SUCCESS) {
 		DERR(vgenp, NULL, "mdeg_register failed\n");
-		KMEM_FREE(parentp);
-		kmem_free(pspecp, templatesz);
-		vgenp->mdeg_parentp = NULL;
-		return (DDI_FAILURE);
+		goto mdeg_reg_fail;
+	}
+
+	/* Register an interest in 'port' nodes */
+	rv = mdeg_register(parentp, &vport_match, vgen_mdeg_port_cb, vgenp,
+	    &port_hdl);
+	if (rv != MDEG_SUCCESS) {
+		DERR(vgenp, NULL, "mdeg_register failed\n");
+		goto mdeg_reg_fail;
 	}
 
 	/* save mdeg handle in vgen_t */
-	vgenp->mdeg_hdl = hdl;
+	vgenp->mdeg_dev_hdl = dev_hdl;
+	vgenp->mdeg_port_hdl = port_hdl;
 
 	return (DDI_SUCCESS);
+
+mdeg_reg_fail:
+	if (dev_hdl != NULL) {
+		(void) mdeg_unregister(dev_hdl);
+	}
+	KMEM_FREE(parentp);
+	kmem_free(pspecp, templatesz);
+	vgenp->mdeg_parentp = NULL;
+	return (DDI_FAILURE);
 }
 
 /* unregister with MD event generator */
 static void
 vgen_mdeg_unreg(vgen_t *vgenp)
 {
-	(void) mdeg_unregister(vgenp->mdeg_hdl);
+	(void) mdeg_unregister(vgenp->mdeg_dev_hdl);
+	(void) mdeg_unregister(vgenp->mdeg_port_hdl);
 	kmem_free(vgenp->mdeg_parentp->specp, sizeof (vgen_prop_template));
 	KMEM_FREE(vgenp->mdeg_parentp);
 	vgenp->mdeg_parentp = NULL;
-	vgenp->mdeg_hdl = NULL;
+	vgenp->mdeg_dev_hdl = NULL;
+	vgenp->mdeg_port_hdl = NULL;
 }
 
-/* callback function registered with MD event generator */
+/* mdeg callback function for the port node */
 static int
-vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
+vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp)
 {
 	int idx;
 	int vsw_idx = -1;
@@ -1613,7 +2088,7 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 				if (val == 0) {
 					/*
 					 * This port is connected to the
-					 * vsw on dom0.
+					 * vsw on service domain.
 					 */
 					vsw_idx = idx;
 					if (vgen_add_port(vgenp,
@@ -1660,23 +2135,190 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	return (MDEG_SUCCESS);
 }
 
+/* mdeg callback function for the vnet node */
+static int
+vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
+{
+	vgen_t		*vgenp;
+	vnet_t		*vnetp;
+	md_t		*mdp;
+	mde_cookie_t	node;
+	uint64_t	inst;
+	char		*node_name = NULL;
+
+	if ((resp == NULL) || (cb_argp == NULL)) {
+		return (MDEG_FAILURE);
+	}
+
+	vgenp = (vgen_t *)cb_argp;
+	vnetp = vgenp->vnetp;
+
+	DBG1(vgenp, NULL, "%s: added %d : removed %d : curr matched %d"
+	    " : prev matched %d", resp->added.nelem, resp->removed.nelem,
+	    resp->match_curr.nelem, resp->match_prev.nelem);
+
+	mutex_enter(&vgenp->lock);
+
+	/*
+	 * We get an initial callback for this node as 'added' after
+	 * registering with mdeg. Note that we would have already gathered
+	 * information about this vnet node by walking MD earlier during attach
+	 * (in vgen_read_mdprops()). So, there is a window where the properties
+	 * of this node might have changed when we get this initial 'added'
+	 * callback. We handle this as if an update occured and invoke the same
+	 * function which handles updates to the properties of this vnet-node
+	 * if any. A non-zero 'match' value indicates that the MD has been
+	 * updated and that a 'network' node is present which may or may not
+	 * have been updated. It is up to the clients to examine their own
+	 * nodes and determine if they have changed.
+	 */
+	if (resp->added.nelem != 0) {
+
+		if (resp->added.nelem != 1) {
+			cmn_err(CE_NOTE, "!vnet%d: number of nodes added "
+			    "invalid: %d\n", vnetp->instance,
+			    resp->added.nelem);
+			goto vgen_mdeg_cb_err;
+		}
+
+		mdp = resp->added.mdp;
+		node = resp->added.mdep[0];
+
+	} else if (resp->match_curr.nelem != 0) {
+
+		if (resp->match_curr.nelem != 1) {
+			cmn_err(CE_NOTE, "!vnet%d: number of nodes updated "
+			    "invalid: %d\n", vnetp->instance,
+			    resp->match_curr.nelem);
+			goto vgen_mdeg_cb_err;
+		}
+
+		mdp = resp->match_curr.mdp;
+		node = resp->match_curr.mdep[0];
+
+	} else {
+		goto vgen_mdeg_cb_err;
+	}
+
+	/* Validate name and instance */
+	if (md_get_prop_str(mdp, node, "name", &node_name) != 0) {
+		DERR(vgenp, NULL, "unable to get node name\n");
+		goto vgen_mdeg_cb_err;
+	}
+
+	/* is this a virtual-network device? */
+	if (strcmp(node_name, vnet_propname) != 0) {
+		DERR(vgenp, NULL, "%s: Invalid node name: %s\n", node_name);
+		goto vgen_mdeg_cb_err;
+	}
+
+	if (md_get_prop_val(mdp, node, "cfg-handle", &inst)) {
+		DERR(vgenp, NULL, "prop(cfg-handle) not found\n");
+		goto vgen_mdeg_cb_err;
+	}
+
+	/* is this the right instance of vsw? */
+	if (inst != vgenp->regprop) {
+		DERR(vgenp, NULL,  "Invalid cfg-handle: %lx\n", inst);
+		goto vgen_mdeg_cb_err;
+	}
+
+	vgen_update_md_prop(vgenp, mdp, node);
+
+	mutex_exit(&vgenp->lock);
+	return (MDEG_SUCCESS);
+
+vgen_mdeg_cb_err:
+	mutex_exit(&vgenp->lock);
+	return (MDEG_FAILURE);
+}
+
+/*
+ * Check to see if the relevant properties in the specified node have
+ * changed, and if so take the appropriate action.
+ */
+static void
+vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
+{
+	uint16_t	pvid;
+	uint16_t	*vids;
+	uint16_t	nvids;
+	vnet_t		*vnetp = vgenp->vnetp;
+	boolean_t	updated_vlans = B_FALSE;
+
+	/* Read the vlan ids */
+	vgen_vlan_read_ids(vgenp, VGEN_LOCAL, mdp, mdex, &pvid, &vids,
+	    &nvids, NULL);
+
+	/* Determine if there are any vlan id updates */
+	if ((pvid != vnetp->pvid) ||		/* pvid changed? */
+	    (nvids != vnetp->nvids) ||		/* # of vids changed? */
+	    ((nvids != 0) && (vnetp->nvids != 0) &&	/* vids changed? */
+	    bcmp(vids, vnetp->vids, sizeof (uint16_t) * nvids))) {
+		updated_vlans = B_TRUE;
+	}
+
+	if (updated_vlans == B_FALSE) {
+		if (nvids != 0) {
+			kmem_free(vids, sizeof (uint16_t) * nvids);
+		}
+		return;
+	}
+
+	/* save the new vlan ids */
+	vnetp->pvid = pvid;
+	if (vnetp->nvids != 0) {
+		kmem_free(vnetp->vids, sizeof (uint16_t) * vnetp->nvids);
+		vnetp->nvids = 0;
+	}
+	if (nvids != 0) {
+		vnetp->nvids = nvids;
+		vnetp->vids = vids;
+	}
+
+	/* reset vlan-unaware peers (ver < 1.3) and restart handshake */
+	vgen_reset_vlan_unaware_ports(vgenp);
+}
+
 /* add a new port to the device */
 static int
 vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 {
-	uint64_t	port_num;
-	uint64_t	*ldc_ids;
-	uint64_t	macaddr;
-	uint64_t	val;
-	int		num_ldcs;
-	int		vsw_port = B_FALSE;
-	int		i;
-	int		addrsz;
-	int		num_nodes = 0;
-	int		listsz = 0;
-	int		rv = DDI_SUCCESS;
-	mde_cookie_t	*listp = NULL;
-	uint8_t		*addrp;
+	vgen_port_t	*portp;
+	int		rv;
+
+	portp = kmem_zalloc(sizeof (vgen_port_t), KM_SLEEP);
+
+	rv = vgen_port_read_props(portp, vgenp, mdp, mdex);
+	if (rv != DDI_SUCCESS) {
+		KMEM_FREE(portp);
+		return (DDI_FAILURE);
+	}
+
+	rv = vgen_port_attach(portp);
+	if (rv != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/* read properties of the port from its md node */
+static int
+vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
+	mde_cookie_t mdex)
+{
+	uint64_t		port_num;
+	uint64_t		*ldc_ids;
+	uint64_t		macaddr;
+	uint64_t		val;
+	int			num_ldcs;
+	int			i;
+	int			addrsz;
+	int			num_nodes = 0;
+	int			listsz = 0;
+	mde_cookie_t		*listp = NULL;
+	uint8_t			*addrp;
 	struct ether_addr	ea;
 
 	/* read "id" property to get the port number */
@@ -1757,22 +2399,27 @@ vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 	if (vgenp->vsw_portp == NULL) {
 		if (!(md_get_prop_val(mdp, mdex, swport_propname, &val))) {
 			if (val == 0) {
-				/* This port is connected to the vsw on dom0 */
-				vsw_port = B_TRUE;
+				/* This port is connected to the vsw */
+				vgenp->vsw_portp = portp;
 			}
 		}
 	}
-	if (vgen_port_attach_mdeg(vgenp, (int)port_num, ldc_ids, num_ldcs,
-	    &ea, vsw_port) != DDI_SUCCESS) {
-		cmn_err(CE_NOTE, "vnet%d failed to attach port %d remote MAC "
-		    "address %s", ddi_get_instance(vgenp->vnetdip),
-		    (int)port_num, ether_sprintf(&ea));
-		rv = DDI_FAILURE;
-	}
+
+	/* now update all properties into the port */
+	portp->vgenp = vgenp;
+	portp->port_num = port_num;
+	ether_copy(&ea, &portp->macaddr);
+	portp->ldc_ids = kmem_zalloc(sizeof (uint64_t) * num_ldcs, KM_SLEEP);
+	bcopy(ldc_ids, portp->ldc_ids, sizeof (uint64_t) * num_ldcs);
+	portp->num_ldcs = num_ldcs;
+
+	/* read vlan id properties of this port node */
+	vgen_vlan_read_ids(portp, VGEN_PEER, mdp, mdex, &portp->pvid,
+	    &portp->vids, &portp->nvids, NULL);
 
 	kmem_free(ldc_ids, num_ldcs * sizeof (uint64_t));
 
-	return (rv);
+	return (DDI_SUCCESS);
 }
 
 /* remove a port from the device */
@@ -1807,28 +2454,26 @@ vgen_remove_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 
 /* attach a port to the device based on mdeg data */
 static int
-vgen_port_attach_mdeg(vgen_t *vgenp, int port_num, uint64_t *ldcids,
-	int num_ids, struct ether_addr *macaddr, boolean_t vsw_port)
+vgen_port_attach(vgen_port_t *portp)
 {
-	vgen_port_t		*portp;
-	vgen_portlist_t		*plistp;
 	int			i;
+	vgen_portlist_t		*plistp;
+	vgen_t			*vgenp;
+	uint64_t		*ldcids;
+	uint32_t		num_ldcs;
 
-	portp = kmem_zalloc(sizeof (vgen_port_t), KM_NOSLEEP);
-	if (portp == NULL) {
-		return (DDI_FAILURE);
-	}
-	portp->vgenp = vgenp;
-	portp->port_num = port_num;
+	ASSERT(portp != NULL);
+
+	vgenp = portp->vgenp;
+	ldcids = portp->ldc_ids;
+	num_ldcs = portp->num_ldcs;
 
 	DBG1(vgenp, NULL, "port_num(%d)\n", portp->port_num);
 
-	portp->ldclist.num_ldcs = 0;
-	portp->ldclist.headp = NULL;
 	rw_init(&portp->ldclist.rwlock, NULL, RW_DRIVER, NULL);
+	portp->ldclist.headp = NULL;
 
-	ether_copy(macaddr, &portp->macaddr);
-	for (i = 0; i < num_ids; i++) {
+	for (i = 0; i < num_ldcs; i++) {
 		DBG2(vgenp, NULL, "ldcid (%lx)\n", ldcids[i]);
 		if (vgen_ldc_attach(portp, ldcids[i]) == DDI_FAILURE) {
 			vgen_port_detach(portp);
@@ -1836,15 +2481,14 @@ vgen_port_attach_mdeg(vgen_t *vgenp, int port_num, uint64_t *ldcids,
 		}
 	}
 
+	/* create vlan id hash table */
+	vgen_vlan_create_hash(portp);
+
 	/* link it into the list of ports */
 	plistp = &(vgenp->vgenports);
 	WRITE_ENTER(&plistp->rwlock);
 	vgen_port_list_insert(portp);
 	RW_EXIT(&plistp->rwlock);
-
-	/* This port is connected to the vsw on domain0 */
-	if (vsw_port)
-		vgenp->vsw_portp = portp;
 
 	if (vgenp->flags & VGEN_STARTED) {	/* interface is configured */
 		vgen_port_init(portp);
@@ -1874,9 +2518,83 @@ static int
 vgen_update_port(vgen_t *vgenp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	md_t *prev_mdp, mde_cookie_t prev_mdex)
 {
-	 _NOTE(ARGUNUSED(vgenp, curr_mdp, curr_mdex, prev_mdp, prev_mdex))
+	uint64_t	cport_num;
+	uint64_t	pport_num;
+	vgen_portlist_t	*plistp;
+	vgen_port_t	*portp;
+	boolean_t	updated_vlans = B_FALSE;
+	uint16_t	pvid;
+	uint16_t	*vids;
+	uint16_t	nvids;
 
-	/* NOTE: TBD */
+	/*
+	 * For now, we get port updates only if vlan ids changed.
+	 * We read the port num and do some sanity check.
+	 */
+	if (md_get_prop_val(curr_mdp, curr_mdex, id_propname, &cport_num)) {
+		DWARN(vgenp, NULL, "prop(%s) not found\n", id_propname);
+		return (DDI_FAILURE);
+	}
+
+	if (md_get_prop_val(prev_mdp, prev_mdex, id_propname, &pport_num)) {
+		DWARN(vgenp, NULL, "prop(%s) not found\n", id_propname);
+		return (DDI_FAILURE);
+	}
+	if (cport_num != pport_num)
+		return (DDI_FAILURE);
+
+	plistp = &(vgenp->vgenports);
+
+	READ_ENTER(&plistp->rwlock);
+
+	portp = vgen_port_lookup(plistp, (int)cport_num);
+	if (portp == NULL) {
+		DWARN(vgenp, NULL, "can't find port(%lx)\n", cport_num);
+		RW_EXIT(&plistp->rwlock);
+		return (DDI_FAILURE);
+	}
+
+	/* Read the vlan ids */
+	vgen_vlan_read_ids(portp, VGEN_PEER, curr_mdp, curr_mdex, &pvid, &vids,
+	    &nvids, NULL);
+
+	/* Determine if there are any vlan id updates */
+	if ((pvid != portp->pvid) ||		/* pvid changed? */
+	    (nvids != portp->nvids) ||		/* # of vids changed? */
+	    ((nvids != 0) && (portp->nvids != 0) &&	/* vids changed? */
+	    bcmp(vids, portp->vids, sizeof (uint16_t) * nvids))) {
+		updated_vlans = B_TRUE;
+	}
+
+	if (updated_vlans == B_FALSE) {
+		RW_EXIT(&plistp->rwlock);
+		return (DDI_FAILURE);
+	}
+
+	/* remove the port from vlans it has been assigned to */
+	vgen_vlan_remove_ids(portp);
+
+	/* save the new vlan ids */
+	portp->pvid = pvid;
+	if (portp->nvids != 0) {
+		kmem_free(portp->vids, sizeof (uint16_t) * portp->nvids);
+		portp->nvids = 0;
+	}
+	if (nvids != 0) {
+		portp->vids = kmem_zalloc(sizeof (uint16_t) * nvids, KM_SLEEP);
+		bcopy(vids, portp->vids, sizeof (uint16_t) * nvids);
+		portp->nvids = nvids;
+		kmem_free(vids, sizeof (uint16_t) * nvids);
+	}
+
+	/* add port to the new vlans */
+	vgen_vlan_add_ids(portp);
+
+	/* reset the port if it is vlan unaware (ver < 1.3) */
+	vgen_vlan_unaware_port_reset(portp);
+
+	RW_EXIT(&plistp->rwlock);
+
 	return (DDI_SUCCESS);
 }
 
@@ -1974,7 +2692,7 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	 * allocate a message for ldc_read()s, big enough to hold ctrl and
 	 * data msgs, including raw data msgs used to recv priority frames.
 	 */
-	ldcp->msglen = VIO_PKT_DATA_HDRSIZE + ETHERMAX;
+	ldcp->msglen = VIO_PKT_DATA_HDRSIZE + vgenp->max_frame_size;
 	ldcp->ldcmsg = kmem_alloc(ldcp->msglen, KM_SLEEP);
 	attach_state |= AST_ldc_reg_cb;
 
@@ -2015,7 +2733,6 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	prev_ldcp = (vgen_ldc_t **)(&ldclp->headp);
 	ldcp->nextp = *prev_ldcp;
 	*prev_ldcp = ldcp;
-	ldclp->num_ldcs++;
 	RW_EXIT(&ldclp->rwlock);
 
 	ldcp->flags |= CHANNEL_ATTACHED;
@@ -2122,7 +2839,6 @@ vgen_ldc_detach(vgen_ldc_t *ldcp)
 
 		/* unlink it from the list */
 		*prev_ldcp = ldcp->nextp;
-		ldclp->num_ldcs--;
 		KMEM_FREE(ldcp);
 	}
 }
@@ -2297,13 +3013,11 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 		vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 		if (ldcp->portp != vgenp->vsw_portp) {
 			/*
-			 * modify fdb entry to use this port as the
-			 * channel is up, instead of going through the
-			 * vsw-port (see comments in vgen_port_init())
+			 * modify fdb entry to use this port as the channel is
+			 * up, instead of going through the vsw-port (see
+			 * comments in vgen_port_init())
 			 */
-			vnet_modify_fdb(vgenp->vnetp,
-			    (uint8_t *)&ldcp->portp->macaddr,
-			    vgen_tx, ldcp->portp, B_FALSE);
+			vgen_fdbe_modify(ldcp->portp, B_FALSE, B_FALSE);
 		}
 
 		/* Initialize local session id */
@@ -2417,11 +3131,18 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 	caddr_t			datap = NULL;
 	int			ci;
 	uint32_t		ncookies;
+	size_t			data_sz;
+	vgen_t			*vgenp;
+
+	vgenp = LDC_TO_VGEN(ldcp);
 
 	bzero(ldcp->tbufp, sizeof (*tbufp) * (ldcp->num_txds));
 	bzero(ldcp->txdp, sizeof (*txdp) * (ldcp->num_txds));
 
-	datap = kmem_zalloc(ldcp->num_txds * VGEN_TXDBLK_SZ, KM_SLEEP);
+	data_sz = vgenp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
+	data_sz = VNET_ROUNDUP_2K(data_sz);
+	ldcp->tx_data_sz = data_sz * ldcp->num_txds;
+	datap = kmem_zalloc(ldcp->tx_data_sz, KM_SLEEP);
 	ldcp->tx_datap = datap;
 
 	/*
@@ -2445,7 +3166,7 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 		 */
 		ci = ncookies = 0;
 		rv = ldc_mem_bind_handle(tbufp->memhandle,
-		    (caddr_t)datap, VGEN_TXDBLK_SZ, LDC_SHADOW_MAP,
+		    (caddr_t)datap, data_sz, LDC_SHADOW_MAP,
 		    LDC_MEM_R, &(tbufp->memcookie[ci]), &ncookies);
 		if (rv != 0) {
 			goto init_tbufs_failed;
@@ -2471,7 +3192,7 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 		}
 
 		tbufp->ncookies = ncookies;
-		datap += VGEN_TXDBLK_SZ;
+		datap += data_sz;
 
 		tbufp->flags = VGEN_PRIV_DESC_FREE;
 		txdp = &(ldcp->txdp[i]);
@@ -2524,8 +3245,9 @@ vgen_uninit_tbufs(vgen_ldc_t *ldcp)
 
 	if (ldcp->tx_datap) {
 		/* prealloc'd tx data buffer */
-		kmem_free(ldcp->tx_datap, ldcp->num_txds * VGEN_TXDBLK_SZ);
+		kmem_free(ldcp->tx_datap, ldcp->tx_data_sz);
 		ldcp->tx_datap = NULL;
+		ldcp->tx_data_sz = 0;
 	}
 
 	bzero(ldcp->tbufp, sizeof (vgen_private_desc_t) * (ldcp->num_txds));
@@ -2741,8 +3463,8 @@ vgen_ldc_stat(vgen_ldc_t *ldcp, uint_t stat)
 }
 
 /*
- * LDC channel is UP, start handshake process with peer.
- * Flag tells vnet_modify_fdb() about the context: set to B_TRUE if this
+ * LDC channel is UP, start handshake process with peer. Flag tells
+ * vnet_fdbe_modify() about the context: set to B_TRUE if this
  * function is being called from transmit routine, otherwise B_FALSE.
  */
 static void
@@ -2756,12 +3478,11 @@ vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag)
 
 	if (ldcp->portp != vgenp->vsw_portp) {
 		/*
-		 * modify fdb entry to use this port as the
-		 * channel is up, instead of going through the
-		 * vsw-port (see comments in vgen_port_init())
+		 * modify fdb entry to use this port as the channel is up,
+		 * instead of going through the vsw-port (see comments in
+		 * vgen_port_init())
 		 */
-		vnet_modify_fdb(vgenp->vnetp, (uint8_t *)&ldcp->portp->macaddr,
-		    vgen_tx, ldcp->portp, flag);
+		vgen_fdbe_modify(ldcp->portp, B_FALSE, flag);
 	}
 
 	/* Initialize local session id */
@@ -2784,7 +3505,7 @@ vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag)
 /*
  * LDC channel is Reset, terminate connection with peer and try to
  * bring the channel up again.
- * Flag tells vnet_modify_fdb() about the context: set to B_TRUE if this
+ * Flag tells vnet_fdbe_modify() about the context: set to B_TRUE if this
  * function is being called from transmit routine, otherwise B_FALSE.
  */
 static void
@@ -2801,13 +3522,11 @@ vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag)
 	if ((ldcp->portp != vgenp->vsw_portp) &&
 	    (vgenp->vsw_portp != NULL)) {
 		/*
-		 * modify fdb entry to use vsw-port  as the
-		 * channel is reset and we don't have a direct
-		 * link to the destination (see comments
-		 * in vgen_port_init()).
+		 * modify fdb entry to use vsw-port  as the channel is reset
+		 * and we don't have a direct link to the destination (see
+		 * comments in vgen_port_init()).
 		 */
-		vnet_modify_fdb(vgenp->vnetp, (uint8_t *)&ldcp->portp->macaddr,
-		    vgen_tx, vgenp->vsw_portp, flag);
+		vgen_fdbe_modify(ldcp->portp, B_TRUE, flag);
 	}
 
 	if (ldcp->hphase != VH_PHASE0) {
@@ -3461,8 +4180,33 @@ vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp)
 	vgen_hparams_t	*lp = &ldcp->local_hparams;
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 
-	if ((lp->ver_major == 1) && (lp->ver_minor == 2)) {
-		/* Version 1.2 */
+	if (VGEN_VER_GTEQ(ldcp, 1, 3)) {
+		/*
+		 * If the version negotiated with peer is >= 1.3,
+		 * set the mtu in our attributes to max_frame_size.
+		 */
+		lp->mtu = vgenp->max_frame_size;
+	} else {
+		vgen_port_t	*portp = ldcp->portp;
+		vnet_t		*vnetp = vgenp->vnetp;
+		/*
+		 * Pre-1.3 peers expect max frame size of ETHERMAX.
+		 * We can negotiate that size with those peers provided the
+		 * following conditions are true:
+		 * - Our max_frame_size is greater only by VLAN_TAGSZ (4).
+		 * - Only pvid is defined for our peer and there are no vids.
+		 * - pvids are equal.
+		 * If the above conditions are true, then we can send/recv only
+		 * untagged frames of max size ETHERMAX.
+		 */
+		if ((vgenp->max_frame_size == ETHERMAX + VLAN_TAGSZ) &&
+		    portp->nvids == 0 && portp->pvid == vnetp->pvid) {
+			lp->mtu = ETHERMAX;
+		}
+	}
+
+	if (VGEN_VER_GTEQ(ldcp, 1, 2)) {
+		/* Versions >= 1.2 */
 
 		if (VGEN_PRI_ETH_DEFINED(vgenp)) {
 			/*
@@ -3506,6 +4250,62 @@ vgen_reset_vnet_proto_ops(vgen_ldc_t *ldcp)
 
 	/* set xfer mode for vgen_send_attr_info() */
 	lp->xfer_mode = VIO_DRING_MODE_V1_0;
+}
+
+static void
+vgen_vlan_unaware_port_reset(vgen_port_t *portp)
+{
+	vgen_ldclist_t	*ldclp;
+	vgen_ldc_t	*ldcp;
+	vgen_t		*vgenp = portp->vgenp;
+	vnet_t		*vnetp = vgenp->vnetp;
+
+	ldclp = &portp->ldclist;
+
+	READ_ENTER(&ldclp->rwlock);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->headp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return;
+	}
+	ldcp = ldclp->headp;
+
+	mutex_enter(&ldcp->cblock);
+
+	/*
+	 * If the peer is vlan_unaware(ver < 1.3), reset channel and terminate
+	 * the connection. See comments in vgen_set_vnet_proto_ops().
+	 */
+	if (ldcp->hphase == VH_DONE && VGEN_VER_LT(ldcp, 1, 3) &&
+	    (portp->nvids != 0 || portp->pvid != vnetp->pvid)) {
+		ldcp->need_ldc_reset = B_TRUE;
+		vgen_handshake_retry(ldcp);
+	}
+
+	mutex_exit(&ldcp->cblock);
+
+	RW_EXIT(&ldclp->rwlock);
+}
+
+static void
+vgen_reset_vlan_unaware_ports(vgen_t *vgenp)
+{
+	vgen_port_t	*portp;
+	vgen_portlist_t	*plistp;
+
+	plistp = &(vgenp->vgenports);
+	READ_ENTER(&plistp->rwlock);
+
+	for (portp = plistp->headp; portp != NULL; portp = portp->nextp) {
+
+		vgen_vlan_unaware_port_reset(portp);
+
+	}
+
+	RW_EXIT(&plistp->rwlock);
 }
 
 /*
@@ -3572,7 +4372,7 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	ldcp->local_hparams.dev_class = VDEV_NETWORK;
 
 	/* set attr_info params */
-	ldcp->local_hparams.mtu = ETHERMAX;
+	ldcp->local_hparams.mtu = vgenp->max_frame_size;
 	ldcp->local_hparams.addr =
 	    vnet_macaddr_strtoul(vgenp->macaddr);
 	ldcp->local_hparams.addr_type = ADDR_TYPE_MAC;
@@ -4059,7 +4859,7 @@ vgen_check_attr_info(vgen_ldc_t *ldcp, vnet_attr_msg_t *msg)
 {
 	vgen_hparams_t	*lp = &ldcp->local_hparams;
 
-	if ((msg->mtu != ETHERMAX) ||
+	if ((msg->mtu != lp->mtu) ||
 	    (msg->addr_type != ADDR_TYPE_MAC) ||
 	    (msg->ack_freq > 64) ||
 	    (msg->xfer_mode != lp->xfer_mode)) {
@@ -4502,13 +5302,14 @@ vgen_handle_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	mblk_t			*mp;
 	vgen_t			*vgenp = LDC_TO_VGEN(ldcp);
 	vgen_stats_t		*statsp = &ldcp->stats;
+	vgen_hparams_t		*lp = &ldcp->local_hparams;
 
 	ASSERT(MUTEX_HELD(&ldcp->cblock));
 
 	mutex_exit(&ldcp->cblock);
 
 	size = msglen - VIO_PKT_DATA_HDRSIZE;
-	if (size < ETHERMIN || size > ETHERMAX) {
+	if (size < ETHERMIN || size > lp->mtu) {
 		(void) atomic_inc_32(&statsp->rx_pri_fail);
 		goto exit;
 	}

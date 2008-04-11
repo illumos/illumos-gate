@@ -71,6 +71,7 @@
 #include <sys/vio_util.h>
 #include <sys/sdt.h>
 #include <sys/atomic.h>
+#include <sys/vlan.h>
 
 /* Switching setup routines */
 void vsw_setup_switching_timeout(void *arg);
@@ -81,23 +82,37 @@ static	int vsw_setup_layer3(vsw_t *);
 
 /* Switching/data transmit routines */
 static	void vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
-    vsw_port_t *port, mac_resource_handle_t);
+	vsw_port_t *port, mac_resource_handle_t);
 static	void vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
-    vsw_port_t *port, mac_resource_handle_t);
+	vsw_port_t *port, mac_resource_handle_t);
 static	int vsw_forward_all(vsw_t *vswp, mblk_t *mp,
 	int caller, vsw_port_t *port);
 static	int vsw_forward_grp(vsw_t *vswp, mblk_t *mp,
     int caller, vsw_port_t *port);
 
+/* VLAN routines */
+void vsw_create_vlans(void *arg, int type);
+void vsw_destroy_vlans(void *arg, int type);
+void vsw_vlan_add_ids(void *arg, int type);
+void vsw_vlan_remove_ids(void *arg, int type);
+static	void vsw_vlan_create_hash(void *arg, int type);
+static	void vsw_vlan_destroy_hash(void *arg, int type);
+boolean_t vsw_frame_lookup_vid(void *arg, int caller, struct ether_header *ehp,
+	uint16_t *vidp);
+mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
+uint32_t vsw_vlan_frames_untag(void *arg, int type, mblk_t **np, mblk_t **npt);
+boolean_t vsw_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid);
+
 /* Forwarding database (FDB) routines */
-static	vsw_port_t *vsw_lookup_fdb(vsw_t *vswp, struct ether_header *);
+void vsw_fdbe_add(vsw_t *vswp, void *port);
+void vsw_fdbe_del(vsw_t *vswp, struct ether_addr *eaddr);
+static	vsw_fdbe_t *vsw_fdbe_find(vsw_t *vswp, struct ether_addr *);
+static void vsw_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val);
+
 int vsw_add_rem_mcst(vnet_mcast_msg_t *, vsw_port_t *);
-void vsw_del_mcst_port(vsw_port_t *);
 int vsw_add_mcst(vsw_t *, uint8_t, uint64_t, void *);
 int vsw_del_mcst(vsw_t *, uint8_t, uint64_t, void *);
 void vsw_del_mcst_vsw(vsw_t *);
-int vsw_add_fdb(vsw_t *vswp, vsw_port_t *port);
-int vsw_del_fdb(vsw_t *vswp, vsw_port_t *port);
 
 /* Support functions */
 static mblk_t *vsw_dupmsgchain(mblk_t *mp);
@@ -123,8 +138,21 @@ extern int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt,
 /*
  * Tunables used in this file.
  */
-extern int vsw_setup_switching_delay;
+extern	int vsw_setup_switching_delay;
+extern	uint32_t vsw_vlan_nchains;
+extern	uint32_t vsw_fdbe_refcnt_delay;
 
+#define	VSW_FDBE_REFHOLD(p)						\
+{									\
+	atomic_inc_32(&(p)->refcnt);					\
+	ASSERT((p)->refcnt != 0);					\
+}
+
+#define	VSW_FDBE_REFRELE(p)						\
+{									\
+	ASSERT((p)->refcnt != 0);					\
+	atomic_dec_32(&(p)->refcnt);					\
+}
 
 /*
  * Timeout routine to setup switching mode:
@@ -381,11 +409,10 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			vsw_port_t *arg, mac_resource_handle_t mrh)
 {
 	struct ether_header	*ehp;
-	vsw_port_t		*port = NULL;
 	mblk_t			*bp, *ret_m;
 	mblk_t			*mpt = NULL;
 	uint32_t		count;
-	vsw_port_list_t		*plist = &vswp->plist;
+	vsw_fdbe_t		*fp;
 
 	D1(vswp, "%s: enter (caller %d)", __func__, caller);
 
@@ -420,14 +447,12 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			continue;
 		}
 
-		READ_ENTER(&plist->lockrw);
-		port = vsw_lookup_fdb(vswp, ehp);
-		if (port) {
-			/*
-			 * Mark the port as in-use before releasing the lockrw.
-			 */
-			VSW_PORT_REFHOLD(port);
-			RW_EXIT(&plist->lockrw);
+		/*
+		 * Find fdb entry for the destination
+		 * and hold a reference to it.
+		 */
+		fp = vsw_fdbe_find(vswp, &ehp->ether_dhost);
+		if (fp != NULL) {
 
 			/*
 			 * If plumbed and in promisc mode then copy msg
@@ -442,14 +467,11 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 * vsw_port (connected to a vnet device -
 			 * VSW_VNETPORT)
 			 */
-			(void) vsw_portsend(port, mp, mpt, count);
+			(void) vsw_portsend(fp->portp, mp, mpt, count);
 
-			/*
-			 * Decrement use count in port.
-			 */
-			VSW_PORT_REFRELE(port);
+			/* Release the reference on the fdb entry */
+			VSW_FDBE_REFRELE(fp);
 		} else {
-			RW_EXIT(&plist->lockrw);
 			/*
 			 * Destination not in FDB.
 			 *
@@ -534,11 +556,10 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			vsw_port_t *arg, mac_resource_handle_t mrh)
 {
 	struct ether_header	*ehp;
-	vsw_port_t		*port = NULL;
 	mblk_t			*bp = NULL;
 	mblk_t			*mpt;
 	uint32_t		count;
-	vsw_port_list_t		*plist = &vswp->plist;
+	vsw_fdbe_t		*fp;
 
 	D1(vswp, "%s: enter (caller %d)", __func__, caller);
 
@@ -563,24 +584,19 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
 		    __func__, MBLKSIZE(mp), MBLKL(mp));
 
-		READ_ENTER(&plist->lockrw);
-		port = vsw_lookup_fdb(vswp, ehp);
-		if (port) {
-			/*
-			 * Mark the port as in-use before releasing the lockrw.
-			 */
-			VSW_PORT_REFHOLD(port);
-			RW_EXIT(&plist->lockrw);
+		/*
+		 * Find fdb entry for the destination
+		 * and hold a reference to it.
+		 */
+		fp = vsw_fdbe_find(vswp, &ehp->ether_dhost);
+		if (fp != NULL) {
 
 			D2(vswp, "%s: sending to target port", __func__);
-			(void) vsw_portsend(port, mp, mpt, count);
+			(void) vsw_portsend(fp->portp, mp, mpt, count);
 
-			/*
-			 * Decrement ref count.
-			 */
-			VSW_PORT_REFRELE(port);
+			/* Release the reference on the fdb entry */
+			VSW_FDBE_REFRELE(fp);
 		} else {
-			RW_EXIT(&plist->lockrw);
 			/*
 			 * Destination not in FDB
 			 *
@@ -718,7 +734,7 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 	/*
 	 * Convert address to hash table key
 	 */
-	KEY_HASH(key, ehp->ether_dhost);
+	KEY_HASH(key, &ehp->ether_dhost);
 
 	D1(vswp, "%s: key 0x%llx", __func__, key);
 
@@ -823,82 +839,556 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 }
 
 /*
- * Add an entry into FDB, for the given mac address and port_id.
- * Returns 0 on success, 1 on failure.
- *
- * Lock protecting FDB must be held by calling process.
+ * This function creates the vlan id hash table for the given vsw device or
+ * port. It then adds each vlan that the device or port has been assigned,
+ * into this hash table.
+ * Arguments:
+ *   arg:  vsw device or port.
+ *   type: type of arg; VSW_LOCALDEV(vsw device) or VSW_VNETPORT(port).
  */
-int
-vsw_add_fdb(vsw_t *vswp, vsw_port_t *port)
+void
+vsw_create_vlans(void *arg, int type)
+{
+	/* create vlan hash table */
+	vsw_vlan_create_hash(arg, type);
+
+	/* add vlan ids of the vsw device into its hash table */
+	vsw_vlan_add_ids(arg, type);
+}
+
+/*
+ * This function removes the vlan ids of the vsw device or port from its hash
+ * table. It then destroys the vlan hash table.
+ * Arguments:
+ *   arg:  vsw device or port.
+ *   type: type of arg; VSW_LOCALDEV(vsw device) or VSW_VNETPORT(port).
+ */
+void
+vsw_destroy_vlans(void *arg, int type)
+{
+	/* remove vlan ids from the hash table */
+	vsw_vlan_remove_ids(arg, type);
+
+	/* destroy vlan-hash-table */
+	vsw_vlan_destroy_hash(arg, type);
+}
+
+/*
+ * Create a vlan-id hash table for the given vsw device or port.
+ */
+static void
+vsw_vlan_create_hash(void *arg, int type)
+{
+	char		hashname[MAXNAMELEN];
+
+	if (type == VSW_LOCALDEV) {
+		vsw_t		*vswp = (vsw_t *)arg;
+
+		(void) snprintf(hashname, MAXNAMELEN, "vsw%d-vlan-hash",
+		    vswp->instance);
+
+		vswp->vlan_nchains = vsw_vlan_nchains;
+		vswp->vlan_hashp = mod_hash_create_idhash(hashname,
+		    vswp->vlan_nchains, mod_hash_null_valdtor);
+
+	} else if (type == VSW_VNETPORT) {
+		vsw_port_t	*portp = (vsw_port_t *)arg;
+
+		(void) snprintf(hashname, MAXNAMELEN, "port%d-vlan-hash",
+		    portp->p_instance);
+
+		portp->vlan_nchains = vsw_vlan_nchains;
+		portp->vlan_hashp = mod_hash_create_idhash(hashname,
+		    portp->vlan_nchains, mod_hash_null_valdtor);
+
+	} else {
+		return;
+	}
+}
+
+/*
+ * Destroy the vlan-id hash table for the given vsw device or port.
+ */
+static void
+vsw_vlan_destroy_hash(void *arg, int type)
+{
+	if (type == VSW_LOCALDEV) {
+		vsw_t		*vswp = (vsw_t *)arg;
+
+		mod_hash_destroy_hash(vswp->vlan_hashp);
+		vswp->vlan_nchains = 0;
+	} else if (type == VSW_VNETPORT) {
+		vsw_port_t	*portp = (vsw_port_t *)arg;
+
+		mod_hash_destroy_hash(portp->vlan_hashp);
+		portp->vlan_nchains = 0;
+	} else {
+		return;
+	}
+}
+
+/*
+ * Add vlan ids of the given vsw device or port into its hash table.
+ */
+void
+vsw_vlan_add_ids(void *arg, int type)
+{
+	int	rv;
+	int	i;
+
+	if (type == VSW_LOCALDEV) {
+		vsw_t		*vswp = (vsw_t *)arg;
+
+		rv = mod_hash_insert(vswp->vlan_hashp,
+		    (mod_hash_key_t)VLAN_ID_KEY(vswp->pvid),
+		    (mod_hash_val_t)B_TRUE);
+		ASSERT(rv == 0);
+
+		for (i = 0; i < vswp->nvids; i++) {
+			rv = mod_hash_insert(vswp->vlan_hashp,
+			    (mod_hash_key_t)VLAN_ID_KEY(vswp->vids[i]),
+			    (mod_hash_val_t)B_TRUE);
+			ASSERT(rv == 0);
+		}
+
+	} else if (type == VSW_VNETPORT) {
+		vsw_port_t	*portp = (vsw_port_t *)arg;
+
+		rv = mod_hash_insert(portp->vlan_hashp,
+		    (mod_hash_key_t)VLAN_ID_KEY(portp->pvid),
+		    (mod_hash_val_t)B_TRUE);
+		ASSERT(rv == 0);
+
+		for (i = 0; i < portp->nvids; i++) {
+			rv = mod_hash_insert(portp->vlan_hashp,
+			    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i]),
+			    (mod_hash_val_t)B_TRUE);
+			ASSERT(rv == 0);
+		}
+
+	} else {
+		return;
+	}
+}
+
+/*
+ * Remove vlan ids of the given vsw device or port from its hash table.
+ */
+void
+vsw_vlan_remove_ids(void *arg, int type)
+{
+	mod_hash_val_t	vp;
+	int		rv;
+	int		i;
+
+	if (type == VSW_LOCALDEV) {
+		vsw_t		*vswp = (vsw_t *)arg;
+
+		rv = vsw_vlan_lookup(vswp->vlan_hashp, vswp->pvid);
+		if (rv == B_TRUE) {
+			rv = mod_hash_remove(vswp->vlan_hashp,
+			    (mod_hash_key_t)VLAN_ID_KEY(vswp->pvid),
+			    (mod_hash_val_t *)&vp);
+			ASSERT(rv == 0);
+		}
+
+		for (i = 0; i < vswp->nvids; i++) {
+			rv = vsw_vlan_lookup(vswp->vlan_hashp, vswp->vids[i]);
+			if (rv == B_TRUE) {
+				rv = mod_hash_remove(vswp->vlan_hashp,
+				    (mod_hash_key_t)VLAN_ID_KEY(vswp->vids[i]),
+				    (mod_hash_val_t *)&vp);
+				ASSERT(rv == 0);
+			}
+		}
+
+	} else if (type == VSW_VNETPORT) {
+		vsw_port_t	*portp = (vsw_port_t *)arg;
+
+		portp = (vsw_port_t *)arg;
+		rv = vsw_vlan_lookup(portp->vlan_hashp, portp->pvid);
+		if (rv == B_TRUE) {
+			rv = mod_hash_remove(portp->vlan_hashp,
+			    (mod_hash_key_t)VLAN_ID_KEY(portp->pvid),
+			    (mod_hash_val_t *)&vp);
+			ASSERT(rv == 0);
+		}
+
+		for (i = 0; i < portp->nvids; i++) {
+			rv = vsw_vlan_lookup(portp->vlan_hashp, portp->vids[i]);
+			if (rv == B_TRUE) {
+				rv = mod_hash_remove(portp->vlan_hashp,
+				    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i]),
+				    (mod_hash_val_t *)&vp);
+				ASSERT(rv == 0);
+			}
+		}
+
+	} else {
+		return;
+	}
+}
+
+/*
+ * Find the given vlan id in the hash table.
+ * Return: B_TRUE if the id is found; B_FALSE if not found.
+ */
+boolean_t
+vsw_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid)
+{
+	int		rv;
+	mod_hash_val_t	vp;
+
+	rv = mod_hash_find(vlan_hashp, VLAN_ID_KEY(vid), (mod_hash_val_t *)&vp);
+
+	if (rv != 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Add an entry into FDB for the given vsw.
+ */
+void
+vsw_fdbe_add(vsw_t *vswp, void *port)
 {
 	uint64_t	addr = 0;
+	vsw_port_t	*portp;
+	vsw_fdbe_t	*fp;
+	int		rv;
 
-	D1(vswp, "%s: enter", __func__);
+	portp = (vsw_port_t *)port;
+	KEY_HASH(addr, &portp->p_macaddr);
 
-	KEY_HASH(addr, port->p_macaddr);
-
-	D2(vswp, "%s: key = 0x%llx", __func__, addr);
+	fp = kmem_zalloc(sizeof (vsw_fdbe_t), KM_SLEEP);
+	fp->portp = port;
 
 	/*
 	 * Note: duplicate keys will be rejected by mod_hash.
 	 */
-	if (mod_hash_insert(vswp->fdb, (mod_hash_key_t)addr,
-	    (mod_hash_val_t)port) != 0) {
-		DERR(vswp, "%s: unable to add entry into fdb.", __func__);
-		return (1);
-	}
-
-	D1(vswp, "%s: exit", __func__);
-	return (0);
+	rv = mod_hash_insert(vswp->fdb_hashp, (mod_hash_key_t)addr,
+	    (mod_hash_val_t)fp);
+	ASSERT(rv == 0);
 }
 
 /*
  * Remove an entry from FDB.
- * Returns 0 on success, 1 on failure.
  */
-int
-vsw_del_fdb(vsw_t *vswp, vsw_port_t *port)
+void
+vsw_fdbe_del(vsw_t *vswp, struct ether_addr *eaddr)
 {
 	uint64_t	addr = 0;
+	vsw_fdbe_t	*fp;
+	int		rv;
 
-	D1(vswp, "%s: enter", __func__);
+	KEY_HASH(addr, eaddr);
 
-	KEY_HASH(addr, port->p_macaddr);
+	/*
+	 * Remove the entry from fdb hash table.
+	 * This prevents further references to this fdb entry.
+	 */
+	rv = mod_hash_remove(vswp->fdb_hashp, (mod_hash_key_t)addr,
+	    (mod_hash_val_t *)&fp);
+	if (rv != 0) {
+		/* invalid key? */
+		return;
+	}
 
-	D2(vswp, "%s: key = 0x%llx", __func__, addr);
+	/*
+	 * If there are threads already ref holding before the entry was
+	 * removed from hash table, then wait for ref count to drop to zero.
+	 */
+	while (fp->refcnt != 0) {
+		delay(drv_usectohz(vsw_fdbe_refcnt_delay));
+	}
 
-	(void) mod_hash_destroy(vswp->fdb, (mod_hash_val_t)addr);
-
-	D1(vswp, "%s: enter", __func__);
-
-	return (0);
+	kmem_free(fp, sizeof (*fp));
 }
 
 /*
- * Search fdb for a given mac address.
- * Returns pointer to the entry if found, else returns NULL.
+ * Search fdb for a given mac address. If an entry is found, hold
+ * a reference to it and return the entry, else returns NULL.
  */
-static vsw_port_t *
-vsw_lookup_fdb(vsw_t *vswp, struct ether_header *ehp)
+static vsw_fdbe_t *
+vsw_fdbe_find(vsw_t *vswp, struct ether_addr *addrp)
 {
 	uint64_t	key = 0;
-	vsw_port_t	*port = NULL;
+	vsw_fdbe_t	*fp;
+	int		rv;
 
-	D1(vswp, "%s: enter", __func__);
+	KEY_HASH(key, addrp);
 
-	KEY_HASH(key, ehp->ether_dhost);
+	rv = mod_hash_find_cb(vswp->fdb_hashp, (mod_hash_key_t)key,
+	    (mod_hash_val_t *)&fp, vsw_fdbe_find_cb);
 
-	D2(vswp, "%s: key = 0x%llx", __func__, key);
-
-	if (mod_hash_find(vswp->fdb, (mod_hash_key_t)key,
-	    (mod_hash_val_t *)&port) != 0) {
-		D2(vswp, "%s: no port found", __func__);
+	if (rv != 0)
 		return (NULL);
+
+	return (fp);
+}
+
+/*
+ * Callback function provided to mod_hash_find_cb(). After finding the fdb
+ * entry corresponding to the key (macaddr), this callback will be invoked by
+ * mod_hash_find_cb() to atomically increment the reference count on the fdb
+ * entry before returning the found entry.
+ */
+static void
+vsw_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val)
+{
+	_NOTE(ARGUNUSED(key))
+	VSW_FDBE_REFHOLD((vsw_fdbe_t *)val);
+}
+
+/*
+ * A given frame must be always tagged with the appropriate vlan id (unless it
+ * is in the default-vlan) before the mac address switching function is called.
+ * Otherwise, after switching function determines the destination, we cannot
+ * figure out if the destination belongs to the the same vlan that the frame
+ * originated from and if it needs tag/untag. Frames which are inbound from
+ * the external(physical) network over a vlan trunk link are always tagged.
+ * However frames which are received from a vnet-port over ldc or frames which
+ * are coming down the stack on the service domain over vsw interface may be
+ * untagged. These frames must be tagged with the appropriate pvid of the
+ * sender (vnet-port or vsw device), before invoking the switching function.
+ *
+ * Arguments:
+ *   arg:    caller of the function.
+ *   type:   type of arg(caller): VSW_LOCALDEV(vsw) or VSW_VNETPORT(port)
+ *   mp:     frame(s) to be tagged.
+ */
+mblk_t *
+vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp)
+{
+	vsw_t			*vswp;
+	vsw_port_t		*portp;
+	struct ether_header	*ehp;
+	mblk_t			*bp;
+	mblk_t			*bpt;
+	mblk_t			*bph;
+	mblk_t			*bpn;
+	uint16_t		pvid;
+
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+
+	if (type == VSW_LOCALDEV) {
+		vswp = (vsw_t *)arg;
+		pvid = vswp->pvid;
+		portp = NULL;
+	} else {
+		/* VSW_VNETPORT */
+		portp = (vsw_port_t *)arg;
+		pvid = portp->pvid;
+		vswp = portp->p_vswp;
 	}
 
-	D1(vswp, "%s: exit", __func__);
+	bpn = bph = bpt = NULL;
 
-	return (port);
+	for (bp = mp; bp != NULL; bp = bpn) {
+
+		bpn = bp->b_next;
+		bp->b_next = bp->b_prev = NULL;
+
+		/* Determine if it is an untagged frame */
+		ehp = (struct ether_header *)bp->b_rptr;
+
+		if (ehp->ether_type != ETHERTYPE_VLAN) {	/* untagged */
+
+			/* no need to tag if the frame is in default vlan */
+			if (pvid != vswp->default_vlan_id) {
+				bp = vnet_vlan_insert_tag(bp, pvid);
+				if (bp == NULL) {
+					continue;
+				}
+			}
+		}
+
+		/* build a chain of processed packets */
+		if (bph == NULL) {
+			bph = bpt = bp;
+		} else {
+			bpt->b_next = bp;
+			bpt = bp;
+		}
+
+	}
+
+	return (bph);
+}
+
+/*
+ * Frames destined to a vnet-port or to the local vsw interface, must be
+ * untagged if necessary before sending. This function first checks that the
+ * frame can be sent to the destination in the vlan identified by the frame
+ * tag. Note that when this function is invoked the frame must have been
+ * already tagged (unless it is in the default-vlan). Because, this function is
+ * called when the switching function determines the destination and invokes
+ * its send function (vnet-port or vsw interface) and all frames would have
+ * been tagged by this time (see comments in vsw_vlan_frame_pretag()).
+ *
+ * Arguments:
+ *   arg:    destination device.
+ *   type:   type of arg(destination): VSW_LOCALDEV(vsw) or VSW_VNETPORT(port)
+ *   np:     head of pkt chain to be validated and untagged.
+ *   npt:    tail of pkt chain to be validated and untagged.
+ *
+ * Returns:
+ *   np:     head of updated chain of packets
+ *   npt:    tail of updated chain of packets
+ *   rv:     count of any packets dropped
+ */
+uint32_t
+vsw_vlan_frame_untag(void *arg, int type, mblk_t **np, mblk_t **npt)
+{
+	mblk_t			*bp;
+	mblk_t			*bpt;
+	mblk_t			*bph;
+	mblk_t			*bpn;
+	vsw_port_t		*portp;
+	vsw_t			*vswp;
+	uint32_t		count;
+	struct ether_header	*ehp;
+	boolean_t		is_tagged;
+	boolean_t		rv;
+	uint16_t		vlan_id;
+	uint16_t		pvid;
+	mod_hash_t		*vlan_hashp;
+
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+
+	if (type == VSW_LOCALDEV) {
+		vswp = (vsw_t *)arg;
+		pvid = vswp->pvid;
+		vlan_hashp = vswp->vlan_hashp;
+		portp = NULL;
+	} else {
+		/* type == VSW_VNETPORT */
+		portp = (vsw_port_t *)arg;
+		vswp = portp->p_vswp;
+		vlan_hashp = portp->vlan_hashp;
+		pvid = portp->pvid;
+	}
+
+	bpn = bph = bpt = NULL;
+	count = 0;
+
+	for (bp = *np; bp != NULL; bp = bpn) {
+
+		bpn = bp->b_next;
+		bp->b_next = bp->b_prev = NULL;
+
+		/*
+		 * Determine the vlan id that the frame belongs to.
+		 */
+		ehp = (struct ether_header *)bp->b_rptr;
+		is_tagged = vsw_frame_lookup_vid(arg, type, ehp, &vlan_id);
+
+		/*
+		 * Check if the destination is in the same vlan.
+		 */
+		rv = vsw_vlan_lookup(vlan_hashp, vlan_id);
+		if (rv == B_FALSE) {
+			/* drop the packet */
+			freemsg(bp);
+			count++;
+			continue;
+		}
+
+		/*
+		 * Check the frame header if tag/untag is  needed.
+		 */
+		if (is_tagged == B_FALSE) {
+			/*
+			 * Untagged frame. We shouldn't have an untagged
+			 * packet at this point, unless the destination's
+			 * vlan id is default-vlan-id; if it is not the
+			 * default-vlan-id, we drop the packet.
+			 */
+			if (vlan_id != vswp->default_vlan_id) {
+				/* drop the packet */
+				freemsg(bp);
+				count++;
+				continue;
+			}
+		} else {
+			/*
+			 * Tagged frame, untag if it's the destination's pvid.
+			 */
+			if (vlan_id == pvid) {
+
+				bp = vnet_vlan_remove_tag(bp);
+				if (bp == NULL) {
+					/* packet dropped */
+					count++;
+					continue;
+				}
+			}
+		}
+
+		/* build a chain of processed packets */
+		if (bph == NULL) {
+			bph = bpt = bp;
+		} else {
+			bpt->b_next = bp;
+			bpt = bp;
+		}
+
+	}
+
+	*np = bph;
+	*npt = bpt;
+
+	return (count);
+}
+
+/*
+ * Lookup the vlan id of the given frame. If it is a vlan-tagged frame,
+ * then the vlan-id is available in the tag; otherwise, its vlan id is
+ * implicitly obtained based on the caller (destination of the frame:
+ * VSW_VNETPORT or VSW_LOCALDEV).
+ * The vlan id determined is returned in vidp.
+ * Returns: B_TRUE if it is a tagged frame; B_FALSE if it is untagged.
+ */
+boolean_t
+vsw_frame_lookup_vid(void *arg, int caller, struct ether_header *ehp,
+	uint16_t *vidp)
+{
+	struct ether_vlan_header	*evhp;
+	vsw_t				*vswp;
+	vsw_port_t			*portp;
+
+	/* If it's a tagged frame, get the vid from vlan header */
+	if (ehp->ether_type == ETHERTYPE_VLAN) {
+
+		evhp = (struct ether_vlan_header *)ehp;
+		*vidp = VLAN_ID(ntohs(evhp->ether_tci));
+		return (B_TRUE);
+	}
+
+	/* Untagged frame; determine vlan id based on caller */
+	switch (caller) {
+
+	case VSW_VNETPORT:
+		/*
+		 * packet destined to a vnet; vlan-id is pvid of vnet-port.
+		 */
+		portp = (vsw_port_t *)arg;
+		*vidp = portp->pvid;
+		break;
+
+	case VSW_LOCALDEV:
+
+		/*
+		 * packet destined to vsw interface;
+		 * vlan-id is port-vlan-id of vsw device.
+		 */
+		vswp = (vsw_t *)arg;
+		*vidp = vswp->pvid;
+		break;
+	}
+
+	return (B_FALSE);
 }
 
 /*
@@ -923,7 +1413,7 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 		 * Convert address into form that can be used
 		 * as hash table key.
 		 */
-		KEY_HASH(addr, mcst_pkt->mca[i]);
+		KEY_HASH(addr, &(mcst_pkt->mca[i]));
 
 		/*
 		 * Add or delete the specified address/port combination.

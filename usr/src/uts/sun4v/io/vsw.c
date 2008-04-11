@@ -72,6 +72,7 @@
 #include <sys/sdt.h>
 #include <sys/atomic.h>
 #include <sys/callb.h>
+#include <sys/vlan.h>
 
 /*
  * Function prototypes.
@@ -88,10 +89,15 @@ static	void vsw_mdeg_unregister(vsw_t *vswp);
 static	int vsw_mdeg_cb(void *cb_argp, mdeg_result_t *);
 static	int vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *);
 static	int vsw_get_initial_md_properties(vsw_t *vswp, md_t *, mde_cookie_t);
+static	int vsw_read_mdprops(vsw_t *vswp);
+static	void vsw_vlan_read_ids(void *arg, int type, md_t *mdp,
+	mde_cookie_t node, uint16_t *pvidp, uint16_t **vidspp,
+	uint16_t *nvidsp, uint16_t *default_idp);
+static	int vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
+	md_t *mdp, mde_cookie_t *node);
 static	void vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp,
 	mde_cookie_t node);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
-static	int vsw_read_mdprops(vsw_t *vswp);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 
 /* Mac driver related routines */
@@ -120,8 +126,9 @@ extern mcst_addr_t *vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr);
 extern int vsw_detach_ports(vsw_t *vswp);
 extern int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
 extern int vsw_port_detach(vsw_t *vswp, int p_instance);
-extern	int vsw_port_attach(vsw_t *vswp, int p_instance,
-	uint64_t *ldcids, int nids, struct ether_addr *macaddr);
+static int vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
+	md_t *prev_mdp, mde_cookie_t prev_mdex);
+extern	int vsw_port_attach(vsw_port_t *port);
 extern vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
 extern int vsw_mac_attach(vsw_t *vswp);
 extern void vsw_mac_detach(vsw_t *vswp);
@@ -132,7 +139,14 @@ extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
 extern void vsw_reconfig_hw(vsw_t *);
 extern void vsw_unset_addrs(vsw_t *vswp);
 extern void vsw_set_addrs(vsw_t *vswp);
-
+extern void vsw_create_vlans(void *arg, int type);
+extern void vsw_destroy_vlans(void *arg, int type);
+extern void vsw_vlan_add_ids(void *arg, int type);
+extern void vsw_vlan_remove_ids(void *arg, int type);
+extern void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
+extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
+	mblk_t **npt);
+extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
 
 /*
  * Internal tunables.
@@ -147,6 +161,21 @@ int	vsw_ldc_tx_delay = 5;		/* delay(ticks) for tx retries */
 int	vsw_ldc_tx_retries = 10;	/* # of ldc tx retries */
 boolean_t vsw_ldc_rxthr_enabled = B_TRUE;	/* LDC Rx thread enabled */
 boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
+
+uint32_t	vsw_fdb_nchains = 8;	/* # of chains in fdb hash table */
+uint32_t	vsw_vlan_nchains = 4;	/* # of chains in vlan id hash table */
+uint32_t	vsw_ethermtu = 1500;	/* mtu of the device */
+
+/* delay in usec to wait for all references on a fdb entry to be dropped */
+uint32_t vsw_fdbe_refcnt_delay = 10;
+
+/*
+ * Default vlan id. This is only used internally when the "default-vlan-id"
+ * property is not present in the MD device node. Therefore, this should not be
+ * used as a tunable; if this value is changed, the corresponding variable
+ * should be updated to the same value in all vnets connected to this vsw.
+ */
+uint16_t	vsw_default_vlan_id = 1;
 
 /*
  * Workaround for a version handshake bug in obp's vnet.
@@ -300,6 +329,11 @@ static char chan_propname[] = "channel-endpoint";
 static char id_propname[] = "id";
 static char reg_propname[] = "reg";
 static char pri_types_propname[] = "priority-ether-types";
+static char vsw_pvid_propname[] = "port-vlan-id";
+static char vsw_vid_propname[] = "vlan-id";
+static char vsw_dvid_propname[] = "default-vlan-id";
+static char port_pvid_propname[] = "remote-port-vlan-id";
+static char port_vid_propname[] = "remote-vlan-id";
 
 /*
  * Matching criteria passed to the MDEG to register interest
@@ -493,16 +527,17 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	(void) snprintf(hashname, MAXNAMELEN, "vsw_unicst_table-%d",
 	    vswp->instance);
 	D2(vswp, "creating unicast hash table (%s)...", hashname);
-	vswp->fdb = mod_hash_create_ptrhash(hashname, VSW_NCHAINS,
+	vswp->fdb_nchains = vsw_fdb_nchains;
+	vswp->fdb_hashp = mod_hash_create_ptrhash(hashname, vswp->fdb_nchains,
 	    mod_hash_null_valdtor, sizeof (void *));
-
+	vsw_create_vlans((void *)vswp, VSW_LOCALDEV);
 	progress |= PROG_fdb;
 
 	/* setup the multicast fowarding database */
 	(void) snprintf(hashname, MAXNAMELEN, "vsw_mcst_table-%d",
 	    vswp->instance);
 	D2(vswp, "creating multicast hash table %s)...", hashname);
-	vswp->mfdb = mod_hash_create_ptrhash(hashname, VSW_NCHAINS,
+	vswp->mfdb = mod_hash_create_ptrhash(hashname, vsw_fdb_nchains,
 	    mod_hash_null_valdtor, sizeof (void *));
 
 	progress |= PROG_mfdb;
@@ -610,8 +645,10 @@ vsw_attach_fail:
 	if (progress & PROG_mfdb)
 		mod_hash_destroy_hash(vswp->mfdb);
 
-	if (progress & PROG_fdb)
-		mod_hash_destroy_hash(vswp->fdb);
+	if (progress & PROG_fdb) {
+		vsw_destroy_vlans(vswp, VSW_LOCALDEV);
+		mod_hash_destroy_hash(vswp->fdb_hashp);
+	}
 
 	if (progress & PROG_readmd) {
 		if (VSW_PRI_ETH_DEFINED(vswp)) {
@@ -744,8 +781,9 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * default destructors.
 	 */
 	D2(vswp, "vsw_detach: destroying hash tables..");
-	mod_hash_destroy_hash(vswp->fdb);
-	vswp->fdb = NULL;
+	vsw_destroy_vlans(vswp, VSW_LOCALDEV);
+	mod_hash_destroy_hash(vswp->fdb_hashp);
+	vswp->fdb_hashp = NULL;
 
 	WRITE_ENTER(&vswp->mfdbrw);
 	mod_hash_destroy_hash(vswp->mfdb);
@@ -977,7 +1015,8 @@ vsw_mac_register(vsw_t *vswp)
 	macp->m_src_addr = (uint8_t *)&vswp->if_addr;
 	macp->m_callbacks = &vsw_m_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = ETHERMTU;
+	macp->m_max_sdu = vsw_ethermtu;
+	macp->m_margin = VLAN_TAGSZ;
 	rv = mac_register(macp, &vswp->if_mh);
 	mac_free(macp);
 	if (rv != 0) {
@@ -991,6 +1030,9 @@ vsw_mac_register(vsw_t *vswp)
 	}
 
 	vswp->if_state |= VSW_IF_REG;
+
+	vswp->max_frame_size = vsw_ethermtu + sizeof (struct ether_header)
+	    + VLAN_TAGSZ;
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1243,6 +1285,12 @@ vsw_m_tx(void *arg, mblk_t *mp)
 	vsw_t		*vswp = (vsw_t *)arg;
 
 	D1(vswp, "%s: enter", __func__);
+
+	mp = vsw_vlan_frame_pretag(vswp, VSW_LOCALDEV, mp);
+
+	if (mp == NULL) {
+		return (NULL);
+	}
 
 	vswp->vsw_switch_frame(vswp, mp, VSW_LOCALDEV, NULL, NULL);
 
@@ -1507,10 +1555,12 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 		}
 	}
 
-	/*
-	 * Currently no support for updating already active ports.
-	 * So, ignore the match_curr and match_priv arrays for now.
-	 */
+	for (idx = 0; idx < resp->match_curr.nelem; idx++) {
+		(void) vsw_port_update(vswp, resp->match_curr.mdp,
+		    resp->match_curr.mdep[idx],
+		    resp->match_prev.mdp,
+		    resp->match_prev.mdep[idx]);
+	}
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1660,10 +1710,115 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		ASSERT(vswp->smode_num != 0);
 	}
 
+	/* read vlan id properties of this vsw instance */
+	vsw_vlan_read_ids(vswp, VSW_LOCALDEV, mdp, node, &vswp->pvid,
+	    &vswp->vids, &vswp->nvids, &vswp->default_vlan_id);
+
+	/* read priority-ether-types */
 	vsw_read_pri_eth_types(vswp, mdp, node);
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
+}
+
+/*
+ * Read vlan id properties of the given MD node.
+ * Arguments:
+ *   arg:          device argument(vsw device or a port)
+ *   type:         type of arg; VSW_LOCALDEV(vsw device) or VSW_VNETPORT(port)
+ *   mdp:          machine description
+ *   node:         md node cookie
+ *
+ * Returns:
+ *   pvidp:        port-vlan-id of the node
+ *   vidspp:       list of vlan-ids of the node
+ *   nvidsp:       # of vlan-ids in the list
+ *   default_idp:  default-vlan-id of the node(if node is vsw device)
+ */
+static void
+vsw_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
+	uint16_t *pvidp, uint16_t **vidspp, uint16_t *nvidsp,
+	uint16_t *default_idp)
+{
+	vsw_t		*vswp;
+	vsw_port_t	*portp;
+	char		*pvid_propname;
+	char		*vid_propname;
+	uint_t		nvids = 0;
+	uint32_t	vids_size;
+	int		rv;
+	int		i;
+	uint64_t	*data;
+	uint64_t	val;
+	int		size;
+	int		inst;
+
+	if (type == VSW_LOCALDEV) {
+
+		vswp = (vsw_t *)arg;
+		pvid_propname = vsw_pvid_propname;
+		vid_propname = vsw_vid_propname;
+		inst = vswp->instance;
+
+	} else if (type == VSW_VNETPORT) {
+
+		portp = (vsw_port_t *)arg;
+		vswp = portp->p_vswp;
+		pvid_propname = port_pvid_propname;
+		vid_propname = port_vid_propname;
+		inst = portp->p_instance;
+
+	} else {
+		return;
+	}
+
+	if (type == VSW_LOCALDEV && default_idp != NULL) {
+		rv = md_get_prop_val(mdp, node, vsw_dvid_propname, &val);
+		if (rv != 0) {
+			DWARN(vswp, "%s: prop(%s) not found", __func__,
+			    vsw_dvid_propname);
+
+			*default_idp = vsw_default_vlan_id;
+		} else {
+			*default_idp = val & 0xFFF;
+			D2(vswp, "%s: %s(%d): (%d)\n", __func__,
+			    vsw_dvid_propname, inst, *default_idp);
+		}
+	}
+
+	rv = md_get_prop_val(mdp, node, pvid_propname, &val);
+	if (rv != 0) {
+		DWARN(vswp, "%s: prop(%s) not found", __func__, pvid_propname);
+		*pvidp = vsw_default_vlan_id;
+	} else {
+
+		*pvidp = val & 0xFFF;
+		D2(vswp, "%s: %s(%d): (%d)\n", __func__,
+		    pvid_propname, inst, *pvidp);
+	}
+
+	rv = md_get_prop_data(mdp, node, vid_propname, (uint8_t **)&data,
+	    &size);
+	if (rv != 0) {
+		D2(vswp, "%s: prop(%s) not found", __func__, vid_propname);
+		size = 0;
+	} else {
+		size /= sizeof (uint64_t);
+	}
+	nvids = size;
+
+	if (nvids != 0) {
+		D2(vswp, "%s: %s(%d): ", __func__, vid_propname, inst);
+		vids_size = sizeof (uint16_t) * nvids;
+		*vidspp = kmem_zalloc(vids_size, KM_SLEEP);
+		for (i = 0; i < nvids; i++) {
+			(*vidspp)[i] = data[i] & 0xFFFF;
+			D2(vswp, " %d ", (*vidspp)[i]);
+		}
+		D2(vswp, "\n");
+	}
+
+	*nvidsp = nvids;
 }
 
 /*
@@ -1752,8 +1907,12 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	enum		{MD_init = 0x1,
 				MD_physname = 0x2,
 				MD_macaddr = 0x4,
-				MD_smode = 0x8} updated;
+				MD_smode = 0x8,
+				MD_vlans = 0x10} updated;
 	int		rv;
+	uint16_t	pvid;
+	uint16_t	*vids;
+	uint16_t	nvids;
 
 	updated = MD_init;
 
@@ -1845,6 +2004,18 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 				break;
 			}
 		}
+	}
+
+	/* Read the vlan ids */
+	vsw_vlan_read_ids(vswp, VSW_LOCALDEV, mdp, node, &pvid, &vids,
+	    &nvids, NULL);
+
+	/* Determine if there are any vlan id updates */
+	if ((pvid != vswp->pvid) ||		/* pvid changed? */
+	    (nvids != vswp->nvids) ||		/* # of vids changed? */
+	    ((nvids != 0) && (vswp->nvids != 0) &&	/* vids changed? */
+	    bcmp(vids, vswp->vids, sizeof (uint16_t) * nvids))) {
+		updated |= MD_vlans;
 	}
 
 	/*
@@ -1970,6 +2141,29 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 
 	}
 
+	if (updated & MD_vlans) {
+		/* Remove existing vlan ids from the hash table. */
+		vsw_vlan_remove_ids(vswp, VSW_LOCALDEV);
+
+		/* save the new vlan ids */
+		vswp->pvid = pvid;
+		if (vswp->nvids != 0) {
+			kmem_free(vswp->vids, sizeof (uint16_t) * vswp->nvids);
+			vswp->nvids = 0;
+		}
+		if (nvids != 0) {
+			vswp->nvids = nvids;
+			vswp->vids = vids;
+		}
+
+		/* add these new vlan ids into hash table */
+		vsw_vlan_add_ids(vswp, VSW_LOCALDEV);
+	} else {
+		if (nvids != 0) {
+			kmem_free(vids, sizeof (uint16_t) * nvids);
+		}
+	}
+
 	return;
 
 fail_reconf:
@@ -1982,12 +2176,11 @@ fail_update:
 }
 
 /*
- * Add a new port to the system.
- *
- * Returns 0 on success, 1 on failure.
+ * Read the port's md properties.
  */
-int
-vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
+static int
+vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
+	md_t *mdp, mde_cookie_t *node)
 {
 	uint64_t		ldc_id;
 	uint8_t			*addrp;
@@ -1998,7 +2191,6 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 	struct ether_addr	ea;
 	uint64_t		macaddr;
 	uint64_t		inst = 0;
-	vsw_port_t		*port;
 
 	if (md_get_prop_val(mdp, *node, id_propname, &inst)) {
 		DWARN(vswp, "%s: prop(%s) not found", __func__,
@@ -2067,15 +2259,133 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 		macaddr >>= 8;
 	}
 
-	if (vsw_port_attach(vswp, (int)inst, &ldc_id, 1, &ea) != 0) {
+	/* now update all properties into the port */
+	portp->p_vswp = vswp;
+	portp->p_instance = inst;
+	portp->addr_set = VSW_ADDR_UNSET;
+	ether_copy(&ea, &portp->p_macaddr);
+	if (nchan > VSW_PORT_MAX_LDCS) {
+		D2(vswp, "%s: using first of %d ldc ids",
+		    __func__, nchan);
+		nchan = VSW_PORT_MAX_LDCS;
+	}
+	portp->num_ldcs = nchan;
+	portp->ldc_ids =
+	    kmem_zalloc(sizeof (uint64_t) * nchan, KM_SLEEP);
+	bcopy(&ldc_id, (portp->ldc_ids), sizeof (uint64_t) * nchan);
+
+	/* read vlan id properties of this port node */
+	vsw_vlan_read_ids(portp, VSW_VNETPORT, mdp, *node, &portp->pvid,
+	    &portp->vids, &portp->nvids, NULL);
+
+	return (0);
+}
+
+/*
+ * Add a new port to the system.
+ *
+ * Returns 0 on success, 1 on failure.
+ */
+int
+vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
+{
+	vsw_port_t	*portp;
+	int		rv;
+
+	portp = kmem_zalloc(sizeof (vsw_port_t), KM_SLEEP);
+
+	rv = vsw_port_read_props(portp, vswp, mdp, node);
+	if (rv != 0) {
+		kmem_free(portp, sizeof (*portp));
+		return (1);
+	}
+
+	rv = vsw_port_attach(portp);
+	if (rv != 0) {
 		DERR(vswp, "%s: failed to attach port", __func__);
 		return (1);
 	}
 
-	port = vsw_lookup_port(vswp, (int)inst);
+	return (0);
+}
 
-	/* just successfuly created the port, so it should exist */
-	ASSERT(port != NULL);
+static int
+vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
+	md_t *prev_mdp, mde_cookie_t prev_mdex)
+{
+	uint64_t	cport_num;
+	uint64_t	pport_num;
+	vsw_port_list_t	*plistp;
+	vsw_port_t	*portp;
+	boolean_t	updated_vlans = B_FALSE;
+	uint16_t	pvid;
+	uint16_t	*vids;
+	uint16_t	nvids;
+
+	/*
+	 * For now, we get port updates only if vlan ids changed.
+	 * We read the port num and do some sanity check.
+	 */
+	if (md_get_prop_val(curr_mdp, curr_mdex, id_propname, &cport_num)) {
+		return (1);
+	}
+
+	if (md_get_prop_val(prev_mdp, prev_mdex, id_propname, &pport_num)) {
+		return (1);
+	}
+	if (cport_num != pport_num)
+		return (1);
+
+	plistp = &(vswp->plist);
+
+	READ_ENTER(&plistp->lockrw);
+
+	portp = vsw_lookup_port(vswp, cport_num);
+	if (portp == NULL) {
+		RW_EXIT(&plistp->lockrw);
+		return (1);
+	}
+
+	/* Read the vlan ids */
+	vsw_vlan_read_ids(portp, VSW_VNETPORT, curr_mdp, curr_mdex, &pvid,
+	    &vids, &nvids, NULL);
+
+	/* Determine if there are any vlan id updates */
+	if ((pvid != portp->pvid) ||		/* pvid changed? */
+	    (nvids != portp->nvids) ||		/* # of vids changed? */
+	    ((nvids != 0) && (portp->nvids != 0) &&	/* vids changed? */
+	    bcmp(vids, portp->vids, sizeof (uint16_t) * nvids))) {
+		updated_vlans = B_TRUE;
+	}
+
+	if (updated_vlans == B_FALSE) {
+		RW_EXIT(&plistp->lockrw);
+		return (1);
+	}
+
+	/* Remove existing vlan ids from the hash table. */
+	vsw_vlan_remove_ids(portp, VSW_VNETPORT);
+
+	/* save the new vlan ids */
+	portp->pvid = pvid;
+	if (portp->nvids != 0) {
+		kmem_free(portp->vids, sizeof (uint16_t) * portp->nvids);
+		portp->nvids = 0;
+	}
+	if (nvids != 0) {
+		portp->vids = kmem_zalloc(sizeof (uint16_t) * nvids, KM_SLEEP);
+		bcopy(vids, portp->vids, sizeof (uint16_t) * nvids);
+		portp->nvids = nvids;
+		kmem_free(vids, sizeof (uint16_t) * nvids);
+	}
+
+	/* add these new vlan ids into hash table */
+	vsw_vlan_add_ids(portp, VSW_VNETPORT);
+
+	/* reset the port if it is vlan unaware (ver < 1.3) */
+	vsw_vlan_unaware_port_reset(portp);
+
+	RW_EXIT(&plistp->lockrw);
 
 	return (0);
 }
@@ -2093,6 +2403,8 @@ void
 vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
     mblk_t *mp, vsw_macrx_flags_t flags)
 {
+	mblk_t		*mpt;
+
 	D1(vswp, "%s:enter\n", __func__);
 	READ_ENTER(&vswp->if_lockrw);
 	/* Check if the interface is up */
@@ -2135,7 +2447,12 @@ vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
 	}
 
 	D2(vswp, "%s: sending up stack", __func__);
-	mac_rx(vswp->if_mh, mrh, mp);
+
+	mpt = NULL;
+	(void) vsw_vlan_frame_untag(vswp, VSW_LOCALDEV, &mp, &mpt);
+	if (mp != NULL) {
+		mac_rx(vswp->if_mh, mrh, mp);
+	}
 	D1(vswp, "%s:exit\n", __func__);
 }
 

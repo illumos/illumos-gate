@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/ksynch.h>
 #include <sys/stat.h>
 #include <sys/modctl.h>
+#include <sys/modhash.h>
 #include <sys/debug.h>
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
@@ -46,7 +47,9 @@
 #include <sys/sunddi.h>
 #include <sys/strsun.h>
 #include <sys/note.h>
+#include <sys/atomic.h>
 #include <sys/vnet.h>
+#include <sys/vlan.h>
 
 /*
  * Function prototypes.
@@ -72,24 +75,37 @@ static int vnet_read_mac_address(vnet_t *vnetp);
 static void vnet_add_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp);
 static void vnet_del_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp);
 static vp_tl_t *vnet_get_vptl(vnet_t *vnetp, const char *devname);
-static void vnet_fdb_alloc(vnet_t *vnetp);
-static void vnet_fdb_free(vnet_t *vnetp);
-static fdb_t *vnet_lookup_fdb(fdb_fanout_t *fdbhp, uint8_t *macaddr);
 
-/* exported functions */
-void vnet_add_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
-void vnet_del_fdb(void *arg, uint8_t *macaddr);
-void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx,
-	void *txarg, boolean_t upgrade);
-void vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg);
-void vnet_del_def_rte(void *arg);
+/* Forwarding database (FDB) routines */
+static void vnet_fdb_create(vnet_t *vnetp);
+static void vnet_fdb_destroy(vnet_t *vnetp);
+static vnet_fdbe_t *vnet_fdbe_find(vnet_t *vnetp, struct ether_addr *eaddr);
+static void vnet_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val);
+void vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr,
+	uint8_t type, mac_tx_t m_tx, void *port);
+void vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr);
+void vnet_fdbe_modify(vnet_t *vnetp, struct ether_addr *macaddr,
+	void *portp, boolean_t flag);
+
 void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
 void vnet_tx_update(void *arg);
 
 /* externs */
-extern int vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
+extern int vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	mac_register_t **vgenmacp);
 extern int vgen_uninit(void *arg);
+
+#define	VNET_FDBE_REFHOLD(p)						\
+{									\
+	atomic_inc_32(&(p)->refcnt);					\
+	ASSERT((p)->refcnt != 0);					\
+}
+
+#define	VNET_FDBE_REFRELE(p)						\
+{									\
+	ASSERT((p)->refcnt != 0);					\
+	atomic_dec_32(&(p)->refcnt);					\
+}
 
 static mac_callbacks_t vnet_m_callbacks = {
 	0,
@@ -116,7 +132,24 @@ uint32_t vnet_ntxds = VNET_NTXDS;	/* power of 2 transmit descriptors */
 uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
 uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
 uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
-uint32_t vnet_nfdb_hash = VNET_NFDB_HASH;	/* size of fdb hash table */
+
+/* # of chains in fdb hash table */
+uint32_t	vnet_fdb_nchains = VNET_NFDB_HASH;
+
+/* Internal tunables */
+uint32_t	vnet_ethermtu = 1500;	/* mtu of the device */
+
+/*
+ * Default vlan id. This is only used internally when the "default-vlan-id"
+ * property is not present in the MD device node. Therefore, this should not be
+ * used as a tunable; if this value is changed, the corresponding variable
+ * should be updated to the same value in vsw and also other vnets connected to
+ * the same vsw.
+ */
+uint16_t	vnet_default_vlan_id = 1;
+
+/* delay in usec to wait for all references on a fdb entry to be dropped */
+uint32_t vnet_fdbe_refcnt_delay = 10;
 
 /*
  * Property names
@@ -319,7 +352,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnet_add_vptl(vnetp, vp_tlp);
 	attach_state |= AST_vptl_alloc;
 
-	vnet_fdb_alloc(vnetp);
+	vnet_fdb_create(vnetp);
 	attach_state |= AST_fdbh_alloc;
 
 	/* register with MAC layer */
@@ -339,7 +372,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 vnet_attach_fail:
 	if (attach_state & AST_fdbh_alloc) {
-		vnet_fdb_free(vnetp);
+		vnet_fdb_destroy(vnetp);
 	}
 	if (attach_state & AST_vptl_alloc) {
 		WRITE_ENTER(&vnetp->trwlock);
@@ -418,7 +451,8 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	RW_EXIT(&vnet_rw);
 
-	vnet_fdb_free(vnetp);
+	/* destroy fdb */
+	vnet_fdb_destroy(vnetp);
 
 	rw_destroy(&vnetp->trwlock);
 	KMEM_FREE(vnetp);
@@ -552,72 +586,81 @@ vnet_m_promisc(void *arg, boolean_t on)
 mblk_t *
 vnet_m_tx(void *arg, mblk_t *mp)
 {
-	vnet_t *vnetp;
-	mblk_t *next;
-	uint32_t fdbhash;
-	fdb_t *fdbp;
-	fdb_fanout_t *fdbhp;
-	struct ether_header *ehp;
-	uint8_t *macaddr;
-	mblk_t *resid_mp;
+	vnet_t			*vnetp;
+	vnet_fdbe_t		*fp;
+	mblk_t			*next;
+	mblk_t 			*resid_mp;
+	struct ether_header 	*ehp;
 
 	vnetp = (vnet_t *)arg;
 	DBG1(vnetp, "enter\n");
 	ASSERT(mp != NULL);
 
 	while (mp != NULL) {
+
 		next = mp->b_next;
 		mp->b_next = NULL;
 
-		/* get the destination mac address in the eth header */
+		/*
+		 * Find fdb entry for the destination
+		 * and hold a reference to it.
+		 */
 		ehp = (struct ether_header *)mp->b_rptr;
-		macaddr = (uint8_t *)&ehp->ether_dhost;
+		fp = vnet_fdbe_find(vnetp, &ehp->ether_dhost);
+		if (fp != NULL) {
 
-		/* Calculate hash value and fdb fanout */
-		fdbhash = MACHASH(macaddr, vnetp->nfdb_hash);
-		fdbhp = &(vnetp->fdbhp[fdbhash]);
-
-		READ_ENTER(&fdbhp->rwlock);
-		fdbp = vnet_lookup_fdb(fdbhp, macaddr);
-		if (fdbp) {
 			/*
-			 * If the destination is in FDB, the destination is
-			 * a vnet device within ldoms and directly reachable,
-			 * invoke the tx function in the fdb entry.
+			 * Destination found in FDB.
+			 * The destination is a vnet device within ldoms
+			 * and directly reachable, invoke the tx function
+			 * in the fdb entry.
 			 */
-			resid_mp = fdbp->m_tx(fdbp->txarg, mp);
+			resid_mp = fp->m_tx(fp->txarg, mp);
+
+			/* tx done; now release ref on fdb entry */
+			VNET_FDBE_REFRELE(fp);
+
 			if (resid_mp != NULL) {
 				/* m_tx failed */
 				mp->b_next = next;
-				RW_EXIT(&fdbhp->rwlock);
 				break;
 			}
-			RW_EXIT(&fdbhp->rwlock);
 		} else {
-			/* destination is not in FDB */
-			RW_EXIT(&fdbhp->rwlock);
 			/*
+			 * Destination is not in FDB.
 			 * If the destination is broadcast/multicast
 			 * or an unknown unicast address, forward the
-			 * packet to vsw, using the last slot in fdb which is
-			 * reserved for default route.
+			 * packet to vsw, using the cached fdb entry
+			 * to vsw.
 			 */
-			fdbhp = &(vnetp->fdbhp[vnetp->nfdb_hash]);
-			READ_ENTER(&fdbhp->rwlock);
-			fdbp = fdbhp->headp;
-			if (fdbp) {
-				resid_mp = fdbp->m_tx(fdbp->txarg, mp);
-				if (resid_mp != NULL) {
-					/* m_tx failed */
-					mp->b_next = next;
-					RW_EXIT(&fdbhp->rwlock);
-					break;
-				}
-			} else {
-				/* drop the packet */
+			READ_ENTER(&vnetp->vsw_fp_rw);
+
+			fp = vnetp->vsw_fp;
+			if (fp == NULL) {
+				/*
+				 * no fdb entry to vsw? drop the packet.
+				 */
+				RW_EXIT(&vnetp->vsw_fp_rw);
 				freemsg(mp);
+				mp = next;
+				continue;
 			}
-			RW_EXIT(&fdbhp->rwlock);
+
+			/* ref hold the fdb entry to vsw */
+			VNET_FDBE_REFHOLD(fp);
+
+			RW_EXIT(&vnetp->vsw_fp_rw);
+
+			resid_mp = fp->m_tx(fp->txarg, mp);
+
+			/* tx done; now release ref on fdb entry */
+			VNET_FDBE_REFRELE(fp);
+
+			if (resid_mp != NULL) {
+				/* m_tx failed */
+				mp->b_next = next;
+				break;
+			}
 		}
 
 		mp = next;
@@ -677,7 +720,8 @@ vnet_mac_register(vnet_t *vnetp)
 	macp->m_src_addr = vnetp->curr_macaddr;
 	macp->m_callbacks = &vnet_m_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = ETHERMTU;
+	macp->m_max_sdu = vnet_ethermtu;
+	macp->m_margin = VLAN_TAGSZ;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
@@ -770,235 +814,197 @@ vnet_read_mac_address(vnet_t *vnetp)
 	return (DDI_SUCCESS);
 }
 
+static void
+vnet_fdb_create(vnet_t *vnetp)
+{
+	char		hashname[MAXNAMELEN];
+
+	(void) snprintf(hashname, MAXNAMELEN, "vnet%d-fdbhash",
+	    vnetp->instance);
+	vnetp->fdb_nchains = vnet_fdb_nchains;
+	vnetp->fdb_hashp = mod_hash_create_ptrhash(hashname, vnetp->fdb_nchains,
+	    mod_hash_null_valdtor, sizeof (void *));
+}
+
+static void
+vnet_fdb_destroy(vnet_t *vnetp)
+{
+	/* destroy fdb-hash-table */
+	if (vnetp->fdb_hashp != NULL) {
+		mod_hash_destroy_hash(vnetp->fdb_hashp);
+		vnetp->fdb_hashp = NULL;
+		vnetp->fdb_nchains = 0;
+	}
+}
 
 /*
- * Functions below are called only by generic transport to add/remove/modify
- * entries in forwarding database. See comments in vgen_port_init(vnet_gen.c).
+ * Add an entry into the fdb.
  */
-
-/* add an entry into the forwarding database */
 void
-vnet_add_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg)
+vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr, uint8_t type,
+	mac_tx_t m_tx, void *port)
 {
-	vnet_t *vnetp = (vnet_t *)arg;
-	uint32_t fdbhash;
-	fdb_t *fdbp;
-	fdb_fanout_t *fdbhp;
+	uint64_t	addr = 0;
+	vnet_fdbe_t	*fp;
+	int		rv;
 
-	/* Calculate hash value and fdb fanout */
-	fdbhash = MACHASH(macaddr, vnetp->nfdb_hash);
-	fdbhp = &(vnetp->fdbhp[fdbhash]);
+	KEY_HASH(addr, macaddr);
 
-	WRITE_ENTER(&fdbhp->rwlock);
+	fp = kmem_zalloc(sizeof (vnet_fdbe_t), KM_SLEEP);
+	fp->txarg = port;
+	fp->type = type;
+	fp->m_tx = m_tx;
 
-	fdbp = kmem_zalloc(sizeof (fdb_t), KM_NOSLEEP);
-	if (fdbp == NULL) {
-		RW_EXIT(&fdbhp->rwlock);
+	/*
+	 * If the entry being added corresponds to vsw-port, we cache that
+	 * entry and keep a permanent reference to it. This is done to avoid
+	 * searching this entry when we need to transmit a frame with an
+	 * unknown unicast destination, in vnet_m_tx().
+	 */
+	(fp->type == VNET_VSWPORT) ? (fp->refcnt = 1) : (fp->refcnt = 0);
+
+	/*
+	 * Note: duplicate keys will be rejected by mod_hash.
+	 */
+	rv = mod_hash_insert(vnetp->fdb_hashp, (mod_hash_key_t)addr,
+	    (mod_hash_val_t)fp);
+	if (rv != 0) {
+		DWARN(vnetp, "Duplicate macaddr key(%lx)\n", addr);
+		KMEM_FREE(fp);
 		return;
 	}
-	bcopy(macaddr, (caddr_t)fdbp->macaddr, ETHERADDRL);
-	fdbp->m_tx = m_tx;
-	fdbp->txarg = txarg;
-	fdbp->nextp = fdbhp->headp;
-	fdbhp->headp = fdbp;
 
-	RW_EXIT(&fdbhp->rwlock);
+	if (type == VNET_VSWPORT) {
+		/* Cache the fdb entry to vsw-port */
+		WRITE_ENTER(&vnetp->vsw_fp_rw);
+		if (vnetp->vsw_fp == NULL)
+			vnetp->vsw_fp = fp;
+		RW_EXIT(&vnetp->vsw_fp_rw);
+	}
 }
 
-/* delete an entry from the forwarding database */
+/*
+ * Remove an entry from fdb.
+ */
 void
-vnet_del_fdb(void *arg, uint8_t *macaddr)
+vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr)
 {
-	vnet_t *vnetp = (vnet_t *)arg;
-	uint32_t fdbhash;
-	fdb_t *fdbp;
-	fdb_t **pfdbp;
-	fdb_fanout_t *fdbhp;
+	uint64_t	addr = 0;
+	vnet_fdbe_t	*fp;
+	int		rv;
+	uint32_t	refcnt;
 
-	/* Calculate hash value and fdb fanout */
-	fdbhash = MACHASH(macaddr, vnetp->nfdb_hash);
-	fdbhp = &(vnetp->fdbhp[fdbhash]);
+	KEY_HASH(addr, eaddr);
 
-	WRITE_ENTER(&fdbhp->rwlock);
+	/*
+	 * Remove the entry from fdb hash table.
+	 * This prevents further references to this fdb entry.
+	 */
+	rv = mod_hash_remove(vnetp->fdb_hashp, (mod_hash_key_t)addr,
+	    (mod_hash_val_t *)&fp);
+	ASSERT(rv == 0);
 
-	for (pfdbp = &fdbhp->headp; (fdbp  = *pfdbp) != NULL;
-	    pfdbp = &fdbp->nextp) {
-		if (bcmp(fdbp->macaddr, macaddr, ETHERADDRL) == 0) {
-			/* Unlink it from the list */
-			*pfdbp = fdbp->nextp;
-			KMEM_FREE(fdbp);
-			break;
-		}
+	if (fp->type == VNET_VSWPORT) {
+		WRITE_ENTER(&vnetp->vsw_fp_rw);
+
+		ASSERT(fp == vnetp->vsw_fp);
+		vnetp->vsw_fp = NULL;
+
+		RW_EXIT(&vnetp->vsw_fp_rw);
 	}
 
-	RW_EXIT(&fdbhp->rwlock);
+	/*
+	 * If there are threads already ref holding before the entry was
+	 * removed from hash table, then wait for ref count to drop to zero.
+	 */
+	(fp->type == VNET_VSWPORT) ? (refcnt = 1) : (refcnt = 0);
+	while (fp->refcnt > refcnt) {
+		delay(drv_usectohz(vnet_fdbe_refcnt_delay));
+	}
+
+	kmem_free(fp, sizeof (*fp));
 }
 
-/* modify an existing entry in the forwarding database */
+/*
+ * Modify the fdb entry for the given macaddr,
+ * to use the specified port for transmits.
+ */
 void
-vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg,
-	boolean_t upgrade)
+vnet_fdbe_modify(vnet_t *vnetp, struct ether_addr *macaddr, void *portp,
+	boolean_t flag)
 {
-	vnet_t *vnetp = (vnet_t *)arg;
-	uint32_t fdbhash;
-	fdb_t *fdbp;
-	fdb_fanout_t *fdbhp;
+	vnet_fdbe_t	*fp;
+	uint64_t	addr = 0;
+	int		rv;
+	uint32_t	refcnt;
 
-	/* Calculate hash value and fdb fanout */
-	fdbhash = MACHASH(macaddr, vnetp->nfdb_hash);
-	fdbhp = &(vnetp->fdbhp[fdbhash]);
+	KEY_HASH(addr, macaddr);
 
-	if (upgrade == B_TRUE) {
-		/*
-		 * Caller already holds the lock as a reader. This can
-		 * occur if this function is invoked in the context
-		 * of transmit routine - vnet_m_tx(), where the lock
-		 * is held as a reader before calling the transmit
-		 * function of an fdb entry (fdbp->m_tx).
-		 * See comments in vgen_ldcsend() in vnet_gen.c
-		 */
-		if (!rw_tryupgrade(&fdbhp->rwlock)) {
-			RW_EXIT(&fdbhp->rwlock);
-			WRITE_ENTER(&fdbhp->rwlock);
-		}
-	} else {
-		/* Caller does not hold the lock */
-		WRITE_ENTER(&fdbhp->rwlock);
+	/*
+	 * Remove the entry from fdb hash table.
+	 * This prevents further references to this fdb entry.
+	 */
+	rv = mod_hash_remove(vnetp->fdb_hashp, (mod_hash_key_t)addr,
+	    (mod_hash_val_t *)&fp);
+	ASSERT(rv == 0);
+
+	/* fdb entry of vsw port must never be modified */
+	ASSERT(fp->type == VNET_VNETPORT);
+
+	/*
+	 * If there are threads already ref holding before the entry was
+	 * removed from hash table, then wait for reference count to drop to
+	 * zero. Note: flag indicates the context of caller. If we are in the
+	 * context of transmit routine, there is a reference held by the caller
+	 * too, in which case, wait for the refcnt to drop to 1.
+	 */
+	(flag == B_TRUE) ? (refcnt = 1) : (refcnt = 0);
+	while (fp->refcnt > refcnt) {
+		delay(drv_usectohz(vnet_fdbe_refcnt_delay));
 	}
 
-	for (fdbp = fdbhp->headp; fdbp != NULL; fdbp = fdbp->nextp) {
-		if (bcmp(fdbp->macaddr, macaddr, ETHERADDRL) == 0) {
-			/* change the entry to have new tx params */
-			fdbp->m_tx = m_tx;
-			fdbp->txarg = txarg;
-			break;
-		}
-	}
+	/* update the portp in fdb entry with the new value */
+	fp->txarg = portp;
 
-	if (upgrade == B_TRUE) {
-		/* restore the caller as a reader */
-		rw_downgrade(&fdbhp->rwlock);
-	} else {
-		RW_EXIT(&fdbhp->rwlock);
-	}
+	/* Reinsert the updated fdb entry into the table */
+	rv = mod_hash_insert(vnetp->fdb_hashp, (mod_hash_key_t)addr,
+	    (mod_hash_val_t)fp);
+	ASSERT(rv == 0);
 }
 
-/* allocate the forwarding database */
+/*
+ * Search fdb for a given mac address. If an entry is found, hold
+ * a reference to it and return the entry; else returns NULL.
+ */
+static vnet_fdbe_t *
+vnet_fdbe_find(vnet_t *vnetp, struct ether_addr *addrp)
+{
+	uint64_t	key = 0;
+	vnet_fdbe_t	*fp;
+	int		rv;
+
+	KEY_HASH(key, addrp);
+
+	rv = mod_hash_find_cb(vnetp->fdb_hashp, (mod_hash_key_t)key,
+	    (mod_hash_val_t *)&fp, vnet_fdbe_find_cb);
+
+	if (rv != 0)
+		return (NULL);
+
+	return (fp);
+}
+
+/*
+ * Callback function provided to mod_hash_find_cb(). After finding the fdb
+ * entry corresponding to the key (macaddr), this callback will be invoked by
+ * mod_hash_find_cb() to atomically increment the reference count on the fdb
+ * entry before returning the found entry.
+ */
 static void
-vnet_fdb_alloc(vnet_t *vnetp)
+vnet_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val)
 {
-	int		i;
-	uint32_t	nfdbh = 0;
-
-	nfdbh = vnet_nfdb_hash;
-	if ((nfdbh < VNET_NFDB_HASH) || (nfdbh > VNET_NFDB_HASH_MAX)) {
-		vnetp->nfdb_hash = VNET_NFDB_HASH;
-	} else {
-		vnetp->nfdb_hash = nfdbh;
-	}
-
-	/* allocate fdb hash table, with an extra slot for default route */
-	vnetp->fdbhp = kmem_zalloc(sizeof (fdb_fanout_t) *
-	    (vnetp->nfdb_hash + 1), KM_SLEEP);
-
-	for (i = 0; i <= vnetp->nfdb_hash; i++) {
-		rw_init(&vnetp->fdbhp[i].rwlock, NULL, RW_DRIVER, NULL);
-	}
-}
-
-/* free the forwarding database */
-static void
-vnet_fdb_free(vnet_t *vnetp)
-{
-	int i;
-
-	for (i = 0; i <= vnetp->nfdb_hash; i++) {
-		rw_destroy(&vnetp->fdbhp[i].rwlock);
-	}
-
-	/*
-	 * deallocate fdb hash table, including an extra slot for default
-	 * route.
-	 */
-	kmem_free(vnetp->fdbhp, sizeof (fdb_fanout_t) * (vnetp->nfdb_hash + 1));
-	vnetp->fdbhp = NULL;
-}
-
-/* look up an fdb entry based on the mac address, caller holds lock */
-static fdb_t *
-vnet_lookup_fdb(fdb_fanout_t *fdbhp, uint8_t *macaddr)
-{
-	fdb_t *fdbp = NULL;
-
-	for (fdbp = fdbhp->headp; fdbp != NULL; fdbp = fdbp->nextp) {
-		if (bcmp(fdbp->macaddr, macaddr, ETHERADDRL) == 0) {
-			break;
-		}
-	}
-
-	return (fdbp);
-}
-
-/* add default route entry into the forwarding database */
-void
-vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg)
-{
-	vnet_t *vnetp = (vnet_t *)arg;
-	fdb_t *fdbp;
-	fdb_fanout_t *fdbhp;
-
-	/*
-	 * The last hash list is reserved for default route entry,
-	 * and for now, we have only one entry in this list.
-	 */
-	fdbhp = &(vnetp->fdbhp[vnetp->nfdb_hash]);
-
-	WRITE_ENTER(&fdbhp->rwlock);
-
-	if (fdbhp->headp) {
-		DWARN(vnetp, "default rte already exists\n");
-		RW_EXIT(&fdbhp->rwlock);
-		return;
-	}
-	fdbp = kmem_zalloc(sizeof (fdb_t), KM_NOSLEEP);
-	if (fdbp == NULL) {
-		RW_EXIT(&fdbhp->rwlock);
-		return;
-	}
-	bzero(fdbp->macaddr, ETHERADDRL);
-	fdbp->m_tx = m_tx;
-	fdbp->txarg = txarg;
-	fdbp->nextp = NULL;
-	fdbhp->headp = fdbp;
-
-	RW_EXIT(&fdbhp->rwlock);
-}
-
-/* delete default route entry from the forwarding database */
-void
-vnet_del_def_rte(void *arg)
-{
-	vnet_t *vnetp = (vnet_t *)arg;
-	fdb_t *fdbp;
-	fdb_fanout_t *fdbhp;
-
-	/*
-	 * The last hash list is reserved for default route entry,
-	 * and for now, we have only one entry in this list.
-	 */
-	fdbhp = &(vnetp->fdbhp[vnetp->nfdb_hash]);
-
-	WRITE_ENTER(&fdbhp->rwlock);
-
-	if (fdbhp->headp == NULL) {
-		RW_EXIT(&fdbhp->rwlock);
-		return;
-	}
-	fdbp = fdbhp->headp;
-	KMEM_FREE(fdbp);
-	fdbhp->headp = NULL;
-
-	RW_EXIT(&fdbhp->rwlock);
+	_NOTE(ARGUNUSED(key))
+	VNET_FDBE_REFHOLD((vnet_fdbe_t *)val);
 }
 
 void

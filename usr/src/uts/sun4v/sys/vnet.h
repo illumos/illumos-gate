@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,9 @@ extern "C" {
 #define	VNET_LDCWD_TXTIMEOUT	1000		/* tx timeout in msec */
 #define	VNET_LDC_MTU		64		/* ldc mtu */
 
+#define	VNET_VNETPORT		1		/* port connected to a vnet */
+#define	VNET_VSWPORT		2		/* port connected to vsw */
+
 /*
  * vnet proxy transport layer information. There is one instance of this for
  * every transport being used by a vnet device and a list of these transports
@@ -57,40 +60,33 @@ typedef struct vp_tl {
 } vp_tl_t;
 
 /*
- * Forwarding database (FDB) entry, used by vnet to provide switching
- * functionality. Each fdb entry corresponds to a destination vnet device
- * within the ldoms which is directly reachable by invoking a transmit
- * function provided by a vnet proxy transport layer. Currently, the generic
- * transport layer adds/removes/modifies entries in fdb.
+ * Forwarding database entry. Each port of a vnet device will have an entry in
+ * the fdb. Reference count is bumped up while sending a packet destined to a
+ * port corresponding to the fdb entry.
  */
-typedef struct fdb {
-	struct fdb	*nextp;			/* next entry in the list */
-	uint8_t		macaddr[ETHERADDRL];	/* destination mac address */
-	mac_tx_t	m_tx;			/* transmit function */
-	void		*txarg;			/* arg to the transmit func */
-} fdb_t;
+typedef struct vnet_fdbe {
+	uint8_t		type;	/* VNET_VNETPORT or VNET_VSWPORT ? */
+	uint32_t	refcnt;	/* reference count */
+	void		*txarg;	/* arg to the transmit func */
+	mac_tx_t 	m_tx;	/* transmit function */
+} vnet_fdbe_t;
 
-/* FDB hash queue head */
-typedef struct fdbf_s {
-	fdb_t		*headp;			/* head of fdb entries */
-	krwlock_t	rwlock;			/* protect the list */
-} fdb_fanout_t;
+#define	VNET_NFDB_HASH	64
 
-#define	VNET_NFDB_HASH		64	/* default no. of hash queues in fdb */
-#define	VNET_NFDB_HASH_MAX	128	/* max number of hash queues in fdb */
-
-/* Hash calculation using the mac address */
-#define	MACHASH(a, n)	((*(((uchar_t *)(a)) + 0) ^		\
-			*(((uchar_t *)(a)) + 1) ^		\
-			*(((uchar_t *)(a)) + 2) ^		\
-			*(((uchar_t *)(a)) + 3) ^		\
-			*(((uchar_t *)(a)) + 4) ^		\
-			*(((uchar_t *)(a)) + 5)) % (uint32_t)n)
+#define	KEY_HASH(key, addr) \
+	(key = ((((uint64_t)(addr)->ether_addr_octet[0]) << 40) | \
+	(((uint64_t)(addr)->ether_addr_octet[1]) << 32) | \
+	(((uint64_t)(addr)->ether_addr_octet[2]) << 24) | \
+	(((uint64_t)(addr)->ether_addr_octet[3]) << 16) | \
+	(((uint64_t)(addr)->ether_addr_octet[4]) << 8) | \
+	((uint64_t)(addr)->ether_addr_octet[5])));
 
 /* rwlock macros */
 #define	READ_ENTER(x)	rw_enter(x, RW_READER)
 #define	WRITE_ENTER(x)	rw_enter(x, RW_WRITER)
 #define	RW_EXIT(x)	rw_exit(x)
+
+#define	VLAN_ID_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
 
 /*
  * vnet instance state information
@@ -105,11 +101,18 @@ typedef struct vnet {
 	vp_tl_t			*tlp;		/* list of vp_tl */
 	krwlock_t		trwlock;	/* lock for vp_tl list */
 	char			vgen_name[MAXNAMELEN];	/* name of generic tl */
-	fdb_fanout_t		*fdbhp;		/* fdb hash queues */
-	int			nfdb_hash;	/* num fdb hash queues */
+
+	uint32_t		fdb_nchains;	/* # of hash chains in fdbtbl */
+	mod_hash_t		*fdb_hashp;	/* forwarding database */
+	vnet_fdbe_t		*vsw_fp;	/* cached fdb entry of vsw */
+	krwlock_t		vsw_fp_rw;	/* lock to protect vsw_fp */
+	uint32_t		max_frame_size;	/* max frame size supported */
+
+	uint16_t		default_vlan_id; /* default vlan id */
+	uint16_t		pvid;		/* port vlan id (untagged) */
+	uint16_t		*vids;		/* vlan ids (tagged) */
+	uint16_t		nvids;		/* # of vids */
 } vnet_t;
-
-
 
 #ifdef DEBUG
 /*

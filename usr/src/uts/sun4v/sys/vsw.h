@@ -157,7 +157,11 @@ typedef struct	vsw {
 	int			mac_open_retries; /* mac_open() retry count */
 	vsw_port_list_t		plist;		/* associated ports */
 	ddi_taskq_t		*taskq_p;	/* VIO ctrl msg taskq */
-	mod_hash_t		*fdb;		/* forwarding database */
+	mod_hash_t		*fdb_hashp;	/* forwarding database */
+	uint32_t		fdb_nchains;	/* # of hash chains in fdb */
+	mod_hash_t		*vlan_hashp;	/* vlan hash table */
+	uint32_t		vlan_nchains;	/* # of vlan hash chains */
+	uint32_t		max_frame_size;	/* max frame size supported */
 
 	mod_hash_t		*mfdb;		/* multicast FDB */
 	krwlock_t		mfdbrw;		/* rwlock for mFDB */
@@ -208,6 +212,11 @@ typedef struct	vsw {
 	uint32_t		pri_num_types;	/* # of priority eth types */
 	uint16_t		*pri_types;	/* priority eth types */
 	vio_mblk_pool_t		*pri_tx_vmp;	/* tx priority mblk pool */
+	uint16_t		default_vlan_id; /* default vlan id */
+	uint16_t		pvid;	/* port vlan id (untagged) */
+	uint16_t		*vids;	/* vlan ids (tagged) */
+	uint16_t		nvids;	/* # of vids */
+	uint32_t		vids_size; /* size alloc'd for vids list */
 } vsw_t;
 
 /*

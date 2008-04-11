@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,10 @@ extern "C" {
 /* initial send sequence number */
 #define	VNET_ISS		0x1
 
+#define	VNET_2K			(1 << 11)
 #define	VNET_IPALIGN		6	/* padding for IP header alignment */
+#define	VNET_LDCALIGN		8	/* padding for ldc_mem_copy() align */
+#define	VNET_ROUNDUP_2K(n)	(((n) + (VNET_2K - 1)) & ~(VNET_2K - 1))
 
 #define	VNET_NUM_HANDSHAKES	6	/* # of handshake attempts */
 
@@ -76,6 +79,8 @@ typedef struct vnet_ibnd_desc {
 /* exported functions */
 uint64_t vnet_macaddr_strtoul(const uint8_t *macaddr);
 void vnet_macaddr_ultostr(uint64_t value, uint8_t *macaddr);
+mblk_t *vnet_vlan_insert_tag(mblk_t *mp, uint16_t vid);
+mblk_t *vnet_vlan_remove_tag(mblk_t *mp);
 
 #ifdef __cplusplus
 }

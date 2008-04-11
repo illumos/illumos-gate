@@ -220,6 +220,7 @@ typedef struct vgen_ldc {
 	uint32_t		next_rxi;	/* next expected recv index */
 	uint32_t		num_rxds;	/* number of rx descriptors */
 	caddr_t			tx_datap;	/* prealloc'd tx data area */
+	size_t			tx_data_sz;	/* alloc'd size of tx databuf */
 	vio_multi_pool_t	vmp;		/* rx mblk pools */
 	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */
 	uint64_t		msglen;		/* size of ldcmsg */
@@ -251,7 +252,6 @@ typedef struct vgen_ldc {
 typedef struct vgen_ldclist_s {
 	vgen_ldc_t	*headp;		/* head of the list */
 	krwlock_t	rwlock;		/* sync access to the list */
-	int		num_ldcs;	/* number of channels in the list */
 } vgen_ldclist_t;
 
 /* port information  structure */
@@ -259,8 +259,15 @@ typedef struct vgen_port {
 	struct vgen_port	*nextp;		/* next port in the list */
 	struct vgen		*vgenp;		/* associated vgen_t */
 	int			port_num;	/* port number */
+	int			num_ldcs;	/* # of channels in this port */
+	uint64_t		*ldc_ids;	/* channel ids */
 	vgen_ldclist_t		ldclist;	/* list of ldcs for this port */
 	struct ether_addr	macaddr;	/* mac address of peer */
+	uint16_t		pvid;		/* port vlan id (untagged) */
+	uint16_t		*vids;		/* vlan ids (tagged) */
+	uint16_t		nvids;		/* # of vids */
+	mod_hash_t		*vlan_hashp;	/* vlan hash table */
+	uint32_t		vlan_nchains;	/* # of vlan hash chains */
 } vgen_port_t;
 
 /* port list structure */
@@ -272,7 +279,7 @@ typedef struct vgen_portlist {
 
 /* vgen instance information  */
 typedef struct vgen {
-	void			*vnetp;		/* associated vnet instance */
+	vnet_t			*vnetp;		/* associated vnet instance */
 	dev_info_t		*vnetdip;	/* dip of vnet */
 	uint64_t		regprop;	/* "reg" property */
 	uint8_t			macaddr[ETHERADDRL];	/* mac addr of vnet */
@@ -280,7 +287,8 @@ typedef struct vgen {
 	int			flags;		/* flags */
 	vgen_portlist_t		vgenports;	/* Port List */
 	mdeg_node_spec_t	*mdeg_parentp;
-	mdeg_handle_t		mdeg_hdl;
+	mdeg_handle_t		mdeg_dev_hdl;	/* mdeg cb handle for device */
+	mdeg_handle_t		mdeg_port_hdl;	/* mdeg cb handle for port */
 	vgen_port_t		*vsw_portp;	/* port connected to vsw */
 	mac_register_t		*macp;		/* vgen mac ops */
 	struct ether_addr	*mctab;		/* multicast addr table */
@@ -290,6 +298,7 @@ typedef struct vgen {
 	uint32_t		pri_num_types;	/* # of priority eth types */
 	uint16_t		*pri_types;	/* priority eth types */
 	vio_mblk_pool_t		*pri_tx_vmp;	/* tx priority mblk pool */
+	uint32_t		max_frame_size;	/* max frame size supported */
 } vgen_t;
 
 #ifdef __cplusplus

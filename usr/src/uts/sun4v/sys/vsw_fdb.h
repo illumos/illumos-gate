@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,12 +37,14 @@ extern "C" {
  * Convert ethernet (mac) address to hash table key.
  */
 #define	KEY_HASH(key, addr) \
-	(key = ((((uint64_t)addr.ether_addr_octet[0]) << 40) | \
-	(((uint64_t)addr.ether_addr_octet[1]) << 32) | \
-	(((uint64_t)addr.ether_addr_octet[2]) << 24) | \
-	(((uint64_t)addr.ether_addr_octet[3]) << 16) | \
-	(((uint64_t)addr.ether_addr_octet[4]) << 8) | \
-	((uint64_t)addr.ether_addr_octet[5])));
+	(key = ((((uint64_t)(addr)->ether_addr_octet[0]) << 40) | \
+	(((uint64_t)(addr)->ether_addr_octet[1]) << 32) | \
+	(((uint64_t)(addr)->ether_addr_octet[2]) << 24) | \
+	(((uint64_t)(addr)->ether_addr_octet[3]) << 16) | \
+	(((uint64_t)(addr)->ether_addr_octet[4]) << 8) | \
+	((uint64_t)(addr)->ether_addr_octet[5])));
+
+#define	VLAN_ID_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
 
 /*
  * Multicast forwarding database (mFDB) is a hashtable
@@ -56,6 +58,16 @@ typedef struct mfdb_ent {
 	void			*d_addr;	/* address of dest */
 	uint8_t			d_type;		/* destination type */
 } mfdb_ent_t;
+
+/*
+ * Forwarding database entry. Each member port of a vsw will have an entry in
+ * the vsw's fdb. Ref count is bumped up while sending a packet destined to a
+ * port corresponding to the fdb entry.
+ */
+typedef struct vsw_fdbe {
+	void		*portp;	/* pointer to the vnet_port */
+	uint32_t	refcnt;	/* reference count */
+} vsw_fdbe_t;
 
 #ifdef	__cplusplus
 }
