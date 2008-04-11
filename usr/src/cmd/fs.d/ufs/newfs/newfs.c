@@ -342,7 +342,7 @@ main(int argc, char *argv[])
 			}
 			fatal(gettext("%s: not a raw disk device"), name);
 		}
-		(void) sprintf(device, "/dev/rdsk/%s", name);
+		(void) snprintf(device, sizeof (device), "/dev/rdsk/%s", name);
 		if ((special = getfullrawname(device)) == NULL) {
 			(void) fprintf(stderr,
 			    gettext("newfs: malloc failed\n"));
@@ -350,7 +350,8 @@ main(int argc, char *argv[])
 		}
 
 		if (*special == '\0') {
-			(void) sprintf(device, "/dev/%s", name);
+			(void) snprintf(device, sizeof (device), "/dev/%s",
+			    name);
 			if ((special = getfullrawname(device)) == NULL) {
 				(void) fprintf(stderr,
 				    gettext("newfs: malloc failed\n"));
@@ -584,7 +585,7 @@ main(int argc, char *argv[])
 			cpg = MINCPG;
 	}
 	if (minfree < 0) {
-		minfree = ((float)MINFREESEC / fssize) * 100;
+		minfree = (int)(((float)MINFREESEC / fssize) * 100);
 		if (minfree > 10)
 			minfree = 10;
 		if (minfree <= 0)
@@ -623,8 +624,8 @@ main(int argc, char *argv[])
 	 * If alternates-per-cylinder is ever implemented:
 	 * need to get apc from dp->d_apc if no -a switch???
 	 */
-	(void) sprintf(cmd,
-	"mkfs -F ufs %s%s%s%s %lld %d %d %d %d %d %d %d %d %s %d %d %d %d %s",
+	(void) snprintf(cmd, sizeof (cmd), "pfexec mkfs -F ufs "
+	    "%s%s%s%s %lld %d %d %d %d %d %d %d %d %s %d %d %d %d %s",
 	    Nflag ? "-o N " : "", binary_sb ? "-o calcbinsb " : "",
 	    text_sb ? "-o calcsb " : "", special,
 	    fssize, nsectors, ntracks, bsize, fsize, cpg, minfree, rpm/60,
@@ -639,7 +640,7 @@ main(int argc, char *argv[])
 		exit(status >> 8);
 	if (Nflag)
 		exit(0);
-	(void) sprintf(cmd, "/usr/sbin/fsirand %s", special);
+	(void) snprintf(cmd, sizeof (cmd), "/usr/sbin/fsirand %s", special);
 	if (notrand(special) && (status = system(cmd)) != 0)
 		(void) fprintf(stderr,
 		    gettext("%s: failed, status = %d\n"),
