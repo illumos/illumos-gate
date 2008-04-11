@@ -221,7 +221,7 @@ vc_reopen_vldc(ipmi_dev_t *devp)
 
 	channel_op.op_sel = VLDC_OP_SET;
 	channel_op.opt_sel = VLDC_OPT_MODE;
-	channel_op.opt_val = LDC_MODE_STREAM;
+	channel_op.opt_val = LDC_MODE_RELIABLE;
 
 	if (ldi_ioctl(vc_lh, VLDC_IOCTL_OPT_OP,
 	    (intptr_t)&channel_op, FKIOCTL, kcred, NULL) != 0) {
@@ -443,7 +443,7 @@ vc_discard_response()
 
 	channel_op.op_sel = VLDC_OP_SET;
 	channel_op.opt_sel = VLDC_OPT_MODE;
-	channel_op.opt_val = LDC_MODE_STREAM;
+	channel_op.opt_val = LDC_MODE_RELIABLE;
 
 	if (ldi_ioctl(vc_lh, VLDC_IOCTL_OPT_OP, (intptr_t)&channel_op,
 	    FKIOCTL, kcred, NULL) !=  0)
@@ -580,7 +580,7 @@ do_vc2bmc(ipmi_dev_t *dev, bmc_req_t *send_pkt, bmc_rsp_t *recv_pkt,
 
 	channel_op.op_sel = VLDC_OP_SET;
 	channel_op.opt_sel = VLDC_OPT_MODE;
-	channel_op.opt_val = LDC_MODE_STREAM;
+	channel_op.opt_val = LDC_MODE_RELIABLE;
 
 	if ((error = ldi_ioctl(vc_lh, VLDC_IOCTL_OPT_OP,
 	    (intptr_t)&channel_op, FKIOCTL, kcred, &rval)) != 0) {
