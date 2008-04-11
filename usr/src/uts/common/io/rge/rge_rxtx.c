@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -260,6 +260,7 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 			return (NULL);
 	}
 	rgep->stats.rbytes += packet_len;
+	rgep->stats.rpackets ++;
 
 	/*
 	 * VLAN packet ?
@@ -543,6 +544,11 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci)
 		}
 	}
 	rgep->stats.obytes += totlen;
+	rgep->stats.tx_pre_ismax = rgep->stats.tx_cur_ismax;
+	if (totlen == rgep->ethmax_size)
+		rgep->stats.tx_cur_ismax = B_TRUE;
+	else
+		rgep->stats.tx_cur_ismax = B_FALSE;
 
 	/*
 	 * We'e reached the end of the chain; and we should have
@@ -607,6 +613,8 @@ rge_send(rge_t *rgep, mblk_t *mp)
 {
 	struct ether_vlan_header *ehp;
 	uint16_t tci;
+	rge_hw_stats_t *bstp;
+	uint8_t counter;
 
 	ASSERT(mp->b_next == NULL);
 
@@ -646,9 +654,33 @@ rge_send(rge_t *rgep, mblk_t *mp)
 	if (--rgep->tx_flow == 0) {
 		DMA_SYNC(rgep->tx_desc, DDI_DMA_SYNC_FORDEV);
 		rge_tx_trigger(rgep);
+		rgep->stats.opackets ++;
 		if (rgep->tx_free < RGE_SEND_SLOTS/2)
 			rge_send_recycle(rgep);
 		rgep->tc_tail = rgep->tx_next;
+
+		/*
+		 * It's observed that in current Realtek PCI-E chips, tx
+		 * request of the second fragment for upper layer packets
+		 * will be ignored if the hardware transmission is in
+		 * progress and will not be processed when the tx engine
+		 * is idle. So one solution is to re-issue the requests
+		 * if the hardware and the software tx packets statistics
+		 * are inconsistent.
+		 */
+		if (rgep->chipid.is_pcie && rgep->stats.tx_pre_ismax) {
+			for (counter = 0; counter < 10; counter ++) {
+				mutex_enter(rgep->genlock);
+				rge_hw_stats_dump(rgep);
+				mutex_exit(rgep->genlock);
+				bstp = rgep->hw_stats;
+				if (rgep->stats.opackets
+				    != RGE_BSWAP_64(bstp->rcv_ok))
+					rge_tx_trigger(rgep);
+				else
+					break;
+			}
+		}
 	}
 	mutex_exit(rgep->tx_lock);
 

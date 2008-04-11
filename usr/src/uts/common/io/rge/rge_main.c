@@ -706,6 +706,13 @@ rge_reset(rge_t *rgep)
 	mutex_exit(rgep->rc_lock);
 	mutex_exit(rgep->rx_lock);
 
+	rgep->stats.rpackets = 0;
+	rgep->stats.rbytes = 0;
+	rgep->stats.opackets = 0;
+	rgep->stats.obytes = 0;
+	rgep->stats.tx_pre_ismax = B_FALSE;
+	rgep->stats.tx_cur_ismax = B_FALSE;
+
 	RGE_DEBUG(("rge_reset($%p) done", (void *)rgep));
 }
 

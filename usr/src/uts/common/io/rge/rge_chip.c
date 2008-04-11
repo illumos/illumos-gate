@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -956,7 +956,8 @@ rge_chip_init(rge_t *rgep)
 
 		val16 = rge_reg_get8(rgep, PHY_STATUS_REG);
 		val16 = 0x12<<8 | val16;
-		if (rgep->chipid.mac_ver != MAC_VER_8101E) {
+		if (rgep->chipid.mac_ver != MAC_VER_8101E &&
+		    rgep->chipid.mac_ver != MAC_VER_8168B_C) {
 			rge_reg_put16(rgep, PHY_STATUS_REG, val16);
 			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
 			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);

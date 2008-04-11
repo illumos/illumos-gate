@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,7 +352,9 @@ typedef struct {
 } chip_id_t;
 
 typedef struct rge_stats {
+	uint64_t	rpackets;
 	uint64_t	rbytes;
+	uint64_t	opackets;
 	uint64_t	obytes;
 	uint32_t	overflow;
 	uint32_t	defer;		/* dot3StatsDeferredTransmissions */
@@ -362,6 +364,8 @@ typedef struct rge_stats {
 	uint32_t	intr;		/* interrupt count */
 	uint16_t	chip_reset;
 	uint16_t	phy_reset;
+	boolean_t	tx_pre_ismax;
+	boolean_t	tx_cur_ismax;
 } rge_stats_t;
 
 /*

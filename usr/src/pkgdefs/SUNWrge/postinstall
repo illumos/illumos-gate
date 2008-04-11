@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -127,4 +127,4 @@ check_add_drv()
 
 }
 
-check_add_drv -i '"pci10ec,8169" "pci10ec,8168" "pci10ec,8167" "pci16ec,0116" "pci10ec,8136" "pciex10ec,8136"' -b "$BASEDIR" rge
+check_add_drv -i '"pci10ec,8169" "pci10ec,8168" "pci10ec,8167" "pci16ec,116" "pci10ec,8136" "pciex10ec,8136"' -b "$BASEDIR" rge
