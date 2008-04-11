@@ -167,13 +167,18 @@ static int
 grow_gnttab_list(uint_t more_frames)
 {
 	uint_t new_nr_grant_frames, extra_entries, i;
+	uint_t nr_glist_frames, new_nr_glist_frames;
 
 	ASSERT(MUTEX_HELD(&gnttab_list_lock));
 
 	new_nr_grant_frames = nr_grant_frames + more_frames;
 	extra_entries = more_frames * GREFS_PER_GRANT_FRAME;
 
-	for (i = nr_grant_frames; i < new_nr_grant_frames; i++)
+	nr_glist_frames = (nr_grant_frames * GREFS_PER_GRANT_FRAME + RPP - 1)
+	    / RPP;
+	new_nr_glist_frames = (new_nr_grant_frames * GREFS_PER_GRANT_FRAME
+	    + RPP - 1) / RPP;
+	for (i = nr_glist_frames; i < new_nr_glist_frames; i++)
 		gnttab_list[i] = kmem_alloc(PAGESIZE, KM_SLEEP);
 
 	for (i = GREFS_PER_GRANT_FRAME * nr_grant_frames;
@@ -565,7 +570,7 @@ gnttab_init(void)
 {
 	gnttab_setup_table_t set;
 	int i;
-	uint_t nr_init_grefs, max_nr_glist_frames;
+	uint_t nr_init_grefs, max_nr_glist_frames, nr_glist_frames;
 	gnttab_frame_t *frames;
 
 	/*
@@ -577,7 +582,7 @@ gnttab_init(void)
 	mutex_exit(&gnttab_list_lock);
 
 	max_nr_glist_frames = (max_nr_grant_frames() *
-	    GREFS_PER_GRANT_FRAME / (PAGESIZE / sizeof (grant_ref_t)));
+	    GREFS_PER_GRANT_FRAME / RPP);
 
 	set.dom = DOMID_SELF;
 	set.nr_frames = max_nr_grant_frames();
@@ -601,7 +606,9 @@ gnttab_init(void)
 	gnttab_list = kmem_alloc(max_nr_glist_frames * sizeof (grant_ref_t *),
 	    KM_SLEEP);
 
-	for (i = 0; i < nr_grant_frames; i++) {
+	nr_glist_frames = (nr_grant_frames * GREFS_PER_GRANT_FRAME + RPP - 1)
+	    / RPP;
+	for (i = 0; i < nr_glist_frames; i++) {
 		gnttab_list[i] = kmem_alloc(PAGESIZE, KM_SLEEP);
 	}
 
