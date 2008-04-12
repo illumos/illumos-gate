@@ -216,6 +216,8 @@ zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type,
 int
 zfs_name_valid(const char *name, zfs_type_t type)
 {
+	if (type == ZFS_TYPE_POOL)
+		return (zpool_name_valid(NULL, B_FALSE, name));
 	return (zfs_validate_name(NULL, name, type, B_FALSE));
 }
 
@@ -2958,7 +2960,6 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 			    "pool must be upgraded to set this "
 			    "property or value"));
 			return (zfs_error(hdl, EZFS_BADVERSION, errbuf));
-
 #ifdef _ILP32
 		case EOVERFLOW:
 			/*

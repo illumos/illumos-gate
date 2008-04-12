@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,13 +66,22 @@
 #define	ZPOOL_CONFIG_DTL		"DTL"
 #define	ZPOOL_CONFIG_STATS		"stats"
 #define	ZPOOL_CONFIG_WHOLE_DISK		"whole_disk"
-#define	ZPOOL_CONFIG_OFFLINE		"offline"
 #define	ZPOOL_CONFIG_ERRCOUNT		"error_count"
 #define	ZPOOL_CONFIG_NOT_PRESENT	"not_present"
 #define	ZPOOL_CONFIG_SPARES		"spares"
 #define	ZPOOL_CONFIG_IS_SPARE		"is_spare"
 #define	ZPOOL_CONFIG_NPARITY		"nparity"
+#define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_L2CACHE		"l2cache"
+/*
+ * The persistent vdev state is stored as separate values rather than a single
+ * 'vdev_state' entry.  This is because a device can be in multiple states, such
+ * as offline and degraded.
+ */
+#define	ZPOOL_CONFIG_OFFLINE		"offline"
+#define	ZPOOL_CONFIG_FAULTED		"faulted"
+#define	ZPOOL_CONFIG_DEGRADED		"degraded"
+#define	ZPOOL_CONFIG_REMOVED		"removed"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"

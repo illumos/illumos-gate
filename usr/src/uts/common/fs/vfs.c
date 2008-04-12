@@ -84,6 +84,7 @@
 #include <sys/console.h>
 #include <sys/reboot.h>
 #include <sys/attr.h>
+#include <sys/spa.h>
 
 #include <vm/page.h>
 
@@ -351,6 +352,13 @@ fs_copyfsops(const fs_operation_def_t *template, vfsops_t *actual,
 	};
 
 	return (fs_build_vector(actual, unused_ops, vfs_ops_table, template));
+}
+
+void
+zfs_boot_init() {
+
+	if (strcmp(rootfs.bo_fstype, MNTTYPE_ZFS) == 0)
+		spa_boot_init();
 }
 
 int
@@ -842,6 +850,12 @@ vfs_mountroot(void)
 	 * root filesystem instead of the boot program's services.
 	 */
 	modrootloaded = 1;
+
+	/*
+	 * Special handling for a ZFS root file system.
+	 */
+	zfs_boot_init();
+
 	/*
 	 * Set up mnttab information for root
 	 */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -316,6 +316,7 @@ extern	pnode_t		prom_findnode_bydevtype(pnode_t id, char *devtype);
  * file IO
  */
 extern	int		prom_fopen(ihandle_t, char *);
+extern	int		prom_volopen(ihandle_t, char *);
 extern	int		prom_fseek(ihandle_t, int, unsigned long long);
 extern	int		prom_fread(ihandle_t, int, caddr_t, size_t);
 extern	int		prom_fsize(ihandle_t, int, size_t *);

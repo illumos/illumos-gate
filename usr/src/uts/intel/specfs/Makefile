@@ -21,7 +21,7 @@
 #
 # uts/intel/specfs/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +63,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSPEC_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
+LDFLAGS 	+= -dy -Nfs/fifofs
 
 #
 # For now, disable these lint checks; maintainers should endeavor

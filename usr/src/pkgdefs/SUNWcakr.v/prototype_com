@@ -97,3 +97,4 @@ s none platform/sun4v/kernel/unix=sparcv9/unix
 
 
 f none platform/sun4v/wanboot 644 root sys
+f none platform/sun4v/bootlst 644 root sys

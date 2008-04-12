@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -430,11 +430,23 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 }
 
 /*
- * Update all disk labels, generate a fresh config based on the current
- * in-core state, and sync the global config cache.
+ * For a pool that's not currently a booting rootpool, update all disk labels,
+ * generate a fresh config based on the current in-core state, and sync the
+ * global config cache.
  */
 void
 spa_config_update(spa_t *spa, int what)
+{
+	spa_config_update_common(spa, what, FALSE);
+}
+
+/*
+ * Update all disk labels, generate a fresh config based on the current
+ * in-core state, and sync the global config cache (do not sync the config
+ * cache if this is a booting rootpool).
+ */
+void
+spa_config_update_common(spa_t *spa, int what, boolean_t isroot)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
 	uint64_t txg;
@@ -472,8 +484,9 @@ spa_config_update(spa_t *spa, int what)
 	/*
 	 * Update the global config cache to reflect the new mosconfig.
 	 */
-	spa_config_sync();
+	if (!isroot)
+		spa_config_sync();
 
 	if (what == SPA_CONFIG_UPDATE_POOL)
-		spa_config_update(spa, SPA_CONFIG_UPDATE_VDEVS);
+		spa_config_update_common(spa, SPA_CONFIG_UPDATE_VDEVS, isroot);
 }

@@ -203,6 +203,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "invalid or missing cache file"));
 	case EZFS_ISL2CACHE:
 		return (dgettext(TEXT_DOMAIN, "device is in use as a cache"));
+	case EZFS_VDEVNOTSUP:
+		return (dgettext(TEXT_DOMAIN, "vdev specification is not "
+		    "supported"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

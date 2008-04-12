@@ -627,6 +627,15 @@ stubs_base:
 #endif
 
 /*
+ * Stubs for zfs
+ */
+#ifndef ZFS_MODULE
+	MODULE(zfs,fs);
+	STUB(zfs, spa_boot_init, nomod_minus_one);
+	END_MODULE(zfs);
+#endif
+
+/*
  * Stubs for dcfs
  */
 #ifndef DCFS_MODULE

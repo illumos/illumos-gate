@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,7 +173,10 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		    FOLLOW, NULLVPP, &vp)) != 0)
 			break;
 		mutex_enter(&dump_lock);
-		error = dumpinit(vp, pathbuf, cmd == DIOCTRYDEV);
+		if (vp->v_type == VBLK)
+			error = dumpinit(vp, pathbuf, cmd == DIOCTRYDEV);
+		else
+			error = ENOTBLK;
 		mutex_exit(&dump_lock);
 		VN_RELE(vp);
 		break;

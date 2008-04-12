@@ -20,7 +20,7 @@
 \
 \
 \ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 
@@ -120,7 +120,7 @@ headers
 : mount-root  ( -- )
    boot-dev$ fs-pkg$  $open-package to fs-ih
    fs-ih 0=  if
-      ." Can't mount root" abort
+      " Can't mount root" die
    then
 ;
 
@@ -364,6 +364,8 @@ headers
 ;
 
 
+false  value  lflag?
+
 \ ZFS support
 \ -Z fsname  opens specified filesystem in disk pool
 
@@ -383,7 +385,10 @@ false     value    zflag?
 [else]
 
 : open-zfs-fs ( fs$ -- )
-   ." -Z not supported on non-zfs root"  abort
+   \ ignore on -L
+   lflag? invert  if
+      " -Z not supported on non-zfs root"  die
+   then
 ;
 
 [then]
@@ -470,6 +475,13 @@ false value halt?
             endof
             ascii H  of
                true to halt?
+            endof
+            ascii L  of
+               " /" fs-name swap  move
+               true to zflag?
+               " bootlst" boot-file swap  move
+               true to fflag?
+               true to lflag?
             endof
             ascii Z  of
                skip-blanks  next-str       ( arg$ fs-name$ )
@@ -596,7 +608,7 @@ headers
    get-arch
    get-targ  open-path              ( fd )
    loader-base over  get-file  if   ( fd alloc-sz virt size )
-      ." Boot load failed" abort
+      " Boot load failed" die
    then
    to file-sz                       ( fd alloc-sz virt )
    swap  to rd-alloc-sz             ( fd virt )

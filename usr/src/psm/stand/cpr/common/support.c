@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@ extern void	prom_unmap(caddr_t, uint_t);
 extern int cpr_debug;
 static int cpr_show_props = 0;
 
-
 /*
  * Read the config file and pass back the file path, filesystem
  * device path.
@@ -53,7 +52,8 @@ cpr_read_cprinfo(int fd, char *file_path, char *fs_path)
 
 	(void) prom_strcpy(file_path, cf.cf_path);
 	(void) prom_strcpy(fs_path, cf.cf_dev_prom);
-
+	if (cf.cf_type == CFT_ZVOL)
+		volname = cf.cf_fs;
 	return (0);
 }
 

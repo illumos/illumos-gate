@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@ static void cpr_save_mp_state(void);
 #endif
 
 int cpr_is_ufs(struct vfs *);
+int cpr_is_zfs(struct vfs *);
 
 char cpr_default_path[] = CPR_DEFAULT;
 
@@ -240,8 +241,8 @@ cpr_cprconfig_to_path(void)
  *	mounted on the same device as when pmconfig was last run,
  *	and the translation of that device to a node in the prom's
  *	device tree must be the same as when pmconfig was last run.
- * for CFT_SPEC, cf_path must be the path to a block special file,
- *	it must have no file system mounted on it,
+ * for CFT_SPEC and CFT_ZVOL, cf_path must be the path to a block
+ *      special file, it must have no file system mounted on it,
  *	and the translation of that device to a node in the prom's
  *	device tree must be the same as when pmconfig was last run.
  */
@@ -278,6 +279,15 @@ cpr_verify_statefile_path(void)
 
 	switch (cf->cf_type) {
 	case CFT_SPEC:
+		error = i_devname_to_promname(cf->cf_devfs, devpath,
+		    OBP_MAXPATHLEN);
+		if (error || strcmp(devpath, cf->cf_dev_prom)) {
+			cpr_err(CE_CONT, path_chg_fmt,
+			    cf->cf_dev_prom, devpath, rerun);
+			return (error);
+		}
+		/*FALLTHROUGH*/
+	case CFT_ZVOL:
 		if (strlen(cf->cf_path) > sizeof (sfpath)) {
 			cpr_err(CE_CONT, long_name);
 			return (ENAMETOOLONG);
@@ -304,12 +314,6 @@ cpr_verify_statefile_path(void)
 			return (ENOTSUP);
 		}
 
-		error = i_devname_to_promname(cf->cf_devfs, devpath,
-		    OBP_MAXPATHLEN);
-		if (error || strcmp(devpath, cf->cf_dev_prom)) {
-			cpr_err(CE_CONT, path_chg_fmt,
-			    cf->cf_dev_prom, devpath, rerun);
-		}
 		return (error);
 	case CFT_UFS:
 		break;		/* don't indent all the original code */
@@ -430,7 +434,8 @@ cpr_check_spec_statefile(void)
 
 	if (err = cpr_get_config())
 		return (err);
-	ASSERT(cprconfig.cf_type == CFT_SPEC);
+	ASSERT(cprconfig.cf_type == CFT_SPEC ||
+	    cprconfig.cf_type == CFT_ZVOL);
 
 	if (cprconfig.cf_devfs == NULL)
 		return (ENXIO);
@@ -1025,6 +1030,8 @@ cpr_build_statefile_path(void)
 			return (NULL);
 		}
 		return (cpr_cprconfig_to_path());
+	case CFT_ZVOL:
+		/*FALLTHROUGH*/
 	case CFT_SPEC:
 		return (cf->cf_devfs);
 	default:
@@ -1049,7 +1056,7 @@ cpr_get_statefile_prom_path(void)
 
 	ASSERT(cprconfig_loaded);
 	ASSERT(cf->cf_magic == CPR_CONFIG_MAGIC);
-	ASSERT(cf->cf_type == CFT_SPEC);
+	ASSERT(cf->cf_type == CFT_SPEC || cf->cf_type == CFT_ZVOL);
 	return (cf->cf_dev_prom);
 }
 
@@ -1065,6 +1072,15 @@ cpr_is_ufs(struct vfs *vfsp)
 
 	fsname = vfssw[vfsp->vfs_fstype].vsw_name;
 	return (strcmp(fsname, "ufs") == 0);
+}
+
+int
+cpr_is_zfs(struct vfs *vfsp)
+{
+	char *fsname;
+
+	fsname = vfssw[vfsp->vfs_fstype].vsw_name;
+	return (strcmp(fsname, "zfs") == 0);
 }
 
 /*
@@ -1121,7 +1137,7 @@ cpr_reusable_mount_check(void)
 int
 cpr_statefile_offset(void)
 {
-	return (cpr_statefile_is_spec() ? btod(CPR_SPEC_OFFSET) : 0);
+	return (cprconfig.cf_type != CFT_UFS ? btod(CPR_SPEC_OFFSET) : 0);
 }
 
 /*

@@ -54,6 +54,7 @@
 #include <sys/systeminfo.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/param.h>
+#include <sys/sysmacros.h>
 
 #if !defined(_OPB)
 #include <sys/ucode.h>
@@ -197,6 +198,7 @@ static int bam_argc;
 static int bam_check;
 static int bam_smf_check;
 static int bam_lock_fd = -1;
+static int bam_zfs;
 static char rootbuf[PATH_MAX] = "/";
 static int bam_update_all;
 static int bam_alt_platform;
@@ -242,6 +244,7 @@ static int s_fputs(char *, FILE *);
 
 static char *s_strdup(char *);
 static int is_readonly(char *);
+static int is_zfs(char *, char **);
 static int is_amd64(void);
 static int is_sun4u(void);
 static int is_sun4v(void);
@@ -419,7 +422,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:p:")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:p:Z")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -499,6 +502,9 @@ parse_args_internal(int argc, char *argv[])
 				error = 1;
 				bam_error(INVALID_PLAT, bam_platform);
 			}
+			break;
+		case 'Z':
+			bam_zfs = 1;
 			break;
 		case '?':
 			error = 1;
@@ -893,8 +899,9 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	error_t ret;
 	char menu_path[PATH_MAX];
 	char path[PATH_MAX];
+	char full_menu_root[PATH_MAX];
 	menu_t *menu;
-	char *mntpt, *menu_root, *logslice, *fstype;
+	char *mntpt, *menu_root, *logslice, *fstype, *grubSLICEpool, *pool;
 	struct stat sb;
 	int mnted;	/* set if we did a mount */
 	error_t (*f)(menu_t *mp, char *menu_path, char *opt);
@@ -919,7 +926,7 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 
 	mntpt = NULL;
 	mnted = 0;
-	logslice = fstype = NULL;
+	logslice = fstype = grubSLICEpool = pool = NULL;
 
 	/*
 	 * Check for the menu.list file:
@@ -931,10 +938,18 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	 * 4. Use /
 	 */
 	if (bam_alt_root) {
-		(void) snprintf(path, sizeof (path), "%s%s", bam_root,
-		    GRUB_slice);
+		if (is_zfs(bam_root, &grubSLICEpool))
+			(void) snprintf(path, sizeof (path), "%s/%s%s",
+			    bam_root, grubSLICEpool, GRUB_slice);
+		else
+			(void) snprintf(path, sizeof (path), "%s%s",
+			    bam_root, GRUB_slice);
 	} else {
-		(void) snprintf(path, sizeof (path), "%s", GRUB_slice);
+		if (is_zfs(bam_root, &grubSLICEpool))
+			(void) snprintf(path, sizeof (path), "/%s%s",
+			    grubSLICEpool, GRUB_slice);
+		else
+			(void) snprintf(path, sizeof (path), "%s", GRUB_slice);
 	}
 
 	if (stat(path, &sb) == 0) {
@@ -953,7 +968,25 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 		return (BAM_ERROR);
 	}
 
-	elide_trailing_slash(menu_root, menu_path, sizeof (menu_path));
+	/*
+	 * menu_root is the root file system of the boot environment being
+	 *    operated on.
+	 * full_menu_root is the location of the /boot/grub directory.
+	 *    With a ufs root, this is simply menu_root.  With a zfs
+	 *    root, it's <menu_root>/<poolname>
+	 */
+	elide_trailing_slash(menu_root, full_menu_root,
+	    sizeof (full_menu_root));
+
+	if (is_zfs(menu_root, &pool)) {
+		(void) strlcat(full_menu_root, "/", sizeof (full_menu_root));
+		(void) strlcat(full_menu_root, pool, sizeof (full_menu_root));
+	}
+
+	/*
+	 * menu_path is the directory that contains the menu.lst file
+	 */
+	(void) strlcpy(menu_path, full_menu_root, sizeof (menu_path));
 	(void) strlcat(menu_path, GRUB_MENU, sizeof (menu_path));
 
 	/*
@@ -999,13 +1032,17 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	else
 		ret = f(menu, menu_path, opt);
 	if (ret == BAM_WRITE) {
-		ret = menu_write(menu_root, menu);
+		ret = menu_write(full_menu_root, menu);
 	}
 
 	menu_free(menu);
 
 	umount_grub_slice(mnted, mntpt, NULL, logslice, fstype);
 
+	if (grubSLICEpool)
+		free(grubSLICEpool);
+	if (pool)
+		free(pool);
 	return (ret);
 }
 
@@ -2087,6 +2124,65 @@ is_readonly(char *root)
 	}
 
 	if (vfs.f_flag & ST_RDONLY) {
+		return (1);
+	}
+
+	return (0);
+}
+
+static int
+is_zfs(char *root, char **poolname)
+{
+	struct statvfs64 vfs;
+	FILE *fp;
+	struct extmnttab mnt;
+	dev_t devicenum;
+	char *special = NULL;
+	char *cp;
+
+	/* poolname can be null */
+	if (poolname)
+		*poolname = NULL;
+
+	if (statvfs64(root, &vfs) != 0) {
+		if (bam_verbose)
+			bam_error(STATVFS_FAIL, root, strerror(errno));
+		return (0);
+	}
+
+	if (strncmp(vfs.f_basetype, "zfs", strlen("zfs")) != 0)
+		return (0);
+
+	if (poolname == NULL)
+		return (1);
+
+	/*
+	 * Now find the mnttab entry so that we can extract the
+	 * pool name from the special device field.
+	 */
+	fp = fopen(MNTTAB, "r");
+	if (fp == NULL) {
+		bam_error(OPEN_FAIL, MNTTAB, strerror(errno));
+		return (0);
+	}
+
+	resetmnttab(fp);
+
+	while (getextmntent(fp, &mnt, sizeof (mnt)) == 0) {
+		devicenum = makedevice(mnt.mnt_major, mnt.mnt_minor);
+		if (devicenum == vfs.f_fsid) {
+			special = s_strdup(mnt.mnt_special);
+			if ((cp = strchr(special, '/')) != NULL)
+				*cp = '\0';
+			*poolname = s_strdup(special);
+			break;
+		}
+	}
+
+	(void) fclose(fp);
+
+	if (special) {
+		free(special);
 		return (1);
 	}
 
@@ -3480,12 +3576,13 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 	/* add the entry for normal Solaris */
 	if (bam_direct == BAM_DIRECT_DBOOT) {
 		entry = update_boot_entry(mp, title, grubdisk,
-		    DIRECT_BOOT_KERNEL, NULL, DIRECT_BOOT_ARCHIVE,
-		    osroot == menu_root);
+		    (bam_zfs ? DIRECT_BOOT_KERNEL_ZFS : DIRECT_BOOT_KERNEL),
+		    NULL, DIRECT_BOOT_ARCHIVE, osroot == menu_root);
 		if ((entry != BAM_ERROR) && (bam_is_hv == BAM_HV_PRESENT)) {
 			(void) update_boot_entry(mp, NEW_HV_ENTRY, grubdisk,
-			    XEN_MENU, KERNEL_MODULE_LINE, DIRECT_BOOT_ARCHIVE,
-			    osroot == menu_root);
+			    XEN_MENU, (bam_zfs ?
+			    KERNEL_MODULE_LINE_ZFS : KERNEL_MODULE_LINE),
+			    DIRECT_BOOT_ARCHIVE, osroot == menu_root);
 		}
 	} else {
 		entry = update_boot_entry(mp, title, grubdisk, MULTI_BOOT,
@@ -3503,7 +3600,9 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 		(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot,
 		    DIRECT_BOOT_FAILSAFE_KERNEL);
 		if (stat(failsafe, &sbuf) == 0) {
-			failsafe_kernel = DIRECT_BOOT_FAILSAFE_LINE;
+			failsafe_kernel =
+			    (bam_zfs ? DIRECT_BOOT_FAILSAFE_LINE_ZFS :
+			    DIRECT_BOOT_FAILSAFE_LINE);
 		} else {
 			(void) snprintf(failsafe, sizeof (failsafe), "%s%s",
 			    osroot, MULTI_BOOT_FAILSAFE);

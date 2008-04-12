@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,6 +75,10 @@ FCODE_OBJS +=		fcode.o
 # XXX -	currently a bug?...
 #PROC_OBJS += 
 CORE_OBJS +=	prmachdep.o
+
+#			ZFS file system module
+ZFS_OBJS +=		\
+	spa_boot.o
 
 #
 #			misc modules

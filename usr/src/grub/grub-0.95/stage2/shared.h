@@ -564,6 +564,7 @@ typedef enum
   ERR_NUMBER_OVERFLOW,
   ERR_BAD_GZIP_CRC,
   ERR_FILESYSTEM_NOT_FOUND,
+  ERR_NO_BOOTPATH,
 
   MAX_ERR_NUM
 } grub_error_t;
@@ -652,6 +653,7 @@ extern unsigned long current_drive;
 extern unsigned long current_partition;
 extern char current_rootpool[MAXNAMELEN];
 extern char current_bootfs[MAXNAMELEN];
+extern char current_bootpath[MAXNAMELEN];
 extern unsigned long long current_bootfs_obj;
 extern int is_zfs_mount;
 

@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/Makefile.1275
@@ -40,6 +40,7 @@ RD_FCODE	= rd.fcode
 
 MKBB		= mkbb
 MKBB_SH		= $(BASEDIR)/common/mkbb.sh
+MKBB.fcode	= $(MKBB) $(MKBBFLAGS)
 
 %.fcode:	$(BASEDIR)/common/%.fth
 	$(TOKENIZE) $<
@@ -55,14 +56,14 @@ $(MKBB):	$(MKBB_SH)
 	chmod +x $@
 
 $(FS_BB):	$(MKBB) $(FS_FCODE) $(RD_FCODE)
-	$(MKBB) $(FS_FCODE) $(RD_FCODE) $(FS_BB)
+	$(MKBB.fcode) $(FS_FCODE) $(RD_FCODE) $(FS_BB)
 
 $(PROG):	$(FS_BB)
 	@-$(RM) $@
 	cp -p $(FS_BB) $@
 
 clean:
-	-$(RM) $(FS_FCODE) $(RD_FCODE)
+	-$(RM) $(FS_FCODE) $(RD_FCODE) $(EX_FCODE) $(MKBB)
 
 clobber:	clean
 	-$(RM) $(PROG) $(FS_BB)

@@ -58,7 +58,7 @@ for fs in /var /var/adm /tmp; do
 		mountpt=`zfs get -H -o value mountpoint $be$fs 2>/dev/null`
 		if [ $? = 0 ] ; then
 			if [ "x$mountpt" = "x$fs" ] ; then
-				/sbin/zfs mount $be$fs
+				/sbin/zfs mount -O $be$fs
 			fi
 		fi
 	fi

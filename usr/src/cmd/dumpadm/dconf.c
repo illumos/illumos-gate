@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <libdiskmgt.h>
+#include <libzfs.h>
 
 #include "dconf.h"
 #include "minfree.h"
@@ -343,6 +344,11 @@ dconf_dev_ioctl(dumpconf_t *dcp, int cmd)
 	case EBUSY:
 		warn(gettext("device %s is already in use\n"), dcp->dc_device);
 		break;
+	case EBADR:
+		/* ZFS pool is too fragmented to support a dump device */
+		warn(gettext("device %s is too fragmented to be used as "
+		    "a dump device\n"), dcp->dc_device);
+		break;
 	default:
 		/*
 		 * NOTE: The stmsboot(1M) command's boot-up script parses this
@@ -447,6 +453,9 @@ dconf_update(dumpconf_t *dcp, int checkinuse)
 				goto err;
 			}
 
+			if ((error = zvol_check_dump_config(
+			    dcp->dc_device)) > 0)
+				goto err;
 			if (ioctl(dcp->dc_dump_fd, DIOCGETDUMPSIZE, &d) == -1) {
 				warn(gettext("failed to get kernel dump size"));
 				goto err;

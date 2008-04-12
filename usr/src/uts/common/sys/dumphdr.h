@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,6 +134,7 @@ extern void dumpsys(void);
 extern void dump_messages(void);
 extern void dump_ereports(void);
 extern void dumpvp_write(const void *, size_t);
+extern int dumpvp_resize(void);
 extern int dump_plat_addr(void);
 extern void dump_plat_pfn(void);
 extern int dump_plat_data(void *);

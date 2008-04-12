@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,10 +178,11 @@ enum zio_compress {
 #define	ZIO_PIPELINE_STOP		0x101
 
 /*
- * We'll take the unused errno 'EBADE' (from the Convergent graveyard)
- * to indicate checksum errors.
+ * We'll take the unused errnos, 'EBADE' and 'EBADR' (from the Convergent
+ * graveyard) to indicate checksum errors and fragmentation.
  */
 #define	ECKSUM	EBADE
+#define	EFRAGS	EBADR
 
 typedef struct zio zio_t;
 typedef void zio_done_func_t(zio_t *zio);

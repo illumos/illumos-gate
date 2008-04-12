@@ -1211,6 +1211,12 @@ spa_busy(void)
 }
 
 void
+spa_boot_init()
+{
+	spa_config_load();
+}
+
+void
 spa_init(int mode)
 {
 	mutex_init(&spa_namespace_lock, NULL, MUTEX_DEFAULT, NULL);

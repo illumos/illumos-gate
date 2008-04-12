@@ -326,6 +326,10 @@ extern int spa_get_stats(const char *pool, nvlist_t **config,
     char *altroot, size_t buflen);
 extern int spa_create(const char *pool, nvlist_t *config, nvlist_t *props,
     const char *history_str);
+extern void spa_check_rootconf(char *devpath, char **the_dev_p,
+    nvlist_t **the_conf_p, uint64_t *the_txg_p);
+extern boolean_t spa_rootdev_validate(nvlist_t *nv);
+extern int spa_import_rootpool(char *devpath);
 extern int spa_import(const char *pool, nvlist_t *config, nvlist_t *props);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);
@@ -390,6 +394,7 @@ extern void spa_config_set(spa_t *spa, nvlist_t *config);
 extern nvlist_t *spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg,
     int getstats);
 extern void spa_config_update(spa_t *spa, int what);
+extern void spa_config_update_common(spa_t *spa, int what, boolean_t isroot);
 
 /*
  * Miscellaneous SPA routines in spa_misc.c
@@ -430,7 +435,6 @@ extern uint64_t spa_first_txg(spa_t *spa);
 extern uint64_t spa_version(spa_t *spa);
 extern int spa_state(spa_t *spa);
 extern uint64_t spa_freeze_txg(spa_t *spa);
-struct metaslab_class;
 extern uint64_t spa_get_alloc(spa_t *spa);
 extern uint64_t spa_get_space(spa_t *spa);
 extern uint64_t spa_get_dspace(spa_t *spa);
@@ -502,6 +506,7 @@ extern void vdev_cache_stat_fini(void);
 /* Initialization and termination */
 extern void spa_init(int flags);
 extern void spa_fini(void);
+extern void spa_boot_init();
 
 /* properties */
 extern int spa_prop_set(spa_t *spa, nvlist_t *nvp);

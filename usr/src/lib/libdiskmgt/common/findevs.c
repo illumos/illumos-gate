@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <devid.h>
+#include <sys/fs/zfs.h>
 
 #include "libdiskmgt.h"
 #include "disks_private.h"
@@ -140,6 +141,7 @@ static int		have_disk(struct search_args *args, char *devid,
 static int		is_cluster_disk(di_node_t node, di_minor_t minor);
 static int		is_ctds(char *name);
 static int		is_drive(di_minor_t minor);
+static int		is_zvol(di_node_t node, di_minor_t minor);
 static int		is_HBA(di_node_t node, di_minor_t minor);
 static int		new_alias(disk_t *diskp, char *kernel_path,
 			    char *devlink_path, struct search_args *args);
@@ -568,7 +570,8 @@ add_devs(di_node_t node, di_minor_t minor, void *arg)
 		result = DI_WALK_TERMINATE;
 	    }
 
-	} else if (di_minor_spectype(minor) == S_IFCHR && is_drive(minor)) {
+	} else if (di_minor_spectype(minor) == S_IFCHR &&
+		(is_drive(minor) || is_zvol(node, minor))) {
 	    char	*devidstr;
 	    char	kernel_name[MAXPATHLEN];
 	    disk_t	*diskp;
@@ -1569,6 +1572,15 @@ is_drive(di_minor_t minor)
 	    type_index++;
 	}
 
+	return (0);
+}
+
+static int
+is_zvol(di_node_t node, di_minor_t minor)
+{
+	if ((strncmp(di_node_name(node), ZFS_DRIVER, 3) == 0) &&
+	    di_minor_devt(minor))
+		return (1);
 	return (0);
 }
 

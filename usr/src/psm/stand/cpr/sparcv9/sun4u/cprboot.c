@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/ddi.h>
 #include "cprboot.h"
 
+char *volname = NULL;
 
 /*
  * local defs
@@ -289,9 +290,10 @@ cb_open_sf(void)
 	/*
 	 * for block devices, seek past the disk label and bootblock
 	 */
-	if (specialstate)
+	if (volname)
+		(void) cpr_fs_seek(sfile.fd, CPR_SPEC_OFFSET);
+	else if (specialstate)
 		(void) prom_seek(sfile.fd, CPR_SPEC_OFFSET);
-
 	return (0);
 }
 
@@ -355,8 +357,9 @@ cb_read_statefile(void)
 	/*
 	 * read-in and check cpr dump header
 	 */
-	if (cpr_read_cdump(sfile.fd, &cdump, CPR_MACHTYPE_4U))
+	if (cpr_read_cdump(sfile.fd, &cdump, CPR_MACHTYPE_4U) == -1)
 		return (ERR);
+
 	if (cpr_debug)
 		prom_printf("\n");
 	cb_nbitmaps = cdump.cdd_bitmaprec;
@@ -399,7 +402,9 @@ cb_read_statefile(void)
 
 	cnt = 0;
 	dtlb_index = cb_dents - 1;
-	if (specialstate)
+	if (volname)
+		(void) cpr_fs_seek(sfile.fd, CPR_SPEC_OFFSET);
+	else if (specialstate)
 		(void) prom_seek(sfile.fd, CPR_SPEC_OFFSET);
 	else
 		(void) cpr_fs_seek(sfile.fd, 0);

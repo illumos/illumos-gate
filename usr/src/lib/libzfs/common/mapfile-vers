@@ -173,6 +173,7 @@ SUNWprivate_1.1 {
 	zprop_get_list;
 	zprop_iter;
 	zprop_print_one_property;
+	zvol_check_dump_config;
     local:
 	*;
 };

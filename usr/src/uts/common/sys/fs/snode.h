@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,6 +177,7 @@ int	spec_is_clone(struct vnode *);
 int	spec_is_selfclone(struct vnode *);
 int	spec_fence_snode(dev_info_t *dip, struct vnode *vp);
 int	spec_unfence_snode(dev_info_t *dip);
+void	spec_size_invalidate(dev_t, vtype_t);
 
 
 /*

@@ -20,7 +20,7 @@
 \
 \
 \ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 
@@ -74,11 +74,15 @@ d# 256  constant  /buf-len
    swap 1+  swap 1-
 ;
 
+: die  ( str -- )
+   cr  type  cr abort
+;
+
 : diag-cr?  ( -- )  diagnostic-mode?  if  cr  then  ;
 
 
 : find-abort ( name$ -- )
-   ." Can't find " type abort
+   cr  ." Can't find " type  cr abort
 ;
 
 : get-package ( pkg$ -- ph )
@@ -192,7 +196,7 @@ d# 256               constant /rd-fcode
 d# 8192 /rd-fcode -  constant rd-offset
 
 : open-abort  ( file$ -- )
-   ." Can't open "  type  abort
+   cr  ." Can't open "  type  cr abort
 ;
 
 /buf-len  buffer: open-cstr
@@ -210,10 +214,10 @@ d# 8192 /rd-fcode -  constant rd-offset
 
 : read-disk    ( adr len off ih -- )
    dup >r  0 swap  cif-seek  if     ( adr len  r: ih )
-      ." seek failed"  abort
+      " seek failed"  die
    then
 
    tuck  swap r>  cif-read  <>  if  (  )
-      ." read failed"  abort
+      " read failed"  die
    then
 ;

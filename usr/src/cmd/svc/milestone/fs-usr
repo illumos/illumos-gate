@@ -33,16 +33,47 @@
 . /lib/svc/share/fs_include.sh
 
 #
-# Add physical swap.
+# Once root is read/write we can enable the dedicated dumpdevice if it exists
+# locally. This is an optimization as svc-dumpadm will attempt do this later.
 #
-/sbin/swapadd -1
+dump_setup()
+{
+	[ -r /etc/dumpadm.conf ] && . /etc/dumpadm.conf
+
+	readswapdev $DUMPADM_DEVICE < $vfstab
+
+	#
+	# If we have a dedicated dump device, then go ahead and configure it.
+	# 
+	if [ "x$special" != "x$DUMPADM_DEVICE" ]; then
+		if [ -x /usr/sbin/zfs ]; then
+			dataset=`echo $DUMPADM_DEVICE | cut -d'/' -f5-`
+			[ -n "$dataset" ] && \
+			    /usr/sbin/zfs list -t volume $dataset > \
+			    /dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				/usr/sbin/zfs volinit
+			fi
+		fi
+
+		if [ -x /usr/sbin/dumpadm -a -b $DUMPADM_DEVICE ]; then
+			/usr/sbin/dumpadm -u || exit $SMF_EXIT_ERR_CONFIG
+		fi
+	fi
+}
 
 rootiszfs=0
 # get the fstype of root
 readmnttab / </etc/mnttab
 if [ "$fstype" = zfs ] ; then
 	rootiszfs=1
+	dump_setup
 fi
+
+#
+# Add physical swap.
+#
+/sbin/swapadd -1
 
 #
 # Check and remount the / (root) file system.

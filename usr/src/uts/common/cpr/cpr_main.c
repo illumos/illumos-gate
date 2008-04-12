@@ -70,6 +70,7 @@ extern void (*srn_signal)(int, int);
 extern void init_cpu_syscall(struct cpu *);
 extern void i_cpr_pre_resume_cpus();
 extern void i_cpr_post_resume_cpus();
+extern int cpr_is_ufs(struct vfs *);
 
 extern int pm_powering_down;
 extern kmutex_t srn_clone_lock;
@@ -336,8 +337,14 @@ cpr_ufs_logging(int enable)
 
 	if (error = cpr_open_deffile(FREAD, &vp))
 		return (error);
-	cpr_log_status(enable, &def_status, vp);
 	vfsp = vp->v_vfsp;
+	if (!cpr_is_ufs(vfsp)) {
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
+		VN_RELE(vp);
+		return (0);
+	}
+
+	cpr_log_status(enable, &def_status, vp);
 	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 

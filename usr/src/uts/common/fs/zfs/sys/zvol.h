@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,9 @@
 extern "C" {
 #endif
 
+#define	ZVOL_OBJ		1ULL
+#define	ZVOL_ZAP_OBJ		2ULL
+
 #ifdef _KERNEL
 extern int zvol_check_volsize(uint64_t volsize, uint64_t blocksize);
 extern int zvol_check_volblocksize(uint64_t volblocksize);
@@ -46,6 +49,7 @@ extern int zvol_set_volsize(const char *, major_t, uint64_t);
 extern int zvol_set_volblocksize(const char *, uint64_t);
 
 extern int zvol_open(dev_t *devp, int flag, int otyp, cred_t *cr);
+extern int zvol_dump(dev_t dev, caddr_t addr, daddr_t offset, int nblocks);
 extern int zvol_close(dev_t dev, int flag, int otyp, cred_t *cr);
 extern int zvol_strategy(buf_t *bp);
 extern int zvol_read(dev_t dev, uio_t *uiop, cred_t *cr);

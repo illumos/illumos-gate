@@ -35,23 +35,15 @@ include $(BASEDIR)/Makefile.com
 
 ZFS_DIR			= $(BASEDIR)/zfs/common
 
-ZFSBOOT_FTH		= $(ZFS_DIR)/boot-zfs.fth
-ZFS_FTH			= $(ZFS_DIR)/zfs.fth
-
 FS_FCODE		= boot-zfs.fcode
+EX_FCODE		= fs-zfs.fcode
 FS_BB			= zfs.bb
 
-ZFSDBGBOOT_FTH		= $(ZFS_DIR)/debug-zfs.fth
-ZFSDBG_FTH		= $(ZFS_DIR)/big-zfs.fth
+ZFSBOOT_FTH		= $(ZFS_DIR)/boot-zfs.fth
+ZFSFS_FTH		= $(ZFS_DIR)/fs-zfs.fth
+ZFS_FTH			= $(ZFS_DIR)/zfs.fth
 
-DBGBOOT_FCODE		= debug-zfs.fcode
-DBGFS_FCODE		= big-zfs.fcode
-
-DBGFS_BB		= debugzfs.bb
-DBGPROG			= debugbb
-
-DBG_CLEAN		+= $(DBGBOOT_FCODE) $(DBGFS_FCODE)
-DBG_CLOBBER		+= $(DBGPROG) $(DBGFS_BB)
+MKBBFLAGS		= -e $(EX_FCODE)
 
 #
 # Where and how stuff gets installed
@@ -64,21 +56,10 @@ BOOTBLK_LINK		= $(BOOTBLK_LINK_PREFIX)/zfs/$(PROG)
 	$(TOKENIZE) $<
 
 # make doesn't know fload
-$(FS_FCODE):	$(UTIL_FTH) $(ZFS_FTH) $(BOOT_FTH)
+$(FS_FCODE):	$(UTIL_FTH) $(BOOT_FTH)
 	$(TOKENIZE) $(ZFSBOOT_FTH)
 
+$(EX_FCODE):	$(UTIL_FTH) $(ZFS_FTH)
+	$(TOKENIZE) $(ZFSFS_FTH)
 
-$(DBGBOOT_FCODE):	$(UTIL_FTH) $(BOOT_FTH)
-	$(TOKENIZE) $(ZFSDBGBOOT_FTH)
-
-$(DBGFS_FCODE):		$(UTIL_FTH) $(ZFS_FTH)
-	$(TOKENIZE) $(ZFSDBG_FTH)
-
-$(DBGFS_BB):		$(MKBB) $(DBGBOOT_FCODE) $(DBGFS_FCODE) $(RD_FCODE)
-	$(MKBB) -e $(DBGFS_FCODE) $(DBGBOOT_FCODE) $(RD_FCODE) $(DBGFS_BB)
-
-$(DBGPROG):		$(DBGFS_BB)
-	@-$(RM) $@
-	cp -p $(DBGFS_BB) $@
-
-debug:	$(DBGPROG)
+$(FS_BB):	$(EX_FCODE)

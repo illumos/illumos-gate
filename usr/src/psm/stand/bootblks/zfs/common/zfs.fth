@@ -1,6 +1,6 @@
 
 \ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -49,13 +49,13 @@ new-device
    \ stack ops and logical ops (dup, and, etc) are 64b
    : xcmp  ( x1 x2 -- -1|0|1 )
       xlsplit rot xlsplit        ( x2.lo x2.hi x1.lo x1.hi )
-      rot 2dup  <  if            ( x2.lo x1.lo x1.hi x2.hi )
+      rot 2dup  u<  if           ( x2.lo x1.lo x1.hi x2.hi )
          2drop 2drop  -1         ( lt )
-      else  >  if                ( x2.lo x1.lo )
+      else  u>  if               ( x2.lo x1.lo )
          2drop  1                ( gt )
-      else  swap 2dup <  if      ( x1.lo x2.lo )
+      else  swap 2dup u<  if     ( x1.lo x2.lo )
          2drop  -1               ( lt )
-      else  >  if                (  )
+      else  u>  if               (  )
          1                       ( gt )
       else                       (  )
          0                       ( eq )
@@ -267,6 +267,13 @@ new-device
    : >nvdata  ( nv -- data )
       >nvname +  /l roundup
    ;
+
+   \ convert nvdata to 64b int or string
+   : nvdata>x  ( nvdata -- x )
+      /l 2* +                   ( ptr )
+      dup /l + l@  swap l@      ( x.lo x.hi )
+      lxjoin                    ( x )
+   ;
    alias nvdata>$ >nvname
 
    : nv-lookup  ( nv name$ -- nvdata false  |  true )
@@ -285,8 +292,14 @@ new-device
    : scan-vdev  ( -- )
       temp-space /nvpairs nvpairs-off    ( adr len off )
       dev-ih  read-disk                  (  )
+      temp-space " txg"  nv-lookup  if
+         " no txg nvpair"  die
+      then  nvdata>x                     ( txg )
+      x0=  if
+         " detached mirror"  die
+      then                               (  )
       temp-space " name"  nv-lookup  if
-         ." no name nvpair"  abort
+         " no name nvpair"  die
       then  nvdata>$                     ( pool$ )
       bootprop-buf swap  move            (  )
    ;
@@ -343,7 +356,7 @@ new-device
       /uber-block +loop
 
       \ make sure we found a valid ub
-      dup 0=  if  ." no ub found" abort  then
+      dup 0=  if  " no ub found" die  then
 
       uber-block /uber-block  move          (  )
    ;
@@ -398,7 +411,7 @@ new-device
       2dup over  dn_indblkshift  rshift    ( dn bp-off dn blk#  r: lvl )
       r> 1+  blk@lvl>bp                    ( dn bp-off bp )
 
-      \ read parent indir and index
+      \ read parent indir blk and index
       rot tuck dn-indsize                  ( bp-off dn bp len )
       ind-cache swap rot  read-bp          ( bp-off dn )
       dn-indmask  and                      ( bp-off' )
@@ -708,6 +721,8 @@ new-device
 
    : dd_head_dataset_obj  ( dd -- n )  h#  8 +  x@  ;
    : dd_child_dir_zapobj  ( dd -- n )  h# 20 +  x@  ;
+
+   : ds_snapnames_zapobj  ( ds -- n )  h# 20 +  x@  ;
    : ds_bp                ( ds -- p )  h# 80 +      ;
 
    0 instance value mos-dn
@@ -725,7 +740,7 @@ new-device
    alias  >dsl-dir  dn_bonus
    alias  >dsl-ds   dn_bonus
 
-   : #dn/blk  ( dn -- n )  dn-bsize /dnode  /  ;
+   : #dn/blk  ( dn -- n )     dn-bsize /dnode  /  ;
 
    \ read block into dn-cache
    : get-dnblk  ( dn blk# -- )
@@ -775,12 +790,22 @@ new-device
 
       \ read root dataset
       obj-dir " root_dataset"  zap-lookup  if
-         ." no root_dataset"  abort
+         " no root_dataset"  die
       then                                   ( obj# )
       dup to root-dsl#
       get-mos-dnode                          (  )
       dnode root-dsl  /dnode  move
    ;
+
+   \ find snapshot of given dataset
+   : snap-look  ( snap$ ds-obj# -- [ss-obj# ] not-found? )
+      get-mos-dnode  dnode >dsl-ds         ( snap$ ds )
+      ds_snapnames_zapobj  get-mos-dnode   ( snap$ )
+      dnode -rot  zap-lookup               ( [ss-obj# ] not-found? )
+   ;
+
+   \ dsl dir to dataset
+   : dir>ds   ( dn -- obj# )  >dsl-dir dd_head_dataset_obj  ;
 
    \ look thru the dsl hierarchy for path
    \ this looks almost exactly like a FS directory lookup
@@ -794,18 +819,34 @@ new-device
          r>  >dsl-dir dd_child_dir_zapobj         ( path$ file$ obj# )
          get-mos-dnode                            ( path$ file$ )
 
+         \ check for snapshot names
+         ascii @  left-parse-string               ( path$ snap$ file$ )
+
          \ search it
-         dnode -rot zap-lookup  if                ( path$ )
+         dnode -rot zap-lookup  if                ( path$ snap$ )
             \ not found
-            2drop true  exit                      ( not-found )
-         then                                     ( path$ obj# )
-         get-mos-dnode                            ( path$ )
+            2drop 2drop true  exit                ( not-found )
+         then                                     ( path$ snap$ obj# )
+         get-mos-dnode                            ( path$ snap$ )
+
+         \ lookup any snapshot name
+         dup  if
+            \ must be last path component
+            2swap  nip  if                        ( snap$ )
+               2drop true  exit                   ( not-found )
+            then
+            dnode dir>ds  snap-look  if           (  )
+               true  exit                         ( not-found )
+            then                                  ( obj# )
+            false  exit                           ( obj# found )
+         else  2drop  then                        ( path$ )
+
          dnode >r                                 ( path$  r: dn )
       repeat                                      ( path$ file$  r: dn)
       2drop 2drop  r> drop                        (  )
 
       \ found it, return dataset obj#
-      dnode >dsl-dir dd_head_dataset_obj          ( ds-obj# )
+      dnode  dir>ds                               ( ds-obj# )
       false                                       ( ds-obj# found )
    ;
 
@@ -837,7 +878,6 @@ new-device
    : fsize     ( dn -- n )     >znode zp_size  ;
    : ftype     ( dn -- n )     >znode zp_mode  h# f000  and  ;
    : dir?      ( dn -- flag )  ftype  h# 4000  =  ;
-   : regular?  ( dn -- flag )  ftype  h# 8000  =  ;
    : symlink?  ( dn -- flag )  ftype  h# a000  =  ;
 
    \ read obj# from fs objset
@@ -855,17 +895,17 @@ new-device
       \ get root obj# from master node
       master-node#  get-fs-dnode
       dnode  " ROOT"  zap-lookup  if
-         ." no ROOT"  abort
+         " no ROOT"  die
       then                             ( fsroot-obj# )
    ;
 
    : prop>rootobj#  ( -- )
       obj-dir " pool_props" zap-lookup  if
-         ." no pool_props"  abort
+         " no pool_props"  die
       then                               ( prop-obj# )
       get-mos-dnode                      (  )
       dnode " bootfs" zap-lookup  if
-         ." no bootfs"  abort
+         " no bootfs"  die
       then                               ( ds-obj# )
       get-rootobj#                       ( fsroot-obj# )
    ;
@@ -972,6 +1012,38 @@ new-device
    ;
 
    \
+   \   ZFS volume (ZVOL) routines
+   \
+   1 constant  zvol-data#
+   2 constant  zvol-prop#
+
+   0 instance value zv-dn
+
+   : get-zvol  ( zvol$ -- not-found? )
+      dsl-lookup  if
+         drop true  exit           ( failed )
+      then                         ( ds-obj# )
+
+      \ get zvol objset
+      get-mos-dnode                (  )
+      zv-dn dnode  get-objset
+      false                        ( succeeded )
+   ;
+
+   \ get zvol data dnode
+   : zvol-data  ( -- )
+      zv-dn zvol-data#  get-dnode
+   ;
+
+   : zvol-size  ( -- size )
+       zv-dn zvol-prop#   get-dnode
+       dnode " size"  zap-lookup  if
+          " no zvol size"  die
+       then                            ( size )
+   ;
+       
+
+   \
    \	ZFS installation routines
    \
 
@@ -979,6 +1051,7 @@ new-device
    struct
       /x     field >busy
       /x     field >offset
+      /x     field >fsize
       /dnode field >dnode
    constant /file-record
 
@@ -993,7 +1066,7 @@ new-device
    : file-offset@  ( -- off )     current-fd fd>record >offset  x@  ;
    : file-offset!  ( off -- )     current-fd fd>record >offset  x!  ;
    : file-dnode    ( -- dn )      current-fd fd>record >dnode  ;
-   : file-size     ( -- size )    file-dnode  fsize  ;
+   : file-size     ( -- size )    current-fd fd>record >fsize  x@  ;
    : file-bsize    ( -- bsize )   file-dnode  dn-bsize  ;
 
    \ find free fd slot
@@ -1010,11 +1083,12 @@ new-device
    ;
 
    \ init fd to offset 0 and copy dnode
-   : init-fd  ( fd -- )
-      fd>record                ( rec )
+   : init-fd  ( fsize fd -- )
+      fd>record                ( fsize rec )
       dup  >busy  1 swap  x!
       dup  >dnode  dnode swap  /dnode  move
-      >offset  0 swap  x!
+      dup  >fsize  rot swap  x!     ( rec )
+      >offset  0 swap  x!      (  )
    ;
 
    \ make fd current
@@ -1043,13 +1117,13 @@ new-device
 
    /max-bsize  5 *
    /uber-block      +
-   /dnode      5 *  +
+   /dnode      6 *  +
    /disk-block      +
    constant alloc-size
 
    : allocate-buffers  ( -- )
       alloc-size h# a0.0000 vmem-alloc  dup 0=  if
-         ." no memory"  abort
+         " no memory"  die
       then                                ( adr )
       dup to temp-space    /max-bsize  +  ( adr )
       dup to dn-cache      /max-bsize  +  ( adr )
@@ -1061,6 +1135,7 @@ new-device
       dup to obj-dir       /dnode      +  ( adr )
       dup to root-dsl      /dnode      +  ( adr )
       dup to fs-dn         /dnode      +  ( adr )
+      dup to zv-dn         /dnode      +  ( adr )
       dup to dnode         /dnode      +  ( adr )
           to gang-space                   (  )
 
@@ -1116,9 +1191,24 @@ new-device
          drop false  exit          ( failed )
       then                         ( fd )
 
-      dup init-fd  true            ( fd succeeded )
+      dnode fsize  over init-fd
+      true                         ( fd succeeded )
    ;
 
+   : open-volume ( vol$ -- okay? )
+      get-slot  if
+         2drop false  exit         ( failed )
+      then  -rot                   ( fd vol$ )
+
+      get-zvol  if                 ( fd )
+         drop false  exit          ( failed )
+      then
+
+      zvol-size over               ( fd size fd )
+      zvol-data init-fd            ( fd )
+      true                         ( fd succeeded )
+   ;
+      
    : close-file  ( fd -- )
       free-slot   (  )
    ;
@@ -1132,7 +1222,7 @@ new-device
          drop false  exit       ( failed )
       then                      ( off )
 
-      dup file-size >  if       ( off )
+      dup file-size x>  if      ( off )
          drop false  exit       ( failed )
       then                      ( off )
       dup  file-offset!  true   ( off succeeded )
@@ -1143,10 +1233,8 @@ new-device
          2drop 0  exit             ( 0 )
       then                         ( adr len )
 
-      file-dnode regular? 0=  if  2drop 0  exit  then
-
       \ adjust len if reading past eof
-      dup  file-offset@ +  file-size  >  if
+      dup  file-offset@ +  file-size  x>  if
          dup  file-offset@ +  file-size -  -
       then
       dup 0=  if  nip exit  then

@@ -174,6 +174,9 @@ extern int is_grub(const char *);
 /* Title used for hv entries */
 #define	NEW_HV_ENTRY	"Solaris xVM"
 
+/* ZFS boot option */
+#define	ZFS_BOOT	"-B $ZFS-BOOTFS"
+
 /* multiboot */
 #define	MULTI_BOOT	"/platform/i86pc/multiboot"
 #define	MULTI_BOOT_FAILSAFE	"/boot/multiboot"
@@ -186,6 +189,8 @@ extern int is_grub(const char *);
 #define	DIRECT_BOOT_KERNEL	"/platform/i86pc/kernel/$ISADIR/unix"
 #define	DIRECT_BOOT_FAILSAFE_KERNEL	"/boot/platform/i86pc/kernel/unix"
 #define	DIRECT_BOOT_FAILSAFE_LINE	DIRECT_BOOT_FAILSAFE_KERNEL " -s"
+#define	DIRECT_BOOT_KERNEL_ZFS	DIRECT_BOOT_KERNEL " " ZFS_BOOT
+#define	DIRECT_BOOT_FAILSAFE_LINE_ZFS	DIRECT_BOOT_FAILSAFE_LINE " " ZFS_BOOT
 
 /* Boot archives */
 #define	SUN4U_ARCHIVE		"/platform/sun4u/boot_archive"
@@ -202,6 +207,8 @@ extern int is_grub(const char *);
 #define	XEN_MENU		"/boot/$ISADIR/xen.gz"
 #define	HYPERVISOR_KERNEL	"/platform/i86xpv/kernel/$ISADIR/unix"
 #define	KERNEL_MODULE_LINE	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL
+#define	KERNEL_MODULE_LINE_ZFS	\
+	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL " " ZFS_BOOT
 
 #ifdef __cplusplus
 }

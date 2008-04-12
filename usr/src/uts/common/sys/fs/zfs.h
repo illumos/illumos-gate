@@ -228,7 +228,7 @@ typedef enum zfs_share_op {
 #define	SPA_VERSION_10			10ULL
 
 /*
- * When bumping up SPA_VERSION, make sure GRUB ZFS understand the on-disk
+ * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.
  */
@@ -316,11 +316,12 @@ typedef enum zfs_share_op {
 #define	ZPOOL_CONFIG_NPARITY		"nparity"
 #define	ZPOOL_CONFIG_HOSTID		"hostid"
 #define	ZPOOL_CONFIG_HOSTNAME		"hostname"
-#define	ZPOOL_CONFIG_TIMESTAMP		"timestamp" /* not stored on disk */
 #define	ZPOOL_CONFIG_UNSPARE		"unspare"
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_IS_LOG		"is_log"
 #define	ZPOOL_CONFIG_L2CACHE		"l2cache"
+#define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
+#define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
@@ -460,6 +461,7 @@ typedef struct vdev_stat {
 	uint64_t	vs_scrub_end;		/* UTC scrub end time	*/
 } vdev_stat_t;
 
+#define	ZVOL_DRIVER	"zvol"
 #define	ZFS_DRIVER	"zfs"
 #define	ZFS_DEV		"/dev/zfs"
 
@@ -475,7 +477,7 @@ typedef struct vdev_stat {
  * And here are the things we need with /dev, etc. in front of them.
  */
 #define	ZVOL_PSEUDO_DEV		"/devices/pseudo/zvol@0:"
-#define	ZVOL_FULL_DEV_DIR	"/dev/" ZVOL_DEV_DIR
+#define	ZVOL_FULL_DEV_DIR	"/dev/" ZVOL_DEV_DIR "/"
 
 #define	ZVOL_PROP_NAME		"name"
 

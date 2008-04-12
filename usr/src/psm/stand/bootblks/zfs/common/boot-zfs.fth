@@ -1,7 +1,7 @@
 
 
 \ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -29,6 +29,12 @@ id: %Z%%M%	%I%	%E% SMI
 purpose: ZFS bootblock
 copyright: Copyright 2006 Sun Microsystems, Inc. All Rights Reserved
 
+\ big bootblk
+create doheaders
+create bigbootblk
+d# 8192  constant  /fs-fcode
+d# 8192  constant  fs-offset
+
 \ for [ifdef] zfs
 create zfs
 
@@ -37,9 +43,6 @@ create zfs
 
 \ load common words
 fload ../../../common/util.fth
-
-\ load fs reader
-fload ../../common/zfs.fth
 
 \ load booter
 fload ../../../common/boot.fth

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@ static char null_input[] = "\" /nulldev\" input";
  * path of the file.  Handle file pathnames with or without leading '/'.
  * if fs points to a null char, it indicates that we are opening a device.
  */
-/* ARGSUSED */
 int
 cpr_statefile_open(char *path, char *fs_dev)
 {
@@ -78,6 +77,10 @@ cpr_statefile_open(char *path, char *fs_dev)
 	if (cb_rih == OBP_BADNODE || cb_rih == 0) {
 		prom_printf("Can't open %s\n", fs_pkg);
 		return (-1);
+	}
+
+	if (volname) {
+		return (cpr_fs_volopen(volname));
 	}
 
 	/*
@@ -123,10 +126,20 @@ cb_unmountroot()
 	return (0);
 }
 
+int
+cpr_fs_volopen(char *path)
+{
+
+	CB_VENTRY(cpr_fs_volopen);
+
+	if (cb_rih == OBP_BADNODE)
+		return (-1);
+	return (prom_volopen(cb_rih, path));
+}
+
 /*
  * Ask prom to open a disk file.
  */
-/* ARGSUSED */
 int
 cpr_fs_open(char *path)
 {
@@ -146,7 +159,7 @@ cpr_fs_open(char *path)
 int
 cpr_read(int fd, caddr_t buf, size_t len)
 {
-	if (!statefile_special)
+	if (!statefile_special || volname)
 		return (cpr_fs_read(fd, buf, len));
 	else
 		return (prom_read(fd, buf, len, 0, 0));

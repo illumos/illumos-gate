@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,7 +60,7 @@ POFILES=	$(PMCFG_SRCS:%.c=%.po)
 OPOFILES=	sysidpm.po
 
 # pmconfig only needs libdevinfo on sparc
-sparc_LDEVINFO=	-ldevinfo
+sparc_LDEVINFO=	-ldevinfo -lefi -ladm -lzfs -lnvpair
 i386_LDEVINFO=
 
 LDEVINFO=	-ldevinfo

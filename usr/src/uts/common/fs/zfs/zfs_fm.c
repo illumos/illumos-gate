@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,6 +263,9 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 		 */
 		if (zio->io_logical != NULL)
 			fm_payload_set(ereport,
+			    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJSET,
+			    DATA_TYPE_UINT64,
+			    zio->io_logical->io_bookmark.zb_objset,
 			    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJECT,
 			    DATA_TYPE_UINT64,
 			    zio->io_logical->io_bookmark.zb_object,

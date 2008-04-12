@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
+#include <sys/refcount.h>
 #include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
 #include <sys/fs/zfs.h>
@@ -266,29 +267,45 @@ vdev_disk_close(vdev_t *vd)
 	vd->vdev_tsd = NULL;
 }
 
+int
+vdev_disk_physio(ldi_handle_t vd_lh, caddr_t data, size_t size,
+    uint64_t offset, int flags)
+{
+	buf_t *bp;
+	int error = 0;
+
+	if (vd_lh == NULL)
+		return (EINVAL);
+
+	ASSERT(flags & B_READ || flags & B_WRITE);
+
+	bp = getrbuf(KM_SLEEP);
+	bp->b_flags = flags | B_BUSY | B_NOCACHE | B_FAILFAST;
+	bp->b_bcount = size;
+	bp->b_un.b_addr = (void *)data;
+	bp->b_lblkno = lbtodb(offset);
+	bp->b_bufsize = size;
+
+	error = ldi_strategy(vd_lh, bp);
+	ASSERT(error == 0);
+	if ((error = biowait(bp)) == 0 && bp->b_resid != 0)
+		error = EIO;
+	freerbuf(bp);
+
+	return (error);
+}
+
 static int
 vdev_disk_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
     int flags)
 {
-	buf_t buf;
 	int error = 0;
 	vdev_disk_t *dvd = vd->vdev_tsd;
 
 	if (vd == NULL || dvd == NULL || dvd->vd_lh == NULL)
 		return (EINVAL);
 
-	ASSERT(flags & B_READ || flags & B_WRITE);
-
-	bioinit(&buf);
-	buf.b_flags = flags | B_BUSY | B_NOCACHE | B_FAILFAST;
-	buf.b_bcount = size;
-	buf.b_un.b_addr = (void *)data;
-	buf.b_lblkno = lbtodb(offset);
-	buf.b_bufsize = size;
-
-	error = ldi_strategy(dvd->vd_lh, &buf);
-	ASSERT(error == 0);
-	error = biowait(&buf);
+	error = vdev_disk_physio(dvd->vd_lh, data, size, offset, flags);
 
 	if (zio_injection_enabled && error == 0)
 		error = zio_handle_device_injection(vd, EIO);
@@ -558,3 +575,65 @@ vdev_ops_t vdev_disk_ops = {
 	VDEV_TYPE_DISK,		/* name of this vdev type */
 	B_TRUE			/* leaf vdev */
 };
+
+/*
+ * Given the root disk device pathname, read the label from the device,
+ * and construct a configuration nvlist.
+ */
+nvlist_t *
+vdev_disk_read_rootlabel(char *devpath)
+{
+	nvlist_t *config = NULL;
+	ldi_handle_t vd_lh;
+	vdev_label_t *label;
+	uint64_t s, size;
+	int l;
+
+	/*
+	 * Read the device label and build the nvlist.
+	 */
+	if (ldi_open_by_name(devpath, FREAD, kcred, &vd_lh, zfs_li))
+		return (NULL);
+
+	if (ldi_get_size(vd_lh, &s))
+		return (NULL);
+
+	size = P2ALIGN_TYPED(s, sizeof (vdev_label_t), uint64_t);
+	label = kmem_alloc(sizeof (vdev_label_t), KM_SLEEP);
+
+	for (l = 0; l < VDEV_LABELS; l++) {
+		uint64_t offset, state, txg = 0;
+
+		/* read vdev label */
+		offset = vdev_label_offset(size, l, 0);
+		if (vdev_disk_physio(vd_lh, (caddr_t)label,
+		    VDEV_SKIP_SIZE + VDEV_BOOT_HEADER_SIZE +
+		    VDEV_PHYS_SIZE, offset, B_READ) != 0)
+			continue;
+
+		if (nvlist_unpack(label->vl_vdev_phys.vp_nvlist,
+		    sizeof (label->vl_vdev_phys.vp_nvlist), &config, 0) != 0) {
+			config = NULL;
+			continue;
+		}
+
+		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
+		    &state) != 0 || state >= POOL_STATE_DESTROYED) {
+			nvlist_free(config);
+			config = NULL;
+			continue;
+		}
+
+		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
+		    &txg) != 0 || txg == 0) {
+			nvlist_free(config);
+			config = NULL;
+			continue;
+		}
+
+		break;
+	}
+
+	kmem_free(label, sizeof (vdev_label_t));
+	return (config);
+}

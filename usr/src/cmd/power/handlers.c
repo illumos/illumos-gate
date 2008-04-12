@@ -30,11 +30,14 @@
 #include <sys/syslog.h>
 #include <sys/openpromio.h>
 #include <sys/mnttab.h>
+#include <sys/vtoc.h>
+#include <sys/efi_partition.h>
 #include <syslog.h>
 #include <stdlib.h>
 #include <sys/pm.h>
 #include <kstat.h>
 #include <sys/smbios.h>
+#include <libzfs.h>
 
 
 #define	STRCPYLIM(dst, src, str) strcpy_limit(dst, src, sizeof (dst), str)
@@ -824,7 +827,6 @@ nfsreq(void)
 	return (scan_int(LINEARG(1), &new_cc.nfsreqs_thold));
 }
 
-
 #ifdef sparc
 static char open_fmt[] = "cannot open \"%s\", %s\n";
 
@@ -838,6 +840,8 @@ check_mount(char *sfile, dev_t sfdev, int ufs)
 {
 	char *src, *err_fmt = NULL, *mnttab = MNTTAB;
 	int rgent, match = 0;
+	struct mnttab zroot = { 0 };
+	struct mnttab entry;
 	struct extmnttab ent;
 	FILE *fp;
 
@@ -846,6 +850,18 @@ check_mount(char *sfile, dev_t sfdev, int ufs)
 		return (1);
 	}
 
+	if (ufs) {
+		zroot.mnt_mountp = "/";
+		zroot.mnt_fstype = "zfs";
+		if (getmntany(fp, &entry, &zroot) == 0) {
+			err_fmt = "ufs statefile with zfs root is not"
+			    " supported\n";
+			mesg(MERR, err_fmt, sfile);
+			fclose(fp);
+			return (1);
+		}
+		resetmnttab(fp);
+	}
 	/*
 	 * Search for a matching dev_t;
 	 * ignore non-ufs filesystems for a regular statefile.
@@ -862,14 +878,13 @@ check_mount(char *sfile, dev_t sfdev, int ufs)
 			break;
 		}
 	}
-	(void) fclose(fp);
 
 	/*
 	 * No match is needed for a block device statefile,
 	 * a match is needed for a regular statefile.
 	 */
 	if (match == 0) {
-		if (new_cc.cf_type == CFT_SPEC)
+		if (new_cc.cf_type != CFT_UFS)
 			STRCPYLIM(new_cc.cf_devfs, sfile, "block statefile");
 		else
 			err_fmt = "cannot find ufs mount point for \"%s\"\n";
@@ -882,6 +897,7 @@ check_mount(char *sfile, dev_t sfdev, int ufs)
 		STRCPYLIM(new_cc.cf_path, src, "statefile path");
 	} else
 		err_fmt = "statefile device \"%s\" is a mounted filesystem\n";
+	(void) fclose(fp);
 	if (err_fmt)
 		mesg(MERR, err_fmt, sfile);
 	return (err_fmt != NULL);
@@ -893,7 +909,7 @@ check_mount(char *sfile, dev_t sfdev, int ufs)
  * log any ioctl/conversion error.
  */
 static int
-utop(void)
+utop(char *fs_name, char *prom_name)
 {
 	union obpbuf {
 		char	buf[OBP_MAXPATHLEN + sizeof (uint_t)];
@@ -911,23 +927,132 @@ utop(void)
 
 	opp = &oppbuf.oppio;
 	opp->oprom_size = OBP_MAXPATHLEN;
-	strcpy_limit(opp->oprom_array, new_cc.cf_devfs,
+	strcpy_limit(opp->oprom_array, fs_name,
 	    OBP_MAXPATHLEN, "statefile device");
 	upval = ioctl(fd, OPROMDEV2PROMNAME, opp);
 	(void) close(fd);
-	if (upval == OKUP)
-		STRCPYLIM(new_cc.cf_dev_prom, opp->oprom_array, "prom device");
-	else {
+	if (upval == OKUP) {
+		strcpy_limit(prom_name, opp->oprom_array, OBP_MAXPATHLEN,
+		    "prom device");
+	} else {
 		openlog("pmconfig", 0, LOG_DAEMON);
 		syslog(LOG_NOTICE,
 		    gettext("cannot convert \"%s\" to prom device"),
-		    new_cc.cf_devfs);
+		    fs_name);
 		closelog();
 	}
 
 	return (upval);
 }
 
+/*
+ * given the path to a zvol, return the cXtYdZ name
+ * returns < 0 on error, 0 if it isn't a zvol, > 1 on success
+ */
+static int
+ztop(char *arg, char *diskname)
+{
+	zpool_handle_t *zpool_handle;
+	nvlist_t *config, *nvroot;
+	nvlist_t **child;
+	uint_t children;
+	libzfs_handle_t *lzfs;
+	char *vname;
+	char *p;
+	char pool_name[MAXPATHLEN];
+
+	if (strncmp(arg, "/dev/zvol/dsk/", 14)) {
+		return (0);
+	}
+	arg += 14;
+	strncpy(pool_name, arg, MAXPATHLEN);
+	if (p = strchr(pool_name, '/'))
+		*p = '\0';
+	STRCPYLIM(new_cc.cf_fs, p + 1, "statefile path");
+
+	if ((lzfs = libzfs_init()) == NULL) {
+		mesg(MERR, "failed to initialize ZFS library\n");
+		return (-1);
+	}
+	if ((zpool_handle = zpool_open(lzfs, pool_name)) == NULL) {
+		mesg(MERR, "couldn't open pool '%s'\n", pool_name);
+		libzfs_fini(lzfs);
+		return (-1);
+	}
+	config = zpool_get_config(zpool_handle, NULL);
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) != 0) {
+		zpool_close(zpool_handle);
+		libzfs_fini(lzfs);
+		return (-1);
+	}
+	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) == 0);
+	if (children != 1) {
+		mesg(MERR, "expected one vdev, got %d\n", children);
+		zpool_close(zpool_handle);
+		libzfs_fini(lzfs);
+		return (-1);
+	}
+	vname = zpool_vdev_name(lzfs, zpool_handle, child[0]);
+	if (vname == NULL) {
+		mesg(MERR, "couldn't determine vdev name\n");
+		zpool_close(zpool_handle);
+		libzfs_fini(lzfs);
+		return (-1);
+	}
+	strcpy(diskname, "/dev/dsk/");
+	strcat(diskname, vname);
+	free(vname);
+	zpool_close(zpool_handle);
+	libzfs_fini(lzfs);
+	return (1);
+}
+
+/*
+ * returns NULL if the slice is good (e.g. does not start at block
+ * zero, or a string describing the error if it doesn't
+ */
+static boolean_t
+is_good_slice(char *sfile, char **err)
+{
+	int fd, rc;
+	struct vtoc vtoc;
+	dk_gpt_t *gpt;
+	char rdskname[MAXPATHLEN];
+	char *x, *y;
+
+	*err = NULL;
+	/* convert from dsk to rdsk */
+	STRCPYLIM(rdskname, sfile, "disk name");
+	x = strstr(rdskname, "dsk/");
+	y = strstr(sfile, "dsk/");
+	if (x != NULL) {
+		*x++ = 'r';
+		strcpy(x, y);
+	}
+
+	if ((fd = open(rdskname, O_RDONLY)) == -1) {
+		*err = "could not open '%s'\n";
+	} else if ((rc = read_vtoc(fd, &vtoc)) >= 0) {
+		/*
+		 * we got a slice number; now check the block
+		 * number where the slice starts
+		 */
+		if (vtoc.v_part[rc].p_start < 2)
+			*err = "using '%s' would clobber the disk label\n";
+		close(fd);
+		return (*err ? B_FALSE : B_TRUE);
+	} else if ((rc == VT_ENOTSUP) &&
+	    (efi_alloc_and_read(fd, &gpt)) >= 0) {
+		/* EFI slices don't clobber the disk label */
+		free(gpt);
+		close(fd);
+		return (B_TRUE);
+	} else
+		*err = "could not read partition table from '%s'\n";
+	return (B_FALSE);
+}
 
 /*
  * Check for a valid statefile pathname, inode and mount status.
@@ -938,6 +1063,7 @@ sfpath(void)
 	static int statefile;
 	char *err_fmt = NULL;
 	char *sfile, *sp, ch;
+	char diskname[256];
 	struct stat stbuf;
 	int dir = 0;
 	dev_t dev;
@@ -991,12 +1117,20 @@ sfpath(void)
 		new_cc.cf_type = CFT_UFS;
 		dev = stbuf.st_dev;
 	} else if (S_ISBLK(stbuf.st_mode)) {
-		if (minor(stbuf.st_rdev) != 2) {
-			new_cc.cf_type = CFT_SPEC;
+		if (is_good_slice(sfile, &err_fmt)) {
+			switch (ztop(sfile, diskname)) {
+				case 1:
+					new_cc.cf_type = CFT_ZVOL;
+					break;
+				case 0:
+					new_cc.cf_type = CFT_SPEC;
+					break;
+				case -1:
+				default:
+					return (NOUP);
+			}
 			dev = stbuf.st_rdev;
-		} else
-			err_fmt = "statefile device cannot be slice 2 (%s)\n"
-			    "would clobber the disk label and boot-block\n";
+		}
 	} else
 		err_fmt = "bad file type for \"%s\"\n"
 		    "statefile must be a regular file or block device\n";
@@ -1004,9 +1138,14 @@ sfpath(void)
 		mesg(MERR, err_fmt, sfile);
 		return (NOUP);
 	}
-
-	if (check_mount(sfile, dev, (new_cc.cf_type == CFT_UFS)) || utop())
+	if (check_mount(sfile, dev, (new_cc.cf_type == CFT_UFS)))
 		return (NOUP);
+	if (new_cc.cf_type == CFT_ZVOL) {
+		if (utop(diskname, new_cc.cf_dev_prom))
+			return (NOUP);
+	} else if (utop(new_cc.cf_devfs, new_cc.cf_dev_prom)) {
+		return (NOUP);
+	}
 	new_cc.cf_magic = CPR_CONFIG_MAGIC;
 	statefile = 1;
 	return (OKUP);

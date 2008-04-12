@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,7 @@ extern char ent_fmt[];
 extern int verbose;
 extern uint_t cb_dents;
 extern uint_t cb_msec;
+extern char *volname;
 
 /*
  * machdep.c
@@ -233,6 +234,7 @@ extern int cb_usb_setup(void);
 extern void cb_enter_mon(void);
 extern void cb_exit_to_mon(void);
 extern int cpr_fs_close(int);
+extern int cpr_fs_volopen(char *);
 extern int cpr_fs_open(char *);
 extern int cpr_fs_read(int, char *, int);
 extern int cpr_fs_seek(int, offset_t);

@@ -114,6 +114,7 @@ enum {
 	EZFS_SHARESMBFAILED,	/* failed to share over smb */
 	EZFS_BADCACHE,		/* bad cache file */
 	EZFS_ISL2CACHE,		/* device is for the level 2 ARC */
+	EZFS_VDEVNOTSUP,	/* unsupported vdev type */
 	EZFS_UNKNOWN
 };
 
@@ -537,6 +538,9 @@ extern int zpool_read_label(int, nvlist_t **);
  */
 extern int zpool_create_zvol_links(zpool_handle_t *);
 extern int zpool_remove_zvol_links(zpool_handle_t *);
+
+/* is this zvol valid for use as a dump device? */
+extern int zvol_check_dump_config(char *);
 
 /*
  * Enable and disable datasets within a pool by mounting/unmounting and

@@ -72,6 +72,19 @@ readvfstab() {
 	done
 }
 
+readswapdev() {
+	while read special fsckdev mountp fstype fsckpass automnt mntopts; do
+		# Ignore comments, empty lines, and no-action lines
+		case "$special" in
+		'#'* | '' | '-') continue;;
+		esac
+
+		[ "$fstype" != swap ] && continue
+
+		[ "x$special" = "x$1" ] && break
+	done
+}
+
 #
 # readmnttab mount_point
 #   -> (special, mountp, fstype, mntopts, mnttime)

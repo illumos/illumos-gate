@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,6 +84,7 @@ IPCTF_TARGET	= $(IPCTF)
 $(PATCH_BUILD)IPCTF_TARGET =
 
 CPPFLAGS	+= -I$(SRC)/common
+CPPFLAGS	+= -I$(SRC)/uts/common/fs/zfs
 
 #
 # For now, disable these lint checks; maintainers should endeavor

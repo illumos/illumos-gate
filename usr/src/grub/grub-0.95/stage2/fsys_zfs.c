@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -199,7 +199,7 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
  * 	Success : physical disk offset
  * 	Failure : errnum = ERR_BAD_ARGUMENT, return value is meaningless
  */
-uint64_t
+static uint64_t
 vdev_label_offset(uint64_t psize, int l, uint64_t offset)
 {
 	/* XXX Need to add back label support! */
@@ -496,7 +496,7 @@ zap_leaf_array_equal(zap_leaf_phys_t *l, int blksft, int chunk,
  *	0 - success
  *	errnum - failure
  */
-int
+static int
 zap_leaf_lookup(zap_leaf_phys_t *l, int blksft, uint64_t h,
     const char *name, uint64_t *value)
 {
@@ -557,7 +557,7 @@ zap_leaf_lookup(zap_leaf_phys_t *l, int blksft, uint64_t h,
  *	0 - success
  *	errnum - failure
  */
-int
+static int
 fzap_lookup(dnode_phys_t *zap_dnode, zap_phys_t *zap,
     char *name, uint64_t *value, char *stack)
 {
@@ -893,9 +893,9 @@ skip:
 }
 
 /*
- * Parse the packed nvlist and search for the string value of a given name.
+ * For a given XDR packed nvlist, verify the first 4 bytes and move on.
  *
- * An XDR packed nvlist is encoded as (from nvs_xdr_create) :
+ * An XDR packed nvlist is encoded as (comments from nvs_xdr_create) :
  *
  *      encoding method/host endian     (4 bytes)
  *      nvl_version                     (4 bytes)
@@ -915,19 +915,46 @@ skip:
  *	0 - success
  *	1 - failure
  */
-int
-nvlist_lookup_value(char *nvlist, char *name, void *val, int valtype)
+static int
+nvlist_unpack(char *nvlist, char **out)
 {
-	int name_len, type, nelm, slen, encode_size;
-	char *nvpair, *nvp_name, *strval = val;
-	uint64_t *intval = val;
-
 	/* Verify if the 1st and 2nd byte in the nvlist are valid. */
 	if (nvlist[0] != NV_ENCODE_XDR || nvlist[1] != HOST_ENDIAN)
 		return (1);
 
+	nvlist += 4;
+	*out = nvlist;
+	return (0);
+}
+
+static char *
+nvlist_array(char *nvlist, int index)
+{
+	int i, encode_size;
+
+	for (i = 0; i < index; i++) {
+		/* skip the header, nvl_version, and nvl_nvflag */
+		nvlist = nvlist + 4 * 2;
+
+		while (encode_size = BSWAP_32(*(uint32_t *)nvlist))
+			nvlist += encode_size; /* goto the next nvpair */
+
+		nvlist = nvlist + 4 * 2; /* skip the ending 2 zeros - 8 bytes */
+	}
+
+	return (nvlist);
+}
+
+static int
+nvlist_lookup_value(char *nvlist, char *name, void *val, int valtype,
+    int *nelmp)
+{
+	int name_len, type, slen, encode_size;
+	char *nvpair, *nvp_name, *strval = val;
+	uint64_t *intval = val;
+
 	/* skip the header, nvl_version, and nvl_nvflag */
-	nvlist = nvlist + 4 * 3;
+	nvlist = nvlist + 4 * 2;
 
 	/*
 	 * Loop thru the nvpair list
@@ -948,8 +975,9 @@ nvlist_lookup_value(char *nvlist, char *name, void *val, int valtype)
 
 		if ((grub_strncmp(nvp_name, name, name_len) == 0) &&
 		    type == valtype) {
+			int nelm;
 
-			if ((nelm = BSWAP_32(*(uint32_t *)nvpair)) != 1)
+			if ((nelm = BSWAP_32(*(uint32_t *)nvpair)) < 1)
 				return (1);
 			nvpair += 4;
 
@@ -964,6 +992,16 @@ nvlist_lookup_value(char *nvlist, char *name, void *val, int valtype)
 			case DATA_TYPE_UINT64:
 				*intval = BSWAP_64(*(uint64_t *)nvpair);
 				return (0);
+
+			case DATA_TYPE_NVLIST:
+				*(void **)val = (void *)nvpair;
+				return (0);
+
+			case DATA_TYPE_NVLIST_ARRAY:
+				*(void **)val = (void *)nvpair;
+				if (nelmp)
+					*nelmp = nelm;
+				return (0);
 			}
 		}
 
@@ -974,18 +1012,92 @@ nvlist_lookup_value(char *nvlist, char *name, void *val, int valtype)
 }
 
 /*
- * Get the pool name of the root pool from the vdev nvpair list of the label.
+ * Check if this vdev is online and is in a good state.
+ */
+static int
+vdev_validate(char *nv)
+{
+	uint64_t ival;
+
+	if (nvlist_lookup_value(nv, ZPOOL_CONFIG_OFFLINE, &ival,
+	    DATA_TYPE_UINT64, NULL) == 0 ||
+	    nvlist_lookup_value(nv, ZPOOL_CONFIG_FAULTED, &ival,
+	    DATA_TYPE_UINT64, NULL) == 0 ||
+	    nvlist_lookup_value(nv, ZPOOL_CONFIG_DEGRADED, &ival,
+	    DATA_TYPE_UINT64, NULL) == 0 ||
+	    nvlist_lookup_value(nv, ZPOOL_CONFIG_REMOVED, &ival,
+	    DATA_TYPE_UINT64, NULL) == 0)
+		return (ERR_DEV_VALUES);
+
+	return (0);
+}
+
+/*
+ * Get a list of valid vdev pathname from the boot device.
+ * The caller should already allocate MAXNAMELEN memory for bootpath.
+ */
+static int
+vdev_get_bootpath(char *nv, char *bootpath)
+{
+	char type[16];
+
+	bootpath[0] = '\0';
+	if (nvlist_lookup_value(nv, ZPOOL_CONFIG_TYPE, &type, DATA_TYPE_STRING,
+	    NULL))
+		return (ERR_FSYS_CORRUPT);
+
+	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
+		if (vdev_validate(nv) != 0 ||
+		    nvlist_lookup_value(nv, ZPOOL_CONFIG_PHYS_PATH, bootpath,
+		    DATA_TYPE_STRING, NULL) != 0)
+			return (ERR_NO_BOOTPATH);
+
+	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
+		int nelm, i;
+		char *child;
+
+		if (nvlist_lookup_value(nv, ZPOOL_CONFIG_CHILDREN, &child,
+		    DATA_TYPE_NVLIST_ARRAY, &nelm))
+			return (ERR_FSYS_CORRUPT);
+
+		for (i = 0; i < nelm; i++) {
+			char tmp_path[MAXNAMELEN];
+			char *child_i;
+
+			child_i = nvlist_array(child, i);
+			if (vdev_validate(child_i) != 0)
+				continue;
+
+			if (nvlist_lookup_value(child_i, ZPOOL_CONFIG_PHYS_PATH,
+			    tmp_path, DATA_TYPE_STRING, NULL) != 0)
+				return (ERR_NO_BOOTPATH);
+
+			if ((strlen(bootpath) + strlen(tmp_path)) > MAXNAMELEN)
+				return (ERR_WONT_FIT);
+
+			if (strlen(bootpath) == 0)
+				sprintf(bootpath, "%s", tmp_path);
+			else
+				sprintf(bootpath, "%s %s", bootpath, tmp_path);
+		}
+	}
+
+	return (strlen(bootpath) > 0 ? 0 : ERR_NO_BOOTPATH);
+}
+
+/*
+ * Check the disk label information and retrieve needed vdev name-value pairs.
  *
  * Return:
  *	0 - success
- *	errnum - failure
+ *	ERR_* - failure
  */
-int
-get_pool_name_value(int label, char *name, void *value, int valtype,
-    char *stack)
+static int
+check_pool_label(int label, char *stack)
 {
 	vdev_phys_t *vdev;
-	uint64_t sector;
+	uint64_t sector, pool_state, txg = 0;
+	char *nvlist, *nv;
 
 	sector = (label * sizeof (vdev_label_t) + VDEV_SKIP_SIZE +
 	    VDEV_BOOT_HEADER_SIZE) >> SPA_MINBLOCKSHIFT;
@@ -996,10 +1108,36 @@ get_pool_name_value(int label, char *name, void *value, int valtype,
 
 	vdev = (vdev_phys_t *)stack;
 
-	if (nvlist_lookup_value(vdev->vp_nvlist, name, value, valtype))
+	if (nvlist_unpack(vdev->vp_nvlist, &nvlist))
 		return (ERR_FSYS_CORRUPT);
-	else
-		return (0);
+
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_POOL_STATE, &pool_state,
+	    DATA_TYPE_UINT64, NULL))
+		return (ERR_FSYS_CORRUPT);
+
+	if (pool_state == POOL_STATE_DESTROYED)
+		return (ERR_FILESYSTEM_NOT_FOUND);
+
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_POOL_NAME,
+	    current_rootpool, DATA_TYPE_STRING, NULL))
+		return (ERR_FSYS_CORRUPT);
+
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_POOL_TXG, &txg,
+	    DATA_TYPE_UINT64, NULL))
+		return (ERR_FSYS_CORRUPT);
+
+	/* not an active device */
+	if (txg == 0)
+		return (ERR_NO_BOOTPATH);
+
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VDEV_TREE, &nv,
+	    DATA_TYPE_NVLIST, NULL))
+		return (ERR_FSYS_CORRUPT);
+
+	if (vdev_get_bootpath(nv, current_bootpath))
+		return (ERR_NO_BOOTPATH);
+
+	return (0);
 }
 
 /*
@@ -1044,22 +1182,13 @@ zfs_mount(void)
 		if ((ubbest = find_bestub(ub_array, label)) != NULL &&
 		    zio_read(&ubbest->ubp_uberblock.ub_rootbp, osp, stack)
 		    == 0) {
-			uint64_t pool_state;
 
 			VERIFY_OS_TYPE(osp, DMU_OST_META);
 
 			/* Got the MOS. Save it at the memory addr MOS. */
 			grub_memmove(MOS, &osp->os_meta_dnode, DNODE_SIZE);
 
-			if (get_pool_name_value(label, ZPOOL_CONFIG_POOL_STATE,
-			    &pool_state, DATA_TYPE_UINT64, stack))
-				return (0);
-
-			if (pool_state == POOL_STATE_DESTROYED)
-				return (0);
-
-			if (get_pool_name_value(label, ZPOOL_CONFIG_POOL_NAME,
-			    current_rootpool, DATA_TYPE_STRING, stack))
+			if (check_pool_label(label, stack))
 				return (0);
 
 			is_zfs_mount = 1;

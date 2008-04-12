@@ -66,6 +66,19 @@ init_statefile_entry() {
 
 		return
 	)
+	if [ $max_avail -eq 0 ]; then
+		if [ X`df -n / | awk '{print $3}'` != "Xzfs" ] ; then
+			return
+		fi
+		rootpool=`zfs mount | grep ' \/$' | awk '{print $1 }' |\
+		    sed 's/\/.*$//'`
+		if [ X$rootpool = "X" ] || \
+		    [ ! -L /dev/zvol/dsk/$rootpool/dump ]; then
+			return
+		fi
+		echo "statefile /dev/zvol/dsk/$rootpool/dump" \
+			>> /etc/power.conf
+	fi
 }
 
 case "$1" in

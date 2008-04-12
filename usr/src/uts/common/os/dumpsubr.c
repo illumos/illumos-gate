@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@
 #include <sys/vtoc.h>
 #include <sys/errorq.h>
 #include <sys/fm/util.h>
+#include <sys/fs/zfs.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -269,6 +270,17 @@ dumpinit(vnode_t *vp, char *name, int justchecking)
 				dump_iosize = dki.dki_maxtransfer * blk_size;
 				dumpbuf_resize();
 			}
+			/*
+			 * If we are working with a zvol then call into
+			 * it to dumpify itself.
+			 */
+			if (strcmp(dki.dki_dname, ZVOL_DRIVER) == 0) {
+				if ((error = VOP_IOCTL(cdev_vp,
+				    DKIOCDUMPINIT, NULL, FKIOCTL, kcred,
+				    NULL, NULL)) != 0) {
+					dumpfini();
+				}
+			}
 
 			(void) VOP_CLOSE(cdev_vp, FREAD | FWRITE, 1, 0,
 			    kcred, NULL);
@@ -279,15 +291,42 @@ dumpinit(vnode_t *vp, char *name, int justchecking)
 
 	cmn_err(CE_CONT, "?dump on %s size %llu MB\n", name, dumpvp_size >> 20);
 
-	return (0);
+	return (error);
 }
 
 void
 dumpfini(void)
 {
+	vattr_t vattr;
+	boolean_t is_zfs = B_FALSE;
+	vnode_t *cdev_vp;
 	ASSERT(MUTEX_HELD(&dump_lock));
 
 	kmem_free(dumppath, strlen(dumppath) + 1);
+
+	/*
+	 * Determine if we are using zvols for our dump device
+	 */
+	vattr.va_mask = AT_RDEV;
+	if (VOP_GETATTR(dumpvp, &vattr, 0, kcred, NULL) == 0) {
+		is_zfs = (getmajor(vattr.va_rdev) ==
+		    ddi_name_to_major(ZFS_DRIVER)) ? B_TRUE : B_FALSE;
+	}
+
+	/*
+	 * If we have a zvol dump device then we call into zfs so
+	 * that it may have a chance to cleanup.
+	 */
+	if (is_zfs &&
+	    (cdev_vp = makespecvp(VTOS(dumpvp)->s_dev, VCHR)) != NULL) {
+		if (VOP_OPEN(&cdev_vp, FREAD | FWRITE, kcred, NULL) == 0) {
+			(void) VOP_IOCTL(cdev_vp, DKIOCDUMPFINI, NULL, FKIOCTL,
+			    kcred, NULL, NULL);
+			(void) VOP_CLOSE(cdev_vp, FREAD | FWRITE, 1, 0,
+			    kcred, NULL);
+		}
+		VN_RELE(cdev_vp);
+	}
 
 	(void) VOP_CLOSE(dumpvp, FREAD | FWRITE, 1, (offset_t)0, kcred, NULL);
 
@@ -797,4 +836,31 @@ dump_resize()
 	dumphdr_init();
 	dumpbuf_resize();
 	mutex_exit(&dump_lock);
+}
+
+/*
+ * This function allows for dynamic resizing of a dump area. It assumes that
+ * the underlying device has update its appropriate size(9P).
+ */
+int
+dumpvp_resize()
+{
+	int error;
+	vattr_t vattr;
+
+	mutex_enter(&dump_lock);
+	vattr.va_mask = AT_SIZE;
+	if ((error = VOP_GETATTR(dumpvp, &vattr, 0, kcred, NULL)) != 0) {
+		mutex_exit(&dump_lock);
+		return (error);
+	}
+
+	if (error == 0 && vattr.va_size < 2 * DUMP_LOGSIZE + DUMP_ERPTSIZE) {
+		mutex_exit(&dump_lock);
+		return (ENOSPC);
+	}
+
+	dumpvp_size = vattr.va_size & -DUMP_OFFSET;
+	mutex_exit(&dump_lock);
+	return (0);
 }

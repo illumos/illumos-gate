@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@
 #include	<locale.h>
 #include	<libintl.h>
 #include	<libdiskmgt.h>
+#include	<sys/fs/zfs.h>
 
 #define	LFLAG	0x01	/* swap -l (list swap devices) */
 #define	DFLAG	0x02	/* swap -d (delete swap device) */
@@ -644,6 +645,19 @@ add(char *path, off_t offset, off_t cnt, int flags)
 		}
 
 		(void) close(fd);
+
+		/*
+		 * zvols cannot act as both a swap device and dump device.
+		 */
+		if (strncmp(dumpdev, ZVOL_FULL_DEV_DIR,
+		    strlen(ZVOL_FULL_DEV_DIR)) == 0) {
+			if (strcmp(dumpdev, path) == 0) {
+				(void) fprintf(stderr, gettext("%s: zvol "
+				    "cannot be used as a swap device and a "
+				    "dump device\n"), path);
+				return (2);
+			}
+		}
 
 	} else if (!(flags & P1FLAG))
 		dumpadm_err(gettext("Warning: failed to open /dev/dump"));

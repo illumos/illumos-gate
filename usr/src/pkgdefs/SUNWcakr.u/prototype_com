@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -520,3 +520,4 @@ f none platform/sun4u/kernel/tod/sparcv9/todstarcat 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todstarfire 755 root sys
 s none platform/sun4u/kernel/unix=sparcv9/unix
 f none platform/sun4u/wanboot 644 root sys
+f none platform/sun4u/bootlst 644 root sys

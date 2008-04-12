@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,52 @@ prom_fopen(ihandle_t fsih, char *path)
 	return (p1275_cell2int(ci[9]));		/* Res2: fd */
 }
 
+int
+prom_volopen(ihandle_t fsih, char *path)
+{
+	cell_t ci[10];
+	size_t len;
+
+#ifdef PROM_32BIT_ADDRS
+	char *opath = NULL;
+
+	if ((uintptr_t)path > (uint32_t)-1) {
+		opath = path;
+		len = prom_strlen(opath) + 1; /* include terminating NUL */
+		path = promplat_alloc(len);
+		if (path == NULL)
+			return (0);
+		(void) prom_strcpy(path, opath);
+	}
+#endif
+	len = prom_strlen(path);
+
+	promif_preprom();
+	ci[0] = p1275_ptr2cell("call-method");	/* Service name */
+	ci[1] = (cell_t)4;			/* #argument cells */
+	ci[2] = (cell_t)3;			/* #result cells */
+	ci[3] = p1275_ptr2cell("open-volume");	/* Arg1: Method name */
+	ci[4] = p1275_ihandle2cell(fsih);	/* Arg2: fs ihandle */
+	ci[5] = p1275_uint2cell(len);		/* Arg3: Len */
+	ci[6] = p1275_ptr2cell(path);		/* Arg4: Pathname */
+
+	(void) p1275_cif_handler(&ci);
+
+	promif_postprom();
+
+#ifdef PROM_32BIT_ADDRS
+	if (opath != NULL)
+		promplat_free(path, len + 1);
+#endif
+
+	if (ci[7] != 0)				/* Catch result */
+		return (-1);
+
+	if (ci[8] == 0)				/* Res1: failed */
+		return (-1);
+
+	return (p1275_cell2int(ci[9]));		/* Res2: fd */
+}
 
 int
 prom_fseek(ihandle_t fsih, int fd, unsigned long long offset)

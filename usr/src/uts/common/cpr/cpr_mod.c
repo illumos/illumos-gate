@@ -44,6 +44,7 @@
 
 extern int i_cpr_is_supported(int sleeptype);
 extern int cpr_is_ufs(struct vfs *);
+extern int cpr_is_zfs(struct vfs *);
 extern int cpr_check_spec_statefile(void);
 extern int cpr_reusable_mount_check(void);
 extern int i_cpr_reusable_supported(void);
@@ -341,7 +342,8 @@ cpr(int fcn, void *mdep)
 	}
 
 	if (!i_cpr_is_supported(cpr_sleeptype) ||
-	    (cpr_sleeptype == CPR_TODISK && !cpr_is_ufs(rootvfs)))
+	    (cpr_sleeptype == CPR_TODISK &&
+	    !cpr_is_ufs(rootvfs)&& !cpr_is_zfs(rootvfs)))
 		return (ENOTSUP);
 
 	if (fcn == AD_CHECK_SUSPEND_TO_RAM ||

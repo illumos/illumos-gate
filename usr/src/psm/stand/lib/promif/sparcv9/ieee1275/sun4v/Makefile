@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/boot/sparcv9/ieee1275/sun4v/Makefile
@@ -51,6 +51,7 @@ PLAT_PFILES = 			\
 PLAT_PSUN4FILES =		\
 	prom_alloc.c		\
 	prom_cpuctl.c		\
+	prom_fio.c		\
 	prom_getunum.c		\
 	prom_idprom.c		\
 	prom_init.c		\

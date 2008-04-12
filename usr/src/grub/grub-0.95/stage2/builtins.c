@@ -115,6 +115,7 @@ init_config (void)
   grub_timeout = -1;
   current_rootpool[0] = '\0';
   current_bootfs[0] = '\0';
+  current_bootpath[0] = '\0';
   current_bootfs_obj = 0;
   is_zfs_mount = 0;
 }
@@ -2678,6 +2679,18 @@ expand_dollar_bootfs(char *in, char *out)
 			grub_sprintf(tmpout, "zfs-bootfs=%s",
 			    current_rootpool);
 		tmpout = out + strlen(out); 
+	}
+
+	/*
+	 * If there is a $ZFS-BOOTFS expansion, it is a ZFS root,
+	 * then add bootpath property.
+	 */
+	if (tmpout != out) {
+		if ((outlen += 12 + strlen(current_bootpath)) > MAX_CMDLINE) {
+			errnum = ERR_WONT_FIT;
+			return (1);
+		}
+		grub_sprintf(tmpout, ",bootpath=\"%s\"", current_bootpath);
 	}
 
 	strncat(out, in, MAX_CMDLINE);

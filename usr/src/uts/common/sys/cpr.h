@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,15 @@ typedef struct cpr_default_info cdef_t;
  * cf_dev_prom	(prom device path of the above special file)
  *			"/sbus/espdma/dma/sd@1:h"
  *
+ * If the statefile is on a zvol, the fields would have these values:
+ *
+ * cf_type	CFT_ZVOL
+ * cf_path	ignored
+ * cf_fs	(the zvol name e.g. "dump" portion of rootpool/dump)
+ * cf_devfs	(devfs path) "/dev/zvol/dsk/<pool>/<zvol>"
+ * cf_dev_prom	(prom device path of the above special file)
+ *		e.g. "/sbus/espdma/dma/sd@1:h"
+ *
  * The rest of the fields are autoshutdown and autopm configuration related.
  * They are updated by pmconfig and consumed by both powerd and dtpower.
  */
@@ -163,6 +172,7 @@ struct cprconfig {
  */
 #define	CFT_UFS		1		/* statefile is ufs file	*/
 #define	CFT_SPEC	2		/* statefile is special file	*/
+#define	CFT_ZVOL	3		/* statefile is a zvol		*/
 
 
 /*

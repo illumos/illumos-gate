@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -820,7 +820,7 @@ specinit(int fstype, char *name)
 	 * Create snode cache
 	 */
 	snode_cache = kmem_cache_create("snode_cache", sizeof (struct snode),
-		0, snode_constructor, snode_destructor, NULL, NULL, NULL, 0);
+	    0, snode_constructor, snode_destructor, NULL, NULL, NULL, 0);
 
 	/*
 	 * Associate vfs operations with spec_vfs
@@ -1049,4 +1049,20 @@ spec_unfence_snode(dev_info_t *dip)
 	kmem_free(path, MAXPATHLEN);
 
 	return (0);
+}
+
+void
+spec_size_invalidate(dev_t dev, vtype_t type)
+{
+
+	struct snode *csp;
+
+	mutex_enter(&stable_lock);
+	if ((csp = sfind(dev, type, NULL)) != NULL) {
+		mutex_enter(&csp->s_lock);
+		csp->s_flag &= ~SSIZEVALID;
+		VN_RELE(STOV(csp));
+		mutex_exit(&csp->s_lock);
+	}
+	mutex_exit(&stable_lock);
 }

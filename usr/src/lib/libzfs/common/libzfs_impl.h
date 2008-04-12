@@ -160,6 +160,7 @@ int zpool_open_silent(libzfs_handle_t *, const char *, zpool_handle_t **);
 int zvol_create_link(libzfs_handle_t *, const char *);
 int zvol_remove_link(libzfs_handle_t *, const char *);
 int zpool_iter_zvol(zpool_handle_t *, int (*)(const char *, void *), void *);
+boolean_t zpool_name_valid(libzfs_handle_t *, boolean_t, const char *);
 
 void namespace_clear(libzfs_handle_t *);
 

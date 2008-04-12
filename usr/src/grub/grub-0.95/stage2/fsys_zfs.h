@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _FSYS_ZFS_H
@@ -128,6 +128,8 @@ typedef struct uberblock_phys {
 #define	HOST_ENDIAN		1	/* for x86 machine */
 #define	DATA_TYPE_UINT64	8
 #define	DATA_TYPE_STRING	9
+#define	DATA_TYPE_NVLIST	19
+#define	DATA_TYPE_NVLIST_ARRAY	20
 
 /*
  * Decompression Entry - lzjb

@@ -96,6 +96,7 @@ $(PATCH_BUILD)IPCTF_TARGET =
 # 
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(SRC)/common
+CPPFLAGS += -I$(SRC)/uts/common/fs/zfs
 
 #
 # For now, disable these lint checks; maintainers should endeavor

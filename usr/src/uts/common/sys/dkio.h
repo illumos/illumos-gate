@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -357,6 +357,9 @@ struct dk_minfo {
 #define	DKIOCGETVOLCAP	(DKIOC | 25)	/* Get volume capabilities */
 #define	DKIOCSETVOLCAP	(DKIOC | 26)	/* Set volume capabilities */
 #define	DKIOCDMR	(DKIOC | 27)	/* Issue a directed read */
+
+#define	DKIOCDUMPINIT	(DKIOC | 28)	/* Dumpify a zvol */
+#define	DKIOCDUMPFINI	(DKIOC | 29)	/* Un-Dumpify a zvol */
 
 typedef uint_t volcapinfo_t;
 

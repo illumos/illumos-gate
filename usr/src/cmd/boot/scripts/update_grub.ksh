@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -43,6 +43,7 @@ done
 ARCH=`uname -p`
 
 is_pcfs_boot=yes
+is_zfs_boot=no
 
 check_pcfs_boot()
 {
@@ -53,13 +54,42 @@ check_pcfs_boot()
 	fi
 }
 
+check_zfs_boot()
+{
+	if [ -f "$ALT_ROOT"/etc/lu/GRUB_slice ]; then
+		dev=`grep '^PHYS_SLICE=' "$ALT_ROOT"/etc/lu/GRUB_slice |
+		    cut -d= -f2`
+		if [ "`fstyp $dev`" = "zfs" ]; then
+			is_zfs_boot=yes
+		fi
+	else
+		rootfstype=`df -n ${ALT_ROOT:-/} | awk '{print $3}'`
+		if [ "$rootfstype" = "zfs" ]; then
+			is_zfs_boot=yes
+		fi
+			
+	fi
+}
+
 #
 # Detect SVM root and return the list of raw devices under the mirror
 #
 get_rootdev_list()
 {
 	if [ -f "$ALT_ROOT"/etc/lu/GRUB_slice ]; then
-		grep '^PHYS_SLICE' "$ALT_ROOT"/etc/lu/GRUB_slice | cut -d= -f2
+		dev=`grep '^PHYS_SLICE' "$ALT_ROOT"/etc/lu/GRUB_slice |
+		    cut -d= -f2`
+		if [ "$is_zfs_boot" = "yes" ]; then
+			fstyp -a "$dev" | grep 'path: ' | grep -v phys_path: | 
+			    cut -d"'" -f2 | sed 's+/dsk/+/rdsk/+'
+		else
+			echo "$dev"
+		fi
+		return
+	elif [ "$is_zfs_boot" = "yes" ]; then
+		rootpool=`df -k ${ALT_ROOT:-/} | tail +2 | cut -d/ -f1`
+		rootdevlist=`zpool iostat -v "$rootpool" | tail +5 |
+		    grep -v mirror | sed -n -e '/--/q' -e p | awk '{print $1}'`
 	else
 		metadev=`grep -v "^#" "$ALT_ROOT"/etc/vfstab | \
 		    grep "[	 ]/[ 	]" | nawk '{print $2}'`
@@ -70,11 +100,11 @@ get_rootdev_list()
 			rootdevlist=`metastat -p $metavol |\
 			    grep -v "^$metavol[	 ]" | nawk '{print $4}'`
 		fi
-		for rootdev in $rootdevlist
-		do
-			echo /dev/rdsk/$rootdev
-		done
 	fi
+	for rootdev in $rootdevlist
+	do
+		echo /dev/rdsk/$rootdev
+	done
 }
 
 #
@@ -101,16 +131,22 @@ install_grub()
 		fi
 	fi
 
-	get_rootdev_list | while read rootdev
+	grubdevlist=`get_rootdev_list`
+	zfsarg=""
+	if [ "$is_zfs_boot" = "yes" ]; then
+		zfsarg="-Z"
+	fi
+
+	for rootdev in $grubdevlist
 	do
 		if [ X"$rpcfsdev" != X ]; then
 			echo "create GRUB menu in "$ALT_ROOT"/stubboot"
-			"$ALT_ROOT"/sbin/bootadm update-menu \
+			"$ALT_ROOT"/sbin/bootadm update-menu $zfsarg\
 			    -R "$ALT_ROOT"/stubboot -o $rootdev,"$ALT_ROOT"
 		else
 			echo "Creating GRUB menu in ${ALT_ROOT:-/}"
 			$ALT_ROOT/sbin/bootadm update-menu -R ${ALT_ROOT:-/} \
-			    -o $rootdev
+			    $zfsarg -o $rootdev
 		fi
 		print "Installing grub on $rootdev"
 		"$ALT_ROOT"/sbin/installgrub $STAGE1 $STAGE2 $rootdev
@@ -119,6 +155,7 @@ install_grub()
 
 if [ -f "$ALT_ROOT"/platform/i86pc/multiboot -a "$ARCH" = i386 ] ; then
 	check_pcfs_boot
+	check_zfs_boot
 	install_grub
 fi
 
