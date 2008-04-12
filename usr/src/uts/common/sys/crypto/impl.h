@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -483,6 +483,7 @@ typedef struct crypto_session_data {
 	kmutex_t			sd_lock;
 	kcondvar_t			sd_cv;
 	uint32_t			sd_flags;
+	int				sd_pre_approved_amount;
 	crypto_ctx_t			*sd_digest_ctx;
 	crypto_ctx_t			*sd_encr_ctx;
 	crypto_ctx_t			*sd_decr_ctx;

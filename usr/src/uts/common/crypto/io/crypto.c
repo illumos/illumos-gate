@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,15 +127,25 @@ static int crypto_get_provider_list(crypto_minor_t *, uint_t *,
 #define	CRYPTO_MAX_FIND_COUNT	512
 
 /*
- * When a mechanism parameter length is less than CRYPTO_DEFERRED_LIMIT
- * bytes, then the length is added to the next resource control check.
+ * We preapprove some bytes for each session to avoid making the costly
+ * crypto_buffer_check() calls. The preapproval is done when a new session
+ * is created and that cost is amortized over later crypto calls.
+ * Most applications create a session and then do a bunch of crypto calls
+ * in that session. So, they benefit from this optimization.
+ *
+ * Note that we may hit the project.max-crypto-memory limit a bit sooner
+ * because of this preapproval. But it is acceptable since the preapproved
+ * amount is insignificant compared to the default max-crypto-memory limit
+ * which is quarter of the machine's memory. The preapproved amount is
+ * roughly 2 * 16K(maximum SSL record size).
  */
-#define	CRYPTO_DEFERRED_LIMIT	100
+#define	CRYPTO_PRE_APPROVED_LIMIT	(32 * 1024)
 
 /* The session table grows by CRYPTO_SESSION_CHUNK increments */
 #define	CRYPTO_SESSION_CHUNK	100
 
 size_t crypto_max_buffer_len = CRYPTO_MAX_BUFFER_LEN;
+size_t crypto_pre_approved_limit = CRYPTO_PRE_APPROVED_LIMIT;
 
 #define	INIT_RAW_CRYPTO_DATA(data, len)				\
 	(data).cd_format = CRYPTO_DATA_RAW;			\
@@ -205,7 +215,7 @@ static kcondvar_t crypto_cv;
 	}							\
 }
 
-#define	CRYPTO_DECREMENT_RCTL(val) {				\
+#define	CRYPTO_DECREMENT_RCTL(val)	if ((val) != 0) {	\
 	kproject_t *projp;					\
 	mutex_enter(&curproc->p_lock);				\
 	projp = curproc->p_task->tk_proj;			\
@@ -216,6 +226,27 @@ static kcondvar_t crypto_cv;
 	curproc->p_crypto_mem -= (val);				\
 	mutex_exit(&curproc->p_lock);				\
 }
+
+/*
+ * We do not need to hold sd_lock in the macros below
+ * as they are called after doing a get_session_ptr() which
+ * sets the CRYPTO_SESSION_IS_BUSY flag.
+ */
+#define	CRYPTO_DECREMENT_RCTL_SESSION(sp, val, rctl_chk) 	\
+	if ((val) != 0) {					\
+		ASSERT(((sp)->sd_flags & CRYPTO_SESSION_IS_BUSY) != 0);	\
+		if (rctl_chk) {				\
+			CRYPTO_DECREMENT_RCTL(val);		\
+		} else {					\
+			(sp)->sd_pre_approved_amount += (val);	\
+		}						\
+	}
+
+#define	CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)		\
+	((sp->sd_pre_approved_amount >= need) ?			\
+	(sp->sd_pre_approved_amount -= need,			\
+	    rctl_chk = B_FALSE, CRYPTO_SUCCESS) :		\
+	    (rctl_chk = B_TRUE, crypto_buffer_check(need)))
 
 /*
  * Module linkage.
@@ -474,6 +505,7 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	crypto_session_data_t *sp;
 	minor_t mn = getminor(dev);
 	uint_t i;
+	size_t total = 0;
 
 	mutex_enter(&crypto_lock);
 	if (mn > crypto_minors_table_count) {
@@ -509,6 +541,9 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 
 		sp = cm->cm_session_table[i];
 		ASSERT((sp->sd_flags & CRYPTO_SESSION_IS_BUSY) == 0);
+		ASSERT(sp->sd_pre_approved_amount == 0 ||
+		    sp->sd_pre_approved_amount == crypto_pre_approved_limit);
+		total += sp->sd_pre_approved_amount;
 		if (sp->sd_find_init_cookie != NULL) {
 			(void) crypto_free_find_ctx(sp);
 		}
@@ -526,10 +561,8 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		kmem_free(cm->cm_session_table, cm->cm_session_table_count *
 		    sizeof (void *));
 
-	if (cm->cm_session_table_count != 0) {
-		CRYPTO_DECREMENT_RCTL(cm->cm_session_table_count *
-		    sizeof (void *));
-	}
+	total += (cm->cm_session_table_count * sizeof (void *));
+	CRYPTO_DECREMENT_RCTL(total);
 
 	kcf_free_provider_tab(cm->cm_provider_count,
 	    cm->cm_provider_array);
@@ -1210,9 +1243,7 @@ get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL(need);
 	crypto_release_minor(cm);
 
 	if (ext_info != NULL)
@@ -1681,6 +1712,15 @@ again:
 	KCF_PROV_REFHOLD(provider);
 	sp->sd_provider = provider;
 	sp->sd_provider_session = ps;
+
+	/* See the comment for CRYPTO_PRE_APPROVED_LIMIT. */
+	if ((rv = crypto_buffer_check(crypto_pre_approved_limit)) !=
+	    CRYPTO_SUCCESS) {
+		sp->sd_pre_approved_amount = 0;
+	} else {
+		sp->sd_pre_approved_amount = crypto_pre_approved_limit;
+	}
+
 	cm->cm_session_table[i] = sp;
 	mutex_exit(&cm->cm_lock);
 	crypto_release_minor(cm);
@@ -1729,6 +1769,10 @@ crypto_close_session(dev_t dev, crypto_session_id_t session_index)
 		sp->sd_flags |= CRYPTO_SESSION_IS_CLOSED;
 		mutex_exit(&sp->sd_lock);
 	} else {
+		ASSERT(sp->sd_pre_approved_amount == 0 ||
+		    sp->sd_pre_approved_amount == crypto_pre_approved_limit);
+		CRYPTO_DECREMENT_RCTL(sp->sd_pre_approved_amount);
+
 		if (sp->sd_find_init_cookie != NULL) {
 			(void) crypto_free_find_ctx(sp);
 		}
@@ -1807,14 +1851,14 @@ close_session(dev_t dev, caddr_t arg, int mode, int *rval)
  * structure.  Allocate param storage if necessary.
  */
 static boolean_t
-copyin_mech(int mode, crypto_mechanism_t *in_mech,
-    crypto_mechanism_t *out_mech, size_t *out_rctl_bytes, size_t *out_carry,
-    int *out_rv, int *out_error)
+copyin_mech(int mode, crypto_session_data_t *sp, crypto_mechanism_t *in_mech,
+    crypto_mechanism_t *out_mech, size_t *out_rctl_bytes,
+    boolean_t *out_rctl_chk, int *out_rv, int *out_error)
 {
 	STRUCT_DECL(crypto_mechanism, mech);
 	caddr_t param;
 	size_t param_len;
-	size_t rctl_bytes = 0, carry = 0;
+	size_t rctl_bytes = 0;
 	int error = 0;
 	int rv = 0;
 
@@ -1834,25 +1878,12 @@ copyin_mech(int mode, crypto_mechanism_t *in_mech,
 			goto out;
 		}
 
-		/*
-		 * Most calls to copyin_mech() are followed by a call to
-		 * copyin_key(), resulting in two resource control checks.
-		 * As an optimization, the resource control check is not
-		 * made in this function if the check is for less than
-		 * CRYPTO_DEFERRED_LIMIT bytes. The number of bytes that
-		 * would be checked is passed as an argument to copyin_key()
-		 * where the check is made, and the bytes are charged against
-		 * the project.max-crypto-memory resource control.
-		 */
-		if ((param_len > CRYPTO_DEFERRED_LIMIT) || out_carry == NULL) {
-			rv = crypto_buffer_check(param_len);
-			if (rv != CRYPTO_SUCCESS) {
-				goto out;
-			}
-			rctl_bytes = param_len;
-		} else {
-			carry = param_len;
+		rv = CRYPTO_BUFFER_CHECK(sp, param_len, *out_rctl_chk);
+		if (rv != CRYPTO_SUCCESS) {
+			goto out;
 		}
+		rctl_bytes = param_len;
+
 		out_mech->cm_param = kmem_alloc(param_len, KM_SLEEP);
 		if (copyin((char *)param, out_mech->cm_param, param_len) != 0) {
 			kmem_free(out_mech->cm_param, param_len);
@@ -1866,8 +1897,6 @@ out:
 	*out_rctl_bytes = rctl_bytes;
 	*out_rv = rv;
 	*out_error = error;
-	if (out_carry != NULL)
-		*out_carry = carry;
 	return ((rv | error) ? B_FALSE : B_TRUE);
 }
 
@@ -1942,10 +1971,11 @@ free_crypto_key(crypto_key_t *key)
  * B_TRUE.  This routine returns B_TRUE if the copyin was successful.
  */
 static boolean_t
-copyin_attributes(int mode, uint_t count, caddr_t oc_attributes,
+copyin_attributes(int mode, crypto_session_data_t *sp,
+    uint_t count, caddr_t oc_attributes,
     crypto_object_attribute_t **k_attrs_out, size_t *k_attrs_size_out,
     caddr_t *u_attrs_out, int *out_rv, int *out_error, size_t *out_rctl_bytes,
-    size_t carry, boolean_t copyin_value)
+    boolean_t *out_rctl_chk, boolean_t copyin_value)
 {
 	STRUCT_DECL(crypto_object_attribute, oa);
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -2004,13 +2034,12 @@ copyin_attributes(int mode, uint_t count, caddr_t oc_attributes,
 
 	k_attrs_len = count * sizeof (crypto_object_attribute_t);
 	k_attrs_total_len = k_attrs_buf_len + k_attrs_len;
-	if ((k_attrs_total_len + carry) != 0) {
-		rv = crypto_buffer_check(k_attrs_total_len + carry);
-		if (rv != CRYPTO_SUCCESS) {
-			goto out;
-		}
+
+	rv = CRYPTO_BUFFER_CHECK(sp, k_attrs_total_len, *out_rctl_chk);
+	if (rv != CRYPTO_SUCCESS) {
+		goto out;
 	}
-	rctl_bytes = k_attrs_total_len + carry;
+	rctl_bytes = k_attrs_total_len;
 
 	/* one big allocation for everything */
 	k_attrs = kmem_alloc(k_attrs_total_len, KM_SLEEP);
@@ -2071,8 +2100,9 @@ out:
  * if both error and rv are set to 0.
  */
 static boolean_t
-copyin_key(int mode, crypto_key_t *in_key, crypto_key_t *out_key,
-    size_t *out_rctl_bytes, int *out_rv, int *out_error, size_t carry)
+copyin_key(int mode, crypto_session_data_t *sp, crypto_key_t *in_key,
+    crypto_key_t *out_key, size_t *out_rctl_bytes,
+    boolean_t *out_rctl_chk, int *out_rv, int *out_error)
 {
 	STRUCT_DECL(crypto_key, key);
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -2099,11 +2129,12 @@ copyin_key(int mode, crypto_key_t *in_key, crypto_key_t *out_key,
 				goto out;
 			}
 
-			rv = crypto_buffer_check(key_bytes + carry);
+			rv = CRYPTO_BUFFER_CHECK(sp, key_bytes,
+			    *out_rctl_chk);
 			if (rv != CRYPTO_SUCCESS) {
 				goto out;
 			}
-			rctl_bytes = key_bytes + carry;
+			rctl_bytes = key_bytes;
 
 			out_key->ck_data = kmem_alloc(key_bytes, KM_SLEEP);
 
@@ -2122,9 +2153,9 @@ copyin_key(int mode, crypto_key_t *in_key, crypto_key_t *out_key,
 	case CRYPTO_KEY_ATTR_LIST:
 		count = STRUCT_FGET(key, ck_count);
 
-		if (copyin_attributes(mode, count,
+		if (copyin_attributes(mode, sp, count,
 		    (caddr_t)STRUCT_FGETP(key, ck_attrs), &k_attrs, NULL, NULL,
-		    &rv, &error, &rctl_bytes, carry, B_TRUE)) {
+		    &rv, &error, &rctl_bytes, out_rctl_chk, B_TRUE)) {
 			out_key->ck_count = count;
 			out_key->ck_attrs = k_attrs;
 			k_attrs = NULL;
@@ -2205,7 +2236,7 @@ out:
 	return ((rv == CRYPTO_SUCCESS && error == 0) ? B_TRUE : B_FALSE);
 }
 
-#define	CRYPTO_SESSION_RELE(s) {			\
+#define	CRYPTO_SESSION_RELE(s)	if ((s) != NULL) {	\
 	mutex_enter(&((s)->sd_lock));			\
 	(s)->sd_flags &= ~CRYPTO_SESSION_IS_BUSY;	\
 	cv_broadcast(&(s)->sd_cv);			\
@@ -2326,12 +2357,13 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	crypto_mechanism_t mech;
 	crypto_key_t key;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_context_t cc;
 	crypto_ctx_t **ctxpp;
 	size_t mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
 	size_t key_rctl_bytes = 0;
-	size_t carry;
+	boolean_t key_rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	boolean_t allocated_by_crypto_module = B_FALSE;
@@ -2356,7 +2388,7 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	session_id = STRUCT_FGET(encrypt_init, ei_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
+		goto out;
 	}
 
 	bcopy(STRUCT_FADDR(encrypt_init, ei_mech), &mech.cm_type,
@@ -2374,14 +2406,13 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 		goto out;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(encrypt_init, ei_mech), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(encrypt_init, ei_mech),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp, STRUCT_FADDR(encrypt_init, ei_mech),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto out;
 		}
 	} else {
@@ -2389,8 +2420,8 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 			goto out;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(encrypt_init, ei_key), &key,
-	    &key_rctl_bytes, &rv, &error, carry)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(encrypt_init, ei_key), &key,
+	    &key_rctl_bytes, &key_rctl_chk, &rv, &error)) {
 		goto out;
 	}
 
@@ -2409,11 +2440,9 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	*ctxpp = (rv == CRYPTO_SUCCESS) ? cc : NULL;
 
 out:
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, key_rctl_bytes, key_rctl_chk);
 	CRYPTO_SESSION_RELE(sp);
-
-release_minor:
-	if (mech_rctl_bytes + key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -2463,7 +2492,7 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	STRUCT_DECL(crypto_encrypt, encrypt);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_ctx_t **ctxpp;
 	crypto_data_t data, encr;
 	size_t datalen, encrlen, need = 0;
@@ -2471,6 +2500,7 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	char *encrbuf;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(encrypt, mode);
 
@@ -2510,7 +2540,14 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	do_inplace = (STRUCT_FGET(encrypt, ce_flags) &
 	    CRYPTO_INPLACE_OPERATION) != 0;
 	need = do_inplace ? datalen : datalen + encrlen;
-	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
+
+	session_id = STRUCT_FGET(encrypt, ce_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
+		goto release_minor;
+	}
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -2531,12 +2568,6 @@ cipher(dev_t dev, caddr_t arg, int mode,
 		INIT_RAW_CRYPTO_DATA(encr, encrlen);
 	}
 
-	session_id = STRUCT_FGET(encrypt, ce_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
-		goto release_minor;
-	}
-
 	ctxpp = (single == crypto_encrypt_single) ?
 	    &sp->sd_encr_ctx : &sp->sd_decr_ctx;
 
@@ -2547,8 +2578,6 @@ cipher(dev_t dev, caddr_t arg, int mode,
 		rv = (single)(*ctxpp, &data, &encr, NULL);
 	if (KCF_CONTEXT_DONE(rv))
 		*ctxpp = NULL;
-
-	CRYPTO_SESSION_RELE(sp);
 
 	if (rv == CRYPTO_SUCCESS) {
 		ASSERT(encr.cd_length <= encrlen);
@@ -2572,9 +2601,8 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	}
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (data.cd_raw.iov_base != NULL)
@@ -2619,13 +2647,14 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 	STRUCT_DECL(crypto_encrypt_update, encrypt_update);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_ctx_t **ctxpp;
 	crypto_data_t data, encr;
 	size_t datalen, encrlen, need = 0;
 	char *encrbuf;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(encrypt_update, mode);
 
@@ -2660,13 +2689,21 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 		cmn_err(CE_NOTE, "cipher_update: buffer greater than %ld "
 		    "bytes, pid = %d", crypto_max_buffer_len, curproc->p_pid);
 		rv = CRYPTO_ARGUMENTS_BAD;
-		goto release_minor;
+		goto out;
+	}
+
+	session_id = STRUCT_FGET(encrypt_update, eu_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
+		goto out;
 	}
 
 	need = datalen + encrlen;
-	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
+
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		need = 0;
-		goto release_minor;
+		goto out;
 	}
 
 	INIT_RAW_CRYPTO_DATA(data, datalen);
@@ -2675,16 +2712,10 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 	if (datalen != 0 && copyin(STRUCT_FGETP(encrypt_update, eu_databuf),
 	    data.cd_raw.iov_base, datalen) != 0) {
 		error = EFAULT;
-		goto release_minor;
+		goto out;
 	}
 
 	INIT_RAW_CRYPTO_DATA(encr, encrlen);
-
-	session_id = STRUCT_FGET(encrypt_update, eu_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
-		goto release_minor;
-	}
 
 	ctxpp = (update == crypto_encrypt_update) ?
 	    &sp->sd_encr_ctx : &sp->sd_decr_ctx;
@@ -2714,12 +2745,8 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 		CRYPTO_CANCEL_CTX(ctxpp);
 	}
 out:
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
 	CRYPTO_SESSION_RELE(sp);
-
-release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
 	crypto_release_minor(cm);
 
 	if (data.cd_raw.iov_base != NULL)
@@ -2764,13 +2791,14 @@ common_final(dev_t dev, caddr_t arg, int mode,
 	STRUCT_DECL(crypto_encrypt_final, encrypt_final);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_ctx_t **ctxpp;
 	crypto_data_t encr;
 	size_t encrlen, need = 0;
 	char *encrbuf;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(encrypt_final, mode);
 
@@ -2806,7 +2834,14 @@ common_final(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(encrlen)) != CRYPTO_SUCCESS) {
+	session_id = STRUCT_FGET(encrypt_final, ef_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, encrlen, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = encrlen;
@@ -2815,12 +2850,6 @@ common_final(dev_t dev, caddr_t arg, int mode,
 
 	encr.cd_offset = 0;
 	encr.cd_length = encrlen;
-
-	session_id = STRUCT_FGET(encrypt_final, ef_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
-	}
 
 	ASSERT(final == crypto_encrypt_final ||
 	    final == crypto_decrypt_final || final == crypto_sign_final ||
@@ -2839,8 +2868,6 @@ common_final(dev_t dev, caddr_t arg, int mode,
 	rv = (final)(*ctxpp, &encr, NULL);
 	if (KCF_CONTEXT_DONE(rv))
 		*ctxpp = NULL;
-
-	CRYPTO_SESSION_RELE(sp);
 
 	if (rv == CRYPTO_SUCCESS) {
 		ASSERT(encr.cd_length <= encrlen);
@@ -2864,9 +2891,8 @@ common_final(dev_t dev, caddr_t arg, int mode,
 	}
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (encr.cd_raw.iov_base != NULL)
@@ -2892,9 +2918,10 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_context_t cc;
 	size_t rctl_bytes = 0;
+	boolean_t rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 
@@ -2916,11 +2943,11 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	session_id = STRUCT_FGET(digest_init, di_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
-		goto release_minor;
+		goto out;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(digest_init, di_mech), &mech,
-	    &rctl_bytes, NULL, &rv, &error)) {
+	if (!copyin_mech(mode, sp, STRUCT_FADDR(digest_init, di_mech), &mech,
+	    &rctl_bytes, &rctl_chk, &rv, &error)) {
 		goto out;
 	}
 
@@ -2941,12 +2968,8 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 		CRYPTO_CANCEL_CTX(&sp->sd_digest_ctx);
 	sp->sd_digest_ctx = (rv == CRYPTO_SUCCESS) ? cc : NULL;
 out:
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
 	CRYPTO_SESSION_RELE(sp);
-
-release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL)
@@ -2973,11 +2996,12 @@ digest_update(dev_t dev, caddr_t arg, int mode, int *rval)
 	STRUCT_DECL(crypto_digest_update, digest_update);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_data_t data;
 	size_t datalen, need = 0;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(digest_update, mode);
 
@@ -3003,9 +3027,17 @@ digest_update(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(datalen)) != CRYPTO_SUCCESS) {
+	session_id = STRUCT_FGET(digest_update, du_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
 		goto release_minor;
 	}
+
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, datalen, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
+		goto release_minor;
+	}
+
 	need = datalen;
 	data.cd_raw.iov_base = kmem_alloc(datalen, KM_SLEEP);
 	data.cd_raw.iov_len = datalen;
@@ -3019,21 +3051,13 @@ digest_update(dev_t dev, caddr_t arg, int mode, int *rval)
 	data.cd_offset = 0;
 	data.cd_length = datalen;
 
-	session_id = STRUCT_FGET(digest_update, du_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
-		goto release_minor;
-	}
-
 	rv = crypto_digest_update(sp->sd_digest_ctx, &data, NULL);
 	if (rv != CRYPTO_SUCCESS)
 		CRYPTO_CANCEL_CTX(&sp->sd_digest_ctx);
-	CRYPTO_SESSION_RELE(sp);
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (data.cd_raw.iov_base != NULL)
@@ -3058,8 +3082,9 @@ digest_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_session_id_t session_id;
 	crypto_key_t key;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	size_t rctl_bytes = 0;
+	boolean_t key_rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 
@@ -3080,11 +3105,11 @@ digest_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	session_id = STRUCT_FGET(digest_key, dk_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
-		goto release_minor;
+		goto out;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(digest_key, dk_key), &key,
-	    &rctl_bytes, &rv, &error, 0)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(digest_key, dk_key), &key,
+	    &rctl_bytes, &key_rctl_chk, &rv, &error)) {
 		goto out;
 	}
 
@@ -3092,12 +3117,8 @@ digest_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (rv != CRYPTO_SUCCESS)
 		CRYPTO_CANCEL_CTX(&sp->sd_digest_ctx);
 out:
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, key_rctl_chk);
 	CRYPTO_SESSION_RELE(sp);
-
-release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
 	crypto_release_minor(cm);
 
 	free_crypto_key(&key);
@@ -3139,13 +3160,14 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 	STRUCT_DECL(crypto_digest, crypto_digest);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_data_t data, digest;
 	crypto_ctx_t **ctxpp;
 	size_t datalen, digestlen, need = 0;
 	char *digestbuf;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(crypto_digest, mode);
 
@@ -3183,8 +3205,15 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
+	session_id = STRUCT_FGET(crypto_digest, cd_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
+		goto release_minor;
+	}
+
 	need = datalen + digestlen;
-	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -3198,12 +3227,6 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 	}
 
 	INIT_RAW_CRYPTO_DATA(digest, digestlen);
-
-	session_id = STRUCT_FGET(crypto_digest, cd_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
-		goto release_minor;
-	}
 
 	ASSERT(single == crypto_digest_single ||
 	    single == crypto_sign_single ||
@@ -3222,8 +3245,6 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 	rv = (single)(*ctxpp, &data, &digest, NULL);
 	if (KCF_CONTEXT_DONE(rv))
 		*ctxpp = NULL;
-
-	CRYPTO_SESSION_RELE(sp);
 
 	if (rv == CRYPTO_SUCCESS) {
 		ASSERT(digest.cd_length <= digestlen);
@@ -3247,9 +3268,8 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 	}
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (data.cd_raw.iov_base != NULL)
@@ -3566,12 +3586,13 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	crypto_mechanism_t mech;
 	crypto_key_t key;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_context_t cc;
 	crypto_ctx_t **ctxpp;
 	size_t mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
 	size_t key_rctl_bytes = 0;
-	size_t carry;
+	boolean_t key_rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	boolean_t allocated_by_crypto_module = B_FALSE;
@@ -3595,7 +3616,7 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	session_id = STRUCT_FGET(sign_init, si_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
+		goto out;
 	}
 
 	bcopy(STRUCT_FADDR(sign_init, si_mech), &mech.cm_type,
@@ -3626,14 +3647,13 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 		goto out;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(sign_init, si_mech), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(sign_init, si_mech),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp, STRUCT_FADDR(sign_init, si_mech),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto out;
 		}
 	} else {
@@ -3641,8 +3661,8 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 			goto out;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(sign_init, si_key), &key,
-	    &key_rctl_bytes, &rv, &error, carry)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(sign_init, si_key), &key,
+	    &key_rctl_bytes, &key_rctl_chk, &rv, &error)) {
 		goto out;
 	}
 
@@ -3658,11 +3678,9 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	*ctxpp = (rv == CRYPTO_SUCCESS) ? cc : NULL;
 
 out:
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, key_rctl_bytes, key_rctl_chk);
 	CRYPTO_SESSION_RELE(sp);
-
-release_minor:
-	if (mech_rctl_bytes + key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -3704,11 +3722,12 @@ verify(dev_t dev, caddr_t arg, int mode, int *rval)
 	STRUCT_DECL(crypto_verify, verify);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_data_t data, sign;
 	size_t datalen, signlen, need = 0;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(verify, mode);
 
@@ -3735,8 +3754,15 @@ verify(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
+	session_id = STRUCT_FGET(verify, cv_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
 	need = datalen + signlen;
-	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -3755,22 +3781,14 @@ verify(dev_t dev, caddr_t arg, int mode, int *rval)
 		error = EFAULT;
 		goto release_minor;
 	}
-	session_id = STRUCT_FGET(verify, cv_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
-	}
 
 	rv = crypto_verify_single(sp->sd_verify_ctx, &data, &sign, NULL);
 	if (KCF_CONTEXT_DONE(rv))
 		sp->sd_verify_ctx = NULL;
 
-	CRYPTO_SESSION_RELE(sp);
-
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (data.cd_raw.iov_base != NULL)
@@ -3821,12 +3839,13 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 	STRUCT_DECL(crypto_sign_update, sign_update);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_ctx_t **ctxpp;
 	crypto_data_t data;
 	size_t datalen, need = 0;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(sign_update, mode);
 
@@ -3851,7 +3870,14 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(datalen)) != CRYPTO_SUCCESS) {
+	session_id = STRUCT_FGET(sign_update, su_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, datalen, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = datalen;
@@ -3864,24 +3890,16 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	session_id = STRUCT_FGET(sign_update, su_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
-	}
-
 	ctxpp = (update == crypto_sign_update) ?
 	    &sp->sd_sign_ctx : &sp->sd_verify_ctx;
 
 	rv = (update)(*ctxpp, &data, NULL);
 	if (rv != CRYPTO_SUCCESS)
 		CRYPTO_CANCEL_CTX(ctxpp);
-	CRYPTO_SESSION_RELE(sp);
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (data.cd_raw.iov_base != NULL)
@@ -3916,11 +3934,12 @@ verify_final(dev_t dev, caddr_t arg, int mode, int *rval)
 	STRUCT_DECL(crypto_verify_final, verify_final);
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_data_t sign;
 	size_t signlen, need = 0;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(verify_final, mode);
 
@@ -3945,7 +3964,14 @@ verify_final(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(signlen)) != CRYPTO_SUCCESS) {
+	session_id = STRUCT_FGET(verify_final, vf_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, signlen, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = signlen;
@@ -3958,22 +3984,13 @@ verify_final(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	session_id = STRUCT_FGET(verify_final, vf_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
-	}
-
 	rv = crypto_verify_final(sp->sd_verify_ctx, &sign, NULL);
 	if (KCF_CONTEXT_DONE(rv))
 		sp->sd_verify_ctx = NULL;
 
-	CRYPTO_SESSION_RELE(sp);
-
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (sign.cd_raw.iov_base != NULL)
@@ -3999,12 +4016,13 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	uchar_t *seed_buffer = NULL;
 	size_t seed_len;
 	size_t need = 0;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(seed_random, mode);
 
@@ -4027,7 +4045,14 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(seed_len)) != CRYPTO_SUCCESS) {
+	session_id = STRUCT_FGET(seed_random, sr_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, seed_len, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = seed_len;
@@ -4039,17 +4064,11 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	session_id = STRUCT_FGET(seed_random, sr_session);
-
-	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
-	}
-
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(random_ops), CRYPTO_RANDOM_OFFSET(seed_random),
 	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
 	    != CRYPTO_SUCCESS) {
-		goto out;
+		goto release_minor;
 	}
 
 	KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_SEED,
@@ -4058,13 +4077,9 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 
-out:
-	CRYPTO_SESSION_RELE(sp);
-
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL)
@@ -4093,12 +4108,13 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	uchar_t *buffer = NULL;
 	size_t len;
 	size_t need = 0;
 	int error = 0;
 	int rv;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(generate_random, mode);
 
@@ -4121,32 +4137,30 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(len)) != CRYPTO_SUCCESS) {
-		goto release_minor;
-	}
-	need = len;
-	buffer = kmem_alloc(len, KM_SLEEP);
-
 	session_id = STRUCT_FGET(generate_random, gr_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
 		goto release_minor;
 	}
 
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, len, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
+		goto release_minor;
+	}
+	need = len;
+	buffer = kmem_alloc(len, KM_SLEEP);
+
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(random_ops),
 	    CRYPTO_RANDOM_OFFSET(generate_random), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
-		goto out;
+		goto release_minor;
 	}
 
 	KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_GENERATE,
 	    sp->sd_provider_session->ps_session, buffer, len, 0, 0);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
-
-out:
-	CRYPTO_SESSION_RELE(sp);
 
 	if (rv == CRYPTO_SUCCESS) {
 		if (len != 0 && copyout(buffer,
@@ -4156,9 +4170,8 @@ out:
 	}
 
 release_minor:
-	if (need != 0) {
-		CRYPTO_DECREMENT_RCTL(need);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, need, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL)
@@ -4247,6 +4260,7 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 	caddr_t oc_attributes;
 	size_t k_attrs_size;
 	size_t rctl_bytes = 0;
+	boolean_t rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	uint_t count;
@@ -4266,14 +4280,14 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	count = STRUCT_FGET(object_create, oc_count);
 	oc_attributes = STRUCT_FGETP(object_create, oc_attributes);
-	if (!copyin_attributes(mode, count, oc_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
-		goto release_minor;
-	}
 
 	session_id = STRUCT_FGET(object_create, oc_session);
-
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+	if (!copyin_attributes(mode, sp, count, oc_attributes, &k_attrs,
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes,
+	    &rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4295,9 +4309,7 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 		STRUCT_FSET(object_create, oc_handle, object_handle);
 
 release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -4321,8 +4333,7 @@ release_minor:
 		}
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 	if (real_provider != NULL)
 		KCF_PROV_REFRELE(real_provider);
@@ -4344,6 +4355,7 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 	caddr_t oc_new_attributes;
 	size_t k_attrs_size;
 	size_t rctl_bytes = 0;
+	boolean_t rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	uint_t count;
@@ -4363,14 +4375,15 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	count = STRUCT_FGET(object_copy, oc_count);
 	oc_new_attributes = STRUCT_FGETP(object_copy, oc_new_attributes);
-	if (!copyin_attributes(mode, count, oc_new_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
-		goto release_minor;
-	}
 
 	session_id = STRUCT_FGET(object_copy, oc_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+	if (!copyin_attributes(mode, sp, count, oc_new_attributes, &k_attrs,
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes,
+	    &rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4392,9 +4405,7 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 		STRUCT_FSET(object_copy, oc_new_handle, new_handle);
 
 release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -4418,8 +4429,7 @@ release_minor:
 		}
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 	if (real_provider != NULL)
 		KCF_PROV_REFRELE(real_provider);
@@ -4504,12 +4514,13 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_object_id_t handle;
 	caddr_t og_attributes;
 	caddr_t u_attrs;
 	size_t k_attrs_size;
 	size_t rctl_bytes = 0;
+	boolean_t rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	uint_t count;
@@ -4531,14 +4542,15 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	count = STRUCT_FGET(get_attribute_value, og_count);
 	og_attributes = STRUCT_FGETP(get_attribute_value, og_attributes);
-	if (!copyin_attributes(mode, count, og_attributes, &k_attrs,
-	    &k_attrs_size, &u_attrs, &rv, &error, &rctl_bytes, 0, B_FALSE)) {
-		goto release_minor;
-	}
 
 	session_id = STRUCT_FGET(get_attribute_value, og_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+	if (!copyin_attributes(mode, sp, count, og_attributes, &k_attrs,
+	    &k_attrs_size, &u_attrs, &rv, &error, &rctl_bytes,
+	    &rctl_chk, B_FALSE)) {
 		goto release_minor;
 	}
 
@@ -4559,8 +4571,6 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	KCF_PROV_REFRELE(real_provider);
 
 out:
-	CRYPTO_SESSION_RELE(sp);
-
 	if (rv == CRYPTO_SUCCESS || rv == CRYPTO_ATTRIBUTE_SENSITIVE ||
 	    rv == CRYPTO_ATTRIBUTE_TYPE_INVALID ||
 	    rv == CRYPTO_BUFFER_TOO_SMALL) {
@@ -4570,9 +4580,8 @@ out:
 	}
 
 release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (k_attrs != NULL)
@@ -4601,7 +4610,7 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_object_id_t handle;
 	size_t size;
 	int error = 0;
@@ -4630,7 +4639,7 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_get_size), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
-		goto out;
+		goto release_minor;
 	}
 
 	handle = STRUCT_FGET(object_get_size, gs_handle);
@@ -4641,14 +4650,13 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 	KCF_PROV_REFRELE(real_provider);
 
-out:
-	CRYPTO_SESSION_RELE(sp);
-
 	if (rv == CRYPTO_SUCCESS) {
 		STRUCT_FSET(object_get_size, gs_size, size);
 	}
+
 release_minor:
 	crypto_release_minor(cm);
+	CRYPTO_SESSION_RELE(sp);
 
 	if (error != 0)
 		return (error);
@@ -4671,11 +4679,12 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_object_id_t object_handle;
 	caddr_t sa_attributes;
 	size_t k_attrs_size;
 	size_t rctl_bytes = 0;
+	boolean_t rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	uint_t count;
@@ -4696,14 +4705,15 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	count = STRUCT_FGET(set_attribute_value, sa_count);
 	sa_attributes = STRUCT_FGETP(set_attribute_value, sa_attributes);
-	if (!copyin_attributes(mode, count, sa_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
-		goto release_minor;
-	}
 
 	session_id = STRUCT_FGET(set_attribute_value, sa_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+	if (!copyin_attributes(mode, sp, count, sa_attributes, &k_attrs,
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes,
+	    &rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4712,7 +4722,7 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	    CRYPTO_OBJECT_OFFSET(object_set_attribute_value),
 	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
 	    != CRYPTO_SUCCESS) {
-		goto out;
+		goto release_minor;
 	}
 
 	object_handle = STRUCT_FGET(set_attribute_value, sa_handle);
@@ -4723,13 +4733,9 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 	KCF_PROV_REFRELE(real_provider);
 
-out:
-	CRYPTO_SESSION_RELE(sp);
-
 release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (k_attrs != NULL)
@@ -4756,10 +4762,11 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	caddr_t attributes;
 	size_t k_attrs_size;
 	size_t rctl_bytes = 0;
+	boolean_t rctl_chk = B_FALSE;
 	int error = 0;
 	int rv;
 	uint_t count;
@@ -4779,14 +4786,15 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	count = STRUCT_FGET(find_init, fi_count);
 	attributes = STRUCT_FGETP(find_init, fi_attributes);
-	if (!copyin_attributes(mode, count, attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
-		goto release_minor;
-	}
 
 	session_id = STRUCT_FGET(find_init, fi_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+	if (!copyin_attributes(mode, sp, count, attributes, &k_attrs,
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes,
+	    &rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4794,13 +4802,12 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_find_init), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
-		goto out;
+		goto release_minor;
 	}
 
 	/* check for an active find */
 	if (sp->sd_find_init_cookie != NULL) {
 		rv = CRYPTO_OPERATION_IS_ACTIVE;
-		CRYPTO_SESSION_RELE(sp);
 		goto release_minor;
 	}
 
@@ -4821,13 +4828,9 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 		sp->sd_find_init_cookie = cookie;
 	}
 
-out:
-	CRYPTO_SESSION_RELE(sp);
-
 release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL)
@@ -4854,12 +4857,13 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 	kcf_provider_desc_t *real_provider;
 	kcf_req_params_t params;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_object_id_t *buffer = NULL;
 	crypto_session_id_t session_id;
 	size_t len, rctl_bytes = 0;
 	uint_t count, max_count;
 	int rv, error = 0;
+	boolean_t rctl_chk = B_FALSE;
 
 	STRUCT_INIT(find_update, mode);
 
@@ -4882,23 +4886,23 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 	len = max_count * sizeof (crypto_object_id_t);
-	if ((rv = crypto_buffer_check(len)) != CRYPTO_SUCCESS) {
-		goto release_minor;
-	}
-	rctl_bytes = len;
-	buffer = kmem_alloc(len, KM_SLEEP);
-
 	session_id = STRUCT_FGET(find_update, fu_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
 		goto release_minor;
 	}
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, len, rctl_chk)) !=
+	    CRYPTO_SUCCESS) {
+		goto release_minor;
+	}
+	rctl_bytes = len;
+	buffer = kmem_alloc(len, KM_SLEEP);
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_find), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
-		goto out;
+		goto release_minor;
 	}
 
 	KCF_WRAP_OBJECT_OPS_PARAMS(&params, KCF_OP_OBJECT_FIND,
@@ -4908,8 +4912,6 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 	KCF_PROV_REFRELE(real_provider);
 
-out:
-	CRYPTO_SESSION_RELE(sp);
 	if (rv == CRYPTO_SUCCESS) {
 		if (count > max_count) {
 			/* bad bad provider */
@@ -4928,9 +4930,8 @@ out:
 	}
 
 release_minor:
-	if (rctl_bytes != 0) {
-		CRYPTO_DECREMENT_RCTL(rctl_bytes);
-	}
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, rctl_bytes, rctl_chk);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (buffer != NULL)
@@ -5041,7 +5042,8 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	caddr_t attributes;
 	size_t k_attrs_size;
 	size_t mech_rctl_bytes = 0, key_rctl_bytes = 0;
-	size_t carry;
+	boolean_t mech_rctl_chk = B_FALSE;
+	boolean_t key_rctl_chk = B_FALSE;
 	uint_t count;
 	int error = 0;
 	int rv;
@@ -5075,14 +5077,14 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(generate_key, gk_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(generate_key, gk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp,
+		    STRUCT_FADDR(generate_key, gk_mechanism),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5092,8 +5094,9 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	count = STRUCT_FGET(generate_key, gk_count);
 	attributes = STRUCT_FGETP(generate_key, gk_attributes);
-	if (!copyin_attributes(mode, count, attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &key_rctl_bytes, carry, B_TRUE)) {
+	if (!copyin_attributes(mode, sp, count, attributes, &k_attrs,
+	    &k_attrs_size, NULL, &rv, &error, &key_rctl_bytes,
+	    &key_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5107,8 +5110,8 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		STRUCT_FSET(generate_key, gk_handle, key_handle);
 
 release_minor:
-	if (mech_rctl_bytes + key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, key_rctl_bytes, key_rctl_chk);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -5132,8 +5135,7 @@ release_minor:
 		}
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5164,8 +5166,10 @@ nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	size_t k_in_attrs_size;
 	size_t k_out_attrs_size;
 	size_t mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
 	size_t in_key_rctl_bytes = 0, out_key_rctl_bytes = 0;
-	size_t carry;
+	boolean_t in_key_rctl_chk = B_FALSE;
+	boolean_t out_key_rctl_chk = B_FALSE;
 	uint_t in_count;
 	uint_t out_count;
 	int error = 0;
@@ -5202,15 +5206,14 @@ nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(generate_key, ngk_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(generate_key,
-		    ngk_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
-		    &error)) {
+		if (!copyin_mech(mode, sp, STRUCT_FADDR(generate_key,
+		    ngk_mechanism), &mech, &mech_rctl_bytes,
+		    &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5220,17 +5223,18 @@ nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	in_count = STRUCT_FGET(generate_key, ngk_in_count);
 	in_attributes = STRUCT_FGETP(generate_key, ngk_in_attributes);
-	if (!copyin_attributes(mode, in_count, in_attributes, &k_in_attrs,
+	if (!copyin_attributes(mode, sp, in_count, in_attributes, &k_in_attrs,
 	    &k_in_attrs_size, NULL, &rv, &error, &in_key_rctl_bytes,
-	    carry, B_TRUE)) {
+	    &in_key_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
 	out_count = STRUCT_FGET(generate_key, ngk_out_count);
 	out_attributes = STRUCT_FGETP(generate_key, ngk_out_attributes);
-	if (!copyin_attributes(mode, out_count, out_attributes, &k_out_attrs,
+	if (!copyin_attributes(mode, sp, out_count, out_attributes,
+	    &k_out_attrs,
 	    &k_out_attrs_size, &u_attrs, &rv, &error, &out_key_rctl_bytes,
-	    0, B_FALSE)) {
+	    &out_key_rctl_chk, B_FALSE)) {
 		goto release_minor;
 	}
 
@@ -5245,9 +5249,10 @@ nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		    out_count, k_out_attrs, u_attrs);
 	}
 release_minor:
-	if (mech_rctl_bytes + in_key_rctl_bytes + out_key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + in_key_rctl_bytes +
-		    out_key_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, in_key_rctl_bytes, in_key_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, out_key_rctl_bytes,
+	    out_key_rctl_chk);
 
 	if (k_in_attrs != NULL)
 		kmem_free(k_in_attrs, k_in_attrs_size);
@@ -5268,8 +5273,7 @@ release_minor:
 		error = EFAULT;
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5299,9 +5303,11 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	caddr_t pub_attributes;
 	size_t k_pub_attrs_size, k_pri_attrs_size;
 	size_t mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
 	size_t pub_rctl_bytes = 0;
+	boolean_t pub_rctl_chk = B_FALSE;
 	size_t pri_rctl_bytes = 0;
-	size_t carry;
+	boolean_t pri_rctl_chk = B_FALSE;
 	uint_t pub_count;
 	uint_t pri_count;
 	int error = 0;
@@ -5337,15 +5343,14 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(generate_key_pair, kp_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(generate_key_pair,
-		    kp_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
-		    &error)) {
+		if (!copyin_mech(mode, sp, STRUCT_FADDR(generate_key_pair,
+		    kp_mechanism), &mech, &mech_rctl_bytes,
+		    &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5357,16 +5362,16 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	pri_count = STRUCT_FGET(generate_key_pair, kp_private_count);
 
 	pub_attributes = STRUCT_FGETP(generate_key_pair, kp_public_attributes);
-	if (!copyin_attributes(mode, pub_count, pub_attributes, &k_pub_attrs,
-	    &k_pub_attrs_size, NULL, &rv, &error, &pub_rctl_bytes, carry,
-	    B_TRUE)) {
+	if (!copyin_attributes(mode, sp, pub_count, pub_attributes,
+	    &k_pub_attrs, &k_pub_attrs_size, NULL, &rv, &error, &pub_rctl_bytes,
+	    &pub_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
 	pri_attributes = STRUCT_FGETP(generate_key_pair, kp_private_attributes);
-	if (!copyin_attributes(mode, pri_count, pri_attributes, &k_pri_attrs,
-	    &k_pri_attrs_size, NULL, &rv, &error, &pri_rctl_bytes, 0,
-	    B_TRUE)) {
+	if (!copyin_attributes(mode, sp, pri_count, pri_attributes,
+	    &k_pri_attrs, &k_pri_attrs_size, NULL, &rv, &error,
+	    &pri_rctl_bytes, &pri_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5383,9 +5388,9 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	if (mech_rctl_bytes + pub_rctl_bytes + pri_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + pub_rctl_bytes +
-		    pri_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, pub_rctl_bytes, pub_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, pri_rctl_bytes, pri_rctl_chk);
 
 	if (k_pub_attrs != NULL)
 		kmem_free(k_pub_attrs, k_pub_attrs_size);
@@ -5420,8 +5425,7 @@ release_minor:
 		}
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5456,11 +5460,15 @@ nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	size_t k_in_pub_attrs_size, k_in_pri_attrs_size;
 	size_t k_out_pub_attrs_size, k_out_pri_attrs_size;
 	size_t mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
 	size_t in_pub_rctl_bytes = 0;
+	boolean_t in_pub_rctl_chk = B_FALSE;
 	size_t in_pri_rctl_bytes = 0;
+	boolean_t in_pri_rctl_chk = B_FALSE;
 	size_t out_pub_rctl_bytes = 0;
+	boolean_t out_pub_rctl_chk = B_FALSE;
 	size_t out_pri_rctl_bytes = 0;
-	size_t carry;
+	boolean_t out_pri_rctl_chk = B_FALSE;
 	uint_t in_pub_count;
 	uint_t in_pri_count;
 	uint_t out_pub_count;
@@ -5501,16 +5509,15 @@ nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(generate_key_pair, nkp_mechanism), &mech, mode,
 	    &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(generate_key_pair,
-		    nkp_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
-		    &error)) {
+		if (!copyin_mech(mode, sp, STRUCT_FADDR(generate_key_pair,
+		    nkp_mechanism), &mech, &mech_rctl_bytes,
+		    &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5523,17 +5530,17 @@ nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	in_pub_attributes = STRUCT_FGETP(generate_key_pair,
 	    nkp_in_public_attributes);
-	if (!copyin_attributes(mode, in_pub_count, in_pub_attributes,
+	if (!copyin_attributes(mode, sp, in_pub_count, in_pub_attributes,
 	    &k_in_pub_attrs, &k_in_pub_attrs_size, NULL, &rv, &error,
-	    &in_pub_rctl_bytes, carry, B_TRUE)) {
+	    &in_pub_rctl_bytes, &in_pub_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
 	in_pri_attributes = STRUCT_FGETP(generate_key_pair,
 	    nkp_in_private_attributes);
-	if (!copyin_attributes(mode, in_pri_count, in_pri_attributes,
+	if (!copyin_attributes(mode, sp, in_pri_count, in_pri_attributes,
 	    &k_in_pri_attrs, &k_in_pri_attrs_size, NULL, &rv, &error,
-	    &in_pri_rctl_bytes, 0, B_TRUE)) {
+	    &in_pri_rctl_bytes, &in_pri_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5542,17 +5549,17 @@ nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	out_pub_attributes = STRUCT_FGETP(generate_key_pair,
 	    nkp_out_public_attributes);
-	if (!copyin_attributes(mode, out_pub_count, out_pub_attributes,
+	if (!copyin_attributes(mode, sp, out_pub_count, out_pub_attributes,
 	    &k_out_pub_attrs, &k_out_pub_attrs_size, &u_pub_attrs, &rv, &error,
-	    &out_pub_rctl_bytes, 0, B_FALSE)) {
+	    &out_pub_rctl_bytes, &out_pub_rctl_chk, B_FALSE)) {
 		goto release_minor;
 	}
 
 	out_pri_attributes = STRUCT_FGETP(generate_key_pair,
 	    nkp_out_private_attributes);
-	if (!copyin_attributes(mode, out_pri_count, out_pri_attributes,
+	if (!copyin_attributes(mode, sp, out_pri_count, out_pri_attributes,
 	    &k_out_pri_attrs, &k_out_pri_attrs_size, &u_pri_attrs, &rv, &error,
-	    &out_pri_rctl_bytes, 0, B_FALSE)) {
+	    &out_pri_rctl_bytes, &out_pri_rctl_chk, B_FALSE)) {
 		goto release_minor;
 	}
 
@@ -5573,11 +5580,13 @@ nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	if (mech_rctl_bytes + in_pub_rctl_bytes + in_pri_rctl_bytes +
-	    out_pub_rctl_bytes + out_pri_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + in_pub_rctl_bytes +
-		    in_pri_rctl_bytes + out_pub_rctl_bytes +
-		    out_pri_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, in_pub_rctl_bytes, in_pub_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, in_pri_rctl_bytes, in_pri_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, out_pub_rctl_bytes,
+	    out_pub_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, out_pri_rctl_bytes,
+	    out_pri_rctl_chk);
 
 	if (k_in_pub_attrs != NULL)
 		kmem_free(k_in_pub_attrs, k_in_pub_attrs_size);
@@ -5608,8 +5617,7 @@ release_minor:
 		error = EFAULT;
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5631,11 +5639,13 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_key_t key;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
-	crypto_session_data_t *sp;
+	crypto_session_data_t *sp = NULL;
 	crypto_object_id_t handle;
 	size_t mech_rctl_bytes = 0, key_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
+	boolean_t key_rctl_chk = B_FALSE;
 	size_t wrapped_key_rctl_bytes = 0;
-	size_t carry;
+	boolean_t wrapped_key_rctl_chk = B_FALSE;
 	size_t wrapped_key_len, new_wrapped_key_len;
 	uchar_t *wrapped_key = NULL;
 	char *wrapped_key_buffer;
@@ -5660,7 +5670,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	session_id = STRUCT_FGET(wrap_key, wk_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
-		goto release_minor;
+		goto out;
 	}
 
 	bcopy(STRUCT_FADDR(wrap_key, wk_mechanism), &mech.cm_type,
@@ -5672,14 +5682,13 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto out;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(wrap_key, wk_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(wrap_key, wk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp, STRUCT_FADDR(wrap_key, wk_mechanism),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto out;
 		}
 	} else {
@@ -5687,8 +5696,8 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 			goto out;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(wrap_key, wk_wrapping_key), &key,
-	    &key_rctl_bytes, &rv, &error, carry)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(wrap_key, wk_wrapping_key), &key,
+	    &key_rctl_bytes, &key_rctl_chk, &rv, &error)) {
 		goto out;
 	}
 
@@ -5710,7 +5719,8 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto out;
 	}
 
-	if ((rv = crypto_buffer_check(wrapped_key_len)) != CRYPTO_SUCCESS) {
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, wrapped_key_len,
+	    wrapped_key_rctl_chk)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -5743,13 +5753,14 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 			rv = CRYPTO_SUCCESS;
 		STRUCT_FSET(wrap_key, wk_wrapped_key_len, new_wrapped_key_len);
 	}
+
 out:
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, key_rctl_bytes, key_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, wrapped_key_rctl_bytes,
+	    wrapped_key_rctl_chk);
 	CRYPTO_SESSION_RELE(sp);
 
-release_minor:
-	if (mech_rctl_bytes + key_rctl_bytes + wrapped_key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes +
-		    wrapped_key_rctl_bytes);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5789,8 +5800,11 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_object_attribute_t *k_attrs = NULL;
 	size_t k_attrs_size;
 	size_t mech_rctl_bytes = 0, unwrapping_key_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
+	boolean_t unwrapping_key_rctl_chk = B_FALSE;
 	size_t wrapped_key_rctl_bytes = 0, k_attrs_rctl_bytes = 0;
-	size_t carry;
+	boolean_t wrapped_key_rctl_chk = B_FALSE;
+	boolean_t k_attrs_rctl_chk = B_FALSE;
 	size_t wrapped_key_len;
 	uchar_t *wrapped_key = NULL;
 	int error = 0;
@@ -5828,14 +5842,14 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(unwrap_key, uk_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(unwrap_key, uk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp,
+		    STRUCT_FADDR(unwrap_key, uk_mechanism),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5843,15 +5857,17 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 			goto release_minor;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(unwrap_key, uk_unwrapping_key),
-	    &unwrapping_key, &unwrapping_key_rctl_bytes, &rv, &error, carry)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(unwrap_key, uk_unwrapping_key),
+	    &unwrapping_key, &unwrapping_key_rctl_bytes,
+	    &unwrapping_key_rctl_chk, &rv, &error)) {
 		goto release_minor;
 	}
 
 	count = STRUCT_FGET(unwrap_key, uk_count);
 	uk_attributes = STRUCT_FGETP(unwrap_key, uk_attributes);
-	if (!copyin_attributes(mode, count, uk_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &k_attrs_rctl_bytes, 0, B_TRUE)) {
+	if (!copyin_attributes(mode, sp, count, uk_attributes, &k_attrs,
+	    &k_attrs_size, NULL, &rv, &error, &k_attrs_rctl_bytes,
+	    &k_attrs_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5863,8 +5879,8 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(wrapped_key_len))
-	    != CRYPTO_SUCCESS) {
+	if ((rv = CRYPTO_BUFFER_CHECK(sp, wrapped_key_len,
+	    wrapped_key_rctl_chk)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	wrapped_key_rctl_bytes = wrapped_key_len;
@@ -5887,11 +5903,13 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		STRUCT_FSET(unwrap_key, uk_object_handle, handle);
 
 release_minor:
-	if (mech_rctl_bytes + unwrapping_key_rctl_bytes +
-	    wrapped_key_rctl_bytes + k_attrs_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes +
-		    unwrapping_key_rctl_bytes +
-		    wrapped_key_rctl_bytes + k_attrs_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, unwrapping_key_rctl_bytes,
+	    unwrapping_key_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, wrapped_key_rctl_bytes,
+	    wrapped_key_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, k_attrs_rctl_bytes,
+	    k_attrs_rctl_chk);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -5920,8 +5938,7 @@ release_minor:
 		}
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5949,8 +5966,10 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_object_id_t handle;
 	size_t k_attrs_size;
 	size_t key_rctl_bytes = 0, mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
+	boolean_t key_rctl_chk = B_FALSE;
 	size_t attributes_rctl_bytes = 0;
-	size_t carry;
+	boolean_t attributes_rctl_chk = B_FALSE;
 	caddr_t attributes;
 	uint_t count;
 	int error = 0;
@@ -5987,14 +6006,14 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(derive_key, dk_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(derive_key, dk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp,
+		    STRUCT_FADDR(derive_key, dk_mechanism),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -6002,17 +6021,17 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 			goto release_minor;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(derive_key, dk_base_key),
-	    &base_key, &key_rctl_bytes, &rv, &error, carry)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(derive_key, dk_base_key),
+	    &base_key, &key_rctl_bytes, &key_rctl_chk, &rv, &error)) {
 		goto release_minor;
 	}
 
 	count = STRUCT_FGET(derive_key, dk_count);
 
 	attributes = STRUCT_FGETP(derive_key, dk_attributes);
-	if (!copyin_attributes(mode, count, attributes, &k_attrs,
+	if (!copyin_attributes(mode, sp, count, attributes, &k_attrs,
 	    &k_attrs_size, NULL, &rv, &error,
-	    &attributes_rctl_bytes, 0, B_TRUE)) {
+	    &attributes_rctl_bytes, &attributes_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -6039,9 +6058,10 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	if (mech_rctl_bytes + key_rctl_bytes + attributes_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes +
-		    attributes_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, key_rctl_bytes, key_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, attributes_rctl_bytes,
+	    attributes_rctl_chk);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -6069,8 +6089,7 @@ out:
 		    NULL, &params, B_FALSE);
 	}
 
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -6099,9 +6118,12 @@ nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_session_data_t *sp = NULL;
 	size_t k_in_attrs_size, k_out_attrs_size;
 	size_t key_rctl_bytes = 0, mech_rctl_bytes = 0;
+	boolean_t mech_rctl_chk = B_FALSE;
+	boolean_t key_rctl_chk = B_FALSE;
 	size_t in_attributes_rctl_bytes = 0;
 	size_t out_attributes_rctl_bytes = 0;
-	size_t carry;
+	boolean_t in_attributes_rctl_chk = B_FALSE;
+	boolean_t out_attributes_rctl_chk = B_FALSE;
 	caddr_t in_attributes, out_attributes;
 	uint_t in_count, out_count;
 	int error = 0;
@@ -6139,14 +6161,14 @@ nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	carry = 0;
 	rv = crypto_provider_copyin_mech_param(real_provider,
 	    STRUCT_FADDR(derive_key, ndk_mechanism), &mech, mode, &error);
 
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
-		if (!copyin_mech(mode, STRUCT_FADDR(derive_key, ndk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+		if (!copyin_mech(mode, sp,
+		    STRUCT_FADDR(derive_key, ndk_mechanism),
+		    &mech, &mech_rctl_bytes, &mech_rctl_chk, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -6154,8 +6176,8 @@ nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 			goto release_minor;
 	}
 
-	if (!copyin_key(mode, STRUCT_FADDR(derive_key, ndk_base_key),
-	    &base_key, &key_rctl_bytes, &rv, &error, carry)) {
+	if (!copyin_key(mode, sp, STRUCT_FADDR(derive_key, ndk_base_key),
+	    &base_key, &key_rctl_bytes, &key_rctl_chk, &rv, &error)) {
 		goto release_minor;
 	}
 
@@ -6163,16 +6185,17 @@ nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	out_count = STRUCT_FGET(derive_key, ndk_out_count);
 
 	in_attributes = STRUCT_FGETP(derive_key, ndk_in_attributes);
-	if (!copyin_attributes(mode, in_count, in_attributes, &k_in_attrs,
+	if (!copyin_attributes(mode, sp, in_count, in_attributes, &k_in_attrs,
 	    &k_in_attrs_size, NULL, &rv, &error, &in_attributes_rctl_bytes,
-	    0, B_TRUE)) {
+	    &in_attributes_rctl_chk, B_TRUE)) {
 		goto release_minor;
 	}
 
 	out_attributes = STRUCT_FGETP(derive_key, ndk_out_attributes);
-	if (!copyin_attributes(mode, out_count, out_attributes, &k_out_attrs,
-	    &k_out_attrs_size, &u_attrs, &rv, &error,
-	    &out_attributes_rctl_bytes, 0, B_FALSE)) {
+	if (!copyin_attributes(mode, sp, out_count, out_attributes,
+	    &k_out_attrs, &k_out_attrs_size, &u_attrs, &rv, &error,
+	    &out_attributes_rctl_bytes,
+	    &out_attributes_rctl_chk, B_FALSE)) {
 		goto release_minor;
 	}
 
@@ -6197,10 +6220,12 @@ nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	if (mech_rctl_bytes + key_rctl_bytes + in_attributes_rctl_bytes +
-	    out_attributes_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes +
-		    in_attributes_rctl_bytes + out_attributes_rctl_bytes);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, mech_rctl_bytes, mech_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, key_rctl_bytes, key_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, in_attributes_rctl_bytes,
+	    in_attributes_rctl_chk);
+	CRYPTO_DECREMENT_RCTL_SESSION(sp, out_attributes_rctl_bytes,
+	    out_attributes_rctl_chk);
 
 	if (k_in_attrs != NULL)
 		kmem_free(k_in_attrs, k_in_attrs_size);
@@ -6223,8 +6248,7 @@ release_minor:
 		error = EFAULT;
 	}
 out:
-	if (sp != NULL)
-		CRYPTO_SESSION_RELE(sp);
+	CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {

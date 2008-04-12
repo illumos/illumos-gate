@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -275,16 +275,18 @@ process_req_hwp(void *ireq)
 	pd = ((ctype = GET_REQ_TYPE(ireq)) == CRYPTO_SYNCH) ?
 	    sreq->sn_provider : areq->an_provider;
 
-	mutex_enter(&pd->pd_lock);
-
 	/*
 	 * Wait if flow control is in effect for the provider. A
 	 * CRYPTO_PROVIDER_READY or CRYPTO_PROVIDER_FAILED
 	 * notification will signal us. We also get signaled if
 	 * the provider is unregistering.
 	 */
-	while (pd->pd_state == KCF_PROV_BUSY)
-		cv_wait(&pd->pd_resume_cv, &pd->pd_lock);
+	if (pd->pd_state == KCF_PROV_BUSY) {
+		mutex_enter(&pd->pd_lock);
+		while (pd->pd_state == KCF_PROV_BUSY)
+			cv_wait(&pd->pd_resume_cv, &pd->pd_lock);
+		mutex_exit(&pd->pd_lock);
+	}
 
 	/*
 	 * Bump the internal reference count while the request is being
@@ -300,12 +302,9 @@ process_req_hwp(void *ireq)
 	 * and for sync clients it is done in the k-api routines.
 	 */
 	if (pd->pd_state >= KCF_PROV_FAILED) {
-		mutex_exit(&pd->pd_lock);
 		error = CRYPTO_DEVICE_ERROR;
 		goto bail;
 	}
-
-	mutex_exit(&pd->pd_lock);
 
 	if (ctype == CRYPTO_SYNCH) {
 		mutex_enter(&sreq->sn_lock);
