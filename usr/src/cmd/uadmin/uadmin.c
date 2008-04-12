@@ -29,19 +29,21 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <string.h>
+#include <strings.h>
 #include <signal.h>
-#include <sys/uadmin.h>
+#include <unistd.h>
+
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
-#include <libscf.h>
-#include <strings.h>
+
+#include <sys/uadmin.h>
 
 #define	SMF_RST	"/etc/svc/volatile/resetting"
-#define	AUDITD_FMRI	"svc:/system/auditd:default"
 
 static const char *Usage = "Usage: %s cmd fcn [mdep]\n";
 
@@ -245,8 +247,7 @@ main(int argc, char *argv[])
 static int
 turnoff_auditd(int cmd, int fcn)
 {
-	char	*smf_state;
-	int	rc = -1;
+	int	rc;
 	int	retries = 15;
 
 	switch (cmd) {
@@ -281,29 +282,39 @@ turnoff_auditd(int cmd, int fcn)
 		return (-1);
 	}
 
-	if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
-		(void) fprintf(stderr, "error disabling auditd: %s\n",
-		    scf_strerror(scf_error()));
-		return (-1);
-	}
-
-	/* wait for auditd to finish its work */
-	do {
-		if ((smf_state = smf_get_state(AUDITD_FMRI)) == NULL) {
-			(void) fprintf(stderr,
-			    "getting state of auditd failed: %s\n",
-			    scf_strerror(scf_error()));
+	if (adt_audit_enabled()) {
+		if ((rc = fork()) == 0) {
+			(void) execl("/usr/sbin/audit", "audit", "-t", NULL);
+			(void) fprintf(stderr, "error disabling auditd: %s\n",
+			    strerror(errno));
+			_exit(-1);
+		} else if (rc == -1) {
+			(void) fprintf(stderr, "error disabling auditd: %s\n",
+			    strerror(errno));
 			return (-1);
 		}
+	} else {
+		return (0);
+	}
 
-		if (strcmp(smf_state, SCF_STATE_STRING_DISABLED)) {
+	/*
+	 * wait for auditd to finish its work.  auditd will change the
+	 * auditstart from AUC_AUDITING (auditd up and running) to
+	 * AUC_NOAUDIT.  Other states are errors, so we're done as well.
+	 */
+	do {
+		int	auditstate;
+
+		rc = -1;
+		if ((auditon(A_GETCOND, (caddr_t)&auditstate,
+		    sizeof (auditstate)) == 0) &&
+		    (auditstate == AUC_AUDITING)) {
 			retries--;
 			(void) sleep(1);
 		} else {
 			rc = 0;
 		}
-		free(smf_state);
-	} while (rc && retries);
+	} while ((rc != 0) && (retries != 0));
 
 	return (rc);
 }
