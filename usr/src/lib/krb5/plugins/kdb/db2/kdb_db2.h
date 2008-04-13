@@ -184,7 +184,13 @@ void
 krb5_db2_free( krb5_context kcontext, 
 		    void *ptr );
 
+const char *
+krb5_db2_errcode_2_string(krb5_context kcontext,
+		    long err_code);
 
+void
+krb5_db2_release_errcode_string(krb5_context kcontext,
+		    const char *msg);
 
 
 

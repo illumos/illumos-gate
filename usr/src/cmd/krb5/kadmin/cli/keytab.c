@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ static int add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
 static int remove_principal(char *keytab_str, krb5_keytab keytab, char
 			    *princ_str, char *kvno_str);
 static char *etype_string(krb5_enctype enctype);
+static char *etype_istring(krb5_enctype enctype);
 
 static int quiet;
 
@@ -345,10 +346,30 @@ int add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
 			fprintf(stderr,
 			    gettext("%s: Principal %s does not exist.\n"),
 		       whoami, princ_str);
-	  } else
+	/* Solaris Kerberos: Better error messages */
+	  } else if (code == KRB5_BAD_ENCTYPE) {
+			int i, et;
+			fprintf(stderr, gettext("%s: Error from the remote system: "
+			    "%s while changing %s's key\n"), whoami,
+			    error_message(code), princ_str);
+			if (nktypes) {
+				et = permitted_etypes[0].ks_enctype;
+				fprintf(stderr, gettext("%s: Encryption types "
+				    "requested: %s (%d)"), whoami,
+				    etype_istring(et), et);
+
+				for (i = 1; i < nktypes; i++) {
+					et = permitted_etypes[i].ks_enctype;
+					fprintf(stderr, ", %s (%d)",
+					    etype_istring(et), et);
+				}
+				fprintf(stderr, "\n");
+			}
+	  } else {
 			com_err(whoami, code,
 				gettext("while changing %s's key"),
 				princ_str);
+	  }
 	  goto cleanup;
      }
 
@@ -555,3 +576,15 @@ static char *etype_string(enctype)
 
     return buf;
 }
+
+/* Solaris Kerberos */
+static char *etype_istring(krb5_enctype enctype) {
+    static char buf[100];
+    krb5_error_code ret;
+
+    if ((ret = krb5_enctype_to_istring(enctype, buf, sizeof(buf))))
+	sprintf(buf, "unknown", enctype);
+
+    return (buf);
+}
+

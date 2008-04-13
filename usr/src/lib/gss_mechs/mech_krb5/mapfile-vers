@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,8 @@ SUNW_1.1 {
 SUNWprivate_1.1 {
     global:
 	adb_error_table;
+	add_com_err_hook;
+	add_default_com_err_hook;
 	initialize_adb_error_table;
 	asn12krb5_buf;
 	asn1_decode_addrtype;
@@ -399,6 +401,7 @@ SUNWprivate_1.1 {
 	krb5_encrypt_helper;
 	krb5_encrypt_tkt_part;
 	krb5_enctype_to_string;
+	krb5_enctype_to_istring;
 	krb5_enctypes_length;
 	krb5_enctypes_list;
 	krb5_error_table;
@@ -770,6 +773,8 @@ SUNWprivate_1.1 {
 	profile_ser_size;
 	profile_verify_node;
 	pty_error_table;
+	rem_com_err_hook;
+	rem_default_com_err_hook;
 	reset_com_err_hook;
 	set_com_err_hook;
 	ss_error_table;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -954,16 +954,21 @@ krb5_error_code kadm5_get_config_params(context, kdcprofile, kdcenv,
 
 	hierarchy[2] = "sunw_dbprop_slave_poll";
 
-	params.iprop_polltime = "2m";
-	params.mask |= KADM5_CONFIG_POLL_TIME;
+	params.iprop_polltime = strdup("2m");
+	if (params.iprop_polltime)
+		params.mask |= KADM5_CONFIG_POLL_TIME;
 
 	if (params_in->mask & KADM5_CONFIG_POLL_TIME) {
+		if (params.iprop_polltime)
+			free(params.iprop_polltime);
 		params.iprop_polltime = strdup(params_in->iprop_polltime);
 		if (params.iprop_polltime)
 			params.mask |= KADM5_CONFIG_POLL_TIME;
 	} else {
 		if (aprofile && !krb5_aprof_get_string(aprofile, hierarchy,
 		    TRUE, &svalue)) {
+			if (params.iprop_polltime)
+				free(params.iprop_polltime);
 			params.iprop_polltime = strdup(svalue);
 			params.mask |= KADM5_CONFIG_POLL_TIME;
 			krb5_xfree(svalue);
@@ -1048,6 +1053,10 @@ kadm5_free_config_params(context, params)
 		if (params->kpasswd_server) {
 			free(params->kpasswd_server);
 			params->kpasswd_server = NULL;
+		}
+		if (params->iprop_polltime) {
+			free(params->iprop_polltime);
+			params->iprop_polltime = NULL;
 		}
 	}
 	return (0);

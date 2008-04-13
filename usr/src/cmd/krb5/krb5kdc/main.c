@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +159,7 @@ finish_realm(kdc_realm_t *rdp)
  * realm data and we should be all set to begin operation for that realm.
  */
 static krb5_error_code
-init_realm(char *progname, kdc_realm_t *rdp, char *realm,
+init_realm(krb5_context kcontext, char *progname, kdc_realm_t *rdp, char *realm,
 	   char *def_mpname, krb5_enctype def_enctype, char *def_udp_ports,
 	   char *def_tcp_ports, krb5_boolean def_manual, char **db_args)
 {
@@ -180,6 +180,12 @@ init_realm(char *progname, kdc_realm_t *rdp, char *realm,
 		realm);
 	goto whoops;
     }
+
+    /*
+     * Solaris Kerberos:
+     * Set the current context to that of the realm being init'ed
+     */
+    krb5_klog_set_context(rdp->realm_context);
 
     kret = krb5_read_realm_params(rdp->realm_context, rdp->realm_name,
 				  (char *) NULL, (char *) NULL, &rparams);
@@ -258,8 +264,12 @@ init_realm(char *progname, kdc_realm_t *rdp, char *realm,
     if ((kret = krb5_db_open(rdp->realm_context, db_args, 
 			     KRB5_KDB_OPEN_RO | KRB5_KDB_SRV_TYPE_KDC))) {
 #endif
+	/*
+	 * Solaris Kerberos:
+	 * Make sure that error messages are printed using gettext
+	 */
 	com_err(progname, kret,
-		"while initializing database for realm %s", realm);
+	    gettext("while initializing database for realm %s"), realm);
 	goto whoops;
     }
 
@@ -362,6 +372,13 @@ init_realm(char *progname, kdc_realm_t *rdp, char *realm,
         
 	finish_realm(rdp);
     }
+
+    /*
+     * Solaris Kerberos:
+     * Set the current context back to the general context
+     */
+    krb5_klog_set_context(kcontext);
+
     return(kret);
 }
 
@@ -436,7 +453,7 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
     char		*db_name = (char *) NULL;
     char		*mkey_name = (char *) NULL;
     char		*rcname = KDCRCACHE;
-    char		*lrealm;
+    char		*lrealm = NULL;
     krb5_error_code	retval;
     krb5_enctype	menctype = ENCTYPE_UNKNOWN;
     kdc_realm_t		*rdatap;
@@ -494,8 +511,8 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 		char **temp = realloc( db_args, sizeof(char*) * (db_args_size+1)); /* one for NULL */
 		if( temp == NULL )
 		{
-		    fprintf(stderr, gettext("%s: KDC cannot initialize. Not enough memory\n"),
-			    argv[0]);
+			/* Solaris Kerberos: Keep error messages consistent */
+		    com_err(argv[0], errno, gettext("while initializing KDC"));
 		    exit(1);
 		}
 
@@ -508,12 +525,12 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 	case 'r':			/* realm name for db */
 	    if (!find_realm_data(optarg, (krb5_ui_4) strlen(optarg))) {
 		if ((rdatap = (kdc_realm_t *) malloc(sizeof(kdc_realm_t)))) {
-		    if ((retval = init_realm(argv[0], rdatap, optarg, 
+		    if ((retval = init_realm(kcontext, argv[0], rdatap, optarg, 
 					     mkey_name, menctype,
 					     default_udp_ports,
 					     default_tcp_ports, manual, db_args))) {
-			fprintf(stderr,gettext("%s: cannot initialize realm %s\n"),
-				argv[0], optarg);
+			/* Solaris Kerberos: Keep error messages consistent */
+			com_err(argv[0], retval, gettext("while initializing realm %s"), optarg);
 			exit(1);
 		    }
 		    kdc_realmlist[kdc_numrealms] = rdatap;
@@ -522,8 +539,8 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 		}
 		else
 		{
-			fprintf(stderr, gettext("%s: cannot initialize realm %s. Not enough memory\n"),
-				argv[0], optarg);
+			/* Solaris Kerberos: Keep error messages consistent */
+			com_err(argv[0], errno, gettext("while initializing realm %s"), optarg);
 			exit(1);
 		}
 	    }
@@ -535,8 +552,8 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 		db_name = malloc(sizeof("dbname=") + strlen(optarg));
 		if( db_name == NULL )
 		{
-			fprintf(stderr, gettext("%s: KDC cannot initialize. Not enough memory\n"),
-				argv[0] );
+			/* Solaris Kerberos: Keep error messages consistent */
+			com_err(argv[0], errno, gettext("while initializing KDC"));
 			exit(1);
 		}
 
@@ -548,8 +565,8 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 		char **temp = realloc( db_args, sizeof(char*) * (db_args_size+1)); /* one for NULL */
 		if( temp == NULL )
 		{
-		    fprintf(stderr, gettext("%s: KDC cannot initialize. Not enough memory\n"),
-			    argv[0]);
+			/* Solaris Kerberos: Keep error messages consistent */
+		    com_err(argv[0], errno, gettext("while initializing KDC"));
 		    exit(1);
 		}
 
@@ -570,9 +587,10 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 	    nofork++;			/* don't detach from terminal */
 	    break;
 	case 'k':			/* enctype for master key */
-	    if (krb5_string_to_enctype(optarg, &menctype))
-		com_err(argv[0], 0,
-		gettext("invalid enctype %s"), optarg);
+		/* Solaris Kerberos: Keep error messages consistent */
+	    if (retval = krb5_string_to_enctype(optarg, &menctype))
+		com_err(argv[0], retval,
+		    gettext("while converting %s to an enctype"), optarg);
 	    break;
 	case 'R':
 	    rcname = optarg;
@@ -622,17 +640,19 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 	if ((retval = krb5_get_default_realm(kcontext, &lrealm))) {
 	    com_err(argv[0], retval,
 		gettext("while attempting to retrieve default realm"));
+	/* Solaris Kerberos: avoid double logging */
+#if 0
 	    fprintf (stderr, "%s: %s, %s", argv[0], error_message (retval),
-	        gettext("attempting to retrieve default realm\n"));
+		gettext("attempting to retrieve default realm\n"));
+#endif
 	    exit(1);
 	}
 	if ((rdatap = (kdc_realm_t *) malloc(sizeof(kdc_realm_t)))) {
-	    if ((retval = init_realm(argv[0], rdatap, lrealm, 
+	    if ((retval = init_realm(kcontext, argv[0], rdatap, lrealm, 
 				     mkey_name, menctype, default_udp_ports,
 				     default_tcp_ports, manual, db_args))) {
-		fprintf(stderr,
-			gettext("%s: cannot initialize realm %s\n"),
-			argv[0], lrealm);
+		/* Solaris Kerberos: Keep error messages consistent */
+		com_err(argv[0], retval, gettext("while initializing realm %s"), lrealm);
 		exit(1);
 	    }
 	    kdc_realmlist[0] = rdatap;
@@ -653,6 +673,8 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 
     /* Ensure that this is set for our first request. */
     kdc_active_realm = kdc_realmlist[0];
+    if (lrealm)
+	free(lrealm);
     if (default_udp_ports)
 	free(default_udp_ports);
     if (default_tcp_ports)
@@ -708,6 +730,8 @@ int main(int argc, char **argv)
     krb5_context	kcontext;
     int errout = 0;
 
+    krb5_boolean log_stderr_set;
+
     (void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
@@ -739,6 +763,18 @@ int main(int argc, char **argv)
 	    exit(1);
     }
     krb5_klog_init(kcontext, "kdc", argv[0], 1);
+
+    /*
+     * Solaris Kerberos:
+     * In the early stages of krb5kdc it is desirable to log error messages
+     * to stderr as well as any other logging locations specified in config
+     * files.
+     */
+     log_stderr_set = krb5_klog_logging_to_stderr();
+     if (log_stderr_set != TRUE) {
+     	krb5_klog_add_stderr();
+     }
+
     /* initialize_kdc5_error_table();  SUNWresync121 XXX */
 
     /*
@@ -760,8 +796,31 @@ int main(int argc, char **argv)
 	finish_realms(argv[0]);
 	return 1;
     }
+
+    /* Solaris Kerberos: Remove the extra stderr logging */
+    if (log_stderr_set != TRUE)
+	krb5_klog_remove_stderr();
+
+    /*
+     * Solaris Kerberos:
+     * List the logs (FILE, STDERR, etc) which are currently being
+     * logged to and print that to stderr. Useful when trying to
+     * track down a failure via SMF.
+     */
+    if (retval = krb5_klog_list_logs(argv[0])) {
+	com_err(argv[0], retval, gettext("while listing logs"));
+	if (log_stderr_set != TRUE) {
+		fprintf(stderr, gettext("%s: %s while listing logs\n"),
+		    argv[0], error_message(retval));
+	}
+    }
+
     if (!nofork && daemon(0, 0)) {
 	com_err(argv[0], errno, gettext("while detaching from tty"));
+	if (log_stderr_set != TRUE) {
+		fprintf(stderr, gettext("%s: %s while detaching from tty\n"),
+		  argv[0], strerror(errno));
+	}
 	finish_realms(argv[0]);
 	return 1;
     }
@@ -769,7 +828,7 @@ int main(int argc, char **argv)
 	com_err(argv[0], retval, gettext("while logging message"));
 	errout++;
 	};
-	
+
     if ((retval = listen_and_process(argv[0]))) {
 	com_err(argv[0], retval, gettext("while processing network requests"));
 	errout++;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2400,6 +2400,9 @@ krb5_error_code KRB5_CALLCONV krb5_string_to_timestamp
 krb5_error_code KRB5_CALLCONV krb5_string_to_deltat
 	(char *, krb5_deltat *);
 krb5_error_code KRB5_CALLCONV krb5_enctype_to_string
+	(krb5_enctype, char *, size_t);
+/* Solaris Kerberos */
+krb5_error_code KRB5_CALLCONV krb5_enctype_to_istring
 	(krb5_enctype, char *, size_t);
 krb5_error_code KRB5_CALLCONV krb5_salttype_to_string
 	(krb5_int32, char *, size_t);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,11 +42,30 @@
 static void MacMessageBox(char *errbuf);
 #endif
 
-static et_old_error_hook_func com_err_hook = 0;
-
 static void default_com_err_proc
 (const char  *whoami, errcode_t code,
 	const char  *fmt, va_list ap);
+
+/*
+ * Solaris Kerberos:
+ * It is sometimes desirable to have more than a single hook called
+ * when com_err() is invoked. A number of new functions have been
+ * added which allow hooks to be added and removed:
+ *    add_com_err_hook()
+ *    add_default_com_err_hook()
+ *    remove_com_err_hook()
+ *    remove_default_com_err_hook()
+ * The existing functions:
+ *    set_com_err_hook()
+ *    reset_com_err_hook()
+ *    com_err()
+ * have been modified to work with the new scheme. Applications using
+ * the original function calls are not affected.
+ */
+#define	MAX_HOOKS 3
+static et_old_error_hook_func com_err_hook[MAX_HOOKS] = { default_com_err_proc,
+    NULL, NULL };
+static int hook_count = 1;
 
 /* Solaris Kerberos specific fix start --------------------------- */
 
@@ -196,10 +215,11 @@ void KRB5_CALLCONV com_err_va(whoami, code, fmt, ap)
 	const char  *fmt;
 	va_list ap;
 {
-	if (!com_err_hook)
-		default_com_err_proc(whoami, code, fmt, ap);
-	else
-	  (com_err_hook)(whoami, code, fmt, ap);
+	int i;
+
+	for (i = 0; i < hook_count; i++) {
+		(com_err_hook[i])(whoami, code, fmt, ap);
+	}
 }
 
 
@@ -230,17 +250,81 @@ void KRB5_CALLCONV_C com_err(whoami, code, fmt, va_alist)
 et_old_error_hook_func set_com_err_hook (new_proc)
 	et_old_error_hook_func new_proc;
 {
-	et_old_error_hook_func x = com_err_hook;
+	int i;
+	et_old_error_hook_func x = com_err_hook[0];
 
-	com_err_hook = new_proc;
+	for (i = 0; i < hook_count; i++)
+		com_err_hook[i] = NULL;
+
+	com_err_hook[0] = new_proc;
+	hook_count = 1;
+
 	return x;
 }
 
 et_old_error_hook_func reset_com_err_hook ()
 {
-	et_old_error_hook_func x = com_err_hook;
+	int i;
+	et_old_error_hook_func x = com_err_hook[0];
 
-	com_err_hook = 0;
+	for (i = 0; i < hook_count; i++)
+		com_err_hook[i] = NULL;
+
+	com_err_hook[0] = default_com_err_proc;
+	hook_count = 1;
+
 	return x;
 }
 #endif
+
+/*
+ * Solaris Kerberos:
+ * Register a hook which will be called every time
+ * com_err() is called.
+ */
+void add_com_err_hook(et_old_error_hook_func f) {
+	int i;
+	if (hook_count < MAX_HOOKS) {
+		for (i = 0; i < hook_count; i++) {
+			if (com_err_hook[i] == NULL)
+				break;
+		}
+		com_err_hook[i] = f;
+		hook_count++;
+	}
+}
+
+/*
+ * Solaris Kerberos:
+ * Remove a logging hook. The first hook matching 'f' will
+ * be removed.
+ */
+void rem_com_err_hook(et_old_error_hook_func f) {
+	int i, j;
+
+	for (i = 0; i < hook_count; i++) {
+		if (com_err_hook[i] == f) {
+			for (j = i; j < hook_count - 1; j++) {
+				com_err_hook[j] = com_err_hook[j+1];
+			}
+			com_err_hook[j] = NULL;
+			hook_count--;
+		}
+	}
+}
+
+/*
+ * Solaris Kerberos:
+ * Remove the default hook.
+ */
+void rem_default_com_err_hook() {
+	rem_com_err_hook(default_com_err_proc);
+}
+
+/*
+ * Solaris Kerberos:
+ * Add back the default hook
+ */
+void add_default_com_err_hook() {
+	add_com_err_hook(default_com_err_proc);
+}

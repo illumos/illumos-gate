@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,6 +355,7 @@ klog_rotate(struct log_entry *le)
  * klog_com_err_proc()	- Handle com_err(3) messages as specified by the
  *			  profile.
  */
+static krb5_context err_context;
 static void
 klog_com_err_proc(whoami, code, format, ap)
     const char	*whoami;
@@ -379,11 +380,13 @@ klog_com_err_proc(whoami, code, format, ap)
 
     /* If reporting an error message, separate it. */
     if (code) {
+        const char *emsg;
         outbuf[sizeof(outbuf) - 1] = '\0';
 
-	strncat(outbuf, error_message(code),
-		sizeof(outbuf) - 1 - strlen(outbuf));
-	strncat(outbuf, " - ", sizeof(outbuf) - 1 - strlen(outbuf));
+	emsg = krb5_get_error_message (err_context, code);
+	strncat(outbuf, emsg, sizeof(outbuf) - 1 - strlen(outbuf));
+	strncat(outbuf, " ", sizeof(outbuf) - 1 - strlen(outbuf));
+	krb5_free_error_message(err_context, emsg);
     }
     cp = &outbuf[strlen(outbuf)];
     
@@ -531,6 +534,8 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
     /* Initialize */
     do_openlog = 0;
     log_facility = 0;
+
+    err_context = kcontext;
 
     /*
      * Look up [logging]-><ename> in the profile.  If that doesn't
@@ -1100,3 +1105,190 @@ krb5_context kcontext;
 	}
     }
 }
+
+/*
+ * Solaris Kerberos:
+ * Switch the current context to the one supplied
+ */
+void krb5_klog_set_context(krb5_context context) {
+	err_context = context;
+}
+
+/*
+ * Solaris Kerberos:
+ * Return a string representation of "facility"
+ */
+static const char * facility2string(int facility) {
+	switch (facility) {
+		case (LOG_AUTH):
+			return ("AUTH");
+		case (LOG_KERN):
+			return ("KERN");
+		case (LOG_USER):
+			return ("USER");
+		case (LOG_MAIL):
+			return ("MAIL");
+		case (LOG_DAEMON):
+			return ("DAEMON");
+		case (LOG_LPR):
+			return ("LPR");
+		case (LOG_NEWS):
+			return ("NEWS");
+		case (LOG_UUCP):
+			return ("UUCP");
+		case (LOG_CRON):
+			return ("CRON");
+		case (LOG_LOCAL0):
+			return ("LOCAL0");
+		case (LOG_LOCAL1):
+			return ("LOCAL1");
+		case (LOG_LOCAL2):
+			return ("LOCAL2");
+		case (LOG_LOCAL3):
+			return ("LOCAL3");
+		case (LOG_LOCAL4):
+			return ("LOCAL4");
+		case (LOG_LOCAL5):
+			return ("LOCAL6");
+		case (LOG_LOCAL7):
+			return ("LOCAL7");
+	}
+	return ("UNKNOWN");
+}
+
+/*
+ * Solaris Kerberos:
+ * Print to stderr where logging is being done
+ */
+krb5_error_code krb5_klog_list_logs(const char *whoami) {
+	int lindex;
+
+	fprintf(stderr, gettext("%s: logging to "), whoami);
+	for (lindex = 0; lindex < log_control.log_nentries; lindex++) {
+		if (lindex != 0 && log_control.log_entries[lindex].log_type != K_LOG_NONE)
+			fprintf(stderr, ", ");
+		switch (log_control.log_entries[lindex].log_type) {
+			case K_LOG_FILE:
+				fprintf(stderr, "FILE=%s", log_control.log_entries[lindex].lfu_fname);
+				break;
+			case K_LOG_STDERR:
+				fprintf(stderr, "STDERR");
+				break;
+			case K_LOG_CONSOLE:
+				fprintf(stderr, "CONSOLE");
+				break;
+			case K_LOG_DEVICE:
+				fprintf(stderr, "DEVICE=%s", log_control.log_entries[lindex].ldu_devname);
+				break;
+			case K_LOG_SYSLOG:
+				fprintf(stderr, "SYSLOG=%s:%s",
+				    severity2string(log_control.log_entries[lindex].lsu_severity),
+				    facility2string(log_control.log_entries[lindex].lsu_facility));
+				break;
+			case K_LOG_NONE:
+				break;
+			default: /* Should never get here */
+				return (-1);
+		}
+	}
+	fprintf(stderr, "\n");
+	return (0);
+}
+
+/*
+ * Solaris Kerberos:
+ * Add logging to stderr.
+ */
+krb5_error_code krb5_klog_add_stderr() {
+
+	struct log_entry *tmp_log_entries = log_control.log_entries;
+	int i;
+
+	if (log_control.log_entries != &def_log_entry) {
+		log_control.log_entries = realloc(log_control.log_entries,
+		    (log_control.log_nentries + 1) * sizeof(struct log_entry));
+		if (log_control.log_entries == NULL) {
+			log_control.log_entries = tmp_log_entries;
+			return (ENOMEM);
+		}
+	} else {
+		log_control.log_entries = malloc(2 * sizeof(struct log_entry));
+		if (log_control.log_entries == NULL) {
+			log_control.log_entries = &def_log_entry;
+			return (ENOMEM);
+		}
+		(void) memcpy(&log_control.log_entries[0], &def_log_entry,
+		    sizeof(struct log_entry));
+	}
+
+	i = log_control.log_nentries;
+	if (log_control.log_entries[i].lfu_filep =
+	    fdopen(fileno(stderr), "a+F")) {
+		log_control.log_entries[i].log_type = K_LOG_STDERR;
+		log_control.log_entries[i].log_2free = NULL;
+		log_control.log_entries[i].lfu_fname = "standard error";
+		log_control.log_nentries++;
+	} else {
+		/* Free the alloc'ed extra entry */
+		int err = errno;
+		tmp_log_entries = log_control.log_entries;
+		log_control.log_entries = realloc(log_control.log_entries,
+		    (log_control.log_nentries) * sizeof(struct log_entry));
+		if (log_control.log_entries == NULL)
+			log_control.log_entries = tmp_log_entries;
+		return (err);
+	}
+
+	return (0);
+}
+
+/*
+ * Solaris Kerberos
+ * Remove logging to stderr.
+ */
+void krb5_klog_remove_stderr() {
+
+	struct log_entry *tmp_log_entries = log_control.log_entries;
+	int i;
+
+	/* Find the entry (if it exists) */
+	for (i = 0; i < log_control.log_nentries; i++) {
+		if (log_control.log_entries[i].log_type == K_LOG_STDERR) {
+			break;
+		}
+	}
+	
+	if ( i < log_control.log_nentries) {
+		for (; i < log_control.log_nentries - 1; i++)
+			log_control.log_entries[i] =
+			    log_control.log_entries[i + 1];
+
+		if (log_control.log_nentries > 1) {
+			log_control.log_entries =
+			    realloc(log_control.log_entries,
+			    (log_control.log_nentries + 1) *
+			    sizeof(struct log_entry));
+			if (log_control.log_entries != NULL)
+				log_control.log_nentries--;
+			else
+				log_control.log_entries = tmp_log_entries;
+		} else {
+			if (log_control.log_entries != NULL)
+				free(log_control.log_entries);
+		}
+	}
+}
+
+/* Solaris Kerberos: Indicate if currently logging to stderr */
+krb5_boolean krb5_klog_logging_to_stderr() {
+	int i;
+
+	/* Find the entry (if it exists) */
+	for (i = 0; i < log_control.log_nentries; i++) {
+		if (log_control.log_entries[i].log_type == K_LOG_STDERR) {
+			return (TRUE);
+		}
+	}
+	return (FALSE);
+}
+

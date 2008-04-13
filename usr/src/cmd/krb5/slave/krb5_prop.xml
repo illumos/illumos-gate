@@ -1,7 +1,7 @@
 <?xml version='1.0'?>
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 <!--
-	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
 	pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@
 	<exec_method
 		type='method'
 		name='start'
-		exec='/lib/svc/method/svc-kdc.slave'
+		exec='/usr/lib/krb5/kpropd -S'
 		timeout_seconds='60'>
 		<method_context>
 			<method_credential

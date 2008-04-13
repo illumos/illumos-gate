@@ -444,6 +444,15 @@ main(int argc, char *argv[])
 	int retdn;
 	int iprop_supported;
 
+	/* Solaris Kerberos: Stores additional error messages */
+	char *emsg = NULL;
+
+	/* Solaris Kerberos: Indicates whether loalhost is master or not */
+	krb5_boolean is_master;
+
+	/* Solaris Kerberos: Used for checking acl file */
+	gss_name_t name;
+	
 	/* This is OID value the Krb5_Name NameType */
      	gssbuf.value = "{1 2 840 113554 1 2 2 1}";
      	gssbuf.length = strlen(gssbuf.value);
@@ -561,8 +570,9 @@ main(int argc, char *argv[])
 
 	if (ret = kadm5_get_config_params(context, NULL, NULL, &chgpw_params,
 		&chgpw_params)) {
-		krb5_klog_syslog(LOG_ERR, gettext("%s: %s while initializing,"
-				" aborting"), whoami, error_message(ret));
+		/* Solaris Kerberos: Remove double "whoami" */
+		krb5_klog_syslog(LOG_ERR, gettext("%s while initializing,"
+		    " aborting"), error_message(ret));
 		fprintf(stderr,
 		    gettext("%s: %s while initializing, aborting\n"),
 		    whoami, error_message(ret));
@@ -622,8 +632,9 @@ main(int argc, char *argv[])
 
 	if (ret = kadm5_get_config_params(context, NULL, NULL, &params,
 		&params)) {
-		krb5_klog_syslog(LOG_ERR, gettext("%s: %s while initializing,"
-				" aborting"), whoami, error_message(ret));
+		/* Solaris Kerberos: Remove double "whoami" */
+		krb5_klog_syslog(LOG_ERR, gettext("%s while initializing,"
+		    " aborting"), error_message(ret));
 		fprintf(stderr,
 		    gettext("%s: %s while initializing, aborting\n"),
 		    whoami, error_message(ret));
@@ -633,9 +644,10 @@ main(int argc, char *argv[])
 #define	REQUIRED_PARAMS (KADM5_CONFIG_REALM | KADM5_CONFIG_ACL_FILE)
 
 	if ((params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
+		/* Solaris Kerberos: Keep error messages consistent */
 		krb5_klog_syslog(LOG_ERR,
-		    gettext("%s: Missing required configuration values "
-			"while initializing, aborting"), whoami,
+		    gettext("Missing required configuration values "
+			"(%lx) while initializing, aborting"),
 		    (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
 		fprintf(stderr,
 		    gettext("%s: Missing required configuration values "
@@ -644,6 +656,37 @@ main(int argc, char *argv[])
 		krb5_klog_close(context);
 		exit(1);
 	}
+
+	/* Solaris Kerberos: Ensure that kadmind is only run on a master kdc */
+	if (ret = kadm5_is_master(context, params.realm, &is_master)){
+		krb5_klog_syslog(LOG_ERR,
+		    gettext("Failed to determine whether host is master "
+		    "KDC for realm %s: %s"), params.realm,
+		    error_message(ret));
+		fprintf(stderr,
+		    gettext("%s: Failed to determine whether host is master "
+		    "KDC for realm %s: %s\n"), whoami, params.realm,
+		    error_message(ret));
+		krb5_klog_close(context);
+		exit(1);
+	}
+
+	if (is_master == FALSE) {
+		char *master = NULL;
+		kadm5_get_master(context, params.realm, &master);
+
+		krb5_klog_syslog(LOG_ERR,
+		    gettext("%s can only be run on the master KDC, %s, for "
+		    "realm %s"), whoami, master ? master : "unknown",
+		    params.realm);
+		fprintf(stderr,
+		    gettext("%s: %s can only be run on the master KDC, %s, for "
+		    "realm %s\n"), whoami, whoami, master ? master: "unknown",
+		    params.realm);
+		krb5_klog_close(context);
+		exit(1);
+	}
+
 	memset((char *) &addr, 0, sizeof (struct sockaddr_in));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
@@ -794,29 +837,38 @@ main(int argc, char *argv[])
 	 * based principals.
 	 */
 
-	(void) kadm5_get_adm_host_srv_name(context,
-					   params.realm, &names[0].name);
-	(void) kadm5_get_cpw_host_srv_name(context,
-					   params.realm, &names[1].name);
-	names[2].name = KADM5_ADMIN_SERVICE_P;
-	names[3].name = KADM5_CHANGEPW_SERVICE_P;
-	names[4].name = OVSEC_KADM_ADMIN_SERVICE_P;
-	names[5].name = OVSEC_KADM_CHANGEPW_SERVICE_P;
-
-	if (names[0].name == NULL || names[1].name == NULL ||
-	    names[2].name == NULL || names[3].name == NULL ||
-	    names[4].name == NULL || names[5].name == NULL) {
+	if (ret = kadm5_get_adm_host_srv_name(context, params.realm,
+	    &names[0].name)) {
 		krb5_klog_syslog(LOG_ERR,
-		    gettext("Cannot initialize GSS-API authentication, "
-			"failing."));
+		    gettext("Cannot get host based service name for admin "
+		    "principal in realm %s: %s"), params.realm,
+		    error_message(ret));
 		fprintf(stderr,
-		    gettext("%s: Cannot initialize "
-			"GSS-API authentication.\n"),
-		    whoami);
+		    gettext("%s: Cannot get host based service name for admin "
+		    "principal in realm %s: %s\n"), whoami, params.realm,
+		    error_message(ret));
 		krb5_klog_close(context);
 		exit(1);
 	}
 
+	if (ret = kadm5_get_cpw_host_srv_name(context, params.realm,
+	    &names[1].name)) {
+		krb5_klog_syslog(LOG_ERR,
+		    gettext("Cannot get host based service name for changepw "
+		    "principal in realm %s: %s"), params.realm,
+		    error_message(ret));
+		fprintf(stderr, 
+		    gettext("%s: Cannot get host based service name for "
+		    "changepw principal in realm %s: %s\n"), whoami, params.realm,
+		    error_message(ret));
+		krb5_klog_close(context);
+		exit(1);
+	}
+
+	names[2].name = KADM5_ADMIN_SERVICE_P;
+	names[3].name = KADM5_CHANGEPW_SERVICE_P;
+	names[4].name = OVSEC_KADM_ADMIN_SERVICE_P;
+	names[5].name = OVSEC_KADM_CHANGEPW_SERVICE_P;
 
 	/*
 	 * Try to acquire creds for the old OV services as well as the new
@@ -883,20 +935,81 @@ main(int argc, char *argv[])
 		krb5_klog_close(context);
 		exit(1);
 	}
-	if ((ret = kadm5_init("kadmind", NULL,
+
+	/*
+	 * Solaris Kerberos:
+	 * Warn if the acl file doesn't contain an entry for a principal in the
+	 * default realm.
+	 */
+	gssbuf.length = strlen("joe/admin@") + strlen(params.realm) + 1;
+	gssbuf.value = malloc(gssbuf.length);
+	if (gssbuf.value != NULL) {
+	/* Use any value as the first component - joe in this case */
+		(void) snprintf(gssbuf.value, gssbuf.length, "joe/admin@%s",
+		    params.realm);
+
+		if (gss_import_name(&minor_status, &gssbuf, GSS_C_NT_USER_NAME,
+		    &name) == GSS_S_COMPLETE) {
+		
+			if (kadm5int_acl_check(context, name, ACL_MODIFY, NULL,
+			    NULL) == 0) {
+				krb5_klog_syslog(LOG_WARNING,
+				    gettext("acls may not be properly "
+				    "configured: failed to find an acl "
+				    "matching the default realm \"%s\" in %s"),
+				    params.realm, params.acl_file);
+				(void) fprintf(stderr, gettext("%s: Warning: "
+				    "acls may not be properly configured: "
+				    "failed to find an acl matching the "
+				    "default realm \"%s\" in %s\n"),
+				    whoami, params.realm,
+				    params.acl_file);
+			}
+			(void) gss_release_name(&minor_status, &name);
+		}
+		free(gssbuf.value);
+		gssbuf.value = NULL;
+	}
+	gssbuf.length = 0;
+
+	/*
+	 * Solaris Kerberos:
+	 * Call a private version of kadm5_init which potentially returns an
+	 * additional error string in case of failure.
+	 */
+	if ((ret = kadm5_init2("kadmind", NULL,
 		    NULL, &params,
 		    KADM5_STRUCT_VERSION,
 		    KADM5_API_VERSION_2,
 		    db_args,
-		    &global_server_handle)) != KADM5_OK) {
+		    &global_server_handle,
+		    &emsg)) != KADM5_OK) {
+
 		krb5_klog_syslog(LOG_ERR,
 		    gettext("%s while initializing, aborting"),
-		    error_message(ret));
+		    (emsg ? emsg : error_message(ret)));
 		fprintf(stderr,
 		    gettext("%s: %s while initializing, aborting\n"),
-		    whoami, error_message(ret));
+		    whoami, (emsg ? emsg : error_message(ret)));
+		if (emsg)
+		    free(emsg);
+
 		krb5_klog_close(context);
+		kadm5_destroy(context);
 		exit(1);
+	}
+
+	/*
+	 * Solaris Kerberos:
+	 * List the logs (FILE, STDERR, etc) which are currently being
+	 * logged to and print to stderr. Useful when trying to
+	 * track down a failure via SMF.
+	 */
+	if (ret = krb5_klog_list_logs(whoami)) {
+		fprintf(stderr, gettext("%s: %s while listing logs\n"),
+		    whoami, error_message(ret));
+		krb5_klog_syslog(LOG_ERR, gettext("%s while listing logs"),
+		    error_message(ret));
 	}
 
 	if (!nofork && (ret = daemon(0, 0))) {
@@ -1235,8 +1348,7 @@ krb5_error_code log_kt_error(char *s_name, char *whoami) {
 		krb5_klog_syslog(LOG_ERR,
 				gettext("krb5_sname_to_principal failed: %s"),
 				error_message(code));
-		fprintf(stderr,
-				gettext("%s: krb5_sname_to_principal failed: %s"),
+		fprintf(stderr, gettext("%s: krb5_sname_to_principal failed: %s\n"),
 				whoami, error_message(code));
 		free(service);
 		return code;
@@ -1246,8 +1358,7 @@ krb5_error_code log_kt_error(char *s_name, char *whoami) {
 		krb5_klog_syslog(LOG_ERR,
 				gettext("krb5_kt_default_name failed: %s"),
 				error_message(code));
-		fprintf(stderr,
-				gettext("%s: krb5_kt_default_name failed: %s"),
+		fprintf(stderr, gettext("%s: krb5_kt_default_name failed: %s\n"),
 				whoami, error_message(code));
 		krb5_free_principal(context, princ);
 		free(service);
@@ -1258,8 +1369,7 @@ krb5_error_code log_kt_error(char *s_name, char *whoami) {
 		krb5_klog_syslog(LOG_ERR,
 				gettext("krb5_kt_default failed: %s"),
 				error_message(code));
-		fprintf(stderr,
-				gettext("%s: krb5_kt_default failed: %s"),
+		fprintf(stderr, gettext("%s: krb5_kt_default failed: %s\n"),
 				whoami, error_message(code));
 		krb5_free_principal(context, princ);
 		free(service);
@@ -1277,8 +1387,7 @@ krb5_error_code log_kt_error(char *s_name, char *whoami) {
 					gettext("Keytab entry \"%s/%s\" is missing from \"%s\""),
 					service, host,
 					kt_name);
-			fprintf(stderr,
-					gettext("%s: Keytab entry \"%s/%s\" is missing from \"%s\".\n"),
+			fprintf(stderr, gettext("%s: Keytab entry \"%s/%s\" is missing from \"%s\".\n"),
 					whoami,
 					service, host,
 					kt_name);
@@ -1287,8 +1396,7 @@ krb5_error_code log_kt_error(char *s_name, char *whoami) {
 			krb5_klog_syslog(LOG_ERR,
 					gettext("Keytab file \"%s\" does not exist"),
 					kt_name);
-			fprintf(stderr,
-					gettext("%s: Keytab file \"%s\" does not exist.\n"),
+			fprintf(stderr, gettext("%s: Keytab file \"%s\" does not exist.\n"),
 					whoami,
 					kt_name);
 			break;

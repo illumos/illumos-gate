@@ -402,12 +402,13 @@ krb5_ldap_free_server_params(ldap_context)
 	ldap_context->service_password_file = NULL;
     }
 
-#ifdef HAVE_EDIRECTORY
+/* Solaris Kerberos */
+/* #ifdef HAVE_EDIRECTORY */
     if (ldap_context->root_certificate_file != NULL) {
 	krb5_xfree(ldap_context->root_certificate_file);
 	ldap_context->root_certificate_file = NULL;
     }
-#endif
+/* #endif */
 
     if (ldap_context->service_cert_path != NULL) {
 	krb5_xfree(ldap_context->service_cert_path);

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,14 +51,6 @@ d none etc 755 root sys
 d none etc/krb5 755 root sys
 e krbconf etc/krb5/krb5.conf 644 root sys
 e preserve etc/krb5/warn.conf 644 root sys
-d none lib 755 root bin
-d none lib/svc 0755 root bin
-d none lib/svc/method 0755 root bin
-f none lib/svc/method/svc-kdc 0555 root bin
-f none lib/svc/method/svc-kdc.master 0555 root bin
-f none lib/svc/method/svc-kdc.slave 0555 root bin
-d none lib/svc/share 0755 root bin
-f none lib/svc/share/krb_include.sh 0444 root bin
 d none var 755 root sys
 d none var/krb5 755 root sys
 d none var/krb5/rcache 1777 root sys

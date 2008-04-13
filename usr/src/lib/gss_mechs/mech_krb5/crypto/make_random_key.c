@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,8 +50,12 @@ krb5_c_make_random_key(krb5_context context, krb5_enctype enctype,
 	    break;
     }
 
-    if (i == krb5_enctypes_length)
+    /* Solaris Kerberos: Better error message */
+    if (i == krb5_enctypes_length) {
+	krb5_set_error_message(context, KRB5_BAD_ENCTYPE,
+	    "Unknown encryption type: %d", enctype);
 	return(KRB5_BAD_ENCTYPE);
+    }
 
     enc = krb5_enctypes_list[i].enc;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1578,9 +1578,10 @@ chrand_principal3_1_svc(chrand3_arg *arg, struct svc_req *rqstp)
     }
 
     if(ret.code != KADM5_AUTH_CHANGEPW) {
-	log_done(funcname, prime_arg,
-		((ret.code == 0) ? "success" : error_message(ret.code)), 
-		client_name, service_name, client_addr(rqstp, buf));
+	/* Solaris Kerberos: Better error messages */
+	log_done(funcname, prime_arg, ((ret.code == 0) ? "success" :
+	    krb5_get_error_message(handle->context, ret.code)), 
+	    client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:

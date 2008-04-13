@@ -455,8 +455,9 @@ hget_header(hashp, page_size)
 	lseek(hashp->fp, 0, SEEK_SET);
 	num_copied = read(hashp->fp, hdr_dest, sizeof(HASHHDR));
 	if (num_copied != sizeof(HASHHDR)) {
+		/* Solaris Kerberos: Make sure to print a newline */
 		fprintf(stderr, dgettext(TEXT_DOMAIN,
-			"hash: could not retrieve header"));
+			"hash: could not retrieve header\n"));
 		return (0);
 	}
 #if DB_BYTE_ORDER == DB_LITTLE_ENDIAN
@@ -486,8 +487,9 @@ hput_header(hashp)
 	lseek(hashp->fp, 0, SEEK_SET);
 	num_copied = write(hashp->fp, whdrp, sizeof(HASHHDR));
 	if (num_copied != sizeof(HASHHDR))
+		/* Solaris Kerberos: Make sure to print a newline */
 		(void)fprintf(stderr, dgettext(TEXT_DOMAIN,
-			"hash: could not write hash header"));
+			"hash: could not write hash header\n"));
 	return;
 }
 

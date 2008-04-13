@@ -1281,6 +1281,10 @@ smf_obsolete_methods="
 	lib/svc/method/aggregation
 	lib/svc/method/datalink
 	lib/svc/method/datalink-init
+	lib/svc/method/svc-kdc
+	lib/svc/method/svc-kdc.master
+	lib/svc/method/svc-kdc.slave
+	lib/svc/share/krb_include.sh
 "
 
 smf_cleanup () {

@@ -1,3 +1,8 @@
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -38,6 +43,25 @@ krb5_enctype_to_string(krb5_enctype enctype, char *buffer, size_t buflen)
 		return(ENOMEM);
 
 	    strcpy(buffer, krb5_enctypes_list[i].out_string);
+	    return(0);
+	}
+    }
+
+    return(EINVAL);
+}
+
+/* Solaris Kerberos */
+krb5_error_code KRB5_CALLCONV
+krb5_enctype_to_istring(krb5_enctype enctype, char *buffer, size_t buflen)
+{
+    int i;
+
+    for (i=0; i<krb5_enctypes_length; i++) {
+	if (krb5_enctypes_list[i].etype == enctype) {
+	    if ((strlen(krb5_enctypes_list[i].in_string)+1) > buflen)
+		return(ENOMEM);
+
+	    strlcpy(buffer, krb5_enctypes_list[i].in_string, buflen);
 	    return(0);
 	}
     }

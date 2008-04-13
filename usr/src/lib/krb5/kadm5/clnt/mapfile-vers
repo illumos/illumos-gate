@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,6 +66,7 @@ SUNWprivate_1.1 {
 	kadm5_get_config_params;
 	kadm5_get_cpw_host_srv_name;
 	kadm5_get_kiprop_host_srv_name;
+	kadm5_get_master;
 	kadm5_get_policies;
 	kadm5_get_policy;
 	kadm5_get_principal;
@@ -77,6 +78,7 @@ SUNWprivate_1.1 {
 	kadm5_init_with_creds;
 	kadm5_init_with_password;
 	kadm5_init_with_skey;
+	kadm5_is_master;
 	kadm5_lock;
 	kadm5_modify_policy;
 	kadm5_modify_principal;

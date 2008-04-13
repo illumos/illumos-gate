@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -73,11 +73,13 @@ SUNWprivate_1.1 {
 	kadm5_get_principal;
 	kadm5_get_principals;
 	kadm5_get_privs;
+	kadm5_init2;
 	kadm5_init;
 	kadm5_init_iprop;
 	kadm5_init_krb5_context;
 	kadm5_init_with_creds;
 	kadm5_init_with_password;
+	kadm5_is_master;
 	kadm5_lock;
 	kadm5_modify_policy;
 	kadm5_modify_policy_internal;
@@ -91,7 +93,8 @@ SUNWprivate_1.1 {
 	kadm5int_acl_check;
 	kadm5int_acl_finish;
 	kadm5int_acl_impose_restrictions;
-	kadm5int_acl_init;kadm5_init_with_skey;
+	kadm5int_acl_init;
+	kadm5_init_with_skey;
 	kdb_delete_entry;
 	kdb_free_entry;
 	kdb_get_entry;
@@ -113,9 +116,14 @@ SUNWprivate_1.1 {
 	krb5_input_flag_to_string;
 	krb5_keysalt_is_present;
 	krb5_keysalt_iterate;
+	krb5_klog_add_stderr;
 	krb5_klog_close;
 	krb5_klog_init;
+	krb5_klog_list_logs;
+	krb5_klog_logging_to_stderr;
+	krb5_klog_remove_stderr;
 	krb5_klog_reopen;
+	krb5_klog_set_context;
 	krb5_klog_syslog;
 	krb5_read_realm_params;
 	krb5_string_to_flags;

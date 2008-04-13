@@ -631,6 +631,8 @@ krb5_db_open(krb5_context kcontext, char **db_args, int mode)
     dal_handle = (kdb5_dal_handle *) kcontext->db_context;
     status = kdb_lock_lib_lock(dal_handle->lib_handle, FALSE);
     if (status) {
+	/* Solaris Kerberos */
+	kdb_free_lib_handle(kcontext);
 	goto clean_n_exit;
     }
 
@@ -640,6 +642,10 @@ krb5_db_open(krb5_context kcontext, char **db_args, int mode)
     get_errmsg(kcontext, status);
 
     kdb_unlock_lib_lock(dal_handle->lib_handle, FALSE);
+
+    /* Solaris Kerberos */
+    if (status)
+	kdb_free_lib_handle(kcontext);
 
   clean_n_exit:
     if (section)

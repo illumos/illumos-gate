@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -517,6 +517,8 @@ prepend_err_str (krb5_context ctx, const char *str, krb5_error_code err,
     if (oerr == 0) oerr = err;
     omsg = krb5_get_error_message (ctx, err);
     krb5_set_error_message (ctx, err, "%s %s", str, omsg);
+    /* Solaris Kerberos: Memleak */
+    krb5_free_error_message(ctx, omsg);
 }
 
 extern krb5int_access accessor;

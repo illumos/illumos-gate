@@ -90,6 +90,14 @@ krb5_error_code krb5_db2_db_lock(krb5_context, int);
 
 static krb5_error_code krb5_db2_db_set_hashfirst(krb5_context, int);
 
+/*
+ * Solaris Kerberos
+ * Extra error handling
+ */
+char errbuf[1024];
+static void krb5_db2_prepend_err_str(krb5_context , const char *,
+    krb5_error_code, krb5_error_code);
+
 static char default_db_name[] = DEFAULT_KDB_FILE;
 
 /*
@@ -340,6 +348,11 @@ krb5_db2_db_init(krb5_context context)
     if ((db_ctx->db_lf_file = open(filename, O_RDWR, 0666)) < 0) {
 	if ((db_ctx->db_lf_file = open(filename, O_RDONLY, 0666)) < 0) {
 	    retval = errno;
+
+	    /* Solaris Kerberos: Better error logging */
+  	    (void) snprintf(errbuf, sizeof(errbuf), gettext("Failed to open \"%s\": "), filename);
+	    krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+
 	    goto err_out;
 	}
     }
@@ -355,6 +368,12 @@ krb5_db2_db_init(krb5_context context)
     if ((retval = osa_adb_init_db(&db_ctx->policy_db, policy_db_name,
 				  policy_lock_name, OSA_ADB_POLICY_DB_MAGIC)))
     {
+	/* Solaris Kerberos: Better error logging */
+	snprintf(errbuf, sizeof(errbuf),
+	    gettext("Failed to initialize db, \"%s\", lockfile, \"%s\" : "),
+	    policy_db_name, policy_lock_name);
+	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+
 	goto err_out;
     }
     return 0;
@@ -547,13 +566,30 @@ krb5_db2_db_end_update(krb5_context context)
 	    if (utime(db_ctx->db_lf_name, (struct utimbuf *) NULL))
 		retval = errno;
 	}
-    } else
+	if (retval) {
+	    /* Solaris Kerberos: Better error logging */
+	    snprintf(errbuf, sizeof(errbuf), gettext("Failed to modify "
+	        "access and modification times for \"%s\": "),
+	        db_ctx->db_lf_file);
+	    krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+	}
+    } else {
 	retval = errno;
+	/* Solaris Kerberos: Better error logging */
+	snprintf(errbuf, sizeof(errbuf), gettext("Failed to stat \"%s\": "),
+	    db_ctx->db_lf_file);
+	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+    }
     if (!retval) {
 	if (fstat(db_ctx->db_lf_file, &st) == 0)
 	    db_ctx->db_lf_time = st.st_mtime;
-	else
+	else {
 	    retval = errno;
+	    /* Solaris Kerberos: Better error logging */
+	    snprintf(errbuf, sizeof(errbuf), gettext("Failed to stat \"%s\": "),
+	        db_ctx->db_lf_file);
+	    krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+	}
     }
     return (retval);
 }
@@ -606,12 +642,29 @@ krb5_db2_db_lock(krb5_context context, int in_mode)
 	if (retval == 0) {
 	    gotlock++;
 	    break;
-	} else if (retval == EBADF && mode == KRB5_DB_LOCKMODE_EXCLUSIVE)
+	} else if (retval == EBADF && mode == KRB5_DB_LOCKMODE_EXCLUSIVE) {
 	    /* tried to exclusive-lock something we don't have */
 	    /* write access to */
+	    
+	    /* Solaris Kerberos: Better error logging */
+	    snprintf(errbuf, sizeof(errbuf),
+	        gettext("Failed to exclusively lock \"%s\": "),
+	        db_ctx->db_lf_file);
+	    krb5_db2_prepend_err_str(context, errbuf, EBADF, EBADF);
+
 	    return KRB5_KDB_CANTLOCK_DB;
+	}
 	sleep(1);
     }
+
+    if (retval) {
+	/* Solaris Kerberos: Better error logging */
+	snprintf(errbuf, sizeof(errbuf),
+	    gettext("Failed to lock \"%s\": "),
+	    db_ctx->db_lf_file);
+	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+    }
+
     if (retval == EACCES)
 	return KRB5_KDB_CANTLOCK_DB;
     else if (retval == EAGAIN || retval == EWOULDBLOCK)
@@ -629,6 +682,13 @@ krb5_db2_db_lock(krb5_context context, int in_mode)
 	db_ctx->db = db;
     } else {
 	retval = errno;
+
+	/* Solaris Kerberos: Better error logging */
+	snprintf(errbuf, sizeof(errbuf),
+	    gettext("Failed to open db \"%s\": "),
+	    db_ctx->db_name);
+	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+
 	db_ctx->db = NULL;
 	goto lock_error;
     }
@@ -716,8 +776,13 @@ krb5_db2_db_create(krb5_context context, char *db_name, krb5_int32 flags)
 	return KRB5_KDB_BAD_CREATEFLAGS;
     }
     db = k5db2_dbopen(db_ctx, db_name, O_RDWR | O_CREAT | O_EXCL, 0600, db_ctx->tempdb);
-    if (db == NULL)
+    if (db == NULL) {
 	retval = errno;
+
+	/* Solaris Kerberos: Better error logging */
+  	snprintf(errbuf, sizeof(errbuf), gettext("Failed to open \"%s\": "), db_name);
+	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+    }
     else
 	(*db->close) (db);
     if (retval == 0) {
@@ -730,8 +795,12 @@ krb5_db2_db_create(krb5_context context, char *db_name, krb5_int32 flags)
 	    retval = ENOMEM;
 	else {
 	    fd = open(okname, O_CREAT | O_RDWR | O_TRUNC, 0600);
-	    if (fd < 0)
+	    if (fd < 0) {
 		retval = errno;
+		/* Solaris Kerberos: Better error logging */
+		snprintf(errbuf, sizeof(errbuf), gettext("Failed to open \"%s\": "), okname);
+		krb5_db2_prepend_err_str(context, errbuf, retval, retval);
+	    }
 	    else
 		close(fd);
 	    free_dbsuffix(okname);
@@ -1423,6 +1492,10 @@ krb5_db2_open(krb5_context kcontext,
 	status = krb5_db2_db_set_name(kcontext, dbname, tempdb);
 	free(dbname);
 	if (status) {
+	    /* Solaris Kerberos: Better error logging */
+	    snprintf(errbuf, sizeof(errbuf), gettext("Failed to set db2 name to \"%s\": "), dbname);
+	    krb5_db2_prepend_err_str(kcontext, errbuf, status, status);
+
 	    goto clean_n_exit;
 	}
 	db_name_set = 1;
@@ -1435,21 +1508,39 @@ krb5_db2_open(krb5_context kcontext,
 	if (value == NULL) {
 	    /* special case for db2. We might actually be looking at old type config file where database is specified as part of realm */
 	    status = profile_get_string(KRB5_DB_GET_PROFILE(kcontext), KDB_REALM_SECTION, KRB5_DB_GET_REALM(kcontext), KDB_DB2_DATABASE_NAME,	/* under given realm */
-					default_db_name, &value);
+	        default_db_name, &value);
+
 	    if (status) {
+		/* Solaris Kerberos: Better error logging */
+		snprintf(errbuf, sizeof(errbuf), gettext("Failed when searching for "
+		    "\"%s\", \"%s\", \"%s\" in profile: "), KDB_REALM_SECTION,
+		    KRB5_DB_GET_REALM(kcontext), KDB_DB2_DATABASE_NAME);
+		krb5_db2_prepend_err_str(kcontext, errbuf, status, status);
+
 		goto clean_n_exit;
 	    }
 	}
 
 	status = krb5_db2_db_set_name(kcontext, value, tempdb);
-	profile_release_string(value);
+
 	if (status) {
+
+	    /* Solaris Kerberos: Better error logging */
+	    snprintf(errbuf, sizeof(errbuf), gettext("Failed to set db2 name to \"%s\": "), value);
+	    krb5_db2_prepend_err_str(kcontext, errbuf, status, status);
+	    profile_release_string(value);
 	    goto clean_n_exit;
 	}
+	profile_release_string(value);
 
     }
 
     status = krb5_db2_db_init(kcontext);
+    if (status) {
+        /* Solaris Kerberos: Better error logging */
+        snprintf(errbuf, sizeof(errbuf), gettext("Failed to initialize db2 db: "));
+        krb5_db2_prepend_err_str(kcontext, errbuf, status, status);
+    }
 
   clean_n_exit:
     return status;
@@ -1813,7 +1904,7 @@ krb5_db2_db_rename(context, from, to)
     krb5_error_code retval;
     krb5_db2_context *s_context, *db_ctx;
     kdb5_dal_handle *dal_handle = context->db_context;
-
+    
     s_context = dal_handle->db_context;
     dal_handle->db_context = NULL;
     if ((retval = k5db2_init_context(context)))
@@ -1919,3 +2010,32 @@ errout:
 
     return retval;
 }
+
+const char *
+krb5_db2_errcode_2_string(krb5_context kcontext, long err_code)
+{
+    return krb5_get_error_message(kcontext, err_code);
+}
+
+void
+krb5_db2_release_errcode_string(krb5_context kcontext, const char *msg)
+{
+    krb5_free_error_message(kcontext, msg);
+}
+
+
+/*
+ * Solaris Kerberos:
+ * Similar to the ldap plugin.
+ */
+static void
+krb5_db2_prepend_err_str(krb5_context ctx, const char *str, krb5_error_code err,
+    krb5_error_code oerr) {
+	const char *omsg;
+	if (oerr == 0)
+		oerr = err;
+	omsg = krb5_get_error_message (ctx, err);
+	krb5_set_error_message (ctx, err, "%s %s", str, omsg);
+	krb5_free_error_message(ctx, omsg);
+}
+

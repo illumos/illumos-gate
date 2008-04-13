@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,7 +7,6 @@
 
 PROG= kadmind
 MANIFEST=	kadmin.xml
-SVCMETHOD=	svc-kdc.master
 
 OBJS	= kadm_rpc_svc.o server_stubs.o ovsec_kadmd.o misc.o server_glue_v1.o \
           ipropd_svc.o

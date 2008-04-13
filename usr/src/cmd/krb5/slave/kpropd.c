@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * 
  * All rights reserved.
@@ -90,6 +90,9 @@
 #include "iprop.h"
 #include <kadm5/admin.h>
 #include <kdb/kdb_log.h>
+
+/* Solaris Kerberos */
+#include <libgen.h>
 
 #define SYSLOG_CLASS LOG_DAEMON
 
@@ -200,6 +203,7 @@ main(argc, argv)
 	int ret = 0;
 	kdb_log_context	*log_ctx;
 	int iprop_supported;
+	krb5_boolean is_master = FALSE;
 
 	PRS(argc, argv);
 
@@ -212,26 +216,85 @@ main(argc, argv)
 		retval = krb5_db_supports_iprop(kpropd_context,
 		    &iprop_supported);
 		if (retval) {
+			/* Solaris Kerberos: Keep error messages consistent */
 			com_err(progname, retval,
-				gettext("Can not determine if dbmodule plugin "
-					    "supports iprop.\n"));
+				gettext("while determining if dbmodule plugin "
+					    "supports iprop"));
 			exit(1);
 		}
 		if (!iprop_supported) {
-			com_err(progname, retval,
+			/* Solaris Kerberos: Keep error messages consistent */
+			com_err(progname, 0,
 				gettext("Current dbmodule plugin does not support "
-				    "iprop.\n"));
+				    "iprop"));
+			exit(1);
+		}
+
+		/*
+		 * Solaris Kerberos:
+		 * Ensure that kpropd is only run on a slave
+		 */
+		if (retval = kadm5_is_master(kpropd_context, def_realm,
+		    &is_master)) {
+			com_err(progname, retval,
+			    gettext("while trying to determine whether host is "
+			    "master KDC for realm %s"), def_realm);
+			exit(1);
+		}
+
+		if (is_master == TRUE) {
+			char *master = NULL;
+			kadm5_get_master(kpropd_context, def_realm, &master);
+
+			com_err(progname, 0,
+			    gettext("%s is the master KDC for the realm %s. "
+			    "%s can only be run on a slave KDC"),
+			    master ? master : "unknown", def_realm, progname);
 			exit(1);
 		}
 
 		retval = do_iprop(log_ctx);
 		if (retval) {
+			/* Solaris Kerberos: Keep error messages consistent */
 			com_err(progname, retval,
-					gettext("do_iprop failed.\n"));
+			    gettext("while doing iprop"));
 			exit(1);
 		}
 
 	} else {
+
+		/*
+		 * Solaris Kerberos:
+		 * Ensure that the kpropd.acl file exists and contains at least
+		 * 1 entry.
+		 */
+		FILE *tmp_acl_file;
+		int seen_file = 0;
+		char buf[1024];
+
+		tmp_acl_file = fopen(acl_file_name, "r");
+		if (!tmp_acl_file) {
+			com_err(progname, errno,
+			    gettext("while opening acl file %s"),
+			    acl_file_name);
+			exit(1);
+		}
+
+		while (!feof(tmp_acl_file) && !seen_file ) {
+			if (!fgets(buf, sizeof(buf), tmp_acl_file))
+				break;
+
+			if (buf[0] != '#' && !isspace(buf[0]))
+				seen_file = 1;
+		}
+		if (!seen_file) {
+			com_err(progname, 0,
+			    gettext("No entries found in %s. Can't "
+			    "authorize propagation requests"), acl_file_name);
+			exit(1);
+		}
+		fclose(tmp_acl_file);
+
 		if (standalone)
 			ret = do_standalone(IPROP_NULL);
 		else
@@ -278,13 +341,13 @@ int do_standalone(iprop_role iproprole)
 	    if (setsockopt(finet, SOL_SOCKET, SO_REUSEADDR,
 			(char *)&on, sizeof(on)) < 0)
 		    com_err(progname, errno,
-			    gettext("in setsockopt(SO_REUSEADDR)"));
+			    gettext("while setting socket option (SO_REUSEADDR)"));
 	    linger.l_onoff = 1;
 	    linger.l_linger = 2;
 	    if (setsockopt(finet, SOL_SOCKET, SO_LINGER,
 			(void *)&linger, sizeof(linger)) < 0)
 		    com_err(progname, errno,
-			    gettext("in setsockopt(SO_LINGER)"));
+			    gettext("while setting socket option (SO_LINGER)"));
     }
     if ((ret = bind(finet, (struct sockaddr *)&sin6, sizeof(sin6))) < 0) {
 	if (debug) {
@@ -295,20 +358,36 @@ int do_standalone(iprop_role iproprole)
 	    if (setsockopt(finet, SOL_SOCKET, SO_REUSEADDR,
 			(char *)&on, sizeof(on)) < 0) {
 		com_err(progname, errno, 
-			gettext("in setsockopt(SO_REUSEADDR)"));
+			gettext("while setting socket option (SO_REUSEADDR)"));
 	    }
 	    ret = bind(finet, (struct sockaddr *) &sin6, sizeof(sin6));
 	    }
 
 	    if (ret < 0) {
+	/*
+	 * Solaris Kerberos:
+	 * com_err will print the err msg associated with errno
+	 */
+#if 0
 		perror(gettext("bind"));
+#endif
 		com_err(progname, errno, 
 		    gettext("while binding listener socket"));
 		exit(1);
 	    }
 	}
-	if (!debug && (iproprole != IPROP_SLAVE))
-		daemon(1, 0);	    
+	if (!debug && (iproprole != IPROP_SLAVE)) {
+	/* Solaris Kerberos: Indicate where further messages will be sent */
+		fprintf(stderr,
+		    gettext("%s: Logging to SYSLOG with LOG_DAEMON facility\n"),
+		    progname);
+		if (daemon(1, 0)) {
+			com_err(progname, errno, gettext("while daemonizing"));
+			exit(1);
+		}
+		rem_default_com_err_hook();
+	}
+
 #ifdef PID_FILE
 	if ((pidfile = fopen(PID_FILE, "w")) != NULL) {
 		fprintf(pidfile, gettext("%d\n"), getpid());
@@ -319,7 +398,8 @@ int do_standalone(iprop_role iproprole)
 		PID_FILE);
 #endif
 	if (listen(finet, 5) < 0) {
-		com_err(progname, errno, gettext("in listen call"));
+		/* Solaris Kerberos: Keep error messages consistent */
+		com_err(progname, errno, gettext("while listening on socket"));
 		exit(1);
 	}
 	while (1) {
@@ -328,9 +408,11 @@ int do_standalone(iprop_role iproprole)
 		s = accept(finet, (struct sockaddr *) &sin6, &sin6_size);
 
 		if (s < 0) {
-			if (errno != EINTR)
+			if (errno != EINTR) {
+				/* Solaris Kerberos: Keep error messages consistent */
 				com_err(progname, errno,
-		    gettext("from accept system call")); 
+		    gettext("while accepting connection")); 
+			}
 			continue;
 		}
 		if (debug && (iproprole != IPROP_SLAVE))
@@ -475,8 +557,9 @@ void doit(fd)
 
 		retval = krb5_unparse_name(doit_context, client, &name);
 		if (retval) {
+			/* Solaris Kerberos: Keep error messages consistent */
 			com_err(progname, retval,
-		    gettext("While unparsing client name"));
+		    gettext("while unparsing client name"));
 			exit(1);
 		}
 		syslog(LOG_WARNING,
@@ -505,8 +588,9 @@ void doit(fd)
 	}
 	recv_database(doit_context, fd, database_fd, &confmsg);
 	if (rename(temp_file_name, file)) {
+		/* Solaris Kerberos: Keep error messages consistent */
 		com_err(progname, errno, 
-			gettext("While renaming %s to %s"),
+			gettext("while renaming %s to %s"),
 			temp_file_name, file);
 		exit(1);
 	}
@@ -577,9 +661,19 @@ krb5_error_code do_iprop(kdb_log_context *log_ctx) {
 	kadm5_iprop_handle_t handle;
 	kdb_hlog_t *ulog;
 
+	krb5_keytab kt;
+	krb5_keytab_entry entry;
+	char kt_name[MAX_KEYTAB_NAME_LEN];
+
+	/*
+	 * Solaris Kerberos:
+	 * Delay daemonizing until some basic configuration checks have been
+	 * performed
+	 */
+#if 0
 	if (!debug)
 		daemon(0, 0);
-
+#endif
 	pollin = (unsigned int)0;
 	(void) memset((char *)&params, 0, sizeof (params));
 	ulog = log_ctx->ulog;
@@ -590,10 +684,10 @@ krb5_error_code do_iprop(kdb_log_context *log_ctx) {
 	if (master_svc_princstr == NULL) {
 		if (retval = kadm5_get_kiprop_host_srv_name(kpropd_context,
 					def_realm, &master_svc_princstr)) {
+			/* Solaris Kerberos: keep error messages consistent */
 			com_err(progname, retval,
-				gettext("%s: unable to get kiprop host based "
-					"service name for realm %s\n"),
-					progname, def_realm);
+				gettext("while getting kiprop host based "
+					"service name for realm %s"), def_realm);
 			exit(1);
 		}
 	}
@@ -624,7 +718,47 @@ krb5_error_code do_iprop(kdb_log_context *log_ctx) {
 		krb5_free_principal(kpropd_context, iprop_svc_principal);
 		exit(1);
 	}
+
+	/*
+	 * Solaris Kerberos:
+	 * Check to see if kiprop/<fqdn>@REALM is in the keytab
+	 */
+	kt_name[0] = '\0';
+	if (retval = krb5_kt_default_name(kpropd_context, kt_name,
+	    MAX_KEYTAB_NAME_LEN)){
+		com_err(progname, retval, gettext ("while resolving the "
+		    "name of the default keytab"));
+	}
+
+	if (retval = krb5_kt_default(kpropd_context, &kt)) {
+		com_err(progname, retval, gettext ("while resolving default "
+		    "keytab"));
+		krb5_free_principal(kpropd_context, iprop_svc_principal);
+		exit(1);
+	} 
+
+	if (retval = krb5_kt_get_entry(kpropd_context, kt, iprop_svc_principal,
+	    0, 0, &entry)) {
+		com_err(progname, retval, gettext("while retrieving entry %s "
+		    "from %s"), iprop_svc_princstr,
+		    kt_name[0] ? kt_name : "default keytab");
+		krb5_kt_close(kpropd_context,kt);
+		krb5_free_principal(kpropd_context, iprop_svc_principal);
+		exit(1);
+	}
+
+	krb5_kt_close(kpropd_context,kt);
 	krb5_free_principal(kpropd_context, iprop_svc_principal);
+
+	if (!debug) {
+	/* Solaris Kerberos: Indicate where further messages will be sent */
+		fprintf(stderr, gettext("%s: Logging to SYSLOG\n"), progname);
+		if (daemon(0, 0)) {
+			com_err(progname, errno, gettext("while daemonizing"));
+			exit(1);
+		}
+		rem_default_com_err_hook();
+	}
 
 reinit:
 	/*
@@ -653,9 +787,10 @@ reinit:
 			(void) sleep(backoff_time);
 			goto reinit;
 		} else {
+			/* Solaris Kerberos: Be more verbose */
 			com_err(progname, retval,
-                                gettext("while initializing %s interface"),
-				progname);
+                                gettext("while initializing %s interface for "
+				    "%s"), progname, iprop_svc_princstr);
 			if (retval == KADM5_BAD_CLIENT_PARAMS ||
 			    retval == KADM5_BAD_SERVER_PARAMS)
 				usage();
@@ -679,8 +814,9 @@ reinit:
 	 */
 	if (poll_time == NULL) {
 		if ((poll_time = (char *)strdup("2m")) == NULL) {
+			/* Solaris Kerberos: Keep error messages consistent */
 			com_err(progname, ENOMEM,
-				gettext("Unable to allocate poll_time"));
+				gettext("while allocating poll_time"));
 			exit(1);
 		}
 	}
@@ -1006,7 +1142,10 @@ void PRS(argc,argv)
 			gettext("while initializing krb5"));
 		exit(1);
 	}
-	progname = argv[0];
+
+	/* Solaris Kerberos: Sanitize progname */
+	progname = basename(argv[0]);
+
 	while ((c = getopt(argc, argv, "dtf:F:p:P:r:s:Sa:")) != EOF){
 		switch (c) {
 		case 'd':
@@ -1073,7 +1212,12 @@ void PRS(argc,argv)
 	 */
 	if (! debug) {
 	    openlog("kpropd", LOG_PID | LOG_ODELAY, SYSLOG_CLASS);
-	    set_com_err_hook(kpropd_com_err_proc);
+	    /*
+	     * Solaris Kerberos:
+	     * Don't replace default logging. Add a new logging channel.
+	     * Stop logging to stderr when daemonizing
+	     */
+	    add_com_err_hook(kpropd_com_err_proc);
 	}
 	/*
 	 * Get my hostname, so we can construct my service name
@@ -1082,8 +1226,9 @@ void PRS(argc,argv)
 					 NULL, KPROP_SERVICE_NAME,
 					 KRB5_NT_SRV_HST, &server);
 	if (retval) {
+		/* Solaris Kerberos: Keep error messages consistent */
 		com_err(progname, retval,
-			gettext("While trying to construct my service name"));
+			gettext("while trying to construct my service name"));
 		exit(1);
 	}
 	if (realm) {
@@ -1117,8 +1262,9 @@ void PRS(argc,argv)
 		poll_time = params.iprop_polltime;
 
 		if (ulog_map(kpropd_context, &params, FKPROPD)) { 
+		/* Solaris Kerberos: Keep error messages consistent */
  			com_err(progname, errno,
-			    gettext("Unable to map log!\n")); 
+			    gettext("while mapping log")); 
 			exit(1); 
 		} 
 	}
@@ -1129,8 +1275,9 @@ void PRS(argc,argv)
 	if (def_realm == NULL) {
 		retval = krb5_get_default_realm(kpropd_context, &def_realm);
 		if (retval) {
+			/* Solaris Kerberos: Keep error messages consistent */
 			com_err(progname, retval,
-				gettext("Unable to get default realm"));
+				gettext("while retrieving default realm"));
 			exit(1);
 		}
 	}
@@ -1180,7 +1327,8 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
 
 	retval = krb5_unparse_name(context, server, &name);
 	if (retval) {
-	    com_err(progname, retval, gettext("While unparsing server name"));
+	    /* Solaris Kerberos: Keep error messages consistent */
+	    com_err(progname, retval, gettext("while unparsing server name"));
 	    exit(1);
 	}
 	printf(gettext("krb5_recvauth(%d, %s, %s, ...)\n"), fd, kprop_version,
@@ -1241,14 +1389,16 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
 
 	retval = krb5_unparse_name(context, *clientp, &name);
 	if (retval) {
+	    /* Solaris Kerberos: Keep error messages consistent */
 	    com_err(progname, retval, 
-		gettext("While unparsing client name"));
+		gettext("while unparsing client name"));
 	    exit(1);
 	}
 
 	retval = krb5_enctype_to_string(*etype, etypebuf, sizeof(etypebuf));
 	if (retval) {
-	    com_err(progname, retval, gettext("While unparsing ticket etype"));
+	    /* Solaris Kerberos: Keep error messages consistent */
+	    com_err(progname, retval, gettext("while unparsing ticket etype"));
 	    exit(1);
 	}
 

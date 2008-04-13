@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,13 +53,15 @@ krb5_validate_ldap_context(krb5_context context, krb5_ldap_context *ldap_context
 
     if (ldap_context->bind_dn == NULL) {
 	st = EINVAL;
-	krb5_set_error_message(context, st, gettext("LDAP bind dn value missing "));
+	/* Solaris Kerberos: Keep error messages consistent */
+	krb5_set_error_message(context, st, gettext("LDAP bind dn value missing"));
 	goto err_out;
     }
 
     if (ldap_context->bind_pwd == NULL && ldap_context->service_password_file == NULL) {
 	st = EINVAL;
-	krb5_set_error_message(context, st, gettext("LDAP bind password value missing "));
+	/* Solaris Kerberos: Keep error messages consistent */
+	krb5_set_error_message(context, st, gettext("LDAP bind password value missing"));
 	goto err_out;
     }
 
@@ -248,9 +250,11 @@ krb5_ldap_initialize(ldap_context, server_info)
 	krb5_update_ldap_handle(ldap_server_handle, server_info);
     } else {
 	if (ldap_context->kcontext)
+	    /* Solaris Kerberos: Better error message */
 	    krb5_set_error_message (ldap_context->kcontext,
-				    KRB5_KDB_ACCESS_ERROR, "%s",
-				    ldap_err2string(st));
+				    KRB5_KDB_ACCESS_ERROR,
+				    gettext("Failed to bind to ldap server \"%s\": %s"),
+				    server_info->server_name, ldap_err2string(st));
 	st = KRB5_KDB_ACCESS_ERROR;
 	server_info->server_status = OFF;
 	time(&server_info->downtime);

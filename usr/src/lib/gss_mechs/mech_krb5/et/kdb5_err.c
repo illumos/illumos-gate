@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,25 @@ switch (errorno) {
 		return(dgettext(TEXT_DOMAIN, "Update log is corrupt"));
 	case 32: /* KRB5_LOG_ERROR */
 		return(dgettext(TEXT_DOMAIN, "Generic update log error"));
+	case 33: /* KRB5_KDB_DBTYPE_NOTFOUND */
+		return(dgettext(TEXT_DOMAIN,
+		    "Unable to find requested database type"));
+	case 34: /* KRB5_KDB_DBTYPE_NOSUP */
+		return(dgettext(TEXT_DOMAIN, "Database type not supported"));
+	case 35: /* KRB5_KDB_DBTYPE_INIT */
+		return(dgettext(TEXT_DOMAIN,
+		    "Database library failed to initialize"));
+	case 36: /* KRB5_KDB_SERVER_INTERNAL_ERR */
+		return(dgettext(TEXT_DOMAIN, "Server error"));
+	case 37: /* KRB5_KDB_ACCESS_ERROR */
+		return(dgettext(TEXT_DOMAIN,
+		    "Unable to access Kerberos database"));
+	case 38: /* KRB5_KDB_INTERNAL_ERROR */
+		return(dgettext(TEXT_DOMAIN,
+		    "Kerberos database internal error"));
+	case 39: /* KRB5_KDB_CONSTRAINT_VIOLATION */
+		return(dgettext(TEXT_DOMAIN,
+		    "Kerberos database constraints violated"));
 	default:
 		return("unknown error");
 	}

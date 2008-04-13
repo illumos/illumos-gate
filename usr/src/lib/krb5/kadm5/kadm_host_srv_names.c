@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,8 @@ kadm5_get_master(krb5_context context, const char *realm, char **master)
 		krb5_get_default_realm(context, &def_realm);
 
 	(void) profile_get_string(context->profile, "realms",
-				realm ? realm : def_realm,
-				KADM5_MASTER, 0, master);
+	    realm ? realm : def_realm,
+	    KADM5_MASTER, 0, master);
 
 	if ((*master != NULL) && ((delim = strchr(*master, ':')) != NULL))
 		*delim = '\0';
@@ -54,8 +54,8 @@ kadm5_get_master(krb5_context context, const char *realm, char **master)
 		dns_realm.magic = 0;
 
 		dns_ret = krb5_get_servername(context, &dns_realm,
-				"_kerberos-adm", "_udp",
-				dns_host, &dns_portno);
+		    "_kerberos-adm", "_udp",
+		    dns_host, &dns_portno);
 		if (dns_ret == 0)
 			*master = strdup(dns_host);
 
@@ -148,6 +148,54 @@ kadm5_ret_t kadm5_get_kiprop_host_srv_name(krb5_context context,
 	sprintf(name, "%s@%s", KADM5_KIPROP_HOST_SERVICE, host);
 	free(host);
 	*host_service_name = name;
+
+	return (KADM5_OK);
+}
+
+/*
+ * Solaris Kerberos:
+ * Try to determine if this is the master KDC for a given realm
+ */
+kadm5_ret_t kadm5_is_master(krb5_context context, const char *realm,
+    krb5_boolean *is_master) {
+
+	kadm5_ret_t ret;
+	char *admin_host = NULL;
+	krb5_address **master_addr = NULL;
+	krb5_address **local_addr = NULL;
+
+	if (is_master)
+		*is_master = FALSE;
+	else
+		return (KADM5_FAILURE);
+
+	/* Locate the master KDC */
+	if (ret = kadm5_get_master(context, realm, &admin_host))
+		return (ret);
+
+	if (ret = krb5_os_hostaddr(context, admin_host, &master_addr)) {
+		free(admin_host);
+		return (ret);
+	}
+
+	/* Get the local addresses */
+	if (ret = krb5_os_localaddr(context, &local_addr)) {
+		krb5_free_addresses(context, master_addr);
+		free(admin_host);
+		return (ret);
+	}
+
+	/* Compare them */
+	for (; *master_addr; master_addr++) {
+		if (krb5_address_search(context, *master_addr, local_addr)) {
+			*is_master = TRUE;
+			break;
+		}
+	}
+
+	krb5_free_addresses(context, local_addr);
+	krb5_free_addresses(context, master_addr);
+	free(admin_host);
 
 	return (KADM5_OK);
 }
