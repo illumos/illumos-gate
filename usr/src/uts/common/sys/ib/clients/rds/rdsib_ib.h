@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -196,6 +196,8 @@ int rds_bind_service(struct rds_state_s *statep);
 void rds_recvcq_handler(ibt_cq_hdl_t cq, void *);
 rds_hca_t *rds_gid_to_hcap(rds_state_t *statep, ib_gid_t gid);
 rds_hca_t *rds_get_hcap(rds_state_t *statep, ib_guid_t guid);
+int rdsib_initialize_ib();
+void rdsib_deinitialize_ib();
 
 /* defined in rds_debug.c */
 void rds_logging_initialization();

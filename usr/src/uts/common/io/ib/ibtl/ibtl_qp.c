@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -418,7 +418,8 @@ ibt_flush_qp(ibt_qp_hdl_t ibt_qp)
 
 	if (ibt_qp->ch_qp.qp_type == IBT_RC_SRV) {
 		mutex_enter(&ibtl_free_qp_mutex);
-		if (ibt_qp->ch_transport.rc.rc_free_flags &
+		if ((ibt_qp->ch_transport.rc.rc_free_flags &
+		    (IBTL_RC_QP_CONNECTED | IBTL_RC_QP_CLOSING)) ==
 		    IBTL_RC_QP_CONNECTED) {
 			mutex_exit(&ibtl_free_qp_mutex);
 			IBTF_DPRINTF_L2(ibtf_qp, "ibt_flush_qp(%p): "

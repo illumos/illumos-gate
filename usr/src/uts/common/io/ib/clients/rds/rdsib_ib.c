@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -172,38 +172,40 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 }
 
 /*
- * Called on open of first RDS socket
+ * Called from attach
  */
 int
-rdsib_open_ib()
+rdsib_initialize_ib()
 {
 	ib_guid_t	*guidp;
 	rds_hca_t	*hcap, *hcap1;
 	uint_t		ix, hcaix, nhcas;
 	int		ret;
 
-	RDS_DPRINTF4("rdsib_open_ib", "enter: statep %p", rdsib_statep);
+	RDS_DPRINTF2("rdsib_initialize_ib", "enter: statep %p", rdsib_statep);
 
 	ASSERT(rdsib_statep != NULL);
 	if (rdsib_statep == NULL) {
-		RDS_DPRINTF1("rdsib_open_ib", "RDS Statep not initialized");
+		RDS_DPRINTF1("rdsib_initialize_ib",
+		    "RDS Statep not initialized");
 		return (-1);
 	}
 
 	/* How many hcas are there? */
 	nhcas = ibt_get_hca_list(&guidp);
 	if (nhcas == 0) {
-		RDS_DPRINTF2("rdsib_open_ib", "No IB HCAs Available");
+		RDS_DPRINTF2("rdsib_initialize_ib", "No IB HCAs Available");
 		return (-1);
 	}
 
-	RDS_DPRINTF3("rdsib_open_ib", "Number of HCAs: %d", nhcas);
+	RDS_DPRINTF3("rdsib_initialize_ib", "Number of HCAs: %d", nhcas);
 
 	/* Register with IBTF */
 	ret = ibt_attach(&rds_ib_modinfo, rdsib_dev_info, rdsib_statep,
 	    &rdsib_statep->rds_ibhdl);
 	if (ret != IBT_SUCCESS) {
-		RDS_DPRINTF2(LABEL, "ibt_attach failed: %d", ret);
+		RDS_DPRINTF2("rdsib_initialize_ib", "ibt_attach failed: %d",
+		    ret);
 		(void) ibt_free_hca_list(guidp, nhcas);
 		return (-1);
 	}
@@ -223,7 +225,7 @@ rdsib_open_ib()
 		ret = ibt_open_hca(rdsib_statep->rds_ibhdl, guidp[ix],
 		    &hcap->hca_hdl);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_open_ib",
+			RDS_DPRINTF2("rdsib_initialize_ib",
 			    "ibt_open_hca: 0x%llx failed: %d", guidp[ix], ret);
 			kmem_free(hcap, sizeof (rds_hca_t));
 			continue;
@@ -233,7 +235,7 @@ rdsib_open_ib()
 
 		ret = ibt_query_hca(hcap->hca_hdl, &hcap->hca_attr);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_open_ib",
+			RDS_DPRINTF2("rdsib_initialize_ib",
 			    "Query HCA: 0x%llx failed:  %d", guidp[ix], ret);
 			ret = ibt_close_hca(hcap->hca_hdl);
 			ASSERT(ret == IBT_SUCCESS);
@@ -244,7 +246,7 @@ rdsib_open_ib()
 		ret = ibt_query_hca_ports(hcap->hca_hdl, 0,
 		    &hcap->hca_pinfop, &hcap->hca_nports, &hcap->hca_pinfo_sz);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_open_ib",
+			RDS_DPRINTF2("rdsib_initialize_ib",
 			    "Query HCA 0x%llx ports failed: %d", guidp[ix],
 			    ret);
 			ret = ibt_close_hca(hcap->hca_hdl);
@@ -257,8 +259,8 @@ rdsib_open_ib()
 		ret = ibt_alloc_pd(hcap->hca_hdl, IBT_PD_NO_FLAGS,
 		    &hcap->hca_pdhdl);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2(LABEL, "ibt_alloc_pd 0x%llx failed: %d",
-			    guidp[ix], ret);
+			RDS_DPRINTF2("rdsib_initialize_ib",
+			    "ibt_alloc_pd 0x%llx failed: %d", guidp[ix], ret);
 			(void) ibt_free_portinfo(hcap->hca_pinfop,
 			    hcap->hca_pinfo_sz);
 			ret = ibt_close_hca(hcap->hca_hdl);
@@ -280,7 +282,7 @@ rdsib_open_ib()
 
 	if (hcaix == 0) {
 		/* Failed to Initialize even one HCA */
-		RDS_DPRINTF2("rdsib_open_ib", "No HCAs are initialized");
+		RDS_DPRINTF2("rdsib_initialize_ib", "No HCAs are initialized");
 		(void) ibt_detach(rdsib_statep->rds_ibhdl);
 		rdsib_statep->rds_ibhdl = NULL;
 		return (-1);
@@ -294,45 +296,21 @@ rdsib_open_ib()
 	rdsib_statep->rds_hcalistp = hcap1;
 	rdsib_statep->rds_nhcas = hcaix;
 
-	/* register the RDS service */
-	rdsib_statep->rds_srvhdl =
-	    rds_register_service(rdsib_statep->rds_ibhdl);
-	if (rdsib_statep->rds_srvhdl == NULL) {
-		RDS_DPRINTF2("rdsib_open_ib", "Service registration failed");
-	} else {
-		/* bind the service on all available ports */
-		ret = rds_bind_service(rdsib_statep);
-		if (ret != 0) {
-			RDS_DPRINTF2("rdsib_open_ib", "Bind service failed");
-		}
-	}
-
-	RDS_DPRINTF4("rdsib_open_ib", "return: statep %p", rdsib_statep);
+	RDS_DPRINTF2("rdsib_initialize_ib", "return: statep %p", rdsib_statep);
 
 	return (0);
 }
 
 /*
- * Called when all ports are closed.
+ * Called from detach
  */
 void
-rdsib_close_ib()
+rdsib_deinitialize_ib()
 {
 	rds_hca_t	*hcap, *nextp;
 	int		ret;
 
-	RDS_DPRINTF2("rds_close_ib", "enter: statep %p", rdsib_statep);
-
-	if (rdsib_statep->rds_srvhdl != NULL) {
-		(void) ibt_unbind_all_services(rdsib_statep->rds_srvhdl);
-		(void) ibt_deregister_service(rdsib_statep->rds_ibhdl,
-		    rdsib_statep->rds_srvhdl);
-		(void) ibt_release_ip_sid(rdsib_statep->rds_service_id);
-
-		(void) ibt_unbind_all_services(rdsib_statep->rds_old_srvhdl);
-		(void) ibt_deregister_service(rdsib_statep->rds_ibhdl,
-		    rdsib_statep->rds_old_srvhdl);
-	}
+	RDS_DPRINTF2("rdsib_deinitialize_ib", "enter: statep %p", rdsib_statep);
 
 	/* close and destroy all the sessions */
 	rds_close_sessions(NULL);
@@ -365,7 +343,87 @@ rdsib_close_ib()
 		rdsib_statep->rds_ibhdl = NULL;
 	}
 
-	RDS_DPRINTF2("rds_close_ib", "return: statep %p", rdsib_statep);
+	RDS_DPRINTF2("rdsib_deinitialize_ib", "return: statep %p",
+	    rdsib_statep);
+}
+
+/*
+ * Called on open of first RDS socket
+ */
+int
+rdsib_open_ib()
+{
+	int	ret;
+
+	RDS_DPRINTF2("rdsib_open_ib", "enter: statep %p", rdsib_statep);
+
+	/* Enable incoming connection requests */
+	if (rdsib_statep->rds_srvhdl == NULL) {
+		rdsib_statep->rds_srvhdl =
+		    rds_register_service(rdsib_statep->rds_ibhdl);
+		if (rdsib_statep->rds_srvhdl == NULL) {
+			RDS_DPRINTF2("rdsib_open_ib",
+			    "Service registration failed");
+			return (-1);
+		} else {
+			/* bind the service on all available ports */
+			ret = rds_bind_service(rdsib_statep);
+			if (ret != 0) {
+				RDS_DPRINTF2("rdsib_open_ib",
+				    "Bind service failed: %d", ret);
+			}
+		}
+	}
+
+	RDS_DPRINTF2("rdsib_open_ib", "return: statep %p", rdsib_statep);
+
+	return (0);
+}
+
+/*
+ * Called when all ports are closed.
+ */
+void
+rdsib_close_ib()
+{
+	int	ret;
+
+	RDS_DPRINTF2("rdsib_close_ib", "enter: statep %p", rdsib_statep);
+
+	/* Disable incoming connection requests */
+	if (rdsib_statep->rds_srvhdl != NULL) {
+		ret = ibt_unbind_all_services(rdsib_statep->rds_srvhdl);
+		if (ret != 0) {
+			RDS_DPRINTF2("rdsib_close_ib",
+			    "ibt_unbind_all_services failed: %d\n", ret);
+		}
+		ret = ibt_deregister_service(rdsib_statep->rds_ibhdl,
+		    rdsib_statep->rds_srvhdl);
+		if (ret != 0) {
+			RDS_DPRINTF2("rdsib_close_ib",
+			    "ibt_deregister_service failed: %d\n", ret);
+		} else {
+			rdsib_statep->rds_srvhdl = NULL;
+		}
+
+		ret = ibt_unbind_all_services(rdsib_statep->rds_old_srvhdl);
+		if (ret != 0) {
+			RDS_DPRINTF2("rdsib_close_ib",
+			    "ibt_unbind_all_services failed for old service"
+			    ": %d\n", ret);
+		}
+		ret = ibt_deregister_service(rdsib_statep->rds_ibhdl,
+		    rdsib_statep->rds_old_srvhdl);
+		if (ret != 0) {
+			RDS_DPRINTF2("rdsib_close_ib",
+			    "ibt_deregister_service failed for old service:"
+			    "%d\n", ret);
+		} else {
+			rdsib_statep->rds_old_srvhdl = NULL;
+		}
+	}
+
+	RDS_DPRINTF2("rdsib_close_ib", "return: statep %p", rdsib_statep);
 }
 
 /* Return hcap, given the hca guid */
@@ -916,7 +974,8 @@ rds_poll_send_completions(ibt_cq_hdl_t cq, rds_ep_t *ep, boolean_t lock)
 				}
 
 				bp = (rds_buf_t *)(uintptr_t)wc[ix].wc_id;
-				bp->buf_state = RDS_SNDBUF_ERROR;
+				ASSERT(bp->buf_state == RDS_SNDBUF_PENDING);
+				bp->buf_state = RDS_SNDBUF_FREE;
 			} else {
 				RDS_INCR_TXERRS();
 				RDS_DPRINTF2("rds_poll_send_completions",
@@ -948,7 +1007,8 @@ rds_poll_send_completions(ibt_cq_hdl_t cq, rds_ep_t *ep, boolean_t lock)
 				}
 
 				bp = (rds_buf_t *)(uintptr_t)wc[ix].wc_id;
-				bp->buf_state = RDS_SNDBUF_ERROR;
+				ASSERT(bp->buf_state == RDS_SNDBUF_PENDING);
+				bp->buf_state = RDS_SNDBUF_FREE;
 			}
 
 			bp->buf_nextp = NULL;
@@ -1252,6 +1312,13 @@ rds_handle_portup_event(rds_state_t *statep, ibt_hca_hdl_t hdl,
 
 	RDS_DPRINTF2("rds_handle_portup_event",
 	    "Enter: GUID: 0x%llx Statep: %p", event->ev_hca_guid, statep);
+
+	/* If RDS service is not registered then no bind is needed */
+	if (statep->rds_srvhdl == NULL) {
+		RDS_DPRINTF2("rds_handle_portup_event",
+		    "RDS Service is not registered, so no action needed");
+		return;
+	}
 
 	hcap = rds_get_hcap(statep, event->ev_hca_guid);
 	if (hcap == NULL) {

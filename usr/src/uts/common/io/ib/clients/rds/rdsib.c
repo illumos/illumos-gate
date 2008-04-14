@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,7 @@
  * Global Configuration Variables
  * As defined in RDS proposal
  */
-uint_t		MaxNodes 		= RDS_MAX_NODES;
+uint_t		MaxNodes		= RDS_MAX_NODES;
 uint_t		RdsPktSize;
 uint_t		NDataRX;
 uint_t		MaxDataSendBuffers	= RDS_MAX_DATA_SEND_BUFFERS;
@@ -251,7 +251,7 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int	ret;
 
-	RDS_DPRINTF4("rdsib_attach", "enter");
+	RDS_DPRINTF2("rdsib_attach", "enter");
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -293,7 +293,16 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	rds_rx_pkts_pending_hwm = (PendingRxPktsHWM * NDataRX)/100;
 
-	RDS_DPRINTF4("rdsib_attach", "return");
+	ret = rdsib_initialize_ib();
+	if (ret != 0) {
+		cmn_err(CE_CONT, "rdsib_initialize_ib failed: %d", ret);
+		ddi_taskq_destroy(rds_taskq);
+		rds_taskq = NULL;
+		rdsib_dev_info = NULL;
+		return (DDI_FAILURE);
+	}
+
+	RDS_DPRINTF2("rdsib_attach", "return");
 
 	return (DDI_SUCCESS);
 }
@@ -301,10 +310,12 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 rdsib_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	RDS_DPRINTF4("rdsib_detach", "enter");
+	RDS_DPRINTF2("rdsib_detach", "enter");
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
+
+	rdsib_deinitialize_ib();
 
 	ddi_remove_minor_node(dip, "rdsib");
 
@@ -316,7 +327,7 @@ rdsib_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	rdsib_dev_info = NULL;
 
-	RDS_DPRINTF4("rdsib_detach", "return");
+	RDS_DPRINTF2("rdsib_detach", "return");
 
 	return (DDI_SUCCESS);
 }

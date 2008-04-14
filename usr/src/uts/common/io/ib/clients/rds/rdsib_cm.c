@@ -258,7 +258,16 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		sp->session_type = RDS_SESSION_PASSIVE;
 		rw_exit(&sp->session_lock);
 
-		rds_session_close(sp, IBT_NOCALLBACKS, 1);
+		/* Handling this will take some time, so send an MRA */
+		(void) ibt_cm_delay(IBT_CM_DELAY_REQ, evp->cm_session_id,
+		    10000000 /* 10 sec */, NULL, 0);
+
+		/*
+		 * Any pending completions don't get flushed until the channel
+		 * is closed. So, passing 0 here will not wait for pending
+		 * completions in rds_session_close before closing the channel
+		 */
+		rds_session_close(sp, IBT_NOCALLBACKS, 0);
 
 		/* move the session to init state */
 		rw_enter(&sp->session_lock, RW_WRITER);
@@ -509,7 +518,8 @@ rds_handle_cm_conn_closed(ibt_cm_event_t *evp)
 
 	ep = (rds_ep_t *)ibt_get_chan_private(evp->cm_channel);
 	sp = ep->ep_sp;
-	RDS_DPRINTF2("rds_handle_cm_conn_closed", "EP(%p) Enter", ep);
+	RDS_DPRINTF2("rds_handle_cm_conn_closed", "EP(%p) Chan(%p) Enter",
+	    ep, evp->cm_channel);
 
 	mutex_enter(&ep->ep_lock);
 	if (ep->ep_state != RDS_EP_STATE_CONNECTED) {
@@ -855,7 +865,7 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 	ipcm_info.SRCIP = htonl(sp->session_myip);
 	ipcm_info.dst_addr.family = AF_INET;
 	ipcm_info.DSTIP = htonl(sp->session_remip);
-	ipcm_info.src_port = htons(6556); /* based on OFED RDS */
+	ipcm_info.src_port = htons(RDS_PORT_NUM);
 	ret = ibt_format_ip_private_data(&ipcm_info,
 	    sizeof (rds_cm_private_data_t), &cmp);
 	if (ret != IBT_SUCCESS) {

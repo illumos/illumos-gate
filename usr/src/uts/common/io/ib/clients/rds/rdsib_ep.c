@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -517,6 +517,14 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 
 	/* CALLED WITH SESSION WRITE LOCK */
 
+	/* Clear the portmaps */
+	rds_unmark_all_ports(sp, RDS_LOCAL);
+	rds_unmark_all_ports(sp, RDS_REMOTE);
+
+	/* make the last buffer as the acknowledged */
+	*(uintptr_t *)sp->session_dataep.ep_ack_addr =
+	    (uintptr_t)sp->session_dataep.ep_sndpool.pool_tailp;
+
 	hcap = rds_gid_to_hcap(rdsib_statep, lgid);
 	if (hcap == NULL) {
 		RDS_DPRINTF1("rds_session_reinit", "SGID is on an "
@@ -564,10 +572,6 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 	    sp, &sp->session_dataep);
 
 	sp->session_lgid = lgid;
-
-	/* Clear the portmaps */
-	rds_unmark_all_ports(sp, RDS_LOCAL);
-	rds_unmark_all_ports(sp, RDS_REMOTE);
 
 	RDS_DPRINTF2("rds_session_reinit", "Return: SP(0x%p)", sp);
 
@@ -668,7 +672,9 @@ rds_session_close(rds_session_t *sp, ibt_execution_mode_t mode, uint_t wait)
 	RDS_DPRINTF3(LABEL, "EP(%p) State: %d", ep, ep->ep_state);
 
 	/* wait until the SQ is empty before closing */
-	(void) rds_is_sendq_empty(ep, wait);
+	if (wait != 0) {
+		(void) rds_is_sendq_empty(ep, wait);
+	}
 
 	mutex_enter(&ep->ep_lock);
 	while (ep->ep_state == RDS_EP_STATE_CLOSING) {
@@ -681,6 +687,10 @@ rds_session_close(rds_session_t *sp, ibt_execution_mode_t mode, uint_t wait)
 		ep->ep_state = RDS_EP_STATE_CLOSING;
 		mutex_exit(&ep->ep_lock);
 		(void) rds_close_rc_channel(ep->ep_chanhdl, mode);
+		if (wait == 0) {
+			/* make sure all WCs are flushed before proceeding */
+			(void) rds_is_sendq_empty(ep, 1);
+		}
 		mutex_enter(&ep->ep_lock);
 	}
 	rds_ep_free_rc_channel(ep);
@@ -693,7 +703,9 @@ rds_session_close(rds_session_t *sp, ibt_execution_mode_t mode, uint_t wait)
 	RDS_DPRINTF3(LABEL, "EP(%p) State: %d", ep, ep->ep_state);
 
 	/* wait until the SQ is empty before closing */
-	(void) rds_is_sendq_empty(ep, 1);
+	if (wait != 0) {
+		(void) rds_is_sendq_empty(ep, wait);
+	}
 
 	mutex_enter(&ep->ep_lock);
 	while (ep->ep_state == RDS_EP_STATE_CLOSING) {
@@ -706,6 +718,10 @@ rds_session_close(rds_session_t *sp, ibt_execution_mode_t mode, uint_t wait)
 		ep->ep_state = RDS_EP_STATE_CLOSING;
 		mutex_exit(&ep->ep_lock);
 		(void) rds_close_rc_channel(ep->ep_chanhdl, mode);
+		if (wait == 0) {
+			/* make sure all WCs are flushed before proceeding */
+			(void) rds_is_sendq_empty(ep, 1);
+		}
 		mutex_enter(&ep->ep_lock);
 	}
 	rds_ep_free_rc_channel(ep);
@@ -1048,7 +1064,7 @@ rds_close_sessions(void *arg)
 			sp->session_state = RDS_SESSION_STATE_ACTIVE_CLOSING;
 			rw_exit(&sp->session_lock);
 
-			rds_session_close(sp, IBT_BLOCKING, 2);
+			rds_session_close(sp, IBT_BLOCKING, 1);
 
 			rw_enter(&sp->session_lock, RW_WRITER);
 			sp->session_state = RDS_SESSION_STATE_CLOSED;
@@ -1167,8 +1183,8 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 	rds_bufpool_t	*pool;
 	int		ret;
 
-	RDS_DPRINTF2("rds_session_create", "Enter: 0x%p 0x%x 0x%x",
-	    statep, localip, remip);
+	RDS_DPRINTF2("rds_session_create", "Enter: 0x%p 0x%x 0x%x, type: %d",
+	    statep, localip, remip, type);
 
 	/* Allocate and initialize global buffer pool */
 	ret = rds_init_recv_caches(statep);
@@ -1252,7 +1268,7 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 	rw_exit(&statep->rds_sessionlock);
 
 	if (type == RDS_SESSION_ACTIVE) {
-		ipaddr_t localip1, remip1;
+		ipaddr_t		localip1, remip1;
 		ibt_ip_path_attr_t	ipattr;
 		ibt_ip_addr_t		dstip;
 
@@ -1989,7 +2005,7 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 		ipaddr_t sendip1, recvip1;
 
 		RDS_DPRINTF3("rds_sendmsg", "SP(%p) is not connected, State: "
-		    "%d", sp);
+		    "%d", sp, sp->session_state);
 		rw_exit(&sp->session_lock);
 		rw_enter(&sp->session_lock, RW_WRITER);
 		if ((sp->session_state == RDS_SESSION_STATE_FAILED) ||
@@ -2212,8 +2228,8 @@ rds_received_msg(rds_ep_t *ep, rds_buf_t *bp)
 	}
 
 	mutex_enter(&ep->ep_lock);
-	/* ep_chanhdl can be null if conn est hasn't come yet */
-	if ((ep->ep_rdmacnt == 0) && (ep->ep_chanhdl != NULL)) {
+	/* The first message can come in before the conn est event */
+	if ((ep->ep_rdmacnt == 0) && (ep->ep_state == RDS_EP_STATE_CONNECTED)) {
 		ep->ep_rdmacnt++;
 		*(uintptr_t *)(uintptr_t)ep->ep_ackds.ds_va = ep->ep_rbufid;
 		mutex_exit(&ep->ep_lock);
