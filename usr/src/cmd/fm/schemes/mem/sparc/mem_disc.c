@@ -371,6 +371,60 @@ get_dimm_by_sn(char *sn)
 	return (NULL);
 }
 
+mem_grp_t *
+find_grp(mde_cookie_t *listp, size_t n, mde_cookie_t *bclist,
+    mem_bank_map_t **banklist, size_t mem_bank_count) {
+
+	mem_grp_t *mg;
+	mem_bank_map_t *bp;
+	size_t i, j;
+	int err;
+
+	for (mg = mem.mem_group; mg != NULL; mg = mg->mg_next) {
+		if (mg->mg_size == n) {
+			err = 0;
+			for (i = 0, bp = mg->mg_bank;
+			    i < n && bp != NULL;
+			    i++, bp = bp->bm_grp) {
+				for (j = 0; j < mem_bank_count; j++) {
+					if (listp[i] == *(bclist+j) &&
+					    bp == *(banklist+j))
+						break;
+				}
+				if (bp == NULL) err++;
+			}
+		}
+		else
+			err++;
+		if (err == 0)
+			return (mg);
+	}
+	return (NULL);
+}
+
+mem_grp_t *
+create_grp(mde_cookie_t *listp, size_t n, mde_cookie_t *bclist,
+    mem_bank_map_t **banklist, size_t mem_bank_count) {
+
+	mem_grp_t *mg;
+	size_t i, j;
+
+	mg = fmd_fmri_zalloc(sizeof (mem_grp_t));
+	mg->mg_size = n;
+	mg->mg_next = mem.mem_group;
+	mem.mem_group = mg;
+
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < mem_bank_count; j++) {
+			if (listp[i] == *(bclist+j)) {
+				(*(banklist+j))->bm_grp = mg->mg_bank;
+				mg->mg_bank = *(banklist+j);
+			}
+		}
+	}
+	return (mg);
+}
+
 #define	MEM_BYTES_PER_CACHELINE	64
 
 static void
@@ -385,6 +439,8 @@ mdesc_init_n1(md_t *mdp, mde_cookie_t *listp)
 	uint64_t rank_mask, rank_value;
 	char *unum, *serial, *part;
 	mem_seg_map_t *seg;
+	mem_bank_map_t *bm;
+	mem_grp_t *mg;
 	char s[20];
 
 	/*
@@ -473,6 +529,16 @@ mdesc_init_n1(md_t *mdp, mde_cookie_t *listp)
 	else
 		chan_step = max_chan - min_chan;
 
+	seg = fmd_fmri_zalloc(sizeof (mem_seg_map_t));
+	seg->sm_next = mem.mem_seg;
+	mem.mem_seg = seg;
+	seg->sm_base = 0;
+	seg->sm_size = sysmem_size;
+
+	mg = fmd_fmri_zalloc(sizeof (mem_grp_t));
+	seg->sm_grp = mg;
+	mem.mem_group = mg;
+
 	for (rank = min_rank, rank_value = 0;
 	    rank <= max_rank;
 	    rank++, rank_value += rank_mask) {
@@ -480,18 +546,19 @@ mdesc_init_n1(md_t *mdp, mde_cookie_t *listp)
 		    chan <= max_chan;
 		    chan += chan_step,
 		    chan_value += MEM_BYTES_PER_CACHELINE) {
-			seg = fmd_fmri_zalloc(sizeof (mem_seg_map_t));
-			seg->sm_next = mem.mem_seg;
-			mem.mem_seg = seg;
-			seg->sm_base = 0;
-			seg->sm_size = sysmem_size;
-			seg->sm_mask = mask;
-			seg->sm_match = chan_value | rank_value;
-			seg->sm_shift = 1;
+			bm = fmd_fmri_zalloc(sizeof (mem_bank_map_t));
+			bm->bm_mask = mask;
+			bm->bm_match = chan_value | rank_value;
+			bm->bm_shift = 1;
+			bm->bm_grp = mg->mg_bank;
+			mg->mg_bank = bm;
+			bm->bm_next = mem.mem_bank;
+			mem.mem_bank = bm;
 			(void) sprintf(s, "MB/CMP0/CH%1d/R%1d", chan, rank);
+			idx = 0;
 			for (d = mem.mem_dm; d != NULL; d = d->dm_next) {
 				if (strncmp(s, d->dm_label, strlen(s)) == 0)
-					d->dm_seg = seg;
+					bm->bm_dimm[idx++] = d;
 			}
 		}
 	}
@@ -500,14 +567,16 @@ mdesc_init_n1(md_t *mdp, mde_cookie_t *listp)
 static void
 mdesc_init_n2(md_t *mdp, mde_cookie_t *listp, int num_comps)
 {
-	mde_cookie_t *dl, t;
-	int idx, mdesc_dimm_count, mdesc_bank_count;
+	mde_cookie_t *dl, *bl, *bclist;
+	int bc, idx, mdesc_dimm_count, mdesc_bank_count;
 	mem_dimm_map_t *dm, *dp;
 	uint64_t i, drgen = fmd_fmri_get_drgen();
 	int n;
 	uint64_t mask, match, base, size;
 	char *unum, *serial, *part, *dash;
 	mem_seg_map_t *smp;
+	mem_bank_map_t *bmp, **banklist;
+	mem_grp_t *gmp;
 	char *type, *sp, *jnum, *nac;
 	size_t ss;
 
@@ -569,6 +638,17 @@ mdesc_init_n2(md_t *mdp, mde_cookie_t *listp, int num_comps)
 	    md_find_name(mdp, "fwd"),
 	    listp);
 
+	/*
+	 * banklist and bclist will be parallel arrays.  For a given bank,
+	 * bclist[i] will be the PRI node id, and *banklist+i will point to the
+	 * mem_bank_map_t for that bank.
+	 */
+
+	banklist = fmd_fmri_zalloc(mdesc_bank_count *
+	    sizeof (mem_bank_map_t *));
+	bclist = fmd_fmri_zalloc(mdesc_bank_count *
+	    sizeof (mde_cookie_t));
+
 	dl = fmd_fmri_zalloc(mdesc_dimm_count * sizeof (mde_cookie_t));
 
 	for (idx = 0; idx < mdesc_bank_count; idx++) {
@@ -576,27 +656,20 @@ mdesc_init_n2(md_t *mdp, mde_cookie_t *listp, int num_comps)
 			mask = 0;
 		if (md_get_prop_val(mdp, listp[idx], "match", &match) < 0)
 			match = 0;
-		n = md_scan_dag(mdp, listp[idx],
-		    md_find_name(mdp, "memory-segment"),
-		    md_find_name(mdp, "back"),
-		    &t); /* only 1 "back" arc, so n must equal 1 here */
-		if (md_get_prop_val(mdp, t, "base", &base) < 0)
-			base = 0;
-		if (md_get_prop_val(mdp, t, "size", &size) < 0)
-			size = 0;
-		smp = fmd_fmri_zalloc(sizeof (mem_seg_map_t));
-		smp->sm_next = mem.mem_seg;
-		mem.mem_seg = smp;
-		smp->sm_base = base;
-		smp->sm_size = size;
-		smp->sm_mask = mask;
-		smp->sm_match = match;
-
+		bmp = fmd_fmri_zalloc(sizeof (mem_bank_map_t));
+		bmp->bm_next = mem.mem_bank;
+		mem.mem_bank = bmp;
+		bmp->bm_mask = mask;
+		bmp->bm_match = match;
+		/* link this bank to its dimms */
 		n = md_scan_dag(mdp, listp[idx],
 		    md_find_name(mdp, "component"),
 		    md_find_name(mdp, "fwd"),
 		    dl);
-		smp->sm_shift = mem_log2(n);
+		bmp->bm_shift = mem_log2(n);
+
+		bclist[idx] = listp[idx];
+		*(banklist+idx) = bmp;
 
 		for (i = 0; i < n; i++) {
 			if (md_get_prop_str(mdp, dl[i],
@@ -604,10 +677,40 @@ mdesc_init_n2(md_t *mdp, mde_cookie_t *listp, int num_comps)
 				continue;
 			if ((dp = get_dimm_by_sn(serial)) == NULL)
 				continue;
-			dp->dm_seg = smp;
+			bmp->bm_dimm[i] = dp;
 		}
 	}
 	fmd_fmri_free(dl, mdesc_dimm_count * sizeof (mde_cookie_t));
+
+	bl = fmd_fmri_zalloc(mdesc_bank_count * sizeof (mde_cookie_t));
+	n = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
+	    md_find_name(mdp, "memory-segment"),
+	    md_find_name(mdp, "fwd"),
+	    listp);
+	for (idx = 0; idx < n; idx++) {
+		if (md_get_prop_val(mdp, listp[idx], "base", &base) < 0)
+			base = 0;
+		if (md_get_prop_val(mdp, listp[idx], "size", &size) < 0)
+			size = 0;
+		bc = md_scan_dag(mdp, listp[idx],
+		    md_find_name(mdp, "memory-bank"),
+		    md_find_name(mdp, "fwd"),
+		    bl);
+		smp = fmd_fmri_zalloc(sizeof (mem_seg_map_t));
+		smp->sm_next = mem.mem_seg;
+		mem.mem_seg = smp;
+		smp->sm_base = base;
+		smp->sm_size = size;
+		gmp = find_grp(bl, bc, bclist, banklist, mdesc_bank_count);
+		if (gmp == NULL)
+			smp->sm_grp = create_grp(bl, bc,
+			    bclist, banklist, mdesc_bank_count);
+		else
+			smp->sm_grp = gmp;
+	}
+	fmd_fmri_free(bl, mdesc_bank_count * sizeof (mde_cookie_t));
+	fmd_fmri_free(bclist, mdesc_bank_count * sizeof (mde_cookie_t));
+	fmd_fmri_free(banklist, mdesc_bank_count * sizeof (mem_bank_map_t *));
 }
 
 int
@@ -1067,20 +1170,6 @@ mem_get_parts_by_unum(const char *unum, char ***partp, uint_t *npartp)
 		return (mem_get_parts_from_mdesc(unum, partp, npartp));
 }
 
-static int
-get_seg_by_sn(char *sn, mem_seg_map_t **segmap)
-{
-	mem_dimm_map_t *dm;
-
-	for (dm = mem.mem_dm; dm != NULL; dm = dm->dm_next) {
-		if (strcmp(sn, dm->dm_serid) == 0) {
-			*segmap = dm->dm_seg;
-			return (0);
-		}
-	}
-	return (-1);
-}
-
 /*
  * Niagara-1, Niagara-2, and Victoria Falls all have physical address
  * spaces of 40 bits.
@@ -1155,10 +1244,28 @@ mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 		return (mem_get_serids_from_cache(unum, seridsp, nseridsp));
 }
 
+uint64_t
+calc_phys_addr(mem_seg_map_t *seg, char *ds, uint64_t offset)
+{
+	mem_bank_map_t *bm;
+	size_t i;
+
+	for (bm = seg->sm_grp->mg_bank; bm != NULL; bm = bm->bm_grp) {
+		for (i = 0; i < MAX_DIMMS_PER_BANK &&
+		    bm->bm_dimm[i] != NULL; i++) {
+			if (strcmp(bm->bm_dimm[i]->dm_serid, ds) == 0)
+				return (insert_bits(offset<<bm->bm_shift,
+				    bm->bm_mask, bm->bm_match));
+		}
+	}
+	return ((uint64_t)-1);
+}
+
 void
 mem_expand_opt(nvlist_t *nvl, char *unum, char **serids)
 {
 	mem_seg_map_t *seg;
+	mem_bank_map_t *bm;
 	uint64_t offset, physaddr;
 	char **parts;
 	uint_t nparts;
@@ -1170,23 +1277,32 @@ mem_expand_opt(nvlist_t *nvl, char *unum, char **serids)
 	 * fmd_fmri_expand.  All optional expansions will be attempted
 	 * once expand_opt is entered.
 	 */
-
-	if ((mem.mem_seg != NULL) &&
-	    (get_seg_by_sn(*serids, &seg) == 0) &&
-	    (seg != NULL)) { /* seg can be NULL if segment missing from PRI */
-
-		if (nvlist_lookup_uint64(nvl,
-		    FM_FMRI_MEM_OFFSET, &offset) == 0) {
-			physaddr = insert_bits((offset<<seg->sm_shift),
-			    seg->sm_mask, seg->sm_match);
-			(void) nvlist_add_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
-			    physaddr); /* displaces any previous physaddr */
-		} else if (nvlist_lookup_uint64(nvl,
-		    FM_FMRI_MEM_PHYSADDR, &physaddr) == 0) {
-			offset = extract_bits(physaddr,
-			    seg->sm_mask) >> seg->sm_shift;
-			(void) (nvlist_add_uint64(nvl, FM_FMRI_MEM_OFFSET,
-			    offset));
+	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &offset) == 0) {
+		for (seg = mem.mem_seg; seg != NULL; seg = seg->sm_next) {
+			physaddr = calc_phys_addr(seg, *serids, offset);
+			if (physaddr >= seg->sm_base &&
+			    physaddr < seg->sm_base + seg->sm_size) {
+				(void) nvlist_add_uint64(nvl,
+				    FM_FMRI_MEM_PHYSADDR, physaddr);
+			}
+		}
+	} else if (nvlist_lookup_uint64(nvl,
+	    FM_FMRI_MEM_PHYSADDR, &physaddr) == 0) {
+		for (seg = mem.mem_seg; seg != NULL; seg = seg->sm_next) {
+			if (physaddr >= seg->sm_base &&
+			    physaddr < seg->sm_base + seg->sm_size) {
+				bm = seg->sm_grp->mg_bank;
+				/*
+				 * The mask & shift values for all banks in a
+				 * segment are always the same; only the match
+				 * values differ, in order to specify a
+				 * dimm-pair. But we already have a full unum.
+				 */
+				offset = extract_bits(physaddr,
+				    bm->bm_mask) >> bm->bm_shift;
+				(void) (nvlist_add_uint64(nvl,
+				    FM_FMRI_MEM_OFFSET, offset));
+			}
 		}
 	}
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,15 +106,7 @@ extern "C" {
  * 18 for Sun Partnumber, 18 partner partnumber, 12 serialnumber for OPL.
  */
 #define	MEM_SERID_MAXLEN	64
-
-typedef struct mem_seg_map {
-	struct mem_seg_map *sm_next;	/* the next segment map */
-	uint64_t	sm_base;	/* base address for this segment */
-	uint64_t	sm_size;	/* size for this segment */
-	uint64_t	sm_mask;	/* mask denoting dimm selection bits */
-	uint64_t	sm_match;	/* value selecting this set of DIMMs */
-	uint16_t	sm_shift;	/* dimms-per-reference shift */
-} mem_seg_map_t;
+#define	MAX_DIMMS_PER_BANK	4
 
 typedef struct mem_dimm_map {
 	struct mem_dimm_map *dm_next;	/* The next DIMM map */
@@ -123,13 +115,37 @@ typedef struct mem_dimm_map {
 	char dm_serid[MEM_SERID_MAXLEN]; /* Cached serial number */
 	char *dm_part;			/* DIMM part number */
 	uint64_t dm_drgen;		/* DR gen count for cached S/N */
-	mem_seg_map_t *dm_seg;		/* segment for this DIMM */
 } mem_dimm_map_t;
+
+typedef struct mem_bank_map {
+	struct mem_bank_map *bm_next;	/* the next bank map overall */
+	struct mem_bank_map *bm_grp;	/* next bank map in group */
+	uint64_t	bm_mask;
+	uint64_t	bm_match;
+	uint16_t	bm_shift;	/* dimms-per-reference shift */
+	mem_dimm_map_t *bm_dimm[MAX_DIMMS_PER_BANK];
+} mem_bank_map_t;
+
+typedef struct mem_grp {
+	struct mem_grp *mg_next;
+	size_t		mg_size;
+	mem_bank_map_t *mg_bank;
+} mem_grp_t;
+
+typedef struct mem_seg_map {
+	struct mem_seg_map *sm_next;	/* the next segment map */
+	uint64_t	sm_base;	/* base address for this segment */
+	uint64_t	sm_size;	/* size for this segment */
+	mem_grp_t	*sm_grp;
+} mem_seg_map_t;
+
 
 typedef struct mem {
 	mem_dimm_map_t *mem_dm;		/* List supported DIMMs */
 	uint64_t mem_memconfig;		/* HV memory-configuration-id# */
 	mem_seg_map_t *mem_seg;		/* list of defined segments */
+	mem_bank_map_t *mem_bank;
+	mem_grp_t *mem_group;		/* groups of banks for a segment */
 } mem_t;
 
 extern int mem_discover(void);

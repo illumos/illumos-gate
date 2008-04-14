@@ -390,6 +390,8 @@ void
 fmd_fmri_fini(void)
 {
 	mem_dimm_map_t *dm, *em;
+	mem_bank_map_t *bm, *cm;
+	mem_grp_t *gm, *hm;
 	mem_seg_map_t *sm, *tm;
 
 	for (dm = mem.mem_dm; dm != NULL; dm = em) {
@@ -398,6 +400,14 @@ fmd_fmri_fini(void)
 		fmd_fmri_strfree(dm->dm_part);
 		fmd_fmri_strfree(dm->dm_device);
 		fmd_fmri_free(dm, sizeof (mem_dimm_map_t));
+	}
+	for (bm = mem.mem_bank; bm != NULL; bm = cm) {
+		cm = bm->bm_next;
+		fmd_fmri_free(bm, sizeof (mem_bank_map_t));
+	}
+	for (gm = mem.mem_group; gm != NULL; gm = hm) {
+		hm = gm->mg_next;
+		fmd_fmri_free(gm, sizeof (mem_grp_t));
 	}
 	for (sm = mem.mem_seg; sm != NULL; sm = tm) {
 		tm = sm->sm_next;
