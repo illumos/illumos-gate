@@ -387,6 +387,7 @@ conn_process(void *v)
 	 * who have alligence to this connection and free them as well.
 	 */
 	(void) pthread_mutex_lock(&c->c_mutex);
+	(void) pthread_mutex_lock(&c->c_state_mutex);
 
 	for (i = 0, cmd = c->c_cmd_head; cmd; i++)
 		cmd = cmd->c_next; /* debug count of lost ttt's */
@@ -425,6 +426,7 @@ conn_process(void *v)
 		umem_cache_free(iscsi_cmd_cache, cmd);
 		cmd = n;
 	}
+	(void) pthread_mutex_unlock(&c->c_state_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
 	if (i) {

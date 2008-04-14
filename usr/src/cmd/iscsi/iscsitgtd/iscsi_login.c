@@ -737,12 +737,13 @@ make_login_response(iscsi_conn_t *c, iscsi_login_hdr_t *lhp)
 	(void) pthread_mutex_lock(&c->c_mutex);
 	r->statsn		= htonl(c->c_statsn++);
 	(void) pthread_mutex_unlock(&c->c_mutex);
-	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
-	/* ---- cmdsn is not advanced during login ---- */
-	r->expcmdsn		= htonl(c->c_sess->s_seencmdsn);
-	r->maxcmdsn		= htonl(c->c_sess->s_seencmdsn + 1);
-	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
-
+	if (c->c_sess != NULL) {
+		(void) pthread_mutex_lock(&c->c_sess->s_mutex);
+		/* ---- cmdsn is not advanced during login ---- */
+		r->expcmdsn		= htonl(c->c_sess->s_seencmdsn);
+		r->maxcmdsn		= htonl(c->c_sess->s_seencmdsn + 1);
+		(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
+	}
 
 	return (r);
 }

@@ -441,10 +441,16 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 	do {
 		min = MIN((cnt * 512) - offset, T10_MAX_OUT(cmd));
-		if ((offset + min) < (cnt * 512LL))
+		if ((offset + min) < (cnt * 512LL)) {
 			c = trans_cmd_dup(cmd);
-		else
+			/* dup failed, just finish the original command */
+			if (c == NULL) {
+				c = cmd;
+				offset = (cnt * 512);
+			}
+		} else {
 			c = cmd;
+		}
 		io = sbc_io_alloc(c);
 
 		io->da_lba	= addr;
@@ -498,6 +504,9 @@ sbc_read_cmplt(emul_handle_t id)
 	t10_cmd_t	*cmd		= io->da_cmd;
 	Boolean_t	last;
 
+	last = (io->da_offset + io->da_data_len) < (io->da_lba_cnt * 512LL) ?
+	    False : True;
+
 	if (io->da_aio.a_aio.aio_return != io->da_data_len) {
 		err_blkno = io->da_lba + ((io->da_offset + 511) / 512);
 		cmd->c_resid = (io->da_lba_cnt * 512) - io->da_offset;
@@ -507,13 +516,15 @@ sbc_read_cmplt(emul_handle_t id)
 			sense_len = 0;
 		spc_sense_create(cmd, KEY_HARDWARE_ERROR, sense_len);
 		spc_sense_info(cmd, err_blkno);
-		trans_send_complete(cmd, STATUS_CHECK);
-		sbc_io_free(io);
+		if (last == True) {
+			trans_send_complete(cmd, STATUS_CHECK);
+			sbc_io_free(io);
+		} else {
+			t10_cmd_done(cmd);
+		}
 		return;
 	}
 
-	last = (io->da_offset + io->da_data_len) < (io->da_lba_cnt * 512LL) ?
-	    False : True;
 	if (trans_send_datain(cmd, io->da_data, io->da_data_len, io->da_offset,
 	    sbc_io_free, last, io) == False) {
 		trans_send_complete(cmd, STATUS_BUSY);

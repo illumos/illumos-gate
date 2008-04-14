@@ -452,6 +452,13 @@ t10_cmd_data(t10_targ_handle_t t, t10_cmd_t *cmd, size_t offset, char *data,
 	return (True);
 }
 
+void
+t10_cmd_done(t10_cmd_t *cmd)
+{
+	if (cmd != NULL)
+		t10_cmd_shoot_event(cmd, T10_Cmd_T5);
+}
+
 /*
  * t10_cmd_state_machine -- State machine for T10 commands
  *
@@ -1071,11 +1078,11 @@ trans_cmd_dup(t10_cmd_t *cmd)
 	t10_cmd_t	*c;
 
 	if ((c = umem_cache_alloc(t10_cmd_cache, UMEM_DEFAULT)) == NULL)
-		return (False);
+		return (NULL);
 	bcopy(cmd, c, sizeof (*c));
 	if ((c->c_cdb = (uint8_t *)malloc(c->c_cdb_len)) == NULL) {
 		umem_cache_free(t10_cmd_cache, c);
-		return (False);
+		return (NULL);
 	}
 	bcopy(cmd->c_cdb, c->c_cdb, c->c_cdb_len);
 
@@ -1466,6 +1473,8 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		spc_sense_ascq(cmd, 0x20, 0x9);
 		goto error;
 	}
+
+	(void) pthread_mutex_lock(&lu_list_mutex);
 
 	if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
 		/*
@@ -2309,6 +2318,9 @@ cmd_common_free(t10_cmd_t *c)
 
 	if (lu) {
 		assert(pthread_mutex_trylock(&lu->l_cmd_mutex) != 0);
+		/* command might be removed by t10_handle_destroy */
+		if (avl_find(&lu->l_cmds, c, NULL) == NULL)
+			return;
 		avl_remove(&lu->l_cmds, c);
 	}
 

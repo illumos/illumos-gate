@@ -563,6 +563,9 @@ Boolean_t
 t10_cmd_data(t10_targ_handle_t t, t10_cmd_t *cmd, size_t offset,
     char *data, size_t data_len);
 
+void
+t10_cmd_done(t10_cmd_t *cmd);
+
 Boolean_t
 t10_task_mgmt(t10_targ_handle_t t, TaskOp_t op, int opt_lun, void *tag);
 

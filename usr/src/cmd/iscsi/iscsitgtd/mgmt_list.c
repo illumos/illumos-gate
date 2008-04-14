@@ -408,6 +408,8 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 			if (local_name != NULL) {
 				mgmt_get_param(&params, local_name, lun_num);
 				free(local_name);
+			} else {
+				continue;
 			}
 		} else {
 			params = lun;
