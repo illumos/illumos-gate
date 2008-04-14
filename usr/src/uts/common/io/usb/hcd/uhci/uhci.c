@@ -921,10 +921,10 @@ uhci_cpr_resume(uhci_state_t	*uhcip)
 static uint_t
 uhci_intr(caddr_t arg1, caddr_t arg2)
 {
-	ushort_t	intr_status, cmd_reg;
+	ushort_t	intr_status, cmd_reg, intr_reg;
 	uhci_state_t	*uhcip = (uhci_state_t *)arg1;
 
-	USB_DPRINTF_L3(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
+	USB_DPRINTF_L4(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
 	    "uhci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
@@ -938,17 +938,38 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 
 	/* Get the status of the interrupts */
 	intr_status = Get_OpReg16(USBSTS);
+	intr_reg = Get_OpReg16(USBINTR);
 
-	USB_DPRINTF_L4(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
-	    "uhci_intr: intr_status = %x", intr_status);
+	USB_DPRINTF_L3(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
+	    "uhci_intr: intr_status = %x, intr_reg = %x",
+	    intr_status, intr_reg);
 
 	/*
-	 * If the intr is not from our controller, just return unclaimed
+	 * If uhci interrupts are all disabled, the driver should return
+	 * unclaimed.
+	 * HC Process Error and Host System Error interrupts cannot be
+	 * disabled by intr register, and need to be judged separately.
+	 */
+	if (((intr_reg & ENABLE_ALL_INTRS) == 0) &&
+	    ((intr_status & USBSTS_REG_HC_PROCESS_ERR) == 0) &&
+	    ((intr_status & USBSTS_REG_HOST_SYS_ERR) == 0)) {
+
+		USB_DPRINTF_L3(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
+		    "uhci_intr: interrupts disabled, unclaim");
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (DDI_INTR_UNCLAIMED);
+	}
+
+	/*
+	 * If the intr is not from our controller, just return unclaimed.
+	 * HCHalted status bit cannot generate interrupts and should be
+	 * ignored.
 	 */
 	if (!(intr_status & UHCI_INTR_MASK)) {
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
-		    "uhci_intr: unclaimed interrupt");
+		    "uhci_intr: no interrupt status set, unclaim");
 		mutex_exit(&uhcip->uhci_int_mutex);
 
 		return (DDI_INTR_UNCLAIMED);
@@ -967,7 +988,7 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 	if (uhcip->uhci_hc_soft_state != UHCI_CTLR_OPERATIONAL_STATE) {
 
 		USB_DPRINTF_L2(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
-		    "uhci_intr: uhci controller is not in the operational"
+		    "uhci_intr: uhci controller is not in the operational "
 		    "state");
 		mutex_exit(&uhcip->uhci_int_mutex);
 

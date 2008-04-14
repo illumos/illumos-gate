@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +108,7 @@ typedef volatile struct hcr_regs {
 
 #define	ENABLE_ALL_INTRS		0x000F
 #define	DISABLE_ALL_INTRS		0x0000
-#define	UHCI_INTR_MASK			0x3f
+#define	UHCI_INTR_MASK			0x1f
 
 
 #define	SetReg32(hndl, addr, val)	ddi_put32((hndl), \

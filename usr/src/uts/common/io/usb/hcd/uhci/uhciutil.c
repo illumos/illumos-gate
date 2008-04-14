@@ -462,6 +462,8 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 	uint_t	cmd_reg;
 	uint_t	frame_base_addr;
 
+	mutex_enter(&uhcip->uhci_int_mutex);
+
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl, "uhci_init_ctlr:");
 
 	/*
@@ -479,7 +481,6 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 	 */
 	Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
 
-	mutex_enter(&uhcip->uhci_int_mutex);
 	cmd_reg = Get_OpReg16(USBCMD);
 	cmd_reg &= (~USBCMD_REG_HC_RUN);
 
