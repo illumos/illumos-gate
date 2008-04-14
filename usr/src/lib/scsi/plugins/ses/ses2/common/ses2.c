@@ -42,10 +42,11 @@ ses2_setprop(ses_plugin_t *sp, ses_node_t *np,
     const ses2_ctl_prop_t *ctlprops, nvlist_t *props)
 {
 	const ses2_ctl_prop_t *cpp;
-	nvpair_t *nvp;
+	nvpair_t *nvp, *next;
 
 	for (nvp = nvlist_next_nvpair(props, NULL); nvp != NULL;
-	    nvp = nvlist_next_nvpair(props, nvp)) {
+	    nvp = next) {
+		next = nvlist_next_nvpair(props, nvp);
 		for (cpp = ctlprops; cpp->scp_name != NULL; cpp++)
 			if (strcmp(cpp->scp_name, nvpair_name(nvp)) == 0)
 				break;

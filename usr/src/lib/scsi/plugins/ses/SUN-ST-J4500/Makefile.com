@@ -25,14 +25,9 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = 			\
-	libses			\
-	ses2			\
-	SUN-Storage-J4400	\
-	SUN-ST-J4500
+MODULE =	SUN-ST-J4500
+SRCS =		loki.c
+SRCDIR =	../common
+PLUGINTYPE =	vendor
 
-.KEEP_STATE:
-
-.PARALLEL:
-
-include ../../Makefile.subdirs
+include ../../Makefile.lib

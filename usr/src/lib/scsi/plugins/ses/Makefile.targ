@@ -70,6 +70,12 @@ lint: lint_prog $(DMODLINTTGT)
 
 install_h:
 
+$(ROOTPLUGINDIR)/%: $(PROG)
+	$(RM) $@; $(LN) -s $< $@
+
+$(ROOTPLUGINDIR64)/%: $(PROG)
+	$(RM) $@; $(LN) -s $< $@
+
 $(ROOTPROG): $$(@D) $(PROG)
 	$(RM) $@; $(INS) -s -m 0755 -f $(@D) $(PROG)
 

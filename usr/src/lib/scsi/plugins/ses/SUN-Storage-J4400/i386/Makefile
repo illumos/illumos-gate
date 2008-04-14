@@ -25,9 +25,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE =	SUN-StorageTek-J4400
-SRCS =		riverwalk.c
-SRCDIR =	../common
-PLUGINTYPE =	vendor
+include ../Makefile.com
 
-include ../../Makefile.lib
+install: all $(ROOTPROG) $(ROOTALIASES)
+
+include ../../Makefile.targ

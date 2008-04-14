@@ -29,4 +29,6 @@
 !include prototype_com
 
 d none usr/lib/scsi/plugins/ses/vendor/amd64 755 root bin
-f none usr/lib/scsi/plugins/ses/vendor/amd64/SUN-StorageTek-J4400.so 755 root bin
+s none usr/lib/scsi/plugins/ses/vendor/amd64/SUN-Storage-J4200.so=SUN-Storage-J4400.so
+f none usr/lib/scsi/plugins/ses/vendor/amd64/SUN-Storage-J4400.so 755 root bin
+f none usr/lib/scsi/plugins/ses/vendor/amd64/SUN-ST-J4500.so 755 root bin

@@ -158,6 +158,33 @@ sun_riverwalk_parse_node(ses_plugin_t *sp, ses_node_t *np)
 				break;
 			}
 			break;
+
+		case SES_ET_COOLING:
+			/*
+			 * The J4200 uses identical STRING IN data except that
+			 * the PSU part numbers are replaced with fan part
+			 * numbers.  The power supply part and serial number
+			 * information are not available.
+			 */
+			switch (index) {
+			case 0:
+				if (strncmp(strp->rws_ps0_id, "FAN0", 4) != 0)
+					break;
+
+				pn = strp->rws_ps0_pn;
+				sn = strp->rws_ps0_sn;
+				break;
+
+			case 1:
+				if (strncmp(strp->rws_ps1_id, "FAN1", 4) != 0)
+					break;
+
+				pn = strp->rws_ps1_pn;
+				sn = strp->rws_ps1_sn;
+				break;
+			}
+			break;
+
 		}
 
 		if (pn == NULL)

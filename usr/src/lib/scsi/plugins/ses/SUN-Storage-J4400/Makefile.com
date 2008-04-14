@@ -25,14 +25,10 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = 			\
-	libses			\
-	ses2			\
-	SUN-Storage-J4400	\
-	SUN-ST-J4500
+MODULE =	SUN-Storage-J4400
+SRCS =		riverwalk.c
+SRCDIR =	../common
+PLUGINTYPE =	vendor
+ALIASES =	SUN-Storage-J4200
 
-.KEEP_STATE:
-
-.PARALLEL:
-
-include ../../Makefile.subdirs
+include ../../Makefile.lib
