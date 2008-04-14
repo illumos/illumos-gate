@@ -20,7 +20,7 @@
  */
 /*
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,8 +105,6 @@ make_handle_bound(scf_handle_t *hdl)
 int
 repval_init(void)
 {
-	debug_msg("Entering repval_init");
-
 	/*
 	 * Create the repval list pool.
 	 */
@@ -151,8 +149,6 @@ cleanup:
 void
 repval_fini(void)
 {
-	debug_msg("Entering repval_fini");
-
 	if (rep_handle != NULL) {
 		/*
 		 * We unbind from the repository before we free the repository
@@ -186,8 +182,6 @@ create_rep_val_list(void)
 {
 	uu_list_t	*ret;
 
-	debug_msg("Entering create_rep_val_list");
-
 	if ((ret = uu_list_create(rep_val_pool, NULL, 0)) == NULL)
 		assert(uu_error() == UU_ERROR_NO_MEMORY);
 
@@ -197,8 +191,6 @@ create_rep_val_list(void)
 void
 destroy_rep_val_list(uu_list_t *list)
 {
-	debug_msg("Entering destroy_rep_val_list");
-
 	if (list != NULL) {
 		empty_rep_val_list(list);
 		uu_list_destroy(list);
@@ -209,8 +201,6 @@ rep_val_t *
 find_rep_val(uu_list_t *list, int64_t val)
 {
 	rep_val_t *rv;
-
-	debug_msg("Entering find_rep_val: val: %lld", val);
 
 	for (rv = uu_list_first(list); rv != NULL;
 	    rv = uu_list_next(list, rv)) {
@@ -224,8 +214,6 @@ int
 add_rep_val(uu_list_t *list, int64_t val)
 {
 	rep_val_t *rv;
-
-	debug_msg("Entering add_rep_val: val: %lld", val);
 
 	if ((rv = malloc(sizeof (rep_val_t))) == NULL)
 		return (-1);
@@ -243,8 +231,6 @@ remove_rep_val(uu_list_t *list, int64_t val)
 {
 	rep_val_t *rv;
 
-	debug_msg("Entering remove_rep_val: val: %lld", val);
-
 	if ((rv = find_rep_val(list, val)) != NULL) {
 		uu_list_remove(list, rv);
 		assert(rv->scf_val == NULL);
@@ -258,8 +244,6 @@ empty_rep_val_list(uu_list_t *list)
 	void		*cookie = NULL;
 	rep_val_t	*rv;
 
-	debug_msg("Entering empty_rep_val_list");
-
 	while ((rv = uu_list_teardown(list, &cookie)) != NULL) {
 		if (rv->scf_val != NULL)
 			scf_value_destroy(rv->scf_val);
@@ -272,8 +256,6 @@ get_single_rep_val(uu_list_t *list)
 {
 	rep_val_t *rv = uu_list_first(list);
 
-	debug_msg("Entering get_single_rep_val");
-
 	assert(rv != NULL);
 	return (rv->val);
 }
@@ -282,8 +264,6 @@ int
 set_single_rep_val(uu_list_t *list, int64_t val)
 {
 	rep_val_t *rv = uu_list_first(list);
-
-	debug_msg("Entering set_single_rep_val");
 
 	if (rv == NULL) {
 		if (add_rep_val(list, val) == -1)
@@ -303,8 +283,6 @@ static void
 remove_tr_entry_values(uu_list_t *vals)
 {
 	rep_val_t	*rval;
-
-	debug_msg("Entering remove_tr_entry_values");
 
 	for (rval = uu_list_first(vals); rval != NULL;
 	    rval = uu_list_next(vals, rval)) {
@@ -328,8 +306,6 @@ add_tr_entry_values(scf_handle_t *hdl, scf_transaction_entry_t *entry,
     uu_list_t *vals)
 {
 	rep_val_t *rval;
-
-	debug_msg("Entering add_tr_entry_values");
 
 	for (rval = uu_list_first(vals); rval != NULL;
 	    rval = uu_list_next(vals, rval)) {
@@ -370,9 +346,6 @@ _store_rep_vals(uu_list_t *vals, const char *inst_fmri, const char *prop_name)
 {
 	int			cret;
 	int			ret;
-
-	debug_msg("Entering _store_rep_vals: fmri: %s, prop: %s", inst_fmri,
-	    prop_name);
 
 	if (scf_handle_decode_fmri(rep_handle, inst_fmri, NULL, NULL, inst,
 	    NULL, NULL, SCF_DECODE_FMRI_EXACT) == -1)
@@ -451,9 +424,6 @@ _retrieve_rep_vals(uu_list_t *list, const char *fmri, const char *prop_name)
 	scf_simple_prop_t	*sp;
 	int64_t			*ip;
 
-	debug_msg("Entering _retrieve_rep_vals: fmri: %s, prop: %s", fmri,
-	    prop_name);
-
 	if ((sp = scf_simple_prop_get(rep_handle, fmri, PG_NAME_INSTANCE_STATE,
 	    prop_name)) == NULL)
 		return (scf_error());
@@ -491,9 +461,6 @@ repvals_to_file(const char *fmri, const char *name, uu_list_t *vals)
 	FILE		*tfp;		/* temp fp */
 	rep_val_t	*spval;		/* Contains a start_pid or ctid */
 	int		ret = 0;
-
-	debug_msg("Entering repvals_to_file, fmri:%s, name=%s\n",
-	    fmri, name);
 
 	if (gen_filenms_from_fmri(fmri, name, genfmri_filename,
 	    genfmri_temp_filename) != 0) {
@@ -570,8 +537,6 @@ store_retrieve_rep_vals(uu_list_t *vals, const char *fmri,
 	int64_t		tval;		/* temp val holder */
 	int		fscanf_ret;
 	int		fopen_retry_cnt = 2;
-
-	debug_msg("Entering store_retrieve_rep_vals, store: %d", store);
 
 	/* inetd specific action for START_PIDS property */
 	if (strcmp(prop, PR_NAME_START_PIDS) == 0) {
@@ -679,8 +644,6 @@ add_remove_contract(instance_t *inst, boolean_t add, ctid_t ctid)
 	int		repval_ret = 0;
 	int		fopen_retry_cnt = 2;
 
-	debug_msg("Entering add_remove_contract, add: %d\n", add);
-
 	/*
 	 * Storage performance of contract ids is important,
 	 * so each instance has its own file.  An add of a
@@ -763,8 +726,6 @@ iterate_repository_contracts(instance_t *inst, int sig)
 	uu_list_t	*uup = NULL;
 	int		fscanf_ret;
 	int		fopen_retry_cnt = 2;
-
-	debug_msg("Entering iterate_repository_contracts, sig: %d", sig);
 
 	if (sig != 0) {
 		/*

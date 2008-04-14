@@ -296,12 +296,6 @@ update_instance_states(instance_t *inst, internal_inst_state_t new_cur_state,
 	scf_error_t		sret;
 	int			ret;
 
-	debug_msg("Entering update_instance_states: oldcur: %s, newcur: %s "
-	    "oldnext: %s, newnext: %s", states[old_cur].name,
-	    states[new_cur_state].name, states[old_next].name,
-	    states[new_next_state].name);
-
-
 	/* update the repository/cached internal state */
 	inst->cur_istate = new_cur_state;
 	inst->next_istate = new_next_state;
@@ -345,8 +339,6 @@ refresh_method(void)
 	uds_request_t   req = UR_REFRESH_INETD;
 	int		fd;
 
-	debug_msg("Entering refresh_method");
-
 	if ((fd = connect_to_inetd()) < 0) {
 		error_msg(gettext("Failed to connect to inetd: %s"),
 		    strerror(errno));
@@ -379,8 +371,6 @@ stop_method(void)
 	int		fd;
 	char		c;
 	ssize_t		ret;
-
-	debug_msg("Entering stop_method");
 
 	if ((fd = connect_to_inetd()) == -1) {
 		debug_msg(gettext("Failed to connect to inetd: %s"),
@@ -439,12 +429,7 @@ stop_method(void)
 static int
 restarter_event_proxy(restarter_event_t *event)
 {
-	restarter_event_type_t  ev_type;
 	boolean_t		processed;
-
-	debug_msg("Entering restarter_event_proxy");
-	ev_type = restarter_event_get_type(event);
-	debug_msg("event: %x, event type: %d", event, ev_type);
 
 	(void) pthread_mutex_lock(&rst_event_pipe_mtx);
 
@@ -492,8 +477,6 @@ pipe_error:
 static void
 ack_restarter_event(boolean_t processed)
 {
-	debug_msg("Entering ack_restarter_event");
-
 	/*
 	 * If safe_write returns -1 something's seriously wrong with the event
 	 * pipe, so start the shutdown proceedings.
@@ -509,8 +492,6 @@ ack_restarter_event(boolean_t processed)
 static void
 change_syslog_ident(const char *ident)
 {
-	debug_msg("Entering change_syslog_ident: ident: %s", ident);
-
 	closelog();
 	openlog(ident, LOG_PID|LOG_CONS, LOG_DAEMON);
 }
@@ -529,8 +510,6 @@ tcp_wrappers_ok(instance_t *instance)
 	char			*daemon_name;
 	basic_cfg_t		*cfg = instance->config->basic;
 	struct request_info	req;
-
-	debug_msg("Entering tcp_wrappers_ok, instance: %s", instance->fmri);
 
 	/*
 	 * Wrap the service using libwrap functions. The code below implements
@@ -592,9 +571,6 @@ conn_rate_online(iu_tq_t *tq, void *arg)
 {
 	instance_t *instance = arg;
 
-	debug_msg("Entering conn_rate_online, instance: %s",
-	    instance->fmri);
-
 	assert(instance->cur_istate == IIS_OFFLINE_CONRATE);
 	instance->timer_id = -1;
 	update_state(instance, IIS_OFFLINE, RERR_RESTART);
@@ -608,8 +584,6 @@ conn_rate_online(iu_tq_t *tq, void *arg)
 void
 process_offline_inst(instance_t *inst)
 {
-	debug_msg("Entering process_offline_inst");
-
 	if (inst->disable_req) {
 		inst->disable_req = B_FALSE;
 		(void) run_method(inst, IM_DISABLE, NULL);
@@ -658,8 +632,6 @@ create_bound_socket(const instance_t *inst, socket_info_t *sock_info)
 	const char	*fmri = inst->fmri;
 	rpc_info_t	*rpc = sock_info->pr_info.ri;
 	const char	*proto = sock_info->pr_info.proto;
-
-	debug_msg("Entering create_bound_socket");
 
 	fd = socket(sock_info->local_addr.ss_family, sock_info->type,
 	    sock_info->protocol);
@@ -740,8 +712,6 @@ retry_bind(iu_tq_t *tq, void *arg)
 {
 	instance_t *instance = arg;
 
-	debug_msg("Entering retry_bind, instance: %s", instance->fmri);
-
 	switch (instance->cur_istate) {
 	case IIS_OFFLINE_BIND:
 	case IIS_ONLINE:
@@ -773,9 +743,6 @@ poll_bound_fds(instance_t *instance, boolean_t listen)
 	proto_info_t	*pi;
 	int		ret = 0;
 
-	debug_msg("Entering poll_bound_fds: instance: %s, on: %d",
-	    instance->fmri, listen);
-
 	for (pi = uu_list_first(cfg->proto_list); pi != NULL;
 	    pi = uu_list_next(cfg->proto_list, pi)) {
 		if (pi->listen_fd != -1) {	/* fd bound */
@@ -798,8 +765,6 @@ static void
 handle_bind_failure(instance_t *instance)
 {
 	basic_cfg_t *cfg = instance->config->basic;
-
-	debug_msg("Entering handle_bind_failure: instance: %s", instance);
 
 	/*
 	 * We must be being called as a result of a failed poll_bound_fds()
@@ -1017,8 +982,6 @@ create_bound_fds(instance_t *instance)
 	boolean_t	success = B_FALSE;
 	proto_info_t	*pi;
 
-	debug_msg("Entering create_bound_fd: instance: %s", instance->fmri);
-
 	/*
 	 * Loop through and try and bind any unbound protos.
 	 */
@@ -1130,8 +1093,6 @@ destroy_bound_fds(instance_t *instance)
 	basic_cfg_t	*cfg = instance->config->basic;
 	proto_info_t	*pi;
 
-	debug_msg("Entering destroy_bound_fds: instance: %s", instance->fmri);
-
 	for (pi = uu_list_first(cfg->proto_list); pi != NULL;
 	    pi = uu_list_next(cfg->proto_list, pi)) {
 		if (pi->listen_fd != -1) {
@@ -1171,8 +1132,6 @@ expand_address(instance_t *inst, const proto_info_t *pi)
 	 * version complains if it's absent.
 	 */
 	const void	*p = pi;
-
-	debug_msg("Entering expand_address");
 
 	/* set ret[0] to the basename of exec path */
 	if ((ret[0] = strrchr(cfg->methods[IM_START]->exec_path, '/'))
@@ -1227,8 +1186,6 @@ get_method_state(instance_method_t method)
 static void
 add_method_ids(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 {
-	debug_msg("Entering add_method_ids");
-
 	if (cid != -1)
 		(void) add_remove_contract(ins, B_TRUE, cid);
 
@@ -1253,8 +1210,6 @@ void
 remove_method_ids(instance_t *inst, pid_t pid, ctid_t cid,
     instance_method_t mthd)
 {
-	debug_msg("Entering remove_method_ids");
-
 	if (cid != -1)
 		(void) add_remove_contract(inst, B_FALSE, cid);
 
@@ -1273,8 +1228,6 @@ static instance_t *
 create_instance(const char *fmri)
 {
 	instance_t *ret;
-
-	debug_msg("Entering create_instance, instance: %s", fmri);
 
 	if (((ret = calloc(1, sizeof (instance_t))) == NULL) ||
 	    ((ret->fmri = strdup(fmri)) == NULL))
@@ -1324,8 +1277,6 @@ alloc_fail:
 static void
 destroy_instance(instance_t *inst)
 {
-	debug_msg("Entering destroy_instance");
-
 	if (inst == NULL)
 		return;
 
@@ -1358,9 +1309,6 @@ retrieve_instance_state(instance_t *inst)
 {
 	scf_error_t	ret;
 
-	debug_msg("Entering retrieve_instance_state: instance: %s",
-	    inst->fmri);
-
 	/* retrieve internal states */
 	if (((ret = retrieve_rep_vals(inst->cur_istate_rep, inst->fmri,
 	    PR_NAME_CUR_INT_STATE)) != 0) ||
@@ -1387,9 +1335,6 @@ retrieve_instance_state(instance_t *inst)
 	/* update convenience states */
 	inst->cur_istate = get_single_rep_val(inst->cur_istate_rep);
 	inst->next_istate = get_single_rep_val(inst->next_istate_rep);
-	debug_msg("previous states: cur: %d, next: %d", inst->cur_istate,
-	    inst->next_istate);
-
 	return (0);
 }
 
@@ -1401,8 +1346,6 @@ static int
 retrieve_method_pids(instance_t *inst)
 {
 	rep_val_t	*rv;
-
-	debug_msg("Entering remove_method_pids");
 
 	switch (retrieve_rep_vals(inst->start_pids, inst->fmri,
 	    PR_NAME_START_PIDS)) {
@@ -1452,8 +1395,6 @@ retrieve_method_pids(instance_t *inst)
 static void
 remove_instance(instance_t *instance)
 {
-	debug_msg("Entering remove_instance");
-
 	switch (instance->cur_istate) {
 	case IIS_ONLINE:
 	case IIS_DEGRADED:
@@ -1485,8 +1426,6 @@ void
 refresh_instance(instance_t *inst)
 {
 	instance_cfg_t	*cfg;
-
-	debug_msg("Entering refresh_instance: inst: %s", inst->fmri);
 
 	switch (inst->cur_istate) {
 	case IIS_MAINTENANCE:
@@ -1656,9 +1595,6 @@ static void
 handle_restarter_event(instance_t *instance, restarter_event_type_t event,
     boolean_t send_ack)
 {
-	debug_msg("Entering handle_restarter_event: inst: %s, event: %d, "
-	    "curr state: %d", instance->fmri, event, instance->cur_istate);
-
 	switch (event) {
 	case RESTARTER_EVENT_TYPE_ADD_INSTANCE:
 		/*
@@ -2015,8 +1951,6 @@ process_restarter_event(void)
 	restarter_event_t	*event;
 	ssize_t			sz;
 
-	debug_msg("Entering process_restarter_event");
-
 	/*
 	 * Try to read an event pointer from the event pipe.
 	 */
@@ -2140,8 +2074,6 @@ process_start_term(instance_t *inst)
 {
 	basic_cfg_t	*cfg;
 
-	debug_msg("Entering process_start_term: inst: %s", inst->fmri);
-
 	inst->copies--;
 
 	if ((inst->cur_istate == IIS_MAINTENANCE) ||
@@ -2225,9 +2157,6 @@ void
 process_non_start_term(instance_t *inst, int status)
 {
 	boolean_t ran_online_method = B_FALSE;
-
-	debug_msg("Entering process_non_start_term: inst: %s, method: %s",
-	    inst->fmri, methods[states[inst->cur_istate].method_running].name);
 
 	if (status == IMRET_FAILURE) {
 		error_msg(gettext("The %s method of instance %s failed, "
@@ -2350,7 +2279,6 @@ can_read_file(const char *path)
 	int	ret;
 	int	serrno;
 
-	debug_msg("Entering can_read_file");
 	do {
 		ret = access(path, R_OK);
 	} while ((ret < 0) && (errno == EINTR));
@@ -2379,8 +2307,6 @@ check_conf_file(void)
 	char		*old_hash = NULL;
 	scf_error_t	ret;
 	const char	*file;
-
-	debug_msg("Entering check_conf_file");
 
 	if (conf_file == NULL) {
 		/*
@@ -2439,7 +2365,7 @@ inetd_refresh(void)
 {
 	instance_t	*inst;
 
-	debug_msg("Entering inetd_refresh");
+	refresh_debug_flag();
 
 	/* call libscf to send refresh requests for all managed instances */
 	for (inst = uu_list_first(instance_list); inst != NULL;
@@ -2464,8 +2390,6 @@ static void
 inetd_stop(void)
 {
 	instance_t *inst;
-
-	debug_msg("Entering inetd_stop");
 
 	/* Block handling signals for stop and refresh */
 	(void) sighold(SIGHUP);
@@ -2501,8 +2425,6 @@ static int
 uds_init(void)
 {
 	struct sockaddr_un addr;
-
-	debug_msg("Entering uds_init");
 
 	if ((uds_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		error_msg("socket: %s", strerror(errno));
@@ -2560,8 +2482,6 @@ process_uds_event(void)
 	uint_t			retries = 0;
 	ucred_t			*ucred = NULL;
 	uid_t			euid;
-
-	debug_msg("Entering process_uds_event");
 
 	do {
 		fd = accept(uds_fd, (struct sockaddr *)&addr, &len);
@@ -2632,8 +2552,6 @@ passes_basic_exec_checks(const char *instance, const char *method,
     const char *path)
 {
 	struct stat	sbuf;
-
-	debug_msg("Entering passes_basic_exec_checks");
 
 	/* check the file exists */
 	while (stat(path, &sbuf) == -1) {
@@ -2972,9 +2890,6 @@ run_method(instance_t *instance, instance_method_t method,
 	boolean_t		trans_failure = B_TRUE;
 	int			serrno;
 
-	debug_msg("Entering run_method, instance: %s, method: %s",
-	    instance->fmri, methods[method].name);
-
 	/*
 	 * Don't bother updating the instance's state for the start method
 	 * as there isn't a separate start method state.
@@ -3147,8 +3062,6 @@ accept_connection(instance_t *instance, proto_info_t *pi)
 	int		fd;
 	socklen_t	size;
 
-	debug_msg("Entering accept_connection");
-
 	if (instance->config->basic->istlx) {
 		fd = tlx_accept(instance->fmri, (tlx_info_t *)pi,
 		    &(instance->remote_addr));
@@ -3179,8 +3092,6 @@ process_nowait_request(instance_t *instance, proto_info_t *pi)
 	int			ret;
 	adt_event_data_t	*ae;
 	char			buf[BUFSIZ];
-
-	debug_msg("Entering process_nowait_req");
 
 	/* accept nowait service connections on a new fd */
 	if ((instance->conn_fd = accept_connection(instance, pi)) == -1) {
@@ -3308,8 +3219,6 @@ process_wait_request(instance_t *instance, const proto_info_t *pi)
 	adt_event_data_t	*ae;
 	char			buf[BUFSIZ];
 
-	debug_msg("Entering process_wait_request");
-
 	instance->conn_fd = pi->listen_fd;
 
 	/*
@@ -3395,8 +3304,6 @@ process_network_events(void)
 {
 	instance_t	*instance;
 
-	debug_msg("Entering process_network_events");
-
 	for (instance = uu_list_first(instance_list); instance != NULL;
 	    instance = uu_list_next(instance_list, instance)) {
 		basic_cfg_t	*cfg;
@@ -3435,8 +3342,6 @@ process_network_events(void)
 static void
 sigterm_handler(int sig)
 {
-	debug_msg("Entering sigterm_handler");
-
 	got_sigterm = B_TRUE;
 }
 
@@ -3444,8 +3349,6 @@ sigterm_handler(int sig)
 static void
 sighup_handler(int sig)
 {
-	debug_msg("Entering sighup_handler");
-
 	refresh_inetd_requested = B_TRUE;
 }
 
@@ -3465,14 +3368,11 @@ event_loop(void)
 	instance_t		*instance;
 	int			timeout;
 
-	debug_msg("Entering event_loop");
-
 	for (;;) {
 		int	pret = -1;
 
 		timeout = iu_earliest_timer(timer_queue);
 
-		debug_msg("Doing signal check/poll");
 		if (!got_sigterm && !refresh_inetd_requested) {
 			pret = poll(poll_fds, num_pollfds, timeout);
 			if ((pret == -1) && (errno != EINTR)) {
@@ -3480,7 +3380,6 @@ event_loop(void)
 				    strerror(errno));
 				continue;
 			}
-			debug_msg("Exiting poll, returned: %d", pret);
 		}
 
 		if (got_sigterm) {
@@ -3561,8 +3460,6 @@ check_if_stopped:
 static void
 fini(void)
 {
-	debug_msg("Entering fini");
-
 	method_fini();
 	uds_fini();
 	if (timer_queue != NULL)
@@ -3607,13 +3504,13 @@ init(void)
 {
 	int err;
 
-	debug_msg("Entering init");
-
 	if (repval_init() < 0)
 		goto failed;
 
 	if (config_init() < 0)
 		goto failed;
+
+	refresh_debug_flag();
 
 	if (tlx_init() < 0)
 		goto failed;
@@ -3705,16 +3602,14 @@ start_method(void)
 	int	pipe_fds[2];
 	int	child;
 
-	debug_msg("ENTERING START_METHOD:");
-
 	/* Create pipe for child to notify parent of initialization success. */
 	if (pipe(pipe_fds) < 0) {
-		debug_msg("pipe: %s", strerror(errno));
+		error_msg("pipe: %s", strerror(errno));
 		return (SMF_EXIT_ERR_OTHER);
 	}
 
 	if ((child = fork()) == -1) {
-		debug_msg("fork: %s", strerror(errno));
+		error_msg("fork: %s", strerror(errno));
 		(void) close(pipe_fds[PE_CONSUMER]);
 		(void) close(pipe_fds[PE_PRODUCER]);
 		return (SMF_EXIT_ERR_OTHER);

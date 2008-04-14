@@ -72,6 +72,12 @@ extern "C" {
 #define	PR_NAME_CUR_INT_STATE	"cur_state"
 #define	PR_NAME_NEXT_INT_STATE	"next_state"
 
+/* Name of the property group that holds debug flag */
+#define	PG_NAME_APPLICATION_CONFIG	"config"
+
+/* Name of the property which holds the debug flag value */
+#define	PR_NAME_DEBUG_FLAG	"debug"
+
 /*
  * Instance states used internal to svc.inetd.
  * NOTE: The states table in cmd/cmd-inetd/inetd/inetd.c relies on the
@@ -242,6 +248,7 @@ extern nfds_t num_pollfds;
 extern method_type_info_t methods[];
 extern iu_tq_t *timer_queue;
 extern uu_list_pool_t *conn_ind_pool;
+extern boolean_t debug_enabled;
 
 /*
  * util.c
@@ -301,6 +308,7 @@ extern void destroy_instance_cfg(instance_cfg_t *);
 extern instance_cfg_t *read_instance_cfg(const char *);
 extern boolean_t bind_config_equal(const basic_cfg_t *, const basic_cfg_t *);
 extern int read_enable_merged(const char *, boolean_t *);
+extern void refresh_debug_flag(void);
 
 /*
  * repval.c

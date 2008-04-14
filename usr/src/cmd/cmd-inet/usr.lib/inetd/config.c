@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,8 +149,6 @@ create_method_info(const inetd_prop_t *mprops, boolean_t *exec_invalid)
 	method_info_t	*ret;
 	int		i;
 
-	debug_msg("Entering create_method_info");
-
 	if ((ret = calloc(1, sizeof (method_info_t))) == NULL)
 		goto alloc_fail;
 
@@ -207,8 +205,6 @@ boolean_t
 method_info_equal(const method_info_t *mi, const method_info_t *mi2)
 {
 	int		i;
-
-	debug_msg("Entering method_info_equal");
 
 	if ((mi == NULL) && (mi2 == NULL)) {
 		return (B_TRUE);
@@ -286,8 +282,6 @@ bind_config_equal(const basic_cfg_t *c1, const basic_cfg_t *c2)
 {
 	proto_info_t	*pi;
 
-	debug_msg("Entering bind_config_equal");
-
 	if ((c1->iswait != c2->iswait) ||
 	    (c1->istlx != c2->istlx))
 		return (B_FALSE);
@@ -319,8 +313,6 @@ bind_config_equal(const basic_cfg_t *c1, const basic_cfg_t *c2)
 static int
 populate_defaults(inetd_prop_t *bprops, basic_cfg_t *cfg)
 {
-	debug_msg("Entering populate_defaults");
-
 	cfg->do_tcp_wrappers = get_prop_value_boolean(bprops,
 	    PR_DO_TCP_WRAPPERS_NAME);
 	cfg->do_tcp_trace = get_prop_value_boolean(bprops,
@@ -369,8 +361,6 @@ create_method_infos(const char *fmri, inetd_prop_t **mprops,
 {
 	int i;
 
-	debug_msg("Entering create_method_infos, inst: %s", fmri);
-
 	for (i = 0; i < NUM_METHODS; i++) {
 		/*
 		 * Only create a method info structure if the method properties
@@ -409,8 +399,6 @@ read_method_props(const char *inst, instance_method_t method, scf_error_t *err)
 {
 	inetd_prop_t	*ret;
 	int		i;
-
-	debug_msg("Entering read_method_props");
 
 	if ((ret = calloc(1, sizeof (method_props))) == NULL) {
 		*err = SCF_ERROR_NO_MEMORY;
@@ -475,8 +463,6 @@ read_inst_props(const char *fmri, inetd_prop_t **bprops,
 	size_t		nprops;
 	int		i;
 
-	debug_msg("Entering read_inst_props");
-
 	if ((*bprops = read_instance_props(rep_handle, (char *)fmri, &nprops,
 	    err)) == NULL)
 		return (-1);
@@ -511,9 +497,6 @@ valid_inst_props(const char *fmri, inetd_prop_t *bprops, inetd_prop_t **mprops,
 	boolean_t	valid;
 	size_t		num_bprops;
 	int		i;
-
-	debug_msg("Entering valid_inst_props: inst: %s, bprops: %x, mprops: %x",
-	    fmri, bprops, *mprops);
 
 	valid = valid_props(bprops, fmri, cfg, proto_info_pool, conn_ind_pool);
 
@@ -595,8 +578,6 @@ read_instance_cfg(const char *fmri)
 	instance_cfg_t	*ret = NULL;
 	scf_error_t	err;
 
-	debug_msg("Entering read_instance_cfg");
-
 	if ((ret = calloc(1, sizeof (instance_cfg_t))) == NULL)
 		return (NULL);
 
@@ -656,9 +637,6 @@ read_method_context(const char *inst_fmri, const char *method, const char *path,
 	struct method_context		*ret;
 	uint_t				retries;
 	const char			*tmpstr;
-
-	debug_msg("Entering read_method_context: inst: %s, method: %s, "
-	    "path: %s", inst_fmri, method, path);
 
 	for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
 		if (make_handle_bound(rep_handle) == -1)
@@ -744,8 +722,6 @@ read_enable_merged(const char *fmri, boolean_t *enabled)
 {
 	uint_t		retries;
 
-	debug_msg("Entering read_enabled_prop: inst: %s", fmri);
-
 	for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
 		if (make_handle_bound(rep_handle) == -1)
 			goto gen_fail;
@@ -790,4 +766,33 @@ gen_fail:
 	error_msg(gettext("Failed to read the %s property of instance %s: %s"),
 	    SCF_PROPERTY_ENABLED, fmri, scf_strerror(scf_error()));
 	return (-1);
+}
+
+/*
+ * Refresh the value of debug property under the property group "config"
+ * for network/inetd service.
+ */
+void
+refresh_debug_flag(void)
+{
+	scf_simple_prop_t	*sprop;
+	uint8_t			*tmp_bool;
+
+	if ((sprop = scf_simple_prop_get(rep_handle, INETD_INSTANCE_FMRI,
+	    PG_NAME_APPLICATION_CONFIG, PR_NAME_DEBUG_FLAG)) == NULL) {
+		error_msg(gettext("Unable to read %s property from %s property "
+		    "group. scf_simple_prop_get() failed: %s"),
+		    PR_NAME_DEBUG_FLAG, PG_NAME_APPLICATION_CONFIG,
+		    scf_strerror(scf_error()));
+		return;
+	} else if ((tmp_bool = scf_simple_prop_next_boolean(sprop)) == NULL) {
+		error_msg(gettext("Unable to read %s property for %s service. "
+		    "scf_simple_prop_next_boolean() failed: %s"),
+		    PR_NAME_DEBUG_FLAG, INETD_INSTANCE_FMRI,
+		    scf_strerror(scf_error()));
+	} else {
+		debug_enabled = ((*tmp_bool == 0) ? B_FALSE : B_TRUE);
+	}
+
+	scf_simple_prop_free(sprop);
 }

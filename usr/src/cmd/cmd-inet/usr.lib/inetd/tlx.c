@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,8 +113,6 @@ register_rpc_service(const char *fmri, const rpc_info_t *rpc)
 	struct netconfig	*nconf;
 	int			ver;
 
-	debug_msg("Entering register_rpc_service: instance: %s", fmri);
-
 	if ((nconf = getnetconfigent(rpc->netid)) == NULL) {
 		/*
 		 * Check whether getnetconfigent() failed as a result of
@@ -159,8 +157,6 @@ unregister_rpc_service(const char *fmri, const rpc_info_t *rpc)
 {
 	int			ver;
 	struct netconfig	*nconf;
-
-	debug_msg("Entering unregister_rpc_service, instance: %s", fmri);
 
 	if ((nconf = getnetconfigent(rpc->netid)) == NULL) {
 		/*
@@ -237,10 +233,6 @@ tlx_bind(int fd, const struct netbuf *reqaddr, struct netbuf *retaddr, int qlen)
 	struct t_bind breq;
 	struct t_bind bret;
 
-	debug_msg("Entering tlx_bind: req: %x, ret: %x, qlen: %d", reqaddr,
-	    retaddr, qlen);
-
-
 	if (retaddr != NULL) {	/* caller requests bound address be returned */
 		bret.addr.buf = retaddr->buf;
 		bret.addr.maxlen = retaddr->maxlen;
@@ -272,10 +264,6 @@ tlx_setsockopt(int fd, int level, int optname, const void *optval,
 		struct opthdr sockopt;
 		char data[256];
 	} optbuf;
-
-	debug_msg("Entering tlx_setsockopt, "
-	    "fd: %d, level: %d, optname: %d, optval: %x, optlen: %d",
-	    fd, level, optname, optval, optlen);
 
 	if (optlen > sizeof (optbuf.data)) {
 		error_msg(gettext("t_optmgmt request too long"));
@@ -330,8 +318,6 @@ create_bound_endpoint(const instance_t *inst, tlx_info_t *tlx_info)
 	struct netbuf		netbuf;
 	struct sockaddr_storage	ss;
 	rpc_info_t		*rpc = tlx_info->pr_info.ri;
-
-	debug_msg("Entering create_bound_endpoint");
 
 	if ((fd = t_open(tlx_info->dev_name, O_RDWR, NULL)) == -1) {
 		error_msg(gettext("Failed to open transport %s for "
@@ -402,8 +388,6 @@ get_new_conind(int fd)
 {
 	struct t_call *call;
 
-	debug_msg("Entering get_new_conind");
-
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	if ((call = (struct t_call *)t_alloc(fd, T_CALL, T_ALL)) == NULL) {
 		error_msg("t_alloc: %s", t_strerror(t_errno));
@@ -465,8 +449,6 @@ process_tlook(const char *fmri, tlx_info_t *tlx_info)
 {
 	int	event;
 	int	fd = tlx_info->pr_info.listen_fd;
-
-	debug_msg("Entering process_tlook:");
 
 	switch (event = t_look(fd)) {
 	case T_LISTEN: {
@@ -560,8 +542,6 @@ tlx_accept(const char *fmri, tlx_info_t *tlx_info,
 	int		fd;
 	int		listen_fd = tlx_info->pr_info.listen_fd;
 
-	debug_msg("Entering tlx_accept: instance: %s", fmri);
-
 	if ((fd = t_open(tlx_info->dev_name, O_RDWR, NULL)) == -1) {
 		error_msg("t_open: %s", t_strerror(t_errno));
 		return (-1);
@@ -651,8 +631,6 @@ tlx_accept(const char *fmri, tlx_info_t *tlx_info,
 void
 close_net_fd(instance_t *inst, int fd)
 {
-	debug_msg("Entering close_net_fd: inst: %s, fd: %d", inst->fmri, fd);
-
 	if (inst->config->basic->istlx) {
 		(void) t_close(fd);
 	} else {
@@ -668,9 +646,6 @@ consume_wait_data(instance_t *inst, int fd)
 {
 	int	flag;
 	char	buf[50];	/* same arbitrary size as old inetd */
-
-	debug_msg("Entering consume_wait_data: inst: %s, fd: %d", inst->fmri,
-	    fd);
 
 	if (inst->config->basic->istlx) {
 		(void) t_rcv(fd, buf, sizeof (buf), &flag);

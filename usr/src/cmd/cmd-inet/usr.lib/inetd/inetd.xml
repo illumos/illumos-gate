@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -156,6 +156,13 @@
 			value='solaris.smf.manage.inetd' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.manage.inetd' />
+	</property_group>
+
+	<property_group name='config' type='application'>
+		<!-- to enable debug-class syslog messages -->
+		<propval name='debug' type='boolean' value='false' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.inetd' />
 	</property_group>
 
 	<stability value='Unstable' />

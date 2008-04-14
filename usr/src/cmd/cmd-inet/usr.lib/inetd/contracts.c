@@ -56,8 +56,6 @@ create_contract_template(void)
 	int		fd;
 	int		err;
 
-	debug_msg("Entering create_contract_template");
-
 	if ((fd = open(CONTRACT_TEMPLATE_PATH, O_RDWR)) == -1) {
 		error_msg(gettext("Failed to open contract file %s: %s"),
 		    CONTRACT_TEMPLATE_PATH, strerror(errno));
@@ -91,8 +89,6 @@ create_contract_template(void)
 int
 contract_init(void)
 {
-	debug_msg("Entering contract_init");
-
 	if ((active_tmpl_fd = create_contract_template()) == -1) {
 		error_msg(gettext("Failed to create contract template"));
 		return (-1);
@@ -103,8 +99,6 @@ contract_init(void)
 void
 contract_fini(void)
 {
-	debug_msg("Entering contract_fini");
-
 	if (active_tmpl_fd != -1) {
 		(void) close(active_tmpl_fd);
 		active_tmpl_fd = -1;
@@ -133,8 +127,6 @@ contract_prefork(const char *fmri, int method)
 		return (-1);
 	}
 
-	debug_msg("Entering contract_prefork");
-
 	if ((err = ct_tmpl_activate(active_tmpl_fd)) != 0) {
 		error_msg(gettext("Failed to activate contract template: %s"),
 		    strerror(err));
@@ -153,8 +145,6 @@ contract_postfork(void)
 {
 	int err;
 
-	debug_msg("Entering contract_postfork");
-
 	if ((err = ct_tmpl_clear(active_tmpl_fd)) != 0)
 		error_msg("Failed to clear active contract template: %s",
 		    strerror(err));
@@ -167,8 +157,6 @@ contract_postfork(void)
 int
 get_latest_contract(ctid_t *cid)
 {
-	debug_msg("Entering get_latest_contract");
-
 	if ((errno = contract_latest(cid)) != 0) {
 		error_msg(gettext("Failed to get new contract's id: %s"),
 		    strerror(errno));
@@ -182,8 +170,6 @@ get_latest_contract(ctid_t *cid)
 static int
 open_contract_ctl_file(ctid_t cid)
 {
-	debug_msg("Entering open_contract_ctl_file");
-
 	return (contract_open(cid, "process", "ctl", O_WRONLY));
 }
 
@@ -197,8 +183,6 @@ adopt_contract(ctid_t ctid, const char *fmri)
 	int fd;
 	int err;
 	int ret = 0;
-
-	debug_msg("Entering adopt_contract, id: %d", ctid);
 
 	if ((fd = open_contract_ctl_file(ctid)) == -1) {
 		if (errno == EACCES || errno == ENOENT) {
@@ -238,8 +222,6 @@ abandon_contract(ctid_t ctid)
 {
 	int fd;
 	int err;
-
-	debug_msg("Entering abandon_contract, id: %d", ctid);
 
 	assert(ctid != -1);
 

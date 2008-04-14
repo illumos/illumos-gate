@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,14 +41,8 @@
 #include "inetd_impl.h"
 
 
-/* location of inetd's debug log file */
-#define	DEBUG_LOG_FILE		"/var/tmp/inetd.log"
-
 /* size of buffer used in msg() to expand printf() like messages into */
 #define	MSG_BUF_SIZE		1024
-
-/* size of buffer used in msg() to store a date/time string */
-#define	TIME_BUF_SIZE		50
 
 /* number of pollfd we grow the pollfd array by at a time in set_pollfd() */
 #define	POLLFDS_GROWTH_SIZE	16
@@ -77,30 +70,21 @@ method_type_info_t methods[] = {
 
 struct pollfd	*poll_fds = NULL;
 nfds_t		num_pollfds;
-static FILE	*debug_fp = NULL;
 
-boolean_t	logging_enabled;
+boolean_t	syslog_open = B_FALSE;
+boolean_t	debug_enabled = B_FALSE;
 
 void
 msg_init(void)
 {
 	openlog(SYSLOG_IDENT, LOG_PID|LOG_CONS, LOG_DAEMON);
-
-	/* Try once at startup to open the log file. */
-	debug_fp = fopen(DEBUG_LOG_FILE, "r+");
-	if (debug_fp != NULL)
-		(void) fseeko(debug_fp, 0, SEEK_END);
-	logging_enabled = B_TRUE;
+	syslog_open = B_TRUE;
 }
 
 void
 msg_fini(void)
 {
-	logging_enabled = B_FALSE;
-	if (debug_fp != NULL) {
-		(void) fclose(debug_fp);
-		debug_fp = NULL;
-	}
+	syslog_open = B_FALSE;
 	closelog();
 }
 
@@ -118,9 +102,8 @@ msg(si_msg_type_t type, const char *format, va_list ap)
 	 * memory shortage failure.
 	 */
 	char		buf[MSG_BUF_SIZE];
-	char		timebuf[TIME_BUF_SIZE];
 
-	if (!logging_enabled)
+	if (!syslog_open)
 		return;
 
 	(void) vsnprintf(buf, sizeof (buf), format, ap);
@@ -132,36 +115,8 @@ msg(si_msg_type_t type, const char *format, va_list ap)
 		syslog(LOG_ERR, "%s", buf);
 	} else if (type == MT_WARN) {
 		syslog(LOG_WARNING, "%s", buf);
-	}
-
-	if (debug_fp != NULL) {
-		struct tm	tms;
-		time_t		tm;
-
-		/*
-		 * We managed to open the log file at startup. Log all
-		 * message types there - in addition to syslog.
-		 */
-		tm = time(NULL);
-		(void) strftime(timebuf, sizeof (timebuf), NULL,
-		    localtime_r(&tm, &tms));
-		(void) fputs(timebuf, debug_fp);
-		(void) fputs(": ", debug_fp);
-
-		if (type == MT_ERROR) {
-			(void) fputs("ERROR: ", debug_fp);
-		} else if (type == MT_DEBUG) {
-			(void) fputs("DEBUG: ", debug_fp);
-		} else if (type == MT_WARN) {
-			(void) fputs("WARN: ", debug_fp);
-		}
-
-		(void) fputs(buf, debug_fp);
-
-		if (buf[strlen(buf) - 1] != '\n')
-			(void) fputc('\n', debug_fp);
-
-		(void) fflush(debug_fp);
+	} else if (debug_enabled && type == MT_DEBUG) {
+		syslog(LOG_DEBUG, "%s", buf);
 	}
 }
 
@@ -231,9 +186,6 @@ set_pollfd(int fd, uint16_t events)
 {
 	struct pollfd	*p;
 	int		i;
-
-	debug_msg("Entering set_pollfd, fd: %d, num_pollfds: %d, fds: %x,"
-	    " events: %hu", fd, num_pollfds, poll_fds, events);
 
 	p = find_pollfd(fd);
 	if ((p == NULL) && ((p = find_pollfd(-1)) == NULL)) {

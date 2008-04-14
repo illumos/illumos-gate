@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,8 +79,6 @@ method_init(void)
 {
 	struct rlimit rl;
 
-	debug_msg("Entering method_init");
-
 	/*
 	 * Save aside the old file limit and impose one large enough to support
 	 * all the /proc file handles we could have open.
@@ -120,8 +117,6 @@ method_init(void)
 void
 method_fini(void)
 {
-	debug_msg("Entering method_fini");
-
 	if (method_list != NULL) {
 		method_el_t *me;
 
@@ -190,9 +185,6 @@ register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 	char		path[MAXPATHLEN];
 	int		fd;
 	method_el_t	*me;
-
-	debug_msg("Entering register_method: inst: %s, pid: %d, mthd: %s",
-	    ins->fmri, pid, methods[mthd].name);
 
 	/* open /proc psinfo file of process to listen for POLLHUP events on */
 	(void) snprintf(path, sizeof (path), "/proc/%u/psinfo", pid);
@@ -267,9 +259,6 @@ register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 static void
 unregister_method(method_el_t *me)
 {
-	debug_msg("Entering unregister_method: inst: %s, pid: %d, mthd: %s",
-	    me->inst->fmri, me->pid, methods[me->method].name);
-
 	/* cancel any timer associated with the method */
 	if (me->inst->timer_id != -1)
 		cancel_inst_timer(me->inst);
@@ -313,8 +302,6 @@ void
 process_terminated_methods(void)
 {
 	method_el_t	*me = uu_list_first(method_list);
-
-	debug_msg("Entering process_terminated_methods");
 
 	while (me != NULL) {
 		struct pollfd	*pfd;
