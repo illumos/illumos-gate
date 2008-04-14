@@ -39,7 +39,7 @@
 
 #include <smbsrv/ndl/lsarpc.ndl>
 #include <smbsrv/mlsvc_util.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 
 
 #ifdef __cplusplus
@@ -51,7 +51,7 @@ extern "C" {
  * lsalib.c
  */
 uint32_t lsa_lookup_name(char *, char *, uint16_t, smb_userinfo_t *);
-uint32_t lsa_lookup_sid(nt_sid_t *, smb_userinfo_t *);
+uint32_t lsa_lookup_sid(smb_sid_t *, smb_userinfo_t *);
 
 int lsa_lookup_privs(char *server,
     char *account_name,

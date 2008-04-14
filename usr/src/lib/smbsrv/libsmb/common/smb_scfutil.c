@@ -40,8 +40,6 @@
 #include <uuid/uuid.h>
 #include <sys/param.h>
 
-#include <smbsrv/alloc.h>
-
 #include <smbsrv/libsmb.h>
 
 /*

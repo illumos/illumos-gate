@@ -233,10 +233,11 @@ smb_com_search(smb_request_t *sr)
 
 		(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
-		pc = MEM_ZALLOC("smb", sizeof (*pc));
+		pc = kmem_zalloc(sizeof (smb_odir_context_t), KM_SLEEP);
 		pc->dc_cookie = cookie;
-		node = (struct smb_node *)0;
+		node = NULL;
 		rc = 0;
+
 		while (count < maxcount) {
 			if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
 				break;
@@ -244,7 +245,7 @@ smb_com_search(smb_request_t *sr)
 			    (strcmp(pc->dc_name, "..") == 0)) {
 				if (node) {
 					smb_node_release(node);
-					node = (struct smb_node *)0;
+					node = NULL;
 				}
 				continue;
 			}
@@ -270,10 +271,11 @@ smb_com_search(smb_request_t *sr)
 			    (int32_t)smb_node_get_size(node, &pc->dc_attr),
 			    name);
 			smb_node_release(node);
-			node = (struct smb_node *)0;
+			node = NULL;
 			count++;
 		}
-		MEM_FREE("smb", pc);
+
+		kmem_free(pc, sizeof (smb_odir_context_t));
 
 		if ((rc != 0) && (rc != ENOENT)) {
 			/* returned error by smb_rdir_next() */

@@ -39,6 +39,7 @@ SUNWprivate {
 	ads_publish_share;
 	ads_refresh;
 	ads_remove_share;
+	ads_update_attrs;
 	dns_msgid_init;
 	dyndns_clear_rev_zone;
 	dyndns_update;

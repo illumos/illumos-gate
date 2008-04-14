@@ -336,7 +336,7 @@ smb_netlogon_samlogon(struct name_entry *server,
 {
 	smb_msgbuf_t mb;
 	nt_domain_t *ntdp;
-	nt_sid_t *domain_sid;
+	smb_sid_t *domain_sid;
 	unsigned domain_sid_len;
 	char *username;
 	unsigned char buffer[MAX_DATAGRAM_LENGTH];
@@ -354,8 +354,7 @@ smb_netlogon_samlogon(struct name_entry *server,
 	}
 
 	domain_sid = ntdp->sid;
-	domain_sid_len = nt_sid_length(domain_sid);
-	nt_sid_logf(domain_sid);
+	domain_sid_len = smb_sid_len(domain_sid);
 
 	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0)
 		return;

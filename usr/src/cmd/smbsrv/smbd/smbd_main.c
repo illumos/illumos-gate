@@ -70,7 +70,7 @@ extern void *smbd_tcp_listener(void *);
 static int smbd_daemonize_init(void);
 static void smbd_daemonize_fini(int, int);
 
-static int smbd_kernel_bind(int, int, int);
+static int smbd_kernel_bind(void);
 static void smbd_kernel_unbind(void);
 static int smbd_already_running(void);
 
@@ -85,7 +85,6 @@ static void smbd_sig_handler(int sig);
 
 static int smbd_localtime_init(void);
 static void *smbd_localtime_monitor(void *arg);
-
 
 static pthread_t localtime_thr;
 
@@ -108,10 +107,10 @@ smbd_t smbd;
 int
 main(int argc, char *argv[])
 {
-	struct sigaction act;
-	sigset_t set;
-	uid_t uid;
-	int pfd = -1;
+	struct sigaction	act;
+	sigset_t		set;
+	uid_t			uid;
+	int			pfd = -1;
 
 	smbd.s_pname = basename(argv[0]);
 	openlog(smbd.s_pname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
@@ -327,15 +326,11 @@ smbd_daemonize_fini(int fd, int exit_status)
 static int
 smbd_service_init(void)
 {
-	int		id_winpipe_door;
-	int		id_lmshr_door;
-	int		id_srv_door;
-	int		rc;
-	uint32_t	mode;
-	char		resource_domain[SMB_PI_MAX_DOMAIN];
-	char		fqdn[MAXHOSTNAMELEN];
-	smbd.s_drv_fd = -1;
+	int	rc;
+	char	resource_domain[SMB_PI_MAX_DOMAIN];
+	char	fqdn[MAXHOSTNAMELEN];
 
+	smbd.s_drv_fd = -1;
 
 	if ((mkdir(SMB_DBDIR, 0700) < 0) && (errno != EEXIST)) {
 		smbd_report("mkdir %s: %s", SMB_DBDIR, strerror(errno));
@@ -354,12 +349,14 @@ smbd_service_init(void)
 
 	(void) oem_language_set("english");
 
-	if (!nt_builtin_init()) {
+	if (!smb_wka_init()) {
 		smbd_report("out of memory");
 		return (1);
 	}
 
-	(void) smb_nicmon_start();
+	if (smb_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
+		smbd_report("NIC monitoring failed to start");
+
 	if (dns_msgid_init() != 0) {
 		smbd_report("DNS message id initialization failed");
 		return (1);
@@ -386,8 +383,8 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	mode = smb_config_get_secmode();
-	if ((rc = nt_domain_init(resource_domain, mode)) != 0) {
+	smbd.s_secmode = smb_config_get_secmode();
+	if ((rc = nt_domain_init(resource_domain, smbd.s_secmode)) != 0) {
 		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
 			smbd_report(
 			    "no machine SID: check idmap configuration");
@@ -401,7 +398,7 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	if (mode == SMB_SECMODE_DOMAIN) {
+	if (smbd.s_secmode == SMB_SECMODE_DOMAIN) {
 		if (!smb_match_netlogon_seqnum())
 			smb_set_netlogon_cred();
 		else
@@ -410,13 +407,13 @@ smbd_service_init(void)
 		(void) lsa_query_primary_domain_info();
 	}
 
-	id_lmshr_door = smb_lmshrd_srv_start();
-	if (id_lmshr_door < 0) {
+	smbd.s_door_lmshr = smb_lmshrd_srv_start();
+	if (smbd.s_door_lmshr < 0) {
 		smbd_report("share initialization failed");
 	}
 
-	id_srv_door = smb_door_srv_start();
-	if (id_srv_door < 0)
+	smbd.s_door_srv = smb_door_srv_start();
+	if (smbd.s_door_srv < 0)
 		return (rc);
 
 	if ((rc = smbd_refresh_init()) != 0)
@@ -427,8 +424,8 @@ smbd_service_init(void)
 
 	(void) smbd_localtime_init();
 
-	id_winpipe_door = smb_winpipe_doorsvc_start();
-	if (id_winpipe_door < 0) {
+	smbd.s_door_winpipe = smb_winpipe_doorsvc_start();
+	if (smbd.s_door_winpipe < 0) {
 		smbd_report("winpipe initialization failed %s",
 		    strerror(errno));
 		return (rc);
@@ -438,9 +435,11 @@ smbd_service_init(void)
 
 	(void) smb_pwd_init();
 
-	rc = smbd_kernel_bind(id_lmshr_door, id_srv_door, id_winpipe_door);
-	if (rc != 0)
+	rc = smbd_kernel_bind();
+	if (rc != 0) {
 		smbd_report("kernel bind error: %s", strerror(errno));
+		return (rc);
+	}
 
 	return (lmshare_start());
 }
@@ -454,7 +453,7 @@ static void
 smbd_service_fini(void)
 {
 	smb_winpipe_doorsvc_stop();
-	nt_builtin_fini();
+	smb_wka_fini();
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
 	smb_door_srv_stop();
@@ -479,9 +478,9 @@ smbd_service_fini(void)
 static int
 smbd_refresh_init()
 {
-	pthread_attr_t tattr;
-	pthread_condattr_t cattr;
-	int rc;
+	pthread_attr_t		tattr;
+	pthread_condattr_t	cattr;
+	int			rc;
 
 	(void) pthread_condattr_init(&cattr);
 	(void) pthread_cond_init(&refresh_cond, &cattr);
@@ -493,8 +492,8 @@ smbd_refresh_init()
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 	rc = pthread_create(&refresh_thr, &tattr, smbd_refresh_monitor, 0);
 	(void) pthread_attr_destroy(&tattr);
-	return (rc);
 
+	return (rc);
 }
 
 /*
@@ -522,7 +521,13 @@ smbd_refresh_fini()
 static void *
 smbd_refresh_monitor(void *arg)
 {
-	int dummy = 0;
+	smb_io_t	smb_io;
+	size_t		len;
+	char		*new_dom;
+	int		new_secmod;
+	char		*old_dom;
+	char		fqdn[MAXHOSTNAMELEN];
+	int		rc = 0;
 
 	(void) pthread_mutex_lock(&refresh_mutex);
 	while (pthread_cond_wait(&refresh_cond, &refresh_mutex) == 0) {
@@ -532,9 +537,51 @@ smbd_refresh_monitor(void *arg)
 		 */
 		ads_refresh();
 		smb_ccache_remove(SMB_CCACHE_PATH);
-		smb_nicmon_reconfig();
+
+		if ((rc = smb_getfqdomainname(fqdn, MAXHOSTNAMELEN)) != 0)
+			smbd_report("failed to get fully qualified domainname");
+
+		if (rc == 0)
+			/* Clear rev zone before creating if list */
+			if (dyndns_clear_rev_zone(fqdn) != 0)
+				smbd_report("failed to clear DNS reverse "
+				    "lookup zone");
+
+		/* re-initialize NIC table */
+		if (smb_nic_init() != 0)
+			smbd_report("failed to get NIC information");
+
+		smb_netbios_name_reconfig();
+		smb_browser_reconfig();
+
+		if (rc == 0)
+			if (dyndns_update(fqdn, B_FALSE) != 0)
+				smbd_report("failed to update dynamic DNS");
+
 		smb_set_netlogon_cred();
-		if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &dummy) < 0) {
+
+		smb_load_kconfig(&smb_io.sio_data.cfg);
+		new_dom = smb_io.sio_data.cfg.skc_resource_domain;
+		old_dom = smbd.s_kcfg.skc_resource_domain;
+		len = strlen(old_dom);
+		new_secmod = smb_config_get_secmode();
+		if ((len != strlen(new_dom)) ||
+		    (strncasecmp(new_dom, old_dom, len)) ||
+		    (new_secmod != smbd.s_secmode) ||
+		    (smbd.s_drv_fd == -1)) {
+			/*
+			 * The active sessions have to be disconnected.
+			 */
+			smbd_kernel_unbind();
+			if (smbd_kernel_bind()) {
+				smbd_report("kernel bind error: %s",
+				    strerror(errno));
+			}
+			continue;
+		}
+
+		bcopy(&smb_io.sio_data.cfg, &smbd.s_kcfg, sizeof (smbd.s_kcfg));
+		if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &smb_io) < 0) {
 			smbd_report("configuration update ioctl: %s",
 			    strerror(errno));
 		}
@@ -573,9 +620,11 @@ smbd_already_running(void)
 
 /*
  * smbd_kernel_bind
+ *
+ * This function open the smbsrv device and start the kernel service.
  */
 static int
-smbd_kernel_bind(int id_lmshr_door, int id_srv_door, int id_winpipe_door)
+smbd_kernel_bind(void)
 {
 	smb_io_t	smb_io;
 	int		rc;
@@ -590,7 +639,8 @@ smbd_kernel_bind(int id_lmshr_door, int id_srv_door, int id_winpipe_door)
 		smbd.s_drv_fd = -1;
 		return (errno);
 	}
-	smb_load_kconfig(&smb_io.sio_data.cfg);
+	smb_load_kconfig(&smbd.s_kcfg);
+	bcopy(&smbd.s_kcfg, &smb_io.sio_data.cfg, sizeof (smb_io.sio_data.cfg));
 	if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &smb_io) < 0) {
 		(void) close(smbd.s_drv_fd);
 		smbd.s_drv_fd = -1;
@@ -602,9 +652,9 @@ smbd_kernel_bind(int id_lmshr_door, int id_srv_door, int id_winpipe_door)
 		smbd.s_drv_fd = -1;
 		return (errno);
 	}
-	smb_io.sio_data.start.winpipe = id_winpipe_door;
-	smb_io.sio_data.start.lmshrd = id_lmshr_door;
-	smb_io.sio_data.start.udoor = id_srv_door;
+	smb_io.sio_data.start.winpipe = smbd.s_door_winpipe;
+	smb_io.sio_data.start.lmshrd = smbd.s_door_lmshr;
+	smb_io.sio_data.start.udoor = smbd.s_door_srv;
 	if (ioctl(smbd.s_drv_fd, SMB_IOC_START, &smb_io) < 0) {
 		(void) close(smbd.s_drv_fd);
 		smbd.s_drv_fd = -1;
@@ -615,8 +665,20 @@ smbd_kernel_bind(int id_lmshr_door, int id_srv_door, int id_winpipe_door)
 	if (rc == 0) {
 		rc = pthread_create(&tcp_listener, NULL, smbd_tcp_listener,
 		    NULL);
-		if (rc == 0)
+		if (rc == 0) {
+			smbd.s_kbound = B_TRUE;
 			return (0);
+		}
+	}
+
+	rc = pthread_create(&nbt_listener, NULL, smbd_nbt_listener, NULL);
+	if (rc == 0) {
+		rc = pthread_create(&tcp_listener, NULL, smbd_tcp_listener,
+		    NULL);
+		if (rc == 0) {
+			smbd.s_kbound = B_TRUE;
+			return (0);
+		}
 	}
 	(void) close(smbd.s_drv_fd);
 	smbd.s_drv_fd = -1;
@@ -632,6 +694,7 @@ smbd_kernel_unbind(void)
 	if (smbd.s_drv_fd != -1) {
 		(void) close(smbd.s_drv_fd);
 		smbd.s_drv_fd = -1;
+		smbd.s_kbound = B_FALSE;
 	}
 }
 

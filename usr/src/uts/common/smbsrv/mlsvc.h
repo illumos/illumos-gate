@@ -37,8 +37,6 @@
 #include <sys/ksynch.h>
 
 #include <smbsrv/wintypes.h>
-#include <smbsrv/ntsid.h>
-
 #include <smbsrv/smb_winpipe.h>
 #include <smbsrv/smb_xdr.h>
 

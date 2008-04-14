@@ -29,7 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_privilege.h>
@@ -41,8 +41,8 @@ extern "C" {
 #endif
 
 extern int mlsvc_init(void);
-extern uint32_t mlsvc_lookup_name(char *, nt_sid_t **, uint16_t *);
-extern uint32_t mlsvc_lookup_sid(nt_sid_t *, char **);
+extern uint32_t mlsvc_lookup_name(char *, smb_sid_t **, uint16_t *);
+extern uint32_t mlsvc_lookup_sid(smb_sid_t *, char **);
 extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD lsa_query_primary_domain_info(void);
 extern DWORD lsa_query_account_domain_info(void);

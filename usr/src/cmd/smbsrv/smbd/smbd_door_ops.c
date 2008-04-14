@@ -306,10 +306,10 @@ smb_dop_lookup_name(char *argp, size_t arg_size,
 	char *rbuf = NULL;
 	char *name = NULL;
 	uint32_t status;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	uint16_t sid_type;
-	char strsid[NT_SID_FMTBUF_SIZE];
-	char strres[NT_SID_FMTBUF_SIZE];
+	char strsid[SMB_SID_STRSZ];
+	char strres[SMB_SID_STRSZ];
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
@@ -326,7 +326,7 @@ smb_dop_lookup_name(char *argp, size_t arg_size,
 	xdr_free(xdr_string, (char *)&name);
 	if (status == NT_STATUS_SUCCESS) {
 		/* pack the SID and its type in a string */
-		nt_sid_format2(sid, strsid);
+		smb_sid_tostr(sid, strsid);
 		(void) snprintf(strres, sizeof (strres), "%d-%s",
 		    sid_type, strsid);
 		free(sid);
@@ -350,7 +350,7 @@ smb_dop_lookup_sid(char *argp, size_t arg_size,
 	char *rbuf = NULL;
 	char *name = NULL;
 	uint32_t status;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	char *strsid;
 
 	*err = SMB_DR_OP_SUCCESS;
@@ -362,7 +362,7 @@ smb_dop_lookup_sid(char *argp, size_t arg_size,
 		return (NULL);
 	}
 
-	sid = nt_sid_strtosid(strsid);
+	sid = smb_sid_fromstr(strsid);
 	status = mlsvc_lookup_sid(sid, &name);
 	free(sid);
 	if (status != NT_STATUS_SUCCESS)

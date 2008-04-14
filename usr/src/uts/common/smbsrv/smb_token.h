@@ -30,6 +30,7 @@
 
 #include <smbsrv/netrauth.h>
 #include <smbsrv/smb_privilege.h>
+#include <smbsrv/smb_sid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,7 +65,7 @@ typedef struct smb_session_key {
 
 typedef struct smb_sid_attrs {
 	uint32_t attrs;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 } smb_sid_attrs_t;
 
 /*
@@ -173,22 +174,22 @@ typedef struct smb_userinfo {
 	uint32_t primary_group_rid;
 	char *name;
 	char *domain_name;
-	nt_sid_t *domain_sid;
+	smb_sid_t *domain_sid;
 	uint32_t n_groups;
 	smb_rid_attrs_t *groups;
 	uint32_t n_other_grps;
 	smb_sid_attrs_t *other_grps;
 	smb_session_key_t *session_key;
 
-	nt_sid_t *user_sid;
-	nt_sid_t *pgrp_sid;
+	smb_sid_t *user_sid;
+	smb_sid_t *pgrp_sid;
 	uint32_t flags;
 } smb_userinfo_t;
 
 /* XDR routines */
 extern bool_t xdr_smb_session_key_t();
 extern bool_t xdr_netr_client_t();
-extern bool_t xdr_nt_sid_t();
+extern bool_t xdr_smb_sid_t();
 extern bool_t xdr_smb_sid_attrs_t();
 extern bool_t xdr_smb_id_t();
 extern bool_t xdr_smb_win_grps_t();
@@ -202,6 +203,7 @@ void smb_token_destroy(smb_token_t *token);
 uint8_t *smb_token_mkselfrel(smb_token_t *obj, uint32_t *len);
 netr_client_t *netr_client_mkabsolute(uint8_t *buf, uint32_t len);
 void netr_client_xfree(netr_client_t *);
+void smb_token_log(smb_token_t *token);
 #else /* _KERNEL */
 smb_token_t *smb_token_mkabsolute(uint8_t *buf, uint32_t len);
 void smb_token_free(smb_token_t *token);
@@ -209,13 +211,6 @@ uint8_t *netr_client_mkselfrel(netr_client_t *obj, uint32_t *len);
 #endif /* _KERNEL */
 
 int smb_token_query_privilege(smb_token_t *token, int priv_id);
-/*
- * Diagnostic routines:
- * smb_token_print: write the contents of a token to the log.
- * smb_token_log: log message is prefixed with token basic info.
- */
-void smb_token_print(smb_token_t *token);
-void smb_token_log(int level, smb_dr_user_ctx_t *user_ctx, char *fmt, ...);
 
 #ifdef __cplusplus
 }

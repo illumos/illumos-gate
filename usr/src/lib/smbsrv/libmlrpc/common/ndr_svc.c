@@ -36,7 +36,7 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 
 
 /*
@@ -221,7 +221,7 @@ ndr_hdalloc(const ndr_xa_t *xa, const void *data)
 {
 	static ndr_hdid_t uuid;
 	ndr_handle_t *hd;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 
 	if ((hd = malloc(sizeof (ndr_handle_t))) == NULL)
 		return (NULL);
@@ -232,9 +232,9 @@ ndr_hdalloc(const ndr_xa_t *xa, const void *data)
 
 		uuid.data[0] = 0;
 		uuid.data[1] = 0;
-		uuid.data[2] = sid->SubAuthority[1];
-		uuid.data[3] = sid->SubAuthority[2];
-		uuid.data[4] = sid->SubAuthority[3];
+		uuid.data[2] = sid->sid_subauth[1];
+		uuid.data[3] = sid->sid_subauth[2];
+		uuid.data[4] = sid->sid_subauth[3];
 	}
 
 	++uuid.data[1];

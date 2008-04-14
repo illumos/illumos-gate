@@ -32,12 +32,12 @@
 #include <smbsrv/cifs.h>
 
 static void smb_encode_sd(struct smb_xa *, smb_sd_t *, uint32_t);
-static void smb_encode_sid(struct smb_xa *, nt_sid_t *);
+static void smb_encode_sid(struct smb_xa *, smb_sid_t *);
 static void smb_encode_sacl(struct smb_xa *, smb_acl_t *);
 static void smb_encode_dacl(struct smb_xa *, smb_acl_t *);
 
 uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
-static nt_sid_t *smb_decode_sid(struct smb_xa *, uint32_t);
+static smb_sid_t *smb_decode_sid(struct smb_xa *, uint32_t);
 static smb_acl_t *smb_decode_acl(struct smb_xa *, uint32_t);
 
 /*
@@ -240,7 +240,7 @@ smb_encode_sd(struct smb_xa *xa, smb_sd_t *sd, uint32_t secinfo)
 	if (secinfo & SMB_OWNER_SECINFO) {
 		ASSERT(sd->sd_owner);
 		(void) smb_encode_mbc(&xa->rep_data_mb, "l", offset);
-		offset += nt_sid_length(sd->sd_owner);
+		offset += smb_sid_len(sd->sd_owner);
 	} else {
 		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
 	}
@@ -249,7 +249,7 @@ smb_encode_sd(struct smb_xa *xa, smb_sd_t *sd, uint32_t secinfo)
 	if (secinfo & SMB_GROUP_SECINFO) {
 		ASSERT(sd->sd_group);
 		(void) smb_encode_mbc(&xa->rep_data_mb, "l", offset);
-		offset += nt_sid_length(sd->sd_group);
+		offset += smb_sid_len(sd->sd_group);
 	} else {
 		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
 	}
@@ -287,21 +287,21 @@ smb_encode_sd(struct smb_xa *xa, smb_sd_t *sd, uint32_t secinfo)
  * Encodes given SID in the reply buffer.
  */
 static void
-smb_encode_sid(struct smb_xa *xa, nt_sid_t *sid)
+smb_encode_sid(struct smb_xa *xa, smb_sid_t *sid)
 {
 	int i;
 
 	(void) smb_encode_mbc(&xa->rep_data_mb, "bb",
-	    sid->Revision, sid->SubAuthCount);
+	    sid->sid_revision, sid->sid_subauthcnt);
 
 	for (i = 0; i < NT_SID_AUTH_MAX; i++) {
 		(void) smb_encode_mbc(&xa->rep_data_mb, "b",
-		    sid->Authority[i]);
+		    sid->sid_authority[i]);
 	}
 
-	for (i = 0; i < sid->SubAuthCount; i++) {
+	for (i = 0; i < sid->sid_subauthcnt; i++) {
 		(void) smb_encode_mbc(&xa->rep_data_mb, "l",
-		    sid->SubAuthority[i]);
+		    sid->sid_subauth[i]);
 	}
 }
 
@@ -444,22 +444,22 @@ decode_error:
  *
  * Allocates memory and decodes the SID in the request buffer
  * Upon successful return, caller must free the allocated memory
- * by calling MEM_FREE()
+ * by calling smb_sid_free()
  */
-static nt_sid_t *
+static smb_sid_t *
 smb_decode_sid(struct smb_xa *xa, uint32_t offset)
 {
 	uint8_t revision;
 	uint8_t subauth_cnt;
 	struct mbuf_chain sidbuf;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	int sidlen;
 	int bytes_left;
 	int i;
 
 	offset += xa->req_data_mb.chain_offset;
 	bytes_left = xa->req_data_mb.max_bytes - offset;
-	if (bytes_left < sizeof (nt_sid_t))
+	if (bytes_left < sizeof (smb_sid_t))
 		return (NULL);
 
 	(void) MBC_SHADOW_CHAIN(&sidbuf, &xa->req_data_mb, offset, bytes_left);
@@ -467,27 +467,27 @@ smb_decode_sid(struct smb_xa *xa, uint32_t offset)
 	if (smb_decode_mbc(&sidbuf, "bb", &revision, &subauth_cnt))
 		return (NULL);
 
-	sidlen = sizeof (nt_sid_t) - sizeof (uint32_t) +
+	sidlen = sizeof (smb_sid_t) - sizeof (uint32_t) +
 	    (subauth_cnt * sizeof (uint32_t));
-	sid = MEM_MALLOC("smbsrv", sidlen);
+	sid = kmem_alloc(sidlen, KM_SLEEP);
 
-	sid->Revision = revision;
-	sid->SubAuthCount = subauth_cnt;
+	sid->sid_revision = revision;
+	sid->sid_subauthcnt = subauth_cnt;
 
 	for (i = 0; i < NT_SID_AUTH_MAX; i++) {
-		if (smb_decode_mbc(&sidbuf, "b", &sid->Authority[i]))
+		if (smb_decode_mbc(&sidbuf, "b", &sid->sid_authority[i]))
 			goto decode_err;
 	}
 
-	for (i = 0; i < sid->SubAuthCount; i++) {
-		if (smb_decode_mbc(&sidbuf, "l", &sid->SubAuthority[i]))
+	for (i = 0; i < sid->sid_subauthcnt; i++) {
+		if (smb_decode_mbc(&sidbuf, "l", &sid->sid_subauth[i]))
 			goto decode_err;
 	}
 
 	return (sid);
 
 decode_err:
-	MEM_FREE("smbsrv", sid);
+	kmem_free(sid, sidlen);
 	return (NULL);
 }
 
@@ -538,7 +538,7 @@ smb_decode_acl(struct smb_xa *xa, uint32_t offset)
 		ace->se_sid = smb_decode_sid(xa, sid_offs);
 		if (ace->se_sid == NULL)
 			goto decode_error;
-		sidlen = nt_sid_length(ace->se_sid);
+		sidlen = smb_sid_len(ace->se_sid);
 		aclbuf.chain_offset += sidlen;
 		sid_offs += sidlen;
 	}

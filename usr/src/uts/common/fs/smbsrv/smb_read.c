@@ -175,8 +175,8 @@ smb_com_lock_and_read(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	status = smb_lock_range(sr, sr->fid_ofile, param->rw_offset,
-	    (uint64_t)param->rw_count, UINT_MAX, SMB_LOCK_TYPE_READWRITE);
+	status = smb_lock_range(sr, param->rw_offset, (uint64_t)param->rw_count,
+	    UINT_MAX, SMB_LOCK_TYPE_READWRITE);
 	if (status != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, status);
 		return (SDRC_ERROR);

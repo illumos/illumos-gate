@@ -56,6 +56,7 @@ SUNWprivate {
 	mlsvc_netlogon;
 	smb_logon;
 	smb_token_destroy;
+	smb_token_log;
 	smb_build_lmshare_info;
 	smb_get_smb_share_group;
 	smb_autohome_add;

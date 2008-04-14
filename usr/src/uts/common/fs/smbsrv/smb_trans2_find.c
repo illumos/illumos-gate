@@ -945,8 +945,10 @@ smb_trans2_find_mbc_encode(
 	char buf83[26];
 	smb_msgbuf_t mb;
 	uint32_t dattr = 0;
-	uint32_t size32 = 0;
-	uint64_t size64 = 0;
+	uint32_t dsize32 = 0;
+	uint32_t asize32 = 0;
+	u_offset_t datasz = 0;
+	u_offset_t allocsz = 0;
 	smb_node_t *lnk_snode;
 	smb_attr_t lnkattr;
 	int rc;
@@ -992,8 +994,14 @@ smb_trans2_find_mbc_encode(
 	}
 
 	if (infolev != SMB_FIND_FILE_NAMES_INFO) {
-		size64 = smb_node_get_size(ient->snode, &ient->attr);
-		size32 = (size64 > 0xFFFFFFFF) ? 0xFFFFFFFF : (uint32_t)size64;
+		/* data size */
+		datasz = smb_node_get_size(ient->snode, &ient->attr);
+		dsize32 = (datasz > UINT_MAX) ? UINT_MAX : (uint32_t)datasz;
+
+		/* allocation size */
+		allocsz = ient->attr.sa_vattr.va_nblocks * DEV_BSIZE;
+		asize32 = (allocsz > UINT_MAX) ? UINT_MAX : (uint32_t)allocsz;
+
 		dattr = smb_mode_to_dos_attributes(&ient->attr);
 	}
 
@@ -1008,8 +1016,8 @@ smb_trans2_find_mbc_encode(
 		    ient->attr.sa_vattr.va_mtime.tv_sec,
 		    ient->attr.sa_vattr.va_atime.tv_sec,
 		    ient->attr.sa_vattr.va_mtime.tv_sec,
-		    size32,
-		    size32,
+		    dsize32,
+		    asize32,
 		    dattr,
 		    uni_namelen,
 		    ient->name);
@@ -1025,8 +1033,8 @@ smb_trans2_find_mbc_encode(
 		    ient->attr.sa_vattr.va_mtime.tv_sec,
 		    ient->attr.sa_vattr.va_atime.tv_sec,
 		    ient->attr.sa_vattr.va_mtime.tv_sec,
-		    size32,
-		    size32,
+		    dsize32,
+		    asize32,
 		    dattr,
 		    0L,		/* EA Size */
 		    uni_namelen,
@@ -1042,8 +1050,8 @@ smb_trans2_find_mbc_encode(
 		    &ient->attr.sa_vattr.va_atime,
 		    &ient->attr.sa_vattr.va_mtime,
 		    &ient->attr.sa_vattr.va_ctime,
-		    size64,
-		    size64,
+		    (uint64_t)datasz,
+		    (uint64_t)allocsz,
 		    dattr,
 		    uni_namelen,
 		    ient->name);
@@ -1068,8 +1076,8 @@ smb_trans2_find_mbc_encode(
 		    &ient->attr.sa_vattr.va_atime,
 		    &ient->attr.sa_vattr.va_mtime,
 		    &ient->attr.sa_vattr.va_ctime,
-		    size64,
-		    size64,
+		    (uint64_t)datasz,
+		    (uint64_t)allocsz,
 		    dattr,
 		    uni_namelen,
 		    0L,

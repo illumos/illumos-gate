@@ -241,15 +241,16 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		    DirFlag);
 	} else {
 		/* Named PIPE */
+		bzero(&new_attr, sizeof (smb_attr_t));
 		(void) smb_encode_mbc(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
 		    0,
 		    sr->smb_fid,
 		    op->action_taken,
 		    0,	/* EaErrorOffset */
-		    0LL,
-		    0LL,
-		    0LL,
-		    0LL,
+		    &new_attr.sa_crtime,
+		    &new_attr.sa_vattr.va_atime,
+		    &new_attr.sa_vattr.va_mtime,
+		    &new_attr.sa_vattr.va_ctime,
 		    op->dattr,
 		    0x1000LL,
 		    0LL,

@@ -201,8 +201,8 @@ void smb_release_oplock(struct smb_ofile *file, int reason);
 
 uint32_t smb_unlock_range(struct smb_request *, struct smb_node *,
     uint64_t, uint64_t);
-uint32_t smb_lock_range(struct smb_request *, struct smb_ofile *,
-    uint64_t, uint64_t, uint32_t, uint32_t);
+uint32_t smb_lock_range(smb_request_t *, uint64_t, uint64_t, uint32_t,
+    uint32_t locktype);
 void smb_lock_range_error(smb_request_t *, uint32_t);
 
 DWORD smb_range_check(smb_request_t *, cred_t *, smb_node_t *,
@@ -369,7 +369,7 @@ uint32_t smb_node_share_check(smb_node_t *, cred_t *,
 DWORD smb_node_rename_check(smb_node_t *);
 DWORD smb_node_delete_check(smb_node_t *);
 
-uint64_t smb_node_get_size(smb_node_t *node, smb_attr_t *attr);
+u_offset_t smb_node_get_size(smb_node_t *, smb_attr_t *);
 void smb_node_set_time(struct smb_node *node, timestruc_t *crtime,
     timestruc_t *mtime, timestruc_t *atime,
     timestruc_t *ctime, unsigned int what);
@@ -565,7 +565,7 @@ int smb_dr_user_create(smb_dr_user_ctx_t *, uint64_t, uint16_t, char *, char *,
  */
 cred_t *smb_cred_create(smb_token_t *, uint32_t *);
 void smb_cred_rele(cred_t *cr);
-int smb_cred_is_member(cred_t *cr, nt_sid_t *sid);
+int smb_cred_is_member(cred_t *cr, smb_sid_t *sid);
 
 smb_xa_t *smb_xa_create(smb_session_t *session, smb_request_t *sr,
     uint32_t total_parameter_count, uint32_t total_data_count,

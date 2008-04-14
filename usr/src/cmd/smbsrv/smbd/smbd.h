@@ -38,9 +38,6 @@ extern "C" {
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 
-extern int smb_nicmon_start(void);
-extern void smb_nicmon_stop(void);
-extern void smb_nicmon_reconfig(void);
 extern int smb_winpipe_doorsvc_start(void);
 extern void smb_winpipe_doorsvc_stop(void);
 extern int smb_lmshrd_srv_start(void);
@@ -60,15 +57,21 @@ extern void smbd_user_auth_logoff(uint32_t);
 extern uint32_t smbd_join(smb_joininfo_t *);
 
 typedef struct smbd {
-	const char *s_version;		/* smbd version string */
-	const char *s_pname;		/* basename to use for messages */
-	pid_t s_pid;			/* process-ID of current daemon */
-	uid_t s_uid;			/* UID of current daemon */
-	gid_t s_gid;			/* GID of current daemon */
-	int s_fg;			/* Run in foreground */
-	int s_drv_fd;			/* Handle for SMB kernel driver */
-	int s_shutdown_flag;		/* Fields for shutdown control */
-	int s_sigval;
+	const char	*s_version;	/* smbd version string */
+	const char	*s_pname;	/* basename to use for messages */
+	pid_t		s_pid;		/* process-ID of current daemon */
+	uid_t		s_uid;		/* UID of current daemon */
+	gid_t		s_gid;		/* GID of current daemon */
+	int		s_fg;		/* Run in foreground */
+	int		s_drv_fd;	/* Handle for SMB kernel driver */
+	int		s_shutdown_flag; /* Fields for shutdown control */
+	int		s_sigval;
+	boolean_t	s_kbound;	/* B_TRUE if bound to kernel */
+	int		s_door_lmshr;
+	int		s_door_srv;
+	int		s_door_winpipe;
+	int		s_secmode;	/* Current security mode */
+	smb_kmod_cfg_t	s_kcfg;		/* Current Kernel configuration */
 } smbd_t;
 
 #ifdef __cplusplus

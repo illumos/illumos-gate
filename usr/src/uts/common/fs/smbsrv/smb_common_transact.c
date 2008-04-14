@@ -732,39 +732,35 @@ smb_trans_ready(struct smb_xa *xa)
 static int
 smb_emit_SHARE_INFO_0(struct mbuf_chain *output, unsigned char *name)
 {
-	mts_wchar_t *unibuf;
-	char *tmpbuf;
 	unsigned int cpid = oem_get_smb_cpid();
 	unsigned int length;
-	char	name_buf[MAX_SHARE_NAME_LEN];
+	char name_buf[MAX_SHARE_NAME_LEN];
+	mts_wchar_t *unibuf;
+	char *tmpbuf;
+	int rc = 0;
 
-	if (name == 0)
-		tmpbuf = "";
-	else
-		tmpbuf = (char *)name;
-
+	tmpbuf = (name == NULL) ? "" : (char *)name;
 	length = strlen(tmpbuf) + 1;
-	unibuf = MEM_MALLOC("smb", length * sizeof (mts_wchar_t));
 
+	unibuf = kmem_alloc(length * sizeof (mts_wchar_t), KM_SLEEP);
 	(void) mts_mbstowcs(unibuf, tmpbuf, length);
-	tmpbuf = MEM_MALLOC("smb", length);
+
+	tmpbuf = kmem_alloc(length, KM_SLEEP);
 	if (unicodestooems(tmpbuf, unibuf, length, cpid) == 0)
 		(void) strcpy(tmpbuf, (char *)name);
 
-	if (strlen(tmpbuf) + 1 > MAX_SHARE_NAME_LEN) {
-		MEM_FREE("smb", unibuf);
-		MEM_FREE("smb", tmpbuf);
-		return (-1);
+	if (strlen(tmpbuf) + 1 <= MAX_SHARE_NAME_LEN) {
+		bzero(name_buf, sizeof (name_buf));
+		(void) strcpy(name_buf, tmpbuf);
+		(void) smb_encode_mbc(output, "13c", name_buf);
+	} else {
+		rc = -1;
 	}
 
-	bzero(name_buf, sizeof (name_buf));
-	(void) strcpy(name_buf, tmpbuf);
-	(void) smb_encode_mbc(output, "13c", name_buf);
+	kmem_free(unibuf, length * sizeof (mts_wchar_t));
+	kmem_free(tmpbuf, length);
 
-	MEM_FREE("smb", unibuf);
-	MEM_FREE("smb", tmpbuf);
-
-	return (0);
+	return (rc);
 }
 
 static int
@@ -813,36 +809,31 @@ smb_emit_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
  * The function returns 1 for long share names and 0 when the length
  * is Ok.
  */
-static int
+static boolean_t
 is_long_sharename(unsigned char *name)
 {
+	unsigned int cpid = oem_get_smb_cpid();
+	size_t length;
 	mts_wchar_t *unibuf;
 	char *tmpbuf;
-	unsigned int cpid = oem_get_smb_cpid();
-	unsigned int length;
+	boolean_t islong;
 
-	if (name == 0)
-		tmpbuf = "";
-	else
-		tmpbuf = (char *)name;
-
+	tmpbuf = (name == NULL) ? "" : (char *)name;
 	length = strlen(tmpbuf) + 1;
-	unibuf = MEM_MALLOC("smb", length * sizeof (mts_wchar_t));
+
+	unibuf = kmem_alloc(length * sizeof (mts_wchar_t), KM_SLEEP);
 	(void) mts_mbstowcs(unibuf, tmpbuf, length);
-	tmpbuf = MEM_MALLOC("smb", length);
+
+	tmpbuf = kmem_alloc(length, KM_SLEEP);
 	if (unicodestooems(tmpbuf, unibuf, length, cpid) == 0)
 		(void) strcpy(tmpbuf, (char *)name);
 
-	if (strlen(tmpbuf) + 1 > MAX_SHARE_NAME_LEN) {
-		MEM_FREE("smb", unibuf);
-		MEM_FREE("smb", tmpbuf);
-		return (1);
-	}
+	islong = (strlen(tmpbuf) + 1 > MAX_SHARE_NAME_LEN);
 
-	MEM_FREE("smb", unibuf);
-	MEM_FREE("smb", tmpbuf);
+	kmem_free(unibuf, length * sizeof (mts_wchar_t));
+	kmem_free(tmpbuf, length);
 
-	return (0);
+	return (islong);
 }
 
 /*
@@ -950,7 +941,7 @@ smb_share_add_autohome(door_handle_t dhdl, char *username, lmshare_info_t *si)
 
 	do_add = (lmshrd_getinfo(dhdl, username, si) == NERR_Success) &&
 	    (si->mode & LMSHRM_TRANS) &&
-	    (is_long_sharename((unsigned char *)(si->share_name)) == 0);
+	    (!is_long_sharename((unsigned char *)(si->share_name)));
 
 	return (do_add);
 }
@@ -1245,6 +1236,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	int cmnt_len;
 	struct mbuf_chain reply;
 	smb_user_t *user;
+	size_t cmnt_size;
 
 	user = sr->uid_user;
 	ASSERT(user);
@@ -1287,7 +1279,8 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	shares_scnt = (shr_enum_info.sei_count > max_shares_per_packet)
 	    ? max_shares_per_packet : shr_enum_info.sei_count;
 
-	cmnt_str = MEM_MALLOC("smb", shr_enum_info.sei_cmntlen * sizeof (char));
+	cmnt_size = shr_enum_info.sei_cmntlen * sizeof (char);
+	cmnt_str = kmem_alloc(cmnt_size, KM_SLEEP);
 	cmnt_len = 0;
 	/* save start of buffer to free it at the end of function */
 	cmnt_start = cmnt_str;
@@ -1295,7 +1288,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	iterator = lmshrd_open_iterator(dhdl, LMSHRM_ALL);
 
 	if (iterator == NULL) {
-		MEM_FREE("smb", cmnt_str);
+		kmem_free(cmnt_start, cmnt_size);
 		return (SDRC_DROP_VC);
 	}
 
@@ -1433,7 +1426,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	(void) lmshrd_close_iterator(dhdl, iterator);
-	MEM_FREE("smb", cmnt_start);
+	kmem_free(cmnt_start, cmnt_size);
 	return (SDRC_NO_REPLY);
 }
 

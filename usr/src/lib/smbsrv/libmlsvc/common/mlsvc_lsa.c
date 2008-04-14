@@ -647,7 +647,7 @@ lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
     struct mlrpc_xaction *mxa)
 {
 	char domain_name[MLSVC_DOMAIN_NAME_MAX];
-	nt_sid_t *sid = NULL;
+	smb_sid_t *sid = NULL;
 	int security_mode;
 	int rc;
 
@@ -655,7 +655,7 @@ lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
 
 	if (security_mode != SMB_SECMODE_DOMAIN) {
 		rc = smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1);
-		sid = nt_sid_dup(nt_domain_local_sid());
+		sid = smb_sid_dup(nt_domain_local_sid());
 	} else {
 		rc = smb_getdomainname(domain_name, MLSVC_DOMAIN_NAME_MAX);
 		sid = smb_getdomainsid();
@@ -688,7 +688,7 @@ lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
     struct mlrpc_xaction *mxa)
 {
 	char domain_name[MLSVC_DOMAIN_NAME_MAX];
-	nt_sid_t *domain_sid;
+	smb_sid_t *domain_sid;
 	int rc;
 
 	if (smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1) != 0)
@@ -808,7 +808,7 @@ lsarpc_s_LookupSids(void *arg, struct mlrpc_xaction *mxa)
 	struct mslsa_name_entry *names;
 	struct mslsa_name_entry *name;
 	smb_userinfo_t *user_info;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	DWORD n_entry;
 	int result;
 	int i;
@@ -835,7 +835,7 @@ lsarpc_s_LookupSids(void *arg, struct mlrpc_xaction *mxa)
 	name = names;
 	for (i = 0; i < n_entry; ++i, name++) {
 		bzero(&names[i], sizeof (struct mslsa_name_entry));
-		sid = (nt_sid_t *)param->lup_sid_table.entries[i].psid;
+		sid = (smb_sid_t *)param->lup_sid_table.entries[i].psid;
 
 		result = lsa_lookup_sid(sid, user_info);
 		if (result != NT_STATUS_SUCCESS)
@@ -914,7 +914,7 @@ lsarpc_s_UpdateDomainTable(struct mlrpc_xaction *mxa,
 		return (-1);
 
 	for (i = 0; i < n_entry; ++i) {
-		if (nt_sid_is_equal((nt_sid_t *)dentry[i].domain_sid,
+		if (smb_sid_cmp((smb_sid_t *)dentry[i].domain_sid,
 		    user_info->domain_sid)) {
 			*domain_idx = i;
 			return (0);
@@ -954,7 +954,7 @@ lsarpc_s_LookupSids2(void *arg, struct mlrpc_xaction *mxa)
 	struct mslsa_domain_table *domain_table;
 	struct mslsa_domain_entry *domain_entry;
 	smb_userinfo_t *user_info;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	DWORD n_entry;
 	int result;
 	int i;
@@ -981,7 +981,7 @@ lsarpc_s_LookupSids2(void *arg, struct mlrpc_xaction *mxa)
 	name = names;
 	for (i = 0; i < n_entry; ++i, name++) {
 		bzero(name, sizeof (struct lsar_name_entry2));
-		sid = (nt_sid_t *)param->lup_sid_table.entries[i].psid;
+		sid = (smb_sid_t *)param->lup_sid_table.entries[i].psid;
 
 		result = lsa_lookup_sid(sid, user_info);
 		if (result != NT_STATUS_SUCCESS)

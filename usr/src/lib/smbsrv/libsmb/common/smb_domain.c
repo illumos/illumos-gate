@@ -39,8 +39,7 @@
 
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/string.h>
-#include <smbsrv/ntsid.h>
-#include <smbsrv/alloc.h>
+#include <smbsrv/smb_sid.h>
 
 #include <smbsrv/libsmb.h>
 
@@ -77,7 +76,7 @@ int
 nt_domain_init(char *resource_domain, uint32_t secmode)
 {
 	nt_domain_t *domain;
-	nt_sid_t *sid = NULL;
+	smb_sid_t *sid = NULL;
 	char sidstr[128];
 	char *lsidstr;
 	char hostname[MAXHOSTNAMELEN];
@@ -94,7 +93,7 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 	lsidstr = smb_config_get_localsid();
 
 	if (lsidstr) {
-		sid = nt_sid_strtosid(lsidstr);
+		sid = smb_sid_fromstr(lsidstr);
 
 		if (sid) {
 			domain = nt_domain_new(NT_DOMAIN_LOCAL, hostname, sid);
@@ -107,7 +106,7 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 		return (SMB_DOMAIN_NOMACHINE_SID);
 	}
 
-	if ((sid = nt_sid_strtosid(NT_BUILTIN_DOMAIN_SIDSTR)) != NULL) {
+	if ((sid = smb_sid_fromstr(NT_BUILTIN_DOMAIN_SIDSTR)) != NULL) {
 		domain = nt_domain_new(NT_DOMAIN_BUILTIN, "BUILTIN", sid);
 		(void) nt_domain_add(domain);
 		free(sid);
@@ -116,8 +115,8 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 	if (secmode == SMB_SECMODE_DOMAIN) {
 		rc = smb_config_getstr(SMB_CI_DOMAIN_SID, sidstr,
 		    sizeof (sidstr));
-		sid = (rc == SMBD_SMF_OK) ? nt_sid_strtosid(sidstr) : NULL;
-		if (nt_sid_is_valid(sid)) {
+		sid = (rc == SMBD_SMF_OK) ? smb_sid_fromstr(sidstr) : NULL;
+		if (smb_sid_isvalid(sid)) {
 			domain = nt_domain_new(NT_DOMAIN_PRIMARY,
 			    resource_domain, sid);
 			(void) nt_domain_add(domain);
@@ -140,7 +139,7 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
  * the new domain structure is returned. Otherwise a null pointer is returned.
  */
 nt_domain_t *
-nt_domain_new(nt_domain_type_t type, char *name, nt_sid_t *sid)
+nt_domain_new(nt_domain_type_t type, char *name, smb_sid_t *sid)
 {
 	nt_domain_t *new_domain;
 
@@ -156,7 +155,7 @@ nt_domain_new(nt_domain_type_t type, char *name, nt_sid_t *sid)
 	bzero(new_domain, sizeof (nt_domain_t));
 	new_domain->type = type;
 	new_domain->name = strdup(name);
-	new_domain->sid = nt_sid_dup(sid);
+	new_domain->sid = smb_sid_dup(sid);
 
 	return (new_domain);
 }
@@ -188,7 +187,7 @@ nt_domain_delete(nt_domain_t *domain)
 nt_domain_t *
 nt_domain_add(nt_domain_t *new_domain)
 {
-	char *sidstr;
+	char sidstr[SMB_SID_STRSZ];
 
 	if (new_domain == NULL)
 		return (NULL);
@@ -199,9 +198,8 @@ nt_domain_add(nt_domain_t *new_domain)
 	nt_domain_list = new_domain;
 
 	if (new_domain->type == NT_DOMAIN_PRIMARY) {
-		sidstr = nt_sid_format(new_domain->sid);
+		smb_sid_tostr(new_domain->sid, sidstr);
 		(void) smb_config_setstr(SMB_CI_DOMAIN_SID, sidstr);
-		free(sidstr);
 	}
 	(void) rw_unlock(&nt_domain_lock);
 
@@ -312,13 +310,13 @@ nt_domain_lookup_name(char *domain_name)
  * a pointer to it is returned. Otherwise a null pointer is returned.
  */
 nt_domain_t *
-nt_domain_lookup_sid(nt_sid_t *domain_sid)
+nt_domain_lookup_sid(smb_sid_t *domain_sid)
 {
 	nt_domain_t *domain = nt_domain_list;
 
 	(void) rw_rdlock(&nt_domain_lock);
 	while (domain) {
-		if (nt_sid_is_equal(domain->sid, domain_sid))
+		if (smb_sid_cmp(domain->sid, domain_sid))
 			break;
 
 		domain = domain->next;
@@ -360,7 +358,7 @@ nt_domain_lookupbytype(nt_domain_type_t type)
  * represents the local domain, which is named after the local hostname.
  * The local domain SID must exist.
  */
-nt_sid_t *
+smb_sid_t *
 nt_domain_local_sid(void)
 {
 	nt_domain_t *domain = nt_domain_list;

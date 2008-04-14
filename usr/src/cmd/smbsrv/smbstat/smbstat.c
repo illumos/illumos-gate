@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,17 +39,18 @@
 #include <utility.h>
 #include <libintl.h>
 #include <zone.h>
+#include <smbsrv/smb_kstat.h>
 
-static kstat_ctl_t *kc;		/* libkstat cookie */
-static kstat_t *smb_info;
-static kstat_t *smb_dispatch;
-static kstat_t *ksmb_kstat;
+static kstat_ctl_t	*kc;		/* libkstat cookie */
+static kstat_t		*smb_server;
+static kstat_t		*smb_cmds;
 
 static int get_smbinfo_stat(void);
 static int get_smbdispatch_stat(void);
-static void smbstat_setup(void);
-static void smbstat_smb_info_print();
-static void smbstat_smb_dispatch_print();
+static void smbstat_init(void);
+static void smbstat_fini(void);
+static void smbstat_smb_server_print();
+static void smbstat_smb_cmds_print();
 static void smbstat_print(const char *, kstat_t *, int);
 static int smbstat_width(kstat_t *, int);
 static void smbstat_fail(int, char *, ...);
@@ -62,8 +63,8 @@ int
 main(int argc, char *argv[])
 {
 	int c;
-	int iflag = 0;		/* smb_info stats */
-	int dflag = 0;		/* smb_dispatch_all stats */
+	int iflag = 0;		/* smb_server stats */
+	int dflag = 0;		/* smb_cmds_all stats */
 
 	if (getzoneid() != GLOBAL_ZONEID) {
 		(void) fprintf(stderr,
@@ -97,19 +98,18 @@ main(int argc, char *argv[])
 		smbstat_usage();
 	}
 
-	smbstat_setup();
+	smbstat_init();
 
 	if (iflag) {
-		smbstat_smb_info_print();
+		smbstat_smb_server_print();
 	} else if (dflag) {
-		smbstat_smb_dispatch_print();
+		smbstat_smb_cmds_print();
 	} else {
-		smbstat_smb_info_print();
-		smbstat_smb_dispatch_print();
+		smbstat_smb_server_print();
+		smbstat_smb_cmds_print();
 	}
 
-	(void) kstat_close(kc);
-	free(ksmb_kstat);
+	smbstat_fini();
 	return (0);
 }
 
@@ -117,31 +117,53 @@ main(int argc, char *argv[])
 static int
 get_smbinfo_stat(void)
 {
-	(void) smbstat_kstat_read(kc, smb_info, NULL);
-	return (smbstat_width(smb_info, 0));
+	(void) smbstat_kstat_read(kc, smb_server, NULL);
+	return (smbstat_width(smb_server, 0));
 }
 
 static int
 get_smbdispatch_stat(void)
 {
-	(void) smbstat_kstat_read(kc, smb_dispatch, NULL);
-	return (smbstat_width(smb_dispatch, 0));
+	(void) smbstat_kstat_read(kc, smb_cmds, NULL);
+	return (smbstat_width(smb_cmds, 0));
 }
 
 static void
-smbstat_smb_info_print()
+smbstat_smb_server_print()
 {
-	int field_width;
+	int	field_width;
+	int	i, j, nreq, ncolumns;
+	char	fixlen[128];
+	kstat_named_t *knp;
 
 	field_width = get_smbinfo_stat();
 	if (field_width == 0)
 		return;
 
-	smbstat_print(gettext("\nSMB Info:\n"), smb_info, field_width);
+	(void) printf("%s\n", "\nSMB Info:\n");
+	ncolumns = (MAX_COLUMNS -1)/field_width;
+
+	knp = KSTAT_NAMED_PTR(smb_server);
+	nreq = smb_server->ks_ndata;
+
+	for (i = 0; i < nreq; i += ncolumns) {
+		/* prints out the titles of the columns */
+		for (j = i; j < MIN(i + ncolumns, nreq); j++) {
+			(void) printf("%-*s", field_width, knp[j].name);
+		}
+		(void) printf("\n");
+		/* prints out the stat numbers */
+		for (j = i; j < MIN(i + ncolumns, nreq); j++) {
+			(void) sprintf(fixlen, "%" PRIu32 " ",
+			    knp[j].value.ui32);
+			(void) printf("%-*s", field_width, fixlen);
+		}
+		(void) printf("\n");
+	}
 }
 
 static void
-smbstat_smb_dispatch_print()
+smbstat_smb_cmds_print()
 {
 	int field_width;
 
@@ -150,25 +172,33 @@ smbstat_smb_dispatch_print()
 		return;
 
 	smbstat_print(gettext("\nAll dispatched SMB requests statistics:\n"),
-	    smb_dispatch, field_width);
+	    smb_cmds, field_width);
 }
 
 static void
-smbstat_setup(void)
+smbstat_init(void)
 {
+	char	smbsrv_name[KSTAT_STRLEN];
+
+	(void) snprintf(smbsrv_name, sizeof (smbsrv_name), "%s%d",
+	    SMBSRV_KSTAT_NAME, getzoneid());
+
 	if ((kc = kstat_open()) == NULL)
 		smbstat_fail(1, gettext("kstat_open(): can't open /dev/kstat"));
 
-	if ((ksmb_kstat = malloc(sizeof (kstat_t))) == NULL) {
-		(void) kstat_close(kc);
-		smbstat_fail(1, gettext("Out of memory"));
-	}
+	smb_server = kstat_lookup(kc, SMBSRV_KSTAT_MODULE, 0, smbsrv_name);
+	smb_cmds = kstat_lookup(kc, SMBSRV_KSTAT_MODULE, 0,
+	    SMBSRV_KSTAT_NAME_CMDS);
 
-	smb_info = kstat_lookup(kc, "smb", 0, "smb_info");
-	smb_dispatch = kstat_lookup(kc, "smb", 0, "smb_dispatch_all");
-	if ((smb_info == NULL) || (smb_dispatch == NULL))
+	if ((smb_server == NULL) || (smb_cmds == NULL))
 		smbstat_fail(0, gettext("kstat lookups failed for smb. "
 		    "Your kernel module may not be loaded\n"));
+}
+
+static void
+smbstat_fini(void)
+{
+	(void) kstat_close(kc);
 }
 
 static int

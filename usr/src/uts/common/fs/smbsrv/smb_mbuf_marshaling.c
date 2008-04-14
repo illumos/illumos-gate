@@ -361,25 +361,25 @@ mbc_marshal_put_mbuf_chain(struct mbuf_chain *mbc, struct mbuf_chain *nmbc)
 }
 
 int
-mbc_marshal_put_SID(struct mbuf_chain *mbc, nt_sid_t *pSid)
+mbc_marshal_put_SID(struct mbuf_chain *mbc, smb_sid_t *pSid)
 {
 	int	i;
 
-	if (mbc_marshal_put_char(mbc, pSid->Revision) != 0)
+	if (mbc_marshal_put_char(mbc, pSid->sid_revision) != 0)
 		return (DECODE_NO_MORE_DATA);
 
-	if (mbc_marshal_put_char(mbc, pSid->SubAuthCount) != 0)
+	if (mbc_marshal_put_char(mbc, pSid->sid_subauthcnt) != 0)
 		return (DECODE_NO_MORE_DATA);
 
 	for (i = 0; i < 6; i++) {
 		if (mbc_marshal_put_char(mbc,
-		    pSid->Authority[i]) != 0)
+		    pSid->sid_authority[i]) != 0)
 			return (DECODE_NO_MORE_DATA);
 
 	}
 
-	for (i = 0; i < pSid->SubAuthCount; i++) {
-		if (mbc_marshal_put_long(mbc, pSid->SubAuthority[i]) != 0)
+	for (i = 0; i < pSid->sid_subauthcnt; i++) {
+		if (mbc_marshal_put_long(mbc, pSid->sid_subauth[i]) != 0)
 			return (DECODE_NO_MORE_DATA);
 	}
 	return (0);
@@ -760,24 +760,24 @@ mbc_marshal_get_uio(struct mbuf_chain *mbc, struct uio *uio)
 
 
 int
-mbc_marshal_get_SID(struct mbuf_chain *mbc, nt_sid_t *pSid)
+mbc_marshal_get_SID(struct mbuf_chain *mbc, smb_sid_t *pSid)
 {
 	int	i;
 
-	if (mbc_marshal_get_char(mbc, &pSid->Revision) != 0)
+	if (mbc_marshal_get_char(mbc, &pSid->sid_revision) != 0)
 		return (DECODE_NO_MORE_DATA);
 
-	if (mbc_marshal_get_char(mbc, &pSid->SubAuthCount) != 0)
+	if (mbc_marshal_get_char(mbc, &pSid->sid_subauthcnt) != 0)
 		return (DECODE_NO_MORE_DATA);
 
 	for (i = 0; i < 6; i++) {
 		if (mbc_marshal_get_char(mbc,
-		    &pSid->Authority[i]) != 0)
+		    &pSid->sid_authority[i]) != 0)
 			return (DECODE_NO_MORE_DATA);
 	}
 
-	for (i = 0; i < pSid->SubAuthCount; i++) {
-		if (mbc_marshal_get_long(mbc, &pSid->SubAuthority[i]) != 0)
+	for (i = 0; i < pSid->sid_subauthcnt; i++) {
+		if (mbc_marshal_get_long(mbc, &pSid->sid_subauth[i]) != 0)
 			return (DECODE_NO_MORE_DATA);
 	}
 	return (0);
@@ -931,9 +931,9 @@ smb_mbc_decode(struct mbuf_chain *mbc, char *fmt, va_list ap)
 			*nm = 0;
 			if (!c) fmt--;
 			if (strcmp((char *)op, "SID") == 0) {
-				nt_sid_t *sidp;
+				smb_sid_t *sidp;
 
-				sidp = va_arg(ap, nt_sid_t *);
+				sidp = va_arg(ap, smb_sid_t *);
 				(void) mbc_marshal_get_SID(mbc, sidp);
 			}
 			continue;
@@ -1334,9 +1334,9 @@ smb_mbc_encode(struct mbuf_chain *mbc, char *fmt, va_list ap)
 			*nm = 0;
 			if (!c) fmt--;
 			if (strcmp((char *)op, "SID") == 0) {
-				nt_sid_t *sidp;
+				smb_sid_t *sidp;
 
-				sidp = va_arg(ap, nt_sid_t *);
+				sidp = va_arg(ap, smb_sid_t *);
 				(void) mbc_marshal_put_SID(mbc, sidp);
 			}
 			continue;

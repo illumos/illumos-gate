@@ -42,7 +42,6 @@
 #include <smbsrv/lsalib.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/ntsid.h>
 #include <smbsrv/smb_token.h>
 
 /*
@@ -57,14 +56,14 @@ static int lsa_lookup_mode(const char *, const char *);
 static uint32_t lsa_lookup_name_builtin(char *, smb_userinfo_t *);
 static uint32_t lsa_lookup_name_local(char *, char *, uint16_t,
     smb_userinfo_t *);
-static uint32_t lsa_lookup_name_lusr(char *, nt_sid_t **);
-static uint32_t lsa_lookup_name_lgrp(char *, nt_sid_t **);
+static uint32_t lsa_lookup_name_lusr(char *, smb_sid_t **);
+static uint32_t lsa_lookup_name_lgrp(char *, smb_sid_t **);
 static uint32_t lsa_lookup_name_domain(char *, char *, char *,
     smb_userinfo_t *);
 
-static uint32_t lsa_lookup_sid_builtin(nt_sid_t *, smb_userinfo_t *);
-static uint32_t lsa_lookup_sid_local(nt_sid_t *, smb_userinfo_t *);
-static uint32_t lsa_lookup_sid_domain(nt_sid_t *, smb_userinfo_t *);
+static uint32_t lsa_lookup_sid_builtin(smb_sid_t *, smb_userinfo_t *);
+static uint32_t lsa_lookup_sid_local(smb_sid_t *, smb_userinfo_t *);
+static uint32_t lsa_lookup_sid_domain(smb_sid_t *, smb_userinfo_t *);
 
 static int lsa_list_accounts(mlsvc_handle_t *);
 
@@ -135,15 +134,15 @@ lsa_lookup_name(char *server, char *account, uint16_t sid_type,
 }
 
 uint32_t
-lsa_lookup_sid(nt_sid_t *sid, smb_userinfo_t *ainfo)
+lsa_lookup_sid(smb_sid_t *sid, smb_userinfo_t *ainfo)
 {
-	if (!nt_sid_is_valid(sid))
+	if (!smb_sid_isvalid(sid))
 		return (NT_STATUS_INVALID_SID);
 
-	if (nt_sid_is_local(sid))
+	if (smb_sid_islocal(sid))
 		return (lsa_lookup_sid_local(sid, ainfo));
 
-	if (nt_builtin_lookup_sid(sid, NULL))
+	if (smb_wka_lookup_sid(sid, NULL))
 		return (lsa_lookup_sid_builtin(sid, ainfo));
 
 	return (lsa_lookup_sid_domain(sid, ainfo));
@@ -255,18 +254,18 @@ lsa_lookup_name_builtin(char *account_name, smb_userinfo_t *user_info)
 	char *domain;
 	int res;
 
-	user_info->user_sid = nt_builtin_lookup_name(account_name,
+	user_info->user_sid = smb_wka_lookup_name(account_name,
 	    &user_info->sid_name_use);
 
 	if (user_info->user_sid == NULL)
 		return (NT_STATUS_NONE_MAPPED);
 
-	user_info->domain_sid = nt_sid_dup(user_info->user_sid);
-	res = nt_sid_split(user_info->domain_sid, &user_info->rid);
+	user_info->domain_sid = smb_sid_dup(user_info->user_sid);
+	res = smb_sid_split(user_info->domain_sid, &user_info->rid);
 	if (res < 0)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	domain = nt_builtin_lookup_domain(account_name);
+	domain = smb_wka_lookup_domain(account_name);
 	if (domain) {
 		user_info->domain_name = strdup(domain);
 		return (NT_STATUS_SUCCESS);
@@ -293,7 +292,7 @@ lsa_lookup_name_local(char *domain, char *name, uint16_t sid_type,
     smb_userinfo_t *ainfo)
 {
 	char hostname[MAXHOSTNAMELEN];
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	uint32_t status;
 
 	switch (sid_type) {
@@ -331,11 +330,11 @@ lsa_lookup_name_local(char *domain, char *name, uint16_t sid_type,
 
 	ainfo->sid_name_use = sid_type;
 	ainfo->user_sid = sid;
-	ainfo->domain_sid = nt_sid_dup(sid);
+	ainfo->domain_sid = smb_sid_dup(sid);
 	if (ainfo->domain_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	(void) nt_sid_split(ainfo->domain_sid, &ainfo->rid);
+	(void) smb_sid_split(ainfo->domain_sid, &ainfo->rid);
 	if ((domain == NULL) || (*domain == '\0')) {
 		(void) smb_getnetbiosname(hostname, sizeof (hostname));
 		ainfo->domain_name = strdup(hostname);
@@ -394,7 +393,7 @@ void
 lsa_test_lookup(char *name)
 {
 	smb_userinfo_t *user_info;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	DWORD status;
 	smb_ntdomain_t *di;
 
@@ -408,7 +407,7 @@ lsa_test_lookup(char *name)
 		    user_info);
 
 		if (status == 0) {
-			sid = nt_sid_splice(user_info->domain_sid,
+			sid = smb_sid_splice(user_info->domain_sid,
 			    user_info->rid);
 
 			(void) lsa_lookup_sid_domain(sid, user_info);
@@ -545,7 +544,7 @@ lsa_list_accounts(mlsvc_handle_t *domain_handle)
 		for (i = 0; i < accounts.entries_read; ++i) {
 			sid = accounts.info[i].sid;
 
-			name = nt_builtin_lookup_sid((nt_sid_t *)sid,
+			name = smb_wka_lookup_sid((smb_sid_t *)sid,
 			    &sid_name_use);
 
 			if (name == 0) {
@@ -558,8 +557,6 @@ lsa_list_accounts(mlsvc_handle_t *domain_handle)
 					sid_name_use = SidTypeUnknown;
 				}
 			}
-
-			nt_sid_logf((nt_sid_t *)sid);
 
 			if (lsar_open_account(domain_handle, sid,
 			    &account_handle) == 0) {
@@ -591,7 +588,7 @@ lsa_list_accounts(mlsvc_handle_t *domain_handle)
  * a domain SID if local users are mapped to domain users.
  */
 static uint32_t
-lsa_lookup_name_lusr(char *name, nt_sid_t **sid)
+lsa_lookup_name_lusr(char *name, smb_sid_t **sid)
 {
 	struct passwd *pw;
 
@@ -615,7 +612,7 @@ lsa_lookup_name_lusr(char *name, nt_sid_t **sid)
  * a domain SID if local groups are mapped to domain groups.
  */
 static uint32_t
-lsa_lookup_name_lgrp(char *name, nt_sid_t **sid)
+lsa_lookup_name_lgrp(char *name, smb_sid_t **sid)
 {
 	struct group *gr;
 
@@ -633,7 +630,7 @@ lsa_lookup_mode(const char *domain, const char *name)
 {
 	int lookup_mode;
 
-	if (nt_builtin_lookup((char *)name))
+	if (smb_wka_lookup((char *)name))
 		return (MLSVC_LOOKUP_BUILTIN);
 
 	if (smb_config_get_secmode() == SMB_SECMODE_WORKGRP)
@@ -651,7 +648,7 @@ lsa_lookup_mode(const char *domain, const char *name)
 }
 
 static uint32_t
-lsa_lookup_sid_local(nt_sid_t *sid, smb_userinfo_t *ainfo)
+lsa_lookup_sid_local(smb_sid_t *sid, smb_userinfo_t *ainfo)
 {
 	char hostname[MAXHOSTNAMELEN];
 	struct passwd *pw;
@@ -687,8 +684,8 @@ lsa_lookup_sid_local(nt_sid_t *sid, smb_userinfo_t *ainfo)
 	if (ainfo->name == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	ainfo->domain_sid = nt_sid_dup(sid);
-	if (nt_sid_split(ainfo->domain_sid, &ainfo->rid) < 0)
+	ainfo->domain_sid = smb_sid_dup(sid);
+	if (smb_sid_split(ainfo->domain_sid, &ainfo->rid) < 0)
 		return (NT_STATUS_INTERNAL_ERROR);
 	*hostname = '\0';
 	(void) smb_getnetbiosname(hostname, MAXHOSTNAMELEN);
@@ -699,25 +696,25 @@ lsa_lookup_sid_local(nt_sid_t *sid, smb_userinfo_t *ainfo)
 }
 
 static uint32_t
-lsa_lookup_sid_builtin(nt_sid_t *sid, smb_userinfo_t *ainfo)
+lsa_lookup_sid_builtin(smb_sid_t *sid, smb_userinfo_t *ainfo)
 {
 	char *name;
 	WORD sid_name_use;
 
-	if ((name = nt_builtin_lookup_sid(sid, &sid_name_use)) == NULL)
+	if ((name = smb_wka_lookup_sid(sid, &sid_name_use)) == NULL)
 		return (NT_STATUS_NONE_MAPPED);
 
 	ainfo->sid_name_use = sid_name_use;
 	ainfo->name = strdup(name);
-	ainfo->domain_sid = nt_sid_dup(sid);
+	ainfo->domain_sid = smb_sid_dup(sid);
 
 	if (ainfo->name == NULL || ainfo->domain_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
 	if (sid_name_use != SidTypeDomain)
-		(void) nt_sid_split(ainfo->domain_sid, &ainfo->rid);
+		(void) smb_sid_split(ainfo->domain_sid, &ainfo->rid);
 
-	if ((name = nt_builtin_lookup_domain(ainfo->name)) != NULL)
+	if ((name = smb_wka_lookup_domain(ainfo->name)) != NULL)
 		ainfo->domain_name = strdup(name);
 	else
 		ainfo->domain_name = strdup("UNKNOWN");
@@ -729,7 +726,7 @@ lsa_lookup_sid_builtin(nt_sid_t *sid, smb_userinfo_t *ainfo)
 }
 
 static uint32_t
-lsa_lookup_sid_domain(nt_sid_t *sid, smb_userinfo_t *ainfo)
+lsa_lookup_sid_domain(smb_sid_t *sid, smb_userinfo_t *ainfo)
 {
 	mlsvc_handle_t domain_handle;
 	char *user = smbrdr_ipc_get_user();

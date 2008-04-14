@@ -41,7 +41,6 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/lsalib.h>
-#include <smbsrv/alloc.h>
 
 extern uint32_t netlogon_logon(netr_client_t *clnt, smb_userinfo_t *uinfo);
 static uint32_t smb_logon_domain(netr_client_t *clnt, smb_userinfo_t *uinfo);
@@ -50,7 +49,7 @@ static uint32_t smb_logon_none(netr_client_t *clnt, smb_userinfo_t *uinfo);
 
 static uint32_t smb_setup_luinfo(smb_userinfo_t *, netr_client_t *, uid_t);
 
-static int smb_token_is_member(smb_token_t *token, nt_sid_t *sid);
+static int smb_token_is_member(smb_token_t *token, smb_sid_t *sid);
 static int smb_token_is_valid(smb_token_t *token);
 static smb_win_grps_t *smb_token_create_wingrps(smb_userinfo_t *user_info);
 
@@ -288,7 +287,7 @@ smb_token_destroy(smb_token_t *token)
 }
 
 static smb_id_t *
-smb_token_create_id(nt_sid_t *sid)
+smb_token_create_id(smb_sid_t *sid)
 {
 	smb_id_t *id;
 
@@ -298,7 +297,7 @@ smb_token_create_id(nt_sid_t *sid)
 
 	id->i_id = (uid_t)-1;
 	id->i_sidattr.attrs = 7;
-	id->i_sidattr.sid = nt_sid_dup(sid);
+	id->i_sidattr.sid = smb_sid_dup(sid);
 
 	if (id->i_sidattr.sid == NULL) {
 		free(id);
@@ -321,13 +320,13 @@ smb_token_create_owner(smb_userinfo_t *user_info)
 
 #ifdef PBSHORTCUT
 	if (user_info->flags & SMB_UINFO_FLAG_ADMIN) {
-		well_known_account_t *wka;
+		smb_wka_t *wka;
 		/*
 		 * Need Winchester update on Group ID as file owner issue.
 		 * For now, the file owner will always be set with user SID.
 		 */
-		wka = nt_builtin_lookup("Administratrors");
-		owner = smb_token_create_id(wka->binsid);
+		wka = smb_wka_lookup("Administratrors");
+		owner = smb_token_create_id(wka->wka_binsid);
 	} else
 #endif
 	owner = smb_token_create_id(user_info->user_sid);
@@ -378,7 +377,7 @@ smb_token_create_privs(smb_userinfo_t *user_info)
 static void
 smb_token_set_flags(smb_token_t *token, smb_userinfo_t *user_info)
 {
-	well_known_account_t *wka;
+	smb_wka_t *wka;
 
 	if (user_info->flags & SMB_UINFO_FLAG_ANON) {
 		token->tkn_flags |= SMB_ATF_ANON;
@@ -390,16 +389,16 @@ smb_token_set_flags(smb_token_t *token, smb_userinfo_t *user_info)
 		return;
 	}
 
-	wka = nt_builtin_lookup("Administrators");
-	if (wka->binsid && smb_token_is_member(token, wka->binsid))
+	wka = smb_wka_lookup("Administrators");
+	if (wka->wka_binsid && smb_token_is_member(token, wka->wka_binsid))
 		token->tkn_flags |= SMB_ATF_ADMIN;
 
-	wka = nt_builtin_lookup("Power Users");
-	if (wka->binsid && smb_token_is_member(token, wka->binsid))
+	wka = smb_wka_lookup("Power Users");
+	if (wka->wka_binsid && smb_token_is_member(token, wka->wka_binsid))
 		token->tkn_flags |= SMB_ATF_POWERUSER;
 
-	wka = nt_builtin_lookup("Backup Operators");
-	if (wka->binsid && smb_token_is_member(token, wka->binsid))
+	wka = smb_wka_lookup("Backup Operators");
+	if (wka->wka_binsid && smb_token_is_member(token, wka->wka_binsid))
 		token->tkn_flags |= SMB_ATF_BACKUPOP;
 
 }
@@ -525,7 +524,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 	smb_sid_attrs_t *dlg_grps;
 	smb_rid_attrs_t *g_grps;
 	smb_sid_attrs_t *grp;
-	nt_sid_t *builtin_sid;
+	smb_sid_t *builtin_sid;
 	smb_giter_t gi;
 	smb_group_t lgrp;
 	uint32_t n_gg, n_lg, n_dlg, n_wg;
@@ -561,7 +560,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 	g_grps = user_info->groups;
 	for (i = 0; i < n_gg; i++) {
 		grp = &tkn_grps->wg_groups[i].i_sidattr;
-		grp->sid = nt_sid_splice(user_info->domain_sid, g_grps[i].rid);
+		grp->sid = smb_sid_splice(user_info->domain_sid, g_grps[i].rid);
 		if (grp->sid == NULL)
 			break;
 		grp->attrs = g_grps[i].attributes;
@@ -573,7 +572,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 		 * primary group.
 		 */
 		grp = &tkn_grps->wg_groups[i].i_sidattr;
-		grp->sid = nt_sid_dup(user_info->pgrp_sid);
+		grp->sid = smb_sid_dup(user_info->pgrp_sid);
 		if (grp->sid != NULL) {
 			grp->attrs = 0x7;
 			i++;
@@ -584,7 +583,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 	dlg_grps = user_info->other_grps;
 	for (j = 0; j < n_dlg; j++, i++) {
 		grp = &tkn_grps->wg_groups[i].i_sidattr;
-		grp->sid = nt_sid_dup(dlg_grps[j].sid);
+		grp->sid = smb_sid_dup(dlg_grps[j].sid);
 		if (grp->sid == NULL)
 			break;
 		grp->attrs = dlg_grps[j].attrs;
@@ -597,7 +596,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 			if ((j < n_lg) &&
 			    smb_lgrp_is_member(&lgrp, user_info->user_sid)) {
 				grp = &tkn_grps->wg_groups[i].i_sidattr;
-				grp->sid = nt_sid_dup(lgrp.sg_id.gs_sid);
+				grp->sid = smb_sid_dup(lgrp.sg_id.gs_sid);
 				if (grp->sid == NULL) {
 					smb_lgrp_free(&lgrp);
 					break;
@@ -613,7 +612,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 
 	/* Add well known groups */
 	for (j = 0; j < n_wg; j++, i++) {
-		builtin_sid = nt_builtin_lookup_name(wk_grps[j], NULL);
+		builtin_sid = smb_wka_lookup_name(wk_grps[j], NULL);
 		if (builtin_sid == NULL)
 			break;
 		tkn_grps->wg_groups[i].i_sidattr.sid = builtin_sid;
@@ -788,7 +787,7 @@ smb_setup_luinfo(smb_userinfo_t *lui, netr_client_t *clnt, uid_t uid)
 	char pwbuf[1024];
 
 	lui->sid_name_use = SidTypeUser;
-	lui->domain_sid = nt_sid_dup(nt_domain_local_sid());
+	lui->domain_sid = smb_sid_dup(nt_domain_local_sid());
 	lui->name = strdup(clnt->username);
 	lui->domain_name = strdup(clnt->domain);
 	lui->n_groups = 0;
@@ -802,8 +801,8 @@ smb_setup_luinfo(smb_userinfo_t *lui, netr_client_t *clnt, uid_t uid)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	if (clnt->flags & NETR_CFLG_ANON) {
-		lui->user_sid = nt_builtin_lookup_name("Anonymous", NULL);
-		lui->pgrp_sid = nt_builtin_lookup_name("Anonymous", NULL);
+		lui->user_sid = smb_wka_lookup_name("Anonymous", NULL);
+		lui->pgrp_sid = smb_wka_lookup_name("Anonymous", NULL);
 		lui->flags = SMB_UINFO_FLAG_ANON;
 
 		if (lui->user_sid == NULL || lui->pgrp_sid == NULL)
@@ -846,10 +845,10 @@ smb_setup_luinfo(smb_userinfo_t *lui, netr_client_t *clnt, uid_t uid)
 	}
 
 	lui->rid = umap->sim_rid;
-	lui->user_sid = nt_sid_dup(umap->sim_sid);
+	lui->user_sid = smb_sid_dup(umap->sim_sid);
 
 	lui->primary_group_rid = gmap->sim_rid;
-	lui->pgrp_sid = nt_sid_dup(gmap->sim_sid);
+	lui->pgrp_sid = smb_sid_dup(gmap->sim_sid);
 
 	smb_idmap_batch_destroy(&sib);
 
@@ -895,7 +894,7 @@ smb_token_is_valid(smb_token_t *token)
  * Return a pointer to the user SID in the specified token. A null
  * pointer indicates an error.
  */
-static nt_sid_t *
+static smb_sid_t *
 smb_token_user_sid(smb_token_t *token)
 {
 	if (token && token->tkn_user)
@@ -918,7 +917,7 @@ smb_token_user_sid(smb_token_t *token)
  * On success a pointer to the appropriate group SID will be returned.
  * Otherwise a null pointer will be returned.
  */
-static nt_sid_t *
+static smb_sid_t *
 smb_token_group_sid(smb_token_t *token, int *iterator)
 {
 	smb_win_grps_t *groups;
@@ -950,18 +949,91 @@ smb_token_group_sid(smb_token_t *token, int *iterator)
  * Returns 1 if the SID is a member of the token. Otherwise returns 0.
  */
 static int
-smb_token_is_member(smb_token_t *token, nt_sid_t *sid)
+smb_token_is_member(smb_token_t *token, smb_sid_t *sid)
 {
-	nt_sid_t *tsid;
+	smb_sid_t *tsid;
 	int iterator = 0;
 
 	tsid = smb_token_user_sid(token);
 	while (tsid) {
-		if (nt_sid_is_equal(tsid, sid))
+		if (smb_sid_cmp(tsid, sid))
 			return (1);
 
 		tsid = smb_token_group_sid(token, &iterator);
 	}
 
 	return (0);
+}
+
+/*
+ * smb_token_log
+ *
+ * Diagnostic routine to write the contents of a token to the log.
+ */
+void
+smb_token_log(smb_token_t *token)
+{
+	smb_win_grps_t *w_grps;
+	smb_posix_grps_t *x_grps;
+	smb_sid_attrs_t *grp;
+	char sidstr[SMB_SID_STRSZ];
+	int i;
+
+	if (token == NULL)
+		return;
+
+	syslog(LOG_DEBUG, "Token for %s\\%s",
+	    (token->tkn_domain_name) ? token->tkn_domain_name : "-NULL-",
+	    (token->tkn_account_name) ? token->tkn_account_name : "-NULL-");
+
+	syslog(LOG_DEBUG, "   User->Attr: %d",
+	    token->tkn_user->i_sidattr.attrs);
+	smb_sid_tostr((smb_sid_t *)token->tkn_user->i_sidattr.sid, sidstr);
+	syslog(LOG_DEBUG, "   User->Sid: %s (id=%u)",
+	    sidstr, token->tkn_user->i_id);
+
+	smb_sid_tostr((smb_sid_t *)token->tkn_owner->i_sidattr.sid, sidstr);
+	syslog(LOG_DEBUG, "   Ownr->Sid: %s (id=%u)",
+	    sidstr, token->tkn_owner->i_id);
+
+	smb_sid_tostr((smb_sid_t *)token->tkn_primary_grp->i_sidattr.sid,
+	    sidstr);
+	syslog(LOG_DEBUG, "   PGrp->Sid: %s (id=%u)",
+	    sidstr, token->tkn_primary_grp->i_id);
+
+	w_grps = token->tkn_win_grps;
+	if (w_grps) {
+		syslog(LOG_DEBUG, "   Windows groups: %d",
+		    w_grps->wg_count);
+
+		for (i = 0; i < w_grps->wg_count; ++i) {
+			grp = &w_grps->wg_groups[i].i_sidattr;
+			syslog(LOG_DEBUG,
+			    "    Grp[%d].Attr:%d", i, grp->attrs);
+			if (w_grps->wg_groups[i].i_sidattr.sid) {
+				smb_sid_tostr((smb_sid_t *)grp->sid, sidstr);
+				syslog(LOG_DEBUG,
+				    "    Grp[%d].Sid: %s (id=%u)", i, sidstr,
+				    w_grps->wg_groups[i].i_id);
+			}
+		}
+	}
+	else
+		syslog(LOG_DEBUG, "   No Windows groups");
+
+	x_grps = token->tkn_posix_grps;
+	if (x_grps) {
+		syslog(LOG_DEBUG, "   Solaris groups: %d",
+		    x_grps->pg_ngrps);
+		for (i = 0; i < x_grps->pg_ngrps; i++)
+			syslog(LOG_DEBUG, "    %u",
+			    x_grps->pg_grps[i]);
+	}
+	else
+		syslog(LOG_DEBUG, "   No Solaris groups");
+
+	if (token->tkn_privileges)
+		smb_privset_log(token->tkn_privileges);
+	else
+		syslog(LOG_DEBUG, "   No privileges");
 }

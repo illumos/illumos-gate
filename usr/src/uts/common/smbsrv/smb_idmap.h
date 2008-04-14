@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@
 #include <idmap.h>
 #endif
 
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,7 +69,7 @@ typedef struct smb_idmap {
 	uid_t		*sim_id;
 	char		*sim_domsid;
 	uint32_t	sim_rid;
-	nt_sid_t	*sim_sid;
+	smb_sid_t	*sim_sid;
 	idmap_stat	sim_stat;
 } smb_idmap_t;
 
@@ -81,14 +81,14 @@ typedef struct smb_idmap_batch {
 	idmap_get_handle_t 	*sib_idmaph;
 } smb_idmap_batch_t;
 
-idmap_stat smb_idmap_getsid(uid_t, int, nt_sid_t **);
-idmap_stat smb_idmap_getid(nt_sid_t *, uid_t *, int *);
+idmap_stat smb_idmap_getsid(uid_t, int, smb_sid_t **);
+idmap_stat smb_idmap_getid(smb_sid_t *, uid_t *, int *);
 
 void smb_idmap_batch_destroy(smb_idmap_batch_t *);
 idmap_stat smb_idmap_batch_create(smb_idmap_batch_t *, uint16_t, int);
 idmap_stat smb_idmap_batch_getmappings(smb_idmap_batch_t *);
 idmap_stat smb_idmap_batch_getid(idmap_get_handle_t *, smb_idmap_t *,
-    nt_sid_t *, int);
+    smb_sid_t *, int);
 idmap_stat smb_idmap_batch_getsid(idmap_get_handle_t *, smb_idmap_t *,
     uid_t, int);
 

@@ -43,8 +43,6 @@ static int smb_fsop_amask_to_omode(uint32_t granted_access);
 static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
     smb_fssd_t *fs_sd);
 
-static callb_cpr_t *smb_fsop_frlock_callback(flk_cb_when_t when, void *error);
-
 /*
  * The smb_fsop_* functions have knowledge of CIFS semantics.
  *
@@ -1349,7 +1347,7 @@ smb_fsop_read(
 
 	if (rc) {
 		smb_node_end_crit(snode);
-		return (rc);
+		return (ERANGE);
 	}
 	rc = smb_vop_read(snode->vp, uio, cr);
 
@@ -1437,7 +1435,7 @@ smb_fsop_write(
 
 	if (rc) {
 		smb_node_end_crit(snode);
-		return (rc);
+		return (ERANGE);
 	}
 	rc = smb_vop_write(snode->vp, uio, flag, lcount, cr);
 
@@ -2526,69 +2524,4 @@ smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid)
 		return;
 
 	(void) smb_vop_unshrlock(node->vp, uniq_fid, cr);
-}
-
-/*
- * smb_fsop_frlock_callback
- *
- * smb wrapper function for fs_frlock
- * this should never happen, as we are not attempting
- * to set Mandatory Locks, cmd = F_SETLK_NBMAND
- *
- */
-
-static callb_cpr_t *
-/* ARGSUSED */
-smb_fsop_frlock_callback(flk_cb_when_t when, void *error)
-{
-	return (0);
-}
-
-/*
- * smb_fs_frlock
- *
- * smb wrapper function for fs_frlock
- */
-
-int
-smb_fsop_frlock(smb_request_t *sr, smb_node_t *node, smb_lock_t *lock,
-    boolean_t unlock)
-{
-	vnode_t		*vp;
-	flock64_t	bf;
-	cred_t		*cr;
-	int		cmd;
-	flk_callback_t	flk_cb;
-	offset_t	offset = 0;
-	int		flag;
-	int		error;
-	int		i;
-
-	flk_init_callback(&flk_cb, smb_fsop_frlock_callback, &error);
-	cr = sr->user_cr;
-	vp = node->vp;
-	cmd = F_SETLK;
-
-	if (unlock == B_TRUE) {
-		bf.l_type = F_UNLCK;
-		flag = 0;
-	} else if (lock->l_type == SMB_LOCK_TYPE_READONLY) {
-		bf.l_type = F_RDLCK;
-		flag = FREAD;
-	} else if (lock->l_type == SMB_LOCK_TYPE_READWRITE) {
-		bf.l_type = F_WRLCK;
-		flag = FWRITE;
-	}
-
-	bf.l_start = lock->l_start;
-	bf.l_len = lock->l_length;
-	bf.l_whence = 0;  /* SEEK_SET */
-	bf.l_pid = lock->l_pid;
-	bf.l_sysid = 0;
-
-	for (i = 0; i < 4; i++)
-		bf.l_pad[i] = 0;
-
-	error = fs_frlock(vp, cmd, &bf, flag, offset, &flk_cb, cr, &smb_ct);
-	return (error);
 }

@@ -37,12 +37,11 @@
 #include <sys/stat.h>
 #include <sys/door.h>
 #include <sys/door_data.h>
-#include <smbsrv/ntsid.h>
-#include <smbsrv/ntsid.h>
+#include <sys/uio.h>
+
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
 #include <smbsrv/mlsvc_util.h>
-#include <sys/uio.h>
 
 
 static door_handle_t smb_winpipe_dh = NULL;

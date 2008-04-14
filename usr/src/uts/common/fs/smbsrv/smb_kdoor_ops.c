@@ -34,7 +34,6 @@
 #include <smbsrv/smb_common_door.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_xdr.h>
-#include <smbsrv/alloc.h>
 #include <smbsrv/smb_incl.h>
 
 /* SMB kernel module's door operation table */

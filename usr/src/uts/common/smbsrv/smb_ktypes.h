@@ -52,6 +52,7 @@ extern "C" {
 #include <smbsrv/lmshare.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/mbuf.h>
+#include <smbsrv/smb_sid.h>
 
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_fsd.h>
@@ -59,7 +60,7 @@ extern "C" {
 
 struct smb_request;
 struct smb_server;
-typedef struct smb_sd smb_sd_t;
+struct smb_sd;
 
 int smb_noop(void *, size_t, int);
 
@@ -640,7 +641,8 @@ typedef enum {
 	SMB_SESSION_STATE_NEGOTIATED,
 	SMB_SESSION_STATE_OPLOCK_BREAKING,
 	SMB_SESSION_STATE_WRITE_RAW_ACTIVE,
-	SMB_SESSION_STATE_TERMINATED
+	SMB_SESSION_STATE_TERMINATED,
+	SMB_SESSION_STATE_SENTINEL
 } smb_session_state_t;
 
 typedef struct smb_session {
@@ -715,7 +717,8 @@ typedef struct smb_session {
 typedef enum {
 	SMB_USER_STATE_LOGGED_IN = 0,
 	SMB_USER_STATE_LOGGING_OFF,
-	SMB_USER_STATE_LOGGED_OFF
+	SMB_USER_STATE_LOGGED_OFF,
+	SMB_USER_STATE_SENTINEL
 } smb_user_state_t;
 
 typedef struct smb_user {
@@ -749,7 +752,8 @@ typedef struct smb_user {
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,
 	SMB_TREE_STATE_DISCONNECTING,
-	SMB_TREE_STATE_DISCONNECTED
+	SMB_TREE_STATE_DISCONNECTED,
+	SMB_TREE_STATE_SENTINEL
 } smb_tree_state_t;
 
 typedef struct smb_tree {
@@ -860,7 +864,8 @@ typedef struct smb_tree {
 typedef enum {
 	SMB_OFILE_STATE_OPEN = 0,
 	SMB_OFILE_STATE_CLOSING,
-	SMB_OFILE_STATE_CLOSED
+	SMB_OFILE_STATE_CLOSED,
+	SMB_OFILE_STATE_SENTINEL
 } smb_ofile_state_t;
 
 typedef struct smb_ofile {
@@ -890,6 +895,7 @@ typedef struct smb_ofile {
 	uint16_t		f_ftype;
 	uint64_t		f_llf_pos;
 	cred_t			*f_cr;
+	pid_t			f_pid;
 } smb_ofile_t;
 
 /* odir flags bits */
@@ -902,7 +908,8 @@ typedef struct smb_ofile {
 typedef enum {
 	SMB_ODIR_STATE_OPEN = 0,
 	SMB_ODIR_STATE_CLOSING,
-	SMB_ODIR_STATE_CLOSED
+	SMB_ODIR_STATE_CLOSED,
+	SMB_ODIR_STATE_SENTINEL
 } smb_odir_state_t;
 
 typedef struct smb_odir {
@@ -1163,7 +1170,8 @@ typedef enum smb_req_state {
 	SMB_REQ_STATE_WAITING_LOCK,
 	SMB_REQ_STATE_COMPLETED,
 	SMB_REQ_STATE_CANCELED,
-	SMB_REQ_STATE_CLEANED_UP
+	SMB_REQ_STATE_CLEANED_UP,
+	SMB_REQ_STATE_SENTINEL
 } smb_req_state_t;
 
 typedef struct smb_request {
@@ -1174,6 +1182,7 @@ typedef struct smb_request {
 	boolean_t		sr_keep;
 	kmem_cache_t		*sr_cache;
 	struct smb_server	*sr_server;
+	pid_t			*sr_pid;
 	uint32_t		sr_gmtoff;
 	smb_session_t		*session;
 	smb_kmod_cfg_t		*sr_cfg;
@@ -1263,7 +1272,7 @@ typedef struct smb_request {
 		uint64_t	fileid;
 		uint32_t	rootdirfid;
 		/* This is only set by NTTransactCreate */
-		smb_sd_t	*sd;
+		struct smb_sd	*sd;
 	    } open;
 
 	    struct dirop {
@@ -1391,7 +1400,8 @@ typedef enum smb_server_state {
 	SMB_SERVER_STATE_CREATED = 0,
 	SMB_SERVER_STATE_CONFIGURED,
 	SMB_SERVER_STATE_RUNNING,
-	SMB_SERVER_STATE_DELETING
+	SMB_SERVER_STATE_DELETING,
+	SMB_SERVER_STATE_SENTINEL
 } smb_server_state_t;
 
 typedef struct smb_server {
@@ -1401,7 +1411,7 @@ typedef struct smb_server {
 	list_node_t		sv_lnd;
 	smb_server_state_t	sv_state;
 	uint32_t		sv_refcnt;
-	proc_t			*sv_proc;
+	pid_t			sv_pid;
 	zoneid_t		sv_zid;
 	smb_listener_daemon_t	sv_nbt_daemon;
 	smb_listener_daemon_t	sv_tcp_daemon;
@@ -1628,7 +1638,7 @@ typedef struct smb_ace {
 	smb_acehdr_t	se_hdr;
 	uint32_t	se_mask;
 	list_node_t	se_sln;
-	nt_sid_t	*se_sid;
+	smb_sid_t	*se_sid;
 } smb_ace_t;
 
 /*
@@ -1768,14 +1778,14 @@ typedef struct smb_acl {
  * the required abstraction for CIFS code.
  */
 
-struct smb_sd {
+typedef struct smb_sd {
 	uint8_t		sd_revision;
 	uint16_t	sd_control;
-	nt_sid_t 	*sd_owner;	/* SID file owner */
-	nt_sid_t 	*sd_group;	/* SID group (for POSIX) */
+	smb_sid_t 	*sd_owner;	/* SID file owner */
+	smb_sid_t 	*sd_group;	/* SID group (for POSIX) */
 	smb_acl_t 	*sd_sacl;	/* ACL System (audits) */
 	smb_acl_t 	*sd_dacl;	/* ACL Discretionary (perm) */
-};
+} smb_sd_t;
 
 /*
  * SD header size as it appears on the wire

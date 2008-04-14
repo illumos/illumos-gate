@@ -62,6 +62,7 @@ OBJS_COMMON = 			\
 	smb_lgrp.o		\
 	smb_mac.o		\
 	smb_nic.o		\
+	smb_nicmon.o		\
 	smb_pwdutil.o		\
 	smb_privilege.o		\
 	smb_scfutil.o		\

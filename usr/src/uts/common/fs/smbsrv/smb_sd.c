@@ -57,12 +57,8 @@ smb_sd_term(smb_sd_t *sd)
 	ASSERT(sd);
 	ASSERT((sd->sd_control & SE_SELF_RELATIVE) == 0);
 
-	if (sd->sd_owner)
-		MEM_FREE("libnt", sd->sd_owner);
-
-	if (sd->sd_group)
-		MEM_FREE("libnt", sd->sd_group);
-
+	smb_sid_free(sd->sd_owner);
+	smb_sid_free(sd->sd_group);
 	smb_acl_free(sd->sd_dacl);
 	smb_acl_free(sd->sd_sacl);
 
@@ -75,10 +71,10 @@ smb_sd_len(smb_sd_t *sd, uint32_t secinfo)
 	uint32_t length = SMB_SD_HDRSIZE;
 
 	if (secinfo & SMB_OWNER_SECINFO)
-		length += nt_sid_length(sd->sd_owner);
+		length += smb_sid_len(sd->sd_owner);
 
 	if (secinfo & SMB_GROUP_SECINFO)
-		length += nt_sid_length(sd->sd_group);
+		length += smb_sid_len(sd->sd_group);
 
 	if (secinfo & SMB_DACL_SECINFO)
 		length += smb_acl_len(sd->sd_dacl);
@@ -202,7 +198,7 @@ smb_sd_write(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 uint32_t
 smb_sd_tofs(smb_sd_t *sd, smb_fssd_t *fs_sd)
 {
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	uint32_t status = NT_STATUS_SUCCESS;
 	uint16_t sd_control;
 	idmap_stat idm_stat;
@@ -228,9 +224,8 @@ smb_sd_tofs(smb_sd_t *sd, smb_fssd_t *fs_sd)
 	/* Owner */
 	if (fs_sd->sd_secinfo & SMB_OWNER_SECINFO) {
 		sid = sd->sd_owner;
-		if (nt_sid_is_valid(sid) == 0) {
+		if (!smb_sid_isvalid(sid))
 			return (NT_STATUS_INVALID_SID);
-		}
 
 		idtype = SMB_IDMAP_UNKNOWN;
 		idm_stat = smb_idmap_getid(sid, &fs_sd->sd_uid, &idtype);
@@ -242,9 +237,8 @@ smb_sd_tofs(smb_sd_t *sd, smb_fssd_t *fs_sd)
 	/* Group */
 	if (fs_sd->sd_secinfo & SMB_GROUP_SECINFO) {
 		sid = sd->sd_group;
-		if (nt_sid_is_valid(sid) == 0) {
+		if (!smb_sid_isvalid(sid))
 			return (NT_STATUS_INVALID_SID);
-		}
 
 		idtype = SMB_IDMAP_UNKNOWN;
 		idm_stat = smb_idmap_getid(sid, &fs_sd->sd_gid, &idtype);
@@ -295,7 +289,7 @@ smb_sd_fromfs(smb_fssd_t *fs_sd, smb_sd_t *sd)
 {
 	uint32_t status = NT_STATUS_SUCCESS;
 	smb_acl_t *acl = NULL;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	idmap_stat idm_stat;
 
 	ASSERT(fs_sd);

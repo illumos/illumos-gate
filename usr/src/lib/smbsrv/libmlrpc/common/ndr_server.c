@@ -43,7 +43,6 @@
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
 #include <smbsrv/mlsvc_util.h>
-#include <smbsrv/ntsid.h>
 #include <smbsrv/smb_winpipe.h>
 
 /*

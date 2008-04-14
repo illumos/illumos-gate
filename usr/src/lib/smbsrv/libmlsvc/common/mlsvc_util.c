@@ -45,7 +45,6 @@
 #include <smbsrv/libmlsvc.h>
 
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/ntsid.h>
 #include <smbsrv/lsalib.h>
 #include <smbsrv/samlib.h>
 #include <smbsrv/mlsvc_util.h>
@@ -102,7 +101,7 @@ mlsvc_is_local_domain(const char *domain)
  * call free when it is no longer required.
  */
 uint32_t
-mlsvc_lookup_name(char *account, nt_sid_t **sid, uint16_t *sid_type)
+mlsvc_lookup_name(char *account, smb_sid_t **sid, uint16_t *sid_type)
 {
 	smb_userinfo_t *ainfo;
 	uint32_t status;
@@ -130,7 +129,7 @@ mlsvc_lookup_name(char *account, nt_sid_t **sid, uint16_t *sid_type)
  * successful return.
  */
 uint32_t
-mlsvc_lookup_sid(nt_sid_t *sid, char **name)
+mlsvc_lookup_sid(smb_sid_t *sid, char **name)
 {
 	smb_userinfo_t *ainfo;
 	uint32_t status;
@@ -238,7 +237,7 @@ mlsvc_setadmin_user_info(smb_userinfo_t *user_info)
 	if ((domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY)) == NULL)
 		return;
 
-	if (!nt_sid_is_equal((nt_sid_t *)user_info->domain_sid, domain->sid))
+	if (!smb_sid_cmp((smb_sid_t *)user_info->domain_sid, domain->sid))
 		return;
 
 	if (user_info->rid == DOMAIN_USER_RID_ADMIN)
@@ -289,18 +288,18 @@ mlsvc_string_save(ms_string_t *ms, char *str, struct mlrpc_xaction *mxa)
  * Expand the heap and copy the sid into the new area.
  * Returns a pointer to the copy of the sid on the heap.
  */
-nt_sid_t *
-mlsvc_sid_save(nt_sid_t *sid, struct mlrpc_xaction *mxa)
+smb_sid_t *
+mlsvc_sid_save(smb_sid_t *sid, struct mlrpc_xaction *mxa)
 {
-	nt_sid_t *heap_sid;
+	smb_sid_t *heap_sid;
 	unsigned size;
 
 	if (sid == NULL)
 		return (NULL);
 
-	size = nt_sid_length(sid);
+	size = smb_sid_len(sid);
 
-	if ((heap_sid = (nt_sid_t *)MLRPC_HEAP_MALLOC(mxa, size)) == NULL)
+	if ((heap_sid = (smb_sid_t *)MLRPC_HEAP_MALLOC(mxa, size)) == NULL)
 		return (0);
 
 	bcopy(sid, heap_sid, size);

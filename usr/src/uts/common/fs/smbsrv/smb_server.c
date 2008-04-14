@@ -224,6 +224,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/lmshare.h>
 #include <smbsrv/smb_door_svc.h>
+#include <smbsrv/smb_kstat.h>
 
 extern void smb_dispatch_kstat_init(void);
 extern void smb_dispatch_kstat_fini(void);
@@ -367,7 +368,7 @@ smb_server_create(void)
 	    "smb_timers", smb_server_timers, sv,
 	    NULL, NULL);
 
-	sv->sv_proc = curproc;
+	sv->sv_pid = curproc->p_pid;
 
 	smb_winpipe_init();
 	(void) smb_server_kstat_init(sv);
@@ -1080,11 +1081,12 @@ smb_server_timers(smb_thread_t *thread, void *arg)
 static int
 smb_server_kstat_init(smb_server_t *sv)
 {
-	(void) snprintf(sv->sv_ksp_name, sizeof (sv->sv_ksp_name),
-	    "smb_server%d", sv->sv_zid);
+	(void) snprintf(sv->sv_ksp_name, sizeof (sv->sv_ksp_name), "%s%d",
+	    SMBSRV_KSTAT_NAME, sv->sv_zid);
 
-	sv->sv_ksp = kstat_create("smbsrv", sv->sv_zid, sv->sv_ksp_name, "net",
-	    KSTAT_TYPE_NAMED, sizeof (sv->sv_ks_data) / sizeof (kstat_named_t),
+	sv->sv_ksp = kstat_create(SMBSRV_KSTAT_MODULE, 0, sv->sv_ksp_name,
+	    SMBSRV_KSTAT_CLASS, KSTAT_TYPE_NAMED,
+	    sizeof (sv->sv_ks_data) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL);
 
 	if (sv->sv_ksp) {

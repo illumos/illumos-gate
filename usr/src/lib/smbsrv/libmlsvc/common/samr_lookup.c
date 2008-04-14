@@ -37,8 +37,9 @@
 #include <unistd.h>
 
 #include <smbsrv/libsmb.h>
+
 #include <smbsrv/ntstatus.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/samlib.h>
 #include <smbsrv/mlrpc.h>
 #include <smbsrv/mlsvc.h>
@@ -94,7 +95,7 @@ samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name,
 	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
 	if (rc == 0) {
 		user_info->sid_name_use = SidTypeDomain;
-		user_info->domain_sid = nt_sid_dup((nt_sid_t *)arg.sid);
+		user_info->domain_sid = smb_sid_dup((smb_sid_t *)arg.sid);
 		user_info->domain_name = MEM_STRDUP("mlrpc", domain_name);
 	}
 

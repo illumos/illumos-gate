@@ -282,6 +282,7 @@ smbadm_join(int argc, char **argv)
 	boolean_t join_d = B_FALSE;
 	uint32_t status;
 	char kdom[MAXHOSTNAMELEN];
+	boolean_t override = B_FALSE;
 
 	bzero(&jdi, sizeof (jdi));
 
@@ -360,6 +361,8 @@ smbadm_join(int argc, char **argv)
 			(void) trim_whitespace(reply);
 			if (strncasecmp(reply, "yes", 3) != 0)
 				return (0);
+
+			override = B_TRUE;
 		}
 	}
 
@@ -386,6 +389,14 @@ smbadm_join(int argc, char **argv)
 	case NT_STATUS_SUCCESS:
 		(void) printf(gettext("Successfully joined domain '%s'\n"),
 		    jdi.domain_name);
+
+		if (override) {
+			if (smb_getfqdomainname(kdom, sizeof (kdom)) == -1)
+				(void) strlcpy(kdom, jdi.domain_name,
+				    sizeof (kdom));
+
+			(void) smb_config_setstr(SMB_CI_KPASSWD_DOMAIN, kdom);
+		}
 		return (0);
 
 	case NT_STATUS_DOMAIN_CONTROLLER_NOT_FOUND:
@@ -494,7 +505,7 @@ smbadm_group_create(int argc, char **argv)
 static void
 smbadm_group_dump_members(smb_gsid_t *members, int num)
 {
-	char sidstr[NT_SID_FMTBUF_SIZE];
+	char sidstr[SMB_SID_STRSZ];
 	int i;
 
 	if (num == 0) {
@@ -555,11 +566,11 @@ smbadm_group_dump_privs(smb_privset_t *privs)
 static void
 smbadm_group_dump(smb_group_t *grp, boolean_t show_mem, boolean_t show_privs)
 {
-	char sidstr[NT_SID_FMTBUF_SIZE];
+	char sidstr[SMB_SID_STRSZ];
 
 	(void) printf(gettext("%s (%s)\n"), grp->sg_name, grp->sg_cmnt);
 
-	nt_sid_format2(grp->sg_id.gs_sid, sidstr);
+	smb_sid_tostr(grp->sg_id.gs_sid, sidstr);
 	(void) printf(gettext("\tSID: %s\n"), sidstr);
 
 	if (show_privs)
@@ -617,19 +628,26 @@ smbadm_group_show(int argc, char **argv)
 		return (status);
 	}
 
-	status = smb_lgrp_iteropen(&gi);
-	if (status != SMB_LGRP_SUCCESS) {
+	if ((status = smb_lgrp_iteropen(&gi)) != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("failed to list groups (%s)\n"),
 		    smb_lgrp_strerror(status));
 		return (status);
 	}
 
-	while (smb_lgrp_iterate(&gi, &grp) == SMB_LGRP_SUCCESS) {
+	while ((status = smb_lgrp_iterate(&gi, &grp)) == SMB_LGRP_SUCCESS) {
 		smbadm_group_dump(&grp, show_members, show_privs);
 		smb_lgrp_free(&grp);
 	}
+
 	smb_lgrp_iterclose(&gi);
+
+	if (status != SMB_LGRP_NO_MORE) {
+		(void) fprintf(stderr,
+		    gettext("failed to get all the groups (%s)\n"),
+		    smb_lgrp_strerror(status));
+		return (status);
+	}
 
 	return (0);
 }

@@ -979,7 +979,6 @@ usr/include/smbsrv/ntaccess.h		i386
 usr/include/smbsrv/nterror.h		i386
 usr/include/smbsrv/ntifs.h		i386
 usr/include/smbsrv/ntlocale.h		i386
-usr/include/smbsrv/ntsid.h		i386
 usr/include/smbsrv/ntstatus.h		i386
 usr/include/smbsrv/oem.h		i386
 usr/include/smbsrv/samlib.h		i386
@@ -993,8 +992,10 @@ usr/include/smbsrv/smb_idmap.h		i386
 usr/include/smbsrv/smb_incl.h		i386
 usr/include/smbsrv/smb_ioctl.h		i386
 usr/include/smbsrv/smb_kproto.h		i386
+usr/include/smbsrv/smb_kstat.h		i386
 usr/include/smbsrv/smb_ktypes.h		i386
 usr/include/smbsrv/smb_privilege.h	i386
+usr/include/smbsrv/smb_sid.h		i386
 usr/include/smbsrv/smb_token.h		i386
 usr/include/smbsrv/smb_vops.h		i386
 usr/include/smbsrv/smb_winpipe.h	i386

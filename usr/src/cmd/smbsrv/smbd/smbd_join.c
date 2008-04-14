@@ -565,12 +565,9 @@ smb_set_netlogon_cred(void)
 		syslog(LOG_ERR, "NETLOGON credential chain establishment"
 		    " failed");
 	} else {
-		if (new_domain) {
+		if (new_domain)
 			(void) smb_config_setstr(SMB_CI_DOMAIN_NAME,
 			    kpasswd_domain);
-			(void) smb_config_setstr(SMB_CI_KPASSWD_DOMAIN,
-			    kpasswd_domain);
-		}
 	}
 
 }

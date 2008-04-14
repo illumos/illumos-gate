@@ -91,8 +91,6 @@ static char *adjoin_errmsg[] = {
 static ADS_HANDLE *ads_open_main(char *domain, char *user, char *password);
 static int ads_bind(ADS_HANDLE *);
 static void ads_get_computer_dn(ADS_HANDLE *, char *, size_t);
-static int ads_get_host_principals(char *fqhost, char *domain,
-    char **spn, char **upn);
 static int ads_add_computer(ADS_HANDLE *ah);
 static int ads_modify_computer(ADS_HANDLE *ah);
 static void ads_del_computer(ADS_HANDLE *ah);
@@ -104,6 +102,11 @@ static int ads_gen_machine_passwd(char *machine_passwd, int bufsz);
 static ADS_HOST_INFO *ads_get_host_info(void);
 static void ads_set_host_info(ADS_HOST_INFO *host);
 static void ads_free_host_info(void);
+static int ads_get_spnset(char *fqhost, char **spn_set);
+static void ads_free_spnset(char **spn_set);
+static int ads_alloc_attr(LDAPMod *attrs[], int num);
+static void ads_free_attr(LDAPMod *attrs[]);
+
 
 /*
  * ads_init
@@ -983,7 +986,31 @@ ads_display_stat(OM_uint32 maj, OM_uint32 min)
 }
 
 /*
- * free_attr
+ * ads_alloc_attr
+ *
+ * Since the attrs is a null-terminated array, all elements
+ * in the array (except the last one) will point to allocated
+ * memory.
+ */
+static int
+ads_alloc_attr(LDAPMod *attrs[], int num)
+{
+	int i;
+
+	bzero(attrs, num * sizeof (LDAPMod *));
+	for (i = 0; i < (num - 1); i++) {
+		attrs[i] = (LDAPMod *)malloc(sizeof (LDAPMod));
+		if (attrs[i] == NULL) {
+			ads_free_attr(attrs);
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * ads_free_attr
  * Free memory allocated when publishing a share.
  * Parameters:
  *   attrs: an array of LDAPMod pointers
@@ -991,12 +1018,49 @@ ads_display_stat(OM_uint32 maj, OM_uint32 min)
  *   None
  */
 static void
-free_attr(LDAPMod *attrs[])
+ads_free_attr(LDAPMod *attrs[])
 {
 	int i;
 	for (i = 0; attrs[i]; i++) {
 		free(attrs[i]);
 	}
+}
+
+/*
+ * ads_get_spnset
+ *
+ * Derives the core set of SPNs based on the FQHN.
+ * The spn_set is a null-terminated array of char pointers.
+ *
+ * Returns 0 upon success. Otherwise, returns -1.
+ */
+static int
+ads_get_spnset(char *fqhost, char **spn_set)
+{
+	int i;
+
+	bzero(spn_set, (SMBKRB5_SPN_IDX_MAX + 1) * sizeof (char *));
+	for (i = 0; i < SMBKRB5_SPN_IDX_MAX; i++) {
+		if ((spn_set[i] = smb_krb5_get_spn(i, fqhost)) == NULL) {
+			ads_free_spnset(spn_set);
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * ads_free_spnset
+ *
+ * Free the memory allocated for the set of SPNs.
+ */
+static void
+ads_free_spnset(char **spn_set)
+{
+	int i;
+	for (i = 0; spn_set[i]; i++)
+		free(spn_set[i]);
 }
 
 /*
@@ -1322,16 +1386,11 @@ ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
 	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
 	    adsContainer, ah->domain_dn);
 
-	for (j = 0; j < (ADS_SHARE_NUM_ATTR - 1); j++) {
-		attrs[j] = (LDAPMod *)malloc(sizeof (LDAPMod));
-		if (attrs[j] == NULL) {
-			free_attr(attrs);
-			free(share_dn);
-			return (-1);
-		}
+	if (ads_alloc_attr(attrs, ADS_SHARE_NUM_ATTR) != 0) {
+		free(share_dn);
+		return (-1);
 	}
 
-	j = 0;
 	attrs[j]->mod_op = LDAP_MOD_ADD;
 	attrs[j]->mod_type = "objectClass";
 	tmp1[0] = "top";
@@ -1347,19 +1406,17 @@ ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
 	tmp2[1] = 0;
 	attrs[j]->mod_values = tmp2;
 
-	attrs[++j] = 0;
-
 	if ((ret = ldap_add_s(ah->ld, share_dn, attrs)) != LDAP_SUCCESS) {
 		(void) snprintf(buf, ADS_MAXMSGLEN,
 		    "ads_add_share: %s:", share_dn);
 		/* LINTED - E_SEC_PRINTF_VAR_FMT */
 		syslog(LOG_ERR, ldap_err2string(ret));
-		free_attr(attrs);
+		ads_free_attr(attrs);
 		free(share_dn);
 		return (ret);
 	}
 	free(share_dn);
-	free_attr(attrs);
+	ads_free_attr(attrs);
 
 	(void) snprintf(buf, ADS_MAXMSGLEN,
 	    "Share %s has been added to ADS container: %s.\n", adsShareName,
@@ -1695,57 +1752,6 @@ ads_get_computer_dn(ADS_HANDLE *ah, char *buf, size_t buflen)
 }
 
 /*
- * ads_get_host_principals
- *
- * This function returns both the HOST Service Principal Name and User
- * Principal Name.
- *
- * If fqhost is NULL, this function will attempt to obtain fully qualified
- * hostname prior to generating the host principals. If caller is only
- * interested in getting the User Principal Name, spn argument can be
- * set to NULL.
- */
-static int
-ads_get_host_principals(char *fqhost, char *domain, char **spn,
-    char **upn)
-{
-	char hostname[MAXHOSTNAMELEN];
-	char *p;
-
-	if (spn != NULL)
-		*spn = NULL;
-
-	*upn = NULL;
-
-	if (fqhost) {
-		(void) strlcpy(hostname, fqhost, MAXHOSTNAMELEN);
-	} else {
-		if (smb_gethostname(hostname, MAXHOSTNAMELEN, 0) != 0)
-			return (-1);
-
-		(void) snprintf(hostname, MAXHOSTNAMELEN, "%s.%s", hostname,
-		    domain);
-	}
-
-	if ((p = smb_krb5_get_spn(SMBKRB5_SPN_IDX_HOST, hostname)) == NULL) {
-		return (-1);
-	}
-
-	*upn = smb_krb5_get_upn(p, domain);
-	if (*upn == NULL) {
-		free(p);
-		return (-1);
-	}
-
-	if (spn != NULL)
-		*spn = p;
-	else
-		free(p);
-
-	return (0);
-}
-
-/*
  * ads_add_computer
  *
  * Returns 0 upon success. Otherwise, returns -1.
@@ -1772,13 +1778,13 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 {
 	LDAPMod *attrs[ADS_COMPUTER_NUM_ATTR];
 	char *oc_vals[6], *sam_val[2], *usr_val[2];
-	char *svc_val[2], *ctl_val[2], *fqh_val[2];
-	int j = 0;
+	char *spn_set[SMBKRB5_SPN_IDX_MAX + 1], *ctl_val[2], *fqh_val[2];
+	int j = -1;
 	int ret, usrctl_flags = 0;
 	char sam_acct[MAXHOSTNAMELEN + 1];
 	char fqhost[MAXHOSTNAMELEN];
 	char dn[ADS_DN_MAX];
-	char *user_principal, *svc_principal;
+	char *user_principal;
 	char usrctl_buf[16];
 	int max;
 
@@ -1790,27 +1796,27 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 	(void) snprintf(fqhost, MAXHOSTNAMELEN, "%s.%s", fqhost,
 	    ah->domain);
 
-	if (ads_get_host_principals(fqhost, ah->domain, &svc_principal,
-	    &user_principal) == -1) {
-		syslog(LOG_ERR,
-		    "ads_computer_op: unable to get host principal");
+	if (ads_get_spnset(fqhost, spn_set) != 0)
+		return (-1);
+
+	user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
+	    ah->domain);
+
+	if (user_principal == NULL) {
+		ads_free_spnset(spn_set);
 		return (-1);
 	}
 
 	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
 
 	max = (ADS_COMPUTER_NUM_ATTR - ((op != LDAP_MOD_ADD) ? 1 : 0));
-	for (j = 0; j < (max - 1); j++) {
-		attrs[j] = (LDAPMod *)malloc(sizeof (LDAPMod));
-		if (attrs[j] == NULL) {
-			free_attr(attrs);
-			free(user_principal);
-			free(svc_principal);
-			return (-1);
-		}
+
+	if (ads_alloc_attr(attrs, max) != 0) {
+		free(user_principal);
+		ads_free_spnset(spn_set);
+		return (-1);
 	}
 
-	j = -1;
 	/* objectClass attribute is not modifiable. */
 	if (op == LDAP_MOD_ADD) {
 		attrs[++j]->mod_op = op;
@@ -1838,9 +1844,7 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 
 	attrs[++j]->mod_op = op;
 	attrs[j]->mod_type = "servicePrincipalName";
-	svc_val[0] = svc_principal;
-	svc_val[1] = 0;
-	attrs[j]->mod_values = svc_val;
+	attrs[j]->mod_values = spn_set;
 
 	attrs[++j]->mod_op = op;
 	attrs[j]->mod_type = "userAccountControl";
@@ -1857,8 +1861,6 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 	fqh_val[0] = fqhost;
 	fqh_val[1] = 0;
 	attrs[j]->mod_values = fqh_val;
-
-	attrs[++j] = 0;
 
 	switch (op) {
 	case LDAP_MOD_ADD:
@@ -1882,9 +1884,9 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 
 	}
 
-	free_attr(attrs);
+	ads_free_attr(attrs);
 	free(user_principal);
-	free(svc_principal);
+	ads_free_spnset(spn_set);
 
 	return (ret);
 }
@@ -2009,18 +2011,20 @@ ads_find_computer(ADS_HANDLE *ah)
 static int
 ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only)
 {
-	LDAPMod *attrs[6];
+	LDAPMod *attrs[2];
 	char *ctl_val[2];
-	int j = -1;
 	int ret, usrctl_flags = 0;
 	char dn[ADS_DN_MAX];
 	char usrctl_buf[16];
 
 	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
 
-	attrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	attrs[j]->mod_op = LDAP_MOD_REPLACE;
-	attrs[j]->mod_type = "userAccountControl";
+
+	if (ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0)
+		return (-1);
+
+	attrs[0]->mod_op = LDAP_MOD_REPLACE;
+	attrs[0]->mod_type = "userAccountControl";
 
 	usrctl_flags |= (ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
 	    ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION |
@@ -2032,9 +2036,7 @@ ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only)
 	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", usrctl_flags);
 	ctl_val[0] = usrctl_buf;
 	ctl_val[1] = 0;
-	attrs[j]->mod_values = ctl_val;
-
-	attrs[++j] = 0;
+	attrs[0]->mod_values = ctl_val;
 
 	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
 		syslog(LOG_ERR, "ads_modify_computer: %s",
@@ -2042,8 +2044,70 @@ ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only)
 		ret = -1;
 	}
 
-	free_attr(attrs);
+	ads_free_attr(attrs);
 	return (ret);
+}
+
+/*
+ * ads_update_attrs
+ *
+ * Updates the servicePrincipalName and dNSHostName attributes of the
+ * system's AD computer object.
+ */
+int
+ads_update_attrs(void)
+{
+	ADS_HANDLE *ah;
+	LDAPMod *attrs[3];
+	char *fqh_val[2];
+	int i = 0;
+	int ret;
+	char fqhost[MAXHOSTNAMELEN];
+	char dn[ADS_DN_MAX];
+	char *spn_set[SMBKRB5_SPN_IDX_MAX + 1];
+
+	if ((ah = ads_open()) == NULL)
+		return (-1);
+
+	if (smb_getfqhostname(fqhost, MAXHOSTNAMELEN) != 0) {
+		ads_close(ah);
+		return (-1);
+	}
+
+	if (ads_get_spnset(fqhost, spn_set) != 0) {
+		ads_close(ah);
+		return (-1);
+	}
+
+	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
+	if (ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0) {
+		ads_free_spnset(spn_set);
+		ads_close(ah);
+		return (-1);
+	}
+
+	attrs[i]->mod_op = LDAP_MOD_REPLACE;
+	attrs[i]->mod_type = "servicePrincipalName";
+	attrs[i]->mod_values = spn_set;
+
+	attrs[++i]->mod_op = LDAP_MOD_REPLACE;
+	attrs[i]->mod_type = "dNSHostName";
+	fqh_val[0] = fqhost;
+	fqh_val[1] = 0;
+	attrs[i]->mod_values = fqh_val;
+
+	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
+		syslog(LOG_ERR, "ads_update_attrs: %s",
+		    ldap_err2string(ret));
+		ret = -1;
+	}
+
+	ads_free_attr(attrs);
+	ads_free_spnset(spn_set);
+	ads_close(ah);
+
+	return (ret);
+
 }
 
 /*

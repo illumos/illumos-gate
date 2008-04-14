@@ -84,8 +84,9 @@ smb_com_query_information2(smb_request_t *sr)
 {
 	smb_node_t *node;
 	smb_attr_t *attr;
-	uint32_t	dsize, dasize;
-	unsigned short	dattr;
+	u_offset_t size64;
+	uint32_t datasz, allocsz;
+	uint16_t dattr;
 	int rc;
 
 
@@ -104,8 +105,11 @@ smb_com_query_information2(smb_request_t *sr)
 	attr = &node->attr;
 
 	dattr = smb_node_get_dosattr(node);
-	dasize = attr->sa_vattr.va_blksize * attr->sa_vattr.va_nblocks;
-	dsize = (dattr & SMB_FA_DIRECTORY) ? 0 : attr->sa_vattr.va_size;
+	size64 = smb_node_get_size(node, attr);
+	datasz = (size64 > UINT_MAX) ? UINT_MAX : (uint32_t)size64;
+
+	size64 = attr->sa_vattr.va_nblocks * DEV_BSIZE;
+	allocsz = (size64 > UINT_MAX) ? UINT_MAX : (uint32_t)size64;
 
 	rc = smbsr_encode_result(sr, 11, 0, "byyyllww",
 	    11,						/* wct */
@@ -114,8 +118,8 @@ smb_com_query_information2(smb_request_t *sr)
 	    smb_gmt2local(sr, attr->sa_vattr.va_atime.tv_sec),
 	    /* LastWriteTime */
 	    smb_gmt2local(sr, attr->sa_vattr.va_mtime.tv_sec),
-	    dsize,
-	    dasize,
+	    datasz,
+	    allocsz,
 	    dattr,					/* FileAttributes */
 	    0);						/* bcc */
 

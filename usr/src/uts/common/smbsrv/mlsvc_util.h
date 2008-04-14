@@ -36,7 +36,7 @@
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
 #include <smbsrv/mlsvc.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/smb_token.h>
 
 #ifndef _KERNEL
@@ -78,7 +78,7 @@ struct ms_string_desc {
 typedef struct ms_string_desc ms_string_t;
 
 int mlsvc_string_save(ms_string_t *ms, char *str, struct mlrpc_xaction *mxa);
-nt_sid_t *mlsvc_sid_save(nt_sid_t *sid, struct mlrpc_xaction *mxa);
+smb_sid_t *mlsvc_sid_save(smb_sid_t *sid, struct mlrpc_xaction *mxa);
 
 /*
  * This is the generic, interface independent handle definition.

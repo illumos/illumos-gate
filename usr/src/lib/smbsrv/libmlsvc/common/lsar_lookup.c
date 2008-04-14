@@ -137,7 +137,7 @@ lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass)
 			nt_domain_flush(NT_DOMAIN_PRIMARY);
 			nt_new_dp = nt_domain_new(NT_DOMAIN_PRIMARY,
 			    (char *)pd_info->name.str,
-			    (nt_sid_t *)pd_info->sid);
+			    (smb_sid_t *)pd_info->sid);
 			(void) nt_domain_add(nt_new_dp);
 			status = NT_STATUS_SUCCESS;
 			break;
@@ -148,7 +148,7 @@ lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass)
 			nt_domain_flush(NT_DOMAIN_ACCOUNT);
 			nt_new_dp = nt_domain_new(NT_DOMAIN_ACCOUNT,
 			    (char *)ad_info->name.str,
-			    (nt_sid_t *)ad_info->sid);
+			    (smb_sid_t *)ad_info->sid);
 			(void) nt_domain_add(nt_new_dp);
 			status = NT_STATUS_SUCCESS;
 			break;
@@ -259,12 +259,12 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 		} else {
 			domain_entry =
 			    &arg.domain_table->entries[index];
-			user_info->domain_sid = nt_sid_dup(
-			    (nt_sid_t *)domain_entry->domain_sid);
+			user_info->domain_sid = smb_sid_dup(
+			    (smb_sid_t *)domain_entry->domain_sid);
 			user_info->domain_name = MEM_STRDUP("mlrpc",
 			    (const char *)
 			    domain_entry->domain_name.str);
-			user_info->user_sid = nt_sid_splice(
+			user_info->user_sid = smb_sid_splice(
 			    user_info->domain_sid, user_info->rid);
 		}
 		status = NT_STATUS_SUCCESS;
@@ -342,8 +342,8 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 			domain_entry =
 			    &arg.domain_table->entries[index];
 
-			user_info->domain_sid = nt_sid_dup(
-			    (nt_sid_t *)domain_entry->domain_sid);
+			user_info->domain_sid = smb_sid_dup(
+			    (smb_sid_t *)domain_entry->domain_sid);
 
 			user_info->domain_name = MEM_STRDUP("mlrpc",
 			    (const char *)
@@ -412,16 +412,14 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 			n_entries = arg.enum_buf->entries_read;
 			nbytes = n_entries * sizeof (struct mslsa_AccountInfo);
 
-			info = (struct mslsa_AccountInfo *)MEM_MALLOC("mlrpc",
-			    nbytes);
-			if (info == NULL) {
+			if ((info = malloc(nbytes)) == NULL) {
 				mlsvc_rpc_free(context, &heap);
 				return (-1);
 			}
 
 			for (i = 0; i < n_entries; ++i)
-				info[i].sid = (struct mslsa_sid *)nt_sid_dup(
-				    (nt_sid_t *)arg.enum_buf->info[i].sid);
+				info[i].sid = (struct mslsa_sid *)smb_sid_dup(
+				    (smb_sid_t *)arg.enum_buf->info[i].sid);
 
 			accounts->entries_read = n_entries;
 			accounts->info = info;
@@ -492,7 +490,7 @@ lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle, DWORD *enum_context)
 			nt_new_dp = nt_domain_new(
 			    NT_DOMAIN_TRUSTED,
 			    (char *)arg.enum_buf->info[i].name.str,
-			    (nt_sid_t *)arg.enum_buf->info[i].sid);
+			    (smb_sid_t *)arg.enum_buf->info[i].sid);
 
 			(void) nt_domain_add(nt_new_dp);
 		}
@@ -756,8 +754,8 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 		} else {
 			domain_entry = &arg.domain_table->entries[index];
 
-			user_info->domain_sid = nt_sid_dup(
-			    (nt_sid_t *)domain_entry->domain_sid);
+			user_info->domain_sid = smb_sid_dup(
+			    (smb_sid_t *)domain_entry->domain_sid);
 
 			user_info->domain_name = MEM_STRDUP("mlrpc",
 			    (char const *)domain_entry->domain_name.str);
@@ -848,12 +846,12 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 		} else {
 			domain_entry = &arg.domain_table->entries[index];
 
-			user_info->domain_sid = nt_sid_dup(
-			    (nt_sid_t *)domain_entry->domain_sid);
+			user_info->domain_sid = smb_sid_dup(
+			    (smb_sid_t *)domain_entry->domain_sid);
 
 			user_info->domain_name = MEM_STRDUP("mlrpc",
 			    (char const *)domain_entry->domain_name.str);
-			user_info->user_sid = nt_sid_splice(
+			user_info->user_sid = smb_sid_splice(
 			    user_info->domain_sid, user_info->rid);
 		}
 		status = NT_STATUS_SUCCESS;

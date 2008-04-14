@@ -144,7 +144,7 @@ typedef struct smb_lgplist {
 } smb_lgplist_t;
 
 static mutex_t smb_lgrp_lsid_mtx;
-static nt_sid_t *smb_lgrp_lsid;
+static smb_sid_t *smb_lgrp_lsid;
 
 static int smb_lgrp_db_init(void);
 static sqlite *smb_lgrp_db_open(int);
@@ -161,9 +161,9 @@ static int smb_lgrp_gtbl_update_plist(sqlite *, char *, uint8_t, boolean_t);
 static int smb_lgrp_gtbl_count(sqlite *, int, int *);
 
 static int smb_lgrp_dtbl_insert(sqlite *, char *, uint32_t *);
-static int smb_lgrp_dtbl_getidx(sqlite *, nt_sid_t *, uint16_t,
+static int smb_lgrp_dtbl_getidx(sqlite *, smb_sid_t *, uint16_t,
     uint32_t *, uint32_t *);
-static int smb_lgrp_dtbl_getsid(sqlite *, uint32_t, nt_sid_t **);
+static int smb_lgrp_dtbl_getsid(sqlite *, uint32_t, smb_sid_t **);
 
 static int smb_lgrp_mlist_add(smb_lgmlist_t *, smb_lgmid_t *, smb_lgmlist_t *);
 static int smb_lgrp_mlist_del(smb_lgmlist_t *, smb_lgmid_t *, smb_lgmlist_t *);
@@ -180,7 +180,7 @@ static int smb_lgrp_decode_members(smb_group_t *, char *, char *, sqlite *);
 static void smb_lgrp_set_default_privs(smb_group_t *);
 static boolean_t smb_lgrp_chkname(char *);
 static boolean_t smb_lgrp_chkmember(uint16_t);
-static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, nt_sid_t **);
+static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, smb_sid_t **);
 
 /*
  * smb_lgrp_add
@@ -197,10 +197,10 @@ static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, nt_sid_t **);
 int
 smb_lgrp_add(char *gname, char *cmnt)
 {
-	well_known_account_t *wk_acct;
+	smb_wka_t *wka;
 	struct group *pxgrp;
 	smb_group_t grp;
-	nt_sid_t *sid = NULL;
+	smb_sid_t *sid = NULL;
 	sqlite *db;
 	int rc;
 
@@ -215,8 +215,8 @@ smb_lgrp_add(char *gname, char *cmnt)
 	grp.sg_name = utf8_strlwr(gname);
 	grp.sg_cmnt = cmnt;
 
-	wk_acct = nt_builtin_lookup(gname);
-	if (wk_acct == NULL) {
+	wka = smb_wka_lookup(gname);
+	if (wka == NULL) {
 		if ((pxgrp = getgrnam(gname)) == NULL)
 			return (SMB_LGRP_NOT_FOUND);
 
@@ -227,7 +227,7 @@ smb_lgrp_add(char *gname, char *cmnt)
 		    != IDMAP_SUCCESS)
 			return (SMB_LGRP_NO_SID);
 
-		if (!nt_sid_is_indomain(smb_lgrp_lsid, sid)) {
+		if (!smb_sid_indomain(smb_lgrp_lsid, sid)) {
 			free(sid);
 			return (SMB_LGRP_SID_NOTLOCAL);
 		}
@@ -236,15 +236,15 @@ smb_lgrp_add(char *gname, char *cmnt)
 		grp.sg_domain = SMB_LGRP_LOCAL;
 		grp.sg_rid = pxgrp->gr_gid;
 	} else {
-		if (wk_acct->flags & LGF_HIDDEN) {
+		if ((wka->wka_flags & SMB_WKAFLG_LGRP_ENABLE) == 0) {
 			/* cannot add well-known accounts */
 			return (SMB_LGRP_WKSID);
 		}
 
-		grp.sg_id.gs_type = wk_acct->sid_name_use;
-		if ((sid = nt_sid_strtosid(wk_acct->sid)) == NULL)
+		grp.sg_id.gs_type = wka->wka_type;
+		if ((sid = smb_sid_fromstr(wka->wka_sid)) == NULL)
 			return (SMB_LGRP_NO_MEMORY);
-		(void) nt_sid_get_rid(sid, &grp.sg_rid);
+		(void) smb_sid_getrid(sid, &grp.sg_rid);
 		free(sid);
 		grp.sg_domain = SMB_LGRP_BUILTIN;
 
@@ -288,11 +288,11 @@ smb_lgrp_rename(char *gname, char *new_gname)
 		return (SMB_LGRP_SUCCESS);
 
 	/* Cannot rename well-known groups */
-	if (nt_builtin_is_wellknown(gname))
+	if (smb_wka_is_wellknown(gname))
 		return (SMB_LGRP_WKSID);
 
 	/* Cannot rename to a well-known groups */
-	if (nt_builtin_is_wellknown(new_gname))
+	if (smb_wka_is_wellknown(new_gname))
 		return (SMB_LGRP_WKSID);
 
 	grp.sg_name = new_gname;
@@ -320,7 +320,7 @@ smb_lgrp_delete(char *gname)
 		return (SMB_LGRP_INVALID_NAME);
 
 	/* Cannot remove a built-in group */
-	if (nt_builtin_is_wellknown(gname))
+	if (smb_wka_is_wellknown(gname))
 		return (SMB_LGRP_WKSID);
 
 	db = smb_lgrp_db_open(SMB_LGRP_DB_ORW);
@@ -463,7 +463,7 @@ smb_lgrp_getpriv(char *gname, uint8_t priv_lid, boolean_t *enable)
  * Add the given account to the specified group as its member.
  */
 int
-smb_lgrp_add_member(char *gname, nt_sid_t *msid, uint16_t sid_type)
+smb_lgrp_add_member(char *gname, smb_sid_t *msid, uint16_t sid_type)
 {
 	sqlite *db;
 	smb_gsid_t mid;
@@ -473,7 +473,7 @@ smb_lgrp_add_member(char *gname, nt_sid_t *msid, uint16_t sid_type)
 	if (!smb_lgrp_chkname(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
-	if (!nt_sid_is_valid(msid))
+	if (!smb_sid_isvalid(msid))
 		return (SMB_LGRP_INVALID_ARG);
 
 	if (!smb_lgrp_chkmember(sid_type))
@@ -495,7 +495,7 @@ smb_lgrp_add_member(char *gname, nt_sid_t *msid, uint16_t sid_type)
  * Delete the specified member from the given group.
  */
 int
-smb_lgrp_del_member(char *gname, nt_sid_t *msid, uint16_t sid_type)
+smb_lgrp_del_member(char *gname, smb_sid_t *msid, uint16_t sid_type)
 {
 	sqlite *db;
 	smb_gsid_t mid;
@@ -505,7 +505,7 @@ smb_lgrp_del_member(char *gname, nt_sid_t *msid, uint16_t sid_type)
 	if (!smb_lgrp_chkname(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
-	if (!nt_sid_is_valid(msid))
+	if (!smb_sid_isvalid(msid))
 		return (SMB_LGRP_INVALID_ARG);
 
 	mid.gs_sid = msid;
@@ -624,7 +624,7 @@ smb_lgrp_numbydomain(smb_gdomain_t dom_type, int *count)
  * as a member.
  */
 int
-smb_lgrp_numbymember(nt_sid_t *msid, int *count)
+smb_lgrp_numbymember(smb_sid_t *msid, int *count)
 {
 	smb_giter_t gi;
 	smb_group_t grp;
@@ -661,11 +661,11 @@ smb_lgrp_free(smb_group_t *grp)
 
 	free(grp->sg_name);
 	free(grp->sg_cmnt);
-	free(grp->sg_id.gs_sid);
+	smb_sid_free(grp->sg_id.gs_sid);
 	smb_privset_free(grp->sg_privs);
 
 	for (i = 0; i < grp->sg_nmembers; i++)
-		free(grp->sg_members[i].gs_sid);
+		smb_sid_free(grp->sg_members[i].gs_sid);
 	free(grp->sg_members);
 }
 
@@ -781,7 +781,7 @@ smb_lgrp_iterate(smb_giter_t *iter, smb_group_t *grp)
  * the given group.
  */
 boolean_t
-smb_lgrp_is_member(smb_group_t *grp, nt_sid_t *sid)
+smb_lgrp_is_member(smb_group_t *grp, smb_sid_t *sid)
 {
 	int i;
 
@@ -789,7 +789,7 @@ smb_lgrp_is_member(smb_group_t *grp, nt_sid_t *sid)
 		return (B_FALSE);
 
 	for (i = 0; i < grp->sg_nmembers; i++) {
-		if (nt_sid_is_equal(grp->sg_members[i].gs_sid, sid))
+		if (smb_sid_cmp(grp->sg_members[i].gs_sid, sid))
 			return (B_TRUE);
 	}
 
@@ -822,7 +822,8 @@ smb_lgrp_strerror(int errno)
 	case SMB_LGRP_NO_LOCAL_SID:
 		return (dgettext(TEXT_DOMAIN, "cannot get the machine SID"));
 	case SMB_LGRP_SID_NOTLOCAL:
-		return (dgettext(TEXT_DOMAIN, "not a local SID"));
+		return (dgettext(TEXT_DOMAIN,
+		    "got a non-local SID for a local account"));
 	case SMB_LGRP_WKSID:
 		return (dgettext(TEXT_DOMAIN,
 		    "operation not permitted on well-known accounts"));
@@ -901,7 +902,7 @@ smb_lgrp_start(void)
 {
 	char *supported_bg[] =
 	    {"Administrators", "Backup Operators", "Power Users"};
-	well_known_account_t *wka;
+	smb_wka_t *wka;
 	int rc, i, ngrp;
 	char *lsid_str;
 
@@ -913,9 +914,9 @@ smb_lgrp_start(void)
 		return (SMB_LGRP_NO_LOCAL_SID);
 	}
 
-	smb_lgrp_lsid = nt_sid_strtosid(lsid_str);
+	smb_lgrp_lsid = smb_sid_fromstr(lsid_str);
 	free(lsid_str);
-	if (!nt_sid_is_valid(smb_lgrp_lsid)) {
+	if (!smb_sid_isvalid(smb_lgrp_lsid)) {
 		free(smb_lgrp_lsid);
 		smb_lgrp_lsid = NULL;
 		(void) mutex_unlock(&smb_lgrp_lsid_mtx);
@@ -933,12 +934,12 @@ smb_lgrp_start(void)
 
 	ngrp = sizeof (supported_bg) / sizeof (supported_bg[0]);
 	for (i = 0; i < ngrp; i++) {
-		wka = nt_builtin_lookup(supported_bg[i]);
+		wka = smb_wka_lookup(supported_bg[i]);
 		if (wka == NULL)
 			continue;
-		rc = smb_lgrp_add(wka->name, wka->desc);
+		rc = smb_lgrp_add(wka->wka_name, wka->wka_desc);
 		if (rc != SMB_LGRP_SUCCESS)
-			syslog(LOG_DEBUG, "failed to add %s", wka->name);
+			syslog(LOG_DEBUG, "failed to add %s", wka->wka_name);
 	}
 
 	return (SMB_LGRP_SUCCESS);
@@ -1601,18 +1602,18 @@ smb_lgrp_dtbl_insert(sqlite *db, char *dom_sid, uint32_t *dom_idx)
  * it in the domain table as a new SID.
  */
 static int
-smb_lgrp_dtbl_getidx(sqlite *db, nt_sid_t *sid, uint16_t sid_type,
+smb_lgrp_dtbl_getidx(sqlite *db, smb_sid_t *sid, uint16_t sid_type,
     uint32_t *dom_idx, uint32_t *rid)
 {
-	char sidstr[NT_SID_FMTBUF_SIZE];
-	nt_sid_t *dom_sid;
+	char sidstr[SMB_SID_STRSZ];
+	smb_sid_t *dom_sid;
 	char **result;
 	int nrow, ncol;
 	char *errmsg = NULL;
 	char *sql;
 	int rc;
 
-	if (nt_sid_is_indomain(smb_lgrp_lsid, sid)) {
+	if (smb_sid_indomain(smb_lgrp_lsid, sid)) {
 		/* This is a local SID */
 		int id_type = (sid_type == SidTypeUser)
 		    ? SMB_IDMAP_USER : SMB_IDMAP_GROUP;
@@ -1623,12 +1624,12 @@ smb_lgrp_dtbl_getidx(sqlite *db, nt_sid_t *sid, uint16_t sid_type,
 		return (SMB_LGRP_SUCCESS);
 	}
 
-	dom_sid = nt_sid_dup(sid);
+	dom_sid = smb_sid_dup(sid);
 	if (dom_sid == NULL)
 		return (SMB_LGRP_NO_MEMORY);
 
-	(void) nt_sid_split(dom_sid, rid);
-	nt_sid_format2(dom_sid, sidstr);
+	(void) smb_sid_split(dom_sid, rid);
+	smb_sid_tostr(dom_sid, sidstr);
 	free(dom_sid);
 
 	sql = sqlite_mprintf("SELECT dom_idx FROM domains WHERE dom_sid = '%s'",
@@ -1672,7 +1673,7 @@ smb_lgrp_dtbl_getidx(sqlite *db, nt_sid_t *sid, uint16_t sid_type,
  * Caller must free the returned SID by calling free().
  */
 static int
-smb_lgrp_dtbl_getsid(sqlite *db, uint32_t dom_idx, nt_sid_t **sid)
+smb_lgrp_dtbl_getsid(sqlite *db, uint32_t dom_idx, smb_sid_t **sid)
 {
 	char **result;
 	int nrow, ncol;
@@ -1701,7 +1702,7 @@ smb_lgrp_dtbl_getsid(sqlite *db, uint32_t dom_idx, nt_sid_t **sid)
 		break;
 
 	case 1:
-		*sid = nt_sid_strtosid(result[1]);
+		*sid = smb_sid_fromstr(result[1]);
 		rc = (*sid == NULL)
 		    ? SMB_LGRP_INTERNAL_ERROR : SMB_LGRP_SUCCESS;
 		break;
@@ -2010,47 +2011,59 @@ smb_lgrp_decode_privset(smb_group_t *grp, char *nprivs, char *privs)
  * smb_lgrp_decode_members
  *
  * Decodes the members information read from group table
- * (nmembers, members) into a binray format specified by the
+ * (nmembers, members) into a binary format specified by the
  * member fields of smb_group_t
  */
 static int
 smb_lgrp_decode_members(smb_group_t *grp, char *nmembers, char *members,
     sqlite *db)
 {
+	smb_lgmid_t *m_id;
 	smb_lgmid_t *m_ids;
-	smb_lgmid_t *mid;
-	smb_gsid_t *member;
+	smb_gsid_t *m_sid;
+	smb_gsid_t *m_sids;
+	int m_num;
 	int mids_size;
 	int i, rc;
 
-	grp->sg_nmembers = atoi(nmembers);
-	mids_size = grp->sg_nmembers * sizeof (smb_lgmid_t);
-	m_ids = malloc(mids_size);
-	if (m_ids == NULL)
+	grp->sg_nmembers = 0;
+	grp->sg_members = NULL;
+
+	m_num = atoi(nmembers);
+	mids_size = m_num * sizeof (smb_lgmid_t);
+	if ((m_ids = malloc(mids_size)) == NULL)
 		return (SMB_LGRP_NO_MEMORY);
 
-	grp->sg_members = malloc(grp->sg_nmembers * sizeof (smb_gsid_t));
-	if (grp->sg_members == NULL) {
+	m_sids = malloc(m_num * sizeof (smb_gsid_t));
+	if (m_sids == NULL) {
 		free(m_ids);
 		return (SMB_LGRP_NO_MEMORY);
 	}
+	bzero(m_sids, m_num * sizeof (smb_gsid_t));
 
 	(void) hextobin(members, strlen(members), (char *)m_ids, mids_size);
 
-	mid = m_ids;
-	member = grp->sg_members;
-	for (i = 0; i < grp->sg_nmembers; i++, mid++, member++) {
-		rc = smb_lgrp_getsid(mid->m_idx, &mid->m_rid, mid->m_type, db,
-		    &member->gs_sid);
+	m_id = m_ids;
+	m_sid = m_sids;
+	for (i = 0; i < m_num; i++, m_id++, m_sid++) {
+		rc = smb_lgrp_getsid(m_id->m_idx, &m_id->m_rid, m_id->m_type,
+		    db, &m_sid->gs_sid);
+
 		if (rc != SMB_LGRP_SUCCESS) {
 			free(m_ids);
-			return (SMB_LGRP_DB_ERROR);
+			for (m_sid = m_sids; m_sid->gs_sid != NULL; m_sid++)
+				smb_sid_free(m_sid->gs_sid);
+			free(m_sids);
+			return (rc);
 		}
 
-		member->gs_type = mid->m_type;
+		m_sid->gs_type = m_id->m_type;
 	}
 
 	free(m_ids);
+
+	grp->sg_nmembers = m_num;
+	grp->sg_members = m_sids;
 	return (SMB_LGRP_SUCCESS);
 }
 
@@ -2194,10 +2207,10 @@ smb_lgrp_set_default_privs(smb_group_t *grp)
  */
 static int
 smb_lgrp_getsid(int dom_idx, uint32_t *rid, uint16_t sid_type,
-    sqlite *db, nt_sid_t **sid)
+    sqlite *db, smb_sid_t **sid)
 {
-	nt_sid_t *dom_sid = NULL;
-	nt_sid_t *res_sid = NULL;
+	smb_sid_t *dom_sid = NULL;
+	smb_sid_t *res_sid = NULL;
 	int id_type;
 	int rc;
 
@@ -2211,12 +2224,12 @@ smb_lgrp_getsid(int dom_idx, uint32_t *rid, uint16_t sid_type,
 		/*
 		 * Make sure the returned SID is local
 		 */
-		if (!nt_sid_is_indomain(smb_lgrp_lsid, res_sid)) {
-			free(res_sid);
+		if (!smb_sid_indomain(smb_lgrp_lsid, res_sid)) {
+			smb_sid_free(res_sid);
 			return (SMB_LGRP_SID_NOTLOCAL);
 		}
 
-		(void) nt_sid_get_rid(res_sid, rid);
+		(void) smb_sid_getrid(res_sid, rid);
 		*sid = res_sid;
 		return (SMB_LGRP_SUCCESS);
 	}
@@ -2225,8 +2238,8 @@ smb_lgrp_getsid(int dom_idx, uint32_t *rid, uint16_t sid_type,
 	if (rc != SMB_LGRP_SUCCESS)
 		return (SMB_LGRP_DB_ERROR);
 
-	res_sid = nt_sid_splice(dom_sid, *rid);
-	free(dom_sid);
+	res_sid = smb_sid_splice(dom_sid, *rid);
+	smb_sid_free(dom_sid);
 	if (res_sid == NULL)
 		return (SMB_LGRP_NO_MEMORY);
 

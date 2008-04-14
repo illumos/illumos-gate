@@ -37,11 +37,11 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
+#include <smbsrv/libmlsvc.h>
+
 #include <smbsrv/ntstatus.h>
-#include <smbsrv/ntsid.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
-#include <smbsrv/libmlsvc.h>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/samrpc.ndl>
 #include <smbsrv/samlib.h>
@@ -232,7 +232,7 @@ samr_s_LookupDomain(void *arg, struct mlrpc_xaction *mxa)
 	struct samr_LookupDomain *param = arg;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char *domain_name;
-	nt_sid_t *sid = NULL;
+	smb_sid_t *sid = NULL;
 
 	if ((domain_name = (char *)param->domain_name.str) == NULL) {
 		bzero(param, sizeof (struct samr_LookupDomain));
@@ -242,7 +242,7 @@ samr_s_LookupDomain(void *arg, struct mlrpc_xaction *mxa)
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 	if (mlsvc_is_local_domain(domain_name) == 1) {
-		sid = nt_sid_dup(nt_domain_local_sid());
+		sid = smb_sid_dup(nt_domain_local_sid());
 	} else if (strcasecmp(resource_domain, domain_name) == 0) {
 		/*
 		 * We should not be asked to provide
@@ -250,7 +250,7 @@ samr_s_LookupDomain(void *arg, struct mlrpc_xaction *mxa)
 		 */
 		sid = NULL;
 	} else {
-		sid = nt_builtin_lookup_name(domain_name, 0);
+		sid = smb_wka_lookup_name(domain_name, 0);
 	}
 
 	if (sid) {
@@ -368,7 +368,7 @@ samr_s_OpenDomain(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	if ((domain = nt_domain_lookup_sid((nt_sid_t *)param->sid)) == NULL) {
+	if ((domain = nt_domain_lookup_sid((smb_sid_t *)param->sid)) == NULL) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		return (MLRPC_DRC_OK);
@@ -524,10 +524,10 @@ samr_s_LookupNames(void *arg, struct mlrpc_xaction *mxa)
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 	ndr_handle_t *hd;
 	samr_keydata_t *data;
-	well_known_account_t *wka;
+	smb_wka_t *wka;
 	smb_group_t grp;
 	smb_passwd_t smbpw;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	uint32_t status = NT_STATUS_SUCCESS;
 	int rc;
 
@@ -558,12 +558,13 @@ samr_s_LookupNames(void *arg, struct mlrpc_xaction *mxa)
 
 	switch (data->kd_type) {
 	case NT_DOMAIN_BUILTIN:
-		wka = nt_builtin_lookup((char *)param->name.str);
+		wka = smb_wka_lookup((char *)param->name.str);
 		if (wka != NULL) {
 			param->rids.n_entry = 1;
-			(void) nt_sid_get_rid(wka->binsid, &param->rids.rid[0]);
+			(void) smb_sid_getrid(wka->wka_binsid,
+			    &param->rids.rid[0]);
 			param->rid_types.n_entry = 1;
-			param->rid_types.rid_type[0] = wka->sid_name_use;
+			param->rid_types.rid_type[0] = wka->wka_type;
 			param->status = NT_STATUS_SUCCESS;
 			return (MLRPC_DRC_OK);
 		}
@@ -586,7 +587,7 @@ samr_s_LookupNames(void *arg, struct mlrpc_xaction *mxa)
 			if (smb_idmap_getsid(smbpw.pw_uid, SMB_IDMAP_USER,
 			    &sid) == IDMAP_SUCCESS) {
 				param->rids.n_entry = 1;
-				(void) nt_sid_get_rid(sid, &param->rids.rid[0]);
+				(void) smb_sid_getrid(sid, &param->rids.rid[0]);
 				param->rid_types.n_entry = 1;
 				param->rid_types.rid_type[0] = SidTypeUser;
 				param->status = NT_STATUS_SUCCESS;
@@ -703,9 +704,9 @@ samr_s_QueryUserGroups(void *arg, struct mlrpc_xaction *mxa)
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->user_handle;
 	ndr_handle_t *hd;
 	samr_keydata_t *data;
-	well_known_account_t *wka;
-	nt_sid_t *user_sid = NULL;
-	nt_sid_t *dom_sid;
+	smb_wka_t *wka;
+	smb_sid_t *user_sid = NULL;
+	smb_sid_t *dom_sid;
 	smb_group_t grp;
 	smb_giter_t gi;
 	uint32_t status;
@@ -720,12 +721,12 @@ samr_s_QueryUserGroups(void *arg, struct mlrpc_xaction *mxa)
 	data = (samr_keydata_t *)hd->nh_data;
 	switch (data->kd_type) {
 	case NT_DOMAIN_BUILTIN:
-		wka = nt_builtin_lookup("builtin");
+		wka = smb_wka_lookup("builtin");
 		if (wka == NULL) {
 			status = NT_STATUS_INTERNAL_ERROR;
 			goto query_error;
 		}
-		dom_sid = wka->binsid;
+		dom_sid = wka->wka_binsid;
 		break;
 	case NT_DOMAIN_LOCAL:
 		dom_sid = nt_domain_local_sid();
@@ -735,7 +736,7 @@ samr_s_QueryUserGroups(void *arg, struct mlrpc_xaction *mxa)
 		goto query_error;
 	}
 
-	user_sid = nt_sid_splice(dom_sid, data->kd_rid);
+	user_sid = smb_sid_splice(dom_sid, data->kd_rid);
 	if (user_sid == NULL) {
 		status = NT_STATUS_NO_MEMORY;
 		goto query_error;
@@ -1169,7 +1170,7 @@ samr_s_CreateDomainAlias(void *arg, struct mlrpc_xaction *mxa)
 		goto create_alias_err;
 	}
 
-	(void) nt_sid_get_rid(grp->sid, &param->rid);
+	(void) smb_sid_getrid(grp->sid, &param->rid);
 	nt_group_putinfo(grp);
 	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR, SAMR_ALIAS_KEY,
 	    param->rid);

@@ -34,8 +34,8 @@
  */
 #include <smbsrv/smb_i18n.h>
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_ktypes.h>
+#include <smbsrv/smb_vops.h>
 #include <sys/callb.h>
 #include <sys/flock.h>
 
@@ -123,7 +123,6 @@ int smb_fsop_sdwrite(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *,
 
 uint32_t smb_fsop_shrlock(cred_t *, smb_node_t *, uint32_t, uint32_t, uint32_t);
 void smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid);
-int smb_fsop_frlock(smb_request_t *, smb_node_t *, smb_lock_t *, boolean_t);
 
 /*
  * Lookup-related flags

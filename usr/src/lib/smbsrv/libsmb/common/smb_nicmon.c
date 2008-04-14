@@ -57,11 +57,14 @@ static int smb_nicmon_setup_eventpipe(int *, int *);
 /* Use this to stop monitoring */
 static int eventpipe_write = -1;
 
+/* Use this to refresh service instance */
+static char *smb_nicmon_caller_fmri = NULL;
+
 /*
  * Start the nic monitor thread.
  */
 int
-smb_nicmon_start(void)
+smb_nicmon_start(const char *svc_fmri)
 {
 	int rc = 0;
 
@@ -78,6 +81,9 @@ smb_nicmon_start(void)
 		return (rc);
 	}
 
+	if (svc_fmri)
+		smb_nicmon_caller_fmri = (char *)svc_fmri;
+
 	return (rc);
 }
 
@@ -93,43 +99,8 @@ smb_nicmon_stop(void)
 		return;
 
 	(void) write(eventpipe_write, &buf, sizeof (buf));
+	smb_nicmon_caller_fmri = NULL;
 	smb_nic_fini();
-}
-
-/*
- * Call this to do stuff after ifs changed.
- */
-void
-smb_nicmon_reconfig(void)
-{
-	char fqdn[MAXHOSTNAMELEN];
-	boolean_t ddns_enabled;
-
-	ddns_enabled = smb_config_getbool(SMB_CI_DYNDNS_ENABLE);
-	(void) smb_getfqdomainname(fqdn, MAXHOSTNAMELEN);
-
-	/* Clear rev zone before creating if list */
-	if (ddns_enabled) {
-		if (*fqdn != '\0' && dyndns_clear_rev_zone(fqdn) != 0) {
-			syslog(LOG_ERR, "smb_nicmon_daemon: "
-			    "failed to clear DNS reverse lookup zone");
-		}
-	}
-
-	/* re-initialize NIC table */
-	if (smb_nic_init() != 0)
-		syslog(LOG_ERR, "smb_nicmon_daemon: "
-		    "failed to get NIC information");
-
-	smb_netbios_name_reconfig();
-	smb_browser_reconfig();
-
-	if (ddns_enabled) {
-		if (*fqdn != '\0' && dyndns_update(fqdn, B_FALSE) != 0) {
-			syslog(LOG_ERR, "smb_nicmon_daemon: "
-			    "failed to update dynamic DNS");
-		}
-	}
 }
 
 /*
@@ -273,11 +244,14 @@ smb_nicmon_daemon(void *args)
 		}
 
 		/*
-		 * If anything changed do refresh our
-		 * nic list and other configs.
+		 * If anything changed, do refresh the instance
+		 * of the registered SMF service.
 		 */
-		if (nic_changed)
-			smb_nicmon_reconfig();
+		if (nic_changed && smb_nicmon_caller_fmri)
+			if (smf_refresh_instance(smb_nicmon_caller_fmri) != 0)
+				syslog(LOG_ERR, "smb_nicmon_daemon: "
+				    "failed to refresh SMF instance %s",
+				    smb_nicmon_caller_fmri);
 	}
 done:
 	/* Close sockets */

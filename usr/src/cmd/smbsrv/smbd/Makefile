@@ -34,7 +34,6 @@ SRCS=				\
 	smbd_main.c		\
 	smbd_mlsvc_doorsvc.c	\
 	smbd_net.c		\
-	smbd_nicmon.c		\
 	smbd_share_doorsvc.c
 
 include ../../Makefile.cmd
@@ -46,7 +45,7 @@ $(ROOTMANIFEST):= FILEMODE = 0444
 
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lsmb -lbsm -lnsl -lsocket
+LDLIBS += -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lsmb -lbsm -lnsl -lumem
 
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv
 ROOTSMBDFILE = $(PROG:%=$(ROOTSMBDDIR)/%)

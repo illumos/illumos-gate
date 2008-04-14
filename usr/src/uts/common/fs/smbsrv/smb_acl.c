@@ -27,7 +27,7 @@
 
 #include <sys/acl.h>
 #include <acl/acl_common.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/smb_kproto.h>
@@ -72,7 +72,7 @@
 /*
  * SID for Everyone group: S-1-1-0.
  */
-nt_sid_t everyone_sid = {
+smb_sid_t everyone_sid = {
 	NT_SID_REVISION,
 	1,
 	NT_SECURITY_WORLD_AUTH,
@@ -139,9 +139,8 @@ smb_acl_free(smb_acl_t *acl)
 	if (acl == NULL)
 		return;
 
-	for (i = 0; i < acl->sl_acecnt; i++) {
-		MEM_FREE("smbsrv", acl->sl_aces[i].se_sid);
-	}
+	for (i = 0; i < acl->sl_acecnt; i++)
+		smb_sid_free(acl->sl_aces[i].se_sid);
 
 	while ((ace = list_head(&acl->sl_sorted)) != NULL)
 		list_remove(&acl->sl_sorted, ace);
@@ -338,7 +337,7 @@ smb_acl_from_zfs(acl_t *zacl, uid_t uid, gid_t gid)
 		ace->se_hdr.se_type = zace->a_type;
 		ace->se_hdr.se_flags = smb_ace_flags_fromzfs(zace->a_flags);
 		ace->se_mask = zace->a_access_mask;
-		ace->se_sid = nt_sid_dup(sim->sim_sid);
+		ace->se_sid = smb_sid_dup(sim->sim_sid);
 		ace->se_hdr.se_bsize = smb_ace_len(ace);
 
 		acl->sl_bsize += ace->se_hdr.se_bsize;
@@ -405,7 +404,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 		zace->a_flags = smb_ace_flags_tozfs(ace->se_hdr.se_flags,
 		    isdir);
 
-		if (nt_sid_is_equal(ace->se_sid, &everyone_sid))
+		if (smb_sid_cmp(ace->se_sid, &everyone_sid))
 			zace->a_flags |= ACE_EVERYONE;
 		else {
 			sim->sim_id = &zace->a_who;
@@ -1191,7 +1190,7 @@ smb_ace_len(smb_ace_t *ace)
 		return (0);
 
 	return (SMB_ACE_HDRSIZE + sizeof (ace->se_mask) +
-	    nt_sid_length(ace->se_sid));
+	    smb_sid_len(ace->se_sid));
 }
 
 static void
@@ -1313,11 +1312,11 @@ smb_ace_isvalid(smb_ace_t *ace, int which_acl)
 		return (B_FALSE);
 
 	if (smb_ace_is_generic(ace->se_hdr.se_type)) {
-		if (nt_sid_is_valid(ace->se_sid) == 0)
+		if (!smb_sid_isvalid(ace->se_sid))
 			return (B_FALSE);
 
 		min_len += sizeof (ace->se_mask);
-		min_len += nt_sid_length(ace->se_sid);
+		min_len += smb_sid_len(ace->se_sid);
 
 		if (ace->se_hdr.se_bsize < min_len)
 			return (B_FALSE);

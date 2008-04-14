@@ -85,6 +85,7 @@ extern int ads_add_share(ADS_HANDLE *, const char *, const char *,
 extern adjoin_status_t ads_join(char *, char *, char *, char *, int);
 extern char *adjoin_report_err(adjoin_status_t);
 extern int ads_domain_change_cleanup(char *);
+extern int ads_update_attrs(void);
 
 /* DYNDNS functions */
 extern int dns_msgid_init(void);

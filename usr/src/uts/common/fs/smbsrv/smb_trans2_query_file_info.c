@@ -78,7 +78,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	static smb_attr_t pipe_attr;
 	unsigned short	infolev, dattr = 0;
-	u_offset_t	dsize = 0, dused = 0;
+	u_offset_t	datasz = 0, allocsz = 0;
 	smb_attr_t	*ap = NULL;
 	char		*namep = NULL;
 	char		*filename = NULL, *alt_nm_ptr = NULL;
@@ -138,12 +138,11 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		ap = &node->attr;
 		if (ap->sa_vattr.va_type == VDIR) {
 			is_dir = 1;
-			dsize = dused = 0;
+			datasz = allocsz = 0;
 		} else {
 			is_dir = 0;
-			dsize = ap->sa_vattr.va_size;
-			dused = ap->sa_vattr.va_blksize *
-			    ap->sa_vattr.va_nblocks;
+			datasz = ap->sa_vattr.va_size;
+			allocsz = ap->sa_vattr.va_nblocks * DEV_BSIZE;
 		}
 
 		dir_snode = node->dir_snode;
@@ -166,7 +165,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		ap = &pipe_attr;
 		creation_time = (timestruc_t *)&ap->sa_vattr.va_ctime;
 		dattr = SMB_FA_NORMAL;
-		dsize = dused = 0;
+		datasz = allocsz = 0;
 
 		delete_on_close = 0;
 		is_dir = 0;
@@ -191,10 +190,10 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_INFO_STANDARD:
-		if (dsize > UINT_MAX)
-			dsize = UINT_MAX;
-		if (dused > UINT_MAX)
-			dused = UINT_MAX;
+		if (datasz > UINT_MAX)
+			datasz = UINT_MAX;
+		if (allocsz > UINT_MAX)
+			allocsz = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -203,16 +202,16 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		    smb_gmt2local(sr, creation_time->tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)dsize,
-		    (uint32_t)dused,
+		    (uint32_t)datasz,
+		    (uint32_t)allocsz,
 		    dattr);
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
-		if (dsize > UINT_MAX)
-			dsize = UINT_MAX;
-		if (dused > UINT_MAX)
-			dused = UINT_MAX;
+		if (datasz > UINT_MAX)
+			datasz = UINT_MAX;
+		if (allocsz > UINT_MAX)
+			allocsz = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -221,8 +220,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		    smb_gmt2local(sr, creation_time->tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)dsize,
-		    (uint32_t)dused,
+		    (uint32_t)datasz,
+		    (uint32_t)allocsz,
 		    dattr, 0);
 		break;
 
@@ -258,8 +257,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		 * necessary because Win2k expects the padded bytes.
 		 */
 		(void) smb_encode_mbc(&xa->rep_data_mb, "qqlbb2.",
-		    dused,
-		    dsize,
+		    (uint64_t)allocsz,
+		    (uint64_t)datasz,
 		    ap->sa_vattr.va_nlink,
 		    delete_on_close,
 		    is_dir);
@@ -319,8 +318,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		    &ap->sa_vattr.va_mtime,
 		    &ap->sa_vattr.va_ctime,
 		    dattr,
-		    (int64_t)dused,
-		    (int64_t)dsize,
+		    (uint64_t)allocsz,
+		    (uint64_t)datasz,
 		    ap->sa_vattr.va_nlink,
 		    delete_on_close,
 		    is_dir,
@@ -377,7 +376,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FILE_COMPRESSION_INFO:
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb, "qwbbb3.",
-		    dsize, 0, 0, 0, 0);
+		    datasz, 0, 0, 0, 0);
 		break;
 
 	default:
@@ -445,20 +444,18 @@ smb_encode_stream_info(
 	uint32_t next_offset;
 	uint32_t stream_nlen;
 	uint32_t pad;
-	u_offset_t dsize;
+	u_offset_t datasz;
 	int is_dir;
 	uint32_t cookie = 0;
 	struct fs_stream_info *stream_info;
 	struct fs_stream_info *stream_info_next;
 	int rc = 0;
 	int done = 0;
-	char *fname;
 
 	stream_info = kmem_alloc(sizeof (struct fs_stream_info), KM_SLEEP);
 	stream_info_next = kmem_alloc(sizeof (struct fs_stream_info), KM_SLEEP);
 	is_dir = (attr->sa_vattr.va_type == VDIR) ? 1 : 0;
-	dsize = attr->sa_vattr.va_size;
-	fname = MEM_MALLOC("smb", MAXPATHLEN);
+	datasz = attr->sa_vattr.va_size;
 
 	rc = smb_fsop_stream_readdir(sr, kcred, snode, &cookie, stream_info,
 	    NULL, NULL);
@@ -471,13 +468,12 @@ smb_encode_stream_info(
 			next_offset = 0;
 
 			(void) smb_encode_mbc(&xa->rep_data_mb, "%llqqu",
-			    sr, next_offset, stream_nlen, dsize, dsize,
+			    sr, next_offset, stream_nlen, datasz, datasz,
 			    stream_name);
 		}
 		/* No named streams, we're done  */
 		kmem_free(stream_info, sizeof (struct fs_stream_info));
 		kmem_free(stream_info_next, sizeof (struct fs_stream_info));
-		MEM_FREE("smb", fname);
 		return;
 	}
 
@@ -493,7 +489,7 @@ smb_encode_stream_info(
 		    smb_ascii_or_unicode_null_len(sr);
 
 		(void) smb_encode_mbc(&xa->rep_data_mb, "%llqqu", sr,
-		    next_offset, stream_nlen, dsize, dsize, stream_name);
+		    next_offset, stream_nlen, datasz, datasz, stream_name);
 	}
 
 	while (!done) {
@@ -534,7 +530,6 @@ smb_encode_stream_info(
 	}
 	kmem_free(stream_info, sizeof (struct fs_stream_info));
 	kmem_free(stream_info_next, sizeof (struct fs_stream_info));
-	MEM_FREE("smb", fname);
 }
 
 /*

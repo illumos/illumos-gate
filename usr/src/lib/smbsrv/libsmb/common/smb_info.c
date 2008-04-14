@@ -310,11 +310,11 @@ smb_getdomainname(char *buf, size_t buflen)
  *
  * Note: Callers are responsible for freeing a returned SID.
  */
-nt_sid_t *
+smb_sid_t *
 smb_getdomainsid(void)
 {
 	char buf[MAXHOSTNAMELEN];
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	int security_mode;
 	int rc;
 
@@ -327,7 +327,7 @@ smb_getdomainsid(void)
 	if ((rc != SMBD_SMF_OK) || (*buf == '\0'))
 		return (NULL);
 
-	if ((sid = nt_sid_strtosid(buf)) == NULL)
+	if ((sid = smb_sid_fromstr(buf)) == NULL)
 		return (NULL);
 
 	return (sid);

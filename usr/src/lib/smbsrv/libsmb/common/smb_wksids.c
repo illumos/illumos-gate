@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,11 +31,12 @@
  * BUILTIN domains, and some other miscellaneous bits.
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <synch.h>
-#include <smbsrv/ntsid.h>
+
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/string.h>
-#include <smbsrv/alloc.h>
 
 /*
  * This table should contain all of the NT builtin domain names.
@@ -56,241 +57,200 @@ static rwlock_t wk_rwlock;
  * the SIDs. For each domain, ensure that the domain SID appears
  * before any aliases in that domain.
  */
-static well_known_account_t wkt[] = {
+static smb_wka_t wka_tbl[] = {
 	{ SidTypeWellKnownGroup, 0, "S-1-0-0",		"Null",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 1, "S-1-1-0",		"Everyone",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 1, "S-1-2-0",		"LOCAL",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 1, "S-1-3-0",		"CREATOR OWNER",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 1, "S-1-3-1",		"CREATOR GROUP",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 1, "S-1-3-2",		"CREATOR OWNER SERVER",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 1, "S-1-3-3",		"CREATOR GROUP SERVER",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeDomain, 1, "S-1-4",			"NON UNIQUE",
-	    LGF_HIDDEN, 0, NULL},
-	{ SidTypeDomain, 2, "S-1-5",		"NT AUTHORITY",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
+	{ SidTypeDomain, 2, "S-1-5",			"NT AUTHORITY",
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-1",		"DIALUP",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-2",		"NETWORK",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-3",		"BATCH",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-4",		"INTERACTIVE",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-6",		"SERVICE",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-7",		"ANONYMOUS",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-8",		"PROXY",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-9",		"SERVER",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-10",		"SELF",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-11",		"Authenticated Users",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-12",		"RESTRICTED",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-18",		"SYSTEM",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeWellKnownGroup, 2, "S-1-5-21",		"NON_UNIQUE",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeDomain, 2, "S-1-5-32",			"BUILTIN",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeAlias, 1, "S-1-5-32-544",		"Administrators",
-	    0, "Members can fully administer the computer/domain", NULL },
+	    SMB_WKAFLG_LGRP_ENABLE,
+	    "Members can fully administer the computer/domain", NULL },
 	{ SidTypeAlias, 1, "S-1-5-32-545",		"Users",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeAlias, 1, "S-1-5-32-546",		"Guests",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeAlias, 1, "S-1-5-32-547",		"Power Users",
-	    0, "Members can share directories", NULL },
+	    SMB_WKAFLG_LGRP_ENABLE, "Members can share directories", NULL },
 	{ SidTypeAlias, 1, "S-1-5-32-548",		"Account Operators",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeAlias, 1, "S-1-5-32-549",		"Server Operators",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeAlias, 1, "S-1-5-32-550",		"Print Operators",
-	    LGF_HIDDEN, 0, NULL},
+	    0, NULL, NULL},
 	{ SidTypeAlias, 1, "S-1-5-32-551",		"Backup Operators",
-	    0, "Members can bypass file security to back up files", NULL },
+	    SMB_WKAFLG_LGRP_ENABLE,
+	    "Members can bypass file security to back up files", NULL },
 	{ SidTypeAlias, 1, "S-1-5-32-552",		"Replicator",
-	    LGF_HIDDEN, 0, NULL}
+	    0, NULL, NULL}
 };
 
+#define	SMB_WKA_NUM	(sizeof (wka_tbl)/sizeof (wka_tbl[0]))
 
 /*
- * nt_builtin_lookup_sid
+ * smb_wka_lookup_sid
  *
- * Search the wkt looking for a match on the specified SID. If the
+ * Search the wka_tbl looking for a match on the specified SID. If the
  * SID matches a builtin entry, the associated name is returned.
  * Otherwise a null pointer is returned.
  */
 char *
-nt_builtin_lookup_sid(nt_sid_t *sid, WORD *sid_name_use)
+smb_wka_lookup_sid(smb_sid_t *sid, uint16_t *sid_name_use)
 {
-	well_known_account_t *entry;
-	char *sidbuf;
-	int sidlen;
+	smb_wka_t *entry;
 	int i;
 
-	if ((sidbuf = nt_sid_format(sid)) == 0)	{
-		return (0);
-	}
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		entry = &wka_tbl[i];
 
-	sidlen = strlen(sidbuf);
-
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		entry = &wkt[i];
-
-		if (strncmp(sidbuf, entry->sid, sidlen) == 0) {
+		if (smb_sid_cmp(sid, entry->wka_binsid)) {
 			if (sid_name_use)
-				*sid_name_use = entry->sid_name_use;
-			free(sidbuf);
-			return (entry->name);
+				*sid_name_use = entry->wka_type;
+			return (entry->wka_name);
 		}
 	}
 
-	free(sidbuf);
-	return (0);
+	return (NULL);
 }
 
 
 /*
- * nt_builtin_lookup_name
+ * smb_wka_lookup_name
  *
- * Search the wkt looking for a match on the specified name. If the
+ * Search the wka_tbl looking for a match on the specified name. If the
  * name matches a builtin entry, the associated SID (which is in
  * malloc'd memory) is returned. Otherwise a null pointer is returned.
  */
-nt_sid_t *
-nt_builtin_lookup_name(char *name, WORD *sid_name_use)
+smb_sid_t *
+smb_wka_lookup_name(char *name, uint16_t *sid_name_use)
 {
-	well_known_account_t *entry;
+	smb_wka_t *entry;
 	int i;
 
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		entry = &wkt[i];
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		entry = &wka_tbl[i];
 
-		if (!utf8_strcasecmp(name, entry->name)) {
+		if (!utf8_strcasecmp(name, entry->wka_name)) {
 			if (sid_name_use)
-				*sid_name_use = entry->sid_name_use;
-			return (nt_sid_strtosid(entry->sid));
+				*sid_name_use = entry->wka_type;
+			return (smb_sid_dup(entry->wka_binsid));
 		}
 	}
 
-	return (0);
+	return (NULL);
 }
 
 /*
- * nt_builtin_lookup
+ * smb_wka_lookup
  *
- * Search the wkt looking for a match on the specified name. If the
+ * Search the wka_tbl looking for a match on the specified name. If the
  * name matches a builtin entry then pointer to that entry will be
  * returned. Otherwise 0 is returned.
  */
-well_known_account_t *
-nt_builtin_lookup(char *name)
+smb_wka_t *
+smb_wka_lookup(char *name)
 {
-	well_known_account_t *entry;
+	smb_wka_t *entry;
 	int i;
 
 	(void) rw_rdlock(&wk_rwlock);
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		entry = &wkt[i];
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		entry = &wka_tbl[i];
 
-		if (!utf8_strcasecmp(name, entry->name)) {
+		if (!utf8_strcasecmp(name, entry->wka_name)) {
 			(void) rw_unlock(&wk_rwlock);
 			return (entry);
 		}
 	}
 
 	(void) rw_unlock(&wk_rwlock);
-	return (0);
+	return (NULL);
 }
 
 
 /*
- * nt_builtin_is_wellknown
+ * smb_wka_is_wellknown
  *
- * Search the wkt looking for a match on the specified name. If the
+ * Search the wka_tbl looking for a match on the specified name. If the
  * name matches a builtin entry returns 1. Otherwise returns 0.
  */
-int
-nt_builtin_is_wellknown(char *name)
+boolean_t
+smb_wka_is_wellknown(char *name)
 {
-	well_known_account_t *entry;
 	int i;
 
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		entry = &wkt[i];
-
-		if (!utf8_strcasecmp(name, entry->name)) {
-			return (1);
-		}
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		if (utf8_strcasecmp(name, wka_tbl[i].wka_name) == 0)
+			return (B_TRUE);
 	}
 
-	return (0);
+	return (B_FALSE);
 }
 
 /*
- * nt_builtin_lookup_domain
+ * smb_wka_lookup_domain
  *
  * Return the builtin domain name for the specified alias or group name.
  */
 char *
-nt_builtin_lookup_domain(char *name)
+smb_wka_lookup_domain(char *name)
 {
-	well_known_account_t *entry;
-	char *domain_name;
+	smb_wka_t *entry;
 	int i;
 
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		entry = &wkt[i];
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		entry = &wka_tbl[i];
 
-		if (!utf8_strcasecmp(name, entry->name)) {
-			domain_name = domain[entry->domain_ix];
-			return (domain_name);
-		}
+		if (!utf8_strcasecmp(name, entry->wka_name))
+			return (domain[entry->wka_domidx]);
 	}
 
-	return (0);
+	return (NULL);
 }
 
 /*
- * nt_builtin_findfirst
- *
- * Returns pointer to the first entry of well known sids table.
- */
-well_known_account_t *
-nt_builtin_findfirst(DWORD *iterator)
-{
-	*iterator = 1;
-	return (&wkt[0]);
-}
-
-/*
- * nt_builtin_findnext
- *
- * Returns pointer to the entry of well known sids table specified
- * by the iterator. Increments iterator to point to the next entry.
- */
-well_known_account_t *
-nt_builtin_findnext(DWORD *iterator)
-{
-	if (*iterator < sizeof (wkt)/sizeof (wkt[0]))
-		return (&wkt[(*iterator)++]);
-
-	return (0);
-}
-
-/*
- * nt_builtin_init
+ * smb_wka_init
  *
  * Generate binary SIDs from the string SIDs in the table
  * and set the proper field.
@@ -301,9 +261,9 @@ nt_builtin_findnext(DWORD *iterator)
  * This function should only be called once.
  */
 int
-nt_builtin_init()
+smb_wka_init(void)
 {
-	well_known_account_t *entry;
+	smb_wka_t *entry;
 	int i;
 
 	(void) rw_wrlock(&wk_rwlock);
@@ -312,12 +272,12 @@ nt_builtin_init()
 		return (1);
 	}
 
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		entry = &wkt[i];
-		entry->binsid = nt_sid_strtosid(entry->sid);
-		if (entry->binsid == NULL) {
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		entry = &wka_tbl[i];
+		entry->wka_binsid = smb_sid_fromstr(entry->wka_sid);
+		if (entry->wka_binsid == NULL) {
 			(void) rw_unlock(&wk_rwlock);
-			nt_builtin_fini();
+			smb_wka_fini();
 			return (0);
 		}
 	}
@@ -328,7 +288,7 @@ nt_builtin_init()
 }
 
 void
-nt_builtin_fini()
+smb_wka_fini(void)
 {
 	int i;
 
@@ -338,10 +298,10 @@ nt_builtin_fini()
 		return;
 	}
 
-	for (i = 0; i < sizeof (wkt)/sizeof (wkt[0]); ++i) {
-		if (wkt[i].binsid) {
-			free(wkt[i].binsid);
-			wkt[i].binsid = NULL;
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		if (wka_tbl[i].wka_binsid) {
+			free(wka_tbl[i].wka_binsid);
+			wka_tbl[i].wka_binsid = NULL;
 		}
 	}
 

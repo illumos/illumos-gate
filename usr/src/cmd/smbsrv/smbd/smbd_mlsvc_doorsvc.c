@@ -39,7 +39,6 @@
 #include <pthread.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/ntsid.h>
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/smb_winpipe.h>

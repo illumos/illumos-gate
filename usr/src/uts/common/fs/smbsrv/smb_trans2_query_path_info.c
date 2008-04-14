@@ -329,7 +329,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	char			*path, *alt_nm_ptr;
 	int			rc;
-	u_offset_t		dsize, dused;
+	u_offset_t		datasz, allocsz;
 	unsigned short		infolev, dattr;
 	smb_attr_t		*ap, ret_attr;
 	struct smb_node		*dir_node;
@@ -405,19 +405,19 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		 * Win2K and NT reply with the size of directory
 		 * file.
 		 */
-		dsize = dused = 0;
+		datasz = allocsz = 0;
 	} else {
 		is_dir = 0;
-		dsize = ap->sa_vattr.va_size;
-		dused = ap->sa_vattr.va_blksize * ap->sa_vattr.va_nblocks;
+		datasz = ap->sa_vattr.va_size;
+		allocsz = ap->sa_vattr.va_nblocks * DEV_BSIZE;
 	}
 
 	switch (infolev) {
 	case SMB_INFO_STANDARD:
-		if (dsize > UINT_MAX)
-			dsize = UINT_MAX;
-		if (dused > UINT_MAX)
-			dused = UINT_MAX;
+		if (datasz > UINT_MAX)
+			datasz = UINT_MAX;
+		if (allocsz > UINT_MAX)
+			allocsz = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -426,16 +426,16 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		    smb_gmt2local(sr, ap->sa_crtime.tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)dsize,
-		    (uint32_t)dused,
+		    (uint32_t)datasz,
+		    (uint32_t)allocsz,
 		    dattr);
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
-		if (dsize > UINT_MAX)
-			dsize = UINT_MAX;
-		if (dused > UINT_MAX)
-			dused = UINT_MAX;
+		if (datasz > UINT_MAX)
+			datasz = UINT_MAX;
+		if (allocsz > UINT_MAX)
+			allocsz = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -444,8 +444,8 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		    smb_gmt2local(sr, ap->sa_crtime.tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
 		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)dsize,
-		    (uint32_t)dused,
+		    (uint32_t)datasz,
+		    (uint32_t)allocsz,
 		    dattr, 0);
 		break;
 
@@ -480,8 +480,8 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		 * necessary because Win2k expects the padded bytes.
 		 */
 		(void) smb_encode_mbc(&xa->rep_data_mb, "qqlbb2.",
-		    dused,
-		    dsize,
+		    (uint64_t)allocsz,
+		    (uint64_t)datasz,
 		    ap->sa_vattr.va_nlink,
 		    (node && (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) != 0),
 		    (char)(ap->sa_vattr.va_type == VDIR));
@@ -524,8 +524,8 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		    &ap->sa_vattr.va_mtime,
 		    &ap->sa_vattr.va_ctime,
 		    dattr,
-		    dused,
-		    dsize,
+		    (uint64_t)allocsz,
+		    (uint64_t)datasz,
 		    ap->sa_vattr.va_nlink,
 		    0,
 		    is_dir,
@@ -567,7 +567,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FILE_COMPRESSION_INFO:
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
-		    "qwbbb3.", dsize, 0, 0, 0, 0);
+		    "qwbbb3.", datasz, 0, 0, 0, 0);
 		break;
 
 	default:

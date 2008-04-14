@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,7 @@ smbd_user_auth_logon(netr_client_t *clnt)
 	adt_session_data_t *ah;
 	adt_event_data_t *event;
 	au_tid_addr_t termid;
+	char sidbuf[SMB_SID_STRSZ];
 	uid_t uid;
 	gid_t gid;
 	char *sid;
@@ -94,20 +95,20 @@ smbd_user_auth_logon(netr_client_t *clnt)
 	if ((token = smb_logon(clnt)) == NULL) {
 		uid = ADT_NO_ATTRIB;
 		gid = ADT_NO_ATTRIB;
-		sid = strdup(NT_NULL_SIDSTR);
+		sid = NT_NULL_SIDSTR;
 		status = ADT_FAILURE;
 		retval = ADT_FAIL_VALUE_AUTH;
 	} else {
 		uid = token->tkn_user->i_id;
 		gid = token->tkn_primary_grp->i_id;
-		sid = nt_sid_format(token->tkn_user->i_sidattr.sid);
+		smb_sid_tostr(token->tkn_user->i_sidattr.sid, sidbuf);
+		sid = sidbuf;
 		status = ADT_SUCCESS;
 		retval = ADT_SUCCESS;
 	}
 
 	if (adt_start_session(&ah, NULL, 0)) {
 		syslog(LOG_AUTH | LOG_ALERT, "adt_start_session: %m");
-		free(sid);
 		smb_token_destroy(token);
 		return (NULL);
 	}
@@ -116,7 +117,6 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		syslog(LOG_AUTH | LOG_ALERT,
 		    "adt_alloc_event(ADT_smbd_session): %m");
 		(void) adt_end_session(ah);
-		free(sid);
 		smb_token_destroy(token);
 		return (NULL);
 	}
@@ -131,7 +131,6 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		syslog(LOG_AUTH | LOG_ALERT, "adt_set_user: %m");
 		adt_free_event(event);
 		(void) adt_end_session(ah);
-		free(sid);
 		smb_token_destroy(token);
 		return (NULL);
 	}
@@ -144,13 +143,11 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		syslog(LOG_AUTH | LOG_ALERT, "adt_put_event: %m");
 
 	adt_free_event(event);
-	free(sid);
 
 	if (token) {
 		if ((entry = malloc(sizeof (smb_audit_t))) == NULL) {
 			syslog(LOG_ERR, "smbd_user_auth_logon: %m");
 			(void) adt_end_session(ah);
-			free(sid);
 			smb_token_destroy(token);
 			return (NULL);
 		}

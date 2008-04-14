@@ -91,21 +91,20 @@ smb_post_query_information(smb_request_t *sr)
 smb_sdrc_t
 smb_com_query_information(smb_request_t *sr)
 {
-	char			*path = sr->arg.dirop.fqi.path;
-	char			*name = sr->arg.dirop.fqi.last_comp;
-	int			rc;
-	unsigned short		dattr;
-	uint32_t		write_time, file_size;
-	struct smb_node		*dir_node;
-	struct smb_node		*node;
-	smb_attr_t		attr;
-	timestruc_t		*mtime;
+	char		*path = sr->arg.dirop.fqi.path;
+	char		*name = sr->arg.dirop.fqi.last_comp;
+	int		rc;
+	uint16_t	dattr;
+	uint32_t	write_time;
+	u_offset_t	datasz;
+	smb_node_t	*dir_node;
+	smb_node_t	*node;
+	smb_attr_t	attr;
+	timestruc_t	*mtime;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		dattr = SMB_FA_NORMAL;
-		write_time = file_size = 0;
 		rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
-		    10, dattr, write_time, file_size, 0);
+		    10, SMB_FA_NORMAL, 0, 0, 0);
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
@@ -128,16 +127,14 @@ smb_com_query_information(smb_request_t *sr)
 	dattr = smb_node_get_dosattr(node);
 	mtime = smb_node_get_mtime(node);
 	write_time = smb_gmt2local(sr, mtime->tv_sec);
-	file_size = (uint32_t)smb_node_get_size(node, &node->attr);
+	datasz = smb_node_get_size(node, &node->attr);
+	if (datasz > UINT_MAX)
+		datasz = UINT_MAX;
 
 	smb_node_release(node);
 
 	rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
-	    10,			/* wct */
-	    dattr,
-	    write_time,		/* Last write time */
-	    file_size,		/* FileSize */
-	    0);			/* bcc */
+	    10, dattr, write_time, (uint32_t)datasz, 0);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

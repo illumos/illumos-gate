@@ -117,7 +117,7 @@ smb_vop_init(void)
 		return (ENOMEM);
 
 	smb_ct.cc_caller_id = fs_new_caller_id();
-	smb_ct.cc_pid = 0;
+	smb_ct.cc_pid = IGN_PID;
 	smb_ct.cc_flags = 0;
 
 	smb_vop_initialized = B_TRUE;
@@ -137,6 +137,7 @@ smb_vop_fini(void)
 		return;
 
 	lm_free_sysidt(smb_ct.cc_sysid);
+	smb_ct.cc_pid = IGN_PID;
 	smb_ct.cc_sysid = LM_NOSYSID;
 	smb_vop_initialized = B_FALSE;
 }

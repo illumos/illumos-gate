@@ -94,12 +94,12 @@ smb_api_ulist(int offset, smb_dr_ulist_t *users)
 }
 
 int
-smb_lookup_sid(nt_sid_t *sid, char *sidbuf, int sidbuflen)
+smb_lookup_sid(smb_sid_t *sid, char *sidbuf, int sidbuflen)
 {
 	char *buf, *rbufp;
 	size_t buflen, rbufsize;
 	int opcode = SMB_DR_LOOKUP_SID;
-	char strsid[NT_SID_FMTBUF_SIZE];
+	char strsid[SMB_SID_STRSZ];
 	char *name = NULL;
 	int fd;
 
@@ -109,7 +109,7 @@ smb_lookup_sid(nt_sid_t *sid, char *sidbuf, int sidbuflen)
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	if (!nt_sid_is_valid(sid)) {
+	if (!smb_sid_isvalid(sid)) {
 		syslog(LOG_ERR, "%s: invalid SID",
 		    smbapi_desc[opcode]);
 		return (NT_STATUS_INVALID_SID);
@@ -119,7 +119,7 @@ smb_lookup_sid(nt_sid_t *sid, char *sidbuf, int sidbuflen)
 		return (NT_STATUS_INTERNAL_ERROR);
 
 	/* Encode */
-	nt_sid_format2(sid, strsid);
+	smb_sid_tostr(sid, strsid);
 	if ((buf = smb_dr_encode_string(opcode, strsid, &buflen)) == 0) {
 		syslog(LOG_ERR, "%s: Encode error", smbapi_desc[opcode]);
 		(void) close(fd);
@@ -144,7 +144,7 @@ smb_lookup_sid(nt_sid_t *sid, char *sidbuf, int sidbuflen)
 	(void) close(fd);
 
 	if ((name == NULL) || (*name == '\0'))
-		nt_sid_format2(sid, sidbuf);
+		smb_sid_tostr(sid, sidbuf);
 
 	(void) strlcpy(sidbuf, name, sidbuflen);
 	xdr_free(xdr_string, (char *)&name);
@@ -202,7 +202,7 @@ smb_lookup_name(char *name, smb_gsid_t *sid)
 
 	*p++ = '\0';
 	sid->gs_type = atoi(strsid);
-	sid->gs_sid = nt_sid_strtosid(p);
+	sid->gs_sid = smb_sid_fromstr(p);
 	xdr_free(xdr_string, (char *)&strsid);
 	return (NT_STATUS_SUCCESS);
 }

@@ -63,7 +63,7 @@ HDRS=	alloc.h			\
 	nterror.h		\
 	ntifs.h			\
 	ntlocale.h		\
-	ntsid.h			\
+	smb_sid.h		\
 	ntstatus.h		\
 	oem.h			\
 	samlib.h		\
@@ -77,6 +77,7 @@ HDRS=	alloc.h			\
 	smb_incl.h		\
 	smb_ioctl.h		\
 	smb_kproto.h		\
+	smb_kstat.h		\
 	smb_ktypes.h		\
 	smb_privilege.h		\
 	smb_token.h		\

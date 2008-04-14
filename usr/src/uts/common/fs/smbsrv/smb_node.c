@@ -644,12 +644,10 @@ smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
 /*
  * smb_node_get_size
  */
-uint64_t
-smb_node_get_size(
-    smb_node_t		*node,
-    smb_attr_t		*attr)
+u_offset_t
+smb_node_get_size(smb_node_t *node, smb_attr_t *attr)
 {
-	uint64_t	size;
+	u_offset_t size;
 
 	if (attr->sa_vattr.va_type == VDIR)
 		return (0);

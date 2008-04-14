@@ -306,6 +306,7 @@ smb_ofile_close(
 			 * See comments in smb_open_subr().
 			 */
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
+			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
 			if (of->f_node->vp->v_type == VREG)
 				(void) smb_fsop_close(of);
@@ -316,7 +317,6 @@ smb_ofile_close(
 			 */
 			if (of->f_node->flags & NODE_FLAGS_NOTIFY_CHANGE)
 				smb_process_file_notify_change_queue(of);
-			smb_node_destroy_lock_by_ofile(of->f_node, of);
 		}
 		atomic_dec_32(&of->f_tree->t_server->sv_open_files);
 

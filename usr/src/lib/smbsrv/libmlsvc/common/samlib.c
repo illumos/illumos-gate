@@ -37,9 +37,9 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlsvc.h>
+
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
-#include <smbsrv/ntsid.h>
 #include <smbsrv/lsalib.h>
 #include <smbsrv/samlib.h>
 

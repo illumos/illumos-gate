@@ -395,6 +395,19 @@ smb_open_subr(smb_request_t *sr)
 	uniq_fid = SMB_UNIQ_FID();
 
 	if (op->fqi.last_comp_was_found) {
+
+		if ((op->fqi.last_attr.sa_vattr.va_type != VREG) &&
+		    (op->fqi.last_attr.sa_vattr.va_type != VDIR) &&
+		    (op->fqi.last_attr.sa_vattr.va_type != VLNK)) {
+
+			smb_node_release(op->fqi.last_snode);
+			smb_node_release(op->fqi.dir_snode);
+			SMB_NULL_FQI_NODES(op->fqi);
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
+			    ERRnoaccess);
+			return (NT_STATUS_ACCESS_DENIED);
+		}
+
 		node = op->fqi.last_snode;
 		dnode = op->fqi.dir_snode;
 
@@ -655,24 +668,9 @@ smb_open_subr(smb_request_t *sr)
 			    S_IWUSR | S_IWGRP | S_IWOTH;
 			new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
 
-			/*
-			 * A problem with setting the readonly bit at
-			 * create time is that this bit will prevent
-			 * writes to the file from the same fid (which
-			 * should be allowed).
-			 *
-			 * The solution is to set the bit at close time.
-			 * Meanwhile, to prevent racing opens from being
-			 * able to write to the file, the bit is set at
-			 * create time until share reservations can be set
-			 * to prevent write and delete access.  At that point,
-			 * the bit can be turned off until close (so as to
-			 * allow writes from the same fid to the file).
-			 */
-
-			if (op->dattr & SMB_FA_READONLY) {
-				new_attr.sa_dosattr = FILE_ATTRIBUTE_READONLY;
-				new_attr.sa_mask |= SMB_AT_DOSATTR;
+			if (op->dsize) {
+				new_attr.sa_vattr.va_size = op->dsize;
+				new_attr.sa_mask |= SMB_AT_SIZE;
 			}
 
 			rc = smb_fsop_create(sr, sr->user_cr, dnode,
@@ -687,10 +685,21 @@ smb_open_subr(smb_request_t *sr)
 				return (sr->smb_error.status);
 			}
 
-			if (op->dattr & SMB_FA_READONLY) {
+			/*
+			 * A problem with setting the readonly bit at
+			 * create time is that this bit will prevent
+			 * writes to the file from the same fid (which
+			 * should be allowed).
+			 *
+			 * The solution is to set the bit at close time.
+			 * Meanwhile, to prevent racing opens from being
+			 * able to write to the file, set share reservations
+			 * to prevent write and delete access.
+			 */
+
+			if (op->dattr & SMB_FA_READONLY)
 				share_access &= ~(FILE_SHARE_WRITE |
 				    FILE_SHARE_DELETE);
-			}
 
 			node = op->fqi.last_snode;
 
@@ -707,41 +716,7 @@ smb_open_subr(smb_request_t *sr)
 				return (status);
 			}
 
-			new_attr = op->fqi.last_attr;
-			new_attr.sa_mask = 0;
-
-			if (op->dattr & SMB_FA_READONLY) {
-				new_attr.sa_dosattr &= ~FILE_ATTRIBUTE_READONLY;
-				new_attr.sa_mask |= SMB_AT_DOSATTR;
-			}
-
-			if (op->dsize) {
-				new_attr.sa_vattr.va_size = op->dsize;
-				new_attr.sa_mask |= SMB_AT_SIZE;
-			}
-
-			if (new_attr.sa_mask) {
-				node->attr = new_attr;
-				node->what = new_attr.sa_mask;
-				rc = smb_sync_fsattr(sr, sr->user_cr, node);
-
-				if (rc != 0) {
-					smb_fsop_unshrlock(sr->user_cr, node,
-					    uniq_fid);
-
-					rw_exit(&node->n_share_lock);
-					smb_node_release(node);
-					(void) smb_fsop_remove(sr, sr->user_cr,
-					    dnode, op->fqi.last_comp, 0);
-					smb_rwx_rwexit(&dnode->n_lock);
-					smb_node_release(dnode);
-					SMB_NULL_FQI_NODES(op->fqi);
-					smbsr_errno(sr, rc);
-					return (sr->smb_error.status);
-				} else {
-					op->fqi.last_attr = node->attr;
-				}
-			}
+			op->fqi.last_attr = node->attr;
 
 		} else {
 			op->dattr |= SMB_FA_DIRECTORY;
@@ -765,24 +740,6 @@ smb_open_subr(smb_request_t *sr)
 
 		created = 1;
 		op->action_taken = SMB_OACT_CREATED;
-	}
-
-	if ((op->fqi.last_attr.sa_vattr.va_type != VREG) &&
-	    (op->fqi.last_attr.sa_vattr.va_type != VDIR) &&
-	    (op->fqi.last_attr.sa_vattr.va_type != VLNK)) {
-		/* not allowed to do this */
-
-		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
-
-		SMB_DEL_NEWOBJ(op->fqi);
-		rw_exit(&node->n_share_lock);
-		smb_node_release(node);
-		if (created)
-			smb_rwx_rwexit(&dnode->n_lock);
-		smb_node_release(dnode);
-		SMB_NULL_FQI_NODES(op->fqi);
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		return (NT_STATUS_ACCESS_DENIED);
 	}
 
 	if (max_requested) {
@@ -864,15 +821,10 @@ smb_open_subr(smb_request_t *sr)
 		/*
 		 * Clients may set the DOS readonly bit on create but they
 		 * expect subsequent write operations on the open fid to
-		 * succeed.  Thus the DOS readonly bit is not set permanently
-		 * until the file is closed.  The NODE_CREATED_READONLY flag
+		 * succeed.  Thus the DOS readonly bit is not set until
+		 * the file is closed.  The NODE_CREATED_READONLY flag
 		 * will act as the indicator to set the DOS readonly bit on
 		 * close.
-		 *	Above, the readonly bit is set on create, share
-		 * reservations are set, and then the bit is unset.
-		 * These actions allow writes to the open fid to succeed
-		 * until the file is closed while preventing write access
-		 * from other opens while this fid is active.
 		 */
 		if (op->dattr & SMB_FA_READONLY) {
 			node->flags |= NODE_CREATED_READONLY;

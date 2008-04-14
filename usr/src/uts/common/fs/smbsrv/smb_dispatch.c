@@ -141,6 +141,7 @@
  */
 
 #include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kstat.h>
 #include <sys/sdt.h>
 
 #define	SMB_ALL_DISPATCH_STAT_INCR(stat)	atomic_inc_64(&stat);
@@ -1286,7 +1287,8 @@ smb_dispatch_kstat_init(void)
 			ks_ndata++;
 	}
 
-	smb_dispatch_ksp = kstat_create("smb", 0, "smb_dispatch_all", "misc",
+	smb_dispatch_ksp = kstat_create(SMBSRV_KSTAT_MODULE, 0,
+	    SMBSRV_KSTAT_NAME_CMDS, SMBSRV_KSTAT_CLASS,
 	    KSTAT_TYPE_NAMED, ks_ndata, 0);
 
 	if (smb_dispatch_ksp) {

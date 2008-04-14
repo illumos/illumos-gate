@@ -94,7 +94,7 @@ smb_idmap_restart(void)
  * Tries to get a mapping for the given uid/gid
  */
 idmap_stat
-smb_idmap_getsid(uid_t id, int idtype, nt_sid_t **sid)
+smb_idmap_getsid(uid_t id, int idtype, smb_sid_t **sid)
 {
 	smb_idmap_batch_t sib;
 	idmap_stat stat;
@@ -118,7 +118,7 @@ smb_idmap_getsid(uid_t id, int idtype, nt_sid_t **sid)
 		return (stat);
 	}
 
-	*sid = nt_sid_dup(sib.sib_maps[0].sim_sid);
+	*sid = smb_sid_dup(sib.sib_maps[0].sim_sid);
 
 	smb_idmap_batch_destroy(&sib);
 
@@ -131,7 +131,7 @@ smb_idmap_getsid(uid_t id, int idtype, nt_sid_t **sid)
  * Tries to get a mapping for the given SID
  */
 idmap_stat
-smb_idmap_getid(nt_sid_t *sid, uid_t *id, int *id_type)
+smb_idmap_getid(smb_sid_t *sid, uid_t *id, int *id_type)
 {
 	smb_idmap_batch_t sib;
 	smb_idmap_t *sim;
@@ -199,10 +199,9 @@ smb_idmap_batch_create(smb_idmap_batch_t *sib, uint16_t nmap, int flags)
 void
 smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 {
-	nt_sid_t *sid;
 	int i;
 
-	if (!sib)
+	if (sib == NULL)
 		return;
 
 	if (sib->sib_idmaph) {
@@ -210,7 +209,7 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 		sib->sib_idmaph = NULL;
 	}
 
-	if (!sib->sib_maps)
+	if (sib->sib_maps == NULL)
 		return;
 
 	if (sib->sib_flags & SMB_IDMAP_ID2SID) {
@@ -218,11 +217,8 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 		 * SIDs are allocated only when mapping
 		 * UID/GID to SIDs
 		 */
-		for (i = 0; i < sib->sib_nmap; i++) {
-			sid = sib->sib_maps[i].sim_sid;
-			if (sid)
-				free(sid);
-		}
+		for (i = 0; i < sib->sib_nmap; i++)
+			smb_sid_free(sib->sib_maps[i].sim_sid);
 	}
 
 	if (sib->sib_size && sib->sib_maps) {
@@ -244,26 +240,28 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
  */
 idmap_stat
 smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
-    nt_sid_t *sid, int idtype)
+    smb_sid_t *sid, int idtype)
 {
-	nt_sid_t *tmpsid;
+	char sidstr[SMB_SID_STRSZ];
+	smb_sid_t *tmpsid;
 	idmap_stat stat;
 	int flag = 0;
 
 	if (!idmaph || !sim || !sid)
 		return (IDMAP_ERR_ARG);
 
-	tmpsid = nt_sid_dup(sid);
+	tmpsid = smb_sid_dup(sid);
 	if (!tmpsid)
 		return (IDMAP_ERR_MEMORY);
 
-	if (nt_sid_split(tmpsid, &sim->sim_rid) != 0) {
-		free(tmpsid);
+	if (smb_sid_split(tmpsid, &sim->sim_rid) != 0) {
+		smb_sid_free(tmpsid);
 		return (IDMAP_ERR_ARG);
 	}
 
-	sim->sim_domsid = nt_sid_format(tmpsid);
-	free(tmpsid);
+	smb_sid_tostr(tmpsid, sidstr);
+	sim->sim_domsid = sidstr;
+	smb_sid_free(tmpsid);
 
 	switch (idtype) {
 	case SMB_IDMAP_USER:
@@ -283,11 +281,9 @@ smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 		break;
 
 	default:
-		free(sim->sim_domsid);
 		return (IDMAP_ERR_ARG);
 	}
 
-	free(sim->sim_domsid);
 	return (stat);
 }
 
@@ -380,7 +376,7 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 static int
 smb_idmap_batch_binsid(smb_idmap_batch_t *sib)
 {
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 	smb_idmap_t *sim;
 	int i;
 
@@ -393,12 +389,12 @@ smb_idmap_batch_binsid(smb_idmap_batch_t *sib)
 		if (sim->sim_domsid == NULL)
 			return (-1);
 
-		sid = nt_sid_strtosid(sim->sim_domsid);
+		sid = smb_sid_fromstr(sim->sim_domsid);
 		free(sim->sim_domsid);
 		if (sid == NULL)
 			return (-1);
 
-		sim->sim_sid = nt_sid_splice(sid, sim->sim_rid);
+		sim->sim_sid = smb_sid_splice(sid, sim->sim_rid);
 		free(sid);
 	}
 

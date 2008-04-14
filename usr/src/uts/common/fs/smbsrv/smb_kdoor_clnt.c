@@ -31,7 +31,6 @@
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/door.h>
-#include <smbsrv/alloc.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_common_door.h>
 

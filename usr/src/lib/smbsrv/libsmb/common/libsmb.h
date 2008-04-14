@@ -285,7 +285,7 @@ extern int smb_getfqdomainname(char *, size_t);
 extern int smb_gethostname(char *, size_t, int);
 extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
-extern nt_sid_t *smb_getdomainsid(void);
+extern smb_sid_t *smb_getdomainsid(void);
 
 extern int smb_get_nameservers(struct in_addr *, int);
 extern void smb_tonetbiosname(char *, char *, char);
@@ -573,10 +573,10 @@ typedef struct nt_domain {
 	struct nt_domain *next;
 	nt_domain_type_t type;
 	char *name;
-	nt_sid_t *sid;
+	smb_sid_t *sid;
 } nt_domain_t;
 
-nt_domain_t *nt_domain_new(nt_domain_type_t type, char *name, nt_sid_t *sid);
+nt_domain_t *nt_domain_new(nt_domain_type_t type, char *name, smb_sid_t *sid);
 void nt_domain_delete(nt_domain_t *domain);
 nt_domain_t *nt_domain_add(nt_domain_t *new_domain);
 void nt_domain_remove(nt_domain_t *domain);
@@ -585,9 +585,9 @@ void nt_domain_sync(void);
 char *nt_domain_xlat_type(nt_domain_type_t domain_type);
 nt_domain_type_t nt_domain_xlat_type_name(char *type_name);
 nt_domain_t *nt_domain_lookup_name(char *domain_name);
-nt_domain_t *nt_domain_lookup_sid(nt_sid_t *domain_sid);
+nt_domain_t *nt_domain_lookup_sid(smb_sid_t *domain_sid);
 nt_domain_t *nt_domain_lookupbytype(nt_domain_type_t type);
-nt_sid_t *nt_domain_local_sid(void);
+smb_sid_t *nt_domain_local_sid(void);
 
 typedef enum {
 	SMB_LGRP_BUILTIN = 1,
@@ -595,7 +595,7 @@ typedef enum {
 } smb_gdomain_t;
 
 typedef struct smb_gsid {
-	nt_sid_t *gs_sid;
+	smb_sid_t *gs_sid;
 	uint16_t gs_type;
 } smb_gsid_t;
 
@@ -625,20 +625,20 @@ int smb_lgrp_setcmnt(char *, char *);
 int smb_lgrp_getcmnt(char *, char **);
 int smb_lgrp_getpriv(char *, uint8_t, boolean_t *);
 int smb_lgrp_setpriv(char *, uint8_t, boolean_t);
-int smb_lgrp_add_member(char *, nt_sid_t *, uint16_t);
-int smb_lgrp_del_member(char *, nt_sid_t *, uint16_t);
+int smb_lgrp_add_member(char *, smb_sid_t *, uint16_t);
+int smb_lgrp_del_member(char *, smb_sid_t *, uint16_t);
 int smb_lgrp_getbyname(char *, smb_group_t *);
 int smb_lgrp_getbyrid(uint32_t, smb_gdomain_t, smb_group_t *);
 int smb_lgrp_numbydomain(smb_gdomain_t, int *);
-int smb_lgrp_numbymember(nt_sid_t *, int *);
+int smb_lgrp_numbymember(smb_sid_t *, int *);
 void smb_lgrp_free(smb_group_t *);
-boolean_t smb_lgrp_is_member(smb_group_t *, nt_sid_t *);
+boolean_t smb_lgrp_is_member(smb_group_t *, smb_sid_t *);
 char *smb_lgrp_strerror(int);
 int smb_lgrp_iteropen(smb_giter_t *);
 void smb_lgrp_iterclose(smb_giter_t *);
 int smb_lgrp_iterate(smb_giter_t *, smb_group_t *);
 
-int smb_lookup_sid(nt_sid_t *, char *buf, int buflen);
+int smb_lookup_sid(smb_sid_t *, char *buf, int buflen);
 int smb_lookup_name(char *, smb_gsid_t *);
 
 #define	SMB_LGRP_SUCCESS		0
@@ -716,6 +716,10 @@ int smb_nic_delhost(const char *);
 int smb_nic_getfirst(smb_niciter_t *);
 int smb_nic_getnext(smb_niciter_t *);
 boolean_t smb_nic_exists(uint32_t, boolean_t);
+
+/* NIC Monitoring functions */
+int smb_nicmon_start(const char *);
+void smb_nicmon_stop(void);
 
 #ifdef	__cplusplus
 }

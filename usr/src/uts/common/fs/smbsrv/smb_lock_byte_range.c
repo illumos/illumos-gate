@@ -99,8 +99,8 @@ smb_com_lock_byte_range(struct smb_request *sr)
 	 * set to be exclusive, lock type is passed as
 	 * normal lock (write lock).
 	 */
-	result = smb_lock_range(sr, sr->fid_ofile,
-	    (u_offset_t)off, (uint64_t)count,  0, SMB_LOCK_TYPE_READWRITE);
+	result = smb_lock_range(sr, (u_offset_t)off, (uint64_t)count,  0,
+	    SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, result);
 		return (SDRC_ERROR);

@@ -183,7 +183,7 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	uint16_t		access = SMB_TREE_READ_WRITE;
 	int			rc;
 	lmshare_info_t 		si;
-	nt_sid_t		*sid;
+	smb_sid_t		*sid;
 	fsvol_attr_t		vol_attr;
 	smb_attr_t		attr;
 	int			is_admin;
@@ -245,13 +245,13 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	}
 
 	if (is_admin) {
-		sid = nt_sid_strtosid(ADMINISTRATORS_SID);
+		sid = smb_sid_fromstr(ADMINISTRATORS_SID);
 		if (sid) {
 			rc = smb_cred_is_member(u_cred, sid);
-			MEM_FREE("smbsrv", sid);
+			smb_sid_free(sid);
 			if (rc == 0) {
-				(void) strlcpy(errmsg,
-				    "not administrator", SMB_TREE_EMSZ);
+				(void) strlcpy(errmsg, "not administrator",
+				    SMB_TREE_EMSZ);
 				return (ERRaccess);
 			}
 		}

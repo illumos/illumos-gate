@@ -1673,7 +1673,7 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
  *                       dyndns_update calls.
  * Returns:
  *   -1: some dynamic DNS updates errors
- *    0: successful
+ *    0: successful or DDNS disabled.
  */
 int
 dyndns_update(char *fqdn, boolean_t init_msgid_counter)
@@ -1686,7 +1686,7 @@ dyndns_update(char *fqdn, boolean_t init_msgid_counter)
 	char fqhn[MAXHOSTNAMELEN];
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
-		return (-1);
+		return (0);
 
 	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
@@ -1754,7 +1754,7 @@ dyndns_update(char *fqdn, boolean_t init_msgid_counter)
  *   fqhn - fully-qualified hostname
  * Returns:
  *   -1: some dynamic DNS updates errors
- *    0: successful
+ *    0: successful or DDNS disabled.
  */
 int
 dyndns_clear_rev_zone(char *fqdn)
@@ -1767,7 +1767,7 @@ dyndns_clear_rev_zone(char *fqdn)
 	char fqhn[MAXHOSTNAMELEN];
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
-		return (-1);
+		return (0);
 
 	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);

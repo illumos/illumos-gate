@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,12 +34,12 @@
 #endif /* !_KERNEL */
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/wintypes.h>
-#include <smbsrv/ntsid.h>
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
 
-bool_t
-xdr_ntsid_helper(xdrs, sid)
+static bool_t
+xdr_sid_helper(xdrs, sid)
 	XDR *xdrs;
 	char **sid;
 {
@@ -50,7 +50,7 @@ xdr_ntsid_helper(xdrs, sid)
 	switch (xdrs->x_op) {
 	case XDR_DECODE:
 		/*
-		 * chicken-and-egg: Can't use nt_sid_length() since it takes
+		 * chicken-and-egg: Can't use smb_sid_len() since it takes
 		 * SID as its parameter while sid is yet to be decoded.
 		 */
 		pos = xdr_getpos(xdrs);
@@ -69,10 +69,10 @@ xdr_ntsid_helper(xdrs, sid)
 		if (rc == FALSE)
 			return (FALSE);
 
-		len = sizeof (nt_sid_t) - sizeof (uint32_t) +
+		len = sizeof (smb_sid_t) - sizeof (uint32_t) +
 		    (cnt * sizeof (uint32_t));
 
-		if (!xdr_pointer(xdrs, sid, len, (xdrproc_t)xdr_nt_sid_t))
+		if (!xdr_pointer(xdrs, sid, len, (xdrproc_t)xdr_smb_sid_t))
 			return (FALSE);
 		break;
 
@@ -81,8 +81,8 @@ xdr_ntsid_helper(xdrs, sid)
 		if (*sid == NULL)
 			return (FALSE);
 
-		len = nt_sid_length((nt_sid_t *)(uintptr_t)*sid);
-		if (!xdr_pointer(xdrs, sid, len, (xdrproc_t)xdr_nt_sid_t))
+		len = smb_sid_len((smb_sid_t *)(uintptr_t)*sid);
+		if (!xdr_pointer(xdrs, sid, len, (xdrproc_t)xdr_smb_sid_t))
 			return (FALSE);
 		break;
 	}
@@ -293,18 +293,18 @@ xdr_netr_client_t(xdrs, objp)
 }
 
 bool_t
-xdr_nt_sid_t(xdrs, objp)
+xdr_smb_sid_t(xdrs, objp)
 	XDR *xdrs;
-	nt_sid_t *objp;
+	smb_sid_t *objp;
 {
-	if (!xdr_uint8_t(xdrs, &objp->Revision))
+	if (!xdr_uint8_t(xdrs, &objp->sid_revision))
 		return (FALSE);
-	if (!xdr_uint8_t(xdrs, &objp->SubAuthCount))
+	if (!xdr_uint8_t(xdrs, &objp->sid_subauthcnt))
 		return (FALSE);
-	if (!xdr_vector(xdrs, (char *)objp->Authority, NT_SID_AUTH_MAX,
+	if (!xdr_vector(xdrs, (char *)objp->sid_authority, NT_SID_AUTH_MAX,
 	    sizeof (uint8_t), (xdrproc_t)xdr_uint8_t))
 		return (FALSE);
-	if (!xdr_vector(xdrs, (char *)objp->SubAuthority, objp->SubAuthCount,
+	if (!xdr_vector(xdrs, (char *)objp->sid_subauth, objp->sid_subauthcnt,
 	    sizeof (uint32_t), (xdrproc_t)xdr_uint32_t))
 		return (FALSE);
 	return (TRUE);
@@ -357,7 +357,7 @@ xdr_smb_sid_attrs_t(xdrs, objp)
 {
 	if (!xdr_uint32_t(xdrs, &objp->attrs))
 		return (FALSE);
-	return (xdr_ntsid_helper(xdrs, (char **)&objp->sid));
+	return (xdr_sid_helper(xdrs, (char **)&objp->sid));
 }
 
 bool_t

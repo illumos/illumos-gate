@@ -19,32 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SMBSRV_NTSID_H
-#define	_SMBSRV_NTSID_H
+#ifndef _SMB_SID_H
+#define	_SMB_SID_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NT Security Identifier (SID) interface definition.
  */
-
-/*
- * some kernel include file /usr/include/... is
- * overriding DWORD and causing conflicts
- * will investigate further - to be removed
- */
-
-#ifdef DWORD
-#undef DWORD
-#define	DWORD uint32_t
-#endif
-
 #include <smbsrv/wintypes.h>
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -223,77 +210,64 @@ extern "C" {
  * definition of a 6 byte vector but the effect is the same
  * as defining it as a member value.
  */
-typedef struct nt_sid {
-	BYTE Revision;
-	BYTE SubAuthCount;
-	BYTE Authority[NT_SID_AUTH_MAX];
-	DWORD SubAuthority[ANY_SIZE_ARRAY];
-} nt_sid_t;
+typedef struct smb_sid {
+	uint8_t sid_revision;
+	uint8_t sid_subauthcnt;
+	uint8_t sid_authority[NT_SID_AUTH_MAX];
+	uint32_t sid_subauth[ANY_SIZE_ARRAY];
+} smb_sid_t;
 
 /*
- * The structure for entries in a static table of well known
- * SIDs. The table definition is in os/libnt/ntbuitin.c
- * The domain_ix field is an index into a predefined domain
- * list in os/libnt/ntbuitin.c
+ * Well-known account structure
  */
-typedef struct well_known_account {
-	WORD sid_name_use;
-	WORD domain_ix;			/* index to a predefine domain list */
-	char *sid;
-	char *name;
-	WORD flags;
-	char *desc;
-	nt_sid_t *binsid;
-} well_known_account_t;
+typedef struct smb_wka {
+	uint16_t	wka_type;
+	uint8_t		wka_domidx;
+	char		*wka_sid;
+	char		*wka_name;
+	uint16_t	wka_flags;
+	char		*wka_desc;
+	smb_sid_t	*wka_binsid;
+} smb_wka_t;
 
 /*
- * flags for local group table entry
+ * Defined values for smb_wka.wka_flags
  *
- * LGF_HIDDEN		this entry won't be represented to users
- *					via builtin group management interface
+ * SMB_WKAFLG_LGRP_ENABLE		Can be added as local group
  */
-#define	LGF_HIDDEN			0x1
+#define	SMB_WKAFLG_LGRP_ENABLE	0x1
+
+/*
+ * The maximum size of a SID in string format
+ */
+#define	SMB_SID_STRSZ		256
+
+boolean_t smb_sid_isvalid(smb_sid_t *);
+int smb_sid_len(smb_sid_t *);
+smb_sid_t *smb_sid_dup(smb_sid_t *);
+smb_sid_t *smb_sid_splice(smb_sid_t *, uint32_t);
+int smb_sid_getrid(smb_sid_t *, uint32_t *);
+int smb_sid_split(smb_sid_t *, uint32_t *);
+boolean_t smb_sid_cmp(smb_sid_t *, smb_sid_t *);
+boolean_t smb_sid_islocal(smb_sid_t *);
+boolean_t smb_sid_indomain(smb_sid_t *, smb_sid_t *);
+void smb_sid_free(smb_sid_t *);
+int smb_sid_splitstr(char *, uint32_t *);
+void smb_sid_tostr(smb_sid_t *, char *);
+smb_sid_t *smb_sid_fromstr(char *);
+char *smb_sid_type2str(uint16_t);
 
 
 /*
- * The maximum size of the SID format buffer.
+ * Well-known account interfaces
  */
-#define	NT_SID_FMTBUF_SIZE		256
-
-
-int nt_sid_is_valid(nt_sid_t *sid);
-int nt_sid_length(nt_sid_t *sid);
-nt_sid_t *nt_sid_dup(nt_sid_t *sid);
-nt_sid_t *nt_sid_splice(nt_sid_t *domain_sid, DWORD rid);
-int nt_sid_get_rid(nt_sid_t *sid, DWORD *rid);
-int nt_sid_split(nt_sid_t *sid, DWORD *rid);
-nt_sid_t *nt_sid_gen_null_sid(void);
-int nt_sid_domain_equal(nt_sid_t *domain_sid, nt_sid_t *sid);
-int nt_sid_is_equal(nt_sid_t *sid1, nt_sid_t *sid2);
-int nt_sid_is_local(nt_sid_t *sid);
-int nt_sid_is_builtin(nt_sid_t *sid);
-int nt_sid_is_domain_equal(nt_sid_t *sid1, nt_sid_t *sid2);
-int nt_sid_is_indomain(nt_sid_t *domain_sid, nt_sid_t *sid);
-void nt_sid_logf(nt_sid_t *sid);
-char *nt_sid_format(nt_sid_t *sid);
-void nt_sid_format2(nt_sid_t *sid, char *fmtbuf);
-nt_sid_t *nt_sid_strtosid(char *sidstr);
-char *nt_sid_name_use(unsigned int snu_id);
-int nt_sid_copy(nt_sid_t *dessid, nt_sid_t *srcsid, unsigned buflen);
-
-
-/*
- * SID/name translation service for NT BUILTIN SIDs.
- */
-int nt_builtin_init(void);
-void nt_builtin_fini(void);
-well_known_account_t *nt_builtin_lookup(char *name);
-char *nt_builtin_lookup_sid(nt_sid_t *sid, WORD *sid_name_use);
-nt_sid_t *nt_builtin_lookup_name(char *name, WORD *sid_name_use);
-char *nt_builtin_lookup_domain(char *name);
-int nt_builtin_is_wellknown(char *name);
-well_known_account_t *nt_builtin_findfirst(DWORD *iterator);
-well_known_account_t *nt_builtin_findnext(DWORD *iterator);
+int smb_wka_init(void);
+void smb_wka_fini(void);
+smb_wka_t *smb_wka_lookup(char *);
+char *smb_wka_lookup_sid(smb_sid_t *, uint16_t *);
+smb_sid_t *smb_wka_lookup_name(char *, uint16_t *);
+char *smb_wka_lookup_domain(char *);
+boolean_t smb_wka_is_wellknown(char *);
 
 
 #ifdef __cplusplus
@@ -301,4 +275,4 @@ well_known_account_t *nt_builtin_findnext(DWORD *iterator);
 #endif
 
 
-#endif /* _SMBSRV_NTSID_H */
+#endif /* _SMB_SID_H */

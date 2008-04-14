@@ -27,7 +27,6 @@
 
 #include <strings.h>
 #include <stdlib.h>
-#include <smbsrv/alloc.h>
 #include <smbsrv/codepage.h>
 #include <smbsrv/oem.h>
 #include <smbsrv/ctype.h>

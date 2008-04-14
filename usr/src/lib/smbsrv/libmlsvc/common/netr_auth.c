@@ -41,6 +41,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
+#include <smbsrv/libsmbns.h>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/ntstatus.h>
@@ -107,6 +108,19 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 
 		}
 	}
+
+	/*
+	 * The NETLOGON credential chain establishment has unset
+	 * both ServerPrincipalName and dNSHostName attributes of the
+	 * workstation trust account. Those attributes will be updated
+	 * here to avoid any Kerberos authentication errors from happening.
+	 *
+	 * Later, when NT4 domain controller is supported, we need to
+	 * find a way to disable the following code.
+	 */
+	if (ads_update_attrs() == -1)
+		syslog(LOG_DEBUG, "netlogon_auth: ServerPrincipalName"
+		    " and dNSHostName attributes might have been unset.");
 
 	return ((rc) ? NT_STATUS_UNSUCCESSFUL : NT_STATUS_SUCCESS);
 }

@@ -337,8 +337,8 @@ smb_com_locking_andx(smb_request_t *sr)
 				return (SDRC_ERROR);
 			}
 
-			result = smb_lock_range(sr, sr->fid_ofile,
-			    offset64, length64, timeout, ltype);
+			result = smb_lock_range(sr, offset64, length64, timeout,
+			    ltype);
 			if (result != NT_STATUS_SUCCESS) {
 				smb_lock_range_error(sr, result);
 				return (SDRC_ERROR);
@@ -370,10 +370,8 @@ smb_com_locking_andx(smb_request_t *sr)
 				return (SDRC_ERROR);
 			}
 
-			result = smb_lock_range(sr, sr->fid_ofile,
-			    (uint64_t)offset32,
-			    (uint64_t)length32,
-			    timeout, ltype);
+			result = smb_lock_range(sr, (uint64_t)offset32,
+			    (uint64_t)length32, timeout, ltype);
 			if (result != NT_STATUS_SUCCESS) {
 				smb_lock_range_error(sr, result);
 				return (SDRC_ERROR);

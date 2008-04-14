@@ -150,17 +150,17 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 	user_info->sid_name_use = SidTypeUser;
 	user_info->rid = info3->UserId;
 	user_info->primary_group_rid = info3->PrimaryGroupId;
-	user_info->domain_sid = nt_sid_dup((nt_sid_t *)info3->LogonDomainId);
+	user_info->domain_sid = smb_sid_dup((smb_sid_t *)info3->LogonDomainId);
 
 	if (user_info->domain_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	user_info->user_sid = nt_sid_splice(user_info->domain_sid,
+	user_info->user_sid = smb_sid_splice(user_info->domain_sid,
 	    user_info->rid);
 	if (user_info->user_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	user_info->pgrp_sid = nt_sid_splice(user_info->domain_sid,
+	user_info->pgrp_sid = smb_sid_splice(user_info->domain_sid,
 	    user_info->primary_group_rid);
 	if (user_info->pgrp_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
@@ -197,8 +197,8 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 				other_grps[i].attrs =
 				    info3->ExtraSids[i].attributes;
 
-				other_grps[i].sid = nt_sid_dup(
-				    (nt_sid_t *)info3->ExtraSids[i].sid);
+				other_grps[i].sid = smb_sid_dup(
+				    (smb_sid_t *)info3->ExtraSids[i].sid);
 
 				if (other_grps[i].sid == NULL)
 					break;
