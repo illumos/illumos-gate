@@ -5479,6 +5479,16 @@ sd_ddi_suspend(dev_info_t *devi)
 		mutex_exit(SD_MUTEX(un));
 		(void) untimeout(temp_id);
 		mutex_enter(SD_MUTEX(un));
+
+		if (un->un_retry_bp != NULL) {
+			un->un_retry_bp->av_forw = un->un_waitq_headp;
+			un->un_waitq_headp = un->un_retry_bp;
+			if (un->un_waitq_tailp == NULL) {
+				un->un_waitq_tailp = un->un_retry_bp;
+			}
+			un->un_retry_bp = NULL;
+			un->un_retry_statp = NULL;
+		}
 	}
 
 	if (un->un_direct_priority_timeid != NULL) {
