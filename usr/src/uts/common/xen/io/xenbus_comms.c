@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,9 @@
 #include <xen/sys/xenbus_comms.h>
 #include <xen/public/io/xs_wire.h>
 
+#ifndef XPV_HVM_DRIVER
 static int xenbus_irq;
+#endif
 static ddi_umem_cookie_t xb_cookie; /* cookie for xenbus comm page */
 extern caddr_t xb_addr;	/* va of xenbus comm page */
 
@@ -240,7 +242,11 @@ xb_read(void *data, unsigned len)
 void
 xb_suspend(void)
 {
+#ifdef XPV_HVM_DRIVER
+	ec_unbind_evtchn(xen_info->store_evtchn);
+#else
 	rem_avintr(NULL, IPL_XENBUS, (avfunc)xenbus_intr, xenbus_irq);
+#endif
 }
 
 void

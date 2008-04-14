@@ -778,6 +778,7 @@ failure_2:
 	xvdi_remove_event_handler(devinfo, XS_OE_STATE);
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(xnfp->xnf_evtchn);
+	xvdi_free_evtchn(devinfo);
 #else
 	ddi_remove_intr(devinfo, 0, xnfp->xnf_icookie);
 #endif
@@ -816,6 +817,7 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 #ifdef XPV_HVM_DRIVER
 		ec_unbind_evtchn(xnfp->xnf_evtchn);
+		xvdi_free_evtchn(devinfo);
 #else
 		ddi_remove_intr(devinfo, 0, xnfp->xnf_icookie);
 #endif
@@ -874,6 +876,7 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	/* Remove the interrupt */
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(xnfp->xnf_evtchn);
+	xvdi_free_evtchn(devinfo);
 #else
 	ddi_remove_intr(devinfo, 0, xnfp->xnf_icookie);
 #endif

@@ -47,12 +47,15 @@
 #include <sys/devops.h>
 #include <sys/pc_mmu.h>
 #include <sys/cmn_err.h>
+#include <sys/cpr.h>
+#include <sys/ddi.h>
 #include <vm/seg_kmem.h>
 #include <vm/as.h>
 #include <vm/hat_pte.h>
 #include <vm/hat_i86.h>
 
 #define	XPV_MINOR 0
+#define	XPV_BUFSIZE 128
 
 /*
  * This structure is ordinarily constructed by Xen. In the HVM world, we
@@ -76,6 +79,18 @@ int xen_is_64bit = -1;
 caddr_t xb_addr;
 
 dev_info_t *xpv_dip;
+static dev_info_t *xpvd_dip;
+
+/* saved pfn of the shared info page */
+static pfn_t shared_info_frame;
+
+#ifdef DEBUG
+int xen_suspend_debug;
+
+#define	SUSPEND_DEBUG if (xen_suspend_debug) xen_printf
+#else
+#define	SUSPEND_DEBUG(...)
+#endif
 
 /*
  * Forward declarations
@@ -300,6 +315,382 @@ hvm_get_param(int param_id)
 	return (xhp.value);
 }
 
+static struct xenbus_watch shutdown_watch;
+taskq_t *xen_shutdown_tq;
+
+#define	SHUTDOWN_INVALID	-1
+#define	SHUTDOWN_POWEROFF	0
+#define	SHUTDOWN_REBOOT		1
+#define	SHUTDOWN_SUSPEND	2
+#define	SHUTDOWN_HALT		3
+#define	SHUTDOWN_MAX		4
+
+#define	SHUTDOWN_TIMEOUT_SECS (60 * 5)
+
+static const char *cmd_strings[SHUTDOWN_MAX] = {
+	"poweroff",
+	"reboot",
+	"suspend",
+	"halt"
+};
+
+int
+xen_suspend_devices(dev_info_t *dip)
+{
+	int error;
+	char buf[XPV_BUFSIZE];
+
+	SUSPEND_DEBUG("xen_suspend_devices\n");
+
+	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
+		if (xen_suspend_devices(ddi_get_child(dip)))
+			return (ENXIO);
+		if (ddi_get_driver(dip) == NULL)
+			continue;
+		SUSPEND_DEBUG("Suspending device %s\n", ddi_deviname(dip, buf));
+		ASSERT((DEVI(dip)->devi_cpr_flags & DCF_CPR_SUSPENDED) == 0);
+
+
+		if (!i_ddi_devi_attached(dip)) {
+			error = DDI_FAILURE;
+		} else {
+			error = devi_detach(dip, DDI_SUSPEND);
+		}
+
+		if (error == DDI_SUCCESS) {
+			DEVI(dip)->devi_cpr_flags |= DCF_CPR_SUSPENDED;
+		} else {
+			SUSPEND_DEBUG("WARNING: Unable to suspend device %s\n",
+			    ddi_deviname(dip, buf));
+			cmn_err(CE_WARN, "Unable to suspend device %s.",
+			    ddi_deviname(dip, buf));
+			cmn_err(CE_WARN, "Device is busy or does not "
+			    "support suspend/resume.");
+				return (ENXIO);
+		}
+	}
+	return (0);
+}
+
+int
+xen_resume_devices(dev_info_t *start, int resume_failed)
+{
+	dev_info_t *dip, *next, *last = NULL;
+	int did_suspend;
+	int error = resume_failed;
+	char buf[XPV_BUFSIZE];
+
+	SUSPEND_DEBUG("xen_resume_devices\n");
+
+	while (last != start) {
+		dip = start;
+		next = ddi_get_next_sibling(dip);
+		while (next != last) {
+			dip = next;
+			next = ddi_get_next_sibling(dip);
+		}
+
+		/*
+		 * cpr is the only one that uses this field and the device
+		 * itself hasn't resumed yet, there is no need to use a
+		 * lock, even though kernel threads are active by now.
+		 */
+		did_suspend = DEVI(dip)->devi_cpr_flags & DCF_CPR_SUSPENDED;
+		if (did_suspend)
+			DEVI(dip)->devi_cpr_flags &= ~DCF_CPR_SUSPENDED;
+
+		/*
+		 * There may be background attaches happening on devices
+		 * that were not originally suspended by cpr, so resume
+		 * only devices that were suspended by cpr. Also, stop
+		 * resuming after the first resume failure, but traverse
+		 * the entire tree to clear the suspend flag.
+		 */
+		if (did_suspend && !error) {
+			SUSPEND_DEBUG("Resuming device %s\n",
+			    ddi_deviname(dip, buf));
+			/*
+			 * If a device suspended by cpr gets detached during
+			 * the resume process (for example, due to hotplugging)
+			 * before cpr gets around to issuing it a DDI_RESUME,
+			 * we'll have problems.
+			 */
+			if (!i_ddi_devi_attached(dip)) {
+				cmn_err(CE_WARN, "Skipping %s, device "
+				    "not ready for resume",
+				    ddi_deviname(dip, buf));
+			} else {
+				if (devi_attach(dip, DDI_RESUME) !=
+				    DDI_SUCCESS) {
+					error = ENXIO;
+				}
+			}
+		}
+
+		if (error == ENXIO) {
+			cmn_err(CE_WARN, "Unable to resume device %s",
+			    ddi_deviname(dip, buf));
+		}
+
+		error = xen_resume_devices(ddi_get_child(dip), error);
+		last = dip;
+	}
+
+	return (error);
+}
+
+/*ARGSUSED*/
+static int
+check_xpvd(dev_info_t *dip, void *arg)
+{
+	char *name;
+
+	name = ddi_node_name(dip);
+	if (name == NULL || strcmp(name, "xpvd")) {
+		return (DDI_WALK_CONTINUE);
+	} else {
+		xpvd_dip = dip;
+		return (DDI_WALK_TERMINATE);
+	}
+}
+
+/*
+ * Top level routine to direct suspend/resume of a domain.
+ */
+void
+xen_suspend_domain(void)
+{
+	extern void rtcsync(void);
+	extern void ec_resume(void);
+	extern kmutex_t ec_lock;
+	struct xen_add_to_physmap xatp;
+	ulong_t flags;
+	int err;
+
+	cmn_err(CE_NOTE, "Domain suspending for save/migrate");
+
+	SUSPEND_DEBUG("xen_suspend_domain\n");
+
+	/*
+	 * We only want to suspend the PV devices, since the emulated devices
+	 * are suspended by saving the emulated device state.  The PV devices
+	 * are all children of the xpvd nexus device.  So we search the
+	 * device tree for the xpvd node to use as the root of the tree to
+	 * be suspended.
+	 */
+	if (xpvd_dip == NULL)
+		ddi_walk_devs(ddi_root_node(), check_xpvd, NULL);
+
+	/*
+	 * suspend interrupts and devices
+	 */
+	if (xpvd_dip != NULL)
+		(void) xen_suspend_devices(ddi_get_child(xpvd_dip));
+	else
+		cmn_err(CE_WARN, "No PV devices found to suspend");
+	SUSPEND_DEBUG("xenbus_suspend\n");
+	xenbus_suspend();
+
+	mutex_enter(&cpu_lock);
+
+	/*
+	 * Suspend on vcpu 0
+	 */
+	thread_affinity_set(curthread, 0);
+	kpreempt_disable();
+
+	if (ncpus > 1)
+		pause_cpus(NULL);
+	/*
+	 * We can grab the ec_lock as it's a spinlock with a high SPL. Hence
+	 * any holder would have dropped it to get through pause_cpus().
+	 */
+	mutex_enter(&ec_lock);
+
+	/*
+	 * From here on in, we can't take locks.
+	 */
+
+	flags = intr_clear();
+
+	SUSPEND_DEBUG("HYPERVISOR_suspend\n");
+	/*
+	 * At this point we suspend and sometime later resume.
+	 * Note that this call may return with an indication of a cancelled
+	 * for now no matter ehat the return we do a full resume of all
+	 * suspended drivers, etc.
+	 */
+	(void) HYPERVISOR_shutdown(SHUTDOWN_suspend);
+
+	/*
+	 * Point HYPERVISOR_shared_info to the proper place.
+	 */
+	xatp.domid = DOMID_SELF;
+	xatp.idx = 0;
+	xatp.space = XENMAPSPACE_shared_info;
+	xatp.gpfn = shared_info_frame;
+	if ((err = HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp)) != 0)
+		panic("Could not set shared_info page. error: %d", err);
+
+	SUSPEND_DEBUG("gnttab_resume\n");
+	gnttab_resume();
+
+	SUSPEND_DEBUG("ec_resume\n");
+	ec_resume();
+
+	intr_restore(flags);
+
+	if (ncpus > 1)
+		start_cpus();
+
+	mutex_exit(&ec_lock);
+	mutex_exit(&cpu_lock);
+
+	/*
+	 * Now we can take locks again.
+	 */
+
+	rtcsync();
+
+	SUSPEND_DEBUG("xenbus_resume\n");
+	xenbus_resume();
+	SUSPEND_DEBUG("xen_resume_devices\n");
+	if (xpvd_dip != NULL)
+		(void) xen_resume_devices(ddi_get_child(xpvd_dip), 0);
+
+	thread_affinity_clear(curthread);
+	kpreempt_enable();
+
+	SUSPEND_DEBUG("finished xen_suspend_domain\n");
+
+	cmn_err(CE_NOTE, "domain restore/migrate completed");
+}
+
+static void
+xen_dirty_shutdown(void *arg)
+{
+	int cmd = (uintptr_t)arg;
+
+	cmn_err(CE_WARN, "Externally requested shutdown failed or "
+	    "timed out.\nShutting down.\n");
+
+	switch (cmd) {
+	case SHUTDOWN_HALT:
+	case SHUTDOWN_POWEROFF:
+		(void) kadmin(A_SHUTDOWN, AD_POWEROFF, NULL, kcred);
+		break;
+	case SHUTDOWN_REBOOT:
+		(void) kadmin(A_REBOOT, AD_BOOT, NULL, kcred);
+		break;
+	}
+}
+
+static void
+xen_shutdown(void *arg)
+{
+	nvlist_t *attr_list = NULL;
+	sysevent_t *event = NULL;
+	sysevent_id_t eid;
+	int cmd = (uintptr_t)arg;
+	int err;
+
+	ASSERT(cmd > SHUTDOWN_INVALID && cmd < SHUTDOWN_MAX);
+
+	if (cmd == SHUTDOWN_SUSPEND) {
+		xen_suspend_domain();
+		return;
+	}
+
+	err = nvlist_alloc(&attr_list, NV_UNIQUE_NAME, KM_SLEEP);
+	if (err != DDI_SUCCESS)
+		goto failure;
+
+	err = nvlist_add_string(attr_list, "shutdown", cmd_strings[cmd]);
+	if (err != DDI_SUCCESS)
+		goto failure;
+
+	if ((event = sysevent_alloc("EC_xpvsys", "control", "SUNW:kern:xpv",
+	    SE_SLEEP)) == NULL)
+		goto failure;
+	(void) sysevent_attach_attributes(event,
+	    (sysevent_attr_list_t *)attr_list);
+
+	err = log_sysevent(event, SE_SLEEP, &eid);
+
+	sysevent_detach_attributes(event);
+	sysevent_free(event);
+
+	if (err != 0)
+		goto failure;
+
+	(void) timeout(xen_dirty_shutdown, arg,
+	    SHUTDOWN_TIMEOUT_SECS * drv_usectohz(MICROSEC));
+
+	nvlist_free(attr_list);
+	return;
+
+failure:
+	if (attr_list != NULL)
+		nvlist_free(attr_list);
+	xen_dirty_shutdown(arg);
+}
+
+/*ARGSUSED*/
+static void
+xen_shutdown_handler(struct xenbus_watch *watch, const char **vec,
+	unsigned int len)
+{
+	char *str;
+	xenbus_transaction_t xbt;
+	int err, shutdown_code = SHUTDOWN_INVALID;
+	unsigned int slen;
+
+again:
+	err = xenbus_transaction_start(&xbt);
+	if (err)
+		return;
+	if (xenbus_read(xbt, "control", "shutdown", (void *)&str, &slen)) {
+		(void) xenbus_transaction_end(xbt, 1);
+		return;
+	}
+
+	SUSPEND_DEBUG("%d: xen_shutdown_handler: \"%s\"\n", CPU->cpu_id, str);
+
+	/*
+	 * If this is a watch fired from our write below, check out early to
+	 * avoid an infinite loop.
+	 */
+	if (strcmp(str, "") == 0) {
+		(void) xenbus_transaction_end(xbt, 0);
+		kmem_free(str, slen);
+		return;
+	} else if (strcmp(str, "poweroff") == 0) {
+		shutdown_code = SHUTDOWN_POWEROFF;
+	} else if (strcmp(str, "reboot") == 0) {
+		shutdown_code = SHUTDOWN_REBOOT;
+	} else if (strcmp(str, "suspend") == 0) {
+		shutdown_code = SHUTDOWN_SUSPEND;
+	} else if (strcmp(str, "halt") == 0) {
+		shutdown_code = SHUTDOWN_HALT;
+	} else {
+		printf("Ignoring shutdown request: %s\n", str);
+	}
+
+	(void) xenbus_write(xbt, "control", "shutdown", "");
+	err = xenbus_transaction_end(xbt, 0);
+	if (err == EAGAIN) {
+		SUSPEND_DEBUG("%d: trying again\n", CPU->cpu_id);
+		kmem_free(str, slen);
+		goto again;
+	}
+
+	kmem_free(str, slen);
+	if (shutdown_code != SHUTDOWN_INVALID) {
+		(void) taskq_dispatch(xen_shutdown_tq, xen_shutdown,
+		    (void *)(intptr_t)shutdown_code, 0);
+	}
+}
+
 static int
 xen_pv_init(dev_info_t *xpv_dip)
 {
@@ -401,10 +792,12 @@ xen_pv_init(dev_info_t *xpv_dip)
 	 * is.
 	 */
 	HYPERVISOR_shared_info = xen_alloc_pages(1);
+	shared_info_frame = hat_getpfnum(kas.a_hat,
+	    (caddr_t)HYPERVISOR_shared_info);
 	xatp.domid = DOMID_SELF;
 	xatp.idx = 0;
 	xatp.space = XENMAPSPACE_shared_info;
-	xatp.gpfn = hat_getpfnum(kas.a_hat, (caddr_t)HYPERVISOR_shared_info);
+	xatp.gpfn = shared_info_frame;
 	if ((err = HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp)) != 0) {
 		cmn_err(CE_WARN, "Could not get shared_info page from Xen."
 		    "  error: %d", err);
@@ -422,6 +815,14 @@ xen_pv_init(dev_info_t *xpv_dip)
 	xb_addr = vmem_alloc(heap_arena, MMU_PAGESIZE, VM_SLEEP);
 	xs_early_init();
 	xs_domu_init();
+
+	/* Set up for suspend/resume/migrate */
+	xen_shutdown_tq = taskq_create("shutdown_taskq", 1,
+	    maxclsyspri - 1, 1, 1, TASKQ_PREPOPULATE);
+	shutdown_watch.node = "control/shutdown";
+	shutdown_watch.callback = xen_shutdown_handler;
+	if (register_xenbus_watch(&shutdown_watch))
+		cmn_err(CE_WARN, "Failed to set shutdown watcher");
 
 	return (0);
 }

@@ -43,7 +43,7 @@
 extern dev_info_t *xpv_dip;
 static ddi_intr_handle_t *evtchn_ihp = NULL;
 static ddi_softint_handle_t evtchn_to_handle[NR_EVENT_CHANNELS];
-static kmutex_t ec_lock;
+kmutex_t ec_lock;
 
 static int evtchn_callback_irq = -1;
 
@@ -373,4 +373,17 @@ ec_init(dev_info_t *dip)
 		return (-1);
 	}
 	return (0);
+}
+
+void
+ec_resume(void)
+{
+	int i;
+
+	/* New event-channel space is not 'live' yet. */
+	for (i = 0; i < NR_EVENT_CHANNELS; i++)
+		(void) hypervisor_mask_event(i);
+	if (set_hvm_callback(evtchn_callback_irq) != 0)
+		cmn_err(CE_WARN, "Couldn't register evtchn callback");
+
 }
