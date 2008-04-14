@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,7 @@ typedef struct spdsock_s
 	boolean_t		spdsock_dump_active;
 	boolean_t		spdsock_dump_tunnel;
 	int			spdsock_dump_remaining_polheads;
-	char			spdsock_dump_name[LIFNAMSIZ];
+	ipsec_tun_pol_t		*spdsock_itp;
 } spdsock_t;
 
 #define	LOADCHECK_INTERVAL	(drv_usectohz(30000))

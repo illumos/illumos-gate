@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,17 @@ static	spdsockparam_t	lcl_param_arr[] = {
 #define	ss1dbg(spds, a)	if (spds->spds_debug != 0) printf a
 #define	ss2dbg(spds, a)	if (spds->spds_debug > 1) printf a
 #define	ss3dbg(spds, a)	if (spds->spds_debug > 2) printf a
+
+#define	RESET_SPDSOCK_DUMP_POLHEAD(ss, iph) { \
+	ASSERT(RW_READ_HELD(&(iph)->iph_lock)); \
+	(ss)->spdsock_dump_head = (iph); \
+	(ss)->spdsock_dump_gen = (iph)->iph_gen; \
+	(ss)->spdsock_dump_cur_type = 0; \
+	(ss)->spdsock_dump_cur_af = IPSEC_AF_V4; \
+	(ss)->spdsock_dump_cur_rule = NULL; \
+	(ss)->spdsock_dump_count = 0; \
+	(ss)->spdsock_dump_cur_chain = 0; \
+}
 
 static int spdsock_close(queue_t *);
 static int spdsock_open(queue_t *, dev_t *, int, int, cred_t *);
@@ -334,6 +345,7 @@ spdsock_stack_fini(netstackid_t stackid, void *arg)
 {
 	spd_stack_t *spds = (spd_stack_t *)arg;
 
+	freemsg(spds->spds_mp_algs);
 	mutex_destroy(&spds->spds_param_lock);
 	mutex_destroy(&spds->spds_alg_lock);
 	nd_free(&spds->spds_g_nd);
@@ -574,11 +586,10 @@ spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, ipsec_tun_pol_t *itp,
 {
 	boolean_t active;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t *spds = ss->spdsock_spds;
-	netstack_t *ns = spds->spds_netstack;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 
 	if (iph != ALL_ACTIVE_POLHEADS && iph != ALL_INACTIVE_POLHEADS) {
-		spdsock_flush_one(iph, spds->spds_netstack);
+		spdsock_flush_one(iph, ns);
 		if (audit_active) {
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
@@ -597,8 +608,7 @@ spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, ipsec_tun_pol_t *itp,
 			    active, 0, DB_CPID(mp));
 		}
 		/* Then flush every tunnel's appropriate one. */
-		itp_walk(spdsock_flush_node, (void *)active,
-		    spds->spds_netstack);
+		itp_walk(spdsock_flush_node, (void *)active, ns);
 		if (audit_active)
 			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns,
 			    "all tunnels", active, 0, DB_CPID(mp));
@@ -1149,7 +1159,7 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 	struct spd_rule *rule = (struct spd_rule *)extv[SPD_EXT_RULE];
 	int err, diag = 0;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t	*spds = ss->spdsock_spds;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 
 	if (rule == NULL) {
 		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NO_RULE_EXT);
@@ -1158,9 +1168,9 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_DELETERULE, DB_CRED(mp),
-			    spds->spds_netstack, ITP_NAME(itp), active,
-			    SPD_DIAGNOSTIC_NO_RULE_EXT, DB_CPID(mp));
+			audit_pf_policy(SPD_DELETERULE, DB_CRED(mp), ns,
+			    ITP_NAME(itp), active, SPD_DIAGNOSTIC_NO_RULE_EXT,
+			    DB_CPID(mp));
 		}
 		return;
 	}
@@ -1173,8 +1183,8 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 		mutex_enter(&itp->itp_lock);
 
 	if (rule->spd_rule_index != 0) {
-		if (ipsec_policy_delete_index(iph, rule->spd_rule_index,
-		    spds->spds_netstack) != 0) {
+		if (ipsec_policy_delete_index(iph, rule->spd_rule_index, ns) !=
+		    0) {
 			err = ESRCH;
 			goto fail;
 		}
@@ -1185,15 +1195,13 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 		}
 
 		if ((rule->spd_rule_flags & SPD_RULE_FLAG_INBOUND) &&
-		    !ipsec_policy_delete(iph, &sel, IPSEC_TYPE_INBOUND,
-		    spds->spds_netstack)) {
+		    !ipsec_policy_delete(iph, &sel, IPSEC_TYPE_INBOUND, ns)) {
 			err = ESRCH;
 			goto fail;
 		}
 
 		if ((rule->spd_rule_flags & SPD_RULE_FLAG_OUTBOUND) &&
-		    !ipsec_policy_delete(iph, &sel, IPSEC_TYPE_OUTBOUND,
-		    spds->spds_netstack)) {
+		    !ipsec_policy_delete(iph, &sel, IPSEC_TYPE_OUTBOUND, ns)) {
 			err = ESRCH;
 			goto fail;
 		}
@@ -1218,8 +1226,8 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp),
-		    spds->spds_netstack, ITP_NAME(itp), active, 0, DB_CPID(mp));
+		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp), ns, ITP_NAME(itp),
+		    active, 0, DB_CPID(mp));
 	}
 	return;
 fail:
@@ -1231,9 +1239,8 @@ fail:
 		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp),
-		    spds->spds_netstack, ITP_NAME(itp), active, err,
-		    DB_CPID(mp));
+		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp), ns, ITP_NAME(itp),
+		    active, err, DB_CPID(mp));
 	}
 }
 
@@ -1254,34 +1261,32 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 	char *tname;
 	ipsec_tun_pol_t *itp;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t	*spds = ss->spdsock_spds;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 
 	if (tunname != NULL) {
 		tname = (char *)tunname->spd_if_name;
 		if (*tname == '\0') {
 			/* can't fail */
-			ipsec_swap_global_policy(spds->spds_netstack);
+			ipsec_swap_global_policy(ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
 				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-				    spds->spds_netstack, NULL, active, 0,
-				    DB_CPID(mp));
+				    ns, NULL, active, 0, DB_CPID(mp));
 			}
-			itp_walk(spdsock_flip_node, NULL, spds->spds_netstack);
+			itp_walk(spdsock_flip_node, NULL, ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-				    spds->spds_netstack, "all tunnels", active,
-				    0, DB_CPID(mp));
+				audit_pf_policy(SPD_FLIP, DB_CRED(mp), ns,
+				    "all tunnels", active, 0, DB_CPID(mp));
 			}
 		} else {
-			itp = get_tunnel_policy(tname, spds->spds_netstack);
+			itp = get_tunnel_policy(tname, ns);
 			if (itp == NULL) {
 				/* Better idea for "tunnel not found"? */
 				spdsock_error(q, mp, ESRCH, 0);
@@ -1293,8 +1298,8 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
 					audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-					    spds->spds_netstack, ITP_NAME(itp),
-					    active, ESRCH, DB_CPID(mp));
+					    ns, ITP_NAME(itp), active,
+					    ESRCH, DB_CPID(mp));
 				}
 				return;
 			}
@@ -1304,21 +1309,20 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-				    spds->spds_netstack, ITP_NAME(itp), active,
-				    0, DB_CPID(mp));
+				audit_pf_policy(SPD_FLIP, DB_CRED(mp), ns,
+				    ITP_NAME(itp), active, 0, DB_CPID(mp));
 			}
-			ITP_REFRELE(itp, spds->spds_netstack);
+			ITP_REFRELE(itp, ns);
 		}
 	} else {
-		ipsec_swap_global_policy(spds->spds_netstack);	/* can't fail */
+		ipsec_swap_global_policy(ns);	/* can't fail */
 		if (audit_active) {
 			boolean_t active;
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
 			audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-			    spds->spds_netstack, NULL, active, 0, DB_CPID(mp));
+			    ns, NULL, active, 0, DB_CPID(mp));
 		}
 	}
 	spd_echo(q, mp);
@@ -1372,73 +1376,11 @@ spdsock_dump_finish(spdsock_t *ss, int error)
 	mblk_t *m;
 	ipsec_policy_head_t *iph = ss->spdsock_dump_head;
 	mblk_t *req = ss->spdsock_dump_req;
-	ipsec_tun_pol_t *itp, dummy;
-	spd_stack_t *spds = ss->spdsock_spds;
-	netstack_t *ns = spds->spds_netstack;
-	ipsec_stack_t *ipss = ns->netstack_ipsec;
-
-	ss->spdsock_dump_remaining_polheads--;
-	if (error == 0 && ss->spdsock_dump_remaining_polheads != 0) {
-		/* Attempt a respin with a new policy head. */
-		rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_READER);
-		/* NOTE:  No need for ITP_REF*() macros here. */
-		if (ipss->ipsec_tunnel_policy_gen > ss->spdsock_dump_tun_gen) {
-			/* Bail with EAGAIN. */
-			error = EAGAIN;
-		} else if (ss->spdsock_dump_name[0] == '\0') {
-			/* Just finished global, find first node. */
-			itp = (ipsec_tun_pol_t *)avl_first(
-			    &ipss->ipsec_tunnel_policies);
-		} else {
-			/*
-			 * We just finished current-named polhead, find
-			 * the next one.
-			 */
-			(void) strncpy(dummy.itp_name, ss->spdsock_dump_name,
-			    LIFNAMSIZ);
-			itp = (ipsec_tun_pol_t *)avl_find(
-			    &ipss->ipsec_tunnel_policies, &dummy, NULL);
-			ASSERT(itp != NULL);
-			itp = (ipsec_tun_pol_t *)AVL_NEXT(
-			    &ipss->ipsec_tunnel_policies, itp);
-			/* remaining_polheads should maintain this assertion. */
-			ASSERT(itp != NULL);
-		}
-		if (error == 0) {
-			(void) strncpy(ss->spdsock_dump_name, itp->itp_name,
-			    LIFNAMSIZ);
-			/* Reset other spdsock_dump thingies. */
-			IPPH_REFRELE(ss->spdsock_dump_head, ns);
-			if (ss->spdsock_dump_active) {
-				ss->spdsock_dump_tunnel =
-				    itp->itp_flags & ITPF_P_TUNNEL;
-				iph = itp->itp_policy;
-			} else {
-				ss->spdsock_dump_tunnel =
-				    itp->itp_flags & ITPF_I_TUNNEL;
-				iph = itp->itp_inactive;
-			}
-			IPPH_REFHOLD(iph);
-			rw_enter(&iph->iph_lock, RW_READER);
-			ss->spdsock_dump_head = iph;
-			ss->spdsock_dump_gen = iph->iph_gen;
-			ss->spdsock_dump_cur_type = 0;
-			ss->spdsock_dump_cur_af = IPSEC_AF_V4;
-			ss->spdsock_dump_cur_rule = NULL;
-			ss->spdsock_dump_count = 0;
-			ss->spdsock_dump_cur_chain = 0;
-			rw_exit(&iph->iph_lock);
-			rw_exit(&ipss->ipsec_tunnel_policy_lock);
-			/* And start again. */
-			return (spdsock_dump_next_record(ss));
-		}
-		rw_exit(&ipss->ipsec_tunnel_policy_lock);
-	}
 
 	rw_enter(&iph->iph_lock, RW_READER);
 	m = spdsock_dump_ruleset(req, iph, ss->spdsock_dump_count, error);
 	rw_exit(&iph->iph_lock);
-	IPPH_REFRELE(iph, ns);
+	IPPH_REFRELE(iph, ss->spdsock_spds->spds_netstack);
 	ss->spdsock_dump_req = NULL;
 	freemsg(req);
 
@@ -1902,13 +1844,46 @@ next:
 
 }
 
+/*
+ * If we're done with one policy head, but have more to go, we iterate through
+ * another IPsec tunnel policy head (itp).  Return NULL if it is an error
+ * worthy of returning EAGAIN via PF_POLICY.
+ */
+static ipsec_tun_pol_t *
+spdsock_dump_iterate_next_tunnel(spdsock_t *ss, ipsec_stack_t *ipss)
+{
+	ipsec_tun_pol_t *itp;
+
+	ASSERT(RW_READ_HELD(&ipss->ipsec_tunnel_policy_lock));
+	if (ipss->ipsec_tunnel_policy_gen > ss->spdsock_dump_tun_gen) {
+		/* Oops, state of the tunnel polheads changed. */
+		itp = NULL;
+	} else if (ss->spdsock_itp == NULL) {
+		/* Just finished global, find first node. */
+		itp = avl_first(&ipss->ipsec_tunnel_policies);
+	} else {
+		/* We just finished current polhead, find the next one. */
+		itp = AVL_NEXT(&ipss->ipsec_tunnel_policies, ss->spdsock_itp);
+	}
+	if (itp != NULL) {
+		ITP_REFHOLD(itp);
+	}
+	if (ss->spdsock_itp != NULL) {
+		ITP_REFRELE(ss->spdsock_itp, ipss->ipsec_netstack);
+	}
+	ss->spdsock_itp = itp;
+	return (itp);
+}
+
 static mblk_t *
 spdsock_dump_next_record(spdsock_t *ss)
 {
 	ipsec_policy_head_t *iph;
 	ipsec_policy_t *rule;
 	mblk_t *m;
-	mblk_t *req = ss->spdsock_dump_req;
+	ipsec_tun_pol_t *itp;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	iph = ss->spdsock_dump_head;
 
@@ -1921,16 +1896,54 @@ spdsock_dump_next_record(spdsock_t *ss)
 		return (spdsock_dump_finish(ss, EAGAIN));
 	}
 
-	rule = spdsock_dump_next_rule(ss, iph);
-
-	if (!rule) {
+	while ((rule = spdsock_dump_next_rule(ss, iph)) == NULL) {
 		rw_exit(&iph->iph_lock);
-		return (spdsock_dump_finish(ss, 0));
+		if (--(ss->spdsock_dump_remaining_polheads) == 0)
+			return (spdsock_dump_finish(ss, 0));
+
+
+		/*
+		 * If we reach here, we have more policy heads (tunnel
+		 * entries) to dump.  Let's reset to a new policy head
+		 * and get some more rules.
+		 *
+		 * An empty policy head will have spdsock_dump_next_rule()
+		 * return NULL, and we loop (while dropping the number of
+		 * remaining polheads).  If we loop to 0, we finish.  We
+		 * keep looping until we hit 0 or until we have a rule to
+		 * encode.
+		 *
+		 * NOTE:  No need for ITP_REF*() macros here as we're only
+		 * going after and refholding the policy head itself.
+		 */
+		rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_READER);
+		itp = spdsock_dump_iterate_next_tunnel(ss, ipss);
+		if (itp == NULL) {
+			rw_exit(&ipss->ipsec_tunnel_policy_lock);
+			return (spdsock_dump_finish(ss, EAGAIN));
+		}
+
+		/* Reset other spdsock_dump thingies. */
+		IPPH_REFRELE(ss->spdsock_dump_head, ns);
+		if (ss->spdsock_dump_active) {
+			ss->spdsock_dump_tunnel =
+			    itp->itp_flags & ITPF_P_TUNNEL;
+			iph = itp->itp_policy;
+		} else {
+			ss->spdsock_dump_tunnel =
+			    itp->itp_flags & ITPF_I_TUNNEL;
+			iph = itp->itp_inactive;
+		}
+		IPPH_REFHOLD(iph);
+		rw_exit(&ipss->ipsec_tunnel_policy_lock);
+
+		rw_enter(&iph->iph_lock, RW_READER);
+		RESET_SPDSOCK_DUMP_POLHEAD(ss, iph);
 	}
 
-	m = spdsock_encode_rule(req, rule, ss->spdsock_dump_cur_type,
-	    ss->spdsock_dump_cur_af, ss->spdsock_dump_name,
-	    ss->spdsock_dump_tunnel);
+	m = spdsock_encode_rule(ss->spdsock_dump_req, rule,
+	    ss->spdsock_dump_cur_type, ss->spdsock_dump_cur_af,
+	    ss->spdsock_itp->itp_name, ss->spdsock_dump_tunnel);
 	rw_exit(&iph->iph_lock);
 
 	if (m == NULL)
@@ -1974,12 +1987,11 @@ static void
 spdsock_dump(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
 {
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t *spds = ss->spdsock_spds;
-	netstack_t *ns = spds->spds_netstack;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 	ipsec_stack_t *ipss = ns->netstack_ipsec;
 	mblk_t *mr;
 
-	/* spdsock_parse() already NULL-terminated spdsock_dump_name. */
+	/* spdsock_open() already set spdsock_itp to NULL. */
 	if (iph == ALL_ACTIVE_POLHEADS || iph == ALL_INACTIVE_POLHEADS) {
 		rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_READER);
 		ss->spdsock_dump_remaining_polheads = 1 +
@@ -1990,10 +2002,10 @@ spdsock_dump(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
 			iph = ipsec_system_policy(ns);
 			ss->spdsock_dump_active = B_TRUE;
 		} else {
-			iph = ipsec_inactive_policy(spds->spds_netstack);
+			iph = ipsec_inactive_policy(ns);
 			ss->spdsock_dump_active = B_FALSE;
 		}
-		ASSERT(ss->spdsock_dump_name[0] == '\0');
+		ASSERT(ss->spdsock_itp == NULL);
 	} else {
 		ss->spdsock_dump_remaining_polheads = 1;
 	}
@@ -2009,13 +2021,8 @@ spdsock_dump(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
 	}
 
 	ss->spdsock_dump_req = mp;
-	ss->spdsock_dump_head = iph;
-	ss->spdsock_dump_gen = iph->iph_gen;
-	ss->spdsock_dump_cur_type = 0;
-	ss->spdsock_dump_cur_af = IPSEC_AF_V4;
-	ss->spdsock_dump_cur_rule = NULL;
-	ss->spdsock_dump_count = 0;
-	ss->spdsock_dump_cur_chain = 0;
+	RESET_SPDSOCK_DUMP_POLHEAD(ss, iph);
+
 	rw_exit(&iph->iph_lock);
 
 	qreply(q, mr);
@@ -2043,24 +2050,22 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 	char *tname;
 	ipsec_tun_pol_t *itp;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t	*spds = ss->spdsock_spds;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 
 	if (tunname != NULL) {
 		tname = (char *)tunname->spd_if_name;
 		if (*tname == '\0') {
-			error = ipsec_clone_system_policy(spds->spds_netstack);
+			error = ipsec_clone_system_policy(ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_CLONE, DB_CRED(mp),
-				    spds->spds_netstack, NULL, active, error,
-				    DB_CPID(mp));
+				audit_pf_policy(SPD_CLONE, DB_CRED(mp), ns,
+				    NULL, active, error, DB_CPID(mp));
 			}
 			if (error == 0) {
-				itp_walk(spdsock_clone_node, &error,
-				    spds->spds_netstack);
+				itp_walk(spdsock_clone_node, &error, ns);
 				if (audit_active) {
 					boolean_t active;
 					spd_msg_t *spmsg =
@@ -2069,13 +2074,12 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
 					audit_pf_policy(SPD_CLONE, DB_CRED(mp),
-					    spds->spds_netstack,
-					    "all tunnels", active, 0,
+					    ns, "all tunnels", active, 0,
 					    DB_CPID(mp));
 				}
 			}
 		} else {
-			itp = get_tunnel_policy(tname, spds->spds_netstack);
+			itp = get_tunnel_policy(tname, ns);
 			if (itp == NULL) {
 				spdsock_error(q, mp, ENOENT, 0);
 				if (audit_active) {
@@ -2086,33 +2090,31 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
 					audit_pf_policy(SPD_CLONE, DB_CRED(mp),
-					    spds->spds_netstack, ITP_NAME(itp),
-					    active, ENOENT, DB_CPID(mp));
+					    ns, ITP_NAME(itp), active, ENOENT,
+					    DB_CPID(mp));
 				}
 				return;
 			}
 			spdsock_clone_node(itp, &error, NULL);
-			ITP_REFRELE(itp, spds->spds_netstack);
+			ITP_REFRELE(itp, ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_CLONE, DB_CRED(mp),
-				    spds->spds_netstack, ITP_NAME(itp), active,
-				    error, DB_CPID(mp));
+				audit_pf_policy(SPD_CLONE, DB_CRED(mp), ns,
+				    ITP_NAME(itp), active, error, DB_CPID(mp));
 			}
 		}
 	} else {
-		error = ipsec_clone_system_policy(spds->spds_netstack);
+		error = ipsec_clone_system_policy(ns);
 		if (audit_active) {
 			boolean_t active;
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
 
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_CLONE, DB_CRED(mp),
-			    spds->spds_netstack, NULL, active, error,
-			    DB_CPID(mp));
+			audit_pf_policy(SPD_CLONE, DB_CRED(mp), ns, NULL,
+			    active, error, DB_CPID(mp));
 		}
 	}
 
@@ -2175,8 +2177,7 @@ spdsock_alglist(queue_t *q, mblk_t *mp)
 	struct spd_ext_actions *act;
 	struct spd_attribute *attr;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t	*spds = ss->spdsock_spds;
-	ipsec_stack_t	*ipss = spds->spds_netstack->netstack_ipsec;
+	ipsec_stack_t *ipss = ss->spdsock_spds->spds_netstack->netstack_ipsec;
 
 	mutex_enter(&ipss->ipsec_alg_lock);
 	/*
@@ -2312,8 +2313,7 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 	uint_t i;
 	uint_t alg_size;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t	*spds = ss->spdsock_spds;
-	ipsec_stack_t	*ipss = spds->spds_netstack->netstack_ipsec;
+	ipsec_stack_t *ipss = ss->spdsock_spds->spds_netstack->netstack_ipsec;
 
 	mutex_enter(&ipss->ipsec_alg_lock);
 
@@ -2757,8 +2757,7 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 	char *tname;
 	boolean_t active;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
-	spd_stack_t	*spds = ss->spdsock_spds;
-	netstack_t	*ns = spds->spds_netstack;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 	uint64_t gen;	/* Placeholder */
 	ill_t *v4, *v6;
 
@@ -2783,7 +2782,7 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 			    ALL_INACTIVE_POLHEADS);
 		}
 
-		itp = get_tunnel_policy(tname, spds->spds_netstack);
+		itp = get_tunnel_policy(tname, ns);
 		if (itp == NULL) {
 			if (msgtype != SPD_ADDRULE) {
 				/* "Tunnel not found" */
@@ -2792,8 +2791,7 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 			}
 
 			errno = 0;
-			itp = create_tunnel_policy(tname, &errno, &gen,
-			    spds->spds_netstack);
+			itp = create_tunnel_policy(tname, &errno, &gen, ns);
 			if (itp == NULL) {
 				/*
 				 * Something very bad happened, most likely
@@ -2820,7 +2818,8 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 		*itpp = itp;
 		/* For spdsock dump state, set the polhead's name. */
 		if (msgtype == SPD_DUMP) {
-			(void) strncpy(ss->spdsock_dump_name, tname, LIFNAMSIZ);
+			ITP_REFHOLD(itp);
+			ss->spdsock_itp = itp;
 			ss->spdsock_dump_tunnel = itp->itp_flags &
 			    (active ? ITPF_P_TUNNEL : ITPF_I_TUNNEL);
 		}
@@ -2828,7 +2827,7 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 		itp = NULL;
 		/* For spdsock dump state, indicate it's global policy. */
 		if (msgtype == SPD_DUMP)
-			ss->spdsock_dump_name[0] = '\0';
+			ss->spdsock_itp = NULL;
 	}
 
 	if (active)
@@ -3017,7 +3016,7 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 		break;
 	}
 
-	IPPH_REFRELE(iph, spds->spds_netstack);
+	IPPH_REFRELE(iph, ns);
 	if (itp != NULL)
 		ITP_REFRELE(itp, ns);
 }
@@ -3048,8 +3047,7 @@ spdsock_loadcheck(void *arg)
 	queue_t *q = (queue_t *)arg;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
 	mblk_t *mp;
-	spd_stack_t	*spds = ss->spdsock_spds;
-	ipsec_stack_t	*ipss = spds->spds_netstack->netstack_ipsec;
+	ipsec_stack_t *ipss = ss->spdsock_spds->spds_netstack->netstack_ipsec;
 
 	ASSERT(ss != NULL);
 
@@ -3442,8 +3440,7 @@ spdsock_wsrv(queue_t *q)
 {
 	spdsock_t *ss = q->q_ptr;
 	mblk_t *mp;
-	spd_stack_t	*spds = ss->spdsock_spds;
-	ipsec_stack_t	*ipss = spds->spds_netstack->netstack_ipsec;
+	ipsec_stack_t *ipss = ss->spdsock_spds->spds_netstack->netstack_ipsec;
 
 	if (ss->spdsock_dump_req != NULL) {
 		qenable(OTHERQ(q));
