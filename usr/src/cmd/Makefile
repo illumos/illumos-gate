@@ -478,6 +478,7 @@ sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
 	drd		\
+	fps		\
 	fruadm		\
 	oplhpd		\
 	prtdscp		\

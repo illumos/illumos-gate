@@ -1,3 +1,5 @@
+#! /usr/bin/sh
+#
 #
 # CDDL HEADER START
 #
@@ -18,12 +20,33 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-SUBDIRS = cpumem-diagnosis datapath-retire USII-io-diagnosis fps-transport
 
-include ../../Makefile.subdirs
+SERVICE="svc:/system/fpsd:default"
+
+# Confirm service is installed, otherwise exit.
+#
+/usr/bin/svcprop -q ${SERVICE} || exit 0
+
+#
+# Check to see if the service is enabled and if so disable it.
+#
+
+SVCPROP=`/usr/bin/svcprop -c -p general/enabled ${SERVICE}`
+
+if [ "${SVCPROP}" = "true" ]; then
+    /usr/sbin/svcadm disable ${SERVICE}
+    if [ $? -ne 0 ]; then
+            echo "\n$0 Disabling of ${SERVICE} failed!\n" >&2
+            exit 1
+    fi
+fi
+
+exit 0

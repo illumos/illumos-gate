@@ -96,6 +96,7 @@ $SkipFiles = qr{ ^(?:
 	libssl_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
 	fcpackage\.so |			# circular dependency on fcthread.so
 	mod_ipp\.so |			# Apache loadable module
+	fptest |	# USIII specific extns. cause ldd noise on USII bld. m/c
 	grub
 	)$
 }x;
@@ -151,6 +152,7 @@ $SkipUndefFiles = qr{ ^(?:
 	preen_md\.so\.1 |		# callback to driver
 	libike\.so\.1 |			# callbacks to in.iked for IKE policy
 	devfsadmd_mod\.so |		# sysevent module callback to syseventd
+	fps-transport\.so |		# Fp-scrubber's FMD module has callbacks
 	sysevent_conf_mod\.so |		# sysevent module callback to syseventd
 	sysevent_reg_mod\.so		# sysevent module callback to syseventd
 	)$

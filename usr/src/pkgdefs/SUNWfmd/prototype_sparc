@@ -96,6 +96,7 @@ f none usr/platform/sun4u/lib/fm/eft/xmits.eft 444 root bin
 d none usr/platform/sun4u/lib/fm/fmd 755 root bin
 d none usr/platform/sun4u/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
+f none usr/platform/sun4u/lib/fm/fmd/plugins/fps-transport.so 555 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/cpumem-diagnosis.conf 644 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.so 555 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.conf 644 root bin

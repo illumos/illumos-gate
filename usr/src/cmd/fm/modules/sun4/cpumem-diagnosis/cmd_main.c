@@ -219,6 +219,7 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.io.oberon.ubc.piorbeue-channel",	cmd_nop },
 	{ "ereport.io.oberon.ubc.piorbeue-cpu",		cmd_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piorbeue-path",	cmd_nop },
+	{ "ereport.cpu.*.fpu.fpscrub",	cmd_fps },
 #else /* i.e. sun4v */
 	{ "ereport.cpu.*.irc",		cmd_irc },
 	{ "ereport.cpu.*.iru", 		cmd_iru },
