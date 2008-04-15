@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,8 +82,7 @@ typedef enum {
 	DR_TYPE_INVAL,
 	DR_TYPE_CPU,
 	DR_TYPE_MEM,
-	DR_TYPE_VIO,
-	DR_TYPE_DIO
+	DR_TYPE_VIO
 } dr_type_t;
 
 /*
@@ -95,7 +94,6 @@ typedef enum {
 			    (t) == DR_TYPE_CPU ? OBP_CPU : 	\
 			    (t) == DR_TYPE_MEM ? "memory" :	\
 			    (t) == DR_TYPE_VIO ? "vio" :	\
-			    (t) == DR_TYPE_DIO ? "dio" :	\
 			    "unknown")
 
 extern boolean_t dr_is_disabled(dr_type_t type);

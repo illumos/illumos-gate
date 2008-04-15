@@ -390,6 +390,7 @@ SYS_KMODS	+=
 #
 MISC_KMODS	+= bootdev
 MISC_KMODS	+= dr_cpu
+MISC_KMODS	+= dr_io
 MISC_KMODS	+= ds
 MISC_KMODS	+= fault_iso
 MISC_KMODS	+= ldc

@@ -164,6 +164,7 @@ DS_SNMP_OBJS	= ds_snmp.o
 #
 BOOTDEV_OBJS	+= bootdev.o
 DR_CPU_OBJS	+= dr_cpu.o
+DR_IO_OBJS	+= dr_io.o
 DRCTL_OBJS	= drctl.o drctl_impl.o dr_util.o
 DS_OBJS		= ds.o
 FAULT_ISO_OBJS	= fault_iso.o

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,16 +314,16 @@ drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
 	case DRCTL_CPU_CONFIG_NOTIFY:
 	case DRCTL_CPU_UNCONFIG_REQUEST:
 	case DRCTL_CPU_UNCONFIG_NOTIFY:
+	case DRCTL_IO_UNCONFIG_REQUEST:
+	case DRCTL_IO_UNCONFIG_NOTIFY:
+	case DRCTL_IO_CONFIG_REQUEST:
+	case DRCTL_IO_CONFIG_NOTIFY:
 		rv = 0;
 		break;
 	case DRCTL_MEM_CONFIG_REQUEST:
 	case DRCTL_MEM_CONFIG_NOTIFY:
 	case DRCTL_MEM_UNCONFIG_REQUEST:
 	case DRCTL_MEM_UNCONFIG_NOTIFY:
-	case DRCTL_IO_CONFIG_REQUEST:
-	case DRCTL_IO_CONFIG_NOTIFY:
-	case DRCTL_IO_UNCONFIG_REQUEST:
-	case DRCTL_IO_UNCONFIG_NOTIFY:
 		rv = ENOTSUP;
 		break;
 	}
@@ -498,14 +498,18 @@ drctl_config_fini(drctl_cookie_t ck, drctl_rsrc_t *res, int count)
 		notify_cmd = DRCTL_CPU_UNCONFIG_NOTIFY;
 		break;
 
+	case DRCTL_IO_UNCONFIG_REQUEST:
+		notify_cmd = DRCTL_IO_UNCONFIG_NOTIFY;
+		break;
+
+	case DRCTL_IO_CONFIG_REQUEST:
+		notify_cmd = DRCTL_IO_CONFIG_NOTIFY;
+		break;
+
 	case DRCTL_MEM_CONFIG_REQUEST:
 	case DRCTL_MEM_CONFIG_NOTIFY:
 	case DRCTL_MEM_UNCONFIG_REQUEST:
 	case DRCTL_MEM_UNCONFIG_NOTIFY:
-	case DRCTL_IO_CONFIG_REQUEST:
-	case DRCTL_IO_CONFIG_NOTIFY:
-	case DRCTL_IO_UNCONFIG_REQUEST:
-	case DRCTL_IO_UNCONFIG_NOTIFY:
 	default:
 		/* none of the above should have been accepted in _init */
 		ASSERT(0);
@@ -566,27 +570,37 @@ send_message(void *msg, size_t size, void **obufp, size_t *osize)
 static void *
 pack_message(int cmd, int flags, int count, void *data, size_t *osize)
 {
-	drd_msg_t *msgp;
+	drd_msg_t *msgp = NULL;
 	size_t hdr_size = offsetof(drd_msg_t, data);
+	size_t data_size = 0;
 
 	switch (cmd) {
 	case DRCTL_CPU_CONFIG_REQUEST:
 	case DRCTL_CPU_CONFIG_NOTIFY:
 	case DRCTL_CPU_UNCONFIG_REQUEST:
 	case DRCTL_CPU_UNCONFIG_NOTIFY:
-
-		*osize = hdr_size + count * sizeof (drctl_rsrc_t);
-
-		msgp = kmem_alloc(*osize, KM_SLEEP);
-		msgp->cmd = cmd;
-		msgp->count = count;
-		msgp->flags = flags;
-		bcopy(data, msgp->data, count * sizeof (drctl_rsrc_t));
+		data_size = count * sizeof (drctl_rsrc_t);
+		break;
+	case DRCTL_IO_CONFIG_REQUEST:
+	case DRCTL_IO_CONFIG_NOTIFY:
+	case DRCTL_IO_UNCONFIG_REQUEST:
+	case DRCTL_IO_UNCONFIG_NOTIFY:
+		data_size = sizeof (drctl_rsrc_t) +
+		    strlen(((drctl_rsrc_t *)data)->res_dev_path);
 		break;
 	default:
 		cmn_err(CE_WARN,
 		    "drctl: pack_message received invalid cmd %d", cmd);
-		msgp = NULL;
+		break;
+	}
+
+	if (data_size) {
+		*osize = hdr_size + data_size;
+		msgp = kmem_alloc(*osize, KM_SLEEP);
+		msgp->cmd = cmd;
+		msgp->count = count;
+		msgp->flags = flags;
+		bcopy(data, msgp->data, data_size);
 	}
 
 	return (msgp);

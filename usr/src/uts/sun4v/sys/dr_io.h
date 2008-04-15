@@ -24,53 +24,67 @@
  * Use is subject to license terms.
  */
 
-#ifndef _DRD_H
-#define	_DRD_H
+#ifndef _DR_IO_H
+#define	_DR_IO_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * VIO DR Control Protocol
+ */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <sys/types.h>
-#include <sys/drctl.h>
-
-typedef int32_t cpuid_t;
-
 /*
- * Logging support
+ * Values of 'msg_type' element of the request message
  */
-extern void drd_err(char *fmt, ...);
-extern void drd_info(char *fmt, ...);
-extern void drd_dbg(char *fmt, ...);
-
-extern boolean_t drd_daemonized;
-extern boolean_t drd_debug;
-
-#define	s_free(x)	(((x) != NULL) ? (free(x), (x) = NULL) : (void *)0)
-#define	s_nvfree(x)	(((x) != NULL) ? (nvlist_free(x)) : (void)0)
+#define	DR_VIO_CONFIGURE	0x494f43	/* 'IOC' */
+#define	DR_VIO_UNCONFIGURE	0x494f55	/* 'IOU' */
+#define	DR_VIO_FORCE_UNCONFIG	0x494f46	/* 'IOF' */
+#define	DR_VIO_STATUS		0x494f53	/* 'IOS' */
 
 /*
- * Backend support
+ * VIO DR Request
  */
 typedef struct {
-	int (*init)(void);
-	int (*fini)(void);
-	int (*cpu_config_request)(drctl_rsrc_t *rsrcs, int nrsrc);
-	int (*cpu_config_notify)(drctl_rsrc_t *rsrcs, int nrsrc);
-	int (*cpu_unconfig_request)(drctl_rsrc_t *rsrcs, int nrsrc);
-	int (*cpu_unconfig_notify)(drctl_rsrc_t *rsrcs, int nrsrc);
-	int (*io_config_request)(drctl_rsrc_t *rsrc, int nrsrc);
-	int (*io_config_notify)(drctl_rsrc_t *rsrc, int nrsrc);
-	int (*io_unconfig_request)(drctl_rsrc_t *rsrc, int nrsrc);
-	int (*io_unconfig_notify)(drctl_rsrc_t *rsrc, int nrsrc);
-} drd_backend_t;
+	uint64_t	req_num;
+	uint64_t	dev_id;
+	uint32_t	msg_type;
+	char		name[1];
+} dr_vio_req_t;
 
-extern drd_backend_t drd_rcm_backend;
+/*
+ * Values of 'result' element of the response message
+ */
+#define	DR_VIO_RES_OK			0x0
+#define	DR_VIO_RES_FAILURE		0x1
+#define	DR_VIO_RES_BLOCKED		0x2
+#define	DR_VIO_RES_NOT_IN_MD		0x3
+
+/*
+ * Values of 'status' element of the response message
+ */
+#define	DR_VIO_STAT_NOT_PRESENT		0x0
+#define	DR_VIO_STAT_UNCONFIGURED	0x1
+#define	DR_VIO_STAT_CONFIGURED		0x2
+
+/*
+ * VIO DR Response
+ */
+typedef struct {
+	uint64_t	req_num;
+	uint32_t	result;
+	uint32_t	status;
+	char		reason[1];
+} dr_vio_res_t;
+
+#define	DR_VIO_DS_ID		"dr-vio"
+#define	DR_VIO_MAXREASONLEN	1024
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _DRD_H */
+#endif /* _DR_IO_H */

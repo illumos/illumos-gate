@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <kstat.h>
 #include <libnvpair.h>
 #include <librcm.h>
+#include <locale.h>
 
 #include "drd.h"
 
@@ -48,6 +49,10 @@ static int drd_rcm_cpu_config_request(drctl_rsrc_t *rsrcs, int nrsrc);
 static int drd_rcm_cpu_config_notify(drctl_rsrc_t *rsrcs, int nrsrc);
 static int drd_rcm_cpu_unconfig_request(drctl_rsrc_t *rsrcs, int nrsrc);
 static int drd_rcm_cpu_unconfig_notify(drctl_rsrc_t *rsrcs, int nrsrc);
+static int drd_rcm_io_config_request(drctl_rsrc_t *rsrc, int nrsrc);
+static int drd_rcm_io_config_notify(drctl_rsrc_t *rsrc, int nrsrc);
+static int drd_rcm_io_unconfig_request(drctl_rsrc_t *rsrc, int nrsrc);
+static int drd_rcm_io_unconfig_notify(drctl_rsrc_t *rsrc, int nrsrc);
 
 drd_backend_t drd_rcm_backend = {
 	drd_rcm_init,			/* init */
@@ -55,7 +60,11 @@ drd_backend_t drd_rcm_backend = {
 	drd_rcm_cpu_config_request,	/* cpu_config_request */
 	drd_rcm_cpu_config_notify,	/* cpu_config_notify */
 	drd_rcm_cpu_unconfig_request,	/* cpu_unconfig_request */
-	drd_rcm_cpu_unconfig_notify	/* cpu_unconfig_notify */
+	drd_rcm_cpu_unconfig_notify,	/* cpu_unconfig_notify */
+	drd_rcm_io_config_request,	/* io_config_request */
+	drd_rcm_io_config_notify,	/* io_config_notify */
+	drd_rcm_io_unconfig_request,	/* io_unconfig_request */
+	drd_rcm_io_unconfig_notify	/* io_unconfig_notify */
 };
 
 #define	RCM_CPU_ALL		"SUNW_cpu"
@@ -80,6 +89,7 @@ static void drd_rcm_cpu_rlist_fini(char **rlist);
 static drctl_rsrc_t *cpu_rsrcstr_to_rsrc(const char *, drctl_rsrc_t *, int);
 static int get_sys_cpuids(cpuid_t **cpuids, int *ncpuids);
 static boolean_t is_cpu_in_list(cpuid_t cpuid, cpuid_t *list, int len);
+static char *rcm_info_table(rcm_info_t *rinfo);
 
 /* debugging utility functions */
 static void dump_cpu_list(char *prefix, cpuid_t *cpuids, int ncpuids);
@@ -123,7 +133,7 @@ drd_rcm_cpu_config_request(drctl_rsrc_t *rsrcs, int nrsrc)
 
 	/*
 	 * There is no RCM operation to request the addition
-	 * of resources. So, by definition, the operation for
+	 * of resources.  So, by definition, the operation for
 	 * all the CPUs is allowed.
 	 */
 	for (idx = 0; idx < nrsrc; idx++)
@@ -987,4 +997,204 @@ dump_cpu_rlist(char **rlist)
 		drd_dbg("  rlist[%d]: rsrc=%s, state=%-2d (%s)", idx,
 		    rlist[idx], state, rcm_state_str[state]);
 	}
+}
+
+static int
+drd_rcm_io_config_request(drctl_rsrc_t *rsrc, int nrsrc)
+{
+	drd_dbg("drd_rcm_io_config_request...");
+
+	if (nrsrc != 1) {
+		drd_dbg("drd_rcm_cpu_config_request: only 1 resource "
+		    "allowed for I/O requests, passed %d resources\n", nrsrc);
+		rsrc->status = DRCTL_STATUS_DENY;
+
+		return (-1);
+	}
+
+	/*
+	 * There is no RCM operation to request the addition
+	 * of resources.  So, by definition, the operation for
+	 * the current resource is allowed.
+	 */
+	rsrc->status = DRCTL_STATUS_ALLOW;
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+drd_rcm_io_config_notify(drctl_rsrc_t *rsrcs, int nrsrc)
+{
+	drd_dbg("drd_rcm_io_config_notify...");
+
+	if (nrsrc != 1) {
+		drd_dbg("drd_rcm_cpu_config_notify: only 1 resource "
+		    "allowed for I/O requests, passed %d resources\n", nrsrc);
+
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+static int
+drd_rcm_io_unconfig_request(drctl_rsrc_t *rsrc, int nrsrc)
+{
+	int		rv;
+	char		*dev = rsrc->res_dev_path;
+	rcm_info_t	*rinfo = NULL;
+
+	if (nrsrc != 1) {
+		drd_dbg("drd_io_unconfig_request: only 1 resource "
+		    "allowed for I/O requests, passed %d resources\n", nrsrc);
+		rsrc->status = DRCTL_STATUS_DENY;
+
+		return (-1);
+	}
+
+	if ((rv = rcm_request_offline(rcm_hdl, dev, 0, &rinfo)) == RCM_SUCCESS)
+		rsrc->status = DRCTL_STATUS_ALLOW;
+	else {
+		rcm_notify_online(rcm_hdl, dev, 0, NULL);
+		rsrc->status = DRCTL_STATUS_DENY;
+		rsrc->offset = (uintptr_t)rcm_info_table(rinfo);
+
+	}
+
+	rcm_free_info(rinfo);
+	drd_dbg("drd_rcm_io_unconfig_request(%s) = %d", dev, rv);
+
+	return (rv);
+}
+
+static int
+drd_rcm_io_unconfig_notify(drctl_rsrc_t *rsrc, int nrsrc)
+{
+	drd_dbg("drd_rcm_io_unconfig_notify...");
+
+	if (nrsrc != 1) {
+		drd_dbg("drd_io_cpu_unconfig_notify: only 1 resource "
+		    "allowed for I/O requests, passed %d resources\n", nrsrc);
+
+		return (-1);
+	}
+
+	return (rcm_notify_remove(rcm_hdl, rsrc->res_dev_path, 0, NULL));
+}
+
+#define	MAX_FORMAT	80
+
+/*
+ * Convert rcm_info_t data into a printable table.
+ */
+static char *
+rcm_info_table(rcm_info_t *rinfo)
+{
+	int		i;
+	size_t		w;
+	size_t		width = 0;
+	size_t		w_rsrc = 0;
+	size_t		w_info = 0;
+	size_t		table_size = 0;
+	uint_t		tuples = 0;
+	rcm_info_tuple_t *tuple = NULL;
+	char		*rsrc;
+	char		*info;
+	char		*table;
+	static char	format[MAX_FORMAT];
+	const char	*infostr;
+
+	/* Protect against invalid arguments */
+	if (rinfo == NULL)
+		return (NULL);
+
+	/* Set localized table header strings */
+	rsrc = dgettext(TEXT_DOMAIN, "Resource");
+	info = dgettext(TEXT_DOMAIN, "Information");
+
+	/* A first pass, to size up the RCM information */
+	while (tuple = rcm_info_next(rinfo, tuple)) {
+		if ((infostr = rcm_info_info(tuple)) != NULL) {
+			tuples++;
+			if ((w = strlen(rcm_info_rsrc(tuple))) > w_rsrc)
+				w_rsrc = w;
+			if ((w = strlen(infostr)) > w_info)
+				w_info = w;
+		}
+	}
+
+	/* If nothing was sized up above, stop early */
+	if (tuples == 0)
+		return (NULL);
+
+	/* Adjust column widths for column headings */
+	if ((w = strlen(rsrc)) > w_rsrc)
+		w_rsrc = w;
+	else if ((w_rsrc - w) % 2)
+		w_rsrc++;
+	if ((w = strlen(info)) > w_info)
+		w_info = w;
+	else if ((w_info - w) % 2)
+		w_info++;
+
+	/*
+	 * Compute the total line width of each line,
+	 * accounting for intercolumn spacing.
+	 */
+	width = w_info + w_rsrc + 4;
+
+	/* Allocate space for the table */
+	table_size = (2 + tuples) * (width + 1) + 2;
+
+	/* zero fill for the strcat() call below */
+	table = calloc(table_size, sizeof (char));
+	if (table == NULL)
+		return (NULL);
+
+	/* Place a table header into the string */
+
+	/* The resource header */
+	(void) strcat(table, "\n");
+	w = strlen(rsrc);
+	for (i = 0; i < ((w_rsrc - w) / 2); i++)
+		(void) strcat(table, " ");
+	(void) strcat(table, rsrc);
+	for (i = 0; i < ((w_rsrc - w) / 2); i++)
+		(void) strcat(table, " ");
+
+	/* The information header */
+	(void) strcat(table, "  ");
+	w = strlen(info);
+	for (i = 0; i < ((w_info - w) / 2); i++)
+		(void) strcat(table, " ");
+	(void) strcat(table, info);
+	for (i = 0; i < ((w_info - w) / 2); i++)
+		(void) strcat(table, " ");
+	/* Underline the headers */
+	(void) strcat(table, "\n");
+	for (i = 0; i < w_rsrc; i++)
+		(void) strcat(table, "-");
+	(void) strcat(table, "  ");
+	for (i = 0; i < w_info; i++)
+		(void) strcat(table, "-");
+
+	/* Construct the format string */
+	(void) snprintf(format, MAX_FORMAT, "%%-%ds  %%-%ds",
+	    (int)w_rsrc, (int)w_info);
+
+	/* Add the tuples to the table string */
+	tuple = NULL;
+	while ((tuple = rcm_info_next(rinfo, tuple)) != NULL) {
+		if ((infostr = rcm_info_info(tuple)) != NULL) {
+			(void) strcat(table, "\n");
+			(void) sprintf(&((table)[strlen(table)]),
+			    format, rcm_info_rsrc(tuple),
+			    infostr);
+		}
+	}
+	drd_dbg("rcm_info_table: %s\n", table);
+
+	return (table);
 }
