@@ -271,6 +271,13 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 #ifdef XPV_HVM_DRIVER
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi, DDI_NO_AUTODETACH, 1);
+
+	/*
+	 * Report our version to dom0.
+	 */
+	if (xenbus_printf(XBT_NULL, "hvmpv/xpvd", "version", "%d",
+	    HVMPV_XPVD_VERS))
+		cmn_err(CE_WARN, "xpvd: couldn't write version\n");
 #endif /* XPV_HVM_DRIVER */
 
 	/* watch both frontend and backend for new devices */

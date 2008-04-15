@@ -518,6 +518,7 @@ gnttab_setup(gnttab_setup_table_t *pset)
 	/*LINTED: constant in conditional context*/
 	set_xen_guest_handle(pset->frame_list, frames);
 
+#ifndef XPV_HVM_DRIVER
 	/*
 	 * Take pset->nr_frames pages of grant table space from
 	 * the hypervisor and map it
@@ -526,6 +527,7 @@ gnttab_setup(gnttab_setup_table_t *pset)
 	    (pset->status != 0)) {
 		cmn_err(CE_PANIC, "Grant Table setup failed");
 	}
+#endif
 
 	return (frames);
 }

@@ -466,6 +466,13 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	xdf_hvm_add(devi);
 
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi, DDI_NO_AUTODETACH, 1);
+
+	/*
+	 * Report our version to dom0.
+	 */
+	if (xenbus_printf(XBT_NULL, "hvmpv/xdf", "version", "%d",
+	    HVMPV_XDF_VERS))
+		cmn_err(CE_WARN, "xdf: couldn't write version\n");
 #endif /* XPV_HVM_DRIVER */
 
 	ddi_report_dev(devi);

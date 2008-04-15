@@ -22,7 +22,7 @@
 #
 # uts/i86pc/xnf/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,7 +66,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LDFLAGS		+= -dy -Nmisc/mac -Ndrv/ip -Ndrv/xpvd -Ndrv/xpv
 
-CPPFLAGS	+= -D_SOLARIS
+CPPFLAGS	+= -D_SOLARIS -DHVMPV_XNF_VERS=1
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN

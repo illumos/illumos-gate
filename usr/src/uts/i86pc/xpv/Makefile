@@ -21,7 +21,7 @@
 #
 # uts/i86pc/xpv/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +62,7 @@ ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-CPPFLAGS	+= -D_SOLARIS
+CPPFLAGS	+= -D_SOLARIS -DHVMPV_XPV_VERS=1
 LDFLAGS		+= -dy -N mach/pcplusmp
 
 #

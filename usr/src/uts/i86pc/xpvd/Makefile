@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,6 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 INC_PATH	+= -I$(UTSBASE)/common/xen -I$(UTSBASE)/../common
 
+CPPFLAGS	+= -DHVMPV_XPVD_VERS=1
 LDFLAGS		+= -dy -Ndrv/xpv
 
 LINTTAGS	+= -erroff=E_STATIC_UNUSED

@@ -681,6 +681,13 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	xnfp->xnf_rx_hvcopy = xnf_hvcopy_peer_status(devinfo) && xnf_rx_hvcopy;
 #ifdef XPV_HVM_DRIVER
+	/*
+	 * Report our version to dom0.
+	 */
+	if (xenbus_printf(XBT_NULL, "hvmpv/xnf", "version", "%d",
+	    HVMPV_XNF_VERS))
+		cmn_err(CE_WARN, "xnf: couldn't write version\n");
+
 	if (!xnfp->xnf_rx_hvcopy) {
 		cmn_err(CE_WARN, "The xnf driver requires a dom0 that "
 		    "supports 'feature-rx-copy'");
