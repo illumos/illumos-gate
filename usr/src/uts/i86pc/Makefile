@@ -54,6 +54,7 @@ LINT_LIBS	 = $(LINT_LIB) \
 def		:=	TARGET= def
 all		:=	TARGET= all
 install		:=	TARGET= install
+install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
