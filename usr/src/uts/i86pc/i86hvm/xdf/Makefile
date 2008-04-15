@@ -20,39 +20,32 @@
 #
 
 #
-# uts/i86pc/xnf/Makefile
+# uts/i86pc/xdf/Makefile
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the xve
-#	network driver kernel module.
-#
 #	i86pc architecture dependent
 #
-
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE	= ../../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= xnf
-OBJECTS		= $(XNF_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(XNF_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= xdf
+OBJECTS		= $(XDF_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(XDF_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
-
-INC_PATH	+= -I$(UTSBASE)/common/xen
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
-include $(UTSBASE)/i86pc/Makefile.hvm
+include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
 #
 #	Define targets
@@ -61,14 +54,12 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# Driver depends on MAC & IP
-#
-LDFLAGS		+= -dy -Nmisc/mac -Ndrv/ip -Ndrv/xpvd -Ndrv/xpv
+# Overrides
+CPPFLAGS	+= -DHVMPV_XDF_VERS=1
+LDFLAGS		+= -dy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
 
-CPPFLAGS	+= -D_SOLARIS -DHVMPV_XNF_VERS=1
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
@@ -95,4 +86,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/i86pc/i86hvm/Makefile.targ

@@ -18,14 +18,17 @@
 #
 # CDDL HEADER END
 #
-
+#
+# uts/i86pc/xpv/Makefile
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the xpvd nexus driver
+#	This makefile drives the production of the xpv
+#	driver, which provides the necessary infrastructure for
+#	paravirtualized front-end drivers in HVM systems.
 #
 #	i86pc implementation architecture dependent
 #
@@ -33,22 +36,21 @@
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE	= ../../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= xpvd
-OBJECTS		= $(XPVD_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(XPVD_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= xpv
+OBJECTS		= $(XPV_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(XPV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/xen/io
+CONF_SRCDIR	= $(UTSBASE)/i86pc/i86hvm/io/xpv
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
-include $(UTSBASE)/i86pc/Makefile.hvm
+include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
 #
 #	Define targets
@@ -57,14 +59,17 @@ ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-INC_PATH	+= -I$(UTSBASE)/common/xen -I$(UTSBASE)/../common
+CPPFLAGS	+= -DHVMPV_XPV_VERS=1
+LDFLAGS		+= -dy -N mach/pcplusmp
 
-CPPFLAGS	+= -DHVMPV_XPVD_VERS=1
-LDFLAGS		+= -dy -Ndrv/xpv
-
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+#
+# The Xen header files do not lint cleanly.  Since the troublesome
+# structures form part of the externally defined interface to the
+# hypervisor, we're stuck with the noise.
+#
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 #	Default build targets.
@@ -90,4 +95,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/i86pc/i86hvm/Makefile.targ

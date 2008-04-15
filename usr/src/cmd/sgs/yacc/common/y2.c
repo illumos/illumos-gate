@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,8 +195,8 @@ char *argv[];
 	prdptr = (int **)malloc(sizeof (int *) * (nprodsz+2));
 	levprd = (int *)malloc(sizeof (int) * (nprodsz+2));
 	had_act = (wchar_t *)calloc((nprodsz + 2), sizeof (wchar_t));
-	lhstext = (wchar_t *)malloc(sizeof (wchar_t) * LHS_TEXT_LEN);
-	rhstext = (wchar_t *)malloc(sizeof (wchar_t) * RHS_TEXT_LEN);
+	lhstext = (wchar_t *)calloc(1, sizeof (wchar_t) * LHS_TEXT_LEN);
+	rhstext = (wchar_t *)calloc(1, sizeof (wchar_t) * RHS_TEXT_LEN);
 	aryfil(toklev, ntoksz, 0);
 	aryfil(levprd, nprodsz, 0);
 	for (ii = 0; ii < ntoksz; ++ii)

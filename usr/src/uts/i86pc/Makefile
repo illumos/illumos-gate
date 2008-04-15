@@ -75,13 +75,14 @@ INITIAL_TARGETS = \
 	cpu/scripts
 
 def all clean clobber clean.lint: setup genassym unix .WAIT \
-	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
+	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) $(IMPLEMENTATIONS)
 
 install: install_platforms setup genassym unix .WAIT \
-	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
+	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) $(IMPLEMENTATIONS)
 
 # list the modules under i86pc.
-modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
+modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
+	$(IMPLEMENTATIONS)
 
 # list the modules for Install -k i86pc.
 modlist.karch: modlist modlist.intel
@@ -98,6 +99,9 @@ genassym unix $(KMODS):	FRC
 
 setup: FRC
 	@cd cpu/scripts; pwd; $(MAKE) $(TARGET)
+
+$(IMPLEMENTATIONS):     FRC
+	@cd $@; pwd; THISIMPL=$@ $(MAKE) $(NO_STATE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
@@ -117,7 +121,7 @@ $(CLOSED_XMODS):	FRC
 		true; \
 	fi
 
-install_h check:	FRC
+install_h check:	$(IMPLEMENTATIONS) FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
 
 #
@@ -148,7 +152,8 @@ globallint:
 	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
-lint:	lintlib .WAIT modlintlib .WAIT $(INTEL_LINTS) $(LINT_DEPS)
+lint:	lintlib .WAIT modlintlib .WAIT $(INTEL_LINTS) $(LINT_DEPS) \
+	$(IMPLEMENTATIONS)
 
 $(INTEL_LINTS):	FRC
 	@cd $(UTSBASE)/intel/$@; pwd; $(MAKE) modlintlib

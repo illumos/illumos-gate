@@ -19,45 +19,40 @@
 # CDDL HEADER END
 #
 #
-# uts/i86pc/pv_cmdk/Makefile
+# uts/i86pc/pv_rtls/Makefile
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the xdc driver.
+#	This makefile drives the production of the null rtls module for xvm.
 #
 #	i86pc implementation architecture dependent
 #
-
-#
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE	= ../../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= cmdk
-OBJECTS		= $(PV_CMDK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PV_CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= rtls
+OBJECTS		= $(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PV_RTLS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
-
-INC_PATH	+= -I$(UTSBASE)/common/xen -I$(UTSBASE)/../common
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
-include $(UTSBASE)/i86pc/Makefile.hvm
+include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
 #
 # When generating lint libraries, we want the name of the lint module
-# that will be generated to by pv_cmdk and not cmdk, so override the
+# that will be generated to be pv_rtls and not rtls, so override the
 # default lint module name here.
 #
-LINT_MODULE	= pv_cmdk
+LINT_MODULE	= pv_rtls
 
 #
 #	Define targets
@@ -66,23 +61,7 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# use Solaris specific code in xen public header files
-#
-CPPFLAGS	+= -D_SOLARIS
-CPPFLAGS	+= -DXPV_HVM_DRIVER
-
-LDFLAGS		+= -dy -Nmisc/strategy -Nmisc/cmlb
-LDFLAGS		+= -Ndrv/xpvd -Ndrv/xdf
-
-#
-# The Xen header files do not lint cleanly.  Since the troublesome
-# structures form part of the externally defined interface to the
-# hypervisor, we're stuck with the noise.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LDFLAGS		+= -dy
 
 #
 #	Default build targets.
@@ -108,4 +87,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/i86pc/i86hvm/Makefile.targ

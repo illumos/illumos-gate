@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,8 +32,8 @@
 #
 #	The following two-level ordering must be maintained in this file.
 #	  Lines are sorted first in order of decreasing specificity based on
-#	  the first directory component.  That is, sun4u rules come before
-#	  sparc rules come before common rules.
+#	  the first directory component.  That is, i86pc rules come before
+#	  intel rules come before common rules.
 #
 #	  Lines whose initial directory components are equal are sorted
 #	  alphabetically by the remaining components.
@@ -110,13 +110,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/tzmon/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xpv/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xpv/%.s
-	$(COMPILE.s) -o $@ $<
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/ml/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -149,14 +142,6 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/dis/i386/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/io/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -304,12 +289,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.s
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/tzmon/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xpv/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xpv/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/ml/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
@@ -338,12 +317,6 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/mc/mc-amd/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c

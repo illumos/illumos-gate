@@ -18,51 +18,62 @@
 #
 # CDDL HEADER END
 #
-
 #
-# uts/i86pc/xdf/Makefile
+# uts/i86pc/pv_cmdk/Makefile
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	i86pc architecture dependent
+#	This makefile drives the production of the xdc driver.
 #
+#	i86pc implementation architecture dependent
+#
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
-INC_PATH	+= -I$(UTSBASE)/common/xen
+UTSBASE	= ../../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= xdf
-OBJECTS		= $(XDF_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(XDF_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= cmdk
+OBJECTS		= $(PV_CMDK_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PV_CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
-include $(UTSBASE)/i86pc/Makefile.hvm
+include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+
+#
+# When generating lint libraries, we want the name of the lint module
+# that will be generated to by pv_cmdk and not cmdk, so override the
+# default lint module name here.
+#
+LINT_MODULE	= pv_cmdk
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
+LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# Overrides
-CPPFLAGS	+= -DXPV_HVM_DRIVER -DHVMPV_XDF_VERS=1
-LDFLAGS		+= -dy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
+LDFLAGS		+= -dy -Nmisc/strategy -Nmisc/cmlb
+LDFLAGS		+= -Ndrv/xpvd -Ndrv/xdf
 
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+#
+# The Xen header files do not lint cleanly.  Since the troublesome
+# structures form part of the externally defined interface to the
+# hypervisor, we're stuck with the noise.
+#
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 #	Default build targets.
@@ -88,4 +99,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/i86pc/i86hvm/Makefile.targ

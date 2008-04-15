@@ -18,51 +18,55 @@
 #
 # CDDL HEADER END
 #
+
 #
-# uts/i86pc/pv_rtls/Makefile
+# uts/i86pc/xnf/Makefile
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the null rtls module for xvm.
+#	This makefile drives the production of the xve
+#	network driver kernel module.
 #
-#	i86pc implementation architecture dependent
+#	i86pc architecture dependent
+#
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE	= ../../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= rtls
-OBJECTS		= $(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PV_RTLS_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= xnf
+OBJECTS		= $(XNF_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(XNF_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
-include $(UTSBASE)/i86pc/Makefile.hvm
-
-#
-# When generating lint libraries, we want the name of the lint module
-# that will be generated to be pv_rtls and not rtls, so override the
-# default lint module name here.
-#
-LINT_MODULE	= pv_rtls
+include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(LINT_MODULE).lint
+LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy
+#
+# Driver depends on MAC & IP
+#
+CPPFLAGS	+= -DHVMPV_XNF_VERS=1
+LDFLAGS		+= -dy -Nmisc/mac -Ndrv/ip -Ndrv/xpvd -Ndrv/xpv
+
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Default build targets.
@@ -88,4 +92,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/i86pc/i86hvm/Makefile.targ
