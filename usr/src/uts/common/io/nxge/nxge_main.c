@@ -3985,14 +3985,16 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			nxgep->mac.maxframesize = (uint16_t)
 			    (new_mtu + NXGE_EHEADER_VLAN_CRC);
 			if (nxge_mac_set_framesize(nxgep)) {
-				nxgep->mac.maxframesize = (uint16_t)old_framesize;
+				nxgep->mac.maxframesize =
+				    (uint16_t)old_framesize;
 				err = EINVAL;
 				break;
 			}
 
 			err = mac_maxsdu_update(nxgep->mach, new_mtu);
 			if (err) {
-				nxgep->mac.maxframesize = (uint16_t)old_framesize;
+				nxgep->mac.maxframesize =
+				    (uint16_t)old_framesize;
 				err = EINVAL;
 				break;
 			}
@@ -4523,7 +4525,8 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 			    "[hot swappable]" : "");
 			break;
 		case PORT_HSP_MODE:
-			(void) sprintf(valstr, "phy not present[hot swappable]");
+			(void) sprintf(valstr,
+			    "phy not present[hot swappable]");
 			break;
 		default:
 			(void) sprintf(valstr, "unknown %s",
