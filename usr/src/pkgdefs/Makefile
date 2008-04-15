@@ -58,7 +58,8 @@ sparc_SUBDIRS= \
 	SUNWerid \
 	SUNWfruid \
 	SUNWfruip.u \
-	SUNWfps  \
+	SUNWfsr \
+	SUNWfsu \
 	SUNWhmd    \
 	SUNWhmdu   \
 	SUNWidn.u \

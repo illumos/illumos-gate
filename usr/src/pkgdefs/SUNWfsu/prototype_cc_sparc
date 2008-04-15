@@ -1,0 +1,51 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+
+
+# packaging files
+i pkginfo
+i copyright
+i preremove
+i depend
+
+d none usr 755 root sys
+d none usr/lib 755 root bin
+d none usr/lib/fps 755 root bin
+d none usr/lib/fps/sun4u 755 root bin
+d none usr/lib/fps/sun4u/UltraSPARC-III 755 root bin
+d none usr/lib/fps/sun4u/UltraSPARC-IIIi 755 root bin
+d none usr/lib/fps/sun4u/UltraSPARC-III+ 755 root bin
+d none usr/lib/fps/sun4u/UltraSPARC-IV 755 root bin
+d none usr/lib/fps/sun4u/UltraSPARC-IV+ 755 root bin
+f none usr/lib/fps/fpsd 755 root bin
+f none usr/lib/fps/sun4u/UltraSPARC-III/fptest 755 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-IIIi/fptest=../UltraSPARC-III/fptest 755 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-III+/fptest=../UltraSPARC-III/fptest 755 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-IV/fptest=../UltraSPARC-III/fptest 755 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-IV+/fptest=../UltraSPARC-III/fptest 755 root bin

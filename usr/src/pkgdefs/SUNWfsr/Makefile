@@ -26,20 +26,12 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+include ../Makefile.com
 
+.KEEP_STATE:
 
-# packaging files
-i pkginfo
-i copyright
-i preremove
-i depend
+all: $(FILES)
 
-d none usr 755 root sys
-d none usr/lib 755 root bin
-d none usr/lib/fps 755 root bin
-f none usr/lib/fps/fpsd 755 root bin
-d none var 755 root sys
-d none var/svc 755 root sys
-d none var/svc/manifest 755 root sys
-d none var/svc/manifest/system 755 root sys
-f none var/svc/manifest/system/fpsd.xml 755 root sys
+install: all pkg
+
+include ../Makefile.targ
