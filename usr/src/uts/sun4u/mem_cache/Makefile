@@ -23,7 +23,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the mm driver
+#	This makefile drives the production of the mem_cache driver
 #
 #	sparc implementation architecture dependent
 #
@@ -39,7 +39,7 @@ UTSBASE	= ../..
 MODULE		= mem_cache
 OBJECTS		= $(MEM_CACHE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(MEM_CACHE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun4u/io
 
 #
@@ -54,30 +54,31 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
+DSF_DIR		= $(UTSBASE)/$(PLATFORM)/mem_cache/genassym
+
 #
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+ASFLAGS += -DCHEETAH_PLUS
+AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
 
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+def		:=	TARGET= def
+all		:=	TARGET= all
+install		:=	TARGET= install
 
 #
 #	Default build targets.
 #
 .KEEP_STATE:
 
-def:		$(DEF_DEPS)
+def:		genassym $(DEF_DEPS)
 
-all:		$(ALL_DEPS)
+all:		genassym $(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		genassym $(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	genassym $(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
@@ -85,7 +86,10 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	$(INSTALL_DEPS)
+install:	genassym $(INSTALL_DEPS)
+
+genassym : FRC
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

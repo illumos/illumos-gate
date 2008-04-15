@@ -420,6 +420,7 @@ f none platform/sun4u/kernel/crypto/sparcv9/rsa 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/sha1 755 root sys
 d none platform/sun4u/kernel/drv 755 root sys
 f none platform/sun4u/kernel/drv/i2bsc.conf 644 root sys
+f none platform/sun4u/kernel/drv/mem_cache.conf 644 root sys
 f none platform/sun4u/kernel/drv/rmc_comm.conf 644 root sys
 f none platform/sun4u/kernel/drv/rmcadm.conf 644 root sys
 f none platform/sun4u/kernel/drv/rmclomv.conf 644 root sys
@@ -445,6 +446,7 @@ f none platform/sun4u/kernel/drv/sparcv9/m1535ppm 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/max1617 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/mc-us3 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/mc-us3i 755 root sys
+f none platform/sun4u/kernel/drv/sparcv9/mem_cache 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/mi2cv 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/pca9556 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/pcf8574 755 root sys

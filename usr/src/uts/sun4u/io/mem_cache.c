@@ -56,10 +56,6 @@ extern int	retire_l3_alternate(uint64_t, uint64_t);
 extern int	unretire_l3(uint64_t, uint64_t);
 extern int	unretire_l3_alternate(uint64_t, uint64_t);
 
-extern void	rw_physical_addr(uint64_t, uint64_t);
-extern void	casxa_physical_addr(uint64_t, uint64_t);
-extern void	read_from_physical_addr(uint64_t, uint64_t, uint64_t);
-
 extern void	retire_l2_start(uint64_t, uint64_t);
 extern void	retire_l2_end(uint64_t, uint64_t);
 extern void	unretire_l2_start(uint64_t, uint64_t);
@@ -70,8 +66,8 @@ extern void	unretire_l3_start(uint64_t, uint64_t);
 extern void	unretire_l3_end(uint64_t, uint64_t);
 
 extern void	get_ecache_dtags_tl1(uint64_t, ch_cpu_logout_t *);
-extern uint64_t	get_l2_tag_tl1(uint64_t, uint64_t);
-extern uint64_t	get_l3_tag_tl1(uint64_t, uint64_t);
+extern void	get_l2_tag_tl1(uint64_t, uint64_t);
+extern void	get_l3_tag_tl1(uint64_t, uint64_t);
 
 
 /* Macro for putting 64-bit onto stack as two 32-bit ints */
@@ -565,9 +561,6 @@ mem_cache_ioctl_ops(int cmd, int mode, cache_info_t *cache_info)
 	cpu_t	*cpu;
 	uint64_t tag_data;
 	uint8_t state;
-	uint64_t start_paddr;
-	uint64_t cache_set_size;
-	uint_t	iteration_count = 0x100000;
 
 	switch (cache_info->cache) {
 		case L2_CACHE_TAG:
@@ -577,7 +570,6 @@ mem_cache_ioctl_ops(int cmd, int mode, cache_info_t *cache_info)
 			if (cache_info->index >=
 			    (PN_L2_SET_SIZE/PN_L2_LINESIZE))
 				return (EINVAL);
-			cache_set_size = PN_L2_SET_SIZE;
 			break;
 		case L3_CACHE_TAG:
 		case L3_CACHE_DATA:
@@ -586,7 +578,6 @@ mem_cache_ioctl_ops(int cmd, int mode, cache_info_t *cache_info)
 			if (cache_info->index >=
 			    (PN_L3_SET_SIZE/PN_L3_LINESIZE))
 				return (EINVAL);
-			cache_set_size = PN_L3_SET_SIZE;
 			break;
 		default:
 			return (ENOTSUP);
@@ -651,6 +642,13 @@ retry_l2_retire:
 					}
 					if (ret_val == 2)
 						l2_flush_retries_done++;
+			/*
+			 * We bind ourself to a CPU and send cross trap to
+			 * ourself. On return from xt_one we can rely on the
+			 * data in tag_data being filled in. Normally one would
+			 * do a xt_sync to make sure that the CPU has completed
+			 * the cross trap call xt_one.
+			 */
 					xt_one(cache_info->cpu_id,
 					    (xcfunc_t *)(get_l2_tag_tl1),
 					    tag_addr, (uint64_t)(&tag_data));
@@ -700,6 +698,13 @@ retry_l2_retire:
 						affinity_clear();
 						return (EIO);
 					}
+			/*
+			 * We bind ourself to a CPU and send cross trap to
+			 * ourself. On return from xt_one we can rely on the
+			 * data in tag_data being filled in. Normally one would
+			 * do a xt_sync to make sure that the CPU has completed
+			 * the cross trap call xt_one.
+			 */
 					xt_one(cache_info->cpu_id,
 					    (xcfunc_t *)(get_l3_tag_tl1),
 					    tag_addr, (uint64_t)(&tag_data));
@@ -727,6 +732,13 @@ retry_l2_retire:
 					/*
 					 * Check if the index/way is in NA state
 					 */
+			/*
+			 * We bind ourself to a CPU and send cross trap to
+			 * ourself. On return from xt_one we can rely on the
+			 * data in tag_data being filled in. Normally one would
+			 * do a xt_sync to make sure that the CPU has completed
+			 * the cross trap call xt_one.
+			 */
 					xt_one(cache_info->cpu_id,
 					    (xcfunc_t *)(get_l2_tag_tl1),
 					    tag_addr, (uint64_t)(&tag_data));
@@ -760,6 +772,13 @@ retry_l2_retire:
 					/*
 					 * Check if the index/way is in NA state
 					 */
+			/*
+			 * We bind ourself to a CPU and send cross trap to
+			 * ourself. On return from xt_one we can rely on the
+			 * data in tag_data being filled in. Normally one would
+			 * do a xt_sync to make sure that the CPU has completed
+			 * the cross trap call xt_one.
+			 */
 					xt_one(cache_info->cpu_id,
 					    (xcfunc_t *)(get_l3_tag_tl1),
 					    tag_addr, (uint64_t)(&tag_data));
@@ -794,13 +813,22 @@ retry_l2_retire:
 		case MEM_CACHE_STATE:
 			return (ENOTSUP);
 		case MEM_CACHE_READ_TAGS:
+#ifdef DEBUG
 		case MEM_CACHE_READ_ERROR_INJECTED_TAGS:
+#endif
 			/*
 			 * Read tag and data for all the ways at a given afar
 			 */
 			afar = (uint64_t)(cache_info->index
 			    << PN_CACHE_LINE_SHIFT);
 			affinity_set(cache_info->cpu_id);
+			/*
+			 * We bind ourself to a CPU and send cross trap to
+			 * ourself. On return from xt_one we can rely on the
+			 * data in clop being filled in. Normally one would
+			 * do a xt_sync to make sure that the CPU has completed
+			 * the cross trap call xt_one.
+			 */
 			xt_one(cache_info->cpu_id,
 			    (xcfunc_t *)(get_ecache_dtags_tl1),
 			    afar, (uint64_t)(&clop));
@@ -831,6 +859,7 @@ retry_l2_retire:
 					affinity_clear();
 					return (ENOTSUP);
 			}	/* end if switch(cache) */
+#ifdef DEBUG
 			if (cmd == MEM_CACHE_READ_ERROR_INJECTED_TAGS) {
 				pattern = ((uint64_t)1 <<
 				    last_error_injected_bit);
@@ -848,6 +877,7 @@ retry_l2_retire:
 					    [last_error_injected_way] ^=
 					    pattern;
 			}
+#endif
 			if (ddi_copyout((caddr_t)Lxcache_tag_data,
 			    (caddr_t)cache_info->datap,
 			    sizeof (Lxcache_tag_data), mode)
@@ -857,180 +887,6 @@ retry_l2_retire:
 			}
 			affinity_clear();
 			break;	/* end of READ_TAGS */
-		case MEM_CACHE_RETIRE_AND_UNRETIRE_RW:
-			affinity_set(cache_info->cpu_id);
-			tag_addr = get_tag_addr(cache_info);
-			do {
-				pattern = 0;
-				pattern |= PN_ECSTATE_NA;
-				switch (cache_info->cache) {
-					case L2_CACHE_DATA:
-					case L2_CACHE_TAG:
-					if (tag_addr_collides(tag_addr,
-					    cache_info->cache,
-					    retire_l2_start, retire_l2_end))
-						ret_val =
-						    retire_l2_alternate(
-						    tag_addr, pattern);
-					else
-						ret_val = retire_l2(tag_addr,
-						    pattern);
-					if (ret_val == 2)
-						l2_flush_retries_done++;
-					if (ret_val < 0) {
-						cmn_err(CE_WARN,
-		"retire_l2() failed. ret_val = %d index = 0x%x way %d\n",
-						    ret_val,
-						    cache_info->index,
-						    cache_info->way);
-						affinity_clear();
-						return (EIO);
-					}
-					xt_one(cache_info->cpu_id,
-					    (xcfunc_t *)(get_l2_tag_tl1),
-					    tag_addr, (uint64_t)(&tag_data));
-					state = tag_data & CH_ECSTATE_MASK;
-					if (state != PN_ECSTATE_NA) {
-						cmn_err(CE_WARN,
-				"L2 RETIRE:failed for index 0x%x way %d\n",
-						    cache_info->index,
-						    cache_info->way);
-						affinity_clear();
-						return (EIO);
-					}
-					break;
-					case L3_CACHE_TAG:
-					case L3_CACHE_DATA:
-					if (tag_addr_collides(tag_addr,
-					    cache_info->cache,
-					    retire_l3_start, retire_l3_end))
-						ret_val =
-						    retire_l3_alternate(
-						    tag_addr, pattern);
-					else
-						ret_val = retire_l3(tag_addr,
-						    pattern);
-					if (ret_val != 0) {
-						cmn_err(CE_WARN,
-		"retire_l3() failed. ret_val = %d index = 0x%x way %d\n",
-						    ret_val,
-						    cache_info->index,
-						    cache_info->way);
-						affinity_clear();
-						return (EIO);
-					}
-					xt_one(cache_info->cpu_id,
-					    (xcfunc_t *)(get_l3_tag_tl1),
-					    tag_addr, (uint64_t)(&tag_data));
-					state = tag_data & CH_ECSTATE_MASK;
-					if (state != PN_ECSTATE_NA) {
-						cmn_err(CE_WARN,
-				"L3 RETIRE failed for index 0x%x way %d\n",
-						    cache_info->index,
-						    cache_info->way);
-						affinity_clear();
-						return (EIO);
-					}
-					break;
-				}	/* end of switch */
-				/*
-				 * Now unretire the way.
-				 */
-				pattern = PN_ECSTATE_INV;
-				switch (cache_info->cache) {
-				case L2_CACHE_DATA:
-				case L2_CACHE_TAG:
-					/*
-					 * Check if the way is in NA state
-					 */
-					xt_one(cache_info->cpu_id,
-					    (xcfunc_t *)(get_l2_tag_tl1),
-					    tag_addr, (uint64_t)(&tag_data));
-					state = tag_data & CH_ECSTATE_MASK;
-					if (state != PN_ECSTATE_NA) {
-						affinity_clear();
-						return (EINVAL);
-					}
-					if (tag_addr_collides(tag_addr,
-					    cache_info->cache,
-					    unretire_l2_start, unretire_l2_end))
-						ret_val =
-						    unretire_l2_alternate(
-						    tag_addr, pattern);
-					else
-						ret_val =
-						    unretire_l2(tag_addr,
-						    pattern);
-					if (ret_val != 0) {
-						cmn_err(CE_WARN,
-			"unretire_l2() failed. ret_val = %d index = 0x%x\n",
-						    ret_val,
-						    cache_info->index);
-						affinity_clear();
-						return (EIO);
-					}
-					xt_one(cache_info->cpu_id,
-					    (xcfunc_t *)(get_l2_tag_tl1),
-					    tag_addr, (uint64_t)(&tag_data));
-					state = tag_data & CH_ECSTATE_MASK;
-					if (state == PN_ECSTATE_NA) {
-						cmn_err(CE_WARN,
-		"L2 UNRETIRE failed for index 0x%x way %d\n",
-						    cache_info->index,
-						    cache_info->way);
-						affinity_clear();
-						return (EIO);
-					}
-					break;
-				case L3_CACHE_TAG:
-				case L3_CACHE_DATA:
-					/*
-					 * Check if the way is in NA state
-					 */
-					xt_one(cache_info->cpu_id,
-					    (xcfunc_t *)(get_l3_tag_tl1),
-					    tag_addr, (uint64_t)(&tag_data));
-					state = tag_data & CH_ECSTATE_MASK;
-					if (state != PN_ECSTATE_NA) {
-						affinity_clear();
-						return (EINVAL);
-					}
-					if (tag_addr_collides(tag_addr,
-					    cache_info->cache,
-					    unretire_l3_start, unretire_l3_end))
-						ret_val =
-						    unretire_l3_alternate(
-						    tag_addr, pattern);
-					else
-						ret_val =
-						    unretire_l3(tag_addr,
-						    pattern);
-					if (ret_val != 0) {
-						cmn_err(CE_WARN,
-			"unretire_l3() failed. ret_val = %d index = 0x%x\n",
-						    ret_val,
-						    cache_info->index);
-						affinity_clear();
-						return (EIO);
-					}
-					break;
-				}
-			} while (iteration_count--);
-			affinity_clear();
-			break;
-		case MEM_CACHE_RW_COLLISION_CODE:
-			/*
-			 * Find the lowest physical addr of kernel text
-			 * that aligns to first L2/L3 cacheline
-			 */
-			tag_addr = get_tag_addr(cache_info);
-			start_paddr = va_to_pa((void *)s_text);
-			start_paddr += (cache_set_size -1);
-			start_paddr &= ~(cache_set_size -1);
-			tag_addr &= (cache_set_size -1);
-			start_paddr += tag_addr;
-			casxa_physical_addr(start_paddr, 0x1000000);
-			break;
 		default:
 			return (ENOTSUP);
 	}	/* end if switch(cmd) */
@@ -1047,6 +903,7 @@ mem_cache_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	cache_info_t	cache_info;
 	cache_info32_t	cache_info32;
 	int	ret_val;
+	int	is_panther;
 
 	inst = getminor(dev);
 	if ((softc = getsoftc(inst)) == NULL)
@@ -1074,10 +931,14 @@ mem_cache_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		mutex_exit(&softc->mutex);
 		return (EFAULT);
 	}
+	is_panther = IS_PANTHER(cpunodes[cache_info.cpu_id].implementation);
+	if (!is_panther) {
+		mutex_exit(&softc->mutex);
+		return (ENOTSUP);
+	}
 	switch (cmd) {
 		case MEM_CACHE_RETIRE:
 		case MEM_CACHE_UNRETIRE:
-		case MEM_CACHE_RETIRE_AND_UNRETIRE_RW:
 			if ((mode & FWRITE) == 0) {
 				ret_val = EBADF;
 				break;
@@ -1086,8 +947,9 @@ mem_cache_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		case MEM_CACHE_ISRETIRED:
 		case MEM_CACHE_STATE:
 		case MEM_CACHE_READ_TAGS:
+#ifdef DEBUG
 		case MEM_CACHE_READ_ERROR_INJECTED_TAGS:
-		case MEM_CACHE_RW_COLLISION_CODE:
+#endif
 			ret_val =  mem_cache_ioctl_ops(cmd, mode, &cache_info);
 			break;
 		default:

@@ -65,7 +65,6 @@ d none kernel/dacf/sparcv9 755 root sys
 f none kernel/dacf/sparcv9/consconfig_dacf 755 root sys
 f none kernel/dacf/sparcv9/net_dacf 755 root sys
 f none kernel/drv/dad.conf 644 root sys
-f none kernel/drv/mem_cache.conf 644 root sys
 f none kernel/drv/px_pci.conf 644 root sys
 f none kernel/drv/pxb_plx.conf 644 root sys
 e sdconf kernel/drv/sd.conf 644 root sys
@@ -103,7 +102,6 @@ f none kernel/drv/sparcv9/kssl 755 root sys
 f none kernel/drv/sparcv9/llc1 755 root sys
 f none kernel/drv/sparcv9/lofi 755 root sys
 f none kernel/drv/sparcv9/log 755 root sys
-f none kernel/drv/sparcv9/mem_cache 755 root sys
 f none kernel/drv/sparcv9/mm 755 root sys
 f none kernel/drv/sparcv9/mouse8042 755 root sys
 f none kernel/drv/sparcv9/openeepr 755 root sys
