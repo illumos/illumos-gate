@@ -551,6 +551,14 @@ struct _nxge_t {
 	p_nxge_stats_t		statsp;
 	uint32_t		param_count;
 	p_nxge_param_t		param_arr;
+
+	uint32_t		param_en_pause:1,
+				param_en_asym_pause:1,
+				param_en_1000fdx:1,
+				param_en_100fdx:1,
+				param_en_10fdx:1,
+				param_pad_to_32:27;
+
 	nxge_hw_list_t		*nxge_hw_p; 	/* pointer to per Neptune */
 	niu_type_t		niu_type;
 	platform_type_t		platform_type;

@@ -80,10 +80,6 @@ extern uint64_t npi_debug_level;
 	rlen -= plen; \
 }
 
-static int nxge_param_rx_intr_pkts(p_nxge_t, queue_t *,
-	mblk_t *, char *, caddr_t);
-static int nxge_param_rx_intr_time(p_nxge_t, queue_t *,
-	mblk_t *, char *, caddr_t);
 static int nxge_param_set_mac(p_nxge_t, queue_t *,
 	mblk_t *, char *, caddr_t);
 static int nxge_param_set_port_rdc(p_nxge_t, queue_t *,
@@ -93,8 +89,6 @@ static int nxge_param_set_grp_rdc(p_nxge_t, queue_t *,
 static int nxge_param_set_ether_usr(p_nxge_t,
 	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_set_ip_usr(p_nxge_t,
-	queue_t *, mblk_t *, char *, caddr_t);
-static int nxge_param_set_ip_opt(p_nxge_t,
 	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_set_vlan_rdcgrp(p_nxge_t,
 	queue_t *, mblk_t *, char *, caddr_t);
@@ -135,7 +129,7 @@ static int nxge_param_dump_fflp_regs(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
 static int nxge_param_dump_vlan_table(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
 static int nxge_param_dump_rdc_table(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
 static int nxge_param_dump_ptrs(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-static boolean_t nxge_param_link_update(p_nxge_t);
+static void nxge_param_sync(p_nxge_t);
 
 /*
  * Global array of Neptune changable parameters.
@@ -563,7 +557,7 @@ nxge_get_param_soft_properties(p_nxge_t nxgep)
 		if ((param_arr[i].type & NXGE_PARAM_PROP_STR))
 			continue;
 		if ((param_arr[i].type & NXGE_PARAM_PROP_ARR32) ||
-				(param_arr[i].type & NXGE_PARAM_PROP_ARR64)) {
+			    (param_arr[i].type & NXGE_PARAM_PROP_ARR64)) {
 			if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
 					nxgep->dip, 0, param_arr[i].fcode_name,
 					(int **)&int_prop_val,
@@ -767,10 +761,9 @@ nxge_init_param(p_nxge_t nxgep)
 			alloc_size = alloc_count * sizeof (uint64_t);
 			param_arr[i].value =
 #if defined(__i386)
-			    (uint64_t)(uint32_t)KMEM_ZALLOC(alloc_size,
-				KM_SLEEP);
+			(uint64_t)(uint32_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
 #else
-			    (uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
+			(uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
 #endif
 			param_arr[i].old_value =
 #if defined(__i386)
@@ -786,6 +779,9 @@ nxge_init_param(p_nxge_t nxgep)
 
 	nxgep->param_arr = param_arr;
 	nxgep->param_count = sizeof (nxge_param_arr)/sizeof (nxge_param_t);
+
+	nxge_param_sync(nxgep);
+
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_init_param: count %d",
 		nxgep->param_count));
 }
@@ -1245,7 +1241,7 @@ nxge_param_set_mac(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 }
 
 /* ARGSUSED */
-static int
+int
 nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 	char *value, caddr_t cp)
 {
@@ -1273,7 +1269,7 @@ nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 }
 
 /* ARGSUSED */
-static int
+int
 nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 	char *value, caddr_t cp)
 {
@@ -1807,7 +1803,7 @@ nxge_class_name_2value(p_nxge_t nxgep, char *name)
 }
 
 /* ARGSUSED */
-static int
+int
 nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
 	mblk_t *mp, char *value, caddr_t cp)
 {
@@ -2547,6 +2543,9 @@ nxge_nd_getset(p_nxge_t nxgep, queue_t *q, caddr_t param, p_mblk_t mp)
 				mp->b_cont = NULL;
 			}
 		}
+
+		nxge_param_sync(nxgep);
+
 		break;
 
 	default:
@@ -2647,8 +2646,7 @@ nxge_param_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_ioctl"));
 }
 
-/* ARGSUSED */
-static boolean_t
+boolean_t
 nxge_param_link_update(p_nxge_t nxgep)
 {
 	p_nxge_param_t 		param_arr;
@@ -2658,7 +2656,7 @@ nxge_param_link_update(p_nxge_t nxgep)
 	int 			instance;
 	boolean_t 		status = B_TRUE;
 
-	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_link_update"));
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_link_update"));
 
 	param_arr = nxgep->param_arr;
 	instance = nxgep->instance;
@@ -2675,6 +2673,8 @@ nxge_param_link_update(p_nxge_t nxgep)
 			param_arr[i].old_value = param_arr[i].value;
 		}
 		if (update_xcvr) {
+			NXGE_DEBUG_MSG((nxgep, NDD_CTL,
+			    "==> nxge_param_link_update: update xcvr"));
 			RW_ENTER_WRITER(&nxgep->filter_lock);
 			(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
 			(void) nxge_link_init(nxgep);
@@ -2694,6 +2694,8 @@ nxge_param_link_update(p_nxge_t nxgep)
 
 	if (update_dev) {
 		RW_ENTER_WRITER(&nxgep->filter_lock);
+		NXGE_DEBUG_MSG((nxgep, NDD_CTL,
+		    "==> nxge_param_link_update: update dev"));
 		(void) nxge_rx_mac_disable(nxgep);
 		(void) nxge_tx_mac_disable(nxgep);
 		(void) nxge_tx_mac_enable(nxgep);
@@ -2705,4 +2707,53 @@ nxge_param_hw_update_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 			"<== nxge_param_link_update status = 0x%08x", status));
 	return (status);
+}
+
+/*
+ * synchronize the  adv* and en* parameters.
+ *
+ * See comments in <sys/dld.h> for details of the *_en_*
+ * parameters.  The usage of ndd for setting adv parameters will
+ * synchronize all the en parameters with the nxge parameters,
+ * implicitly disabling any settings made via dladm.
+ */
+static void
+nxge_param_sync(p_nxge_t nxgep)
+{
+	p_nxge_param_t	param_arr;
+	param_arr = nxgep->param_arr;
+
+	nxgep->param_en_pause	= param_arr[param_anar_pause].value;
+	nxgep->param_en_1000fdx	= param_arr[param_anar_1000fdx].value;
+	nxgep->param_en_100fdx	= param_arr[param_anar_100fdx].value;
+	nxgep->param_en_10fdx	= param_arr[param_anar_10fdx].value;
+}
+
+/* ARGSUSED */
+int
+nxge_dld_get_ip_opt(p_nxge_t nxgep, caddr_t cp)
+{
+	uint32_t status, cfg_value;
+	p_nxge_param_t pa = (p_nxge_param_t)cp;
+	tcam_class_t class;
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_dld_get_ip_opt"));
+
+	/* do the actual hw setup  */
+	class = nxge_class_name_2value(nxgep, pa->name);
+	if (class == -1)
+		return (EINVAL);
+
+	cfg_value = 0;
+	status = nxge_fflp_ip_class_config_get(nxgep, class, &cfg_value);
+	if (status != NXGE_OK)
+		return (EINVAL);
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
+	    "nxge_param_get_ip_opt_get %x ", cfg_value));
+
+	pa->value = cfg_value;
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_ip_opt status "));
+	return (0);
 }

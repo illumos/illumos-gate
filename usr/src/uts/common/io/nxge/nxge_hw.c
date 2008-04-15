@@ -103,7 +103,12 @@ nxge_hw_id_init(p_nxge_t nxgep)
 	 * Set up initial hardware parameters required such as mac mtu size.
 	 */
 	nxgep->mac.is_jumbo = B_FALSE;
-	nxgep->mac.maxframesize = NXGE_MTU_DEFAULT_MAX;	/* 1522 */
+	/*
+	 * Set the maxframe size to 1522 (1518 + 4) to account for
+	 * VLAN tagged packets.
+	 */
+	nxgep->mac.minframesize = NXGE_MIN_MAC_FRAMESIZE; /* 64   */
+	nxgep->mac.maxframesize = NXGE_MAX_MAC_FRAMESIZE; /* 1522 */
 	if (nxgep->param_arr[param_accept_jumbo].value || nxge_jumbo_enable) {
 		nxgep->mac.maxframesize = (uint16_t)nxge_jumbo_mtu;
 		nxgep->mac.is_jumbo = B_TRUE;

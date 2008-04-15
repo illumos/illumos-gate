@@ -1070,7 +1070,13 @@ nxge_mac_ctrl_init(p_nxge_t nxgep)
 				val &= ~XMAC_RX_CFG_RX_PAUSE_EN;
 			}
 		} else {
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "==> nxge_mac_ctrl_init: port<%d>: pause",
+			    portn));
 			if (statsp->mac_stats.adv_cap_pause) {
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "==> nxge_mac_ctrl_init: port<%d>: "
+				    "enable pause", portn));
 				/*
 				 * If adv_cap_asmpause is 0 and adv_cap_pause
 				 * is 1, enable receive pause.
@@ -1082,6 +1088,9 @@ nxge_mac_ctrl_init(p_nxge_t nxgep)
 				 * is 0, disable receive pause. Send pause is
 				 * not supported
 				 */
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "==> nxge_mac_ctrl_init: port<%d>: "
+				    "disable pause", portn));
 				val &= ~XMAC_RX_CFG_RX_PAUSE_EN;
 			}
 		}
@@ -2132,6 +2141,7 @@ static nxge_status_t
 nxge_10G_xcvr_init(p_nxge_t nxgep)
 {
 	p_nxge_stats_t		statsp;
+	p_nxge_param_t		param_arr = nxgep->param_arr;
 	nxge_status_t		status = NXGE_OK;
 #ifdef	NXGE_DEBUG
 	uint8_t			portn = nxgep->mac.portnum;
@@ -2176,6 +2186,9 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 done:
 	statsp->mac_stats.cap_10gfdx = 1;
 	statsp->mac_stats.lp_cap_10gfdx = 1;
+	statsp->mac_stats.adv_cap_asmpause =
+	    param_arr[param_anar_asmpause].value;
+	statsp->mac_stats.adv_cap_pause = param_arr[param_anar_pause].value;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_10G_xcvr_init: port<%d>",
 	    portn));
@@ -2317,28 +2330,25 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_tx_mac_init: port<%d>",
 			portn));
-
 	/* Set Max and Min Frame Size */
-	if (nxgep->param_arr[param_accept_jumbo].value || nxge_jumbo_enable) {
-		SET_MAC_ATTR2(handle, ap, portn,
-		    MAC_PORT_FRAME_SIZE, 64, nxge_jumbo_mtu, rs);
-	} else {
-		/*
-		 * Set the maxframe size to 1522 (1518 + 4) to account for
-		 * VLAN tagged packets
-		 */
-		SET_MAC_ATTR2(handle, ap, portn,
-		    MAC_PORT_FRAME_SIZE, 64, 0x5EE + 4, rs);
-	}
+	/*
+	 * Use maxframesize to configure the hardware maxframe size
+	 * and minframesize to configure the hardwae minframe size.
+	 */
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "==> nxge_tx_mac_init: port<%d> "
+	    "min framesize %d max framesize %d ",
+	    nxgep->mac.minframesize,
+	    nxgep->mac.maxframesize,
+	    portn));
 
+	SET_MAC_ATTR2(handle, ap, portn,
+	    MAC_PORT_FRAME_SIZE,
+	    nxgep->mac.minframesize,
+	    nxgep->mac.maxframesize,
+	    rs);
 	if (rs != NPI_SUCCESS)
 		goto fail;
-	if (nxgep->param_arr[param_accept_jumbo].value ||
-		nxgep->mac.is_jumbo == B_TRUE)
-		nxgep->mac.maxframesize = (uint16_t)nxge_jumbo_mtu;
-	else
-		nxgep->mac.maxframesize = 0x5EE + 4;
-	nxgep->mac.minframesize = 64;
 
 	if (portt == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_tx_iconfig(handle, INIT, portn,
@@ -5875,6 +5885,45 @@ fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "<== nxge_mii_get_link_mode (failed)"));
 	return (NXGE_ERROR);
+}
+
+nxge_status_t
+nxge_mac_set_framesize(p_nxge_t nxgep)
+{
+	npi_attr_t		ap;
+	uint8_t			portn;
+	npi_handle_t		handle;
+	npi_status_t		rs = NPI_SUCCESS;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_mac_set_framesize"));
+
+	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	handle = nxgep->npi_handle;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "==> nxge_mac_sec_framesize: port<%d> "
+	    "min framesize %d max framesize %d ",
+	    portn,
+	    nxgep->mac.minframesize,
+	    nxgep->mac.maxframesize));
+
+	SET_MAC_ATTR2(handle, ap, portn,
+	    MAC_PORT_FRAME_SIZE,
+	    nxgep->mac.minframesize,
+	    nxgep->mac.maxframesize,
+	    rs);
+	if (rs != NPI_SUCCESS) {
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "<== nxge_mac_set_framesize: failed to configure "
+		    "max/min frame size port %d", portn));
+
+		return (NXGE_ERROR | rs);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "<== nxge_mac_set_framesize: port<%d>", portn));
+
+	return (NXGE_OK);
 }
 
 #ifdef NXGE_DEBUG

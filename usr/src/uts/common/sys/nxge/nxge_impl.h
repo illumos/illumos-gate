@@ -100,6 +100,8 @@ extern "C" {
 #include 	<sys/hsvc.h>
 #endif
 
+#include 	<sys/dld.h>
+
 /*
  * Handy macros (taken from bge driver)
  */
@@ -833,6 +835,14 @@ int nxge_nd_getset(p_nxge_t, queue_t *, caddr_t, p_mblk_t);
 
 nxge_status_t nxge_set_lb_normal(p_nxge_t);
 boolean_t nxge_set_lb(p_nxge_t, queue_t *, p_mblk_t);
+boolean_t nxge_param_link_update(p_nxge_t);
+int nxge_param_set_ip_opt(p_nxge_t, queue_t *, mblk_t *, char *, caddr_t);
+int nxge_dld_get_ip_opt(p_nxge_t, caddr_t);
+int nxge_param_rx_intr_pkts(p_nxge_t, queue_t *,
+	mblk_t *, char *, caddr_t);
+int nxge_param_rx_intr_time(p_nxge_t, queue_t *,
+	mblk_t *, char *, caddr_t);
+
 
 /* nxge_virtual.c */
 nxge_status_t nxge_cntlops(dev_info_t *, nxge_ctl_enum_t, void *, void *);
@@ -934,6 +944,7 @@ nxge_status_t nxge_10g_link_led_on(p_nxge_t);
 nxge_status_t nxge_10g_link_led_off(p_nxge_t);
 nxge_status_t nxge_scan_ports_phy(p_nxge_t, p_nxge_hw_list_t);
 boolean_t nxge_is_valid_local_mac(ether_addr_st);
+nxge_status_t nxge_mac_set_framesize(p_nxge_t);
 
 /* espc (sprom) prototypes */
 nxge_status_t nxge_espc_mac_addrs_get(p_nxge_t);

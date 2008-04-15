@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,16 @@ extern "C" {
 #include <npi_mac.h>
 
 #define	NXGE_MTU_DEFAULT_MAX	1522	/* 0x5f2 */
+#define	NXGE_DEFAULT_MTU	1500	/* 0x5dc */
+#define	NXGE_MIN_MAC_FRAMESIZE	64
+#define	NXGE_MAX_MAC_FRAMESIZE	NXGE_MTU_DEFAULT_MAX
+/*
+ * Maximum MTU: maximum frame size supported by the
+ * hardware (9216) - (22).
+ * (22 = ether header size (including VLAN) - CRC size (4)).
+ */
+#define	NXGE_EHEADER_VLAN_CRC	(sizeof (struct ether_header) + ETHERFCSL + 4)
+#define	NXGE_MAXIMUM_MTU	(TX_JUMBO_MTU - NXGE_EHEADER_VLAN_CRC)
 
 #define	NXGE_XMAC_TX_INTRS	(ICFG_XMAC_TX_ALL & \
 					~(ICFG_XMAC_TX_FRAME_XMIT |\
@@ -236,6 +246,7 @@ typedef	struct _nxge_mac {
 	nxge_mac_stats_t	*mac_stats;
 	nxge_xmac_stats_t	*xmac_stats;
 	nxge_bmac_stats_t	*bmac_stats;
+	uint32_t		default_mtu;
 } nxge_mac_t;
 
 #ifdef	__cplusplus
