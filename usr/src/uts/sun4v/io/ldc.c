@@ -3570,8 +3570,21 @@ ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 		 * to check if it actually contains unread data packets.
 		 * The queue may just contain ctrl packets.
 		 */
-		if (rx_head != rx_tail)
+		if (rx_head != rx_tail) {
 			*hasdata = (i_ldc_chkq(ldcp) == 0);
+			/*
+			 * If no data packets were found on the queue,
+			 * all packets must have been control packets
+			 * which will now have been processed, leaving
+			 * the queue empty. If the interrupt state
+			 * is pending, we need to clear the interrupt
+			 * here.
+			 */
+			if (*hasdata == B_FALSE &&
+			    ldcp->rx_intr_state == LDC_INTR_PEND) {
+				i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+			}
+		}
 		break;
 
 	case LDC_MODE_RELIABLE:
