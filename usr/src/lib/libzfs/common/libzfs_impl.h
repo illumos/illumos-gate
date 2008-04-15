@@ -44,6 +44,11 @@
 extern "C" {
 #endif
 
+#ifdef	VERIFY
+#undef	VERIFY
+#endif
+#define	VERIFY	verify
+
 struct libzfs_handle {
 	int libzfs_error;
 	int libzfs_fd;
