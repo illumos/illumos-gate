@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1046,8 +1046,9 @@ wait_for_recovery(mntinfo4_t *mi, nfs4_op_hint_t op_hint)
 	while (mi->mi_recovflags != 0) {
 		klwp_t *lwp = ttolwp(curthread);
 
-		if ((mi->mi_vfsp->vfs_flag & VFS_UNMOUNTED) ||
-		    (mi->mi_flags & MI4_RECOV_FAIL))
+		if (mi->mi_flags & MI4_RECOV_FAIL)
+			break;
+		if (mi->mi_vfsp->vfs_flag & VFS_UNMOUNTED)
 			break;
 		if (OH_IS_STATE_RELE(op_hint) &&
 		    (curthread->t_proc_flag & TP_LWPEXIT))
@@ -1066,15 +1067,15 @@ wait_for_recovery(mntinfo4_t *mi, nfs4_op_hint_t op_hint)
 			lwp->lwp_nostop--;
 	}
 
-	if ((mi->mi_vfsp->vfs_flag & VFS_UNMOUNTED) &&
+	if (mi->mi_flags & MI4_RECOV_FAIL) {
+		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
+		    "wait_for_recovery: fail since RECOV FAIL"));
+		error = mi->mi_error;
+	} else if ((mi->mi_vfsp->vfs_flag & VFS_UNMOUNTED) &&
 	    !OH_IS_STATE_RELE(op_hint)) {
 		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
 		    "wait_for_recovery: forced unmount"));
 		error = EIO;
-	} else if (mi->mi_flags & MI4_RECOV_FAIL) {
-		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
-		    "wait_for_recovery: fail since RECOV FAIL"));
-		error = mi->mi_error;
 	}
 
 	mutex_exit(&mi->mi_lock);
