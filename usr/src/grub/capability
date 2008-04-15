@@ -18,46 +18,15 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-# 
-
-PROG= bootadm
-
-SBINLINKS= $(PROG)
-
-OBJS= bootadm.o bootadm_upgrade.o
-SRCS = $(OBJS:.o=.c)
-
-include ../Makefile.com
-
-
-.KEEP_STATE:
-
-LDLIBS +=	-lnvpair -lgen -ladm -lefi
-
-# Writing into string literals is incorrect.  We need to match gcc's
-# behavior, which causes us to take SIGSEGV on such a write.
-CFLAGS +=	$(XSTRCONST)
-CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
-CPPFLAGS +=	-I../../../uts/common -I../../../common
-
-all: $(PROG)
-
-$(PROG): $(OBJS) bootadm.h
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
-
-clean:
-	-$(RM) $(OBJS)
-
-_msg:
-
-lint:	lint_SRCS
-
-include ../Makefile.targ
+#
+#
+# This file defines the current capabilities of GRUB over and above that
+# supported by the standard distribution
+#
+dboot
+xVM
+findroot

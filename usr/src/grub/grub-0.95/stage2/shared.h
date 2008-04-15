@@ -17,6 +17,11 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Generic defines to use anywhere
@@ -49,6 +54,12 @@ extern char *grub_scratch_mem;
 
 #define	MAXNAMELEN	256
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
+
+/* Boot signature related defines for the findroot command */
+#define	BOOTSIGN_DIR	"/boot/grub/bootsign"
+#define	BOOTSIGN_ARGLEN	(MAXNAMELEN + 10)	/* (<sign>,0,d) */
+#define	BOOTSIGN_LEN	(sizeof (BOOTSIGN_DIR) + 1 + BOOTSIGN_ARGLEN)
+#define	BOOTSIGN_BACKUP	"/etc/bootsign"
 
 /*
  *  Integer sizes
@@ -931,6 +942,7 @@ int grub_memcmp (const char *s1, const char *s2, int n);
 int grub_strcmp (const char *s1, const char *s2);
 int grub_strlen (const char *str);
 char *grub_strcpy (char *dest, const char *src);
+char *grub_strchr (char *str, char c);
 
 void noisy_printf (const char *format,...);
 

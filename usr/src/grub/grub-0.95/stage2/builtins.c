@@ -17,6 +17,11 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Include stdio.h before shared.h, because we can't define
    WITHOUT_LIBC_STUBS here.  */
@@ -1513,16 +1518,41 @@ static struct builtin builtin_fallback =
 };
 
 
-/* find */
-/* Search for the filename ARG in all of partitions.  */
 static int
-find_func (char *arg, int flags)
+find_common (char *arg, char *root, int for_root, int flags)
 {
-  char *filename = arg;
+  char *filename = NULL;
+  static char argpart[32];
+  static char device[32];
+  char *tmp_argpart = NULL;
   unsigned long drive;
   unsigned long tmp_drive = saved_drive;
   unsigned long tmp_partition = saved_partition;
   int got_file = 0;
+  static char bootsign[BOOTSIGN_LEN];
+
+  /*
+   * If argument has partition information (findroot command only), then
+   * it can't be a floppy
+   */
+  if (for_root && arg[0] == '(') {
+	tmp_argpart = grub_strchr(arg + 1, ',');
+        if (tmp_argpart == NULL)
+		goto out;
+	grub_strcpy(argpart, tmp_argpart);
+	*tmp_argpart = '\0';
+	arg++;
+        grub_sprintf(bootsign, "%s/%s", BOOTSIGN_DIR, arg);
+	filename = bootsign;
+	goto harddisk;
+  } else if (for_root) {
+	/* Boot signature without partition/slice information */
+        grub_sprintf(bootsign, "%s/%s", BOOTSIGN_DIR, arg);
+	filename = bootsign;
+  } else {
+	/* plain vanilla find cmd */
+	filename = arg;
+  }
   
   /* Floppies.  */
   for (drive = 0; drive < 8; drive++)
@@ -1537,14 +1567,19 @@ find_func (char *arg, int flags)
 	  if (grub_open (filename))
 	    {
 	      grub_close ();
-	      grub_printf (" (fd%d)\n", drive);
 	      got_file = 1;
+	      if (for_root) {
+		 grub_sprintf(root, "(fd%d)", drive);
+		 goto out;
+	      } else
+	         grub_printf (" (fd%d)\n", drive);
 	    }
 	}
 
       errnum = ERR_NONE;
     }
 
+harddisk:
   /* Hard disks.  */
   for (drive = 0x80; drive < 0x88; drive++)
     {
@@ -1553,6 +1588,32 @@ find_func (char *arg, int flags)
       int type, entry;
       char buf[SECTOR_SIZE];
 
+      if (for_root && tmp_argpart) {
+	grub_sprintf(device, "(hd%d%s", drive - 0x80, argpart); 
+	set_device(device);
+        errnum = ERR_NONE;
+	part = current_partition;
+	if (open_device ()) {
+	   saved_drive = current_drive;
+	   saved_partition = current_partition;
+           errnum = ERR_NONE;
+	   if (grub_open (filename)) {
+	      int bsd_part = (part >> 8) & 0xFF;
+	      int pc_slice = part >> 16;
+	      grub_close ();
+	      got_file = 1;
+	      if (bsd_part == 0xFF)
+		grub_sprintf (root, "(hd%d,%d)\n", drive - 0x80, pc_slice);
+	      else
+		grub_sprintf (root, "(hd%d,%d,%c)\n",
+			     drive - 0x80, pc_slice, bsd_part + 'a');
+	      goto out;
+           }
+
+	}
+        errnum = ERR_NONE;
+	continue;
+      }
       current_drive = drive;
       while (next_partition (drive, 0xFFFFFF, &part, &type,
 			     &start, &len, &offset, &entry,
@@ -1573,15 +1634,26 @@ find_func (char *arg, int flags)
 		      int pc_slice = part >> 16;
 		      
 		      grub_close ();
-		      
-		      if (bsd_part == 0xFF)
-			grub_printf (" (hd%d,%d)\n",
-				     drive - 0x80, pc_slice);
-		      else
-			grub_printf (" (hd%d,%d,%c)\n",
-				     drive - 0x80, pc_slice, bsd_part + 'a');
-
 		      got_file = 1;
+		      
+		      if (bsd_part == 0xFF) {
+			if (for_root)  {
+			   grub_sprintf (root, "(hd%d,%d)\n",
+				     drive - 0x80, pc_slice);
+			   goto out;
+			} else
+			   grub_printf (" (hd%d,%d)\n",
+				     drive - 0x80, pc_slice);
+		      } else {
+			if (for_root) {
+			   grub_sprintf (root, "(hd%d,%d,%c)\n",
+				     drive - 0x80, pc_slice, bsd_part + 'a');
+			   goto out;
+			} else
+			   grub_printf (" (hd%d,%d,%c)\n",
+				     drive - 0x80, pc_slice, bsd_part + 'a');
+		      }
+
 		    }
 		}
 	    }
@@ -1595,8 +1667,11 @@ find_func (char *arg, int flags)
       errnum = ERR_NONE;
     }
 
+out:
   saved_drive = tmp_drive;
   saved_partition = tmp_partition;
+  if (tmp_argpart)
+	*tmp_argpart = ',';
 
   if (got_file)
     {
@@ -1606,6 +1681,14 @@ find_func (char *arg, int flags)
 
   errnum = ERR_FILE_NOT_FOUND;
   return 1;
+}
+
+/* find */
+/* Search for the filename ARG in all of partitions.  */
+static int
+find_func (char *arg, int flags)
+{
+	return (find_common(arg, NULL, 0, flags));
 }
 
 static struct builtin builtin_find =
@@ -3888,6 +3971,50 @@ static struct builtin builtin_root =
 };
 
 
+/* findroot */
+static int
+findroot_func (char *arg, int flags)
+{
+  int ret;
+  char root[32];
+
+  if (grub_strlen(arg) >= BOOTSIGN_ARGLEN) {
+  	errnum = ERR_BAD_ARGUMENT;
+	return 1;
+  }
+
+  if (arg[0] == '\0') {
+  	errnum = ERR_BAD_ARGUMENT;
+	return 1;
+  }
+
+  if (grub_strchr(arg, '/')) {
+  	errnum = ERR_BAD_ARGUMENT;
+	return 1;
+  }
+
+  ret = find_common(arg, root, 1, flags);
+  if (ret != 0)
+	return (ret);
+
+  is_zfs_mount = 0;
+  return real_root_func (root, 1);
+}
+
+static struct builtin builtin_findroot =
+{
+  "findroot",
+  findroot_func,
+  BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
+  "findroot  <SIGNATURE-FILE | (SIGNATURE-FILE,partition[,slice])>",
+  "Search for the root partition that contains the specified SIGNATURE-FILE."
+  " The SIGNATURE-FILE is assumed to be unique across all partitions."
+  " An optional partition and slice may be specified to optimize the search."
+  " GRUB stops at the first root partition that has the specified"
+  " SIGNATURE-FILE and then invokes the \"root\" command on that device."
+};
+
+
 /*
  * COMMAND to override the default root filesystem for ZFS
  *	bootfs pool/fs
@@ -5574,6 +5701,7 @@ struct builtin *builtin_table[] =
   &builtin_embed,
   &builtin_fallback,
   &builtin_find,
+  &builtin_findroot,
 #ifdef SUPPORT_GRAPHICS
   &builtin_foreground,
 #endif

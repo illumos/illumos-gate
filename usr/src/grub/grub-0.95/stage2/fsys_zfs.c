@@ -679,17 +679,26 @@ dnode_get(dnode_phys_t *mdn, uint64_t objnum, uint8_t type, dnode_phys_t *buf,
 }
 
 /*
- * Check if this is the "menu.lst" file.
+ * Check if this is a special file that resides at the top
+ * dataset of the pool. Currently this is the GRUB menu,
+ * boot signature and boot signature backup.
  * str starts with '/'.
  */
 static int
-is_menu_lst(char *str)
+is_top_dataset_file(char *str)
 {
 	char *tptr;
 
 	if ((tptr = grub_strstr(str, "menu.lst")) &&
 	    (tptr[8] == '\0' || tptr[8] == ' ') &&
 	    *(tptr-1) == '/')
+		return (1);
+
+	if (grub_strncmp(str, BOOTSIGN_DIR"/",
+	    grub_strlen(BOOTSIGN_DIR) + 1) == 0) 
+		return (1);
+
+	if (grub_strcmp(str, BOOTSIGN_BACKUP) == 0)
 		return (1);
 
 	return (0);
@@ -1228,7 +1237,7 @@ zfs_open(char *filename)
 	 * menu.lst is placed at the root pool filesystem level,
 	 * do not goto 'current_bootfs'.
 	 */
-	if (is_menu_lst(filename)) {
+	if (is_top_dataset_file(filename)) {
 		if (errnum = get_objset_mdn(MOS, NULL, NULL, mdn, stack))
 			return (0);
 

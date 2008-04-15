@@ -17,6 +17,11 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <shared.h>
 #include <term.h>
@@ -1277,6 +1282,14 @@ nul_terminate (char *str)
   ch = *str;
   *str = 0;
   return ch;
+}
+
+char *
+grub_strchr (char *str, char c)
+{
+  for (; *str && (*str != c); str++);
+
+  return (*str ? str : NULL);
 }
 #endif /* ! STAGE1_5 */
 
