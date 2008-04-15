@@ -1616,3 +1616,8 @@ HXGE_OBJS =	hxge_main.o hxge_vmac.o hxge_send.o		\
 		hxge_ndd.o hxge_pfc.o				\
 		hpi.o hpi_vmac.o hpi_rxdma.o hpi_txdma.o	\
 		hpi_vir.o hpi_pfc.o
+
+#
+#	MEGARAID_SAS module
+#
+MEGA_SAS_OBJS = megaraid_sas.o

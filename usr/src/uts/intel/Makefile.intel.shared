@@ -258,6 +258,7 @@ DRV_KMODS	+= lofi
 DRV_KMODS	+= log
 DRV_KMODS	+= logi
 DRV_KMODS	+= logindmux
+DRV_KMODS	+= mega_sas
 DRV_KMODS	+= mm
 DRV_KMODS	+= mouse8042
 DRV_KMODS_32	+= mscsi

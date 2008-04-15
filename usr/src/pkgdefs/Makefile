@@ -153,6 +153,7 @@ i386_XMODS= \
 	BRCMbnx \
 	SUNWadpu320 \
 	SUNWlsimega \
+	SUNWmegasas \
 
 COMMON_SUBDIRS= \
 	SUNW1394h \
