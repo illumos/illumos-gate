@@ -7282,15 +7282,17 @@ mondo_loop() {
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
-		print "Extracting $rootfstype modules for boot block ... \c" | \
-			tee -a $EXTRACT_LOG
 		# extract both /platform and /usr/platform bootblks
 		# for compatibility with older bootblk delivery
+		print "Extracting platform $rootfstype modules for boot " \
+		    "block ... \c" | tee -a $EXTRACT_LOG
 		do_extraction $cpiodir/$karch.root$ZFIX \
-			'platform/'$karch'/lib/fs/$rootfstype/*' | \
+			'platform/'$karch'/lib/fs/'$rootfstype'/*' | \
 			tee -a $EXTRACT_LOG
+		print "Extracting usr/platform $rootfstype modules for boot " \
+		    "block ... \c" | tee -a $EXTRACT_LOG
 		do_extraction $cpiodir/$karch.usr$ZFIX \
-			'usr/platform/'$karch'/lib/fs/$rootfstype/*' | \
+			'usr/platform/'$karch'/lib/fs/'$rootfstype'/*' | \
 			tee -a $EXTRACT_LOG
 		case $target_isa in
 		    sparc)
