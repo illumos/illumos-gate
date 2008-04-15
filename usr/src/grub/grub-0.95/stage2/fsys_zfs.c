@@ -695,7 +695,7 @@ is_top_dataset_file(char *str)
 		return (1);
 
 	if (grub_strncmp(str, BOOTSIGN_DIR"/",
-	    grub_strlen(BOOTSIGN_DIR) + 1) == 0) 
+	    grub_strlen(BOOTSIGN_DIR) + 1) == 0)
 		return (1);
 
 	if (grub_strcmp(str, BOOTSIGN_BACKUP) == 0)
