@@ -539,6 +539,7 @@ extern uint_t cpuid_get_ncpu_sharing_last_cache(struct cpu *);
 extern id_t cpuid_get_last_lvl_cacheid(struct cpu *);
 extern int cpuid_get_chipid(struct cpu *);
 extern id_t cpuid_get_coreid(struct cpu *);
+extern uint_t cpuid_get_apicid(struct cpu *);
 extern int cpuid_get_pkgcoreid(struct cpu *);
 extern int cpuid_get_clogid(struct cpu *);
 extern int cpuid_is_cmt(struct cpu *);

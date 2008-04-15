@@ -321,11 +321,6 @@ mlsetup(struct regs *rp)
 	pci_cfgspace_init();
 #endif
 
-	/*
-	 * Initialize the lgrp framework
-	 */
-	lgrp_init();
-
 	rp->r_fp = 0;	/* terminate kernel stack traces! */
 
 	prom_init("kernel", (void *)NULL);
@@ -336,6 +331,11 @@ mlsetup(struct regs *rp)
 		boot_ncpus = NCPU;
 
 	max_ncpus = boot_max_ncpus = boot_ncpus;
+
+	/*
+	 * Initialize the lgrp framework
+	 */
+	lgrp_init();
 
 	if (boothowto & RB_HALT) {
 		prom_printf("unix: kernel halted by -h flag\n");

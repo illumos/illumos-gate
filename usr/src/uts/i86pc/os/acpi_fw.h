@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,11 +138,21 @@ struct srat {
 #define	SRAT_HOT_PLUG	  (2)
 #define	SRAT_NON_VOLATILE (4)
 
+/*
+ * Pointer to System Resource Affinity Table (SRAT)
+ */
+extern struct srat	*srat_ptr;
+
 struct slit {
 	struct table_header hdr;
 	uint64_t number;
 	uint8_t  entry[1];
 };
+
+/*
+ * Pointer to System Locality Information Table (SLIT)
+ */
+extern struct slit	*slit_ptr;
 
 /*
  * Arbitrary limit on number of localities we handle; if

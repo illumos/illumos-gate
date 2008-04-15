@@ -122,6 +122,14 @@ static void build_firmware_properties(void);
 static int early_allocation = 1;
 
 /*
+ * Pointers to where System Resource Affinity Table (SRAT) and
+ * System Locality Information Table (SLIT) are mapped into virtual memory
+ */
+struct srat	*srat_ptr = NULL;
+struct slit	*slit_ptr = NULL;
+
+
+/*
  * Allocate aligned physical memory at boot time. This allocator allocates
  * from the highest possible addresses. This avoids exhausting memory that
  * would be useful for DMA buffers.
@@ -2008,11 +2016,11 @@ build_firmware_properties(void)
 	if ((tp = find_fw_table("APIC")) != NULL)
 		process_madt((struct madt *)tp);
 
-	if ((tp = find_fw_table("SRAT")) != NULL)
-		process_srat((struct srat *)tp);
+	if ((srat_ptr = (struct srat *)find_fw_table("SRAT")) != NULL)
+		process_srat(srat_ptr);
 
-	if (tp = find_fw_table("SLIT"))
-		process_slit((struct slit *)tp);
+	if (slit_ptr = (struct slit *)find_fw_table("SLIT"))
+		process_slit(slit_ptr);
 #else /* __xpv */
 	enumerate_xen_cpus();
 #endif /* __xpv */
