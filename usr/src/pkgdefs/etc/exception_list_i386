@@ -847,7 +847,6 @@ usr/lib/amd64/llib-lshell.ln		      i386
 #
 # bmc (IPMI) interfaces shared within ON.
 #
-usr/include/sys/bmc_cmd.h		i386
 usr/include/sys/bmc_intf.h		i386
 #
 # These files are used by the iSCSI Target which is in this consolidation

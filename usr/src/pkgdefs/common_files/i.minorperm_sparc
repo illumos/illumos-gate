@@ -336,7 +336,6 @@ physmem:*
 smbsrv:*
 vscan:*
 nsmb:*
-bmc:bmc
 EOF
 }
 
