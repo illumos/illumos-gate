@@ -1669,13 +1669,15 @@ i_xvdi_enum_worker(dev_info_t *parent, i_xd_cfg_t *xdcp,
 	unsigned int ndevices;
 	int ldevices, j, circ;
 	domid_t dom;
+	long tmplong;
 
 	if (domain == NULL) {
 		dom = DOMID_SELF;
 		path = xdcp->xs_path_fe;
 		domain_path = "";
 	} else {
-		(void) ddi_strtol(domain, &ep, 0, (long *)&dom);
+		(void) ddi_strtol(domain, &ep, 0, &tmplong);
+		dom = tmplong;
 		path = xdcp->xs_path_be;
 		domain_path = domain;
 	}
@@ -1688,12 +1690,12 @@ i_xvdi_enum_worker(dev_info_t *parent, i_xd_cfg_t *xdcp,
 		int vdev;
 
 		ldevices += strlen(devices[j]) + 1 + sizeof (char *);
-		(void) ddi_strtol(devices[j], &ep, 0, (long *)&vdev);
+		(void) ddi_strtol(devices[j], &ep, 0, &tmplong);
+		vdev = tmplong;
 
 		ndi_devi_enter(parent, &circ);
 
-		if (xvdi_find_dev(parent, xdcp->devclass, dom, vdev)
-		    == NULL)
+		if (xvdi_find_dev(parent, xdcp->devclass, dom, vdev) == NULL)
 			(void) xvdi_create_dev(parent, xdcp->devclass,
 			    dom, vdev);
 
