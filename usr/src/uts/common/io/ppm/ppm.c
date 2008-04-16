@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1750,7 +1750,7 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 
 		/* implement any post op delay. */
 		if (key == PPMDC_FET_ON) {
-			PPM_GET_IO_DELAY(dc, delay);
+			PPM_GET_IO_POST_DELAY(dc, delay);
 			PPMD(D_FET, ("%s : waiting %lu micro seconds "
 			    "after on\n", domp->name, delay))
 			if (delay > 0)
@@ -2292,7 +2292,7 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 	}
 
 	/* implement any post op delay. */
-	PPM_GET_IO_DELAY(dc, delay);
+	PPM_GET_IO_POST_DELAY(dc, delay);
 	if (delay > 0) {
 		PPMD(D_GPIO, ("%s : waiting %lu micro seconds "
 		    "after change\n", domp->name, delay))

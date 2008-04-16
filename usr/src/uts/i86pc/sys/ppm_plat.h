@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,11 @@ extern "C" {
 #define	PPM_GET_IO_DELAY(dc, delay) { \
 	if (dc->method == PPMDC_KIO) \
 		delay = dc->m_un.kio.delay; \
+}
+
+#define	PPM_GET_IO_POST_DELAY(dc, delay) { \
+	if (dc->method == PPMDC_KIO) \
+		delay = dc->m_un.kio.post_delay; \
 }
 
 extern void	ppm_rebuild_cpu_domains(void);
