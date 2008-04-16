@@ -29,7 +29,7 @@ include	../Makefile.com
 
 TMPLFILES += preremove
 
-LICENSEFILES += \
+$(CLOSED_BUILD)LICENSEFILES += \
 	../../../closed/lib/smartcard/ocfserv/opencard/core/event/THIRDPARTYLICENSE
 
 .KEEP_STATE:

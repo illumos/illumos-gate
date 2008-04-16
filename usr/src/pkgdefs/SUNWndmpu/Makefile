@@ -28,7 +28,8 @@
 
 include ../Makefile.com
 
-LICENSEFILES += $(OSBL) ../../../closed/cmd/ndmpd/LICENSE
+LICENSEFILES += $(OSBL)
+$(CLOSED_BUILD)LICENSEFILES += ../../../closed/cmd/ndmpd/LICENSE
 CDDL=
 
 all: $(FILES) depend

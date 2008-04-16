@@ -40,7 +40,9 @@ LICENSEFILES += \
 	../../cmd/soelim/THIRDPARTYLICENSE \
 	../../cmd/tbl/THIRDPARTYLICENSE \
 	../../cmd/ul/THIRDPARTYLICENSE \
-	../../cmd/vgrind/THIRDPARTYLICENSE \
+	../../cmd/vgrind/THIRDPARTYLICENSE
+
+$(CLOSED_BUILD)LICENSEFILES += \
 	../../../closed/cmd/man/src/util/solbookv1/THIRDPARTYLICENSE
 
 CDDL=
