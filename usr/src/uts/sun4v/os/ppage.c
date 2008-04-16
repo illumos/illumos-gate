@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <vm/page.h>
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
+#include <vm/seg_kpm.h>
 #include <vm/hat_sfmmu.h>
 #include <sys/debug.h>
 #include <sys/cpu_module.h>
@@ -162,8 +163,8 @@ ppmapin(page_t *pp, uint_t vprot, caddr_t hint)
 #endif /* PPDEBUG */
 			if (casptr(&ppmap_vaddrs[nset], va, NULL) == va) {
 				hat_memload(kas.a_hat, va, pp,
-					vprot | HAT_NOSYNC,
-					HAT_LOAD_LOCK);
+				    vprot | HAT_NOSYNC,
+				    HAT_LOAD_LOCK);
 				return (va);
 			}
 		}
@@ -258,7 +259,7 @@ ppcopy_kernel__relocatable(page_t *fm_pp, page_t *to_pp)
 int
 ppcopy(page_t *fm_pp, page_t *to_pp)
 {
-	caddr_t fm_va;
+	caddr_t fm_va = NULL;
 	caddr_t to_va;
 	boolean_t fast;
 	label_t ljb;
@@ -268,10 +269,11 @@ ppcopy(page_t *fm_pp, page_t *to_pp)
 	ASSERT(PAGE_LOCKED(to_pp));
 
 	/*
-	 * Try to map using KPM.  If it fails, fall back to
-	 * ppmapin/ppmapout.
+	 * Try to map using KPM if enabled.  If it fails, fall
+	 * back to ppmapin/ppmapout.
 	 */
-	if ((fm_va = hat_kpm_mapin(fm_pp, NULL)) == NULL ||
+	if ((kpm_enable == 0) ||
+	    (fm_va = hat_kpm_mapin(fm_pp, NULL)) == NULL ||
 	    (to_va = hat_kpm_mapin(to_pp, NULL)) == NULL) {
 		if (fm_va != NULL)
 			hat_kpm_mapout(fm_pp, NULL, fm_va);
@@ -327,11 +329,16 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 	kpreempt_disable();
 
 	/*
-	 * Try to use KPM.  If that fails, fall back to
+	 * Try to use KPM if enabled.  If that fails, fall back to
 	 * ppmapin/ppmapout.
 	 */
-	fast = B_TRUE;
-	va = hat_kpm_mapin(pp, NULL);
+
+	if (kpm_enable != 0) {
+		fast = B_TRUE;
+		va = hat_kpm_mapin(pp, NULL);
+	} else
+		va = NULL;
+
 	if (va == NULL) {
 		fast = B_FALSE;
 		va = ppmapin(pp, PROT_READ | PROT_WRITE, (caddr_t)-1);
