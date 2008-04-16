@@ -386,7 +386,7 @@ static int	lgrp_plat_node_domain_update(node_domain_map_t *node_domain,
     uint32_t domain);
 
 static int	lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
-    node_phys_addr_map_t *node_memory, uintptr_t start, uintptr_t end,
+    node_phys_addr_map_t *node_memory, uint64_t start, uint64_t end,
     uint32_t domain);
 
 static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
@@ -1729,7 +1729,7 @@ lgrp_plat_node_domain_update(node_domain_map_t *node_domain, uint32_t domain)
  */
 static int
 lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
-    node_phys_addr_map_t *node_memory, uintptr_t start, uintptr_t end,
+    node_phys_addr_map_t *node_memory, uint64_t start, uint64_t end,
     uint32_t domain)
 {
 	int	node;
