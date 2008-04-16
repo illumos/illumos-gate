@@ -69,7 +69,7 @@ install  : $$(PROGBIN)
 	install -f $(INSTBINDIR) -m 755 $(PROGBIN)
 	install -d $(ROOTMANIFESTDIR)
 	$(RM) $(ROOTMANIFESTDIR)/$(MANIFEST)
-	install -m 755 -f $(ROOTMANIFESTDIR) $(MANIFEST)
+	install -m 444 -f $(ROOTMANIFESTDIR) $(MANIFEST)
 
 $(POFILE):  $(POFILES) FRC
 	@$(RM) $@
