@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,20 +22,26 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.	 All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
-
 while read src dest
 do
-	if [ ! -f $dest ] ; then
+	if [ ! -f $dest ]; then
 		cp $src $dest
 	else
-		grep '^#pragma' $src > /tmp/newident.$$ 2>/dev/null
+		update=0
+
+		# Check xpv_psm entry exists in etc/mach
+		grep -w "xpv_psm" $dest > /dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			update=1
+		fi
+
 		sed -e '/^ast/d' \
 		    -e '/^compaq/d' \
 		    -e '/^corollary/d' \
@@ -44,15 +49,27 @@ do
 		    -e '/^tpf/d' \
 		    -e '/^wysemp/d' \
 		$dest > /tmp/m.$$
-	   if cmp -s /tmp/m.$$	$dest  > /dev/null 2>&1
-           then
-		:
-	   else
-		cat /tmp/newident.$$ > /tmp/rest.$$
-		sed '/^#pragma.*/d' /tmp/m.$$ >> /tmp/rest.$$
-		cp /tmp/rest.$$ $dest
-	   fi
-	   rm -f /tmp/m.$$ /tmp/rest.$$ /tmp/newident.$$
+		cmp -s /tmp/m.$$ $dest > /dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			update=1
+		fi
+
+		if [ $update -eq 1 ]; then
+			cat $src > /tmp/rest.$$
+			sed -e '/^#/d' \
+			    -e '/^pcplusmp/d' \
+			    -e '/^xpv_psm/d' \
+			    -e '/^ast/d' \
+			    -e '/^compaq/d' \
+			    -e '/^corollary/d' \
+			    -e '/^syspro/d' \
+			    -e '/^tpf/d' \
+			    -e '/^wysemp/d' \
+			    $dest >> /tmp/rest.$$
+			cp /tmp/rest.$$ $dest
+		fi
+
+		rm -f /tmp/m.$$ /tmp/rest.$$
 	fi
 
 done

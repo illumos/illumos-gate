@@ -39,10 +39,6 @@
 i pkginfo
 i copyright
 
-# installation scripts
-i postinstall
-i preremove
-
 #
 # source locations relative to the prototype file
 #
