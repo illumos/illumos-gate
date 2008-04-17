@@ -28,7 +28,7 @@
 
 include ../Makefile.com
 
-CLOBBERFILES += prototype_sparc
+FILES += prototype_sparc
 
 .KEEP_STATE:
 
@@ -53,12 +53,10 @@ proto:sh = \
 	echo "prototype_gcc_sparc"; \
         fi
 
-prototype_sparc: FRC
+prototype_sparc: prototype_cc_sparc prototype_gcc_sparc
 	$(RM) prototype_sparc
 	@$(CP) $(proto) prototype_sparc
 
-FILES += prototype_sparc
 
 include ../Makefile.targ
 
-FRC:
