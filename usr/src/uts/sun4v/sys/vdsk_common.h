@@ -555,29 +555,34 @@ void vd_efi_free(vd_efi_dev_t *dev, efi_gpt_t *gpt, efi_gpe_t *gpe);
  * check to see if the kstat was created when the vDisk instance was
  * added (i.e. is not NULL).
  */
-#define	VD_KSTAT_WAITQ_ENTER(kp)					\
-	if ((kp) != NULL) {						\
-		kstat_waitq_enter(KSTAT_IO_PTR((kp)));			\
+#define	VD_KSTAT_WAITQ_ENTER(vd)					\
+	if ((vd)->io_stats != NULL) {					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		kstat_waitq_enter(KSTAT_IO_PTR((vd)->io_stats));	\
 	}
 
-#define	VD_KSTAT_WAITQ_EXIT(kp)						\
-	if ((kp) != NULL) {						\
-		kstat_waitq_exit(KSTAT_IO_PTR((kp)));			\
+#define	VD_KSTAT_WAITQ_EXIT(vd)						\
+	if ((vd)->io_stats != NULL) {					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		kstat_waitq_exit(KSTAT_IO_PTR((vd)->io_stats));		\
 	}
 
-#define	VD_KSTAT_WAITQ_TO_RUNQ(kp)					\
-	if ((kp) != NULL) {						\
-		kstat_waitq_to_runq(KSTAT_IO_PTR((kp)));		\
+#define	VD_KSTAT_WAITQ_TO_RUNQ(vd)					\
+	if ((vd)->io_stats != NULL) {					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		kstat_waitq_to_runq(KSTAT_IO_PTR((vd)->io_stats));	\
 	}
 
-#define	VD_KSTAT_RUNQ_ENTER(kp)						\
-	if ((kp) != NULL) {						\
-		kstat_runq_enter(KSTAT_IO_PTR((kp)));			\
+#define	VD_KSTAT_RUNQ_ENTER(vd)						\
+	if ((vd)->io_stats != NULL) {					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		kstat_runq_enter(KSTAT_IO_PTR((vd)->io_stats));		\
 	}
 
-#define	VD_KSTAT_RUNQ_EXIT(kp)						\
-	if ((kp) != NULL) {						\
-		kstat_runq_exit(KSTAT_IO_PTR((kp)));			\
+#define	VD_KSTAT_RUNQ_EXIT(vd)						\
+	if ((vd)->io_stats != NULL) {					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		kstat_runq_exit(KSTAT_IO_PTR((vd)->io_stats));		\
 	}
 
 /*

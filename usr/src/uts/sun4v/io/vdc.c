@@ -2717,7 +2717,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 
 /*
  * Function:
- *	vdc_map_to_shared_ring()
+ *	vdc_map_to_shared_dring()
  *
  * Description:
  *	Copy contents of the local descriptor to the shared
@@ -2818,7 +2818,7 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 	 */
 	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
 		DTRACE_IO1(start, buf_t *, cb_arg);
-		VD_KSTAT_WAITQ_ENTER(vdcp->io_stats);
+		VD_KSTAT_WAITQ_ENTER(vdcp);
 	}
 
 	do {
@@ -2862,11 +2862,11 @@ done:
 	 */
 	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
 		if (rv == 0) {
-			VD_KSTAT_WAITQ_TO_RUNQ(vdcp->io_stats);
+			VD_KSTAT_WAITQ_TO_RUNQ(vdcp);
 			DTRACE_PROBE1(send, buf_t *, cb_arg);
 		} else {
 			VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
-			VD_KSTAT_WAITQ_EXIT(vdcp->io_stats);
+			VD_KSTAT_WAITQ_EXIT(vdcp);
 			DTRACE_IO1(done, buf_t *, cb_arg);
 		}
 	}
@@ -3645,11 +3645,12 @@ vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp)
 static int
 vdc_resubmit_backup_dring(vdc_t *vdcp)
 {
+	int		processed = 0;
 	int		count;
 	int		b_idx;
-	int		rv;
+	int		rv = 0;
 	int		dring_size;
-	int		status;
+	int		op;
 	vio_msg_t	vio_msg;
 	vdc_local_desc_t	*curr_ldep;
 
@@ -3675,40 +3676,85 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 
 		/* only resubmit outstanding transactions */
 		if (!curr_ldep->is_free) {
+			/*
+			 * If we are retrying a block read/write operation we
+			 * need to update the I/O statistics to indicate that
+			 * the request is being put back on the waitq to be
+			 * serviced (it will have been taken off after the
+			 * error was reported).
+			 */
+			mutex_enter(&vdcp->lock);
+			op = curr_ldep->operation;
+			if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
+				DTRACE_IO1(start, buf_t *, curr_ldep->cb_arg);
+				VD_KSTAT_WAITQ_ENTER(vdcp);
+			}
 
 			DMSG(vdcp, 1, "resubmitting entry idx=%x\n", b_idx);
-			mutex_enter(&vdcp->lock);
-			rv = vdc_populate_descriptor(vdcp, curr_ldep->operation,
+			rv = vdc_populate_descriptor(vdcp, op,
 			    curr_ldep->addr, curr_ldep->nbytes,
 			    curr_ldep->slice, curr_ldep->offset,
 			    curr_ldep->cb_type, curr_ldep->cb_arg,
 			    curr_ldep->dir);
-			mutex_exit(&vdcp->lock);
+
 			if (rv) {
+				if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
+					VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
+					VD_KSTAT_WAITQ_EXIT(vdcp);
+					DTRACE_IO1(done, buf_t *,
+					    curr_ldep->cb_arg);
+				}
 				DMSG(vdcp, 1, "[%d] cannot resubmit entry %d\n",
 				    vdcp->instance, b_idx);
-				return (rv);
+				mutex_exit(&vdcp->lock);
+				goto done;
 			}
+
+			/*
+			 * If this is a block read/write we update the I/O
+			 * statistics kstat to indicate that the request
+			 * has been sent back to the vDisk server and should
+			 * now be put on the run queue.
+			 */
+			if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
+				DTRACE_PROBE1(send, buf_t *, curr_ldep->cb_arg);
+				VD_KSTAT_WAITQ_TO_RUNQ(vdcp);
+			}
+			mutex_exit(&vdcp->lock);
 
 			/* Wait for the response message. */
 			DMSG(vdcp, 1, "waiting for response to idx=%x\n",
 			    b_idx);
-			status = vdc_wait_for_response(vdcp, &vio_msg);
-			if (status) {
+			rv = vdc_wait_for_response(vdcp, &vio_msg);
+			if (rv) {
+				/*
+				 * If this is a block read/write we update
+				 * the I/O statistics kstat to take it
+				 * off the run queue.
+				 */
+				mutex_enter(&vdcp->lock);
+				if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
+					VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
+					VD_KSTAT_RUNQ_EXIT(vdcp);
+					DTRACE_IO1(done, buf_t *,
+					    curr_ldep->cb_arg);
+				}
 				DMSG(vdcp, 1, "[%d] wait_for_response "
 				    "returned err=%d\n", vdcp->instance,
-				    status);
-				return (status);
+				    rv);
+				mutex_exit(&vdcp->lock);
+				goto done;
 			}
 
 			DMSG(vdcp, 1, "processing msg for idx=%x\n", b_idx);
-			status = vdc_process_data_msg(vdcp, &vio_msg);
-			if (status) {
+			rv = vdc_process_data_msg(vdcp, &vio_msg);
+			if (rv) {
 				DMSG(vdcp, 1, "[%d] process_data_msg "
 				    "returned err=%d\n", vdcp->instance,
-				    status);
-				return (status);
+				    rv);
+				goto done;
 			}
+			processed++;
 		}
 
 		/* get the next element to submit */
@@ -3724,7 +3770,10 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 
 	vdcp->local_dring_backup = NULL;
 
-	return (0);
+done:
+	DTRACE_PROBE2(processed, int, processed, vdc_t *, vdcp);
+
+	return (rv);
 }
 
 /*
@@ -3742,13 +3791,14 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
  *	None
  */
 void
-vdc_cancel_backup_ring(vdc_t *vdcp)
+vdc_cancel_backup_dring(vdc_t *vdcp)
 {
 	vdc_local_desc_t *ldep;
 	struct buf 	*bufp;
 	int		count;
 	int		b_idx;
 	int		dring_size;
+	int		cancelled = 0;
 
 	ASSERT(MUTEX_HELD(&vdcp->lock));
 	ASSERT(vdcp->state == VDC_STATE_INIT ||
@@ -3777,6 +3827,7 @@ vdc_cancel_backup_ring(vdc_t *vdcp)
 		if (!ldep->is_free) {
 
 			DMSG(vdcp, 1, "cancelling entry idx=%x\n", b_idx);
+			cancelled++;
 
 			/*
 			 * All requests have already been cleared from the
@@ -3798,7 +3849,7 @@ vdc_cancel_backup_ring(vdc_t *vdcp)
 				ASSERT(bufp != NULL);
 				bufp->b_resid = bufp->b_bcount;
 				VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
-				VD_KSTAT_RUNQ_EXIT(vdcp->io_stats);
+				VD_KSTAT_RUNQ_EXIT(vdcp);
 				DTRACE_IO1(done, buf_t *, bufp);
 				bioerror(bufp, EIO);
 				biodone(bufp);
@@ -3823,7 +3874,7 @@ vdc_cancel_backup_ring(vdc_t *vdcp)
 
 	vdcp->local_dring_backup = NULL;
 
-	DTRACE_PROBE2(processed, int, count, vdc_t *, vdcp);
+	DTRACE_PROBE2(cancelled, int, cancelled, vdc_t *, vdcp);
 }
 
 /*
@@ -3873,7 +3924,7 @@ vdc_connection_timeout(void *arg)
 	cv_broadcast(&vdcp->running_cv);
 
 	/* cancel requests waiting for a result */
-	vdc_cancel_backup_ring(vdcp);
+	vdc_cancel_backup_dring(vdcp);
 
 	mutex_exit(&vdcp->lock);
 
@@ -4293,6 +4344,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	vdc_local_desc_t	*ldep = NULL;
 	int			start, end;
 	int			idx;
+	int			op;
 
 	dring_msg = (vio_dring_msg_t *)msg;
 
@@ -4308,9 +4360,14 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	end = dring_msg->end_idx;
 	if ((start >= vdcp->dring_len) ||
 	    (end >= vdcp->dring_len) || (end < -1)) {
+		/*
+		 * Update the I/O statistics to indicate that an error ocurred.
+		 * No need to update the wait/run queues as no specific read or
+		 * write request is being completed in response to this 'msg'.
+		 */
+		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 		DMSG(vdcp, 0, "[%d] Bogus ACK data : start %d, end %d\n",
 		    vdcp->instance, start, end);
-		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 		mutex_exit(&vdcp->lock);
 		return (EINVAL);
 	}
@@ -4325,20 +4382,46 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 		mutex_exit(&vdcp->lock);
 		return (0);
 	case VDC_SEQ_NUM_INVALID:
-		DMSG(vdcp, 0, "[%d] invalid seqno\n", vdcp->instance);
+		/*
+		 * Update the I/O statistics to indicate that an error ocurred.
+		 * No need to update the wait/run queues as no specific read or
+		 * write request is being completed in response to this 'msg'.
+		 */
 		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
+		DMSG(vdcp, 0, "[%d] invalid seqno\n", vdcp->instance);
 		mutex_exit(&vdcp->lock);
 		return (ENXIO);
 	}
 
 	if (msg->tag.vio_subtype == VIO_SUBTYPE_NACK) {
-		DMSG(vdcp, 0, "[%d] DATA NACK\n", vdcp->instance);
-		VDC_DUMP_DRING_MSG(dring_msg);
+		/*
+		 * Update the I/O statistics to indicate that an error ocurred.
+		 *
+		 * We need to update the run queue if a read or write request
+		 * is being NACKed - otherwise there will appear to be an
+		 * indefinite outstanding request and statistics reported by
+		 * iostat(1M) will be incorrect. The transaction will be
+		 * resubmitted from the backup DRing following the reset
+		 * and the wait/run queues will be entered again.
+		 */
+		ldep = &vdcp->local_dring[idx];
+		op = ldep->operation;
+		if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
+			DTRACE_IO1(done, buf_t *, ldep->cb_arg);
+			VD_KSTAT_RUNQ_EXIT(vdcp);
+		}
 		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
+		VDC_DUMP_DRING_MSG(dring_msg);
+		DMSG(vdcp, 0, "[%d] DATA NACK\n", vdcp->instance);
 		mutex_exit(&vdcp->lock);
 		return (EIO);
 
 	} else if (msg->tag.vio_subtype == VIO_SUBTYPE_INFO) {
+		/*
+		 * Update the I/O statistics to indicate that an error occurred.
+		 * No need to update the wait/run queues as no specific read or
+		 * write request is being completed in response to this 'msg'.
+		 */
 		VD_UPDATE_ERR_STATS(vdcp, vd_protoerrs);
 		mutex_exit(&vdcp->lock);
 		return (EPROTO);
@@ -4392,12 +4475,12 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 				(void) vdc_failfast_io_queue(vdcp, bufp);
 			} else {
 				if (status == 0) {
-					int op = (bufp->b_flags & B_READ) ?
+					op = (bufp->b_flags & B_READ) ?
 					    VD_OP_BREAD : VD_OP_BWRITE;
 					VD_UPDATE_IO_STATS(vdcp, op,
 					    ldep->dep->payload.nbytes);
 				}
-				VD_KSTAT_RUNQ_EXIT(vdcp->io_stats);
+				VD_KSTAT_RUNQ_EXIT(vdcp);
 				DTRACE_IO1(done, buf_t *, bufp);
 				biodone(bufp);
 			}
@@ -6055,7 +6138,7 @@ vdc_failfast_io_unqueue(vdc_t *vdc, clock_t deadline)
 	while (vio != NULL) {
 		vio_tmp = vio->vio_next;
 		if (vio->vio_buf != NULL) {
-			VD_KSTAT_RUNQ_EXIT(vdc->io_stats);
+			VD_KSTAT_RUNQ_EXIT(vdc);
 			DTRACE_IO1(done, buf_t *, vio->vio_buf);
 			biodone(vio->vio_buf);
 			kmem_free(vio, sizeof (vdc_io_t));
