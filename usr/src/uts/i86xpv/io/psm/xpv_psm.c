@@ -833,8 +833,8 @@ xen_psm_post_cpu_start()
 {
 	processorid_t cpun;
 
+	cpun = psm_get_cpu_id();
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		cpun = psm_get_cpu_id();
 		apic_cpus[cpun].aci_status =
 		    APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
 	}
