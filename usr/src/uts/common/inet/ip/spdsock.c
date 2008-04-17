@@ -1722,7 +1722,7 @@ spdsock_encode_rule_head(uint8_t *base, uint_t offset, spd_msg_t *req,
 	 * If we have an interface name (i.e. if this policy head came from
 	 * a tunnel), add the SPD_EXT_TUN_NAME extension.
 	 */
-	if (name[0] != '\0') {
+	if (name != NULL) {
 
 		ASSERT(ALIGNED64(offset));
 
@@ -1943,7 +1943,8 @@ spdsock_dump_next_record(spdsock_t *ss)
 
 	m = spdsock_encode_rule(ss->spdsock_dump_req, rule,
 	    ss->spdsock_dump_cur_type, ss->spdsock_dump_cur_af,
-	    ss->spdsock_itp->itp_name, ss->spdsock_dump_tunnel);
+	    (ss->spdsock_itp == NULL) ? NULL : ss->spdsock_itp->itp_name,
+	    ss->spdsock_dump_tunnel);
 	rw_exit(&iph->iph_lock);
 
 	if (m == NULL)
