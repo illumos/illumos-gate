@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/file.h>
 #include <sys/open.h>
 #include <sys/user.h>
+#include <sys/uio.h>
 #include <sys/termios.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
@@ -90,6 +91,7 @@
 #define	SO_LOCK_WAKEUP_TIME	3000	/* Wakeup time in milliseconds */
 
 static struct kmem_cache *socktpi_cache, *socktpi_unix_cache;
+struct kmem_cache *socktpi_sod_cache;
 
 dev_t sockdev;	/* For fsid in getattr */
 
@@ -104,6 +106,8 @@ static int sockfs_snapshot(kstat_t *, void *, int);
 extern void sendfile_init();
 
 extern void nl7c_init(void);
+
+extern int sostr_init();
 
 #define	ADRSTRLEN (2 * sizeof (void *) + 1)
 /*
@@ -523,6 +527,15 @@ sockfree(struct sonode *so)
 		so->so_nl7c_flags = 0;
 	}
 
+	if (so->so_direct != NULL) {
+		sodirect_t *sodp = so->so_direct;
+
+		ASSERT(sodp->sod_uioafh == NULL);
+
+		so->so_direct = NULL;
+		kmem_cache_free(socktpi_sod_cache, sodp);
+	}
+
 	ASSERT(so->so_ux_bound_vp == NULL);
 	if ((mp = so->so_unbind_mp) != NULL) {
 		freemsg(mp);
@@ -567,6 +580,8 @@ socktpi_constructor(void *buf, void *cdrarg, int kmflags)
 	struct sonode *so = buf;
 	struct vnode *vp;
 
+	so->so_direct		= NULL;
+
 	so->so_nl7c_flags	= 0;
 	so->so_nl7c_uri		= NULL;
 	so->so_nl7c_rcv_mp	= NULL;
@@ -605,6 +620,8 @@ socktpi_destructor(void *buf, void *cdrarg)
 {
 	struct sonode *so = buf;
 	struct vnode *vp = SOTOV(so);
+
+	ASSERT(so->so_direct == NULL);
 
 	ASSERT(so->so_nl7c_flags == 0);
 	ASSERT(so->so_nl7c_uri == NULL);
@@ -708,6 +725,12 @@ sockinit(int fstype, char *name)
 	}
 
 	error = sosdp_init();
+	if (error != 0) {
+		err_str = NULL;
+		goto failure;
+	}
+
+	error = sostr_init();
 	if (error != 0) {
 		err_str = NULL;
 		goto failure;

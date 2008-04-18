@@ -488,6 +488,7 @@ CHKHDRS=			\
 	socket_impl.h		\
 	socketvar.h		\
 	sockio.h		\
+	sodirect.h		\
 	squeue.h		\
 	squeue_impl.h		\
 	srn.h			\

@@ -143,6 +143,7 @@ static uint32_t ioc_id;
 static void putback(struct stdata *, queue_t *, mblk_t *, int);
 static void strcleanall(struct vnode *);
 static int strwsrv(queue_t *);
+static void struioainit(queue_t *, sodirect_t *, uio_t *);
 
 /*
  * qinit and module_info structures for stream head read and write queues
@@ -188,6 +189,11 @@ static boolean_t msghasdata(mblk_t *bp);
  *		mirror this.
  *	4. ioctl monitor: sd_lock is gotten to ensure that only one
  *		thread is doing an ioctl at a time.
+ *
+ * Note, for sodirect case 3. is extended to (*sodirect_t.sod_enqueue)()
+ * call-back from below, further the sodirect support is for code paths
+ * called via kstgetmsg(), all other code paths ASSERT() that sodirect
+ * uioa generated mblk_t's (i.e. DBLK_UIOA) aren't processed.
  */
 
 static int
@@ -395,6 +401,7 @@ ckreturn:
 	stp->sd_qn_minpsz = 0;
 	stp->sd_qn_maxpsz = INFPSZ - 1;	/* used to check for initialization */
 	stp->sd_maxblk = INFPSZ;
+	stp->sd_sodirect = NULL;
 	qp->q_ptr = _WR(qp)->q_ptr = stp;
 	STREAM(qp) = STREAM(_WR(qp)) = stp;
 	vp->v_stream = stp;
@@ -966,11 +973,14 @@ strcleanall(struct vnode *vp)
  * It is the callers responsibility to call qbackenable after
  * it is finished with the message. The caller should not call
  * qbackenable until after any putback calls to avoid spurious backenabling.
+ *
+ * Also, handle uioa initialization and process any DBLK_UIOA flaged messages.
  */
 mblk_t *
 strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
     int *errorp)
 {
+	sodirect_t *sodp = stp->sd_sodirect;
 	mblk_t *bp;
 	int error;
 
@@ -1059,7 +1069,67 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 	}
 	*errorp = 0;
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
-	return (getq_noenab(q));
+	if (sodp != NULL && (sodp->sod_state & SOD_ENABLED) &&
+	    (sodp->sod_uioa.uioa_state & UIOA_INIT)) {
+		/*
+		 * First kstrgetmsg() call for an uioa_t so if any
+		 * queued mblk_t's need to consume them before uioa
+		 * from below can occur.
+		 */
+		sodp->sod_uioa.uioa_state &= UIOA_CLR;
+		sodp->sod_uioa.uioa_state |= UIOA_ENABLED;
+		if (q->q_first != NULL) {
+			struioainit(q, sodp, uiop);
+		}
+	}
+
+	bp = getq_noenab(q);
+
+	if (bp != NULL && (bp->b_datap->db_flags & DBLK_UIOA)) {
+		/*
+		 * A uioa flaged mblk_t chain, already uio processed,
+		 * add it to the sodirect uioa pending free list.
+		 *
+		 * Note, a b_cont chain headed by a DBLK_UIOA enable
+		 * mblk_t must have all mblk_t(s) DBLK_UIOA enabled.
+		 */
+		mblk_t	*bpt = sodp->sod_uioaft;
+
+		ASSERT(sodp != NULL);
+
+		/*
+		 * Add first mblk_t of "bp" chain to current sodirect uioa
+		 * free list tail mblk_t, if any, else empty list so new head.
+		 */
+		if (bpt == NULL)
+			sodp->sod_uioafh = bp;
+		else
+			bpt->b_cont = bp;
+
+		/*
+		 * Walk mblk_t "bp" chain to find tail and adjust rptr of
+		 * each to reflect that uioamove() has consumed all data.
+		 */
+		bpt = bp;
+		for (;;) {
+			bpt->b_rptr = bpt->b_wptr;
+			if (bpt->b_cont == NULL)
+				break;
+			bpt = bpt->b_cont;
+
+			ASSERT(bpt->b_datap->db_flags & DBLK_UIOA);
+		}
+		/* New sodirect uioa free list tail */
+		sodp->sod_uioaft = bpt;
+
+		/* Only 1 strget() with data returned per uioa_t */
+		if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
+			sodp->sod_uioa.uioa_state &= UIOA_CLR;
+			sodp->sod_uioa.uioa_state |= UIOA_FINI;
+		}
+	}
+
+	return (bp);
 }
 
 /*
@@ -1079,6 +1149,8 @@ struiocopyout(mblk_t *bp, struct uio *uiop, int *errorp)
 	ASSERT(bp->b_wptr >= bp->b_rptr);
 
 	do {
+		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
+
 		if ((n = MIN(uiop->uio_resid, MBLKL(bp))) != 0) {
 			ASSERT(n > 0);
 
@@ -1225,8 +1297,10 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 			}
 			first = 0;
 		}
+
 		ASSERT(MUTEX_HELD(&stp->sd_lock));
 		ASSERT(bp);
+		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		pri = bp->b_band;
 		/*
 		 * Extract any mark information. If the message is not
@@ -6460,6 +6534,7 @@ strgetmsg(
 			bp = strget(stp, q, uiop, first, &error);
 			ASSERT(MUTEX_HELD(&stp->sd_lock));
 			if (bp != NULL) {
+				ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 				if (bp->b_datap->db_type == M_SIG) {
 					strsignal_nolock(stp, *bp->b_rptr,
 					    (int32_t)bp->b_band);
@@ -7098,7 +7173,7 @@ retry:
 		    "kstrgetmsg calls strwaitq:%p, %p",
 		    vp, uiop);
 		if (((error = strwaitq(stp, waitflag, (ssize_t)0,
-		    fmode, timout, &done)) != 0) || done) {
+		    fmode, timout, &done))) != 0 || done) {
 			TRACE_2(TR_FAC_STREAMS_FR, TR_KSTRGETMSG_DONE,
 			    "kstrgetmsg error or done:%p, %p",
 			    vp, uiop);
@@ -7132,6 +7207,7 @@ retry:
 		 * If the caller doesn't want the mark return.
 		 * Used to implement MSG_WAITALL in sockets.
 		 */
+		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		if (flags & MSG_NOMARK) {
 			putback(stp, q, bp, pri);
 			qbackenable(q, pri);
@@ -7170,6 +7246,8 @@ retry:
 		 * there is indeed a shortage of memory.  dupmsg() may fail
 		 * if db_ref in any of the messages reaches its limit.
 		 */
+
+		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		if ((nbp = dupmsg(bp)) == NULL && (nbp = copymsg(bp)) == NULL) {
 			/*
 			 * Restore the state of the stream head since we
@@ -7228,6 +7306,7 @@ retry:
 			}
 		}
 
+		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		bp = (stp->sd_rputdatafunc)(stp->sd_vnode, bp,
 		    NULL, NULL, NULL, NULL);
 
@@ -7278,6 +7357,8 @@ retry:
 	 */
 	if (uiop == NULL) {
 		/* Append data to tail of mctlp */
+
+		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		if (mctlp != NULL) {
 			mblk_t **mpp = mctlp;
 
@@ -7286,6 +7367,14 @@ retry:
 			*mpp = bp;
 			bp = NULL;
 		}
+	} else if (bp->b_datap->db_flags & DBLK_UIOA) {
+		/*
+		 * A uioa mblk_t chain, as uio processing has already
+		 * been done we simple skip over processing.
+		 */
+		bp = NULL;
+		pr = 0;
+
 	} else if (uiop->uio_resid >= 0 && bp) {
 		size_t oldresid = uiop->uio_resid;
 
@@ -7374,6 +7463,8 @@ retry:
 			 * again since the flush logic in strrput_nondata()
 			 * may have cleared it while we had sd_lock dropped.
 			 */
+
+			ASSERT(!(savemp->b_datap->db_flags & DBLK_UIOA));
 			if (type >= QPCTL) {
 				ASSERT(type == M_PCPROTO);
 				if (queclass(savemp) < QPCTL)
@@ -8444,4 +8535,83 @@ msghasdata(mblk_t *bp)
 				return (B_TRUE);
 		}
 	return (B_FALSE);
+}
+
+/*
+ * Called on the first strget() of a sodirect/uioa enabled streamhead,
+ * if any mblk_t(s) enqueued they must first be uioamove()d before uioa
+ * can be enabled for the underlying transport's use.
+ */
+void
+struioainit(queue_t *q, sodirect_t *sodp, uio_t *uiop)
+{
+	uioa_t	*uioap = (uioa_t *)uiop;
+	mblk_t	*bp = q->q_first;
+	mblk_t	*lbp = NULL;
+	mblk_t	*nbp, *wbp;
+	int	len;
+	int	error;
+
+	ASSERT(MUTEX_HELD(sodp->sod_lock));
+	ASSERT(&sodp->sod_uioa == uioap);
+
+	/*
+	 * Walk the b_next/b_prev doubly linked list of b_cont chain(s)
+	 * and schedule any M_DATA mblk_t's for uio asynchronous move.
+	 */
+	do {
+		/* Next mblk_t chain */
+		nbp = bp->b_next;
+		/* Walk the chain */
+		wbp = bp;
+		do {
+			if (wbp->b_datap->db_type == M_DATA &&
+			    (len = wbp->b_wptr - wbp->b_rptr) > 0) {
+				/* Have a M_DATA mblk_t with data */
+				if (len > uioap->uio_resid) {
+					/* Not enough uio sapce */
+					goto nospace;
+				}
+				error = uioamove(wbp->b_rptr, len,
+				    UIO_READ, uioap);
+				if (!error) {
+					/* Scheduled, mark dblk_t as such */
+					wbp->b_datap->db_flags |= DBLK_UIOA;
+				} else {
+					/* Error of some sort, no more uioa */
+					uioap->uioa_state &= UIOA_CLR;
+					uioap->uioa_state |= UIOA_FINI;
+					return;
+				}
+			}
+			/* Save last wbp processed */
+			lbp = wbp;
+		} while ((wbp = wbp->b_cont) != NULL);
+	} while ((bp = nbp) != NULL);
+
+	return;
+
+nospace:
+	/* Not enough uio space, no more uioa */
+	uioap->uioa_state &= UIOA_CLR;
+	uioap->uioa_state |= UIOA_FINI;
+
+	/*
+	 * If we processed 1 or more mblk_t(s) then we need to split the
+	 * current mblk_t chain in 2 so that all the uioamove()ed mblk_t(s)
+	 * are in the current chain and the rest are in the following new
+	 * chain.
+	 */
+	if (lbp != NULL) {
+		/* New end of current chain */
+		lbp->b_cont = NULL;
+
+		/* Insert new chain wbp after bp */
+		if ((wbp->b_next = nbp) != NULL)
+			nbp->b_prev = wbp;
+		else
+			q->q_last = wbp;
+		wbp->b_prev = bp;
+		bp->b_next = wbp;
+	}
 }

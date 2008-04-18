@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -37,6 +37,7 @@ extern "C" {
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <sys/sodirect.h>
 #include <sys/multidata.h>
 #include <sys/md5.h>
 #include <inet/common.h>
@@ -597,6 +598,13 @@ typedef struct tcp_s {
 	 * protected by the tcp_non_sq_lock lock.
 	 */
 	boolean_t	tcp_flow_stopped;
+
+	/*
+	 * tcp_sodirect is used by tcp on the receive side to push mblk_t(s)
+	 * directly to sockfs. Also, to schedule asynchronous copyout directly
+	 * to a pending user-land uio buffer.
+	 */
+	sodirect_t	*tcp_sodirect;
 
 #ifdef DEBUG
 	pc_t			tcmp_stk[15];

@@ -240,6 +240,7 @@ MACH_NOT_YET_KMODS	= $(AUTOCONF_OBJS)
 #
 
 DRV_KMODS	+= rootnex
+DRV_KMODS	+= ioat
 DRV_KMODS	+= isa
 DRV_KMODS	+= pci
 DRV_KMODS	+= npe

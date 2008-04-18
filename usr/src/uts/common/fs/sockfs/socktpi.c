@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,7 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
+#include <sys/sodirect.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/strsun.h>
@@ -185,6 +186,9 @@ extern mblk_t	*strsock_kssl_output(vnode_t *, mblk_t *, strwakeup_t *,
 		    strsigset_t *, strsigset_t *, strpollset_t *);
 
 static int	sotpi_unbind(struct sonode *, int);
+
+extern int	sodput(sodirect_t *, mblk_t *);
+extern void	sodwakeup(sodirect_t *);
 
 /* TPI sockfs sonode operations */
 static int	sotpi_accept(struct sonode *, int, struct sonode **);
@@ -2910,11 +2914,13 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	t_uscalar_t		namelen;
 	int			so_state = so->so_state; /* Snapshot */
 	ssize_t			saved_resid;
-	int			error;
 	rval_t			rval;
 	int			flags;
 	clock_t			timout;
 	int			first;
+	int			error = 0;
+	struct uio		*suiop = NULL;
+	sodirect_t		*sodp = so->so_direct;
 
 	flags = msg->msg_flags;
 	msg->msg_flags = 0;
@@ -3062,6 +3068,53 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	opflag = pflag;
 	first = 1;
 
+	if (uiop->uio_resid >= uioasync.mincnt &&
+	    sodp != NULL && (sodp->sod_state & SOD_ENABLED) &&
+	    uioasync.enabled && !(flags & MSG_PEEK) &&
+	    !(so_state & SS_CANTRCVMORE)) {
+		/*
+		 * Big enough I/O for uioa min setup and an sodirect socket
+		 * and sodirect enabled and uioa enabled and I/O will be done
+		 * and not EOF so initialize the sodirect_t uioa_t with "uiop".
+		 */
+		mutex_enter(sodp->sod_lock);
+		if (!uioainit(uiop, &sodp->sod_uioa)) {
+			/*
+			 * Successful uioainit() so the uio_t part of the
+			 * uioa_t will be used for all uio_t work to follow,
+			 * we save the original "uiop" in "suiop".
+			 */
+			suiop = uiop;
+			uiop = (uio_t *)&sodp->sod_uioa;
+			/*
+			 * Before returning to the caller the passed in uio_t
+			 * "uiop" will be updated via a call to uioafini()
+			 * below.
+			 *
+			 * Note, the uioa.uioa_state isn't set to UIOA_ENABLED
+			 * here as first we have to uioamove() any currently
+			 * queued M_DATA mblk_t(s) so it will be done in
+			 * kstrgetmsg().
+			 */
+		}
+		/*
+		 * In either uioainit() success or not case note the number
+		 * of uio bytes the caller wants for sod framework and/or
+		 * transport (e.g. TCP) strategy.
+		 */
+		sodp->sod_want = uiop->uio_resid;
+		mutex_exit(sodp->sod_lock);
+	} else if (sodp != NULL && (sodp->sod_state & SOD_ENABLED)) {
+		/*
+		 * No uioa but still using sodirect so note the number of
+		 * uio bytes the caller wants for sodirect framework and/or
+		 * transport (e.g. TCP) strategy.
+		 *
+		 * Note, sod_lock not held, only writer is in this function
+		 * and only one thread at a time so not needed just to init.
+		 */
+		sodp->sod_want = uiop->uio_resid;
+	}
 retry:
 	saved_resid = uiop->uio_resid;
 	pri = 0;
@@ -3091,10 +3144,7 @@ retry:
 			eprintsoline(so, error);
 			break;
 		}
-		mutex_enter(&so->so_lock);
-		so_unlock_read(so);	/* Clear SOREADLOCKED */
-		mutex_exit(&so->so_lock);
-		return (error);
+		goto out;
 	}
 	/*
 	 * For datagrams the MOREDATA flag is used to set MSG_TRUNC.
@@ -3137,9 +3187,7 @@ retry:
 			pflag = opflag | MSG_NOMARK;
 			goto retry;
 		}
-		so_unlock_read(so);	/* Clear SOREADLOCKED */
-		mutex_exit(&so->so_lock);
-		return (0);
+		goto out_locked;
 	}
 
 	/* strsock_proto has already verified length and alignment */
@@ -3179,9 +3227,7 @@ retry:
 			pflag = opflag | MSG_NOMARK;
 			goto retry;
 		}
-		so_unlock_read(so);	/* Clear SOREADLOCKED */
-		mutex_exit(&so->so_lock);
-		return (0);
+		goto out_locked;
 	}
 	case T_UNITDATA_IND: {
 		void *addr;
@@ -3207,7 +3253,7 @@ retry:
 				freemsg(mp);
 				error = EPROTO;
 				eprintsoline(so, error);
-				goto err;
+				goto out;
 			}
 			if (so->so_family == AF_UNIX) {
 				/*
@@ -3236,7 +3282,7 @@ retry:
 				freemsg(mp);
 				error = EPROTO;
 				eprintsoline(so, error);
-				goto err;
+				goto out;
 			}
 			if (so->so_family == AF_UNIX)
 				so_getopt_srcaddr(opt, optlen, &addr, &addrlen);
@@ -3283,17 +3329,14 @@ retry:
 					    msg->msg_namelen);
 				kmem_free(control, controllen);
 				eprintsoline(so, error);
-				goto err;
+				goto out;
 			}
 			msg->msg_control = control;
 			msg->msg_controllen = controllen;
 		}
 
 		freemsg(mp);
-		mutex_enter(&so->so_lock);
-		so_unlock_read(so);	/* Clear SOREADLOCKED */
-		mutex_exit(&so->so_lock);
-		return (0);
+		goto out;
 	}
 	case T_OPTDATA_IND: {
 		struct T_optdata_req *tdr;
@@ -3322,7 +3365,7 @@ retry:
 				freemsg(mp);
 				error = EPROTO;
 				eprintsoline(so, error);
-				goto err;
+				goto out;
 			}
 
 			ncontrollen = so_cmsglen(mp, opt, optlen,
@@ -3350,7 +3393,7 @@ retry:
 				freemsg(mp);
 				kmem_free(control, controllen);
 				eprintsoline(so, error);
-				goto err;
+				goto out;
 			}
 			msg->msg_control = control;
 			msg->msg_controllen = controllen;
@@ -3382,9 +3425,7 @@ retry:
 			pflag = opflag | MSG_NOMARK;
 			goto retry;
 		}
-		so_unlock_read(so);	/* Clear SOREADLOCKED */
-		mutex_exit(&so->so_lock);
-		return (0);
+		goto out_locked;
 	}
 	case T_EXDATA_IND: {
 		dprintso(so, 1,
@@ -3441,10 +3482,7 @@ retry:
 					eprintsoline(so, error);
 				}
 #endif /* SOCK_DEBUG */
-				mutex_enter(&so->so_lock);
-				so_unlock_read(so);	/* Clear SOREADLOCKED */
-				mutex_exit(&so->so_lock);
-				return (error);
+				goto out;
 			}
 			ASSERT(mp);
 			tpr = (union T_primitives *)mp->b_rptr;
@@ -3490,11 +3528,40 @@ retry:
 		freemsg(mp);
 		error = EPROTO;
 		eprintsoline(so, error);
-		goto err;
+		goto out;
 	}
 	/* NOTREACHED */
-err:
+out:
 	mutex_enter(&so->so_lock);
+out_locked:
+	if (sodp != NULL) {
+		/* Finish any sodirect and uioa processing */
+		mutex_enter(sodp->sod_lock);
+		if (suiop != NULL) {
+			/* Finish any uioa_t processing */
+			int ret;
+
+			ASSERT(uiop == (uio_t *)&sodp->sod_uioa);
+			ret = uioafini(suiop, (uioa_t *)uiop);
+			if (error == 0 && ret != 0) {
+				/* If no error yet, set it */
+				error = ret;
+			}
+			if ((mp = sodp->sod_uioafh) != NULL) {
+				sodp->sod_uioafh = NULL;
+				sodp->sod_uioaft = NULL;
+				freemsg(mp);
+			}
+		}
+		if (!(sodp->sod_state & SOD_WAKE_NOT)) {
+			/* Awoke */
+			sodp->sod_state &= SOD_WAKE_CLR;
+			sodp->sod_state |= SOD_WAKE_NOT;
+		}
+		/* Last, clear sod_want value */
+		sodp->sod_want = 0;
+		mutex_exit(sodp->sod_lock);
+	}
 	so_unlock_read(so);	/* Clear SOREADLOCKED */
 	mutex_exit(&so->so_lock);
 	return (error);

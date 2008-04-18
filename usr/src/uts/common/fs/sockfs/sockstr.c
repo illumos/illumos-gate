@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,8 @@
 #include <inet/kssl/ksslapi.h>
 
 #include <c2/audit.h>
+
+#include <sys/dcopy.h>
 
 int so_default_version = SOV_SOCKSTREAM;
 
@@ -117,6 +119,36 @@ static mblk_t *strsock_misc(vnode_t *vp, mblk_t *mp,
 		strsigset_t *allmsgsigs, strpollset_t *pollwakeups);
 
 static int tlitosyserr(int terr);
+
+/*
+ * Sodirect kmem_cache and put/wakeup functions.
+ */
+struct kmem_cache *socktpi_sod_cache;
+static int sodput(sodirect_t *, mblk_t *);
+static void sodwakeup(sodirect_t *);
+
+/*
+ * Called by sockinit() when sockfs is loaded.
+ *
+ * Check for uioasync dcopy support and if supported
+ * allocate the sodirect_t kmem_cache socktpi_sod_cache.
+ */
+int
+sostr_init()
+{
+	if (uioasync.enabled == B_TRUE && modload("misc", "dcopy") == -1) {
+		/* No dcopy KAPI driver, disable uioa */
+		uioasync.enabled = B_FALSE;
+	}
+
+	if (uioasync.enabled == B_TRUE) {
+		/* Uioasync enabled so sodirect will be used */
+		socktpi_sod_cache = kmem_cache_create("socktpi_sod_cache",
+		    sizeof (sodirect_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	}
+
+	return (0);
+}
 
 /*
  * Convert a socket to a stream. Invoked when the illusory sockmod
@@ -467,6 +499,34 @@ so_strinit(struct sonode *so, struct sonode *tso)
 	if (stp->sd_qn_minpsz == 1)
 		stp->sd_qn_minpsz = 0;
 	mutex_exit(&stp->sd_lock);
+
+	/*
+	 * If sodirect capable allocate and initialize sodirect_t.
+	 * Note, SS_SODIRECT is set in socktpi_open().
+	 */
+	if (so->so_state & SS_SODIRECT) {
+		sodirect_t	*sodp;
+
+		ASSERT(so->so_direct == NULL);
+
+		sodp = kmem_cache_alloc(socktpi_sod_cache, KM_SLEEP);
+		sodp->sod_state = SOD_ENABLED | SOD_WAKE_NOT;
+		sodp->sod_want = 0;
+		sodp->sod_q = RD(stp->sd_wrq);
+		sodp->sod_enqueue = sodput;
+		sodp->sod_wakeup = sodwakeup;
+		sodp->sod_uioafh = NULL;
+		sodp->sod_uioaft = NULL;
+		sodp->sod_lock = &stp->sd_lock;
+		/*
+		 * Remainder of the sod_uioa members are left uninitialized
+		 * but will be initialized later by uioainit() before uioa
+		 * is enabled.
+		 */
+		sodp->sod_uioa.uioa_state = UIOA_ALLOC;
+		so->so_direct = sodp;
+		stp->sd_sodirect = sodp;
+	}
 
 	return (0);
 }
@@ -2871,4 +2931,122 @@ tlitosyserr(int terr)
 		return (EPROTO);
 	else
 		return (tli_errs[terr]);
+}
+
+/*
+ * Sockfs sodirect STREAMS read put procedure. Called from sodirect enable
+ * transport driver/module with an mblk_t chain.
+ *
+ * Note, we in-line putq() for the fast-path cases of q is empty, q_last and
+ * bp are of type M_DATA. All other cases we call putq().
+ *
+ * On success a zero will be return, else an errno will be returned.
+ */
+int
+sodput(sodirect_t *sodp, mblk_t *bp)
+{
+	queue_t		*q = sodp->sod_q;
+	struct stdata	*stp = (struct stdata *)q->q_ptr;
+	mblk_t		*nbp;
+	int		ret;
+	mblk_t		*last = q->q_last;
+	int		bytecnt = 0;
+	int		mblkcnt = 0;
+
+
+	ASSERT(MUTEX_HELD(sodp->sod_lock));
+
+	if (stp->sd_flag == STREOF) {
+		ret = 0;
+		goto error;
+	}
+
+	if (q->q_first == NULL) {
+		/* Q empty, really fast fast-path */
+		bp->b_prev = NULL;
+		bp->b_next = NULL;
+		q->q_first = bp;
+		q->q_last = bp;
+
+	} else if (last->b_datap->db_type == M_DATA &&
+	    bp->b_datap->db_type == M_DATA) {
+		/*
+		 * Last mblk_t chain and bp are both type M_DATA so
+		 * in-line putq() here, if the DBLK_UIOA state match
+		 * add bp to the end of the current last chain, else
+		 * start a new last chain with bp.
+		 */
+		if ((last->b_datap->db_flags & DBLK_UIOA) ==
+		    (bp->b_datap->db_flags & DBLK_UIOA)) {
+			/* Added to end */
+			while ((nbp = last->b_cont) != NULL)
+				last = nbp;
+			last->b_cont = bp;
+		} else {
+			/* New last */
+			last->b_next = bp;
+			bp->b_next = NULL;
+			bp->b_prev = last;
+			q->q_last = bp;
+		}
+	} else {
+		/*
+		 * Can't use q_last so just call putq().
+		 */
+		(void) putq(q, bp);
+		return (0);
+	}
+
+	/* Count bytes and mblk_t's */
+	do {
+		bytecnt += MBLKL(bp);
+		mblkcnt++;
+	} while ((bp = bp->b_cont) != NULL);
+	q->q_count += bytecnt;
+	q->q_mblkcnt += mblkcnt;
+
+	/* Check for QFULL */
+	if (q->q_count >= q->q_hiwat + sodp->sod_want ||
+	    q->q_mblkcnt >= q->q_hiwat) {
+		q->q_flag |= QFULL;
+	}
+
+	return (0);
+
+error:
+	do {
+		if ((nbp = bp->b_next) != NULL)
+			bp->b_next = NULL;
+		freemsg(bp);
+	} while ((bp = nbp) != NULL);
+
+	return (ret);
+}
+
+/*
+ * Sockfs sodirect read wakeup. Called from a sodirect enabled transport
+ * driver/module to indicate that read-side data is available.
+ *
+ * On return the sodirect_t.lock mutex will be exited so this must be the
+ * last sodirect_t call to guarantee atomic access of *sodp.
+ */
+void
+sodwakeup(sodirect_t *sodp)
+{
+	queue_t		*q = sodp->sod_q;
+	struct stdata	*stp = (struct stdata *)q->q_ptr;
+
+	ASSERT(MUTEX_HELD(sodp->sod_lock));
+
+	if (stp->sd_flag & RSLEEP) {
+		stp->sd_flag &= ~RSLEEP;
+		cv_broadcast(&q->q_wait);
+	}
+
+	if (stp->sd_rput_opt & SR_POLLIN) {
+		stp->sd_rput_opt &= ~SR_POLLIN;
+		mutex_exit(sodp->sod_lock);
+		pollwakeup(&stp->sd_pollist, POLLIN | POLLRDNORM);
+	} else
+		mutex_exit(sodp->sod_lock);
 }

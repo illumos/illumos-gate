@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +100,49 @@ typedef struct uio {
 	ssize_t		uio_resid;	/* residual count */
 } uio_t;
 
+/*
+ * Extended uio_t uioa_t used for asynchronous uio.
+ *
+ * Note: UIOA_IOV_MAX is defined and used as it is in "fs/vncalls.c"
+ *	 as there isn't a formal definition of IOV_MAX for the kernel.
+ */
+#define	UIOA_IOV_MAX	16
+
+typedef struct uioa_page_s {		/* locked uio_iov state */
+	int	uioa_pfncnt;		/* count of pfn_t(s) in *uioa_ppp */
+	void	**uioa_ppp;		/* page_t or pfn_t arrary */
+	caddr_t	uioa_base;		/* address base */
+	size_t	uioa_len;		/* span length */
+} uioa_page_t;
+
+typedef struct uioa_s {
+	iovec_t		*uio_iov;	/* pointer to array of iovecs */
+	int		uio_iovcnt;	/* number of iovecs */
+	lloff_t		_uio_offset;	/* file offset */
+	uio_seg_t	uio_segflg;	/* address space (kernel or user) */
+	uint16_t	uio_fmode;	/* file mode flags */
+	uint16_t	uio_extflg;	/* extended flags */
+	lloff_t		_uio_limit;	/* u-limit (maximum byte offset) */
+	ssize_t		uio_resid;	/* residual count */
+	/*
+	 * uioa extended members.
+	 */
+	uint32_t	uioa_state;	/* state of asynch i/o */
+	uioa_page_t	*uioa_lcur;	/* pointer into uioa_locked[] */
+	void		**uioa_lppp;	/* pointer into lcur->uioa_ppp[] */
+	void		*uioa_hwst[4];	/* opaque hardware state */
+	uioa_page_t	uioa_locked[UIOA_IOV_MAX]; /* Per iov locked pages */
+} uioa_t;
+
+#define	UIOA_ALLOC	0x0001		/* allocated but not yet initialized */
+#define	UIOA_INIT	0x0002		/* initialized but not yet enabled */
+#define	UIOA_ENABLED	0x0004		/* enabled, asynch i/o active */
+#define	UIOA_FINI	0x0008		/* finished waiting for uioafini() */
+
+#define	UIOA_CLR	(~0x000F)	/* clear mutually exclusive bits */
+
+#define	UIOA_POLL	0x0010		/* need dcopy_poll() */
+
 #define	uio_loffset	_uio_offset._f
 #if !defined(_LP64)
 #define	uio_offset	_uio_offset._p._l
@@ -127,9 +169,23 @@ typedef enum uio_rw { UIO_READ, UIO_WRITE } uio_rw_t;
  * access, ie, access bypassing caches, should be used.  Filesystems that
  * don't initialize this field could experience suboptimal performance due to
  * the random data the field contains.
+ *
+ * NOTE: This flag is also used by uioasync callers to pass an extended
+ * uio_t (uioa_t), to uioasync enabled consumers. Unlike above all
+ * consumers of a uioa_t require the uio_extflg to be initialized.
  */
 #define	UIO_COPY_DEFAULT	0x0000	/* no special options to copy */
 #define	UIO_COPY_CACHED		0x0001	/* copy should not bypass caches */
+
+#define	UIO_ASYNC		0x0002	/* uio_t is really a uioa_t */
+
+/*
+ * Global uioasync capability shadow state.
+ */
+typedef struct uioasync_s {
+	boolean_t	enabled;	/* Is uioasync enabled? */
+	size_t		mincnt;		/* Minimum byte count for use of */
+} uioasync_t;
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
@@ -140,6 +196,11 @@ int	ureadc(int, uio_t *);	/* should be errno_t in future */
 int	uwritec(struct uio *);
 void	uioskip(uio_t *, size_t);
 int	uiodup(uio_t *, uio_t *, iovec_t *, int);
+
+int	uioamove(void *, size_t, enum uio_rw, uioa_t *);
+int	uioainit(uio_t *, uioa_t *);
+int	uioafini(uio_t *, uioa_t *);
+extern	uioasync_t uioasync;
 
 #else	/* defined(_KERNEL) */
 

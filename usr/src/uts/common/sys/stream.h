@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,6 +190,8 @@ typedef struct queue {
 #define	_QASSOCIATED	0x10000000	/* queue is associated with a device */
 #define	_QDIRECT	0x20000000	/* Private; transport module uses */
 					/* direct interface to/from sockfs */
+#define	_QSODIRECT	0x40000000	/* Private, transport module shares */
+					/* an sodirect_t with sockfs */
 
 /* queue sqflags (protected by SQLOCK). */
 #define	Q_SQQUEUED	0x01		/* Queue is in the syncq list */
@@ -400,6 +402,7 @@ typedef	struct	bcache {
  */
 #define	DBLK_REFMIN		0x01	/* min refcnt stored in low bit */
 #define	DBLK_COOKED		0x02	/* message has been processed once */
+#define	DBLK_UIOA		0x04	/* uioamove() is pending */
 
 /*
  * db_struioflag values:
