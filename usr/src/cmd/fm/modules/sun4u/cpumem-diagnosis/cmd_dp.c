@@ -315,17 +315,22 @@ cmd_dp_timeout(fmd_hdl_t *hdl, id_t id)
 	fmd_hdl_debug(hdl, "cmd_dp_timeout() complete\n");
 }
 
+/*
+ * Validate by matching each cmd_dp_t cpu and serial id to what is
+ * installed and active on this machine or domain. Delete the cmd_dp_t
+ * if no match is made.
+ */
 void
 cmd_dp_validate(fmd_hdl_t *hdl)
 {
 	cmd_dp_t *dp, *next;
 	nvlist_t *nvl;
-	int i;
+	int i, no_match;
 
 	for (dp = cmd_list_next(&cmd.cmd_datapaths); dp != NULL; dp = next) {
 		next = cmd_list_next(dp);
 
-		for (i = 0; i < dp->dp_ncpus; i++) {
+		for (i = 0, no_match = 0; i < dp->dp_ncpus; i++) {
 			nvl = dp_cpu_fmri(hdl, dp->dp_cpuid_list[i],
 			    dp->dp_serid_list[i]);
 
@@ -333,9 +338,14 @@ cmd_dp_validate(fmd_hdl_t *hdl)
 				fmd_hdl_abort(hdl, "could not make CPU fmri");
 
 			if (!fmd_nvl_fmri_present(hdl, nvl))
-				cmd_dp_destroy(hdl, dp);
+				no_match = 1;
 
 			nvlist_free(nvl);
+
+			if (no_match) {
+				cmd_dp_destroy(hdl, dp);
+				break;
+			}
 		}
 	}
 }
