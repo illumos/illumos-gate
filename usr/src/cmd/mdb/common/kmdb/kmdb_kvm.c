@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2220,7 +2220,7 @@ kmt_add_sbrkpt(mdb_tgt_t *t, const char *fullname,
 	ka->ka_defbp = dbp;
 
 	return (mdb_tgt_vespec_insert(t, &kmt_brkpt_ops, spec_flags,
-		    func, data, ka, kmt_bparg_dtor));
+	    func, data, ka, kmt_bparg_dtor));
 }
 
 static int
@@ -2435,7 +2435,8 @@ static const mdb_tgt_ops_t kmt_ops = {
 	kmt_add_trap,				/* t_add_fault */
 	kmt_getareg,				/* t_getareg */
 	kmt_putareg,				/* t_putareg */
-	(int (*)()) mdb_tgt_nop			/* XXX t_stack_iter */
+	(int (*)()) mdb_tgt_nop,		/* XXX t_stack_iter */
+	(int (*)()) mdb_tgt_notsup		/* t_auxv */
 };
 
 /*

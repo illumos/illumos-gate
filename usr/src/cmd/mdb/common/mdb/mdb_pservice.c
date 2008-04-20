@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,8 @@ static struct {
 	    const char *, const char *, ps_sym_t *);
 	ps_err_e (*ps_pauxv)(struct ps_prochandle *,
 	    const auxv_t **);
+	ps_err_e (*ps_pbrandname)(struct ps_prochandle *,
+	    char *, size_t);
 	ps_err_e (*ps_pdmodel)(struct ps_prochandle *,
 	    int *);
 } ps_ops;
@@ -239,6 +241,33 @@ ps_pauxv(struct ps_prochandle *P, const auxv_t **auxvp)
 	return (PS_OK);
 }
 
+ps_err_e
+ps_pbrandname(struct ps_prochandle *P, char *buf, size_t len)
+{
+	mdb_tgt_t *t = mdb_tgt_from_pshandle(P);
+	const auxv_t *auxv;
+
+	if (t == NULL)
+		return (ps_ops.ps_pbrandname(P, buf, len));
+
+	if (mdb_tgt_auxv(t, &auxv) != 0)
+		return (PS_ERR);
+
+	while (auxv->a_type != AT_NULL) {
+		if (auxv->a_type == AT_SUN_BRANDNAME)
+			break;
+		auxv++;
+	}
+	if (auxv->a_type == AT_NULL)
+		return (PS_ERR);
+
+	if (mdb_tgt_readstr(t, MDB_TGT_AS_VIRT,
+	    buf, len, auxv->a_un.a_val) <= 0)
+		return (PS_ERR);
+
+	return (PS_OK);
+}
+
 /*
  * Return the data model of the target.
  */
@@ -298,6 +327,10 @@ mdb_pservice_init(void)
 	if ((ps_ops.ps_pauxv = (ps_err_e (*)())
 	    dlsym(RTLD_NEXT, "ps_pauxv")) == NULL)
 		ps_ops.ps_pauxv = (ps_err_e (*)())ps_fail;
+
+	if ((ps_ops.ps_pbrandname = (ps_err_e (*)())
+	    dlsym(RTLD_NEXT, "ps_pbrandname")) == NULL)
+		ps_ops.ps_pbrandname = (ps_err_e (*)())ps_fail;
 
 	if ((ps_ops.ps_pdmodel = (ps_err_e (*)())
 	    dlsym(RTLD_NEXT, "ps_pdmodel")) == NULL)

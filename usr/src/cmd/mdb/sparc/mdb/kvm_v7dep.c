@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -420,6 +420,7 @@ const mdb_tgt_ops_t kt_sparcv7_ops = {
 	kt_getareg,				/* t_getareg */
 	kt_putareg,				/* t_putareg */
 	kt_stack_iter,				/* t_stack_iter */
+	(int (*)()) mdb_tgt_notsup		/* t_auxv */
 };
 
 void

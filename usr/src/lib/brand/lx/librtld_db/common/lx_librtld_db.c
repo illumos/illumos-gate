@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,6 +125,9 @@ lx_ldb_fix_phdr(struct rd_agent *rap, Elf32_Dyn *dp, size_t size,
 	uint32_t		strtab_p = NULL;
 	char			*strtab;
 
+	/* Make sure addr matches the current byte size */
+	addr = (uint32_t)addr;
+
 	/*
 	 * First we need to find the address of the string table.
 	 */
@@ -135,18 +138,18 @@ lx_ldb_fix_phdr(struct rd_agent *rap, Elf32_Dyn *dp, size_t size,
 			strsz = dp[i].d_un.d_val;
 	}
 	if (strtab_p == NULL) {
-		ps_plog("lx_librtld_db: couldn't find strtab\n");
+		ps_plog("lx_librtld_db: couldn't find strtab");
 		return;
 	}
 	if (strsz == 0) {
-		ps_plog("lx_librtld_db: couldn't find strsz\n");
+		ps_plog("lx_librtld_db: couldn't find strsz");
 		return;
 	}
 
 	if ((strtab = malloc(strsz)) == NULL)
 		return;
 	if (Pread(php, strtab, strsz, strtab_p) != strsz) {
-		ps_plog("lx_librtld_db: couldn't read strtab at %x\n",
+		ps_plog("lx_librtld_db: couldn't read strtab at 0x%p",
 		    strtab_p);
 		free(strtab);
 		return;
@@ -178,8 +181,8 @@ lx_ldb_fix_phdr(struct rd_agent *rap, Elf32_Dyn *dp, size_t size,
 		/*
 		 * This is not a linux mapping, so we have nothing left to do.
 		 */
-		ps_plog("lx_librtld_db: %x doesn't appear to be an lx object\n",
-		    addr);
+		ps_plog("lx_librtld_db: "
+		    "0x%p doesn't appear to be an lx object", addr);
 		return;
 	}
 
@@ -217,90 +220,106 @@ lx_ldb_fix_phdr(struct rd_agent *rap, Elf32_Dyn *dp, size_t size,
  * use the DT_DEBUG token in the executable's dynamic section. The linux linker
  * wrote the address of its r_debug structure to the DT_DEBUG dynamic entry. We
  * get the address of the executable's program headers from the
- * AT_SUN_BRAND_PHDR aux vector entry. From there, we calculate the address of
- * the Elf header, and from there we can easily get to the DT_DEBUG entry.
+ * AT_SUN_BRAND_LX_PHDR aux vector entry. From there, we calculate the
+ * address of the Elf header, and from there we can easily get to the DT_DEBUG
+ * entry.
  */
 static void *
 lx_ldb_client_init(struct ps_prochandle *php)
 {
 	lx_rd_t		*rd = calloc(sizeof (lx_rd_t), 1);
-	uint32_t	phdr_addr;
+	uint32_t	phdr_addr, ehdr_addr, dp_addr;
 	Elf32_Dyn	*dp;
-	Elf32_Phdr	*ph, phdr, *phdrs;
+	Elf32_Phdr	phdr, *ph, *phdrs;
 	Elf32_Ehdr	ehdr;
-	int		i;
+	int		i, dp_count;
 
 	rd->lr_rdebug = 0;
 
 	if (rd == NULL) {
-		ps_plog("lx_ldb_client_init: cannot allocate memory\n");
+		ps_plog("lx_ldb_client_init: cannot allocate memory");
 		return (NULL);
 	}
 
 	phdr_addr = Pgetauxval(php, AT_SUN_BRAND_LX_PHDR);
+	if (phdr_addr == (uint32_t)-1) {
+		ps_plog("lx_ldb_client_init: no LX_PHDR found in aux vector");
+		return (NULL);
+	}
+	ps_plog("lx_ldb_client_init: found LX_PHDR auxv phdr at: 0x%p",
+	    phdr_addr);
 
 	if (ps_pread(php, phdr_addr, &phdr, sizeof (phdr)) != PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read phdr at %x\n",
+		ps_plog("lx_ldb_client_init: couldn't read phdr at 0x%p",
 		    phdr_addr);
 		free(rd);
 		return (NULL);
 	}
 
-	rd->lr_exec = phdr.p_vaddr - phdr.p_offset;
-
-	if (ps_pread(php, rd->lr_exec, &ehdr, sizeof (ehdr)) !=
+	/* The ELF headher should be before the program header in memory */
+	rd->lr_exec = ehdr_addr = phdr_addr - phdr.p_offset;
+	if (ps_pread(php, ehdr_addr, &ehdr, sizeof (ehdr)) !=
 	    PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read ehdr\n");
+		ps_plog("lx_ldb_client_init: couldn't read ehdr at 0x%p",
+		    rd->lr_exec);
 		free(rd);
 		return (NULL);
 	}
+	ps_plog("lx_ldb_client_init: read ehdr at: 0x%p", ehdr_addr);
 
 	if ((phdrs = malloc(ehdr.e_phnum * ehdr.e_phentsize)) == NULL) {
-		ps_plog("lx_ldb_client_init: couldn't alloc phdrs memory\n");
+		ps_plog("lx_ldb_client_init: couldn't alloc phdrs memory");
 		free(rd);
 		return (NULL);
 	}
 
 	if (ps_pread(php, phdr_addr, phdrs, ehdr.e_phnum * ehdr.e_phentsize) !=
 	    PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read phdrs at %x\n",
+		ps_plog("lx_ldb_client_init: couldn't read phdrs at 0x%p",
 		    phdr_addr);
 		free(rd);
 		free(phdrs);
 		return (NULL);
 	}
+	ps_plog("lx_ldb_client_init: read %d phdrs at: 0x%p",
+	    ehdr.e_phnum, phdr_addr);
 
 	for (i = 0, ph = phdrs; i < ehdr.e_phnum; i++,
 	    /*LINTED */
 	    ph = (Elf32_Phdr *)((char *)ph + ehdr.e_phentsize)) {
-
 		if (ph->p_type == PT_DYNAMIC)
 			break;
 	}
 	if (i == ehdr.e_phnum) {
-		ps_plog("lx_ldb_client_init: no PT_DYNAMIC in executable\n");
+		ps_plog("lx_ldb_client_init: no PT_DYNAMIC in executable");
 		free(rd);
 		free(phdrs);
 		return (NULL);
 	}
+	ps_plog("lx_ldb_client_init: found PT_DYNAMIC phdr[%d] at: 0x%p",
+	    i, (phdr_addr + ((char *)ph - (char *)phdrs)));
 
 	if ((dp = malloc(ph->p_filesz)) == NULL) {
-		ps_plog("lx_ldb_client_init: couldn't alloc for PT_DYNAMIC\n");
+		ps_plog("lx_ldb_client_init: couldn't alloc for PT_DYNAMIC");
 		free(rd);
 		free(phdrs);
 		return (NULL);
 	}
 
-	if (ps_pread(php, ph->p_vaddr, dp, ph->p_filesz) != PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read dynamic at %x\n",
-		    ph->p_vaddr);
+	dp_addr = ehdr_addr + ph->p_offset;
+	dp_count = ph->p_filesz / sizeof (Elf32_Dyn);
+	if (ps_pread(php, dp_addr, dp, ph->p_filesz) != PS_OK) {
+		ps_plog("lx_ldb_client_init: couldn't read dynamic at 0x%p",
+		    dp_addr);
 		free(rd);
 		free(phdrs);
 		free(dp);
 		return (NULL);
 	}
+	ps_plog("lx_ldb_client_init: read %d dynamic headers at: 0x%p",
+	    dp_count, dp_addr);
 
-	for (i = 0; i < ph->p_filesz / sizeof (Elf32_Dyn); i++) {
+	for (i = 0; i < dp_count; i++) {
 		if (dp[i].d_tag == DT_DEBUG) {
 			rd->lr_rdebug = dp[i].d_un.d_ptr;
 			break;
@@ -310,10 +329,11 @@ lx_ldb_client_init(struct ps_prochandle *php)
 	free(dp);
 
 	if (rd->lr_rdebug == 0) {
-		ps_plog("lx_ldb_client_init: no DT_DEBUG found in exe\n");
+		ps_plog("lx_ldb_client_init: no DT_DEBUG found in exe");
 		free(rd);
 		return (NULL);
 	}
+	ps_plog("lx_ldb_client_init: found DT_DEBUG: 0x%p", rd->lr_rdebug);
 
 	return (rd);
 }
@@ -328,12 +348,13 @@ lx_elf_props(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
 	Elf32_Ehdr	ehdr;
 	Elf32_Phdr	*phdrs, *ph;
 	int		i;
-	uintptr_t	min = (uintptr_t)-1;
-	uintptr_t	max = 0;
+	uint32_t	min = (uint32_t)-1;
+	uint32_t	max = 0;
 	size_t		sz;
 
 	if (ps_pread(php, addr, &ehdr, sizeof (ehdr)) != PS_OK) {
-		ps_plog("lx_elf_props: Couldn't read ELF header at %x\n", addr);
+		ps_plog("lx_elf_props: Couldn't read ELF header at 0x%p",
+		    addr);
 		return (0);
 	}
 
@@ -342,7 +363,7 @@ lx_elf_props(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
 
 	if (ps_pread(php, addr + ehdr.e_phoff, phdrs, ehdr.e_phnum *
 	    ehdr.e_phentsize) != PS_OK) {
-		ps_plog("lx_elf_props: Couldn't read program headers at %x\n",
+		ps_plog("lx_elf_props: Couldn't read program headers at 0x%p",
 		    addr + ehdr.e_phoff);
 		return (0);
 	}
@@ -384,13 +405,13 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 	lx_rd_t			*lx_rd = (lx_rd_t *)rd_addr;
 	struct lx_r_debug	r_debug;
 	struct lx_link_map	map;
-	psaddr_t		p = NULL;
+	uint32_t		p = NULL;
 	int			rc;
 	rd_loadobj_t		exec;
 
 	if ((rc = ps_pread(php, (psaddr_t)lx_rd->lr_rdebug, &r_debug,
 	    sizeof (r_debug))) != PS_OK) {
-		ps_plog("lx_ldb_iter: Couldn't read linux r_debug at %x\n",
+		ps_plog("lx_ldb_iter: Couldn't read linux r_debug at 0x%p",
 		    rd_addr);
 		return (rc);
 	}
@@ -406,7 +427,8 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 	 * the AT_EXECNAME entry instead.
 	 */
 	if ((rc = ps_pread(php, (psaddr_t)p, &map, sizeof (map))) != PS_OK) {
-		ps_plog("lx_ldb_iter: Couldn't read linux link map at %x\n", p);
+		ps_plog("lx_ldb_iter: Couldn't read linux link map at 0x%p",
+		    p);
 		return (rc);
 	}
 
@@ -420,7 +442,7 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 	    lx_elf_props(php, lx_rd->lr_exec, &exec.rl_data_base);
 
 	if ((*cb)(&exec, client_data) == 0) {
-		ps_plog("lx_ldb_iter: client callb failed for executable\n");
+		ps_plog("lx_ldb_iter: client callb failed for executable");
 		return (PS_ERR);
 	}
 
@@ -429,7 +451,8 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 
 		if ((rc = ps_pread(php, (psaddr_t)p, &map, sizeof (map))) !=
 		    PS_OK) {
-			ps_plog("lx_ldb_iter: Couldn't read lk map at %x\n", p);
+			ps_plog("lx_ldb_iter: Couldn't read lk map at %p",
+			    p);
 			return (rc);
 		}
 
@@ -459,10 +482,11 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 		obj.rl_dynamic = map.lxm_ld;
 		obj.rl_tlsmodid = 0;
 
-		ps_plog("lx_ldb_iter: %x to %x\n", obj.rl_base, obj.rl_bend);
+		ps_plog("lx_ldb_iter: 0x%p to 0x%p",
+		    obj.rl_base, obj.rl_bend);
 
 		if ((*cb)(&obj, client_data) == 0) {
-			ps_plog("lx_ldb_iter: Client callback failed on %s\n",
+			ps_plog("lx_ldb_iter: Client callback failed on %s",
 			    map.lxm_name);
 			return (rc);
 		}
