@@ -7358,7 +7358,7 @@ retry:
 	if (uiop == NULL) {
 		/* Append data to tail of mctlp */
 
-		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
+		ASSERT(bp == NULL || !(bp->b_datap->db_flags & DBLK_UIOA));
 		if (mctlp != NULL) {
 			mblk_t **mpp = mctlp;
 
@@ -7367,7 +7367,7 @@ retry:
 			*mpp = bp;
 			bp = NULL;
 		}
-	} else if (bp->b_datap->db_flags & DBLK_UIOA) {
+	} else if (bp && (bp->b_datap->db_flags & DBLK_UIOA)) {
 		/*
 		 * A uioa mblk_t chain, as uio processing has already
 		 * been done we simple skip over processing.
