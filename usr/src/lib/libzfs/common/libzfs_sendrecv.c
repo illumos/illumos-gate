@@ -593,12 +593,16 @@ dump_filesystem(zfs_handle_t *zhp, void *arg)
 		(void) snprintf(snapname, sizeof (snapname), "%s@%s",
 		    zfs_get_name(zhp), sdd->tosnap);
 		snapzhp = zfs_open(zhp->zfs_hdl, snapname, ZFS_TYPE_SNAPSHOT);
-		rv = dump_ioctl(snapzhp,
-		    missingfrom ? NULL : sdd->fromsnap,
-		    sdd->fromorigin || missingfrom,
-		    sdd->outfd);
-		sdd->seento = B_TRUE;
-		zfs_close(snapzhp);
+		if (snapzhp == NULL) {
+			rv = -1;
+		} else {
+			rv = dump_ioctl(snapzhp,
+			    missingfrom ? NULL : sdd->fromsnap,
+			    sdd->fromorigin || missingfrom,
+			    sdd->outfd);
+			sdd->seento = B_TRUE;
+			zfs_close(snapzhp);
+		}
 	}
 
 	return (rv);
@@ -644,6 +648,8 @@ again:
 		}
 
 		zhp = zfs_open(rzhp->zfs_hdl, fsname, ZFS_TYPE_DATASET);
+		if (zhp == NULL)
+			return (-1);
 		err = dump_filesystem(zhp, sdd);
 		VERIFY(nvlist_add_boolean(fslist, "sent") == 0);
 		progress = B_TRUE;
@@ -1024,30 +1030,36 @@ guid_to_name(libzfs_handle_t *hdl, const char *parent, uint64_t guid,
 /*
  * Return true if dataset guid1 is created before guid2.
  */
-static boolean_t
+static int
 created_before(libzfs_handle_t *hdl, avl_tree_t *avl,
     uint64_t guid1, uint64_t guid2)
 {
 	nvlist_t *nvfs;
 	char *fsname, *snapname;
 	char buf[ZFS_MAXNAMELEN];
-	boolean_t rv;
+	int rv;
 	zfs_node_t zn1, zn2;
 
 	if (guid2 == 0)
-		return (B_FALSE);
+		return (0);
 	if (guid1 == 0)
-		return (B_TRUE);
+		return (1);
 
 	nvfs = fsavl_find(avl, guid1, &snapname);
 	VERIFY(0 == nvlist_lookup_string(nvfs, "name", &fsname));
 	(void) snprintf(buf, sizeof (buf), "%s@%s", fsname, snapname);
 	zn1.zn_handle = zfs_open(hdl, buf, ZFS_TYPE_SNAPSHOT);
+	if (zn1.zn_handle == NULL)
+		return (-1);
 
 	nvfs = fsavl_find(avl, guid2, &snapname);
 	VERIFY(0 == nvlist_lookup_string(nvfs, "name", &fsname));
 	(void) snprintf(buf, sizeof (buf), "%s@%s", fsname, snapname);
 	zn2.zn_handle = zfs_open(hdl, buf, ZFS_TYPE_SNAPSHOT);
+	if (zn2.zn_handle == NULL) {
+		zfs_close(zn2.zn_handle);
+		return (-1);
+	}
 
 	rv = (zfs_snapshot_compare(&zn1, &zn2) == -1);
 
@@ -1124,8 +1136,9 @@ again:
 		(void) nvlist_lookup_uint64(stream_nvfs, "origin",
 		    &stream_originguid);
 		if (stream_nvfs && originguid != stream_originguid) {
-			if (created_before(hdl, local_avl, stream_originguid,
-			    originguid)) {
+			switch (created_before(hdl, local_avl,
+			    stream_originguid, originguid)) {
+			case 1: {
 				/* promote it! */
 				zfs_cmd_t zc = { 0 };
 				nvlist_t *origin_nvfs;
@@ -1145,6 +1158,14 @@ again:
 				error = zfs_ioctl(hdl, ZFS_IOC_PROMOTE, &zc);
 				if (error == 0)
 					progress = B_TRUE;
+				break;
+			}
+			default:
+				break;
+			case -1:
+				fsavl_destroy(local_avl);
+				nvlist_free(local_nv);
+				return (-1);
 			}
 			/*
 			 * We had/have the wrong origin, therefore our
@@ -1858,7 +1879,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		h = zfs_open(hdl, zc.zc_value,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
 		*cp = '@';
-		if (h) {
+		if (h != NULL) {
 			if (h->zfs_type == ZFS_TYPE_VOLUME) {
 				err = zvol_create_link(hdl, h->zfs_name);
 				if (err == 0 && ioctl_err == 0)
@@ -1867,7 +1888,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			} else if (newfs) {
 				err = zfs_mount(h, NULL, 0);
 			}
-		zfs_close(h);
+			zfs_close(h);
 		}
 	}
 
