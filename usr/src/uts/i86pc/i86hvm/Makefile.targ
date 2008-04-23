@@ -38,10 +38,10 @@ $(ROOT_HVM_DIR):
 $(ROOT_HVM_MOD_DIR):		$(ROOT_HVM_DIR)
 	-$(INS.dir.root.sys)
 
-$(ROOT_HVM_DRV_DIR):		$(ROOT_MOD_DIR)
+$(ROOT_HVM_DRV_DIR):		$(ROOT_HVM_DIR)
 	-$(INS.dir.root.sys)
 
-$(ROOT_HVM_MISC_DIR):		$(ROOT_MOD_DIR)
+$(ROOT_HVM_MISC_DIR):		$(ROOT_HVM_DIR)
 	-$(INS.dir.root.sys)
 
 $(ROOT_HVM_MOD_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MOD_DIR) FRC

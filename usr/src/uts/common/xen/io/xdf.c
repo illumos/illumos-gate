@@ -606,6 +606,7 @@ xdf_suspend(dev_info_t *devi)
 	if ((st == XD_INIT) || (st == XD_READY)) {
 #ifdef XPV_HVM_DRIVER
 		ec_unbind_evtchn(vdp->xdf_evtchn);
+		xvdi_free_evtchn(devi);
 #else /* !XPV_HVM_DRIVER */
 		(void) ddi_remove_intr(devi, 0, NULL);
 #endif /* !XPV_HVM_DRIVER */
