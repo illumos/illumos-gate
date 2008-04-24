@@ -1110,11 +1110,8 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp)
 			 * value, because the stored checksum is of
 			 * everything before the DRR_END record.
 			 */
-			if (drre.drr_checksum.zc_word[0] != 0 &&
-			    !ZIO_CHECKSUM_EQUAL(drre.drr_checksum, pcksum)) {
+			if (!ZIO_CHECKSUM_EQUAL(drre.drr_checksum, pcksum))
 				ra.err = ECKSUM;
-				goto out;
-			}
 			goto out;
 		}
 		default:
@@ -1123,6 +1120,7 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp)
 		}
 		pcksum = ra.cksum;
 	}
+	ASSERT(ra.err != 0);
 
 out:
 	dmu_objset_close(os);

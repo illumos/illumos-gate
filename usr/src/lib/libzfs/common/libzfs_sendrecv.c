@@ -1324,6 +1324,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 	dmu_replay_record_t drre;
 	int error;
 	boolean_t anyerr = B_FALSE;
+	boolean_t softerr = B_FALSE;
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot receive"));
@@ -1410,7 +1411,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 				    ZFS_MAXNAMELEN);
 				*strchr(tofs, '@') = '\0';
 			}
-			anyerr |= recv_incremental_replication(hdl, tofs,
+			softerr = recv_incremental_replication(hdl, tofs,
 			    flags, stream_nv, stream_avl);
 		}
 	}
@@ -1438,7 +1439,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		 * Now that we have the fs's they sent us, try the
 		 * renames again.
 		 */
-		anyerr |= recv_incremental_replication(hdl, tofs, flags,
+		softerr = recv_incremental_replication(hdl, tofs, flags,
 		    stream_nv, stream_avl);
 	}
 
@@ -1446,6 +1447,8 @@ out:
 	fsavl_destroy(stream_avl);
 	if (stream_nv)
 		nvlist_free(stream_nv);
+	if (softerr)
+		error = -2;
 	if (anyerr)
 		error = -1;
 	return (error);
@@ -1919,6 +1922,9 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 /*
  * Restores a backup of tosnap from the file descriptor specified by infd.
+ * Return 0 on total success, -2 if some things couldn't be
+ * destroyed/renamed/promoted, -1 if some things couldn't be received.
+ * (-1 will override -2).
  */
 int
 zfs_receive(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
