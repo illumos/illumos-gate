@@ -965,7 +965,7 @@ static void
 dev_mboot_write(int sect, char *buff, int bootsiz)
 {
 	int 	new_pt, old_pt, error;
-	int	clr_efi = -1, old_solaris = -1, new_solaris = -1;
+	int	clr_efi = -1;
 
 	if (io_readonly)
 		return;
@@ -979,37 +979,51 @@ dev_mboot_write(int sect, char *buff, int bootsiz)
 		}
 	}
 
-	/* see if the old table had EFI or Solaris partitions */
-	for (old_pt = 0; old_pt < FD_NUMPART; old_pt++) {
-		if (Old_Table[old_pt].systid == SUNIXOS ||
-		    Old_Table[old_pt].systid == SUNIXOS2) {
-			old_solaris = old_pt;
-		} else if (Old_Table[old_pt].systid == EFI_PMBR) {
-			clr_efi = old_pt;
-		}
-	}
-
-	/* look to see if Solaris partition changed in relsect/numsect */
+	/*
+	 * If the new table has any Solaris partitions and the old
+	 * table does not have an entry that describes it
+	 * exactly then clear the old vtoc (if any).
+	 */
 	for (new_pt = 0; new_pt < FD_NUMPART; new_pt++) {
 
-		/*
-		 * if this is not a Solaris partition, ignore it
-		 */
+		/* We only care about potential Solaris parts. */
 		if (Table[new_pt].systid != SUNIXOS &&
 		    Table[new_pt].systid != SUNIXOS2)
 			continue;
 
-		/*
-		 * if there was no previous Solaris partition
-		 * or if the old partition was in a different place
-		 * or if the old partition was a different size
-		 * then this must be a new Solaris partition
-		 */
-		if (old_solaris == -1 ||
-		    Old_Table[old_solaris].relsect != Table[new_pt].relsect ||
-		    Old_Table[old_solaris].numsect != Table[new_pt].numsect) {
-			new_solaris = new_pt;
-			break;
+		/* Does the old table have an exact entry for the new entry? */
+		for (old_pt = 0; old_pt < FD_NUMPART; old_pt++) {
+
+			/* We only care about old Solaris partitions. */
+			if ((Old_Table[old_pt].systid == SUNIXOS) ||
+			    (Old_Table[old_pt].systid == SUNIXOS2)) {
+
+				/* Is this old one the same as a new one? */
+				if ((Old_Table[old_pt].relsect ==
+				    Table[new_pt].relsect) &&
+				    (Old_Table[old_pt].numsect ==
+				    Table[new_pt].numsect))
+					break; /* Yes */
+			}
+		}
+
+		/* Did a solaris partition change location or size? */
+		if (old_pt >= FD_NUMPART) {
+			/* Yes clear old vtoc */
+			if (io_debug) {
+				(void) fprintf(stderr,
+				    "Clearing VTOC labels from NEW"
+				    " table\n");
+			}
+			clear_vtoc(NEW, new_pt);
+		}
+	}
+
+
+	/* see if the old table had EFI */
+	for (old_pt = 0; old_pt < FD_NUMPART; old_pt++) {
+		if (Old_Table[old_pt].systid == EFI_PMBR) {
+			clr_efi = old_pt;
 		}
 	}
 
@@ -1050,14 +1064,6 @@ dev_mboot_write(int sect, char *buff, int bootsiz)
 				    error);
 			}
 		}
-	}
-
-	if (new_solaris >= 0) {
-		if (io_debug) {
-			(void) fprintf(stderr, "Clearing VTOC labels from NEW"
-			    " table\n");
-		}
-		clear_vtoc(NEW, new_solaris);
 	}
 
 	if ((ioctl(Dev, DKIOCSMBOOT, buff) == -1) && (errno != ENOTTY)) {
