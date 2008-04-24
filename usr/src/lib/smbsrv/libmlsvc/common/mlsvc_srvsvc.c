@@ -64,21 +64,51 @@
 
 #define	SV_TYPE_SENT_BY_ME (SV_TYPE_WORKSTATION | SV_TYPE_SERVER | SV_TYPE_NT)
 
+#define	SMB_SRVSVC_MAXBUFLEN	(8 * 1024)
+#define	SMB_SRVSVC_MAXPREFLEN	((uint32_t)(-1))
+
+/*
+ * prefmaxlen:    Client specified response buffer limit.
+ * resume_handle: Cookie used to track enumeration across multiple calls.
+ * n_total:       Total number of entries.
+ * n_enum:        Number of entries to enumerate (derived from prefmaxlen).
+ * n_skip:        Number of entries to skip (from incoming resume handle).
+ * n_read:        Number of objects returned for current enumeration request.
+ */
+typedef struct srvsvc_enum {
+	uint32_t se_level;
+	uint32_t se_prefmaxlen;
+	uint32_t se_resume_handle;
+	uint32_t se_n_total;
+	uint32_t se_n_enum;
+	uint32_t se_n_skip;
+	uint32_t se_n_read;
+} srvsvc_enum_t;
+
 static DWORD mlsvc_NetSessionEnumLevel0(struct mslm_infonres *, DWORD,
     struct mlrpc_xaction *);
 static DWORD mlsvc_NetSessionEnumLevel1(struct mslm_infonres *, DWORD,
     struct mlrpc_xaction *);
-static DWORD mlsvc_NetShareEnumLevel0(struct mslm_infonres *, DWORD,
-    struct mlrpc_xaction *, char);
-static DWORD mlsvc_NetShareEnumLevel1(struct mslm_infonres *, DWORD,
-    struct mlrpc_xaction *, char);
-static DWORD mlsvc_NetShareEnumLevel2(struct mslm_infonres *, DWORD,
-    struct mlrpc_xaction *, char);
-static DWORD mlsvc_NetShareEnumLevel502(struct mslm_infonres *, DWORD,
-    struct mlrpc_xaction *, char);
-static DWORD mlsvc_NetShareEnumCommon(struct mlrpc_xaction *, DWORD,
-    int, lmshare_info_t *, void *);
-static int srvsvc_is_poweruser(struct mlrpc_xaction *);
+
+static DWORD mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *,
+    struct mslm_infonres *, srvsvc_enum_t *, int);
+static DWORD mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *,
+    struct mslm_infonres *, srvsvc_enum_t *, int);
+static DWORD mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *,
+    struct mslm_infonres *, srvsvc_enum_t *, int);
+static DWORD mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *,
+    struct mslm_infonres *, srvsvc_enum_t *, int);
+static DWORD mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *,
+    struct mslm_infonres *, srvsvc_enum_t *, int);
+static DWORD mlsvc_NetShareEnumCommon(struct mlrpc_xaction *,
+    srvsvc_enum_t *, lmshare_info_t *, void *);
+static boolean_t srvsvc_add_autohome(struct mlrpc_xaction *, srvsvc_enum_t *,
+    void *);
+static char *srvsvc_share_mkpath(struct mlrpc_xaction *, char *);
+
+static uint32_t srvsvc_estimate_objcnt(uint32_t, uint32_t, uint32_t);
+static boolean_t srvsvc_is_administrator(struct mlrpc_xaction *);
+static boolean_t srvsvc_is_poweruser(struct mlrpc_xaction *);
 
 static char empty_string[1];
 
@@ -98,70 +128,6 @@ static mlrpc_service_t srvsvc_service = {
 	&TYPEINFO(srvsvc_interface),	/* interface ti */
 	srvsvc_stub_table		/* stub_table */
 };
-
-/*
- * srvsvc_share_mkpath
- *
- * Create the share path required by the share enum calls. This function
- * creates the path in a MLRPC heap buffer ready for use by the caller.
- *
- * Some Windows over-the-wire backup applications do not work unless a
- * drive letter is present in the share path. We don't care about the
- * drive letter since the path is fully qualified with the volume name.
- * We can try using drive B since by default that letter isn't assigned
- * and even if it conflicts, we should still be okay with the fully
- * qualified path.
- *
- * Windows clients seem to be mostly okay with the forward slash in
- * share paths but they cannot handle one immediately after the drive
- * letter, i.e. D:/. For consistency we convert all the slashes in
- * the path.
- *
- * Returns a pointer to a heap buffer containing the share path, which
- * could be a null pointer if the heap allocation fails.
- */
-static char *
-srvsvc_share_mkpath(struct mlrpc_xaction *mxa, char *path)
-{
-	char tmpbuf[MAXPATHLEN];
-	char *p;
-
-	if (strlen(path) == 0)
-		return (MLRPC_HEAP_STRSAVE(mxa, path));
-
-	/* strip the volume from the path (/vol1/home -> /home) */
-	p = strchr(path[0] == '/' ? &path[1] : path, '/');
-
-	(void) snprintf(tmpbuf, MAXPATHLEN, "%c:%s", 'B'
-	    /* vattr.drive_letter */, p == NULL ? "/": p);
-	(void) strsubst(tmpbuf, '/', '\\');
-
-	return (MLRPC_HEAP_STRSAVE(mxa, tmpbuf));
-}
-
-/*
- * srvsvc_add_autohome
- *
- * Add the autohome share for the user to the shares' list
- * if autohome is enabled the share is not a permanent share.
- */
-static int
-srvsvc_add_autohome(struct mlrpc_xaction *mxa, char *username, DWORD i,
-    int level, char *infop)
-{
-	lmshare_info_t si;
-	DWORD status;
-
-	if ((lmshare_getinfo(username, &si) == NERR_Success) &&
-	    (si.mode & LMSHRM_TRANS)) {
-		status = mlsvc_NetShareEnumCommon(mxa, i, level, &si,
-		    (void *)infop);
-		if (status == ERROR_SUCCESS)
-			i++;
-	}
-
-	return (i);
-}
 
 /*
  * srvsvc_initialize
@@ -276,6 +242,12 @@ srvsvc_s_NetFileEnum(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetFileEnum *param = arg;
 	struct mslm_NetFileInfoBuf3 *fi3;
+
+	if (!srvsvc_is_administrator(mxa)) {
+		bzero(param, sizeof (struct mslm_NetFileEnum));
+		param->status = ERROR_ACCESS_DENIED;
+		return (MLRPC_DRC_OK);
+	}
 
 	if (param->info.switch_value != 3) {
 		bzero(param, sizeof (struct mslm_NetFileEnum));
@@ -759,7 +731,7 @@ srvsvc_s_NetSessionDel(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetSessionDel *param = arg;
 
-	if (srvsvc_is_poweruser(mxa) == 0) {
+	if (!srvsvc_is_poweruser(mxa)) {
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
 	}
@@ -1021,7 +993,7 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 
 	user_ctx = mxa->context->user_ctx;
 
-	if (srvsvc_is_poweruser(mxa) == 0) {
+	if (!srvsvc_is_poweruser(mxa)) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
@@ -1091,6 +1063,42 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 }
 
 /*
+ * srvsvc_estimate_objcnt
+ *
+ * Estimate the number of objects that will fit in prefmaxlen.
+ */
+static uint32_t
+srvsvc_estimate_objcnt(uint32_t prefmaxlen, uint32_t n_obj, uint32_t obj_size)
+{
+	DWORD max_cnt;
+
+	if (obj_size == 0)
+		return (0);
+
+	if ((max_cnt = (prefmaxlen / obj_size)) == 0)
+		return (0);
+
+	if (n_obj > max_cnt)
+		n_obj = max_cnt;
+
+	return (n_obj);
+}
+
+/*
+ * srvsvc_is_administrator
+ *
+ * Check whether or not the specified user has administrator privileges,
+ * i.e. is a member of the Domain Admins or Administrators groups.
+ */
+static boolean_t
+srvsvc_is_administrator(struct mlrpc_xaction *mxa)
+{
+	smb_dr_user_ctx_t *user = mxa->context->user_ctx;
+
+	return (user->du_flags & SMB_ATF_ADMIN);
+}
+
+/*
  * srvsvc_is_poweruser
  *
  * Check whether or not the specified user has power-user privileges,
@@ -1100,7 +1108,7 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
  *
  * Returns 1 if the user is a power user, otherwise returns 0.
  */
-static int
+static boolean_t
 srvsvc_is_poweruser(struct mlrpc_xaction *mxa)
 {
 	smb_dr_user_ctx_t *user = mxa->context->user_ctx;
@@ -1112,50 +1120,69 @@ srvsvc_is_poweruser(struct mlrpc_xaction *mxa)
 /*
  * srvsvc_s_NetShareEnum
  *
+ * Enumerate all shares (see also NetShareEnumSticky).
+ *
  * Request for various levels of information about our shares.
- * Level 0: just the share names.
- * Level 1: the share name, the share type and the comment field.
+ * Level 0: share names.
+ * Level 1: share name, share type and comment field.
  * Level 2: everything that we know about the shares.
+ * Level 501: level 1 + flags (flags must be zero).
+ * Level 502: level 2 + security descriptor.
  */
 static int
 srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetShareEnum *param = arg;
 	struct mslm_infonres *infonres;
+	srvsvc_enum_t se;
 	DWORD status;
-	DWORD n_shares;
 
 	infonres = MLRPC_HEAP_NEW(mxa, struct mslm_infonres);
-	if (infonres == 0) {
+	if (infonres == NULL) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (MLRPC_DRC_OK);
 	}
 
 	infonres->entriesread = 0;
-	infonres->entries = 0;
+	infonres->entries = NULL;
 	param->result.level = param->level;
 	param->result.bufptr.p = infonres;
-	param->totalentries = 1; /* NT stream hint value: prefmaxlen? */
-	param->status = ERROR_SUCCESS;
 
-	n_shares = lmshare_num_shares();
+	bzero(&se, sizeof (srvsvc_enum_t));
+	se.se_level = param->level;
+	se.se_n_total = lmshare_num_shares();
+
+	if (param->prefmaxlen == SMB_SRVSVC_MAXPREFLEN ||
+	    param->prefmaxlen > SMB_SRVSVC_MAXBUFLEN)
+		se.se_prefmaxlen = SMB_SRVSVC_MAXBUFLEN;
+	else
+		se.se_prefmaxlen = param->prefmaxlen;
+
+	if (param->resume_handle) {
+		se.se_resume_handle = *param->resume_handle;
+		se.se_n_skip = se.se_resume_handle;
+	}
 
 	switch (param->level) {
 	case 0:
-		status = mlsvc_NetShareEnumLevel0(infonres, n_shares, mxa, 0);
+		status = mlsvc_NetShareEnumLevel0(mxa, infonres, &se, 0);
 		break;
 
 	case 1:
-		status = mlsvc_NetShareEnumLevel1(infonres, n_shares, mxa, 0);
+		status = mlsvc_NetShareEnumLevel1(mxa, infonres, &se, 0);
 		break;
 
 	case 2:
-		status = mlsvc_NetShareEnumLevel2(infonres, n_shares, mxa, 0);
+		status = mlsvc_NetShareEnumLevel2(mxa, infonres, &se, 0);
+		break;
+
+	case 501:
+		status = mlsvc_NetShareEnumLevel501(mxa, infonres, &se, 0);
 		break;
 
 	case 502:
-		status = mlsvc_NetShareEnumLevel502(infonres, n_shares, mxa, 0);
+		status = mlsvc_NetShareEnumLevel502(mxa, infonres, &se, 0);
 		break;
 
 	default:
@@ -1169,221 +1196,274 @@ srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	param->resume_handle = 0;
-	param->totalentries = infonres->entriesread;
+	if (se.se_n_enum == 0) {
+		if (param->resume_handle)
+			*param->resume_handle = 0;
+		param->status = ERROR_SUCCESS;
+		return (MLRPC_DRC_OK);
+	}
+
+	if (param->resume_handle &&
+	    param->prefmaxlen != SMB_SRVSVC_MAXPREFLEN) {
+		if (se.se_resume_handle < se.se_n_total) {
+			*param->resume_handle = se.se_resume_handle;
+			status = ERROR_MORE_DATA;
+		} else {
+			*param->resume_handle = 0;
+		}
+	}
+
+	param->totalentries = se.se_n_total;
 	param->status = status;
 	return (MLRPC_DRC_OK);
 }
 
-
 /*
  * srvsvc_s_NetShareEnumSticky
  *
- * Request for various levels of information about our shares.
- * Level 0: just the share names.
- * Level 1: the share name, the share type and the comment field.
- * Level 2: everything that we know about the shares.
+ * Enumerate sticky shares: all shares except those marked STYPE_SPECIAL.
+ * Except for excluding STYPE_SPECIAL shares, NetShareEnumSticky is the
+ * same as NetShareEnum.
  *
- * NetShareEnumSticky is the same as NetShareEnum except that hidden
- * shares are not returned. This call was apparently added due to a
- * bug in the NT implementation of NetShareEnum - it didn't process
- * the resume handle correctly so that attempts to enumerate large
- * share lists resulted in an infinite loop.
+ * Request for various levels of information about our shares.
+ * Level 0: share names.
+ * Level 1: share name, share type and comment field.
+ * Level 2: everything that we know about the shares.
+ * Level 501: not valid for this request.
+ * Level 502: level 2 + security descriptor.
+ *
+ * We set n_skip to resume_handle, which is used to find the appropriate
+ * place to resume.  The resume_handle is similar to the readdir cookie.
  */
 static int
 srvsvc_s_NetShareEnumSticky(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetShareEnum *param = arg;
 	struct mslm_infonres *infonres;
-	DWORD resume_handle;
+	srvsvc_enum_t se;
 	DWORD status;
-	DWORD n_shares;
 
 	infonres = MLRPC_HEAP_NEW(mxa, struct mslm_infonres);
-	if (infonres == 0) {
+	if (infonres == NULL) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (MLRPC_DRC_OK);
 	}
 
 	infonres->entriesread = 0;
-	infonres->entries = 0;
+	infonres->entries = NULL;
 	param->result.level = param->level;
 	param->result.bufptr.p = infonres;
-	param->totalentries = 1; /* NT stream hint value: prefmaxlen? */
-	param->status = ERROR_SUCCESS;
 
-	n_shares = lmshare_num_shares();
+	bzero(&se, sizeof (srvsvc_enum_t));
+	se.se_level = param->level;
+	se.se_n_total = lmshare_num_shares();
 
-	if (param->resume_handle)
-		resume_handle = *param->resume_handle;
+	if (param->prefmaxlen == SMB_SRVSVC_MAXPREFLEN ||
+	    param->prefmaxlen > SMB_SRVSVC_MAXBUFLEN)
+		se.se_prefmaxlen = SMB_SRVSVC_MAXBUFLEN;
 	else
-		resume_handle = 0;
+		se.se_prefmaxlen = param->prefmaxlen;
+
+	if (param->resume_handle) {
+		se.se_resume_handle = *param->resume_handle;
+		se.se_n_skip = se.se_resume_handle;
+	}
 
 	switch (param->level) {
 	case 0:
-		status = mlsvc_NetShareEnumLevel0(infonres, n_shares, mxa, 1);
+		status = mlsvc_NetShareEnumLevel0(mxa, infonres, &se, 1);
 		break;
 
 	case 1:
-		status = mlsvc_NetShareEnumLevel1(infonres, n_shares, mxa, 1);
+		status = mlsvc_NetShareEnumLevel1(mxa, infonres, &se, 1);
 		break;
 
 	case 2:
-		status = mlsvc_NetShareEnumLevel2(infonres, n_shares, mxa, 1);
+		status = mlsvc_NetShareEnumLevel2(mxa, infonres, &se, 1);
 		break;
 
 	case 502:
-		status = mlsvc_NetShareEnumLevel502(infonres, n_shares, mxa, 1);
+		status = mlsvc_NetShareEnumLevel502(mxa, infonres, &se, 1);
 		break;
 
 	default:
-		status = ERROR_INVALID_PARAMETER;
+		status = ERROR_INVALID_LEVEL;
 		break;
 	}
 
-	if (status != 0) {
+	if (status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = status;
 		return (MLRPC_DRC_OK);
 	}
 
-	if (param->resume_handle)
-		*param->resume_handle = resume_handle;
-	param->totalentries = infonres->entriesread;
+	if (se.se_n_enum == 0) {
+		if (param->resume_handle)
+			*param->resume_handle = 0;
+		param->status = ERROR_SUCCESS;
+		return (MLRPC_DRC_OK);
+	}
+
+	if (param->resume_handle &&
+	    param->prefmaxlen != SMB_SRVSVC_MAXPREFLEN) {
+		if (se.se_resume_handle < se.se_n_total) {
+			*param->resume_handle = se.se_resume_handle;
+			status = ERROR_MORE_DATA;
+		} else {
+			*param->resume_handle = 0;
+		}
+	}
+
+	param->totalentries = se.se_n_total;
 	param->status = status;
 	return (MLRPC_DRC_OK);
 }
 
-
-
 /*
- * mlsvc_NetShareEnumLevel0
- *
- * Build the level 0 share information. The list should have been built
- * before we got here so all we have to do is copy the share names to
- * the response heap and setup the infonres values.
+ * NetShareEnum Level 0
  */
 static DWORD
-mlsvc_NetShareEnumLevel0(struct mslm_infonres *infonres, DWORD n_shares,
-    struct mlrpc_xaction *mxa, char sticky)
+mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
+    struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_0 *info0;
 	lmshare_iterator_t *iterator;
 	lmshare_info_t *si;
-	DWORD i;
 	DWORD status;
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
 
-	info0 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_0, n_shares);
-	if (info0 == 0) {
-		status = ERROR_NOT_ENOUGH_MEMORY;
-		return (status);
-	}
+	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_0));
+	if (se->se_n_enum == 0)
+		return (ERROR_SUCCESS);
 
-	iterator = lmshare_open_iterator(LMSHRM_ALL);
-	if (iterator == NULL) {
-		status = ERROR_NOT_ENOUGH_MEMORY;
-		return (status);
-	}
-
-	i = 0;
-	while ((si = lmshare_iterate(iterator)) != 0) {
-		if (sticky && (si->stype & STYPE_SPECIAL))
-			continue;
-
-		if (smb_is_autohome(si))
-			continue;
-
-		status = mlsvc_NetShareEnumCommon(mxa, i, 0, si,
-		    (void *)info0);
-
-		if (status != ERROR_SUCCESS)
-			break;
-
-		i++;
-	}
-
-	i = srvsvc_add_autohome(mxa, user_ctx->du_account, i, 0, (char *)info0);
-
-	lmshare_close_iterator(iterator);
-
-	infonres->entriesread = i;
-	infonres->entries = info0;
-	return (ERROR_SUCCESS);
-}
-
-
-/*
- * mlsvc_NetShareEnumLevel1
- *
- * Build the level 1 share information. The list should have been built
- * before we arrived here so all we have to do is copy the share info
- * to the response heap and setup the infonres values. The only thing
- * to be aware of here is that there are minor difference between the
- * various share types.
- */
-static DWORD
-mlsvc_NetShareEnumLevel1(struct mslm_infonres *infonres, DWORD n_shares,
-    struct mlrpc_xaction *mxa, char sticky)
-{
-	struct mslm_SHARE_INFO_1 *info1;
-	lmshare_iterator_t *iterator;
-	lmshare_info_t *si;
-	DWORD i;
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
-
-	info1 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_1, n_shares);
-	if (info1 == 0)
+	info0 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_0, se->se_n_enum);
+	if (info0 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
 	iterator = lmshare_open_iterator(LMSHRM_ALL);
 	if (iterator == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	i = 0;
-	while ((si = lmshare_iterate(iterator)) != 0) {
+	se->se_n_read = 0;
+	while ((si = lmshare_iterate(iterator)) != NULL) {
+		if (se->se_n_skip > 0) {
+			--se->se_n_skip;
+			continue;
+		}
+
+		++se->se_resume_handle;
+
 		if (sticky && (si->stype & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
 			continue;
 
-		if (mlsvc_NetShareEnumCommon(mxa, i, 1, si,
-		    (void *)info1) != ERROR_SUCCESS)
+		if (se->se_n_read >= se->se_n_enum) {
+			se->se_n_read = se->se_n_enum;
 			break;
-		i++;
+		}
+
+		status = mlsvc_NetShareEnumCommon(mxa, se, si, (void *)info0);
+		if (status != ERROR_SUCCESS)
+			break;
+
+		++se->se_n_read;
 	}
 
-	i = srvsvc_add_autohome(mxa, user_ctx->du_account, i, 1, (char *)info1);
+	if (se->se_n_read < se->se_n_enum) {
+		if (srvsvc_add_autohome(mxa, se, (void *)info0))
+			++se->se_n_read;
+	}
 
 	lmshare_close_iterator(iterator);
+	infonres->entriesread = se->se_n_read;
+	infonres->entries = info0;
+	return (ERROR_SUCCESS);
+}
 
-	infonres->entriesread = i;
+/*
+ * NetShareEnum Level 1
+ */
+static DWORD
+mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
+    struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
+{
+	struct mslm_SHARE_INFO_1 *info1;
+	lmshare_iterator_t *iterator;
+	lmshare_info_t *si;
+	DWORD status;
+
+	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_1));
+	if (se->se_n_enum == 0)
+		return (ERROR_SUCCESS);
+
+	info1 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_1, se->se_n_enum);
+	if (info1 == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	iterator = lmshare_open_iterator(LMSHRM_ALL);
+	if (iterator == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	se->se_n_read = 0;
+	while ((si = lmshare_iterate(iterator)) != 0) {
+		if (se->se_n_skip > 0) {
+			--se->se_n_skip;
+			continue;
+		}
+
+		++se->se_resume_handle;
+
+		if (sticky && (si->stype & STYPE_SPECIAL))
+			continue;
+
+		if (smb_is_autohome(si))
+			continue;
+
+		if (se->se_n_read >= se->se_n_enum) {
+			se->se_n_read = se->se_n_enum;
+			break;
+		}
+
+		status = mlsvc_NetShareEnumCommon(mxa, se, si, (void *)info1);
+		if (status != ERROR_SUCCESS)
+			break;
+
+		++se->se_n_read;
+	}
+
+	if (se->se_n_read < se->se_n_enum) {
+		if (srvsvc_add_autohome(mxa, se, (void *)info1))
+			++se->se_n_read;
+	}
+
+	lmshare_close_iterator(iterator);
+	infonres->entriesread = se->se_n_read;
 	infonres->entries = info1;
 	return (ERROR_SUCCESS);
 }
 
 /*
- * mlsvc_NetShareEnumLevel2
- *
- * Build the level 2 share information. The list should have been built
- * before we arrived here so all we have to do is copy the share info
- * to the response heap and setup the infonres values. The only thing
- * to be aware of here is that there are minor difference between the
- * various share types.
+ * NetShareEnum Level 2
  */
 static DWORD
-mlsvc_NetShareEnumLevel2(struct mslm_infonres *infonres, DWORD n_shares,
-    struct mlrpc_xaction *mxa, char sticky)
+mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
+    struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_2 *info2;
 	lmshare_iterator_t *iterator;
 	lmshare_info_t *si;
-	DWORD i;
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
+	DWORD status;
 
-	info2 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_2, n_shares);
+	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_2));
+	if (se->se_n_enum == 0)
+		return (ERROR_SUCCESS);
+
+	info2 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_2, se->se_n_enum);
 	if (info2 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -1391,74 +1471,168 @@ mlsvc_NetShareEnumLevel2(struct mslm_infonres *infonres, DWORD n_shares,
 	if (iterator == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	i = 0;
+	se->se_n_read = 0;
 	while ((si = lmshare_iterate(iterator)) != 0) {
+		if (se->se_n_skip > 0) {
+			--se->se_n_skip;
+			continue;
+		}
+
+		++se->se_resume_handle;
+
 		if (sticky && (si->stype & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
 			continue;
 
-		if (mlsvc_NetShareEnumCommon(mxa, i, 2, si,
-		    (void *)info2) != ERROR_SUCCESS)
+		if (se->se_n_read >= se->se_n_enum) {
+			se->se_n_read = se->se_n_enum;
 			break;
-		i++;
+		}
+
+		status = mlsvc_NetShareEnumCommon(mxa, se, si, (void *)info2);
+		if (status != ERROR_SUCCESS)
+			break;
+
+		++se->se_n_read;
 	}
 
-	i = srvsvc_add_autohome(mxa, user_ctx->du_account, i, 2, (char *)info2);
+	if (se->se_n_read < se->se_n_enum) {
+		if (srvsvc_add_autohome(mxa, se, (void *)info2))
+			++se->se_n_read;
+	}
 
 	lmshare_close_iterator(iterator);
-	infonres->entriesread = i;
+	infonres->entriesread = se->se_n_read;
 	infonres->entries = info2;
 	return (ERROR_SUCCESS);
 }
 
 /*
- * mlsvc_NetShareEnumLevel502
- *
- * Build the level 502 share information. This is the same as level 2
- * but with a security descriptor in the share structure. We don't
- * support SD's on shares so we can just set that field to zero. See
- * mlsvc_NetShareEnumLevel2 for more information.
+ * NetShareEnum Level 501
  */
 static DWORD
-mlsvc_NetShareEnumLevel502(struct mslm_infonres *infonres, DWORD n_shares,
-    struct mlrpc_xaction *mxa, char sticky)
+mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
+    struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
-	struct mslm_SHARE_INFO_502 *info502;
+	struct mslm_SHARE_INFO_501 *info501;
 	lmshare_iterator_t *iterator;
 	lmshare_info_t *si;
-	DWORD i;
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
+	DWORD status;
 
-	info502 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_502, n_shares);
+	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_501));
+	if (se->se_n_enum == 0)
+		return (ERROR_SUCCESS);
 
-	if (info502 == 0)
+	info501 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_501,
+	    se->se_n_enum);
+	if (info501 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
 	iterator = lmshare_open_iterator(LMSHRM_ALL);
 	if (iterator == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	i = 0;
+	se->se_n_read = 0;
 	while ((si = lmshare_iterate(iterator)) != 0) {
+		if (se->se_n_skip > 0) {
+			--se->se_n_skip;
+			continue;
+		}
+
+		++se->se_resume_handle;
+
 		if (sticky && (si->stype & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
 			continue;
 
-		if (mlsvc_NetShareEnumCommon(
-		    mxa, i, 502, si, (void *)info502) != ERROR_SUCCESS)
+		if (se->se_n_read >= se->se_n_enum) {
+			se->se_n_read = se->se_n_enum;
 			break;
-		i++;
+		}
+
+		status = mlsvc_NetShareEnumCommon(mxa, se, si, (void *)info501);
+		if (status != ERROR_SUCCESS)
+			break;
+
+		++se->se_n_read;
 	}
 
-	i = srvsvc_add_autohome(mxa, user_ctx->du_account, i, 502,
-	    (char *)info502);
+	if (se->se_n_read < se->se_n_enum) {
+		if (srvsvc_add_autohome(mxa, se, (void *)info501))
+			++se->se_n_read;
+	}
 
 	lmshare_close_iterator(iterator);
-	infonres->entriesread = i;
+	infonres->entriesread = se->se_n_read;
+	infonres->entries = info501;
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * NetShareEnum Level 502
+ */
+static DWORD
+mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
+    struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
+{
+	struct mslm_SHARE_INFO_502 *info502;
+	lmshare_iterator_t *iterator;
+	lmshare_info_t *si;
+	DWORD status;
+
+	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_502));
+	if (se->se_n_enum == 0)
+		return (ERROR_SUCCESS);
+
+	info502 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_502,
+	    se->se_n_enum);
+	if (info502 == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	iterator = lmshare_open_iterator(LMSHRM_ALL);
+	if (iterator == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	se->se_n_read = 0;
+	while ((si = lmshare_iterate(iterator)) != NULL) {
+		if (se->se_n_skip > 0) {
+			--se->se_n_skip;
+			continue;
+		}
+
+		++se->se_resume_handle;
+
+		if (sticky && (si->stype & STYPE_SPECIAL))
+			continue;
+
+		if (smb_is_autohome(si))
+			continue;
+
+		if (se->se_n_read >= se->se_n_enum) {
+			se->se_n_read = se->se_n_enum;
+			break;
+		}
+
+		status = mlsvc_NetShareEnumCommon(mxa, se, si, (void *)info502);
+		if (status != ERROR_SUCCESS)
+			break;
+
+		++se->se_n_read;
+	}
+
+	if (se->se_n_read < se->se_n_enum) {
+		if (srvsvc_add_autohome(mxa, se, (void *)info502))
+			++se->se_n_read;
+	}
+
+	lmshare_close_iterator(iterator);
+	infonres->entriesread = se->se_n_read;
 	infonres->entries = info502;
 	return (ERROR_SUCCESS);
 }
@@ -1466,7 +1640,7 @@ mlsvc_NetShareEnumLevel502(struct mslm_infonres *infonres, DWORD n_shares,
 /*
  * mlsvc_NetShareEnumCommon
  *
- * Build the levels 0, 1, 2 and 502 share information. This function
+ * Build the levels 0, 1, 2, 501 and 502 share information. This function
  * is called by the various NetShareEnum levels for each share. If
  * we cannot build the share data for some reason, we return an error
  * but the actual value of the error is not important to the caller.
@@ -1479,14 +1653,16 @@ mlsvc_NetShareEnumLevel502(struct mslm_infonres *infonres, DWORD n_shares,
  *	ERROR_INVALID_LEVEL
  */
 static DWORD
-mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, DWORD i, int level,
+mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
     lmshare_info_t *si, void *infop)
 {
 	struct mslm_SHARE_INFO_0 *info0;
 	struct mslm_SHARE_INFO_1 *info1;
 	struct mslm_SHARE_INFO_2 *info2;
+	struct mslm_SHARE_INFO_501 *info501;
 	struct mslm_SHARE_INFO_502 *info502;
 	char shr_comment[LMSHR_COMMENT_MAX];
+	int i = se->se_n_read;
 
 	if ((si->stype & STYPE_MASK) == STYPE_IPC) {
 		/*
@@ -1500,15 +1676,15 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, DWORD i, int level,
 		(void) snprintf(shr_comment, sizeof (shr_comment), "%s (%s)",
 		    si->directory, si->comment);
 	else
-		(void) strcpy(shr_comment, si->directory);
+		(void) strlcpy(shr_comment, si->directory, LMSHR_COMMENT_MAX);
 
-	switch (level) {
+	switch (se->se_level) {
 	case 0:
 		info0 = (struct mslm_SHARE_INFO_0 *)infop;
 		info0[i].shi0_netname
 		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
 
-		if (info0[i].shi0_netname == 0)
+		if (info0[i].shi0_netname == NULL)
 			return (ERROR_NOT_ENOUGH_MEMORY);
 		break;
 
@@ -1550,6 +1726,21 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, DWORD i, int level,
 
 		break;
 
+	case 501:
+		info501 = (struct mslm_SHARE_INFO_501 *)infop;
+		info501[i].shi501_netname
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
+
+		info501[i].shi501_remark
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+
+		info501[i].shi501_type = si->stype;
+		info501[i].shi501_flags = 0;
+
+		if (!info501[i].shi501_netname || !info501[i].shi501_remark)
+			return (ERROR_NOT_ENOUGH_MEMORY);
+		break;
+
 	case 502:
 		info502 = (struct mslm_SHARE_INFO_502 *)infop;
 		info502[i].shi502_netname
@@ -1584,6 +1775,67 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, DWORD i, int level,
 }
 
 /*
+ * srvsvc_add_autohome
+ *
+ * Add the autohome share for the user. The share must not be a permanent
+ * share to avoid duplicates.
+ */
+static boolean_t
+srvsvc_add_autohome(struct mlrpc_xaction *mxa, srvsvc_enum_t *se, void *infop)
+{
+	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
+	char *username = user_ctx->du_account;
+	lmshare_info_t si;
+	DWORD status;
+
+	if (lmshare_getinfo(username, &si) != NERR_Success)
+		return (B_FALSE);
+
+	if (!(si.mode & LMSHRM_TRANS))
+		return (B_FALSE);
+
+	status = mlsvc_NetShareEnumCommon(mxa, se, &si, infop);
+	return (status == ERROR_SUCCESS);
+}
+
+/*
+ * srvsvc_share_mkpath
+ *
+ * Create the share path required by the share enum calls. The path
+ * is created in a heap buffer ready for use by the caller.
+ *
+ * Some Windows over-the-wire backup applications do not work unless a
+ * drive letter is present in the share path.  We don't care about the
+ * drive letter since the path is fully qualified with the volume name.
+ *
+ * Windows clients seem to be mostly okay with forward slashes in
+ * share paths but they cannot handle one immediately after the drive
+ * letter, i.e. B:/.  For consistency we convert all the slashes in
+ * the path.
+ *
+ * Returns a pointer to a heap buffer containing the share path, which
+ * could be a null pointer if the heap allocation fails.
+ */
+static char *
+srvsvc_share_mkpath(struct mlrpc_xaction *mxa, char *path)
+{
+	char tmpbuf[MAXPATHLEN];
+	char *p;
+
+	/*
+	 * Strip the volume name from the path (/vol1/home -> /home).
+	 */
+	p = path;
+	p += strspn(p, "/");
+	p += strcspn(p, "/");
+	p += strspn(p, "/");
+	(void) snprintf(tmpbuf, MAXPATHLEN, "%c:/%s", 'B', p);
+	(void) strsubst(tmpbuf, '/', '\\');
+
+	return (MLRPC_HEAP_STRSAVE(mxa, tmpbuf));
+}
+
+/*
  * srvsvc_s_NetShareDel
  *
  * Delete a share. Only the administrator, or a member of the domain
@@ -1600,7 +1852,7 @@ srvsvc_s_NetShareDel(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetShareDel *param = arg;
 
-	if (srvsvc_is_poweruser(mxa) == 0 ||
+	if (!srvsvc_is_poweruser(mxa) ||
 	    lmshare_is_restricted((char *)param->netname)) {
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);

@@ -1057,7 +1057,6 @@ struct mslm_NetNameValidate {
 #define SHI_USES_UNLIMITED      (DWORD)-1
 
 
-
 struct mslm_SHARE_INFO_0 {
 	LPTSTR		shi0_netname;
 };
@@ -1083,11 +1082,22 @@ struct mslm_SHARE_INFO_2 {
 INFONRES_RESULT(mslm_SHARE_INFO,2)
 
 /*
+ * shi501_flags must be zero.
+ */
+struct mslm_SHARE_INFO_501 {
+	LPTSTR		shi501_netname;
+	DWORD		shi501_type;
+	LPTSTR		shi501_remark;
+	DWORD		shi501_flags;
+};
+INFONRES_RESULT(mslm_SHARE_INFO,501)
+
+/*
  * Note: shi502_security_descriptor should be a pointer to a
  * security descriptor (W32SEC_SECURITY_DESCRIPTOR):
  *	PSECURITY_DESCRIPTOR shi502_security_descriptor;
  *
- * For now we can just use a DWORD and set it to zero.
+ * For now use a DWORD and set it to zero.
  */
 struct mslm_SHARE_INFO_502 {
 	LPTSTR		shi502_netname;
@@ -1129,20 +1139,23 @@ INFONRES_DEFINITION(mslm_NetShareEnum,
 	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,0)
 	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,1)
 	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,2)
+	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,501)
 	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,502))
 
-
+/*
+ * NetShareEnum: enumerate all shares (see also NetShareEnumSticky).
+ * Note: the server should ignore the content of servername.
+ */
 OPERATION(SRVSVC_OPNUM_NetShareEnum)
 struct mslm_NetShareEnum {
 	IN  		LPTSTR	servername;
 	INOUT  		DWORD	level;
-	OUT 		struct mslm_NetShareEnum_result result;
+	INOUT 		struct mslm_NetShareEnum_result result;
 	IN  		DWORD	prefmaxlen;
 	OUT 		DWORD	totalentries;
-	INOUT 		DWORD *	resume_handle;		/* not sure about ptr */
+	INOUT 		DWORD	*resume_handle;
 	OUT 		DWORD	status;
 };
-
 
 /*
  * Delete a share. The reserved field appears in netmon
@@ -1157,22 +1170,19 @@ struct mslm_NetShareDel {
 	OUT	DWORD status;
 };
 
-
 /*
- * NetShareEnumSticky is the same as NetShareEnum except that hidden
- * shares are not returned. This call was apparently added due to a
- * bug in the NT implementation of NetShareEnum - it didn't process
- * the resume handle correctly so that attempts to enumerate large
- * share lists resulted in an infinite loop.
+ * NetShareEnumSticky is the same as NetShareEnum except that
+ * STYPE_SPECIAL (hidden or special) shares are not returned.
+ * Note: the server should ignore the content of servername.
  */
 OPERATION(SRVSVC_OPNUM_NetShareEnumSticky)
 struct mslm_NetShareEnumSticky {
 	IN  		LPTSTR	servername;
 	INOUT  		DWORD	level;
-	OUT 		struct mslm_NetShareEnum_result result;
+	INOUT 		struct mslm_NetShareEnum_result result;
 	IN  		DWORD	prefmaxlen;
 	OUT 		DWORD	totalentries;
-	INOUT 		DWORD *	resume_handle;		/* not sure about ptr */
+	INOUT 		DWORD	*resume_handle;
 	OUT 		DWORD	status;
 };
 

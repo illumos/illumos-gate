@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,14 +246,21 @@ struct mlndr_stream_ops {
 #define	MLNDS_DESTRUCT(MLNDS) \
 	(*(MLNDS)->mlndo->mlndo_destruct)(MLNDS)
 
+typedef struct ndr_frag {
+	struct ndr_frag *next;
+	uint8_t *buf;
+	uint32_t len;
+} ndr_frag_t;
+
 struct mlndr_stream {
 	unsigned long		pdu_size;
-	unsigned long		pdu_size_with_rpc_hdrs;
 	unsigned long		pdu_max_size;
 	unsigned long		pdu_base_offset;
 	unsigned long		pdu_scan_offset;
 	unsigned char		*pdu_base_addr;
-	unsigned char		*pdu_base_addr_with_rpc_hdrs;
+	ndr_frag_t		*head;
+	ndr_frag_t		*tail;
+	uint32_t		nfrag;
 
 	struct mlndr_stream_ops *mlndo;
 

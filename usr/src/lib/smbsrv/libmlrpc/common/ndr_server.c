@@ -66,6 +66,7 @@ static int mlrpc_s_alter_context(struct mlrpc_xaction *);
 static void mlrpc_reply_bind_ack(struct mlrpc_xaction *);
 static void mlrpc_reply_fault(struct mlrpc_xaction *, unsigned long);
 static int mlrpc_build_reply(struct mlrpc_xaction *);
+static void mlrpc_build_frag(struct mlndr_stream *, uint8_t *, uint32_t);
 
 /*
  * This is the RPC service server-side entry point.  All MSRPC encoded
@@ -80,7 +81,6 @@ mlrpc_process(int fid, smb_dr_user_ctx_t *user_ctx)
 	struct mlrpc_xaction		*mxa;
 	struct mlndr_stream		*recv_mlnds;
 	struct mlndr_stream		*send_mlnds;
-	unsigned char			*pdu_base_addr;
 	char				*data;
 	int				datalen;
 
@@ -116,17 +116,9 @@ mlrpc_process(int fid, smb_dr_user_ctx_t *user_ctx)
 
 	(void) mlrpc_s_process(mxa);
 
-	/*
-	 * Different pointers for single frag vs multi frag responses.
-	 */
-	if (send_mlnds->pdu_base_addr_with_rpc_hdrs)
-		pdu_base_addr = send_mlnds->pdu_base_addr_with_rpc_hdrs;
-	else
-		pdu_base_addr = send_mlnds->pdu_base_addr;
-
-	datalen = send_mlnds->pdu_size_with_rpc_hdrs;
-	context->outpipe->sp_datalen = datalen;
-	bcopy(pdu_base_addr, context->outpipe->sp_data, datalen);
+	context->outpipe->sp_datalen = mlnds_finalize(send_mlnds,
+	    (uint8_t *)context->outpipe->sp_data,
+	    SMB_CTXT_PIPE_SZ - sizeof (smb_pipe_t));
 
 	mlnds_destruct(&mxa->recv_mlnds);
 	mlnds_destruct(&mxa->send_mlnds);
@@ -710,24 +702,16 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 {
 	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 	struct mlndr_stream *mlnds = &mxa->send_mlnds;
+	ndr_frag_t *frag;
+	uint8_t *pdu_buf;
 	unsigned long pdu_size;
 	unsigned long frag_size;
 	unsigned long pdu_data_size;
 	unsigned long frag_data_size;
-	uint32_t rem_dlen;
-	uint32_t save_rem_dlen;
-	uint32_t bytesoff;
-	uint32_t cnt;
-	uint32_t obytes;
-	uint32_t num_ext_frags;
-	uint16_t last_frag = 0;
-	uchar_t  *frag_startp;
-	mlrpcconn_common_header_t *rpc_hdr;
-
-	hdr = &mxa->send_hdr.common_hdr;
 
 	frag_size = mlrpc_frag_size;
 	pdu_size = mlnds->pdu_size;
+	pdu_buf = mlnds->pdu_base_addr;
 
 	if (pdu_size <= frag_size) {
 		/*
@@ -758,9 +742,8 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 
 		mlnds->pdu_scan_offset = 0;
 		(void) mlrpc_encode_pdu_hdr(mxa);
-
-		mlnds->pdu_size_with_rpc_hdrs = mlnds->pdu_size;
-		mlnds->pdu_base_addr_with_rpc_hdrs = 0;
+		pdu_size = mlnds->pdu_size;
+		mlrpc_build_frag(mlnds, pdu_buf,  pdu_size);
 		return (0);
 	}
 
@@ -771,77 +754,75 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 	hdr->frag_length = frag_size;
 	mxa->send_hdr.response_hdr.alloc_hint = pdu_size - MLRPC_RSP_HDR_SIZE;
 	mlnds->pdu_scan_offset = 0;
-
 	(void) mlrpc_encode_pdu_hdr(mxa);
+	mlrpc_build_frag(mlnds, pdu_buf,  frag_size);
 
 	/*
 	 * We need to update the 24-byte header in subsequent fragments.
 	 *
-	 *	pdu_data_size:	total data remaining to be handled
-	 *	frag_size:		total fragment size including header
-	 *	frag_data_size: data in fragment
+	 * pdu_data_size:	total data remaining to be handled
+	 * frag_size:		total fragment size including header
+	 * frag_data_size:	data in fragment
 	 *			(i.e. frag_size - MLRPC_RSP_HDR_SIZE)
 	 */
 	pdu_data_size = pdu_size - MLRPC_RSP_HDR_SIZE;
 	frag_data_size = frag_size - MLRPC_RSP_HDR_SIZE;
 
-	num_ext_frags = pdu_data_size / frag_data_size;
+	while (pdu_data_size) {
+		mxa->send_hdr.response_hdr.alloc_hint -= frag_data_size;
+		pdu_data_size -= frag_data_size;
+		pdu_buf += frag_data_size;
 
-	/*
-	 * We may need to stretch the pipe and insert an RPC header
-	 * at each frag boundary.  The response will get chunked into
-	 * xdrlen sizes for each trans request.
-	 */
-	mlnds->pdu_base_addr_with_rpc_hdrs
-	    = malloc(pdu_size + (num_ext_frags * MLRPC_RSP_HDR_SIZE));
-	mlnds->pdu_size_with_rpc_hdrs =
-	    mlnds->pdu_size + (num_ext_frags * MLRPC_RSP_HDR_SIZE);
-
-	/*
-	 * Start stretching loop.
-	 */
-	bcopy(mlnds->pdu_base_addr,
-	    mlnds->pdu_base_addr_with_rpc_hdrs, frag_size);
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	rpc_hdr = (mlrpcconn_common_header_t *)
-	    mlnds->pdu_base_addr_with_rpc_hdrs;
-	rpc_hdr->pfc_flags = MLRPC_PFC_FIRST_FRAG;
-	rem_dlen = pdu_data_size - frag_size;
-	bytesoff = frag_size;
-	cnt = 1;
-	while (num_ext_frags--) {
-		/* first copy the RPC header to the front of the frag */
-		bcopy(mlnds->pdu_base_addr, mlnds->pdu_base_addr_with_rpc_hdrs +
-		    (cnt * frag_size), MLRPC_RSP_HDR_SIZE);
-
-		/* then copy the data portion of the frag */
-		save_rem_dlen = rem_dlen;
-		if (rem_dlen >= (frag_size - MLRPC_RSP_HDR_SIZE)) {
-			rem_dlen = rem_dlen - frag_size + MLRPC_RSP_HDR_SIZE;
-			obytes = frag_size - MLRPC_RSP_HDR_SIZE;
+		if (pdu_data_size <= frag_data_size) {
+			frag_data_size = pdu_data_size;
+			frag_size = frag_data_size + MLRPC_RSP_HDR_SIZE;
+			hdr->pfc_flags = MLRPC_PFC_LAST_FRAG;
 		} else {
-			last_frag = 1;   /* this is the last one */
-			obytes = rem_dlen;
+			hdr->pfc_flags = 0;
 		}
 
-		frag_startp = mlnds->pdu_base_addr_with_rpc_hdrs +
-		    (cnt * frag_size);
-		bcopy(mlnds->pdu_base_addr + bytesoff,
-		    frag_startp + MLRPC_RSP_HDR_SIZE, obytes);
+		hdr->frag_length = frag_size;
+		mlnds->pdu_scan_offset = 0;
+		mlrpc_encode_pdu_hdr(mxa);
+		bcopy(mlnds->pdu_base_addr, pdu_buf, MLRPC_RSP_HDR_SIZE);
 
-		/* set the FRAG FLAGS in the frag header spot */
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		rpc_hdr = (mlrpcconn_common_header_t *)frag_startp;
-		if (last_frag) {
-			rpc_hdr->frag_length = save_rem_dlen;
-			rpc_hdr->pfc_flags = MLRPC_PFC_LAST_FRAG;
-		} else {
-			rpc_hdr->pfc_flags = 0;
-		}
+		mlrpc_build_frag(mlnds, pdu_buf, frag_size);
 
-		bytesoff += (frag_size - MLRPC_RSP_HDR_SIZE);
-		cnt++;
+		if (hdr->pfc_flags & MLRPC_PFC_LAST_FRAG)
+			break;
 	}
 
 	return (0);
+}
+
+/*
+ * mlrpc_build_frag
+ *
+ * Build an RPC PDU fragment from the specified buffer.
+ * If malloc fails, the client will see a header/pdu inconsistency
+ * and report an error.
+ */
+static void
+mlrpc_build_frag(struct mlndr_stream *mlnds, uint8_t *buf, uint32_t len)
+{
+	ndr_frag_t *frag;
+	int size = sizeof (ndr_frag_t) + len;
+
+	if ((frag = (ndr_frag_t *)malloc(size)) == NULL)
+		return;
+
+	frag->next = NULL;
+	frag->buf = (uint8_t *)frag + sizeof (ndr_frag_t);
+	frag->len = len;
+	bcopy(buf, frag->buf, len);
+
+	if (mlnds->head == NULL) {
+		mlnds->head = frag;
+		mlnds->tail = frag;
+		mlnds->nfrag = 1;
+	} else {
+		mlnds->tail->next = frag;
+		mlnds->tail = frag;
+		++mlnds->nfrag;
+	}
 }

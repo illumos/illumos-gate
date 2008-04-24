@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,6 +156,27 @@ mlnds_initialize(struct mlndr_stream *mlnds, unsigned pdu_size_hint,
 
 	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;
 	return (1);
+}
+
+int
+mlnds_finalize(struct mlndr_stream *mlnds, uint8_t *buf, uint32_t buflen)
+{
+	ndr_frag_t *frag;
+	uint8_t *pdu = mlnds->pdu_base_addr;
+	uint32_t size = 0;
+
+	for (frag = mlnds->head; frag; frag = frag->next)
+		size += frag->len;
+
+	if (size == 0 || size >= NDR_PDU_MAX_SIZE || size > buflen)
+		return (0);
+
+	for (frag = mlnds->head; frag; frag = frag->next) {
+		bcopy(frag->buf, buf, frag->len);
+		buf += frag->len;
+	}
+
+	return (size);
 }
 
 /*
@@ -360,21 +381,29 @@ mlndo_reset(struct mlndr_stream *mlnds)
 /*
  * mlndo_destruct
  *
- * Destruct a stream: zap the outer_queue. Currently, this operation isn't
- * required because the heap management (creation/destruction) is external
- * to the stream but it provides a place-holder for stream cleanup.
+ * Destruct a stream: zap the outer_queue.
+ * Note: heap management (creation/destruction) is external to the stream.
  */
 static void
 mlndo_destruct(struct mlndr_stream *mlnds)
 {
+	ndr_frag_t *frag;
+
 	mlndo_printf(mlnds, 0, "destruct");
 
-	if (mlnds->pdu_base_addr != 0) {
+	if (mlnds->pdu_base_addr != NULL) {
 		free(mlnds->pdu_base_addr);
-		mlnds->pdu_base_addr = 0;
+		mlnds->pdu_base_addr = NULL;
 		mlnds->pdu_base_offset = 0;
 	}
 
+	while ((frag = mlnds->head) != NULL) {
+		mlnds->head = frag->next;
+		free(frag);
+	}
+
+	mlnds->head = NULL;
+	mlnds->tail = NULL;
 	mlnds->outer_queue_head = 0;
 	mlnds->outer_current = 0;
 	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;

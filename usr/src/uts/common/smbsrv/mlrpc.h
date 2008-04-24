@@ -389,6 +389,7 @@ struct mlrpc_client {
 
 /* ndr_ops.c */
 int mlnds_initialize(struct mlndr_stream *, unsigned, int, mlrpc_heap_t *);
+int mlnds_finalize(struct mlndr_stream *, uint8_t *, uint32_t);
 void mlnds_destruct(struct mlndr_stream *);
 
 /* ndr_client.c */
