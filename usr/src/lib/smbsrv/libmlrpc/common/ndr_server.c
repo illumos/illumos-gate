@@ -702,7 +702,6 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 {
 	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 	struct mlndr_stream *mlnds = &mxa->send_mlnds;
-	ndr_frag_t *frag;
 	uint8_t *pdu_buf;
 	unsigned long pdu_size;
 	unsigned long frag_size;
@@ -783,7 +782,7 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 
 		hdr->frag_length = frag_size;
 		mlnds->pdu_scan_offset = 0;
-		mlrpc_encode_pdu_hdr(mxa);
+		(void) mlrpc_encode_pdu_hdr(mxa);
 		bcopy(mlnds->pdu_base_addr, pdu_buf, MLRPC_RSP_HDR_SIZE);
 
 		mlrpc_build_frag(mlnds, pdu_buf, frag_size);

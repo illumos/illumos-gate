@@ -162,7 +162,6 @@ int
 mlnds_finalize(struct mlndr_stream *mlnds, uint8_t *buf, uint32_t buflen)
 {
 	ndr_frag_t *frag;
-	uint8_t *pdu = mlnds->pdu_base_addr;
 	uint32_t size = 0;
 
 	for (frag = mlnds->head; frag; frag = frag->next)
