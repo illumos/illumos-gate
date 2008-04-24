@@ -54,18 +54,14 @@ extern "C" {
 #define	VDC_LOCKS	0x0002
 #define	VDC_MINOR	0x0004
 #define	VDC_THREAD	0x0008
-#define	VDC_LDC		0x0010
-#define	VDC_LDC_INIT	0x0020
-#define	VDC_LDC_CB	0x0040
-#define	VDC_LDC_OPEN	0x0080
-#define	VDC_DRING_INIT	0x0100	/* The DRing was created */
-#define	VDC_DRING_BOUND	0x0200	/* The DRing was bound to an LDC channel */
-#define	VDC_DRING_LOCAL	0x0400	/* The local private DRing was allocated */
-#define	VDC_DRING_ENTRY	0x0800	/* At least one DRing entry was initialised */
+#define	VDC_DRING_INIT	0x0010	/* The DRing was created */
+#define	VDC_DRING_BOUND	0x0020	/* The DRing was bound to an LDC channel */
+#define	VDC_DRING_LOCAL	0x0040	/* The local private DRing was allocated */
+#define	VDC_DRING_ENTRY	0x0080	/* At least one DRing entry was initialised */
 #define	VDC_DRING	(VDC_DRING_INIT | VDC_DRING_BOUND |	\
 				VDC_DRING_LOCAL | VDC_DRING_ENTRY)
-#define	VDC_HANDSHAKE	0x1000	/* Indicates if a handshake is in progress */
-#define	VDC_HANDSHAKE_STOP	0x2000	/* stop further handshakes */
+#define	VDC_HANDSHAKE	0x0100	/* Indicates if a handshake is in progress */
+#define	VDC_HANDSHAKE_STOP	0x0200	/* stop further handshakes */
 
 /*
  * Definitions of strings to be used to create device node properties.
@@ -240,6 +236,28 @@ typedef struct vdc_io {
 } vdc_io_t;
 
 /*
+ * Per vDisk server channel states
+ */
+#define	VDC_LDC_INIT	0x0001
+#define	VDC_LDC_CB	0x0002
+#define	VDC_LDC_OPEN	0x0004
+#define	VDC_LDC		(VDC_LDC_INIT | VDC_LDC_CB | VDC_LDC_OPEN)
+
+/*
+ * vDisk server information
+ */
+typedef struct vdc_server {
+	struct vdc_server	*next;			/* Next server */
+	struct vdc		*vdcp;			/* Ptr to vdc struct */
+	uint64_t		id;			/* Server port id */
+	uint64_t		state;			/* Server state */
+	uint64_t		ldc_id;			/* Server LDC id */
+	ldc_handle_t		ldc_handle;		/* Server LDC handle */
+	ldc_status_t		ldc_state;		/* Server LDC state */
+	uint64_t		ctimeout;		/* conn tmout (secs) */
+} vdc_server_t;
+
+/*
  * vdc soft state structure
  */
 typedef struct vdc {
@@ -298,7 +316,6 @@ typedef struct vdc {
 	struct dk_cinfo	*cinfo;		/* structure to store DKIOCINFO data */
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */
 	ddi_devid_t	devid;		/* device id */
-	uint64_t	ctimeout;	/* connection timeout in seconds */
 	boolean_t	ctimeout_reached; /* connection timeout has expired */
 
 	/*
@@ -327,6 +344,7 @@ typedef struct vdc {
 	kstat_t		*io_stats;
 	kstat_t		*err_stats;
 
+	ldc_dring_handle_t	dring_hdl;		/* dring handle */
 	ldc_mem_info_t		dring_mem_info;		/* dring information */
 	uint_t			dring_curr_idx;		/* current index */
 	uint32_t		dring_len;		/* dring length */
@@ -343,10 +361,9 @@ typedef struct vdc {
 	int			local_dring_backup_tail; /* backup dring tail */
 	int			local_dring_backup_len;	/* backup dring len */
 
-	uint64_t		ldc_id;			/* LDC channel id */
-	ldc_status_t		ldc_state;		/* LDC channel state */
-	ldc_handle_t		ldc_handle;		/* LDC handle */
-	ldc_dring_handle_t	ldc_dring_hdl;		/* LDC dring handle */
+	int			num_servers;		/* no. of servers */
+	vdc_server_t		*server_list;		/* vdisk server list */
+	vdc_server_t		*curr_server;		/* curr vdisk server */
 } vdc_t;
 
 /*

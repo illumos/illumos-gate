@@ -124,7 +124,7 @@ static int	vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 /* setup */
 static void	vdc_min(struct buf *bufp);
 static int	vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen);
-static int	vdc_do_ldc_init(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_node);
+static int	vdc_do_ldc_init(vdc_t *vdc, vdc_server_t *srvr);
 static int	vdc_start_ldc_connection(vdc_t *vdc);
 static int	vdc_create_device_nodes(vdc_t *vdc);
 static int	vdc_create_device_nodes_efi(vdc_t *vdc);
@@ -134,10 +134,12 @@ static void	vdc_create_io_kstats(vdc_t *vdc);
 static void	vdc_create_err_kstats(vdc_t *vdc);
 static void	vdc_set_err_kstats(vdc_t *vdc);
 static int	vdc_get_md_node(dev_info_t *dip, md_t **mdpp,
-		    mde_cookie_t *vd_nodep, mde_cookie_t *vd_portp);
-static int	vdc_get_ldc_id(md_t *, mde_cookie_t, uint64_t *);
+		    mde_cookie_t *vd_nodep);
+static int	vdc_init_ports(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_nodep);
+static void	vdc_fini_ports(vdc_t *vdc);
+static void	vdc_switch_server(vdc_t *vdcp);
 static int	vdc_do_ldc_up(vdc_t *vdc);
-static void	vdc_terminate_ldc(vdc_t *vdc);
+static void	vdc_terminate_ldc(vdc_t *vdc, vdc_server_t *srvr);
 static int	vdc_init_descriptor_ring(vdc_t *vdc);
 static void	vdc_destroy_descriptor_ring(vdc_t *vdc);
 static int	vdc_setup_devid(vdc_t *vdc);
@@ -226,6 +228,7 @@ static int	vdc_failfast_check_resv(vdc_t *vdc);
 static int	vdc_hshake_retries = 3;
 
 static int	vdc_timeout = 0; /* units: seconds */
+static int 	vdc_ldcup_timeout = 1; /* units: seconds */
 
 static uint64_t vdc_hz_min_ldc_delay;
 static uint64_t vdc_min_timeout_ldc = 1 * MILLISEC;
@@ -448,8 +451,11 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/*
 	 * try and disable callbacks to prevent another handshake
 	 */
-	rv = ldc_set_cb_mode(vdc->ldc_handle, LDC_CB_DISABLE);
-	DMSG(vdc, 0, "callback disabled (rv=%d)\n", rv);
+	if (vdc->curr_server != NULL) {
+		rv = ldc_set_cb_mode(vdc->curr_server->ldc_handle,
+		    LDC_CB_DISABLE);
+		DMSG(vdc, 0, "callback disabled (rv=%d)\n", rv);
+	}
 
 	if (vdc->initialized & VDC_THREAD) {
 		mutex_enter(&vdc->read_lock);
@@ -484,8 +490,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vdc->initialized & VDC_DRING)
 		vdc_destroy_descriptor_ring(vdc);
 
-	if (vdc->initialized & VDC_LDC)
-		vdc_terminate_ldc(vdc);
+	vdc_fini_ports(vdc);
 
 	if (vdc->failfast_thread) {
 		failfast_tid = vdc->failfast_thread->t_did;
@@ -575,7 +580,7 @@ vdc_do_attach(dev_info_t *dip)
 	vdc_t		*vdc = NULL;
 	int		status;
 	md_t		*mdp;
-	mde_cookie_t	vd_node, vd_port;
+	mde_cookie_t	vd_node;
 
 	ASSERT(dip != NULL);
 
@@ -606,7 +611,6 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->vdisk_label = VD_DISK_LABEL_UNK;
 	vdc->state	= VDC_STATE_INIT;
 	vdc->lifecycle	= VDC_LC_ATTACHING;
-	vdc->ldc_state	= 0;
 	vdc->session_id = 0;
 	vdc->block_size = DEV_BSIZE;
 	vdc->max_xfer_sz = maxphys / DEV_BSIZE;
@@ -651,27 +655,18 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->initialized |= VDC_LOCKS;
 
 	/* get device and port MD node for this disk instance */
-	if (vdc_get_md_node(dip, &mdp, &vd_node, &vd_port) != 0) {
+	if (vdc_get_md_node(dip, &mdp, &vd_node) != 0) {
 		cmn_err(CE_NOTE, "[%d] Could not get machine description node",
 		    instance);
 		return (DDI_FAILURE);
 	}
 
-	/* set the connection timeout */
-	if (vd_port == NULL || (md_get_prop_val(mdp, vd_port,
-	    VDC_MD_TIMEOUT, &vdc->ctimeout) != 0)) {
-		vdc->ctimeout = 0;
+	if (vdc_init_ports(vdc, mdp, vd_node) != 0) {
+		cmn_err(CE_NOTE, "[%d] Error initialising ports", instance);
+		return (DDI_FAILURE);
 	}
-
-	/* initialise LDC channel which will be used to communicate with vds */
-	status = vdc_do_ldc_init(vdc, mdp, vd_node);
 
 	(void) md_fini_handle(mdp);
-
-	if (status != 0) {
-		cmn_err(CE_NOTE, "[%d] Couldn't initialize LDC", instance);
-		goto return_status;
-	}
 
 	/* initialize the thread responsible for managing state with server */
 	vdc->msg_proc_thr = thread_create(NULL, 0, vdc_process_msg_thread,
@@ -763,74 +758,66 @@ vdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 }
 
 static int
-vdc_do_ldc_init(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_node)
+vdc_do_ldc_init(vdc_t *vdc, vdc_server_t *srvr)
 {
 	int			status = 0;
 	ldc_status_t		ldc_state;
 	ldc_attr_t		ldc_attr;
-	uint64_t		ldc_id = 0;
 
 	ASSERT(vdc != NULL);
-
-	vdc->initialized |= VDC_LDC;
-
-	if ((status = vdc_get_ldc_id(mdp, vd_node, &ldc_id)) != 0) {
-		DMSG(vdc, 0, "[%d] Failed to get LDC channel ID property",
-		    vdc->instance);
-		return (EIO);
-	}
-
-	DMSGX(0, "[%d] LDC id is 0x%lx\n", vdc->instance, ldc_id);
-
-	vdc->ldc_id = ldc_id;
+	ASSERT(srvr != NULL);
 
 	ldc_attr.devclass = LDC_DEV_BLK;
 	ldc_attr.instance = vdc->instance;
 	ldc_attr.mode = LDC_MODE_UNRELIABLE;	/* unreliable transport */
 	ldc_attr.mtu = VD_LDC_MTU;
 
-	if ((vdc->initialized & VDC_LDC_INIT) == 0) {
-		status = ldc_init(ldc_id, &ldc_attr, &vdc->ldc_handle);
+	if ((srvr->state & VDC_LDC_INIT) == 0) {
+		status = ldc_init(srvr->ldc_id, &ldc_attr,
+		    &srvr->ldc_handle);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] ldc_init(chan %ld) returned %d",
-			    vdc->instance, ldc_id, status);
+			    vdc->instance, srvr->ldc_id, status);
 			return (status);
 		}
-		vdc->initialized |= VDC_LDC_INIT;
+		srvr->state |= VDC_LDC_INIT;
 	}
-	status = ldc_status(vdc->ldc_handle, &ldc_state);
+	status = ldc_status(srvr->ldc_handle, &ldc_state);
 	if (status != 0) {
 		DMSG(vdc, 0, "[%d] Cannot discover LDC status [err=%d]",
 		    vdc->instance, status);
-		return (status);
+		goto init_exit;
 	}
-	vdc->ldc_state = ldc_state;
+	srvr->ldc_state = ldc_state;
 
-	if ((vdc->initialized & VDC_LDC_CB) == 0) {
-		status = ldc_reg_callback(vdc->ldc_handle, vdc_handle_cb,
-		    (caddr_t)vdc);
+	if ((srvr->state & VDC_LDC_CB) == 0) {
+		status = ldc_reg_callback(srvr->ldc_handle, vdc_handle_cb,
+		    (caddr_t)srvr);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] LDC callback reg. failed (%d)",
 			    vdc->instance, status);
-			return (status);
+			goto init_exit;
 		}
-		vdc->initialized |= VDC_LDC_CB;
+		srvr->state |= VDC_LDC_CB;
 	}
-
-	vdc->initialized |= VDC_LDC;
 
 	/*
 	 * At this stage we have initialised LDC, we will now try and open
 	 * the connection.
 	 */
-	if (vdc->ldc_state == LDC_INIT) {
-		status = ldc_open(vdc->ldc_handle);
+	if (srvr->ldc_state == LDC_INIT) {
+		status = ldc_open(srvr->ldc_handle);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] ldc_open(chan %ld) returned %d",
-			    vdc->instance, vdc->ldc_id, status);
-			return (status);
+			    vdc->instance, srvr->ldc_id, status);
+			goto init_exit;
 		}
-		vdc->initialized |= VDC_LDC_OPEN;
+		srvr->state |= VDC_LDC_OPEN;
+	}
+
+init_exit:
+	if (status) {
+		vdc_terminate_ldc(vdc, srvr);
 	}
 
 	return (status);
@@ -857,10 +844,14 @@ vdc_stop_ldc_connection(vdc_t *vdcp)
 {
 	int	status;
 
+	ASSERT(vdcp != NULL);
+
+	ASSERT(MUTEX_HELD(&vdcp->lock));
+
 	DMSG(vdcp, 0, ": Resetting connection to vDisk server : state %d\n",
 	    vdcp->state);
 
-	status = ldc_down(vdcp->ldc_handle);
+	status = ldc_down(vdcp->curr_server->ldc_handle);
 	DMSG(vdcp, 0, "ldc_down() = %d\n", status);
 
 	vdcp->initialized &= ~VDC_HANDSHAKE;
@@ -1636,8 +1627,8 @@ vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver)
 	    vdc->instance, status);
 	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
 		DMSG(vdc, 0, "[%d] Failed to send Ver negotiation info: "
-		    "id(%lx) rv(%d) size(%ld)", vdc->instance, vdc->ldc_handle,
-		    status, msglen);
+		    "id(%lx) rv(%d) size(%ld)", vdc->instance,
+		    vdc->curr_server->ldc_handle, status, msglen);
 		if (msglen != sizeof (vio_ver_msg_t))
 			status = ENOMSG;
 	}
@@ -1731,8 +1722,8 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 
 	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
 		DMSG(vdc, 0, "[%d] Failed to send Attr negotiation info: "
-		    "id(%lx) rv(%d) size(%ld)", vdc->instance, vdc->ldc_handle,
-		    status, msglen);
+		    "id(%lx) rv(%d) size(%ld)", vdc->instance,
+		    vdc->curr_server->ldc_handle, status, msglen);
 		if (msglen != sizeof (vio_ver_msg_t))
 			status = ENOMSG;
 	}
@@ -2037,7 +2028,7 @@ vdc_recv(vdc_t *vdc, vio_msg_t *msgp, size_t *nbytesp)
 	delay_time = vdc_ldc_read_init_delay;
 loop:
 	len = *nbytesp;
-	status = ldc_read(vdc->ldc_handle, (caddr_t)msgp, &len);
+	status = ldc_read(vdc->curr_server->ldc_handle, (caddr_t)msgp, &len);
 	switch (status) {
 	case EAGAIN:
 		delay_time *= 2;
@@ -2060,7 +2051,7 @@ loop:
 		 * read state as pending. Otherwise, set the state
 		 * back to idle.
 		 */
-		status = ldc_chkq(vdc->ldc_handle, &q_has_pkts);
+		status = ldc_chkq(vdc->curr_server->ldc_handle, &q_has_pkts);
 		if (status == 0 && !q_has_pkts)
 			vdc->read_state = VDC_READ_IDLE;
 
@@ -2166,7 +2157,7 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
 	delay_ticks = vdc_hz_min_ldc_delay;
 	do {
 		size = *msglen;
-		status = ldc_write(vdc->ldc_handle, pkt, &size);
+		status = ldc_write(vdc->curr_server->ldc_handle, pkt, &size);
 		if (status == EWOULDBLOCK) {
 			delay(delay_ticks);
 			/* geometric backoff */
@@ -2208,16 +2199,14 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
  *	vdc_get_md_node
  *
  * Description:
- *	Get the MD, the device node and the port node for the given
- *	disk instance. The caller is responsible for cleaning up the
- *	reference to the returned MD (mdpp) by calling md_fini_handle().
+ *	Get the MD, the device node for the given disk instance. The
+ *	caller is responsible for cleaning up the reference to the
+ *	returned MD (mdpp) by calling md_fini_handle().
  *
  * Arguments:
  *	dip	- dev info pointer for this instance of the device driver.
  *	mdpp	- the returned MD.
  *	vd_nodep - the returned device node.
- *	vd_portp - the returned port node. The returned port node is NULL
- *		   if no port node is found.
  *
  * Return Code:
  *	0	- Success.
@@ -2225,15 +2214,13 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
  *	ENXIO	- Unexpected error communicating with MD framework
  */
 static int
-vdc_get_md_node(dev_info_t *dip, md_t **mdpp, mde_cookie_t *vd_nodep,
-    mde_cookie_t *vd_portp)
+vdc_get_md_node(dev_info_t *dip, md_t **mdpp, mde_cookie_t *vd_nodep)
 {
 	int		status = ENOENT;
 	char		*node_name = NULL;
 	md_t		*mdp = NULL;
 	int		num_nodes;
 	int		num_vdevs;
-	int		num_vports;
 	mde_cookie_t	rootnode;
 	mde_cookie_t	*listp = NULL;
 	boolean_t	found_inst = B_FALSE;
@@ -2327,18 +2314,6 @@ vdc_get_md_node(dev_info_t *dip, md_t **mdpp, mde_cookie_t *vd_nodep,
 
 	*vd_nodep = listp[idx];
 	*mdpp = mdp;
-
-	num_vports = md_scan_dag(mdp, *vd_nodep,
-	    md_find_name(mdp, VDC_MD_PORT_NAME),
-	    md_find_name(mdp, "fwd"), listp);
-
-	if (num_vports != 1) {
-		DMSGX(0, "Expected 1 '%s' node for '%s' port, found %d\n",
-		    VDC_MD_PORT_NAME, VDC_MD_VDEV_NAME, num_vports);
-	}
-
-	*vd_portp = (num_vports == 0)? NULL: listp[0];
-
 done:
 	kmem_free(listp, listsz);
 	return (status);
@@ -2346,99 +2321,200 @@ done:
 
 /*
  * Function:
- *	vdc_get_ldc_id()
+ *	vdc_init_ports
  *
  * Description:
- *	This function gets the 'ldc-id' for this particular instance of vdc.
- *	The id returned is the guest domain channel endpoint LDC uses for
- *	communication with vds.
+ *	Initialize all the ports for this vdisk instance.
  *
  * Arguments:
- *	mdp	- pointer to the machine description.
- *	vd_node	- the vdisk element from the MD.
- *	ldc_id	- pointer to variable used to return the 'ldc-id' found.
+ *	vdc	- soft state pointer for this instance of the device driver.
+ *	mdp	- md pointer
+ *	vd_nodep - device md node.
  *
  * Return Code:
  *	0	- Success.
  *	ENOENT	- Expected node or property did not exist.
  */
 static int
-vdc_get_ldc_id(md_t *mdp, mde_cookie_t vd_node, uint64_t *ldc_id)
+vdc_init_ports(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_nodep)
 {
-	mde_cookie_t	*chanp = NULL;
-	int		listsz;
-	int		num_chans;
-	int		num_nodes;
 	int		status = 0;
+	int		idx;
+	int		num_nodes;
+	int		num_vports;
+	int		num_chans;
+	int		listsz;
+	mde_cookie_t	vd_port;
+	mde_cookie_t	*chanp = NULL;
+	mde_cookie_t	*portp = NULL;
+	vdc_server_t	*srvr;
+	vdc_server_t	*prev_srvr = NULL;
 
+	/*
+	 * We now walk the MD nodes to find the port nodes for this vdisk.
+	 */
 	num_nodes = md_node_count(mdp);
 	ASSERT(num_nodes > 0);
 
 	listsz = num_nodes * sizeof (mde_cookie_t);
 
 	/* allocate memory for nodes */
+	portp = kmem_zalloc(listsz, KM_SLEEP);
 	chanp = kmem_zalloc(listsz, KM_SLEEP);
 
-	/* get the channels for this node */
-	num_chans = md_scan_dag(mdp, vd_node,
-	    md_find_name(mdp, VDC_MD_CHAN_NAME),
-	    md_find_name(mdp, "fwd"), chanp);
-
-	/* expecting at least one channel */
-	if (num_chans <= 0) {
-		cmn_err(CE_NOTE, "No '%s' node for '%s' port",
-		    VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME);
+	num_vports = md_scan_dag(mdp, vd_nodep,
+	    md_find_name(mdp, VDC_MD_PORT_NAME),
+	    md_find_name(mdp, "fwd"), portp);
+	if (num_vports == 0) {
+		DMSGX(0, "Found no '%s' node for '%s' port\n",
+		    VDC_MD_PORT_NAME, VDC_MD_VDEV_NAME);
 		status = ENOENT;
 		goto done;
+	}
 
-	} else if (num_chans != 1) {
-		DMSGX(0, "Expected 1 '%s' node for '%s' port, found %d\n",
-		    VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME, num_chans);
+	DMSGX(1, "Found %d '%s' node(s) for '%s' port\n",
+	    num_vports, VDC_MD_PORT_NAME, VDC_MD_VDEV_NAME);
+
+	vdc->num_servers = 0;
+	for (idx = 0; idx < num_vports; idx++) {
+
+		/* initialize this port */
+		vd_port = portp[idx];
+		srvr = kmem_zalloc(sizeof (vdc_server_t), KM_SLEEP);
+		srvr->vdcp = vdc;
+
+		/* get port id */
+		if (md_get_prop_val(mdp, vd_port, VDC_MD_ID, &srvr->id) != 0) {
+			cmn_err(CE_NOTE, "vDisk port '%s' property not found",
+			    VDC_MD_ID);
+			kmem_free(srvr, sizeof (vdc_server_t));
+			continue;
+		}
+
+		/* set the connection timeout */
+		if (md_get_prop_val(mdp, vd_port, VDC_MD_TIMEOUT,
+		    &srvr->ctimeout) != 0) {
+			srvr->ctimeout = 0;
+		}
+
+		/* get the ldc id */
+		num_chans = md_scan_dag(mdp, vd_port,
+		    md_find_name(mdp, VDC_MD_CHAN_NAME),
+		    md_find_name(mdp, "fwd"), chanp);
+
+		/* expecting at least one channel */
+		if (num_chans <= 0) {
+			cmn_err(CE_NOTE, "No '%s' node for '%s' port",
+			    VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME);
+			kmem_free(srvr, sizeof (vdc_server_t));
+			continue;
+		} else if (num_chans != 1) {
+			DMSGX(0, "Expected 1 '%s' node for '%s' port, "
+			    "found %d\n", VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME,
+			    num_chans);
+		}
+
+		/*
+		 * We use the first channel found (index 0), irrespective of how
+		 * many are there in total.
+		 */
+		if (md_get_prop_val(mdp, chanp[0], VDC_MD_ID,
+		    &srvr->ldc_id) != 0) {
+			cmn_err(CE_NOTE, "Channel '%s' property not found",
+			    VDC_MD_ID);
+			kmem_free(srvr, sizeof (vdc_server_t));
+			continue;
+		}
+
+		/*
+		 * now initialise LDC channel which will be used to
+		 * communicate with this server
+		 */
+		if (vdc_do_ldc_init(vdc, srvr) != 0) {
+			kmem_free(srvr, sizeof (vdc_server_t));
+			continue;
+		}
+
+		/* add server to list */
+		if (prev_srvr) {
+			prev_srvr->next = srvr;
+		} else {
+			vdc->server_list = srvr;
+			prev_srvr = srvr;
+		}
+
+		/* inc numbers of servers */
+		vdc->num_servers++;
 	}
 
 	/*
-	 * We use the first channel found (index 0), irrespective of how
-	 * many are there in total.
+	 * Adjust the max number of handshake retries to match
+	 * the number of vdisk servers.
 	 */
-	if (md_get_prop_val(mdp, chanp[0], VDC_MD_ID, ldc_id) != 0) {
-		cmn_err(CE_NOTE, "Channel '%s' property not found", VDC_MD_ID);
+	if (vdc_hshake_retries < vdc->num_servers)
+		vdc_hshake_retries = vdc->num_servers;
+
+	/* pick first server as current server */
+	if (vdc->server_list != NULL) {
+		vdc->curr_server = vdc->server_list;
+		status = 0;
+	} else {
 		status = ENOENT;
 	}
 
 done:
 	kmem_free(chanp, listsz);
+	kmem_free(portp, listsz);
 	return (status);
 }
 
+
+/*
+ * Function:
+ *	vdc_do_ldc_up
+ *
+ * Description:
+ *	Bring the channel for the current server up.
+ *
+ * Arguments:
+ *	vdc	- soft state pointer for this instance of the device driver.
+ *
+ * Return Code:
+ *	0		- Success.
+ *	EINVAL		- Driver is detaching / LDC error
+ *	ECONNREFUSED	- Other end is not listening
+ */
 static int
 vdc_do_ldc_up(vdc_t *vdc)
 {
 	int		status;
 	ldc_status_t	ldc_state;
 
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
 	DMSG(vdc, 0, "[%d] Bringing up channel %lx\n",
-	    vdc->instance, vdc->ldc_id);
+	    vdc->instance, vdc->curr_server->ldc_id);
 
 	if (vdc->lifecycle == VDC_LC_DETACHING)
 		return (EINVAL);
 
-	if ((status = ldc_up(vdc->ldc_handle)) != 0) {
+	if ((status = ldc_up(vdc->curr_server->ldc_handle)) != 0) {
 		switch (status) {
 		case ECONNREFUSED:	/* listener not ready at other end */
 			DMSG(vdc, 0, "[%d] ldc_up(%lx,...) return %d\n",
-			    vdc->instance, vdc->ldc_id, status);
+			    vdc->instance, vdc->curr_server->ldc_id, status);
 			status = 0;
 			break;
 		default:
 			DMSG(vdc, 0, "[%d] Failed to bring up LDC: "
-			    "channel=%ld, err=%d", vdc->instance, vdc->ldc_id,
-			    status);
+			    "channel=%ld, err=%d", vdc->instance,
+			    vdc->curr_server->ldc_id, status);
 			break;
 		}
 	}
 
-	if (ldc_status(vdc->ldc_handle, &ldc_state) == 0) {
-		vdc->ldc_state = ldc_state;
+	if (ldc_status(vdc->curr_server->ldc_handle, &ldc_state) == 0) {
+		vdc->curr_server->ldc_state = ldc_state;
 		if (ldc_state == LDC_UP) {
 			DMSG(vdc, 0, "[%d] LDC channel already up\n",
 			    vdc->instance);
@@ -2458,35 +2534,73 @@ vdc_do_ldc_up(vdc_t *vdc)
  *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
+ *	srvr	- vdc per-server info structure
  *
  * Return Code:
  *	None
  */
 static void
-vdc_terminate_ldc(vdc_t *vdc)
+vdc_terminate_ldc(vdc_t *vdc, vdc_server_t *srvr)
 {
 	int	instance = ddi_get_instance(vdc->dip);
+
+	if (srvr->state & VDC_LDC_OPEN) {
+		DMSG(vdc, 0, "[%d] ldc_close()\n", instance);
+		(void) ldc_close(srvr->ldc_handle);
+	}
+	if (srvr->state & VDC_LDC_CB) {
+		DMSG(vdc, 0, "[%d] ldc_unreg_callback()\n", instance);
+		(void) ldc_unreg_callback(srvr->ldc_handle);
+	}
+	if (srvr->state & VDC_LDC_INIT) {
+		DMSG(vdc, 0, "[%d] ldc_fini()\n", instance);
+		(void) ldc_fini(srvr->ldc_handle);
+		srvr->ldc_handle = NULL;
+	}
+
+	srvr->state &= ~(VDC_LDC_INIT | VDC_LDC_CB | VDC_LDC_OPEN);
+}
+
+/*
+ * Function:
+ *	vdc_fini_ports()
+ *
+ * Description:
+ *	Finalize all ports by closing the channel associated with each
+ *	port and also freeing the server structure.
+ *
+ * Arguments:
+ *	vdc	- soft state pointer for this instance of the device driver.
+ *
+ * Return Code:
+ *	None
+ */
+static void
+vdc_fini_ports(vdc_t *vdc)
+{
+	int		instance = ddi_get_instance(vdc->dip);
+	vdc_server_t	*srvr, *prev_srvr;
 
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
 
 	DMSG(vdc, 0, "[%d] initialized=%x\n", instance, vdc->initialized);
 
-	if (vdc->initialized & VDC_LDC_OPEN) {
-		DMSG(vdc, 0, "[%d] ldc_close()\n", instance);
-		(void) ldc_close(vdc->ldc_handle);
-	}
-	if (vdc->initialized & VDC_LDC_CB) {
-		DMSG(vdc, 0, "[%d] ldc_unreg_callback()\n", instance);
-		(void) ldc_unreg_callback(vdc->ldc_handle);
-	}
-	if (vdc->initialized & VDC_LDC) {
-		DMSG(vdc, 0, "[%d] ldc_fini()\n", instance);
-		(void) ldc_fini(vdc->ldc_handle);
-		vdc->ldc_handle = NULL;
+	srvr = vdc->server_list;
+
+	while (srvr) {
+
+		vdc_terminate_ldc(vdc, srvr);
+
+		/* next server */
+		prev_srvr = srvr;
+		srvr = srvr->next;
+
+		/* free server */
+		kmem_free(prev_srvr, sizeof (vdc_server_t));
 	}
 
-	vdc->initialized &= ~(VDC_LDC | VDC_LDC_CB | VDC_LDC_OPEN);
+	vdc->server_list = NULL;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2518,7 +2632,6 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
-	ASSERT(vdc->ldc_handle != NULL);
 
 	/* ensure we have enough room to store max sized block */
 	ASSERT(maxphys <= VD_MAX_BLOCK_SIZE);
@@ -2546,8 +2659,8 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 		vdc->dring_len = VD_DRING_LEN;
 
 		status = ldc_mem_dring_create(vdc->dring_len,
-		    vdc->dring_entry_size, &vdc->ldc_dring_hdl);
-		if ((vdc->ldc_dring_hdl == NULL) || (status != 0)) {
+		    vdc->dring_entry_size, &vdc->dring_hdl);
+		if ((vdc->dring_hdl == NULL) || (status != 0)) {
 			DMSG(vdc, 0, "[%d] Descriptor ring creation failed",
 			    vdc->instance);
 			return (status);
@@ -2560,26 +2673,27 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 		vdc->dring_cookie =
 		    kmem_zalloc(sizeof (ldc_mem_cookie_t), KM_SLEEP);
 
-		status = ldc_mem_dring_bind(vdc->ldc_handle, vdc->ldc_dring_hdl,
+		status = ldc_mem_dring_bind(vdc->curr_server->ldc_handle,
+		    vdc->dring_hdl,
 		    LDC_SHADOW_MAP|LDC_DIRECT_MAP, LDC_MEM_RW,
 		    &vdc->dring_cookie[0],
 		    &vdc->dring_cookie_count);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] Failed to bind descriptor ring "
 			    "(%lx) to channel (%lx) status=%d\n",
-			    vdc->instance, vdc->ldc_dring_hdl,
-			    vdc->ldc_handle, status);
+			    vdc->instance, vdc->dring_hdl,
+			    vdc->curr_server->ldc_handle, status);
 			return (status);
 		}
 		ASSERT(vdc->dring_cookie_count == 1);
 		vdc->initialized |= VDC_DRING_BOUND;
 	}
 
-	status = ldc_mem_dring_info(vdc->ldc_dring_hdl, &vdc->dring_mem_info);
+	status = ldc_mem_dring_info(vdc->dring_hdl, &vdc->dring_mem_info);
 	if (status != 0) {
 		DMSG(vdc, 0,
 		    "[%d] Failed to get info for descriptor ring (%lx)\n",
-		    vdc->instance, vdc->ldc_dring_hdl);
+		    vdc->instance, vdc->dring_hdl);
 		return (status);
 	}
 
@@ -2604,7 +2718,7 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 		dep = VDC_GET_DRING_ENTRY_PTR(vdc, i);
 		dep->hdr.dstate = VIO_DESC_FREE;
 
-		status = ldc_mem_alloc_handle(vdc->ldc_handle,
+		status = ldc_mem_alloc_handle(vdc->curr_server->ldc_handle,
 		    &vdc->local_dring[i].desc_mhdl);
 		if (status != 0) {
 			DMSG(vdc, 0, "![%d] Failed to alloc mem handle for"
@@ -2691,26 +2805,26 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 
 	if (vdc->initialized & VDC_DRING_BOUND) {
 		DMSG(vdc, 0, "[%d] Unbinding DRing\n", vdc->instance);
-		status = ldc_mem_dring_unbind(vdc->ldc_dring_hdl);
+		status = ldc_mem_dring_unbind(vdc->dring_hdl);
 		if (status == 0) {
 			vdc->initialized &= ~VDC_DRING_BOUND;
 		} else {
 			DMSG(vdc, 0, "[%d] Error %d unbinding DRing %lx",
-			    vdc->instance, status, vdc->ldc_dring_hdl);
+			    vdc->instance, status, vdc->dring_hdl);
 		}
 		kmem_free(vdc->dring_cookie, sizeof (ldc_mem_cookie_t));
 	}
 
 	if (vdc->initialized & VDC_DRING_INIT) {
 		DMSG(vdc, 0, "[%d] Destroying DRing\n", vdc->instance);
-		status = ldc_mem_dring_destroy(vdc->ldc_dring_hdl);
+		status = ldc_mem_dring_destroy(vdc->dring_hdl);
 		if (status == 0) {
-			vdc->ldc_dring_hdl = NULL;
+			vdc->dring_hdl = NULL;
 			bzero(&vdc->dring_mem_info, sizeof (ldc_mem_info_t));
 			vdc->initialized &= ~VDC_DRING_INIT;
 		} else {
 			DMSG(vdc, 0, "[%d] Error %d destroying DRing (%lx)",
-			    vdc->instance, status, vdc->ldc_dring_hdl);
+			    vdc->instance, status, vdc->dring_hdl);
 		}
 	}
 }
@@ -3177,7 +3291,8 @@ vdc_drain_response(vdc_t *vdc)
 	retries = 0;
 	for (;;) {
 		msglen = sizeof (dmsg);
-		rv = ldc_read(vdc->ldc_handle, (caddr_t)&dmsg, &msglen);
+		rv = ldc_read(vdc->curr_server->ldc_handle, (caddr_t)&dmsg,
+		    &msglen);
 		if (rv) {
 			rv = EINVAL;
 			break;
@@ -3477,12 +3592,22 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 {
 	ldc_status_t	ldc_state;
 	int		rv = 0;
-
-	vdc_t	*vdc = (vdc_t *)(void *)arg;
+	vdc_server_t	*srvr = (vdc_server_t *)(void *)arg;
+	vdc_t		*vdc = srvr->vdcp;
 
 	ASSERT(vdc != NULL);
 
 	DMSG(vdc, 1, "evt=%lx seqID=%ld\n", event, vdc->seq_num);
+
+	/* If callback is not for the current server, ignore it */
+	mutex_enter(&vdc->lock);
+
+	if (vdc->curr_server != srvr) {
+		DMSG(vdc, 0, "[%d] Ignoring event 0x%lx for port@%ld\n",
+		    vdc->instance, event, srvr->id);
+		mutex_exit(&vdc->lock);
+		return (LDC_SUCCESS);
+	}
 
 	/*
 	 * Depending on the type of event that triggered this callback,
@@ -3495,16 +3620,16 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 	if (event & LDC_EVT_UP) {
 		DMSG(vdc, 0, "[%d] Received LDC_EVT_UP\n", vdc->instance);
 
-		mutex_enter(&vdc->lock);
-
 		/* get LDC state */
-		rv = ldc_status(vdc->ldc_handle, &ldc_state);
+		rv = ldc_status(srvr->ldc_handle, &ldc_state);
 		if (rv != 0) {
 			DMSG(vdc, 0, "[%d] Couldn't get LDC status %d",
 			    vdc->instance, rv);
+			mutex_exit(&vdc->lock);
 			return (LDC_SUCCESS);
 		}
-		if (vdc->ldc_state != LDC_UP && ldc_state == LDC_UP) {
+		if (srvr->ldc_state != LDC_UP &&
+		    ldc_state == LDC_UP) {
 			/*
 			 * Reset the transaction sequence numbers when
 			 * LDC comes up. We then kick off the handshake
@@ -3512,11 +3637,9 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 			 */
 			vdc->seq_num = 1;
 			vdc->seq_num_reply = 0;
-			vdc->ldc_state = ldc_state;
+			srvr->ldc_state = ldc_state;
 			cv_signal(&vdc->initwait_cv);
 		}
-
-		mutex_exit(&vdc->lock);
 	}
 
 	if (event & LDC_EVT_READ) {
@@ -3525,6 +3648,7 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 		cv_signal(&vdc->read_cv);
 		vdc->read_state = VDC_READ_PENDING;
 		mutex_exit(&vdc->read_lock);
+		mutex_exit(&vdc->lock);
 
 		/* that's all we have to do - no need to handle DOWN/RESET */
 		return (LDC_SUCCESS);
@@ -3534,7 +3658,6 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 
 		DMSG(vdc, 0, "[%d] Received LDC RESET event\n", vdc->instance);
 
-		mutex_enter(&vdc->lock);
 		/*
 		 * Need to wake up any readers so they will
 		 * detect that a reset has occurred.
@@ -3552,8 +3675,9 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 			cv_signal(&vdc->initwait_cv);
 		}
 
-		mutex_exit(&vdc->lock);
 	}
+
+	mutex_exit(&vdc->lock);
 
 	if (event & ~(LDC_EVT_UP | LDC_EVT_RESET | LDC_EVT_DOWN | LDC_EVT_READ))
 		DMSG(vdc, 0, "![%d] Unexpected LDC event (%lx) received",
@@ -3991,6 +4115,42 @@ vdc_backup_local_dring(vdc_t *vdcp)
 	vdcp->local_dring_backup_len = vdcp->dring_len;
 }
 
+static void
+vdc_switch_server(vdc_t *vdcp)
+{
+	int		rv;
+	vdc_server_t 	*curr_server, *new_server;
+
+	ASSERT(MUTEX_HELD(&vdcp->lock));
+
+	/* if there is only one server return back */
+	if (vdcp->num_servers == 1) {
+		return;
+	}
+
+	/* Get current and next server */
+	curr_server = vdcp->curr_server;
+	new_server =
+	    (curr_server->next) ? curr_server->next : vdcp->server_list;
+	ASSERT(curr_server != new_server);
+
+	/* bring current server's channel down */
+	rv = ldc_down(curr_server->ldc_handle);
+	if (rv) {
+		DMSG(vdcp, 0, "[%d] Cannot bring channel down, port %ld\n",
+		    vdcp->instance, curr_server->id);
+		return;
+	}
+
+	/* switch the server */
+	vdcp->curr_server = new_server;
+
+	cmn_err(CE_NOTE, "Successfully failed over from VDS on port@%ld to "
+	    "VDS on port@%ld.\n", curr_server->id, new_server->id);
+	DMSG(vdcp, 0, "[%d] Switched to next vdisk server, port@%ld, ldc@%ld\n",
+	    vdcp->instance, vdcp->curr_server->id, vdcp->curr_server->ldc_id);
+}
+
 /* -------------------------------------------------------------------------- */
 
 /*
@@ -4017,9 +4177,10 @@ vdc_backup_local_dring(vdc_t *vdcp)
 static void
 vdc_process_msg_thread(vdc_t *vdcp)
 {
-	int	status;
-	int	ctimeout;
-	timeout_id_t tmid = 0;
+	int		status;
+	int		ctimeout;
+	timeout_id_t	tmid = 0;
+	clock_t		ldcup_timeout = 0;
 
 	mutex_enter(&vdcp->lock);
 
@@ -4048,54 +4209,87 @@ vdc_process_msg_thread(vdc_t *vdcp)
 			 * If some reset have occurred while establishing
 			 * the connection, we already have a timeout armed
 			 * and in that case we don't need to arm a new one.
+			 *
+			 * The same rule applies when there are multiple vds'.
+			 * If either a connection cannot be established or
+			 * the handshake times out, the connection thread will
+			 * try another server. The 'ctimeout' will report
+			 * back an error after it expires irrespective of
+			 * whether the vdisk is trying to connect to just
+			 * one or multiple servers.
 			 */
 			ctimeout = (vdc_timeout != 0)?
-			    vdc_timeout : vdcp->ctimeout;
+			    vdc_timeout : vdcp->curr_server->ctimeout;
 
 			if (ctimeout != 0 && tmid == 0) {
 				tmid = timeout(vdc_connection_timeout, vdcp,
-				    ctimeout * drv_usectohz(1000000));
+				    ctimeout * drv_usectohz(MICROSEC));
 			}
 
-			/* Check if have re-initializing repeatedly */
-			if (vdcp->hshake_cnt++ > vdc_hshake_retries &&
+			/* Check if we are re-initializing repeatedly */
+			if (vdcp->hshake_cnt > vdc_hshake_retries &&
 			    vdcp->lifecycle != VDC_LC_ONLINE) {
+
+				DMSG(vdcp, 0, "[%d] too many handshakes,cnt=%d",
+				    vdcp->instance, vdcp->hshake_cnt);
 				cmn_err(CE_NOTE, "[%d] disk access failed.\n",
 				    vdcp->instance);
 				vdcp->state = VDC_STATE_DETACH;
 				break;
 			}
 
+			/* Switch to STATE_DETACH if drv is detaching */
+			if (vdcp->lifecycle == VDC_LC_DETACHING) {
+				vdcp->state = VDC_STATE_DETACH;
+				break;
+			}
+
+			/* Switch server */
+			if (vdcp->hshake_cnt > 0)
+				vdc_switch_server(vdcp);
+			vdcp->hshake_cnt++;
+
 			/* Bring up connection with vds via LDC */
 			status = vdc_start_ldc_connection(vdcp);
-			if (status == EINVAL) {
-				DMSG(vdcp, 0, "[%d] Could not start LDC",
-				    vdcp->instance);
-				vdcp->state = VDC_STATE_DETACH;
-			} else {
+			if (status != EINVAL) {
 				vdcp->state = VDC_STATE_INIT_WAITING;
 			}
 			break;
 
 		case VDC_STATE_INIT_WAITING:
 
-			/*
-			 * Let the callback event move us on
-			 * when channel is open to server
-			 */
-			while (vdcp->ldc_state != LDC_UP) {
-				cv_wait(&vdcp->initwait_cv, &vdcp->lock);
-				if (vdcp->state != VDC_STATE_INIT_WAITING) {
-					DMSG(vdcp, 0,
-				"state moved to %d out from under us...\n",
-					    vdcp->state);
+			/* if channel is UP, start negotiation */
+			if (vdcp->curr_server->ldc_state == LDC_UP) {
+				vdcp->state = VDC_STATE_NEGOTIATE;
+				break;
+			}
 
+			/* check if only one server exists */
+			if (vdcp->num_servers == 1) {
+				cv_wait(&vdcp->initwait_cv, &vdcp->lock);
+			} else {
+				/*
+				 * wait for LDC_UP, if it times out, switch
+				 * to another server.
+				 */
+				ldcup_timeout = ddi_get_lbolt() +
+				    (vdc_ldcup_timeout *
+				    drv_usectohz(MICROSEC));
+				status = cv_timedwait(&vdcp->initwait_cv,
+				    &vdcp->lock, ldcup_timeout);
+				if (status == -1 &&
+				    vdcp->state == VDC_STATE_INIT_WAITING &&
+				    vdcp->curr_server->ldc_state != LDC_UP) {
+					/* timed out & still waiting */
+					vdcp->state = VDC_STATE_INIT;
 					break;
 				}
 			}
-			if (vdcp->state == VDC_STATE_INIT_WAITING &&
-			    vdcp->ldc_state == LDC_UP) {
-				vdcp->state = VDC_STATE_NEGOTIATE;
+
+			if (vdcp->state != VDC_STATE_INIT_WAITING) {
+				DMSG(vdcp, 0,
+				    "state moved to %d out from under us...\n",
+				    vdcp->state);
 			}
 			break;
 
