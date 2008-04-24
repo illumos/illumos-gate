@@ -41,7 +41,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1148,6 +1148,7 @@ main(int ac, char **av)
 		sock_in = dup(0);
 		sock_out = dup(1);
 		startup_pipe = -1;
+		newsock = sock_in;
 		/*
 		 * We intentionally do not close the descriptors 0, 1, and 2
 		 * as our code for setting the descriptors won\'t work if
