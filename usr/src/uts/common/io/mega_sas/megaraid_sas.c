@@ -1353,7 +1353,7 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 
 		cmd->sync_cmd = MEGASAS_TRUE;
 
-		instance->func_ptr-> issue_cmd_in_sync_mode(instance, cmd);
+		instance->func_ptr-> issue_cmd_in_poll_mode(instance, cmd);
 
 		pkt->pkt_reason		= CMD_CMPLT;
 		pkt->pkt_statistics	= 0;
