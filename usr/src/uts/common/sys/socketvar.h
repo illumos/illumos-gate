@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,12 +50,13 @@
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/zone.h>
-#include <sys/sodirect.h>
 #include <inet/kssl/ksslapi.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+
 
 /*
  * Internal representation used for addresses.
@@ -332,9 +333,6 @@ struct sonode {
 	kssl_endpt_type_t	so_kssl_type;	/* is proxy/is proxied/none */
 	kssl_ent_t		so_kssl_ent;	/* SSL config entry */
 	kssl_ctx_t		so_kssl_ctx;	/* SSL session context */
-
-	/* != NULL for sodirect_t enabled socket */
-	sodirect_t	*so_direct;
 };
 
 /* flags */
@@ -377,7 +375,6 @@ struct sonode {
 #define	SS_MOREDATA		0x00100000 /* NCAfs: NCA has more data */
 
 #define	SS_DIRECT		0x00200000 /* transport is directly below */
-#define	SS_SODIRECT		0x00400000 /* transport supports sodirect */
 
 #define	SS_LADDR_VALID		0x01000000	/* so_laddr valid for user */
 #define	SS_FADDR_VALID		0x02000000	/* so_faddr valid for user */

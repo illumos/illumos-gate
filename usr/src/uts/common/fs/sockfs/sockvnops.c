@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -239,10 +239,6 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr,
 			 * udp case, when some other module is autopushed
 			 * above it, or for some reasons the expected module
 			 * isn't purely D_MP (which is the main requirement).
-			 *
-			 * Else, SS_DIRECT is valid. If the read-side Q has
-			 * _QSODIRECT set then and uioasync is enabled then
-			 * set SS_SODIRECT to enable sodirect.
 			 */
 			if (!socktpi_direct || !(tq->q_flag & _QDIRECT) ||
 			    !(_OTHERQ(tq)->q_flag & _QDIRECT)) {
@@ -259,10 +255,6 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr,
 						return (error);
 					}
 				}
-			} else if ((_OTHERQ(tq)->q_flag & _QSODIRECT) &&
-			    uioasync.enabled) {
-				/* Enable sodirect */
-				so->so_state |= SS_SODIRECT;
 			}
 		}
 	} else {

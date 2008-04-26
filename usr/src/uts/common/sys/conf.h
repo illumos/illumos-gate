@@ -22,7 +22,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,9 +220,6 @@ extern int cdev_prop_op(dev_t, dev_info_t *, ddi_prop_op_t,
 #define	_D_DIRECT	0x80000	/* Private flag for transport modules */
 
 #define	D_OPEN_RETURNS_EINTR	0x100000 /* EINTR expected from open(9E) */
-
-#define	_D_SODIRECT	0x200000 /* Private flag for transport modules used */
-				/* to enable _QSODIRECT for a STREAMS Q */
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 

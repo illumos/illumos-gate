@@ -1218,7 +1218,6 @@ f none usr/include/sys/socket.h 644 root bin
 f none usr/include/sys/socket_impl.h 644 root bin
 f none usr/include/sys/socketvar.h 644 root bin
 f none usr/include/sys/sockio.h 644 root bin
-f none usr/include/sys/sodirect.h 644 root bin
 f none usr/include/sys/sservice.h 644 root bin
 f none usr/include/sys/squeue.h 644 root bin
 f none usr/include/sys/squeue_impl.h 644 root bin
