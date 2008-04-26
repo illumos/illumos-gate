@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -542,8 +542,6 @@ function destroy_kdc {
 
 	printf "$(gettext "yes")\n" | kdb5_util destroy > /dev/null 2>&1
 	rm -f $KRB5KT $KADM5KT
-
-	cleanup 0
 }
 
 function kadm5_acl_configed {
@@ -693,7 +691,8 @@ case "$*" in
 	"create slave")		slave=yes;;
 	destroy)		d_option=yes
 				kill_daemons
-				destroy_kdc;;
+				destroy_kdc
+				cleanup 0;;
 	status)			status_kdc;;
 	*)			usage;;
 esac

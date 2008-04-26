@@ -55,8 +55,6 @@ static int attempt_refresh_cred(krb5_module_data_t *, char *, int);
 static int attempt_delete_initcred(krb5_module_data_t *);
 static krb5_error_code krb5_renew_tgt(krb5_module_data_t *, krb5_principal,
 		krb5_principal, int);
-static krb5_boolean creds_match(krb5_context, const krb5_creds *,
-	const krb5_creds *);
 
 extern uint_t kwarn_add_warning(char *, int);
 extern uint_t kwarn_del_warning(char *);
@@ -76,7 +74,6 @@ pam_sm_setcred(
 	int	debug = 0;
 	krb5_module_data_t	*kmd = NULL;
 	char			*user = NULL;
-	int			result;
 	krb5_repository_data_t	*krb5_data = NULL;
 	pam_repository_t	*rep_data = NULL;
 
@@ -127,10 +124,16 @@ pam_sm_setcred(
 
 			kmd = calloc(1, sizeof (krb5_module_data_t));
 
-			if (kmd == NULL) {
-				result = PAM_BUF_ERR;
-				return (result);
-			}
+			if (kmd == NULL)
+				return (PAM_BUF_ERR);
+
+
+			/*
+			 * Need to initialize auth_status here to
+			 * PAM_AUTHINFO_UNAVAIL else there is a false positive
+			 * of PAM_SUCCESS.
+			 */
+			kmd->auth_status = PAM_AUTHINFO_UNAVAIL;
 
 			if ((err = pam_set_data(pamh, KRB5_DATA,
 			    kmd, &krb5_cleanup)) != PAM_SUCCESS) {
@@ -155,7 +158,7 @@ pam_sm_setcred(
 				    "PAM-KRB5 (setcred): kmd structure"
 				    " gotten but is NULL for user %s", user);
 			}
-			err = PAM_CRED_UNAVAIL;
+			err = PAM_SYSTEM_ERR;
 			goto out;
 		}
 
@@ -295,15 +298,6 @@ attempt_refresh_cred(
 		KRB5_TGS_NAME
 	};
 
-	/* User must have passed pam_authenticate() */
-	if (kmd->auth_status != PAM_SUCCESS) {
-		if (kmd->debug)
-			__pam_log(LOG_AUTH | LOG_DEBUG,
-			    "PAM-KRB5 (setcred): unable to "
-			    "setcreds, not authenticated!");
-		return (PAM_CRED_UNAVAIL);
-	}
-
 	/* Create a new context here. */
 	if (krb5_init_context(&kmd->kcontext) != 0) {
 		if (kmd->debug)
@@ -355,10 +349,15 @@ attempt_refresh_cred(
 /*
  * This code will update the credential matching "server" in the user's
  * credential cache.  The flag may be set to one of:
- * PAM_ESTABLISH_CRED -  Create a new cred cache if one doesnt exist,
- *                       else refresh the existing one.
- * PAM_REINITIALIZE_CRED  - destroy current cred cache and create a new one
- * PAM_REFRESH_CRED  - update the existing cred cache (default action)
+ * PAM_ESTABLISH_CRED - If we have new credentials then create a new cred cache
+ *  with these credentials else return failure.
+ * PAM_REINITIALIZE_CRED - Destroy current cred cache and create a new one.
+ * PAM_REFRESH_CRED - If we have new credentials then create a new cred cache
+ *  with these credentials else attempt to renew the credentials.
+ *
+ * Note for the PAM_ESTABLISH_CRED and PAM_REFRESH_CRED flags that if a new
+ * credential does exist from the previous auth pass then this will overwrite
+ * any existing credentials in the credential cache.
  */
 static krb5_error_code
 krb5_renew_tgt(
@@ -371,12 +370,6 @@ krb5_renew_tgt(
 	krb5_creds	creds;
 	krb5_creds	*renewed_cred = NULL;
 	char		*client_name = NULL;
-	typedef struct _cred_node {
-		krb5_creds		*creds;
-		struct _cred_node	*next;
-	} cred_node;
-	cred_node *cred_list_head = NULL;
-	cred_node *fetched = NULL;
 
 #define	my_creds	(kmd->initcreds)
 
@@ -468,98 +461,40 @@ krb5_renew_tgt(
 		}
 	} else {
 		/*
-		 * Creds already exist, update them if possible.
+		 * Default credentials already exist, update them if possible.
 		 * We got here either with the ESTABLISH or REFRESH flag.
 		 *
-		 * The credential cache does exist, and we are going to
-		 * read in each cred, looking for our own.  When we find
-		 * a matching credential, we will update it, and store it.
-		 * Any nonmatching credentials are stored as is.
-		 *
 		 * Rules:
-		 *    TGT must exist in cache to get to this point.
-		 *	if flag == ESTABLISH
-		 *		refresh it if possible, else overwrite
-		 *		with new TGT, other tickets in cache remain
-		 *		unchanged.
-		 *	else if flag == REFRESH
-		 *		refresh it if possible, else return error.
-		 *		- Will not work if "R" flag is not set in
-		 *		original cred, we dont want to 2nd guess the
-		 *		intention of the person who created the
-		 *		existing TGT.
+		 * - If the prior auth pass was successful then store the new
+		 * credentials in the cache, regardless of which flag.
 		 *
+		 * - Else if REFRESH flag is used and there are no new
+		 * credentials then attempt to refresh the existing credentials.
+		 *
+		 * - Note, refresh will not work if "R" flag is not set in
+		 * original credential.  We don't want to 2nd guess the
+		 * intention of the person who created the existing credential.
 		 */
-		krb5_cc_cursor	cursor;
-		krb5_creds	nextcred;
-		boolean_t	found = 0;
-
-		if ((retval = krb5_cc_start_seq_get(kmd->kcontext,
-		    kmd->ccache, &cursor)) != 0)
-			goto cleanup_creds;
-
-		while ((krb5_cc_next_cred(kmd->kcontext, kmd->ccache,
-		    &cursor, &nextcred) == 0)) {
-			/* if two creds match, we just update the first */
-			if ((!found) && (creds_match(kmd->kcontext,
-			    &nextcred, &creds))) {
-				/*
-				 * Mark it as found, don't store it
-				 * in the list or else it will be
-				 * stored twice later.
-				 */
-				found = 1;
-			} else {
-				/*
-				 * Add a new node to the list
-				 * of creds that must be replaced
-				 * in the cache later.
-				 */
-				cred_node *newnode = (cred_node *)malloc(
-				    sizeof (cred_node));
-				if (newnode == NULL) {
-					retval = ENOMEM;
-					goto cleanup_creds;
-				}
-				newnode->creds = NULL;
-				newnode->next = NULL;
-
-				if (cred_list_head == NULL) {
-					cred_list_head = newnode;
-					fetched = cred_list_head;
-				} else {
-					fetched->next = newnode;
-					fetched = fetched->next;
-				}
-				retval = krb5_copy_creds(kmd->kcontext,
-				    &nextcred, &fetched->creds);
-				if (retval)
-					goto cleanup_creds;
-			}
-		}
-
-		if ((retval = krb5_cc_end_seq_get(kmd->kcontext,
-		    kmd->ccache, &cursor)) != 0)
-			goto cleanup_creds;
-
-		/*
-		 * If we found a matching cred, renew it.
-		 * This destroys the credential cache, if and only
-		 * if it passes.
-		 */
-		if (found &&
-		    (retval = krb5_get_credentials_renew(kmd->kcontext,
-		    0, kmd->ccache, &creds, &renewed_cred))) {
-			if (kmd->debug)
-				__pam_log(LOG_AUTH | LOG_DEBUG,
-				    "PAM-KRB5 (setcred): krb5_get_credentials"
-				    "_renew(update) failed: %s",
-				    error_message((errcode_t)retval));
+		if ((kmd->auth_status != PAM_SUCCESS) &&
+		    (flag & PAM_REFRESH_CRED)) {
 			/*
 			 * If we only wanted to refresh the creds but failed
 			 * due to expiration, lack of "R" flag, or other
-			 * problems, return an error.  If we were trying to
-			 * establish new creds, add them to the cache.
+			 * problems, return an error.
+			 */
+			if (retval = krb5_get_credentials_renew(kmd->kcontext,
+			    0, kmd->ccache, &creds, &renewed_cred)) {
+				if (kmd->debug)
+					__pam_log(LOG_AUTH | LOG_DEBUG,
+					    "PAM-KRB5 (setcred): "
+					    "krb5_get_credentials"
+					    "_renew(update) failed: %s",
+					    error_message((errcode_t)retval));
+				goto cleanup_creds;
+			}
+		} else {
+			/*
+			 * If we have new creds, add them to the cache.
 			 */
 			if ((retval = krb5_cc_initialize(kmd->kcontext,
 			    kmd->ccache, me)) != 0) {
@@ -569,46 +504,9 @@ krb5_renew_tgt(
 				goto cleanup_creds;
 			}
 		}
-		/*
-		 * If no matching creds were found, we must
-		 * initialize the cache before we can store stuff
-		 * in it.
-		 */
-		if (!found) {
-			if ((retval = krb5_cc_initialize(kmd->kcontext,
-			    kmd->ccache, me)) != 0) {
-				goto cleanup_creds;
-			}
-		}
-
-		/* now store all the other tickets */
-		fetched = cred_list_head;
-		while (fetched != NULL) {
-			retval = krb5_cc_store_cred(kmd->kcontext,
-			    kmd->ccache, fetched->creds);
-			fetched = fetched->next;
-			if (retval) {
-				if (kmd->debug)
-					__pam_log(LOG_AUTH | LOG_DEBUG,
-					    "PAM-KRB5(setcred): "
-					    "krb5_cc_store_cred() "
-					    "failed: %s",
-					    error_message((errcode_t)retval));
-				goto cleanup_creds;
-			}
-		}
 	}
 
 cleanup_creds:
-	/* Cleanup the list of creds read from the cache if necessary */
-	fetched = cred_list_head;
-	while (fetched != NULL) {
-		cred_node *old = fetched;
-		/* Free the contents and the cred structure itself */
-		krb5_free_creds(kmd->kcontext, fetched->creds);
-		fetched = fetched->next;
-		free(old);
-	}
 
 	if ((retval == 0) && (client_name != NULL)) {
 		/*
@@ -693,20 +591,6 @@ error:
 	krb5_free_cred_contents(kmd->kcontext, &creds);
 
 	return (retval);
-}
-
-static krb5_boolean
-creds_match(krb5_context ctx, const krb5_creds *mcreds,
-	const krb5_creds *creds)
-{
-	char *s1, *s2, *c1, *c2;
-	krb5_unparse_name(ctx, mcreds->client, &c1);
-	krb5_unparse_name(ctx, mcreds->server, &s1);
-	krb5_unparse_name(ctx, creds->client, &c2);
-	krb5_unparse_name(ctx, creds->server, &s2);
-
-	return (krb5_principal_compare(ctx, mcreds->client, creds->client) &&
-	    krb5_principal_compare(ctx, mcreds->server, creds->server));
 }
 
 /*
