@@ -170,6 +170,7 @@ COMMON_SUBDIRS=		\
 	fs.d		\
 	fstyp		\
 	fuser		\
+	fwflash		\
 	gcore		\
 	gencat		\
 	geniconvtbl	\
@@ -444,7 +445,6 @@ COMMON_SUBDIRS=		\
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/dodatadm	\
-	$(CLOSED)/cmd/fwflash	\
 	$(CLOSED)/cmd/iconv	\
 	$(CLOSED)/cmd/ksh	\
 	$(CLOSED)/cmd/llc2	\
@@ -568,6 +568,7 @@ MSGSUBDIRS=		\
 	fm		\
 	fold		\
 	fs.d		\
+	fwflash		\
 	geniconvtbl	\
 	genmsg		\
 	getconf		\
@@ -716,7 +717,6 @@ MSGSUBDIRS=		\
 	zpool
 
 $(CLOSED_BUILD)MSGSUBDIRS += \
-	$(CLOSED)/cmd/fwflash	\
 	$(CLOSED)/cmd/iconv	\
 	$(CLOSED)/cmd/ksh	\
 	$(CLOSED)/cmd/llc2	\

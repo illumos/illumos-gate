@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,3 +43,15 @@ i depend
 d none usr 0755 root sys
 d none usr/sbin 0755 root bin
 f none usr/sbin/fwflash 0555 root bin
+d none usr/lib 0755 root bin
+d none usr/lib/fwflash 0755 root bin
+d none usr/lib/fwflash/identify 0755 root bin
+d none usr/lib/fwflash/verify 0755 root bin
+f none usr/lib/fwflash/verify/ses-SUN.so 0644 root bin
+s none usr/lib/fwflash/verify/ses-LSILOGIC.so=./ses-SUN.so
+f none usr/lib/fwflash/verify/tavor-MELLANOX.so 644 root bin
+f none usr/lib/fwflash/identify/ses.so 0644 root bin
+f none usr/lib/fwflash/identify/tavor.so 0644 root bin
+d none usr/include 0755 root bin
+d none usr/include/fwflash 0755 root bin
+f none usr/include/fwflash/fwflash.h 0644 root bin

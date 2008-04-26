@@ -139,6 +139,7 @@ COMMON_SUBDIRS = \
 	cmd/fs.d/ufs/mount \
 	cmd/fs.d/ufs/fsirand\
 	cmd/fs.d/zfs/fstyp \
+	cmd/fwflash \
 	cmd/fuser \
 	cmd/gcore \
 	cmd/genmsg \
@@ -422,7 +423,6 @@ COMMON_SUBDIRS = \
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
-	$(CLOSED)/cmd/fwflash \
 	$(CLOSED)/cmd/ndmpadm \
 	$(CLOSED)/cmd/ndmpd \
 	$(CLOSED)/cmd/ndmpstat \
