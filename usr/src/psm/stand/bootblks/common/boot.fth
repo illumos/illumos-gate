@@ -153,8 +153,8 @@ headers
          r@ over  vmem-alloc                  ( size virt len adr adr  r: alloc-sz )
          nip  r@ +                            ( size virt len adr'  r: alloc-sz )
          swap r> -                            ( size virt adr len' )
-         swap over  0=                        ( size virt len adr done? )
-      until                                   ( size virt len adr )
+         swap over  0=                        ( size virt len' adr done? )
+      until                                   ( size virt len' adr )
       2drop nip  32meg                        ( virt 32meg )
    else                                       ( size virt virt )
       nip nip  0                              ( virt 0 )
@@ -164,7 +164,9 @@ headers
 
 \ read in file and return buffer
 \ if base==0, vmem-alloc will allocate virt
-: get-file ( base fd -- [ virt size ] failed? )
+\ NB returned size is 8k rounded since the
+\ memory allocator rounded it for us
+: get-file ( base fd -- [ alloc-sz virt size ] failed? )
    dup >r  fs-size                         ( base size  r: fd )
    dup rot  vmem-alloc-prop                ( size alloc-sz virt  r: fd )
    rot  2dup tuck  r>                      ( alloc-sz virt size size virt size fd )
@@ -172,7 +174,8 @@ headers
    <>  if                                  ( alloc-sz virt size )
       3drop true  exit                     ( failed )
    then
-   false                                   ( alloc-sz virt size succeeded )
+   h# 2000  roundup                        ( alloc-sz virt size' )
+   false                                   ( alloc-sz virt size' succeeded )
 ;
 
 

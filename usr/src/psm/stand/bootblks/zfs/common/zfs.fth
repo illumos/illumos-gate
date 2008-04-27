@@ -506,7 +506,7 @@ new-device
    : entry-name$  ( dn le -- name$ )
       2dup le_name_chunk              ( dn le dn la-ch# )
       leaf-name  get-chunk-data       ( dn le )
-      nip le_name_length              ( len )
+      nip  le_name_length 1-          ( len )
       leaf-name swap                  ( name$ )
    ;
 
@@ -576,7 +576,7 @@ new-device
 
       \ blk# 1 is always the 1st leaf
       >r  1 leaf-apply  if              ( ???  r: fz )
-         r> drop  false  exit           ( ??? found )
+         r> drop  true  exit            ( ??? found )
       then  r>                          ( xt dn fz )
 
       \ call leaf-apply on every non-duplicate hash entry
