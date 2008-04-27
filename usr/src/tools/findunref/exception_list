@@ -285,6 +285,14 @@
 ./src/cmd/sgs/rtld/common/mapfile-order-gcc
 
 #
+# Ignore compiler dependent header files for fpscrubber
+# and sparc prototype files
+#
+./src/cmd/fps/fptest/singdoub*
+./src/pkgdefs/SUNWfsu/prototype_gcc_sparc
+./src/pkgdefs/SUNWfsu/prototype_cc_sparc
+
+#
 # Ignore license files.  This should be temporary, and these lines
 # should be removed once we start generating the opensolaris.org
 # deliverables from the nightly gate builds.
