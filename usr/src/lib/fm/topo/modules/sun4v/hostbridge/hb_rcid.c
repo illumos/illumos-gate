@@ -49,8 +49,8 @@ prc_t usbrdt_5440_prcs[] = {
 	/* physical id, bus address */
 	{ 0, 0x400 },
 	{ 1, 0x500 },
-	{ 1, 0x600 },
-	{ 1, 0x700 }
+	{ 2, 0x600 },
+	{ 3, 0x700 }
 };
 
 pprc_t plat_prcids[] = {
