@@ -481,6 +481,7 @@ struct oscarg {
 	dsl_dataset_t *clone_parent;
 	const char *lastname;
 	dmu_objset_type_t type;
+	uint64_t flags;
 };
 
 /*ARGSUSED*/
@@ -527,7 +528,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
-	    oa->clone_parent, cr, tx);
+	    oa->clone_parent, oa->flags, cr, tx);
 
 	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds));
@@ -551,7 +552,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 int
 dmu_objset_create(const char *name, dmu_objset_type_t type,
-    objset_t *clone_parent,
+    objset_t *clone_parent, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg)
 {
 	dsl_dir_t *pdd;
@@ -574,6 +575,7 @@ dmu_objset_create(const char *name, dmu_objset_type_t type,
 	oa.userarg = arg;
 	oa.lastname = tail;
 	oa.type = type;
+	oa.flags = flags;
 
 	if (clone_parent != NULL) {
 		/*
@@ -943,6 +945,21 @@ dmu_objset_is_snapshot(objset_t *os)
 		return (dsl_dataset_is_snapshot(os->os->os_dsl_dataset));
 	else
 		return (B_FALSE);
+}
+
+int
+dmu_snapshot_realname(objset_t *os, char *name, char *real, int maxlen,
+    boolean_t *conflict)
+{
+	dsl_dataset_t *ds = os->os->os_dsl_dataset;
+	uint64_t ignored;
+
+	if (ds->ds_phys->ds_snapnames_zapobj == 0)
+		return (ENOENT);
+
+	return (zap_lookup_norm(ds->ds_dir->dd_pool->dp_meta_objset,
+	    ds->ds_phys->ds_snapnames_zapobj, name, 8, 1, &ignored, MT_FIRST,
+	    real, maxlen, conflict));
 }
 
 int

@@ -35,6 +35,7 @@
 #include <sys/mutex.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
+#include <sys/sunddi.h>
 #include <sys/uio.h>
 #include <sys/vmsystm.h>
 #include <sys/vfs.h>
@@ -706,43 +707,102 @@ gfs_dir_inactive(vnode_t *vp)
 }
 
 /*
- * gfs_dir_lookup()
+ * gfs_dir_lookup_dynamic()
  *
- * Looks up the given name in the directory and returns the corresponding vnode,
- * if found.
+ * This routine looks up the provided name amongst the dynamic entries
+ * in the gfs directory and returns the corresponding vnode, if found.
  *
- * First, we search statically defined entries, if any.  If a match is found,
- * and GFS_CACHE_VNODE is set and the vnode exists, we simply return the
- * existing vnode.  Otherwise, we call the static entry's callback routine,
- * caching the result if necessary.
+ * The gfs directory is expected to be locked by the caller prior to
+ * calling this function.  The directory will be unlocked during the
+ * execution of this function, but will be locked upon return from the
+ * function.  This function returns 0 on success, non-zero on error.
  *
- * If no static entry is found, we invoke the lookup callback, if any.  The
- * arguments to this callback are:
+ * The dynamic lookups are performed by invoking the lookup
+ * callback, which is passed to this function as the first argument.
+ * The arguments to the callback are:
  *
- * int gfs_lookup_cb(vnode_t *pvp, const char *nm, vnode_t **vpp, cred_t *cr);
+ * int gfs_lookup_cb(vnode_t *pvp, const char *nm, vnode_t **vpp, cred_t *cr,
+ *     int flags, int *deflgs, pathname_t *rpnp);
  *
  *	pvp	- parent vnode
  *	nm	- name of entry
  *	vpp	- pointer to resulting vnode
  *	cr	- pointer to cred
+ *	flags	- flags value from lookup request
+ *		ignored here; currently only used to request
+ *		insensitive lookups
+ *	direntflgs - output parameter, directory entry flags
+ *		ignored here; currently only used to indicate a lookup
+ *		has more than one possible match when case is not considered
+ *	realpnp	- output parameter, real pathname
+ *		ignored here; when lookup was performed case-insensitively,
+ *		this field contains the "real" name of the file.
  *
  * 	Returns 0 on success, non-zero on error.
  */
-int
-gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp, cred_t *cr)
+static int
+gfs_dir_lookup_dynamic(gfs_lookup_cb callback, gfs_dir_t *dp,
+    const char *nm, vnode_t *dvp, vnode_t **vpp, cred_t *cr, int flags,
+    int *direntflags, pathname_t *realpnp)
 {
-	int i;
-	gfs_dirent_t *ge;
-	vnode_t *vp;
-	gfs_dir_t *dp = dvp->v_data;
-	int ret = 0;
+	gfs_file_t *fp;
+	ino64_t ino;
+	int ret;
 
-	ASSERT(dvp->v_type == VDIR);
+	ASSERT(GFS_DIR_LOCKED(dp));
 
-	if (gfs_lookup_dot(vpp, dvp, dp->gfsd_file.gfs_parent, nm) == 0)
-		return (0);
-
+	/*
+	 * Drop the directory lock, as the lookup routine
+	 * will need to allocate memory, or otherwise deadlock on this
+	 * directory.
+	 */
+	gfs_dir_unlock(dp);
+	ret = callback(dvp, nm, vpp, &ino, cr, flags, direntflags, realpnp);
 	gfs_dir_lock(dp);
+
+	/*
+	 * The callback for extended attributes returns a vnode
+	 * with v_data from an underlying fs.
+	 */
+	if (ret == 0 && !IS_XATTRDIR(dvp)) {
+		fp = (gfs_file_t *)((*vpp)->v_data);
+		fp->gfs_index = -1;
+		fp->gfs_ino = ino;
+	}
+
+	return (ret);
+}
+
+/*
+ * gfs_dir_lookup_static()
+ *
+ * This routine looks up the provided name amongst the static entries
+ * in the gfs directory and returns the corresponding vnode, if found.
+ * The first argument to the function is a pointer to the comparison
+ * function this function should use to decide if names are a match.
+ *
+ * If a match is found, and GFS_CACHE_VNODE is set and the vnode
+ * exists, we simply return the existing vnode.  Otherwise, we call
+ * the static entry's callback routine, caching the result if
+ * necessary.  If the idx pointer argument is non-NULL, we use it to
+ * return the index of the matching static entry.
+ *
+ * The gfs directory is expected to be locked by the caller prior to calling
+ * this function.  The directory may be unlocked during the execution of
+ * this function, but will be locked upon return from the function.
+ *
+ * This function returns 0 if a match is found, ENOENT if not.
+ */
+static int
+gfs_dir_lookup_static(int (*compare)(const char *, const char *),
+    gfs_dir_t *dp, const char *nm, vnode_t *dvp, int *idx,
+    vnode_t **vpp, pathname_t *rpnp)
+{
+	gfs_dirent_t *ge;
+	vnode_t *vp = NULL;
+	int i;
+
+	ASSERT(GFS_DIR_LOCKED(dp));
 
 	/*
 	 * Search static entries.
@@ -750,12 +810,16 @@ gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp, cred_t *cr)
 	for (i = 0; i < dp->gfsd_nstatic; i++) {
 		ge = &dp->gfsd_static[i];
 
-		if (strcmp(ge->gfse_name, nm) == 0) {
+		if (compare(ge->gfse_name, nm) == 0) {
+			if (rpnp)
+				(void) strlcpy(rpnp->pn_buf, ge->gfse_name,
+				    rpnp->pn_bufsize);
+
 			if (ge->gfse_vnode) {
 				ASSERT(ge->gfse_flags & GFS_CACHE_VNODE);
 				vp = ge->gfse_vnode;
 				VN_HOLD(vp);
-				goto out;
+				break;
 			}
 
 			/*
@@ -763,8 +827,8 @@ gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp, cred_t *cr)
 			 * need to do KM_SLEEP allocations.  If we return from
 			 * the constructor only to find that a parallel
 			 * operation has completed, and GFS_CACHE_VNODE is set
-			 * for this entry, we discard the result in favor of the
-			 * cached vnode.
+			 * for this entry, we discard the result in favor of
+			 * the cached vnode.
 			 */
 			gfs_dir_unlock(dp);
 			vp = ge->gfse_ctor(dvp);
@@ -797,57 +861,94 @@ gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp, cred_t *cr)
 					gfs_dir_lock(dp);
 				}
 			}
-
-			goto out;
+			break;
 		}
 	}
 
-	/*
-	 * See if there is a dynamic constructor.
-	 */
-	if (dp->gfsd_lookup) {
-		ino64_t ino;
-		gfs_file_t *fp;
+	if (vp == NULL)
+		return (ENOENT);
+	else if (idx)
+		*idx = i;
+	*vpp = vp;
+	return (0);
+}
 
-		/*
-		 * Once again, drop the directory lock, as the lookup routine
-		 * will need to allocate memory, or otherwise deadlock on this
-		 * directory.
-		 */
-		gfs_dir_unlock(dp);
-		ret = dp->gfsd_lookup(dvp, nm, &vp, &ino, cr);
-		gfs_dir_lock(dp);
-		if (ret != 0)
-			goto out;
+/*
+ * gfs_dir_lookup()
+ *
+ * Looks up the given name in the directory and returns the corresponding
+ * vnode, if found.
+ *
+ * First, we search statically defined entries, if any, with a call to
+ * gfs_dir_lookup_static().  If no static entry is found, and we have
+ * a callback function we try a dynamic lookup via gfs_dir_lookup_dynamic().
+ *
+ * This function returns 0 on success, non-zero on error.
+ */
+int
+gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp, cred_t *cr,
+    int flags, int *direntflags, pathname_t *realpnp)
+{
+	gfs_dir_t *dp = dvp->v_data;
+	boolean_t casecheck;
+	vnode_t *dynvp = NULL;
+	vnode_t *vp = NULL;
+	int (*compare)(const char *, const char *);
+	int error, idx;
 
-		/*
-		 * The lookup_cb might be returning a non-GFS vnode.
-		 * Currently this is true for extended attributes,
-		 * where we're returning a vnode with v_data from an
-		 * underlying fs.
-		 */
-		if ((dvp->v_flag & V_XATTRDIR) == 0) {
-			fp = (gfs_file_t *)vp->v_data;
-			fp->gfs_index = -1;
-			fp->gfs_ino = ino;
+	ASSERT(dvp->v_type == VDIR);
+
+	if (gfs_lookup_dot(vpp, dvp, dp->gfsd_file.gfs_parent, nm) == 0)
+		return (0);
+
+	casecheck = (flags & FIGNORECASE) != 0 && direntflags != NULL;
+	if (vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) ||
+	    (flags & FIGNORECASE))
+		compare = strcasecmp;
+	else
+		compare = strcmp;
+
+	gfs_dir_lock(dp);
+
+	error = gfs_dir_lookup_static(compare, dp, nm, dvp, &idx, &vp, realpnp);
+
+	if (vp && casecheck) {
+		gfs_dirent_t *ge;
+		int i;
+
+		for (i = idx + 1; i < dp->gfsd_nstatic; i++) {
+			ge = &dp->gfsd_static[i];
+
+			if (strcasecmp(ge->gfse_name, nm) == 0) {
+				*direntflags |= ED_CASE_CONFLICT;
+				goto out;
+			}
 		}
-	} else {
-		/*
-		 * No static entry found, and there is no lookup callback, so
-		 * return ENOENT.
-		 */
-		ret = ENOENT;
+	}
+
+	if ((error || casecheck) && dp->gfsd_lookup)
+		error = gfs_dir_lookup_dynamic(dp->gfsd_lookup, dp, nm, dvp,
+		    &dynvp, cr, flags, direntflags, vp ? NULL : realpnp);
+
+	if (vp && dynvp) {
+		/* static and dynamic entries are case-insensitive conflict */
+		ASSERT(casecheck);
+		*direntflags |= ED_CASE_CONFLICT;
+		VN_RELE(dynvp);
+	} else if (vp == NULL) {
+		vp = dynvp;
+	} else if (error == ENOENT) {
+		error = 0;
+	} else if (error) {
+		VN_RELE(vp);
+		vp = NULL;
 	}
 
 out:
 	gfs_dir_unlock(dp);
 
-	if (ret == 0)
-		*vpp = vp;
-	else
-		*vpp = NULL;
-
-	return (ret);
+	*vpp = vp;
+	return (error);
 }
 
 /*
@@ -964,7 +1065,7 @@ gfs_vop_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
     int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
     int *direntflags, pathname_t *realpnp)
 {
-	return (gfs_dir_lookup(dvp, nm, vpp, cr));
+	return (gfs_dir_lookup(dvp, nm, vpp, cr, flags, direntflags, realpnp));
 }
 
 /*

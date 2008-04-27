@@ -37,6 +37,7 @@
 #include <sys/mntent.h>
 #include <sys/mkdev.h>
 #include <sys/u8_textprep.h>
+#include <sys/dsl_dataset.h>
 #include <sys/vfs.h>
 #include <sys/vfs_opreg.h>
 #include <sys/vnode.h>

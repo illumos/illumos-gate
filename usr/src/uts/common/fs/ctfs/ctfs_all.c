@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,7 @@
 static int ctfs_adir_do_readdir(vnode_t *, void *, int *, offset_t *,
     offset_t *, void *, int);
 static int ctfs_adir_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
-    cred_t *);
+    cred_t *, int, int *, pathname_t *);
 
 /*
  * ctfs_create_adirnode
@@ -98,7 +98,7 @@ ctfs_adir_getattr(
 /* ARGSUSED */
 static int
 ctfs_adir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
-    cred_t *cr)
+    cred_t *cr, int flags, int *deflags, pathname_t *rpnp)
 {
 	int i;
 	contract_t *ct;
@@ -127,9 +127,7 @@ ctfs_adir_do_readdir(vnode_t *vp, void *dp, int *eofp,
 	ctid_t next;
 	struct dirent64 *odp = dp;
 
-	/* ctfs does not support V_RDDIR_ENTFLAGS */
-	if (flags & V_RDDIR_ENTFLAGS)
-		return (ENOTSUP);
+	ASSERT(!(flags & V_RDDIR_ENTFLAGS));
 
 	zuniqid = VTOZONE(vp)->zone_uniqid;
 	next = contract_lookup(zuniqid, *offp);

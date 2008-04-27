@@ -269,6 +269,9 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	if (fromorigin)
 		drr->drr_u.drr_begin.drr_flags |= DRR_FLAG_CLONE;
 	drr->drr_u.drr_begin.drr_toguid = ds->ds_phys->ds_guid;
+	if (ds->ds_phys->ds_flags & DS_FLAG_CI_DATASET)
+		drr->drr_u.drr_begin.drr_flags |= DRR_FLAG_CI_DATA;
+
 	if (fromds)
 		drr->drr_u.drr_begin.drr_fromguid = fromds->ds_phys->ds_guid;
 	dsl_dataset_name(ds, drr->drr_u.drr_begin.drr_toname);
@@ -322,6 +325,7 @@ struct recvbeginsyncarg {
 	dmu_objset_type_t type;
 	void *tag;
 	boolean_t force;
+	uint64_t dsflags;
 	char clonelastname[MAXNAMELEN];
 	dsl_dataset_t *ds; /* the ds to recv into; returned from the syncfunc */
 };
@@ -339,9 +343,6 @@ recv_full_sync_impl(dsl_pool_t *dp, uint64_t dsobj, dmu_objset_type_t type,
 		(void) dmu_objset_create_impl(dp->dp_spa,
 		    ds, &ds->ds_phys->ds_bp, type, tx);
 	}
-
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
 	spa_history_internal_log(LOG_DS_REPLAY_FULL_SYNC,
 	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
@@ -385,9 +386,12 @@ recv_full_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsl_dir_t *dd = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
 	uint64_t dsobj;
+	uint64_t flags = DS_FLAG_INCONSISTENT;
+
+	flags |= rbsa->dsflags;
 
 	dsobj = dsl_dataset_create_sync(dd, strrchr(rbsa->tofs, '/') + 1,
-	    rbsa->origin, cr, tx);
+	    rbsa->origin, flags, cr, tx);
 
 	rbsa->ds = recv_full_sync_impl(dd->dd_pool, dsobj,
 	    rbsa->origin ? DMU_OST_NONE : rbsa->type, cr, tx);
@@ -432,6 +436,9 @@ recv_full_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	struct recvbeginsyncarg *rbsa = arg2;
 	dsl_dir_t *dd = ds->ds_dir;
 	uint64_t dsobj;
+	uint64_t flags = DS_FLAG_INCONSISTENT;
+
+	flags |= rbsa->dsflags;
 
 	/*
 	 * NB: caller must provide an extra hold on the dsl_dir_t, so it
@@ -440,7 +447,7 @@ recv_full_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	 */
 	dsl_dataset_destroy_sync(ds, rbsa->tag, cr, tx);
 
-	dsobj = dsl_dataset_create_sync_impl(dd, rbsa->origin, tx);
+	dsobj = dsl_dataset_create_sync_impl(dd, rbsa->origin, flags, tx);
 
 	rbsa->ds = recv_full_sync_impl(dd->dd_pool, dsobj,
 	    rbsa->origin ? DMU_OST_NONE : rbsa->type, cr, tx);
@@ -495,12 +502,15 @@ recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsl_pool_t *dp = ohds->ds_dir->dd_pool;
 	dsl_dataset_t *ods, *cds;
 	uint64_t dsobj;
+	uint64_t flags = DS_FLAG_INCONSISTENT;
+
+	flags |= rbsa->dsflags;
 
 	/* create the temporary clone */
 	VERIFY(0 == dsl_dataset_open_obj(dp, ohds->ds_phys->ds_prev_snap_obj,
 	    NULL, DS_MODE_STANDARD, FTAG, &ods));
 	dsobj = dsl_dataset_create_sync(ohds->ds_dir,
-	    rbsa->clonelastname, ods, cr, tx);
+	    rbsa->clonelastname, ods, flags, cr, tx);
 	dsl_dataset_close(ods, DS_MODE_STANDARD, FTAG);
 
 	/* open the temporary clone */
@@ -510,9 +520,6 @@ recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	/* copy the refquota from the target fs to the clone */
 	if (ohds->ds_quota > 0)
 		dsl_dataset_set_quota_sync(cds, &ohds->ds_quota, cr, tx);
-
-	dmu_buf_will_dirty(cds->ds_dbuf, tx);
-	cds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
 	rbsa->ds = cds;
 
@@ -563,6 +570,7 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 	rbsa.fromguid = drrb->drr_fromguid;
 	rbsa.type = drrb->drr_type;
 	rbsa.tag = FTAG;
+	rbsa.dsflags = 0;
 	version = drrb->drr_version;
 	flags = drrb->drr_flags;
 
@@ -577,6 +585,9 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 	    rbsa.type >= DMU_OST_NUMTYPES ||
 	    ((flags & DRR_FLAG_CLONE) && origin == NULL))
 		return (EINVAL);
+
+	if (flags & DRR_FLAG_CI_DATA)
+		rbsa.dsflags = DS_FLAG_CI_DATASET;
 
 	bzero(drc, sizeof (dmu_recv_cookie_t));
 	drc->drc_drrb = drrb;

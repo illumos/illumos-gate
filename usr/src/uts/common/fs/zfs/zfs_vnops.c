@@ -1421,7 +1421,7 @@ top:
 	vnevent_remove(vp, dvp, name, ct);
 
 	if (realnmp)
-		dnlc_remove(dvp, realnmp->pn_path);
+		dnlc_remove(dvp, realnmp->pn_buf);
 	else
 		dnlc_remove(dvp, name);
 

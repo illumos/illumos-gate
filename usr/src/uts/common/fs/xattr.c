@@ -978,7 +978,7 @@ xattr_dir_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	 * Don't allow creation of extended attributes with sysattr names.
 	 */
 	if (is_sattr_name(name)) {
-		return (gfs_dir_lookup(dvp, name, vpp, cr));
+		return (gfs_dir_lookup(dvp, name, vpp, cr, 0, NULL, NULL));
 	}
 
 	error = xattr_dir_realdir(dvp, &pvp, LOOKUP_XATTR|CREATE_XATTR_DIR,
@@ -1096,14 +1096,13 @@ readdir_xattr_casecmp(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	int error;
 	vnode_t *vp;
 	struct pathname pn;
-	int flags = FIGNORECASE;
 
 	*eflags = 0;
 
 	error = pn_get(nm, UIO_SYSSPACE, &pn);
 	if (error == 0) {
-		error = VOP_LOOKUP(dvp, nm, &vp, &pn, LOOKUP_XATTR, rootvp,
-		    cr, ct, &flags, NULL);
+		error = VOP_LOOKUP(dvp, nm, &vp, &pn,
+		    FIGNORECASE, rootvp, cr, ct, NULL, NULL);
 		if (error == 0) {
 			*eflags = ED_CASE_CONFLICT;
 			VN_RELE(vp);
@@ -1170,13 +1169,14 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 		while ((error = gfs_readdir_pred(&gstate, uiop, &off)) == 0 &&
 		    !*eofp) {
 			if (off >= 0 && off < dp->gfsd_nstatic) {
-				int eflags = 0;
+				int eflags;
 
 				/*
 				 * Check to see if this sysattr set name has a
 				 * case-insensitive conflict with a real xattr
 				 * name.
 				 */
+				eflags = 0;
 				if ((flags & V_RDDIR_ENTFLAGS) && has_xattrs) {
 					error = readdir_xattr_casecmp(pvp,
 					    dp->gfsd_static[off].gfse_name,
@@ -1286,7 +1286,7 @@ static gfs_opsvec_t xattr_opsvec[] = {
 
 static int
 xattr_lookup_cb(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
-    cred_t *cr)
+    cred_t *cr, int flags, int *deflags, pathname_t *rpnp)
 {
 	vnode_t *pvp;
 	struct pathname pn;
@@ -1310,8 +1310,8 @@ xattr_lookup_cb(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
 
 	error = pn_get((char *)nm, UIO_SYSSPACE, &pn);
 	if (error == 0) {
-		error = VOP_LOOKUP(pvp, (char *)nm, vpp, &pn, 0, rootvp,
-		    cr, NULL, NULL, NULL);
+		error = VOP_LOOKUP(pvp, (char *)nm, vpp, &pn, flags, rootvp,
+		    cr, NULL, deflags, rpnp);
 		pn_free(&pn);
 	}
 	VN_RELE(pvp);

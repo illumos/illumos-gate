@@ -166,7 +166,7 @@ int dmu_objset_open_ds(struct dsl_dataset *ds, dmu_objset_type_t type,
 void dmu_objset_close(objset_t *os);
 int dmu_objset_evict_dbufs(objset_t *os);
 int dmu_objset_create(const char *name, dmu_objset_type_t type,
-    objset_t *clone_parent,
+    objset_t *clone_parent, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
 int dmu_objset_destroy(const char *name);
 int dmu_snapshots_destroy(char *fsname, char *snapname);
@@ -540,6 +540,8 @@ extern dmu_objset_type_t dmu_objset_type(objset_t *os);
 extern uint64_t dmu_objset_id(objset_t *os);
 extern int dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
     uint64_t *id, uint64_t *offp, boolean_t *case_conflict);
+extern int dmu_snapshot_realname(objset_t *os, char *name, char *real,
+    int maxlen, boolean_t *conflict);
 extern int dmu_dir_list_next(objset_t *os, int namelen, char *name,
     uint64_t *idp, uint64_t *offp);
 extern void dmu_objset_set_user(objset_t *os, void *user_ptr);

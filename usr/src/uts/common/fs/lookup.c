@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -525,7 +525,7 @@ checkforroot:
 				 * Return the case-preserved name
 				 * within the resolved path.
 				 */
-				error = copystr(pp->pn_path,
+				error = copystr(pp->pn_buf,
 				    rpnp->pn_path + rpnp->pn_pathlen,
 				    rpnp->pn_bufsize - rpnp->pn_pathlen, &len);
 			} else {

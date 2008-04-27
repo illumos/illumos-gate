@@ -62,6 +62,12 @@ typedef void dsl_dataset_evict_func_t(struct dsl_dataset *, void *);
  */
 #define	DS_FLAG_UNIQUE_ACCURATE	(1ULL<<2)
 
+/*
+ * DS_FLAG_CI_DATASET is set if the dataset contains a file system whose
+ * name lookups should be performed case-insensitively.
+ */
+#define	DS_FLAG_CI_DATASET	(1ULL<<16)
+
 typedef struct dsl_dataset_phys {
 	uint64_t ds_dir_obj;
 	uint64_t ds_prev_snap_obj;
@@ -145,9 +151,10 @@ void dsl_dataset_close(dsl_dataset_t *ds, int mode, void *tag);
 void dsl_dataset_downgrade(dsl_dataset_t *ds, int oldmode, int newmode);
 boolean_t dsl_dataset_tryupgrade(dsl_dataset_t *ds, int oldmode, int newmode);
 uint64_t dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin,
-    dmu_tx_t *tx);
+    uint64_t flags, dmu_tx_t *tx);
 uint64_t dsl_dataset_create_sync(dsl_dir_t *pds,
-    const char *lastname, dsl_dataset_t *origin, cred_t *, dmu_tx_t *);
+    const char *lastname, dsl_dataset_t *origin, uint64_t flags,
+    cred_t *, dmu_tx_t *);
 int dsl_dataset_destroy(dsl_dataset_t *ds, void *tag);
 int dsl_snapshots_destroy(char *fsname, char *snapname);
 dsl_checkfunc_t dsl_dataset_destroy_check;
@@ -199,6 +206,7 @@ int dsl_dataset_set_quota(const char *dsname, uint64_t quota);
 void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
     dmu_tx_t *tx);
 int dsl_dataset_set_reservation(const char *dsname, uint64_t reservation);
+void dsl_dataset_set_flags(dsl_dataset_t *ds, uint64_t flags);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \

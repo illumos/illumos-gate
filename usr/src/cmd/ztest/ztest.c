@@ -1237,8 +1237,8 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	/*
 	 * Verify that we can create a new dataset.
 	 */
-	error = dmu_objset_create(name, DMU_OST_OTHER, NULL, ztest_create_cb,
-	    NULL);
+	error = dmu_objset_create(name, DMU_OST_OTHER, NULL, 0,
+	    ztest_create_cb, NULL);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_create");
@@ -1293,7 +1293,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	/*
 	 * Verify that we cannot create an existing dataset.
 	 */
-	error = dmu_objset_create(name, DMU_OST_OTHER, NULL, NULL, NULL);
+	error = dmu_objset_create(name, DMU_OST_OTHER, NULL, 0, NULL, NULL);
 	if (error != EEXIST)
 		fatal(0, "created existing dataset, error = %d", error);
 
@@ -3219,7 +3219,7 @@ ztest_run(char *pool)
 			int test_future = FALSE;
 			(void) rw_rdlock(&ztest_shared->zs_name_lock);
 			(void) snprintf(name, 100, "%s/%s_%d", pool, pool, d);
-			error = dmu_objset_create(name, DMU_OST_OTHER, NULL,
+			error = dmu_objset_create(name, DMU_OST_OTHER, NULL, 0,
 			    ztest_create_cb, NULL);
 			if (error == EEXIST) {
 				test_future = TRUE;

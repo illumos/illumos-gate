@@ -290,6 +290,43 @@ dsl_dataset_get_snapname(dsl_dataset_t *ds)
 	return (err);
 }
 
+static int
+dsl_dataset_snap_lookup(objset_t *os, uint64_t flags,
+    uint64_t snapnames_zapobj, const char *name, uint64_t *value)
+{
+	matchtype_t mt;
+	int err;
+
+	if (flags & DS_FLAG_CI_DATASET)
+		mt = MT_FIRST;
+	else
+		mt = MT_EXACT;
+
+	err = zap_lookup_norm(os, snapnames_zapobj, name, 8, 1,
+	    value, mt, NULL, 0, NULL);
+	if (err == ENOTSUP && mt == MT_FIRST)
+		err = zap_lookup(os, snapnames_zapobj, name, 8, 1, value);
+	return (err);
+}
+
+static int
+dsl_dataset_snap_remove(objset_t *os, uint64_t flags,
+    uint64_t snapnames_zapobj, char *name, dmu_tx_t *tx)
+{
+	matchtype_t mt;
+	int err;
+
+	if (flags & DS_FLAG_CI_DATASET)
+		mt = MT_FIRST;
+	else
+		mt = MT_EXACT;
+
+	err = zap_remove_norm(os, snapnames_zapobj, name, mt, tx);
+	if (err == ENOTSUP && mt == MT_FIRST)
+		err = zap_remove(os, snapnames_zapobj, name, tx);
+	return (err);
+}
+
 int
 dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
     int mode, void *tag, dsl_dataset_t **dsp)
@@ -355,12 +392,14 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 				    ds->ds_dir->dd_phys->dd_head_dataset_obj,
 				    FTAG, &headdbuf);
 				if (err == 0) {
-					headphys = headdbuf->db_data;
 					uint64_t foundobj;
-					err = zap_lookup(dp->dp_meta_objset,
+
+					headphys = headdbuf->db_data;
+					err = dsl_dataset_snap_lookup(
+					    dp->dp_meta_objset,
+					    headphys->ds_flags,
 					    headphys->ds_snapnames_zapobj,
-					    snapname, sizeof (foundobj), 1,
-					    &foundobj);
+					    snapname, &foundobj);
 					ASSERT3U(foundobj, ==, dsobj);
 					dmu_buf_rele(headdbuf, FTAG);
 				}
@@ -469,11 +508,13 @@ dsl_dataset_open_spa(spa_t *spa, const char *name, int mode,
 
 	if (tail != NULL) {
 		objset_t *mos = dp->dp_meta_objset;
+		uint64_t flags;
 
 		err = dsl_dataset_open_obj(dp, obj, NULL,
 		    DS_MODE_NONE, tag, &ds);
 		if (err)
 			goto out;
+		flags = ds->ds_phys->ds_flags;
 		obj = ds->ds_phys->ds_snapnames_zapobj;
 		dsl_dataset_close(ds, DS_MODE_NONE, tag);
 		ds = NULL;
@@ -490,7 +531,7 @@ dsl_dataset_open_spa(spa_t *spa, const char *name, int mode,
 			goto out;
 		}
 		dprintf("looking for snapshot '%s'\n", tail);
-		err = zap_lookup(mos, obj, tail, 8, 1, &obj);
+		err = dsl_dataset_snap_lookup(mos, flags, obj, tail, &obj);
 		if (err)
 			goto out;
 	}
@@ -632,7 +673,8 @@ dsl_dataset_create_root(dsl_pool_t *dp, uint64_t *ddobjp, dmu_tx_t *tx)
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_snapnames_zapobj =
-	    zap_create(mos, DMU_OT_DSL_DS_SNAP_MAP, DMU_OT_NONE, 0, tx);
+	    zap_create_norm(mos, U8_TEXTPREP_TOUPPER, DMU_OT_DSL_DS_SNAP_MAP,
+	    DMU_OT_NONE, 0, tx);
 	dsphys->ds_creation_time = gethrestime_sec();
 	dsphys->ds_creation_txg = tx->tx_txg;
 	dsphys->ds_deadlist_obj =
@@ -653,7 +695,8 @@ dsl_dataset_create_root(dsl_pool_t *dp, uint64_t *ddobjp, dmu_tx_t *tx)
 }
 
 uint64_t
-dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin, dmu_tx_t *tx)
+dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin,
+    uint64_t flags, dmu_tx_t *tx)
 {
 	dsl_pool_t *dp = dd->dd_pool;
 	dmu_buf_t *dbuf;
@@ -672,17 +715,17 @@ dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin, dmu_tx_t *tx)
 	dmu_buf_will_dirty(dbuf, tx);
 	dsphys = dbuf->db_data;
 	dsphys->ds_dir_obj = dd->dd_object;
+	dsphys->ds_flags = flags;
 	dsphys->ds_fsid_guid = unique_create();
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_snapnames_zapobj =
-	    zap_create(mos, DMU_OT_DSL_DS_SNAP_MAP, DMU_OT_NONE, 0, tx);
+	    zap_create_norm(mos, U8_TEXTPREP_TOUPPER, DMU_OT_DSL_DS_SNAP_MAP,
+	    DMU_OT_NONE, 0, tx);
 	dsphys->ds_creation_time = gethrestime_sec();
 	dsphys->ds_creation_txg = tx->tx_txg;
 	dsphys->ds_deadlist_obj =
 	    bplist_create(mos, DSL_DEADLIST_BLOCKSIZE, tx);
-	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
-		dsphys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
 
 	if (origin) {
 		dsphys->ds_prev_snap_obj = origin->ds_object;
@@ -695,6 +738,7 @@ dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin, dmu_tx_t *tx)
 		dsphys->ds_uncompressed_bytes =
 		    origin->ds_phys->ds_uncompressed_bytes;
 		dsphys->ds_bp = origin->ds_phys->ds_bp;
+		dsphys->ds_flags = origin->ds_phys->ds_flags;
 
 		dmu_buf_will_dirty(origin->ds_dbuf, tx);
 		origin->ds_phys->ds_num_children++;
@@ -702,6 +746,10 @@ dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin, dmu_tx_t *tx)
 		dmu_buf_will_dirty(dd->dd_dbuf, tx);
 		dd->dd_phys->dd_origin_obj = origin->ds_object;
 	}
+
+	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
+		dsphys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
+
 	dmu_buf_rele(dbuf, FTAG);
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
@@ -711,8 +759,8 @@ dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin, dmu_tx_t *tx)
 }
 
 uint64_t
-dsl_dataset_create_sync(dsl_dir_t *pdd,
-    const char *lastname, dsl_dataset_t *origin, cred_t *cr, dmu_tx_t *tx)
+dsl_dataset_create_sync(dsl_dir_t *pdd, const char *lastname,
+    dsl_dataset_t *origin, uint64_t flags, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_pool_t *dp = pdd->dd_pool;
 	uint64_t dsobj, ddobj;
@@ -723,7 +771,7 @@ dsl_dataset_create_sync(dsl_dir_t *pdd,
 	ddobj = dsl_dir_create_sync(pdd, lastname, tx);
 	VERIFY(0 == dsl_dir_open_obj(dp, ddobj, lastname, FTAG, &dd));
 
-	dsobj = dsl_dataset_create_sync_impl(dd, origin, tx);
+	dsobj = dsl_dataset_create_sync_impl(dd, origin, flags, tx);
 
 	dsl_deleg_set_create_perms(dd, tx, cr);
 
@@ -1518,14 +1566,18 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 #ifdef ZFS_DEBUG
 		{
 			uint64_t val;
-			err = zap_lookup(mos,
+
+			err = dsl_dataset_snap_lookup(mos,
+			    ds_head->ds_phys->ds_flags,
 			    ds_head->ds_phys->ds_snapnames_zapobj,
-			    ds->ds_snapname, 8, 1, &val);
+			    ds->ds_snapname, &val);
 			ASSERT3U(err, ==, 0);
 			ASSERT3U(val, ==, obj);
 		}
 #endif
-		err = zap_remove(mos, ds_head->ds_phys->ds_snapnames_zapobj,
+		err = dsl_dataset_snap_remove(mos,
+		    ds_head->ds_phys->ds_flags,
+		    ds_head->ds_phys->ds_snapnames_zapobj,
 		    ds->ds_snapname, tx);
 		ASSERT(err == 0);
 		dsl_dataset_close(ds_head, DS_MODE_NONE, FTAG);
@@ -1590,8 +1642,8 @@ dsl_dataset_snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	/*
 	 * Check for conflicting name snapshot name.
 	 */
-	err = zap_lookup(mos, ds->ds_phys->ds_snapnames_zapobj,
-	    snapname, 8, 1, &value);
+	err = dsl_dataset_snap_lookup(mos, ds->ds_phys->ds_flags,
+	    ds->ds_phys->ds_snapnames_zapobj, snapname, &value);
 	if (err == 0)
 		return (EEXIST);
 	if (err != ENOENT)
@@ -1840,8 +1892,8 @@ dsl_dataset_snapshot_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		return (err);
 
 	/* new name better not be in use */
-	err = zap_lookup(mos, hds->ds_phys->ds_snapnames_zapobj,
-	    newsnapname, 8, 1, &val);
+	err = dsl_dataset_snap_lookup(mos, hds->ds_phys->ds_flags,
+	    hds->ds_phys->ds_snapnames_zapobj, newsnapname, &val);
 	dsl_dataset_close(hds, DS_MODE_NONE, FTAG);
 
 	if (err == 0)
@@ -1873,8 +1925,8 @@ dsl_dataset_snapshot_rename_sync(void *arg1, void *arg2,
 	    dd->dd_phys->dd_head_dataset_obj, NULL, DS_MODE_NONE, FTAG, &hds));
 
 	VERIFY(0 == dsl_dataset_get_snapname(ds));
-	err = zap_remove(mos, hds->ds_phys->ds_snapnames_zapobj,
-	    ds->ds_snapname, tx);
+	err = dsl_dataset_snap_remove(mos, hds->ds_phys->ds_flags,
+	    hds->ds_phys->ds_snapnames_zapobj, ds->ds_snapname, tx);
 	ASSERT3U(err, ==, 0);
 	mutex_enter(&ds->ds_lock);
 	(void) strcpy(ds->ds_snapname, newsnapname);
@@ -2069,7 +2121,7 @@ dsl_dataset_rename(char *oldname, const char *newname,
 
 struct promotearg {
 	uint64_t used, comp, uncomp, unique;
-	uint64_t newnext_obj, snapnames_obj;
+	uint64_t ds_flags, newnext_obj, snapnames_obj;
 };
 
 /* ARGSUSED */
@@ -2110,6 +2162,7 @@ dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		    odd->dd_phys->dd_head_dataset_obj,
 		    NULL, DS_MODE_NONE, FTAG, &phds))
 			goto out;
+		pa->ds_flags = phds->ds_phys->ds_flags;
 		pa->snapnames_obj = phds->ds_phys->ds_snapnames_zapobj;
 		dsl_dataset_close(phds, DS_MODE_NONE, FTAG);
 	}
@@ -2153,9 +2206,9 @@ dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 		/* Check that the snapshot name does not conflict */
 		dsl_dataset_name(ds, name);
-		err = zap_lookup(dd->dd_pool->dp_meta_objset,
-		    hds->ds_phys->ds_snapnames_zapobj, ds->ds_snapname,
-		    8, 1, &val);
+		err = dsl_dataset_snap_lookup(dd->dd_pool->dp_meta_objset,
+		    hds->ds_phys->ds_flags, hds->ds_phys->ds_snapnames_zapobj,
+		    ds->ds_snapname, &val);
 		if (err != ENOENT) {
 			if (err == 0)
 				err = EEXIST;
@@ -2245,8 +2298,8 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 		/* move snap name entry */
 		dsl_dataset_name(ds, name);
-		VERIFY(0 == zap_remove(dp->dp_meta_objset,
-		    pa->snapnames_obj, ds->ds_snapname, tx));
+		VERIFY(0 == dsl_dataset_snap_remove(dp->dp_meta_objset,
+		    pa->ds_flags, pa->snapnames_obj, ds->ds_snapname, tx));
 		VERIFY(0 == zap_add(dp->dp_meta_objset,
 		    hds->ds_phys->ds_snapnames_zapobj, ds->ds_snapname,
 		    8, 1, &ds->ds_object, tx));

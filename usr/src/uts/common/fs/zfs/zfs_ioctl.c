@@ -1811,7 +1811,7 @@ zfs_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
  */
 static int
 zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
-    nvlist_t *zplprops, uint64_t zplver)
+    nvlist_t *zplprops, uint64_t zplver, boolean_t *is_ci)
 {
 	objset_t *os;
 	char parentname[MAXNAMELEN];
@@ -1891,6 +1891,9 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 	VERIFY(nvlist_add_uint64(zplprops,
 	    zfs_prop_to_name(ZFS_PROP_CASE), sense) == 0);
 
+	if (is_ci)
+		*is_ci = (sense == ZFS_CASE_INSENSITIVE);
+
 	dmu_objset_close(os);
 	return (0);
 }
@@ -1956,7 +1959,9 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			nvlist_free(nvprops);
 			return (error);
 		}
-		error = dmu_objset_create(zc->zc_name, type, clone, NULL, NULL);
+
+		error = dmu_objset_create(zc->zc_name, type, clone, 0,
+		    NULL, NULL);
 		if (error) {
 			dmu_objset_close(clone);
 			nvlist_free(nvprops);
@@ -1964,6 +1969,8 @@ zfs_ioc_create(zfs_cmd_t *zc)
 		}
 		dmu_objset_close(clone);
 	} else {
+		boolean_t is_insensitive = B_FALSE;
+
 		if (cbfunc == NULL) {
 			nvlist_free(nvprops);
 			return (EINVAL);
@@ -2038,17 +2045,16 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			VERIFY(nvlist_alloc(&zct.zct_zplprops,
 			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
 			error = zfs_fill_zplprops(zc->zc_name, nvprops,
-			    zct.zct_zplprops, version);
+			    zct.zct_zplprops, version, &is_insensitive);
 			if (error != 0) {
 				nvlist_free(nvprops);
 				nvlist_free(zct.zct_zplprops);
 				return (error);
 			}
 		}
-		error = dmu_objset_create(zc->zc_name, type, NULL, cbfunc,
-		    &zct);
+		error = dmu_objset_create(zc->zc_name, type, NULL,
+		    is_insensitive ? DS_FLAG_CI_DATASET : 0, cbfunc, &zct);
 		nvlist_free(zct.zct_zplprops);
-
 	}
 
 	/*

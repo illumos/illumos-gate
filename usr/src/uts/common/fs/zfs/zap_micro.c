@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,6 +139,7 @@ mzap_byteswap(mzap_phys_t *buf, size_t size)
 	int i, max;
 	buf->mz_block_type = BSWAP_64(buf->mz_block_type);
 	buf->mz_salt = BSWAP_64(buf->mz_salt);
+	buf->mz_normflags = BSWAP_64(buf->mz_normflags);
 	max = (size / MZAP_ENT_LEN) - 1;
 	for (i = 0; i < max; i++) {
 		buf->mz_chunk[i].mze_value =

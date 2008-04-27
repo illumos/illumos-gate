@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ typedef struct gfs_file {
 typedef int (*gfs_readdir_cb)(vnode_t *, void *, int *, offset_t *,
     offset_t *, void *, int);
 typedef int (*gfs_lookup_cb)(vnode_t *, const char *, vnode_t **, ino64_t *,
-    cred_t *);
+    cred_t *, int, int *, pathname_t *);
 typedef ino64_t (*gfs_inode_cb)(vnode_t *, int);
 
 typedef struct gfs_dir {
@@ -105,12 +105,16 @@ extern vnode_t *gfs_root_create_file(size_t, struct vfs *, vnodeops_t *,
 extern void *gfs_file_inactive(vnode_t *);
 extern void *gfs_dir_inactive(vnode_t *);
 
-extern int gfs_dir_lookup(vnode_t *, const char *, vnode_t **, cred_t *);
+extern int gfs_dir_case_lookup(vnode_t *, const char *, vnode_t **, cred_t *,
+    int, int *, pathname_t *);
+extern int gfs_dir_lookup(vnode_t *, const char *, vnode_t **, cred_t *,
+    int, int *, pathname_t *);
 extern int gfs_dir_readdir(vnode_t *, uio_t *, int *, void *, cred_t *,
     caller_context_t *, int flags);
 
 #define	gfs_dir_lock(gd)	mutex_enter(&(gd)->gfsd_lock)
 #define	gfs_dir_unlock(gd)	mutex_exit(&(gd)->gfsd_lock)
+#define	GFS_DIR_LOCKED(gd)	MUTEX_HELD(&(gd)->gfsd_lock)
 
 #define	gfs_file_parent(vp)	(((gfs_file_t *)(vp)->v_data)->gfs_parent)
 

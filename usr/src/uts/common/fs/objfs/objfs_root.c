@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
 extern int last_module_id;
 
 static int objfs_root_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
-    cred_t *);
+    cred_t *, int, int *, pathname_t *);
 static int objfs_root_do_readdir(vnode_t *, void *, int *,
     offset_t *, offset_t *, void *, int);
 
@@ -72,7 +72,7 @@ objfs_root_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 /* ARGSUSED */
 static int
 objfs_root_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
-    cred_t *cr)
+    cred_t *cr, int flags, int *deflags, pathname_t *rpnp)
 {
 	int result = ENOENT;
 	struct modctl *mp;
@@ -112,9 +112,7 @@ objfs_root_do_readdir(vnode_t *vp, void *dp, int *eofp,
 	struct modctl *mp = *mpp;
 	struct dirent64 *odp = dp;
 
-	/* objfs does not support V_RDDIR_ENTFLAGS */
-	if (flags & V_RDDIR_ENTFLAGS)
-		return (ENOTSUP);
+	ASSERT(!(flags & V_RDDIR_ENTFLAGS));
 
 	mutex_enter(&mod_lock);
 

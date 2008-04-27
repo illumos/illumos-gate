@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,7 @@ int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp);
 void dmu_objset_close(objset_t *os);
 int dmu_objset_create(const char *name, dmu_objset_type_t type,
-    objset_t *clone_parent,
+    objset_t *clone_parent, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
 int dmu_objset_destroy(const char *name);
 int dmu_objset_rollback(objset_t *os);

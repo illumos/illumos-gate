@@ -74,7 +74,7 @@ zfs_match_find(zfsvfs_t *zfsvfs, znode_t *dzp, char *name, boolean_t exact,
 		char *buf = NULL;
 
 		if (rpnp) {
-			buf = rpnp->pn_path;
+			buf = rpnp->pn_buf;
 			bufsz = rpnp->pn_bufsize;
 		}
 		if (exact)
@@ -85,7 +85,7 @@ zfs_match_find(zfsvfs_t *zfsvfs, znode_t *dzp, char *name, boolean_t exact,
 		 */
 		error = zap_lookup_norm(zfsvfs->z_os, dzp->z_id, name, 8, 1,
 		    zoid, mt, buf, bufsz, &conflict);
-		if (deflags)
+		if (!error && deflags)
 			*deflags = conflict ? ED_CASE_CONFLICT : 0;
 	} else {
 		error = zap_lookup(zfsvfs->z_os, dzp->z_id, name, 8, 1, zoid);
@@ -401,8 +401,8 @@ zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp, int flags,
 		rpnp = NULL;
 	}
 
-	if ((flags & FIGNORECASE) && rpnp)
-		(void) strlcpy(rpnp->pn_path, name, rpnp->pn_bufsize);
+	if ((flags & FIGNORECASE) && rpnp && !error)
+		(void) strlcpy(rpnp->pn_buf, name, rpnp->pn_bufsize);
 
 	return (error);
 }

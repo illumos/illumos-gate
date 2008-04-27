@@ -321,6 +321,8 @@ typedef struct vn_vfslocks_entry {
 
 #define	V_XATTRDIR	0x4000	/* attribute unnamed directory */
 
+#define	IS_XATTRDIR(vp)	((vp)->v_flag & V_XATTRDIR)
+
 #define	V_LOCALITY	0x8000	/* whether locality aware */
 
 /*
