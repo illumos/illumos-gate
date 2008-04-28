@@ -236,7 +236,7 @@ xvdi_init_dev(dev_info_t *dip)
 	char xsnamebuf[TYPICALMAXPATHLEN];
 	char *xsname;
 	void *prop_str;
-	unsigned int prop_len, addr;
+	unsigned int prop_len;
 	char unitaddr[8];
 
 	devcls = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
