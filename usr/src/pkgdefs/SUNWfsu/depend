@@ -44,5 +44,6 @@
 P SUNWcsr	Core Solaris, (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsl	Core Solaris Libraries
+P SUNWlibmsr	Math & Microtasking Libraries (Root)
 P SUNWfmd	Fault Management Daemon and Utilities
 P SUNWfsr	FP Scrubber configuration files (ROOT)
