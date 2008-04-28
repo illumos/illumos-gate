@@ -1272,7 +1272,7 @@ nxge_hio_share_free(mac_share_handle_t shandle)
 	 * First, unassign the VR (take it back),
 	 * so we can enable interrupts again.
 	 */
-	nxge_hio_share_unassign(shp->vrp);
+	(void) nxge_hio_share_unassign(shp->vrp);
 
 	/*
 	 * Free Ring Resources for TX and RX

@@ -100,9 +100,9 @@ nxge_rxbuf_threshold_t nxge_rx_threshold_lo = NXGE_RX_COPY_3;
 
 /* Use kmem_alloc() to allocate data buffers. */
 #if !defined(__i386)
-uint32_t       nxge_use_kmem_alloc = 1;
+uint32_t	nxge_use_kmem_alloc = 1;
 #else
-uint32_t       nxge_use_kmem_alloc = 0;
+uint32_t	nxge_use_kmem_alloc = 0;
 #endif
 
 rtrace_t npi_rtracebuf;
@@ -867,7 +867,7 @@ nxge_unattach(p_nxge_t nxgep)
 
 #if	defined(sun4v)
 	if (isLDOMguest(nxgep)) {
-		nxge_hio_vr_release(nxgep);
+		(void) nxge_hio_vr_release(nxgep);
 	}
 #endif
 
