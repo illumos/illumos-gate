@@ -147,6 +147,9 @@ extern void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
 extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
 	mblk_t **npt);
 extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
+extern void vsw_hio_cleanup(vsw_t *vswp);
+extern void vsw_hio_start_ports(vsw_t *vswp);
+void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
 
 /*
  * Internal tunables.
@@ -201,6 +204,10 @@ uint64_t vsw_pri_eth_type = 0;
  * of priority packets. Note: Must be a power of 2 for vio_create_mblks().
  */
 uint32_t vsw_pri_tx_nmblks = 64;
+
+boolean_t vsw_hio_enabled = B_TRUE;	/* Enable/disable HybridIO */
+int vsw_hio_max_cleanup_retries = 10;	/* Max retries for HybridIO cleanp */
+int vsw_hio_cleanup_delay = 10000;	/* 10ms */
 
 /*
  * External tunables.
@@ -334,6 +341,7 @@ static char vsw_vid_propname[] = "vlan-id";
 static char vsw_dvid_propname[] = "default-vlan-id";
 static char port_pvid_propname[] = "remote-port-vlan-id";
 static char port_vid_propname[] = "remote-vlan-id";
+static char hybrid_propname[] = "hybrid";
 
 /*
  * Matching criteria passed to the MDEG to register interest
@@ -633,6 +641,7 @@ vsw_attach_fail:
 
 	if (progress & PROG_swmode) {
 		vsw_stop_switching_timeout(vswp);
+		vsw_hio_cleanup(vswp);
 		mutex_enter(&vswp->mac_lock);
 		vsw_mac_detach(vswp);
 		vsw_mac_close(vswp);
@@ -725,6 +734,9 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	rw_destroy(&vswp->if_lockrw);
+
+	/* cleanup HybridIO */
+	vsw_hio_cleanup(vswp);
 
 	mutex_destroy(&vswp->hw_lock);
 
@@ -2029,6 +2041,9 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 */
 		vsw_stop_switching_timeout(vswp);
 
+		/* Cleanup HybridIO */
+		vsw_hio_cleanup(vswp);
+
 		/*
 		 * Remove unicst, mcst addrs of vsw interface
 		 * and ports from the physdev.
@@ -2099,6 +2114,9 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 * and ports in the physdev.
 		 */
 		vsw_set_addrs(vswp);
+
+		/* Start HIO for ports that have already connected */
+		vsw_hio_start_ports(vswp);
 
 	} else if (updated & MD_macaddr) {
 		/*
@@ -2191,6 +2209,7 @@ vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	struct ether_addr	ea;
 	uint64_t		macaddr;
 	uint64_t		inst = 0;
+	uint64_t		val;
 
 	if (md_get_prop_val(mdp, *node, id_propname, &inst)) {
 		DWARN(vswp, "%s: prop(%s) not found", __func__,
@@ -2278,6 +2297,18 @@ vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	vsw_vlan_read_ids(portp, VSW_VNETPORT, mdp, *node, &portp->pvid,
 	    &portp->vids, &portp->nvids, NULL);
 
+	/* Check if hybrid property is present */
+	if (md_get_prop_val(mdp, *node, hybrid_propname, &val) == 0) {
+		D1(vswp, "%s: prop(%s) found\n", __func__, hybrid_propname);
+		portp->p_hio_enabled = B_TRUE;
+	} else {
+		portp->p_hio_enabled = B_FALSE;
+	}
+	/*
+	 * Port hio capability determined after version
+	 * negotiation, i.e., when we know the peer is HybridIO capable.
+	 */
+	portp->p_hio_capable = B_FALSE;
 	return (0);
 }
 
@@ -2321,6 +2352,8 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	uint16_t	pvid;
 	uint16_t	*vids;
 	uint16_t	nvids;
+	uint64_t	val;
+	boolean_t	hio_enabled = B_FALSE;
 
 	/*
 	 * For now, we get port updates only if vlan ids changed.
@@ -2358,32 +2391,42 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 		updated_vlans = B_TRUE;
 	}
 
-	if (updated_vlans == B_FALSE) {
-		RW_EXIT(&plistp->lockrw);
-		return (1);
+	if (updated_vlans == B_TRUE) {
+
+		/* Remove existing vlan ids from the hash table. */
+		vsw_vlan_remove_ids(portp, VSW_VNETPORT);
+
+		/* save the new vlan ids */
+		portp->pvid = pvid;
+		if (portp->nvids != 0) {
+			kmem_free(portp->vids,
+			    sizeof (uint16_t) * portp->nvids);
+			portp->nvids = 0;
+		}
+		if (nvids != 0) {
+			portp->vids = kmem_zalloc(sizeof (uint16_t) *
+			    nvids, KM_SLEEP);
+			bcopy(vids, portp->vids, sizeof (uint16_t) * nvids);
+			portp->nvids = nvids;
+			kmem_free(vids, sizeof (uint16_t) * nvids);
+		}
+
+		/* add these new vlan ids into hash table */
+		vsw_vlan_add_ids(portp, VSW_VNETPORT);
+
+		/* reset the port if it is vlan unaware (ver < 1.3) */
+		vsw_vlan_unaware_port_reset(portp);
 	}
 
-	/* Remove existing vlan ids from the hash table. */
-	vsw_vlan_remove_ids(portp, VSW_VNETPORT);
-
-	/* save the new vlan ids */
-	portp->pvid = pvid;
-	if (portp->nvids != 0) {
-		kmem_free(portp->vids, sizeof (uint16_t) * portp->nvids);
-		portp->nvids = 0;
-	}
-	if (nvids != 0) {
-		portp->vids = kmem_zalloc(sizeof (uint16_t) * nvids, KM_SLEEP);
-		bcopy(vids, portp->vids, sizeof (uint16_t) * nvids);
-		portp->nvids = nvids;
-		kmem_free(vids, sizeof (uint16_t) * nvids);
+	/* Check if hybrid property is present */
+	if (md_get_prop_val(curr_mdp, curr_mdex, hybrid_propname, &val) == 0) {
+		D1(vswp, "%s: prop(%s) found\n", __func__, hybrid_propname);
+		hio_enabled = B_TRUE;
 	}
 
-	/* add these new vlan ids into hash table */
-	vsw_vlan_add_ids(portp, VSW_VNETPORT);
-
-	/* reset the port if it is vlan unaware (ver < 1.3) */
-	vsw_vlan_unaware_port_reset(portp);
+	if (portp->p_hio_enabled != hio_enabled) {
+		vsw_hio_port_update(portp, hio_enabled);
+	}
 
 	RW_EXIT(&plistp->lockrw);
 

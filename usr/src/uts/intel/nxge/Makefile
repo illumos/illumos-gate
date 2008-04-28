@@ -74,6 +74,7 @@ CFLAGS	+= -dalign
 INC_PATH	+= -I$(UTSBASE)/common
 INC_PATH	+= -I$(UTSBASE)/common/io/nxge/npi
 INC_PATH	+= -I$(UTSBASE)/common/sys/nxge
+INC_PATH	+= -I$(UTSBASE)/sun4v
 #
 #
 # lint pass one enforcement

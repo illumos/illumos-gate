@@ -27,9 +27,16 @@
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_rxdma.h>
+#include <sys/nxge/nxge_hio.h>
+
+#if !defined(_BIG_ENDIAN)
+#include <npi_rx_rd32.h>
+#endif
+#include <npi_rx_rd64.h>
+#include <npi_rx_wr64.h>
 
 #define	NXGE_ACTUAL_RDCGRP(nxgep, rdcgrp)	\
-	(rdcgrp + nxgep->pt_config.hw_config.start_rdc_grpid)
+	(rdcgrp + nxgep->pt_config.hw_config.def_mac_rxdma_grpid)
 #define	NXGE_ACTUAL_RDC(nxgep, rdc)	\
 	(rdc + nxgep->pt_config.hw_config.start_rdc)
 
@@ -61,14 +68,15 @@ extern nxge_rxbuf_threshold_t nxge_rx_threshold_hi;
 extern nxge_rxbuf_type_t nxge_rx_buf_size_type;
 extern nxge_rxbuf_threshold_t nxge_rx_threshold_lo;
 
-static nxge_status_t nxge_map_rxdma(p_nxge_t);
-static void nxge_unmap_rxdma(p_nxge_t);
+extern uint32_t	nxge_cksum_enable;
+
+static nxge_status_t nxge_map_rxdma(p_nxge_t, int);
+static void nxge_unmap_rxdma(p_nxge_t, int);
 
 static nxge_status_t nxge_rxdma_hw_start_common(p_nxge_t);
-static void nxge_rxdma_hw_stop_common(p_nxge_t);
 
-static nxge_status_t nxge_rxdma_hw_start(p_nxge_t);
-static void nxge_rxdma_hw_stop(p_nxge_t);
+static nxge_status_t nxge_rxdma_hw_start(p_nxge_t, int);
+static void nxge_rxdma_hw_stop(p_nxge_t, int);
 
 static nxge_status_t nxge_map_rxdma_channel(p_nxge_t, uint16_t,
     p_nxge_dma_common_t *,  p_rx_rbr_ring_t *,
@@ -96,9 +104,8 @@ static nxge_status_t nxge_rxdma_start_channel(p_nxge_t, uint16_t,
     p_rx_rbr_ring_t, p_rx_rcr_ring_t, p_rx_mbox_t);
 static nxge_status_t nxge_rxdma_stop_channel(p_nxge_t, uint16_t);
 
-mblk_t *
-nxge_rx_pkts(p_nxge_t, uint_t, p_nxge_ldv_t,
-    p_rx_rcr_ring_t *, rx_dma_ctl_stat_t);
+static mblk_t *
+nxge_rx_pkts(p_nxge_t, p_rx_rcr_ring_t, rx_dma_ctl_stat_t, int);
 
 static void nxge_receive_packet(p_nxge_t,
 	p_rx_rcr_ring_t,
@@ -110,10 +117,8 @@ nxge_status_t nxge_disable_rxdma_channel(p_nxge_t, uint16_t);
 
 static p_rx_msg_t nxge_allocb(size_t, uint32_t, p_nxge_dma_common_t);
 static void nxge_freeb(p_rx_msg_t);
-static void nxge_rx_pkts_vring(p_nxge_t, uint_t,
-    p_nxge_ldv_t, rx_dma_ctl_stat_t);
-static nxge_status_t nxge_rx_err_evnts(p_nxge_t, uint_t,
-				p_nxge_ldv_t, rx_dma_ctl_stat_t);
+static void nxge_rx_pkts_vring(p_nxge_t, uint_t, rx_dma_ctl_stat_t);
+static nxge_status_t nxge_rx_err_evnts(p_nxge_t, int, rx_dma_ctl_stat_t);
 
 static nxge_status_t nxge_rxdma_handle_port_errors(p_nxge_t,
 				uint32_t, uint32_t);
@@ -128,32 +133,75 @@ nxge_rxdma_fatal_err_recover(p_nxge_t, uint16_t);
 nxge_status_t
 nxge_rx_port_fatal_err_recover(p_nxge_t);
 
+static void nxge_rxdma_databuf_free(p_rx_rbr_ring_t);
+
 nxge_status_t
 nxge_init_rxdma_channels(p_nxge_t nxgep)
 {
-	nxge_status_t	status = NXGE_OK;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	int i, count;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_init_rxdma_channels"));
 
-	status = nxge_map_rxdma(nxgep);
+	if (!isLDOMguest(nxgep)) {
+		if (nxge_rxdma_hw_start_common(nxgep) != NXGE_OK) {
+			cmn_err(CE_NOTE, "hw_start_common");
+			return (NXGE_ERROR);
+		}
+	}
+
+	/*
+	 * NXGE_LOGICAL_GROUP_MAX > NXGE_MAX_RDC_GROUPS (8)
+	 * We only have 8 hardware RDC tables, but we may have
+	 * up to 16 logical (software-defined) groups of RDCS,
+	 * if we make use of layer 3 & 4 hardware classification.
+	 */
+	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
+		if ((1 << i) & set->lg.map) {
+			int channel;
+			nxge_grp_t *group = set->group[i];
+			for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
+				if ((1 << channel) & group->map) {
+					if ((nxge_grp_dc_add(nxgep,
+						(vr_handle_t)group,
+						VP_BOUND_RX, channel)))
+						return (NXGE_ERROR);
+				}
+			}
+		}
+		if (++count == set->lg.count)
+			break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_rxdma_channels"));
+
+	return (NXGE_OK);
+}
+
+nxge_status_t
+nxge_init_rxdma_channel(p_nxge_t nxge, int channel)
+{
+	nxge_status_t status;
+
+	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "==> nxge_init_rxdma_channel"));
+
+	status = nxge_map_rxdma(nxge, channel);
 	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_init_rxdma: status 0x%x", status));
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+		    "<== nxge_init_rxdma: status 0x%x", status));
 		return (status);
 	}
 
-	status = nxge_rxdma_hw_start_common(nxgep);
+	status = nxge_rxdma_hw_start(nxge, channel);
 	if (status != NXGE_OK) {
-		nxge_unmap_rxdma(nxgep);
+		nxge_unmap_rxdma(nxge, channel);
 	}
 
-	status = nxge_rxdma_hw_start(nxgep);
-	if (status != NXGE_OK) {
-		nxge_unmap_rxdma(nxgep);
-	}
+	if (!nxge->statsp->rdc_ksp[channel])
+		nxge_setup_rdc_kstats(nxge, channel);
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"<== nxge_init_rxdma_channels: status 0x%x", status));
+	NXGE_DEBUG_MSG((nxge, MEM2_CTL,
+	    "<== nxge_init_rxdma_channel: status 0x%x", status));
 
 	return (status);
 }
@@ -161,14 +209,40 @@ nxge_init_rxdma_channels(p_nxge_t nxgep)
 void
 nxge_uninit_rxdma_channels(p_nxge_t nxgep)
 {
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	int rdc;
+
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_uninit_rxdma_channels"));
 
-	nxge_rxdma_hw_stop(nxgep);
-	nxge_rxdma_hw_stop_common(nxgep);
-	nxge_unmap_rxdma(nxgep);
+	if (set->owned.map == 0) {
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		    "nxge_uninit_rxdma_channels: no channels"));
+		return;
+	}
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"<== nxge_uinit_rxdma_channels"));
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			nxge_grp_dc_remove(nxgep, VP_BOUND_RX, rdc);
+		}
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_uninit_rxdma_channels"));
+}
+
+void
+nxge_uninit_rxdma_channel(p_nxge_t nxgep, int channel)
+{
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_uninit_rxdma_channel"));
+
+	if (nxgep->statsp->rdc_ksp[channel]) {
+		kstat_delete(nxgep->statsp->rdc_ksp[channel]);
+		nxgep->statsp->rdc_ksp[channel] = 0;
+	}
+
+	nxge_rxdma_hw_stop(nxgep, channel);
+	nxge_unmap_rxdma(nxgep, channel);
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_uinit_rxdma_channel"));
 }
 
 nxge_status_t
@@ -193,52 +267,40 @@ nxge_reset_rxdma_channel(p_nxge_t nxgep, uint16_t channel)
 void
 nxge_rxdma_regs_dump_channels(p_nxge_t nxgep)
 {
-	int			i, ndmas;
-	uint16_t		channel;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-	npi_handle_t		handle;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	int rdc;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_regs_dump_channels"));
 
-	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	(void) npi_rxdma_dump_fzc_regs(handle);
-
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	if (rx_rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_regs_dump_channels: "
-			"NULL ring pointer"));
-		return;
+	if (!isLDOMguest(nxgep)) {
+		npi_handle_t handle = NXGE_DEV_NPI_HANDLE(nxgep);
+		(void) npi_rxdma_dump_fzc_regs(handle);
 	}
-	if (rx_rbr_rings->rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_regs_dump_channels: "
-			" NULL rbr rings pointer"));
+
+	if (nxgep->rx_rbr_rings == 0 || nxgep->rx_rbr_rings->rbr_rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "nxge_rxdma_regs_dump_channels: "
+		    "NULL ring pointer(s)"));
 		return;
 	}
 
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
+	if (set->owned.map == 0) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_regs_dump_channels: no channel"));
+		    "nxge_rxdma_regs_dump_channels: no channels"));
 		return;
 	}
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_regs_dump_channels (ndmas %d)", ndmas));
-
-	rbr_rings = rx_rbr_rings->rbr_rings;
-	for (i = 0; i < ndmas; i++) {
-		if (rbr_rings == NULL || rbr_rings[i] == NULL) {
-			continue;
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			rx_rbr_ring_t *ring =
+			    nxgep->rx_rbr_rings->rbr_rings[rdc];
+			if (ring) {
+				(void) nxge_dump_rxdma_channel(nxgep, rdc);
+			}
 		}
-		channel = rbr_rings[i]->rdc;
-		(void) nxge_dump_rxdma_channel(nxgep, channel);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_regs_dump"));
-
 }
 
 nxge_status_t
@@ -301,9 +363,32 @@ nxge_init_rxdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
 	return (status);
 }
 
+/*
+ * nxge_rxdma_cfg_rdcgrp_default_rdc
+ *
+ *	Set the default RDC for an RDC Group (Table)
+ *
+ * Arguments:
+ * 	nxgep
+ *	rdcgrp	The group to modify
+ *	rdc	The new default RDC.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_rxdma_cfg_rdc_table_default_rdc()
+ *
+ * Registers accessed:
+ *	RDC_TBL_REG: FZC_ZCP + 0x10000
+ *
+ * Context:
+ *	Service domain
+ */
 nxge_status_t
-nxge_rxdma_cfg_rdcgrp_default_rdc(p_nxge_t nxgep, uint8_t rdcgrp,
-				    uint8_t rdc)
+nxge_rxdma_cfg_rdcgrp_default_rdc(
+	p_nxge_t nxgep,
+	uint8_t rdcgrp,
+	uint8_t rdc)
 {
 	npi_handle_t		handle;
 	npi_status_t		rs = NPI_SUCCESS;
@@ -317,14 +402,18 @@ nxge_rxdma_cfg_rdcgrp_default_rdc(p_nxge_t nxgep, uint8_t rdcgrp,
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
+	/*
+	 * This has to be rewritten.  Do we even allow this anymore?
+	 */
 	rdc_grp_p = &p_dma_cfgp->rdc_grps[rdcgrp];
-	rdc_grp_p->rdc[0] = rdc;
+	RDC_MAP_IN(rdc_grp_p->map, rdc);
+	rdc_grp_p->def_rdc = rdc;
 
 	actual_rdcgrp = NXGE_ACTUAL_RDCGRP(nxgep, rdcgrp);
 	actual_rdc = NXGE_ACTUAL_RDC(nxgep, rdc);
 
-	rs = npi_rxdma_cfg_rdc_table_default_rdc(handle, actual_rdcgrp,
-							    actual_rdc);
+	rs = npi_rxdma_cfg_rdc_table_default_rdc(
+		handle, actual_rdcgrp, actual_rdc);
 
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
@@ -346,7 +435,7 @@ nxge_rxdma_cfg_port_default_rdc(p_nxge_t nxgep, uint8_t port, uint8_t rdc)
 			    " ==> nxge_rxdma_cfg_port_default_rdc"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	actual_rdc = NXGE_ACTUAL_RDC(nxgep, rdc);
+	actual_rdc = rdc;	/* XXX Hack! */
 	rs = npi_rxdma_cfg_default_port_rdc(handle, port, actual_rdc);
 
 
@@ -456,8 +545,14 @@ nxge_enable_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 
 	cfgb_p = &(rcr_p->rcr_cfgb);
 	rdc_desc.rcr_threshold = cfgb_p->bits.ldw.pthres;
-	rdc_desc.rcr_timeout = cfgb_p->bits.ldw.timeout;
-	rdc_desc.rcr_timeout_enable = cfgb_p->bits.ldw.entout;
+	/* For now, disable this timeout in a guest domain. */
+	if (isLDOMguest(nxgep)) {
+		rdc_desc.rcr_timeout = 0;
+		rdc_desc.rcr_timeout_enable = 0;
+	} else {
+		rdc_desc.rcr_timeout = cfgb_p->bits.ldw.timeout;
+		rdc_desc.rcr_timeout_enable = cfgb_p->bits.ldw.entout;
+	}
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_enable_rxdma_channel: "
 		"rbr_len qlen %d pagesize code %d rcr_len %d",
@@ -1095,63 +1190,53 @@ nxge_rxdma_stop_reinit(p_nxge_t nxgep)
 nxge_status_t
 nxge_rxdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 {
-	int			i, ndmas;
-	uint16_t		channel;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-	npi_handle_t		handle;
-	npi_status_t		rs = NPI_SUCCESS;
-	nxge_status_t		status = NXGE_OK;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	nxge_status_t status;
+	npi_status_t rs;
+	int rdc;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 		"==> nxge_rxdma_hw_mode: mode %d", enable));
 
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_mode: not initialized"));
+		    "<== nxge_rxdma_mode: not initialized"));
 		return (NXGE_ERROR);
 	}
 
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	if (rx_rbr_rings == NULL) {
+	if (nxgep->rx_rbr_rings == 0 || nxgep->rx_rbr_rings->rbr_rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_tx_port_fatal_err_recover: "
+		    "NULL ring pointer(s)"));
+		return (NXGE_ERROR);
+	}
+
+	if (set->owned.map == 0) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_mode: NULL ring pointer"));
-		return (NXGE_ERROR);
-	}
-	if (rx_rbr_rings->rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_mode: NULL rbr rings pointer"));
-		return (NXGE_ERROR);
+		    "nxge_rxdma_regs_dump_channels: no channels"));
+		return (NULL);
 	}
 
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_mode: no channel"));
-		return (NXGE_ERROR);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_mode (ndmas %d)", ndmas));
-
-	rbr_rings = rx_rbr_rings->rbr_rings;
-
-	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	for (i = 0; i < ndmas; i++) {
-		if (rbr_rings == NULL || rbr_rings[i] == NULL) {
-			continue;
-		}
-		channel = rbr_rings[i]->rdc;
-		if (enable) {
-			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-				"==> nxge_rxdma_hw_mode: channel %d (enable)",
-				channel));
-			rs = npi_rxdma_cfg_rdc_enable(handle, channel);
-		} else {
-			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-				"==> nxge_rxdma_hw_mode: channel %d (disable)",
-				channel));
-			rs = npi_rxdma_cfg_rdc_disable(handle, channel);
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			rx_rbr_ring_t *ring =
+			    nxgep->rx_rbr_rings->rbr_rings[rdc];
+			npi_handle_t handle = NXGE_DEV_NPI_HANDLE(nxgep);
+			if (ring) {
+				if (enable) {
+					NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+					    "==> nxge_rxdma_hw_mode: "
+					    "channel %d (enable)", rdc));
+					rs = npi_rxdma_cfg_rdc_enable
+					    (handle, rdc);
+				} else {
+					NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+					    "==> nxge_rxdma_hw_mode: "
+					    "channel %d disable)", rdc));
+					rs = npi_rxdma_cfg_rdc_disable
+					    (handle, rdc);
+				}
+			}
 		}
 	}
 
@@ -1206,45 +1291,38 @@ nxge_hw_start_rx(p_nxge_t nxgep)
 void
 nxge_fixup_rxdma_rings(p_nxge_t nxgep)
 {
-	int			i, ndmas;
-	uint16_t		rdc;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	int rdc;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_fixup_rxdma_rings"));
 
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	if (rx_rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_fixup_rxdma_rings: NULL ring pointer"));
-		return;
-	}
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_fixup_rxdma_rings: no channel"));
+	if (nxgep->rx_rbr_rings == 0 || nxgep->rx_rbr_rings->rbr_rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_tx_port_fatal_err_recover: "
+		    "NULL ring pointer(s)"));
 		return;
 	}
 
-	rx_rcr_rings = nxgep->rx_rcr_rings;
-	if (rx_rcr_rings == NULL) {
+	if (set->owned.map == 0) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_fixup_rxdma_rings: NULL ring pointer"));
+		    "nxge_rxdma_regs_dump_channels: no channels"));
 		return;
 	}
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_fixup_rxdma_rings (ndmas %d)", ndmas));
 
-	nxge_rxdma_hw_stop(nxgep);
-
-	rbr_rings = rx_rbr_rings->rbr_rings;
-	for (i = 0; i < ndmas; i++) {
-		rdc = rbr_rings[i]->rdc;
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"==> nxge_fixup_rxdma_rings: channel %d "
-			"ring $%px", rdc, rbr_rings[i]));
-		(void) nxge_rxdma_fixup_channel(nxgep, rdc, i);
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			rx_rbr_ring_t *ring =
+			    nxgep->rx_rbr_rings->rbr_rings[rdc];
+			if (ring) {
+				nxge_rxdma_hw_stop(nxgep, rdc);
+				NXGE_DEBUG_MSG((nxgep, RX_CTL,
+					"==> nxge_fixup_rxdma_rings: "
+					"channel %d ring $%px",
+					rdc, ring));
+				(void) nxge_rxdma_fixup_channel
+				    (nxgep, rdc, rdc);
+			}
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_fixup_rxdma_rings"));
@@ -1265,7 +1343,7 @@ nxge_rxdma_fix_channel(p_nxge_t nxgep, uint16_t channel)
 
 	nxge_rxdma_fixup_channel(nxgep, channel, i);
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_txdma_fix_channel"));
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_fix_channel"));
 }
 
 void
@@ -1343,87 +1421,47 @@ nxge_rxdma_fixup_channel_fail:
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_fixup_channel"));
 }
 
+/* ARGSUSED */
 int
 nxge_rxdma_get_ring_index(p_nxge_t nxgep, uint16_t channel)
 {
-	int			i, ndmas;
-	uint16_t		rdc;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_rxdma_get_ring_index: channel %d", channel));
-
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	if (rx_rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_get_ring_index: NULL ring pointer"));
-		return (-1);
-	}
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_get_ring_index: no channel"));
-		return (-1);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_rxdma_get_ring_index (ndmas %d)", ndmas));
-
-	rbr_rings = rx_rbr_rings->rbr_rings;
-	for (i = 0; i < ndmas; i++) {
-		rdc = rbr_rings[i]->rdc;
-		if (channel == rdc) {
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-				"==> nxge_rxdma_get_rbr_ring: "
-				"channel %d (index %d) "
-				"ring %d", channel, i,
-				rbr_rings[i]));
-			return (i);
-		}
-	}
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"<== nxge_rxdma_get_rbr_ring_index: not found"));
-
-	return (-1);
+	return (channel);
 }
 
 p_rx_rbr_ring_t
 nxge_rxdma_get_rbr_ring(p_nxge_t nxgep, uint16_t channel)
 {
-	int			i, ndmas;
-	uint16_t		rdc;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	nxge_channel_t rdc;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		"==> nxge_rxdma_get_rbr_ring: channel %d", channel));
 
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	if (rx_rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_get_rbr_ring: NULL ring pointer"));
-		return (NULL);
-	}
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_get_rbr_ring: no channel"));
+	if (nxgep->rx_rbr_rings == 0 || nxgep->rx_rbr_rings->rbr_rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_rxdma_get_rbr_ring: "
+		    "NULL ring pointer(s)"));
 		return (NULL);
 	}
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_rxdma_get_ring (ndmas %d)", ndmas));
+	if (set->owned.map == 0) {
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "<== nxge_rxdma_get_rbr_ring: no channels"));
+		return (NULL);
+	}
 
-	rbr_rings = rx_rbr_rings->rbr_rings;
-	for (i = 0; i < ndmas; i++) {
-		rdc = rbr_rings[i]->rdc;
-		if (channel == rdc) {
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-				"==> nxge_rxdma_get_rbr_ring: channel %d "
-				"ring $%p", channel, rbr_rings[i]));
-			return (rbr_rings[i]);
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			rx_rbr_ring_t *ring =
+			    nxgep->rx_rbr_rings->rbr_rings[rdc];
+			if (ring) {
+				if (channel == ring->rdc) {
+					NXGE_DEBUG_MSG((nxgep, RX_CTL,
+					    "==> nxge_rxdma_get_rbr_ring: "
+					    "channel %d ring $%p", rdc, ring));
+					return (ring);
+				}
+			}
 		}
 	}
 
@@ -1436,38 +1474,37 @@ nxge_rxdma_get_rbr_ring(p_nxge_t nxgep, uint16_t channel)
 p_rx_rcr_ring_t
 nxge_rxdma_get_rcr_ring(p_nxge_t nxgep, uint16_t channel)
 {
-	int			i, ndmas;
-	uint16_t		rdc;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
-	p_rx_rcr_ring_t		*rcr_rings;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	nxge_channel_t rdc;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		"==> nxge_rxdma_get_rcr_ring: channel %d", channel));
 
-	rx_rcr_rings = nxgep->rx_rcr_rings;
-	if (rx_rcr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_get_rcr_ring: NULL ring pointer"));
-		return (NULL);
-	}
-	ndmas = rx_rcr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_get_rcr_ring: no channel"));
+	if (nxgep->rx_rcr_rings == 0 || nxgep->rx_rcr_rings->rcr_rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_rxdma_get_rcr_ring: "
+		    "NULL ring pointer(s)"));
 		return (NULL);
 	}
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_rxdma_get_rcr_ring (ndmas %d)", ndmas));
+	if (set->owned.map == 0) {
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "<== nxge_rxdma_get_rbr_ring: no channels"));
+		return (NULL);
+	}
 
-	rcr_rings = rx_rcr_rings->rcr_rings;
-	for (i = 0; i < ndmas; i++) {
-		rdc = rcr_rings[i]->rdc;
-		if (channel == rdc) {
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-				"==> nxge_rxdma_get_rcr_ring: channel %d "
-				"ring $%p", channel, rcr_rings[i]));
-			return (rcr_rings[i]);
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			rx_rcr_ring_t *ring =
+			    nxgep->rx_rcr_rings->rcr_rings[rdc];
+			if (ring) {
+				if (channel == ring->rdc) {
+					NXGE_DEBUG_MSG((nxgep, RX_CTL,
+					    "==> nxge_rxdma_get_rcr_ring: "
+					    "channel %d ring $%p", rdc, ring));
+					return (ring);
+				}
+			}
 		}
 	}
 
@@ -1682,13 +1719,34 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 			atomic_dec_32(&ring->rbr_ref_cnt);
 
 			/*
-			 * Free the receive buffer ring, iff
+			 * Free the receive buffer ring, if
 			 * 1. all the receive buffers have been freed
 			 * 2. and we are in the proper state (that is,
 			 *    we are not UNMAPPING).
 			 */
 			if (ring->rbr_ref_cnt == 0 &&
 			    ring->rbr_state == RBR_UNMAPPED) {
+				/*
+				 * Free receive data buffers,
+				 * buffer index information
+				 * (rxring_info) and
+				 * the message block ring.
+				 */
+				NXGE_DEBUG_MSG((NULL, RX_CTL,
+				    "nxge_freeb:rx_msg_p = $%p "
+				    "(block pending %d) free buffers",
+				    rx_msg_p, nxge_mblks_pending));
+				nxge_rxdma_databuf_free(ring);
+				if (ring->ring_info) {
+					KMEM_FREE(ring->ring_info,
+					    sizeof (rxring_info_t));
+				}
+
+				if (ring->rx_msg_ring) {
+					KMEM_FREE(ring->rx_msg_ring,
+					    ring->tnblocks *
+					    sizeof (p_rx_msg_t));
+				}
 				KMEM_FREE(ring, sizeof (*ring));
 			}
 		}
@@ -1757,17 +1815,15 @@ nxge_rx_intr(void *arg1, void *arg2)
 		cs.bits.hdw.rcrto,
 		cs.bits.hdw.rcrthres));
 
-	nxge_rx_pkts_vring(nxgep, ldvp->vdma_index, ldvp, cs);
+	nxge_rx_pkts_vring(nxgep, ldvp->vdma_index, cs);
 	serviced = DDI_INTR_CLAIMED;
 
 	/* error events. */
 	if (cs.value & RX_DMA_CTL_STAT_ERROR) {
-		(void) nxge_rx_err_evnts(nxgep, ldvp->vdma_index, ldvp, cs);
+		(void) nxge_rx_err_evnts(nxgep, channel, cs);
 	}
 
 nxge_intr_exit:
-
-
 	/*
 	 * Enable the mailbox update interrupt if we want
 	 * to use mailbox. We probably don't need to use
@@ -1790,9 +1846,13 @@ nxge_intr_exit:
 		mgm.value = 0;
 		mgm.bits.ldw.arm = 1;
 		mgm.bits.ldw.timer = ldgp->ldg_timer;
-		NXGE_REG_WR64(handle,
+		if (isLDOMguest(nxgep)) {
+			nxge_hio_ldgimgn(nxgep, ldgp);
+		} else {
+			NXGE_REG_WR64(handle,
 			    LDGIMGN_REG + LDSV_OFFSET(ldgp->ldg),
 			    mgm.value);
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_intr: serviced %d",
@@ -1805,14 +1865,19 @@ nxge_intr_exit:
  * and pass up a chain of message blocks to the upper layer.
  */
 static void
-nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
-				    rx_dma_ctl_stat_t cs)
+nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, rx_dma_ctl_stat_t cs)
 {
 	p_mblk_t		mp;
 	p_rx_rcr_ring_t		rcrp;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts_vring"));
-	if ((mp = nxge_rx_pkts(nxgep, vindex, ldvp, &rcrp, cs)) == NULL) {
+	rcrp = nxgep->rx_rcr_rings->rcr_rings[vindex];
+	if (rcrp->poll_flag) {
+		/* It is in the poll mode */
+		return;
+	}
+
+	if ((mp = nxge_rx_pkts(nxgep, rcrp, cs, -1)) == NULL) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 			"<== nxge_rx_pkts_vring: no mp"));
 		return;
@@ -1858,7 +1923,20 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 		}
 #endif
 
-	mac_rx(nxgep->mach, rcrp->rcr_mac_handle, mp);
+	if (!isLDOMguest(nxgep))
+		mac_rx(nxgep->mach, rcrp->rcr_mac_handle, mp);
+#if defined(sun4v)
+	else {			/* isLDOMguest(nxgep) */
+		nxge_hio_data_t *nhd = (nxge_hio_data_t *)
+		    nxgep->nxge_hw_p->hio;
+		nx_vio_fp_t *vio = &nhd->hio.vio;
+
+		if (vio->cb.vio_net_rx_cb) {
+			(*vio->cb.vio_net_rx_cb)
+			    (nxgep->hio_vr->vhp, mp);
+		}
+	}
+#endif
 }
 
 
@@ -1876,42 +1954,33 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
  * packets were removed from the hardware queue.
  *
  */
-mblk_t *
-nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
-    p_rx_rcr_ring_t *rcrp, rx_dma_ctl_stat_t cs)
+static mblk_t *
+nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
+    int bytes_to_pickup)
 {
 	npi_handle_t		handle;
 	uint8_t			channel;
-	p_rx_rcr_rings_t	rx_rcr_rings;
-	p_rx_rcr_ring_t		rcr_p;
 	uint32_t		comp_rd_index;
 	p_rcr_entry_t		rcr_desc_rd_head_p;
 	p_rcr_entry_t		rcr_desc_rd_head_pp;
 	p_mblk_t		nmp, mp_cont, head_mp, *tail_mp;
 	uint16_t		qlen, nrcr_read, npkt_read;
-	uint32_t qlen_hw;
+	uint32_t		qlen_hw;
 	boolean_t		multi;
-	rcrcfig_b_t rcr_cfg_b;
+	rcrcfig_b_t		rcr_cfg_b;
+	int			totallen = 0;
 #if defined(_BIG_ENDIAN)
 	npi_status_t		rs = NPI_SUCCESS;
 #endif
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts:vindex %d "
-		"channel %d", vindex, ldvp->channel));
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts: "
+		"channel %d", rcr_p->rdc));
 
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
 		return (NULL);
 	}
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	rx_rcr_rings = nxgep->rx_rcr_rings;
-	rcr_p = rx_rcr_rings->rcr_rings[vindex];
 	channel = rcr_p->rdc;
-	if (channel != ldvp->channel) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts:index %d "
-			"channel %d, and rcr channel %d not matched.",
-			vindex, ldvp->channel, channel));
-		return (NULL);
-	}
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		"==> nxge_rx_pkts: START: rcr channel %d "
@@ -1926,9 +1995,9 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 #else
 	rs = npi_rxdma_rdc_rcr_qlen_get(handle, channel, &qlen);
 	if (rs != NPI_SUCCESS) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts:index %d "
+		NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts: "
 		"channel %d, get qlen failed 0x%08x",
-		vindex, ldvp->channel, rs));
+		channel, rs));
 		return (NULL);
 	}
 #endif
@@ -1982,16 +2051,20 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 			if (!multi && !mp_cont) { /* frame fits a partition */
 				*tail_mp = nmp;
 				tail_mp = &nmp->b_next;
+				totallen += MBLKL(nmp);
 				nmp = NULL;
 			} else if (multi && !mp_cont) { /* first segment */
 				*tail_mp = nmp;
 				tail_mp = &nmp->b_cont;
+				totallen += MBLKL(nmp);
 			} else if (multi && mp_cont) {	/* mid of multi segs */
 				*tail_mp = mp_cont;
 				tail_mp = &mp_cont->b_cont;
+				totallen += MBLKL(mp_cont);
 			} else if (!multi && mp_cont) { /* last segment */
 				*tail_mp = mp_cont;
 				tail_mp = &nmp->b_next;
+				totallen += MBLKL(mp_cont);
 				nmp = NULL;
 			}
 		}
@@ -2038,6 +2111,10 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 			nrcr_read, npkt_read, rcr_desc_rd_head_pp,
 			comp_rd_index));
 
+		if ((bytes_to_pickup != -1) &&
+		    (totallen >= bytes_to_pickup)) {
+			break;
+		}
 	}
 
 	rcr_p->rcr_desc_rd_head_pp = rcr_desc_rd_head_pp;
@@ -2072,7 +2149,6 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 	 * read.
 	 */
 
-	*rcrp = rcr_p;
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_pkts"));
 	return (head_mp);
 }
@@ -2574,10 +2650,22 @@ nxge_receive_packet(p_nxge_t nxgep,
 	 * Update stats and hardware checksuming.
 	 */
 	if (is_valid && !multi) {
-
-		is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP ||
+		/*
+		 * If the checksum flag nxge_chksum_enable
+		 * is enabled, TCP and UDP packets can be sent
+		 * up with good checksum. If the checksum flag
+		 * is not set, checksum reporting will apply to
+		 * TCP packets only (workaround for a hardware bug).
+		 */
+		if (nxge_cksum_enable) {
+			is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP ||
 				pkt_type == RCR_PKT_IS_UDP) ?
 					B_TRUE: B_FALSE);
+		} else {
+			/* TCP checksum only. */
+			is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP) ?
+					B_TRUE: B_FALSE);
+		}
 
 		NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_receive_packet: "
 			"is_valid 0x%x multi 0x%llx pkt %d frag %d error %d",
@@ -2605,24 +2693,21 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 /*ARGSUSED*/
 static nxge_status_t
-nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
-						rx_dma_ctl_stat_t cs)
+nxge_rx_err_evnts(p_nxge_t nxgep, int channel, rx_dma_ctl_stat_t cs)
 {
 	p_nxge_rx_ring_stats_t	rdc_stats;
 	npi_handle_t		handle;
 	npi_status_t		rs;
 	boolean_t		rxchan_fatal = B_FALSE;
 	boolean_t		rxport_fatal = B_FALSE;
-	uint8_t			channel;
 	uint8_t			portn;
 	nxge_status_t		status = NXGE_OK;
 	uint32_t		error_disp_cnt = NXGE_ERROR_SHOW_MAX;
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_rx_err_evnts"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	channel = ldvp->channel;
 	portn = nxgep->mac.portnum;
-	rdc_stats = &nxgep->statsp->rdc_stats[ldvp->vdma_index];
+	rdc_stats = &nxgep->statsp->rdc_stats[channel];
 
 	if (cs.bits.hdw.rbr_tmout) {
 		rdc_stats->rx_rbr_tmout++;
@@ -2789,23 +2874,29 @@ nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
 
 	if (rxport_fatal)  {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_rx_err_evnts: "
-				" fatal error on Port #%d\n",
-				portn));
-		status = nxge_ipp_fatal_err_recover(nxgep);
-		if (status == NXGE_OK) {
-			FM_SERVICE_RESTORED(nxgep);
+		    " nxge_rx_err_evnts: fatal error on Port #%d\n",
+		    portn));
+		if (isLDOMguest(nxgep)) {
+			status = NXGE_ERROR;
+		} else {
+			status = nxge_ipp_fatal_err_recover(nxgep);
+			if (status == NXGE_OK) {
+				FM_SERVICE_RESTORED(nxgep);
+			}
 		}
 	}
 
 	if (rxchan_fatal) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_rx_err_evnts: "
-				" fatal error on Channel #%d\n",
-				channel));
-		status = nxge_rxdma_fatal_err_recover(nxgep, channel);
-		if (status == NXGE_OK) {
-			FM_SERVICE_RESTORED(nxgep);
+		    " nxge_rx_err_evnts: fatal error on Channel #%d\n",
+		    channel));
+		if (isLDOMguest(nxgep)) {
+			status = NXGE_ERROR;
+		} else {
+			status = nxge_rxdma_fatal_err_recover(nxgep, channel);
+			if (status == NXGE_OK) {
+				FM_SERVICE_RESTORED(nxgep);
+			}
 		}
 	}
 
@@ -2814,62 +2905,112 @@ nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
 	return (status);
 }
 
-static nxge_status_t
-nxge_map_rxdma(p_nxge_t nxgep)
+/*
+ * nxge_rdc_hvio_setup
+ *
+ *	This code appears to setup some Hypervisor variables.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel
+ *
+ * Notes:
+ *	What does NIU_LP_WORKAROUND mean?
+ *
+ * NPI/NXGE function calls:
+ *	na
+ *
+ * Context:
+ *	Any domain
+ */
+#if defined(sun4v) && defined(NIU_LP_WORKAROUND)
+static void
+nxge_rdc_hvio_setup(
+	nxge_t *nxgep, int channel)
 {
-	int			i, ndmas;
-	uint16_t		channel;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
-	p_rx_rcr_ring_t		*rcr_rings;
-	p_rx_mbox_areas_t 	rx_mbox_areas_p;
-	p_rx_mbox_t		*rx_mbox_p;
-	p_nxge_dma_pool_t	dma_buf_poolp;
-	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_nxge_dma_common_t	*dma_buf_p;
-	p_nxge_dma_common_t	*dma_cntl_p;
-	uint32_t		*num_chunks;
-	nxge_status_t		status = NXGE_OK;
-#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
-	p_nxge_dma_common_t	t_dma_buf_p;
-	p_nxge_dma_common_t	t_dma_cntl_p;
+	nxge_dma_common_t	*dma_common;
+	nxge_dma_common_t	*dma_control;
+	rx_rbr_ring_t		*ring;
+
+	ring = nxgep->rx_rbr_rings->rbr_rings[channel];
+	dma_common = nxgep->rx_buf_pool_p->dma_buf_pool_p[channel];
+
+	ring->hv_set = B_FALSE;
+
+	ring->hv_rx_buf_base_ioaddr_pp = (uint64_t)
+	    dma_common->orig_ioaddr_pp;
+	ring->hv_rx_buf_ioaddr_size = (uint64_t)
+	    dma_common->orig_alength;
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_map_rxdma_channel: "
+	    "channel %d data buf base io $%lx ($%p) size 0x%lx (%ld 0x%lx)",
+	    channel, ring->hv_rx_buf_base_ioaddr_pp,
+	    dma_common->ioaddr_pp, ring->hv_rx_buf_ioaddr_size,
+	    dma_common->orig_alength, dma_common->orig_alength));
+
+	dma_control = nxgep->rx_cntl_pool_p->dma_buf_pool_p[channel];
+
+	ring->hv_rx_cntl_base_ioaddr_pp =
+	    (uint64_t)dma_control->orig_ioaddr_pp;
+	ring->hv_rx_cntl_ioaddr_size =
+	    (uint64_t)dma_control->orig_alength;
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_map_rxdma_channel: "
+	    "channel %d cntl base io $%p ($%p) size 0x%llx (%d 0x%x)",
+	    channel, ring->hv_rx_cntl_base_ioaddr_pp,
+	    dma_control->ioaddr_pp, ring->hv_rx_cntl_ioaddr_size,
+	    dma_control->orig_alength, dma_control->orig_alength));
+}
 #endif
+
+/*
+ * nxge_map_rxdma
+ *
+ *	Map an RDC into our kernel space.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel	The channel to map.
+ *
+ * Notes:
+ *	1. Allocate & initialise a memory pool, if necessary.
+ *	2. Allocate however many receive buffers are required.
+ *	3. Setup buffers, descriptors, and mailbox.
+ *
+ * NPI/NXGE function calls:
+ *	nxge_alloc_rx_mem_pool()
+ *	nxge_alloc_rbb()
+ *	nxge_map_rxdma_channel()
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Any domain
+ */
+static nxge_status_t
+nxge_map_rxdma(p_nxge_t nxgep, int channel)
+{
+	nxge_dma_common_t	**data;
+	nxge_dma_common_t	**control;
+	rx_rbr_ring_t		**rbr_ring;
+	rx_rcr_ring_t		**rcr_ring;
+	rx_mbox_t		**mailbox;
+	uint32_t		chunks;
+
+	nxge_status_t		status;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_map_rxdma"));
 
-	dma_buf_poolp = nxgep->rx_buf_pool_p;
-	dma_cntl_poolp = nxgep->rx_cntl_pool_p;
-
-	if (!dma_buf_poolp->buf_allocated || !dma_cntl_poolp->buf_allocated) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_map_rxdma: buf not allocated"));
-		return (NXGE_ERROR);
+	if (!nxgep->rx_buf_pool_p) {
+		if (nxge_alloc_rx_mem_pool(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_map_rxdma: buf not allocated"));
+			return (NXGE_ERROR);
+		}
 	}
 
-	ndmas = dma_buf_poolp->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_map_rxdma: no dma allocated"));
+	if (nxge_alloc_rxb(nxgep, channel) != NXGE_OK)
 		return (NXGE_ERROR);
-	}
-
-	num_chunks = dma_buf_poolp->num_chunks;
-	dma_buf_p = dma_buf_poolp->dma_buf_pool_p;
-	dma_cntl_p = dma_cntl_poolp->dma_buf_pool_p;
-
-	rx_rbr_rings = (p_rx_rbr_rings_t)
-		KMEM_ZALLOC(sizeof (rx_rbr_rings_t), KM_SLEEP);
-	rbr_rings = (p_rx_rbr_ring_t *)
-		KMEM_ZALLOC(sizeof (p_rx_rbr_ring_t) * ndmas, KM_SLEEP);
-	rx_rcr_rings = (p_rx_rcr_rings_t)
-		KMEM_ZALLOC(sizeof (rx_rcr_rings_t), KM_SLEEP);
-	rcr_rings = (p_rx_rcr_ring_t *)
-		KMEM_ZALLOC(sizeof (p_rx_rcr_ring_t) * ndmas, KM_SLEEP);
-	rx_mbox_areas_p = (p_rx_mbox_areas_t)
-		KMEM_ZALLOC(sizeof (rx_mbox_areas_t), KM_SLEEP);
-	rx_mbox_p = (p_rx_mbox_t *)
-		KMEM_ZALLOC(sizeof (p_rx_mbox_t) * ndmas, KM_SLEEP);
 
 	/*
 	 * Timeout should be set based on the system clock divider.
@@ -2881,180 +3022,73 @@ nxge_map_rxdma(p_nxge_t nxgep)
 	nxgep->intr_timeout = RXDMA_RCR_TO_DEFAULT;
 
 	/*
-	 * Map descriptors from the buffer polls for each dam channel.
+	 * Map descriptors from the buffer polls for each dma channel.
 	 */
-	for (i = 0; i < ndmas; i++) {
-		/*
-		 * Set up and prepare buffer blocks, descriptors
-		 * and mailbox.
-		 */
-		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
-		status = nxge_map_rxdma_channel(nxgep, channel,
-				(p_nxge_dma_common_t *)&dma_buf_p[i],
-				(p_rx_rbr_ring_t *)&rbr_rings[i],
-				num_chunks[i],
-				(p_nxge_dma_common_t *)&dma_cntl_p[i],
-				(p_rx_rcr_ring_t *)&rcr_rings[i],
-				(p_rx_mbox_t *)&rx_mbox_p[i]);
-		if (status != NXGE_OK) {
-			goto nxge_map_rxdma_fail1;
-		}
-		rbr_rings[i]->index = (uint16_t)i;
-		rcr_rings[i]->index = (uint16_t)i;
-		rcr_rings[i]->rdc_stats = &nxgep->statsp->rdc_stats[i];
+
+	/*
+	 * Set up and prepare buffer blocks, descriptors
+	 * and mailbox.
+	 */
+	data = &nxgep->rx_buf_pool_p->dma_buf_pool_p[channel];
+	rbr_ring = &nxgep->rx_rbr_rings->rbr_rings[channel];
+	chunks = nxgep->rx_buf_pool_p->num_chunks[channel];
+
+	control = &nxgep->rx_cntl_pool_p->dma_buf_pool_p[channel];
+	rcr_ring = &nxgep->rx_rcr_rings->rcr_rings[channel];
+
+	mailbox = &nxgep->rx_mbox_areas_p->rxmbox_areas[channel];
+
+	status = nxge_map_rxdma_channel(nxgep, channel, data, rbr_ring,
+	    chunks, control, rcr_ring, mailbox);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"==> nxge_map_rxdma: nxge_map_rxdma_channel(%d) "
+			"returned 0x%x",
+			channel, status));
+		return (status);
+	}
+	nxgep->rx_rbr_rings->rbr_rings[channel]->index = (uint16_t)channel;
+	nxgep->rx_rcr_rings->rcr_rings[channel]->index = (uint16_t)channel;
+	nxgep->rx_rcr_rings->rcr_rings[channel]->rdc_stats =
+	    &nxgep->statsp->rdc_stats[channel];
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
-		if (nxgep->niu_type == N2_NIU && NXGE_DMA_BLOCK == 1) {
-			rbr_rings[i]->hv_set = B_FALSE;
-			t_dma_buf_p = (p_nxge_dma_common_t)dma_buf_p[i];
-			t_dma_cntl_p =
-				(p_nxge_dma_common_t)dma_cntl_p[i];
+	if (!isLDOMguest(nxgep))
+		nxge_rdc_hvio_setup(nxgep, channel);
+#endif
 
-			rbr_rings[i]->hv_rx_buf_base_ioaddr_pp =
-				(uint64_t)t_dma_buf_p->orig_ioaddr_pp;
-			rbr_rings[i]->hv_rx_buf_ioaddr_size =
-				(uint64_t)t_dma_buf_p->orig_alength;
-			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-				"==> nxge_map_rxdma_channel: "
-				"channel %d "
-				"data buf base io $%p ($%p) "
-				"size 0x%llx (%d 0x%x)",
-				channel,
-				rbr_rings[i]->hv_rx_buf_base_ioaddr_pp,
-				t_dma_cntl_p->ioaddr_pp,
-				rbr_rings[i]->hv_rx_buf_ioaddr_size,
-				t_dma_buf_p->orig_alength,
-				t_dma_buf_p->orig_alength));
-
-			rbr_rings[i]->hv_rx_cntl_base_ioaddr_pp =
-				(uint64_t)t_dma_cntl_p->orig_ioaddr_pp;
-			rbr_rings[i]->hv_rx_cntl_ioaddr_size =
-				(uint64_t)t_dma_cntl_p->orig_alength;
-			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-				"==> nxge_map_rxdma_channel: "
-				"channel %d "
-				"cntl base io $%p ($%p) "
-				"size 0x%llx (%d 0x%x)",
-				channel,
-				rbr_rings[i]->hv_rx_cntl_base_ioaddr_pp,
-				t_dma_cntl_p->ioaddr_pp,
-				rbr_rings[i]->hv_rx_cntl_ioaddr_size,
-				t_dma_cntl_p->orig_alength,
-				t_dma_cntl_p->orig_alength));
-		}
-
-#endif	/* sun4v and NIU_LP_WORKAROUND */
-	}
-
-	rx_rbr_rings->ndmas = rx_rcr_rings->ndmas = ndmas;
-	rx_rbr_rings->rbr_rings = rbr_rings;
-	nxgep->rx_rbr_rings = rx_rbr_rings;
-	rx_rcr_rings->rcr_rings = rcr_rings;
-	nxgep->rx_rcr_rings = rx_rcr_rings;
-
-	rx_mbox_areas_p->rxmbox_areas = rx_mbox_p;
-	nxgep->rx_mbox_areas_p = rx_mbox_areas_p;
-
-	goto nxge_map_rxdma_exit;
-
-nxge_map_rxdma_fail1:
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"==> nxge_map_rxdma: unmap rbr,rcr "
-		"(status 0x%x channel %d i %d)",
-		status, channel, i));
-	i--;
-	for (; i >= 0; i--) {
-		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
-		nxge_unmap_rxdma_channel(nxgep, channel,
-			rbr_rings[i],
-			rcr_rings[i],
-			rx_mbox_p[i]);
-	}
-
-	KMEM_FREE(rbr_rings, sizeof (p_rx_rbr_ring_t) * ndmas);
-	KMEM_FREE(rx_rbr_rings, sizeof (rx_rbr_rings_t));
-	KMEM_FREE(rcr_rings, sizeof (p_rx_rcr_ring_t) * ndmas);
-	KMEM_FREE(rx_rcr_rings, sizeof (rx_rcr_rings_t));
-	KMEM_FREE(rx_mbox_p, sizeof (p_rx_mbox_t) * ndmas);
-	KMEM_FREE(rx_mbox_areas_p, sizeof (rx_mbox_areas_t));
-
-nxge_map_rxdma_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"<== nxge_map_rxdma: "
-		"(status 0x%x channel %d)",
-		status, channel));
+	    "<== nxge_map_rxdma: (status 0x%x channel %d)", status, channel));
 
 	return (status);
 }
 
 static void
-nxge_unmap_rxdma(p_nxge_t nxgep)
+nxge_unmap_rxdma(p_nxge_t nxgep, int channel)
 {
-	int			i, ndmas;
-	uint16_t		channel;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
-	p_rx_rcr_ring_t		*rcr_rings;
-	p_rx_mbox_areas_t 	rx_mbox_areas_p;
-	p_rx_mbox_t		*rx_mbox_p;
-	p_nxge_dma_pool_t	dma_buf_poolp;
-	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_nxge_dma_common_t	*dma_buf_p;
+	rx_rbr_ring_t	*rbr_ring;
+	rx_rcr_ring_t	*rcr_ring;
+	rx_mbox_t	*mailbox;
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_unmap_rxdma"));
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_unmap_rxdma(%d)", channel));
 
-	dma_buf_poolp = nxgep->rx_buf_pool_p;
-	dma_cntl_poolp = nxgep->rx_cntl_pool_p;
-
-	if (!dma_buf_poolp->buf_allocated || !dma_cntl_poolp->buf_allocated) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_unmap_rxdma: NULL buf pointers"));
+	if (!nxgep->rx_rbr_rings || !nxgep->rx_rcr_rings ||
+	    !nxgep->rx_mbox_areas_p)
 		return;
-	}
 
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	rx_rcr_rings = nxgep->rx_rcr_rings;
-	if (rx_rbr_rings == NULL || rx_rcr_rings == NULL) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_unmap_rxdma: NULL ring pointers"));
+	rbr_ring = nxgep->rx_rbr_rings->rbr_rings[channel];
+	rcr_ring = nxgep->rx_rcr_rings->rcr_rings[channel];
+	mailbox = nxgep->rx_mbox_areas_p->rxmbox_areas[channel];
+
+	if (!rbr_ring || !rcr_ring || !mailbox)
 		return;
-	}
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_unmap_rxdma: no channel"));
-		return;
-	}
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_unmap_rxdma (ndmas %d)", ndmas));
-	rbr_rings = rx_rbr_rings->rbr_rings;
-	rcr_rings = rx_rcr_rings->rcr_rings;
-	rx_mbox_areas_p = nxgep->rx_mbox_areas_p;
-	rx_mbox_p = rx_mbox_areas_p->rxmbox_areas;
-	dma_buf_p = dma_buf_poolp->dma_buf_pool_p;
+	(void) nxge_unmap_rxdma_channel(
+		nxgep, channel, rbr_ring, rcr_ring, mailbox);
 
-	for (i = 0; i < ndmas; i++) {
-		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
-		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"==> nxge_unmap_rxdma (ndmas %d) channel %d",
-				ndmas, channel));
-		(void) nxge_unmap_rxdma_channel(nxgep, channel,
-				(p_rx_rbr_ring_t)rbr_rings[i],
-				(p_rx_rcr_ring_t)rcr_rings[i],
-				(p_rx_mbox_t)rx_mbox_p[i]);
-	}
+	nxge_free_rxb(nxgep, channel);
 
-	KMEM_FREE(rx_rbr_rings, sizeof (rx_rbr_rings_t));
-	KMEM_FREE(rbr_rings, sizeof (p_rx_rbr_ring_t) * ndmas);
-	KMEM_FREE(rx_rcr_rings, sizeof (rx_rcr_rings_t));
-	KMEM_FREE(rcr_rings, sizeof (p_rx_rcr_ring_t) * ndmas);
-	KMEM_FREE(rx_mbox_areas_p, sizeof (rx_mbox_areas_t));
-	KMEM_FREE(rx_mbox_p, sizeof (p_rx_mbox_t) * ndmas);
-
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"<== nxge_unmap_rxdma"));
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_unmap_rxdma"));
 }
 
 nxge_status_t
@@ -3620,6 +3654,24 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 			index++;
 			rx_msg_p->buf_dma.dma_channel = channel;
 		}
+
+		rbrp->rbr_alloc_type = DDI_MEM_ALLOC;
+		if (dma_bufp->contig_alloc_type) {
+			rbrp->rbr_alloc_type = CONTIG_MEM_ALLOC;
+		}
+
+		if (dma_bufp->kmem_alloc_type) {
+			rbrp->rbr_alloc_type = KMEM_ALLOC;
+		}
+
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		    " nxge_map_rxdma_channel_buf_ring: map channel %d "
+		    "chunk %d"
+		    " nblocks %d chunk_size %x block_size 0x%x "
+		    "dma_bufp $%p",
+		    channel, i,
+		    dma_bufp->nblocks, ring_info->buffer[i].buf_size, bsize,
+		    dma_bufp));
 	}
 	if (i < rbrp->num_blocks) {
 		goto nxge_map_rxdma_channel_buf_ring_fail1;
@@ -3743,11 +3795,21 @@ nxge_unmap_rxdma_channel_buf_ring(p_nxge_t nxgep,
 	MUTEX_DESTROY(&rbr_p->post_lock);
 
 	MUTEX_DESTROY(&rbr_p->lock);
-	KMEM_FREE(ring_info, sizeof (rxring_info_t));
-	KMEM_FREE(rx_msg_ring, size);
 
 	if (rbr_p->rbr_ref_cnt == 0) {
-		/* This is the normal state of affairs. */
+		/*
+		 * This is the normal state of affairs.
+		 * Need to free the following buffers:
+		 *  - data buffers
+		 *  - rx_msg ring
+		 *  - ring_info
+		 *  - rbr ring
+		 */
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "unmap_rxdma_buf_ring: No outstanding - freeing "));
+		nxge_rxdma_databuf_free(rbr_p);
+		KMEM_FREE(ring_info, sizeof (rxring_info_t));
+		KMEM_FREE(rx_msg_ring, size);
 		KMEM_FREE(rbr_p, sizeof (*rbr_p));
 	} else {
 		/*
@@ -3766,6 +3828,23 @@ nxge_unmap_rxdma_channel_buf_ring(p_nxge_t nxgep,
 		"<== nxge_unmap_rxdma_channel_buf_ring"));
 }
 
+/*
+ * nxge_rxdma_hw_start_common
+ *
+ * Arguments:
+ * 	nxgep
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	nxge_init_fzc_rx_common();
+ *	nxge_init_fzc_rxdma_port();
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Service domain
+ */
 static nxge_status_t
 nxge_rxdma_hw_start_common(p_nxge_t nxgep)
 {
@@ -3791,20 +3870,10 @@ nxge_rxdma_hw_start_common(p_nxge_t nxgep)
 	return (status);
 }
 
-/*ARGSUSED*/
-static void
-nxge_rxdma_hw_stop_common(p_nxge_t nxgep)
-{
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_hw_stop_common"));
-
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_hw_stop_common"));
-}
-
 static nxge_status_t
-nxge_rxdma_hw_start(p_nxge_t nxgep)
+nxge_rxdma_hw_start(p_nxge_t nxgep, int channel)
 {
 	int			i, ndmas;
-	uint16_t		channel;
 	p_rx_rbr_rings_t 	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
 	p_rx_rcr_rings_t 	rx_rcr_rings;
@@ -3839,36 +3908,25 @@ nxge_rxdma_hw_start(p_nxge_t nxgep)
 		rx_mbox_p = rx_mbox_areas_p->rxmbox_areas;
 	}
 
-	for (i = 0; i < ndmas; i++) {
-		channel = rbr_rings[i]->rdc;
-		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"==> nxge_rxdma_hw_start (ndmas %d) channel %d",
-				ndmas, channel));
-		status = nxge_rxdma_start_channel(nxgep, channel,
-				(p_rx_rbr_ring_t)rbr_rings[i],
-				(p_rx_rcr_ring_t)rcr_rings[i],
-				(p_rx_mbox_t)rx_mbox_p[i]);
-		if (status != NXGE_OK) {
-			goto nxge_rxdma_hw_start_fail1;
-		}
+	i = channel;
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		"==> nxge_rxdma_hw_start (ndmas %d) channel %d",
+		ndmas, channel));
+	status = nxge_rxdma_start_channel(nxgep, channel,
+	    (p_rx_rbr_ring_t)rbr_rings[i],
+	    (p_rx_rcr_ring_t)rcr_rings[i],
+	    (p_rx_mbox_t)rx_mbox_p[i]);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_rxdma_hw_start: disable "
+		    "(status 0x%x channel %d)", status, channel));
+		return (status);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_hw_start: "
 		"rx_rbr_rings 0x%016llx rings 0x%016llx",
 		rx_rbr_rings, rx_rcr_rings));
 
-	goto nxge_rxdma_hw_start_exit;
-
-nxge_rxdma_hw_start_fail1:
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"==> nxge_rxdma_hw_start: disable "
-		"(status 0x%x channel %d i %d)", status, channel, i));
-	for (; i >= 0; i--) {
-		channel = rbr_rings[i]->rdc;
-		(void) nxge_rxdma_stop_channel(nxgep, channel);
-	}
-
-nxge_rxdma_hw_start_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 		"==> nxge_rxdma_hw_start: (status 0x%x)", status));
 
@@ -3876,12 +3934,9 @@ nxge_rxdma_hw_start_exit:
 }
 
 static void
-nxge_rxdma_hw_stop(p_nxge_t nxgep)
+nxge_rxdma_hw_stop(p_nxge_t nxgep, int channel)
 {
-	int			i, ndmas;
-	uint16_t		channel;
 	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
 	p_rx_rcr_rings_t 	rx_rcr_rings;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_hw_stop"));
@@ -3893,25 +3948,11 @@ nxge_rxdma_hw_stop(p_nxge_t nxgep)
 			"<== nxge_rxdma_hw_stop: NULL ring pointers"));
 		return;
 	}
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"<== nxge_rxdma_hw_stop: no dma channel allocated"));
-		return;
-	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_hw_stop (ndmas %d)", ndmas));
-
-	rbr_rings = rx_rbr_rings->rbr_rings;
-
-	for (i = 0; i < ndmas; i++) {
-		channel = rbr_rings[i]->rdc;
-		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"==> nxge_rxdma_hw_stop (ndmas %d) channel %d",
-				ndmas, channel));
-		(void) nxge_rxdma_stop_channel(nxgep, channel);
-	}
+		"==> nxge_rxdma_hw_stop(channel %d)",
+		channel));
+	(void) nxge_rxdma_stop_channel(nxgep, channel);
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_hw_stop: "
 		"rx_rbr_rings 0x%016llx rings 0x%016llx",
@@ -3940,59 +3981,62 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 		"npi handle addr $%p acc $%p",
 		nxgep->npi_handle.regp, nxgep->npi_handle.regh));
 
-	/* Reset RXDMA channel */
-	rs = npi_rxdma_cfg_rdc_reset(handle, channel);
-	if (rs != NPI_SUCCESS) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rxdma_start_channel: "
-			"reset rxdma failed (0x%08x channel %d)",
-			status, channel));
-		return (NXGE_ERROR | rs);
+	/* Reset RXDMA channel, but not if you're a guest. */
+	if (!isLDOMguest(nxgep)) {
+		rs = npi_rxdma_cfg_rdc_reset(handle, channel);
+		if (rs != NPI_SUCCESS) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_init_fzc_rdc: "
+			    "npi_rxdma_cfg_rdc_reset(%d) returned 0x%08x",
+			    channel, rs));
+			return (NXGE_ERROR | rs);
+		}
+
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		    "==> nxge_rxdma_start_channel: reset done: channel %d",
+		    channel));
 	}
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_start_channel: reset done: channel %d",
-		channel));
+#if defined(sun4v) && defined(NIU_LP_WORKAROUND)
+	if (isLDOMguest(nxgep))
+		(void) nxge_rdc_lp_conf(nxgep, channel);
+#endif
 
 	/*
 	 * Initialize the RXDMA channel specific FZC control
 	 * configurations. These FZC registers are pertaining
 	 * to each RX channel (logical pages).
 	 */
-	status = nxge_init_fzc_rxdma_channel(nxgep,
-			channel, rbr_p, rcr_p, mbox_p);
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rxdma_start_channel: "
-			"init fzc rxdma failed (0x%08x channel %d)",
-			status, channel));
-		return (status);
+	if (!isLDOMguest(nxgep)) {
+		status = nxge_init_fzc_rxdma_channel(nxgep, channel);
+		if (status != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				"==> nxge_rxdma_start_channel: "
+				"init fzc rxdma failed (0x%08x channel %d)",
+				status, channel));
+			return (status);
+		}
+
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+			"==> nxge_rxdma_start_channel: fzc done"));
 	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_start_channel: fzc done"));
-
-	/*
-	 * Zero out the shadow  and prefetch ram.
-	 */
-
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_start_channel: "
-		"ram done"));
 
 	/* Set up the interrupt event masks. */
 	ent_mask.value = 0;
 	ent_mask.value |= RX_DMA_ENT_MSK_RBREMPTY_MASK;
 	rs = npi_rxdma_event_mask(handle, OP_SET, channel,
-			&ent_mask);
+	    &ent_mask);
 	if (rs != NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"==> nxge_rxdma_start_channel: "
-			"init rxdma event masks failed (0x%08x channel %d)",
+			"init rxdma event masks failed "
+			"(0x%08x channel %d)",
 			status, channel));
 		return (NXGE_ERROR | rs);
 	}
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_start_channel: "
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		"==> nxge_rxdma_start_channel: "
 		"event done: channel %d (mask 0x%016llx)",
 		channel, ent_mask.value));
 
@@ -4022,14 +4066,28 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	 * enable each DMA channel.
 	 */
 	status = nxge_enable_rxdma_channel(nxgep,
-			channel, rbr_p, rcr_p, mbox_p);
+	    channel, rbr_p, rcr_p, mbox_p);
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    " nxge_rxdma_start_channel: "
-			    " init enable rxdma failed (0x%08x channel %d)",
-			    status, channel));
+		    " nxge_rxdma_start_channel: "
+		    " enable rxdma failed (0x%08x channel %d)",
+		    status, channel));
 		return (status);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+	    "==> nxge_rxdma_start_channel: enabled channel %d"));
+
+	if (isLDOMguest(nxgep)) {
+		/* Add interrupt handler for this channel. */
+		if (nxge_hio_intr_add(nxgep, VP_BOUND_RX, channel)
+		    != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    " nxge_rxdma_start_channel: "
+			    " nxge_hio_intr_add failed (0x%08x channel %d)",
+		    status, channel));
+		}
 	}
 
 	ent_mask.value = 0;
@@ -4047,9 +4105,6 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_start_channel: "
 		"control done - channel %d cs 0x%016llx", channel, cs.value));
-
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_start_channel: enable done"));
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_rxdma_start_channel"));
 
@@ -4402,38 +4457,33 @@ fail:
 nxge_status_t
 nxge_rx_port_fatal_err_recover(p_nxge_t nxgep)
 {
-	nxge_status_t		status = NXGE_OK;
-	p_nxge_dma_common_t	*dma_buf_p;
-	uint16_t		channel;
-	int			ndmas;
-	int			i;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	nxge_status_t status = NXGE_OK;
+	int rdc;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_port_fatal_err_recover"));
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"Recovering from RxPort error..."));
-	/* Disable RxMAC */
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Disabling RxMAC...\n"));
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Disable RxMAC...\n"));
 	if (nxge_rx_mac_disable(nxgep) != NXGE_OK)
 		goto fail;
 
 	NXGE_DELAY(1000);
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Stop all RxDMA channels..."));
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Stopping all RxDMA channels..."));
 
-	ndmas = nxgep->rx_buf_pool_p->ndmas;
-	dma_buf_p = nxgep->rx_buf_pool_p->dma_buf_pool_p;
-
-	for (i = 0; i < ndmas; i++) {
-		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
-		if (nxge_rxdma_fatal_err_recover(nxgep, channel) != NXGE_OK) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					"Could not recover channel %d",
-					channel));
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			if (nxge_rxdma_fatal_err_recover(nxgep, rdc)
+			    != NXGE_OK) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "Could not recover channel %d", rdc));
+			}
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Reset IPP..."));
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Resetting IPP..."));
 
 	/* Reset IPP */
 	if (nxge_ipp_reset(nxgep) != NXGE_OK) {
@@ -4572,12 +4622,104 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			"!Write 0x%lx to RX_CTL_DAT_FIFO_STAT_DBG_REG\n",
 			cdfs.value);
 #endif
-		RXDMA_REG_WRITE64(nxgep->npi_handle,
-			RX_CTL_DAT_FIFO_STAT_DBG_REG, chan, cdfs.value);
+		NXGE_REG_WR64(nxgep->npi_handle,
+		    RX_CTL_DAT_FIFO_STAT_DBG_REG, cdfs.value);
 		break;
 	case NXGE_FM_EREPORT_RDMC_DCF_ERR:
 		break;
 	case NXGE_FM_EREPORT_RDMC_RCR_ERR:
 		break;
 	}
+}
+
+static void
+nxge_rxdma_databuf_free(p_rx_rbr_ring_t rbr_p)
+{
+	rxring_info_t 		*ring_info;
+	int			index;
+	uint32_t		chunk_size;
+	uint64_t		kaddr;
+	uint_t			num_blocks;
+
+	NXGE_DEBUG_MSG((NULL, DMA_CTL, "==> nxge_rxdma_databuf_free"));
+
+	if (rbr_p == NULL) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "==> nxge_rxdma_databuf_free: NULL rbr pointer"));
+		return;
+	}
+
+	if (rbr_p->rbr_alloc_type == DDI_MEM_ALLOC) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "==> nxge_rxdma_databuf_free: DDI"));
+		return;
+	}
+
+	ring_info = rbr_p->ring_info;
+	if (ring_info == NULL) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "==> nxge_rxdma_databuf_free: NULL ring info"));
+		return;
+	}
+	num_blocks = rbr_p->num_blocks;
+	for (index = 0; index < num_blocks; index++) {
+		kaddr = ring_info->buffer[index].kaddr;
+		chunk_size = ring_info->buffer[index].buf_size;
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "==> nxge_rxdma_databuf_free: free chunk %d "
+		    "kaddrp $%p chunk size %d",
+		    index, kaddr, chunk_size));
+		if (kaddr == NULL) continue;
+		nxge_free_buf(rbr_p->rbr_alloc_type, kaddr, chunk_size);
+		ring_info->buffer[index].kaddr = NULL;
+	}
+
+	NXGE_DEBUG_MSG((NULL, DMA_CTL, "<== nxge_rxdma_databuf_free"));
+}
+
+#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
+extern void contig_mem_free(void *, size_t);
+#endif
+
+void
+nxge_free_buf(buf_alloc_type_t alloc_type, uint64_t kaddr, uint32_t buf_size)
+{
+	NXGE_DEBUG_MSG((NULL, DMA_CTL, "==> nxge_free_buf"));
+
+	if (kaddr == NULL || !buf_size) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "==> nxge_free_buf: invalid kaddr $%p size to free %d",
+		    kaddr, buf_size));
+		return;
+	}
+
+	switch (alloc_type) {
+	case KMEM_ALLOC:
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "==> nxge_free_buf: freeing kmem $%p size %d",
+		    kaddr, buf_size));
+#if defined(__i386)
+		KMEM_FREE((void *)(uint32_t)kaddr, buf_size);
+#else
+		KMEM_FREE((void *)kaddr, buf_size);
+#endif
+		break;
+
+#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
+	case CONTIG_MEM_ALLOC:
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "==> nxge_free_buf: freeing contig_mem kaddr $%p size %d",
+		    kaddr, buf_size));
+		contig_mem_free((void *)kaddr, buf_size);
+		break;
+#endif
+
+	default:
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "<== nxge_free_buf: unsupported alloc type %d",
+		    alloc_type));
+		return;
+	}
+
+	NXGE_DEBUG_MSG((NULL, DMA_CTL, "<== nxge_free_buf"));
 }

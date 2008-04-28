@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,20 +136,6 @@ typedef	struct _txdma_ring_errlog {
 
 #define	TX_LOG_REG_WRITE64(handle, reg, channel, data)	\
 	NXGE_REG_WR64(handle, NXGE_TXLOG_OFFSET(reg, channel), data)
-
-#define	TXDMA_REG_READ64(handle, reg, channel, val_p)	\
-		NXGE_REG_RD64(handle, \
-		(NXGE_TXDMA_OFFSET(reg, handle.is_vraddr, channel)), val_p)
-
-#define	TXDMA_REG_WRITE64(handle, reg, channel, data)	\
-		NXGE_REG_WR64(handle, \
-		NXGE_TXDMA_OFFSET(reg, handle.is_vraddr, channel), data)
-
-#define	TX_DRR_RNGUSE_REG_READ64(handle, reg, channel, val_p)	\
-	NXGE_REG_RD64(handle, (NXGE_TXDMA_DRR_OFFSET(reg, channel)), val_p)
-
-#define	TX_DRR_RNGUSE_REG_WRITE64(handle, reg, channel, data)	\
-	NXGE_REG_WR64(handle, NXGE_TXDMA_DRR_OFFSET(reg, channel), data)
 
 /*
  * Transmit Descriptor Definitions.

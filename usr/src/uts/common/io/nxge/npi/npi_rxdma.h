@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,21 +51,6 @@ extern "C" {
 #define	 REG_RDC_TABLE_OFFSET(table) \
 	    (RDC_TBL_REG + table * (NXGE_MAX_RDCS * 8))
 
-#define	RXDMA_REG_READ64(handle, reg, channel, data_p) {\
-	NXGE_REG_RD64(handle, (NXGE_RXDMA_OFFSET(reg, handle.is_vraddr,\
-			channel)), (data_p))\
-}
-
-#define	RXDMA_REG_READ32(handle, reg, channel) \
-	NXGE_NPI_PIO_READ32(handle, (NXGE_RXDMA_OFFSET(reg, handle.is_vraddr,\
-			channel)))
-
-
-#define	RXDMA_REG_WRITE64(handle, reg, channel, data) {\
-	NXGE_REG_WR64(handle, (NXGE_RXDMA_OFFSET(reg, handle.is_vraddr,\
-			channel)), (data))\
-}
-
 /*
  * RX NPI error codes
  */
@@ -84,9 +69,9 @@ extern "C" {
 #define	NPI_RXDMA_DISABLE_ERR		(NPI_RXDMA_HW_ERROR | 0x0000a)
 #define	NPI_RXDMA_ENABLE_ERR		(NPI_RXDMA_HW_ERROR | 0x0000b)
 #define	NPI_RXDMA_FUNC_INVALID		(NPI_RXDMA_SW_PARAM_ERROR | 0x0000a)
-#define	NPI_RXDMA_BUFSZIE_INVALID	(NPI_RXDMA_SW_PARAM_ERROR | 0x0000b)
-#define	NPI_RXDMA_RBRSZIE_INVALID	(NPI_RXDMA_SW_PARAM_ERROR | 0x0000c)
-#define	NPI_RXDMA_RCRSZIE_INVALID	(NPI_RXDMA_SW_PARAM_ERROR | 0x0000d)
+#define	NPI_RXDMA_BUFSIZE_INVALID	(NPI_RXDMA_SW_PARAM_ERROR | 0x0000b)
+#define	NPI_RXDMA_RBRSIZE_INVALID	(NPI_RXDMA_SW_PARAM_ERROR | 0x0000c)
+#define	NPI_RXDMA_RCRSIZE_INVALID	(NPI_RXDMA_SW_PARAM_ERROR | 0x0000d)
 #define	NPI_RXDMA_PORT_INVALID		(NPI_RXDMA_ERROR | PORT_INVALID)
 #define	NPI_RXDMA_TABLE_INVALID		(NPI_RXDMA_ERROR | RDC_TAB_INVALID)
 
@@ -121,7 +106,6 @@ extern "C" {
 
 #define	RXDMA_RCR_TO_VALID(tov) ((tov) && (tov < 64))
 #define	RXDMA_RCR_THRESH_VALID(thresh) ((thresh) && (thresh < 512))
-
 
 /*
  * RXDMA NPI defined control types.
@@ -225,13 +209,14 @@ npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t,
 				    uint8_t, uint8_t);
 
 /*
- * npi_rxdma_cfg_rdc_table()
+ * npi_rxdma_rdc_table_config
  * Configure/populate the RDC table
  *
  * Inputs:
- *	handle:		register handle interpreted by the underlying OS
- *	table:		RDC Group Number
- *	rdc[]:	 Array of RX DMA Channels
+ *	handle:	register handle interpreted by the underlying OS
+ *	table:	RDC Group Number
+ *	map:	Bitmap of RDCs to be written to <table>.
+ *	count:	A count of the number of bits in <map>.
  *
  * Return:
  * NPI_SUCCESS
@@ -239,8 +224,8 @@ npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t,
  *
  */
 
-npi_status_t npi_rxdma_cfg_rdc_table(npi_handle_t,
-			    uint8_t, uint8_t []);
+npi_status_t npi_rxdma_rdc_table_config(npi_handle_t, uint8_t, dc_map_t,
+    int);
 
 npi_status_t npi_rxdma_cfg_rdc_table_default_rdc(npi_handle_t,
 					    uint8_t, uint8_t);

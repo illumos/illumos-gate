@@ -64,6 +64,7 @@ extern "C" {
 #define	VIO_DRING_REG		0x0003
 #define	VIO_DRING_UNREG		0x0004
 #define	VIO_RDX			0x0005
+#define	VIO_DDS_INFO		0x0006
 
 /*
  * Generic subtype Data envelopes

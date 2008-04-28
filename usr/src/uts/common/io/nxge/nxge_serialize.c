@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,6 +301,14 @@ nxge_onetrack(void *s)
 					    drv_usectohz(tns / NXGE_TX_AVG_RES);
 					(void) cv_timedwait(&p->timecv,
 					    &p->serial, wait);
+					if (p->s_state &
+					    NXGE_TX_STHREAD_DESTROY) {
+						NXGE_DEBUG_MSG((NULL,
+						    TX_CTL,
+						    "==> nxge_onetrack: s $%p "
+						    "exiting", s));
+						break;
+					}
 				}
 				mp = n;
 			}

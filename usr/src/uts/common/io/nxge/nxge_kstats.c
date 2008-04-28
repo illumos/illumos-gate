@@ -26,6 +26,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nxge/nxge_impl.h>
+#include <sys/nxge/nxge_hio.h>
+
 #include <inet/mi.h>
 
 #define	RDC_NAME_FORMAT1	"RDC Channel"
@@ -1184,31 +1186,57 @@ nxge_setup_local_kstat(p_nxge_t nxgep, int instance, char *name,
 
 /* ARGSUSED */
 void
+nxge_setup_rdc_kstats(p_nxge_t nxgep, int channel)
+{
+	char stat_name[64];
+
+	/* Setup RDC statistics */
+	(void) sprintf(stat_name, "%s" CH_NAME_FORMAT,
+	    RDC_NAME_FORMAT1, channel);
+	nxgep->statsp->rdc_ksp[channel] = nxge_setup_local_kstat(nxgep,
+	    nxgep->instance,
+	    stat_name,
+	    nxge_rdc_stats,
+	    RDC_STAT_END,
+	    nxge_rdc_stat_update);
+#ifdef	NXGE_DEBUG_ERROR
+	if (nxgep->statsp->rdc_ksp[channel] == NULL)
+		NXGE_DEBUG_MSG((nxgep, KST_CTL,
+			"kstat_create failed for rdc channel %d", channel));
+#endif
+}
+
+void
+nxge_setup_tdc_kstats(p_nxge_t nxgep, int channel)
+{
+	char stat_name[64];
+
+	/* Setup TDC statistics */
+	(void) sprintf(stat_name, "%s" CH_NAME_FORMAT,
+	    TDC_NAME_FORMAT1, channel);
+	nxgep->statsp->tdc_ksp[channel] = nxge_setup_local_kstat(nxgep,
+	    nxgep->instance,
+	    stat_name,
+	    nxge_tdc_stats,
+	    TDC_STAT_END,
+	    nxge_tdc_stat_update);
+#ifdef	NXGE_DEBUG_ERROR
+	if (nxgep->statsp->tdc_ksp[channel] == NULL) {
+		NXGE_DEBUG_MSG((nxgep, KST_CTL,
+			"kstat_create failed for tdc channel %d", channel));
+	}
+#endif
+}
+
+void
 nxge_setup_kstats(p_nxge_t nxgep)
 {
 	struct kstat *ksp;
 	p_nxge_port_kstat_t nxgekp;
 	size_t nxge_kstat_sz;
-	char stat_name[64];
 	char mmac_name[64];
-	int i;
 
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "==> nxge_setup_kstats"));
-
-
-	/* Setup RDC statistics */
-	for (i = 0; i < nxgep->nrdc; i++) {
-		(void) sprintf(stat_name, "%s" CH_NAME_FORMAT,
-			RDC_NAME_FORMAT1, i);
-		nxgep->statsp->rdc_ksp[i] = nxge_setup_local_kstat(nxgep,
-			nxgep->instance, stat_name,
-			&nxge_rdc_stats[0], RDC_STAT_END, nxge_rdc_stat_update);
-#ifdef	NXGE_DEBUG_ERROR
-		if (nxgep->statsp->rdc_ksp[i] == NULL)
-			NXGE_DEBUG_MSG((nxgep, KST_CTL,
-				"kstat_create failed for rdc channel %d", i));
-#endif
-	}
 
 	/* Setup RDC System statistics */
 	nxgep->statsp->rdc_sys_ksp = nxge_setup_local_kstat(nxgep,
@@ -1229,24 +1257,6 @@ nxge_setup_kstats(p_nxge_t nxgep)
 	if (nxgep->istatsp->pp_ksp == NULL)
 		NXGE_DEBUG_MSG((nxgep, KST_CTL, "kstat_create failed for ipp"));
 #endif
-
-	/* Setup TDC statistics */
-	for (i = 0; i < nxgep->ntdc; i++) {
-		(void) sprintf(stat_name, "%s" CH_NAME_FORMAT,
-			TDC_NAME_FORMAT1, i);
-		nxgep->statsp->tdc_ksp[i] = nxge_setup_local_kstat(nxgep,
-			nxgep->instance,
-			stat_name,
-			&nxge_tdc_stats[0],
-			TDC_STAT_END,
-			nxge_tdc_stat_update);
-#ifdef	NXGE_DEBUG_ERROR
-		if (nxgep->statsp->tdc_ksp[i] == NULL) {
-			NXGE_DEBUG_MSG((nxgep, KST_CTL,
-				"kstat_create failed for tdc channel %d", i));
-		}
-#endif
-	}
 
 	/* Setup TXC statistics */
 	nxgep->statsp->txc_ksp = nxge_setup_local_kstat(nxgep,
@@ -1660,29 +1670,12 @@ nxge_mac_init_kstats(p_nxge_t nxgep, struct kstat *ksp)
 void
 nxge_destroy_kstats(p_nxge_t nxgep)
 {
-	int channel;
-	p_nxge_dma_pt_cfg_t p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t p_cfgp;
-
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "==> nxge_destroy_kstats"));
 
 	if (nxgep->statsp == NULL)
 		return;
 	if (nxgep->statsp->ksp)
 		kstat_delete(nxgep->statsp->ksp);
-
-	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
-
-	for (channel = 0; channel < p_cfgp->max_rdcs; channel++) {
-		if (nxgep->statsp->rdc_ksp[channel])
-			kstat_delete(nxgep->statsp->rdc_ksp[channel]);
-	}
-
-	for (channel = 0; channel < p_cfgp->max_tdcs; channel++) {
-		if (nxgep->statsp->tdc_ksp[channel])
-			kstat_delete(nxgep->statsp->tdc_ksp[channel]);
-	}
 
 	if (nxgep->statsp->rdc_sys_ksp)
 		kstat_delete(nxgep->statsp->rdc_sys_ksp);
@@ -2090,6 +2083,10 @@ nxge_save_cntrs(p_nxge_t nxgep)
 		/* Clear register as it is not auto clear on read */
 		BMAC_REG_WR(handle, portn, BMAC_CD_VIO_CNT_REG, 0);
 	}
+	if (isLDOMguest(nxgep)) {
+		MUTEX_EXIT(&nxgep->ouraddr_lock);
+		goto nxge_save_cntrs_exit;
+	}
 	/* Update IPP counters */
 	(void) npi_ipp_get_ecc_err_count(handle, portn, &cnt8);
 	statsp->ipp_stats.ecc_err_cnt += cnt8;
@@ -2104,6 +2101,97 @@ nxge_save_cntrs_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_save_cntrs"));
 }
 
+uint64_t
+nxge_m_rx_stat(
+	nxge_t *nxgep,
+	uint_t stat)
+{
+	p_nxge_stats_t statsp;
+	nxge_grp_set_t *rx_set;
+	int8_t set[NXGE_MAX_RDCS];
+	int i, cursor;
+
+	uint64_t val = 0;
+
+	NXGE_DEBUG_MSG((nxgep, KST_CTL, "==> nxge_m_rx_stat"));
+	statsp = (p_nxge_stats_t)nxgep->statsp;
+
+	rx_set = &nxgep->rx_set;
+	for (i = 0, cursor = 0; i < NXGE_MAX_RDCS; i++) {
+		if ((1 << i) & rx_set->owned.map) {
+			set[cursor++] = (uint8_t)i;
+		}
+	}
+
+	for (i = 0; i < cursor; i++) {
+		int rdc = set[i];
+		switch (stat) {
+		case MAC_STAT_IERRORS:
+		case ETHER_STAT_MACRCV_ERRORS:
+			val += statsp->rdc_stats[rdc].ierrors;
+			break;
+
+		case MAC_STAT_RBYTES:
+			val += statsp->rdc_stats[rdc].ibytes;
+			break;
+
+		case MAC_STAT_IPACKETS:
+			val += statsp->rdc_stats[rdc].ipackets;
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	return (val);
+}
+
+uint64_t
+nxge_m_tx_stat(
+	nxge_t *nxgep,
+	uint_t stat)
+{
+	p_nxge_stats_t statsp;
+	nxge_grp_set_t *tx_set;
+	int8_t set[NXGE_MAX_TDCS];
+	int i, cursor;
+
+	uint64_t val = 0;
+
+	NXGE_DEBUG_MSG((nxgep, KST_CTL, "==> nxge_m_tx_stat"));
+	statsp = (p_nxge_stats_t)nxgep->statsp;
+
+	tx_set = &nxgep->tx_set;
+	for (i = 0, cursor = 0; i < NXGE_MAX_RDCS; i++) {
+		if ((1 << i) & tx_set->owned.map) {
+			set[cursor++] = (uint8_t)i;
+		}
+	}
+
+	for (i = 0; i < cursor; i++) {
+		int tdc = set[i];
+		switch (stat) {
+		case MAC_STAT_OERRORS:
+			val += statsp->tdc_stats[tdc].oerrors;
+			break;
+
+		case MAC_STAT_OBYTES:
+			val += statsp->tdc_stats[tdc].obytes;
+			break;
+
+		case MAC_STAT_OPACKETS:
+			val += statsp->tdc_stats[tdc].opackets;
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	return (val);
+}
+
 /* ARGSUSED */
 int
 nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
@@ -2111,7 +2199,6 @@ nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 	p_nxge_t nxgep = (p_nxge_t)arg;
 	p_nxge_stats_t statsp;
 	uint64_t val = 0;
-	int channel;
 
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "==> nxge_m_stat"));
 	statsp = (p_nxge_stats_t)nxgep->statsp;
@@ -2143,21 +2230,15 @@ nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 
 	case MAC_STAT_IERRORS:
 	case ETHER_STAT_MACRCV_ERRORS:
-		val = 0;
-		for (channel = 0; channel < nxgep->nrdc; channel++) {
-			val += statsp->rdc_stats[channel].ierrors;
-		}
+		val = nxge_m_rx_stat(nxgep, stat);
+		break;
+
+	case MAC_STAT_OERRORS:
+		val = nxge_m_tx_stat(nxgep, stat);
 		break;
 
 	case MAC_STAT_NOXMTBUF:
 		val = statsp->port_stats.noxmtbuf;
-		break;
-
-	case MAC_STAT_OERRORS:
-		for (channel = 0; channel < nxgep->ntdc; channel++) {
-			val += statsp->tdc_stats[channel].oerrors;
-		}
-
 		break;
 
 	case MAC_STAT_COLLISIONS:
@@ -2165,27 +2246,19 @@ nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 		break;
 
 	case MAC_STAT_RBYTES:
-		for (channel = 0; channel < nxgep->nrdc; channel++) {
-			val += statsp->rdc_stats[channel].ibytes;
-		}
+		val = nxge_m_rx_stat(nxgep, stat);
 		break;
 
 	case MAC_STAT_IPACKETS:
-		for (channel = 0; channel < nxgep->nrdc; channel++) {
-			val += statsp->rdc_stats[channel].ipackets;
-		}
+		val = nxge_m_rx_stat(nxgep, stat);
 		break;
 
 	case MAC_STAT_OBYTES:
-		for (channel = 0; channel < nxgep->ntdc; channel++) {
-			val += statsp->tdc_stats[channel].obytes;
-		}
+		val = nxge_m_tx_stat(nxgep, stat);
 		break;
 
 	case MAC_STAT_OPACKETS:
-		for (channel = 0; channel < nxgep->ntdc; channel++) {
-			val += statsp->tdc_stats[channel].opackets;
-		}
+		val = nxge_m_tx_stat(nxgep, stat);
 		break;
 	case MAC_STAT_LINK_STATE:
 		val = statsp->mac_stats.link_duplex;

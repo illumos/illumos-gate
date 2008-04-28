@@ -282,16 +282,20 @@ typedef struct  nxge_tdc_cfg {
 
 /* per receive DMA channel table group data structure */
 typedef struct nxge_rdc_grp {
-	uint32_t	flag;		/* 0:not configured 1: configured */
-	uint8_t	port;
-	uint8_t	partition_id;
-	uint8_t	rx_group_id;
-	uint8_t	start_rdc;	/* assume assigned in sequence	*/
-	uint8_t	max_rdcs;
-	uint8_t	def_rdc;
-	uint8_t		rdc[NXGE_MAX_RDCS];
+	uint32_t	flag;		/* 0: not configured 1: configured */
+	uint8_t		port;
+	uint8_t		start_rdc;	/* assume assigned in sequence	*/
+	uint8_t		max_rdcs;
+	uint8_t		def_rdc;
+	dc_map_t	map;
 	uint16_t	config_method;
 } nxge_rdc_grp_t, *p_nxge_rdc_grp_t;
+
+#define	RDC_MAP_IN(map, rdc) \
+	(map |= (1 << rdc))
+
+#define	RDC_MAP_OUT(map, rdc) \
+	(map &= (~(1 << rdc)))
 
 /* Common RDC and TDC configuration of DMC */
 typedef struct _nxge_dma_common_cfg_t {
@@ -347,6 +351,22 @@ typedef struct nxge_rcr_param {
 #endif
 } nxge_rcr_param_t, *p_nxge_rcr_param_t;
 
+/*
+ * These are the properties of the TxDMA channels for this
+ * port (instance).
+ * <start> is the index of the first TDC that is being managed
+ *		by this port.
+ * <count> is the number of TDCs being managed by this port.
+ * <owned> is the number of TDCs currently being utilized by this port.
+ *
+ * <owned> may be less than <count> in hybrid I/O systems.
+ */
+typedef struct {
+	int		start;	/* start TDC (0 - 31) */
+	int		count;	/* 8 - 32 */
+	int		owned;	/* 1 - count */
+} tdc_cfg_t;
+
 /* Needs to have entries in the ndd table */
 /*
  * Hardware properties created by fcode.
@@ -360,8 +380,7 @@ typedef struct nxge_hw_pt_cfg {
 	uint32_t	partition_id;	 /* partition Id		*/
 	uint32_t	read_write_mode; /* read write permission mode	*/
 	uint32_t	function_number; /* function number		*/
-	uint32_t	start_tdc;	 /* start TDC (0 - 31)		*/
-	uint32_t	max_tdcs;	 /* max TDC in sequence		*/
+	tdc_cfg_t	tdc;
 	uint32_t	start_rdc;	 /* start RDC (0 - 31)		*/
 	uint32_t	max_rdcs;	 /* max rdc in sequence		*/
 	uint32_t	ninterrupts;	/* obp interrupts(mac/mif/syserr) */
@@ -373,7 +392,7 @@ typedef struct nxge_hw_pt_cfg {
 	uint32_t	rx_full_header;	 /* select the header flag	*/
 	uint32_t	start_grpid;	 /* starting group ID		*/
 	uint32_t	max_grpids;	 /* max group ID		*/
-	uint32_t	start_rdc_grpid; /* starting RDC group ID	*/
+	uint32_t	grpids[NXGE_MAX_RDCS]; /* RDC group IDs		*/
 	uint32_t	max_rdc_grpids;	 /* max RDC group ID		*/
 	uint32_t	start_ldg;	 /* starting logical group # 	*/
 	uint32_t	max_ldgs;	 /* max logical device group	*/
@@ -493,6 +512,8 @@ typedef struct nxge_hw_list {
 	uint32_t		niu_type;
 	uint32_t		platform_type;
 	uint8_t			xcvr_addr[NXGE_MAX_PORTS];
+	uintptr_t		tcam;
+	uintptr_t		hio;
 } nxge_hw_list_t, *p_nxge_hw_list_t;
 
 #ifdef	__cplusplus

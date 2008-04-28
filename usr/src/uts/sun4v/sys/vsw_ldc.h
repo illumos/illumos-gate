@@ -398,6 +398,10 @@ typedef struct vsw_port {
 	uint32_t		vids_size; /* size alloc'd for vids list */
 	mod_hash_t		*vlan_hashp;	/* vlan hash table */
 	uint32_t		vlan_nchains;	/* # of vlan hash chains */
+
+	/* HybridIO related info */
+	uint32_t		p_hio_enabled;	/* Hybrid mode enabled? */
+	uint32_t		p_hio_capable;	/* Port capable of HIO */
 } vsw_port_t;
 
 /* list of ports per vsw */

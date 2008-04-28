@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,16 +46,21 @@ nxge_status_t nxge_fzc_dmc_rx_log_page_mask(p_nxge_t, uint16_t,
 
 void nxge_init_fzc_txdma_channels(p_nxge_t);
 
+nxge_status_t nxge_init_fzc_tdc(p_nxge_t, uint16_t);
 nxge_status_t nxge_init_fzc_txdma_channel(p_nxge_t, uint16_t,
 	p_tx_ring_t, p_tx_mbox_t);
 nxge_status_t nxge_init_fzc_txdma_port(p_nxge_t);
 
-nxge_status_t nxge_init_fzc_rxdma_channel(p_nxge_t, uint16_t,
-	p_rx_rbr_ring_t, p_rx_rcr_ring_t, p_rx_mbox_t);
+nxge_status_t nxge_init_fzc_rxdma_channel(p_nxge_t, uint16_t);
 
-nxge_status_t nxge_init_fzc_rdc_tbl(p_nxge_t);
+nxge_status_t nxge_init_fzc_rdc(p_nxge_t, uint16_t);
 nxge_status_t nxge_init_fzc_rx_common(p_nxge_t);
 nxge_status_t nxge_init_fzc_rxdma_port(p_nxge_t);
+
+nxge_status_t nxge_init_fzc_rdc_tbl(nxge_t *, int);
+
+int nxge_fzc_rdc_tbl_bind(nxge_t *, int, int);
+int nxge_fzc_rdc_tbl_unbind(p_nxge_t, int);
 
 nxge_status_t nxge_init_fzc_rxdma_channel_pages(p_nxge_t,
 	uint16_t, p_rx_rbr_ring_t);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +115,181 @@ fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_txc_init: Failed to initialize txc on port %d",
 			port));
+
+	return (NXGE_ERROR | rs);
+}
+
+/*
+ * nxge_txc_tdc_bind
+ *
+ *	Bind a TDC to a port.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to bind.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txc_control()
+ *	npi_txc_global_imask_set()
+ *	npi_txc_port_dma_enable()
+ *
+ * Registers accessed:
+ *	TXC_CONTROL
+ *	TXC_PORT_DMA
+ *	TXC_INT_MASK
+ *
+ * Context:
+ *	Service domain
+ */
+nxge_status_t
+nxge_txc_tdc_bind(
+	p_nxge_t nxgep,
+	int channel)
+{
+	uint8_t		port;
+	uint64_t	bitmap;
+	npi_handle_t	handle;
+	npi_status_t	rs = NPI_SUCCESS;
+	txc_control_t	txc_control;
+
+	port = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "==> nxge_txc_tdc_bind(port %d, channel %d)", port, channel));
+
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+
+	/* Get the current value of TXC_CONTROL. */
+	(void) npi_txc_control(handle, OP_GET, &txc_control);
+
+	/* Mask all TXC interrupts for <port>. */
+	if (txc_control.value & (1 << port)) {
+		npi_txc_global_imask_set(handle, port, TXC_INT_MASK_IVAL);
+	}
+
+	/* Bind <channel> to <port>. */
+	/* Read in the old bitmap. */
+	TXC_FZC_CNTL_REG_READ64(handle, TXC_PORT_DMA_ENABLE_REG, port,
+	    &bitmap);
+
+	if (bitmap & (1 << channel)) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_txc_tdc_bind: channel %d already bound on port %d",
+			channel, port));
+	} else {
+		/* Bind the new channel. */
+		bitmap |= (1 << channel);
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			"==> nxge_txc_tdc_bind(): bitmap = %lx", bitmap));
+
+		/* Write out the new bitmap. */
+		if ((rs = npi_txc_port_dma_enable(handle, port,
+			(uint32_t)bitmap)) != NPI_SUCCESS) {
+			goto fail;
+		}
+	}
+
+	/* Enable this port, if necessary. */
+	if (!(txc_control.value & (1 << port))) {
+		if ((rs = npi_txc_port_enable(handle, port)) != NPI_SUCCESS) {
+			goto fail;
+		}
+	}
+
+	/*
+	 * Enable the TXC controller, if necessary.
+	 */
+	if (txc_control.bits.ldw.txc_enabled == 0) {
+		if ((rs = npi_txc_global_enable(handle)) != NPI_SUCCESS) {
+			goto fail;
+		}
+	}
+
+	/* Unmask all TXC interrupts on <port> */
+	npi_txc_global_imask_set(handle, port, 0);
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "<== nxge_txc_tdc_bind(port %d, channel %d)", port, channel));
+
+	return (NXGE_OK);
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_txc_tdc_bind(port %d, channel %d) failed", port, channel));
+
+	return (NXGE_ERROR | rs);
+}
+
+/*
+ * nxge_txc_tdc_unbind
+ *
+ *	Unbind a TDC from a port.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to unbind.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txc_control()
+ *	npi_txc_global_imask_set()
+ *	npi_txc_port_dma_enable()
+ *
+ * Registers accessed:
+ *	TXC_CONTROL
+ *	TXC_PORT_DMA
+ *	TXC_INT_MASK
+ *
+ * Context:
+ *	Service domain
+ */
+nxge_status_t
+nxge_txc_tdc_unbind(
+	p_nxge_t nxgep,
+	int channel)
+{
+	uint8_t		port;
+	uint64_t	bitmap;
+	npi_handle_t	handle;
+	npi_status_t	rs = NPI_SUCCESS;
+
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+	port = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "==> nxge_txc_tdc_unbind(port %d, channel %d)", port, channel));
+
+	/* Mask all TXC interrupts for <port>. */
+	npi_txc_global_imask_set(handle, port, TXC_INT_MASK_IVAL);
+
+	/* Unbind <channel>. */
+	/* Read in the old bitmap. */
+	TXC_FZC_CNTL_REG_READ64(handle, TXC_PORT_DMA_ENABLE_REG, port,
+	    &bitmap);
+
+	bitmap &= (~(1 << channel));
+
+	/* Write out the new bitmap. */
+	if ((rs = npi_txc_port_dma_enable(handle, port,
+		(uint32_t)bitmap)) != NPI_SUCCESS) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "npi_txc_port_dma_enable(%d, %d) failed: %x",
+			port, channel, rs));
+	}
+
+	/* Unmask all TXC interrupts on <port> */
+	if (bitmap)
+		npi_txc_global_imask_set(handle, port, 0);
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "<== nxge_txc_tdc_unbind(port %d, channel %d)", port, channel));
+
+	return (NXGE_OK);
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_txc_tdc_unbind(port %d, channel %d) failed", port, channel));
 
 	return (NXGE_ERROR | rs);
 }

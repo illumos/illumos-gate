@@ -29,6 +29,8 @@
  * SunOs MT STREAMS NIU/Neptune 10Gb Ethernet Device Driver.
  */
 #include	<sys/nxge/nxge_impl.h>
+#include	<sys/nxge/nxge_hio.h>
+#include	<sys/nxge/nxge_rxdma.h>
 #include	<sys/pcie.h>
 
 uint32_t 	nxge_use_partition = 0;		/* debug partition flag */
@@ -44,6 +46,8 @@ uint32_t	nxge_msi_enable = 2;
 #else
 uint32_t	nxge_msi_enable = 1;
 #endif
+
+uint32_t	nxge_cksum_enable = 0;
 
 /*
  * Globals: tunable parameters (/etc/system or adb)
@@ -94,6 +98,13 @@ nxge_rxbuf_threshold_t nxge_rx_threshold_hi = NXGE_RX_COPY_6;
 nxge_rxbuf_type_t nxge_rx_buf_size_type = RCR_PKTBUFSZ_0;
 nxge_rxbuf_threshold_t nxge_rx_threshold_lo = NXGE_RX_COPY_3;
 
+/* Use kmem_alloc() to allocate data buffers. */
+#if !defined(__i386)
+uint32_t       nxge_use_kmem_alloc = 1;
+#else
+uint32_t       nxge_use_kmem_alloc = 0;
+#endif
+
 rtrace_t npi_rtracebuf;
 
 #if	defined(sun4v)
@@ -104,6 +115,8 @@ static hsvc_info_t niu_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_NIU, NIU_MAJOR_VER,
 	NIU_MINOR_VER, "nxge"
 };
+
+static int nxge_hsvc_register(p_nxge_t);
 #endif
 
 /*
@@ -116,6 +129,12 @@ static void nxge_unattach(p_nxge_t);
 #if NXGE_PROPERTY
 static void nxge_remove_hard_properties(p_nxge_t);
 #endif
+
+/*
+ * These two functions are required by nxge_hio.c
+ */
+extern int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
+extern int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
 
 static nxge_status_t nxge_setup_system_dma_pages(p_nxge_t);
 
@@ -148,10 +167,10 @@ static void nxge_destroy_dev(p_nxge_t);
 static nxge_status_t nxge_alloc_mem_pool(p_nxge_t);
 static void nxge_free_mem_pool(p_nxge_t);
 
-static nxge_status_t nxge_alloc_rx_mem_pool(p_nxge_t);
+nxge_status_t nxge_alloc_rx_mem_pool(p_nxge_t);
 static void nxge_free_rx_mem_pool(p_nxge_t);
 
-static nxge_status_t nxge_alloc_tx_mem_pool(p_nxge_t);
+nxge_status_t nxge_alloc_tx_mem_pool(p_nxge_t);
 static void nxge_free_tx_mem_pool(p_nxge_t);
 
 static nxge_status_t nxge_dma_mem_alloc(p_nxge_t, dma_method_t,
@@ -160,6 +179,7 @@ static nxge_status_t nxge_dma_mem_alloc(p_nxge_t, dma_method_t,
 	p_nxge_dma_common_t);
 
 static void nxge_dma_mem_free(p_nxge_dma_common_t);
+static void nxge_dma_free_rx_data_buf(p_nxge_dma_common_t);
 
 static nxge_status_t nxge_alloc_rx_buf_dma(p_nxge_t, uint16_t,
 	p_nxge_dma_common_t *, size_t, size_t, uint32_t *);
@@ -169,11 +189,11 @@ static nxge_status_t nxge_alloc_rx_cntl_dma(p_nxge_t, uint16_t,
 	p_nxge_dma_common_t *, size_t);
 static void nxge_free_rx_cntl_dma(p_nxge_t, p_nxge_dma_common_t);
 
-static nxge_status_t nxge_alloc_tx_buf_dma(p_nxge_t, uint16_t,
+extern nxge_status_t nxge_alloc_tx_buf_dma(p_nxge_t, uint16_t,
 	p_nxge_dma_common_t *, size_t, size_t, uint32_t *);
 static void nxge_free_tx_buf_dma(p_nxge_t, p_nxge_dma_common_t, uint32_t);
 
-static nxge_status_t nxge_alloc_tx_cntl_dma(p_nxge_t, uint16_t,
+extern nxge_status_t nxge_alloc_tx_cntl_dma(p_nxge_t, uint16_t,
 	p_nxge_dma_common_t *,
 	size_t);
 static void nxge_free_tx_cntl_dma(p_nxge_t, p_nxge_dma_common_t);
@@ -195,11 +215,9 @@ mblk_t *nxge_m_tx(void *arg, mblk_t *);
 static nxge_status_t nxge_mac_register(p_nxge_t);
 static int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
 	mac_addr_slot_t slot);
-static void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
+void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
 	boolean_t factory);
-static int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
 static int nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr);
-static int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
 static int nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr);
 static int nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr);
 static	boolean_t nxge_m_getcapab(void *, mac_capab_t, void *);
@@ -222,7 +240,7 @@ static int nxge_get_priv_prop(nxge_t *, const char *, uint_t,
 #define	NXGE_M_CALLBACK_FLAGS	\
 	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
-static mac_callbacks_t nxge_m_callbacks = {
+mac_callbacks_t nxge_m_callbacks = {
 	NXGE_M_CALLBACK_FLAGS,
 	nxge_m_stat,
 	nxge_m_start,
@@ -253,7 +271,7 @@ static int nxge_create_msi_property(p_nxge_t);
  * output.
  */
 out_dbgmsg_t nxge_dbgmsg_out = DBG_CONSOLE | STR_LOG;
-uint64_t nxge_debug_level = 0;
+uint64_t nxge_debug_level;
 
 /*
  * This list contains the instance structures for the Neptune
@@ -394,6 +412,8 @@ size_t alloc_sizes [] = {0x1000, 0x2000, 0x4000, 0x8000,
  * Translate "dev_t" to a pointer to the associated "dev_info_t".
  */
 
+extern void nxge_get_environs(nxge_t *);
+
 static int
 nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -475,19 +495,38 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nxgep->nxge_debug_level = nxge_debug_level;
 	npi_debug_level = nxge_debug_level;
 
-	nxge_fm_init(nxgep, &nxge_dev_reg_acc_attr, &nxge_dev_desc_dma_acc_attr,
-				&nxge_rx_dma_attr);
+	/* Are we a guest running in a Hybrid I/O environment? */
+	nxge_get_environs(nxgep);
 
 	status = nxge_map_regs(nxgep);
+
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_map_regs failed"));
 		goto nxge_attach_fail3;
 	}
 
+	nxge_fm_init(nxgep, &nxge_dev_reg_acc_attr,
+	    &nxge_dev_desc_dma_acc_attr,
+	    &nxge_rx_dma_attr);
+
+	/* Create & initialize the per-Neptune data structure */
+	/* (even if we're a guest). */
 	status = nxge_init_common_dev(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_init_common_dev failed"));
+		goto nxge_attach_fail4;
+	}
+
+#if defined(sun4v)
+	/* This is required by nxge_hio_init(), which follows. */
+	if ((status = nxge_hsvc_register(nxgep)) != DDI_SUCCESS)
+		goto nxge_attach_fail;
+#endif
+
+	if ((status = nxge_hio_init(nxgep)) != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"nxge_hio_init failed"));
 		goto nxge_attach_fail4;
 	}
 
@@ -501,24 +540,37 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
-	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
-	nxgep->mac.portnum = portn;
-	if ((portn == 0) || (portn == 1))
-		nxgep->mac.porttype = PORT_TYPE_XMAC;
-	else
-		nxgep->mac.porttype = PORT_TYPE_BMAC;
-	/*
-	 * Neptune has 4 ports, the first 2 ports use XMAC (10G MAC)
-	 * internally, the rest 2 ports use BMAC (1G "Big" MAC).
-	 * The two types of MACs have different characterizations.
-	 */
-	mmac_info = &nxgep->nxge_mmac_info;
-	if (nxgep->function_num < 2) {
-		mmac_info->num_mmac = XMAC_MAX_ALT_ADDR_ENTRY;
-		mmac_info->naddrfree = XMAC_MAX_ALT_ADDR_ENTRY;
+	if (isLDOMguest(nxgep)) {
+		/*
+		 * Use the function number here.
+		 */
+		nxgep->mac.portnum = nxgep->function_num;
+		nxgep->mac.porttype = PORT_TYPE_LOGICAL;
+
+		/* XXX We'll set the MAC address counts to 1 for now. */
+		mmac_info = &nxgep->nxge_mmac_info;
+		mmac_info->num_mmac = 1;
+		mmac_info->naddrfree = 1;
 	} else {
-		mmac_info->num_mmac = BMAC_MAX_ALT_ADDR_ENTRY;
-		mmac_info->naddrfree = BMAC_MAX_ALT_ADDR_ENTRY;
+		portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+		nxgep->mac.portnum = portn;
+		if ((portn == 0) || (portn == 1))
+			nxgep->mac.porttype = PORT_TYPE_XMAC;
+		else
+			nxgep->mac.porttype = PORT_TYPE_BMAC;
+		/*
+		 * Neptune has 4 ports, the first 2 ports use XMAC (10G MAC)
+		 * internally, the rest 2 ports use BMAC (1G "Big" MAC).
+		 * The two types of MACs have different characterizations.
+		 */
+		mmac_info = &nxgep->nxge_mmac_info;
+		if (nxgep->function_num < 2) {
+			mmac_info->num_mmac = XMAC_MAX_ALT_ADDR_ENTRY;
+			mmac_info->naddrfree = XMAC_MAX_ALT_ADDR_ENTRY;
+		} else {
+			mmac_info->num_mmac = BMAC_MAX_ALT_ADDR_ENTRY;
+			mmac_info->naddrfree = BMAC_MAX_ALT_ADDR_ENTRY;
+		}
 	}
 	/*
 	 * Setup the Ndd parameters for the this instance.
@@ -534,25 +586,82 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nxge_init_statsp(nxgep);
 
 	/*
-	 * read the vpd info from the eeprom into local data
-	 * structure and check for the VPD info validity
+	 * Copy the vpd info from eeprom to a local data
+	 * structure, and then check its validity.
 	 */
-	nxge_vpd_info_get(nxgep);
+	if (!isLDOMguest(nxgep)) {
+		int *regp;
+		uint_t reglen;
+		int rv;
 
-	status = nxge_xcvr_find(nxgep);
+		nxge_vpd_info_get(nxgep);
 
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
-				    " Couldn't determine card type"
-				    " .... exit "));
-		goto nxge_attach_fail5;
+		/* Find the NIU config handle. */
+		rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
+		    ddi_get_parent(nxgep->dip), DDI_PROP_DONTPASS,
+		    "reg", &regp, &reglen);
+
+		if (rv != DDI_PROP_SUCCESS) {
+			goto nxge_attach_fail5;
+		}
+		/*
+		 * The address_hi, that is the first int, in the reg
+		 * property consists of config handle, but need to remove
+		 * the bits 28-31 which are OBP specific info.
+		 */
+		nxgep->niu_cfg_hdl = (*regp) & 0xFFFFFFF;
+		ddi_prop_free(regp);
 	}
 
-	status = nxge_get_config_properties(nxgep);
+	if (isLDOMguest(nxgep)) {
+		uchar_t *prop_val;
+		uint_t prop_len;
 
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "get_hw create failed"));
-		goto nxge_attach_fail;
+		extern void nxge_get_logical_props(p_nxge_t);
+
+		nxgep->statsp->mac_stats.xcvr_inuse = LOGICAL_XCVR;
+		nxgep->mac.portmode = PORT_LOGICAL;
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, nxgep->dip,
+		    "phy-type", "virtual transceiver");
+
+		nxgep->nports = 1;
+		nxgep->board_ver = 0;	/* XXX What? */
+
+		/*
+		 * local-mac-address property gives us info on which
+		 * specific MAC address the Hybrid resource is associated
+		 * with.
+		 */
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "local-mac-address", &prop_val,
+		    &prop_len) != DDI_PROP_SUCCESS) {
+			goto nxge_attach_fail5;
+		}
+		if (prop_len !=  ETHERADDRL) {
+			ddi_prop_free(prop_val);
+			goto nxge_attach_fail5;
+		}
+		ether_copy(prop_val, nxgep->hio_mac_addr);
+		ddi_prop_free(prop_val);
+		nxge_get_logical_props(nxgep);
+
+	} else {
+		status = nxge_xcvr_find(nxgep);
+
+		if (status != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
+				" Couldn't determine card type"
+				" .... exit "));
+			goto nxge_attach_fail5;
+		}
+
+		status = nxge_get_config_properties(nxgep);
+
+		if (status != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				"get_hw create failed"));
+			goto nxge_attach_fail;
+		}
 	}
 
 	/*
@@ -560,7 +669,8 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	nxge_setup_kstats(nxgep);
 
-	nxge_setup_param(nxgep);
+	if (!isLDOMguest(nxgep))
+		nxge_setup_param(nxgep);
 
 	status = nxge_setup_system_dma_pages(nxgep);
 	if (status != NXGE_OK) {
@@ -568,45 +678,24 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail;
 	}
 
-#if	defined(sun4v)
-	if (nxgep->niu_type == N2_NIU) {
-		nxgep->niu_hsvc_available = B_FALSE;
-		bcopy(&niu_hsvc, &nxgep->niu_hsvc, sizeof (hsvc_info_t));
-		if ((status =
-			hsvc_register(&nxgep->niu_hsvc,
-					&nxgep->niu_min_ver)) != 0) {
-				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					"nxge_attach: "
-					"%s: cannot negotiate "
-					"hypervisor services "
-					"revision %d "
-					"group: 0x%lx "
-					"major: 0x%lx minor: 0x%lx "
-					"errno: %d",
-					niu_hsvc.hsvc_modname,
-					niu_hsvc.hsvc_rev,
-					niu_hsvc.hsvc_group,
-					niu_hsvc.hsvc_major,
-					niu_hsvc.hsvc_minor,
-					status));
-				status = DDI_FAILURE;
-				goto nxge_attach_fail;
-		}
-
-		nxgep->niu_hsvc_available = B_TRUE;
-		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"NIU Hypervisor service enabled"));
-	}
-#endif
-
 	nxge_hw_id_init(nxgep);
-	nxge_hw_init_niu_common(nxgep);
+
+	if (!isLDOMguest(nxgep))
+		nxge_hw_init_niu_common(nxgep);
 
 	status = nxge_setup_mutexes(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL, "set mutex failed"));
 		goto nxge_attach_fail;
 	}
+
+#if defined(sun4v)
+	if (isLDOMguest(nxgep)) {
+		/* Find our VR & channel sets. */
+		status = nxge_hio_vr_add(nxgep);
+		goto nxge_attach_exit;
+	}
+#endif
 
 	status = nxge_setup_dev(nxgep);
 	if (status != DDI_SUCCESS) {
@@ -621,7 +710,8 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	status = nxge_add_soft_intrs(nxgep);
 	if (status != DDI_SUCCESS) {
-		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL, "add_soft_intr failed"));
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "add_soft_intr failed"));
 		goto nxge_attach_fail;
 	}
 
@@ -630,16 +720,17 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	nxge_intrs_enable(nxgep);
 
+	// If a guest, register with vio_net instead.
 	if ((status = nxge_mac_register(nxgep)) != NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"unable to register to mac layer (%d)", status));
+		    "unable to register to mac layer (%d)", status));
 		goto nxge_attach_fail;
 	}
 
 	mac_link_update(nxgep->mach, LINK_STATE_UNKNOWN);
 
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "registered to mac (instance %d)",
-		instance));
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+	    "registered to mac (instance %d)", instance));
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
@@ -737,7 +828,9 @@ nxge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
 
-	if (nxgep->mach && (status = mac_unregister(nxgep->mach)) != 0) {
+	if (isLDOMguest(nxgep)) {
+		nxge_hio_unregister(nxgep);
+	} else if (nxgep->mach && (status = mac_unregister(nxgep->mach)) != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"<== nxge_detach status = 0x%08X", status));
 		return (DDI_FAILURE);
@@ -772,6 +865,12 @@ nxge_unattach(p_nxge_t nxgep)
 		nxgep->nxge_timerid = 0;
 	}
 
+#if	defined(sun4v)
+	if (isLDOMguest(nxgep)) {
+		nxge_hio_vr_release(nxgep);
+	}
+#endif
+
 	if (nxgep->nxge_hw_p) {
 		nxge_uninit_common_dev(nxgep);
 		nxgep->nxge_hw_p = NULL;
@@ -794,7 +893,9 @@ nxge_unattach(p_nxge_t nxgep)
 	/*
 	 * Stop the device and free resources.
 	 */
-	nxge_destroy_dev(nxgep);
+	if (!isLDOMguest(nxgep)) {
+		nxge_destroy_dev(nxgep);
+	}
 
 	/*
 	 * Tear down the ndd parameters setup.
@@ -838,6 +939,36 @@ nxge_unattach(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((NULL, DDI_CTL, "<== nxge_unattach"));
 }
 
+#if defined(sun4v)
+int
+nxge_hsvc_register(
+	nxge_t *nxgep)
+{
+	nxge_status_t status;
+
+	if (nxgep->niu_type == N2_NIU) {
+		nxgep->niu_hsvc_available = B_FALSE;
+		bcopy(&niu_hsvc, &nxgep->niu_hsvc, sizeof (hsvc_info_t));
+		if ((status = hsvc_register(&nxgep->niu_hsvc,
+		    &nxgep->niu_min_ver)) != 0) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_attach: %s: cannot negotiate "
+			    "hypervisor services revision %d group: 0x%lx "
+			    "major: 0x%lx minor: 0x%lx errno: %d",
+			    niu_hsvc.hsvc_modname, niu_hsvc.hsvc_rev,
+			    niu_hsvc.hsvc_group, niu_hsvc.hsvc_major,
+			    niu_hsvc.hsvc_minor, status));
+			return (DDI_FAILURE);
+		}
+		nxgep->niu_hsvc_available = B_TRUE;
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+			"NIU Hypervisor service enabled"));
+	}
+
+	return (DDI_SUCCESS);
+}
+#endif
+
 static char n2_siu_name[] = "niu";
 
 static nxge_status_t
@@ -856,6 +987,10 @@ nxge_map_regs(p_nxge_t nxgep)
 	off_t pci_offset;
 	uint16_t pcie_devctl;
 #endif
+
+	if (isLDOMguest(nxgep)) {
+		return (nxge_guest_regs_map(nxgep));
+	}
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_map_regs"));
 	nxgep->dev_regs = NULL;
@@ -902,6 +1037,10 @@ nxge_map_regs(p_nxge_t nxgep)
 				"Reg property found: fun # %d",
 				func_num));
 			nxgep->function_num = func_num;
+			if (isLDOMguest(nxgep)) {
+				nxgep->function_num /= 2;
+				return (NXGE_OK);
+			}
 			ddi_prop_free(prop_val);
 		}
 	}
@@ -1020,7 +1159,7 @@ nxge_map_regs(p_nxge_t nxgep)
 			goto nxge_map_regs_fail1;
 		}
 
-		/* set up the vio region mapped register */
+		/* set up the first vio region mapped register */
 		(void) ddi_dev_regsize(nxgep->dip, 2, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 			"nxge_map_regs: vio (1) size 0x%x", regsize));
@@ -1033,7 +1172,7 @@ nxge_map_regs(p_nxge_t nxgep)
 				"ddi_map_regs for nxge vio reg failed"));
 			goto nxge_map_regs_fail2;
 		}
-		/* set up the vio region mapped register */
+		/* set up the second vio region mapped register */
 		(void) ddi_dev_regsize(nxgep->dip, 3, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 			"nxge_map_regs: vio (3) size 0x%x", regsize));
@@ -1100,6 +1239,12 @@ static void
 nxge_unmap_regs(p_nxge_t nxgep)
 {
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_unmap_regs"));
+
+	if (isLDOMguest(nxgep)) {
+		nxge_guest_regs_map_free(nxgep);
+		return;
+	}
+
 	if (nxgep->dev_regs) {
 		if (nxgep->dev_regs->nxge_pciregh) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
@@ -1153,12 +1298,18 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 	 * Get the interrupt cookie so the mutexes can be
 	 * Initialized.
 	 */
-	ddi_status = ddi_get_iblock_cookie(nxgep->dip, 0,
-					&nxgep->interrupt_cookie);
-	if (ddi_status != DDI_SUCCESS) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_setup_mutexes: failed 0x%x", ddi_status));
-		goto nxge_setup_mutexes_exit;
+	if (isLDOMguest(nxgep)) {
+		nxgep->interrupt_cookie = 0;
+	} else {
+		ddi_status = ddi_get_iblock_cookie(nxgep->dip, 0,
+		    &nxgep->interrupt_cookie);
+
+		if (ddi_status != DDI_SUCCESS) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_setup_mutexes: failed 0x%x",
+			    ddi_status));
+			goto nxge_setup_mutexes_exit;
+		}
 	}
 
 	cv_init(&nxgep->poll_cv, NULL, CV_DRIVER, NULL);
@@ -1174,6 +1325,8 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 		MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 	MUTEX_INIT(&nxgep->mif_lock, NULL,
 		MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+	MUTEX_INIT(&nxgep->group_lock, NULL,
+	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 	RW_INIT(&nxgep->filter_lock, NULL,
 		RW_DRIVER, (void *)nxgep->interrupt_cookie);
 
@@ -1213,6 +1366,7 @@ nxge_destroy_mutexes(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_destroy_mutexes"));
 	RW_DESTROY(&nxgep->filter_lock);
+	MUTEX_DESTROY(&nxgep->group_lock);
 	MUTEX_DESTROY(&nxgep->mif_lock);
 	MUTEX_DESTROY(&nxgep->ouraddr_lock);
 	MUTEX_DESTROY(nxgep->genlock);
@@ -1238,7 +1392,7 @@ nxge_destroy_mutexes(p_nxge_t nxgep)
 nxge_status_t
 nxge_init(p_nxge_t nxgep)
 {
-	nxge_status_t	status = NXGE_OK;
+	nxge_status_t status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, STR_CTL, "==> nxge_init"));
 
@@ -1256,16 +1410,19 @@ nxge_init(p_nxge_t nxgep)
 		goto nxge_init_fail1;
 	}
 
-	/*
-	 * Initialize and enable TXC registers
-	 * (Globally enable TX controller,
-	 *  enable a port, configure dma channel bitmap,
-	 *  configure the max burst size).
-	 */
-	status = nxge_txc_init(nxgep);
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "init txc failed\n"));
-		goto nxge_init_fail2;
+	if (!isLDOMguest(nxgep)) {
+		/*
+		 * Initialize and enable the TXC registers.
+		 * (Globally enable the Tx controller,
+		 *  enable the port, configure the dma channel bitmap,
+		 *  configure the max burst size).
+		 */
+		status = nxge_txc_init(nxgep);
+		if (status != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep,
+			    NXGE_ERR_CTL, "init txc failed\n"));
+			goto nxge_init_fail2;
+		}
 	}
 
 	/*
@@ -1284,6 +1441,14 @@ nxge_init(p_nxge_t nxgep)
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "init rxdma failed\n"));
 		goto nxge_init_fail4;
+	}
+
+	/*
+	 * The guest domain is now done.
+	 */
+	if (isLDOMguest(nxgep)) {
+		nxgep->drv_state |= STATE_HW_INITIALIZED;
+		goto nxge_init_exit;
 	}
 
 	/*
@@ -1322,7 +1487,7 @@ nxge_init(p_nxge_t nxgep)
 		goto nxge_init_fail5;
 	}
 
-	nxge_intrs_enable(nxgep);
+	nxge_intrs_enable(nxgep); /* XXX What changes do I need to make here? */
 
 	/*
 	 * Enable hardware interrupts.
@@ -1337,7 +1502,9 @@ nxge_init_fail5:
 nxge_init_fail4:
 	nxge_uninit_txdma_channels(nxgep);
 nxge_init_fail3:
-	(void) nxge_txc_uninit(nxgep);
+	if (!isLDOMguest(nxgep)) {
+		(void) nxge_txc_uninit(nxgep);
+	}
 nxge_init_fail2:
 	nxge_free_mem_pool(nxgep);
 nxge_init_fail1:
@@ -1346,7 +1513,6 @@ nxge_init_fail1:
 	return (status);
 
 nxge_init_exit:
-
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_init status = 0x%08x",
 		status));
 	return (status);
@@ -1401,7 +1567,8 @@ nxge_uninit(p_nxge_t nxgep)
 	(void) nxge_rx_mac_disable(nxgep);
 
 	/* Disable and soft reset the IPP */
-	(void) nxge_ipp_disable(nxgep);
+	if (!isLDOMguest(nxgep))
+		(void) nxge_ipp_disable(nxgep);
 
 	/* Free classification resources */
 	(void) nxge_classify_uninit(nxgep);
@@ -1486,6 +1653,12 @@ nxge_debug_msg(p_nxge_t nxgep, uint64_t level, char *fmt, ...)
 	uint64_t debug_level;
 	int cmn_level = CE_CONT;
 	va_list ap;
+
+	if (nxgep && nxgep->nxge_debug_level != nxge_debug_level) {
+		/* In case a developer has changed nxge_debug_level. */
+		if (nxgep->nxge_debug_level != nxge_debug_level)
+			nxgep->nxge_debug_level = nxge_debug_level;
+	}
 
 	debug_level = (nxgep == NULL) ? nxge_debug_level :
 		nxgep->nxge_debug_level;
@@ -1720,7 +1893,7 @@ nxge_setup_system_dma_pages(p_nxge_t nxgep)
 	uint_t 			iommu_pagesize;
 	nxge_status_t		status = NXGE_OK;
 
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_setup_system_dma_pages"));
+	NXGE_ERROR_MSG((nxgep, DDI_CTL, "==> nxge_setup_system_dma_pages"));
 	nxgep->sys_page_sz = ddi_ptob(nxgep->dip, (ulong_t)1);
 	if (nxgep->niu_type != N2_NIU) {
 		iommu_pagesize = dvma_pagesize(nxgep->dip);
@@ -1859,56 +2032,50 @@ nxge_free_mem_pool(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MEM_CTL, "<== nxge_free_mem_pool"));
 }
 
-static nxge_status_t
+nxge_status_t
 nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 {
-	int			i, j;
-	uint32_t		ndmas, st_rdc;
+	uint32_t		rdc_max;
 	p_nxge_dma_pt_cfg_t	p_all_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	p_nxge_dma_pool_t	dma_poolp;
 	p_nxge_dma_common_t	*dma_buf_p;
 	p_nxge_dma_pool_t	dma_cntl_poolp;
 	p_nxge_dma_common_t	*dma_cntl_p;
-	size_t			rx_buf_alloc_size;
-	size_t			rx_cntl_alloc_size;
 	uint32_t 		*num_chunks; /* per dma */
 	nxge_status_t		status = NXGE_OK;
 
 	uint32_t		nxge_port_rbr_size;
 	uint32_t		nxge_port_rbr_spare_size;
 	uint32_t		nxge_port_rcr_size;
+	uint32_t		rx_cntl_alloc_size;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rx_mem_pool"));
 
 	p_all_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_all_cfgp->hw_config;
-	st_rdc = p_cfgp->start_rdc;
-	ndmas = p_cfgp->max_rdcs;
-
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		" nxge_alloc_rx_mem_pool st_rdc %d ndmas %d", st_rdc, ndmas));
+	rdc_max = NXGE_MAX_RDCS;
 
 	/*
-	 * Allocate memory for each receive DMA channel.
+	 * Allocate memory for the common DMA data structures.
 	 */
 	dma_poolp = (p_nxge_dma_pool_t)KMEM_ZALLOC(sizeof (nxge_dma_pool_t),
 			KM_SLEEP);
 	dma_buf_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * ndmas, KM_SLEEP);
+			sizeof (p_nxge_dma_common_t) * rdc_max, KM_SLEEP);
 
 	dma_cntl_poolp = (p_nxge_dma_pool_t)
 				KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
 	dma_cntl_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * ndmas, KM_SLEEP);
+			sizeof (p_nxge_dma_common_t) * rdc_max, KM_SLEEP);
 
 	num_chunks = (uint32_t *)KMEM_ZALLOC(
-			sizeof (uint32_t) * ndmas, KM_SLEEP);
+			sizeof (uint32_t) * rdc_max, KM_SLEEP);
 
 	/*
-	 * Assume that each DMA channel will be configured with default
-	 * block size.
-	 * rbr block counts are mod of batch count (16).
+	 * Assume that each DMA channel will be configured with
+	 * the default block size.
+	 * rbr block counts are modulo the batch count (16).
 	 */
 	nxge_port_rbr_size = p_all_cfgp->rbr_size;
 	nxge_port_rcr_size = p_all_cfgp->rcr_size;
@@ -1963,9 +2130,6 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 	}
 #endif
 
-	rx_buf_alloc_size = (nxgep->rx_default_block_size *
-		(nxge_port_rbr_size + nxge_port_rbr_spare_size));
-
 	/*
 	 * Addresses of receive block ring, receive completion ring and the
 	 * mailbox must be all cache-aligned (64 bytes).
@@ -1985,6 +2149,9 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	if (nxgep->niu_type == N2_NIU) {
+		uint32_t rx_buf_alloc_size = (nxgep->rx_default_block_size *
+		    (nxge_port_rbr_size + nxge_port_rbr_spare_size));
+
 		if (!ISP2(rx_buf_alloc_size)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"==> nxge_alloc_rx_mem_pool: "
@@ -2008,161 +2175,201 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 #endif
 	nxgep->nxge_port_rbr_size = nxge_port_rbr_size;
 	nxgep->nxge_port_rcr_size = nxge_port_rcr_size;
+	nxgep->nxge_port_rbr_spare_size = nxge_port_rbr_spare_size;
+	nxgep->nxge_port_rx_cntl_alloc_size = rx_cntl_alloc_size;
 
-	/*
-	 * Allocate memory for receive buffers and descriptor rings.
-	 * Replace allocation functions with interface functions provided
-	 * by the partition manager when it is available.
-	 */
-	/*
-	 * Allocate memory for the receive buffer blocks.
-	 */
-	for (i = 0; i < ndmas; i++) {
-		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			" nxge_alloc_rx_mem_pool to alloc mem: "
-			" dma %d dma_buf_p %llx &dma_buf_p %llx",
-			i, dma_buf_p[i], &dma_buf_p[i]));
-		num_chunks[i] = 0;
-		status = nxge_alloc_rx_buf_dma(nxgep, st_rdc, &dma_buf_p[i],
-				rx_buf_alloc_size,
-				nxgep->rx_default_block_size, &num_chunks[i]);
-		if (status != NXGE_OK) {
-			break;
-		}
-		st_rdc++;
-		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			" nxge_alloc_rx_mem_pool DONE  alloc mem: "
-			"dma %d dma_buf_p %llx &dma_buf_p %llx", i,
-			dma_buf_p[i], &dma_buf_p[i]));
-	}
-	if (i < ndmas) {
-		goto nxge_alloc_rx_mem_fail1;
-	}
-	/*
-	 * Allocate memory for descriptor rings and mailbox.
-	 */
-	st_rdc = p_cfgp->start_rdc;
-	for (j = 0; j < ndmas; j++) {
-		status = nxge_alloc_rx_cntl_dma(nxgep, st_rdc, &dma_cntl_p[j],
-					rx_cntl_alloc_size);
-		if (status != NXGE_OK) {
-			break;
-		}
-		st_rdc++;
-	}
-	if (j < ndmas) {
-		goto nxge_alloc_rx_mem_fail2;
-	}
-
-	dma_poolp->ndmas = ndmas;
+	dma_poolp->ndmas = p_cfgp->max_rdcs;
 	dma_poolp->num_chunks = num_chunks;
 	dma_poolp->buf_allocated = B_TRUE;
 	nxgep->rx_buf_pool_p = dma_poolp;
 	dma_poolp->dma_buf_pool_p = dma_buf_p;
 
-	dma_cntl_poolp->ndmas = ndmas;
+	dma_cntl_poolp->ndmas = p_cfgp->max_rdcs;
 	dma_cntl_poolp->buf_allocated = B_TRUE;
 	nxgep->rx_cntl_pool_p = dma_cntl_poolp;
 	dma_cntl_poolp->dma_buf_pool_p = dma_cntl_p;
 
-	goto nxge_alloc_rx_mem_pool_exit;
+	/* Allocate the receive rings, too. */
+	nxgep->rx_rbr_rings =
+		KMEM_ZALLOC(sizeof (rx_rbr_rings_t), KM_SLEEP);
+	nxgep->rx_rbr_rings->rbr_rings =
+		KMEM_ZALLOC(sizeof (p_rx_rbr_ring_t) * rdc_max, KM_SLEEP);
+	nxgep->rx_rcr_rings =
+		KMEM_ZALLOC(sizeof (rx_rcr_rings_t), KM_SLEEP);
+	nxgep->rx_rcr_rings->rcr_rings =
+		KMEM_ZALLOC(sizeof (p_rx_rcr_ring_t) * rdc_max, KM_SLEEP);
+	nxgep->rx_mbox_areas_p =
+		KMEM_ZALLOC(sizeof (rx_mbox_areas_t), KM_SLEEP);
+	nxgep->rx_mbox_areas_p->rxmbox_areas =
+		KMEM_ZALLOC(sizeof (p_rx_mbox_t) * rdc_max, KM_SLEEP);
 
-nxge_alloc_rx_mem_fail2:
-	/* Free control buffers */
-	j--;
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_alloc_rx_mem_pool: freeing control bufs (%d)", j));
-	for (; j >= 0; j--) {
-		nxge_free_rx_cntl_dma(nxgep,
-			(p_nxge_dma_common_t)dma_cntl_p[j]);
-		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"==> nxge_alloc_rx_mem_pool: control bufs freed (%d)",
-			j));
-	}
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_alloc_rx_mem_pool: control bufs freed (%d)", j));
+	nxgep->rx_rbr_rings->ndmas = nxgep->rx_rcr_rings->ndmas =
+	    p_cfgp->max_rdcs;
 
-nxge_alloc_rx_mem_fail1:
-	/* Free data buffers */
-	i--;
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_alloc_rx_mem_pool: freeing data bufs (%d)", i));
-	for (; i >= 0; i--) {
-		nxge_free_rx_buf_dma(nxgep, (p_nxge_dma_common_t)dma_buf_p[i],
-			num_chunks[i]);
-	}
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_alloc_rx_mem_pool: data bufs freed (%d)", i));
-
-	KMEM_FREE(num_chunks, sizeof (uint32_t) * ndmas);
-	KMEM_FREE(dma_poolp, sizeof (nxge_dma_pool_t));
-	KMEM_FREE(dma_buf_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(dma_cntl_poolp, sizeof (nxge_dma_pool_t));
-	KMEM_FREE(dma_cntl_p, ndmas * sizeof (p_nxge_dma_common_t));
-
-nxge_alloc_rx_mem_pool_exit:
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
 		"<== nxge_alloc_rx_mem_pool:status 0x%08x", status));
 
+nxge_alloc_rx_mem_pool_exit:
 	return (status);
+}
+
+/*
+ * nxge_alloc_rxb
+ *
+ *	Allocate buffers for an RDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel	The channel to map into our kernel space.
+ *
+ * Notes:
+ *
+ * NPI function calls:
+ *
+ * NXGE function calls:
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *
+ * Taking apart:
+ *
+ * Open questions:
+ *
+ */
+nxge_status_t
+nxge_alloc_rxb(
+	p_nxge_t nxgep,
+	int channel)
+{
+	size_t			rx_buf_alloc_size;
+	nxge_status_t		status = NXGE_OK;
+
+	nxge_dma_common_t	**data;
+	nxge_dma_common_t	**control;
+	uint32_t 		*num_chunks;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rbb"));
+
+	/*
+	 * Allocate memory for the receive buffers and descriptor rings.
+	 * Replace these allocation functions with the interface functions
+	 * provided by the partition manager if/when they are available.
+	 */
+
+	/*
+	 * Allocate memory for the receive buffer blocks.
+	 */
+	rx_buf_alloc_size = (nxgep->rx_default_block_size *
+		(nxgep->nxge_port_rbr_size + nxgep->nxge_port_rbr_spare_size));
+
+	data = &nxgep->rx_buf_pool_p->dma_buf_pool_p[channel];
+	num_chunks = &nxgep->rx_buf_pool_p->num_chunks[channel];
+
+	if ((status = nxge_alloc_rx_buf_dma(
+	    nxgep, channel, data, rx_buf_alloc_size,
+	    nxgep->rx_default_block_size, num_chunks)) != NXGE_OK) {
+		return (status);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_alloc_rxb(): "
+	    "dma %d dma_buf_p %llx &dma_buf_p %llx", channel, *data, data));
+
+	/*
+	 * Allocate memory for descriptor rings and mailbox.
+	 */
+	control = &nxgep->rx_cntl_pool_p->dma_buf_pool_p[channel];
+
+	if ((status = nxge_alloc_rx_cntl_dma(
+	    nxgep, channel, control, nxgep->nxge_port_rx_cntl_alloc_size))
+	    != NXGE_OK) {
+		nxge_free_rx_cntl_dma(nxgep, *control);
+		(*data)->buf_alloc_state |= BUF_ALLOCATED_WAIT_FREE;
+		nxge_free_rx_buf_dma(nxgep, *data, *num_chunks);
+		return (status);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+	    "<== nxge_alloc_rx_mem_pool:status 0x%08x", status));
+
+	return (status);
+}
+
+void
+nxge_free_rxb(
+	p_nxge_t nxgep,
+	int channel)
+{
+	nxge_dma_common_t	*data;
+	nxge_dma_common_t	*control;
+	uint32_t 		num_chunks;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rbb"));
+
+	data = nxgep->rx_buf_pool_p->dma_buf_pool_p[channel];
+	num_chunks = nxgep->rx_buf_pool_p->num_chunks[channel];
+	nxge_free_rx_buf_dma(nxgep, data, num_chunks);
+
+	nxgep->rx_buf_pool_p->dma_buf_pool_p[channel] = 0;
+	nxgep->rx_buf_pool_p->num_chunks[channel] = 0;
+
+	control = nxgep->rx_cntl_pool_p->dma_buf_pool_p[channel];
+	nxge_free_rx_cntl_dma(nxgep, control);
+
+	nxgep->rx_cntl_pool_p->dma_buf_pool_p[channel] = 0;
+
+	KMEM_FREE(data, sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK);
+	KMEM_FREE(control, sizeof (nxge_dma_common_t));
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_alloc_rbb"));
 }
 
 static void
 nxge_free_rx_mem_pool(p_nxge_t nxgep)
 {
-	uint32_t		i, ndmas;
-	p_nxge_dma_pool_t	dma_poolp;
-	p_nxge_dma_common_t	*dma_buf_p;
-	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_nxge_dma_common_t	*dma_cntl_p;
-	uint32_t 		*num_chunks;
+	int rdc_max = NXGE_MAX_RDCS;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_free_rx_mem_pool"));
 
-	dma_poolp = nxgep->rx_buf_pool_p;
-	if (dma_poolp == NULL || (!dma_poolp->buf_allocated)) {
+	if (!nxgep->rx_buf_pool_p || !nxgep->rx_buf_pool_p->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 			"<== nxge_free_rx_mem_pool "
 			"(null rx buf pool or buf not allocated"));
 		return;
 	}
-
-	dma_cntl_poolp = nxgep->rx_cntl_pool_p;
-	if (dma_cntl_poolp == NULL || (!dma_cntl_poolp->buf_allocated)) {
+	if (!nxgep->rx_cntl_pool_p || !nxgep->rx_cntl_pool_p->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 			"<== nxge_free_rx_mem_pool "
 			"(null rx cntl buf pool or cntl buf not allocated"));
 		return;
 	}
 
-	dma_buf_p = dma_poolp->dma_buf_pool_p;
-	num_chunks = dma_poolp->num_chunks;
+	KMEM_FREE(nxgep->rx_cntl_pool_p->dma_buf_pool_p,
+	    sizeof (p_nxge_dma_common_t) * rdc_max);
+	KMEM_FREE(nxgep->rx_cntl_pool_p, sizeof (nxge_dma_pool_t));
 
-	dma_cntl_p = dma_cntl_poolp->dma_buf_pool_p;
-	ndmas = dma_cntl_poolp->ndmas;
+	KMEM_FREE(nxgep->rx_buf_pool_p->num_chunks,
+	    sizeof (uint32_t) * rdc_max);
+	KMEM_FREE(nxgep->rx_buf_pool_p->dma_buf_pool_p,
+	    sizeof (p_nxge_dma_common_t) * rdc_max);
+	KMEM_FREE(nxgep->rx_buf_pool_p, sizeof (nxge_dma_pool_t));
 
-	for (i = 0; i < ndmas; i++) {
-		nxge_free_rx_buf_dma(nxgep, dma_buf_p[i], num_chunks[i]);
-	}
+	nxgep->rx_buf_pool_p = 0;
+	nxgep->rx_cntl_pool_p = 0;
 
-	for (i = 0; i < ndmas; i++) {
-		nxge_free_rx_cntl_dma(nxgep, dma_cntl_p[i]);
-	}
+	KMEM_FREE(nxgep->rx_rbr_rings->rbr_rings,
+	    sizeof (p_rx_rbr_ring_t) * rdc_max);
+	KMEM_FREE(nxgep->rx_rbr_rings, sizeof (rx_rbr_rings_t));
+	KMEM_FREE(nxgep->rx_rcr_rings->rcr_rings,
+	    sizeof (p_rx_rcr_ring_t) * rdc_max);
+	KMEM_FREE(nxgep->rx_rcr_rings, sizeof (rx_rcr_rings_t));
+	KMEM_FREE(nxgep->rx_mbox_areas_p->rxmbox_areas,
+	    sizeof (p_rx_mbox_t) * rdc_max);
+	KMEM_FREE(nxgep->rx_mbox_areas_p, sizeof (rx_mbox_areas_t));
 
-	for (i = 0; i < ndmas; i++) {
-		KMEM_FREE(dma_buf_p[i],
-			sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK);
-		KMEM_FREE(dma_cntl_p[i], sizeof (nxge_dma_common_t));
-	}
-
-	KMEM_FREE(num_chunks, sizeof (uint32_t) * ndmas);
-	KMEM_FREE(dma_cntl_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(dma_cntl_poolp, sizeof (nxge_dma_pool_t));
-	KMEM_FREE(dma_buf_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(dma_poolp, sizeof (nxge_dma_pool_t));
-
-	nxgep->rx_buf_pool_p = NULL;
-	nxgep->rx_cntl_pool_p = NULL;
+	nxgep->rx_rbr_rings = 0;
+	nxgep->rx_rcr_rings = 0;
+	nxgep->rx_mbox_areas_p = 0;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_free_rx_mem_pool"));
 }
@@ -2178,6 +2385,7 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	size_t			total_alloc_size;
 	size_t			allocated = 0;
 	int			i, size_index, array_size;
+	boolean_t		use_kmem_alloc = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rx_buf_dma"));
 
@@ -2205,6 +2413,18 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 		size_index = array_size - 1;
 	}
 
+	/* For Neptune, use kmem_alloc if the kmem flag is set. */
+	if (nxgep->niu_type != N2_NIU && nxge_use_kmem_alloc) {
+		use_kmem_alloc = B_TRUE;
+#if defined(__i386) || defined(__amd64)
+		size_index = 0;
+#endif
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		    "==> nxge_alloc_rx_buf_dma: "
+		    "Neptune use kmem_alloc() - size_index %d",
+		    size_index));
+	}
+
 	while ((allocated < total_alloc_size) &&
 			(size_index >= 0) && (i < NXGE_DMA_BLOCK)) {
 		rx_dmap[i].dma_chunk_index = i;
@@ -2214,6 +2434,8 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 		rx_dmap[i].nblocks = alloc_sizes[size_index] / block_size;
 		rx_dmap[i].dma_channel = dma_channel;
 		rx_dmap[i].contig_alloc_type = B_FALSE;
+		rx_dmap[i].kmem_alloc_type = B_FALSE;
+		rx_dmap[i].buf_alloc_type = DDI_MEM_ALLOC;
 
 		/*
 		 * N2/NIU: data buffers must be contiguous as the driver
@@ -2222,6 +2444,14 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 		 */
 		if ((nxgep->niu_type == N2_NIU) && (NXGE_DMA_BLOCK == 1)) {
 			rx_dmap[i].contig_alloc_type = B_TRUE;
+			rx_dmap[i].buf_alloc_type = CONTIG_MEM_ALLOC;
+		} else if (use_kmem_alloc) {
+			/* For Neptune, use kmem_alloc */
+			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+			    "==> nxge_alloc_rx_buf_dma: "
+			    "Neptune use kmem_alloc()"));
+			rx_dmap[i].kmem_alloc_type = B_TRUE;
+			rx_dmap[i].buf_alloc_type = KMEM_ALLOC;
 		}
 
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
@@ -2238,23 +2468,38 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 			(p_nxge_dma_common_t)(&rx_dmap[i]));
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_alloc_rx_buf_dma: Alloc Failed "));
+			    "nxge_alloc_rx_buf_dma: Alloc Failed: "
+			    "dma %d size_index %d size requested %d",
+			    dma_channel,
+			    size_index,
+			    rx_dmap[i].alength));
 			size_index--;
 		} else {
-			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-				" alloc_rx_buf_dma allocated rdc %d "
-				"chunk %d size %x dvma %x bufp %llx ",
-				dma_channel, i, rx_dmap[i].alength,
-				rx_dmap[i].ioaddr_pp, &rx_dmap[i]));
+			rx_dmap[i].buf_alloc_state = BUF_ALLOCATED;
+			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+			    " nxge_alloc_rx_buf_dma DONE  alloc mem: "
+			    "dma %d dma_buf_p $%p kaddrp $%p alength %d "
+			    "buf_alloc_state %d alloc_type %d",
+			    dma_channel,
+			    &rx_dmap[i],
+			    rx_dmap[i].kaddrp,
+			    rx_dmap[i].alength,
+			    rx_dmap[i].buf_alloc_state,
+			    rx_dmap[i].buf_alloc_type));
+			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+			    " alloc_rx_buf_dma allocated rdc %d "
+			    "chunk %d size %x dvma %x bufp %llx kaddrp $%p",
+			    dma_channel, i, rx_dmap[i].alength,
+			    rx_dmap[i].ioaddr_pp, &rx_dmap[i],
+			    rx_dmap[i].kaddrp));
 			i++;
 			allocated += alloc_sizes[size_index];
 		}
 	}
 
-
 	if (allocated < total_alloc_size) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    "==> nxge_alloc_rx_buf_dma: not enough for channe %d "
+		    "==> nxge_alloc_rx_buf_dma: not enough for channel %d "
 		    "allocated 0x%x requested 0x%x",
 		    dma_channel,
 		    allocated, total_alloc_size));
@@ -2263,7 +2508,7 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-	    "==> nxge_alloc_rx_buf_dma: Allocated for channe %d "
+	    "==> nxge_alloc_rx_buf_dma: Allocated for channel %d "
 	    "allocated 0x%x requested 0x%x",
 	    dma_channel,
 	    allocated, total_alloc_size));
@@ -2296,11 +2541,14 @@ nxge_free_rx_buf_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap,
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 		"==> nxge_free_rx_buf_dma: # of chunks %d", num_chunks));
 
+	if (dmap == 0)
+		return;
+
 	for (i = 0; i < num_chunks; i++) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 			"==> nxge_free_rx_buf_dma: chunk %d dmap 0x%llx",
 				i, dmap));
-		nxge_dma_mem_free(dmap++);
+		nxge_dma_free_rx_data_buf(dmap++);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_free_rx_buf_dma"));
@@ -2320,6 +2568,7 @@ nxge_alloc_rx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
 			KMEM_ZALLOC(sizeof (nxge_dma_common_t), KM_SLEEP);
 
 	rx_dmap->contig_alloc_type = B_FALSE;
+	rx_dmap->kmem_alloc_type = B_FALSE;
 
 	status = nxge_dma_mem_alloc(nxgep, nxge_force_dma,
 			&nxge_desc_dma_attr,
@@ -2350,50 +2599,227 @@ nxge_free_rx_cntl_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap)
 {
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_free_rx_cntl_dma"));
 
+	if (dmap == 0)
+		return;
+
 	nxge_dma_mem_free(dmap);
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_free_rx_cntl_dma"));
 }
 
-static nxge_status_t
+typedef struct {
+	size_t	tx_size;
+	size_t	cr_size;
+	size_t	threshhold;
+} nxge_tdc_sizes_t;
+
+static
+nxge_status_t
+nxge_tdc_sizes(
+	nxge_t *nxgep,
+	nxge_tdc_sizes_t *sizes)
+{
+	uint32_t threshhold;	/* The bcopy() threshhold */
+	size_t tx_size;		/* Transmit buffer size */
+	size_t cr_size;		/* Completion ring size */
+
+	/*
+	 * Assume that each DMA channel will be configured with the
+	 * default transmit buffer size for copying transmit data.
+	 * (If a packet is bigger than this, it will not be copied.)
+	 */
+	if (nxgep->niu_type == N2_NIU) {
+		threshhold = TX_BCOPY_SIZE;
+	} else {
+		threshhold = nxge_bcopy_thresh;
+	}
+	tx_size = nxge_tx_ring_size * threshhold;
+
+	cr_size = nxge_tx_ring_size * sizeof (tx_desc_t);
+	cr_size += sizeof (txdma_mailbox_t);
+
+#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
+	if (nxgep->niu_type == N2_NIU) {
+		if (!ISP2(tx_size)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				"==> nxge_tdc_sizes: Tx size"
+				" must be power of 2"));
+			return (NXGE_ERROR);
+		}
+
+		if (tx_size > (1 << 22)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				"==> nxge_tdc_sizes: Tx size"
+				" limited to 4M"));
+			return (NXGE_ERROR);
+		}
+
+		if (cr_size < 0x2000)
+			cr_size = 0x2000;
+	}
+#endif
+
+	sizes->threshhold = threshhold;
+	sizes->tx_size = tx_size;
+	sizes->cr_size = cr_size;
+
+	return (NXGE_OK);
+}
+/*
+ * nxge_alloc_txb
+ *
+ *	Allocate buffers for an TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel	The channel to map into our kernel space.
+ *
+ * Notes:
+ *
+ * NPI function calls:
+ *
+ * NXGE function calls:
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *
+ * Taking apart:
+ *
+ * Open questions:
+ *
+ */
+nxge_status_t
+nxge_alloc_txb(
+	p_nxge_t nxgep,
+	int channel)
+{
+	nxge_dma_common_t	**dma_buf_p;
+	nxge_dma_common_t	**dma_cntl_p;
+	uint32_t 		*num_chunks;
+	nxge_status_t		status = NXGE_OK;
+
+	nxge_tdc_sizes_t	sizes;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_tbb"));
+
+	if (nxge_tdc_sizes(nxgep, &sizes) != NXGE_OK)
+		return (NXGE_ERROR);
+
+	/*
+	 * Allocate memory for transmit buffers and descriptor rings.
+	 * Replace these allocation functions with the interface functions
+	 * provided by the partition manager Real Soon Now.
+	 */
+	dma_buf_p = &nxgep->tx_buf_pool_p->dma_buf_pool_p[channel];
+	num_chunks = &nxgep->tx_buf_pool_p->num_chunks[channel];
+
+	dma_cntl_p = &nxgep->tx_cntl_pool_p->dma_buf_pool_p[channel];
+
+	/*
+	 * Allocate memory for transmit buffers and descriptor rings.
+	 * Replace allocation functions with interface functions provided
+	 * by the partition manager when it is available.
+	 *
+	 * Allocate memory for the transmit buffer pool.
+	 */
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+		"sizes: tx: %ld, cr:%ld, th:%ld",
+		sizes.tx_size, sizes.cr_size, sizes.threshhold));
+
+	*num_chunks = 0;
+	status = nxge_alloc_tx_buf_dma(nxgep, channel, dma_buf_p,
+	    sizes.tx_size, sizes.threshhold, num_chunks);
+	if (status != NXGE_OK) {
+		cmn_err(CE_NOTE, "nxge_alloc_tx_buf_dma failed!");
+		return (status);
+	}
+
+	/*
+	 * Allocate memory for descriptor rings and mailbox.
+	 */
+	status = nxge_alloc_tx_cntl_dma(nxgep, channel, dma_cntl_p,
+	    sizes.cr_size);
+	if (status != NXGE_OK) {
+		nxge_free_tx_buf_dma(nxgep, *dma_buf_p, *num_chunks);
+		cmn_err(CE_NOTE, "nxge_alloc_tx_cntl_dma failed!");
+		return (status);
+	}
+
+	return (NXGE_OK);
+}
+
+void
+nxge_free_txb(
+	p_nxge_t nxgep,
+	int channel)
+{
+	nxge_dma_common_t	*data;
+	nxge_dma_common_t	*control;
+	uint32_t 		num_chunks;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_free_txb"));
+
+	data = nxgep->tx_buf_pool_p->dma_buf_pool_p[channel];
+	num_chunks = nxgep->tx_buf_pool_p->num_chunks[channel];
+	nxge_free_tx_buf_dma(nxgep, data, num_chunks);
+
+	nxgep->tx_buf_pool_p->dma_buf_pool_p[channel] = 0;
+	nxgep->tx_buf_pool_p->num_chunks[channel] = 0;
+
+	control = nxgep->tx_cntl_pool_p->dma_buf_pool_p[channel];
+	nxge_free_tx_cntl_dma(nxgep, control);
+
+	nxgep->tx_cntl_pool_p->dma_buf_pool_p[channel] = 0;
+
+	KMEM_FREE(data, sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK);
+	KMEM_FREE(control, sizeof (nxge_dma_common_t));
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_free_txb"));
+}
+
+/*
+ * nxge_alloc_tx_mem_pool
+ *
+ *	This function allocates all of the per-port TDC control data structures.
+ *	The per-channel (TDC) data structures are allocated when needed.
+ *
+ * Arguments:
+ * 	nxgep
+ *
+ * Notes:
+ *
+ * Context:
+ *	Any domain
+ */
+nxge_status_t
 nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 {
-	nxge_status_t		status = NXGE_OK;
-	int			i, j;
-	uint32_t		ndmas, st_tdc;
-	p_nxge_dma_pt_cfg_t	p_all_cfgp;
-	p_nxge_hw_pt_cfg_t	p_cfgp;
-	p_nxge_dma_pool_t	dma_poolp;
-	p_nxge_dma_common_t	*dma_buf_p;
-	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_nxge_dma_common_t	*dma_cntl_p;
-	size_t			tx_buf_alloc_size;
-	size_t			tx_cntl_alloc_size;
+	nxge_hw_pt_cfg_t	*p_cfgp;
+	nxge_dma_pool_t		*dma_poolp;
+	nxge_dma_common_t	**dma_buf_p;
+	nxge_dma_pool_t		*dma_cntl_poolp;
+	nxge_dma_common_t	**dma_cntl_p;
 	uint32_t		*num_chunks; /* per dma */
-	uint32_t		bcopy_thresh;
+	int			tdc_max;
 
 	NXGE_DEBUG_MSG((nxgep, MEM_CTL, "==> nxge_alloc_tx_mem_pool"));
 
-	p_all_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_all_cfgp->hw_config;
-	st_tdc = p_cfgp->start_tdc;
-	ndmas = p_cfgp->max_tdcs;
+	p_cfgp = &nxgep->pt_config.hw_config;
+	tdc_max = NXGE_MAX_TDCS;
 
-	NXGE_DEBUG_MSG((nxgep, MEM_CTL, "==> nxge_alloc_tx_mem_pool: "
-		"p_cfgp 0x%016llx start_tdc %d ndmas %d nxgep->max_tdcs %d",
-		p_cfgp, p_cfgp->start_tdc, p_cfgp->max_tdcs, nxgep->max_tdcs));
 	/*
 	 * Allocate memory for each transmit DMA channel.
 	 */
 	dma_poolp = (p_nxge_dma_pool_t)KMEM_ZALLOC(sizeof (nxge_dma_pool_t),
 			KM_SLEEP);
 	dma_buf_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * ndmas, KM_SLEEP);
+			sizeof (p_nxge_dma_common_t) * tdc_max, KM_SLEEP);
 
 	dma_cntl_poolp = (p_nxge_dma_pool_t)
 			KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
 	dma_cntl_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * ndmas, KM_SLEEP);
+			sizeof (p_nxge_dma_common_t) * tdc_max, KM_SLEEP);
 
 	if (nxge_tx_ring_size > TDC_DEFAULT_MAX) {
 		NXGE_DEBUG_MSG((nxgep, MEM_CTL,
@@ -2421,139 +2847,41 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 
 	nxgep->nxge_port_tx_ring_size = nxge_tx_ring_size;
 
-	/*
-	 * Assume that each DMA channel will be configured with default
-	 * transmit bufer size for copying transmit data.
-	 * (For packet payload over this limit, packets will not be
-	 *  copied.)
-	 */
-	if (nxgep->niu_type == N2_NIU) {
-		bcopy_thresh = TX_BCOPY_SIZE;
-	} else {
-		bcopy_thresh = nxge_bcopy_thresh;
-	}
-	tx_buf_alloc_size = (bcopy_thresh * nxge_tx_ring_size);
-
-	/*
-	 * Addresses of transmit descriptor ring and the
-	 * mailbox must be all cache-aligned (64 bytes).
-	 */
-	tx_cntl_alloc_size = nxge_tx_ring_size;
-	tx_cntl_alloc_size *= (sizeof (tx_desc_t));
-	tx_cntl_alloc_size += sizeof (txdma_mailbox_t);
-
-#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
-	if (nxgep->niu_type == N2_NIU) {
-		if (!ISP2(tx_buf_alloc_size)) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_alloc_tx_mem_pool: "
-				" must be power of 2"));
-			status |= (NXGE_ERROR | NXGE_DDI_FAILED);
-			goto nxge_alloc_tx_mem_pool_exit;
-		}
-
-		if (tx_buf_alloc_size > (1 << 22)) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_alloc_tx_mem_pool: "
-				" limit size to 4M"));
-			status |= (NXGE_ERROR | NXGE_DDI_FAILED);
-			goto nxge_alloc_tx_mem_pool_exit;
-		}
-
-		if (tx_cntl_alloc_size < 0x2000) {
-			tx_cntl_alloc_size = 0x2000;
-		}
-	}
-#endif
-
 	num_chunks = (uint32_t *)KMEM_ZALLOC(
-			sizeof (uint32_t) * ndmas, KM_SLEEP);
+			sizeof (uint32_t) * tdc_max, KM_SLEEP);
 
-	/*
-	 * Allocate memory for transmit buffers and descriptor rings.
-	 * Replace allocation functions with interface functions provided
-	 * by the partition manager when it is available.
-	 *
-	 * Allocate memory for the transmit buffer pool.
-	 */
-	for (i = 0; i < ndmas; i++) {
-		num_chunks[i] = 0;
-		status = nxge_alloc_tx_buf_dma(nxgep, st_tdc, &dma_buf_p[i],
-					tx_buf_alloc_size,
-					bcopy_thresh, &num_chunks[i]);
-		if (status != NXGE_OK) {
-			break;
-		}
-		st_tdc++;
-	}
-	if (i < ndmas) {
-		goto nxge_alloc_tx_mem_pool_fail1;
-	}
-
-	st_tdc = p_cfgp->start_tdc;
-	/*
-	 * Allocate memory for descriptor rings and mailbox.
-	 */
-	for (j = 0; j < ndmas; j++) {
-		status = nxge_alloc_tx_cntl_dma(nxgep, st_tdc, &dma_cntl_p[j],
-					tx_cntl_alloc_size);
-		if (status != NXGE_OK) {
-			break;
-		}
-		st_tdc++;
-	}
-	if (j < ndmas) {
-		goto nxge_alloc_tx_mem_pool_fail2;
-	}
-
-	dma_poolp->ndmas = ndmas;
+	dma_poolp->ndmas = p_cfgp->tdc.owned;
 	dma_poolp->num_chunks = num_chunks;
-	dma_poolp->buf_allocated = B_TRUE;
 	dma_poolp->dma_buf_pool_p = dma_buf_p;
 	nxgep->tx_buf_pool_p = dma_poolp;
 
-	dma_cntl_poolp->ndmas = ndmas;
-	dma_cntl_poolp->buf_allocated = B_TRUE;
+	dma_poolp->buf_allocated = B_TRUE;
+
+	dma_cntl_poolp->ndmas = p_cfgp->tdc.owned;
 	dma_cntl_poolp->dma_buf_pool_p = dma_cntl_p;
 	nxgep->tx_cntl_pool_p = dma_cntl_poolp;
 
+	dma_cntl_poolp->buf_allocated = B_TRUE;
+
+	nxgep->tx_rings =
+	    KMEM_ZALLOC(sizeof (tx_rings_t), KM_SLEEP);
+	nxgep->tx_rings->rings =
+	    KMEM_ZALLOC(sizeof (p_tx_ring_t) * tdc_max, KM_SLEEP);
+	nxgep->tx_mbox_areas_p =
+	    KMEM_ZALLOC(sizeof (tx_mbox_areas_t), KM_SLEEP);
+	nxgep->tx_mbox_areas_p->txmbox_areas_p =
+	    KMEM_ZALLOC(sizeof (p_tx_mbox_t) * tdc_max, KM_SLEEP);
+
+	nxgep->tx_rings->ndmas = p_cfgp->tdc.owned;
+
 	NXGE_DEBUG_MSG((nxgep, MEM_CTL,
-		"==> nxge_alloc_tx_mem_pool: start_tdc %d "
-		"ndmas %d poolp->ndmas %d",
-		st_tdc, ndmas, dma_poolp->ndmas));
+		"==> nxge_alloc_tx_mem_pool: ndmas %d poolp->ndmas %d",
+		tdc_max, dma_poolp->ndmas));
 
-	goto nxge_alloc_tx_mem_pool_exit;
-
-nxge_alloc_tx_mem_pool_fail2:
-	/* Free control buffers */
-	j--;
-	for (; j >= 0; j--) {
-		nxge_free_tx_cntl_dma(nxgep,
-			(p_nxge_dma_common_t)dma_cntl_p[j]);
-	}
-
-nxge_alloc_tx_mem_pool_fail1:
-	/* Free data buffers */
-	i--;
-	for (; i >= 0; i--) {
-		nxge_free_tx_buf_dma(nxgep, (p_nxge_dma_common_t)dma_buf_p[i],
-			num_chunks[i]);
-	}
-
-	KMEM_FREE(dma_poolp, sizeof (nxge_dma_pool_t));
-	KMEM_FREE(dma_buf_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(dma_cntl_poolp, sizeof (nxge_dma_pool_t));
-	KMEM_FREE(dma_cntl_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(num_chunks, sizeof (uint32_t) * ndmas);
-
-nxge_alloc_tx_mem_pool_exit:
-	NXGE_DEBUG_MSG((nxgep, MEM_CTL,
-		"<== nxge_alloc_tx_mem_pool:status 0x%08x", status));
-
-	return (status);
+	return (NXGE_OK);
 }
 
-static nxge_status_t
+nxge_status_t
 nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
     p_nxge_dma_common_t *dmap, size_t alloc_size,
     size_t block_size, uint32_t *num_chunks)
@@ -2591,6 +2919,7 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 		tx_dmap[i].nblocks = alloc_sizes[size_index] / block_size;
 		tx_dmap[i].dma_channel = dma_channel;
 		tx_dmap[i].contig_alloc_type = B_FALSE;
+		tx_dmap[i].kmem_alloc_type = B_FALSE;
 
 		/*
 		 * N2/NIU: data buffers must be contiguous as the driver
@@ -2657,6 +2986,9 @@ nxge_free_tx_buf_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap,
 
 	NXGE_DEBUG_MSG((nxgep, MEM_CTL, "==> nxge_free_tx_buf_dma"));
 
+	if (dmap == 0)
+		return;
+
 	for (i = 0; i < num_chunks; i++) {
 		nxge_dma_mem_free(dmap++);
 	}
@@ -2665,7 +2997,7 @@ nxge_free_tx_buf_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap,
 }
 
 /*ARGSUSED*/
-static nxge_status_t
+nxge_status_t
 nxge_alloc_tx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
     p_nxge_dma_common_t *dmap, size_t size)
 {
@@ -2677,6 +3009,7 @@ nxge_alloc_tx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
 			KMEM_ZALLOC(sizeof (nxge_dma_common_t), KM_SLEEP);
 
 	tx_dmap->contig_alloc_type = B_FALSE;
+	tx_dmap->kmem_alloc_type = B_FALSE;
 
 	status = nxge_dma_mem_alloc(nxgep, nxge_force_dma,
 			&nxge_desc_dma_attr,
@@ -2707,69 +3040,80 @@ nxge_free_tx_cntl_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap)
 {
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_free_tx_cntl_dma"));
 
+	if (dmap == 0)
+		return;
+
 	nxge_dma_mem_free(dmap);
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_free_tx_cntl_dma"));
 }
 
+/*
+ * nxge_free_tx_mem_pool
+ *
+ *	This function frees all of the per-port TDC control data structures.
+ *	The per-channel (TDC) data structures are freed when the channel
+ *	is stopped.
+ *
+ * Arguments:
+ * 	nxgep
+ *
+ * Notes:
+ *
+ * Context:
+ *	Any domain
+ */
 static void
 nxge_free_tx_mem_pool(p_nxge_t nxgep)
 {
-	uint32_t		i, ndmas;
-	p_nxge_dma_pool_t	dma_poolp;
-	p_nxge_dma_common_t	*dma_buf_p;
-	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_nxge_dma_common_t	*dma_cntl_p;
-	uint32_t 		*num_chunks;
+	int tdc_max = NXGE_MAX_TDCS;
 
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_free_tx_mem_pool"));
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_free_tx_mem_pool"));
 
-	dma_poolp = nxgep->tx_buf_pool_p;
-	if (dma_poolp == NULL || (!dma_poolp->buf_allocated)) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+	if (!nxgep->tx_buf_pool_p || !nxgep->tx_buf_pool_p->buf_allocated) {
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 			"<== nxge_free_tx_mem_pool "
-			"(null rx buf pool or buf not allocated"));
+			"(null tx buf pool or buf not allocated"));
 		return;
 	}
-
-	dma_cntl_poolp = nxgep->tx_cntl_pool_p;
-	if (dma_cntl_poolp == NULL || (!dma_cntl_poolp->buf_allocated)) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+	if (!nxgep->tx_cntl_pool_p || !nxgep->tx_cntl_pool_p->buf_allocated) {
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 			"<== nxge_free_tx_mem_pool "
 			"(null tx cntl buf pool or cntl buf not allocated"));
 		return;
 	}
 
-	dma_buf_p = dma_poolp->dma_buf_pool_p;
-	num_chunks = dma_poolp->num_chunks;
+	/* 1. Free the mailboxes. */
+	KMEM_FREE(nxgep->tx_mbox_areas_p->txmbox_areas_p,
+	    sizeof (p_tx_mbox_t) * tdc_max);
+	KMEM_FREE(nxgep->tx_mbox_areas_p, sizeof (tx_mbox_areas_t));
 
-	dma_cntl_p = dma_cntl_poolp->dma_buf_pool_p;
-	ndmas = dma_cntl_poolp->ndmas;
+	nxgep->tx_mbox_areas_p = 0;
 
-	for (i = 0; i < ndmas; i++) {
-		nxge_free_tx_buf_dma(nxgep, dma_buf_p[i], num_chunks[i]);
-	}
+	/* 2. Free the transmit ring arrays. */
+	KMEM_FREE(nxgep->tx_rings->rings,
+	    sizeof (p_tx_ring_t) * tdc_max);
+	KMEM_FREE(nxgep->tx_rings, sizeof (tx_rings_t));
 
-	for (i = 0; i < ndmas; i++) {
-		nxge_free_tx_cntl_dma(nxgep, dma_cntl_p[i]);
-	}
+	nxgep->tx_rings = 0;
 
-	for (i = 0; i < ndmas; i++) {
-		KMEM_FREE(dma_buf_p[i],
-			sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK);
-		KMEM_FREE(dma_cntl_p[i], sizeof (nxge_dma_common_t));
-	}
+	/* 3. Free the completion ring data structures. */
+	KMEM_FREE(nxgep->tx_cntl_pool_p->dma_buf_pool_p,
+	    sizeof (p_nxge_dma_common_t) * tdc_max);
+	KMEM_FREE(nxgep->tx_cntl_pool_p, sizeof (nxge_dma_pool_t));
 
-	KMEM_FREE(num_chunks, sizeof (uint32_t) * ndmas);
-	KMEM_FREE(dma_cntl_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(dma_cntl_poolp, sizeof (nxge_dma_pool_t));
-	KMEM_FREE(dma_buf_p, ndmas * sizeof (p_nxge_dma_common_t));
-	KMEM_FREE(dma_poolp, sizeof (nxge_dma_pool_t));
+	nxgep->tx_cntl_pool_p = 0;
 
-	nxgep->tx_buf_pool_p = NULL;
-	nxgep->tx_cntl_pool_p = NULL;
+	/* 4. Free the data ring data structures. */
+	KMEM_FREE(nxgep->tx_buf_pool_p->num_chunks,
+	    sizeof (uint32_t) * tdc_max);
+	KMEM_FREE(nxgep->tx_buf_pool_p->dma_buf_pool_p,
+	    sizeof (p_nxge_dma_common_t) * tdc_max);
+	KMEM_FREE(nxgep->tx_buf_pool_p, sizeof (nxge_dma_pool_t));
 
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "<== nxge_free_tx_mem_pool"));
+	nxgep->tx_buf_pool_p = 0;
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_free_tx_mem_pool"));
 }
 
 /*ARGSUSED*/
@@ -2782,6 +3126,7 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 	caddr_t 		kaddrp;
 	int			ddi_status = DDI_SUCCESS;
 	boolean_t		contig_alloc_type;
+	boolean_t		kmem_alloc_type;
 
 	contig_alloc_type = dma_p->contig_alloc_type;
 
@@ -2791,7 +3136,7 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 		 * for N2/NIU.
 		 */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_dma_mem_alloc: alloc type not allows (%d)",
+			"nxge_dma_mem_alloc: alloc type not allowed (%d)",
 			dma_p->contig_alloc_type));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
@@ -2808,62 +3153,127 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
+	kmem_alloc_type = dma_p->kmem_alloc_type;
+
 	switch (contig_alloc_type) {
 	case B_FALSE:
-		ddi_status = ddi_dma_mem_alloc(dma_p->dma_handle, length,
-			acc_attr_p,
-			xfer_flags,
-			DDI_DMA_DONTWAIT, 0, &kaddrp, &dma_p->alength,
-			&dma_p->acc_handle);
-		if (ddi_status != DDI_SUCCESS) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc:ddi_dma_mem_alloc failed"));
-			ddi_dma_free_handle(&dma_p->dma_handle);
-			dma_p->dma_handle = NULL;
-			return (NXGE_ERROR | NXGE_DDI_FAILED);
-		}
-		if (dma_p->alength < length) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc:ddi_dma_mem_alloc "
-				"< length."));
-			ddi_dma_mem_free(&dma_p->acc_handle);
-			ddi_dma_free_handle(&dma_p->dma_handle);
-			dma_p->acc_handle = NULL;
-			dma_p->dma_handle = NULL;
-			return (NXGE_ERROR);
-		}
-
-		ddi_status = ddi_dma_addr_bind_handle(dma_p->dma_handle, NULL,
-			kaddrp, dma_p->alength, xfer_flags, DDI_DMA_DONTWAIT, 0,
-			&dma_p->dma_cookie, &dma_p->ncookies);
-		if (ddi_status != DDI_DMA_MAPPED) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc:di_dma_addr_bind failed "
-				"(staus 0x%x ncookies %d.)", ddi_status,
-				dma_p->ncookies));
-			if (dma_p->acc_handle) {
-				ddi_dma_mem_free(&dma_p->acc_handle);
-				dma_p->acc_handle = NULL;
+		switch (kmem_alloc_type) {
+		case B_FALSE:
+			ddi_status = ddi_dma_mem_alloc(dma_p->dma_handle,
+				length,
+				acc_attr_p,
+				xfer_flags,
+				DDI_DMA_DONTWAIT, 0, &kaddrp, &dma_p->alength,
+				&dma_p->acc_handle);
+			if (ddi_status != DDI_SUCCESS) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_dma_mem_alloc: "
+				    "ddi_dma_mem_alloc failed"));
+				ddi_dma_free_handle(&dma_p->dma_handle);
+				dma_p->dma_handle = NULL;
+				return (NXGE_ERROR | NXGE_DDI_FAILED);
 			}
-			ddi_dma_free_handle(&dma_p->dma_handle);
-			dma_p->dma_handle = NULL;
-			return (NXGE_ERROR | NXGE_DDI_FAILED);
-		}
-
-		if (dma_p->ncookies != 1) {
-			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-				"nxge_dma_mem_alloc:ddi_dma_addr_bind "
-				"> 1 cookie"
-				"(staus 0x%x ncookies %d.)", ddi_status,
-				dma_p->ncookies));
-			if (dma_p->acc_handle) {
+			if (dma_p->alength < length) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_dma_mem_alloc:di_dma_mem_alloc "
+				    "< length."));
 				ddi_dma_mem_free(&dma_p->acc_handle);
+				ddi_dma_free_handle(&dma_p->dma_handle);
 				dma_p->acc_handle = NULL;
+				dma_p->dma_handle = NULL;
+				return (NXGE_ERROR);
 			}
-			(void) ddi_dma_unbind_handle(dma_p->dma_handle);
-			ddi_dma_free_handle(&dma_p->dma_handle);
-			dma_p->dma_handle = NULL;
-			return (NXGE_ERROR);
+
+			ddi_status = ddi_dma_addr_bind_handle(dma_p->dma_handle,
+			    NULL,
+			    kaddrp, dma_p->alength, xfer_flags,
+			    DDI_DMA_DONTWAIT,
+			    0, &dma_p->dma_cookie, &dma_p->ncookies);
+			if (ddi_status != DDI_DMA_MAPPED) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_dma_mem_alloc: ddi_dma_addr_bind "
+				    "failed "
+				    "(staus 0x%x ncookies %d.)", ddi_status,
+				    dma_p->ncookies));
+				if (dma_p->acc_handle) {
+					ddi_dma_mem_free(&dma_p->acc_handle);
+					dma_p->acc_handle = NULL;
+				}
+				ddi_dma_free_handle(&dma_p->dma_handle);
+				dma_p->dma_handle = NULL;
+				return (NXGE_ERROR | NXGE_DDI_FAILED);
+			}
+
+			if (dma_p->ncookies != 1) {
+				NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+				    "nxge_dma_mem_alloc:ddi_dma_addr_bind "
+				    "> 1 cookie"
+				    "(staus 0x%x ncookies %d.)", ddi_status,
+				    dma_p->ncookies));
+				if (dma_p->acc_handle) {
+					ddi_dma_mem_free(&dma_p->acc_handle);
+					dma_p->acc_handle = NULL;
+				}
+				(void) ddi_dma_unbind_handle(dma_p->dma_handle);
+				ddi_dma_free_handle(&dma_p->dma_handle);
+				dma_p->dma_handle = NULL;
+				return (NXGE_ERROR);
+			}
+			break;
+
+		case B_TRUE:
+			kaddrp = KMEM_ALLOC(length, KM_NOSLEEP);
+			if (kaddrp == NULL) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_dma_mem_alloc:ddi_dma_mem_alloc "
+				    "kmem alloc failed"));
+				return (NXGE_ERROR);
+			}
+
+			dma_p->alength = length;
+			ddi_status = ddi_dma_addr_bind_handle(dma_p->dma_handle,
+			    NULL, kaddrp, dma_p->alength, xfer_flags,
+			    DDI_DMA_DONTWAIT, 0,
+			    &dma_p->dma_cookie, &dma_p->ncookies);
+			if (ddi_status != DDI_DMA_MAPPED) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_dma_mem_alloc:ddi_dma_addr_bind: "
+				    "(kmem_alloc) failed kaddrp $%p length %d "
+				    "(staus 0x%x (%d) ncookies %d.)",
+				    kaddrp, length,
+				    ddi_status, ddi_status, dma_p->ncookies));
+				KMEM_FREE(kaddrp, length);
+				dma_p->acc_handle = NULL;
+				ddi_dma_free_handle(&dma_p->dma_handle);
+				dma_p->dma_handle = NULL;
+				dma_p->kaddrp = NULL;
+				return (NXGE_ERROR | NXGE_DDI_FAILED);
+			}
+
+			if (dma_p->ncookies != 1) {
+				NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+				    "nxge_dma_mem_alloc:ddi_dma_addr_bind "
+				    "(kmem_alloc) > 1 cookie"
+				    "(staus 0x%x ncookies %d.)", ddi_status,
+				dma_p->ncookies));
+				KMEM_FREE(kaddrp, length);
+				dma_p->acc_handle = NULL;
+				(void) ddi_dma_unbind_handle(dma_p->dma_handle);
+				ddi_dma_free_handle(&dma_p->dma_handle);
+				dma_p->dma_handle = NULL;
+				dma_p->kaddrp = NULL;
+				return (NXGE_ERROR);
+			}
+
+			dma_p->kaddrp = kaddrp;
+
+			NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+				"nxge_dma_mem_alloc: kmem_alloc dmap $%p "
+				"kaddr $%p alength %d",
+				dma_p,
+				kaddrp,
+				dma_p->alength));
+			break;
 		}
 		break;
 
@@ -3031,6 +3441,100 @@ nxge_dma_mem_free(p_nxge_dma_common_t dma_p)
 	dma_p->alength = NULL;
 }
 
+static void
+nxge_dma_free_rx_data_buf(p_nxge_dma_common_t dma_p)
+{
+	uint64_t kaddr;
+	uint32_t buf_size;
+
+	NXGE_DEBUG_MSG((NULL, DMA_CTL, "==> nxge_dma_free_rx_data_buf"));
+
+	if (dma_p->dma_handle != NULL) {
+		if (dma_p->ncookies) {
+			(void) ddi_dma_unbind_handle(dma_p->dma_handle);
+			dma_p->ncookies = 0;
+		}
+		ddi_dma_free_handle(&dma_p->dma_handle);
+		dma_p->dma_handle = NULL;
+	}
+
+	if (dma_p->acc_handle != NULL) {
+		ddi_dma_mem_free(&dma_p->acc_handle);
+		dma_p->acc_handle = NULL;
+		NPI_DMA_ACC_HANDLE_SET(dma_p, NULL);
+	}
+
+	NXGE_DEBUG_MSG((NULL, DMA_CTL,
+	    "==> nxge_dma_free_rx_data_buf: dmap $%p buf_alloc_state %d",
+	    dma_p,
+	    dma_p->buf_alloc_state));
+
+	if (!(dma_p->buf_alloc_state & BUF_ALLOCATED_WAIT_FREE)) {
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "<== nxge_dma_free_rx_data_buf: "
+		    "outstanding data buffers"));
+		return;
+	}
+
+#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
+	if (dma_p->contig_alloc_type &&
+		    dma_p->orig_kaddrp && dma_p->orig_alength) {
+		NXGE_DEBUG_MSG((NULL, DMA_CTL, "nxge_dma_free_rx_data_buf: "
+		    "kaddrp $%p (orig_kaddrp $%p)"
+		    "mem type %d ",
+		    "orig_alength %d "
+		    "alength 0x%x (%d)",
+		    dma_p->kaddrp,
+		    dma_p->orig_kaddrp,
+		    dma_p->contig_alloc_type,
+		    dma_p->orig_alength,
+		    dma_p->alength, dma_p->alength));
+
+		kaddr = (uint64_t)dma_p->orig_kaddrp;
+		buf_size = dma_p->orig_alength;
+		nxge_free_buf(CONTIG_MEM_ALLOC, kaddr, buf_size);
+		dma_p->orig_alength = NULL;
+		dma_p->orig_kaddrp = NULL;
+		dma_p->contig_alloc_type = B_FALSE;
+		dma_p->kaddrp = NULL;
+		dma_p->alength = NULL;
+		return;
+	}
+#endif
+
+	if (dma_p->kmem_alloc_type) {
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "nxge_dma_free_rx_data_buf: free kmem "
+			"kaddrp $%p (orig_kaddrp $%p)"
+			"alloc type %d "
+			"orig_alength %d "
+			"alength 0x%x (%d)",
+			dma_p->kaddrp,
+			dma_p->orig_kaddrp,
+			dma_p->kmem_alloc_type,
+			dma_p->orig_alength,
+			dma_p->alength, dma_p->alength));
+#if defined(__i386)
+		kaddr = (uint64_t)(uint32_t)dma_p->kaddrp;
+#else
+		kaddr = (uint64_t)dma_p->kaddrp;
+#endif
+		buf_size = dma_p->orig_alength;
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "nxge_dma_free_rx_data_buf: free dmap $%p "
+		    "kaddr $%p buf_size %d",
+		    dma_p,
+		    kaddr, buf_size));
+		nxge_free_buf(KMEM_ALLOC, kaddr, buf_size);
+		dma_p->alength = 0;
+		dma_p->orig_alength = 0;
+		dma_p->kaddrp = NULL;
+		dma_p->kmem_alloc_type = B_FALSE;
+	}
+
+	NXGE_DEBUG_MSG((NULL, DMA_CTL, "<== nxge_dma_free_rx_data_buf"));
+}
+
 /*
  *	nxge_m_start() -- start transmitting and receiving.
  *
@@ -3058,8 +3562,13 @@ nxge_m_start(void *arg)
 	/*
 	 * Start timer to check the system error and tx hangs
 	 */
-	nxgep->nxge_timerid = nxge_start_timer(nxgep, nxge_check_hw_state,
-		NXGE_CHECK_TIMER);
+	if (!isLDOMguest(nxgep))
+		nxgep->nxge_timerid = nxge_start_timer(nxgep,
+		    nxge_check_hw_state, NXGE_CHECK_TIMER);
+#if	defined(sun4v)
+	else
+		nxge_hio_start_timer(nxgep);
+#endif
 
 	nxgep->link_notify = B_TRUE;
 
@@ -3087,6 +3596,7 @@ nxge_m_stop(void *arg)
 	}
 
 	MUTEX_ENTER(nxgep->genlock);
+	nxgep->nxge_mac_state = NXGE_MAC_STOPPING;
 	nxge_uninit(nxgep);
 
 	nxgep->nxge_mac_state = NXGE_MAC_STOPPED;
@@ -3285,22 +3795,28 @@ nxge_m_resources(void *arg)
 {
 	p_nxge_t		nxgep = arg;
 	mac_rx_fifo_t 		mrf;
-	p_rx_rcr_rings_t	rcr_rings;
-	p_rx_rcr_ring_t		*rcr_p;
-	uint32_t		i, ndmas;
-	nxge_status_t		status;
+
+	nxge_grp_set_t		*set = &nxgep->rx_set;
+	uint8_t			rdc;
+
+	rx_rcr_ring_t		*ring;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_m_resources"));
 
 	MUTEX_ENTER(nxgep->genlock);
+
+	if (set->owned.map == 0) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "nxge_m_resources: no receive resources"));
+		goto nxge_m_resources_exit;
+	}
 
 	/*
 	 * CR 6492541 Check to see if the drv_state has been initialized,
 	 * if not * call nxge_init().
 	 */
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = nxge_init(nxgep);
-		if (status != NXGE_OK)
+		if (nxge_init(nxgep) != NXGE_OK)
 			goto nxge_m_resources_exit;
 	}
 
@@ -3310,24 +3826,32 @@ nxge_m_resources(void *arg)
 
 	mrf.mrf_normal_blank_time = 128;
 	mrf.mrf_normal_pkt_count = 8;
-	rcr_rings = nxgep->rx_rcr_rings;
-	rcr_p = rcr_rings->rcr_rings;
-	ndmas = rcr_rings->ndmas;
 
 	/*
 	 * Export our receive resources to the MAC layer.
 	 */
-	for (i = 0; i < ndmas; i++) {
-		((p_rx_rcr_ring_t)rcr_p[i])->rcr_mac_handle =
-				mac_resource_add(nxgep->mach,
-				    (mac_resource_t *)&mrf);
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			ring = nxgep->rx_rcr_rings->rcr_rings[rdc];
+			if (ring == 0) {
+				/*
+				 * This is a big deal only if we are
+				 * *not* in an LDOMs environment.
+				 */
+				if (nxgep->environs == SOLARIS_DOMAIN) {
+					cmn_err(CE_NOTE,
+					    "==> nxge_m_resources: "
+					    "ring %d == 0", rdc);
+				}
+				continue;
+			}
+			ring->rcr_mac_handle = mac_resource_add
+			    (nxgep->mach, (mac_resource_t *)&mrf);
 
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			"==> nxge_m_resources: vdma %d dma %d "
-			"rcrptr 0x%016llx mac_handle 0x%016llx",
-			i, ((p_rx_rcr_ring_t)rcr_p[i])->rdc,
-			rcr_p[i],
-			((p_rx_rcr_ring_t)rcr_p[i])->rcr_mac_handle));
+			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
+			    "==> nxge_m_resources: RDC %d RCR %p MAC handle %p",
+			    rdc, ring, ring->rcr_mac_handle));
+		}
 	}
 
 nxge_m_resources_exit:
@@ -3335,7 +3859,7 @@ nxge_m_resources_exit:
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_m_resources"));
 }
 
-static void
+void
 nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot, boolean_t factory)
 {
 	p_nxge_mmac_stats_t mmac_stats;
@@ -3420,7 +3944,7 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
  * value to the one specified, enable the port to start filtering on
  * the new MAC address.  Returns 0 on success.
  */
-static int
+int
 nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 {
 	p_nxge_t nxgep = arg;
@@ -3459,7 +3983,7 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 	 * 	Slot 0 is for unique (primary) MAC. The first alternate
 	 * MAC slot is slot 1.
 	 *	Each of the first two ports of Neptune has 16 alternate
-	 * MAC slots but only the first 7 (or 15) slots have assigned factory
+	 * MAC slots but only the first 7 (of 15) slots have assigned factory
 	 * MAC addresses. We first search among the slots without bundled
 	 * factory MACs. If we fail to find one in that range, then we
 	 * search the slots with bundled factory MACs.  A factory MAC
@@ -3592,7 +4116,7 @@ nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr)
  * Remove the specified mac address and update the HW not to filter
  * the mac address anymore.
  */
-static int
+int
 nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
 {
 	p_nxge_t nxgep = arg;
@@ -3662,7 +4186,6 @@ nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
 	mutex_exit(nxgep->genlock);
 	return (err);
 }
-
 
 /*
  * Modify a mac address added by nxge_m_mmac_add or nxge_m_mmac_reserve().
@@ -3793,7 +4316,6 @@ nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr)
 	return (0);
 }
 
-
 static boolean_t
 nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
@@ -3803,8 +4325,13 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM:
-		*txflags = HCKSUM_INET_PARTIAL;
+		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
+		    "==> nxge_m_getcapab: checksum %d", nxge_cksum_enable));
+		if (nxge_cksum_enable) {
+			*txflags = HCKSUM_INET_PARTIAL;
+		}
 		break;
+
 	case MAC_CAPAB_POLL:
 		/*
 		 * There's nothing for us to fill in, simply returning
@@ -3813,6 +4340,7 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		break;
 
 	case MAC_CAPAB_MULTIADDRESS:
+		mmacp = (multiaddress_capab_t *)cap_data;
 		mutex_enter(nxgep->genlock);
 
 		mmacp->maddr_naddr = nxgep->nxge_mmac_info.num_mmac;
@@ -3831,6 +4359,7 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 		mutex_exit(nxgep->genlock);
 		break;
+
 	case MAC_CAPAB_LSO: {
 		mac_capab_lso_t *cap_lso = cap_data;
 
@@ -3846,6 +4375,59 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		}
 	}
 
+#if defined(sun4v)
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *mrings = (mac_capab_rings_t *)cap_data;
+
+		/*
+		 * Only the service domain driver responds to
+		 * this capability request.
+		 */
+		if (isLDOMservice(nxgep)) {
+			mrings->mr_handle = (void *)nxgep;
+
+			/*
+			 * No dynamic allocation of groups and
+			 * rings at this time.  Shares dictate the
+			 * configurartion.
+			 */
+			mrings->mr_gadd_ring = NULL;
+			mrings->mr_grem_ring = NULL;
+			mrings->mr_rget = NULL;
+			mrings->mr_gget = nxge_hio_group_get;
+
+			if (mrings->mr_type == MAC_RING_TYPE_RX) {
+				mrings->mr_rnum = 8; /* XXX */
+				mrings->mr_gnum = 6; /* XXX */
+			} else {
+				mrings->mr_rnum = 8; /* XXX */
+				mrings->mr_gnum = 0; /* XXX */
+			}
+		} else
+			return (B_FALSE);
+		break;
+	}
+
+	case MAC_CAPAB_SHARES: {
+		mac_capab_share_t *mshares = (mac_capab_share_t *)cap_data;
+
+		/*
+		 * Only the service domain driver responds to
+		 * this capability request.
+		 */
+		if (isLDOMservice(nxgep)) {
+			mshares->ms_snum = 3;
+			mshares->ms_handle = (void *)nxgep;
+			mshares->ms_salloc = nxge_hio_share_alloc;
+			mshares->ms_sfree = nxge_hio_share_free;
+			mshares->ms_sadd = NULL;
+			mshares->ms_sremove = NULL;
+			mshares->ms_squery = nxge_hio_share_query;
+		} else
+			return (B_FALSE);
+		break;
+	}
+#endif
 	default:
 		return (B_FALSE);
 	}
@@ -5743,7 +6325,6 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 				p_dip,
 				hw_p->ndevs));
 
-			nxgep->nxge_hw_p = NULL;
 			if (hw_p->ndevs) {
 				hw_p->ndevs--;
 			}
@@ -5762,6 +6343,8 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 					hw_p,
 					p_dip,
 					hw_p->ndevs));
+
+				nxge_hio_uninit(nxgep);
 
 				if (hw_p == nxge_hw_list) {
 					NXGE_DEBUG_MSG((nxgep, MOD_CTL,
@@ -5787,6 +6370,7 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 					h_hw_p->next = hw_p->next;
 				}
 
+				nxgep->nxge_hw_p = NULL;
 				KMEM_FREE(hw_p, sizeof (nxge_hw_list_t));
 			}
 			break;

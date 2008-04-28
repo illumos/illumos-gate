@@ -262,12 +262,17 @@ typedef struct vgen_port {
 	int			num_ldcs;	/* # of channels in this port */
 	uint64_t		*ldc_ids;	/* channel ids */
 	vgen_ldclist_t		ldclist;	/* list of ldcs for this port */
-	struct ether_addr	macaddr;	/* mac address of peer */
+	ether_addr_t		macaddr;	/* mac address of peer */
 	uint16_t		pvid;		/* port vlan id (untagged) */
 	uint16_t		*vids;		/* vlan ids (tagged) */
 	uint16_t		nvids;		/* # of vids */
 	mod_hash_t		*vlan_hashp;	/* vlan hash table */
 	uint32_t		vlan_nchains;	/* # of vlan hash chains */
+	uint32_t		use_vsw_port;	/* Use vsw_port or not */
+	uint32_t		flags;		/* status of this port */
+	vio_net_callbacks_t	vcb;		/* vnet callbacks */
+	vio_net_handle_t	vhp;		/* handle from vnet */
+	kmutex_t		lock;		/* synchornize ops */
 } vgen_port_t;
 
 /* port list structure */
@@ -280,9 +285,10 @@ typedef struct vgen_portlist {
 /* vgen instance information  */
 typedef struct vgen {
 	vnet_t			*vnetp;		/* associated vnet instance */
+	int			instance;	/* vnet instance */
 	dev_info_t		*vnetdip;	/* dip of vnet */
 	uint64_t		regprop;	/* "reg" property */
-	uint8_t			macaddr[ETHERADDRL];	/* mac addr of vnet */
+	ether_addr_t		macaddr;	/* mac addr of vnet */
 	kmutex_t		lock;		/* synchornize ops */
 	int			flags;		/* flags */
 	vgen_portlist_t		vgenports;	/* Port List */
@@ -290,7 +296,6 @@ typedef struct vgen {
 	mdeg_handle_t		mdeg_dev_hdl;	/* mdeg cb handle for device */
 	mdeg_handle_t		mdeg_port_hdl;	/* mdeg cb handle for port */
 	vgen_port_t		*vsw_portp;	/* port connected to vsw */
-	mac_register_t		*macp;		/* vgen mac ops */
 	struct ether_addr	*mctab;		/* multicast addr table */
 	uint32_t		mcsize;		/* allocated size of mctab */
 	uint32_t		mccount;	/* # of valid addrs in mctab */
@@ -299,6 +304,8 @@ typedef struct vgen {
 	uint16_t		*pri_types;	/* priority eth types */
 	vio_mblk_pool_t		*pri_tx_vmp;	/* tx priority mblk pool */
 	uint32_t		max_frame_size;	/* max frame size supported */
+
+	uint32_t		vsw_port_refcnt; /* refcnt for vsw_port */
 } vgen_t;
 
 #ifdef __cplusplus

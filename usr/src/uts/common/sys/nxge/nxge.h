@@ -203,6 +203,13 @@ typedef enum {
 	param_end
 } nxge_param_index_t;
 
+typedef enum {
+	SOLARIS_DOMAIN,
+	SOLARIS_SERVICE_DOMAIN,
+	SOLARIS_GUEST_DOMAIN,
+	LINUX_SERVICE_DOMAIN,
+	LINUX_GUEST_DOMAIN
+} nxge_environs_t;
 
 /*
  * Named Dispatch Parameter Management Structure
@@ -284,7 +291,8 @@ typedef enum {
 
 enum nxge_mac_state {
 	NXGE_MAC_STOPPED = 0,
-	NXGE_MAC_STARTED
+	NXGE_MAC_STARTED,
+	NXGE_MAC_STOPPING
 };
 
 /*
@@ -476,7 +484,6 @@ typedef struct _nxge_intr_t {
 	boolean_t		intr_registered; /* interrupts are registered */
 	boolean_t		intr_enabled; 	/* interrupts are enabled */
 	boolean_t		niu_msi_enable;	/* debug or configurable? */
-	uint8_t			nldevs;		/* # of logical devices */
 	int			intr_types;	/* interrupt types supported */
 	int			intr_type;	/* interrupt type to add */
 	int			max_int_cnt;	/* max MSIX/INT HW supports */
@@ -493,9 +500,6 @@ typedef struct _nxge_intr_t {
 typedef struct _nxge_ldgv_t {
 	uint8_t			ndma_ldvs;
 	uint8_t			nldvs;
-	uint8_t			start_ldg;
-	uint8_t			start_ldg_tx;
-	uint8_t			start_ldg_rx;
 	uint8_t			maxldgs;
 	uint8_t			maxldvs;
 	uint8_t			ldg_intrs;
@@ -506,6 +510,102 @@ typedef struct _nxge_ldgv_t {
 	p_nxge_ldv_t		ldvp;
 	p_nxge_ldv_t		ldvp_syserr;
 } nxge_ldgv_t, *p_nxge_ldgv_t;
+
+typedef enum {
+	NXGE_TRANSMIT_GROUP,	/* Legacy transmit group */
+	NXGE_RECEIVE_GROUP,	/* Legacy receive group */
+	NXGE_VR_GROUP,		/* Virtualization Region group */
+	EXT_TRANSMIT_GROUP,	/* External (Crossbow) transmit group */
+	EXT_RECEIVE_GROUP	/* External (Crossbow) receive group */
+} nxge_grp_type_t;
+
+#define	NXGE_ILLEGAL_CHANNEL	(NXGE_MAX_TDCS + 1)
+
+typedef uint8_t nxge_channel_t;
+
+typedef struct nxge_grp {
+	nxge_t			*nxge;
+	nxge_grp_type_t		type; /* Tx or Rx */
+
+	int			sequence; /* When it was created. */
+	int			index; /* nxge_grp_set_t.group[index] */
+
+	struct nx_dc		*dc; /* Linked list of DMA channels. */
+	size_t			count; /* A count of <dc> above. */
+
+	boolean_t		active;	/* Is it being used? */
+
+	dc_map_t		map; /* A bitmap of the channels in <dc>. */
+	nxge_channel_t		legend[NXGE_MAX_TDCS];
+
+} nxge_grp_t;
+
+typedef struct {
+	lg_map_t		map;
+	size_t			count;
+} lg_data_t;
+
+typedef struct {
+	dc_map_t		map;
+	size_t			count;
+} dc_data_t;
+
+#define	NXGE_DC_SET(map, channel)	map |= (1 << channel)
+#define	NXGE_DC_RESET(map, channel)	map &= (~(1 << channel))
+
+#define	NXGE_LOGICAL_GROUP_MAX	NXGE_MAX_TDCS
+
+typedef struct {
+	int			sequence; /* To order groups in time. */
+
+	/* These are this instance's logical groups. */
+	nxge_grp_t		*group[NXGE_LOGICAL_GROUP_MAX];
+	lg_data_t		lg;
+
+	dc_data_t		shared;	/* These DCs are being shared. */
+	dc_data_t		owned; /* These DCs belong to me. */
+	dc_data_t		dead; /* These DCs are in an error state. */
+
+} nxge_grp_set_t;
+
+/*
+ * Receive Ring Group
+ * One of the advanced virtualization features is the ability to bundle
+ * multiple Receive Rings in a single group.  One or more MAC addresses may
+ * be assigned to a group.  Incoming packets destined to the group's MAC
+ * address(es) are delivered to any ring member, according to a programmable
+ * or predefined RTS policy.  Member rings can be polled individually.
+ * RX ring groups can come with a predefined set of member rings, or they
+ * are programmable by adding and removing rings to/from them.
+ */
+typedef struct _nxge_rx_ring_group_t {
+	mac_group_handle_t	ghandle;
+	p_nxge_t		nxgep;
+	int			gindex;
+	int			sindex;
+} nxge_rx_ring_group_t;
+
+/*
+ * Ring Handle
+ */
+typedef struct _nxge_ring_handle_t {
+	p_nxge_t		nxgep;
+	int			index;		/* port-wise */
+	mac_ring_handle_t	ring_handle;
+} nxge_ring_handle_t;
+
+/*
+ * Share Handle
+ */
+typedef struct _nxge_share_handle_t {
+	p_nxge_t		nxgep;		/* Driver Handle */
+	int			index;
+	void			*vrp;
+	uint64_t		tmap;
+	uint64_t		rmap;
+	int			rxgroup;
+	boolean_t		active;
+} nxge_share_handle_t;
 
 /*
  * Neptune Device instance state information.
@@ -563,11 +663,8 @@ struct _nxge_t {
 	niu_type_t		niu_type;
 	platform_type_t		platform_type;
 	boolean_t		os_addr_mode32;	/* set to 1 for 32 bit mode */
-	uint8_t			nrdc;
+
 	uint8_t			def_rdc;
-	uint8_t			rdc[NXGE_MAX_RDCS];
-	uint8_t			ntdc;
-	uint8_t			tdc[NXGE_MAX_TDCS];
 
 	nxge_intr_t		nxge_intr_type;
 	nxge_dma_pt_cfg_t 	pt_config;
@@ -622,7 +719,6 @@ struct _nxge_t {
 
 	uint32_t		start_tdc;
 	uint32_t		max_tdcs;
-	uint32_t		tdc_mask;
 
 	p_rx_tx_params_t	tx_params;
 
@@ -671,7 +767,9 @@ struct _nxge_t {
 	int			fm_capabilities; /* FMA capabilities */
 
 	uint32_t 		nxge_port_rbr_size;
+	uint32_t 		nxge_port_rbr_spare_size;
 	uint32_t 		nxge_port_rcr_size;
+	uint32_t		nxge_port_rx_cntl_alloc_size;
 	uint32_t 		nxge_port_tx_ring_size;
 	nxge_mmac_t		nxge_mmac_info;
 #if	defined(sun4v)
@@ -688,6 +786,19 @@ struct _nxge_t {
 	uint32_t		nxge_magic;
 
 	int			soft_lso_enable;
+	/* The following fields are LDOMs-specific additions. */
+	nxge_environs_t		environs;
+	ether_addr_t		hio_mac_addr;
+	uint32_t		niu_cfg_hdl;
+	kmutex_t		group_lock;
+
+	struct nxge_hio_vr	*hio_vr;
+
+	nxge_grp_set_t		rx_set;
+	nxge_grp_set_t		tx_set;
+
+	nxge_rx_ring_group_t	rx_hio_groups[NXGE_MAX_RDC_GROUPS];
+	nxge_share_handle_t	shares[NXGE_MAX_VRS];
 };
 
 /*

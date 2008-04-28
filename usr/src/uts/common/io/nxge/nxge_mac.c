@@ -27,6 +27,7 @@
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_mac.h>
+#include <sys/nxge/nxge_hio.h>
 
 #define	LINK_MONITOR_PERIOD	(1000 * 1000)
 #define	LM_WAIT_MULTIPLIER	8
@@ -39,6 +40,12 @@ extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
 extern boolean_t nxge_jumbo_enable;
 extern uint32_t nxge_jumbo_mtu;
+
+	/* The following functions may be found in nxge_main.c */
+extern void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
+	boolean_t factory);
+extern int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
+extern int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
 
 typedef enum {
 	CHECK_LINK_RESCHEDULE,
@@ -211,9 +218,9 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 			}
 		}
 		if (nxge_is_phy_present(nxgep,
-		    (BCM8706_GOA_PORT_ADDR_BASE) + portn,
+		    BCM8706_GOA_PORT_ADDR_BASE + portn,
 		    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
-			nxgep->xcvr_addr = (BCM8706_GOA_PORT_ADDR_BASE) +
+			nxgep->xcvr_addr = BCM8706_GOA_PORT_ADDR_BASE +
 			    portn;
 			goto found_phy;
 		}
@@ -2417,6 +2424,214 @@ fail:
 	return (NXGE_ERROR | rs);
 }
 
+int
+nxge_hio_hostinfo_get_rdc_table(p_nxge_t nxgep)
+{
+	int rdc_tbl;
+
+	/*
+	 * Get an RDC table (version 0).
+	 */
+	if ((rdc_tbl = nxge_fzc_rdc_tbl_bind(nxgep, -1, B_FALSE)) < 0) {
+		NXGE_ERROR_MSG((nxgep, OBP_CTL,
+		    "nxge_hio_hostinfo_get_rdc_table: "
+		    "there are no free RDC tables!"));
+		return (EBUSY);
+	}
+
+	return (rdc_tbl);
+}
+
+/*
+ * nxge_hio_hostinfo_init
+ *
+ *	Initialize an alternate MAC address, and bind a macrdctbln to it.
+ *
+ * Arguments:
+ * 	nxge
+ * 	vr	The Virtualization Region
+ * 	macaddr	The alternate MAC address
+ *
+ * Notes:
+ *	1. Find & bind an RDC table to <nxge>.
+ *	2. Program an alternate MAC address (<macaddr>).
+ *	3. Bind the RDC table to <macaddr>.
+ *
+ * Context:
+ *	Service domain
+ *
+ * Side Effects:
+ *	nxge->class_config.mac_host_info[slot].rdctbl
+ *	vr->slot & vr->altmac
+ *
+ */
+int
+nxge_hio_hostinfo_init(
+	nxge_t *nxge,
+	nxge_hio_vr_t *vr,	/* Virtualization Region */
+	ether_addr_t *macaddr)	/* The alternate MAC address */
+{
+	int rdc_tbl, slot;
+
+	nxge_class_pt_cfg_t *class;
+	hostinfo_t mac_rdc;
+	npi_mac_addr_t altmac;
+	nxge_mmac_t *mmac_info;
+	nxge_rdc_grp_t	*group;
+	uint8_t *addr = (uint8_t *)macaddr;
+
+	mutex_enter(nxge->genlock);
+
+	rdc_tbl = vr->rdc_tbl;
+
+	/* Initialize the NXGE RDC table data structure. */
+	group = &nxge->pt_config.rdc_grps[rdc_tbl];
+	group->port = NXGE_GET_PORT_NUM(nxge->function_num);
+	group->config_method = RDC_TABLE_ENTRY_METHOD_REP;
+	group->flag = 1;	/* This group has been configured. */
+
+	mmac_info = &nxge->nxge_mmac_info;
+
+	/*
+	 * Are there free slots.
+	 */
+	if (mmac_info->naddrfree == 0) {
+		mutex_exit(nxge->genlock);
+		return (ENOSPC);
+	}
+
+	/*
+	 * The vswitch has already added this MAC address.
+	 * Find its assigned slot.
+	 */
+	if (mmac_info->num_factory_mmac < mmac_info->num_mmac) {
+		for (slot = mmac_info->num_factory_mmac + 1;
+		    slot <= mmac_info->num_mmac; slot++) {
+			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
+				break;
+		}
+		if (slot > mmac_info->num_mmac) {
+			for (slot = 1; slot <= mmac_info->num_factory_mmac;
+			    slot++) {
+				if (!(mmac_info->mac_pool[slot].flags
+				    & MMAC_SLOT_USED))
+					break;
+			}
+		}
+	} else {
+		for (slot = 1; slot <= mmac_info->num_mmac; slot++) {
+			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
+				break;
+		}
+	}
+
+	ASSERT(slot <= mmac_info->num_mmac);
+	vr->slot = slot;
+	slot = vr->slot - 1;
+
+	/*
+	 * Programm the mac address.
+	 */
+	altmac.w2 = (((uint16_t)addr[0]) << 8) |
+	    (((uint16_t)addr[1]) & 0x0ff);
+	altmac.w1 = (((uint16_t)addr[2]) << 8) |
+	    (((uint16_t)addr[3]) & 0x0ff);
+	altmac.w0 = (((uint16_t)addr[4]) << 8) |
+	    (((uint16_t)addr[5]) & 0x0ff);
+
+	if (npi_mac_altaddr_entry(nxge->npi_handle, OP_SET,
+	    nxge->function_num, slot, &altmac) != NPI_SUCCESS) {
+		mutex_exit(nxge->genlock);
+		return (EIO);
+	}
+
+	/*
+	 * Associate <rdc_tbl> with this MAC address slot.
+	 */
+	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
+
+	/* Update this variable. */
+	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
+	class->mac_host_info[slot].rdctbl = (uint8_t)rdc_tbl;
+
+	mac_rdc.value = 0;
+	mac_rdc.bits.w0.rdc_tbl_num = rdc_tbl;
+	mac_rdc.bits.w0.mac_pref = class->mac_host_info[slot].mpr_npr;
+	/* <mpr_npr> had better be 1! */
+
+	/* Program the RDC table. */
+	if ((npi_mac_hostinfo_entry(nxge->npi_handle, OP_SET,
+		nxge->function_num, slot, &mac_rdc)) != NPI_SUCCESS) {
+		mutex_exit(nxge->genlock);
+		(void) nxge_m_mmac_remove(nxge, vr->slot);
+		return (EIO);
+	}
+
+	if (nxge->mac.portnum != XMAC_PORT_0 &&
+	    nxge->mac.portnum != XMAC_PORT_1)
+		slot++;
+
+	/* (Re-)enable the MAC address. */
+	(void) npi_mac_altaddr_enable(
+		nxge->npi_handle, nxge->mac.portnum, slot);
+
+	bcopy(macaddr, vr->altmac, sizeof (vr->altmac));
+
+	/*
+	 * Update mmac
+	 */
+	bcopy(addr, mmac_info->mac_pool[vr->slot].addr, ETHERADDRL);
+	mmac_info->mac_pool[vr->slot].flags |= MMAC_SLOT_USED;
+	mmac_info->mac_pool[vr->slot].flags &= ~MMAC_VENDOR_ADDR;
+	mmac_info->naddrfree--;
+	nxge_mmac_kstat_update(nxge, vr->slot, B_FALSE);
+
+	mutex_exit(nxge->genlock);
+	return (0);
+}
+
+/*
+ * nxge_hio_hostinfo_uninit
+ *
+ *	Uninitialize an alternate MAC address.
+ *
+ * Arguments:
+ * 	nxge
+ * 	vr	The Virtualization Region
+ *
+ * Notes:
+ *	1. Remove the VR's alternate MAC address.
+ *	1. Free (unbind) the RDC table allocated to this VR.
+ *
+ * Context:
+ *	Service domain
+ *
+ * Side Effects:
+ *	nxge->class_config.mac_host_info[slot].rdctbl
+ *
+ */
+void
+nxge_hio_hostinfo_uninit(
+	nxge_t *nxge,
+	nxge_hio_vr_t *vr)
+{
+	nxge_class_pt_cfg_t *class;
+
+	(void) npi_mac_altaddr_disable(
+		nxge->npi_handle, nxge->mac.portnum, vr->slot);
+
+	/* Set this variable to its default. */
+	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
+	class->mac_host_info[vr->slot].rdctbl =
+	    nxge->pt_config.hw_config.def_mac_rxdma_grpid;
+
+	(void) nxge_m_mmac_remove(nxge, vr->slot);
+	vr->slot = -1;
+
+	(void) nxge_fzc_rdc_tbl_unbind(nxge, vr->rdc_tbl);
+	vr->rdc_tbl = -1;
+}
+
 /* Initialize the RxMAC sub-block */
 
 nxge_status_t
@@ -2599,6 +2814,9 @@ nxge_tx_mac_disable(p_nxge_t nxgep)
 	npi_handle_t	handle;
 	npi_status_t	rs = NPI_SUCCESS;
 
+	if (isLDOMguest(nxgep))
+		return (NXGE_OK);
+
 	handle = nxgep->npi_handle;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_tx_mac_disable: port<%d>",
@@ -2634,6 +2852,10 @@ nxge_rx_mac_enable(p_nxge_t nxgep)
 	npi_status_t	rs = NPI_SUCCESS;
 	nxge_status_t	status = NXGE_OK;
 
+	/* This is a service-domain-only activity. */
+	if (isLDOMguest(nxgep))
+		return (status);
+
 	handle = nxgep->npi_handle;
 	portn = nxgep->mac.portnum;
 
@@ -2645,22 +2867,21 @@ nxge_rx_mac_enable(p_nxge_t nxgep)
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_rx_config(handle, ENABLE, portn,
-						CFG_XMAC_RX)) != NPI_SUCCESS)
+		    CFG_XMAC_RX)) != NPI_SUCCESS)
 			goto fail;
 	} else {
 		if ((rs = npi_bmac_rx_config(handle, ENABLE, portn,
-						CFG_BMAC_RX)) != NPI_SUCCESS)
+		    CFG_BMAC_RX)) != NPI_SUCCESS)
 			goto fail;
 	}
 
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_rx_mac_enable: port<%d>",
-			portn));
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "<== nxge_rx_mac_enable: port<%d>", portn));
 
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxgep_rx_mac_enable: Failed to enable port<%d> RxMAC",
-			portn));
+	    "nxgep_rx_mac_enable: Failed to enable port<%d> RxMAC", portn));
 
 	if (rs != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
@@ -2676,6 +2897,10 @@ nxge_rx_mac_disable(p_nxge_t nxgep)
 	npi_handle_t	handle;
 	uint8_t		portn;
 	npi_status_t	rs = NPI_SUCCESS;
+
+	/* If we are a guest domain driver, don't bother. */
+	if (isLDOMguest(nxgep))
+		return (NXGE_OK);
 
 	handle = nxgep->npi_handle;
 	portn = nxgep->mac.portnum;
@@ -4569,11 +4794,14 @@ nxge_serdes_reset(p_nxge_t nxgep)
 }
 
 /* Monitor link status using interrupt or polling */
-
 nxge_status_t
 nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 {
 	nxge_status_t status = NXGE_OK;
+
+	/* If we are a guest domain driver, don't bother. */
+	if (isLDOMguest(nxgep))
+		return (status);
 
 	/*
 	 * Return immediately if this is an imaginary XMAC port.
@@ -4656,6 +4884,7 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "<== nxge_link_monitor port<%d> enable=%d",
 	    nxgep->mac.portnum, enable));
+
 	return (NXGE_OK);
 fail:
 	return (status);
@@ -5325,6 +5554,12 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	    "==> nxge_scan_ports_phy: nxge niu_type[0x%x]",
 	    nxgep->niu_type));
 
+	if (isLDOMguest(nxgep)) {
+		hw_p->niu_type = NIU_TYPE_NONE;
+		hw_p->platform_type = P_NEPTUNE_NONE;
+		return (NXGE_OK);
+	}
+
 	j = l = 0;
 	total_port_fd = total_phy_fd = 0;
 	/*
@@ -5938,6 +6173,7 @@ nxge_mii_dump(p_nxge_t nxgep)
 	mii_idr1_t	idr1;
 	mii_idr2_t	idr2;
 	mii_mode_control_stat_t	mode;
+	p_nxge_param_t	param_arr;
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "==> nxge_mii_dump"));
 

@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nxge/nxge_impl.h>
+#include <sys/nxge/nxge_hio.h>
 #include <sys/ddifm.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
@@ -359,8 +360,13 @@ nxge_fm_init(p_nxge_t nxgep, ddi_device_acc_attr_t *reg_attr,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "fm-capable",
 	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE);
 
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+	NXGE_ERROR_MSG((nxgep, DDI_CTL,
 		"FM capable = %d\n", nxgep->fm_capabilities));
+
+	if (isLDOMguest(nxgep)) {
+		nxgep->fm_capabilities = DDI_FM_NOT_CAPABLE;
+		return;
+	}
 
 	/*
 	 * Register capabilities with IO Fault Services. The capabilities

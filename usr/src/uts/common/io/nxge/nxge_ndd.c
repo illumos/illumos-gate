@@ -26,6 +26,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nxge/nxge_impl.h>
+#include <sys/nxge/nxge_hio.h>
+
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
@@ -953,16 +955,18 @@ int
 nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
 
-	uint_t	print_len, buf_len;
+	uint_t print_len, buf_len;
 	p_mblk_t np;
-	int tdc;
 
 	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE;
+	int tdc;
+
+	nxge_grp_set_t *set;
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_txdma_info"));
 
 	(void) mi_mpprintf(mp, "TXDMA Information for Port\t %d \n",
 		nxgep->function_num);
-
 
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		(void) mi_mpprintf(mp, "%s\n", "out of buffer");
@@ -971,23 +975,23 @@ nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	buf_len = buff_alloc_size;
 	mp->b_cont = np;
-
-	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-		"Total TDCs\t %d\n", nxgep->ntdc);
+	print_len = 0;
 
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		"TDC\t HW TDC\t\n");
 	((mblk_t *)np)->b_wptr += print_len;
-
 	buf_len -= print_len;
-	for (tdc = 0; tdc < nxgep->ntdc; tdc++) {
-		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-					    buf_len, "%d\t %d\n",
-					    tdc, nxgep->tdc[tdc]);
-		((mblk_t *)np)->b_wptr += print_len;
-		buf_len -= print_len;
+
+	set = &nxgep->tx_set;
+	for (tdc = 0; tdc < NXGE_MAX_RDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
+			    buf_len, "%d\n", tdc);
+			((mblk_t *)np)->b_wptr += print_len;
+			buf_len -= print_len;
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_txdma_info"));
@@ -1008,6 +1012,7 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	p_rx_rcr_ring_t		*rcr_rings;
 	p_rx_rbr_rings_t 	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
+	nxge_grp_set_t		*set;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_rxdma_info"));
 
@@ -1041,16 +1046,21 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
-	for (rdc = 0; rdc < p_cfgp->max_rdcs; rdc++) {
-		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			" %d\t  %d\t   %x\t\t %x\t $%p\t 0x%x\t $%p\n",
-			rdc, nxgep->rdc[rdc],
-			p_dma_cfgp->rcr_timeout[rdc],
-			p_dma_cfgp->rcr_threshold[rdc],
-			rbr_rings[rdc],
-			rbr_rings[rdc]->num_blocks, rcr_rings[rdc]);
+
+	set = &nxgep->rx_set;
+	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			print_len = snprintf((char *)
+			    ((mblk_t *)np)->b_wptr, buf_len,
+			    " %d\t   %x\t\t %x\t $%p\t 0x%x\t $%p\n",
+			    rdc,
+			    p_dma_cfgp->rcr_timeout[rdc],
+			    p_dma_cfgp->rcr_threshold[rdc],
+			    rbr_rings[rdc],
+			    rbr_rings[rdc]->num_blocks, rcr_rings[rdc]);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_rxdma_info"));
@@ -1079,7 +1089,7 @@ nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
 	(void) mi_mpprintf(mp, "RXDMA RDC Group Information for Port\t %d \n",
 		nxgep->function_num);
 
-	rdc_grp = p_cfgp->start_rdc_grpid;
+	rdc_grp = p_cfgp->def_mac_rxdma_grpid;
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		/* The following may work even if we cannot get a large buf. */
 		(void) mi_mpprintf(mp, "%s\n", "out of buffer");
@@ -1090,55 +1100,59 @@ nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
 	mp->b_cont = np;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		"Total RDC Groups\t %d \n"
-		"start RDC group\t %d\n",
+		"default RDC group\t %d\n",
 		p_cfgp->max_rdc_grpids,
-		p_cfgp->start_rdc_grpid);
+		p_cfgp->def_mac_rxdma_grpid);
 
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 
-	for (i = 0, rdc_grp = p_cfgp->start_rdc_grpid;
-	    rdc_grp < (p_cfgp->max_rdc_grpids + p_cfgp->start_rdc_grpid);
-	    rdc_grp++, i++) {
-		rdc_grp_p = &p_dma_cfgp->rdc_grps[i];
-		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			"\nRDC Group Info for Group [%d] %d\n"
-			"RDC Count %d\tstart RDC %d\n"
-			"RDC Group Population Information"
-			" (offsets 0 - 15)\n",
-			i, rdc_grp, rdc_grp_p->max_rdcs,
-			rdc_grp_p->start_rdc);
-
-		((mblk_t *)np)->b_wptr += print_len;
-		buf_len -= print_len;
-		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-			buf_len, "\n");
-		((mblk_t *)np)->b_wptr += print_len;
-		buf_len -= print_len;
-
-		for (rdc = 0; rdc < rdc_grp_p->max_rdcs; rdc++) {
+	for (i = 0; i < NXGE_MAX_RDCS; i++) {
+		if (p_cfgp->grpids[i]) {
+			rdc_grp_p = &p_dma_cfgp->rdc_grps[i];
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-				buf_len, "[%d]=%d ", rdc,
-				rdc_grp_p->start_rdc + rdc);
+			    buf_len,
+			    "\nRDC Group Info for Group [%d] %d\n"
+			    "RDC Count %d\tstart RDC %d\n"
+			    "RDC Group Population Information"
+			    " (offsets 0 - 15)\n",
+			    i, rdc_grp, rdc_grp_p->max_rdcs,
+			    rdc_grp_p->start_rdc);
+
+			((mblk_t *)np)->b_wptr += print_len;
+			buf_len -= print_len;
+			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
+			    buf_len, "\n");
+			((mblk_t *)np)->b_wptr += print_len;
+			buf_len -= print_len;
+
+			for (rdc = 0; rdc < rdc_grp_p->max_rdcs; rdc++) {
+				print_len = snprintf(
+					(char *)((mblk_t *)np)->b_wptr,
+					buf_len, "[%d]=%d ", rdc,
+					rdc_grp_p->start_rdc + rdc);
+				((mblk_t *)np)->b_wptr += print_len;
+				buf_len -= print_len;
+			}
+			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
+			    buf_len, "\n");
+			((mblk_t *)np)->b_wptr += print_len;
+			buf_len -= print_len;
+
+			for (offset = 0; offset < 16; offset++) {
+				print_len = snprintf(
+					(char *)((mblk_t *)np)->b_wptr,
+					buf_len, " %c",
+					rdc_grp_p->map & (1 << offset) ?
+					'1' : '0');
+				((mblk_t *)np)->b_wptr += print_len;
+				buf_len -= print_len;
+			}
+			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
+			    buf_len, "\n");
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
 		}
-		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-					    buf_len, "\n");
-		((mblk_t *)np)->b_wptr += print_len;
-		buf_len -= print_len;
-
-		for (offset = 0; offset < 16; offset++) {
-			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-				buf_len, " %2d ",
-				rdc_grp_p->rdc[offset]);
-			((mblk_t *)np)->b_wptr += print_len;
-			buf_len -= print_len;
-		}
-		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-			buf_len, "\n");
-		((mblk_t *)np)->b_wptr += print_len;
-		buf_len -= print_len;
 	}
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
 		"<== nxge_param_get_rxdma_rdcgrp_info"));
@@ -1328,12 +1342,10 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 		cfg_value, mac_map->param_id, mac_map->map_to));
 
 	if ((mac_map->param_id < p_cfgp->max_macs) &&
-			(mac_map->map_to < (p_cfgp->max_rdc_grpids +
-			p_cfgp->start_rdc_grpid)) && (mac_map->map_to >=
-			p_cfgp->start_rdc_grpid)) {
+	    p_cfgp->grpids[mac_map->map_to]) {
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			" nxge_param_set_mac_rdcgrp mapping"
-			" id %d grp %d", mac_map->param_id, mac_map->map_to));
+		    " nxge_param_set_mac_rdcgrp mapping"
+		    " id %d grp %d", mac_map->param_id, mac_map->map_to));
 #if defined(__i386)
 		val_ptr = (uint32_t *)(uint32_t)pa->value;
 #else
@@ -1346,13 +1358,13 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 #endif
 		if (val_ptr[mac_map->param_id] != cfg_value) {
 			old_val_ptr[mac_map->param_id] =
-				    val_ptr[mac_map->param_id];
+			    val_ptr[mac_map->param_id];
 			val_ptr[mac_map->param_id] = cfg_value;
 			mac_host_info[mac_map->param_id].mpr_npr =
-				    mac_map->pref;
+			    mac_map->pref;
 			mac_host_info[mac_map->param_id].flag = 1;
 			mac_host_info[mac_map->param_id].rdctbl =
-				    mac_map->map_to;
+			    mac_map->map_to;
 			cfg_it = B_TRUE;
 		}
 	} else {
@@ -1361,7 +1373,7 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 
 	if (cfg_it == B_TRUE) {
 		status = nxge_logical_mac_assign_rdc_table(nxgep,
-						    (uint8_t)mac_map->param_id);
+		    (uint8_t)mac_map->param_id);
 		if (status != NXGE_OK)
 			return (EINVAL);
 	}
@@ -1461,7 +1473,7 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 			vlan_tbl[vmap->param_id].mpr_npr = vmap->pref;
 			vlan_tbl[vmap->param_id].flag = 1;
 			vlan_tbl[vmap->param_id].rdctbl =
-			    vmap->map_to + p_cfgp->start_rdc_grpid;
+			    vmap->map_to + p_cfgp->def_mac_rxdma_grpid;
 			cfg_it = B_TRUE;
 			if (inc) {
 				cfgd_vlans++;
@@ -1551,7 +1563,7 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 				vmap->param_id,
 				vlan_tbl[vmap->param_id].rdctbl,
 				vlan_tbl[vmap->param_id].rdctbl -
-				p_cfgp->start_rdc_grpid,
+				p_cfgp->def_mac_rxdma_grpid,
 				vlan_tbl[vmap->param_id].mpr_npr);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
@@ -1604,7 +1616,7 @@ nxge_param_get_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 				"   %d\t  %d/%d\t\t %d\n",
 				i, mac_host_info[i].rdctbl,
 				mac_host_info[i].rdctbl -
-				p_cfgp->start_rdc_grpid,
+				p_cfgp->def_mac_rxdma_grpid,
 				mac_host_info[i].mpr_npr);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
@@ -2023,9 +2035,11 @@ nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
 	}
 
 	if (cfg_it == B_TRUE) {
+		int rdc;
+		if ((rdc = nxge_dci_map(nxgep, VP_BOUND_RX, cfg_value)) < 0)
+			return (EINVAL);
 		status = nxge_rxdma_cfg_port_default_rdc(nxgep,
-			nxgep->function_num,
-			nxgep->rdc[cfg_value]);
+		    nxgep->function_num, rdc);
 		if (status != NXGE_OK)
 			return (EINVAL);
 	}
@@ -2123,13 +2137,19 @@ nxge_param_set_npi_debug_flag(p_nxge_t nxgep, queue_t *q,
 static int
 nxge_param_dump_rdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-	uint_t rdc;
+	nxge_grp_set_t *set = &nxgep->rx_set;
+	int rdc;
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_rdc"));
 
-	(void) npi_rxdma_dump_fzc_regs(NXGE_DEV_NPI_HANDLE(nxgep));
-	for (rdc = 0; rdc < nxgep->nrdc; rdc++)
-		(void) nxge_dump_rxdma_channel(nxgep, nxgep->rdc[rdc]);
+	if (!isLDOMguest(nxgep))
+	    (void) npi_rxdma_dump_fzc_regs(NXGE_DEV_NPI_HANDLE(nxgep));
+
+	for (rdc = 0; rdc < NXGE_MAX_TDCS; rdc++) {
+		if ((1 << rdc) & set->owned.map) {
+			(void) nxge_dump_rxdma_channel(nxgep, rdc);
+		}
+	}
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_dump_rdc"));
 	return (0);
@@ -2139,12 +2159,16 @@ nxge_param_dump_rdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 static int
 nxge_param_dump_tdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-	uint_t	tdc;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_tdc"));
 
-	for (tdc = 0; tdc < nxgep->ntdc; tdc++)
-		(void) nxge_txdma_regs_dump(nxgep, nxgep->tdc[tdc]);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			(void) nxge_txdma_regs_dump(nxgep, tdc);
+		}
+	}
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_dump_tdc"));
 	return (0);
@@ -2334,7 +2358,7 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	tx_rings = nxgep->tx_rings->rings;
-	for (tdc = 0; tdc < p_cfgp->max_tdcs; tdc++) {
+	for (tdc = 0; tdc < p_cfgp->tdc.count; tdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 			" %d\t  $%p\n", tdc, tx_rings[tdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);

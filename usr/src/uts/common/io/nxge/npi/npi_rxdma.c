@@ -19,13 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <npi_rxdma.h>
+#include <npi_rx_rd64.h>
+#include <npi_rx_wr64.h>
 #include <nxge_common.h>
 
 #define	 RXDMA_RESET_TRY_COUNT	4
@@ -159,21 +161,6 @@ npi_rxdma_dump_rdc_regs(npi_handle_t handle, uint8_t rdc)
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 			"%08llx %s\t %08llx \n",
 			offset, rdc_dmc_name[i], value));
-	}
-
-	NPI_DEBUG_MSG((handle.function, DUMP_ALWAYS,
-			    "\nFZC_DMC Register Dump for Channel %d\n",
-			    rdc));
-	num_regs = sizeof (rdc_fzc_offset) / sizeof (uint64_t);
-
-	for (i = 0; i < num_regs; i++) {
-		offset = REG_FZC_RDC_OFFSET(rdc_fzc_offset[i], rdc);
-		NXGE_REG_RD64(handle, offset, &value);
-		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				    "%8llx %s\t %8llx \n",
-				    rdc_fzc_offset[i], rdc_fzc_name[i],
-				    value));
-
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
@@ -357,7 +344,6 @@ npi_rxdma_cfg_logical_page_handle(npi_handle_t handle, uint8_t rdc,
 		    " Illegal RDC number %d \n", rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
-
 
 	page_hdl.value = 0;
 
@@ -671,7 +657,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 				    "npi_rxdma_cfg_rdc_ring"
 				    " Illegal RBR Queue Length %d \n",
 				    rdc_desc_cfg->rbr_len));
-		return (NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RBRSZIE_INVALID, rdc));
+		return (NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RBRSIZE_INVALID, rdc));
 	}
 
 
@@ -695,7 +681,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			    "rxdma_cfg_rdc_ring"
 			    " blksize: Illegal buffer size %d \n",
 			    rdc_desc_cfg->page_size));
-		return (NPI_RXDMA_BUFSZIE_INVALID);
+		return (NPI_RXDMA_BUFSIZE_INVALID);
 	}
 
 	if (rdc_desc_cfg->valid0) {
@@ -713,7 +699,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 				    " rxdma_cfg_rdc_ring"
 				    " blksize0: Illegal buffer size %x \n",
 				    rdc_desc_cfg->size0));
-			return (NPI_RXDMA_BUFSZIE_INVALID);
+			return (NPI_RXDMA_BUFSIZE_INVALID);
 		}
 		cfgb.bits.ldw.vld0 = 1;
 	} else {
@@ -735,7 +721,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 				    " rxdma_cfg_rdc_ring"
 				    " blksize1: Illegal buffer size %x \n",
 				    rdc_desc_cfg->size1));
-			return (NPI_RXDMA_BUFSZIE_INVALID);
+			return (NPI_RXDMA_BUFSIZE_INVALID);
 		}
 		cfgb.bits.ldw.vld1 = 1;
 	} else {
@@ -757,7 +743,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 				    " rxdma_cfg_rdc_ring"
 				    " blksize2: Illegal buffer size %x \n",
 				    rdc_desc_cfg->size2));
-			return (NPI_RXDMA_BUFSZIE_INVALID);
+			return (NPI_RXDMA_BUFSIZE_INVALID);
 		}
 		cfgb.bits.ldw.vld2 = 1;
 	} else {
@@ -776,7 +762,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			    " rxdma_cfg_rdc_ring"
 			    " Illegal RCR Queue Length %d \n",
 			    rdc_desc_cfg->rcr_len));
-		return (NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RCRSZIE_INVALID, rdc));
+		return (NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RCRSIZE_INVALID, rdc));
 	}
 
 	rcr_cfga.bits.hdw.len = rdc_desc_cfg->rcr_len;
@@ -1431,46 +1417,87 @@ npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
 }
 
 /*
- * npi_rxdma_cfg_rdc_table()
+ * npi_rxdma_rdc_table_config()
  * Configure/populate the RDC table
  *
  * Inputs:
- *	handle:		register handle interpreted by the underlying OS
- *	table:		RDC Group Number
- *	rdc[]:	 Array of RX DMA Channels
+ *	handle:	register handle interpreted by the underlying OS
+ *	table:	RDC Group Number
+ *	map:	A bitmap of the RDCs to populate with.
+ *	count:	A count of the RDCs expressed in <map>.
+ *
+ * Notes:
+ *	This function assumes that we are not using the TCAM, but are
+ *	hashing all fields of the incoming ethernet packet!
  *
  * Return:
- * NPI_SUCCESS
- * NPI_RXDMA_TABLE_INVALID
+ *	NPI_SUCCESS
+ *	NPI_RXDMA_TABLE_INVALID
  *
  */
 npi_status_t
-npi_rxdma_cfg_rdc_table(npi_handle_t handle,
-			    uint8_t table, uint8_t rdc[])
+npi_rxdma_rdc_table_config(
+	npi_handle_t handle,
+	uint8_t table,
+	dc_map_t rdc_map,
+	int count)
 {
+	int8_t set[NXGE_MAX_RDCS];
+	int i, cursor;
+
+	rdc_tbl_t rdc_tbl;
 	uint64_t offset;
-	int tbl_offset;
-	rdc_tbl_t tbl_reg;
-	tbl_reg.value = 0;
 
 	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_rxdma_cfg_rdc_table"
-			    " Illegal RDC Rable Number %d \n",
-			    rdc));
+			" npi_rxdma_cfg_rdc_table"
+			" Illegal RDC Table Number %d \n",
+			table));
 		return (NPI_RXDMA_TABLE_INVALID);
 	}
 
-	offset = REG_RDC_TABLE_OFFSET(table);
-	for (tbl_offset = 0; tbl_offset < NXGE_MAX_RDCS; tbl_offset++) {
-		tbl_reg.bits.ldw.rdc = rdc[tbl_offset];
-		NXGE_REG_WR64(handle, offset, tbl_reg.value);
-		offset += 8;
+	if (count == 0)		/* This shouldn't happen */
+		return (NPI_SUCCESS);
+
+	for (i = 0, cursor = 0; i < NXGE_MAX_RDCS; i++) {
+		if ((1 << i) & rdc_map) {
+			set[cursor++] = (int8_t)i;
+			if (cursor == count)
+				break;
+		}
 	}
 
-	return (NPI_SUCCESS);
+	rdc_tbl.value = 0;
+	offset = REG_RDC_TABLE_OFFSET(table);
 
+	/* Now write ( NXGE_MAX_RDCS / count ) sets of RDC numbers. */
+	for (i = 0, cursor = 0; i < NXGE_MAX_RDCS; i++) {
+		rdc_tbl.bits.ldw.rdc = set[cursor++];
+		NXGE_REG_WR64(handle, offset, rdc_tbl.value);
+		offset += sizeof (rdc_tbl.value);
+		if (cursor == count)
+			cursor = 0;
+	}
+
+	/*
+	 * Here is what the resulting table looks like with:
+	 *
+	 *  0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+	 * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+	 * |v |w |x |y |z |v |w |x |y |z |v |w |x |y |z |v | 5 RDCs
+	 * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+	 * |w |x |y |z |w |x |y |z |w |x |y |z |w |x |y |z | 4 RDCs
+	 * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+	 * |x |y |z |x |y |z |x |y |z |x |y |z |x |y |z |x | 3 RDCs
+	 * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+	 * |x |y |x |y |x |y |x |y |x |y |x |y |x |y |x |y | 2 RDCs
+	 * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+	 * |x |x |x |x |x |x |x |x |x |x |x |x |x |x |x |x | 1 RDC
+	 * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+	 */
+
+	return (NPI_SUCCESS);
 }
 
 npi_status_t
@@ -2245,6 +2272,7 @@ npi_rxdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 		uint8_t channel, rxdma_ent_msk_cfg_t *mask_cfgp)
 {
 	int		status = NPI_SUCCESS;
+	uint64_t	configuration = *mask_cfgp;
 	uint64_t	value;
 
 	ASSERT(RXDMA_CHANNEL_VALID(channel));
@@ -2258,23 +2286,23 @@ npi_rxdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 	switch (op_mode) {
 	case OP_GET:
 		RXDMA_REG_READ64(handle, RX_DMA_ENT_MSK_REG, channel,
-				mask_cfgp);
+		    (uint64_t *)mask_cfgp);
 		break;
 
 	case OP_SET:
 		RXDMA_REG_WRITE64(handle, RX_DMA_ENT_MSK_REG, channel,
-				*mask_cfgp);
+		    configuration);
 		break;
 
 	case OP_UPDATE:
 		RXDMA_REG_READ64(handle, RX_DMA_ENT_MSK_REG, channel, &value);
 		RXDMA_REG_WRITE64(handle, RX_DMA_ENT_MSK_REG, channel,
-			*mask_cfgp | value);
+		    configuration | value);
 		break;
 
 	case OP_CLEAR:
 		RXDMA_REG_WRITE64(handle, RX_DMA_ENT_MSK_REG, channel,
-			CFG_RXDMA_MASK_ALL);
+		    CFG_RXDMA_MASK_ALL);
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,

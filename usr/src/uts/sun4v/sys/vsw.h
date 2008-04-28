@@ -45,6 +45,7 @@ extern "C" {
 #include <sys/vio_util.h>
 #include <sys/vgen_stats.h>
 #include <sys/vsw_ldc.h>
+#include <sys/vsw_hio.h>
 
 #define	DRV_NAME	"vsw"
 
@@ -217,6 +218,10 @@ typedef struct	vsw {
 	uint16_t		*vids;	/* vlan ids (tagged) */
 	uint16_t		nvids;	/* # of vids */
 	uint32_t		vids_size; /* size alloc'd for vids list */
+
+	/* HybridIO related fields */
+	boolean_t		hio_capable;	/* Phys dev HIO capable */
+	vsw_hio_t		vhio;		/* HybridIO info */
 } vsw_t;
 
 /*

@@ -242,6 +242,8 @@ typedef struct _rx_rcr_ring_t {
 
 	p_nxge_rx_ring_stats_t	rdc_stats;
 
+	int			poll_flag; /* 1 if polling mode */
+
 	rcrcfig_a_t		rcr_cfga;
 	rcrcfig_b_t		rcr_cfgb;
 	boolean_t		cfg_set;
@@ -397,7 +399,11 @@ typedef struct _rx_rbr_ring_t {
 	 */
 	uint32_t		rbr_ref_cnt;
 	rbr_state_t		rbr_state; /* POSTING, etc */
-
+	/*
+	 * Receive buffer allocation types:
+	 *   ddi_dma_mem_alloc(), contig_mem_alloc(), kmem_alloc()
+	 */
+	buf_alloc_type_t	rbr_alloc_type;
 } rx_rbr_ring_t, *p_rx_rbr_ring_t;
 
 /* Receive Mailbox */
@@ -450,9 +456,13 @@ typedef struct _rxdma_globals {
 /*
  * Receive DMA Prototypes.
  */
-nxge_status_t nxge_init_rxdma_channel_rcrflush(p_nxge_t, uint8_t);
 nxge_status_t nxge_init_rxdma_channels(p_nxge_t);
 void nxge_uninit_rxdma_channels(p_nxge_t);
+
+nxge_status_t nxge_init_rxdma_channel(p_nxge_t, int);
+void nxge_uninit_rxdma_channel(p_nxge_t, int);
+
+nxge_status_t nxge_init_rxdma_channel_rcrflush(p_nxge_t, uint8_t);
 nxge_status_t nxge_reset_rxdma_channel(p_nxge_t, uint16_t);
 nxge_status_t nxge_init_rxdma_channel_cntl_stat(p_nxge_t,
 	uint16_t, p_rx_dma_ctl_stat_t);
@@ -475,6 +485,9 @@ void nxge_rxdma_regs_dump_channels(p_nxge_t);
 nxge_status_t nxge_rxdma_handle_sys_errors(p_nxge_t);
 void nxge_rxdma_inject_err(p_nxge_t, uint32_t, uint8_t);
 
+extern nxge_status_t nxge_alloc_rx_mem_pool(p_nxge_t);
+extern nxge_status_t nxge_alloc_rxb(p_nxge_t nxgep, int channel);
+extern void nxge_free_rxb(p_nxge_t nxgep, int channel);
 
 #ifdef	__cplusplus
 }

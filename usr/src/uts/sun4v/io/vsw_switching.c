@@ -134,6 +134,8 @@ extern int vsw_get_hw_maddr(vsw_t *);
 extern int vsw_mac_attach(vsw_t *vswp);
 extern int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt,
 	uint32_t count);
+extern void vsw_hio_init(vsw_t *vswp);
+extern void vsw_hio_start_ports(vsw_t *vswp);
 
 /*
  * Tunables used in this file.
@@ -179,6 +181,9 @@ vsw_setup_switching_timeout(void *arg)
 		 * interface and ports in the physdev.
 		 */
 		vsw_set_addrs(vswp);
+
+		/* Start HIO for ports that have already connected */
+		vsw_hio_start_ports(vswp);
 	}
 
 	mutex_enter(&vswp->swtmout_lock);
@@ -369,6 +374,9 @@ vsw_setup_layer2(vsw_t *vswp)
 	D1(vswp, "%s: exit", __func__);
 
 	mutex_exit(&vswp->mac_lock);
+
+	/* Initialize HybridIO related stuff */
+	vsw_hio_init(vswp);
 	return (0);
 
 exit_error:

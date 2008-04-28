@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,8 @@
 nxge_os_mutex_t npidebuglock;
 int npi_debug_init = 0;
 uint64_t npi_debug_level = 0;
+
+extern void npi_trace_dump(rtrace_t *, int);
 
 void
 npi_debug_msg(npi_handle_function_t function, uint64_t level, char *fmt, ...)
@@ -84,7 +86,7 @@ npi_rtrace_buf_init(rtrace_t *rt)
 
 void
 npi_rtrace_update(npi_handle_t handle, boolean_t wr, rtrace_t *rt,
-		    uint32_t addr, uint64_t val)
+    uint32_t addr, uint64_t val)
 {
 	int idx;
 	idx = rt->next_idx;
@@ -105,3 +107,69 @@ npi_rtrace_update(npi_handle_t handle, boolean_t wr, rtrace_t *rt,
 		rt->wrapped = B_TRUE;
 	}
 }
+
+void
+npi_trace_update(npi_handle_t handle, boolean_t wr, rtrace_t *rt,
+    const char *name, uint32_t addr, uint64_t val)
+{
+	int idx;
+	idx = rt->next_idx;
+	if (wr == B_TRUE)
+		rt->buf[idx].ctl_addr = (addr & TRACE_ADDR_MASK)
+						| TRACE_CTL_WR;
+	else
+		rt->buf[idx].ctl_addr = (addr & TRACE_ADDR_MASK);
+	/*
+	 * Control Address field format
+	 *
+	 * Bit  0 - 23: Address
+	 * Bit 24 - 25: Function Number
+	 * Bit 26 - 29: Instance Number
+	 * Bit 30: Read/Write Direction bit
+	 * Bit 31: Invalid bit
+	 */
+	rt->buf[idx].ctl_addr |= (((handle.function.function
+				<< TRACE_FUNC_SHIFT) & TRACE_FUNC_MASK) |
+				((handle.function.instance
+				<< TRACE_INST_SHIFT) & TRACE_INST_MASK));
+	rt->buf[idx].val_l32 = val & 0xFFFFFFFF;
+	rt->buf[idx].val_h32 = (val >> 32) & 0xFFFFFFFF;
+	(void) strncpy(rt->buf[idx].name, name, 15);
+	rt->next_idx++;
+	if (rt->next_idx > rt->last_idx) {
+		rt->next_idx = 0;
+		rt->wrapped = B_TRUE;
+	}
+}
+
+#if defined(NPI_DEBUG)
+void
+npi_trace_dump(
+	rtrace_t *rt,
+	int count)
+{
+	rt_buf_t *trace;
+	int cursor, i;
+
+	if (count == 0 || count > MAX_RTRACE_ENTRIES)
+		count = 32;
+
+	/*
+	 * Starting with the last recorded entry,
+	 * dump the <count> most recent records.
+	 */
+	cursor = rt->next_idx;
+	cursor = (cursor == 0) ? rt->last_idx : cursor - 1;
+
+	for (i = 0; i < count; i++) {
+		trace = &rt->buf[cursor];
+		if (trace->ctl_addr == 0)
+			break;
+		cmn_err(CE_NOTE, "%16s @ 0x%08x: 0x%08x.%08x: %c",
+		    trace->name, trace->ctl_addr,
+		    trace->val_h32, trace->val_l32,
+		    trace->ctl_addr & TRACE_CTL_WR ? 'W' : 'R');
+		cursor = (cursor == 0) ? rt->last_idx : cursor - 1;
+	}
+}
+#endif

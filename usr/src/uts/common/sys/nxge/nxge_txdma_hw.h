@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ extern "C" {
 /*
  * Partitioning Suport: same as those defined for the RX
  */
+
 /*
  * TDC: Partitioning Support
  *	(Each of the following registers is for each TDC)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,6 +448,22 @@ npi_status_t npi_fzc_mpc_get(npi_handle_t, boolean_t *);
  *
  */
 npi_status_t npi_fzc_dma_bind_set(npi_handle_t, fzc_dma_bind_t);
+
+/*
+ * npi_fzc_dma_bind_get():
+ *	This function is called to get a DMA binding register.
+ * Parameters:
+ *	handle		- NPI handle
+ *	dma_bind	- NPI defined data structure that
+ *			  contains the tx/rx channel binding info.
+ *	value		- Where to put the register value.
+ * Return:
+ *	NPI_SUCCESS	-
+ *	Error:
+ *	NPI_FAILURE
+ *
+ */
+npi_status_t npi_fzc_dma_bind_get(npi_handle_t, fzc_dma_bind_t, uint64_t *);
 
 /*
  * npi_fzc_ldg_num_set():

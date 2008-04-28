@@ -26,6 +26,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nxge/nxge_impl.h>
+#include <sys/nxge/nxge_hio.h>
+#include <npi_tx_wr64.h>
 
 /* Software LSO required header files */
 #include <netinet/tcp.h>
@@ -130,41 +132,53 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	boolean_t		lso_tail_wrap = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_start: tx dma channel %d", tx_ring_p->tdc));
+	    "==> nxge_start: tx dma channel %d", tx_ring_p->tdc));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_start: Starting tdc %d desc pending %d",
-		tx_ring_p->tdc, tx_ring_p->descs_pending));
+	    "==> nxge_start: Starting tdc %d desc pending %d",
+	    tx_ring_p->tdc, tx_ring_p->descs_pending));
 
 	statsp = nxgep->statsp;
 
-	switch (nxgep->mac.portmode) {
-	default:
-		if (nxgep->statsp->port_stats.lb_mode == nxge_lb_normal) {
-			if (!statsp->mac_stats.link_up) {
-				freemsg(mp);
-				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				    "==> nxge_start: "
-				    "link not up"));
-				goto nxge_start_fail1;
+	if (!isLDOMguest(nxgep)) {
+		switch (nxgep->mac.portmode) {
+		default:
+			if (nxgep->statsp->port_stats.lb_mode ==
+			    nxge_lb_normal) {
+				if (!statsp->mac_stats.link_up) {
+					freemsg(mp);
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "==> nxge_start: "
+					    "link not up"));
+					goto nxge_start_fail1;
+				}
 			}
-		}
-		break;
-	case PORT_10G_FIBER:
-		/*
-		 * For the following modes, check the link status
-		 * before sending the packet out:
-		 * nxge_lb_normal, nxge_lb_ext10g, nxge_lb_phy10g
-		 */
-		if (nxgep->statsp->port_stats.lb_mode < nxge_lb_serdes10g) {
-			if (!statsp->mac_stats.link_up) {
-				freemsg(mp);
-				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				    "==> nxge_start: "
-				    "link not up"));
-				goto nxge_start_fail1;
+			break;
+		case PORT_10G_FIBER:
+			/*
+			 * For the following modes, check the link status
+			 * before sending the packet out:
+			 * nxge_lb_normal, nxge_lb_ext10g, nxge_lb_phy10g
+			 */
+			if (nxgep->statsp->port_stats.lb_mode <
+			    nxge_lb_serdes10g) {
+				if (!statsp->mac_stats.link_up) {
+					freemsg(mp);
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "==> nxge_start: "
+					    "link not up"));
+					goto nxge_start_fail1;
+				}
 			}
+			break;
 		}
-		break;
+	}
+
+	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
+	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "==> nxge_start: hardware not initialized or stopped"));
+		freemsg(mp);
+		goto nxge_start_fail1;
 	}
 
 	if (nxgep->soft_lso_enable) {
@@ -289,9 +303,6 @@ start_again:
 	npi_desc_handle.regh = (nxge_os_acc_handle_t)
 			DMA_COMMON_ACC_HANDLE(desc_area);
 	tx_desc_ring_vp = (p_tx_desc_t)DMA_COMMON_VPTR(desc_area);
-#ifdef	NXGE_DEBUG
-	tx_desc_ring_pp = (p_tx_desc_t)DMA_COMMON_IOADDR(desc_area);
-#endif
 	tx_desc_dma_handle = (nxge_os_dma_handle_t)
 			DMA_COMMON_HANDLE(desc_area);
 	tx_msg_ring = tx_ring_p->tx_msg_ring;
@@ -724,6 +735,7 @@ nxge_start_control_header_only:
 	pkthdrp = (p_tx_pkt_hdr_all_t)hdrp;
 	pkthdrp->reserved = 0;
 	hdrp->value = 0;
+
 	(void) nxge_fill_tx_hdr(mp, B_FALSE, cksum_on,
 		(pkt_len - TX_PKT_HEADER_SIZE), npads, pkthdrp);
 
@@ -731,7 +743,7 @@ nxge_start_control_header_only:
 		tdc_stats->tx_jumbo_pkts++;
 	}
 
-	min_len = (nxgep->msg_min + TX_PKT_HEADER_SIZE + (npads * 2));
+	min_len = (ETHERMIN + TX_PKT_HEADER_SIZE + (npads * 2));
 	if (pkt_len < min_len) {
 		/* Assume we use bcopy to premapped buffers */
 		kaddr = (caddr_t)DMA_COMMON_VPTR(tx_msg_p->buf_dma);
@@ -922,10 +934,11 @@ nxge_start_control_header_only:
 					    (uint8_t)tx_ring_p->tdc,
 					    kick.value);
 					tdc_stats->tx_starts++;
+
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
 					    "==> nxge_start: more LSO: "
 					    "LSO_CNT %d",
-					    lso_gathers));
+					    lso_ngathers));
 				}
 				lso_ngathers = 0;
 				ngathers = 0;
@@ -941,7 +954,7 @@ nxge_start_control_header_only:
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
 			    "==> nxge_start: next : count %d",
-			    lso_gathers));
+			    lso_ngathers));
 			lso_again = B_TRUE;
 			goto start_again;
 		}
@@ -966,6 +979,8 @@ nxge_start_control_header_only:
 
 	tx_ring_p->descs_pending += ngathers;
 	tdc_stats->tx_starts++;
+
+	tx_ring_p->tx_ring_state = TX_RING_STATE_IDLE;
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
@@ -1055,6 +1070,8 @@ nxge_start_fail2:
 		nxgep->resched_needed = B_TRUE;
 	}
 
+	tx_ring_p->tx_ring_state = TX_RING_STATE_IDLE;
+
 	MUTEX_EXIT(&tx_ring_p->lock);
 
 nxge_start_fail1:
@@ -1080,21 +1097,44 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 	p_tx_ring_t 		*tx_rings;
 	uint8_t			ring_index;
 	p_tx_ring_t		tx_ring_p;
+	nxge_grp_t		*group;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_send"));
 
 	ASSERT(mp->b_next == NULL);
 
-	ring_index = nxge_tx_lb_ring_1(mp, nxgep->max_tdcs, hp);
+	group = nxgep->tx_set.group[0];	/* The default group */
+	ring_index = nxge_tx_lb_ring_1(mp, group->count, hp);
+
 	tx_rings = nxgep->tx_rings->rings;
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_tx_msg: tx_rings $%p",
-		tx_rings));
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_tx_msg: max_tdcs %d "
-		"ring_index %d", nxgep->max_tdcs, ring_index));
+	tx_ring_p = tx_rings[group->legend[ring_index]];
+
+	MUTEX_ENTER(&tx_ring_p->lock);
+	if (tx_ring_p->tx_ring_state == TX_RING_STATE_OFFLINE) {
+		/*
+		 * OFFLINE means that it is in the process of being
+		 * shared - that is, it has been claimed by the HIO
+		 * code, but hasn't been unlinked from <group> yet.
+		 * So in this case use the first TDC, which always
+		 * belongs to the service domain and can't be shared.
+		 */
+		ring_index = 0;
+		tx_ring_p = tx_rings[group->legend[ring_index]];
+	} else {
+		/*
+		 * Otherwise, mark the TDC as BUSY: the HIO code
+		 * will wait until nxge_start() has completed.
+		 */
+		tx_ring_p->tx_ring_state = TX_RING_STATE_BUSY;
+	}
+	MUTEX_EXIT(&tx_ring_p->lock);
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "count %d, tx_rings[%d] = %p",
+		(int)group->count, group->legend[ring_index], tx_ring_p));
 
 	switch (nxge_tx_scheme) {
 	case NXGE_USE_START:
-		if (nxge_start(nxgep, tx_rings[ring_index], mp)) {
+		if (nxge_start(nxgep, tx_ring_p, mp)) {
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: failed "
 				"ring index %d", ring_index));
 			return (B_FALSE);
@@ -1103,7 +1143,6 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 
 	case NXGE_USE_SERIAL:
 	default:
-		tx_ring_p = tx_rings[ring_index];
 		nxge_serialize_enter(tx_ring_p->serial, mp);
 		break;
 	}
@@ -1124,11 +1163,16 @@ nxge_m_tx(void *arg, mblk_t *mp)
 	mblk_t 			*next;
 	mac_tx_hint_t		hint;
 
-	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_m_tx"));
+
+	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
+	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"==> nxge_m_tx: hardware not initialized"));
+		    "==> nxge_m_tx: hardware not initialized"));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"<== nxge_m_tx"));
+		    "<== nxge_m_tx"));
+		freemsgchain(mp);
+		mp = NULL;
 		return (mp);
 	}
 
@@ -1158,6 +1202,7 @@ nxge_m_tx(void *arg, mblk_t *mp)
 		    mp, next));
 	}
 
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_m_tx"));
 	return (mp);
 }
 
@@ -1293,8 +1338,22 @@ nxge_reschedule(caddr_t arg)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_reschedule"));
 
 	if (nxgep->nxge_mac_state == NXGE_MAC_STARTED &&
-			nxgep->resched_needed) {
-		mac_tx_update(nxgep->mach);
+	    nxgep->resched_needed) {
+		if (!isLDOMguest(nxgep))
+			mac_tx_update(nxgep->mach);
+#if defined(sun4v)
+		else {		/* isLDOMguest(nxgep) */
+			nxge_hio_data_t *nhd = (nxge_hio_data_t *)
+			    nxgep->nxge_hw_p->hio;
+			nx_vio_fp_t *vio = &nhd->hio.vio;
+
+			/* Call back vnet. */
+			if (vio->cb.vio_net_tx_update) {
+				(*vio->cb.vio_net_tx_update)
+				    (nxgep->hio_vr->vhp);
+			}
+		}
+#endif
 		nxgep->resched_needed = B_FALSE;
 		nxgep->resched_running = B_FALSE;
 	}
@@ -1631,7 +1690,7 @@ nxge_do_softlso(mblk_t *mp, uint32_t mss)
 					do_cleanup = B_TRUE;
 					NXGE_DEBUG_MSG((NULL, TX_CTL,
 					    "==> nxge_do_softlso: "
-					    "Can not dupb(datamp) (1), :
+					    "Can not dupb(datamp) (1), :"
 					    "have to do clean up"));
 					NXGE_DEBUG_MSG((NULL, TX_CTL,
 					    "==> nxge_do_softlso: "

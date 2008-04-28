@@ -19,13 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <npi_txdma.h>
+#include <npi_tx_rd64.h>
+#include <npi_tx_wr64.h>
 
 #define	TXDMA_WAIT_LOOP		10000
 #define	TXDMA_WAIT_MSEC		5
@@ -93,14 +95,18 @@ uint64_t tx_fzc_offset[] = {
 	TX_ADDR_MD_REG,
 	TDMC_INJ_PAR_ERR_REG,
 	TDMC_DBG_SEL_REG,
-	TDMC_TRAINING_REG
+	TDMC_TRAINING_REG,
+	TXC_PORT_DMA_ENABLE_REG,
+	TXC_DMA_MAX_BURST_REG
 };
 
 const char *tx_fzc_name[] = {
 	"TX_ADDR_MD_REG",
 	"TDMC_INJ_PAR_ERR_REG",
 	"TDMC_DBG_SEL_REG",
-	"TDMC_TRAINING_REG"
+	"TDMC_TRAINING_REG",
+	"TXC_PORT_DMA_ENABLE_REG",
+	"TXC_DMA_MAX_BURST_REG"
 };
 
 #define	NUM_TDC_DMC_REGS	(sizeof (tdc_dmc_offset) / sizeof (uint64_t))
@@ -142,35 +148,12 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 
 	num_regs = NUM_TDC_DMC_REGS;
 	for (i = 0; i < num_regs; i++) {
-#if defined(__i386)
-		TXDMA_REG_READ64(handle, (uint32_t)tdc_dmc_offset[i], tdc,
-			&value);
-#else
 		TXDMA_REG_READ64(handle, tdc_dmc_offset[i], tdc, &value);
-#endif
 		offset = NXGE_TXDMA_OFFSET(tdc_dmc_offset[i], handle.is_vraddr,
 				tdc);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
 			"%s\t 0x%016llx \n",
 			offset, tdc_dmc_name[i],
-			value));
-	}
-
-	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nTXDMA FZC_DMC Register Dump for Channel %d\n",
-		tdc));
-
-	num_regs = NUM_TX_FZC_REGS;
-	for (i = 0; i < num_regs; i++) {
-		offset = NXGE_TXLOG_OFFSET(tdc_fzc_offset[i], tdc);
-#if defined(__i386)
-		NXGE_REG_RD64(handle, (uint32_t)offset, &value);
-#else
-		NXGE_REG_RD64(handle, offset, &value);
-#endif
-		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t %016llx \n",
-			offset, tdc_fzc_name[i],
 			value));
 	}
 
@@ -243,12 +226,7 @@ npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 	num_regs = NUM_TDC_DMC_REGS;
 	value = 0;
 	for (i = 0; i < num_regs; i++) {
-#if defined(__i386)
-		TXDMA_REG_WRITE64(handle, (uint32_t)tdc_dmc_offset[i], tdc,
-			value);
-#else
 		TXDMA_REG_WRITE64(handle, tdc_dmc_offset[i], tdc, value);
-#endif
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
@@ -1190,6 +1168,7 @@ npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 		uint8_t channel, txdma_ent_msk_cfg_t *mask_cfgp)
 {
 	int		status = NPI_SUCCESS;
+	uint64_t	configuration = *mask_cfgp;
 	uint64_t	value;
 
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
@@ -1204,18 +1183,19 @@ npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 
 	switch (op_mode) {
 	case OP_GET:
-		TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel, mask_cfgp);
+		TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel,
+		    (uint64_t *)mask_cfgp);
 		break;
 
 	case OP_SET:
 		TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-				*mask_cfgp);
+		    configuration);
 		break;
 
 	case OP_UPDATE:
 		TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel, &value);
 		TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-			*mask_cfgp | value);
+		    configuration | value);
 		break;
 
 	case OP_CLEAR:
@@ -1251,8 +1231,8 @@ npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 npi_status_t
 npi_txdma_event_mask_mk_out(npi_handle_t handle, uint8_t channel)
 {
-	txdma_ent_msk_cfg_t event_mask;
-	int		status = NPI_SUCCESS;
+	uint64_t event_mask;
+	int	status = NPI_SUCCESS;
 
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
@@ -1288,8 +1268,8 @@ npi_txdma_event_mask_mk_out(npi_handle_t handle, uint8_t channel)
 npi_status_t
 npi_txdma_event_mask_mk_in(npi_handle_t handle, uint8_t channel)
 {
-	txdma_ent_msk_cfg_t event_mask;
-	int		status = NPI_SUCCESS;
+	uint64_t event_mask;
+	int	status = NPI_SUCCESS;
 
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {

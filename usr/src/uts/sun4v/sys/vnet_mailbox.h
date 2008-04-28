@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <sys/vio_mailbox.h>
+#include <sys/dds.h>
 #include <sys/ethernet.h>
 
 /*
@@ -42,6 +43,7 @@ extern "C" {
  *	subtype == VIO_SUBTYPE_{INFO|ACK|NACK}
  */
 #define	VNET_MCAST_INFO		0x0101
+#define	VNET_DDS_INFO		0x0102
 
 /*
  * Vnet/Vswitch device attributes information message.

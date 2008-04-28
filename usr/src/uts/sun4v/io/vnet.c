@@ -50,6 +50,11 @@
 #include <sys/atomic.h>
 #include <sys/vnet.h>
 #include <sys/vlan.h>
+#include <sys/vnet_mailbox.h>
+#include <sys/vnet_common.h>
+#include <sys/dds.h>
+#include <sys/strsubr.h>
+#include <sys/taskq.h>
 
 /*
  * Function prototypes.
@@ -72,28 +77,41 @@ mblk_t *vnet_m_tx(void *, mblk_t *);
 /* vnet internal functions */
 static int vnet_mac_register(vnet_t *);
 static int vnet_read_mac_address(vnet_t *vnetp);
-static void vnet_add_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp);
-static void vnet_del_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp);
-static vp_tl_t *vnet_get_vptl(vnet_t *vnetp, const char *devname);
 
 /* Forwarding database (FDB) routines */
 static void vnet_fdb_create(vnet_t *vnetp);
 static void vnet_fdb_destroy(vnet_t *vnetp);
-static vnet_fdbe_t *vnet_fdbe_find(vnet_t *vnetp, struct ether_addr *eaddr);
+static vnet_res_t *vnet_fdbe_find(vnet_t *vnetp, struct ether_addr *addrp);
 static void vnet_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val);
-void vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr,
-	uint8_t type, mac_tx_t m_tx, void *port);
-void vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr);
-void vnet_fdbe_modify(vnet_t *vnetp, struct ether_addr *macaddr,
-	void *portp, boolean_t flag);
+void vnet_fdbe_add(vnet_t *vnetp, vnet_res_t *vresp);
+static void vnet_fdbe_del(vnet_t *vnetp, vnet_res_t *vresp);
 
-void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
-void vnet_tx_update(void *arg);
+static void vnet_rx(vio_net_handle_t vrh, mblk_t *mp);
+static void vnet_tx_update(vio_net_handle_t vrh);
+static void vnet_res_start_task(void *arg);
+static void vnet_start_resources(vnet_t *vnetp);
+static void vnet_stop_resources(vnet_t *vnetp);
+static void vnet_dispatch_res_task(vnet_t *vnetp);
+static void vnet_res_start_task(void *arg);
+static void vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err);
 
-/* externs */
-extern int vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
-	mac_register_t **vgenmacp);
+
+/* Exported to to vnet_dds */
+int vnet_send_dds_msg(vnet_t *vnetp, void *dmsg);
+
+/* Externs that are imported from vnet_gen */
+extern int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
+    const uint8_t *macaddr, void **vgenhdl);
 extern int vgen_uninit(void *arg);
+extern int vgen_dds_tx(void *arg, void *dmsg);
+
+/* Externs that are imported from vnet_dds */
+extern void vdds_mod_init(void);
+extern void vdds_mod_fini(void);
+extern int vdds_init(vnet_t *vnetp);
+extern void vdds_cleanup(vnet_t *vnetp);
+extern void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
+extern void vdds_cleanup_hybrid_res(vnet_t *vnetp);
 
 #define	VNET_FDBE_REFHOLD(p)						\
 {									\
@@ -150,6 +168,11 @@ uint16_t	vnet_default_vlan_id = 1;
 
 /* delay in usec to wait for all references on a fdb entry to be dropped */
 uint32_t vnet_fdbe_refcnt_delay = 10;
+
+static struct ether_addr etherbroadcastaddr = {
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+};
+
 
 /*
  * Property names
@@ -245,7 +268,7 @@ _init(void)
 	if (status != 0) {
 		mac_fini_ops(&vnetops);
 	}
-
+	vdds_mod_init();
 	DBG1(NULL, "exit(%d)\n", status);
 	return (status);
 }
@@ -262,6 +285,7 @@ _fini(void)
 	if (status != 0)
 		return (status);
 	mac_fini_ops(&vnetops);
+	vdds_mod_fini();
 
 	DBG1(NULL, "exit(%d)\n", status);
 	return (status);
@@ -282,14 +306,15 @@ static int
 vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	vnet_t		*vnetp;
-	vp_tl_t		*vp_tlp;
-	int		instance;
 	int		status;
-	mac_register_t	*vgenmacp = NULL;
+	int		instance;
+	uint64_t	reg;
+	char		qname[TASKQ_NAMELEN];
 	enum	{ AST_init = 0x0, AST_vnet_alloc = 0x1,
 		AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
-		AST_vgen_init = 0x8, AST_vptl_alloc = 0x10,
-		AST_fdbh_alloc = 0x20 } attach_state;
+		AST_vgen_init = 0x8, AST_fdbh_alloc = 0x10,
+		AST_vdds_init = 0x20, AST_taskq_create = 0x40,
+		AST_vnet_list = 0x80 } attach_state;
 
 	attach_state = AST_init;
 
@@ -307,12 +332,20 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* allocate vnet_t and mac_t structures */
 	vnetp = kmem_zalloc(sizeof (vnet_t), KM_SLEEP);
+	vnetp->dip = dip;
+	vnetp->instance = instance;
+	rw_init(&vnetp->vrwlock, NULL, RW_DRIVER, NULL);
+	rw_init(&vnetp->vsw_fp_rw, NULL, RW_DRIVER, NULL);
 	attach_state |= AST_vnet_alloc;
+
+	status = vdds_init(vnetp);
+	if (status != 0) {
+		goto vnet_attach_fail;
+	}
+	attach_state |= AST_vdds_init;
 
 	/* setup links to vnet_t from both devinfo and mac_t */
 	ddi_set_driver_private(dip, (caddr_t)vnetp);
-	vnetp->dip = dip;
-	vnetp->instance = instance;
 
 	/* read the mac address */
 	status = vnet_read_mac_address(vnetp);
@@ -321,45 +354,24 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	attach_state |= AST_read_macaddr;
 
-	/*
-	 * Initialize the generic vnet proxy transport. This is the first
-	 * and default transport used by vnet. The generic transport
-	 * is provided by using sun4v LDC (logical domain channel). On success,
-	 * vgen_init() provides a pointer to mac_t of generic transport.
-	 * Currently, this generic layer provides network connectivity to other
-	 * vnets within ldoms and also to remote hosts oustide ldoms through
-	 * the virtual switch (vsw) device on domain0. In the future, when
-	 * physical adapters that are able to share their resources (such as
-	 * dma channels) with guest domains become available, the vnet device
-	 * will use hardware specific driver to communicate directly over the
-	 * physical device to reach remote hosts without going through vswitch.
-	 */
-	status = vgen_init(vnetp, vnetp->dip, (uint8_t *)vnetp->curr_macaddr,
-	    &vgenmacp);
-	if (status != DDI_SUCCESS) {
-		DERR(vnetp, "vgen_init() failed\n");
+	reg = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "reg", -1);
+	if (reg == -1) {
 		goto vnet_attach_fail;
 	}
-	rw_init(&vnetp->trwlock, NULL, RW_DRIVER, NULL);
-	attach_state |= AST_vgen_init;
-
-	vp_tlp = kmem_zalloc(sizeof (vp_tl_t), KM_SLEEP);
-	vp_tlp->macp = vgenmacp;
-	(void) snprintf(vp_tlp->name, MAXNAMELEN, "%s%u", "vgen", instance);
-	(void) strcpy(vnetp->vgen_name, vp_tlp->name);
-
-	/* add generic transport to the list of vnet proxy transports */
-	vnet_add_vptl(vnetp, vp_tlp);
-	attach_state |= AST_vptl_alloc;
+	vnetp->reg = reg;
 
 	vnet_fdb_create(vnetp);
 	attach_state |= AST_fdbh_alloc;
 
-	/* register with MAC layer */
-	status = vnet_mac_register(vnetp);
-	if (status != DDI_SUCCESS) {
+	(void) snprintf(qname, TASKQ_NAMELEN, "vnet_taskq%d", instance);
+	if ((vnetp->taskqp = ddi_taskq_create(dip, qname, 1,
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
+		cmn_err(CE_WARN, "!vnet%d: Unable to create task queue",
+		    instance);
 		goto vnet_attach_fail;
 	}
+	attach_state |= AST_taskq_create;
 
 	/* add to the list of vnet devices */
 	WRITE_ENTER(&vnet_rw);
@@ -367,23 +379,62 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnet_headp = vnetp;
 	RW_EXIT(&vnet_rw);
 
+	attach_state |= AST_vnet_list;
+
+	/*
+	 * Initialize the generic vnet plugin which provides
+	 * communication via sun4v LDC (logical domain channel) based
+	 * resources. It will register the LDC resources as and when
+	 * they become available.
+	 */
+	status = vgen_init(vnetp, reg, vnetp->dip,
+	    (uint8_t *)vnetp->curr_macaddr, &vnetp->vgenhdl);
+	if (status != DDI_SUCCESS) {
+		DERR(vnetp, "vgen_init() failed\n");
+		goto vnet_attach_fail;
+	}
+	attach_state |= AST_vgen_init;
+
+	/* register with MAC layer */
+	status = vnet_mac_register(vnetp);
+	if (status != DDI_SUCCESS) {
+		goto vnet_attach_fail;
+	}
+
 	DBG1(NULL, "instance(%d) exit\n", instance);
 	return (DDI_SUCCESS);
 
 vnet_attach_fail:
+
+	if (attach_state & AST_vnet_list) {
+		vnet_t		**vnetpp;
+		/* unlink from instance(vnet_t) list */
+		WRITE_ENTER(&vnet_rw);
+		for (vnetpp = &vnet_headp; *vnetpp;
+		    vnetpp = &(*vnetpp)->nextp) {
+			if (*vnetpp == vnetp) {
+				*vnetpp = vnetp->nextp;
+				break;
+			}
+		}
+		RW_EXIT(&vnet_rw);
+	}
+
+	if (attach_state & AST_vdds_init) {
+		vdds_cleanup(vnetp);
+	}
+	if (attach_state & AST_taskq_create) {
+		ddi_taskq_destroy(vnetp->taskqp);
+	}
 	if (attach_state & AST_fdbh_alloc) {
 		vnet_fdb_destroy(vnetp);
 	}
-	if (attach_state & AST_vptl_alloc) {
-		WRITE_ENTER(&vnetp->trwlock);
-		vnet_del_vptl(vnetp, vp_tlp);
-		RW_EXIT(&vnetp->trwlock);
-	}
 	if (attach_state & AST_vgen_init) {
-		(void) vgen_uninit(vgenmacp->m_driver);
-		rw_destroy(&vnetp->trwlock);
+		(void) vgen_uninit(vnetp->vgenhdl);
 	}
 	if (attach_state & AST_vnet_alloc) {
+		rw_destroy(&vnetp->vrwlock);
+		rw_destroy(&vnetp->vsw_fp_rw);
 		KMEM_FREE(vnetp);
 	}
 	return (DDI_FAILURE);
@@ -397,7 +448,6 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	vnet_t		*vnetp;
 	vnet_t		**vnetpp;
-	vp_tl_t		*vp_tlp;
 	int		instance;
 	int		rv;
 
@@ -418,20 +468,11 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		goto vnet_detach_fail;
 	}
 
-	/* uninit and free vnet proxy transports */
-	WRITE_ENTER(&vnetp->trwlock);
-	while ((vp_tlp = vnetp->tlp) != NULL) {
-		if (strcmp(vnetp->vgen_name, vp_tlp->name) == 0) {
-			/* uninitialize generic transport */
-			rv = vgen_uninit(vp_tlp->macp->m_driver);
-			if (rv != DDI_SUCCESS) {
-				RW_EXIT(&vnetp->trwlock);
-				goto vnet_detach_fail;
-			}
-		}
-		vnet_del_vptl(vnetp, vp_tlp);
+	(void) vdds_cleanup(vnetp);
+	rv = vgen_uninit(vnetp->vgenhdl);
+	if (rv != DDI_SUCCESS) {
+		goto vnet_detach_fail;
 	}
-	RW_EXIT(&vnetp->trwlock);
 
 	/*
 	 * Unregister from the MAC subsystem.  This can fail, in
@@ -451,10 +492,12 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	RW_EXIT(&vnet_rw);
 
+	ddi_taskq_destroy(vnetp->taskqp);
 	/* destroy fdb */
 	vnet_fdb_destroy(vnetp);
 
-	rw_destroy(&vnetp->trwlock);
+	rw_destroy(&vnetp->vrwlock);
+	rw_destroy(&vnetp->vsw_fp_rw);
 	KMEM_FREE(vnetp);
 
 	return (DDI_SUCCESS);
@@ -468,29 +511,13 @@ static int
 vnet_m_start(void *arg)
 {
 	vnet_t		*vnetp = arg;
-	vp_tl_t		*vp_tlp;
-	mac_register_t	*vp_macp;
-	mac_callbacks_t	*cbp;
 
 	DBG1(vnetp, "enter\n");
 
-	/*
-	 * NOTE:
-	 * Currently, we only have generic transport. m_start() invokes
-	 * vgen_start() which enables ports/channels in vgen and
-	 * initiates handshake with peer vnets and vsw. In the future when we
-	 * have support for hardware specific transports, this information
-	 * needs to be propagted back to vnet from vgen and we need to revisit
-	 * this code (see comments in vnet_attach()).
-	 *
-	 */
-	WRITE_ENTER(&vnetp->trwlock);
-	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
-		vp_macp = vp_tlp->macp;
-		cbp = vp_macp->m_callbacks;
-		cbp->mc_start(vp_macp->m_driver);
-	}
-	RW_EXIT(&vnetp->trwlock);
+	WRITE_ENTER(&vnetp->vrwlock);
+	vnetp->flags |= VNET_STARTED;
+	vnet_start_resources(vnetp);
+	RW_EXIT(&vnetp->vrwlock);
 
 	DBG1(vnetp, "exit\n");
 	return (VNET_SUCCESS);
@@ -502,19 +529,15 @@ static void
 vnet_m_stop(void *arg)
 {
 	vnet_t		*vnetp = arg;
-	vp_tl_t		*vp_tlp;
-	mac_register_t	*vp_macp;
-	mac_callbacks_t	*cbp;
 
 	DBG1(vnetp, "enter\n");
 
-	WRITE_ENTER(&vnetp->trwlock);
-	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
-		vp_macp = vp_tlp->macp;
-		cbp = vp_macp->m_callbacks;
-		cbp->mc_stop(vp_macp->m_driver);
+	WRITE_ENTER(&vnetp->vrwlock);
+	if (vnetp->flags & VNET_STARTED) {
+		vnet_stop_resources(vnetp);
+		vnetp->flags &= ~VNET_STARTED;
 	}
-	RW_EXIT(&vnetp->trwlock);
+	RW_EXIT(&vnetp->vrwlock);
 
 	DBG1(vnetp, "exit\n");
 }
@@ -543,22 +566,23 @@ vnet_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	_NOTE(ARGUNUSED(add, mca))
 
 	vnet_t *vnetp = arg;
-	vp_tl_t		*vp_tlp;
-	mac_register_t	*vp_macp;
+	vnet_res_t	*vresp;
+	mac_register_t	*macp;
 	mac_callbacks_t	*cbp;
 	int rv = VNET_SUCCESS;
 
 	DBG1(vnetp, "enter\n");
-	READ_ENTER(&vnetp->trwlock);
-	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
-		if (strcmp(vnetp->vgen_name, vp_tlp->name) == 0) {
-			vp_macp = vp_tlp->macp;
-			cbp = vp_macp->m_callbacks;
-			rv = cbp->mc_multicst(vp_macp->m_driver, add, mca);
-			break;
+
+	READ_ENTER(&vnetp->vrwlock);
+	for (vresp = vnetp->vres_list; vresp != NULL; vresp = vresp->nextp) {
+		if (vresp->type == VIO_NET_RES_LDC_SERVICE) {
+			macp = &vresp->macreg;
+			cbp = macp->m_callbacks;
+			rv = cbp->mc_multicst(macp->m_driver, add, mca);
 		}
 	}
-	RW_EXIT(&vnetp->trwlock);
+	RW_EXIT(&vnetp->vrwlock);
+
 	DBG1(vnetp, "exit(%d)\n", rv);
 	return (rv);
 }
@@ -587,10 +611,12 @@ mblk_t *
 vnet_m_tx(void *arg, mblk_t *mp)
 {
 	vnet_t			*vnetp;
-	vnet_fdbe_t		*fp;
+	vnet_res_t		*vresp;
 	mblk_t			*next;
-	mblk_t 			*resid_mp;
-	struct ether_header 	*ehp;
+	mblk_t			*resid_mp;
+	mac_register_t		*macp;
+	struct ether_header	*ehp;
+	boolean_t		is_unicast;
 
 	vnetp = (vnet_t *)arg;
 	DBG1(vnetp, "enter\n");
@@ -606,8 +632,8 @@ vnet_m_tx(void *arg, mblk_t *mp)
 		 * and hold a reference to it.
 		 */
 		ehp = (struct ether_header *)mp->b_rptr;
-		fp = vnet_fdbe_find(vnetp, &ehp->ether_dhost);
-		if (fp != NULL) {
+		vresp = vnet_fdbe_find(vnetp, &ehp->ether_dhost);
+		if (vresp != NULL) {
 
 			/*
 			 * Destination found in FDB.
@@ -615,10 +641,11 @@ vnet_m_tx(void *arg, mblk_t *mp)
 			 * and directly reachable, invoke the tx function
 			 * in the fdb entry.
 			 */
-			resid_mp = fp->m_tx(fp->txarg, mp);
+			macp = &vresp->macreg;
+			resid_mp = macp->m_callbacks->mc_tx(macp->m_driver, mp);
 
 			/* tx done; now release ref on fdb entry */
-			VNET_FDBE_REFRELE(fp);
+			VNET_FDBE_REFRELE(vresp);
 
 			if (resid_mp != NULL) {
 				/* m_tx failed */
@@ -626,17 +653,24 @@ vnet_m_tx(void *arg, mblk_t *mp)
 				break;
 			}
 		} else {
+			is_unicast = !(IS_BROADCAST(ehp) ||
+			    (IS_MULTICAST(ehp)));
 			/*
 			 * Destination is not in FDB.
-			 * If the destination is broadcast/multicast
-			 * or an unknown unicast address, forward the
-			 * packet to vsw, using the cached fdb entry
-			 * to vsw.
+			 * If the destination is broadcast or multicast,
+			 * then forward the packet to vswitch.
+			 * If a Hybrid resource avilable, then send the
+			 * unicast packet via hybrid resource, otherwise
+			 * forward it to vswitch.
 			 */
 			READ_ENTER(&vnetp->vsw_fp_rw);
 
-			fp = vnetp->vsw_fp;
-			if (fp == NULL) {
+			if ((is_unicast) && (vnetp->hio_fp != NULL)) {
+				vresp = vnetp->hio_fp;
+			} else {
+				vresp = vnetp->vsw_fp;
+			}
+			if (vresp == NULL) {
 				/*
 				 * no fdb entry to vsw? drop the packet.
 				 */
@@ -647,14 +681,15 @@ vnet_m_tx(void *arg, mblk_t *mp)
 			}
 
 			/* ref hold the fdb entry to vsw */
-			VNET_FDBE_REFHOLD(fp);
+			VNET_FDBE_REFHOLD(vresp);
 
 			RW_EXIT(&vnetp->vsw_fp_rw);
 
-			resid_mp = fp->m_tx(fp->txarg, mp);
+			macp = &vresp->macreg;
+			resid_mp = macp->m_callbacks->mc_tx(macp->m_driver, mp);
 
 			/* tx done; now release ref on fdb entry */
-			VNET_FDBE_REFRELE(fp);
+			VNET_FDBE_REFRELE(vresp);
 
 			if (resid_mp != NULL) {
 				/* m_tx failed */
@@ -675,8 +710,8 @@ int
 vnet_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	vnet_t *vnetp = arg;
-	vp_tl_t	*vp_tlp;
-	mac_register_t	*vp_macp;
+	vnet_res_t	*vresp;
+	mac_register_t	*macp;
 	mac_callbacks_t	*cbp;
 	uint64_t val_total = 0;
 
@@ -690,14 +725,15 @@ vnet_m_stat(void *arg, uint_t stat, uint64_t *val)
 	    (IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat))) {
 		return (ENOTSUP);
 	}
-	READ_ENTER(&vnetp->trwlock);
-	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
-		vp_macp = vp_tlp->macp;
-		cbp = vp_macp->m_callbacks;
-		if (cbp->mc_getstat(vp_macp->m_driver, stat, val) == 0)
+
+	READ_ENTER(&vnetp->vrwlock);
+	for (vresp = vnetp->vres_list; vresp != NULL; vresp = vresp->nextp) {
+		macp = &vresp->macreg;
+		cbp = macp->m_callbacks;
+		if (cbp->mc_getstat(macp->m_driver, stat, val) == 0)
 			val_total += *val;
 	}
-	RW_EXIT(&vnetp->trwlock);
+	RW_EXIT(&vnetp->vrwlock);
 
 	*val = val_total;
 
@@ -730,66 +766,6 @@ vnet_mac_register(vnet_t *vnetp)
 	err = mac_register(macp, &vnetp->mh);
 	mac_free(macp);
 	return (err == 0 ? DDI_SUCCESS : DDI_FAILURE);
-}
-
-/* add vp_tl to the list */
-static void
-vnet_add_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp)
-{
-	vp_tl_t *ttlp;
-
-	WRITE_ENTER(&vnetp->trwlock);
-	if (vnetp->tlp == NULL) {
-		vnetp->tlp = vp_tlp;
-	} else {
-		ttlp = vnetp->tlp;
-		while (ttlp->nextp)
-			ttlp = ttlp->nextp;
-		ttlp->nextp = vp_tlp;
-	}
-	RW_EXIT(&vnetp->trwlock);
-}
-
-/* remove vp_tl from the list */
-static void
-vnet_del_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp)
-{
-	vp_tl_t *ttlp, **pretlp;
-	boolean_t found = B_FALSE;
-
-	pretlp = &vnetp->tlp;
-	ttlp = *pretlp;
-	while (ttlp) {
-		if (ttlp == vp_tlp) {
-			found = B_TRUE;
-			(*pretlp) = ttlp->nextp;
-			ttlp->nextp = NULL;
-			break;
-		}
-		pretlp = &(ttlp->nextp);
-		ttlp = *pretlp;
-	}
-
-	if (found) {
-		KMEM_FREE(vp_tlp);
-	}
-}
-
-/* get vp_tl corresponding to the given name */
-static vp_tl_t *
-vnet_get_vptl(vnet_t *vnetp, const char *name)
-{
-	vp_tl_t *tlp;
-
-	tlp = vnetp->tlp;
-	while (tlp) {
-		if (strcmp(tlp->name, name) == 0) {
-			return (tlp);
-		}
-		tlp = tlp->nextp;
-	}
-	DWARN(vnetp, "can't find vp_tl with name (%s)\n", name);
-	return (NULL);
 }
 
 /* read the mac address of the device */
@@ -841,44 +817,47 @@ vnet_fdb_destroy(vnet_t *vnetp)
  * Add an entry into the fdb.
  */
 void
-vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr, uint8_t type,
-	mac_tx_t m_tx, void *port)
+vnet_fdbe_add(vnet_t *vnetp, vnet_res_t *vresp)
 {
 	uint64_t	addr = 0;
-	vnet_fdbe_t	*fp;
 	int		rv;
 
-	KEY_HASH(addr, macaddr);
-
-	fp = kmem_zalloc(sizeof (vnet_fdbe_t), KM_SLEEP);
-	fp->txarg = port;
-	fp->type = type;
-	fp->m_tx = m_tx;
+	KEY_HASH(addr, vresp->rem_macaddr);
 
 	/*
-	 * If the entry being added corresponds to vsw-port, we cache that
-	 * entry and keep a permanent reference to it. This is done to avoid
-	 * searching this entry when we need to transmit a frame with an
-	 * unknown unicast destination, in vnet_m_tx().
+	 * If the entry being added corresponds to LDC_SERVICE resource,
+	 * that is, vswitch connection, it is added to the hash and also
+	 * the entry is cached, an additional reference count reflects
+	 * this. The HYBRID resource is not added to the hash, but only
+	 * cached, as it is only used for sending out packets for unknown
+	 * unicast destinations.
 	 */
-	(fp->type == VNET_VSWPORT) ? (fp->refcnt = 1) : (fp->refcnt = 0);
+	(vresp->type == VIO_NET_RES_LDC_SERVICE) ?
+	    (vresp->refcnt = 1) : (vresp->refcnt = 0);
 
 	/*
 	 * Note: duplicate keys will be rejected by mod_hash.
 	 */
-	rv = mod_hash_insert(vnetp->fdb_hashp, (mod_hash_key_t)addr,
-	    (mod_hash_val_t)fp);
-	if (rv != 0) {
-		DWARN(vnetp, "Duplicate macaddr key(%lx)\n", addr);
-		KMEM_FREE(fp);
-		return;
+	if (vresp->type != VIO_NET_RES_HYBRID) {
+		rv = mod_hash_insert(vnetp->fdb_hashp, (mod_hash_key_t)addr,
+		    (mod_hash_val_t)vresp);
+		if (rv != 0) {
+			DWARN(vnetp, "Duplicate macaddr key(%lx)\n", addr);
+			return;
+		}
 	}
 
-	if (type == VNET_VSWPORT) {
+	if (vresp->type == VIO_NET_RES_LDC_SERVICE) {
 		/* Cache the fdb entry to vsw-port */
 		WRITE_ENTER(&vnetp->vsw_fp_rw);
 		if (vnetp->vsw_fp == NULL)
-			vnetp->vsw_fp = fp;
+			vnetp->vsw_fp = vresp;
+		RW_EXIT(&vnetp->vsw_fp_rw);
+	} else if (vresp->type == VIO_NET_RES_HYBRID) {
+		/* Cache the fdb entry to hybrid resource */
+		WRITE_ENTER(&vnetp->vsw_fp_rw);
+		if (vnetp->hio_fp == NULL)
+			vnetp->hio_fp = vresp;
 		RW_EXIT(&vnetp->vsw_fp_rw);
 	}
 }
@@ -886,29 +865,44 @@ vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr, uint8_t type,
 /*
  * Remove an entry from fdb.
  */
-void
-vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr)
+static void
+vnet_fdbe_del(vnet_t *vnetp, vnet_res_t *vresp)
 {
 	uint64_t	addr = 0;
-	vnet_fdbe_t	*fp;
 	int		rv;
 	uint32_t	refcnt;
+	vnet_res_t	*tmp;
 
-	KEY_HASH(addr, eaddr);
+	KEY_HASH(addr, vresp->rem_macaddr);
 
 	/*
 	 * Remove the entry from fdb hash table.
 	 * This prevents further references to this fdb entry.
 	 */
-	rv = mod_hash_remove(vnetp->fdb_hashp, (mod_hash_key_t)addr,
-	    (mod_hash_val_t *)&fp);
-	ASSERT(rv == 0);
+	if (vresp->type != VIO_NET_RES_HYBRID) {
+		rv = mod_hash_remove(vnetp->fdb_hashp, (mod_hash_key_t)addr,
+		    (mod_hash_val_t *)&tmp);
+		if (rv != 0) {
+			/*
+			 * As the resources are added to the hash only
+			 * after they are started, this can occur if
+			 * a resource unregisters before it is ever started.
+			 */
+			return;
+		}
+	}
 
-	if (fp->type == VNET_VSWPORT) {
+	if (vresp->type == VIO_NET_RES_LDC_SERVICE) {
 		WRITE_ENTER(&vnetp->vsw_fp_rw);
 
-		ASSERT(fp == vnetp->vsw_fp);
+		ASSERT(tmp == vnetp->vsw_fp);
 		vnetp->vsw_fp = NULL;
+
+		RW_EXIT(&vnetp->vsw_fp_rw);
+	} else if (vresp->type == VIO_NET_RES_HYBRID) {
+		WRITE_ENTER(&vnetp->vsw_fp_rw);
+
+		vnetp->hio_fp = NULL;
 
 		RW_EXIT(&vnetp->vsw_fp_rw);
 	}
@@ -917,81 +911,33 @@ vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr)
 	 * If there are threads already ref holding before the entry was
 	 * removed from hash table, then wait for ref count to drop to zero.
 	 */
-	(fp->type == VNET_VSWPORT) ? (refcnt = 1) : (refcnt = 0);
-	while (fp->refcnt > refcnt) {
+	(vresp->type == VIO_NET_RES_LDC_SERVICE) ?
+	    (refcnt = 1) : (refcnt = 0);
+	while (vresp->refcnt > refcnt) {
 		delay(drv_usectohz(vnet_fdbe_refcnt_delay));
 	}
-
-	kmem_free(fp, sizeof (*fp));
-}
-
-/*
- * Modify the fdb entry for the given macaddr,
- * to use the specified port for transmits.
- */
-void
-vnet_fdbe_modify(vnet_t *vnetp, struct ether_addr *macaddr, void *portp,
-	boolean_t flag)
-{
-	vnet_fdbe_t	*fp;
-	uint64_t	addr = 0;
-	int		rv;
-	uint32_t	refcnt;
-
-	KEY_HASH(addr, macaddr);
-
-	/*
-	 * Remove the entry from fdb hash table.
-	 * This prevents further references to this fdb entry.
-	 */
-	rv = mod_hash_remove(vnetp->fdb_hashp, (mod_hash_key_t)addr,
-	    (mod_hash_val_t *)&fp);
-	ASSERT(rv == 0);
-
-	/* fdb entry of vsw port must never be modified */
-	ASSERT(fp->type == VNET_VNETPORT);
-
-	/*
-	 * If there are threads already ref holding before the entry was
-	 * removed from hash table, then wait for reference count to drop to
-	 * zero. Note: flag indicates the context of caller. If we are in the
-	 * context of transmit routine, there is a reference held by the caller
-	 * too, in which case, wait for the refcnt to drop to 1.
-	 */
-	(flag == B_TRUE) ? (refcnt = 1) : (refcnt = 0);
-	while (fp->refcnt > refcnt) {
-		delay(drv_usectohz(vnet_fdbe_refcnt_delay));
-	}
-
-	/* update the portp in fdb entry with the new value */
-	fp->txarg = portp;
-
-	/* Reinsert the updated fdb entry into the table */
-	rv = mod_hash_insert(vnetp->fdb_hashp, (mod_hash_key_t)addr,
-	    (mod_hash_val_t)fp);
-	ASSERT(rv == 0);
 }
 
 /*
  * Search fdb for a given mac address. If an entry is found, hold
  * a reference to it and return the entry; else returns NULL.
  */
-static vnet_fdbe_t *
+static vnet_res_t *
 vnet_fdbe_find(vnet_t *vnetp, struct ether_addr *addrp)
 {
 	uint64_t	key = 0;
-	vnet_fdbe_t	*fp;
+	vnet_res_t	*vresp;
 	int		rv;
 
-	KEY_HASH(key, addrp);
+	KEY_HASH(key, addrp->ether_addr_octet);
 
 	rv = mod_hash_find_cb(vnetp->fdb_hashp, (mod_hash_key_t)key,
-	    (mod_hash_val_t *)&fp, vnet_fdbe_find_cb);
+	    (mod_hash_val_t *)&vresp, vnet_fdbe_find_cb);
 
 	if (rv != 0)
 		return (NULL);
 
-	return (fp);
+	return (vresp);
 }
 
 /*
@@ -1004,19 +950,267 @@ static void
 vnet_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val)
 {
 	_NOTE(ARGUNUSED(key))
-	VNET_FDBE_REFHOLD((vnet_fdbe_t *)val);
+	VNET_FDBE_REFHOLD((vnet_res_t *)val);
+}
+
+static void
+vnet_rx(vio_net_handle_t vrh, mblk_t *mp)
+{
+	vnet_res_t *vresp = (vnet_res_t *)vrh;
+	vnet_t *vnetp = vresp->vnetp;
+
+	if ((vnetp != NULL) && (vnetp->mh)) {
+		mac_rx(vnetp->mh, NULL, mp);
+	} else {
+		freemsgchain(mp);
+	}
 }
 
 void
-vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+vnet_tx_update(vio_net_handle_t vrh)
 {
-	vnet_t *vnetp = arg;
-	mac_rx(vnetp->mh, mrh, mp);
+	vnet_res_t *vresp = (vnet_res_t *)vrh;
+	vnet_t *vnetp = vresp->vnetp;
+
+	if ((vnetp != NULL) && (vnetp->mh != NULL)) {
+		mac_tx_update(vnetp->mh);
+	}
 }
 
+/*
+ * vio_net_resource_reg -- An interface called to register a resource
+ *	with vnet.
+ *	macp -- a GLDv3 mac_register that has all the details of
+ *		a resource and its callbacks etc.
+ *	type -- resource type.
+ *	local_macaddr -- resource's MAC address. This is used to
+ *			 associate a resource with a corresponding vnet.
+ *	remote_macaddr -- remote side MAC address. This is ignored for
+ *			  the Hybrid resources.
+ *	vhp -- A handle returned to the caller.
+ *	vcb -- A set of callbacks provided to the callers.
+ */
+int vio_net_resource_reg(mac_register_t *macp, vio_net_res_type_t type,
+    ether_addr_t local_macaddr, ether_addr_t rem_macaddr, vio_net_handle_t *vhp,
+    vio_net_callbacks_t *vcb)
+{
+	vnet_t	*vnetp;
+	vnet_res_t *vresp;
+
+	vresp = kmem_zalloc(sizeof (vnet_res_t), KM_SLEEP);
+	ether_copy(local_macaddr, vresp->local_macaddr);
+	ether_copy(rem_macaddr, vresp->rem_macaddr);
+	vresp->type = type;
+	bcopy(macp, &vresp->macreg, sizeof (mac_register_t));
+
+	DBG1(NULL, "Resource Registerig type=0%X\n", type);
+
+	READ_ENTER(&vnet_rw);
+	vnetp = vnet_headp;
+	while (vnetp != NULL) {
+		if (VNET_MATCH_RES(vresp, vnetp)) {
+			WRITE_ENTER(&vnetp->vrwlock);
+			vresp->vnetp = vnetp;
+			vresp->nextp = vnetp->vres_list;
+			vnetp->vres_list = vresp;
+			RW_EXIT(&vnetp->vrwlock);
+			break;
+		}
+		vnetp = vnetp->nextp;
+	}
+	RW_EXIT(&vnet_rw);
+	if (vresp->vnetp == NULL) {
+		DWARN(NULL, "No vnet instance");
+		kmem_free(vresp, sizeof (vnet_res_t));
+		return (ENXIO);
+	}
+
+	*vhp = vresp;
+	vcb->vio_net_rx_cb = vnet_rx;
+	vcb->vio_net_tx_update = vnet_tx_update;
+	vcb->vio_net_report_err = vnet_handle_res_err;
+
+	/* Dispatch a task to start resources */
+	vnet_dispatch_res_task(vnetp);
+	return (0);
+}
+
+/*
+ * vio_net_resource_unreg -- An interface to unregister a resource.
+ */
 void
-vnet_tx_update(void *arg)
+vio_net_resource_unreg(vio_net_handle_t vhp)
+{
+	vnet_res_t *vresp = (vnet_res_t *)vhp;
+	vnet_t *vnetp = vresp->vnetp;
+	vnet_res_t *vrp;
+
+	DBG1(NULL, "Resource Registerig hdl=0x%p", vhp);
+
+	ASSERT(vnetp != NULL);
+	vnet_fdbe_del(vnetp, vresp);
+
+	WRITE_ENTER(&vnetp->vrwlock);
+	if (vresp == vnetp->vres_list) {
+		vnetp->vres_list = vresp->nextp;
+	} else {
+		vrp = vnetp->vres_list;
+		while (vrp->nextp != NULL) {
+			if (vrp->nextp == vresp) {
+				vrp->nextp = vresp->nextp;
+				break;
+			}
+			vrp = vrp->nextp;
+		}
+	}
+	vresp->vnetp = NULL;
+	vresp->nextp = NULL;
+	RW_EXIT(&vnetp->vrwlock);
+	KMEM_FREE(vresp);
+}
+
+/*
+ * vnet_dds_rx -- an interface called by vgen to DDS messages.
+ */
+void
+vnet_dds_rx(void *arg, void *dmsg)
 {
 	vnet_t *vnetp = arg;
-	mac_tx_update(vnetp->mh);
+	vdds_process_dds_msg(vnetp, dmsg);
+}
+
+/*
+ * vnet_send_dds_msg -- An interface provided to DDS to send
+ *	DDS messages. This simply sends meessages via vgen.
+ */
+int
+vnet_send_dds_msg(vnet_t *vnetp, void *dmsg)
+{
+	int rv;
+
+	if (vnetp->vgenhdl != NULL) {
+		rv = vgen_dds_tx(vnetp->vgenhdl, dmsg);
+	}
+	return (rv);
+}
+
+/*
+ * vnet_handle_res_err -- A callback function called by a resource
+ *	to report an error. For example, vgen can call to report
+ *	an LDC down/reset event. This will trigger cleanup of associated
+ *	Hybrid resource.
+ */
+/* ARGSUSED */
+static void
+vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err)
+{
+	vnet_res_t *vresp = (vnet_res_t *)vrh;
+	vnet_t *vnetp = vresp->vnetp;
+
+	if (vnetp == NULL) {
+		return;
+	}
+	if ((vresp->type != VIO_NET_RES_LDC_SERVICE) &&
+	    (vresp->type != VIO_NET_RES_HYBRID)) {
+		return;
+	}
+	vdds_cleanup_hybrid_res(vnetp);
+}
+
+/*
+ * vnet_dispatch_res_task -- A function to dispatch tasks start resources.
+ */
+static void
+vnet_dispatch_res_task(vnet_t *vnetp)
+{
+	int rv;
+
+	WRITE_ENTER(&vnetp->vrwlock);
+	if (vnetp->flags & VNET_STARTED) {
+		rv = ddi_taskq_dispatch(vnetp->taskqp, vnet_res_start_task,
+		    vnetp, DDI_NOSLEEP);
+		if (rv != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "vnet%d:Can't dispatch start resource task",
+			    vnetp->instance);
+		}
+	}
+	RW_EXIT(&vnetp->vrwlock);
+}
+
+/*
+ * vnet_res_start_task -- A taskq callback function that starts a resource.
+ */
+static void
+vnet_res_start_task(void *arg)
+{
+	vnet_t *vnetp = arg;
+
+	WRITE_ENTER(&vnetp->vrwlock);
+	if (vnetp->flags & VNET_STARTED) {
+		vnet_start_resources(vnetp);
+	}
+	RW_EXIT(&vnetp->vrwlock);
+}
+
+/*
+ * vnet_start_resources -- starts all resources associated with
+ *	a vnet.
+ */
+static void
+vnet_start_resources(vnet_t *vnetp)
+{
+	mac_register_t	*macp;
+	mac_callbacks_t	*cbp;
+	vnet_res_t	*vresp;
+	int rv;
+
+	DBG1(vnetp, "enter\n");
+
+	for (vresp = vnetp->vres_list; vresp != NULL; vresp = vresp->nextp) {
+		/* skip if it is already started */
+		if (vresp->flags & VNET_STARTED) {
+			continue;
+		}
+		macp = &vresp->macreg;
+		cbp = macp->m_callbacks;
+		rv = cbp->mc_start(macp->m_driver);
+		if (rv == 0) {
+			/*
+			 * Successfully started the resource, so now
+			 * add it to the fdb.
+			 */
+			vresp->flags |= VNET_STARTED;
+			vnet_fdbe_add(vnetp, vresp);
+		}
+	}
+
+	DBG1(vnetp, "exit\n");
+
+}
+
+/*
+ * vnet_stop_resources -- stop all resources associated with a vnet.
+ */
+static void
+vnet_stop_resources(vnet_t *vnetp)
+{
+	vnet_res_t	*vresp;
+	vnet_res_t	*nvresp;
+	mac_register_t	*macp;
+	mac_callbacks_t	*cbp;
+
+	DBG1(vnetp, "enter\n");
+
+	for (vresp = vnetp->vres_list; vresp != NULL; ) {
+		nvresp = vresp->nextp;
+		if (vresp->flags & VNET_STARTED) {
+			macp = &vresp->macreg;
+			cbp = macp->m_callbacks;
+			cbp->mc_stop(macp->m_driver);
+			vresp->flags &= ~VNET_STARTED;
+		}
+		vresp = nvresp;
+	}
+	DBG1(vnetp, "exit\n");
 }

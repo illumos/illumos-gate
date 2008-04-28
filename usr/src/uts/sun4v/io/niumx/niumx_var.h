@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,6 @@ typedef struct niumx_devstate {
 	ddi_iblock_cookie_t niumx_fm_ibc;
 } niumx_devstate_t;
 
-#define	NIUMX_FUNC_NUM_MASK	1
 #define	NIUMX_MAX_INTRS	64
 #define	NIUMX_RSVD_INTRS	16
 

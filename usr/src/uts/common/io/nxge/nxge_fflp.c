@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -932,7 +932,7 @@ nxge_get_rdc_group(p_nxge_t nxgep, uint8_t class, intptr_t cookie)
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 	rdc_grp_p = &p_dma_cfgp->rdc_grps[use_port_rdc_grp];
-	rdc_grp = p_cfgp->start_rdc_grpid;
+	rdc_grp = p_cfgp->def_mac_rxdma_grpid;
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		"nxge_get_rdc_group: grp 0x%x real_grp %x grpp $%p\n",
@@ -1515,15 +1515,17 @@ nxge_fflp_config_hash_lookup_enable(p_nxge_t nxgep)
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
-	for (partition = p_cfgp->start_rdc_grpid;
-		partition < p_cfgp->max_rdc_grpids; partition++) {
-		rs = npi_fflp_cfg_fcram_partition_enable(handle, partition);
-		if (rs != NPI_SUCCESS) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_fflp_config_hash_lookup_enable"
-				"failed FCRAM partition"
-				" enable for partition %d ", partition));
-			return (NXGE_ERROR | rs);
+	for (partition = 0; partition < NXGE_MAX_RDC_GROUPS; partition++) {
+		if (p_cfgp->grpids[partition]) {
+			rs = npi_fflp_cfg_fcram_partition_enable(
+				handle, partition);
+			if (rs != NPI_SUCCESS) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    " nxge_fflp_config_hash_lookup_enable"
+				    "failed FCRAM partition"
+				    " enable for partition %d ", partition));
+				return (NXGE_ERROR | rs);
+			}
 		}
 	}
 
@@ -1546,16 +1548,17 @@ nxge_fflp_config_hash_lookup_disable(p_nxge_t nxgep)
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
-	for (partition = p_cfgp->start_rdc_grpid;
-		partition < p_cfgp->max_rdc_grpids; partition++) {
-		rs = npi_fflp_cfg_fcram_partition_disable(handle,
-			partition);
-		if (rs != NPI_SUCCESS) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_fflp_config_hash_lookup_disable"
-				" failed FCRAM partition"
-				" disable for partition %d ", partition));
-			return (NXGE_ERROR | rs);
+	for (partition = 0; partition < NXGE_MAX_RDC_GROUPS; partition++) {
+		if (p_cfgp->grpids[partition]) {
+			rs = npi_fflp_cfg_fcram_partition_disable(handle,
+			    partition);
+			if (rs != NPI_SUCCESS) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    " nxge_fflp_config_hash_lookup_disable"
+				    " failed FCRAM partition"
+				    " disable for partition %d ", partition));
+				return (NXGE_ERROR | rs);
+			}
 		}
 	}
 
@@ -2020,23 +2023,24 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
-	for (rdc_grp = p_cfgp->start_rdc_grpid;
-		rdc_grp < p_cfgp->max_rdc_grpids; rdc_grp++) {
-		npi_fflp_fcram_error_get(handle, &fcram_err, rdc_grp);
-		if (fcram_err.bits.ldw.pio_err) {
-			NXGE_ERROR_MSG((nxgep, FFLP_CTL,
-				" FCRAM PIO ECC error on port %d"
-				" rdc group: %d Hash Table addr: 0x%x"
-				" syndrome: 0x%x",
-				portn, rdc_grp,
-				fcram_err.bits.ldw.fcram_addr,
-				fcram_err.bits.ldw.syndrome));
-			statsp->hash_pio_err[rdc_grp]++;
-			statsp->errlog.hash_pio[rdc_grp] =
-				(uint32_t)fcram_err.value;
-			NXGE_FM_REPORT_ERROR(nxgep, NULL, NULL,
-				NXGE_FM_EREPORT_FFLP_HASHT_DATA_ERR);
-			npi_fflp_fcram_error_clear(handle, rdc_grp);
+	for (rdc_grp = 0; rdc_grp < NXGE_MAX_RDC_GROUPS; rdc_grp++) {
+		if (p_cfgp->grpids[rdc_grp]) {
+			npi_fflp_fcram_error_get(handle, &fcram_err, rdc_grp);
+			if (fcram_err.bits.ldw.pio_err) {
+				NXGE_ERROR_MSG((nxgep, FFLP_CTL,
+					" FCRAM PIO ECC error on port %d"
+					" rdc group: %d Hash Table addr: 0x%x"
+					" syndrome: 0x%x",
+					portn, rdc_grp,
+					fcram_err.bits.ldw.fcram_addr,
+					fcram_err.bits.ldw.syndrome));
+				statsp->hash_pio_err[rdc_grp]++;
+				statsp->errlog.hash_pio[rdc_grp] =
+				    (uint32_t)fcram_err.value;
+				NXGE_FM_REPORT_ERROR(nxgep, NULL, NULL,
+				    NXGE_FM_EREPORT_FFLP_HASHT_DATA_ERR);
+				npi_fflp_fcram_error_clear(handle, rdc_grp);
+			}
 		}
 	}
 

@@ -1579,7 +1579,8 @@ NXGE_OBJS =	nxge_mac.o nxge_ipp.o nxge_rxdma.o 		\
 		nxge_send.o nxge_classify.o nxge_fflp.o		\
 		nxge_fflp_hash.o nxge_ndd.o nxge_kstats.o	\
 		nxge_zcp.o nxge_fm.o nxge_espc.o		\
-		nxge_serialize.o
+		nxge_serialize.o nxge_hv.o			\
+		nxge_hio.o nxge_hio_guest.o nxge_intr.o
 
 NXGE_NPI_OBJS =	\
 		npi.o npi_mac.o	npi_ipp.o			\

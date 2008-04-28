@@ -417,7 +417,14 @@ typedef enum {
 	STR_LOG = 4		/* Sessage sent to streams logging driver. */
 } out_dbgmsg_t, *p_out_dbgmsg_t;
 
+typedef enum {
+	DDI_MEM_ALLOC,		/* default (use ddi_dma_mem_alloc) */
+	KMEM_ALLOC,		/* use kmem_alloc(). */
+	CONTIG_MEM_ALLOC	/* use contig_mem_alloc() (N2/NIU only) */
+} buf_alloc_type_t;
 
+#define	BUF_ALLOCATED		0x00000001
+#define	BUF_ALLOCATED_WAIT_FREE	0x00000002
 
 #if defined(_KERNEL) || defined(COSIM)
 
@@ -445,6 +452,8 @@ typedef struct _nxge_xcvr_table {
 /*
  * Common DMA data elements.
  */
+typedef struct _nxge_dma_pool_t nxge_dma_pool_t, *p_nxge_dma_pool_t;
+
 struct _nxge_dma_common_t {
 	uint16_t		dma_channel;
 	void			*kaddrp;
@@ -471,17 +480,26 @@ struct _nxge_dma_common_t {
 	void			*orig_kaddrp;
 	size_t			orig_alength;
 	boolean_t		contig_alloc_type;
+	/*
+	 * Receive buffers may be allocated using
+	 * kmem_alloc(). The buffer free function
+	 * depends on its allocation function.
+	 */
+	boolean_t		kmem_alloc_type;
+	uint32_t		buf_alloc_state;
+	buf_alloc_type_t	buf_alloc_type;
+	p_nxge_dma_pool_t	rx_buf_pool_p;
 };
 
 typedef struct _nxge_t nxge_t, *p_nxge_t;
 typedef struct _nxge_dma_common_t nxge_dma_common_t, *p_nxge_dma_common_t;
 
-typedef struct _nxge_dma_pool_t {
+struct _nxge_dma_pool_t {
 	p_nxge_dma_common_t	*dma_buf_pool_p;
 	uint32_t		ndmas;
 	uint32_t		*num_chunks;
 	boolean_t		buf_allocated;
-} nxge_dma_pool_t, *p_nxge_dma_pool_t;
+};
 
 /*
  * Each logical device (69):
@@ -759,6 +777,8 @@ nxge_status_t nxge_zcp_handle_sys_errors(p_nxge_t);
 /* nxge_kstats.c */
 void nxge_init_statsp(p_nxge_t);
 void nxge_setup_kstats(p_nxge_t);
+void nxge_setup_rdc_kstats(p_nxge_t, int);
+void nxge_setup_tdc_kstats(p_nxge_t, int);
 void nxge_destroy_kstats(p_nxge_t);
 int nxge_port_kstat_update(kstat_t *, int);
 void nxge_save_cntrs(p_nxge_t);
@@ -867,10 +887,8 @@ nxge_status_t nxge_init_fzc_txdma_channel(p_nxge_t, uint16_t,
 	p_tx_ring_t, p_tx_mbox_t);
 nxge_status_t nxge_init_fzc_txdma_port(p_nxge_t);
 
-nxge_status_t nxge_init_fzc_rxdma_channel(p_nxge_t, uint16_t,
-	p_rx_rbr_ring_t, p_rx_rcr_ring_t, p_rx_mbox_t);
+nxge_status_t nxge_init_fzc_rxdma_channel(p_nxge_t, uint16_t);
 
-nxge_status_t nxge_init_fzc_rdc_tbl(p_nxge_t);
 nxge_status_t nxge_init_fzc_rx_common(p_nxge_t);
 nxge_status_t nxge_init_fzc_rxdma_port(p_nxge_t);
 
@@ -959,6 +977,8 @@ void nxge_vpd_info_get(p_nxge_t);
 void nxge_debug_msg(p_nxge_t, uint64_t, char *, ...);
 int nxge_get_nports(p_nxge_t);
 
+void nxge_free_buf(buf_alloc_type_t, uint64_t, uint32_t);
+
 uint64_t hv_niu_rx_logical_page_conf(uint64_t, uint64_t,
 	uint64_t, uint64_t);
 #pragma weak	hv_niu_rx_logical_page_conf
@@ -974,6 +994,71 @@ uint64_t hv_niu_tx_logical_page_conf(uint64_t, uint64_t,
 uint64_t hv_niu_tx_logical_page_info(uint64_t, uint64_t,
 	uint64_t *, uint64_t *);
 #pragma weak	hv_niu_tx_logical_page_info
+
+uint64_t hv_niu_vr_assign(uint64_t vridx, uint64_t ldc_id, uint32_t *cookie);
+#pragma weak	hv_niu_vr_assign
+
+uint64_t hv_niu_vr_unassign(uint32_t cookie);
+#pragma weak	hv_niu_vr_unassign
+
+uint64_t hv_niu_vr_getinfo(uint32_t cookie, uint64_t *real_start,
+    uint64_t *size);
+#pragma weak	hv_niu_vr_getinfo
+
+uint64_t hv_niu_vr_get_rxmap(uint32_t cookie, uint64_t *dma_map);
+#pragma weak	hv_niu_vr_get_rxmap
+
+uint64_t hv_niu_vr_get_txmap(uint32_t cookie, uint64_t *dma_map);
+#pragma weak	hv_niu_vr_get_txmap
+
+uint64_t hv_niu_rx_dma_assign(uint32_t cookie, uint64_t chidx,
+    uint64_t *vchidx);
+#pragma weak	hv_niu_rx_dma_assign
+
+uint64_t hv_niu_rx_dma_unassign(uint32_t cookie, uint64_t chidx);
+#pragma weak	hv_niu_rx_dma_unassign
+
+uint64_t hv_niu_tx_dma_assign(uint32_t cookie, uint64_t chidx,
+    uint64_t *vchidx);
+#pragma weak	hv_niu_tx_dma_assign
+
+uint64_t hv_niu_tx_dma_unassign(uint32_t cookie, uint64_t chidx);
+#pragma weak	hv_niu_tx_dma_unassign
+
+uint64_t hv_niu_vrrx_logical_page_conf(uint32_t cookie, uint64_t chidx,
+    uint64_t pgidx, uint64_t raddr, uint64_t size);
+#pragma weak	hv_niu_vrrx_logical_page_conf
+
+uint64_t hv_niu_vrrx_logical_page_info(uint32_t cookie, uint64_t chidx,
+    uint64_t pgidx, uint64_t *raddr, uint64_t *size);
+#pragma weak	hv_niu_vrrx_logical_page_info
+
+uint64_t hv_niu_vrtx_logical_page_conf(uint32_t cookie, uint64_t chidx,
+    uint64_t pgidx, uint64_t raddr, uint64_t size);
+#pragma weak	hv_niu_vrtx_logical_page_conf
+
+uint64_t hv_niu_vrtx_logical_page_info(uint32_t cookie, uint64_t chidx,
+    uint64_t pgidx, uint64_t *raddr, uint64_t *size);
+#pragma weak	hv_niu_vrtx_logical_page_info
+
+//
+// NIU-specific interrupt API
+//
+uint64_t hv_niu_vrrx_getinfo(uint32_t cookie, uint64_t v_chidx,
+    uint64_t *group, uint64_t *logdev);
+#pragma weak	hv_niu_vrrx_getinfo
+
+uint64_t hv_niu_vrtx_getinfo(uint32_t cookie, uint64_t v_chidx,
+    uint64_t *group, uint64_t *logdev);
+#pragma weak	hv_niu_vrtx_getinfo
+
+uint64_t hv_niu_vrrx_to_logical_dev(uint32_t cookie, uint64_t v_chidx,
+    uint64_t *ldn);
+#pragma weak	hv_niu_vrrx_to_logical_dev
+
+uint64_t hv_niu_vrtx_to_logical_dev(uint32_t cookie, uint64_t v_chidx,
+    uint64_t *ldn);
+#pragma weak	hv_niu_vrtx_to_logical_dev
 
 #ifdef NXGE_DEBUG
 char *nxge_dump_packet(char *, int);

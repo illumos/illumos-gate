@@ -27,6 +27,7 @@
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_mac.h>
+#include <sys/nxge/nxge_hio.h>
 
 static void nxge_get_niu_property(dev_info_t *, niu_type_t *);
 static nxge_status_t nxge_get_mac_addr_properties(p_nxge_t);
@@ -45,6 +46,7 @@ static nxge_status_t nxge_use_default_dma_config_n2(p_nxge_t);
 static void nxge_ldgv_setup(p_nxge_ldg_t *, p_nxge_ldv_t *, uint8_t,
 	uint8_t, int *);
 static void nxge_init_mmac(p_nxge_t, boolean_t);
+static void nxge_set_rdc_intr_property(p_nxge_t);
 
 uint32_t nxge_use_hw_property = 1;
 uint32_t nxge_groups_per_port = 2;
@@ -1765,7 +1767,6 @@ static nxge_status_t
 nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 {
 	int ndmas;
-	int nrxgp;
 	uint8_t func;
 	p_nxge_dma_pt_cfg_t p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t p_cfgp;
@@ -1785,10 +1786,10 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
 			"tx-dma-channels", (int **)&prop_val,
 			&prop_len) == DDI_PROP_SUCCESS) {
-		p_cfgp->start_tdc = prop_val[0];
+		p_cfgp->tdc.start = prop_val[0];
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
 			"==> nxge_use_default_dma_config_n2: tdc starts %d "
-			"(#%d)", p_cfgp->start_tdc, prop_len));
+			"(#%d)", p_cfgp->tdc.start, prop_len));
 
 		ndmas = prop_val[1];
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
@@ -1802,12 +1803,12 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 		return (NXGE_DDI_FAILED);
 	}
 
-	p_cfgp->max_tdcs = nxgep->max_tdcs = ndmas;
-	nxgep->tdc_mask = (ndmas - 1);
+	p_cfgp->tdc.count = nxgep->max_tdcs = ndmas;
+	p_cfgp->tdc.owned = p_cfgp->tdc.count;
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
 		"p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d start %d",
-		p_cfgp, p_cfgp->max_tdcs, nxgep->max_tdcs, p_cfgp->start_tdc));
+		p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs, p_cfgp->tdc.start));
 
 	/* Receive DMA */
 	ndmas = NXGE_RDMA_PER_NIU_PORT;
@@ -1834,7 +1835,7 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	nxgep->rdc_mask = (ndmas - 1);
 
 	/* Hypervisor: rdc # and group # use the same # !! */
-	p_cfgp->max_grpids = p_cfgp->max_rdcs + p_cfgp->max_tdcs;
+	p_cfgp->max_grpids = p_cfgp->max_rdcs + p_cfgp->tdc.owned;
 	p_cfgp->start_grpid = 0;
 	p_cfgp->mif_ldvid = p_cfgp->mac_ldvid = p_cfgp->ser_ldvid = 0;
 
@@ -1885,8 +1886,8 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 			p_cfgp->ldg[i] = prop_val[i];
 			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
 				"==> nxge_use_default_dma_config_n2(obp): "
-				"interrupt #%d, ldg %d",
-				i, p_cfgp->ldg[i]));
+				"F%d: interrupt #%d, ldg %d",
+				nxgep->function_num, i, p_cfgp->ldg[i]));
 		}
 
 		p_cfgp->max_grpids = prop_len;
@@ -1919,17 +1920,25 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	/*
 	 * RDC groups and the beginning RDC group assigned to this function.
 	 */
-	nrxgp = 2;
-	p_cfgp->max_rdc_grpids = nrxgp;
-	p_cfgp->start_rdc_grpid = (nxgep->function_num * nrxgp);
+	p_cfgp->max_rdc_grpids = 1;
+	p_cfgp->def_mac_rxdma_grpid = (nxgep->function_num * 1);
+
+	if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind
+		(nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
+	    >= NXGE_MAX_RDC_GRPS) {
+		NXGE_ERROR_MSG((nxgep, CFG_CTL,
+		    "nxge_use_default_dma_config_n2(): "
+		    "nxge_fzc_rdc_tbl_bind failed"));
+		return (NXGE_DDI_FAILED);
+	}
 
 	status = ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-		"rx-rdc-grps", nrxgp);
+	    "rx-rdc-grps", p_cfgp->max_rdc_grpids);
 	if (status) {
 		return (NXGE_DDI_FAILED);
 	}
 	status = ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-		"rx-rdc-grps-begin", p_cfgp->start_rdc_grpid);
+		"rx-rdc-grps-begin", p_cfgp->def_mac_rxdma_grpid);
 	if (status) {
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, nxgep->dip,
 			"rx-rdc-grps");
@@ -1938,7 +1947,7 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
 		"p_cfgp $%p # rdc groups %d start rdc group id %d",
 		p_cfgp, p_cfgp->max_rdc_grpids,
-		p_cfgp->start_rdc_grpid));
+		p_cfgp->def_mac_rxdma_grpid));
 
 	nxge_set_hw_dma_config(nxgep);
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "<== nxge_use_default_dma_config_n2"));
@@ -1970,7 +1979,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
 			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
-		p_cfgp->start_tdc = *prop_val;
+		p_cfgp->tdc.start = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
 		switch (nxgep->niu_type) {
@@ -2007,7 +2016,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
 		    prop, st_txdma);
-		p_cfgp->start_tdc = st_txdma;
+		p_cfgp->tdc.start = st_txdma;
 	}
 
 	prop = param_arr[param_txdma_channels].fcode_name;
@@ -2048,11 +2057,11 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			prop, tx_ndmas);
 	}
 
-	p_cfgp->max_tdcs = nxgep->max_tdcs = tx_ndmas;
-	nxgep->tdc_mask = (tx_ndmas - 1);
+	p_cfgp->tdc.count = nxgep->max_tdcs = tx_ndmas;
+	p_cfgp->tdc.owned = p_cfgp->tdc.count;
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_cfg_dma_config: "
 		"p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d",
-		p_cfgp, p_cfgp->max_tdcs, nxgep->max_tdcs));
+		p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs));
 
 	prop = param_arr[param_rxdma_channels_begin].fcode_name;
 
@@ -2142,17 +2151,34 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	prop = param_arr[param_rdc_grps_start].fcode_name;
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
 			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
-		p_cfgp->start_rdc_grpid = *prop_val;
+		p_cfgp->def_mac_rxdma_grpid = *prop_val;
 		ddi_prop_free(prop_val);
+		if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind
+			(nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
+		    >= NXGE_MAX_RDC_GRPS) {
+			NXGE_ERROR_MSG((nxgep, CFG_CTL,
+			    "nxge_use_cfg_dma_config(): "
+			    "nxge_fzc_rdc_tbl_bind failed"));
+			cmn_err(CE_CONT, "nxge%d: group not available!\n",
+			    nxgep->instance);
+			goto nxge_use_cfg_dma_config_exit;
+		}
+
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			"==> nxge_use_default_dma_config: "
-			"use property " "start_grpid %d ",
+		    "==> nxge_use_default_dma_config: "
+		    "use property " "start_grpid %d ",
 			p_cfgp->start_grpid));
 	} else {
-		p_cfgp->start_rdc_grpid = nxgep->function_num;
+		p_cfgp->def_mac_rxdma_grpid = nxgep->function_num;
+		if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind(
+		    nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE)) >=
+		    NXGE_MAX_RDC_GRPS) {
+			cmn_err(CE_CONT, "nxge%d: group not available!\n",
+			    nxgep->instance);
+			goto nxge_use_cfg_dma_config_exit;
+		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, p_cfgp->start_rdc_grpid);
-
+			prop, p_cfgp->def_mac_rxdma_grpid);
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
 			"==> nxge_use_default_dma_config: "
 			"use default "
@@ -2191,9 +2217,9 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_cfg_dma_config: "
 		"p_cfgp 0x%016llx start_ldg %d nxgep->max_ldgs %d "
-		"start_rdc_grpid %d",
+		"def_mac_rxdma_grpid %d",
 		p_cfgp, p_cfgp->start_ldg, p_cfgp->max_ldgs,
-		p_cfgp->start_rdc_grpid));
+		p_cfgp->def_mac_rxdma_grpid));
 
 	prop = param_arr[param_rxdma_intr_time].fcode_name;
 
@@ -2219,10 +2245,63 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_use_cfg_dma_config: "
 	    "sTDC[%d] nTDC[%d] sRDC[%d] nRDC[%d]",
-	    p_cfgp->start_tdc, p_cfgp->max_tdcs,
+	    p_cfgp->tdc.start, p_cfgp->tdc.count,
 	    p_cfgp->start_rdc, p_cfgp->max_rdcs));
 
+nxge_use_cfg_dma_config_exit:
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_use_cfg_dma_config"));
+}
+
+void
+nxge_get_logical_props(p_nxge_t nxgep)
+{
+	nxge_dma_pt_cfg_t *port = &nxgep->pt_config;
+	nxge_hw_pt_cfg_t *hardware;
+	nxge_rdc_grp_t *group;
+
+	(void) memset(port, 0, sizeof (*port));
+
+	port->mac_port = 0;	/* := function number */
+
+	/*
+	 * alloc_buf_size:
+	 * dead variables.
+	 */
+	port->rbr_size = nxge_rbr_size;
+	port->rcr_size = nxge_rcr_size;
+
+	port->tx_dma_map = 0;	/* Transmit DMA channel bit map */
+
+	nxge_set_rdc_intr_property(nxgep);
+
+	port->rcr_full_header = NXGE_RCR_FULL_HEADER;
+	port->rx_drr_weight = PT_DRR_WT_DEFAULT_10G;
+
+	/* ----------------------------------------------------- */
+	hardware = &port->hw_config;
+
+	(void) memset(hardware, 0, sizeof (*hardware));
+
+	/*
+	 * partition_id, read_write_mode:
+	 * dead variables.
+	 */
+
+	/*
+	 * drr_wt, rx_full_header, *_ldg?, start_mac_entry,
+	 * mac_pref, def_mac_rxdma_grpid, start_vlan, max_vlans,
+	 * start_ldgs, max_ldgs, max_ldvs,
+	 * vlan_pref, def_vlan_rxdma_grpid are meaningful only
+	 * in the service domain.
+	 */
+
+	group = &port->rdc_grps[0];
+
+	group->flag = 1;	/* configured */
+	group->config_method = RDC_TABLE_ENTRY_METHOD_REP;
+
+	/* HIO futures: this is still an open question. */
+	hardware->max_macs = 1;
 }
 
 static void
@@ -2282,8 +2361,6 @@ nxge_use_cfg_mac_class_config(p_nxge_t nxgep)
 	}
 
 	p_cfgp->mac_pref = 1;
-	p_cfgp->def_mac_rxdma_grpid = p_cfgp->start_rdc_grpid;
-
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL,
 		"== nxge_use_cfg_mac_class_config: "
 		" mac_pref bit set def_mac_rxdma_grpid %d",
@@ -2327,7 +2404,7 @@ nxge_set_rdc_intr_property(p_nxge_t nxgep)
 static void
 nxge_set_hw_dma_config(p_nxge_t nxgep)
 {
-	int i, j, rdc, ndmas, ngrps, bitmap, end, st_rdc;
+	int i, ndmas, ngrps, bitmap, end, st_rdc;
 	int32_t status;
 	uint8_t rdcs_per_grp;
 	p_nxge_dma_pt_cfg_t p_dma_cfgp;
@@ -2337,6 +2414,7 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 	char *prop, *prop_val;
 	p_nxge_param_t param_arr;
 	config_token_t token;
+	nxge_grp_t *group;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_set_hw_dma_config"));
 
@@ -2344,15 +2422,17 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 	rdc_grp_p = p_dma_cfgp->rdc_grps;
 
-	/* Transmit DMA Channels */
 	bitmap = 0;
-	end = p_cfgp->start_tdc + p_cfgp->max_tdcs;
-	nxgep->ntdc = p_cfgp->max_tdcs;
+	end = p_cfgp->tdc.start + p_cfgp->tdc.owned;
 	p_dma_cfgp->tx_dma_map = 0;
-	for (i = p_cfgp->start_tdc; i < end; i++) {
+	for (i = p_cfgp->tdc.start; i < end; i++) {
 		bitmap |= (1 << i);
-		nxgep->tdc[i - p_cfgp->start_tdc] = (uint8_t)i;
 	}
+
+	nxgep->tx_set.owned.map |= bitmap; /* Owned, & not shared. */
+
+	group = (nxge_grp_t *)nxge_grp_add(nxgep, NXGE_TRANSMIT_GROUP);
+	group->map = bitmap;
 
 	p_dma_cfgp->tx_dma_map = bitmap;
 	param_arr = nxgep->param_arr;
@@ -2397,13 +2477,7 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 		break;
 	}
 
-	/* Receive DMA Channels */
 	st_rdc = p_cfgp->start_rdc;
-	nxgep->nrdc = p_cfgp->max_rdcs;
-
-	for (i = 0; i < p_cfgp->max_rdcs; i++) {
-		nxgep->rdc[i] = i + p_cfgp->start_rdc;
-	}
 
 	switch (rdcgrp_cfg) {
 	case CFG_L3_DISTRIBUTE:
@@ -2428,22 +2502,33 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 	}
 
 	for (i = 0; i < ngrps; i++) {
-		rdc_grp_p = &p_dma_cfgp->rdc_grps[i];
+		uint8_t count = rdcs_per_grp;
+		dc_map_t map = 0;
+
+		rdc_grp_p = &p_dma_cfgp->rdc_grps[
+			p_cfgp->def_mac_rxdma_grpid + i];
 		rdc_grp_p->start_rdc = st_rdc + i * rdcs_per_grp;
 		rdc_grp_p->max_rdcs = rdcs_per_grp;
+		rdc_grp_p->def_rdc = rdc_grp_p->start_rdc;
 
 		/* default to: 0, 1, 2, 3, ...., 0, 1, 2, 3.... */
-		rdc_grp_p->config_method = RDC_TABLE_ENTRY_METHOD_SEQ;
-		rdc = rdc_grp_p->start_rdc;
-		for (j = 0; j < NXGE_MAX_RDCS; j++) {
-			rdc_grp_p->rdc[j] = rdc++;
-			if (rdc == (rdc_grp_p->start_rdc + rdcs_per_grp)) {
-				rdc = rdc_grp_p->start_rdc;
-			}
+		while (count) {
+			map |= (1 << count);
+			count--;
 		}
-		rdc_grp_p->def_rdc = rdc_grp_p->rdc[0];
-		rdc_grp_p->flag = 1;	/* configured */
+		map >>= 1;	/* In case <start_rdc> is zero (0) */
+		map <<= rdc_grp_p->start_rdc;
+		rdc_grp_p->map = map;
+
+		nxgep->rx_set.owned.map |= map; /* Owned, & not shared. */
+
+		group = (nxge_grp_t *)nxge_grp_add(nxgep, NXGE_RECEIVE_GROUP);
+		group->map = rdc_grp_p->map;
+
+		rdc_grp_p->config_method = RDC_TABLE_ENTRY_METHOD_SEQ;
+		rdc_grp_p->flag = 1; /* This group has been configured. */
 	}
+
 
 	/* default RDC */
 	p_cfgp->def_rdc = p_cfgp->start_rdc;
@@ -2483,19 +2568,15 @@ nxge_check_rxdma_port_member(p_nxge_t nxgep, uint8_t rdc)
 boolean_t
 nxge_check_txdma_port_member(p_nxge_t nxgep, uint8_t tdc)
 {
-	p_nxge_dma_pt_cfg_t p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t p_cfgp;
 	int status = B_FALSE;
 
-	NXGE_DEBUG_MSG((nxgep, CFG2_CTL, "==> nxge_check_rxdma_port_member"));
+	NXGE_DEBUG_MSG((nxgep, CFG2_CTL, "==> nxge_check_txdma_port_member"));
 
-	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
-
-	/* Receive DMA Channels */
-	if (tdc < p_cfgp->max_tdcs)
+	if (tdc >= nxgep->pt_config.hw_config.tdc.start &&
+	    tdc < nxgep->pt_config.hw_config.tdc.count)
 		status = B_TRUE;
-	NXGE_DEBUG_MSG((nxgep, CFG2_CTL, " <== nxge_check_rxdma_port_member"));
+
+	NXGE_DEBUG_MSG((nxgep, CFG2_CTL, " <== nxge_check_txdma_port_member"));
 	return (status);
 }
 
@@ -2600,7 +2681,7 @@ nxge_set_hw_vlan_class_config(p_nxge_t nxgep)
 					good_count++;
 				vlan_tbl[vmap->param_id].flag = 1;
 				vlan_tbl[vmap->param_id].rdctbl =
-					vmap->map_to + p_cfgp->start_rdc_grpid;
+				    vmap->map_to + p_cfgp->def_mac_rxdma_grpid;
 				vlan_tbl[vmap->param_id].mpr_npr = vmap->pref;
 			}
 		}
@@ -2661,7 +2742,7 @@ nxge_set_hw_mac_class_config(p_nxge_t nxgep)
 					mac_map->pref;
 				mac_host_info[mac_map->param_id].rdctbl =
 					mac_map->map_to +
-					p_cfgp->start_rdc_grpid;
+					p_cfgp->def_mac_rxdma_grpid;
 				good_cfg[good_count] = mac_cfg_val[i];
 				if (mac_host_info[mac_map->param_id].flag == 0)
 					good_count++;
@@ -2737,7 +2818,7 @@ nxge_set_hw_class_config(p_nxge_t nxgep)
 nxge_status_t
 nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 {
-	int i, maxldvs, maxldgs, start, end, nldvs;
+	int i, maxldvs, maxldgs, nldvs;
 	int ldv, endldg;
 	uint8_t func;
 	uint8_t channel;
@@ -2749,6 +2830,7 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	p_nxge_ldg_t ldgp, ptr;
 	p_nxge_ldv_t ldvp;
 	nxge_status_t status = NXGE_OK;
+	nxge_grp_set_t *set;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2"));
 	if (!*navail_p) {
@@ -2803,16 +2885,16 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		nxgep->ldgvp = ldgvp;
 		ldgvp->maxldgs = (uint8_t)maxldgs;
 		ldgvp->maxldvs = (uint8_t)maxldvs;
-		ldgp = ldgvp->ldgp = KMEM_ZALLOC(sizeof (nxge_ldg_t) * maxldgs,
-			KM_SLEEP);
-		ldvp = ldgvp->ldvp = KMEM_ZALLOC(sizeof (nxge_ldv_t) * maxldvs,
-			KM_SLEEP);
+		ldgp = ldgvp->ldgp = KMEM_ZALLOC(
+			sizeof (nxge_ldg_t) * maxldgs, KM_SLEEP);
+		ldvp = ldgvp->ldvp = KMEM_ZALLOC(
+			sizeof (nxge_ldv_t) * maxldvs, KM_SLEEP);
 	} else {
 		ldgp = ldgvp->ldgp;
 		ldvp = ldgvp->ldvp;
 	}
 
-	ldgvp->ndma_ldvs = p_cfgp->max_tdcs + p_cfgp->max_rdcs;
+	ldgvp->ndma_ldvs = p_cfgp->tdc.owned + p_cfgp->max_rdcs;
 	ldgvp->tmres = NXGE_TIMER_RESO;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
@@ -2917,31 +2999,30 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		func, nldvs, *navail_p, *nrequired_p));
 
 	/*
-	 * Receive DMA channels.
-	 */
-	channel = p_cfgp->start_rdc;
-	start = p_cfgp->start_rdc + NXGE_RDMA_LD_START;
-	end = start + p_cfgp->max_rdcs;
-	chn_start = p_cfgp->ldg_chn_start;
-	/*
 	 * Start with RDC to configure logical devices for each group.
 	 */
-	for (i = 0, ldv = start; ldv < end; i++, ldv++, chn_start++) {
-		ldvp->is_rxdma = B_TRUE;
-		ldvp->ldv = (uint8_t)ldv;
-		ldvp->channel = channel++;
-		ldvp->vdma_index = (uint8_t)i;
-		ldvp->ldv_intr_handler = nxge_rx_intr;
-		ldvp->ldv_ldf_masks = 0;
-		ldvp->nxgep = nxgep;
-		ldgp->ldg = p_cfgp->ldg[chn_start];
+	chn_start = p_cfgp->ldg_chn_start;
+	set = &nxgep->rx_set;
+	for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
+		if ((1 << channel) & set->owned.map) {
+			ldvp->is_rxdma = B_TRUE;
+			ldvp->ldv = (uint8_t)channel + NXGE_RDMA_LD_START;
+			ldvp->channel = channel;
+			ldvp->vdma_index = (uint8_t)channel;
+			ldvp->ldv_intr_handler = nxge_rx_intr;
+			ldvp->ldv_ldf_masks = 0;
+			ldvp->nxgep = nxgep;
+			ldgp->ldg = p_cfgp->ldg[chn_start];
 
-		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_ldgv_init_n2(rx%d): maxldvs %d ldv %d "
-			"ldg %d ldgptr 0x%016llx ldvptr 0x%016llx",
-			i, maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
-		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
-		nldvs++;
+			NXGE_DEBUG_MSG((nxgep, INT_CTL,
+			    "==> nxge_ldgv_init_n2(rx%d): maxldvs %d ldv %d "
+			    "ldg %d ldgptr 0x%016llx ldvptr 0x%016llx",
+			    i, maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+			nxge_ldgv_setup(&ldgp, &ldvp, ldvp->ldv,
+			    endldg, nrequired_p);
+			nldvs++;
+			chn_start++;
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
@@ -2955,24 +3036,27 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	/*
 	 * Transmit DMA channels.
 	 */
-	channel = p_cfgp->start_tdc;
-	start = p_cfgp->start_tdc + NXGE_TDMA_LD_START;
-	end = start + p_cfgp->max_tdcs;
-	for (i = 0, ldv = start; ldv < end; i++, ldv++, chn_start++) {
-		ldvp->is_txdma = B_TRUE;
-		ldvp->ldv = (uint8_t)ldv;
-		ldvp->channel = channel++;
-		ldvp->vdma_index = (uint8_t)i;
-		ldvp->ldv_intr_handler = nxge_tx_intr;
-		ldvp->ldv_ldf_masks = 0;
-		ldgp->ldg = p_cfgp->ldg[chn_start];
-		ldvp->nxgep = nxgep;
-		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_ldgv_init_n2(tx%d): maxldvs %d ldv %d "
-			"ldg %d ldgptr 0x%016llx ldvptr 0x%016llx",
-			i, maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
-		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
-		nldvs++;
+	chn_start = p_cfgp->ldg_chn_start + 8;
+	set = &nxgep->tx_set;
+	for (channel = 0; channel < NXGE_MAX_TDCS; channel++) {
+		if ((1 << channel) & set->owned.map) {
+			ldvp->is_txdma = B_TRUE;
+			ldvp->ldv = (uint8_t)channel + NXGE_TDMA_LD_START;
+			ldvp->channel = channel;
+			ldvp->vdma_index = (uint8_t)channel;
+			ldvp->ldv_intr_handler = nxge_tx_intr;
+			ldvp->ldv_ldf_masks = 0;
+			ldgp->ldg = p_cfgp->ldg[chn_start];
+			ldvp->nxgep = nxgep;
+			NXGE_DEBUG_MSG((nxgep, INT_CTL,
+			    "==> nxge_ldgv_init_n2(tx%d): maxldvs %d ldv %d "
+			    "ldg %d ldgptr %p ldvptr %p",
+			    channel, maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+			nxge_ldgv_setup(&ldgp, &ldvp, ldvp->ldv,
+			    endldg, nrequired_p);
+			nldvs++;
+			chn_start++;
+		}
 	}
 
 	ldgvp->ldg_intrs = *nrequired_p;
@@ -2993,7 +3077,7 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 nxge_status_t
 nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 {
-	int i, maxldvs, maxldgs, start, end, nldvs;
+	int i, maxldvs, maxldgs, nldvs;
 	int ldv, ldg, endldg, ngrps;
 	uint8_t func;
 	uint8_t channel;
@@ -3003,6 +3087,8 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	p_nxge_ldgv_t ldgvp;
 	p_nxge_ldg_t ldgp, ptr;
 	p_nxge_ldv_t ldvp;
+	nxge_grp_set_t *set;
+
 	nxge_status_t status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init"));
@@ -3015,7 +3101,7 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
-	nldvs = p_cfgp->max_tdcs + p_cfgp->max_rdcs;
+	nldvs = p_cfgp->tdc.owned + p_cfgp->max_rdcs;
 
 	/*
 	 * If function zero instance, it needs to handle the system error
@@ -3059,7 +3145,7 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp = ldgvp->ldvp = KMEM_ZALLOC(sizeof (nxge_ldv_t) * maxldvs,
 			KM_SLEEP);
 	}
-	ldgvp->ndma_ldvs = p_cfgp->max_tdcs + p_cfgp->max_rdcs;
+	ldgvp->ndma_ldvs = p_cfgp->tdc.owned + p_cfgp->max_rdcs;
 	ldgvp->tmres = NXGE_TIMER_RESO;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
@@ -3093,9 +3179,6 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	/*
 	 * Receive DMA channels.
 	 */
-	channel = p_cfgp->start_rdc;
-	start = p_cfgp->start_rdc + NXGE_RDMA_LD_START;
-	end = start + p_cfgp->max_rdcs;
 	nldvs = 0;
 	ldgvp->nldvs = 0;
 	ldgp->ldvp = NULL;
@@ -3104,37 +3187,43 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	/*
 	 * Start with RDC to configure logical devices for each group.
 	 */
-	for (i = 0, ldv = start; ldv < end; i++, ldv++) {
-		ldvp->is_rxdma = B_TRUE;
-		ldvp->ldv = (uint8_t)ldv;
-		/* If non-seq needs to change the following code */
-		ldvp->channel = channel++;
-		ldvp->vdma_index = (uint8_t)i;
-		ldvp->ldv_intr_handler = nxge_rx_intr;
-		ldvp->ldv_ldf_masks = 0;
-		ldvp->use_timer = B_FALSE;
-		ldvp->nxgep = nxgep;
-		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
-		nldvs++;
+	set = &nxgep->rx_set;
+	for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
+		if ((1 << channel) & set->owned.map) {
+			/* For now, <channel & <vdma_index> are the same. */
+			ldvp->is_rxdma = B_TRUE;
+			ldvp->ldv = (uint8_t)channel + NXGE_RDMA_LD_START;
+			ldvp->channel = channel;
+			ldvp->vdma_index = (uint8_t)channel;
+			ldvp->ldv_intr_handler = nxge_rx_intr;
+			ldvp->ldv_ldf_masks = 0;
+			ldvp->use_timer = B_FALSE;
+			ldvp->nxgep = nxgep;
+			nxge_ldgv_setup(&ldgp, &ldvp, ldvp->ldv,
+			    endldg, nrequired_p);
+			nldvs++;
+		}
 	}
 
 	/*
 	 * Transmit DMA channels.
 	 */
-	channel = p_cfgp->start_tdc;
-	start = p_cfgp->start_tdc + NXGE_TDMA_LD_START;
-	end = start + p_cfgp->max_tdcs;
-	for (i = 0, ldv = start; ldv < end; i++, ldv++) {
-		ldvp->is_txdma = B_TRUE;
-		ldvp->ldv = (uint8_t)ldv;
-		ldvp->channel = channel++;
-		ldvp->vdma_index = (uint8_t)i;
-		ldvp->ldv_intr_handler = nxge_tx_intr;
-		ldvp->ldv_ldf_masks = 0;
-		ldvp->use_timer = B_FALSE;
-		ldvp->nxgep = nxgep;
-		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
-		nldvs++;
+	set = &nxgep->tx_set;
+	for (channel = 0; channel < NXGE_MAX_TDCS; channel++) {
+		if ((1 << channel) & set->owned.map) {
+			/* For now, <channel & <vdma_index> are the same. */
+			ldvp->is_txdma = B_TRUE;
+			ldvp->ldv = (uint8_t)channel + NXGE_TDMA_LD_START;
+			ldvp->channel = channel;
+			ldvp->vdma_index = (uint8_t)channel;
+			ldvp->ldv_intr_handler = nxge_tx_intr;
+			ldvp->ldv_ldf_masks = 0;
+			ldvp->use_timer = B_FALSE;
+			ldvp->nxgep = nxgep;
+			nxge_ldgv_setup(&ldgp, &ldvp, ldvp->ldv,
+			    endldg, nrequired_p);
+			nldvs++;
+		}
 	}
 
 	if (own_fzc) {

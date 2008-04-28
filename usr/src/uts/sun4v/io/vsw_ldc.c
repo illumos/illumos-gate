@@ -94,6 +94,8 @@ int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count);
 int vsw_port_attach(vsw_port_t *portp);
 vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
 void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
+int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
+void vsw_hio_port_reset(vsw_port_t *portp);
 
 /* Interrupt routines */
 static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
@@ -140,7 +142,6 @@ static void vsw_send_attr(vsw_ldc_t *);
 static vio_dring_reg_msg_t *vsw_create_dring_info_pkt(vsw_ldc_t *);
 static void vsw_send_dring_info(vsw_ldc_t *);
 static void vsw_send_rdx(vsw_ldc_t *);
-static int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
 
 /* Dring routines */
 static dring_info_t *vsw_create_dring(vsw_ldc_t *);
@@ -200,6 +201,10 @@ extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
 extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
 	mblk_t **npt);
 extern boolean_t vsw_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid);
+extern void vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp);
+extern void vsw_hio_stop(vsw_t *vswp, vsw_ldc_t *ldcp);
+extern void vsw_process_dds_msg(vsw_t *vswp, vsw_ldc_t *ldcp, void *msg);
+extern void vsw_hio_stop_port(vsw_port_t *portp);
 
 #define	VSW_NUM_VMPOOLS		3	/* number of vio mblk pools */
 
@@ -402,6 +407,9 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 		RW_EXIT(&plist->lockrw);
 		return (1);
 	}
+
+	/* cleanup any HybridIO for this port */
+	vsw_hio_stop_port(port);
 
 	/*
 	 * No longer need to hold writer lock on port list now
@@ -617,6 +625,8 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	ldcp->peer_session = 0;
 	ldcp->session_status = 0;
 	ldcp->hss_id = 1;	/* Initial handshake session id */
+
+	(void) atomic_swap_32(&port->p_hio_capable, B_FALSE);
 
 	/* only set for outbound lane, inbound set by peer */
 	vsw_set_lane_attr(vswp, &ldcp->lane_out);
@@ -1221,6 +1231,42 @@ vsw_vlan_unaware_port_reset(vsw_port_t *portp)
 	RW_EXIT(&ldclp->lockrw);
 }
 
+void
+vsw_hio_port_reset(vsw_port_t *portp)
+{
+	vsw_ldc_list_t	*ldclp;
+	vsw_ldc_t	*ldcp;
+
+	ldclp = &portp->p_ldclist;
+
+	READ_ENTER(&ldclp->lockrw);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->head == NULL) {
+		RW_EXIT(&ldclp->lockrw);
+		return;
+	}
+	ldcp = ldclp->head;
+
+	mutex_enter(&ldcp->ldc_cblock);
+
+	/*
+	 * If the peer is HybridIO capable (ver >= 1.3), reset channel
+	 * to trigger re-negotiation, which inturn trigger HybridIO
+	 * setup/cleanup.
+	 */
+	if ((ldcp->hphase == VSW_MILESTONE4) &&
+	    (portp->p_hio_capable == B_TRUE)) {
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+	}
+
+	mutex_exit(&ldcp->ldc_cblock);
+
+	RW_EXIT(&ldclp->lockrw);
+}
+
 /*
  * Search for and remove the specified port from the port
  * list. Returns 0 if able to locate and remove port, otherwise
@@ -1506,6 +1552,7 @@ vsw_conn_task(void *arg)
 {
 	vsw_conn_evt_t	*conn = (vsw_conn_evt_t *)arg;
 	vsw_ldc_t	*ldcp = NULL;
+	vsw_port_t	*portp;
 	vsw_t		*vswp = NULL;
 	uint16_t	evt;
 	ldc_status_t	curr_status;
@@ -1513,6 +1560,7 @@ vsw_conn_task(void *arg)
 	ldcp = conn->ldcp;
 	evt = conn->evt;
 	vswp = ldcp->ldc_vswp;
+	portp = ldcp->ldc_port;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -1534,6 +1582,10 @@ vsw_conn_task(void *arg)
 	 */
 	if ((evt == VSW_CONN_RESTART) && (curr_status == LDC_UP))
 		(void) ldc_down(ldcp->ldc_handle);
+
+	if ((vswp->hio_capable) && (portp->p_hio_enabled)) {
+		vsw_hio_stop(vswp, ldcp);
+	}
 
 	/*
 	 * re-init all the associated data structures.
@@ -1731,6 +1783,7 @@ void
 vsw_next_milestone(vsw_ldc_t *ldcp)
 {
 	vsw_t		*vswp = ldcp->ldc_vswp;
+	vsw_port_t	*portp = ldcp->ldc_port;
 
 	D1(vswp, "%s (chan %lld): enter (phase %ld)", __func__,
 	    ldcp->ldc_id, ldcp->hphase);
@@ -1843,6 +1896,11 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 			ldcp->hphase = VSW_MILESTONE4;
 			ldcp->hcnt = 0;
 			DISPLAY_STATE();
+			/* Start HIO if enabled and capable */
+			if ((portp->p_hio_enabled) && (portp->p_hio_capable)) {
+				D2(vswp, "%s: start HybridIO setup", __func__);
+				vsw_hio_start(vswp, ldcp);
+			}
 		} else {
 			D2(vswp, "%s: still in milestone 3 (0x%llx : 0x%llx)",
 			    __func__, ldcp->lane_in.lstate,
@@ -2202,6 +2260,9 @@ vsw_process_ctrl_pkt(void *arg)
 	case VIO_RDX:
 		vsw_process_ctrl_rdx_pkt(ldcp, &ctaskp->pktp);
 		break;
+	case VIO_DDS_INFO:
+		vsw_process_dds_msg(vswp, ldcp, &ctaskp->pktp);
+		break;
 	default:
 		DERR(vswp, "%s: unknown vio_subtype_env (%x)\n", __func__, env);
 	}
@@ -2525,6 +2586,18 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 			port->transmit = vsw_descrsend;
 			ldcp->lane_out.xfer_mode = VIO_DESC_MODE;
 		}
+
+		/*
+		 * HybridIO is supported only vnet, not by OBP.
+		 * So, set hio_capable to true only when in DRING mode.
+		 */
+		if (VSW_VER_GTEQ(ldcp, 1, 3) &&
+		    (ldcp->lane_in.xfer_mode != VIO_DESC_MODE)) {
+			(void) atomic_swap_32(&port->p_hio_capable, B_TRUE);
+		} else {
+			(void) atomic_swap_32(&port->p_hio_capable, B_FALSE);
+		}
+
 		mutex_exit(&port->tx_lock);
 
 		attr_pkt->tag.vio_sid = ldcp->local_session;
@@ -4708,7 +4781,7 @@ vsw_send_rdx(vsw_ldc_t *ldcp)
  * of the handle_reset flag we either handle that event here or simply
  * notify the caller that the channel was reset.
  */
-static int
+int
 vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 {
 	int			rv;

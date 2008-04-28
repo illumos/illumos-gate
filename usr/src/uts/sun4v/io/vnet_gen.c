@@ -72,9 +72,10 @@
  * Function prototypes.
  */
 /* vgen proxy entry points */
-int vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
-	mac_register_t **vgenmacp);
+int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
+    const uint8_t *macaddr, void **vgenhdl);
 int vgen_uninit(void *arg);
+int vgen_dds_tx(void *arg, void *dmsg);
 static int vgen_start(void *arg);
 static void vgen_stop(void *arg);
 static mblk_t *vgen_tx(void *arg, mblk_t *mp);
@@ -84,15 +85,6 @@ static int vgen_promisc(void *arg, boolean_t on);
 static int vgen_unicst(void *arg, const uint8_t *mca);
 static int vgen_stat(void *arg, uint_t stat, uint64_t *val);
 static void vgen_ioctl(void *arg, queue_t *wq, mblk_t *mp);
-
-/* externs - functions provided by vnet to add/remove/modify entries in fdb */
-extern void vnet_fdbe_add(vnet_t *vnetp, struct ether_addr *macaddr,
-	uint8_t type, mac_tx_t m_tx, void *port);
-extern void vnet_fdbe_del(vnet_t *vnetp, struct ether_addr *eaddr);
-extern void vnet_fdbe_modify(vnet_t *vnetp, struct ether_addr *macaddr,
-	void *portp, boolean_t flag);
-extern void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
-extern void vnet_tx_update(void *arg);
 
 /* vgen internal functions */
 static int vgen_read_mdprops(vgen_t *vgenp);
@@ -112,8 +104,6 @@ static int vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp);
 static int vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
 static int vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
 	mde_cookie_t mdex);
-static void vgen_fdbe_modify(vgen_port_t *portp, boolean_t use_vsw_port,
-	boolean_t flag);
 static int vgen_remove_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
 static int vgen_port_attach(vgen_port_t *portp);
 static void vgen_port_detach_mdeg(vgen_port_t *portp);
@@ -186,8 +176,8 @@ static int vgen_send_dring_ack(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 static int vgen_handle_datamsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	uint32_t msglen);
 static void vgen_handle_errmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static void vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag);
-static void vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag);
+static void vgen_handle_evt_up(vgen_ldc_t *ldcp);
+static void vgen_handle_evt_reset(vgen_ldc_t *ldcp);
 static int vgen_check_sid(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 static int vgen_check_datamsg_seq(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 static caddr_t vgen_print_ethaddr(uint8_t *a, char *ebuf);
@@ -217,6 +207,10 @@ static mblk_t *vgen_vlan_frame_fixtag(vgen_port_t *portp, mblk_t *mp,
 	boolean_t is_tagged, uint16_t vid);
 static void vgen_vlan_unaware_port_reset(vgen_port_t *portp);
 static void vgen_reset_vlan_unaware_ports(vgen_t *vgenp);
+static int vgen_dds_rx(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+
+/* externs */
+extern void vnet_dds_rx(void *arg, void *dmsg);
 
 /*
  * The handshake process consists of 5 phases defined below, with VH_PHASE0
@@ -453,15 +447,14 @@ uint32_t vgen_hdbg;
  * vgen_init() is called by an instance of vnet driver to initialize the
  * corresponding generic proxy transport layer. The arguments passed by vnet
  * are - an opaque pointer to the vnet instance, pointers to dev_info_t and
- * the mac address of the vnet device, and a pointer to mac_register_t of
- * the generic transport is returned in the last argument.
+ * the mac address of the vnet device, and a pointer to vgen_t is passed
+ * back as a handle to vnet.
  */
 int
-vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
-    mac_register_t **vgenmacp)
+vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
+    const uint8_t *macaddr, void **vgenhdl)
 {
 	vgen_t *vgenp;
-	mac_register_t *macp;
 	int instance;
 	int rv;
 
@@ -475,21 +468,10 @@ vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	vgenp = kmem_zalloc(sizeof (vgen_t), KM_SLEEP);
 
 	vgenp->vnetp = vnetp;
+	vgenp->instance = instance;
+	vgenp->regprop = regprop;
 	vgenp->vnetdip = vnetdip;
 	bcopy(macaddr, &(vgenp->macaddr), ETHERADDRL);
-
-	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
-		KMEM_FREE(vgenp);
-		return (DDI_FAILURE);
-	}
-	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
-	macp->m_driver = vgenp;
-	macp->m_dip = vnetdip;
-	macp->m_src_addr = (uint8_t *)&(vgenp->macaddr);
-	macp->m_callbacks = &vgen_m_callbacks;
-	macp->m_min_sdu = 0;
-	macp->m_max_sdu = vnet_ethermtu;
-	vgenp->macp = macp;
 
 	/* allocate multicast table */
 	vgenp->mctab = kmem_zalloc(VGEN_INIT_MCTAB_SIZE *
@@ -513,8 +495,7 @@ vgen_init(vnet_t *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 		goto vgen_init_fail;
 	}
 
-	/* register macp of this vgen_t with vnet */
-	*vgenmacp = vgenp->macp;
+	*vgenhdl = (void *)vgenp;
 
 	DBG1(NULL, NULL, "vnet(%d): exit\n", instance);
 	return (DDI_SUCCESS);
@@ -529,7 +510,6 @@ vgen_init_fail:
 		    sizeof (uint16_t) * vgenp->pri_num_types);
 		(void) vio_destroy_mblks(vgenp->pri_tx_vmp);
 	}
-	mac_free(vgenp->macp);
 	KMEM_FREE(vgenp);
 	return (DDI_FAILURE);
 }
@@ -584,8 +564,6 @@ vgen_uninit(void *arg)
 		(void) vio_destroy_mblks(vgenp->pri_tx_vmp);
 	}
 
-	mac_free(vgenp->macp);
-
 	mutex_exit(&vgenp->lock);
 
 	rw_destroy(&vgenp->vgenports.rwlock);
@@ -602,16 +580,16 @@ vgen_uninit(void *arg)
 int
 vgen_start(void *arg)
 {
-	vgen_t		*vgenp = (vgen_t *)arg;
+	vgen_port_t	*portp = (vgen_port_t *)arg;
+	vgen_t		*vgenp = portp->vgenp;
 
 	DBG1(vgenp, NULL, "enter\n");
-
-	mutex_enter(&vgenp->lock);
-	vgen_init_ports(vgenp);
-	vgenp->flags |= VGEN_STARTED;
-	mutex_exit(&vgenp->lock);
-
+	mutex_enter(&portp->lock);
+	vgen_port_init(portp);
+	portp->flags |= VGEN_STARTED;
+	mutex_exit(&portp->lock);
 	DBG1(vgenp, NULL, "exit\n");
+
 	return (DDI_SUCCESS);
 }
 
@@ -619,16 +597,17 @@ vgen_start(void *arg)
 void
 vgen_stop(void *arg)
 {
-	vgen_t		*vgenp = (vgen_t *)arg;
+	vgen_port_t	*portp = (vgen_port_t *)arg;
+	vgen_t		*vgenp = portp->vgenp;
 
 	DBG1(vgenp, NULL, "enter\n");
 
-	mutex_enter(&vgenp->lock);
-	vgen_uninit_ports(vgenp);
-	vgenp->flags &= ~(VGEN_STARTED);
-	mutex_exit(&vgenp->lock);
-
+	mutex_enter(&portp->lock);
+	vgen_port_uninit(portp);
+	portp->flags &= ~(VGEN_STARTED);
+	mutex_exit(&portp->lock);
 	DBG1(vgenp, NULL, "exit\n");
+
 }
 
 /* vgen transmit function */
@@ -768,14 +747,21 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 	vgen_ldc_t		*ldcp;
 	int			status;
 	int			rv = VGEN_SUCCESS;
-	vgen_t			*vgenp;
-	vnet_t			*vnetp;
+	vgen_t			*vgenp = portp->vgenp;
+	vnet_t			*vnetp = vgenp->vnetp;
 	boolean_t		is_tagged;
+	boolean_t		dec_refcnt = B_FALSE;
 	uint16_t		vlan_id;
 	struct ether_header	*ehp;
 
-	vgenp = portp->vgenp;
-	vnetp = vgenp->vnetp;
+	if (portp->use_vsw_port) {
+		(void) atomic_inc_32(&vgenp->vsw_port_refcnt);
+		portp = portp->vgenp->vsw_portp;
+		dec_refcnt = B_TRUE;
+	}
+	if (portp == NULL) {
+		return (VGEN_FAILURE);
+	}
 
 	/*
 	 * Determine the vlan id that the frame belongs to.
@@ -797,14 +783,14 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 		if (portp != vgenp->vsw_portp &&
 		    portp->pvid != vnetp->default_vlan_id) {
 			freemsg(mp);
-			return (VGEN_SUCCESS);
+			goto portsend_ret;
 		}
 
 	} else {	/* frame not in default-vlan */
 
 		mp = vgen_vlan_frame_fixtag(portp, mp, is_tagged, vlan_id);
 		if (mp == NULL) {
-			return (VGEN_SUCCESS);
+			goto portsend_ret;
 		}
 
 	}
@@ -816,7 +802,8 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 	 */
 	if (ldclp->headp == NULL) {
 		RW_EXIT(&ldclp->rwlock);
-		return (VGEN_FAILURE);
+		rv = VGEN_FAILURE;
+		goto portsend_ret;
 	}
 	ldcp = ldclp->headp;
 
@@ -826,6 +813,11 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 
 	if (status != VGEN_TX_SUCCESS) {
 		rv = VGEN_FAILURE;
+	}
+
+portsend_ret:
+	if (dec_refcnt == B_TRUE) {
+		(void) atomic_dec_32(&vgenp->vsw_port_refcnt);
 	}
 	return (rv);
 }
@@ -875,17 +867,6 @@ vgen_ldcsend_process_reset(vgen_ldc_t *ldcp)
 	ldc_status_t	istatus;
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 
-	/*
-	 * Calling mutex_enter() will result in a deadlock, if the other thread
-	 * already holds cblock and is waiting for all references on the fdbe
-	 * to be dropped in vnet_fdbe_modify() which is called from
-	 * vgen_handle_evt_reset(). This transmit thread holds a reference to
-	 * that fdb entry and will not drop its reference unless it gets cblock
-	 * here, completes processing and returns.
-	 * To avoid this race condition, we check if either callback thread
-	 * or another tx thread is already holding cblock, if so just return
-	 * and the thread which already holds it will handle the reset.
-	 */
 	if (mutex_tryenter(&ldcp->cblock)) {
 		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 			DWARN(vgenp, ldcp, "ldc_status() error\n");
@@ -893,12 +874,7 @@ vgen_ldcsend_process_reset(vgen_ldc_t *ldcp)
 			ldcp->ldc_status = istatus;
 		}
 		if (ldcp->ldc_status != LDC_UP) {
-			/*
-			 * Second arg is TRUE, as we know that
-			 * the caller of this function - vnet_m_tx(),
-			 * already has a ref on the fdb entry.
-			 */
-			vgen_handle_evt_reset(ldcp, B_TRUE);
+			vgen_handle_evt_reset(ldcp);
 		}
 		mutex_exit(&ldcp->cblock);
 	}
@@ -1179,7 +1155,13 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	int			rv = DDI_FAILURE;
 	uint32_t		i;
 
-	vgenp = (vgen_t *)arg;
+	portp = (vgen_port_t *)arg;
+	vgenp = portp->vgenp;
+
+	if (portp != vgenp->vsw_portp) {
+		return (DDI_SUCCESS);
+	}
+
 	addrp = (struct ether_addr *)mca;
 	tagp = &mcastmsg.tag;
 	bzero(&mcastmsg, sizeof (mcastmsg));
@@ -1308,20 +1290,9 @@ vgen_unicst(void *arg, const uint8_t *mca)
 int
 vgen_stat(void *arg, uint_t stat, uint64_t *val)
 {
-	vgen_t		*vgenp = (vgen_t *)arg;
-	vgen_port_t	*portp;
-	vgen_portlist_t	*plistp;
+	vgen_port_t	*portp = (vgen_port_t *)arg;
 
-	*val = 0;
-
-	plistp = &(vgenp->vgenports);
-	READ_ENTER(&plistp->rwlock);
-
-	for (portp = plistp->headp; portp != NULL; portp = portp->nextp) {
-		*val += vgen_port_stat(portp, stat);
-	}
-
-	RW_EXIT(&plistp->rwlock);
+	*val = vgen_port_stat(portp, stat);
 
 	return (0);
 }
@@ -1365,6 +1336,29 @@ vgen_port_detach(vgen_port_t *portp)
 
 	DBG1(vgenp, NULL, "port(%d):enter\n", port_num);
 
+	/*
+	 * If this port is connected to the vswitch, then
+	 * potentially there could be ports that may be using
+	 * this port to transmit packets. To address this do
+	 * the following:
+	 *	- First set vgenp->vsw_portp to NULL, so that
+	 *	  its not used after that.
+	 *	- Then wait for the refcnt to go down to 0.
+	 *	- Now we can safely detach this port.
+	 */
+	if (vgenp->vsw_portp == portp) {
+		vgenp->vsw_portp = NULL;
+		while (vgenp->vsw_port_refcnt > 0) {
+			delay(drv_usectohz(vgen_tx_delay));
+		}
+		(void) atomic_swap_32(&vgenp->vsw_port_refcnt, 0);
+	}
+
+	if (portp->vhp != NULL) {
+		vio_net_resource_unreg(portp->vhp);
+		portp->vhp = NULL;
+	}
+
 	vgen_vlan_destroy_hash(portp);
 
 	/* remove it from port list */
@@ -1384,9 +1378,7 @@ vgen_port_detach(vgen_port_t *portp)
 		portp->num_ldcs = 0;
 	}
 
-	if (vgenp->vsw_portp == portp) {
-		vgenp->vsw_portp = NULL;
-	}
+	mutex_destroy(&portp->lock);
 	KMEM_FREE(portp);
 
 	DBG1(vgenp, NULL, "port(%d):exit\n", port_num);
@@ -1479,35 +1471,6 @@ vgen_init_ports(vgen_t *vgenp)
 static void
 vgen_port_init(vgen_port_t *portp)
 {
-	vgen_t		*vgenp = portp->vgenp;
-	vgen_port_t	*tx_portp;
-	int		type;
-
-	/*
-	 * Add the mac address of the port into the fdb of the vnet device.
-	 *
-	 * If the port being added is a vnet-port:
-	 * In this case the tx_port arg specified to vnet_fdbe_add() is
-	 * vsw-port. This is done so that vsw-port acts as the route to reach
-	 * the macaddr corresponding to this port, until the channel for this
-	 * port comes up (LDC_UP) and handshake is done successfully. eg, if
-	 * the peer is OBP-vnet, it may not bring the channel up for this port
-	 * and may communicate via vsw to reach this port. Later, when
-	 * Solaris-vnet comes up at the other end of the channel for this port
-	 * and brings up the channel, it is an indication that peer vnet is
-	 * capable of distributed switching, so the direct route through this
-	 * port is specified in fdb (see func vgen_fdbe_modify()).
-	 */
-	if (portp == vgenp->vsw_portp) {
-		type = VNET_VSWPORT;
-	} else {
-		type = VNET_VNETPORT;
-	}
-	tx_portp = vgenp->vsw_portp;
-
-	/* Add entry for the port's mac address into fdb */
-	vnet_fdbe_add(vgenp->vnetp, &portp->macaddr, type, vgen_tx, tx_portp);
-
 	/* Add the port to the specified vlans */
 	vgen_vlan_add_ids(portp);
 
@@ -1535,12 +1498,7 @@ vgen_uninit_ports(vgen_t *vgenp)
 static void
 vgen_port_uninit(vgen_port_t *portp)
 {
-	vgen_t	*vgenp = portp->vgenp;
-
 	vgen_uninit_ldcs(portp);
-
-	/* delete the entry in vnet's fdb for this macaddr/port */
-	vnet_fdbe_del(vgenp->vnetp, &portp->macaddr);
 
 	/* remove the port from vlans it has been assigned to */
 	vgen_vlan_remove_ids(portp);
@@ -1558,7 +1516,6 @@ vgen_read_mdprops(vgen_t *vgenp)
 	md_t		*mdp = NULL;
 	mde_cookie_t	rootnode;
 	mde_cookie_t	*listp = NULL;
-	uint64_t	inst;
 	uint64_t	cfgh;
 	char		*name;
 	int		rv = 1;
@@ -1566,27 +1523,6 @@ vgen_read_mdprops(vgen_t *vgenp)
 	int		num_devs = 0;
 	int		listsz = 0;
 	int		i;
-
-	/*
-	 * In each 'virtual-device' node in the MD there is a
-	 * 'cfg-handle' property which is the MD's concept of
-	 * an instance number (this may be completely different from
-	 * the device drivers instance #). OBP reads that value and
-	 * stores it in the 'reg' property of the appropriate node in
-	 * the device tree. We first read this reg property and use this
-	 * to compare against the 'cfg-handle' property of vnet nodes
-	 * in MD to get to this specific vnet instance and then read
-	 * other properties that we are interested in.
-	 * We also cache the value of 'reg' property and use it later
-	 * to register callbacks with mdeg (see vgen_mdeg_reg())
-	 */
-	inst = ddi_prop_get_int(DDI_DEV_T_ANY, vgenp->vnetdip,
-	    DDI_PROP_DONTPASS, reg_propname, -1);
-	if (inst == -1) {
-		return (rv);
-	}
-
-	vgenp->regprop = inst;
 
 	if ((mdp = md_get_handle()) == NULL) {
 		return (rv);
@@ -1629,7 +1565,7 @@ vgen_read_mdprops(vgen_t *vgenp)
 		}
 
 		/* is this the required instance of vnet? */
-		if (inst != cfgh)
+		if (vgenp->regprop != cfgh)
 			continue;
 
 		/* now read all properties of this vnet instance */
@@ -1872,39 +1808,6 @@ vgen_vlan_lookup(mod_hash_t *vlan_hashp, uint16_t vid)
 }
 
 /*
- * Modify fdb entries corresponding to the port's macaddr, to use a different
- * port. This is done when the port's ldc channel goes down or comes up. When
- * the channel state changes to RESET/DOWN, we modify the fdb entry for the
- * port by specifying vsw-port as the port to be used for transmits.
- * Similarly when the channel state changes to UP, we restore its fdb entry to
- * start using the actual vnet-port for transmits.
- *
- * Arguments:
- *
- *   portp:          port for which fdb entry is being updated
- *
- *   use_vsw_port:
- *                   B_TRUE:  update fdb entry to use vsw-port for transmits
- *                   B_FALSE: update fdb entry to use the port itself for tx
- *
- *   flag:	     provides context info
- *                   B_TRUE:  this func is being called from transmit routine
- *                   B_FALSE: other contexts (callbacks)
- */
-static void
-vgen_fdbe_modify(vgen_port_t *portp, boolean_t use_vsw_port,
-	boolean_t flag)
-{
-	vgen_t		*vgenp = portp->vgenp;
-	vnet_t		*vnetp = vgenp->vnetp;
-	vgen_port_t	*pp;
-
-	(use_vsw_port == B_TRUE) ? (pp = vgenp->vsw_portp) : (pp = portp);
-
-	vnet_fdbe_modify(vnetp, &portp->macaddr, pp, flag);
-}
-
-/*
  * This function reads "priority-ether-types" property from md. This property
  * is used to enable support for priority frames. Applications which need
  * guaranteed and timely delivery of certain high priority frames to/from
@@ -1939,7 +1842,7 @@ vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp, mde_cookie_t node)
 			size = sizeof (vgen_pri_eth_type);
 			data = &vgen_pri_eth_type;
 		} else {
-			DWARN(vgenp, NULL,
+			DBG2(vgenp, NULL,
 			    "prop(%s) not found", pri_types_propname);
 			size = 0;
 		}
@@ -2098,8 +2001,7 @@ vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp)
 						cmn_err(CE_NOTE, "vnet%d Could "
 						    "not initialize virtual "
 						    "switch port.",
-						    ddi_get_instance(vgenp->
-						    vnetdip));
+						    vgenp->instance);
 						mutex_exit(&vgenp->lock);
 						return (MDEG_FAILURE);
 					}
@@ -2217,7 +2119,7 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 		goto vgen_mdeg_cb_err;
 	}
 
-	/* is this the right instance of vsw? */
+	/* is this the right instance of vnet? */
 	if (inst != vgenp->regprop) {
 		DERR(vgenp, NULL,  "Invalid cfg-handle: %lx\n", inst);
 		goto vgen_mdeg_cb_err;
@@ -2399,6 +2301,8 @@ vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
 	if (vgenp->vsw_portp == NULL) {
 		if (!(md_get_prop_val(mdp, mdex, swport_propname, &val))) {
 			if (val == 0) {
+				(void) atomic_swap_32(
+				    &vgenp->vsw_port_refcnt, 0);
 				/* This port is connected to the vsw */
 				vgenp->vsw_portp = portp;
 			}
@@ -2461,6 +2365,9 @@ vgen_port_attach(vgen_port_t *portp)
 	vgen_t			*vgenp;
 	uint64_t		*ldcids;
 	uint32_t		num_ldcs;
+	mac_register_t		*macp;
+	vio_net_res_type_t	type;
+	int			rv;
 
 	ASSERT(portp != NULL);
 
@@ -2470,6 +2377,7 @@ vgen_port_attach(vgen_port_t *portp)
 
 	DBG1(vgenp, NULL, "port_num(%d)\n", portp->port_num);
 
+	mutex_init(&portp->lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&portp->ldclist.rwlock, NULL, RW_DRIVER, NULL);
 	portp->ldclist.headp = NULL;
 
@@ -2484,14 +2392,44 @@ vgen_port_attach(vgen_port_t *portp)
 	/* create vlan id hash table */
 	vgen_vlan_create_hash(portp);
 
-	/* link it into the list of ports */
-	plistp = &(vgenp->vgenports);
-	WRITE_ENTER(&plistp->rwlock);
-	vgen_port_list_insert(portp);
-	RW_EXIT(&plistp->rwlock);
+	if (portp == vgenp->vsw_portp) {
+		/* This port is connected to the switch port */
+		vgenp->vsw_portp = portp;
+		(void) atomic_swap_32(&portp->use_vsw_port, B_FALSE);
+		type = VIO_NET_RES_LDC_SERVICE;
+	} else {
+		(void) atomic_swap_32(&portp->use_vsw_port, B_TRUE);
+		type = VIO_NET_RES_LDC_GUEST;
+	}
 
-	if (vgenp->flags & VGEN_STARTED) {	/* interface is configured */
-		vgen_port_init(portp);
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
+		vgen_port_detach(portp);
+		return (DDI_FAILURE);
+	}
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = portp;
+	macp->m_dip = vgenp->vnetdip;
+	macp->m_src_addr = (uint8_t *)&(vgenp->macaddr);
+	macp->m_callbacks = &vgen_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
+
+	mutex_enter(&portp->lock);
+	rv = vio_net_resource_reg(macp, type, vgenp->macaddr,
+	    portp->macaddr, &portp->vhp, &portp->vcb);
+	mutex_exit(&portp->lock);
+	mac_free(macp);
+
+	if (rv == 0) {
+		/* link it into the list of ports */
+		plistp = &(vgenp->vgenports);
+		WRITE_ENTER(&plistp->rwlock);
+		vgen_port_list_insert(portp);
+		RW_EXIT(&plistp->rwlock);
+	} else {
+		DERR(vgenp, NULL, "vio_net_resource_reg failed for portp=0x%p",
+		    portp);
+		vgen_port_detach(portp);
 	}
 
 	DBG1(vgenp, NULL, "exit: port_num(%d)\n", portp->port_num);
@@ -2505,10 +2443,15 @@ vgen_port_detach_mdeg(vgen_port_t *portp)
 	vgen_t *vgenp = portp->vgenp;
 
 	DBG1(vgenp, NULL, "enter: port_num(%d)\n", portp->port_num);
+
+	mutex_enter(&portp->lock);
+
 	/* stop the port if needed */
-	if (vgenp->flags & VGEN_STARTED) {
+	if (portp->flags & VGEN_STARTED) {
 		vgen_port_uninit(portp);
 	}
+
+	mutex_exit(&portp->lock);
 	vgen_port_detach(portp);
 
 	DBG1(vgenp, NULL, "exit: port_num(%d)\n", portp->port_num);
@@ -2657,7 +2600,7 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	attach_state |= AST_mutex_init;
 
 	attr.devclass = LDC_DEV_NT;
-	attr.instance = ddi_get_instance(vgenp->vnetdip);
+	attr.instance = vgenp->instance;
 	attr.mode = LDC_MODE_UNRELIABLE;
 	attr.mtu = vnet_ldc_mtu;
 	status = ldc_init(ldc_id, &attr, &ldcp->ldc_handle);
@@ -2717,7 +2660,7 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	attach_state |= AST_create_rxmblks;
 
 	/* Setup kstats for the channel */
-	instance = ddi_get_instance(vgenp->vnetdip);
+	instance = vgenp->instance;
 	(void) sprintf(kname, "vnetldc0x%lx", ldcp->ldc_id);
 	ldcp->ksp = vgen_setup_kstats("vnet", instance, kname, &ldcp->stats);
 	if (ldcp->ksp == NULL) {
@@ -3013,11 +2956,10 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 		vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 		if (ldcp->portp != vgenp->vsw_portp) {
 			/*
-			 * modify fdb entry to use this port as the channel is
-			 * up, instead of going through the vsw-port (see
-			 * comments in vgen_port_init())
+			 * As the channel is up, use this port from now on.
 			 */
-			vgen_fdbe_modify(ldcp->portp, B_FALSE, B_FALSE);
+			(void) atomic_swap_32(
+			    &ldcp->portp->use_vsw_port, B_FALSE);
 		}
 
 		/* Initialize local session id */
@@ -3077,6 +3019,12 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 	rv = ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_DISABLE);
 	if (rv != 0) {
 		DWARN(vgenp, ldcp, "ldc_set_cb_mode failed\n");
+	}
+
+	if (vgenp->vsw_portp == ldcp->portp) {
+		vio_net_report_err_t rep_err =
+		    ldcp->portp->vcb.vio_net_report_err;
+		rep_err(ldcp->portp->vhp, VIO_NET_RES_DOWN);
 	}
 
 	/*
@@ -3463,12 +3411,10 @@ vgen_ldc_stat(vgen_ldc_t *ldcp, uint_t stat)
 }
 
 /*
- * LDC channel is UP, start handshake process with peer. Flag tells
- * vnet_fdbe_modify() about the context: set to B_TRUE if this
- * function is being called from transmit routine, otherwise B_FALSE.
+ * LDC channel is UP, start handshake process with peer.
  */
 static void
-vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag)
+vgen_handle_evt_up(vgen_ldc_t *ldcp)
 {
 	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
 
@@ -3478,11 +3424,9 @@ vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag)
 
 	if (ldcp->portp != vgenp->vsw_portp) {
 		/*
-		 * modify fdb entry to use this port as the channel is up,
-		 * instead of going through the vsw-port (see comments in
-		 * vgen_port_init())
+		 * As the channel is up, use this port from now on.
 		 */
-		vgen_fdbe_modify(ldcp->portp, B_FALSE, flag);
+		(void) atomic_swap_32(&ldcp->portp->use_vsw_port, B_FALSE);
 	}
 
 	/* Initialize local session id */
@@ -3505,11 +3449,9 @@ vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag)
 /*
  * LDC channel is Reset, terminate connection with peer and try to
  * bring the channel up again.
- * Flag tells vnet_fdbe_modify() about the context: set to B_TRUE if this
- * function is being called from transmit routine, otherwise B_FALSE.
  */
 static void
-vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag)
+vgen_handle_evt_reset(vgen_ldc_t *ldcp)
 {
 	ldc_status_t istatus;
 	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
@@ -3522,11 +3464,18 @@ vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag)
 	if ((ldcp->portp != vgenp->vsw_portp) &&
 	    (vgenp->vsw_portp != NULL)) {
 		/*
-		 * modify fdb entry to use vsw-port  as the channel is reset
-		 * and we don't have a direct link to the destination (see
-		 * comments in vgen_port_init()).
+		 * As the channel is down, use the switch port until
+		 * the channel becomes ready to be used.
 		 */
-		vgen_fdbe_modify(ldcp->portp, B_TRUE, flag);
+		(void) atomic_swap_32(&ldcp->portp->use_vsw_port, B_TRUE);
+	}
+
+	if (vgenp->vsw_portp == ldcp->portp) {
+		vio_net_report_err_t rep_err =
+		    ldcp->portp->vcb.vio_net_report_err;
+
+		/* Post a reset message */
+		rep_err(ldcp->portp->vhp, VIO_NET_RES_DOWN);
 	}
 
 	if (ldcp->hphase != VH_PHASE0) {
@@ -3547,7 +3496,7 @@ vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag)
 
 	/* if channel is already UP - restart handshake */
 	if (ldcp->ldc_status == LDC_UP) {
-		vgen_handle_evt_up(ldcp, flag);
+		vgen_handle_evt_up(ldcp);
 	}
 
 	DBG1(vgenp, ldcp, "exit\n");
@@ -3602,7 +3551,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		DWARN(vgenp, ldcp, "event(%lx) UP, status(%d)\n",
 		    event, ldcp->ldc_status);
 
-		vgen_handle_evt_up(ldcp, B_FALSE);
+		vgen_handle_evt_up(ldcp);
 
 		ASSERT((event & (LDC_EVT_RESET | LDC_EVT_DOWN)) == 0);
 	}
@@ -3619,7 +3568,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		DWARN(vgenp, ldcp, "event(%lx) RESET/DOWN, status(%d)\n",
 		    event, ldcp->ldc_status);
 
-		vgen_handle_evt_reset(ldcp, B_FALSE);
+		vgen_handle_evt_reset(ldcp);
 
 		/*
 		 * As the channel is down/reset, ignore READ event
@@ -3786,7 +3735,7 @@ vgen_evtread_error:
 		} else {
 			ldcp->ldc_status = istatus;
 		}
-		vgen_handle_evt_reset(ldcp, B_FALSE);
+		vgen_handle_evt_reset(ldcp);
 	} else if (rv) {
 		vgen_handshake_retry(ldcp);
 	}
@@ -4181,6 +4130,7 @@ vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp)
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 
 	if (VGEN_VER_GTEQ(ldcp, 1, 3)) {
+
 		/*
 		 * If the version negotiated with peer is >= 1.3,
 		 * set the mtu in our attributes to max_frame_size.
@@ -4513,8 +4463,11 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		 */
 		mutex_enter(&ldcp->tclock);
 		if (ldcp->need_resched) {
+			vio_net_tx_update_t vtx_update =
+			    ldcp->portp->vcb.vio_net_tx_update;
+
 			ldcp->need_resched = B_FALSE;
-			vnet_tx_update(vgenp->vnetp);
+			vtx_update(ldcp->portp->vhp);
 		}
 		mutex_exit(&ldcp->tclock);
 
@@ -4530,7 +4483,7 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		} else {
 			ldcp->ldc_status = istatus;
 		}
-		vgen_handle_evt_reset(ldcp, B_FALSE);
+		vgen_handle_evt_reset(ldcp);
 	} else if (rv) {
 		vgen_handshake_reset(ldcp);
 	}
@@ -5237,6 +5190,9 @@ vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		rv = vgen_handle_mcast_info(ldcp, tagp);
 		break;
 
+	case VIO_DDS_INFO:
+		rv = vgen_dds_rx(ldcp, tagp);
+		break;
 	}
 
 	DBG1(vgenp, ldcp, "exit rv(%d)\n", rv);
@@ -5303,6 +5259,7 @@ vgen_handle_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	vgen_t			*vgenp = LDC_TO_VGEN(ldcp);
 	vgen_stats_t		*statsp = &ldcp->stats;
 	vgen_hparams_t		*lp = &ldcp->local_hparams;
+	vio_net_rx_cb_t		vrx_cb;
 
 	ASSERT(MUTEX_HELD(&ldcp->cblock));
 
@@ -5333,8 +5290,9 @@ vgen_handle_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	(void) atomic_inc_64(&statsp->rx_pri_packets);
 	(void) atomic_add_64(&statsp->rx_pri_bytes, size);
 
-	/* send up; call vnet_rx() as cblock is already released */
-	vnet_rx(vgenp->vnetp, NULL, mp);
+	/* send up; call vrx_cb() as cblock is already released */
+	vrx_cb = ldcp->portp->vcb.vio_net_rx_cb;
+	vrx_cb(ldcp->portp->vhp, mp);
 
 exit:
 	mutex_enter(&ldcp->cblock);
@@ -6018,7 +5976,6 @@ vgen_reclaim_dring(vgen_ldc_t *ldcp)
 	vnet_public_desc_t *txdp;
 	vgen_private_desc_t *tbufp;
 	vio_dring_entry_hdr_t	*hdrp;
-	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
 
 #ifdef DEBUG
 	if (vgen_trigger_txtimeout)
@@ -6047,8 +6004,11 @@ vgen_reclaim_dring(vgen_ldc_t *ldcp)
 	 * Check if mac layer should be notified to restart transmissions
 	 */
 	if ((ldcp->need_resched) && (count > 0)) {
+		vio_net_tx_update_t vtx_update =
+		    ldcp->portp->vcb.vio_net_tx_update;
+
 		ldcp->need_resched = B_FALSE;
-		vnet_tx_update(vgenp->vnetp);
+		vtx_update(ldcp->portp->vhp);
 	}
 }
 
@@ -6122,8 +6082,11 @@ vgen_ldc_watchdog(void *arg)
 		vgen_handshake_retry(ldcp);
 		mutex_exit(&ldcp->cblock);
 		if (ldcp->need_resched) {
+			vio_net_tx_update_t vtx_update =
+			    ldcp->portp->vcb.vio_net_tx_update;
+
 			ldcp->need_resched = B_FALSE;
-			vnet_tx_update(vgenp->vnetp);
+			vtx_update(ldcp->portp->vhp);
 		}
 	}
 
@@ -6280,7 +6243,7 @@ vgen_print_ldcinfo(vgen_ldc_t *ldcp)
 static void
 vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp)
 {
-	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
+	vio_net_rx_cb_t vrx_cb = ldcp->portp->vcb.vio_net_rx_cb;
 
 	if (ldcp->rcv_thread != NULL) {
 		ASSERT(MUTEX_HELD(&ldcp->rxlock));
@@ -6290,7 +6253,7 @@ vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp)
 		mutex_exit(&ldcp->cblock);
 	}
 
-	vnet_rx(vgenp->vnetp, NULL, bp);
+	vrx_cb(ldcp->portp->vhp, bp);
 
 	if (ldcp->rcv_thread != NULL) {
 		mutex_enter(&ldcp->rxlock);
@@ -6377,6 +6340,60 @@ vgen_stop_rcv_thread(vgen_ldc_t *ldcp)
 	mutex_exit(&ldcp->rcv_thr_lock);
 	ldcp->rcv_thread = NULL;
 	DBG1(vgenp, ldcp, "exit\n");
+}
+
+/*
+ * vgen_dds_rx -- post DDS messages to vnet.
+ */
+static int
+vgen_dds_rx(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
+{
+	vio_dds_msg_t *dmsg = (vio_dds_msg_t *)tagp;
+	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
+
+	if (dmsg->dds_class != DDS_VNET_NIU) {
+		DWARN(vgenp, ldcp, "Unknown DDS class, dropping");
+		return (EBADMSG);
+	}
+	vnet_dds_rx(vgenp->vnetp, dmsg);
+	return (0);
+}
+
+/*
+ * vgen_dds_tx -- an interface called by vnet to send DDS messages.
+ */
+int
+vgen_dds_tx(void *arg, void *msg)
+{
+	vgen_t *vgenp = arg;
+	vio_dds_msg_t *dmsg = msg;
+	vgen_portlist_t *plistp = &vgenp->vgenports;
+	vgen_ldc_t *ldcp;
+	vgen_ldclist_t *ldclp;
+	int rv = EIO;
+
+
+	READ_ENTER(&plistp->rwlock);
+	ldclp = &(vgenp->vsw_portp->ldclist);
+	READ_ENTER(&ldclp->rwlock);
+	ldcp = ldclp->headp;
+	if ((ldcp == NULL) || (ldcp->hphase != VH_DONE)) {
+		goto vgen_dsend_exit;
+	}
+
+	dmsg->tag.vio_sid = ldcp->local_sid;
+	rv = vgen_sendmsg(ldcp, (caddr_t)dmsg, sizeof (vio_dds_msg_t), B_FALSE);
+	if (rv != VGEN_SUCCESS) {
+		rv = EIO;
+	} else {
+		rv = 0;
+	}
+
+vgen_dsend_exit:
+	RW_EXIT(&ldclp->rwlock);
+	RW_EXIT(&plistp->rwlock);
+	return (rv);
+
 }
 
 #if DEBUG

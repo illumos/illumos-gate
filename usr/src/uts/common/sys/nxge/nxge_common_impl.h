@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,6 +97,8 @@ extern "C" {
 
 #define	VIR_CTL		0x0000000100000000ULL
 #define	VIR2_CTL	0x0000000200000000ULL
+
+#define	HIO_CTL		0x0000000400000000ULL
 
 #define	NXGE_NOTE	0x0000001000000000ULL
 #define	NXGE_ERR_CTL	0x0000002000000000ULL

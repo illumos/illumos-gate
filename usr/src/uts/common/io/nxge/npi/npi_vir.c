@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +156,7 @@ npi_vir_dump_ldgnum(npi_handle_t handle)
 			NXGE_REG_RD64(handle, offset, &value);
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 				"Logical Device %d: 0x%08llx "
-				"%s\t 0x%08llx \n",
+				"%s\t %d\n",
 				ldv, offset,
 				fzc_pio_ldgnum_name[i], value));
 		}
@@ -798,7 +798,32 @@ npi_fzc_dma_bind_set(npi_handle_t handle, fzc_dma_bind_t dma_bind)
 	}
 
 	NXGE_REG_WR64(handle, DMA_BIND_REG +
-		DMA_BIND_REG_OFFSET(fn, rn, id), bind.value);
+	    DMA_BIND_REG_OFFSET(fn, region, id), bind.value);
+
+	return (status);
+}
+
+npi_status_t
+npi_fzc_dma_bind_get(
+	npi_handle_t handle,
+	fzc_dma_bind_t dma_bind,
+	uint64_t *pValue)
+{
+	uint8_t		function, region, slot;
+	int		offset;
+	int		status;
+
+	function = dma_bind.function_id;
+	region = dma_bind.sub_vir_region;
+	slot = dma_bind.vir_index;
+
+	DMA_BIND_VADDR_VALIDATE(function, region, slot, status);
+	if (status) {
+		return (status);
+	}
+
+	offset = DMA_BIND_REG_OFFSET(function, region, slot);
+	NXGE_REG_RD64(handle, DMA_BIND_REG + offset, pValue);
 
 	return (status);
 }

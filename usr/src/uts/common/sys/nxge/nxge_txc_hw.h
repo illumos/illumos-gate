@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1179,6 +1179,7 @@ typedef union _txc_int_stat_t {
 
 #define	TXC_INT_MASK_REG		(FZC_TXC + 0x20430)
 #define	TXC_INT_MASK_MASK		0x00000000FFFFFFFFULL
+#define	TXC_INT_MASK_IVAL		0x3f
 
 typedef union _txc_int_mask_t {
 	uint64_t value;

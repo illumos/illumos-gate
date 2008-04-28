@@ -33,6 +33,9 @@
 extern "C" {
 #endif
 
+#include <sys/vnet_res.h>
+#include <sys/vnet_mailbox.h>
+
 #define	VNET_SUCCESS		(0)	/* successful return */
 #define	VNET_FAILURE		(-1)	/* unsuccessful return */
 
@@ -43,43 +46,55 @@ extern "C" {
 #define	VNET_LDCWD_TXTIMEOUT	1000		/* tx timeout in msec */
 #define	VNET_LDC_MTU		64		/* ldc mtu */
 
-#define	VNET_VNETPORT		1		/* port connected to a vnet */
-#define	VNET_VSWPORT		2		/* port connected to vsw */
+
+#define	IS_BROADCAST(ehp) \
+		(ether_cmp(&ehp->ether_dhost, &etherbroadcastaddr) == 0)
+#define	IS_MULTICAST(ehp) \
+		((ehp->ether_dhost.ether_addr_octet[0] & 01) == 1)
+
+#define	VNET_MATCH_RES(vresp, vnetp)	\
+	(ether_cmp(vresp->local_macaddr, vnetp->curr_macaddr) == 0)
 
 /*
- * vnet proxy transport layer information. There is one instance of this for
- * every transport being used by a vnet device and a list of these transports
- * is maintained by vnet.
+ * A vnet resource structure.
  */
-typedef struct vp_tl {
-	struct vp_tl		*nextp;			/* next in list */
-	mac_register_t		*macp;			/* transport ops */
-	char			name[LIFNAMSIZ];	/* device name */
-	major_t			major;			/* driver major # */
-	uint_t			instance;		/* dev instance */
-} vp_tl_t;
+typedef struct vnet_res {
+	struct vnet_res		*nextp;		/* next resource in the list */
+	mac_register_t		macreg;		/* resource's mac_reg */
+	vio_net_res_type_t	type;		/* resource type */
+	ether_addr_t		local_macaddr;	/* resource's macaddr */
+	ether_addr_t		rem_macaddr;	/* resource's remote macaddr */
+	uint32_t		flags;		/* resource flags */
+	uint32_t		refcnt;		/* reference count */
+	struct	vnet		*vnetp;		/* back pointer to vnet */
+} vnet_res_t;
 
-/*
- * Forwarding database entry. Each port of a vnet device will have an entry in
- * the fdb. Reference count is bumped up while sending a packet destined to a
- * port corresponding to the fdb entry.
- */
-typedef struct vnet_fdbe {
-	uint8_t		type;	/* VNET_VNETPORT or VNET_VSWPORT ? */
-	uint32_t	refcnt;	/* reference count */
-	void		*txarg;	/* arg to the transmit func */
-	mac_tx_t 	m_tx;	/* transmit function */
-} vnet_fdbe_t;
+#define	VNET_DDS_TASK_ADD_SHARE		0x01
+#define	VNET_DDS_TASK_DEL_SHARE		0x02
+#define	VNET_DDS_TASK_REL_SHARE		0x04
+
+/* An instance specific DDS structure */
+typedef struct vnet_dds_info {
+	kmutex_t	lock;		/* lock for this structure */
+	uint8_t		task_flags;	/* flags for taskq */
+	uint8_t		dds_req_id;	/* DDS message request id */
+	vio_dds_msg_t	dmsg;		/* Pending DDS message */
+	dev_info_t	*hio_dip;	/* Hybrid device's dip */
+	uint64_t	hio_cookie;	/* Hybrid device's cookie */
+	ddi_taskq_t	*dds_taskqp;	/* Taskq's used for DDS */
+	struct vnet	*vnetp;		/* Back pointer to vnetp */
+} vnet_dds_info_t;
 
 #define	VNET_NFDB_HASH	64
 
 #define	KEY_HASH(key, addr) \
-	(key = ((((uint64_t)(addr)->ether_addr_octet[0]) << 40) | \
-	(((uint64_t)(addr)->ether_addr_octet[1]) << 32) | \
-	(((uint64_t)(addr)->ether_addr_octet[2]) << 24) | \
-	(((uint64_t)(addr)->ether_addr_octet[3]) << 16) | \
-	(((uint64_t)(addr)->ether_addr_octet[4]) << 8) | \
-	((uint64_t)(addr)->ether_addr_octet[5])));
+	(key = (((uint64_t)(addr[0])) << 40) | \
+	(((uint64_t)(addr[1])) << 32) | \
+	(((uint64_t)(addr[2])) << 24) | \
+	(((uint64_t)(addr[3])) << 16) | \
+	(((uint64_t)(addr[4])) << 8) | \
+	((uint64_t)(addr[5])));
+
 
 /* rwlock macros */
 #define	READ_ENTER(x)	rw_enter(x, RW_READER)
@@ -94,17 +109,16 @@ typedef struct vnet_fdbe {
 typedef struct vnet {
 	int			instance;	/* instance # */
 	dev_info_t		*dip;		/* dev_info */
+	uint64_t		reg;		/* reg prop value */
 	struct vnet		*nextp;		/* next in list */
-	mac_handle_t 		mh;		/* handle to GLDv3 mac module */
+	mac_handle_t		mh;		/* handle to GLDv3 mac module */
 	uchar_t			vendor_addr[ETHERADDRL]; /* orig macadr */
 	uchar_t			curr_macaddr[ETHERADDRL]; /* current macadr */
-	vp_tl_t			*tlp;		/* list of vp_tl */
-	krwlock_t		trwlock;	/* lock for vp_tl list */
-	char			vgen_name[MAXNAMELEN];	/* name of generic tl */
+	void			*vgenhdl;	/* Handle for vgen */
 
 	uint32_t		fdb_nchains;	/* # of hash chains in fdbtbl */
 	mod_hash_t		*fdb_hashp;	/* forwarding database */
-	vnet_fdbe_t		*vsw_fp;	/* cached fdb entry of vsw */
+	vnet_res_t		*vsw_fp;	/* cached fdb entry of vsw */
 	krwlock_t		vsw_fp_rw;	/* lock to protect vsw_fp */
 	uint32_t		max_frame_size;	/* max frame size supported */
 
@@ -112,7 +126,16 @@ typedef struct vnet {
 	uint16_t		pvid;		/* port vlan id (untagged) */
 	uint16_t		*vids;		/* vlan ids (tagged) */
 	uint16_t		nvids;		/* # of vids */
+
+	uint32_t		flags;		/* interface flags */
+	vnet_res_t		*hio_fp;	/* Hybrid IO resource */
+	vnet_res_t		*vres_list;	/* Resource list */
+	vnet_dds_info_t		vdds_info;	/* DDS related info */
+	krwlock_t		vrwlock;	/* Resource list lock */
+	ddi_taskq_t		*taskqp;	/* Resource taskq */
 } vnet_t;
+
+#define	VNET_STARTED	0x01
 
 #ifdef DEBUG
 /*

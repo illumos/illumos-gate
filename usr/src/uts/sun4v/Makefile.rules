@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -131,6 +131,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4v/io/n2rng/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:                $(UTSBASE)/sun4v/io/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:                $(UTSBASE)/sun4v/io/n2rng/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -160,6 +163,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/cpu/%.s
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/px/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

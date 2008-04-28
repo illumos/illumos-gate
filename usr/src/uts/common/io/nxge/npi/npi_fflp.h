@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@ extern "C" {
 
 
 #include <npi.h>
+#include <nxge_hw.h>
 #include <nxge_fflp_hw.h>
 #include <nxge_fflp.h>
 

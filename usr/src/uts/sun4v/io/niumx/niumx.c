@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -531,8 +531,7 @@ niumx_name_child(dev_info_t *child, char *name, int namelen)
 		cmn_err(CE_WARN, "reg property not well-formed");
 		return (DDI_FAILURE);
 	}
-	(void) snprintf(name, namelen, "%x", (r[0].addr_high &
-	    NIUMX_FUNC_NUM_MASK));
+	(void) snprintf(name, namelen, "%x", (r[0].addr_high));
 	ddi_prop_free(r);
 	return (DDI_SUCCESS);
 }
@@ -1034,6 +1033,8 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 			goto fail2;
 		}
 	}
+
+	ih_p->ih_sysino = 0;
 
 	hdlp->ih_vector = (uint32_t)sysino;
 	if (hdlp->ih_vector !=  NULL) i_ddi_rem_ivintr(hdlp);

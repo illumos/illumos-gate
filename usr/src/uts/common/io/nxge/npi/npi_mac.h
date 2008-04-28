@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -467,7 +467,7 @@ npi_status_t npi_mac_hostinfo_entry(npi_handle_t, io_op_t,
 				hostinfo_t *);
 npi_status_t npi_mac_altaddr_enable(npi_handle_t, uint8_t,
 				uint8_t);
-npi_status_t npi_mac_altaddr_disble(npi_handle_t, uint8_t,
+npi_status_t npi_mac_altaddr_disable(npi_handle_t, uint8_t,
 				uint8_t);
 npi_status_t npi_mac_altaddr_entry(npi_handle_t, io_op_t,
 				uint8_t, uint8_t,

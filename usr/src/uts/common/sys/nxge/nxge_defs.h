@@ -198,8 +198,22 @@ extern "C" {
 
 
 /* DMC/TMC CSR size */
-#define	DMA_CSR_SIZE		512
-#define	DMA_CSR_MIN_PAGE_SIZE	1024
+#define	DMA_CSR_SLL		9	/* Used to calculate VR addresses */
+#define	DMA_CSR_SIZE		(1 << DMA_CSR_SLL) /* 512 */
+#define	DMA_CSR_MASK		0xff	/* Used to calculate VR addresses */
+	/*
+	 * That is, each DMA CSR set must fit into a 512 byte space.
+	 * If you subtract DMC (0x60000) from each DMA register definition,
+	 * what you have left over is currently less than 255 (0xff)
+	 */
+#define	DMA_CSR_MIN_PAGE_SIZE	(2 * DMA_CSR_SIZE) /* 1024 */
+	/*
+	 * There are 2 subpages per page in a VR.
+	 */
+#define	VDMA_CSR_SIZE		(8 * DMA_CSR_MIN_PAGE_SIZE) /* 0x2000 */
+	/*
+	 * There are 8 pages in a VR.
+	 */
 
 /*
  * Define the Default RBR, RCR
@@ -261,11 +275,15 @@ extern "C" {
 #define	NXGE_PORTS_NEPTUNE		4
 #define	NXGE_PORTS_NIU			2
 
+/*
+ * Virtualization Regions.
+ */
+#define	NXGE_MAX_VRS			8
+
 /* Max. RDC table groups */
 #define	NXGE_MAX_RDC_GROUPS		8
 #define	NXGE_MAX_RDCS			16
 #define	NXGE_MAX_DMAS			32
-
 
 #define	NXGE_MAX_MACS_XMACS		16
 #define	NXGE_MAX_MACS_BMACS		8

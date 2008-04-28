@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,17 @@ extern "C" {
 #include <nxge_sr_hw.h>
 #include <nxge_phy_hw.h>
 
+
+/*
+ * The Neptune chip has 16 Receive DMA channels, but no more than
+ * 24 Transmit DMA channels.
+ */
+typedef uint32_t dc_map_t;
+
+/*
+ * The logical group map is a Crossbow addition.
+ */
+typedef uint32_t lg_map_t;
 
 /* Modes of NXGE core */
 typedef	enum nxge_mode_e {

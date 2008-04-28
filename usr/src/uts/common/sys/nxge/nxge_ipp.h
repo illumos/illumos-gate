@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,7 @@ typedef	struct _nxge_ipp {
 nxge_status_t nxge_ipp_reset(p_nxge_t);
 nxge_status_t nxge_ipp_init(p_nxge_t);
 nxge_status_t nxge_ipp_disable(p_nxge_t);
+nxge_status_t nxge_ipp_drain(p_nxge_t);
 nxge_status_t nxge_ipp_handle_sys_errors(p_nxge_t);
 nxge_status_t nxge_ipp_fatal_err_recover(p_nxge_t);
 nxge_status_t nxge_ipp_eccue_valid_check(p_nxge_t, boolean_t *);

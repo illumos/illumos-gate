@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,8 @@ typedef struct _nxge_txc {
  */
 nxge_status_t nxge_txc_init(p_nxge_t);
 nxge_status_t nxge_txc_uninit(p_nxge_t);
+nxge_status_t nxge_txc_tdc_bind(p_nxge_t, int);
+nxge_status_t nxge_txc_tdc_unbind(p_nxge_t, int);
 nxge_status_t nxge_txc_handle_sys_errors(p_nxge_t);
 void nxge_txc_inject_err(p_nxge_t, uint32_t);
 

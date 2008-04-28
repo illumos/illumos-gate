@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,9 @@
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_txdma.h>
+#include <sys/nxge/nxge_hio.h>
+#include <npi_tx_rd64.h>
+#include <npi_tx_wr64.h>
 #include <sys/llc1.h>
 
 uint32_t 	nxge_reclaim_pending = TXDMA_RECLAIM_PENDING_DEFAULT;
@@ -53,18 +56,15 @@ extern ddi_dma_attr_t nxge_tx_dma_attr;
 
 extern int nxge_serial_tx(mblk_t *mp, void *arg);
 
-static nxge_status_t nxge_map_txdma(p_nxge_t);
-static void nxge_unmap_txdma(p_nxge_t);
+static nxge_status_t nxge_map_txdma(p_nxge_t, int);
 
-static nxge_status_t nxge_txdma_hw_start(p_nxge_t);
-static void nxge_txdma_hw_stop(p_nxge_t);
+static nxge_status_t nxge_txdma_hw_start(p_nxge_t, int);
 
 static nxge_status_t nxge_map_txdma_channel(p_nxge_t, uint16_t,
 	p_nxge_dma_common_t *, p_tx_ring_t *,
 	uint32_t, p_nxge_dma_common_t *,
 	p_tx_mbox_t *);
-static void nxge_unmap_txdma_channel(p_nxge_t, uint16_t,
-	p_tx_ring_t, p_tx_mbox_t);
+static void nxge_unmap_txdma_channel(p_nxge_t, uint16_t);
 
 static nxge_status_t nxge_map_txdma_channel_buf_ring(p_nxge_t, uint16_t,
 	p_nxge_dma_common_t *, p_tx_ring_t *, uint32_t);
@@ -78,8 +78,7 @@ static void nxge_unmap_txdma_channel_cfg_ring(p_nxge_t,
 
 static nxge_status_t nxge_txdma_start_channel(p_nxge_t, uint16_t,
     p_tx_ring_t, p_tx_mbox_t);
-static nxge_status_t nxge_txdma_stop_channel(p_nxge_t, uint16_t,
-	p_tx_ring_t, p_tx_mbox_t);
+static nxge_status_t nxge_txdma_stop_channel(p_nxge_t, uint16_t);
 
 static p_tx_ring_t nxge_txdma_get_ring(p_nxge_t, uint16_t);
 static nxge_status_t nxge_tx_err_evnts(p_nxge_t, uint_t,
@@ -88,42 +87,109 @@ static p_tx_mbox_t nxge_txdma_get_mbox(p_nxge_t, uint16_t);
 static nxge_status_t nxge_txdma_fatal_err_recover(p_nxge_t,
 	uint16_t, p_tx_ring_t);
 
+static void nxge_txdma_fixup_hung_channel(p_nxge_t nxgep,
+    p_tx_ring_t ring_p, uint16_t channel);
+
 nxge_status_t
 nxge_init_txdma_channels(p_nxge_t nxgep)
 {
-	nxge_status_t		status = NXGE_OK;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int i, count;
 
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_init_txdma_channels"));
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_init_txdma_channels"));
 
-	status = nxge_map_txdma(nxgep);
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_init_txdma_channels: status 0x%x", status));
-		return (status);
+	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
+		if ((1 << i) & set->lg.map) {
+			int tdc;
+			nxge_grp_t *group = set->group[i];
+			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+				if ((1 << tdc) & group->map) {
+					if ((nxge_grp_dc_add(nxgep,
+						(vr_handle_t)group,
+						VP_BOUND_TX, tdc)))
+						return (NXGE_ERROR);
+				}
+			}
+		}
+		if (++count == set->lg.count)
+			break;
 	}
 
-	status = nxge_txdma_hw_start(nxgep);
-	if (status != NXGE_OK) {
-		nxge_unmap_txdma(nxgep);
-		return (status);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_init_txdma_channels: status 0x%x", status));
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_txdma_channels"));
 
 	return (NXGE_OK);
+}
+
+nxge_status_t
+nxge_init_txdma_channel(
+	p_nxge_t nxge,
+	int channel)
+{
+	nxge_status_t status;
+
+	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "==> nxge_init_txdma_channel"));
+
+	status = nxge_map_txdma(nxge, channel);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+		    "<== nxge_init_txdma_channel: status 0x%x", status));
+		(void) npi_txdma_dump_tdc_regs(nxge->npi_handle, channel);
+		return (status);
+	}
+
+	status = nxge_txdma_hw_start(nxge, channel);
+	if (status != NXGE_OK) {
+		(void) nxge_unmap_txdma_channel(nxge, channel);
+		(void) npi_txdma_dump_tdc_regs(nxge->npi_handle, channel);
+		return (status);
+	}
+
+	if (!nxge->statsp->tdc_ksp[channel])
+		nxge_setup_tdc_kstats(nxge, channel);
+
+	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "<== nxge_init_txdma_channel"));
+
+	return (status);
 }
 
 void
 nxge_uninit_txdma_channels(p_nxge_t nxgep)
 {
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_uninit_txdma_channels"));
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
-	nxge_txdma_hw_stop(nxgep);
-	nxge_unmap_txdma(nxgep);
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_uninit_txdma_channels"));
+
+	if (set->owned.map == 0) {
+		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		    "nxge_uninit_txdma_channels: no channels"));
+		return;
+	}
+
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			nxge_grp_dc_remove(nxgep, VP_BOUND_TX, tdc);
+		}
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_uninit_txdma_channels"));
+}
+
+void
+nxge_uninit_txdma_channel(p_nxge_t nxgep, int channel)
+{
+	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_uninit_txdma_channel"));
+
+	if (nxgep->statsp->tdc_ksp[channel]) {
+		kstat_delete(nxgep->statsp->tdc_ksp[channel]);
+		nxgep->statsp->tdc_ksp[channel] = 0;
+	}
+
+	(void) nxge_txdma_stop_channel(nxgep, channel);
+	nxge_unmap_txdma_channel(nxgep, channel);
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_uinit_txdma_channels"));
+		"<== nxge_uninit_txdma_channel"));
 }
 
 void
@@ -144,6 +210,29 @@ nxge_setup_dma_common(p_nxge_dma_common_t dest_p, p_nxge_dma_common_t src_p,
 	src_p->dma_cookie.dmac_size -= tsize;
 }
 
+/*
+ * nxge_reset_txdma_channel
+ *
+ *	Reset a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to reset.
+ * 	reg_data	The current TX_CS.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_channel_reset()
+ *	npi_txdma_channel_control()
+ *
+ * Registers accessed:
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *	TX_RING_KICK	DMC+0x40018 Transmit Ring Kick
+ *
+ * Context:
+ *	Any domain
+ */
 nxge_status_t
 nxge_reset_txdma_channel(p_nxge_t nxgep, uint16_t channel, uint64_t reg_data)
 {
@@ -176,6 +265,27 @@ nxge_reset_txdma_channel(p_nxge_t nxgep, uint16_t channel, uint64_t reg_data)
 	return (status);
 }
 
+/*
+ * nxge_init_txdma_channel_event_mask
+ *
+ *	Enable interrupts for a set of events.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel	The channel to map.
+ * 	mask_p	The events to enable.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_event_mask()
+ *
+ * Registers accessed:
+ *	TX_ENT_MSK	DMC+0x40020 Transmit Event Mask
+ *
+ * Context:
+ *	Any domain
+ */
 nxge_status_t
 nxge_init_txdma_channel_event_mask(p_nxge_t nxgep, uint16_t channel,
 		p_tx_dma_ent_msk_t mask_p)
@@ -196,6 +306,26 @@ nxge_init_txdma_channel_event_mask(p_nxge_t nxgep, uint16_t channel,
 	return (status);
 }
 
+/*
+ * nxge_init_txdma_channel_cntl_stat
+ *
+ *	Stop a TDC.  If at first we don't succeed, inject an error.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to stop.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_control_status()
+ *
+ * Registers accessed:
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *
+ * Context:
+ *	Any domain
+ */
 nxge_status_t
 nxge_init_txdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
 	uint64_t reg_data)
@@ -218,6 +348,33 @@ nxge_init_txdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
 	return (status);
 }
 
+/*
+ * nxge_enable_txdma_channel
+ *
+ *	Enable a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to enable.
+ * 	tx_desc_p	channel's transmit descriptor ring.
+ * 	mbox_p		channel's mailbox,
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_ring_config()
+ *	npi_txdma_mbox_config()
+ *	npi_txdma_channel_init_enable()
+ *
+ * Registers accessed:
+ *	TX_RNG_CFIG	DMC+0x40000 Transmit Ring Configuration
+ *	TXDMA_MBH	DMC+0x40030 TXDMA Mailbox High
+ *	TXDMA_MBL	DMC+0x40038 TXDMA Mailbox Low
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *
+ * Context:
+ *	Any domain
+ */
 nxge_status_t
 nxge_enable_txdma_channel(p_nxge_t nxgep,
 	uint16_t channel, p_tx_ring_t tx_desc_p, p_tx_mbox_t mbox_p)
@@ -234,10 +391,16 @@ nxge_enable_txdma_channel(p_nxge_t nxgep,
 	 * Write to hardware the transmit ring configurations.
 	 */
 	rs = npi_txdma_ring_config(handle, OP_SET, channel,
-			(uint64_t *)&(tx_desc_p->tx_ring_cfig.value));
+	    (uint64_t *)&(tx_desc_p->tx_ring_cfig.value));
 
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
+	}
+
+	if (isLDOMguest(nxgep)) {
+		/* Add interrupt handler for this channel. */
+		if (nxge_hio_intr_add(nxgep, VP_BOUND_TX, channel) != NXGE_OK)
+			return (NXGE_ERROR);
 	}
 
 	/* Write to hardware the mailbox */
@@ -590,11 +753,11 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 			if (len > TX_MAX_TRANSFER_LENGTH) {
 				uint32_t	nsegs;
 
+				nsegs = 1;
 				NXGE_DEBUG_MSG((NULL, TX_CTL,
 					"==> nxge_tx_pkt_nmblocks: "
 					"len %d pkt_len %d nmblks %d nsegs %d",
 					len, pkt_len, nmblks, nsegs));
-				nsegs = 1;
 				if (len % (TX_MAX_TRANSFER_LENGTH * 2)) {
 					++nsegs;
 				}
@@ -850,6 +1013,31 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 	return (status);
 }
 
+/*
+ * nxge_tx_intr
+ *
+ *	Process a TDC interrupt
+ *
+ * Arguments:
+ * 	arg1	A Logical Device state Vector (LSV) data structure.
+ * 	arg2	nxge_t *
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_control_status()
+ *	npi_intr_ldg_mgmt_set()
+ *
+ *	nxge_tx_err_evnts()
+ *	nxge_txdma_reclaim()
+ *
+ * Registers accessed:
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *	PIO_LDSV
+ *
+ * Context:
+ *	Any domain
+ */
 uint_t
 nxge_tx_intr(void *arg1, void *arg2)
 {
@@ -928,8 +1116,12 @@ nxge_tx_intr(void *arg1, void *arg2)
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			"==> nxge_tx_intr: rearm"));
 		if (status == NXGE_OK) {
-			(void) npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
-				B_TRUE, ldgp->ldg_timer);
+			if (isLDOMguest(nxgep)) {
+				nxge_hio_ldgimgn(nxgep, ldgp);
+			} else {
+				(void) npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
+				    B_TRUE, ldgp->ldg_timer);
+			}
 		}
 	}
 
@@ -939,7 +1131,7 @@ nxge_tx_intr(void *arg1, void *arg2)
 }
 
 void
-nxge_txdma_stop(p_nxge_t nxgep)
+nxge_txdma_stop(p_nxge_t nxgep)	/* Dead */
 {
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_stop"));
 
@@ -949,7 +1141,7 @@ nxge_txdma_stop(p_nxge_t nxgep)
 }
 
 void
-nxge_txdma_stop_start(p_nxge_t nxgep)
+nxge_txdma_stop_start(p_nxge_t nxgep) /* Dead */
 {
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_stop_start"));
 
@@ -963,16 +1155,79 @@ nxge_txdma_stop_start(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_stop_start"));
 }
 
+npi_status_t
+nxge_txdma_channel_disable(
+	nxge_t *nxge,
+	int channel)
+{
+	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxge);
+	npi_status_t	rs;
+	tdmc_intr_dbg_t	intr_dbg;
+
+	/*
+	 * Stop the dma channel and wait for the stop-done.
+	 * If the stop-done bit is not present, then force
+	 * an error so TXC will stop.
+	 * All channels bound to this port need to be stopped
+	 * and reset after injecting an interrupt error.
+	 */
+	rs = npi_txdma_channel_disable(handle, channel);
+	NXGE_DEBUG_MSG((nxge, MEM3_CTL,
+		"==> nxge_txdma_channel_disable(%d) "
+		"rs 0x%x", channel, rs));
+	if (rs != NPI_SUCCESS) {
+		/* Inject any error */
+		intr_dbg.value = 0;
+		intr_dbg.bits.ldw.nack_pref = 1;
+		NXGE_DEBUG_MSG((nxge, MEM3_CTL,
+			"==> nxge_txdma_hw_mode: "
+			"channel %d (stop failed 0x%x) "
+			"(inject err)", rs, channel));
+		(void) npi_txdma_inj_int_error_set(
+			handle, channel, &intr_dbg);
+		rs = npi_txdma_channel_disable(handle, channel);
+		NXGE_DEBUG_MSG((nxge, MEM3_CTL,
+			"==> nxge_txdma_hw_mode: "
+			"channel %d (stop again 0x%x) "
+			"(after inject err)",
+			rs, channel));
+	}
+
+	return (rs);
+}
+
+/*
+ * nxge_txdma_hw_mode
+ *
+ *	Toggle all TDCs on (enable) or off (disable).
+ *
+ * Arguments:
+ * 	nxgep
+ * 	enable	Enable or disable a TDC.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_channel_enable(TX_CS)
+ *	npi_txdma_channel_disable(TX_CS)
+ *	npi_txdma_inj_int_error_set(TDMC_INTR_DBG)
+ *
+ * Registers accessed:
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *	TDMC_INTR_DBG	DMC + 0x40060 Transmit DMA Interrupt Debug
+ *
+ * Context:
+ *	Any domain
+ */
 nxge_status_t
 nxge_txdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 {
-	int			i, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		*tx_desc_rings;
-	npi_handle_t		handle;
-	npi_status_t		rs = NPI_SUCCESS;
-	nxge_status_t		status = NXGE_OK;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+
+	npi_handle_t	handle;
+	nxge_status_t	status;
+	npi_status_t	rs;
+	int		tdc;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 		"==> nxge_txdma_hw_mode: enable mode %d", enable));
@@ -983,76 +1238,30 @@ nxge_txdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 		return (NXGE_ERROR);
 	}
 
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_mode: NULL global ring pointer"));
+		    "<== nxge_txdma_hw_mode: NULL ring pointer(s)"));
 		return (NXGE_ERROR);
 	}
 
-	tx_desc_rings = tx_rings->rings;
-	if (tx_desc_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_mode: NULL rings pointer"));
-		return (NXGE_ERROR);
-	}
-
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_txdma_hw_mode: no dma channel allocated"));
-		return (NXGE_ERROR);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_mode: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_desc_rings, ndmas));
-
+	/* Enable or disable all of the TDCs owned by us. */
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
-		}
-		channel = tx_desc_rings[i]->tdc;
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_txdma_hw_mode: channel %d", channel));
-		if (enable) {
-			rs = npi_txdma_channel_enable(handle, channel);
-			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"==> nxge_txdma_hw_mode: channel %d (enable) "
-				"rs 0x%x", channel, rs));
-		} else {
-			/*
-			 * Stop the dma channel and waits for the stop done.
-			 * If the stop done bit is not set, then force
-			 * an error so TXC will stop.
-			 * All channels bound to this port need to be stopped
-			 * and reset after injecting an interrupt error.
-			 */
-			rs = npi_txdma_channel_disable(handle, channel);
-			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"==> nxge_txdma_hw_mode: channel %d (disable) "
-				"rs 0x%x", channel, rs));
-			{
-				tdmc_intr_dbg_t		intr_dbg;
-
-				if (rs != NPI_SUCCESS) {
-					/* Inject any error */
-					intr_dbg.value = 0;
-					intr_dbg.bits.ldw.nack_pref = 1;
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+				    "==> nxge_txdma_hw_mode: channel %d", tdc));
+				if (enable) {
+					rs = npi_txdma_channel_enable
+					    (handle, tdc);
 					NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-						"==> nxge_txdma_hw_mode: "
-						"channel %d (stop failed 0x%x) "
-						"(inject err)", rs, channel));
-					(void) npi_txdma_inj_int_error_set(
-						handle, channel, &intr_dbg);
-					rs = npi_txdma_channel_disable(handle,
-						channel);
-					NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-						"==> nxge_txdma_hw_mode: "
-						"channel %d (stop again 0x%x) "
-						"(after inject err)",
-						rs, channel));
+					    "==> nxge_txdma_hw_mode: "
+					    "channel %d (enable) rs 0x%x",
+					    tdc, rs));
+				} else {
+					rs = nxge_txdma_channel_disable
+					    (nxgep, tdc);
 				}
 			}
 		}
@@ -1096,6 +1305,31 @@ nxge_txdma_disable_channel(p_nxge_t nxgep, uint16_t channel)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_disable_channel"));
 }
 
+/*
+ * nxge_txdma_stop_inj_err
+ *
+ *	Stop a TDC.  If at first we don't succeed, inject an error.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to stop.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_channel_disable()
+ *	npi_txdma_inj_int_error_set()
+ * #if defined(NXGE_DEBUG)
+ *	nxge_txdma_regs_dump_channels(nxgep);
+ * #endif
+ *
+ * Registers accessed:
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *	TDMC_INTR_DBG	DMC + 0x40060 Transmit DMA Interrupt Debug
+ *
+ * Context:
+ *	Any domain
+ */
 int
 nxge_txdma_stop_inj_err(p_nxge_t nxgep, int channel)
 {
@@ -1149,62 +1383,31 @@ nxge_txdma_stop_inj_err(p_nxge_t nxgep, int channel)
 	return (status);
 }
 
-void
-nxge_hw_start_tx(p_nxge_t nxgep)
-{
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_hw_start_tx"));
-
-	(void) nxge_txdma_hw_start(nxgep);
-	(void) nxge_tx_mac_enable(nxgep);
-
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hw_start_tx"));
-}
-
 /*ARGSUSED*/
 void
 nxge_fixup_txdma_rings(p_nxge_t nxgep)
 {
-	int			index, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_fixup_txdma_rings"));
 
-	/*
-	 * For each transmit channel, reclaim each descriptor and
-	 * free buffers.
-	 */
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_fixup_txdma_rings: NULL ring pointer"));
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_fixup_txdma_rings: NULL ring pointer(s)"));
 		return;
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_fixup_txdma_rings: no channel allocated"));
-		return;
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_fixup_txdma_rings: NULL rings pointer"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_fixup_txdma_rings: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings->rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_fixup_txdma_rings: channel %d", channel));
-
-		nxge_txdma_fixup_channel(nxgep, tx_rings->rings[index],
-			channel);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+				    "==> nxge_fixup_txdma_rings: channel %d",
+				    tdc));
+				nxge_txdma_fixup_channel(nxgep, ring, tdc);
+			}
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_fixup_txdma_rings"));
@@ -1272,42 +1475,26 @@ nxge_txdma_fixup_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
 void
 nxge_txdma_hw_kick(p_nxge_t nxgep)
 {
-	int			index, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_hw_kick"));
 
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_kick: NULL ring pointer"));
+		    "<== nxge_txdma_hw_kick: NULL ring pointer(s)"));
 		return;
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_kick: no channel allocated"));
-		return;
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_kick: NULL rings pointer"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_kick: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings->rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_txdma_hw_kick: channel %d", channel));
-		nxge_txdma_hw_kick_channel(nxgep, tx_rings->rings[index],
-			channel);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+				    "==> nxge_txdma_hw_kick: channel %d", tdc));
+				nxge_txdma_hw_kick_channel(nxgep, ring, tdc);
+			}
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_hw_kick"));
@@ -1357,11 +1544,28 @@ nxge_txdma_hw_kick_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_hw_kick_channel"));
 }
 
+/*
+ * nxge_check_tx_hang
+ *
+ *	Check the state of all TDCs belonging to nxgep.
+ *
+ * Arguments:
+ * 	nxgep
+ *
+ * Notes:
+ *	Called by nxge_hw.c:nxge_check_hw_state().
+ *
+ * NPI/NXGE function calls:
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Any domain
+ */
 /*ARGSUSED*/
 void
 nxge_check_tx_hang(p_nxge_t nxgep)
 {
-
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_check_tx_hang"));
 
 	/*
@@ -1375,43 +1579,52 @@ nxge_check_tx_hang(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_check_tx_hang"));
 }
 
+/*
+ * nxge_txdma_hung
+ *
+ *	Reset a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to reset.
+ * 	reg_data	The current TX_CS.
+ *
+ * Notes:
+ *	Called by nxge_check_tx_hang()
+ *
+ * NPI/NXGE function calls:
+ *	nxge_txdma_channel_hung()
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Any domain
+ */
 int
 nxge_txdma_hung(p_nxge_t nxgep)
 {
-	int			index, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		tx_ring_p;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_hung"));
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hung: NULL ring pointer"));
+		    "<== nxge_txdma_hung: NULL ring pointer(s)"));
 		return (B_FALSE);
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hung: no channel "
-			"allocated"));
-		return (B_FALSE);
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hung: NULL rings pointer"));
-		return (B_FALSE);
-	}
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		tx_ring_p = tx_rings->rings[index];
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_hung: channel %d", channel));
-		if (nxge_txdma_channel_hung(nxgep, tx_ring_p, channel)) {
-			return (B_TRUE);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				if (nxge_txdma_channel_hung(nxgep, ring, tdc)) {
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "==> nxge_txdma_hung: TDC %d hung",
+					    tdc));
+					return (B_TRUE);
+				}
+			}
 		}
 	}
 
@@ -1420,6 +1633,28 @@ nxge_txdma_hung(p_nxge_t nxgep)
 	return (B_FALSE);
 }
 
+/*
+ * nxge_txdma_channel_hung
+ *
+ *	Reset a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	ring		<channel>'s ring.
+ * 	channel		The channel to reset.
+ *
+ * Notes:
+ *	Called by nxge_txdma.c:nxge_txdma_hung()
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_ring_head_get()
+ *
+ * Registers accessed:
+ *	TX_RING_HDL	DMC+0x40010 Transmit Ring Head Low
+ *
+ * Context:
+ *	Any domain
+ */
 int
 nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
 {
@@ -1482,53 +1717,85 @@ nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
 	return (B_FALSE);
 }
 
+/*
+ * nxge_fixup_hung_txdma_rings
+ *
+ *	Disable a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to reset.
+ * 	reg_data	The current TX_CS.
+ *
+ * Notes:
+ *	Called by nxge_check_tx_hang()
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_ring_head_get()
+ *
+ * Registers accessed:
+ *	TX_RING_HDL	DMC+0x40010 Transmit Ring Head Low
+ *
+ * Context:
+ *	Any domain
+ */
 /*ARGSUSED*/
 void
 nxge_fixup_hung_txdma_rings(p_nxge_t nxgep)
 {
-	int			index, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_fixup_hung_txdma_rings"));
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_fixup_hung_txdma_rings: NULL ring pointer"));
+		    "<== nxge_fixup_hung_txdma_rings: NULL ring pointer(s)"));
 		return;
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_fixup_hung_txdma_rings: no channel "
-			"allocated"));
-		return;
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_fixup_hung_txdma_rings: NULL rings pointer"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_fixup_hung_txdma_rings: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings->rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_fixup_hung_txdma_rings: channel %d",
-			channel));
-
-		nxge_txdma_fixup_hung_channel(nxgep, tx_rings->rings[index],
-			channel);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				nxge_txdma_fixup_hung_channel(nxgep, ring, tdc);
+				NXGE_DEBUG_MSG((nxgep, TX_CTL,
+				    "==> nxge_fixup_hung_txdma_rings: TDC %d",
+				    tdc));
+			}
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_fixup_hung_txdma_rings"));
 }
 
+/*
+ * nxge_txdma_fixup_hung_channel
+ *
+ *	'Fix' a hung TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to fix.
+ *
+ * Notes:
+ *	Called by nxge_fixup_hung_txdma_rings()
+ *
+ *	1. Reclaim the TDC.
+ *	2. Disable the TDC.
+ *
+ * NPI/NXGE function calls:
+ *	nxge_txdma_reclaim()
+ *	npi_txdma_channel_disable(TX_CS)
+ *	npi_txdma_inj_int_error_set(TDMC_INTR_DBG)
+ *
+ * Registers accessed:
+ *	TX_CS		DMC+0x40028 Transmit Control And Status
+ *	TDMC_INTR_DBG	DMC + 0x40060 Transmit DMA Interrupt Debug
+ *
+ * Context:
+ *	Any domain
+ */
 /*ARGSUSED*/
 void
 nxge_txdma_fix_hung_channel(p_nxge_t nxgep, uint16_t channel)
@@ -1629,46 +1896,28 @@ nxge_txdma_fixup_hung_channel(p_nxge_t nxgep, p_tx_ring_t ring_p,
 void
 nxge_reclaim_rings(p_nxge_t nxgep)
 {
-	int			index, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		tx_ring_p;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_reclaim_ring"));
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_reclaim_rings"));
+
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_reclain_rimgs: NULL ring pointer"));
+		    "<== nxge_fixup_hung_txdma_rings: NULL ring pointer(s)"));
 		return;
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_reclain_rimgs: no channel "
-			"allocated"));
-		return;
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_reclain_rimgs: NULL rings pointer"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_reclain_rimgs: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings->rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> reclain_rimgs: channel %d",
-			channel));
-		tx_ring_p = tx_rings->rings[index];
-		MUTEX_ENTER(&tx_ring_p->lock);
-		(void) nxge_txdma_reclaim(nxgep, tx_ring_p, channel);
-		MUTEX_EXIT(&tx_ring_p->lock);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				NXGE_DEBUG_MSG((nxgep, TX_CTL,
+				    "==> nxge_reclaim_rings: TDC %d", tdc));
+				MUTEX_ENTER(&ring->lock);
+				(void) nxge_txdma_reclaim(nxgep, ring, tdc);
+				MUTEX_EXIT(&ring->lock);
+			}
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_reclaim_rings"));
@@ -1677,71 +1926,51 @@ nxge_reclaim_rings(p_nxge_t nxgep)
 void
 nxge_txdma_regs_dump_channels(p_nxge_t nxgep)
 {
-	int			index, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
-	npi_handle_t		handle;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	npi_handle_t handle;
+	int tdc;
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_txdma_regs_dump_channels"));
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_regs_dump_channels"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	(void) npi_txdma_dump_fzc_regs(handle);
 
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+	if (!isLDOMguest(nxgep)) {
+		(void) npi_txdma_dump_fzc_regs(handle);
+
+		/* Dump TXC registers. */
+		(void) npi_txc_dump_fzc_regs(handle);
+		(void) npi_txc_dump_port_fzc_regs(handle, nxgep->function_num);
+	}
+
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_regs_dump_channels: NULL ring"));
+		    "<== nxge_fixup_hung_txdma_rings: NULL ring pointer(s)"));
 		return;
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_regs_dump_channels: "
-			"no channel allocated"));
-		return;
-	}
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				NXGE_DEBUG_MSG((nxgep, TX_CTL,
+				    "==> nxge_txdma_regs_dump_channels: "
+				    "TDC %d", tdc));
+				(void) npi_txdma_dump_tdc_regs(handle, tdc);
 
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_regs_dump_channels: NULL rings"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_regs_dump_channels: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings->rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_regs_dump_channels: channel %d",
-			channel));
-		(void) npi_txdma_dump_tdc_regs(handle, channel);
-	}
-
-	/* Dump TXC registers */
-	(void) npi_txc_dump_fzc_regs(handle);
-	(void) npi_txc_dump_port_fzc_regs(handle, nxgep->function_num);
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_regs_dump_channels: channel %d",
-			channel));
-		(void) npi_txc_dump_tdc_fzc_regs(handle, channel);
-	}
-
-	for (index = 0; index < ndmas; index++) {
-		channel = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_regs_dump_channels: channel %d",
-			channel));
-		nxge_txdma_regs_dump(nxgep, channel);
+				/* Dump TXC registers, if able to. */
+				if (!isLDOMguest(nxgep)) {
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "==> nxge_txdma_regs_dump_channels:"
+					    " FZC TDC %d", tdc));
+					(void) npi_txc_dump_tdc_fzc_regs
+					    (handle, tdc);
+				}
+				nxge_txdma_regs_dump(nxgep, tdc);
+			}
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_regs_dump"));
-
 }
 
 void
@@ -1806,235 +2035,135 @@ nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
 }
 
 /*
- * Static functions start here.
+ * nxge_tdc_hvio_setup
+ *
+ *	I'm not exactly sure what this code does.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel	The channel to map.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	na
+ *
+ * Context:
+ *	Service domain?
  */
-static nxge_status_t
-nxge_map_txdma(p_nxge_t nxgep)
+#if defined(sun4v) && defined(NIU_LP_WORKAROUND)
+static void
+nxge_tdc_hvio_setup(
+	nxge_t *nxgep, int channel)
 {
-	int			i, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		*tx_desc_rings;
-	p_tx_mbox_areas_t 	tx_mbox_areas_p;
-	p_tx_mbox_t		*tx_mbox_p;
-	p_nxge_dma_pool_t	dma_buf_poolp;
-	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_nxge_dma_common_t	*dma_buf_p;
-	p_nxge_dma_common_t	*dma_cntl_p;
-	nxge_status_t		status = NXGE_OK;
-#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
-	p_nxge_dma_common_t	t_dma_buf_p;
-	p_nxge_dma_common_t	t_dma_cntl_p;
+	nxge_dma_common_t	*data;
+	nxge_dma_common_t	*control;
+	tx_ring_t 		*ring;
+
+	ring = nxgep->tx_rings->rings[channel];
+	data = nxgep->tx_buf_pool_p->dma_buf_pool_p[channel];
+
+	ring->hv_set = B_FALSE;
+
+	ring->hv_tx_buf_base_ioaddr_pp =
+	    (uint64_t)data->orig_ioaddr_pp;
+	ring->hv_tx_buf_ioaddr_size =
+	    (uint64_t)data->orig_alength;
+
+	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma_channel: "
+		"hv data buf base io $%p size 0x%llx (%d) buf base io $%p "
+		"orig vatopa base io $%p orig_len 0x%llx (%d)",
+		ring->hv_tx_buf_base_ioaddr_pp,
+		ring->hv_tx_buf_ioaddr_size, ring->hv_tx_buf_ioaddr_size,
+		data->ioaddr_pp, data->orig_vatopa,
+		data->orig_alength, data->orig_alength));
+
+	control = nxgep->tx_cntl_pool_p->dma_buf_pool_p[channel];
+
+	ring->hv_tx_cntl_base_ioaddr_pp =
+	    (uint64_t)control->orig_ioaddr_pp;
+	ring->hv_tx_cntl_ioaddr_size =
+	    (uint64_t)control->orig_alength;
+
+	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma_channel: "
+		"hv cntl base io $%p orig ioaddr_pp ($%p) "
+		"orig vatopa ($%p) size 0x%llx (%d 0x%x)",
+		ring->hv_tx_cntl_base_ioaddr_pp,
+		control->orig_ioaddr_pp, control->orig_vatopa,
+		ring->hv_tx_cntl_ioaddr_size,
+		control->orig_alength, control->orig_alength));
+}
 #endif
 
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma"));
+static nxge_status_t
+nxge_map_txdma(p_nxge_t nxgep, int channel)
+{
+	nxge_dma_common_t	**pData;
+	nxge_dma_common_t	**pControl;
+	tx_ring_t 		**pRing, *ring;
+	tx_mbox_t		**mailbox;
+	uint32_t		num_chunks;
 
-	dma_buf_poolp = nxgep->tx_buf_pool_p;
-	dma_cntl_poolp = nxgep->tx_cntl_pool_p;
+	nxge_status_t		status = NXGE_OK;
 
-	if (!dma_buf_poolp->buf_allocated || !dma_cntl_poolp->buf_allocated) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_map_txdma: buf not allocated"));
-		return (NXGE_ERROR);
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma"));
+
+	if (!nxgep->tx_cntl_pool_p->buf_allocated) {
+		if (nxge_alloc_tx_mem_pool(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_map_txdma: buf not allocated"));
+			return (NXGE_ERROR);
+		}
 	}
 
-	ndmas = dma_buf_poolp->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_map_txdma: no dma allocated"));
+	if (nxge_alloc_txb(nxgep, channel) != NXGE_OK)
 		return (NXGE_ERROR);
-	}
 
-	dma_buf_p = dma_buf_poolp->dma_buf_pool_p;
-	dma_cntl_p = dma_cntl_poolp->dma_buf_pool_p;
+	num_chunks = nxgep->tx_buf_pool_p->num_chunks[channel];
+	pData = &nxgep->tx_buf_pool_p->dma_buf_pool_p[channel];
+	pControl = &nxgep->tx_cntl_pool_p->dma_buf_pool_p[channel];
+	pRing = &nxgep->tx_rings->rings[channel];
+	mailbox = &nxgep->tx_mbox_areas_p->txmbox_areas_p[channel];
 
-	tx_rings = (p_tx_rings_t)
-			KMEM_ZALLOC(sizeof (tx_rings_t), KM_SLEEP);
-	tx_desc_rings = (p_tx_ring_t *)KMEM_ZALLOC(
-			sizeof (p_tx_ring_t) * ndmas, KM_SLEEP);
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma: "
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma: "
 		"tx_rings $%p tx_desc_rings $%p",
-		tx_rings, tx_desc_rings));
-
-	tx_mbox_areas_p = (p_tx_mbox_areas_t)
-			KMEM_ZALLOC(sizeof (tx_mbox_areas_t), KM_SLEEP);
-	tx_mbox_p = (p_tx_mbox_t *)KMEM_ZALLOC(
-			sizeof (p_tx_mbox_t) * ndmas, KM_SLEEP);
+		nxgep->tx_rings, nxgep->tx_rings->rings));
 
 	/*
-	 * Map descriptors from the buffer pools for each dma channel.
+	 * Map descriptors from the buffer pools for <channel>.
 	 */
-	for (i = 0; i < ndmas; i++) {
-		/*
-		 * Set up and prepare buffer blocks, descriptors
-		 * and mailbox.
-		 */
-		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
-		status = nxge_map_txdma_channel(nxgep, channel,
-				(p_nxge_dma_common_t *)&dma_buf_p[i],
-				(p_tx_ring_t *)&tx_desc_rings[i],
-				dma_buf_poolp->num_chunks[i],
-				(p_nxge_dma_common_t *)&dma_cntl_p[i],
-				(p_tx_mbox_t *)&tx_mbox_p[i]);
-		if (status != NXGE_OK) {
-			goto nxge_map_txdma_fail1;
-		}
-		tx_desc_rings[i]->index = (uint16_t)i;
-		tx_desc_rings[i]->tdc_stats = &nxgep->statsp->tdc_stats[i];
 
-#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
-		if (nxgep->niu_type == N2_NIU && NXGE_DMA_BLOCK == 1) {
-			tx_desc_rings[i]->hv_set = B_FALSE;
-			t_dma_buf_p = (p_nxge_dma_common_t)dma_buf_p[i];
-			t_dma_cntl_p = (p_nxge_dma_common_t)dma_cntl_p[i];
+	/*
+	 * Set up and prepare buffer blocks, descriptors
+	 * and mailbox.
+	 */
+	status = nxge_map_txdma_channel(nxgep, channel,
+	    pData, pRing, num_chunks, pControl, mailbox);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, MEM3_CTL,
+			"==> nxge_map_txdma(%d): nxge_map_txdma_channel() "
+			"returned 0x%x",
+			nxgep, channel, status));
+		return (status);
+	}
 
-			tx_desc_rings[i]->hv_tx_buf_base_ioaddr_pp =
-				(uint64_t)t_dma_buf_p->orig_ioaddr_pp;
-			tx_desc_rings[i]->hv_tx_buf_ioaddr_size =
-				(uint64_t)t_dma_buf_p->orig_alength;
+	ring = *pRing;
 
-			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"==> nxge_map_txdma_channel: "
-				"hv data buf base io $%p "
-				"size 0x%llx (%d) "
-				"buf base io $%p "
-				"orig vatopa base io $%p "
-				"orig_len 0x%llx (%d)",
-				tx_desc_rings[i]->hv_tx_buf_base_ioaddr_pp,
-				tx_desc_rings[i]->hv_tx_buf_ioaddr_size,
-				tx_desc_rings[i]->hv_tx_buf_ioaddr_size,
-				t_dma_buf_p->ioaddr_pp,
-				t_dma_buf_p->orig_vatopa,
-				t_dma_buf_p->orig_alength,
-				t_dma_buf_p->orig_alength));
+	ring->index = (uint16_t)channel;
+	ring->tdc_stats = &nxgep->statsp->tdc_stats[channel];
 
-			tx_desc_rings[i]->hv_tx_cntl_base_ioaddr_pp =
-				(uint64_t)t_dma_cntl_p->orig_ioaddr_pp;
-			tx_desc_rings[i]->hv_tx_cntl_ioaddr_size =
-				(uint64_t)t_dma_cntl_p->orig_alength;
-
-			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"==> nxge_map_txdma_channel: "
-				"hv cntl base io $%p "
-				"orig ioaddr_pp ($%p) "
-				"orig vatopa ($%p) "
-				"size 0x%llx (%d 0x%x)",
-				tx_desc_rings[i]->hv_tx_cntl_base_ioaddr_pp,
-				t_dma_cntl_p->orig_ioaddr_pp,
-				t_dma_cntl_p->orig_vatopa,
-				tx_desc_rings[i]->hv_tx_cntl_ioaddr_size,
-				t_dma_cntl_p->orig_alength,
-				t_dma_cntl_p->orig_alength));
-		}
+#if defined(sun4v) && defined(NIU_LP_WORKAROUND)
+	if (isLDOMguest(nxgep)) {
+		(void) nxge_tdc_lp_conf(nxgep, channel);
+	} else {
+		nxge_tdc_hvio_setup(nxgep, channel);
+	}
 #endif
-	}
 
-	tx_rings->ndmas = ndmas;
-	tx_rings->rings = tx_desc_rings;
-	nxgep->tx_rings = tx_rings;
-	tx_mbox_areas_p->txmbox_areas_p = tx_mbox_p;
-	nxgep->tx_mbox_areas_p = tx_mbox_areas_p;
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma: "
-		"tx_rings $%p rings $%p",
-		nxgep->tx_rings, nxgep->tx_rings->rings));
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma: "
-		"tx_rings $%p tx_desc_rings $%p",
-		nxgep->tx_rings, tx_desc_rings));
-
-	goto nxge_map_txdma_exit;
-
-nxge_map_txdma_fail1:
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma: uninit tx desc "
-		"(status 0x%x channel %d i %d)",
-		nxgep, status, channel, i));
-	i--;
-	for (; i >= 0; i--) {
-		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
-		nxge_unmap_txdma_channel(nxgep, channel,
-			tx_desc_rings[i],
-			tx_mbox_p[i]);
-	}
-
-	KMEM_FREE(tx_desc_rings, sizeof (p_tx_ring_t) * ndmas);
-	KMEM_FREE(tx_rings, sizeof (tx_rings_t));
-	KMEM_FREE(tx_mbox_p, sizeof (p_tx_mbox_t) * ndmas);
-	KMEM_FREE(tx_mbox_areas_p, sizeof (tx_mbox_areas_t));
-
-nxge_map_txdma_exit:
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma: "
-		"(status 0x%x channel %d)",
-		status, channel));
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma: "
+	    "(status 0x%x channel %d)", status, channel));
 
 	return (status);
-}
-
-static void
-nxge_unmap_txdma(p_nxge_t nxgep)
-{
-	int			i, ndmas;
-	uint8_t			channel;
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		*tx_desc_rings;
-	p_tx_mbox_areas_t 	tx_mbox_areas_p;
-	p_tx_mbox_t		*tx_mbox_p;
-	p_nxge_dma_pool_t	dma_buf_poolp;
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_unmap_txdma"));
-
-	dma_buf_poolp = nxgep->tx_buf_pool_p;
-	if (!dma_buf_poolp->buf_allocated) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_unmap_txdma: buf not allocated"));
-		return;
-	}
-
-	ndmas = dma_buf_poolp->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_unmap_txdma: no dma allocated"));
-		return;
-	}
-
-	tx_rings = nxgep->tx_rings;
-	tx_desc_rings = tx_rings->rings;
-	if (tx_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_unmap_txdma: NULL ring pointer"));
-		return;
-	}
-
-	tx_desc_rings = tx_rings->rings;
-	if (tx_desc_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_unmap_txdma: NULL ring pointers"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_unmap_txdma: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_desc_rings, ndmas));
-
-	tx_mbox_areas_p = nxgep->tx_mbox_areas_p;
-	tx_mbox_p = tx_mbox_areas_p->txmbox_areas_p;
-
-	for (i = 0; i < ndmas; i++) {
-		channel = tx_desc_rings[i]->tdc;
-		(void) nxge_unmap_txdma_channel(nxgep, channel,
-				(p_tx_ring_t)tx_desc_rings[i],
-				(p_tx_mbox_t)tx_mbox_p[i]);
-	}
-
-	KMEM_FREE(tx_desc_rings, sizeof (p_tx_ring_t) * ndmas);
-	KMEM_FREE(tx_rings, sizeof (tx_rings_t));
-	KMEM_FREE(tx_mbox_p, sizeof (p_tx_mbox_t) * ndmas);
-	KMEM_FREE(tx_mbox_areas_p, sizeof (tx_mbox_areas_t));
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_unmap_txdma"));
 }
 
 static nxge_status_t
@@ -2051,7 +2180,7 @@ nxge_map_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	 * Set up and prepare buffer blocks, descriptors
 	 * and mailbox.
 	 */
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
 		"==> nxge_map_txdma_channel (channel %d)", channel));
 	/*
 	 * Transmit buffer blocks
@@ -2074,14 +2203,14 @@ nxge_map_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	goto nxge_map_txdma_channel_exit;
 
 nxge_map_txdma_channel_fail1:
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
 		"==> nxge_map_txdma_channel: unmap buf"
 		"(status 0x%x channel %d)",
 		status, channel));
 	nxge_unmap_txdma_channel_buf_ring(nxgep, *tx_desc_p);
 
 nxge_map_txdma_channel_exit:
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
 		"<== nxge_map_txdma_channel: "
 		"(status 0x%x channel %d)",
 		status, channel));
@@ -2091,24 +2220,53 @@ nxge_map_txdma_channel_exit:
 
 /*ARGSUSED*/
 static void
-nxge_unmap_txdma_channel(p_nxge_t nxgep, uint16_t channel,
-	p_tx_ring_t tx_ring_p,
-	p_tx_mbox_t tx_mbox_p)
+nxge_unmap_txdma_channel(p_nxge_t nxgep, uint16_t channel)
 {
+	tx_ring_t *ring;
+	tx_mbox_t *mailbox;
+
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 		"==> nxge_unmap_txdma_channel (channel %d)", channel));
 	/*
 	 * unmap tx block ring, and mailbox.
 	 */
-	(void) nxge_unmap_txdma_channel_cfg_ring(nxgep,
-			tx_ring_p, tx_mbox_p);
+	ring = nxgep->tx_rings->rings[channel];
+	mailbox = nxgep->tx_mbox_areas_p->txmbox_areas_p[channel];
+
+	(void) nxge_unmap_txdma_channel_cfg_ring(nxgep, ring, mailbox);
 
 	/* unmap buffer blocks */
-	(void) nxge_unmap_txdma_channel_buf_ring(nxgep, tx_ring_p);
+	(void) nxge_unmap_txdma_channel_buf_ring(nxgep, ring);
+
+	nxge_free_txb(nxgep, channel);
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "<== nxge_unmap_txdma_channel"));
 }
 
+/*
+ * nxge_map_txdma_channel_cfg_ring
+ *
+ *	Map a TDC into our kernel space.
+ *	This function allocates all of the per-channel data structures.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	dma_channel	The channel to map.
+ *	dma_cntl_p
+ *	tx_ring_p	dma_channel's transmit ring
+ *	tx_mbox_p	dma_channel's mailbox
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	nxge_setup_dma_common()
+ *
+ * Registers accessed:
+ *	none.
+ *
+ * Context:
+ *	Any domain
+ */
 /*ARGSUSED*/
 static void
 nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
@@ -2225,6 +2383,28 @@ nxge_unmap_txdma_channel_cfg_ring(p_nxge_t nxgep,
 		"<== nxge_unmap_txdma_channel_cfg_ring"));
 }
 
+/*
+ * nxge_map_txdma_channel_buf_ring
+ *
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to map.
+ *	dma_buf_p
+ *	tx_desc_p	channel's descriptor ring
+ *	num_chunks
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	nxge_setup_dma_common()
+ *
+ * Registers accessed:
+ *	none.
+ *
+ * Context:
+ *	Any domain
+ */
 static nxge_status_t
 nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	p_nxge_dma_common_t *dma_buf_p,
@@ -2404,32 +2584,23 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 		tx_ring_p->tdc));
 
 	tx_msg_ring = tx_ring_p->tx_msg_ring;
+
+	/*
+	 * Since the serialization thread, timer thread and
+	 * interrupt thread can all call the transmit reclaim,
+	 * the unmapping function needs to acquire the lock
+	 * to free those buffers which were transmitted
+	 * by the hardware already.
+	 */
+	MUTEX_ENTER(&tx_ring_p->lock);
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "==> nxge_unmap_txdma_channel_buf_ring (reclaim): "
+	    "channel %d",
+	    tx_ring_p->tdc));
+	(void) nxge_txdma_reclaim(nxgep, tx_ring_p, 0);
+
 	for (i = 0; i < tx_ring_p->tx_ring_size; i++) {
 		tx_msg_p = &tx_msg_ring[i];
-		if (tx_msg_p->flags.dma_type == USE_DVMA) {
-			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"entry = %d",
-				i));
-			(void) dvma_unload(tx_msg_p->dvma_handle,
-				0, -1);
-			tx_msg_p->dvma_handle = NULL;
-			if (tx_ring_p->dvma_wr_index ==
-				tx_ring_p->dvma_wrap_mask) {
-				tx_ring_p->dvma_wr_index = 0;
-			} else {
-				tx_ring_p->dvma_wr_index++;
-			}
-			tx_ring_p->dvma_pending--;
-		} else if (tx_msg_p->flags.dma_type ==
-				USE_DMA) {
-			if (ddi_dma_unbind_handle
-				(tx_msg_p->dma_handle)) {
-				cmn_err(CE_WARN, "!nxge_unmap_tx_bug_ring: "
-					"ddi_dma_unbind_handle "
-					"failed.");
-			}
-		}
-
 		if (tx_msg_p->tx_message != NULL) {
 			freemsg(tx_msg_p->tx_message);
 			tx_msg_p->tx_message = NULL;
@@ -2440,7 +2611,10 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 		if (tx_msg_ring[i].dma_handle != NULL) {
 			ddi_dma_free_handle(&tx_msg_ring[i].dma_handle);
 		}
+		tx_msg_ring[i].dma_handle = NULL;
 	}
+
+	MUTEX_EXIT(&tx_ring_p->lock);
 
 	if (tx_ring_p->serial) {
 		nxge_serialize_destroy(tx_ring_p->serial);
@@ -2456,10 +2630,8 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 }
 
 static nxge_status_t
-nxge_txdma_hw_start(p_nxge_t nxgep)
+nxge_txdma_hw_start(p_nxge_t nxgep, int channel)
 {
-	int			i, ndmas;
-	uint16_t		channel;
 	p_tx_rings_t 		tx_rings;
 	p_tx_ring_t 		*tx_desc_rings;
 	p_tx_mbox_areas_t 	tx_mbox_areas_p;
@@ -2481,28 +2653,17 @@ nxge_txdma_hw_start(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_start: no dma channel allocated"));
-		return (NXGE_ERROR);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_start: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_desc_rings, ndmas));
+	NXGE_ERROR_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_start: "
+	    "tx_rings $%p tx_desc_rings $%p", tx_rings, tx_desc_rings));
 
 	tx_mbox_areas_p = nxgep->tx_mbox_areas_p;
 	tx_mbox_p = tx_mbox_areas_p->txmbox_areas_p;
 
-	for (i = 0; i < ndmas; i++) {
-		channel = tx_desc_rings[i]->tdc,
-		status = nxge_txdma_start_channel(nxgep, channel,
-				(p_tx_ring_t)tx_desc_rings[i],
-				(p_tx_mbox_t)tx_mbox_p[i]);
-		if (status != NXGE_OK) {
-			goto nxge_txdma_hw_start_fail1;
-		}
+	status = nxge_txdma_start_channel(nxgep, channel,
+	    (p_tx_ring_t)tx_desc_rings[channel],
+	    (p_tx_mbox_t)tx_mbox_p[channel]);
+	if (status != NXGE_OK) {
+		goto nxge_txdma_hw_start_fail1;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_start: "
@@ -2517,13 +2678,7 @@ nxge_txdma_hw_start(p_nxge_t nxgep)
 nxge_txdma_hw_start_fail1:
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 		"==> nxge_txdma_hw_start: disable "
-		"(status 0x%x channel %d i %d)", status, channel, i));
-	for (; i >= 0; i--) {
-		channel = tx_desc_rings[i]->tdc,
-		(void) nxge_txdma_stop_channel(nxgep, channel,
-			(p_tx_ring_t)tx_desc_rings[i],
-			(p_tx_mbox_t)tx_mbox_p[i]);
-	}
+		"(status 0x%x channel %d)", status, channel));
 
 nxge_txdma_hw_start_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
@@ -2532,59 +2687,30 @@ nxge_txdma_hw_start_exit:
 	return (status);
 }
 
-static void
-nxge_txdma_hw_stop(p_nxge_t nxgep)
-{
-	int			i, ndmas;
-	uint16_t		channel;
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		*tx_desc_rings;
-	p_tx_mbox_areas_t 	tx_mbox_areas_p;
-	p_tx_mbox_t		*tx_mbox_p;
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_stop"));
-
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_stop: NULL ring pointer"));
-		return;
-	}
-	tx_desc_rings = tx_rings->rings;
-	if (tx_desc_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_stop: NULL ring pointers"));
-		return;
-	}
-
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_stop: no dma channel allocated"));
-		return;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_stop: "
-		"tx_rings $%p tx_desc_rings $%p",
-		tx_rings, tx_desc_rings));
-
-	tx_mbox_areas_p = nxgep->tx_mbox_areas_p;
-	tx_mbox_p = tx_mbox_areas_p->txmbox_areas_p;
-
-	for (i = 0; i < ndmas; i++) {
-		channel = tx_desc_rings[i]->tdc;
-		(void) nxge_txdma_stop_channel(nxgep, channel,
-				(p_tx_ring_t)tx_desc_rings[i],
-				(p_tx_mbox_t)tx_mbox_p[i]);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_stop: "
-		"tx_rings $%p tx_desc_rings $%p",
-		tx_rings, tx_desc_rings));
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "<== nxge_txdma_hw_stop"));
-}
-
+/*
+ * nxge_txdma_start_channel
+ *
+ *	Start a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to start.
+ * 	tx_ring_p	channel's transmit descriptor ring.
+ * 	tx_mbox_p	channel' smailbox.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	nxge_reset_txdma_channel()
+ *	nxge_init_txdma_channel_event_mask()
+ *	nxge_enable_txdma_channel()
+ *
+ * Registers accessed:
+ *	none directly (see functions above).
+ *
+ * Context:
+ *	Any domain
+ */
 static nxge_status_t
 nxge_txdma_start_channel(p_nxge_t nxgep, uint16_t channel,
     p_tx_ring_t tx_ring_p, p_tx_mbox_t tx_mbox_p)
@@ -2618,10 +2744,12 @@ nxge_txdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	 * configurations. These FZC registers are pertaining
 	 * to each TX channel (i.e. logical pages).
 	 */
-	status = nxge_init_fzc_txdma_channel(nxgep, channel,
-			tx_ring_p, tx_mbox_p);
-	if (status != NXGE_OK) {
-		goto nxge_txdma_start_channel_exit;
+	if (!isLDOMguest(nxgep)) {
+		status = nxge_init_fzc_txdma_channel(nxgep, channel,
+		    tx_ring_p, tx_mbox_p);
+		if (status != NXGE_OK) {
+			goto nxge_txdma_start_channel_exit;
+		}
 	}
 
 	/*
@@ -2629,7 +2757,7 @@ nxge_txdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	 */
 	tx_ring_p->tx_evmask.value = 0;
 	status = nxge_init_txdma_channel_event_mask(nxgep,
-			channel, &tx_ring_p->tx_evmask);
+	    channel, &tx_ring_p->tx_evmask);
 	if (status != NXGE_OK) {
 		goto nxge_txdma_start_channel_exit;
 	}
@@ -2651,12 +2779,38 @@ nxge_txdma_start_channel_exit:
 	return (status);
 }
 
+/*
+ * nxge_txdma_stop_channel
+ *
+ *	Stop a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to stop.
+ * 	tx_ring_p	channel's transmit descriptor ring.
+ * 	tx_mbox_p	channel' smailbox.
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *	nxge_txdma_stop_inj_err()
+ *	nxge_reset_txdma_channel()
+ *	nxge_init_txdma_channel_event_mask()
+ *	nxge_init_txdma_channel_cntl_stat()
+ *	nxge_disable_txdma_channel()
+ *
+ * Registers accessed:
+ *	none directly (see functions above).
+ *
+ * Context:
+ *	Any domain
+ */
 /*ARGSUSED*/
 static nxge_status_t
-nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel,
-	p_tx_ring_t tx_ring_p, p_tx_mbox_t tx_mbox_p)
+nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 {
-	int		status = NXGE_OK;
+	p_tx_ring_t tx_ring_p;
+	int status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 		"==> nxge_txdma_stop_channel: channel %d", channel));
@@ -2667,6 +2821,8 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel,
 	 * not be set if reset TXDMA.
 	 */
 	(void) nxge_txdma_stop_inj_err(nxgep, channel);
+
+	tx_ring_p = nxgep->tx_rings->rings[channel];
 
 	/*
 	 * Reset TXDMA channel
@@ -2696,9 +2852,11 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel,
 		goto nxge_txdma_stop_channel_exit;
 	}
 
+	tx_mbox_p = nxgep->tx_mbox_areas_p->txmbox_areas_p[channel];
+
 	/* Disable channel */
 	status = nxge_disable_txdma_channel(nxgep, channel,
-			tx_ring_p, tx_mbox_p);
+	    tx_ring_p, tx_mbox_p);
 	if (status != NXGE_OK) {
 		goto nxge_txdma_start_channel_exit;
 	}
@@ -2713,116 +2871,150 @@ nxge_txdma_stop_channel_exit:
 	return (status);
 }
 
+/*
+ * nxge_txdma_get_ring
+ *
+ *	Get the ring for a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Any domain
+ */
 static p_tx_ring_t
 nxge_txdma_get_ring(p_nxge_t nxgep, uint16_t channel)
 {
-	int			index, ndmas;
-	uint16_t		tdc;
-	p_tx_rings_t 		tx_rings;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_get_ring"));
 
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_get_ring: NULL ring pointer"));
-		return (NULL);
+		    "<== nxge_txdma_get_ring: NULL ring pointer(s)"));
+		goto return_null;
 	}
 
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_get_ring: no channel allocated"));
-		return (NULL);
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_get_ring: NULL rings pointer"));
-		return (NULL);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_get_ring: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		tdc = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_fixup_txdma_rings: channel %d", tdc));
-		if (channel == tdc) {
-			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"<== nxge_txdma_get_ring: tdc %d "
-				"ring $%p",
-				tdc, tx_rings->rings[index]));
-			return (p_tx_ring_t)(tx_rings->rings[index]);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				if (channel == ring->tdc) {
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "<== nxge_txdma_get_ring: "
+					    "tdc %d ring $%p", tdc, ring));
+					return (ring);
+				}
+			}
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_get_ring"));
+return_null:
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_get_ring: "
+		"ring not found"));
+
 	return (NULL);
 }
 
+/*
+ * nxge_txdma_get_mbox
+ *
+ *	Get the mailbox for a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel
+ *
+ * Notes:
+ *
+ * NPI/NXGE function calls:
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Any domain
+ */
 static p_tx_mbox_t
 nxge_txdma_get_mbox(p_nxge_t nxgep, uint16_t channel)
 {
-	int			index, tdc, ndmas;
-	p_tx_rings_t 		tx_rings;
-	p_tx_mbox_areas_t 	tx_mbox_areas_p;
-	p_tx_mbox_t		*tx_mbox_p;
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	int tdc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_get_mbox"));
 
-	tx_rings = nxgep->tx_rings;
-	if (tx_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_txdma_get_mbox: NULL ring pointer"));
-		return (NULL);
+	if (nxgep->tx_mbox_areas_p == 0 ||
+	    nxgep->tx_mbox_areas_p->txmbox_areas_p == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_txdma_get_mbox: NULL mailbox pointer(s)"));
+		goto return_null;
 	}
 
-	tx_mbox_areas_p = nxgep->tx_mbox_areas_p;
-	if (tx_mbox_areas_p == NULL) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_txdma_get_mbox: NULL mbox pointer"));
-		return (NULL);
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_txdma_get_mbox: NULL ring pointer(s)"));
+		goto return_null;
 	}
 
-	tx_mbox_p = tx_mbox_areas_p->txmbox_areas_p;
-
-	ndmas = tx_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_txdma_get_mbox: no channel allocated"));
-		return (NULL);
-	}
-
-	if (tx_rings->rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_txdma_get_mbox: NULL rings pointer"));
-		return (NULL);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_get_mbox: "
-		"tx_rings $%p tx_desc_rings $%p ndmas %d",
-		tx_rings, tx_rings, ndmas));
-
-	for (index = 0; index < ndmas; index++) {
-		tdc = tx_rings->rings[index]->tdc;
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_txdma_get_mbox: channel %d", tdc));
-		if (channel == tdc) {
-			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"<== nxge_txdma_get_mbox: tdc %d "
-				"ring $%p",
-				tdc, tx_rings->rings[index]));
-			return (p_tx_mbox_t)(tx_mbox_p[index]);
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				if (channel == ring->tdc) {
+					tx_mbox_t *mailbox = nxgep->
+					    tx_mbox_areas_p->
+					    txmbox_areas_p[tdc];
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "<== nxge_txdma_get_mbox: tdc %d "
+					    "ring $%p", tdc, mailbox));
+					return (mailbox);
+				}
+			}
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_get_mbox"));
+return_null:
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_get_mbox: "
+		"mailbox not found"));
+
 	return (NULL);
 }
 
+/*
+ * nxge_tx_err_evnts
+ *
+ *	Recover a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	index	The index to the TDC ring.
+ * 	ldvp	Used to get the channel number ONLY.
+ * 	cs	A copy of the bits from TX_CS.
+ *
+ * Notes:
+ *	Calling tree:
+ *	 nxge_tx_intr()
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_ring_error_get()
+ *	npi_txdma_inj_par_error_get()
+ *	nxge_txdma_fatal_err_recover()
+ *
+ * Registers accessed:
+ *	TX_RNG_ERR_LOGH	DMC+0x40048 Transmit Ring Error Log High
+ *	TX_RNG_ERR_LOGL DMC+0x40050 Transmit Ring Error Log Low
+ *	TDMC_INJ_PAR_ERR (FZC_DMC + 0x45040) TDMC Inject Parity Error
+ *
+ * Context:
+ *	Any domain	XXX Remove code which accesses TDMC_INJ_PAR_ERR.
+ */
 /*ARGSUSED*/
 static nxge_status_t
 nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
@@ -2838,7 +3030,7 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 	tdmc_inj_par_err_t	par_err;
 	uint32_t		value;
 
-	NXGE_DEBUG_MSG((nxgep, RX2_CTL, "==> nxge_tx_err_evnts"));
+	NXGE_DEBUG_MSG((nxgep, TX2_CTL, "==> nxge_tx_err_evnts"));
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	channel = ldvp->channel;
 
@@ -2946,14 +3138,16 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxgep, RX2_CTL, "<== nxge_tx_err_evnts"));
+	NXGE_DEBUG_MSG((nxgep, TX2_CTL, "<== nxge_tx_err_evnts"));
 
 	return (status);
 }
 
 static nxge_status_t
-nxge_txdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel,
-						p_tx_ring_t tx_ring_p)
+nxge_txdma_fatal_err_recover(
+	p_nxge_t nxgep,
+	uint16_t channel,
+	p_tx_ring_t tx_ring_p)
 {
 	npi_handle_t	handle;
 	npi_status_t	rs = NPI_SUCCESS;
@@ -3005,18 +3199,21 @@ nxge_txdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel,
 
 	/* Restart TXDMA channel */
 
-	/*
-	 * Initialize the TXDMA channel specific FZC control
-	 * configurations. These FZC registers are pertaining
-	 * to each TX channel (i.e. logical pages).
-	 */
-	tx_mbox_p = nxge_txdma_get_mbox(nxgep, channel);
+	if (!isLDOMguest(nxgep)) {
+		tx_mbox_p = nxge_txdma_get_mbox(nxgep, channel);
 
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxDMA channel restart..."));
-	status = nxge_init_fzc_txdma_channel(nxgep, channel,
-						tx_ring_p, tx_mbox_p);
-	if (status != NXGE_OK)
-		goto fail;
+		// XXX This is a problem in HIO!
+		/*
+		 * Initialize the TXDMA channel specific FZC control
+		 * configurations. These FZC registers are pertaining
+		 * to each TX channel (i.e. logical pages).
+		 */
+		NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxDMA channel restart..."));
+		status = nxge_init_fzc_txdma_channel(nxgep, channel,
+		    tx_ring_p, tx_mbox_p);
+		if (status != NXGE_OK)
+			goto fail;
+	}
 
 	/*
 	 * Initialize the event masks.
@@ -3060,185 +3257,228 @@ fail:
 	return (status);
 }
 
+/*
+ * nxge_tx_port_fatal_err_recover
+ *
+ *	Attempt to recover from a fatal port error.
+ *
+ * Arguments:
+ * 	nxgep
+ *
+ * Notes:
+ *	How would a guest do this?
+ *
+ * NPI/NXGE function calls:
+ *
+ * Registers accessed:
+ *
+ * Context:
+ *	Service domain
+ */
 nxge_status_t
 nxge_tx_port_fatal_err_recover(p_nxge_t nxgep)
 {
+	nxge_grp_set_t *set = &nxgep->tx_set;
+	nxge_channel_t tdc;
+
+	tx_ring_t	*ring;
+	tx_mbox_t	*mailbox;
+
 	npi_handle_t	handle;
-	npi_status_t	rs = NPI_SUCCESS;
-	nxge_status_t	status = NXGE_OK;
-	p_tx_ring_t 	*tx_desc_rings;
-	p_tx_rings_t	tx_rings;
-	p_tx_ring_t	tx_ring_p;
-	p_tx_mbox_t	tx_mbox_p;
-	int		i, ndmas;
-	uint16_t	channel;
+	nxge_status_t	status;
+	npi_status_t	rs;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_tx_port_fatal_err_recover"));
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"Recovering from TxPort error..."));
+	    "Recovering from TxPort error..."));
 
-	/*
-	 * Stop the dma channel waits for the stop done.
-	 * If the stop done bit is not set, then create
-	 * an error.
-	 */
+	if (isLDOMguest(nxgep)) {
+		return (NXGE_OK);
+	}
+
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_tx_port_fatal_err_recover: not initialized"));
+		return (NXGE_ERROR);
+	}
+
+	if (nxgep->tx_rings == 0 || nxgep->tx_rings->rings == 0) {
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "<== nxge_tx_port_fatal_err_recover: "
+		    "NULL ring pointer(s)"));
+		return (NXGE_ERROR);
+	}
+
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring)
+				MUTEX_ENTER(&ring->lock);
+		}
+	}
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxPort stop all DMA channels..."));
 
-	tx_rings = nxgep->tx_rings;
-	tx_desc_rings = tx_rings->rings;
-	ndmas = tx_rings->ndmas;
-
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
-		}
-		tx_ring_p = tx_rings->rings[i];
-		MUTEX_ENTER(&tx_ring_p->lock);
-	}
-
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
-		}
-		channel = tx_desc_rings[i]->tdc;
-		tx_ring_p = tx_rings->rings[i];
-		rs = npi_txdma_channel_control(handle, TXDMA_STOP, channel);
-		if (rs != NPI_SUCCESS) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_txdma_fatal_err_recover (channel %d): "
-			"stop failed ", channel));
-			goto fail;
+	/*
+	 * Stop all the TDCs owned by us.
+	 * (The shared TDCs will have been stopped by their owners.)
+	 */
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				rs = npi_txdma_channel_control
+				    (handle, TXDMA_STOP, tdc);
+				if (rs != NPI_SUCCESS) {
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "nxge_tx_port_fatal_err_recover "
+					    "(channel %d): stop failed ", tdc));
+					goto fail;
+				}
+			}
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxPort reclaim all DMA channels..."));
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "Reclaiming all TDCs..."));
 
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring)
+				(void) nxge_txdma_reclaim(nxgep, ring, 0);
 		}
-		tx_ring_p = tx_rings->rings[i];
-		(void) nxge_txdma_reclaim(nxgep, tx_ring_p, 0);
 	}
 
 	/*
-	 * Reset TXDMA channel
+	 * Reset all the TDCs.
 	 */
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxPort reset all DMA channels..."));
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "Resetting all TDCs..."));
 
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				if ((rs = npi_txdma_channel_control
+					(handle, TXDMA_RESET, tdc))
+				    != NPI_SUCCESS) {
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "nxge_tx_port_fatal_err_recover "
+					    "(channel %d) reset channel "
+					    "failed 0x%x", tdc, rs));
+					goto fail;
+				}
+			}
+			/*
+			 * Reset the tail (kick) register to 0.
+			 * (Hardware will not reset it. Tx overflow fatal
+			 * error if tail is not set to 0 after reset!
+			 */
+			TXDMA_REG_WRITE64(handle, TX_RING_KICK_REG, tdc, 0);
 		}
-		channel = tx_desc_rings[i]->tdc;
-		tx_ring_p = tx_rings->rings[i];
-		if ((rs = npi_txdma_channel_control(handle, TXDMA_RESET,
-				channel)) != NPI_SUCCESS) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_txdma_fatal_err_recover (channel %d)"
-				" reset channel failed 0x%x", channel, rs));
-			goto fail;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "Restarting all TDCs..."));
+
+	/* Restart all the TDCs */
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				mailbox = nxge_txdma_get_mbox(nxgep, tdc);
+				status = nxge_init_fzc_txdma_channel(nxgep, tdc,
+				    ring, mailbox);
+				ring->tx_evmask.value = 0;
+				/*
+				 * Initialize the event masks.
+				 */
+				status = nxge_init_txdma_channel_event_mask
+				    (nxgep, tdc, &ring->tx_evmask);
+
+				ring->wr_index_wrap = B_FALSE;
+				ring->wr_index = 0;
+				ring->rd_index = 0;
+
+				if (status != NXGE_OK)
+					goto fail;
+				if (status != NXGE_OK)
+					goto fail;
+			}
 		}
+	}
 
-		/*
-		 * Reset the tail (kick) register to 0.
-		 * (Hardware will not reset it. Tx overflow fatal
-		 * error if tail is not set to 0 after reset!
-		 */
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "Re-enabling all TDCs..."));
 
-		TXDMA_REG_WRITE64(handle, TX_RING_KICK_REG, channel, 0);
-
+	/* Re-enable all the TDCs */
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			ring = nxgep->tx_rings->rings[tdc];
+			if (ring) {
+				mailbox = nxge_txdma_get_mbox(nxgep, tdc);
+				status = nxge_enable_txdma_channel(nxgep, tdc,
+				    ring, mailbox);
+				if (status != NXGE_OK)
+					goto fail;
+			}
+		}
 	}
 
 	/*
-	 * Initialize the TXDMA channel specific FZC control
-	 * configurations. These FZC registers are pertaining
-	 * to each TX channel (i.e. logical pages).
+	 * Unlock all the TDCs.
 	 */
-
-	/* Restart TXDMA channels */
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxPort re-start all DMA channels..."));
-
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
+			if (ring)
+				MUTEX_EXIT(&ring->lock);
 		}
-		channel = tx_desc_rings[i]->tdc;
-		tx_ring_p = tx_rings->rings[i];
-		tx_mbox_p = nxge_txdma_get_mbox(nxgep, channel);
-		status = nxge_init_fzc_txdma_channel(nxgep, channel,
-						tx_ring_p, tx_mbox_p);
-		tx_ring_p->tx_evmask.value = 0;
-		/*
-		 * Initialize the event masks.
-		 */
-		status = nxge_init_txdma_channel_event_mask(nxgep, channel,
-							&tx_ring_p->tx_evmask);
-
-		tx_ring_p->wr_index_wrap = B_FALSE;
-		tx_ring_p->wr_index = 0;
-		tx_ring_p->rd_index = 0;
-
-		if (status != NXGE_OK)
-			goto fail;
-		if (status != NXGE_OK)
-			goto fail;
 	}
 
-	/*
-	 * Load TXDMA descriptors, buffers, mailbox,
-	 * initialise the DMA channels and
-	 * enable each DMA channel.
-	 */
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxPort re-enable all DMA channels..."));
-
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
-		}
-		channel = tx_desc_rings[i]->tdc;
-		tx_ring_p = tx_rings->rings[i];
-		tx_mbox_p = nxge_txdma_get_mbox(nxgep, channel);
-		status = nxge_enable_txdma_channel(nxgep, channel,
-						tx_ring_p, tx_mbox_p);
-		if (status != NXGE_OK)
-			goto fail;
-	}
-
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
-		}
-		tx_ring_p = tx_rings->rings[i];
-		MUTEX_EXIT(&tx_ring_p->lock);
-	}
-
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"Recovery Successful, TxPort Restored"));
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Tx port recovery succeeded"));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_tx_port_fatal_err_recover"));
 
 	return (NXGE_OK);
 
 fail:
-	for (i = 0; i < ndmas; i++) {
-		if (tx_desc_rings[i] == NULL) {
-			continue;
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+		if ((1 << tdc) & set->owned.map) {
+			ring = nxgep->tx_rings->rings[tdc];
+			if (ring)
+				MUTEX_EXIT(&ring->lock);
 		}
-		tx_ring_p = tx_rings->rings[i];
-		MUTEX_EXIT(&tx_ring_p->lock);
 	}
 
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Recovery failed"));
-	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"nxge_txdma_fatal_err_recover (channel %d): "
-		"failed to recover this txdma channel"));
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Tx port recovery failed"));
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_tx_port_fatal_err_recover"));
 
 	return (status);
 }
 
+/*
+ * nxge_txdma_inject_err
+ *
+ *	Inject an error into a TDC.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	err_id	The error to inject.
+ * 	chan	The channel to inject into.
+ *
+ * Notes:
+ *	This is called from nxge_main.c:nxge_err_inject()
+ *	Has this ioctl ever been used?
+ *
+ * NPI/NXGE function calls:
+ *	npi_txdma_inj_par_error_get()
+ *	npi_txdma_inj_par_error_set()
+ *
+ * Registers accessed:
+ *	TDMC_INJ_PAR_ERR (FZC_DMC + 0x45040) TDMC Inject Parity Error
+ *	TDMC_INTR_DBG	DMC + 0x40060 Transmit DMA Interrupt Debug
+ *	TDMC_INTR_DBG	DMC + 0x40060 Transmit DMA Interrupt Debug
+ *
+ * Context:
+ *	Service domain
+ */
 void
 nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 {

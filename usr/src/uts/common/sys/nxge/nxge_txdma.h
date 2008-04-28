@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,12 @@ typedef struct _nxge_tx_ring_stats_t {
 	txdma_ring_errlog_t	errlog;
 } nxge_tx_ring_stats_t, *p_nxge_tx_ring_stats_t;
 
+typedef enum {
+	TX_RING_STATE_IDLE,
+	TX_RING_STATE_BUSY,
+	TX_RING_STATE_OFFLINE
+} nxge_tx_state_t;
+
 typedef struct _tx_ring_t {
 	nxge_os_dma_common_t	tdc_desc;
 	struct _nxge_t		*nxgep;
@@ -146,7 +152,7 @@ typedef struct _tx_ring_t {
 	log_page_hdl_t		page_hdl;
 	txc_dma_max_burst_t	max_burst;
 	boolean_t		cfg_set;
-	uint32_t		tx_ring_state;
+	nxge_tx_state_t		tx_ring_state;
 
 	nxge_os_mutex_t		lock;
 	uint16_t 		index;
@@ -255,6 +261,10 @@ typedef struct _txdma_globals {
  */
 nxge_status_t nxge_init_txdma_channels(p_nxge_t);
 void nxge_uninit_txdma_channels(p_nxge_t);
+
+nxge_status_t nxge_init_txdma_channel(p_nxge_t, int);
+void nxge_uninit_txdma_channel(p_nxge_t, int);
+
 void nxge_setup_dma_common(p_nxge_dma_common_t, p_nxge_dma_common_t,
 		uint32_t, uint32_t);
 nxge_status_t nxge_reset_txdma_channel(p_nxge_t, uint16_t,
@@ -290,9 +300,6 @@ void nxge_txdma_regs_dump_channels(p_nxge_t);
 
 void nxge_check_tx_hang(p_nxge_t);
 void nxge_fixup_hung_txdma_rings(p_nxge_t);
-void nxge_txdma_fix_hung_channel(p_nxge_t, uint16_t);
-void nxge_txdma_fixup_hung_channel(p_nxge_t, p_tx_ring_t,
-	uint16_t);
 
 void nxge_reclaim_rings(p_nxge_t);
 int nxge_txdma_channel_hung(p_nxge_t,
@@ -300,6 +307,10 @@ int nxge_txdma_channel_hung(p_nxge_t,
 int nxge_txdma_hung(p_nxge_t);
 int nxge_txdma_stop_inj_err(p_nxge_t, int);
 void nxge_txdma_inject_err(p_nxge_t, uint32_t, uint8_t);
+
+extern nxge_status_t nxge_alloc_tx_mem_pool(p_nxge_t);
+extern nxge_status_t nxge_alloc_txb(p_nxge_t nxgep, int channel);
+extern void nxge_free_txb(p_nxge_t nxgep, int channel);
 
 #endif
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,17 @@
 #include	<nxge_impl.h>
 #include	<npi_mac.h>
 #include	<npi_rxdma.h>
+#include	<nxge_hio.h>
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 static int	nxge_herr2kerr(uint64_t);
 #endif
+
+static nxge_status_t nxge_init_fzc_rdc_pages(p_nxge_t,
+    uint16_t, dma_log_page_t *, dma_log_page_t *);
+
+static nxge_status_t nxge_init_fzc_tdc_pages(p_nxge_t,
+    uint16_t, dma_log_page_t *, dma_log_page_t *);
 
 /*
  * The following interfaces are controlled by the
@@ -253,16 +260,146 @@ nxge_fzc_intr_sid_set(p_nxge_t nxgep)
 }
 
 /*
- * Receive DMA registers that are under function zero
- * management.
+ * nxge_init_fzc_rdc
+ *
+ *	Initialize all of a RDC's FZC_DMC registers.
+ *	This is executed by the service domain, on behalf of a
+ *	guest domain, who cannot access these registers.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to initialize.
+ *
+ * NPI_NXGE function calls:
+ *	nxge_init_fzc_rdc_pages()
+ *
+ * Context:
+ *	Service Domain
  */
 /*ARGSUSED*/
 nxge_status_t
-nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
-	p_rx_rbr_ring_t rbr_p, p_rx_rcr_ring_t rcr_p, p_rx_mbox_t mbox_p)
+nxge_init_fzc_rdc(p_nxge_t nxgep, uint16_t channel)
 {
 	nxge_status_t	status = NXGE_OK;
+
+	dma_log_page_t	page1, page2;
+	npi_handle_t	handle;
+	rdc_red_para_t	red;
+
+	/*
+	 * Initialize the RxDMA channel-specific FZC control
+	 * registers.
+	 */
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_init_fzc_tdc"));
+
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+
+	/* Reset RXDMA channel */
+	status = npi_rxdma_cfg_rdc_reset(handle, channel);
+	if (status != NPI_SUCCESS) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_init_fzc_rdc: npi_rxdma_cfg_rdc_reset(%d) "
+		    "returned 0x%08x", channel, status));
+		return (NXGE_ERROR | status);
+	}
+
+	/*
+	 * These values have been copied from
+	 * nxge_txdma.c:nxge_map_txdma_channel_cfg_ring().
+	 */
+	page1.page_num = 0;
+	page1.valid = 1;
+	page1.func_num = nxgep->function_num;
+	page1.mask = 0;
+	page1.value = 0;
+	page1.reloc = 0;
+
+	page2.page_num = 1;
+	page2.valid = 1;
+	page2.func_num = nxgep->function_num;
+	page2.mask = 0;
+	page2.value = 0;
+	page2.reloc = 0;
+
+	if (nxgep->niu_type == N2_NIU) {
+#if !defined(NIU_HV_WORKAROUND)
+		status = NXGE_OK;
+#else
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "==> nxge_init_fzc_rxdma_channel: N2_NIU - NEED to "
+		    "set up logical pages"));
+		/* Initialize the RXDMA logical pages */
+		status = nxge_init_fzc_rdc_pages(nxgep, channel,
+		    &page1, &page2);
+		if (status != NXGE_OK) {
+			return (status);
+		}
+#endif
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
+		/* Initialize the RXDMA logical pages */
+		status = nxge_init_fzc_rdc_pages(nxgep, channel,
+		    &page1, &page2);
+		if (status != NXGE_OK) {
+			return (status);
+		}
+	} else {
+		return (NXGE_ERROR);
+	}
+
+	/*
+	 * Configure RED parameters
+	 */
+	red.value = 0;
+	red.bits.ldw.win = RXDMA_RED_WINDOW_DEFAULT;
+	red.bits.ldw.thre =
+	    (nxgep->nxge_port_rcr_size - RXDMA_RED_LESS_ENTRIES);
+	red.bits.ldw.win_syn = RXDMA_RED_WINDOW_DEFAULT;
+	red.bits.ldw.thre_sync =
+	    (nxgep->nxge_port_rcr_size - RXDMA_RED_LESS_ENTRIES);
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+		"==> nxge_init_fzc_rxdma_channel_red(thre_sync %d(%x))",
+		red.bits.ldw.thre_sync,
+		red.bits.ldw.thre_sync));
+
+	status |= npi_rxdma_cfg_wred_param(handle, channel, &red);
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_init_fzc_rdc"));
+
+	return (status);
+}
+
+/*
+ * nxge_init_fzc_rxdma_channel
+ *
+ *	Initialize all per-channel FZC_DMC registers.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to start
+ *
+ * NPI_NXGE function calls:
+ *	nxge_init_hv_fzc_rxdma_channel_pages()
+ *	nxge_init_fzc_rxdma_channel_pages()
+ *	nxge_init_fzc_rxdma_channel_red()
+ *
+ * Context:
+ *	Service Domain
+ */
+/*ARGSUSED*/
+nxge_status_t
+nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel)
+{
+	rx_rbr_ring_t		*rbr_ring;
+	rx_rcr_ring_t		*rcr_ring;
+
+	nxge_status_t		status = NXGE_OK;
+
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_init_fzc_rxdma_channel"));
+
+	rbr_ring = nxgep->rx_rbr_rings->rbr_rings[channel];
+	rcr_ring = nxgep->rx_rcr_rings->rcr_rings[channel];
 
 	if (nxgep->niu_type == N2_NIU) {
 #ifndef	NIU_HV_WORKAROUND
@@ -272,7 +409,7 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 		    "set up logical pages"));
 		/* Initialize the RXDMA logical pages */
 		status = nxge_init_hv_fzc_rxdma_channel_pages(nxgep, channel,
-			rbr_p);
+		    rbr_ring);
 		if (status != NXGE_OK) {
 			return (status);
 		}
@@ -284,7 +421,7 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 		    "set up logical pages"));
 		/* Initialize the RXDMA logical pages */
 		status = nxge_init_fzc_rxdma_channel_pages(nxgep, channel,
-		    rbr_p);
+		    rbr_ring);
 		if (status != NXGE_OK) {
 			return (status);
 		}
@@ -292,7 +429,7 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		/* Initialize the RXDMA logical pages */
 		status = nxge_init_fzc_rxdma_channel_pages(nxgep,
-		    channel, rbr_p);
+		    channel, rbr_ring);
 		if (status != NXGE_OK) {
 			return (status);
 		}
@@ -301,10 +438,93 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 	}
 
 	/* Configure RED parameters */
-	status = nxge_init_fzc_rxdma_channel_red(nxgep, channel, rcr_p);
+	status = nxge_init_fzc_rxdma_channel_red(nxgep, channel, rcr_ring);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_init_fzc_rxdma_channel"));
 	return (status);
+}
+
+/*
+ * nxge_init_fzc_rdc_pages
+ *
+ *	Configure a TDC's logical pages.
+ *
+ *	This function is executed by the service domain, on behalf of
+ *	a guest domain, to whom this RDC has been loaned.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to initialize.
+ * 	page0		Logical page 0 definition.
+ * 	page1		Logical page 1 definition.
+ *
+ * Notes:
+ *	I think that this function can be called from any
+ *	domain, but I need to check.
+ *
+ * NPI/NXGE function calls:
+ *	hv_niu_tx_logical_page_conf()
+ *	hv_niu_tx_logical_page_info()
+ *
+ * Context:
+ *	Any domain
+ */
+nxge_status_t
+nxge_init_fzc_rdc_pages(
+	p_nxge_t nxgep,
+	uint16_t channel,
+	dma_log_page_t *page0,
+	dma_log_page_t *page1)
+{
+	npi_handle_t handle;
+	npi_status_t rs;
+
+	uint64_t page_handle;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+		"==> nxge_init_fzc_txdma_channel_pages"));
+
+#ifndef	NIU_HV_WORKAROUND
+	if (nxgep->niu_type == N2_NIU) {
+		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			"<== nxge_init_fzc_rdc_pages: "
+			"N2_NIU: no need to set rxdma logical pages"));
+		return (NXGE_OK);
+	}
+#else
+	if (nxgep->niu_type == N2_NIU) {
+		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			"<== nxge_init_fzc_rdc_pages: "
+			"N2_NIU: NEED to set rxdma logical pages"));
+	}
+#endif
+
+	/*
+	 * Initialize logical page 1.
+	 */
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+	if ((rs = npi_rxdma_cfg_logical_page(handle, channel, page0))
+	    != NPI_SUCCESS)
+		return (NXGE_ERROR | rs);
+
+	/*
+	 * Initialize logical page 2.
+	 */
+	if ((rs = npi_rxdma_cfg_logical_page(handle, channel, page1))
+	    != NPI_SUCCESS)
+		return (NXGE_ERROR | rs);
+
+	/*
+	 * Initialize the page handle.
+	 * (In the current driver, this is always set to 0.)
+	 */
+	page_handle = 0;
+	rs = npi_rxdma_cfg_logical_page_handle(handle, channel, page_handle);
+	if (rs == NPI_SUCCESS) {
+		return (NXGE_OK);
+	} else {
+		return (NXGE_ERROR | rs);
+	}
 }
 
 /*ARGSUSED*/
@@ -397,6 +617,94 @@ nxge_init_fzc_rxdma_channel_red(p_nxge_t nxgep,
 	return (NXGE_OK);
 }
 
+/*
+ * nxge_init_fzc_tdc
+ *
+ *	Initialize all of a TDC's FZC_DMC registers.
+ *	This is executed by the service domain, on behalf of a
+ *	guest domain, who cannot access these registers.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to initialize.
+ *
+ * NPI_NXGE function calls:
+ *	nxge_init_fzc_tdc_pages()
+ *	npi_txc_dma_max_burst_set()
+ *
+ * Registers accessed:
+ *	TXC_DMA_MAX_BURST
+ *
+ * Context:
+ *	Service Domain
+ */
+/*ARGSUSED*/
+nxge_status_t
+nxge_init_fzc_tdc(p_nxge_t nxgep, uint16_t channel)
+{
+	nxge_status_t	status = NXGE_OK;
+
+	dma_log_page_t	page1, page2;
+	npi_handle_t	handle;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_init_fzc_tdc"));
+
+	/*
+	 * These values have been copied from
+	 * nxge_txdma.c:nxge_map_txdma_channel_cfg_ring().
+	 */
+	page1.page_num = 0;
+	page1.valid = 1;
+	page1.func_num = nxgep->function_num;
+	page1.mask = 0;
+	page1.value = 0;
+	page1.reloc = 0;
+
+	page1.page_num = 1;
+	page1.valid = 1;
+	page1.func_num = nxgep->function_num;
+	page1.mask = 0;
+	page1.value = 0;
+	page1.reloc = 0;
+
+#ifdef	NIU_HV_WORKAROUND
+	if (nxgep->niu_type == N2_NIU) {
+		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+		    "==> nxge_init_fzc_txdma_channel "
+		    "N2_NIU: NEED to set up txdma logical pages"));
+		/* Initialize the TXDMA logical pages */
+		(void) nxge_init_fzc_tdc_pages(nxgep, channel,
+		    &page1, &page2);
+	}
+#endif
+	if (nxgep->niu_type != N2_NIU) {
+		if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
+			/* Initialize the TXDMA logical pages */
+			(void) nxge_init_fzc_tdc_pages(nxgep, channel,
+			    &page1, &page2);
+		} else
+			return (NXGE_ERROR);
+	}
+
+	/*
+	 * Configure the TXC DMA Max Burst value.
+	 *
+	 * PRM.13.5
+	 *
+	 * TXC DMA Max Burst. TXC_DMA_MAX (FZC_TXC + 0000016)
+	 * 19:0		dma_max_burst		RW
+	 * Max burst value associated with DMA. Used by DRR engine
+	 * for computing when DMA has gone into deficit.
+	 */
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+	(void) npi_txc_dma_max_burst_set(
+		handle, channel, TXC_DMA_MAX_BURST_DEFAULT);
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_init_fzc_tdc"));
+
+	return (status);
+}
+
 /*ARGSUSED*/
 nxge_status_t
 nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
@@ -464,6 +772,9 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	npi_status_t	rs = NPI_SUCCESS;
 	nxge_status_t	status = NXGE_OK;
 	clock_t		lbolt;
+	int		table;
+
+	nxge_hw_pt_cfg_t *hardware;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_init_fzc_rx_common"));
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
@@ -505,9 +816,12 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	if (rs != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
 
-	/* Initialize the RDC tables for each group */
-	status = nxge_init_fzc_rdc_tbl(nxgep);
-
+	hardware = &nxgep->pt_config.hw_config;
+	for (table = 0; table < NXGE_MAX_RDC_GRPS; table++) {
+		/* Does this table belong to <nxgep>? */
+		if (hardware->grpids[table] == (nxgep->function_num + 256))
+			status = nxge_init_fzc_rdc_tbl(nxgep, table);
+	}
 
 	/* Ethernet Timeout Counter (?) */
 
@@ -518,38 +832,138 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 }
 
 nxge_status_t
-nxge_init_fzc_rdc_tbl(p_nxge_t nxgep)
+nxge_init_fzc_rdc_tbl(p_nxge_t nxge, int rdc_tbl)
 {
-	npi_handle_t		handle;
-	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t	p_cfgp;
-	p_nxge_rdc_grp_t	rdc_grp_p;
-	uint8_t 		grp_tbl_id;
-	int			ngrps;
-	int			i;
-	npi_status_t		rs = NPI_SUCCESS;
-	nxge_status_t		status = NXGE_OK;
+	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
+	nx_rdc_tbl_t	*table;
+	nxge_rdc_grp_t	*group;
+	npi_handle_t	handle;
 
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_init_fzc_rdc_tbl"));
+	npi_status_t	rs = NPI_SUCCESS;
+	nxge_status_t	status = NXGE_OK;
 
-	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
+	NXGE_DEBUG_MSG((nxge, DMA_CTL, "==> nxge_init_fzc_rdc_tbl(%d)", table));
 
-	grp_tbl_id = p_cfgp->start_rdc_grpid;
-	rdc_grp_p = &p_dma_cfgp->rdc_grps[0];
-	ngrps = p_cfgp->max_rdc_grpids;
-	for (i = 0; i < ngrps; i++, rdc_grp_p++) {
-		rs = npi_rxdma_cfg_rdc_table(handle, grp_tbl_id++,
-			rdc_grp_p->rdc);
-		if (rs != NPI_SUCCESS) {
-			status = NXGE_ERROR | rs;
-			break;
+	group = &nxge->pt_config.rdc_grps[rdc_tbl];
+
+	/* This RDC table must have been previously bound to <nxge>. */
+	MUTEX_ENTER(&nhd->lock);
+	table = &nhd->rdc_tbl[rdc_tbl];
+	if (table->nxge != (uintptr_t)nxge) {
+		MUTEX_EXIT(&nhd->lock);
+		NXGE_ERROR_MSG((nxge, DMA_CTL,
+		    "nxge_init_fzc_rdc_tbl(%d): not owner", table));
+		return (NXGE_ERROR);
+	} else {
+		table->map = group->map;
+	}
+	MUTEX_EXIT(&nhd->lock);
+
+	handle = NXGE_DEV_NPI_HANDLE(nxge);
+
+	rs = npi_rxdma_rdc_table_config(handle, rdc_tbl,
+	    group->map, group->max_rdcs);
+
+	if (rs != NPI_SUCCESS) {
+		status = NXGE_ERROR | rs;
+	}
+
+	NXGE_DEBUG_MSG((nxge, DMA_CTL, "<== nxge_init_fzc_rdc_tbl(%d)", table));
+	return (status);
+}
+
+static
+int
+rdc_tbl_bind(p_nxge_t nxge, int rdc_tbl)
+{
+	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
+	nx_rdc_tbl_t *table;
+	int i;
+
+	NXGE_DEBUG_MSG((nxge, DMA_CTL, "==> nxge_fzc_rdc_tbl_bind"));
+
+	MUTEX_ENTER(&nhd->lock);
+	/* is the caller asking for a particular table? */
+	if (rdc_tbl >= 0 && rdc_tbl < NXGE_MAX_RDC_GROUPS) {
+		table = &nhd->rdc_tbl[rdc_tbl];
+		if (table->nxge == 0) {
+			table->nxge = (uintptr_t)nxge; /* It is now bound. */
+			NXGE_DEBUG_MSG((nxge, DMA_CTL,
+			    "<== nxge_fzc_rdc_tbl_bind(%d)", rdc_tbl));
+			MUTEX_EXIT(&nhd->lock);
+			return (rdc_tbl);
+		}
+	} else {	/* The caller will take any old RDC table. */
+		for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
+			nx_rdc_tbl_t *table = &nhd->rdc_tbl[i];
+			if (table->nxge == 0) {
+				table->nxge = (uintptr_t)nxge;
+				/* It is now bound. */
+				MUTEX_EXIT(&nhd->lock);
+				NXGE_DEBUG_MSG((nxge, DMA_CTL,
+				    "<== nxge_fzc_rdc_tbl_bind: %d", i));
+				return (i);
+			}
+		}
+	}
+	MUTEX_EXIT(&nhd->lock);
+
+	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_fzc_rdc_tbl_bind"));
+
+	return (-EBUSY);	/* RDC tables are bound. */
+}
+
+int
+nxge_fzc_rdc_tbl_bind(
+	nxge_t *nxge,
+	int grp_index,
+	int acceptNoSubstitutes)
+{
+	nxge_hw_pt_cfg_t *hardware;
+	int index;
+
+	hardware = &nxge->pt_config.hw_config;
+
+	if ((index = rdc_tbl_bind(nxge, grp_index)) < 0) {
+		if (acceptNoSubstitutes)
+			return (index);
+		index = rdc_tbl_bind(nxge, grp_index);
+		if (index < 0) {
+			NXGE_ERROR_MSG((nxge, OBP_CTL,
+			    "nxge_fzc_rdc_tbl_init: "
+			    "there are no free RDC tables!"));
+			return (index);
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_init_fzc_rdc_tbl"));
-	return (status);
+	hardware->grpids[index] = nxge->function_num + 256;
+
+	return (index);
+}
+
+int
+nxge_fzc_rdc_tbl_unbind(p_nxge_t nxge, int rdc_tbl)
+{
+	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
+	nx_rdc_tbl_t *table;
+
+	NXGE_DEBUG_MSG((nxge, DMA_CTL, "==> nxge_fzc_rdc_tbl_unbind(%d)",
+	    rdc_tbl));
+
+	table = &nhd->rdc_tbl[rdc_tbl];
+	if (table->nxge != (uintptr_t)nxge) {
+		NXGE_ERROR_MSG((nxge, DMA_CTL,
+		    "nxge_fzc_rdc_tbl_unbind(%d): func%d not owner",
+		    nxge->function_num, rdc_tbl));
+		return (EINVAL);
+	} else {
+		bzero(table, sizeof (*table));
+	}
+
+	NXGE_DEBUG_MSG((nxge, DMA_CTL, "<== nxge_fzc_rdc_tbl_unbind(%d)",
+	    rdc_tbl));
+
+	return (0);
 }
 
 nxge_status_t
@@ -584,7 +998,7 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 
 	/* Program the default RDC of a port */
 	rs = npi_rxdma_cfg_default_port_rdc(handle, nxgep->function_num,
-			p_cfgp->def_rdc);
+	    p_cfgp->def_rdc);
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
 	}
@@ -595,7 +1009,7 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 	hostinfo.value = 0;
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	for (i = 0; i < p_cfgp->max_macs; i++) {
-		hostinfo.bits.w0.rdc_tbl_num = p_cfgp->start_rdc_grpid;
+		hostinfo.bits.w0.rdc_tbl_num = p_cfgp->def_mac_rxdma_grpid;
 		hostinfo.bits.w0.mac_pref = p_cfgp->mac_pref;
 		if (p_class_cfgp->mac_host_info[i].flag) {
 			hostinfo.bits.w0.rdc_tbl_num =
@@ -626,6 +1040,89 @@ nxge_fzc_dmc_def_port_rdc(p_nxge_t nxgep, uint8_t port, uint16_t rdc)
 	if (rs & NPI_FAILURE)
 		return (NXGE_ERROR | rs);
 	return (NXGE_OK);
+}
+
+/*
+ * nxge_init_fzc_tdc_pages
+ *
+ *	Configure a TDC's logical pages.
+ *
+ *	This function is executed by the service domain, on behalf of
+ *	a guest domain, to whom this TDC has been loaned.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to initialize.
+ * 	page0		Logical page 0 definition.
+ * 	page1		Logical page 1 definition.
+ *
+ * Notes:
+ *	I think that this function can be called from any
+ *	domain, but I need to check.
+ *
+ * NPI/NXGE function calls:
+ *	hv_niu_tx_logical_page_conf()
+ *	hv_niu_tx_logical_page_info()
+ *
+ * Context:
+ *	Any domain
+ */
+nxge_status_t
+nxge_init_fzc_tdc_pages(
+	p_nxge_t nxgep,
+	uint16_t channel,
+	dma_log_page_t *page0,
+	dma_log_page_t *page1)
+{
+	npi_handle_t handle;
+	npi_status_t rs;
+
+	log_page_hdl_t page_handle;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+		"==> nxge_init_fzc_txdma_channel_pages"));
+
+#ifndef	NIU_HV_WORKAROUND
+	if (nxgep->niu_type == N2_NIU) {
+		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			"<== nxge_init_fzc_tdc_pages: "
+			"N2_NIU: no need to set txdma logical pages"));
+		return (NXGE_OK);
+	}
+#else
+	if (nxgep->niu_type == N2_NIU) {
+		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			"<== nxge_init_fzc_tdc_pages: "
+			"N2_NIU: NEED to set txdma logical pages"));
+	}
+#endif
+
+	/*
+	 * Initialize logical page 1.
+	 */
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+	if ((rs = npi_txdma_log_page_set(handle, channel, page0))
+	    != NPI_SUCCESS)
+		return (NXGE_ERROR | rs);
+
+	/*
+	 * Initialize logical page 2.
+	 */
+	if ((rs = npi_txdma_log_page_set(handle, channel, page1))
+	    != NPI_SUCCESS)
+		return (NXGE_ERROR | rs);
+
+	/*
+	 * Initialize the page handle.
+	 * (In the current driver, this is always set to 0.)
+	 */
+	page_handle.value = 0;
+	rs = npi_txdma_log_page_handle_set(handle, channel, &page_handle);
+	if (rs == NPI_SUCCESS) {
+		return (NXGE_OK);
+	} else {
+		return (NXGE_ERROR | rs);
+	}
 }
 
 nxge_status_t
@@ -729,7 +1226,28 @@ nxge_fzc_sys_err_mask_set(p_nxge_t nxgep, uint64_t mask)
 	}
 }
 
-#if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
+/*
+ * nxge_init_hv_fzc_txdma_channel_pages
+ *
+ *	Configure a TDC's logical pages.
+ *
+ * Arguments:
+ * 	nxgep
+ * 	channel		The channel to initialize.
+ * 	tx_ring_p	The transmit ring.
+ *
+ * Notes:
+ *	I think that this function can be called from any
+ *	domain, but I need to check.
+ *
+ * NPI/NXGE function calls:
+ *	hv_niu_tx_logical_page_conf()
+ *	hv_niu_tx_logical_page_info()
+ *
+ * Context:
+ *	Any domain
+ */
+#if defined(sun4v) && defined(NIU_LP_WORKAROUND)
 nxge_status_t
 nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 	p_tx_ring_t tx_ring_p)

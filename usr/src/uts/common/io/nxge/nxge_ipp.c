@@ -283,6 +283,51 @@ fail:
 
 /* ARGSUSED */
 nxge_status_t
+nxge_ipp_drain(p_nxge_t nxgep)
+{
+	uint8_t portn;
+	npi_handle_t handle;
+	npi_status_t rs = NPI_SUCCESS;
+	uint16_t wr_ptr, rd_ptr;
+	uint32_t try_count;
+
+	handle = nxgep->npi_handle;
+	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "==> nxge_ipp_drain: port%d", portn));
+
+	/*
+	 * Wait until ip read and write fifo pointers are equal
+	 */
+	(void) npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr);
+	(void) npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr);
+	try_count = NXGE_IPP_FIFO_SYNC_TRY_COUNT;
+
+	while ((try_count > 0) && (rd_ptr != wr_ptr)) {
+		(void) npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr);
+		(void) npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr);
+		try_count--;
+	}
+
+	if (try_count == 0) {
+		if ((rd_ptr != 0) && (wr_ptr != 1)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    " nxge_ipp_drain: port%d failed"
+			    " rd_fifo != wr_fifo", portn));
+			goto fail;
+		}
+	}
+
+	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "<== nxge_ipp_drain: port%d", portn));
+	return (NXGE_OK);
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_ipp_init: "
+	    "Fail to Reset IPP Port #%d\n", portn));
+	return (NXGE_ERROR | rs);
+}
+
+/* ARGSUSED */
+nxge_status_t
 nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 {
 	npi_handle_t handle;

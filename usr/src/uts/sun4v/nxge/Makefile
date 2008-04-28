@@ -20,7 +20,7 @@
 #
 # uts/sun4v/nxge/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -76,6 +76,7 @@ CFLAGS	+= -dalign
 #
 INC_PATH	+= -I$(UTSBASE)/common/io/nxge/npi
 INC_PATH	+= -I$(UTSBASE)/common/sys/nxge
+INC_PATH	+= -I$(UTSBASE)/sun4v
 #
 #
 # lint pass one enforcement

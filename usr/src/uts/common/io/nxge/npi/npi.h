@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,8 +121,10 @@ typedef	uint32_t			npi_status_t;
 
 typedef struct _rt_buf {
 	uint32_t	ctl_addr;
-	uint32_t	val_l32;
+	uint32_t	align;
 	uint32_t	val_h32;
+	uint32_t	val_l32;
+	char		name[16];
 } rt_buf_t;
 
 /*
@@ -151,6 +153,7 @@ typedef struct _rtrace {
 	uint16_t	next_idx;
 	uint16_t	last_idx;
 	boolean_t	wrapped;
+	uint64_t	align;
 	rt_buf_t	buf[MAX_RTRACE_ENTRIES];
 } rtrace_t;
 
@@ -227,7 +230,9 @@ typedef struct _dma_log_page {
 extern	rtrace_t npi_rtracebuf;
 void npi_rtrace_buf_init(rtrace_t *);
 void npi_rtrace_update(npi_handle_t, boolean_t, rtrace_t *,
-			uint32_t, uint64_t);
+    uint32_t, uint64_t);
+void npi_trace_update(npi_handle_t, boolean_t, rtrace_t *,
+    const char *, uint32_t, uint64_t);
 void npi_rtrace_buf_init(rtrace_t *);
 
 void npi_debug_msg(npi_handle_function_t, uint64_t,

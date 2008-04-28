@@ -240,6 +240,8 @@ typedef enum {
 	MAC_CAPAB_NO_NATIVEVLAN	= 0x10, /* boolean only, no data */
 	MAC_CAPAB_NO_ZCOPY	= 0x20, /* boolean only, no data */
 	/* add new capabilities here */
+	MAC_CAPAB_RINGS		= 0x100, /* data is mac_capab_rings_t */
+	MAC_CAPAB_SHARES	= 0x200, /* data is mac_capab_share_t */
 
 	/* The following capabilities are specific to softmac. */
 	MAC_CAPAB_LEGACY	= 0x8001, /* data is mac_capab_legacy_t */
@@ -327,6 +329,150 @@ typedef struct mac_callbacks_s {
 	mac_set_prop_t	mc_setprop;
 	mac_get_prop_t	mc_getprop;
 } mac_callbacks_t;
+
+/*
+ * Multiple Rings capability
+ */
+typedef enum {
+	MAC_RING_TYPE_RX	= 1,	/* Receive ring */
+	MAC_RING_TYPE_TX	= 2	/* Transmit ring */
+} mac_ring_type_t;
+
+/*
+ * Grouping type of a ring group
+ *
+ * MAC_GROUP_TYPE_STATIC: The ring group can not be re-grouped.
+ * MAC_GROUP_TYPE_DYNAMIC: The ring group support dynamic re-grouping
+ */
+typedef enum {
+	MAC_GROUP_TYPE_STATIC	= 1,	/* Static ring group */
+	MAC_GROUP_TYPE_DYNAMIC	= 2	/* Dynamic ring group */
+} mac_group_type_t;
+
+typedef	struct __mac_ring_driver	*mac_ring_driver_t;
+typedef	struct __mac_ring_handle	*mac_ring_handle_t;
+typedef	struct __mac_group_driver	*mac_group_driver_t;
+typedef	struct __mac_group_handle	*mac_group_handle_t;
+typedef	struct __mac_intr_handle	*mac_intr_handle_t;
+
+typedef	struct mac_ring_info_s mac_ring_info_t;
+typedef	struct mac_group_info_s mac_group_info_t;
+
+typedef	int	(*mac_intr_enable_t)(mac_intr_handle_t);
+typedef	int	(*mac_intr_disable_t)(mac_intr_handle_t);
+
+typedef	struct mac_intr_s {
+	mac_intr_handle_t	mi_handle;
+	mac_intr_enable_t	mi_enable;
+	mac_intr_disable_t	mi_disable;
+} mac_intr_t;
+
+typedef void	(*mac_get_ring_t)(void *, mac_ring_type_t, const int, const int,
+    mac_ring_info_t *, mac_ring_handle_t);
+typedef void	(*mac_get_group_t)(void *, mac_ring_type_t, const int,
+    mac_group_info_t *, mac_group_handle_t);
+
+typedef void	(*mac_group_add_ring_t)(mac_group_driver_t,
+    mac_ring_driver_t, mac_ring_type_t);
+typedef void	(*mac_group_rem_ring_t)(mac_group_driver_t,
+    mac_ring_driver_t, mac_ring_type_t);
+
+/*
+ * Multiple Rings Capability
+ */
+typedef struct	mac_capab_rings_s {
+	mac_ring_type_t		mr_type;	/* Ring type */
+	mac_group_type_t	mr_group_type;	/* Grouping type */
+	void			*mr_handle;	/* Group Driver Handle. */
+	uint_t			mr_rnum;	/* Number of rings */
+	uint_t			mr_gnum;	/* Number of ring groups */
+	mac_get_ring_t		mr_rget;	/* Get ring from driver */
+	mac_get_group_t		mr_gget;	/* Get ring group from driver */
+	mac_group_add_ring_t	mr_gadd_ring;	/* Add ring into a group */
+	mac_group_rem_ring_t	mr_grem_ring;	/* Remove ring from a group */
+} mac_capab_rings_t;
+
+/*
+ * Common ring functions and driver interfaces
+ */
+typedef	int	(*mac_ring_start_t)(mac_ring_driver_t);
+typedef	void	(*mac_ring_stop_t)(mac_ring_driver_t);
+
+typedef	mblk_t	*(*mac_ring_send_t)(void *, mblk_t *);
+typedef	mblk_t *(*mac_ring_poll_t)(void *, int);
+
+typedef struct mac_ring_info_s {
+	mac_ring_driver_t	mr_driver;
+	mac_ring_start_t	mr_start;
+	mac_ring_stop_t		mr_stop;
+	mac_intr_t		mr_intr;
+	union {
+		mac_ring_send_t	send;
+		mac_ring_poll_t	poll;
+	} mrfunion;
+} mac_ring_info_s;
+
+#define	mr_send		mrfunion.send
+#define	mr_poll		mrfunion.poll
+
+typedef	int	(*mac_group_start_t)(mac_group_driver_t);
+typedef	void	(*mac_group_stop_t)(mac_group_driver_t);
+typedef	int	(*mac_add_mac_addr_t)(void *, const uint8_t *);
+typedef	int	(*mac_rem_mac_addr_t)(void *, const uint8_t *);
+
+struct mac_group_info_s {
+	mac_group_driver_t	mrg_driver;	/* Driver reference */
+	mac_group_start_t	mrg_start;	/* Start the group */
+	mac_group_stop_t	mrg_stop;	/* Stop the group */
+	uint_t			mrg_count;	/* Count of rings */
+	mac_intr_t		mrg_intr;	/* Optional per-group intr */
+
+	/* Only used for rx groups */
+	mac_add_mac_addr_t	mrg_addmac;	/* Add a MAC address */
+	mac_rem_mac_addr_t	mrg_remmac;	/* Remove a MAC address */
+};
+
+/*
+ * Share management functions.
+ */
+typedef uint64_t mac_share_handle_t;
+
+/*
+ * Returns a Share handle to the client calling from above.
+ */
+typedef int    (*mac_alloc_share_t)(void *, uint64_t cookie,
+    uint64_t *rcookie, mac_share_handle_t *);
+
+/*
+ * Destroys the share previously allocated and unallocates
+ * all share resources (e.g. DMA's assigned to the share).
+ */
+typedef void (*mac_free_share_t)(mac_share_handle_t);
+
+typedef void (*mac_share_query_t)(mac_share_handle_t shdl,
+    mac_ring_type_t type, uint32_t *rmin, uint32_t *rmax,
+    uint64_t *rmap, uint64_t *gnum);
+
+/*
+ * Basic idea, bind previously created ring groups to shares
+ * for them to be exported (or shared) by another domain.
+ * These interfaces bind/unbind the ring group to a share.  The
+ * of doing such causes the resources to be shared with the guest.
+ */
+typedef int (*mac_share_add_group_t)(mac_share_handle_t,
+    mac_group_handle_t);
+typedef int (*mac_share_rem_group_t)(mac_share_handle_t,
+    mac_group_handle_t);
+
+typedef struct  mac_capab_share_s {
+	uint_t			ms_snum;	/* Number of shares (vr's) */
+	void			*ms_handle;	/* Handle to driver. */
+	mac_alloc_share_t	ms_salloc;	/* Get a share from driver. */
+	mac_free_share_t	ms_sfree;	/* Return a share to driver. */
+	mac_share_add_group_t	ms_sadd;	/* Add a group to the share. */
+	mac_share_rem_group_t	ms_sremove;	/* Remove group from share. */
+	mac_share_query_t	ms_squery;	/* Query share constraints */
+} mac_capab_share_t;
 
 /*
  * Flags for mc_callbacks.  Requiring drivers to set the flags associated
