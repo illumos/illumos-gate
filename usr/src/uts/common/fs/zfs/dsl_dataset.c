@@ -738,7 +738,7 @@ dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin,
 		dsphys->ds_uncompressed_bytes =
 		    origin->ds_phys->ds_uncompressed_bytes;
 		dsphys->ds_bp = origin->ds_phys->ds_bp;
-		dsphys->ds_flags = origin->ds_phys->ds_flags;
+		dsphys->ds_flags |= origin->ds_phys->ds_flags;
 
 		dmu_buf_will_dirty(origin->ds_dbuf, tx);
 		origin->ds_phys->ds_num_children++;
