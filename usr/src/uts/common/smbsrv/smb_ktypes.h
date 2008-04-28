@@ -54,6 +54,7 @@ extern "C" {
 #include <smbsrv/mbuf.h>
 #include <smbsrv/smb_sid.h>
 
+#include <smbsrv/netbios.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_fsd.h>
 #include <smbsrv/mlsvc.h>
@@ -206,19 +207,26 @@ typedef struct smb_idpool {
 } smb_idpool_t;
 
 /*
- * Maximum size of a Netbios Request.
- *   0x1FFFF -> Maximum size of the data
- *   4 -> Size of the Netbios header
+ * Maximum size of a Transport Data Unit
+ *     4 --> NBT/TCP Transport Header.
+ *    32 --> SMB Header
+ *     1 --> Word Count byte
+ *   510 --> Maximum Number of bytes of the Word Table (2 * 255)
+ *     2 --> Byte count of the data
+ * 65535 --> Maximum size of the data
+ * -----
+ * 66084
  */
-#define	NETBIOS_REQ_MAX_SIZE	(0x1FFFF + 0x4)
+#define	SMB_REQ_MAX_SIZE	66080
+#define	SMB_XPRT_MAX_SIZE	(SMB_REQ_MAX_SIZE + NETBIOS_HDR_SZ)
 
-#define	SMB_TXBUF_MAGIC		0X54584246	/* 'TXBF' */
+#define	SMB_TXREQ_MAGIC		0X54524251	/* 'TREQ' */
 typedef struct {
-	uint32_t	tb_magic;
-	list_node_t	tb_lnd;
-	int		tb_len;
-	uint8_t		tb_data[NETBIOS_REQ_MAX_SIZE];
-} smb_txbuf_t;
+	uint32_t	tr_magic;
+	list_node_t	tr_lnd;
+	int		tr_len;
+	uint8_t		tr_buf[SMB_XPRT_MAX_SIZE];
+} smb_txreq_t;
 
 #define	SMB_TXLST_MAGIC		0X544C5354	/* 'TLST' */
 typedef struct {
@@ -365,14 +373,6 @@ typedef struct {
 	uint8_t		xh_type;
 	uint32_t	xh_length;
 } smb_xprt_t;
-
-struct mbuf_chain {
-	volatile uint32_t	flags;		/* Various flags */
-	struct mbuf_chain	*shadow_of;	/* I'm shadowing someone */
-	struct mbuf		*chain;		/* Start of chain */
-	int32_t			max_bytes;	/* max # of bytes for chain */
-	int32_t			chain_offset;	/* Current offset into chain */
-};
 
 int MBC_LENGTH(struct mbuf_chain *);
 void MBC_SETUP(struct mbuf_chain *, uint32_t);

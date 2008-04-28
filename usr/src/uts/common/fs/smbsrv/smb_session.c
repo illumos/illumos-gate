@@ -154,14 +154,11 @@ smb_session_reconnection_check(smb_session_list_t *se, smb_session_t *session)
  * If an mbuf chain is provided, it will be freed and set to NULL here.
  */
 int
-smb_session_send(smb_session_t *session, uint8_t type, struct mbuf_chain *mbc)
+smb_session_send(smb_session_t *session, uint8_t type, mbuf_chain_t *mbc)
 {
-	struct mbuf	*m = NULL;
-	smb_txbuf_t	*txb;
-	int		len = 0;
+	smb_txreq_t	*txr;
 	smb_xprt_t	hdr;
 	int		rc;
-	uint8_t		*data;
 
 	switch (session->s_state) {
 	case SMB_SESSION_STATE_DISCONNECTED:
@@ -176,45 +173,29 @@ smb_session_send(smb_session_t *session, uint8_t type, struct mbuf_chain *mbc)
 		break;
 	}
 
-	txb = smb_net_txb_alloc();
+	txr = smb_net_txr_alloc();
 
 	if ((mbc != NULL) && (mbc->chain != NULL)) {
-		len = NETBIOS_HDR_SZ;	/* Account for the NBT header. */
-		m = mbc->chain;
-		data = &txb->tb_data[len];
-
-		while (m) {
-			if ((len + m->m_len) > sizeof (txb->tb_data)) {
-				smb_net_txb_free(txb);
-				m_freem(mbc->chain);
-				mbc->chain = NULL;
-				mbc->flags = 0;
-				return (EMSGSIZE);
-			}
-			bcopy(m->m_data, data, m->m_len);
-			data += m->m_len;
-			len += m->m_len;
-			m = m->m_next;
+		rc = mbc_moveout(mbc, (caddr_t)&txr->tr_buf[NETBIOS_HDR_SZ],
+		    sizeof (txr->tr_buf) - NETBIOS_HDR_SZ, &txr->tr_len);
+		if (rc != 0) {
+			smb_net_txr_free(txr);
+			return (rc);
 		}
-
-		m_freem(mbc->chain);
-		mbc->chain = NULL;
-		mbc->flags = 0;
-		len -= NETBIOS_HDR_SZ;
 	}
 
 	hdr.xh_type = type;
-	hdr.xh_length = len;
+	hdr.xh_length = (uint32_t)txr->tr_len;
 
-	rc = smb_session_xprt_puthdr(session, &hdr, txb->tb_data,
+	rc = smb_session_xprt_puthdr(session, &hdr, txr->tr_buf,
 	    NETBIOS_HDR_SZ);
-	if (rc == 0) {
-		txb->tb_len = len + NETBIOS_HDR_SZ;
-		rc = smb_net_txb_send(session->sock, &session->s_txlst, txb);
-	} else {
-		smb_net_txb_free(txb);
+
+	if (rc != 0) {
+		smb_net_txr_free(txr);
+		return (rc);
 	}
-	return (rc);
+	txr->tr_len += NETBIOS_HDR_SZ;
+	return (smb_net_txr_send(session->sock, &session->s_txlst, txr));
 }
 
 /*
@@ -649,32 +630,6 @@ smb_session_message(smb_session_t *session)
 		(void) taskq_dispatch(session->s_server->sv_thread_pool,
 		    smb_session_worker, sr, TQ_SLEEP);
 	}
-}
-
-/*
- * smb_session_reject
- *
- * Build and send a NEGATIVE_SESSION_RESPONSE on the specified socket.
- * The reason is written to the log.
- */
-/*ARGSUSED*/
-void
-smb_session_reject(smb_session_t *session, char *reason)
-{
-	smb_txbuf_t	*txb;
-
-	smb_rwx_rwenter(&session->s_lock, RW_READER);
-	if (session->sock != NULL) {
-		txb = smb_net_txb_alloc();
-		txb->tb_data[0] = NEGATIVE_SESSION_RESPONSE;
-		txb->tb_data[1] = 0;
-		txb->tb_data[2] = 0;
-		txb->tb_data[3] = 1;
-		txb->tb_data[4] = SESSION_INSUFFICIENT_RESOURCES;
-		txb->tb_len = 5;
-		(void) smb_net_txb_send(session->sock, &session->s_txlst, txb);
-	}
-	smb_rwx_rwexit(&session->s_lock);
 }
 
 /*

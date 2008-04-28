@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -129,7 +129,7 @@ struct m_ext {
 	uint_t	ext_size;		/* size of buffer, for ext_free */
 };
 
-struct mbuf {
+typedef struct mbuf {
 	struct	m_hdr m_hdr;
 	union {
 		struct {
@@ -141,7 +141,8 @@ struct mbuf {
 		} MH;
 		char	M_databuf[MLEN];		/* !M_PKTHDR, !M_EXT */
 	} M_dat;
-};
+} mbuf_t;
+
 #define	m_next		m_hdr.mh_next
 #define	m_len		m_hdr.mh_len
 #define	m_data		m_hdr.mh_data
@@ -261,6 +262,18 @@ extern	int mclrefnoop();
  */
 #define	MH_ALIGN(m, len) \
 	{ (m)->m_data += (MHLEN - (len)) &~ (sizeof (int32_t) - 1); }
+
+typedef struct mbuf_chain {
+	volatile uint32_t	flags;		/* Various flags */
+	struct mbuf_chain	*shadow_of;	/* I'm shadowing someone */
+	mbuf_t			*chain;		/* Start of chain */
+	int32_t			max_bytes;	/* max # of bytes for chain */
+	int32_t			chain_offset;	/* Current offset into chain */
+} mbuf_chain_t;
+
+mbuf_t *m_free(mbuf_t *);
+void m_freem(mbuf_t *);
+int mbc_moveout(mbuf_chain_t *, caddr_t, int, int *);
 
 #ifdef __cplusplus
 }

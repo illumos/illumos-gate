@@ -39,6 +39,7 @@ extern "C" {
 #define	SMBSRV_KSTAT_CLASS	"net"
 #define	SMBSRV_KSTAT_NAME	"smbsrv"
 #define	SMBSRV_KSTAT_NAME_CMDS	"smbsrv_commands"
+#define	SMBSRV_KSTAT_TXRCACHE	"smb_txreq"
 
 #ifdef	__cplusplus
 }

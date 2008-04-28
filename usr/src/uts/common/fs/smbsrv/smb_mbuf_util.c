@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,6 +280,35 @@ MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
 	(SUBMBC)->max_bytes = (OFF) + (LEN);
 	(SUBMBC)->shadow_of = (MBC);
 	return (0);
+}
+
+int
+mbc_moveout(mbuf_chain_t *mbc, caddr_t buf, int buflen, int *tlen)
+{
+	int	rc = 0;
+	int	len = 0;
+
+	if ((mbc != NULL) && (mbc->chain != NULL)) {
+		mbuf_t	*m;
+
+		m = mbc->chain;
+		while (m) {
+			if ((len + m->m_len) <= buflen) {
+				bcopy(m->m_data, buf, m->m_len);
+				buf += m->m_len;
+				len += m->m_len;
+				m = m->m_next;
+				continue;
+			}
+			rc = EMSGSIZE;
+			break;
+		}
+		m_freem(mbc->chain);
+		mbc->chain = NULL;
+		mbc->flags = 0;
+	}
+	*tlen = len;
+	return (rc);
 }
 
 /*

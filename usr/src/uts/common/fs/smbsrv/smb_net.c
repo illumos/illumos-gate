@@ -44,6 +44,56 @@
 #include <smbsrv/smb.h>
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_kproto.h>
+#include <smbsrv/smb_kstat.h>
+
+static	kmem_cache_t	*smb_txr_cache = NULL;
+
+/*
+ * smb_net_init
+ *
+ *	This function initializes the resources necessary to access the
+ *	network. It assumes it won't be called simultaneously by multiple
+ *	threads.
+ *
+ * Return Value
+ *
+ *	0	Initialization successful
+ *	ENOMEM	Initialization failed
+ */
+int
+smb_net_init(void)
+{
+	int	rc = 0;
+
+	ASSERT(smb_txr_cache == NULL);
+
+	smb_txr_cache = kmem_cache_create(SMBSRV_KSTAT_TXRCACHE,
+	    sizeof (smb_txreq_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+	if (smb_txr_cache == NULL)
+		rc = ENOMEM;
+	return (rc);
+}
+
+/*
+ * smb_net_fini
+ *
+ *	This function releases the resources allocated by smb_net_init(). It
+ *	assumes it won't be called simultaneously by multiple threads.
+ *	This function can safely be called even if smb_net_init() hasn't been
+ *	called previously.
+ *
+ * Return Value
+ *
+ *	None
+ */
+void
+smb_net_fini(void)
+{
+	if (smb_txr_cache) {
+		kmem_cache_destroy(smb_txr_cache);
+		smb_txr_cache = NULL;
+	}
+}
 
 /*
  * SMB Network Socket API
@@ -220,8 +270,8 @@ smb_net_txl_constructor(smb_txlst_t *txl)
 	ASSERT(txl->tl_magic != SMB_TXLST_MAGIC);
 
 	mutex_init(&txl->tl_mutex, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&txl->tl_list, sizeof (smb_txbuf_t),
-	    offsetof(smb_txbuf_t, tb_lnd));
+	list_create(&txl->tl_list, sizeof (smb_txreq_t),
+	    offsetof(smb_txreq_t, tr_lnd));
 	txl->tl_active = B_FALSE;
 	txl->tl_magic = SMB_TXLST_MAGIC;
 }
@@ -242,48 +292,46 @@ smb_net_txl_destructor(smb_txlst_t *txl)
 }
 
 /*
- * smb_net_txb_alloc
+ * smb_net_txr_alloc
  *
  *	Transmit buffer allocator
  */
-smb_txbuf_t *
-smb_net_txb_alloc(void)
+smb_txreq_t *
+smb_net_txr_alloc(void)
 {
-	smb_txbuf_t	*txb;
+	smb_txreq_t	*txr;
 
-	txb = kmem_alloc(sizeof (smb_txbuf_t), KM_SLEEP);
-
-	bzero(&txb->tb_lnd, sizeof (txb->tb_lnd));
-	txb->tb_len = 0;
-	txb->tb_magic = SMB_TXBUF_MAGIC;
-
-	return (txb);
+	txr = kmem_cache_alloc(smb_txr_cache, KM_SLEEP);
+	txr->tr_len = 0;
+	bzero(&txr->tr_lnd, sizeof (txr->tr_lnd));
+	txr->tr_magic = SMB_TXREQ_MAGIC;
+	return (txr);
 }
 
 /*
- * smb_net_txb_free
+ * smb_net_txr_free
  *
  *	Transmit buffer deallocator
  */
 void
-smb_net_txb_free(smb_txbuf_t *txb)
+smb_net_txr_free(smb_txreq_t *txr)
 {
-	ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
-	ASSERT(!list_link_active(&txb->tb_lnd));
+	ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
+	ASSERT(!list_link_active(&txr->tr_lnd));
 
-	txb->tb_magic = 0;
-	kmem_free(txb, sizeof (smb_txbuf_t));
+	txr->tr_magic = 0;
+	kmem_cache_free(smb_txr_cache, txr);
 }
 
 /*
- * smb_net_txb_send
+ * smb_net_txr_send
  *
  *	This routine puts the transmit buffer passed in on the wire. If another
  *	thread is already draining the transmit list, the transmit buffer is
  *	queued and the routine returns immediately.
  */
 int
-smb_net_txb_send(struct sonode *so, smb_txlst_t *txl, smb_txbuf_t *txb)
+smb_net_txr_send(struct sonode *so, smb_txlst_t *txl, smb_txreq_t *txr)
 {
 	list_t		local;
 	int		rc = 0;
@@ -294,25 +342,25 @@ smb_net_txb_send(struct sonode *so, smb_txlst_t *txl, smb_txbuf_t *txb)
 	ASSERT(txl->tl_magic == SMB_TXLST_MAGIC);
 
 	mutex_enter(&txl->tl_mutex);
-	list_insert_tail(&txl->tl_list, txb);
+	list_insert_tail(&txl->tl_list, txr);
 	if (txl->tl_active) {
 		mutex_exit(&txl->tl_mutex);
 		return (0);
 	}
-
 	txl->tl_active = B_TRUE;
-	list_create(&local, sizeof (smb_txbuf_t),
-	    offsetof(smb_txbuf_t, tb_lnd));
+
+	list_create(&local, sizeof (smb_txreq_t),
+	    offsetof(smb_txreq_t, tr_lnd));
 
 	while (!list_is_empty(&txl->tl_list)) {
 		list_move_tail(&local, &txl->tl_list);
 		mutex_exit(&txl->tl_mutex);
-		while ((txb = list_head(&local)) != NULL) {
-			ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
-			list_remove(&local, txb);
+		while ((txr = list_head(&local)) != NULL) {
+			ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
+			list_remove(&local, txr);
 
-			iov.iov_base = (void *)txb->tb_data;
-			iov.iov_len = txb->tb_len;
+			iov.iov_base = (void *)txr->tr_buf;
+			iov.iov_len = txr->tr_len;
 
 			bzero(&msg, sizeof (msg));
 			msg.msg_iov	= &iov;
@@ -323,39 +371,37 @@ smb_net_txb_send(struct sonode *so, smb_txlst_t *txl, smb_txbuf_t *txb)
 			uio.uio_iov	= &iov;
 			uio.uio_iovcnt	= 1;
 			uio.uio_segflg	= UIO_SYSSPACE;
-			uio.uio_resid	= txb->tb_len;
+			uio.uio_resid	= txr->tr_len;
 
 			rc = sosendmsg(so, &msg, &uio);
 
-			smb_net_txb_free(txb);
+			smb_net_txr_free(txr);
 
 			if ((rc == 0) && (uio.uio_resid == 0))
-					continue;
+				continue;
 
 			if (rc == 0)
 				rc = -1;
 
-			while ((txb = list_head(&local)) != NULL) {
-				ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
-				list_remove(&local, txb);
-				smb_net_txb_free(txb);
+			while ((txr = list_head(&local)) != NULL) {
+				ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
+				list_remove(&local, txr);
+				smb_net_txr_free(txr);
 			}
 			break;
 		}
 		mutex_enter(&txl->tl_mutex);
-
 		if (rc == 0)
 			continue;
 
-		while ((txb = list_head(&txl->tl_list)) != NULL) {
-			ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
-			list_remove(&txl->tl_list, txb);
-			smb_net_txb_free(txb);
+		while ((txr = list_head(&txl->tl_list)) != NULL) {
+			ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
+			list_remove(&txl->tl_list, txr);
+			smb_net_txr_free(txr);
 		}
 		break;
 	}
 	txl->tl_active = B_FALSE;
 	mutex_exit(&txl->tl_mutex);
-
 	return (rc);
 }

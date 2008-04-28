@@ -269,17 +269,20 @@ smb_server_svc_init(void)
 		if (rc = smb_vop_init())
 			continue;
 		if (rc = smb_node_init())
-			break;
+			continue;
 		if (rc = smb_fem_init())
-			break;
+			continue;
 		if (rc = smb_notify_init())
-			break;
+			continue;
+		if (rc = smb_net_init())
+			continue;
 		if (rc = smb_kdoor_srv_start())
-			break;
+			continue;
 		smb_llist_constructor(&smb_servers, sizeof (smb_server_t),
 		    offsetof(smb_server_t, sv_lnd));
 		return (0);
 	}
+	smb_net_fini();
 	smb_notify_fini();
 	smb_fem_fini();
 	smb_node_fini();
@@ -300,6 +303,7 @@ smb_server_svc_fini(void)
 
 	if (smb_llist_get_count(&smb_servers) == 0) {
 		smb_kdoor_srv_stop();
+		smb_net_fini();
 		smb_notify_fini();
 		smb_fem_fini();
 		smb_node_fini();

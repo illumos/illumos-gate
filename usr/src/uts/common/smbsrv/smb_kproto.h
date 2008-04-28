@@ -56,12 +56,6 @@ extern	clock_t	smb_oplock_timeout;
 #define	smb_gmt2local(_sr_, _gmt_)	((_gmt_) + (_sr_)->sr_gmtoff)
 #define	smb_local2gmt(_sr_, _local_)	((_local_) - (_sr_)->sr_gmtoff)
 
-/*
- * Definitions that should be elsewhere...
- */
-struct mbuf	*m_free(struct mbuf *);
-void		m_freem(struct mbuf *);
-
 int		fd_dealloc(int);
 
 off_t		lseek(int fildes, off_t offset, int whence);
@@ -298,11 +292,13 @@ void smb_sodestroy(struct sonode *so);
 int smb_sorecv(struct sonode *so, void *msg, size_t len);
 int smb_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen,
     size_t total_len);
+int smb_net_init(void);
+void smb_net_fini(void);
 void smb_net_txl_constructor(smb_txlst_t *);
 void smb_net_txl_destructor(smb_txlst_t *);
-smb_txbuf_t *smb_net_txb_alloc(void);
-void smb_net_txb_free(smb_txbuf_t *);
-int smb_net_txb_send(struct sonode *, smb_txlst_t *, smb_txbuf_t *);
+smb_txreq_t *smb_net_txr_alloc(void);
+void smb_net_txr_free(smb_txreq_t *);
+int smb_net_txr_send(struct sonode *, smb_txlst_t *, smb_txreq_t *);
 
 /*
  * SMB RPC interface
@@ -478,7 +474,6 @@ void smb_session_delete(smb_session_t *session);
 void smb_session_cancel(smb_session_t *session);
 void smb_session_cancel_requests(smb_session_t *session);
 void smb_session_config(smb_session_t *session);
-void smb_session_reject(smb_session_t *session, char *reason);
 void smb_session_disconnect_share(smb_session_list_t *, char *);
 void smb_session_disconnect_volume(smb_session_list_t *, fs_desc_t *);
 void smb_session_list_constructor(smb_session_list_t *);
