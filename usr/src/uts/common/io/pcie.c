@@ -267,7 +267,16 @@ pcie_initchild(dev_info_t *cdip)
 		/* Setup the device's secondary command register */
 		reg16 = PCIE_GET(16, bus_p, PCI_BCNF_BCNTRL);
 		tmp16 = (reg16 & pcie_bdg_command_default_fw);
+
 		tmp16 |= PCI_BCNF_BCNTRL_SERR_ENABLE;
+		/*
+		 * Workaround for this Nvidia bridge. Don't enable the SERR
+		 * enable bit in the bridge control register as it could lead to
+		 * bogus NMIs.
+		 */
+		if (bus_p->bus_dev_ven_id == 0x037010DE)
+			tmp16 &= ~PCI_BCNF_BCNTRL_SERR_ENABLE;
+
 		if (pcie_command_default & PCI_COMM_PARITY_DETECT)
 			tmp16 |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
 
