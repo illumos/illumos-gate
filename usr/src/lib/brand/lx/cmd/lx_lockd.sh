@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,8 @@
 
 LD_LIBRARY_PATH=/usr/lib/brand/lx
 LD_PRELOAD=/native/usr/lib/brand/lx/lx_thunk.so.1
-export LD_LIBRARY_PATH LD_PRELOAD
+LD_BIND_NOW=1
+export LD_LIBRARY_PATH LD_PRELOAD LD_BIND_NOW
 
 exec /native/usr/lib/brand/lx/lx_native \
 	/native/usr/lib/nfs/lockd -P -U 29 -G 29
