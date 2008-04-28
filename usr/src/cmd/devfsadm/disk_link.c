@@ -30,6 +30,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <bsm/devalloc.h>
 
@@ -51,6 +52,7 @@ extern int system_labeled;
 static int disk_callback_chan(di_minor_t minor, di_node_t node);
 static int disk_callback_nchan(di_minor_t minor, di_node_t node);
 static int disk_callback_wwn(di_minor_t minor, di_node_t node);
+static int disk_callback_xvmd(di_minor_t minor, di_node_t node);
 static int disk_callback_fabric(di_minor_t minor, di_node_t node);
 static void disk_common(di_minor_t minor, di_node_t node, char *disk,
 				int flags);
@@ -76,6 +78,12 @@ static devfsadm_create_t disk_cbt[] = {
 	},
 	{ "disk", "ddi_block:cdrom:channel", NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_chan
+	},
+	{ "disk", "ddi_block:xvmd", NULL,
+	    TYPE_EXACT, ILEVEL_0, disk_callback_xvmd
+	},
+	{ "disk", "ddi_block:cdrom:xvmd", NULL,
+	    TYPE_EXACT, ILEVEL_0, disk_callback_xvmd
 	},
 };
 
@@ -212,6 +220,63 @@ disk_callback_fabric(di_minor_t minor, di_node_t node)
 	disk_common(minor, node, disk, RM_STALE);
 
 	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * xVM virtual block device
+ *
+ * VBDs are enumerated into xenstore by xend and named using
+ * the linux dev_t values for 'hd' and 'xvd' devices.  Linux
+ * dev_t's are 16-bit values.  The upper 8 bits identify the major #
+ * of the device (hd, xvd) and the lower 8 bits the instance and partition
+ *
+ * For PV guests, VBDs are named by the virt-tools using
+ * the form xvd[a-p][1-15].  The corresponding Solaris /dev/dsk name
+ * created by this generator will be c0t[0-15]d[0-15]sN,
+ * were the target (t) value represents [a-p] and the
+ * disk (d) value is either 0 (e.g. xvda) or contains the partition
+ * information if it has been specified [1-15] (e.g. xvda1)
+ *
+ * For PV guests using the legacy naming (0, 1, 2, ...)
+ * the Solaris disk names created will be c0d[0..767]sN
+ * The Solaris version of virt-install based on virtinst.101
+ * named PV disks as sequential integers.  With virtinst.300_1 and
+ * beyond, the virt-* tools will no longer create legacy disk
+ * names.
+ */
+static int
+disk_callback_xvmd(di_minor_t minor, di_node_t node)
+{
+#define	HD_BASE (3 << 8)
+#define	XVBDMAJ 202
+
+	char *addr;
+	char disk[16];
+	uint_t targ;
+	uint_t lun = 0;
+	uint_t fmaj;
+
+	addr = di_bus_addr(node);
+	targ = strtol(addr, (char **)NULL, 10);
+	fmaj = targ >> 8;
+
+	/* legacy device address */
+	if (targ < HD_BASE)
+		(void) snprintf(disk, sizeof (disk),  "d%d", targ);
+	/* PV VBD */
+	else if (fmaj == XVBDMAJ) {
+		lun = targ & 0xf;
+		targ = (targ & 0xff) >> 4;
+		(void) snprintf(disk, sizeof (disk), "t%dd%d", targ, lun);
+	/* HVM device names are generated using the standard generator */
+	} else {
+		devfsadm_errprint("%s: invalid disk device number (%s)\n",
+		    modname, addr);
+		return (DEVFSADM_CONTINUE);
+	}
+	disk_common(minor, node, disk, 0);
+	return (DEVFSADM_CONTINUE);
+
 }
 
 /*

@@ -880,12 +880,8 @@ i_xpvd_parse_devname(char *name, xendev_devclass_t *devclassp,
 
 	/* Frontend format is "<vdev>". */
 	*domp = DOMID_SELF;
-	if (sscanf(caddr, "%x", vdevp) == 1) {
+	if (sscanf(caddr, "%d", vdevp) == 1)
 		ret = B_TRUE;
-		goto done;
-	}
-
-
 done:
 	kmem_free(device_name, len);
 	return (ret);

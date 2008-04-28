@@ -192,20 +192,8 @@ static hvm_to_pv_t pv_cmdk_h2p_xen_qemu[] = {
 	 * To understand the second half of the mapping (ie, the xdf device
 	 * that each emulated cmdk device should be mapped two) we need to
 	 * know the solaris device node address that will be assigned to
-	 * each xdf device.  (The device node address is the hex number that
-	 * comes after the "xdf@" in the device path.)
-	 *
-	 * Normally when a domU is run in non-HVM mode, the xen disk device
-	 * names in the xen domain configuration file are specified with
-	 * integers instead of Linux device names.  (for example, '0' would
-	 * be used instead of 'hda'.)  So in the non-HVM case we simply
-	 * convert the xen disk device name (which is an interger) into a
-	 * hex number and use it as the Solaris xdf device node address.
-	 * But when we're running in HVM mode then we have a string for the
-	 * xen disk device name, so we can't simply use that as a solaris
-	 * device node address.  Instead we fall back to using the xenstore
-	 * device id for the xen disk device as the xdf device node address.
-	 * The xdf device node address assignment happens in xvdi_init_dev().
+	 * each xdf device.  (The device node address is the decimal
+	 * number that comes after the "xdf@" in the device path.)
 	 *
 	 * So the question becomes, how do we know what the xenstore device
 	 * id for emulated disk will be?  Well, it turns out that since the
@@ -218,15 +206,15 @@ static hvm_to_pv_t pv_cmdk_h2p_xen_qemu[] = {
 	 *
 	 * So looking at the code above we can see the following xen disk
 	 * device name to xenstore device id mappings:
-	 *	'hda' --> 0x300  == 0t768  == ((3  * 256) + (0 * 64))
-	 *	'hdb' --> 0x340  == 0t832  == ((3  * 256) + (1 * 64))
-	 *	'hdc' --> 0x1600 == 0t5632 == ((22 * 256) + (0 * 64))
-	 *	'hdd' --> 0x1640 == 0t5696 == ((22 * 256) + (1 * 64))
+	 *	'hda' == 0t768  == ((3  * 256) + (0 * 64))
+	 *	'hdb' == 0t832  == ((3  * 256) + (1 * 64))
+	 *	'hdc' == 0t5632 == ((22 * 256) + (0 * 64))
+	 *	'hdd' == 0t5696 == ((22 * 256) + (1 * 64))
 	 */
-	{ "/pci@0,0/pci-ide@1,1/ide@0/cmdk@0,0", "/xpvd/xdf@300" },
-	{ "/pci@0,0/pci-ide@1,1/ide@0/cmdk@1,0", "/xpvd/xdf@340" },
-	{ "/pci@0,0/pci-ide@1,1/ide@1/cmdk@0,0", "/xpvd/xdf@1600" },
-	{ "/pci@0,0/pci-ide@1,1/ide@1/cmdk@1,0", "/xpvd/xdf@1640" },
+	{ "/pci@0,0/pci-ide@1,1/ide@0/cmdk@0,0", "/xpvd/xdf@768" },
+	{ "/pci@0,0/pci-ide@1,1/ide@0/cmdk@1,0", "/xpvd/xdf@832" },
+	{ "/pci@0,0/pci-ide@1,1/ide@1/cmdk@0,0", "/xpvd/xdf@5632" },
+	{ "/pci@0,0/pci-ide@1,1/ide@1/cmdk@1,0", "/xpvd/xdf@5696" },
 	{ NULL, 0 }
 };
 

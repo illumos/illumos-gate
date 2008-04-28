@@ -166,6 +166,12 @@ extern "C" {
 #define	DDI_NT_ENCLOSURE	"ddi_enclosure"
 #define	DDI_NT_SCSI_ENCLOSURE	"ddi_enclosure:scsi"
 
+/*
+ * xVM virtual block devices
+ */
+#define	DDI_NT_BLOCK_XVMD	"ddi_block:xvmd"
+#define	DDI_NT_CD_XVMD		"ddi_block:cdrom:xvmd"
+
 
 #define	DDI_NT_TAPE	"ddi_byte:tape"		/* tape drives */
 

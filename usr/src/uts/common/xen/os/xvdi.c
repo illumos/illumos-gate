@@ -235,6 +235,9 @@ xvdi_init_dev(dev_info_t *dip)
 	boolean_t backend;
 	char xsnamebuf[TYPICALMAXPATHLEN];
 	char *xsname;
+	void *prop_str;
+	unsigned int prop_len, addr;
+	char unitaddr[8];
 
 	devcls = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "devclass", XEN_INVAL);
@@ -303,89 +306,46 @@ xvdi_init_dev(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	if (backend)
+		return (DDI_SUCCESS);
+
 	/*
-	 * frontend device will use "unit-addr" as
-	 * the bus address, which will be set here
+	 * The unit-address for frontend devices is the name of the
+	 * of the xenstore node containing the device configuration
+	 * and is contained in the 'vdev' property.
+	 * VIF devices are named using an incrementing integer.
+	 * VBD devices are either named using the 16-bit dev_t value
+	 * for linux 'hd' and 'xvd' devices, or a simple integer value
+	 * in the range 0..767.  768 is the base value of the linux
+	 * dev_t namespace, the dev_t value for 'hda'.
 	 */
-	if (!backend) {
-		char *prop_str;
-		unsigned int prop_len, addr, i;
-		boolean_t use_vdev;
-		char addr_str[9]; /* hold 32-bit hex */
+	(void) snprintf(unitaddr, sizeof (unitaddr), "%d", vdevnum);
+	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "unit-address",
+	    unitaddr);
 
-		switch (devcls) {
-		case XEN_VNET:
-			if (xenbus_read(XBT_NULL, xsname,
-			    "mac", (void *)&prop_str, &prop_len) == 0) {
-				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    dip, "mac", prop_str);
-				kmem_free(prop_str, prop_len);
-			}
-			prop_str = NULL;
-			if (xenbus_scanf(XBT_NULL, xsname, "handle", "%u",
-			    &addr) == 0) {
-
-				(void) snprintf(addr_str, sizeof (addr_str),
-				    "%x", addr);
-				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    dip, "unit-address", addr_str);
-			}
+	switch (devcls) {
+	case XEN_VNET:
+		if (xenbus_read(XBT_NULL, xsname, "mac", (void *)&prop_str,
+		    &prop_len) != 0)
 			break;
-		case XEN_VBLK:
-			if (xenbus_read(XBT_NULL, pdp->xd_xsdev.otherend,
-			    "dev", (void *)&prop_str, &prop_len) != 0)
-				break;
-
-			/*
-			 * Save a copy of the xenstore "dev" property
-			 * on the device node.
-			 */
-			(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-			    dip, "xenstore-dev", prop_str);
-
-			/*
-			 * Verify that the "dev" property associated with the
-			 * otherend device is a 32-bit hex value.  Normally
-			 * we use this value as the "unit-address" (which is
-			 * the same as the solaris device bus address).  If
-			 * the "dev" property is not a32-bit hex value then
-			 * that usually means we're in an HVM environment
-			 * where the disk names have been specified via
-			 * non-integer values.  In this case we'll fall
-			 * back to using the devices vdev value (which is
-			 * really just its xenstore id) as its unit-address.
-			 */
-			i = 0;
-			use_vdev = B_FALSE;
-			while (prop_str[i] != '\0') {
-				if ((!isxdigit(prop_str[i++])) ||
-				    (prop_str[i++] >= 8)) {
-					use_vdev = B_TRUE;
-					break;
-				}
-			}
-			if (use_vdev) {
-				/*
-				 * Use the xenstore device id as the
-				 * devices "unit-address".
-				 */
-				addr = vdevnum;
-			} else {
-				/*
-				 * Use the xenstore "dev" property as the
-				 * devices "unit-address".
-				 */
-				(void) sscanf(prop_str, "%x", &addr);
-			}
-			kmem_free(prop_str, prop_len);
-			(void) snprintf(addr_str, sizeof (addr_str),
-			    "%x", addr);
-			(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-			    dip, "unit-address", addr_str);
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "mac",
+		    prop_str);
+		kmem_free(prop_str, prop_len);
+		break;
+	case XEN_VBLK:
+		/*
+		 * cache a copy of the otherend name
+		 * for ease of observeability
+		 */
+		if (xenbus_read(XBT_NULL, pdp->xd_xsdev.otherend, "dev",
+		    &prop_str, &prop_len) != 0)
 			break;
-		default:
-			break;
-		}
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
+		    "dev-address", prop_str);
+		kmem_free(prop_str, prop_len);
+		break;
+	default:
+		break;
 	}
 
 	return (DDI_SUCCESS);
