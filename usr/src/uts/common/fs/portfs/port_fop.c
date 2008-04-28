@@ -184,6 +184,7 @@ extern int mntfstype;
 #define	PORTFOP_PVFSH(vfsp)	(&portvfs_hash[PORTFOP_PVFSHASH(vfsp)])
 portfop_vfs_hash_t	 portvfs_hash[PORTFOP_PVFSHASH_SZ];
 
+#define	PORTFOP_NVP	20
 /*
  * Inactive file event watches(portfop_t) are retained on the vnode's list
  * for performance reason. If the applications re-registers the file, the
@@ -496,6 +497,7 @@ port_fop_trimpfplist(vnode_t *vp)
 	portfop_vp_t *pvp;
 	portfop_t *pfp = NULL;
 	portfop_cache_t *pfcp;
+	vnode_t	*tdvp;
 
 	/*
 	 * Due to a reference the vnode cannot disappear, v_fopdata should
@@ -529,13 +531,21 @@ port_fop_trimpfplist(vnode_t *vp)
 		 * discard pfp if any.
 		 */
 		if (pfp != NULL) {
+			tdvp = pfp->pfop_dvp;
 			port_pcache_remove_fop(pfcp, pfp);
 			mutex_exit(&pfcp->pfc_lock);
+			if (tdvp != NULL)
+				VN_RELE(tdvp);
 		}
 	}
 }
 
-void
+/*
+ * This routine returns 1, if the vnode can be rele'ed by the caller.
+ * The caller has to VN_RELE the vnode with out holding any
+ * locks.
+ */
+int
 port_fop_femuninstall(vnode_t *vp)
 {
 	portfop_vp_t	*pvp;
@@ -543,6 +553,7 @@ port_fop_femuninstall(vnode_t *vp)
 	portfop_vfs_t *pvfsp;
 	portfop_vfs_hash_t	*pvfsh;
 	kmutex_t	*mtx;
+	int	ret = 0;
 
 	/*
 	 * if list is empty, uninstall fem.
@@ -583,27 +594,31 @@ port_fop_femuninstall(vnode_t *vp)
 		if (!pvfsp->pvfs_unmount) {
 			list_remove(&pvfsp->pvfs_pvplist, pvp);
 			mutex_exit(mtx);
-			VN_RELE(vp);
+			ret = 1;
 		} else {
 			mutex_exit(mtx);
 		}
 	} else {
 		mutex_exit(&pvp->pvp_mutex);
 	}
+	return (ret);
 }
 
 /*
  * Remove pfp from the vnode's watch list and the cache and discard it.
  * If it is the last pfp on the vnode's list, the fem hooks get uninstalled.
- * Returns 1 if removed successfully.
+ * Returns 1 if pfp removed successfully.
  *
  * The *active is set to indicate if the pfp was still active(no events had
  * been posted, or the posted event had not been collected yet and it was
  * able to remove it from the port's queue).
+ *
+ * vpp and dvpp will point to the vnode and directory vnode which the caller
+ * is required to VN_RELE without holding any locks.
  */
 int
 port_remove_fop(portfop_t *pfp, portfop_cache_t *pfcp, int cleanup,
-    int *active)
+    int *active, vnode_t **vpp, vnode_t **dvpp)
 {
 	vnode_t		*vp;
 	portfop_vp_t	*pvp;
@@ -676,7 +691,9 @@ port_remove_fop(portfop_t *pfp, portfop_cache_t *pfcp, int cleanup,
 	 * If no more associations on the vnode, uninstall fem hooks.
 	 * The pvp mutex will be released in this routine.
 	 */
-	port_fop_femuninstall(vp);
+	if (port_fop_femuninstall(vp))
+		*vpp = vp;
+	*dvpp = pfp->pfop_dvp;
 	port_pcache_remove_fop(pfcp, pfp);
 	return (1);
 }
@@ -1186,6 +1203,11 @@ port_pfp_setup(portfop_t **pfpp, port_t *pp, vnode_t *vp, portfop_cache_t *pfcp,
 	port_fop_listinsert_head(pvp, pfp);
 
 	mutex_exit(&pvp->pvp_mutex);
+	/*
+	 * Hold the directory vnode since we have a reference now.
+	 */
+	if (dvp != NULL)
+		VN_HOLD(dvp);
 	*pfpp = pfp;
 	return (0);
 }
@@ -1222,13 +1244,18 @@ port_resolve_vp(vnode_t *vp)
  *
  * The association is identified by the object pointer and the pid.
  * The events argument contains the events to be monitored for.
+ *
+ * The vnode will have a VN_HOLD once the fem hooks are installed.
+ *
+ * Every reference(pfp) to the directory vnode will have a VN_HOLD to ensure
+ * that the directory vnode pointer does not change.
  */
 int
 port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
     void *user)
 {
 	portfop_cache_t	*pfcp;
-	vnode_t		*vp, *dvp;
+	vnode_t		*vp, *dvp, *oldvp = NULL, *olddvp = NULL;
 	portfop_t	*pfp;
 	int		error = 0;
 	file_obj_t	fobj;
@@ -1275,7 +1302,6 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 
 	if (dvp != NULL) {
 		dvp = port_resolve_vp(dvp);
-		VN_RELE(dvp);
 	}
 
 	/*
@@ -1310,15 +1336,17 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	pfp = port_cache_lookup_fop(pfcp, curproc->p_pid, object);
 
 	/*
-	 * if it is not the same vnode, just discard it.
+	 * If it is not the same vnode, just discard it. VN_RELE needs to be
+	 * called with no locks held, therefore save vnode pointers and
+	 * vn_rele them later.
 	 */
 	if (pfp != NULL && (pfp->pfop_vp != vp || pfp->pfop_dvp != dvp)) {
-		(void) port_remove_fop(pfp, pfcp, 1, NULL);
+		(void) port_remove_fop(pfp, pfcp, 1, NULL, &oldvp, &olddvp);
 		pfp = NULL;
 	}
 
 	if (pfp == NULL) {
-		vnode_t *tvp;
+		vnode_t *tvp, *tdvp;
 		portfop_t	*tpfp;
 		int error;
 
@@ -1395,8 +1423,11 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 			 * active and it is not being removed from
 			 * the vnode list. This is checked in
 			 * port_remove_fop with the vnode lock held.
+			 * The vnode returned is VN_RELE'ed after dropping
+			 * the locks.
 			 */
-			if (port_remove_fop(pfp, pfcp, 0, NULL)) {
+			tdvp = tvp = NULL;
+			if (port_remove_fop(pfp, pfcp, 0, NULL, &tvp, &tdvp)) {
 				/*
 				 * The pfp was removed, means no
 				 * events where queued. Report the
@@ -1405,6 +1436,10 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 				error = EINVAL;
 			}
 			mutex_exit(&pfcp->pfc_lock);
+			if (tvp != NULL)
+				VN_RELE(tvp);
+			if (tdvp != NULL)
+				VN_RELE(tdvp);
 			goto errout;
 		}
 	} else {
@@ -1471,6 +1506,13 @@ errout:
 	 */
 	if (vp != NULL)
 		VN_RELE(vp);
+	if (dvp != NULL)
+		VN_RELE(dvp);
+
+	if (oldvp != NULL)
+		VN_RELE(oldvp);
+	if (olddvp != NULL)
+		VN_RELE(olddvp);
 
 	/*
 	 * copied file name not used, free it.
@@ -1496,6 +1538,7 @@ port_dissociate_fop(port_t *pp, uintptr_t object)
 	portfop_t	*pfp;
 	port_source_t	*pse;
 	int		active = 0;
+	vnode_t		*tvp = NULL, *tdvp = NULL;
 
 	pse = port_getsrc(pp, PORT_SOURCE_FILE);
 
@@ -1527,8 +1570,12 @@ port_dissociate_fop(port_t *pp, uintptr_t object)
 	 * complete. The vnode itself will not disappear as long its pfps
 	 * have a reference.
 	 */
-	(void) port_remove_fop(pfp, pfcp, 1, &active);
+	(void) port_remove_fop(pfp, pfcp, 1, &active, &tvp, &tdvp);
 	mutex_exit(&pfcp->pfc_lock);
+	if (tvp != NULL)
+		VN_RELE(tvp);
+	if (tdvp != NULL)
+		VN_RELE(tdvp);
 	return (active ? 0 : ENOENT);
 }
 
@@ -1547,9 +1594,10 @@ port_close_fop(void *arg, int port, pid_t pid, int lastclose)
 	portfop_t	**hashtbl;
 	portfop_t	*pfp;
 	portfop_t	*pfpnext;
-	int		index;
+	int		index, i;
 	port_source_t	*pse;
-
+	vnode_t 	*tdvp = NULL;
+	vnode_t		*vpl[PORTFOP_NVP];
 
 	pse = port_getsrc(pp, PORT_SOURCE_FILE);
 
@@ -1561,16 +1609,48 @@ port_close_fop(void *arg, int port, pid_t pid, int lastclose)
 		return;
 	/*
 	 * Scan the cache and free all allocated portfop_t and port_kevent_t
-	 * structures of this pid.
+	 * structures of this pid. Note, no new association for this pid will
+	 * be possible as the port is being closed.
+	 *
+	 * The common case is that the port is not shared and all the entries
+	 * are of this pid and have to be freed. Since VN_RELE has to be
+	 * called outside the lock, we do it in batches.
 	 */
-	mutex_enter(&pfcp->pfc_lock);
 	hashtbl = (portfop_t **)pfcp->pfc_hash;
-	for (index = 0; index < PORTFOP_HASHSIZE; index++) {
-		for (pfp = hashtbl[index]; pfp != NULL; pfp = pfpnext) {
+	index = i = 0;
+	bzero(vpl, sizeof (vpl));
+	mutex_enter(&pfcp->pfc_lock);
+	while (index < PORTFOP_HASHSIZE) {
+		pfp = hashtbl[index];
+		while (pfp != NULL && i < (PORTFOP_NVP - 1)) {
 			pfpnext = pfp->pfop_hashnext;
 			if (pid == pfp->pfop_pid) {
-				(void) port_remove_fop(pfp, pfcp, 1, NULL);
+				(void) port_remove_fop(pfp, pfcp, 1, NULL,
+				    &vpl[i], &tdvp);
+				if (vpl[i] != NULL) {
+					i++;
+				}
+				if (tdvp != NULL) {
+					vpl[i++] = tdvp;
+					tdvp = NULL;
+				}
 			}
+			pfp = pfpnext;
+		}
+		if (pfp == NULL)
+			index++;
+		/*
+		 * Now call VN_RELE if we have collected enough vnodes or
+		 * we have reached the end of the hash table.
+		 */
+		if (i >= (PORTFOP_NVP - 1) ||
+		    (i > 0 && index == PORTFOP_HASHSIZE)) {
+			mutex_exit(&pfcp->pfc_lock);
+			while (i > 0) {
+				VN_RELE(vpl[--i]);
+				vpl[i] = NULL;
+			}
+			mutex_enter(&pfcp->pfc_lock);
 		}
 	}
 
@@ -1610,6 +1690,7 @@ port_fop_excep(list_t *tlist, int op)
 	portfop_cache_t *pfcp;
 	port_t	*pp;
 	port_kevent_t	*pkevp;
+	vnode_t		*tdvp;
 	int		error = 0;
 
 	while (pfp = (portfop_t *)list_head(tlist)) {
@@ -1670,8 +1751,11 @@ port_fop_excep(list_t *tlist, int op)
 		 * list its cached port_kevent_t is not on the done queue.
 		 * Remove the pfp and free it from the cache.
 		 */
+		tdvp = pfp->pfop_dvp;
 		port_pcache_remove_fop(pfcp, pfp);
 		mutex_exit(&pfcp->pfc_lock);
+		if (tdvp != NULL)
+			VN_RELE(tdvp);
 	}
 }
 
@@ -1827,7 +1911,8 @@ port_fop_sendevent(vnode_t *vp, int events, vnode_t *dvp, char *cname)
 		 * important to syncronize with a port_dissociate_fop() call
 		 * that may be attempting to remove an object from the vnode's.
 		 */
-		port_fop_femuninstall(vp);
+		if (port_fop_femuninstall(vp))
+			VN_RELE(vp);
 
 		/*
 		 * Send exception events and discard the watch entries.
@@ -1893,7 +1978,7 @@ port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr)
 	pvfsp = NULL;
 	mutex_enter(mtx);
 	/*
-	 * since this fsem hook is triggered, tit has to be on
+	 * since this fsem hook is triggered, the vfsp has to be on
 	 * the hash list.
 	 */
 	for (pvfsp = *ppvfsp; pvfsp->pvfs != vfsp; pvfsp = pvfsp->pvfs_next)
