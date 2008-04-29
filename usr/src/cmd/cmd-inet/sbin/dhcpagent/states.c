@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This module contains core functions for managing DHCP state machine
@@ -1205,25 +1205,17 @@ nuke_smach_list(void)
 		for (dsmp = next_smach(NULL, isv6); dsmp != NULL;
 		    dsmp = dsmp_next) {
 			int	status;
-			const char *drop = isv6 ? EVENT_DROP6 : EVENT_DROP;
-			const char *release = isv6 ? EVENT_RELEASE6 :
-			    EVENT_RELEASE;
 
 			dsmp_next = next_smach(dsmp, isv6);
 
+			/* If we're already dropping or releasing, skip */
+			if (dsmp->dsm_droprelease)
+				continue;
+			dsmp->dsm_droprelease = B_TRUE;
+
 			cancel_smach_timers(dsmp);
-			if (dsmp->dsm_script_pid != -1) {
-				/*
-				 * Stop a script if it is not for DROP or
-				 * RELEASE
-				 */
-				if (strcmp(dsmp->dsm_script_event, drop) == 0 ||
-				    strcmp(dsmp->dsm_script_event, release) ==
-				    0) {
-					continue;
-				}
+			if (dsmp->dsm_script_pid != -1)
 				script_stop(dsmp);
-			}
 
 			/*
 			 * If the script is started by script_start, dhcp_drop
@@ -1232,14 +1224,16 @@ nuke_smach_list(void)
 			 */
 			if (df_get_bool(dsmp->dsm_name, isv6,
 			    DF_RELEASE_ON_SIGTERM)) {
-				if (script_start(dsmp, release, dhcp_release,
-				    "DHCP agent is exiting", &status) == 1) {
+				if (script_start(dsmp, isv6 ? EVENT_RELEASE6 :
+				    EVENT_RELEASE, dhcp_release,
+				    "DHCP agent is exiting", &status)) {
 					continue;
 				}
 				if (status == 1)
 					continue;
 			}
-			(void) script_start(dsmp, drop, dhcp_drop, NULL, NULL);
+			(void) script_start(dsmp, isv6 ? EVENT_DROP6 :
+			    EVENT_DROP, dhcp_drop, NULL, NULL);
 		}
 		if (isv6)
 			break;

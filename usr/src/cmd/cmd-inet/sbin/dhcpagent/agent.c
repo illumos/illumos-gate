@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -696,6 +696,9 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 	switch (iap->ia_cmd) {
 
 	case DHCP_DROP:
+		if (dsmp->dsm_droprelease)
+			break;
+		dsmp->dsm_droprelease = B_TRUE;
 		(void) script_start(dsmp, isv6 ? EVENT_DROP6 : EVENT_DROP,
 		    dhcp_drop, NULL, NULL);
 		break;		/* not an immediate function */
@@ -898,6 +901,9 @@ load_option:
 		break;
 
 	case DHCP_RELEASE:
+		if (dsmp->dsm_droprelease)
+			break;
+		dsmp->dsm_droprelease = B_TRUE;
 		(void) script_start(dsmp, isv6 ? EVENT_RELEASE6 :
 		    EVENT_RELEASE, dhcp_release, "Finished with lease.", NULL);
 		break;		/* not an immediate function */
@@ -1336,6 +1342,13 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		oldstate = dsmp->dsm_state;
 
 		/*
+		 * Ignore state machines that are currently processing drop or
+		 * release; there is nothing more we can do for them.
+		 */
+		if (dsmp->dsm_droprelease)
+			continue;
+
+		/*
 		 * Look for link up/down notifications.  These occur on a
 		 * physical interface basis.
 		 */
@@ -1376,8 +1389,9 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		    (!isv6 && !verify_lif(dsmp->dsm_lif))) {
 			if (dsmp->dsm_script_pid != -1)
 				script_stop(dsmp);
-			(void) script_start(dsmp, EVENT_DROP6, dhcp_drop, NULL,
-			    NULL);
+			dsmp->dsm_droprelease = B_TRUE;
+			(void) script_start(dsmp, isv6 ? EVENT_DROP6 :
+			    EVENT_DROP, dhcp_drop, NULL, NULL);
 			continue;
 		}
 

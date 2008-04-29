@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,7 @@ struct dhcp_smach_s {
 	 */
 
 	DHCPSTATE	dsm_state;
+	boolean_t	dsm_droprelease;  /* soon to call finished_smach */
 
 	uint16_t	dsm_dflags;	/* DHCP_IF_* (shared with IPC) */
 
