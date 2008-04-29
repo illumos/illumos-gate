@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * From "tsol_getrhent.c	7.6	00/09/22 SMI; TSOL 2.x"
@@ -128,7 +128,7 @@ tsol_getrhent(void)
 }
 
 tsol_rhent_t *
-tsol_fgetrhent(FILE *f)
+tsol_fgetrhent(FILE *f, boolean_t *error)
 {
 	int		err = 0;
 	char		*errstr = NULL;
@@ -149,11 +149,13 @@ tsol_fgetrhent(FILE *f)
 		 * Loop until we find a non-blank, non-comment line, or
 		 * until EOF. No need to log blank lines, comments.
 		 */
-		if (err != LTSNET_EMPTY)
+		if (err != LTSNET_EMPTY) {
 			(void) fprintf(stderr, "%s: %.32s%s: %s\n",
 			    gettext("Error parsing tnrhdb file"), errstr,
 			    (strlen(errstr) > 32)? "...": "",
 			    (char *)tsol_strerror(err, errno));
+			*error = B_TRUE;
+		}
 		_nss_XbyY_fgets(f, &arg);
 		rhstrp = (tsol_rhstr_t *)NSS_XbyY_FINI(&arg);
 		if (rhstrp == NULL)	/* EOF */

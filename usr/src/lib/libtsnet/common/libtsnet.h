@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * All symbols and functions in this header file and library are private to Sun
@@ -70,7 +70,7 @@ extern "C" {
 /* Template entry parsing */
 extern tsol_tpent_t *tsol_gettpbyname(const char *);
 extern tsol_tpent_t *tsol_gettpent(void);
-extern tsol_tpent_t *tsol_fgettpent(FILE *);
+extern tsol_tpent_t *tsol_fgettpent(FILE *, boolean_t *);
 extern void tsol_freetpent(tsol_tpent_t *);
 extern void tsol_settpent(int);
 extern void tsol_endtpent(void);
@@ -80,7 +80,7 @@ extern tsol_tpent_t *tpstr_to_ent(tsol_tpstr_t *, int *, char **);
 /* Remote host entry parsing */
 extern tsol_rhent_t *tsol_getrhbyaddr(const void *, size_t, int);
 extern tsol_rhent_t *tsol_getrhent(void);
-extern tsol_rhent_t *tsol_fgetrhent(FILE *);
+extern tsol_rhent_t *tsol_fgetrhent(FILE *, boolean_t *);
 extern void tsol_freerhent(tsol_rhent_t *);
 extern void tsol_setrhent(int);
 extern void tsol_endrhent(void);

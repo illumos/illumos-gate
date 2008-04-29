@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +171,7 @@ translate_inet_addr(tsol_rhent_t *rhentp, int *alen, char abuf[], int abuflen)
 static void
 process_rhl(const char *file)
 {
+	boolean_t	error = B_FALSE;
 	boolean_t	success = B_FALSE;
 	tsol_rhent_t	*rhentp = NULL;
 	FILE		*fp;
@@ -186,7 +187,7 @@ process_rhl(const char *file)
 	}
 
 	tsol_setrhent(1);
-	while (rhentp = tsol_fgetrhent(fp)) {
+	while (rhentp = tsol_fgetrhent(fp, &error)) {
 		/* First time through the loop, flush it all */
 		if (!success && flush_mode)
 			(void) tnrh(TNDB_FLUSH, NULL);
@@ -218,6 +219,9 @@ process_rhl(const char *file)
 	}
 	(void) fclose(fp);
 	tsol_endrhent();
+
+	if (error)
+		exit(1);
 }
 
 /*
@@ -461,6 +465,7 @@ static void
 process_tpl(const char *file)
 {
 	FILE		*fp;
+	boolean_t	error = B_FALSE;
 	boolean_t	success = B_FALSE;
 	tsol_tpent_t	*tpentp;
 
@@ -472,7 +477,7 @@ process_tpl(const char *file)
 	}
 
 	tsol_settpent(1);
-	while (tpentp = tsol_fgettpent(fp)) {
+	while (tpentp = tsol_fgettpent(fp, &error)) {
 		/* First time through the loop, flush it all */
 		if (!success && flush_mode)
 			(void) tnrhtp(TNDB_FLUSH, NULL);
@@ -503,6 +508,9 @@ process_tpl(const char *file)
 	}
 	(void) fclose(fp);
 	tsol_endtpent();
+
+	if (error)
+		exit(1);
 }
 
 static void
