@@ -44,21 +44,9 @@ $(CHKINSTALL): $(PKGDEFS)/common_files/$(CHKINSTALLSRC)
 	$(RM) $(CHKINSTALL)
 	cp $(PKGDEFS)/common_files/$(CHKINSTALLSRC) $(CHKINSTALL)
 
-LDELIM="--------------------------------------------------------------------"
 
-CURPKG :sh= basename `pwd`
-
-copyright: $(LICENSEFILES)
-	@[ ! -f SCCS/s.$@ ] || \
-		( $(ECHO) "$@ should not be under SCCS control">&2 && false )
-	@$(ECHO) "building $(CURPKG) copyright file from $(LICENSEFILES)"
-	@$(RM) $@
-	@$(NAWK) ' \
-		(FNR == 1) && (NR > 1)	{ print "\n" ldelim "\n" } \
-					{ print $$0 }' \
-	ldelim="$(LDELIM)" $(LICENSEFILES) /dev/null > $@
-	@[ -s copyright ] || \
-		( $(ECHO) "copyright file may not be empty">&2 && false )
+copyright: $(BUILDPKGCR) $(LICENSEFILES)
+	@$(DO_BUILDPKGCR)
 
 # If the file is under SCCS, then it should not be destroyed
 # by an install rule here.  This is a mistake in package makefile.

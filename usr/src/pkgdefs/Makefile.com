@@ -50,6 +50,8 @@ COPYRIGHT=copyright
 # packages.  They're fair game for inclusion in LICENSEFILES (see below),
 # and should be referenced by the macro names defined here.
 #
+BUILDPKGCR=$(PKGDEFS)/build_copyright.sh
+DO_BUILDPKGCR=$(KSH93) -p $(BUILDPKGCR) $(LICENSEFILES)
 CMN_LIC_DIR=$(PKGDEFS)/license_files
 ATT=$(CMN_LIC_DIR)/cr_ATT
 SUN=$(CMN_LIC_DIR)/cr_Sun

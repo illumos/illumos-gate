@@ -64,14 +64,7 @@ clobber clean:
 	-$(RM) $(CLOBBERFILES) $(CLEANFILES)
 	-$(RM) awk_pkginfo bld_awk_pkginfo
 
-LDELIM="--------------------------------------------------------------------"
-
-copyright: $(LICENSEFILES)
-	@$(ECHO) "building SUNWonbld copyright file from $(LICENSEFILES)"
-	@$(RM) $@
-	@$(NAWK) ' \
-		(FNR == 1) && (NR > 1)	{ print "\n" ldelim "\n" } \
-					{ print $$0 }' \
-	ldelim="$(LDELIM)" $(LICENSEFILES) > $@
+copyright: $(BUILDPKGCR) $(LICENSEFILES)
+	@$(DO_BUILDPKGCR)
 
 FRC:
