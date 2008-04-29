@@ -825,7 +825,6 @@ cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp,
 		return (EINVAL);
 	}
 
-
 	if (cl->cl_cur_labeltype == CMLB_LABEL_EFI) {
 		if (cl->cl_reserved != -1) {
 			blk = cl->cl_map[cl->cl_reserved].dkl_cylno;
@@ -834,6 +833,12 @@ cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp,
 			return (EINVAL);
 		}
 	} else {
+		/* if the disk is unlabeled, don't write a devid to it */
+		if (!cl->cl_vtoc_label_is_from_media) {
+			mutex_exit(CMLB_MUTEX(cl));
+			return (EINVAL);
+		}
+
 		/* this geometry doesn't allow us to write a devid */
 		if (cl->cl_g.dkg_acyl < 2) {
 			mutex_exit(CMLB_MUTEX(cl));
@@ -847,7 +852,8 @@ cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp,
 		cyl  = cl->cl_g.dkg_ncyl  + cl->cl_g.dkg_acyl - 2;
 		spc  = cl->cl_g.dkg_nhead * cl->cl_g.dkg_nsect;
 		head = cl->cl_g.dkg_nhead - 1;
-		blk  = (cyl * (spc - cl->cl_g.dkg_apc)) +
+		blk  = cl->cl_solaris_offset +
+		    (cyl * (spc - cl->cl_g.dkg_apc)) +
 		    (head * cl->cl_g.dkg_nsect) + 1;
 	}
 
