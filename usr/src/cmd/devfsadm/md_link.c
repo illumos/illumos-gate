@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,16 @@ static devfsadm_remove_t md_remove_cbt[] = {
 
 DEVFSADM_REMOVE_INIT_V0(md_remove_cbt);
 
+
+/*
+ * minor_fini - module cleanup routine
+ */
+int
+minor_fini(void)
+{
+	metarpccloseall();
+	return (DEVFSADM_SUCCESS);
+}
 
 /*
  * For the admin device:
@@ -152,12 +162,12 @@ md_create(di_minor_t minor, di_node_t node)
 			if (set == 0) {
 				/* this is a simple md */
 				(void) snprintf(path, sizeof (path),
-				"md/%s/%s", dir, basename(device_name));
+				    "md/%s/%s", dir, basename(device_name));
 			} else {
 				/* this is a shared md */
 				(void) snprintf(path, sizeof (path),
-				"md/shared/%d/%s/%s", set, dir,
-				basename(device_name));
+				    "md/shared/%d/%s/%s", set, dir,
+				    basename(device_name));
 
 				/*
 				 * flush the caches so the next call to
