@@ -5000,7 +5000,7 @@ msg(int severity, const char *fmt, ...)
 
 	(void) vfprintf(file_p, gettext(fmt), ap);
 	if (severity == ERRN || severity == EXTN) {
-		if ((G_p->g_attrnam_p != NULL) && G_p->g_rw_sysattr) {
+		if (G_p && (G_p->g_attrnam_p != NULL) && G_p->g_rw_sysattr) {
 			if (errno == EPERM) {
 				(void) fprintf(file_p, ", errno %d, %s", errno,
 				    gettext("insufficient privileges\n"));
