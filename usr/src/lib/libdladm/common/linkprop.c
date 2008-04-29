@@ -64,7 +64,7 @@ struct prop_desc;
 
 typedef dladm_status_t	pd_getf_t(struct prop_desc *pd,
 			datalink_id_t, char **propstp, uint_t *cntp,
-			datalink_media_t);
+			datalink_media_t, uint_t);
 
 /*
  * The linkprop set() callback.
@@ -109,16 +109,16 @@ typedef struct dld_public_prop_s {
 } dld_public_prop_t;
 
 static dld_ioc_prop_t *dld_buf_alloc(size_t, datalink_id_t, const char *,
-					dladm_status_t *);
+					uint_t, dladm_status_t *);
 static dladm_status_t dld_set_prop(datalink_id_t, const char *, char **,
 					uint_t, uint_t);
 static dladm_status_t dld_get_prop(datalink_id_t, const char *, char **,
-					uint_t *, dladm_prop_type_t);
+					uint_t *, dladm_prop_type_t, uint_t);
 static pd_getf_t	do_get_zone, do_get_autopush, do_get_rate_mod,
 			do_get_rate_prop, do_get_channel_prop,
 			do_get_powermode_prop, do_get_radio_prop,
 			dld_duplex_get, dld_status_get,
-			dld_binary_get, dld_uint64_get, dld_flowctl_get;
+			dld_binary_get, dld_uint32_get, dld_flowctl_get;
 static pd_setf_t	do_set_zone, do_set_autopush, do_set_rate_prop,
 			do_set_powermode_prop, do_set_radio_prop,
 			dld_set_public_prop;
@@ -126,7 +126,7 @@ static pd_checkf_t	do_check_zone, do_check_autopush, do_check_rate,
 			dld_defmtu_check;
 
 static dladm_status_t	dld_speed_get(struct prop_desc *, datalink_id_t,
-			char **, uint_t *);
+			char **, uint_t *, uint_t);
 
 typedef struct prop_desc {
 	/*
@@ -179,6 +179,7 @@ typedef struct prop_desc {
 	uint_t			pd_flags;
 #define	PD_TEMPONLY	0x1	/* property is temporary only */
 #define	PD_CHECK_ALLOC	0x2	/* alloc vd_val as part of pd_check */
+#define	PD_EMPTY_RESET	0x4	/* Use "" to reset the link property */
 	/*
 	 * indicate link classes this property applies to.
 	 */
@@ -194,19 +195,19 @@ typedef struct prop_desc {
 
 
 static dld_public_prop_t dld_prop[] = {
-	{ DLD_PROP_DUPLEX,	sizeof (uint8_t),
+	{ DLD_PROP_DUPLEX,	sizeof (link_duplex_t),
 	    "duplex",		"link duplex mode" },
 
 	{DLD_PROP_SPEED,	sizeof (uint64_t),
 	    "speed",		"link speed (bps)" },
 
-	{ DLD_PROP_STATUS,	sizeof (uint8_t),
+	{ DLD_PROP_STATUS,	sizeof (link_state_t),
 	    "state",		"link up/down" },
 
 	{ DLD_PROP_AUTONEG,	sizeof (uint8_t),
 	    "adv_autoneg_cap",	"Advertised auto-negotiation" },
 
-	{ DLD_PROP_DEFMTU,	sizeof (uint64_t),
+	{ DLD_PROP_MTU,		sizeof (uint32_t),
 	    "mtu",		"current link mtu" },
 
 	{ DLD_PROP_FLOWCTRL,	sizeof (link_flowctrl_t),
@@ -256,11 +257,6 @@ static  val_desc_t	link_duplex_vals[] = {
 	{ "half", 	LINK_DUPLEX_HALF	},
 	{ "full", 	LINK_DUPLEX_HALF	}
 };
-static  val_desc_t	link_speed_vals[] = {
-	{ "10",		10			},
-	{ "100",	100			},
-	{ "1000",	1000			}
-};
 static  val_desc_t	link_status_vals[] = {
 	{ "up",		LINK_STATE_UP		},
 	{ "down",	LINK_STATE_DOWN		}
@@ -274,9 +270,6 @@ static  val_desc_t	link_flow_vals[] = {
 	{ "tx",		LINK_FLOWCTRL_TX	},
 	{ "rx",		LINK_FLOWCTRL_RX	},
 	{ "bi",		LINK_FLOWCTRL_BI	}
-};
-static  val_desc_t	macdefaultmtu_vals[] = {
-	{ "68-9000",	NULL			}
 };
 
 #define	VALCNT(vals)    (sizeof ((vals)) / sizeof (val_desc_t))
@@ -316,17 +309,17 @@ static prop_desc_t	prop_table[] = {
 	    do_get_rate_prop, do_check_rate, 0,
 	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE },
 
-	{ "autopush",	{ "", NULL }, NULL, 0,
+	{ "autopush",	{ "", 0 }, NULL, 0,
 	    do_set_autopush, NULL,
-	    do_get_autopush, do_check_autopush, PD_CHECK_ALLOC,
+	    do_get_autopush, do_check_autopush, PD_CHECK_ALLOC|PD_EMPTY_RESET,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
-	{ "zone",	{ "", NULL }, NULL, 0,
+	{ "zone",	{ "", 0 }, NULL, 0,
 	    do_set_zone, NULL,
-	    do_get_zone, do_check_zone, PD_TEMPONLY,
+	    do_get_zone, do_check_zone, PD_TEMPONLY|PD_EMPTY_RESET,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
-	{ "duplex", { "full", LINK_DUPLEX_FULL },
+	{ "duplex", { "", 0 },
 	    link_duplex_vals, VALCNT(link_duplex_vals),
 	    NULL, NULL, dld_duplex_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
@@ -334,79 +327,78 @@ static prop_desc_t	prop_table[] = {
 	{ "state", { "up", LINK_STATE_UP },
 	    link_status_vals, VALCNT(link_status_vals),
 	    NULL, NULL, dld_status_get, NULL,
-	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+	    0, DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
 	{ "adv_autoneg_cap", { "1", 1 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "mtu", { NULL, NULL },
-	    macdefaultmtu_vals, VALCNT(macdefaultmtu_vals),
-	    dld_set_public_prop, NULL, dld_uint64_get, dld_defmtu_check,
-	    PD_CHECK_ALLOC, DATALINK_CLASS_PHYS, DL_ETHER },
+	{ "mtu", { "", 0 }, NULL, 0,
+	    dld_set_public_prop, NULL, dld_uint32_get,
+	    dld_defmtu_check, 0, DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
-	{ "flowctrl", { "bi", LINK_FLOWCTRL_BI },
+	{ "flowctrl", { "", 0 },
 	    link_flow_vals, VALCNT(link_flow_vals),
 	    dld_set_public_prop, NULL, dld_flowctl_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "adv_1000fdx_cap", { NULL, NULL },
-	    link_01_vals, 0,
+	{ "adv_1000fdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "en_1000fdx_cap", { NULL, NULL },
+	{ "en_1000fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "adv_1000hdx_cap", { NULL, NULL },
+	{ "adv_1000hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "en_1000hdx_cap", { NULL, NULL },
+	{ "en_1000hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "adv_100fdx_cap", { NULL, NULL },
+	{ "adv_100fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "en_100fdx_cap", { NULL, NULL },
+	{ "en_100fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "adv_100hdx_cap", { NULL, NULL },
+	{ "adv_100hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "en_100hdx_cap", { NULL, NULL },
+	{ "en_100hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "adv_10fdx_cap", { NULL, NULL },
+	{ "adv_10fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "en_10fdx_cap", { NULL, NULL },
+	{ "en_10fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "adv_10hdx_cap", { NULL, NULL },
+	{ "adv_10hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
-	{ "en_10hdx_cap", { NULL, NULL },
+	{ "en_10hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    dld_set_public_prop, NULL, dld_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER }
@@ -423,7 +415,8 @@ static dladm_status_t	i_dladm_set_single_prop(datalink_id_t, datalink_class_t,
 			    uint32_t, prop_desc_t *, char **, uint_t, uint_t);
 static dladm_status_t	i_dladm_set_linkprop(datalink_id_t, const char *,
 			    char **, uint_t, uint_t);
-
+static dladm_status_t	i_dladm_getset_defval(prop_desc_t *, datalink_id_t,
+			    datalink_media_t, uint_t);
 /*
  * Unfortunately, MAX_SCAN_SUPPORT_RATES is too small to allow all
  * rates to be retrieved. However, we cannot increase it at this
@@ -513,10 +506,17 @@ i_dladm_set_single_prop(datalink_id_t linkid, datalink_class_t class,
 		if (pdp->pd_defval.vd_name == NULL)
 			return (DLADM_STATUS_NOTSUP);
 
-		if ((vdp = malloc(sizeof (val_desc_t))) == NULL)
-			return (DLADM_STATUS_NOMEM);
-
-		(void) memcpy(vdp, &pdp->pd_defval, sizeof (val_desc_t));
+		if ((pdp->pd_flags & PD_EMPTY_RESET) != 0 ||
+		    strlen(pdp->pd_defval.vd_name) > 0) {
+			if ((vdp = malloc(sizeof (val_desc_t))) == NULL)
+				return (DLADM_STATUS_NOMEM);
+			(void) memcpy(vdp, &pdp->pd_defval,
+			    sizeof (val_desc_t));
+		} else {
+			status = i_dladm_getset_defval(pdp, linkid,
+			    media, flags);
+			return (status);
+		}
 		cnt = 1;
 	}
 	status = pdp->pd_set(pdp, linkid, vdp, cnt, flags, media);
@@ -651,8 +651,11 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 	datalink_class_t	class;
 	uint_t			media;
 	prop_desc_t		*pdp;
-	uint_t			cnt;
+	uint_t			cnt, dld_flags = 0;
 	int			i;
+
+	if (type == DLADM_PROP_VAL_DEFAULT)
+		dld_flags = DLD_DEFAULT;
 
 	if (linkid == DATALINK_INVALID_LINKID || prop_name == NULL ||
 	    prop_val == NULL || val_cntp == NULL || *val_cntp == 0)
@@ -668,7 +671,7 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 			 * private property.
 			 */
 			return (dld_get_prop(linkid, prop_name,
-			    prop_val, val_cntp, type));
+			    prop_val, val_cntp, type, dld_flags));
 		} else {
 			return (DLADM_STATUS_NOTFOUND);
 		}
@@ -688,7 +691,8 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 
 	switch (type) {
 	case DLADM_PROP_VAL_CURRENT:
-		status = pdp->pd_get(pdp, linkid, prop_val, val_cntp, media);
+		status = pdp->pd_get(pdp, linkid, prop_val, val_cntp, media,
+		    dld_flags);
 		break;
 
 	case DLADM_PROP_VAL_DEFAULT:
@@ -696,14 +700,20 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 			status = DLADM_STATUS_NOTSUP;
 			break;
 		}
-		(void) strcpy(*prop_val, pdp->pd_defval.vd_name);
+
+		if (strlen(pdp->pd_defval.vd_name) == 0) {
+			status = pdp->pd_get(pdp, linkid, prop_val, val_cntp,
+			    media, dld_flags);
+		} else {
+			(void) strcpy(*prop_val, pdp->pd_defval.vd_name);
+		}
 		*val_cntp = 1;
 		break;
 
 	case DLADM_PROP_VAL_MODIFIABLE:
 		if (pdp->pd_getmod != NULL) {
 			status = pdp->pd_getmod(pdp, linkid, prop_val,
-			    val_cntp, media);
+			    val_cntp, media, dld_flags);
 			break;
 		}
 		cnt = pdp->pd_noptval;
@@ -791,11 +801,14 @@ dladm_init_linkprop(datalink_id_t linkid)
 /* ARGSUSED */
 static dladm_status_t
 do_get_zone(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	char		zone_name[ZONENAME_MAX];
 	zoneid_t	zid;
 	dladm_status_t	status;
+
+	if (flags != 0)
+		return (DLADM_STATUS_NOTSUP);
 
 	status = dladm_getzid(linkid, &zid);
 	if (status != DLADM_STATUS_OK)
@@ -998,10 +1011,13 @@ do_check_zone(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
 /* ARGSUSED */
 static dladm_status_t
 do_get_autopush(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_ap_t	dia;
 	int		fd, i, len;
+
+	if (flags & DLD_DEFAULT)
+		return (DLADM_STATUS_NOTSUP);
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
@@ -1187,29 +1203,27 @@ done:
 
 static dladm_status_t
 do_get_rate_prop(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	if (media != DL_WIFI)
-		return (dld_speed_get(pd, linkid, prop_val, val_cnt));
+		return (dld_speed_get(pd, linkid, prop_val, val_cnt, flags));
 
 	return (do_get_rate_common(pd, linkid, prop_val, val_cnt,
 	    WL_DESIRED_RATES));
 }
 
+/* ARGSUSED */
 static dladm_status_t
 do_get_rate_mod(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	int		i;
-
 	switch (media) {
 	case DL_ETHER:
-		if (VALCNT(link_speed_vals) > *val_cnt)
-			return (DLADM_STATUS_TOOSMALL);
-		for (i = 0; i < VALCNT(link_speed_vals); i++)
-			(void) strcpy(prop_val[i], link_speed_vals[i].vd_name);
-		*val_cnt = VALCNT(link_speed_vals);
-		return (DLADM_STATUS_OK);
+		/*
+		 * Speed for ethernet links is unbounded. E.g., 802.11b
+		 * links can have a speed of 5.5 Gbps.
+		 */
+		return (DLADM_STATUS_NOTSUP);
 
 	case DL_WIFI:
 		return (do_get_rate_common(pd, linkid, prop_val, val_cnt,
@@ -1299,7 +1313,7 @@ do_check_rate(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
 		    i * DLADM_STRSIZE;
 	}
 
-	status = do_get_rate_mod(NULL, linkid, modval, &modval_cnt, media);
+	status = do_get_rate_mod(NULL, linkid, modval, &modval_cnt, media, 0);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
@@ -1327,7 +1341,7 @@ do_get_phyconf(datalink_id_t linkid, wldp_t *gbuf)
 /* ARGSUSED */
 static dladm_status_t
 do_get_channel_prop(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	uint32_t	channel;
 	wldp_t		*gbuf;
@@ -1362,7 +1376,7 @@ do_get_powermode(datalink_id_t linkid, wldp_t *gbuf)
 /* ARGSUSED */
 static dladm_status_t
 do_get_powermode_prop(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	wl_ps_mode_t	*mode;
 	const char	*s;
@@ -1447,7 +1461,7 @@ do_get_radio(datalink_id_t linkid, wldp_t *gbuf)
 /* ARGSUSED */
 static dladm_status_t
 do_get_radio_prop(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	wl_radio_t	radio;
 	const char	*s;
@@ -1602,7 +1616,7 @@ dladm_name2prop(const char *prop_name)
 
 static dld_ioc_prop_t *
 dld_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
-    dladm_status_t *status)
+    uint_t flags, dladm_status_t *status)
 {
 	int dsize;
 	dld_ioc_prop_t *dip;
@@ -1621,10 +1635,11 @@ dld_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
 	}
 	bzero(dip, dsize);
 	dip->pr_valsize = valsize;
-	(void) strlcpy(dip->pr_name, prop_name, DLD_LINKPROP_NAME_MAX);
+	(void) strlcpy(dip->pr_name, prop_name, sizeof (dip->pr_name));
 	dip->pr_version = DLD_PROP_VERSION;
 	dip->pr_linkid = linkid;
 	dip->pr_num = p->pp_id;
+	dip->pr_flags = flags;
 	return (dip);
 }
 
@@ -1641,7 +1656,7 @@ dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 	uint32_t	u32;
 	void		*val;
 
-	dip = dld_buf_alloc(0, linkid, pd->pd_name, &status);
+	dip = dld_buf_alloc(0, linkid, pd->pd_name, 0, &status);
 	if (dip == NULL)
 		return (status);
 
@@ -1682,26 +1697,40 @@ dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 
 	(void) close(fd);
 done:
+	free(dip);
 	return (status);
 }
 
-static dladm_status_t
-dld_get_public_prop(dld_ioc_prop_t *dip)
+static dld_ioc_prop_t *
+dld_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
+    dladm_status_t *status)
 {
 	int fd, dsize;
-	dladm_status_t status = DLADM_STATUS_OK;
+	dld_ioc_prop_t *dip = NULL;
+
+	*status = DLADM_STATUS_OK;
+
+	dip = dld_buf_alloc(0, linkid, prop_name, flags, status);
+	if (dip == NULL)
+		return (NULL);
 
 	dsize = DLD_PROPBUF_SIZE(dip->pr_valsize);
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
-		status = dladm_errno2status(errno);
+		*status = dladm_errno2status(errno);
 		goto done;
 	}
 	if (i_dladm_ioctl(fd, DLDIOCGETPROP, dip, dsize) < 0) {
-		status = dladm_errno2status(errno);
+		*status = dladm_errno2status(errno);
 	}
+
+	(void) close(fd);
 done:
-	return (status);
+	if (*status != DLADM_STATUS_OK) {
+		free(dip);
+		return (NULL);
+	}
+	return (dip);
 }
 
 /* ARGSUSED */
@@ -1709,25 +1738,22 @@ static dladm_status_t
 dld_defmtu_check(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
     uint_t val_cnt, val_desc_t *v, datalink_media_t media)
 {
-	uint64_t mtu;
-
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVAL);
-	mtu = atoll(prop_val[0]);
-	v->vd_val = (uintptr_t)malloc(sizeof (uint64_t));
-	if ((void *)v->vd_val == NULL)
-		return (DLADM_STATUS_NOMEM);
-	bcopy(&mtu, (void *)v->vd_val, sizeof (mtu));
+	v->vd_val = atoi(prop_val[0]);
 	return (DLADM_STATUS_OK);
 }
 
 /* ARGSUSED */
 static dladm_status_t
 dld_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	link_duplex_t   link_duplex;
 	dladm_status_t  status;
+
+	if (flags & DLD_DEFAULT)
+		return (DLADM_STATUS_NOTSUP);
 
 	if ((status = dladm_get_single_mac_stat(linkid, "link_duplex",
 	    KSTAT_DATA_UINT32, &link_duplex)) != 0)
@@ -1751,14 +1777,18 @@ dld_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 dld_speed_get(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt)
+    char **prop_val, uint_t *val_cnt, uint_t flags)
 {
 	uint64_t	ifspeed = 0;
 	dladm_status_t status;
 
+	if (flags & DLD_DEFAULT)
+		return (DLADM_STATUS_NOTSUP);
+
 	if ((status = dladm_get_single_mac_stat(linkid, "ifspeed",
 	    KSTAT_DATA_UINT64, &ifspeed)) != 0)
 		return (status);
+
 	if ((ifspeed % 1000000) != 0) {
 		(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX,
 		    "%llf", ifspeed / (float)1000000); /* Mbps */
@@ -1773,14 +1803,20 @@ dld_speed_get(struct prop_desc *pd, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 dld_status_get(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	link_state_t   link_state;
-	dladm_status_t status;
+	link_state_t	link_state;
+	dladm_status_t	status;
+	uchar_t 	*cp;
+	dld_ioc_prop_t  *dip;
 
-	if ((status = dladm_get_single_mac_stat(linkid, "link_state",
-	    KSTAT_DATA_UINT32, &link_state)) != 0)
+	if (flags & DLD_DEFAULT)
+		return (DLADM_STATUS_NOTSUP);
+	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	if (status != DLADM_STATUS_OK)
 		return (status);
+	cp = (uchar_t *)dip->pr_val;
+	(void) memcpy(&link_state, cp, sizeof (link_state));
 
 	switch (link_state) {
 	case LINK_STATE_UP:
@@ -1794,23 +1830,21 @@ dld_status_get(struct prop_desc *pd, datalink_id_t linkid,
 		break;
 	}
 	*val_cnt = 1;
+	free(dip);
 	return (DLADM_STATUS_OK);
 }
 
 /* ARGSUSED */
 static dladm_status_t
 dld_binary_get(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_prop_t *dip;
 	dladm_status_t status;
 
-	if ((dip = dld_buf_alloc(0, linkid, pd->pd_name, &status)) == NULL)
+	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	if (dip == NULL)
 		return (status);
-	if ((status = dld_get_public_prop(dip)) != DLADM_STATUS_OK) {
-		free(dip);
-		return (status);
-	}
 	(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%x", dip->pr_val[0]);
 	free(dip);
 	*val_cnt = 1;
@@ -1819,23 +1853,20 @@ dld_binary_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_uint64_get(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+dld_uint32_get(struct prop_desc *pd, datalink_id_t linkid,
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_prop_t *dip;
-	uint64_t v  = 0;
+	uint32_t v  = 0;
 	uchar_t *cp;
 	dladm_status_t status;
 
-	if ((dip = dld_buf_alloc(0, linkid, pd->pd_name, &status)) == NULL)
+	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	if (dip == NULL)
 		return (status);
-	if ((status = dld_get_public_prop(dip)) != DLADM_STATUS_OK) {
-		free(dip);
-		return (status);
-	}
 	cp = (uchar_t *)dip->pr_val;
 	(void) memcpy(&v, cp, sizeof (v));
-	(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%" PRIu64, v);
+	(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%ld", v);
 	free(dip);
 	*val_cnt = 1;
 	return (DLADM_STATUS_OK);
@@ -1844,20 +1875,16 @@ dld_uint64_get(struct prop_desc *pd, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 dld_flowctl_get(struct prop_desc *pd, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media)
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_prop_t *dip;
 	link_flowctrl_t v;
 	dladm_status_t status;
 	uchar_t *cp;
 
-	if ((dip = dld_buf_alloc(0, linkid, pd->pd_name, &status)) == NULL)
+	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	if (dip == NULL)
 		return (status);
-
-	if ((status = dld_get_public_prop(dip)) != DLADM_STATUS_OK) {
-		free(dip);
-		return (status);
-	}
 	cp = (uchar_t *)dip->pr_val;
 	(void) memcpy(&v, cp, sizeof (v));
 	switch (v) {
@@ -1890,7 +1917,7 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 	dld_ioc_prop_t *dip = NULL;
 	uchar_t 	*dp;
 	dld_public_prop_t *p;
-	dladm_status_t	status;
+	dladm_status_t	status = DLADM_STATUS_OK;
 
 	if ((prop_name == NULL && prop_val != NULL) ||
 	    (prop_val != NULL && val_cnt == 0))
@@ -1906,42 +1933,60 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 	for (i = 0; i < val_cnt; i++) {
 		bufsize += strlen(prop_val[i]) + 1;
 	}
-	dip = dld_buf_alloc(bufsize + 1, linkid, prop_name, &status);
+
+	if (prop_val == NULL) {
+		/*
+		 * getting default value. so use more buffer space.
+		 */
+		bufsize += 1024;
+	}
+
+	dip = dld_buf_alloc(bufsize + 1, linkid, prop_name,
+	    (prop_val != NULL ? 0 : DLD_DEFAULT), &status);
 	if (dip == NULL)
 		return (status);
 
 	dp = (uchar_t *)dip->pr_val;
 	dsize = sizeof (dld_ioc_prop_t) + bufsize;
 	slen = 0;
-	for (i = 0; i < val_cnt; i++) {
-		int plen = 0;
-
-		plen = strlen(prop_val[i]);
-		bcopy(prop_val[i], dp, plen);
-		slen += plen;
-		/*
-		 * add a "," separator and update dp.
-		 */
-		if (i != (val_cnt -1))
-			dp[slen++] = ',';
-		dp += (plen + 1);
-	}
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
-		free(dip);
-		return (dladm_errno2status(errno));
+		status = dladm_errno2status(errno);
+		goto done;
 	}
-	if ((status = i_dladm_ioctl(fd, DLDIOCSETPROP, dip, dsize)) < 0) {
-		free(dip);
-		return (status);
+	if (prop_val == NULL) {
+		if (i_dladm_ioctl(fd, DLDIOCGETPROP, dip, dsize) < 0) {
+			status = dladm_errno2status(errno);
+			goto done;
+		}
+	} else {
+		for (i = 0; i < val_cnt; i++) {
+			int plen = 0;
+
+			plen = strlen(prop_val[i]);
+			bcopy(prop_val[i], dp, plen);
+			slen += plen;
+			/*
+			 * add a "," separator and update dp.
+			 */
+			if (i != (val_cnt -1))
+				dp[slen++] = ',';
+			dp += (plen + 1);
+		}
 	}
+	if (i_dladm_ioctl(fd, DLDIOCSETPROP, dip, dsize) < 0) {
+		status = dladm_errno2status(errno);
+	}
+
+done:
+	if (fd > 0)
+		(void) close(fd);
 	free(dip);
-	(void) close(fd);
-	return (DLADM_STATUS_OK);
+	return (status);
 }
 
 static dladm_status_t
 dld_get_prop(datalink_id_t linkid, const char *prop_name,
-    char **prop_val, uint_t *val_cnt, dladm_prop_type_t type)
+    char **prop_val, uint_t *val_cnt, dladm_prop_type_t type, uint_t dld_flags)
 {
 	int		fd;
 	dladm_status_t  status = DLADM_STATUS_OK;
@@ -1958,8 +2003,7 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 	if (p->pp_id != DLD_PROP_PRIVATE)
 		return (DLADM_STATUS_BADARG);
 
-	if (type == DLADM_PROP_VAL_DEFAULT ||
-	    type == DLADM_PROP_VAL_MODIFIABLE) {
+	if (type == DLADM_PROP_VAL_MODIFIABLE) {
 		*prop_val = &tmp;
 		*val_cnt = 1;
 		return (DLADM_STATUS_OK);
@@ -1968,13 +2012,15 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 	/*
 	 * private properties: all parsing is done in the kernel.
 	 */
-	dip = dld_buf_alloc(1024, linkid, prop_name, &status);
+	dip = dld_buf_alloc(1024, linkid, prop_name, dld_flags, &status);
 	if (dip == NULL)
 		return (status);
 	dsize = DLD_PROPBUF_SIZE(dip->pr_valsize);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
+		free(dip);
 		return (DLADM_STATUS_BADARG);
+	}
 
 	if ((status = i_dladm_ioctl(fd, DLDIOCGETPROP, dip, dsize)) < 0) {
 		status = dladm_errno2status(errno);
@@ -1982,5 +2028,42 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 		(void) strncpy(*prop_val, dip->pr_val, DLADM_PROP_VAL_MAX);
 		*val_cnt = 1;
 	}
+
+	(void) close(fd);
+	free(dip);
+	return (status);
+}
+
+
+static dladm_status_t
+i_dladm_getset_defval(prop_desc_t *pdp, datalink_id_t linkid,
+    datalink_media_t media, uint_t flags)
+{
+	dladm_status_t status;
+	char **prop_vals = NULL, *buf;
+	size_t bufsize;
+	uint_t cnt;
+	int i;
+
+	/*
+	 * Allocate buffer needed for prop_vals array. We can have at most
+	 * DLADM_MAX_PROP_VALCNT char *prop_vals[] entries, where
+	 * each entry has max size DLADM_PROP_VAL_MAX
+	 */
+	bufsize =
+	    (sizeof (char *) + DLADM_PROP_VAL_MAX) * DLADM_MAX_PROP_VALCNT;
+	buf = malloc(bufsize);
+	prop_vals = (char **)(void *)buf;
+	for (i = 0; i < DLADM_MAX_PROP_VALCNT; i++) {
+		prop_vals[i] = buf +
+		    sizeof (char *) * DLADM_MAX_PROP_VALCNT +
+		    i * DLADM_PROP_VAL_MAX;
+	}
+	status = pdp->pd_get(pdp, linkid, prop_vals, &cnt, media, DLD_DEFAULT);
+	if (status == DLADM_STATUS_OK) {
+		status = i_dladm_set_single_prop(linkid, pdp->pd_class,
+		    media, pdp, prop_vals, cnt, flags);
+	}
+	free(buf);
 	return (status);
 }

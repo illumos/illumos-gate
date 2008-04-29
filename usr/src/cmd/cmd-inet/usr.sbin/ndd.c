@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998, 2000, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,8 @@
 #include <inet/nd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <libdllink.h>
+#include <libintl.h>
 
 static boolean_t do_getset(int fd, int cmd, char *buf, int buf_len);
 static int	get_value(char *msg, char *buf, int buf_len);
@@ -56,6 +57,33 @@ static char	gbuf[65536];	/* Need 20k for 160 IREs ... */
 static char	usage_str[] =	"usage: ndd -set device_name name value\n"
 				"       ndd [-get] device_name name [name ...]";
 
+static void
+gldv3_warning(char *module)
+{
+	datalink_id_t	linkid;
+	dladm_status_t	status;
+	char		buf[DLADM_PROP_VAL_MAX], *cp;
+	uint_t		cnt;
+	char		*link;
+
+	link = strrchr(module, '/');
+	if (link == NULL)
+		return;
+	status = dladm_name2info(++link, &linkid,
+	    NULL, NULL, NULL);
+	if (status != DLADM_STATUS_OK)
+		return;
+	cp = buf;
+	status = dladm_get_linkprop(linkid, DLADM_PROP_VAL_CURRENT, "flowctrl",
+	    &cp, &cnt);
+	if (status != DLADM_STATUS_OK)
+		return;
+	(void) fprintf(stderr, gettext(
+	    "WARNING: The ndd commands for datalink administration "
+	    "are obsolete and may be removed in a future release of "
+	    "Solaris. Use dladm(1M) to manage datalink tunables.\n"));
+}
+
 /* ARGSUSED */
 int
 main(int argc, char **argv)
@@ -63,6 +91,7 @@ main(int argc, char **argv)
 	char	*cp, *value;
 	int	cmd;
 	int	fd;
+
 
 	if (!(cp = *++argv)) {
 		while ((fd = open_device()) != -1) {
@@ -81,6 +110,7 @@ main(int argc, char **argv)
 		if (!(cp = *++argv))
 			fatal(usage_str);
 	}
+	gldv3_warning(cp);
 	if ((fd = open(cp, O_RDWR)) == -1)
 		fatal("open of %s failed: %s", cp, errmsg(errno));
 
@@ -252,6 +282,7 @@ printe(boolean_t print_errno, char *fmt, ...)
 		(void) printf("\n");
 }
 
+
 static int
 open_device(void)
 {
@@ -268,6 +299,8 @@ open_device(void)
 			printe(B_TRUE, "open of %s failed", name);
 			continue;
 		}
+
+		gldv3_warning(name);
 
 		if (isastream(fd))
 			return (fd);

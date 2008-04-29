@@ -47,7 +47,7 @@ extern "C" {
 /*
  * Data-Link Driver Information (text emitted by modinfo(1m))
  */
-#define	DLD_INFO	"Data-Link Driver v%I%"
+#define	DLD_INFO	"Data-Link Driver"
 
 /*
  * Options: To enable an option set the property name to a non-zero value
@@ -243,8 +243,7 @@ typedef enum {
 	DLD_PROP_STATUS,
 	DLD_PROP_AUTONEG,
 	DLD_PROP_EN_AUTONEG,
-	DLD_PROP_DEFMTU,
-	DLD_PROP_NDD_LEGACY,
+	DLD_PROP_MTU,
 	DLD_PROP_FLOWCTRL,
 	DLD_PROP_ADV_1000FDX_CAP,
 	DLD_PROP_EN_1000FDX_CAP,
@@ -258,26 +257,24 @@ typedef enum {
 	DLD_PROP_EN_10FDX_CAP,
 	DLD_PROP_ADV_10HDX_CAP,
 	DLD_PROP_EN_10HDX_CAP,
+	DLD_PROP_ADV_100T4_CAP,
+	DLD_PROP_EN_100T4_CAP,
 	DLD_PROP_PRIVATE = -1
 } dld_prop_id_t;
 
-/*
- * to figure out r/w status of legacy ndd props.
- */
-#define	DLD_NDD_READ		0x01
-#define	DLD_NDD_WRITE		0x10
 
 #define	DLDIOCSETPROP		(DLDIOC | 0x14)
 #define	DLDIOCGETPROP		(DLDIOC | 0x15)
-#define	DLD_LINKPROP_NAME_MAX	256
 #define	DLD_PROP_VERSION	1
+#define	MAXLINKPROPNAME	256
+#define	DLD_DEFAULT	0x0001
 
 typedef struct dld_ioc_prop_s {
 	int		pr_version;
-	uint_t		pr_flags;		/* private to libdladm */
+	uint_t		pr_flags;
 	datalink_id_t	pr_linkid;
 	dld_prop_id_t	pr_num;
-	char    	pr_name[DLD_LINKPROP_NAME_MAX];
+	char    	pr_name[MAXLINKPROPNAME];
 	uint_t		pr_valsize;		/* sizeof pr_val */
 	char		pr_val[1];
 } dld_ioc_prop_t;

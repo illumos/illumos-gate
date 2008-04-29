@@ -200,6 +200,8 @@ static void nxge_free_tx_cntl_dma(p_nxge_t, p_nxge_dma_common_t);
 
 static int nxge_init_common_dev(p_nxge_t);
 static void nxge_uninit_common_dev(p_nxge_t);
+extern int nxge_param_set_mac(p_nxge_t, queue_t *, mblk_t *,
+    char *, caddr_t);
 
 /*
  * The next declarations are for the GLDv3 interface.
@@ -224,11 +226,37 @@ static	boolean_t nxge_m_getcapab(void *, mac_capab_t, void *);
 static int nxge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int nxge_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, void *);
+    uint_t, uint_t, void *);
 static int nxge_set_priv_prop(nxge_t *, const char *, uint_t,
     const void *);
-static int nxge_get_priv_prop(nxge_t *, const char *, uint_t,
+static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, uint_t,
     void *);
+static int nxge_get_def_val(nxge_t *, mac_prop_id_t, uint_t, void *);
+
+
+mac_priv_prop_t nxge_priv_props[] = {
+	{"_adv_10gfdx_cap", MAC_PROP_PERM_RW},
+	{"_adv_pause_cap", MAC_PROP_PERM_RW},
+	{"_function_number", MAC_PROP_PERM_READ},
+	{"_fw_version", MAC_PROP_PERM_READ},
+	{"_port_mode", MAC_PROP_PERM_READ},
+	{"_hot_swap_phy", MAC_PROP_PERM_READ},
+	{"_accept_jumbo", MAC_PROP_PERM_RW},
+	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
+	{"_rxdma_intr_pkts", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv4_tcp", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv4_udp", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv4_ah", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv4_sctp", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv6_tcp", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv6_udp", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv6_ah", MAC_PROP_PERM_RW},
+	{"_class_opt_ipv6_sctp", MAC_PROP_PERM_RW},
+	{"_soft_lso_enable", MAC_PROP_PERM_RW}
+};
+
+#define	NXGE_MAX_PRIV_PROPS	\
+	(sizeof (nxge_priv_props)/sizeof (mac_priv_prop_t))
 
 #define	NXGE_M_CALLBACK_FLAGS\
 	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
@@ -514,7 +542,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	status = nxge_init_common_dev(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_init_common_dev failed"));
+		    "nxge_init_common_dev failed"));
 		goto nxge_attach_fail4;
 	}
 
@@ -526,7 +554,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if ((status = nxge_hio_init(nxgep)) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_hio_init failed"));
+		    "nxge_hio_init failed"));
 		goto nxge_attach_fail4;
 	}
 
@@ -650,8 +678,8 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
-				" Couldn't determine card type"
-				" .... exit "));
+			    " Couldn't determine card type"
+			    " .... exit "));
 			goto nxge_attach_fail5;
 		}
 
@@ -659,7 +687,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"get_hw create failed"));
+			    "get_hw create failed"));
 			goto nxge_attach_fail;
 		}
 	}
@@ -775,7 +803,7 @@ nxge_attach_fail1:
 
 nxge_attach_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_attach status = 0x%08x",
-		status));
+	    status));
 
 	return (status);
 }
@@ -832,19 +860,19 @@ nxge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		nxge_hio_unregister(nxgep);
 	} else if (nxgep->mach && (status = mac_unregister(nxgep->mach)) != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_detach status = 0x%08X", status));
+		    "<== nxge_detach status = 0x%08X", status));
 		return (DDI_FAILURE);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"<== nxge_detach (mac_unregister) status = 0x%08X", status));
+	    "<== nxge_detach (mac_unregister) status = 0x%08X", status));
 
 	nxge_unattach(nxgep);
 	nxgep = NULL;
 
 nxge_detach_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_detach status = 0x%08X",
-		status));
+	    status));
 
 	return (status);
 }
@@ -918,7 +946,7 @@ nxge_unattach(p_nxge_t nxgep)
 	 */
 	if (nxgep->dip) {
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-				    " nxge_unattach: remove all properties"));
+		    " nxge_unattach: remove all properties"));
 
 		(void) ddi_prop_remove_all(nxgep->dip);
 	}
@@ -962,7 +990,7 @@ nxge_hsvc_register(
 		}
 		nxgep->niu_hsvc_available = B_TRUE;
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"NIU Hypervisor service enabled"));
+		    "NIU Hypervisor service enabled"));
 	}
 
 	return (DDI_SUCCESS);
@@ -1005,37 +1033,37 @@ nxge_map_regs(p_nxge_t nxgep)
 	devname = ddi_pathname(nxgep->dip, buf);
 	ASSERT(strlen(devname) > 0);
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"nxge_map_regs: pathname devname %s", devname));
+	    "nxge_map_regs: pathname devname %s", devname));
 
 	if (strstr(devname, n2_siu_name)) {
 		/* N2/NIU */
 		nxgep->niu_type = N2_NIU;
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: N2/NIU devname %s", devname));
+		    "nxge_map_regs: N2/NIU devname %s", devname));
 		/* get function number */
 		nxgep->function_num =
-			(devname[strlen(devname) -1] == '1' ? 1 : 0);
+		    (devname[strlen(devname) -1] == '1' ? 1 : 0);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: N2/NIU function number %d",
-			nxgep->function_num));
+		    "nxge_map_regs: N2/NIU function number %d",
+		    nxgep->function_num));
 	} else {
 		int		*prop_val;
 		uint_t 		prop_len;
 		uint8_t 	func_num;
 
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip,
-				0, "reg",
-				&prop_val, &prop_len) != DDI_PROP_SUCCESS) {
+		    0, "reg",
+		    &prop_val, &prop_len) != DDI_PROP_SUCCESS) {
 			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
-				"Reg property not found"));
+			    "Reg property not found"));
 			ddi_status = DDI_FAILURE;
 			goto nxge_map_regs_fail0;
 
 		} else {
 			func_num = (prop_val[0] >> 8) & 0x7;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"Reg property found: fun # %d",
-				func_num));
+			    "Reg property found: fun # %d",
+			    func_num));
 			nxgep->function_num = func_num;
 			if (isLDOMguest(nxgep)) {
 				nxgep->function_num /= 2;
@@ -1049,20 +1077,20 @@ nxge_map_regs(p_nxge_t nxgep)
 	default:
 		(void) ddi_dev_regsize(nxgep->dip, 0, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: pci config size 0x%x", regsize));
+		    "nxge_map_regs: pci config size 0x%x", regsize));
 
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 0,
-			(caddr_t *)&(dev_regs->nxge_pciregp), 0, 0,
-			&nxge_dev_reg_acc_attr, &dev_regs->nxge_pciregh);
+		    (caddr_t *)&(dev_regs->nxge_pciregp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_pciregh);
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs, nxge bus config regs failed"));
+			    "ddi_map_regs, nxge bus config regs failed"));
 			goto nxge_map_regs_fail0;
 		}
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_reg: PCI config addr 0x%0llx "
-			" handle 0x%0llx", dev_regs->nxge_pciregp,
-			dev_regs->nxge_pciregh));
+		    "nxge_map_reg: PCI config addr 0x%0llx "
+		    " handle 0x%0llx", dev_regs->nxge_pciregp,
+		    dev_regs->nxge_pciregh));
 			/*
 			 * IMP IMP
 			 * workaround  for bit swapping bug in HW
@@ -1076,67 +1104,67 @@ nxge_map_regs(p_nxge_t nxgep)
 		pcie_devctl &= PCIE_DEVCTL_ENABLE_NO_SNOOP;
 		pcie_devctl |= PCIE_DEVCTL_RO_EN;
 		pci_config_put16(dev_regs->nxge_pciregh, pci_offset,
-				    pcie_devctl);
+		    pcie_devctl);
 #endif
 
 		(void) ddi_dev_regsize(nxgep->dip, 1, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: pio size 0x%x", regsize));
+		    "nxge_map_regs: pio size 0x%x", regsize));
 		/* set up the device mapped register */
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 1,
-			(caddr_t *)&(dev_regs->nxge_regp), 0, 0,
-			&nxge_dev_reg_acc_attr, &dev_regs->nxge_regh);
+		    (caddr_t *)&(dev_regs->nxge_regp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_regh);
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs for Neptune global reg failed"));
+			    "ddi_map_regs for Neptune global reg failed"));
 			goto nxge_map_regs_fail1;
 		}
 
 		/* set up the msi/msi-x mapped register */
 		(void) ddi_dev_regsize(nxgep->dip, 2, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: msix size 0x%x", regsize));
+		    "nxge_map_regs: msix size 0x%x", regsize));
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 2,
-			(caddr_t *)&(dev_regs->nxge_msix_regp), 0, 0,
-			&nxge_dev_reg_acc_attr, &dev_regs->nxge_msix_regh);
+		    (caddr_t *)&(dev_regs->nxge_msix_regp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_msix_regh);
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs for msi reg failed"));
+			    "ddi_map_regs for msi reg failed"));
 			goto nxge_map_regs_fail2;
 		}
 
 		/* set up the vio region mapped register */
 		(void) ddi_dev_regsize(nxgep->dip, 3, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: vio size 0x%x", regsize));
+		    "nxge_map_regs: vio size 0x%x", regsize));
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 3,
-			(caddr_t *)&(dev_regs->nxge_vir_regp), 0, 0,
-			&nxge_dev_reg_acc_attr, &dev_regs->nxge_vir_regh);
+		    (caddr_t *)&(dev_regs->nxge_vir_regp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_vir_regh);
 
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs for nxge vio reg failed"));
+			    "ddi_map_regs for nxge vio reg failed"));
 			goto nxge_map_regs_fail3;
 		}
 		nxgep->dev_regs = dev_regs;
 
 		NPI_PCI_ACC_HANDLE_SET(nxgep, dev_regs->nxge_pciregh);
 		NPI_PCI_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_pciregp);
+		    (npi_reg_ptr_t)dev_regs->nxge_pciregp);
 		NPI_MSI_ACC_HANDLE_SET(nxgep, dev_regs->nxge_msix_regh);
 		NPI_MSI_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_msix_regp);
+		    (npi_reg_ptr_t)dev_regs->nxge_msix_regp);
 
 		NPI_ACC_HANDLE_SET(nxgep, dev_regs->nxge_regh);
 		NPI_ADD_HANDLE_SET(nxgep, (npi_reg_ptr_t)dev_regs->nxge_regp);
 
 		NPI_REG_ACC_HANDLE_SET(nxgep, dev_regs->nxge_regh);
 		NPI_REG_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_regp);
+		    (npi_reg_ptr_t)dev_regs->nxge_regp);
 
 		NPI_VREG_ACC_HANDLE_SET(nxgep, dev_regs->nxge_vir_regh);
 		NPI_VREG_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_vir_regp);
+		    (npi_reg_ptr_t)dev_regs->nxge_vir_regp);
 
 		break;
 
@@ -1148,41 +1176,41 @@ nxge_map_regs(p_nxge_t nxgep)
 		 */
 		(void) ddi_dev_regsize(nxgep->dip, 1, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: dev size 0x%x", regsize));
+		    "nxge_map_regs: dev size 0x%x", regsize));
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 1,
-				(caddr_t *)&(dev_regs->nxge_regp), 0, 0,
-				&nxge_dev_reg_acc_attr, &dev_regs->nxge_regh);
+		    (caddr_t *)&(dev_regs->nxge_regp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_regh);
 
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs for N2/NIU, global reg failed "));
+			    "ddi_map_regs for N2/NIU, global reg failed "));
 			goto nxge_map_regs_fail1;
 		}
 
 		/* set up the first vio region mapped register */
 		(void) ddi_dev_regsize(nxgep->dip, 2, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: vio (1) size 0x%x", regsize));
+		    "nxge_map_regs: vio (1) size 0x%x", regsize));
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 2,
-			(caddr_t *)&(dev_regs->nxge_vir_regp), 0, 0,
-			&nxge_dev_reg_acc_attr, &dev_regs->nxge_vir_regh);
+		    (caddr_t *)&(dev_regs->nxge_vir_regp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_vir_regh);
 
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs for nxge vio reg failed"));
+			    "ddi_map_regs for nxge vio reg failed"));
 			goto nxge_map_regs_fail2;
 		}
 		/* set up the second vio region mapped register */
 		(void) ddi_dev_regsize(nxgep->dip, 3, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"nxge_map_regs: vio (3) size 0x%x", regsize));
+		    "nxge_map_regs: vio (3) size 0x%x", regsize));
 		ddi_status = ddi_regs_map_setup(nxgep->dip, 3,
-			(caddr_t *)&(dev_regs->nxge_vir2_regp), 0, 0,
-			&nxge_dev_reg_acc_attr, &dev_regs->nxge_vir2_regh);
+		    (caddr_t *)&(dev_regs->nxge_vir2_regp), 0, 0,
+		    &nxge_dev_reg_acc_attr, &dev_regs->nxge_vir2_regh);
 
 		if (ddi_status != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"ddi_map_regs for nxge vio2 reg failed"));
+			    "ddi_map_regs for nxge vio2 reg failed"));
 			goto nxge_map_regs_fail3;
 		}
 		nxgep->dev_regs = dev_regs;
@@ -1192,21 +1220,21 @@ nxge_map_regs(p_nxge_t nxgep)
 
 		NPI_REG_ACC_HANDLE_SET(nxgep, dev_regs->nxge_regh);
 		NPI_REG_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_regp);
+		    (npi_reg_ptr_t)dev_regs->nxge_regp);
 
 		NPI_VREG_ACC_HANDLE_SET(nxgep, dev_regs->nxge_vir_regh);
 		NPI_VREG_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_vir_regp);
+		    (npi_reg_ptr_t)dev_regs->nxge_vir_regp);
 
 		NPI_V2REG_ACC_HANDLE_SET(nxgep, dev_regs->nxge_vir2_regh);
 		NPI_V2REG_ADD_HANDLE_SET(nxgep,
-			(npi_reg_ptr_t)dev_regs->nxge_vir2_regp);
+		    (npi_reg_ptr_t)dev_regs->nxge_vir2_regp);
 
 		break;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "nxge_map_reg: hardware addr 0x%0llx "
-		" handle 0x%0llx", dev_regs->nxge_regp, dev_regs->nxge_regh));
+	    " handle 0x%0llx", dev_regs->nxge_regp, dev_regs->nxge_regh));
 
 	goto nxge_map_regs_exit;
 nxge_map_regs_fail3:
@@ -1248,31 +1276,31 @@ nxge_unmap_regs(p_nxge_t nxgep)
 	if (nxgep->dev_regs) {
 		if (nxgep->dev_regs->nxge_pciregh) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"==> nxge_unmap_regs: bus"));
+			    "==> nxge_unmap_regs: bus"));
 			ddi_regs_map_free(&nxgep->dev_regs->nxge_pciregh);
 			nxgep->dev_regs->nxge_pciregh = NULL;
 		}
 		if (nxgep->dev_regs->nxge_regh) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"==> nxge_unmap_regs: device registers"));
+			    "==> nxge_unmap_regs: device registers"));
 			ddi_regs_map_free(&nxgep->dev_regs->nxge_regh);
 			nxgep->dev_regs->nxge_regh = NULL;
 		}
 		if (nxgep->dev_regs->nxge_msix_regh) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"==> nxge_unmap_regs: device interrupts"));
+			    "==> nxge_unmap_regs: device interrupts"));
 			ddi_regs_map_free(&nxgep->dev_regs->nxge_msix_regh);
 			nxgep->dev_regs->nxge_msix_regh = NULL;
 		}
 		if (nxgep->dev_regs->nxge_vir_regh) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"==> nxge_unmap_regs: vio region"));
+			    "==> nxge_unmap_regs: vio region"));
 			ddi_regs_map_free(&nxgep->dev_regs->nxge_vir_regh);
 			nxgep->dev_regs->nxge_vir_regh = NULL;
 		}
 		if (nxgep->dev_regs->nxge_vir2_regh) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"==> nxge_unmap_regs: vio2 region"));
+			    "==> nxge_unmap_regs: vio2 region"));
 			ddi_regs_map_free(&nxgep->dev_regs->nxge_vir2_regh);
 			nxgep->dev_regs->nxge_vir2_regh = NULL;
 		}
@@ -1320,15 +1348,15 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 	 * Initialize mutexes for this device.
 	 */
 	MUTEX_INIT(nxgep->genlock, NULL,
-		MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 	MUTEX_INIT(&nxgep->ouraddr_lock, NULL,
-		MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 	MUTEX_INIT(&nxgep->mif_lock, NULL,
-		MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 	MUTEX_INIT(&nxgep->group_lock, NULL,
 	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 	RW_INIT(&nxgep->filter_lock, NULL,
-		RW_DRIVER, (void *)nxgep->interrupt_cookie);
+	    RW_DRIVER, (void *)nxgep->interrupt_cookie);
 
 	classify_ptr = &nxgep->classifier;
 		/*
@@ -1509,12 +1537,12 @@ nxge_init_fail2:
 	nxge_free_mem_pool(nxgep);
 nxge_init_fail1:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"<== nxge_init status (failed) = 0x%08x", status));
+	    "<== nxge_init status (failed) = 0x%08x", status));
 	return (status);
 
 nxge_init_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_init status = 0x%08x",
-		status));
+	    status));
 	return (status);
 }
 
@@ -1522,10 +1550,9 @@ nxge_init_exit:
 timeout_id_t
 nxge_start_timer(p_nxge_t nxgep, fptrv_t func, int msec)
 {
-	if ((nxgep->suspended == 0) ||
-			(nxgep->suspended == DDI_RESUME)) {
+	if ((nxgep->suspended == 0) || (nxgep->suspended == DDI_RESUME)) {
 		return (timeout(func, (caddr_t)nxgep,
-			drv_usectohz(1000 * msec)));
+		    drv_usectohz(1000 * msec)));
 	}
 	return (NULL);
 }
@@ -1546,9 +1573,9 @@ nxge_uninit(p_nxge_t nxgep)
 
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"==> nxge_uninit: not initialized"));
+		    "==> nxge_uninit: not initialized"));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"<== nxge_uninit"));
+		    "<== nxge_uninit"));
 		return;
 	}
 
@@ -1594,7 +1621,7 @@ nxge_uninit(p_nxge_t nxgep)
 	nxgep->drv_state &= ~STATE_HW_INITIALIZED;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_uninit: "
-		"nxge_mblks_pending %d", nxge_mblks_pending));
+	    "nxge_mblks_pending %d", nxge_mblks_pending));
 }
 
 void
@@ -1661,11 +1688,11 @@ nxge_debug_msg(p_nxge_t nxgep, uint64_t level, char *fmt, ...)
 	}
 
 	debug_level = (nxgep == NULL) ? nxge_debug_level :
-		nxgep->nxge_debug_level;
+	    nxgep->nxge_debug_level;
 
 	if ((level & debug_level) ||
-		(level == NXGE_NOTE) ||
-		(level == NXGE_ERR_CTL)) {
+	    (level == NXGE_NOTE) ||
+	    (level == NXGE_ERR_CTL)) {
 		/* do the msg processing */
 		if (nxge_debug_init == 0) {
 			MUTEX_INIT(&nxgedebuglock, NULL, MUTEX_DRIVER, NULL);
@@ -1691,12 +1718,12 @@ nxge_debug_msg(p_nxge_t nxgep, uint64_t level, char *fmt, ...)
 		} else {
 			instance = nxgep->instance;
 			(void) sprintf(prefix_buffer,
-						    "%s%d :", "nxge", instance);
+			    "%s%d :", "nxge", instance);
 		}
 
 		MUTEX_EXIT(&nxgedebuglock);
 		cmn_err(cmn_level, "!%s %s\n",
-				prefix_buffer, msg_buffer);
+		    prefix_buffer, msg_buffer);
 
 	}
 }
@@ -1837,7 +1864,7 @@ nxge_resume(p_nxge_t nxgep)
 	nxgep->suspended = 0;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"<== nxge_resume status = 0x%x", status));
+	    "<== nxge_resume status = 0x%x", status));
 	return (status);
 }
 
@@ -1853,21 +1880,21 @@ nxge_setup_dev(p_nxge_t nxgep)
 
 	if (fm_check_acc_handle(nxgep->dev_regs->nxge_regh) != DDI_FM_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"port%d Bad register acc handle", nxgep->mac.portnum));
+		    "port%d Bad register acc handle", nxgep->mac.portnum));
 		status = NXGE_ERROR;
 	}
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    " nxge_setup_dev status "
-			    "(xcvr init 0x%08x)", status));
+		    " nxge_setup_dev status "
+		    "(xcvr init 0x%08x)", status));
 		goto nxge_setup_dev_exit;
 	}
 
 nxge_setup_dev_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"<== nxge_setup_dev port %d status = 0x%08x",
-		nxgep->mac.portnum, status));
+	    "<== nxge_setup_dev port %d status = 0x%08x",
+	    nxgep->mac.portnum, status));
 
 	return (status);
 }
@@ -1898,12 +1925,12 @@ nxge_setup_system_dma_pages(p_nxge_t nxgep)
 	if (nxgep->niu_type != N2_NIU) {
 		iommu_pagesize = dvma_pagesize(nxgep->dip);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			" nxge_setup_system_dma_pages: page %d (ddi_ptob %d) "
-			" default_block_size %d iommu_pagesize %d",
-			nxgep->sys_page_sz,
-			ddi_ptob(nxgep->dip, (ulong_t)1),
-			nxgep->rx_default_block_size,
-			iommu_pagesize));
+		    " nxge_setup_system_dma_pages: page %d (ddi_ptob %d) "
+		    " default_block_size %d iommu_pagesize %d",
+		    nxgep->sys_page_sz,
+		    ddi_ptob(nxgep->dip, (ulong_t)1),
+		    nxgep->rx_default_block_size,
+		    iommu_pagesize));
 
 		if (iommu_pagesize != 0) {
 			if (nxgep->sys_page_sz == iommu_pagesize) {
@@ -1917,12 +1944,12 @@ nxge_setup_system_dma_pages(p_nxge_t nxgep)
 	}
 	nxgep->sys_page_mask = ~(nxgep->sys_page_sz - 1);
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"==> nxge_setup_system_dma_pages: page %d (ddi_ptob %d) "
-		"default_block_size %d page mask %d",
-		nxgep->sys_page_sz,
-		ddi_ptob(nxgep->dip, (ulong_t)1),
-		nxgep->rx_default_block_size,
-		nxgep->sys_page_mask));
+	    "==> nxge_setup_system_dma_pages: page %d (ddi_ptob %d) "
+	    "default_block_size %d page mask %d",
+	    nxgep->sys_page_sz,
+	    ddi_ptob(nxgep->dip, (ulong_t)1),
+	    nxgep->rx_default_block_size,
+	    nxgep->sys_page_mask));
 
 
 	switch (nxgep->sys_page_sz) {
@@ -1960,25 +1987,25 @@ nxge_setup_system_dma_pages(p_nxge_t nxgep)
 	 * Get the system DMA burst size.
 	 */
 	ddi_status = ddi_dma_alloc_handle(nxgep->dip, &nxge_tx_dma_attr,
-			DDI_DMA_DONTWAIT, 0,
-			&nxgep->dmasparehandle);
+	    DDI_DMA_DONTWAIT, 0,
+	    &nxgep->dmasparehandle);
 	if (ddi_status != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"ddi_dma_alloc_handle: failed "
-			" status 0x%x", ddi_status));
+		    "ddi_dma_alloc_handle: failed "
+		    " status 0x%x", ddi_status));
 		goto nxge_get_soft_properties_exit;
 	}
 
 	ddi_status = ddi_dma_addr_bind_handle(nxgep->dmasparehandle, NULL,
-				(caddr_t)nxgep->dmasparehandle,
-				sizeof (nxgep->dmasparehandle),
-				DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-				DDI_DMA_DONTWAIT, 0,
-				&cookie, &count);
+	    (caddr_t)nxgep->dmasparehandle,
+	    sizeof (nxgep->dmasparehandle),
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, 0,
+	    &cookie, &count);
 	if (ddi_status != DDI_DMA_MAPPED) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"Binding spare handle to find system"
-			" burstsize failed."));
+		    "Binding spare handle to find system"
+		    " burstsize failed."));
 		ddi_status = DDI_FAILURE;
 		goto nxge_get_soft_properties_fail1;
 	}
@@ -1995,7 +2022,7 @@ nxge_get_soft_properties_exit:
 		status |= (NXGE_ERROR | NXGE_DDI_FAILED);
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"<== nxge_setup_system_dma_pages status = 0x%08x", status));
+	    "<== nxge_setup_system_dma_pages status = 0x%08x", status));
 	return (status);
 }
 
@@ -2060,17 +2087,17 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 	 * Allocate memory for the common DMA data structures.
 	 */
 	dma_poolp = (p_nxge_dma_pool_t)KMEM_ZALLOC(sizeof (nxge_dma_pool_t),
-			KM_SLEEP);
+	    KM_SLEEP);
 	dma_buf_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * rdc_max, KM_SLEEP);
+	    sizeof (p_nxge_dma_common_t) * rdc_max, KM_SLEEP);
 
 	dma_cntl_poolp = (p_nxge_dma_pool_t)
-				KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
 	dma_cntl_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * rdc_max, KM_SLEEP);
+	    sizeof (p_nxge_dma_common_t) * rdc_max, KM_SLEEP);
 
 	num_chunks = (uint32_t *)KMEM_ZALLOC(
-			sizeof (uint32_t) * rdc_max, KM_SLEEP);
+	    sizeof (uint32_t) * rdc_max, KM_SLEEP);
 
 	/*
 	 * Assume that each DMA channel will be configured with
@@ -2085,7 +2112,7 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 	}
 	if (nxge_port_rbr_size % NXGE_RXDMA_POST_BATCH) {
 		nxge_port_rbr_size = (NXGE_RXDMA_POST_BATCH *
-			(nxge_port_rbr_size / NXGE_RXDMA_POST_BATCH + 1));
+		    (nxge_port_rbr_size / NXGE_RXDMA_POST_BATCH + 1));
 	}
 
 	p_all_cfgp->rbr_size = nxge_port_rbr_size;
@@ -2093,7 +2120,7 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 
 	if (nxge_port_rbr_spare_size % NXGE_RXDMA_POST_BATCH) {
 		nxge_port_rbr_spare_size = (NXGE_RXDMA_POST_BATCH *
-			(nxge_port_rbr_spare_size / NXGE_RXDMA_POST_BATCH + 1));
+		    (nxge_port_rbr_spare_size / NXGE_RXDMA_POST_BATCH + 1));
 	}
 	if (nxge_port_rbr_size > RBR_DEFAULT_MAX_BLKS) {
 		NXGE_DEBUG_MSG((nxgep, MEM_CTL,
@@ -2120,11 +2147,11 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 	if (nxgep->niu_type == N2_NIU) {
 		nxge_port_rbr_spare_size = 0;
 		if ((nxge_port_rbr_size > NXGE_NIU_CONTIG_RBR_MAX) ||
-				(!ISP2(nxge_port_rbr_size))) {
+		    (!ISP2(nxge_port_rbr_size))) {
 			nxge_port_rbr_size = NXGE_NIU_CONTIG_RBR_MAX;
 		}
 		if ((nxge_port_rcr_size > NXGE_NIU_CONTIG_RCR_MAX) ||
-				(!ISP2(nxge_port_rcr_size))) {
+		    (!ISP2(nxge_port_rcr_size))) {
 			nxge_port_rcr_size = NXGE_NIU_CONTIG_RCR_MAX;
 		}
 	}
@@ -2140,12 +2167,12 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 	rx_cntl_alloc_size += sizeof (rxdma_mailbox_t);
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_alloc_rx_mem_pool: "
-		"nxge_port_rbr_size = %d nxge_port_rbr_spare_size = %d "
-		"nxge_port_rcr_size = %d "
-		"rx_cntl_alloc_size = %d",
-		nxge_port_rbr_size, nxge_port_rbr_spare_size,
-		nxge_port_rcr_size,
-		rx_cntl_alloc_size));
+	    "nxge_port_rbr_size = %d nxge_port_rbr_spare_size = %d "
+	    "nxge_port_rcr_size = %d "
+	    "rx_cntl_alloc_size = %d",
+	    nxge_port_rbr_size, nxge_port_rbr_spare_size,
+	    nxge_port_rcr_size,
+	    rx_cntl_alloc_size));
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	if (nxgep->niu_type == N2_NIU) {
@@ -2154,16 +2181,16 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 
 		if (!ISP2(rx_buf_alloc_size)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_alloc_rx_mem_pool: "
-				" must be power of 2"));
+			    "==> nxge_alloc_rx_mem_pool: "
+			    " must be power of 2"));
 			status |= (NXGE_ERROR | NXGE_DDI_FAILED);
 			goto nxge_alloc_rx_mem_pool_exit;
 		}
 
 		if (rx_buf_alloc_size > (1 << 22)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_alloc_rx_mem_pool: "
-				" limit size to 4M"));
+			    "==> nxge_alloc_rx_mem_pool: "
+			    " limit size to 4M"));
 			status |= (NXGE_ERROR | NXGE_DDI_FAILED);
 			goto nxge_alloc_rx_mem_pool_exit;
 		}
@@ -2191,23 +2218,23 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 
 	/* Allocate the receive rings, too. */
 	nxgep->rx_rbr_rings =
-		KMEM_ZALLOC(sizeof (rx_rbr_rings_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (rx_rbr_rings_t), KM_SLEEP);
 	nxgep->rx_rbr_rings->rbr_rings =
-		KMEM_ZALLOC(sizeof (p_rx_rbr_ring_t) * rdc_max, KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (p_rx_rbr_ring_t) * rdc_max, KM_SLEEP);
 	nxgep->rx_rcr_rings =
-		KMEM_ZALLOC(sizeof (rx_rcr_rings_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (rx_rcr_rings_t), KM_SLEEP);
 	nxgep->rx_rcr_rings->rcr_rings =
-		KMEM_ZALLOC(sizeof (p_rx_rcr_ring_t) * rdc_max, KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (p_rx_rcr_ring_t) * rdc_max, KM_SLEEP);
 	nxgep->rx_mbox_areas_p =
-		KMEM_ZALLOC(sizeof (rx_mbox_areas_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (rx_mbox_areas_t), KM_SLEEP);
 	nxgep->rx_mbox_areas_p->rxmbox_areas =
-		KMEM_ZALLOC(sizeof (p_rx_mbox_t) * rdc_max, KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (p_rx_mbox_t) * rdc_max, KM_SLEEP);
 
 	nxgep->rx_rbr_rings->ndmas = nxgep->rx_rcr_rings->ndmas =
 	    p_cfgp->max_rdcs;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_alloc_rx_mem_pool:status 0x%08x", status));
+	    "<== nxge_alloc_rx_mem_pool:status 0x%08x", status));
 
 nxge_alloc_rx_mem_pool_exit:
 	return (status);
@@ -2261,7 +2288,7 @@ nxge_alloc_rxb(
 	 * Allocate memory for the receive buffer blocks.
 	 */
 	rx_buf_alloc_size = (nxgep->rx_default_block_size *
-		(nxgep->nxge_port_rbr_size + nxgep->nxge_port_rbr_spare_size));
+	    (nxgep->nxge_port_rbr_size + nxgep->nxge_port_rbr_spare_size));
 
 	data = &nxgep->rx_buf_pool_p->dma_buf_pool_p[channel];
 	num_chunks = &nxgep->rx_buf_pool_p->num_chunks[channel];
@@ -2333,14 +2360,14 @@ nxge_free_rx_mem_pool(p_nxge_t nxgep)
 
 	if (!nxgep->rx_buf_pool_p || !nxgep->rx_buf_pool_p->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"<== nxge_free_rx_mem_pool "
-			"(null rx buf pool or buf not allocated"));
+		    "<== nxge_free_rx_mem_pool "
+		    "(null rx buf pool or buf not allocated"));
 		return;
 	}
 	if (!nxgep->rx_cntl_pool_p || !nxgep->rx_cntl_pool_p->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"<== nxge_free_rx_mem_pool "
-			"(null rx cntl buf pool or cntl buf not allocated"));
+		    "<== nxge_free_rx_mem_pool "
+		    "(null rx cntl buf pool or cntl buf not allocated"));
 		return;
 	}
 
@@ -2390,12 +2417,12 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rx_buf_dma"));
 
 	rx_dmap = (p_nxge_dma_common_t)
-			KMEM_ZALLOC(sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK,
-			KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK,
+	    KM_SLEEP);
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		" alloc_rx_buf_dma rdc %d asize %x bsize %x bbuf %llx ",
-		dma_channel, alloc_size, block_size, dmap));
+	    " alloc_rx_buf_dma rdc %d asize %x bsize %x bbuf %llx ",
+	    dma_channel, alloc_size, block_size, dmap));
 
 	total_alloc_size = alloc_size;
 
@@ -2407,8 +2434,8 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	size_index = 0;
 	array_size =  sizeof (alloc_sizes)/sizeof (size_t);
 	while ((alloc_sizes[size_index] < alloc_size) &&
-			(size_index < array_size))
-			size_index++;
+	    (size_index < array_size))
+		size_index++;
 	if (size_index >= array_size) {
 		size_index = array_size - 1;
 	}
@@ -2426,7 +2453,7 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	}
 
 	while ((allocated < total_alloc_size) &&
-			(size_index >= 0) && (i < NXGE_DMA_BLOCK)) {
+	    (size_index >= 0) && (i < NXGE_DMA_BLOCK)) {
 		rx_dmap[i].dma_chunk_index = i;
 		rx_dmap[i].block_size = block_size;
 		rx_dmap[i].alength = alloc_sizes[size_index];
@@ -2455,17 +2482,17 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 		}
 
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"alloc_rx_buf_dma rdc %d chunk %d bufp %llx size %x "
-			"i %d nblocks %d alength %d",
-			dma_channel, i, &rx_dmap[i], block_size,
-			i, rx_dmap[i].nblocks,
-			rx_dmap[i].alength));
+		    "alloc_rx_buf_dma rdc %d chunk %d bufp %llx size %x "
+		    "i %d nblocks %d alength %d",
+		    dma_channel, i, &rx_dmap[i], block_size,
+		    i, rx_dmap[i].nblocks,
+		    rx_dmap[i].alength));
 		status = nxge_dma_mem_alloc(nxgep, nxge_force_dma,
-			&nxge_rx_dma_attr,
-			rx_dmap[i].alength,
-			&nxge_dev_buf_dma_acc_attr,
-			DDI_DMA_READ | DDI_DMA_STREAMING,
-			(p_nxge_dma_common_t)(&rx_dmap[i]));
+		    &nxge_rx_dma_attr,
+		    rx_dmap[i].alength,
+		    &nxge_dev_buf_dma_acc_attr,
+		    DDI_DMA_READ | DDI_DMA_STREAMING,
+		    (p_nxge_dma_common_t)(&rx_dmap[i]));
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_alloc_rx_buf_dma: Alloc Failed: "
@@ -2514,8 +2541,8 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	    allocated, total_alloc_size));
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		" alloc_rx_buf_dma rdc %d allocated %d chunks",
-		dma_channel, i));
+	    " alloc_rx_buf_dma rdc %d allocated %d chunks",
+	    dma_channel, i));
 	*num_chunks = i;
 	*dmap = rx_dmap;
 
@@ -2526,7 +2553,7 @@ nxge_alloc_rx_mem_fail1:
 
 nxge_alloc_rx_mem_exit:
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_alloc_rx_buf_dma status 0x%08x", status));
+	    "<== nxge_alloc_rx_buf_dma status 0x%08x", status));
 
 	return (status);
 }
@@ -2539,15 +2566,15 @@ nxge_free_rx_buf_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap,
 	int		i;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_free_rx_buf_dma: # of chunks %d", num_chunks));
+	    "==> nxge_free_rx_buf_dma: # of chunks %d", num_chunks));
 
 	if (dmap == 0)
 		return;
 
 	for (i = 0; i < num_chunks; i++) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"==> nxge_free_rx_buf_dma: chunk %d dmap 0x%llx",
-				i, dmap));
+		    "==> nxge_free_rx_buf_dma: chunk %d dmap 0x%llx",
+		    i, dmap));
 		nxge_dma_free_rx_data_buf(dmap++);
 	}
 
@@ -2565,17 +2592,17 @@ nxge_alloc_rx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rx_cntl_dma"));
 
 	rx_dmap = (p_nxge_dma_common_t)
-			KMEM_ZALLOC(sizeof (nxge_dma_common_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (nxge_dma_common_t), KM_SLEEP);
 
 	rx_dmap->contig_alloc_type = B_FALSE;
 	rx_dmap->kmem_alloc_type = B_FALSE;
 
 	status = nxge_dma_mem_alloc(nxgep, nxge_force_dma,
-			&nxge_desc_dma_attr,
-			size,
-			&nxge_dev_desc_dma_acc_attr,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			rx_dmap);
+	    &nxge_desc_dma_attr,
+	    size,
+	    &nxge_dev_desc_dma_acc_attr,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    rx_dmap);
 	if (status != NXGE_OK) {
 		goto nxge_alloc_rx_cntl_dma_fail1;
 	}
@@ -2588,7 +2615,7 @@ nxge_alloc_rx_cntl_dma_fail1:
 
 nxge_alloc_rx_cntl_dma_exit:
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_alloc_rx_cntl_dma status 0x%08x", status));
+	    "<== nxge_alloc_rx_cntl_dma status 0x%08x", status));
 
 	return (status);
 }
@@ -2642,15 +2669,15 @@ nxge_tdc_sizes(
 	if (nxgep->niu_type == N2_NIU) {
 		if (!ISP2(tx_size)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_tdc_sizes: Tx size"
-				" must be power of 2"));
+			    "==> nxge_tdc_sizes: Tx size"
+			    " must be power of 2"));
 			return (NXGE_ERROR);
 		}
 
 		if (tx_size > (1 << 22)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_tdc_sizes: Tx size"
-				" limited to 4M"));
+			    "==> nxge_tdc_sizes: Tx size"
+			    " limited to 4M"));
 			return (NXGE_ERROR);
 		}
 
@@ -2724,8 +2751,8 @@ nxge_alloc_txb(
 	 * Allocate memory for the transmit buffer pool.
 	 */
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"sizes: tx: %ld, cr:%ld, th:%ld",
-		sizes.tx_size, sizes.cr_size, sizes.threshhold));
+	    "sizes: tx: %ld, cr:%ld, th:%ld",
+	    sizes.tx_size, sizes.cr_size, sizes.threshhold));
 
 	*num_chunks = 0;
 	status = nxge_alloc_tx_buf_dma(nxgep, channel, dma_buf_p,
@@ -2812,14 +2839,14 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 	 * Allocate memory for each transmit DMA channel.
 	 */
 	dma_poolp = (p_nxge_dma_pool_t)KMEM_ZALLOC(sizeof (nxge_dma_pool_t),
-			KM_SLEEP);
+	    KM_SLEEP);
 	dma_buf_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * tdc_max, KM_SLEEP);
+	    sizeof (p_nxge_dma_common_t) * tdc_max, KM_SLEEP);
 
 	dma_cntl_poolp = (p_nxge_dma_pool_t)
-			KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
 	dma_cntl_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
-			sizeof (p_nxge_dma_common_t) * tdc_max, KM_SLEEP);
+	    sizeof (p_nxge_dma_common_t) * tdc_max, KM_SLEEP);
 
 	if (nxge_tx_ring_size > TDC_DEFAULT_MAX) {
 		NXGE_DEBUG_MSG((nxgep, MEM_CTL,
@@ -2839,7 +2866,7 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 	 */
 	if (nxgep->niu_type == N2_NIU) {
 		if ((nxge_tx_ring_size > NXGE_NIU_CONTIG_TX_MAX) ||
-			(!ISP2(nxge_tx_ring_size))) {
+		    (!ISP2(nxge_tx_ring_size))) {
 			nxge_tx_ring_size = NXGE_NIU_CONTIG_TX_MAX;
 		}
 	}
@@ -2848,7 +2875,7 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 	nxgep->nxge_port_tx_ring_size = nxge_tx_ring_size;
 
 	num_chunks = (uint32_t *)KMEM_ZALLOC(
-			sizeof (uint32_t) * tdc_max, KM_SLEEP);
+	    sizeof (uint32_t) * tdc_max, KM_SLEEP);
 
 	dma_poolp->ndmas = p_cfgp->tdc.owned;
 	dma_poolp->num_chunks = num_chunks;
@@ -2875,8 +2902,8 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 	nxgep->tx_rings->ndmas = p_cfgp->tdc.owned;
 
 	NXGE_DEBUG_MSG((nxgep, MEM_CTL,
-		"==> nxge_alloc_tx_mem_pool: ndmas %d poolp->ndmas %d",
-		tdc_max, dma_poolp->ndmas));
+	    "==> nxge_alloc_tx_mem_pool: ndmas %d poolp->ndmas %d",
+	    tdc_max, dma_poolp->ndmas));
 
 	return (NXGE_OK);
 }
@@ -2895,22 +2922,22 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_tx_buf_dma"));
 
 	tx_dmap = (p_nxge_dma_common_t)
-		KMEM_ZALLOC(sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK,
-			KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (nxge_dma_common_t) * NXGE_DMA_BLOCK,
+	    KM_SLEEP);
 
 	total_alloc_size = alloc_size;
 	i = 0;
 	size_index = 0;
 	array_size =  sizeof (alloc_sizes) /  sizeof (size_t);
 	while ((alloc_sizes[size_index] < alloc_size) &&
-		(size_index < array_size))
+	    (size_index < array_size))
 		size_index++;
 	if (size_index >= array_size) {
 		size_index = array_size - 1;
 	}
 
 	while ((allocated < total_alloc_size) &&
-			(size_index >= 0) && (i < NXGE_DMA_BLOCK)) {
+	    (size_index >= 0) && (i < NXGE_DMA_BLOCK)) {
 
 		tx_dmap[i].dma_chunk_index = i;
 		tx_dmap[i].block_size = block_size;
@@ -2931,11 +2958,11 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 		}
 
 		status = nxge_dma_mem_alloc(nxgep, nxge_force_dma,
-			&nxge_tx_dma_attr,
-			tx_dmap[i].alength,
-			&nxge_dev_buf_dma_acc_attr,
-			DDI_DMA_WRITE | DDI_DMA_STREAMING,
-			(p_nxge_dma_common_t)(&tx_dmap[i]));
+		    &nxge_tx_dma_attr,
+		    tx_dmap[i].alength,
+		    &nxge_dev_buf_dma_acc_attr,
+		    DDI_DMA_WRITE | DDI_DMA_STREAMING,
+		    (p_nxge_dma_common_t)(&tx_dmap[i]));
 		if (status != NXGE_OK) {
 			size_index--;
 		} else {
@@ -2963,8 +2990,8 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	*num_chunks = i;
 	*dmap = tx_dmap;
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_alloc_tx_buf_dma dmap 0x%016llx num chunks %d",
-		*dmap, i));
+	    "==> nxge_alloc_tx_buf_dma dmap 0x%016llx num chunks %d",
+	    *dmap, i));
 	goto nxge_alloc_tx_mem_exit;
 
 nxge_alloc_tx_mem_fail1:
@@ -2972,7 +2999,7 @@ nxge_alloc_tx_mem_fail1:
 
 nxge_alloc_tx_mem_exit:
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_alloc_tx_buf_dma status 0x%08x", status));
+	    "<== nxge_alloc_tx_buf_dma status 0x%08x", status));
 
 	return (status);
 }
@@ -3006,17 +3033,17 @@ nxge_alloc_tx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_tx_cntl_dma"));
 	tx_dmap = (p_nxge_dma_common_t)
-			KMEM_ZALLOC(sizeof (nxge_dma_common_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (nxge_dma_common_t), KM_SLEEP);
 
 	tx_dmap->contig_alloc_type = B_FALSE;
 	tx_dmap->kmem_alloc_type = B_FALSE;
 
 	status = nxge_dma_mem_alloc(nxgep, nxge_force_dma,
-			&nxge_desc_dma_attr,
-			size,
-			&nxge_dev_desc_dma_acc_attr,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			tx_dmap);
+	    &nxge_desc_dma_attr,
+	    size,
+	    &nxge_dev_desc_dma_acc_attr,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    tx_dmap);
 	if (status != NXGE_OK) {
 		goto nxge_alloc_tx_cntl_dma_fail1;
 	}
@@ -3029,7 +3056,7 @@ nxge_alloc_tx_cntl_dma_fail1:
 
 nxge_alloc_tx_cntl_dma_exit:
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_alloc_tx_cntl_dma status 0x%08x", status));
+	    "<== nxge_alloc_tx_cntl_dma status 0x%08x", status));
 
 	return (status);
 }
@@ -3072,14 +3099,14 @@ nxge_free_tx_mem_pool(p_nxge_t nxgep)
 
 	if (!nxgep->tx_buf_pool_p || !nxgep->tx_buf_pool_p->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"<== nxge_free_tx_mem_pool "
-			"(null tx buf pool or buf not allocated"));
+		    "<== nxge_free_tx_mem_pool "
+		    "(null tx buf pool or buf not allocated"));
 		return;
 	}
 	if (!nxgep->tx_cntl_pool_p || !nxgep->tx_cntl_pool_p->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"<== nxge_free_tx_mem_pool "
-			"(null tx cntl buf pool or cntl buf not allocated"));
+		    "<== nxge_free_tx_mem_pool "
+		    "(null tx cntl buf pool or cntl buf not allocated"));
 		return;
 	}
 
@@ -3136,8 +3163,8 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 		 * for N2/NIU.
 		 */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_dma_mem_alloc: alloc type not allowed (%d)",
-			dma_p->contig_alloc_type));
+		    "nxge_dma_mem_alloc: alloc type not allowed (%d)",
+		    dma_p->contig_alloc_type));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
@@ -3146,10 +3173,10 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 	dma_p->kaddrp = dma_p->last_kaddrp = NULL;
 	dma_p->first_ioaddr_pp = dma_p->last_ioaddr_pp = NULL;
 	ddi_status = ddi_dma_alloc_handle(nxgep->dip, dma_attrp,
-		DDI_DMA_DONTWAIT, NULL, &dma_p->dma_handle);
+	    DDI_DMA_DONTWAIT, NULL, &dma_p->dma_handle);
 	if (ddi_status != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_dma_mem_alloc:ddi_dma_alloc_handle failed."));
+		    "nxge_dma_mem_alloc:ddi_dma_alloc_handle failed."));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
@@ -3160,11 +3187,11 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 		switch (kmem_alloc_type) {
 		case B_FALSE:
 			ddi_status = ddi_dma_mem_alloc(dma_p->dma_handle,
-				length,
-				acc_attr_p,
-				xfer_flags,
-				DDI_DMA_DONTWAIT, 0, &kaddrp, &dma_p->alength,
-				&dma_p->acc_handle);
+			    length,
+			    acc_attr_p,
+			    xfer_flags,
+			    DDI_DMA_DONTWAIT, 0, &kaddrp, &dma_p->alength,
+			    &dma_p->acc_handle);
 			if (ddi_status != DDI_SUCCESS) {
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				    "nxge_dma_mem_alloc: "
@@ -3255,7 +3282,7 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 				    "nxge_dma_mem_alloc:ddi_dma_addr_bind "
 				    "(kmem_alloc) > 1 cookie"
 				    "(staus 0x%x ncookies %d.)", ddi_status,
-				dma_p->ncookies));
+				    dma_p->ncookies));
 				KMEM_FREE(kaddrp, length);
 				dma_p->acc_handle = NULL;
 				(void) ddi_dma_unbind_handle(dma_p->dma_handle);
@@ -3268,11 +3295,11 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 			dma_p->kaddrp = kaddrp;
 
 			NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc: kmem_alloc dmap $%p "
-				"kaddr $%p alength %d",
-				dma_p,
-				kaddrp,
-				dma_p->alength));
+			    "nxge_dma_mem_alloc: kmem_alloc dmap $%p "
+			    "kaddr $%p alength %d",
+			    dma_p,
+			    kaddrp,
+			    dma_p->alength));
 			break;
 		}
 		break;
@@ -3282,29 +3309,29 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 		kaddrp = (caddr_t)contig_mem_alloc(length);
 		if (kaddrp == NULL) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc:contig_mem_alloc failed."));
+			    "nxge_dma_mem_alloc:contig_mem_alloc failed."));
 			ddi_dma_free_handle(&dma_p->dma_handle);
 			return (NXGE_ERROR | NXGE_DDI_FAILED);
 		}
 
 		dma_p->alength = length;
 		ddi_status = ddi_dma_addr_bind_handle(dma_p->dma_handle, NULL,
-			kaddrp, dma_p->alength, xfer_flags, DDI_DMA_DONTWAIT, 0,
-			&dma_p->dma_cookie, &dma_p->ncookies);
+		    kaddrp, dma_p->alength, xfer_flags, DDI_DMA_DONTWAIT, 0,
+		    &dma_p->dma_cookie, &dma_p->ncookies);
 		if (ddi_status != DDI_DMA_MAPPED) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc:di_dma_addr_bind failed "
-				"(status 0x%x ncookies %d.)", ddi_status,
-				dma_p->ncookies));
+			    "nxge_dma_mem_alloc:di_dma_addr_bind failed "
+			    "(status 0x%x ncookies %d.)", ddi_status,
+			    dma_p->ncookies));
 
 			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-				"==> nxge_dma_mem_alloc: (not mapped)"
-				"length %lu (0x%x) "
-				"free contig kaddrp $%p "
-				"va_to_pa $%p",
-				length, length,
-				kaddrp,
-				va_to_pa(kaddrp)));
+			    "==> nxge_dma_mem_alloc: (not mapped)"
+			    "length %lu (0x%x) "
+			    "free contig kaddrp $%p "
+			    "va_to_pa $%p",
+			    length, length,
+			    kaddrp,
+			    va_to_pa(kaddrp)));
 
 
 			contig_mem_free((void *)kaddrp, length);
@@ -3319,16 +3346,16 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 		}
 
 		if (dma_p->ncookies != 1 ||
-			(dma_p->dma_cookie.dmac_laddress == NULL)) {
+		    (dma_p->dma_cookie.dmac_laddress == NULL)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_dma_mem_alloc:di_dma_addr_bind > 1 "
-				"cookie or "
-				"dmac_laddress is NULL $%p size %d "
-				" (status 0x%x ncookies %d.)",
-				ddi_status,
-				dma_p->dma_cookie.dmac_laddress,
-				dma_p->dma_cookie.dmac_size,
-				dma_p->ncookies));
+			    "nxge_dma_mem_alloc:di_dma_addr_bind > 1 "
+			    "cookie or "
+			    "dmac_laddress is NULL $%p size %d "
+			    " (status 0x%x ncookies %d.)",
+			    ddi_status,
+			    dma_p->dma_cookie.dmac_laddress,
+			    dma_p->dma_cookie.dmac_size,
+			    dma_p->ncookies));
 
 			contig_mem_free((void *)kaddrp, length);
 			(void) ddi_dma_unbind_handle(dma_p->dma_handle);
@@ -3346,55 +3373,55 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 #else
 	case B_TRUE:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_dma_mem_alloc: invalid alloc type for !sun4v"));
+		    "nxge_dma_mem_alloc: invalid alloc type for !sun4v"));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 #endif
 	}
 
 	dma_p->kaddrp = kaddrp;
 	dma_p->last_kaddrp = (unsigned char *)kaddrp +
-			dma_p->alength - RXBUF_64B_ALIGNED;
+	    dma_p->alength - RXBUF_64B_ALIGNED;
 #if defined(__i386)
 	dma_p->ioaddr_pp =
-		(unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress;
+	    (unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress;
 #else
 	dma_p->ioaddr_pp = (unsigned char *)dma_p->dma_cookie.dmac_laddress;
 #endif
 	dma_p->last_ioaddr_pp =
 #if defined(__i386)
-		(unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress +
+	    (unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress +
 #else
-		(unsigned char *)dma_p->dma_cookie.dmac_laddress +
+	    (unsigned char *)dma_p->dma_cookie.dmac_laddress +
 #endif
-				dma_p->alength - RXBUF_64B_ALIGNED;
+	    dma_p->alength - RXBUF_64B_ALIGNED;
 
 	NPI_DMA_ACC_HANDLE_SET(dma_p, dma_p->acc_handle);
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	dma_p->orig_ioaddr_pp =
-		(unsigned char *)dma_p->dma_cookie.dmac_laddress;
+	    (unsigned char *)dma_p->dma_cookie.dmac_laddress;
 	dma_p->orig_alength = length;
 	dma_p->orig_kaddrp = kaddrp;
 	dma_p->orig_vatopa = (uint64_t)va_to_pa(kaddrp);
 #endif
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_dma_mem_alloc: "
-		"dma buffer allocated: dma_p $%p "
-		"return dmac_ladress from cookie $%p cookie dmac_size %d "
-		"dma_p->ioaddr_p $%p "
-		"dma_p->orig_ioaddr_p $%p "
-		"orig_vatopa $%p "
-		"alength %d (0x%x) "
-		"kaddrp $%p "
-		"length %d (0x%x)",
-		dma_p,
-		dma_p->dma_cookie.dmac_laddress, dma_p->dma_cookie.dmac_size,
-		dma_p->ioaddr_pp,
-		dma_p->orig_ioaddr_pp,
-		dma_p->orig_vatopa,
-		dma_p->alength, dma_p->alength,
-		kaddrp,
-		length, length));
+	    "dma buffer allocated: dma_p $%p "
+	    "return dmac_ladress from cookie $%p cookie dmac_size %d "
+	    "dma_p->ioaddr_p $%p "
+	    "dma_p->orig_ioaddr_p $%p "
+	    "orig_vatopa $%p "
+	    "alength %d (0x%x) "
+	    "kaddrp $%p "
+	    "length %d (0x%x)",
+	    dma_p,
+	    dma_p->dma_cookie.dmac_laddress, dma_p->dma_cookie.dmac_size,
+	    dma_p->ioaddr_pp,
+	    dma_p->orig_ioaddr_pp,
+	    dma_p->orig_vatopa,
+	    dma_p->alength, dma_p->alength,
+	    kaddrp,
+	    length, length));
 
 	return (NXGE_OK);
 }
@@ -3419,17 +3446,17 @@ nxge_dma_mem_free(p_nxge_dma_common_t dma_p)
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	if (dma_p->contig_alloc_type &&
-			dma_p->orig_kaddrp && dma_p->orig_alength) {
+	    dma_p->orig_kaddrp && dma_p->orig_alength) {
 		NXGE_DEBUG_MSG((NULL, DMA_CTL, "nxge_dma_mem_free: "
-			"kaddrp $%p (orig_kaddrp $%p)"
-			"mem type %d ",
-			"orig_alength %d "
-			"alength 0x%x (%d)",
-			dma_p->kaddrp,
-			dma_p->orig_kaddrp,
-			dma_p->contig_alloc_type,
-			dma_p->orig_alength,
-			dma_p->alength, dma_p->alength));
+		    "kaddrp $%p (orig_kaddrp $%p)"
+		    "mem type %d ",
+		    "orig_alength %d "
+		    "alength 0x%x (%d)",
+		    dma_p->kaddrp,
+		    dma_p->orig_kaddrp,
+		    dma_p->contig_alloc_type,
+		    dma_p->orig_alength,
+		    dma_p->alength, dma_p->alength));
 
 		contig_mem_free(dma_p->orig_kaddrp, dma_p->orig_alength);
 		dma_p->orig_alength = NULL;
@@ -3478,7 +3505,7 @@ nxge_dma_free_rx_data_buf(p_nxge_dma_common_t dma_p)
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	if (dma_p->contig_alloc_type &&
-		    dma_p->orig_kaddrp && dma_p->orig_alength) {
+	    dma_p->orig_kaddrp && dma_p->orig_alength) {
 		NXGE_DEBUG_MSG((NULL, DMA_CTL, "nxge_dma_free_rx_data_buf: "
 		    "kaddrp $%p (orig_kaddrp $%p)"
 		    "mem type %d ",
@@ -3505,15 +3532,15 @@ nxge_dma_free_rx_data_buf(p_nxge_dma_common_t dma_p)
 	if (dma_p->kmem_alloc_type) {
 		NXGE_DEBUG_MSG((NULL, DMA_CTL,
 		    "nxge_dma_free_rx_data_buf: free kmem "
-			"kaddrp $%p (orig_kaddrp $%p)"
-			"alloc type %d "
-			"orig_alength %d "
-			"alength 0x%x (%d)",
-			dma_p->kaddrp,
-			dma_p->orig_kaddrp,
-			dma_p->kmem_alloc_type,
-			dma_p->orig_alength,
-			dma_p->alength, dma_p->alength));
+		    "kaddrp $%p (orig_kaddrp $%p)"
+		    "alloc type %d "
+		    "orig_alength %d "
+		    "alength 0x%x (%d)",
+		    dma_p->kaddrp,
+		    dma_p->orig_kaddrp,
+		    dma_p->kmem_alloc_type,
+		    dma_p->orig_alength,
+		    dma_p->alength, dma_p->alength));
 #if defined(__i386)
 		kaddr = (uint64_t)(uint32_t)dma_p->kaddrp;
 #else
@@ -3552,7 +3579,7 @@ nxge_m_start(void *arg)
 	MUTEX_ENTER(nxgep->genlock);
 	if (nxge_init(nxgep) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_m_start: initialization failed"));
+		    "<== nxge_m_start: initialization failed"));
 		MUTEX_EXIT(nxgep->genlock);
 		return (EIO);
 	}
@@ -3617,7 +3644,7 @@ nxge_m_unicst(void *arg, const uint8_t *macaddr)
 	bcopy(macaddr, (uint8_t *)&addrp, ETHERADDRL);
 	if (nxge_set_mac_addr(nxgep, &addrp)) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_m_unicst: set unitcast failed"));
+		    "<== nxge_m_unicst: set unitcast failed"));
 		return (EINVAL);
 	}
 
@@ -3633,19 +3660,19 @@ nxge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	struct 		ether_addr addrp;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		"==> nxge_m_multicst: add %d", add));
+	    "==> nxge_m_multicst: add %d", add));
 
 	bcopy(mca, (uint8_t *)&addrp, ETHERADDRL);
 	if (add) {
 		if (nxge_add_mcast_addr(nxgep, &addrp)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"<== nxge_m_multicst: add multicast failed"));
+			    "<== nxge_m_multicst: add multicast failed"));
 			return (EINVAL);
 		}
 	} else {
 		if (nxge_del_mcast_addr(nxgep, &addrp)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"<== nxge_m_multicst: del multicast failed"));
+			    "<== nxge_m_multicst: del multicast failed"));
 			return (EINVAL);
 		}
 	}
@@ -3661,16 +3688,16 @@ nxge_m_promisc(void *arg, boolean_t on)
 	p_nxge_t 	nxgep = (p_nxge_t)arg;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		"==> nxge_m_promisc: on %d", on));
+	    "==> nxge_m_promisc: on %d", on));
 
 	if (nxge_set_promisc(nxgep, on)) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_m_promisc: set promisc failed"));
+		    "<== nxge_m_promisc: set promisc failed"));
 		return (EINVAL);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		"<== nxge_m_promisc: on %d", on));
+	    "<== nxge_m_promisc: on %d", on));
 
 	return (0);
 }
@@ -3705,11 +3732,6 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 	case LB_SET_MODE:
 		break;
 
-	case ND_GET:
-		need_privilege = B_FALSE;
-		break;
-	case ND_SET:
-		break;
 
 	case NXGE_GET_MII:
 	case NXGE_PUT_MII:
@@ -3743,18 +3765,12 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 		if (err != 0) {
 			miocnak(wq, mp, 0, err);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"<== nxge_m_ioctl: no priv"));
+			    "<== nxge_m_ioctl: no priv"));
 			return;
 		}
 	}
 
 	switch (cmd) {
-	case ND_GET:
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "ND_GET command"));
-	case ND_SET:
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "ND_SET command"));
-		nxge_param_ioctl(nxgep, wq, mp, iocp);
-		break;
 
 	case LB_GET_MODE:
 	case LB_SET_MODE:
@@ -3780,7 +3796,7 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 	case NXGE_INT_REGS_DUMP:
 	case NXGE_VIR_INT_REGS_DUMP:
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			"==> nxge_m_ioctl: cmd 0x%x", cmd));
+		    "==> nxge_m_ioctl: cmd 0x%x", cmd));
 		nxge_hw_ioctl(nxgep, wq, mp, iocp);
 		break;
 	}
@@ -3875,10 +3891,12 @@ nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot, boolean_t factory)
 	for (i = 0; i < ETHERADDRL; i++) {
 		if (factory) {
 			mmac_stats->mmac_avail_pool[slot-1].ether_addr_octet[i]
-			= mmac_info->factory_mac_pool[slot][(ETHERADDRL-1) - i];
+			    = mmac_info->factory_mac_pool[slot][
+			    (ETHERADDRL-1) - i];
 		} else {
 			mmac_stats->mmac_avail_pool[slot-1].ether_addr_octet[i]
-			= mmac_info->mac_pool[slot].addr[(ETHERADDRL - 1) - i];
+			    = mmac_info->mac_pool[slot].addr[
+			    (ETHERADDRL - 1) - i];
 		}
 	}
 }
@@ -3903,7 +3921,7 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
 	addrn = (uint8_t)slot - 1;
 
 	if (npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET, portn,
-		addrn, &altmac) != NPI_SUCCESS)
+	    addrn, &altmac) != NPI_SUCCESS)
 		return (EIO);
 
 	/*
@@ -3933,7 +3951,7 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
 		addrn = (uint8_t)slot;
 
 	if (npi_mac_altaddr_enable(nxgep->npi_handle, portn, addrn)
-		!= NPI_SUCCESS)
+	    != NPI_SUCCESS)
 		return (EIO);
 
 	return (0);
@@ -3973,7 +3991,7 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 		return (ENOSPC);
 	}
 	if (!mac_unicst_verify(nxgep->mach, maddr->mma_addr,
-		maddr->mma_addrlen)) {
+	    maddr->mma_addrlen)) {
 		mutex_exit(nxgep->genlock);
 		return (EINVAL);
 	}
@@ -3993,15 +4011,15 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 	 */
 	if (mmac_info->num_factory_mmac < mmac_info->num_mmac) {
 		for (slot = mmac_info->num_factory_mmac + 1;
-			slot <= mmac_info->num_mmac; slot++) {
+		    slot <= mmac_info->num_mmac; slot++) {
 			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
 				break;
 		}
 		if (slot > mmac_info->num_mmac) {
 			for (slot = 1; slot <= mmac_info->num_factory_mmac;
-				slot++) {
+			    slot++) {
 				if (!(mmac_info->mac_pool[slot].flags
-					& MMAC_SLOT_USED))
+				    & MMAC_SLOT_USED))
 					break;
 			}
 		}
@@ -4088,12 +4106,12 @@ nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr)
 	}
 	/* Verify the address to be reserved */
 	if (!mac_unicst_verify(nxgep->mach,
-		mmac_info->factory_mac_pool[slot], ETHERADDRL)) {
+	    mmac_info->factory_mac_pool[slot], ETHERADDRL)) {
 		mutex_exit(nxgep->genlock);
 		return (EINVAL);
 	}
 	if (err = nxge_altmac_set(nxgep,
-		mmac_info->factory_mac_pool[slot], slot)) {
+	    mmac_info->factory_mac_pool[slot], slot)) {
 		mutex_exit(nxgep->genlock);
 		return (err);
 	}
@@ -4154,7 +4172,7 @@ nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
 
 	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
 		if (npi_mac_altaddr_disable(nxgep->npi_handle, portn, addrn)
-				== NPI_SUCCESS) {
+		    == NPI_SUCCESS) {
 			mmac_info->naddrfree++;
 			mmac_info->mac_pool[slot].flags &= ~MMAC_SLOT_USED;
 			/*
@@ -4166,7 +4184,7 @@ nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
 			 */
 			if (slot <= mmac_info->num_factory_mmac) {
 				mmac_info->mac_pool[slot].flags
-					|= MMAC_VENDOR_ADDR;
+				    |= MMAC_VENDOR_ADDR;
 			}
 			/*
 			 * Clear mac_pool[slot].addr so that kstat shows 0
@@ -4200,7 +4218,7 @@ nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr)
 	nxge_status_t status;
 
 	if (!mac_unicst_verify(nxgep->mach, maddr->mma_addr,
-			maddr->mma_addrlen))
+	    maddr->mma_addrlen))
 		return (EINVAL);
 
 	slot = maddr->mma_slot;
@@ -4226,9 +4244,9 @@ nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr)
 	}
 	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
 		if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot))
-			!= 0) {
+		    != 0) {
 			bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr,
-				ETHERADDRL);
+			    ETHERADDRL);
 			/*
 			 * Assume that the MAC passed down from the caller
 			 * is not a factory MAC address (The user should
@@ -4300,12 +4318,12 @@ nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr)
 	if (mmac_info->mac_pool[slot].flags & MMAC_VENDOR_ADDR) {
 		maddr->mma_flags |= MMAC_VENDOR_ADDR;
 		bcopy(mmac_info->factory_mac_pool[slot],
-			maddr->mma_addr, ETHERADDRL);
+		    maddr->mma_addr, ETHERADDRL);
 		maddr->mma_addrlen = ETHERADDRL;
 	} else {
 		if (maddr->mma_flags & MMAC_SLOT_USED) {
 			bcopy(mmac_info->mac_pool[slot].addr,
-				maddr->mma_addr, ETHERADDRL);
+			    maddr->mma_addr, ETHERADDRL);
 			maddr->mma_addrlen = ETHERADDRL;
 		} else {
 			bzero(maddr->mma_addr, ETHERADDRL);
@@ -4535,7 +4553,7 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 
 			goto reprogram;
 
-		case DLD_PROP_DEFMTU:
+		case DLD_PROP_MTU:
 			if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
 				err = EBUSY;
 				break;
@@ -4615,12 +4633,15 @@ reprogram:
 				}
 			}
 			break;
-
-		default:
+		case DLD_PROP_PRIVATE:
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_setprop: private property"));
 			err = nxge_set_priv_prop(nxgep, pr_name, pr_valsize,
 			    pr_val);
+			break;
+
+		default:
+			err = ENOTSUP;
 			break;
 	}
 
@@ -4633,7 +4654,7 @@ reprogram:
 
 static int
 nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
 {
 	nxge_t 		*nxgep = barg;
 	p_nxge_param_t	param_arr = nxgep->param_arr;
@@ -4641,14 +4662,23 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	int		err = 0;
 	link_flowctrl_t	fl;
 	uint64_t	tmp = 0;
+	link_state_t	ls;
+	boolean_t	is_default = (pr_flags & DLD_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_m_getprop: pr_num %d", pr_num));
+
+	if (pr_valsize == 0)
+		return (EINVAL);
+
+	if ((is_default) && (pr_num != DLD_PROP_PRIVATE)) {
+		err = nxge_get_def_val(nxgep, pr_num, pr_valsize, pr_val);
+		return (err);
+	}
+
 	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
 		case DLD_PROP_DUPLEX:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val = statsp->mac_stats.link_duplex;
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_getprop: duplex mode %d",
@@ -4663,26 +4693,19 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case DLD_PROP_STATUS:
-			if (pr_valsize < sizeof (uint8_t))
+			if (pr_valsize < sizeof (link_state_t))
 				return (EINVAL);
-			*(uint8_t *)pr_val = statsp->mac_stats.link_up;
+			if (!statsp->mac_stats.link_up)
+				ls = LINK_STATE_DOWN;
+			else
+				ls = LINK_STATE_UP;
+			bcopy(&ls, pr_val, sizeof (ls));
 			break;
 
 		case DLD_PROP_AUTONEG:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val =
 			    param_arr[param_autoneg].value;
 			break;
-
-
-		case DLD_PROP_DEFMTU: {
-			if (pr_valsize < sizeof (uint64_t))
-				return (EINVAL);
-			tmp = nxgep->mac.default_mtu;
-			bcopy(&tmp, pr_val, sizeof (tmp));
-			break;
-		}
 
 		case DLD_PROP_FLOWCTRL:
 			if (pr_valsize < sizeof (link_flowctrl_t))
@@ -4696,41 +4719,29 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case DLD_PROP_ADV_1000FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_1000fdx].value;
 			break;
 
 		case DLD_PROP_EN_1000FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val = nxgep->param_en_1000fdx;
 			break;
 
 		case DLD_PROP_ADV_100FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_100fdx].value;
 			break;
 
 		case DLD_PROP_EN_100FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val = nxgep->param_en_100fdx;
 			break;
 
 		case DLD_PROP_ADV_10FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_10fdx].value;
 			break;
 
 		case DLD_PROP_EN_10FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
 			*(uint8_t *)pr_val = nxgep->param_en_10fdx;
 			break;
 
@@ -4740,12 +4751,16 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		case DLD_PROP_ADV_1000HDX_CAP:
 		case DLD_PROP_ADV_100HDX_CAP:
 		case DLD_PROP_ADV_10HDX_CAP:
-			err = EINVAL;
+			err = ENOTSUP;
 			break;
 
+		case DLD_PROP_PRIVATE:
+			err = nxge_get_priv_prop(nxgep, pr_name, pr_flags,
+			    pr_valsize, pr_val);
+			break;
 		default:
-			err = nxge_get_priv_prop(nxgep, pr_name, pr_valsize,
-			    pr_val);
+			err = EINVAL;
+			break;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "<== nxge_m_getprop"));
@@ -5028,25 +5043,39 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 		return (err);
 	}
+	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
+		err = nxge_param_set_mac(nxgep, NULL, NULL, (char *)pr_val,
+		    (caddr_t)&param_arr[param_anar_10gfdx]);
+		return (err);
+	}
+	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		err = nxge_param_set_mac(nxgep, NULL, NULL, (char *)pr_val,
+		    (caddr_t)&param_arr[param_anar_pause]);
+		return (err);
+	}
 
 	return (EINVAL);
 }
 
 static int
-nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
-    void *pr_val)
+nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
+    uint_t pr_valsize, void *pr_val)
 {
 	p_nxge_param_t	param_arr = nxgep->param_arr;
 	char		valstr[MAXNAMELEN];
 	int		err = EINVAL;
 	uint_t		strsize;
+	boolean_t	is_default = (pr_flags & DLD_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_get_priv_prop: property %s", pr_name));
 
 	/* function number */
 	if (strcmp(pr_name, "_function_number") == 0) {
-		(void) sprintf(valstr, "%d", nxgep->function_num);
+		if (is_default)
+			return (ENOTSUP);
+		(void) snprintf(valstr, sizeof (valstr), "%d",
+		    nxgep->function_num);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: name %s "
 		    "(value %d valstr %s)",
@@ -5058,7 +5087,10 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	/* Neptune firmware version */
 	if (strcmp(pr_name, "_fw_version") == 0) {
-		(void) sprintf(valstr, "%s", nxgep->vpd_info.ver);
+		if (is_default)
+			return (ENOTSUP);
+		(void) snprintf(valstr, sizeof (valstr), "%s",
+		    nxgep->vpd_info.ver);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: name %s "
 		    "(value %d valstr %s)",
@@ -5070,48 +5102,51 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	/* port PHY mode */
 	if (strcmp(pr_name, "_port_mode") == 0) {
+		if (is_default)
+			return (ENOTSUP);
 		switch (nxgep->mac.portmode) {
 		case PORT_1G_COPPER:
-			(void) sprintf(valstr, "1G copper %s",
+			(void) snprintf(valstr, sizeof (valstr), "1G copper %s",
 			    nxgep->hot_swappable_phy ?
 			    "[Hot Swappable]" : "");
 			break;
 		case PORT_1G_FIBER:
-			(void) sprintf(valstr, "1G fiber %s",
+			(void) snprintf(valstr, sizeof (valstr), "1G fiber %s",
 			    nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_10G_COPPER:
-			(void) sprintf(valstr, "10G copper %s",
+			(void) snprintf(valstr, sizeof (valstr),
+			    "10G copper %s",
 			    nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_10G_FIBER:
-			(void) sprintf(valstr, "10G fiber %s",
+			(void) snprintf(valstr, sizeof (valstr), "10G fiber %s",
 			    nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_10G_SERDES:
-			(void) sprintf(valstr, "10G serdes %s",
-			    nxgep->hot_swappable_phy ?
+			(void) snprintf(valstr, sizeof (valstr),
+			    "10G serdes %s", nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_1G_SERDES:
-			(void) sprintf(valstr, "1G serdes %s",
+			(void) snprintf(valstr, sizeof (valstr), "1G serdes %s",
 			    nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_1G_RGMII_FIBER:
-			(void) sprintf(valstr, "1G rgmii fiber %s",
-			    nxgep->hot_swappable_phy ?
+			(void) snprintf(valstr, sizeof (valstr),
+			    "1G rgmii fiber %s", nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_HSP_MODE:
-			(void) sprintf(valstr,
+			(void) snprintf(valstr, sizeof (valstr),
 			    "phy not present[hot swappable]");
 			break;
 		default:
-			(void) sprintf(valstr, "unknown %s",
+			(void) snprintf(valstr, sizeof (valstr), "unknown %s",
 			    nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
@@ -5127,7 +5162,9 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	/* Hot swappable PHY */
 	if (strcmp(pr_name, "_hot_swap_phy") == 0) {
-		(void) sprintf(valstr, "%s",
+		if (is_default)
+			return (ENOTSUP);
+		(void) snprintf(valstr, sizeof (valstr), "%s",
 		    nxgep->hot_swappable_phy ?
 		    "yes" : "no");
 
@@ -5143,7 +5180,11 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	/* accept jumbo */
 	if (strcmp(pr_name, "_accept_jumbo") == 0) {
-		(void) sprintf(valstr, "%d", nxgep->mac.is_jumbo);
+		if (is_default)
+			(void) snprintf(valstr, sizeof (valstr),  "%d", 0);
+		else
+			(void) snprintf(valstr, sizeof (valstr),
+			    "%d", nxgep->mac.is_jumbo);
 		err = 0;
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: name %s (value %d (%d, %d))",
@@ -5157,31 +5198,50 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	/* Receive Interrupt Blanking Parameters */
 	if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
-		(void) sprintf(valstr, "%d", nxgep->intr_timeout);
+		err = 0;
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr),
+			    "%d", RXDMA_RCR_TO_DEFAULT);
+			goto done;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d",
+		    nxgep->intr_timeout);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: name %s (value %d)",
 		    pr_name,
 		    (uint32_t)nxgep->intr_timeout));
-		err = 0;
 		goto done;
 	}
 
 	if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
-		(void) sprintf(valstr, "%d", nxgep->intr_threshold);
+		err = 0;
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr),
+			    "%d", RXDMA_RCR_PTHRES_DEFAULT);
+			goto done;
+		}
+		(void) snprintf(valstr, sizeof (valstr), "%d",
+		    nxgep->intr_threshold);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: name %s (value %d)",
 		    pr_name, (uint32_t)nxgep->intr_threshold));
 
-		err = 0;
 		goto done;
 	}
 
 	/* Classification and Load Distribution Configuration */
 	if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_tcp]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv4_tcp].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5190,10 +5250,16 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv4_udp") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_udp]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv4_udp].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5201,10 +5267,16 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 		goto done;
 	}
 	if (strcmp(pr_name, "_class_opt_ipv4_ah") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_ah]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv4_ah].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5213,10 +5285,16 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv4_sctp") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_sctp]);
 
-		(void) printf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv4_sctp].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5225,23 +5303,34 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_tcp") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_tcp]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv6_tcp].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: %s", valstr));
-		err = 0;
 		goto done;
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_udp") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_udp]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv6_udp].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5250,10 +5339,16 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_ah") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_ah]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv6_ah].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5262,10 +5357,16 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%x",
+			    NXGE_CLASS_FLOW_GEN_SERVER);
+			err = 0;
+			goto done;
+		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_sctp]);
 
-		(void) sprintf(valstr, "%x",
+		(void) snprintf(valstr, sizeof (valstr), "%x",
 		    (int)param_arr[param_class_opt_ipv6_sctp].value);
 
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5275,13 +5376,41 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	/* Software LSO */
 	if (strcmp(pr_name, "_soft_lso_enable") == 0) {
-		(void) sprintf(valstr, "%d", nxgep->soft_lso_enable);
+		if (is_default) {
+			(void) snprintf(valstr, sizeof (valstr), "%d", 0);
+			err = 0;
+			goto done;
+		}
+		(void) snprintf(valstr, sizeof (valstr),
+		    "%d", nxgep->soft_lso_enable);
 		err = 0;
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_get_priv_prop: name %s (value %d)",
 		    pr_name, nxgep->soft_lso_enable));
 
 		goto done;
+	}
+	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
+		err = 0;
+		if (is_default ||
+		    nxgep->param_arr[param_anar_10gfdx].value != 0) {
+			(void) snprintf(valstr, sizeof (valstr), "%d", 1);
+			goto done;
+		} else {
+			(void) snprintf(valstr, sizeof (valstr), "%d", 0);
+			goto done;
+		}
+	}
+	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		err = 0;
+		if (is_default ||
+		    nxgep->param_arr[param_anar_pause].value != 0) {
+			(void) snprintf(valstr, sizeof (valstr), "%d", 1);
+			goto done;
+		} else {
+			(void) snprintf(valstr, sizeof (valstr), "%d", 0);
+			goto done;
+		}
 	}
 
 done:
@@ -5365,7 +5494,7 @@ _init(void)
 	status = ddi_soft_state_init(&nxge_list, sizeof (nxge_t), 0);
 	if (status != 0) {
 		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
-			"failed to init device soft state"));
+		    "failed to init device soft state"));
 		goto _init_exit;
 	}
 	status = mod_install(&modlinkage);
@@ -5398,8 +5527,8 @@ _fini(void)
 	status = mod_remove(&modlinkage);
 	if (status != DDI_SUCCESS) {
 		NXGE_DEBUG_MSG((NULL, MOD_CTL,
-			    "Module removal failed 0x%08x",
-			    status));
+		    "Module removal failed 0x%08x",
+		    status));
 		goto _fini_exit;
 	}
 
@@ -5453,16 +5582,16 @@ nxge_add_intrs(p_nxge_t nxgep)
 
 	/* Get the supported interrupt types */
 	if ((ddi_status = ddi_intr_get_supported_types(nxgep->dip, &intr_types))
-			!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_add_intrs: "
-			"ddi_intr_get_supported_types failed: status 0x%08x",
-			ddi_status));
+		    "ddi_intr_get_supported_types failed: status 0x%08x",
+		    ddi_status));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 	nxgep->nxge_intr_type.intr_types = intr_types;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs: "
-		"ddi_intr_get_supported_types: 0x%08x", intr_types));
+	    "ddi_intr_get_supported_types: 0x%08x", intr_types));
 
 	/*
 	 * Solaris MSIX is not supported yet. use MSI for now.
@@ -5473,28 +5602,28 @@ nxge_add_intrs(p_nxge_t nxgep)
 	default:
 		type = DDI_INTR_TYPE_FIXED;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_add_intrs: "
-			"use fixed (intx emulation) type %08x",
-			type));
+		    "use fixed (intx emulation) type %08x",
+		    type));
 		break;
 
 	case 2:
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_add_intrs: "
-			"ddi_intr_get_supported_types: 0x%08x", intr_types));
+		    "ddi_intr_get_supported_types: 0x%08x", intr_types));
 		if (intr_types & DDI_INTR_TYPE_MSIX) {
 			type = DDI_INTR_TYPE_MSIX;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs: "
-				"ddi_intr_get_supported_types: MSIX 0x%08x",
-				type));
+			    "ddi_intr_get_supported_types: MSIX 0x%08x",
+			    type));
 		} else if (intr_types & DDI_INTR_TYPE_MSI) {
 			type = DDI_INTR_TYPE_MSI;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs: "
-				"ddi_intr_get_supported_types: MSI 0x%08x",
-				type));
+			    "ddi_intr_get_supported_types: MSI 0x%08x",
+			    type));
 		} else if (intr_types & DDI_INTR_TYPE_FIXED) {
 			type = DDI_INTR_TYPE_FIXED;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_add_intrs: "
-				"ddi_intr_get_supported_types: MSXED0x%08x",
-				type));
+			    "ddi_intr_get_supported_types: MSXED0x%08x",
+			    type));
 		}
 		break;
 
@@ -5502,39 +5631,39 @@ nxge_add_intrs(p_nxge_t nxgep)
 		if (intr_types & DDI_INTR_TYPE_MSI) {
 			type = DDI_INTR_TYPE_MSI;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_add_intrs: "
-				"ddi_intr_get_supported_types: MSI 0x%08x",
-				type));
+			    "ddi_intr_get_supported_types: MSI 0x%08x",
+			    type));
 		} else if (intr_types & DDI_INTR_TYPE_MSIX) {
 			type = DDI_INTR_TYPE_MSIX;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs: "
-				"ddi_intr_get_supported_types: MSIX 0x%08x",
-				type));
+			    "ddi_intr_get_supported_types: MSIX 0x%08x",
+			    type));
 		} else if (intr_types & DDI_INTR_TYPE_FIXED) {
 			type = DDI_INTR_TYPE_FIXED;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs: "
-				"ddi_intr_get_supported_types: MSXED0x%08x",
-				type));
+			    "ddi_intr_get_supported_types: MSXED0x%08x",
+			    type));
 		}
 	}
 
 	nxgep->nxge_intr_type.intr_type = type;
 	if ((type == DDI_INTR_TYPE_MSIX || type == DDI_INTR_TYPE_MSI ||
-		type == DDI_INTR_TYPE_FIXED) &&
-			nxgep->nxge_intr_type.niu_msi_enable) {
+	    type == DDI_INTR_TYPE_FIXED) &&
+	    nxgep->nxge_intr_type.niu_msi_enable) {
 		if ((status = nxge_add_intrs_adv(nxgep)) != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " nxge_add_intrs: "
-				    " nxge_add_intrs_adv failed: status 0x%08x",
-				    status));
+			    " nxge_add_intrs: "
+			    " nxge_add_intrs_adv failed: status 0x%08x",
+			    status));
 			return (status);
 		} else {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs: "
-			"interrupts registered : type %d", type));
+			    "interrupts registered : type %d", type));
 			nxgep->nxge_intr_type.intr_registered = B_TRUE;
 
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"\nAdded advanced nxge add_intr_adv "
-					"intr type 0x%x\n", type));
+			    "\nAdded advanced nxge add_intr_adv "
+			    "intr type 0x%x\n", type));
 
 			return (status);
 		}
@@ -5542,7 +5671,7 @@ nxge_add_intrs(p_nxge_t nxgep)
 
 	if (!nxgep->nxge_intr_type.intr_registered) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "==> nxge_add_intrs: "
-			"failed to register interrupts"));
+		    "failed to register interrupts"));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
@@ -5563,12 +5692,12 @@ nxge_add_soft_intrs(p_nxge_t nxgep)
 	nxgep->resched_id = NULL;
 	nxgep->resched_running = B_FALSE;
 	ddi_status = ddi_add_softintr(nxgep->dip, DDI_SOFTINT_LOW,
-			&nxgep->resched_id,
-		NULL, NULL, nxge_reschedule, (caddr_t)nxgep);
+	    &nxgep->resched_id,
+	    NULL, NULL, nxge_reschedule, (caddr_t)nxgep);
 	if (ddi_status != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_add_soft_intrs: "
-			"ddi_add_softintrs failed: status 0x%08x",
-			ddi_status));
+		    "ddi_add_softintrs failed: status 0x%08x",
+		    ddi_status));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
@@ -5588,7 +5717,7 @@ nxge_add_intrs_adv(p_nxge_t nxgep)
 	intrp = (p_nxge_intr_t)&nxgep->nxge_intr_type;
 	intr_type = intrp->intr_type;
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_intrs_adv: type 0x%x",
-		intr_type));
+	    intr_type));
 
 	switch (intr_type) {
 	case DDI_INTR_TYPE_MSI: /* 0x2 */
@@ -5628,22 +5757,22 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 	ddi_status = ddi_intr_get_nintrs(dip, int_type, &nintrs);
 	if ((ddi_status != DDI_SUCCESS) || (nintrs == 0)) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"ddi_intr_get_nintrs() failed, status: 0x%x%, "
-			    "nintrs: %d", ddi_status, nintrs));
+		    "ddi_intr_get_nintrs() failed, status: 0x%x%, "
+		    "nintrs: %d", ddi_status, nintrs));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
 	ddi_status = ddi_intr_get_navail(dip, int_type, &navail);
 	if ((ddi_status != DDI_SUCCESS) || (navail == 0)) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"ddi_intr_get_navail() failed, status: 0x%x%, "
-			    "nintrs: %d", ddi_status, navail));
+		    "ddi_intr_get_navail() failed, status: 0x%x%, "
+		    "nintrs: %d", ddi_status, navail));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"ddi_intr_get_navail() returned: nintrs %d, navail %d",
-		    nintrs, navail));
+	    "ddi_intr_get_navail() returned: nintrs %d, navail %d",
+	    nintrs, navail));
 
 	/* PSARC/2007/453 MSI-X interrupt limit override */
 	if (int_type == DDI_INTR_TYPE_MSIX) {
@@ -5671,29 +5800,29 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 			navail = 1;
 		}
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"ddi_intr_get_navail(): (msi power of 2) nintrs %d, "
-			"navail %d", nintrs, navail));
+		    "ddi_intr_get_navail(): (msi power of 2) nintrs %d, "
+		    "navail %d", nintrs, navail));
 	}
 
 	behavior = ((int_type == DDI_INTR_TYPE_FIXED) ? DDI_INTR_ALLOC_STRICT :
-			DDI_INTR_ALLOC_NORMAL);
+	    DDI_INTR_ALLOC_NORMAL);
 	intrp->intr_size = navail * sizeof (ddi_intr_handle_t);
 	intrp->htable = kmem_alloc(intrp->intr_size, KM_SLEEP);
 	ddi_status = ddi_intr_alloc(dip, intrp->htable, int_type, inum,
-		    navail, &nactual, behavior);
+	    navail, &nactual, behavior);
 	if (ddi_status != DDI_SUCCESS || nactual == 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " ddi_intr_alloc() failed: %d",
-				    ddi_status));
+		    " ddi_intr_alloc() failed: %d",
+		    ddi_status));
 		kmem_free(intrp->htable, intrp->intr_size);
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
 	if ((ddi_status = ddi_intr_get_pri(intrp->htable[0],
-			(uint_t *)&intrp->pri)) != DDI_SUCCESS) {
+	    (uint_t *)&intrp->pri)) != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " ddi_intr_get_pri() failed: %d",
-				    ddi_status));
+		    " ddi_intr_get_pri() failed: %d",
+		    ddi_status));
 		/* Free already allocated interrupts */
 		for (y = 0; y < nactual; y++) {
 			(void) ddi_intr_free(intrp->htable[y]);
@@ -5716,8 +5845,8 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_add_intrs_adv_typ:nxge_ldgv_init "
-			"failed: 0x%x", status));
+		    "nxge_add_intrs_adv_typ:nxge_ldgv_init "
+		    "failed: 0x%x", status));
 		/* Free already allocated interrupts */
 		for (y = 0; y < nactual; y++) {
 			(void) ddi_intr_free(intrp->htable[y]);
@@ -5736,35 +5865,35 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 		if (ldgp->nldvs == 1) {
 			inthandler = (uint_t *)ldgp->ldvp->ldv_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"nxge_add_intrs_adv_type: "
-				"arg1 0x%x arg2 0x%x: "
-				"1-1 int handler (entry %d intdata 0x%x)\n",
-				arg1, arg2,
-				x, ldgp->intdata));
+			    "nxge_add_intrs_adv_type: "
+			    "arg1 0x%x arg2 0x%x: "
+			    "1-1 int handler (entry %d intdata 0x%x)\n",
+			    arg1, arg2,
+			    x, ldgp->intdata));
 		} else if (ldgp->nldvs > 1) {
 			inthandler = (uint_t *)ldgp->sys_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"nxge_add_intrs_adv_type: "
-				"arg1 0x%x arg2 0x%x: "
-				"nldevs %d int handler "
-				"(entry %d intdata 0x%x)\n",
-				arg1, arg2,
-				ldgp->nldvs, x, ldgp->intdata));
+			    "nxge_add_intrs_adv_type: "
+			    "arg1 0x%x arg2 0x%x: "
+			    "nldevs %d int handler "
+			    "(entry %d intdata 0x%x)\n",
+			    arg1, arg2,
+			    ldgp->nldvs, x, ldgp->intdata));
 		}
 
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_add_intrs_adv_type: ddi_add_intr(inum) #%d "
-			"htable 0x%llx", x, intrp->htable[x]));
+		    "==> nxge_add_intrs_adv_type: ddi_add_intr(inum) #%d "
+		    "htable 0x%llx", x, intrp->htable[x]));
 
 		if ((ddi_status = ddi_intr_add_handler(intrp->htable[x],
-			(ddi_intr_handler_t *)inthandler, arg1, arg2))
-				!= DDI_SUCCESS) {
+		    (ddi_intr_handler_t *)inthandler, arg1, arg2))
+		    != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_add_intrs_adv_type: failed #%d "
-				"status 0x%x", x, ddi_status));
+			    "==> nxge_add_intrs_adv_type: failed #%d "
+			    "status 0x%x", x, ddi_status));
 			for (y = 0; y < intrp->intr_added; y++) {
 				(void) ddi_intr_remove_handler(
-						intrp->htable[y]);
+				    intrp->htable[y]);
 			}
 			/* Free already allocated intr */
 			for (y = 0; y < nactual; y++) {
@@ -5782,10 +5911,10 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 	intrp->msi_intx_cnt = nactual;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"Requested: %d, Allowed: %d msi_intx_cnt %d intr_added %d",
-		navail, nactual,
-		intrp->msi_intx_cnt,
-		intrp->intr_added));
+	    "Requested: %d, Allowed: %d msi_intx_cnt %d intr_added %d",
+	    navail, nactual,
+	    intrp->msi_intx_cnt,
+	    intrp->intr_added));
 
 	(void) ddi_intr_get_cap(intrp->htable[0], &intrp->intr_cap);
 
@@ -5820,42 +5949,42 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 	ddi_status = ddi_intr_get_nintrs(dip, int_type, &nintrs);
 	if ((ddi_status != DDI_SUCCESS) || (nintrs == 0)) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"ddi_intr_get_nintrs() failed, status: 0x%x%, "
-			    "nintrs: %d", status, nintrs));
+		    "ddi_intr_get_nintrs() failed, status: 0x%x%, "
+		    "nintrs: %d", status, nintrs));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
 	ddi_status = ddi_intr_get_navail(dip, int_type, &navail);
 	if ((ddi_status != DDI_SUCCESS) || (navail == 0)) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"ddi_intr_get_navail() failed, status: 0x%x%, "
-			    "nintrs: %d", ddi_status, navail));
+		    "ddi_intr_get_navail() failed, status: 0x%x%, "
+		    "nintrs: %d", ddi_status, navail));
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"ddi_intr_get_navail() returned: nintrs %d, naavail %d",
-		    nintrs, navail));
+	    "ddi_intr_get_navail() returned: nintrs %d, naavail %d",
+	    nintrs, navail));
 
 	behavior = ((int_type == DDI_INTR_TYPE_FIXED) ? DDI_INTR_ALLOC_STRICT :
-			DDI_INTR_ALLOC_NORMAL);
+	    DDI_INTR_ALLOC_NORMAL);
 	intrp->intr_size = navail * sizeof (ddi_intr_handle_t);
 	intrp->htable = kmem_alloc(intrp->intr_size, KM_SLEEP);
 	ddi_status = ddi_intr_alloc(dip, intrp->htable, int_type, inum,
-		    navail, &nactual, behavior);
+	    navail, &nactual, behavior);
 	if (ddi_status != DDI_SUCCESS || nactual == 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    " ddi_intr_alloc() failed: %d",
-			    ddi_status));
+		    " ddi_intr_alloc() failed: %d",
+		    ddi_status));
 		kmem_free(intrp->htable, intrp->intr_size);
 		return (NXGE_ERROR | NXGE_DDI_FAILED);
 	}
 
 	if ((ddi_status = ddi_intr_get_pri(intrp->htable[0],
-			(uint_t *)&intrp->pri)) != DDI_SUCCESS) {
+	    (uint_t *)&intrp->pri)) != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " ddi_intr_get_pri() failed: %d",
-				    ddi_status));
+		    " ddi_intr_get_pri() failed: %d",
+		    ddi_status));
 		/* Free already allocated interrupts */
 		for (y = 0; y < nactual; y++) {
 			(void) ddi_intr_free(intrp->htable[y]);
@@ -5878,8 +6007,8 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_add_intrs_adv_type_fix:nxge_ldgv_init "
-			"failed: 0x%x", status));
+		    "nxge_add_intrs_adv_type_fix:nxge_ldgv_init "
+		    "failed: 0x%x", status));
 		/* Free already allocated interrupts */
 		for (y = 0; y < nactual; y++) {
 			(void) ddi_intr_free(intrp->htable[y]);
@@ -5901,30 +6030,30 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 		if (ldgp->nldvs == 1) {
 			inthandler = (uint_t *)ldgp->ldvp->ldv_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"nxge_add_intrs_adv_type_fix: "
-				"1-1 int handler(%d) ldg %d ldv %d "
-				"arg1 $%p arg2 $%p\n",
-				x, ldgp->ldg, ldgp->ldvp->ldv,
-				arg1, arg2));
+			    "nxge_add_intrs_adv_type_fix: "
+			    "1-1 int handler(%d) ldg %d ldv %d "
+			    "arg1 $%p arg2 $%p\n",
+			    x, ldgp->ldg, ldgp->ldvp->ldv,
+			    arg1, arg2));
 		} else if (ldgp->nldvs > 1) {
 			inthandler = (uint_t *)ldgp->sys_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"nxge_add_intrs_adv_type_fix: "
-				"shared ldv %d int handler(%d) ldv %d ldg %d"
-				"arg1 0x%016llx arg2 0x%016llx\n",
-				x, ldgp->nldvs, ldgp->ldg, ldgp->ldvp->ldv,
-				arg1, arg2));
+			    "nxge_add_intrs_adv_type_fix: "
+			    "shared ldv %d int handler(%d) ldv %d ldg %d"
+			    "arg1 0x%016llx arg2 0x%016llx\n",
+			    x, ldgp->nldvs, ldgp->ldg, ldgp->ldvp->ldv,
+			    arg1, arg2));
 		}
 
 		if ((ddi_status = ddi_intr_add_handler(intrp->htable[x],
-			(ddi_intr_handler_t *)inthandler, arg1, arg2))
-				!= DDI_SUCCESS) {
+		    (ddi_intr_handler_t *)inthandler, arg1, arg2))
+		    != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_add_intrs_adv_type_fix: failed #%d "
-				"status 0x%x", x, ddi_status));
+			    "==> nxge_add_intrs_adv_type_fix: failed #%d "
+			    "status 0x%x", x, ddi_status));
 			for (y = 0; y < intrp->intr_added; y++) {
 				(void) ddi_intr_remove_handler(
-						intrp->htable[y]);
+				    intrp->htable[y]);
 			}
 			for (y = 0; y < nactual; y++) {
 				(void) ddi_intr_free(intrp->htable[y]);
@@ -5959,7 +6088,7 @@ nxge_remove_intrs(p_nxge_t nxgep)
 	intrp = (p_nxge_intr_t)&nxgep->nxge_intr_type;
 	if (!intrp->intr_registered) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"<== nxge_remove_intrs: interrupts not registered"));
+		    "<== nxge_remove_intrs: interrupts not registered"));
 		return;
 	}
 
@@ -5967,7 +6096,7 @@ nxge_remove_intrs(p_nxge_t nxgep)
 
 	if (intrp->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		(void) ddi_intr_block_disable(intrp->htable,
-			intrp->intr_added);
+		    intrp->intr_added);
 	} else {
 		for (i = 0; i < intrp->intr_added; i++) {
 			(void) ddi_intr_disable(intrp->htable[i]);
@@ -5983,11 +6112,11 @@ nxge_remove_intrs(p_nxge_t nxgep)
 	for (inum = 0; inum < intrp->msi_intx_cnt; inum++) {
 		if (intrp->htable[inum]) {
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"nxge_remove_intrs: ddi_intr_free inum %d "
-				"msi_intx_cnt %d intr_added %d",
-				inum,
-				intrp->msi_intx_cnt,
-				intrp->intr_added));
+			    "nxge_remove_intrs: ddi_intr_free inum %d "
+			    "msi_intx_cnt %d intr_added %d",
+			    inum,
+			    intrp->msi_intx_cnt,
+			    intrp->intr_added));
 
 			(void) ddi_intr_free(intrp->htable[inum]);
 		}
@@ -6015,7 +6144,7 @@ nxge_remove_soft_intrs(p_nxge_t nxgep)
 	if (nxgep->resched_id) {
 		ddi_remove_softintr(nxgep->resched_id);
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_remove_soft_intrs: removed"));
+		    "==> nxge_remove_soft_intrs: removed"));
 		nxgep->resched_id = NULL;
 	}
 
@@ -6036,29 +6165,29 @@ nxge_intrs_enable(p_nxge_t nxgep)
 
 	if (!intrp->intr_registered) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_intrs_enable: "
-			"interrupts are not registered"));
+		    "interrupts are not registered"));
 		return;
 	}
 
 	if (intrp->intr_enabled) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"<== nxge_intrs_enable: already enabled"));
+		    "<== nxge_intrs_enable: already enabled"));
 		return;
 	}
 
 	if (intrp->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		status = ddi_intr_block_enable(intrp->htable,
-			intrp->intr_added);
+		    intrp->intr_added);
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intrs_enable "
-			"block enable - status 0x%x total inums #%d\n",
-			status, intrp->intr_added));
+		    "block enable - status 0x%x total inums #%d\n",
+		    status, intrp->intr_added));
 	} else {
 		for (i = 0; i < intrp->intr_added; i++) {
 			status = ddi_intr_enable(intrp->htable[i]);
 			NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intrs_enable "
-				"ddi_intr_enable:enable - status 0x%x "
-				"total inums %d enable inum #%d\n",
-				status, intrp->intr_added, i));
+			    "ddi_intr_enable:enable - status 0x%x "
+			    "total inums %d enable inum #%d\n",
+			    status, intrp->intr_added, i));
 			if (status == DDI_SUCCESS) {
 				intrp->intr_enabled = B_TRUE;
 			}
@@ -6081,13 +6210,13 @@ nxge_intrs_disable(p_nxge_t nxgep)
 
 	if (!intrp->intr_registered) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_intrs_disable: "
-			"interrupts are not registered"));
+		    "interrupts are not registered"));
 		return;
 	}
 
 	if (intrp->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		(void) ddi_intr_block_disable(intrp->htable,
-			intrp->intr_added);
+		    intrp->intr_added);
 	} else {
 		for (i = 0; i < intrp->intr_added; i++) {
 			(void) ddi_intr_disable(intrp->htable[i]);
@@ -6119,6 +6248,8 @@ nxge_mac_register(p_nxge_t nxgep)
 	    NXGE_EHEADER_VLAN_CRC;
 	macp->m_max_sdu = nxgep->mac.default_mtu;
 	macp->m_margin = VLAN_TAGSZ;
+	macp->m_priv_props = nxge_priv_props;
+	macp->m_priv_prop_count = NXGE_MAX_PRIV_PROPS;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_mac_register: instance %d "
@@ -6133,13 +6264,13 @@ nxge_mac_register(p_nxge_t nxgep)
 
 	if (status != 0) {
 		cmn_err(CE_WARN,
-			"!nxge_mac_register failed (status %d instance %d)",
-			status, nxgep->instance);
+		    "!nxge_mac_register failed (status %d instance %d)",
+		    status, nxgep->instance);
 		return (NXGE_ERROR);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_mac_register success "
-		"(instance %d)", nxgep->instance));
+	    "(instance %d)", nxgep->instance));
 
 	return (NXGE_OK);
 }
@@ -6220,40 +6351,40 @@ nxge_init_common_dev(p_nxge_t nxgep)
 	p_dip = nxgep->p_dip;
 	MUTEX_ENTER(&nxge_common_lock);
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-		"==> nxge_init_common_dev:func # %d",
-			nxgep->function_num));
+	    "==> nxge_init_common_dev:func # %d",
+	    nxgep->function_num));
 	/*
 	 * Loop through existing per neptune hardware list.
 	 */
 	for (hw_p = nxge_hw_list; hw_p; hw_p = hw_p->next) {
 		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-			"==> nxge_init_common_device:func # %d "
-			"hw_p $%p parent dip $%p",
-			nxgep->function_num,
-			hw_p,
-			p_dip));
+		    "==> nxge_init_common_device:func # %d "
+		    "hw_p $%p parent dip $%p",
+		    nxgep->function_num,
+		    hw_p,
+		    p_dip));
 		if (hw_p->parent_devp == p_dip) {
 			nxgep->nxge_hw_p = hw_p;
 			hw_p->ndevs++;
 			hw_p->nxge_p[nxgep->function_num] = nxgep;
 			NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-				"==> nxge_init_common_device:func # %d "
-				"hw_p $%p parent dip $%p "
-				"ndevs %d (found)",
-				nxgep->function_num,
-				hw_p,
-				p_dip,
-				hw_p->ndevs));
+			    "==> nxge_init_common_device:func # %d "
+			    "hw_p $%p parent dip $%p "
+			    "ndevs %d (found)",
+			    nxgep->function_num,
+			    hw_p,
+			    p_dip,
+			    hw_p->ndevs));
 			break;
 		}
 	}
 
 	if (hw_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-			"==> nxge_init_common_device:func # %d "
-			"parent dip $%p (new)",
-			nxgep->function_num,
-			p_dip));
+		    "==> nxge_init_common_device:func # %d "
+		    "parent dip $%p (new)",
+		    nxgep->function_num,
+		    p_dip));
 		hw_p = kmem_zalloc(sizeof (nxge_hw_list_t), KM_SLEEP);
 		hw_p->parent_devp = p_dip;
 		hw_p->magic = NXGE_NEPTUNE_MAGIC;
@@ -6287,8 +6418,8 @@ nxge_init_common_dev(p_nxge_t nxgep)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-		"==> nxge_init_common_device (nxge_hw_list) $%p",
-		nxge_hw_list));
+	    "==> nxge_init_common_device (nxge_hw_list) $%p",
+	    nxge_hw_list));
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "<== nxge_init_common_device"));
 
 	return (NXGE_OK);
@@ -6303,7 +6434,7 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "==> nxge_uninit_common_device"));
 	if (nxgep->nxge_hw_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-			"<== nxge_uninit_common_device (no common)"));
+		    "<== nxge_uninit_common_device (no common)"));
 		return;
 	}
 
@@ -6312,18 +6443,18 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 	for (hw_p = nxge_hw_list; hw_p; hw_p = hw_p->next) {
 		p_dip = hw_p->parent_devp;
 		if (nxgep->nxge_hw_p == hw_p &&
-			p_dip == nxgep->p_dip &&
-			nxgep->nxge_hw_p->magic == NXGE_NEPTUNE_MAGIC &&
-			hw_p->magic == NXGE_NEPTUNE_MAGIC) {
+		    p_dip == nxgep->p_dip &&
+		    nxgep->nxge_hw_p->magic == NXGE_NEPTUNE_MAGIC &&
+		    hw_p->magic == NXGE_NEPTUNE_MAGIC) {
 
 			NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-				"==> nxge_uninit_common_device:func # %d "
-				"hw_p $%p parent dip $%p "
-				"ndevs %d (found)",
-				nxgep->function_num,
-				hw_p,
-				p_dip,
-				hw_p->ndevs));
+			    "==> nxge_uninit_common_device:func # %d "
+			    "hw_p $%p parent dip $%p "
+			    "ndevs %d (found)",
+			    nxgep->function_num,
+			    hw_p,
+			    p_dip,
+			    hw_p->ndevs));
 
 			if (hw_p->ndevs) {
 				hw_p->ndevs--;
@@ -6335,38 +6466,38 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 				MUTEX_DESTROY(&hw_p->nxge_cfg_lock);
 				MUTEX_DESTROY(&hw_p->nxge_mdio_lock);
 				NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-					"==> nxge_uninit_common_device: "
-					"func # %d "
-					"hw_p $%p parent dip $%p "
-					"ndevs %d (last)",
-					nxgep->function_num,
-					hw_p,
-					p_dip,
-					hw_p->ndevs));
+				    "==> nxge_uninit_common_device: "
+				    "func # %d "
+				    "hw_p $%p parent dip $%p "
+				    "ndevs %d (last)",
+				    nxgep->function_num,
+				    hw_p,
+				    p_dip,
+				    hw_p->ndevs));
 
 				nxge_hio_uninit(nxgep);
 
 				if (hw_p == nxge_hw_list) {
 					NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-						"==> nxge_uninit_common_device:"
-						"remove head func # %d "
-						"hw_p $%p parent dip $%p "
-						"ndevs %d (head)",
-						nxgep->function_num,
-						hw_p,
-						p_dip,
-						hw_p->ndevs));
+					    "==> nxge_uninit_common_device:"
+					    "remove head func # %d "
+					    "hw_p $%p parent dip $%p "
+					    "ndevs %d (head)",
+					    nxgep->function_num,
+					    hw_p,
+					    p_dip,
+					    hw_p->ndevs));
 					nxge_hw_list = hw_p->next;
 				} else {
 					NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-						"==> nxge_uninit_common_device:"
-						"remove middle func # %d "
-						"hw_p $%p parent dip $%p "
-						"ndevs %d (middle)",
-						nxgep->function_num,
-						hw_p,
-						p_dip,
-						hw_p->ndevs));
+					    "==> nxge_uninit_common_device:"
+					    "remove middle func # %d "
+					    "hw_p $%p parent dip $%p "
+					    "ndevs %d (middle)",
+					    nxgep->function_num,
+					    hw_p,
+					    p_dip,
+					    hw_p->ndevs));
 					h_hw_p->next = hw_p->next;
 				}
 
@@ -6381,8 +6512,8 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 
 	MUTEX_EXIT(&nxge_common_lock);
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-		"==> nxge_uninit_common_device (nxge_hw_list) $%p",
-		nxge_hw_list));
+	    "==> nxge_uninit_common_device (nxge_hw_list) $%p",
+	    nxge_hw_list));
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "<= nxge_uninit_common_device"));
 }
@@ -6474,4 +6605,37 @@ nxge_create_msi_property(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "<==nxge_create_msi_property"));
 	return (nmsi);
+}
+
+/* ARGSUSED */
+static int
+nxge_get_def_val(nxge_t *nxgep, mac_prop_id_t pr_num, uint_t pr_valsize,
+    void *pr_val)
+{
+	int err = 0;
+	link_flowctrl_t fl;
+
+	switch (pr_num) {
+	case DLD_PROP_AUTONEG:
+		*(uint8_t *)pr_val = 1;
+		break;
+	case DLD_PROP_FLOWCTRL:
+		if (pr_valsize < sizeof (link_flowctrl_t))
+			return (EINVAL);
+		fl = LINK_FLOWCTRL_RX;
+		bcopy(&fl, pr_val, sizeof (fl));
+		break;
+	case DLD_PROP_ADV_1000FDX_CAP:
+	case DLD_PROP_EN_1000FDX_CAP:
+		*(uint8_t *)pr_val = 1;
+		break;
+	case DLD_PROP_ADV_100FDX_CAP:
+	case DLD_PROP_EN_100FDX_CAP:
+		*(uint8_t *)pr_val = 1;
+		break;
+	default:
+		err = ENOTSUP;
+		break;
+	}
+	return (err);
 }

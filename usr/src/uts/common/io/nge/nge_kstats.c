@@ -562,6 +562,11 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = ngep->param_link_duplex;
 		break;
 
+	case ETHER_STAT_CAP_100T4:
+	case ETHER_STAT_LP_CAP_100T4:
+		*val = 0;
+		break;
+
 	default:
 		return (ENOTSUP);
 	}

@@ -639,73 +639,6 @@ typedef struct {
 	boolean_t		(*phys_check)(struct bge *, boolean_t);
 } phys_ops_t;
 
-/*
- * Named Data (ND) Parameter Management Structure
- */
-typedef struct {
-	int			ndp_info;
-	int			ndp_min;
-	int			ndp_max;
-	int			ndp_val;
-	char			*ndp_name;
-} nd_param_t;					/* 0x18 (24) bytes	*/
-
-/*
- * NDD parameter indexes, divided into:
- *
- *	read-only parameters describing the hardware's capabilities
- *	read-write parameters controlling the advertised capabilities
- *	read-only parameters describing the partner's capabilities
- *	read-only parameters describing the link state
- */
-enum {
-	PARAM_AUTONEG_CAP,
-	PARAM_PAUSE_CAP,
-	PARAM_ASYM_PAUSE_CAP,
-	PARAM_1000FDX_CAP,
-	PARAM_1000HDX_CAP,
-	PARAM_100T4_CAP,
-	PARAM_100FDX_CAP,
-	PARAM_100HDX_CAP,
-	PARAM_10FDX_CAP,
-	PARAM_10HDX_CAP,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_PAUSE_CAP,
-	PARAM_ADV_ASYM_PAUSE_CAP,
-	PARAM_ADV_1000FDX_CAP,
-	PARAM_ADV_1000HDX_CAP,
-	PARAM_ADV_100T4_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_100HDX_CAP,
-	PARAM_ADV_10FDX_CAP,
-	PARAM_ADV_10HDX_CAP,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_PAUSE_CAP,
-	PARAM_LP_ASYM_PAUSE_CAP,
-	PARAM_LP_1000FDX_CAP,
-	PARAM_LP_1000HDX_CAP,
-	PARAM_LP_100T4_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_100HDX_CAP,
-	PARAM_LP_10FDX_CAP,
-	PARAM_LP_10HDX_CAP,
-
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_DUPLEX,
-
-	PARAM_LINK_AUTONEG,
-	PARAM_LINK_RX_PAUSE,
-	PARAM_LINK_TX_PAUSE,
-
-	PARAM_MSI_CNT,
-
-	PARAM_DRAIN_MAX,
-
-	PARAM_COUNT
-};
 
 /*
  * Actual state of the BCM570x chip
@@ -936,7 +869,6 @@ typedef struct bge {
 	 * NDD parameters (protected by genlock)
 	 */
 	caddr_t			nd_data_p;
-	nd_param_t		*nd_params;
 
 	/*
 	 * A flag to prevent excessive config space accesses
@@ -972,9 +904,36 @@ typedef struct bge {
 				param_en_100hdx:1,
 				param_en_10fdx:1,
 				param_en_10hdx:1,
-				param_pad_to_32:24;
+				param_adv_autoneg:1,
+				param_adv_1000fdx:1,
+				param_adv_1000hdx:1,
+				param_adv_100fdx:1,
+				param_adv_100hdx:1,
+				param_adv_10fdx:1,
+				param_adv_10hdx:1,
+				param_lp_autoneg:1,
+				param_lp_pause:1,
+				param_lp_asym_pause:1,
+				param_lp_1000fdx:1,
+				param_lp_1000hdx:1,
+				param_lp_100fdx:1,
+				param_lp_100hdx:1,
+				param_lp_10fdx:1,
+				param_lp_10hdx:1,
+				param_link_up:1,
+				param_link_autoneg:1,
+				param_adv_pause:1,
+				param_adv_asym_pause:1,
+				param_link_rx_pause:1,
+				param_link_tx_pause:1,
+				param_pad_to_32:2;
 
 	uint32_t		param_loop_mode;
+	uint32_t		param_msi_cnt;
+	uint32_t 		param_drain_max;
+	uint64_t		param_link_speed;
+	link_duplex_t		param_link_duplex;
+
 } bge_t;
 
 /*
@@ -993,39 +952,6 @@ typedef struct bge {
 #define	PROGRESS_KSTATS		0x2000	/* kstats created		*/
 #define	PROGRESS_READY		0x8000	/* ready for work		*/
 
-/*
- * Shorthand for the NDD parameters
- */
-#define	param_adv_autoneg	nd_params[PARAM_ADV_AUTONEG_CAP].ndp_val
-#define	param_adv_pause		nd_params[PARAM_ADV_PAUSE_CAP].ndp_val
-#define	param_adv_asym_pause	nd_params[PARAM_ADV_ASYM_PAUSE_CAP].ndp_val
-#define	param_adv_1000fdx	nd_params[PARAM_ADV_1000FDX_CAP].ndp_val
-#define	param_adv_1000hdx	nd_params[PARAM_ADV_1000HDX_CAP].ndp_val
-#define	param_adv_100fdx	nd_params[PARAM_ADV_100FDX_CAP].ndp_val
-#define	param_adv_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
-#define	param_adv_10fdx		nd_params[PARAM_ADV_10FDX_CAP].ndp_val
-#define	param_adv_10hdx		nd_params[PARAM_ADV_10HDX_CAP].ndp_val
-
-#define	param_lp_autoneg	nd_params[PARAM_LP_AUTONEG_CAP].ndp_val
-#define	param_lp_pause		nd_params[PARAM_LP_PAUSE_CAP].ndp_val
-#define	param_lp_asym_pause	nd_params[PARAM_LP_ASYM_PAUSE_CAP].ndp_val
-#define	param_lp_1000fdx	nd_params[PARAM_LP_1000FDX_CAP].ndp_val
-#define	param_lp_1000hdx	nd_params[PARAM_LP_1000HDX_CAP].ndp_val
-#define	param_lp_100fdx		nd_params[PARAM_LP_100FDX_CAP].ndp_val
-#define	param_lp_100hdx		nd_params[PARAM_LP_100HDX_CAP].ndp_val
-#define	param_lp_10fdx		nd_params[PARAM_LP_10FDX_CAP].ndp_val
-#define	param_lp_10hdx		nd_params[PARAM_LP_10HDX_CAP].ndp_val
-
-#define	param_link_up		nd_params[PARAM_LINK_STATUS].ndp_val
-#define	param_link_speed	nd_params[PARAM_LINK_SPEED].ndp_val
-#define	param_link_duplex	nd_params[PARAM_LINK_DUPLEX].ndp_val
-
-#define	param_link_autoneg	nd_params[PARAM_LINK_AUTONEG].ndp_val
-#define	param_link_rx_pause	nd_params[PARAM_LINK_RX_PAUSE].ndp_val
-#define	param_link_tx_pause	nd_params[PARAM_LINK_TX_PAUSE].ndp_val
-
-#define	param_msi_cnt		nd_params[PARAM_MSI_CNT].ndp_val
-#define	param_drain_max		nd_params[PARAM_DRAIN_MAX].ndp_val
 
 /*
  * Sync a DMA area described by a dma_area_t
@@ -1286,9 +1212,6 @@ boolean_t bge_phys_check(bge_t *bgep);
 
 /* bge_ndd.c */
 int bge_nd_init(bge_t *bgep);
-enum ioc_reply bge_nd_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp,
-	struct iocblk *iocp);
-void bge_nd_cleanup(bge_t *bgep);
 
 /* bge_recv.c */
 void bge_receive(bge_t *bgep, bge_status_t *bsp);

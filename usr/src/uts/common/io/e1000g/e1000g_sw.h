@@ -223,7 +223,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_KSTATS		0x0040	/* Kstats created */
 #define	ATTACH_PROGRESS_ALLOC		0x0080	/* DMA resources allocated */
 #define	ATTACH_PROGRESS_INIT		0x0100	/* Driver initialization */
-#define	ATTACH_PROGRESS_NDD		0x0200	/* NDD initialized */
+/* 0200 used to be PROGRESS_NDD. Now unused */
 #define	ATTACH_PROGRESS_MAC		0x0400	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x0800	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FMINIT		0x1000	/* FMA initiated */
@@ -399,42 +399,6 @@ extern "C" {
 #define	E1000G_PROP_GET_INT(d, n)	ddi_prop_get_int(DDI_DEV_T_ANY, (d), \
 						DDI_PROP_DONTPASS, (n), -1)
 
-/*
- * Shorthand for the NDD parameters
- */
-#define	param_autoneg_cap	nd_params[PARAM_AUTONEG_CAP].ndp_val
-#define	param_pause_cap		nd_params[PARAM_PAUSE_CAP].ndp_val
-#define	param_asym_pause_cap	nd_params[PARAM_ASYM_PAUSE_CAP].ndp_val
-#define	param_1000fdx_cap	nd_params[PARAM_1000FDX_CAP].ndp_val
-#define	param_1000hdx_cap	nd_params[PARAM_1000HDX_CAP].ndp_val
-#define	param_100t4_cap		nd_params[PARAM_100T4_CAP].ndp_val
-#define	param_100fdx_cap	nd_params[PARAM_100FDX_CAP].ndp_val
-#define	param_100hdx_cap	nd_params[PARAM_100HDX_CAP].ndp_val
-#define	param_10fdx_cap		nd_params[PARAM_10FDX_CAP].ndp_val
-#define	param_10hdx_cap		nd_params[PARAM_10HDX_CAP].ndp_val
-
-#define	param_adv_autoneg	nd_params[PARAM_ADV_AUTONEG_CAP].ndp_val
-#define	param_adv_pause		nd_params[PARAM_ADV_PAUSE_CAP].ndp_val
-#define	param_adv_asym_pause	nd_params[PARAM_ADV_ASYM_PAUSE_CAP].ndp_val
-#define	param_adv_1000fdx	nd_params[PARAM_ADV_1000FDX_CAP].ndp_val
-#define	param_adv_1000hdx	nd_params[PARAM_ADV_1000HDX_CAP].ndp_val
-#define	param_adv_100t4		nd_params[PARAM_ADV_100T4_CAP].ndp_val
-#define	param_adv_100fdx	nd_params[PARAM_ADV_100FDX_CAP].ndp_val
-#define	param_adv_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
-#define	param_adv_10fdx		nd_params[PARAM_ADV_10FDX_CAP].ndp_val
-#define	param_adv_10hdx		nd_params[PARAM_ADV_10HDX_CAP].ndp_val
-
-#define	param_lp_autoneg	nd_params[PARAM_LP_AUTONEG_CAP].ndp_val
-#define	param_lp_pause		nd_params[PARAM_LP_PAUSE_CAP].ndp_val
-#define	param_lp_asym_pause	nd_params[PARAM_LP_ASYM_PAUSE_CAP].ndp_val
-#define	param_lp_1000fdx	nd_params[PARAM_LP_1000FDX_CAP].ndp_val
-#define	param_lp_1000hdx	nd_params[PARAM_LP_1000HDX_CAP].ndp_val
-#define	param_lp_100t4		nd_params[PARAM_LP_100T4_CAP].ndp_val
-#define	param_lp_100fdx		nd_params[PARAM_LP_100FDX_CAP].ndp_val
-#define	param_lp_100hdx		nd_params[PARAM_LP_100HDX_CAP].ndp_val
-#define	param_lp_10fdx		nd_params[PARAM_LP_10FDX_CAP].ndp_val
-#define	param_lp_10hdx		nd_params[PARAM_LP_10HDX_CAP].ndp_val
-
 #ifdef E1000G_DEBUG
 /*
  * E1000G-specific ioctls ...
@@ -482,72 +446,6 @@ typedef struct {
 	struct e1000g *ndp_instance;
 	char *ndp_name;
 } nd_param_t;
-
-/*
- * NDD parameter indexes, divided into:
- *
- *	read-only parameters describing the hardware's capabilities
- *	read-write parameters controlling the advertised capabilities
- *	read-only parameters describing the partner's capabilities
- *	read-write parameters controlling the force speed and duplex
- *	read-only parameters describing the link state
- *	read-only parameters describing the driver properties
- *	read-write parameters controlling the driver properties
- */
-enum {
-	PARAM_AUTONEG_CAP,
-	PARAM_PAUSE_CAP,
-	PARAM_ASYM_PAUSE_CAP,
-	PARAM_1000FDX_CAP,
-	PARAM_1000HDX_CAP,
-	PARAM_100T4_CAP,
-	PARAM_100FDX_CAP,
-	PARAM_100HDX_CAP,
-	PARAM_10FDX_CAP,
-	PARAM_10HDX_CAP,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_PAUSE_CAP,
-	PARAM_ADV_ASYM_PAUSE_CAP,
-	PARAM_ADV_1000FDX_CAP,
-	PARAM_ADV_1000HDX_CAP,
-	PARAM_ADV_100T4_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_100HDX_CAP,
-	PARAM_ADV_10FDX_CAP,
-	PARAM_ADV_10HDX_CAP,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_PAUSE_CAP,
-	PARAM_LP_ASYM_PAUSE_CAP,
-	PARAM_LP_1000FDX_CAP,
-	PARAM_LP_1000HDX_CAP,
-	PARAM_LP_100T4_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_100HDX_CAP,
-	PARAM_LP_10FDX_CAP,
-	PARAM_LP_10HDX_CAP,
-
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_DUPLEX,
-	PARAM_LINK_AUTONEG,
-
-	PARAM_MAX_FRAME_SIZE,
-	PARAM_LOOP_MODE,
-	PARAM_INTR_TYPE,
-
-	PARAM_TX_BCOPY_THRESHOLD,
-	PARAM_TX_INTR_ENABLE,
-	PARAM_TX_TIDV,
-	PARAM_TX_TADV,
-	PARAM_RX_BCOPY_THRESHOLD,
-	PARAM_RX_PKT_ON_INTR,
-	PARAM_RX_RDTR,
-	PARAM_RX_RADV,
-
-	PARAM_COUNT
-};
 
 /*
  * The entry of the private dip list
@@ -992,12 +890,6 @@ typedef struct e1000g {
 
 	kstat_t *e1000g_ksp;
 
-	/*
-	 * NDD parameters
-	 */
-	caddr_t nd_data;
-	nd_param_t nd_params[PARAM_COUNT];
-
 	uint16_t phy_ctrl;		/* contents of PHY_CTRL */
 	uint16_t phy_status;		/* contents of PHY_STATUS */
 	uint16_t phy_an_adv;		/* contents of PHY_AUTONEG_ADV */
@@ -1018,7 +910,39 @@ typedef struct e1000g {
 			param_en_100hdx:1,
 			param_en_10fdx:1,
 			param_en_10hdx:1,
-			param_pad_to_32:26;
+			param_autoneg_cap:1,
+			param_pause_cap:1,
+			param_asym_pause_cap:1,
+			param_1000fdx_cap:1,
+			param_1000hdx_cap:1,
+			param_100t4_cap:1,
+			param_100fdx_cap:1,
+			param_100hdx_cap:1,
+			param_10fdx_cap:1,
+			param_10hdx_cap:1,
+			param_adv_autoneg:1,
+			param_adv_pause:1,
+			param_adv_asym_pause:1,
+			param_adv_1000fdx:1,
+			param_adv_1000hdx:1,
+			param_adv_100t4:1,
+			param_adv_100fdx:1,
+			param_adv_100hdx:1,
+			param_adv_10fdx:1,
+			param_adv_10hdx:1,
+			param_lp_autoneg:1,
+			param_lp_pause:1,
+			param_lp_asym_pause:1,
+			param_lp_1000fdx:1,
+			param_lp_1000hdx:1,
+			param_lp_100t4:1;
+
+	uint32_t	param_lp_100fdx:1,
+			param_lp_100hdx:1,
+			param_lp_10fdx:1,
+			param_lp_10hdx:1,
+			param_pad_to_32:28;
+
 } e1000g_t;
 
 
@@ -1045,10 +969,6 @@ int e1000g_m_stat(void *arg, uint_t stat, uint64_t *val);
 int e1000g_init_stats(struct e1000g *Adapter);
 void e1000_tbi_adjust_stats(struct e1000g *Adapter,
     uint32_t frame_len, uint8_t *mac_addr);
-enum ioc_reply e1000g_nd_ioctl(struct e1000g *Adapter,
-    queue_t *wq, mblk_t *mp, struct iocblk *iocp);
-void e1000g_nd_cleanup(struct e1000g *Adapter);
-int e1000g_nd_init(struct e1000g *Adapter);
 
 void e1000g_clear_interrupt(struct e1000g *Adapter);
 void e1000g_mask_interrupt(struct e1000g *Adapter);

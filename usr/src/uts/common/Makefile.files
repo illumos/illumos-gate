@@ -567,7 +567,7 @@ DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o \
 
 GLD_OBJS +=     gld.o gldutil.o
 
-MAC_OBJS +=     mac.o mac_mod.o mac_stat.o
+MAC_OBJS +=     mac.o mac_mod.o mac_stat.o mac_ndd.o
 
 MAC_ETHER_OBJS +=	mac_ether.o
 
@@ -1560,7 +1560,7 @@ E1000G_OBJS +=	e1000_80003es2lan.o e1000_82540.o e1000_82541.o e1000_82542.o \
 		e1000_82543.o e1000_82571.o e1000_api.o e1000_ich8lan.o \
 		e1000_mac.o e1000_manage.o e1000_nvm.o e1000_osdep.o \
 		e1000_phy.o e1000g_debug.o e1000g_main.o e1000g_alloc.o \
-		e1000g_tx.o e1000g_rx.o e1000g_stat.o e1000g_ndd.o
+		e1000g_tx.o e1000g_rx.o e1000g_stat.o
 
 #
 #	Intel 82575 1G NIC driver module

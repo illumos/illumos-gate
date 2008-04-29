@@ -34,7 +34,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.61";
+static char bge_ident[] = "Broadcom Gb Ethernet";
 
 /*
  * Property names
@@ -131,11 +131,11 @@ static int		bge_m_unicst_get(void *, mac_multi_addr_t *);
 static int		bge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int		bge_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, void *);
+    uint_t, uint_t, void *);
 static int		bge_set_priv_prop(bge_t *, const char *, uint_t,
     const void *);
 static int		bge_get_priv_prop(bge_t *, const char *, uint_t,
-    void *);
+    uint_t, void *);
 
 #define	BGE_M_CALLBACK_FLAGS\
 	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
@@ -157,6 +157,14 @@ static mac_callbacks_t bge_m_callbacks = {
 	bge_m_setprop,
 	bge_m_getprop
 };
+
+mac_priv_prop_t bge_priv_prop[] = {
+	{"_adv_asym_pause_cap", MAC_PROP_PERM_RW},
+	{"_adv_pause_cap", MAC_PROP_PERM_RW}
+};
+
+#define	BGE_MAX_PRIV_PROPS \
+	(sizeof (bge_priv_prop) / sizeof (mac_priv_prop_t))
 
 /*
  * ========== Transmit and receive ring reinitialisation ==========
@@ -885,7 +893,7 @@ bge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 {
 	bge_t *bgep = barg;
 	int err = 0;
-	uint64_t cur_mtu, new_mtu;
+	uint32_t cur_mtu, new_mtu;
 	uint_t	maxsdu;
 	link_flowctrl_t fl;
 
@@ -899,6 +907,19 @@ bge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		mutex_exit(bgep->genlock);
 		return (EBUSY);
 	}
+	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
+	    ((pr_num == DLD_PROP_EN_100FDX_CAP) ||
+	    (pr_num == DLD_PROP_EN_100FDX_CAP) ||
+	    (pr_num == DLD_PROP_EN_10FDX_CAP) ||
+	    (pr_num == DLD_PROP_EN_10HDX_CAP))) {
+		/*
+		 * these properties are read/write on copper,
+		 * read-only and 0 on serdes
+		 */
+		mutex_exit(bgep->genlock);
+		return (ENOTSUP);
+	}
+
 	switch (pr_num) {
 		case DLD_PROP_EN_1000FDX_CAP:
 			bgep->param_en_1000fdx = *(uint8_t *)pr_val;
@@ -936,16 +957,17 @@ reprogram:
 		case DLD_PROP_STATUS:
 		case DLD_PROP_SPEED:
 		case DLD_PROP_DUPLEX:
-			err = EINVAL; /* read-only prop. Can't set this */
+			err = ENOTSUP; /* read-only prop. Can't set this */
 			break;
 		case DLD_PROP_AUTONEG:
 			bgep->param_adv_autoneg = *(uint8_t *)pr_val;
 			if (bge_reprogram(bgep) == IOC_INVAL)
 				err = EINVAL;
 			break;
-		case DLD_PROP_DEFMTU:
+		case DLD_PROP_MTU:
 			cur_mtu = bgep->chipid.default_mtu;
 			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
+
 			if (new_mtu == cur_mtu) {
 				err = 0;
 				break;
@@ -984,7 +1006,7 @@ reprogram:
 			bcopy(pr_val, &fl, sizeof (fl));
 			switch (fl) {
 			default:
-				err = EINVAL;
+				err = ENOTSUP;
 				break;
 			case LINK_FLOWCTRL_NONE:
 				bgep->param_adv_pause = 0;
@@ -1035,56 +1057,66 @@ reprogram:
 			}
 
 			break;
-		default:
+		case DLD_PROP_PRIVATE:
 			err = bge_set_priv_prop(bgep, pr_name, pr_valsize,
 			    pr_val);
+			break;
+		default:
+			err = ENOTSUP;
 			break;
 	}
 	mutex_exit(bgep->genlock);
 	return (err);
 }
+
 static int
 bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
 {
 	bge_t *bgep = barg;
 	int err = 0;
 	link_flowctrl_t fl;
-	uint64_t tmp = 0;
+	uint64_t speed;
+	int flags = bgep->chipid.flags;
+	boolean_t is_default = (pr_flags & DLD_DEFAULT);
 
+	if (pr_valsize == 0)
+		return (EINVAL);
 	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
 		case DLD_PROP_DUPLEX:
-			if (pr_valsize < sizeof (uint8_t))
+			if (pr_valsize < sizeof (link_duplex_t))
 				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_link_duplex;
+			bcopy(&bgep->param_link_duplex, pr_val,
+			    sizeof (link_duplex_t));
 			break;
 		case DLD_PROP_SPEED:
-			if (pr_valsize < sizeof (uint64_t))
+			if (pr_valsize < sizeof (speed))
 				return (EINVAL);
-			tmp = bgep->param_link_speed * 1000000ull;
-			bcopy(&tmp, pr_val, sizeof (tmp));
+			speed = bgep->param_link_speed * 1000000ull;
+			bcopy(&speed, pr_val, sizeof (speed));
 			break;
 		case DLD_PROP_STATUS:
-			if (pr_valsize < sizeof (uint8_t))
+			if (pr_valsize < sizeof (link_state_t))
 				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_link_up;
+			bcopy(&bgep->link_state, pr_val,
+			    sizeof (link_state_t));
 			break;
 		case DLD_PROP_AUTONEG:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_autoneg;
+			if (is_default)
+				*(uint8_t *)pr_val = 1;
+			else
+				*(uint8_t *)pr_val = bgep->param_adv_autoneg;
 			break;
-		case DLD_PROP_DEFMTU: {
-			if (pr_valsize < sizeof (uint64_t))
-				return (EINVAL);
-			tmp = bgep->chipid.default_mtu;
-			bcopy(&tmp, pr_val, sizeof (tmp));
-			break;
-		}
 		case DLD_PROP_FLOWCTRL:
-			if (pr_valsize < sizeof (link_flowctrl_t))
+			if (pr_valsize < sizeof (fl))
 				return (EINVAL);
+			if (is_default) {
+				fl = LINK_FLOWCTRL_BI;
+				bcopy(&fl, pr_val, sizeof (fl));
+				break;
+			}
+
 			if (bgep->param_link_rx_pause &&
 			    !bgep->param_link_tx_pause)
 				fl = LINK_FLOWCTRL_RX;
@@ -1103,69 +1135,103 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			bcopy(&fl, pr_val, sizeof (fl));
 			break;
 		case DLD_PROP_ADV_1000FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_1000fdx;
+			if (is_default)
+				*(uint8_t *)pr_val = 1;
+			else
+				*(uint8_t *)pr_val = bgep->param_adv_1000fdx;
 			break;
 		case DLD_PROP_EN_1000FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_en_1000fdx;
+			if (is_default)
+				*(uint8_t *)pr_val = 1;
+			else
+				*(uint8_t *)pr_val = bgep->param_en_1000fdx;
 			break;
 		case DLD_PROP_ADV_1000HDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_1000hdx;
+			if (is_default)
+				*(uint8_t *)pr_val = 1;
+			else
+				*(uint8_t *)pr_val = bgep->param_adv_1000hdx;
 			break;
 		case DLD_PROP_EN_1000HDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_en_1000hdx;
+			if (is_default)
+				*(uint8_t *)pr_val = 1;
+			else
+				*(uint8_t *)pr_val = bgep->param_en_1000hdx;
 			break;
 		case DLD_PROP_ADV_100FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_100fdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_adv_100fdx;
+			}
 			break;
 		case DLD_PROP_EN_100FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_en_100fdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_en_100fdx;
+			}
 			break;
 		case DLD_PROP_ADV_100HDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_100hdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_adv_100hdx;
+			}
 			break;
 		case DLD_PROP_EN_100HDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_en_100hdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_en_100hdx;
+			}
 			break;
 		case DLD_PROP_ADV_10FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_10fdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_adv_10fdx;
+			}
 			break;
 		case DLD_PROP_EN_10FDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_en_10fdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_en_10fdx;
+			}
 			break;
 		case DLD_PROP_ADV_10HDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_adv_10hdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_adv_10hdx;
+			}
 			break;
 		case DLD_PROP_EN_10HDX_CAP:
-			if (pr_valsize < sizeof (uint8_t))
-				return (EINVAL);
-			*(uint8_t *)pr_val = bgep->param_en_10hdx;
+			if (is_default) {
+				*(uint8_t *)pr_val =
+				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
+			} else {
+				*(uint8_t *)pr_val = bgep->param_en_10hdx;
+			}
 			break;
-		default:
-			err = bge_get_priv_prop(bgep, pr_name, pr_valsize,
-			    pr_val);
+		case DLD_PROP_ADV_100T4_CAP:
+		case DLD_PROP_EN_100T4_CAP:
+			*(uint8_t *)pr_val = 0;
+			break;
+		case DLD_PROP_PRIVATE:
+			err = bge_get_priv_prop(bgep, pr_name, pr_flags,
+			    pr_valsize, pr_val);
 			return (err);
+		default:
+			return (ENOTSUP);
 	}
 	return (0);
 }
@@ -1178,6 +1244,28 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 	int err = 0;
 	long result;
 
+	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result > 1 || result < 0) {
+			err = EINVAL;
+		} else {
+			bgep->param_adv_pause = result;
+			if (bge_reprogram(bgep) == IOC_INVAL)
+				err = EINVAL;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result > 1 || result < 0) {
+			err = EINVAL;
+		} else {
+			bgep->param_adv_asym_pause = result;
+			if (bge_reprogram(bgep) == IOC_INVAL)
+				err = EINVAL;
+		}
+		return (err);
+	}
 	if (strcmp(pr_name, "_drain_max") == 0) {
 
 		/*
@@ -1220,9 +1308,8 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		return (err);
 	}
 	if (strcmp(pr_name, "_intr_coalesce_blank_time") == 0) {
-		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0) {
+		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
 			return (EINVAL);
-		}
 
 		bgep->chipid.rx_ticks_norm = result;
 		return (0);
@@ -1235,49 +1322,55 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		bgep->chipid.rx_count_norm = result;
 		return (0);
 	}
-	return (EINVAL);
+	return (ENOTSUP);
 }
 
 static int
-bge_get_priv_prop(bge_t *bge, const char *pr_name, uint_t pr_valsize,
-    void *pr_val)
+bge_get_priv_prop(bge_t *bge, const char *pr_name, uint_t pr_flags,
+    uint_t pr_valsize, void *pr_val)
 {
-	char valstr[MAXNAMELEN];
-	int err = EINVAL;
-	uint_t strsize;
+	int err = ENOTSUP;
+	boolean_t is_default = (pr_flags & DLD_DEFAULT);
+	int value;
 
-
+	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		value = (is_default? 1 : bge->param_adv_pause);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
+		value = (is_default? 1 : bge->param_adv_asym_pause);
+		err = 0;
+		goto done;
+	}
 	if (strcmp(pr_name, "_drain_max") == 0) {
-		(void) sprintf(valstr, "%d", bge->param_drain_max);
+		value = (is_default? 64 : bge->param_drain_max);
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_msi_cnt") == 0) {
-		(void) sprintf(valstr, "%d", bge->param_msi_cnt);
+		value = (is_default? 0 : bge->param_msi_cnt);
 		err = 0;
 		goto done;
 	}
 
 	if (strcmp(pr_name, "_intr_coalesce_blank_time") == 0) {
-		(void) sprintf(valstr, "%d", bge->chipid.rx_ticks_norm);
+		value = (is_default? bge_rx_ticks_norm :
+		    bge->chipid.rx_ticks_norm);
 		err = 0;
 		goto done;
 	}
 
 	if (strcmp(pr_name, "_intr_coalesce_pkt_cnt") == 0) {
-		(void) sprintf(valstr, "%d", bge->chipid.rx_count_norm);
+		value = (is_default? bge_rx_count_norm :
+		    bge->chipid.rx_count_norm);
 		err = 0;
 		goto done;
 	}
 
 done:
-	if (err != 0) {
-		strsize = (uint_t)strlen(valstr);
-		if (pr_valsize < strsize) {
-			err = ENOBUFS;
-		} else {
-			(void) strlcpy(pr_val, valstr, pr_valsize);
-		}
+	if (err == 0) {
+		(void) snprintf(pr_val, pr_valsize, "%d", value);
 	}
 	return (err);
 }
@@ -1640,11 +1733,6 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	case LB_SET_MODE:
 		break;
 
-	case ND_GET:
-		need_privilege = B_FALSE;
-		/* FALLTHRU */
-	case ND_SET:
-		break;
 	}
 
 	if (need_privilege) {
@@ -1694,10 +1782,6 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		status = bge_loop_ioctl(bgep, wq, mp, iocp);
 		break;
 
-	case ND_GET:
-	case ND_SET:
-		status = bge_nd_ioctl(bgep, wq, mp, iocp);
-		break;
 	}
 
 	/*
@@ -2780,8 +2864,6 @@ bge_unattach(bge_t *bgep)
 	}
 	if (bgep->progress & PROGRESS_KSTATS)
 		bge_fini_kstats(bgep);
-	if (bgep->progress & PROGRESS_NDD)
-		bge_nd_cleanup(bgep);
 	if (bgep->progress & PROGRESS_PHY)
 		bge_phys_reset(bgep);
 	if (bgep->progress & PROGRESS_HWINT) {
@@ -2836,7 +2918,6 @@ bge_unattach(bge_t *bgep)
 
 	ddi_remove_minor_node(bgep->devinfo, NULL);
 	kmem_free(bgep->pstats, sizeof (bge_statistics_reg_t));
-	kmem_free(bgep->nd_params, PARAM_COUNT * sizeof (nd_param_t));
 	kmem_free(bgep, sizeof (*bgep));
 }
 
@@ -2957,8 +3038,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	bgep = kmem_zalloc(sizeof (*bgep), KM_SLEEP);
 	bgep->pstats = kmem_zalloc(sizeof (bge_statistics_reg_t), KM_SLEEP);
-	bgep->nd_params =
-	    kmem_zalloc(PARAM_COUNT * sizeof (nd_param_t), KM_SLEEP);
 	ddi_set_driver_private(devinfo, bgep);
 	bgep->bge_guard = BGE_GUARD;
 	bgep->devinfo = devinfo;
@@ -3101,6 +3180,8 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
 		goto attach_fail;
 	}
+
+
 	err = bge_alloc_bufs(bgep);
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "DMA buffer allocation failed");
@@ -3267,7 +3348,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	bgep->progress |= PROGRESS_PHY;
 
 	/*
-	 * Register NDD-tweakable parameters
+	 * initialize NDD-tweakable parameters
 	 */
 	if (bge_nd_init(bgep)) {
 		bge_problem(bgep, "bge_nd_init() failed");
@@ -3306,6 +3387,9 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = cidp->ethmax_size - sizeof (struct ether_header);
 	macp->m_margin = VLAN_TAGSZ;
+	macp->m_priv_props = bge_priv_prop;
+	macp->m_priv_prop_count = BGE_MAX_PRIV_PROPS;
+
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
 	 * interface; if this succeeds, we're all ready to start()

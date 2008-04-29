@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +119,106 @@ static struct modlinkage mac_ether_modlinkage = {
 
 static mactype_ops_t mac_ether_type_ops;
 
+static mac_ndd_mapping_t  mac_ether_mapping[] = {
+	{"adv_autoneg_cap",	DLD_PROP_AUTONEG, 0, 1, sizeof (uint8_t),
+	    MAC_PROP_PERM_RW},
+
+	{"adv_1000fdx_cap",	DLD_PROP_EN_1000FDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_1000hdx_cap",	DLD_PROP_EN_1000HDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_100fdx_cap",	DLD_PROP_EN_100FDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_100hdx_cap",	DLD_PROP_EN_100HDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_10fdx_cap",	DLD_PROP_EN_10FDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_10hdx_cap",	DLD_PROP_EN_10HDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_100T4_cap",	DLD_PROP_EN_100T4_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_READ},
+
+	{"link_status",		MAC_STAT_LINK_UP, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"link_speed",		DLD_PROP_SPEED, 0, LONG_MAX,
+	    sizeof (uint64_t), MAC_PROP_PERM_READ},
+
+	{"link_duplex",		DLD_PROP_DUPLEX, 0, 2,
+	    sizeof (link_duplex_t), MAC_PROP_PERM_READ},
+
+	{"autoneg_cap",		ETHER_STAT_CAP_AUTONEG, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"pause_cap",		ETHER_STAT_CAP_PAUSE, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"asym_pause_cap",	ETHER_STAT_CAP_ASMPAUSE, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"1000fdx_cap",		ETHER_STAT_CAP_1000FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"1000hdx_cap",		ETHER_STAT_CAP_1000HDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"100T4_cap",		ETHER_STAT_CAP_100T4, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"100fdx_cap",		ETHER_STAT_CAP_100FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"100hdx_cap",		ETHER_STAT_CAP_100HDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"10fdx_cap",		ETHER_STAT_CAP_10FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"10hdx_cap",		ETHER_STAT_CAP_10HDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_autoneg_cap",	ETHER_STAT_LP_CAP_AUTONEG, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_pause_cap",	ETHER_STAT_LP_CAP_PAUSE, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_asym_pause_cap",	ETHER_STAT_LP_CAP_ASMPAUSE, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_1000hdx_cap",	ETHER_STAT_LP_CAP_1000HDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_1000fdx_cap",	ETHER_STAT_LP_CAP_1000FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_100T4_cap",	ETHER_STAT_LP_CAP_100T4, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_100fdx_cap",	ETHER_STAT_LP_CAP_100FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_100hdx_cap",	ETHER_STAT_LP_CAP_100HDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_10fdx_cap",	ETHER_STAT_LP_CAP_10FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_10hdx_cap",	ETHER_STAT_LP_CAP_10HDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"link_autoneg",	ETHER_STAT_LINK_AUTONEG, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK}
+
+};
+
+
 int
 _init(void)
 {
@@ -135,6 +235,8 @@ _init(void)
 	mtrp->mtr_brdcst_addr = ether_brdcst;
 	mtrp->mtr_stats = ether_stats;
 	mtrp->mtr_statcount = A_CNT(ether_stats);
+	mtrp->mtr_mapping = mac_ether_mapping;
+	mtrp->mtr_mappingcount = A_CNT(mac_ether_mapping);
 	if ((err = mactype_register(mtrp)) == 0) {
 		if ((err = mod_install(&mac_ether_modlinkage)) != 0)
 			(void) mactype_unregister(MAC_PLUGIN_IDENT_ETHER);

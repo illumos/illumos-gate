@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,9 +65,9 @@ CFLAGS		+= $(CCVERBOSE)
 CFLAGS		+= -dalign
 
 #
-# Driver depends on MAC & IP
+# Driver depends on MAC
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -dy -N misc/mac
 
 #
 # For now, disable these lint checks; maintainers should endeavor

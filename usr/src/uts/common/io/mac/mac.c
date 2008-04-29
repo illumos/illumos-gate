@@ -55,6 +55,7 @@
 #include <sys/atomic.h>
 #include <sys/sdt.h>
 #include <inet/nd.h>
+#include <sys/ethernet.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -78,6 +79,7 @@ static kmutex_t		i_mactype_lock;
 static void i_mac_notify_thread(void *);
 static mblk_t *mac_vnic_tx(void *, mblk_t *);
 static mblk_t *mac_vnic_txloop(void *, mblk_t *);
+static void   mac_register_priv_prop(mac_impl_t *, mac_priv_prop_t *, uint_t);
 
 /*
  * Private functions.
@@ -1048,20 +1050,18 @@ void
 mac_ioctl(mac_handle_t mh, queue_t *wq, mblk_t *bp)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	int		cmd;
+	int cmd = ((struct iocblk *)bp->b_rptr)->ioc_cmd;
 
-	if (mip->mi_callbacks->mc_callbacks & (MC_SETPROP|MC_GETPROP)) {
-		cmd = ((struct iocblk *)bp->b_rptr)->ioc_cmd;
-		if (cmd == ND_SET || cmd == ND_GET) {
-			/*
-			 * ndd ioctls are Obsolete
-			 */
-			cmn_err(CE_WARN,
-			    "The ndd commands are obsolete and may be removed "
-			    "in a future release of Solaris. "
-			    "Use dladm(1M) to manage driver tunables\n");
-		}
+	if ((cmd == ND_GET && (mip->mi_callbacks->mc_callbacks & MC_GETPROP)) ||
+	    (cmd == ND_SET && (mip->mi_callbacks->mc_callbacks & MC_SETPROP))) {
+		/*
+		 * If ndd props were registered, call them.
+		 * Note that ndd ioctls are Obsolete
+		 */
+		mac_ndd_ioctl(mip, wq, bp);
+		return;
 	}
+
 	/*
 	 * Call the driver to handle the ioctl.  The driver may not support
 	 * any ioctls, in which case we reply with a NAK on its behalf.
@@ -1616,6 +1616,12 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	}
 
 	/*
+	 * Register the private properties.
+	 */
+	mac_register_priv_prop(mip, mregp->m_priv_props,
+	    mregp->m_priv_prop_count);
+
+	/*
 	 * Stash the driver callbacks into the mac_impl_t, but first sanity
 	 * check to make sure all mandatory callbacks are set.
 	 */
@@ -1678,6 +1684,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 * Initialize the kstats for this device.
 	 */
 	mac_stat_create(mip);
+
 
 	/* set the gldv3 flag in dn_flags */
 	dnp = &devnamesp[ddi_driver_major(mip->mi_dip)];
@@ -1797,6 +1804,7 @@ mac_unregister(mac_handle_t mh)
 	mod_hash_val_t		val;
 	mac_multicst_addr_t	*p, *nextp;
 	mac_margin_req_t	*mmr, *nextmmr;
+	mac_priv_prop_t		*mpriv;
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
@@ -1873,6 +1881,9 @@ mac_unregister(mac_handle_t mh)
 		mac_minor_rele(mip->mi_minor);
 
 	cmn_err(CE_NOTE, "!%s unregistered", mip->mi_name);
+
+	mpriv = mip->mi_priv_prop;
+	kmem_free(mpriv, mip->mi_priv_prop_count * sizeof (*mpriv));
 
 	kmem_cache_free(i_mac_impl_cachep, mip);
 
@@ -2810,6 +2821,9 @@ mactype_register(mactype_register_t *mtrp)
 	mtp->mt_stats = mtrp->mtr_stats;
 	mtp->mt_statcount = mtrp->mtr_statcount;
 
+	mtp->mt_mapping = mtrp->mtr_mapping;
+	mtp->mt_mappingcount = mtrp->mtr_mappingcount;
+
 	if (mod_hash_insert(i_mactype_hash,
 	    (mod_hash_key_t)mtp->mt_ident, (mod_hash_val_t)mtp) != 0) {
 		kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
@@ -2880,10 +2894,41 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 {
 	int err = ENOTSUP;
 	mac_impl_t *mip = (mac_impl_t *)mh;
+	uint32_t sdu;
+	link_state_t link_state;
 
+	switch (macprop->mp_id) {
+	case DLD_PROP_MTU:
+		if (valsize < sizeof (sdu))
+			return (EINVAL);
+		if ((macprop->mp_flags & DLD_DEFAULT) == 0) {
+			mac_sdu_get(mh, NULL, &sdu);
+			bcopy(&sdu, val, sizeof (sdu));
+			return (0);
+		} else {
+			if (mip->mi_info.mi_media == DL_ETHER) {
+				sdu = ETHERMTU;
+				bcopy(&sdu, val, sizeof (sdu));
+				return (0);
+			}
+			/*
+			 * ask driver for its default.
+			 */
+			break;
+		}
+	case DLD_PROP_STATUS:
+		if (valsize < sizeof (link_state))
+			return (EINVAL);
+		link_state = mac_link_get(mh);
+		bcopy(&link_state, val, sizeof (link_state));
+		return (0);
+	default:
+		break;
+	}
 	if (mip->mi_callbacks->mc_callbacks & MC_GETPROP) {
 		err = mip->mi_callbacks->mc_getprop(mip->mi_driver,
-		    macprop->mp_name, macprop->mp_id, valsize, val);
+		    macprop->mp_name, macprop->mp_id, macprop->mp_flags,
+		    valsize, val);
 	}
 	return (err);
 }
@@ -2900,4 +2945,18 @@ mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 	/* Send a MAC_NOTE_SDU_SIZE notification. */
 	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);
 	return (0);
+}
+
+static void
+mac_register_priv_prop(mac_impl_t *mip, mac_priv_prop_t *mpp, uint_t nprop)
+{
+	mac_priv_prop_t *mpriv;
+
+	if (mpp == NULL)
+		return;
+
+	mpriv = kmem_zalloc(nprop * sizeof (*mpriv), KM_SLEEP);
+	(void) memcpy(mpriv, mpp, nprop * sizeof (*mpriv));
+	mip->mi_priv_prop = mpriv;
+	mip->mi_priv_prop_count = nprop;
 }

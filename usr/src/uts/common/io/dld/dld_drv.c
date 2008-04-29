@@ -542,6 +542,7 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 
 	macprop.mp_name = dipp->pr_name;
 	macprop.mp_id = dipp->pr_num;
+	macprop.mp_flags = dipp->pr_flags;
 
 	if (set)
 		err = mac_set_prop(dvp->dv_dlp->dl_mh, &macprop,

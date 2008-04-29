@@ -45,7 +45,7 @@ extern "C" {
 /*
  * MAC Information (text emitted by modinfo(1m))
  */
-#define	MAC_INFO	"MAC Services v%I%"
+#define	MAC_INFO	"MAC Services"
 
 /*
  * MAC version identifier.  This is used by mac_alloc() mac_register() to
@@ -302,7 +302,7 @@ typedef void		(*mac_close_t)(void *);
 typedef	int		(*mac_set_prop_t)(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 typedef	int		(*mac_get_prop_t)(void *, const char *, mac_prop_id_t,
-    uint_t, void *);
+    uint_t, uint_t, void *);
 
 /*
  * Drivers must set all of these callbacks except for mc_resources,
@@ -329,6 +329,11 @@ typedef struct mac_callbacks_s {
 	mac_set_prop_t	mc_setprop;
 	mac_get_prop_t	mc_getprop;
 } mac_callbacks_t;
+
+typedef struct mac_priv_prop_s {
+	char	mpp_name[MAXLINKPROPNAME];
+	uint_t	mpp_flags;
+} mac_priv_prop_t;
 
 /*
  * Multiple Rings capability
@@ -491,20 +496,23 @@ typedef struct  mac_capab_share_s {
 #define	MAC_MAX_MINOR	1000
 
 typedef struct mac_register_s {
-	uint_t		m_version;	/* set by mac_alloc() */
-	const char	*m_type_ident;
-	void		*m_driver;	/* Driver private data */
-	dev_info_t	*m_dip;
-	uint_t		m_instance;
-	uint8_t		*m_src_addr;
-	uint8_t		*m_dst_addr;
-	mac_callbacks_t	*m_callbacks;
-	uint_t		m_min_sdu;
-	uint_t		m_max_sdu;
-	void		*m_pdata;
-	size_t		m_pdata_size;
-	uint32_t	m_margin;
+	uint_t			m_version;	/* set by mac_alloc() */
+	const char		*m_type_ident;
+	void			*m_driver;	/* Driver private data */
+	dev_info_t		*m_dip;
+	uint_t			m_instance;
+	uint8_t			*m_src_addr;
+	uint8_t			*m_dst_addr;
+	mac_callbacks_t		*m_callbacks;
+	uint_t			m_min_sdu;
+	uint_t			m_max_sdu;
+	void			*m_pdata;
+	size_t			m_pdata_size;
+	uint32_t		m_margin;
+	mac_priv_prop_t		*m_priv_props;
+	size_t			m_priv_prop_count;
 } mac_register_t;
+
 
 /*
  * Opaque handle types.
@@ -682,6 +690,38 @@ typedef struct mactype_ops_s {
 #define	MTOPS_HEADER_UNCOOK	0x004
 #define	MTOPS_LINK_DETAILS	0x008
 
+/*
+ * Provide mapping for legacy ndd ioctls relevant to that mactype.
+ * Note that the ndd ioctls are obsolete, and may be removed in a future
+ * release of Solaris. The ndd ioctls are not typically used in legacy
+ * ethernet drivers. New datalink drivers of all link-types should use
+ * dladm(1m) interfaces for administering tunables and not have to provide
+ * a mapping.
+ */
+typedef struct mac_ndd_mapping_s {
+	char		*mp_name;
+	union {
+		mac_prop_id_t   u_id;
+		uint_t		u_kstat;
+	} u_mp_id;
+	long		mp_minval;
+	long		mp_maxval;
+	size_t		mp_valsize;
+	int		mp_flags;
+} mac_ndd_mapping_t;
+
+#define	mp_prop_id	u_mp_id.u_id
+#define	mp_kstat	u_mp_id.u_kstat
+
+/*
+ * Flags to figure out r/w status of legacy ndd props.
+ */
+#define	MAC_PROP_PERM_READ		0x0001
+#define	MAC_PROP_PERM_WRITE		0x0010
+#define	MAC_PROP_MAP_KSTAT		0x0100
+#define	MAC_PROP_PERM_RW		(MAC_PROP_PERM_READ|MAC_PROP_PERM_WRITE)
+#define	MAC_PROP_FLAGS_RK		(MAC_PROP_PERM_READ|MAC_PROP_MAP_KSTAT)
+
 typedef struct mactype_register_s {
 	uint_t		mtr_version;	/* set by mactype_alloc() */
 	const char	*mtr_ident;
@@ -692,11 +732,14 @@ typedef struct mactype_register_s {
 	uint8_t		*mtr_brdcst_addr;
 	mac_stat_info_t	*mtr_stats;
 	size_t		mtr_statcount;
+	mac_ndd_mapping_t *mtr_mapping;
+	size_t		mtr_mappingcount;
 } mactype_register_t;
 
 typedef struct mac_prop_s {
 	mac_prop_id_t	mp_id;
 	char		*mp_name;
+	uint_t		mp_flags;
 } mac_prop_t;
 
 /*

@@ -476,7 +476,7 @@ typedef struct link_fields_buf_s {
 	char link_mtu[11];
 	char link_state[DLADM_STRSIZE];
 	char link_over[MAXLINKNAMELEN];
-	char link_phys_state[6];
+	char link_phys_state[DLADM_STRSIZE];
 	char link_phys_media[DLADM_STRSIZE];
 	char link_phys_speed[DLADM_STRSIZE];
 	char link_phys_duplex[DLPI_LINKNAME_MAX];
@@ -5431,11 +5431,11 @@ show_etherprop(datalink_id_t linkid, void *arg)
 		speed = speed/1000;
 		speed_unit = 'G';
 	}
-	(void) get_linkduplex(ebuf.eth_link, B_FALSE, buf);
+	(void) get_linkduplex(ebuf.eth_link, B_TRUE, buf);
 	(void) snprintf(ebuf.eth_spdx, sizeof (ebuf.eth_spdx), "%d%c-%c",
 	    speed, speed_unit, buf[0]);
 
-	(void) get_linkstate(ebuf.eth_link, B_FALSE, buf);
+	(void) get_linkstate(ebuf.eth_link, B_TRUE, buf);
 	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state),
 	    "%s", buf);
 

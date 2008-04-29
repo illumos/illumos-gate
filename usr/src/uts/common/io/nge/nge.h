@@ -263,71 +263,6 @@ enum send_status {
 	SEND_MAP_SUCCESS		/* OK, free msg		*/
 };
 
-
-/*
- * NDD parameter indexes, divided into:
- *
- *	read-only parameters describing the hardware's capabilities
- *	read-write parameters controlling the advertised capabilities
- *	read-only parameters describing the partner's capabilities
- *	read-only parameters describing the link state
- */
-enum {
-	PARAM_AUTONEG_CAP,
-	PARAM_PAUSE_CAP,
-	PARAM_ASYM_PAUSE_CAP,
-	PARAM_1000FDX_CAP,
-	PARAM_1000HDX_CAP,
-	PARAM_100T4_CAP,
-	PARAM_100FDX_CAP,
-	PARAM_100HDX_CAP,
-	PARAM_10FDX_CAP,
-	PARAM_10HDX_CAP,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_PAUSE_CAP,
-	PARAM_ADV_ASYM_PAUSE_CAP,
-	PARAM_ADV_1000FDX_CAP,
-	PARAM_ADV_1000HDX_CAP,
-	PARAM_ADV_100T4_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_100HDX_CAP,
-	PARAM_ADV_10FDX_CAP,
-	PARAM_ADV_10HDX_CAP,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_PAUSE_CAP,
-	PARAM_LP_ASYM_PAUSE_CAP,
-	PARAM_LP_1000FDX_CAP,
-	PARAM_LP_1000HDX_CAP,
-	PARAM_LP_100T4_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_100HDX_CAP,
-	PARAM_LP_10FDX_CAP,
-	PARAM_LP_10HDX_CAP,
-
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_DUPLEX,
-
-	PARAM_LINK_AUTONEG,
-	PARAM_LINK_RX_PAUSE,
-	PARAM_LINK_TX_PAUSE,
-
-	PARAM_LOOP_MODE,
-	PARAM_TXBCOPY_THRESHOLD,
-	PARAM_RXBCOPY_THRESHOLD,
-	PARAM_RECV_MAX_PACKET,
-	PARAM_POLL_QUIET_TIME,
-	PARAM_POLL_BUSY_TIME,
-	PARAM_RX_INTR_HWATER,
-	PARAM_RX_INTR_LWATER,
-	PARAM_TX_N_INTR,
-
-	PARAM_COUNT
-};
-
-
 /*
  * (Internal) return values from ioctl subroutines
  */
@@ -428,17 +363,6 @@ typedef struct {
 } nge_mac_addr_t;
 
 struct nge;
-
-/*
- * Named Data (ND) Parameter Management Structure
- */
-typedef struct {
-	int			ndp_info;
-	int			ndp_min;
-	int			ndp_max;
-	int			ndp_val;
-	char			*ndp_name;
-} nd_param_t;
 
 
 #define	CHIP_FLAG_COPPER	0x40
@@ -862,12 +786,6 @@ typedef struct nge {
 
 	uint32_t		param_loop_mode;
 
-	/*
-	 * NDD parameters (protected by genlock)
-	 */
-	caddr_t			nd_data_p;
-	nd_param_t		nd_params[PARAM_COUNT];
-
 	kstat_t			*nge_kstats[NGE_KSTAT_COUNT];
 	nge_statistics_t	statistics;
 
@@ -881,52 +799,42 @@ typedef struct nge {
 				param_en_100hdx:1,
 				param_en_10fdx:1,
 				param_en_10hdx:1,
-				param_pad_to_32:24;
+				param_adv_autoneg:1,
+				param_adv_pause:1,
+				param_adv_asym_pause:1,
+				param_adv_1000fdx:1,
+				param_adv_1000hdx:1,
+				param_adv_100fdx:1,
+				param_adv_100hdx:1,
+				param_adv_10fdx:1,
+				param_adv_10hdx:1,
+				param_lp_autoneg:1,
+				param_lp_pause:1,
+				param_lp_asym_pause:1,
+				param_lp_1000fdx:1,
+				param_lp_1000hdx:1,
+				param_lp_100fdx:1,
+				param_lp_100hdx:1,
+				param_lp_10fdx:1,
+				param_lp_10hdx:1,
+				param_link_up:1,
+				param_link_autoneg:1,
+				param_link_rx_pause:1,
+				param_link_tx_pause:1,
+				param_pad_to_32:2;
+	uint64_t		param_link_speed;
+	link_duplex_t		param_link_duplex;
+	int			param_txbcopy_threshold;
+	int			param_rxbcopy_threshold;
+	int			param_recv_max_packet;
+	int			param_poll_quiet_time;
+	int			param_poll_busy_time;
+	int			param_rx_intr_hwater;
+	int			param_rx_intr_lwater;
+	int			param_tx_n_intr;
 } nge_t;
 
 extern const nge_ksindex_t nge_statistics[];
-
-/*
- * Shorthand for the NDD parameters
- */
-#define	param_adv_autoneg	nd_params[PARAM_ADV_AUTONEG_CAP].ndp_val
-#define	param_adv_pause		nd_params[PARAM_ADV_PAUSE_CAP].ndp_val
-#define	param_adv_asym_pause	nd_params[PARAM_ADV_ASYM_PAUSE_CAP].ndp_val
-#define	param_adv_1000fdx	nd_params[PARAM_ADV_1000FDX_CAP].ndp_val
-#define	param_adv_1000hdx	nd_params[PARAM_ADV_1000HDX_CAP].ndp_val
-#define	param_adv_100fdx	nd_params[PARAM_ADV_100FDX_CAP].ndp_val
-#define	param_adv_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
-#define	param_adv_10fdx		nd_params[PARAM_ADV_10FDX_CAP].ndp_val
-#define	param_adv_10hdx		nd_params[PARAM_ADV_10HDX_CAP].ndp_val
-
-#define	param_lp_autoneg	nd_params[PARAM_LP_AUTONEG_CAP].ndp_val
-#define	param_lp_pause		nd_params[PARAM_LP_PAUSE_CAP].ndp_val
-#define	param_lp_asym_pause	nd_params[PARAM_LP_ASYM_PAUSE_CAP].ndp_val
-#define	param_lp_1000fdx	nd_params[PARAM_LP_1000FDX_CAP].ndp_val
-#define	param_lp_1000hdx	nd_params[PARAM_LP_1000HDX_CAP].ndp_val
-#define	param_lp_100fdx		nd_params[PARAM_LP_100FDX_CAP].ndp_val
-#define	param_lp_100hdx		nd_params[PARAM_LP_100HDX_CAP].ndp_val
-#define	param_lp_10fdx		nd_params[PARAM_LP_10FDX_CAP].ndp_val
-#define	param_lp_10hdx		nd_params[PARAM_LP_10HDX_CAP].ndp_val
-
-#define	param_link_up		nd_params[PARAM_LINK_STATUS].ndp_val
-#define	param_link_speed	nd_params[PARAM_LINK_SPEED].ndp_val
-#define	param_link_duplex	nd_params[PARAM_LINK_DUPLEX].ndp_val
-
-#define	param_link_autoneg	nd_params[PARAM_LINK_AUTONEG].ndp_val
-#define	param_link_rx_pause	nd_params[PARAM_LINK_RX_PAUSE].ndp_val
-#define	param_link_tx_pause	nd_params[PARAM_LINK_TX_PAUSE].ndp_val
-
-#define	param_loop_mode		nd_params[PARAM_LOOP_MODE].ndp_val
-
-#define	param_txbcopy_threshold	nd_params[PARAM_TXBCOPY_THRESHOLD].ndp_val
-#define	param_rxbcopy_threshold	nd_params[PARAM_RXBCOPY_THRESHOLD].ndp_val
-#define	param_recv_max_packet	nd_params[PARAM_RECV_MAX_PACKET].ndp_val
-#define	param_poll_quiet_time	nd_params[PARAM_POLL_QUIET_TIME].ndp_val
-#define	param_poll_busy_time	nd_params[PARAM_POLL_BUSY_TIME].ndp_val
-#define	param_rx_intr_hwater	nd_params[PARAM_RX_INTR_HWATER].ndp_val
-#define	param_rx_intr_lwater	nd_params[PARAM_RX_INTR_LWATER].ndp_val
-#define	param_tx_n_intr		nd_params[PARAM_TX_N_INTR].ndp_val
 
 /*
  * Sync a DMA area described by a dma_area_t
@@ -1110,8 +1018,6 @@ mblk_t *nge_m_tx(void *arg, mblk_t *mp);
 void nge_tx_recycle(nge_t *ngep, boolean_t is_intr);
 void nge_tx_recycle_all(nge_t *ngep);
 
-enum ioc_reply nge_nd_ioctl(nge_t *ngep, queue_t *wq,
-    mblk_t *mp, struct iocblk *iocp);
 int nge_nd_init(nge_t *ngep);
 void nge_nd_cleanup(nge_t *ngep);
 

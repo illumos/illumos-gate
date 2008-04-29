@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -63,9 +63,9 @@ INC_PATH	+= -I$(CONF_SRCDIR)
 # CFLAGS += $(CINLINEFLAGS)
 
 #
-# Driver depends on GLD & IP
+# Driver depends on GLD
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -dy -N misc/mac
 
 #
 # For now, disable these lint checks; maintainers should endeavor

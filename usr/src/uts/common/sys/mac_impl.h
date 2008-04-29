@@ -87,6 +87,8 @@ typedef struct mactype_s {
 	mactype_ops_t	mt_ops;
 	mac_stat_info_t	*mt_stats;	/* array of mac_stat_info_t elements */
 	size_t		mt_statcount;	/* number of elements in mt_stats */
+	mac_ndd_mapping_t *mt_mapping;
+	size_t		mt_mappingcount;
 } mactype_t;
 
 
@@ -112,6 +114,7 @@ typedef struct mac_vnic_tx_s {
 	kcondvar_t	mv_cv;
 	boolean_t	mv_clearing;
 } mac_vnic_tx_t;
+
 
 /*
  * Each registered MAC is associated with a mac_t structure.
@@ -197,6 +200,8 @@ typedef struct mac_impl_s {
 	 * sorted: the first one has the greatest value.
 	 */
 	mac_margin_req_t	*mi_mmrp;
+	mac_priv_prop_t		*mi_priv_prop;
+	uint_t			mi_priv_prop_count;
 } mac_impl_t;
 
 #define	mi_getstat	mi_callbacks->mc_getstat
@@ -218,6 +223,8 @@ extern int	mac_fini(void);
 extern void	mac_stat_create(mac_impl_t *);
 extern void	mac_stat_destroy(mac_impl_t *);
 extern uint64_t	mac_stat_default(mac_impl_t *, uint_t);
+
+extern void mac_ndd_ioctl(mac_impl_t *, queue_t *, mblk_t *);
 
 #ifdef	__cplusplus
 }
