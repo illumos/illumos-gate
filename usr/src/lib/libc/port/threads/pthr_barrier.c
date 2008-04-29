@@ -127,7 +127,7 @@ _pthread_barrier_destroy(pthread_barrier_t *barrier)
 
 	(void) __mutex_destroy(mp);
 	(void) _cond_destroy(cvp);
-	(void) _private_memset(barrier, -1, sizeof (*barrier));
+	(void) memset(barrier, -1, sizeof (*barrier));
 	return (0);
 }
 

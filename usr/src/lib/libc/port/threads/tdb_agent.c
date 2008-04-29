@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,7 +142,7 @@ alloc_sync_addr(void *addr)
 
 		/* double the allocation each time */
 		tdbp->tdb_sync_alloc *= 2;
-		if ((vaddr = _private_mmap(NULL,
+		if ((vaddr = mmap(NULL,
 		    tdbp->tdb_sync_alloc * sizeof (tdb_sync_stats_t),
 		    PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON,
 		    -1, (off_t)0)) == MAP_FAILED) {
@@ -161,7 +161,7 @@ alloc_sync_addr(void *addr)
 	tdbp->tdb_sync_addr_free = (tdb_sync_stats_t *)(uintptr_t)sap->next;
 	sap->next = (uintptr_t)0;
 	sap->sync_addr = (uintptr_t)addr;
-	(void) _memset(&sap->un, 0, sizeof (sap->un));
+	(void) memset(&sap->un, 0, sizeof (sap->un));
 	return (sap);
 }
 
@@ -193,8 +193,7 @@ initialize_sync_hash()
 	}
 	/* start with a free list of 2k elements */
 	tdbp->tdb_sync_alloc = 2*1024;
-	if ((vaddr = _private_mmap(NULL,
-	    TDB_HASH_SIZE * sizeof (uint64_t) +
+	if ((vaddr = mmap(NULL, TDB_HASH_SIZE * sizeof (uint64_t) +
 	    tdbp->tdb_sync_alloc * sizeof (tdb_sync_stats_t),
 	    PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON,
 	    -1, (off_t)0)) == MAP_FAILED) {
@@ -205,7 +204,7 @@ initialize_sync_hash()
 
 	/* initialize the free list */
 	tdbp->tdb_sync_addr_free = sap =
-		(tdb_sync_stats_t *)&addr_hash[TDB_HASH_SIZE];
+	    (tdb_sync_stats_t *)&addr_hash[TDB_HASH_SIZE];
 	for (i = 1; i < tdbp->tdb_sync_alloc; sap++, i++)
 		sap->next = (uintptr_t)(sap + 1);
 	sap->next = (uintptr_t)0;
@@ -215,7 +214,7 @@ initialize_sync_hash()
 	udp->tdb_hash_lock_stats.next = (uintptr_t)0;
 	udp->tdb_hash_lock_stats.sync_addr = (uintptr_t)&udp->tdb_hash_lock;
 	addr_hash[tdb_addr_hash(&udp->tdb_hash_lock)] =
-		(uintptr_t)&udp->tdb_hash_lock_stats;
+	    (uintptr_t)&udp->tdb_hash_lock_stats;
 
 	tdbp->tdb_register_count = 1;
 	/* assign to tdb_sync_addr_hash only after fully initialized */
@@ -308,7 +307,7 @@ tdb_sync_obj_register(void *addr, int *new)
 			    (uintptr_t)tdbp->tdb_sync_addr_hash[i];
 			    sap != NULL;
 			    sap = (tdb_sync_stats_t *)(uintptr_t)sap->next)
-				(void) _memset(&sap->un, 0, sizeof (sap->un));
+				(void) memset(&sap->un, 0, sizeof (sap->un));
 
 		switch (udp->uberflags.uf_tdb_register_sync) {
 		case REGISTER_SYNC_ENABLE:

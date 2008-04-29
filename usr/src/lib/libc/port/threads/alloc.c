@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +109,7 @@ initial_allocation(bucket_t *bp)	/* &__uberdata.bucket[0] */
 	 * We do this seemingly obtuse call to __systemcall6(SYS_mmap)
 	 * instead of simply calling mmap() directly because, if the
 	 * mmap() system call fails, we must make sure that __cerror()
-	 * is not called, because that would call _private___errno()
+	 * is not called, because that would call ___errno()
 	 * which would dereference curthread and, because we are very
 	 * early in libc initialization, curthread is NULL and we would
 	 * draw a hard-to-debug SIGSEGV core dump, or worse.
@@ -196,8 +196,8 @@ lmalloc(size_t size)
 
 	if (bucketnum >= NBUCKETS) {
 		/* mmap() allocates memory already set to zero */
-		ptr = _private_mmap((void *)CHUNKSIZE, size, prot,
-			MAP_PRIVATE|MAP_ANON|MAP_ALIGN, -1, (off_t)0);
+		ptr = mmap((void *)CHUNKSIZE, size, prot,
+		    MAP_PRIVATE|MAP_ANON|MAP_ALIGN, -1, (off_t)0);
 		if (ptr == MAP_FAILED)
 			ptr = NULL;
 		return (ptr);
@@ -233,8 +233,8 @@ lmalloc(size_t size)
 		for (;;) {
 			bsize = CHUNKSIZE * bp->chunks;
 			n = bsize / size;
-			ptr = _private_mmap((void *)CHUNKSIZE, bsize, prot,
-				MAP_PRIVATE|MAP_ANON|MAP_ALIGN, -1, (off_t)0);
+			ptr = mmap((void *)CHUNKSIZE, bsize, prot,
+			    MAP_PRIVATE|MAP_ANON|MAP_ALIGN, -1, (off_t)0);
 			if (ptr != MAP_FAILED)
 				break;
 			/* try a smaller chunk allocation */
@@ -279,7 +279,7 @@ lfree(void *ptr, size_t size)
 		/* see comment below */
 		if (((uintptr_t)ptr & (CHUNKSIZE - 1)) != 0)
 			goto bad;
-		(void) _private_munmap(ptr, size);
+		(void) munmap(ptr, size);
 		return;
 	}
 
@@ -297,7 +297,7 @@ lfree(void *ptr, size_t size)
 	/*
 	 * Zeroing the memory here saves time later when reallocating it.
 	 */
-	(void) _private_memset(ptr, 0, size);
+	(void) memset(ptr, 0, size);
 
 	if ((self = __curthread()) == NULL)
 		bp = &__uberdata.bucket[bucketnum];
@@ -367,7 +367,7 @@ libc_realloc(void *old, size_t size)
 		ptr = (private_header_t *)old - 1;
 		if (size >= ptr->private_size)
 			size = ptr->private_size;
-		(void) _memcpy(new, old, size - sizeof (*ptr));
+		(void) memcpy(new, old, size - sizeof (*ptr));
 		lfree(ptr, ptr->private_size);
 	}
 	return (new);

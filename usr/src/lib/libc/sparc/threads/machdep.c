@@ -48,8 +48,8 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 	    SA(MINFRAME);
 
 	/* clear the context and the top stack frame */
-	(void) _memset(ucp, 0, sizeof (*ucp));
-	(void) _memset((void *)stack, 0, SA(MINFRAME));
+	(void) memset(ucp, 0, sizeof (*ucp));
+	(void) memset((void *)stack, 0, SA(MINFRAME));
 
 	/* fill in registers of interest */
 	ucp->uc_flags |= UC_CPU;
@@ -77,7 +77,7 @@ _thr_setup(ulwp_t *self)
 	self->ul_ustack.ss_sp = (void *)(self->ul_stktop - self->ul_stksiz);
 	self->ul_ustack.ss_size = self->ul_stksiz;
 	self->ul_ustack.ss_flags = 0;
-	(void) _private_setustack(&self->ul_ustack);
+	(void) setustack(&self->ul_ustack);
 
 	update_sched(self);
 	tls_setup();

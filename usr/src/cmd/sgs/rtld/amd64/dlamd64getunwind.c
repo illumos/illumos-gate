@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +121,7 @@ _dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
 {
 	Rt_map	*lmp;
 	Lm_list	*lml;
-	int	entry = enter();
+	int	entry = enter(0);
 
 	/*
 	 * Identify the link-map associated with the exception "pc".  Note,
@@ -141,6 +141,6 @@ _dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
 	unwindinfo = getunwind_core(lml, lmp, pc, unwindinfo);
 
 	if (entry)
-		leave(lml);
+		leave(lml, 0);
 	return (unwindinfo);
 }

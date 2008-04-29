@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@
 #define	GETCONTEXT_IMPL							\
 	movl	4(%esp), %eax;		/* %eax <-- first arg: ucp */	\
 	pushl	%eax;			/* push ucp for system call */	\
-	call	__getcontext_syscall;	/* call getcontext: syscall */	\
+	call	__getcontext;		/* call getcontext: syscall */	\
 	addl	$4, %esp;		/* pop arg */			\
 	andl	%eax, %eax;		/* if (err_ret_from_syscall) */	\
 	je	1f;							\
@@ -74,8 +74,6 @@
 /*
  * getcontext(ucontext_t *ucp)
  */
-	ANSI_PRAGMA_WEAK2(_private_getcontext,getcontext,function)
-
 	ENTRY(getcontext)
 	GETCONTEXT_IMPL
 	ret
@@ -90,7 +88,7 @@
 	/ call setcontext
 	movl	8(%esp), %eax		/* %eax <-- second arg: ucp */
 	pushl	%eax			/* push ucp for setcontext */
-	call	_private_setcontext	/* call setcontext */
+	call	setcontext
 	addl	$4, %esp		/* pop arg: just in case */
 	ret
 	SET_SIZE(swapcontext)

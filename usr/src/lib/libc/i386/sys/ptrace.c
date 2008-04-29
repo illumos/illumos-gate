@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * ptrace(2) interface built on top of proc(4).
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * ptrace(2) interface built on top of proc(4).
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -154,10 +154,10 @@ ptrace(int request, pid_t pid, int addr, int data)
 
 #if PTRACE_DEBUG
 	fprintf(stderr, " ptrace(%s, 0x%X, 0x%X, 0x%X)\n",
-		map(request), pid, addr, data);
+	    map(request), pid, addr, data);
 #endif
 
-	(void) _private_mutex_lock(&pt_lock);
+	(void) mutex_lock(&pt_lock);
 
 	if (request == 0) {	/* PTRACE_TRACEME, executed by traced process */
 		/*
@@ -205,7 +205,7 @@ ptrace(int request, pid_t pid, int addr, int data)
 		if (close(fd) != 0)
 			exit(255);
 
-		(void) _private_mutex_unlock(&pt_lock);
+		(void) mutex_unlock(&pt_lock);
 		return (0);
 	}
 
@@ -237,7 +237,7 @@ again:
 			goto eio;
 		if (pread(cp->asfd, (char *)&data, sizeof (data), (off_t)addr)
 		    == sizeof (data)) {
-			(void) _private_mutex_unlock(&pt_lock);
+			(void) mutex_unlock(&pt_lock);
 			return (data);
 		}
 		goto eio;
@@ -255,7 +255,7 @@ again:
 		if ((int)xaddr >= 0 && xaddr < U_END) {
 			/* LINTED pointer alignment */
 			data = *((int *)((caddr_t)(&cp->user) + xaddr));
-			(void) _private_mutex_unlock(&pt_lock);
+			(void) mutex_unlock(&pt_lock);
 			return (data);
 		}
 		goto eio;
@@ -266,7 +266,7 @@ again:
 			goto eio;
 		if (pwrite(cp->asfd, (char *)&data, sizeof (data), (off_t)addr)
 		    == sizeof (data)) {
-			(void) _private_mutex_unlock(&pt_lock);
+			(void) mutex_unlock(&pt_lock);
 			return (data);
 		}
 		goto eio;
@@ -284,14 +284,14 @@ again:
 				    (data & PSL_USERMASK);
 			cp->user.u_reg[rx] = data;
 			cp->flags |= CS_SETREGS;
-			(void) _private_mutex_unlock(&pt_lock);
+			(void) mutex_unlock(&pt_lock);
 			return (data);
 		}
 		goto eio;
 
 	case 7:		/* PTRACE_CONT */
 	case 9:		/* PTRACE_SINGLESTEP */
-	    {
+	{
 		long runctl[3];
 
 		if (cp->flags & CS_SETREGS) {
@@ -355,16 +355,16 @@ again:
 			if (errno == ENOENT) {
 				/* current signal must have killed it */
 				ReleaseProc(cp);
-				(void) _private_mutex_unlock(&pt_lock);
+				(void) mutex_unlock(&pt_lock);
 				return (data);
 			}
 			goto tryagain;
 		}
 		(void) memset((char *)ps, 0, sizeof (pstatus_t));
 		cp->flags = 0;
-		(void) _private_mutex_unlock(&pt_lock);
+		(void) mutex_unlock(&pt_lock);
 		return (data);
-	    }
+	}
 
 	case 8:		/* PTRACE_KILL */
 		/* overkill? */
@@ -375,7 +375,7 @@ again:
 		    sizeof (long)+sizeof (siginfo_t));
 		(void) kill(pid, SIGKILL);
 		ReleaseProc(cp);
-		(void) _private_mutex_unlock(&pt_lock);
+		(void) mutex_unlock(&pt_lock);
 		return (0);
 
 	default:
@@ -390,11 +390,11 @@ tryagain:
 	}
 eio:
 	errno = EIO;
-	(void) _private_mutex_unlock(&pt_lock);
+	(void) mutex_unlock(&pt_lock);
 	return (-1);
 esrch:
 	errno = ESRCH;
-	(void) _private_mutex_unlock(&pt_lock);
+	(void) mutex_unlock(&pt_lock);
 	return (-1);
 }
 

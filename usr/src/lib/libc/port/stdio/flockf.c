@@ -72,7 +72,7 @@ ftrylockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		return (_private_mutex_trylock(rl));
+		return (mutex_trylock(rl));
 	return (0);	/* can't happen? */
 }
 
@@ -82,7 +82,7 @@ flockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		_private_mutex_lock(rl);
+		mutex_lock(rl);
 }
 
 void
@@ -91,7 +91,7 @@ funlockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		_private_mutex_unlock(rl);
+		mutex_unlock(rl);
 }
 
 int

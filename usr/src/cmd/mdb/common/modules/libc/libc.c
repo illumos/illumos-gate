@@ -438,210 +438,210 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	HD("self                  uberdata");
 	mdb_printf(OFFSTR "%s %s\n",
-		OFFSET(ul_self),
-		prt_addr(ulwp.ul_self, 1),
-		prt_addr(ulwp.ul_uberdata, 0));
+	    OFFSET(ul_self),
+	    prt_addr(ulwp.ul_self, 1),
+	    prt_addr(ulwp.ul_uberdata, 0));
 
 	HD("tlsent                ntlsent");
 	mdb_printf(OFFSTR "%s %ld\n",
-		OFFSET(ul_tlsent),
-		prt_addr(ulwp.ul_tlsent, 1),
-		ulwp.ul_ntlsent);
+	    OFFSET(ul_tlsent),
+	    prt_addr(ulwp.ul_tlsent, 1),
+	    ulwp.ul_ntlsent);
 
 	HD("forw                  back                  next");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ul_forw),
-		prt_addr(ulwp.ul_forw, 1),
-		prt_addr(ulwp.ul_back, 1),
-		prt_addr(ulwp.ul_next, 0));
+	    OFFSET(ul_forw),
+	    prt_addr(ulwp.ul_forw, 1),
+	    prt_addr(ulwp.ul_back, 1),
+	    prt_addr(ulwp.ul_next, 0));
 
 	HD("hash                  rval                  stk");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ul_hash),
-		prt_addr(ulwp.ul_hash, 1),
-		prt_addr(ulwp.ul_rval, 1),
-		prt_addr(ulwp.ul_stk, 0));
+	    OFFSET(ul_hash),
+	    prt_addr(ulwp.ul_hash, 1),
+	    prt_addr(ulwp.ul_rval, 1),
+	    prt_addr(ulwp.ul_stk, 0));
 
 	HD("mapsiz     guardsize  stktop                stksiz");
 	mdb_printf(OFFSTR "%-10ld %-10ld %s %ld\n",
-		OFFSET(ul_mapsiz),
-		ulwp.ul_mapsiz,
-		ulwp.ul_guardsize,
-		prt_addr((void *)ulwp.ul_stktop, 1),
-		ulwp.ul_stksiz);
+	    OFFSET(ul_mapsiz),
+	    ulwp.ul_mapsiz,
+	    ulwp.ul_guardsize,
+	    prt_addr((void *)ulwp.ul_stktop, 1),
+	    ulwp.ul_stksiz);
 
 	HD("ustack.ss_sp          ustack.ss_size        ustack.ss_flags");
 	mdb_printf(OFFSTR "%s %-21ld %s\n",
-		OFFSET(ul_ustack.ss_sp),
-		prt_addr(ulwp.ul_ustack.ss_sp, 1),
-		ulwp.ul_ustack.ss_size,
-		stack_flags(&ulwp.ul_ustack));
+	    OFFSET(ul_ustack.ss_sp),
+	    prt_addr(ulwp.ul_ustack.ss_sp, 1),
+	    ulwp.ul_ustack.ss_size,
+	    stack_flags(&ulwp.ul_ustack));
 
 	HD("ix         lwpid      pri        epri       policy     cid");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
-		OFFSET(ul_ix),
-		ulwp.ul_ix,
-		ulwp.ul_lwpid,
-		ulwp.ul_pri,
-		ulwp.ul_epri,
-		ulwp.ul_policy,
-		ulwp.ul_cid);
+	    OFFSET(ul_ix),
+	    ulwp.ul_ix,
+	    ulwp.ul_lwpid,
+	    ulwp.ul_pri,
+	    ulwp.ul_epri,
+	    ulwp.ul_policy,
+	    ulwp.ul_cid);
 
 	HD("cursig     pleasestop stop       signalled  dead       unwind");
 	mdb_printf(OFFSTR "%-10d ",
-		OFFSET(ul_cursig),
-		ulwp.ul_cursig);
+	    OFFSET(ul_cursig),
+	    ulwp.ul_cursig);
 	mdb_printf(ulwp.ul_pleasestop? "0x%-8x " : "%-10d ",
-		ulwp.ul_pleasestop);
+	    ulwp.ul_pleasestop);
 	mdb_printf(ulwp.ul_stop? "0x%-8x " : "%-10d ",
-		ulwp.ul_stop);
+	    ulwp.ul_stop);
 	mdb_printf("%-10d %-10d %d\n",
-		ulwp.ul_signalled,
-		ulwp.ul_dead,
-		ulwp.ul_unwind);
+	    ulwp.ul_signalled,
+	    ulwp.ul_dead,
+	    ulwp.ul_unwind);
 
 	HD("detached   writer     stopping   can'prolog preempt    savpreempt");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
-		OFFSET(ul_detached),
-		ulwp.ul_detached,
-		ulwp.ul_writer,
-		ulwp.ul_stopping,
-		ulwp.ul_cancel_prologue,
-		ulwp.ul_preempt,
-		ulwp.ul_savpreempt);
+	    OFFSET(ul_detached),
+	    ulwp.ul_detached,
+	    ulwp.ul_writer,
+	    ulwp.ul_stopping,
+	    ulwp.ul_cancel_prologue,
+	    ulwp.ul_preempt,
+	    ulwp.ul_savpreempt);
 
 	HD("sigsuspend main       fork       primarymap m'spinners d'noreserv");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
-		OFFSET(ul_sigsuspend),
-		ulwp.ul_sigsuspend,
-		ulwp.ul_main,
-		ulwp.ul_fork,
-		ulwp.ul_primarymap,
-		ulwp.ul_max_spinners,
-		ulwp.ul_door_noreserve);
+	    OFFSET(ul_sigsuspend),
+	    ulwp.ul_sigsuspend,
+	    ulwp.ul_main,
+	    ulwp.ul_fork,
+	    ulwp.ul_primarymap,
+	    ulwp.ul_max_spinners,
+	    ulwp.ul_door_noreserve);
 
 	HD("queue_fifo c'w'defer  e'detect'  async_safe rt         rtqueued");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
-		OFFSET(ul_queue_fifo),
-		ulwp.ul_queue_fifo,
-		ulwp.ul_cond_wait_defer,
-		ulwp.ul_error_detection,
-		ulwp.ul_async_safe,
-		ulwp.ul_rt,
-		ulwp.ul_rtqueued);
+	    OFFSET(ul_queue_fifo),
+	    ulwp.ul_queue_fifo,
+	    ulwp.ul_cond_wait_defer,
+	    ulwp.ul_error_detection,
+	    ulwp.ul_async_safe,
+	    ulwp.ul_rt,
+	    ulwp.ul_rtqueued);
 
 	HD("adapt'spin queue_spin critical   sigdefer   vfork");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %d\n",
-		OFFSET(ul_adaptive_spin),
-		ulwp.ul_adaptive_spin,
-		ulwp.ul_queue_spin,
-		ulwp.ul_critical,
-		ulwp.ul_sigdefer,
-		ulwp.ul_vfork);
+	    OFFSET(ul_adaptive_spin),
+	    ulwp.ul_adaptive_spin,
+	    ulwp.ul_queue_spin,
+	    ulwp.ul_critical,
+	    ulwp.ul_sigdefer,
+	    ulwp.ul_vfork);
 
 	HD("cancelable c'pending  c'disabled c'async    save_async mutator");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
-		OFFSET(ul_cancelable),
-		ulwp.ul_cancelable,
-		ulwp.ul_cancel_pending,
-		ulwp.ul_cancel_disabled,
-		ulwp.ul_cancel_async,
-		ulwp.ul_save_async,
-		ulwp.ul_mutator);
+	    OFFSET(ul_cancelable),
+	    ulwp.ul_cancelable,
+	    ulwp.ul_cancel_pending,
+	    ulwp.ul_cancel_disabled,
+	    ulwp.ul_cancel_async,
+	    ulwp.ul_save_async,
+	    ulwp.ul_mutator);
 
 	HD("created    replace    nocancel   errno      errnop");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %s\n",
-		OFFSET(ul_created),
-		ulwp.ul_created,
-		ulwp.ul_replace,
-		ulwp.ul_nocancel,
-		ulwp.ul_errno,
-		prt_addr(ulwp.ul_errnop, 0));
+	    OFFSET(ul_created),
+	    ulwp.ul_created,
+	    ulwp.ul_replace,
+	    ulwp.ul_nocancel,
+	    ulwp.ul_errno,
+	    prt_addr(ulwp.ul_errnop, 0));
 
 	HD("clnup_hdr             schedctl_called       schedctl");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ul_clnup_hdr),
-		prt_addr(ulwp.ul_clnup_hdr, 1),
-		prt_addr(ulwp.ul_schedctl_called, 1),
-		prt_addr((void *)ulwp.ul_schedctl, 0));
+	    OFFSET(ul_clnup_hdr),
+	    prt_addr(ulwp.ul_clnup_hdr, 1),
+	    prt_addr(ulwp.ul_schedctl_called, 1),
+	    prt_addr((void *)ulwp.ul_schedctl, 0));
 
 	HD("bindflags  libc_locks stsd                  &ftsd");
 	mdb_printf(OFFSTR,
-		OFFSET(ul_bindflags));
+	    OFFSET(ul_bindflags));
 	mdb_printf(ulwp.ul_bindflags? "0x%-8x " : "%-10d ",
-		ulwp.ul_bindflags);
+	    ulwp.ul_bindflags);
 	mdb_printf("%-10d ", ulwp.ul_libc_locks);
 	mdb_printf("%s %s\n",
-		prt_addr(ulwp.ul_stsd, 1),
-		prt_addr((void *)(addr + OFFSET(ul_ftsd[0])), 0));
+	    prt_addr(ulwp.ul_stsd, 1),
+	    prt_addr((void *)(addr + OFFSET(ul_ftsd[0])), 0));
 
 	HD("eventmask[0..1]       eventnum              eventdata");
 	mdb_printf(OFFSTR "0x%08x 0x%08x %-21d %s\n",
-		OFFSET(ul_td_evbuf.eventmask.event_bits[0]),
-		ulwp.ul_td_evbuf.eventmask.event_bits[0],
-		ulwp.ul_td_evbuf.eventmask.event_bits[1],
-		ulwp.ul_td_evbuf.eventnum,
-		prt_addr(ulwp.ul_td_evbuf.eventdata, 0));
+	    OFFSET(ul_td_evbuf.eventmask.event_bits[0]),
+	    ulwp.ul_td_evbuf.eventmask.event_bits[0],
+	    ulwp.ul_td_evbuf.eventmask.event_bits[1],
+	    ulwp.ul_td_evbuf.eventnum,
+	    prt_addr(ulwp.ul_td_evbuf.eventdata, 0));
 
 	HD("td'enable  sync'reg   qtype      cv_wake    usropts");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d ",
-		OFFSET(ul_td_events_enable),
-		ulwp.ul_td_events_enable,
-		ulwp.ul_sync_obj_reg,
-		ulwp.ul_qtype,
-		ulwp.ul_cv_wake);
+	    OFFSET(ul_td_events_enable),
+	    ulwp.ul_td_events_enable,
+	    ulwp.ul_sync_obj_reg,
+	    ulwp.ul_qtype,
+	    ulwp.ul_cv_wake);
 	mdb_printf(ulwp.ul_usropts? "0x%x\n" : "%d\n",
-		ulwp.ul_usropts);
+	    ulwp.ul_usropts);
 
 	HD("startpc               startarg              wchan");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ul_startpc),
-		prt_addr((void *)ulwp.ul_startpc, 1),
-		prt_addr(ulwp.ul_startarg, 1),
-		prt_addr(ulwp.ul_wchan, 0));
+	    OFFSET(ul_startpc),
+	    prt_addr((void *)ulwp.ul_startpc, 1),
+	    prt_addr(ulwp.ul_startarg, 1),
+	    prt_addr(ulwp.ul_wchan, 0));
 
 	HD("link                  sleepq                cvmutex");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ul_link),
-		prt_addr(ulwp.ul_link, 1),
-		prt_addr(ulwp.ul_sleepq, 1),
-		prt_addr(ulwp.ul_cvmutex, 0));
+	    OFFSET(ul_link),
+	    prt_addr(ulwp.ul_link, 1),
+	    prt_addr(ulwp.ul_sleepq, 1),
+	    prt_addr(ulwp.ul_cvmutex, 0));
 
 	HD("mxchain               save_state");
 	mdb_printf(OFFSTR "%s %d\n",
-		OFFSET(ul_mxchain),
-		prt_addr(ulwp.ul_mxchain, 1),
-		ulwp.ul_save_state);
+	    OFFSET(ul_mxchain),
+	    prt_addr(ulwp.ul_mxchain, 1),
+	    ulwp.ul_save_state);
 
 	HD("rdlockcnt             rd_rwlock             rd_count");
 	mdb_printf(OFFSTR "%-21d %s %d\n",
-		OFFSET(ul_rdlockcnt),
-		ulwp.ul_rdlockcnt,
-		prt_addr(ulwp.ul_readlock.single.rd_rwlock, 1),
-		ulwp.ul_readlock.single.rd_count);
+	    OFFSET(ul_rdlockcnt),
+	    ulwp.ul_rdlockcnt,
+	    prt_addr(ulwp.ul_readlock.single.rd_rwlock, 1),
+	    ulwp.ul_readlock.single.rd_count);
 
 	HD("heldlockcnt           heldlocks             tpdp");
 	mdb_printf(OFFSTR "%-21d %s %s\n",
-		OFFSET(ul_heldlockcnt),
-		ulwp.ul_heldlockcnt,
-		prt_addr(ulwp.ul_heldlocks.single, 1),
-		prt_addr(ulwp.ul_tpdp, 0));
+	    OFFSET(ul_heldlockcnt),
+	    ulwp.ul_heldlockcnt,
+	    prt_addr(ulwp.ul_heldlocks.single, 1),
+	    prt_addr(ulwp.ul_tpdp, 0));
 
 	HD("siglink               s'l'spin   s'l'spin2  s'l'sleep  s'l'wakeup");
 	mdb_printf(OFFSTR "%s %-10d %-10d %-10d %d\n",
-		OFFSET(ul_siglink),
-		prt_addr(ulwp.ul_siglink, 1),
-		ulwp.ul_spin_lock_spin,
-		ulwp.ul_spin_lock_spin2,
-		ulwp.ul_spin_lock_sleep,
-		ulwp.ul_spin_lock_wakeup);
+	    OFFSET(ul_siglink),
+	    prt_addr(ulwp.ul_siglink, 1),
+	    ulwp.ul_spin_lock_spin,
+	    ulwp.ul_spin_lock_spin2,
+	    ulwp.ul_spin_lock_sleep,
+	    ulwp.ul_spin_lock_wakeup);
 
 	HD("&queue_root           rtclassid  pilocks");
 	mdb_printf(OFFSTR "%s %-10d %d\n",
-		OFFSET(ul_queue_root),
-		prt_addr((void *)(addr + OFFSET(ul_queue_root)), 1),
-		ulwp.ul_rtclassid,
-		ulwp.ul_pilocks);
+	    OFFSET(ul_queue_root),
+	    prt_addr((void *)(addr + OFFSET(ul_queue_root)), 1),
+	    ulwp.ul_rtclassid,
+	    ulwp.ul_pilocks);
 
 	/*
 	 * The remainder of the ulwp_t structure
@@ -652,26 +652,26 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	HD("sigmask[0..3]");
 	mdb_printf(OFFSTR "0x%08x 0x%08x 0x%08x 0x%08x\n",
-		OFFSET(ul_sigmask.__sigbits[0]),
-		ulwp.ul_sigmask.__sigbits[0],
-		ulwp.ul_sigmask.__sigbits[1],
-		ulwp.ul_sigmask.__sigbits[2],
-		ulwp.ul_sigmask.__sigbits[3]);
+	    OFFSET(ul_sigmask.__sigbits[0]),
+	    ulwp.ul_sigmask.__sigbits[0],
+	    ulwp.ul_sigmask.__sigbits[1],
+	    ulwp.ul_sigmask.__sigbits[2],
+	    ulwp.ul_sigmask.__sigbits[3]);
 
 	HD("tmpmask[0..3]");
 	mdb_printf(OFFSTR "0x%08x 0x%08x 0x%08x 0x%08x\n",
-		OFFSET(ul_tmpmask.__sigbits[0]),
-		ulwp.ul_tmpmask.__sigbits[0],
-		ulwp.ul_tmpmask.__sigbits[1],
-		ulwp.ul_tmpmask.__sigbits[2],
-		ulwp.ul_tmpmask.__sigbits[3]);
+	    OFFSET(ul_tmpmask.__sigbits[0]),
+	    ulwp.ul_tmpmask.__sigbits[0],
+	    ulwp.ul_tmpmask.__sigbits[1],
+	    ulwp.ul_tmpmask.__sigbits[2],
+	    ulwp.ul_tmpmask.__sigbits[3]);
 
 	HD("&siginfo              &spinlock             &fpuenv");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ul_siginfo),
-		prt_addr((void *)(addr + OFFSET(ul_siginfo)), 1),
-		prt_addr((void *)(addr + OFFSET(ul_spinlock)), 1),
-		prt_addr((void *)(addr + OFFSET(ul_fpuenv)), 0));
+	    OFFSET(ul_siginfo),
+	    prt_addr((void *)(addr + OFFSET(ul_siginfo)), 1),
+	    prt_addr((void *)(addr + OFFSET(ul_spinlock)), 1),
+	    prt_addr((void *)(addr + OFFSET(ul_fpuenv)), 0));
 
 	return (DCMD_OK);
 }
@@ -726,139 +726,141 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("%#a\n", addr);
 
-	HD("&link_lock            &fork_lock            &atfork_lock");
+	HD("&link_lock            &ld_lock              &fork_lock");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(link_lock),
-		prt_addr((void *)(addr + OFFSET(link_lock)), 1),
-		prt_addr((void *)(addr + OFFSET(fork_lock)), 1),
-		prt_addr((void *)(addr + OFFSET(atfork_lock)), 0));
+	    OFFSET(link_lock),
+	    prt_addr((void *)(addr + OFFSET(link_lock)), 1),
+	    prt_addr((void *)(addr + OFFSET(ld_lock)), 1),
+	    prt_addr((void *)(addr + OFFSET(fork_lock)), 0));
 
-	HD("&callout_lock         &tdb_hash_lock        &siguaction[0]");
+	HD("&atfork_lock          &callout_lock         &tdb_hash_lock");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(callout_lock),
-		prt_addr((void *)(addr + OFFSET(callout_lock)), 1),
-		prt_addr((void *)(addr + OFFSET(tdb_hash_lock)), 1),
-		prt_addr((void *)(addr + OFFSET(siguaction)), 0));
+	    OFFSET(atfork_lock),
+	    prt_addr((void *)(addr + OFFSET(atfork_lock)), 1),
+	    prt_addr((void *)(addr + OFFSET(callout_lock)), 1),
+	    prt_addr((void *)(addr + OFFSET(tdb_hash_lock)), 0));
+
+	HD("&tdb_hash_lock_stats  &siguaction[0]");
+	mdb_printf(OFFSTR "%s %s\n",
+	    OFFSET(tdb_hash_lock_stats),
+	    prt_addr((void *)(addr + OFFSET(tdb_hash_lock_stats)), 1),
+	    prt_addr((void *)(addr + OFFSET(siguaction)), 0));
 
 	HD("&bucket               free_list             chunks");
 	for (i = 0; i < NBUCKETS; i++) {
 		mdb_printf(OFFSTR "%s %s %ld\n",
-			OFFSET(bucket[i]),
-			prt_addr((void *)(addr + OFFSET(bucket[i])), 1),
-			prt_addr(uberdata.bucket[i].free_list, 1),
-			uberdata.bucket[i].chunks);
+		    OFFSET(bucket[i]),
+		    prt_addr((void *)(addr + OFFSET(bucket[i])), 1),
+		    prt_addr(uberdata.bucket[i].free_list, 1),
+		    uberdata.bucket[i].chunks);
 	}
 
 	HD("&atexit_root          head                  exit_frame_monitor");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(atexit_root),
-		prt_addr((void *)(addr + OFFSET(atexit_root.exitfns_lock)), 1),
-		prt_addr(uberdata.atexit_root.head, 1),
-		prt_addr(uberdata.atexit_root.exit_frame_monitor, 0));
+	    OFFSET(atexit_root),
+	    prt_addr((void *)(addr + OFFSET(atexit_root.exitfns_lock)), 1),
+	    prt_addr(uberdata.atexit_root.head, 1),
+	    prt_addr(uberdata.atexit_root.exit_frame_monitor, 0));
 
 	HD("&tsd_metadata         tsdm_nkeys tsdm_nused tsdm_destro");
 	mdb_printf(OFFSTR "%s %-10d %-10d %s\n",
-		OFFSET(tsd_metadata),
-		prt_addr((void *)(addr + OFFSET(tsd_metadata.tsdm_lock)), 1),
-		uberdata.tsd_metadata.tsdm_nkeys,
-		uberdata.tsd_metadata.tsdm_nused,
-		prt_addr((void *)uberdata.tsd_metadata.tsdm_destro, 0));
+	    OFFSET(tsd_metadata),
+	    prt_addr((void *)(addr + OFFSET(tsd_metadata.tsdm_lock)), 1),
+	    uberdata.tsd_metadata.tsdm_nkeys,
+	    uberdata.tsd_metadata.tsdm_nused,
+	    prt_addr((void *)uberdata.tsd_metadata.tsdm_destro, 0));
 
 	HD("&tls_metadata         tls_modinfo.data      tls_modinfo.size");
 	mdb_printf(OFFSTR "%s %s %ld\n",
-		OFFSET(tls_metadata),
-		prt_addr((void *)(addr + OFFSET(tls_metadata.tls_lock)), 1),
-		prt_addr(uberdata.tls_metadata.tls_modinfo.tls_data, 1),
-		uberdata.tls_metadata.tls_modinfo.tls_size);
+	    OFFSET(tls_metadata),
+	    prt_addr((void *)(addr + OFFSET(tls_metadata.tls_lock)), 1),
+	    prt_addr(uberdata.tls_metadata.tls_modinfo.tls_data, 1),
+	    uberdata.tls_metadata.tls_modinfo.tls_size);
 
 	HD("                      static_tls.data       static_tls.size");
 	mdb_printf(OFFSTR "%s %s %ld\n",
-		OFFSET(tls_metadata.static_tls),
-		"                     ",
-		prt_addr(uberdata.tls_metadata.static_tls.tls_data, 1),
-		uberdata.tls_metadata.static_tls.tls_size);
+	    OFFSET(tls_metadata.static_tls),
+	    "                     ",
+	    prt_addr(uberdata.tls_metadata.static_tls.tls_data, 1),
+	    uberdata.tls_metadata.static_tls.tls_size);
 
 	HD("primary_ma bucket_ini uflags.mt  uflags.pad uflags.trs uflags.ted");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
-		OFFSET(primary_map),
-		uberdata.primary_map,
-		uberdata.bucket_init,
-		uberdata.uberflags.uf_x.x_mt,
-		uberdata.uberflags.uf_x.x_pad,
-		uberdata.uberflags.uf_x.x_tdb_register_sync,
-		uberdata.uberflags.uf_x.x_thread_error_detection);
+	    OFFSET(primary_map),
+	    uberdata.primary_map,
+	    uberdata.bucket_init,
+	    uberdata.uberflags.uf_x.x_mt,
+	    uberdata.uberflags.uf_x.x_pad,
+	    uberdata.uberflags.uf_x.x_tdb_register_sync,
+	    uberdata.uberflags.uf_x.x_thread_error_detection);
 
 	HD("queue_head            thr_hash_table        hash_size  hash_mask");
 	mdb_printf(OFFSTR "%s %s %-10d 0x%x\n",
-		OFFSET(queue_head),
-		prt_addr(uberdata.queue_head, 1),
-		prt_addr(uberdata.thr_hash_table, 1),
-		uberdata.hash_size,
-		uberdata.hash_mask);
+	    OFFSET(queue_head),
+	    prt_addr(uberdata.queue_head, 1),
+	    prt_addr(uberdata.thr_hash_table, 1),
+	    uberdata.hash_size,
+	    uberdata.hash_mask);
 
 	HD("ulwp_one              all_lwps              all_zombies");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(ulwp_one),
-		prt_addr(uberdata.ulwp_one, 1),
-		prt_addr(uberdata.all_lwps, 1),
-		prt_addr(uberdata.all_zombies, 0));
+	    OFFSET(ulwp_one),
+	    prt_addr(uberdata.ulwp_one, 1),
+	    prt_addr(uberdata.all_lwps, 1),
+	    prt_addr(uberdata.all_zombies, 0));
 
 	HD("nthreads   nzombies   ndaemons   pid        sigacthandler");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %s\n",
-		OFFSET(nthreads),
-		uberdata.nthreads,
-		uberdata.nzombies,
-		uberdata.ndaemons,
-		(int)uberdata.pid,
-		prt_addr((void *)uberdata.sigacthandler, 0));
+	    OFFSET(nthreads),
+	    uberdata.nthreads,
+	    uberdata.nzombies,
+	    uberdata.ndaemons,
+	    (int)uberdata.pid,
+	    prt_addr((void *)uberdata.sigacthandler, 0));
 
 	HD("lwp_stacks            lwp_laststack         nfreestack stk_cache");
 	mdb_printf(OFFSTR "%s %s %-10d %d\n",
-		OFFSET(lwp_stacks),
-		prt_addr(uberdata.lwp_stacks, 1),
-		prt_addr(uberdata.lwp_laststack, 1),
-		uberdata.nfreestack,
-		uberdata.thread_stack_cache);
+	    OFFSET(lwp_stacks),
+	    prt_addr(uberdata.lwp_stacks, 1),
+	    prt_addr(uberdata.lwp_laststack, 1),
+	    uberdata.nfreestack,
+	    uberdata.thread_stack_cache);
 
-	HD("ulwp_freelist         ulwp_lastfree");
-	mdb_printf(OFFSTR "%s %s\n",
-		OFFSET(ulwp_freelist),
-		prt_addr(uberdata.ulwp_freelist, 1),
-		prt_addr(uberdata.ulwp_lastfree, 0));
+	HD("ulwp_freelist         ulwp_lastfree         ulwp_replace_free");
+	mdb_printf(OFFSTR "%s %s %s\n",
+	    OFFSET(ulwp_freelist),
+	    prt_addr(uberdata.ulwp_freelist, 1),
+	    prt_addr(uberdata.ulwp_lastfree, 1),
+	    prt_addr(uberdata.ulwp_replace_free, 0));
 
-	HD("ulwp_replace_free     ulwp_replace_last");
-	mdb_printf(OFFSTR "%s %s\n",
-		OFFSET(ulwp_replace_free),
-		prt_addr(uberdata.ulwp_replace_free, 1),
-		prt_addr(uberdata.ulwp_replace_last, 0));
-
-	HD("atforklist            robustlocks");
-	mdb_printf(OFFSTR "%s %s\n",
-		OFFSET(atforklist),
-		prt_addr(uberdata.atforklist, 1),
-		prt_addr(uberdata.robustlocks, 0));
+	HD("ulwp_replace_last     atforklist            robustlocks");
+	mdb_printf(OFFSTR "%s %s %s\n",
+	    OFFSET(ulwp_replace_last),
+	    prt_addr(uberdata.ulwp_replace_last, 1),
+	    prt_addr(uberdata.atforklist, 1),
+	    prt_addr(uberdata.robustlocks, 0));
 
 	HD("tdb_bootstrap         tdb_sync_addr_hash    tdb_'count tdb_'fail");
 	mdb_printf(OFFSTR "%s %s %-10d %d\n",
-		OFFSET(tdb_bootstrap),
-		prt_addr(uberdata.tdb_bootstrap, 1),
-		prt_addr(uberdata.tdb.tdb_sync_addr_hash, 1),
-		uberdata.tdb.tdb_register_count,
-		uberdata.tdb.tdb_hash_alloc_failed);
+	    OFFSET(tdb_bootstrap),
+	    prt_addr(uberdata.tdb_bootstrap, 1),
+	    prt_addr(uberdata.tdb.tdb_sync_addr_hash, 1),
+	    uberdata.tdb.tdb_register_count,
+	    uberdata.tdb.tdb_hash_alloc_failed);
 
 	HD("tdb_sync_addr_free    tdb_sync_addr_last    tdb_sync_alloc");
 	mdb_printf(OFFSTR "%s %s %ld\n",
-		OFFSET(tdb.tdb_sync_addr_free),
-		prt_addr(uberdata.tdb.tdb_sync_addr_free, 1),
-		prt_addr(uberdata.tdb.tdb_sync_addr_last, 1),
-		uberdata.tdb.tdb_sync_alloc);
+	    OFFSET(tdb.tdb_sync_addr_free),
+	    prt_addr(uberdata.tdb.tdb_sync_addr_free, 1),
+	    prt_addr(uberdata.tdb.tdb_sync_addr_last, 1),
+	    uberdata.tdb.tdb_sync_alloc);
 
 	HD("tdb_ev_global_mask    tdb_events");
 	mdb_printf(OFFSTR "0x%08x 0x%08x %s\n",
-		OFFSET(tdb.tdb_ev_global_mask),
-		uberdata.tdb.tdb_ev_global_mask.event_bits[0],
-		uberdata.tdb.tdb_ev_global_mask.event_bits[1],
-		prt_addr((void *)uberdata.tdb.tdb_events, 0));
+	    OFFSET(tdb.tdb_ev_global_mask),
+	    uberdata.tdb.tdb_ev_global_mask.event_bits[0],
+	    uberdata.tdb.tdb_ev_global_mask.event_bits[1],
+	    prt_addr((void *)uberdata.tdb.tdb_events, 0));
 
 	return (DCMD_OK);
 }

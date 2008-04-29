@@ -67,20 +67,8 @@ typedef struct file_attr {
 
 extern	pid_t	_vforkx(int);
 #pragma unknown_control_flow(_vforkx)
-extern	void	*_private_memset(void *, int, size_t);
 extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
 extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
-extern	int	_private_close(int);
-extern	int	_private_execve(const char *, char *const *, char *const *);
-extern	int	_private_fcntl(int, int, intptr_t);
-extern	int	_private_setgid(gid_t);
-extern	int	_private_setpgid(pid_t, pid_t);
-extern	int	_private_setuid(uid_t);
-extern	int	_private_sigismember(sigset_t *, int);
-extern	gid_t	_private_getgid(void);
-extern	uid_t	_private_getuid(void);
-extern	uid_t	_private_geteuid(void);
-extern	void	_private_exit(int);
 
 static int
 perform_flag_actions(spawn_attr_t *sap)
@@ -94,21 +82,20 @@ perform_flag_actions(spawn_attr_t *sap)
 	if (sap->sa_psflags & POSIX_SPAWN_SETSIGDEF) {
 		struct sigaction sigdfl;
 
-		(void) _private_memset(&sigdfl, 0, sizeof (sigdfl));
+		(void) memset(&sigdfl, 0, sizeof (sigdfl));
 		for (sig = 1; sig < NSIG; sig++) {
-			if (_private_sigismember(&sap->sa_sigdefault, sig))
+			if (sigismember(&sap->sa_sigdefault, sig))
 				(void) __sigaction(sig, &sigdfl, NULL);
 		}
 	}
 
 	if (sap->sa_psflags & POSIX_SPAWN_RESETIDS) {
-		if (_private_setgid(_private_getgid()) != 0 ||
-		    _private_setuid(_private_getuid()) != 0)
+		if (setgid(getgid()) != 0 || setuid(getuid()) != 0)
 			return (errno);
 	}
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETPGROUP) {
-		if (_private_setpgid(0, sap->sa_pgroup) != 0)
+		if (setpgid(0, sap->sa_pgroup) != 0)
 			return (errno);
 	}
 
@@ -133,23 +120,22 @@ perform_file_actions(file_attr_t *fap)
 	do {
 		switch (fap->fa_type) {
 		case FA_OPEN:
-			fd = _private_open(fap->fa_path,
+			fd = __open(fap->fa_path,
 			    fap->fa_oflag, fap->fa_mode);
 			if (fd < 0)
 				return (errno);
 			if (fd != fap->fa_filedes) {
-				if (_private_fcntl(fd, F_DUP2FD,
-				    fap->fa_filedes) < 0)
+				if (__fcntl(fd, F_DUP2FD, fap->fa_filedes) < 0)
 					return (errno);
-				(void) _private_close(fd);
+				(void) __close(fd);
 			}
 			break;
 		case FA_CLOSE:
-			if (_private_close(fap->fa_filedes) == -1)
+			if (__close(fap->fa_filedes) == -1)
 				return (errno);
 			break;
 		case FA_DUP2:
-			fd = _private_fcntl(fap->fa_filedes, F_DUP2FD,
+			fd = __fcntl(fap->fa_filedes, F_DUP2FD,
 			    fap->fa_newfiledes);
 			if (fd < 0)
 				return (errno);
@@ -237,16 +223,16 @@ _posix_spawn(
 
 	if (sap != NULL)
 		if (set_error(&error, perform_flag_actions(sap)) != 0)
-			_private_exit(_EVAPORATE);
+			_exit(_EVAPORATE);
 
 	if (fap != NULL)
 		if (set_error(&error, perform_file_actions(fap)) != 0)
-			_private_exit(_EVAPORATE);
+			_exit(_EVAPORATE);
 
 	(void) set_error(&error, 0);
-	(void) _private_execve(path, argv, envp);
+	(void) execve(path, argv, envp);
 	(void) set_error(&error, errno);
-	_private_exit(_EVAPORATE);
+	_exit(_EVAPORATE);
 	return (0);	/* not reached */
 }
 
@@ -339,11 +325,11 @@ _posix_spawnp(
 
 	if (sap != NULL)
 		if (set_error(&error, perform_flag_actions(sap)) != 0)
-			_private_exit(_EVAPORATE);
+			_exit(_EVAPORATE);
 
 	if (fap != NULL)
 		if (set_error(&error, perform_file_actions(fap)) != 0)
-			_private_exit(_EVAPORATE);
+			_exit(_EVAPORATE);
 
 	if (pathstr == NULL) {
 		/*
@@ -355,7 +341,7 @@ _posix_spawnp(
 		 * contain '/', the last call to execat() will result in an
 		 * attempt to execv file from the current directory.
 		 */
-		if (_private_geteuid() == 0 || _private_getuid() == 0) {
+		if (geteuid() == 0 || getuid() == 0) {
 			if (!xpg4)
 				pathstr = "/usr/sbin:/usr/ccs/bin:/usr/bin";
 			else
@@ -389,20 +375,20 @@ _posix_spawnp(
 			path[1] = '/';
 		}
 		(void) set_error(&error, 0);
-		(void) _private_execve(path, argv, envp);
+		(void) execve(path, argv, envp);
 		if (set_error(&error, errno) == ENOEXEC) {
 			newargs[0] = (char *)shell;
 			newargs[1] = path;
 			for (i = 1; i <= argc; i++)
 				newargs[i + 1] = argv[i];
 			(void) set_error(&error, 0);
-			(void) _private_execve(xpg4? xpg4_path : sun_path,
+			(void) execve(xpg4? xpg4_path : sun_path,
 			    newargs, envp);
 			(void) set_error(&error, errno);
-			_private_exit(_EVAPORATE);
+			_exit(_EVAPORATE);
 		}
 	} while (cp);
-	_private_exit(_EVAPORATE);
+	_exit(_EVAPORATE);
 	return (0);	/* not reached */
 }
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,9 +32,11 @@
 #define	MIN_MOD_SLOTS	16
 
 /*
- * To inform libc_init that we are on the primary link map.
+ * Used to inform libc_init() that we are on the primary link map,
+ * and to cause certain functions (like malloc() and sbrk()) to fail
+ * (with ENOTSUP) when they are called on an alternate link map.
  */
-int primary_link_map;
+int primary_link_map = 0;
 
 #if defined(_LP64)
 #define	ALIGN	16
@@ -62,10 +64,10 @@ tls_modinfo_alloc(tls_metadata_t *tlsm, ulong_t moduleid)
 			mod_slots *= 2;
 		modinfo = lmalloc(mod_slots * sizeof (TLS_modinfo));
 		if (tls_modinfo->tls_data != NULL) {
-			(void) _private_memcpy(modinfo, tls_modinfo->tls_data,
-				tls_modinfo->tls_size * sizeof (TLS_modinfo));
+			(void) memcpy(modinfo, tls_modinfo->tls_data,
+			    tls_modinfo->tls_size * sizeof (TLS_modinfo));
 			lfree(tls_modinfo->tls_data,
-				tls_modinfo->tls_size * sizeof (TLS_modinfo));
+			    tls_modinfo->tls_size * sizeof (TLS_modinfo));
 		}
 		tls_modinfo->tls_data = modinfo;
 		tls_modinfo->tls_size = mod_slots;
@@ -106,7 +108,7 @@ __tls_static_mods(TLS_modinfo **tlslist, unsigned long statictlssize)
 	 */
 	tlsm = &__uberdata.tls_metadata;
 	if (oldself != NULL) {
-		(void) _private_memcpy(tlsm,
+		(void) memcpy(tlsm,
 		    &oldself->ul_uberdata->tls_metadata, sizeof (*tlsm));
 		ASSERT(tlsm->static_tls.tls_data == NULL);
 	}
@@ -135,8 +137,8 @@ __tls_static_mods(TLS_modinfo **tlslist, unsigned long statictlssize)
 		ASSERT(tlsp->tm_filesz <= tlsp->tm_memsz);
 		ASSERT(tlsp->tm_memsz <= tlsp->tm_stattlsoffset);
 		if (tlsp->tm_filesz)
-			(void) _private_memcpy(data_end-tlsp->tm_stattlsoffset,
-				tlsp->tm_tlsblock, tlsp->tm_filesz);
+			(void) memcpy(data_end-tlsp->tm_stattlsoffset,
+			    tlsp->tm_tlsblock, tlsp->tm_filesz);
 		if (max_modid < tlsp->tm_modid)
 			max_modid = tlsp->tm_modid;
 	}
@@ -145,7 +147,7 @@ __tls_static_mods(TLS_modinfo **tlslist, unsigned long statictlssize)
 	 */
 	modinfo = tls_modinfo_alloc(tlsm, max_modid);
 	for (tlspp = tlslist; (tlsp = *tlspp) != NULL; tlspp++)
-		(void) _private_memcpy(&modinfo[tlsp->tm_modid],
+		(void) memcpy(&modinfo[tlsp->tm_modid],
 		    tlsp, sizeof (*tlsp));
 
 	/*
@@ -153,7 +155,7 @@ __tls_static_mods(TLS_modinfo **tlslist, unsigned long statictlssize)
 	 * since it will be copied up again in libc_init().
 	 */
 	if (oldself != NULL)
-		(void) _private_memcpy(&oldself->ul_uberdata->tls_metadata,
+		(void) memcpy(&oldself->ul_uberdata->tls_metadata,
 		    tlsm, sizeof (*tlsm));
 }
 
@@ -173,7 +175,7 @@ __tls_mod_add(TLS_modinfo *tlsp)
 	ASSERT(!(tlsp->tm_flags & TM_FLG_STATICTLS));
 	ASSERT(tlsp->tm_filesz <= tlsp->tm_memsz);
 	modinfo = tls_modinfo_alloc(tlsm, moduleid);
-	(void) _private_memcpy(&modinfo[moduleid], tlsp, sizeof (*tlsp));
+	(void) memcpy(&modinfo[moduleid], tlsp, sizeof (*tlsp));
 	lmutex_unlock(&tlsm->tls_lock);
 }
 
@@ -191,7 +193,7 @@ __tls_mod_remove(TLS_modinfo *tlsp)
 	ASSERT(tlsm->tls_modinfo.tls_data != NULL &&
 	    moduleid < tlsm->tls_modinfo.tls_size);
 	modinfo = tlsm->tls_modinfo.tls_data;
-	(void) _private_memset(&modinfo[moduleid], 0, sizeof (TLS_modinfo));
+	(void) memset(&modinfo[moduleid], 0, sizeof (TLS_modinfo));
 	lmutex_unlock(&tlsm->tls_lock);
 }
 
@@ -236,10 +238,10 @@ slow_tls_get_addr(TLS_index *tls_index)
 		ASSERT(moduleid < tlsm->tls_modinfo.tls_size);
 		tlsent = lmalloc(tlsm->tls_modinfo.tls_size * sizeof (tls_t));
 		if (self->ul_tlsent != NULL) {
-			(void) _private_memcpy(tlsent, self->ul_tlsent,
-				self->ul_ntlsent * sizeof (tls_t));
+			(void) memcpy(tlsent, self->ul_tlsent,
+			    self->ul_ntlsent * sizeof (tls_t));
 			lfree(self->ul_tlsent,
-				self->ul_ntlsent * sizeof (tls_t));
+			    self->ul_ntlsent * sizeof (tls_t));
 		}
 		self->ul_tlsent = tlsent;
 		self->ul_ntlsent = tlsm->tls_modinfo.tls_size;
@@ -258,8 +260,8 @@ slow_tls_get_addr(TLS_index *tls_index)
 			/* allocate/initialize the dynamic TLS */
 			base = lmalloc(tlsp->tm_memsz);
 			if (tlsp->tm_filesz != 0)
-				(void) _private_memcpy(base, tlsp->tm_tlsblock,
-					tlsp->tm_filesz);
+				(void) memcpy(base, tlsp->tm_tlsblock,
+				    tlsp->tm_filesz);
 			tlsent->tls_data = base;
 			tlsent->tls_size = tlsp->tm_memsz;
 			/* remember the constructors */
@@ -280,6 +282,9 @@ slow_tls_get_addr(TLS_index *tls_index)
 			(**initarray++)();
 		} while (--arraycnt != 0);
 	}
+
+	if (base == NULL)	/* kludge to get x86/x64 to boot */
+		base = (caddr_t)self - 512;
 
 	sigon(self);
 	return (base + tls_index->ti_tlsoffset);
@@ -323,8 +328,8 @@ tls_setup()
 		return;
 
 	/* static TLS initialization */
-	(void) _private_memcpy((caddr_t)self - tlsm->static_tls.tls_size,
-		tlsm->static_tls.tls_data, tlsm->static_tls.tls_size);
+	(void) memcpy((caddr_t)self - tlsm->static_tls.tls_size,
+	    tlsm->static_tls.tls_data, tlsm->static_tls.tls_size);
 
 	/* call TLS constructors for the static TLS just initialized */
 	lmutex_lock(&tlsm->tls_lock);

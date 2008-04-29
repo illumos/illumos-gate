@@ -70,14 +70,14 @@ void
 fork_lock_enter(void)
 {
 	ASSERT(curthread->ul_critical == 0);
-	(void) _private_mutex_lock(&curthread->ul_uberdata->fork_lock);
+	(void) mutex_lock(&curthread->ul_uberdata->fork_lock);
 }
 
 void
 fork_lock_exit(void)
 {
 	ASSERT(curthread->ul_critical == 0);
-	(void) _private_mutex_unlock(&curthread->ul_uberdata->fork_lock);
+	(void) mutex_unlock(&curthread->ul_uberdata->fork_lock);
 }
 
 /*
@@ -100,10 +100,9 @@ callout_lock_exit(void)
 	cancel_safe_mutex_unlock(&curthread->ul_uberdata->callout_lock);
 }
 
-#pragma weak forkx = _private_forkx
-#pragma weak _forkx = _private_forkx
+#pragma weak forkx = _forkx
 pid_t
-_private_forkx(int flags)
+_forkx(int flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -122,7 +121,7 @@ _private_forkx(int flags)
 		}
 		pid = __forkx(flags);
 		if (pid == 0) {		/* child */
-			udp->pid = _private_getpid();
+			udp->pid = getpid();
 			self->ul_vfork = 0;
 		}
 		return (pid);
@@ -150,13 +149,13 @@ _private_forkx(int flags)
 	 * functions are free to do anything they please (except they
 	 * will not receive any signals).
 	 */
-	(void) _private_mutex_lock(&udp->atfork_lock);
+	(void) mutex_lock(&udp->atfork_lock);
 	_prefork_handler();
 
 	/*
 	 * Block every other thread attempting thr_suspend() or thr_continue().
 	 */
-	(void) _private_mutex_lock(&udp->fork_lock);
+	(void) mutex_lock(&udp->fork_lock);
 
 	/*
 	 * Block all signals.
@@ -187,22 +186,22 @@ _private_forkx(int flags)
 		self->ul_schedctl = NULL;
 		self->ul_cursig = 0;
 		self->ul_siginfo.si_signo = 0;
-		udp->pid = _private_getpid();
+		udp->pid = getpid();
 		/* reset the library's data structures to reflect one thread */
 		unregister_locks();
 		postfork1_child();
 		restore_signals(self);
-		(void) _private_mutex_unlock(&udp->fork_lock);
+		(void) mutex_unlock(&udp->fork_lock);
 		_postfork_child_handler();
 	} else {
 		/* restart all threads that were suspended for fork() */
 		continue_fork(0);
 		restore_signals(self);
-		(void) _private_mutex_unlock(&udp->fork_lock);
+		(void) mutex_unlock(&udp->fork_lock);
 		_postfork_parent_handler();
 	}
 
-	(void) _private_mutex_unlock(&udp->atfork_lock);
+	(void) mutex_unlock(&udp->atfork_lock);
 	self->ul_fork = 0;
 	sigon(self);
 
@@ -220,17 +219,16 @@ _private_forkx(int flags)
 pid_t
 _fork(void)
 {
-	return (_private_forkx(0));
+	return (_forkx(0));
 }
 
 /*
  * Much of the logic here is the same as in forkx().
  * See the comments in forkx(), above.
  */
-#pragma weak forkallx = _private_forkallx
-#pragma weak _forkallx = _private_forkallx
+#pragma weak forkallx = _forkallx
 pid_t
-_private_forkallx(int flags)
+_forkallx(int flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -243,7 +241,7 @@ _private_forkallx(int flags)
 		}
 		pid = __forkallx(flags);
 		if (pid == 0) {		/* child */
-			udp->pid = _private_getpid();
+			udp->pid = getpid();
 			self->ul_vfork = 0;
 		}
 		return (pid);
@@ -256,8 +254,8 @@ _private_forkallx(int flags)
 		return (-1);
 	}
 	self->ul_fork = 1;
-	(void) _private_mutex_lock(&udp->atfork_lock);
-	(void) _private_mutex_lock(&udp->fork_lock);
+	(void) mutex_lock(&udp->atfork_lock);
+	(void) mutex_lock(&udp->fork_lock);
 	block_all_signals(self);
 	suspend_fork();
 
@@ -268,15 +266,15 @@ _private_forkallx(int flags)
 		self->ul_schedctl = NULL;
 		self->ul_cursig = 0;
 		self->ul_siginfo.si_signo = 0;
-		udp->pid = _private_getpid();
+		udp->pid = getpid();
 		unregister_locks();
 		continue_fork(1);
 	} else {
 		continue_fork(0);
 	}
 	restore_signals(self);
-	(void) _private_mutex_unlock(&udp->fork_lock);
-	(void) _private_mutex_unlock(&udp->atfork_lock);
+	(void) mutex_unlock(&udp->fork_lock);
+	(void) mutex_unlock(&udp->atfork_lock);
 	self->ul_fork = 0;
 	sigon(self);
 
@@ -287,7 +285,7 @@ _private_forkallx(int flags)
 pid_t
 _forkall(void)
 {
-	return (_private_forkallx(0));
+	return (_forkallx(0));
 }
 
 /*
@@ -971,6 +969,11 @@ _sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 	siginfo_t info;
 	int sig;
 
+	if (!primary_link_map) {
+		errno = ENOTSUP;
+		return (-1);
+	}
+
 	PROLOGUE
 	if (abort) {
 		*self->ul_errnop = EINTR;
@@ -986,7 +989,7 @@ _sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 	}
 	EPILOGUE
 	if (sig != -1 && infop)
-		(void) _private_memcpy(infop, &info, sizeof (*infop));
+		(void) memcpy(infop, &info, sizeof (*infop));
 	return (sig);
 }
 

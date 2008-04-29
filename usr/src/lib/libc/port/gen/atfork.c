@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@
  * handlers installed by a library are deleted when that library
  * is unloaded (see _preexec_atfork_unload() in atexit.c).
  */
-#pragma weak _private_pthread_atfork = _pthread_atfork
 #pragma weak pthread_atfork = _pthread_atfork
 int
 _pthread_atfork(void (*prepare)(void),
@@ -57,7 +56,7 @@ _pthread_atfork(void (*prepare)(void),
 	atfork_t *head;
 	int error = 0;
 
-	(void) _private_mutex_lock(&udp->atfork_lock);
+	(void) mutex_lock(&udp->atfork_lock);
 	if (self->ul_fork) {
 		/*
 		 * Cannot call pthread_atfork() from a fork handler.
@@ -80,7 +79,7 @@ _pthread_atfork(void (*prepare)(void),
 		}
 	}
 
-	(void) _private_mutex_unlock(&udp->atfork_lock);
+	(void) mutex_unlock(&udp->atfork_lock);
 	return (error);
 }
 

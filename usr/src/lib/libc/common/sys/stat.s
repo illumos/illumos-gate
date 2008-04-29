@@ -46,7 +46,6 @@
 
 #if !defined(_LARGEFILE_SOURCE)
 	
-	ANSI_PRAGMA_WEAK2(_private_stat,stat,function)
 	SYSCALL_RVAL1(stat)
 	RETC
 	SET_SIZE(stat)
@@ -56,7 +55,6 @@
 /* C library -- stat64 - transitional API			*/
 /* int stat64 (const char *path, struct stat64 *buf);		*/
 
-	ANSI_PRAGMA_WEAK2(_private_stat64,stat64,function)
 	SYSCALL_RVAL1(stat64)
 	RETC
 	SET_SIZE(stat64)

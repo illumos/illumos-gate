@@ -41,6 +41,7 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <dlfcn.h>
+#include <atomic.h>
 #include <md5.h>
 #include "pos4obj.h"
 
@@ -102,19 +103,18 @@ static void
 load_md5_calc(void)
 {
 	void *md5_handle = dlopen("libmd.so.1", RTLD_LAZY);
+	md5_calc_t md5_calc = (md5_handle == NULL)? NULL :
+	    (md5_calc_t)dlsym(md5_handle, "md5_calc");
 
 	lmutex_lock(&md5_lock);
 	if (real_md5_calc == NULL) {
-		if (md5_handle == NULL)
+		if (md5_calc == NULL)
 			real_md5_calc = (md5_calc_t)(-1);
 		else {
-			real_md5_calc =
-			    (md5_calc_t)dlsym(md5_handle, "md5_calc");
-			if (real_md5_calc != NULL)	/* got it */
-				md5_handle = NULL;	/* don't dlclose it */
-			else
-				real_md5_calc = (md5_calc_t)(-1);
+			real_md5_calc = md5_calc;
+			md5_handle = NULL;	/* don't dlclose it */
 		}
+		membar_producer();
 	}
 	lmutex_unlock(&md5_lock);
 

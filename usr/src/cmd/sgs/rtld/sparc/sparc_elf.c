@@ -370,7 +370,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 * further process a locking request.  Under this recursion we disable
 	 * tsort and cleanup activities.
 	 */
-	entry = enter();
+	entry = enter(0);
 
 	if ((lmflags = lml->lm_flags) & LML_FLG_RTLDLM) {
 		dbg_class = dbg_desc->d_class;
@@ -517,7 +517,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 */
 	if (entry) {
 		is_dep_init(nlmp, lmp);
-		leave(lml);
+		leave(lml, 0);
 	}
 
 	if (lmflags & LML_FLG_RTLDLM)

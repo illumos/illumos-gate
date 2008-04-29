@@ -52,7 +52,7 @@ __set_panicstr(const char *msg)
 void
 grab_assert_lock()
 {
-	(void) _private_lwp_mutex_lock(&assert_lock);
+	(void) _lwp_mutex_lock(&assert_lock);
 }
 
 static void
@@ -73,17 +73,17 @@ Abort(const char *msg)
 	}
 
 	/* set SIGABRT signal handler to SIG_DFL w/o grabbing any locks */
-	(void) _private_memset(&act, 0, sizeof (act));
+	(void) memset(&act, 0, sizeof (act));
 	act.sa_sigaction = SIG_DFL;
 	(void) __sigaction(SIGABRT, &act, NULL);
 
 	/* delete SIGABRT from the signal mask */
-	(void) _private_sigemptyset(&sigmask);
-	(void) _private_sigaddset(&sigmask, SIGABRT);
+	(void) sigemptyset(&sigmask);
+	(void) sigaddset(&sigmask, SIGABRT);
 	(void) __lwp_sigmask(SIG_UNBLOCK, &sigmask, NULL);
 
 	(void) __lwp_kill(lwpid, SIGABRT);	/* never returns */
-	(void) _kill(_private_getpid(), SIGABRT); /* if it does, try harder */
+	(void) _kill(getpid(), SIGABRT);	/* if it does, try harder */
 	_exit(127);
 }
 
@@ -100,9 +100,9 @@ common_panic(const char *head, const char *why)
 
 	if ((self = __curthread()) != NULL)
 		enter_critical(self);
-	(void) _private_lwp_mutex_lock(&assert_lock);
+	(void) _lwp_mutex_lock(&assert_lock);
 
-	(void) _private_memset(msg, 0, sizeof (msg));
+	(void) memset(msg, 0, sizeof (msg));
 	(void) strcpy(msg, head);
 	len1 = strlen(msg);
 	len2 = strlen(why);
@@ -174,17 +174,17 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 		if (assert_thread == self)
 			_exit(127);
 		enter_critical(self);
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		assert_thread = self;
 		lwpid = self->ul_lwpid;
 		udp = self->ul_uberdata;
 		pid = udp->pid;
 	} else {
 		self = NULL;
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		lwpid = __lwp_self();
 		udp = &__uberdata;
-		pid = _private_getpid();
+		pid = getpid();
 	}
 
 	(void) strcpy(buf,
@@ -232,7 +232,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 	if (udp->uberflags.uf_thread_error_detection >= 2)
 		Abort(buf);
 	assert_thread = NULL;
-	(void) _private_lwp_mutex_unlock(&assert_lock);
+	(void) _lwp_mutex_unlock(&assert_lock);
 	if (self != NULL)
 		exit_critical(self);
 }
@@ -261,17 +261,17 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 		if (assert_thread == self)
 			_exit(127);
 		enter_critical(self);
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		assert_thread = self;
 		lwpid = self->ul_lwpid;
 		udp = self->ul_uberdata;
 		pid = udp->pid;
 	} else {
 		self = NULL;
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		lwpid = __lwp_self();
 		udp = &__uberdata;
-		pid = _private_getpid();
+		pid = getpid();
 	}
 
 	rwstate = (uint32_t)rcopy.rwlock_readers;
@@ -316,7 +316,7 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 	if (udp->uberflags.uf_thread_error_detection >= 2)
 		Abort(buf);
 	assert_thread = NULL;
-	(void) _private_lwp_mutex_unlock(&assert_lock);
+	(void) _lwp_mutex_unlock(&assert_lock);
 	if (self != NULL)
 		exit_critical(self);
 }
@@ -340,13 +340,13 @@ thread_error(const char *msg)
 		if (assert_thread == self)
 			_exit(127);
 		enter_critical(self);
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		assert_thread = self;
 		lwpid = self->ul_lwpid;
 		udp = self->ul_uberdata;
 	} else {
 		self = NULL;
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		lwpid = __lwp_self();
 		udp = &__uberdata;
 	}
@@ -364,7 +364,7 @@ thread_error(const char *msg)
 	if (udp->uberflags.uf_thread_error_detection >= 2)
 		Abort(buf);
 	assert_thread = NULL;
-	(void) _private_lwp_mutex_unlock(&assert_lock);
+	(void) _lwp_mutex_unlock(&assert_lock);
 	if (self != NULL)
 		exit_critical(self);
 }
@@ -389,12 +389,12 @@ __assfail(const char *assertion, const char *filename, int line_num)
 		if (assert_thread == self)
 			_exit(127);
 		enter_critical(self);
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		assert_thread = self;
 		lwpid = self->ul_lwpid;
 	} else {
 		self = NULL;
-		(void) _private_lwp_mutex_lock(&assert_lock);
+		(void) _lwp_mutex_lock(&assert_lock);
 		lwpid = __lwp_self();
 	}
 
@@ -414,7 +414,7 @@ __assfail(const char *assertion, const char *filename, int line_num)
 	 * We could replace the call to Abort() with the following code
 	 * if we want just to issue a warning message and not die.
 	 *	assert_thread = NULL;
-	 *	_private_lwp_mutex_unlock(&assert_lock);
+	 *	_lwp_mutex_unlock(&assert_lock);
 	 *	if (self != NULL)
 	 *		exit_critical(self);
 	 */

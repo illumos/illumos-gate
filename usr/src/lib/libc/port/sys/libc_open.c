@@ -52,15 +52,6 @@ static void push_module(int fd);
 static int isptsfd(int fd);
 static void itoa(int i, char *ptr);
 
-/*
- * We must be careful to call only functions that are private
- * to libc here, to avoid invoking the dynamic linker.
- * This is important because _private_open() and _private_open64()
- * are called from posix_spawn() after vfork() and we must never
- * invoke the dynamic linker in a vfork() child.
- */
-
-#pragma weak _private_open = __open
 int
 __open(const char *fname, int oflag, ...)
 {
@@ -89,7 +80,6 @@ __open(const char *fname, int oflag, ...)
  * The 32-bit APIs to large files require this interposition.
  * The 64-bit APIs just fall back to __open() above.
  */
-#pragma weak _private_open64 = __open64
 int
 __open64(const char *fname, int oflag, ...)
 {
@@ -121,12 +111,6 @@ __open64(const char *fname, int oflag, ...)
 static int
 isptsfd(int fd)
 {
-#if defined(_LP64)
-#define	_private_stat64 _private_stat
-#define	_private_fstat64 _private_fstat
-#endif
-	extern int _private_stat64(const char *, struct stat64 *);
-	extern int _private_fstat64(int, struct stat64 *);
 	char buf[TTYNAME_MAX];
 	char *str1 = buf;
 	const char *str2 = "/dev/pts/";
@@ -134,7 +118,7 @@ isptsfd(int fd)
 	int oerrno = errno;
 	int rval = 0;
 
-	if (_private_fstat64(fd, &fsb) == 0 && S_ISCHR(fsb.st_mode)) {
+	if (fstat64(fd, &fsb) == 0 && S_ISCHR(fsb.st_mode)) {
 		/*
 		 * Do this without strcpy() or strlen(),
 		 * to avoid invoking the dynamic linker.
@@ -145,7 +129,7 @@ isptsfd(int fd)
 		 * Inline version of minor(dev), to avoid the dynamic linker.
 		 */
 		itoa(fsb.st_rdev & MAXMIN, str1);
-		if (_private_stat64(buf, &stb) == 0)
+		if (stat64(buf, &stb) == 0)
 			rval = (stb.st_rdev == fsb.st_rdev);
 	}
 	errno = oerrno;
@@ -181,7 +165,6 @@ itoa(int i, char *ptr)
 static void
 push_module(int fd)
 {
-	extern int _private_ioctl(int, int, ...);
 	struct strioctl istr;
 	int oerrno = errno;
 
@@ -189,15 +172,15 @@ push_module(int fd)
 	istr.ic_len = 0;
 	istr.ic_timout = 0;
 	istr.ic_dp = NULL;
-	if (_private_ioctl(fd, I_STR, &istr) != -1) {
-		(void) _private_ioctl(fd, __I_PUSH_NOCTTY, "ptem");
-		(void) _private_ioctl(fd, __I_PUSH_NOCTTY, "ldterm");
-		(void) _private_ioctl(fd, __I_PUSH_NOCTTY, "ttcompat");
+	if (ioctl(fd, I_STR, &istr) != -1) {
+		(void) ioctl(fd, __I_PUSH_NOCTTY, "ptem");
+		(void) ioctl(fd, __I_PUSH_NOCTTY, "ldterm");
+		(void) ioctl(fd, __I_PUSH_NOCTTY, "ttcompat");
 		istr.ic_cmd = PTSSTTY;
 		istr.ic_len = 0;
 		istr.ic_timout = 0;
 		istr.ic_dp = NULL;
-		(void) _private_ioctl(fd, I_STR, &istr);
+		(void) ioctl(fd, I_STR, &istr);
 	}
 	errno = oerrno;
 }

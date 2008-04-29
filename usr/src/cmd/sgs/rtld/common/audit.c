@@ -101,11 +101,11 @@ _audit_objfilter(List *list, Rt_map *frlmp, const char *ref, Rt_map *felmp,
 		if ((feacp = _audit_client(AUDINFO(felmp), alp->al_lmp)) == 0)
 			continue;
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		if ((*alp->al_objfilter)(&(fracp->ac_cookie), ref,
 		    &(feacp->ac_cookie), flags) == 0)
 			return (0);
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 	return (1);
 }
@@ -155,9 +155,9 @@ _audit_objsearch(List *list, char *name, Rt_map *clmp, uint_t flags)
 		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == 0)
 			continue;
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		nname = (*alp->al_objsearch)(nname, &(acp->ac_cookie), flags);
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 		if (nname == 0)
 			break;
 	}
@@ -235,9 +235,9 @@ _audit_activity(List *list, Rt_map *clmp, uint_t flags)
 			alml->lm_flags &= ~LML_FLG_AUDITNOTIFY;
 		}
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		(*alp->al_activity)(&(acp->ac_cookie), flags);
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 }
 
@@ -291,10 +291,10 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 		DBG_CALL(Dbg_audit_object(LIST(alp->al_lmp), alp->al_libname,
 		    NAME(nlmp)));
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		flags = (*alp->al_objopen)((Link_map *)nlmp, lmid,
 		    &(acp->ac_cookie));
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 
 		if (flags & LA_FLG_BINDTO)
 			acp->ac_flags |= FLG_AC_BINDTO;
@@ -403,9 +403,9 @@ _audit_objclose(List *list, Rt_map *lmp)
 		if ((acp = _audit_client(AUDINFO(lmp), alp->al_lmp)) == 0)
 			continue;
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		(*alp->al_objclose)(&(acp->ac_cookie));
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 }
 
@@ -463,7 +463,7 @@ _audit_pltenter(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		    ((dacp->ac_flags & FLG_AC_BINDTO) == 0))
 			continue;
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		sym->st_value = (Addr)(*alp->al_pltenter)(sym, ndx,
 		    &(racp->ac_cookie), &(dacp->ac_cookie), regs,
 		/* BEGIN CSTYLED */
@@ -473,7 +473,7 @@ _audit_pltenter(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		    flags);
 #endif
 		/* END CSTYLED */
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 
 		DBG_CALL(Dbg_audit_symval(LIST(alp->al_lmp), alp->al_libname,
 		    MSG_ORIG(MSG_AUD_PLTENTER), name, prev, sym->st_name));
@@ -490,7 +490,7 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 	/*
 	 * We're effectively entering ld.so.1 from user (glue) code.
 	 */
-	(void) enter();
+	(void) enter(0);
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		_appl = rtld_flags |= RT_FL_APPLIC;
 
@@ -504,7 +504,7 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 
 	if (_appl)
 		rtld_flags &= ~RT_FL_APPLIC;
-	leave(LIST(rlmp));
+	leave(LIST(rlmp), 0);
 
 	return (_sym.st_value);
 }
@@ -538,7 +538,7 @@ _audit_pltexit(List *list, uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp,
 		    ((dacp->ac_flags & FLG_AC_BINDTO) == 0))
 			continue;
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		retval = (*alp->al_pltexit)(sym, ndx,
 		    &(racp->ac_cookie), &(dacp->ac_cookie),
 		/* BEGIN CSTYLED */
@@ -548,7 +548,7 @@ _audit_pltexit(List *list, uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp,
 		    retval);
 #endif
 		/* END CSTYLED */
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 	return (retval);
 }
@@ -563,7 +563,7 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 	/*
 	 * We're effectively entering ld.so.1 from user (glue) code.
 	 */
-	(void) enter();
+	(void) enter(0);
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		_appl = rtld_flags |= RT_FL_APPLIC;
 
@@ -576,7 +576,7 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 
 	if (_appl)
 		rtld_flags &= ~RT_FL_APPLIC;
-	leave(LIST(rlmp));
+	leave(LIST(rlmp), 0);
 
 	return (_retval);
 }
@@ -622,7 +622,7 @@ _audit_symbind(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 		called++;
 		lflags = (*flags & ~(LA_SYMB_NOPLTENTER | LA_SYMB_NOPLTEXIT));
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		sym->st_value = (*alp->al_symbind)(sym, ndx,
 		    &(racp->ac_cookie), &(dacp->ac_cookie),
 		/* BEGIN CSTYLED */
@@ -632,7 +632,7 @@ _audit_symbind(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 		    &lflags);
 #endif
 		/* END CSTYLED */
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 
 		/*
 		 * If the auditor indicated that they did not want to process
@@ -712,9 +712,9 @@ _audit_preinit(List *list, Rt_map *clmp)
 		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == 0)
 			continue;
 
-		leave(LIST(alp->al_lmp));
+		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		(*alp->al_preinit)(&(acp->ac_cookie));
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 }
 

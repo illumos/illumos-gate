@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +32,6 @@
 
 #if !defined(_KMDB) && !defined(_BOOT) && !defined(_KERNEL)
 
-#pragma weak _private_memset = _memset
 #pragma weak memset = _memset
 
 #include "synonyms.h"

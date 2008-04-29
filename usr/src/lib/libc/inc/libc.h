@@ -87,7 +87,6 @@ extern int _thr_keycreate_once(thread_key_t *pkey, void (*destructor)(void *));
 extern void *_pthread_getspecific(thread_key_t);
 extern int _pollsys(struct pollfd *, nfds_t, const timespec_t *,
 	const sigset_t *);
-extern void _private_testcancel(void);
 
 /*
  * The private_DIR structure is the same as the DIR structure,
@@ -219,12 +218,8 @@ extern int lsign(dl_t);
 
 /*
  * defined in ucontext.s
- * __getcontext() is exported by libc
- * __getcontext_syscall() is private to libc
- * otherwise they are the same function
  */
 extern int __getcontext(ucontext_t *);
-extern int __getcontext_syscall(ucontext_t *);
 
 /*
  * defined in door.s

@@ -142,7 +142,7 @@ door_restart:
 	cmpl	$EINTR, %eax		/* interrupted while waiting? */
 	jne	__cerror		/* if not, return the error */
 
-	call	_private_getpid		/* get current process id */
+	call	getpid			/* get current process id */
 	movq	_daref_(door_create_pid), %rdx
 	movl	0(%rdx), %edx
 	cmpl	%eax, %edx		/* same process? */

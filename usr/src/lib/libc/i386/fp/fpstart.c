@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*
  *	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,7 +51,6 @@
 #include	<sys/sysi86.h>	/* for SI86FPHW/SI86FPSTART definitions */
 #include	<sys/fp.h>	/* for FPU_CW_INIT and SSE_MXCSR_INIT */
 
-extern int	_private_sysi86();
 extern int	__fltrounds();
 
 int	_fp_hw;			/* default: bss: 0 == no hardware */
@@ -65,7 +64,7 @@ __fpstart()
 	 * query OS for HW status and ensure the x87 and (optional)
 	 * SSE control words are (will be) set correctly.
 	 */
-	if ((_sse_hw = _private_sysi86(SI86FPSTART,
+	if ((_sse_hw = sysi86(SI86FPSTART,
 	    &_fp_hw, FPU_CW_INIT, SSE_MXCSR_INIT)) == -1) {
 		extern void _putcw();
 
@@ -73,7 +72,7 @@ __fpstart()
 		 * (fallback to old syscall on old kernels)
 		 */
 		_sse_hw = 0;
-		(void) _private_sysi86(SI86FPHW, &_fp_hw);
+		(void) sysi86(SI86FPHW, &_fp_hw);
 		_putcw(0x133f);
 	}
 

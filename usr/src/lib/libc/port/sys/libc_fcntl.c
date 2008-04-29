@@ -52,15 +52,6 @@
 #include <stdlib.h>
 #include "libc.h"
 
-/*
- * We must be careful to call only functions that are private
- * to libc here, to avoid invoking the dynamic linker.
- * This is important because _private_fcntl() is called from
- * posix_spawn() after vfork() and we must never invoke the
- * dynamic linker in a vfork() child.
- */
-
-extern int _private_ioctl(int, int, ...);
 extern int __fcntl_syscall(int fd, int cmd, ...);
 
 #if !defined(_LP64)
@@ -75,11 +66,10 @@ extern int __fcntl_syscall(int fd, int cmd, ...);
 int
 _s_ioctl(int fd, int cmd, intptr_t arg)
 {
-	return (_private_ioctl(fd, cmd, arg));
+	return (ioctl(fd, cmd, arg));
 }
 #endif	/* _LP64 */
 
-#pragma weak _private_fcntl = __fcntl
 int
 __fcntl(int fd, int cmd, ...)
 {
@@ -95,10 +85,10 @@ __fcntl(int fd, int cmd, ...)
 	switch (cmd) {
 	case F_SETOWN:
 		pid = (int)arg;
-		return (_private_ioctl(fd, FIOSETOWN, &pid));
+		return (ioctl(fd, FIOSETOWN, &pid));
 
 	case F_GETOWN:
-		if (_private_ioctl(fd, FIOGETOWN, &res) < 0)
+		if (ioctl(fd, FIOGETOWN, &res) < 0)
 			return (-1);
 		return (res);
 

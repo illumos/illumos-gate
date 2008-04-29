@@ -104,7 +104,7 @@ rwl_entry(rwlock_t *rwlp)
 	 * Reallocate the array, double the size each time.
 	 */
 	readlockp = lmalloc(nlocks * 2 * sizeof (readlock_t));
-	(void) _memcpy(readlockp, self->ul_readlock.array,
+	(void) memcpy(readlockp, self->ul_readlock.array,
 	    nlocks * sizeof (readlock_t));
 	lfree(self->ul_readlock.array, nlocks * sizeof (readlock_t));
 	self->ul_readlock.array = readlockp;
@@ -218,7 +218,7 @@ __rwlock_init(rwlock_t *rwlp, int type, void *arg)
 	sigoff(curthread);
 	rwl_entry(rwlp)->rd_count = 0;
 	sigon(curthread);
-	(void) _memset(rwlp, 0, sizeof (*rwlp));
+	(void) memset(rwlp, 0, sizeof (*rwlp));
 	rwlp->rwlock_type = (uint16_t)type;
 	rwlp->rwlock_magic = RWL_MAGIC;
 	rwlp->mutex.mutex_type = (uint8_t)type;
@@ -419,7 +419,7 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 		preempt(self);
 	}
 	if (lwpid != buffer)
-		(void) _private_munmap(lwpid, maxlwps * sizeof (lwpid_t));
+		(void) munmap((caddr_t)lwpid, maxlwps * sizeof (lwpid_t));
 	return (nlwpid != 0);
 }
 
@@ -455,16 +455,16 @@ shared_rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 			error = EBUSY;
 			break;
 		}
-		if ((error = _private_mutex_lock(mp)) != 0)
+		if ((error = mutex_lock(mp)) != 0)
 			break;
 		if (rd_wr == READ_LOCK) {
 			if (read_lock_try(rwlp, 0)) {
-				(void) _private_mutex_unlock(mp);
+				(void) mutex_unlock(mp);
 				break;
 			}
 		} else {
 			if (write_lock_try(rwlp, 0)) {
-				(void) _private_mutex_unlock(mp);
+				(void) mutex_unlock(mp);
 				break;
 			}
 		}
@@ -1006,9 +1006,9 @@ __rw_unlock(rwlock_t *rwlp)
 	} else if (rd_wr == READ_LOCK && read_unlock_try(rwlp)) {
 		/* EMPTY */;
 	} else if (rwlp->rwlock_type == USYNC_PROCESS) {
-		(void) _private_mutex_lock(&rwlp->mutex);
+		(void) mutex_lock(&rwlp->mutex);
 		(void) __lwp_rwlock_unlock(rwlp);
-		(void) _private_mutex_unlock(&rwlp->mutex);
+		(void) mutex_unlock(&rwlp->mutex);
 		waked = 1;
 	} else {
 		qp = queue_lock(rwlp, MX);
@@ -1034,7 +1034,7 @@ out:
 	 * the pending writer.
 	 */
 	if (waked)
-		lwp_yield();
+		yield();
 	return (0);
 }
 

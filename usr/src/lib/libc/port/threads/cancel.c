@@ -204,7 +204,6 @@ _pthread_setcanceltype(int type, int *oldtype)
  * it by calling thr_exit. thr_exit takes care of calling
  * cleanup handlers.
  */
-#pragma weak _private_testcancel = _pthread_testcancel
 #pragma weak pthread_testcancel = _pthread_testcancel
 void
 _pthread_testcancel(void)

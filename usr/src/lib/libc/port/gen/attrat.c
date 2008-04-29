@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <stdio.h>
+#include <atomic.h>
 
 static int (*nvpacker)(nvlist_t *, char **, size_t *, int, int);
 static int (*nvsize)(nvlist_t *, size_t *, int);
@@ -58,37 +59,46 @@ static char *xattr_view_name[XATTR_VIEW_LAST] = {
 static int
 attrat_init()
 {
+	void *packer;
+	void *sizer;
+	void *unpacker;
+	void *freer;
+	void *looker;
+
 	if (initialized == 0) {
-		void *libnvhandle = dlopen("libnvpair.so.1", RTLD_LAZY);
+		void *handle = dlopen("libnvpair.so.1", RTLD_LAZY);
 
-		lmutex_lock(&attrlock);
-		if (initialized == 1) {
-			lmutex_unlock(&attrlock);
-			if (libnvhandle)
-				dlclose(libnvhandle);
-			return (0);
-		}
-
-		if (libnvhandle == NULL || (nvpacker = (int (*)(nvlist_t *,
-		    char **, size_t *, int, int)) dlsym(libnvhandle,
-		    "nvlist_pack")) == NULL ||
-		    (nvsize = (int (*)(nvlist_t *,
-		    size_t *, int)) dlsym(libnvhandle,
-		    "nvlist_size")) == NULL ||
-		    (nvfree = (int (*)(nvlist_t *)) dlsym(libnvhandle,
-		    "nvlist_free")) == NULL ||
-		    (nvlookupint64 = (int (*)(nvlist_t *, const char *,
-		    uint64_t *)) dlsym(libnvhandle,
-		    "nvlist_lookup_uint64")) == NULL ||
-		    (nvunpacker = (int (*)(char *, size_t,
-		    nvlist_t **)) dlsym(libnvhandle,
-		    "nvlist_unpack")) == NULL) {
-			if (libnvhandle)
-				dlclose(libnvhandle);
-			lmutex_unlock(&attrlock);
+		if (handle == NULL ||
+		    (packer = dlsym(handle, "nvlist_pack")) == NULL ||
+		    (sizer = dlsym(handle, "nvlist_size")) == NULL ||
+		    (unpacker = dlsym(handle, "nvlist_unpack")) == NULL ||
+		    (freer = dlsym(handle, "nvlist_free")) == NULL ||
+		    (looker = dlsym(handle, "nvlist_lookup_uint64")) == NULL) {
+			if (handle)
+				dlclose(handle);
 			return (-1);
 		}
 
+		lmutex_lock(&attrlock);
+
+		if (initialized != 0) {
+			lmutex_unlock(&attrlock);
+			dlclose(handle);
+			return (0);
+		}
+
+		nvpacker = (int (*)(nvlist_t *, char **, size_t *, int, int))
+		    packer;
+		nvsize = (int (*)(nvlist_t *, size_t *, int))
+		    sizer;
+		nvunpacker = (int (*)(char *, size_t, nvlist_t **))
+		    unpacker;
+		nvfree = (int (*)(nvlist_t *))
+		    freer;
+		nvlookupint64 = (int (*)(nvlist_t *, const char *, uint64_t *))
+		    looker;
+
+		membar_producer();
 		initialized = 1;
 		lmutex_unlock(&attrlock);
 	}

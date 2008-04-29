@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 
 #include "synonyms.h"
 #include <values.h>
+#include <pthread.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -77,7 +78,7 @@ pselect(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 	 * SUSV3: We must behave as a cancellation point even if we fail early.
 	 */
 	if (nfds < 0 || nfds > FD_SETSIZE) {
-		_private_testcancel();
+		pthread_testcancel();
 		errno = EINVAL;
 		return (-1);
 	}
@@ -87,7 +88,7 @@ pselect(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 		/* check timespec validity */
 		if (tsp->tv_nsec < 0 || tsp->tv_nsec >= NANOSEC ||
 		    tsp->tv_sec < 0) {
-			_private_testcancel();
+			pthread_testcancel();
 			errno = EINVAL;
 			return (-1);
 		}

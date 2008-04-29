@@ -890,7 +890,7 @@ _nss_db_state_constr(nss_db_initf_t initf)
 	if ((s = libc_malloc(sizeof (*s))) == 0) {
 		return (0);
 	}
-	(void) _private_mutex_init(&s->orphan_root.lock, USYNC_THREAD, 0);
+	(void) mutex_init(&s->orphan_root.lock, USYNC_THREAD, 0);
 
 	s->p.max_active_per_src	= 10;
 	s->p.max_dormant_per_src = 1;
@@ -985,7 +985,7 @@ _nss_db_state_destr(struct nss_db_state *s)
 	if (s == NULL)
 		return;
 
-	/* === _private_mutex_destroy(&s->orphan_root.lock); */
+	/* === mutex_destroy(&s->orphan_root.lock); */
 	if (s->p.cleanup != 0) {
 		(*s->p.cleanup)(&s->p);
 	}

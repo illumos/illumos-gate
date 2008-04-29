@@ -61,23 +61,6 @@ __priocntl(int pc_version, idtype_t idtype, id_t id, int cmd, caddr_t arg)
 	return (__priocntlset(pc_version, &procset, cmd, arg, 0));
 }
 
-/*
- * Internally to libc, we call this function rather than priocntl()
- * when the cmd is not PC_GETXPARMS or PC_SETXPARMS.  We do this
- * for the sake of calling common code in various places.  One of
- * these places is in spawn() and spawnp(), where we must not call
- * any function that is exported from libc while in the child of vfork().
- */
-long
-_private_priocntl(idtype_t idtype, id_t id, int cmd, void *arg)
-{
-	extern long _private__priocntlset(int, procset_t *, int, caddr_t, ...);
-	procset_t procset;
-
-	setprocset(&procset, POP_AND, idtype, id, P_ALL, 0);
-	return (_private__priocntlset(PC_VERSION, &procset, cmd, arg, 0));
-}
-
 
 /*VARARGS3*/
 long

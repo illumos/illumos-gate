@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
 
 #include "SYS.h"
 #include <../assym.h>
-
-	ANSI_PRAGMA_WEAK2(_private_lwp_mutex_unlock,_lwp_mutex_unlock,function)
 
 	ENTRY(_lwp_mutex_unlock)
 	movq	%rdi, %rax

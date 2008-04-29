@@ -118,8 +118,7 @@ get_info_by_policy(int policy)
 		/* policy number not defined in <sched.h> */
 		ASSERT(policy >= _SCHED_NEXT);
 		pccp->pcc_info.pc_cid = policy - _SCHED_NEXT;
-		if (_private_priocntl(0, 0, PC_GETCLINFO, &pccp->pcc_info)
-		    == -1 ||
+		if (priocntl(0, 0, PC_GETCLINFO, &pccp->pcc_info) == -1 ||
 		    (base = is_base_class(pccp->pcc_info.pc_clname)) != 0) {
 			pccp->pcc_info.pc_clname[0] = '\0';
 			pccp->pcc_info.pc_cid = -1;
@@ -138,7 +137,7 @@ get_info_by_policy(int policy)
 		}
 		pccp->pcc_policy = policy;
 	} else if (policy != SCHED_SYS &&
-	    _private_priocntl(0, 0, PC_GETCID, &pccp->pcc_info) == -1) {
+	    priocntl(0, 0, PC_GETCID, &pccp->pcc_info) == -1) {
 		_membar_producer();
 		pccp->pcc_state = -1;
 		errno = EINVAL;
@@ -164,7 +163,7 @@ get_info_by_policy(int policy)
 		 * not defined in <sched.h>.
 		 */
 		pcpri.pc_cid = pccp->pcc_info.pc_cid;
-		if (_private_priocntl(0, 0, PC_GETPRIRANGE, &pcpri) == 0) {
+		if (priocntl(0, 0, PC_GETPRIRANGE, &pcpri) == 0) {
 			pccp->pcc_primin = pcpri.pc_clpmin;
 			pccp->pcc_primax = pcpri.pc_clpmax;
 		}
@@ -198,7 +197,7 @@ get_info_by_class(id_t classid)
 	}
 
 	pcinfo.pc_cid = classid;
-	if (_private_priocntl(0, 0, PC_GETCLINFO, &pcinfo) == -1) {
+	if (priocntl(0, 0, PC_GETCLINFO, &pcinfo) == -1) {
 		if (classid == 0)	/* no kernel info for sys class */
 			return (get_info_by_policy(SCHED_SYS));
 		return (NULL);
@@ -237,7 +236,7 @@ static const pcclass_t *
 get_parms(idtype_t idtype, id_t id, pcparms_t *pcparmp)
 {
 	pcparmp->pc_cid = PC_CLNULL;
-	if (_private_priocntl(idtype, id, PC_GETPARMS, pcparmp) == -1)
+	if (priocntl(idtype, id, PC_GETPARMS, pcparmp) == -1)
 		return (NULL);
 	return (get_info_by_class(pcparmp->pc_cid));
 }
@@ -280,14 +279,14 @@ set_priority(idtype_t idtype, id_t id, int policy, int prio,
 		pcprio.pc_cid = pcparmp->pc_cid;
 		pcprio.pc_val = prio;
 		do {
-			rv = _private_priocntl(idtype, id, PC_DOPRIO, &pcprio);
+			rv = priocntl(idtype, id, PC_DOPRIO, &pcprio);
 		} while (rv == -1 && errno == ENOMEM);
 		return (rv);
 	}
 	}
 
 	do {
-		rv = _private_priocntl(idtype, id, PC_SETPARMS, pcparmp);
+		rv = priocntl(idtype, id, PC_SETPARMS, pcparmp);
 	} while (rv == -1 && errno == ENOMEM);
 	return (rv);
 }
@@ -376,7 +375,7 @@ getparam(idtype_t idtype, id_t id, int *policyp, struct sched_param *param)
 		pcprio.pc_op = PC_GETPRIO;
 		pcprio.pc_cid = 0;
 		pcprio.pc_val = 0;
-		if (_private_priocntl(idtype, id, PC_DOPRIO, &pcprio) == 0)
+		if (priocntl(idtype, id, PC_DOPRIO, &pcprio) == 0)
 			priority = pcprio.pc_val;
 		else
 			priority = 0;
@@ -479,7 +478,7 @@ sched_getscheduler(pid_t pid)
 int
 sched_yield(void)
 {
-	thr_yield();
+	yield();
 	return (0);
 }
 
@@ -622,7 +621,7 @@ update_sched(ulwp_t *self)
 		pcprio.pc_op = PC_GETPRIO;
 		pcprio.pc_cid = 0;
 		pcprio.pc_val = 0;
-		if (_private_priocntl(P_LWPID, P_MYID, PC_DOPRIO, &pcprio) == 0)
+		if (priocntl(P_LWPID, P_MYID, PC_DOPRIO, &pcprio) == 0)
 			priority = pcprio.pc_val;
 		else
 			priority = 0;

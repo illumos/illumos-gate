@@ -76,6 +76,7 @@ extern const Lc_interface rtld_funcs[];
 #pragma weak _uberdata = __uberdata
 uberdata_t __uberdata = {
 	{ DEFAULTMUTEX, NULL, 0 },	/* link_lock */
+	{ RECURSIVEMUTEX, NULL, 0 },	/* ld_lock */
 	{ RECURSIVEMUTEX, NULL, 0 },	/* fork_lock */
 	{ RECURSIVEMUTEX, NULL, 0 },	/* atfork_lock */
 	{ RECURSIVEMUTEX, NULL, 0 },	/* callout_lock */
@@ -219,7 +220,7 @@ ulwp_clean(ulwp_t *ulwp)
 	uintptr_t stktop = ulwp->ul_stktop;
 	size_t stksiz = ulwp->ul_stksiz;
 
-	(void) _private_memset(ulwp, 0, sizeof (*ulwp));
+	(void) memset(ulwp, 0, sizeof (*ulwp));
 
 	ulwp->ul_stk = stk;
 	ulwp->ul_mapsiz = mapsiz;
@@ -270,7 +271,7 @@ trim_stack_cache(int cache_limit)
 				udp->lwp_laststack = prev;
 			hash_out(ulwp, udp);
 			udp->nfreestack--;
-			(void) _private_munmap(ulwp->ul_stk, ulwp->ul_mapsiz);
+			(void) munmap(ulwp->ul_stk, ulwp->ul_mapsiz);
 			/*
 			 * Now put the free ulwp on the ulwp freelist.
 			 */
@@ -377,14 +378,14 @@ find_stack(size_t stksize, size_t guardsize)
 	/*
 	 * Create a new stack.
 	 */
-	if ((stk = _private_mmap(NULL, mapsize, stackprot,
+	if ((stk = mmap(NULL, mapsize, stackprot,
 	    MAP_PRIVATE|MAP_NORESERVE|MAP_ANON, -1, (off_t)0)) != MAP_FAILED) {
 		/*
 		 * We have allocated our stack.  Now allocate the ulwp.
 		 */
 		ulwp = ulwp_alloc();
 		if (ulwp == NULL)
-			(void) _private_munmap(stk, mapsize);
+			(void) munmap(stk, mapsize);
 		else {
 			ulwp->ul_stk = stk;
 			ulwp->ul_mapsiz = mapsize;
@@ -393,8 +394,7 @@ find_stack(size_t stksize, size_t guardsize)
 			ulwp->ul_stksiz = stksize;
 			ulwp->ul_ix = -1;
 			if (guardsize)	/* protect the extra red zone */
-				(void) _private_mprotect(stk,
-				    guardsize, PROT_NONE);
+				(void) mprotect(stk, guardsize, PROT_NONE);
 		}
 	}
 	return (ulwp);
@@ -802,7 +802,7 @@ _thrp_exit()
 	self->ul_pleasestop = 0;
 	if (replace != NULL) {
 		int ix = self->ul_ix;		/* the hash index */
-		(void) _private_memcpy(replace, self, REPLACEMENT_SIZE);
+		(void) memcpy(replace, self, REPLACEMENT_SIZE);
 		replace->ul_self = replace;
 		replace->ul_next = NULL;	/* clone not on stack list */
 		replace->ul_mapsiz = 0;		/* allows clone to be freed */
@@ -1270,7 +1270,7 @@ libc_init(void)
 	 * This is also convenient to use for getting our signal mask.
 	 */
 	uc.uc_flags = UC_ALL;
-	(void) __getcontext_syscall(&uc);
+	(void) __getcontext(&uc);
 	ASSERT(uc.uc_link == NULL);
 
 	tls_size = roundup64(udp->tls_metadata.static_tls.tls_size);
@@ -1307,7 +1307,7 @@ libc_init(void)
 #endif
 
 	self->ul_stktop = (uintptr_t)uc.uc_stack.ss_sp + uc.uc_stack.ss_size;
-	(void) _private_getrlimit(RLIMIT_STACK, &rl);
+	(void) getrlimit(RLIMIT_STACK, &rl);
 	self->ul_stksiz = rl.rlim_cur;
 	self->ul_stk = (caddr_t)(self->ul_stktop - self->ul_stksiz);
 
@@ -1340,8 +1340,7 @@ libc_init(void)
 		 * external functions until we establish curthread, below,
 		 * so we just call our private version of memcpy().
 		 */
-		(void) _private_memcpy(udp,
-		    oldself->ul_uberdata, sizeof (*udp));
+		(void) memcpy(udp, oldself->ul_uberdata, sizeof (*udp));
 		/*
 		 * These items point to global data on the primary link map.
 		 */
@@ -1356,7 +1355,7 @@ libc_init(void)
 	}
 	udp->all_lwps = self;
 	udp->ulwp_one = self;
-	udp->pid = _private_getpid();
+	udp->pid = getpid();
 	udp->nthreads = 1;
 	/*
 	 * In every link map, tdb_bootstrap points to the same piece of
@@ -1415,7 +1414,7 @@ libc_init(void)
 		self->ul_ustack.ss_size = self->ul_stksiz;
 	}
 	self->ul_ustack.ss_flags = 0;
-	(void) _private_setustack(&self->ul_ustack);
+	(void) setustack(&self->ul_ustack);
 
 	/*
 	 * Get the variables that affect thread behavior from the environment.
@@ -1532,7 +1531,7 @@ finish_init()
 	/*
 	 * Now allocate the thread hash table.
 	 */
-	if ((data = _private_mmap(NULL, HASHTBLSZ * sizeof (thr_hash_table_t),
+	if ((data = mmap(NULL, HASHTBLSZ * sizeof (thr_hash_table_t),
 	    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, (off_t)0))
 	    == MAP_FAILED)
 		thr_panic("cannot allocate thread hash table");
@@ -1608,16 +1607,16 @@ postfork1_child()
 	hash_in_unlocked(self, TIDHASH(self->ul_lwpid, udp), udp);
 
 	/*
-	 * Some thread in the parent might have been suspended while
-	 * holding udp->callout_lock.  Reinitialize the child's copy.
+	 * Some thread in the parent might have been suspended
+	 * while holding udp->callout_lock or udp->ld_lock.
+	 * Reinitialize the child's copies.
 	 */
-	_private_mutex_init(&udp->callout_lock,
-	    USYNC_THREAD | LOCK_RECURSIVE, NULL);
+	mutex_init(&udp->callout_lock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
+	mutex_init(&udp->ld_lock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
 
 	/* no one in the child is on a sleep queue; reinitialize */
 	if ((qp = udp->queue_head) != NULL) {
-		(void) _private_memset(qp, 0,
-		    2 * QHASHSIZE * sizeof (queue_head_t));
+		(void) memset(qp, 0, 2 * QHASHSIZE * sizeof (queue_head_t));
 		for (i = 0; i < 2 * QHASHSIZE; qp++, i++) {
 			qp->qh_type = (i < QHASHSIZE)? MX : CV;
 			qp->qh_lock.mutex_flag = LOCK_INITED;
@@ -2118,7 +2117,7 @@ _thr_continue(thread_t tid)
 void
 _thr_yield()
 {
-	lwp_yield();
+	yield();
 }
 
 #pragma weak thr_kill = _thr_kill
@@ -2190,12 +2189,19 @@ do_exit_critical()
  * or forking allowed), and to be immune from cancellation for the duration.
  */
 int
-_ti_bind_guard(int bindflag)
+_ti_bind_guard(int flags)
 {
 	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
+	int bindflag = (flags & THR_FLG_RTLD);
 
 	if ((self->ul_bindflags & bindflag) == bindflag)
 		return (0);
+	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
+		ASSERT(self->ul_critical == 0);
+		sigoff(self);	/* see no signals while holding ld_lock */
+		mutex_lock(&udp->ld_lock);
+	}
 	enter_critical(self);
 	self->ul_save_state = self->ul_cancel_disabled;
 	self->ul_cancel_disabled = 1;
@@ -2205,9 +2211,11 @@ _ti_bind_guard(int bindflag)
 }
 
 int
-_ti_bind_clear(int bindflag)
+_ti_bind_clear(int flags)
 {
 	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
+	int bindflag = (flags & THR_FLG_RTLD);
 
 	if ((self->ul_bindflags & bindflag) == 0)
 		return (self->ul_bindflags);
@@ -2215,6 +2223,13 @@ _ti_bind_clear(int bindflag)
 	self->ul_cancel_disabled = self->ul_save_state;
 	set_cancel_pending_flag(self, 0);
 	exit_critical(self);
+	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
+		ASSERT(self->ul_critical == 0);
+		if (MUTEX_OWNED(&udp->ld_lock, self)) {
+			mutex_unlock(&udp->ld_lock);
+			sigon(self);	/* reenable signals */
+		}
+	}
 	return (self->ul_bindflags);
 }
 
@@ -2422,15 +2437,15 @@ getlwpstatus(thread_t tid, struct lwpstatus *sp)
 	(void) strcpy(buf, "/proc/self/lwp/");
 	ultos((uint64_t)tid, 10, buf + strlen(buf));
 	(void) strcat(buf, "/lwpstatus");
-	if ((fd = _private_open(buf, O_RDONLY, 0)) >= 0) {
+	if ((fd = __open(buf, O_RDONLY, 0)) >= 0) {
 		while (__pread(fd, sp, sizeof (*sp), 0) == sizeof (*sp)) {
 			if (sp->pr_flags & PR_STOPPED) {
-				(void) _private_close(fd);
+				(void) __close(fd);
 				return (0);
 			}
-			lwp_yield();	/* give him a chance to stop */
+			yield();	/* give him a chance to stop */
 		}
-		(void) _private_close(fd);
+		(void) __close(fd);
 	}
 	return (-1);
 }
@@ -2449,7 +2464,7 @@ putlwpregs(thread_t tid, prgregset_t prp)
 	(void) strcpy(buf, "/proc/self/lwp/");
 	ultos((uint64_t)tid, 10, buf + strlen(buf));
 	(void) strcat(buf, "/lwpctl");
-	if ((fd = _private_open(buf, O_WRONLY, 0)) >= 0) {
+	if ((fd = __open(buf, O_WRONLY, 0)) >= 0) {
 		dstop_sreg[0] = PCDSTOP;	/* direct it to stop */
 		dstop_sreg[1] = PCSREG;		/* set the registers */
 		iov[0].iov_base = (caddr_t)dstop_sreg;
@@ -2461,10 +2476,10 @@ putlwpregs(thread_t tid, prgregset_t prp)
 		iov[2].iov_base = (caddr_t)run_null;
 		iov[2].iov_len = sizeof (run_null);
 		if (__writev(fd, iov, 3) >= 0) {
-			(void) _private_close(fd);
+			(void) __close(fd);
 			return (0);
 		}
-		(void) _private_close(fd);
+		(void) __close(fd);
 	}
 	return (-1);
 }

@@ -37,11 +37,6 @@ extern "C" {
 
 /* these are private to the library */
 extern	int	primary_link_map;
-extern	int	_private_mutex_init(mutex_t *, int, void *);
-extern	int	_private_mutex_destroy(mutex_t *);
-extern	int	_private_mutex_lock(mutex_t *);
-extern	int	_private_mutex_trylock(mutex_t *);
-extern	int	_private_mutex_unlock(mutex_t *);
 extern	void	lmutex_lock(mutex_t *);
 extern	void	lmutex_unlock(mutex_t *);
 extern	int	__rwlock_init(rwlock_t *, int, void *);

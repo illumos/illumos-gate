@@ -51,7 +51,7 @@ _sema_init(sema_t *sp, unsigned int count, int type, void *arg)
 	if ((type != USYNC_THREAD && type != USYNC_PROCESS) ||
 	    (count > _semvaluemax))
 		return (EINVAL);
-	(void) _memset(sp, 0, sizeof (*sp));
+	(void) memset(sp, 0, sizeof (*sp));
 	sp->count = count;
 	sp->type = (uint16_t)type;
 	sp->magic = SEMA_MAGIC;

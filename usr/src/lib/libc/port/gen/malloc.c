@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,13 +103,13 @@ static int freeidx;		/* index of free blocks in flist % FREESIZE */
 void
 malloc_locks(void)
 {
-	(void) _private_mutex_lock(&libc_malloc_lock);
+	(void) mutex_lock(&libc_malloc_lock);
 }
 
 void
 malloc_unlocks(void)
 {
-	(void) _private_mutex_unlock(&libc_malloc_lock);
+	(void) mutex_unlock(&libc_malloc_lock);
 }
 
 /*
@@ -169,9 +169,9 @@ malloc(size_t size)
 		return (NULL);
 	}
 	assert_no_libc_locks_held();
-	(void) _private_mutex_lock(&libc_malloc_lock);
+	(void) mutex_lock(&libc_malloc_lock);
 	ret = _malloc_unlocked(size);
-	(void) _private_mutex_unlock(&libc_malloc_lock);
+	(void) mutex_unlock(&libc_malloc_lock);
 	return (ret);
 }
 
@@ -204,7 +204,7 @@ _malloc_unlocked(size_t size)
 			 * exact match, use it as is
 			 */
 			freeidx = (freeidx + FREESIZE - 1) &
-				FREEMASK; /* 1 back */
+			    FREEMASK; /* 1 back */
 			flist[freeidx] = Lfree = NULL;
 			return (DATA(sp));
 		} else if (size >= MINSIZE && n > size) {
@@ -212,7 +212,7 @@ _malloc_unlocked(size_t size)
 			 * got a big enough piece
 			 */
 			freeidx = (freeidx + FREESIZE - 1) &
-				FREEMASK; /* 1 back */
+			    FREEMASK; /* 1 back */
 			flist[freeidx] = Lfree = NULL;
 			o_bit1 = SIZE(sp) & BIT1;
 			SIZE(sp) = n;
@@ -320,10 +320,10 @@ realloc(void *old, size_t size)
 	}
 
 	/* pointer to the block */
-	(void) _private_mutex_lock(&libc_malloc_lock);
+	(void) mutex_lock(&libc_malloc_lock);
 	if (old == NULL) {
 		new = _malloc_unlocked(size);
-		(void) _private_mutex_unlock(&libc_malloc_lock);
+		(void) mutex_unlock(&libc_malloc_lock);
 		return (new);
 	}
 
@@ -338,7 +338,7 @@ realloc(void *old, size_t size)
 
 	/* if the block was freed, data has been destroyed. */
 	if (!ISBIT0(ts)) {
-		(void) _private_mutex_unlock(&libc_malloc_lock);
+		(void) mutex_unlock(&libc_malloc_lock);
 		return (NULL);
 	}
 
@@ -346,7 +346,7 @@ realloc(void *old, size_t size)
 	CLRBITS01(SIZE(tp));
 	if (size == SIZE(tp)) {
 		SIZE(tp) = ts;
-		(void) _private_mutex_unlock(&libc_malloc_lock);
+		(void) mutex_unlock(&libc_malloc_lock);
 		return (old);
 	}
 
@@ -356,7 +356,7 @@ realloc(void *old, size_t size)
 		if (size == 0) {
 			SETOLD01(SIZE(tp), ts);
 			_free_unlocked(old);
-			(void) _private_mutex_unlock(&libc_malloc_lock);
+			(void) mutex_unlock(&libc_malloc_lock);
 			return (NULL);
 		} else {
 			goto call_malloc;
@@ -405,7 +405,7 @@ chop_big:
 
 		/* the previous block may be free */
 		SETOLD01(SIZE(tp), ts);
-		(void) _private_mutex_unlock(&libc_malloc_lock);
+		(void) mutex_unlock(&libc_malloc_lock);
 		return (old);
 	}
 
@@ -418,7 +418,7 @@ call_malloc:
 			ts = size;
 		MEMCOPY(new, old, ts);
 		_free_unlocked(old);
-		(void) _private_mutex_unlock(&libc_malloc_lock);
+		(void) mutex_unlock(&libc_malloc_lock);
 		return (new);
 	}
 
@@ -443,7 +443,7 @@ call_malloc:
 	if (SIZE(tp) < MINSIZE) {
 		if (size < SIZE(tp)) {			/* case 1. */
 			SETOLD01(SIZE(tp), ts);
-			(void) _private_mutex_unlock(&libc_malloc_lock);
+			(void) mutex_unlock(&libc_malloc_lock);
 			return (old);
 		} else if (size < MINSIZE) {		/* case 2. */
 			size = MINSIZE;
@@ -468,7 +468,7 @@ call_malloc:
 		goto chop_big;
 	}
 	SETOLD01(SIZE(tp), ts);
-	(void) _private_mutex_unlock(&libc_malloc_lock);
+	(void) mutex_unlock(&libc_malloc_lock);
 	return (NULL);
 }
 
@@ -853,10 +853,14 @@ t_splay(TREE *tp)
 void
 free(void *old)
 {
+	if (!primary_link_map) {
+		errno = ENOTSUP;
+		return;
+	}
 	assert_no_libc_locks_held();
-	(void) _private_mutex_lock(&libc_malloc_lock);
+	(void) mutex_lock(&libc_malloc_lock);
 	_free_unlocked(old);
-	(void) _private_mutex_unlock(&libc_malloc_lock);
+	(void) mutex_unlock(&libc_malloc_lock);
 }
 
 
@@ -865,7 +869,7 @@ _free_unlocked(void *old)
 {
 	int	i;
 
-	if (old == NULL || !primary_link_map)
+	if (old == NULL)
 		return;
 
 	/*

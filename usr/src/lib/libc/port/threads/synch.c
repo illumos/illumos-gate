@@ -125,7 +125,6 @@ int	thread_queue_spin = 10000;
  *	LOCK_PRIO_PROTECT
  *	LOCK_ROBUST
  */
-#pragma weak _private_mutex_init = __mutex_init
 #pragma weak mutex_init = __mutex_init
 #pragma weak _mutex_init = __mutex_init
 /* ARGSUSED2 */
@@ -185,7 +184,7 @@ __mutex_init(mutex_t *mp, int type, void *arg)
 		if (basetype == USYNC_PROCESS)
 			register_lock(mp);
 	} else {
-		(void) _memset(mp, 0, sizeof (*mp));
+		(void) memset(mp, 0, sizeof (*mp));
 		mp->mutex_type = (uint8_t)type;
 		mp->mutex_flag = LOCK_INITED;
 		mp->mutex_magic = MUTEX_MAGIC;
@@ -250,7 +249,7 @@ set_rt_priority(ulwp_t *self, int prio)
 	pcparm.pc_cid = self->ul_rtclassid;
 	((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs = RT_NOCHANGE;
 	((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
-	(void) _private_priocntl(P_LWPID, self->ul_lwpid, PC_SETPARMS, &pcparm);
+	(void) priocntl(P_LWPID, self->ul_lwpid, PC_SETPARMS, &pcparm);
 }
 
 /*
@@ -455,7 +454,7 @@ queue_alloc(void)
 	 */
 	ASSERT(self == udp->ulwp_one);
 	ASSERT(!udp->uberflags.uf_mt);
-	if ((data = _private_mmap(NULL, 2 * QHASHSIZE * sizeof (queue_head_t),
+	if ((data = mmap(NULL, 2 * QHASHSIZE * sizeof (queue_head_t),
 	    PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, (off_t)0))
 	    == MAP_FAILED)
 		thr_panic("cannot allocate thread queue_head table");
@@ -1181,14 +1180,14 @@ preempt(ulwp_t *self)
 			scp->sc_preemptctl.sc_nopreempt = self->ul_savpreempt;
 			if (scp->sc_preemptctl.sc_yield &&
 			    scp->sc_preemptctl.sc_nopreempt == 0) {
-				lwp_yield();
+				yield();
 				if (scp->sc_preemptctl.sc_yield) {
 					/*
 					 * Shouldn't happen.  This is either
 					 * a race condition or the thread
 					 * just entered the real-time class.
 					 */
-					lwp_yield();
+					yield();
 					scp->sc_preemptctl.sc_yield = 0;
 				}
 			}
@@ -1635,7 +1634,7 @@ mutex_wakeup_all(mutex_t *mp)
 	}
 
 	if (lwpid != buffer)
-		(void) _private_munmap(lwpid, maxlwps * sizeof (lwpid_t));
+		(void) munmap((caddr_t)lwpid, maxlwps * sizeof (lwpid_t));
 }
 
 /*
@@ -2167,18 +2166,6 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	return (mutex_lock_internal(mp, tsp, MUTEX_LOCK));
 }
 
-/*
- * Of the following function names (all the same function, of course),
- * only _private_mutex_lock() is not exported from libc.  This means
- * that calling _private_mutex_lock() within libc will not invoke the
- * dynamic linker.  This is critical for any code called in the child
- * of vfork() (via posix_spawn()) because invoking the dynamic linker
- * in such a case would corrupt the parent's address space.  There are
- * other places in libc where avoiding the dynamic linker is necessary.
- * Of course, _private_mutex_lock() can be called in cases not requiring
- * the avoidance of the dynamic linker too, and often is.
- */
-#pragma weak _private_mutex_lock = __mutex_lock
 #pragma weak mutex_lock = __mutex_lock
 #pragma weak _mutex_lock = __mutex_lock
 #pragma weak pthread_mutex_lock = __mutex_lock
@@ -2220,7 +2207,6 @@ _pthread_mutex_reltimedlock_np(mutex_t *mp, const timespec_t *reltime)
 	return (error);
 }
 
-#pragma weak _private_mutex_trylock = __mutex_trylock
 #pragma weak mutex_trylock = __mutex_trylock
 #pragma weak _mutex_trylock = __mutex_trylock
 #pragma weak pthread_mutex_trylock = __mutex_trylock
@@ -2347,7 +2333,6 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 	return (error);
 }
 
-#pragma weak _private_mutex_unlock = __mutex_unlock
 #pragma weak mutex_unlock = __mutex_unlock
 #pragma weak _mutex_unlock = __mutex_unlock
 #pragma weak pthread_mutex_unlock = __mutex_unlock
@@ -2537,13 +2522,13 @@ void
 sig_mutex_lock(mutex_t *mp)
 {
 	sigoff(curthread);
-	(void) _private_mutex_lock(mp);
+	(void) mutex_lock(mp);
 }
 
 void
 sig_mutex_unlock(mutex_t *mp)
 {
-	(void) _private_mutex_unlock(mp);
+	(void) mutex_unlock(mp);
 	sigon(curthread);
 }
 
@@ -2553,7 +2538,7 @@ sig_mutex_trylock(mutex_t *mp)
 	int error;
 
 	sigoff(curthread);
-	if ((error = _private_mutex_trylock(mp)) != 0)
+	if ((error = mutex_trylock(mp)) != 0)
 		sigon(curthread);
 	return (error);
 }
@@ -2567,14 +2552,14 @@ sig_cond_wait(cond_t *cv, mutex_t *mp)
 	int error;
 
 	ASSERT(curthread->ul_sigdefer != 0);
-	_private_testcancel();
+	pthread_testcancel();
 	error = __cond_wait(cv, mp);
 	if (error == EINTR && curthread->ul_cursig) {
 		sig_mutex_unlock(mp);
 		/* take the deferred signal here */
 		sig_mutex_lock(mp);
 	}
-	_private_testcancel();
+	pthread_testcancel();
 	return (error);
 }
 
@@ -2587,14 +2572,14 @@ sig_cond_reltimedwait(cond_t *cv, mutex_t *mp, const timespec_t *ts)
 	int error;
 
 	ASSERT(curthread->ul_sigdefer != 0);
-	_private_testcancel();
+	pthread_testcancel();
 	error = __cond_reltimedwait(cv, mp, ts);
 	if (error == EINTR && curthread->ul_cursig) {
 		sig_mutex_unlock(mp);
 		/* take the deferred signal here */
 		sig_mutex_lock(mp);
 	}
-	_private_testcancel();
+	pthread_testcancel();
 	return (error);
 }
 
@@ -2607,7 +2592,7 @@ sig_cond_reltimedwait(cond_t *cv, mutex_t *mp, const timespec_t *ts)
 void
 cancel_safe_mutex_lock(mutex_t *mp)
 {
-	(void) _private_mutex_lock(mp);
+	(void) mutex_lock(mp);
 	curthread->ul_libc_locks++;
 }
 
@@ -2616,7 +2601,7 @@ cancel_safe_mutex_trylock(mutex_t *mp)
 {
 	int error;
 
-	if ((error = _private_mutex_trylock(mp)) == 0)
+	if ((error = mutex_trylock(mp)) == 0)
 		curthread->ul_libc_locks++;
 	return (error);
 }
@@ -2628,7 +2613,7 @@ cancel_safe_mutex_unlock(mutex_t *mp)
 
 	ASSERT(self->ul_libc_locks != 0);
 
-	(void) _private_mutex_unlock(mp);
+	(void) mutex_unlock(mp);
 
 	/*
 	 * Decrement the count of locks held by cancel_safe_mutex_lock().
@@ -2687,7 +2672,6 @@ mutex_is_held(mutex_t *mparg)
 	return (MUTEX_OWNED(mp, curthread));
 }
 
-#pragma weak _private_mutex_destroy = __mutex_destroy
 #pragma weak mutex_destroy = __mutex_destroy
 #pragma weak _mutex_destroy = __mutex_destroy
 #pragma weak pthread_mutex_destroy = __mutex_destroy
@@ -2697,7 +2681,7 @@ __mutex_destroy(mutex_t *mp)
 {
 	if (mp->mutex_type & USYNC_PROCESS)
 		forget_lock(mp);
-	(void) _memset(mp, 0, sizeof (*mp));
+	(void) memset(mp, 0, sizeof (*mp));
 	tdb_sync_obj_deregister(mp);
 	return (0);
 }
@@ -2735,7 +2719,7 @@ _pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 {
 	mutex_t *mp = (mutex_t *)lock;
 
-	(void) _memset(mp, 0, sizeof (*mp));
+	(void) memset(mp, 0, sizeof (*mp));
 	if (pshared == PTHREAD_PROCESS_SHARED)
 		mp->mutex_type = USYNC_PROCESS;
 	else
@@ -2749,7 +2733,7 @@ _pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 int
 _pthread_spin_destroy(pthread_spinlock_t *lock)
 {
-	(void) _memset(lock, 0, sizeof (*lock));
+	(void) memset(lock, 0, sizeof (*lock));
 	return (0);
 }
 
@@ -2886,7 +2870,7 @@ find_lock_entry(mutex_t *lock)
 	 * Reallocate the array, double the size each time.
 	 */
 	lockptr = lmalloc(nlocks * 2 * sizeof (mutex_t *));
-	(void) _memcpy(lockptr, self->ul_heldlocks.array,
+	(void) memcpy(lockptr, self->ul_heldlocks.array,
 	    nlocks * sizeof (mutex_t *));
 	lfree(self->ul_heldlocks.array, nlocks * sizeof (mutex_t *));
 	self->ul_heldlocks.array = lockptr;
@@ -2978,7 +2962,7 @@ _cond_init(cond_t *cvp, int type, void *arg)
 {
 	if (type != USYNC_THREAD && type != USYNC_PROCESS)
 		return (EINVAL);
-	(void) _memset(cvp, 0, sizeof (*cvp));
+	(void) memset(cvp, 0, sizeof (*cvp));
 	cvp->cond_type = (uint16_t)type;
 	cvp->cond_magic = COND_MAGIC;
 	return (0);
@@ -3594,7 +3578,7 @@ alloc_lwpids(lwpid_t *lwpid, int *nlwpid_ptr, int *maxlwps_ptr)
 
 	first_allocation = (maxlwps == MAXLWPS);
 	newlwps = first_allocation? NEWLWPS : 2 * maxlwps;
-	vaddr = _private_mmap(NULL, newlwps * sizeof (lwpid_t),
+	vaddr = mmap(NULL, newlwps * sizeof (lwpid_t),
 	    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, (off_t)0);
 
 	if (vaddr == MAP_FAILED) {
@@ -3606,9 +3590,9 @@ alloc_lwpids(lwpid_t *lwpid, int *nlwpid_ptr, int *maxlwps_ptr)
 		(void) __lwp_unpark_all(lwpid, nlwpid);
 		*nlwpid_ptr = 0;
 	} else {
-		(void) _memcpy(vaddr, lwpid, maxlwps * sizeof (lwpid_t));
+		(void) memcpy(vaddr, lwpid, maxlwps * sizeof (lwpid_t));
 		if (!first_allocation)
-			(void) _private_munmap(lwpid,
+			(void) munmap((caddr_t)lwpid,
 			    maxlwps * sizeof (lwpid_t));
 		lwpid = vaddr;
 		*maxlwps_ptr = newlwps;
@@ -3711,7 +3695,7 @@ cond_broadcast_internal(cond_t *cvp)
 		preempt(self);
 	}
 	if (lwpid != buffer)
-		(void) _private_munmap(lwpid, maxlwps * sizeof (lwpid_t));
+		(void) munmap((caddr_t)lwpid, maxlwps * sizeof (lwpid_t));
 	return (error);
 }
 

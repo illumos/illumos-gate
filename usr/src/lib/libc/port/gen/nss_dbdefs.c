@@ -1080,42 +1080,32 @@ nss_pinit_funcs(int index, nss_db_initf_t *initf, nss_str2ent_t *s2e)
 	membar_consumer();
 
 	if (initf) {
-		if (getXbyY_to_dbop[index].initfnp != NULL) {
-			membar_consumer();
-			*initf = (nss_db_initf_t)getXbyY_to_dbop[index].initfnp;
-		} else {
+		if (getXbyY_to_dbop[index].initfnp == NULL) {
+			name = getXbyY_to_dbop[index].initfn;
+			if ((sym = dlsym(handle, name)) == NULL)
+				return (NSS_ERROR);
 			lmutex_lock(&initf_lock);
-			if (getXbyY_to_dbop[index].initfnp == NULL) {
-				name = getXbyY_to_dbop[index].initfn;
-				if ((sym = dlsym(handle, name)) == 0) {
-					lmutex_unlock(&initf_lock);
-					return (NSS_ERROR);
-				}
+			if (getXbyY_to_dbop[index].initfnp == NULL)
 				getXbyY_to_dbop[index].initfnp = sym;
-			}
 			membar_producer();
-			*initf = (nss_db_initf_t)getXbyY_to_dbop[index].initfnp;
 			lmutex_unlock(&initf_lock);
 		}
+		membar_consumer();
+		*initf = (nss_db_initf_t)getXbyY_to_dbop[index].initfnp;
 	}
 	if (s2e) {
-		if (getXbyY_to_dbop[index].strfnp != NULL) {
-			membar_consumer();
-			*s2e = (nss_str2ent_t)getXbyY_to_dbop[index].strfnp;
-		} else {
+		if (getXbyY_to_dbop[index].strfnp == NULL) {
+			name = getXbyY_to_dbop[index].strfn;
+			if ((sym = dlsym(handle, name)) == NULL)
+				return (NSS_ERROR);
 			lmutex_lock(&s2e_lock);
-			if (getXbyY_to_dbop[index].strfnp == NULL) {
-				name = getXbyY_to_dbop[index].strfn;
-				if ((sym = dlsym(handle, name)) == 0) {
-					lmutex_unlock(&s2e_lock);
-					return (NSS_ERROR);
-				}
+			if (getXbyY_to_dbop[index].strfnp == NULL)
 				getXbyY_to_dbop[index].strfnp = sym;
-			}
 			membar_producer();
-			*s2e = (nss_str2ent_t)getXbyY_to_dbop[index].strfnp;
 			lmutex_unlock(&s2e_lock);
 		}
+		membar_consumer();
+		*s2e = (nss_str2ent_t)getXbyY_to_dbop[index].strfnp;
 	}
 
 	return (NSS_SUCCESS);

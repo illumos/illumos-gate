@@ -185,7 +185,9 @@
 void
 get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 {
-	int		tag, threaded = 0;
+	int		threaded = 0;
+	int		version;
+	int		tag;
 	Lm_list		*lml;
 	Lc_desc		*lcp;
 
@@ -293,7 +295,14 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 			if ((rtld_flags2 & RT_FL2_RTLDSEEN) == 0) {
 				rtld_flags2 |= RT_FL2_RTLDSEEN;
 
-				if (funcs->ci_un.ci_val >= CI_V_FOUR) {
+				version = funcs->ci_un.ci_val;
+#if defined(CI_V_FIVE)
+				if (version >= CI_V_FIVE) {
+					thr_flg_nolock = THR_FLG_NOLOCK;
+					thr_flg_reenter = THR_FLG_REENTER;
+				}
+#endif
+				if (version >= CI_V_FOUR) {
 					Listnode	*lnp;
 					Lm_list		*lml2;
 
@@ -392,13 +401,15 @@ rt_get_extern(Lm_list *lml, Rt_map *lmp)
 static int	bindmask = 0;
 
 int
-rt_bind_guard(int bindflag)
+rt_bind_guard(int flags)
 {
 	int	(*fptr)(int);
+	int	bindflag;
 
 	if ((fptr = glcs[CI_BIND_GUARD].lc_un.lc_func) != NULL) {
-		return ((*fptr)(bindflag));
+		return ((*fptr)(flags));
 	} else {
+		bindflag = (flags & THR_FLG_RTLD);
 		if ((bindflag & bindmask) == 0) {
 			bindmask |= bindflag;
 			return (1);
@@ -408,13 +419,15 @@ rt_bind_guard(int bindflag)
 }
 
 int
-rt_bind_clear(int bindflag)
+rt_bind_clear(int flags)
 {
 	int	(*fptr)(int);
+	int	bindflag;
 
 	if ((fptr = glcs[CI_BIND_CLEAR].lc_un.lc_func) != NULL) {
-		return ((*fptr)(bindflag));
+		return ((*fptr)(flags));
 	} else {
+		bindflag = (flags & THR_FLG_RTLD);
 		if (bindflag == 0)
 			return (bindmask);
 		else {
@@ -435,9 +448,9 @@ rt_thr_init(Lm_list *lml)
 
 	if ((fptr = (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != 0) {
 		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = 0;
-		leave((Lm_list *)0);
+		leave((Lm_list *)0, thr_flg_reenter);
 		(*fptr)();
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 }
 

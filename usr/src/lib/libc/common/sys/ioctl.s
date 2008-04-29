@@ -40,7 +40,6 @@
 
 #include "SYS.h"
 
-	ANSI_PRAGMA_WEAK2(_private_ioctl,ioctl,function)
 	SYSCALL_RESTART_RVAL1(ioctl)
 	RET
 	SET_SIZE(ioctl)

@@ -118,7 +118,7 @@ _pthread_attr_equal(const pthread_attr_t *attr1, const pthread_attr_t *attr2)
 
 	if (ap1 == NULL || ap2 == NULL)
 		return (0);
-	return (ap1 == ap2 || _memcmp(ap1, ap2, sizeof (thrattr_t)) == 0);
+	return (ap1 == ap2 || memcmp(ap1, ap2, sizeof (thrattr_t)) == 0);
 }
 
 /*

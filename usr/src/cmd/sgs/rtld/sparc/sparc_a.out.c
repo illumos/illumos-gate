@@ -83,7 +83,7 @@ aout_bndr(caddr_t pc)
 	 * further process a locking request (see comments in completion()).
 	 * Under this recursion we disable tsort and cleanup activities.
 	 */
-	entry = enter();
+	entry = enter(0);
 
 	for (lmp = lml_main.lm_head; lmp; lmp = (Rt_map *)NEXT(lmp)) {
 		if (FCT(lmp) == &aout_fct) {
@@ -167,7 +167,7 @@ aout_bndr(caddr_t pc)
 	 */
 	if (entry) {
 		is_dep_init(nlmp, lmp);
-		leave(lml);
+		leave(lml, 0);
 	}
 
 	return (symval);

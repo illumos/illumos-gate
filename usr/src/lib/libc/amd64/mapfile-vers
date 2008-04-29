@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@ SUNW_1.22 {
 	dlmopen = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	dlopen = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	dlsym = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
+    protected:
 	_SUNW_Unwind_DeleteException;
 	_SUNW_Unwind_ForcedUnwind;
 	_SUNW_Unwind_GetCFA;
@@ -68,6 +69,57 @@ SUNW_1.22 {
 
 SUNW_0.7 {
     global:
+	_altzone;
+	calloc = NODIRECT;
+	_ctype;
+	__ctype;
+	daylight;
+	_daylight;
+	environ = NODIRECT;
+	_environ = NODIRECT;
+	errno = NODIRECT;
+	free = NODIRECT;
+	frexp = FUNCTION FILTER libm.so.2;
+	getdate_err;
+	_getdate_err;
+	__huge_val;
+	_iob;
+	__iob;
+	isnan = FUNCTION FILTER libm.so.2;
+	_isnan = FUNCTION FILTER libm.so.2;
+	isnand = FUNCTION FILTER libm.so.2;
+	_isnand = FUNCTION FILTER libm.so.2;
+	ldexp = FUNCTION FILTER libm.so.2;
+	logb = FUNCTION FILTER libm.so.2;
+	malloc = NODIRECT;
+	modf = FUNCTION FILTER libm.so.2;
+	_modf = FUNCTION FILTER libm.so.2;
+	nextafter = FUNCTION FILTER libm.so.2;
+	_nextafter = FUNCTION FILTER libm.so.2;
+	_numeric;
+	optarg;
+	opterr;
+	optind;
+	optopt;
+	realloc = NODIRECT;
+	scalb = FUNCTION FILTER libm.so.2;
+	_scalb = FUNCTION FILTER libm.so.2;
+	_sibuf;
+	_sobuf;
+	_sys_buslist;
+	_sys_cldlist;
+	_sys_fpelist;
+	_sys_segvlist;
+	_sys_siginfolistp;
+	_sys_siglist;
+	_sys_siglistn;
+	_sys_siglistp;
+	_sys_traplist;
+	timezone;
+	_timezone;
+	tzname;
+	_tzname;
+    protected:
 	abort;
 	abs;
 	access;
@@ -78,7 +130,6 @@ SUNW_0.7 {
 	_addseverity;
 	alarm;
 	_alarm;
-	_altzone;
 	asctime;
 	asctime_r;
 	_assert;
@@ -89,7 +140,6 @@ SUNW_0.7 {
 	atol;
 	bsearch;
 	__builtin_alloca;
-	calloc = NODIRECT;
 	catclose;
 	_catclose;
 	catgets;
@@ -116,7 +166,7 @@ SUNW_0.7 {
 	clearerr;
 	clock;
 	_close;
-	close = NODIRECT;
+	close;
 	closedir;
 	_closedir;
 	creat;
@@ -126,12 +176,8 @@ SUNW_0.7 {
 	ctermid;
 	ctime;
 	ctime_r;
-	_ctype;
-	__ctype;
 	cuserid;
 	_cuserid;
-	daylight;
-	_daylight;
 	difftime;
 	div;
 	dup;
@@ -142,9 +188,6 @@ SUNW_0.7 {
 	_encrypt;
 	endgrent;
 	endpwent;
-	environ = NODIRECT;
-	_environ = NODIRECT;
-	errno = NODIRECT;
 	___errno;
 	execl;
 	_execl;
@@ -196,16 +239,14 @@ SUNW_0.7 {
 	_fmtmsg;
 	fopen;
 	_fork;
-	fork = NODIRECT;
+	fork;
 	fpathconf;
 	_fpathconf;
 	fprintf;
 	fputc;
 	fputs;
 	fread;
-	free = NODIRECT;
 	freopen;
-	frexp = FUNCTION FILTER libm.so.2;
 	fscanf;
 	fseek;
 	fsetpos;
@@ -230,8 +271,6 @@ SUNW_0.7 {
 	_getcwd;
 	getdate;
 	_getdate;
-	getdate_err;
-	_getdate_err;
 	getegid;
 	_getegid;
 	getenv;
@@ -298,11 +337,8 @@ SUNW_0.7 {
 	_hdestroy;
 	hsearch;
 	_hsearch;
-	__huge_val;
 	initgroups;
 	_initgroups;
-	_iob;
-	__iob;
 	ioctl;
 	_ioctl;
 	isalnum;
@@ -317,10 +353,6 @@ SUNW_0.7 {
 	isdigit;
 	isgraph;
 	islower;
-	isnan = FUNCTION FILTER libm.so.2;
-	_isnan = FUNCTION FILTER libm.so.2;
-	isnand = FUNCTION FILTER libm.so.2;
-	_isnand = FUNCTION FILTER libm.so.2;
 	isprint;
 	ispunct;
 	isspace;
@@ -331,7 +363,6 @@ SUNW_0.7 {
 	labs;
 	lchown;
 	_lchown;
-	ldexp = FUNCTION FILTER libm.so.2;
 	ldiv;
 	lfind;
 	_lfind;
@@ -342,7 +373,6 @@ SUNW_0.7 {
 	localtime_r;
 	lockf;
 	_lockf;
-	logb = FUNCTION FILTER libm.so.2;
 	longjmp;
 	lsearch;
 	_lsearch;
@@ -352,7 +382,6 @@ SUNW_0.7 {
 	_lstat;
 	makecontext;
 	_makecontext;
-	malloc = NODIRECT;
 	mblen;
 	mbstowcs;
 	mbtowc;
@@ -378,8 +407,6 @@ SUNW_0.7 {
 	_mlock;
 	mmap;
 	_mmap;
-	modf = FUNCTION FILTER libm.so.2;
-	_modf = FUNCTION FILTER libm.so.2;
 	monitor;
 	_monitor;
 	mount;
@@ -402,23 +429,16 @@ SUNW_0.7 {
 	_munmap;
 	_mutex_held = NODYNSORT;
 	_mutex_lock = NODYNSORT;
-	nextafter = FUNCTION FILTER libm.so.2;
-	_nextafter = FUNCTION FILTER libm.so.2;
 	nftw;
 	_nftw;
 	nice;
 	_nice;
 	nl_langinfo;
 	_nl_langinfo;
-	_numeric;
 	open;
 	_open;
 	opendir;
 	_opendir;
-	optarg;
-	opterr;
-	optind;
-	optopt;
 	pathconf;
 	_pathconf;
 	pause;
@@ -464,7 +484,6 @@ SUNW_0.7 {
 	_readlink;
 	readv;
 	_readv;
-	realloc = NODIRECT;
 	remove;
 	rename;
 	_rename;
@@ -476,8 +495,6 @@ SUNW_0.7 {
 	_rw_read_held;
 	_rw_write_held;
 	sbrk;
-	scalb = FUNCTION FILTER libm.so.2;
-	_scalb = FUNCTION FILTER libm.so.2;
 	scanf;
 	seekdir;
 	_seekdir;
@@ -522,9 +539,8 @@ SUNW_0.7 {
 	_shmdt;
 	shmget;
 	_shmget;
-	_sibuf;
-	sigaction = NODIRECT;
-	_sigaction = NODIRECT NODYNSORT;
+	sigaction;
+	_sigaction = NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -564,7 +580,6 @@ SUNW_0.7 {
 	_sigsuspend;
 	sleep;
 	_sleep;
-	_sobuf;
 	sprintf;
 	srand;
 	srand48;
@@ -607,21 +622,12 @@ SUNW_0.7 {
 	_symlink;
 	sync;
 	_sync;
-	_sys_buslist;
 	_syscall;
-	_sys_cldlist;
 	sysconf;
 	_sysconf;
-	_sys_fpelist;
 	sysinfo;
 	_sysinfo;
-	_sys_segvlist;
-	_sys_siginfolistp;
-	_sys_siglist;
-	_sys_siglistn;
-	_sys_siglistp;
 	system;
-	_sys_traplist;
 	tcdrain;
 	_tcdrain;
 	tcflow;
@@ -654,8 +660,6 @@ SUNW_0.7 {
 	_time;
 	times;
 	_times;
-	timezone;
-	_timezone;
 	tmpfile;
 	tmpnam;
 	toascii;
@@ -670,8 +674,6 @@ SUNW_0.7 {
 	ttyname_r;
 	twalk;
 	_twalk;
-	tzname;
-	_tzname;
 	tzset;
 	_tzset;
 	ulimit;
@@ -708,7 +710,7 @@ SUNW_0.7 {
 } SYSVABI_1.3;
 
 SYSVABI_1.3 {
-    global:
+    protected:
 	_ctermid;
 	__flt_rounds;
 	_fpstart;
@@ -724,9 +726,6 @@ SYSVABI_1.3 {
 
 SUNWprivate_1.1 {
     global:
-	_D_cplx_lr_div;
-	_D_cplx_lr_div_ix;
-	_D_cplx_lr_div_rx;
 	_dladdr = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_dladdr1 = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_dlamd64getunwind = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
@@ -737,15 +736,16 @@ SUNWprivate_1.1 {
 	_dlmopen = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_dlopen = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_dlsym = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
+	_ld_libc = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
+    protected:
+	_D_cplx_lr_div;
+	_D_cplx_lr_div_ix;
+	_D_cplx_lr_div_rx;
 	_F_cplx_lr_div;
 	_F_cplx_lr_div_ix;
 	_F_cplx_lr_div_rx;
 	__fltrounds;
 	__fseterror_u;
-	gtty;
-	_gtty;
-	_hasmntopt;
-	_ld_libc = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_memcmp;
 	_memcpy;
 	_memmove;
@@ -766,6 +766,5 @@ SUNWprivate_1.1 {
 	__xtoull;
 
     local:
-	_private_sysi86 = NODYNSORT;
 	___tls_get_addr = NODYNSORT;
 };

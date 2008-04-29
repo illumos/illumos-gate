@@ -26,7 +26,7 @@
 #
 
 SUNW_1.23 {
-    global:
+    protected:
 	aio_cancel64;
 	aio_error64;
 	aio_fsync64;
@@ -45,7 +45,7 @@ SUNW_1.23 {
 };
 
 SUNW_1.22.1 {
-    global:
+    protected:
 	# Note: The atomic_OP_WIDTH_nv symbols defined here are also defined
 	# by the common mapfile. Here, we add the NODYNSORT attribute
 	# to them. On this platform, they are aliases for the non-_nv
@@ -72,6 +72,16 @@ SUNW_1.22.1 {
 
 SUNW_1.22 {
     global:
+	dladdr = FUNCTION FILTER /usr/lib/ld.so.1;
+	dladdr1 = FUNCTION FILTER /usr/lib/ld.so.1;
+	dlclose = FUNCTION FILTER /usr/lib/ld.so.1;
+	dldump = FUNCTION FILTER /usr/lib/ld.so.1;
+	dlerror = FUNCTION FILTER /usr/lib/ld.so.1;
+	dlinfo = FUNCTION FILTER /usr/lib/ld.so.1;
+	dlmopen = FUNCTION FILTER /usr/lib/ld.so.1;
+	dlopen = FUNCTION FILTER /usr/lib/ld.so.1;
+	dlsym = FUNCTION FILTER /usr/lib/ld.so.1;
+    protected:
 	alphasort64;
 	_alphasort64;
 
@@ -83,28 +93,19 @@ SUNW_1.22 {
 	atomic_add_32_nv =		NODYNSORT;
 	atomic_add_64_nv =		NODYNSORT;
 
-	dladdr = FUNCTION FILTER /usr/lib/ld.so.1;
-	dladdr1 = FUNCTION FILTER /usr/lib/ld.so.1;
-	dlclose = FUNCTION FILTER /usr/lib/ld.so.1;
-	dldump = FUNCTION FILTER /usr/lib/ld.so.1;
-	dlerror = FUNCTION FILTER /usr/lib/ld.so.1;
-	dlinfo = FUNCTION FILTER /usr/lib/ld.so.1;
-	dlmopen = FUNCTION FILTER /usr/lib/ld.so.1;
-	dlopen = FUNCTION FILTER /usr/lib/ld.so.1;
-	dlsym = FUNCTION FILTER /usr/lib/ld.so.1;
 	pselect_large_fdset;
 	scandir64;
 	_scandir64;
 };
 
 SUNW_1.21.2 {
-    global:
+    protected:
 	__makecontext_v2;
 	___makecontext_v2;
 };
 
 SUNW_1.21 {
-    global:
+    protected:
 	attropen64;
 	_attropen64;
 	fstatat64;
@@ -115,12 +116,12 @@ SUNW_1.21 {
 };
 
 SUNW_1.18 {
-    global:
+    protected:
 	select_large_fdset;
 };
 
 SUNW_1.1 {
-    global:
+    protected:
 	creat64;
 	_creat64;
 	fgetpos64;
@@ -184,23 +185,12 @@ SUNW_1.1 {
 
 SUNW_0.7 {
     global:
-	_assert;
 	_bufendtab;
-	__builtin_alloca;
 	_ctype;
-	file_to_decimal;
-	_flsbuf;
 	_lastbuf;
-	_mutex_held = NODYNSORT;
-	_mutex_lock = NODYNSORT;
-	p_online;
-	_rw_read_held;
-	_rw_write_held;
 	_sibuf;
 	_sobuf;
-	srand48;
 	_sys_buslist;
-	_syscall;
 	_sys_cldlist;
 	sys_errlist;
 	_sys_fpelist;
@@ -212,10 +202,25 @@ SUNW_0.7 {
 	_sys_siglistn;
 	_sys_siglistp;
 	_sys_traplist;
+    protected:
+	_assert;
+	__builtin_alloca;
+	file_to_decimal;
+	_flsbuf;
+	_mutex_held = NODYNSORT;
+	_mutex_lock = NODYNSORT;
+	p_online;
+	_rw_read_held;
+	_rw_write_held;
+	srand48;
+	_syscall;
 } SISCD_2.3;
 
 SISCD_2.3 {
     global:
+	errno = NODIRECT;
+	_iob;
+    protected:
 	addseverity;
 	_addseverity;
 	asctime_r;
@@ -229,7 +234,6 @@ SISCD_2.3 {
 	_encrypt;
 	endgrent;
 	endpwent;
-	errno = NODIRECT;
 	___errno;
 	fgetgrent;
 	fgetgrent_r;
@@ -255,7 +259,6 @@ SISCD_2.3 {
 	gettimeofday;
 	_gettimeofday;
 	gmtime_r;
-	_iob;
 	localtime_r;
 	__mul64;
 	putchar_unlocked;
@@ -286,6 +289,43 @@ SISCD_2.3 {
 
 SYSVABI_1.3 {
     global:
+	_altzone;
+	calloc = NODIRECT;
+	__ctype;
+	daylight;
+	_daylight;
+	environ = NODIRECT;
+	_environ = NODIRECT;
+	free = NODIRECT;
+	frexp = FUNCTION FILTER libm.so.2;
+	getdate_err;
+	_getdate_err;
+	__huge_val;
+	__iob;
+	isnan = FUNCTION FILTER libm.so.2;
+	_isnan = FUNCTION FILTER libm.so.2;
+	isnand = FUNCTION FILTER libm.so.2;
+	_isnand = FUNCTION FILTER libm.so.2;
+	ldexp = FUNCTION FILTER libm.so.2;
+	logb = FUNCTION FILTER libm.so.2;
+	malloc = NODIRECT;
+	modf = FUNCTION FILTER libm.so.2;
+	_modf = FUNCTION FILTER libm.so.2;
+	nextafter = FUNCTION FILTER libm.so.2;
+	_nextafter = FUNCTION FILTER libm.so.2;
+	_numeric;
+	optarg;
+	opterr;
+	optind;
+	optopt;
+	realloc = NODIRECT;
+	scalb = FUNCTION FILTER libm.so.2;
+	_scalb = FUNCTION FILTER libm.so.2;
+	timezone;
+	_timezone;
+	tzname;
+	_tzname;
+    protected:
 	.div;
 	.mul;
 	.rem;
@@ -305,7 +345,6 @@ SYSVABI_1.3 {
 	_acct;
 	alarm;
 	_alarm;
-	_altzone;
 	asctime;
 	__assert;
 	atexit;
@@ -313,7 +352,6 @@ SYSVABI_1.3 {
 	atoi;
 	atol;
 	bsearch;
-	calloc = NODIRECT;
 	catclose;
 	_catclose;
 	catgets;
@@ -340,7 +378,7 @@ SYSVABI_1.3 {
 	clearerr;
 	clock;
 	_close;
-	close = NODIRECT;
+	close;
 	closedir;
 	_closedir;
 	creat;
@@ -348,11 +386,8 @@ SYSVABI_1.3 {
 	ctermid;
 	_ctermid;
 	ctime;
-	__ctype;
 	cuserid;
 	_cuserid;
-	daylight;
-	_daylight;
 	difftime;
 	div;
 	__dtou;
@@ -360,8 +395,6 @@ SYSVABI_1.3 {
 	_dup;
 	dup2;
 	_dup2;
-	environ = NODIRECT;
-	_environ = NODIRECT;
 	execl;
 	_execl;
 	execle;
@@ -405,16 +438,14 @@ SYSVABI_1.3 {
 	_fmtmsg;
 	fopen;
 	_fork;
-	fork = NODIRECT;
+	fork;
 	fpathconf;
 	_fpathconf;
 	fprintf;
 	fputc;
 	fputs;
 	fread;
-	free = NODIRECT;
 	freopen;
-	frexp = FUNCTION FILTER libm.so.2;
 	fscanf;
 	fseek;
 	fsetpos;
@@ -437,8 +468,6 @@ SYSVABI_1.3 {
 	_getcwd;
 	getdate;
 	_getdate;
-	getdate_err;
-	_getdate_err;
 	getegid;
 	_getegid;
 	getenv;
@@ -496,10 +525,8 @@ SYSVABI_1.3 {
 	_hdestroy;
 	hsearch;
 	_hsearch;
-	__huge_val;
 	initgroups;
 	_initgroups;
-	__iob;
 	ioctl;
 	_ioctl;
 	isalnum;
@@ -514,10 +541,6 @@ SYSVABI_1.3 {
 	isdigit;
 	isgraph;
 	islower;
-	isnan = FUNCTION FILTER libm.so.2;
-	_isnan = FUNCTION FILTER libm.so.2;
-	isnand = FUNCTION FILTER libm.so.2;
-	_isnand = FUNCTION FILTER libm.so.2;
 	isprint;
 	ispunct;
 	isspace;
@@ -528,7 +551,6 @@ SYSVABI_1.3 {
 	labs;
 	lchown;
 	_lchown;
-	ldexp = FUNCTION FILTER libm.so.2;
 	ldiv;
 	lfind;
 	_lfind;
@@ -538,7 +560,6 @@ SYSVABI_1.3 {
 	localtime;
 	lockf;
 	_lockf;
-	logb = FUNCTION FILTER libm.so.2;
 	longjmp;
 	lsearch;
 	_lsearch;
@@ -548,7 +569,6 @@ SYSVABI_1.3 {
 	_lstat;
 	makecontext;
 	_makecontext;
-	malloc = NODIRECT;
 	mblen;
 	mbstowcs;
 	mbtowc;
@@ -574,8 +594,6 @@ SYSVABI_1.3 {
 	_mlock;
 	mmap;
 	_mmap;
-	modf = FUNCTION FILTER libm.so.2;
-	_modf = FUNCTION FILTER libm.so.2;
 	monitor;
 	_monitor;
 	mount;
@@ -596,23 +614,16 @@ SYSVABI_1.3 {
 	_munlock;
 	munmap;
 	_munmap;
-	nextafter = FUNCTION FILTER libm.so.2;
-	_nextafter = FUNCTION FILTER libm.so.2;
 	nftw;
 	_nftw;
 	nice;
 	_nice;
 	nl_langinfo;
 	_nl_langinfo;
-	_numeric;
 	open;
 	_open;
 	opendir;
 	_opendir;
-	optarg;
-	opterr;
-	optind;
-	optopt;
 	pathconf;
 	_pathconf;
 	pause;
@@ -677,7 +688,6 @@ SYSVABI_1.3 {
 	_readlink;
 	readv;
 	_readv;
-	realloc = NODIRECT;
 	remove;
 	rename;
 	_rename;
@@ -686,8 +696,6 @@ SYSVABI_1.3 {
 	_rewinddir;
 	rmdir;
 	_rmdir;
-	scalb = FUNCTION FILTER libm.so.2;
-	_scalb = FUNCTION FILTER libm.so.2;
 	scanf;
 	seekdir;
 	_seekdir;
@@ -726,8 +734,8 @@ SYSVABI_1.3 {
 	_shmdt;
 	shmget;
 	_shmget;
-	sigaction = NODIRECT;
-	_sigaction = NODIRECT NODYNSORT;
+	sigaction;
+	_sigaction = NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -842,8 +850,6 @@ SYSVABI_1.3 {
 	_time;
 	times;
 	_times;
-	timezone;
-	_timezone;
 	tmpfile;
 	tmpnam;
 	toascii;
@@ -858,8 +864,6 @@ SYSVABI_1.3 {
 	_ttyname;
 	twalk;
 	_twalk;
-	tzname;
-	_tzname;
 	tzset;
 	_tzset;
 	ulimit;
@@ -897,12 +901,6 @@ SYSVABI_1.3 {
 
 SUNWprivate_1.1 {
     global:
-	__ashldi3;
-	__ashrdi3;
-	_cerror;
-	_cerror64;
-	__cmpdi2;
-	__divdi3;
 	_dladdr = FUNCTION FILTER /usr/lib/ld.so.1;
 	_dladdr1 = FUNCTION FILTER /usr/lib/ld.so.1;
 	_dlclose = FUNCTION FILTER /usr/lib/ld.so.1;
@@ -912,6 +910,22 @@ SUNWprivate_1.1 {
 	_dlmopen = FUNCTION FILTER /usr/lib/ld.so.1;
 	_dlopen = FUNCTION FILTER /usr/lib/ld.so.1;
 	_dlsym = FUNCTION FILTER /usr/lib/ld.so.1;
+	_ld_libc = FUNCTION FILTER /usr/lib/ld.so.1;
+	__lyday_to_month;
+	__mon_lengths;
+	_sys_errlist;
+	_sys_errs;
+	_sys_index;
+	_sys_nerr = NODYNSORT;
+	_sys_num_err;
+	__yday_to_month;
+    protected:
+	__ashldi3;
+	__ashrdi3;
+	_cerror;
+	_cerror64;
+	__cmpdi2;
+	__divdi3;
 	_file_set;
 	__floatdidf;
 	__floatdisf;
@@ -920,22 +934,16 @@ SUNWprivate_1.1 {
 	__fseterror_u;
 	_fwprintf_c89;
 	_fwscanf_c89;
-	gtty;
-	_gtty;
-	_hasmntopt;
 	_imaxabs_c89;
 	_imaxdiv_c89;
 	install_utrap;
 	_install_utrap;
-	_ld_libc = FUNCTION FILTER /usr/lib/ld.so.1;
 	__lshrdi3;
-	__lyday_to_month;
 	_memcmp = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	_memcpy = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	_memmove = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	_memset = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	__moddi3;
-	__mon_lengths;
 	__muldi3;
 	nop;
 	_printf_c89;
@@ -956,11 +964,6 @@ SUNWprivate_1.1 {
 	_strtoumax_c89;
 	_swprintf_c89;
 	_swscanf_c89;
-	_sys_errlist;
-	_sys_errs;
-	_sys_index;
-	_sys_nerr = NODYNSORT;
-	_sys_num_err;
 	__ucmpdi2;
 	__udivdi3;
 	__umoddi3;
@@ -982,13 +985,10 @@ SUNWprivate_1.1 {
 	_wprintf_c89;
 	_wscanf_c89;
 	_xregs_clrptr;
-	__yday_to_month;
 
     local:
 	__cerror =		NODYNSORT;
 	__cerror64 =		NODYNSORT;
-	_private_fstat64 =	NODYNSORT;
-	_private_stat64 =	NODYNSORT;
 	_seekdir64 =		NODYNSORT;
 	_telldir64 =		NODYNSORT;
 };

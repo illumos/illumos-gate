@@ -40,8 +40,6 @@
 #include "cache.h"
 #include "proc64_id.h"
 
-	ANSI_PRAGMA_WEAK2(_private_memcpy,memcpy,function)
-
 #define L(s) .memcpy/**/s
 
 /*

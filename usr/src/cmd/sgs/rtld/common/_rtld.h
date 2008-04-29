@@ -337,9 +337,14 @@ typedef struct {
 
 /*
  * Binding flags for the bindguard routines.
+ * These are defined in usr/src/lib/libc/inc/libc_int.h in the
+ * latest version of the libc/rtld runtime interface (CI_V_FIVE).
  */
+#if !defined(CI_V_FIVE)
 #define	THR_FLG_RTLD	0x00000001	/* rtldlock bind_guard() flag */
-#define	THR_FLG_MASK	THR_FLG_RTLD	/* mask for all THR_FLG flags */
+#define	THR_FLG_NOLOCK	0x00000000	/* no-op before CI_V_FIVE */
+#define	THR_FLG_REENTER	0x00000000	/* no-op before CI_V_FIVE */
+#endif
 
 #define	ROUND(x, a)	(((int)(x) + ((int)(a) - 1)) & ~((int)(a) - 1))
 
@@ -416,7 +421,9 @@ typedef struct {
  */
 extern Lc_desc		glcs[];		/* global external interfaces */
 
-extern Rt_lock		rtldlock;	/* rtld lock */
+extern	Rt_lock		rtldlock;	/* rtld lock */
+extern	int		thr_flg_nolock;
+extern	int		thr_flg_reenter;
 
 extern List		dynlm_list;	/* dynamic list of link-maps */
 extern char		**environ;	/* environ pointer */
@@ -549,7 +556,7 @@ extern ulong_t		elf_reloc_relacount(ulong_t, ulong_t,
 			    ulong_t, ulong_t);
 extern long		elf_static_tls(Rt_map *, Sym *, void *, uchar_t, char *,
 			    ulong_t, long);
-extern int		enter(void);
+extern int		enter(int);
 extern uint_t		expand(char **, size_t *, char **, uint_t, uint_t,
 			    Rt_map *);
 extern Pnode		*expand_paths(Rt_map *, const char *, uint_t, uint_t);
@@ -582,7 +589,7 @@ extern Listnode		*list_append(List *, const void *);
 extern Listnode		*list_insert(List *, const void *, Listnode *);
 extern Listnode		*list_prepend(List *, const void *);
 extern void		list_delete(List *, void *);
-extern void		leave(Lm_list *);
+extern void		leave(Lm_list *, int);
 extern void		lm_append(Lm_list *, Aliste, Rt_map *);
 extern void		lm_delete(Lm_list *, Rt_map *);
 extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,

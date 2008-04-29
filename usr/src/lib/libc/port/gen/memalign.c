@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,11 @@ memalign(size_t align, size_t nbytes)
 	size_t	frag_size;	/* size of fragments fore and aft */
 	size_t	 x;
 
+	if (!primary_link_map) {
+		errno = ENOTSUP;
+		return (NULL);
+	}
+
 	/*
 	 * check for valid size and alignment parameters
 	 * MAX_ALIGN check prevents overflow in later calculation.
@@ -114,7 +119,7 @@ memalign(size_t align, size_t nbytes)
 		/* malloc sets errno */
 		return (NULL);
 	}
-	(void) _private_mutex_lock(&libc_malloc_lock);
+	(void) mutex_lock(&libc_malloc_lock);
 
 	/*
 	 * get size of the entire block (overhead and all)
@@ -175,6 +180,6 @@ memalign(size_t align, size_t nbytes)
 		SIZE(blk) = frag_size | BIT0;
 		_free_unlocked(DATA(blk));
 	}
-	(void) _private_mutex_unlock(&libc_malloc_lock);
+	(void) mutex_unlock(&libc_malloc_lock);
 	return (DATA(aligned_blk));
 }

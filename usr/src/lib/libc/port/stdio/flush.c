@@ -163,7 +163,7 @@ __cleanup(void)		/* called at process end to flush ouput streams */
 void
 stdio_locks()
 {
-	(void) _private_mutex_lock(&_first_link_lock);
+	(void) mutex_lock(&_first_link_lock);
 	/*
 	 * XXX: We should acquire all of the iob locks here.
 	 */
@@ -175,7 +175,7 @@ stdio_unlocks()
 	/*
 	 * XXX: We should release all of the iob locks here.
 	 */
-	(void) _private_mutex_unlock(&_first_link_lock);
+	(void) mutex_unlock(&_first_link_lock);
 }
 
 void
@@ -365,16 +365,14 @@ rescan:
 #ifdef	_LP64
 	fp = hdr->iobp;
 	for (i = 0; i < FILE_ARY_SZ; i++)
-		_private_mutex_init(&fp[i]._lock,
-		    USYNC_THREAD|LOCK_RECURSIVE, NULL);
+		mutex_init(&fp[i]._lock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
 #else
 	xfp = hdr->iobp;
 	fp = &xfp->_iob;
 
 	for (i = 0; i < FILE_ARY_SZ; i++) {
 		xfp[i].xmagic = XMAGIC(&xfp[i]);
-		_private_mutex_init(&xfp[i].xlock,
-		    USYNC_THREAD|LOCK_RECURSIVE, NULL);
+		mutex_init(&xfp[i].xlock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
 	}
 #endif	/*	_LP64	*/
 

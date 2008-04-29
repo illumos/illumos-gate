@@ -196,7 +196,7 @@ door_restart:
 	cmpl	$EINTR, %eax		/* interrupted while waiting? */
 	jne	4f			/* if not, return the error */
 	_prologue_
-	call	_private_getpid		/* get current process id */
+	call	getpid
 	movl	_daref_(door_create_pid), %edx
 	movl	0(%edx), %edx
 	_epilogue_

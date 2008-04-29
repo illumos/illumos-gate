@@ -846,8 +846,9 @@ typedef struct {
  */
 typedef struct uberdata {
 	pad_lock_t	_link_lock;
-	pad32_lock_t	_fork_lock;
-	pad32_lock_t	_atfork_lock;
+	pad_lock_t	_ld_lock;
+	pad_lock_t	_fork_lock;
+	pad_lock_t	_atfork_lock;
 	pad32_lock_t	_callout_lock;
 	pad32_lock_t	_tdb_hash_lock;
 	tdb_sync_stats_t tdb_hash_lock_stats;
@@ -891,6 +892,7 @@ typedef struct uberdata {
 } uberdata_t;
 
 #define	link_lock	_link_lock.pad_lock
+#define	ld_lock		_ld_lock.pad_lock
 #define	fork_lock	_fork_lock.pad_lock
 #define	atfork_lock	_atfork_lock.pad_lock
 #define	callout_lock	_callout_lock.pad_lock
@@ -1054,8 +1056,9 @@ typedef struct ulwp32 {
 
 typedef struct uberdata32 {
 	pad_lock_t	_link_lock;
-	pad32_lock_t	_fork_lock;
-	pad32_lock_t	_atfork_lock;
+	pad_lock_t	_ld_lock;
+	pad_lock_t	_fork_lock;
+	pad_lock_t	_atfork_lock;
 	pad32_lock_t	_callout_lock;
 	pad32_lock_t	_tdb_hash_lock;
 	tdb_sync_stats_t tdb_hash_lock_stats;
@@ -1328,50 +1331,27 @@ extern	void	no_preempt(ulwp_t *);
 extern	void	preempt(ulwp_t *);
 extern	void	_thrp_unwind(void *);
 
-/*
- * Prototypes for the strong versions of the interface functions
- */
 extern	pid_t	__forkx(int);
 extern	pid_t	__forkallx(int);
-extern	pid_t	_private_getpid(void);
-extern	uid_t	_private_geteuid(void);
 extern	int	_kill(pid_t, int);
-extern	int	_private_open(const char *, int, ...);
-extern	int	_private_close(int);
+extern	int	__open(const char *, int, ...);
+extern	int	__close(int);
 extern	ssize_t	__read(int, void *, size_t);
 extern	ssize_t	__write(int, const void *, size_t);
-extern	void	*_memcpy(void *, const void *, size_t);
-extern	void	*_memset(void *, int, size_t);
-extern	int	_memcmp(const void *, const void *, size_t);
-extern	void	*_private_memcpy(void *, const void *, size_t);
-extern	void	*_private_memset(void *, int, size_t);
-extern	int	_private_sigfillset(sigset_t *);
-extern	int	_private_sigemptyset(sigset_t *);
-extern	int	_private_sigaddset(sigset_t *, int);
-extern	int	_private_sigdelset(sigset_t *, int);
-extern	int	_private_sigismember(sigset_t *, int);
-extern	void	*_private_mmap(void *, size_t, int, int, int, off_t);
-extern	int	_private_mprotect(void *, size_t, int);
-extern	int	_private_munmap(void *, size_t);
-extern	int	_private_getrlimit(int, struct rlimit *);
+extern	int	__fcntl(int, int, ...);
 extern	int	__lwp_continue(lwpid_t);
 extern	int	__lwp_create(ucontext_t *, uint_t, lwpid_t *);
 extern	int	__lwp_kill(lwpid_t, int);
 extern	lwpid_t	__lwp_self(void);
 extern	int	___lwp_suspend(lwpid_t);
-extern	void	lwp_yield(void);
 extern	int	lwp_wait(lwpid_t, lwpid_t *);
 extern	int	__lwp_wait(lwpid_t, lwpid_t *);
 extern	int	__lwp_detach(lwpid_t);
 extern	sc_shared_t *__schedctl(void);
 
-extern	int	_private_setcontext(const ucontext_t *);
-extern	int	_private_getcontext(ucontext_t *);
-#pragma unknown_control_flow(_private_getcontext)
 /* actual system call traps */
-extern	int	__setcontext_syscall(const ucontext_t *);
-extern	int	__getcontext_syscall(ucontext_t *);
-extern	int	_private_setustack(stack_t *);
+extern	int	__setcontext(const ucontext_t *);
+extern	int	__getcontext(ucontext_t *);
 extern	int	__clock_gettime(clockid_t, timespec_t *);
 extern	void	abstime_to_reltime(clockid_t, const timespec_t *, timespec_t *);
 extern	void	hrt2ts(hrtime_t, timespec_t *);
@@ -1387,20 +1367,12 @@ extern	int	_pthread_setspecific(pthread_key_t, const void *);
 extern	void	*_pthread_getspecific(pthread_key_t);
 extern	void	_pthread_exit(void *);
 extern	int	_pthread_setcancelstate(int, int *);
-extern	void	_private_testcancel(void);
 
 /* belongs in <pthread.h> */
 #define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
 #define	PTHREAD_CREATE_NONDAEMON_NP	0
 extern	int	_pthread_attr_setdaemonstate_np(pthread_attr_t *, int);
 extern	int	_pthread_attr_getdaemonstate_np(const pthread_attr_t *, int *);
-
-/* these are private to the library */
-extern	int	_private_mutex_init(mutex_t *, int, void *);
-extern	int	_private_mutex_destroy(mutex_t *);
-extern	int	_private_mutex_lock(mutex_t *);
-extern	int	_private_mutex_trylock(mutex_t *);
-extern	int	_private_mutex_unlock(mutex_t *);
 
 extern	int	_mutex_init(mutex_t *, int, void *);
 extern	int	_mutex_destroy(mutex_t *);
@@ -1475,7 +1447,6 @@ extern	const thrattr_t *def_thrattr(void);
 extern	id_t	setparam(idtype_t, id_t, int, int);
 extern	id_t	setprio(idtype_t, id_t, int, int *);
 extern	id_t	getparam(idtype_t, id_t, int *, struct sched_param *);
-extern	long	_private_priocntl(idtype_t, id_t, int, void *);
 
 /*
  * System call wrappers (direct interfaces to the kernel)
@@ -1502,9 +1473,6 @@ extern	int	__lwp_unpark_all(lwpid_t *, int);
 #if defined(__x86)
 extern	int	___lwp_private(int, int, void *);
 #endif	/* __x86 */
-
-extern	int	_private_lwp_mutex_lock(mutex_t *);
-extern	int	_private_lwp_mutex_unlock(mutex_t *);
 
 /*
  * inlines

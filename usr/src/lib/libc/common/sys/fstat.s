@@ -46,7 +46,6 @@
 
 #if !defined(_LARGEFILE_SOURCE)
 	
-	ANSI_PRAGMA_WEAK2(_private_fstat,fstat,function)
 	SYSCALL_RVAL1(fstat)
 	RETC
 	SET_SIZE(fstat)
@@ -56,7 +55,6 @@
 /* C library -- fstat64 transitional large file API		*/
 /* int fstat64 (int fildes, struct stat64 *buf)			*/
 
-	ANSI_PRAGMA_WEAK2(_private_fstat64,fstat64,function)
 	SYSCALL_RVAL1(fstat64)
 	RETC
 	SET_SIZE(fstat64)

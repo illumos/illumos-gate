@@ -25,8 +25,15 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+#
+# All function names added to this or any other libc mapfile
+# must be placed under the 'protected:' designation.
+# The 'global:' designation is used *only* for data
+# items and for the members of the malloc() family.
+#
+
 SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
-    global:
+    protected:
 	addrtosymstr;
 	aio_cancel;
 	aiocancel;
@@ -151,15 +158,15 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	warnx;
 } SUNW_1.22.2;
 
-SUNW_1.22.2 {
-    global:
+SUNW_1.22.2 {		# SunOS 5.10 (Solaris 10) patch additions
+    protected:
 	is_system_labeled;
 	ucred_getlabel;
 	_ucred_getlabel;
 } SUNW_1.22.1;
 
-SUNW_1.22.1 {
-    global:
+SUNW_1.22.1 {		# SunOS 5.10 (Solaris 10) patch additions
+    protected:
 	atomic_add_8;
 	atomic_add_8_nv;
 	atomic_add_char =		NODYNSORT;
@@ -257,7 +264,7 @@ SUNW_1.22.1 {
 } SUNW_1.22;
 
 SUNW_1.22 {		# SunOS 5.10 (Solaris 10)
-    global:
+    protected:
 	alphasort;
 	_alphasort;
 	atomic_add_16;
@@ -466,13 +473,13 @@ SUNW_1.22 {		# SunOS 5.10 (Solaris 10)
 	wcstoumax;
 } SUNW_1.21.3;
 
-SUNW_1.21.3 {
-    global:
+SUNW_1.21.3 {		# SunOS 5.9 (Solaris 9) patch additions
+    protected:
 	forkall;
 } SUNW_1.21.2;
 
-SUNW_1.21.2 {
-    global:
+SUNW_1.21.2 {		# SunOS 5.9 (Solaris 9) patch additions
+    protected:
 	getustack;
 	_getustack;
 	setustack;
@@ -488,13 +495,13 @@ SUNW_1.21.2 {
 	_stack_violation;
 } SUNW_1.21.1;
 
-SUNW_1.21.1 {
-    global:
+SUNW_1.21.1 {		# SunOS 5.9 (Solaris 9) patch additions
+    protected:
 	crypt_gensalt;
 } SUNW_1.21;
 
 SUNW_1.21 {		# SunOS 5.9 (Solaris 9)
-    global:
+    protected:
 	attropen;
 	_attropen;
 	bind_textdomain_codeset;
@@ -567,14 +574,14 @@ SUNW_1.21 {		# SunOS 5.9 (Solaris 9)
 	vwscanf;
 } SUNW_1.20.4;
 
-SUNW_1.20.4 {
-    global:
+SUNW_1.20.4 {		# SunOS 5.8 (Solaris 8) patch additions
+    protected:
 	semtimedop;
 	_semtimedop;
 } SUNW_1.20.1;
 
-SUNW_1.20.1 {
-    global:
+SUNW_1.20.1 {		# SunOS 5.8 (Solaris 8) patch additions
+    protected:
 	getacct;
 	_getacct;
 	getprojid;
@@ -598,13 +605,13 @@ SUNW_1.20.1 {
 } SUNW_1.20;
 
 SUNW_1.20 {		# SunOS 5.8 (Solaris 8)
-    global:
+    protected:
 	getextmntent;
 	resetmnttab;
 } SUNW_1.19;
 
 SUNW_1.19 {
-    global:
+    protected:
 	strlcat;
 	strlcpy;
 	umount2;
@@ -612,12 +619,12 @@ SUNW_1.19 {
 } SUNW_1.18.1;
 
 SUNW_1.18.1 {
-    global:
+    protected:
 	__fsetlocking;
 } SUNW_1.18;
 
 SUNW_1.18 {		# SunOS 5.7 (Solaris 7)
-    global:
+    protected:
 	btowc;
 	__fbufsize;
 	__flbf;
@@ -679,87 +686,89 @@ SUNW_1.18 {		# SunOS 5.7 (Solaris 7)
 # may depend on them.  All symbol content for SunOS 5.6 is now in SUNW_1.1
 
 SUNW_1.17 {
-    global:
+    protected:
 	SUNW_1.17;
 } SUNW_1.16;
 
 SUNW_1.16 {
-    global:
+    protected:
 	SUNW_1.16;
 } SUNW_1.15;
 
 SUNW_1.15 {
-    global:
+    protected:
 	SUNW_1.15;
 } SUNW_1.14;
 
 SUNW_1.14 {
-    global:
+    protected:
 	SUNW_1.14;
 } SUNW_1.13;
 
 SUNW_1.13 {
-    global:
+    protected:
 	SUNW_1.13;
 } SUNW_1.12;
 
 SUNW_1.12 {
-    global:
+    protected:
 	SUNW_1.12;
 } SUNW_1.11;
 
 SUNW_1.11 {
-    global:
+    protected:
 	SUNW_1.11;
 } SUNW_1.10;
 
 SUNW_1.10 {
-    global:
+    protected:
 	SUNW_1.10;
 } SUNW_1.9;
 
 SUNW_1.9 {
-    global:
+    protected:
 	SUNW_1.9;
 } SUNW_1.8;
 
 SUNW_1.8 {
-    global:
+    protected:
 	SUNW_1.8;
 } SUNW_1.7;
 
 SUNW_1.7 {
-    global:
+    protected:
 	SUNW_1.7;
 } SUNW_1.6;
 
 SUNW_1.6 {
-    global:
+    protected:
 	SUNW_1.6;
 } SUNW_1.5;
 
 SUNW_1.5 {
-    global:
+    protected:
 	SUNW_1.5;
 } SUNW_1.4;
 
 SUNW_1.4 {
-    global:
+    protected:
 	SUNW_1.4;
 } SUNW_1.3;
 
 SUNW_1.3 {
-    global:
+    protected:
 	SUNW_1.3;
 } SUNW_1.2;
 
 SUNW_1.2 {
-    global:
+    protected:
 	SUNW_1.2;
 } SUNW_1.1;
 
 SUNW_1.1 {		# SunOS 5.6 (Solaris 2.6)
     global:
+	__loc1;
+    protected:
 	basename;
 	bindtextdomain;
 	bsd_signal;
@@ -805,7 +814,6 @@ SUNW_1.1 {		# SunOS 5.6 (Solaris 2.6)
 	iswspace;
 	iswupper;
 	iswxdigit;
-	__loc1;
 	____loc1;
 	_longjmp;
 	_lwp_sema_trywait;
@@ -945,7 +953,7 @@ SUNW_1.1 {		# SunOS 5.6 (Solaris 2.6)
 } SUNW_0.9;
 
 SUNW_0.9 {		# SunOS 5.5 (Solaris 2.5)
-    global:
+    protected:
 	acl;
 	bcmp;
 	bcopy;
@@ -1011,6 +1019,8 @@ SUNW_0.9 {		# SunOS 5.5 (Solaris 2.5)
 
 SUNW_0.8 {		# SunOS 5.4 (Solaris 2.4)
     global:
+	__xpg4 = NODIRECT;
+    protected:
 	addsev;
 	cond_broadcast =		NODYNSORT;
 	cond_destroy =			NODYNSORT;
@@ -1074,14 +1084,23 @@ SUNW_0.8 {		# SunOS 5.4 (Solaris 2.4)
 	vpfmt;
 	wordexp;
 	wordfree;
-	__xpg4 = NODIRECT;
 } SUNW_0.7;
 
 SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
     global:
+	altzone;
+	isnanf = FUNCTION FILTER libm.so.2;
+	lone;
+	lten;
+	lzero;
+	memalign = NODIRECT;
+	modff = FUNCTION FILTER libm.so.2;
+	nss_default_finders;
+	_sys_illlist;
+	valloc = NODIRECT;
+    protected:
 	a64l;
 	adjtime;
-	altzone;
 	ascftime;
 	atoll;
 	brk;
@@ -1164,7 +1183,6 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 	innetgr;
 	insque;
 	_insque;
-	isnanf = FUNCTION FILTER libm.so.2;
 	jrand48;
 	l64a;
 	ladd;
@@ -1178,11 +1196,9 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 	llseek;
 	lltostr;
 	lmul;
-	lone;
 	lrand48;
 	lshiftl;
 	lsub;
-	lten;
 	_lwp_cond_broadcast;
 	_lwp_cond_signal;
 	_lwp_cond_timedwait;
@@ -1198,21 +1214,17 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 	_lwp_sema_post;
 	_lwp_sema_wait;
 	_lwp_suspend;
-	lzero;
 	madvise;
 	__major;
 	__makedev;
-	memalign = NODIRECT;
 	mincore;
 	__minor;
 	mkstemp;
 	_mkstemp;
 	mlockall;
-	modff = FUNCTION FILTER libm.so.2;
 	mrand48;
 	munlockall;
 	nrand48;
-	nss_default_finders;
 	_nss_netdb_aliases;
 	_nss_XbyY_buf_alloc;
 	_nss_XbyY_buf_free;
@@ -1271,7 +1283,6 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 	strtoull;
 	swapctl;
 	sysfs;
-	_sys_illlist;
 	syslog;
 	_syslog;
 	tmpnam_r;
@@ -1287,7 +1298,6 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 	utimes;
 	utmpname;
 	utmpxname;
-	valloc = NODIRECT;
 	vfork;
 	vhangup;
 	vsyslog;
@@ -1299,6 +1309,51 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 
 SUNWprivate_1.1 {
     global:
+	___Argv = NODIRECT;
+	cfree = NODIRECT;
+	_cswidth;
+	__ctype_mask;
+	__environ_lock = NODIRECT;
+	__inf_read;
+	__inf_written;
+	__i_size;
+	_isnanf = FUNCTION FILTER libm.so.2;
+	__lc_charmap;
+	__lc_collate;
+	__lc_ctype;
+	__lc_locale;
+	__lc_messages;
+	__lc_monetary;
+	__lc_numeric;
+	__lc_time;
+	__libc_threaded;
+	_lib_version = NODIRECT;
+	_logb = FUNCTION FILTER libm.so.2;
+	_lone =				NODYNSORT;
+	_lten;
+	_lzero =			NODYNSORT;
+	__malloc_lock;
+	_modff = FUNCTION FILTER libm.so.2;
+	__nan_read;
+	__nan_written;
+	__nis_debug_bind;
+	__nis_debug_calls;
+	__nis_debug_file;
+	__nis_debug_rpc;
+	__nis_prefsrv;
+	__nis_preftype;
+	__nis_server;
+	_nss_default_finders;
+	_smbuf;
+	_sp;
+	_tdb_bootstrap;
+	__threaded;
+	thr_probe_getfunc_addr;
+	__trans_lower;
+	__trans_upper;
+	_uberdata;
+	__xpg6 = NODIRECT;
+    protected:
 	__accessat;
 	_a64l;
 	acctctl;
@@ -1306,7 +1361,6 @@ SUNWprivate_1.1 {
 	_acl;
 	_adjtime;
 	allocids;
-	___Argv = NODIRECT;
 	_ascftime;
 	_asctime_r;
 	_assert_c99;
@@ -1426,7 +1480,6 @@ SUNWprivate_1.1 {
 	__btowc_euc;
 	__btowc_sb;
 	_bufsync;
-	cfree = NODIRECT;
 	_cftime;
 	__charmap_init;
 	_cladm;
@@ -1473,11 +1526,9 @@ SUNWprivate_1.1 {
 	_core_set_process_content;
 	core_set_process_path;
 	_core_set_process_path;
-	_cswidth;
 	_ctermid_r;
 	_ctime_r;
 	__ctype_init;
-	__ctype_mask;
 	dbm_close_status;
 	dbm_do_nextkey;
 	dbm_setdefwrite;
@@ -1521,7 +1572,6 @@ SUNWprivate_1.1 {
 	_endspent;
 	_endutent;
 	_endutxent;
-	__environ_lock = NODIRECT;
 	_erand48;
 	_err;
 	_errfp;
@@ -1631,13 +1681,14 @@ SUNWprivate_1.1 {
 	_getzonenamebyid;
 	_gmtime_r;
 	_gsignal;
+	gtty;
+	_gtty;
+	_hasmntopt;
 	_iconv;
 	_iconv_close;
 	_iconv_open;
 	idmap_reg;
 	idmap_unreg;
-	__inf_read;
-	__inf_written;
 	__init_daemon_priv;
 	__init_suid_priv;
 	_insert;
@@ -1645,8 +1696,6 @@ SUNWprivate_1.1 {
 	_inst_sync;
 	_is_euc_fc;
 	_is_euc_pc;
-	__i_size;
-	_isnanf = FUNCTION FILTER libm.so.2;
 	_is_system_labeled;
 	_iswctype;
 	__iswctype_bc;
@@ -1663,22 +1712,12 @@ SUNWprivate_1.1 {
 	klpd_unregister_id;
 	_l64a;
 	_ladd;
-	__lc_charmap;
-	__lc_collate;
-	__lc_ctype;
 	_lckpwdf;
-	__lc_locale;
-	__lc_messages;
-	__lc_monetary;
-	__lc_numeric;
 	_lcong48;
-	__lc_time;
 	_ldivide;
 	_lexp10;
 	_lgrp_home_fast =		NODYNSORT;
 	_lgrpsys;
-	__libc_threaded;
-	_lib_version = NODIRECT;
 	_llabs;
 	_lldiv;
 	_llog10;
@@ -1690,12 +1729,9 @@ SUNWprivate_1.1 {
 	_localtime_r;
 	_lock_clear;
 	_lock_try;
-	_logb = FUNCTION FILTER libm.so.2;
-	_lone =				NODYNSORT;
 	_lrand48;
 	_lshiftl;
 	_lsub;
-	_lten;
 	_ltzset;
 	__lwp_cond_broadcast;
 	__lwp_cond_reltimedwait;
@@ -1715,13 +1751,11 @@ SUNWprivate_1.1 {
 	__lwp_sema_trywait;
 	__lwp_sema_wait;
 	__lwp_suspend;
-	_lzero =			NODYNSORT;
 	_madvise;
 	makeut;
 	_makeut;
 	makeutx;
 	_makeutx;
-	__malloc_lock;
 	_mbftowc;
 	__mbftowc_dense;
 	__mbftowc_euc;
@@ -1760,7 +1794,6 @@ SUNWprivate_1.1 {
 	_mlockall;
 	mntopt;
 	modctl;
-	_modff = FUNCTION FILTER libm.so.2;
 	modutx;
 	_modutx;
 	__monetary_init;
@@ -1784,25 +1817,15 @@ SUNWprivate_1.1 {
 	__mutex_unlock;
 	name_to_attr;
 	_nanosleep;
-	__nan_read;
-	__nan_written;
 	nfs_getfh;
 	_nfs_getfh;
 	nfssvc;
 	_nfssvc;
 	_nfssys;
-	__nis_debug_bind;
-	__nis_debug_calls;
-	__nis_debug_file;
-	__nis_debug_rpc;
 	__nis_get_environment;
-	__nis_prefsrv;
-	__nis_preftype;
-	__nis_server;
 	__nl_langinfo_std;
 	_nrand48;
 	_nss_db_state_destr;
-	_nss_default_finders;
 	nss_default_key2str;
 	nss_delete;
 	_nss_delete;
@@ -2018,7 +2041,6 @@ SUNWprivate_1.1 {
 	_rw_unlock =			NODYNSORT;
 	_rw_wrlock =			NODYNSORT;
 	_sbrk_grow_aligned;
-	_sbrk_unlocked;
 	_schedctl_exit;
 	_schedctl_init;
 	_schedctl_lookup =		NODYNSORT;
@@ -2082,7 +2104,6 @@ SUNWprivate_1.1 {
 	_sigwait;
 	_sigwaitinfo;
 	_single_to_decimal;
-	_smbuf;
 	_so_accept;
 	_so_bind;
 	_sockconfig;
@@ -2101,7 +2122,6 @@ SUNWprivate_1.1 {
 	_so_shutdown;
 	_so_socket;
 	_so_socketpair;
-	_sp;
 	_srand48;
 	_ssignal;
 	_statfs;
@@ -2133,7 +2153,6 @@ SUNWprivate_1.1 {
 	_sysconfig;
 	_sysfs;
 	__systemcall;
-	_tdb_bootstrap;
 	_thr_continue;
 	thr_continue_allmutators;
 	_thr_continue_allmutators;
@@ -2141,7 +2160,6 @@ SUNWprivate_1.1 {
 	_thr_continue_mutator;
 	_thr_create;
 	_thr_detach;
-	__threaded;
 	_thr_exit =			NODYNSORT;
 	_thr_getconcurrency;
 	_thr_get_inf_read;
@@ -2159,7 +2177,6 @@ SUNWprivate_1.1 {
 	_thr_min_stack =		NODYNSORT;
 	thr_mutators_barrier;
 	_thr_mutators_barrier;
-	thr_probe_getfunc_addr;
 	thr_probe_setup;
 	_thr_schedctl;
 	_thr_self =			NODYNSORT;
@@ -2198,8 +2215,6 @@ SUNWprivate_1.1 {
 	__towlower_std;
 	__towupper_bc;
 	__towupper_std;
-	__trans_lower;
-	__trans_upper;
 	_truncate;
 	_trwctype;
 	__trwctype_std;
@@ -2207,7 +2222,6 @@ SUNWprivate_1.1 {
 	_ttyname_r;
 	_ttyslot;
 	_uadmin;
-	_uberdata;
 	_ucred_alloc;
 	ucred_getamask;
 	_ucred_getamask;
@@ -2299,7 +2313,6 @@ SUNWprivate_1.1 {
 	_wrtchk;
 	_xflsbuf;
 	_xgetwidth;
-	__xpg6 = NODIRECT;
 	_yield;
 	zone_add_datalink;
 	zone_boot;
@@ -2318,43 +2331,6 @@ SUNWprivate_1.1 {
 	zone_version;
     local:
 	__imax_lldiv =			NODYNSORT;
-	_private_execve =		NODYNSORT;
-	_private_exit =			NODYNSORT;
-	_private_fcntl =		NODYNSORT;
-	_private_forkallx =		NODYNSORT;
-	_private_forkx =		NODYNSORT;
-	_private_fstat =		NODYNSORT;
-	_private_geteuid =		NODYNSORT;
-	_private_getcontext =		NODYNSORT;
-	_private_getgid =		NODYNSORT;
-	_private_getpid =		NODYNSORT;
-	_private_getrlimit =		NODYNSORT;
-	_private_getuid =		NODYNSORT;
-	_private_ioctl =		NODYNSORT;
-	_private_lwp_mutex_lock =	NODYNSORT;
-	_private_lwp_mutex_unlock =	NODYNSORT;
-	_private_mmap =			NODYNSORT;
-	_private_mprotect =		NODYNSORT;
-	_private_munmap =		NODYNSORT;
-	_private_mutex_destroy =	NODYNSORT;
-	_private_mutex_init =		NODYNSORT;
-	_private_mutex_lock =		NODYNSORT;
-	_private_mutex_trylock =	NODYNSORT;
-	_private_mutex_unlock =		NODYNSORT;
-	_private_memcpy =		NODYNSORT;
-	_private_memset =		NODYNSORT;
-	_private_pthread_atfork =	NODYNSORT;
-	_private_setgid =		NODYNSORT;
-	_private_setpgid =		NODYNSORT;
-	_private_setuid =		NODYNSORT;
-	_private_setustack =		NODYNSORT;
-	_private_sigaddset =		NODYNSORT;
-	_private_sigdelset =		NODYNSORT;
-	_private_sigemptyset =		NODYNSORT;
-	_private_sigfillset =		NODYNSORT;
-	_private_sigismember =		NODYNSORT;
-	_private_stat =			NODYNSORT;
-	_private_testcancel =		NODYNSORT;
 	_ti_thr_self  =			NODYNSORT;
 	rw_read_is_held =		NODYNSORT;
 	rw_write_is_held =		NODYNSORT;

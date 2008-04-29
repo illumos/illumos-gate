@@ -615,11 +615,7 @@ is_dep_ready(Rt_map *dlmp, Rt_map *clmp, int what)
 	    ((FLAGS(dlmp) & FLG_RT_INITDONE) == 0) &&
 	    ((FLAGS(clmp) & FLG_RT_INITFRST) == 0) &&
 	    ((tid = rt_thr_self()) != 0) && (THREADID(dlmp) != tid)) {
-		while ((FLAGS(dlmp) & FLG_RT_INITDONE) == 0) {
-			FLAGS1(dlmp) |= FL1_RT_INITWAIT;
-			DBG_CALL(Dbg_util_wait(clmp, dlmp, what));
-			(void) rt_cond_wait(CONDVAR(dlmp), &rtldlock);
-		}
+		rtldexit(LIST(dlmp), 1);
 	}
 }
 
@@ -656,9 +652,9 @@ call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
 
 		DBG_CALL(Dbg_util_call_array(lmp, (void *)fptr, ndx, shtype));
 
-		leave(LIST(lmp));
+		leave(LIST(lmp), thr_flg_reenter);
 		(*fptr)();
-		(void) enter();
+		(void) enter(thr_flg_reenter);
 	}
 }
 
@@ -724,9 +720,9 @@ call_init(Rt_map **tobj, int flag)
 		}
 
 		if (iptr) {
-			leave(LIST(lmp));
+			leave(LIST(lmp), thr_flg_reenter);
 			(*iptr)();
-			(void) enter();
+			(void) enter(thr_flg_reenter);
 		}
 
 		call_array(INITARRAY(lmp), INITARRAYSZ(lmp), lmp,
@@ -820,9 +816,9 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			    SHT_FINI_ARRAY);
 
 			if (fptr) {
-				leave(LIST(lmp));
+				leave(LIST(lmp), thr_flg_reenter);
 				(*fptr)();
-				(void) enter();
+				(void) enter(thr_flg_reenter);
 			}
 		}
 
@@ -875,7 +871,7 @@ atexit_fini()
 	Lm_list		*lml;
 	Listnode	*lnp;
 
-	(void) enter();
+	(void) enter(0);
 
 	rtld_flags |= RT_FL_ATEXIT;
 
@@ -950,7 +946,7 @@ atexit_fini()
 	    (tobj != (Rt_map **)S_ERROR))
 		call_fini(lml, tobj);
 
-	leave(&lml_main);
+	leave(&lml_main, 0);
 }
 
 
@@ -3007,7 +3003,7 @@ rtldexit(Lm_list * lml, int status)
 				    MSG_STR_NL_SIZE);
 			}
 		}
-		leave(lml);
+		leave(lml, 0);
 		(void) _lwp_kill(_lwp_self(), killsig);
 	}
 	_exit(status);
@@ -3152,10 +3148,11 @@ nu_map(Lm_list *lml, caddr_t addr, size_t len, int prot, int flags)
  * entrance count.
  */
 int
-enter(void)
+enter(int flags)
 {
-	if (rt_bind_guard(THR_FLG_RTLD)) {
-		(void) rt_mutex_lock(&rtldlock);
+	if (rt_bind_guard(THR_FLG_RTLD | thr_flg_nolock | flags)) {
+		if (!thr_flg_nolock)
+			(void) rt_mutex_lock(&rtldlock);
 		if (rtld_flags & RT_FL_OPERATION)
 			ld_entry_cnt++;
 		return (1);
@@ -3395,7 +3392,7 @@ fmap_setup()
  * released, and any locks dropped.
  */
 void
-leave(Lm_list *lml)
+leave(Lm_list *lml, int flags)
 {
 	Lm_list	*elml = lml;
 	Rt_map	*clmp;
@@ -3456,8 +3453,9 @@ leave(Lm_list *lml)
 		return;
 
 	if (rt_bind_clear(0) & THR_FLG_RTLD) {
-		(void) rt_mutex_unlock(&rtldlock);
-		(void) rt_bind_clear(THR_FLG_RTLD);
+		if (!thr_flg_nolock)
+			(void) rt_mutex_unlock(&rtldlock);
+		(void) rt_bind_clear(THR_FLG_RTLD | thr_flg_nolock | flags);
 	}
 }
 

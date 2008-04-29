@@ -42,7 +42,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 	uint64_t *stack;
 
 	/* clear the context */
-	(void) _memset(ucp, 0, sizeof (*ucp));
+	(void) memset(ucp, 0, sizeof (*ucp));
 
 	/* setup to store the current thread pointer in %fs */
 	ucp->uc_mcontext.gregs[REG_FSBASE] = (greg_t)ulwp;
@@ -78,7 +78,7 @@ _thr_setup(ulwp_t *self)
 	self->ul_ustack.ss_sp = (void *)(self->ul_stktop - self->ul_stksiz);
 	self->ul_ustack.ss_size = self->ul_stksiz;
 	self->ul_ustack.ss_flags = 0;
-	(void) _private_setustack(&self->ul_ustack);
+	(void) setustack(&self->ul_ustack);
 
 	update_sched(self);
 	tls_setup();
@@ -164,7 +164,7 @@ __csigsetjmp(sigjmp_buf env, int savemask, gregset_t rs)
 		ucp->uc_sigmask = self->ul_sigmask;
 		exit_critical(self);
 	}
-	(void) _memcpy(ucp->uc_mcontext.gregs, rs, _NGREG * sizeof (greg_t));
+	(void) memcpy(ucp->uc_mcontext.gregs, rs, _NGREG * sizeof (greg_t));
 
 	return (0);
 }

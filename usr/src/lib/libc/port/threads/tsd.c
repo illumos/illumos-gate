@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,8 +111,8 @@ _thr_keycreate(thread_key_t *pkey, void (*destructor)(void *))
 			new_data[0] = TSD_UNALLOCATED;
 			tsdm->tsdm_nused = 1;
 		} else {
-			(void) _private_memcpy(new_data, old_data,
-				old_nkeys * sizeof (void *));
+			(void) memcpy(new_data, old_data,
+			    old_nkeys * sizeof (void *));
 		}
 		tsdm->tsdm_destro = new_data;
 		tsdm->tsdm_nkeys = new_nkeys;
@@ -299,8 +299,7 @@ _thr_setspecific_slow(thread_key_t key, void *value)
 		/*
 		 * Copy the old TSD across to the new.
 		 */
-		(void) _private_memcpy(ntsd, stsd,
-			stsd->tsd_nalloc * sizeof (void *));
+		(void) memcpy(ntsd, stsd, stsd->tsd_nalloc * sizeof (void *));
 		lfree(stsd, stsd->tsd_nalloc * sizeof (void *));
 	}
 

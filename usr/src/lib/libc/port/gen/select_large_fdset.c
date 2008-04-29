@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@
 #include <values.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -110,13 +111,13 @@ pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 		if (tsp != NULL) {
 			if (tsp->tv_nsec < 0 || tsp->tv_nsec >= NANOSEC ||
 			    tsp->tv_sec < 0) {
-				_private_testcancel();
+				pthread_testcancel();
 				errno = EINVAL;
 				return (-1);
 			}
 		}
 	} else {
-		_private_testcancel();
+		pthread_testcancel();
 		errno = EINVAL;
 		return (-1);
 	}
@@ -146,7 +147,7 @@ pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 	nused = 0;
 	/*
 	 * nused reflects the number of pollfd structs currently used
-	 * less one. If realloc_fds returns 0 it is because malloc
+	 * less one. If realloc_fds returns NULL it is because malloc
 	 * failed. We expect malloc() to have done the proper
 	 * thing with errno.
 	 */
@@ -165,16 +166,13 @@ pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 						p->events |= POLLRDBAND;
 					if (nused < (nfds_on_list - 1)) {
 						p++;
-					} else {
-						p = realloc_fds(
-						    &nfds_on_list,
-						    &pfd_list, pfd);
-						if (p == 0) {
-						    if (pfd_list != pfd)
+					} else if ((p = realloc_fds(
+					    &nfds_on_list, &pfd_list, pfd))
+					    == NULL) {
+						if (pfd_list != pfd)
 							(void) free(pfd_list);
-						    _private_testcancel();
-						    return (-1);
-						}
+						pthread_testcancel();
+						return (-1);
 					}
 					nused++;
 				} else
@@ -393,7 +391,7 @@ realloc_fds(int *num, struct pollfd **list_head, struct pollfd *orig)
 		(void) memset(b, 0, (size_t)nta);
 		(void) memcpy(b, *list_head, nta / 2);
 		if (*list_head != orig)
-			(void) free (*list_head);
+			(void) free(*list_head);
 		*list_head = b;
 		b += *num;
 		*num = n2;

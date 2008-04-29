@@ -48,7 +48,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 
 		/* do this once to load the segment registers */
 		uc.uc_flags = UC_CPU;
-		(void) __getcontext_syscall(&uc);
+		(void) __getcontext(&uc);
 		fs = uc.uc_mcontext.gregs[FS];
 		es = uc.uc_mcontext.gregs[ES];
 		ds = uc.uc_mcontext.gregs[DS];
@@ -57,7 +57,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 		initialized = 1;
 	}
 	/* clear the context and set the segment registers */
-	(void) _memset(ucp, 0, sizeof (*ucp));
+	(void) memset(ucp, 0, sizeof (*ucp));
 	ucp->uc_mcontext.gregs[FS] = fs;
 	ucp->uc_mcontext.gregs[ES] = es;
 	ucp->uc_mcontext.gregs[DS] = ds;
@@ -103,7 +103,7 @@ _thr_setup(ulwp_t *self)
 	self->ul_ustack.ss_sp = (void *)(self->ul_stktop - self->ul_stksiz);
 	self->ul_ustack.ss_size = self->ul_stksiz;
 	self->ul_ustack.ss_flags = 0;
-	(void) _private_setustack(&self->ul_ustack);
+	(void) setustack(&self->ul_ustack);
 
 	update_sched(self);
 	tls_setup();

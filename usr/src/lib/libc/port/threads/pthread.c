@@ -164,16 +164,15 @@ _pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 		return (EINVAL);
 
 	if (once->once_flag == PTHREAD_ONCE_NOTDONE) {
-		(void) _private_mutex_lock(&once->mlock);
+		(void) mutex_lock(&once->mlock);
 		if (once->once_flag == PTHREAD_ONCE_NOTDONE) {
-			pthread_cleanup_push(_private_mutex_unlock,
-			    &once->mlock);
+			pthread_cleanup_push(mutex_unlock, &once->mlock);
 			(*init_routine)();
 			pthread_cleanup_pop(0);
 			_membar_producer();
 			once->once_flag = PTHREAD_ONCE_DONE;
 		}
-		(void) _private_mutex_unlock(&once->mlock);
+		(void) mutex_unlock(&once->mlock);
 	}
 	_membar_consumer();
 

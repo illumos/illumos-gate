@@ -81,13 +81,13 @@ extern	caddr_t	_getfp(void);
 void
 atexit_locks()
 {
-	(void) _private_mutex_lock(&__uberdata.atexit_root.exitfns_lock);
+	(void) mutex_lock(&__uberdata.atexit_root.exitfns_lock);
 }
 
 void
 atexit_unlocks()
 {
-	(void) _private_mutex_unlock(&__uberdata.atexit_root.exitfns_lock);
+	(void) mutex_unlock(&__uberdata.atexit_root.exitfns_lock);
 }
 
 /*
@@ -108,13 +108,13 @@ _atexit(void (*func)(void))
 		arp = &__uberdata.atexit_root;
 	else {
 		arp = &self->ul_uberdata->atexit_root;
-		(void) _private_mutex_lock(&arp->exitfns_lock);
+		(void) mutex_lock(&arp->exitfns_lock);
 	}
 	p->hdlr = func;
 	p->next = arp->head;
 	arp->head = p;
 	if (self != NULL)
-		(void) _private_mutex_unlock(&arp->exitfns_lock);
+		(void) mutex_unlock(&arp->exitfns_lock);
 	return (0);
 }
 
@@ -124,7 +124,7 @@ _exithandle(void)
 	atexit_root_t *arp = &curthread->ul_uberdata->atexit_root;
 	_exthdlr_t *p;
 
-	(void) _private_mutex_lock(&arp->exitfns_lock);
+	(void) mutex_lock(&arp->exitfns_lock);
 	arp->exit_frame_monitor = _getfp() + STACK_BIAS;
 	p = arp->head;
 	while (p != NULL) {
@@ -133,7 +133,7 @@ _exithandle(void)
 		lfree(p, sizeof (_exthdlr_t));
 		p = arp->head;
 	}
-	(void) _private_mutex_unlock(&arp->exitfns_lock);
+	(void) mutex_unlock(&arp->exitfns_lock);
 }
 
 /*
@@ -203,7 +203,7 @@ _preexec_atfork_unload(Lc_addr_range_t range[], uint_t count)
 	void (*func)(void);
 	int start_again;
 
-	(void) _private_mutex_lock(&udp->atfork_lock);
+	(void) mutex_lock(&udp->atfork_lock);
 	if ((atfork_q = udp->atforklist) != NULL) {
 		atfp = atfork_q;
 		do {
@@ -244,7 +244,7 @@ _preexec_atfork_unload(Lc_addr_range_t range[], uint_t count)
 			}
 		} while ((atfp = next) != atfork_q || start_again);
 	}
-	(void) _private_mutex_unlock(&udp->atfork_lock);
+	(void) mutex_unlock(&udp->atfork_lock);
 }
 
 /*
@@ -287,7 +287,7 @@ _preexec_exit_handlers(Lc_addr_range_t range[], uint_t count)
 	_exthdlr_t *o;		/* previous node */
 	_exthdlr_t *p;		/* this node */
 
-	(void) _private_mutex_lock(&arp->exitfns_lock);
+	(void) mutex_lock(&arp->exitfns_lock);
 	o = NULL;
 	p = arp->head;
 	while (p != NULL) {
@@ -306,7 +306,7 @@ _preexec_exit_handlers(Lc_addr_range_t range[], uint_t count)
 			p = p->next;
 		}
 	}
-	(void) _private_mutex_unlock(&arp->exitfns_lock);
+	(void) mutex_unlock(&arp->exitfns_lock);
 
 	_preexec_tsd_unload(range, count);
 	_preexec_atfork_unload(range, count);

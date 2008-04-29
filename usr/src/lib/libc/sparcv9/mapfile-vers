@@ -26,7 +26,7 @@
 #
 
 SUNW_1.22.1 {
-    global:
+    protected:
 	# Note: The atomic_OP_WIDTH_nv symbols defined here are also defined
 	# by the common mapfile. Here, we add the NODYNSORT attribute
 	# to them. On this platform, they are aliases for the non-_nv
@@ -53,14 +53,6 @@ SUNW_1.22.1 {
 
 SUNW_1.22 {
     global:
-	# Note: atomic_add_[16,32,64]_nv are also defined by the common
-	# mapfile. Here, we add the NODYNSORT attribute to them. On this
-	# platform, they are aliases for the non-_nv versions. If that is
-	# changed, these lines should be removed.
-	atomic_add_16_nv =		NODYNSORT;
-	atomic_add_32_nv =		NODYNSORT;
-	atomic_add_64_nv =		NODYNSORT;
-
 	dladdr = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	dladdr1 = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	dlclose = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
@@ -70,22 +62,82 @@ SUNW_1.22 {
 	dlmopen = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	dlopen = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	dlsym = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
+    protected:
+	# Note: atomic_add_[16,32,64]_nv are also defined by the common
+	# mapfile. Here, we add the NODYNSORT attribute to them. On this
+	# platform, they are aliases for the non-_nv versions. If that is
+	# changed, these lines should be removed.
+	atomic_add_16_nv =		NODYNSORT;
+	atomic_add_32_nv =		NODYNSORT;
+	atomic_add_64_nv =		NODYNSORT;
+
 	walkcontext;
 };
 
 SUNW_1.21.2 {
-    global:
+    protected:
 	__makecontext_v2;
 	___makecontext_v2;
 };
 
 SUNW_1.1 {
-    global:
+    protected:
 	__flt_rounds;
 };
 
 SUNW_0.7 {
     global:
+	_altzone;
+	calloc = NODIRECT;
+	_ctype;
+	__ctype;
+	daylight;
+	_daylight;
+	environ = NODIRECT;
+	_environ = NODIRECT;
+	errno = NODIRECT;
+	free = NODIRECT;
+	frexp = FUNCTION FILTER libm.so.2;
+	getdate_err;
+	_getdate_err;
+	__huge_val;
+	_iob;
+	__iob;
+	isnan = FUNCTION FILTER libm.so.2;
+	_isnan = FUNCTION FILTER libm.so.2;
+	isnand = FUNCTION FILTER libm.so.2;
+	_isnand = FUNCTION FILTER libm.so.2;
+	ldexp = FUNCTION FILTER libm.so.2;
+	logb = FUNCTION FILTER libm.so.2;
+	malloc = NODIRECT;
+	modf = FUNCTION FILTER libm.so.2;
+	_modf = FUNCTION FILTER libm.so.2;
+	nextafter = FUNCTION FILTER libm.so.2;
+	_nextafter = FUNCTION FILTER libm.so.2;
+	_numeric;
+	optarg;
+	opterr;
+	optind;
+	optopt;
+	realloc = NODIRECT;
+	scalb = FUNCTION FILTER libm.so.2;
+	_scalb = FUNCTION FILTER libm.so.2;
+	_sibuf;
+	_sobuf;
+	_sys_buslist;
+	_sys_cldlist;
+	_sys_fpelist;
+	_sys_segvlist;
+	_sys_siginfolistp;
+	_sys_siglist;
+	_sys_siglistn;
+	_sys_siglistp;
+	_sys_traplist;
+	timezone;
+	_timezone;
+	tzname;
+	_tzname;
+    protected:
 	abort;
 	abs;
 	access;
@@ -104,7 +156,6 @@ SUNW_0.7 {
 	__align_cpy_4;
 	# __align_cpy_8 is same as __align_cpy_16
 	__align_cpy_8 = NODYNSORT;
-	_altzone;
 	asctime;
 	asctime_r;
 	_assert;
@@ -115,7 +166,6 @@ SUNW_0.7 {
 	atol;
 	bsearch;
 	__builtin_alloca;
-	calloc = NODIRECT;
 	catclose;
 	_catclose;
 	catgets;
@@ -142,7 +192,7 @@ SUNW_0.7 {
 	clearerr;
 	clock;
 	_close;
-	close = NODIRECT;
+	close;
 	closedir;
 	_closedir;
 	creat;
@@ -153,12 +203,8 @@ SUNW_0.7 {
 	_ctermid;
 	ctime;
 	ctime_r;
-	_ctype;
-	__ctype;
 	cuserid;
 	_cuserid;
-	daylight;
-	_daylight;
 	difftime;
 	div;
 	__dtou;
@@ -171,9 +217,6 @@ SUNW_0.7 {
 	_encrypt;
 	endgrent;
 	endpwent;
-	environ = NODIRECT;
-	_environ = NODIRECT;
-	errno = NODIRECT;
 	___errno;
 	execl;
 	_execl;
@@ -225,16 +268,14 @@ SUNW_0.7 {
 	_fmtmsg;
 	fopen;
 	_fork;
-	fork = NODIRECT;
+	fork;
 	fpathconf;
 	_fpathconf;
 	fprintf;
 	fputc;
 	fputs;
 	fread;
-	free = NODIRECT;
 	freopen;
-	frexp = FUNCTION FILTER libm.so.2;
 	fscanf;
 	fseek;
 	fsetpos;
@@ -261,8 +302,6 @@ SUNW_0.7 {
 	_getcwd;
 	getdate;
 	_getdate;
-	getdate_err;
-	_getdate_err;
 	getegid;
 	_getegid;
 	getenv;
@@ -334,11 +373,8 @@ SUNW_0.7 {
 	_hdestroy;
 	hsearch;
 	_hsearch;
-	__huge_val;
 	initgroups;
 	_initgroups;
-	_iob;
-	__iob;
 	ioctl;
 	_ioctl;
 	isalnum;
@@ -353,10 +389,6 @@ SUNW_0.7 {
 	isdigit;
 	isgraph;
 	islower;
-	isnan = FUNCTION FILTER libm.so.2;
-	_isnan = FUNCTION FILTER libm.so.2;
-	isnand = FUNCTION FILTER libm.so.2;
-	_isnand = FUNCTION FILTER libm.so.2;
 	isprint;
 	ispunct;
 	isspace;
@@ -367,7 +399,6 @@ SUNW_0.7 {
 	labs;
 	lchown;
 	_lchown;
-	ldexp = FUNCTION FILTER libm.so.2;
 	ldiv;
 	lfind;
 	_lfind;
@@ -378,7 +409,6 @@ SUNW_0.7 {
 	localtime_r;
 	lockf;
 	_lockf;
-	logb = FUNCTION FILTER libm.so.2;
 	longjmp;
 	lsearch;
 	_lsearch;
@@ -388,7 +418,6 @@ SUNW_0.7 {
 	_lstat;
 	makecontext;
 	_makecontext;
-	malloc = NODIRECT;
 	mblen;
 	mbstowcs;
 	mbtowc;
@@ -414,8 +443,6 @@ SUNW_0.7 {
 	_mlock;
 	mmap;
 	_mmap;
-	modf = FUNCTION FILTER libm.so.2;
-	_modf = FUNCTION FILTER libm.so.2;
 	monitor;
 	_monitor;
 	mount;
@@ -438,23 +465,16 @@ SUNW_0.7 {
 	_munmap;
 	_mutex_held = NODYNSORT;
 	_mutex_lock = NODYNSORT;
-	nextafter = FUNCTION FILTER libm.so.2;
-	_nextafter = FUNCTION FILTER libm.so.2;
 	nftw;
 	_nftw;
 	nice;
 	_nice;
 	nl_langinfo;
 	_nl_langinfo;
-	_numeric;
 	open;
 	_open;
 	opendir;
 	_opendir;
-	optarg;
-	opterr;
-	optind;
-	optopt;
 	pathconf;
 	_pathconf;
 	pause;
@@ -526,7 +546,6 @@ SUNW_0.7 {
 	_readlink;
 	readv;
 	_readv;
-	realloc = NODIRECT;
 	remove;
 	rename;
 	_rename;
@@ -539,8 +558,6 @@ SUNW_0.7 {
 	_rw_write_held;
 	sbrk;
 	_sbrk;
-	scalb = FUNCTION FILTER libm.so.2;
-	_scalb = FUNCTION FILTER libm.so.2;
 	scanf;
 	seekdir;
 	_seekdir;
@@ -585,9 +602,8 @@ SUNW_0.7 {
 	_shmdt;
 	shmget;
 	_shmget;
-	_sibuf;
-	sigaction = NODIRECT;
-	_sigaction = NODIRECT NODYNSORT;
+	sigaction;
+	_sigaction = NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -627,7 +643,6 @@ SUNW_0.7 {
 	_sigsuspend;
 	sleep;
 	_sleep;
-	_sobuf;
 	__sparc_utrap_install;
 	sprintf;
 	srand;
@@ -671,21 +686,12 @@ SUNW_0.7 {
 	_symlink;
 	sync;
 	_sync;
-	_sys_buslist;
 	_syscall;
-	_sys_cldlist;
 	sysconf;
 	_sysconf;
-	_sys_fpelist;
 	sysinfo;
 	_sysinfo;
-	_sys_segvlist;
-	_sys_siginfolistp;
-	_sys_siglist;
-	_sys_siglistn;
-	_sys_siglistp;
 	system;
-	_sys_traplist;
 	tcdrain;
 	_tcdrain;
 	tcflow;
@@ -718,8 +724,6 @@ SUNW_0.7 {
 	_time;
 	times;
 	_times;
-	timezone;
-	_timezone;
 	tmpfile;
 	tmpnam;
 	toascii;
@@ -735,8 +739,6 @@ SUNW_0.7 {
 	ttyname_r;
 	twalk;
 	_twalk;
-	tzname;
-	_tzname;
 	tzset;
 	_tzset;
 	ulimit;
@@ -774,7 +776,6 @@ SUNW_0.7 {
 
 SUNWprivate_1.1 {
     global:
-	_cerror;
 	_dladdr = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	_dladdr1 = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	_dlclose = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
@@ -784,19 +785,19 @@ SUNWprivate_1.1 {
 	_dlmopen = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	_dlopen = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	_dlsym = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
-	__fseterror_u;
-	gtty;
-	_gtty;
-	_hasmntopt;
-	install_utrap;
-	_install_utrap;
 	_ld_libc = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	__lyday_to_month;
+	__mon_lengths;
+	__yday_to_month;
+    protected:
+	_cerror;
+	__fseterror_u;
+	install_utrap;
+	_install_utrap;
 	_memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memset = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	__mon_lengths;
 	nop;
 	_Q_cplx_div;
 	_Q_cplx_div_ix;
@@ -808,7 +809,6 @@ SUNWprivate_1.1 {
 	_Q_cplx_mul;
 	_QgetRD;
 	_xregs_clrptr;
-	__yday_to_month;
 
     local:
 	__cerror =		NODYNSORT;

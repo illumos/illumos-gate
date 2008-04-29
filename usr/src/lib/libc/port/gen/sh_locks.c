@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <synch.h>
 #include <thread.h>
+#include <pthread.h>
 #include "libc.h"
 
 /*
@@ -80,10 +81,6 @@ libc_parent_atfork(void)
 void
 atfork_init(void)
 {
-	/* same as pthread_atfork() but private to libc */
-	extern int _private_pthread_atfork(void (*)(void),
-		void (*)(void), void (*)(void));
-
-	(void) _private_pthread_atfork(libc_prepare_atfork,
-		libc_parent_atfork, libc_child_atfork);
+	(void) pthread_atfork(libc_prepare_atfork,
+	    libc_parent_atfork, libc_child_atfork);
 }

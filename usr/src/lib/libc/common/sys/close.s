@@ -36,7 +36,6 @@
 
 #include "SYS.h"
 
-	ANSI_PRAGMA_WEAK2(_private_close,__close,function)
 	SYSCALL2_RVAL1(__close,close)
 	RETC
 	SET_SIZE(__close)

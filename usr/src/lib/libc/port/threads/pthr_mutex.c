@@ -234,7 +234,7 @@ _pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
 		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALL_NP;
 	}
 
-	return (_private_mutex_init((mutex_t *)mutex, type, &prioceiling));
+	return (mutex_init((mutex_t *)mutex, type, &prioceiling));
 }
 
 /*

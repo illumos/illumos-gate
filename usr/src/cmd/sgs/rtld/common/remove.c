@@ -120,9 +120,9 @@ purge_exit_handlers(Lm_list *lml, Rt_map **tobj)
 	}
 	_addr->lb = _addr->ub = 0;
 
-	leave(LIST(*tobj));
+	leave(LIST(*tobj), thr_flg_reenter);
 	error = (*fptr)(addr, (num - 1));
-	(void) enter();
+	(void) enter(thr_flg_reenter);
 
 	/*
 	 * If we fail to converse with libc, generate an error message to

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@ void *_nd = &_end;
 mutex_t __sbrk_lock = DEFAULTMUTEX;
 
 extern int _brk_unlocked(void *);
-void *_sbrk_unlocked(intptr_t);
+static void *_sbrk_unlocked(intptr_t);
 
 /*
  * The break must always be at least 8-byte aligned
@@ -63,6 +63,10 @@ sbrk(intptr_t addend)
 {
 	void *result;
 
+	if (!primary_link_map) {
+		errno = ENOTSUP;
+		return ((void *)-1);
+	}
 	lmutex_lock(&__sbrk_lock);
 	result = _sbrk_unlocked(addend);
 	lmutex_unlock(&__sbrk_lock);
@@ -80,16 +84,12 @@ sbrk(intptr_t addend)
  *   - the addend is negative and brk + addend < 0.
  *   - the addend is positive and brk + addend > ULONG_MAX
  */
-void *
+static void *
 _sbrk_unlocked(intptr_t addend)
 {
 	char *old_brk = BRKALIGN(_nd);
 	char *new_brk = BRKALIGN(old_brk + addend);
 
-	if (!primary_link_map) {
-		errno = ENOTSUP;
-		return ((void *)-1);
-	}
 	if ((addend > 0 && new_brk < old_brk) ||
 	    (addend < 0 && new_brk > old_brk)) {
 		errno = ENOMEM;

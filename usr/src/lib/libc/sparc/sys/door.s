@@ -156,7 +156,7 @@ door_restart:
 	nop
 
 	save	%sp, -SA(MINFRAME), %sp
-	call	_private_getpid		/* get current process id */
+	call	getpid
 	nop
 	PIC_SETUP(g1)
 #ifdef __sparcv9

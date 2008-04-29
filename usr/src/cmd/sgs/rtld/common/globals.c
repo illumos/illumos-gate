@@ -40,6 +40,8 @@
  * Declarations of global variables used in ld.so.
  */
 Rt_lock		rtldlock;
+int		thr_flg_nolock = 0;
+int		thr_flg_reenter = 0;
 
 /*
  * Major link-map lists.
