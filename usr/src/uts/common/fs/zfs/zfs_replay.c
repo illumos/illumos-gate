@@ -770,6 +770,8 @@ zfs_replay_acl_v0(zfsvfs_t *zfsvfs, lr_acl_v0_t *lr, boolean_t byteswap)
 	bzero(&vsa, sizeof (vsa));
 	vsa.vsa_mask = VSA_ACE | VSA_ACECNT;
 	vsa.vsa_aclcnt = lr->lr_aclcnt;
+	vsa.vsa_aclentsz = sizeof (ace_t) * vsa.vsa_aclcnt;
+	vsa.vsa_aclflags = 0;
 	vsa.vsa_aclentp = ace;
 
 	error = VOP_SETSECATTR(ZTOV(zp), &vsa, 0, kcred, NULL);

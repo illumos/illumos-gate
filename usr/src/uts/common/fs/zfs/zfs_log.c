@@ -227,7 +227,6 @@ zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 	xvattr_t *xvap = (xvattr_t *)vap;
 	void *end;
 	size_t lrsize;
-
 	size_t namesize = strlen(name) + 1;
 	size_t fuidsz = 0;
 
@@ -640,7 +639,10 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, znode_t *zp,
 	size_t txsize;
 	size_t aclbytes = vsecp->vsa_aclentsz;
 
-	txtype = (zp->z_zfsvfs->z_version == ZPL_VERSION_INITIAL) ?
+	if (zilog == NULL || zp->z_unlinked)
+		return;
+
+	txtype = (zp->z_zfsvfs->z_version < ZPL_VERSION_FUID) ?
 	    TX_ACL_V0 : TX_ACL;
 
 	if (txtype == TX_ACL)
@@ -648,13 +650,10 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, znode_t *zp,
 	else
 		lrsize = sizeof (*lrv0);
 
-	if (zilog == NULL || zp->z_unlinked)
-		return;
-
 	txsize = lrsize +
 	    ((txtype == TX_ACL) ? ZIL_ACE_LENGTH(aclbytes) : aclbytes) +
 	    (fuidp ? fuidp->z_domain_str_sz : 0) +
-	    sizeof (uint64) * (fuidp ? fuidp->z_fuid_cnt : 0);
+	    sizeof (uint64_t) * (fuidp ? fuidp->z_fuid_cnt : 0);
 
 	itx = zil_itx_create(txtype, txsize);
 
