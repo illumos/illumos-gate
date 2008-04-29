@@ -921,6 +921,7 @@ usr/lib/sparcv9/llib-lshell.ln  	      sparc
 #
 # bmc (IPMI) interfaces shared within ON.
 #
+usr/include/sys/bmc_cmd.h		sparc
 usr/include/sys/bmc_intf.h		sparc
 #
 # This file is used in ON to build DSCP clients.  It is not for customers.
