@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -152,6 +152,6 @@ ${ADD_DRV} -m "${DRVPERM}" -i "${BRALIAS}" agptarget || EXIT=1
 # amd64_gart is only needed in AMD64 system
 ${ADD_DRV} -m "${DRVPERM}" -i "${CPUGART}" amd64_gart || EXIT=1
 
-${ADD_DRV} -m "${DRVPERM}" agpgart || EXIT 1
+${ADD_DRV} -m "${DRVPERM}" agpgart || EXIT=1
 
 exit ${EXIT}
