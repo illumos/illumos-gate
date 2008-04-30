@@ -431,7 +431,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/sed_xpg4 \
 	$(CLOSED)/cmd/smartcard \
 	$(CLOSED)/cmd/tail \
-	$(CLOSED)/cmd/tr \
 	$(CLOSED)/lib/libc_i18n \
 	$(CLOSED)/lib/libndmp \
 	$(CLOSED)/lib/smartcard
