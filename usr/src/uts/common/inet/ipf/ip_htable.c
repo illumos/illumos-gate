@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -657,6 +657,12 @@ ipf_stack_t *ifs;
 
 	READ_ENTER(&ifs->ifs_ip_poolrw);
 
+	/*
+	 * Get "previous" entry from the token and find the next entry.
+	 *
+	 * If we found an entry, add a reference to it and update the token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
@@ -666,19 +672,13 @@ ipf_stack_t *ifs;
 		} else {
 			nextiph = iph->iph_next;
 		}
-
 		if (nextiph != NULL) {
-			if (nextiph->iph_next == NULL) {
-				token->ipt_alive = 0;
-				ipf_unlinktoken(token, ifs);
-				KFREE(token);
-			} else {
-				ATOMIC_INC(nextiph->iph_ref);
-			}
+			ATOMIC_INC(nextiph->iph_ref);
+			token->ipt_data = nextiph;
 		} else {
 			bzero((char *)&zp, sizeof(zp));
 			nextiph = &zp;
-			ipf_freetoken(token, ifs);
+			token->ipt_data = NULL;
 		}
 		break;
 
@@ -694,57 +694,65 @@ ipf_stack_t *ifs;
 		} else {
 			nextnode = node->ipe_snext;
 		}
-
 		if (nextnode != NULL) {
-			if (nextnode->ipe_snext == NULL) {
-				token->ipt_alive = 0;
-				ipf_unlinktoken(token, ifs);
-				KFREE(token);
-			} else {
-				ATOMIC_INC(nextnode->ipe_ref);
-			}
+			ATOMIC_INC(nextnode->ipe_ref);
+			token->ipt_data = nextnode;
 		} else {
 			bzero((char *)&zn, sizeof(zn));
 			nextnode = &zn;
-			ipf_freetoken(token, ifs);
+			token->ipt_data = NULL;
 		}
 		break;
+
 	default :
 		err = EINVAL;
 		break;
 	}
 
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 	if (err != 0)
 		return err;
 
+	/*
+	 * Copy out data and clean up references and token as needed.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		if (iph != NULL) {
-			WRITE_ENTER(&ifs->ifs_ip_poolrw);
-			fr_derefhtable(iph, ifs);
-			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
-		}
-		if (nextiph->iph_next != NULL) 
-			token->ipt_data = nextiph;
-		
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0)
 			err = EFAULT;
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token, ifs);
+		} else {
+			if (iph != NULL) {
+				WRITE_ENTER(&ifs->ifs_ip_poolrw);
+				fr_derefhtable(iph, ifs);
+				RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+			}
+			if (nextiph->iph_next == NULL)
+				ipf_freetoken(token, ifs);
+		}
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		if (node != NULL) {
-			WRITE_ENTER(&ifs->ifs_ip_poolrw);
-			fr_derefhtent(node);
-			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
-		}
-		if (nextnode->ipe_snext != NULL) 
-			token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0)
 			err = EFAULT;
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token, ifs);
+		} else {
+			if (node != NULL) {
+				WRITE_ENTER(&ifs->ifs_ip_poolrw);
+				fr_derefhtent(node);
+				RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+			}
+			if (nextnode->ipe_snext == NULL)
+				ipf_freetoken(token, ifs);
+		}
 		break;
 	}
 

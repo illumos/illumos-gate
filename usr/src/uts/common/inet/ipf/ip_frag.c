@@ -917,36 +917,49 @@ ipf_stack_t *ifs;
 	ipfr_t *frag, *next, zero;
 	int error = 0;
 
-	frag = token->ipt_data;
-	if (frag == (ipfr_t *)-1) {
-		ipf_freetoken(token, ifs);
-		return ESRCH;
-	}
-
 	READ_ENTER(lock);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	frag = token->ipt_data;
 	if (frag == NULL)
 		next = *top;
 	else
 		next = frag->ipfr_next;
 
+	/*
+	 * If we found an entry, add reference to it and update token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	if (next != NULL) {
 		ATOMIC_INC(next->ipfr_ref);
 		token->ipt_data = next;
 	} else {
 		bzero(&zero, sizeof(zero));
 		next = &zero;
-		token->ipt_data = (void *)-1;
+		token->ipt_data = NULL;
 	}
+
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(lock);
 
-	if (frag != NULL) {
-		fr_fragderef(&frag, lock, ifs);
-	}
-
+	/*
+	 * Copy out data and clean up references and token as needed.
+	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0)
 		error = EFAULT;
-
+	if (token->ipt_data == NULL) {
+		ipf_freetoken(token, ifs);
+	} else {
+		if (frag != NULL)
+			fr_fragderef(&frag, lock, ifs);
+		if (next->ipfr_next == NULL)
+			ipf_freetoken(token, ifs);
+	}
 	return error;
 }
 

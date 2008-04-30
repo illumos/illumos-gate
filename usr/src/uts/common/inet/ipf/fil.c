@@ -219,6 +219,7 @@ static	void		*fr_ifsync __P((int, int, char *, char *,
 					void *, void *, ipf_stack_t *));
 static	ipftuneable_t	*fr_findtunebyname __P((const char *, ipf_stack_t *));
 static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **, ipf_stack_t *));
+static	void		ipf_unlinktoken __P((ipftoken_t *, ipf_stack_t *));
 
 
 /*
@@ -6740,7 +6741,7 @@ ipf_stack_t *ifs;
 /* that it belongs to.  The head pointer never needs to be explicitly       */
 /* adjusted, but the tail does due to the linked list implementation.       */
 /* ------------------------------------------------------------------------ */
-void ipf_unlinktoken(token, ifs)
+static void ipf_unlinktoken(token, ifs)
 ipftoken_t *token;
 ipf_stack_t *ifs;
 {
@@ -6929,8 +6930,12 @@ ipf_stack_t *ifs;
 	 * F_IN (0) and F_ACIN (2) mask to out = 0.
 	 */
 	out = it.iri_inout & F_OUT;
-	fr = t->ipt_data;
 	READ_ENTER(&ifs->ifs_ipf_mutex);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	fr = t->ipt_data;
 	if (fr == NULL) {
 		if (*it.iri_group == '\0') {
 			/*
@@ -6971,6 +6976,10 @@ ipf_stack_t *ifs;
 	 * copied out, so long as that many exist in the list to start with!
 	 */
 	for (count = it.iri_nrules; count > 0; count--) {
+		/*
+		 * If we found an entry, add reference to it and update token.
+		 * Otherwise, zero out data to be returned and NULL out token.
+		 */
 		if (next != NULL) {
 			MUTEX_ENTER(&next->fr_lock);
 			next->fr_ref++;
@@ -6979,26 +6988,39 @@ ipf_stack_t *ifs;
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			count = 1;
 			t->ipt_data = NULL;
 		}
+
+		/*
+		 * Now that we have ref, it's save to give up lock.
+		 */
 		RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
  
-		if (fr != NULL) {
-			(void) fr_derefrule(&fr, ifs);
-		}
-
+		/*
+		 * Copy out data and clean up references and token as needed.
+		 */
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
-			return EFAULT;
- 
-		if (next->fr_data != NULL) {
-			dst += sizeof(*next);
-			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
-			if (error != 0)
-				error = EFAULT;
-			else
-				dst += next->fr_dsize;
+			error = EFAULT;
+		if (t->ipt_data == NULL) {
+			ipf_freetoken(t, ifs);
+			break;
+		} else {
+			if (fr != NULL)
+				(void) fr_derefrule(&fr, ifs);
+			if (next->fr_data != NULL) {
+				dst += sizeof(*next);
+				error = COPYOUT(next->fr_data, dst,
+						next->fr_dsize);
+				if (error != 0)
+					error = EFAULT;
+				else
+					dst += next->fr_dsize;
+			}
+			if (next->fr_next == NULL) {
+				ipf_freetoken(t, ifs);
+				break;
+			}
 		}
  
 		if ((count == 1) || (error != 0))
@@ -7008,7 +7030,7 @@ ipf_stack_t *ifs;
 		fr = next;
 		next = fr->fr_next;
 	}
- 
+
 	return error;
 }
 

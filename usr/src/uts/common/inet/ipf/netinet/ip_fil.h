@@ -6,7 +6,7 @@
  * @(#)ip_fil.h	1.35 6/5/96
  * $Id: ip_fil.h,v 2.170.2.22 2005/07/16 05:55:35 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1481,7 +1481,6 @@ extern	int		fr_zerostats __P((char *, ipf_stack_t *));
 extern  ipftoken_t      *ipf_findtoken __P((int, int, void *, ipf_stack_t *));
 extern  int             ipf_getnextrule __P((ipftoken_t *, void *, ipf_stack_t *));
 extern  void            ipf_expiretokens __P((ipf_stack_t *));
-extern  void            ipf_unlinktoken __P((ipftoken_t *, ipf_stack_t *));
 extern  void            ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
 extern  int             ipf_deltoken __P((int,int, void *, ipf_stack_t *));
 extern  int             ipf_genericiter __P((void *, int, void *, ipf_stack_t *));

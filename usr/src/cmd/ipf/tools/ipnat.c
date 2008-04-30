@@ -5,7 +5,7 @@
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -450,8 +450,6 @@ int fd, opts;
 		nsp->ns_list = ipn.in_next;
 	}
 
-	(void) ioctl(fd, SIOCIPFDELTOK, &iter.igi_type);
-
 	printf("\nList of active sessions:\n");
 
 	iter.igi_type = IPFGENITER_NAT;
@@ -466,8 +464,6 @@ int fd, opts;
 			printaps(nat.nat_aps, opts);
 		nsp->ns_instances = nat.nat_next;
 	}
-
-	(void) ioctl(fd, SIOCIPFDELTOK, &iter.igi_type);
 
 	if (opts & OPT_VERBOSE)
 		showhostmap_live(fd, nsp);
@@ -502,6 +498,4 @@ natstat_t *nsp;
 		printhostmap(&hm, 0);
 		nsp->ns_maplist = hm.hm_next;
 	}
-
-	(void) ioctl(fd, SIOCIPFDELTOK, &iter.igi_type);
 }

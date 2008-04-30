@@ -3,12 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -878,46 +873,53 @@ ipf_stack_t *ifs;
 	if (itp->igi_type != IPFGENITER_AUTH)
 		return EINVAL;
 
-	fae = token->ipt_data;
 	READ_ENTER(&ifs->ifs_ipf_auth);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	fae = token->ipt_data;
 	if (fae == NULL) {
 		next = ifs->ifs_fae_list;
 	} else {
 		next = fae->fae_next;
 	}
 
+	/*
+	 * If we found an entry, add reference to it and update token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	if (next != NULL) {
-		/*
-		 * If we find an auth entry to use, bump its reference count
-		 * so that it can be used for is_next when we come back.
-		 */
 		ATOMIC_INC(next->fae_ref);
-		if (next->fae_next == NULL)
-			ipf_freetoken(token, ifs);
+		token->ipt_data = next;
 	} else {
 		bzero(&zero, sizeof(zero));
 		next = &zero;
+		token->ipt_data = NULL;
 	}
+
+	/*
+	 * Safe to release the lock now that we have a reference.
+	 */
 	RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 
 	/*
-	 * If we had a prior pointer to an auth entry, release it.
-	 */
-	if (fae != NULL) {
-		WRITE_ENTER(&ifs->ifs_ipf_auth);
-		fr_authderef(&fae);
-		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
-	}
-	token->ipt_data = next;
-
-	/*
-	 * This should arguably be via fr_outobj() so that the auth
-	 * structure can (if required) be massaged going out.
+	 * Copy out the data and clean up references and token as needed.
 	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0)
 		error = EFAULT;
-
+	if (token->ipt_data == NULL) {
+		ipf_freetoken(token, ifs);
+	} else {
+		if (fae != NULL) {
+			WRITE_ENTER(&ifs->ifs_ipf_auth);
+			fr_authderef(&fae);
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
+		}
+		if (next->fae_next == NULL)
+			ipf_freetoken(token, ifs);
+	}
 	return error;
 }
 

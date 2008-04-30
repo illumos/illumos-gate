@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -782,7 +782,7 @@ char *group, *comment;
 {
 	frgroup_t *grtop, *grtail, *g;
 	struct	frentry	fb, *fg;
-	int type, n;
+	int n;
 	ipfruleiter_t rule;
 	ipfobj_t obj;
 
@@ -815,8 +815,6 @@ char *group, *comment;
 		rule.iri_rule = fp;
 		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
 			perror("ioctl(SIOCIPFITER)");
-			type = IPFGENITER_IPF;
-			(void) ioctl(ipf_fd, SIOCIPFDELTOK, &type);
 			return;
 		}
 		if (fp->fr_data != NULL)
@@ -862,9 +860,6 @@ char *group, *comment;
 			}
 		}
 	} while (fp->fr_next != NULL);
-
-	type = IPFGENITER_IPF;
-	(void) ioctl(ipf_fd, SIOCIPFDELTOK, &type);
 
 	while ((g = grtop) != NULL) {
 		printlivelist(out, set, NULL, g->fg_name, comment);

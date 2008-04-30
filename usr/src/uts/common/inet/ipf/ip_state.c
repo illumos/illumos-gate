@@ -4141,29 +4141,27 @@ ipf_stack_t *ifs;
 	if (itp->igi_type != IPFGENITER_STATE)
 		return EINVAL;
 
-	is = token->ipt_data;
-	if (is == (void *)-1) {
-		ipf_freetoken(token, ifs);
-		return ESRCH;
-	}
-
 	error = 0;
-	dst = itp->igi_data;
 
 	READ_ENTER(&ifs->ifs_ipf_state);
+
+	/*
+	 * Get "previous" entry from the token and find the next entry.
+	 */
+	is = token->ipt_data;
 	if (is == NULL) {
 		next = ifs->ifs_ips_list;
 	} else {
 		next = is->is_next;
 	}
 
+	dst = itp->igi_data;
 	for (count = itp->igi_nitems; count > 0; count--) {
+		/*
+		 * If we found an entry, add a reference to it and update the token.
+		 * Otherwise, zero out data to be returned and NULL out token.
+		 */
 		if (next != NULL) {
-			/*
-			 * If we find a state entry to use, bump its
-			 * reference count so that it can be used for
-			 * is_next when we come back.
-			 */
 			MUTEX_ENTER(&next->is_lock);
 			next->is_ref++;
 			MUTEX_EXIT(&next->is_lock);
@@ -4171,30 +4169,37 @@ ipf_stack_t *ifs;
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			token->ipt_data = (void *)-1;
-			count = 1;
+			token->ipt_data = NULL;
 		}
+
+		/*
+		 * Safe to release lock now the we have a reference.
+		 */
 		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 
 		/*
-		 * If we had a prior pointer to a state entry, release it.
-		 */
-		if (is != NULL) {
-			fr_statederef(&is, ifs);
-		}
-
-		/*
-		 * This should arguably be via fr_outobj() so that the state
-		 * structure can (if required) be massaged going out.
+		 * Copy out data and clean up references and tokens.
 		 */
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
 			error = EFAULT;
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token, ifs);
+			break;
+		} else {
+			if (is != NULL)
+				fr_statederef(&is, ifs);
+			if (next->is_next == NULL) {
+				ipf_freetoken(token, ifs);
+				break;
+			}
+		}
+
 		if ((count == 1) || (error != 0))
 			break;
 
-		dst += sizeof(*next);
 		READ_ENTER(&ifs->ifs_ipf_state);
+		dst += sizeof(*next);
 		is = next;
 		next = is->is_next;
 	}
