@@ -463,7 +463,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/sed_xpg4	\
 	$(CLOSED)/cmd/smartcard	\
 	$(CLOSED)/cmd/tail	\
-	$(CLOSED)/cmd/tr	\
 	$(CLOSED)/cmd/tr_xpg4
 
 i386_SUBDIRS=		\
@@ -731,7 +730,6 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/sed	\
 	$(CLOSED)/cmd/sed_xpg4	\
 	$(CLOSED)/cmd/tail	\
-	$(CLOSED)/cmd/tr	\
 	$(CLOSED)/cmd/tr_xpg4
 
 sparc_MSGSUBDIRS=	\
