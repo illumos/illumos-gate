@@ -16,6 +16,7 @@
 #include <compat.h>
 #include <libdlpi.h>
 #include <inet/ip.h>
+#include <inet/ipsec_impl.h>
 
 #define	LOOPBACK_IF	"lo0"
 #define	NONE_STR	"none"
@@ -670,7 +671,7 @@ tun_reality_check(void)
 	    ipsr->ipsr_esp_auth_alg == SADB_AALG_NONE &&
 	    ipsr->ipsr_ah_req == 0)
 		(void) fprintf(stderr, "ifconfig: WARNING - tunnel with "
-		    "only ESP and potentially no authentication.\n");
+		    "only ESP and no authentication.\n");
 }
 
 /*
@@ -1054,9 +1055,17 @@ rparsealg(uint8_t alg_value, int proto_num)
 	struct ipsecalgent *alg;
 	static char numprint[128];	/* Enough to hold an algorithm name. */
 
-	/* Special-case 0 to return "<any-none>" */
-	if (alg_value == 0)
-		return ("<any-none>");
+	/*
+	 * Special cases for "any" and "none"
+	 * The kernel needs to be able to distinguish between "any"
+	 * and "none" and the APIs are underdefined in this area for auth.
+	 */
+	if (proto_num == IPSEC_PROTO_AH) {
+		if (alg_value == SADB_AALG_NONE)
+			return ("none");
+		if (alg_value == SADB_AALG_ANY)
+			return ("any");
+	}
 
 	alg = getipsecalgbynum(alg_value, proto_num, NULL);
 	if (alg != NULL) {
@@ -1082,13 +1091,15 @@ parsealg(char *algname, int proto_num)
 	}
 
 	/*
-	 * Special-case "none". Use strcasecmp because its length is
-	 * bound.
+	 * Special-case "none" and "any".
+	 * Use strcasecmp because its length is bounded.
 	 */
 	if (strcasecmp("none", algname) == 0) {
 		return ((proto_num == IPSEC_PROTO_ESP) ?
 		    NO_ESP_EALG : NO_ESP_AALG);
 	}
+	if ((strcasecmp("any", algname) == 0) && (proto_num == IPSEC_PROTO_AH))
+		return (SADB_AALG_ANY);
 
 	alg = getipsecalgbyname(algname, proto_num, NULL);
 	if (alg != NULL) {
@@ -1121,26 +1132,33 @@ enum ipsec_alg_type { ESP_ENCR_ALG = 1, ESP_AUTH_ALG, AH_AUTH_ALG };
 boolean_t first_set_tun = _B_TRUE;
 boolean_t encr_alg_set = _B_FALSE;
 
+/*
+ * Need global for multiple calls to set_tun_algs
+ * because we accumulate algorithm selections over
+ * the lifetime of this ifconfig(1M) invocation.
+ */
+static struct iftun_req treq_tun;
+
 static int
 set_tun_algs(int which_alg, int alg)
 {
-	struct iftun_req treq;
 	ipsec_req_t *ipsr;
 
-	(void) strncpy(treq.ifta_lifr_name, name, sizeof (treq.ifta_lifr_name));
+	(void) strncpy(treq_tun.ifta_lifr_name, name,
+	    sizeof (treq_tun.ifta_lifr_name));
 	if (strchr(name, ':') != NULL) {
 		errno = EPERM;
 		Perror0_exit("Tunnel params on logical interfaces");
 	}
-	if (ioctl(s, SIOCGTUNPARAM, (caddr_t)&treq) < 0) {
+	if (ioctl(s, SIOCGTUNPARAM, (caddr_t)&treq_tun) < 0) {
 		if (errno == EOPNOTSUPP || errno == EINVAL)
 			Perror0_exit("Not a tunnel");
 		else Perror0_exit("SIOCGTUNPARAM");
 	}
 
-	ipsr = (ipsec_req_t *)&treq.ifta_secinfo;
+	ipsr = (ipsec_req_t *)&treq_tun.ifta_secinfo;
 
-	if (treq.ifta_vers != IFTUN_VERSION) {
+	if (treq_tun.ifta_vers != IFTUN_VERSION) {
 		(void) fprintf(stderr,
 		    "Kernel tunnel secinfo version mismatch.\n");
 		exit(1);
@@ -1156,7 +1174,7 @@ set_tun_algs(int which_alg, int alg)
 		(void) memset(ipsr, 0, sizeof (*ipsr));
 	}
 
-	treq.ifta_flags = IFTUN_SECURITY;
+	treq_tun.ifta_flags = IFTUN_SECURITY;
 
 	switch (which_alg) {
 	case ESP_ENCR_ALG:
@@ -1164,6 +1182,12 @@ set_tun_algs(int which_alg, int alg)
 			if (ipsr->ipsr_esp_auth_alg == SADB_AALG_NONE)
 				ipsr->ipsr_esp_req = 0;
 			ipsr->ipsr_esp_alg = SADB_EALG_NONE;
+
+			/* Let the user specify NULL encryption implicitly. */
+			if (ipsr->ipsr_esp_auth_alg != SADB_AALG_NONE) {
+				encr_alg_set = _B_TRUE;
+				ipsr->ipsr_esp_alg = SADB_EALG_NULL;
+			}
 		} else {
 			encr_alg_set = _B_TRUE;
 			ipsr->ipsr_esp_req =
@@ -1173,8 +1197,9 @@ set_tun_algs(int which_alg, int alg)
 		break;
 	case ESP_AUTH_ALG:
 		if (alg == NO_ESP_AALG) {
-			if (ipsr->ipsr_esp_alg == SADB_EALG_NONE ||
-			    ipsr->ipsr_esp_alg == SADB_EALG_NULL)
+			if ((ipsr->ipsr_esp_alg == SADB_EALG_NONE ||
+			    ipsr->ipsr_esp_alg == SADB_EALG_NULL) &&
+			    !encr_alg_set)
 				ipsr->ipsr_esp_req = 0;
 			ipsr->ipsr_esp_auth_alg = SADB_AALG_NONE;
 		} else {
@@ -1201,9 +1226,9 @@ set_tun_algs(int which_alg, int alg)
 		/* Will never hit DEFAULT */
 	}
 
-	if (ioctl(s, SIOCSTUNPARAM, (caddr_t)&treq) < 0) {
+	if (ioctl(s, SIOCSTUNPARAM, (caddr_t)&treq_tun) < 0) {
 		Perror2_exit("set tunnel security properties",
-		    treq.ifta_lifr_name);
+		    treq_tun.ifta_lifr_name);
 	}
 
 	return (0);

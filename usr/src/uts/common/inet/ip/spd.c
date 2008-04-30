@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1403,13 +1403,21 @@ ipsec_prot_from_req(ipsec_req_t *req, ipsec_prot_t *ipp)
 	 */
 	ipp->ipp_use_ah = !!(req->ipsr_ah_req & IPSEC_PREF_REQUIRED);
 	ipp->ipp_use_esp = !!(req->ipsr_esp_req & IPSEC_PREF_REQUIRED);
-	ipp->ipp_use_espa = !!(req->ipsr_esp_auth_alg) || !ipp->ipp_use_ah;
+	ipp->ipp_use_espa = !!(req->ipsr_esp_auth_alg);
 	ipp->ipp_use_se = !!(req->ipsr_self_encap_req & IPSEC_PREF_REQUIRED);
 	ipp->ipp_use_unique = !!((req->ipsr_ah_req|req->ipsr_esp_req) &
 	    IPSEC_PREF_UNIQUE);
 	ipp->ipp_encr_alg = req->ipsr_esp_alg;
-	ipp->ipp_auth_alg = req->ipsr_auth_alg;
-	ipp->ipp_esp_auth_alg = req->ipsr_esp_auth_alg;
+	/*
+	 * SADB_AALG_ANY is a placeholder to distinguish "any" from
+	 * "none" above.  If auth is required, as determined above,
+	 * SADB_AALG_ANY becomes 0, which is the representation
+	 * of "any" and "none" in PF_KEY v2.
+	 */
+	ipp->ipp_auth_alg = (req->ipsr_auth_alg != SADB_AALG_ANY) ?
+	    req->ipsr_auth_alg : 0;
+	ipp->ipp_esp_auth_alg = (req->ipsr_esp_auth_alg != SADB_AALG_ANY) ?
+	    req->ipsr_esp_auth_alg : 0;
 }
 
 /*

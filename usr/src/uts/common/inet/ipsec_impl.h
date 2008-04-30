@@ -73,6 +73,12 @@ extern "C" {
 #define	IPSEC_ESP_ONLY		0x02
 #define	IPSEC_AH_ESP		0x03
 
+/*
+ * Internally defined "any" algorithm.
+ * Move to PF_KEY v3 when that RFC is released.
+ */
+#define	SADB_AALG_ANY 255
+
 #ifdef _KERNEL
 
 #include <inet/common.h>
