@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,7 @@ typedef struct	segvn_data {
 	struct	segvn_data *svn_trnext; /* textrepl list next link */
 	struct	segvn_data *svn_trprev; /* textrepl list prev link */
 	int	tr_state;	/* TR (text replication) state */
+	uchar_t	pageswap;	/* true if per page swap accounting is set */
 } segvn_data_t;
 
 #ifdef _KERNEL

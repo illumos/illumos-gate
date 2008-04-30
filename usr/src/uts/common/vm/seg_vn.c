@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,7 @@ static faultcode_t segvn_faultpage(struct hat *, struct seg *, caddr_t,
     u_offset_t, struct vpage *, page_t **, uint_t,
     enum fault_type, enum seg_rw, int, int);
 static void	segvn_vpage(struct seg *);
+static size_t	segvn_count_swap_by_vpages(struct seg *);
 
 static void segvn_purge(struct seg *seg);
 static int segvn_reclaim(struct seg *, caddr_t, size_t, struct page **,
@@ -786,6 +787,7 @@ segvn_create(struct seg *seg, void *argsp)
 	svd->flags = (ushort_t)a->flags;
 	svd->softlockcnt = 0;
 	svd->rcookie = HAT_INVALID_REGION_COOKIE;
+	svd->pageswap = 0;
 
 	if (a->szc != 0 && a->vp != NULL) {
 		segvn_setvnode_mpss(a->vp);
@@ -1031,7 +1033,7 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 	 * If either seg has vpages, create a new merged vpage array.
 	 */
 	if (vpage1 != NULL || vpage2 != NULL) {
-		struct vpage *vp;
+		struct vpage *vp, *evp;
 
 		npages1 = seg_pages(seg1);
 		npages2 = seg_pages(seg2);
@@ -1044,7 +1046,8 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 		if (vpage1 != NULL) {
 			bcopy(vpage1, nvpage, vpgtob(npages1));
 		} else {
-			for (vp = nvpage; vp < nvpage + npages1; vp++) {
+			evp = nvpage + npages1;
+			for (vp = nvpage; vp < evp; vp++) {
 				VPP_SETPROT(vp, svd1->prot);
 				VPP_SETADVICE(vp, svd1->advice);
 			}
@@ -1053,13 +1056,36 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 		if (vpage2 != NULL) {
 			bcopy(vpage2, nvpage + npages1, vpgtob(npages2));
 		} else {
-			for (vp = nvpage + npages1;
-			    vp < nvpage + npages1 + npages2; vp++) {
+			evp = nvpage + npages1 + npages2;
+			for (vp = nvpage + npages1; vp < evp; vp++) {
 				VPP_SETPROT(vp, svd2->prot);
 				VPP_SETADVICE(vp, svd2->advice);
 			}
 		}
+
+		if (svd2->pageswap && (!svd1->pageswap && svd1->swresv)) {
+			ASSERT(svd1->swresv == seg1->s_size);
+			ASSERT(!(svd1->flags & MAP_NORESERVE));
+			ASSERT(!(svd2->flags & MAP_NORESERVE));
+			evp = nvpage + npages1;
+			for (vp = nvpage; vp < evp; vp++) {
+				VPP_SETSWAPRES(vp);
+			}
+		}
+
+		if (svd1->pageswap && (!svd2->pageswap && svd2->swresv)) {
+			ASSERT(svd2->swresv == seg2->s_size);
+			ASSERT(!(svd1->flags & MAP_NORESERVE));
+			ASSERT(!(svd2->flags & MAP_NORESERVE));
+			vp = nvpage + npages1;
+			evp = vp + npages2;
+			for (; vp < evp; vp++) {
+				VPP_SETSWAPRES(vp);
+			}
+		}
 	}
+	ASSERT((vpage1 != NULL || vpage2 != NULL) ||
+	    (svd1->pageswap == 0 && svd2->pageswap == 0));
 
 	/*
 	 * If either segment has private pages, create a new merged anon
@@ -1159,6 +1185,9 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 		}
 		if (svd2->pageadvice) {
 			svd1->pageadvice = 1;
+		}
+		if (svd2->pageswap) {
+			svd1->pageswap = 1;
 		}
 		svd1->vpage = nvpage;
 	}
@@ -1269,7 +1298,16 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 		evp = vp + seg_pages(seg2);
 		for (; vp < evp; vp++)
 			VPP_SETPROT(vp, a->prot);
+		if (svd1->pageswap && swresv) {
+			ASSERT(!(svd1->flags & MAP_NORESERVE));
+			ASSERT(swresv == seg2->s_size);
+			vp = new_vpage + seg_pages(seg1);
+			for (; vp < evp; vp++) {
+				VPP_SETSWAPRES(vp);
+			}
+		}
 	}
+	ASSERT(svd1->vpage != NULL || svd1->pageswap == 0);
 	size = seg2->s_size;
 	seg_free(seg2);
 	seg1->s_size += size;
@@ -1381,7 +1419,16 @@ segvn_extend_next(
 		evp = vp + seg_pages(seg1);
 		for (; vp < evp; vp++)
 			VPP_SETPROT(vp, a->prot);
+		if (svd2->pageswap && swresv) {
+			ASSERT(!(svd2->flags & MAP_NORESERVE));
+			ASSERT(swresv == seg1->s_size);
+			vp = new_vpage;
+			for (; vp < evp; vp++) {
+				VPP_SETSWAPRES(vp);
+			}
+		}
 	}
+	ASSERT(svd2->vpage != NULL || svd2->pageswap == 0);
 	size = seg1->s_size;
 	seg_free(seg1);
 	seg2->s_size += size;
@@ -1448,6 +1495,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	newsvd->advice = svd->advice;
 	newsvd->pageadvice = svd->pageadvice;
 	newsvd->swresv = svd->swresv;
+	newsvd->pageswap = svd->pageswap;
 	newsvd->flags = svd->flags;
 	newsvd->softlockcnt = 0;
 	newsvd->policy_info = svd->policy_info;
@@ -1694,6 +1742,31 @@ segvn_hat_unload_callback(hat_callback_t *cb)
 	free_vp_pages(svd->vp, svd->offset + off, len);
 }
 
+/*
+ * This function determines the number of bytes of swap reserved by
+ * a segment for which per-page accounting is present. It is used to
+ * calculate the correct value of a segvn_data's swresv.
+ */
+static size_t
+segvn_count_swap_by_vpages(struct seg *seg)
+{
+	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
+	struct vpage *vp, *evp;
+	size_t nswappages = 0;
+
+	ASSERT(svd->pageswap);
+	ASSERT(svd->vpage != NULL);
+
+	evp = &svd->vpage[seg_page(seg, seg->s_base + seg->s_size)];
+
+	for (vp = svd->vpage; vp < evp; vp++) {
+		if (VPP_ISSWAPRES(vp))
+			nswappages++;
+	}
+
+	return (nswappages << PAGESHIFT);
+}
+
 static int
 segvn_unmap(struct seg *seg, caddr_t addr, size_t len)
 {
@@ -1908,6 +1981,9 @@ retry:
 		if (svd->vp != NULL)
 			svd->offset += len;
 
+		seg->s_base += len;
+		seg->s_size -= len;
+
 		if (svd->swresv) {
 			if (svd->flags & MAP_NORESERVE) {
 				ASSERT(amp);
@@ -1917,15 +1993,25 @@ retry:
 				    svd->anon_index, npages));
 				anon_unresv(oswresv - svd->swresv);
 			} else {
-				anon_unresv(len);
-				svd->swresv -= len;
+				size_t unlen;
+
+				if (svd->pageswap) {
+					oswresv = svd->swresv;
+					svd->swresv =
+					    segvn_count_swap_by_vpages(seg);
+					ASSERT(oswresv >= svd->swresv);
+					unlen = oswresv - svd->swresv;
+				} else {
+					svd->swresv -= len;
+					ASSERT(svd->swresv == seg->s_size);
+					unlen = len;
+				}
+				anon_unresv(unlen);
 			}
 			TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
 			    seg, len, 0);
 		}
 
-		seg->s_base += len;
-		seg->s_size -= len;
 		return (0);
 	}
 
@@ -1983,6 +2069,8 @@ retry:
 			ANON_LOCK_EXIT(&amp->a_rwlock);
 		}
 
+		seg->s_size -= len;
+
 		if (svd->swresv) {
 			if (svd->flags & MAP_NORESERVE) {
 				ASSERT(amp);
@@ -1991,14 +2079,25 @@ retry:
 				    svd->anon_index, npages));
 				anon_unresv(oswresv - svd->swresv);
 			} else {
-				anon_unresv(len);
-				svd->swresv -= len;
+				size_t unlen;
+
+				if (svd->pageswap) {
+					oswresv = svd->swresv;
+					svd->swresv =
+					    segvn_count_swap_by_vpages(seg);
+					ASSERT(oswresv >= svd->swresv);
+					unlen = oswresv - svd->swresv;
+				} else {
+					svd->swresv -= len;
+					ASSERT(svd->swresv == seg->s_size);
+					unlen = len;
+				}
+				anon_unresv(unlen);
 			}
 			TRACE_3(TR_FAC_VM, TR_ANON_PROC,
 			    "anon proc:%p %lu %u", seg, len, 0);
 		}
 
-		seg->s_size -= len;
 		return (0);
 	}
 
@@ -2135,14 +2234,26 @@ retry:
 			ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
 			anon_unresv(oswresv - (svd->swresv + nsvd->swresv));
 		} else {
-			if (seg->s_size + nseg->s_size + len != svd->swresv) {
-				panic("segvn_unmap: "
-				    "cannot split swap reservation");
-				/*NOTREACHED*/
+			size_t unlen;
+
+			if (svd->pageswap) {
+				oswresv = svd->swresv;
+				svd->swresv = segvn_count_swap_by_vpages(seg);
+				nsvd->swresv = segvn_count_swap_by_vpages(nseg);
+				ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
+				unlen = oswresv - (svd->swresv + nsvd->swresv);
+			} else {
+				if (seg->s_size + nseg->s_size + len !=
+				    svd->swresv) {
+					panic("segvn_unmap: cannot split "
+					    "swap reservation");
+					/*NOTREACHED*/
+				}
+				svd->swresv = seg->s_size;
+				nsvd->swresv = nseg->s_size;
+				unlen = len;
 			}
-			anon_unresv(len);
-			svd->swresv = seg->s_size;
-			nsvd->swresv = nseg->s_size;
+			anon_unresv(unlen);
 		}
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
 		    seg, len, 0);
@@ -2264,6 +2375,9 @@ segvn_free(struct seg *seg)
 		svd->vp = NULL;
 	}
 	crfree(svd->cred);
+	svd->pageprot = 0;
+	svd->pageadvice = 0;
+	svd->pageswap = 0;
 	svd->cred = NULL;
 
 	seg->s_data = NULL;
@@ -5685,7 +5799,7 @@ static int
 segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 {
 	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
-	struct vpage *svp, *evp;
+	struct vpage *cvp, *svp, *evp;
 	struct vnode *vp;
 	size_t pgsz;
 	pgcnt_t pgcnt;
@@ -5782,25 +5896,89 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 
 
 	/*
-	 * If it's a private mapping and we're making it writable
-	 * and no swap space has been reserved, have to reserve
-	 * it all now.  If it's a private mapping to a file (i.e., vp != NULL)
-	 * and we're removing write permission on the entire segment and
-	 * we haven't modified any pages, we can release the swap space.
+	 * If it's a private mapping and we're making it writable then we
+	 * may have to reserve the additional swap space now. If we are
+	 * making writable only a part of the segment then we use its vpage
+	 * array to keep a record of the pages for which we have reserved
+	 * swap. In this case we set the pageswap field in the segment's
+	 * segvn structure to record this.
+	 *
+	 * If it's a private mapping to a file (i.e., vp != NULL) and we're
+	 * removing write permission on the entire segment and we haven't
+	 * modified any pages, we can release the swap space.
 	 */
 	if (svd->type == MAP_PRIVATE) {
 		if (prot & PROT_WRITE) {
-			size_t sz;
-			if (svd->swresv == 0 && !(svd->flags & MAP_NORESERVE)) {
-				if (anon_resv_zone(seg->s_size,
+			if (!(svd->flags & MAP_NORESERVE) &&
+			    !(svd->swresv && svd->pageswap == 0)) {
+				size_t sz = 0;
+
+				/*
+				 * Start by determining how much swap
+				 * space is required.
+				 */
+				if (addr == seg->s_base &&
+				    len == seg->s_size &&
+				    svd->pageswap == 0) {
+					/* The whole segment */
+					sz = seg->s_size;
+				} else {
+					/*
+					 * Make sure that the vpage array
+					 * exists, and make a note of the
+					 * range of elements corresponding
+					 * to len.
+					 */
+					segvn_vpage(seg);
+					svp = &svd->vpage[seg_page(seg, addr)];
+					evp = &svd->vpage[seg_page(seg,
+					    addr + len)];
+
+					if (svd->pageswap == 0) {
+						/*
+						 * This is the first time we've
+						 * asked for a part of this
+						 * segment, so we need to
+						 * reserve everything we've
+						 * been asked for.
+						 */
+						sz = len;
+					} else {
+						/*
+						 * We have to count the number
+						 * of pages required.
+						 */
+						for (cvp = svp;  cvp < evp;
+						    cvp++) {
+							if (!VPP_ISSWAPRES(cvp))
+								sz++;
+						}
+						sz <<= PAGESHIFT;
+					}
+				}
+
+				/* Try to reserve the necessary swap. */
+				if (anon_resv_zone(sz,
 				    seg->s_as->a_proc->p_zone) == 0) {
 					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 					return (IE_NOMEM);
 				}
-				sz = svd->swresv = seg->s_size;
-				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
-				    "anon proc:%p %lu %u",
-				    seg, sz, 1);
+
+				/*
+				 * Make a note of how much swap space
+				 * we've reserved.
+				 */
+				if (svd->pageswap == 0 && sz == seg->s_size) {
+					svd->swresv = sz;
+				} else {
+					ASSERT(svd->vpage != NULL);
+					svd->swresv += sz;
+					svd->pageswap = 1;
+					for (cvp = svp; cvp < evp; cvp++) {
+						if (!VPP_ISSWAPRES(cvp))
+							VPP_SETSWAPRES(cvp);
+					}
+				}
 			}
 		} else {
 			/*
@@ -5812,7 +5990,8 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			if (svd->swresv != 0 && svd->vp != NULL &&
 			    svd->amp == NULL && addr == seg->s_base &&
 			    len == seg->s_size && svd->pageprot == 0) {
-				anon_unresv_zone(svd->swresv,
+				ASSERT(svd->pageswap == 0);
+			    	anon_unresv_zone(svd->swresv,
 				    seg->s_as->a_proc->p_zone);
 				svd->swresv = 0;
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
@@ -6566,7 +6745,7 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 	}
 
 	/*
-	 * Split amount of swap reserve
+	 * Split the amount of swap reserved.
 	 */
 	if (svd->swresv) {
 		/*
@@ -6585,9 +6764,16 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 			    nsvd->anon_index, btop(nseg->s_size)));
 			ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
 		} else {
-			ASSERT(svd->swresv == seg->s_size + nseg->s_size);
-			svd->swresv = seg->s_size;
-			nsvd->swresv = nseg->s_size;
+			if (svd->pageswap) {
+				svd->swresv = segvn_count_swap_by_vpages(seg);
+				ASSERT(nsvd->swresv >= svd->swresv);
+				nsvd->swresv -= svd->swresv;
+			} else {
+				ASSERT(svd->swresv == seg->s_size +
+				    nseg->s_size);
+				svd->swresv = seg->s_size;
+				nsvd->swresv = nseg->s_size;
+			}
 		}
 	}
 
