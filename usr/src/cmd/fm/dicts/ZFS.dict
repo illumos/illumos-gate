@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -43,3 +43,5 @@ fault.fs.zfs.device=12
 ereport.fs.zfs.pool.hostname_mismatch=13
 fault.fs.zfs.vdev.io=14
 fault.fs.zfs.vdev.checksum=15
+fault.fs.zfs.io_failure_wait=16
+fault.fs.zfs.io_failure_continue=17

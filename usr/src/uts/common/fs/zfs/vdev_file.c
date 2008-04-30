@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,7 +133,7 @@ static int
 vdev_file_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
     enum uio_rw rw)
 {
-	vdev_file_t *vf = vd->vdev_tsd;
+	vdev_file_t *vf = vd ? vd->vdev_tsd : NULL;
 	ssize_t resid;
 	int error = 0;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,9 @@ static char *zfs_msgid_table[] = {
 	"ZFS-8000-8A",
 	"ZFS-8000-9P",
 	"ZFS-8000-A5",
-	"ZFS-8000-EY"
+	"ZFS-8000-EY",
+	"ZFS-8000-HC",
+	"ZFS-8000-JQ"
 };
 
 #define	NMSGID	(sizeof (zfs_msgid_table) / sizeof (zfs_msgid_table[0]))
@@ -161,7 +163,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
  * only picks the most damaging of all the current errors to report.
  */
 static zpool_status_t
-check_status(nvlist_t *config, boolean_t isimport)
+check_status(zpool_handle_t *zhp, nvlist_t *config, boolean_t isimport)
 {
 	nvlist_t *nvroot;
 	vdev_stat_t *vs;
@@ -201,6 +203,44 @@ check_status(nvlist_t *config, boolean_t isimport)
 	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
 	    vs->vs_aux == VDEV_AUX_BAD_GUID_SUM)
 		return (ZPOOL_STATUS_BAD_GUID_SUM);
+
+	/*
+	 * Pool has experienced failed I/O.
+	 */
+	if (stateval == POOL_STATE_IO_FAILURE) {
+		zpool_handle_t *tmp_zhp = NULL;
+		libzfs_handle_t *hdl = NULL;
+		char property[ZPOOL_MAXPROPLEN];
+		char *failmode = NULL;
+
+		if (zhp == NULL) {
+			char *poolname;
+
+			verify(nvlist_lookup_string(config,
+			    ZPOOL_CONFIG_POOL_NAME, &poolname) == 0);
+			if ((hdl = libzfs_init()) == NULL)
+				return (ZPOOL_STATUS_IO_FAILURE_WAIT);
+			tmp_zhp = zpool_open_canfail(hdl, poolname);
+			if (tmp_zhp == NULL) {
+				libzfs_fini(hdl);
+				return (ZPOOL_STATUS_IO_FAILURE_WAIT);
+			}
+		}
+		if (zpool_get_prop(zhp ? zhp : tmp_zhp, ZPOOL_PROP_FAILUREMODE,
+		    property, sizeof (property), NULL) == 0)
+			failmode = property;
+		if (tmp_zhp != NULL)
+			zpool_close(tmp_zhp);
+		if (hdl != NULL)
+			libzfs_fini(hdl);
+		if (failmode == NULL)
+			return (ZPOOL_STATUS_IO_FAILURE_WAIT);
+
+		if (strncmp(failmode, "continue", strlen("continue")) == 0)
+			return (ZPOOL_STATUS_IO_FAILURE_CONTINUE);
+		else
+			return (ZPOOL_STATUS_IO_FAILURE_WAIT);
+	}
 
 	/*
 	 * Bad devices in non-replicated config.
@@ -273,7 +313,7 @@ check_status(nvlist_t *config, boolean_t isimport)
 zpool_status_t
 zpool_get_status(zpool_handle_t *zhp, char **msgid)
 {
-	zpool_status_t ret = check_status(zhp->zpool_config, B_FALSE);
+	zpool_status_t ret = check_status(zhp, zhp->zpool_config, B_FALSE);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;
@@ -286,7 +326,7 @@ zpool_get_status(zpool_handle_t *zhp, char **msgid)
 zpool_status_t
 zpool_import_status(nvlist_t *config, char **msgid)
 {
-	zpool_status_t ret = check_status(config, B_TRUE);
+	zpool_status_t ret = check_status(NULL, config, B_TRUE);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;

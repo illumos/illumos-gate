@@ -300,7 +300,7 @@ vdev_disk_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
     int flags)
 {
 	int error = 0;
-	vdev_disk_t *dvd = vd->vdev_tsd;
+	vdev_disk_t *dvd = vd ? vd->vdev_tsd : NULL;
 
 	if (vd == NULL || dvd == NULL || dvd->vd_lh == NULL)
 		return (EINVAL);

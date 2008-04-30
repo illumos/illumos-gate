@@ -2776,6 +2776,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 			(void) printf(gettext("too many errors"));
 			break;
 
+		case VDEV_AUX_IO_FAILURE:
+			(void) printf(gettext("experienced I/O failures"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;
@@ -3056,6 +3060,14 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "from a backup source.  Manually marking the device\n"
 		    "\trepaired using 'zpool clear' may allow some data "
 		    "to be recovered.\n"));
+		break;
+
+	case ZPOOL_STATUS_IO_FAILURE_WAIT:
+	case ZPOOL_STATUS_IO_FAILURE_CONTINUE:
+		(void) printf(gettext("status: One or more devices are "
+		    "faultd in response to IO failures.\n"));
+		(void) printf(gettext("action: Make sure the affected devices "
+		    "are connected, then run 'zpool clear'.\n"));
 		break;
 
 	default:

@@ -253,6 +253,8 @@ typedef enum {
 	ZPOOL_STATUS_FAILING_DEV,	/* device experiencing errors */
 	ZPOOL_STATUS_VERSION_NEWER,	/* newer on-disk version */
 	ZPOOL_STATUS_HOSTID_MISMATCH,	/* last accessed by another system */
+	ZPOOL_STATUS_IO_FAILURE_WAIT,	/* failed I/O, failmode 'wait' */
+	ZPOOL_STATUS_IO_FAILURE_CONTINUE, /* failed I/O, failmode 'continue' */
 	ZPOOL_STATUS_FAULTED_DEV_R,	/* faulted device with replicas */
 	ZPOOL_STATUS_FAULTED_DEV_NR,	/* faulted device with no replicas */
 

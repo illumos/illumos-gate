@@ -390,7 +390,8 @@ typedef enum vdev_aux {
 	VDEV_AUX_VERSION_NEWER,	/* on-disk version is too new		*/
 	VDEV_AUX_VERSION_OLDER,	/* on-disk version is too old		*/
 	VDEV_AUX_SPARED,	/* hot spare used in another pool	*/
-	VDEV_AUX_ERR_EXCEEDED	/* too many errors			*/
+	VDEV_AUX_ERR_EXCEEDED,	/* too many errors			*/
+	VDEV_AUX_IO_FAILURE	/* experienced I/O failure		*/
 } vdev_aux_t;
 
 /*

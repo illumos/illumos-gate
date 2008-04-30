@@ -248,6 +248,8 @@ struct zio {
 
 	/* Stuff for the vdev stack */
 	vdev_t		*io_vd;
+	vdev_t		**io_failed_vds;
+	uint64_t	io_failed_vds_count;
 	void		*io_vsd;
 	uint64_t	io_offset;
 	uint64_t	io_deadline;

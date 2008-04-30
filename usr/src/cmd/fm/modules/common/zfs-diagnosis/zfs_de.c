@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -531,6 +531,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		 */
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.device",  B_TRUE);
 	} else {
+		char *failmode = NULL;
+
 		if (pool_state == SPA_LOAD_OPEN) {
 			/*
 			 * Error incurred during a pool open.  Reset the timer
@@ -576,6 +578,20 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 				zfs_case_serialize(hdl, zcp);
 			}
 			serd = zcp->zc_data.zc_serd_checksum;
+		} else if (fmd_nvl_class_match(hdl, nvl,
+		    "ereport.fs.zfs.io_failure") && (nvlist_lookup_string(nvl,
+		    FM_EREPORT_PAYLOAD_ZFS_POOL_FAILMODE, &failmode) == 0) &&
+		    failmode != NULL) {
+			if (strncmp(failmode, FM_EREPORT_FAILMODE_CONTINUE,
+			    strlen(FM_EREPORT_FAILMODE_CONTINUE)) == 0) {
+				zfs_case_solve(hdl, zcp,
+				    "fault.fs.zfs.io_failure_continue",
+				    B_FALSE);
+			} else if (strncmp(failmode, FM_EREPORT_FAILMODE_WAIT,
+			    strlen(FM_EREPORT_FAILMODE_WAIT)) == 0) {
+				zfs_case_solve(hdl, zcp,
+				    "fault.fs.zfs.io_failure_wait", B_FALSE);
+			}
 		}
 
 		/*

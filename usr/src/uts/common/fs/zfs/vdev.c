@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1778,7 +1778,14 @@ vdev_writeable(vdev_t *vd)
 int
 vdev_is_dead(vdev_t *vd)
 {
-	return (vd->vdev_state < VDEV_STATE_DEGRADED);
+	/*
+	 * If the vdev experienced I/O failures, then the vdev is marked
+	 * as faulted (VDEV_STATE_FAULTED) for status output and FMA; however,
+	 * we need to allow access to the vdev for resumed I/Os (see
+	 * zio_vdev_resume_io() ).
+	 */
+	return (vd->vdev_state < VDEV_STATE_DEGRADED &&
+	    vd->vdev_stat.vs_aux != VDEV_AUX_IO_FAILURE);
 }
 
 int
@@ -2044,6 +2051,9 @@ vdev_config_clean(vdev_t *vd)
 	list_remove(&spa->spa_dirty_list, vd);
 }
 
+/*
+ * Propagate vdev state up from children to parent.
+ */
 void
 vdev_propagate_state(vdev_t *vd)
 {
@@ -2057,6 +2067,8 @@ vdev_propagate_state(vdev_t *vd)
 		for (c = 0; c < vd->vdev_children; c++) {
 			child = vd->vdev_child[c];
 			if (vdev_is_dead(child) && !vdev_readable(child))
+				faulted++;
+			else if (child->vdev_stat.vs_aux == VDEV_AUX_IO_FAILURE)
 				faulted++;
 			else if (child->vdev_state <= VDEV_STATE_DEGRADED)
 				degraded++;
