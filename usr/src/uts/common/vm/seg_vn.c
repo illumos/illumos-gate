@@ -5991,7 +5991,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			    svd->amp == NULL && addr == seg->s_base &&
 			    len == seg->s_size && svd->pageprot == 0) {
 				ASSERT(svd->pageswap == 0);
-			    	anon_unresv_zone(svd->swresv,
+				anon_unresv_zone(svd->swresv,
 				    seg->s_as->a_proc->p_zone);
 				svd->swresv = 0;
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
