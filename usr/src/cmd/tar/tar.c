@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -418,21 +418,21 @@ struct linkbuf {
 
 /* see comments before build_table() */
 #define	TABLE_SIZE 512
-struct	file_list	{
+typedef struct	file_list	{
 	char	*name;			/* Name of file to {in,ex}clude */
 	struct	file_list	*next;	/* Linked list */
-};
-static	struct	file_list	*exclude_tbl[TABLE_SIZE],
-				*include_tbl[TABLE_SIZE];
+} file_list_t;
+static	file_list_t	*exclude_tbl[TABLE_SIZE],
+			*include_tbl[TABLE_SIZE];
 
 static int	append_secattr(char **, int *, int, char *, char);
 static void	write_ancillary(union hblock *, char *, int, char);
 
-static void add_file_to_table(struct file_list *table[], char *str);
+static void add_file_to_table(file_list_t *table[], char *str);
 static void assert_string(char *s, char *msg);
 static int istape(int fd, int type);
 static void backtape(void);
-static void build_table(struct file_list *table[], char *file);
+static void build_table(file_list_t *table[], char *file);
 static int check_prefix(char **namep, char **dirp, char **compp);
 static void closevol(void);
 static void copy(void *dst, void *src);
@@ -484,7 +484,7 @@ static int checkw(char c, char *name);
 static int cmp(char *b, char *s, int n);
 static int defset(char *arch);
 static int endtape(void);
-static int is_in_table(struct file_list *table[], char *str);
+static int is_in_table(file_list_t *table[], char *str);
 static int notsame(void);
 static int is_prefix(char *s1, char *s2);
 static int response(void);
@@ -1672,6 +1672,21 @@ verify_attr(char *attrname, char *attrparent, int arc_rwsysattr,
 }
 #endif
 
+static void
+free_children(file_list_t *children)
+{
+	file_list_t	*child = children;
+	file_list_t	*cptr;
+
+	while (child != NULL) {
+		cptr = child->next;
+		if (child->name != NULL) {
+			free(child->name);
+		}
+		child = cptr;
+	}
+}
+
 static int
 putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
     int filetype, int lev, int symlink_lev)
@@ -1687,10 +1702,12 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 	char *name;
 	char *attrparent = NULL;
 	char *longattrname = NULL;
+	file_list_t	*child = NULL;
+	file_list_t	*child_end = NULL;
+	file_list_t	*cptr;
 	struct dirent *dp;
 	DIR *dirp;
 	int i;
-	long l;
 	int split;
 	int dirfd = -1;
 	int rc = PUT_NOTAS_LINK;
@@ -2047,18 +2064,42 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 			goto out;
 		}
 
+		/*
+		 * Create a list of files (children) in this directory to avoid
+		 * having to perform telldir()/seekdir().
+		 */
 		while ((dp = readdir(dirp)) != NULL && !term) {
 			if ((strcmp(".", dp->d_name) == 0) ||
 			    (strcmp("..", dp->d_name) == 0))
 				continue;
-			(void) strcpy(cp, dp->d_name);
-			if (stat(dp->d_name, &sbuf) < 0 ||
-			    (sbuf.st_mode & S_IFMT) == S_IFDIR) {
-				l = telldir(dirp);
-				(void) closedir(dirp);
-			} else
-				l = -1;
+			if (((cptr = (file_list_t *)calloc(sizeof (char),
+			    sizeof (file_list_t))) == NULL) ||
+			    ((cptr->name = strdup(dp->d_name)) == NULL)) {
+				vperror(1, gettext(
+				    "Insufficient memory for directory "
+				    "list entry %s/%s\n"),
+				    newparent, dp->d_name);
+			}
 
+			/* Add the file to the list */
+			if (child == NULL) {
+				child = cptr;
+			} else {
+				child_end->next = cptr;
+			}
+			child_end = cptr;
+		}
+		(void) closedir(dirp);
+
+		/*
+		 * Archive each of the files in the current directory.
+		 * If a file is a directory, putfile() is called
+		 * recursively to archive the file hierarchy of the
+		 * directory before archiving the next file in the
+		 * current directory.
+		 */
+		while ((child != NULL) && !term) {
+			(void) strcpy(cp, child->name);
 			archtype = putfile(buf, cp, newparent, NULL,
 			    NORMAL_FILE, lev + 1, symlink_lev);
 
@@ -2071,25 +2112,15 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 			if (exitflag)
 				break;
 
-			/*
-			 * If the directory was not closed, then it does
-			 * not need to be reopened.
-			 */
-			if (l < 0)
-				continue;
-			if ((dirp = opendir(".")) == NULL) {
-				vperror(0, gettext(
-				    "can't open directory %s"), longname);
-				if (chdir(parent) < 0)
-					vperror(0,
-					    gettext("cannot change back?: %s"),
-					    parent);
-				goto out;
-			}
-			seekdir(dirp, l);
-
+			/* Free each child as we are done processing it. */
+			cptr = child;
+			child = child->next;
+			free(cptr->name);
+			free(cptr);
 		}
-		(void) closedir(dirp);
+		if ((child != NULL) && !term) {
+			free_children(child);
+		}
 
 		if (chdir(parent) < 0) {
 			vperror(0, gettext("cannot change back?: %s"), parent);
@@ -5482,7 +5513,7 @@ defset(char *arch)
  */
 
 static void
-build_table(struct file_list *table[], char *file)
+build_table(file_list_t *table[], char *file)
 {
 	FILE	*fp;
 	char	buf[PATH_MAX + 1];
@@ -5506,11 +5537,11 @@ build_table(struct file_list *table[], char *file)
  */
 
 static void
-add_file_to_table(struct file_list *table[], char *str)
+add_file_to_table(file_list_t *table[], char *str)
 {
 	char	name[PATH_MAX + 1];
 	unsigned int h;
-	struct	file_list	*exp;
+	file_list_t	*exp;
 
 	(void) strcpy(name, str);
 	while (name[strlen(name) - 1] == '/') {
@@ -5518,7 +5549,7 @@ add_file_to_table(struct file_list *table[], char *str)
 	}
 
 	h = hash(name);
-	if ((exp = (struct file_list *)calloc(sizeof (struct file_list),
+	if ((exp = (file_list_t *)calloc(sizeof (file_list_t),
 	    sizeof (char))) == NULL) {
 		(void) fprintf(stderr, gettext(
 		    "tar: out of memory, exclude/include table(entry)\n"));
@@ -5543,11 +5574,11 @@ add_file_to_table(struct file_list *table[], char *str)
  */
 
 static int
-is_in_table(struct file_list *table[], char *str)
+is_in_table(file_list_t *table[], char *str)
 {
 	char	name[PATH_MAX + 1];
 	unsigned int	h;
-	struct	file_list	*exp;
+	file_list_t	*exp;
 	char	*ptr;
 
 	(void) strcpy(name, str);
