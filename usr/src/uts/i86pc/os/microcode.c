@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,9 +85,9 @@ static void ucode_update_intel(uint8_t *, struct cpu_ucode_info *);
 static void ucode_read_rev(struct cpu_ucode_info *);
 
 static const char ucode_failure_fmt[] =
-	"cpu%d: failed to update microcode code from version 0x%x to 0x%x\n";
+	"cpu%d: failed to update microcode from version 0x%x to 0x%x\n";
 static const char ucode_success_fmt[] =
-	"?cpu%d: microcode code has been updated from version 0x%x to 0x%x\n";
+	"?cpu%d: microcode has been updated from version 0x%x to 0x%x\n";
 
 /*
  * Force flag.  If set, the first microcode binary that matches
