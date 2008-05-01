@@ -99,6 +99,10 @@ typedef struct ad_host {
 	/* hardwired to SASL GSSAPI only for now */
 	char			*saslmech;
 	unsigned		saslflags;
+
+	/* Number of outstanding search requests */
+	uint32_t		max_requests;
+	uint32_t		num_requests;
 } ad_host_t;
 
 /* A set of DSs for a given AD partition; ad_t typedef comes from  adutil.h */
@@ -138,6 +142,11 @@ typedef struct idmap_q {
 
 	/* lookup state */
 	int			msgid;		/* LDAP message ID */
+	/*
+	 * The LDAP search entry result is placed here to be processed
+	 * when the search done result is received.
+	 */
+	LDAPMessage		*search_res;	/* The LDAP search result */
 } idmap_q_t;
 
 /* Batch context structure; typedef is in header file */
@@ -469,6 +478,7 @@ idmap_open_conn(ad_host_t *adh, int timeoutsecs)
 		(void) ldap_unbind(adh->ld);
 		adh->ld = NULL;
 	}
+	adh->num_requests = 0;
 
 	atomic_inc_64(&adh->generation);
 
@@ -645,6 +655,8 @@ idmap_add_ds(ad_t *ad, const char *host, int port)
 	new->owner = ad;
 	new->port = port;
 	new->dead = 0;
+	new->max_requests = 80;
+	new->num_requests = 0;
 	if ((new->host = strdup(host)) == NULL)
 		goto err;
 
@@ -1049,8 +1061,9 @@ int
 idmap_msgid2query(ad_host_t *adh, int msgid,
 	idmap_query_state_t **state, int *qid)
 {
-	idmap_query_state_t *p;
-	int		    i;
+	idmap_query_state_t	*p;
+	int			i;
+	int			ret;
 
 	(void) pthread_mutex_lock(&qstatelock);
 	for (p = qstatehead; p != NULL; p = p->next) {
@@ -1058,17 +1071,61 @@ idmap_msgid2query(ad_host_t *adh, int msgid,
 			continue;
 		for (i = 0; i < p->qcount; i++) {
 			if ((p->queries[i]).msgid == msgid) {
-				p->ref_cnt++;
-				*state = p;
-				*qid = i;
+				if (!p->qdead) {
+					p->ref_cnt++;
+					*state = p;
+					*qid = i;
+					ret = 1;
+				} else
+					ret = 0;
 				(void) pthread_mutex_unlock(&qstatelock);
-				return (1);
+				return (ret);
 			}
 		}
 	}
 	(void) pthread_mutex_unlock(&qstatelock);
 	return (0);
 }
+
+/*
+ * Put the the search result onto the correct idmap_q_t given the LDAP result
+ * msgid
+ * Returns:	0 success
+ *		-1 already has a search result
+ *		-2 cant find message id
+ */
+static
+int
+idmap_quesearchresbymsgid(ad_host_t *adh, int msgid, LDAPMessage *search_res)
+{
+	idmap_query_state_t	*p;
+	int			i;
+	int			res;
+
+	(void) pthread_mutex_lock(&qstatelock);
+	for (p = qstatehead; p != NULL; p = p->next) {
+		if (p->qadh != adh || adh->generation != p->qadh_gen)
+			continue;
+		for (i = 0; i < p->qcount; i++) {
+			if ((p->queries[i]).msgid == msgid) {
+				if (p->queries[i].search_res == NULL) {
+					if (!p->qdead) {
+						p->queries[i].search_res =
+						    search_res;
+						res = 0;
+					} else
+						res = -2;
+				} else
+					res = -1;
+				(void) pthread_mutex_unlock(&qstatelock);
+				return (res);
+			}
+		}
+	}
+	(void) pthread_mutex_unlock(&qstatelock);
+	return (-2);
+}
+
 
 /*
  * Take parsed attribute values from a search result entry and check if
@@ -1263,6 +1320,7 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 	int			sid_type = _IDMAP_T_UNDEF;
 	int			has_class, has_san, has_sid;
 	int			has_unixuser, has_unixgroup;
+	int			num;
 
 	adh = state->qadh;
 
@@ -1272,9 +1330,12 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 
 	assert(q->rc != NULL);
 
-	if (*q->rc == IDMAP_SUCCESS || adh->dead ||
-	    (dn = ldap_get_dn(adh->ld, res)) == NULL) {
+	if (adh->dead || (dn = ldap_get_dn(adh->ld, res)) == NULL) {
+		num = adh->num_requests;
 		(void) pthread_mutex_unlock(&adh->lock);
+		idmapdlog(LOG_DEBUG,
+		    "AD error decoding search result - %d queued requests",
+		    num);
 		return;
 	}
 
@@ -1387,6 +1448,8 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 		}
 	}
 
+	(void) pthread_mutex_unlock(&adh->lock);
+
 	if (!has_class) {
 		/*
 		 * Didn't find objectclass. Something's wrong with our
@@ -1409,8 +1472,6 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 		    (unixuser != NULL) ? unixuser : unixgroup);
 	}
 
-	(void) pthread_mutex_unlock(&adh->lock);
-
 	if (ber != NULL)
 		ber_free(ber, 0);
 
@@ -1420,6 +1481,10 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 /*
  * Try to get a result; if there is one, find the corresponding
  * idmap_q_t and process the result.
+ *
+ * Returns:	0 success
+ *		-1 error
+ *		-2 queue empty
  */
 static
 int
@@ -1428,11 +1493,17 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 	idmap_query_state_t	*query_state;
 	LDAPMessage		*res = NULL;
 	int			rc, ret, msgid, qid;
+	idmap_q_t		*que;
+	int			num;
 
 	(void) pthread_mutex_lock(&adh->lock);
-	if (adh->dead) {
+	if (adh->dead || adh->num_requests == 0) {
+		if (adh->dead)
+			ret = -1;
+		else
+			ret = -2;
 		(void) pthread_mutex_unlock(&adh->lock);
-		return (-1);
+		return (ret);
 	}
 
 	/* Get one result */
@@ -1441,28 +1512,45 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 	if ((timeout != NULL && timeout->tv_sec > 0 && rc == LDAP_SUCCESS) ||
 	    rc < 0)
 		adh->dead = 1;
-	(void) pthread_mutex_unlock(&adh->lock);
 
-	if (adh->dead)
+	if (rc == LDAP_RES_SEARCH_RESULT && adh->num_requests > 0)
+		adh->num_requests--;
+
+	if (adh->dead) {
+		num = adh->num_requests;
+		(void) pthread_mutex_unlock(&adh->lock);
+		idmapdlog(LOG_DEBUG,
+		    "AD ldap_result error - %d queued requests", num);
 		return (-1);
-
+	}
 	switch (rc) {
 	case LDAP_RES_SEARCH_RESULT:
-		/* We have all the LDAP replies for some search... */
+		/* We should have the LDAP replies for some search... */
 		msgid = ldap_msgid(res);
-		if (idmap_msgid2query(adh, msgid,
-		    &query_state, &qid)) {
+		if (idmap_msgid2query(adh, msgid, &query_state, &qid)) {
+			(void) pthread_mutex_unlock(&adh->lock);
+			que = &(query_state->queries[qid]);
+			if (que->search_res != NULL) {
+				idmap_extract_object(query_state, qid,
+				    que->search_res);
+				(void) ldap_msgfree(que->search_res);
+				que->search_res = NULL;
+			} else
+				*que->rc = IDMAP_ERR_NOTFOUND;
 			/* ...so we can decrement qinflight */
 			atomic_dec_32(&query_state->qinflight);
-			/* We've seen all the result entries we'll see */
-			if (*query_state->queries[qid].rc != IDMAP_SUCCESS)
-				*query_state->queries[qid].rc =
-				    IDMAP_ERR_NOTFOUND;
 			idmap_lookup_unlock_batch(&query_state);
+		} else {
+			num = adh->num_requests;
+			(void) pthread_mutex_unlock(&adh->lock);
+			idmapdlog(LOG_DEBUG,
+			    "AD cannot find message ID  - %d queued requests",
+			    num);
 		}
 		(void) ldap_msgfree(res);
 		ret = 0;
 		break;
+
 	case LDAP_RES_SEARCH_REFERENCE:
 		/*
 		 * We have no need for these at the moment.  Eventually,
@@ -1470,23 +1558,34 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 		 * the Global Catalog then we'll need to learn to follow
 		 * references.
 		 */
+		(void) pthread_mutex_unlock(&adh->lock);
 		(void) ldap_msgfree(res);
 		ret = 0;
 		break;
+
 	case LDAP_RES_SEARCH_ENTRY:
-		/* Got a result */
+		/* Got a result - queue it */
 		msgid = ldap_msgid(res);
-		if (idmap_msgid2query(adh, msgid,
-		    &query_state, &qid)) {
-			idmap_extract_object(query_state, qid, res);
-			/* we saw at least one result */
-			idmap_lookup_unlock_batch(&query_state);
+		rc = idmap_quesearchresbymsgid(adh, msgid, res);
+		num = adh->num_requests;
+		(void) pthread_mutex_unlock(&adh->lock);
+		if (rc == -1) {
+			idmapdlog(LOG_DEBUG,
+			    "AD already has search result - %d queued requests",
+			    num);
+			(void) ldap_msgfree(res);
+		} else if (rc == -2) {
+			idmapdlog(LOG_DEBUG,
+			    "AD cannot queue by message ID  "
+			    "- %d queued requests", num);
+			(void) ldap_msgfree(res);
 		}
-		(void) ldap_msgfree(res);
 		ret = 0;
 		break;
+
 	default:
 		/* timeout or error; treat the same */
+		(void) pthread_mutex_unlock(&adh->lock);
 		ret = -1;
 		break;
 	}
@@ -1509,7 +1608,7 @@ idmap_lookup_unlock_batch(idmap_query_state_t **state)
 	/*
 	 * If there are no references wakup the allocating thread
 	 */
-	if ((*state)->ref_cnt == 0)
+	if ((*state)->ref_cnt <= 1)
 		(void) pthread_cond_signal(&(*state)->cv);
 	(void) pthread_mutex_unlock(&qstatelock);
 	*state = NULL;
@@ -1542,12 +1641,13 @@ idmap_lookup_release_batch(idmap_query_state_t **state)
 	idmap_query_state_t **p;
 
 	/*
-	 * Decrement reference count with qstatelock locked
-	 * and wait for reference count to get to zero
+	 * Set state to dead to stop further operations.
+	 * Wait for reference count with qstatelock locked
+	 * to get to one.
 	 */
 	(void) pthread_mutex_lock(&qstatelock);
-	(*state)->ref_cnt--;
-	while ((*state)->ref_cnt > 0) {
+	(*state)->qdead = 1;
+	while ((*state)->ref_cnt > 1) {
 		(void) pthread_cond_wait(&(*state)->cv, &qstatelock);
 	}
 
@@ -1558,10 +1658,9 @@ idmap_lookup_release_batch(idmap_query_state_t **state)
 			break;
 		}
 	}
+	(void) pthread_mutex_unlock(&qstatelock);
 
 	idmap_cleanup_batch(*state);
-
-	(void) pthread_mutex_unlock(&qstatelock);
 
 	(void) pthread_cond_destroy(&(*state)->cv);
 
@@ -1571,6 +1670,32 @@ idmap_lookup_release_batch(idmap_query_state_t **state)
 	*state = NULL;
 }
 
+
+/*
+ * This routine waits for other threads using the
+ * idmap_query_state_t structure to finish.
+ * If the reference count is greater than 1 it waits
+ * for the other threads to finish using it.
+ */
+static
+void
+idmap_lookup_wait_batch(idmap_query_state_t *state)
+{
+	/*
+	 * Set state to dead to stop further operation.
+	 * stating.
+	 * Wait for reference count to get to one
+	 * with qstatelock locked.
+	 */
+	(void) pthread_mutex_lock(&qstatelock);
+	state->qdead = 1;
+	while (state->ref_cnt > 1) {
+		(void) pthread_cond_wait(&state->cv, &qstatelock);
+	}
+	(void) pthread_mutex_unlock(&qstatelock);
+}
+
+
 idmap_retcode
 idmap_lookup_batch_end(idmap_query_state_t **state)
 {
@@ -1578,7 +1703,6 @@ idmap_lookup_batch_end(idmap_query_state_t **state)
 	idmap_retcode	    retcode = IDMAP_SUCCESS;
 	struct timeval	    timeout;
 
-	(*state)->qdead = 1;
 	timeout.tv_sec = IDMAPD_SEARCH_TIMEOUT;
 	timeout.tv_usec = 0;
 
@@ -1588,8 +1712,11 @@ idmap_lookup_batch_end(idmap_query_state_t **state)
 		    &timeout)) != 0)
 			break;
 	}
+	(*state)->qdead = 1;
+	/* Wait for other threads proceesing search result to finish */
+	idmap_lookup_wait_batch(*state);
 
-	if (rc != 0)
+	if (rc == -1 || (*state)->qinflight != 0)
 		retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
 
 	idmap_lookup_release_batch(state);
@@ -1612,6 +1739,8 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 {
 	idmap_retcode	retcode = IDMAP_SUCCESS;
 	int		lrc, qid, i;
+	int		num;
+	int		dead;
 	struct timeval	tv;
 	idmap_q_t	*q;
 	static char	*attrs[] = {
@@ -1687,7 +1816,17 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 	if (value != NULL)
 		*value = NULL;
 
+	/* Check the number of queued requests first */
+	tv.tv_sec = IDMAPD_SEARCH_TIMEOUT;
+	tv.tv_usec = 0;
+	while (!state->qadh->dead &&
+	    state->qadh->num_requests > state->qadh->max_requests) {
+		if (idmap_get_adobject_batch(state->qadh, &tv) != 0)
+			break;
+	}
+
 	/* Send this lookup, don't wait for a result here */
+	lrc = LDAP_SUCCESS;
 	(void) pthread_mutex_lock(&state->qadh->lock);
 
 	if (!state->qadh->dead) {
@@ -1695,20 +1834,31 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 		lrc = ldap_search_ext(state->qadh->ld, "",
 		    LDAP_SCOPE_SUBTREE, filter, attrs, 0, NULL, NULL,
 		    NULL, -1, &q->msgid);
-		if (lrc == LDAP_BUSY || lrc == LDAP_UNAVAILABLE ||
+
+		if (lrc == LDAP_SUCCESS) {
+			state->qadh->num_requests++;
+		} else if (lrc == LDAP_BUSY || lrc == LDAP_UNAVAILABLE ||
 		    lrc == LDAP_CONNECT_ERROR || lrc == LDAP_SERVER_DOWN ||
 		    lrc == LDAP_UNWILLING_TO_PERFORM) {
 			retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
 			state->qadh->dead = 1;
-		} else if (lrc != LDAP_SUCCESS) {
+		} else {
 			retcode = IDMAP_ERR_OTHER;
 			state->qadh->dead = 1;
 		}
 	}
+	dead = state->qadh->dead;
+	num = state->qadh->num_requests;
 	(void) pthread_mutex_unlock(&state->qadh->lock);
 
-	if (state->qadh->dead)
+	if (dead) {
+		if (lrc != LDAP_SUCCESS)
+			idmapdlog(LOG_DEBUG,
+			    "AD ldap_search_ext error (%s) "
+			    "- %d queued requests",
+			    ldap_err2string(lrc), num);
 		return (retcode);
+	}
 
 	atomic_inc_32(&state->qinflight);
 

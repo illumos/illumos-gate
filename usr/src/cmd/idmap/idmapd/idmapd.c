@@ -55,6 +55,7 @@
 #include <sys/resource.h>
 #include <sys/sid.h>
 #include <sys/idmap.h>
+#include <pthread.h>
 
 static void	term_handler(int);
 static void	init_idmapd();
@@ -71,6 +72,73 @@ SVCXPRT *xprt = NULL;
 
 static int dfd = -1;		/* our door server fildes, for unregistration */
 static int degraded = 0;	/* whether the FMRI has been marked degraded */
+
+
+static uint32_t		num_threads = 0;
+static pthread_key_t	create_threads_key;
+static uint32_t		max_threads = 40;
+
+/*
+ * Server door thread start routine.
+ *
+ * Set a TSD value to the door thread. This enables the destructor to
+ * be called when this thread exits.
+ */
+/*ARGSUSED*/
+static void *
+idmapd_door_thread_start(void *arg)
+{
+	static void *value = 0;
+
+	/*
+	 * Disable cancellation to avoid memory leaks from not running
+	 * the thread cleanup code.
+	 */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	(void) pthread_setspecific(create_threads_key, value);
+	(void) door_return(NULL, 0, NULL, 0);
+
+	/* make lint happy */
+	return (NULL);
+}
+
+/*
+ * Server door threads creation
+ */
+/*ARGSUSED*/
+static void
+idmapd_door_thread_create(door_info_t *dip)
+{
+	int		num;
+	pthread_t	thread_id;
+
+	if ((num = atomic_inc_32_nv(&num_threads)) > max_threads) {
+		atomic_dec_32(&num_threads);
+		idmapdlog(LOG_DEBUG,
+		    "thread creation refused - %d threads currently active",
+		    num - 1);
+		return;
+	}
+	(void) pthread_create(&thread_id, NULL, idmapd_door_thread_start, NULL);
+	idmapdlog(LOG_DEBUG,
+	    "created thread ID %d - %d threads currently active",
+	    thread_id, num);
+}
+
+/*
+ * Server door thread cleanup
+ */
+/*ARGSUSED*/
+static void
+idmapd_door_thread_cleanup(void *arg)
+{
+	int num;
+
+	num = atomic_dec_32_nv(&num_threads);
+	idmapdlog(LOG_DEBUG,
+	    "exiting thread ID %d - %d threads currently active",
+	    pthread_self(), num);
+}
 
 /*
  * This is needed for mech_krb5 -- we run as daemon, yes, but we want
@@ -269,7 +337,8 @@ static void
 init_idmapd()
 {
 	int	error;
-	int connmaxrec = IDMAP_MAX_DOOR_RPC;
+	int	connmaxrec = IDMAP_MAX_DOOR_RPC;
+
 
 	/* create directories as root and chown to daemon uid */
 	if (create_directory(IDMAP_DBDIR, DAEMON_UID, DAEMON_GID) < 0)
@@ -296,6 +365,14 @@ init_idmapd()
 	if ((error = init_mapping_system()) < 0) {
 		idmapdlog(LOG_ERR, "unable to initialize mapping system");
 		exit(error < -2 ? SMF_EXIT_ERR_CONFIG : 1);
+	}
+
+	(void) door_server_create(idmapd_door_thread_create);
+	if ((error = pthread_key_create(&create_threads_key,
+	    idmapd_door_thread_cleanup)) != 0) {
+		idmapdlog(LOG_ERR, "unable to create threads key (%s)",
+		    strerror(error));
+		goto errout;
 	}
 
 	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, connmaxrec);
