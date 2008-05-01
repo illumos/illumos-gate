@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,12 +37,30 @@ nvlist_t *mb_nvl;
 nvlist_t *
 cmd_fault_add_location(fmd_hdl_t *hdl, nvlist_t *flt, const char *locstr) {
 
-	char *t;
+	char *t, *s;
 
 	if (nvlist_lookup_string(flt, FM_FAULT_LOCATION, &t) == 0)
 		return (flt); /* already has location value */
-	if (nvlist_add_string(flt, FM_FAULT_LOCATION, locstr) != 0)
+
+	/* Replace occurrence of ": " with "/" to avoid confusing ILOM. */
+	t = fmd_hdl_zalloc(hdl, strlen(locstr) + 1, FMD_SLEEP);
+	s = strstr(locstr, ": ");
+	if (s != NULL) {
+		(void) strncpy(t, locstr, s - locstr);
+		(void) strcat(t, "/");
+		(void) strcat(t, s + 2);
+	} else {
+		(void) strcpy(t, locstr);
+	}
+
+	/* Also, remove any J number from end of this string. */
+	s = strstr(t, "/J");
+	if (s != NULL)
+		*s = '\0';
+
+	if (nvlist_add_string(flt, FM_FAULT_LOCATION, t) != 0)
 		fmd_hdl_error(hdl, "unable to alloc location for fault\n");
+	fmd_hdl_free(hdl, t, strlen(locstr) + 1);
 	return (flt);
 }
 
