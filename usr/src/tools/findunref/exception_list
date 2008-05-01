@@ -150,6 +150,7 @@
 ./src/cmd/sendmail/libsm/t-*.c
 ./src/cmd/sort/common/convert.c
 ./src/cmd/sort/common/invoke.c
+./src/lib/crypt_modules/sha256/test.c
 ./src/lib/efcode/fcode_test
 ./src/lib/libkvm/common/test.c
 

@@ -22,14 +22,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-SUBDIRS = \
-	bsdmd5 \
-	bsdbf \
-	sunmd5 \
-	sha256 \
-	sha512
+include $(SRC)/lib/Makefile.lib
+
+SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -37,17 +36,17 @@ clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
 lint :=		TARGET= lint
-catalog :=	TARGET= catalog
-package :=	TARGET= package
-_msg :=		TARGET= _msg
+test :=		TARGET= test
 
 .KEEP_STATE:
 
-all lint clean clobber catalog package install _msg: $(SUBDIRS)
+all clean clobber delete install lint test: $(SUBDIRS)
 
-install: all
+_msg:
 
-$(SUBDIRS): FRC
+catalog:
+
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

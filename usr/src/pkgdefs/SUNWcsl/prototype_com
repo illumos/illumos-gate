@@ -311,6 +311,10 @@ f none usr/lib/security/crypt_bsdmd5.so.1 755 root bin
 s none usr/lib/security/crypt_bsdmd5.so=./crypt_bsdmd5.so.1
 f none usr/lib/security/crypt_bsdbf.so.1 755 root bin
 s none usr/lib/security/crypt_bsdbf.so=./crypt_bsdbf.so.1
+f none usr/lib/security/crypt_sha256.so.1 755 root bin
+s none usr/lib/security/crypt_sha256.so=./crypt_sha256.so.1
+f none usr/lib/security/crypt_sha512.so.1 755 root bin
+s none usr/lib/security/crypt_sha512.so=./crypt_sha512.so.1
 f none usr/lib/security/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/crypt_sunmd5.so=./crypt_sunmd5.so.1
 f none usr/lib/security/kmf_nss.so.1 755 root bin

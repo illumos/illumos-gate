@@ -18,36 +18,28 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = \
-	bsdmd5 \
-	bsdbf \
-	sunmd5 \
-	sha256 \
-	sha512
+LIBRARY=	crypt_sha256.a
+VERS= 		.1
+OBJECTS=	crypt_sha.o
 
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-catalog :=	TARGET= catalog
-package :=	TARGET= package
-_msg :=		TARGET= _msg
+include		../../Makefile.crypt_modules
 
-.KEEP_STATE:
+CPPFLAGS	+= -DCRYPT_SHA256
+LDLIBS 		+= -lc -lmd
 
-all lint clean clobber catalog package install _msg: $(SUBDIRS)
+all: $(LIBS)
 
-install: all
+lint: lintcheck
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+include $(SRC)/lib/Makefile.targ
 
-FRC:
+CLOBBERFILES += test test.o
+
+test: $(LIBS) ../test.c
+	$(LINK.c) -o test ../test.c -R. $(DYNLIB) $(LDFLAGS)
+	./test

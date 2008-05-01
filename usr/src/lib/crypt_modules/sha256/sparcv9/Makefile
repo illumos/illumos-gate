@@ -24,30 +24,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = \
-	bsdmd5 \
-	bsdbf \
-	sunmd5 \
-	sha256 \
-	sha512
+include ../Makefile.com
+include ../../../Makefile.lib.64
 
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-catalog :=	TARGET= catalog
-package :=	TARGET= package
-_msg :=		TARGET= _msg
-
-.KEEP_STATE:
-
-all lint clean clobber catalog package install _msg: $(SUBDIRS)
-
-install: all
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

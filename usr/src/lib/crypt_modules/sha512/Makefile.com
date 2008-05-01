@@ -24,30 +24,25 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = \
-	bsdmd5 \
-	bsdbf \
-	sunmd5 \
-	sha256 \
-	sha512
+LIBRARY=	crypt_sha512.a
+VERS= 		.1
+OBJECTS=	crypt_sha.o
 
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-catalog :=	TARGET= catalog
-package :=	TARGET= package
-_msg :=		TARGET= _msg
+include		../../Makefile.crypt_modules
 
-.KEEP_STATE:
+CPPFLAGS	+= -DCRYPT_SHA512
+LDLIBS 		+= -lc -lmd
 
-all lint clean clobber catalog package install _msg: $(SUBDIRS)
+SRCDIR = ../../sha256/
 
-install: all
+all: $(LIBS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+lint: lintcheck
 
-FRC:
+include $(SRC)/lib/Makefile.targ
+
+CLOBBERFILES +=	test test.o
+
+test: $(LIBS) $(SRCDIR)/test.c
+	$(LINK.c) -o test $(SRCDIR)/test.c -R. $(DYNLIB) $(LDFLAGS)
+	./test
