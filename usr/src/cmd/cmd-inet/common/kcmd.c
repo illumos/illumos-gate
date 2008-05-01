@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -457,56 +457,6 @@ strsave(char *sp)
 	return (ret);
 }
 
-/*
- * Decode, decrypt and store the forwarded creds in the local ccache.
- */
-krb5_error_code
-rd_and_store_for_creds(krb5_context context,
-		    krb5_auth_context auth_context,
-		    krb5_data *inbuf,
-		    krb5_ticket *ticket,
-		    char *lusername,
-		    krb5_ccache *ccache)
-{
-	krb5_creds ** creds;
-	krb5_error_code retval;
-	char ccname[64];
-	struct passwd *pwd;
-	uid_t uid;
-
-	*ccache = NULL;
-	if (!(pwd = (struct passwd *)getpwnam(lusername)))
-		return (ENOENT);
-
-	uid = getuid();
-	if (seteuid(pwd->pw_uid))
-		return (-1);
-
-	if ((retval =
-		krb5_rd_cred(context, auth_context, inbuf, &creds, NULL)) != 0)
-		return (retval);
-
-	(void) snprintf(ccname, sizeof (ccname),
-			"FILE:/tmp/krb5cc_%ld", pwd->pw_uid);
-
-	if ((retval = krb5_cc_resolve(context, ccname, ccache)) != 0)
-		goto cleanup;
-
-	if ((retval = krb5_cc_initialize(context, *ccache,
-					ticket->enc_part2->client)) != 0)
-		goto cleanup;
-
-	if ((retval = krb5_cc_store_cred(context, *ccache, *creds)) != 0)
-		goto cleanup;
-
-	if ((retval = krb5_cc_close(context, *ccache)) != 0)
-		goto cleanup;
-
-cleanup:
-	(void) seteuid(uid);
-	krb5_free_creds(context, *creds);
-	return (retval);
-}
 
 /*
  * This routine is to initialize the desinbuf, desoutbuf and the session key

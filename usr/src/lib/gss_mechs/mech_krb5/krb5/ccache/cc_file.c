@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,8 @@ etc.
    fcc_nseq.c and fcc_read don't check return values a lot.
  */
 #include "k5-int.h"
-#include <syslog.h>	/* SUNW */
+#include <syslog.h>	/* Solaris Kerberos */
+#include <ctype.h>
 
 #define NEED_SOCKETS    /* Only for ntohs, etc. */
 #define NEED_LOWLEVEL_IO
@@ -248,7 +249,7 @@ static krb5_error_code krb5_fcc_open_file
 #define	FCC_OPEN_AND_ERASE	1
 #define	FCC_OPEN_RDWR		2
 #define	FCC_OPEN_RDONLY		3
-#define	FCC_OPEN_AND_ERASE_NOUNLINK	255	/* SUNW */
+#define	FCC_OPEN_AND_ERASE_NOUNLINK	255	/* Solaris Kerberos */
 
 /* Credential file header tags.
  * The header tags are constructed as:
@@ -1215,7 +1216,7 @@ krb5_fcc_open_nounlink(char *filename, int open_flag, int *ret_fd, int *new)
 
      *ret_fd = -1;
      /*
-      * SUNW
+      * Solaris Kerberos
       * If we are opening in NOUNLINK mode, we have to check that the
       * existing file, if any, is not a symlink. If it is, we try to
       * delete and re-create it.
@@ -1267,14 +1268,14 @@ krb5_fcc_open_nounlink(char *filename, int open_flag, int *ret_fd, int *new)
 	  return (-1);
 
      /*
-      * SUNW
+      * Solaris Kerberos
       * If the file was not created now with a O_CREAT | O_EXCL open,
       * we have opened an existing file. We should check if the file
       * owner is us, if not, unlink and retry. If unlink fails we log
       * the error and return.
       */
      if (!newfile) {
-	  if (fstat(fd, &fres) == -1) {
+	    if (fstat(fd, &fres) == -1) {
 	       syslog(LOG_ERR, "lstat failed for %s [%m]", filename);
 	       close(fd);
 	       return (-1);
@@ -1288,29 +1289,42 @@ krb5_fcc_open_nounlink(char *filename, int open_flag, int *ret_fd, int *new)
 
 	  /*
 	   * Solaris Kerberos
-	   * Use krb5_getuid to select the mechanism to obtain the uid.
+	   * Check if the cc filename uid matches owner of file.
+	   * Expects cc file to be in the form of /tmp/krb5cc_<uid>,
+	   * else skip this check.
 	   */
-	  uid = krb5_getuid();
-	  euid = geteuid();
-	  /*
-	   * Some apps (gssd, via a priv version of getuid())
-	   * "set" the real uid only, others
-	   * (telnetd/login/pam_krb5, etc) set effective uid only.
-	   */
-	  if (fres.st_uid != uid && fres.st_uid != euid) {
-	       close(fd);
-	       syslog(LOG_WARNING,
-		    "%s owned by %d instead of %d (euid=%d, uid=%d)",
-		    filename, fres.st_uid, euid, euid, uid);
-	       syslog(LOG_WARNING, "trying to unlink %s", filename);
-	       if (unlink(filename) != 0) {
-		    syslog(LOG_ERR, "could not unlink %s [%m]", filename);
-		    return (-1);
-	       }
-	       return (0);
+	  if (strncmp(filename, "/tmp/krb5cc_", strlen("/tmp/krb5cc_")) == 0) {
+		uid_t fname_uid;
+		char *uidstr = strchr(filename, '_');
+		char *s = NULL;
+
+		/* make sure we have some non-null char after '_' */
+		if (!*++uidstr)
+			goto out;
+
+		/* make sure the uid part is all digits */
+		for (s = uidstr; *s; s++)
+			if (!isdigit(*s))
+				goto out;
+
+		fname_uid = (uid_t) atoi(uidstr);
+		if (fname_uid != fres.st_uid) {
+			close(fd);
+			syslog(LOG_WARNING,
+			    "%s owned by %d instead of %d",
+			    filename, fres.st_uid, fname_uid);
+			syslog(LOG_WARNING, "trying to unlink %s", filename);
+			if (unlink(filename) != 0) {
+				syslog(LOG_ERR,
+				    "could not unlink %s [%m]", filename);
+				return (-1);
+			}
+			return (0);
+		}
 	  }
      }
 
+out:
      *new = newfile;
      *ret_fd = fd;
      return (0);
@@ -1361,7 +1375,7 @@ krb5_fcc_open_file (krb5_context context, krb5_ccache id, int mode)
 
 fcc_retry:
     /*
-     * SUNW
+     * Solaris Kerberos
      * If we are opening in NOUNLINK mode, check whether we are opening a
      * symlink or a file owned by some other user and take preventive action.
      */
@@ -1387,7 +1401,7 @@ fcc_retry:
     if ((retval = krb5_lock_file(context, f, lock_flag))) {
        (void) close(f);
         if (retval == EAGAIN && retries++ < LOCK_RETRIES) {
-	    /* SUNW wait some time before retrying */
+	    /* Solaris Kerberos wait some time before retrying */
 	    if (poll(NULL, 0, WAIT_LENGTH) == 0)
 	        goto fcc_retry;
 	}
@@ -1399,7 +1413,7 @@ fcc_retry:
         int cnt;
 
 	/*
-	 * SUNW
+	 * Solaris Kerberos
 	 * If this file was not created, we have to flush existing data.
 	 * This will happen only if we are doing an ERASE_NOUNLINK open.
 	 */
@@ -1590,7 +1604,7 @@ krb5_fcc_initialize(krb5_context context, krb5_ccache id, krb5_principal princ)
      if (kret)
 	 return kret;
 
-     MAYBE_OPEN(context, id, FCC_OPEN_AND_ERASE_NOUNLINK); /* SUNW */
+     MAYBE_OPEN(context, id, FCC_OPEN_AND_ERASE_NOUNLINK); /* Solaris Kerberos */
 
      /*
       * SUN14resync

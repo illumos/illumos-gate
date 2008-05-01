@@ -193,9 +193,12 @@ PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
 
 SUPPORT_OBJS= fake-addrinfo.o threads.o errors.o plugins.o
 
+KWARN_OBJS= kwarnd_clnt_stubs.o kwarnd_clnt.o kwarnd_handle.o kwarnd_xdr.o
+
 OBJECTS= \
 	$(MECH) $(MECH_UTS) $(GSSAPI_UTS)\
 	$(SUPPORT_OBJS) \
+	$(KWARN_OBJS) \
 	$(PROFILE_OBJS) \
 	$(CRYPTO) $(CRYPTO_UTS) \
 	$(CRYPTO_CRC32) \
@@ -534,6 +537,29 @@ SOURCES= \
 	$(GSSAPI_UTS:%.o= $(SRC)/uts/common/gssapi/%.c) \
 	$(PROFILE_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/profile/%.c) \
 	$(SUPPORT_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/support/%.c)
+
+kwarnd.h:	$(SRC)/cmd/krb5/kwarn/kwarnd.x
+	$(RM) $@
+	$(RPCGEN) -M -h $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
+	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
+
+kwarnd_xdr.c:	kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
+	$(RM) $@
+	$(RPCGEN) -M -c $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
+	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
+
+kwarnd_clnt.c:   kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
+	$(RM) $@
+	$(RPCGEN) -M -l $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
+	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
+
+kwarnd_clnt_stubs.c: kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c
+	$(RM) $@
+	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c $@
+
+kwarnd_handle.c: $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c
+	$(RM) $@
+	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c $@
 
 # So lint.out won't be needlessly recreated
 lint: $(LINTOUT)

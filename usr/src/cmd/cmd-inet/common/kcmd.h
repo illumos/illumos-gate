@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,13 +101,6 @@ int kcmd(int *sock, char **ahost, ushort_t rport, char *locuser,
 	krb5_creds **cred, krb5_int32 *seqno, krb5_int32 *server_seqno,
 	krb5_flags authopts,
 	int anyport, enum kcmd_proto *kcmd_proto);
-
-krb5_error_code rd_and_store_for_creds(krb5_context context,
-				    krb5_auth_context auth_context,
-				    krb5_data *inbuf,
-				    krb5_ticket *ticket,
-				    char *lusername,
-				    krb5_ccache *ccache);
 
 void init_encrypt(int, krb5_context, enum kcmd_proto,
 			krb5_data *, krb5_data *,

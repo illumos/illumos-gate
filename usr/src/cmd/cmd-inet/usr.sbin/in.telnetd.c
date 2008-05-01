@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,9 +156,11 @@ static char	subbuffer[4096], *subpointer = subbuffer, *subend = subbuffer;
 #define	SB_EOF()	(subpointer >= subend)
 #define	SB_LEN()	(subend - subpointer)
 
-#define	MAXCCACHENAMELEN 36
 #define	MAXERRSTRLEN 1024
 #define	MAXPRINCLEN 256
+
+extern uint_t kwarn_add_warning(char *, int);
+extern uint_t kwarn_del_warning(char *);
 
 static boolean_t auth_debug = 0;
 static boolean_t negotiate_auth_krb5 = 1;
@@ -465,8 +467,9 @@ rd_and_store_forwarded_creds(krb5_context context,
 {
 	krb5_creds **creds;
 	krb5_error_code retval;
-	char ccname[MAXCCACHENAMELEN];
+	char ccname[MAXPATHLEN];
 	krb5_ccache ccache = NULL;
+	char *client_name = NULL;
 
 	if (retval = krb5_rd_cred(context, auth_context, inbuf, &creds, NULL))
 		return (retval);
@@ -486,6 +489,23 @@ rd_and_store_forwarded_creds(krb5_context context,
 
 	if ((retval = krb5_cc_close(context, ccache)) != 0)
 		goto cleanup;
+
+	/* Register with ktkt_warnd(1M) */
+	if ((retval = krb5_unparse_name(context, (*creds)->client,
+					&client_name)) != 0)
+		goto cleanup;
+	(void) kwarn_del_warning(client_name);
+	if (kwarn_add_warning(client_name, (*creds)->times.endtime) != 0) {
+		syslog(LOG_AUTH|LOG_NOTICE,
+		    "rd_and_store_forwarded_creds: kwarn_add_warning"
+		    " failed: ktkt_warnd(1M) down? ");
+		if (auth_debug)
+			(void) fprintf(stderr,
+				    "kwarn_add_warning failed:"
+				    " ktkt_warnd(1M) down?\n");
+	}
+	free(client_name);
+	client_name = NULL;
 
 	if (username != NULL) {
 		/*

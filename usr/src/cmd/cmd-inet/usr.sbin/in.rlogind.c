@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@
 #include <sys/cryptmod.h>
 #include <bsm/adt.h>
 #include <addr_match.h>
+#include <store_forw_creds.h>
 
 #define	KRB5_RECVAUTH_V5 5
 #define	UT_NAMESIZE	sizeof (((struct utmpx *)0)->ut_name)
@@ -605,14 +606,29 @@ recvauth(int f,
 					&inbuf)))
 		fatal(f, "Error reading krb5 message");
 
-	if ((inbuf.length) && /* Forwarding being done, read creds */
-	    (status = rd_and_store_for_creds(krb_context, auth_context,
-					    &inbuf, *ticket, lusername,
-					    &ccache))) {
-		if (rcache)
-		    (void) krb5_rc_close(krb_context, rcache);
-		fatal(f, "Can't get forwarded credentials");
+	if (inbuf.length) { /* Forwarding being done, read creds */
+		krb5_creds **creds = NULL;
+
+		if (status = krb5_rd_cred(krb_context, auth_context, &inbuf,
+					    &creds, NULL)) {
+			if (rcache)
+				(void) krb5_rc_close(krb_context, rcache);
+			krb5_free_creds(krb_context, *creds);
+			fatal(f, "Can't get forwarded credentials");
+		}
+
+		/* Store the forwarded creds in the ccache */
+		if (status = store_forw_creds(krb_context,
+					    creds, *ticket, lusername,
+					    &ccache)) {
+			if (rcache)
+				(void) krb5_rc_close(krb_context, rcache);
+			krb5_free_creds(krb_context, *creds);
+			fatal(f, "Can't store forwarded credentials");
+		}
+		krb5_free_creds(krb_context, *creds);
 	}
+
 	if (rcache)
 		(void) krb5_rc_close(krb_context, rcache);
 

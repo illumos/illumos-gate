@@ -1,5 +1,26 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -9,6 +30,10 @@
 #include <gssapiP_krb5.h>
 #include <memory.h>
 #include <assert.h>
+#include <syslog.h>
+
+extern uint_t kwarn_add_warning(char *, int);
+extern uint_t kwarn_del_warning(char *);
 
 static
 OM_uint32
@@ -108,6 +133,7 @@ gss_cred_usage_t *cred_usage_stored;
 	OM_uint32 cur_time_rec;			/* lifetime of current cred */
 	gss_cred_usage_t in_usage;		/* usage of input cred */
 	gss_name_t in_name = GSS_C_NO_NAME;	/* name of input cred */
+	char *client_name = NULL;
 
 	if (input_cred == GSS_C_NO_CREDENTIAL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
@@ -204,6 +230,19 @@ gss_cred_usage_t *cred_usage_stored;
 	maj = store_init_cred(ctx, minor_status, cred, default_cred);
 	if (GSS_ERROR(maj))
 		goto cleanup;
+
+	/* Alert ktkt_warnd(1M) */
+	maj = krb5_unparse_name(ctx, cred->princ, &client_name);
+	if (GSS_ERROR(maj))
+		goto cleanup;
+	(void) kwarn_del_warning(client_name);
+	if (kwarn_add_warning(client_name, cred->tgt_expire) != 0) {
+		syslog(LOG_AUTH|LOG_NOTICE,
+		    "store_cred: kwarn_add_warning"
+		    " failed: ktkt_warnd(1M) down? ");
+	}
+	free(client_name);
+	client_name = NULL;
 
 	/* Output parameters */
 	if (cred_usage_stored != NULL)

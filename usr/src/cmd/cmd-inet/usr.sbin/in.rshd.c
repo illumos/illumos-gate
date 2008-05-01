@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@
 #include <kcmd.h>
 
 #include <addr_match.h>
+#include <store_forw_creds.h>
 
 #ifndef NCARGS
 #define	NCARGS	5120
@@ -1630,16 +1631,28 @@ error_cleanup:
 	}
 
 	if (inbuf.length) {
+		krb5_creds **creds = NULL;
+
 		/* Forwarding being done, read creds */
-		if ((status = rd_and_store_for_creds(bsd_context,
-				auth_context, &inbuf, ticket, locuser,
-				&ccache))) {
+		if ((status = krb5_rd_cred(bsd_context,
+					    auth_context, &inbuf, &creds,
+					    NULL))) {
 			error("Can't get forwarded credentials: %s\n",
 				error_message(status));
 			exit(1);
 		}
 
+		/* Store the forwarded creds in the ccache */
+		if ((status = store_forw_creds(bsd_context,
+					    creds, ticket, locuser,
+					    &ccache))) {
+			error("Can't store forwarded credentials: %s\n",
+				error_message(status));
+			exit(1);
+		}
+		krb5_free_creds(bsd_context, *creds);
 	}
+
 	krb5_free_ticket(bsd_context, ticket);
 	return (0);
 }
