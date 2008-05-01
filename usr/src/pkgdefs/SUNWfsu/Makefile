@@ -32,7 +32,7 @@ FILES += prototype_sparc
 
 .KEEP_STATE:
 
-all: $(FILES)
+all: $(FILES) depend
 
 install: prototype_sparc all pkg
 

@@ -31,7 +31,6 @@
 # packaging files
 i pkginfo
 i copyright
-i preremove
 i depend
 
 d none usr 755 root sys
