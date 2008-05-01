@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,15 +256,14 @@ construct_symtab(dis_tgt_t *tgt)
 		die("%s: failed to get symbol table", tgt->dt_filename);
 
 	tgt->dt_symcount = symdata->d_size / gelf_fsize(tgt->dt_elf, ELF_T_SYM,
-		1, EV_CURRENT);
+	    1, EV_CURRENT);
 
 	p_symtab = safe_malloc(tgt->dt_symcount * sizeof (sym_entry_t));
 
 	for (i = 0, sym = p_symtab; i < tgt->dt_symcount; i++) {
-		(void) memset(sym, sizeof (sym_entry_t), 0);
 		if (gelf_getsym(symdata, i, &(sym->se_sym)) == NULL) {
 			warn("%s: gelf_getsym returned NULL for %d",
-				tgt->dt_filename, i);
+			    tgt->dt_filename, i);
 			nsym++;
 			continue;
 		}
@@ -280,7 +279,7 @@ construct_symtab(dis_tgt_t *tgt)
 		if (sym->se_sym.st_shndx == SHN_XINDEX && symshndx != NULL) {
 			if (i > symshndx_size) {
 				warn("%s: bad SHNX_XINDEX %d",
-					tgt->dt_filename, i);
+				    tgt->dt_filename, i);
 				sym->se_shndx = -1;
 			} else {
 				sym->se_shndx = symshndx[i];
@@ -292,7 +291,7 @@ construct_symtab(dis_tgt_t *tgt)
 		if ((sym->se_name = elf_strptr(tgt->dt_elf, shdr.sh_link,
 		    (size_t)sym->se_sym.st_name)) == NULL) {
 			warn("%s: failed to lookup symbol %d name",
-				tgt->dt_filename, i);
+			    tgt->dt_filename, i);
 			nsym++;
 			continue;
 		}
@@ -301,8 +300,8 @@ construct_symtab(dis_tgt_t *tgt)
 	}
 
 	tgt->dt_symcount -= nsym;
-	tgt->dt_symtab = realloc(p_symtab,
-				tgt->dt_symcount * sizeof (sym_entry_t));
+	tgt->dt_symtab = realloc(p_symtab, tgt->dt_symcount *
+	    sizeof (sym_entry_t));
 
 	qsort(tgt->dt_symtab, tgt->dt_symcount, sizeof (sym_entry_t),
 	    sym_compare);
@@ -328,7 +327,7 @@ dis_tgt_create(const char *file)
 
 	if ((tgt->dt_fd = open(file, O_RDONLY)) < 0) {
 		warn("%s: failed opening file, reason: %s", file,
-			strerror(errno));
+		    strerror(errno));
 		free(tgt);
 		return (NULL);
 	}
@@ -566,8 +565,8 @@ dis_tgt_lookup(dis_tgt_t *tgt, uint64_t addr, off_t *offset, int cache_result,
 
 		osym = osym - 1;
 	} while ((sym->se_sym.st_value == osym->se_sym.st_value) &&
-		(addr >= osym->se_sym.st_value) &&
-		(addr < osym->se_sym.st_value + osym->se_sym.st_size));
+	    (addr >= osym->se_sym.st_value) &&
+	    (addr < osym->se_sym.st_value + osym->se_sym.st_size));
 
 	if (cache_result)
 		tgt->dt_symcache = sym;
@@ -753,8 +752,8 @@ dis_tgt_function_iter(dis_tgt_t *tgt, function_iter_f func, void *data)
 		    (sym->se_sym.st_value + sym->se_sym.st_size) >
 		    (shdr.sh_addr + shdr.sh_size)) {
 			warn("%s: bad section %d for address %p",
-				tgt->dt_filename, sym->se_sym.st_shndx,
-				sym->se_sym.st_value);
+			    tgt->dt_filename, sym->se_sym.st_shndx,
+			    sym->se_sym.st_value);
 			continue;
 		}
 
