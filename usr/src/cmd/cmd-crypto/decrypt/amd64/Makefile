@@ -25,39 +25,8 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG= decrypt
-ROOTLINK= $(ROOTBIN)/encrypt
-DCFILE=$(PROG).dc
+include ../Makefile.com
+include ../../../Makefile.cmd.64
 
-include ../../Makefile.cmd
+install: all $(ROOTPROG64) $(ROOTLINK64)
 
-SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
-
-.KEEP_STATE:
-
-all clean clobber lint:	$(SUBDIRS)
-
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG) $(ROOTLINK)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTLINK)
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-$(DCFILE):
-	$(RM) messages.po
-	$(XGETTEXT) $(XGETFLAGS) -t $(PROG).c
-	$(SED) -e '/^domain/d' messages.po > $@
-	$(RM) messages.po
-
-FRC:
-
-include ../../Makefile.targ

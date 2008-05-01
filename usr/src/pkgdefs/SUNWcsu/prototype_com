@@ -93,7 +93,7 @@ f none usr/bin/ctwatch 555 root bin
 f none usr/bin/cut 555 root bin
 f none usr/bin/date 555 root bin
 f none usr/bin/dd 555 root bin
-f none usr/bin/decrypt 555 root bin
+l none usr/bin/decrypt=../../usr/lib/isaexec
 f none usr/bin/devattr 555 root bin
 f none usr/bin/devfree 555 root bin
 f none usr/bin/devreserv 555 root bin
@@ -111,7 +111,7 @@ f none usr/bin/ed 555 root bin
 f none usr/bin/edit 555 root bin
 f none usr/bin/egrep 555 root bin
 f none usr/bin/eject 555 root bin
-l none usr/bin/encrypt=../../usr/bin/decrypt
+l none usr/bin/encrypt=../../usr/lib/isaexec
 f none usr/bin/env 555 root bin
 l none usr/bin/ex=../../usr/bin/edit
 f none usr/bin/expr 555 root bin

@@ -50,7 +50,9 @@ f none usr/bin/addbadsec 555 root bin
 f none usr/bin/i86/amt 555 root bin
 f none usr/bin/diskscan 555 root bin
 d none usr/bin/i86 755 root bin
+f none usr/bin/i86/decrypt 555 root bin
 f none usr/bin/i86/digest 555 root bin
+l none usr/bin/i86/encrypt=decrypt
 f none usr/bin/i86/ksh93 555 root bin
 f none usr/bin/i86/newtask 4555 root sys
 f none usr/bin/i86/nohup 555 root bin
@@ -107,7 +109,9 @@ f none usr/sbin/i86/whodo 4555 root bin
 d none usr/bin/amd64 755 root bin
 f none usr/bin/amd64/amt 555 root bin
 f none usr/bin/amd64/crle 555 root bin
+f none usr/bin/amd64/decrypt 555 root bin
 f none usr/bin/amd64/digest 555 root bin
+l none usr/bin/amd64/encrypt=decrypt
 f none usr/bin/amd64/ksh93 555 root bin
 f none usr/bin/amd64/ls 555 root bin
 l none usr/bin/amd64/mac=digest

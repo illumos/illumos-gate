@@ -25,39 +25,45 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG= decrypt
-ROOTLINK= $(ROOTBIN)/encrypt
-DCFILE=$(PROG).dc
+PROG = decrypt
 
-include ../../Makefile.cmd
+ROOTLINK32= $(ROOTBIN32)/encrypt
+ROOTLINK64= $(ROOTBIN64)/encrypt
 
-SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+OBJS = decrypt.o
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+SRCS = $(OBJS:%.o=../%.c)
+
+include ../../../Makefile.cmd 
+
+CFLAGS += $(CCVERBOSE) 
+CFLAGS64 += $(CCVERBOSE)
+CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+LDLIBS += -lkmf -lpkcs11 -lcryptoutil
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all:    $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG) $(ROOTLINK)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTLINK)
+lint:   lint_SRCS
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+include ../../../Makefile.targ
 
-$(DCFILE):
-	$(RM) messages.po
-	$(XGETTEXT) $(XGETFLAGS) -t $(PROG).c
-	$(SED) -e '/^domain/d' messages.po > $@
-	$(RM) messages.po
+%.o:	../%.c
+	$(COMPILE.c) $<
 
-FRC:
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(DYNFLAGS)
+	$(POST_PROCESS)
 
-include ../../Makefile.targ
+$(ROOTLINK32): $(ROOTPROG32)
+	$(RM) $@
+	$(LN) $(ROOTPROG32) $@
+
+$(ROOTLINK64): $(ROOTPROG64)
+	$(RM) $@
+	$(LN) $(ROOTPROG64) $@
+
+clean:
+	$(RM) $(PROG) $(OBJS)
