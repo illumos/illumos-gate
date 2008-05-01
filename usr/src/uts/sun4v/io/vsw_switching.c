@@ -77,6 +77,8 @@
 void vsw_setup_switching_timeout(void *arg);
 void vsw_stop_switching_timeout(vsw_t *vswp);
 int vsw_setup_switching(vsw_t *);
+void vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller,
+    vsw_port_t *port, mac_resource_handle_t mrh);
 static	int vsw_setup_layer2(vsw_t *);
 static	int vsw_setup_layer3(vsw_t *);
 
@@ -396,6 +398,14 @@ vsw_setup_layer3(vsw_t *vswp)
 	D1(vswp, "%s: exit", __func__);
 
 	return (0);
+}
+
+/* ARGSUSED */
+void
+vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *port,
+			mac_resource_handle_t mrh)
+{
+	freemsgchain(mp);
 }
 
 /*

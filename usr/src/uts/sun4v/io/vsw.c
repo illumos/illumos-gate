@@ -119,6 +119,8 @@ void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
 extern void vsw_setup_switching_timeout(void *arg);
 extern void vsw_stop_switching_timeout(vsw_t *vswp);
 extern int vsw_setup_switching(vsw_t *);
+extern void vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller,
+    vsw_port_t *port, mac_resource_handle_t mrh);
 extern int vsw_add_mcst(vsw_t *, uint8_t, uint64_t, void *);
 extern int vsw_del_mcst(vsw_t *, uint8_t, uint64_t, void *);
 extern void vsw_del_mcst_vsw(vsw_t *);
@@ -168,6 +170,9 @@ boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
 uint32_t	vsw_fdb_nchains = 8;	/* # of chains in fdb hash table */
 uint32_t	vsw_vlan_nchains = 4;	/* # of chains in vlan id hash table */
 uint32_t	vsw_ethermtu = 1500;	/* mtu of the device */
+
+/* sw timeout for boot delay only, in milliseconds */
+int vsw_setup_switching_boot_delay = 100 * MILLISEC;
 
 /* delay in usec to wait for all references on a fdb entry to be dropped */
 uint32_t vsw_fdbe_refcnt_delay = 10;
@@ -572,26 +577,25 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * The null switching function is set to avoid panic until
+	 * switch mode is setup.
+	 */
+	vswp->vsw_switch_frame = vsw_switch_frame_nop;
+
+	/*
 	 * Setup the required switching mode,
 	 * based on the mdprops that we read earlier.
+	 * schedule a short timeout (0.1 sec) for the first time
+	 * setup and avoid calling mac_open() directly here,
+	 * others are regular timeout 3 secs.
 	 */
-	rv = vsw_setup_switching(vswp);
-	if (rv == EAGAIN) {
-		/*
-		 * Unable to setup switching mode;
-		 * as the error is EAGAIN, schedule a timeout to retry.
-		 */
-		mutex_enter(&vswp->swtmout_lock);
+	mutex_enter(&vswp->swtmout_lock);
 
-		vswp->swtmout_enabled = B_TRUE;
-		vswp->swtmout_id =
-		    timeout(vsw_setup_switching_timeout, vswp,
-		    (vsw_setup_switching_delay * drv_usectohz(MICROSEC)));
+	vswp->swtmout_enabled = B_TRUE;
+	vswp->swtmout_id = timeout(vsw_setup_switching_timeout, vswp,
+	    drv_usectohz(vsw_setup_switching_boot_delay));
 
-		mutex_exit(&vswp->swtmout_lock);
-	} else if (rv != 0) {
-		goto vsw_attach_fail;
-	}
+	mutex_exit(&vswp->swtmout_lock);
 
 	progress |= PROG_swmode;
 
