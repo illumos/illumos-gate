@@ -83,6 +83,9 @@ typedef enum {DBUS_CONNECTION, HAL_CONTEXT, HAL_PAIRED,
 #define	HAL_RDSK_PROP	"block.solaris.raw_device"
 #define	HAL_SYMDEV_PROP	"storage.solaris.legacy.symdev"
 
+#define	ONE_MB_BASE2	1048576	/* Number of bytes in 1 MB */
+#define	ONE_GB_BASE10	1000000000	/* Manufacturers use 1 GB = 10^9 B */
+
 int setup_target(int flag);
 
 int hald_running(void);

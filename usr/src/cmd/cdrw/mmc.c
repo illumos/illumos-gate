@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -756,11 +756,14 @@ ftr_supported(int fd, uint16_t feature)
  *
  * Parameters:  num     - hexadecimal representation of Profile
  *              current - 1 if the Profile is Current, otherwise 0
+ *		abbr	- 1 if printing abbreviated name, otherwise 0
  */
-static void
-print_profile_name(uint16_t num, uchar_t current)
+void
+print_profile_name(uint16_t num, uchar_t current, uchar_t abbr)
 {
-	(void) printf(" 0x%04x: ", num);
+	if (abbr != 1)
+		(void) printf(" 0x%04x: ", num);
+
 	switch (num) {
 	case 0x0000:
 		(void) printf("No Current Profile");
@@ -793,16 +796,43 @@ print_profile_name(uint16_t num, uchar_t current)
 		(void) printf("DVD-ROM");
 		break;
 	case 0x0011:
-		(void) printf("DVD-R Sequential Recording");
+		(void) printf("DVD-R");
+		if (abbr != 1)
+			(void) printf(" Sequential Recording");
 		break;
 	case 0x0012:
 		(void) printf("DVD-RAM");
 		break;
 	case 0x0013:
-		(void) printf("DVD-RW Restricted Overwrite");
+		(void) printf("DVD-RW");
+		if (abbr != 1)
+			(void) printf(" Restricted Overwrite");
 		break;
 	case 0x0014:
-		(void) printf("DVD-RW Sequential Recording");
+		(void) printf("DVD-RW");
+		if (abbr != 1)
+			(void) printf(" Sequential Recording");
+		break;
+	case 0x0015:
+		(void) printf("DVD-R");
+		if (abbr != 1)
+			(void) printf(" Dual Layer Sequential Recording");
+		else
+			(void) printf(" DL");
+		break;
+	case 0x0016:
+		(void) printf("DVD-R");
+		if (abbr != 1)
+			(void) printf(" Dual Layer Jump Recording");
+		else
+			(void) printf(" DL");
+		break;
+	case 0x0017:
+		(void) printf("DVD-RW");
+		if (abbr != 1)
+			(void) printf(" Dual Layer");
+		else
+			(void) printf(" DL");
 		break;
 	case 0x001A:
 		(void) printf("DVD+RW");
@@ -819,8 +849,19 @@ print_profile_name(uint16_t num, uchar_t current)
 	case 0x0022:
 		(void) printf("DDCD-RW");
 		break;
+	case 0x002A:
+		(void) printf("DVD+RW");
+		if (abbr != 1)
+			(void) printf(" Dual Layer");
+		else
+			(void) printf(" DL");
+		break;
 	case 0x002B:
-		(void) printf("DVD+R Double Layer");
+		(void) printf("DVD+R");
+		if (abbr != 1)
+			(void) printf(" Dual Layer");
+		else
+			(void) printf(" DL");
 		break;
 	case 0x0040:
 		(void) printf("BD-ROM");
@@ -895,9 +936,9 @@ print_profile_list(int fd)
 			    i < buflen; i += MMC_PRFL_DSCRPTR_LEN) {
 				other = read_scsi16(&bufp[i]);
 				if (other == current)
-					print_profile_name(other, 1);
+					print_profile_name(other, 1, 0);
 				else
-					print_profile_name(other, 0);
+					print_profile_name(other, 0, 0);
 			}
 			(void) printf("\n");
 		}

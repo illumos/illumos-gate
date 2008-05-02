@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,8 +40,10 @@
 void
 info(void)
 {
-	uchar_t *toc, *p;
+	uchar_t *toc, *p, *conf;
 	int ret, toc_size;
+	uint_t bsize;
+	size_t cap = 0;
 	char *msg;
 	struct track_info *ti;
 
@@ -61,6 +62,61 @@ info(void)
 		(void) check_device(target, CHECK_DEVICE_NOT_READY |
 		    EXIT_IF_CHECK_FAILED);
 	}
+
+	if (verbose != 0) {
+		/*
+		 * Determine the media type by reading the active profile
+		 * from the profile list.
+		 */
+		(void) printf(gettext("Media Type : "));
+
+		conf = (uchar_t *)my_zalloc(MMC_FTR_HDR_LEN);
+
+		if (get_configuration(target->d_fd, MMC_FTR_PRFL_LIST,
+		    MMC_FTR_HDR_LEN, conf))
+			print_profile_name(read_scsi16(&conf[6]), 0, 1);
+		else
+			(void) printf(gettext("UNKNOWN\n"));
+
+		free(conf);
+
+		/*
+		 * Get the start address of the last possible lead out.
+		 */
+		cap = get_last_possible_lba(target);
+
+		/*
+		 * The start address of the last possible leadout will only
+		 * be zero if the disc is full or this drive does not support
+		 * this method of determining capacity.
+		 */
+		if (cap == 0)
+			cap = read_format_capacity(target->d_fd, &bsize);
+
+		/*
+		 * Since both methods of determining the capacity of the
+		 * media count the correct number of blocks, just multiply
+		 * the capacity by the block size.
+		 */
+		cap *= target->d_blksize;
+
+		if (device_type == CD_RW) {
+			(void) printf(gettext("Media Capacity : %.2f MB "),
+			    ((double)cap/ONE_MB_BASE2));
+		} else {
+			/*
+			 * For DVD's make sure we print out "Formatted Media
+			 * Capacity". Don't do this for CD-RWs as only
+			 * DVDs are formatted.
+			 */
+			(void) printf(gettext("Formatted Media Capacity : "
+			    "%.2f GB "), ((double)cap/ONE_GB_BASE10));
+		}
+
+		cap /= target->d_blksize;
+		(void) printf(gettext("(%u blocks)\n"), (uint_t)cap);
+	}
+
 	if (!check_device(target, CHECK_MEDIA_IS_NOT_BLANK)) {
 		(void) printf(gettext("Media is blank\n"));
 		exit(0);

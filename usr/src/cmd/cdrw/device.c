@@ -862,15 +862,41 @@ get_media_type(int fd)
 				device_type = DVD_MINUS;
 				break;
 
+			case 0x15: /* DVD-R Dual Layer Sequential Recording */
+			case 0x16: /* DVD-R Dual Layer Jump Recording */
+				if (debug)
+					(void) printf("DVD-R DL found\n");
+				device_type = DVD_MINUS;
+				break;
+
+			case 0x17: /* DVD-RW Dual Layer */
+				if (debug)
+					(void) printf("DVD-RW DL found\n");
+				device_type = DVD_MINUS;
+				break;
+
 			case 0x1A: /* DVD+RW */
 				if (debug)
 					(void) printf("DVD+RW found\n");
 
 				device_type = DVD_PLUS_W;
 				break;
+
 			case 0x1B: /* DVD+R */
 				if (debug)
 					(void) printf("DVD+R found\n");
+				device_type = DVD_PLUS;
+				break;
+
+			case 0x2A: /* DVD+RW Dual Layer */
+				if (debug)
+					(void) printf("DVD+RW DL found\n");
+				device_type = DVD_PLUS_W;
+				break;
+
+			case 0x2B: /* DVD+R Dual Layer */
+				if (debug)
+					(void) printf("DVD+R DL found\n");
 				device_type = DVD_PLUS;
 				break;
 
