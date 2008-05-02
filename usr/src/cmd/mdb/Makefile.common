@@ -74,6 +74,7 @@ COMMON_MODULES_KVM = \
 	s1394 \
 	scsi_vhci \
 	sctp \
+	sd \
 	smbfs \
 	smbsrv \
 	specfs \

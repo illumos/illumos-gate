@@ -51,6 +51,7 @@ f none kernel/kmdb/amd64/random 555 root sys
 f none kernel/kmdb/amd64/s1394 555 root sys
 f none kernel/kmdb/amd64/scsi_vhci 555 root sys
 f none kernel/kmdb/amd64/sctp 555 root sys
+f none kernel/kmdb/amd64/sd 555 root sys
 f none kernel/kmdb/amd64/specfs 555 root sys
 f none kernel/kmdb/amd64/sppp 555 root sys
 f none kernel/kmdb/amd64/ufs 555 root sys
@@ -79,6 +80,7 @@ f none kernel/kmdb/random 555 root sys
 f none kernel/kmdb/s1394 555 root sys
 f none kernel/kmdb/scsi_vhci 555 root sys
 f none kernel/kmdb/sctp 555 root sys
+f none kernel/kmdb/sd 555 root sys
 f none kernel/kmdb/specfs 555 root sys
 f none kernel/kmdb/sppp 555 root sys
 f none kernel/kmdb/ufs 555 root sys

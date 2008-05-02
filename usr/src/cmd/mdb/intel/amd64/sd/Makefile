@@ -21,28 +21,15 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../../Makefile.common
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULES = \
-	$(COMMON_MODULES_PROC) \
-	$(COMMON_MODULES_KVM) \
-	intr \
-	ssd
+MODULE = sd.so
+MDBTGT = kvm
 
-$(CLOSED_BUILD)MODULES += \
-	$(CLOSED_COMMON_MODULES_KVM:%=$(CLOSED)/cmd/mdb/sparc/v9/%)
-$(CLOSED_BUILD)MODULES += \
-	$(CLOSED)/cmd/mdb/sparc/v9/isp
+MODSRCS = sd.c
 
-#
-# a "$(MODULES): kmdb" rule would seem to do the trick but, for some reason,
-# it serializes $(MODULES).
-#
-SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
-
-include ../../Makefile.subdirs
-
-.PARALLEL: $(SUBDIRS)
+include ../../../../Makefile.cmd
+include ../../../../Makefile.cmd.64
+include ../../Makefile.amd64
+include ../../../Makefile.module
