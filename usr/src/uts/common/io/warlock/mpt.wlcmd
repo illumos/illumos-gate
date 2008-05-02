@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -18,19 +18,22 @@ add scsi_pkt::pkt_comp targets \
 	mpt_scsi_reset_notify \
 	mpt_scsi_tgt_init \
 	mpt_scsi_tgt_free \
-	mpt_scsi_sync_pkt
+	mpt_scsi_sync_pkt \
+	mpt_smp_start \
+	mpt_sas_getcap
 
 add notify_entry::callback target warlock_dummy
 
 root mpt_kmem_cache_constructor mpt_kmem_cache_destructor
-root mpt_do_dma
 root mpt_handle_event
 root mpt_handle_dr
 root mpt_name_child
+root mpt_fm_error_cb
 
 for ptr in `funcptrs | grep '^scsi_hba_tran::'`
 do
         add $ptr target warlock_dummy
 done
+
 root    scsi_hba_bus_power
 ignore  delay 

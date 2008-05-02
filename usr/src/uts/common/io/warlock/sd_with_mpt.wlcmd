@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,9 @@ add scsi_pkt::pkt_comp targets \
 	mpt.c:mpt_scsi_reset_notify \
 	mpt.c:mpt_scsi_tgt_init \
 	mpt.c:mpt_scsi_tgt_free \
-	mpt.c:mpt_scsi_sync_pkt
+	mpt.c:mpt_scsi_sync_pkt \
+	mpt.c:mpt_smp_start \
+	mpt.c:mpt_sas_getcap
 
 one 	scsi_device
 one 	mpt
@@ -58,8 +60,9 @@ add 	notify_entry::callback target  sd_mhd_reset_notify_cb
 add 	sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi
 
 root 	mpt_kmem_cache_constructor mpt_kmem_cache_destructor
-root 	mpt_do_dma
 root	mpt_handle_event
+root	mpt_handle_dr
+root	mpt_fm_error_cb
 
 root 	sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
 root 	sd_wm_cache_constructor sd_wm_cache_destructor sd_read_modify_write_task
