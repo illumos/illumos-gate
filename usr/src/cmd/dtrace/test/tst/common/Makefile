@@ -42,8 +42,6 @@ CLOBBERFILES += nfs/$(RPCSVCOBJS) $(RPCSVCDIR)/$(RPCSVCSRCS)
 fasttrap/tst.fasttrap.exe := LDLIBS += -ldtrace
 fasttrap/tst.stack.exe := LDLIBS += -ldtrace
 
-proc/tst.sigwait.exe := LDLIBS += -lrt
-
 sysevent/tst.post.exe := LDLIBS += -lsysevent
 sysevent/tst.post_chan.exe := LDLIBS += -lsysevent
 

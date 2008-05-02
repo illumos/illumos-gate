@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,9 +49,7 @@ XGETFLAGS += -a -x sh.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DACCT
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
-LAZYLIBS = $(ZLAZYLOAD) -lgen -lsecdb $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lgen -lsecdb
-LDLIBS += $(LAZYLIBS)
+LDLIBS += -lgen -lsecdb
 GROUP =	root
 
 .KEEP_STATE:

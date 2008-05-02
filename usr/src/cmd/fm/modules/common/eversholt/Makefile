@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,8 +44,9 @@ DMOD_SRCS = eft_mdb.c
 include ../../Makefile.plugin
 
 CPPFLAGS += -DFMAPLUGIN -I$(EVERSRCDIR) -I.
-LDFLAGS += -R/usr/lib/fm
-LDLIBS += -L$(ROOTLIB)/fm -ltopo
+
+$(PROG) := LDFLAGS += -R/usr/lib/fm
+$(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo
 
 CLEANFILES += y.tab.h y.tab.c
 

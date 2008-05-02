@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,7 +48,7 @@ HDRS=	snoop.h snoop_mip.h at.h snoop_ospf.h snoop_ospf6.h
 include	../../../Makefile.cmd
 
 CPPFLAGS += -I. -I$(SRC)/common/net/dhcp
-LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl -ltsol
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:

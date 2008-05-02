@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,15 +58,12 @@ LIBS=	$(DYNLIB) $(LINTLIB)
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
-LAZYLIBS=	$(ZLAZYLOAD) -lpkcs11 $(ZNOLAZYLOAD)
-lint		:=	LAZYLIBS =	-lpkcs11
-
-LDLIBS		+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd $(LAZYLIBS) -lnsl -lsocket -lc 
-LDLIBS64	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd $(LAZYLIBS) -lnsl -lsocket -lc 
+LDLIBS	+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd -lpkcs11 -lnsl -lsocket -lc 
+LDLIBS6	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd -lpkcs11 -lnsl -lsocket -lc 
 
 # DYNLIB libraries do not have lint libs and are not linted
-$(DYNLIB) :=    LDLIBS += $(ZLAZYLOAD) -lxml2 $(ZNOLAZYLOAD)
-$(DYNLIB64) :=  LDLIBS64 += $(ZLAZYLOAD) -lxml2 $(ZNOLAZYLOAD)
+$(DYNLIB) :=    LDLIBS += -lxml2
+$(DYNLIB64) :=  LDLIBS64 += -lxml2
 
 CPPFLAGS	+=	-I$(INCDIR) -I/usr/include/libxml2 -I../../ber_der/inc -I$(SRCDIR)
 

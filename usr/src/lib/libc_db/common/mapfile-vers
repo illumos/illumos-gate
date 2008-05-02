@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -144,4 +144,24 @@ SUNWprivate_1.1 {
 	__td_thr_validate;
     local:
 	*;
+};
+
+# External interface requirements
+
+{
+    global:
+	ps_lcontinue =		EXTERN;
+	ps_lgetfpregs =		EXTERN;
+	ps_lgetregs =		EXTERN;
+	ps_lgetxregs =		EXTERN;
+	ps_lgetxregsize =	EXTERN;
+	ps_lsetfpregs =		EXTERN;
+	ps_lsetregs =		EXTERN;
+	ps_lsetxregs =		EXTERN;
+	ps_lstop =		EXTERN;
+	ps_pcontinue =		EXTERN;
+	ps_pdread =		EXTERN;
+	ps_pdwrite =		EXTERN;
+	ps_pglobal_lookup =	EXTERN;
+	ps_pstop =		EXTERN;
 };

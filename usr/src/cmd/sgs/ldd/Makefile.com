@@ -49,8 +49,9 @@ package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
 		-I$(SRCBASE)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master)
-LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPTS) \
-		'-R$$ORIGIN/../lib'
+LLDFLAGS =	'-R$$ORIGIN/../../lib'
+LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
+LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPTS) $(LLDFLAGS)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lelf $(DLLIB)
 LINTFLAGS +=	-x
 LINTFLAGS64 +=	-x

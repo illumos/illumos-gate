@@ -49,7 +49,7 @@ CPPFLAGS += \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 	-DHAVE_SYSLOG_H=1 
 
-LDFLAGS += $(KRUNPATH)
+LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L$(ROOT_KLIBDIR) -L$(KRB5LIB) \
 	  -lmech_krb5 -lkdb -lkadm5srv -lnsl -lsocket -lbsm -lc
 

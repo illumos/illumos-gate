@@ -21,7 +21,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1 "10 Jan 2008"
+.TH check_rtime 1 "21 April 2008"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
@@ -93,6 +93,17 @@ discussion above). Unsatisfied symbol relocations are displayed as:
 .RS 6
 foo: symbol not found: bar  <no -zdefs?>
 .RE
+.RS 4
+.sp
+Note: Shared objects can make reference to symbol definitions
+that are expected to be defined by the caller. To indicate that
+such symbols are not undefined in the usual sense, you must
+specify these symbols in a \fImapfile\fP, using the \fBEXTERN\fP
+or \fBPARENT\fP symbol attribute. Without these symbol attributes,
+\fBldd(1)\fP is unable to determine the symbols special nature, and
+.I check_rtime
+will report these symbols as undefined. 
+.RE
 .TP
 \(bu
 Unused dependencies are wasteful at runtime, as they take time to
@@ -120,10 +131,28 @@ different objects, or as the other object dependencies evolve.
 Unreferenced dependencies are displayed as:
 .sp
 .RS 6
-foo: unreferenced object=bar.so.1; unused dependency of libfoo.so.1
+foo: unreferenced object=bar.so.1;  \\
+.br
+    unused dependency of libfoo.so.1  \\
+.br
+    <remove lib or -zignore?>
 .RE
+.RS 4
 .sp
 See also the section ENVIRONMENT VARIABLES.
+.RE
+.TP
+\(bu
+Unused search paths are wasteful at runtime.
+Unused search paths are displayed as:
+.sp
+.RS 6
+foo: unused search path=/usr/foo/lib  \\
+.br
+    (RUNPATH/RPATH from file libfoo.so.1)  \\
+.br
+    <remove search path?>
+.RE
 .LP
 .I check_rtime
 uses \fBelfdump(1)\fP to look for a concatenated relocation
@@ -185,7 +214,9 @@ information.  Note, removal of debugging information is only enabled
 for release builds. The existence of debugging information is displayed as:
 .sp
 .RS 6
-foo: debugging sections should be deleted  <no strip -x?>
+foo: debugging sections should be deleted  \\
+.br
+    <no strip -x?>
 .RE
 .TP
 \(bu
@@ -199,7 +230,9 @@ reason for symbol tables being removed.
 Objects that do not contain a symbol table are displayed as:
 .sp
 .RS 6
-foo.so.1: symbol table should not be stripped  <remove -s?>
+foo.so.1: symbol table should not be stripped  \\
+.br
+    <remove -s?>
 .RE
 .TP
 \(bu

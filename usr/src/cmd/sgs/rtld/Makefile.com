@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -98,7 +98,7 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) \
 		$(RTLDLIB) -lrtld \
 		$(LDLIB) $(LD_LIB) 
 
-DYNFLAGS +=	-i -e _rt_boot $(VERSREF) $(ZLAZYLOAD) $(ZNODLOPEN) \
+DYNFLAGS +=	-i -e _rt_boot $(VERSREF) $(ZNODLOPEN) \
 		$(ZINTERPOSE) -zdtrace=dtrace_data '-R$$ORIGIN'
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@

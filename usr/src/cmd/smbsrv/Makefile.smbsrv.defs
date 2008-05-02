@@ -31,8 +31,6 @@
 
 OBJS=	$(SRCS:%.c=%.o)
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv
-LDFLAGS += -R/usr/lib/smbsrv
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 
 CFLAGS += $(CCVERBOSE)

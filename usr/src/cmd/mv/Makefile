@@ -20,7 +20,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -48,8 +48,8 @@ XGETFLAGS += -a -x mv.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 
 lint :=	LDLIBS += -lcmdutils -lavl -lsec -lnvpair
-$(PROG) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec -lnvpair $(ZNOLAZYLOAD)
-$(XPG4) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec -lnvpair $(ZNOLAZYLOAD)
+$(PROG) := LDLIBS += -lcmdutils -lavl -lsec -lnvpair
+$(XPG4) := LDLIBS += -lcmdutils -lavl -lsec -lnvpair
 
 .KEEP_STATE:
 

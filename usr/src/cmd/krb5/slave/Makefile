@@ -57,7 +57,7 @@ CPPFLAGS +=	-I. \
 		-I$(SRC)/lib/krb5/kadm5 \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
-LDFLAGS +=	$(KRUNPATH)
+LDFLAGS +=	$(KRUNPATH) $(KERBRUNPATH)
 LDLIBS +=	-lmech_krb5 -lsocket
 $(PROG1) :=	LDLIBS += -L$(KRB5LIB) -lkadm5srv
 $(PROG2) :=	LDLIBS += -L$(KRB5LIB) -lnsl -lkdb -lkadm5clnt

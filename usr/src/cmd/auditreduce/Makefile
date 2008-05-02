@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,9 +40,7 @@ POFILE=auditreduce.po
 POFILES=main.po option.po proc.po time.po token.po
 
 CPPFLAGS += -I$(TABLEDIR) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
-LDLIBS += -lnsl -lbsm -lscf $(LAZYLIBS)
+LDLIBS += -lnsl -lbsm -lscf -ltsol
 
 .KEEP_STATE:
 

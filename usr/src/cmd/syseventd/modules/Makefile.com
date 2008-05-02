@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,21 +36,14 @@ include $(SRC)/lib/Makefile.lib
 include $(SRC)/cmd/syseventd/Makefile.com
 
 SRCDIR =	.
-
-#
-# Build modules with -Kpic, -z combreloc and -z text but not -z defs
-# Note: -K pic is inherited by including Makefile.lib
-#
 HSONAME =
-ZDEFS =
-
-# There should be a mapfile here
-MAPFILES =
+MAPFILES =	$(SRC)/cmd/syseventd/modules/mapfile-extern
 
 #
 # sysevent loadable modules require sysevent header files
 #
 CPPFLAGS += -I ../../daemons/syseventd
+LDLIBS +=	-lc
 
 POFILES =	$(SRCS:.c=.po)
 POFILE =	$(LIBRARY).po

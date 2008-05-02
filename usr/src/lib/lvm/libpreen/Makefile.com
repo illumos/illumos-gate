@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,8 +34,7 @@ include $(SRC)/lib/lvm/Makefile.lvm
 ROOTLIBDIR=	$(ROOT)/usr/lib/drv
 LIBS=		$(DYNLIB) 	# don't build a static lib
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
-LDLIBS +=	-lmeta -lc
-ZDEFS=
+LDLIBS +=	-lmeta -ldevid -lc
 
 .KEEP_STATE:
 

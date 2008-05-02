@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,9 +45,7 @@ OBJECTS= \
 
 SRCS=	$(OBJECTS:.o=.c)
 
-LAZYLIBS = $(ZLAZYLOAD) -lproject
-lint := LAZYLIBS = -lproject
-LDLIBS	+= -lsocket -lnsl $(LAZYLIBS)
+LDLIBS	+= -lsocket -lnsl -lproject
 
 #
 # for message catalog

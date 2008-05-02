@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,7 +51,7 @@ CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
 		$(CPPFLAGS.master)
 LLDFLAGS =	$(VAR_ELFDUMP_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_LD_LLDFLAGS64)
-LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPT) $(LLDFLAGS) $(ZLAZYLOAD)
+LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPT) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(CONVLIBDIR) $(CONV_LIB)
 

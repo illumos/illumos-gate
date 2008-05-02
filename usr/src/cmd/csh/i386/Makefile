@@ -1,4 +1,4 @@
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -27,9 +27,7 @@ DEFS	=  -DVFORK -DFILEC -DBSD_COMP -DFIVE	# No TELL when MBCHAR
 CPPFLAGS= -I. $(DEFS) $(MBCHAR) $(CPPFLAGS.master)
 CPPFLAGS +=	-I../../sh
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
-LAZYLIBS = $(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lsecdb
-LDLIBS += -lcurses $(LAZYLIBS)
+LDLIBS += -lcurses -lsecdb
 
 MAPFILES =	../mapfile-intf $(MAPFILE.NGB)
 LDFLAGS +=	$(MAPFILES:%=-M%)

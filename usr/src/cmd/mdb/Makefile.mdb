@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -91,8 +91,7 @@ CPPFLAGS += -D_MDB -I. -I../.. -I../../../common
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
-LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm \
-	$(ZLAZYLOAD) -lscf $(ZNOLAZYLOAD)
+LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
 
 LINTFLAGS += -n -errtags=yes
 LINTFILES = $(SRCS:%.c=%.ln)

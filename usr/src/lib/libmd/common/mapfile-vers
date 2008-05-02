@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,9 +44,9 @@ SUNW_1.1 {
 	MD4Init;
 	MD4Update;
 	md5_calc;
-	MD5Final;
-	MD5Init;
-	MD5Update;
+	MD5Final =	NODIRECT;	# Address interposition from testsuite
+	MD5Init =	NODIRECT;	# Address interposition from testsuite
+	MD5Update =	NODIRECT;	# Address interposition from testsuite
 	SHA1Final;
 	SHA1Init;
 	SHA1Update;

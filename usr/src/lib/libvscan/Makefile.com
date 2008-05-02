@@ -42,7 +42,6 @@ ROOTLIBDIR = $(ROOT)/usr/lib/vscan
 LDLIBS += -lc -lscf -lsecdb -lnsl -lm
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(SRCDIR)
-DYNFLAGS += -R/usr/lib/vscan
 
 .KEEP_STATE:
 

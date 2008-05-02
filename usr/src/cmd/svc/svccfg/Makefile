@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,8 +76,7 @@ YFLAGS = -d
 CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \
     $(MYPROG:%=%-native)
 
-LAZYLIBS = $(ZLAZYLOAD) -lxml2 $(ZNOLAZYLOAD)
-SVCCFG_EXTRA_LIBS = $(LAZYLIBS) -lscf -ll -luutil -lumem -lmd5
+SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5
 $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
 
 LIBSCF		= $(SRC)/lib/libscf

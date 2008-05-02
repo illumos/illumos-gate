@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,9 +43,7 @@ XGETFLAGS += -a -x praudit.xcl
 CPPFLAGS += -D_PRAUDIT -I$(SRC)/lib/libbsm/common
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
-LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
-LDLIBS += -lbsm -lnsl -lpam $(LAZYLIBS)
+LDLIBS += -lbsm -lnsl -lpam -ltsol
 
 .KEEP_STATE:
 

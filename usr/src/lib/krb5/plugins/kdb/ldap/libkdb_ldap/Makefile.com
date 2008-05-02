@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,7 +76,7 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 		-DUSE_KADM5_API_VERSION=2
 
 CFLAGS +=	$(CCVERBOSE) -I..
-DYNFLAGS += $(KRUNPATH) $(KMECHLIB)
+DYNFLAGS +=	$(KRUNPATH) $(KERBRUNPATH) $(KMECHLIB)
 LDLIBS +=	-L $(ROOTLIBDIR) -lkadm5srv -lc -lnsl -lldap
 
 .KEEP_STATE:

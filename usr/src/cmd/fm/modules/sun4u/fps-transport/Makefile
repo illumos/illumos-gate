@@ -45,11 +45,11 @@ LINTFLAGS = -I. -I ../../../fmd/common -D_sparc64 -D_REENTRANT -D_POSIX_PTHREAD_
 
 ##### beginning of dependency lines #####
 
-LDFLAGS += -R/usr/lib/fm -M../../../fmd/common/fmd_api.map
+LDFLAGS += -M../../../fmd/common/fmd_api.map
 
 fps-transport.so  : $$(OBJS)
 	(unset LD_LIBRARY_PATH LD_RUN_PATH; \
-	$(CC) -i $(CFLAGS) -o $@ -G $(OBJS) -zcombreloc -mt -zignore -ztext -zdefs -lc -ldoor -lnvpair -lsysevent $(LDFLAGS))
+	$(CC) -i $(CFLAGS) -o $@ -G $(OBJS) -mt -zignore -ztext -zdefs -lc -ldoor -lnvpair -lsysevent $(LDFLAGS))
 	$(POST_PROCESS_SO)
 
 all: install

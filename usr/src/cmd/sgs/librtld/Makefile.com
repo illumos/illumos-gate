@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@ SRCDIR =	../common
 CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
 		-I$(SRCBASE)/uts/common/krtld -I$(SRC)/common/sgsrtcid \
 		-I$(SRCBASE)/uts/sparc
-DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
+DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
 
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2

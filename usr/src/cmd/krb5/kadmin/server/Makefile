@@ -43,7 +43,7 @@ CPPFLAGS += -I. -I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 
-LDFLAGS += $(KRUNPATH)
+LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -lgss -L$(KRB5LIB) \
 	-lmech_krb5 -lkadm5srv -lkdb -lnsl -lresolv -lbsm -lpam -lsocket
 

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -118,14 +118,7 @@ MAPFILES=       ../mapfile-vers
 include ../../../Makefile.ast
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-
-# load dll, socket, and secdb libraries on demand
-LDLIBS += \
-	-lcmd \
-	-z lazyload -ldll -z nolazyload \
-	-last \
-	-z lazyload -lsocket -lsecdb -z nolazyload \
-	-lm -lc
+LDLIBS +=	-lcmd -ldll -last -lsocket -lsecdb -lm -lc
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

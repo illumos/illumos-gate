@@ -1,4 +1,7 @@
 #
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,17 +21,12 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
-include ../../../../Makefile.lib.64
-
-CPPFLAGS += -I $(ROOT)/usr/platform/sun4v/include
-LDLIBS += -L$(ROOTLIBDIR64)
-
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+# External interface requirements
+{
+	global:
+		fc_run_priv =		EXTERN;
+		search_for_fcode_file =	EXTERN;
+};

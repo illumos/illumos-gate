@@ -40,10 +40,8 @@ POFILE=zoneadmd_all.po
 POFILES= $(OBJS:%.o=%.po)
 
 CFLAGS += $(CCVERBOSE)
-LAZYLIBS = $(ZLAZYLOAD) -ltsnet -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsnet -ltsol
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
-	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm $(LAZYLIBS)
+	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

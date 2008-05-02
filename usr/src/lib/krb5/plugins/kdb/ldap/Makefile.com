@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +62,7 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 
 CFLAGS +=	$(CCVERBOSE)
 
-DYNFLAGS +=	$(KRUNPATH)
+DYNFLAGS +=	$(KERBRUNPATH)
 # setting -L $(ROOT)/usr/lib/gss because libkdb_ldap needs mech_krb5
 LDLIBS +=	-L $(ROOT)/usr/lib/gss -L $(ROOTLIBDIR) -lkdb_ldap -lc
 

@@ -31,7 +31,8 @@ SRCS=	smbadm.c
 include ../../Makefile.cmd
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -lsmb -lumem
+LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lumem
+LDFLAGS += -R/usr/lib/smbsrv
 
 all:		$(PROG)
 

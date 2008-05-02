@@ -60,10 +60,11 @@
 
 # Define all global variables (required for strict)
 use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles $SkipDirectBindFiles);
-use vars  qw($SkipUndefDirs $SkipUndefFiles $SkipUnusedDirs $SkipUnusedFiles);
+use vars  qw($SkipUndefFiles $SkipUnusedDirs);
 use vars  qw($SkipStabFiles $SkipNoExStkFiles $SkipCrleConf);
-use vars  qw($UnusedNoise $Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
-use vars  qw($UnusedFiles $UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
+use vars  qw($SkipUnusedSearchPath $SkipUnrefObject);
+use vars  qw($Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
+use vars  qw($UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
 use vars  qw($SkipDirectBindDirs $SkipInterps $SkipSymSort $OldDeps %opt);
 
 use strict;
@@ -71,7 +72,6 @@ use strict;
 
 # Define any directories we should skip completely.
 $SkipDirs = qr{ 
-	etc/lib |			# special - used for partial statics
 	usr/lib/devfsadm |		# 4382889
 	usr/lib/libc |			# optimized libc
 	usr/lib/rcm |			# 4426119
@@ -81,20 +81,13 @@ $SkipDirs = qr{
 
 # Define any files we should skip completely.
 $SkipFiles = qr{ ^(?:
-	ld\.so\.1 |			# confusing but correct dependencies
 	lddstub |			# lddstub has no dependencies
-	libmakestate\.so\.1 |		# temporary; delivered by compiler group
-	libm\.so\.1 |			# temporary; delivered by compiler group
-	libm\.so\.2 |			# temporary; delivered by compiler group
 	geniconvtbl\.so |		# 4384329
 	libssagent\.so\.1 |		# 4328854
 	libpsvcplugin_psr\.so\.1 |	# 4385799
 	libpsvcpolicy_psr\.so\.1 |	#  "  "
 	libpsvcpolicy\.so\.1 |		#  "  "
 	picl_slm\.so |			#  "  "
-	libcrypto_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
-	libssl_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
-	fcpackage\.so |			# circular dependency on fcthread.so
 	mod_ipp\.so |			# Apache loadable module
 	fptest |	# USIII specific extns. cause ldd noise on USII bld. m/c
 	grub
@@ -123,38 +116,10 @@ $SkipDirectBindFiles = qr{ ^(?:
 }x;
 
 # Define any files that are allowed undefined references.
-$SkipUndefDirs = qr{
-	usr/lib/elfedit/ |		# elfedit modules have callbacks
-	usr/lib/inet/ppp/ |		# pppd plugins have callbacks
-	usr/lib/libp/ |			# libc.so.1 requires _mcount
-	/lib/mdb/ |			# mdb modules have callbacks
-	/lib/fm/fmd/plugins/ |		# fmd modules have callbacks
-	/lib/fm/fmd/schemes/ |		# fmd schemes have callbacks
-	/lib/scsi/plugins/ |		# scsi plugins have callbacks
-	/i86pc/lib/mtst/		# mtst modules have callbacks
-}x;
 
 $SkipUndefFiles = qr{ ^(?:
-	libthread_db\.so\.0 |		# callbacks to proc service interface
-	libthread_db\.so\.1 |		#  "	"	"	"
-	librtld_db\.so\.1 |		#  "	"	"	"
-	libc_db\.so\.1 |		#  "	"	"	"
-	libldstab\.so\.1 |		# link-edit support libraries have
-	libld\.so\.[2-4] |			# callback to the link-editors
-	liblddbg\.so\.4 |		#  "	"	"	"
-	librtld\.so\.1 |		#  "	"	"	"
-	libnisdb\.so\.2 |		# C++
 	libsvm\.so\.1 |			# libspmicommon.so.1 lacking
-	libwanboot\.so\.1 |		# libcrypto.a and libssl.a
-	libwrap\.so\.1\.0 |		# uses symbols provided by application
-	fcthread\.so |			# uses symbols provided by application
-	fn\.so\.2 |			# callback to automount
-	preen_md\.so\.1 |		# callback to driver
-	libike\.so\.1 |			# callbacks to in.iked for IKE policy
-	devfsadmd_mod\.so |		# sysevent module callback to syseventd
-	fps-transport\.so |		# Fp-scrubber's FMD module has callbacks
-	sysevent_conf_mod\.so |		# sysevent module callback to syseventd
-	sysevent_reg_mod\.so		# sysevent module callback to syseventd
+	libnisdb\.so\.2			# C++
 	)$
 }x;
 
@@ -164,26 +129,8 @@ $SkipUnusedDirs = qr{
 	/lib/libp			# profile libc makes libm an unused
 }x;					#	dependency of standard libc
 
-$SkipUnusedFiles = qr{ ^(?:
-	devfsadm |			# 4382889
-	disks |				#  "  "
-	tapes |				#  "  "
-	ports |				#  "  "
-	audlinks |			#  "  "
-	devlinks |			#  "  "
-	drvconfig |			#  "  "
-	ntptrace |			# on intel doesn't need libmd5
-	ocfserv |			# libsched unreference by libjvm,
-	poold |				#	see 4952319. 
-	libc\.so\.1\.9 |		# 4lib/libc versions have private
-	libc\.so\.2\.9			#	copies of stuff from libc.
-	)$
-}x;
-
 # Define any files that should contain debugging information.
 $SkipStabFiles = qr{ ^(?:
-	abi_.* |
-	interceptors\.so\.1 |
 	unix
 	)$
 }x;
@@ -203,39 +150,54 @@ $SkipCrleConf = qr{
 	lib/libc/libc_hwcap
 }x;
 
+# Skip "unused search path=" ldd(1) diagnostics.
+$SkipUnusedSearchPath = qr{
+	/usr/lib/fs/autofs.*\ from\ .automountd |		# dlopen()
+	/etc/ppp/plugins.*\ from\ .*pppd |			# dlopen()
+	/usr/lib/inet/ppp.*\ from\ .*pppd |			# dlopen()
+	/usr/sfw/lib.*\ from\ .*libipsecutil.so.1 |		# dlopen()
+	/usr/platform/.*rsmlib.*\ from\ .*librsm.so.2 |		# dlopen()
+	\$ORIGIN.*\ from\ .*fcode.so |				# dlopen()
+	/usr/platform/.*\ from\ .*/usr/platform |		# picl
+	/usr/lib/picl/.*\ from\ .*/usr/platform |		# picl
+	/usr/platform/.*\ from\ .*/usr/lib/picl |		# picl
+	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 |		# future needs
+	/usr/lib/mps/secv1.*\ from\ .*libnss3\.so |		# non-OSNet
+	/usr/lib/mps.*\ from\ .*libnss3\.so |			# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libdbus-1\.so\.3 |		# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2 |		# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0 |		# non-OSNet
+	/usr/X11/lib.*\ from\ .*libglib-2\.0\.so\.0 |		# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libgobject-2\.0\.so\.0 |	# non-OSNet
+	/usr/X11/lib.*\ from\ .*libgobject-2\.0\.so\.0 |	# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8 |	# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.5 |		# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1			# non-OSNet
+}x;
+
+# Skip "unreferenced object=" ldd(1) diagnostics.
+$SkipUnrefObject = qr{
+	/libmapmalloc\.so\.1;\ unused\ dependency\ of |		# interposer
+	/lib.*\ of\ .*/lib/picl/plugins/ |			# picl
+	/lib.*\ of\ .*libcimapi\.so |				# non-OSNET
+	/lib.*\ of\ .*libjvm\.so |				# non-OSNET
+	/lib.*\ of\ .*libnetsnmp\.so\.5 |			# non-OSNET
+	/lib.*\ of\ .*libnetsnmpagent\.so\.5 |			# non-OSNET
+	/lib.*\ of\ .*libnetsnmpmibs\.so\.5 |			# non-OSNET
+	/lib.*\ of\ .*libnetsnmphelpers\.so\.5 |		# non-OSNET
+	/lib.*\ of\ .*libnspr4\.so |				# non-OSNET
+	/lib.*\ of\ .*libsoftokn3\.so |				# non-OSNET
+	/lib.*\ of\ .*libspmicommon\.so\.1 |			# non-OSNET
+	/lib.*\ of\ .*libspmocommon\.so\.1 |			# non-OSNET
+	/lib.*\ of\ .*libssl3\.so |				# non-OSNET
+	/lib.*\ of\ .*libxml2\.so\.2 |				# non-OSNET
+	/lib.*\ of\ .*libxslt\.so\.1				# non-OSNET
+}x;
+
 # Define any files that should only have unused (ldd -u) processing.
 $UnusedPaths = qr{
 	ucb/shutdown			# libucb interposes on libc and makes
 					# dependencies on libc seem unnecessary
-}x;
-
-$UnusedFiles = qr{ ^(?:
-	rpc\.nisd			# CCNEEDED makes pthread unreferenced
-	)$
-}x;
-
-# Define unused dependencies we should ignore.
-# libCrun has a unnecessary dependency on libw, and libmapmalloc is often
-# defined to interpose on libc but isn't used by the application itself.
-# Threads dependencies look unused if libc is bound first.
-$UnusedNoise = qr{
-	libw\.so\.1;\ unused |
-	unused\ object=.*libw\.so\.1 |
-	libthread\.so\.1;\ unused |
-	libpthread\.so\.1;\ unused |
-	unused\ object=.*libpthread\.so\.1 |
-	libnsl\.so\.1;\ unused\ dependency\ of\ .*libxslt\.so\.1 |
-	libdl\.so\.1;\ unused\ dependency\ of\ .*libspmicommon\.so\.1 |
-	libdl\.so\.1;\ unused\ dependency\ of\ .*libCrun\.so\.1 |
-	libfru\.so\.1;\ unused\ object=.*libdl\.so\.1 |
-	libfrupicl\.so\.1;\ unused\ object=.*libdl\.so\.1 |
-	libmapmalloc\.so\.1;\ unused |
-	unused\ dependency\ of\ .*libstdc\+\+\.so\.6 |
-	unreferenced\ object=.*libstdc\+\+\.so\.6 |
-	unused\ dependency\ of\ .*libnetsnmp\.so\.5 |
-	unused\ dependency\ of\ .*libnetsnmphelpers\.so\.5 |
-	unused\ dependency\ of\ .*libnetsnmpmibs\.so\.5 |
-	unused\ dependency\ of\ .*libnetsnmpagent\.so\.5
 }x;
 
 # Define interpreters we should ignore.
@@ -248,13 +210,16 @@ $SkipInterps = qr{
 # Catch libintl and libw, although ld(1) will bind to these and thus determine
 # they're needed, their content was moved into libc as of on297 build 7.
 # libthread and libpthread were completely moved into libc as of on10 build 53.
-# Also, catch libdl, whose content was moved into libc as of on10 build 49.
+# libdl was moved into libc as of on10 build 49.  librt and libaio were moved
+# into libc as of Nevada build 44.
 $OldDeps = qr{ ^(?:
 	libintl\.so\.1 |
 	libw\.so\.1 |
 	libthread\.so\.1 |
 	libpthread\.so\.1 |
-	libdl\.so\.1
+	libdl\.so\.1 |
+	librt\.so\.1 |
+	libaio\.so\.1
 	)$
 }x;
 
@@ -274,7 +239,8 @@ $SkipSymSort = qr{ ^.*(?:
 	lib/amd64/libnsl\.so\.1 |			# C++
 	lib/sparcv9/libnsl\.so\.1 |			# C++
 	lib/sparcv9/libfru\.so\.1 |			# C++
-	usr/lib/sgml/nsgmls				# C++
+	usr/lib/sgml/nsgmls |				# C++
+	ld\.so\.1					# libc_pic.a user
 	)$
 }x;
 
@@ -480,8 +446,8 @@ sub OutMsg {
 sub ProcFile {
 	my($FullPath, $RelPath, $File, $Secure) = @_;
 	my(@Elf, @Ldd, $Dyn, $Intp, $Dll, $Ttl, $Sym, $Interp, $Stack);
-	my($Sun, $Relsz, $Pltsz, $Uns, $Tex, $Stab, $Strip, $Lddopt, $SymSort);
-	my($Val, $Header, $SkipLdd, $IsX86, $RWX);
+	my($Sun, $Relsz, $Pltsz, $Tex, $Stab, $Strip, $Lddopt, $SymSort);
+	my($Val, $Header, $SkipLdd, $IsX86, $RWX, $UnDep);
 	my($HasDirectBinding);
 
 	# Ignore symbolic links.
@@ -666,8 +632,7 @@ DYN:
 		# By default look for all unreferenced dependencies.  However,
 		# some objects have legitimate dependencies that they do not
 		# reference.
-		if ($LddNoU || ($File =~ $UnusedFiles) ||
-		    ($RelPath =~ $UnusedPaths)) {
+		if ($LddNoU || ($RelPath =~ $UnusedPaths)) {
 			$Lddopt = "-ru";
 		} else {
 			$Lddopt = "-rU";
@@ -680,9 +645,9 @@ DYN:
 
 	$Val = 0;
 	$Sym = 5;
-	$Uns = 1;
+	$UnDep = 1;
 
-LDD:	foreach my $Line (@Ldd) {
+	foreach my $Line (@Ldd) {
 
 		if ($Val == 0) {
 			$Val = 1;
@@ -736,13 +701,9 @@ LDD:	foreach my $Line (@Ldd) {
 			# references.
 			if ($Sym == 5) {
 				if (!$opt{a}) {
-					if ($RelPath =~ $SkipUndefDirs) {
-						$Sym = 0;
-						next LDD;
-					}
 					if ($File =~ $SkipUndefFiles) {
 						$Sym = 0;
-						next LDD;
+						next;
 					}
 				}
 			}
@@ -758,22 +719,43 @@ LDD:	foreach my $Line (@Ldd) {
 			OutMsg($Ttl++, $RelPath, $Line);
 			next;
 		}
+		# Look for any unused search paths.
+		if ($Line =~ /unused search path=/) {
+			if (!$opt{a}) {
+				if ($Line =~ $SkipUnusedSearchPath) {
+					next;
+				}
+			}
+			if ($Secure) {
+				$Line =~ s!$Tmpdir/!!;
+			}
+			$Line =~ s/^[ \t]*(.*)/\t$1\t<remove search path?>/;
+			OutMsg($Ttl++, $RelPath, $Line);
+			next;
+		}
+		# Look for unreferenced dependencies.  Note, if any unreferenced
+		# objects are ignored, then set $UnDep so as to suppress any
+		# associated unused-object messages.
+		if ($Line =~ /unreferenced object=/) {
+			if (!$opt{a}) {
+				if ($Line =~ $SkipUnrefObject) {
+					$UnDep = 0;
+					next;
+				}
+			}
+			if ($Secure) {
+				$Line =~ s!$Tmpdir/!!;
+			}
+			$Line =~ s/^[ \t]*(.*)/\t$1\t<remove lib or -zignore?>/;
+			OutMsg($Ttl++, $RelPath, $Line);
+			next;
+		}
 		# Look for any unused dependencies.
-		if ($Uns && ($Line =~ /unused/)) {
+		if ($UnDep && ($Line =~ /unused/)) {
 			if (!$opt{a}) {
 				if ($RelPath =~ $SkipUnusedDirs) {
-					$Uns = 0;
-					next LDD;
-				}
-				if ($File =~ $SkipUnusedFiles) {
-					$Uns = 0;
-					next LDD;
-				}
-
-				# Remove any noise.
-				if ($Line =~ $UnusedNoise) {
-					$Uns = 0;
-					next LDD;
+					$UnDep = 0;
+					next;
 				}
 			}
 			if ($Secure) {
@@ -880,17 +862,17 @@ ELF:	foreach my $Line (@Elf) {
 			next;
 		}
 
-		# Under the -i (information) option print out any useful dynamic
-		# entries.
 		# Does this object have any dependencies.
-		if ($opt{i} && ($Line =~ /NEEDED/)) {
+		if ($Line =~ /NEEDED/) {
 			my($Need) = (split(' ', $Line))[3];
 
-			# Catch any old (unnecessary) dependencies.
 			if ($Need =~ $OldDeps) {
+				# Catch any old (unnecessary) dependencies.
 				OutMsg($Ttl++, $RelPath,
 				    "\tNEEDED=$Need\t<dependency no longer necessary>");
-			} else { 
+			} elsif ($opt{i}) {
+				# Under the -i (information) option print out
+				# any useful dynamic entries.
 				OutMsg($Ttl++, $RelPath, "\tNEEDED=$Need");
 			}
 			next;
@@ -965,7 +947,6 @@ sub ProcSymSortOutMsg {
 	OutMsg($$RefTtl++, $RelPath,
 	    "$secname: duplicate $addr: ". join(', ', @names));
 }
-
 
 
 ## ProcSymSort(FullPath, RelPath)

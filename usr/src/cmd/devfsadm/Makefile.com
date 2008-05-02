@@ -91,9 +91,7 @@ LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
-LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg -lbrand -lbsm $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lzonecfg -lbrand -lbsm
-LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -ldoor $(LAZYLIBS) -lnsl
+LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -ldoor -lzonecfg -lbsm
 
 LINK_MOD_LDLIBS=
 SUNW_md_link.so :=	LINK_MOD_LDLIBS=	-lmeta

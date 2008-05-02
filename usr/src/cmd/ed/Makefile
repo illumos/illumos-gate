@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,9 +42,8 @@ include ../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 $(XPG4) := CFLAGS += -DXPG4  
 $(XPG6) := CFLAGS += -DXPG6 -I$(SRC)/lib/libc/inc 
-LAZYLIBS = $(ZLAZYLOAD) -lgen -lcrypt_i $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lgen -lcrypt
-LDLIBS += -lmapmalloc $(LAZYLIBS)
+lint := LDLIBS += -lgen -lcrypt
+LDLIBS += -lmapmalloc -lgen -lcrypt_i
 XGETFLAGS += -a -x ed.xcl
 
 MAPFILE.INT =	../expr/mapfile-intf

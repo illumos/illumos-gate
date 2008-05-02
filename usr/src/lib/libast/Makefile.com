@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -655,9 +655,7 @@ SRCS=		$(OBJECTS:%.o=../%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS += \
-	-z lazyload -lsocket -z nolazyload \
-	-lm -lc
+LDLIBS +=	-lsocket -lm -lc
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

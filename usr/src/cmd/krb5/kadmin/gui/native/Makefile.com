@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ OBJECTS=	$(CLASSES:%=%.o)
 
 include $(SRC)/lib/Makefile.lib
 #
-# Need this makefile to find the KRUNPATH and KMECHLIB definitions
+# Need this makefile to find the KRUNPATH, KERBRUNPATH and KMECHLIB definitions
 #
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
@@ -48,7 +48,7 @@ CPPFLAGS += -I../ -I$(SRC)/lib/krb5 \
 	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
 
 LDLIBS += $(KMECHLIB) -L$(ROOT)/$(KERBLIBDIR) -lkadm5clnt -lsocket -lc
-DYNFLAGS += $(KRUNPATH)
+DYNFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 
 #
 # This library is not directly linked against by any C applications

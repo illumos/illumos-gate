@@ -20,7 +20,7 @@
 
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -60,10 +60,9 @@ LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 # conditional assignments
 #
 lpfilter:=	LDLIBS += $(LIBFLT) $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBLP) \
-			-lgen $(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
+			-lgen -lsecdb
 lpforms:=	LDLIBS += $(LIBFRM) $(LIBMSG) $(LIBREQ) $(LIBOAM) \
-			$(LIBACC) $(LIBLP) \
-			$(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
+			$(LIBACC) $(LIBLP) -lsecdb
 lpshut:=	LDLIBS += $(LIBMSG) $(LIBOAM) $(LIBLP)
 lpusers:=	LDLIBS += $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBUSR) $(LIBLP)
 

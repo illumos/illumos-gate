@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -70,12 +70,9 @@ CPPFLAGS +=  -DUSG -DSTDIO -DVMUNIX -DTABS=8 -DSINGLE -DTAG_STACK
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 CLOBBERFILES += $(LIBPROGS)
-ex :=		LDLIBS += -lmapmalloc -lcurses \
-			$(ZLAZYLOAD) -lgen -lcrypt_i $(ZNOLAZYLOAD)
-$(XPG4) :=	LDLIBS += -lmapmalloc -lcurses \
-			$(ZLAZYLOAD) -lgen -lcrypt_i $(ZNOLAZYLOAD)
-$(XPG6) :=	LDLIBS += -lmapmalloc -lcurses \
-			$(ZLAZYLOAD) -lgen -lcrypt_i $(ZNOLAZYLOAD)
+ex :=		LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt_i
+$(XPG4) :=	LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt_i
+$(XPG6) :=	LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt_i
 exrecover :=	LDLIBS += -lmapmalloc -lcrypt_i
 lint :=		LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -104,13 +104,13 @@ $(ROOTSECLIB)/% :=	FILEMODE = 0555
 $(ROOTSECLIB)/% :=	OWNER = root
 $(ROOTSECLIB)/% :=	GROUP = sys
 
-LAZYLIBS =	$(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint :=		LDLIBS += -lbsm -lsec -lsecdb -ltsol -ldevinfo
-$(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb -ldevinfo $(LAZYLIBS)
+lint :=			LDLIBS += -lbsm -lsec -lsecdb -ldevinfo -ltsol
+
+$(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb -ldevinfo -ltsol
 $(PROGmkdevalloc) :=	LDLIBS += -lbsm
 $(PROGdminfo) :=	LDLIBS += -lbsm
 $(PROGaudio) :=		LDLIBS += -lbsm
-$(PROGaddalloc) :=	LDLIBS += -lbsm -lsecdb $(LAZYLIBS)
+$(PROGaddalloc) :=	LDLIBS += -lbsm -lsecdb -ltsol
 
 CLOBBERFILES +=	$(SCRIPTS)
 

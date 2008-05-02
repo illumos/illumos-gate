@@ -160,7 +160,7 @@ $(NSLPROG)		:=	LDLIBS += -lnsl
 $(AUDITPROG)		:=	LDLIBS += -lbsm
 $(PAMPROG)		:=	LDLIBS += -lpam
 $(RPCSVCPROG)		:=	LDLIBS += -lrpcsvc
-$(K5PROGS)		:=	LDFLAGS += $(ZLAZYLOAD) $(KRUNPATH) \
+$(K5PROGS)		:=	LDFLAGS += $(KRUNPATH) \
 				-L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
 $(K5PROGS)		:=	K5LIBS=  -lmech_krb5
 $(K5PROGS)		:=	CPPFLAGS += -I$(SRC)/head \
@@ -169,7 +169,7 @@ $(K5PROGS)		:=	CPPFLAGS += -I$(SRC)/head \
 				-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 				-I$(SRC)/lib/pam_modules/krb5
 LDLIBS +=	$(K5LIBS)
-$(TSNETPROG)		:=	LDLIBS += $(ZLAZYLOAD) -ltsnet $(ZNOLAZYLOAD)
+$(TSNETPROG)		:=	LDLIBS += -ltsnet
 
 in.rarpd		:=	LDLIBS += -linetutil -ldlpi
 route			:=	CPPFLAGS += -DNDEBUG

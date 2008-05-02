@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,5 +54,5 @@ CFLAGS += -G $(XREGSFLAG)
 CFLAGS64 += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS64 += -G $(XREGSFLAG)
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT -D$(MACH) -I..
-LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZDEFS) $(ZIGNORE) -M$(MAPFILE)
+LDFLAGS += $(ZTEXT) $(ZDEFS) $(ZIGNORE) -M$(MAPFILE)
 LDLIBS += -lnvpair -lc

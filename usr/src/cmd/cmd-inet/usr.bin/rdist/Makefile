@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ include ../../Makefile.cmd-inet
 
 CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP
 LDLIBS +=	-lsocket -lnsl
-LDFLAGS +=	$(ZLAZYLOAD) $(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 include  $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 LDFLAGS += $(KRUNPATH) -L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)

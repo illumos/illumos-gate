@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -96,9 +96,7 @@ $(USERDEL) :=	LIBS = $(LIBUSRGRP)
 $(USERMOD) :=	OBJS = $(MOD_OBJ)
 $(USERMOD) :=	LIBS = $(LIBUSRGRP)
 
-LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
-LDLIBS +=	-lsecdb -lproject $(LAZYLIBS)
+LDLIBS +=	-lsecdb -lproject -ltsol
 
 .PARALLEL: $(OBJECTS)
 

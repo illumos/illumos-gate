@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,9 +42,7 @@ COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR)
-LAZYLIBS = $(ZLAZYLOAD) -ltsnet -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsnet -ltsol
-LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat $(LAZYLIBS)
+LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol
 
 .KEEP_STATE:
 

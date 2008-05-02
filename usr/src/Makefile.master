@@ -747,7 +747,6 @@ BNODIRECT=	-Bnodirect
 BREDUCE=	-Breduce
 BSTATIC=	-Bstatic
 
-ZCOMBRELOC=	-zcombreloc
 ZDEFS=		-zdefs
 ZDIRECT=	-zdirect
 ZIGNORE=	-zignore

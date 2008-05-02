@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,6 +76,9 @@ SRCS += fmd.c \
 PROG = fmd
 MANIFEST = ../common/$(PROG).xml
 
+MAPFILE-DMOD = $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
+
+
 ROOTPDIR = $(ROOT)/usr/lib/fm/$(PROG)
 ROOTVDIR = $(ROOT)/var/fm/$(PROG)
 ROOTVSUB = $(ROOTVDIR)/ckpt $(ROOTVDIR)/rsrc $(ROOTVDIR)/xprt
@@ -111,12 +114,13 @@ CPPFLAGS += -I. -I../common
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LINTFLAGS += -mu
-LDFLAGS += -R/usr/lib/fm
-LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios -luuid -lnvpair
-LDLIBS += -lexacct -lnsl -lumem -ldevinfo
+
+$(PROG) := LDFLAGS += -R/usr/lib/fm
+$(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios \
+		-luuid -lnvpair -lexacct -lnsl -lumem -ldevinfo
 
 $(DMOD) := CFLAGS += $(CC_PICFLAGS) -G $(XREGSFLAG)
-$(DMOD) := LDFLAGS += $(ZTEXT) $(ZCOMBRELOC)
+$(DMOD) := LDFLAGS += $(ZTEXT) $(ZDEFS) $(MAPFILE-DMOD:%=-M%)
 
 #
 # rpcgen(1) produces code that wants to be in the foreground if we're compiled
@@ -143,7 +147,7 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 $(DMOD): $(DMOD_OBJS)
-	$(LINK.c) $(DMOD_OBJS) -o $@
+	$(LINK.c) $(DMOD_OBJS) -o $@ -lc
 	$(POST_PROCESS)
 
 %.o: ../common/%.c

@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,8 +27,10 @@ KCLNTLIB = $(ROOT)$(KERBLIBDIR)/libkadm5clnt.so
 KCLNTLIB64 = $(ROOT)$(KERBLIBDIR64)/libkadm5clnt.so
 
 # Run-time library seach path
-KRUNPATH = -R$(KLIBDIR) -R$(KERBLIBDIR)
-KRUNPATH64 = -R$(KLIBDIR64) -R$(KERBLIBDIR64)
+KRUNPATH = -R$(KLIBDIR)
+KRUNPATH64 = -R$(KLIBDIR64)
+KERBRUNPATH = -R$(KERBLIBDIR)
+KERBRUNPATH64 = -R$(KERBLIBDIR64)
 
 CPPFLAGS +=	-DKRB5_DNS_LOOKUP \
 		-DKRB5_DNS_LOOKUP_KDC

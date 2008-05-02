@@ -535,6 +535,9 @@ PSARC 2004/035: RULE W4: usr/lib/libmilter.so.1
 # WARNINGs exempted from RULE W5 (See RULES section of intf_check manpage) 
 # exempts libraries with versions that offer no interfaces
 #############################################
+6689937: RULE W5: lib/libresolv.so.2: SUNW_2.3
+6689937: RULE W5: lib/sparcv9/libresolv.so.2: SUNW_2.3
+6689937: RULE W5: lib/amd64/libresolv.so.2: SUNW_2.3
 4480868: RULE W5: usr/lib/watchmalloc.so.1: SUNWprivate_1.1
 4480868: RULE W5: usr/lib/sparcv9/watchmalloc.so.1: SUNWprivate_1.1
 PSARC 2004/619: RULE W5: usr/lib/amd64/watchmalloc.so.1: SUNWprivate_1.1

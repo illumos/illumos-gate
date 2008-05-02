@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 
-LDFLAGS += $(KRUNPATH)
+LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L $(KRB5LIBDIR)
 LDLIBS += $(KMECHLIB) $(KCLNTLIB)
 

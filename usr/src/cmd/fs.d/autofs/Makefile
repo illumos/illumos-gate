@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -88,7 +88,6 @@ SED= sed
 $(AUTO) := 	LDLIBS += -lnsl -lsldap  -ldoor
 $(MOUNT):=	LDLIBS += -lnsl
 $(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat -ldoor
-$(TYPEPROG) :=	LDFLAGS += -R/usr/lib/fs/$(FSTYPE)
 
 CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64
 CPPFLAGS=	-I. -I.. -I../nfs/lib $(CPPFLAGS.master) -D_REENTRANT \

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,8 +97,8 @@ proc_TGTFLAGS		= -D_USER
 CFLAGS			+= $(CCVERBOSE)
 CFLAGS64		+= $(CCVERBOSE)
 CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common
-LDFLAGS			+= $(ZTEXT) $(ZCOMBRELOC)
-LDFLAGS64		+= $(ZTEXT) $(ZCOMBRELOC)
+LDFLAGS			+= $(ZTEXT)
+LDFLAGS64		+= $(ZTEXT)
 
 # Module type-specific compiler flags
 $(MODOBJS) :=			CFLAGS += $(C_BIGPICFLAGS) $(XREGSFLAG)
@@ -108,7 +108,11 @@ $(KMODOBJS) :=			V9CODESIZE = $(CCABS32)
 $(KMODOBJS) :=			DTS_ERRNO =
 
 # Modules aren't allowed to export symbols
-MAPFILE			= $(SRC)/cmd/mdb/common/modules/conf/mapfile
+MAPFILE		= $(SRC)/cmd/mdb/common/modules/conf/mapfile
+
+# Modules typically make external references.  To provide for -zdefs use
+# and clean ldd(1) processing, explicitly define all external references.
+MAPFILE-EXT	= $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
 #
 # kmdb is a kernel module, so we'll use the kernel's build flags.
@@ -143,8 +147,9 @@ lint: $$(LINTFILES)
 .PARALLEL: $(MODOBJS) $(KMODOBJS) mdb_tgt kmdb_tgt dmod kmod \
 	$(TARGETS) $(LINTFILES)
 
-$(MODFILE): dmod .WAIT $(MODOBJS)
-	$(LINK.c) $(GSHARED) $(MODOBJS) -o $@ $(LDLIBS)
+$(MODFILE): dmod .WAIT $(MODOBJS) $$(MAPFILE-EXT)
+	$(LINK.c) $(ZDEFS) $(ZIGNORE) $(MAPFILE-EXT:%=-M%) $(GSHARED) \
+	    $(MODOBJS) -o $@ $(LDLIBS) -lc
 	$(CTFMERGE) -L VERSION -o $@ $(MODOBJS)
 	$(POST_PROCESS_SO)
 

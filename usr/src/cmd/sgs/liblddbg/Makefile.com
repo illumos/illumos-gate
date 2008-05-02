@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,7 @@ LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc $(VAR_LIBLDDBG_CPPFLAGS)
-DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
+DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 # A bug in pmake causes redundancy when '+=' is conditionally assigned, so

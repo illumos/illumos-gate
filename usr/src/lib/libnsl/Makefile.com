@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -204,10 +204,9 @@ CPPFLAGS +=	-I$(SRC)/lib/common/inc -I$(SRC)/lib/libnsl/include -D_REENTRANT
 CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
 
 CFLAGS +=	$(CCVERBOSE)
+LDLIBS +=	-lmp -lmd -lscf -lc
 
-LAZYLIBS = $(ZLAZYLOAD) -lmp -lmd -lscf $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lmd
-LDLIBS +=	$(LAZYLIBS) -lc
+lint :=		LDLIBS = -lmd -lscf -lc
 
 $(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
 LINTFLAGS +=	-m -DPORTMAP

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,12 +75,13 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG) 
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
-LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZIGNORE)
+LDFLAGS += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
 
-$(PROG) := LDFLAGS += $(ZDEFS) -M$(APIMAP) -M$(FMRIMAP)
+MAPFILE-DMOD = $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
+
+
+$(PROG) := LDFLAGS += -M$(APIMAP) -M$(FMRIMAP)
 $(PROG) := LDLIBS += -lnvpair -lc
-
-$(DMODPROG) := LDFLAGS += $(ZNODEFS)
 
 all: $(PROG) $(DMODPROG)
 
@@ -92,9 +93,9 @@ $(PROG): $(OBJS) $(APIMAP)
 	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS_SO)
 
-$(DMODPROG): $(DMOD_OBJS)
+$(DMODPROG): $(DMOD_OBJS) $(MAPFILE-DMOD)
 	-@mkdir -p $(@D)
-	$(LINK.c) $(DMOD_OBJS) -o $@
+	$(LINK.c) $(DMOD_OBJS) $(MAPFILE-DMOD:%=-M%) -o $@ -lc
 	$(POST_PROCESS)
 
 %.o: %.c

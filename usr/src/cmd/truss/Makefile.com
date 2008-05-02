@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,10 +39,7 @@ include ../../Makefile.cmd
 CFLAGS		+= $(CCVERBOSE)
 CFLAGS64	+= $(CCVERBOSE)
 
-LAZYLIBS = $(ZLAZYLOAD) -ltsol -lnvpair $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol -lnvpair
-LDLIBS	+= -lproc -lrtld_db -lc_db -lnsl -lsocket $(LAZYLIBS)
-
+LDLIBS	+= -lproc -lrtld_db -lc_db -lnsl -lsocket -ltsol -lnvpair
 CPPFLAGS += -D_REENTRANT -D_LARGEFILE64_SOURCE=1
 
 .KEEP_STATE:

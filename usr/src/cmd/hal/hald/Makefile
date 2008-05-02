@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,8 +43,6 @@ ROOTCMDDIR =	$(ROOTLIB_HAL)
 
 LDLIBS +=	-lc -lm -ldbus-1 -ldbus-glib-1 -lglib-2.0 -lgobject-2.0 \
 		-ldevinfo -lsysevent -lnvpair
-
-LDFLAGS +=	-L$(SFW_ROOT)/lib -R$(SFW_ROOT)/lib
 
 all install $(PROG) :=	LDLIBS += -lexpat
 

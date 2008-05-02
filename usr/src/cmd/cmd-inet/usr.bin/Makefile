@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -88,7 +88,7 @@ whois :=		LDLIBS += -lnsl -lsocket
 
 include  $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 $(KCMDPROGS)	:=	LDLIBS += -lnsl -lmech_krb5
-$(KCMDPROGS)	:=	LDFLAGS += $(ZIGNORE) $(ZLAZYLOAD) $(KRUNPATH) \
+$(KCMDPROGS)	:=	LDFLAGS += $(ZIGNORE) $(KRUNPATH) \
 				-L$(ROOT)$(KLIBDIR_DO) \
 				-L$(ROOT)$(KLIBDIR_GL)
 KCMDLINTS=	$(KCMDPROGS:%=lint-%)

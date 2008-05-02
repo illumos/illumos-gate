@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -24,7 +24,7 @@ clean:
 
 include ../../Makefile.targ
 
-LDLIBS += $(LIBS) ../$(LIBNTP_A)
+LDLIBS += $(LIBS) ../$(LIBNTP_A) -lmd
 OBJS=	ntpq.o ntpq_ops.o version.o
 SOURCE=	ntpq.c ntpq_ops.c
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,10 +36,7 @@ include ../Makefile.cmd
 OWNER = root
 GROUP = sys
 
-LDLIBS_LIST = -lpam -lbsm -lcontract $(ZLAZYLOAD) -lscf
-lint := LDLIBS_LIST = -lpam -lbsm -lcontract -lscf
-
-LDLIBS += $(LDLIBS_LIST)
+LDLIBS += -lpam -lbsm -lcontract -lscf
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 CLOBBERFILES= $(STATIC)
 

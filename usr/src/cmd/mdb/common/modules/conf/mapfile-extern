@@ -1,0 +1,129 @@
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# External interface requirements
+{
+	global:
+#		Plwp_iter =			EXTERN;
+#		Pmapping_iter =			EXTERN;
+
+		_mdb_ks_ncpu =			EXTERN;
+		_mdb_ks_pageshift =		EXTERN;
+		_mdb_ks_pagesize =		EXTERN;
+
+		mdb =				EXTERN;
+		mdb_add_walker =		EXTERN;
+		mdb_alloc =			EXTERN;
+		mdb_call_dcmd =			EXTERN;
+		mdb_callback_add =		EXTERN;
+		mdb_cpuset_find =		EXTERN;
+		mdb_ctf_array_info =		EXTERN;
+		mdb_ctf_enum_name =		EXTERN;
+		mdb_ctf_lookup_by_addr =	EXTERN;
+		mdb_ctf_member_iter =		EXTERN;
+		mdb_ctf_type_cmp =		EXTERN;
+		mdb_ctf_type_invalidate =	EXTERN;
+		mdb_ctf_type_kind =		EXTERN;
+		mdb_ctf_type_reference =	EXTERN;
+		mdb_ctf_lookup_by_name =	EXTERN;
+		mdb_ctf_offsetof =		EXTERN;
+		mdb_ctf_type_name =		EXTERN;
+		mdb_ctf_type_resolve =		EXTERN;
+		mdb_ctf_type_size =		EXTERN;
+		mdb_ctf_type_valid =		EXTERN;
+		mdb_ctf_vread =			EXTERN;
+		mdb_ddi_pathname =		EXTERN;
+		mdb_dec_indent =		EXTERN;
+		mdb_devinfo2driver =		EXTERN;
+		mdb_devinfo2statep =		EXTERN;
+		mdb_dlpi_prim =			EXTERN;
+		mdb_dumpptr =			EXTERN;
+		mdb_eval =			EXTERN;
+		mdb_fdio_create_path =		EXTERN;
+		mdb_fdio_fileno =		EXTERN;
+		mdb_ffs =			EXTERN;
+		mdb_flush =			EXTERN;
+		mdb_free =			EXTERN;
+		mdb_get_dot =			EXTERN;
+		mdb_get_pipe =			EXTERN;
+		mdb_get_soft_state_byaddr =	EXTERN;
+		mdb_get_state =			EXTERN;
+		mdb_get_xdata =			EXTERN;
+		mdb_getopts =			EXTERN;
+		mdb_gelf_create =		EXTERN;
+		mdb_gelf_destroy =		EXTERN;
+		mdb_gelf_sect_by_name =		EXTERN;
+		mdb_gelf_sect_load =		EXTERN;
+		mdb_inc_indent =		EXTERN;
+		mdb_io_destroy =		EXTERN;
+		mdb_iob_clrflags =		EXTERN;
+		mdb_iob_getflags =		EXTERN;
+		mdb_iob_resize =		EXTERN;
+		mdb_iob_setflags =		EXTERN;
+		mdb_layered_walk =		EXTERN;
+		mdb_lookup_by_addr =		EXTERN;
+		mdb_lookup_by_name =		EXTERN;
+		mdb_lookup_by_obj =		EXTERN;
+		mdb_mac_addr =			EXTERN;
+		mdb_major_to_name =		EXTERN;
+		mdb_mblk_count =		EXTERN;
+		mdb_memio_create =		EXTERN;
+		mdb_name_to_major =		EXTERN;
+		mdb_nhconvert =			EXTERN;
+		mdb_pid2proc =			EXTERN;
+		mdb_printf =			EXTERN;
+		mdb_prop_kernel =		EXTERN;
+		mdb_prop_postmortem =		EXTERN;
+		mdb_pread =			EXTERN;
+		mdb_pwalk =			EXTERN;
+		mdb_pwalk_dcmd =		EXTERN;
+		mdb_qinfo = 			EXTERN;
+		mdb_qname =			EXTERN;
+		mdb_qops_install =		EXTERN;
+		mdb_qops_remove =		EXTERN;
+		mdb_qrnext_default =		EXTERN;
+		mdb_qwnext =			EXTERN;
+		mdb_qwnext_default =		EXTERN;
+		mdb_read_refstr =		EXTERN;
+		mdb_readstr =			EXTERN;
+		mdb_readsym =			EXTERN;
+		mdb_readvar =			EXTERN;
+		mdb_remove_walker =		EXTERN;
+		mdb_set_dot =			EXTERN;
+		mdb_set_pipe =			EXTERN;
+		mdb_snprintf =			EXTERN;
+		mdb_strtoull =			EXTERN;
+		mdb_tgt_notsup =		EXTERN;
+		mdb_vnode2page =		EXTERN;
+		mdb_vnode2path =		EXTERN;
+		mdb_vread =			EXTERN;
+		mdb_vtype2chr =			EXTERN;
+		mdb_walk =			EXTERN;
+		mdb_walk_dcmd =			EXTERN;
+		mdb_warn =			EXTERN;
+		mdb_writevar =			EXTERN;
+		mdb_zalloc =			EXTERN;
+};

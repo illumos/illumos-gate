@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,10 +37,10 @@ COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 SHAREDLIBS = -lmech_krb5 -lss
 
-CLLIBS = $(LDLIBS) $(KRUNPATH) \
+CLLIBS = $(LDLIBS) $(KRUNPATH) $(KERBRUNPATH) \
 	-L$(ROOT_KLIBDIR) -L$(KRB5LIB) $(SHAREDLIBS) -lkadm5clnt
 
-SRVLIBS = $(LDLIBS) $(KRUNPATH) \
+SRVLIBS = $(LDLIBS) $(KRUNPATH) $(KERBRUNPATH) \
 	-L$(ROOT_KLIBDIR) -L$(KRB5LIB) $(SHAREDLIBS) -lkadm5srv
 
 kadmin.local:=	DEFS += -D_KADMIN_LOCAL_

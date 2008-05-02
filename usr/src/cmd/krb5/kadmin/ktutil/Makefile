@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,7 +27,7 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	 -DHAVE_TIMEZONE
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 
-LDFLAGS += $(KRUNPATH)
+LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += $(KMECHLIB) $(ROOT)$(KERBLIBDIR)/libss.so
 
 .KEEP_STATE:
