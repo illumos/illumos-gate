@@ -777,7 +777,6 @@ pcie_enable_errors(dev_info_t *dip)
 		    reg32);
 	}
 
-	/* x86 doesn't do this except for RC */
 	/* Enable ECRC generation and checking */
 	if ((reg32 = PCIE_AER_GET(32, bus_p, PCIE_AER_CTL)) !=
 	    PCI_CAP_EINVAL32) {

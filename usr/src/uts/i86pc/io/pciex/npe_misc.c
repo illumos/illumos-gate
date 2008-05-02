@@ -39,6 +39,7 @@
 #include <sys/pci_cap.h>
 #include <sys/pcie_impl.h>
 #include <io/pciex/pcie_nvidia.h>
+#include <io/pciex/pcie_nb5000.h>
 
 /*
  * Prototype declaration
@@ -47,6 +48,7 @@ void	npe_query_acpi_mcfg(dev_info_t *dip);
 void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
+void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
 
 /*
  * Default ecfga base address
@@ -160,5 +162,28 @@ npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl) {
 		 * have the correct ID.
 		 */
 		pcie_full_scan = B_TRUE;
+	}
+}
+
+void
+npe_intel_error_mask(ddi_acc_handle_t cfg_hdl) {
+	uint32_t regs;
+	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+
+	if (vendor_id == INTEL_VENDOR_ID) {
+		/*
+		 * Due to an errata in Intel's ESB2 southbridge, all ECRCs
+		 * generation/checking need to be disabled.  There is a
+		 * workaround by setting a proprietary bit in the ESB2, but it
+		 * is not well documented or understood.  If that bit is set in
+		 * the future, then ECRC generation/checking should be enabled
+		 * again.
+		 *
+		 * Disable ECRC generation/checking by masking ECRC in the AER
+		 * UE Mask.  The pcie misc module would then automatically
+		 * disable ECRC generation/checking in the AER Control register.
+		 */
+		regs = pcie_get_aer_uce_mask() | PCIE_AER_UCE_ECRC;
+		pcie_set_aer_uce_mask(regs);
 	}
 }

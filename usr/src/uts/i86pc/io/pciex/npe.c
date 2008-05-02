@@ -169,6 +169,7 @@ extern void	npe_query_acpi_mcfg(dev_info_t *dip);
 extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 extern void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
+extern void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
 
 /*
  * Module linkage information for the kernel.
@@ -857,6 +858,7 @@ npe_initchild(dev_info_t *child)
 	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
 		npe_ck804_fix_aer_ptr(cfg_hdl);
 		npe_nvidia_error_mask(cfg_hdl);
+		npe_intel_error_mask(cfg_hdl);
 		pci_config_teardown(&cfg_hdl);
 	}
 
@@ -873,19 +875,6 @@ npe_initchild(dev_info_t *child)
 			bus_p->bus_aer_off = 0;
 
 		(void) pcie_initchild(child);
-
-		/* If device is an NVIDIA RC do device specific error setup */
-		if ((vendor_id == NVIDIA_VENDOR_ID) &&
-		    NVIDIA_PCIE_RC_DEV_ID(device_id)) {
-			ddi_acc_handle_t cfg_hdl = bus_p->bus_cfg_hdl;
-			uint16_t rc_ctl;
-
-			rc_ctl = pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF +
-			    0x2);
-			pci_config_put16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2,
-			    rc_ctl | NVIDIA_INTR_BCR_SERR_FORWARD_BIT);
-		}
-
 	}
 
 	return (DDI_SUCCESS);
