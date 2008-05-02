@@ -218,8 +218,10 @@ lo_mount(struct vfs *vfsp,
 		zone_t	*to_zptr;
 
 		if (vnodetopath(NULL, realrootvp, specname,
-		    sizeof (specname), CRED()) != 0)
+		    sizeof (specname), CRED()) != 0) {
+			VN_RELE(realrootvp);
 			return (EACCES);
+		}
 
 		from_zptr = zone_find_by_path(specname);
 		to_zptr = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
@@ -271,6 +273,7 @@ lo_mount(struct vfs *vfsp,
 					/* make the mount read-only */
 					vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
 				} else {
+					VN_RELE(realrootvp);
 					zone_rele(to_zptr);
 					zone_rele(from_zptr);
 					return (EACCES);
