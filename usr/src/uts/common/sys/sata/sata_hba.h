@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,12 +145,9 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
 /*
  * satadev_state field of sata_device structure.
  * Common flags specifying current state of a port or an attached drive.
- * These states are mutually exclusive, except SATA_STATE_PROBED and
- * SATA_STATE_READY that may be set at the same time.
+ * These states are mutually exclusive, obviously
  */
 #define	SATA_STATE_UNKNOWN		0x000000
-#define	SATA_STATE_PROBING		0x000001
-#define	SATA_STATE_PROBED		0x000002
 #define	SATA_STATE_READY		0x000010
 
 /*

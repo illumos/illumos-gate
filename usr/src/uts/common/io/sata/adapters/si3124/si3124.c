@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1068,7 +1068,7 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 
 	if (cport >= SI_MAX_PORTS) {
 		sd->satadev_type = SATA_DTYPE_NONE;
-		sd->satadev_state = SATA_STATE_PROBED;
+		sd->satadev_state = SATA_STATE_UNKNOWN; /* invalid port */
 		return (SATA_FAILURE);
 	}
 
@@ -1077,7 +1077,7 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	mutex_exit(&si_ctlp->sictl_mutex);
 	if (si_portp == NULL) {
 		sd->satadev_type = SATA_DTYPE_NONE;
-		sd->satadev_state = SATA_STATE_PROBED;
+		sd->satadev_state = SATA_STATE_UNKNOWN;
 		return (SATA_FAILURE);
 	}
 
@@ -1086,7 +1086,7 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	if (qual == SATA_ADDR_PMPORT) {
 		if (pmport >= si_portp->siport_portmult_state.sipm_num_ports) {
 			sd->satadev_type = SATA_DTYPE_NONE;
-			sd->satadev_state = SATA_STATE_PROBED;
+			sd->satadev_state = SATA_STATE_UNKNOWN;
 			mutex_exit(&si_portp->siport_mutex);
 			return (SATA_FAILURE);
 		} else {
@@ -1101,31 +1101,28 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 
 	case PORT_TYPE_DISK:
 		sd->satadev_type = SATA_DTYPE_ATADISK;
-		sd->satadev_state = SATA_STATE_PROBED;
 		break;
 
 	case PORT_TYPE_ATAPI:
 		sd->satadev_type = SATA_DTYPE_ATAPICD;
-		sd->satadev_state = SATA_STATE_PROBED;
 		break;
 
 	case PORT_TYPE_MULTIPLIER:
 		sd->satadev_type = SATA_DTYPE_PMULT;
 		sd->satadev_add_info =
 			si_portp->siport_portmult_state.sipm_num_ports;
-		sd->satadev_state = SATA_STATE_PROBED;
 		break;
 
 	case PORT_TYPE_UNKNOWN:
 		sd->satadev_type = SATA_DTYPE_UNKNOWN;
-		sd->satadev_state = SATA_STATE_PROBED;
+		break;
 
 	default:
 		/* we don't support any other device types. */
 		sd->satadev_type = SATA_DTYPE_NONE;
-		sd->satadev_state = SATA_STATE_PROBED;
 		break;
 	}
+	sd->satadev_state = SATA_STATE_READY;
 
 	if (qual == SATA_ADDR_PMPORT) {
 		(void) si_read_portmult_reg(si_ctlp, si_portp, cport,
@@ -1148,6 +1145,7 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 						SSTATUS_DET_PHYOFFLINE);
 			SSTATUS_SET_IPM(sd->satadev_scr.sstatus,
 						SSTATUS_IPM_NODEV_NOPHY);
+			sd->satadev_state = SATA_PSTATE_SHUTDOWN;
 		}
 	}
 
@@ -4361,7 +4359,7 @@ si_intr_phy_ready_change(
 		sdevice.satadev_addr.qual = SATA_ADDR_CPORT;
 	}
 
-	sdevice.satadev_state = SATA_PSTATE_PWRON;
+	sdevice.satadev_state = SATA_STATE_READY; /* port state */
 
 	if (dev_exists_now) {
 		if (dev_existed_previously) {

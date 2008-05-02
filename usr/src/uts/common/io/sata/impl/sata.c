@@ -110,8 +110,22 @@ static	void sata_save_atapi_trace(sata_pkt_txlate_t *, int);
 static void
 sata_test_atapi_packet_command(sata_hba_inst_t *, int);
 #endif
-#define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
+#ifdef SATA_INJECT_FAULTS
+
+#define		SATA_INJECT_PKT_FAULT	1
+uint32_t	sata_inject_fault = 0;
+
+uint32_t	sata_fault_cmd = 0;
+uint32_t	sata_inject_fault_type = 0;
+uint32_t	sata_inject_fault_count = 0;
+uint32_t	sata_inject_fault_pause_count = 0;
+
+static	void sata_inject_pkt_fault(sata_pkt_t *, uint8_t, int *, int);
+
+#endif
+
+#define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
 /*
  * SATA cb_ops functions
@@ -2044,7 +2058,9 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	    &spx->txlt_sata_pkt->satapkt_device);
 	if (sdinfo == NULL ||
 	    SATA_CPORT_INFO(sata_hba_inst, cport)->cport_tgtnode_clean ==
-	    B_FALSE) {
+	    B_FALSE ||
+	    (sdinfo->satadrv_state & SATA_DSTATE_FAILED) != 0) {
+
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 		pkt->pkt_reason = CMD_DEV_GONE;
 		/*
@@ -7977,7 +7993,7 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 				    drv_usectohz(SATA_DEV_IDENTIFY_TIMEOUT)) {
 					/* sleep for a while */
 					delay(drv_usectohz(
-					    SATA_DEV_IDENTIFY_RTR_DLY));
+					    SATA_DEV_RETRY_DLY));
 					goto reprobe_cport;
 				}
 			}
@@ -8103,7 +8119,7 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 					    SATA_DEV_IDENTIFY_TIMEOUT)) {
 						/* sleep for a while */
 						delay(drv_usectohz(
-						    SATA_DEV_IDENTIFY_RTR_DLY));
+						    SATA_DEV_RETRY_DLY));
 						goto reprobe_pmport;
 					}
 				}
@@ -8478,16 +8494,20 @@ fail:
  * SATA_FAILURE is returned if one of the operations failed.
  *
  * This function cannot be called in interrupt context - it may sleep.
+ *
+ * NOte: Port multiplier is not supported yet, although there may be some
+ * pieces of code referencing to it.
  */
 static int
 sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device,
     int flag)
 {
 	sata_cport_info_t *cportinfo;
-	sata_drive_info_t *sdinfo;
+	sata_drive_info_t *sdinfo, *osdinfo;
 	boolean_t init_device = B_FALSE;
 	int prev_device_type = SATA_DTYPE_NONE;
 	int prev_device_settings = 0;
+	int prev_device_state = 0;
 	clock_t start_time;
 	int retry = B_FALSE;
 	int rval;
@@ -8495,14 +8515,15 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device,
 	/* We only care about host sata cport for now */
 	cportinfo = SATA_CPORT_INFO(sata_hba_inst,
 	    sata_device->satadev_addr.cport);
-	sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
-	if (sdinfo != NULL) {
+	osdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
+	if (osdinfo != NULL) {
 		/*
 		 * We are re-probing port with a previously attached device.
-		 * Save previous device type and settings
+		 * Save previous device type and settings.
 		 */
 		prev_device_type = cportinfo->cport_dev_type;
-		prev_device_settings = sdinfo->satadrv_settings;
+		prev_device_settings = osdinfo->satadrv_settings;
+		prev_device_state = osdinfo->satadrv_state;
 	}
 	if (flag == SATA_DEV_IDENTIFY_RETRY) {
 		start_time = ddi_get_lbolt();
@@ -8570,7 +8591,12 @@ retry_probe:
 	if (sata_device->satadev_type == SATA_DTYPE_NONE) {
 		/*
 		 * There is no device, so remove device info structure,
-		 * if necessary. Direct attached drive only!
+		 * if necessary.
+		 * Only direct attached drive is considered now, until
+		 * port multiplier is supported. If the previously
+		 * attached device was a port multiplier, we would need
+		 * to take care of devices attached beyond the port
+		 * multiplier.
 		 */
 		SATA_CPORTINFO_DRV_INFO(cportinfo) = NULL;
 		cportinfo->cport_dev_type = SATA_DTYPE_NONE;
@@ -8637,20 +8663,45 @@ retry_probe:
 	 */
 	rval = sata_probe_device(sata_hba_inst, sata_device);
 
+	mutex_enter(&cportinfo->cport_mutex);
 	if (rval == SATA_SUCCESS) {
 		/*
 		 * If we are dealing with the same type of a device as before,
 		 * restore its settings flags.
 		 */
-		if (sata_device->satadev_type == prev_device_type)
+		if (osdinfo != NULL &&
+		    sata_device->satadev_type == prev_device_type)
 			sdinfo->satadrv_settings = prev_device_settings;
 
+		mutex_exit(&cportinfo->cport_mutex);
 		/* Set initial device features, if necessary */
 		if (init_device == B_TRUE) {
 			rval = sata_initialize_device(sata_hba_inst, sdinfo);
 		}
 		if (rval == SATA_SUCCESS)
 			return (rval);
+	} else {
+		/*
+		 * If there was some device info before we probe the device,
+		 * restore previous device setting, so we can retry from scratch
+		 * later. Providing, of course, that device has not disapear
+		 * during probing process.
+		 */
+		if (sata_device->satadev_type != SATA_DTYPE_NONE) {
+			if (osdinfo != NULL) {
+				cportinfo->cport_dev_type = prev_device_type;
+				sdinfo->satadrv_type = prev_device_type;
+				sdinfo->satadrv_state = prev_device_state;
+			}
+		} else {
+			/* device is gone */
+			kmem_free(sdinfo, sizeof (sata_drive_info_t));
+			cportinfo->cport_dev_type = SATA_DTYPE_NONE;
+			SATA_CPORTINFO_DRV_INFO(cportinfo) = NULL;
+			mutex_exit(&cportinfo->cport_mutex);
+			return (SATA_SUCCESS);
+		}
+		mutex_exit(&cportinfo->cport_mutex);
 	}
 
 	if (retry) {
@@ -8660,13 +8711,19 @@ retry_probe:
 		 * Track retry time for device identification.
 		 */
 		if ((cur_time - start_time) <
-		    drv_usectohz(SATA_DEV_IDENTIFY_TIMEOUT)) {
+		    drv_usectohz(SATA_DEV_REPROBE_TIMEOUT)) {
 			/* sleep for a while */
-			delay(drv_usectohz(SATA_DEV_IDENTIFY_RTR_DLY));
+			delay(drv_usectohz(SATA_DEV_RETRY_DLY));
 			goto retry_probe;
+		} else {
+			mutex_enter(&cportinfo->cport_mutex);
+			if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL)
+				SATA_CPORTINFO_DRV_INFO(cportinfo)->
+				    satadrv_state = SATA_DSTATE_FAILED;
+			mutex_exit(&cportinfo->cport_mutex);
 		}
 	}
-	return (rval);
+	return (SATA_SUCCESS);
 }
 
 /*
@@ -9024,7 +9081,7 @@ sata_probe_device(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 		sata_device->satadev_type = SATA_DTYPE_UNKNOWN;
 		sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
 		sdinfo->satadrv_state &= ~SATA_STATE_PROBING;
-		sdinfo->satadrv_state = SATA_STATE_PROBED;
+		sdinfo->satadrv_state |= SATA_STATE_PROBED;
 		if (sata_device->satadev_addr.qual == SATA_ADDR_DCPORT)
 			SATA_CPORT_DEV_TYPE(sata_hba_inst,
 			    sata_device->satadev_addr.cport) =
@@ -10104,6 +10161,14 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 
 	/* Send pkt to SATA HBA driver */
 	rval = (*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt);
+
+#ifdef SATA_INJECT_FAULTS
+	if (sata_inject_fault == SATA_INJECT_PKT_FAULT)
+		if (sata_fault_cmd == scmd->satacmd_cmd_reg)
+			sata_inject_pkt_fault(spkt, scmd->satacmd_cmd_reg,
+			    &rval, sata_inject_fault_type);
+#endif
+
 	if (rval == SATA_TRAN_ACCEPTED &&
 	    spkt->satapkt_reason == SATA_PKT_COMPLETED) {
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
@@ -10795,10 +10860,8 @@ sata_ioctl_disconnect(sata_hba_inst_t *sata_hba_inst,
 				pmultinfo =
 				    cportinfo->cport_devp.cport_sata_pmult;
 				ASSERT(pmultinfo != NULL);
-			} else if (cportinfo->cport_dev_type &
-			    SATA_VALID_DEV_TYPE) {
+			} else {
 				sdinfo = cportinfo->cport_devp.cport_sata_drive;
-				ASSERT(sdinfo != NULL);
 			}
 		}
 		cportinfo->cport_state &= ~SATA_STATE_READY;
@@ -11028,17 +11091,32 @@ sata_ioctl_connect(sata_hba_inst_t *sata_hba_inst,
 	 * If there is a device attached to the port, emit
 	 * a message.
 	 */
-	if (qual == SATA_ADDR_CPORT) {
-		if (SATA_CPORT_DEV_TYPE(sata_hba_inst, cport) !=
-		    SATA_DTYPE_NONE)
+	if (sata_device->satadev_type != SATA_DTYPE_NONE) {
+
+		if (qual == SATA_ADDR_CPORT) {
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA device detected at port %d", cport);
-	} else { /* port multiplier device port */
-		if (SATA_PMPORT_STATE(sata_hba_inst, cport, pmport) !=
-		    SATA_DTYPE_NONE)
+			if (sata_device->satadev_type == SATA_DTYPE_UNKNOWN) {
+				/*
+				 * A device was not successfully identified
+				 */
+				sata_log(sata_hba_inst, CE_WARN,
+				    "Could not identify SATA "
+				    "device at port %d", cport);
+			}
+		} else { /* port multiplier device port */
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA device detected at port %d:%d",
 			    cport, pmport);
+			if (sata_device->satadev_type == SATA_DTYPE_UNKNOWN) {
+				/*
+				 * A device was not successfully identified
+				 */
+				sata_log(sata_hba_inst, CE_WARN,
+				    "Could not identify SATA "
+				    "device at port %d:%d", cport, pmport);
+			}
+		}
 	}
 
 	return (rv);
@@ -11138,7 +11216,9 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 
 	if (rval != SATA_SUCCESS ||
 	    (sata_device->satadev_state & SATA_PSTATE_FAILED) != 0) {
-		/* Obviously, device on a failed port is not visible */
+		/*
+		 * Obviously, device on a failed port is not visible
+		 */
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
 		return (ENXIO);
 	}
@@ -11206,9 +11286,8 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 	    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS)
 		return (EIO);
 
-	if (qual == SATA_ADDR_PMPORT) {
-		if (pmportinfo->pmport_dev_type != SATA_DTYPE_NONE &&
-		    target == FALSE) {
+	if (sata_device->satadev_type != SATA_DTYPE_NONE && target == FALSE) {
+		if (qual == SATA_ADDR_PMPORT) {
 			/*
 			 * That's the transition from "inactive" port
 			 * to active one with device attached.
@@ -11216,10 +11295,7 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA device detected at port %d:%d",
 			    cport, pmport);
-		}
-	} else {
-		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE &&
-		    target == FALSE) {
+		} else {
 			/*
 			 * When PM is attached to the cport and cport is
 			 * activated, every PM device port needs to be reprobed.
@@ -11243,6 +11319,25 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 	 * For now, configure only disks and other valid target devices.
 	 */
 	if (!(sata_device->satadev_type & SATA_VALID_DEV_TYPE)) {
+		if (qual == SATA_ADDR_CPORT) {
+			if (sata_device->satadev_type == SATA_DTYPE_UNKNOWN) {
+				/*
+				 * A device was not successfully identified
+				 */
+				sata_log(sata_hba_inst, CE_WARN,
+				    "Could not identify SATA "
+				    "device at port %d", cport);
+			}
+		} else { /* port multiplier device port */
+			if (sata_device->satadev_type == SATA_DTYPE_UNKNOWN) {
+				/*
+				 * A device was not successfully identified
+				 */
+				sata_log(sata_hba_inst, CE_WARN,
+				    "Could not identify SATA "
+				    "device at port %d:%d", cport, pmport);
+			}
+		}
 		return (ENXIO);		/* No device to configure */
 	}
 
@@ -11268,8 +11363,8 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 	if (sdinfo->satadrv_event_flags &
 	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) {
 		sdinfo->satadrv_event_flags = 0;
-		sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
 	}
+	sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
 
 	if ((tdip = sata_get_scsi_target_dip(SATA_DIP(sata_hba_inst),
@@ -11388,8 +11483,7 @@ sata_ioctl_deactivate(sata_hba_inst_t *sata_hba_inst,
 			 */
 			if ((cportinfo->cport_dev_type &
 			    SATA_VALID_DEV_TYPE) != 0)
-				sdinfo = sata_get_device_info(sata_hba_inst,
-				    sata_device);
+				sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
 			/*
 			 * If attached device is a port multiplier, we will
 			 * have to unconfigure all devices attached to the
@@ -11403,8 +11497,7 @@ sata_ioctl_deactivate(sata_hba_inst_t *sata_hba_inst,
 		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
 		if (pmportinfo->pmport_dev_type != SATA_DTYPE_NONE &&
 		    (pmportinfo->pmport_dev_type & SATA_VALID_DEV_TYPE) != 0)
-			sdinfo = sata_get_device_info(sata_hba_inst,
-			    sata_device);
+			sdinfo = SATA_PMPORTINFO_DRV_INFO(pmportinfo);
 		pmportinfo->pmport_state &= ~SATA_STATE_READY;
 	}
 
@@ -11716,7 +11809,7 @@ sata_ioctl_reset_device(sata_hba_inst_t *sata_hba_inst,
     sata_device_t *sata_device)
 {
 	sata_drive_info_t *sdinfo;
-	int cport, pmport, qual;
+	int cport, pmport;
 	int rv = 0;
 
 	/* Sanity check */
@@ -11729,15 +11822,18 @@ sata_ioctl_reset_device(sata_hba_inst_t *sata_hba_inst,
 
 	cport = sata_device->satadev_addr.cport;
 	pmport = sata_device->satadev_addr.pmport;
-	qual = sata_device->satadev_addr.qual;
-
-	if (qual == SATA_ADDR_CPORT)
-		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
-	else
-		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
 
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
-	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT) {
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport);
+	} else { /* port multiplier */
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+		sdinfo = SATA_PMPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport,
+		    sata_device->satadev_addr.pmport);
+	}
 	if (sdinfo == NULL) {
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
 		return (EINVAL);
@@ -11828,8 +11924,12 @@ sata_ioctl_reset_all(sata_hba_inst_t *sata_hba_inst)
 		/*
 		 * All cports were successfully locked.
 		 * Reset main SATA controller only for now - no PMult.
+		 * Set the device address to port 0, to have a valid device
+		 * address.
 		 */
 		sata_device.satadev_addr.qual = SATA_ADDR_CNTRL;
+		sata_device.satadev_addr.cport = 0;
+		sata_device.satadev_addr.pmport = 0;
 
 		if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))
 		    (SATA_DIP(sata_hba_inst), &sata_device) != SATA_SUCCESS) {
@@ -11868,7 +11968,7 @@ sata_ioctl_reset_all(sata_hba_inst_t *sata_hba_inst)
 
 	/*
 	 * This operation returns EFAULT if either reset
-	 * controller failed or a re-probing of any ports failed.
+	 * controller failed or a re-probing of any port failed.
 	 */
 	return (rv);
 }
@@ -11951,6 +12051,7 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 {
 	uint16_t	cport;
 	int		port_state;
+	sata_drive_info_t *sdinfo;
 
 	/* Cport only */
 	cport = SCSI_TO_SATA_CPORT(port);
@@ -12009,7 +12110,24 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 				 */
 				ap_state->ap_condition = AP_COND_UNUSABLE;
 			} else {
-				ap_state->ap_condition = AP_COND_OK;
+				mutex_enter(&SATA_CPORT_MUTEX(sata_hba_inst,
+				    cport));
+				sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst,
+				    cport);
+				if (sdinfo != NULL) {
+					if ((sdinfo->satadrv_state &
+					    SATA_DSTATE_FAILED) != 0)
+						ap_state->ap_condition =
+						    AP_COND_FAILED;
+					else
+						ap_state->ap_condition =
+						    AP_COND_OK;
+				} else {
+					ap_state->ap_condition =
+					    AP_COND_UNKNOWN;
+				}
+				mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst,
+				    cport));
 			}
 			if ((DEVI_IS_DEVICE_OFFLINE(tdip)) ||
 			    (DEVI_IS_DEVICE_DOWN(tdip))) {
@@ -12172,11 +12290,12 @@ sata_ioctl_get_model_info(sata_hba_inst_t *sata_hba_inst,
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
 	    sata_device->satadev_addr.cport)->cport_mutex);
 	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
-		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport);
 	else /* port multiplier */
-		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
-
-	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+		sdinfo = SATA_PMPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport,
+		    sata_device->satadev_addr.pmport);
 	if (sdinfo == NULL) {
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
 		    sata_device->satadev_addr.cport)->cport_mutex);
@@ -12229,11 +12348,12 @@ sata_ioctl_get_revfirmware_info(sata_hba_inst_t *sata_hba_inst,
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
 	    sata_device->satadev_addr.cport)->cport_mutex);
 	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
-		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport);
 	else /* port multiplier */
-		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
-
-	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+		sdinfo = SATA_PMPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport,
+		    sata_device->satadev_addr.pmport);
 	if (sdinfo == NULL) {
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
 		    sata_device->satadev_addr.cport)->cport_mutex);
@@ -12285,11 +12405,12 @@ sata_ioctl_get_serialnumber_info(sata_hba_inst_t *sata_hba_inst,
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
 	    sata_device->satadev_addr.cport)->cport_mutex);
 	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
-		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport);
 	else /* port multiplier */
-		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
-
-	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+		sdinfo = SATA_PMPORT_DRV_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport,
+		    sata_device->satadev_addr.pmport);
 	if (sdinfo == NULL) {
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
 		    sata_device->satadev_addr.cport)->cport_mutex);
@@ -12476,8 +12597,8 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 		/*
 		 * Cannot get device identification - retry later
 		 */
-		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "%s fetch device identify data\n", finfo));
+		SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
+		    "%s fetch device identify data\n", finfo);
 		return (SATA_FAILURE);
 	}
 	finfox = (restore != 0) ? " restore device features" :
@@ -13970,12 +14091,19 @@ sata_process_controller_events(sata_hba_inst_t *sata_hba_inst)
 				    sata_hba_inst, saddr);
 			}
 		}
-		if (SATA_CPORT_DEV_TYPE(sata_hba_inst, ncport) !=
-		    SATA_DTYPE_NONE) {
-			/* May have device event */
-			sata_process_device_reset(sata_hba_inst, saddr);
-		}
 		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, ncport)));
+		if ((SATA_CPORT_DEV_TYPE(sata_hba_inst, ncport) !=
+		    SATA_DTYPE_NONE) &&
+		    (SATA_CPORT_DRV_INFO(sata_hba_inst, ncport) != NULL)) {
+			if (SATA_CPORT_DRV_INFO(sata_hba_inst, ncport)->
+			    satadrv_event_flags &
+			    (SATA_EVNT_DEVICE_RESET |
+			    SATA_EVNT_INPROC_DEVICE_RESET)) {
+				/* Have device event */
+				sata_process_device_reset(sata_hba_inst,
+				    saddr);
+			}
+		}
 		/* Release PORT_BUSY flag */
 		(SATA_CPORT_INFO(sata_hba_inst, ncport))->
 		    cport_event_flags &= ~SATA_EVNT_LOCK_PORT_BUSY;
@@ -14053,6 +14181,9 @@ sata_process_port_failed_event(sata_hba_inst_t *sata_hba_inst,
  * - reset event reported,
  * - reset event being processed,
  * - request to clear device reset state.
+ *
+ * NOTE: This function has to be entered with cport mutex held. It exits with
+ * mutex held as well, but can release mutex during the processing.
  */
 static void
 sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
@@ -14066,38 +14197,45 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 
 	/* We only care about host sata cport for now */
 	cportinfo = SATA_CPORT_INFO(sata_hba_inst, saddr->cport);
-
-	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
-
-	/* If the port is in SHUTDOWN or FAILED state, ignore reset event. */
-	if ((cportinfo->cport_state &
-	    (SATA_PSTATE_SHUTDOWN | SATA_PSTATE_FAILED)) != 0) {
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
+	sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst, saddr->cport);
+	/*
+	 * If the port is in SHUTDOWN or FAILED state, or device is in FAILED
+	 * state, ignore reset event.
+	 */
+	if (((cportinfo->cport_state &
+	    (SATA_PSTATE_SHUTDOWN | SATA_PSTATE_FAILED)) != 0) ||
+	    (sdinfo->satadrv_state & SATA_DSTATE_FAILED) != 0) {
+		sdinfo->satadrv_event_flags &=
+		    ~(SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET);
 		return;
 	}
 
 	if ((SATA_CPORT_DEV_TYPE(sata_hba_inst, saddr->cport) &
 	    SATA_VALID_DEV_TYPE) == 0) {
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
-		return;
-	}
-	sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst, saddr->cport);
-	if (sdinfo == NULL) {
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
+		/*
+		 * This should not happen - coding error.
+		 * But we can recover, so do not panic, just clean up
+		 * and if in debug mode, log the message.
+		 */
+#ifdef SATA_DEBUG
+		sata_log(sata_hba_inst, CE_WARN,
+		    "sata_process_device_reset: "
+		    "Invalid device type with sdinfo!", NULL);
+#endif
+		sdinfo->satadrv_event_flags = 0;
 		return;
 	}
 
+#ifdef SATA_DEBUG
 	if ((sdinfo->satadrv_event_flags &
 	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) == 0) {
 		/* Nothing to do */
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
+		/* Something is weird - why we are processing dev reset? */
+		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+		    "No device reset event!!!!", NULL);
+
 		return;
 	}
-#ifdef SATA_DEBUG
 	if ((sdinfo->satadrv_event_flags &
 	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) ==
 	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) {
@@ -14127,11 +14265,16 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 	if (rval != SATA_SUCCESS) {
 		/* Something went wrong? Fail the port */
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
+		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst, saddr->cport);
+		if (sdinfo != NULL)
+			sdinfo->satadrv_event_flags = 0;
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
 		    "SATA port %d probing failed",
 		    saddr->cport));
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+		    saddr->cport)->cport_mutex);
 		return;
 	}
 	if ((sata_device.satadev_scr.sstatus  &
@@ -14144,13 +14287,28 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 		 * To be safe (HBA may need it), request clearing device
 		 * reset condition.
 		 */
-		sdinfo->satadrv_event_flags = 0;
-		sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
+		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst, saddr->cport);
+		if (sdinfo != NULL) {
+			sdinfo->satadrv_event_flags &=
+			    ~SATA_EVNT_INPROC_DEVICE_RESET;
+			sdinfo->satadrv_event_flags |=
+			    SATA_EVNT_CLEAR_DEVICE_RESET;
+		}
 		return;
 	}
 
+	sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst, saddr->cport);
+	if (sdinfo == NULL) {
+		return;
+	}
+	if ((sdinfo->satadrv_event_flags &
+	    SATA_EVNT_INPROC_DEVICE_RESET) == 0) {
+		/*
+		 * Start tracking time for device feature restoration and
+		 * identification. Save current time (lbolt value).
+		 */
+		sdinfo->satadrv_reset_time = ddi_get_lbolt();
+	}
 	/* Mark device reset processing as active */
 	sdinfo->satadrv_event_flags |= SATA_EVNT_INPROC_DEVICE_RESET;
 
@@ -14180,22 +14338,37 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 			/*
 			 * We may retry this a bit later - in-process reset
 			 * condition should be already set.
+			 * Track retry time for device identification.
 			 */
 			if ((cportinfo->cport_dev_type &
 			    SATA_VALID_DEV_TYPE) != 0 &&
-			    SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
-				sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    saddr->cport)->cport_mutex);
-				mutex_enter(&sata_hba_inst->satahba_mutex);
-				sata_hba_inst->satahba_event_flags |=
-				    SATA_EVNT_MAIN;
-				mutex_exit(&sata_hba_inst->satahba_mutex);
-				mutex_enter(&sata_mutex);
-				sata_event_pending |= SATA_EVNT_MAIN;
-				mutex_exit(&sata_mutex);
-				return;
+			    SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL &&
+			    sdinfo->satadrv_reset_time != 0) {
+				clock_t cur_time = ddi_get_lbolt();
+				/*
+				 * If the retry time limit was not
+				 * exceeded, retry.
+				 */
+				if ((cur_time - sdinfo->satadrv_reset_time) <
+				    drv_usectohz(SATA_DEV_REPROBE_TIMEOUT)) {
+					mutex_enter(
+					    &sata_hba_inst->satahba_mutex);
+					sata_hba_inst->satahba_event_flags |=
+					    SATA_EVNT_MAIN;
+					mutex_exit(
+					    &sata_hba_inst->satahba_mutex);
+					mutex_enter(&sata_mutex);
+					sata_event_pending |= SATA_EVNT_MAIN;
+					mutex_exit(&sata_mutex);
+					return;
+				}
 			}
+			/* Fail the drive */
+			sdinfo->satadrv_state = SATA_DSTATE_FAILED;
+
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA device at port %d - device failed",
+			    saddr->cport);
 		} else {
 			/*
 			 * No point of retrying - some other event processing
@@ -14203,28 +14376,29 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 			 * To be safe (HBA may need it),
 			 * request clearing device reset condition.
 			 */
-			sdinfo->satadrv_event_flags = 0;
 			sdinfo->satadrv_event_flags |=
 			    SATA_EVNT_CLEAR_DEVICE_RESET;
 		}
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
+		sdinfo->satadrv_event_flags &= ~SATA_EVNT_INPROC_DEVICE_RESET;
+		sdinfo->satadrv_reset_time = 0;
 		return;
 	}
-
 	/*
 	 * Raise the flag indicating that the next sata command could
 	 * be sent with SATA_CLEAR_DEV_RESET_STATE flag, if no new device
 	 * reset is reported.
 	 */
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
-	if ((cportinfo->cport_dev_type & SATA_VALID_DEV_TYPE) != 0 &&
-	    SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
-		sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
-		sdinfo->satadrv_event_flags &= ~SATA_EVNT_INPROC_DEVICE_RESET;
-		sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
+	if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
+		sdinfo->satadrv_reset_time = 0;
+		if ((cportinfo->cport_dev_type & SATA_VALID_DEV_TYPE) != 0) {
+			sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
+			sdinfo->satadrv_event_flags &=
+			    ~SATA_EVNT_INPROC_DEVICE_RESET;
+			sdinfo->satadrv_event_flags |=
+			    SATA_EVNT_CLEAR_DEVICE_RESET;
+		}
 	}
-	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 }
 
 
@@ -14746,9 +14920,8 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 					cportinfo->cport_dev_attach_time = 0;
 					sata_log(sata_hba_inst,
 					    CE_WARN,
-					    "Cannot identify SATA device "
-					    "at port %d - device will not be "
-					    "attached.",
+					    "Could not identify SATA device "
+					    "at port %d",
 					    saddr->cport);
 				}
 			} else {
@@ -15185,3 +15358,145 @@ sata_check_device_removed(dev_info_t *tdip)
 	else
 		return (B_FALSE);
 }
+
+/* ************************ FAULT INJECTTION **************************** */
+
+#ifdef SATA_INJECT_FAULTS
+
+static	uint32_t sata_fault_count = 0;
+static	uint32_t sata_fault_suspend_count = 0;
+
+/*
+ * Inject sata pkt fault
+ * It modifies returned values of the sata packet.
+ * First argument is the pointer to the executed sata packet.
+ * The second argument specifies SATA command to be affected (not all commands
+ * are instrumented).
+ * Third argument is a pointer to a value returned by the HBA tran_start
+ * function.
+ * Fourth argument specifies injected error. Injected sata packet faults
+ * are the satapkt_reason values.
+ * SATA_PKT_BUSY		-1	Not completed, busy
+ * SATA_PKT_DEV_ERROR		1	Device reported error
+ * SATA_PKT_QUEUE_FULL		2	Not accepted, queue full
+ * SATA_PKT_PORT_ERROR		3	Not completed, port error
+ * SATA_PKT_CMD_UNSUPPORTED	4	Cmd unsupported
+ * SATA_PKT_ABORTED		5	Aborted by request
+ * SATA_PKT_TIMEOUT		6	Operation timeut
+ * SATA_PKT_RESET		7	Aborted by reset request
+ *
+ * sata_inject_fault_count variable specifies number of times in row the
+ * error is injected. Value of -1 specifies permanent fault, ie. every time
+ * the fault injection pointnis reached, the fault is injected and anu pause
+ * between fault injection specified by sata_inject_fault_pause_count is
+ * ignored).
+ *
+ * sata_inject_fault_pause_count variable specifies number of times a fault
+ * injection is bypassed (pause between fault injections).
+ * If set to 0, a fault is injected only a number of times specified by
+ * sata_inject_fault_count.
+ *
+ * The fault counts are static, so for periodic errors they have to be manually
+ * reset to start repetition sequence from scratch.
+ * If the original value returned by the HBA tran_start function is not
+ * SATA_TRAN_ACCEPTED and pkt reason is not SATA_PKT_COMPLETED, no error
+ * is injected (to avoid masking real problems);
+ *
+ * NOTE: In its current incarnation, this function should be invoked only for
+ * commands executed in SYNCHRONOUS mode.
+ */
+
+
+static	void
+sata_inject_pkt_fault(sata_pkt_t *spkt, uint8_t cmd, int *rval,
+    int fault)
+{
+	if (fault == 0)
+		return;
+	if (sata_inject_fault_count == 0)
+		return;
+
+	if (spkt->satapkt_cmd.satacmd_cmd_reg != cmd)
+		return;
+
+	if (*rval != SATA_TRAN_ACCEPTED ||
+	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		sata_fault_count = 0;
+		sata_fault_suspend_count = 0;
+		return;
+	}
+	if (sata_fault_count == 0 && sata_fault_suspend_count != 0) {
+		/* Pause in the injection */
+		sata_fault_suspend_count -= 1;
+		return;
+	}
+
+	if (sata_fault_count == 0 && sata_fault_suspend_count == 0) {
+		/*
+		 * Init inject fault cycle. If fault count is set to -1,
+		 * it is a permanent fault.
+		 */
+		if (sata_inject_fault_count != -1) {
+			sata_fault_count = sata_inject_fault_count;
+			sata_fault_suspend_count =
+			    sata_inject_fault_pause_count;
+			if (sata_fault_suspend_count == 0)
+				sata_inject_fault_count = 0;
+		}
+	}
+
+	if (sata_fault_count != 0)
+		sata_fault_count -= 1;
+
+	switch (fault) {
+	case SATA_PKT_BUSY:
+		*rval = SATA_TRAN_BUSY;
+		spkt->satapkt_reason = SATA_PKT_BUSY;
+		break;
+
+	case SATA_PKT_QUEUE_FULL:
+		*rval = SATA_TRAN_QUEUE_FULL;
+		spkt->satapkt_reason = SATA_PKT_QUEUE_FULL;
+		break;
+
+	case SATA_PKT_CMD_UNSUPPORTED:
+		*rval = SATA_TRAN_CMD_UNSUPPORTED;
+		spkt->satapkt_reason = SATA_PKT_CMD_UNSUPPORTED;
+		break;
+
+	case SATA_PKT_PORT_ERROR:
+		/* This is "rejected" command */
+		*rval = SATA_TRAN_PORT_ERROR;
+		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
+		/* Additional error setup could be done here - port state */
+		break;
+
+	case SATA_PKT_DEV_ERROR:
+		spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+		/*
+		 * Additional error setup could be done here
+		 */
+		break;
+
+	case SATA_PKT_ABORTED:
+		spkt->satapkt_reason = SATA_PKT_ABORTED;
+		break;
+
+	case SATA_PKT_TIMEOUT:
+		spkt->satapkt_reason = SATA_PKT_TIMEOUT;
+		/* Additional error setup could be done here */
+		break;
+
+	case SATA_PKT_RESET:
+		spkt->satapkt_reason = SATA_PKT_RESET;
+		/*
+		 * Additional error setup could be done here - device reset
+		 */
+		break;
+
+	default:
+		break;
+	}
+}
+
+#endif

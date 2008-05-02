@@ -827,7 +827,7 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 
 	if (cport >= NV_MAX_PORTS(nvc)) {
 		sd->satadev_type = SATA_DTYPE_NONE;
-		sd->satadev_state = SATA_STATE_PROBED;
+		sd->satadev_state = SATA_STATE_UNKNOWN;
 
 		return (SATA_FAILURE);
 	}
@@ -858,7 +858,7 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 
 	if (qual == SATA_ADDR_PMPORT) {
 		sd->satadev_type = SATA_DTYPE_NONE;
-		sd->satadev_state = SATA_STATE_PROBED;
+		sd->satadev_state = SATA_STATE_UNKNOWN;
 		mutex_exit(&nvp->nvp_mutex);
 		nv_cmn_err(CE_WARN, nvc, nvp,
 		    "controller does not support port multiplier");

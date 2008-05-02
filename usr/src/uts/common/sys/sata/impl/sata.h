@@ -43,6 +43,10 @@ extern "C" {
 #include <sys/sata/sata_defs.h>
 #include <sys/sata/sata_hba.h>
 
+/* Common flags specifying current state of a port or an attached drive. */
+#define	SATA_STATE_PROBING		0x000001
+#define	SATA_STATE_PROBED		0x000002
+
 /* Statistics counters */
 struct sata_port_stats {
 	uint64_t	link_lost;		/* event counter */
@@ -198,7 +202,11 @@ struct sata_drive_info {
 						 * SATA_EVNT_DRIVE_RESET
 						 */
 	uint32_t	satadrv_event_flags;
-
+						/*
+						 * lbolt value @ start of
+						 * device reset processing
+						 */
+	clock_t		satadrv_reset_time;
 						/*
 						 * Attached device type:
 						 * SATA_DTYPE_ATADISK
@@ -393,8 +401,10 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 #define	SATA_EVNT_DAEMON_TERM_TIMEOUT	100000	/* 100 ms */
 #define	SATA_EVNT_DAEMON_TERM_WAIT	60000000 /* 60 s */
 #define	SATA_EVNT_LINK_LOST_TIMEOUT	1000000	/* 1 s */
-#define	SATA_DEV_IDENTIFY_TIMEOUT	60000000 /* 60 s */
-#define	SATA_DEV_IDENTIFY_RTR_DLY	10000	/* 10 ms */
+
+#define	SATA_DEV_IDENTIFY_TIMEOUT	60000000 /* 60 s, device enumeration */
+#define	SATA_DEV_REPROBE_TIMEOUT	30000000  /* 30 s, dev resp after rst */
+#define	SATA_DEV_RETRY_DLY		10000	/* 10 ms */
 
 /* DEVICE IDENTIFY and device initialization retry delay */
 #define	SATA_DEV_IDENTIFY_RETRY		1
