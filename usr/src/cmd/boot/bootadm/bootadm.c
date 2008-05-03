@@ -7574,19 +7574,7 @@ is_sun4v(void)
 int
 is_sparc(void)
 {
-	static int issparc = -1;
-	char mbuf[257];	/* from sysinfo(2) manpage */
-
-	if (issparc != -1)
-		return (issparc);
-
-	if (sysinfo(SI_ARCHITECTURE, mbuf, sizeof (mbuf)) > 0 &&
-	    strcmp(mbuf, "sparc") == 0)
-		issparc = 1;
-	else
-		issparc = 0;
-
-	return (issparc);
+	return (is_sun4u() || is_sun4v());
 }
 
 static void
