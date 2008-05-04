@@ -108,7 +108,7 @@ static struct dev_ops i915_dev_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* drv_modops */
-	"I915 DRM driver 1.2",	/* drv_linkinfo */
+	"I915 DRM driver %I%",	/* drv_linkinfo */
 	&i915_dev_ops,			/* drv_dev_ops */
 };
 
@@ -281,6 +281,7 @@ static void i915_configure(drm_driver_t *driver)
 
 	driver->buf_priv_size	=	1;	/* No dev_priv */
 	driver->load	=	i915_driver_load;
+	driver->unload	=	i915_driver_unload;
 	driver->preclose	=	i915_driver_preclose;
 	driver->lastclose	=	i915_driver_lastclose;
 	driver->device_is_agp	=	i915_driver_device_is_agp;

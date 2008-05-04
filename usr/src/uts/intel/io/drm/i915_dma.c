@@ -103,6 +103,9 @@ void i915_kernel_lost_context(drm_device_t * dev)
 
 static int i915_dma_cleanup(drm_device_t * dev)
 {
+	drm_i915_private_t *dev_priv =
+		    (drm_i915_private_t *) dev->dev_private;
+
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
@@ -110,41 +113,35 @@ static int i915_dma_cleanup(drm_device_t * dev)
 	if (dev->irq)
 		(void) drm_irq_uninstall(dev);
 
-	if (dev->dev_private) {
-		drm_i915_private_t *dev_priv =
-		    (drm_i915_private_t *) dev->dev_private;
+	if (dev_priv->ring.virtual_start) {
+		drm_core_ioremapfree(&dev_priv->ring.map, dev);
+		dev_priv->ring.virtual_start = 0;
+		dev_priv->ring.map.handle = 0;
+		dev_priv->ring.map.size = 0;
+	}
 
-		if (dev_priv->ring.virtual_start) {
-			drm_core_ioremapfree(&dev_priv->ring.map, dev);
-		}
+	if (dev_priv->status_page_dmah) {
+		drm_pci_free(dev, dev_priv->status_page_dmah);
+		dev_priv->status_page_dmah = NULL;
 
-		if (dev_priv->status_page_dmah) {
-			drm_pci_free(dev, dev_priv->status_page_dmah);
+		/* Need to rewrite hardware status page */
+		I915_WRITE(0x02080, 0x1ffff000);
+	}
 
-			/* Need to rewrite hardware status page */
-			I915_WRITE(0x02080, 0x1ffff000);
-		}
-
-		if (dev_priv->status_gfx_addr) {
-			dev_priv->status_gfx_addr = 0;
-			drm_core_ioremapfree(&dev_priv->hws_map, dev);
-			I915_WRITE(0x2080, 0x1ffff000);
-		}
-
-		drm_free(dev->dev_private, sizeof(drm_i915_private_t),
-			 DRM_MEM_DRIVER);
-
-		dev->dev_private = NULL;
+	if (dev_priv->status_gfx_addr) {
+		dev_priv->status_gfx_addr = 0;
+		drm_core_ioremapfree(&dev_priv->hws_map, dev);
+		I915_WRITE(0x2080, 0x1ffff000);
 	}
 
 	return 0;
 }
 
 static int i915_initialize(drm_device_t * dev,
-			   drm_i915_private_t * dev_priv,
 			   drm_i915_init_t * init)
 {
-	(void) memset(dev_priv, 0, sizeof(drm_i915_private_t));
+	drm_i915_private_t *dev_priv =
+	    (drm_i915_private_t *)dev->dev_private;
 
 	DRM_GETSAREA();
 	if (!dev_priv->sarea) {
@@ -227,7 +224,6 @@ static int i915_initialize(drm_device_t * dev,
 	}
 	DRM_DEBUG("Enabled hardware status page\n");
 
-	dev->dev_private = (void *)dev_priv;
 
 #ifdef I915_HAVE_BUFFER
 	drm_bo_driver_init(dev);
@@ -274,7 +270,6 @@ static int i915_dma_resume(drm_device_t * dev)
 static int i915_dma_init(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
-	drm_i915_private_t *dev_priv;
 	drm_i915_init_t init;
 	int retcode = 0;
 
@@ -282,11 +277,7 @@ static int i915_dma_init(DRM_IOCTL_ARGS)
 
 	switch (init.func) {
 	case I915_INIT_DMA:
-		dev_priv = drm_alloc(sizeof(drm_i915_private_t),
-		     DRM_MEM_DRIVER);
-		if (dev_priv == NULL)
-			return (ENOMEM);
-		retcode = i915_initialize(dev, dev_priv, &init);
+		retcode = i915_initialize(dev, &init);
 		break;
 	case I915_CLEANUP_DMA:
 		retcode = i915_dma_cleanup(dev);
@@ -908,6 +899,8 @@ static int i915_set_status_page(DRM_IOCTL_ARGS)
 /*ARGSUSED*/
 int i915_driver_load(drm_device_t *dev, unsigned long flags)
 {
+	struct drm_i915_private *dev_priv;
+
 	/* i915 has 4 more counters */
 	dev->counters += 4;
 	dev->types[6] = _DRM_STAT_IRQ;
@@ -915,8 +908,24 @@ int i915_driver_load(drm_device_t *dev, unsigned long flags)
 	dev->types[8] = _DRM_STAT_SECONDARY;
 	dev->types[9] = _DRM_STAT_DMA;
 
+	dev_priv = drm_alloc(sizeof(drm_i915_private_t), DRM_MEM_DRIVER);
+	if (dev_priv == NULL)
+		return ENOMEM;
+		
+	(void) memset(dev_priv, 0, sizeof(drm_i915_private_t));
+	dev->dev_private = (void *)dev_priv;
+
 	return 0;
 }
+
+int i915_driver_unload(struct drm_device *dev)
+{
+	drm_free(dev->dev_private, sizeof(drm_i915_private_t),
+	    DRM_MEM_DRIVER);
+
+	return 0;
+}
+
 
 void i915_driver_lastclose(drm_device_t * dev)
 {
