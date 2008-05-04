@@ -34,7 +34,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.62";
 
 /*
  * Property names
@@ -499,6 +499,11 @@ bge_m_stop(void *arg)
 		return;
 	}
 	bge_stop(bgep);
+
+	bgep->link_update_timer = 0;
+	bgep->link_state = LINK_STATE_UNKNOWN;
+	mac_link_update(bgep->mh, bgep->link_state);
+
 	/*
 	 * Free the possible tx buffers allocated in tx process.
 	 */

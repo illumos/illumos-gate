@@ -799,6 +799,28 @@ bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t data)
 	BGE_PCICHK(bgep);
 }
 
+uint32_t bge_mbx_get(bge_t *bgep, bge_regno_t regno);
+#pragma inline(bge_mbx_get)
+
+uint32_t
+bge_mbx_get(bge_t *bgep, bge_regno_t regno)
+{
+	uint32_t val32;
+
+	BGE_TRACE(("bge_mbx_get($%p, 0x%lx)",
+	    (void *)bgep, regno));
+
+#ifdef	_BIG_ENDIAN
+	val32 = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno+4));
+#else
+	val32 = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno));
+#endif	/* _BIG_ENDIAN */
+	BGE_PCICHK(bgep);
+
+	return (val32);
+}
+
+
 #if	BGE_DEBUGGING
 
 void bge_led_mark(bge_t *bgep);
@@ -1857,6 +1879,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5752M:
 	case DEVICE_ID_5754:
 	case DEVICE_ID_5755:
+	case DEVICE_ID_5755M:
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
@@ -2061,6 +2084,7 @@ bge_chip_id_init(bge_t *bgep)
 		break;
 
 	case DEVICE_ID_5755:
+	case DEVICE_ID_5755M:
 		cidp->chip_label = 5755;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
@@ -2787,6 +2811,9 @@ bge_chip_sync(bge_t *bgep)
 	/*
 	 * Reprogram the hashed multicast address table ...
 	 */
+	for (i = 0; i < BGE_HASH_TABLE_SIZE/32; ++i)
+		bge_reg_put32(bgep, MAC_HASH_REG(i), 0);
+
 	for (i = 0; i < BGE_HASH_TABLE_SIZE/32; ++i)
 		bge_reg_put32(bgep, MAC_HASH_REG(i),
 			bgep->mcast_hash[i] | fill);
@@ -4069,6 +4096,8 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		 */
 		bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
 		    INTERRUPT_MBOX_ENABLE(flags));
+		if (bgep->chipid.pci_type == BGE_PCI_E)
+			(void) bge_mbx_get(bgep, INTERRUPT_MBOX_0_REG);
 		bgep->missed_dmas = 0;
 	}
 
@@ -4504,8 +4533,17 @@ bge_chip_factotum(caddr_t arg)
 	 * If the link state changed, tell the world about it.
 	 * Note: can't do this while still holding the mutex.
 	 */
-	if (linkchg)
+	if (bgep->link_update_timer == BGE_LINK_UPDATE_TIMEOUT &&
+	    bgep->link_state != LINK_STATE_UNKNOWN)
+		linkchg = B_TRUE;
+	else if (bgep->link_update_timer < BGE_LINK_UPDATE_TIMEOUT &&
+	    bgep->link_state == LINK_STATE_DOWN)
+		linkchg = B_FALSE;
+
+	if (linkchg) {
 		mac_link_update(bgep->mh, bgep->link_state);
+		bgep->link_update_timer = BGE_LINK_UPDATE_DONE;
+	}
 	if (bgep->manual_reset) {
 		bgep->manual_reset = B_FALSE;
 	}
@@ -4539,6 +4577,10 @@ bge_chip_cyclic(void *arg)
 		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
 			ddi_fm_service_impact(bgep->devinfo,
 			    DDI_SERVICE_UNAFFECTED);
+
+		if (bgep->link_update_timer < BGE_LINK_UPDATE_TIMEOUT)
+			bgep->link_update_timer++;
+
 		break;
 
 	case BGE_CHIP_FAULT:

@@ -934,6 +934,8 @@ typedef struct bge {
 	uint64_t		param_link_speed;
 	link_duplex_t		param_link_duplex;
 
+
+	uint32_t		link_update_timer;
 } bge_t;
 
 /*
@@ -1251,6 +1253,9 @@ uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
 #define	ASF_MODE_POST_INIT	4	/* only do post-init	 */
 
 #define	BGE_ASF_HEARTBEAT_INTERVAL		1500000
+
+#define	BGE_LINK_UPDATE_TIMEOUT	10	/* ~ 5 sec */
+#define	BGE_LINK_UPDATE_DONE	(BGE_LINK_UPDATE_TIMEOUT+1)
 
 #ifdef __cplusplus
 }

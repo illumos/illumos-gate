@@ -669,14 +669,6 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		return (EINVAL);
 	}
 
-	/*
-	 * The MII/GMII physical layer 802.3 stats are not supported by the
-	 * bge optical interface.
-	 */
-	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) && ETHER_STAT_ISMII(stat)) {
-		return (ENOTSUP);
-	}
-
 	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
 		bstp = DMA_VPTR(bgep->statistics);
 	else {
@@ -950,7 +942,10 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_XCVR_INUSE:
-		*val = XCVR_1000T;
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = XCVR_1000X;
+		else
+			*val = XCVR_1000T;
 		break;
 
 	case ETHER_STAT_CAP_1000FDX:
@@ -962,19 +957,31 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_CAP_100FDX:
-		*val = 1;
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = 0;
+		else
+			*val = 1;
 		break;
 
 	case ETHER_STAT_CAP_100HDX:
-		*val = 1;
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = 0;
+		else
+			*val = 1;
 		break;
 
 	case ETHER_STAT_CAP_10FDX:
-		*val = 1;
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = 0;
+		else
+			*val = 1;
 		break;
 
 	case ETHER_STAT_CAP_10HDX:
-		*val = 1;
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = 0;
+		else
+			*val = 1;
 		break;
 
 	case ETHER_STAT_CAP_ASMPAUSE:
@@ -1030,14 +1037,19 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_ADV_REMFAULT:
-		mutex_enter(bgep->genlock);
-		*val = bge_mii_get16(bgep, MII_AN_ADVERT) &
-		    MII_AN_ADVERT_REMFAULT ? 1 : 0;
-		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
-			ddi_fm_service_impact(bgep->devinfo,
-			    DDI_SERVICE_UNAFFECTED);
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = 0;
+		else {
+			mutex_enter(bgep->genlock);
+			*val = bge_mii_get16(bgep, MII_AN_ADVERT) &
+			    MII_AN_ADVERT_REMFAULT ? 1 : 0;
+			if (bge_check_acc_handle(bgep, bgep->io_handle) !=
+			    DDI_FM_OK) {
+				ddi_fm_service_impact(bgep->devinfo,
+				    DDI_SERVICE_UNAFFECTED);
+			}
+			mutex_exit(bgep->genlock);
 		}
-		mutex_exit(bgep->genlock);
 		break;
 
 	case ETHER_STAT_LP_CAP_1000FDX:
@@ -1077,14 +1089,19 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_LP_REMFAULT:
-		mutex_enter(bgep->genlock);
-		*val = bge_mii_get16(bgep, MII_AN_LPABLE) &
-		    MII_AN_ADVERT_REMFAULT ? 1 : 0;
-		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
-			ddi_fm_service_impact(bgep->devinfo,
-			    DDI_SERVICE_UNAFFECTED);
+		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+			*val = 0;
+		else {
+			mutex_enter(bgep->genlock);
+			*val = bge_mii_get16(bgep, MII_AN_LPABLE) &
+			    MII_AN_ADVERT_REMFAULT ? 1 : 0;
+			if (bge_check_acc_handle(bgep, bgep->io_handle) !=
+			    DDI_FM_OK) {
+				ddi_fm_service_impact(bgep->devinfo,
+				    DDI_SERVICE_UNAFFECTED);
+			}
+			mutex_exit(bgep->genlock);
 		}
-		mutex_exit(bgep->genlock);
 		break;
 
 	case ETHER_STAT_LINK_ASMPAUSE:
