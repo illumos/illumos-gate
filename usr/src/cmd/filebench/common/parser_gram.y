@@ -85,13 +85,16 @@ extern void yyerror(char *s);
 static void terminate(void);
 static cmd_t *alloc_cmd(void);
 static attr_t *alloc_attr(void);
+static attr_t *alloc_lvar_attr(var_t *var);
 static attr_t *get_attr(cmd_t *cmd, int64_t name);
 static attr_t *get_attr_integer(cmd_t *cmd, int64_t name);
 static attr_t *get_attr_bool(cmd_t *cmd, int64_t name);
+static void get_attr_lvars(cmd_t *cmd, flowop_t *flowop);
 static var_t *alloc_var(void);
 static var_t *get_var(cmd_t *cmd, int64_t name);
 static list_t *alloc_list();
 static probtabent_t *alloc_probtabent(void);
+static void add_lvar_to_list(var_t *newlvar, var_t **lvar_list);
 
 /* Info Commands */
 static void parser_list(cmd_t *);
@@ -105,6 +108,7 @@ static void parser_file_define(cmd_t *);
 static void parser_fileset_define(cmd_t *);
 static void parser_randvar_define(cmd_t *);
 static void parser_randvar_set(cmd_t *);
+static void parser_composite_flowop_define(cmd_t *);
 
 /* Create Commands */
 static void parser_proc_create(cmd_t *);
@@ -179,6 +183,7 @@ static void parser_abort(int arg);
 %token FSA_DIRGAMMA FSA_USEISM FSA_TYPE FSA_RANDTABLE FSA_RANDSRC FSA_RANDROUND
 %token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN
 %token FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC FSS_ROUND
+%token FSV_SET_LOCAL_VAR FSA_LVAR_ASSIGN
 %token FSA_ALLDONE FSA_FIRSTDONE FSA_TIMEOUT
 
 %type <ival> FSV_VAL_INT
@@ -188,6 +193,7 @@ static void parser_abort(int arg);
 %type <sval> FSV_VARIABLE
 %type <sval> FSV_RANDVAR
 %type <sval> FSK_ASSIGN
+%type <sval> FSV_SET_LOCAL_VAR
 
 %type <ival> FSC_LIST FSC_DEFINE FSC_SET FSC_LOAD FSC_RUN
 %type <ival> FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSC_HELP
@@ -198,7 +204,7 @@ static void parser_abort(int arg);
 
 %type <cmd> command inner_commands load_command run_command list_command
 %type <cmd> proc_define_command files_define_command randvar_define_command
-%type <cmd> debug_command create_command
+%type <cmd> fo_define_command debug_command create_command
 %type <cmd> sleep_command stats_command set_command shutdown_command
 %type <cmd> foreach_command log_command system_command flowop_command
 %type <cmd> eventgen_command quit_command flowop_list thread_list
@@ -208,10 +214,11 @@ static void parser_abort(int arg);
 %type <attr> fo_attr_op fo_attr_ops ev_attr_op ev_attr_ops
 %type <attr> randvar_attr_op randvar_attr_ops randvar_attr_typop
 %type <attr> randvar_attr_srcop attr_value attr_list_value
+%type <attr> comp_lvar_def comp_attr_op comp_attr_ops
 %type <list> integer_seplist string_seplist string_list var_string_list
 %type <list> var_string whitevar_string whitevar_string_list
 %type <ival> attrs_define_file attrs_define_thread attrs_flowop
-%type <ival> attrs_define_fileset attrs_define_proc attrs_eventgen
+%type <ival> attrs_define_fileset attrs_define_proc attrs_eventgen attrs_define_comp
 %type <ival> files_attr_name pt_attr_name fo_attr_name ev_attr_name
 %type <ival> randvar_attr_name FSA_TYPE randtype_name randvar_attr_param
 %type <ival> randsrc_name FSA_RANDSRC randvar_attr_tsp
@@ -265,6 +272,7 @@ command:
   proc_define_command
 | files_define_command
 | randvar_define_command
+| fo_define_command
 | debug_command
 | eventgen_command
 | create_command
@@ -951,6 +959,19 @@ randvar_define_command: FSC_DEFINE FSE_RAND randvar_attr_ops
 	$$->cmd_attr_list = $3;
 };
 
+fo_define_command: FSC_DEFINE FSC_FLOWOP comp_attr_ops FSK_OPENLST flowop_list FSK_CLOSELST
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_composite_flowop_define;
+	$$->cmd_list = $5;
+	$$->cmd_attr_list = $3;
+}
+| fo_define_command comp_attr_ops
+{
+	$1->cmd_attr_list = $2;
+};
+
 create_command: FSC_CREATE entity
 {
 	if (($$ = alloc_cmd()) == NULL)
@@ -1251,6 +1272,19 @@ fo_attr_ops: fo_attr_op
 	list_end->attr_next = $3;
 
 	$$ = $1;
+}
+| fo_attr_ops FSK_SEPLST comp_lvar_def
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
 };
 
 fo_attr_op: fo_attr_name FSK_ASSIGN attr_value
@@ -1295,7 +1329,6 @@ ev_attr_op: ev_attr_name FSK_ASSIGN attr_value
 		YYERROR;
 	$$->attr_name = $1;
 };
-
 
 files_attr_name: attrs_define_file
 |attrs_define_fileset;
@@ -1406,6 +1439,79 @@ attrs_flowop:
 
 attrs_eventgen:
   FSA_RATE { $$ = FSA_RATE;};
+
+comp_attr_ops: comp_attr_op
+{
+	$$ = $1;
+}
+| comp_attr_ops FSK_SEPLST comp_attr_op
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+}
+| comp_attr_ops FSK_SEPLST comp_lvar_def
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+};
+
+comp_attr_op: attrs_define_comp FSK_ASSIGN attr_value
+{
+	$$ = $3;
+	$$->attr_name = $1;
+};
+
+comp_lvar_def: FSV_VARIABLE FSK_ASSIGN FSV_VAL_BOOLEAN
+{
+	if (($$ = alloc_lvar_attr(var_lvar_assign_boolean($1, $3))) == NULL)
+		YYERROR;
+}
+| FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
+{
+	if (($$ = alloc_lvar_attr(var_lvar_assign_integer($1, $3))) == NULL)
+		YYERROR;
+}
+| FSV_VARIABLE FSK_ASSIGN FSK_QUOTE FSV_WHITESTRING FSK_QUOTE
+{
+	if (($$ = alloc_lvar_attr(var_lvar_assign_string($1, $4))) == NULL)
+		YYERROR;
+}
+| FSV_VARIABLE FSK_ASSIGN FSV_STRING
+{
+	if (($$ = alloc_lvar_attr(var_lvar_assign_string($1, $3))) == NULL)
+		YYERROR;
+}
+| FSV_VARIABLE FSK_ASSIGN FSV_VARIABLE
+{
+	if (($$ = alloc_lvar_attr(var_lvar_assign_var($1, $3))) == NULL)
+		YYERROR;
+}
+| FSV_VARIABLE
+{
+	if (($$ = alloc_lvar_attr(var_lvar_alloc_local($1))) == NULL)
+		YYERROR;
+};
+
+
+attrs_define_comp:
+  FSA_NAME { $$ = FSA_NAME;}
+| FSA_ITERS { $$ = FSA_ITERS;};
 
 attr_value: FSV_STRING
 {
@@ -2053,7 +2159,7 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 	for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
 	    inner_cmd = inner_cmd->cmd_next) {
 		parser_flowop_define(inner_cmd, threadflow,
-		    &threadflow->tf_ops, FLOW_MASTER);
+		    &threadflow->tf_thrd_fops, FLOW_MASTER);
 	}
 }
 
@@ -2149,6 +2255,123 @@ parser_flowop_get_attrs(cmd_t *cmd, flowop_t *flowop)
 	}
 }
 
+/*
+ * defines the FLOW_MASTER flowops within a FLOW_MASTER instance of
+ * a composit flowop. Default attributes from the FLOW_INNER_DEF instances
+ * of the composit flowop's inner flowops are used if set. Otherwise
+ * default attributes from the FLOW_MASTER instance of the composit flowop
+ * are used, which may include defaults from the original FLOW_DEFINITION
+ * of the composit flowop.
+ */
+static void
+parser_inner_flowop_define(threadflow_t *thread, flowop_t *comp0_flow,
+			   flowop_t *comp_mstr_flow)
+{
+	flowop_t *inner_flowtype, *inner_flowop;
+
+	/* follow flowop list, creating composit names */
+	inner_flowtype = comp0_flow->fo_comp_fops;
+	comp_mstr_flow->fo_comp_fops = NULL;
+
+	while (inner_flowtype) {
+		char fullname[MAXPATHLEN];
+
+		/* create composite_name.name for new flowop */
+		(void) strlcpy(fullname, comp_mstr_flow->fo_name, MAXPATHLEN);
+		(void) strlcat(fullname, ".", MAXPATHLEN);
+		(void) strlcat(fullname, inner_flowtype->fo_name,
+		    MAXPATHLEN);
+
+		if ((inner_flowop = flowop_define(thread, fullname,
+		    inner_flowtype, &comp_mstr_flow->fo_comp_fops,
+		    FLOW_MASTER, 0)) == NULL) {
+			filebench_log(LOG_ERROR,
+			    "define flowop: Failed to instantiate flowop %s\n",
+			    fullname);
+			filebench_shutdown(1);
+		}
+
+		/* if applicable, update filename attribute */
+		if (inner_flowop->fo_filename) {
+			char *name;
+
+			/* fix up avd_t */
+			avd_update(&inner_flowop->fo_filename,
+			    comp_mstr_flow->fo_lvar_list);
+
+			/* see if ready to get the file or fileset */
+			name = avd_get_str(inner_flowop->fo_filename);
+			if (name) {
+
+				inner_flowop->fo_fileset = fileset_find(name);
+
+				if (inner_flowop->fo_fileset == NULL) {
+					filebench_log(LOG_ERROR,
+					    "inr flowop %s: file %s not found",
+					    inner_flowop->fo_name, name);
+					filebench_shutdown(1);
+				}
+			}
+		}
+
+		/* update attributes from local variables */
+		avd_update(&inner_flowop->fo_iters,
+		    comp_mstr_flow->fo_lvar_list);
+
+		/* if the inner flowop is a composit flowop, recurse */
+		if (inner_flowtype->fo_type == FLOW_TYPE_COMPOSITE) {
+			var_t *newlvar, *proto_lvars, *lvar_ptr;
+
+			proto_lvars = inner_flowop->fo_lvar_list;
+			inner_flowop->fo_lvar_list = 0;
+
+			for (lvar_ptr = inner_flowtype->fo_lvar_list; lvar_ptr;
+			    lvar_ptr = lvar_ptr->var_next) {
+
+				if ((newlvar = var_lvar_alloc_local(
+				    lvar_ptr->var_name)) != NULL) {
+
+					add_lvar_to_list(newlvar,
+					    &inner_flowop->fo_lvar_list);
+
+					var_update_comp_lvars(newlvar,
+					    proto_lvars,
+					    comp_mstr_flow->fo_lvar_list);
+				}
+			}
+		  
+			parser_inner_flowop_define(thread,
+			    inner_flowtype,
+			    inner_flowop);
+
+			inner_flowtype = inner_flowtype->fo_exec_next;
+			continue;
+		}
+
+		avd_update(&inner_flowop->fo_iosize,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_wss,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_iters,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_value,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_random,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_dsync,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_rotatefd,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_blocking,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_directio,
+		    comp_mstr_flow->fo_lvar_list);
+		avd_update(&inner_flowop->fo_highwater,
+		    comp_mstr_flow->fo_lvar_list);
+
+		inner_flowtype = inner_flowtype->fo_exec_next;
+	}
+}
 
 /*
  * Calls flowop_define() to allocate a flowop with the supplied name.
@@ -2206,7 +2429,7 @@ parser_flowop_define(cmd_t *cmd, threadflow_t *thread,
 	}
 
 	if ((flowop = flowop_define(thread, name,
-	    flowop_type, category, 0)) == NULL) {
+	    flowop_type, flowoplist_hdp, category, 0)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "define flowop: Failed to instantiate flowop %s\n",
 		    cmd->cmd_name);
@@ -2219,8 +2442,61 @@ parser_flowop_define(cmd_t *cmd, threadflow_t *thread,
 	else
 		flowop->fo_iters = avd_int_alloc(1);
 
-	parser_flowop_get_attrs(cmd, flowop);
+
+	/* if this is a use of a composit flowop, create inner FLOW MASTERS */
+	if (flowop_type->fo_type == FLOW_TYPE_COMPOSITE) {
+		get_attr_lvars(cmd, flowop);
+		if (category == FLOW_MASTER)
+			parser_inner_flowop_define(thread,
+			    flowop_type, flowop);
+	}
+	else {
+		parser_flowop_get_attrs(cmd, flowop);
+	}
 }
+
+static void
+parser_composite_flowop_define(cmd_t *cmd)
+{
+	flowop_t *flowop;
+	cmd_t *inner_cmd;
+	char *name;
+	attr_t *attr;
+
+	/* Get the name of the flowop */
+	if (attr = get_attr(cmd, FSA_NAME)) {
+		name = avd_get_str(attr->attr_avd);
+	} else {
+		filebench_log(LOG_ERROR,
+		    "define flowop: Composit flowop specifies no name");
+
+		filebench_shutdown(1);
+	}
+
+	if ((flowop = flowop_new_composite_define(name)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "define flowop: Failed to instantiate flowop %s\n",
+		    cmd->cmd_name);
+		filebench_shutdown(1);
+	}
+
+	/* place any local var_t variables on the flowop's local list */
+	get_attr_lvars(cmd, flowop);
+
+	/* Iterations */
+	if (attr = get_attr_integer(cmd, FSA_ITERS))
+		flowop->fo_iters = attr->attr_avd;
+	else
+		flowop->fo_iters = avd_int_alloc(1);
+
+	/* define inner flowops */
+	for (inner_cmd = cmd->cmd_list; inner_cmd != NULL;
+	    inner_cmd = inner_cmd->cmd_next) {
+		parser_flowop_define(inner_cmd, NULL,
+		    &flowop->fo_comp_fops, FLOW_INNER_DEF);
+	}
+}
+
 
 /*
  * Calls fileset_define() to allocate a fileset with the supplied name and
@@ -3252,8 +3528,6 @@ parser_randvar_set(cmd_t *cmd)
 		{
 			int disttype = (int)avd_get_int(value);
 
-			printf("parser_randvar_set: changing type to %d\n",
-			    disttype);
 			rndp->rnd_type &= (~RAND_TYPE_MASK);
 
 			switch (disttype) {
@@ -3273,9 +3547,6 @@ parser_randvar_set(cmd_t *cmd)
 	case FSS_SRC:
 		{
 			int randsrc = (int)avd_get_int(value);
-
-			printf("parser_randvar_set: changing source to %d\n",
-			    randsrc);
 
 			rndp->rnd_type &=
 			    (~(RAND_SRC_URANDOM | RAND_SRC_GENERATOR));
@@ -3351,7 +3622,7 @@ free_cmd(cmd_t *cmd)
  * a pointer to the attr_t.
  */
 static attr_t *
-alloc_attr()
+alloc_attr(void)
 {
 	attr_t *attr;
 
@@ -3378,6 +3649,24 @@ alloc_probtabent(void)
 
 	(void) memset(rte, 0, sizeof (probtabent_t));
 	return (rte);
+}
+
+/*
+ * Allocates an attr_t structure and puts the supplied var_t into
+ * its attr_avd location, and sets its name to FSA_LVAR_ASSIGN
+ */
+static attr_t *
+alloc_lvar_attr(var_t *var)
+{
+	attr_t *attr;
+
+	if ((attr = alloc_attr()) == NULL)
+		return (NULL);
+
+	attr->attr_name = FSA_LVAR_ASSIGN;
+	attr->attr_avd = (avd_t)var;
+
+	return (attr);
 }
 
 /*
@@ -3487,6 +3776,66 @@ get_attr_bool(cmd_t *cmd, int64_t name)
 	}
 
 	return (rtn);
+}
+
+/*
+ * removes the newly allocated local var from the shared local var
+ * list, then puts it at the head of the private local var list
+ * supplied as the second argument.
+ */
+static void
+add_lvar_to_list(var_t *newlvar, var_t **lvar_list)
+{
+	var_t *prev;
+
+	/* remove from shared local list, if there */
+	if (newlvar == filebench_shm->shm_var_loc_list) {
+		/* on top of list, just grap */
+		filebench_shm->shm_var_loc_list = newlvar->var_next;
+	} else {
+		/* find newvar on list and remove */
+		for (prev = filebench_shm->shm_var_loc_list; prev;
+		    prev = prev->var_next) {
+			if (prev->var_next == newlvar)
+				prev->var_next = newlvar->var_next;
+		}
+	}
+	newlvar->var_next = NULL;
+
+	/* add to flowop private local list at head */
+	newlvar->var_next = *lvar_list;
+	*lvar_list = newlvar;
+}
+
+/*
+ * Searches the attribute list for the command for any allocated local
+ * variables. The attribute list is created by the parser from the list of
+ * attributes supplied with certain commands, such as the define and flowop
+ * commands. Places all found local vars onto the flowop's local variable
+ * list. 
+ */
+static void
+get_attr_lvars(cmd_t *cmd, flowop_t *flowop)
+{
+	attr_t *attr;
+	var_t *list_tail, *orig_lvar_list;
+
+	/* save the local var list */
+	orig_lvar_list = flowop->fo_lvar_list;
+
+	for (attr = cmd->cmd_attr_list; attr != NULL;
+	    attr = attr->attr_next) {
+
+		if (attr->attr_name == FSA_LVAR_ASSIGN) {
+			var_t *newvar, *prev;
+
+			if ((newvar = (var_t *)attr->attr_avd) == NULL)
+				continue;
+
+			add_lvar_to_list(newvar, &flowop->fo_lvar_list);
+			var_update_comp_lvars(newvar, orig_lvar_list, NULL);
+		}
+	}
 }
 
 /*

@@ -233,7 +233,7 @@ flowoplib_init()
 		fl = &flowoplib_funcs[i];
 
 		if ((flowop = flowop_define(NULL,
-		    fl->fl_name, NULL, 0, fl->fl_type)) == 0) {
+		    fl->fl_name, NULL, NULL, 0, fl->fl_type)) == 0) {
 			filebench_log(LOG_ERROR,
 			    "failed to create flowop %s\n",
 			    fl->fl_name);
@@ -1503,7 +1503,7 @@ flowoplib_sempost(threadflow_t *threadflow, flowop_t *flowop)
 		int i;
 #endif /* HAVE_SYSV_SEM */
 		struct timespec timeout;
-		int value = avd_get_int(flowop->fo_value);
+		int value = (int)avd_get_int(flowop->fo_value);
 
 		if (target->fo_instance == FLOW_MASTER) {
 			target = target->fo_targetnext;

@@ -56,8 +56,10 @@ typedef struct flowop {
 	char		fo_name[128];	/* Name */
 	int		fo_instance;	/* Instance number */
 	struct flowop	*fo_next;	/* Next in global list */
-	struct flowop	*fo_threadnext;	/* Next in thread's list */
+	struct flowop	*fo_exec_next;	/* Next in thread's or compfo's list */
 	struct flowop	*fo_resultnext;	/* List of flowops in result */
+	struct flowop	*fo_comp_fops;	/* List of flowops in composite fo */
+	var_t		*fo_lvar_list;	/* List of composite local vars */
 	struct threadflow *fo_thread;	/* Backpointer to thread */
 	int		(*fo_func)();	/* Method */
 	int		(*fo_init)();	/* Init Method */
@@ -118,22 +120,29 @@ typedef struct flowop {
 #define	FLOW_ATTR_READ		0x80
 #define	FLOW_ATTR_WRITE		0x100
 
-#define	FLOW_MASTER -1	    /* Declaration of thread from script */
+/* Flowop Instance Numbers */
+			    /* Worker flowops have instance numbers > 0 */
 #define	FLOW_DEFINITION 0   /* Prototype definition of flowop from library */
+#define	FLOW_INNER_DEF -1   /* Constructed proto flowops within composite */
+#define	FLOW_MASTER -2	    /* Master flowop based on flowop declaration */
+			    /* supplied within a thread definition */
 
-#define	FLOW_TYPES	5
+/* Flowop type definitions */
+
+#define	FLOW_TYPES	6
 #define	FLOW_TYPE_GLOBAL	0  /* Rolled up statistics */
 #define	FLOW_TYPE_IO		1  /* Op is an I/O, reflected in iops and lat */
 #define	FLOW_TYPE_AIO		2  /* Op is an async I/O, reflected in iops */
 #define	FLOW_TYPE_SYNC		3  /* Op is a sync event */
-#define	FLOW_TYPE_OTHER		4  /* Op is a something else */
+#define	FLOW_TYPE_COMPOSITE	4  /* Op is a composite flowop */
+#define	FLOW_TYPE_OTHER		5  /* Op is a something else */
 
 extern flowstat_t controlstats;
 extern pthread_mutex_t controlstats_lock;
 
 void flowop_init(void);
 flowop_t *flowop_define(threadflow_t *, char *name, flowop_t *inherit,
-    int instance, int type);
+    flowop_t **flowoplist_hdp, int instance, int type);
 flowop_t *flowop_find(char *name);
 flowop_t *flowop_find_one(char *name, int instance);
 void flowoplib_usage(void);
@@ -142,6 +151,7 @@ void flowop_delete_all(flowop_t **threadlist);
 void flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes);
 void flowop_beginop(threadflow_t *threadflow, flowop_t *flowop);
 void flowop_destruct_all_flows(threadflow_t *threadflow);
+flowop_t *flowop_new_composite_define(char *name);
 void flowop_printall(void);
 
 #ifdef	__cplusplus

@@ -41,7 +41,10 @@
 #endif
 
 static flowop_t *flowop_define_common(threadflow_t *threadflow, char *name,
-    flowop_t *inherit, int instance, int type);
+    flowop_t *inherit, flowop_t **flowoplist_hdp, int instance, int type);
+static int flowop_composite(threadflow_t *threadflow, flowop_t *flowop);
+static int flowop_composite_init(flowop_t *flowop);
+static void flowop_composite_destruct(flowop_t *flowop);
 
 /*
  * A collection of flowop support functions. The actual code that
@@ -51,8 +54,53 @@ static flowop_t *flowop_define_common(threadflow_t *threadflow, char *name,
  * flowops, cyclically invoking the flowops on each threadflow's flowop
  * list, collecting statistics about flowop execution, and other
  * housekeeping duties are included in this file.
+ *
+ * User Defined Composite Flowops
+ *    The ability to define new flowops as lists of built-in or previously
+ * defined flowops has been added to Filebench. In a sense they are like
+ * in-line subroutines, which can have default attributes set at definition
+ * time and passed arguments at invocation time. Like other flowops (and
+ * unlike conventional subroutines) you can invoke them with an iteration
+ * count (the "iter" attribute), and they will loop through their associated
+ * list of flowops for "iter" number of times each time they are encountered
+ * in the thread or outer composite flowop which invokes them.
+ *
+ * Composite flowops are created with a "define" command, are given a name,
+ * optional default attributes, and local variable definitions on the
+ * "define" command line, followed by a brace enclosed list of flowops
+ * to execute. The enclosed flowops may include attributes that reference
+ * the local variables, as well as constants and global variables.
+ *
+ * Composite flowops are used pretty much like regular flowops, but you can
+ * also set local variables to constants or global variables ($local_var =
+ * [$var | $random_var | string | boolean | integer | double]) as part of
+ * the invocation. Thus each invocation can pass customized values to its
+ * inner flowops, greatly increasing their generality.
+ *
+ * All flowops are placed on a global, singly linked list, with fo_next
+ * being the link pointer for this list. The are also placed on a private
+ * list for the thread or composite flowop they are part of. The tf_thrd_fops
+ * pointer in the thread will point to the list of top level flowops in the
+ * thread, which are linked together by fo_exec_next. If any of these flowops
+ * are composite flowops, they will have a list of second level flowops rooted
+ * at the composite flowop's fo_comp_fops pointer. So, there is one big list
+ * of all flowops, and an n-arry tree of threads, composite flowops, and
+ * flowops, with composite flowops being the branch nodes in the tree.
+ *
+ * To illustrate, if we have three first level flowops, the first of which is
+ * a composite flowop consisting of two other flowops, we get:
+ *
+ * Thread->tf_thrd_fops -> flowop->fo_exec_next -> flowop->fo_exec_next
+ *			   flowop->fo_comp_fops		    |
+ *				    |			    V
+ *				    |			flowop->fo_exec_next
+ *				    |
+ *				    V
+ *				flowop->fo_exec_next -> flowop->fo_exec_next
+ *
+ * And all five flowops (plus others from any other threads) are on a global
+ * list linked with fo_next.
  */
-
 
 /*
  * Prints the name and instance number of each flowop in
@@ -66,7 +114,7 @@ flowop_printlist(flowop_t *list)
 	while (flowop) {
 		filebench_log(LOG_DEBUG_IMPL, "flowop-list %s-%d",
 		    flowop->fo_name, flowop->fo_instance);
-		flowop = flowop->fo_threadnext;
+		flowop = flowop->fo_exec_next;
 	}
 	return (0);
 }
@@ -216,6 +264,47 @@ flowop_initflow(flowop_t *flowop)
 	return (0);
 }
 
+static int
+flowop_create_runtime_flowops(threadflow_t *threadflow, flowop_t **ops_list_ptr)
+{
+	flowop_t *flowop = *ops_list_ptr;
+
+	while (flowop) {
+		flowop_t *newflowop;
+
+		if (flowop == *ops_list_ptr)
+			*ops_list_ptr = NULL;
+
+		newflowop = flowop_define_common(threadflow, flowop->fo_name,
+		    flowop, ops_list_ptr, 1, 0);
+		if (newflowop == NULL)
+			return (FILEBENCH_ERROR);
+
+		/* check for fo_filename attribute, and resolve if present */
+		if (flowop->fo_filename) {
+			char *name;
+
+			name = avd_get_str(flowop->fo_filename);
+			newflowop->fo_fileset = fileset_find(name);
+
+			if (newflowop->fo_fileset == NULL) {
+				filebench_log(LOG_ERROR,
+				    "flowop %s: file %s not found",
+				    newflowop->fo_name, name);
+				filebench_shutdown(1);
+			}
+		}
+
+		if (flowop_initflow(newflowop) < 0) {
+			filebench_log(LOG_ERROR, "Flowop init of %s failed",
+			    newflowop->fo_name);
+		}
+
+		flowop = flowop->fo_exec_next;
+	}
+	return (FILEBENCH_OK);
+}
+
 /*
  * Calls the flowop's destruct function, pointed to by
  * flowop->fo_destruct.
@@ -245,13 +334,13 @@ flowop_destruct_all_flows(threadflow_t *threadflow)
 		return;
 	}
 
-	flowop = threadflow->tf_ops;
+	flowop = threadflow->tf_thrd_fops;
 	threadflow->tf_running = 0;
 	(void) ipc_mutex_unlock(&threadflow->tf_lock);
 
 	while (flowop) {
 		flowop_destructflow(flowop);
-		flowop = flowop->fo_threadnext;
+		flowop = flowop->fo_exec_next;
 	}
 }
 
@@ -295,7 +384,7 @@ flowop_start(threadflow_t *threadflow)
 	}
 	(void) ipc_mutex_unlock(&controlstats_lock);
 
-	flowop = threadflow->tf_ops;
+	flowop = threadflow->tf_thrd_fops;
 	threadflow->tf_stats.fs_stime = gethrtime();
 	flowop->fo_stats.fs_stime = gethrtime();
 
@@ -317,36 +406,11 @@ flowop_start(threadflow_t *threadflow)
 
 	/* Create the runtime flowops from those defined by the script */
 	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
-	while (flowop) {
-		flowop_t *newflowop;
-
-		if (flowop == threadflow->tf_ops)
-			threadflow->tf_ops = NULL;
-		newflowop = flowop_define_common(threadflow, flowop->fo_name,
-		    flowop, 1, 0);
-		if (newflowop == NULL)
-			return;
-
-		/* check for fo_filename attribute, and resolve if present */
-		if (flowop->fo_filename) {
-			char *name;
-
-			name = avd_get_str(flowop->fo_filename);
-			newflowop->fo_fileset = fileset_find(name);
-
-			if (newflowop->fo_fileset == NULL) {
-				filebench_log(LOG_ERROR,
-				    "flowop %s: file %s not found",
-				    newflowop->fo_name, name);
-				filebench_shutdown(1);
-			}
-		}
-
-		if (flowop_initflow(newflowop) < 0) {
-			filebench_log(LOG_ERROR, "Flowop init of %s failed",
-			    newflowop->fo_name);
-		}
-		flowop = flowop->fo_threadnext;
+	if (flowop_create_runtime_flowops(threadflow, &threadflow->tf_thrd_fops)
+	    != FILEBENCH_OK) {
+		(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
+		filebench_shutdown(1);
+		return;
 	}
 	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
@@ -354,7 +418,7 @@ flowop_start(threadflow_t *threadflow)
 	(void) pthread_rwlock_unlock(&filebench_shm->shm_flowop_find_lock);
 
 	/* Set to the start of the new flowop list */
-	flowop = threadflow->tf_ops;
+	flowop = threadflow->tf_thrd_fops;
 
 	threadflow->tf_abort = 0;
 	threadflow->tf_running = 1;
@@ -409,7 +473,7 @@ flowop_start(threadflow_t *threadflow)
 			flowop->fo_stats.fs_stime = gethrtime();
 
 		/* Execute the flowop for fo_iters times */
-		count = avd_get_int(flowop->fo_iters);
+		count = (int)avd_get_int(flowop->fo_iters);
 		for (i = 0; i < count; i++) {
 
 			filebench_log(LOG_DEBUG_SCRIPT, "%s: executing flowop "
@@ -497,11 +561,11 @@ flowop_start(threadflow_t *threadflow)
 		}
 
 		/* advance to next flowop */
-		flowop = flowop->fo_threadnext;
+		flowop = flowop->fo_exec_next;
 
 		/* but if at end of list, start over from the beginning */
 		if (flowop == NULL) {
-			flowop = threadflow->tf_ops;
+			flowop = threadflow->tf_thrd_fops;
 			threadflow->tf_stats.fs_count++;
 		}
 	}
@@ -539,31 +603,31 @@ flowop_delete(flowop_t **flowoplist, flowop_t *flowop)
 	/* Delete from thread's flowop list */
 	if (flowop == *flowoplist) {
 		/* First on list */
-		*flowoplist = flowop->fo_threadnext;
+		*flowoplist = flowop->fo_exec_next;
 		filebench_log(LOG_DEBUG_IMPL,
 		    "Delete0 flowop: (%s-%d)",
 		    flowop->fo_name,
 		    flowop->fo_instance);
 	} else {
-		while (entry->fo_threadnext) {
+		while (entry->fo_exec_next) {
 			filebench_log(LOG_DEBUG_IMPL,
 			    "Delete0 flowop: (%s-%d) == (%s-%d)",
-			    entry->fo_threadnext->fo_name,
-			    entry->fo_threadnext->fo_instance,
+			    entry->fo_exec_next->fo_name,
+			    entry->fo_exec_next->fo_instance,
 			    flowop->fo_name,
 			    flowop->fo_instance);
 
-			if (flowop == entry->fo_threadnext) {
+			if (flowop == entry->fo_exec_next) {
 				/* Delete */
 				filebench_log(LOG_DEBUG_IMPL,
 				    "Deleted0 flowop: (%s-%d)",
-				    entry->fo_threadnext->fo_name,
-				    entry->fo_threadnext->fo_instance);
-				entry->fo_threadnext =
-				    entry->fo_threadnext->fo_threadnext;
+				    entry->fo_exec_next->fo_name,
+				    entry->fo_exec_next->fo_instance);
+				entry->fo_exec_next =
+				    entry->fo_exec_next->fo_exec_next;
 				break;
 			}
-			entry = entry->fo_threadnext;
+			entry = entry->fo_exec_next;
 		}
 	}
 
@@ -620,25 +684,19 @@ flowop_delete_all(flowop_t **flowoplist)
 {
 	flowop_t *flowop = *flowoplist;
 
-	filebench_log(LOG_DEBUG_IMPL, "Deleting all flowops...");
-	while (flowop) {
-		filebench_log(LOG_DEBUG_IMPL, "Deleting flowop (%s-%d)",
-		    flowop->fo_name, flowop->fo_instance);
-		flowop = flowop->fo_threadnext;
-	}
-
-	flowop = *flowoplist;
-
 	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 
 	while (flowop) {
+		filebench_log(LOG_DEBUG_IMPL, "Deleting flowop (%s-%d)",
+		    flowop->fo_name, flowop->fo_instance);
+
 		if (flowop->fo_instance &&
 		    (flowop->fo_instance == FLOW_MASTER)) {
-			flowop = flowop->fo_threadnext;
+			flowop = flowop->fo_exec_next;
 			continue;
 		}
 		flowop_delete(flowoplist, flowop);
-		flowop = flowop->fo_threadnext;
+		flowop = flowop->fo_exec_next;
 	}
 
 	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
@@ -647,21 +705,21 @@ flowop_delete_all(flowop_t **flowoplist)
 /*
  * Allocates a flowop entity and initializes it with inherited
  * contents from the "inherit" flowop, if it is supplied, or
- * with zeros otherwise. In either case the file descriptor
- * (fo_fd) is set to -1, and the fo_next and fo_threadnext
+ * with zeros otherwise. In either case the fo_next and fo_exec_next
  * pointers are set to NULL, and fo_thread is set to point to
  * the owning threadflow. The initialized flowop is placed at
  * the head of the global flowop list, and also placed on the
- * tail of thethreadflow's tf_ops list. The routine locks the
- * flowop's fo_lock and leaves it held on return. If successful,
- * it returns a pointer to the allocated and initialized flowop,
- * otherwise NULL.
+ * tail of the supplied local flowop list, which will either
+ * be a threadflow's tf_thrd_fops list or a composite flowop's
+ * fo_comp_fops list. The routine locks the flowop's fo_lock and
+ * leaves it held on return. If successful, it returns a pointer
+ * to the allocated and initialized flowop, otherwise it returns NULL.
  *
  * filebench_shm->shm_flowop_lock must be held by caller.
  */
 static flowop_t *
 flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
-    int instance, int type)
+    flowop_t **flowoplist_hdp, int instance, int type)
 {
 	flowop_t *flowop;
 
@@ -685,7 +743,7 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 		(void) pthread_mutex_init(&flowop->fo_lock, ipc_mutexattr());
 		(void) ipc_mutex_lock(&flowop->fo_lock);
 		flowop->fo_next = NULL;
-		flowop->fo_threadnext = NULL;
+		flowop->fo_exec_next = NULL;
 		filebench_log(LOG_DEBUG_IMPL,
 		    "flowop %s-%d calling init", name, instance);
 	} else {
@@ -711,22 +769,22 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 	(void) strcpy(flowop->fo_name, name);
 	flowop->fo_instance = instance;
 
-	if (threadflow == NULL)
+	if (flowoplist_hdp == NULL)
 		return (flowop);
 
 	/* Add flowop to thread op list */
-	if (threadflow->tf_ops == NULL) {
-		threadflow->tf_ops = flowop;
-		flowop->fo_threadnext = NULL;
+	if (*flowoplist_hdp == NULL) {
+		*flowoplist_hdp = flowop;
+		flowop->fo_exec_next = NULL;
 	} else {
 		flowop_t *flowend;
 
 		/* Find the end of the thread list */
-		flowend = threadflow->tf_ops;
-		while (flowend->fo_threadnext != NULL)
-			flowend = flowend->fo_threadnext;
-		flowend->fo_threadnext = flowop;
-		flowop->fo_threadnext = NULL;
+		flowend = *flowoplist_hdp;
+		while (flowend->fo_exec_next != NULL)
+			flowend = flowend->fo_exec_next;
+		flowend->fo_exec_next = flowop;
+		flowop->fo_exec_next = NULL;
 	}
 
 	return (flowop);
@@ -739,18 +797,43 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
  */
 flowop_t *
 flowop_define(threadflow_t *threadflow, char *name, flowop_t *inherit,
-    int instance, int type)
+    flowop_t **flowoplist_hdp, int instance, int type)
 {
 	flowop_t	*flowop;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 	flowop = flowop_define_common(threadflow, name,
-	    inherit, instance, type);
+	    inherit, flowoplist_hdp, instance, type);
 	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 	if (flowop == NULL)
 		return (NULL);
 
+	(void) ipc_mutex_unlock(&flowop->fo_lock);
+	return (flowop);
+}
+
+/*
+ * Calls flowop_define_common() to allocate and initialize a
+ * composite flowop, and holds the shared flowop_lock during the call.
+ * It releases the created flowop's fo_lock when done.
+ */
+flowop_t *
+flowop_new_composite_define(char *name)
+{
+	flowop_t *flowop;
+
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
+	flowop = flowop_define_common(NULL, name,
+	    NULL, NULL, 0, FLOW_TYPE_COMPOSITE);
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
+
+	if (flowop == NULL)
+		return (NULL);
+
+	flowop->fo_func = flowop_composite;
+	flowop->fo_init = flowop_composite_init;
+	flowop->fo_destruct = flowop_composite_destruct;
 	(void) ipc_mutex_unlock(&flowop->fo_lock);
 
 	return (flowop);
@@ -836,4 +919,109 @@ flowop_find_one(char *name, int instance)
 	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 	return (test_flowop);
+}
+
+/*
+ * Composite flowop method. Does one pass through its list of
+ * inner flowops per iteration.
+ */
+static int
+flowop_composite(threadflow_t *threadflow, flowop_t *flowop)
+{
+	flowop_t	*inner_flowop;
+
+	/* get the first flowop in the list */
+	inner_flowop = flowop->fo_comp_fops;
+
+	/* make a pass through the list of sub flowops */
+	while (inner_flowop) {
+		int	i, count;
+
+		/* Abort if asked */
+		if (threadflow->tf_abort || filebench_shm->shm_f_abort)
+			return (FILEBENCH_DONE);
+
+		if (inner_flowop->fo_stats.fs_stime == 0)
+			inner_flowop->fo_stats.fs_stime = gethrtime();
+
+		/* Execute the flowop for fo_iters times */
+		count = (int)avd_get_int(inner_flowop->fo_iters);
+		for (i = 0; i < count; i++) {
+
+			filebench_log(LOG_DEBUG_SCRIPT, "%s: executing flowop "
+			    "%s-%d", threadflow->tf_name,
+			    inner_flowop->fo_name,
+			    inner_flowop->fo_instance);
+
+			switch ((*inner_flowop->fo_func)(threadflow,
+			    inner_flowop)) {
+
+			/* all done */
+			case FILEBENCH_DONE:
+				return (FILEBENCH_DONE);
+
+			/* quit if inner flowop limit reached */
+			case FILEBENCH_NORSC:
+				return (FILEBENCH_NORSC);
+
+			/* quit on inner flowop error */
+			case FILEBENCH_ERROR:
+				filebench_log(LOG_ERROR,
+				    "inner flowop %s failed",
+				    inner_flowop->fo_name);
+				return (FILEBENCH_ERROR);
+
+			/* otherwise keep going */
+			default:
+				break;
+			}
+
+		}
+
+		/* advance to next flowop */
+		inner_flowop = inner_flowop->fo_exec_next;
+	}
+
+	/* finished with this pass */
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Composite flowop initialization. Creates runtime inner flowops
+ * from prototype inner flowops.
+ */
+static int
+flowop_composite_init(flowop_t *flowop)
+{
+	int err;
+
+	err = flowop_create_runtime_flowops(flowop->fo_thread,
+	    &flowop->fo_comp_fops);
+	if (err != FILEBENCH_OK)
+		return (err);
+
+	(void) ipc_mutex_unlock(&flowop->fo_lock);
+	return (0);
+}
+
+/*
+ * clean up inner flowops
+ */
+static void
+flowop_composite_destruct(flowop_t *flowop)
+{
+	flowop_t *inner_flowop = flowop->fo_comp_fops;
+
+	while (inner_flowop) {
+		filebench_log(LOG_DEBUG_IMPL, "Deleting inner flowop (%s-%d)",
+		    inner_flowop->fo_name, inner_flowop->fo_instance);
+
+		if (inner_flowop->fo_instance &&
+		    (inner_flowop->fo_instance == FLOW_MASTER)) {
+			inner_flowop = inner_flowop->fo_exec_next;
+			continue;
+		}
+		flowop_delete(&flowop->fo_comp_fops, inner_flowop);
+		inner_flowop = inner_flowop->fo_exec_next;
+	}
 }

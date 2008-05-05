@@ -69,6 +69,7 @@ static var_t *var_find_dynamic(char *name);
  * and integers of vars, and said components of avd_t.
  */
 
+
 /*
  * returns a pointer to a string indicating the type of data contained
  * in the supplied attribute variable descriptor.
@@ -460,6 +461,11 @@ avd_alloc_var_ptr(var_t *var)
 		avd->avd_val.randptr = var->var_val.randptr;
 		break;
 
+	case VAR_TYPE_INDVAR_SET:
+		avd->avd_type = AVD_IND_VAR;
+		avd->avd_val.varptr = var->var_val.varptr;
+		break;
+
 	default:
 		avd->avd_type = AVD_IND_VAR;
 		avd->avd_val.varptr = var;
@@ -500,7 +506,7 @@ avd_str_alloc(char *string)
 /*
  * Allocates a var (var_t) from interprocess shared memory.
  * Places the allocated var on the end of the globally shared
- * var_list. Finally, the routine allocates a string containing
+ * shm_var_list. Finally, the routine allocates a string containing
  * a copy of the supplied "name" string. If any allocations
  * fails, returns NULL, otherwise it returns a pointer to the
  * newly allocated var.
@@ -535,6 +541,12 @@ var_alloc_cmn(char *name, int var_type)
 		var_listp = &filebench_shm->shm_var_dyn_list;
 		break;
 
+	case VAR_TYPE_LOCAL:
+		/* place on head of shared local list */
+		newvar->var_next = filebench_shm->shm_var_loc_list;
+		filebench_shm->shm_var_loc_list = newvar;
+		return (newvar);
+
 	default:
 		var_listp = &filebench_shm->shm_var_list;
 		break;
@@ -552,9 +564,25 @@ var_alloc_cmn(char *name, int var_type)
 }
 
 /*
+ * Allocates a var (var_t) from interprocess shared memory after
+ * first adjusting the name to elminate the leading $. Places the
+ * allocated var temporarily on the end of the globally
+ * shared var_loc_list. If the allocation fails, returns NULL,
+ * otherwise it returns a pointer to the newly allocated var.
+ */
+var_t *
+var_lvar_alloc_local(char *name)
+{
+	if (name[0] == '$')
+		name += 1;
+
+	return (var_alloc_cmn(name, VAR_TYPE_LOCAL));
+}
+
+/*
  * Allocates a var (var_t) from interprocess shared memory and
  * places the allocated var on the end of the globally shared
- * var_list. If the allocation fails, returns NULL, otherwise
+ * shm_var_list. If the allocation fails, returns NULL, otherwise
  * it returns a pointer to the newly allocated var.
  */
 static var_t *
@@ -566,7 +594,7 @@ var_alloc(char *name)
 /*
  * Allocates a var (var_t) from interprocess shared memory.
  * Places the allocated var on the end of the globally shared
- * var_dyn_list. If the allocation fails, returns NULL, otherwise
+ * shm_var_dyn_list. If the allocation fails, returns NULL, otherwise
  * it returns a pointer to the newly allocated var.
  */
 static var_t *
@@ -576,14 +604,21 @@ var_alloc_dynamic(char *name)
 }
 
 /*
- * Searches for var_t with name "name" in the master var_list.
- * If successful, returns a pointer to the var_t, otherwise
- * returns NULL.
+ * Searches for var_t with name "name" in the shm_var_loc_list,
+ * then, if not found, in the global shm_var_list. If a matching
+ * local or global var is found, returns a pointer to the var_t,
+ * otherwise returns NULL.
  */
 static var_t *
 var_find(char *name)
 {
 	var_t *var;
+
+	for (var = filebench_shm->shm_var_loc_list; var != NULL;
+	    var = var->var_next) {
+		if (strcmp(var->var_name, name) == 0)
+			return (var);
+	}
 
 	for (var = filebench_shm->shm_var_list; var != NULL;
 	    var = var->var_next) {
@@ -592,6 +627,40 @@ var_find(char *name)
 	}
 
 	return (NULL);
+}
+
+/*
+ * Searches for var_t with name "name" in the supplied shm_var_list.
+ * If not found there, checks the global list. If still
+ * unsuccessful, returns NULL. Otherwise returns a pointer to the var_t.
+ */
+static var_t *
+var_find_list_only(char *name, var_t *var_list)
+{
+	var_t *var;
+
+	for (var = var_list; var != NULL; var = var->var_next) {
+		if (strcmp(var->var_name, name) == 0)
+			return (var);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Searches for var_t with name "name" in the supplied shm_var_list.
+ * If not found there, checks the global list. If still
+ * unsuccessful, returns NULL. Otherwise returns a pointer to the var_t.
+ */
+static var_t *
+var_find_list(char *name, var_t *var_list)
+{
+	var_t *var;
+
+	if ((var = var_find_list_only(name, var_list)) != NULL)
+		return (var);
+	else
+		return (var_find(name));
 }
 
 /*
@@ -959,13 +1028,64 @@ var_randvar_to_string(char *name, int param_name)
 }
 
 /*
+ * Copies the value stored in the source string into the destination
+ * string. Returns -1 if any problems encountered, 0 otherwise.
+ */
+static int
+var_copy(var_t *dst_var, var_t *src_var) {
+
+	if (VAR_HAS_BOOLEAN(src_var)) {
+		VAR_SET_BOOL(dst_var, src_var->var_val.boolean);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var %s=%s", dst_var->var_name,
+		    dst_var->var_val.boolean?"true":"false");
+	}
+
+	if (VAR_HAS_INTEGER(src_var)) {
+		VAR_SET_INT(dst_var, src_var->var_val.integer);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var %s=%llu", dst_var->var_name,
+		    (u_longlong_t)dst_var->var_val.integer);
+	}
+
+	if (VAR_HAS_DOUBLE(src_var)) {
+		VAR_SET_DBL(dst_var, src_var->var_val.dbl_flt);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var %s=%lf", dst_var->var_name,
+		    dst_var->var_val.dbl_flt);
+	}
+
+	if (VAR_HAS_STRING(src_var)) {
+		char *strptr;
+
+		if ((strptr =
+		    ipc_stralloc(src_var->var_val.string)) == NULL) {
+			filebench_log(LOG_ERROR,
+			    "Cannot assign string for variable %s",
+			    dst_var->var_name);
+			return (-1);
+		}
+		VAR_SET_STR(dst_var, strptr);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var %s=%s", dst_var->var_name,
+		    dst_var->var_val.string);
+	}
+
+	if (VAR_HAS_INDVAR(src_var)) {
+		VAR_SET_INDVAR(dst_var, src_var->var_val.varptr);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var %s to var %s", dst_var->var_name,
+		    src_var->var_name);
+	}
+	return (0);
+}
+
+/*
  * Searches for the var named "name", and if not found
- * allocates it. The then extracts the var_string from
- * the var named "string" and copies it into the var_string
- * of the var "name", after first allocating a piece of
- * interprocess shared string memory. If the var "name"
- * cannot be found or allocated, or the var "string" cannot
- * be found, the routine returns -1, otherwise it returns 0.
+ * allocates it. The then copies the value from
+ * the src_var into the destination var "name"
+ * If the var "name" cannot be found or allocated, or the var "src_name"
+ * cannot be found, the routine returns -1, otherwise it returns 0.
  */
 int
 var_assign_var(char *name, char *src_name)
@@ -996,40 +1116,7 @@ var_assign_var(char *name, char *src_name)
 		return (-1);
 	}
 
-	if (VAR_HAS_BOOLEAN(src_var)) {
-		VAR_SET_BOOL(dst_var, src_var->var_val.boolean);
-		filebench_log(LOG_VERBOSE,
-		    "Assign var %s=%d", name, src_var->var_val.boolean);
-	}
-
-	if (VAR_HAS_INTEGER(src_var)) {
-		VAR_SET_INT(dst_var, src_var->var_val.integer);
-		filebench_log(LOG_VERBOSE,
-		    "Assign var %s=%llu",
-		    name, (u_longlong_t)src_var->var_val.integer);
-	}
-
-	if (VAR_HAS_DOUBLE(src_var)) {
-		VAR_SET_DBL(dst_var, src_var->var_val.dbl_flt);
-		filebench_log(LOG_VERBOSE,
-		    "Assign var %s=%lf", name, src_var->var_val.dbl_flt);
-	}
-
-	if (VAR_HAS_STRING(src_var)) {
-		char *strptr;
-
-		if ((strptr =
-		    ipc_stralloc(src_var->var_val.string)) == NULL) {
-			filebench_log(LOG_ERROR,
-			    "Cannot assign variable %s",
-			    name);
-			return (-1);
-		}
-		VAR_SET_STR(dst_var, strptr);
-		filebench_log(LOG_VERBOSE,
-		    "Assign var %s=%s", name, src_var->var_val.string);
-	}
-	return (0);
+	return (var_copy(dst_var, src_var));
 }
 
 /*
@@ -1039,7 +1126,7 @@ var_assign_var(char *name, char *src_name)
  * before the copy. Space for the string in the var comes
  * from interprocess shared memory. If the var "name"
  * cannot be found or allocated, or the memory for the
- * var_string copy of "string" cannot be allocated, the
+ * var_val.string copy of "string" cannot be allocated, the
  * routine returns -1, otherwise it returns 0.
  */
 int
@@ -1076,6 +1163,197 @@ var_assign_string(char *name, char *string)
 	    "Var assign string $%s=%s", name, string);
 
 	return (0);
+}
+
+/*
+ * Allocates a local var. The then extracts the var_string from
+ * the var named "string" and copies it into the var_string
+ * of the var "name", after first allocating a piece of
+ * interprocess shared string memory. Returns a pointer to the
+ * newly allocated local var or NULL on error.
+ */
+var_t *
+var_lvar_assign_var(char *name, char *src_name)
+{
+	var_t *dst_var, *src_var;
+
+	src_name += 1;
+
+	if ((src_var = var_find(src_name)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "Cannot find source variable %s", src_name);
+		return (NULL);
+	}
+
+	dst_var = var_lvar_alloc_local(name);
+
+	if (dst_var == NULL) {
+		filebench_log(LOG_ERROR, "Cannot assign variable %s",
+		    name);
+		return (NULL);
+	}
+
+	/*
+	 * if referencing another local var which is currently
+	 * empty, indirect to it
+	 */
+	if ((src_var->var_type & VAR_TYPE_MASK) == VAR_TYPE_LOCAL) {
+		VAR_SET_INDVAR(dst_var, src_var);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign local var %s to %s", name, src_name);
+		return (dst_var);
+	}
+
+	if (VAR_HAS_BOOLEAN(src_var)) {
+		VAR_SET_BOOL(dst_var, src_var->var_val.boolean);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var (%s, %p)=%s", name,
+		    dst_var, src_var->var_val.boolean?"true":"false");
+	} else if (VAR_HAS_INTEGER(src_var)) {
+		VAR_SET_INT(dst_var, src_var->var_val.integer);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var (%s, %p)=%llu", name,
+		    dst_var, (u_longlong_t)src_var->var_val.integer);
+	} else if (VAR_HAS_STRING(src_var)) {
+		char *strptr;
+
+		if ((strptr = ipc_stralloc(src_var->var_val.string)) == NULL) {
+			filebench_log(LOG_ERROR,
+			    "Cannot assign variable %s",
+			    name);
+			return (NULL);
+		}
+		VAR_SET_STR(dst_var, strptr);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var (%s, %p)=%s", name,
+		    dst_var, src_var->var_val.string);
+	} else if (VAR_HAS_DOUBLE(src_var)) {
+		/* LINTED E_ASSIGMENT_CAUSE_LOSS_PREC */
+		VAR_SET_INT(dst_var, src_var->var_val.dbl_flt);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var (%s, %p)=%8.2f", name,
+		    dst_var, src_var->var_val.dbl_flt);
+	} else if (VAR_HAS_RANDDIST(src_var)) {
+		VAR_SET_RAND(dst_var, src_var->var_val.randptr);
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "Assign var (%s, %p)=%llu", name,
+		    dst_var, (u_longlong_t)src_var->var_val.integer);
+	}
+
+	return (dst_var);
+}
+
+/*
+ * the routine allocates a new local var and sets
+ * its var_boolean's value to that of the supplied
+ * boolean. It returns a pointer to the new local var
+ */
+var_t *
+var_lvar_assign_boolean(char *name, boolean_t bool)
+{
+	var_t *var;
+
+	var = var_lvar_alloc_local(name);
+
+	if (var == NULL) {
+		filebench_log(LOG_ERROR, "Cannot assign variable %s",
+		    name);
+		return (NULL);
+	}
+
+	VAR_SET_BOOL(var, bool);
+
+	filebench_log(LOG_DEBUG_SCRIPT, "Assign integer %s=%s",
+	    name, bool ? "true" : "false");
+
+	return (var);
+}
+
+/*
+ * the routine allocates a new local var and sets
+ * its var_integers's value to that of the supplied
+ * integer. It returns a pointer to the new local var
+ */
+var_t *
+var_lvar_assign_integer(char *name, fbint_t integer)
+{
+	var_t *var;
+
+	var = var_lvar_alloc_local(name);
+
+	if (var == NULL) {
+		filebench_log(LOG_ERROR, "Cannot assign variable %s",
+		    name);
+		return (NULL);
+	}
+
+	VAR_SET_INT(var, integer);
+
+	filebench_log(LOG_DEBUG_SCRIPT, "Assign integer %s=%llu",
+	    name, (u_longlong_t)integer);
+
+	return (var);
+}
+
+/*
+ * the routine allocates a new local var and sets
+ * its var_dbl_flt value to that of the supplied
+ * double precission floating point number. It returns
+ * a pointer to the new local var
+ */
+var_t *
+var_lvar_assign_double(char *name, double dbl)
+{
+	var_t *var;
+
+	var = var_lvar_alloc_local(name);
+
+	if (var == NULL) {
+		filebench_log(LOG_ERROR, "Cannot assign variable %s",
+		    name);
+		return (NULL);
+	}
+
+	VAR_SET_DBL(var, dbl);
+
+	filebench_log(LOG_DEBUG_SCRIPT, "Assign integer %s=%8.2f", name, dbl);
+
+	return (var);
+}
+
+/*
+ * Like var_lvar_assign_integer, only this routine copies the
+ * supplied "string" into the var named "name". If the var
+ * named "name" cannot be found then it is first allocated
+ * before the copy. Space for the string in the var comes
+ * from interprocess shared memory. The allocated local var
+ * is returned at as a char *, or NULL on error.
+ */
+var_t *
+var_lvar_assign_string(char *name, char *string)
+{
+	var_t *var;
+	char *strptr;
+
+	var = var_lvar_alloc_local(name);
+
+	if (var == NULL) {
+		filebench_log(LOG_ERROR, "Cannot assign variable %s",
+		    name);
+		return (NULL);
+	}
+
+	if ((strptr = ipc_stralloc(string)) == NULL) {
+		filebench_log(LOG_ERROR, "Cannot assign variable %s",
+		    name);
+		return (NULL);
+	}
+	VAR_SET_STR(var, strptr);
+
+	filebench_log(LOG_DEBUG_SCRIPT,
+	    "Lvar_assign_string (%s, %p)=%s", name, var, string);
+
+	return (var);
 }
 
 /*
@@ -1198,7 +1476,7 @@ var_find_environment(var_t *var)
  * Look up special variables. The "name" argument is used to find
  * the desired special var and fill it with an appropriate string
  * value. Looks for an already allocated var of the same name on
- * the var_dyn_list. If not found a new dynamic var is allocated.
+ * the shm_var_dyn_list. If not found a new dynamic var is allocated.
  * if the name begins with '{', it is an internal variable, and
  * var_find_internal() is called. If the name begins with '(' it
  * is an environment varable, and var_find_environment() is
@@ -1247,4 +1525,75 @@ var_find_dynamic(char *name)
 	}
 
 	return (NULL);
+}
+
+/*
+ * replace the avd_t attribute value descriptor in the new FLOW_MASTER flowop
+ * that points to a local variable with a new avd_t containing
+ * the actual value from the local variable.
+ */
+void
+avd_update(avd_t *avdp, var_t *lvar_list)
+{
+	var_t *old_lvar, *new_lvar;
+
+	if ((*avdp)->avd_type == AVD_IND_VAR) {
+
+		/* Make sure there is a local var */
+		if ((old_lvar = (*avdp)->avd_val.varptr) == NULL) {
+			filebench_log(LOG_ERROR,
+			    "avd_update: local var not found");
+			return;
+		}
+	} else {
+		/* Empty or not indirect, so no update needed */
+		return;
+	}
+
+	/*  allocate a new avd using the new or old lvar contents */
+	if ((new_lvar =
+	    var_find_list(old_lvar->var_name, lvar_list)) != NULL)
+		(*avdp) = avd_alloc_var_ptr(new_lvar);
+	else
+		(*avdp) = avd_alloc_var_ptr(old_lvar);
+}
+
+void
+var_update_comp_lvars(var_t *newlvar, var_t *proto_comp_vars,
+    var_t *mstr_lvars)
+{
+	var_t *proto_lvar;
+
+	/* find the prototype lvar from the inherited list */
+	proto_lvar = var_find_list_only(newlvar->var_name, proto_comp_vars);
+
+	if (proto_lvar == NULL)
+		return;
+
+	/*
+	 * if the new local variable has not already been assigned
+	 * a value, try to copy a value from the prototype local variable
+	 */
+	if ((newlvar->var_type & VAR_TYPE_SET_MASK) == 0) {
+
+		/* copy value from prototype lvar to new lvar */
+		(void) var_copy(newlvar, proto_lvar);
+	}
+
+	/* If proto lvar is indirect, see if we can colapse indirection */
+	if (VAR_HAS_INDVAR(proto_lvar)) {
+		var_t *uplvp;
+
+		uplvp = (var_t *)proto_lvar->var_val.varptr;
+
+		/* search for more current uplvar on comp master list */
+		if (mstr_lvars) {
+			uplvp = var_find_list_only(
+			    uplvp->var_name, mstr_lvars);
+			VAR_SET_INDVAR(newlvar, uplvp);
+		}
+
+		if (VAR_HAS_INDVAR(uplvp))
+			VAR_SET_INDVAR(newlvar, uplvp->var_val.varptr);
+	}
 }

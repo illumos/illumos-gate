@@ -271,7 +271,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 		    threadflow->tf_instance);
 
 		threadflow_kill(threadflow, wait_cnt);
-		flowop_delete_all(&threadflow->tf_ops);
+		flowop_delete_all(&threadflow->tf_thrd_fops);
 		*threadlist = threadflow->tf_next;
 		ipc_free(FILEBENCH_THREADFLOW, (char *)threadflow);
 		return (0);
@@ -292,7 +292,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 			    entry->tf_next->tf_name,
 			    entry->tf_next->tf_instance);
 			threadflow_kill(entry->tf_next, wait_cnt);
-			flowop_delete_all(&entry->tf_next->tf_ops);
+			flowop_delete_all(&entry->tf_next->tf_thrd_fops);
 			ipc_free(FILEBENCH_THREADFLOW, (char *)threadflow);
 			entry->tf_next = entry->tf_next->tf_next;
 			return (0);

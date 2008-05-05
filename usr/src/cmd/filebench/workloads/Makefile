@@ -30,6 +30,7 @@ include ../../Makefile.cmd
 
 WORKLOADS = \
 	bringover.f \
+	compflow_demo.f \
 	copyfiles.f \
 	createfiles.f \
 	deletefiles.f \

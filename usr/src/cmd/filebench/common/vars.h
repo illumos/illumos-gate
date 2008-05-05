@@ -87,18 +87,21 @@ typedef struct var {
 		double		dbl_flt;
 		char		*string;
 		struct randdist *randptr;
+		struct var	*varptr;
 	} var_val;
 } var_t;
 
 #define	VAR_TYPE_GLOBAL		0x00	/* global variable */
 #define	VAR_TYPE_DYNAMIC	0x01	/* Dynamic variable */
 #define	VAR_TYPE_RANDOM		0x02	/* random variable */
+#define	VAR_TYPE_LOCAL		0x03	/* Local variable */
 #define	VAR_TYPE_MASK		0x0f
 #define	VAR_TYPE_BOOL_SET	0x10	/* var contains a boolean */
 #define	VAR_TYPE_INT_SET	0x20	/* var contains an integer */
 #define	VAR_TYPE_STR_SET	0x30	/* var contains a string */
 #define	VAR_TYPE_DBL_SET	0x40	/* var contains a double */
 #define	VAR_TYPE_RAND_SET	0x50	/* var contains a randdist pointer */
+#define	VAR_TYPE_INDVAR_SET	0x60    /* var points to another local var */
 #define	VAR_TYPE_SET_MASK	0xf0
 
 #define	VAR_HAS_BOOLEAN(vp) \
@@ -115,6 +118,9 @@ typedef struct var {
 
 #define	VAR_HAS_RANDDIST(vp) \
 	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_RAND_SET)
+
+#define	VAR_HAS_INDVAR(vp) \
+	(((vp)->var_type & VAR_TYPE_SET_MASK) == VAR_TYPE_INDVAR_SET)
 
 #define	VAR_SET_BOOL(vp, val)	\
 	{			\
@@ -134,41 +140,62 @@ typedef struct var {
 	{			\
 		(vp)->var_val.dbl_flt = (val); \
 		(vp)->var_type = \
-		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_DBL_SET); \
+		    (((vp)->var_type & (~VAR_TYPE_SET_MASK)) | \
+		    VAR_TYPE_DBL_SET); \
 	}
 
 #define	VAR_SET_STR(vp, val)	\
 	{			\
 		(vp)->var_val.string = (val); \
 		(vp)->var_type = \
-		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_STR_SET); \
+		    (((vp)->var_type & (~VAR_TYPE_SET_MASK)) | \
+		    VAR_TYPE_STR_SET); \
 	}
 
 #define	VAR_SET_RAND(vp, val)	\
 	{			\
 		(vp)->var_val.randptr = (val); \
 		(vp)->var_type = \
-		(((vp)->var_type & (~VAR_TYPE_SET_MASK)) | VAR_TYPE_RAND_SET);\
+		    (((vp)->var_type & (~VAR_TYPE_SET_MASK)) | \
+		    VAR_TYPE_RAND_SET); \
+	}
+
+#define	VAR_SET_INDVAR(vp, val)	\
+	{			\
+		(vp)->var_val.varptr = (val); \
+		(vp)->var_type = \
+		    (((vp)->var_type & (~VAR_TYPE_SET_MASK)) | \
+		    VAR_TYPE_INDVAR_SET); \
 	}
 
 avd_t avd_bool_alloc(boolean_t bool);
 avd_t avd_int_alloc(fbint_t integer);
 avd_t avd_str_alloc(char *string);
-avd_t var_ref_attr(char *name);
-int var_assign_boolean(char *name, boolean_t bool);
-int var_assign_integer(char *name, fbint_t integer);
-int var_assign_string(char *name, char *string);
-int var_assign_var(char *name, char *string);
-var_t *var_define_randvar(char *name);
-var_t *var_find_randvar(char *name);
-boolean_t var_to_boolean(char *name);
-fbint_t var_to_integer(char *name);
-char *var_to_string(char *name);
-char *var_randvar_to_string(char *name, int param);
 boolean_t avd_get_bool(avd_t);
 fbint_t avd_get_int(avd_t);
 double avd_get_dbl(avd_t);
 char *avd_get_str(avd_t);
+void avd_update(avd_t *avdp, var_t *lvar_list);
+avd_t var_ref_attr(char *name);
+int var_assign_boolean(char *name, boolean_t bool);
+int var_assign_integer(char *name, fbint_t integer);
+int var_assign_double(char *name, double dbl);
+int var_assign_string(char *name, char *string);
+int var_assign_var(char *name, char *string);
+void var_update_comp_lvars(var_t *newlvar, var_t *proto_comp_vars,
+    var_t *mstr_lvars);
+var_t *var_define_randvar(char *name);
+var_t *var_find_randvar(char *name);
+boolean_t var_to_boolean(char *name);
+fbint_t var_to_integer(char *name);
+var_t *var_lvar_alloc_local(char *name);
+var_t *var_lvar_assign_boolean(char *name, boolean_t);
+var_t *var_lvar_assign_integer(char *name, fbint_t);
+var_t *var_lvar_assign_double(char *name, double);
+var_t *var_lvar_assign_string(char *name, char *string);
+var_t *var_lvar_assign_var(char *name, char *src_name);
+char *var_to_string(char *name);
+char *var_randvar_to_string(char *name, int param);
 int var_is_set4_randvar(char *name);
 
 #ifdef	__cplusplus

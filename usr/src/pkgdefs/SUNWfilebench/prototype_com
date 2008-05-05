@@ -52,6 +52,7 @@ f none usr/benchmarks/filebench/scripts/filebench_compare 555 root bin
 f none usr/benchmarks/filebench/scripts/fs_flush 555 root bin
 d none usr/benchmarks/filebench/workloads 755 root bin
 f none usr/benchmarks/filebench/workloads/bringover.f 444 root bin
+f none usr/benchmarks/filebench/workloads/compflow_demo.f 444 root bin
 f none usr/benchmarks/filebench/workloads/copyfiles.f 444 root bin
 f none usr/benchmarks/filebench/workloads/createfiles.f 444 root bin
 f none usr/benchmarks/filebench/workloads/deletefiles.f 444 root bin

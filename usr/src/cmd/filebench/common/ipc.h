@@ -98,6 +98,7 @@ typedef struct filebench_shm {
 	var_t		*shm_var_list;
 	var_t		*shm_var_dyn_list;
 	randdist_t	*shm_rand_list;
+	var_t		*shm_var_loc_list;
 	int		shm_debug_level;
 	hrtime_t	shm_epoch;
 	hrtime_t	shm_starttime;
