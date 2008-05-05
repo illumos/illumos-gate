@@ -115,7 +115,7 @@
 #endif
 
 #if defined(_SUNOS_VTOC_16)
-#define	VTOC_OFFSET	512
+#define	VTOC_OFFSET	1
 #elif defined(_SUNOS_VTOC_8)
 #define	VTOC_OFFSET	0
 #else
@@ -243,8 +243,8 @@ static int	io_readonly = 0;	/* do not write to disk (-R) */
 
 /* The -o offset and -s size options specify the area of the disk on */
 /* which to perform the particular operation; i.e., -P, -r, or -w. */
-static int	io_offset = 0;		/* offset sector (-o offset) */
-static int	io_size = 0;		/* size in sectors (-s size) */
+static off_t	io_offset = 0;		/* offset sector (-o offset) */
+static off_t	io_size = 0;		/* size in sectors (-s size) */
 
 /* Partition table flags */
 static int	v_flag = 0;		/* virtual geometry-HBA flag (-v) */
@@ -313,7 +313,7 @@ static void update_disk_and_exit(boolean_t table_changed);
 int main(int argc, char *argv[]);
 static int read_geom(char *sgeom);
 static void dev_mboot_read(void);
-static void dev_mboot_write(int sect, char *buff, int bootsiz);
+static void dev_mboot_write(off_t sect, char *buff, int bootsiz);
 static void mboot_read(void);
 static void fill_patt(void);
 static void abs_read(void);
@@ -408,10 +408,10 @@ main(int argc, char *argv[])
 		switch (c) {
 
 			case 'o':
-				io_offset = strtoul(optarg, 0, 0);
+				io_offset = (off_t)strtoull(optarg, 0, 0);
 				continue;
 			case 's':
-				io_size = strtoul(optarg, 0, 0);
+				io_size = (off_t)strtoull(optarg, 0, 0);
 				continue;
 			case 'P':
 				diag_cnt++;
@@ -962,7 +962,7 @@ dev_mboot_read(void)
  * Write the master boot sector to the device.
  */
 static void
-dev_mboot_write(int sect, char *buff, int bootsiz)
+dev_mboot_write(off_t sect, char *buff, int bootsiz)
 {
 	int 	new_pt, old_pt, error;
 	int	clr_efi = -1;
@@ -1164,6 +1164,7 @@ static void
 fill_patt(void)
 {
 	int	*buff_ptr, i;
+	off_t	*off_ptr;
 	int	io_fpatt = 0;
 	int	io_ipatt = 0;
 
@@ -1181,13 +1182,15 @@ fill_patt(void)
 	 * for io_size blocks.
 	 */
 	while (io_size--) {
-		buff_ptr = (int *)Bootsect;
+		off_ptr = (off_t *)Bootsect;
 		if (!io_fpatt) {
-			for (i = 0; i < sectsiz; i += 4, buff_ptr++)
-				*buff_ptr = io_offset;
+			for (i = 0; i < sectsiz;
+			    i += sizeof (off_t), off_ptr++)
+				*off_ptr = io_offset;
 		}
 		/* Write the data to disk */
-		if (lseek(Dev, sectsiz * io_offset++, SEEK_SET) == -1) {
+		if (lseek(Dev, (off_t)(sectsiz * io_offset++),
+		    SEEK_SET) == -1) {
 			(void) fprintf(stderr, "fdisk: Error seeking on %s.\n",
 			    Dfltdev);
 			exit(1);
@@ -1211,7 +1214,8 @@ abs_read(void)
 	int c;
 
 	while (io_size--) {
-		if (lseek(Dev, sectsiz * io_offset++, SEEK_SET) == -1) {
+		if (lseek(Dev, (off_t)(sectsiz * io_offset++),
+		    SEEK_SET) == -1) {
 			(void) fprintf(stderr, "fdisk: Error seeking on %s.\n",
 			    Dfltdev);
 			exit(1);
@@ -1276,7 +1280,8 @@ abs_write(void)
 
 		}
 		/* Write to disk drive */
-		if (lseek(Dev, sectsiz * io_offset++, SEEK_SET) == -1) {
+		if (lseek(Dev, (off_t)(sectsiz * io_offset++),
+		    SEEK_SET) == -1) {
 			(void) fprintf(stderr, "fdisk: Error seeking on %s.\n",
 			    Dfltdev);
 			exit(1);
@@ -3491,7 +3496,9 @@ clear_vtoc(int table, int part)
 {
 	struct ipart *clr_table;
 	struct dk_label disk_label;
-	int pcyl, ncyl, backup_block, solaris_offset, count, bytes, seek_byte;
+	int pcyl, ncyl, count, bytes;
+	uint_t backup_block, solaris_offset;
+	off_t seek_byte;
 
 #ifdef DEBUG
 	struct dk_label	read_label;
@@ -3505,17 +3512,19 @@ clear_vtoc(int table, int part)
 
 	(void) memset(&disk_label, 0, sizeof (struct dk_label));
 
-	seek_byte = (lel(clr_table->relsect) * sectsiz) + VTOC_OFFSET;
+	seek_byte = (off_t)(lel(clr_table->relsect) + VTOC_OFFSET) * sectsiz;
 
 	if (io_debug) {
-		(void) fprintf(stderr, "\tClearing primary VTOC at byte %d\n",
-		    seek_byte);
+		(void) fprintf(stderr,
+		    "\tClearing primary VTOC at byte %llu (block %llu)\n",
+		    (uint64_t)seek_byte,
+		    (uint64_t)(lel(clr_table->relsect) + VTOC_OFFSET));
 	}
 
 	if (lseek(Dev, seek_byte, SEEK_SET) == -1) {
 		(void) fprintf(stderr,
-		    "\tError seeking to primary label at byte %d\n",
-		    seek_byte);
+		    "\tError seeking to primary label at byte %llu\n",
+		    (uint64_t)seek_byte);
 		return;
 	}
 
@@ -3530,12 +3539,13 @@ clear_vtoc(int table, int part)
 #ifdef DEBUG
 	if (lseek(Dev, seek_byte, SEEK_SET) == -1) {
 		(void) fprintf(stderr,
-		    "DEBUG: Error seeking to primary label at byte %d\n",
-		    seek_byte);
+		    "DEBUG: Error seeking to primary label at byte %llu\n",
+		    (uint64_t)seek_byte);
 		return;
 	} else {
-		(void) fprintf(stderr, "DEBUG: Successful lseek() to byte %d\n",
-		    seek_byte);
+		(void) fprintf(stderr,
+		    "DEBUG: Successful lseek() to byte %llu\n",
+		    (uint64_t)seek_byte);
 	}
 
 	bytes = read(Dev, &read_label, sizeof (struct dk_label));
@@ -3564,20 +3574,20 @@ clear_vtoc(int table, int part)
 	    (heads * sectors)) + ((heads - 1) * sectors) + 1;
 
 	for (count = 1; count < 6; count++) {
-		seek_byte = (solaris_offset + backup_block) * 512;
+		seek_byte = (off_t)(solaris_offset + backup_block) * 512;
 
 		if (lseek(Dev, seek_byte, SEEK_SET) == -1) {
 			(void) fprintf(stderr,
-			    "\tError seeking to backup label at byte %d on "
-			    "%s.\n", seek_byte, Dfltdev);
+			    "\tError seeking to backup label at byte %llu on "
+			    "%s.\n", (uint64_t)seek_byte, Dfltdev);
 			return;
 		}
 
 		if (io_debug) {
 			(void) fprintf(stderr, "\tClearing backup VTOC at"
-			    " byte %d (block %d)\n",
-			    (solaris_offset + backup_block) * 512,
-			    (solaris_offset + backup_block));
+			    " byte %llu (block %llu)\n",
+			    (uint64_t)seek_byte,
+			    (uint64_t)(solaris_offset + backup_block));
 		}
 
 		bytes = write(Dev, &disk_label, sizeof (struct dk_label));
@@ -3585,19 +3595,20 @@ clear_vtoc(int table, int part)
 		if (bytes != sizeof (struct dk_label)) {
 			(void) fprintf(stderr,
 			    "\t\tWarning: only %d bytes written to "
-			    "clear backup VTOC at block %d!\n", bytes,
-			    (solaris_offset + backup_block));
+			    "clear backup VTOC at block %llu!\n", bytes,
+			    (uint64_t)(solaris_offset + backup_block));
 		}
 
 #ifdef DEBUG
 	if (lseek(Dev, seek_byte, SEEK_SET) == -1) {
 		(void) fprintf(stderr,
-		    "DEBUG: Error seeking to backup label at byte %d\n",
-		    seek_byte);
+		    "DEBUG: Error seeking to backup label at byte %llu\n",
+		    (uint64_t)seek_byte);
 		return;
 	} else {
-		(void) fprintf(stderr, "DEBUG: Successful lseek() to byte %d\n",
-		    seek_byte);
+		(void) fprintf(stderr,
+		    "DEBUG: Successful lseek() to byte %llu\n",
+		    (uint64_t)seek_byte);
 	}
 
 	bytes = read(Dev, &read_label, sizeof (struct dk_label));
