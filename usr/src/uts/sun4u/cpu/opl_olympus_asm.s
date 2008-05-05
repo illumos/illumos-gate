@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Assembly code support for the Olympus-C module
@@ -1381,8 +1381,8 @@ opl_cpu0_err_log:
 	 nop
 	RESET_WINREG(%g1)		! reset windows to prevent spills
 4:
-	RESET_USER_RTT_REGS(%g2, %g3, 5f)
-5:
+	RESET_USER_RTT_REGS(%g2, %g3, opl_sync_trap_resetskip)
+opl_sync_trap_resetskip:
 	mov	%g5, %g3		! pass SFSR to the 3rd arg
 	mov	%g6, %g2		! pass SFAR to the 2nd arg
 	set	opl_cpu_isync_tl1_error, %g1
@@ -1616,8 +1616,8 @@ opl_uger_panic1:
 	 * %g2 = arg #1 already set above
 	 */
 opl_uger_panic_cmn:
-	RESET_USER_RTT_REGS(%g4, %g5, 1f)
-1:
+	RESET_USER_RTT_REGS(%g4, %g5, opl_uger_panic_resetskip)
+opl_uger_panic_resetskip:
 	rdpr	%tl, %g3			! arg #2
 	set	opl_cpu_urgent_error, %g1	! pc
 	sethi	%hi(sys_trap), %g5
