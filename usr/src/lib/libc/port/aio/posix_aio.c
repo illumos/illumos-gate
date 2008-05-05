@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -968,16 +968,14 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait, const timespec_t *utimo)
 
 	_aio_flags |= AIO_LIB_WAITN;
 
-	if (*nwait >= AIO_WAITN_MAXIOCBS) {
-		if (_aio_check_timeout(utimo, &end, &timedwait) != 0) {
-			error = -1;
-			dnwait = 0;
-			goto out;
-		}
-		if (timedwait != AIO_TIMEOUT_INDEF) {
-			twait = *utimo;
-			wait = &twait;
-		}
+	if (_aio_check_timeout(utimo, &end, &timedwait) != 0) {
+		error = -1;
+		dnwait = 0;
+		goto out;
+	}
+	if (timedwait != AIO_TIMEOUT_INDEF) {
+		twait = *utimo;
+		wait = &twait;
 	}
 
 	/*
