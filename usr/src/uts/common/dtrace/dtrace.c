@@ -10766,13 +10766,21 @@ dtrace_enabling_matchall(void)
 	mutex_enter(&dtrace_lock);
 
 	/*
-	 * Because we can be called after dtrace_detach() has been called, we
-	 * cannot assert that there are retained enablings.  We can safely
-	 * load from dtrace_retained, however:  the taskq_destroy() at the
-	 * end of dtrace_detach() will block pending our completion.
+	 * Iterate over all retained enablings to see if any probes match
+	 * against them.  We only perform this operation on enablings for which
+	 * we have sufficient permissions by virtue of being in the global zone
+	 * or in the same zone as the DTrace client.  Because we can be called
+	 * after dtrace_detach() has been called, we cannot assert that there
+	 * are retained enablings.  We can safely load from dtrace_retained,
+	 * however:  the taskq_destroy() at the end of dtrace_detach() will
+	 * block pending our completion.
 	 */
-	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next)
-		(void) dtrace_enabling_match(enab, NULL);
+	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
+		cred_t *cr = enab->dten_vstate->dtvs_state->dts_cred.dcr_cred;
+
+		if (INGLOBALZONE(curproc) || getzoneid() == crgetzoneid(cr))
+			(void) dtrace_enabling_match(enab, NULL);
+	}
 
 	mutex_exit(&dtrace_lock);
 	mutex_exit(&cpu_lock);

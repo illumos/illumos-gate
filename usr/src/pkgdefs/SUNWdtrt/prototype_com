@@ -1368,6 +1368,8 @@ f none SUNWdtrt/tst/common/usdt/tst.badguess.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.eliminate.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.enabled.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.enabled.ksh.out 0444 root bin
+f none SUNWdtrt/tst/common/usdt/tst.enabled2.ksh 0444 root bin
+f none SUNWdtrt/tst/common/usdt/tst.enabled2.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.entryreturn.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.entryreturn.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh 0444 root bin
