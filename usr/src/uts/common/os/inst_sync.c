@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,13 @@
  * -	This could be done as a case of the modctl(2) system call
  *	though the ability to have it load and unload would disappear.
  *
- * -	Currently, flags are not interpreted.
+ * -	'flags' have either of two meanings:
+ *	INST_SYNC_IF_REQUIRED	'pathname' will be written if there
+ *				has been a change in the kernel's
+ *				internal view of instance number
+ *				information
+ *	INST_SYNC_ALWAYS	'pathname' will be written even if
+ *				the kernel's view hasn't changed.
  *
  * -	Maybe we should pass through two filenames - one to create,
  *	and the other as the 'final' target i.e. do the rename of
@@ -117,7 +123,6 @@ _fini(void)
 
 static int in_write_instance(struct vnode *vp);
 
-/*ARGSUSED1*/
 static int
 in_sync_sys(char *pathname, uint_t flags)
 {
@@ -131,13 +136,20 @@ in_sync_sys(char *pathname, uint_t flags)
 	if ((error = secpolicy_sys_devices(CRED())) != 0)
 		return (set_errno(error));
 
+	if (flags != INST_SYNC_ALWAYS && flags != INST_SYNC_IF_REQUIRED)
+		return (set_errno(EINVAL));
+
 	/*
 	 * Only one process is allowed to get the state of the instance
 	 * number assignments on the system at any given time.
 	 */
 	e_ddi_enter_instance();
 
-	if (e_ddi_instance_is_clean()) {
+	/*
+	 * Recreate the instance file only if the device tree has changed
+	 * or if the caller explicitly requests so.
+	 */
+	if (e_ddi_instance_is_clean() && flags != INST_SYNC_ALWAYS) {
 		error = EALREADY;
 		goto end;
 	}

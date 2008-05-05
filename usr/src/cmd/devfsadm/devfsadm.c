@@ -355,7 +355,7 @@ main(int argc, char *argv[])
 
 	/* Initialize device allocation list */
 	devlist.audio = devlist.cd = devlist.floppy = devlist.tape =
-	devlist.rmdisk = NULL;
+	    devlist.rmdisk = NULL;
 
 	if (daemon_mode == TRUE) {
 		/*
@@ -395,7 +395,7 @@ main(int argc, char *argv[])
 			    (void *(*)(void *))instance_flush_thread,
 			    NULL, THR_DETACHED, NULL) != 0) {
 				err_print(CANT_CREATE_THREAD, "daemon",
-					strerror(errno));
+				    strerror(errno));
 				devfsadm_exit(1);
 			}
 
@@ -595,7 +595,7 @@ parse_args(int argc, char *argv[])
 		build_dev = FALSE;
 
 		while ((opt =
-			getopt(argc, argv, "a:bdc:i:m:np:R:r:svV:")) != EOF) {
+		    getopt(argc, argv, "a:bdc:i:m:np:R:r:svV:")) != EOF) {
 			switch (opt) {
 			case 'a':
 				ap = calloc(sizeof (struct aliases), 1);
@@ -733,8 +733,8 @@ parse_args(int argc, char *argv[])
 				break;
 			case 'c':
 				num_classes++;
-				classes = s_realloc(classes, num_classes *
-						    sizeof (char *));
+				classes = s_realloc(classes,
+				    num_classes * sizeof (char *));
 				classes[num_classes - 1] = optarg;
 				break;
 			case 'd':
@@ -942,7 +942,7 @@ usage(void)
 	} else if (strcmp(prog, DRVCONFIG) == 0) {
 		err_print(DRVCONFIG_USAGE);
 	} else if ((strcmp(prog, DEVFSADM) == 0) ||
-			(strcmp(prog, DEVFSADMD) == 0)) {
+	    (strcmp(prog, DEVFSADMD) == 0)) {
 		err_print(DEVFSADM_USAGE);
 	} else {
 		err_print(COMPAT_LINK_USAGE);
@@ -1122,7 +1122,7 @@ process_devinfo_tree()
 		 * just need to take a snapshot with active devices.
 		 */
 		vprint(CHATTY_MID, "%staking snapshot of active devices\n",
-			fcn);
+		    fcn);
 		flags = DINFOCPYALL;
 	}
 
@@ -1207,7 +1207,7 @@ daemon_update(void)
 	if ((sysevent_hp = sysevent_open_channel_alt(
 	    door_file)) == NULL) {
 		err_print(CANT_CREATE_DOOR,
-			door_file, strerror(errno));
+		    door_file, strerror(errno));
 		devfsadm_exit(1);
 	}
 	if (sysevent_bind_subscriber(sysevent_hp, event_handler) != 0) {
@@ -1364,7 +1364,8 @@ lock_dev(void)
 		return;
 
 	/* lockout other threads from /dev */
-	while (sema_wait(&dev_sema) != 0);
+	while (sema_wait(&dev_sema) != 0)
+		;
 
 	/*
 	 * Lock out other devfsadm processes from /dev.
@@ -1840,7 +1841,7 @@ minor_process(di_node_t node, di_minor_t minor, struct mlist *dep)
 	int		defer;
 
 	vprint(CHATTY_MID, "minor_process: node=%s, minor=%s\n",
-		di_node_name(node), di_minor_name(minor));
+	    di_node_name(node), di_minor_name(minor));
 
 	if (dep != NULL) {
 
@@ -2114,7 +2115,7 @@ load_modules(void)
 
 		if ((mod_dir = opendir(cdir)) == NULL) {
 			vprint(MODLOAD_MID, "%sopendir(%s): %s\n",
-				fcn, cdir, strerror(errno));
+			    fcn, cdir, strerror(errno));
 			continue;
 		}
 
@@ -2163,28 +2164,28 @@ load_module(char *mname, char *cdir)
 	if ((dlhandle = dlopen(epath, RTLD_LAZY)) == NULL) {
 		dlerrstr = dlerror();
 		err_print(DLOPEN_FAILED, epath,
-			dlerrstr ? dlerrstr : "unknown error");
+		    dlerrstr ? dlerrstr : "unknown error");
 		return;
 	}
 
 	/* dlsym the _devfsadm_create_reg structure */
 	if (NULL == (create_reg = (_devfsadm_create_reg_t *)
-		    dlsym(dlhandle, _DEVFSADM_CREATE_REG))) {
+	    dlsym(dlhandle, _DEVFSADM_CREATE_REG))) {
 		vprint(MODLOAD_MID, "dlsym(%s, %s): symbol not found\n", epath,
-			_DEVFSADM_CREATE_REG);
+		    _DEVFSADM_CREATE_REG);
 	} else {
 		vprint(MODLOAD_MID, "%sdlsym(%s, %s) succeeded\n",
-			    fcn, epath, _DEVFSADM_CREATE_REG);
+		    fcn, epath, _DEVFSADM_CREATE_REG);
 	}
 
 	/* dlsym the _devfsadm_remove_reg structure */
 	if (NULL == (remove_reg = (_devfsadm_remove_reg_V1_t *)
 	    dlsym(dlhandle, _DEVFSADM_REMOVE_REG))) {
 		vprint(MODLOAD_MID, "dlsym(%s,\n\t%s): symbol not found\n",
-			epath, _DEVFSADM_REMOVE_REG);
+		    epath, _DEVFSADM_REMOVE_REG);
 	} else {
 		vprint(MODLOAD_MID, "dlsym(%s, %s): succeeded\n",
-			    epath, _DEVFSADM_REMOVE_REG);
+		    epath, _DEVFSADM_REMOVE_REG);
 	}
 
 	vprint(MODLOAD_MID, "module %s loaded\n", epath);
@@ -2207,7 +2208,7 @@ load_module(char *mname, char *cdir)
 			int flags = create_reg->tblp[i].flags;
 
 			create_list_element = (create_list_t *)
-				s_malloc(sizeof (create_list_t));
+			    s_malloc(sizeof (create_list_t));
 
 			create_list_element->create = &(create_reg->tblp[i]);
 			create_list_element->modptr = module;
@@ -2216,7 +2217,7 @@ load_module(char *mname, char *cdir)
 			    ((flags & CREATE_MASK) != CREATE_DEFER)) {
 				free(create_list_element);
 				err_print("illegal flag combination in "
-						"module create\n");
+				    "module create\n");
 				err_print(IGNORING_ENTRY, i, epath);
 				continue;
 			}
@@ -2225,7 +2226,7 @@ load_module(char *mname, char *cdir)
 			    (create_reg->tblp[i].node_type == NULL)) {
 				free(create_list_element);
 				err_print("flags value incompatible with "
-					"node_type value in module create\n");
+				    "node_type value in module create\n");
 				err_print(IGNORING_ENTRY, i, epath);
 				continue;
 			}
@@ -2236,7 +2237,7 @@ load_module(char *mname, char *cdir)
 			    ((flags & TYPE_MASK) != TYPE_PARTIAL)) {
 				free(create_list_element);
 				err_print("illegal TYPE_* flag combination in "
-						"module create\n");
+				    "module create\n");
 				err_print(IGNORING_ENTRY, i, epath);
 				continue;
 			}
@@ -2249,8 +2250,7 @@ load_module(char *mname, char *cdir)
 				    REG_EXTENDED)) != 0) {
 					free(create_list_element);
 					err_print(REGCOMP_FAILED,
-						create_reg->tblp[i].node_type,
-						n);
+					    create_reg->tblp[i].node_type, n);
 					err_print(IGNORING_ENTRY, i, epath);
 					continue;
 				}
@@ -2264,7 +2264,7 @@ load_module(char *mname, char *cdir)
 				}
 				free(create_list_element);
 				err_print("flags value incompatible with "
-					"drv_name value in module create\n");
+				    "drv_name value in module create\n");
 				err_print(IGNORING_ENTRY, i, epath);
 				continue;
 			}
@@ -2278,7 +2278,7 @@ load_module(char *mname, char *cdir)
 				}
 				free(create_list_element);
 				err_print("illegal DRV_* flag combination in "
-					"module create\n");
+				    "module create\n");
 				err_print(IGNORING_ENTRY, i, epath);
 				continue;
 			}
@@ -2295,8 +2295,7 @@ load_module(char *mname, char *cdir)
 					}
 					free(create_list_element);
 					err_print(REGCOMP_FAILED,
-						create_reg->tblp[i].drv_name,
-						n);
+					    create_reg->tblp[i].drv_name, n);
 					err_print(IGNORING_ENTRY, i, epath);
 					continue;
 				}
@@ -2305,11 +2304,11 @@ load_module(char *mname, char *cdir)
 
 			/* add to list sorted by interpose level */
 			for (create_list_next = &(create_head);
-				(*create_list_next != NULL) &&
-				(*create_list_next)->create->interpose_lvl >=
-				create_list_element->create->interpose_lvl;
-				create_list_next =
-					&((*create_list_next)->next));
+			    (*create_list_next != NULL) &&
+			    (*create_list_next)->create->interpose_lvl >=
+			    create_list_element->create->interpose_lvl;
+			    create_list_next = &((*create_list_next)->next))
+				;
 			create_list_element->next = *create_list_next;
 			*create_list_next = create_list_element;
 		}
@@ -2326,18 +2325,18 @@ load_module(char *mname, char *cdir)
 		for (i = 0; i < remove_reg->count; i++) {
 
 			remove_list_element = (remove_list_t *)
-				s_malloc(sizeof (remove_list_t));
+			    s_malloc(sizeof (remove_list_t));
 
 			remove_list_element->remove = &(remove_reg->tblp[i]);
 			remove_list_element->remove->flags |= flags;
 			remove_list_element->modptr = module;
 
 			for (remove_list_next = &(remove_head);
-				(*remove_list_next != NULL) &&
-				(*remove_list_next)->remove->interpose_lvl >=
-				remove_list_element->remove->interpose_lvl;
-				remove_list_next =
-					&((*remove_list_next)->next));
+			    (*remove_list_next != NULL) &&
+			    (*remove_list_next)->remove->interpose_lvl >=
+			    remove_list_element->remove->interpose_lvl;
+			    remove_list_next = &((*remove_list_next)->next))
+				;
 			remove_list_element->next = *remove_list_next;
 			*remove_list_next = remove_list_element;
 		}
@@ -2405,7 +2404,7 @@ call_minor_init(module_t *module)
 	}
 
 	vprint(INITFINI_MID, "%smodule %s.  current state: inactive\n",
-		fcn, module->name);
+	    fcn, module->name);
 
 	if (module->minor_init == NULL) {
 		module->flags |= MODULE_ACTIVE;
@@ -2419,7 +2418,7 @@ call_minor_init(module_t *module)
 	}
 
 	vprint(INITFINI_MID, "minor_init() returns DEVFSADM_SUCCESS. "
-		"new state: active\n");
+	    "new state: active\n");
 
 	module->flags |= MODULE_ACTIVE;
 	return (DEVFSADM_SUCCESS);
@@ -2590,7 +2589,7 @@ devfsadm_secondary_link(char *link, char *primary_link, int flags)
 
 	if (devlinks_debug == TRUE) {
 		vprint(INFO_MID, "adding extra link %s ==> %s\n",
-				devlink, contents);
+		    devlink, contents);
 	}
 
 	if ((rv = create_link_common(devlink, contents, &link_exists))
@@ -2662,11 +2661,11 @@ create_link_common(char *devlink, char *contents, int *exists)
 			checkcontents[linksize] = '\0';
 			if (strcmp(checkcontents, contents) != 0) {
 				vprint(CHATTY_MID, REMOVING_LINK,
-						devlink, checkcontents);
+				    devlink, checkcontents);
 				return (DEVFSADM_SUCCESS);
 			} else {
 				vprint(CHATTY_MID, "link exists and is correct:"
-					" %s -> %s\n", devlink, contents);
+				    " %s -> %s\n", devlink, contents);
 				/* failure only in that the link existed */
 				return (DEVFSADM_FAILURE);
 			}
@@ -2693,7 +2692,7 @@ create_link_common(char *devlink, char *contents, int *exists)
 
 			if (symlink(contents, devlink) == 0) {
 				vprint(VERBOSE_MID, CREATING_LINK, devlink,
-						contents);
+				    contents);
 				prev_link_existed = FALSE;
 				/* link successfully created */
 				*exists = TRUE;
@@ -2707,7 +2706,7 @@ create_link_common(char *devlink, char *contents, int *exists)
 					hide = strrchr(devlink, '/');
 					*hide = '\0';
 					s_mkdirp(devlink, S_IRWXU|S_IRGRP|
-						S_IXGRP|S_IROTH|S_IXOTH);
+					    S_IXGRP|S_IROTH|S_IXOTH);
 					*hide = '/';
 					break;
 				case EEXIST:
@@ -2715,7 +2714,7 @@ create_link_common(char *devlink, char *contents, int *exists)
 					break;
 				default:
 					err_print(SYMLINK_FAILED, devlink,
-						contents, strerror(errno));
+					    contents, strerror(errno));
 					return (DEVFSADM_FAILURE);
 				}
 			}
@@ -2729,14 +2728,13 @@ create_link_common(char *devlink, char *contents, int *exists)
 				if (strcmp(checkcontents, contents) != 0) {
 					s_unlink(devlink);
 					vprint(VERBOSE_MID, REMOVING_LINK,
-						devlink, checkcontents);
+					    devlink, checkcontents);
 					try = CREATE_LINK;
 				} else {
 					prev_link_existed = TRUE;
 					vprint(CHATTY_MID,
-						"link exists and is correct:"
-						" %s -> %s\n", devlink,
-						contents);
+					    "link exists and is correct:"
+					    " %s -> %s\n", devlink, contents);
 					*exists = TRUE;
 					/* failure in that the link existed */
 					return (DEVFSADM_FAILURE);
@@ -2943,7 +2941,7 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 	lminor = minor;
 
 	vprint(CHATTY_MID, "reset_node_permissions: phy_path=%s lphy_path=%s\n",
-			phy_path, lphy_path);
+	    phy_path, lphy_path);
 
 	dev = di_minor_devt(minor);
 	spectype = di_minor_spectype(minor); /* block or char */
@@ -3076,7 +3074,7 @@ devfsadm_rm_work(char *file, int recurse, int file_type)
 		} else {
 			if (strncmp(contents, DEV "/", strlen(DEV) + 1) == 0) {
 				devfsadm_rm_work(&contents[strlen(DEV) + 1],
-							TRUE, TYPE_LINK);
+				    TRUE, TYPE_LINK);
 			} else {
 				if ((ptr = strrchr(file, '/')) != NULL) {
 					*ptr = '\0';
@@ -3269,9 +3267,9 @@ devfsadm_rm_stale_links(char *dir_re, char *valid_link, di_node_t node,
 		if ((strcmp(link->contents, valid_link_contents) == 0) &&
 		    (strcmp(link->devlink, valid_link) != 0)) {
 			vprint(CHATTY_MID, "removing %s -> %s\n"
-				"valid link is: %s -> %s\n",
-				link->devlink, link->contents,
-				valid_link, valid_link_contents);
+			    "valid link is: %s -> %s\n",
+			    link->devlink, link->contents,
+			    valid_link, valid_link_contents);
 			/*
 			 * Use a copy of the cached link name as the
 			 * cache entry will go away during link removal
@@ -3296,7 +3294,7 @@ get_cached_links(char *dir_re)
 	vprint(BUILDCACHE_MID, "get_cached_links: %s\n", dir_re);
 
 	for (linkhead = headlinkhead; linkhead != NULL;
-		linkhead = linkhead->nexthead) {
+	    linkhead = linkhead->nexthead) {
 		if (strcmp(linkhead->dir_re, dir_re) == 0) {
 			return (linkhead);
 		}
@@ -3312,7 +3310,7 @@ get_cached_links(char *dir_re)
 	linkhead->dir_re = s_strdup(dir_re);
 
 	if ((n = regcomp(&(linkhead->dir_re_compiled), dir_re,
-				REG_EXTENDED)) != 0) {
+	    REG_EXTENDED)) != 0) {
 		err_print(REGCOMP_FAILED,  dir_re, n);
 	}
 
@@ -3379,13 +3377,13 @@ build_devlink_list(char *devlink, void *data)
 			 *	/dev/audio -> /dev/sound/0
 			 */
 			if (strncmp(contents, DEV "/",
-				strlen(DEV) + strlen("/")) != 0) {
+			    strlen(DEV) + strlen("/")) != 0) {
 
 				if ((ptr = strrchr(newlink, '/')) == NULL) {
 					vprint(REMOVE_MID, "%s%s -> %s invalid "
-						"link. missing '/'\n", fcn,
-						newlink, contents);
-						return;
+					    "link. missing '/'\n", fcn,
+					    newlink, contents);
+					return;
 				}
 				*ptr = '\0';
 				(void) strcpy(stage_link, newlink);
@@ -3397,7 +3395,7 @@ build_devlink_list(char *devlink, void *data)
 				(void) strcpy(newlink, dev_dir);
 				(void) strcat(newlink, "/");
 				(void) strcat(newlink,
-					&contents[strlen(DEV) + strlen("/")]);
+				    &contents[strlen(DEV) + strlen("/")]);
 			}
 
 		} else {
@@ -3446,12 +3444,12 @@ add_link_to_cache(char *devlink, char *physpath)
 	}
 
 	vprint(CACHE_MID, "add_link_to_cache: %s -> %s ",
-				devlink, physpath);
+	    devlink, physpath);
 
 	for (linkhead = headlinkhead; linkhead != NULL;
-		linkhead = linkhead->nexthead) {
-		if (regexec(&(linkhead->dir_re_compiled), devlink, 0, NULL,
-			0) == 0) {
+	    linkhead = linkhead->nexthead) {
+		if (regexec(&(linkhead->dir_re_compiled), devlink, 0, NULL, 0)
+		    == 0) {
 			added++;
 			link = s_malloc(sizeof (link_t));
 			link->devlink = s_strdup(devlink);
@@ -3462,7 +3460,7 @@ add_link_to_cache(char *devlink, char *physpath)
 	}
 
 	vprint(CACHE_MID,
-		" %d %s\n", added, added == 0 ? "NOT ADDED" : "ADDED");
+	    " %d %s\n", added, added == 0 ? "NOT ADDED" : "ADDED");
 }
 
 /*
@@ -3480,8 +3478,8 @@ rm_link_from_cache(char *devlink)
 
 	for (linkhead = headlinkhead; linkhead != NULL;
 	    linkhead = linkhead->nexthead) {
-		if (regexec(&(linkhead->dir_re_compiled), devlink, 0, NULL,
-			0) == 0) {
+		if (regexec(&(linkhead->dir_re_compiled), devlink, 0, NULL, 0)
+		    == 0) {
 
 			for (linkp = &(linkhead->link); *linkp != NULL; ) {
 				if ((strcmp((*linkp)->devlink, devlink) == 0)) {
@@ -3500,7 +3498,7 @@ rm_link_from_cache(char *devlink)
 					free(save->contents);
 					free(save);
 					vprint(CACHE_MID, " %s FREED FROM "
-						"CACHE\n", devlink);
+					    "CACHE\n", devlink);
 				} else {
 					linkp = &((*linkp)->next);
 				}
@@ -3520,7 +3518,7 @@ rm_all_links_from_cache()
 	vprint(CACHE_MID, "rm_all_links_from_cache\n");
 
 	for (linkhead = headlinkhead; linkhead != NULL;
-		linkhead = nextlinkhead) {
+	    linkhead = nextlinkhead) {
 
 		nextlinkhead = linkhead->nexthead;
 		assert(linkhead->nextlink == NULL);
@@ -3569,7 +3567,7 @@ instance_flush_thread(void)
 		inst_count = 0;
 
 		vprint(PATH2INST_MID, "signaled to flush path_to_inst."
-			" Enter delay loop\n");
+		    " Enter delay loop\n");
 		/*
 		 * Wait MAX_IDLE_DELAY seconds after getting the last flush
 		 * path_to_inst event before invoking a flush, but never wait
@@ -3603,14 +3601,18 @@ instance_flush_thread(void)
  * inst_sync syscall to flush the path_to_inst database to the given file.
  */
 static int
-do_inst_sync(char *filename)
+do_inst_sync(char *filename, char *instfilename)
 {
 	void (*sigsaved)(int);
-	int err = 0;
+	int err = 0, flags = INST_SYNC_IF_REQUIRED;
+	struct stat sb;
+
+	if (stat(instfilename, &sb) == -1 && errno == ENOENT)
+		flags = INST_SYNC_ALWAYS;
 
 	vprint(INSTSYNC_MID, "do_inst_sync: about to flush %s\n", filename);
 	sigsaved = sigset(SIGSYS, SIG_IGN);
-	if (inst_sync(filename, 0) == -1)
+	if (inst_sync(filename, flags) == -1)
 		err = errno;
 	(void) sigset(SIGSYS, sigsaved);
 
@@ -3670,13 +3672,14 @@ flush_path_to_inst(void)
 	    sizeof (INSTANCE_FILE_SUFFIX));
 
 	(void) snprintf(new_inst_file, inst_strlen + PID_STR_LEN + 2,
-		"%s.%ld", inst_file, getpid());
+	    "%s.%ld", inst_file, getpid());
 
 	if (stat(new_inst_file, &sb) == 0) {
 		s_unlink(new_inst_file);
 	}
 
-	if ((err = do_inst_sync(new_inst_file)) != DEVFSADM_SUCCESS) {
+	err = do_inst_sync(new_inst_file, inst_file);
+	if (err != DEVFSADM_SUCCESS) {
 		goto out;
 		/*NOTREACHED*/
 	}
@@ -3705,7 +3708,7 @@ flush_path_to_inst(void)
 	}
 
 	(void) snprintf(old_inst_file, inst_strlen + PID_STR_LEN + 6,
-		"%s.old.%ld", inst_file, getpid());
+	    "%s.old.%ld", inst_file, getpid());
 
 	if (stat(old_inst_file, &sb) == 0) {
 		s_unlink(old_inst_file);
@@ -3760,7 +3763,7 @@ flush_path_to_inst(void)
 
 	if ((err = rename(old_inst_file, old_inst_file_npid)) != 0) {
 		err_print(RENAME_FAILED, old_inst_file_npid,
-				strerror(errno));
+		    strerror(errno));
 	} else if ((err = rename(new_inst_file, inst_file)) != 0) {
 		err_print(RENAME_FAILED, inst_file, strerror(errno));
 	}
@@ -3858,10 +3861,10 @@ enter_dev_lock()
 			pid = 0;
 			n = read(dev_lock_fd, &pid, sizeof (pid_t));
 			vprint(LOCK_MID, "waiting for PID %d to complete\n",
-				(int)pid);
+			    (int)pid);
 			if (lseek(dev_lock_fd, 0, SEEK_SET) == (off_t)-1) {
 				err_print(LSEEK_FAILED, dev_lockfile,
-						strerror(errno));
+				    strerror(errno));
 				devfsadm_exit(1);
 			}
 			/*
@@ -3878,7 +3881,7 @@ enter_dev_lock()
 
 			if (fcntl(dev_lock_fd, F_SETLKW, &lock) == -1) {
 				err_print(LOCK_FAILED, dev_lockfile,
-						strerror(errno));
+				    strerror(errno));
 				devfsadm_exit(1);
 			}
 		}
@@ -3975,7 +3978,7 @@ enter_daemon_lock(void)
 		if (errno == EAGAIN || errno == EDEADLK) {
 			if (fcntl(daemon_lock_fd, F_GETLK, &lock) == -1) {
 				err_print(LOCK_FAILED, daemon_lockfile,
-						strerror(errno));
+				    strerror(errno));
 				devfsadm_exit(1);
 			}
 			return (lock.l_pid);
@@ -4057,8 +4060,8 @@ pre_and_post_cleanup(int flags)
 			vprint(REMOVE_MID, "%scleanup: PRE or POST\n", fcn);
 			if (clean_ok(rm->remove) == DEVFSADM_SUCCESS) {
 				vprint(REMOVE_MID, "cleanup: cleanup OK\n");
-				recurse_dev_re(dev_dir, rm->remove->
-					dev_dirs_re, &rd);
+				recurse_dev_re(dev_dir,
+				    rm->remove->dev_dirs_re, &rd);
 			}
 		}
 	}
@@ -4204,8 +4207,8 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 					continue;
 
 				vprint(REMOVE_MID,
-					"%sremoving %s -> %s\n", fcn,
-					link->devlink, link->contents);
+				    "%sremoving %s -> %s\n", fcn,
+				    link->devlink, link->contents);
 				/*
 				 * Use a copy of the cached link name
 				 * as the cache entry will go away
@@ -4215,7 +4218,7 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 				    "%s", link->devlink);
 				if (rm->remove->flags & RM_NOINTERPOSE) {
 					((void (*)(char *))
-					(rm->remove->callback_fcn))(rmlink);
+					    (rm->remove->callback_fcn))(rmlink);
 				} else {
 					ret = ((int (*)(char *))
 					    (rm->remove->callback_fcn))(rmlink);
@@ -4274,7 +4277,7 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	const char *fp;
 
 	vprint(RECURSEDEV_MID, "recurse_dev_re: curr = %s path=%s\n",
-		current_dir, path_re);
+	    current_dir, path_re);
 
 	if (finddev_readdir(current_dir, &fhandle) != 0)
 		return;
@@ -4303,14 +4306,14 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 			(void) strcat(new_path, fp);
 
 			vprint(RECURSEDEV_MID, "recurse_dev_re: match, new "
-				"path = %s\n", new_path);
+			    "path = %s\n", new_path);
 
 			if (slash != NULL) {
 				recurse_dev_re(new_path, slash + 1, rd);
 			} else {
 				/* reached the leaf component of path_re */
 				vprint(RECURSEDEV_MID,
-					"recurse_dev_re: calling fcn\n");
+				    "recurse_dev_re: calling fcn\n");
 				(*(rd->fcn))(new_path, rd->data);
 			}
 		}
@@ -4335,7 +4338,7 @@ matching_dev(char *devpath, void *data)
 	char *fcn = "matching_dev: ";
 
 	vprint(RECURSEDEV_MID, "%sexamining devpath = '%s'\n", fcn,
-			devpath);
+	    devpath);
 
 	/*
 	 * If the link is in the no-further-process hash
@@ -4346,17 +4349,16 @@ matching_dev(char *devpath, void *data)
 
 	if (resolve_link(devpath, NULL, NULL, NULL, 1) == TRUE) {
 		if (call_minor_init(cleanup_data->rm->modptr) ==
-				DEVFSADM_FAILURE) {
+		    DEVFSADM_FAILURE) {
 			return;
 		}
 
 		devpath += norm_len;
 
-		vprint(RECURSEDEV_MID, "%scalling"
-			" callback %s\n", fcn, devpath);
+		vprint(RECURSEDEV_MID, "%scalling callback %s\n", fcn, devpath);
 		if (cleanup_data->rm->remove->flags & RM_NOINTERPOSE)
 			((void (*)(char *))
-			(cleanup_data->rm->remove->callback_fcn))(devpath);
+			    (cleanup_data->rm->remove->callback_fcn))(devpath);
 		else {
 			ret = ((int (*)(char *))
 			    (cleanup_data->rm->remove->callback_fcn))(devpath);
@@ -4485,12 +4487,11 @@ resolve_link(char *devpath, char **content_p, int *type_p, char **devfs_path,
 			(void) strcpy(stage_link, dev_dir);
 			(void) strcat(stage_link, "/");
 			(void) strcpy(stage_link,
-					&contents[strlen(DEV) + strlen("/")]);
+			    &contents[strlen(DEV) + strlen("/")]);
 		} else {
 			if ((ptr = strrchr(devpath, '/')) == NULL) {
 				vprint(REMOVE_MID, "%s%s -> %s invalid link. "
-					"missing '/'\n", fcn, devpath,
-					contents);
+				    "missing '/'\n", fcn, devpath, contents);
 				return (TRUE);
 			}
 			*ptr = '\0';
@@ -4516,7 +4517,7 @@ resolve_link(char *devpath, char **content_p, int *type_p, char **devfs_path,
 		rv = (stat(ptr - strlen(DEVICES), &sb) == -1);
 
 	vprint(REMOVE_MID, "%slink=%s, returning %s\n", fcn,
-			devpath, ((rv == TRUE) ? "TRUE" : "FALSE"));
+	    devpath, ((rv == TRUE) ? "TRUE" : "FALSE"));
 
 	return (rv);
 }
@@ -4635,7 +4636,7 @@ alloc_cmp_str(const char *path, devfsadm_enumerate_t *dep)
 	}
 
 	vprint(ENUM_MID, "%s: invalid enumeration flags: 0x%x"
-		" path: %s\n", fcn, dep->flags, path);
+	    " path: %s\n", fcn, dep->flags, path);
 
 	/*FALLTHRU*/
 err:
@@ -5335,7 +5336,7 @@ enumerate_parse(char *rsvstr, char *path_left, numeral_set_t *setp,
 		 */
 		numeral_id = NULL;
 		if (match_path_component(path_left, rsvstr, &numeral_id,
-				    slash1 ? 0 : rules[index].subexp)) {
+		    slash1 ? 0 : rules[index].subexp)) {
 
 			/* We have a match. */
 			if (slash1 == NULL) {
@@ -5424,7 +5425,7 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 		 */
 		numeral_id = NULL;
 		if (match_path_component(path_left, (char *)fp, &numeral_id,
-				    slash ? 0 : rules[index].subexp)) {
+		    slash ? 0 : rules[index].subexp)) {
 
 			new_path = s_malloc(strlen(current_dir) +
 			    strlen(fp) + 2);
@@ -5470,8 +5471,8 @@ match_path_component(char *file_re,  char *file,  char **id, int subexp)
 
 	if (subexp != 0) {
 		nelements = subexp + 1;
-		pmatch = (regmatch_t *)
-			s_malloc(sizeof (regmatch_t) * nelements);
+		pmatch =
+		    (regmatch_t *)s_malloc(sizeof (regmatch_t) * nelements);
 	} else {
 		pmatch = NULL;
 		nelements = 0;
@@ -5756,7 +5757,7 @@ devfsadm_copy_file(const char *file, const struct stat *stat,
 		linkcontents[bytes] = '\0';
 		if (symlink(linkcontents, newfile) == -1) {
 			err_print(SYMLINK_FAILED, newfile, newfile,
-					strerror(errno));
+			    strerror(errno));
 			return (DEVFSADM_SUCCESS);
 		}
 	}
@@ -5782,8 +5783,7 @@ translate_major(dev_t old_dev, dev_t *new_dev)
 	char *fcn = "translate_major: ";
 
 	oldmajor = major(old_dev);
-	if (modctl(MODGETNAME, driver, sizeof (driver),
-			    &oldmajor) != 0) {
+	if (modctl(MODGETNAME, driver, sizeof (driver), &oldmajor) != 0) {
 		return (DEVFSADM_FAILURE);
 	}
 
@@ -5798,9 +5798,8 @@ translate_major(dev_t old_dev, dev_t *new_dev)
 		*new_dev = makedev(newmajor, minor(old_dev));
 		if (old_dev != *new_dev) {
 			vprint(CHATTY_MID, "%sdriver: %s old: %lu,%lu "
-				"new: %lu,%lu\n", fcn, driver, major(old_dev),
-				minor(old_dev), major(*new_dev),
-				minor(*new_dev));
+			    "new: %lu,%lu\n", fcn, driver, major(old_dev),
+			    minor(old_dev), major(*new_dev), minor(*new_dev));
 		}
 		return (DEVFSADM_SUCCESS);
 	} else {
@@ -5814,7 +5813,7 @@ translate_major(dev_t old_dev, dev_t *new_dev)
 
 		oldminor = minor(old_dev);
 		if (modctl(MODGETNAME, cdriver, sizeof (cdriver),
-					&oldminor) != 0) {
+		    &oldminor) != 0) {
 			err_print(MODGETNAME_FAILED, oldminor);
 			return (DEVFSADM_FAILURE);
 		}
@@ -5826,9 +5825,9 @@ translate_major(dev_t old_dev, dev_t *new_dev)
 		*new_dev = makedev(newmajor, newminor);
 		if (old_dev != *new_dev) {
 			vprint(CHATTY_MID, "%sdriver: %s old: "
-				"%lu,%lu  new: %lu,%lu\n", fcn, driver,
-				major(old_dev), minor(old_dev),
-				major(*new_dev), minor(*new_dev));
+			    "%lu,%lu  new: %lu,%lu\n", fcn, driver,
+			    major(old_dev), minor(old_dev),
+			    major(*new_dev), minor(*new_dev));
 		}
 		return (DEVFSADM_SUCCESS);
 	}
@@ -5978,11 +5977,11 @@ read_enumerate_file(void)
 		if (cp)
 			*cp = '\0';
 
-		vprint(RSRV_MID, "Reserve file: line %d: %s\n",
-			linenum, line);
+		vprint(RSRV_MID, "Reserve file: line %d: %s\n", linenum, line);
 
 		/* skip over space and tab */
-		for (cp = line; *cp == ' ' || *cp == '\t'; cp++);
+		for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
+			;
 
 		if (*cp == '\0' || *cp == '#') {
 			vprint(RSRV_MID, "Skipping line: '%s'\n", line);
@@ -5992,7 +5991,8 @@ read_enumerate_file(void)
 		ncp = cp;
 
 		/* delete trailing blanks */
-		for (; *cp != ' ' && *cp != '\t' && *cp != '\0'; cp++);
+		for (; *cp != ' ' && *cp != '\t' && *cp != '\0'; cp++)
+			;
 		*cp = '\0';
 
 		entry = s_zalloc(sizeof (enumerate_file_t));
@@ -6079,7 +6079,8 @@ read_devlinktab_file(void)
 		} else if (i == sizeof (line-1)) {
 			err_print(LINE_TOO_LONG, devlinktab_line,
 			    devlinktab_file, sizeof (line)-1);
-			while (((i = getc(fp)) != '\n') && (i != EOF));
+			while (((i = getc(fp)) != '\n') && (i != EOF))
+				;
 			continue;
 		}
 
@@ -6091,7 +6092,7 @@ read_devlinktab_file(void)
 			continue;
 
 		vprint(DEVLINK_MID, "table: %s line %d: '%s'\n",
-			devlinktab_file, devlinktab_line, line);
+		    devlinktab_file, devlinktab_line, line);
 
 		/* break each entry into fields.  s_link may be NULL */
 		if (split_devlinktab_entry(line, &selector, &p_link,
@@ -6100,17 +6101,17 @@ read_devlinktab_file(void)
 			continue;
 		} else {
 			vprint(DEVLINK_MID, "split_entry selector='%s' "
-				"p_link='%s' s_link='%s'\n\n", selector,
-				p_link, (s_link == NULL) ? "" : s_link);
+			    "p_link='%s' s_link='%s'\n\n", selector,
+			    p_link, (s_link == NULL) ? "" : s_link);
 		}
 
-		entryp = (devlinktab_list_t *)
-			s_malloc(sizeof (devlinktab_list_t));
+		entryp =
+		    (devlinktab_list_t *)s_malloc(sizeof (devlinktab_list_t));
 
 		entryp->line_number = devlinktab_line;
 
-		if ((entryp->selector =
-			create_selector_list(selector)) == NULL) {
+		if ((entryp->selector = create_selector_list(selector))
+		    == NULL) {
 			free(entryp);
 			continue;
 		}
@@ -6135,7 +6136,7 @@ read_devlinktab_file(void)
 				free(entryp);
 				continue;
 			}
-			    entryp->s_link_pattern = s_strdup(s_link);
+			entryp->s_link_pattern = s_strdup(s_link);
 		} else {
 			entryp->s_link = NULL;
 			entryp->s_link_pattern = NULL;
@@ -6186,7 +6187,7 @@ split_devlinktab_entry(char *entry, char **selector, char **p_link,
 		*s_link = ++tab;
 		if (strchr(*s_link, TAB) != NULL) {
 			err_print(TOO_MANY_FIELDS, devlinktab_line,
-					devlinktab_file);
+			    devlinktab_file);
 			return (DEVFSADM_FAILURE);
 		}
 	} else {
@@ -6204,81 +6205,75 @@ split_devlinktab_entry(char *entry, char **selector, char **p_link,
 static selector_list_t *
 create_selector_list(char *selector)
 {
-	    char *key;
-	    char *val;
-	    int error = FALSE;
-	    selector_list_t *head_selector_list = NULL;
-	    selector_list_t *selector_list;
+	char *key;
+	char *val;
+	int error = FALSE;
+	selector_list_t *head_selector_list = NULL;
+	selector_list_t *selector_list;
 
-	    /* parse_devfs_spec splits the next field into keyword & value */
-	    while ((*selector != NULL) && (error == FALSE)) {
-		    if (parse_selector(&selector, &key,
-				&val) == DEVFSADM_FAILURE) {
-			    error = TRUE;
-			    break;
-		    } else {
-			    selector_list = (selector_list_t *)
-				    s_malloc(sizeof (selector_list_t));
-			    if (strcmp(NAME_S, key) == 0) {
-				    selector_list->key = NAME;
-			    } else if (strcmp(TYPE_S, key) == 0) {
-				    selector_list->key = TYPE;
-			    } else if (strncmp(ADDR_S, key, ADDR_S_LEN) == 0) {
-				    selector_list->key = ADDR;
-				    if (key[ADDR_S_LEN] == '\0') {
-					    selector_list->arg = 0;
-				    } else if (isdigit(key[ADDR_S_LEN]) !=
-						FALSE) {
-					    selector_list->arg =
-							atoi(&key[ADDR_S_LEN]);
-				    } else {
-					    error = TRUE;
-					    free(selector_list);
-					    err_print(BADKEYWORD, key,
-						devlinktab_line,
-						devlinktab_file);
-					    break;
-				    }
-			    } else if (strncmp(MINOR_S, key,
-						MINOR_S_LEN) == 0) {
-				    selector_list->key = MINOR;
-				    if (key[MINOR_S_LEN] == '\0') {
-					    selector_list->arg = 0;
-				    } else if (isdigit(key[MINOR_S_LEN]) !=
-						FALSE) {
-					    selector_list->arg =
-						atoi(&key[MINOR_S_LEN]);
-				    } else {
-					    error = TRUE;
-					    free(selector_list);
-					    err_print(BADKEYWORD, key,
-						devlinktab_line,
-						devlinktab_file);
-					    break;
-				    }
-				    vprint(DEVLINK_MID, "MINOR = %s\n", val);
-			    } else {
-				    err_print(UNRECOGNIZED_KEY, key,
-					devlinktab_line, devlinktab_file);
-				    error = TRUE;
-				    free(selector_list);
-				    break;
-			    }
-			    selector_list->val = s_strdup(val);
-			    selector_list->next = head_selector_list;
-			    head_selector_list = selector_list;
-			    vprint(DEVLINK_MID, "key='%s' val='%s' arg=%d\n",
-					key, val, selector_list->arg);
-		    }
-	    }
+	/* parse_devfs_spec splits the next field into keyword & value */
+	while ((*selector != NULL) && (error == FALSE)) {
+		if (parse_selector(&selector, &key, &val) == DEVFSADM_FAILURE) {
+			error = TRUE;
+			break;
+		} else {
+			selector_list = (selector_list_t *)
+			    s_malloc(sizeof (selector_list_t));
+			if (strcmp(NAME_S, key) == 0) {
+				selector_list->key = NAME;
+			} else if (strcmp(TYPE_S, key) == 0) {
+				selector_list->key = TYPE;
+			} else if (strncmp(ADDR_S, key, ADDR_S_LEN) == 0) {
+				selector_list->key = ADDR;
+				if (key[ADDR_S_LEN] == '\0') {
+					selector_list->arg = 0;
+				} else if (isdigit(key[ADDR_S_LEN]) != FALSE) {
+					selector_list->arg =
+					    atoi(&key[ADDR_S_LEN]);
+				} else {
+					error = TRUE;
+					free(selector_list);
+					err_print(BADKEYWORD, key,
+					    devlinktab_line, devlinktab_file);
+					break;
+				}
+			} else if (strncmp(MINOR_S, key, MINOR_S_LEN) == 0) {
+				selector_list->key = MINOR;
+				if (key[MINOR_S_LEN] == '\0') {
+					selector_list->arg = 0;
+				} else if (isdigit(key[MINOR_S_LEN]) != FALSE) {
+					selector_list->arg =
+					    atoi(&key[MINOR_S_LEN]);
+				} else {
+					error = TRUE;
+					free(selector_list);
+					err_print(BADKEYWORD, key,
+					    devlinktab_line, devlinktab_file);
+					break;
+				}
+				vprint(DEVLINK_MID, "MINOR = %s\n", val);
+			} else {
+				err_print(UNRECOGNIZED_KEY, key,
+				    devlinktab_line, devlinktab_file);
+				error = TRUE;
+				free(selector_list);
+				break;
+			}
+			selector_list->val = s_strdup(val);
+			selector_list->next = head_selector_list;
+			head_selector_list = selector_list;
+			vprint(DEVLINK_MID, "key='%s' val='%s' arg=%d\n",
+			    key, val, selector_list->arg);
+		}
+	}
 
-	    if ((error == FALSE) && (head_selector_list != NULL)) {
-		    return (head_selector_list);
-	    } else {
-		    /* parse failed.  Free any allocated structs */
-		    free_selector_list(head_selector_list);
-		    return (NULL);
-	    }
+	if ((error == FALSE) && (head_selector_list != NULL)) {
+		return (head_selector_list);
+	} else {
+		/* parse failed.  Free any allocated structs */
+		free_selector_list(head_selector_list);
+		return (NULL);
+	}
 }
 
 /*
@@ -6362,8 +6357,8 @@ create_link_list(char *link)
 			case 'N':
 				if (counter_found == TRUE) {
 					error = TRUE;
-					error_str = "multiple counters "
-						"not permitted";
+					error_str =
+					    "multiple counters not permitted";
 					free(link_list);
 				} else {
 					counter_found = TRUE;
@@ -6382,20 +6377,21 @@ create_link_list(char *link)
 			if (*(link++) != 'D') {
 				if (isdigit(*link) == FALSE) {
 					error_str = "escape sequence must be "
-						"followed by a digit\n";
+					    "followed by a digit\n";
 					error = TRUE;
 					free(link_list);
 				} else {
 					link_list->arg =
-						(int)strtoul(link, &link, 10);
+					    (int)strtoul(link, &link, 10);
 					vprint(DEVLINK_MID, "link_list->arg = "
-						"%d\n", link_list->arg);
+					    "%d\n", link_list->arg);
 				}
 			}
 		}
 		/* append link_list struct to end of list */
 		if (error == FALSE) {
-			for (ptr = &head; *ptr != NULL; ptr = &((*ptr)->next));
+			for (ptr = &head; *ptr != NULL; ptr = &((*ptr)->next))
+				;
 			*ptr = link_list;
 		}
 	}
@@ -6428,10 +6424,9 @@ process_devlink_compat(di_minor_t minor, di_node_t node)
 		nodetype =  di_minor_nodetype(minor);
 		assert(nodetype != NULL);
 		if ((dev_path = di_devfs_path(node)) != NULL) {
-			vprint(INFO_MID, "'%s' entry: %s:%s\n", nodetype,
-				dev_path,
-				di_minor_name(minor) ? di_minor_name(minor) :
-				"");
+			vprint(INFO_MID, "'%s' entry: %s:%s\n",
+			    nodetype, dev_path,
+			    di_minor_name(minor) ? di_minor_name(minor) : "");
 			di_devfs_path_free(dev_path);
 		}
 
@@ -6504,7 +6499,7 @@ devlink_matches(devlinktab_list_t *entry, di_minor_t minor, di_node_t node)
 				}
 			} else {
 				if (compare_field(minor_name, selector->val,
-					selector->arg) == DEVFSADM_FAILURE) {
+				    selector->arg) == DEVFSADM_FAILURE) {
 					return (DEVFSADM_FAILURE);
 				}
 			}
@@ -6541,8 +6536,7 @@ build_links(devlinktab_list_t *entry, di_minor_t minor, di_node_t node)
 	(void) strcat(contents, di_minor_name(minor));
 
 	if (construct_devlink(primary_link, entry->p_link, contents,
-				minor, node,
-			    entry->p_link_pattern) == DEVFSADM_FAILURE) {
+	    minor, node, entry->p_link_pattern) == DEVFSADM_FAILURE) {
 		return (DEVFSADM_FAILURE);
 	}
 	(void) devfsadm_mklink(primary_link, node, minor, 0);
@@ -6551,9 +6545,8 @@ build_links(devlinktab_list_t *entry, di_minor_t minor, di_node_t node)
 		return (DEVFSADM_SUCCESS);
 	}
 
-	if (construct_devlink(secondary_link, entry->s_link,
-			primary_link, minor, node,
-				entry->s_link_pattern) == DEVFSADM_FAILURE) {
+	if (construct_devlink(secondary_link, entry->s_link, primary_link,
+	    minor, node, entry->s_link_pattern) == DEVFSADM_FAILURE) {
 		return (DEVFSADM_FAILURE);
 	}
 
@@ -6627,20 +6620,20 @@ construct_devlink(char *link, link_list_t *link_build, char *contents,
 			break;
 		case ADDR:
 			if (component_cat(link, di_bus_addr(node),
-				    link_build->arg) == DEVFSADM_FAILURE) {
+			    link_build->arg) == DEVFSADM_FAILURE) {
 				node_path = di_devfs_path(node);
 				err_print(CANNOT_BE_USED, pattern, node_path,
-					    di_minor_name(minor));
+				    di_minor_name(minor));
 				di_devfs_path_free(node_path);
 				return (DEVFSADM_FAILURE);
 			}
 			break;
 		case MINOR:
 			if (component_cat(link, di_minor_name(minor),
-				    link_build->arg) == DEVFSADM_FAILURE) {
+			    link_build->arg) == DEVFSADM_FAILURE) {
 				node_path = di_devfs_path(node);
 				err_print(CANNOT_BE_USED, pattern, node_path,
-					    di_minor_name(minor));
+				    di_minor_name(minor));
 				di_devfs_path_free(node_path);
 				return (DEVFSADM_FAILURE);
 			}
@@ -6662,7 +6655,7 @@ construct_devlink(char *link, link_list_t *link_build, char *contents,
 		 */
 
 		(void) strcpy(templink,
-			    &link[counter_offset + strlen("([0-9]+)")]);
+		    &link[counter_offset + strlen("([0-9]+)")]);
 		if (get_anchored_re(link, anchored_re, pattern)
 		    != DEVFSADM_SUCCESS) {
 			return (DEVFSADM_FAILURE);
@@ -6702,7 +6695,7 @@ compare_field(char *full_name, char *field_item, int field)
 	}
 
 	while ((*full_name != '\0') && (*field_item != '\0') &&
-			(*full_name != ',')) {
+	    (*full_name != ',')) {
 		if (*(full_name++) != *(field_item++)) {
 			return (DEVFSADM_FAILURE);
 		}
@@ -6829,12 +6822,12 @@ devfsadm_print(char *msgid, char *message, ...)
 	} else {
 		if (logflag == TRUE) {
 			(void) syslog(LOG_DEBUG, "%s[%ld]: %s: ",
-				    prog, getpid(), msgid);
+			    prog, getpid(), msgid);
 			(void) vsyslog(LOG_DEBUG, message, ap);
 		} else {
 			if (newline == TRUE) {
 				(void) fprintf(stdout, "%s[%ld]: %s: ",
-					prog, getpid(), msgid);
+				    prog, getpid(), msgid);
 			}
 			(void) vfprintf(stdout, message, ap);
 		}
@@ -7087,13 +7080,13 @@ getattr(char *phy_path, char *aminor, int spectype, dev_t dev, mode_t *mode,
 	is_clone = (strcmp(node_name, "clone") == 0 ? TRUE : FALSE);
 	for (mp = minor_perms; mp != NULL; mp = mp->mp_next) {
 		mp_drvname_matches_node_name =
-			(strcmp(mp->mp_drvname, node_name) == 0 ? TRUE : FALSE);
+		    (strcmp(mp->mp_drvname, node_name) == 0 ? TRUE : FALSE);
 		mp_drvname_matches_minor_name =
-			(strcmp(mp->mp_drvname, minor_name) == 0  ? TRUE:FALSE);
+		    (strcmp(mp->mp_drvname, minor_name) == 0  ? TRUE:FALSE);
 		mp_drvname_is_clone =
-			(strcmp(mp->mp_drvname, "clone") == 0  ? TRUE : FALSE);
+		    (strcmp(mp->mp_drvname, "clone") == 0  ? TRUE : FALSE);
 		mp_drvname_matches_drvname =
-			(strcmp(mp->mp_drvname, driver) == 0  ? TRUE : FALSE);
+		    (strcmp(mp->mp_drvname, driver) == 0  ? TRUE : FALSE);
 
 		/*
 		 * If one of the following cases is true, then we try to change
@@ -7375,13 +7368,11 @@ read_logindevperm_file(void)
 		if (drv) {
 			if (strcmp(drv, LDEV_DRVLIST_NAME) == 0) {
 
-				drv = strtok_r(NULL, LDEV_DRV_DELIMS,
-					&lasts);
+				drv = strtok_r(NULL, LDEV_DRV_DELIMS, &lasts);
 
 				while (drv) {
 					vprint(FILES_MID,
-					    "logindevperm driver=%s\n",
-					    drv);
+					    "logindevperm driver=%s\n", drv);
 
 					/*
 					 * create a linked list of driver
@@ -7421,8 +7412,8 @@ getnexttoken(char *next, char **nextp, char **tokenpp, char *tchar)
 	}
 	tokenp = cp;			/* start of token */
 	while (*cp != '\0' && *cp != '\n' && *cp != ' ' && *cp != '\t' &&
-		*cp != ':' && *cp != '=' && *cp != '&' &&
-		*cp != '|' && *cp != ';') {
+	    *cp != ':' && *cp != '=' && *cp != '&' &&
+	    *cp != '|' && *cp != ';') {
 		cp++;			/* point to next character */
 	}
 	/*
@@ -7435,7 +7426,7 @@ getnexttoken(char *next, char **nextp, char **tokenpp, char *tchar)
 		while (*++cp1 == ' ' || *cp1 == '\t')
 			;
 		if (*cp1 == '=' || *cp1 == ':' || *cp1 == '&' || *cp1 == '|' ||
-			*cp1 == ';' || *cp1 == '\n' || *cp1 == '\0') {
+		    *cp1 == ';' || *cp1 == '\n' || *cp1 == '\0') {
 			*cp = NULL;	/* terminate token */
 			cp = cp1;
 		}
@@ -7524,7 +7515,7 @@ read_driver_aliases_file(void)
 			continue;
 		}
 		ap = (struct driver_alias *)
-				s_zalloc(sizeof (struct driver_alias));
+		    s_zalloc(sizeof (struct driver_alias));
 		ap->driver_name = s_strdup(p);
 		if (getnexttoken(cp, &cp, &p, &t) == DEVFSADM_FAILURE) {
 			err_print(DRV_BUT_NO_ALIAS, ln, ALIASFILE);
@@ -7784,18 +7775,18 @@ process_rcm_events(void *arg)
 				    RCM_NV_DEVFS_PATH, DATA_TYPE_STRING))
 				    == NULL) ||
 				    (nvpair_value_string(nvp, &path) != 0))
-					    path = "unknown";
+					path = "unknown";
 
 				if (((nvp = lookup_nvpair(ev->nvl,
 				    RCM_NV_DRIVER_NAME, DATA_TYPE_STRING))
 				    == NULL) ||
 				    (nvpair_value_string(nvp, &driver) != 0))
-					    driver = "unknown";
+					driver = "unknown";
 				if (((nvp = lookup_nvpair(ev->nvl,
 				    RCM_NV_INSTANCE, DATA_TYPE_INT32))
 				    == NULL) ||
 				    (nvpair_value_int32(nvp, &instance) != 0))
-					    instance = -1;
+					instance = -1;
 
 				err_print(RCM_NOTIFY_FAILED, path, driver,
 				    instance, strerror(err));
@@ -8516,7 +8507,7 @@ process_syseventq()
 		syseventq_t *tmp = syseventq_back;
 
 		vprint(CHATTY_MID, "sending queued event: %s, %s\n",
-			tmp->class, tmp->subclass);
+		    tmp->class, tmp->subclass);
 
 		log_event(tmp->class, tmp->subclass, tmp->nvl);
 
@@ -8541,7 +8532,7 @@ build_and_enq_event(char *class, char *subclass, char *node_path,
 	nvlist_t *nvl;
 
 	vprint(CHATTY_MID, "build_and_enq_event(%s, %s, %s, 0x%8.8x)\n",
-		class, subclass, node_path, (int)node);
+	    class, subclass, node_path, (int)node);
 
 	if (node != DI_NODE_NIL)
 		nvl = build_event_attributes(class, subclass, node_path, node,
