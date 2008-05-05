@@ -416,10 +416,13 @@ lnkfil(char *source, char *target)
 		}
 
 		/*
-		 * Check to see if the file exists already
+		 * Check to see if the file exists already.
+		 * In this case we use lstat() instead of stat():
+		 * unlink(2) and symlink(2) will operate on the file
+		 * itself, not its reference, if the file is a symlink.
 		 */
 
-		if ((stat(target, &s2) == 0)) {
+		if ((lstat(target, &s2) == 0)) {
 			/*
 			 * Check if the silent flag is set ie. the -f option
 			 * is used.  If so, use unlink to remove the current
@@ -427,6 +430,18 @@ lnkfil(char *source, char *target)
 			 * on the command line.  Proceed with symlink.
 			 */
 			if (silent) {
+			/*
+			 * Don't allow silent (-f) removal of an existing
+			 * directory; could leave unreferenced directory
+			 * entries.
+			 */
+				if (ISDIR(s2)) {
+					(void) fprintf(stderr,
+					    gettext("%s: cannot create link "
+					    "over directory %s\n"), cmd,
+					    target);
+					return (1);
+				}
 				if (unlink(target) < 0) {
 					(void) fprintf(stderr,
 					    gettext("%s: cannot unlink %s: "),
