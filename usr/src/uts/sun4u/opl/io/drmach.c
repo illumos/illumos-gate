@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3108,6 +3108,9 @@ int drmach_disable_mcopy = 0;
 		}						\
 	}
 
+/* Each loop is 2ms, timeout at 1000ms */
+static int drmach_copy_rename_timeout = 500;
+
 static int
 drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 	int cpuid)
@@ -3302,9 +3305,16 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 						    EOPL_FMEM_COPY_ERROR;
 						return (EOPL_FMEM_COPY_ERROR);
 					}
-					prog->data->fmem_status.error =
-					    EOPL_FMEM_COPY_TIMEOUT;
-					return (EOPL_FMEM_COPY_TIMEOUT);
+
+					prog->data->copy_rename_count++;
+					if (prog->data->copy_rename_count
+					    < drmach_copy_rename_timeout) {
+						continue;
+					} else {
+						prog->data->fmem_status.error =
+						    EOPL_FMEM_COPY_TIMEOUT;
+						return (EOPL_FMEM_COPY_TIMEOUT);
+					}
 				}
 			}
 		}
@@ -3345,14 +3355,15 @@ drmach_copy_rename_end(void)
 }
 
 
-static void
+static int
 drmach_setup_memlist(drmach_copy_rename_program_t *p)
 {
 	struct memlist *ml;
 	caddr_t buf;
-	int nbytes, s;
+	int nbytes, s, n_elements;
 
 	nbytes = PAGESIZE;
+	n_elements = 0;
 	s = roundup(sizeof (struct memlist), sizeof (void *));
 	p->free_mlist = NULL;
 	buf = p->memlist_buffer;
@@ -3361,8 +3372,10 @@ drmach_setup_memlist(drmach_copy_rename_program_t *p)
 		ml->next = p->free_mlist;
 		p->free_mlist = ml;
 		buf += s;
+		n_elements++;
 		nbytes -= s;
 	}
+	return (n_elements);
 }
 
 static void
@@ -3407,13 +3420,14 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	uint64_t	s_copybasepa, t_copybasepa;
 	uint_t		len;
 	caddr_t		bp, wp;
-	int			s_bd, t_bd, cpuid, active_cpus, i;
-	uint64_t		c_addr;
-	size_t			c_size, copy_sz, sz;
-	extern void		drmach_fmem_loop_script();
-	extern void		drmach_fmem_loop_script_rtn();
-	extern int		drmach_fmem_exec_script();
-	extern void		drmach_fmem_exec_script_end();
+	int		s_bd, t_bd, cpuid, active_cpus, i;
+	int		max_elms, mlist_size, rv;
+	uint64_t	c_addr;
+	size_t		c_size, copy_sz, sz;
+	extern void	drmach_fmem_loop_script();
+	extern void	drmach_fmem_loop_script_rtn();
+	extern int	drmach_fmem_exec_script();
+	extern void	drmach_fmem_exec_script_end();
 	sbd_error_t	*err;
 	drmach_copy_rename_program_t *prog = NULL;
 	drmach_copy_rename_program_t *prog_kmem = NULL;
@@ -3501,9 +3515,11 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	/* adjust copy memlist addresses to be relative to copy base pa */
 	x_ml = c_ml;
+	mlist_size = 0;
 	while (x_ml != NULL) {
 		x_ml->address -= s_copybasepa;
 		x_ml = x_ml->next;
+		mlist_size++;
 	}
 
 	/*
@@ -3665,10 +3681,24 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	prog->data->cpu_slave_set = cpu_ready_set;
 	prog->data->slowest_cpuid = (processorid_t)-1;
 	prog->data->copy_wait_time = 0;
+	prog->data->copy_rename_count = 0;
 	CPUSET_DEL(prog->data->cpu_slave_set, cpuid);
 
 	for (i = 0; i < NCPU; i++) {
 		prog->data->cpu_ml[i] = NULL;
+	}
+
+	/*
+	 * max_elms -	max number of memlist structures that
+	 * 		may be allocated for the CPU memory list.
+	 *		If there are too many memory span (because
+	 *		of fragmentation) than number of memlist
+	 *		available, we should return error.
+	 */
+	max_elms = drmach_setup_memlist(prog);
+	if (max_elms < mlist_size) {
+		err = drerr_new(1, EOPL_FMEM_SETUP, NULL);
+		goto err_out;
 	}
 
 	active_cpus = 0;
@@ -3676,16 +3706,50 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 		active_cpus = 1;
 		CPUSET_ADD(prog->data->cpu_copy_set, cpuid);
 	} else {
+		int max_cpu_num;
+		/*
+		 * The parallel copy procedure is going to split some
+		 * of the elements of the original memory copy list.
+		 * The number of added elements can be up to
+		 * (max_cpu_num - 1).  It means that max_cpu_num
+		 * should satisfy the following condition:
+		 * (max_cpu_num - 1) + mlist_size <= max_elms.
+		 */
+		max_cpu_num = max_elms - mlist_size + 1;
+
 		for (i = 0; i < NCPU; i++) {
 			if (CPU_IN_SET(cpu_ready_set, i) &&
 			    CPU_ACTIVE(cpu[i])) {
-				CPUSET_ADD(prog->data->cpu_copy_set, i);
-				active_cpus++;
+				/*
+				 * To reduce the level-2 cache contention only
+				 * one strand per core will participate
+				 * in the copy. If the strand with even cpu_id
+				 * number is present in the ready set, we will
+				 * include this strand in the copy set. If it
+				 * is not present in the ready set, we check for
+				 * the strand with the consecutive odd cpu_id
+				 * and include it, provided that it is
+				 * present in the ready set.
+				 */
+				if (!(i & 0x1) ||
+				    !CPU_IN_SET(prog->data->cpu_copy_set,
+				    i - 1)) {
+					CPUSET_ADD(prog->data->cpu_copy_set, i);
+					active_cpus++;
+					/*
+					 * We cannot have more than
+					 * max_cpu_num CPUs in the copy
+					 * set, because each CPU has to
+					 * have at least one element
+					 * long memory copy list.
+					 */
+					if (active_cpus >= max_cpu_num)
+						break;
+
+				}
 			}
 		}
 	}
-
-	drmach_setup_memlist(prog);
 
 	x_ml = c_ml;
 	sz = 0;
@@ -3718,17 +3782,36 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 		while (sz) {
 			if (c_size > sz) {
-				prog->data->cpu_ml[i] =
+				if ((prog->data->cpu_ml[i] =
 				    drmach_memlist_add_span(prog,
-				    prog->data->cpu_ml[i], c_addr, sz);
+				    prog->data->cpu_ml[i],
+				    c_addr, sz)) == NULL) {
+					cmn_err(CE_WARN,
+					    "Unexpected drmach_memlist_add_span"
+					    " failure.");
+					err = drerr_new(1, EOPL_FMEM_SETUP,
+					    NULL);
+					mc_resume();
+					goto out;
+				}
 				c_addr += sz;
 				c_size -= sz;
 				break;
 			} else {
 				sz -= c_size;
-				prog->data->cpu_ml[i] =
+				if ((prog->data->cpu_ml[i] =
 				    drmach_memlist_add_span(prog,
-				    prog->data->cpu_ml[i], c_addr, c_size);
+				    prog->data->cpu_ml[i],
+				    c_addr, c_size)) == NULL) {
+					cmn_err(CE_WARN,
+					    "Unexpected drmach_memlist_add_span"
+					    " failure.");
+					err = drerr_new(1, EOPL_FMEM_SETUP,
+					    NULL);
+					mc_resume();
+					goto out;
+				}
+
 				x_ml = x_ml->next;
 				if (x_ml != NULL) {
 					c_addr = x_ml->address;
@@ -3748,6 +3831,13 @@ end:
 	/* Unmap the alternate space.  It will have to be remapped again */
 	drmach_unlock_critical((caddr_t)prog);
 	return (NULL);
+
+err_out:
+	mc_resume();
+	rv = (*prog->data->scf_fmem_cancel)();
+	if (rv) {
+		cmn_err(CE_WARN, "scf_fmem_cancel() failed rv=0x%x", rv);
+	}
 out:
 	if (prog != NULL) {
 		drmach_unlock_critical((caddr_t)prog);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,6 +238,7 @@ typedef struct {
 	uint64_t		stick_freq;
 	uint64_t		copy_wait_time;
 	processorid_t		slowest_cpuid;
+	int			copy_rename_count;
 } drmach_copy_rename_data_t;
 
 typedef struct {
