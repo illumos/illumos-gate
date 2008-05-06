@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 #ident	"@(#)wx	1.12	98/11/09 SMI" (from bonwick)
@@ -894,7 +894,7 @@ Usage:  $ME command [-D] [args]
         $ME copyright   make sure there is a correct copyright message
                         that contains the current year
                         skips files in wx/copyright.NOT
-	$ME cddlchk     make sure there is a current CDDL block in
+        $ME cddlchk     make sure there is a current CDDL block in
                         active files
                         skips files in wx/cddlchk.NOT
         $ME rmdelchk    make sure sccs rmdel was not run on active files
@@ -921,7 +921,7 @@ Usage:  $ME command [-D] [args]
         $ME pbchk [file ...]
                         putback check.  Run cstyle, jstyle, hdrchk, copyright,
                         cddlchk, keywords, rmdelchk, deltachk, comchk, rtichk
-			and outchk over files to which they are
+                        and outchk over files to which they are
                         applicable (makestyle is not currently run
                         because it seems to be quite broken -- more
                         noise than data).  Good command to run before
@@ -931,10 +931,10 @@ Usage:  $ME command [-D] [args]
 
 ======================== Code Review Commands ======================
         $ME webrev [webrev-args]
-		        generate webrev for active and renamed/deleted files.
+                        generate webrev for active and renamed/deleted files.
                         Note, uses comments in the active list.  This is the
                         preferred way of reviewing code.  Arguments to webrev
-			may also be specified.
+                        may also be specified.
                         Will skip files listed in wx/webrev.NOT
 
         $ME codereview [-N] [codereview options]
@@ -1131,10 +1131,10 @@ wx_webrev() {
 		fi
 	done
 	# End of subshell
-	) > $wxdir/tmp/webrev.list
+	) > $wxtmp/webrev.list
 	
 	# Note that the file list must come last.
-	${WXWEBREV:-webrev} -w "$@" $(basename $wxdir)/tmp/webrev.list
+	${WXWEBREV:-webrev} -w "$@" $wxtmp/webrev.list
 
 	cd $origdir
 }
@@ -1302,7 +1302,7 @@ bugdb_compare() {
 #
 
 wx_summary() {
-	typeset i comment arc bug bugnospc bugid buglist synopsis \
+	typeset i comment arc arcerr bug bugnospc bugid buglist synopsis \
 		show_arcs=true \
 		show_bugs=true \
 		show_others=true \
@@ -1348,8 +1348,10 @@ wx_summary() {
 		show_others=true
 	fi
 
-	# Note, hard tab in the arc R.E.
-	arc='[A-Z][A-Z]*ARC[/ 	][12][0-9][0-9][0-9]/[0-9][0-9][0-9][^0-9]'
+	# Note, hard tab in the arc regex.  This only recognizes FWARC,
+	# LSARC and PSARC.  Also, regex must be compat with both egrep
+	# and nawk.
+	arc='(FW|LS|PS)ARC[\/ 	][12][0-9][0-9][0-9]\/[0-9][0-9][0-9][^0-9]'
 	# bug ID must followed by single space
 	bug='[0-9][0-9][0-9][0-9][0-9][0-9][0-9] '
 	bugnospc='[0-9][0-9][0-9][0-9][0-9][0-9][0-9][^ ]'
@@ -1358,16 +1360,19 @@ wx_summary() {
 		# Note must use /usr/bin/sort.
 		if ! egrep "^$arc" $wxtmp/comments |
 			 sed 's#\([A-Z][A-Z]*ARC\)[/ 	]#\1 #' | sort |
-			 /usr/bin/sort -cu -k 2,2 2>$wxtmp/error >/dev/null
+			 /usr/bin/sort -cu -k 1,2 2>$wxtmp/error >/dev/null
 		then
+			arcerr=$(nawk '{match($0, '"/$arc/"'); \
+				print substr($0, RSTART, RLENGTH);}' \
+				$wxtmp/error)
+
 			if $pbchk; then
-				print -n "Inconsistent ARC summaries for: "
-				sed 's#^[^A-Z]*\('"${arc}"'\).*#\1#' \
-				    $wxtmp/error
+				# if pbchk print to stdout
+				print "Inconsistent ARC summaries for: $arcerr"
 			else
-				print -nu2 "Inconsistent ARC summaries for: "
-				sed 's#^[^A-Z]*\('"${arc}"'\).*#\1#' \
-				    $wxtmp/error >&2
+				# else print to stderr
+				print -u2 \
+				"Inconsistent ARC summaries for: $arcerr"
 			fi
 			if $pbcom && ! $verbatim; then
 
@@ -4610,7 +4615,7 @@ wx_resolve() {
 export LC_ALL=C
 
 # Turn on debugging output early
-if echo "$*"|/usr/xpg4/bin/grep -q -E ' -D( *$| )'; then
+if [[ "$*" == *' -D'*( *) ]]; then
 	typeset -ft $(typeset +f)
 	set -x
 fi
@@ -4658,7 +4663,7 @@ if [[ -n "$CODEMGR_WS" ]]; then
 	# If the current dir is in a workspace check that it is the same
 	# as CODEMGR_WS.
 	if [[ -n "$(workspace name)" ]]; then
-		if ! echo "$(/bin/pwd)/" | grep -q "^$workspace/"; then
+		if [[ "$(/bin/pwd)/" != "$workspace/"* ]]; then
 			cat <<-EOF
 
 Warning, $ME will use $ME files in workspace $workspace (the current
@@ -4772,6 +4777,8 @@ export workspace parent wxdir file dir filepath backup_done DEFAULT_SRCDIR
 command=$1
 comlist=$command
 shift
+# throw away -D flag after command assigned as this flag was processed earlier
+[[ "$1" == '-D' ]] && shift
 
 case $command in
 	apply|eval)	subcommand=$1; shift;;
@@ -4803,7 +4810,7 @@ while [ $# -gt 0 ]; do
 				# set global comment_file
 				[[ "$1" == "-C" ]] && comment_mode="append"
 				comment_file=$2; 
-				if ! echo $comment_file|grep -q '^/'; then
+				if [[ $comment_file != '/'* ]]; then
 					comment_file="$(pwd)/$comment_file"
 				fi
 				if [[ -z "$comment_file" ]]; then
@@ -4832,7 +4839,6 @@ while [ $# -gt 0 ]; do
 			else
 				args="$args $1"
 			fi;;
-		-D)	: ;; # debug flag, already processed
 		-p) 	if [[ $command == @(putback|pb) ]]; then
 				if workspace access $2 >/dev/null; then
 					# 2nd arg is a workspace
@@ -4914,7 +4920,7 @@ fi
 if [[ ! -f $wxdir/renamed ]]; then
 	# if 'wx update' or 'wx update -r' is the command then skip
 	# renamed list creation since it will happen anyway.
-	if [[ "$command" != "update" ]] || echo "$args"|grep -q -- "-q"; then
+	if [[ "$command" != "update" ]] || [[ "$args" == *'-q'* ]]; then
 		ring_bell
 		cat <<-EOF
 
@@ -4975,7 +4981,7 @@ elif [[ "$command" == @(unedit|uncheckout|unco) ]]; then
 	cp $wxdir/active $wxdir/active.old
 elif [[ "$command" == @(bugs|arcs) ]]; then
 	# -v verbatim is not valid for these commands
-	if echo "$args"|grep -q -- "-v"; then
+	if [[ "$args" == *'-v'* ]]; then
 		fail "Invalid flag -v. Run 'wx help' for info."
 	fi
 elif [[ "$command" == "create" ]]; then
@@ -5158,7 +5164,7 @@ case $command in
 		cd $workspace; 
 		hdrchk_files=;
 		for filepath in $file_list ; do
-			if echo $filepath | grep -q '\.h$'; then
+			if [[ "$filepath" == *.h ]]; then
 				if [[ -s $wxdir/${command}.NOT ]] &&
 					grep -q "^$(escape_re $filepath)$" \
 						$wxdir/${command}.NOT
