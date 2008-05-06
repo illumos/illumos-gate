@@ -377,6 +377,8 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	(void) pthread_mutex_init(&dp->d_stats_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_topo_lock, NULL);
 	(void) pthread_rwlock_init(&dp->d_log_lock, NULL);
+	(void) pthread_mutex_init(&dp->d_fmd_lock, NULL);
+	(void) pthread_cond_init(&dp->d_fmd_cv, NULL);
 
 	/*
 	 * A small number of properties must be set manually before we open
@@ -950,7 +952,10 @@ fmd_run(fmd_t *dp, int pfd)
 	fmd_gc(dp, 0, 0);
 	fmd_clear_aged_rsrcs(dp, 0, 0);
 
+	(void) pthread_mutex_lock(&dp->d_fmd_lock);
 	dp->d_booted = 1;
+	(void) pthread_cond_broadcast(&dp->d_fmd_cv);
+	(void) pthread_mutex_unlock(&dp->d_fmd_lock);
 }
 
 void

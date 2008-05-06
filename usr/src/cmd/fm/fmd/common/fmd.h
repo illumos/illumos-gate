@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,6 +135,8 @@ typedef struct fmd {
 	pthread_rwlock_t d_log_lock;	/* log pointer lock (r=use, w=rotate) */
 	struct fmd_log *d_errlog;	/* log file for error events */
 	struct fmd_log *d_fltlog;	/* log file for fault events */
+	pthread_cond_t d_fmd_cv;	/* sync startup with rpc */
+	pthread_mutex_t d_fmd_lock;	/* sync startup with rpc */
 } fmd_t;
 
 /*
