@@ -32,8 +32,8 @@
 # profiles attributes. see prof_attr(4)
 #
 All:::Execute any command as the user or role:help=RtAll.html
-Audit Control:::Configure BSM auditing:auths=solaris.audit.config,solaris.jobs.admin;help=RtAuditCtrl.html
-Audit Review:::Review BSM auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
+Audit Control:::Configure Solaris Auditing:auths=solaris.audit.config,solaris.jobs.admin;help=RtAuditCtrl.html
+Audit Review:::Review Solaris Auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
 Console User:::Manage System as the Console User:help=RtConsUser.html
 Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
 Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html

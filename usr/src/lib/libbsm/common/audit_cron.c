@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,7 +74,7 @@ audit_cron_syslog(const char *message) {
 	static	int	is_open = 0;
 
 	if (!is_open) {
-		openlog("BSM-audit", LOG_ODELAY, LOG_CRON);
+		openlog("Solaris_Audit", LOG_ODELAY, LOG_CRON);
 		is_open = 1;
 	}
 	syslog(LOG_WARNING, "%s", message);
@@ -113,23 +112,23 @@ audit_cron_getinfo(char *fname, char *fname_aux, struct auditinfo_addr *info)
 	}
 
 	if (sscanf(textbuf,
-			F_AUID
-			F_SMASK
-			F_FMASK
-			F_PORT
-			F_TYPE
-			F_MACH
-			F_ASID,
-				(int *)&(info->ai_auid),
-				&(info->ai_mask.am_success),
-				&(info->ai_mask.am_failure),
-				&(info->ai_termid.at_port),
-				&(info->ai_termid.at_type),
-				&(info->ai_termid.at_addr[0]),
-				&(info->ai_termid.at_addr[1]),
-				&(info->ai_termid.at_addr[2]),
-				&(info->ai_termid.at_addr[3]),
-				(unsigned int *)&(info->ai_asid)) != 10) {
+	    F_AUID
+	    F_SMASK
+	    F_FMASK
+	    F_PORT
+	    F_TYPE
+	    F_MACH
+	    F_ASID,
+	    (int *)&(info->ai_auid),
+	    &(info->ai_mask.am_success),
+	    &(info->ai_mask.am_failure),
+	    &(info->ai_termid.at_port),
+	    &(info->ai_termid.at_type),
+	    &(info->ai_termid.at_addr[0]),
+	    &(info->ai_termid.at_addr[1]),
+	    &(info->ai_termid.at_addr[2]),
+	    &(info->ai_termid.at_addr[3]),
+	    (unsigned int *)&(info->ai_asid)) != 10) {
 		audit_cron_syslog(msg);
 		goto delete_first;
 	}
@@ -195,23 +194,23 @@ audit_cron_setinfo(char *fname, struct auditinfo_addr *info)
 		return (-1);
 
 	len = sprintf(textbuf,
-			F_AUID
-			F_SMASK
-			F_FMASK
-			F_PORT
-			F_TYPE
-			F_MACH
-			F_ASID,
-				(int)info->ai_auid,
-				info->ai_mask.am_success,
-				info->ai_mask.am_failure,
-				info->ai_termid.at_port,
-				info->ai_termid.at_type,
-				info->ai_termid.at_addr[0],
-				info->ai_termid.at_addr[1],
-				info->ai_termid.at_addr[2],
-				info->ai_termid.at_addr[3],
-				(unsigned int)info->ai_asid);
+	    F_AUID
+	    F_SMASK
+	    F_FMASK
+	    F_PORT
+	    F_TYPE
+	    F_MACH
+	    F_ASID,
+	    (int)info->ai_auid,
+	    info->ai_mask.am_success,
+	    info->ai_mask.am_failure,
+	    info->ai_termid.at_port,
+	    info->ai_termid.at_type,
+	    info->ai_termid.at_addr[0],
+	    info->ai_termid.at_addr[1],
+	    info->ai_termid.at_addr[2],
+	    info->ai_termid.at_addr[3],
+	    (unsigned int)info->ai_asid);
 
 	if (write(fd, textbuf, len) != len)
 		goto audit_setinfo_clean;
@@ -337,8 +336,8 @@ audit_cron_session(
 			err_str = strerror(errno);
 
 		audit_cron_session_failure(name,
-					at_jobname == NULL,
-					err_str);
+		    at_jobname == NULL,
+		    err_str);
 		if (anc_file != NULL)
 			free(anc_file);
 		return (r);
@@ -357,7 +356,7 @@ audit_cron_session(
 	aug_save_auid(info.ai_auid);
 	aug_save_asid(info.ai_asid);
 	aug_save_tid_ex(info.ai_termid.at_port, info.ai_termid.at_addr,
-		info.ai_termid.at_type);
+	    info.ai_termid.at_type);
 	aug_save_pid(getpid());
 	aug_save_uid(uid);
 	aug_save_gid(gid);
@@ -384,19 +383,19 @@ audit_cron_new_job(char *cmd, int type, void *event)
 		return;
 
 	if (type == 0) {
-	    (void) snprintf(textbuf, sizeof (textbuf),
+		(void) snprintf(textbuf, sizeof (textbuf),
 		    dgettext(bsm_dom, "at-job"));
 	} else if (type == 1) {
-	    (void) snprintf(textbuf, sizeof (textbuf),
+		(void) snprintf(textbuf, sizeof (textbuf),
 		    dgettext(bsm_dom, "batch-job"));
 	} else if (type == 2) {
-	    (void) snprintf(textbuf, sizeof (textbuf),
+		(void) snprintf(textbuf, sizeof (textbuf),
 		    dgettext(bsm_dom, "crontab-job"));
 	} else if ((type > 2) && (type <= 25)) {	/* 25 from cron.h */
-	    (void) snprintf(textbuf, sizeof (textbuf),
+		(void) snprintf(textbuf, sizeof (textbuf),
 		    dgettext(bsm_dom, "queue-job (%c)"), (type+'a'));
 	} else {
-	    (void) snprintf(textbuf, sizeof (textbuf),
+		(void) snprintf(textbuf, sizeof (textbuf),
 		    dgettext(bsm_dom, "unknown job type (%d)"), type);
 	}
 
@@ -414,7 +413,7 @@ audit_cron_bad_user(char *name)
 		return;
 
 	(void) snprintf(textbuf, sizeof (textbuf),
-			dgettext(bsm_dom, "bad user %s"), name);
+	    dgettext(bsm_dom, "bad user %s"), name);
 
 	aug_save_event(AUE_cron_invoke);
 	aug_save_sorf(2);
@@ -429,8 +428,8 @@ audit_cron_user_acct_expired(char *name)
 		return;
 
 	(void) snprintf(textbuf, sizeof (textbuf),
-			dgettext(bsm_dom,
-				"user %s account expired"), name);
+	    dgettext(bsm_dom,
+	    "user %s account expired"), name);
 
 	aug_save_event(AUE_cron_invoke);
 	aug_save_sorf(3);

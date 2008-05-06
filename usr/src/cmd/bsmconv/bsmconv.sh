@@ -20,7 +20,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,7 +57,7 @@ fi
 RESP="x"
 while [ "$RESP" != `gettext "y"` -a "$RESP" != `gettext "n"` ]
 do
-gettext "This script is used to enable the Basic Security Module (BSM).\n"
+gettext "This script is used to enable Solaris Auditing and device allocation.\n"
 form=`gettext "Shall we continue with the conversion now? [y/n]"`
 echo "$form \c"
 read RESP
@@ -204,10 +204,12 @@ then
 	bsmconvert
 
 	echo
-	gettext "The Basic Security Module is ready.\n"
+	gettext "Solaris Auditing and device allocation is ready.\n"
 	gettext "If there were any errors, please fix them now.\n"
-	gettext "Configure BSM by editing files located in /etc/security.\n"
-	gettext "Reboot this system now to come up with BSM enabled.\n"
+	gettext "Configure Solaris Auditing and device allocation by editing "
+	gettext "files\nlocated in /etc/security.\n"
+	gettext "Reboot this system now to come up with auditing "
+	gettext "and device allocation enabled.\n"
 else
 	# determine if local root is being converted ("/" passed on
 	# command line), if so, full permission check required
@@ -233,11 +235,13 @@ else
 		printf "${form}\n" $PROG $ROOT
 	done
 	echo
-	gettext "The Basic Security Module is ready.\n"
+	gettext "Solaris Auditing and device allocation is ready.\n"
 	gettext "If there were any errors, please fix them now.\n"
-	gettext "Configure BSM by editing files located in /etc/security\n"
-	gettext "in the root directories of each host converted.\n"
-	gettext "Reboot each system converted to come up with BSM active.\n"
+	gettext "Configure Solaris auditing and device allocation by editing "
+	gettext "files\nlocated in /etc/security in the root directories " 
+	gettext "of each host converted.\n"
+	gettext "Reboot each system converted to come up with auditing "
+	gettext "and device\nallocation enabled.\n"
 fi
 
 exit 0

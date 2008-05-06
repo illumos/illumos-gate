@@ -21,7 +21,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -70,8 +70,8 @@ fi
 RESP="x"
 while [ "$RESP" != `gettext "y"` -a "$RESP" != `gettext "n"` ]
 do
-gettext "This script is used to disable the Basic Security Module (BSM).\n"
-form=`gettext "Shall we continue the reversion to a non-BSM system now? [y/n]"`
+gettext "This script is used to disable Solaris Auditing and device allocation.\n"
+form=`gettext "Would you like to continue now? [y/n]"`
 echo "$form \c"
 read RESP
 done
@@ -149,8 +149,8 @@ then
 	ROOT=
 	bsmunconvert
 	echo
-	gettext "The Basic Security Module has been disabled.\n"
-	gettext "Reboot this system now to come up without BSM.\n"
+	gettext "Solaris Auditing and device allocation has been disabled.\n"
+	gettext "Reboot the system now to come up without these features.\n"
 else
 
 	# determine if local root is being converted ("/" passed on
@@ -174,8 +174,8 @@ else
 	done
 
 	echo
-	gettext "The Basic Security Module has been disabled.\n"
-	gettext "Reboot each system that was disabled to come up without BSM.\n"
+	gettext "Solaris Auditing and device allocation has been disabled.\n"
+	gettext "Reboot each system that was disabled to come up without these features.\n"
 fi
 
 exit 0
