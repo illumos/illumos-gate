@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,7 +163,7 @@ soft_nzero_random_generator(CK_BYTE *ran_out, CK_ULONG ran_len)
 
 
 /*
- * Generate random number in BIGNUM format.
+ * Generate random number in BIGNUM format. length is in bits
  */
 BIG_ERR_CODE
 random_bignum(BIGNUM *r, int length, boolean_t token_obj)
@@ -173,10 +172,10 @@ random_bignum(BIGNUM *r, int length, boolean_t token_obj)
 	CK_RV rv = CKR_OK;
 
 	/* Convert length of bits to length of word to hold valid data. */
-	r->len = (length-1) / 32 + 1;
+	r->len = (length-1) / BIG_CHUNK_SIZE + 1;
 
 	/* len1 is the byte count. */
-	len1 = r->len * sizeof (uint32_t);
+	len1 = r->len * sizeof (BIG_CHUNK_TYPE);
 
 	/* Generate len1 bytes of data and store in memory pointed by value. */
 	rv = soft_random_generator((CK_BYTE *)(r->value), len1, token_obj);
@@ -185,16 +184,16 @@ random_bignum(BIGNUM *r, int length, boolean_t token_obj)
 		return (convert_brv(rv));
 	}
 
-	/* Turn on the sign bit of big number which is the MSB in last word. */
-	r->value[r->len - 1] |= 0x80000000;
+	r->value[r->len - 1] |= BIG_CHUNK_HIGHBIT;
 
 	/*
 	 * If the bit length is not on word boundary, shift the existing
 	 * bits in last word to right adjusted.
 	 */
-	if ((length % 32) != 0)
+	if ((length % BIG_CHUNK_SIZE) != 0)
 		r->value[r->len - 1] =
-		    r->value[r->len - 1] >> (32 - (length % 32));
+		    r->value[r->len - 1] >>
+		    (BIG_CHUNK_SIZE - (length % BIG_CHUNK_SIZE));
 	r->sign = 1;
 
 	return (BIG_OK);

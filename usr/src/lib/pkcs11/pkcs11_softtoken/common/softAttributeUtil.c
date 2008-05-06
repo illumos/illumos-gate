@@ -1862,7 +1862,6 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		/* Private Key Object Attributes */
 		switch (template[i].type) {
-
 		/* common key attributes */
 		case CKA_KEY_TYPE:
 			keytype = *((CK_KEY_TYPE*)template[i].pValue);
@@ -2248,30 +2247,28 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		if (isPrime && isSubprime && isBase && isValue) {
 			/*
 			 * The private value x must be less than subprime q.
-			 * Size for big_init is in (32-bit) words.
+			 * Size for big_init is in BIG_CHUNK_TYPE words.
 			 */
 #ifdef	__sparcv9
-			/* LINTED */
-			if (big_init(&x, ((int)value.big_value_len +
-			    (int)sizeof (uint32_t) - 1) /
-			    (int)sizeof (uint32_t)) != BIG_OK) {
+			if (big_init(&x,
+			    (int)CHARLEN2BIGNUMLEN(value.big_value_len))
+			    != BIG_OK) {
 #else	/* !__sparcv9 */
-			if (big_init(&x, (value.big_value_len +
-			    (int)sizeof (uint32_t) - 1) /
-			    (int)sizeof (uint32_t)) != BIG_OK) {
+			if (big_init(&x,
+			    CHARLEN2BIGNUMLEN(value.big_value_len))
+			    != BIG_OK) {
 #endif	/* __sparcv9 */
 				rv = CKR_HOST_MEMORY;
 				goto fail_cleanup;
 			}
 #ifdef	__sparcv9
-			/* LINTED */
-			if (big_init(&q, ((int)subprime.big_value_len +
-			    (int)sizeof (uint32_t) - 1) /
-			    (int)sizeof (uint32_t)) != BIG_OK) {
+			if (big_init(&q,
+			    (int)CHARLEN2BIGNUMLEN(subprime.big_value_len))
+			    != BIG_OK) {
 #else	/* !__sparcv9 */
-			if (big_init(&q, (subprime.big_value_len +
-			    (int)sizeof (uint32_t) - 1) /
-			    (int)sizeof (uint32_t)) != BIG_OK) {
+			if (big_init(&q,
+			    CHARLEN2BIGNUMLEN(subprime.big_value_len))
+			    != BIG_OK) {
 #endif	/* __sparcv9 */
 				rv = CKR_HOST_MEMORY;
 				goto fail_cleanup;

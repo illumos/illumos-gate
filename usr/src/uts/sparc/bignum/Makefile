@@ -24,7 +24,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the RSA KEF provider.
+#	This makefile drives the production of the misx/bignum module.
 #
 #	sparc implementation architecture dependent
 #
@@ -34,23 +34,19 @@
 #
 UTSBASE	= ../..
 COM1_DIR = $(COMMONBASE)/bignum
-COM2_DIR = $(COMMONBASE)/crypto/rsa
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= rsa
-OBJECTS		= $(RSAPROV_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(RSAPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
+MODULE		= bignum
+OBJECTS		= $(BIGNUM_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(BIGNUM_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
-
-#	set signing mode
-ELFSIGN_MOD	= $(ELFSIGN_CRYPTO)
 
 #
 #	Define targets
@@ -62,26 +58,15 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum
+LDFLAGS += -dy
 
 #
 # lint pass one enforcement
 #
-CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR) -I$(COM2_DIR)
+CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR)
 CFLAGS		+= -DUMUL64
-LINTFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
+LINTFLAGS	+= -I$(COM1_DIR)
 
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 #	Default build targets.

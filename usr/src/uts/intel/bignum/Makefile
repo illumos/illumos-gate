@@ -26,31 +26,31 @@
 #
 #	This makefile drives the production of the RSA KEF provider.
 #
-#	sparc implementation architecture dependent
+#	intel implementation architecture dependent
 #
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM1_DIR = $(COMMONBASE)/bignum
-COM2_DIR = $(COMMONBASE)/crypto/rsa
+BIGNUMDIR = $(COMMONBASE)/bignum
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= rsa
-OBJECTS		= $(RSAPROV_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(RSAPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
+MODULE		= bignum
+OBJECTS		= $(BIGNUM_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(BIGNUM_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+
+BIGNUM_OBJS_32 = bignum_i386.o bignum_i386_asm.o
+BIGNUM_OBJS_64 = bignum_amd64.o bignum_amd64_asm.o
+BIGNUM_PSR_OBJS = $(BIGNUM_OBJS_$(CLASS))
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sparc/Makefile.sparc
-
-#	set signing mode
-ELFSIGN_MOD	= $(ELFSIGN_CRYPTO)
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Define targets
@@ -62,26 +62,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum
+LDFLAGS += -dy
 
-#
-# lint pass one enforcement
-#
-CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR) -I$(COM2_DIR)
-CFLAGS		+= -DUMUL64
-LINTFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+CPPFLAGS	+= -I$(BIGNUMDIR)
 
 #
 #	Default build targets.
@@ -107,4 +90,7 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ
+
+
+include Makefile.$(CLASS)

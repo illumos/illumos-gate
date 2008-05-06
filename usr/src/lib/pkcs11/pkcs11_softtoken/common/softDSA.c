@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,31 +115,34 @@ soft_dsa_sign_verify_init_common(soft_session_t *session_p,
 	return (CKR_OK);
 }
 
+
+/* size is in bits */
 BIG_ERR_CODE
 DSA_key_init(DSAkey *key, int size)
 {
 	BIG_ERR_CODE err;
-	int len;
+	int len, len160;
 
-	len = size / 32;
+	len = BITLEN2BIGNUMLEN(size);
+	len160 = BIG_CHUNKS_FOR_160BITS;
 	key->size = size;
-	if ((err = big_init1(&(key->q), 5, NULL, 0)) != BIG_OK)
+	if ((err = big_init1(&(key->q), len160, NULL, 0)) != BIG_OK)
 		return (err);
 	if ((err = big_init1(&(key->p), len, NULL, 0)) != BIG_OK)
 		goto ret1;
 	if ((err = big_init1(&(key->g), len, NULL, 0)) != BIG_OK)
 		goto ret2;
-	if ((err = big_init1(&(key->x), 5, NULL, 0)) != BIG_OK)
+	if ((err = big_init1(&(key->x), len160, NULL, 0)) != BIG_OK)
 		goto ret3;
 	if ((err = big_init1(&(key->y), len, NULL, 0)) != BIG_OK)
 		goto ret4;
-	if ((err = big_init1(&(key->k), 5, NULL, 0)) != BIG_OK)
+	if ((err = big_init1(&(key->k), len160, NULL, 0)) != BIG_OK)
 		goto ret5;
-	if ((err = big_init1(&(key->r), 5, NULL, 0)) != BIG_OK)
+	if ((err = big_init1(&(key->r), len160, NULL, 0)) != BIG_OK)
 		goto ret6;
-	if ((err = big_init1(&(key->s), 5, NULL, 0)) != BIG_OK)
+	if ((err = big_init1(&(key->s), len160, NULL, 0)) != BIG_OK)
 		goto ret7;
-	if ((err = big_init1(&(key->v), 5, NULL, 0)) != BIG_OK)
+	if ((err = big_init1(&(key->v), len160, NULL, 0)) != BIG_OK)
 		goto ret8;
 
 	return (BIG_OK);
@@ -236,16 +239,17 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	if ((err = big_init(&msg, 5)) != BIG_OK) {
+	if ((err = big_init(&msg, BIG_CHUNKS_FOR_160BITS)) != BIG_OK) {
 		goto clean6;
 	}
-	if ((err = big_init(&tmp, plen / 4 + 11)) != BIG_OK) {
+	if ((err = big_init(&tmp, CHARLEN2BIGNUMLEN(plen) +
+	    2 * BIG_CHUNKS_FOR_160BITS + 1)) != BIG_OK) {
 		goto clean7;
 	}
-	if ((err = big_init(&tmp1, 11)) != BIG_OK) {
+	if ((err = big_init(&tmp1, 2 * BIG_CHUNKS_FOR_160BITS + 1)) != BIG_OK) {
 		goto clean8;
 	}
-	if ((err = big_init(&tmp2, 5)) != BIG_OK) {
+	if ((err = big_init(&tmp2, BIG_CHUNKS_FOR_160BITS)) != BIG_OK) {
 		goto clean9;
 	}
 
@@ -374,16 +378,16 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 	}
 
 	rv = CKR_HOST_MEMORY;
-	if (big_init(&msg, 5) != BIG_OK) {
+	if (big_init(&msg, BIG_CHUNKS_FOR_160BITS) != BIG_OK) {
 		goto clean6;
 	}
-	if (big_init(&tmp1, plen / 2) != BIG_OK) {
+	if (big_init(&tmp1, 2 * CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
 		goto clean7;
 	}
-	if (big_init(&tmp2, plen / 4) != BIG_OK) {
+	if (big_init(&tmp2, CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
 		goto clean8;
 	}
-	if (big_init(&tmp3, 10) != BIG_OK) {
+	if (big_init(&tmp3, 2 * BIG_CHUNKS_FOR_160BITS) != BIG_OK) {
 		goto clean9;
 	}
 
@@ -415,12 +419,10 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 	if (big_div_pos(NULL, &tmp2, &tmp2, &(dsakey.q)) != BIG_OK)
 		goto clean10;				/* tmp2 <- u_2 */
 
-	if (big_modexp(&tmp1, &(dsakey.g), &tmp1, &(dsakey.p), NULL) !=
-	    BIG_OK)
+	if (big_modexp(&tmp1, &(dsakey.g), &tmp1, &(dsakey.p), NULL) != BIG_OK)
 		goto clean10;
 
-	if (big_modexp(&tmp2, &(dsakey.y), &tmp2, &(dsakey.p), NULL) !=
-	    BIG_OK)
+	if (big_modexp(&tmp2, &(dsakey.y), &tmp2, &(dsakey.p), NULL) != BIG_OK)
 		goto clean10;
 
 	if (big_mul(&tmp1, &tmp1, &tmp2) != BIG_OK)
@@ -781,21 +783,24 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto cleanexit;
 	}
 
-	if ((brv = big_extend(&dsakey.p, (prime_len + 3) / 4)) != BIG_OK) {
+	if ((brv = big_extend(&dsakey.p,
+	    CHARLEN2BIGNUMLEN(prime_len))) != BIG_OK) {
 		rv = convert_rv(brv);
 		goto cleanexit;
 	}
 
 	bytestring2bignum(&dsakey.p, prime, prime_len);
 
-	if ((brv = big_extend(&dsakey.q, (subprime_len + 3) / 4)) != BIG_OK) {
+	if ((brv = big_extend(&dsakey.q, CHARLEN2BIGNUMLEN(subprime_len))) !=
+	    BIG_OK) {
 		rv = convert_rv(brv);
 		goto cleanexit;
 	}
 
 	bytestring2bignum(&dsakey.q, subprime, subprime_len);
 
-	if ((brv = big_extend(&dsakey.g, (base_len + 3) / 4)) != BIG_OK) {
+	if ((brv = big_extend(&dsakey.g, CHARLEN2BIGNUMLEN(base_len))) !=
+	    BIG_OK) {
 		rv = convert_rv(brv);
 		goto cleanexit;
 	}
@@ -811,14 +816,14 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto cleanexit;
 	}
 
-	pubvalue_len = dsakey.y.len * (int)sizeof (uint32_t);
+	pubvalue_len = prime_len;
 	if ((pubvalue = malloc(pubvalue_len)) == NULL) {
 		rv = CKR_HOST_MEMORY;
 		goto cleanexit;
 	}
 	bignum2bytestring(pubvalue, &dsakey.y, pubvalue_len);
 
-	privalue_len = dsakey.x.len * (int)sizeof (uint32_t);
+	privalue_len = DSA_SUBPRIME_BYTES;
 	if ((privalue = malloc(privalue_len)) == NULL) {
 		rv = CKR_HOST_MEMORY;
 		goto cleanexit;

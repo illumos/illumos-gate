@@ -2326,8 +2326,8 @@ end:
 	return (rv);
 }
 
-#define	DSA_PRIME_BUFSIZE	256	/* 8192 bits */
-#define	DSA_PRIVATE_BUFSIZE	5	/* 160 bits */
+#define	DSA_PRIME_BUFSIZE	CHARLEN2BIGNUMLEN(1024)	/* 8192 bits */
+#define	DSA_PRIVATE_BUFSIZE	BIG_CHUNKS_FOR_160BITS	/* 160 bits */
 
 /*
  * This function calculates the pubkey value from the prime,

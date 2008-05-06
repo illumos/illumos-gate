@@ -1239,6 +1239,13 @@ IPCSEM_OBJS +=	sem.o
 IPCSHM_OBJS +=	shm.o
 
 #
+#			bignum module
+#
+COMMON_BIGNUM_OBJS += bignum_mod.o bignumimpl.o
+
+BIGNUM_OBJS += $(COMMON_BIGNUM_OBJS) $(BIGNUM_PSR_OBJS)
+
+#
 #			kernel cryptographic framework
 #
 KCF_OBJS +=	kcf.o kcf_callprov.o kcf_cbufcall.o kcf_cipher.o kcf_crypto.o \
@@ -1269,9 +1276,7 @@ ECCPROV_OBJS += ecc.o ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o \
 		mpi.o mplogic.o mpmontg.o mpprime.o oid.o \
 		secitem.o ec2_test.o ecp_test.o
 
-COMMON_RSAPROV_OBJS += rsa.o bignumimpl.o rsa_impl.o
-
-RSAPROV_OBJS += $(COMMON_RSAPROV_OBJS) $(RSAPROV_PSR_OBJS)
+RSAPROV_OBJS += rsa.o rsa_impl.o
 
 SWRANDPROV_OBJS += swrand.o
 

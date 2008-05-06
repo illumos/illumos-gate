@@ -416,7 +416,6 @@ d none platform/sun4u/kernel/crypto/sparcv9 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/arcfour 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/des 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/md5 755 root sys
-f none platform/sun4u/kernel/crypto/sparcv9/rsa 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/sha1 755 root sys
 d none platform/sun4u/kernel/drv 755 root sys
 f none platform/sun4u/kernel/drv/i2bsc.conf 644 root sys
@@ -488,6 +487,7 @@ f none platform/sun4u/kernel/drv/zsh.conf 644 root sys
 d none platform/sun4u/kernel/misc 755 root sys
 d none platform/sun4u/kernel/misc/sparcv9 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/kmdbmod 755 root sys
+f none platform/sun4u/kernel/misc/sparcv9/bignum 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/bootdev 755 root sys
 s none platform/sun4u/kernel/misc/sparcv9/des=../../../kernel/crypto/sparcv9/des
 f none platform/sun4u/kernel/misc/sparcv9/forthdebug 755 root sys

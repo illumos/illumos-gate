@@ -44,10 +44,6 @@ OBJECTS		= $(RSAPROV_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(RSAPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 
-RSAPROV_OBJS_32 = bignum_i386.o bignum_i386_asm.o
-RSAPROV_OBJS_64 = bignum_amd64.o bignum_amd64_asm.o
-RSAPROV_PSR_OBJS = $(RSAPROV_OBJS_$(CLASS))
-
 #
 #	Include common rules.
 #
@@ -66,7 +62,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2
+LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum
 
 CPPFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
 
@@ -105,7 +101,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-BIGNUMDIR = $(COMMONBASE)/bignum
-
-include Makefile.$(CLASS)

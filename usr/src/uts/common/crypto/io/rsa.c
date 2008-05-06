@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1043,9 +1043,8 @@ core_rsa_encrypt(crypto_key_t *key, uchar_t *in,
 		goto clean1;
 	}
 
-	/* Size for big_init is in (32-bit) words. */
-	if (big_init(&msg, (in_len + (int)sizeof (uint32_t) - 1) /
-	    (int)sizeof (uint32_t)) != BIG_OK) {
+	/* Size for big_init is in BIG_CHUNK_TYPE words. */
+	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
 		rv = CRYPTO_HOST_MEMORY;
 		goto clean2;
 	}
@@ -1239,9 +1238,8 @@ core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len,
 		goto clean1;
 	}
 
-	/* Size for big_init is in (32-bit) words. */
-	if (big_init(&msg, (in_len + (int)sizeof (uint32_t) - 1) /
-	    (int)sizeof (uint32_t)) != BIG_OK) {
+	/* Size for big_init is in BIG_CHUNK_TYPE words. */
+	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
 		rv = CRYPTO_HOST_MEMORY;
 		goto clean2;
 	}

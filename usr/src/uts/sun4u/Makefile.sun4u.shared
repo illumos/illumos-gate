@@ -434,6 +434,7 @@ SYS_KMODS	+=
 #
 #	'User' Modules (/kernel/misc):
 #
+MISC_KMODS	+= bignum
 MISC_KMODS	+= obpsym bootdev vis cpr platmod md5 sha1 i2c_svc
 MISC_KMODS	+= sbd
 
@@ -455,7 +456,6 @@ BRAND_KMODS	+= sn1_brand
 $(CLOSED_BUILD)CRYPTO_KMODS	+= aes
 $(CLOSED_BUILD)CRYPTO_KMODS	+= arcfour
 $(CLOSED_BUILD)CRYPTO_KMODS	+= des
-CRYPTO_KMODS	+= rsa
 
 #
 #	generic-unix module (/kernel/genunix):

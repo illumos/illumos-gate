@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,12 +61,13 @@ soft_genDHkey_set_attribute(soft_object_t *key, BIGNUM *bn,
 	 * whose size is multiple of 4, prime_len is rounded up to be
 	 * multiple of 4.
 	 */
-	if ((buf = malloc((prime_len + 3) & ~3)) == NULL) {
+	if ((buf = malloc((prime_len + sizeof (BIG_CHUNK_TYPE) - 1) &
+	    ~(sizeof (BIG_CHUNK_TYPE) - 1))) == NULL) {
 		rv = CKR_HOST_MEMORY;
 		goto cleanexit;
 	}
 
-	buflen = bn->len * (int)sizeof (uint32_t);
+	buflen = bn->len * (int)sizeof (BIG_CHUNK_TYPE);
 	bignum2bytestring(buf, bn, buflen);
 
 	switch (type) {
@@ -125,14 +125,15 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	BIGNUM		bnpubval;
 	CK_ATTRIBUTE 	template;
 
-
 	if ((pubkey->class != CKO_PUBLIC_KEY) ||
-	    (pubkey->key_type != CKK_DH))
+	    (pubkey->key_type != CKK_DH)) {
 		return (CKR_KEY_TYPE_INCONSISTENT);
+	}
 
 	if ((prikey->class != CKO_PRIVATE_KEY) ||
-	    (prikey->key_type != CKK_DH))
+	    (prikey->key_type != CKK_DH)) {
 		return (CKR_KEY_TYPE_INCONSISTENT);
+	}
 
 	/*
 	 * The input to the first phase shall be the Diffie-Hellman
@@ -150,7 +151,8 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto ret0;
 	}
 
-	if ((brv = big_init(&bnprime, (prime_len + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnprime, CHARLEN2BIGNUMLEN(prime_len))) !=
+	    BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret0;
 	}
@@ -164,7 +166,7 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto ret1;
 	}
 
-	if ((brv = big_init(&bnbase, (base_len + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnbase, CHARLEN2BIGNUMLEN(base_len))) != BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret1;
 	}
@@ -214,12 +216,14 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	}
 
 	/* Generate DH key pair private and public values. */
-	if ((brv = big_init(&bnprival, (prime_len + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnprival, CHARLEN2BIGNUMLEN(prime_len)))
+	    != BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret3;
 	}
 
-	if ((brv = big_init(&bnpubval, (prime_len + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnpubval, CHARLEN2BIGNUMLEN(prime_len)))
+	    != BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret4;
 	}
@@ -310,7 +314,6 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 	BIGNUM		bnprivate;
 	BIGNUM		bnsecret;
 
-
 	rv = soft_get_private_attr(basekey, CKA_VALUE, privatevalue,
 	    &privatevaluelen);
 	if (rv != CKR_OK) {
@@ -323,14 +326,16 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 		goto ret0;
 	}
 
-	if ((brv = big_init(&bnprime, (privateprimelen + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnprime, CHARLEN2BIGNUMLEN(privateprimelen))) !=
+	    BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret0;
 	}
 
 	bytestring2bignum(&bnprime, privateprime, privateprimelen);
 
-	if ((brv = big_init(&bnprivate, (privatevaluelen + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnprivate, CHARLEN2BIGNUMLEN(privatevaluelen))) !=
+	    BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret1;
 	}
@@ -338,11 +343,11 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 	bytestring2bignum(&bnprivate, privatevalue, privatevaluelen);
 
 #ifdef	__sparcv9
-	/* LINTED */
-	if ((brv = big_init(&bnpublic, (int)(publicvaluelen + 3)/4)) !=
-	    BIG_OK) {
+	if ((brv = big_init(&bnpublic,
+	    (int)CHARLEN2BIGNUMLEN(publicvaluelen))) != BIG_OK) {
 #else	/* !__sparcv9 */
-	if ((brv = big_init(&bnpublic, (publicvaluelen + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnpublic,
+	    CHARLEN2BIGNUMLEN(publicvaluelen))) != BIG_OK) {
 #endif	/* __sparcv9 */
 		rv = convert_rv(brv);
 		goto ret2;
@@ -350,7 +355,8 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 
 	bytestring2bignum(&bnpublic, (uchar_t *)publicvalue, publicvaluelen);
 
-	if ((brv = big_init(&bnsecret, (privateprimelen + 3)/4)) != BIG_OK) {
+	if ((brv = big_init(&bnsecret,
+	    CHARLEN2BIGNUMLEN(privateprimelen))) != BIG_OK) {
 		rv = convert_rv(brv);
 		goto ret3;
 	}
@@ -361,13 +367,14 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 		goto ret4;
 	}
 
-	if ((buf = malloc((privateprimelen + 3) & ~3)) == NULL) {
+	if ((buf = malloc((privateprimelen + sizeof (BIG_CHUNK_TYPE) - 1) &
+	    ~(sizeof (BIG_CHUNK_TYPE) - 1))) == NULL) {
 		rv = CKR_HOST_MEMORY;
 		goto ret4;
 	}
 
 	value = buf;
-	valuelen = bnsecret.len * (int)sizeof (uint32_t);
+	valuelen = bnsecret.len * (int)sizeof (BIG_CHUNK_TYPE);
 	bignum2bytestring(value, &bnsecret, valuelen);
 
 	switch (secretkey->key_type) {

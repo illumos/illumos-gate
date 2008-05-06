@@ -130,6 +130,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(SRC)/common/bignum/sun4u/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(SRC)/common/crypto/aes/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -152,9 +155,6 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/crypto/des/sun4u/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.s
-	$(COMPILE.s) -o $@ $<
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/rsa/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
@@ -240,6 +240,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sparc/os/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(SRC)/common/bignum/sun4u/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/aes/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -259,9 +262,6 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/des/sun4u/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/rsa/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c

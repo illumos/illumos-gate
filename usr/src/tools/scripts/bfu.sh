@@ -7391,6 +7391,12 @@ mondo_loop() {
 		rm -f $root/platform/sun4u-us3/kernel/crypto/sparcv9/aes256
 	fi
 
+	#
+	# remove platform specific rsa module obsoleted by the bignum module
+	#
+
+	rm -f $root/platform/sun4u/kernel/crypto/sparcv9/rsa
+
 	if [ $zone = global ]; then
 		print "\nRemoving duplicate kernel binaries ..."
 		#

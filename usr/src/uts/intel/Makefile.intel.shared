@@ -519,6 +519,7 @@ MISC_KMODS	+= acpica
 MISC_KMODS	+= agpmaster
 MISC_KMODS	+= amsrc2
 MISC_KMODS	+= audiosup
+MISC_KMODS	+= bignum
 MISC_KMODS	+= bootdev
 MISC_KMODS	+= busra
 MISC_KMODS	+= cmlb

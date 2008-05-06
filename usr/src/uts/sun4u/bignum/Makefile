@@ -24,9 +24,9 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the RSA KEF provider.
+#	This makefile drives the production of the misc/bignum module.
 #
-#	sparc implementation architecture dependent
+#	sun4u implementation architecture dependent
 #
 
 #
@@ -34,23 +34,19 @@
 #
 UTSBASE	= ../..
 COM1_DIR = $(COMMONBASE)/bignum
-COM2_DIR = $(COMMONBASE)/crypto/rsa
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= rsa
-OBJECTS		= $(RSAPROV_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(RSAPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
+MODULE		= bignum
+OBJECTS		= $(BIGNUM_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(BIGNUM_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sparc/Makefile.sparc
-
-#	set signing mode
-ELFSIGN_MOD	= $(ELFSIGN_CRYPTO)
+include $(UTSBASE)/sun4u/Makefile.sun4u
 
 #
 #	Define targets
@@ -62,14 +58,14 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum
+LDFLAGS += -dy
 
 #
 # lint pass one enforcement
 #
-CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR) -I$(COM2_DIR)
-CFLAGS		+= -DUMUL64
-LINTFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
+CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR)
+CFLAGS		+= -DUMUL64 -DUSE_FLOATING_POINT
+LINTFLAGS	+= -I$(COM1_DIR)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

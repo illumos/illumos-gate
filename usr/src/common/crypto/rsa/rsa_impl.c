@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +76,8 @@ const CK_BYTE SHA512_DER_PREFIX[SHA2_DER_PREFIX_Len] = {0x30, 0x51, 0x30, 0x0d,
     0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05,
     0x00, 0x04, 0x40};
 
+
+/* psize and qsize are in bits */
 BIG_ERR_CODE
 RSA_key_init(RSAkey *key, int psize, int qsize)
 {
@@ -86,8 +87,8 @@ RSA_key_init(RSAkey *key, int psize, int qsize)
 
 	int plen, qlen, nlen;
 
-	plen = (psize + 31) / 32;
-	qlen = (qsize + 31) / 32;
+	plen = BITLEN2BIGNUMLEN(psize);
+	qlen = BITLEN2BIGNUMLEN(qsize);
 	nlen = plen + qlen;
 	key->size = psize + qsize;
 	if ((err = big_init(&(key->p), plen)) != BIG_OK)

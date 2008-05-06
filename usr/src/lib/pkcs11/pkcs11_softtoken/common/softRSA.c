@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,9 +92,8 @@ soft_rsa_encrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 		goto clean4;
 	}
 
-	/* Size for big_init is in (32-bit) words. */
-	if (big_init(&msg, (in_len + (int)sizeof (uint32_t) - 1) /
-	    (int)sizeof (uint32_t)) != BIG_OK) {
+	/* Size for big_init is in BIG_CHUNK_TYPE words. */
+	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
 		rv = CKR_HOST_MEMORY;
 		goto clean5;
 	}
@@ -229,9 +227,8 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 		goto clean8;
 	}
 
-	/* Size for big_init is in (32-bit) words. */
-	if (big_init(&msg, (in_len + (int)sizeof (uint32_t) - 1) /
-	    (int)sizeof (uint32_t)) != BIG_OK) {
+	/* Size for big_init is in BIG_CHUNK_TYPE words. */
+	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
 		rv = CKR_HOST_MEMORY;
 		goto clean9;
 	}
@@ -856,10 +853,11 @@ soft_genRSAkey_set_attribute(soft_object_t *key, RSAkey *rsakey,
 	/*
 	 * Allocate the buffer used to store the value of key fields
 	 * for bignum2bytestring. Since bignum only deals with a buffer
-	 * whose size is multiple of 4, modulus_len is rounded up to be
-	 * multiple of 4.
+	 * whose size is multiple of sizeof (BIG_CHUNK_TYPE),
+	 * modulus_len is rounded up to be multiple of that.
 	 */
-	if ((buf1 = malloc((modulus_len + 3) & ~3)) == NULL) {
+	if ((buf1 = malloc((modulus_len + sizeof (BIG_CHUNK_TYPE) - 1) &
+	    ~(sizeof (BIG_CHUNK_TYPE) - 1))) == NULL) {
 		rv = CKR_HOST_MEMORY;
 		goto cleanexit;
 	}
@@ -870,7 +868,7 @@ soft_genRSAkey_set_attribute(soft_object_t *key, RSAkey *rsakey,
 
 	case CKA_MODULUS:
 
-		buflen = rsakey->n.len * (int)sizeof (uint32_t);
+		buflen = rsakey->n.len * (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->n, buflen);
 		if (public)
 			dst = OBJ_PUB_RSA_MOD(key);
@@ -880,7 +878,7 @@ soft_genRSAkey_set_attribute(soft_object_t *key, RSAkey *rsakey,
 
 	case CKA_PUBLIC_EXPONENT:
 
-		buflen = rsakey->e.len * (int)sizeof (uint32_t);
+		buflen = rsakey->e.len * (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->e, buflen);
 		if (public)
 			dst = OBJ_PUB_RSA_PUBEXPO(key);
@@ -890,42 +888,44 @@ soft_genRSAkey_set_attribute(soft_object_t *key, RSAkey *rsakey,
 
 	case CKA_PRIVATE_EXPONENT:
 
-		buflen = rsakey->d.len * (int)sizeof (uint32_t);
+		buflen = rsakey->d.len * (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->d, buflen);
 		dst = OBJ_PRI_RSA_PRIEXPO(key);
 		break;
 
 	case CKA_PRIME_1:
 
-		buflen = rsakey->q.len * (int)sizeof (uint32_t);
+		buflen = rsakey->q.len * (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->q, buflen);
 		dst = OBJ_PRI_RSA_PRIME1(key);
 		break;
 
 	case CKA_PRIME_2:
 
-		buflen = rsakey->p.len * (int)sizeof (uint32_t);
+		buflen = rsakey->p.len * (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->p, buflen);
 		dst = OBJ_PRI_RSA_PRIME2(key);
 		break;
 
 	case CKA_EXPONENT_1:
 
-		buflen = rsakey->dmodqminus1.len * (int)sizeof (uint32_t);
+		buflen = rsakey->dmodqminus1.len *
+		    (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->dmodqminus1, buflen);
 		dst = OBJ_PRI_RSA_EXPO1(key);
 		break;
 
 	case CKA_EXPONENT_2:
 
-		buflen = rsakey->dmodpminus1.len * (int)sizeof (uint32_t);
+		buflen = rsakey->dmodpminus1.len *
+		    (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->dmodpminus1, buflen);
 		dst = OBJ_PRI_RSA_EXPO2(key);
 		break;
 
 	case CKA_COEFFICIENT:
 
-		buflen = rsakey->pinvmodq.len * (int)sizeof (uint32_t);
+		buflen = rsakey->pinvmodq.len * (int)sizeof (BIG_CHUNK_TYPE);
 		bignum2bytestring(buf, &rsakey->pinvmodq, buflen);
 		dst = OBJ_PRI_RSA_COEF(key);
 		break;
@@ -967,7 +967,7 @@ generate_rsa_key(RSAkey *key, int psize, int qsize, BIGNUM * pubexp,
 	BIG_ERR_CODE	brv = BIG_OK;
 
 	size = psize + qsize;
-	keylen = (size + 31) / 32;
+	keylen = BITLEN2BIGNUMLEN(size);
 	len = keylen * 2 + 1;
 	key->size = size;
 
@@ -1007,11 +1007,11 @@ nextp:
 	if ((brv = big_nextprime_pos(&b, &a)) != BIG_OK) {
 		goto ret;
 	}
-	(void) big_sub_pos(&a, &b, &One);
+	(void) big_sub_pos(&a, &b, &big_One);
 	if ((brv = big_ext_gcd_pos(&f, &d, &g, pubexp, &a)) != BIG_OK) {
 		goto ret;
 	}
-	if (big_cmp_abs(&f, &One) != 0) {
+	if (big_cmp_abs(&f, &big_One) != 0) {
 		goto nextp;
 	}
 
@@ -1020,7 +1020,7 @@ nextp:
 	}
 
 nextq:
-	(void) big_add(&a, &c, &Two);
+	(void) big_add(&a, &c, &big_Two);
 
 	if (big_bitlength(&a) != qsize) {
 		goto nextp;
@@ -1038,8 +1038,8 @@ nextq:
 		goto nextp;
 	}
 
-	(void) big_sub_pos(&a, &b, &One);
-	(void) big_sub_pos(&d, &c, &One);
+	(void) big_sub_pos(&a, &b, &big_One);
+	(void) big_sub_pos(&d, &c, &big_One);
 
 	if ((brv = big_mul(&a, &a, &d)) != BIG_OK) {
 		goto ret;
@@ -1047,7 +1047,7 @@ nextq:
 	if ((brv = big_ext_gcd_pos(&f, &d, &h, pubexp, &a)) != BIG_OK) {
 		goto ret;
 	}
-	if (big_cmp_abs(&f, &One) != 0) {
+	if (big_cmp_abs(&f, &big_One) != 0) {
 		goto nextq;
 	} else {
 		(void) big_copy(&e, pubexp);
@@ -1073,12 +1073,12 @@ nextq:
 	}
 	(void) big_copy(&(key->pinvmodq), &f);
 
-	(void) big_sub(&a, &b, &One);
+	(void) big_sub(&a, &b, &big_One);
 	if ((brv = big_div_pos(&a, &f, &d, &a)) != BIG_OK) {
 		goto ret;
 	}
 	(void) big_copy(&(key->dmodpminus1), &f);
-	(void) big_sub(&a, &c, &One);
+	(void) big_sub(&a, &c, &big_One);
 	if ((brv = big_div_pos(&a, &f, &d, &a)) != BIG_OK) {
 		goto ret;
 	}
@@ -1178,7 +1178,8 @@ soft_rsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	}
 
 	/* Create a public exponent in bignum format. */
-	if (big_init(&public_exponent, (modulus_len + 3)/4) != BIG_OK) {
+	if (big_init(&public_exponent, CHARLEN2BIGNUMLEN(modulus_len)) !=
+	    BIG_OK) {
 		rv = CKR_HOST_MEMORY;
 		goto clean0;
 	}

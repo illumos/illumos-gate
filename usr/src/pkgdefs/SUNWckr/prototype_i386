@@ -184,6 +184,7 @@ f none kernel/misc/scsi_vhci/scsi_vhci_f_sym_hds 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_tpgs 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/agpmaster 755 root sys
+f none kernel/misc/bignum 755 root sys
 f none kernel/misc/bootdev 755 root sys
 f none kernel/misc/busra 755 root sys
 f none kernel/misc/cardbus 755 root sys
@@ -388,6 +389,7 @@ f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_tpgs 755 root sys
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
 f none kernel/misc/amd64/agpmaster 755 root sys
+f none kernel/misc/amd64/bignum 755 root sys
 f none kernel/misc/amd64/bootdev 755 root sys
 f none kernel/misc/amd64/busra 755 root sys
 f none kernel/misc/amd64/cardbus 755 root sys
