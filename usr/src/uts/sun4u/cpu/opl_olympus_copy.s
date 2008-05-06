@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1052,9 +1052,12 @@ bcopy(const void *from, void *to, size_t count)
 	ldub	[%o0 + 6], %o3		! load third byte
 	stb	%o3, [%o1 + 6]		! store third byte
 .bc_sm_exit:
+	brz,pt  %o4, .bc_sm_done
+	  nop
 	membar	#Sync				! sync error barrier
 	andn	%o4, TRAMP_FLAG, %o4
 	stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+.bc_sm_done:
 	retl
 	  mov	%g0, %o0		! return 0
 
