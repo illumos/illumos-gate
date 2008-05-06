@@ -173,7 +173,7 @@ typedef struct	vsw {
 					vsw_port_t *, mac_resource_handle_t);
 
 	/* mac layer */
-	kmutex_t		mac_lock;	/* protect fields below */
+	krwlock_t		mac_rwlock;	/* protect fields below */
 	mac_handle_t		mh;
 	mac_rx_handle_t		mrh;
 	multiaddress_capab_t	maddr;		/* Multiple uni addr capable */

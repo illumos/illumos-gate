@@ -235,9 +235,9 @@ vsw_stop_switching_timeout(vsw_t *vswp)
 
 	(void) atomic_swap_32(&vswp->switching_setup_done, B_FALSE);
 
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 	vswp->mac_open_retries = 0;
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 }
 
 /*
@@ -334,7 +334,7 @@ vsw_setup_layer2(vsw_t *vswp)
 		return (EIO);
 	}
 
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 
 	rv = vsw_mac_open(vswp);
 	if (rv != 0) {
@@ -342,7 +342,7 @@ vsw_setup_layer2(vsw_t *vswp)
 			cmn_err(CE_WARN, "!vsw%d: Unable to open physical "
 			    "device: %s\n", vswp->instance, vswp->physname);
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		return (rv);
 	}
 
@@ -375,7 +375,7 @@ vsw_setup_layer2(vsw_t *vswp)
 
 	D1(vswp, "%s: exit", __func__);
 
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
 	/* Initialize HybridIO related stuff */
 	vsw_hio_init(vswp);
@@ -383,7 +383,7 @@ vsw_setup_layer2(vsw_t *vswp)
 
 exit_error:
 	vsw_mac_close(vswp);
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 	return (EIO);
 }
 
@@ -1466,11 +1466,11 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * just increments a ref counter (which is
 				 * used when the address is being deleted)
 				 */
-				mutex_enter(&vswp->mac_lock);
+				WRITE_ENTER(&vswp->mac_rwlock);
 				if (vswp->mh != NULL) {
 					if (mac_multicst_add(vswp->mh,
 					    (uchar_t *)&mcst_pkt->mca[i])) {
-						mutex_exit(&vswp->mac_lock);
+						RW_EXIT(&vswp->mac_rwlock);
 						cmn_err(CE_WARN, "!vsw%d: "
 						    "unable to add multicast "
 						    "address: %s\n",
@@ -1485,7 +1485,7 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 					}
 					mcst_p->mac_added = B_TRUE;
 				}
-				mutex_exit(&vswp->mac_lock);
+				RW_EXIT(&vswp->mac_rwlock);
 
 				mutex_enter(&port->mca_lock);
 				mcst_p->nextp = port->mcap;
@@ -1520,11 +1520,11 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * if other ports are interested in this
 				 * address.
 				 */
-				mutex_enter(&vswp->mac_lock);
+				WRITE_ENTER(&vswp->mac_rwlock);
 				if (vswp->mh != NULL && mcst_p->mac_added) {
 					if (mac_multicst_remove(vswp->mh,
 					    (uchar_t *)&mcst_pkt->mca[i])) {
-						mutex_exit(&vswp->mac_lock);
+						RW_EXIT(&vswp->mac_rwlock);
 						cmn_err(CE_WARN, "!vsw%d: "
 						    "unable to remove mcast "
 						    "address: %s\n",
@@ -1537,7 +1537,7 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 					}
 					mcst_p->mac_added = B_FALSE;
 				}
-				mutex_exit(&vswp->mac_lock);
+				RW_EXIT(&vswp->mac_rwlock);
 				kmem_free(mcst_p, sizeof (*mcst_p));
 
 			} else {
@@ -1770,12 +1770,12 @@ vsw_del_mcst_port(vsw_port_t *port)
 		 * if other ports are interested in this
 		 * address.
 		 */
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		if (vswp->mh != NULL && mcap->mac_added) {
 			(void) mac_multicst_remove(vswp->mh,
 			    (uchar_t *)&mcap->mca);
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 
 		kmem_free(mcap, sizeof (*mcap));
 

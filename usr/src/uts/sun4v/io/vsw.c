@@ -521,10 +521,10 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_set_driver_private(dip, (caddr_t)vswp);
 
 	mutex_init(&vswp->hw_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&vswp->mac_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vswp->mca_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vswp->swtmout_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&vswp->if_lockrw, NULL, RW_DRIVER, NULL);
+	rw_init(&vswp->mac_rwlock, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->mfdbrw, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->plist.lockrw, NULL, RW_DRIVER, NULL);
 
@@ -646,10 +646,10 @@ vsw_attach_fail:
 	if (progress & PROG_swmode) {
 		vsw_stop_switching_timeout(vswp);
 		vsw_hio_cleanup(vswp);
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		vsw_mac_detach(vswp);
 		vsw_mac_close(vswp);
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 	}
 
 	if (progress & PROG_taskq)
@@ -674,10 +674,10 @@ vsw_attach_fail:
 	if (progress & PROG_locks) {
 		rw_destroy(&vswp->plist.lockrw);
 		rw_destroy(&vswp->mfdbrw);
+		rw_destroy(&vswp->mac_rwlock);
 		rw_destroy(&vswp->if_lockrw);
 		mutex_destroy(&vswp->swtmout_lock);
 		mutex_destroy(&vswp->mca_lock);
-		mutex_destroy(&vswp->mac_lock);
 		mutex_destroy(&vswp->hw_lock);
 	}
 
@@ -724,12 +724,12 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	vsw_mdeg_unregister(vswp);
 
 	/* remove mac layer callback */
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 	if ((vswp->mh != NULL) && (vswp->mrh != NULL)) {
 		mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
 		vswp->mrh = NULL;
 	}
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
 	if (vsw_detach_ports(vswp) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to unconfigure ports",
@@ -748,14 +748,14 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * Now that the ports have been deleted, stop and close
 	 * the physical device.
 	 */
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 
 	vsw_mac_detach(vswp);
 	vsw_mac_close(vswp);
 
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
-	mutex_destroy(&vswp->mac_lock);
+	rw_destroy(&vswp->mac_rwlock);
 	mutex_destroy(&vswp->swtmout_lock);
 
 	/*
@@ -1092,16 +1092,16 @@ vsw_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	D1(vswp, "%s: enter", __func__);
 
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 	if (vswp->mh == NULL) {
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		return (EINVAL);
 	}
 
 	/* return stats from underlying device */
 	*val = mac_stat_get(vswp->mh, stat);
 
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
 	return (0);
 }
@@ -1221,14 +1221,14 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			 * Call into the underlying driver to program the
 			 * address into HW.
 			 */
-			mutex_enter(&vswp->mac_lock);
+			WRITE_ENTER(&vswp->mac_rwlock);
 			if (vswp->mh != NULL) {
 				ret = mac_multicst_add(vswp->mh, mca);
 				if (ret != 0) {
 					cmn_err(CE_NOTE, "!vsw%d: unable to "
 					    "add multicast address",
 					    vswp->instance);
-					mutex_exit(&vswp->mac_lock);
+					RW_EXIT(&vswp->mac_rwlock);
 					(void) vsw_del_mcst(vswp,
 					    VSW_LOCALDEV, addr, NULL);
 					kmem_free(mcst_p, sizeof (*mcst_p));
@@ -1236,7 +1236,7 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 				}
 				mcst_p->mac_added = B_TRUE;
 			}
-			mutex_exit(&vswp->mac_lock);
+			RW_EXIT(&vswp->mac_rwlock);
 
 			mutex_enter(&vswp->mca_lock);
 			mcst_p->nextp = vswp->mcap;
@@ -1262,12 +1262,12 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		mcst_p = vsw_del_addr(VSW_LOCALDEV, vswp, addr);
 		ASSERT(mcst_p != NULL);
 
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		if (vswp->mh != NULL && mcst_p->mac_added) {
 			(void) mac_multicst_remove(vswp->mh, mca);
 			mcst_p->mac_added = B_FALSE;
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		kmem_free(mcst_p, sizeof (*mcst_p));
 	}
 
@@ -2057,12 +2057,12 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		/*
 		 * Stop, detach and close the old device..
 		 */
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 
 		vsw_mac_detach(vswp);
 		vsw_mac_close(vswp);
 
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 
 		/*
 		 * Update phys name.

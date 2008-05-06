@@ -116,7 +116,7 @@ vsw_get_hw_maddr(vsw_t *vswp)
 {
 	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
 
 	if (vswp->mh == NULL)
 		return (1);
@@ -171,7 +171,7 @@ vsw_set_addrs(vsw_t *vswp)
 
 		/* program mcast addrs of vsw interface in the physdev */
 		mutex_enter(&vswp->mca_lock);
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		for (mcap = vswp->mcap; mcap != NULL; mcap = mcap->nextp) {
 			if (mcap->mac_added)
 				continue;
@@ -184,7 +184,7 @@ vsw_set_addrs(vsw_t *vswp)
 				    ether_sprintf((void *)&mcap->mca));
 			}
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		mutex_exit(&vswp->mca_lock);
 
 	}
@@ -209,7 +209,7 @@ vsw_set_addrs(vsw_t *vswp)
 	/* program multicast addresses of ports in the physdev */
 	for (port = plist->head; port != NULL; port = port->p_next) {
 		mutex_enter(&port->mca_lock);
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		for (mcap = port->mcap; mcap != NULL; mcap = mcap->nextp) {
 			if (mcap->mac_added)
 				continue;
@@ -222,7 +222,7 @@ vsw_set_addrs(vsw_t *vswp)
 				    ether_sprintf((void *)&mcap->mca));
 			}
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		mutex_exit(&port->mca_lock);
 	}
 
@@ -257,7 +257,7 @@ vsw_unset_addrs(vsw_t *vswp)
 		 * from current physdev
 		 */
 		mutex_enter(&vswp->mca_lock);
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		for (mcap = vswp->mcap; mcap != NULL; mcap = mcap->nextp) {
 			if (!mcap->mac_added)
 				continue;
@@ -265,7 +265,7 @@ vsw_unset_addrs(vsw_t *vswp)
 			    (uchar_t *)&mcap->mca);
 			mcap->mac_added = B_FALSE;
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		mutex_exit(&vswp->mca_lock);
 
 	}
@@ -289,7 +289,7 @@ vsw_unset_addrs(vsw_t *vswp)
 	/* Remove multicast addresses of ports from the current physdev */
 	for (port = plist->head; port != NULL; port = port->p_next) {
 		mutex_enter(&port->mca_lock);
-		mutex_enter(&vswp->mac_lock);
+		WRITE_ENTER(&vswp->mac_rwlock);
 		for (mcap = port->mcap; mcap != NULL; mcap = mcap->nextp) {
 			if (!mcap->mac_added)
 				continue;
@@ -297,7 +297,7 @@ vsw_unset_addrs(vsw_t *vswp)
 			    (uchar_t *)&mcap->mca);
 			mcap->mac_added = B_FALSE;
 		}
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		mutex_exit(&port->mca_lock);
 	}
 
@@ -316,7 +316,7 @@ vsw_mac_open(vsw_t *vswp)
 {
 	int	rv;
 
-	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
 
 	if (vswp->mh != NULL) {
 		/* already open */
@@ -357,7 +357,7 @@ vsw_mac_open(vsw_t *vswp)
 void
 vsw_mac_close(vsw_t *vswp)
 {
-	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
 
 	if (vswp->mh != NULL) {
 		mac_close(vswp->mh);
@@ -381,7 +381,7 @@ vsw_mac_attach(vsw_t *vswp)
 	ASSERT(vswp->mstarted == B_FALSE);
 	ASSERT(vswp->mresources == B_FALSE);
 
-	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
 
 	ASSERT(vswp->mh != NULL);
 
@@ -447,7 +447,7 @@ vsw_mac_detach(vsw_t *vswp)
 	D1(vswp, "vsw_mac_detach: enter");
 
 	ASSERT(vswp != NULL);
-	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
 
 	if (vsw_multi_ring_enable) {
 		vsw_mac_ring_tbl_destroy(vswp);
@@ -711,22 +711,22 @@ vsw_set_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
 	ASSERT(MUTEX_HELD(&vswp->hw_lock));
 	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
 
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 	if (vswp->mh == NULL) {
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		return (1);
 	}
 
 	if (vswp->promisc_cnt++ == 0) {
 		if (mac_promisc_set(vswp->mh, B_TRUE, MAC_DEVPROMISC) != 0) {
 			vswp->promisc_cnt--;
-			mutex_exit(&vswp->mac_lock);
+			RW_EXIT(&vswp->mac_rwlock);
 			return (1);
 		}
 		cmn_err(CE_NOTE, "!vsw%d: switching device %s into "
 		    "promiscuous mode", vswp->instance, vswp->physname);
 	}
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
 	if (type == VSW_VNETPORT) {
 		ASSERT(port != NULL);
@@ -755,16 +755,16 @@ vsw_unset_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
 	ASSERT(MUTEX_HELD(&vswp->hw_lock));
 	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
 
-	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->mac_rwlock);
 	if (vswp->mh == NULL) {
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		return (1);
 	}
 
 	if (--vswp->promisc_cnt == 0) {
 		if (mac_promisc_set(vswp->mh, B_FALSE, MAC_DEVPROMISC) != 0) {
 			vswp->promisc_cnt++;
-			mutex_exit(&vswp->mac_lock);
+			RW_EXIT(&vswp->mac_rwlock);
 			return (1);
 		}
 
@@ -784,7 +784,7 @@ vsw_unset_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
 			    "promiscuous mode", vswp->instance, vswp->physname);
 		}
 	}
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
 	if (type == VSW_VNETPORT) {
 		ASSERT(port != NULL);
@@ -1338,17 +1338,17 @@ vsw_tx_msg(vsw_t *vswp, mblk_t *mp)
 {
 	const mac_txinfo_t	*mtp;
 
-	mutex_enter(&vswp->mac_lock);
+	READ_ENTER(&vswp->mac_rwlock);
 	if ((vswp->mh == NULL) || (vswp->mstarted == B_FALSE)) {
 
 		DERR(vswp, "vsw_tx_msg: dropping pkts: no tx routine avail");
-		mutex_exit(&vswp->mac_lock);
+		RW_EXIT(&vswp->mac_rwlock);
 		return (mp);
 	} else {
 		mtp = vswp->txinfo;
 		mp = mtp->mt_fn(mtp->mt_arg, mp);
 	}
-	mutex_exit(&vswp->mac_lock);
+	RW_EXIT(&vswp->mac_rwlock);
 
 	return (mp);
 }
