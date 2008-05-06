@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,9 @@
 #include <libfstyp_module.h>
 
 #define	PC_LABEL_SIZE 11
+
+/* for the <sys/fs/pc_dir.h> PCDL_IS_LFN macro */
+int	enable_long_filenames = 1;
 
 struct fstyp_fat16_bs {
 	uint8_t		f_drvnum;
@@ -262,24 +265,24 @@ well_formed(fstyp_pcfs_t *h)
 
 	if (h->bs16.f_bootsig == 0x29) {
 		fatmatch = ((h->bs16.f_typestring[0] == 'F' &&
-			h->bs16.f_typestring[1] == 'A' &&
-			h->bs16.f_typestring[2] == 'T') &&
-			(h->bs.fatsec > 0) &&
-			((PC_NSEC(h) == 0 && h->bs.totalsec > 0) ||
-			    PC_NSEC(h) > 0));
+		    h->bs16.f_typestring[1] == 'A' &&
+		    h->bs16.f_typestring[2] == 'T') &&
+		    (h->bs.fatsec > 0) &&
+		    ((PC_NSEC(h) == 0 && h->bs.totalsec > 0) ||
+		    PC_NSEC(h) > 0));
 	} else if (h->bs32.f_bootsig == 0x29) {
 		fatmatch = ((h->bs32.f_typestring[0] == 'F' &&
-			h->bs32.f_typestring[1] == 'A' &&
-			h->bs32.f_typestring[2] == 'T') &&
-			(h->bs.fatsec == 0 && h->bs32.f_fatlength > 0) &&
-			((PC_NSEC(h) == 0 && h->bs.totalsec > 0) ||
-			    PC_NSEC(h) > 0));
+		    h->bs32.f_typestring[1] == 'A' &&
+		    h->bs32.f_typestring[2] == 'T') &&
+		    (h->bs.fatsec == 0 && h->bs32.f_fatlength > 0) &&
+		    ((PC_NSEC(h) == 0 && h->bs.totalsec > 0) ||
+		    PC_NSEC(h) > 0));
 	} else {
 		fatmatch = (PC_NSEC(h) > 0 && h->bs.fatsec > 0);
 	}
 
 	return (fatmatch && h->bps > 0 && h->bps % 512 == 0 &&
-		h->bs.spcl > 0 && PC_RESSEC(h) >= 1 && h->bs.nfat > 0);
+	    h->bs.spcl > 0 && PC_RESSEC(h) >= 1 && h->bs.nfat > 0);
 }
 
 static void
@@ -461,6 +464,8 @@ dir_find_label(fstyp_pcfs_t *h, struct pcdir *d, int nent)
 	int	i;
 
 	for (i = 0; i < nent; i++, d++) {
+		if (PCDL_IS_LFN(d))
+			continue;
 		if ((d->pcd_filename[0] != PCD_UNUSED) &&
 		    (d->pcd_filename[0] != PCD_ERASED) &&
 		    ((d->pcd_attr & (PCA_LABEL | PCA_DIR)) == PCA_LABEL) &&
