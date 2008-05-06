@@ -20,7 +20,7 @@
    
     CDDL HEADER END
    
-    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
@@ -156,10 +156,14 @@
 		</property_group>
 
 		<property_group name='config' type='application'>
-			<propval
-				name='local_only'
-				type='boolean'
-				value='false' />
+			<propval name='include_info'
+				type='boolean' value='false' />
+			<propval name='local_only'
+				type='boolean' value='false' />
+			<propval name='path_to_sendmail_mc'
+				type='astring' value='' />
+			<propval name='path_to_submit_mc'
+				type='astring' value='' />
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.sendmail' />
 		</property_group>

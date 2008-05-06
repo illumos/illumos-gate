@@ -48,8 +48,8 @@ LDFLAGS +=	-R$(SFW_ROOT)/lib $(MAPFILES:%=-M%)
 CRYPTOLIBS=	-lssl -lcrypto
 # EXPORT DELETE END
 LDLIBS += 	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
-		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -L$(ROOTSFWLIB) \
-		$(CRYPTOLIBS)
+		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -lumem \
+		-L$(ROOTSFWLIB) $(CRYPTOLIBS)
 
 INCPATH=	-I. -I../include -I../db -I$(ROOTSFWINCLUDE)
 
@@ -58,7 +58,7 @@ CRYPTOENVDEF=	-DSTARTTLS
 # EXPORT DELETE END
 ENVDEF=		-DNETINET6 -DTCPWRAPPERS $(CRYPTOENVDEF)
 SUNENVDEF=	-DSUN_EXTENSIONS -DVENDOR_DEFAULT=VENDOR_SUN \
-		-DSUN_INIT_DOMAIN -DSUN_SIMPLIFIED_LDAP
+		-DSUN_INIT_DOMAIN -DSUN_SIMPLIFIED_LDAP -D_FFR_LOCAL_DAEMON
 
 CPPFLAGS = 	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
 

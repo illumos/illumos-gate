@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,6 +32,11 @@ SERVER_PID_FILE="/var/run/sendmail.pid"
 CLIENT_PID_FILE="/var/spool/clientmqueue/sm-client.pid"
 DEFAULT_FILE="/etc/default/sendmail"
 ALIASES_FILE="/etc/mail/aliases"
+SENDMAIL_CF="/etc/mail/sendmail.cf"
+SUBMIT_CF="/etc/mail/submit.cf"
+SENDMAIL="/usr/lib/sendmail"
+PATH="/usr/bin:/usr/sbin:/usr/ccs/bin"
+export PATH
 
 check_queue_interval_syntax()
 {
@@ -54,6 +59,58 @@ check_and_kill()
 	[ $? -eq 0 ] && kill $PID
 }
 
+exist_or_exit()
+{
+	if [ ! -f $1 ]; then
+		echo "$1 does not exist"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+}
+
+turn_m4_crank()
+{
+	# expected to be called with two arguments: .cf path & path to m4 file
+	[ $# -lt 2 ] && return
+	cf_path=$1
+	m4_path=$2
+	case "$m4_path" in
+	/*)	;;	# absolute path
+	*)	return;;
+	esac
+	if [ "$m4_path" = "_DONT_TOUCH_THIS" ]; then
+		if [ -f "${cf_path}.old" ]; then
+			mv "$cf_path" "${cf_path}.new"
+			[ $? -ne 0 ] && exit $SMF_EXIT_ERR_CONFIG
+			mv "${cf_path}.old" "$cf_path"
+			[ $? -ne 0 ] && exit $SMF_EXIT_ERR_CONFIG
+		fi
+		#
+		# If ${cf_path}.old does not exist, assume it was taken care
+		# of on a previous run.
+		#
+	else
+		exist_or_exit "$m4_path"
+		cd `dirname "$m4_path"`
+		base=`basename "$m4_path"`
+		name=`basename "$m4_path" .mc`
+		info=`svcprop -p config/include_info $SMF_FMRI 2>/dev/null`
+		if [ "$info" = "true" ]; then
+			m4flags=""
+		else
+			m4flags="-DSUN_HIDE_INTERNAL_DETAILS"
+		fi
+		m4 $m4flags /etc/mail/cf/m4/cf.m4 "$base" > "${name}.cf"
+		[ $? -ne 0 ] && exit $SMF_EXIT_ERR_CONFIG
+		cmp -s "${name}.cf" "$cf_path" || (
+			cp "${name}.cf" "${cf_path}.tmp" &&
+			chown root:bin "${cf_path}.tmp" &&
+			chmod 444 "${cf_path}.tmp" &&
+			mv "${cf_path}.tmp" "$cf_path"
+		)
+		[ $? -ne 0 ] && exit $SMF_EXIT_ERR_CONFIG
+	fi
+}
+
 case "$1" in 
 'refresh')
         [ -f $SERVER_PID_FILE ] && kill -1 `head -1 $SERVER_PID_FILE`
@@ -61,9 +118,7 @@ case "$1" in
         ;;
 
 'start')
-	if [ ! -f /usr/lib/sendmail -o ! -f /etc/mail/sendmail.cf ]; then
-		exit $SMF_EXIT_ERR_CONFIG
-	fi
+	exist_or_exit $SENDMAIL
 	if [ ! -d /var/spool/mqueue ]; then
 		/usr/bin/mkdir -m 0750 /var/spool/mqueue
 		/usr/bin/chown root:bin /var/spool/mqueue
@@ -93,12 +148,23 @@ case "$1" in
 	CLIENTQUEUEINTERVAL=$answer
 
 	local=`/usr/bin/svcprop -p config/local_only $SMF_FMRI 2>/dev/null`
-	if [ $? = 0 -a "$local" = "true" ]; then
-		OPTIONS="$OPTIONS -C /etc/mail/local.cf"
+	if [ $? -eq 0 -a "$local" = "true" ]; then
+		MODE="-bl"
 	fi
+	sendmail_path=`svcprop -p config/path_to_sendmail_mc $SMF_FMRI \
+	    2>/dev/null`
+	if [ $? -eq 0 -a -n "$sendmail_path" ]; then
+		turn_m4_crank $SENDMAIL_CF $sendmail_path
+	fi
+	exist_or_exit $SENDMAIL_CF
+	submit_path=`svcprop -p config/path_to_submit_mc $SMF_FMRI 2>/dev/null`
+	if [ $? -eq 0 -a -n "$submit_path" ]; then
+		turn_m4_crank $SUBMIT_CF $submit_path
+	fi
+	exist_or_exit $SUBMIT_CF
 
-	/usr/lib/sendmail $MODE -q$QUEUEOPTION$QUEUEINTERVAL $OPTIONS &
-	/usr/lib/sendmail -Ac -q$CLIENTQUEUEINTERVAL $CLIENTOPTIONS &
+	$SENDMAIL $MODE -q$QUEUEOPTION$QUEUEINTERVAL $OPTIONS &
+	$SENDMAIL -Ac -q$CLIENTQUEUEINTERVAL $CLIENTOPTIONS &
 
 	#
 	# ETRN_HOSTS should be of the form

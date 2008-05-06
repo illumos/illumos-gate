@@ -30,7 +30,6 @@ include ../Makefile.com
 DATAFILES += \
 	i.manifest \
 	r.manifest \
-	i.renamenew \
 	i.renameold \
 	i.initd \
 	i.preserve \
@@ -40,7 +39,7 @@ LICENSEFILES += ../../cmd/sendmail/THIRDPARTYLICENSE
 
 .KEEP_STATE:
 
-all: $(FILES)
+all: $(FILES) checkinstall depend postinstall
 install: all pkg
 
 include ../Makefile.targ

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,9 +30,9 @@
 
 include		../../Makefile.cmd
 
-CFS=		sendmail.cf submit.cf local.cf
+CFS=		sendmail.cf submit.cf
 
-SUBCFS=		cf/sendmail.cf cf/submit.cf cf/local.cf
+SUBCFS=		cf/sendmail.cf cf/submit.cf
 
 COMMONM4FILES=	m4/version.m4 m4/cf.m4 m4/cfhead.m4 m4/proto.m4 \
 		ostype/solaris8.m4 domain/solaris-generic.m4 \
@@ -46,8 +46,6 @@ ROOTETCMAILCF =	$(ROOTETCMAIL)/cf
 
 BUILDPARTS =	$(ROOTETCMAILCF)/README \
 		$(ROOTETCMAILCF)/cf/Makefile \
-		$(ROOTETCMAILCF)/cf/local.cf \
-		$(ROOTETCMAILCF)/cf/local.mc \
 		$(ROOTETCMAILCF)/cf/sendmail.cf \
 		$(ROOTETCMAILCF)/cf/sendmail.mc \
 		$(ROOTETCMAILCF)/cf/submit.cf \

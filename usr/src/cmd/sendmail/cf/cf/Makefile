@@ -22,7 +22,7 @@
 #
 #  Makefile for configuration files.
 #
-#  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+#  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 #  Use is subject to license terms.
 #
 #	@(#)Makefile	8.15 (Berkeley) 3/29/98
@@ -49,7 +49,7 @@ RM=	/usr/bin/rm -f
 	test ! -f $@ || $(MV) $@ $@.prev
 	$(M4) ${CFDIR}/m4/cf.m4 $*.mc > $@
 
-ALL=	sendmail.cf submit.cf local.cf
+ALL=	sendmail.cf submit.cf
 
 all: $(ALL)
 

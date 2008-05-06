@@ -6834,6 +6834,11 @@ mondo_loop() {
 		rm -rf $usr/lib/mail
 	fi
 
+	# local.cf no longer needed with the advent of sendmail -bl
+	rm -f $root/etc/mail/cf/cf/local.cf
+	rm -f $root/etc/mail/cf/cf/local.mc
+	rm -f $root/etc/mail/local.cf
+
 	#
 	# Remove drivers and header files for EOF of Lance Ethernet
 	# driver(le) as per PSARC/2003/335.

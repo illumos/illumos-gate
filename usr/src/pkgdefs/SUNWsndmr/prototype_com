@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,6 @@ i postinstall
 i depend
 i checkinstall
 i i.preserve
-i i.renamenew
 i i.renameold
 i i.initd
 i i.sendmail
@@ -63,8 +62,6 @@ d none etc/mail/cf 755 root mail
 f none etc/mail/cf/README 444 root mail
 d none etc/mail/cf/cf 755 root mail
 f none etc/mail/cf/cf/Makefile 444 root mail
-f none etc/mail/cf/cf/local.cf 444 root mail
-f none etc/mail/cf/cf/local.mc 444 root mail
 s none etc/mail/cf/cf/main.cf=sendmail.cf
 s none etc/mail/cf/cf/main.mc=sendmail.mc
 f none etc/mail/cf/cf/sendmail.cf 444 root mail
@@ -154,7 +151,6 @@ f none etc/mail/cf/sh/makeinfo.sh 444 root mail
 s none etc/mail/cf/sh/check-hostname=../../../../usr/sbin/check-hostname
 s none etc/mail/cf/sh/check-permissions=../../../../usr/sbin/check-permissions
 f none etc/mail/helpfile 644 root bin
-e renameold etc/mail/local.cf 444 root bin
 e sendmail etc/mail/local-host-names 644 root bin
 s none etc/mail/main.cf=sendmail.cf
 e renameold etc/mail/sendmail.cf 444 root bin

@@ -4,8 +4,8 @@
 # Copyright (c) 1988, 1993
 #	The Regents of the University of California.  All rights reserved.
 #
-# Copyright (c) 1998
-#	Sun Microsystems, Inc.  All rights reserved.
+# Copyright 1998, 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -89,7 +89,11 @@ if [ $quiet -eq 1 ]
 then
 	echo '#####' built on `date`
 else
-	echo '#####' built by $user@$host on `date`
+	if [ -n "$user" ]; then
+		echo '#####' built by $user@$host on `date`
+	else
+		echo '#####' built automatically @$host on `date`
+	fi
 	echo '#####' in `pwd` | sed 's/\/tmp_mnt//'
 	echo '#####' using $1 as configuration include directory | sed 's/\/tmp_mnt//'
 	echo "define(\`__HOST__', $host)dnl"

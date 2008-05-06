@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: parseaddr.c,v 8.401 2007/09/27 23:33:59 ca Exp $")
+SM_RCSID("@(#)$Id: parseaddr.c,v 8.403 2008/02/08 02:27:35 ca Exp $")
 
 #include <sm/sendmail.h>
 #include "map.h"
@@ -1462,6 +1462,7 @@ rewrite(pvp, ruleset, reclevel, e, maxatom)
 			size_t trsize;
 			char *replac;
 			int endtoken;
+			bool external;
 			STAB *map;
 			char *mapname;
 			char **key_rvp;
@@ -1577,6 +1578,7 @@ rewrite(pvp, ruleset, reclevel, e, maxatom)
 				true);
 			argvect[0] = cbuf;
 			replac = map_lookup(map, cbuf, argvect, &rstat, e);
+			external = replac != NULL;
 
 			/* if no replacement, use default */
 			if (replac == NULL && default_rvp != NULL)
@@ -1601,7 +1603,8 @@ rewrite(pvp, ruleset, reclevel, e, maxatom)
 			{
 				/* scan the new replacement */
 				xpvp = prescan(replac, '\0', pvpbuf,
-					       sizeof(pvpbuf), NULL, NULL,
+					       sizeof(pvpbuf), NULL,
+					       external ? NULL : IntTokenTab,
 					       false);
 				if (xpvp == NULL)
 				{
@@ -2265,7 +2268,7 @@ cataddr(pvp, evp, buf, sz, spacesub, external)
 	{
 		char *q;
 
-		natomtok = (ExtTokenTab[**pvp & 0xff] == ATM);
+		natomtok = (IntTokenTab[**pvp & 0xff] == ATM);
 		if (oatomtok && natomtok)
 		{
 			*p++ = spacesub;

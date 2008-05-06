@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -116,10 +116,6 @@ mailstats:	mailstats.o ../libsmutil/libsmutil.a ../libsm/libsm.a
 	$(LINK.c) mailstats.o -o $@ $(LDLIBS) ../libsmutil/libsmutil.a \
 		../libsm/libsm.a
 	$(POST_PROCESS)
-
-etrn%:	etrn%.pl
-	$(CP) -f $< $@
-	$(CHMOD) +x $@
 
 install: all $(ROOTPROG) $(ROOTLIB)/mail.local $(ROOTLIB)/smrsh \
 	$(ROOTUSRSBIN)/makemap $(ROOTUSRSBIN)/etrn $(ROOTUSRSBIN)/editmap
