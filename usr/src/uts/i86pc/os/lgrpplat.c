@@ -735,6 +735,12 @@ lgrp_plat_init(void)
 	max_mem_nodes = lgrp_plat_node_cnt;
 
 	/*
+	 * Initialize min and max latency before reading SLIT or probing
+	 */
+	lgrp_plat_lat_stats.latency_min = -1;
+	lgrp_plat_lat_stats.latency_max = 0;
+
+	/*
 	 * Determine how far each NUMA node is from each other by
 	 * reading ACPI System Locality Information Table (SLIT) if it
 	 * exists
@@ -1926,7 +1932,7 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
 
 			latency = slit_entries[(i * localities) + j];
 			lat_stats->latencies[i][j] = latency;
-			if (latency < min)
+			if (latency < min || min == -1)
 				min = latency;
 			if (latency > max)
 				max = latency;
@@ -1968,7 +1974,7 @@ lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
     node_domain_map_t *node_domain, cpu_node_map_t *cpu_node,
     node_phys_addr_map_t *node_memory)
 {
-	struct srat_item	*end;
+	struct srat_item	*srat_end;
 	int			i;
 	struct srat_item	*item;
 
@@ -1995,8 +2001,8 @@ lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
 	 * which CPUs and memory belong to which node.
 	 */
 	item = tp->list;
-	end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
-	while (item < end) {
+	srat_end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
+	while (item < srat_end) {
 		uint32_t	apic_id;
 		uint32_t	domain;
 		uint64_t	end;
