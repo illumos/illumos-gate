@@ -358,13 +358,14 @@ static int
 privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 {
 	xen_sysctl_t op;
-	import_export_t op_ie, sub_ie;
+	import_export_t op_ie, sub_ie, sub2_ie;
 	int error = 0;
 
 	if (import_buffer(&op_ie, opp, &op, sizeof (op), IE_IMPEXP) != 0)
 		return (-X_EFAULT);
 
 	sub_ie = null_ie;
+	sub2_ie = null_ie;
 
 	/*
 	 * Check this first because our wrapper will forcibly overwrite it.
@@ -405,6 +406,7 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 		get_xen_guest_handle_u(scdp, op.u.perfc_op.desc);
 		if (scdp != NULL) {
 			static int numcounters = -1;
+			static int numvals = -1;
 
 			if (numcounters == -1) {
 				xen_sysctl_t dop;
@@ -413,15 +415,26 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 				dop.interface_version =
 				    XEN_SYSCTL_INTERFACE_VERSION;
 				dop.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
+				/*LINTED: constant in conditional context*/
+				set_xen_guest_handle_u(dop.u.perfc_op.desc,
+				    NULL);
+				/*LINTED: constant in conditional context*/
+				set_xen_guest_handle_u(dop.u.perfc_op.val,
+				    NULL);
 
 				error = HYPERVISOR_sysctl(&dop);
 				if (error != 0)
 					break;
 				numcounters = dop.u.perfc_op.nr_counters;
+				numvals = dop.u.perfc_op.nr_vals;
 			}
 			ASSERT(numcounters != -1);
+			ASSERT(numvals != -1);
 			error = import_handle(&sub_ie, &op.u.perfc_op.desc,
 			    (sizeof (xen_sysctl_perfc_desc_t) * numcounters),
+			    IE_EXPORT);
+			error = import_handle(&sub2_ie, &op.u.perfc_op.val,
+			    (sizeof (xen_sysctl_perfc_val_t) * numvals),
 			    IE_EXPORT);
 		}
 		break;
@@ -451,6 +464,7 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 
 	export_buffer(&op_ie, &error);
 	export_buffer(&sub_ie, &error);
+	export_buffer(&sub2_ie, &error);
 
 	return (error);
 }
