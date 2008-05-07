@@ -1,14 +1,13 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -66,4 +65,34 @@ root _elf_version
 root nlist
 #root _elf_errmsg_r
 root demangle
-add xlate.c:xlate/f target `funcs | egrep '_to(m|f)$'` byte_to
+add xlate.c:xlate/f target `funcs | egrep '_to(m|f)$'` xlate.c:byte_to
+add xlate64.c:xlate/f target `funcs | egrep '_to(m|f)$'` xlate64.c:byte_to
+#
+root _elf_getxoff
+root _elf_swap_wrimage
+root _gelf_getdyndtflags_1
+root elf_getshnum
+root elf_getshstrndx
+root gelf_checksum
+root gelf_fsize
+root gelf_getcap
+root gelf_getmove
+root gelf_getphdr
+root gelf_getrel
+root gelf_getrela
+root gelf_getsyminfo
+root gelf_getsymshndx
+root gelf_newehdr
+root gelf_newphdr
+root gelf_update_cap
+root gelf_update_dyn
+root gelf_update_ehdr
+root gelf_update_move
+root gelf_update_phdr
+root gelf_update_rel
+root gelf_update_rela
+root gelf_update_shdr
+root gelf_update_syminfo
+root gelf_update_symshndx
+root gelf_xlatetof
+root gelf_xlatetom

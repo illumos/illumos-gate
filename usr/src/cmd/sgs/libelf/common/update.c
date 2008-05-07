@@ -835,26 +835,33 @@ _elfxx_update(Elf * elf, Elf_Cmd cmd)
  * target host.
  */
 int
-_elfxx_swap_wrimage(Elf * elf)
+_elfxx_swap_wrimage(Elf *elf)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	Elf_Data	dst, src;
 	Elf_Scn		*s;
-	Ehdr		*eh = elf->ed_ehdr;
-	Half		e_phnum = eh->e_phnum;
-	unsigned	ver = eh->e_version;
-	unsigned	encode = eh->e_ident[EI_DATA];
+	Ehdr		*eh;
+	Half		e_phnum;
+	unsigned	ver;
+	unsigned	encode;
 
 	/*
 	 * Ehdr first
 	 */
 
+	ELFWLOCK(elf);
+	eh = elf->ed_ehdr;
+	e_phnum = eh->e_phnum;
+	ver = eh->e_version;
+	encode = eh->e_ident[EI_DATA];
+
 	src.d_buf = dst.d_buf = (Elf_Void *)eh;
 	src.d_type = dst.d_type = ELF_T_EHDR;
 	src.d_size = dst.d_size = sizeof (Ehdr);
 	src.d_version = dst.d_version = ver;
-	if (elf_xlatetof(&dst, &src, encode) == 0)
+	if (elf_xlatetof(&dst, &src, encode) == 0) {
+		ELFUNLOCK(elf);
 		return (1);
+	}
 
 	/*
 	 * Phdr table if one exists
@@ -873,6 +880,7 @@ _elfxx_swap_wrimage(Elf * elf)
 		ELFACCESSDATA(work, _elf_work)
 		src.d_version = dst.d_version = work;
 		if (elf_xlatetof(&dst, &src, encode) == 0) {
+			ELFUNLOCK(elf);
 			return (1);
 		}
 	}
@@ -896,14 +904,17 @@ _elfxx_swap_wrimage(Elf * elf)
 				if (_elf_locked_getdata(s, &prevd->db_data) !=
 				    &d->db_data) {
 					SCNUNLOCK(s);
+					ELFUNLOCK(elf);
 					return (1);
 				}
 				SCNUNLOCK(s);
 			}
 
 			dst = d->db_data;
-			if (elf_xlatetof(&dst, &d->db_data, encode) == 0)
+			if (elf_xlatetof(&dst, &d->db_data, encode) == 0) {
+				ELFUNLOCK(elf);
 				return (1);
+			}
 		}
 	}
 
@@ -916,10 +927,13 @@ _elfxx_swap_wrimage(Elf * elf)
 	for (s = elf->ed_hdscn; s != 0; s = s->s_next) {
 		src.d_buf = dst.d_buf = s->s_shdr;
 		src.d_size = dst.d_size = sizeof (Shdr);
-		if (elf_xlatetof(&dst, &src, encode) == 0)
+		if (elf_xlatetof(&dst, &src, encode) == 0) {
+			ELFUNLOCK(elf);
 			return (1);
+		}
 	}
 
+	ELFUNLOCK(elf);
 	return (0);
 }
 

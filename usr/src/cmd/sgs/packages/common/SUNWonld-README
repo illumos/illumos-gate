@@ -1338,3 +1338,4 @@ Bugid   Risk Synopsis
 6685125 ld/elfdump do not handle ZERO terminator .eh_frame amd64 unwind entry
 6686889 ld.so.1 regression - bad pointer created with 6509323 integration
 6695681 ldd(1) crashes when run from a chrooted environment
+6516212 usr/src/cmd/sgs/libelf warlock targets should be fixed or abandoned
