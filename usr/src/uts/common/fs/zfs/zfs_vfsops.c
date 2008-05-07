@@ -930,10 +930,8 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		rootvp = vp;
 
 		/*
-		 * The zfs_zget call above returns with a hold on vp, we release
-		 * it here.
+		 * Leave rootvp held.  The root file system is never unmounted.
 		 */
-		VN_RELE(vp);
 
 		vfs_add((struct vnode *)0, vfsp,
 		    (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);

@@ -293,14 +293,14 @@ ace_walk(void *datap, uint64_t cookie, int aclcnt, uint16_t *flags,
 {
 	ace_t *acep = datap;
 
+	if (cookie >= aclcnt)
+		return (0);
+
 	*flags = acep[cookie].a_flags;
 	*type = acep[cookie].a_type;
 	*mask = acep[cookie++].a_access_mask;
 
-	if (cookie > aclcnt)
-		return (0);
-	else
-		return (cookie);
+	return (cookie);
 }
 
 int
