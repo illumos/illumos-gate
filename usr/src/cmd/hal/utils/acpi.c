@@ -1,8 +1,8 @@
 /***************************************************************************
  *
- * battery.c : Main routines for setting battery and AC adapter properties
+ * acpi.c : Main routines for setting battery, AC adapter, and lid properties
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -21,14 +21,14 @@
 #include <kstat.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <sys/battery.h>
+#include <sys/acpi_drv.h>
 
 #include <libhal.h>
 #include "../hald/device_info.h"
 #include "../hald/hald_dbus.h"
 #include "../hald/logger.h"
 #include "../hald/util_pm.h"
-#include "battery.h"
+#include "acpi.h"
 
 
 static void
@@ -39,6 +39,79 @@ my_dbus_error_free(DBusError *error)
 	}
 }
 
+gboolean
+laptop_panel_update(LibHalContext *ctx, const char *udi, int fd)
+{
+	LibHalChangeSet *cs;
+	DBusError error;
+	struct acpi_drv_output_info inf;
+
+	HAL_DEBUG(("laptop_panel_update() enter"));
+
+	dbus_error_init(&error);
+	if (!libhal_device_query_capability(ctx, udi, "laptop_panel", &error)) {
+		bzero(&inf, sizeof (inf));
+		if ((ioctl(fd, ACPI_DRV_IOC_INFO, &inf) < 0) ||
+		    (inf.nlev == 0)) {
+			return (FALSE);
+		}
+
+		my_dbus_error_free(&error);
+		libhal_device_add_capability(ctx, udi, "laptop_panel", &error);
+		if ((cs = libhal_device_new_changeset(udi)) == NULL) {
+			my_dbus_error_free(&error);
+			return (FALSE);
+		}
+		libhal_changeset_set_property_string(cs, "info.product",
+		    "Generic Backlight Device");
+		libhal_changeset_set_property_string(cs, "info.category",
+		    "laptop_panel");
+		libhal_changeset_set_property_int(cs, "laptop_panel.num_levels",
+		    inf.nlev);
+		my_dbus_error_free(&error);
+		libhal_device_commit_changeset(ctx, cs, &error);
+		libhal_device_free_changeset(cs);
+	}
+	my_dbus_error_free(&error);
+	HAL_DEBUG(("ac_adapter_present() exit"));
+	return (TRUE);
+}
+
+gboolean
+lid_update(LibHalContext *ctx, const char *udi, int fd)
+{
+	LibHalChangeSet *cs;
+	DBusError error;
+
+	HAL_DEBUG(("lid_update() enter"));
+
+	dbus_error_init(&error);
+	if (!libhal_device_query_capability(ctx, udi, "button", &error)) {
+		my_dbus_error_free(&error);
+		libhal_device_add_capability(ctx, udi, "button", &error);
+		if ((cs = libhal_device_new_changeset(udi)) == NULL) {
+			my_dbus_error_free(&error);
+			return (FALSE);
+		}
+		libhal_changeset_set_property_bool(cs, "button.has_state",
+		    TRUE);
+		libhal_changeset_set_property_bool(cs, "button.state.value",
+		    FALSE);
+		libhal_changeset_set_property_string(cs, "button.type",
+		    "lid");
+		libhal_changeset_set_property_string(cs, "info.product",
+		    "Lid Switch");
+		libhal_changeset_set_property_string(cs, "info.category",
+		    "button");
+		my_dbus_error_free(&error);
+		libhal_device_commit_changeset(ctx, cs, &error);
+		libhal_device_free_changeset(cs);
+	}
+	my_dbus_error_free(&error);
+	HAL_DEBUG(("update_lid() exit"));
+	return (TRUE);
+}
+
 static void
 ac_adapter_present(LibHalContext *ctx, const char *udi, int fd)
 {
@@ -47,7 +120,7 @@ ac_adapter_present(LibHalContext *ctx, const char *udi, int fd)
 	DBusError error;
 
 	HAL_DEBUG(("ac_adapter_present() enter"));
-	if (ioctl(fd, BATT_IOC_POWER_STATUS, &pow) < 0) {
+	if (ioctl(fd, ACPI_DRV_IOC_POWER_STATUS, &pow) < 0) {
 		return;
 	}
 	if ((cs = libhal_device_new_changeset(udi)) == NULL) {
@@ -170,7 +243,7 @@ battery_last_full(LibHalChangeSet *cs, int fd)
 	acpi_bif_t bif;
 
 	bzero(&bif, sizeof (bif));
-	if (ioctl(fd, BATT_IOC_INFO, &bif) < 0) {
+	if (ioctl(fd, ACPI_DRV_IOC_INFO, &bif) < 0) {
 		return;
 	}
 	libhal_changeset_set_property_int(cs, "battery.reporting_last_full",
@@ -197,12 +270,12 @@ battery_dynamic_update(LibHalContext *ctx, const char *udi, int fd)
 
 	HAL_DEBUG(("battery_dynamic_update() enter"));
 	bzero(&bst, sizeof (bst));
-	if (ioctl(fd, BATT_IOC_STATUS, &bst) < 0) {
+	if (ioctl(fd, ACPI_DRV_IOC_STATUS, &bst) < 0) {
 		return;
 	}
 
-	charging = bst.bst_state & BATT_BST_CHARGING ? TRUE : FALSE;
-	discharging = bst.bst_state & BATT_BST_DISCHARGING ? TRUE : FALSE;
+	charging = bst.bst_state & ACPI_DRV_BST_CHARGING ? TRUE : FALSE;
+	discharging = bst.bst_state & ACPI_DRV_BST_DISCHARGING ? TRUE : FALSE;
 	/* No need to continue if battery is essentially idle. */
 	if (counter && !charging && !discharging) {
 		return;
@@ -359,7 +432,7 @@ battery_static_update(LibHalContext *ctx, const char *udi, int fd)
 
 	HAL_DEBUG(("battery_static_update() enter"));
 	bzero(&bif, sizeof (bif));
-	if (ioctl(fd, BATT_IOC_INFO, &bif) < 0) {
+	if (ioctl(fd, ACPI_DRV_IOC_INFO, &bif) < 0) {
 		return (FALSE);
 	}
 	if ((cs = libhal_device_new_changeset(udi)) == NULL) {
@@ -436,17 +509,17 @@ battery_static_update(LibHalContext *ctx, const char *udi, int fd)
 			    "battery.charge_level.unit", "mWh");
 		}
 		libhal_changeset_set_property_int(cs,
-                    "battery.charge_level.design", reporting_design);
-                libhal_changeset_set_property_int(cs,
-                    "battery.charge_level.warning", reporting_warning);
-                libhal_changeset_set_property_int(cs,
-                    "battery.charge_level.low", reporting_low);
-                libhal_changeset_set_property_int(cs,
-                    "battery.charge_level.granularity_1", reporting_gran1);
-                libhal_changeset_set_property_int(cs,
-                    "battery.charge_level.granularity_2", reporting_gran2);
+		    "battery.charge_level.design", reporting_design);
+		libhal_changeset_set_property_int(cs,
+		    "battery.charge_level.warning", reporting_warning);
+		libhal_changeset_set_property_int(cs,
+		    "battery.charge_level.low", reporting_low);
+		libhal_changeset_set_property_int(cs,
+		    "battery.charge_level.granularity_1", reporting_gran1);
+		libhal_changeset_set_property_int(cs,
+		    "battery.charge_level.granularity_2", reporting_gran2);
 	}
-		
+
 
 	dbus_error_init(&error);
 	libhal_device_commit_changeset(ctx, cs, &error);
@@ -471,7 +544,7 @@ battery_update(LibHalContext *ctx, const char *udi, int fd)
 	    &error);
 
 	bzero(&bst, sizeof (bst));
-	if (ioctl(fd, BATT_IOC_STATUS, &bst) < 0) {
+	if (ioctl(fd, ACPI_DRV_IOC_STATUS, &bst) < 0) {
 		if (errno == ENXIO) {
 			my_dbus_error_free(&error);
 			libhal_device_set_property_bool(ctx, udi,

@@ -20,14 +20,14 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#	This makefile drives the production of the battery
-#	Battery Monitor driver kernel module.
+#	This makefile drives the production of the acpi_drv 
+#	driver kernel module.
 #
 #	i86pc architecture dependent
 #
@@ -40,11 +40,11 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= battery
-OBJECTS		= $(BATTERY_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BATTERY_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= acpi_drv 
+OBJECTS		= $(ACPI_DRV_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(ACPI_DRV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/i86pc/io/battery
+CONF_SRCDIR	= $(UTSBASE)/i86pc/io/acpi_drv
 
 #
 #	Include common rules.

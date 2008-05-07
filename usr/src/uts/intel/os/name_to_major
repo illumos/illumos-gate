@@ -136,7 +136,7 @@ lx_ptm 240
 lx_systrace 241
 lx_audio 242
 physmem 243
-battery 244
+acpi_drv 244
 ucode 245
 ppm 246
 cpunex 247

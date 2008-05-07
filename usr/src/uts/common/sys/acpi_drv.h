@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _BATTERY_H
-#define	_BATTERY_H
+#ifndef _ACPI_DRV_H
+#define	_ACPI_DRV_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -34,19 +34,23 @@ extern "C" {
 #endif
 
 #include <sys/param.h>
+#include <sys/kstat.h>
 
-#define	_BATT_DRV		(('B' << 24) + ('A' << 16) + ('T' << 8))
+enum acpi_drv_ioctl {
+	ACPI_DRV_IOC_BAY,
+	ACPI_DRV_IOC_INFO,
+	ACPI_DRV_IOC_STATUS,
+	ACPI_DRV_IOC_AC_COUNT,
+	ACPI_DRV_IOC_POWER_STATUS,
+	ACPI_DRV_IOC_SET_WARNING,
+	ACPI_DRV_IOC_GET_WARNING,
+	ACPI_DRV_IOC_LID_STATUS,
+	ACPI_DRV_IOC_LEVELS,
+	ACPI_DRV_IOC_SET_BRIGHTNESS
+};
 
-#define	BATT_IOC_BAY		(_BATT_DRV | 0)
-#define	BATT_IOC_INFO		(_BATT_DRV | 1)
-#define	BATT_IOC_STATUS		(_BATT_DRV | 2)
-#define	BATT_IOC_AC_COUNT	(_BATT_DRV | 3)
-#define	BATT_IOC_POWER_STATUS	(_BATT_DRV | 4)
-#define	BATT_IOC_SET_WARNING	(_BATT_DRV | 5)
-#define	BATT_IOC_GET_WARNING	(_BATT_DRV | 6)
-
-#define	BATT_BST_CHARGING	2
-#define	BATT_BST_DISCHARGING	1
+#define	ACPI_DRV_BST_CHARGING		2
+#define	ACPI_DRV_BST_DISCHARGING	1
 
 typedef struct batt_bay {
 	/* Total number of bays in the system */
@@ -125,17 +129,17 @@ typedef	struct acpi_bst {
 } acpi_bst_t;
 
 /* Battery warnning levels in percentage */
-typedef struct batt_warn {
+typedef struct acpi_drv_warn {
 	uint32_t	bw_enabled;	/* Enabled */
 	uint32_t	bw_charge_warn;	/* charge warn threshold */
 	uint32_t	bw_charge_low;	/* charge low threshold */
-} batt_warn_t;
+} acpi_drv_warn_t;
 
-#define	BATT_DRV_NAME		"battery"
-#define	BATT_POWER_KSTAT_NAME	"power"
-#define	BATT_BTWARN_KSTAT_NAME	"battery warning"
-#define	BATT_BIF_KSTAT_NAME	"battery BIF"
-#define	BATT_BST_KSTAT_NAME	"battery BST"
+#define	ACPI_DRV_NAME		"acpi_drv"
+#define	ACPI_DRV_POWER_KSTAT_NAME	"power"
+#define	ACPI_DRV_BTWARN_KSTAT_NAME	"battery warning"
+#define	ACPI_DRV_BIF_KSTAT_NAME		"battery BIF"
+#define	ACPI_DRV_BST_KSTAT_NAME		"battery BST"
 
 #define	AC			"AC"
 #define	BATTERY			"battery"
@@ -167,44 +171,62 @@ typedef struct batt_warn {
 
 #define	PSR_AC_PRESENT		"psr_ac_present"
 
-typedef struct batt_power_kstat_s {
-	struct kstat_named	batt_power;
-	struct kstat_named	batt_supported_battery_count;
-} batt_power_kstat_t;
+typedef struct acpi_drv_power_kstat_s {
+	struct kstat_named	acpi_drv_power;
+	struct kstat_named	acpi_drv_supported_battery_count;
+} acpi_drv_power_kstat_t;
 
-typedef struct batt_warn_kstat_s {
-	struct kstat_named	batt_bw_enabled;
-	struct kstat_named	batt_bw_charge_warn;
-	struct kstat_named	batt_bw_charge_low;
-} batt_warn_kstat_t;
+typedef struct acpi_drv_warn_kstat_s {
+	struct kstat_named	acpi_drv_bw_enabled;
+	struct kstat_named	acpi_drv_bw_charge_warn;
+	struct kstat_named	acpi_drv_bw_charge_low;
+} acpi_drv_warn_kstat_t;
 
 /* BIF kstat */
-typedef struct batt_bif_kstat_s {
-	struct kstat_named	batt_bif_unit;
-	struct kstat_named	batt_bif_design_cap;
-	struct kstat_named	batt_bif_last_cap;
-	struct kstat_named	batt_bif_tech;
-	struct kstat_named	batt_bif_voltage;
-	struct kstat_named	batt_bif_warn_cap;
-	struct kstat_named	batt_bif_low_cap;
-	struct kstat_named	batt_bif_gran1_cap;
-	struct kstat_named	batt_bif_gran2_cap;
-	struct kstat_named	batt_bif_model;
-	struct kstat_named	batt_bif_serial;
-	struct kstat_named	batt_bif_type;
-	struct kstat_named	batt_bif_oem_info;
-} batt_bif_kstat_t;
+typedef struct acpi_drv_bif_kstat_s {
+	struct kstat_named	acpi_drv_bif_unit;
+	struct kstat_named	acpi_drv_bif_design_cap;
+	struct kstat_named	acpi_drv_bif_last_cap;
+	struct kstat_named	acpi_drv_bif_tech;
+	struct kstat_named	acpi_drv_bif_voltage;
+	struct kstat_named	acpi_drv_bif_warn_cap;
+	struct kstat_named	acpi_drv_bif_low_cap;
+	struct kstat_named	acpi_drv_bif_gran1_cap;
+	struct kstat_named	acpi_drv_bif_gran2_cap;
+	struct kstat_named	acpi_drv_bif_model;
+	struct kstat_named	acpi_drv_bif_serial;
+	struct kstat_named	acpi_drv_bif_type;
+	struct kstat_named	acpi_drv_bif_oem_info;
+} acpi_drv_bif_kstat_t;
 
 /* BST kstat */
-typedef struct batt_bst_kstat_s {
-	struct kstat_named	batt_bst_state;
-	struct kstat_named	batt_bst_rate;
-	struct kstat_named	batt_bst_rem_cap;
-	struct kstat_named	batt_bst_voltage;
-} batt_bst_kstat_t;
+typedef struct acpi_drv_bst_kstat_s {
+	struct kstat_named	acpi_drv_bst_state;
+	struct kstat_named	acpi_drv_bst_rate;
+	struct kstat_named	acpi_drv_bst_rem_cap;
+	struct kstat_named	acpi_drv_bst_voltage;
+} acpi_drv_bst_kstat_t;
+
+struct acpi_drv_display_info {
+	int noutput; /* number of output devices */
+	int sw_on;
+	int bright_on;
+};
+
+struct acpi_drv_output_info {
+	uint32_t adr; /* unique ID for this output device */
+	int nlev; /* number of brightness levels */
+};
+
+struct acpi_drv_output_status {
+	int state;
+	int num_levels;
+	int cur_level;
+	int cur_level_index;
+};
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _BATTERY_H */
+#endif /* _ACPI_DRV_H */

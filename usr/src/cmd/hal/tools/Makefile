@@ -19,16 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+SUBDIR =	sunos	
+
 HAL_PROG =	hal-device hal-find-by-capability hal-find-by-property \
 		hal-get-property hal-set-property lshal
 
-SCRIPT =	hal-fdi-validate
+HAL_LIB =	hal-is-caller-privileged
+
+SCRIPT_BIN =	hal-fdi-validate
+
+SCRIPT_LIB =	hal-system-lcd-set-brightness  hal-system-lcd-get-brightness \
+		hal-system-power-hibernate hal-system-power-suspend \
+		hal-system-power-reboot hal-system-power-shutdown hal-functions
 
 STORAGE_METHOD_PROG = hal-storage-closetray hal-storage-eject \
 		hal-storage-mount hal-storage-unmount \
@@ -46,7 +54,7 @@ STORAGE_SHAREDSRCS =	$(STORAGE_SHAREDOBJS:%.o=%.c)
 
 SRCS =		$(PROGSRCS) $(STORAGE_SHAREDSRCS)
 
-CLOBBERFILES += $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT)
+CLOBBERFILES += $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT_BIN) $(SCRIPT_LIB) $(HAL_LIB)
 CLEANFILES += $(STORAGE_SHAREDOBJS) $(STORAGE_OBJS)
 
 include ../../Makefile.cmd
@@ -55,6 +63,8 @@ include ../Makefile.hal
 $(HAL_PROG) :=		LDLIBS += -lc -ldbus-1 -lhal
 
 lshal :=		LDLIBS += -ldbus-glib-1 -lglib-2.0
+
+$(HAL_LIB) :=	LDLIBS += -lc -ldbus-1 -lpolkit $(ZIGNORE) -lglib-2.0
 
 $(STORAGE_PROG)	:=	LDLIBS += -lc -ldbus-1 -lglib-2.0 -lhal -lhal-storage -lbsm
 
@@ -65,14 +75,22 @@ CPPFLAGS += -I$(ROOT)/usr/include/hal
 CPPFLAGS += -I$(ROOT)/usr/include/libpolkit
 C99MODE = $(C99_ENABLE)
 
-ROOTUSRSBINPROG =	$(HAL_PROG:%=$(ROOTUSRSBIN)/%) $(SCRIPT:%=$(ROOTUSRSBIN)/%)
+ROOTUSRSBINPROG =	$(HAL_PROG:%=$(ROOTUSRSBIN)/%) \
+			$(SCRIPT_BIN:%=$(ROOTUSRSBIN)/%)
 
 ROOTCMDDIR =		$(ROOTLIB_HAL)
-ROOTCMD =		$(STORAGE_PROG:%=$(ROOTCMDDIR)/%)
+ROOTCMD =		$(STORAGE_PROG:%=$(ROOTCMDDIR)/%) \
+			$(HAL_LIB:%=$(ROOTCMDDIR)/%) \
+			$(SCRIPT_LIB:%=$(ROOTCMDDIR)/%)
+
+all :=          TARGET= all
+install :=      TARGET= install
+clean :=        TARGET= clean
+clobber :=      TARGET= clobber
 
 .KEEP_STATE:
 
-all: $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT)
+all: $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT_BIN) $(SCRIPT_LIB) $(HAL_LIB) $(SUBDIR)
 
 $(STORAGE_SHAREDOBJS): $(STORAGE_SHAREDSRCS)
 	$(COMPILE.c) $(STORAGE_SHAREDSRCS)
@@ -137,10 +155,14 @@ lshal: lshal.c
 	$(LINK.c) -o $@ lshal.c $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTCMD)
+install: all $(ROOTUSRSBINPROG) $(ROOTCMD) $(SUBDIR)
 
-
-clean:
+clean: $(SUBDIR)
 	$(RM) $(CLEANFILES)
+
+$(SUBDIR): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
 
 include ../../Makefile.targ

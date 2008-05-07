@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1167,7 +1167,7 @@ static void
 power_button_monitor(void *arg)
 {
 	struct pollfd pfd;
-	int events;
+	int events, ret;
 
 	if (ioctl(pb_fd, PB_BEGIN_MONITOR, NULL) == -1) {
 		logerror("Failed to monitor the power button.");
@@ -1187,12 +1187,20 @@ power_button_monitor(void *arg)
 		if (!(pfd.revents & POLLIN))
 			continue;
 
+		/*
+		 * Monitor the power button, but only take action if
+		 * gnome-power-manager is not running.
+		 *
+		 * ret greater than 0 means could not find process.
+		 */
+		ret = system("/usr/bin/pgrep -f -P 1 gnome-power-manager");
+
 		if (ioctl(pfd.fd, PB_GET_EVENTS, &events) == -1) {
 			logerror("Failed to get power button events.");
 			thr_exit((void *) 0);
 		}
 
-		if ((events & PB_BUTTON_PRESS) &&
+		if ((ret > 0) && (events & PB_BUTTON_PRESS) &&
 		    (poweroff(NULL, power_button_cmd) != 0)) {
 			logerror("Power button is pressed, powering "
 			    "down the system!");

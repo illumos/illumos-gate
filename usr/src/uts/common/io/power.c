@@ -1,4 +1,3 @@
-
 /*
  * CDDL HEADER START
  *
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +57,8 @@
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <sys/pbio.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/pwrctl.h>
 
 #if defined(__sparc)
 #include <sys/machsystm.h>
@@ -175,6 +176,8 @@ struct power_soft_state {
 #endif
 };
 
+static void power_gen_sysevent(struct power_soft_state *);
+
 #ifdef	ACPI_POWER_BUTTON
 static int power_attach_acpi(struct power_soft_state *softsp);
 static void power_detach_acpi(struct power_soft_state *softsp);
@@ -224,7 +227,7 @@ static struct dev_ops power_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"power button driver v%I%",	/* name of module */
+	"power button driver",	/* name of module */
 	&power_ops,		/* driver ops */
 };
 
@@ -442,14 +445,14 @@ power_high_intr(caddr_t arg)
 		if (hasEPIC) {
 			/* read isr - first issue command */
 			EPIC_WR(hdl, softsp->power_btn_reg,
-				EPIC_ATOM_INTR_READ);
+			    EPIC_ATOM_INTR_READ);
 			/* next, read the reg */
 			EPIC_RD(hdl, softsp->power_btn_reg, reg);
 
 			if (reg & EPIC_FIRE_INTERRUPT) {  /* PB pressed */
 				/* clear the interrupt */
 				EPIC_WR(hdl, softsp->power_btn_reg,
-					EPIC_ATOM_INTR_CLEAR);
+				    EPIC_ATOM_INTR_CLEAR);
 			} else {
 				if (!softsp->power_btn_ioctl) {
 					mutex_exit(&softsp->power_intr_mutex);
@@ -678,6 +681,7 @@ power_issue_shutdown(caddr_t arg)
 		mutex_exit(&softsp->power_mutex);
 		pollwakeup(&softsp->pollhd, POLLRDNORM);
 		pollwakeup(&softsp->pollhd, POLLIN);
+		power_gen_sysevent(softsp);
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -697,6 +701,59 @@ power_issue_shutdown(caddr_t arg)
 	mutex_exit(&softsp->power_mutex);
 
 	return (DDI_INTR_CLAIMED);
+}
+
+static void
+power_gen_sysevent(struct power_soft_state *softsp)
+{
+	nvlist_t *attr_list = NULL;
+	int err;
+	char pathname[MAXPATHLEN];
+	char hid[9] = "\0";
+
+	/* Allocate and build sysevent attribute list */
+	err = nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, DDI_NOSLEEP);
+	if (err != 0) {
+		cmn_err(CE_WARN,
+		    "cannot allocate memory for sysevent attributes\n");
+		return;
+	}
+
+#ifdef ACPI_POWER_BUTTON
+	/* Only control method power button has HID */
+	if (softsp->gpe_attached) {
+		(void) strlcpy(hid, "PNP0C0C", sizeof (hid));
+	}
+#endif
+
+	err = nvlist_add_string(attr_list, PWRCTL_DEV_HID, hid);
+	if (err != 0) {
+		cmn_err(CE_WARN,
+		    "Failed to add attr [%s] for %s/%s event",
+		    PWRCTL_DEV_HID, EC_PWRCTL, ESC_PWRCTL_POWER_BUTTON);
+		nvlist_free(attr_list);
+		return;
+	}
+
+	(void) ddi_pathname(softsp->dip, pathname);
+	err = nvlist_add_string(attr_list, PWRCTL_DEV_PHYS_PATH, pathname);
+	if (err != 0) {
+		cmn_err(CE_WARN,
+		    "Failed to add attr [%s] for %s/%s event",
+		    PWRCTL_DEV_PHYS_PATH, EC_PWRCTL, ESC_PWRCTL_POWER_BUTTON);
+		nvlist_free(attr_list);
+		return;
+	}
+
+	/* Generate/log sysevent */
+	err = ddi_log_sysevent(softsp->dip, DDI_VENDOR_SUNW, EC_PWRCTL,
+	    ESC_PWRCTL_POWER_BUTTON, attr_list, NULL, DDI_NOSLEEP);
+	if (err != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "cannot log sysevent, err code %x\n", err);
+	}
+
+	nvlist_free(attr_list);
 }
 
 /*
@@ -1097,8 +1154,8 @@ power_setup_epic_regs(dev_info_t *dip, struct power_soft_state *softsp)
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&reg_base,
-		EPIC_REGS_OFFSET, EPIC_REGS_LEN, &attr,
-		&softsp->power_rhandle) != DDI_SUCCESS) {
+	    EPIC_REGS_OFFSET, EPIC_REGS_LEN, &attr,
+	    &softsp->power_rhandle) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
@@ -1107,11 +1164,11 @@ power_setup_epic_regs(dev_info_t *dip, struct power_soft_state *softsp)
 
 	/* Clear power button interrupt first */
 	EPIC_WR(softsp->power_rhandle, softsp->power_btn_reg,
-		EPIC_ATOM_INTR_CLEAR);
+	    EPIC_ATOM_INTR_CLEAR);
 
 	/* Enable EPIC interrupt for power button single press event */
 	EPIC_WR(softsp->power_rhandle, softsp->power_btn_reg,
-		EPIC_ATOM_INTR_ENABLE);
+	    EPIC_ATOM_INTR_ENABLE);
 
 	/*
 	 * At this point, EPIC interrupt processing is fully initialised.
@@ -1165,7 +1222,7 @@ power_setup_mbc_regs(dev_info_t *dip, struct power_soft_state *softsp)
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&reg_base, 0, 0, &attr,
-		&softsp->power_rhandle) != DDI_SUCCESS) {
+	    &softsp->power_rhandle) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 	softsp->power_btn_reg = &reg_base[FIRE_SSI_ISR];

@@ -162,7 +162,7 @@ rtw:* 0666 root sys
 wpi:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys
-battery:* 0666 root sys
+acpi_drv:* 0666 root sys
 ucode:* 0644 root sys
 dmfe:* 0666 root sys
 afe:* 0666 root sys

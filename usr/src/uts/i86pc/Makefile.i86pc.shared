@@ -256,7 +256,7 @@ DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc
 DRV_KMODS	+= mc-amd
 DRV_KMODS	+= tzmon
-DRV_KMODS	+= battery
+DRV_KMODS	+= acpi_drv 
 
 DRV_KMODS	+= cpudrv
 

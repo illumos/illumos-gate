@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		hald-addon-acpi
-OBJS =		addon-acpi.o logger.o util_helper.o battery.o util_pm.o
+OBJS =		addon-acpi.o logger.o util_helper.o acpi.o util_pm.o
 SRCS =		addon-acpi.c ../../hald/logger.c ../../hald/util_helper.c
 
 include ../../../Makefile.cmd
@@ -44,8 +44,8 @@ C99MODE =	$(C99_ENABLE)
 
 all: $(PROG)
 
-battery.o: ../../utils/battery.c
-	$(COMPILE.c) -o $@ ../../utils/battery.c
+acpi.o: ../../utils/acpi.c
+	$(COMPILE.c) -o $@ ../../utils/acpi.c
 	$(POST_PROCESS_O)
 
 logger.o: ../../hald/logger.c

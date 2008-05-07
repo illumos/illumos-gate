@@ -655,7 +655,7 @@ f none usr/include/sys/auxv_SPARC.h 644 root bin
 f none usr/include/sys/avintr.h 644 root bin
 f none usr/include/sys/avl.h 644 root bin
 f none usr/include/sys/avl_impl.h 644 root bin
-f none usr/include/sys/battery.h 644 root bin
+f none usr/include/sys/acpi_drv.h 644 root bin
 f none usr/include/sys/bitmap.h 644 root bin
 f none usr/include/sys/bitset.h 644 root bin
 f none usr/include/sys/bl.h 644 root bin
@@ -1253,7 +1253,6 @@ f none usr/include/sys/sysconf.h 644 root bin
 f none usr/include/sys/sysconfig.h 644 root bin
 f none usr/include/sys/sysconfig_impl.h 644 root bin
 d none usr/include/sys/sysevent 755 root bin
-f none usr/include/sys/sysevent/acpiev.h 644 root bin
 f none usr/include/sys/sysevent/ap_driver.h 644 root bin
 f none usr/include/sys/sysevent/domain.h 644 root bin
 f none usr/include/sys/sysevent/dr.h 644 root bin
@@ -1261,6 +1260,7 @@ f none usr/include/sys/sysevent/env.h 644 root bin
 f none usr/include/sys/sysevent/eventdefs.h 644 root bin
 f none usr/include/sys/sysevent/ipmp.h 644 root bin
 f none usr/include/sys/sysevent/dev.h 644 root bin
+f none usr/include/sys/sysevent/pwrctl.h 644 root bin
 f none usr/include/sys/sysevent/svm.h 644 root bin
 f none usr/include/sys/sysevent.h 644 root bin
 f none usr/include/sys/sysevent_impl.h 644 root bin

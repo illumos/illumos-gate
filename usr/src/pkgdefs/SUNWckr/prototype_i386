@@ -68,8 +68,8 @@ f none kernel/dacf/net_dacf 755 root sys
 f none kernel/devname/sdev_nsconfig_mod 755 root sys
 f none kernel/drv/aggr 755 root sys
 f none kernel/drv/arp 755 root sys
-f none kernel/drv/battery 755 root sys
-f none kernel/drv/battery.conf 644 root sys
+f none kernel/drv/acpi_drv 755 root sys
+f none kernel/drv/acpi_drv.conf 644 root sys
 f none kernel/drv/bl 755 root sys
 f none kernel/drv/bmc 755 root sys
 f none kernel/drv/bmc.conf 644 root sys
@@ -279,7 +279,7 @@ f none kernel/devname/amd64/sdev_nsconfig_mod 755 root sys
 d none kernel/drv/amd64 755 root sys
 f none kernel/drv/amd64/aggr 755 root sys
 f none kernel/drv/amd64/arp 755 root sys
-f none kernel/drv/amd64/battery 755 root sys
+f none kernel/drv/amd64/acpi_drv 755 root sys
 f none kernel/drv/amd64/bl 755 root sys
 f none kernel/drv/amd64/bmc 755 root sys
 f none kernel/drv/amd64/bscbus 755 root sys

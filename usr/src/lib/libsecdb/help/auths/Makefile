@@ -131,7 +131,12 @@ HTMLENTS = \
 	PrintUnlabeled.html \
 	TNDaemon.html \
 	TNctl.html \
-	ValueTND.html
+	ValueTND.html \
+	SysPowerMgmtHeader.html \
+	SysPowerMgmtSuspend.html \
+	SysPowerMgmtSuspendtoDisk.html \
+	SysPowerMgmtSuspendtoRAM.html \
+	SysPowerMgmtBrightness.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

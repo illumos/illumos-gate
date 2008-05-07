@@ -319,7 +319,7 @@ physmem:*
 asy:*
 asy:*,cu
 ucode:*
-battery:*
+acpi_drv:*
 smbsrv:*
 vscan:*
 nsmb:*

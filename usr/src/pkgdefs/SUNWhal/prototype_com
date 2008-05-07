@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,12 +50,14 @@ f none usr/lib/hal/hald 555 root bin
 f none usr/lib/hal/hald-addon-acpi 555 root bin
 f none usr/lib/hal/hald-addon-network-discovery 555 root bin
 f none usr/lib/hal/hald-addon-storage 555 root bin
-f none usr/lib/hal/hald-probe-battery 555 root bin
+f none usr/lib/hal/hald-probe-acpi 555 root bin
 f none usr/lib/hal/hald-probe-network-printer 555 root bin
 f none usr/lib/hal/hald-probe-printer 555 root bin
 f none usr/lib/hal/hald-probe-storage 555 root bin
 f none usr/lib/hal/hald-probe-volume 555 root bin
 f none usr/lib/hal/hald-runner 555 root bin
+f none usr/lib/hal/hal-functions 555 root bin
+f none usr/lib/hal/hal-is-caller-privileged 555 root bin
 f none usr/lib/hal/hal-storage-closetray 555 root bin
 f none usr/lib/hal/hal-storage-eject 555 root bin
 f none usr/lib/hal/hal-storage-mount 555 root bin
@@ -64,6 +66,19 @@ f none usr/lib/hal/hal-storage-cleanup-mountpoint 555 root bin
 f none usr/lib/hal/hal-storage-cleanup-all-mountpoints 555 root bin
 f none usr/lib/hal/hal-storage-zpool-export 555 root bin
 f none usr/lib/hal/hal-storage-zpool-import 555 root bin
+f none usr/lib/hal/hal-system-lcd-get-brightness 555 root bin
+f none usr/lib/hal/hal-system-lcd-set-brightness 555 root bin
+f none usr/lib/hal/hal-system-power-hibernate 555 root bin
+f none usr/lib/hal/hal-system-power-reboot 555 root bin
+f none usr/lib/hal/hal-system-power-shutdown 555 root bin
+f none usr/lib/hal/hal-system-power-suspend 555 root bin
+d none usr/lib/hal/sunos 755 root bin
+f none usr/lib/hal/sunos/hal-system-lcd-get-brightness-sunos 555 root bin
+f none usr/lib/hal/sunos/hal-system-lcd-set-brightness-sunos 555 root bin
+f none usr/lib/hal/sunos/hal-system-power-hibernate-sunos 555 root bin
+f none usr/lib/hal/sunos/hal-system-power-reboot-sunos 555 root bin
+f none usr/lib/hal/sunos/hal-system-power-shutdown-sunos 555 root bin
+f none usr/lib/hal/sunos/hal-system-power-suspend-sunos 555 root bin
 s none usr/lib/libhal.so=./libhal.so.1.0.0
 s none usr/lib/libhal.so.1=./libhal.so.1.0.0
 f none usr/lib/libhal.so.1.0.0 755 root bin

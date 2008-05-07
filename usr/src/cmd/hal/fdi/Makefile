@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,6 @@ FDIS =		information/10freedesktop/10-camera-ptp.fdi \
 		information/10freedesktop/10-usb-pda.fdi \
 		information/10freedesktop/10-usb-zip-drives.fdi \
 		information/10freedesktop/10-wireless-mice.fdi \
-		policy/10osvendor/10-keyboard-policy.fdi \
 		policy/10osvendor/10-laptop-panel-mgmt-policy.fdi \
 		policy/10osvendor/10-network-attached.fdi \
 		policy/10osvendor/10-power-mgmt-policy.fdi \

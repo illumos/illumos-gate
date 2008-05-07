@@ -3257,7 +3257,7 @@ hald_exec_method_cb (HalDevice *d, guint32 exit_type,
 		     gint return_code, gchar **error,
 		     gpointer data1, gpointer data2)
 {
-	dbus_uint32_t result;
+	dbus_int32_t result;
 	DBusMessage *reply = NULL;
 	DBusMessage *message;
 	DBusMessageIter iter;
@@ -3302,14 +3302,14 @@ hald_exec_method_cb (HalDevice *d, guint32 exit_type,
 		dbus_message_unref (reply);
 
 	} else {
-		result = (dbus_uint32_t) return_code;
+		result = (dbus_int32_t) return_code;
 
 		reply = dbus_message_new_method_return (message);
 		if (reply == NULL)
 			DIE (("No memory"));
 		
 		dbus_message_iter_init_append (reply, &iter);
-		dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32, &result);
+		dbus_message_iter_append_basic (&iter, DBUS_TYPE_INT32, &result);
 		
 		if (conn != NULL) {
 			if (!dbus_connection_send (conn, reply, NULL))

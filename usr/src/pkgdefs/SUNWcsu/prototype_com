@@ -522,6 +522,11 @@ f none usr/lib/help/auths/locale/C/SmfIdmapStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueIdmap.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueVscan.html 0444 root bin
 f none usr/lib/help/auths/locale/C/SmfVscanStates.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SysPowerMgmtHeader.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SysPowerMgmtSuspend.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SysPowerMgmtSuspendtoDisk.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SysPowerMgmtSuspendtoRAM.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SysPowerMgmtBrightness.html 0444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 d none usr/lib/help/profiles/locale/C 755 root bin
@@ -574,6 +579,11 @@ f none usr/lib/help/profiles/locale/C/RtZoneMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtIdmapMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtIdmapNameRulesMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtVscanMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSysPowerMgmt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspend.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspendtoDisk.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspendtoRAM.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtBrightness.html 444 root bin
 d none usr/lib/iconv 755 root bin
 f none usr/lib/iconv/646da.8859.t 444 root bin
 f none usr/lib/iconv/646de.8859.t 444 root bin

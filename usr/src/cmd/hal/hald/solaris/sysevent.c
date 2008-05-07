@@ -26,7 +26,7 @@
 #include <libdevinfo.h>
 #include <libsysevent.h>
 #include <sys/sysevent/dev.h>
-#include <sys/sysevent/acpiev.h>
+#include <sys/sysevent/pwrctl.h>
 #include <glib.h>
 
 #include "../osspec.h"
@@ -55,6 +55,8 @@ static void	sysevent_dev_branch(gchar *);
 static void	sysevent_lofi_add(gchar *, gchar *);
 static void	sysevent_lofi_remove(gchar *, gchar *);
 static void	sysevent_devfs_add(gchar *);
+static void	sysevent_pwrctl(gchar *, gchar *, gchar *, gchar *, gchar *,
+		    gchar *, uint_t);
 
 static sysevent_handle_t	*shp;
 
@@ -66,7 +68,7 @@ gboolean
 sysevent_init(void)
 {
 	GError *err = NULL;
-	const char	*subcl[3];
+	const char	*subcl[6];
 
 	/*
 	 * pipe used to serialize sysevents through the main loop
@@ -111,10 +113,13 @@ sysevent_init(void)
 		return (FALSE);
 	}
 
-	subcl[0] = ESC_ACPIEV_ADD;
-	subcl[1] = ESC_ACPIEV_REMOVE;
-	subcl[2] = ESC_ACPIEV_STATE_CHANGE;
-	if (sysevent_subscribe_event(shp, EC_ACPIEV, subcl, 3) != 0) {
+	subcl[0] = ESC_PWRCTL_ADD;
+	subcl[1] = ESC_PWRCTL_REMOVE;
+	subcl[2] = ESC_PWRCTL_STATE_CHANGE;
+	subcl[3] = ESC_PWRCTL_BRIGHTNESS_UP;
+	subcl[4] = ESC_PWRCTL_BRIGHTNESS_DOWN;
+	subcl[5] = ESC_PWRCTL_POWER_BUTTON;
+	if (sysevent_subscribe_event(shp, EC_PWRCTL, subcl, 6) != 0) {
 		HAL_INFO(("subscribe(dev_add) failed %d", errno));
 		sysevent_unbind_handle(shp);
 		return (FALSE);
@@ -173,8 +178,8 @@ sysevent_dev_handler(sysevent_t *ev)
 		goto out;
 	}
 
-	if (strcmp(class, EC_ACPIEV) == 0) {
-		if (nvlist_lookup_string(attr_list, ACPIEV_DEV_PHYS_PATH,
+	if (strcmp(class, EC_PWRCTL) == 0) {
+		if (nvlist_lookup_string(attr_list, PWRCTL_DEV_PHYS_PATH,
 		    &phys_path) != 0) {
 			goto out;
 		}
@@ -184,20 +189,20 @@ sysevent_dev_handler(sysevent_t *ev)
 	}
 
 	if (nvlist_lookup_string(attr_list, DEV_NAME, &dev_name) != 0) {
-		if (strcmp(class, EC_ACPIEV) == 0) {
+		if (strcmp(class, EC_PWRCTL) == 0) {
 			dev_name = "noname";
 		} else {
 			dev_name = "";
 		}
 	}
 
-	if (nvlist_lookup_string(attr_list, ACPIEV_DEV_HID, &dev_hid) != 0) {
+	if (nvlist_lookup_string(attr_list, PWRCTL_DEV_HID, &dev_hid) != 0) {
 		dev_hid = "";
 	}
-	if (nvlist_lookup_string(attr_list, ACPIEV_DEV_UID, &dev_uid) != 0) {
+	if (nvlist_lookup_string(attr_list, PWRCTL_DEV_UID, &dev_uid) != 0) {
 		dev_uid = "";
 	}
-	if (nvlist_lookup_uint32(attr_list, ACPIEV_DEV_INDEX, &dev_index)
+	if (nvlist_lookup_uint32(attr_list, PWRCTL_DEV_INDEX, &dev_index)
 	    != 0) {
 		dev_index = 0;
 	}
@@ -227,7 +232,6 @@ sysevent_iochannel_data (GIOChannel *source,
 	gchar dev_name[1024];
 	gchar dev_uid[1024];
 	gchar dev_hid[1024];
-	gchar udi[1024];
 	uint_t dev_index;
 
 	HAL_INFO (("sysevent_iochannel_data"));
@@ -265,20 +269,9 @@ sysevent_iochannel_data (GIOChannel *source,
 			}
 		} else if (strcmp(class, EC_DEV_BRANCH) == 0) {
 			sysevent_dev_branch(phys_path);
-		} else if (strcmp(class, EC_ACPIEV) == 0) {
-			if (strcmp(dev_hid, "PNP0C0A") == 0) {
-				snprintf(udi, sizeof(udi),
-				    "/org/freedesktop/Hal/devices/pseudo/"
-				    "battery_0_battery%d_0", dev_index);
-			} else if (strcmp(dev_hid, "ACPI0003") == 0) {
-				snprintf(udi, sizeof(udi),
-				    "/org/freedesktop/Hal/devices/pseudo/"
-				    "battery_0_ac%d_0", dev_index);
-			} else {
-				HAL_INFO(("dev_hid %s unknown", dev_hid));
-				continue;
-			}
-			devinfo_battery_device_rescan(phys_path, udi);
+		} else if (strcmp(class, EC_PWRCTL) == 0) {
+			sysevent_pwrctl(class, subclass, phys_path,
+			    dev_name, dev_hid, dev_uid, dev_index); 
 		} else if (strcmp(class, EC_DEVFS) == 0) {
 			if (strcmp(subclass, ESC_DEVFS_DEVI_ADD) == 0) {
 				sysevent_devfs_add(phys_path);
@@ -447,4 +440,30 @@ sysevent_devfs_add(gchar *devfs_path)
 
  out:
 	di_fini (node);
+}
+
+static void 
+sysevent_pwrctl(gchar *class, gchar *subclass, gchar *phys_path,
+    gchar *dev_name, gchar *dev_hid, gchar *dev_uid, uint_t dev_index)
+{
+	const gchar prefix[] = "/org/freedesktop/Hal/devices/pseudo/acpi_drv_0";
+	gchar udi[HAL_PATH_MAX];
+
+	if (strcmp(dev_hid, "PNP0C0A") == 0) {
+		snprintf(udi, sizeof(udi), "%s_battery%d_0", prefix, dev_index);
+		devinfo_battery_device_rescan(phys_path, udi);
+	} else if (strcmp(dev_hid, "ACPI0003") == 0) {
+		snprintf(udi, sizeof (udi), "%s_ac%d_0", prefix, dev_index);
+		devinfo_battery_device_rescan(phys_path, udi);
+	} else if (strcmp(dev_hid, "PNP0C0D") == 0) {
+		snprintf(udi, sizeof (udi), "%s_lid_0", prefix);
+		devinfo_lid_device_rescan(subclass, udi);
+	} else if (strcmp(subclass, ESC_PWRCTL_POWER_BUTTON) == 0) {
+		devinfo_power_button_rescan();
+	} else if ((strcmp(subclass, ESC_PWRCTL_BRIGHTNESS_UP) == 0) ||
+	    (strcmp(subclass, ESC_PWRCTL_BRIGHTNESS_DOWN) == 0)) {
+		devinfo_brightness_hotkeys_rescan(subclass);
+	} else {
+		HAL_INFO(("Unmatched EC_PWRCTL"));
+	}
 }

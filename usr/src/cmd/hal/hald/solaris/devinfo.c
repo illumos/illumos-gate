@@ -141,6 +141,8 @@ static DevinfoDevHandler *devinfo_handlers[] = {
 	&devinfo_lofi_handler,
 	&devinfo_acpi_handler,
 	&devinfo_battery_handler,
+	&devinfo_power_button_handler,
+	&devinfo_keyboard_handler,
 	&devinfo_default_handler,
 	NULL
 };

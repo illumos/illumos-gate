@@ -69,7 +69,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:                $(UTSBASE)/i86pc/io/battery/%.c
+$(OBJS_DIR)/%.o:                $(UTSBASE)/i86pc/io/acpi_drv/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -256,7 +256,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/intel_nb5000/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:              $(UTSBASE)/i86pc/io/battery/%.c
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/i86pc/io/acpi_drv/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/mc/%.c

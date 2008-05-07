@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -208,14 +208,17 @@ extern "C" {
 #define	ESC_PLATFORM_SP_RESET	"ESC_platform_sp_reset"
 
 /*
- * EC_ACPIEV subclass definitions
+ * EC_PWRCTL subclass definitions
  */
-#define	EC_ACPIEV			"EC_acpiev"
-#define	ESC_ACPIEV_ADD			"ESC_acpiev_add"
-#define	ESC_ACPIEV_REMOVE		"ESC_acpiev_remove"
-#define	ESC_ACPIEV_WARN			"ESC_acpiev_warn"
-#define	ESC_ACPIEV_LOW			"ESC_acpiev_low"
-#define	ESC_ACPIEV_STATE_CHANGE		"ESC_acpiev_state_change"
+#define	EC_PWRCTL			"EC_pwrctl"
+#define	ESC_PWRCTL_ADD			"ESC_pwrctl_add"
+#define	ESC_PWRCTL_REMOVE		"ESC_pwrctl_remove"
+#define	ESC_PWRCTL_WARN			"ESC_pwrctl_warn"
+#define	ESC_PWRCTL_LOW			"ESC_pwrctl_low"
+#define	ESC_PWRCTL_STATE_CHANGE		"ESC_pwrctl_state_change"
+#define	ESC_PWRCTL_POWER_BUTTON		"ESC_pwrctl_power_button"
+#define	ESC_PWRCTL_BRIGHTNESS_UP	"ESC_pwrctl_brightness_up"
+#define	ESC_PWRCTL_BRIGHTNESS_DOWN	"ESC_pwrctl_brightness_down"
 
 /*
  * ZFS subclass definitions.  supporting attributes (name/value paris) are found

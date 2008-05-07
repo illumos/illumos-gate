@@ -2,7 +2,7 @@
  *
  * libpolkit-rbac.c : RBAC implementation of the libpolkit API
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -150,6 +150,17 @@ libpolkit_is_uid_allowed_for_privilege (LibPolKitContext   *ctx,
 		authname = "solaris.device.mount.fixed";
 	} else if (strcmp (privilege, "hal-storage-fixed-mount-all-options") == 0) {
 		authname = "solaris.device.mount.alloptions.fixed";
+	} else if (strcmp(privilege, "hal-power-suspend") == 0) {
+		authname = "solaris.system.power.suspend.ram";
+	} else if (strcmp(privilege, "hal-power-hibernate") == 0) {
+                authname = "solaris.system.power.suspend.disk";
+	} else if ((strcmp(privilege, "hal-power-shutdown") == 0) ||
+	    (strcmp(privilege, "hal-power-reboot") == 0)) {
+                authname = "solaris.system.shutdown";
+	} else if (strcmp(privilege, "hal-power-cpu") == 0) {
+                authname = "solaris.system.power.cpu";
+	} else if (strcmp(privilege, "hal-power-brightness") == 0) {
+                authname = "solaris.system.power.brightness";
 	} else {
 		/* replace '-' with '.' */
 		authname = g_strdup (privilege);

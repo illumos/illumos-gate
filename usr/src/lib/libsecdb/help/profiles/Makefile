@@ -80,7 +80,12 @@ HTMLENTS = \
 	RtDefault.html \
 	RtIdmapMngmnt.html \
 	RtIdmapNameRulesMngmnt.html \
-	RtVscanMngmnt.html
+	RtVscanMngmnt.html \
+	RtSysPowerMgmt.html \
+	RtSysPowerMgmtSuspend.html \
+	RtSysPowerMgmtSuspendtoDisk.html \
+	RtSysPowerMgmtSuspendtoRAM.html \
+	RtSysPowerMgmtBrightness.html
 
 
 HELPDIR =	$(ROOT)/usr/lib/help

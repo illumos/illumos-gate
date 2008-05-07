@@ -1,8 +1,8 @@
 /***************************************************************************
  *
- * probe-battery.c : Probe for battery device information
+ * probe-acpi.c : Probe for ACPI device information
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -28,7 +28,7 @@
 
 #include <libhal.h>
 #include <logger.h>
-#include "../utils/battery.h"
+#include "../utils/acpi.h"
 
 int
 main(int argc, char *argv[])
@@ -53,17 +53,21 @@ main(int argc, char *argv[])
 	if ((ctx = libhal_ctx_init_direct(&error)) == NULL)
 		goto out;
 
-	HAL_DEBUG(("Doing probe-battery for %s (udi=%s)",
+	HAL_DEBUG(("Doing probe-acpi for %s (udi=%s)",
 	    device_file, udi));
 
 	if ((fd = open(device_file, O_RDONLY | O_NONBLOCK)) < 0) {
 		HAL_DEBUG(("Cannot open %s: %s", device_file, strerror(errno)));
 		goto out;
 	}
-	if (strstr(udi, "ac")) {
+	if (strstr(udi, "_ac")) {
 		ac_adapter_update(ctx, udi, fd);
-	} else {
+	} else if (strstr(udi, "_battery")) {
 		battery_update(ctx, udi, fd);
+	} else if (strstr(udi, "_lid")) {
+		lid_update(ctx, udi, fd);
+	} else if (strstr(udi, "_output")) {
+		laptop_panel_update(ctx, udi, fd);
 	}
 
 	ret = 0;

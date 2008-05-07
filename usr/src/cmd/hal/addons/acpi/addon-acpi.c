@@ -3,7 +3,7 @@
  * addon-acpi.c : Poll battery and AC adapter devices and update
  *                   properties
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -27,7 +27,7 @@
 #include <libhal.h>
 #include "../../hald/logger.h"
 #include "../../hald/util_helper.h"
-#include "../../utils/battery.h"
+#include "../../utils/acpi.h"
 
 int
 main(int argc, char **argv)

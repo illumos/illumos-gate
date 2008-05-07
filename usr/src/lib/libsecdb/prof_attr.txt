@@ -34,7 +34,7 @@
 All:::Execute any command as the user or role:help=RtAll.html
 Audit Control:::Configure Solaris Auditing:auths=solaris.audit.config,solaris.jobs.admin;help=RtAuditCtrl.html
 Audit Review:::Review Solaris Auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
-Console User:::Manage System as the Console User:help=RtConsUser.html
+Console User:::Manage System as the Console User:profiles=Suspend To RAM,Suspend To Disk,Brightness;auths=solaris.system.shutdown;help=RtConsUser.html
 Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
 Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html
 Printer Management:::Manage printers, daemons, spooling:auths=solaris.print.*,solaris.label.print,solaris.smf.manage.discovery.printers.*,solaris.smf.value.discovery.printers.*;help=RtPrntAdmin.html
@@ -93,3 +93,11 @@ Object Label Management:::Change labels on files.:auths=solaris.device.allocate,
 Outside Accred:::Allow a user to operate outside the user accreditation range.:auths=solaris.label.range;help=RtOutsideAccred.html
 ISCSI Target Administration:::Configure ISCSI Target service:auths=solaris.smf.modify.iscsitgt,solaris.smf.read.iscsitgt,solaris.smf.value.iscsitgt
 ISCSI Target Management:::Start/Stop ISCSI Target service:auths=solaris.smf.manage.iscsitgt
+#
+# Power Management profiles:
+#
+System Power:::For authorized users to manage system power:auths=solaris.system.power.*;help=RtSysPowerMgmt.html
+Suspend:::For authorized users to Suspend system:auths=solaris.system.power.suspend.*;help=RtSysPowerMgmtSuspend.html
+Suspend To Disk:::For authorized users to Suspend to Disk:auths=solaris.system.power.suspend.disk;help=RtSysPowerMgmtSuspendToDisk.html
+Suspend To RAM:::For authorized users to Suspend to RAM:auths=solaris.system.power.suspend.ram;help=RtSysPowerMgmtSuspendToRAM.html
+Brightness:::For authorized users to Control LCD Brightness:auths=solaris.system.power.brightness;help=RtSysPowerMgmtBrightness.html

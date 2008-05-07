@@ -73,6 +73,7 @@ GENHDRS=			\
 	priv_names.h
 
 CHKHDRS=			\
+	acpi_drv.h		\
 	acct.h			\
 	acctctl.h		\
 	acl.h			\
@@ -97,7 +98,6 @@ CHKHDRS=			\
 	auxv_SPARC.h		\
 	avl.h			\
 	avl_impl.h		\
-	battery.h		\
 	bitmap.h		\
 	bitset.h		\
 	bl.h			\
@@ -882,7 +882,6 @@ SATAGENHDRS=		\
 	sata_cfgadm.h
 
 SYSEVENTHDRS=		\
-	acpiev.h	\
 	ap_driver.h     \
 	dev.h		\
 	domain.h        \
@@ -890,6 +889,7 @@ SYSEVENTHDRS=		\
 	env.h           \
 	eventdefs.h	\
 	ipmp.h		\
+	pwrctl.h	\
 	svm.h
 
 CONTRACTHDRS=		\

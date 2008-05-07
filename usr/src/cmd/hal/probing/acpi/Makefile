@@ -19,15 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG =		hald-probe-battery
-OBJS =		probe-battery.o logger.o battery.o util_pm.o
-SRCS =		probe-battery.c
+PROG =		hald-probe-acpi
+OBJS =		probe-acpi.o logger.o acpi.o util_pm.o
+SRCS =		probe-acpi.c
 
 include ../../../Makefile.cmd
 include ../../Makefile.hal
@@ -48,8 +48,8 @@ logger.o: ../../hald/logger.c
 	$(COMPILE.c) -o $@ ../../hald/logger.c
 	$(POST_PROCESS_O)
 
-battery.o: ../../utils/battery.c
-	$(COMPILE.c) -o $@ ../../utils/battery.c
+acpi.o: ../../utils/acpi.c
+	$(COMPILE.c) -o $@ ../../utils/acpi.c
 	$(POST_PROCESS_O)
 
 util_pm.o: ../../hald/util_pm.c
