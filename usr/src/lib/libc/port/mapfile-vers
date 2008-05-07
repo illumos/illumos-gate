@@ -98,7 +98,6 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	mq_timedreceive;
 	mq_timedsend;
 	mq_unlink;
-	mutex_consistent;
 	nanosleep;
 	ntohl;
 	ntohs;
@@ -156,6 +155,11 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	vwarnx;
 	warn;
 	warnx;
+} SUNW_1.22.3;
+
+SUNW_1.22.3 {		# SunOS 5.10 (Solaris 10) patch additions
+    protected:
+	mutex_consistent;
 } SUNW_1.22.2;
 
 SUNW_1.22.2 {		# SunOS 5.10 (Solaris 10) patch additions
