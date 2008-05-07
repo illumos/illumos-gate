@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -904,7 +904,7 @@ add:
 		}
 
 		scf_transaction_reset(tx);
-		if (scf_pg_update(pg) != 0) {
+		if (scf_pg_update(pg) == -1) {
 			switch (scf_error()) {
 			case SCF_ERROR_CONNECTION_BROKEN:
 			default:

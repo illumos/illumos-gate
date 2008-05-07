@@ -1658,7 +1658,7 @@ set_astring_prop(const char *fmri, const char *pgname, const char *pgtype,
 		if (ret == 0) {
 			scf_transaction_reset(tx);
 
-			if (scf_pg_update(pg) != SCF_SUCCESS)
+			if (scf_pg_update(pg) == -1)
 				scfdie();
 		}
 	} while (ret == 0);
