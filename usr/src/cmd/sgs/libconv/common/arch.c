@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,7 +80,7 @@ conv_check_native(char **argv, char **envp)
 uchar_t
 conv_check_native(char **argv, char **envp)
 {
-	char	*str;
+	const char	*str;
 
 	/*
 	 * LD_NOEXEC_64 defined in the environment prevents the isaexec() call.
@@ -89,7 +89,8 @@ conv_check_native(char **argv, char **envp)
 	if (((str = getenv(MSG_ORIG(MSG_LD_NOEXEC64))) != NULL) && *str)
 		return (ELFCLASS32);
 
-	(void) isaexec(getexecname(), argv, envp);
+	if ((str = getexecname()) != NULL)
+		(void) isaexec(str, argv, envp);
 	return (ELFCLASS32);
 }
 #endif
