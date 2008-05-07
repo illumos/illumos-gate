@@ -647,59 +647,11 @@ prldap_tsd_destroy( void *priv )
 #ifdef	_SOLARIS_SDK
 #pragma	init(prldap_nspr_init)
 static mutex_t	nspr_init_lock = DEFAULTMUTEX;
-static mutex_t	nspr_idle_lock = DEFAULTMUTEX;
-static cond_t	nspr_idle_cond = DEFAULTCV;
-static int	nspr_pr_init_is_done = 0;
 static int	nspr_initialized = 0;
-
-void *
-prldap_nspr_idle_primordial_thread(void *arg) {
-	/*
-	 * Make sure PR_Init finishes before any other thread can continue
-	 */
-	(void) mutex_lock(&nspr_idle_lock);
-	if (PR_Initialized() == PR_FALSE) {
-		/*
-		 * PR_Init() changes the current thread's
-		 * priority.  Save and restore the priority.
-		 */
-		int priority;
-		(void) thr_getprio(thr_self(), &priority);
-		PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
-		(void) thr_setprio(thr_self(), priority);
-	}
-	nspr_pr_init_is_done = 1;
-	(void) cond_signal(&nspr_idle_cond);
-	(void) mutex_unlock(&nspr_idle_lock);
-
-	/* Debug only */
-	syslog(LOG_DEBUG, "NSPR is initialized by the"
-		"idle primordial thread tid %ld created by thread "
-		"tid %ld", thr_self(), (long)arg);
-	pause();
-
-}
 
 /*
  * Initialize NSPR once
  *
- * Ideally this should be done in .init of NSPR.
- * This is a workaround so only main thread can initialize
- * NSPR but main() does not need to call PR_Init().
- * The future direction is NSPR free so we don't want programs
- * to call PR_Init().
- *
- * For most of cases, programs link libldap (-lldap)
- * and .init is executed before the control is transfered to
- * main().
- * But for programs linking libnsl (-lnsl), libldap is loaded
- * via dlopen("nss_ldap.so.1", RTLD_LAZY) so the thread loads
- * libldap is not necessary a main or a primordial
- * thread. In the latter case, an idle primordial thread is created
- * to initialize NSPR so NSPR won't be initialized by non-primordial
- * threads.
- * libldap is built with "-z nodelete" so libldap and libnspr4.so
- * are persistent in the address space.
  */
 void
 prldap_nspr_init(void) {
@@ -720,50 +672,21 @@ prldap_nspr_init(void) {
 		 */
 		(void) sigaction(SIGPIPE, NULL, &action);
 
-		if (thr_self() == 1) {
-			/* main thread */
-			if (PR_Initialized() == PR_FALSE) {
-				/*
-				 * PR_Init() changes the current thread's
-				 * priority.  Save and restore the priority.
-				 */
-				int priority;
-				(void) thr_getprio(thr_self(), &priority);
-				PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
-				(void) thr_setprio(thr_self(), priority);
-			}
-			nspr_initialized = 1;
-		} else {
-			if (thr_create(NULL, NULL,
-				prldap_nspr_idle_primordial_thread,
-				(void *)thr_self(), THR_DETACHED, NULL) != 0) {
-					syslog(LOG_ERR,
-					"libldap:.init: Can't create thread. "
-					"%s", strerror(errno));
-			} else {
+		if (PR_Initialized() == PR_FALSE) {
 			/*
-			 * Make sure PR_Init finishes before any other thread
-			 * can continue.
-			 * It's unlikely, but not impossible that this thread
-			 * finishes dlopen and  starts to call
-			 * LDAP API when the idle thread still has not
-			 * finished PR_Init() yet.
+			 * PR_Init() changes the current thread's
+			 * priority.  Save and restore the priority.
 			 */
-				(void) mutex_lock(&nspr_idle_lock);
-				while (nspr_pr_init_is_done == 0) {
-					(void) cond_wait(&nspr_idle_cond,
-							&nspr_idle_lock);
-							
-				}
-				(void) mutex_unlock(&nspr_idle_lock);
-				nspr_initialized = 1;
-			}
+			int priority;
+			(void) thr_getprio(thr_self(), &priority);
+			PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
+			(void) thr_setprio(thr_self(), priority);
 		}
+		nspr_initialized = 1;
 		/*
 		 * Restore signal handling attributes of SIGPIPE
 		 */
 		(void) sigaction(SIGPIPE, &action, NULL);
-		
 	}
 	(void) mutex_unlock(&nspr_init_lock);
 }
