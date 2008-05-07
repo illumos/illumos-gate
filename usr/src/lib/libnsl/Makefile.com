@@ -204,9 +204,9 @@ CPPFLAGS +=	-I$(SRC)/lib/common/inc -I$(SRC)/lib/libnsl/include -D_REENTRANT
 CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
 
 CFLAGS +=	$(CCVERBOSE)
-LDLIBS +=	-lmp -lmd -lscf -lc
-
-lint :=		LDLIBS = -lmd -lscf -lc
+LIBMP =		-lmp
+lint :=		LIBMP =
+LDLIBS +=	$(LIBMP) -lmd -lscf -lc
 
 $(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
 LINTFLAGS +=	-m -DPORTMAP
@@ -231,7 +231,6 @@ SRCS=	$(DES:%.o=../des/%.c)			\
 	$(COMMON:%.o=../common/%.c)
 
 lint:
-	@echo $(LINT.c) ...
 	@$(LINT.c) $(SRCS) $(LDLIBS)
 
 # include library targets

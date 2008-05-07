@@ -63,7 +63,7 @@ use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles $SkipDirectBindFiles);
 use vars  qw($SkipUndefFiles $SkipUnusedDirs);
 use vars  qw($SkipStabFiles $SkipNoExStkFiles $SkipCrleConf);
 use vars  qw($SkipUnusedSearchPath $SkipUnrefObject);
-use vars  qw($Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
+use vars  qw($Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error $Gnuc);
 use vars  qw($UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
 use vars  qw($SkipDirectBindDirs $SkipInterps $SkipSymSort $OldDeps %opt);
 
@@ -178,6 +178,8 @@ $SkipUnusedSearchPath = qr{
 # Skip "unreferenced object=" ldd(1) diagnostics.
 $SkipUnrefObject = qr{
 	/libmapmalloc\.so\.1;\ unused\ dependency\ of |		# interposer
+	/libstdc\+\+\.so\.6;\ unused\ dependency\ of |		# gcc build
+	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6 |		# gcc build
 	/lib.*\ of\ .*/lib/picl/plugins/ |			# picl
 	/lib.*\ of\ .*libcimapi\.so |				# non-OSNET
 	/lib.*\ of\ .*libjvm\.so |				# non-OSNET
@@ -326,6 +328,14 @@ if ((getopts('ad:imos', \%opt) == 0) || ($#ARGV == -1)) {
 
 	if (!($Tmpdir = $ENV{TMPDIR}) || (! -d $Tmpdir)) {
 		$Tmpdir = "/tmp";
+	}
+
+	# Determine whether this is a __GNUC build.  If so, unused search path
+	# processing is disabled.
+	if (defined $ENV{__GNUC}) {
+		$Gnuc = 1;
+	} else {
+		$Gnuc = 0;
 	}
 
 	# Look for dependencies under $Proto.
@@ -721,6 +731,11 @@ DYN:
 		}
 		# Look for any unused search paths.
 		if ($Line =~ /unused search path=/) {
+			# Note, skip this comparison for __GNUC builds, as the
+			# gnu compilers insert numerous unused search paths.
+			if ($Gnuc == 1) {
+				next;
+			}
 			if (!$opt{a}) {
 				if ($Line =~ $SkipUnusedSearchPath) {
 					next;
