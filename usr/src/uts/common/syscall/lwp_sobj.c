@@ -711,18 +711,6 @@ lwp_upimutex_lock(lwp_mutex_t *lp, uint8_t type, int try, lwp_timer_t *lwptp)
 		error = EFAULT;
 		goto out;
 	}
-	/*
-	 * The apparent assumption made in implementing other _lwp_* synch
-	 * primitives, is that get_lwpchan() does not return a unique cookie
-	 * for the case where 2 processes (one forked from the other) point
-	 * at the same underlying object, which is typed USYNC_PROCESS, but
-	 * mapped MAP_PRIVATE, since the object has not yet been written to,
-	 * in the child process.
-	 *
-	 * Since get_lwpchan() has been fixed, it is not necessary to do the
-	 * dummy writes to force a COW fault as in other places (which should
-	 * be fixed).
-	 */
 	if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
 	    &lwpchan, LWPCHAN_MPPOOL)) {
 		error = EFAULT;
@@ -1175,7 +1163,13 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 		error = EFAULT;
 		goto out;
 	}
+	/*
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
+	 */
 	fuword8_noerr(&lp->mutex_type, (uint8_t *)&type);
+	suword8_noerr(&lp->mutex_type, type);
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_BLOCK, &lwpt);
@@ -1189,12 +1183,6 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 			return (set_errno(error));
 		return (0);
 	}
-	/*
-	 * Force Copy-on-write fault if lwp_mutex_t object is
-	 * defined to be MAP_PRIVATE and it was initialized to
-	 * USYNC_PROCESS.
-	 */
-	suword8_noerr(&lp->mutex_type, type);
 	if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
 	    &lwpchan, LWPCHAN_MPPOOL)) {
 		error = EFAULT;
@@ -1505,8 +1493,9 @@ lwp_mutex_wakeup(lwp_mutex_t *lp, int release_all)
 		goto out;
 	}
 	/*
-	 * Force Copy-on-write fault if lwp_mutex_t object is
-	 * defined to be MAP_PRIVATE, and type is USYNC_PROCESS
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword8_noerr(&lp->mutex_type, (uint8_t *)&type);
 	suword8_noerr(&lp->mutex_type, type);
@@ -1627,12 +1616,13 @@ lwp_cond_wait(lwp_cond_t *cv, lwp_mutex_t *mp, timespec_t *tsp, int check_park)
 	}
 
 	/*
-	 * Force Copy-on-write fault if lwp_cond_t and lwp_mutex_t
-	 * objects are defined to be MAP_PRIVATE, and are USYNC_PROCESS
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword8_noerr(&mp->mutex_type, (uint8_t *)&mtype);
+	suword8_noerr(&mp->mutex_type, mtype);
 	if (UPIMUTEX(mtype) == 0) {
-		suword8_noerr(&mp->mutex_type, mtype);
 		/* convert user level mutex, "mp", to a unique lwpchan */
 		/* check if mtype is ok to use below, instead of type from cv */
 		if (!get_lwpchan(p->p_as, (caddr_t)mp, mtype,
@@ -1852,8 +1842,9 @@ lwp_cond_signal(lwp_cond_t *cv)
 		goto out;
 	}
 	/*
-	 * Force Copy-on-write fault if lwp_cond_t object is
-	 * defined to be MAP_PRIVATE, and is USYNC_PROCESS.
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword16_noerr(&cv->cond_type, (uint16_t *)&type);
 	suword16_noerr(&cv->cond_type, type);
@@ -1916,8 +1907,9 @@ lwp_cond_broadcast(lwp_cond_t *cv)
 		goto out;
 	}
 	/*
-	 * Force Copy-on-write fault if lwp_cond_t object is
-	 * defined to be MAP_PRIVATE, and is USYNC_PROCESS.
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword16_noerr(&cv->cond_type, (uint16_t *)&type);
 	suword16_noerr(&cv->cond_type, type);
@@ -1969,8 +1961,9 @@ lwp_sema_trywait(lwp_sema_t *sp)
 		goto out;
 	}
 	/*
-	 * Force Copy-on-write fault if lwp_sema_t object is
-	 * defined to be MAP_PRIVATE, and is USYNC_PROCESS.
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword16_noerr((void *)&sp->sema_type, (uint16_t *)&type);
 	suword16_noerr((void *)&sp->sema_type, type);
@@ -2046,8 +2039,9 @@ lwp_sema_timedwait(lwp_sema_t *sp, timespec_t *tsp, int check_park)
 		goto out;
 	}
 	/*
-	 * Force Copy-on-write fault if lwp_sema_t object is
-	 * defined to be MAP_PRIVATE, and is USYNC_PROCESS.
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword16_noerr((void *)&sp->sema_type, (uint16_t *)&type);
 	suword16_noerr((void *)&sp->sema_type, type);
@@ -2185,8 +2179,9 @@ lwp_sema_post(lwp_sema_t *sp)
 		goto out;
 	}
 	/*
-	 * Force Copy-on-write fault if lwp_sema_t object is
-	 * defined to be MAP_PRIVATE, and is USYNC_PROCESS.
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
 	 */
 	fuword16_noerr(&sp->sema_type, (uint16_t *)&type);
 	suword16_noerr(&sp->sema_type, type);
@@ -2400,18 +2395,22 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 		goto out_nodrop;
 	}
 
-	/* We can only continue for simple USYNC_PROCESS locks. */
+	/*
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
+	 */
 	mp = &rw->mutex;
 	fuword8_noerr(&mp->mutex_type, (uint8_t *)&mtype);
 	fuword16_noerr(&rw->rwlock_type, (uint16_t *)&type);
+	suword8_noerr(&mp->mutex_type, mtype);
+	suword16_noerr(&rw->rwlock_type, type);
+
+	/* We can only continue for simple USYNC_PROCESS locks. */
 	if ((mtype != USYNC_PROCESS) || (type != USYNC_PROCESS)) {
 		error = EINVAL;
 		goto out_nodrop;
 	}
-
-	/* Force Copy-on-write fault incase objects are MAP_PRIVATE. */
-	suword8_noerr(&mp->mutex_type, mtype);
-	suword16_noerr(&rw->rwlock_type, type);
 
 	/* Convert user level mutex, "mp", to a unique lwpchan. */
 	if (!get_lwpchan(p->p_as, (caddr_t)mp, mtype,
@@ -2726,15 +2725,19 @@ lwp_rwlock_unlock(lwp_rwlock_t *rw)
 		goto out_nodrop;
 	}
 
-	/* We can only continue for simple USYNC_PROCESS locks. */
+	/*
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
+	 */
 	fuword16_noerr(&rw->rwlock_type, (uint16_t *)&type);
+	suword16_noerr(&rw->rwlock_type, type);
+
+	/* We can only continue for simple USYNC_PROCESS locks. */
 	if (type != USYNC_PROCESS) {
 		error = EINVAL;
 		goto out_nodrop;
 	}
-
-	/* Force Copy-on-write fault incase objects are MAP_PRIVATE. */
-	suword16_noerr(&rw->rwlock_type, type);
 
 	/* Convert user level rwlock, "rw", to a unique lwpchan. */
 	if (!get_lwpchan(p->p_as, (caddr_t)rw, type,
@@ -2962,20 +2965,19 @@ lwp_mutex_register(lwp_mutex_t *lp)
 	if (on_fault(&ljb)) {
 		error = EFAULT;
 	} else {
+		/*
+		 * Force Copy-on-write if necessary and ensure that the
+		 * synchronization object resides in read/write memory.
+		 * Cause an EFAULT return now if this is not so.
+		 */
 		fuword8_noerr(&lp->mutex_type, &type);
+		suword8_noerr(&lp->mutex_type, type);
 		if ((type & (USYNC_PROCESS|LOCK_ROBUST))
 		    != (USYNC_PROCESS|LOCK_ROBUST)) {
 			error = EINVAL;
-		} else {
-			/*
-			 * Force Copy-on-write fault if lwp_mutex_t object is
-			 * defined to be MAP_PRIVATE and it was initialized to
-			 * USYNC_PROCESS.
-			 */
-			suword8_noerr(&lp->mutex_type, type);
-			if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
-			    &lwpchan, LWPCHAN_MPPOOL))
-				error = EFAULT;
+		} else if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
+		    &lwpchan, LWPCHAN_MPPOOL)) {
+			error = EFAULT;
 		}
 	}
 	no_fault();
@@ -3010,7 +3012,13 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 		error = EFAULT;
 		goto out;
 	}
+	/*
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
+	 */
 	fuword8_noerr(&lp->mutex_type, (uint8_t *)&type);
+	suword8_noerr(&lp->mutex_type, type);
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_TRY, NULL);
@@ -3022,12 +3030,6 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 			return (set_errno(error));
 		return (0);
 	}
-	/*
-	 * Force Copy-on-write fault if lwp_mutex_t object is
-	 * defined to be MAP_PRIVATE and it was initialized to
-	 * USYNC_PROCESS.
-	 */
-	suword8_noerr(&lp->mutex_type, type);
 	if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
 	    &lwpchan, LWPCHAN_MPPOOL)) {
 		error = EFAULT;
@@ -3104,7 +3106,15 @@ lwp_mutex_unlock(lwp_mutex_t *lp)
 		error = EFAULT;
 		goto out;
 	}
+
+	/*
+	 * Force Copy-on-write if necessary and ensure that the
+	 * synchronization object resides in read/write memory.
+	 * Cause an EFAULT return now if this is not so.
+	 */
 	fuword8_noerr(&lp->mutex_type, (uint8_t *)&type);
+	suword8_noerr(&lp->mutex_type, type);
+
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_unlock(lp, type);
@@ -3115,11 +3125,6 @@ lwp_mutex_unlock(lwp_mutex_t *lp)
 
 	watched = watch_disable_addr((caddr_t)lp, sizeof (*lp), S_WRITE);
 
-	/*
-	 * Force Copy-on-write fault if lwp_mutex_t object is
-	 * defined to be MAP_PRIVATE, and type is USYNC_PROCESS
-	 */
-	suword8_noerr(&lp->mutex_type, type);
 	if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
 	    &lwpchan, LWPCHAN_MPPOOL)) {
 		error = EFAULT;
