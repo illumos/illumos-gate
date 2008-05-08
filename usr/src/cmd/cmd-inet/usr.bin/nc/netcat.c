@@ -244,10 +244,15 @@ main(int argc, char *argv[])
 			usage(1);
 	}
 
+	if (argc > 2)
+		usage(1);
+
 	if (lflag && sflag)
 		errx(1, "cannot use -s and -l");
 	if (lflag && rflag)
 		errx(1, "cannot use -r and -l");
+	if (lflag && (timeout >= 0))
+		warnx("-w has no effect with -l");
 	if (lflag && pflag) {
 		if (uport)
 			usage(1);
