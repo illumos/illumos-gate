@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,6 @@ port_watcher(void *v)
 	port_args_t		*p = (port_args_t *)v;
 	target_queue_t		*q = p->port_mgmtq;
 	int			l;
-	int			accept_err_sleep = 1;
 	const int		just_say_no = 1;
 	pthread_t		junk;
 
@@ -144,7 +143,7 @@ port_watcher(void *v)
 		}
 	}
 
-	if (listen(s, 5) < 0) {
+	if (listen(s, 128) < 0) {
 		queue_str(q, Q_GEN_ERRS, msg_status, "listen failed");
 		return (NULL);
 	}
@@ -155,13 +154,10 @@ port_watcher(void *v)
 		socklen = sizeof (st);
 		if ((fd = accept(s, (struct sockaddr *)&st,
 		    &socklen)) < 0) {
-			accept_err_sleep *= 2;
-			(void) sleep(accept_err_sleep);
-			if (accept_err_sleep > 60) {
-				accept_err_sleep = 1;
+			if (errno != EINTR)
 				queue_prt(q, Q_GEN_ERRS,
-				    "accept failed, errno %d", errno);
-			}
+				    "accept failed, %s", strerror(errno));
+			(void) sleep(1);
 			continue;
 		}
 

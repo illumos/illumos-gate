@@ -493,7 +493,7 @@ t10_cmd_done(t10_cmd_t *cmd)
  *	---+---------+---+---+---+---+-------+
  *       S6|T2/6     | - | - | - | - | - |T3 |
  *	---+---------+---+---+---+---+-------+
- *       S7|T4       | - | - | - | - | - |T6 |
+ *       S7|T4/5     | - | - | - | - | - |T6 |
  *	---+---------+---+---+---+---+-------+
  *
  * Events definitions:
@@ -514,9 +514,6 @@ static t10_cmd_state_t
 t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 {
 	t10_lu_impl_t	*lu		= c->c_lu;
-
-	queue_prt(mgmtq, Q_STE_ERRS,
-	    "t10_cmd_state_machine: State %u Trans %u\n", c->c_state, e);
 
 	/* ---- Callers must already hold the mutex ---- */
 	assert(pthread_mutex_trylock(&lu->l_cmd_mutex) != 0);
@@ -651,6 +648,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 	case T10_Cmd_S6_Freeing_In:
 		switch (e) {
 		case T10_Cmd_T2:
+		case T10_Cmd_T4: /* AIO complete */
 		case T10_Cmd_T6: /* warm reset */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
@@ -671,7 +669,8 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 
 	case T10_Cmd_S7_Freeing_AIO:
 		switch (e) {
-		case T10_Cmd_T4:
+		case T10_Cmd_T4:	/* AIO complete */
+		case T10_Cmd_T5:	/* command complete */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);

@@ -786,6 +786,21 @@ sbc_write_cmplt(emul_handle_t e)
 {
 	disk_io_t	*io	= (disk_io_t *)e;
 	t10_cmd_t	*cmd	= io->da_cmd;
+	int		sense_len;
+	uint64_t	err_blkno;
+
+	if (io->da_aio.a_aio.aio_return != io->da_data_len) {
+		err_blkno = io->da_lba + ((io->da_offset + 511) / 512);
+		cmd->c_resid = (io->da_lba_cnt * 512) - io->da_offset;
+		if (err_blkno > FIXED_SENSE_ADDL_INFO_LEN)
+			sense_len = INFORMATION_SENSE_DESCR;
+		else
+			sense_len = 0;
+		spc_sense_create(cmd, KEY_HARDWARE_ERROR, sense_len);
+		spc_sense_info(cmd, err_blkno);
+		trans_send_complete(cmd, STATUS_CHECK);
+		return;
+	}
 
 	if ((io->da_offset + io->da_data_len) < (io->da_lba_cnt * 512)) {
 		if (io->da_data_alloc == True) {
