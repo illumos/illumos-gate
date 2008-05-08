@@ -18493,6 +18493,119 @@ no_more_eagers:
 	}
 }
 
+static int
+tcp_getmyname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
+{
+	sin_t *sin = (sin_t *)sa;
+	sin6_t *sin6 = (sin6_t *)sa;
+
+	switch (tcp->tcp_family) {
+	case AF_INET:
+		ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
+
+		if (*salenp < sizeof (sin_t))
+			return (EINVAL);
+
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		sin->sin_port = tcp->tcp_lport;
+		sin->sin_addr.s_addr = tcp->tcp_ipha->ipha_src;
+		break;
+
+	case AF_INET6:
+		if (*salenp < sizeof (sin6_t))
+			return (EINVAL);
+
+		*sin6 = sin6_null;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = tcp->tcp_lport;
+		if (tcp->tcp_ipversion == IPV4_VERSION) {
+			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
+			    &sin6->sin6_addr);
+		} else {
+			sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
+		}
+		break;
+	}
+
+	return (0);
+}
+
+static int
+tcp_getpeername(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
+{
+	sin_t *sin = (sin_t *)sa;
+	sin6_t *sin6 = (sin6_t *)sa;
+
+	if (tcp->tcp_state < TCPS_SYN_RCVD)
+		return (ENOTCONN);
+
+	switch (tcp->tcp_family) {
+	case AF_INET:
+		ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
+
+		if (*salenp < sizeof (sin_t))
+			return (EINVAL);
+
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		sin->sin_port = tcp->tcp_fport;
+		IN6_V4MAPPED_TO_IPADDR(&tcp->tcp_remote_v6,
+		    sin->sin_addr.s_addr);
+		break;
+
+	case AF_INET6:
+		if (*salenp < sizeof (sin6_t))
+			return (EINVAL);
+
+		*sin6 = sin6_null;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = tcp->tcp_fport;
+		sin6->sin6_addr = tcp->tcp_remote_v6;
+		if (tcp->tcp_ipversion == IPV6_VERSION) {
+			sin6->sin6_flowinfo = tcp->tcp_ip6h->ip6_vcf &
+			    ~IPV6_VERS_AND_FLOW_MASK;
+		}
+		break;
+	}
+
+	return (0);
+}
+
+/*
+ * Handle special out-of-band ioctl requests (see PSARC/2008/265).
+ */
+static void
+tcp_wput_cmdblk(queue_t *q, mblk_t *mp)
+{
+	void	*data;
+	mblk_t	*datamp = mp->b_cont;
+	tcp_t	*tcp = Q_TO_TCP(q);
+	cmdblk_t *cmdp = (cmdblk_t *)mp->b_rptr;
+
+	if (datamp == NULL || MBLKL(datamp) < cmdp->cb_len) {
+		cmdp->cb_error = EPROTO;
+		qreply(q, mp);
+		return;
+	}
+
+	data = datamp->b_rptr;
+
+	switch (cmdp->cb_cmd) {
+	case TI_GETPEERNAME:
+		cmdp->cb_error = tcp_getpeername(tcp, data, &cmdp->cb_len);
+		break;
+	case TI_GETMYNAME:
+		cmdp->cb_error = tcp_getmyname(tcp, data, &cmdp->cb_len);
+		break;
+	default:
+		cmdp->cb_error = EINVAL;
+		break;
+	}
+
+	qreply(q, mp);
+}
+
 void
 tcp_wput(queue_t *q, mblk_t *mp)
 {
@@ -18525,6 +18638,11 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
 		    tcp_output, connp, SQTAG_TCP_OUTPUT);
 		return;
+
+	case M_CMD:
+		tcp_wput_cmdblk(q, mp);
+		return;
+
 	case M_PROTO:
 	case M_PCPROTO:
 		/*
@@ -18573,14 +18691,6 @@ tcp_wput(queue_t *q, mblk_t *mp)
 			tcp_ioctl_abort_conn(q, mp);
 			return;
 		case TI_GETPEERNAME:
-			if (tcp->tcp_state < TCPS_SYN_RCVD) {
-				iocp->ioc_error = ENOTCONN;
-				iocp->ioc_count = 0;
-				mp->b_datap->db_type = M_IOCACK;
-				qreply(q, mp);
-				return;
-			}
-			/* FALLTHRU */
 		case TI_GETMYNAME:
 			mi_copyin(q, mp, NULL,
 			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
@@ -21897,16 +22007,14 @@ static void
 tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 {
 	mblk_t	*mp1;
+	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	STRUCT_HANDLE(strbuf, sb);
-	uint16_t port;
-	queue_t 	*q = tcp->tcp_wq;
-	in6_addr_t	v6addr;
-	ipaddr_t	v4addr;
-	uint32_t	flowinfo = 0;
-	int		addrlen;
+	queue_t *q = tcp->tcp_wq;
+	int	error;
+	uint_t	addrlen;
 
 	/* Make sure it is one of ours. */
-	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
+	switch (iocp->ioc_cmd) {
 	case TI_GETMYNAME:
 	case TI_GETPEERNAME:
 		break;
@@ -21937,93 +22045,35 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 		return;
 	}
 
-	STRUCT_SET_HANDLE(sb, ((struct iocblk *)mp->b_rptr)->ioc_flag,
-	    (void *)mp1->b_rptr);
+	STRUCT_SET_HANDLE(sb, iocp->ioc_flag, (void *)mp1->b_rptr);
 	addrlen = tcp->tcp_family == AF_INET ? sizeof (sin_t) : sizeof (sin6_t);
-
 	if (STRUCT_FGET(sb, maxlen) < addrlen) {
 		mi_copy_done(q, mp, EINVAL);
 		return;
 	}
-	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
+
+	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
+	if (mp1 == NULL)
+		return;
+
+	switch (iocp->ioc_cmd) {
 	case TI_GETMYNAME:
-		if (tcp->tcp_family == AF_INET) {
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				v4addr = tcp->tcp_ipha->ipha_src;
-			} else {
-				/* can't return an address in this case */
-				v4addr = 0;
-			}
-		} else {
-			/* tcp->tcp_family == AF_INET6 */
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
-				    &v6addr);
-			} else {
-				v6addr = tcp->tcp_ip6h->ip6_src;
-			}
-		}
-		port = tcp->tcp_lport;
+		error = tcp_getmyname(tcp, (void *)mp1->b_rptr, &addrlen);
 		break;
 	case TI_GETPEERNAME:
-		if (tcp->tcp_family == AF_INET) {
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				IN6_V4MAPPED_TO_IPADDR(&tcp->tcp_remote_v6,
-				    v4addr);
-			} else {
-				/* can't return an address in this case */
-				v4addr = 0;
-			}
-		} else {
-			/* tcp->tcp_family == AF_INET6) */
-			v6addr = tcp->tcp_remote_v6;
-			if (tcp->tcp_ipversion == IPV6_VERSION) {
-				/*
-				 * No flowinfo if tcp->tcp_ipversion is v4.
-				 *
-				 * flowinfo was already initialized to zero
-				 * where it was declared above, so only
-				 * set it if ipversion is v6.
-				 */
-				flowinfo = tcp->tcp_ip6h->ip6_vcf &
-				    ~IPV6_VERS_AND_FLOW_MASK;
-			}
-		}
-		port = tcp->tcp_fport;
+		error = tcp_getpeername(tcp, (void *)mp1->b_rptr, &addrlen);
 		break;
-	default:
-		mi_copy_done(q, mp, EPROTO);
-		return;
 	}
-	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
-	if (!mp1)
-		return;
 
-	if (tcp->tcp_family == AF_INET) {
-		sin_t *sin;
-
-		STRUCT_FSET(sb, len, (int)sizeof (sin_t));
-		sin = (sin_t *)mp1->b_rptr;
-		mp1->b_wptr = (uchar_t *)&sin[1];
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		sin->sin_addr.s_addr = v4addr;
-		sin->sin_port = port;
+	if (error != 0) {
+		mi_copy_done(q, mp, error);
 	} else {
-		/* tcp->tcp_family == AF_INET6 */
-		sin6_t *sin6;
+		mp1->b_wptr += addrlen;
+		STRUCT_FSET(sb, len, addrlen);
 
-		STRUCT_FSET(sb, len, (int)sizeof (sin6_t));
-		sin6 = (sin6_t *)mp1->b_rptr;
-		mp1->b_wptr = (uchar_t *)&sin6[1];
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_flowinfo = flowinfo;
-		sin6->sin6_addr = v6addr;
-		sin6->sin6_port = port;
+		/* Copy out the address */
+		mi_copyout(q, mp);
 	}
-	/* Copy out the address */
-	mi_copyout(q, mp);
 }
 
 /*

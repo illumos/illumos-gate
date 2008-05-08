@@ -7273,6 +7273,142 @@ done:
 	return (mp);
 }
 
+
+static int
+udp_getpeername(udp_t *udp, struct sockaddr *sa, uint_t *salenp)
+{
+	sin_t *sin = (sin_t *)sa;
+	sin6_t *sin6 = (sin6_t *)sa;
+
+	ASSERT(RW_LOCK_HELD(&udp->udp_rwlock));
+
+	if (udp->udp_state != TS_DATA_XFER)
+		return (ENOTCONN);
+
+	switch (udp->udp_family) {
+	case AF_INET:
+		ASSERT(udp->udp_ipversion == IPV4_VERSION);
+
+		if (*salenp < sizeof (sin_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin_t);
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		sin->sin_port = udp->udp_dstport;
+		sin->sin_addr.s_addr = V4_PART_OF_V6(udp->udp_v6dst);
+		break;
+
+	case AF_INET6:
+		if (*salenp < sizeof (sin6_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin6_t);
+		*sin6 = sin6_null;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = udp->udp_dstport;
+		sin6->sin6_addr = udp->udp_v6dst;
+		sin6->sin6_flowinfo = udp->udp_flowinfo;
+		break;
+	}
+
+	return (0);
+}
+
+static int
+udp_getmyname(udp_t *udp, struct sockaddr *sa, uint_t *salenp)
+{
+	sin_t *sin = (sin_t *)sa;
+	sin6_t *sin6 = (sin6_t *)sa;
+
+	ASSERT(RW_LOCK_HELD(&udp->udp_rwlock));
+
+	switch (udp->udp_family) {
+	case AF_INET:
+		ASSERT(udp->udp_ipversion == IPV4_VERSION);
+
+		if (*salenp < sizeof (sin_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin_t);
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		sin->sin_port = udp->udp_port;
+
+		/*
+		 * If udp_v6src is unspecified, we might be bound to broadcast
+		 * / multicast.  Use udp_bound_v6src as local address instead
+		 * (that could also still be unspecified).
+		 */
+		if (!IN6_IS_ADDR_V4MAPPED_ANY(&udp->udp_v6src) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&udp->udp_v6src)) {
+			sin->sin_addr.s_addr = V4_PART_OF_V6(udp->udp_v6src);
+		} else {
+			sin->sin_addr.s_addr =
+			    V4_PART_OF_V6(udp->udp_bound_v6src);
+		}
+		break;
+
+	case AF_INET6:
+		if (*salenp < sizeof (sin6_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin6_t);
+		*sin6 = sin6_null;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = udp->udp_port;
+		sin6->sin6_flowinfo = udp->udp_flowinfo;
+
+		/*
+		 * If udp_v6src is unspecified, we might be bound to broadcast
+		 * / multicast.  Use udp_bound_v6src as local address instead
+		 * (that could also still be unspecified).
+		 */
+		if (!IN6_IS_ADDR_UNSPECIFIED(&udp->udp_v6src))
+			sin6->sin6_addr = udp->udp_v6src;
+		else
+			sin6->sin6_addr = udp->udp_bound_v6src;
+		break;
+	}
+
+	return (0);
+}
+
+/*
+ * Handle special out-of-band ioctl requests (see PSARC/2008/265).
+ */
+static void
+udp_wput_cmdblk(queue_t *q, mblk_t *mp)
+{
+	void	*data;
+	mblk_t	*datamp = mp->b_cont;
+	udp_t	*udp = Q_TO_UDP(q);
+	cmdblk_t *cmdp = (cmdblk_t *)mp->b_rptr;
+
+	if (datamp == NULL || MBLKL(datamp) < cmdp->cb_len) {
+		cmdp->cb_error = EPROTO;
+		qreply(q, mp);
+		return;
+	}
+	data = datamp->b_rptr;
+
+	rw_enter(&udp->udp_rwlock, RW_READER);
+	switch (cmdp->cb_cmd) {
+	case TI_GETPEERNAME:
+		cmdp->cb_error = udp_getpeername(udp, data, &cmdp->cb_len);
+		break;
+	case TI_GETMYNAME:
+		cmdp->cb_error = udp_getmyname(udp, data, &cmdp->cb_len);
+		break;
+	default:
+		cmdp->cb_error = EINVAL;
+		break;
+	}
+	rw_exit(&udp->udp_rwlock);
+
+	qreply(q, mp);
+}
+
 static void
 udp_wput_other(queue_t *q, mblk_t *mp)
 {
@@ -7293,6 +7429,10 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 	cr = DB_CREDDEF(mp, connp->conn_cred);
 
 	switch (db->db_type) {
+	case M_CMD:
+		udp_wput_cmdblk(q, mp);
+		return;
+
 	case M_PROTO:
 	case M_PCPROTO:
 		if (mp->b_wptr - rptr < sizeof (t_scalar_t)) {
@@ -7492,16 +7632,14 @@ static void
 udp_wput_iocdata(queue_t *q, mblk_t *mp)
 {
 	mblk_t	*mp1;
+	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	STRUCT_HANDLE(strbuf, sb);
-	uint16_t port;
-	in6_addr_t	v6addr;
-	ipaddr_t	v4addr;
-	uint32_t	flowinfo = 0;
-	int		addrlen;
-	udp_t		*udp = Q_TO_UDP(q);
+	udp_t	*udp = Q_TO_UDP(q);
+	int	error;
+	uint_t	addrlen;
 
 	/* Make sure it is one of ours. */
-	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
+	switch (iocp->ioc_cmd) {
 	case TI_GETMYNAME:
 	case TI_GETPEERNAME:
 		break;
@@ -7544,101 +7682,38 @@ udp_wput_iocdata(queue_t *q, mblk_t *mp)
 	 * and TI_GETPEERNAME.  Next we copyout the requested
 	 * address and then we'll copyout the strbuf.
 	 */
-	STRUCT_SET_HANDLE(sb, ((struct iocblk *)mp->b_rptr)->ioc_flag,
-	    (void *)mp1->b_rptr);
-	if (udp->udp_family == AF_INET)
-		addrlen = sizeof (sin_t);
-	else
-		addrlen = sizeof (sin6_t);
-
+	STRUCT_SET_HANDLE(sb, iocp->ioc_flag, (void *)mp1->b_rptr);
+	addrlen = udp->udp_family == AF_INET ? sizeof (sin_t) : sizeof (sin6_t);
 	if (STRUCT_FGET(sb, maxlen) < addrlen) {
 		mi_copy_done(q, mp, EINVAL);
 		return;
 	}
-	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
+
+	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
+	if (mp1 == NULL)
+		return;
+
+	rw_enter(&udp->udp_rwlock, RW_READER);
+	switch (iocp->ioc_cmd) {
 	case TI_GETMYNAME:
-		if (udp->udp_family == AF_INET) {
-			ASSERT(udp->udp_ipversion == IPV4_VERSION);
-			if (!IN6_IS_ADDR_V4MAPPED_ANY(&udp->udp_v6src) &&
-			    !IN6_IS_ADDR_UNSPECIFIED(&udp->udp_v6src)) {
-				v4addr = V4_PART_OF_V6(udp->udp_v6src);
-			} else {
-				/*
-				 * INADDR_ANY
-				 * udp_v6src is not set, we might be bound to
-				 * broadcast/multicast. Use udp_bound_v6src as
-				 * local address instead (that could
-				 * also still be INADDR_ANY)
-				 */
-				v4addr = V4_PART_OF_V6(udp->udp_bound_v6src);
-			}
-		} else {
-			/* udp->udp_family == AF_INET6 */
-			if (!IN6_IS_ADDR_UNSPECIFIED(&udp->udp_v6src)) {
-				v6addr = udp->udp_v6src;
-			} else {
-				/*
-				 * UNSPECIFIED
-				 * udp_v6src is not set, we might be bound to
-				 * broadcast/multicast. Use udp_bound_v6src as
-				 * local address instead (that could
-				 * also still be UNSPECIFIED)
-				 */
-				v6addr = udp->udp_bound_v6src;
-			}
-		}
-		port = udp->udp_port;
+		error = udp_getmyname(udp, (void *)mp1->b_rptr, &addrlen);
 		break;
 	case TI_GETPEERNAME:
-		if (udp->udp_state != TS_DATA_XFER) {
-			mi_copy_done(q, mp, ENOTCONN);
-			return;
-		}
-		if (udp->udp_family == AF_INET) {
-			ASSERT(udp->udp_ipversion == IPV4_VERSION);
-			v4addr = V4_PART_OF_V6(udp->udp_v6dst);
-		} else {
-			/* udp->udp_family == AF_INET6) */
-			v6addr = udp->udp_v6dst;
-			flowinfo = udp->udp_flowinfo;
-		}
-		port = udp->udp_dstport;
+		error = udp_getpeername(udp, (void *)mp1->b_rptr, &addrlen);
 		break;
-	default:
-		mi_copy_done(q, mp, EPROTO);
-		return;
 	}
-	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
-	if (!mp1)
-		return;
+	rw_exit(&udp->udp_rwlock);
 
-	if (udp->udp_family == AF_INET) {
-		sin_t *sin;
-
-		STRUCT_FSET(sb, len, (int)sizeof (sin_t));
-		sin = (sin_t *)mp1->b_rptr;
-		mp1->b_wptr = (uchar_t *)&sin[1];
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		sin->sin_addr.s_addr = v4addr;
-		sin->sin_port = port;
+	if (error != 0) {
+		mi_copy_done(q, mp, error);
 	} else {
-		/* udp->udp_family == AF_INET6 */
-		sin6_t *sin6;
+		mp1->b_wptr += addrlen;
+		STRUCT_FSET(sb, len, addrlen);
 
-		STRUCT_FSET(sb, len, (int)sizeof (sin6_t));
-		sin6 = (sin6_t *)mp1->b_rptr;
-		mp1->b_wptr = (uchar_t *)&sin6[1];
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_flowinfo = flowinfo;
-		sin6->sin6_addr = v6addr;
-		sin6->sin6_port = port;
+		/* Copy out the address */
+		mi_copyout(q, mp);
 	}
-	/* Copy out the address */
-	mi_copyout(q, mp);
 }
-
 
 static int
 udp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,

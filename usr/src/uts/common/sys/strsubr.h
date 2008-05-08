@@ -244,6 +244,7 @@ typedef struct stdata {
 	kcondvar_t	sd_zcopy_wait;
 	uint_t		sd_copyflag;	/* copy-related flags */
 	zoneid_t	sd_anchorzone;	/* Allow removal from same zone only */
+	struct msgb	*sd_cmdblk;	/* reply from _I_CMD */
 } stdata_t;
 
 /*
@@ -278,7 +279,7 @@ typedef struct stdata {
 	/*		0x00020000	   unused */
 	/*		0x00040000	   unused */
 #define	STRTOSTOP	0x00080000	/* block background writes */
-	/*		0x00100000	   unused */
+#define	STRCMDWAIT	0x00100000 	/* someone is doing an _I_CMD */
 	/*		0x00200000	   unused */
 #define	STRMOUNT	0x00400000	/* stream is mounted */
 #define	STRNOTATMARK	0x00800000	/* Not at mark (when empty read q) */

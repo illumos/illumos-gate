@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,7 +151,7 @@ static const struct str_flags stdf[] = {
 	{ SF(0x00020000),	"unused"				},
 	{ SF(0x00040000),	"unused"				},
 	{ SF(STRTOSTOP),	"block background writes"		},
-	{ SF(0x00100000),	"unused"				},
+	{ SF(STRCMDWAIT),	"someone is doing an _I_CMD"		},
 	{ SF(0x00200000),	"unused"				},
 	{ SF(STRMOUNT),		"stream is mounted"			},
 	{ SF(STRNOTATMARK),	"Not at mark (when empty read q)"	},
@@ -211,6 +210,7 @@ static const strtypes_t mbt[] = {
 	{ "M_STARTI",	M_STARTI,	"restart reception after stop"	},
 	{ "M_PCEVENT",	M_PCEVENT,	"Obsoleted: do not use"		},
 	{ "M_UNHANGUP",	M_UNHANGUP,	"line reconnect"		},
+	{ "M_CMD",	M_CMD,		"out-of-band ioctl command"	},
 	{ NULL,		0,		NULL 				}
 };
 
@@ -1255,17 +1255,17 @@ mblk_prt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		quiet = TRUE;
 
 	if (mdb_getopts(argc, argv,
-		'v', MDB_OPT_SETBITS, TRUE, &verbose,
-		'q', MDB_OPT_SETBITS, TRUE, &quiet,
-		'f', MDB_OPT_STR, &flag,
-		'F', MDB_OPT_STR, &not_flag,
-		't', MDB_OPT_STR, &typ,
-		'T', MDB_OPT_STR, &not_typ,
-		'l', MDB_OPT_UINT64, &len,
-		'L', MDB_OPT_UINT64, &llen,
-		'G', MDB_OPT_UINT64, &glen,
-		'b', MDB_OPT_UINT64, &blen,
-		'd', MDB_OPT_UINTPTR, &dbaddr,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    'q', MDB_OPT_SETBITS, TRUE, &quiet,
+	    'f', MDB_OPT_STR, &flag,
+	    'F', MDB_OPT_STR, &not_flag,
+	    't', MDB_OPT_STR, &typ,
+	    'T', MDB_OPT_STR, &not_typ,
+	    'l', MDB_OPT_UINT64, &len,
+	    'L', MDB_OPT_UINT64, &llen,
+	    'G', MDB_OPT_UINT64, &glen,
+	    'b', MDB_OPT_UINT64, &blen,
+	    'd', MDB_OPT_UINTPTR, &dbaddr,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -1328,16 +1328,17 @@ mblk_prt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	db_type = dblk.db_type;
 
 	/* M_DATA is 0, so tmask has special value 0xff for it */
-	if ((tmask != 0) &&
-	    (((tmask == M_DATA_T) && (db_type != M_DATA)) ||
-		((tmask != M_DATA_T) && (db_type != tmask))))
-		return (DCMD_OK);
+	if (tmask != 0) {
+		if ((tmask == M_DATA_T && db_type != M_DATA) ||
+		    (tmask != M_DATA_T && db_type != tmask))
+			return (DCMD_OK);
+	}
 
-
-	if ((not_tmask != 0) &&
-	    (((not_tmask == M_DATA_T) && (db_type == M_DATA)) ||
-		(db_type == not_tmask)))
-		return (DCMD_OK);
+	if (not_tmask != 0) {
+		if ((not_tmask == M_DATA_T && db_type == M_DATA) ||
+		    (db_type == not_tmask))
+			return (DCMD_OK);
+	}
 
 	if (dbaddr != 0 && (uintptr_t)mblk.b_datap != dbaddr)
 		return (DCMD_OK);
@@ -1577,9 +1578,9 @@ queue_help(void)
 	    "	q2wrq:		given a queue addr print write queue pointer\n"
 	    "	q2otherq:	given a queue addr print other queue pointer\n"
 	    "	q2syncq:	given a queue addr print syncq pointer"
-		" (::help syncq)\n"
+	    " (::help syncq)\n"
 	    "	q2stream:	given a queue addr print its stream pointer\n"
-		"\t\t(see ::help stream and ::help stdata)\n\n"
+	    "\t\t(see ::help stream and ::help stdata)\n\n"
 	    "To walk q_next pointer of the queue use\n"
 	    "	queue_addr::walk qnext\n");
 }

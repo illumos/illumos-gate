@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,14 +277,12 @@ extern "C" {
  * IOCTLs (STR|050) - (STR|055) are available for use.
  */
 
-#define	_I_MUXID2FD	(STR|056)	/* Private, get a fd from a muxid */
-#define	_I_INSERT	(STR|057)	/* Private, insert a module */
-#define	_I_REMOVE	(STR|060)	/* Private, remove a module */
-
-#define	_I_GETPEERCRED	(STR|061)	/* Private, get peer cred */
-
-/* Private Layered Driver ioctl's */
-#define	_I_PLINK_LH	(STR|062)
+#define	_I_MUXID2FD	(STR|056)	/* Private: get a fd from a muxid */
+#define	_I_INSERT	(STR|057)	/* Private: insert a module */
+#define	_I_REMOVE	(STR|060)	/* Private: remove a module */
+#define	_I_GETPEERCRED	(STR|061)	/* Private: get peer cred */
+#define	_I_PLINK_LH	(STR|062)	/* Private: Layered Driver ioctl */
+#define	_I_CMD		(STR|063) 	/* Private: send ioctl via M_CMD */
 
 /*
  * User level ioctl format for ioctls that go downstream (I_STR)
@@ -314,6 +311,22 @@ struct strioctl32 {
 #define	_INFTIM		-1
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #define	INFTIM		_INFTIM
+#endif
+
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+/*
+ * For _I_CMD: similar to strioctl, but with included buffer (to avoid copyin/
+ * copyout from another address space).  NOTE: the size of this structure must
+ * be less than libproc.h`MAXARGL for pr_ioctl() to handle it.
+ */
+#define	STRCMDBUFSIZE			2048
+typedef struct strcmd {
+	int 	sc_cmd;			/* ioctl command */
+	int	sc_timeout;		/* timeout value (in seconds) */
+	int	sc_len;			/* length of data */
+	int	sc_pad;
+	char	sc_buf[STRCMDBUFSIZE];	/* data buffer */
+} strcmd_t;
 #endif
 
 /*

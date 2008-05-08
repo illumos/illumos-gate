@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -469,6 +469,7 @@ typedef	struct	bcache {
 #define	M_STARTI	0x90		/* restart reception after stop */
 #define	M_PCEVENT	0x91		/* Obsoleted: do not use */
 #define	M_UNHANGUP	0x92		/* line reconnect, sigh */
+#define	M_CMD		0x93		/* out-of-band ioctl command */
 
 /*
  * Queue message class definitions.
@@ -588,7 +589,6 @@ union ioctypes {
  * Options structure for M_SETOPTS message.  This is sent upstream
  * by a module or driver to set stream head options.
  */
-
 struct stroptions {
 	uint_t	so_flags;		/* options to set */
 	short	so_readopt;		/* read option */
@@ -663,6 +663,16 @@ typedef struct infod {
 #define	INFOD_BYTES		0x04	/* return msgbsize() of all mblk(s) */
 #define	INFOD_COUNT		0x08	/* return count of mblk(s) */
 #define	INFOD_COPYOUT		0x10	/* copyout any M_DATA mblk(s) */
+
+/*
+ * Structure used by _I_CMD mechanism, similar in spirit to iocblk.
+ */
+typedef struct cmdblk {
+	int		cb_cmd;		/* ioctl command type */
+	cred_t		*cb_cr;		/* full credentials */
+	uint_t		cb_len;		/* payload size */
+	int		cb_error;	/* error code */
+} cmdblk_t;
 
 #endif /* _KERNEL */
 

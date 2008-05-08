@@ -143,6 +143,7 @@ static uint32_t ioc_id;
 static void putback(struct stdata *, queue_t *, mblk_t *, int);
 static void strcleanall(struct vnode *);
 static int strwsrv(queue_t *);
+static int strdocmd(struct stdata *, struct strcmd *, cred_t *);
 
 /*
  * qinit and module_info structures for stream head read and write queues
@@ -391,6 +392,7 @@ ckreturn:
 	stp->sd_wroff = 0;
 	stp->sd_tail = 0;
 	stp->sd_iocblk = NULL;
+	stp->sd_cmdblk = NULL;
 	stp->sd_pushcnt = 0;
 	stp->sd_qn_minpsz = 0;
 	stp->sd_qn_maxpsz = INFPSZ - 1;	/* used to check for initialization */
@@ -811,6 +813,8 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 	vp->v_stream = NULL;
 	mutex_exit(&vp->v_lock);
 	mutex_enter(&stp->sd_lock);
+	freemsg(stp->sd_cmdblk);
+	stp->sd_cmdblk = NULL;
 	stp->sd_flag &= ~STRCLOSE;
 	cv_broadcast(&stp->sd_monitor);
 	mutex_exit(&stp->sd_lock);
@@ -2124,6 +2128,24 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 		freemsg(bp);
 		return (0);
 
+	case M_CMD:
+		if (MBLKL(bp) != sizeof (cmdblk_t)) {
+			freemsg(bp);
+			return (0);
+		}
+
+		mutex_enter(&stp->sd_lock);
+		if (stp->sd_flag & STRCMDWAIT) {
+			ASSERT(stp->sd_cmdblk == NULL);
+			stp->sd_cmdblk = bp;
+			cv_broadcast(&stp->sd_monitor);
+			mutex_exit(&stp->sd_lock);
+		} else {
+			mutex_exit(&stp->sd_lock);
+			freemsg(bp);
+		}
+		return (0);
+
 	case M_FLUSH:
 		/*
 		 * Flush queues.  The indication of which queues to flush
@@ -3180,6 +3202,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
     cred_t *crp, int *rvalp)
 {
 	struct stdata *stp;
+	struct strcmd *scp;
 	struct strioctl strioc;
 	struct uio uio;
 	struct iovec iov;
@@ -3550,6 +3573,39 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			error = strcopyout_strioctl(&strioc, (void *)arg,
 			    flag, copyflag);
 		}
+		return (error);
+
+	case _I_CMD:
+		/*
+		 * Like I_STR, but without using M_IOC* messages and without
+		 * copyins/copyouts beyond the passed-in argument.
+		 */
+		if (stp->sd_flag & STRHUP)
+			return (ENXIO);
+
+		if ((scp = kmem_alloc(sizeof (strcmd_t), KM_NOSLEEP)) == NULL)
+			return (ENOMEM);
+
+		if (copyin((void *)arg, scp, sizeof (strcmd_t))) {
+			kmem_free(scp, sizeof (strcmd_t));
+			return (EFAULT);
+		}
+
+		access = job_control_type(scp->sc_cmd);
+		mutex_enter(&stp->sd_lock);
+		if (access != -1 && (error = i_straccess(stp, access)) != 0) {
+			mutex_exit(&stp->sd_lock);
+			kmem_free(scp, sizeof (strcmd_t));
+			return (error);
+		}
+		mutex_exit(&stp->sd_lock);
+
+		*rvalp = 0;
+		if ((error = strdocmd(stp, scp, crp)) == 0) {
+			if (copyout(scp, (void *)arg, sizeof (strcmd_t)))
+				error = EFAULT;
+		}
+		kmem_free(scp, sizeof (strcmd_t));
 		return (error);
 
 	case I_NREAD:
@@ -6316,6 +6372,140 @@ waitioc:
 	}
 
 	freemsg(bp);
+	crfree(crp);
+	return (error);
+}
+
+/*
+ * Send an M_CMD message downstream and wait for a reply.  This is a ptools
+ * special used to retrieve information from modules/drivers a stream without
+ * being subjected to flow control or interfering with pending messages on the
+ * stream (e.g. an ioctl in flight).
+ */
+int
+strdocmd(struct stdata *stp, struct strcmd *scp, cred_t *crp)
+{
+	mblk_t *mp;
+	struct cmdblk *cmdp;
+	int error = 0;
+	int errs = STRHUP|STRDERR|STWRERR|STPLEX;
+	clock_t rval, timeout = STRTIMOUT;
+
+	if (scp->sc_len < 0 || scp->sc_len > sizeof (scp->sc_buf) ||
+	    scp->sc_timeout < -1)
+		return (EINVAL);
+
+	if (scp->sc_timeout > 0)
+		timeout = scp->sc_timeout * MILLISEC;
+
+	if ((mp = allocb_cred(sizeof (struct cmdblk), crp)) == NULL)
+		return (ENOMEM);
+
+	crhold(crp);
+
+	cmdp = (struct cmdblk *)mp->b_wptr;
+	cmdp->cb_cr = crp;
+	cmdp->cb_cmd = scp->sc_cmd;
+	cmdp->cb_len = scp->sc_len;
+	cmdp->cb_error = 0;
+	mp->b_wptr += sizeof (struct cmdblk);
+
+	DB_TYPE(mp) = M_CMD;
+	DB_CPID(mp) = curproc->p_pid;
+
+	/*
+	 * Copy in the payload.
+	 */
+	if (cmdp->cb_len > 0) {
+		mp->b_cont = allocb_cred(sizeof (scp->sc_buf), crp);
+		if (mp->b_cont == NULL) {
+			error = ENOMEM;
+			goto out;
+		}
+
+		/* cb_len comes from sc_len, which has already been checked */
+		ASSERT(cmdp->cb_len <= sizeof (scp->sc_buf));
+		(void) bcopy(scp->sc_buf, mp->b_cont->b_wptr, cmdp->cb_len);
+		mp->b_cont->b_wptr += cmdp->cb_len;
+		DB_CPID(mp->b_cont) = curproc->p_pid;
+	}
+
+	/*
+	 * Since this mechanism is strictly for ptools, and since only one
+	 * process can be grabbed at a time, we simply fail if there's
+	 * currently an operation pending.
+	 */
+	mutex_enter(&stp->sd_lock);
+	if (stp->sd_flag & STRCMDWAIT) {
+		mutex_exit(&stp->sd_lock);
+		error = EBUSY;
+		goto out;
+	}
+	stp->sd_flag |= STRCMDWAIT;
+	ASSERT(stp->sd_cmdblk == NULL);
+	mutex_exit(&stp->sd_lock);
+
+	putnext(stp->sd_wrq, mp);
+	mp = NULL;
+
+	/*
+	 * Timed wait for acknowledgment.  If the reply has already arrived,
+	 * don't sleep.  If awakened from the sleep, fail only if the reply
+	 * has not arrived by then.  Otherwise, process the reply.
+	 */
+	mutex_enter(&stp->sd_lock);
+	while (stp->sd_cmdblk == NULL) {
+		if (stp->sd_flag & errs) {
+			if ((error = strgeterr(stp, errs, 0)) != 0)
+				goto waitout;
+		}
+
+		rval = str_cv_wait(&stp->sd_monitor, &stp->sd_lock, timeout, 0);
+		if (stp->sd_cmdblk != NULL)
+			break;
+
+		if (rval <= 0) {
+			error = (rval == 0) ? EINTR : ETIME;
+			goto waitout;
+		}
+	}
+
+	/*
+	 * We received a reply.
+	 */
+	mp = stp->sd_cmdblk;
+	stp->sd_cmdblk = NULL;
+	ASSERT(mp != NULL && DB_TYPE(mp) == M_CMD);
+	ASSERT(stp->sd_flag & STRCMDWAIT);
+	stp->sd_flag &= ~STRCMDWAIT;
+	mutex_exit(&stp->sd_lock);
+
+	cmdp = (struct cmdblk *)mp->b_rptr;
+	if ((error = cmdp->cb_error) != 0)
+		goto out;
+
+	/*
+	 * Data may have been returned in the reply (cb_len > 0).
+	 * If so, copy it out to the user's buffer.
+	 */
+	if (cmdp->cb_len > 0) {
+		if (mp->b_cont == NULL || MBLKL(mp->b_cont) < cmdp->cb_len) {
+			error = EPROTO;
+			goto out;
+		}
+
+		cmdp->cb_len = MIN(cmdp->cb_len, sizeof (scp->sc_buf));
+		(void) bcopy(mp->b_cont->b_rptr, scp->sc_buf, cmdp->cb_len);
+	}
+	scp->sc_len = cmdp->cb_len;
+out:
+	freemsg(mp);
+	crfree(crp);
+	return (error);
+waitout:
+	ASSERT(stp->sd_cmdblk == NULL);
+	stp->sd_flag &= ~STRCMDWAIT;
+	mutex_exit(&stp->sd_lock);
 	crfree(crp);
 	return (error);
 }

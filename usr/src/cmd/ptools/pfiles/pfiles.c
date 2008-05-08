@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,22 +33,20 @@
 #include <ctype.h>
 #include <string.h>
 #include <signal.h>
-#include <errno.h>
 #include <dirent.h>
 #include <limits.h>
 #include <door.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include <sys/mkdev.h>
+#include <sys/stropts.h>
+#include <sys/timod.h>
 #include <sys/un.h>
-#include <netdb.h>
 #include <libproc.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
-#include <netdb.h>
 
 #define	copyflock(dst, src) \
 	(dst).l_type = (src).l_type;		\
@@ -66,6 +64,7 @@ static boolean_t nflag = B_FALSE;
 static	void	intr(int);
 static	void	dofcntl(struct ps_prochandle *, int, int, int);
 static	void	dosocket(struct ps_prochandle *, int);
+static	void	dotli(struct ps_prochandle *, int);
 static	void	show_files(struct ps_prochandle *);
 static	void	show_fileflags(int);
 static	void	show_door(struct ps_prochandle *, int);
@@ -196,6 +195,7 @@ show_files(struct ps_prochandle *Pr)
 {
 	DIR *dirp;
 	struct dirent *dentp;
+	const char *dev;
 	char pname[100];
 	char fname[PATH_MAX];
 	struct stat64 statb;
@@ -305,13 +305,34 @@ show_files(struct ps_prochandle *Pr)
 
 			(void) sprintf(pname, "/proc/%d/path/%d", (int)pid, fd);
 
-			if ((ret = readlink(pname, fname, PATH_MAX - 1)) > 0) {
-				fname[ret] = '\0';
-				(void) printf("      %s\n", fname);
+			if ((ret = readlink(pname, fname, PATH_MAX - 1)) <= 0)
+				continue;
+
+			fname[ret] = '\0';
+
+			if ((statb.st_mode & S_IFMT) == S_IFCHR &&
+			    (dev = strrchr(fname, ':')) != NULL) {
+				/*
+				 * There's no elegant way to determine if a
+				 * character device supports TLI, so we lame
+				 * out and just check a hardcoded list of
+				 * known TLI devices.
+				 */
+				int i;
+				const char *tlidevs[] =
+				    { "tcp", "tcp6", "udp", "udp6", NULL };
+
+				dev++; /* skip past the `:' */
+				for (i = 0; tlidevs[i] != NULL; i++) {
+					if (strcmp(dev, tlidevs[i]) == 0) {
+						dotli(Pr, fd);
+						break;
+					}
+				}
 			}
+			(void) printf("      %s\n", fname);
 		}
 	}
-
 	(void) closedir(dirp);
 }
 
@@ -469,13 +490,15 @@ show_door(struct ps_prochandle *Pr, int fd)
 		(void) printf("pid %d", (int)door_info.di_target);
 }
 
+/*
+ * Print out the socket address pointed to by `sa'.  `len' is only
+ * needed for AF_UNIX sockets.
+ */
 static void
 show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 {
-	/* LINTED pointer assignment */
-	struct sockaddr_in *so_in = (struct sockaddr_in *)sa;
-	/* LINTED pointer assignment */
-	struct sockaddr_in6 *so_in6 = (struct sockaddr_in6 *)sa;
+	struct sockaddr_in *so_in = (struct sockaddr_in *)(void *)sa;
+	struct sockaddr_in6 *so_in6 = (struct sockaddr_in6 *)(void *)sa;
 	struct sockaddr_un *so_un = (struct sockaddr_un *)sa;
 	char  abuf[INET6_ADDRSTRLEN];
 	const char *p;
@@ -484,14 +507,12 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 	default:
 		return;
 	case AF_INET:
-		(void) printf("\t%s: AF_INET %s  port: %u\n",
-		    str,
+		(void) printf("\t%s: AF_INET %s  port: %u\n", str,
 		    inet_ntop(AF_INET, &so_in->sin_addr, abuf, sizeof (abuf)),
 		    ntohs(so_in->sin_port));
 		return;
 	case AF_INET6:
-		(void) printf("\t%s: AF_INET6 %s  port: %u\n",
-		    str,
+		(void) printf("\t%s: AF_INET6 %s  port: %u\n", str,
 		    inet_ntop(AF_INET6, &so_in6->sin6_addr,
 		    abuf, sizeof (abuf)),
 		    ntohs(so_in->sin_port));
@@ -500,7 +521,7 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 		if (len >= sizeof (so_un->sun_family)) {
 			/* Null terminate */
 			len -= sizeof (so_un->sun_family);
-			so_un->sun_path[len] = NULL;
+			so_un->sun_path[len] = '\0';
 			(void) printf("\t%s: AF_UNIX %s\n",
 			    str, so_un->sun_path);
 		}
@@ -632,8 +653,7 @@ dosocket(struct ps_prochandle *Pr, int fd)
 	int type, tlen;
 
 	tlen = sizeof (type);
-	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_TYPE, &type, &tlen)
-	    == 0)
+	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_TYPE, &type, &tlen) == 0)
 		show_socktype((uint_t)type);
 
 	show_sockopts(Pr, fd);
@@ -645,4 +665,22 @@ dosocket(struct ps_prochandle *Pr, int fd)
 	len = sizeof (buf);
 	if (pr_getpeername(Pr, fd, sa, &len) == 0)
 		show_sockaddr("peername", sa, len);
+}
+
+/* the file is a TLI endpoint */
+static void
+dotli(struct ps_prochandle *Pr, int fd)
+{
+	struct strcmd strcmd;
+
+	strcmd.sc_len = STRCMDBUFSIZE;
+	strcmd.sc_timeout = 5;
+
+	strcmd.sc_cmd = TI_GETMYNAME;
+	if (pr_ioctl(Pr, fd, _I_CMD, &strcmd, sizeof (strcmd)) == 0)
+		show_sockaddr("sockname", (void *)&strcmd.sc_buf, 0);
+
+	strcmd.sc_cmd = TI_GETPEERNAME;
+	if (pr_ioctl(Pr, fd, _I_CMD, &strcmd, sizeof (strcmd)) == 0)
+		show_sockaddr("peername", (void *)&strcmd.sc_buf, 0);
 }

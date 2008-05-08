@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,6 +124,15 @@ dedump_ssize(mblk_t *mp)
 }
 
 static void
+dedump_cmdblk(mblk_t *mp)
+{
+	struct cmdblk *cbp = (struct cmdblk *)mp->b_rptr;
+
+	(void) printf("%s cmd %x cred %p len %u error %d\n", hdr, cbp->cb_cmd,
+	    (void *)cbp->cb_cr, cbp->cb_len, cbp->cb_error);
+}
+
+static void
 dedump_iocblk(mblk_t *mp)
 {
 	struct iocblk *ic = (struct iocblk *)mp->b_rptr;
@@ -205,6 +213,7 @@ static msgfmt_t msgfmt[256] = {
 	{	M_STARTI,	"M_STARTI  ", 	dedump_raw		},
 	{	M_PCEVENT,	"M_PCEVENT ", 	dedump_raw		},
 	{	M_UNHANGUP,	"M_UNHANGUP", 	dedump_raw		},
+	{	M_CMD,		"M_CMD     ", 	dedump_cmdblk		},
 };
 
 /*ARGSUSED1*/
