@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,8 +454,8 @@ extern int do_failback(struct phyint *pi);
 extern boolean_t change_lif_flags(struct phyint *pi, uint64_t flags,
     boolean_t setfl);
 
-extern void logperror_pii(struct phyint_instance *pii, char *str);
-extern void logperror_li(struct logint *li, char *str);
+extern void logperror_pii(struct phyint_instance *pii, const char *str);
+extern void logperror_li(struct logint *li, const char *str);
 extern char *pr_addr(int af, struct in6_addr addr, char *abuf, int len);
 extern void phyint_inst_print_all(void);
 

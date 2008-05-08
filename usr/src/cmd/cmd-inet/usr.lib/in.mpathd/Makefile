@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,11 +36,13 @@ include ../../../Makefile.cmd
 POFILE	= $(PROG).po
 POFILES = $(SRCS:%.c=%.po)
 
+C99MODE= $(C99_ENABLE)
+
 #
 # We need access to the ancillary data features which are only available
-# via UNIX98; enable the appropriate #defines for UNIX98.
+# via the SUS standards.  Further, C99 support requires SUSv3 or higher.
 #
-CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__ -I$(SRC)/cmd/cmd-inet/common
+CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 LDLIBS	+= -lsocket -lnsl -lsysevent -lnvpair -lipmp -lc
 
 LINTFLAGS += -erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_VAL_TYPE_DECL2 \

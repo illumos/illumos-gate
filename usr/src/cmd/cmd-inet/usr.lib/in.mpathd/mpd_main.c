@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -834,9 +834,9 @@ select_test_ifs(void)
 }
 
 /*
- * Check test address configuration, and log warnings if appropriate.  Note
- * that this function only logs pre-existing conditions (e.g., that probe-
- * based failure detection is disabled).
+ * Check test address configuration, and log notices/errors if appropriate.
+ * Note that this function only logs pre-existing conditions (e.g., that
+ * probe-based failure detection is disabled).
  */
 static void
 check_testconfig(void)
@@ -844,6 +844,7 @@ check_testconfig(void)
 	struct phyint	*pi;
 	struct logint  	*li;
 	char		abuf[INET6_ADDRSTRLEN];
+	int		pri;
 
 	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
 		if (pi->pi_flags & IFF_OFFLINE)
@@ -852,7 +853,11 @@ check_testconfig(void)
 		if (PROBE_ENABLED(pi->pi_v4) || PROBE_ENABLED(pi->pi_v6)) {
 			if (pi->pi_taddrmsg_printed ||
 			    pi->pi_duptaddrmsg_printed) {
-				logerr("Test address now configured on "
+				if (pi->pi_duptaddrmsg_printed)
+					pri = LOG_ERR;
+				else
+					pri = LOG_INFO;
+				logmsg(pri, "Test address now configured on "
 				    "interface %s; enabling probe-based "
 				    "failure detection on it\n", pi->pi_name);
 				pi->pi_taddrmsg_printed = 0;
@@ -886,7 +891,7 @@ check_testconfig(void)
 			continue;
 
 		if (!pi->pi_taddrmsg_printed) {
-			logerr("No test address configured on interface %s; "
+			logtrace("No test address configured on interface %s; "
 			    "disabling probe-based failure detection on it\n",
 			    pi->pi_name);
 			pi->pi_taddrmsg_printed = 1;
@@ -3039,19 +3044,19 @@ static void
 initlog(void)
 {
 	logging++;
-	openlog("in.mpathd", LOG_PID | LOG_CONS, LOG_DAEMON);
+	openlog("in.mpathd", LOG_PID, LOG_DAEMON);
 }
 
-/* PRINTFLIKE1 */
+/* PRINTFLIKE2 */
 void
-logerr(char *fmt, ...)
+logmsg(int pri, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
 
 	if (logging)
-		vsyslog(LOG_ERR, fmt, ap);
+		vsyslog(pri, fmt, ap);
 	else
 		(void) vfprintf(stderr, fmt, ap);
 	va_end(ap);
@@ -3059,37 +3064,7 @@ logerr(char *fmt, ...)
 
 /* PRINTFLIKE1 */
 void
-logtrace(char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-
-	if (logging)
-		vsyslog(LOG_INFO, fmt, ap);
-	else
-		(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
-
-/* PRINTFLIKE1 */
-void
-logdebug(char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-
-	if (logging)
-		vsyslog(LOG_DEBUG, fmt, ap);
-	else
-		(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
-
-/* PRINTFLIKE1 */
-void
-logperror(char *str)
+logperror(const char *str)
 {
 	if (logging)
 		syslog(LOG_ERR, "%s: %m\n", str);
@@ -3098,7 +3073,7 @@ logperror(char *str)
 }
 
 void
-logperror_pii(struct phyint_instance *pii, char *str)
+logperror_pii(struct phyint_instance *pii, const char *str)
 {
 	if (logging) {
 		syslog(LOG_ERR, "%s (%s %s): %m\n",
@@ -3111,7 +3086,7 @@ logperror_pii(struct phyint_instance *pii, char *str)
 }
 
 void
-logperror_li(struct logint *li, char *str)
+logperror_li(struct logint *li, const char *str)
 {
 	struct	phyint_instance	*pii = li->li_phyint_inst;
 

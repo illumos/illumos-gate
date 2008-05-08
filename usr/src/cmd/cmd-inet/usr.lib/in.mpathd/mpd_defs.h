@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@ extern "C" {
 #include <unistd.h>
 #include <time.h>
 #include <stdarg.h>
+#include <syslog.h>
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -207,15 +208,16 @@ extern boolean_t handle_link_notifications;
 /*
  * Function prototypes
  */
-void		timer_schedule(uint_t delay);
-extern void	logerr(char *fmt, ...);
-extern void	logtrace(char *fmt, ...);
-extern void	logdebug(char *fmt, ...);
-extern void	logperror(char *str);
-
+extern void	timer_schedule(uint_t delay);
+extern void	logmsg(int pri, const char *fmt, ...);
+extern void	logperror(const char *str);
 extern int	poll_add(int fd);
 extern uint64_t	getcurrentsec(void);
 extern uint_t	getcurrenttime(void);
+
+#define	logerr(...)	logmsg(LOG_ERR, __VA_ARGS__)
+#define	logtrace(...)	logmsg(LOG_INFO, __VA_ARGS__)
+#define	logdebug(...)	logmsg(LOG_DEBUG, __VA_ARGS__)
 
 #ifdef	__cplusplus
 }
