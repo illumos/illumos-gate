@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +135,13 @@ impl_create_root_class(void)
 	if ((major = ddi_name_to_major("rootnex")) == (major_t)-1)
 		panic("Couldn't find major number for 'rootnex'");
 
-	size = (size_t)BOP_GETPROPLEN(bootops, "mfg-name");
+	/*
+	 * C OBP (Serengeti) does not include the NULL when returning
+	 * the length of the name property, while this violates 1275,
+	 * Solaris needs to work around this by allocating space for
+	 * an extra character.
+	 */
+	size = (size_t)BOP_GETPROPLEN(bootops, "mfg-name") + 1;
 	rootname = kmem_zalloc(size, KM_SLEEP);
 	(void) BOP_GETPROP(bootops, "mfg-name", rootname);
 

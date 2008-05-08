@@ -3921,7 +3921,7 @@ kobj_uncomp_blk(struct _buf *file, char *buf, uint_t off)
 	i = off / file->_bsize;
 	src = file->_dbuf + hdr->ch_blkmap[i];
 	if (i == hdr->ch_fsize / file->_bsize)
-		slen = hdr->ch_fsize - hdr->ch_blkmap[i];
+		slen = file->_dsize - hdr->ch_blkmap[i];
 	else
 		slen = hdr->ch_blkmap[i + 1] - hdr->ch_blkmap[i];
 	if (z_uncompress(buf, &dlen, src, slen) != Z_OK)

@@ -1116,7 +1116,7 @@ startup_memlist(void)
 	/*
 	 * Place the array that protects pp->p_selock in the kmem64 wad.
 	 */
-	pse_shift = size_pse_array(physmem, max_ncpus);
+	pse_shift = size_pse_array(npages, max_ncpus);
 	PRM_DEBUG(pse_shift);
 	pse_table_size = 1 << pse_shift;
 	PRM_DEBUG(pse_table_size);

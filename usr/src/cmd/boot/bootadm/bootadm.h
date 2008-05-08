@@ -222,8 +222,8 @@ extern int is_sparc(void);
 #define	XEN_KERNEL_SUBSTR "xen.gz"
 
 /* Boot archives */
-#define	SUN4U_ARCHIVE		"/platform/sun4u/boot_archive"
-#define	SUN4V_ARCHIVE		"/platform/sun4v/boot_archive"
+#define	ARCHIVE_PREFIX		"/platform/"
+#define	ARCHIVE_SUFFIX		"/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE	"/platform/i86pc/$ISADIR/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_32	"/platform/i86pc/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_64	"/platform/i86pc/amd64/boot_archive"

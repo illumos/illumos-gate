@@ -39,9 +39,23 @@ usage() {
 	echo "and it is not recommended for stand-alone use."
 	echo "Please use bootadm(1M) instead."
 	echo ""
-	echo "Usage: ${0##*/}: [-R \<root\>] [-p \<platform\>] \<filelist\> ..."
-	echo "where \<platform\> is one of i86pc, sun4u or sun4v"
+	echo "Usage: ${0##*/}: [-R <root>] [-p <platform>] <filelist> ..."
+	echo "where <platform> is one of i86pc, sun4u or sun4v"
 	exit 2
+}
+
+build_platform() {
+
+	altroot=$1
+
+	(
+		cd $altroot/
+		if [ -z "$STRIP" ] ; then
+			ls -d platform/*/kernel
+		else
+			ls -d platform/*/kernel | grep -v $STRIP
+		fi
+	)
 }
 
 # default platform is what we're running on
@@ -83,18 +97,16 @@ filtering=no
 if [ "$altroot" == "" ] || [ $platform_provided = yes ]; then
 	case $PLATFORM in
 	i86pc)
-		filtering=no
+		STRIP=
 		;;
 	sun4u)
-		filtering=yes
-		exclude_pattern="sun4v"
+		STRIP=platform/sun4v/
 		;;
 	sun4v)
-		filtering=yes
-		exclude_pattern="sun4u"
+		STRIP=platform/sun4u/
 		;;
 	*)
-		usage
+		STRIP=
 		;;
 	esac
 fi
@@ -102,11 +114,23 @@ fi
 for list in $filelists
 do
 	if [ -f $altroot/$list ]; then
-		if [ $filtering = yes ]; then
-			cat $altroot/$list | grep -v $exclude_pattern
+		grep ^platform$ $altroot/$list > /dev/null
+		if [ $? = 0 ] ; then
+			build_platform $altroot
+			if [ -z "$STRIP" ] ; then
+				cat $altroot/$list | grep -v ^platform$
+			else
+				cat $altroot/$list | grep -v ^platform$ | \
+				    grep -v $STRIP
+			fi
 		else
-			cat $altroot/$list
+			if [ -z "$STRIP" ] ; then
+				cat $altroot/$list
+			else
+				cat $altroot/$list | grep -v $STRIP
+			fi
 		fi
+
 	fi
 done
 

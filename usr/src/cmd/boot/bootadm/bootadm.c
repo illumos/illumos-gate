@@ -269,8 +269,7 @@ static int is_zfs(char *root);
 static int is_ufs(char *root);
 static int is_pcfs(char *root);
 static int is_amd64(void);
-static int is_sun4u(void);
-static int is_sun4v(void);
+static char *get_machine(void);
 static void append_to_flist(filelist_t *, char *);
 static char *mount_top_dataset(char *pool, zfs_mnted_t *mnted);
 static int umount_top_dataset(char *pool, zfs_mnted_t mnted, char *mntpt);
@@ -1359,12 +1358,9 @@ check_flags_and_files(char *root)
 	/*
 	 * If archive is missing, create archive
 	 */
-	if (is_sun4u()) {
-		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    SUN4U_ARCHIVE);
-	} else if (is_sun4v()) {
-		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    SUN4V_ARCHIVE);
+	if (is_sparc()) {
+		(void) snprintf(path, sizeof (path), "%s%s%s%s", root,
+		    ARCHIVE_PREFIX, get_machine(), ARCHIVE_SUFFIX);
 	} else {
 		if (bam_direct == BAM_DIRECT_DBOOT) {
 			(void) snprintf(path, sizeof (path), "%s%s", root,
@@ -7521,60 +7517,52 @@ is_amd64(void)
 	return (amd64);
 }
 
-static int
-is_sun4u(void)
+static char *
+get_machine(void)
 {
-	static int sun4u = -1;
-	char mbuf[257];	/* from sysinfo(2) manpage */
+	static int cached = -1;
+	static char mbuf[257];	/* from sysinfo(2) manpage */
 
-	if (sun4u != -1)
-		return (sun4u);
+	if (cached == 0)
+		return (mbuf);
 
 	if (bam_alt_platform) {
-		if (strcmp(bam_platform, "sun4u") == 0) {
-			sun4u = 1;
-		}
+		return (bam_platform);
 	} else {
-		if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
-		    strncmp(mbuf, "sun4u", strlen("sun4u")) == 0) {
-			sun4u = 1;
+		if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0) {
+			cached = 1;
 		}
 	}
-	if (sun4u == -1)
-		sun4u = 0;
-
-	return (sun4u);
-}
-
-static int
-is_sun4v(void)
-{
-	static int sun4v = -1;
-	char mbuf[257];	/* from sysinfo(2) manpage */
-
-	if (sun4v != -1)
-		return (sun4v);
-
-	if (bam_alt_platform) {
-		if (strcmp(bam_platform, "sun4v") == 0) {
-			sun4v = 1;
-		}
-	} else {
-		if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
-		    strncmp(mbuf, "sun4v", strlen("sun4v")) == 0) {
-			sun4v = 1;
-		}
+	if (cached == -1) {
+		mbuf[0] = '\0';
+		cached = 0;
 	}
-	if (sun4v == -1)
-		sun4v = 0;
 
-	return (sun4v);
+	return (mbuf);
 }
 
 int
 is_sparc(void)
 {
-	return (is_sun4u() || is_sun4v());
+	static int issparc = -1;
+	char mbuf[257];	/* from sysinfo(2) manpage */
+
+	if (issparc != -1)
+		return (issparc);
+
+	if (bam_alt_platform) {
+		if (strncmp(bam_platform, "sun4", 4) == 0) {
+			issparc = 1;
+		}
+	} else {
+		if (sysinfo(SI_ARCHITECTURE, mbuf, sizeof (mbuf)) > 0 &&
+		    strcmp(mbuf, "sparc") == 0)
+			issparc = 1;
+		else
+			issparc = 0;
+	}
+
+	return (issparc);
 }
 
 static void
