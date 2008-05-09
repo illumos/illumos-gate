@@ -375,8 +375,9 @@ get_disc_info(int fd, disc_info_t *di)
 	/*
 	 * According to MMC-5 6.22.3.2, the Disc Information Length should be
 	 * 32+8*(Number of OPC Tables). Some devices, like U3 sticks, return 0.
+	 * Yet some drives can return less than 32. We only need the first 22.
 	 */
-	if (GET16(&buf[0]) < 32) {
+	if (GET16(&buf[0]) < 22) {
 		return (B_FALSE);
 	}
 
