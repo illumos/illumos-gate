@@ -2720,7 +2720,7 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  * This function should be called with port mutex held.
  */
 static int
-sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
+sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason)
 {
 	sata_drive_info_t *sdinfo;
 	sata_device_t sata_device;
@@ -2732,12 +2732,13 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 	 * Pkt_reason has to be set if the pkt_comp callback is invoked,
 	 * and that implies TRAN_ACCEPT return value. Any other returned value
 	 * indicates that the scsi packet was not accepted (the reason will not
-	 * be checked by the scsi traget driver).
+	 * be checked by the scsi target driver).
 	 * To make debugging easier, we set pkt_reason to know value here.
 	 * It may be changed later when different completion reason is
 	 * determined.
 	 */
 	spx->txlt_scsi_pkt->pkt_reason = CMD_TRAN_ERR;
+	*reason = CMD_TRAN_ERR;
 
 	/* Validate address */
 	switch (sata_validate_scsi_address(spx->txlt_sata_hba_inst,
@@ -2749,6 +2750,7 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 	case 1:
 		/* valid address but no device - it has disappeared ? */
 		spx->txlt_scsi_pkt->pkt_reason = CMD_DEV_GONE;
+		*reason = CMD_DEV_GONE;
 		/*
 		 * The sd target driver is checking CMD_DEV_GONE pkt_reason
 		 * only in callback function (for normal requests) and
@@ -2769,7 +2771,7 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 		}
 		return (TRAN_FATAL_ERROR);
 	default:
-		/* all OK */
+		/* all OK; pkt reason will be overwritten later */
 		break;
 	}
 	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
@@ -2793,6 +2795,7 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 		    sata_device.satadev_addr.cport) &
 		    SATA_APCTL_LOCK_PORT_BUSY) == 0)) {
 			spx->txlt_scsi_pkt->pkt_reason = CMD_INCOMPLETE;
+			*reason = CMD_INCOMPLETE;
 			SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 			    "sata_scsi_start: rejecting command because "
 			    "of device reset state\n", NULL);
@@ -2822,6 +2825,7 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 	 * changed later when a different completion reason is determined.
 	 */
 	spx->txlt_scsi_pkt->pkt_reason = CMD_CMPLT;
+	*reason = CMD_CMPLT;
 
 	if ((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0) {
 		/* Synchronous execution */
@@ -2977,11 +2981,12 @@ static 	int
 sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 {
 	int rval;
+	int reason;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3039,12 +3044,12 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 	uint8_t *p;
 	int i, j;
 	uint8_t page_buf[0xff]; /* Max length */
-	int rval;
+	int rval, reason;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3219,12 +3224,12 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	struct scsi_extended_sense sense;
 	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
-	int rval;
+	int rval, reason;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3285,12 +3290,12 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	struct scsi_extended_sense *sense;
 	int power_state;
-	int rval;
+	int rval, reason;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3354,7 +3359,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 	struct scsi_extended_sense *sense;
 	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
 	int cport = SATA_TXLT_CPORT(spx);
-	int rval;
+	int rval, reason;
 	int synch;
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -3362,8 +3367,8 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&SATA_CPORT_MUTEX(shi, cport));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3461,15 +3466,15 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 	sata_drive_info_t *sdinfo;
 	uint64_t val;
 	uchar_t *rbuf;
-	int rval;
+	int rval, reason;
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_read_capacity: ", NULL);
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3549,7 +3554,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	int 		len, bdlen, count, alc_len;
 	int		pc;	/* Page Control code */
 	uint8_t		*buf;	/* mode sense buffer */
-	int		rval;
+	int		rval, reason;
 
 	SATADBG2(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_mode_sense, pc %x page code 0x%02x\n",
@@ -3560,8 +3565,8 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		kmem_free(buf, 1024);
 		return (rval);
@@ -3826,7 +3831,7 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 	struct scsi_extended_sense *sense;
 	int len, pagelen, count, pllen;
 	uint8_t *buf;	/* mode select buffer */
-	int rval, stat;
+	int rval, stat, reason;
 	uint_t nointr_flag;
 	int dmod = 0;
 
@@ -3837,8 +3842,8 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4104,7 +4109,7 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 	int		pc;	/* Page Control code */
 	int		page_code;	/* Page code */
 	uint8_t		*buf;	/* log sense buffer */
-	int		rval;
+	int		rval, reason;
 #define	MAX_LOG_SENSE_PAGE_SIZE	512
 
 	SATADBG2(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -4116,8 +4121,8 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
 		return (rval);
@@ -4363,13 +4368,13 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	int cport = SATA_TXLT_CPORT(spx);
 	uint16_t sec_count;
 	uint64_t lba;
-	int rval;
+	int rval, reason;
 	int synch;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4632,13 +4637,13 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	int cport = SATA_TXLT_CPORT(spx);
 	uint16_t sec_count;
 	uint64_t lba;
-	int rval;
+	int rval, reason;
 	int synch;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4876,7 +4881,7 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 
 	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	struct scsi_extended_sense *sense;
-	int rval, mode, sector_count;
+	int rval, mode, sector_count, reason;
 	int cport = SATA_TXLT_CPORT(spx);
 
 	mode = scsipkt->pkt_cdbp[1] & 0x1f;
@@ -4886,7 +4891,7 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if ((rval = sata_txlt_generic_pkt_info(spx, &reason)) != TRAN_ACCEPT) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -5116,13 +5121,13 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
 	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
 	int cport = SATA_TXLT_CPORT(spx);
-	int rval;
+	int rval, reason;
 	int synch;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -6906,14 +6911,14 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 	    &spx->txlt_sata_pkt->satapkt_device);
 	int cport = SATA_TXLT_CPORT(spx);
 	int cdblen;
-	int rval;
+	int rval, reason;
 	int synch;
 	union scsi_cdb *cdbp = (union scsi_cdb *)scsipkt->pkt_cdbp;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
-	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
