@@ -942,6 +942,7 @@ struct FTW *state;
 			val = !fnmatch(np->first.cp,
 			    basename(name1), FNM_PERIOD);
 #endif
+			free(name1);
 			break;
 		}
 
