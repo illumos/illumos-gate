@@ -10879,6 +10879,9 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	ASSERT(ill->ill_move_in_progress == B_FALSE);
 
 	if (ipif->ipif_id == 0) {
+
+		ipsq_t *ipsq;
+
 		/* Find based on address */
 		if (ipif->ipif_isv6) {
 			sin6_t *sin6;
@@ -10921,6 +10924,21 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		if (ipif == NULL) {
 			return (EADDRNOTAVAIL);
 		}
+
+		/*
+		 * It is possible for a user to send an SIOCLIFREMOVEIF with
+		 * lifr_name of the physical interface but with an ip address
+		 * lifr_addr of a logical interface plumbed over it.
+		 * So update ipsq_current_ipif once ipif points to the
+		 * correct interface after doing ipif_lookup_addr().
+		 */
+		ipsq = ipif->ipif_ill->ill_phyint->phyint_ipsq;
+		ASSERT(ipsq != NULL);
+
+		mutex_enter(&ipsq->ipsq_lock);
+		ipsq->ipsq_current_ipif = ipif;
+		mutex_exit(&ipsq->ipsq_lock);
+
 		/*
 		 * When the address to be removed is hosted on a different
 		 * interface, we check if the interface is in the same IPMP
