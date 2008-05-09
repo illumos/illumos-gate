@@ -7090,6 +7090,7 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 	zoneid_t	last_zoneid;
 	boolean_t	reuseaddr;
 	boolean_t	shared_addr;
+	boolean_t	unlabeled;
 	ip_stack_t	*ipst;
 
 	ASSERT(recv_ill != NULL);
@@ -7112,6 +7113,11 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 	dst = ipha->ipha_dst;
 	src = ipha->ipha_src;
 
+	unlabeled = B_FALSE;
+	if (is_system_labeled())
+		/* Cred cannot be null on IPv4 */
+		unlabeled = (crgetlabel(DB_CRED(mp))->tsl_flags &
+		    TSLF_UNLABELED) != 0;
 	shared_addr = (zoneid == ALL_ZONES);
 	if (shared_addr) {
 		/*
@@ -7119,8 +7125,20 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		 * only applies to the shared stack.
 		 */
 		zoneid = tsol_mlp_findzone(IPPROTO_UDP, dstport);
+		/*
+		 * If no shared MLP is found, tsol_mlp_findzone returns
+		 * ALL_ZONES.  In that case, we assume it's SLP, and
+		 * search for the zone based on the packet label.
+		 *
+		 * If there is such a zone, we prefer to find a
+		 * connection in it.  Otherwise, we look for a
+		 * MAC-exempt connection in any zone whose label
+		 * dominates the default label on the packet.
+		 */
 		if (zoneid == ALL_ZONES)
 			zoneid = tsol_packet_to_zoneid(mp);
+		else
+			unlabeled = B_FALSE;
 	}
 
 	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(dstport, ipst)];
@@ -7135,7 +7153,14 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		 */
 		while ((connp != NULL) &&
 		    (!IPCL_UDP_MATCH(connp, dstport, dst, srcport, src) ||
-		    !IPCL_ZONE_MATCH(connp, zoneid))) {
+		    (!IPCL_ZONE_MATCH(connp, zoneid) &&
+		    !(unlabeled && connp->conn_mac_exempt)))) {
+			/*
+			 * We keep searching since the conn did not match,
+			 * or its zone did not match and it is not either
+			 * an allzones conn or a mac exempt conn (if the
+			 * sender is unlabeled.)
+			 */
 			connp = connp->conn_next;
 		}
 
@@ -13862,6 +13887,17 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 
 	ipha = (ipha_t *)mp->b_rptr;
 
+	if (ire != NULL &&
+	    ire->ire_zoneid != GLOBAL_ZONEID &&
+	    ire->ire_zoneid != ALL_ZONES) {
+		/*
+		 * Should only use IREs that are visible to the global
+		 * zone for forwarding.
+		 */
+		ire_refrele(ire);
+		ire = ire_cache_lookup(dst, GLOBAL_ZONEID, NULL, ipst);
+	}
+
 	/*
 	 * Martian Address Filtering [RFC 1812, Section 5.3.7]
 	 * The loopback address check for both src and dst has already
@@ -13880,7 +13916,6 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		ire_refrele(src_ire);
 		goto drop;
 	}
-
 
 	/* No ire cache of nexthop. So first create one  */
 	if (ire == NULL) {
@@ -15223,6 +15258,18 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		if (ire == NULL) {
 			ire = ire_cache_lookup(dst, ALL_ZONES,
+			    MBLK_GETLABEL(mp), ipst);
+		}
+
+		if (ire != NULL && ire->ire_stq != NULL &&
+		    ire->ire_zoneid != GLOBAL_ZONEID &&
+		    ire->ire_zoneid != ALL_ZONES) {
+			/*
+			 * Should only use IREs that are visible from the
+			 * global zone for forwarding.
+			 */
+			ire_refrele(ire);
+			ire = ire_cache_lookup(dst, GLOBAL_ZONEID,
 			    MBLK_GETLABEL(mp), ipst);
 		}
 
@@ -20116,8 +20163,6 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	mblk_t		*copy_mp = NULL;
 	int		err;
 	zoneid_t	zoneid;
-	int	adjust;
-	uint16_t iplen;
 	boolean_t	need_decref = B_FALSE;
 	boolean_t	ignore_dontroute = B_FALSE;
 	boolean_t	ignore_nexthop = B_FALSE;
@@ -20199,7 +20244,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	if (is_system_labeled() &&
 	    (ipha->ipha_version_and_hdr_length & 0xf0) == (IPV4_VERSION << 4) &&
 	    !connp->conn_ulp_labeled) {
-		err = tsol_check_label(BEST_CRED(mp, connp), &mp, &adjust,
+		err = tsol_check_label(BEST_CRED(mp, connp), &mp,
 		    connp->conn_mac_exempt, ipst);
 		ipha = (ipha_t *)mp->b_rptr;
 		if (err != 0) {
@@ -20209,8 +20254,6 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 			ip2dbg(("ip_wput: label check failed (%d)\n", err));
 			goto discard_pkt;
 		}
-		iplen = ntohs(ipha->ipha_length) + adjust;
-		ipha->ipha_length = htons(iplen);
 	}
 
 	ASSERT(infop != NULL);
@@ -20736,7 +20779,7 @@ hdrtoosmall:
 		    (*mp->b_rptr & 0xf0) == (IPV4_VERSION << 4) &&
 		    !connp->conn_ulp_labeled) {
 			err = tsol_check_label(BEST_CRED(mp, connp), &mp,
-			    &adjust, connp->conn_mac_exempt, ipst);
+			    connp->conn_mac_exempt, ipst);
 			ipha = (ipha_t *)mp->b_rptr;
 			if (first_mp != NULL)
 				first_mp->b_cont = mp;
@@ -20749,8 +20792,6 @@ hdrtoosmall:
 				    err));
 				goto discard_pkt;
 			}
-			iplen = ntohs(ipha->ipha_length) + adjust;
-			ipha->ipha_length = htons(iplen);
 		}
 
 		ipha = (ipha_t *)mp->b_rptr;

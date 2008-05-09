@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,10 +92,8 @@ typedef struct udp_bits_s {
 	udpb_direct_sockfs : 1,		/* direct calls to/from sockfs */
 	udpb_timestamp : 1,		/* SO_TIMESTAMP "socket" option */
 
-	udpb_anon_mlp : 1,		/* SO_ANON_MLP */
-	udpb_mac_exempt : 1,		/* SO_MAC_EXEMPT */
 	udpb_nat_t_endpoint : 1,	/* UDP_NAT_T_ENDPOINT option */
-	udpb_pad_to_bit_31 : 1;
+	udpb_pad_to_bit_31 : 3;
 } udp_bits_t;
 
 #define	udp_debug	udp_bits.udpb_debug
@@ -133,8 +131,6 @@ typedef struct udp_bits_s {
 #define	udp_direct_sockfs	udp_bits.udpb_direct_sockfs
 #define	udp_timestamp		udp_bits.udpb_timestamp
 
-#define	udp_anon_mlp		udp_bits.udpb_anon_mlp
-#define	udp_mac_exempt		udp_bits.udpb_mac_exempt
 #define	udp_nat_t_endpoint	udp_bits.udpb_nat_t_endpoint
 
 /*

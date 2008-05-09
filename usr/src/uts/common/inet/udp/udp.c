@@ -827,7 +827,8 @@ udp_bind(queue_t *q, mblk_t *mp)
 			if (!(IPCL_ZONE_MATCH(udp1->udp_connp, zoneid) ||
 			    IPCL_ZONE_MATCH(connp,
 			    udp1->udp_connp->conn_zoneid)) &&
-			    !udp->udp_mac_exempt && !udp1->udp_mac_exempt)
+			    !connp->conn_mac_exempt && \
+			    !udp1->udp_connp->conn_mac_exempt)
 				continue;
 
 			/*
@@ -850,7 +851,8 @@ udp_bind(queue_t *q, mblk_t *mp)
 			 * as UDP_EXCLBIND, except that zoneid is ignored.
 			 */
 			if (udp1->udp_exclbind || udp->udp_exclbind ||
-			    udp1->udp_mac_exempt || udp->udp_mac_exempt) {
+			    udp1->udp_connp->conn_mac_exempt ||
+			    connp->conn_mac_exempt) {
 				if (V6_OR_V4_INADDR_ANY(
 				    udp1->udp_bound_v6src) ||
 				    is_inaddr_any ||
@@ -2482,7 +2484,7 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		udp->udp_mac_exempt = B_TRUE;
+		connp->conn_mac_exempt = B_TRUE;
 
 	if (flag & SO_SOCKSTR) {
 		connp->conn_flags |= IPCL_SOCKET;
@@ -2639,10 +2641,10 @@ udp_opt_get_locked(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			*i1 = udp->udp_timestamp;
 			break;	/* goto sizeof (int) option return */
 		case SO_ANON_MLP:
-			*i1 = udp->udp_anon_mlp;
+			*i1 = connp->conn_anon_mlp;
 			break;	/* goto sizeof (int) option return */
 		case SO_MAC_EXEMPT:
-			*i1 = udp->udp_mac_exempt;
+			*i1 = connp->conn_mac_exempt;
 			break;	/* goto sizeof (int) option return */
 		case SO_ALLZONES:
 			*i1 = connp->conn_allzones;
@@ -3064,16 +3066,11 @@ udp_opt_set_locked(queue_t *q, uint_t optset_context, int level,
 				udp->udp_timestamp = onoff;
 			break;
 		case SO_ANON_MLP:
-			if (!checkonly)
-				udp->udp_anon_mlp = onoff;
-			break;
+			/* Pass option along to IP level for handling */
+			return (-EINVAL);
 		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(cr) != 0 ||
-			    udp->udp_state != TS_UNBND)
-				return (EACCES);
-			if (!checkonly)
-				udp->udp_mac_exempt = onoff;
-			break;
+			/* Pass option along to IP level for handling */
+			return (-EINVAL);
 		case SCM_UCRED: {
 			struct ucred_s *ucr;
 			cred_t *cr, *newcr;
@@ -5731,7 +5728,7 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
 	udp_stack_t	*us = udp->udp_us;
 
 	err = tsol_compute_label(DB_CREDDEF(mp, udp->udp_connp->conn_cred), dst,
-	    opt_storage, udp->udp_mac_exempt,
+	    opt_storage, udp->udp_connp->conn_mac_exempt,
 	    us->us_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_options(&udp->udp_ip_snd_options,
@@ -6371,7 +6368,7 @@ udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
 	udp_stack_t		*us = udp->udp_us;
 
 	err = tsol_compute_label_v6(DB_CREDDEF(mp, udp->udp_connp->conn_cred),
-	    dst, opt_storage, udp->udp_mac_exempt,
+	    dst, opt_storage, udp->udp_connp->conn_mac_exempt,
 	    us->us_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_sticky(&udp->udp_sticky_ipp,

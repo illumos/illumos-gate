@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,8 +156,7 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 	/* First validate stream parameters */
 	if (init->sic_instr == 0 || init->sic_outstr == 0) {
 		serror = SCTP_ERR_BAD_MANDPARM;
-		dprint(1,
-		    ("validate_init_params: bad sid, is=%d os=%d\n",
+		dprint(1, ("validate_init_params: bad sid, is=%d os=%d\n",
 		    htons(init->sic_instr), htons(init->sic_outstr)));
 		goto abort;
 	}
@@ -731,14 +730,14 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	if (is_system_labeled() && (cr = DB_CRED(iackmp)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		conn_t *connp = sctp->sctp_connp;
-		int err, adjust;
+		int err;
 
 		if (isv4)
-			err = tsol_check_label(cr, &iackmp, &adjust,
+			err = tsol_check_label(cr, &iackmp,
 			    connp->conn_mac_exempt,
 			    sctps->sctps_netstack->netstack_ip);
 		else
-			err = tsol_check_label_v6(cr, &iackmp, &adjust,
+			err = tsol_check_label_v6(cr, &iackmp,
 			    connp->conn_mac_exempt,
 			    sctps->sctps_netstack->netstack_ip);
 		if (err != 0) {
@@ -746,11 +745,6 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 			    SCTP_ERR_AUTH_ERR, NULL, 0, initmp, 0, B_FALSE);
 			freemsg(iackmp);
 			return;
-		}
-		if (isv4) {
-			iackiph = (ipha_t *)iackmp->b_rptr;
-			adjust += ntohs(iackiph->ipha_length);
-			iackiph->ipha_length = htons(adjust);
 		}
 	}
 

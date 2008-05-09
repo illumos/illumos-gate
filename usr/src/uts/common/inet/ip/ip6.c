@@ -4436,18 +4436,6 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 	ip3dbg(("ip_newroute_v6: ire_ftable_lookup_v6() "
 	    "returned ire %p, sire %p\n", (void *)ire, (void *)sire));
 
-	if (zoneid == ALL_ZONES && ire != NULL) {
-		/*
-		 * In the forwarding case, we can use a route from any zone
-		 * since we won't change the source address. We can easily
-		 * assert that the source address is already set when there's no
-		 * ip6_info header - otherwise we'd have to call pullupmsg().
-		 */
-		ASSERT(ip6i_present ||
-		    !IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src));
-		zoneid = ire->ire_zoneid;
-	}
-
 	/*
 	 * We enter a loop that will be run only once in most cases.
 	 * The loop is re-entered in the case where the destination
@@ -7342,7 +7330,20 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	} else {
 		ire = ire_cache_lookup_v6(&ip6h->ip6_dst, ALL_ZONES,
 		    MBLK_GETLABEL(mp), ipst);
+
+		if (ire != NULL && ire->ire_stq != NULL &&
+		    ire->ire_zoneid != GLOBAL_ZONEID &&
+		    ire->ire_zoneid != ALL_ZONES) {
+			/*
+			 * Should only use IREs that are visible from the
+			 * global zone for forwarding.
+			 */
+			ire_refrele(ire);
+			ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
+			    GLOBAL_ZONEID, MBLK_GETLABEL(mp), ipst);
+		}
 	}
+
 	if (ire == NULL) {
 		/*
 		 * No matching IRE found.  Mark this packet as having
@@ -7381,7 +7382,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		    ill->ill_phyint->phyint_ifindex;
 		ip_newroute_v6(q, mp, &ip6h->ip6_dst, &ip6h->ip6_src,
 		    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst) ? ill : NULL,
-		    ALL_ZONES, ipst);
+		    GLOBAL_ZONEID, ipst);
 		return;
 	}
 	/* we have a matching IRE */
@@ -7534,7 +7535,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 
 			src_ire_v6 = ire_ftable_lookup_v6(&ip6h->ip6_src,
 			    NULL, NULL, IRE_INTERFACE, ire->ire_ipif, NULL,
-			    ALL_ZONES, 0, NULL,
+			    GLOBAL_ZONEID, 0, NULL,
 			    MATCH_IRE_IPIF | MATCH_IRE_TYPE,
 			    ipst);
 
@@ -7962,6 +7963,7 @@ tcp_fanout:
 					    hdr_len, mctl_present, 0, zoneid,
 					    dl_mp);
 			}
+		}
 			/* FALLTHRU */
 		default: {
 			/*
@@ -8146,7 +8148,7 @@ tcp_fanout:
 			used = 0;
 			break;
 		}
-		case IPPROTO_HOPOPTS:
+		case IPPROTO_HOPOPTS: {
 			if (hada_mp != NULL) {
 				ip0dbg(("hop hada drop\n"));
 				goto hada_drop;
@@ -9171,7 +9173,6 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	boolean_t	conn_lock_held;
 	boolean_t	need_decref = B_FALSE;
 	ip_stack_t	*ipst;
-	int		adjust;
 
 	if (q->q_next != NULL) {
 		ill = (ill_t *)q->q_ptr;
@@ -9303,10 +9304,10 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		if (connp != NULL) {
 			ASSERT(CONN_CRED(connp) != NULL);
 			err = tsol_check_label_v6(BEST_CRED(mp, connp),
-			    &mp, &adjust, connp->conn_mac_exempt, ipst);
+			    &mp, connp->conn_mac_exempt, ipst);
 		} else if (DB_CRED(mp) != NULL) {
 			err = tsol_check_label_v6(DB_CRED(mp),
-			    &mp, &adjust, 0, ipst);
+			    &mp, B_FALSE, ipst);
 		}
 		if (mctl_present)
 			first_mp->b_cont = mp;

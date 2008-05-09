@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -128,9 +128,8 @@ typedef	struct icmp_s {
 	    icmp_old_ipv6_recvdstopts : 1, /* Old ver of IPV6_RECVDSTOPTS */
 
 	    icmp_timestamp : 1,  	/* SO_TIMESTAMP "socket" option */
-	    icmp_mac_exempt : 1,	/* SO_MAC_EXEMPT option */
 
-	    icmp_pad_to_bit_31: 10;
+	    icmp_pad_to_bit_31: 11;
 
 	uint8_t		icmp_type_of_service;
 	uint8_t		icmp_ttl;		/* TTL or hoplimit */

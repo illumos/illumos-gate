@@ -257,7 +257,7 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 		} else if (ire == NULL) {
 			ire = ire_ftable_lookup(dst, 0, 0, 0, NULL, &sire,
 			    ip_zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
-				MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR), ipst);
+			    MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR), ipst);
 		}
 
 		/* no route to destination */
@@ -606,7 +606,7 @@ tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
  * zero, so the caller knows that the label is syncronized, and further calls
  * are not required.  If the label isn't right, then the right one is inserted.
  *
- * The packet's header is clear, before entering IPSec's engine.
+ * The packet's header is clear before entering IPsec's engine.
  *
  * Returns:
  *      0		Label on packet (was|is now) correct
@@ -615,8 +615,8 @@ tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
  *	EINVAL		Label cannot be computed
  */
 int
-tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
-    boolean_t isexempt, ip_stack_t *ipst)
+tsol_check_label(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
+    ip_stack_t *ipst)
 {
 	mblk_t *mp = *mpp;
 	ipha_t  *ipha;
@@ -624,11 +624,8 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
 	uint_t hlen;
 	uint_t sec_opt_len;
 	uchar_t *optr;
-	int added;
+	int delta_remove = 0, delta_add, adjust;
 	int retv;
-
-	if (addedp != NULL)
-		*addedp = 0;
 
 	opt_storage[IPOPT_OPTVAL] = 0;
 
@@ -658,8 +655,10 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
 	/*
 	 * If there is an option there, then it must be the wrong one; delete.
 	 */
-	if (hlen > 0)
-		mp->b_wptr += tsol_remove_secopt(ipha, MBLKL(mp));
+	if (hlen > 0) {
+		delta_remove = tsol_remove_secopt(ipha, MBLKL(mp));
+		mp->b_wptr += delta_remove;
+	}
 
 	/* Make sure we have room for the worst-case addition */
 	hlen = IPH_HDR_LENGTH(ipha) + opt_storage[IPOPT_OLEN];
@@ -693,15 +692,16 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
 		ipha = (ipha_t *)mp->b_rptr;
 	}
 
-	added = tsol_prepend_option(opt_storage, ipha, MBLKL(mp));
-	if (added == -1)
+	delta_add = tsol_prepend_option(opt_storage, ipha, MBLKL(mp));
+	if (delta_add == -1)
 		goto param_prob;
 
-	if (addedp != NULL)
-		*addedp = added;
+	ASSERT((mp->b_wptr + delta_add) <= DB_LIM(mp));
+	mp->b_wptr += delta_add;
 
-	ASSERT((mp->b_wptr + added) <= DB_LIM(mp));
-	mp->b_wptr += added;
+	adjust = delta_remove + delta_add;
+	adjust += ntohs(ipha->ipha_length);
+	ipha->ipha_length = htons(adjust);
 
 	return (0);
 
@@ -1171,8 +1171,8 @@ tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
  *      ENOMEM		Memory allocation failure.
  */
 int
-tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
-    boolean_t isexempt, ip_stack_t *ipst)
+tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
+    ip_stack_t *ipst)
 {
 	mblk_t *mp = *mpp;
 	ip6_t  *ip6h;
@@ -1183,16 +1183,13 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 	uint_t hlen;
 	uint_t sec_opt_len; /* label option length not including type, len */
-	int added;
+	int delta_remove = 0, delta_add;
 	int retv;
 	uchar_t	*after_secopt;
 	uchar_t	*secopt = NULL;
 	uchar_t	*ip6hbh;
 	uint_t	hbhlen;
 	boolean_t hbh_needed;
-
-	if (addedp != NULL)
-		*addedp = 0;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	retv = tsol_compute_label_v6(credp, &ip6h->ip6_dst, opt_storage,
@@ -1225,8 +1222,10 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
 	/*
 	 * If there is an option there, then it must be the wrong one; delete.
 	 */
-	if (secopt != NULL)
-		mp->b_wptr += tsol_remove_secopt_v6(ip6h, MBLKL(mp));
+	if (secopt != NULL) {
+		delta_remove = tsol_remove_secopt_v6(ip6h, MBLKL(mp));
+		mp->b_wptr += delta_remove;
+	}
 
 	/*
 	 * Make sure we have room for the worst-case addition. Add 2 bytes for
@@ -1268,15 +1267,12 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
 
-	added = tsol_prepend_option_v6(opt_storage, ip6h, MBLKL(mp));
-	if (added == -1)
+	delta_add = tsol_prepend_option_v6(opt_storage, ip6h, MBLKL(mp));
+	if (delta_add == -1)
 		goto param_prob;
 
-	if (addedp != NULL)
-		*addedp = added;
-
-	ASSERT(mp->b_wptr + added <= DB_LIM(mp));
-	mp->b_wptr += added;
+	ASSERT(mp->b_wptr + delta_add <= DB_LIM(mp));
+	mp->b_wptr += delta_add;
 
 	return (0);
 

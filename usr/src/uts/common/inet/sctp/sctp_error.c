@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -254,27 +254,20 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
+	ipst = sctps->sctps_netstack->netstack_ip;
 	connp = sctp->sctp_connp;
 	if (is_system_labeled() && (cr = DB_CRED(inmp)) != NULL &&
 	    crgetlabel(cr) != NULL) {
-		int err, adjust;
+		int err;
+		boolean_t exempt = connp->conn_mac_exempt;
 
 		if (isv4)
-			err = tsol_check_label(cr, &hmp, &adjust,
-			    connp->conn_mac_exempt,
-			    sctps->sctps_netstack->netstack_ip);
+			err = tsol_check_label(cr, &hmp, exempt, ipst);
 		else
-			err = tsol_check_label_v6(cr, &hmp, &adjust,
-			    connp->conn_mac_exempt,
-			    sctps->sctps_netstack->netstack_ip);
+			err = tsol_check_label_v6(cr, &hmp, exempt, ipst);
 		if (err != 0) {
 			freemsg(hmp);
 			return;
-		}
-		if (isv4) {
-			ahiph = (ipha_t *)hmp->b_rptr;
-			adjust += ntohs(ahiph->ipha_length);
-			ahiph->ipha_length = htons(adjust);
 		}
 	}
 
@@ -289,7 +282,6 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	 * Let's just mark the IRE for this destination as temporary
 	 * to prevent any DoS attack.
 	 */
-	ipst = sctps->sctps_netstack->netstack_ip;
 	tsl = cr == NULL ? NULL : crgetlabel(cr);
 	if (isv4) {
 		ire = ire_cache_lookup(iniph->ipha_src, sctp->sctp_zoneid, tsl,

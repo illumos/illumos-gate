@@ -10452,25 +10452,14 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			}
 			break;
 		case SO_ALLZONES:
-			/* Handled at the IP level */
+			/* Pass option along to IP level for handling */
 			return (-EINVAL);
 		case SO_ANON_MLP:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_anon_mlp = onoff;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;
+			/* Pass option along to IP level for handling */
+			return (-EINVAL);
 		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(cr) != 0 ||
-			    IPCL_IS_BOUND(connp))
-				return (EACCES);
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_mac_exempt = onoff;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;
+			/* Pass option along to IP level for handling */
+			return (-EINVAL);
 		case SO_EXCLBIND:
 			if (!checkonly)
 				tcp->tcp_exclbind = onoff;
@@ -22734,14 +22723,14 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	/* IP trusts us to set up labels when required. */
 	if (is_system_labeled() && (cr = DB_CRED(mp)) != NULL &&
 	    crgetlabel(cr) != NULL) {
-		int err, adjust;
+		int err;
 
 		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION)
-			err = tsol_check_label(cr, &mp, &adjust,
+			err = tsol_check_label(cr, &mp,
 			    tcp->tcp_connp->conn_mac_exempt,
 			    tcps->tcps_netstack->netstack_ip);
 		else
-			err = tsol_check_label_v6(cr, &mp, &adjust,
+			err = tsol_check_label_v6(cr, &mp,
 			    tcp->tcp_connp->conn_mac_exempt,
 			    tcps->tcps_netstack->netstack_ip);
 		if (mctl_present)
@@ -22754,8 +22743,6 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		}
 		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 			ipha = (ipha_t *)mp->b_rptr;
-			adjust += ntohs(ipha->ipha_length);
-			ipha->ipha_length = htons(adjust);
 		} else {
 			ip6h = (ip6_t *)mp->b_rptr;
 		}

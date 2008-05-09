@@ -1558,7 +1558,7 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		icmp->icmp_mac_exempt = B_TRUE;
+		connp->conn_mac_exempt = B_TRUE;
 
 	connp->conn_ulp_labeled = is_system_labeled();
 
@@ -1713,7 +1713,7 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 			*i1 = icmp->icmp_timestamp;
 			break;
 		case SO_MAC_EXEMPT:
-			*i1 = icmp->icmp_mac_exempt;
+			*i1 = connp->conn_mac_exempt;
 			break;
 		case SO_DOMAIN:
 			*i1 = icmp->icmp_family;
@@ -2227,12 +2227,12 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			}
 			break;
 		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(cr) != 0 ||
-			    icmp->icmp_state != TS_UNBND)
-				return (EACCES);
-			if (!checkonly)
-				icmp->icmp_mac_exempt = onoff;
-			break;
+			/*
+			 * "soft" error (negative)
+			 * option not handled at this level
+			 * Note: Do not modify *outlenp
+			 */
+			return (-EINVAL);
 		/*
 		 * Following three not meaningful for icmp
 		 * Action is same as "default" so we keep them
@@ -4344,7 +4344,7 @@ icmp_update_label(queue_t *q, icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 	conn_t	*connp = icmp->icmp_connp;
 
 	err = tsol_compute_label(DB_CREDDEF(mp, connp->conn_cred), dst,
-	    opt_storage, icmp->icmp_mac_exempt,
+	    opt_storage, connp->conn_mac_exempt,
 	    is->is_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_options(&icmp->icmp_ip_snd_options,
@@ -4666,7 +4666,7 @@ icmp_update_label_v6(queue_t *wq, icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 	conn_t	*connp = icmp->icmp_connp;
 
 	err = tsol_compute_label_v6(DB_CREDDEF(mp, connp->conn_cred), dst,
-	    opt_storage, icmp->icmp_mac_exempt,
+	    opt_storage, connp->conn_mac_exempt,
 	    is->is_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_sticky(&icmp->icmp_sticky_ipp,

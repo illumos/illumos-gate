@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * from "tnet.h	7.44	02/10/09 SMI; TSOL 2.x"
@@ -52,9 +52,8 @@ extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *, boolean_t,
     ip_stack_t *);
 extern int tsol_compute_label_v6(const cred_t *, const in6_addr_t *, uchar_t *,
     boolean_t, ip_stack_t *);
-extern int tsol_check_label(const cred_t *, mblk_t **, int *, boolean_t,
-    ip_stack_t *);
-extern int tsol_check_label_v6(const cred_t *, mblk_t **, int *, boolean_t,
+extern int tsol_check_label(const cred_t *, mblk_t **, boolean_t, ip_stack_t *);
+extern int tsol_check_label_v6(const cred_t *, mblk_t **, boolean_t,
     ip_stack_t *);
 extern int tsol_prepend_option(uchar_t *, ipha_t *, int);
 extern int tsol_prepend_option_v6(uchar_t *, ip6_t *, int);

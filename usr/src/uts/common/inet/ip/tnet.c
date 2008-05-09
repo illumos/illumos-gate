@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -849,8 +849,8 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 		if ((src_rhtp = find_tpc(src, version, B_FALSE)) == NULL)
 			return (B_FALSE);
 		if (src_rhtp->tpc_tp.host_type == UNLABELED)
-		    crgetlabel(DB_CRED(mp))->tsl_flags |=
-		    TSLF_UNLABELED;
+			crgetlabel(DB_CRED(mp))->tsl_flags |=
+			    TSLF_UNLABELED;
 		TPC_RELE(src_rhtp);
 	}
 
@@ -1240,10 +1240,10 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 	 */
 	if (tsl == NULL || ire->ire_gw_secattr == NULL) {
 		if (tsl != NULL) {
-			DTRACE_PROBE3(
-			tx__ip__log__drop__irematch__nogwsec, char *,
-			"ire(1) lacks ire_gw_secattr when matching label(2)",
-			ire_t *, ire, ts_label_t *, tsl);
+			DTRACE_PROBE3(tx__ip__log__drop__irematch__nogwsec,
+			    char *,
+			    "ire(1) lacks ire_gw_secattr matching label(2)",
+			    ire_t *, ire, ts_label_t *, tsl);
 			error = EACCES;
 		}
 		goto done;
@@ -1400,11 +1400,9 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 		ASSERT(gw_rhc != NULL);
 		switch (gw_rhc->rhc_tpc->tpc_tp.host_type) {
 		case SUN_CIPSO:
-			if (tsl->tsl_doi !=
-			    gw_rhc->rhc_tpc->tpc_tp.tp_doi ||
+			if (tsl->tsl_doi != gw_rhc->rhc_tpc->tpc_tp.tp_doi ||
 			    (!_blinrange(&tsl->tsl_label,
-			    &gw_rhc->rhc_tpc->tpc_tp.
-			    tp_sl_range_cipso) &&
+			    &gw_rhc->rhc_tpc->tpc_tp.tp_sl_range_cipso) &&
 			    !blinlset(&tsl->tsl_label,
 			    gw_rhc->rhc_tpc->tpc_tp.tp_sl_set_cipso))) {
 				error = EACCES;
@@ -1418,8 +1416,7 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 			break;
 
 		case UNLABELED:
-			if (tsl->tsl_doi !=
-				gw_rhc->rhc_tpc->tpc_tp.tp_doi ||
+			if (tsl->tsl_doi != gw_rhc->rhc_tpc->tpc_tp.tp_doi ||
 			    (!_blinrange(&tsl->tsl_label,
 			    &gw_rhc->rhc_tpc->tpc_tp.tp_gw_sl_range) &&
 			    !blinlset(&tsl->tsl_label,
@@ -1673,27 +1670,17 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		goto keep_label;
 
 	if ((af == AF_INET &&
-	    tsol_check_label(DB_CRED(mp), &mp, &adjust, B_FALSE, ipst) != 0) ||
+	    tsol_check_label(DB_CRED(mp), &mp, B_FALSE, ipst) != 0) ||
 	    (af == AF_INET6 &&
-	    tsol_check_label_v6(DB_CRED(mp), &mp, &adjust, B_FALSE,
-	    ipst) != 0)) {
+	    tsol_check_label_v6(DB_CRED(mp), &mp, B_FALSE, ipst) != 0)) {
 		mp = NULL;
 		goto keep_label;
 	}
 
-	ASSERT(adjust != -1);
-	if (adjust != 0) {
-		if (af == AF_INET) {
-			ipha = (ipha_t *)mp->b_rptr;
-			iplen = ntohs(ipha->ipha_length) + adjust;
-			ipha->ipha_length = htons(iplen);
-			ipha->ipha_hdr_checksum = 0;
-			ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-		}
-
-		DTRACE_PROBE3(tx__ip__log__info__forward__adjust, char *,
-		    "mp(1) adjusted(2) for CIPSO option removal",
-		    mblk_t *, mp, int, adjust);
+	if (af == AF_INET) {
+		ipha = (ipha_t *)mp->b_rptr;
+		ipha->ipha_hdr_checksum = 0;
+		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
 	}
 
 keep_label:
