@@ -1590,12 +1590,24 @@ sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 #error - the size of hmehash_bucket structure is not power of 2
 #endif
 
+/*
+ * Enable backoff to significantly reduce locking overhead and reduce a chance
+ * of xcall timeout. This is only enabled for sun4v as a Makefile compile-
+ * time option.
+ * The rd %ccr is better for performance compared to a non pipeline releasing
+ * tight spin on N2/VF.
+ * Backoff based fix is a temporary solution and doesn't allow scaling above
+ * lock saturation point. The final fix is to eliminate HMELOCK_ENTER()
+ * to avoid xcall timeouts and improve GET_TTE() performance.
+ */
+
 #ifdef HMELOCK_BACKOFF_ENABLE
 
 #define HMELOCK_BACKOFF(reg, val)                               \
 	set     val, reg                                        ;\
-	brnz    reg, .                                          ;\
-	  dec   reg
+	rd	%ccr, %g0                                       ;\
+	brnz	reg, .-4                                        ;\
+	dec	reg
 
 #define CAS_HME(tmp1, tmp2, exitlabel, asi)                     \
 	mov     0xff, tmp2                                      ;\
@@ -1609,13 +1621,21 @@ sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 	casa    [tmp1]asi, %g0, tmp2                            ;\
 	brz,a,pt tmp2, label/**/2                               ;\
 	membar  #LoadLoad                                       ;\
+	HMELOCK_BACKOFF(tmp2,0x8)                               ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x10)                              ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x20)                              ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x40)                              ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
 	HMELOCK_BACKOFF(tmp2,0x80)                              ;\
 	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+label/**/1:                                                     ;\
 	HMELOCK_BACKOFF(tmp2,0x100)                             ;\
 	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
 	HMELOCK_BACKOFF(tmp2,0x200)                             ;\
 	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-label/**/1:                                                     ;\
 	HMELOCK_BACKOFF(tmp2,0x400)                             ;\
 	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
 	HMELOCK_BACKOFF(tmp2,0x800)                             ;\
