@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 #include <fnmatch.h>
 #include <langinfo.h>
 #include <ftw.h>
+#include <libgen.h>
 #include "getresponse.h"
 
 #define	A_DAY		(long)(60*60*24)	/* a day full of seconds */
@@ -915,6 +916,18 @@ struct FTW *state;
 			break;
 
 		case NAME: {
+			char *name1;
+
+			/*
+			 * basename(3c) may modify name, so
+			 * we need to pass another string
+			 */
+			if ((name1 = strdup(name)) == NULL) {
+				(void) fprintf(stderr,
+				    gettext("%s: cannot strdup() %s: %s\n"),
+				    name, strerror(errno));
+				exit(2);
+			}
 			/*
 			 * XPG4 find should not treat a leading '.' in a
 			 * filename specially for pattern matching.
@@ -924,10 +937,10 @@ struct FTW *state;
 			 */
 #ifdef XPG4
 			val = !fnmatch(np->first.cp,
-			    name+state->base, 0);
+			    basename(name1), 0);
 #else
 			val = !fnmatch(np->first.cp,
-			    name+state->base, FNM_PERIOD);
+			    basename(name1), FNM_PERIOD);
 #endif
 			break;
 		}
