@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
         Licensed under the Academic Free License version 2.1
@@ -87,6 +87,8 @@
 		<property_group name='general' type='framework'>
 			<!-- to start/stop the discovery service -->
 			<propval name='action_authorization' type='astring'
+				value='solaris.smf.manage.discovery.printers.snmp' />
+			<propval name='value_authorization' type='astring'
 				value='solaris.smf.manage.discovery.printers.snmp' />
 		</property_group>
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -37,6 +37,8 @@
 
 static int __list_increment = 16;
 
+#define	LIST_SIZE(x)	((((x) / __list_increment) + 1) * __list_increment)
+
 int
 list_append(void ***list, void *item)
 {
@@ -50,14 +52,14 @@ list_append(void ***list, void *item)
 	if (item != NULL) {
 		if (*list == NULL)
 			*list = (void **)calloc(__list_increment,
-						sizeof (void *));
+			    sizeof (void *));
 
-		for (count = 0; (*list)[count] != NULL; count++);
+		for (count = 0; (*list)[count] != NULL; count++)
+			;
 
 		if ((count + 1) % __list_increment == 0) { /* expand the list */
 			void **new_list = NULL;
-			int new_size = (((count + 1) / __list_increment) + 1) *
-				__list_increment;
+			int new_size = LIST_SIZE(count + 1);
 
 			new_list = (void **)calloc(new_size, sizeof (void *));
 			if (new_list == NULL)
@@ -85,9 +87,9 @@ int
 list_concatenate(void ***result, void **list2)
 {
 	void    **list1;
-	int	size1 = 0,
-		size2 = 0,
-		new_size = 0;
+	int	size1 = 0;
+	int	size2 = 0;
+	int	new_size = 0;
 
 	if ((result == NULL) || ((*result == NULL) && (list2 == NULL))) {
 		errno = EINVAL;
@@ -97,15 +99,16 @@ list_concatenate(void ***result, void **list2)
 	list1 = *result;
 
 	if (list1 != NULL)
-		for (size1 = 0; list1[size1] != NULL; size1++);
+		for (size1 = 0; list1[size1] != NULL; size1++)
+			;
 	if (list2 != NULL)
-		for (size2 = 0; list2[size2] != NULL; size2++);
+		for (size2 = 0; list2[size2] != NULL; size2++)
+			;
 
 	/* list1 + list2 padded to a multiple of _list_increment */
-	new_size = ((size1 + size2)/__list_increment + 2) * __list_increment;
+	new_size = LIST_SIZE(size1 + size2);
 
-	if ((*result = (void **)calloc((new_size), sizeof (void *)))
-				!= NULL) {
+	if ((*result = (void **)calloc((new_size), sizeof (void *))) != NULL) {
 		int count = 0;
 
 		if (list1 != NULL)
@@ -140,33 +143,35 @@ list_locate(void **list, int (*compare)(void *, void *), void *element)
 void
 list_remove(void ***list, void *item)
 {
-	int i, count;
-	void **tmp = NULL;
+	int i = 0, count;
 
 	if ((list == NULL) || (*list == NULL) || (item == NULL))
 		return;
 
-	for (count = 0; (*list)[count] != NULL; count++);
+	/* size the original list */
+	for (count = 0; (*list)[count] != NULL; count++)
+		if ((*list)[count] == item) {	/* mark the location of item */
+			i = count;
+			item = NULL;
+		}
 
-	if (count > 0) {
-		int new_size = (((count + 1) / __list_increment) + 1) *
-				__list_increment;
-
-		if ((tmp = (void **)calloc(new_size, sizeof (void *))) != NULL)
-			tmp = *list;
-
-		/* copy up to item */
-		for (i = 0; (((*list)[i] != NULL) && ((*list)[i] != item)); i++)
-			tmp[i] = (*list)[i];
-		/* copy after item */
-		if ((*list)[i] == item)
-			for (++i; ((*list)[i] != NULL); i++)
-				tmp[i-1] = (*list)[i];
+	/* if found, remove it */
+	if (item == NULL) {
+		/* shift the list over the item */
+		for (++i; ((*list)[i] != NULL); i++)
+			(*list)[i-1] = (*list)[i];
+		(*list)[i-1] = NULL;
 	}
 
-	/* replace the list */
-	if (tmp != *list) {
-		free(*list);
-		*list = tmp;
+	/* if found, removed, and list should shrink, shrink it */
+	if ((item == NULL) && (LIST_SIZE(i) < LIST_SIZE(count))) {
+		void **tmp = (void **)calloc(LIST_SIZE(i), sizeof (void *));
+
+		if (tmp != NULL) {
+			for (i = 0; (*list)[i] != NULL; i++)
+				tmp[i] = (*list)[i];
+			free(*list);
+			*list = tmp;
+		}
 	}
 }
