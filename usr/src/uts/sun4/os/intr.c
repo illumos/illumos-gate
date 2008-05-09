@@ -111,11 +111,6 @@ intr_init(cpu_t *cp)
 	REGISTER_BBUS_INTR();
 
 	/*
-	 * We just allocate memory for per-cpu siron right now. Rest of
-	 * the work is done when CPU is configured.
-	 */
-	siron_cpu_inum = kmem_zalloc(sizeof (uint64_t) * NCPU, KM_SLEEP);
-	/*
 	 * Register these software interrupts for ddi timer.
 	 * Software interrupts up to the level 10 are supported.
 	 */
@@ -212,7 +207,11 @@ siron(void)
 	uint64_t inum;
 
 	if (siron1_inum != 0) {
-		if (siron_cpu_inum[CPU->cpu_id] != 0)
+		/*
+		 * Once siron_cpu_inum has been allocated, we can
+		 * use per-CPU siron inum.
+		 */
+		if (siron_cpu_inum && siron_cpu_inum[CPU->cpu_id] != 0)
 			inum = siron_cpu_inum[CPU->cpu_id];
 		else
 			inum = siron1_inum;
@@ -220,6 +219,17 @@ siron(void)
 		setsoftint(inum);
 	} else
 		siron1_pending = 1;
+}
+
+
+static void
+siron_init(void)
+{
+	/*
+	 * We just allocate memory for per-cpu siron right now. Rest of
+	 * the work is done when CPU is configured.
+	 */
+	siron_cpu_inum = kmem_zalloc(sizeof (uint64_t) * NCPU, KM_SLEEP);
 }
 
 /*
@@ -230,6 +240,11 @@ void
 siron_mp_init()
 {
 	cpu_t *c;
+
+	/*
+	 * Get the memory for per-CPU siron inums
+	 */
+	siron_init();
 
 	mutex_enter(&cpu_lock);
 	c = cpu_list;
