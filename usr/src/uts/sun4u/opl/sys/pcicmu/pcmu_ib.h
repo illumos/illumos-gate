@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,7 +154,7 @@ extern int pcmu_ib_update_intr_state(pcmu_t *pcmu_p, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state);
 extern void pcmu_ib_ino_add_intr(pcmu_t *pcmu_p,
     pcmu_ib_ino_info_t *ino_p, ih_t *ih_p);
-extern void pcmu_ib_ino_rem_intr(pcmu_t *pcmu_p,
+extern int pcmu_ib_ino_rem_intr(pcmu_t *pcmu_p,
     pcmu_ib_ino_info_t *ino_p, ih_t *ih_p);
 extern ih_t *pcmu_ib_ino_locate_intr(pcmu_ib_ino_info_t *ino_p,
     dev_info_t *dip, uint32_t inum);

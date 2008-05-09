@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,7 +256,7 @@ ino_done:
 	mutex_exit(&pib_p->pib_ino_lst_mutex);
 done:
 	PCMU_DBG2(PCMU_DBG_A_INTX, dip, "done! Interrupt 0x%x pil=%x\n",
-		hdlp->ih_vector, hdlp->ih_pri);
+	    hdlp->ih_vector, hdlp->ih_pri);
 	return (DDI_SUCCESS);
 fail4:
 	pcmu_ib_delete_ino(pib_p, ino_p);
@@ -267,7 +267,7 @@ fail3:
 	kmem_free(ih_p, sizeof (ih_t));
 fail1:
 	PCMU_DBG2(PCMU_DBG_A_INTX, dip, "Failed! Interrupt 0x%x pil=%x\n",
-		hdlp->ih_vector, hdlp->ih_pri);
+	    hdlp->ih_vector, hdlp->ih_pri);
 	return (DDI_FAILURE);
 }
 
@@ -304,7 +304,10 @@ pcmu_remove_intr(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	ih_p = pcmu_ib_ino_locate_intr(ino_p, rdip, hdlp->ih_inum);
-	pcmu_ib_ino_rem_intr(pcmu_p, ino_p, ih_p);
+	if (pcmu_ib_ino_rem_intr(pcmu_p, ino_p, ih_p) != DDI_SUCCESS) {
+		mutex_exit(&pib_p->pib_ino_lst_mutex);
+		return (DDI_FAILURE);
+	}
 	intr_dist_cpuid_rem_device_weight(ino_p->pino_cpuid, rdip);
 	if (ino_p->pino_ih_size == 0) {
 		PCMU_IB_INO_INTR_PEND(ib_clear_intr_reg_addr(pib_p, ino));

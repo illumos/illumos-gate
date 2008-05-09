@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,9 +65,9 @@ pcmu_ib_create(pcmu_t *pcmu_p)
 	 * registers that have common offsets.
 	 */
 	pib_p->pib_intr_retry_timer_reg =
-		(uint64_t *)(a + PCMU_IB_INTR_RETRY_TIMER_OFFSET);
+	    (uint64_t *)(a + PCMU_IB_INTR_RETRY_TIMER_OFFSET);
 	pib_p->pib_obio_intr_state_diag_reg =
-		(uint64_t *)(a + PCMU_IB_OBIO_INTR_STATE_DIAG_REG);
+	    (uint64_t *)(a + PCMU_IB_OBIO_INTR_STATE_DIAG_REG);
 
 	PCMU_DBG2(PCMU_DBG_ATTACH, pcmu_p->pcmu_dip,
 	    "pcmu_ib_create: obio_imr=%x, obio_cir=%x\n",
@@ -85,7 +85,7 @@ pcmu_ib_create(pcmu_t *pcmu_p)
 	    "pcmu_ib_create: numproxy=%x\n", pcmu_p->pcmu_numproxy);
 	for (i = 1; i <= pcmu_p->pcmu_numproxy; i++) {
 		set_intr_mapping_reg(pcmu_p->pcmu_id,
-			(uint64_t *)pib_p->pib_upa_imr[i - 1], i);
+		    (uint64_t *)pib_p->pib_upa_imr[i - 1], i);
 	}
 
 	pcmu_ib_configure(pib_p);
@@ -429,7 +429,8 @@ pcmu_ib_locate_ino(pcmu_ib_t *pib_p, pcmu_ib_ino_t ino_num)
 	pcmu_ib_ino_info_t *ino_p = pib_p->pib_ino_lst;
 	ASSERT(MUTEX_HELD(&pib_p->pib_ino_lst_mutex));
 
-	for (; ino_p && ino_p->pino_ino != ino_num; ino_p = ino_p->pino_next);
+	for (; ino_p && ino_p->pino_ino != ino_num; ino_p = ino_p->pino_next)
+		;
 	return (ino_p);
 }
 
@@ -473,7 +474,8 @@ pcmu_ib_delete_ino(pcmu_ib_t *pib_p, pcmu_ib_ino_info_t *ino_p)
 	if (list == ino_p) {
 		pib_p->pib_ino_lst = list->pino_next;
 	} else {
-		for (; list->pino_next != ino_p; list = list->pino_next);
+		for (; list->pino_next != ino_p; list = list->pino_next)
+			;
 		list->pino_next = ino_p->pino_next;
 	}
 }
@@ -520,7 +522,7 @@ pcmu_ib_ino_add_intr(pcmu_t *pcmu_p, pcmu_ib_ino_info_t *ino_p, ih_t *ih_p)
 	jump = TICK_TO_NSEC(xc_tick_jump_limit);
 	start_time = curr = gethrtime();
 	while ((ino_p->pino_unclaimed <= pcmu_unclaimed_intr_max) &&
-		PCMU_IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
+	    PCMU_IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
 		/*
 		 * If we have a really large jump in hrtime, it is most
 		 * probably because we entered the debugger (or OBP,
@@ -579,14 +581,14 @@ pcmu_ib_ino_add_intr(pcmu_t *pcmu_p, pcmu_ib_ino_info_t *ino_p, ih_t *ih_p)
  * if we are sharing PCI slot with other inos, the caller needs
  * to turn it back on.
  */
-void
+int
 pcmu_ib_ino_rem_intr(pcmu_t *pcmu_p, pcmu_ib_ino_info_t *ino_p, ih_t *ih_p)
 {
 	int i;
 	pcmu_ib_ino_t ino = ino_p->pino_ino;
 	ih_t *ih_lst = ino_p->pino_ih_head;
 	volatile uint64_t *state_reg =
-		PCMU_IB_INO_INTR_STATE_REG(ino_p->pino_ib_p, ino);
+	    PCMU_IB_INO_INTR_STATE_REG(ino_p->pino_ib_p, ino);
 	hrtime_t start_time;
 	hrtime_t prev, curr, interval, jump;
 	hrtime_t intr_timeout;
@@ -608,7 +610,7 @@ pcmu_ib_ino_rem_intr(pcmu_t *pcmu_p, pcmu_ib_ino_info_t *ino_p, ih_t *ih_p)
 	jump = TICK_TO_NSEC(xc_tick_jump_limit);
 	start_time = curr = gethrtime();
 	while ((ino_p->pino_unclaimed <= pcmu_unclaimed_intr_max) &&
-		PCMU_IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
+	    PCMU_IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
 		/*
 		 * If we have a really large jump in hrtime, it is most
 		 * probably because we entered the debugger (or OBP,
@@ -628,7 +630,9 @@ pcmu_ib_ino_rem_intr(pcmu_t *pcmu_p, pcmu_ib_ino_info_t *ino_p, ih_t *ih_p)
 			    "%s:%s: pcmu_ib_ino_rem_intr %x timeout",
 			    pcbm_p->pcbm_nameinst_str,
 			    pcbm_p->pcbm_nameaddr_str, ino);
-			break;
+			PCMU_IB_INO_INTR_ON(ino_p->pino_map_reg);
+			*ino_p->pino_map_reg;
+			return (DDI_FAILURE);
 		}
 	}
 
@@ -656,7 +660,8 @@ pcmu_ib_ino_rem_intr(pcmu_t *pcmu_p, pcmu_ib_ino_info_t *ino_p, ih_t *ih_p)
 
 	/* search the link list for ih_p */
 	for (i = 0; (i < ino_p->pino_ih_size) && (ih_lst->ih_next != ih_p);
-	    i++, ih_lst = ih_lst->ih_next);
+	    i++, ih_lst = ih_lst->ih_next)
+		;
 	if (ih_lst->ih_next != ih_p) {
 		goto not_found;
 	}
@@ -677,10 +682,11 @@ reset:
 	kmem_free(ih_p, sizeof (ih_t));
 	ino_p->pino_ih_size--;
 
-	return;
+	return (DDI_SUCCESS);
 not_found:
 	PCMU_DBG2(PCMU_DBG_R_INTX, ino_p->pino_ib_p->pib_pcmu_p->pcmu_dip,
 	    "ino_p=%x does not have ih_p=%x\n", ino_p, ih_p);
+	return (DDI_SUCCESS);
 }
 
 ih_t *
