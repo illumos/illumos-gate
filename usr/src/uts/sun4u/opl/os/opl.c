@@ -1052,7 +1052,7 @@ plat_lock_delay(uint_t backoff)
 		}
 	} else {
 		/* backoff is large.  Fill it by sleeping */
-		delay_start = gethrtime();
+		delay_start = gethrtime_waitfree();
 		cnt = backoff / OPL_BOFF_SLEEP;
 		/*
 		 * use sleep instructions for delay
@@ -1069,7 +1069,7 @@ plat_lock_delay(uint_t backoff)
 		 * spin loop and a sleep for repeated delay times.
 		 */
 
-		rem_delay = gethrtime() - delay_start;
+		rem_delay = gethrtime_waitfree() - delay_start;
 		while (rem_delay < cnt * OPL_BOFF_TM) {
 			remcnt = cnt - (rem_delay / OPL_BOFF_TM);
 			for (i = 0; i < remcnt; i++) {
@@ -1078,7 +1078,7 @@ plat_lock_delay(uint_t backoff)
 					mutex_delay_default();
 				}
 			}
-			rem_delay = gethrtime() - delay_start;
+			rem_delay = gethrtime_waitfree() - delay_start;
 		}
 	}
 }

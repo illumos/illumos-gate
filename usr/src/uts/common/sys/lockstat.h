@@ -156,8 +156,8 @@ extern void lockstat_hot_patch(void);
 /*
  * Return timestamp for start of busy-waiting (for spin probes)
  */
-#define	LOCKSTAT_START_TIME(probe)	(		\
-	lockstat_probemap[(probe)] ? gethrtime() : 0	\
+#define	LOCKSTAT_START_TIME(probe)	(			\
+	lockstat_probemap[(probe)] ? gethrtime_waitfree() : 0	\
 )
 
 /*
@@ -173,7 +173,7 @@ extern void lockstat_hot_patch(void);
 		membar_enter();						\
 		if ((id = lockstat_probemap[(probe)]) != 0) {		\
 			if (t_spin) {					\
-				t_spin = gethrtime() - t_spin;		\
+				t_spin = gethrtime_waitfree() - t_spin;	\
 				t_spin = CLAMP32(t_spin);		\
 			} 						\
 			(*lockstat_probe)(id, (uintptr_t)(lp), t_spin,	\
