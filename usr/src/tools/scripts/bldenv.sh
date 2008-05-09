@@ -1,4 +1,4 @@
-#!/bin/ksh -p
+#!/usr/bin/ksh93
 #
 # CDDL HEADER START
 #
@@ -30,34 +30,17 @@
 # before spawning a shell for doing a release-style builds interactively
 # and incrementally.
 #
-USAGE='Usage: bldenv [-fd] [+t] [ -S E|D|H|O ] <env_file> [ command ]
 
-Where:
-	-c	Force the use of csh - ignore $SHELL
-	-f	Invoke csh with -f
-	-d	Setup a DEBUG build (default: non-DEBUG)
-	+t	use the tools in $ONBLD_TOOLS/bin
-	-S	Build a variant of the source product
-		E - build exportable source
-		D - build domestic source (exportable + crypt)
-		H - build hybrid source (binaries + deleted source)
-		O - simulate OpenSolaris build
-'
+function usage
+{
+    OPTIND=0
+    getopts -a "${progname}" "${USAGE}" OPT '-?'
+    exit 2
+}
 
-c_FLAG=n
-f_FLAG=n
-d_FLAG=n
-O_FLAG=n
-o_FLAG=n
-t_FLAG=y
-SE_FLAG=n
-SH_FLAG=n
-SD_FLAG=n
-SO_FLAG=n
-
-is_source_build() {
-	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
-	    "$SH_FLAG" = "y" -o "$SO_FLAG" = "y" ]
+function is_source_build
+{
+	"${flags.s.e}" || "${flags.s.d}" || "${flags.s.h}" || "${flags.s.o}"
 	return $?
 }
 
@@ -66,91 +49,203 @@ is_source_build() {
 # usage: set_S_flag <type>
 # where <type> is the source build type ("E", "D", ...).
 #
-set_S_flag() {
+function set_S_flag
+{
 	if is_source_build; then
-		echo "Can only build one source variant at a time."
+		print 'Can only build one source variant at a time.'
 		exit 1
 	fi
-	if [ "$1" = "E" ]; then
-		SE_FLAG=y
-	elif [ "$1" = "D" ]; then
-		SD_FLAG=y
-	elif [ "$1" = "H" ]; then
-		SH_FLAG=y
-	elif [ "$1" = "O" ]; then
-		SO_FLAG=y
-	else
-		echo "$USAGE"
-		exit 1
-	fi
+	
+	case "$1" in
+		"E") flags.s.e=true ;;
+		"D") flags.s.d=true ;;
+		"H") flags.s.h=true ;;
+		"O") flags.s.o=true ;;
+		*)   usage ;;
+	esac
 }
+
+typeset -r USAGE=$'+
+[-?\n@(#)\$Id: bldenv (OS/Net) 2008-04-06 \$\n]
+[-author?OS/Net community <tools-discuss@opensolaris.org>]
+[+NAME?bldenv - spawn shell for interactive incremental OS-Net
+    consolidation builds]
+[+DESCRIPTION?bldenv is a useful companion to the nightly(1) script for
+    doing interactive and incremental builds in a workspace
+    already built with nightly(1). bldenv spawns a shell set up
+    with the same environment variables taken from an env_file,
+    as prepared for use with nightly(1).]
+[+?In addition to running a shell for interactive use, bldenv
+    can optionally run a single command in the given environment,
+    in the vein of sh -c or su -c. This is useful for
+    scripting, when an interactive shell would not be. If the
+    command is composed of multiple shell words or contains
+    other shell metacharacters, it must be quoted appropriately.]
+[+?bldenv is particularly useful for testing Makefile targets
+    like clobber, install and _msg, which otherwise require digging
+    through large build logs to figure out what is being
+    done.]
+[+?bldenv is also useful if you run into build issues with the
+    source product or when generating OpenSolaris deliverables.
+    If a source product build is flagged, the environment is set
+    up for building the indicated source product tree, which is
+    assumed to have already been created. If the OpenSolaris
+    deliverables flag (-O) is set in NIGHTLY_OPTIONS, the
+    environment is set up for building just the open source.
+    This includes using an alternate proto area, as well as
+    using the closed binaries in $CODEMGR_WS/closed.skel (which
+    is assumed to already exist).]
+[+?By default, bldenv will invoke the shell specified in
+    $SHELL. If $SHELL is not set or is invalid, csh will be
+    used.]
+[c?force the use of csh, regardless of the  value  of $SHELL.]
+[f?invoke csh with the -f (fast-start) option. This option is valid
+    only if $SHELL is unset or if it points to csh.]
+[d?set up environment for doing DEBUG builds (default is non-DEBUG)]
+[t?set up environment to use the tools in usr/src/tools (this is the
+    default, use +t to use the tools from /opt/onbld)]
+[S]:[option?Build a variant of the source product.
+The value of \aoption\a must be one of the following:]{
+       [+E?build the exportable source variant of the source product.]
+       [+D?build the domestic  source  (exportable + crypt) variant of
+           the source product.]
+       [+H?build hybrid source (binaries + deleted source).]
+       [+O?simulate an OpenSolaris (open source only) build.]
+}
+
+<env_file> [command]
+
+[+EXAMPLES]{
+    [+?Example 1: Interactive use]{
+        [+?Use bldenv to spawn a shell to perform  a  DEBUG  build  and
+            testing of the  Makefile  targets  clobber and install for
+            usr/src/cmd/true.]
+        [+\n% rlogin wopr-2 -l gk
+{root::wopr-2::49} bldenv -d /export0/jg/on10-se.env
+Build type   is  DEBUG
+RELEASE      is  5.10
+VERSION      is  wopr-2::on10-se::11/01/2001
+RELEASE_DATE is  May 2004
+The top-level `setup\' target is available to build headers
+and tools.
+Using /usr/bin/tcsh as shell.
+{root::wopr-2::49}
+{root::wopr-2::49} cd $SRC/cmd/true
+{root::wopr-2::50} make
+{root::wopr-2::51} make clobber
+/usr/bin/rm -f true true.po
+{root::wopr-2::52} make
+/usr/bin/rm -f true
+cat true.sh > true
+chmod +x true
+{root::wopr-2::53} make install
+install -s -m 0555 -u root -g bin -f /export0/jg/on10-se/proto/root_sparc/usr/bin true
+`install\' is up to date.]
+    }
+    [+?Example 2: Non-interactive use]{
+        [+?Invoke bldenv to create SUNWonbld with a single command:]
+        [+\nexample% bldenv onnv_06 \'cd $SRC/tools && make pkg\']
+        }
+}
+[+SEE ALSO?\bnightly\b(1)]
+'
+
+# main
+builtin basename
+
+# boolean flags (true/false)
+typeset flags=(
+	typeset c=false
+	typeset f=false
+	typeset d=false
+	typeset O=false
+	typeset o=false
+	typeset t=true
+	typeset s=(
+		typeset e=false
+		typeset h=false
+		typeset d=false
+		typeset o=false
+	)
+)
+
+typeset progname="$(basename "${0}")"
 
 OPTIND=1
 SUFFIX="-nd"
-while getopts cdfS:t FLAG
-do
-	case $FLAG in
-	  c )	c_FLAG=y
-		;;
-	  f )	f_FLAG=y
-		;;
-	  d )	d_FLAG=y
-		SUFFIX=""
-		;;
-	 +t )	t_FLAG=n
-		;;
-	  S )
-		set_S_flag $OPTARG
-		;;
-	  \?)	echo "$USAGE"
-		exit 1
-		;;
-	esac
-done
 
-# correct argument count after options
-shift `expr $OPTIND - 1`
+while getopts -a "${progname}" "${USAGE}" OPT ; do 
+    case ${OPT} in
+	  c)	flags.c=true  ;;
+	  +c)	flags.c=false ;;
+	  f)	flags.f=true  ;;
+	  +f)	flags.f=false ;;
+	  d)	flags.d=true  SUFFIX=""    ;;
+	  +d)	flags.d=false SUFFIX="-nd" ;;
+	  t)	flags.t=true  ;;
+	  +t)	flags.t=false ;;
+	  S)	set_S_flag "$OPTARG" ;;
+	  \?)	usage ;;
+    esac
+done
+shift $((OPTIND-1))
 
 # test that the path to the environment-setting file was given
-if [ $# -lt 1 ]
-then
-	echo "$USAGE"
-	exit 1
+if (( $# < 1 )) ; then
+	usage
 fi
 
 # force locale to C
-LC_COLLATE=C;   export LC_COLLATE
-LC_CTYPE=C;     export LC_CTYPE
-LC_MESSAGES=C;  export LC_MESSAGES
-LC_MONETARY=C;  export LC_MONETARY
-LC_NUMERIC=C;   export LC_NUMERIC
-LC_TIME=C;      export LC_TIME
+export \
+	LC_COLLATE=C \
+	LC_CTYPE=C \
+	LC_MESSAGES=C \
+	LC_MONETARY=C \
+	LC_NUMERIC=C \
+	LC_TIME=C
 
 # clear environment variables we know to be bad for the build
-unset LD_OPTIONS LD_LIBRARY_PATH LD_AUDIT LD_BIND_NOW LD_BREADTH LD_CONFIG
-unset LD_DEBUG LD_FLAGS LD_LIBRARY_PATH_64 LD_NOVERSION LD_ORIGIN 
-unset LD_LOADFLTR LD_NOAUXFLTR LD_NOCONFIG LD_NODIRCONFIG LD_NOOBJALTER 
-unset LD_PRELOAD LD_PROFILE  
-unset CONFIG
-unset GROUP
-unset OWNER
-unset REMOTE
-unset ENV
-unset ARCH
-unset CLASSPATH 
+unset \
+	LD_OPTIONS \
+        LD_LIBRARY_PATH \
+        LD_AUDIT \
+        LD_BIND_NOW \
+        LD_BREADTH \
+        LD_CONFIG \
+	LD_DEBUG \
+        LD_FLAGS \
+        LD_LIBRARY_PATH_64 \
+        LD_NOVERSION \
+        LD_ORIGIN \
+	LD_LOADFLTR \
+        LD_NOAUXFLTR \
+        LD_NOCONFIG \
+        LD_NODIRCONFIG \
+        LD_NOOBJALTER \
+	LD_PRELOAD \
+        LD_PROFILE \
+	CONFIG \
+	GROUP \
+	OWNER \
+	REMOTE \
+	ENV \
+	ARCH \
+	CLASSPATH
 
 # setup environmental variables
-if [ -f $1 ]; then
-	if [[ $1 = */* ]]; then
-		. $1
+if [[ -f "$1" ]]; then
+	if [[ "$1" == */* ]]; then
+		source "$1"
 	else
-		. ./$1
+		source "./$1"
 	fi
 else
-	if [ -f /opt/onbld/env/$1 ]; then
-		. /opt/onbld/env/$1
+	if [[ -f "/opt/onbld/env/$1" ]]; then
+		source "/opt/onbld/env/$1"
 	else
-		echo "Cannot find env file as either $1 or /opt/onbld/env/$1"
+		printf \
+		    'Cannot find env file as either %s or /opt/onbld/env/%s\n' \
+		    "$1" "$1"
 		exit 1
 	fi
 fi
@@ -160,133 +255,132 @@ shift
 # STDENV_START
 # STDENV_END
 
-#MACH=`uname -p`
+#MACH=$(uname -p)
 
 # must match the getopts in nightly.sh
 OPTIND=1
-NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
-while getopts AaBCDdFfGIilMmNnOopRrS:tUuWwXxz FLAG $NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-${NIGHTLY_OPTIONS#-}"
+while getopts '+AaBCDdFfGIilMmNnOopRrS:tUuWwXxz' FLAG "$NIGHTLY_OPTIONS"
 do
-	case $FLAG in
-	  O)	O_FLAG=y
-		;;
-	  o)	o_FLAG=y
-		;;
-	 +t )	t_FLAG=n
-		;;
-	  S )
-		set_S_flag $OPTARG
-		;;
-	  *)    ;;
+	case "$FLAG" in
+	  O)	flags.O=true  ;;
+	  +O)	flags.O=false ;;
+	  o)	flags.o=true  ;;
+	  +o)	flags.o=false ;;
+	  t)	flags.t=true  ;;
+	  +t)	flags.t=false ;;
+	  S)	set_S_flag "$OPTARG" ;;
+	  *)	;;
 	esac
 done
 
-echo "Build type   is  \c"
-if [ ${d_FLAG} = "y" ]; then
-	echo "DEBUG"
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
+export INTERNAL_RELEASE_BUILD=
+
+print 'Build type   is  \c'
+if ${flags.d} ; then
+	print 'DEBUG'
 	unset RELEASE_BUILD
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
 else
 	# default is a non-DEBUG build
-	echo "non-DEBUG"
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-	export RELEASE_BUILD ; RELEASE_BUILD=
+	print 'non-DEBUG'
+	export RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
 fi
 
-if [ $O_FLAG = "y" ]; then
-	export MULTI_PROTO=yes
-	if [ "$CLOSED_IS_PRESENT" = "yes" ]; then
-		echo "CLOSED_IS_PRESENT is 'no' (because of '-O')"
+if ${flags.O} ; then
+	export MULTI_PROTO="yes"
+	if [[ "$CLOSED_IS_PRESENT" == "yes" ]]; then
+		print "CLOSED_IS_PRESENT is 'no' (because of '-O')"
 	fi
 	export CLOSED_IS_PRESENT=no
-	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
+	export ON_CLOSED_BINS="$CODEMGR_WS/closed.skel"
 fi
 
 # update build-type variables
-CPIODIR=${CPIODIR}${SUFFIX}
-PKGARCHIVE=${PKGARCHIVE}${SUFFIX}
+CPIODIR="${CPIODIR}${SUFFIX}"
+PKGARCHIVE="${PKGARCHIVE}${SUFFIX}"
 
 # Append source version
-if [ "$SE_FLAG" = "y" ]; then
-        VERSION="${VERSION}:EXPORT"
-	SRC=${EXPORT_SRC}/usr/src
+if "${flags.s.e}" ; then
+        VERSION+=":EXPORT"
+	SRC="${EXPORT_SRC}/usr/src"
 fi
  
-if [ "$SD_FLAG" = "y" ]; then
-        VERSION="${VERSION}:DOMESTIC"
-	SRC=${EXPORT_SRC}/usr/src
+if "${flags.s.d}" ; then
+        VERSION+=":DOMESTIC"
+	SRC="${EXPORT_SRC}/usr/src"
 fi
 
-if [ "$SH_FLAG" = "y" ]; then
-        VERSION="${VERSION}:HYBRID"
-	SRC=${EXPORT_SRC}/usr/src
+if "${flags.s.h}" ; then
+        VERSION+=":HYBRID"
+	SRC="${EXPORT_SRC}/usr/src"
 fi
  
-if [ "$SO_FLAG" = "y" ]; then
-        VERSION="${VERSION}:OPEN_ONLY"
-	SRC=${OPEN_SRCDIR}/usr/src
+if "${flags.s.o}" ; then
+        VERSION+=":OPEN_ONLY"
+	SRC="${OPEN_SRCDIR}/usr/src"
 fi
  
 # 	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
-if [ "${SUNWSPRO}" != "" ]; then 
-	PATH="${SUNWSPRO}/bin:$PATH" 
-	export PATH 
+if [[ "${SUNWSPRO}" != "" ]]; then 
+	export PATH="${SUNWSPRO}/bin:$PATH" 
 fi 
 
-if [ -z "$CLOSED_IS_PRESENT" ]; then
-	if [ -d $SRC/../closed ]; then
-		CLOSED_IS_PRESENT="yes"
+if [[ -z "$CLOSED_IS_PRESENT" ]]; then
+	if [[ -d $SRC/../closed ]]; then
+		export CLOSED_IS_PRESENT="yes"
 	else
-		CLOSED_IS_PRESENT="no"
+		export CLOSED_IS_PRESENT="no"
 	fi
-	export CLOSED_IS_PRESENT
 fi
 
-TOOLS=${SRC}/tools
-TOOLS_PROTO=${TOOLS}/proto
+TOOLS="${SRC}/tools"
+TOOLS_PROTO="${TOOLS}/proto"
 
-if [ "$t_FLAG" = "y" ]; then
-	export ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
+if "${flags.t}" ; then
+	export ONBLD_TOOLS="${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}"
 
-	STABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/stabs
-	export STABS
-	CTFSTABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfstabs
-	export CTFSTABS
-	GENOFFSETS=${TOOLS_PROTO}/opt/onbld/bin/genoffsets
-	export GENOFFSETS
+	export STABS="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/stabs"
+	export CTFSTABS="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfstabs"
+	export GENOFFSETS="${TOOLS_PROTO}/opt/onbld/bin/genoffsets"
 
-	CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert
-	export CTFCONVERT
-	CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge
-	export CTFMERGE
+	export CTFCONVERT="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert"
+	export CTFMERGE="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge"
 
-	CTFCVTPTBL=${TOOLS_PROTO}/opt/onbld/bin/ctfcvtptbl
-	export CTFCVTPTBL
-	CTFFINDMOD=${TOOLS_PROTO}/opt/onbld/bin/ctffindmod
-	export CTFFINDMOD
+	export CTFCVTPTBL="${TOOLS_PROTO}/opt/onbld/bin/ctfcvtptbl"
+	export CTFFINDMOD="${TOOLS_PROTO}/opt/onbld/bin/ctffindmod"
 
 	PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
 	PATH="${TOOLS_PROTO}/opt/onbld/bin:${PATH}"
 	export PATH
 fi
 
-unset CH
-if [ "$o_FLAG" = "y" ]; then
-	CH=
-	export CH
+
+if "${flags.o}" ; then
+	export CH=
+else
+	unset CH
 fi
 POUND_SIGN="#"
 DEF_STRIPFLAG="-s"
 
 TMPDIR="/tmp"
 
-export	PATH TMPDIR o_FLAG POUND_SIGN DEF_STRIPFLAG
-unset	CFLAGS LD_LIBRARY_PATH
+# "o_FLAG" is used by "nightly.sh" and "makebfu.sh" (it may be useful to
+# rename this variable using a more descriptive name later)
+export o_FLAG="$(${flags.o} && print 'y' || print 'n')"
+
+export \
+	PATH TMPDIR \
+	POUND_SIGN \
+	DEF_STRIPFLAG
+unset \
+	CFLAGS \
+	LD_LIBRARY_PATH
 
 # a la ws
 ENVLDLIBS1=
@@ -298,55 +392,66 @@ ENVCPPFLAGS3=
 ENVCPPFLAGS4=
 PARENT_ROOT=
 
-[ "$O_FLAG" = "y" ] && export ROOT=$ROOT-open
+"${flags.O}" && export ROOT="$ROOT-open"
 
-if [ "$MULTI_PROTO" != "yes" -a "$MULTI_PROTO" != "no" ]; then
-	echo "WARNING: invalid value for MULTI_PROTO ($MULTI_PROTO);" \
-	    "setting to \"no\"."
-	export MULTI_PROTO=no
+if [[ "$MULTI_PROTO" != "yes" && "$MULTI_PROTO" != "no" ]]; then
+	printf \
+	    'WARNING: invalid value for MULTI_PROTO (%s);setting to "no".\n' \
+	    "$MULTI_PROTO"
+	export MULTI_PROTO="no"
 fi
 
-[ "$MULTI_PROTO" = "yes" ] && export ROOT=$ROOT$SUFFIX
+[[ "$MULTI_PROTO" == "yes" ]] && export ROOT="${ROOT}${SUFFIX}"
 
 ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
 ENVCPPFLAGS1="-I$ROOT/usr/include"
 MAKEFLAGS=e
 
-export ENVLDLIBS1 ENVLDLIBS2 ENVLDLIBS3 \
-	ENVCPPFLAGS1 ENVCPPFLAGS2 ENVCPPFLAGS3 \
-	ENVCPPFLAGS4 MAKEFLAGS PARENT_ROOT
+export \
+        ENVLDLIBS1 \
+        ENVLDLIBS2 \
+        ENVLDLIBS3 \
+	ENVCPPFLAGS1 \
+        ENVCPPFLAGS2 \
+        ENVCPPFLAGS3 \
+	ENVCPPFLAGS4 \
+        MAKEFLAGS \
+        PARENT_ROOT
 
-echo "RELEASE      is  $RELEASE"
-echo "VERSION      is  $VERSION"
-echo "RELEASE_DATE is  $RELEASE_DATE"
-echo ""
+printf 'RELEASE      is %s\n'   "$RELEASE"
+printf 'VERSION      is %s\n'   "$VERSION"
+printf 'RELEASE_DATE is %s\n\n' "$RELEASE_DATE"
 
-if [[ -f $SRC/Makefile ]] && egrep -s '^setup:' $SRC/Makefile; then
-	echo "The top-level 'setup' target is available \c"
-	echo "to build headers and tools."
-	echo ""
+if [[ -f "$SRC/Makefile" ]] && egrep -s '^setup:' "$SRC/Makefile" ; then
+	print "The top-level 'setup' target is available \c"
+	print "to build headers and tools."
+	print ""
 
-elif [[ "$t_FLAG" = "y" ]]; then
-	echo "The tools can be (re)built with the install target in ${TOOLS}."
-	echo ""
+elif "${flags.t}" ; then
+	printf \
+	    'The tools can be (re)built with the install target in %s.\n\n' \
+	    "${TOOLS}"
 fi
 
 
-if [[ "$c_FLAG" = "n" && -x "$SHELL" && `basename $SHELL` != "csh" ]]; then
+if [[ "${flags.c}" == "false" && -x "$SHELL" && \
+    "$(basename "${SHELL}")" != "csh" ]]; then
 	# $SHELL is set, and it's not csh.
 
-	if [[ "$f_FLAG" != "n" ]]; then
-		echo "WARNING: -f is ignored when \$SHELL is not csh"
+	if "${flags.f}" ; then
+		print 'WARNING: -f is ignored when $SHELL is not csh'
 	fi
 
-	echo "Using $SHELL as shell."
-	exec $SHELL ${@:+-c "$@"}
+	printf 'Using %s as shell.\n' "$SHELL"
+	exec "$SHELL" ${@:+-c "$@"}
 
-elif [[ "$f_FLAG" = "y" ]]; then
-	echo "Using csh -f as shell."
+elif "${flags.f}" ; then
+	print 'Using csh -f as shell.'
 	exec csh -f ${@:+-c "$@"}
 
 else
-	echo "Using csh as shell."
+	print 'Using csh as shell.'
 	exec csh ${@:+-c "$@"}
 fi
+
+# not reached
