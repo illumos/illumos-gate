@@ -925,7 +925,7 @@ struct FTW *state;
 			if ((name1 = strdup(name)) == NULL) {
 				(void) fprintf(stderr,
 				    gettext("%s: cannot strdup() %s: %s\n"),
-				    name, strerror(errno));
+				    cmdname, name, strerror(errno));
 				exit(2);
 			}
 			/*
