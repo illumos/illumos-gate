@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-1996, 1999, 2001-2003 Sun Microsystems, Inc.
- * All rights reserved.
- * Use is subject to license terms.
- */
-/*
- * Copyright 1991-1996, 1999, 2001-2002 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +141,8 @@ struct	menu_item menu_partition[] = {
 	{ "9      - change `9' partition",
 		p_jpart, expert },
 #endif
+	{ "expand - expand label to use whole disk",
+		p_expand, disp_expand_efi },
 	{ "select - select a predefined table",
 		p_select, true },
 	{ "modify - modify a predefined partition table",

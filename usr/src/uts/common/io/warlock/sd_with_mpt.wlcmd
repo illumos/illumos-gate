@@ -67,6 +67,7 @@ root	mpt_fm_error_cb
 root 	sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
 root 	sd_wm_cache_constructor sd_wm_cache_destructor sd_read_modify_write_task
 root 	sd_failfast_flushq_callback sd_reenable_dsense_task
+root	sd_target_change_task
 
 assert order scsi_device::sd_mutex  mpt::m_mutex
 

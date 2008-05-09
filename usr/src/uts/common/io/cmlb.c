@@ -946,6 +946,58 @@ cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
 	return (rval);
 }
 
+/*
+ * cmlb_efi_label_capacity:
+ *	Get capacity stored in EFI disk label.
+ *
+ * Arguments:
+ *	cmlbhandle	cmlb handle associated with device.
+ *	capacity	pointer to capacity stored in EFI disk label.
+ *	tg_cookie	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
+ *
+ *
+ * Notes:
+ *	If in-core label is not valid, this functions tries to revalidate
+ *	the label. If label is valid and is an EFI label, it stores the capacity
+ *      in disk label in the area pointed to by capacity.
+ *
+ *
+ * Return values:
+ *	0	success
+ *	EINVAL  no valid EFI label or capacity is NULL.
+ *
+ */
+int
+cmlb_efi_label_capacity(cmlb_handle_t cmlbhandle, diskaddr_t *capacity,
+    void *tg_cookie)
+{
+	struct cmlb_lun *cl = (struct cmlb_lun *)cmlbhandle;
+	int rval;
+
+	ASSERT(cl != NULL);
+	mutex_enter(CMLB_MUTEX(cl));
+	if (cl->cl_state < CMLB_ATTACHED) {
+		mutex_exit(CMLB_MUTEX(cl));
+		return (EINVAL);
+	}
+
+	if (cl->cl_f_geometry_is_valid == FALSE)
+		(void) cmlb_validate_geometry((struct cmlb_lun *)cl, 0,
+		    0, tg_cookie);
+
+	if ((cl->cl_f_geometry_is_valid == FALSE) || (capacity == NULL) ||
+	    (cl->cl_cur_labeltype != CMLB_LABEL_EFI)) {
+		rval = EINVAL;
+	} else {
+		*capacity = (diskaddr_t)cl->cl_map[WD_NODE].dkl_nblk;
+		rval = 0;
+	}
+
+	mutex_exit(CMLB_MUTEX(cl));
+	return (rval);
+}
+
 /* Caller should make sure Test Unit Ready succeeds before calling this. */
 /*ARGSUSED*/
 int
@@ -2088,6 +2140,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	diskaddr_t	cap = 0;
 	uint_t		nparts;
 	diskaddr_t	gpe_lba;
+	diskaddr_t	alternate_lba;
 	int		iofailed = 0;
 	struct uuid	uuid_type_reserved = EFI_RESERVED;
 
@@ -2173,6 +2226,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 
 	nparts = ((efi_gpt_t *)buf)->efi_gpt_NumberOfPartitionEntries;
 	gpe_lba = ((efi_gpt_t *)buf)->efi_gpt_PartitionEntryLBA;
+	alternate_lba = ((efi_gpt_t *)buf)->efi_gpt_AlternateLBA;
 
 	rval = DK_TG_READ(cl, buf, gpe_lba, EFI_MIN_ARRAY_SIZE, tg_cookie);
 	if (rval) {
@@ -2210,9 +2264,21 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 		if (i == WD_NODE) {
 			/*
 			 * minor number 7 corresponds to the whole disk
+			 * if the disk capacity is expanded after disk is
+			 * labeled, minor number 7 represents the capacity
+			 * indicated by the disk label.
 			 */
 			cl->cl_map[i].dkl_cylno = 0;
-			cl->cl_map[i].dkl_nblk = capacity;
+			if (alternate_lba == 1) {
+				/*
+				 * We are using backup label. Since we can
+				 * find a valid label at the end of disk,
+				 * the disk capacity is not expanded.
+				 */
+				cl->cl_map[i].dkl_nblk = capacity;
+			} else {
+				cl->cl_map[i].dkl_nblk = alternate_lba + 1;
+			}
 			cl->cl_offset[i] = 0;
 		}
 		partitions++;

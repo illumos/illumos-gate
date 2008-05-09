@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ main(int argc, char *argv[])
 	if (option_f) {
 		if (freopen(option_f, "r", stdin) == NULL) {
 			err_print("Unable to open command file '%s'.\n",
-				option_f);
+			    option_f);
 			fullabort();
 		}
 	}
@@ -114,7 +114,7 @@ main(int argc, char *argv[])
 	if (option_l) {
 		if ((log_file = fopen(option_l, "w")) == NULL) {
 			err_print("Unable to open log file '%s'.\n",
-				option_l);
+			    option_l);
 			fullabort();
 		}
 	}
@@ -151,7 +151,7 @@ main(int argc, char *argv[])
 	act.sa_flags = SA_RESTART | SA_NODEFER;
 	if (sigaction(SIGINT, &act, (struct sigaction *)NULL) == -1) {
 		err_print("sigaction(SIGINT) failed - %s\n",
-			strerror(errno));
+		    strerror(errno));
 		fullabort();
 	}
 
@@ -160,7 +160,7 @@ main(int argc, char *argv[])
 	act.sa_flags = SA_RESTART | SA_NODEFER;
 	if (sigaction(SIGTSTP, &act, (struct sigaction *)NULL) == -1) {
 		err_print("sigaction(SIGTSTP) failed - %s\n",
-			strerror(errno));
+		    strerror(errno));
 		fullabort();
 	}
 
@@ -169,7 +169,7 @@ main(int argc, char *argv[])
 	act.sa_flags = SA_RESTART;
 	if (sigaction(SIGALRM, &act, (struct sigaction *)NULL) == -1) {
 		err_print("sigaction(SIGALRM) failed - %s\n",
-			strerror(errno));
+		    strerror(errno));
 		fullabort();
 	}
 
@@ -330,6 +330,8 @@ init_globals(disk)
 	struct	disk_info *disk;
 {
 	int		status;
+	int		found_mount;
+	int		found_inuse;
 #ifdef sparc
 	int		i;
 	caddr_t		bad_ptr = (caddr_t)&badmap;
@@ -540,20 +542,42 @@ Continue"))
 	 * Check to see if there are any mounted file systems on the
 	 * disk.  If there are, print a warning.
 	 */
-	if (checkmount((daddr_t)-1, (daddr_t)-1))
+	if ((found_mount = checkmount((daddr_t)-1, (daddr_t)-1)) != 0)
 		err_print("Warning: Current Disk has mounted partitions.\n");
 
 	/*
 	 * If any part of this device is also part of an SVM, VxVM or
 	 * Live Upgrade device, print a warning.
 	 */
-	(void) checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	found_inuse =  checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
 	    (diskaddr_t)-1, 1, 0);
 
 	/*
 	 * Get the Solaris Fdisk Partition information
 	 */
 	(void) copy_solaris_part(&cur_disk->fdisk_part);
+
+	if (!found_mount && !found_inuse &&
+	    cur_disk->label_type == L_TYPE_EFI) {
+
+		/*
+		 * If alter_lba is 1, we are using the backup label.
+		 * Since we can locate the backup label by disk capacity,
+		 * there must be no space expanded after backup label.
+		 */
+		if ((cur_parts->etoc->efi_altern_lba != 1) &&
+		    (cur_parts->etoc->efi_altern_lba <
+		    cur_parts->etoc->efi_last_lba)) {
+
+			/*
+			 * Lun expansion detected. Prompt user now and actually
+			 * adjust the label in <partition> command.
+			 */
+			fmt_print(
+"Note: capacity in disk label is smaller than the real disk capacity.\n\
+Select <partition> <expand> to adjust the label capacity. \n");
+		}
+	}
 }
 
 
@@ -602,28 +626,28 @@ get_disk_characteristics()
 
 		cur_dtype->dtype_pcyl = get_pcyl(ncyl, cur_dtype->dtype_acyl);
 		cur_dtype->dtype_bpt = get_bpt(cur_dtype->dtype_nsect,
-			&cur_dtype->dtype_options);
+		    &cur_dtype->dtype_options);
 		cur_dtype->dtype_rpm = get_rpm();
 		cur_dtype->dtype_fmt_time =
-			get_fmt_time(&cur_dtype->dtype_options);
+		    get_fmt_time(&cur_dtype->dtype_options);
 		cur_dtype->dtype_cyl_skew =
-			get_cyl_skew(&cur_dtype->dtype_options);
+		    get_cyl_skew(&cur_dtype->dtype_options);
 		cur_dtype->dtype_trk_skew =
-			get_trk_skew(&cur_dtype->dtype_options);
+		    get_trk_skew(&cur_dtype->dtype_options);
 		cur_dtype->dtype_trks_zone =
-			get_trks_zone(&cur_dtype->dtype_options);
+		    get_trks_zone(&cur_dtype->dtype_options);
 		cur_dtype->dtype_atrks = get_atrks(&cur_dtype->dtype_options);
 		cur_dtype->dtype_asect = get_asect(&cur_dtype->dtype_options);
 		cur_dtype->dtype_cache = get_cache(&cur_dtype->dtype_options);
 		cur_dtype->dtype_threshold =
-			get_threshold(&cur_dtype->dtype_options);
+		    get_threshold(&cur_dtype->dtype_options);
 		cur_dtype->dtype_prefetch_min =
-			get_min_prefetch(&cur_dtype->dtype_options);
+		    get_min_prefetch(&cur_dtype->dtype_options);
 		cur_dtype->dtype_prefetch_max =
-			get_max_prefetch(cur_dtype->dtype_prefetch_min,
-			&cur_dtype->dtype_options);
+		    get_max_prefetch(cur_dtype->dtype_prefetch_min,
+		    &cur_dtype->dtype_options);
 		cur_dtype->dtype_phead =
-			get_phead(nhead, &cur_dtype->dtype_options);
+		    get_phead(nhead, &cur_dtype->dtype_options);
 		cur_dtype->dtype_psect = get_psect(&cur_dtype->dtype_options);
 		cur_dtype->dtype_bps = get_bps();
 #ifdef sparc

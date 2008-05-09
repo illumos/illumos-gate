@@ -50,6 +50,7 @@ extern "C" {
 #define	EC_DEV_ADD	"EC_dev_add"	/* device add event class */
 #define	EC_DEV_REMOVE	"EC_dev_remove"	/* device remove event class */
 #define	EC_DEV_BRANCH	"EC_dev_branch"	/* device tree branch event class */
+#define	EC_DEV_STATUS	"EC_dev_status"	/* device status event class */
 #define	EC_FM		"EC_fm"		/* FMA error report event */
 #define	EC_ZFS		"EC_zfs"	/* ZFS event */
 
@@ -199,6 +200,9 @@ extern "C" {
 
 /* device tree branch removed */
 #define	ESC_DEV_BRANCH_REMOVE	"ESC_dev_branch_remove"
+
+/* device capacity dynamically changed */
+#define	ESC_DEV_DLE		"ESC_dev_dle"
 
 /* FMA Fault and Error event protocol subclass */
 #define	ESC_FM_ERROR		"ESC_FM_error"

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,6 +163,33 @@ p_jpart()
 	return (0);
 }
 #endif	/* defined(i386) */
+
+int
+p_expand()
+{
+	uint64_t delta;
+	uint_t nparts;
+	struct dk_gpt *efi_label = cur_parts->etoc;
+
+	if (cur_parts->etoc->efi_altern_lba == 1 ||
+	    (cur_parts->etoc->efi_altern_lba >=
+	    cur_parts->etoc->efi_last_lba)) {
+		err_print("Warning: No expanded capacity is found.\n");
+		return (0);
+	}
+
+	delta = efi_label->efi_last_lba - efi_label->efi_altern_lba;
+	nparts = efi_label->efi_nparts;
+
+	enter_critical();
+	efi_label->efi_parts[nparts - 1].p_start += delta;
+	efi_label->efi_last_u_lba += delta;
+	efi_label->efi_altern_lba = cur_parts->etoc->efi_last_lba;
+	exit_critical();
+
+	fmt_print("The expanded capacity is added to the unallocated space.\n");
+	return (0);
+}
 
 /*
  * This routine implements the 'select' command.  It allows the user

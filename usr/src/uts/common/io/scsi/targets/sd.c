@@ -64,6 +64,8 @@
 
 #include <sys/scsi/targets/sddef.h>
 #include <sys/cmlb.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/dev.h>
 
 
 /*
@@ -973,6 +975,8 @@ static int sd_pm_idletime = 1;
 #define	sd_start_stop_unit_task		ssd_start_stop_unit_task
 #define	sd_taskq_create			ssd_taskq_create
 #define	sd_taskq_delete			ssd_taskq_delete
+#define	sd_target_change_task		ssd_target_change_task
+#define	sd_log_lun_expansion_event	ssd_log_lun_expansion_event
 #define	sd_media_change_task		ssd_media_change_task
 #define	sd_handle_mchange		ssd_handle_mchange
 #define	sd_send_scsi_DOORLOCK		ssd_send_scsi_DOORLOCK
@@ -1392,6 +1396,8 @@ static void sd_start_stop_unit_task(void *arg);
 
 static void sd_taskq_create(void);
 static void sd_taskq_delete(void);
+static void sd_target_change_task(void *arg);
+static void sd_log_lun_expansion_event(struct sd_lun *un, int km_flag);
 static void sd_media_change_task(void *arg);
 
 static int sd_handle_mchange(struct sd_lun *un);
@@ -9042,6 +9048,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	dev_t		dev;
 	int		rval = EIO;
 	diskaddr_t	nblks = 0;
+	diskaddr_t	label_cap;
 
 	/* Validate the open type */
 	if (otyp >= OTYPCNT) {
@@ -9251,6 +9258,31 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	/* Set up open and exclusive open flags */
 	if (flag & FEXCL) {
 		un->un_exclopen |= (partmask);
+	}
+
+	/*
+	 * If the lun is EFI labeled and lun capacity is greater than the
+	 * capacity contained in the label, log a sys-event to notify the
+	 * interested module.
+	 * To avoid an infinite loop of logging sys-event, we only log the
+	 * event when the lun is not opened in NDELAY mode. The event handler
+	 * should open the lun in NDELAY mode.
+	 */
+	if (!(flag & FNDELAY)) {
+		mutex_exit(SD_MUTEX(un));
+		if (cmlb_efi_label_capacity(un->un_cmlbhandle, &label_cap,
+		    (void*)SD_PATH_DIRECT) == 0) {
+			mutex_enter(SD_MUTEX(un));
+			if (un->un_f_blockcount_is_valid &&
+			    un->un_blockcount > label_cap) {
+				mutex_exit(SD_MUTEX(un));
+				sd_log_lun_expansion_event(un,
+				    (nodelay ? KM_NOSLEEP : KM_SLEEP));
+				mutex_enter(SD_MUTEX(un));
+			}
+		} else {
+			mutex_enter(SD_MUTEX(un));
+		}
 	}
 
 	SD_TRACE(SD_LOG_OPEN_CLOSE, un, "sdopen: "
@@ -16495,6 +16527,7 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 	boolean_t	kstat_updated = B_FALSE;
 	struct	sd_sense_info		si;
 	uint8_t asc = scsi_sense_asc(sense_datap);
+	uint8_t	ascq = scsi_sense_ascq(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -16587,6 +16620,26 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 
 	default:
 		break;
+	}
+
+	/*
+	 * ASC  ASCQ
+	 *  2A   09	Capacity data has changed
+	 *  2A   01	Mode parameters changed
+	 *  3F   0E	Reported luns data has changed
+	 * Arrays that support logical unit expansion should report
+	 * capacity changes(2Ah/09). Mode parameters changed and
+	 * reported luns data has changed are the approximation.
+	 */
+	if (((asc == 0x2a) && (ascq == 0x09)) ||
+	    ((asc == 0x2a) && (ascq == 0x01)) ||
+	    ((asc == 0x3f) && (ascq == 0x0e))) {
+		if (taskq_dispatch(sd_tq, sd_target_change_task, un,
+		    KM_NOSLEEP) == 0) {
+			SD_ERROR(SD_LOG_ERROR, un,
+			    "sd_sense_key_unit_attention: "
+			    "Could not dispatch sd_target_change_task\n");
+		}
 	}
 
 	/*
@@ -17495,6 +17548,120 @@ sd_reset_target(struct sd_lun *un, struct scsi_pkt *pktp)
 	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un, "sd_reset_target: exit\n");
 }
 
+/*
+ *    Function: sd_target_change_task
+ *
+ * Description: Handle dynamic target change
+ *
+ *     Context: Executes in a taskq() thread context
+ */
+static void
+sd_target_change_task(void *arg)
+{
+	struct sd_lun		*un = arg;
+	uint64_t		capacity;
+	diskaddr_t		label_cap;
+	uint_t			lbasize;
+
+	ASSERT(un != NULL);
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
+
+	if ((un->un_f_blockcount_is_valid == FALSE) ||
+	    (un->un_f_tgt_blocksize_is_valid == FALSE)) {
+		return;
+	}
+
+	if (sd_send_scsi_READ_CAPACITY(un, &capacity,
+	    &lbasize, SD_PATH_DIRECT) != 0) {
+		SD_ERROR(SD_LOG_ERROR, un,
+		    "sd_target_change_task: fail to read capacity\n");
+		return;
+	}
+
+	mutex_enter(SD_MUTEX(un));
+	if (capacity <= un->un_blockcount) {
+		mutex_exit(SD_MUTEX(un));
+		return;
+	}
+
+	sd_update_block_info(un, lbasize, capacity);
+	mutex_exit(SD_MUTEX(un));
+
+	/*
+	 * If lun is EFI labeled and lun capacity is greater than the
+	 * capacity contained in the label, log a sys event.
+	 */
+	if (cmlb_efi_label_capacity(un->un_cmlbhandle, &label_cap,
+	    (void*)SD_PATH_DIRECT) == 0) {
+		mutex_enter(SD_MUTEX(un));
+		if (un->un_f_blockcount_is_valid &&
+		    un->un_blockcount > label_cap) {
+			mutex_exit(SD_MUTEX(un));
+			sd_log_lun_expansion_event(un, KM_SLEEP);
+		} else {
+			mutex_exit(SD_MUTEX(un));
+		}
+	}
+}
+
+/*
+ *    Function: sd_log_lun_expansion_event
+ *
+ * Description: Log lun expansion sys event
+ *
+ *     Context: Never called from interrupt context
+ */
+static void
+sd_log_lun_expansion_event(struct sd_lun *un, int km_flag)
+{
+	int err;
+	char			*path;
+	nvlist_t		*dle_attr_list;
+
+	/* Allocate and build sysevent attribute list */
+	err = nvlist_alloc(&dle_attr_list, NV_UNIQUE_NAME_TYPE, km_flag);
+	if (err != 0) {
+		SD_ERROR(SD_LOG_ERROR, un,
+		    "sd_log_lun_expansion_event: fail to allocate space\n");
+		return;
+	}
+
+	path = kmem_alloc(MAXPATHLEN, km_flag);
+	if (path == NULL) {
+		nvlist_free(dle_attr_list);
+		SD_ERROR(SD_LOG_ERROR, un,
+		    "sd_log_lun_expansion_event: fail to allocate space\n");
+		return;
+	}
+	/*
+	 * Add path attribute to identify the lun.
+	 * We are using minor node 'a' as the sysevent attribute.
+	 */
+	(void) snprintf(path, MAXPATHLEN, "/devices");
+	(void) ddi_pathname(SD_DEVINFO(un), path + strlen(path));
+	(void) snprintf(path + strlen(path), MAXPATHLEN - strlen(path),
+	    ":a");
+
+	err = nvlist_add_string(dle_attr_list, DEV_PHYS_PATH, path);
+	if (err != 0) {
+		nvlist_free(dle_attr_list);
+		kmem_free(path, MAXPATHLEN);
+		SD_ERROR(SD_LOG_ERROR, un,
+		    "sd_log_lun_expansion_event: fail to add attribute\n");
+		return;
+	}
+
+	/* Log dynamic lun expansion sysevent */
+	err = ddi_log_sysevent(SD_DEVINFO(un), SUNW_VENDOR, EC_DEV_STATUS,
+	    ESC_DEV_DLE, dle_attr_list, NULL, km_flag);
+	if (err != DDI_SUCCESS) {
+		SD_ERROR(SD_LOG_ERROR, un,
+		    "sd_log_lun_expansion_event: fail to log sysevent\n");
+	}
+
+	nvlist_free(dle_attr_list);
+	kmem_free(path, MAXPATHLEN);
+}
 
 /*
  *    Function: sd_media_change_task
@@ -20840,6 +21007,17 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 		rval = EIO;
 		goto done;
 	}
+
+	/*
+	 * If lun is expanded dynamically, update the un structure.
+	 */
+	mutex_enter(SD_MUTEX(un));
+	if ((un->un_f_blockcount_is_valid == TRUE) &&
+	    (un->un_f_tgt_blocksize_is_valid == TRUE) &&
+	    (capacity > un->un_blockcount)) {
+		sd_update_block_info(un, lbasize, capacity);
+	}
+	mutex_exit(SD_MUTEX(un));
 
 	media_info.dki_lbsize = lbasize;
 	media_capacity = capacity;

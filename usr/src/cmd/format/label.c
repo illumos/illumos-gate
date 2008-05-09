@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -642,6 +642,7 @@ vtoc64_to_label(struct efi_info *label, struct dk_gpt *vtoc)
 	lmap->efi_last_lba = vtoc->efi_last_lba;
 	lmap->efi_first_u_lba = vtoc->efi_first_u_lba;
 	lmap->efi_last_u_lba = vtoc->efi_last_u_lba;
+	lmap->efi_altern_lba = vtoc->efi_altern_lba;
 	lmap->efi_flags = vtoc->efi_flags;
 	(void) memcpy((uchar_t *)&lmap->efi_disk_uguid,
 	    (uchar_t *)&vtoc->efi_disk_uguid, sizeof (struct uuid));

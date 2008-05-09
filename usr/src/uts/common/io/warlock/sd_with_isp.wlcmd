@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,7 @@ root isp.c:isp_i_print_response
 root sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
 root sd_wm_cache_constructor sd_wm_cache_destructor sd_read_modify_write_task
 root sd_failfast_flushq_callback sd_reenable_dsense_task
+root sd_target_change_task
 
 for ptr in `funcptrs | grep '^scsi_hba_tran::'`
 do

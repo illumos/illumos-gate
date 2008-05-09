@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +189,9 @@ typedef struct dk_gpt {
 	diskaddr_t	efi_last_u_lba;	/* last block before backup labels */
 	struct uuid	efi_disk_uguid;	/* unique disk GUID */
 	uint_t		efi_flags;
-	uint_t		efi_reserved[15]; /* future use - set to zero */
+	uint_t		efi_reserved1;	/* future use - set to zero */
+	diskaddr_t	efi_altern_lba;	/* lba of alternate GPT header */
+	uint_t		efi_reserved[12]; /* future use - set to zero */
 	struct dk_part	efi_parts[1];	/* array of partitions */
 } dk_gpt_t;
 
@@ -229,6 +231,7 @@ extern	void	efi_free(struct dk_gpt *);
 extern	int	efi_type(int);
 extern	void	efi_err_check(struct dk_gpt *);
 extern	int	efi_auto_sense(int fd, struct dk_gpt **);
+extern	int	efi_use_whole_disk(int fd);
 #endif
 
 #ifdef __cplusplus

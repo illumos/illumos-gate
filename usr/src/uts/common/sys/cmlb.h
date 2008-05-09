@@ -409,6 +409,31 @@ int
 cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
     diskaddr_t *startblockp, char **partnamep, uint16_t *tagp, void *tg_cookie);
 
+/*
+ * cmlb_efi_label_capacity:
+ *	Get capacity stored in EFI disk label.
+ *
+ * Arguments:
+ *	cmlbhandle	cmlb handle associated with device.
+ *	capacity	pointer to capacity stored in EFI disk label.
+ *	tg_cookie	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
+ *
+ *
+ * Notes:
+ *	If in-core label is not valid, this functions tries to revalidate
+ *	the label. If label is valid and is an EFI label, it stores the capacity
+ *      in disk label in the area pointed to by capacity.
+ *
+ *
+ * Return values:
+ *	0	success
+ *	EINVAL  no valid EFI label or capacity is NULL.
+ *
+ */
+int
+cmlb_efi_label_capacity(cmlb_handle_t cmlbhandle, diskaddr_t *capacity,
+    void *tg_cookie);
 
 /*
  * cmlb_ioctl:

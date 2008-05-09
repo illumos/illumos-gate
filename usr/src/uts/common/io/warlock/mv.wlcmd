@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@ root    sd.c:sd_wm_cache_constructor sd_wm_cache_destructor
 root	sd.c:sd_read_modify_write_task sd_reenable_dsense_task
 root	sd.c:sd_failfast_flushq_callback sd_start_direct_priority_command
 root	sd.c:sdstrategy sdioctl
+root	sd.c:sd_target_change_task
 
 root	scsi_hba.c:scsi_hba_bus_power
 
