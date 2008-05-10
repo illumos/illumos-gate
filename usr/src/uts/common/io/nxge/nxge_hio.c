@@ -446,7 +446,7 @@ nxge_grp_dc_add(
 	if ((status = (*dc->init)(nxge, channel)) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nxge_grp_dc_add(%d): channel init failed", channel));
-		return (NXGE_ERROR);	
+		return (NXGE_ERROR);
 	}
 
 	nxge_grp_dc_append(nxge, group, dc);
