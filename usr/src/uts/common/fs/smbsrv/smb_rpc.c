@@ -213,8 +213,6 @@ smb_rpc_initialize(struct smb_request *sr, char *pipe_name)
 		return (err.status);
 
 	op->dsize = 0x01000;
-	op->utime.tv_sec = 0;
-	op->utime.tv_nsec = 0;
 	op->dattr = SMB_FA_NORMAL;
 	op->ftype = SMB_FTYPE_MESG_PIPE;
 	op->action_taken = SMB_OACT_LOCK | SMB_OACT_OPENED; /* 0x8001 */

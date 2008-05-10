@@ -30,9 +30,10 @@
  */
 
 #include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_fsops.h>
 
 /*
- * Oplock functionality enable/disable (see smb_oplock_init).
+ * Oplock functionality enable/disable
  */
 
 /*
@@ -113,99 +114,121 @@
  */
 
 /*
- * smb_acquire_oplock
+ * smb_oplock_acquire
  *
  * Attempt to acquire an oplock. Note that the oplock granted may be
  * none, i.e. the oplock was not granted.
  *
- * We may have to break an oplock in order to acquire one, and depending
- * on what action is taken by the other client (unlock or close), we may
- * or may not end up with an oplock. The type of oplock being requested
- * is passed in level_requested, the result is returned in level_granted
- * and is only valid if the status is NT_STATUS_SUCCESS.
+ * Grant an oplock to the requestor if this session is the only one
+ * that has the file open, regardless of the number of instances of
+ * the file opened by this session.
+ *
+ * However, if there is no oplock on this file and there is already
+ * at least one open, we will not grant an oplock, even if the only
+ * existing opens are from the same client.  This is "server discretion."
+ *
+ * An oplock may need to be broken in order for one to be granted, and
+ * depending on what action is taken by the other client (unlock or close),
+ * an oplock may or may not be granted.  (The breaking of an oplock is
+ * done earlier in the calling path.)
+ *
+ * XXX: Node synchronization is not yet implemented.  However, racing
+ * opens are handled thus:
+ *
+ * A racing oplock acquire can happen in the open path between
+ * smb_oplock_break() and smb_fsop_open(), but no later.  (Once
+ * the file is open via smb_fsop_open()/VOP_OPEN,
+ * smb_fsop_oplock_install() will not be able to install an oplock,
+ * which requires an open count of 1.)
+ *
+ * Hence, we can safely break any oplock that came in after the
+ * smb_oplock_break() done previously in the open path, knowing that
+ * no other racing oplock acquisitions should be able to succeed
+ * because we already have the file open (see above).
+ *
+ * The type of oplock being requested is passed in op->my_flags.  The result
+ * is also returned in op->my_flags.
+ *
+ * (Note that exclusive and batch oplocks are treated interchangeably.)
  *
  * The Returns NT status codes:
  *	NT_STATUS_SUCCESS
  *	NT_STATUS_CONNECTION_DISCONNECTED
  */
 DWORD
-smb_acquire_oplock(
-    struct smb_request	*sr,
-    struct smb_ofile	*file,
-    unsigned int	level_requested,
-    unsigned int	*level_granted)
+smb_oplock_acquire(
+    smb_request_t	*sr,
+    smb_ofile_t		*of,
+    struct open_param	*op)
 {
-	struct smb_node	*node = file->f_node;
-	unsigned int	level;
-	int		oplock_owner;
-	DWORD		status;
-	smb_user_t	*user;
+	smb_node_t		*node;
+	unsigned int		level;
 
-	user = sr->uid_user;
-	ASSERT(user);
+	ASSERT(sr);
+	ASSERT(of);
+	ASSERT(op);
+	ASSERT(op->fqi.last_attr.sa_vattr.va_type == VREG);
 
-	level = level_requested & MYF_OPLOCK_MASK;
-	*level_granted = MYF_OPLOCK_NONE;
+	level = op->my_flags & MYF_OPLOCK_MASK;
 
-	if (sr->sr_cfg->skc_oplock_enable == 0)
+	op->my_flags &= ~MYF_OPLOCK_MASK;
+
+	if ((sr->sr_cfg->skc_oplock_enable == 0) ||
+	    (fsd_chkcap(&of->f_tree->t_fsd, FSOLF_DISABLE_OPLOCKS) > 0))
 		return (NT_STATUS_SUCCESS);
 
-	if (fsd_chkcap(&sr->tid_tree->t_fsd, FSOLF_DISABLE_OPLOCKS) > 0)
+	if (!((MYF_IS_EXCLUSIVE_OPLOCK(level)) ||
+	    (MYF_IS_BATCH_OPLOCK(level))))
 		return (NT_STATUS_SUCCESS);
 
-restart:
-	oplock_owner = 0;
+	node = of->f_node;
 
-	/*
-	 * I'm not convinced the client redirector will send multiple
-	 * opens requesting a batch oplock for the same file. I think
-	 * the client redirector will handle the multiple instances
-	 * and only send a single open to the server. The the original
-	 * implementation supported it, however, so I'll leave it here
-	 * for now.
-	 *
-	 * Grant an oplock to the requester if this session is the
-	 * only one that has the file open, regardless of the number
-	 * of instances of the file opened by this session. We grant
-	 * any oplock requested to the owner.
-	 */
-	if (node->n_refcnt == 1 || oplock_owner == 1) {
-		if (MYF_IS_EXCLUSIVE_OPLOCK(level)) {
-			node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-			node->flags |= NODE_EXCLUSIVE_OPLOCK;
-			node->n_oplock.op_ofile = file;
-		} else if (MYF_IS_BATCH_OPLOCK(level)) {
-			node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-			node->flags |= NODE_BATCH_OPLOCK;
-			node->n_oplock.op_ofile = file;
-		} else {
-			level &= ~MYF_OPLOCK_MASK;
+	smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+
+	if (EXCLUSIVE_OPLOCK_IN_FORCE(node) ||
+	    BATCH_OPLOCK_IN_FORCE(node)) {
+
+		smb_rwx_rwexit(&node->n_lock);
+
+		if (SMB_SAME_SESSION(sr->session,
+		    node->n_oplock.op_ofile->f_session)) {
+			op->my_flags |= level;
+			return (NT_STATUS_SUCCESS);
+		} else if (SMB_ATTR_ONLY_OPEN(op)) {
+			ASSERT(!(op->my_flags & MYF_OPLOCK_MASK));
+			return (NT_STATUS_SUCCESS);
 		}
 
-		*level_granted = level;
+		smb_oplock_break(node);
+
+		smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+	}
+
+	if (smb_fsop_oplock_install(node, of->f_mode) != 0) {
+		smb_rwx_rwexit(&node->n_lock);
 		return (NT_STATUS_SUCCESS);
 	}
 
-	/*
-	 * Other clients have this file open but they do not have any
-	 * oplocks in force, so we must reject this oplock request.
-	 */
-	if (node->n_refcnt > 1 && OPLOCKS_IN_FORCE(node) == 0) {
-		return (NT_STATUS_SUCCESS);
-	}
+	node->n_oplock.op_ofile = of;
+	node->n_oplock.op_ipaddr = sr->session->ipaddr;
+	node->n_oplock.op_kid = sr->session->s_kid;
+	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
 
-	/*
-	 * Someone has an oplock, we need to break it.
-	 */
-	if ((status = smb_break_oplock(sr, node)) == NT_STATUS_SUCCESS)
-		goto restart;
+	if (MYF_IS_EXCLUSIVE_OPLOCK(level))
+		node->flags |= NODE_EXCLUSIVE_OPLOCK;
 
-	return (status);
+	if (MYF_IS_BATCH_OPLOCK(level))
+		node->flags |= NODE_BATCH_OPLOCK;
+
+	op->my_flags |= level;
+
+	smb_rwx_rwexit(&node->n_lock);
+
+	return (NT_STATUS_SUCCESS);
 }
 
-
 /*
- * smb_break_oplock
+ * smb_oplock_break
  *
  * The oplock break may succeed for multiple reasons: file close, oplock
  * release, holder connection dropped, requesting client disconnect etc.
@@ -216,31 +239,30 @@ restart:
  *
  * Returns NT status codes:
  *	NT_STATUS_SUCCESS                  No oplock in force, i.e. the
- *                                     oplock has been broken.
+ *						oplock has been broken.
  *	NT_STATUS_CONNECTION_DISCONNECTED  Requesting client disconnected.
  *	NT_STATUS_INTERNAL_ERROR
  */
-DWORD
-smb_break_oplock(struct smb_request *sr, struct smb_node *node)
+
+void
+smb_oplock_break(smb_node_t *node)
 {
-	struct smb_session	*sent_session;
-	struct smb_ofile	*sent_ofile;
+	smb_session_t		*oplock_session;
+	smb_ofile_t		*oplock_ofile;
 	struct mbuf_chain	mbc;
 	int			retries = 0;
-	int			tid;
-	unsigned short		fid;
 	clock_t			elapsed_time;
 	clock_t			max_time;
 	boolean_t		flag;
-	smb_user_t		*user;
-
-	user = sr->uid_user;
-	ASSERT(user);
 
 	smb_rwx_rwenter(&node->n_lock, RW_WRITER);
 
-	if (node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) {
+	if (!OPLOCKS_IN_FORCE(node)) {
+		smb_rwx_rwexit(&node->n_lock);
+		return;
+	}
 
+	if (node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) {
 		elapsed_time = 0;
 		max_time = MSEC_TO_TICK(smb_oplock_timeout * OPLOCK_RETRIES);
 		/*
@@ -266,98 +288,85 @@ smb_break_oplock(struct smb_request *sr, struct smb_node *node)
 		}
 		/*
 		 * If there are no oplocks in force we're done.
-		 * Otherwise fall through and break the oplock.
 		 */
-		if (OPLOCKS_IN_FORCE(node) == 0) {
+		if (!OPLOCKS_IN_FORCE(node)) {
 			smb_rwx_rwexit(&node->n_lock);
-			return (NT_STATUS_SUCCESS);
+			return;
 		} else {
 			/*
-			 * Should we clear the
-			 * LOCK_BREAKING_OPLOCK flag?
+			 * This is an anomalous condition.
+			 * Cancel/release the oplock.
 			 */
+			smb_oplock_release(node, B_TRUE);
 			smb_rwx_rwexit(&node->n_lock);
-			return (NT_STATUS_INTERNAL_ERROR);
+			return;
 		}
 	}
 
-	/*
-	 * No oplock break is in progress so we start one.
-	 */
-	sent_ofile = node->n_oplock.op_ofile;
-	sent_session = sent_ofile->f_session;
-	ASSERT(sent_session);
-	/*
-	 * If a client has an OPLOCK on a file it would not break it because
-	 * another of its processes wants to open the same file. However, if
-	 * a client were to behave like that it would create a deadlock in the
-	 * code that follows. For now we leave the ASSERT(). Eventually the
-	 * code will have to be more defensive.
-	 */
-	ASSERT(sent_session != sr->session);
-	node->n_oplock.op_flags |= OPLOCK_FLAG_BREAKING;
-	smb_rwx_rwexit(&node->n_lock);
+	oplock_ofile = node->n_oplock.op_ofile;
+	ASSERT(oplock_ofile);
+
+	oplock_session = oplock_ofile->f_session;
+	ASSERT(oplock_session);
 
 	/*
-	 * IR #104382
-	 * What we could find from this panic was that the tree field
-	 * of sent_ofile structure points to an invalid memory page,
-	 * but we couldn't find why exactly this happened. So, this is
-	 * a work around till we can find the real problem.
+	 * Start oplock break.
 	 */
-	tid = sent_ofile->f_tree->t_tid;
-	fid = sent_ofile->f_fid;
+
+	node->n_oplock.op_flags |= OPLOCK_FLAG_BREAKING;
+
+	smb_rwx_rwexit(&node->n_lock);
 
 	max_time = MSEC_TO_TICK(smb_oplock_timeout);
 	do {
 		MBC_INIT(&mbc, MLEN);
 		(void) smb_encode_mbc(&mbc, "Mb19.wwwwbb3.ww10.",
-		    SMB_COM_LOCKING_ANDX,	/* Command */
-		    tid,  			/* TID */
-		    0xffff,			/* PID */
-		    0,				/* UID */
-		    0xffff,			/* MID oplock break */
-		    8,				/* parameter words=8 */
-		    0xff,			/* 0xFF=none */
-		    fid,			/* File handle */
+		    SMB_COM_LOCKING_ANDX, oplock_ofile->f_tree->t_tid,
+		    0xffff, 0, 0xffff, 8, 0xff, oplock_ofile->f_fid,
 		    LOCKING_ANDX_OPLOCK_RELEASE);
 
 		flag = B_TRUE;
-		smb_rwx_rwenter(&sent_session->s_lock, RW_WRITER);
+		smb_rwx_rwenter(&oplock_session->s_lock, RW_WRITER);
 		while (flag) {
-			switch (sent_session->s_state) {
+			switch (oplock_session->s_state) {
 			case SMB_SESSION_STATE_DISCONNECTED:
 			case SMB_SESSION_STATE_TERMINATED:
-				smb_rwx_rwexit(&sent_session->s_lock);
+				smb_rwx_rwexit(&oplock_session->s_lock);
 				smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+
 				node->flags &= ~NODE_OPLOCKS_IN_FORCE;
 				node->n_oplock.op_flags &=
 				    ~OPLOCK_FLAG_BREAKING;
 				node->n_oplock.op_ofile = NULL;
+				node->n_oplock.op_ipaddr = 0;
+				node->n_oplock.op_kid = 0;
+
 				smb_rwx_rwexit(&node->n_lock);
-				return (NT_STATUS_SUCCESS);
+
+				return;
 
 			case SMB_SESSION_STATE_OPLOCK_BREAKING:
 				flag = B_FALSE;
 				break;
 
 			case SMB_SESSION_STATE_NEGOTIATED:
-				sent_session->s_state =
+				oplock_session->s_state =
 				    SMB_SESSION_STATE_OPLOCK_BREAKING;
 				flag = B_FALSE;
 				break;
 
 			default:
-				(void) smb_rwx_rwwait(&sent_session->s_lock,
+				(void) smb_rwx_rwwait(&oplock_session->s_lock,
 				    -1);
 				break;
 			}
 		}
-		smb_rwx_rwexit(&sent_session->s_lock);
+		smb_rwx_rwexit(&oplock_session->s_lock);
 
-		(void) smb_session_send(sent_session, 0, &mbc);
+		(void) smb_session_send(oplock_session, 0, &mbc);
 
 		elapsed_time = 0;
+
 		smb_rwx_rwenter(&node->n_lock, RW_WRITER);
 		while ((node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) &&
 		    (elapsed_time < max_time)) {
@@ -370,9 +379,13 @@ smb_break_oplock(struct smb_request *sr, struct smb_node *node)
 				elapsed_time += max_time - timeleft;
 			}
 		}
-		if (OPLOCKS_IN_FORCE(node) == 0) {
+
+		if (!OPLOCKS_IN_FORCE(node)) {
+			/*
+			 * smb_oplock_release() was called
+			 */
 			smb_rwx_rwexit(&node->n_lock);
-			return (NT_STATUS_SUCCESS);
+			return;
 		}
 	} while (++retries < OPLOCK_RETRIES);
 
@@ -380,37 +393,85 @@ smb_break_oplock(struct smb_request *sr, struct smb_node *node)
 	 * Retries exhausted and timed out.
 	 * Cancel the oplock and continue.
 	 */
-	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-	node->n_oplock.op_flags &= ~OPLOCK_FLAG_BREAKING;
-	node->n_oplock.op_ofile = 0;
+
+	smb_oplock_release(node, B_TRUE);
+
 	smb_rwx_rwexit(&node->n_lock);
-	return (NT_STATUS_SUCCESS);
 }
 
-
 /*
- * smb_release_oplock
+ * smb_oplock_release
  *
- * The original code supported batch oplock inheritance but I'm not
- * convinced the client redirector will open multiple instances of a
- * file with batch oplocks on the server (see smb_acquire_oplock).
+ * This function uninstalls the FEM oplock monitors and
+ * clears all flags in relation to an oplock on the
+ * given node.
+ *
+ * The function can be called with the node->n_lock held
+ * or not held.
  */
-void /*ARGSUSED*/
-smb_release_oplock(struct smb_ofile *file, int reason)
-{
-	struct smb_node *node = file->f_node;
 
-	smb_rwx_rwenter(&node->n_lock, RW_WRITER);
-	if ((node->n_oplock.op_ofile != file) || OPLOCKS_IN_FORCE(node) == 0) {
-		smb_rwx_rwexit(&node->n_lock);
+void /*ARGSUSED*/
+smb_oplock_release(smb_node_t *node, boolean_t have_rwx)
+{
+	if (!have_rwx)
+		smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+
+	if (!OPLOCKS_IN_FORCE(node)) {
+		if (!have_rwx)
+			smb_rwx_rwexit(&node->n_lock);
 		return;
 	}
 
-	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-	node->n_oplock.op_ofile = 0;
+	smb_fsop_oplock_uninstall(node);
 
-	if (node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) {
-		node->n_oplock.op_flags &= ~OPLOCK_FLAG_BREAKING;
+	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
+	node->n_oplock.op_flags &= ~OPLOCK_FLAG_BREAKING;
+	node->n_oplock.op_ofile = NULL;
+	node->n_oplock.op_ipaddr = 0;
+	node->n_oplock.op_kid = 0;
+
+	if (!have_rwx)
+		smb_rwx_rwexit(&node->n_lock);
+}
+
+/*
+ * smb_oplock_conflict
+ *
+ * The two checks on "session" and "op" are primarily for the open path.
+ * Other CIFS functions may call smb_oplock_conflict() with a session
+ * pointer so as to do the session check.
+ */
+
+boolean_t
+smb_oplock_conflict(smb_node_t *node, smb_session_t *session,
+    struct open_param *op)
+{
+	smb_session_t		*oplock_session;
+	smb_ofile_t		*oplock_ofile;
+
+	smb_rwx_rwenter(&node->n_lock, RW_READER);
+
+	if (!OPLOCKS_IN_FORCE(node)) {
+		smb_rwx_rwexit(&node->n_lock);
+		return (B_FALSE);
 	}
+
+	oplock_ofile = node->n_oplock.op_ofile;
+	ASSERT(oplock_ofile);
+
+	oplock_session = oplock_ofile->f_session;
+	ASSERT(oplock_session);
+
+	if (SMB_SAME_SESSION(session, oplock_session)) {
+		smb_rwx_rwexit(&node->n_lock);
+		return (B_FALSE);
+	}
+
+	if (SMB_ATTR_ONLY_OPEN(op)) {
+		smb_rwx_rwexit(&node->n_lock);
+		return (B_FALSE);
+	}
+
 	smb_rwx_rwexit(&node->n_lock);
+	return (B_TRUE);
 }

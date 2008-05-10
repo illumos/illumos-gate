@@ -42,6 +42,7 @@
 #include <sys/vfs.h>
 #include <sys/refstr.h>
 #include <sys/acl.h>
+#include <sys/fcntl.h>
 #include <smbsrv/smb_i18n.h>
 #include <smbsrv/smb_fsd.h>
 
@@ -361,6 +362,8 @@ acl_type_t smb_vop_acl_type(vnode_t *);
 
 int smb_vop_shrlock(vnode_t *, uint32_t, uint32_t, uint32_t, cred_t *);
 int smb_vop_unshrlock(vnode_t *, uint32_t, cred_t *);
+
+int smb_vop_frlock(vnode_t *, cred_t *, int, flock64_t *);
 
 #ifdef __cplusplus
 }

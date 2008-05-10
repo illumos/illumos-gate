@@ -38,7 +38,6 @@
 
 static int smb_write_common(smb_request_t *, smb_rw_param_t *);
 static int smb_write_truncate(smb_request_t *, smb_rw_param_t *);
-int smb_set_file_size(smb_request_t *);
 
 
 /*
@@ -538,7 +537,7 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 
 	smb_rwx_xexit(&node->n_lock);
 
-	if ((rc = smb_set_file_size(sr)) != 0)
+	if ((rc = smb_set_file_size(sr, node)) != 0)
 		return (rc);
 
 	mutex_enter(&ofile->f_mutex);
@@ -564,13 +563,12 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
  * Returns 0 on success. Otherwise returns EACCES.
  */
 int
-smb_set_file_size(smb_request_t *sr)
+smb_set_file_size(smb_request_t *sr, smb_node_t *node)
 {
-	struct smb_node *node;
 	smb_attr_t new_attr;
 	uint32_t dosattr;
 
-	if ((node = sr->fid_ofile->f_node) == 0)
+	if (node == NULL)
 		return (0);
 
 	if ((node->flags & NODE_FLAGS_SET_SIZE) == 0)

@@ -43,6 +43,7 @@ SUNWprivate {
 	dns_msgid_init;
 	dyndns_clear_rev_zone;
 	dyndns_update;
+	dyndns_update_core;
 	msdcs_lookup_ads;
 	smb_browser_netlogon;
 	smb_browser_reconfig;

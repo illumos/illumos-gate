@@ -141,11 +141,12 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 
 static DWORD
 netr_setup_userinfo(struct netr_validation_info3 *info3,
-    smb_userinfo_t *user_info, netr_client_t *clnt)
+    smb_userinfo_t *user_info, netr_client_t *clnt, netr_info_t *netr_info)
 {
 	smb_sid_attrs_t *other_grps;
 	char *username, *domain;
 	int i, nbytes;
+	unsigned char rc4key[SMBAUTH_SESSION_KEY_SZ];
 
 	user_info->sid_name_use = SidTypeUser;
 	user_info->rid = info3->UserId;
@@ -188,7 +189,6 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 			return (NT_STATUS_NO_MEMORY);
 		}
 	}
-
 	nbytes = info3->SidCount * sizeof (smb_sid_attrs_t);
 	if (nbytes) {
 		if ((other_grps = malloc(nbytes)) != NULL) {
@@ -208,7 +208,22 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 			return (NT_STATUS_NO_MEMORY);
 		}
 	}
-
+	/*
+	 * The UserSessionKey in NetrSamLogon RPC is obfuscated using the
+	 * 8 byte session key obtained in the NETLOGON credential chain.
+	 * The 8 byte session key is zero extended to 16 bytes. This 16 byte
+	 * key is the key to the RC4 algorithm. The RC4 byte stream is
+	 * exclusively ored with the 16 byte UserSessionKey to recover
+	 * the the clear form.
+	 */
+	if ((user_info->session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
+		return (NT_STATUS_NO_MEMORY);
+	bzero(rc4key, SMBAUTH_SESSION_KEY_SZ);
+	bcopy(netr_info->session_key, rc4key, 8);
+	bcopy(info3->UserSessionKey.data, user_info->session_key,
+	    SMBAUTH_SESSION_KEY_SZ);
+	rand_hash((unsigned char *)user_info->session_key,
+	    SMBAUTH_SESSION_KEY_SZ, rc4key, SMBAUTH_SESSION_KEY_SZ);
 	mlsvc_setadmin_user_info(user_info);
 	return (NT_STATUS_SUCCESS);
 }
@@ -326,7 +341,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		}
 
 		info3 = arg.ru.info3;
-		status = netr_setup_userinfo(info3, user_info, clnt);
+		status = netr_setup_userinfo(info3, user_info, clnt, netr_info);
 	}
 
 	mlsvc_rpc_free(netr_handle->context, &heap);

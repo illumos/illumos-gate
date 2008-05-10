@@ -194,7 +194,6 @@ extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
 
 extern boolean_t smb_match_netlogon_seqnum(void);
-extern int smb_getjoineddomain(char *, size_t);
 extern int smb_setdomainprops(char *, char *, char *);
 extern void smb_update_netlogon_seqnum(void);
 
@@ -470,6 +469,9 @@ extern int smb_auth_ntlm_hash(char *, unsigned char *);
 extern int smb_auth_set_info(char *, char *,
     unsigned char *, char *, unsigned char *,
     int, int, smb_auth_info_t *);
+
+extern int smb_auth_ntlmv2_hash(unsigned char *,
+	char *, char *, unsigned char *);
 
 extern int smb_auth_gen_session_key(smb_auth_info_t *, unsigned char *);
 

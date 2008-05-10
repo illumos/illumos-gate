@@ -70,6 +70,9 @@ smb_gather_dents_info(char *args, ino_t fileid, int namelen,
 static void
 smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp);
 
+static
+callb_cpr_t *smb_lock_frlock_callback(flk_cb_when_t, void *);
+
 extern sysid_t lm_alloc_sysidt();
 
 #define	SMB_AT_MAX	16
@@ -161,6 +164,16 @@ smb_vop_close(vnode_t *vp, int mode, cred_t *cred)
 	return (VOP_CLOSE(vp, mode, 1, (offset_t)0, cred, &smb_ct));
 }
 
+int
+smb_vop_other_opens(vnode_t *vp, int mode)
+{
+	return (((mode & FWRITE) && vn_has_other_opens(vp, V_WRITE)) ||
+	    (((mode & FWRITE) == 0) && vn_is_opened(vp, V_WRITE)) ||
+	    ((mode & FREAD) && vn_has_other_opens(vp, V_READ)) ||
+	    (((mode & FREAD) == 0) && vn_is_opened(vp, V_READ)) ||
+	    vn_is_mapped(vp, V_RDORWR));
+}
+
 /*
  * The smb_vop_* functions have minimal knowledge of CIFS semantics and
  * serve as an interface to the VFS layer.
@@ -180,9 +193,9 @@ smb_vop_read(vnode_t *vp, uio_t *uiop, cred_t *cr)
 {
 	int error;
 
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
 	error = VOP_READ(vp, uiop, 0, cr, &smb_ct);
-	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
 	return (error);
 }
 
@@ -200,9 +213,9 @@ smb_vop_write(vnode_t *vp, uio_t *uiop, uint32_t *flag, uint32_t *lcount,
 
 	uiop->uio_llimit = MAXOFFSET_T;
 
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &smb_ct);
 	error = VOP_WRITE(vp, uiop, ioflag, cr, &smb_ct);
-	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &smb_ct);
 
 	*lcount -= uiop->uio_resid;
 
@@ -924,9 +937,9 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
 	auio.uio_resid = *count;
 	auio.uio_fmode = 0;
 
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
 	error = VOP_READDIR(vp, &auio, cr, &sink, &smb_ct, rdirent_flags);
-	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
 
 	if (error) {
 		if (error == ENOENT) {
@@ -1695,9 +1708,9 @@ smb_vop_acl_write(vnode_t *vp, acl_t *aclp, int flags, cred_t *cr)
 	error = smb_fsacl_to_vsa(aclp, &vsecattr, &aclbsize);
 
 	if (error == 0) {
-		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &smb_ct);
 		error = VOP_SETSECATTR(vp, &vsecattr, flags, cr, &smb_ct);
-		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &smb_ct);
 	}
 
 	if (aclbsize && vsecattr.vsa_aclentp)
@@ -1883,4 +1896,22 @@ smb_vop_unshrlock(vnode_t *vp, uint32_t uniq_fid, cred_t *cr)
 	shr_own.sl_pid = shr.s_pid;
 
 	return (VOP_SHRLOCK(vp, F_UNSHARE, &shr, 0, cr, NULL));
+}
+
+int
+smb_vop_frlock(vnode_t *vp, cred_t *cr, int flag, flock64_t *bf)
+{
+	int cmd = nbl_need_check(vp) ? F_SETLK_NBMAND : F_SETLK;
+	flk_callback_t flk_cb;
+
+	flk_init_callback(&flk_cb, smb_lock_frlock_callback, NULL);
+
+	return (VOP_FRLOCK(vp, cmd, bf, flag, 0, &flk_cb, cr, &smb_ct));
+}
+
+static callb_cpr_t *
+/* ARGSUSED */
+smb_lock_frlock_callback(flk_cb_when_t when, void *error)
+{
+	return (0);
 }

@@ -251,6 +251,7 @@ smb_sdrc_t
 smb_com_open(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
+	smb_node_t *node;
 	uint16_t file_attr;
 	int rc;
 
@@ -265,7 +266,7 @@ smb_com_open(smb_request_t *sr)
 	}
 
 	op->dsize = 0; /* Don't set spurious size */
-	op->utime.tv_sec = op->utime.tv_nsec = 0;
+	op->crtime.tv_sec = op->crtime.tv_nsec = 0;
 	op->create_disposition = FILE_OPEN;
 	op->create_options = (op->omode & SMB_DA_WRITE_THROUGH)
 	    ? FILE_WRITE_THROUGH : 0;
@@ -292,12 +293,13 @@ smb_com_open(smb_request_t *sr)
 	}
 
 	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
+	node = sr->fid_ofile->f_node;
 
 	rc = smbsr_encode_result(sr, 7, 0, "bwwllww",
 	    7,
 	    sr->smb_fid,
 	    file_attr,
-	    smb_gmt2local(sr, op->utime.tv_sec),
+	    smb_gmt2local(sr, node->attr.sa_vattr.va_mtime.tv_sec),
 	    (uint32_t)op->dsize,
 	    op->omode & SMB_DA_ACCESS_MASK,
 	    (uint16_t)0);	/* bcc */
@@ -310,7 +312,7 @@ smb_pre_open_andx(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint16_t flags;
-	uint32_t CreationTime;
+	uint32_t creation_time;
 	uint16_t file_attr;
 	uint16_t ofun;
 	int rc;
@@ -319,7 +321,7 @@ smb_pre_open_andx(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "b.wwwwwlwll4.", &sr->andx_com,
 	    &sr->andx_off, &flags, &op->omode, &op->fqi.srch_attr,
-	    &file_attr, &CreationTime, &ofun, &op->dsize, &op->timeo);
+	    &file_attr, &creation_time, &ofun, &op->dsize, &op->timeo);
 
 	if (rc == 0) {
 		rc = smbsr_decode_data(sr, "%u", sr, &op->fqi.path);
@@ -331,9 +333,9 @@ smb_pre_open_andx(smb_request_t *sr)
 		else if (flags & 4)
 			op->my_flags = MYF_BATCH_OPLOCK;
 
-		if ((CreationTime != 0) && (CreationTime != UINT_MAX))
-			op->utime.tv_sec = smb_local2gmt(sr, CreationTime);
-		op->utime.tv_nsec = 0;
+		if ((creation_time != 0) && (creation_time != UINT_MAX))
+			op->crtime.tv_sec = smb_local2gmt(sr, creation_time);
+		op->crtime.tv_nsec = 0;
 
 		op->create_disposition = smb_ofun_to_crdisposition(ofun);
 	}

@@ -119,12 +119,19 @@ smb_com_set_information(smb_request_t *sr)
 
 	smb_node_release(dir_node);
 
+	if (smb_oplock_conflict(node, sr->session, NULL)) {
+		/*
+		 * for the benefit of attribute setting later on
+		 */
+		smb_oplock_break(node);
+	}
+
 	smb_node_set_dosattr(node, dattr);
 
 	/*
-	 * IR101794 The behaviour when the time field is set to -1
-	 * is not documented, so we'll assume it should be treated
-	 * like 0. We ignore utime.tv_nsec is assumed to be 0 here.
+	 * The behaviour when the time field is set to -1 is not
+	 * documented--we will treat it as if it was 0.
+	 * utime.tv_nsec is assumed to be 0.
 	 */
 	if (utime.tv_sec != 0 && utime.tv_sec != -1) {
 		utime.tv_sec = smb_local2gmt(sr, utime.tv_sec);

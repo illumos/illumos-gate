@@ -35,6 +35,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <assert.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_door_svc.h>
@@ -93,37 +94,43 @@ smb_api_ulist(int offset, smb_dr_ulist_t *users)
 	return (rc);
 }
 
+/*
+ * smb_lookup_sid
+ *
+ * Tries to get the account name associated with the given SID
+ * The mapping is requested to be performed by smbd via a door
+ * call. If no account name can be found the string format of
+ * the SID will be returned as the name.
+ *
+ * The passed namebuf should be big enough to hold the string
+ * format of a SID.
+ */
 int
-smb_lookup_sid(smb_sid_t *sid, char *sidbuf, int sidbuflen)
+smb_lookup_sid(smb_sid_t *sid, char *namebuf, int namebuflen)
 {
 	char *buf, *rbufp;
 	size_t buflen, rbufsize;
 	int opcode = SMB_DR_LOOKUP_SID;
-	char strsid[SMB_SID_STRSZ];
 	char *name = NULL;
 	int fd;
 
-	if ((sidbuf == NULL) || (sidbuflen == 0)) {
-		syslog(LOG_ERR, "%s: invalid parameter(s)",
-		    smbapi_desc[opcode]);
-		return (NT_STATUS_INVALID_PARAMETER);
-	}
+	assert((namebuf != NULL) && (namebuflen != 0));
 
-	if (!smb_sid_isvalid(sid)) {
-		syslog(LOG_ERR, "%s: invalid SID",
-		    smbapi_desc[opcode]);
+	if (!smb_sid_isvalid(sid))
 		return (NT_STATUS_INVALID_SID);
-	}
 
-	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1)
-		return (NT_STATUS_INTERNAL_ERROR);
+	smb_sid_tostr(sid, namebuf);
+
+	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1) {
+		/* returning string SID */
+		return (NT_STATUS_SUCCESS);
+	}
 
 	/* Encode */
-	smb_sid_tostr(sid, strsid);
-	if ((buf = smb_dr_encode_string(opcode, strsid, &buflen)) == 0) {
-		syslog(LOG_ERR, "%s: Encode error", smbapi_desc[opcode]);
+	if ((buf = smb_dr_encode_string(opcode, namebuf, &buflen)) == 0) {
+		/* returning string SID */
 		(void) close(fd);
-		return (NT_STATUS_INTERNAL_ERROR);
+		return (NT_STATUS_SUCCESS);
 	}
 
 	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
@@ -133,24 +140,28 @@ smb_lookup_sid(smb_sid_t *sid, char *sidbuf, int sidbuflen)
 	if (rbufp) {
 		name = smb_dr_decode_string(rbufp + SMB_DR_DATA_OFFSET,
 		    rbufsize - SMB_DR_DATA_OFFSET);
-		if (name == NULL) {
-			smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
-			(void) close(fd);
-			return (NT_STATUS_INTERNAL_ERROR);
-		}
 	}
 
 	smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
 	(void) close(fd);
 
-	if ((name == NULL) || (*name == '\0'))
-		smb_sid_tostr(sid, sidbuf);
+	if (name) {
+		if (*name != '\0')
+			(void) strlcpy(namebuf, name, namebuflen);
 
-	(void) strlcpy(sidbuf, name, sidbuflen);
-	xdr_free(xdr_string, (char *)&name);
+		xdr_free(xdr_string, (char *)&name);
+	}
+
 	return (NT_STATUS_SUCCESS);
 }
 
+/*
+ * smb_lookup_name
+ *
+ * Tries to get the SID associated with the given account name
+ * The mapping is requested to be performed by smbd via a door
+ * call. If no SID can be found NT_STATUS_NONE_MAPPED is returned.
+ */
 int
 smb_lookup_name(char *name, smb_gsid_t *sid)
 {
@@ -161,18 +172,16 @@ smb_lookup_name(char *name, smb_gsid_t *sid)
 	char *p;
 	int fd;
 
-	if ((name == NULL) || (*name == '\0')) {
-		syslog(LOG_ERR, "%s: invalid parameter(s)",
-		    smbapi_desc[opcode]);
-		return (NT_STATUS_INVALID_PARAMETER);
-	}
+	assert(name && sid);
+
+	if (*name == '\0')
+		return (NT_STATUS_NONE_MAPPED);
 
 	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1)
 		return (NT_STATUS_INTERNAL_ERROR);
 
 	/* Encode */
 	if ((buf = smb_dr_encode_string(opcode, name, &buflen)) == 0) {
-		syslog(LOG_ERR, "%s: Encode error", smbapi_desc[opcode]);
 		(void) close(fd);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}

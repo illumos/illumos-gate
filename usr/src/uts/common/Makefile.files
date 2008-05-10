@@ -921,7 +921,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_books.o				\
 		smb_check_directory.o			\
 		smb_close.o				\
-		smb_common_lock.o			\
 		smb_common_open.o			\
 		smb_common_search.o			\
 		smb_common_transact.o			\
@@ -963,6 +962,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
                 smb_odir.o				\
 		smb_ofile.o				\
 		smb_open_andx.o				\
+		smb_oplock.o				\
 		smb_path_name_reduction.o		\
 		smb_print.o				\
 		smb_process_exit.o			\

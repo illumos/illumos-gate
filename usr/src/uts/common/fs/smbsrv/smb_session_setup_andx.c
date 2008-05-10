@@ -462,12 +462,12 @@ smb_com_session_setup_andx(smb_request_t *sr)
 
 	if (ci_password)
 		kmem_free(ci_password, ci_pwlen + 1);
-	if (cs_password)
-		kmem_free(cs_password, cs_pwlen + 1);
 
 	if (user == NULL) {
 		if (session_key)
 			kmem_free(session_key, sizeof (smb_session_key_t));
+		if (cs_password)
+			kmem_free(cs_password, cs_pwlen + 1);
 		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
 		return (SDRC_ERROR);
 	}
@@ -489,6 +489,9 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	    (sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) &&
 	    session_key)
 		smb_sign_init(sr, session_key, (char *)cs_password, cs_pwlen);
+
+	if (cs_password)
+		kmem_free(cs_password, cs_pwlen + 1);
 
 	if (session_key)
 		kmem_free(session_key, sizeof (smb_session_key_t));

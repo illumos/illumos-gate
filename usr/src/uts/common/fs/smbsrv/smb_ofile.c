@@ -238,17 +238,25 @@ smb_ofile_open(
 			of->f_granted_access |= FILE_READ_ATTRIBUTES;
 		}
 
-		if ((node->vp->v_type == VREG) && (smb_fsop_open(of) != 0)) {
-			of->f_magic = 0;
-			mutex_destroy(&of->f_mutex);
-			crfree(of->f_cr);
-			smb_idpool_free(&tree->t_fid_pool, of->f_fid);
-			kmem_cache_free(tree->t_server->si_cache_ofile, of);
-			err->status = NT_STATUS_ACCESS_DENIED;
-			err->errcls = ERRDOS;
-			err->errcode = ERROR_ACCESS_DENIED;
-			return (NULL);
+		if (node->vp->v_type == VREG) {
+			of->f_mode =
+			    smb_fsop_amask_to_omode(of->f_granted_access);
+			if (smb_fsop_open(of->f_node, of->f_mode, of->f_cr)
+			    != 0) {
+				of->f_magic = 0;
+				mutex_destroy(&of->f_mutex);
+				crfree(of->f_cr);
+				smb_idpool_free(&tree->t_fid_pool,
+				    of->f_fid);
+				kmem_cache_free(tree->t_server->si_cache_ofile,
+				    of);
+				err->status = NT_STATUS_ACCESS_DENIED;
+				err->errcls = ERRDOS;
+				err->errcode = ERROR_ACCESS_DENIED;
+				return (NULL);
+			}
 		}
+
 		smb_llist_enter(&node->n_ofile_list, RW_WRITER);
 		smb_llist_insert_tail(&node->n_ofile_list, of);
 		smb_llist_exit(&node->n_ofile_list);
@@ -298,7 +306,7 @@ smb_ofile_close(
 			smb_ofile_close_timestamp_update(of, last_wtime);
 			rc = smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 			smb_commit_delete_on_close(of);
-			smb_release_oplock(of, OPLOCK_RELEASE_FILE_CLOSED);
+			smb_oplock_release(of->f_node, B_FALSE);
 
 			/*
 			 * Share reservations cannot be removed until the
@@ -309,7 +317,8 @@ smb_ofile_close(
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
 			if (of->f_node->vp->v_type == VREG)
-				(void) smb_fsop_close(of);
+				(void) smb_fsop_close(of->f_node, of->f_mode,
+				    of->f_cr);
 
 			/*
 			 * Cancel any notify change requests related

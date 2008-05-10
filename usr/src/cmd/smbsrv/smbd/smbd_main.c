@@ -420,7 +420,7 @@ smbd_service_init(void)
 		return (rc);
 
 	if (smb_getfqdomainname(fqdn, MAXHOSTNAMELEN) == 0)
-		(void) dyndns_update(fqdn, B_FALSE);
+		(void) dyndns_update_core(fqdn);
 
 	(void) smbd_localtime_init();
 
@@ -555,7 +555,7 @@ smbd_refresh_monitor(void *arg)
 		smb_browser_reconfig();
 
 		if (rc == 0)
-			if (dyndns_update(fqdn, B_FALSE) != 0)
+			if (dyndns_update_core(fqdn) != 0)
 				smbd_report("failed to update dynamic DNS");
 
 		smb_set_netlogon_cred();

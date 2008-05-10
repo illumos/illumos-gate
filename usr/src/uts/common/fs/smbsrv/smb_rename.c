@@ -182,18 +182,8 @@ smb_do_rename(
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
-	if (OPLOCKS_IN_FORCE(src_node)) {
-		status = smb_break_oplock(sr, src_node);
 
-		if (status != NT_STATUS_SUCCESS) {
-			smb_node_release(src_node);
-			smb_node_release(src_fqi->dir_snode);
-
-			SMB_NULL_FQI_NODES(*src_fqi);
-			SMB_NULL_FQI_NODES(*dst_fqi);
-			return (EACCES);
-		}
-	}
+	smb_oplock_break(src_node);
 
 	for (count = 0; count <= 3; count++) {
 		if (count) {

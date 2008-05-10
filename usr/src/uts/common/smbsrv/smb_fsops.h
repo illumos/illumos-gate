@@ -43,9 +43,15 @@
 extern "C" {
 #endif
 
-int smb_fsop_open(smb_ofile_t *of);
+int smb_fsop_amask_to_omode(uint32_t);
 
-int smb_fsop_close(smb_ofile_t *of);
+int smb_fsop_open(smb_node_t *, int, cred_t *);
+
+int smb_fsop_close(smb_node_t *, int, cred_t *);
+
+int smb_fsop_oplock_install(smb_node_t *, int);
+
+void smb_fsop_oplock_uninstall(smb_node_t *);
 
 int smb_fsop_create(smb_request_t *, cred_t *, smb_node_t *,
     char *name, smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr);
@@ -123,6 +129,8 @@ int smb_fsop_sdwrite(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *,
 
 uint32_t smb_fsop_shrlock(cred_t *, smb_node_t *, uint32_t, uint32_t, uint32_t);
 void smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid);
+
+int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
 
 /*
  * Lookup-related flags

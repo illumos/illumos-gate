@@ -101,6 +101,7 @@ SUNWprivate {
 	smb_auth_DES;
 	smb_auth_gen_session_key;
 	smb_auth_ntlm_hash;
+	smb_auth_ntlmv2_hash;
 	smb_auth_qnd_unicode;
 	smb_auth_set_info;
 	smb_auth_validate_lm;
@@ -179,7 +180,6 @@ SUNWprivate {
 	smb_getfqdomainname;
 	smb_getfqhostname;
 	smb_gethostname;
-	smb_getjoineddomain;
 	smb_getnetbiosname;
 	smb_idmap_batch_create;
 	smb_idmap_batch_destroy;

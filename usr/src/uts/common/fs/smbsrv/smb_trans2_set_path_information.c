@@ -160,6 +160,13 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
+	if (smb_oplock_conflict(ret_snode, sr->session, NULL)) {
+		/*
+		 * for the benefit of attribute setting later on
+		 */
+		smb_oplock_break(ret_snode);
+	}
+
 	info->node = ret_snode;
 	status = smb_trans2_set_information(sr, info, &smberr);
 	info->node = NULL;

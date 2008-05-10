@@ -45,8 +45,6 @@ static uint32_t smb_open_subr(smb_request_t *);
 
 extern uint32_t smb_is_executable(char *);
 
-static uint32_t smb_open_subr(smb_request_t *);
-
 /*
  * This macro is used to delete a newly created object
  * if any error happens after creation of object.
@@ -240,6 +238,19 @@ smb_common_open(smb_request_t *sr)
  * This function will return NT status codes but it also raises errors,
  * in which case it won't return to the caller. Be careful how you
  * handle things in here.
+ *
+ * The following rules apply when processing a file open request:
+ *
+ * - Oplocks must be broken prior to share checking to prevent open
+ * starvation due to batch oplocks.  Checking share reservations first
+ * could potentially result in unnecessary open failures due to
+ * open/close batching on the client.
+ *
+ * - Share checks must take place prior to access checks for correct
+ * Windows semantics and to prevent unnecessary NFS delegation recalls.
+ *
+ * - Oplocks must be acquired after open to ensure the correct
+ * synchronization with NFS delegation and FEM installation.
  */
 
 static uint32_t
@@ -256,7 +267,6 @@ smb_open_subr(smb_request_t *sr)
 	int			pathlen;
 	int			max_requested = 0;
 	uint32_t		max_allowed;
-	unsigned int		granted_oplock;
 	uint32_t		status = NT_STATUS_SUCCESS;
 	int			is_dir;
 	smb_error_t		err;
@@ -412,20 +422,12 @@ smb_open_subr(smb_request_t *sr)
 		dnode = op->fqi.dir_snode;
 
 		/*
-		 * Enter critical region for share reservations.
-		 * (See comments above smb_fsop_shrlock().)
-		 */
-
-		rw_enter(&node->n_share_lock, RW_WRITER);
-
-		/*
 		 * Reject this request if the target is a directory
 		 * and the client has specified that it must not be
 		 * a directory (required by Lotus Notes).
 		 */
 		if ((op->create_options & FILE_NON_DIRECTORY_FILE) &&
 		    (op->fqi.last_attr.sa_vattr.va_type == VDIR)) {
-			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -441,7 +443,6 @@ smb_open_subr(smb_request_t *sr)
 				 * Directories cannot be opened
 				 * with the above commands
 				 */
-				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
@@ -450,7 +451,6 @@ smb_open_subr(smb_request_t *sr)
 				return (NT_STATUS_FILE_IS_A_DIRECTORY);
 			}
 		} else if (op->my_flags & MYF_MUST_BE_DIRECTORY) {
-			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -464,7 +464,6 @@ smb_open_subr(smb_request_t *sr)
 		 * flag is set.
 		 */
 		if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
-			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -477,7 +476,6 @@ smb_open_subr(smb_request_t *sr)
 		 * Specified file already exists so the operation should fail.
 		 */
 		if (op->create_disposition == FILE_CREATE) {
-			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -495,7 +493,6 @@ smb_open_subr(smb_request_t *sr)
 			if (node->attr.sa_vattr.va_type != VDIR) {
 				if (op->desired_access & (FILE_WRITE_DATA |
 				    FILE_APPEND_DATA)) {
-					rw_exit(&node->n_share_lock);
 					smb_node_release(node);
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
@@ -506,17 +503,18 @@ smb_open_subr(smb_request_t *sr)
 			}
 		}
 
-		/*
-		 * The following check removes the need to check share
-		 * reservations again when a truncate is done.
-		 */
+		if (smb_oplock_conflict(node, sr->session, op))
+			smb_oplock_break(node);
+
+		rw_enter(&node->n_share_lock, RW_WRITER);
 
 		if ((op->create_disposition == FILE_SUPERSEDE) ||
 		    (op->create_disposition == FILE_OVERWRITE_IF) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
 
 			if (!(op->desired_access &
-			    (FILE_WRITE_DATA | FILE_APPEND_DATA))) {
+			    (FILE_WRITE_DATA | FILE_APPEND_DATA |
+			    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))) {
 				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);
@@ -557,26 +555,6 @@ smb_open_subr(smb_request_t *sr)
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 				    ERRDOS, ERROR_ACCESS_DENIED);
 				return (NT_STATUS_ACCESS_DENIED);
-			}
-		}
-
-		/*
-		 * Break the oplock before share checks. If another client
-		 * has the file open, this will force a flush or close,
-		 * which may affect the outcome of any share checking.
-		 */
-
-		if (OPLOCKS_IN_FORCE(node)) {
-			status = smb_break_oplock(sr, node);
-
-			if (status != NT_STATUS_SUCCESS) {
-				rw_exit(&node->n_share_lock);
-				smb_node_release(node);
-				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
-				smbsr_error(sr, status,
-				    ERRDOS, ERROR_VC_DISCONNECTED);
-				return (status);
 			}
 		}
 
@@ -771,27 +749,8 @@ smb_open_subr(smb_request_t *sr)
 		return (err.status);
 	}
 
-	/*
-	 * Propagate the write-through mode from the open params
-	 * to the node: see the notes in the function header.
-	 *
-	 * IR #102318 Mirroring may force synchronous
-	 * writes regardless of what we specify here.
-	 */
-	if (sr->sr_cfg->skc_sync_enable ||
-	    (op->create_options & FILE_WRITE_THROUGH))
-		node->flags |= NODE_FLAGS_WRITE_THROUGH;
-
-	op->fileid = op->fqi.last_attr.sa_vattr.va_nodeid;
-
-	if (op->fqi.last_attr.sa_vattr.va_type == VDIR) {
-		/* We don't oplock directories */
-		op->my_flags &= ~MYF_OPLOCK_MASK;
-		op->dsize = 0;
-	} else {
-		status = smb_acquire_oplock(sr, of, op->my_flags,
-		    &granted_oplock);
-		op->my_flags &= ~MYF_OPLOCK_MASK;
+	if (op->fqi.last_attr.sa_vattr.va_type == VREG) {
+		status = smb_oplock_acquire(sr, of, op);
 
 		if (status != NT_STATUS_SUCCESS) {
 			rw_exit(&node->n_share_lock);
@@ -812,9 +771,21 @@ smb_open_subr(smb_request_t *sr)
 			return (status);
 		}
 
-		op->my_flags |= granted_oplock;
 		op->dsize = op->fqi.last_attr.sa_vattr.va_size;
+	} else { /* VDIR or VLNK */
+		op->my_flags &= ~MYF_OPLOCK_MASK;
+		op->dsize = 0;
 	}
+
+	/*
+	 * Propagate the write-through mode from the open params
+	 * to the node: see the notes in the function header.
+	 */
+	if (sr->sr_cfg->skc_sync_enable ||
+	    (op->create_options & FILE_WRITE_THROUGH))
+		node->flags |= NODE_FLAGS_WRITE_THROUGH;
+
+	op->fileid = op->fqi.last_attr.sa_vattr.va_nodeid;
 
 	if (created) {
 		node->flags |= NODE_FLAGS_CREATED;
@@ -830,10 +801,10 @@ smb_open_subr(smb_request_t *sr)
 			node->flags |= NODE_CREATED_READONLY;
 			op->dattr &= ~SMB_FA_READONLY;
 		}
-		smb_node_set_dosattr(node, op->dattr | SMB_FA_ARCHIVE);
-		if (op->utime.tv_sec == 0 || op->utime.tv_sec == UINT_MAX)
-			(void) microtime(&op->utime);
-		smb_node_set_time(node, NULL, &op->utime, 0, 0, SMB_AT_MTIME);
+		smb_node_set_dosattr(node, op->dattr);
+		if ((op->crtime.tv_sec != 0) && (op->crtime.tv_sec != UINT_MAX))
+			smb_node_set_time(node, &op->crtime, NULL, NULL, NULL,
+			    SMB_AT_CRTIME);
 		(void) smb_sync_fsattr(sr, sr->user_cr, node);
 	} else {
 		/*
@@ -850,11 +821,9 @@ smb_open_subr(smb_request_t *sr)
 		case FILE_SUPERSEDE:
 		case FILE_OVERWRITE_IF:
 		case FILE_OVERWRITE:
-			smb_node_set_dosattr(node,
-			    op->dattr | SMB_FA_ARCHIVE);
+			smb_node_set_dosattr(node, op->dattr);
 			(void) smb_sync_fsattr(sr, sr->user_cr, node);
 		}
-		op->utime = *smb_node_get_crtime(node);
 		op->dattr = smb_node_get_dosattr(node);
 	}
 

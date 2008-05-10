@@ -1657,6 +1657,33 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
 
 /*
  * dyndns_update
+ *
+ * Dynamic DNS update API for kclient.
+ *
+ * Returns:
+ *   0: successful
+ *  -1: dynamic update failure.
+ *  -2: unable to obtain NIC info.
+ *  -3: init failure
+ */
+int
+dyndns_update(char *fqdn)
+{
+	int rc;
+
+	if (smb_nic_init() != 0)
+		return (-2);
+
+	if (dns_msgid_init() != 0)
+		return (-3);
+
+	rc = dyndns_update_core(fqdn);
+	smb_nic_fini();
+	return (rc);
+}
+
+/*
+ * dyndns_update_core
  * Perform dynamic update on both forward and reverse lookup zone using
  * the specified hostname and IP addresses.  Before updating DNS, existing
  * host entries with the same hostname in the forward lookup zone are removed
@@ -1666,17 +1693,13 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
  * IP addresses will show current hostname.
  * Parameters:
  *  fqhn - fully-qualified hostname
- *  init_msgid_counter - to indicate whether the global message id counter
- *                       needs to be initialized or not. Any process, other
- *                       than smbd, should specify B_TRUE for the first
- *                       dyndns_update call, and B_FALSE for the subsequent
- *                       dyndns_update calls.
+ *
  * Returns:
  *   -1: some dynamic DNS updates errors
  *    0: successful or DDNS disabled.
  */
 int
-dyndns_update(char *fqdn, boolean_t init_msgid_counter)
+dyndns_update_core(char *fqdn)
 {
 	int forw_update_ok, error;
 	char *my_ip;
@@ -1692,10 +1715,6 @@ dyndns_update(char *fqdn, boolean_t init_msgid_counter)
 		return (-1);
 
 	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn, fqdn);
-	if (init_msgid_counter)
-		if (dns_msgid_init() != 0)
-			return (-1);
-
 	error = 0;
 	forw_update_ok = 0;
 

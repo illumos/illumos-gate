@@ -1390,15 +1390,6 @@ smb_server_store_cfg(smb_server_t *sv, smb_kmod_cfg_t *cfg)
 	if (cfg->skc_maxconnections == 0)
 		cfg->skc_maxconnections = 0xFFFFFFFF;
 
-	/*
-	 * XXX should not override configuration.
-	 * For now, this disables server side
-	 * signing regardless of configuration.
-	 */
-	cfg->skc_signing_enable = 0;
-	cfg->skc_signing_required = 0;
-	cfg->skc_signing_check = 0;
-
 	smb_session_correct_keep_alive_values(
 	    &sv->sv_nbt_daemon.ld_session_list, cfg->skc_keepalive);
 	smb_session_correct_keep_alive_values(

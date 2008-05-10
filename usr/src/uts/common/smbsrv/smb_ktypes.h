@@ -389,6 +389,8 @@ int MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
 typedef struct smb_oplock {
 	struct smb_ofile	*op_ofile;
 	uint32_t		op_flags;
+	uint32_t		op_ipaddr;
+	uint64_t		op_kid;
 } smb_oplock_t;
 
 #define	OPLOCK_FLAG_BREAKING	1
@@ -894,6 +896,7 @@ typedef struct smb_ofile {
 	uint16_t		f_opened_by_pid;
 	uint16_t		f_ftype;
 	uint64_t		f_llf_pos;
+	int			f_mode;
 	cred_t			*f_cr;
 	pid_t			f_pid;
 } smb_ofile_t;
@@ -1261,7 +1264,7 @@ typedef struct smb_request {
 		uint32_t	my_flags;
 		uint32_t	timeo;
 		uint32_t	dattr;
-		timestruc_t	utime;
+		timestruc_t	crtime;
 		uint64_t	dsize;
 		uint32_t	desired_access;
 		uint32_t	share_access;

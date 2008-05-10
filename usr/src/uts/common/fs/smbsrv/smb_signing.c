@@ -38,6 +38,7 @@
 #include <sys/crypto/api.h>
 #include <smbsrv/smb_incl.h>
 
+#define	SMBAUTH_SESSION_KEY_SZ 16
 #define	SMB_SIG_SIZE	8
 #define	SMB_SIG_OFFS	14
 
@@ -60,6 +61,7 @@ smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
 	 * Initialise the crypto mechanism to MD5 if it not
 	 * already initialised.
 	 */
+
 	if (crypto_mech.cm_type ==  CRYPTO_MECHANISM_INVALID) {
 		crypto_mech.cm_type = crypto_mech2id(SUN_CKM_MD5);
 		if (crypto_mech.cm_type == CRYPTO_MECHANISM_INVALID) {
@@ -146,7 +148,8 @@ smb_sign_calc(struct mbuf_chain *mbc,
 	digest.cd_raw.iov_len = sizeof (mac);
 
 	status = crypto_digest_init(&crypto_mech, &crypto_ctx, 0);
-	if (status != CRYPTO_SUCCESS) goto error;
+	if (status != CRYPTO_SUCCESS)
+		goto error;
 
 	/*
 	 * Put the sequence number into the first 4 bytes
@@ -171,8 +174,10 @@ smb_sign_calc(struct mbuf_chain *mbc,
 	/* Digest the MACKey */
 	data.cd_raw.iov_base = (char *)sign->mackey;
 	data.cd_raw.iov_len = sign->mackey_len;
-	status = crypto_digest_update(&crypto_ctx, &data, 0);
-	if (status != CRYPTO_SUCCESS) goto error;
+	data.cd_length = sign->mackey_len;
+	status = crypto_digest_update(crypto_ctx, &data, 0);
+	if (status != CRYPTO_SUCCESS)
+		goto error;
 
 	/* Find start of data in chain */
 	while (offset >= mbuf->m_len) {
@@ -185,8 +190,10 @@ smb_sign_calc(struct mbuf_chain *mbc,
 	while (size >= mbuf->m_len - offset) {
 		data.cd_raw.iov_base = &mbuf->m_data[offset];
 		data.cd_raw.iov_len = mbuf->m_len - offset;
-		status = crypto_digest_update(&crypto_ctx, &data, 0);
-		if (status != CRYPTO_SUCCESS) goto error;
+		data.cd_length = mbuf->m_len - offset;
+		status = crypto_digest_update(crypto_ctx, &data, 0);
+		if (status != CRYPTO_SUCCESS)
+			goto error;
 
 		size -= mbuf->m_len - offset;
 		mbuf = mbuf->m_next;
@@ -195,9 +202,10 @@ smb_sign_calc(struct mbuf_chain *mbc,
 	if (size > 0) {
 		data.cd_raw.iov_base = &mbuf->m_data[offset];
 		data.cd_raw.iov_len = size;
-		status = crypto_digest_update(&crypto_ctx, &data, 0);
-		if (status != CRYPTO_SUCCESS) goto error;
-
+		data.cd_length = size;
+		status = crypto_digest_update(crypto_ctx, &data, 0);
+		if (status != CRYPTO_SUCCESS)
+			goto error;
 		offset += size;
 	}
 
@@ -208,8 +216,10 @@ smb_sign_calc(struct mbuf_chain *mbc,
 
 	data.cd_raw.iov_base = (char *)seq_buf;
 	data.cd_raw.iov_len = SMB_SIG_SIZE;
-	status = crypto_digest_update(&crypto_ctx, &data, 0);
-	if (status != CRYPTO_SUCCESS) goto error;
+	data.cd_length = SMB_SIG_SIZE;
+	status = crypto_digest_update(crypto_ctx, &data, 0);
+	if (status != CRYPTO_SUCCESS)
+		goto error;
 
 	/* Find the end of the signature field  */
 	offset += SMB_SIG_SIZE;
@@ -221,18 +231,18 @@ smb_sign_calc(struct mbuf_chain *mbc,
 	while (mbuf) {
 		data.cd_raw.iov_base = &mbuf->m_data[offset];
 		data.cd_raw.iov_len = mbuf->m_len - offset;
-		status = crypto_digest_update(&crypto_ctx, &data, 0);
-		if (status != CRYPTO_SUCCESS) goto error;
-
+		data.cd_length = mbuf->m_len - offset;
+		status = crypto_digest_update(crypto_ctx, &data, 0);
+		if (status != CRYPTO_SUCCESS)
+			goto error;
 		mbuf = mbuf->m_next;
 		offset = 0;
 	}
-
-	status = crypto_digest_final(&crypto_ctx, &digest, 0);
-	if (status != CRYPTO_SUCCESS) goto error;
-
+	digest.cd_length = SMBAUTH_SESSION_KEY_SZ;
+	status = crypto_digest_final(crypto_ctx, &digest, 0);
+	if (status != CRYPTO_SUCCESS)
+		goto error;
 	bcopy(mac, mac_sign, SMB_SIG_SIZE);
-
 	return (0);
 error:
 	cmn_err(CE_WARN, "SmbSignCalc: crypto error %d", status);

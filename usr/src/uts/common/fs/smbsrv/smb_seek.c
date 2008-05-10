@@ -110,7 +110,7 @@ smb_com_seek(smb_request_t *sr)
 	}
 
 	if (mode == SMB_SEEK_END)
-		(void) smb_set_file_size(sr);
+		(void) smb_set_file_size(sr, sr->fid_ofile->f_node);
 
 	if ((rc = smb_ofile_seek(sr->fid_ofile, mode, off, &off_ret)) != 0) {
 		if (rc == EINVAL) {

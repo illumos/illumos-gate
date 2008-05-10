@@ -53,7 +53,6 @@ static smb_lock_t *smb_lock_create(smb_request_t *, uint64_t, uint64_t,
     uint32_t, uint32_t);
 static void smb_lock_destroy(smb_lock_t *);
 static void smb_lock_free(smb_lock_t *);
-static int smb_lock_frlock(vnode_t *, smb_lock_t *, boolean_t, cred_t *);
 
 
 
@@ -213,7 +212,7 @@ smb_lock_range(
 		 * don't insert into the CIFS lock list unless the
 		 * posix lock worked
 		 */
-		if (smb_lock_frlock(node->vp, lock, B_FALSE, sr->user_cr))
+		if (smb_fsop_frlock(node, lock, B_FALSE, sr->user_cr))
 			result = NT_STATUS_FILE_LOCK_CONFLICT;
 		else
 			smb_llist_insert_tail(&node->n_lock_list, lock);
@@ -411,14 +410,14 @@ smb_lock_posix_unlock(smb_node_t *node, smb_lock_t *lock, cred_t *cr)
 				new_unlock = *lock;
 				new_unlock.l_start = unlock_start;
 				new_unlock.l_length = new_mark - unlock_start;
-				(void) smb_lock_frlock(node->vp, &new_unlock,
+				(void) smb_fsop_frlock(node, &new_unlock,
 				    B_TRUE, cr);
 				unlock_start = new_mark;
 			} else {
 				new_unlock = *lock;
 				new_unlock.l_start = unlock_start;
 				new_unlock.l_length = unlock_end - unlock_start;
-				(void) smb_lock_frlock(node->vp, &new_unlock,
+				(void) smb_fsop_frlock(node, &new_unlock,
 				    B_TRUE, cr);
 				break;
 			}
@@ -844,55 +843,4 @@ smb_is_range_unlocked(uint64_t start, uint64_t end, smb_llist_t *llist_head,
 	}
 	/* the range is completely unlocked */
 	return (B_TRUE);
-}
-
-/*
- * smb_vop_frlock_callback
- *
- * smb wrapper function for fs_frlock
- * this should never happen, as we are not attempting
- * to set Mandatory Locks, cmd = F_SETLK_NBMAND
- *
- */
-
-static callb_cpr_t *
-/* ARGSUSED */
-smb_lock_frlock_callback(flk_cb_when_t when, void *error)
-{
-	return (0);
-}
-
-/*
- * smb_vop_frlock
- *
- * smb wrapper function for fs_frlock
- */
-static int
-smb_lock_frlock(vnode_t *vp, smb_lock_t *lock, boolean_t unlock, cred_t *cr)
-{
-	int			flag = F_REMOTELOCK;
-	flock64_t		bf;
-	flk_callback_t		flk_cb;
-
-	bzero(&bf, sizeof (bf));
-
-	flk_init_callback(&flk_cb, smb_lock_frlock_callback, NULL);
-
-	if (unlock) {
-		bf.l_type = F_UNLCK;
-	} else if (lock->l_type == SMB_LOCK_TYPE_READONLY) {
-		bf.l_type = F_RDLCK;
-		flag |= FREAD;
-	} else if (lock->l_type == SMB_LOCK_TYPE_READWRITE) {
-		bf.l_type = F_WRLCK;
-		flag |= FWRITE;
-	}
-
-	bf.l_start = lock->l_start;
-	bf.l_len = lock->l_length;
-	bf.l_pid = IGN_PID;
-	bf.l_sysid = smb_ct.cc_sysid;
-
-	return (VOP_FRLOCK(vp, F_SETLK, &bf, flag, 0, &flk_cb, cr,
-	    &smb_ct));
 }

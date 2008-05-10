@@ -488,31 +488,6 @@ smb_match_netlogon_seqnum(void)
 }
 
 /*
- * smb_getjoineddomain
- *
- * Returns the NETBIOS name of the domain to which the system is joined
- * via smbadm CLI. If the system is in workgroup mode or any error has
- * been encountered, an empty string will be returned via buf.
- *
- * Returns:
- *   -1 upon errors.
- *    0 if in workgroup mode.
- *    1 if in domain mode.
- */
-int
-smb_getjoineddomain(char *buf, size_t buflen)
-{
-	if (buf == NULL || buflen == 0)
-		return (-1);
-
-	*buf = '\0';
-	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
-		return (0);
-
-	return (smb_getdomainname(buf, buflen) ? -1 : 1);
-}
-
-/*
  * smb_setdomainprops
  *
  * This function should be called after joining an AD to

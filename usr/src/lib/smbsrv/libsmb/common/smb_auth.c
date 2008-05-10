@@ -287,7 +287,7 @@ smb_auth_blob_to_string(smb_auth_data_blob_t *blob, unsigned char *data_blob)
  * The NTLMv2 hash will be returned via the ntlmv2_hash parameter which
  * will be used in the calculation of the NTLMv2 and LMv2 responses.
  */
-static int
+int
 smb_auth_ntlmv2_hash(unsigned char *ntlm_hash,
 	char *username,
 	char *ntdomain,

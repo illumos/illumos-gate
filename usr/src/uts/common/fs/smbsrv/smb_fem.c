@@ -26,25 +26,40 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_fsops.h>
 #include <sys/sdt.h>
+#include <sys/fcntl.h>
 #include <sys/vfs.h>
 #include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/fem.h>
 
-int smb_fem_fcn_create(femarg_t *, char *, vattr_t *, vcexcl_t, int,
+extern caller_context_t	smb_ct;
+
+static boolean_t	smb_fem_initialized = B_FALSE;
+static fem_t		*smb_fcn_ops = NULL;
+static fem_t		*smb_oplock_ops = NULL;
+
+/*
+ * Declarations for FCN (file change notification) FEM monitors
+ */
+
+void smb_fem_fcn_install(smb_node_t *);
+void smb_fem_fcn_uninstall(smb_node_t *);
+
+static int smb_fem_fcn_create(femarg_t *, char *, vattr_t *, vcexcl_t, int,
     vnode_t **, cred_t *, int, caller_context_t *, vsecattr_t *);
-int smb_fem_fcn_remove(femarg_t *, char *, cred_t *,
+static int smb_fem_fcn_remove(femarg_t *, char *, cred_t *,
     caller_context_t *, int);
-int smb_fem_fcn_rename(femarg_t *, char *, vnode_t *, char *,
+static int smb_fem_fcn_rename(femarg_t *, char *, vnode_t *, char *,
     cred_t *, caller_context_t *, int);
-int smb_fem_fcn_mkdir(femarg_t *, char *, vattr_t *, vnode_t **,
+static int smb_fem_fcn_mkdir(femarg_t *, char *, vattr_t *, vnode_t **,
     cred_t *, caller_context_t *, int, vsecattr_t *);
-int smb_fem_fcn_rmdir(femarg_t *, char *, vnode_t *, cred_t *,
+static int smb_fem_fcn_rmdir(femarg_t *, char *, vnode_t *, cred_t *,
     caller_context_t *, int);
-int smb_fem_fcn_link(femarg_t *, vnode_t *, char *, cred_t *,
+static int smb_fem_fcn_link(femarg_t *, vnode_t *, char *, cred_t *,
     caller_context_t *, int);
-int smb_fem_fcn_symlink(femarg_t *, char *, vattr_t *,
+static int smb_fem_fcn_symlink(femarg_t *, char *, vattr_t *,
     char *, cred_t *, caller_context_t *, int);
 
 static const fs_operation_def_t smb_fcn_tmpl[] = {
@@ -58,8 +73,41 @@ static const fs_operation_def_t smb_fcn_tmpl[] = {
 	NULL, NULL
 };
 
-static boolean_t	smb_fem_initialized = B_FALSE;
-static fem_t		*smb_fcn_ops = NULL;
+/*
+ * Declarations for oplock FEM monitors
+ */
+
+int smb_fem_oplock_install(smb_node_t *);
+void smb_fem_oplock_uninstall(smb_node_t *);
+
+static int smb_fem_oplock_open(femarg_t *, int, cred_t *,
+    struct caller_context *);
+static int smb_fem_oplock_read(femarg_t *, uio_t *, int, cred_t *,
+    struct caller_context *);
+static int smb_fem_oplock_write(femarg_t *, uio_t *, int, cred_t *,
+    struct caller_context *);
+static int smb_fem_oplock_setattr(femarg_t *, vattr_t *, int, cred_t *,
+    caller_context_t *);
+static int smb_fem_oplock_rwlock(femarg_t *, int, caller_context_t *);
+static int smb_fem_oplock_space(femarg_t *, int, flock64_t *, int,
+    offset_t, cred_t *, caller_context_t *);
+static int smb_fem_oplock_setsecattr(femarg_t *, vsecattr_t *, int, cred_t *,
+    caller_context_t *);
+static int smb_fem_oplock_vnevent(femarg_t *, vnevent_t, vnode_t *, char *,
+    caller_context_t *);
+
+static const fs_operation_def_t smb_oplock_tmpl[] = {
+	VOPNAME_OPEN,	{ .femop_open = smb_fem_oplock_open },
+	VOPNAME_READ,	{ .femop_read = smb_fem_oplock_read },
+	VOPNAME_WRITE,	{ .femop_write = smb_fem_oplock_write },
+	VOPNAME_SETATTR, { .femop_setattr = smb_fem_oplock_setattr },
+	VOPNAME_RWLOCK, { .femop_rwlock = smb_fem_oplock_rwlock },
+	VOPNAME_SPACE,	{ .femop_space = smb_fem_oplock_space },
+	VOPNAME_SETSECATTR, { .femop_setsecattr = smb_fem_oplock_setsecattr },
+	VOPNAME_VNEVENT, { .femop_vnevent = smb_fem_oplock_vnevent },
+	NULL, NULL
+};
+
 /*
  * smb_fem_init
  *
@@ -77,6 +125,15 @@ smb_fem_init(void)
 	rc = fem_create("smb_fcn_ops", smb_fcn_tmpl, &smb_fcn_ops);
 	if (rc)
 		return (rc);
+
+	rc = fem_create("smb_oplock_ops", smb_oplock_tmpl,
+	    &smb_oplock_ops);
+
+	if (rc) {
+		fem_free(smb_fcn_ops);
+		smb_fcn_ops = NULL;
+		return (rc);
+	}
 
 	smb_fem_initialized = B_TRUE;
 
@@ -96,15 +153,17 @@ smb_fem_fini(void)
 		return;
 
 	fem_free(smb_fcn_ops);
+	fem_free(smb_oplock_ops);
 	smb_fcn_ops = NULL;
+	smb_oplock_ops = NULL;
 	smb_fem_initialized = B_FALSE;
 }
 
 void
 smb_fem_fcn_install(smb_node_t *node)
 {
-	(void) fem_install(node->vp, smb_fcn_ops, (void *)node,
-	    OPARGUNIQ, (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
+	(void) fem_install(node->vp, smb_fcn_ops, (void *)node, OPARGUNIQ,
+	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
 }
 
 void
@@ -112,6 +171,26 @@ smb_fem_fcn_uninstall(smb_node_t *node)
 {
 	(void) fem_uninstall(node->vp, smb_fcn_ops, (void *)node);
 }
+
+int
+smb_fem_oplock_install(smb_node_t *node)
+{
+	return (fem_install(node->vp, smb_oplock_ops, (void *)node, OPARGUNIQ,
+	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release));
+}
+
+void
+smb_fem_oplock_uninstall(smb_node_t *node)
+{
+	(void) fem_uninstall(node->vp, smb_oplock_ops, (void *)node);
+}
+
+/*
+ * FEM FCN monitors
+ *
+ * The FCN monitors intercept the respective VOP_* call regardless
+ * of whether the call originates from CIFS, NFS, or a local process.
+ */
 
 /*
  * smb_fem_fcn_create()
@@ -124,7 +203,7 @@ smb_fem_fcn_uninstall(smb_node_t *node)
  * VDIR directory being monitored.
  */
 
-int
+static int
 smb_fem_fcn_create(
     femarg_t *arg,
     char *name,
@@ -164,7 +243,7 @@ smb_fem_fcn_create(
  * VDIR directory being monitored.
  */
 
-int
+static int
 smb_fem_fcn_remove(
     femarg_t *arg,
     char *name,
@@ -187,7 +266,7 @@ smb_fem_fcn_remove(
 	return (error);
 }
 
-int
+static int
 smb_fem_fcn_rename(
     femarg_t *arg,
     char *snm,
@@ -212,7 +291,7 @@ smb_fem_fcn_rename(
 	return (error);
 }
 
-int
+static int
 smb_fem_fcn_mkdir(
     femarg_t *arg,
     char *name,
@@ -238,7 +317,7 @@ smb_fem_fcn_mkdir(
 	return (error);
 }
 
-int
+static int
 smb_fem_fcn_rmdir(
     femarg_t *arg,
     char *name,
@@ -262,7 +341,7 @@ smb_fem_fcn_rmdir(
 	return (error);
 }
 
-int
+static int
 smb_fem_fcn_link(
     femarg_t *arg,
     vnode_t *svp,
@@ -286,7 +365,7 @@ smb_fem_fcn_link(
 	return (error);
 }
 
-int
+static int
 smb_fem_fcn_symlink(
     femarg_t *arg,
     char *linkname,
@@ -309,4 +388,160 @@ smb_fem_fcn_symlink(
 		smb_process_node_notify_change_queue(dnode);
 
 	return (error);
+}
+
+/*
+ * FEM oplock monitors
+ *
+ * The monitors below are not intended to intercept CIFS calls.
+ * CIFS higher-level routines will break oplocks as needed prior
+ * to getting to the VFS layer.
+ */
+
+#define	SMB_FEM_OPLOCK_BREAK(arg) \
+	smb_oplock_break((smb_node_t *)((arg)->fa_fnode->fn_available));
+
+static int
+smb_fem_oplock_open(
+	femarg_t *arg,
+	int mode,
+	cred_t *cr,
+	struct caller_context *ct)
+{
+	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+		SMB_FEM_OPLOCK_BREAK(arg);
+
+	return (vnext_open(arg, mode, cr, ct));
+}
+
+/*
+ * Should normally be hit only via NFSv2/v3.  All other accesses
+ * (CIFS/NFS/local) should call VOP_OPEN first.
+ */
+
+static int
+smb_fem_oplock_read(
+	femarg_t *arg,
+	uio_t *uiop,
+	int ioflag,
+	cred_t *cr,
+	struct caller_context *ct)
+{
+	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+		SMB_FEM_OPLOCK_BREAK(arg);
+
+	return (vnext_read(arg, uiop, ioflag, cr, ct));
+}
+
+/*
+ * Should normally be hit only via NFSv2/v3.  All other accesses
+ * (CIFS/NFS/local) should call VOP_OPEN first.
+ */
+
+static int
+smb_fem_oplock_write(
+	femarg_t *arg,
+	uio_t *uiop,
+	int ioflag,
+	cred_t *cr,
+	struct caller_context *ct)
+{
+	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+		SMB_FEM_OPLOCK_BREAK(arg);
+
+	return (vnext_write(arg, uiop, ioflag, cr, ct));
+}
+
+static int
+smb_fem_oplock_setattr(
+	femarg_t *arg,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
+{
+	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+		SMB_FEM_OPLOCK_BREAK(arg);
+
+	return (vnext_setattr(arg, vap, flags, cr, ct));
+}
+
+static int
+smb_fem_oplock_rwlock(
+	femarg_t *arg,
+	int write_lock,
+	caller_context_t *ct)
+{
+	if (write_lock) {
+		if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+			SMB_FEM_OPLOCK_BREAK(arg);
+	}
+
+	return (vnext_rwlock(arg, write_lock, ct));
+}
+
+static int
+smb_fem_oplock_space(
+	femarg_t *arg,
+	int cmd,
+	flock64_t *bfp,
+	int flag,
+	offset_t offset,
+	cred_t *cr,
+	caller_context_t *ct)
+{
+	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+		SMB_FEM_OPLOCK_BREAK(arg);
+
+	return (vnext_space(arg, cmd, bfp, flag, offset, cr, ct));
+}
+
+static int
+smb_fem_oplock_setsecattr(
+	femarg_t *arg,
+	vsecattr_t *vsap,
+	int flag,
+	cred_t *cr,
+	caller_context_t *ct)
+{
+	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
+		SMB_FEM_OPLOCK_BREAK(arg);
+
+	return (vnext_setsecattr(arg, vsap, flag, cr, ct));
+}
+
+/*
+ * smb_fem_oplock_vnevent()
+ *
+ * To intercept NFS and local renames and removes in order to break any
+ * existing oplock prior to the operation.
+ *
+ * Note: Currently, this monitor is traversed only when an FS is mounted
+ * non-nbmand.  (When the FS is mounted nbmand, share reservation checking
+ * will detect a share violation and return an error prior to the VOP layer
+ * being reached.)  Thus, for nbmand NFS and local renames and removes,
+ * an existing oplock is never broken prior to share checking (contrary to
+ * how it is with intra-CIFS remove and rename requests).
+ */
+
+static int
+smb_fem_oplock_vnevent(
+	femarg_t *arg,
+	vnevent_t vnevent,
+	vnode_t *dvp,
+	char *name,
+	caller_context_t *ct)
+{
+	switch (vnevent) {
+	case VE_REMOVE:
+	case VE_RENAME_DEST:
+	case VE_RENAME_SRC:
+
+		SMB_FEM_OPLOCK_BREAK(arg);
+		break;
+
+	default:
+		break;
+	}
+	return (vnext_vnevent(arg, vnevent, dvp, name, ct));
 }

@@ -145,6 +145,9 @@ smb_info_passthru(unsigned short infolevel)
 
 	case FileEndOfFileInformation:
 		return (SMB_SET_FILE_END_OF_FILE_INFO);
+
+	case FileAllocationInformation:
+		return (SMB_SET_FILE_ALLOCATION_INFO);
 	}
 
 	return (infolevel);
@@ -320,13 +323,6 @@ smb_set_alloc_info(
 	struct smb_node *node = info->node;
 	int rc;
 
-	if (sr->fid_ofile == NULL) {
-		smberr->status = NT_STATUS_ACCESS_DENIED;
-		smberr->errcls = ERRDOS;
-		smberr->errcode = ERROR_ACCESS_DENIED;
-		return (NT_STATUS_UNSUCCESSFUL);
-	}
-
 	if (smb_decode_mbc(&info->ts_xa->req_data_mb, "q", &DataSize) != 0)
 		return (NT_STATUS_DATA_ERROR);
 
@@ -339,7 +335,7 @@ smb_set_alloc_info(
 		 * because the size flag can get cleared by subsequent
 		 * write requests without the inode ever being updated.
 		 */
-		if ((rc = smb_set_file_size(sr)) != 0) {
+		if ((rc = smb_set_file_size(sr, node)) != 0) {
 			smbsr_map_errno(rc, smberr);
 			status = NT_STATUS_UNSUCCESSFUL;
 		}

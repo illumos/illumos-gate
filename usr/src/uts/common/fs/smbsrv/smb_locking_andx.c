@@ -262,7 +262,7 @@ smb_com_locking_andx(smb_request_t *sr)
 	pid = sr->smb_pid;	/* Save the original pid */
 
 	if (lock_type & LOCKING_ANDX_OPLOCK_RELEASE) {
-		smb_release_oplock(sr->fid_ofile, OPLOCK_RELEASE_LOCK_RELEASED);
+		smb_oplock_release(sr->fid_ofile->f_node, B_FALSE);
 
 		/*
 		 * According to the protocol:

@@ -39,7 +39,11 @@
 
 extern caller_context_t smb_ct;
 
-static int smb_fsop_amask_to_omode(uint32_t granted_access);
+extern int smb_fem_oplock_install(smb_node_t *);
+extern void smb_fem_oplock_uninstall(smb_node_t *);
+
+extern int smb_vop_other_opens(vnode_t *, int);
+
 static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
     smb_fssd_t *fs_sd);
 
@@ -64,45 +68,79 @@ static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
  * Note: Stream names cannot be mangled.
  */
 
+/*
+ * smb_fsop_amask_to_omode
+ *
+ * Convert the access mask to the open mode (for use
+ * with the VOP_OPEN call).
+ *
+ * Note that opening a file for attribute only access
+ * will also translate into an FREAD or FWRITE open mode
+ * (i.e., it's not just for data).
+ *
+ * This is needed so that opens are tracked appropriately
+ * for oplock processing.
+ */
+
 int
-smb_fsop_open(smb_ofile_t *of)
-{
-	int mode;
-
-	mode = smb_fsop_amask_to_omode(of->f_granted_access);
-
-	/*
-	 * Assuming that same vnode is returned as we had before
-	 * (i.e. no special vnodes)
-	 */
-	return (smb_vop_open(&of->f_node->vp, mode, of->f_cr));
-}
-
-int
-smb_fsop_close(smb_ofile_t *of)
-{
-	int mode;
-
-	mode = smb_fsop_amask_to_omode(of->f_granted_access);
-
-	return (smb_vop_close(of->f_node->vp, mode, of->f_cr));
-}
-
-static int
-smb_fsop_amask_to_omode(uint32_t granted_access)
+smb_fsop_amask_to_omode(uint32_t access)
 {
 	int mode = 0;
 
-	if (granted_access & (ACE_READ_DATA | ACE_EXECUTE))
+	if (access & (FILE_READ_DATA | FILE_EXECUTE |
+	    FILE_READ_ATTRIBUTES | FILE_READ_EA))
 		mode |= FREAD;
 
-	if (granted_access & (ACE_WRITE_DATA | ACE_APPEND_DATA))
+	if (access & (FILE_WRITE_DATA | FILE_APPEND_DATA |
+	    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))
 		mode |= FWRITE;
 
-	if (granted_access & ACE_APPEND_DATA)
+	if (access & FILE_APPEND_DATA)
 		mode |= FAPPEND;
 
 	return (mode);
+}
+
+int
+smb_fsop_open(smb_node_t *node, int mode, cred_t *cred)
+{
+	/*
+	 * Assuming that the same vnode is returned as we had before.
+	 * (I.e., with certain types of files or file systems, a
+	 * different vnode might be returned by VOP_OPEN)
+	 */
+	return (smb_vop_open(&node->vp, mode, cred));
+}
+
+int
+smb_fsop_close(smb_node_t *node, int mode, cred_t *cred)
+{
+	return (smb_vop_close(node->vp, mode, cred));
+}
+
+int
+smb_fsop_oplock_install(smb_node_t *node, int mode)
+{
+	int rc;
+
+	if (smb_vop_other_opens(node->vp, mode))
+		return (EMFILE);
+
+	if ((rc = smb_fem_oplock_install(node)))
+		return (rc);
+
+	if (smb_vop_other_opens(node->vp, mode)) {
+		(void) smb_fem_oplock_uninstall(node);
+		return (EMFILE);
+	}
+
+	return (0);
+}
+
+void
+smb_fsop_oplock_uninstall(smb_node_t *node)
+{
+	smb_fem_oplock_uninstall(node);
 }
 
 static int
@@ -247,7 +285,6 @@ smb_fsop_create_with_sd(
 
 	return (rc);
 }
-
 
 /*
  * smb_fsop_create
@@ -2524,4 +2561,31 @@ smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid)
 		return;
 
 	(void) smb_vop_unshrlock(node->vp, uniq_fid, cr);
+}
+
+int
+smb_fsop_frlock(smb_node_t *node, smb_lock_t *lock, boolean_t unlock,
+    cred_t *cr)
+{
+	flock64_t bf;
+	int flag = F_REMOTELOCK;
+
+	bzero(&bf, sizeof (bf));
+
+	if (unlock) {
+		bf.l_type = F_UNLCK;
+	} else if (lock->l_type == SMB_LOCK_TYPE_READONLY) {
+		bf.l_type = F_RDLCK;
+		flag |= FREAD;
+	} else if (lock->l_type == SMB_LOCK_TYPE_READWRITE) {
+		bf.l_type = F_WRLCK;
+		flag |= FWRITE;
+	}
+
+	bf.l_start = lock->l_start;
+	bf.l_len = lock->l_length;
+	bf.l_pid = IGN_PID;
+	bf.l_sysid = smb_ct.cc_sysid;
+
+	return (smb_vop_frlock(node->vp, cr, flag, &bf));
 }

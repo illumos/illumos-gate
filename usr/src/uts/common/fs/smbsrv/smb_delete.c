@@ -119,7 +119,6 @@ smb_com_delete(smb_request_t *sr)
 	char *fname;
 	char *sname;
 	char *fullname;
-	uint32_t status;
 	int is_stream;
 	smb_odir_context_t *pc;
 
@@ -169,16 +168,7 @@ smb_com_delete(smb_request_t *sr)
 		 * to close the file.
 		 */
 
-		if (OPLOCKS_IN_FORCE(node)) {
-			status = smb_break_oplock(sr, node);
-
-			if (status != NT_STATUS_SUCCESS) {
-				smbsr_error(sr, status,
-				    ERRDOS, ERROR_VC_DISCONNECTED);
-				smb_node_release(node);
-				goto delete_error;
-			}
-		}
+		smb_oplock_break(node);
 
 		smb_node_start_crit(node, RW_READER);
 

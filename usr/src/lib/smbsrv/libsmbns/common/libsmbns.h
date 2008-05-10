@@ -89,7 +89,8 @@ extern int ads_update_attrs(void);
 
 /* DYNDNS functions */
 extern int dns_msgid_init(void);
-extern int dyndns_update(char *, boolean_t);
+extern int dyndns_update(char *);
+extern int dyndns_update_core(char *);
 extern int dyndns_clear_rev_zone(char *);
 
 /* Kerberos initialization function */

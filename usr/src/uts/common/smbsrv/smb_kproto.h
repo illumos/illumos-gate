@@ -175,7 +175,7 @@ smb_sdrc_t smb_com_trans2_set_file_information(struct smb_request *,
 void smb_log_flush(void);
 void smb_correct_keep_alive_values(uint32_t new_keep_alive);
 void smb_close_all_connections(void);
-int smb_set_file_size(struct smb_request *sr);
+int smb_set_file_size(smb_request_t *, smb_node_t *);
 int smb_session_send(smb_session_t *, uint8_t type, struct mbuf_chain *);
 int smb_session_xprt_gethdr(smb_session_t *, smb_xprt_t *);
 
@@ -183,15 +183,40 @@ int smb_net_id(uint32_t);
 
 void smb_process_file_notify_change_queue(struct smb_ofile *of);
 
-void smb_oplock_init(void);
+DWORD smb_oplock_acquire(struct smb_request *, struct smb_ofile *,
+    struct open_param *);
+void smb_oplock_break(struct smb_node *);
+void smb_oplock_release(struct smb_node *, boolean_t);
+boolean_t smb_oplock_conflict(struct smb_node *, struct smb_session *,
+    struct open_param *);
 
-DWORD smb_acquire_oplock(struct smb_request *sr,
-    struct smb_ofile *file,
-    unsigned int level_requested,
-    unsigned int *level_granted);
+/*
+ * macros used in oplock processing
+ *
+ * SMB_SAME_SESSION: Checks for equivalence
+ * of session.  If an existing oplock is
+ * from the same IP address/session as the current
+ * request, the oplock is not broken.
+ *
+ * SMB_ATTR_ONLY_OPEN: Checks to see if this is
+ * an attribute-only open with no contravening
+ * dispositions.  Such an open cannot effect an
+ * oplock break.  However, a contravening disposition
+ * of FILE_SUPERSEDE or FILE_OVERWRITE can allow
+ * an oplock break.
+ */
 
-DWORD smb_break_oplock(struct smb_request *sr, struct smb_node *node);
-void smb_release_oplock(struct smb_ofile *file, int reason);
+#define	SMB_SAME_SESSION(sess1, sess2)				\
+	((sess1) && (sess2) &&					\
+	((sess1)->ipaddr == (sess2)->ipaddr) &&			\
+	((sess1)->s_kid == (sess2)->s_kid))			\
+
+#define	SMB_ATTR_ONLY_OPEN(op)					\
+	((op) && (op)->desired_access &&			\
+	(((op)->desired_access & ~(FILE_READ_ATTRIBUTES |	\
+	FILE_WRITE_ATTRIBUTES | SYNCHRONIZE)) == 0) &&		\
+	((op)->create_disposition != FILE_SUPERSEDE) &&		\
+	((op)->create_disposition != FILE_OVERWRITE))		\
 
 uint32_t smb_unlock_range(struct smb_request *, struct smb_node *,
     uint64_t, uint64_t);
@@ -507,6 +532,7 @@ void smb_ofile_close_all_by_pid(smb_tree_t *tree, uint16_t pid);
 void smb_ofile_set_flags(smb_ofile_t *of, uint32_t flags);
 void smb_ofile_close_timestamp_update(smb_ofile_t *of, uint32_t last_wtime);
 boolean_t smb_ofile_is_open(smb_ofile_t *of);
+
 #define	smb_ofile_granted_access(_of_)	((_of_)->f_granted_access)
 
 /*

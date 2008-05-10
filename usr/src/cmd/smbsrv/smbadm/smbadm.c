@@ -281,8 +281,7 @@ smbadm_join(int argc, char **argv)
 	boolean_t join_w = B_FALSE;
 	boolean_t join_d = B_FALSE;
 	uint32_t status;
-	char kdom[MAXHOSTNAMELEN];
-	boolean_t override = B_FALSE;
+	char curdom[MAXHOSTNAMELEN];
 
 	bzero(&jdi, sizeof (jdi));
 
@@ -347,22 +346,21 @@ smbadm_join(int argc, char **argv)
 		return (1);
 	}
 
-	if ((smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kdom, sizeof (kdom))
-	    == SMBD_SMF_OK) && (*kdom != 0)) {
-		if (strncasecmp(jdi.domain_name, kdom,
-		    strlen(jdi.domain_name))) {
+	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
+		(void) smb_getdomainname(curdom, MAXHOSTNAMELEN);
+		if (*curdom != 0 && strncasecmp(curdom, jdi.domain_name,
+		    strlen(curdom))) {
 			char reply[8];
 
-			(void) printf(gettext("The system has already "
-			    "joined to a different domain %s by another "
-			    "program.\nWould you like to continue [yes/no]? "),
-			    kdom);
+			(void) printf(gettext("This system has already "
+			    "joined to '%s' domain.\n"
+			    "Would you like to join the new domain "
+			    "[yes/no]? "),
+			    curdom);
 			(void) scanf("%8s", reply);
 			(void) trim_whitespace(reply);
 			if (strncasecmp(reply, "yes", 3) != 0)
 				return (0);
-
-			override = B_TRUE;
 		}
 	}
 
@@ -390,13 +388,6 @@ smbadm_join(int argc, char **argv)
 		(void) printf(gettext("Successfully joined domain '%s'\n"),
 		    jdi.domain_name);
 
-		if (override) {
-			if (smb_getfqdomainname(kdom, sizeof (kdom)) == -1)
-				(void) strlcpy(kdom, jdi.domain_name,
-				    sizeof (kdom));
-
-			(void) smb_config_setstr(SMB_CI_KPASSWD_DOMAIN, kdom);
-		}
 		return (0);
 
 	case NT_STATUS_DOMAIN_CONTROLLER_NOT_FOUND:
@@ -515,9 +506,12 @@ smbadm_group_dump_members(smb_gsid_t *members, int num)
 
 	(void) printf(gettext("\tMembers:\n"));
 	for (i = 0; i < num; i++) {
-		(void) smb_lookup_sid(members[i].gs_sid, sidstr,
-		    sizeof (sidstr));
-		(void) printf(gettext("\t\t%s\n"), sidstr);
+		*sidstr = '\0';
+		if (smb_lookup_sid(members[i].gs_sid, sidstr,
+		    sizeof (sidstr)) == NT_STATUS_SUCCESS)
+			(void) printf(gettext("\t\t%s\n"), sidstr);
+		else
+			(void) printf(gettext("\t\tERROR! Invalid SID\n"));
 	}
 }
 
