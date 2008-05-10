@@ -55,8 +55,8 @@ extern "C" {
 /*
  * MegaRAID SAS Driver meta data
  */
-#define	MEGASAS_VERSION				"00.00.01.21"
-#define	MEGASAS_RELDATE				"Feb 19, 2008"
+#define	MEGASAS_VERSION				"LSIv1.23"
+#define	MEGASAS_RELDATE				"Mar 31, 2008"
 
 #define	MEGASAS_TRUE				1
 #define	MEGASAS_FALSE				0
@@ -71,6 +71,7 @@ extern "C" {
  */
 #define	PCI_DEVICE_ID_LSI_1064			0x0411
 #define	PCI_DEVICE_ID_LSI_1078			0x0060
+#define	PCI_DEVICE_ID_LSI_1078DE		0x007C
 
 #define	PCI_DEVICE_ID_DELL_PERC5		0x0015
 #define	PCI_DEVICE_ID_DELL_SAS5			0x0054

@@ -425,9 +425,10 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			}
 
 			/* initialize function pointers */
-			if (device_id == PCI_DEVICE_ID_LSI_1078) {
+			if ((device_id == PCI_DEVICE_ID_LSI_1078) ||
+			    (device_id == PCI_DEVICE_ID_LSI_1078DE)) {
 				con_log(CL_ANN, (CE_CONT, "megasas[%d]: "
-				    "1078R detected\n", instance_no));
+				    "1078R/DE detected\n", instance_no));
 				instance->func_ptr->read_fw_status_reg =
 				    read_fw_status_reg_ppc;
 				instance->func_ptr->issue_cmd = issue_cmd_ppc;
@@ -4881,6 +4882,11 @@ enable_intr_ppc(struct megasas_instance *instance)
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	WR_OB_DOORBELL_CLEAR(0xFFFFFFFF, instance);
+
+	/*
+	 * As 1078DE is same as 1078 chip, the interrupt mask
+	 * remains the same.
+	 */
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	WR_OB_INTR_MASK(~(MFI_REPLY_1078_MESSAGE_INTR), instance);
 	/* WR_OB_INTR_MASK(~0x80000000, instance); */
@@ -4962,6 +4968,10 @@ intr_ack_ppc(struct megasas_instance *instance)
 
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: status = 0x%x\n", status));
 
+	/*
+	 * As 1078DE is same as 1078 chip, the status field
+	 * remains the same.
+	 */
 	if (!(status & MFI_REPLY_1078_MESSAGE_INTR)) {
 		return (DDI_INTR_UNCLAIMED);
 	}
