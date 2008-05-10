@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -925,7 +924,7 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 		rv = CFGA_IB_OK;	/* Other status don't matter */
 
 		len = strlen(IB_CONFIRM0) + strlen(IB_CONFIRM1) +
-				strlen("Configure") + strlen(ap_id);
+		    strlen("Configure") + strlen(ap_id);
 		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
 			(void) snprintf(msg, len + 3, "Configure %s%s\n%s",
 			    IB_CONFIRM0, ap_id, IB_CONFIRM1);
@@ -988,7 +987,7 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 
 		rv = CFGA_IB_OK;	/* Other statuses don't matter */
 		len = strlen(IB_CONFIRM0) + strlen(IB_CONFIRM1) +
-				strlen("Unconfigure") + strlen(ap_id);
+		    strlen("Unconfigure") + strlen(ap_id);
 		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
 			(void) snprintf(msg, len + 3, "Unconfigure %s%s\n%s",
 			    IB_CONFIRM0, ap_id, IB_CONFIRM1);
@@ -1519,7 +1518,7 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
 		free(msg);
 
 		misc_arg = (strcmp(fab_apid, IBNEX_FABRIC) == 0) ?
-			IBNEX_BASE_APID : IBNEX_DYN_APID;
+		    IBNEX_BASE_APID : IBNEX_DYN_APID;
 
 		/* Reprobe and update IOC(s) configuration */
 		rv = ib_do_control_ioctl((char *)ap_id, IBNEX_UPDATE_IOC_CONF,
@@ -1844,6 +1843,14 @@ cfga_list_ext(const char *ap_id, cfga_list_data_t **ap_id_list, int *nlistp,
 				++index;
 			}
 
+			/*
+			 * Check if the index doesn't go beyond the
+			 * device number. If it goes, stop the loop
+			 * here not to cause the heap corruption.
+			 */
+			if (show_dynamic == 0 && index > num_devices)
+				break;
+
 			/* fill up data into "clp" */
 			clp =  (show_dynamic != 0) ? &(*ap_id_list[0]) :
 			    &(ap_id_list[0][index]);
@@ -1952,7 +1959,7 @@ cfga_list_ext(const char *ap_id, cfga_list_data_t **ap_id_list, int *nlistp,
 					clp->ap_r_state = CFGA_STAT_EMPTY;
 				else if (intval == AP_RSTATE_DISCONNECTED)
 					clp->ap_r_state =
-						CFGA_STAT_DISCONNECTED;
+					    CFGA_STAT_DISCONNECTED;
 				else if (intval == AP_RSTATE_CONNECTED)
 					clp->ap_r_state = CFGA_STAT_CONNECTED;
 				DPRINTF("cfga_list_ext: Name = %s, "
@@ -1966,7 +1973,7 @@ cfga_list_ext(const char *ap_id, cfga_list_data_t **ap_id_list, int *nlistp,
 					clp->ap_o_state = CFGA_STAT_CONFIGURED;
 				else if (intval == AP_OSTATE_UNCONFIGURED)
 					clp->ap_o_state =
-						CFGA_STAT_UNCONFIGURED;
+					    CFGA_STAT_UNCONFIGURED;
 				DPRINTF("cfga_list_ext: Name = %s, "
 				    "ostate = %x\n", name, intval);
 				++count;

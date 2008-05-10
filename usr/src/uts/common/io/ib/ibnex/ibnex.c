@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1474,8 +1474,21 @@ ibnex_config_all_children(dev_info_t *parent)
 	ndi_devi_exit(parent, circ);
 
 	/*
+	 * Check if ibtc_attach() is called and the phci is
+	 * set up for this device before the IB nexus starts
+	 * enumerating MPxIO clients.
+	 *
+	 * If an HCA is in maintenance mode, its phci is not set up
+	 * but the driver is attached to update the firmware. In the
+	 * case, do not configure the MPxIO clients.
+	 */
+	if (mdi_component_is_phci(parent, NULL) == MDI_FAILURE) {
+		return;
+	}
+
+	/*
 	 * Use mdi_devi_enter() for locking. IB Nexus is
-	 * enumerating MPXIO clients.
+	 * enumerating MPxIO clients.
 	 */
 	mdi_devi_enter(parent, &circ);
 
@@ -4122,6 +4135,18 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
 		if (ret == MDI_SUCCESS)
 			*need_bus_config = 0;
 	} else {
+		/*
+		 * Check if ibtc_attach() is called and the phci is
+		 * set up for this device.
+		 *
+		 * If an HCA is in maintenance mode, its phci is not set up
+		 * but the driver is attached to update the firmware. In the
+		 * case, do not configure the ioc node because the IB does not
+		 * work properly.
+		 */
+		if (mdi_component_is_phci(pdip, NULL) == MDI_FAILURE) {
+			return (IBNEX_FAILURE);
+		}
 		mdi_devi_enter(pdip, &circ);
 		if (strstr((char *)devname, ":port=") != NULL) {
 			ret = ibnex_config_root_iocnode(pdip, devname);

@@ -5289,15 +5289,14 @@ ibdm_get_node_record_by_port(ibmf_saa_handle_t sa_hdl, ib_guid_t guid,
 		    " SA Retrieve Failed: %d", ret);
 		return (IBDM_FAILURE);
 	}
-	/*
-	 * There is one NodeRecord on each endport on a subnet.
-	 */
-	ASSERT(*length == sizeof (sa_node_record_t));
-
 	if (*resp == NULL || *length == 0) {
 		IBTF_DPRINTF_L2("ibdm", "\tport_reachable: No records");
 		return (IBDM_FAILURE);
 	}
+	/*
+	 * There is one NodeRecord on each endport on a subnet.
+	 */
+	ASSERT(*length == sizeof (sa_node_record_t));
 
 	return (IBDM_SUCCESS);
 }
