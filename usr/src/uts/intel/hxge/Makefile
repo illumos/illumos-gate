@@ -117,7 +117,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS)
+modlintlib:	$(MODLINTLIB_DEPS) lint32
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
@@ -127,3 +127,11 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+# This is a hack to avoid a lint warning in the nightly build due to
+# lack of a 32 bit version of the hxge driver. This will be removed
+# when the 32 bit driver is available.
+#
+LINT32_DIRS=$(LINT32_BUILDS:%=$(UTSBASE)/intel/lint-libs/%)
+LINT32_FILES=$(LINT32_DIRS:%=%/llib-l$(MODULE).ln)
