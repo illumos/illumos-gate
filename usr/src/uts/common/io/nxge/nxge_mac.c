@@ -67,8 +67,13 @@ static ether_addr_st etherzeroaddr =
 /*
  * Supported chip types
  */
-static uint32_t nxge_supported_cl45_ids[] = {BCM8704_DEV_ID, BCM8706_DEV_ID};
-static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID, BCM5482_PHY_ID};
+static uint32_t nxge_supported_cl45_ids[] = {
+	BCM8704_DEV_ID,
+	MARVELL_88X_201X_DEV_ID,
+	BCM8706_DEV_ID
+};
+
+static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID};
 
 #define	NUM_CLAUSE_45_IDS	(sizeof (nxge_supported_cl45_ids) /	\
 				sizeof (uint32_t))
@@ -98,6 +103,8 @@ static nxge_status_t nxge_BCM8704_xcvr_init(p_nxge_t);
 static nxge_status_t nxge_BCM8706_xcvr_init(p_nxge_t);
 static nxge_status_t nxge_1G_xcvr_init(p_nxge_t);
 static void nxge_bcm5464_link_led_off(p_nxge_t);
+static nxge_status_t nxge_mrvl88x2011_link(p_nxge_t, boolean_t *);
+static nxge_status_t nxge_mrvl88x2011_xcvr_init(p_nxge_t);
 
 /*
  * xcvr tables for supported transceivers
@@ -599,7 +606,15 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 	}
 
 	if (nxgep->mac.portmode == PORT_10G_FIBER) {
-		if ((status = nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+		uint32_t pma_pmd_id;
+		pma_pmd_id = nxge_get_cl45_pma_pmd_id(nxgep,
+		    nxgep->xcvr_addr);
+		if ((pma_pmd_id & BCM_PHY_ID_MASK) == MARVELL_88X201X_PHY_ID) {
+			chip_id = MRVL88X201X_CHIP_ID;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "nxge_setup_xcvr_table: "
+			    "Chip ID  MARVELL [0x%x] for 10G xcvr", chip_id));
+		} else if ((status = nxge_mdio_read(nxgep, nxgep->xcvr_addr,
 		    BCM8704_PCS_DEV_ADDR, BCM8704_CHIP_ID_REG,
 		    &chip_id)) == NXGE_OK) {
 
@@ -2142,6 +2157,113 @@ fail:
 	return (status);
 }
 
+#define	CHK_STAT(x)	status = (x); if (status != NXGE_OK) goto fail
+
+#define	MRVL88X2011_RD(nxgep, port, d, r, p) \
+	CHK_STAT(nxge_mdio_read(nxgep, port, d, r, p))
+
+#define	MRVL88X2011_WR(nxgep, port, d, r, p) \
+	CHK_STAT(nxge_mdio_write(nxgep, port, d, r, p))
+
+
+static void
+nxge_mrvl88x2011_led_blink_rate(p_nxge_t nxgep, uint16_t rate)
+{
+	uint16_t	value;
+	uint8_t phy = nxgep->statsp->mac_stats.xcvr_portn;
+
+	if (nxge_mdio_read(nxgep, phy, MRVL_88X2011_USER_DEV2_ADDR,
+	    MRVL_88X2011_LED_BLINK_CTL, &value) == NXGE_OK) {
+		value &= ~MRVL_88X2011_LED_BLK_MASK;
+		value |= (rate << MRVL_88X2011_LED_BLK_SHIFT);
+		(void) nxge_mdio_write(nxgep, phy,
+		    MRVL_88X2011_USER_DEV2_ADDR, MRVL_88X2011_LED_BLINK_CTL,
+		    value);
+	}
+}
+
+static nxge_status_t
+nxge_mrvl88x2011_setup_lb(p_nxge_t nxgep)
+{
+	nxge_status_t	status;
+	pcs_control_t	pcs_ctl;
+	uint8_t phy = nxgep->statsp->mac_stats.xcvr_portn;
+
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV3_ADDR,
+	    MRVL_88X2011_PMA_PMD_CTL_1, &pcs_ctl.value);
+
+	if (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g)
+		pcs_ctl.bits.loopback = 1;
+	else
+		pcs_ctl.bits.loopback = 0;
+
+	MRVL88X2011_WR(nxgep, phy, MRVL_88X2011_USER_DEV3_ADDR,
+	    MRVL_88X2011_PMA_PMD_CTL_1, pcs_ctl.value);
+
+fail:
+	return (status);
+}
+
+
+static void
+nxge_mrvl88x2011_led(p_nxge_t nxgep,  uint16_t val)
+{
+	uint16_t	val2;
+	uint8_t phy = nxgep->statsp->mac_stats.xcvr_portn;
+
+	val2 = MRVL_88X2011_LED(MRVL_88X2011_LED_ACT, val);
+	val2 &= ~MRVL_88X2011_LED(MRVL_88X2011_LED_ACT,
+	    MRVL_88X2011_LED_CTL_MASK);
+	val2 |= MRVL_88X2011_LED(MRVL_88X2011_LED_ACT, val);
+
+	if (nxge_mdio_write(nxgep, phy, MRVL_88X2011_USER_DEV2_ADDR,
+	    MRVL_88X2011_LED_8_TO_11_CTL, val2) != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_mrvl88x2011_led: nxge_mdio_write failed!!"));
+	}
+}
+
+
+static nxge_status_t
+nxge_mrvl88x2011_xcvr_init(p_nxge_t nxgep)
+{
+	uint8_t		phy;
+	nxge_status_t	status;
+	uint16_t	clk;
+
+	phy = nxgep->statsp->mac_stats.xcvr_portn;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "==> nxge_mrvl88x2011_xcvr_init: port<%d> addr<0x%x>",
+	    nxgep->mac.portnum, phy));
+
+	/* Set LED functions	*/
+	nxge_mrvl88x2011_led_blink_rate(nxgep, MRVL_88X2011_LED_BLK134MS);
+	/* PCS activity */
+	nxge_mrvl88x2011_led(nxgep, MRVL_88X2011_LED_ACT);
+
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV3_ADDR,
+	    MRVL_88X2011_GEN_CTL, &clk);
+	clk |= MRVL_88X2011_ENA_XFPREFCLK;
+	MRVL88X2011_WR(nxgep, phy, MRVL_88X2011_USER_DEV3_ADDR,
+	    MRVL_88X2011_GEN_CTL, clk);
+
+	/* Set internal loopback mode if necessary */
+
+	CHK_STAT(nxge_mrvl88x2011_setup_lb(nxgep));
+
+	/* Enable PMD */
+	MRVL88X2011_WR(nxgep, phy, MRVL_88X2011_USER_DEV1_ADDR,
+	    MRVL_88X2011_10G_PMD_TX_DIS, MRVL_88X2011_ENA_PMDTX);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, " nxge_mrvl88x2011_reset: OK"));
+
+fail:
+	return (status);
+}
+
+
+
 /* Initialize the 10G Transceiver */
 
 static nxge_status_t
@@ -2179,6 +2301,11 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
 		    "Chip ID 8706 [0x%x] for 10G xcvr", nxgep->chip_id));
 		status = nxge_BCM8706_xcvr_init(nxgep);
+		break;
+	case MRVL88X201X_CHIP_ID:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		    "Chip ID 8706 [0x%x] for 10G xcvr", nxgep->chip_id));
+		status = nxge_mrvl88x2011_xcvr_init(nxgep);
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_xcvr_init: "
@@ -4614,8 +4741,11 @@ phy_check_done:
 
 			}
 		}
-
-		status = nxge_check_bcm8704_link(nxgep, &link_up);
+		if (nxgep->chip_id == MRVL88X201X_CHIP_ID) {
+			status = nxge_mrvl88x2011_link(nxgep, &link_up);
+		} else {
+			status = nxge_check_bcm8704_link(nxgep, &link_up);
+		}
 		if (status != NXGE_OK)
 			goto fail;
 		break;
@@ -5354,6 +5484,76 @@ fail:
 	return (status);
 }
 
+static nxge_status_t
+nxge_mrvl88x2011_link(p_nxge_t nxgep, boolean_t *link_up)
+{
+	uint8_t		phy;
+	nxge_status_t   status = NXGE_OK;
+	boolean_t	pma_status;
+	boolean_t	pcs_status;
+	boolean_t	xgxs_status;
+	uint16_t	val;
+
+	phy = nxgep->statsp->mac_stats.xcvr_portn;
+
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV1_ADDR,
+	    MRVL_88X2011_10G_PMD_STAT_2, &val);
+
+	*link_up = B_FALSE;
+
+	/* Check from Marvell 88X2011 if 10G link is up or down */
+
+	/* Check PMA/PMD Register: 1.0001.2 == 1 */
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV1_ADDR,
+	    MRVL_88X2011_PMA_PMD_STAT_1, &val);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_check_mrvl88x2011_link: pmd=0x%x", val));
+
+	pma_status = ((val & MRVL_88X2011_LNK_STATUS_OK) ? B_TRUE : B_FALSE);
+
+	/* Check PMC Register : 3.0001.2 == 1: read twice */
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV3_ADDR,
+	    MRVL_88X2011_PMA_PMD_STAT_1, &val);
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV3_ADDR,
+	    MRVL_88X2011_PMA_PMD_STAT_1, &val);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_check_mrvl88x2011_link: pcs=0x%x", val));
+
+	pcs_status = ((val & MRVL_88X2011_LNK_STATUS_OK) ? B_TRUE : B_FALSE);
+
+	/* Check XGXS Register : 4.0018.[0-3,12] */
+	MRVL88X2011_RD(nxgep, phy, MRVL_88X2011_USER_DEV4_ADDR,
+	    MRVL_88X2011_10G_XGXS_LANE_STAT, &val);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_check_mrvl88x2011_link: xgxs=0x%x", val));
+
+	xgxs_status = (val == (XGXS_LANE_ALIGN_STATUS | XGXS_LANE3_SYNC |
+	    XGXS_LANE2_SYNC | XGXS_LANE1_SYNC |
+	    XGXS_LANE0_SYNC | XGXS_PATTERN_TEST_ABILITY |
+	    XGXS_LANE_STAT_MAGIC)) ? B_TRUE : B_FALSE;
+
+	*link_up = (pma_status && pcs_status && xgxs_status) ?
+	    B_TRUE : B_FALSE;
+
+fail:
+
+	if (*link_up == B_FALSE) {
+		/* PCS OFF */
+		nxge_mrvl88x2011_led(nxgep, MRVL_88X2011_LED_CTL_OFF);
+	} else {
+		/* PCS Activity */
+		nxge_mrvl88x2011_led(nxgep, MRVL_88X2011_LED_CTL_PCS_ACT);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    " <== nxge_check_mrvl88x2011_link: up=%d", *link_up));
+
+	return (status);
+}
+
 nxge_status_t
 nxge_10g_link_led_on(p_nxge_t nxgep)
 {
@@ -5573,7 +5773,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		if (nxge_is_supported_phy(pma_pmd_dev_id, CLAUSE_45_TYPE)) {
 			pma_pmd_dev_fd[i] = 1;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] "
-			    "PMA/PMD dev found", i));
+			    "PMA/PMD dev %x found", i, pma_pmd_dev_id));
 			if (j < NXGE_PORTS_NEPTUNE) {
 				port_pma_pmd_dev_id[j] = pma_pmd_dev_id &
 				    BCM_PHY_ID_MASK;
@@ -5589,7 +5789,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		if (nxge_is_supported_phy(pcs_dev_id, CLAUSE_45_TYPE)) {
 			pcs_dev_fd[i] = 1;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PCS "
-			    "dev found", i));
+			    "dev %x found", i, pcs_dev_id));
 			if (pma_pmd_dev_fd[i] == 1) {
 				port_pcs_dev_id[j - 1] = pcs_dev_id &
 				    BCM_PHY_ID_MASK;
@@ -5614,7 +5814,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		if (nxge_is_supported_phy(phy_id, CLAUSE_22_TYPE)) {
 			total_phy_fd ++;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PHY ID"
-			    "found", i));
+			    "%x found", i, phy_id));
 			if (l < NXGE_PORTS_NEPTUNE) {
 				port_phy_id[l] = phy_id & BCM_PHY_ID_MASK;
 				phy_fd_arr[l] = (uint8_t)i;
@@ -5664,7 +5864,13 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			if (((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
 			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
 			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
-			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY))) {
+			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY)) ||
+			    ((port_pcs_dev_id[0] == MARVELL_88X201X_PHY_ID) &&
+			    (port_pcs_dev_id[1] == MARVELL_88X201X_PHY_ID)) ||
+			    ((port_pma_pmd_dev_id[0] ==
+			    MARVELL_88X201X_PHY_ID) &&
+			    (port_pma_pmd_dev_id[1] ==
+			    MARVELL_88X201X_PHY_ID))) {
 
 				/*
 				 * Check the first phy port address against
@@ -5674,6 +5880,13 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 
 				switch (port_fd_arr[0]) {
 				case BCM8704_NEPTUNE_PORT_ADDR_BASE:
+					/*
+					 * The Marvell case also falls into
+					 * this case as
+					 * MRVL88X2011_NEPTUNE_PORT_ADDR_BASE
+					 * == BCM8704_NEPTUNE_PORT_ADDR_BASE.
+					 * This is OK for the 2 10G case.
+					 */
 					hw_p->niu_type = NEPTUNE_2_10GF;
 					hw_p->platform_type =
 					    P_NEPTUNE_ATLAS_2PORT;
