@@ -1118,8 +1118,12 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 		 * So in this case use the first TDC, which always
 		 * belongs to the service domain and can't be shared.
 		 */
+		MUTEX_EXIT(&tx_ring_p->lock);
+
 		ring_index = 0;
 		tx_ring_p = tx_rings[group->legend[ring_index]];
+		MUTEX_ENTER(&tx_ring_p->lock);
+		tx_ring_p->tx_ring_state = TX_RING_STATE_BUSY;
 	} else {
 		/*
 		 * Otherwise, mark the TDC as BUSY: the HIO code

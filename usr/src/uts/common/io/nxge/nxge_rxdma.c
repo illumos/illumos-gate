@@ -1792,6 +1792,14 @@ nxge_rx_intr(void *arg1, void *arg2)
 	if (arg2 == NULL || (void *)ldvp->nxgep != arg2) {
 		nxgep = ldvp->nxgep;
 	}
+
+	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
+	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
+		NXGE_DEBUG_MSG((nxgep, INT_CTL,
+		    "<== nxge_rx_intr: interface not started or intialized"));
+		return (DDI_INTR_CLAIMED);
+	}
+
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		"==> nxge_rx_intr: arg2 $%p arg1 $%p",
 		nxgep, ldvp));

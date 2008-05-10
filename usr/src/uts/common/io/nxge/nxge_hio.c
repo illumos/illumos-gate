@@ -364,6 +364,7 @@ nxge_grp_dc_add(
 	nxge_hio_dc_t *dc;
 	nxge_grp_set_t *set;
 	nxge_grp_t *group;
+	nxge_status_t status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_grp_dc_add"));
 
@@ -442,11 +443,17 @@ nxge_grp_dc_add(
 
 	MUTEX_EXIT(&nhd->lock);
 
+	if ((status = (*dc->init)(nxge, channel)) != NXGE_OK) {
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+		    "nxge_grp_dc_add(%d): channel init failed", channel));
+		return (NXGE_ERROR);	
+	}
+
 	nxge_grp_dc_append(nxge, group, dc);
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_grp_dc_add"));
 
-	return ((*dc->init)(nxge, channel));
+	return ((int)status);
 }
 
 void
@@ -482,6 +489,11 @@ nxge_grp_dc_remove(
 
 	MUTEX_ENTER(&nhd->lock);
 
+	set = dc->type == VP_BOUND_TX ? &nxge->tx_set : &nxge->rx_set;
+	if (isLDOMs(nxge) && ((1 << channel) && set->shared.map)) {
+		NXGE_DC_RESET(group->map, channel);
+	}
+
 	/* Remove the DC from its group. */
 	if (nxge_grp_dc_unlink(nxge, group, channel) != dc) {
 		MUTEX_EXIT(&nhd->lock);
@@ -493,7 +505,6 @@ nxge_grp_dc_remove(
 	uninit = dc->uninit;
 	channel = dc->channel;
 
-	set = dc->type == VP_BOUND_TX ? &nxge->tx_set : &nxge->rx_set;
 	NXGE_DC_RESET(set->owned.map, channel);
 	set->owned.count--;
 
@@ -578,9 +589,9 @@ nxge_grp_dc_append(
 	}
 
 	NXGE_DC_SET(group->map, dc->channel);
-	group->count++;
 
 	nxge_grp_dc_map(group);
+	group->count++;
 
 	MUTEX_EXIT(&nxge->group_lock);
 }
@@ -636,8 +647,6 @@ nxge_grp_dc_unlink(
 		current->group = 0;
 
 		group->count--;
-		if (isLDOMs(nxge))
-			NXGE_DC_RESET(group->map, channel);
 	}
 
 	nxge_grp_dc_map(group);
@@ -1539,11 +1548,9 @@ nxge_hio_tdc_share(
 	switch (ring->tx_ring_state) {
 		int count;
 	case TX_RING_STATE_OFFLINE:
-		MUTEX_EXIT(&ring->lock);
 		break;
 	case TX_RING_STATE_IDLE:
 		ring->tx_ring_state = TX_RING_STATE_OFFLINE;
-		MUTEX_EXIT(&ring->lock);
 		break;
 	case TX_RING_STATE_BUSY:
 		/* 30 seconds */
@@ -1553,7 +1560,6 @@ nxge_hio_tdc_share(
 			MUTEX_ENTER(&ring->lock);
 			if (ring->tx_ring_state == TX_RING_STATE_IDLE) {
 				ring->tx_ring_state = TX_RING_STATE_OFFLINE;
-				MUTEX_EXIT(&ring->lock);
 				break;
 			}
 		}
@@ -1564,7 +1570,11 @@ nxge_hio_tdc_share(
 			return (-EIO);
 		}
 		break;
+	default:
+		MUTEX_EXIT(&ring->lock);
+		return (-EIO);
 	}
+	MUTEX_EXIT(&ring->lock);
 
 	if (nxge_intr_remove(nxge, VP_BOUND_TX, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
@@ -1576,12 +1586,12 @@ nxge_hio_tdc_share(
 	/* Disable TxDMA A.9.6.10 */
 	(void) nxge_txdma_channel_disable(nxge, channel);
 
-	/* Soft Reset TxDMA A.9.6.2 */
-	nxge_grp_dc_remove(nxge, VP_BOUND_TX, channel);
-
 	/* The SD is sharing this channel. */
 	NXGE_DC_SET(set->shared.map, channel);
 	set->shared.count++;
+
+	/* Soft Reset TxDMA A.9.6.2 */
+	nxge_grp_dc_remove(nxge, VP_BOUND_TX, channel);
 
 	/*
 	 * Initialize the DC-specific FZC control registers.
@@ -1668,12 +1678,12 @@ nxge_hio_rdc_share(
 		    "Failed to disable RxDMA channel %d", channel));
 	}
 
-	// Assert RST: RXDMA_CFIG1[30] = 1
-	nxge_grp_dc_remove(nxge, VP_BOUND_RX, channel);
-
 	/* The SD is sharing this channel. */
 	NXGE_DC_SET(set->shared.map, channel);
 	set->shared.count++;
+
+	// Assert RST: RXDMA_CFIG1[30] = 1
+	nxge_grp_dc_remove(nxge, VP_BOUND_RX, channel);
 
 	/*
 	 * We have to reconfigure the RDC table(s)
@@ -2046,6 +2056,7 @@ nxge_hio_dc_unshare(
 	/* Unlink the channel from its group. */
 	/* -------------------------------------------------- */
 	group = (type == MAC_RING_TYPE_TX) ? &vr->tx_group : &vr->rx_group;
+	NXGE_DC_RESET(group->map, channel);
 	if ((dc = nxge_grp_dc_unlink(nxge, group, channel)) == 0) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nx_hio_dc_unshare(%d) failed", channel));
