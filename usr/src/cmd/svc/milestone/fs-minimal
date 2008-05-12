@@ -70,7 +70,7 @@ if [ $? != 0 ] ; then
 fi
 
 if [ "$rootiszfs" = 1 ] ; then
-	/sbin/zfs list -rH -o mountpoint -s mountpoint $be | \
+	/sbin/zfs list -rH -o mountpoint -s mountpoint -t filesystem $be | \
 	    while read mountp ; do
 		if [ "x$mountp" != "x" -a "$mountp" != "legacy" ] ; then
 			mounted $mountp - zfs < /etc/mnttab  && continue

@@ -2257,7 +2257,6 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		 * Getting the precise mountpoint can be tricky.
 		 *
 		 *  - for 'none' or 'legacy', return those values.
-		 *  - for default mountpoints, construct it as /zfs/<dataset>
 		 *  - for inherited mountpoints, we want to take everything
 		 *    after our ancestor and append it to the inherited value.
 		 *
@@ -2267,15 +2266,28 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		root = zhp->zfs_root;
 		str = getprop_string(zhp, prop, &source);
 
-		if (str[0] == '\0') {
-			(void) snprintf(propbuf, proplen, "%s/zfs/%s",
-			    root, zhp->zfs_name);
-		} else if (str[0] == '/') {
+		if (str[0] == '/') {
 			const char *relpath = zhp->zfs_name + strlen(source);
+
 
 			if (relpath[0] == '/')
 				relpath++;
-			if (str[1] == '\0')
+
+			/*
+			 * Special case an alternate root of '/'. This will
+			 * avoid having multiple leading slashes in the
+			 * mountpoint path.
+			 */
+			if (strcmp(root, "/") == 0)
+				root++;
+
+			/*
+			 * If the mountpoint is '/' then skip over this
+			 * if we are obtaining either an alternate root or
+			 * an inherited mountpoint.
+			 */
+			if (str[1] == '\0' && (root[0] != '\0' ||
+			    relpath[0] != '\0'))
 				str++;
 
 			if (relpath[0] == '\0')
