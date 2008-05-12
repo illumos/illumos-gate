@@ -19091,7 +19091,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 			    (scsi_sense_key(sense_buf) ==
 			    KEY_ILLEGAL_REQUEST)) {
 				/* Ignore Illegal Request error */
-				if (cdb->cdb_un.tag|SD_SYNC_NV_BIT) {
+				if (cdb->cdb_un.tag&SD_SYNC_NV_BIT) {
 					mutex_enter(SD_MUTEX(un));
 					un->un_f_sync_nv_supported = FALSE;
 					mutex_exit(SD_MUTEX(un));
