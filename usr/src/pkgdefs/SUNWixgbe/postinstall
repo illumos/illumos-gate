@@ -1,0 +1,135 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Function: check_add_drv()
+#
+# This function will check if the module has an entry in etc/name_to_major
+# If not simply calls add_drv with the arguments given. If there is
+# such an entry in name_to_major file, it adds entries in driver_aliases
+# driver_classes and minor_perm if necessary.
+# The syntax of this function is the same as add_drv. 
+
+check_add_drv()
+{
+	if [ "$BASEDIR" = "" ]
+	then
+		BASEDIR=/  
+	fi
+	alias=""
+	class=""
+	ADD_ALIAS=0
+	ADD_CLASS=0
+	ADD_MINOR=0
+	OPTIND=1
+	IS_NET_DRIVER=0
+
+	cmd="add_drv"
+
+	NO_CMD=
+	while getopts i:b:m:c:N  opt
+	do
+		case $opt in
+			N )	NO_CMD=1;;
+			i )	ADD_ALIAS=1	
+				alias=$OPTARG
+				cmd=$cmd" -i '$alias'"
+				;;
+			m )	ADD_MINOR=1
+				minor=$OPTARG
+				cmd=$cmd" -m '$minor'"
+				;;
+			c)	ADD_CLASS=1
+				class=$OPTARG
+				cmd=$cmd" -c $class"
+				;;
+			b)	BASEDIR=$OPTARG
+				cmd=$cmd" -b $BASEDIR"
+				;;
+			\?) 	echo "check_add_drv can not handle this option"
+				return
+				;;
+			esac
+	done 
+	shift `/usr/bin/expr $OPTIND - 1`
+	
+	drvname=$1
+
+	cmd=$cmd" "$drvname
+
+	drvname=`echo $drvname | /usr/bin/sed 's;.*/;;g'`
+
+	/usr/bin/grep "^$drvname[ 	]" $BASEDIR/etc/name_to_major >  /dev/null 2>&1
+
+	if [ "$NO_CMD" = "" -a $? -ne 0 ] 
+	then
+		eval $cmd
+	else	
+		# entry already in name_to_major, add alias, class, minorperm
+		# if necessary
+		if [ $ADD_ALIAS = 1 ]	
+		then
+			for i in $alias
+			do
+				/usr/bin/egrep "^$drvname[ 	]+$i" $BASEDIR/etc/driver_aliases>/dev/null 2>&1
+				if [ $? -ne 0 ]
+				then
+					echo "$drvname $i" >> $BASEDIR/etc/driver_aliases	
+				fi
+			done
+		fi
+
+		if [ $ADD_CLASS = 1 ]
+		then
+			/usr/bin/egrep "^$drvname[ 	]+$class( |	|$)" $BASEDIR/etc/driver_classes > /dev/null 2>&1
+			if [ $? -ne 0 ]
+			then 
+				echo "$drvname\t$class" >> $BASEDIR/etc/driver_classes
+			fi
+		fi
+
+		if [ $ADD_MINOR = 1 ]
+		then
+			/usr/bin/grep "^$drvname:" $BASEDIR/etc/minor_perm > /dev/null 2>&1
+			if [ $? -ne 0 ]
+			then 
+				minorentry="$drvname:$minor"
+				echo $minorentry >> $BASEDIR/etc/minor_perm
+			fi
+		fi
+
+	fi
+
+
+}
+
+check_add_drv -i		\
+	'"pciex8086,10c6"
+	"pciex8086,10c7"'	\
+	-b "$BASEDIR" ixgbe

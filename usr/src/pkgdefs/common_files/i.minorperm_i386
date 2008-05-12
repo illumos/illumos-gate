@@ -105,6 +105,7 @@ profile:profile		0600 root sys 0644 root sys /dev/dtrace/provider/profile
 sdt:sdt			0600 root sys 0644 root sys /dev/dtrace/provider/sdt
 systrace:systrace	0600 root sys 0644 root sys /dev/dtrace/provider/systrace
 clone:bge		0600 root sys 0666 root sys	/dev/bge
+clone:ixgbe		0600 root sys 0666 root sys	/dev/ixgbe
 clone:rge		0600 root sys 0666 root sys	/dev/rge
 clone:xge		0600 root sys 0666 root sys	/dev/xge
 clone:nge		0600 root sys 0666 root sys	/dev/nge
@@ -124,6 +125,7 @@ clone:afe		0600 root sys 0666 root sys	/dev/afe
 clone:dmfe		0600 root sys 0666 root sys	/dev/dmfe
 clone:mxfe		0600 root sys 0666 root sys	/dev/mxfe
 bge:*			0600 root sys 0666 root sys	/dev/bge*
+ixgbe:*			0600 root sys 0666 root sys	/dev/ixgbe*
 rge:*			0600 root sys 0666 root sys	/dev/rge*
 xge:*			0600 root sys 0666 root sys	/dev/xge*
 nge:*			0600 root sys 0666 root sys	/dev/nge*
@@ -261,6 +263,7 @@ sctp6:*
 vni:*
 cpuid:self
 clone:bge
+clone:ixgbe
 clone:rge
 clone:xge
 clone:nge
@@ -281,6 +284,7 @@ clone:afe
 clone:dmfe
 clone:mxfe
 bge:*
+ixgbe:*
 rge:*
 xge:*
 nge:*

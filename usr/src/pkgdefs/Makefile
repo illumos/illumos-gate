@@ -239,6 +239,7 @@ COMMON_SUBDIRS= \
 	SUNWibsdpu \
 	SUNWibsdp \
 	SUNWigb \
+	SUNWixgbe \
 	SUNWintgige \
 	SUNWiotu  \
 	SUNWioth  \

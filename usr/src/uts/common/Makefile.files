@@ -1576,6 +1576,16 @@ IGB_OBJS =	igb_82575.o igb_api.o igb_mac.o igb_manage.o \
 		igb_ndd.o igb_rx.o igb_stat.o igb_tx.o
 
 #
+#       Intel 10GbE PCIE NIC driver module
+#
+IXGBE_OBJS =    ixgbe_82598.o ixgbe_api.o ixgbe_common.o        \
+                ixgbe_phy.o                                     \
+                ixgbe_buf.o ixgbe_debug.o ixgbe_gld.o           \
+                ixgbe_log.o ixgbe_main.o ixgbe_ndd.o            \
+                ixgbe_osdep.o ixgbe_rx.o ixgbe_stat.o           \
+                ixgbe_tx.o
+
+#
 #	NIU 10G/1G driver module
 #
 NXGE_OBJS =	nxge_mac.o nxge_ipp.o nxge_rxdma.o 		\

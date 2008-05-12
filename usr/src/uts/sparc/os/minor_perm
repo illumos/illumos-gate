@@ -150,6 +150,7 @@ zfs:zfs 0666 root sys
 scsi_vhci:* 0666 root sys
 kssl:* 0666 root sys
 clone:bge 0666 root sys
+clone:ixgbe 0666 root sys
 clone:rge 0666 root sys
 clone:xge 0666 root sys
 clone:nge 0666 root sys
@@ -164,6 +165,7 @@ clone:mxfe 0666 root sys
 clone:rtls 0666 root sys
 clone:vnic 0666 root sys
 bge:* 0666 root sys
+ixgbe:* 0666 root sys
 rge:* 0666 root sys
 xge:* 0666 root sys
 nge:* 0666 root sys

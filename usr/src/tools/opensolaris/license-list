@@ -132,6 +132,7 @@ usr/src/uts/common/io/ipw/THIRDPARTYLICENSE
 usr/src/uts/common/io/ipw/fw-ipw2100/LICENSE
 usr/src/uts/common/io/iwi/THIRDPARTYLICENSE
 usr/src/uts/common/io/iwi/fw-ipw2200/LICENSE
+usr/src/uts/common/io/ixgbe/THIRDPARTYLICENSE
 usr/src/uts/common/io/mega_sas/THIRDPARTYLICENSE
 usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE
 usr/src/uts/common/io/pcan/THIRDPARTYLICENSE
