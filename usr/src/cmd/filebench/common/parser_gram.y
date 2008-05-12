@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 %{
@@ -2277,10 +2279,8 @@ parser_inner_flowop_define(threadflow_t *thread, flowop_t *comp0_flow,
 		char fullname[MAXPATHLEN];
 
 		/* create composite_name.name for new flowop */
-		(void) strlcpy(fullname, comp_mstr_flow->fo_name, MAXPATHLEN);
-		(void) strlcat(fullname, ".", MAXPATHLEN);
-		(void) strlcat(fullname, inner_flowtype->fo_name,
-		    MAXPATHLEN);
+		snprintf(fullname, MAXPATHLEN, "%s.%s",
+		    comp_mstr_flow->fo_name, inner_flowtype->fo_name);
 
 		if ((inner_flowop = flowop_define(thread, fullname,
 		    inner_flowtype, &comp_mstr_flow->fo_comp_fops,
@@ -2918,7 +2918,7 @@ parser_help(cmd_t *cmd)
 	} else {
 		filebench_log(LOG_INFO,
 		    "load <personality> (ls "
-		    "/usr/benchmarks/filebench/workloads for list)");
+		    FILEBENCHDIR "/workloads for list)");
 	}
 }
 
@@ -3858,7 +3858,7 @@ alloc_list()
 
 #define	USAGE1	\
 "Usage:\n" \
-"%s: interpret f script and generate file workload\n" \
+"go_filebench: interpret f script and generate file workload\n" \
 "Options:\n" \
 "   [-h] Display verbose help\n" \
 "   [-p] Disable opening /proc to set uacct to enable truss\n"
@@ -3878,7 +3878,7 @@ alloc_list()
 
 #define	PARSER_EXAMPLE \
 "Example:\n\n" \
-"#!/usr/bin/filebench -f\n" \
+"#!" FILEBENCHDIR "/bin/go_filebench -f\n" \
 "\n" \
 "define file name=bigfile,path=bigfile,size=1g,prealloc,reuse\n" \
 "define process name=randomizer\n" \

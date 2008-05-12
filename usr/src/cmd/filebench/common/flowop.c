@@ -584,6 +584,7 @@ flowop_start(threadflow_t *threadflow)
 void
 flowop_init(void)
 {
+	(void) pthread_mutex_init(&controlstats_lock, ipc_mutexattr());
 	flowoplib_init();
 }
 

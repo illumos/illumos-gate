@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 #ifndef _FB_FILEBENCH_H
@@ -32,10 +34,18 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
-#include "vars.h"
+#ifndef HAVE_BOOLEAN_T
+typedef enum { B_FALSE, B_TRUE } boolean_t;
+#endif
+
+#ifndef HAVE_U_LONGLONG_T
+typedef unsigned long long u_longlong_t;
+#endif
+
+#include "procflow.h"
 #include "misc.h"
-#include "flowop.h"
 #include "ipc.h"
 
 #ifdef HAVE_STDINT_H
@@ -109,7 +119,7 @@ void filebench_shutdown(int error);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.3.0"
+#define	FILEBENCH_VERSION	"1.3.1"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024

@@ -515,7 +515,7 @@ stats_snap(void)
 
 	flowop = filebench_shm->shm_flowoplist;
 	str = malloc(1048576);
-	*str = NULL;
+	*str = '\0';
 	(void) strcpy(str, "Per-Operation Breakdown\n");
 	while (flowop) {
 		char line[1024];

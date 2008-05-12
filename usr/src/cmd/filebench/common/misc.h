@@ -37,6 +37,8 @@
 
 #include <sys/times.h>
 
+#include "vars.h"
+
 #ifdef	__cplusplus
 extern "C" {
 #endif

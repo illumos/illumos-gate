@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,8 +33,9 @@
 #include <sys/lwp.h>
 #endif
 #include <signal.h>
-#include "threadflow.h"
+
 #include "filebench.h"
+#include "threadflow.h"
 #include "flowop.h"
 #include "ipc.h"
 
@@ -273,6 +276,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 		threadflow_kill(threadflow, wait_cnt);
 		flowop_delete_all(&threadflow->tf_thrd_fops);
 		*threadlist = threadflow->tf_next;
+		(void) pthread_mutex_destroy(&threadflow->tf_lock);
 		ipc_free(FILEBENCH_THREADFLOW, (char *)threadflow);
 		return (0);
 	}
@@ -293,6 +297,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 			    entry->tf_next->tf_instance);
 			threadflow_kill(entry->tf_next, wait_cnt);
 			flowop_delete_all(&entry->tf_next->tf_thrd_fops);
+			(void) pthread_mutex_destroy(&threadflow->tf_lock);
 			ipc_free(FILEBENCH_THREADFLOW, (char *)threadflow);
 			entry->tf_next = entry->tf_next->tf_next;
 			return (0);
@@ -421,6 +426,7 @@ threadflow_define_common(procflow_t *procflow, char *name,
 	threadflow->tf_instance = instance;
 	(void) strcpy(threadflow->tf_name, name);
 	threadflow->tf_process = procflow;
+	(void) pthread_mutex_init(&threadflow->tf_lock, ipc_mutexattr());
 
 	filebench_log(LOG_DEBUG_IMPL, "Defining thread %s-%d",
 	    name, instance);

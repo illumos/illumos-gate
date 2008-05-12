@@ -29,6 +29,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "config.h"
+
+#include "filebench.h"
 #include "vars.h"
 
 #ifdef	__cplusplus

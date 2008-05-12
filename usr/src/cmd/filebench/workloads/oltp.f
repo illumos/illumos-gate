@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,7 +65,7 @@ define process name=dbwr,instances=$ndbwriters
   thread name=dbwr,memsize=$memperthread,useism
   {
     flowop aiowrite name=dbwrite-a,filesetname=datafiles,
-        iosize=$iosize,workingset=$workingset,random,iters=100,opennext,directio=$directio
+        iosize=$iosize,workingset=$workingset,random,iters=100,opennext,directio=$directio,dsync
     flowop hog name=dbwr-hog,value=10000
     flowop semblock name=dbwr-block,value=1000,highwater=2000
     flowop aiowait name=dbwr-aiowait
@@ -86,7 +86,7 @@ define process name=shadow,instances=$nshadows
   }
 }
 
-echo "OLTP Version 2.1 personality successfully loaded"
+echo "OLTP Version 2.2 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage " "
 usage "       set \$filesize=<size>   defaults to $filesize, n.b. there are ten files of this size"

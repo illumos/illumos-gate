@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,12 +32,12 @@
 #include <string.h>
 #include <errno.h>
 
+#include "filebench.h"
 #include "vars.h"
 #include "misc.h"
 #include "utils.h"
 #include "stats.h"
 #include "eventgen.h"
-#include "filebench.h"
 #include "fb_random.h"
 
 static var_t *var_find_dynamic(char *name);

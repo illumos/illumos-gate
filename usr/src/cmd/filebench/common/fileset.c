@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,8 +34,9 @@
 #include <math.h>
 #include <libgen.h>
 #include <sys/mman.h>
-#include "fileset.h"
+
 #include "filebench.h"
+#include "fileset.h"
 #include "gamma_dist.h"
 
 /*
@@ -303,8 +306,11 @@ fileset_alloc_file(filesetentry_t *entry)
 			filebench_log(LOG_INFO,
 			    "Truncating & re-using file %s", path);
 
-			(void) ftruncate64(fd,
-			    (off64_t)entry->fse_size);
+#ifdef HAVE_FTRUNCATE64
+			(void) ftruncate64(fd, (off64_t)entry->fse_size);
+#else
+			(void) ftruncate(fd, (off_t)entry->fse_size);
+#endif
 
 			if (!avd_get_bool(entry->fse_fileset->fs_cached))
 				(void) fileset_freemem(fd,
@@ -630,10 +636,8 @@ fileset_create(fileset_t *fileset)
 		} else {
 			/* we are re-using */
 			reusing = 1;
-			filebench_log(LOG_VERBOSE,
-			    "Re-using %s %s on %s file system.",
-			    fileset_entity_name(fileset),
-			    fileset_name, sb.st_fstype);
+			filebench_log(LOG_VERBOSE, "Re-using %s %s.",
+			    fileset_entity_name(fileset), fileset_name);
 		}
 	}
 	(void) mkdir(path, 0755);

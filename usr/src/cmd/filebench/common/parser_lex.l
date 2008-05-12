@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 %{
@@ -38,10 +40,10 @@
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
+
+#include "filebench.h"
 #include "parsertypes.h"
 #include "utils.h"
-#include "filebench.h"
-
 #include "parser_gram.h"
 
 int lex_lineno = 1;		/* line-number for error reporting */

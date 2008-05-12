@@ -19,8 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2008 Denis Cheng
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +36,8 @@
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
+
+#include "filebench.h"
 #include "utils.h"
 #include "parsertypes.h"
 
