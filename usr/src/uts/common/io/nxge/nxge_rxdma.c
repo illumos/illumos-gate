@@ -68,7 +68,7 @@ extern nxge_rxbuf_threshold_t nxge_rx_threshold_hi;
 extern nxge_rxbuf_type_t nxge_rx_buf_size_type;
 extern nxge_rxbuf_threshold_t nxge_rx_threshold_lo;
 
-extern uint32_t	nxge_cksum_enable;
+extern uint32_t	nxge_cksum_offload;
 
 static nxge_status_t nxge_map_rxdma(p_nxge_t, int);
 static void nxge_unmap_rxdma(p_nxge_t, int);
@@ -2659,17 +2659,20 @@ nxge_receive_packet(p_nxge_t nxgep,
 	 */
 	if (is_valid && !multi) {
 		/*
-		 * If the checksum flag nxge_chksum_enable
-		 * is enabled, TCP and UDP packets can be sent
+		 * If the checksum flag nxge_chksum_offload
+		 * is 1, TCP and UDP packets can be sent
 		 * up with good checksum. If the checksum flag
-		 * is not set, checksum reporting will apply to
+		 * is set to 0, checksum reporting will apply to
 		 * TCP packets only (workaround for a hardware bug).
+		 * If the checksum flag nxge_cksum_offload is
+		 * greater than 1, both TCP and UDP packets
+		 * will not be reported its hardware checksum results.
 		 */
-		if (nxge_cksum_enable) {
+		if (nxge_cksum_offload == 1) {
 			is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP ||
 				pkt_type == RCR_PKT_IS_UDP) ?
 					B_TRUE: B_FALSE);
-		} else {
+		} else if (!nxge_cksum_offload) {
 			/* TCP checksum only. */
 			is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP) ?
 					B_TRUE: B_FALSE);

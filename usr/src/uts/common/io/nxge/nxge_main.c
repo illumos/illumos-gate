@@ -47,7 +47,44 @@ uint32_t	nxge_msi_enable = 2;
 uint32_t	nxge_msi_enable = 1;
 #endif
 
-uint32_t	nxge_cksum_enable = 0;
+/*
+ * Software workaround for the hardware
+ * checksum bugs that affect packet transmission
+ * and receive:
+ *
+ * Usage of nxge_cksum_offload:
+ *
+ *  (1) nxge_cksum_offload = 0 (default):
+ *	- transmits packets:
+ *	  TCP: uses the hardware checksum feature.
+ *	  UDP: driver will compute the software checksum
+ *	       based on the partial checksum computed
+ *	       by the IP layer.
+ *	- receives packets
+ *	  TCP: marks packets checksum flags based on hardware result.
+ *	  UDP: will not mark checksum flags.
+ *
+ *  (2) nxge_cksum_offload = 1:
+ *	- transmit packets:
+ *	  TCP/UDP: uses the hardware checksum feature.
+ *	- receives packets
+ *	  TCP/UDP: marks packet checksum flags based on hardware result.
+ *
+ *  (3) nxge_cksum_offload = 2:
+ *	- The driver will not register its checksum capability.
+ *	  Checksum for both TCP and UDP will be computed
+ *	  by the stack.
+ *	- The software LSO is not allowed in this case.
+ *
+ *  (4) nxge_cksum_offload > 2:
+ *	- Will be treated as it is set to 2
+ *	  (stack will compute the checksum).
+ *
+ *  (5) If the hardware bug is fixed, this workaround
+ *	needs to be updated accordingly to reflect
+ *	the new hardware revision.
+ */
+uint32_t	nxge_cksum_offload = 0;
 
 /*
  * Globals: tunable parameters (/etc/system or adb)
@@ -4344,8 +4381,8 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM:
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-		    "==> nxge_m_getcapab: checksum %d", nxge_cksum_enable));
-		if (nxge_cksum_enable) {
+		    "==> nxge_m_getcapab: checksum %d", nxge_cksum_offload));
+		if (nxge_cksum_offload <= 1) {
 			*txflags = HCKSUM_INET_PARTIAL;
 		}
 		break;
@@ -4363,7 +4400,7 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 		mmacp->maddr_naddr = nxgep->nxge_mmac_info.num_mmac;
 		mmacp->maddr_naddrfree = nxgep->nxge_mmac_info.naddrfree;
-		mmacp->maddr_flag = 0; /* 0 is requried by PSARC2006/265 */
+		mmacp->maddr_flag = 0; /* 0 is required by PSARC2006/265 */
 		/*
 		 * maddr_handle is driver's private data, passed back to
 		 * entry point functions as arg.
@@ -4382,11 +4419,14 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mac_capab_lso_t *cap_lso = cap_data;
 
 		if (nxgep->soft_lso_enable) {
-			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
-			if (nxge_lso_max > NXGE_LSO_MAXLEN) {
-				nxge_lso_max = NXGE_LSO_MAXLEN;
+			if (nxge_cksum_offload <= 1) {
+				cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+				if (nxge_lso_max > NXGE_LSO_MAXLEN) {
+					nxge_lso_max = NXGE_LSO_MAXLEN;
+				}
+				cap_lso->lso_basic_tcp_ipv4.lso_max =
+				    nxge_lso_max;
 			}
-			cap_lso->lso_basic_tcp_ipv4.lso_max = nxge_lso_max;
 			break;
 		} else {
 			return (B_FALSE);

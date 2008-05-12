@@ -881,6 +881,10 @@ typedef union _txrng_use_t {
 #define	TX_PKT_PKT_TYPE_UDP			0x02
 #define	TX_PKT_PKT_TYPE_SCTP			0x03
 
+#define	TX_CKSUM_EN_PKT_TYPE_TCP	(1ull << TX_PKT_HEADER_PKT_TYPE_SHIFT)
+#define	TX_CKSUM_EN_PKT_TYPE_UDP	(2ull << TX_PKT_HEADER_PKT_TYPE_SHIFT)
+#define	TX_CKSUM_EN_PKT_TYPE_NOOP	(0ull << TX_PKT_HEADER_PKT_TYPE_SHIFT)
+
 typedef union _tx_pkt_header_t {
 	uint64_t value;
 	struct {

@@ -281,7 +281,7 @@ int nxge_tx_pkt_nmblocks(p_mblk_t, int *);
 boolean_t nxge_txdma_reclaim(p_nxge_t, p_tx_ring_t, int);
 
 void nxge_fill_tx_hdr(p_mblk_t, boolean_t, boolean_t,
-	int, uint8_t, p_tx_pkt_hdr_all_t);
+	int, uint8_t, p_tx_pkt_hdr_all_t, t_uscalar_t, t_uscalar_t);
 
 nxge_status_t nxge_txdma_hw_mode(p_nxge_t, boolean_t);
 void nxge_hw_start_tx(p_nxge_t);

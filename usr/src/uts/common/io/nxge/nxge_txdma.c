@@ -44,6 +44,7 @@ extern uint32_t 	nxge_bcopy_thresh;
 extern uint32_t 	nxge_dvma_thresh;
 extern uint32_t 	nxge_dma_stream_thresh;
 extern dma_method_t 	nxge_force_dma;
+extern uint32_t		nxge_cksum_offload;
 
 /* Device register access attributes for PIO.  */
 extern ddi_device_acc_attr_t nxge_dev_reg_acc_attr;
@@ -426,7 +427,9 @@ nxge_enable_txdma_channel(p_nxge_t nxgep,
 void
 nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		boolean_t l4_cksum, int pkt_len, uint8_t npads,
-		p_tx_pkt_hdr_all_t pkthdrp)
+		p_tx_pkt_hdr_all_t pkthdrp,
+		t_uscalar_t start_offset,
+		t_uscalar_t stuff_offset)
 {
 	p_tx_pkt_header_t	hdrp;
 	p_mblk_t 		nmp;
@@ -459,8 +462,7 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		goto fill_tx_header_done;
 	}
 
-	tmp = (uint64_t)npads;
-	hdrp->value |= (tmp << TX_PKT_HEADER_PAD_SHIFT);
+	hdrp->value |= (((uint64_t)npads) << TX_PKT_HEADER_PAD_SHIFT);
 
 	/*
 	 * mp is the original data packet (does not include the
@@ -618,25 +620,82 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	switch (ipproto) {
 	case IPPROTO_TCP:
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"==> nxge_fill_tx_hdr: TCP (cksum flag %d)", l4_cksum));
+		    "==> nxge_fill_tx_hdr: TCP (cksum flag %d)", l4_cksum));
 		if (l4_cksum) {
-			tmp = 1ull;
-			hdrp->value |= (tmp << TX_PKT_HEADER_PKT_TYPE_SHIFT);
+			hdrp->value |= TX_CKSUM_EN_PKT_TYPE_TCP;
+			hdrp->value |=
+			    (((uint64_t)(start_offset >> 1)) <<
+			    TX_PKT_HEADER_L4START_SHIFT);
+			hdrp->value |=
+			    (((uint64_t)(stuff_offset >> 1)) <<
+			    TX_PKT_HEADER_L4STUFF_SHIFT);
+
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_tx_pkt_hdr_init: TCP CKSUM"
-				"value 0x%llx", hdrp->value));
+			    "==> nxge_tx_pkt_hdr_init: TCP CKSUM "
+			    "value 0x%llx", hdrp->value));
 		}
 
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_hdr_init: TCP "
-			"value 0x%llx", hdrp->value));
+		    "value 0x%llx", hdrp->value));
 		break;
 
 	case IPPROTO_UDP:
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_fill_tx_hdr: UDP"));
 		if (l4_cksum) {
-			tmp = 0x2ull;
-			hdrp->value |= (tmp << TX_PKT_HEADER_PKT_TYPE_SHIFT);
+			if (!nxge_cksum_offload) {
+				uint16_t	*up;
+				uint16_t	cksum;
+				t_uscalar_t	stuff_len;
+
+				/*
+				 * The checksum field has the
+				 * partial checksum.
+				 * IP_CSUM() macro calls ip_cksum() which
+				 * can add in the partial checksum.
+				 */
+				cksum = IP_CSUM(mp, start_offset, 0);
+				stuff_len = stuff_offset;
+				nmp = mp;
+				mblk_len = MBLKL(nmp);
+				while ((nmp != NULL) &&
+				    (mblk_len < stuff_len)) {
+					stuff_len -= mblk_len;
+					nmp = nmp->b_cont;
+				}
+				ASSERT(nmp);
+				up = (uint16_t *)(nmp->b_rptr + stuff_len);
+
+				*up = cksum;
+				hdrp->value &= ~TX_CKSUM_EN_PKT_TYPE_UDP;
+				NXGE_DEBUG_MSG((NULL, TX_CTL,
+				    "==> nxge_tx_pkt_hdr_init: UDP offset %d "
+				    "use sw cksum "
+				    "write to $%p cksum 0x%x content up 0x%x",
+				    stuff_len,
+				    up,
+				    cksum,
+				    *up));
+			} else {
+				/* Hardware will compute the full checksum */
+				hdrp->value |= TX_CKSUM_EN_PKT_TYPE_UDP;
+				hdrp->value |=
+				    (((uint64_t)(start_offset >> 1)) <<
+				    TX_PKT_HEADER_L4START_SHIFT);
+				hdrp->value |=
+				    (((uint64_t)(stuff_offset >> 1)) <<
+				    TX_PKT_HEADER_L4STUFF_SHIFT);
+
+				NXGE_DEBUG_MSG((NULL, TX_CTL,
+				    "==> nxge_tx_pkt_hdr_init: UDP offset %d "
+				    " use partial checksum "
+				    "cksum 0x%x ",
+				    "value 0x%llx",
+				    stuff_offset,
+				    IP_CSUM(mp, start_offset, 0),
+				    hdrp->value));
+			}
 		}
+
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
 			"==> nxge_tx_pkt_hdr_init: UDP"
 			"value 0x%llx", hdrp->value));

@@ -77,6 +77,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	tx_desc_t		tx_desc, *tmp_desc_p;
 	tx_desc_t		sop_tx_desc, *sop_tx_desc_p;
 	p_tx_pkt_header_t	hdrp;
+	tx_pkt_header_t		tmp_hdrp;
 	p_tx_pkt_hdr_all_t	pkthdrp;
 	uint8_t			npads = 0;
 	uint64_t 		dma_ioaddr;
@@ -111,7 +112,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	t_uscalar_t 		cksum_flags = 0;
 	boolean_t		cksum_on = B_FALSE;
 	uint32_t		boff = 0;
-	uint64_t		tot_xfer_len = 0, tmp_len = 0;
+	uint64_t		tot_xfer_len = 0;
 	boolean_t		header_set = B_FALSE;
 #ifdef NXGE_DEBUG
 	p_tx_desc_t 		tx_desc_ring_pp;
@@ -220,6 +221,13 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 			mp, MBLKL(mp), cksum_flags));
 		cksum_on = B_TRUE;
 	}
+
+	pkthdrp = (p_tx_pkt_hdr_all_t)&tmp_hdrp;
+	pkthdrp->reserved = 0;
+	tmp_hdrp.value = 0;
+	nxge_fill_tx_hdr(mp, B_FALSE, cksum_on,
+	    0, 0, pkthdrp,
+	    start_offset, stuff_offset);
 
 	lso_again = B_FALSE;
 	lso_ngathers = 0;
@@ -735,9 +743,7 @@ nxge_start_control_header_only:
 	pkthdrp = (p_tx_pkt_hdr_all_t)hdrp;
 	pkthdrp->reserved = 0;
 	hdrp->value = 0;
-
-	(void) nxge_fill_tx_hdr(mp, B_FALSE, cksum_on,
-		(pkt_len - TX_PKT_HEADER_SIZE), npads, pkthdrp);
+	bcopy(&tmp_hdrp, hdrp, sizeof (tx_pkt_header_t));
 
 	if (pkt_len > NXGE_MTU_DEFAULT_MAX) {
 		tdc_stats->tx_jumbo_pkts++;
@@ -767,27 +773,6 @@ nxge_start_control_header_only:
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: cksum_flags 0x%x ",
 		cksum_flags));
-	if (cksum_flags & HCK_PARTIALCKSUM) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_start: cksum_flags 0x%x (partial checksum) ",
-			cksum_flags));
-		cksum_on = B_TRUE;
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_start: from IP cksum_flags 0x%x "
-			"(partial checksum) "
-			"start_offset %d stuff_offset %d",
-			cksum_flags, start_offset, stuff_offset));
-		tmp_len = (uint64_t)(start_offset >> 1);
-		hdrp->value |= (tmp_len << TX_PKT_HEADER_L4START_SHIFT);
-		tmp_len = (uint64_t)(stuff_offset >> 1);
-		hdrp->value |= (tmp_len << TX_PKT_HEADER_L4STUFF_SHIFT);
-
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_start: from IP cksum_flags 0x%x "
-			"(partial checksum) "
-			"after SHIFT start_offset %d stuff_offset %d",
-			cksum_flags, start_offset, stuff_offset));
-	}
 	{
 		uint64_t	tmp_len;
 
