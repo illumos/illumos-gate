@@ -91,6 +91,7 @@ static void (*SSL_load_error_strings_fn)() = NULL;
 static void (*ERR_free_strings_fn)() = NULL;
 static void (*CRYPTO_set_locking_callback_fn)() = NULL;
 static void (*CRYPTO_set_id_callback_fn)() = NULL;
+static void (*OPENSSL_free_fn)() = NULL;
 
 static void solaris_locking_callback(int, int, char *, int);
 static unsigned long solaris_thread_id(void);
@@ -153,6 +154,11 @@ libssl_load()
 		CRYPTO_set_id_callback_fn = (void(*)())dlsym(dldesc,
 		    "CRYPTO_set_id_callback");
 		if (CRYPTO_set_id_callback_fn == NULL)
+			goto libssl_err;
+
+		OPENSSL_free_fn = (void(*)())dlsym(dldesc,
+		    "OPENSSL_free");
+		if (OPENSSL_free_fn == NULL)
 			goto libssl_err;
 
 		thread_setup();
@@ -234,6 +240,7 @@ print_asn1_name(FILE *file, const unsigned char *buf, long buflen)
 			(void) X509_NAME_print_ex_fp_fn(file, x509, 0,
 			    (ASN1_STRFLGS_RFC2253 | ASN1_STRFLGS_ESC_QUOTE |
 			    XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_FN_SN));
+			OPENSSL_free_fn(p);
 			(void) fprintf(file, "\n");
 		} else {
 			char errbuf[80];
