@@ -4168,8 +4168,6 @@ spa_sync(spa_t *spa, uint64_t txg)
 	bplist_t *bpl = &spa->spa_sync_bplist;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
-	vdev_t *svd[SPA_DVAS_PER_BP];
-	int svdcount = 0;
 	dmu_tx_t *tx;
 	int dirty_vdevs;
 
@@ -4254,6 +4252,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	 * then sync the uberblock to all vdevs.
 	 */
 	if (list_is_empty(&spa->spa_dirty_list)) {
+		vdev_t *svd[SPA_DVAS_PER_BP];
+		int svdcount = 0;
 		int children = rvd->vdev_children;
 		int c0 = spa_get_random(children);
 		int c;
@@ -4266,11 +4266,10 @@ spa_sync(spa_t *spa, uint64_t txg)
 			if (svdcount == SPA_DVAS_PER_BP)
 				break;
 		}
+		vdev_config_sync(svd, svdcount, txg);
+	} else {
+		vdev_config_sync(rvd->vdev_child, rvd->vdev_children, txg);
 	}
-	if (svdcount == 0 || vdev_config_sync(svd, svdcount, txg) != 0)
-		VERIFY3U(vdev_config_sync(rvd->vdev_child,
-		    rvd->vdev_children, txg), ==, 0);
-
 	dmu_tx_commit(tx);
 
 	/*

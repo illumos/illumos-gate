@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +108,7 @@ extern void vdev_queue_io_done(zio_t *zio);
 
 extern void vdev_config_dirty(vdev_t *vd);
 extern void vdev_config_clean(vdev_t *vd);
-extern int vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg);
+extern void vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg);
 
 extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
     boolean_t getstats, boolean_t isspare, boolean_t isl2cache);
@@ -118,6 +118,7 @@ extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
  */
 struct uberblock;
 extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
+extern int vdev_label_number(uint64_t psise, uint64_t offset);
 extern nvlist_t *vdev_label_read_config(vdev_t *vd);
 extern void vdev_uberblock_load(zio_t *zio, vdev_t *vd, struct uberblock *ub);
 

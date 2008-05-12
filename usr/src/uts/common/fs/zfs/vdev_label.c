@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,22 @@ vdev_label_offset(uint64_t psize, int l, uint64_t offset)
 
 	return (offset + l * sizeof (vdev_label_t) + (l < VDEV_LABELS / 2 ?
 	    0 : psize - VDEV_LABELS * sizeof (vdev_label_t)));
+}
+
+/*
+ * Returns back the vdev label associated with the passed in offset.
+ */
+int
+vdev_label_number(uint64_t psize, uint64_t offset)
+{
+	int l;
+
+	if (offset >= psize - VDEV_LABEL_END_SIZE) {
+		offset -= psize - VDEV_LABEL_END_SIZE;
+		offset += (VDEV_LABELS / 2) * sizeof (vdev_label_t);
+	}
+	l = offset / sizeof (vdev_label_t);
+	return (l < VDEV_LABELS ? l : -1);
 }
 
 static void
@@ -809,19 +825,50 @@ vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd)
 	zio_buf_free(ubbuf, VDEV_UBERBLOCK_SIZE(vd));
 }
 
+static void
+vdev_uberblock_sync_list_done(zio_t *zio)
+{
+	uint64_t *good_writes = zio->io_private;
+
+	if (*good_writes == 0)
+		zio->io_error = EIO;
+}
+
 int
 vdev_uberblock_sync_list(vdev_t **svd, int svdcount, uberblock_t *ub, int flags)
 {
 	spa_t *spa = svd[0]->vdev_spa;
 	int v;
-	zio_t *zio;
+	zio_t *zio, *nio;
 	uint64_t good_writes = 0;
+	int io_flags = flags;
 
-	zio = zio_root(spa, NULL, &good_writes, flags);
+	/*
+	 * If we've been asked to update all the vdevs then we change
+	 * our flags to ZIO_FLAG_MUSTSUCCEED so that the pipeline can
+	 * handle error should all update fail.
+	 */
+	if (svdcount == spa->spa_root_vdev->vdev_children)
+		io_flags &= ~ZIO_FLAG_CANFAIL;
 
+	/*
+	 * We rely on the value of good_writes and the root I/O to determine
+	 * how a complete failure is handled. In the event that the root is a
+	 * ZIO_FLAG_MUSTSUCCED, then the pipeline will block this I/O if we
+	 * were unable to update any uberblock. Once the I/O is blocked the
+	 * pipeline will retry it when the error is cleared. Unfortunately,
+	 * the pipeline does not have the complete I/O tree so it will be
+	 * unable to retry the actual uberblock update. Instead we rely on
+	 * the value of good_writes to return the failed status to the caller
+	 * which will retry on error and thus resubmit the complete I/O
+	 * tree.
+	 */
+	zio = zio_root(spa, NULL, NULL, io_flags);
+	nio = zio_null(zio, spa, vdev_uberblock_sync_list_done, &good_writes,
+	    flags);
 	for (v = 0; v < svdcount; v++)
-		vdev_uberblock_sync(zio, ub, svd[v]);
-
+		vdev_uberblock_sync(nio, ub, svd[v]);
+	zio_nowait(nio);
 	(void) zio_wait(zio);
 
 	/*
@@ -916,24 +963,34 @@ vdev_label_sync_list(spa_t *spa, int l, int flags, uint64_t txg)
 {
 	list_t *dl = &spa->spa_dirty_list;
 	vdev_t *vd;
-	zio_t *zio;
+	zio_t *zio, *nio;
 	int error;
+	int io_flags = flags & ~ZIO_FLAG_CANFAIL;
 
 	/*
-	 * Write the new labels to disk.
+	 * The root I/O for all label updates must succeed and we track
+	 * the error returned back from the null I/O to determine if we
+	 * need to reissue the I/O tree from scratch. If we are unable
+	 * to update any leaf vdev associated with a dirty top-level vdev,
+	 * then the pipeline will either suspend or panic when the root I/O
+	 * is issued. If the error is cleared, then the pipleine will retry
+	 * the root I/O. Unfortunately we've lost the entire I/O tree so we
+	 * return back the original error to the caller and allow the caller
+	 * to call use again so that we can build the I/O tree from scratch.
 	 */
-	zio = zio_root(spa, NULL, NULL, flags);
+	zio = zio_root(spa, NULL, NULL, io_flags);
+	nio = zio_null(zio, spa, NULL, NULL, flags);
 
 	for (vd = list_head(dl); vd != NULL; vd = list_next(dl, vd)) {
 		uint64_t *good_writes = kmem_zalloc(sizeof (uint64_t),
 		    KM_SLEEP);
-		zio_t *vio = zio_null(zio, spa, vdev_label_sync_top_done,
+		zio_t *vio = zio_null(nio, spa, vdev_label_sync_top_done,
 		    good_writes, flags);
 		vdev_label_sync(vio, vd, l, txg);
 		zio_nowait(vio);
 	}
-
-	error = zio_wait(zio);
+	error = zio_wait(nio);
+	(void) zio_wait(zio);
 
 	/*
 	 * Flush the new labels to disk.
@@ -959,14 +1016,13 @@ vdev_label_sync_list(spa_t *spa, int l, int flags, uint64_t txg)
  * Moreover, vdev_config_sync() is designed to be idempotent: if it fails
  * at any time, you can just call it again, and it will resume its work.
  */
-int
+void
 vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg)
 {
 	spa_t *spa = svd[0]->vdev_spa;
 	uberblock_t *ub = &spa->spa_uberblock;
 	vdev_t *vd;
 	zio_t *zio;
-	int error;
 	int flags = ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL;
 
 	ASSERT(ub->ub_txg <= txg);
@@ -980,10 +1036,10 @@ vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg)
 	if (ub->ub_txg < txg &&
 	    uberblock_update(ub, spa->spa_root_vdev, txg) == B_FALSE &&
 	    list_is_empty(&spa->spa_dirty_list))
-		return (0);
+		return;
 
 	if (txg > spa_freeze_txg(spa))
-		return (0);
+		return;
 
 	ASSERT(txg <= spa->spa_final_txg);
 
@@ -1009,12 +1065,16 @@ vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg)
 	 * which have not yet been touched, will still be valid.  We flush
 	 * the new labels to disk to ensure that all even-label updates
 	 * are committed to stable storage before the uberblock update.
+	 * Failure to update any of the labels will invoke the 'failmode'
+	 * code path. Thus we must retry the entire I/O tree once the error
+	 * is cleared and we ar resumed.
 	 */
-	if ((error = vdev_label_sync_list(spa, 0, flags, txg)) != 0)
-		return (error);
+	while (vdev_label_sync_list(spa, 0, flags, txg) != 0)
+		;
 
 	/*
-	 * Sync the uberblocks to all vdevs in svd[].
+	 * Sync the uberblocks to all vdevs in svd[]. If we are unable
+	 * to do so, then we attempt to sync out to all top-level vdevs.
 	 * If the system dies in the middle of this step, there are two cases
 	 * to consider, and the on-disk state is consistent either way:
 	 *
@@ -1027,9 +1087,18 @@ vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg)
 	 *	will be the newest, and the even labels (which had all
 	 *	been successfully committed) will be valid with respect
 	 *	to the new uberblocks.
+	 *
+	 * In addition, if we have failed to update all the uberblocks then
+	 * we will follow the 'failmode' code path. We must retry the entire
+	 * I/O tree if we are resumed.
 	 */
-	if ((error = vdev_uberblock_sync_list(svd, svdcount, ub, flags)) != 0)
-		return (error);
+	if (vdev_uberblock_sync_list(svd, svdcount, ub, flags) != 0) {
+		vdev_t *rvd = spa->spa_root_vdev;
+
+		while (vdev_uberblock_sync_list(rvd->vdev_child,
+		    rvd->vdev_children, ub, flags))
+			;
+	}
 
 	/*
 	 * Sync out odd labels for every dirty vdev.  If the system dies
@@ -1040,6 +1109,10 @@ vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg)
 	 * all labels will be brought up to date.  We flush the new labels
 	 * to disk to ensure that all odd-label updates are committed to
 	 * stable storage before the next transaction group begins.
+	 * Failure to update any of the labels will invoke the 'failmode'
+	 * code path. Thus we must retry the entire I/O tree once the error
+	 * is cleared and we are resumed.
 	 */
-	return (vdev_label_sync_list(spa, 1, flags, txg));
+	while (vdev_label_sync_list(spa, 1, flags, txg) != 0)
+		;
 }
