@@ -3878,6 +3878,13 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 				    rv);
 				goto done;
 			}
+			/*
+			 * Mark this entry as free so that we will not resubmit
+			 * this "done" request again, if we were to use the same
+			 * backup_dring again in future. This could happen when
+			 * a reset happens while processing the backup_dring.
+			 */
+			curr_ldep->is_free = B_TRUE;
 			processed++;
 		}
 
