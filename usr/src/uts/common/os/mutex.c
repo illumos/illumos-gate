@@ -577,7 +577,39 @@ mutex_init(kmutex_t *mp, char *name, kmutex_type_t type, void *ibc)
 		LOCK_INIT_HELD(&lp->m_spin.m_dummylock);
 		lp->m_spin.m_minspl = (int)(intptr_t)ibc;
 	} else {
+#ifdef MUTEX_ALIGN
+		static int misalign_cnt = 0;
+
+		if (((uintptr_t)lp & (uintptr_t)(MUTEX_ALIGN - 1)) &&
+		    (misalign_cnt < MUTEX_ALIGN_WARNINGS)) {
+			/*
+			 * The mutex is not aligned and may cross a cache line.
+			 * This is not supported and may cause a panic.
+			 * Show a warning that the mutex is not aligned
+			 * and attempt to identify the origin.
+			 * Unaligned mutexes are not (supposed to be)
+			 * possible on SPARC.
+			 */
+			char *funcname;
+			ulong_t offset = 0;
+
+			funcname = modgetsymname((uintptr_t)caller(), &offset);
+			cmn_err(CE_WARN, "mutex_init: %p is not %d byte "
+			    "aligned; caller %s+%lx in module %s. "
+			    "This is unsupported and may cause a panic. "
+			    "Please report this to the kernel module supplier.",
+			    lp, MUTEX_ALIGN,
+			    funcname ? funcname : "unknown", offset,
+			    mod_containing_pc(caller()));
+			misalign_cnt++;
+			if (misalign_cnt >= MUTEX_ALIGN_WARNINGS) {
+				cmn_err(CE_WARN, "mutex_init: further unaligned"
+				    " mutex warnings will be suppressed.");
+			}
+		}
+#endif	/* MUTEX_ALIGN */
 		ASSERT(type != MUTEX_SPIN);
+
 		MUTEX_SET_TYPE(lp, MUTEX_ADAPTIVE);
 		MUTEX_CLEAR_LOCK_AND_WAITERS(lp);
 	}

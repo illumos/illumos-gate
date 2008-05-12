@@ -73,6 +73,9 @@ typedef union mutex_impl {
 
 #define	m_owner	m_adaptive._m_owner
 
+#define	MUTEX_ALIGN	_LONG_ALIGNMENT
+#define	MUTEX_ALIGN_WARNINGS	10	/* num of warnings to issue */
+
 #define	MUTEX_WAITERS		0x1
 #define	MUTEX_DEAD		0x6
 #define	MUTEX_THREAD		(-0x8)
