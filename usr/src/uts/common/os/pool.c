@@ -1534,15 +1534,22 @@ skip:
 
 #ifdef DEBUG
 	/*
-	 * All processes in the array should have PBWAIT set, and none should
-	 * be in the critical section.  Even though p_poolflag is protected by
-	 * the p_lock, these assertions should be stable across the dropping of
-	 * p_lock.
+	 * All processes in the array should have PBWAIT set, and none
+	 * should be in the critical section. Thus, although p_poolflag
+	 * and p_poolcnt are protected by p_lock, their ASSERTions below
+	 * should be stable without it. procinset(), however, ASSERTs that
+	 * the p_lock is held upon entry.
 	 */
 	for (pp = procs; (p = *pp) != NULL; pp++) {
+		int in_set;
+
+		mutex_enter(&p->p_lock);
+		in_set = procinset(p, &set);
+		mutex_exit(&p->p_lock);
+
+		ASSERT(in_set);
 		ASSERT(p->p_poolflag & PBWAIT);
 		ASSERT(p->p_poolcnt == 0);
-		ASSERT(procinset(p, &set));
 	}
 #endif
 

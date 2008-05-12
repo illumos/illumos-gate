@@ -539,11 +539,16 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			 * setting them, we want to make sure init is not
 			 * excluded if it is in the set.
 			 */
-			if (initpp != NULL &&
-			    procinset(initpp, &procset) &&
-			    (retthreadp != NULL) &&
-			    ttoproc(retthreadp) != initpp)
-				(void) proccmp(initpp, &pcmpargs);
+			if (initpp != NULL && retthreadp != NULL &&
+			    ttoproc(retthreadp) != initpp) {
+				mutex_enter(&initpp->p_lock);
+				if (procinset(initpp, &procset)) {
+					mutex_exit(&initpp->p_lock);
+					(void) proccmp(initpp, &pcmpargs);
+				} else {
+					mutex_exit(&initpp->p_lock);
+				}
+			}
 
 			/*
 			 * If dotoprocs returned success it found at least
@@ -1039,9 +1044,15 @@ donice(procset_t *procset, pcnice_t *pcnice)
 		proc_t *initpp;
 
 		mutex_enter(&pidlock);
-		initpp = prfind(P_INITPID);
-		if (initpp != NULL && procinset(initpp, procset))
-			err = setprocnice(initpp, pcnice);
+		if ((initpp = prfind(P_INITPID)) != NULL) {
+			mutex_enter(&initpp->p_lock);
+			if (procinset(initpp, procset)) {
+				mutex_exit(&initpp->p_lock);
+				err = setprocnice(initpp, pcnice);
+			} else {
+				mutex_exit(&initpp->p_lock);
+			}
+		}
 		mutex_exit(&pidlock);
 	}
 
@@ -1206,9 +1217,15 @@ doprio(procset_t *procset, pcprio_t *pcprio)
 		proc_t *initpp;
 
 		mutex_enter(&pidlock);
-		initpp = prfind(P_INITPID);
-		if (initpp != NULL && procinset(initpp, procset))
-			err = setprocprio(initpp, pcprio);
+		if ((initpp = prfind(P_INITPID)) != NULL) {
+			mutex_enter(&initpp->p_lock);
+			if (procinset(initpp, procset)) {
+				mutex_exit(&initpp->p_lock);
+				err = setprocprio(initpp, pcprio);
+			} else {
+				mutex_exit(&initpp->p_lock);
+			}
+		}
 		mutex_exit(&pidlock);
 	}
 

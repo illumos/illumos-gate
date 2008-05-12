@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,10 +168,20 @@ dotoprocs(procset_t *psp, int (*funcp)(), char *arg)
 		 */
 		if (!HASZONEACCESS(curproc, prp->p_zone->zone_id))
 			continue;
-		if (prp->p_stat == SIDL || prp->p_stat == SZOMB ||
-		    prp->p_tlist == NULL || prp->p_flag & SSYS)
+
+		/*
+		 * Ignore this process if it's coming or going,
+		 * if it's a system process or if it's not in
+		 * the given procset_t.
+		 */
+		if (prp->p_stat == SIDL || prp->p_stat == SZOMB)
 			continue;
-		if (procinset(prp, psp)) {
+
+		mutex_enter(&prp->p_lock);
+		if (prp->p_flag & SSYS || procinset(prp, psp) == 0) {
+			mutex_exit(&prp->p_lock);
+		} else {
+			mutex_exit(&prp->p_lock);
 			nfound++;
 			lastprp = prp;
 			if (prp != proc_init) {
@@ -258,10 +268,12 @@ checkprocset(procset_t *psp)
 }
 
 /*
- * procinset returns 1 if the process pointed to
- * by pp is in the process set specified by psp, otherwise 0 is returned.
- * The caller should check that the process is not exiting and is not
- * in the SYS scheduling class.
+ * procinset returns 1 if the process pointed to by pp is in the process
+ * set specified by psp, otherwise 0 is returned. A process that is
+ * exiting, by which we mean that its p_tlist is NULL, cannot belong
+ * to any set; pp's p_lock must be held across the call to this function.
+ * The caller should ensure that the process does not belong to the SYS
+ * scheduling class.
  *
  * This function expects to be called with a valid procset_t.
  * The set should be checked using checkprocset() before calling
@@ -275,6 +287,11 @@ procinset(proc_t *pp, procset_t *psp)
 	int	lwplinproc = 0;
 	int	lwprinproc = 0;
 	kthread_t	*tp = proctot(pp);
+
+	ASSERT(MUTEX_HELD(&pp->p_lock));
+
+	if (tp == NULL)
+		return (0);
 
 	switch (psp->p_lidtype) {
 
@@ -721,9 +738,9 @@ lwpinset(proc_t *pp, procset_t *psp, kthread_t *tp, int *done)
 
 	case POP_XOR:
 		if (((loperand || lwplinset) &&
-					!(lwprinset || roperand)) ||
+		    !(lwprinset || roperand)) ||
 		    ((roperand || lwprinset) &&
-					!(lwplinset || loperand)))
+		    !(lwplinset || loperand)))
 			return (1);
 		else
 			return (0);
@@ -748,22 +765,22 @@ boolean_t
 cur_inset_only(procset_t *psp)
 {
 	if (((psp->p_lidtype == P_PID &&
-		(psp->p_lid == P_MYID ||
-		psp->p_lid == ttoproc(curthread)->p_pid)) ||
-		((psp->p_lidtype == P_LWPID) &&
-		(psp->p_lid == P_MYID ||
-		psp->p_lid == curthread->t_tid))) &&
-		psp->p_op == POP_AND && psp->p_ridtype == P_ALL)
-			return (B_TRUE);
+	    (psp->p_lid == P_MYID ||
+	    psp->p_lid == ttoproc(curthread)->p_pid)) ||
+	    ((psp->p_lidtype == P_LWPID) &&
+	    (psp->p_lid == P_MYID ||
+	    psp->p_lid == curthread->t_tid))) &&
+	    psp->p_op == POP_AND && psp->p_ridtype == P_ALL)
+		return (B_TRUE);
 
 	if (((psp->p_ridtype == P_PID &&
-		(psp->p_rid == P_MYID ||
-		psp->p_rid == ttoproc(curthread)->p_pid)) ||
-		((psp->p_ridtype == P_LWPID) &&
-		(psp->p_rid == P_MYID ||
-		psp->p_rid == curthread->t_tid))) &&
-		psp->p_op == POP_AND && psp->p_lidtype == P_ALL)
-			return (B_TRUE);
+	    (psp->p_rid == P_MYID ||
+	    psp->p_rid == ttoproc(curthread)->p_pid)) ||
+	    ((psp->p_ridtype == P_LWPID) &&
+	    (psp->p_rid == P_MYID ||
+	    psp->p_rid == curthread->t_tid))) &&
+	    psp->p_op == POP_AND && psp->p_lidtype == P_ALL)
+		return (B_TRUE);
 
 	return (B_FALSE);
 }
@@ -844,13 +861,13 @@ getlwpptr(id_t id)
 	proc_t		*p;
 	kthread_t	*t;
 
+	ASSERT(MUTEX_HELD(&(ttoproc(curthread)->p_lock)));
+
 	if (id == P_MYID)
 		t = curthread;
 	else {
 		p = ttoproc(curthread);
-		mutex_enter(&p->p_lock);
 		t = idtot(p, id);
-		mutex_exit(&p->p_lock);
 	}
 
 	return (t);
@@ -903,12 +920,9 @@ dotolwp(procset_t *psp, int (*funcp)(), char *arg)
 
 	pp = ttoproc(curthread);
 
-	if (procinset(pp, psp)) {
-		mutex_exit(&pidlock);
-		return (0);
-	}
 	mutex_enter(&pp->p_lock);
-	if ((tp = pp->p_tlist) == NULL) {
+	if (procinset(pp, psp) ||
+	    (tp = pp->p_tlist) == NULL) {
 		mutex_exit(&pp->p_lock);
 		mutex_exit(&pidlock);
 		return (0);
