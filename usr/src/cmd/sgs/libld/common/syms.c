@@ -951,8 +951,8 @@ ld_sym_spec(Ofl_desc *ofl)
 void
 ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 {
-	ofl_flag_t	oflags = ofl->ofl_flags, oflags1 = ofl->ofl_flags1;
-	Sym	*sym = sdp->sd_sym;
+	ofl_flag_t	oflags = ofl->ofl_flags;
+	Sym		*sym = sdp->sd_sym;
 
 	if ((sdp->sd_ref == REF_REL_NEED) &&
 	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
@@ -976,15 +976,14 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 * Indicate that the symbol has been reduced as it may be
 		 * necessary to print these symbols later.
 		 */
-		if (((oflags & FLG_OF_AUTOLCL) ||
-		    (oflags1 & FLG_OF1_AUTOELM)) &&
+		if ((oflags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM)) &&
 		    ((sdp->sd_flags1 & MSK_SY1_NOAUTO) == 0)) {
 			if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) {
 				sdp->sd_flags |= FLG_SY_REDUCED;
 				sdp->sd_flags1 |= FLG_SY1_HIDDEN;
 			}
 
-			if (oflags1 & (FLG_OF1_REDLSYM | FLG_OF1_AUTOELM)) {
+			if (oflags & (FLG_OF_REDLSYM | FLG_OF_AUTOELM)) {
 				sdp->sd_flags1 |= FLG_SY1_ELIM;
 				sym->st_other = STV_ELIMINATE |
 				    (sym->st_other & ~MSK_SYM_VISIBILITY);
@@ -2136,7 +2135,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * (and hence symbol resolution) is complete during
 			 * sym_validate().
 			 */
-			if (!(ofl->ofl_flags1 & FLG_OF1_REDLSYM)) {
+			if (!(ofl->ofl_flags & FLG_OF_REDLSYM)) {
 				ofl->ofl_locscnt++;
 
 				if ((((sdp->sd_flags & FLG_SY_REGSYM) == 0) ||

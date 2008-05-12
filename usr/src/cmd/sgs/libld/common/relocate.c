@@ -287,8 +287,7 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 		if ((rlocal == TRUE) &&
 		    ((tsdp->sd_flags1 & FLG_SY1_HIDDEN) ||
 		    (ELF_ST_BIND(tsdp->sd_sym->st_info) != STB_GLOBAL) ||
-		    (((ofl->ofl_flags & FLG_OF_AUTOLCL) ||
-		    (ofl->ofl_flags1 & FLG_OF1_AUTOELM)) &&
+		    ((ofl->ofl_flags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM)) &&
 		    ((tsdp->sd_flags1 & MSK_SY1_NOAUTO) == 0))))
 			return (tsdp);
 
@@ -1014,7 +1013,7 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 * to be against section symbols, since section symbols are the only
 	 * local symbols which will be added to the .symtab.
 	 */
-	if (local && (((ofl->ofl_flags1 & FLG_OF1_REDLSYM) &&
+	if (local && (((ofl->ofl_flags & FLG_OF_REDLSYM) &&
 	    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL)) ||
 	    ((sdp->sd_flags1 & FLG_SY1_ELIM) &&
 	    (ofl->ofl_flags & FLG_OF_PROCRED)))) {

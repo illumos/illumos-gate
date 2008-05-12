@@ -50,7 +50,7 @@ remove_local(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 	/* LINTED - only used for assert() */
 	int	err;
 
-	if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) == 0) {
+	if ((ofl->ofl_flags & FLG_OF_REDLSYM) == 0) {
 		ofl->ofl_locscnt--;
 
 		err = st_delstring(ofl->ofl_strtab, sdp->sd_name);

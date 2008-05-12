@@ -1339,3 +1339,6 @@ Bugid   Risk Synopsis
 6686889 ld.so.1 regression - bad pointer created with 6509323 integration
 6695681 ldd(1) crashes when run from a chrooted environment
 6516212 usr/src/cmd/sgs/libelf warlock targets should be fixed or abandoned
+6678310 using LD_AUDIT, ld.so.1 calls shared library's .init before library is
+	fully relocated (link-editor components only)
+6699594 The ld command has a problem handling 'protected' mapfile keyword.

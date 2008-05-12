@@ -692,11 +692,11 @@ update_osym(Ofl_desc *ofl)
 			 * used during relocation.
 			 */
 			enter_in_symtab = symtab &&
-			    (!(ofl->ofl_flags1 & FLG_OF1_REDLSYM) ||
+			    (!(ofl->ofl_flags & FLG_OF_REDLSYM) ||
 			    (sdp->sd_psyminfo));
 			enter_in_ldynsym = ldynsym && sdp->sd_name &&
 			    ldynsym_symtype[type] &&
-			    !(ofl->ofl_flags1 & FLG_OF1_REDLSYM);
+			    !(ofl->ofl_flags & FLG_OF_REDLSYM);
 			_symshndx = 0;
 			if (enter_in_symtab) {
 				if (!dynsym)
@@ -3017,7 +3017,7 @@ update_move(Ofl_desc *ofl)
 				Boolean 	isredloc = FALSE;
 
 				if ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) &&
-				    (ofl->ofl_flags1 & FLG_OF1_REDLSYM))
+				    (ofl->ofl_flags & FLG_OF_REDLSYM))
 					isredloc = TRUE;
 
 				if (isredloc && !(sdp->sd_psyminfo)) {

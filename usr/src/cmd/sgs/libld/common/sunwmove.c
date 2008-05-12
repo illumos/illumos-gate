@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -443,7 +443,7 @@ ld_sunwmove_preprocess(Ofl_desc *ofl)
 				 * local symbol used for partial initialization
 				 * is kept.
 				 */
-				if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) &&
+				if ((ofl->ofl_flags & FLG_OF_REDLSYM) &&
 				    (ELF_ST_BIND(sdp->sd_sym->st_info) ==
 				    STB_LOCAL) &&
 				    (ELF_ST_TYPE(sdp->sd_sym->st_info) ==

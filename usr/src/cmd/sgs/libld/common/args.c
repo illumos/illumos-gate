@@ -243,7 +243,7 @@ check_flags(Ofl_desc * ofl, int argc)
 		ofl->ofl_flags |= FLG_OF_AUTOLCL;
 
 	if (Beflag)
-		ofl->ofl_flags1 |= FLG_OF1_AUTOELM;
+		ofl->ofl_flags |= FLG_OF_AUTOELM;
 
 	if (Blflag && Beflag) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
@@ -583,8 +583,9 @@ check_flags(Ofl_desc * ofl, int argc)
 	 * (even those that reference section symbols) are processed within
 	 * the object being built.
 	 */
-	if ((ofl->ofl_flags &
-	    (FLG_OF_MAPSYMB | FLG_OF_MAPGLOB)) == FLG_OF_MAPSYMB) {
+	if (((ofl->ofl_flags &
+	    (FLG_OF_MAPSYMB | FLG_OF_MAPGLOB)) == FLG_OF_MAPSYMB) &&
+	    (ofl->ofl_flags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM))) {
 		ofl->ofl_flags |= FLG_OF_SYMBOLIC;
 		ofl->ofl_dtflags |= DF_SYMBOLIC;
 	}
@@ -1063,7 +1064,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 				ofl->ofl_flags |= FLG_OF_MULDEFS;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_REDLOCSYM)) == 0) {
-				ofl->ofl_flags1 |= FLG_OF1_REDLSYM;
+				ofl->ofl_flags |= FLG_OF_REDLSYM;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_INITFIRST)) == 0) {
 				ofl->ofl_dtflags_1 |= DF_1_INITFIRST;

@@ -309,8 +309,7 @@ struct ofl_desc {
 #define	FLG_OF_VERDEF	0x00400000	/* record version definitions */
 #define	FLG_OF_VERNEED	0x00800000	/* record version dependencies */
 #define	FLG_OF_NOVERSEC 0x01000000	/* don't record version sections */
-#define	FLG_OF_AUTOLCL	0x02000000	/* automatically reduce unspecified */
-					/*	global symbols to locals */
+
 #define	FLG_OF_PROCRED	0x04000000	/* process any symbol reductions by */
 					/*	effecting the symbol table */
 					/*	output and relocations */
@@ -325,6 +324,11 @@ struct ofl_desc {
 #define	FLG_OF_COMREL	0x000400000000	/* -z combreloc set, which enables */
 					/*	DT_RELACNT tracking, */
 #define	FLG_OF_NOCOMREL	0x000800000000	/* -z nocombreloc set */
+#define	FLG_OF_AUTOLCL	0x001000000000	/* automatically reduce unspecified */
+					/*	global symbols to locals */
+#define	FLG_OF_AUTOELM	0x002000000000	/* automatically eliminate  */
+					/*	unspecified global symbols */
+#define	FLG_OF_REDLSYM	0x004000000000	/* reduce local symbols */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -344,9 +348,7 @@ struct ofl_desc {
 #define	FLG_OF1_OVHWCAP	0x00000040	/* override any input hardware or */
 #define	FLG_OF1_OVSFCAP	0x00000080	/*	software capabilities */
 #define	FLG_OF1_RELDYN	0x00000100	/* process .dynamic in rel obj */
-#define	FLG_OF1_REDLSYM	0x00000200	/* reduce local symbols */
-#define	FLG_OF1_AUTOELM	0x00000400	/* automatically eliminate  */
-					/*	unspecified global symbols */
+
 #define	FLG_OF1_IGNORE	0x00000800	/* ignore unused dependencies */
 
 #define	FLG_OF1_TEXTOFF 0x00002000	/* text relocations are ok */

@@ -1705,8 +1705,8 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					ofl->ofl_flags |=
 					    (FLG_OF_VERDEF | FLG_OF_AUTOLCL);
 				else if (scope == FLG_SCOPE_ELIM) {
-					ofl->ofl_flags |= FLG_OF_VERDEF;
-					ofl->ofl_flags1 |= FLG_OF1_AUTOELM;
+					ofl->ofl_flags |=
+					    (FLG_OF_VERDEF | FLG_OF_AUTOELM);
 				}
 				continue;
 			}
@@ -1895,7 +1895,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				/*
 				 * This symbol needs to be reduced to local.
 				 */
-				if (ofl->ofl_flags1 & FLG_OF1_REDLSYM) {
+				if (ofl->ofl_flags & FLG_OF_REDLSYM) {
 					sdp->sd_flags1 |=
 					    (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
 					sdp->sd_sym->st_other = STV_ELIMINATE;
