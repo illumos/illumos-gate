@@ -34,6 +34,7 @@
 #include <sys/varargs.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
+#include "idmap_impl.h"
 
 /* Initialization values for pids/rids: */
 
@@ -41,12 +42,7 @@
 #define	UNDEFINED_GID (gid_t)-1
 #define	UNDEFINED_RID (idmap_rid_t)-1;
 
-/* is_user values */
-
-#define	I_YES 1
-#define	I_NO 0
-#define	I_UNKNOWN -1
-
+#define	CHECK_NULL(s)	(s != NULL ? s : "null")
 /*
  * used in do_show for the type of argument, which can be winname,
  * unixname, uid, gid, sid or not given at all:
@@ -70,11 +66,12 @@
 #define	IS_USER		0x001	/* mask for user types */
 #define	IS_GROUP	0x002	/* mask for group types */
 
+#define	TYPE_INVALID    0x1000	/* Invalid input */
+#define	TYPE_AUTO	0xaaa	/* Autodetection required */
 
 /* Identity type strings */
 
 #define	ID_WINNAME	"winname"
-#define	ID_UNIXNAME	"unixname"
 #define	ID_UNIXUSER	"unixuser"
 #define	ID_UNIXGROUP	"unixgroup"
 #define	ID_WINUSER	"winuser"
@@ -85,6 +82,8 @@
 #define	ID_UID	"uid"
 #define	ID_GID	"gid"
 
+#define	ID_UNKNOWN	"unknown"
+
 #define	INHIBITED(str)	(str == NULL || *str == 0 || strcmp(str, "\"\"") == 0)
 
 typedef struct {
@@ -94,7 +93,6 @@ typedef struct {
 
 id_code_t identity2code[] = {
 	{ID_WINNAME,	TYPE_WN},
-	{ID_UNIXNAME,	TYPE_UN},
 	{ID_UNIXUSER,	TYPE_UU},
 	{ID_UNIXGROUP,	TYPE_UG},
 	{ID_WINUSER,	TYPE_WU},
@@ -112,11 +110,13 @@ id_code_t identity2code[] = {
 #define	f_FLAG	'f'
 #define	t_FLAG	't'
 #define	d_FLAG	'd'
+#define	D_FLAG	'D'
 #define	F_FLAG	'F'
 #define	a_FLAG	'a'
 #define	n_FLAG	'n'
 #define	c_FLAG	'c'
 #define	v_FLAG	'v'
+#define	j_FLAG	'j'
 
 
 /* used in the function do_import */
@@ -232,6 +232,9 @@ static int do_remove_name_mapping(flag_t *f, int argc, char **argv,
 static int do_exit(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_export(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_help(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
+static int do_set_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
+static int do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
+static int do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 
 /* Command names and their hanlers to be passed to idmap_engine */
 
@@ -280,6 +283,21 @@ static cmd_ops_t commands[] = {
 		"help",
 		"",
 		do_help
+	},
+	{
+		"set-namemap",
+		"a:(authentication)D:(bindDN)j:(passwd-file)",
+		do_set_namemap
+	},
+	{
+		"get-namemap",
+		"",
+		do_get_namemap
+	},
+	{
+		"unset-namemap",
+		"a:(authentication)D:(bindDN)j:(passwd-file):",
+		do_unset_namemap
 	}
 };
 
@@ -405,16 +423,21 @@ help()
 	(void) fprintf(stderr,
 	    "idmap\n"
 	    "idmap -f command-file\n"
-	    "idmap show [-c] [-v] identity [targettype]\n"
-	    "idmap dump [-n] [-v]\n"
 	    "idmap add [-d] name1 name2\n"
+	    "idmap dump [-n] [-v]\n"
+	    "idmap export [-f file] format\n"
+	    "idmap get-namemap name\n"
+	    "idmap help\n"
+	    "idmap import [-F] [-f file] format\n"
+	    "idmap list\n"
 	    "idmap remove -a\n"
 	    "idmap remove [-f|-t] name\n"
 	    "idmap remove [-d] name1 name2\n"
-	    "idmap list\n"
-	    "idmap import [-F] [-f file] format\n"
-	    "idmap export [-f file] format\n"
-	    "idmap help\n");
+	    "idmap set-namemap [-a authenticationMethod] [-D bindDN] "
+	    "[-j passwdfile] name1 name2\n"
+	    "idmap show [-c] [-v] identity [targettype]\n"
+	    "idmap unset-namemap [-a authenticationMethod] [-D bindDN]"
+	    "[-j passwdfile] name\n");
 }
 
 /* The handler for the "help" command. */
@@ -433,7 +456,7 @@ init_batch()
 	idmap_stat stat;
 
 	stat = idmap_init(&handle);
-	if (stat < 0) {
+	if (stat != IDMAP_SUCCESS) {
 		print_error(NULL,
 		    gettext("Connection not established (%s)\n"),
 		    idmap_stat2string(NULL, stat));
@@ -473,7 +496,7 @@ init_udt_batch()
 		return (-1);
 
 	stat = idmap_udt_create(handle, &udt);
-	if (stat < 0) {
+	if (stat != IDMAP_SUCCESS) {
 		print_error(NULL,
 		    gettext("Error initiating transaction (%s)"),
 		    idmap_stat2string(handle, stat));
@@ -702,10 +725,10 @@ sid_format(name_mapping_t *nm)
 	char *typestring;
 
 	switch (nm->is_wuser) {
-	case I_YES:
+	case IDMAP_YES:
 		typestring = ID_USID;
 		break;
-	case I_NO:
+	case IDMAP_NO:
 		typestring = ID_GSID;
 		break;
 	default:
@@ -737,7 +760,7 @@ pid_format(uid_t from, int is_user)
 	if (to == NULL)
 		return (NULL);
 
-	(void) snprintf(to, 16, "%s:%u", is_user ? ID_UID : ID_GID, from);
+	(void) snprintf(to, len, "%s:%u", is_user ? ID_UID : ID_GID, from);
 	return (to);
 }
 
@@ -757,13 +780,13 @@ nm2winqn(name_mapping_t *nm, char **winqn)
 	}
 
 	switch (nm->is_wuser) {
-	case I_YES:
+	case IDMAP_YES:
 		prefix = ID_WINUSER ":";
 		break;
-	case I_NO:
+	case IDMAP_NO:
 		prefix = ID_WINGROUP ":";
 		break;
-	case I_UNKNOWN:
+	case IDMAP_UNKNOWN:
 		prefix = ID_WINNAME ":";
 		break;
 
@@ -834,14 +857,14 @@ nm2unixname(name_mapping_t *nm, char **unixname)
 
 
 	switch (nm->is_user) {
-	case I_YES:
+	case IDMAP_YES:
 		prefix = ID_UNIXUSER ":";
 		break;
-	case I_NO:
+	case IDMAP_NO:
 		prefix = ID_UNIXGROUP ":";
 		break;
-	case I_UNKNOWN:
-		prefix = ID_UNIXNAME ":";
+	case IDMAP_UNKNOWN:
+		prefix = ID_UNIXUSER ":";
 		break;
 
 	}
@@ -876,8 +899,8 @@ name_mapping_init()
 	nm->winname = nm->windomain = nm->unixname = nm->sidprefix = NULL;
 	nm->rid = UNDEFINED_RID;
 	nm->is_nt4 = B_FALSE;
-	nm->is_user = I_UNKNOWN;
-	nm->is_wuser = I_UNKNOWN;
+	nm->is_user = IDMAP_UNKNOWN;
+	nm->is_wuser = IDMAP_UNKNOWN;
 	nm->direction = IDMAP_DIRECTION_UNDEF;
 	nm->pid = UNDEFINED_UID;
 	return (nm);
@@ -1122,7 +1145,7 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 
 		break;
 	case SMBUSERS:
-		if (nm->is_user != I_YES || nm->is_wuser != I_YES) {
+		if (nm->is_user != IDMAP_YES || nm->is_wuser != IDMAP_YES) {
 			print_error(NULL,
 			    gettext("Group rule: "));
 			f = stderr;
@@ -1162,7 +1185,7 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 		unixname = NULL;
 		break;
 	case USERMAP_CFG:
-		if (nm->is_user != I_YES || nm->is_wuser != I_YES) {
+		if (nm->is_user != IDMAP_YES || nm->is_wuser != IDMAP_YES) {
 			print_error(NULL,
 			    gettext("Group rule: "));
 			f = stderr;
@@ -1204,7 +1227,7 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 		    strcmp_null(pnm->last->unixname, nm->unixname) == 0 &&
 		    strcmp_null(pnm->last->winname, nm->winname) == 0 &&
 		    strcmp_null(pnm->last->windomain, nm->windomain) == 0) {
-			pnm->last->is_wuser = I_UNKNOWN;
+			pnm->last->is_wuser = IDMAP_UNKNOWN;
 		} else {
 			if (pnm->last->unixname != NULL ||
 			    pnm->last->winname != NULL) {
@@ -1244,19 +1267,19 @@ print_how(idmap_how *how)
 	case IDMAP_MAP_TYPE_DS_AD:
 		(void) printf(gettext("Method:\tAD Directory\n"));
 		(void) printf(gettext("DN:\t%s\n"),
-		    how->idmap_how_u.ad.dn);
+		    CHECK_NULL(how->idmap_how_u.ad.dn));
 		(void) printf(gettext("Attribute:\t%s=%s\n"),
-		    how->idmap_how_u.ad.attr,
-		    how->idmap_how_u.ad.value);
+		    CHECK_NULL(how->idmap_how_u.ad.attr),
+		    CHECK_NULL(how->idmap_how_u.ad.value));
 		break;
 
 	case IDMAP_MAP_TYPE_DS_NLDAP:
 		(void) printf(gettext("Method:\tNative LDAP Directory\n"));
 		(void) printf(gettext("DN:\t%s\n"),
-		    how->idmap_how_u.nldap.dn);
+		    CHECK_NULL(how->idmap_how_u.nldap.dn));
 		(void) printf(gettext("Attribute:\t%s=%s\n"),
-		    how->idmap_how_u.nldap.attr,
-		    how->idmap_how_u.nldap.value);
+		    CHECK_NULL(how->idmap_how_u.nldap.attr),
+		    CHECK_NULL(how->idmap_how_u.nldap.value));
 		break;
 
 	case IDMAP_MAP_TYPE_RULE_BASED:
@@ -1271,7 +1294,7 @@ print_how(idmap_how *how)
 		 * It is therefore better set is_wuser to unknown.
 		 */
 		nm.is_user = rule->is_user;
-		nm.is_wuser = I_UNKNOWN;
+		nm.is_wuser = IDMAP_UNKNOWN;
 		nm.direction = rule->direction;
 		nm.winname = rule->winname;
 		nm.windomain = rule->windomain;
@@ -1370,7 +1393,7 @@ print_error_info(idmap_info *info)
 		 * It is therefore better to set is_wuser to unknown.
 		 */
 		nm.is_user = rule->is_user;
-		nm.is_wuser = I_UNKNOWN;
+		nm.is_wuser = IDMAP_UNKNOWN;
 		nm.direction = rule->direction;
 		nm.winname = rule->winname;
 		nm.windomain = rule->windomain;
@@ -1446,8 +1469,8 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		    &nm->unixname, &is_user, &is_wuser,
 		    &nm->direction, &info);
 
-		nm->is_user = is_user ? I_YES : I_NO;
-		nm->is_wuser = is_wuser ? I_YES : I_NO;
+		nm->is_user = is_user ? IDMAP_YES : IDMAP_NO;
+		nm->is_wuser = is_wuser ? IDMAP_YES : IDMAP_NO;
 
 		if (stat >= 0) {
 			(void) print_mapping(ph, nm);
@@ -2139,8 +2162,8 @@ list_name_mappings(format_t format, FILE *fi)
 		    &nm->winname, &nm->unixname, &is_user, &is_wuser,
 		    &nm->is_nt4, &nm->direction);
 		if (stat >= 0) {
-			nm->is_user = is_user ? I_YES : I_NO;
-			nm->is_wuser = is_wuser ? I_YES : I_NO;
+			nm->is_user = is_user ? IDMAP_YES : IDMAP_NO;
+			nm->is_wuser = is_wuser ? IDMAP_YES : IDMAP_NO;
 			(void) print_mapping(ph, nm);
 		}
 
@@ -2234,52 +2257,58 @@ print_flags(flag_t *f)
 	}
 }
 
-
-/*
- * Split argument to its identity code and a name part
- * return values:
- *    -1 for unknown identity
- *     0 for no identity
- *     <TYPE_XXX> for known identity
- */
+/* Convert string like sid or winname to the identity type code */
 
 static int
-get_identity(char *arg, char **name, cmd_pos_t *pos)
-{
+string2type(char *str, cmd_pos_t *pos) {
 	int i;
-	char *it;
-	int code;
+	int code = TYPE_INVALID;
 
-	if ((it = strchr(arg, ':')) == NULL) {
-		*name = arg;
-		return (0);
-	}
-
-
-	*it = '\0';
-	for (i = 0, code = 0;
-	    i < sizeof (identity2code) / sizeof (id_code_t);
-	    i++) {
-		if (strcmp(identity2code[i].identity, arg) == 0) {
+	for (i = 0; i < sizeof (identity2code) / sizeof (id_code_t); i++) {
+		if (strcasecmp(identity2code[i].identity, str) == 0) {
 			code = identity2code[i].code;
 			break;
 		}
 	}
 
-	/* restore the original string: */
-	*it = ':';
-
-	if (!code) {
+	if (code == TYPE_INVALID) {
 		print_error(pos,
-		    gettext("Error: invalid identity type \"%.*s\"\n"),
-		    it - arg, arg);
-		return (-1);
+		    gettext("Error: invalid identity type \"%s\"\n"), str);
 	}
+
+	return (code);
+}
+
+
+
+
+/*
+ * Split argument to its identity code and a name part
+ * return values:
+ *    TYPE_INVALID for unknown identity
+ *    TYPE_AUTO for no identity (to be autodetected)
+ *    <TYPE_XXX> for known identity
+ */
+
+static int
+get_identity(char *arg, char **name, cmd_pos_t *pos)
+{
+	char *it;
+	int code = TYPE_INVALID;
+
+	if ((it = strchr(arg, ':')) == NULL) {
+		*name = arg;
+		return (TYPE_AUTO);
+	}
+
+
+	*it = '\0';
+	code = string2type(arg, pos);
+	*it = ':'; /* restore the original string: */
 
 	*name = it + 1;
 	return (code);
 }
-
 
 /*
  * This function splits name to the relevant pieces: is_user, winname,
@@ -2302,17 +2331,17 @@ name2parts(char *name, name_mapping_t *nm, cmd_pos_t *pos)
 	code = get_identity(name, &it, pos);
 
 	switch (code) {
-	case -1:
+	case TYPE_INVALID:
 		/* syntax error: */
 		return (-1);
-	case 0:
+	case TYPE_AUTO:
 		/* autodetection: */
-		if (nm->winname != NULL && nm->is_wuser != I_UNKNOWN)
-			code = nm->is_wuser == I_YES ? TYPE_UU : TYPE_UG;
+		if (nm->winname != NULL && nm->is_wuser != IDMAP_UNKNOWN)
+			code = nm->is_wuser == IDMAP_YES ? TYPE_UU : TYPE_UG;
 		else if (nm->unixname != NULL ||
 		    strchr(name, '@') != NULL ||
 		    strchr(name, '\\') != NULL)
-			/* btw, nm->is_user can never be I_UNKNOWN here */
+			/* btw, nm->is_user can never be IDMAP_UNKNOWN here */
 			code = TYPE_WN;
 		else
 			return (0);
@@ -2324,14 +2353,14 @@ name2parts(char *name, name_mapping_t *nm, cmd_pos_t *pos)
 
 	if (code & IS_WIN) {
 		if (code & IS_USER)
-			nm->is_wuser = I_YES;
+			nm->is_wuser = IDMAP_YES;
 		else if (code & IS_GROUP)
-			nm->is_wuser = I_NO;
+			nm->is_wuser = IDMAP_NO;
 	} else {
 		if (code & IS_USER)
-			nm->is_user = I_YES;
+			nm->is_user = IDMAP_YES;
 		else if (code & IS_GROUP)
-			nm->is_user = I_NO;
+			nm->is_user = IDMAP_NO;
 	}
 
 	if (code & IS_WIN && code & IS_NAME) {
@@ -2394,25 +2423,30 @@ name2parts(char *name, name_mapping_t *nm, cmd_pos_t *pos)
  * invalid.
  */
 static
-int
-args2nm(name_mapping_t *nm, int *is_first_win, int argc, char **argv,
+name_mapping_t *
+args2nm(int *is_first_win, int argc, char **argv,
     cmd_pos_t *pos)
 {
 	int code;
 	int i;
+	name_mapping_t *nm;
+
+	nm = name_mapping_init();
+	if (nm == NULL)
+		return (NULL);
 
 	for (i = 0; i < 2 * argc - 1; i++) {
 		code = name2parts(argv[i % 2], nm, pos);
 		switch (code) {
 			case -1:
-				return (-1);
+				goto fail;
 		case 0:
 			if (i > 0) {
 				print_error(pos,
 				    gettext("Missing identity type"
 				    " cannot be determined for %s.\n"),
 				    argv[i % 2]);
-				return (-1);
+				goto fail;
 			}
 			break;
 		default:
@@ -2420,24 +2454,30 @@ args2nm(name_mapping_t *nm, int *is_first_win, int argc, char **argv,
 				print_error(pos,
 				    gettext("%s is not a valid name\n"),
 				    argv[i % 2]);
-				return (-1);
+				goto fail;
 			}
 		}
 	}
 
 	if (argc == 2 && nm->winname == NULL) {
 		print_error(pos, gettext("No windows identity found.\n"));
-		return (-1);
+		goto fail;
 	}
 	if (argc == 2 && nm->unixname == NULL) {
 		print_error(pos, gettext("No unix identity found.\n"));
-		return (-1);
+		goto fail;
+	}
+	if (argc == 1 && nm->winname == NULL && nm->unixname == NULL) {
+		print_error(pos, gettext("No identity type determined.\n"));
+		goto fail;
 	}
 
-	*is_first_win = code & IS_WIN;
-	return (0);
-
-
+	if (is_first_win != NULL)
+		*is_first_win = code & IS_WIN;
+	return (nm);
+fail:
+	name_mapping_fini(nm);
+	return (NULL);
 }
 
 
@@ -2464,14 +2504,9 @@ do_add_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		return (-1);
 	}
 
-	nm = name_mapping_init();
+	nm = args2nm(&is_first_win, argc, argv, pos);
 	if (nm == NULL)
 		return (-1);
-
-	if (args2nm(nm, &is_first_win, argc, argv, pos) < 0) {
-		name_mapping_fini(nm);
-		return (-1);
-	}
 
 	if (f[d_FLAG] != NULL)
 		nm->direction = is_first_win
@@ -2487,10 +2522,10 @@ do_add_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		return (-1);
 	}
 
-	for (is_wuser = I_YES; is_wuser >= I_NO; is_wuser--) {
-		/* nm->is_wuser can be I_YES, I_NO or I_UNKNOWN */
-		if ((is_wuser == I_YES && nm->is_wuser == I_NO) ||
-		    (is_wuser == I_NO && nm->is_wuser == I_YES))
+	for (is_wuser = IDMAP_YES; is_wuser >= IDMAP_NO; is_wuser--) {
+		/* nm->is_wuser can be IDMAP_YES, IDMAP_NO or IDMAP_UNKNOWN */
+		if ((is_wuser == IDMAP_YES && nm->is_wuser == IDMAP_NO) ||
+		    (is_wuser == IDMAP_NO && nm->is_wuser == IDMAP_YES))
 			continue;
 
 		stat = idmap_udt_add_namerule(udt, nm->windomain,
@@ -2508,7 +2543,7 @@ do_add_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	(void) print_mapping(ph, nm);
 	(void) print_mapping_fini(ph);
 
-	if (stat < 0) {
+	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
 		    gettext("Mapping not created (%s)\n"),
 		    idmap_stat2string(handle, stat));
@@ -2579,14 +2614,9 @@ do_remove_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	 * Similar to do_add_name_mapping - see the comments
 	 * there. Except we may have only one argument here.
 	 */
-	nm = name_mapping_init();
+	nm = args2nm(&is_first_win, argc, argv, pos);
 	if (nm == NULL)
 		return (-1);
-
-	if (args2nm(nm, &is_first_win, argc, argv, pos) < 0) {
-		name_mapping_fini(nm);
-		return (-1);
-	}
 
 	/*
 	 * If the direction is not specified by a -d/-f/-t flag, then it
@@ -2610,9 +2640,9 @@ do_remove_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		return (-1);
 	}
 
-	for (is_wuser = I_YES; is_wuser >= I_NO; is_wuser--) {
-		if ((is_wuser == I_YES && nm->is_wuser == I_NO) ||
-		    (is_wuser == I_NO && nm->is_wuser == I_YES))
+	for (is_wuser = IDMAP_YES; is_wuser >= IDMAP_NO; is_wuser--) {
+		if ((is_wuser == IDMAP_YES && nm->is_wuser == IDMAP_NO) ||
+		    (is_wuser == IDMAP_NO && nm->is_wuser == IDMAP_YES))
 			continue;
 
 		stat = idmap_udt_rm_namerule(udt,
@@ -2620,7 +2650,7 @@ do_remove_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		    is_wuser ? B_TRUE : B_FALSE,
 		    nm->windomain, nm->winname, nm->unixname, nm->direction);
 
-		if (stat < 0) {
+		if (stat != IDMAP_SUCCESS) {
 			print_error(pos,
 			    gettext("Mapping not deleted (%s)\n"),
 			    idmap_stat2string(handle, stat));
@@ -2758,21 +2788,8 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		if (type_from & IS_NAME)
 			type_to |= IS_NAME;
 	} else {
-		int i;
-
-		for (i = 0, type_to = 0;
-		    i < sizeof (identity2code) / sizeof (id_code_t);
-		    i++) {
-			if (strcmp(identity2code[i].identity, argv[1]) == 0) {
-				type_to = identity2code[i].code;
-				break;
-			}
-		}
-
-		if (!type_to) {
-			print_error(pos,
-			    gettext("Error: invalid target type \"%s\"\n"),
-			    argv[1]);
+		type_to = string2type(argv[1], pos);
+		if (type_to == TYPE_INVALID) {
 			stat = IDMAP_ERR_ARG;
 			goto cleanup;
 		}
@@ -2780,16 +2797,16 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 	if (type_to & IS_WIN) {
 		if (type_to & IS_USER)
-			nm->is_wuser = I_YES;
+			nm->is_wuser = IDMAP_YES;
 		else if (type_to & IS_GROUP)
-			nm->is_wuser = I_NO;
+			nm->is_wuser = IDMAP_NO;
 		else
-			nm->is_wuser = I_UNKNOWN;
+			nm->is_wuser = IDMAP_UNKNOWN;
 	} else {
 		if (type_to & IS_USER)
-			nm->is_user = I_YES;
+			nm->is_user = IDMAP_YES;
 		else if (type_to & IS_GROUP)
-			nm->is_user = I_NO;
+			nm->is_user = IDMAP_NO;
 	}
 
 	/* Are both arguments the same OS side? */
@@ -2810,6 +2827,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
  * Btw, type_from cannot be IDMAP_PID, because there is no type string
  * for it.
  */
+
 	if (type_from & IS_NAME || type_to & IS_NAME ||
 	    type_from  == TYPE_GSID || type_from  == TYPE_USID ||
 	    type_to  == TYPE_GSID || type_to  == TYPE_USID) {
@@ -2850,7 +2868,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 		/* Create an in-memory structure for all the batch: */
 		stat = idmap_get_create(handle, &ghandle);
-		if (stat < 0) {
+		if (stat != IDMAP_SUCCESS) {
 			print_error(pos,
 			    gettext("Unable to create handle for communicating"
 			    " with idmapd(1M) (%s)\n"),
@@ -2987,6 +3005,347 @@ cleanup:
 	fini_command();
 	return (stat < 0 || map_stat < 0 ? -1 : 0);
 }
+
+
+static int
+flags2cred(flag_t *f, char **user, char **passwd,  cmd_pos_t *pos)
+{
+
+	*user = NULL;
+	*passwd = NULL;
+
+	if (f[D_FLAG] == NULL)
+		return (0); /* GSSAPI authentification => OK */
+
+	*user = strdup(f[D_FLAG]);
+	if (*user == NULL) {
+		print_error(pos, gettext("Not enough memory.\n"));
+		return (-1);
+	}
+
+	/* Password: */
+
+	if (f[j_FLAG] != NULL) {
+		char line[MAX_INPUT_LINE_SZ];
+		int i;
+		FILE *file = fopen(f[j_FLAG], "r");
+
+		if (file == NULL) {
+			print_error(pos,
+			    gettext("Failed to open password file \"%s\": (%s)"
+			    ".\n"), f[j_FLAG], strerror(errno));
+			goto fail;
+		}
+
+		/* The password is the fist line, we ignore the rest: */
+		if (fgets(line, MAX_INPUT_LINE_SZ, file) == NULL) {
+			print_error(pos,
+			    gettext("The password file \"%s\" is empty.\n"),
+			    f[j_FLAG]);
+			(void) fclose(file);
+			goto fail;
+		}
+
+		if (fclose(file) != 0) {
+			print_error(pos,
+			    gettext("Unable to close the password file \"%s\""
+			    ".\n"), f[j_FLAG], strerror(errno));
+			goto fail;
+		}
+
+		/* Trim the eol: */
+		for (i = strlen(line) - 1;
+		    i >= 0 && (line[i] == '\r' || line[i] == '\n');
+		    i--)
+			line[i] = '\0';
+
+		*passwd = strdup(line);
+		if (*passwd == NULL) {
+			print_error(pos, gettext("Not enough memory.\n"));
+			goto fail;
+		}
+	} else if (!batch_mode) {
+		/* If in the interactive mode, read the terminal input: */
+		char *it = getpassphrase("Enter password:");
+		if (it == NULL) {
+			print_error(NULL,
+			    gettext("Failed to get password (%s).\n"),
+			    strerror(errno));
+			goto fail;
+		}
+
+		*passwd = strdup(it);
+		(void) memset(it, 0, strlen(it));
+
+		if (*passwd == NULL) {
+			print_error(pos, gettext("Not enough memory.\n"));
+			goto fail;
+		}
+	} else {
+		print_error(pos, gettext("No password given.\n"));
+		goto fail;
+	}
+
+	return (0);
+fail:
+	if (*passwd != NULL) {
+		(void) memset(*passwd, 0, strlen(*passwd));
+		free(*passwd);
+		*passwd = NULL;
+	}
+
+	free(*user);
+	return (-1);
+}
+
+
+static int
+do_set_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
+{
+	idmap_stat stat;
+	name_mapping_t *nm;
+	int is_first_win;
+	char *user;
+	char *passwd;
+
+	if (argc < 2) {
+		print_error(pos,
+		    gettext("Not enough arguments: two names needed for a "
+		    "namemap.\n"));
+		return (-1);
+	} else if (argc > 2) {
+		print_error(pos,
+		    gettext("Too many arguments: two names needed for a "
+		    "namemap.\n"));
+		return (-1);
+	}
+
+	nm = args2nm(&is_first_win, argc, argv, pos);
+	if (nm == NULL)
+		return (-1);
+
+	if (flags2cred(f, &user, &passwd, pos) < 0)
+		return (-1);
+
+	nm->direction = is_first_win ? IDMAP_DIRECTION_W2U
+	    : IDMAP_DIRECTION_U2W;
+
+	idmap_log_stderr(LOG_INFO);
+
+	stat = idmap_set_namemap(user, passwd, f[a_FLAG],
+	    nm->windomain, nm->winname, nm->unixname,
+	    nm->is_user, nm->is_wuser, nm->direction);
+
+	if (stat != IDMAP_SUCCESS) {
+		print_error(pos,
+		    gettext("Failed to set namemap (%s).\n"),
+		    idmap_stat2string(NULL, stat));
+	}
+
+	if (passwd != NULL) {
+		(void) memset(passwd, 0, strlen(passwd));
+		free(passwd);
+	}
+
+	free(user);
+
+	name_mapping_fini(nm);
+	return (stat != IDMAP_SUCCESS ? -1 : 0);
+}
+
+static int
+do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
+{
+	idmap_stat stat;
+	name_mapping_t *nm;
+	int is_first_win;
+	char *user;
+	char *passwd;
+
+	if (argc < 1) {
+		print_error(pos,
+		    gettext("Not enough arguments: a name needed to unset a "
+		    "namemap.\n"));
+		return (-1);
+	} else if (argc > 2) {
+		print_error(pos,
+		    gettext("Too many arguments: Only target name and type is "
+		    "needed to unset namemap.\n"));
+		return (-1);
+	}
+
+	nm = args2nm(&is_first_win, 1, argv, pos);
+	if (nm == NULL)
+		return (-1);
+
+	if (flags2cred(f, &user, &passwd, pos) < 0)
+		return (-1);
+
+	nm->direction = is_first_win ? IDMAP_DIRECTION_W2U
+	    : IDMAP_DIRECTION_U2W;
+
+	if (argc > 1 && !is_first_win) {
+			print_error(pos,
+			    gettext("Target type \"%s\" is redundant.\n"),
+			    argv[1]);
+			stat = IDMAP_ERR_ARG;
+			goto cleanup;
+	} else	if (argc > 1) {
+		switch (string2type(argv[1], pos)) {
+		case TYPE_INVALID:
+			name_mapping_fini(nm);
+			return (-1);
+		case TYPE_UU:
+			nm->is_user = IDMAP_YES;
+			break;
+		case TYPE_UG:
+			nm->is_user = IDMAP_NO;
+			break;
+		default:
+			print_error(pos,
+			    gettext("Invalid target type \"%s\": here the "
+			    "possible target type is unixuser or "
+			    "unixgroup.\n"), argv[1]);
+			stat = IDMAP_ERR_ARG;
+			goto cleanup;
+		}
+	}
+
+	idmap_log_stderr(LOG_INFO);
+
+	stat = idmap_unset_namemap(user, passwd, f[a_FLAG],
+	    nm->windomain, nm->winname, nm->unixname,
+	    nm->is_user, nm->is_wuser, nm->direction);
+
+	if (stat != IDMAP_SUCCESS) {
+		print_error(pos,
+		    gettext("Failed to unset namemap (%s).\n"),
+		    idmap_stat2string(NULL, stat));
+	}
+
+cleanup:
+	if (passwd != NULL) {
+		(void) memset(passwd, 0, strlen(passwd));
+		free(passwd);
+	}
+
+	free(user);
+
+	name_mapping_fini(nm);
+	return (stat == IDMAP_SUCCESS ? 0 : -1);
+}
+
+static int
+/* LINTED E_FUNC_ARG_UNUSED */
+do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
+{
+	idmap_stat stat;
+	name_mapping_t *nm;
+	int is_first_win;
+	int is_source_ad;
+	char *winname = NULL;
+	char *unixname = NULL;
+	char *unixuser = NULL;
+	char *unixgroup = NULL;
+
+	if (argc < 1) {
+		print_error(pos,
+		    gettext("Not enough arguments: a name needed to get a "
+		    "namemap.\n"));
+		return (-1);
+	} else if (argc > 1) {
+		print_error(pos,
+		    gettext("Too many arguments: just one name needed to get "
+		    "a namemap.\n"));
+		return (-1);
+	}
+
+	nm = args2nm(&is_first_win, argc, argv, pos);
+	if (nm == NULL)
+		return (-1);
+
+	nm->direction = is_first_win ? IDMAP_DIRECTION_W2U
+	    : IDMAP_DIRECTION_U2W;
+
+	/* nm->is_user is IDMAP_UNKNOWN for IDMAP_DIRECTION_W2U */
+	if (nm->is_user == IDMAP_YES) {
+		unixuser = strdup(nm->unixname);
+		if (unixuser == NULL) {
+			print_error(pos, gettext("Not enough memory.\n"));
+			goto cleanup;
+		}
+	} else if (nm->is_user == IDMAP_NO) {
+		unixgroup = strdup(nm->unixname);
+		if (unixgroup == NULL) {
+			print_error(pos, gettext("Not enough memory.\n"));
+			goto cleanup;
+		}
+	}
+
+	idmap_log_stderr(LOG_INFO);
+
+	stat = idmap_get_namemap(&is_source_ad, &nm->windomain, &nm->winname,
+	    &nm->is_wuser, &unixuser, &unixgroup);
+
+	if (stat != IDMAP_SUCCESS) {
+		print_error(pos,
+		    gettext("Failed to get namemap info (%s).\n"),
+		    idmap_stat2string(NULL, stat));
+		goto cleanup;
+	}
+
+	if (nm2winqn(nm, &winname) < 0)
+			goto cleanup;
+
+	switch (is_source_ad) {
+	case IDMAP_YES:
+		if (unixuser == NULL && unixgroup == NULL)
+			(void) printf(gettext("\t\tNo namemap found in AD.\n"));
+		else {
+			(void) printf(gettext("AD namemaps for %s\n"), winname);
+			if (unixuser != NULL)
+				(void) printf(gettext("\t\t->\t%s:%s\n"),
+				    ID_UNIXUSER, unixuser);
+
+			if (unixgroup != NULL)
+				(void) printf(gettext("\t\t->\t%s:%s\n"),
+				    ID_UNIXGROUP, unixgroup);
+		}
+		break;
+	case IDMAP_NO:
+		if (nm2unixname(nm, &unixname) < 0)
+			goto cleanup;
+
+		if (nm->winname == NULL)
+			(void) printf(gettext("\t\tNo namemap found in "
+			    "native LDAP.\n"));
+		else {
+			(void) printf(gettext("Native LDAP namemap for %s\n"),
+			    unixname);
+			(void) printf(gettext("\t\t->\t%s\n"), winname);
+		}
+		break;
+	default:
+		/*
+		 * This can never happen; the error must be recognized in
+		 * args2nm
+		 */
+		print_error(pos,
+		    gettext("Internal error: unknown source of namemaps.\n"));
+	}
+
+cleanup:
+	name_mapping_fini(nm);
+	if (winname != NULL)
+		free(winname);
+	if (unixuser != NULL)
+		free(unixuser);
+	if (unixgroup != NULL)
+		free(unixgroup);
+	return (stat == IDMAP_SUCCESS ? 0 : -1);
+}
+
+
 
 /* main function. Returns 1 for error, 0 otherwise */
 int

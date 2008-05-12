@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -78,6 +78,10 @@ SUNWprivate_1.0 {
 	__ns_ldap_getServiceAuthMethods;
 	__ns_ldap_host2dn;
 	__ns_ldap_list;
+	__ns_ldap_list_batch_start;
+	__ns_ldap_list_batch_add;
+	__ns_ldap_list_batch_end;
+	__ns_ldap_list_batch_release;
 	__ns_ldap_LoadConfiguration;
 	__ns_ldap_LoadDoorInfo;
 	__ns_ldap_make_config;

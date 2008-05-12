@@ -85,6 +85,14 @@ _idmap_get_mapped_id_by_name_1(idmap_mapping  *argp,
 	return (idmap_get_mapped_id_by_name_1_svc(*argp, result, rqstp));
 }
 
+int
+_idmap_get_prop_1(idmap_prop_type  *argp,
+		idmap_prop_res *result, struct svc_req *rqstp)
+{
+	return (idmap_get_prop_1_svc(*argp, result, rqstp));
+}
+
+
 
 void
 idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
@@ -95,6 +103,7 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		idmap_list_namerules_1_argument idmap_list_namerules_1_arg;
 		idmap_update_batch idmap_update_1_arg;
 		idmap_mapping idmap_get_mapped_id_by_name_1_arg;
+		idmap_prop_type idmap_get_prop_1_arg;
 	} argument;
 	union {
 		idmap_ids_res idmap_get_mapped_ids_1_res;
@@ -102,6 +111,7 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		idmap_namerules_res idmap_list_namerules_1_res;
 		idmap_update_res idmap_update_1_res;
 		idmap_mappings_res idmap_get_mapped_id_by_name_1_res;
+		idmap_prop_res idmap_get_prop_1_res;
 	} result;
 	bool_t retval;
 	xdrproc_t _xdr_argument, _xdr_result;
@@ -151,6 +161,13 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		_xdr_result = (xdrproc_t)xdr_idmap_mappings_res;
 		local = (bool_t (*) (char *,  void *,  struct svc_req *))
 		    _idmap_get_mapped_id_by_name_1;
+		break;
+
+	case IDMAP_GET_PROP:
+		_xdr_argument = (xdrproc_t)xdr_idmap_prop_type;
+		_xdr_result = (xdrproc_t)xdr_idmap_prop_res;
+		local = (bool_t (*) (char *,  void *,  struct svc_req *))
+		    _idmap_get_prop_1;
 		break;
 
 	default:

@@ -69,10 +69,12 @@ typedef struct idmap_pg_config {
 	char		*default_domain;	/* default domain name */
 	char		*domain_name;		/* AD domain name */
 	char		*machine_sid;		/* machine sid */
-	ad_disc_ds_t	*domain_controller;	/* domain controller hosts */
+	idmap_ad_disc_ds_t	*domain_controller;
+						/* domain controller hosts */
 	char		*forest_name;		/* forest name */
 	char		*site_name;		/* site name */
-	ad_disc_ds_t	*global_catalog;	/* global catalog hosts */
+	idmap_ad_disc_ds_t	*global_catalog;
+						/* global catalog hosts */
 	/*
 	 * Following properties are associated with directory-based
 	 * name-mappings.

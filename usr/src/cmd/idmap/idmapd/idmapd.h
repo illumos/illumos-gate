@@ -30,7 +30,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <syslog.h>
 #include <stdarg.h>
 #include <rpc/rpc.h>
 #include <synch.h>
@@ -51,9 +50,8 @@ extern "C" {
 #define	_IDLE	0
 #define	_SERVED	1
 
-#define	CHECK_NULL(s)	(s?s:"null")
-
 #define	SENTINEL_PID	UINT32_MAX
+#define	CHECK_NULL(s)	(s != NULL ? s : "null")
 
 extern int _rpcsvcstate;	/* set when a request is serviced */
 extern int _rpcsvccount;	/* number of requests being serviced */
@@ -111,6 +109,10 @@ typedef struct lookup_state {
 	idmap_namemap_mode_t	nm_sidgid;
 	char			*ad_unixuser_attr;
 	char			*ad_unixgroup_attr;
+	char			*nldap_winname_attr;
+	char			*defdom;
+	sqlite			*cache;
+	sqlite			*db;
 } lookup_state_t;
 
 #define	NLDAP_OR_MIXED(nm) \
@@ -246,28 +248,32 @@ extern idmap_retcode	validate_list_cb_data(list_cb_data_t *, int,
 				char **, int, uchar_t **, size_t);
 extern idmap_retcode	process_list_svc_sql(sqlite *, const char *, char *,
 				uint64_t, int, list_svc_cb, void *);
-extern idmap_retcode	sid2pid_first_pass(lookup_state_t *, sqlite *,
+extern idmap_retcode	sid2pid_first_pass(lookup_state_t *,
 				idmap_mapping *, idmap_id_res *);
-extern idmap_retcode	sid2pid_second_pass(lookup_state_t *, sqlite *,
-				sqlite *, idmap_mapping *, idmap_id_res *);
-extern idmap_retcode	pid2sid_first_pass(lookup_state_t *, sqlite *,
+extern idmap_retcode	sid2pid_second_pass(lookup_state_t *,
+				idmap_mapping *, idmap_id_res *);
+extern idmap_retcode	pid2sid_first_pass(lookup_state_t *,
 				idmap_mapping *, idmap_id_res *, int, int);
-extern idmap_retcode	pid2sid_second_pass(lookup_state_t *, sqlite *,
-				sqlite *, idmap_mapping *, idmap_id_res *, int);
-extern idmap_retcode	update_cache_sid2pid(lookup_state_t *, sqlite *,
+extern idmap_retcode	pid2sid_second_pass(lookup_state_t *,
+				idmap_mapping *, idmap_id_res *, int);
+extern idmap_retcode	update_cache_sid2pid(lookup_state_t *,
 				idmap_mapping *, idmap_id_res *);
-extern idmap_retcode	update_cache_pid2sid(lookup_state_t *, sqlite *,
+extern idmap_retcode	update_cache_pid2sid(lookup_state_t *,
 				idmap_mapping *, idmap_id_res *);
 extern idmap_retcode	get_u2w_mapping(sqlite *, sqlite *, idmap_mapping *,
 				idmap_mapping *, int);
 extern idmap_retcode	get_w2u_mapping(sqlite *, sqlite *, idmap_mapping *,
 				idmap_mapping *);
-extern idmap_retcode	get_ds_namemap_type(lookup_state_t *);
+extern idmap_retcode	load_cfg_in_state(lookup_state_t *);
 extern void		cleanup_lookup_state(lookup_state_t *);
 
 extern idmap_retcode	ad_lookup_batch(lookup_state_t *,
 				idmap_mapping_batch *, idmap_ids_res *);
-
+extern idmap_retcode	lookup_name2sid(sqlite *, const char *, const char *,
+				int *, char **, char **, idmap_rid_t *,
+				idmap_mapping *, int);
+extern idmap_retcode	lookup_wksids_name2sid(const char *, char **, char **,
+				idmap_rid_t *, int *);
 
 #ifdef __cplusplus
 }

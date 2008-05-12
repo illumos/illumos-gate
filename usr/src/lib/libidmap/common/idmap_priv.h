@@ -32,6 +32,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <libscf.h>
+#include <syslog.h>
+#include <resolv.h>
+
 #include "idmap.h"
 #include "idmap_prot.h"
 
@@ -50,6 +54,13 @@ extern "C" {
 #define	IDMAP_DIRECTION_BI	0	/* bi-directional */
 #define	IDMAP_DIRECTION_W2U	1	/* windows to unix only */
 #define	IDMAP_DIRECTION_U2W	2	/* unix to windows only */
+
+
+/* is_user values */
+
+#define	IDMAP_YES 1
+#define	IDMAP_NO 0
+#define	IDMAP_UNKNOWN -1
 
 /* Opaque handle to batch config add/remove operations */
 typedef struct idmap_udt_handle idmap_udt_handle_t;
@@ -182,6 +193,21 @@ extern idmap_stat idmap_getext_sidbygid(idmap_get_handle_t *, gid_t, int,
 	char **, idmap_rid_t *, idmap_info *, idmap_stat *);
 
 
+
+/* logging */
+extern void idmapdlog(int, const char *, ...);
+
+/*
+ * The maximal priority to be logged to stderr: set to -1 to suppress
+ * stderr logging completely.
+ */
+extern void idmap_log_stderr(int);
+
+/* write log messages to syslog? */
+extern void idmap_log_syslog(bool_t);
+
+/* write log messages to syslog? */
+extern void idmap_log_degraded(bool_t);
 
 #ifdef __cplusplus
 }

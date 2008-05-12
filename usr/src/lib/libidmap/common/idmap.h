@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@ typedef struct idmap_handle idmap_handle_t;
 typedef struct idmap_get_handle idmap_get_handle_t;
 
 
+
 /*
  * Setup API
  */
@@ -70,6 +71,21 @@ extern const char *idmap_stat2string(idmap_handle_t *, idmap_stat);
 /* Free memory allocated by the API */
 extern void idmap_free(void *);
 
+
+/*
+ * Directory based name map API
+ */
+
+/* Set namemap */
+extern idmap_stat idmap_set_namemap(char *, char *, char *,
+    char *, char *, char *, int, int, int);
+
+/* Unset namemap */
+extern idmap_stat idmap_unset_namemap(char *, char *, char *,
+	char *, char *, char *, int, int, int);
+
+extern idmap_stat idmap_get_namemap(int *, char **, char **, int *, char **,
+    char **);
 
 /*
  * API to batch SID to UID/GID mapping requests

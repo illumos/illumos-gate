@@ -186,8 +186,13 @@ usr1_handler(int sig)
 	bool_t saved_debug_mode = _idmapdstate.debug_mode;
 
 	_idmapdstate.debug_mode = TRUE;
+	idmap_log_stderr(LOG_DEBUG);
+
 	print_idmapdstate();
+
 	_idmapdstate.debug_mode = saved_debug_mode;
+	idmap_log_stderr(_idmapdstate.daemon_mode ? -1 : LOG_DEBUG);
+
 }
 
 static int pipe_fd = -1;
@@ -247,6 +252,7 @@ daemonize_start(void)
 	(void) setsid();
 	(void) umask(0077);
 	openlog("idmap", LOG_PID, LOG_DAEMON);
+
 	return (0);
 }
 
@@ -274,6 +280,9 @@ main(int argc, char **argv)
 	/* set locale and domain for internationalization */
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
+
+	idmap_log_syslog(TRUE);
+	idmap_log_stderr(_idmapdstate.daemon_mode ? -1 : LOG_DEBUG);
 
 	if (is_system_labeled() && getzoneid() != GLOBAL_ZONEID) {
 		idmapdlog(LOG_ERR,
@@ -482,6 +491,7 @@ degrade_svc(int poke_discovery, const char *reason)
 
 	membar_producer();
 	degraded = 1;
+	idmap_log_degraded(TRUE);
 
 	if ((fmri = get_fmri()) != NULL)
 		(void) smf_degrade_instance(fmri, 0);
@@ -501,9 +511,12 @@ restore_svc(void)
 
 	membar_producer();
 	degraded = 0;
+	idmap_log_degraded(FALSE);
+
 	idmapdlog(LOG_NOTICE, "Normal operation restored");
 }
 
+#if 0
 void
 idmapdlog(int pri, const char *format, ...)
 {
@@ -527,3 +540,4 @@ idmapdlog(int pri, const char *format, ...)
 	(void) vsyslog(pri, format, args);
 	va_end(args);
 }
+#endif

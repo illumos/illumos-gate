@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,7 +27,7 @@
 
 PROG =		idmapd
 MANIFEST =	idmap.xml
-SERVEROBJS =	idmapd.o init.o dbutils.o rpc_svc.o server.o adutils.o addisc.o\
+SERVEROBJS =	idmapd.o init.o dbutils.o rpc_svc.o server.o adutils.o\
 	idmap_config.o nldaputils.o
 SERVERSRCS =	$(SERVEROBJS:%.o=%.c)
 OBJS =		$(SERVEROBJS)
@@ -53,14 +53,15 @@ POFILE =	$(PROG)_all.po
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE= 444
 
-INCS += -I. -I../../../lib/libidmap/common -I$(IDMAP_PROT_DIR)
+INCS += -I. -I../../../lib/libidmap/common -I$(IDMAP_PROT_DIR)\
+	 -I../../../lib/libsldap/common
 
 $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
 CLOBBERFILES += $(IDMAP_PROT_H)
 
 CFLAGS += -v
-LDLIBS += -lsecdb -lresolv -lsocket -lnsl -lidmap -lscf -lldap -luuid
+LDLIBS += -lsecdb -lsocket -lnsl -lidmap -lscf -lsldap -lldap -luuid
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 $(PROG) := LDFLAGS += $(MAPFILES:%=-M%)
@@ -72,8 +73,6 @@ GROUP = sys
 
 lint_SRCS := CPPFLAGS += $(INCS) -D_REENTRANT
 lint := LDLIBS += $(SQLITELINT)
-
-LINTFLAGS += -erroff=E_CONSTANT_CONDITION
 
 .KEEP_STATE:
 

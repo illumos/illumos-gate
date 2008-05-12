@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <strings.h>
+
 
 #include "ns_sldap.h"
 #include "ns_internal.h"
@@ -2068,6 +2069,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	ns_ldap_entry_t	*nextEntry;
 	ns_ldap_error_t *error = NULL;
 	ns_ldap_error_t **errorp;
+	struct timeval	tv;
 
 	errorp = &error;
 	cookie->state = state;
@@ -2283,9 +2285,19 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			cookie->new_state = cookie->next_state;
 			break;
 		case NEXT_RESULT:
+			/*
+			 * Caller (e.g. __ns_ldap_list_batch_add)
+			 * does not want to block on ldap_result().
+			 * Therefore we execute ldap_result() with
+			 * a zeroed timeval.
+			 */
+			if (cookie->no_wait == B_TRUE)
+				(void) memset(&tv, 0, sizeof (tv));
+			else
+				tv = cookie->search_timeout;
 			rc = ldap_result(cookie->conn->ld, cookie->msgId,
 			    LDAP_MSG_ONE,
-			    (struct timeval *)&cookie->search_timeout,
+			    &tv,
 			    &cookie->resultMsg);
 			if (rc == LDAP_RES_SEARCH_RESULT) {
 				cookie->new_state = END_RESULT;
@@ -2308,6 +2320,12 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			if (rc != LDAP_RES_SEARCH_ENTRY) {
 				switch (rc) {
 				case 0:
+					if (cookie->no_wait == B_TRUE) {
+						(void) ldap_msgfree(
+						    cookie->resultMsg);
+						cookie->resultMsg = NULL;
+						return (cookie->new_state);
+					}
 					rc = LDAP_TIMEOUT;
 					break;
 				case -1:
@@ -2367,9 +2385,13 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			cookie->next_state = NEXT_RESULT;
 			break;
 		case MULTI_RESULT:
+			if (cookie->no_wait == B_TRUE)
+				(void) memset(&tv, 0, sizeof (tv));
+			else
+				tv = cookie->search_timeout;
 			rc = ldap_result(cookie->conn->ld, cookie->msgId,
 			    LDAP_MSG_ONE,
-			    (struct timeval *)&cookie->search_timeout,
+			    &tv,
 			    &cookie->resultMsg);
 			if (rc == LDAP_RES_SEARCH_RESULT) {
 				rc = ldap_result2error(cookie->conn->ld,
@@ -2396,6 +2418,12 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			if (rc != LDAP_RES_SEARCH_ENTRY) {
 				switch (rc) {
 				case 0:
+					if (cookie->no_wait == B_TRUE) {
+						(void) ldap_msgfree(
+						    cookie->resultMsg);
+						cookie->resultMsg = NULL;
+						return (cookie->new_state);
+					}
 					rc = LDAP_TIMEOUT;
 					break;
 				case -1:
@@ -2591,15 +2619,12 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 }
 
 
-
 /*
- * __ns_ldap_list performs one or more LDAP searches to a given
- * directory server using service search descriptors and schema
- * mapping as appropriate.
+ * internal function for __ns_ldap_list
  */
-
-int
-__ns_ldap_list(
+static int
+ldap_list(
+	ns_ldap_list_batch_t *batch,
 	const char *service,
 	const char *filter,
 	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
@@ -2609,6 +2634,7 @@ __ns_ldap_list(
 	const int flags,
 	ns_ldap_result_t **rResult, /* return result entries */
 	ns_ldap_error_t **errorp,
+	int *rcp,
 	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
 	const void *userdata)
 {
@@ -2622,10 +2648,13 @@ __ns_ldap_list(
 	int			from_result;
 
 	*errorp = NULL;
+	*rResult = NULL;
+	*rcp = NS_LDAP_SUCCESS;
 
 	/* Initialize State machine cookie */
 	cookie = init_search_state_machine();
 	if (cookie == NULL) {
+		*rcp = NS_LDAP_MEMORY;
 		return (NS_LDAP_MEMORY);
 	}
 
@@ -2634,6 +2663,7 @@ __ns_ldap_list(
 	    &cookie->followRef, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
+		*rcp = rc;
 		return (rc);
 	}
 
@@ -2643,6 +2673,7 @@ __ns_ldap_list(
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		*errorp = error;
+		*rcp = rc;
 		return (rc);
 	}
 
@@ -2653,6 +2684,7 @@ __ns_ldap_list(
 		if (sdlist == NULL) {
 			delete_search_cookie(cookie);
 			cookie = NULL;
+			*rcp = NS_LDAP_MEMORY;
 			return (NS_LDAP_MEMORY);
 		}
 		dptr = (ns_ldap_search_desc_t *)
@@ -2661,6 +2693,7 @@ __ns_ldap_list(
 			free(sdlist);
 			delete_search_cookie(cookie);
 			cookie = NULL;
+			*rcp = NS_LDAP_MEMORY;
 			return (NS_LDAP_MEMORY);
 		}
 		sdlist[0] = dptr;
@@ -2676,6 +2709,7 @@ __ns_ldap_list(
 			cookie->errorp = NULL;
 			delete_search_cookie(cookie);
 			cookie = NULL;
+			*rcp = rc;
 			return (rc);
 		}
 		dptr->basedn = strdup(dns[0]);
@@ -2713,6 +2747,7 @@ __ns_ldap_list(
 		if (cookie->service == NULL) {
 			delete_search_cookie(cookie);
 			cookie = NULL;
+			*rcp = NS_LDAP_MEMORY;
 			return (NS_LDAP_MEMORY);
 		}
 	}
@@ -2722,8 +2757,36 @@ __ns_ldap_list(
 	cookie->i_auth = auth;
 	cookie->i_flags = flags;
 
-	/* Process search */
-	rc = search_state_machine(cookie, INIT, 0);
+	if (batch != NULL) {
+		cookie->batch = batch;
+		cookie->no_wait = B_TRUE;
+		(void) search_state_machine(cookie, INIT, 0);
+		cookie->no_wait = B_FALSE;
+		rc = cookie->err_rc;
+
+		if (rc == NS_LDAP_SUCCESS) {
+			/*
+			 * Here rc == NS_LDAP_SUCCESS means that the state
+			 * machine init'ed successfully. The actual status
+			 * of the search will be determined by
+			 * __ns_ldap_list_batch_end(). Add the cookie to our
+			 * batch.
+			 */
+			cookie->caller_result = rResult;
+			cookie->caller_errorp = errorp;
+			cookie->caller_rc = rcp;
+			cookie->next_cookie_in_batch = batch->cookie_list;
+			batch->cookie_list = cookie;
+			batch->nactive++;
+			return (rc);
+		}
+		/*
+		 * If state machine init failed then copy error to the caller
+		 * and delete the cookie.
+		 */
+	} else {
+		(void) search_state_machine(cookie, INIT, 0);
+	}
 
 	/* Copy results back to user */
 	rc = cookie->err_rc;
@@ -2739,8 +2802,211 @@ __ns_ldap_list(
 
 	if (from_result == 0 && *rResult == NULL)
 		rc = NS_LDAP_NOTFOUND;
+	*rcp = rc;
 	return (rc);
 }
+
+
+/*
+ * __ns_ldap_list performs one or more LDAP searches to a given
+ * directory server using service search descriptors and schema
+ * mapping as appropriate.
+ */
+
+int
+__ns_ldap_list(
+	const char *service,
+	const char *filter,
+	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+	char **realfilter, const void *userdata),
+	const char * const *attribute,
+	const ns_cred_t *auth,
+	const int flags,
+	ns_ldap_result_t **rResult, /* return result entries */
+	ns_ldap_error_t **errorp,
+	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
+	const void *userdata)
+{
+	int	rc;
+	return (ldap_list(NULL, service, filter,
+	    init_filter_cb, attribute, auth, flags, rResult, errorp, &rc,
+	    callback, userdata));
+}
+
+
+/*
+ * Create and initialize batch for native LDAP lookups
+ */
+int
+__ns_ldap_list_batch_start(ns_ldap_list_batch_t **batch)
+{
+	*batch = calloc(1, sizeof (ns_ldap_list_batch_t));
+	if (*batch == NULL)
+		return (NS_LDAP_MEMORY);
+	return (NS_LDAP_SUCCESS);
+}
+
+
+/*
+ * Add a LDAP search request to the batch.
+ */
+int
+__ns_ldap_list_batch_add(
+	ns_ldap_list_batch_t *batch,
+	const char *service,
+	const char *filter,
+	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+	char **realfilter, const void *userdata),
+	const char * const *attribute,
+	const ns_cred_t *auth,
+	const int flags,
+	ns_ldap_result_t **rResult, /* return result entries */
+	ns_ldap_error_t **errorp,
+	int *rcp,
+	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
+	const void *userdata)
+{
+	return (ldap_list(batch, service, filter,
+	    init_filter_cb, attribute, auth, flags, rResult, errorp, rcp,
+	    callback, userdata));
+}
+
+
+/*
+ * Free batch.
+ */
+void
+__ns_ldap_list_batch_release(ns_ldap_list_batch_t *batch)
+{
+	ns_ldap_cookie_t	*c, *next;
+
+	for (c = batch->cookie_list; c != NULL; c = next) {
+		next = c->next_cookie_in_batch;
+		delete_search_cookie(c);
+	}
+	free(batch);
+}
+
+
+/*
+ * Process batch. Everytime this function is called it selects an
+ * active cookie from the batch and single steps through the
+ * search_state_machine for the selected cookie. If lookup associated
+ * with the cookie is complete (success or error) then the cookie is
+ * removed from the batch and its memory freed.
+ *
+ * Returns 1 (if batch still has active cookies)
+ *         0 (if batch has no more active cookies)
+ *        -1 (on errors, *rcp will contain the error code)
+ *
+ * The caller should call this function in a loop as long as it returns 1
+ * to process all the requests added to the batch. The results (and errors)
+ * will be available in the locations provided by the caller at the time of
+ * __ns_ldap_list_batch_add().
+ */
+static
+int
+__ns_ldap_list_batch_process(ns_ldap_list_batch_t *batch, int *rcp)
+{
+	ns_ldap_cookie_t	*c, *ptr, **prev;
+	ns_state_t		state;
+	int			rc;
+
+	/* Check if are already done */
+	if (batch->nactive == 0)
+		return (0);
+
+	/* Get the next cookie from the batch */
+	c = (batch->next_cookie == NULL) ?
+	    batch->cookie_list : batch->next_cookie;
+
+	batch->next_cookie = c->next_cookie_in_batch;
+
+	if (c->conn->shared > 0) {
+		rc = __s_api_check_MTC_tsd();
+		if (rc != NS_LDAP_SUCCESS) {
+			if (rcp != NULL)
+				*rcp = rc;
+			return (-1);
+		}
+	}
+
+	for (;;) {
+		/* Single step through the search_state_machine */
+		state = search_state_machine(c, c->new_state, ONE_STEP);
+		switch (state) {
+		case LDAP_ERROR:
+			(void) search_state_machine(c, state, ONE_STEP);
+			(void) search_state_machine(c, CLEAR_RESULTS, ONE_STEP);
+			/* FALLTHROUGH */
+		case ERROR:
+		case EXIT:
+			*c->caller_result = c->result;
+			*c->caller_errorp = c->errorp;
+			*c->caller_rc =
+			    (c->result == NULL && c->err_from_result == 0)
+			    ? NS_LDAP_NOTFOUND : c->err_rc;
+			c->result = NULL;
+			c->errorp = NULL;
+			/* Remove the cookie from the batch */
+			ptr = batch->cookie_list;
+			prev = &batch->cookie_list;
+			while (ptr != NULL) {
+				if (ptr == c) {
+					*prev = ptr->next_cookie_in_batch;
+					break;
+				}
+				prev = &ptr->next_cookie_in_batch;
+				ptr = ptr->next_cookie_in_batch;
+			}
+			/* Delete cookie and decrement active cookie count */
+			delete_search_cookie(c);
+			batch->nactive--;
+			break;
+		case NEXT_RESULT:
+		case MULTI_RESULT:
+			/*
+			 * This means that search_state_machine needs to do
+			 * another ldap_result() for the cookie in question.
+			 * We only do at most one ldap_result() per call in
+			 * this function and therefore we return. This allows
+			 * the caller to process results from other cookies
+			 * in the batch without getting tied up on just one
+			 * cookie.
+			 */
+			break;
+		default:
+			/*
+			 * This includes states that follow NEXT_RESULT or
+			 * MULTI_RESULT such as PROCESS_RESULT and
+			 * END_PROCESS_RESULT. We continue processing
+			 * this cookie till we reach either the error, exit
+			 * or the result states.
+			 */
+			continue;
+		}
+		break;
+	}
+
+	/* Return 0 if no more cookies left otherwise 1 */
+	return ((batch->nactive > 0) ? 1 : 0);
+}
+
+
+/*
+ * Process all the active cookies in the batch and when none
+ * remains finalize the batch.
+ */
+int
+__ns_ldap_list_batch_end(ns_ldap_list_batch_t *batch)
+{
+	int rc = NS_LDAP_SUCCESS;
+	while (__ns_ldap_list_batch_process(batch, &rc) > 0)
+		;
+	__ns_ldap_list_batch_release(batch);
+	return (rc);
+}
+
 
 /*
  * __s_api_find_domainname performs one or more LDAP searches to

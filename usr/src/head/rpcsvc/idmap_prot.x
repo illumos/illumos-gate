@@ -44,7 +44,7 @@ enum idmap_id_type {
 
 /* The type of ID mapping */
 enum idmap_map_type {
-	IDMAP_MAP_TYPE_UNKNOWN = 0, 
+	IDMAP_MAP_TYPE_UNKNOWN = 0,
 	IDMAP_MAP_TYPE_DS_AD,
 	IDMAP_MAP_TYPE_DS_NLDAP,
 	IDMAP_MAP_TYPE_RULE_BASED,
@@ -112,6 +112,7 @@ union idmap_how switch(idmap_map_type map_type) {
 	case IDMAP_MAP_TYPE_RULE_BASED: idmap_namerule rule;
 	case IDMAP_MAP_TYPE_EPHEMERAL: void;
 	case IDMAP_MAP_TYPE_LOCAL_SID: void;
+	case IDMAP_MAP_TYPE_KNOWN_SID: void;
 };
 
 struct idmap_info {
@@ -175,7 +176,6 @@ struct idmap_update_res {
 	idmap_namerule	conflict_rule;
 };
 
-
 /* Update requests */
 enum idmap_opnum {
 	OP_NONE = 0,
@@ -192,6 +192,61 @@ union idmap_update_op switch(idmap_opnum opnum) {
 };
 typedef idmap_update_op idmap_update_batch<>;
 
+const AD_DISC_MAXHOSTNAME = 256;
+
+#ifndef _KERNEL
+struct idmap_ad_disc_ds_t {
+	int	port;
+	int	priority;
+	int	weight;
+	char	host[AD_DISC_MAXHOSTNAME];
+};
+
+
+/* get-prop, set-prop */
+enum idmap_prop_type {
+	PROP_UNKNOWN = 0,
+	PROP_LIST_SIZE_LIMIT = 1,
+	PROP_DEFAULT_DOMAIN = 2,	/* default domain name */
+	PROP_DOMAIN_NAME = 3,		/* AD domain name */
+	PROP_MACHINE_SID = 4,		/* machine sid */
+	PROP_DOMAIN_CONTROLLER = 5,	/* domain controller hosts */
+	PROP_FOREST_NAME = 6,		/* forest name */
+	PROP_SITE_NAME = 7,		/* site name */
+	PROP_GLOBAL_CATALOG = 8,	/* global catalog hosts */
+	PROP_AD_UNIXUSER_ATTR = 9,
+	PROP_AD_UNIXGROUP_ATTR = 10,
+	PROP_NLDAP_WINNAME_ATTR = 11,
+	PROP_DS_NAME_MAPPING_ENABLED = 12
+};
+
+union idmap_prop_val switch(idmap_prop_type prop) {
+	case PROP_LIST_SIZE_LIMIT:
+		uint64_t intval;
+	case PROP_DEFAULT_DOMAIN:
+	case PROP_DOMAIN_NAME:
+	case PROP_MACHINE_SID:
+	case PROP_FOREST_NAME:
+	case PROP_SITE_NAME:
+	case PROP_AD_UNIXUSER_ATTR:
+	case PROP_AD_UNIXGROUP_ATTR:
+	case PROP_NLDAP_WINNAME_ATTR:
+		idmap_utf8str utf8val;
+	case PROP_DS_NAME_MAPPING_ENABLED:
+		bool boolval;
+	case PROP_DOMAIN_CONTROLLER:
+	case PROP_GLOBAL_CATALOG:
+		idmap_ad_disc_ds_t dsval;
+	default:
+		void;
+};
+
+struct idmap_prop_res {
+	idmap_retcode	retcode;
+	idmap_prop_val	value;
+	bool		auto_discovered;
+};
+#endif
 
 program IDMAP_PROG {
 	version IDMAP_V1 {
@@ -219,6 +274,12 @@ program IDMAP_PROG {
 		/* Get mapped identity by name */
 		idmap_mappings_res
 		IDMAP_GET_MAPPED_ID_BY_NAME(idmap_mapping request) = 5;
+
+#ifndef _KERNEL 
+		/* Get configuration property */
+		idmap_prop_res
+		IDMAP_GET_PROP(idmap_prop_type) = 6;
+#endif
 
 	} = 1;
 } = 100172;

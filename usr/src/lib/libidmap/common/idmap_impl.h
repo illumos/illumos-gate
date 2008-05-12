@@ -32,9 +32,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <rpc/xdr.h>
+#include <libscf.h>
+#include <syslog.h>
+#include <resolv.h>
+
 #include "idmap_prot.h"
 #include "idmap_priv.h"
-#include <rpc/xdr.h>
+#include "addisc.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,6 +129,12 @@ extern idmap_retcode	_get_ids_extend_batch(idmap_get_handle_t *);
 extern idmap_stat	_iter_get_next_list(int, idmap_iter_t *, void *,
 				uchar_t **, size_t, xdrproc_t, xdrproc_t);
 extern idmap_stat	_idmap_rpc2stat(CLIENT *);
+
+extern idmap_stat idmap_get_prop_ds(idmap_handle_t *, idmap_prop_type,
+    idmap_ad_disc_ds_t *);
+extern idmap_stat idmap_get_prop_str(idmap_handle_t *, idmap_prop_type,
+    char **);
+
 
 #ifdef __cplusplus
 }

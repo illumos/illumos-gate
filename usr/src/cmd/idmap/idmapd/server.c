@@ -73,6 +73,15 @@
 			return (1); \
 	}
 
+#define	STRDUP_CHECK(to, from) \
+	if ((from) != NULL) { \
+		to = strdup(from); \
+		if (to == NULL) { \
+			result->retcode = IDMAP_ERR_MEMORY; \
+			goto out; \
+		} \
+	}
+
 /* ARGSUSED */
 bool_t
 idmap_null_1_svc(void *result, struct svc_req *rqstp)
@@ -181,11 +190,13 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	result->retcode = get_cache_handle(&cache);
 	if (result->retcode != IDMAP_SUCCESS)
 		goto out;
+	state.cache = cache;
 
 	/* Get db handle */
 	result->retcode = get_db_handle(&db);
 	if (result->retcode != IDMAP_SUCCESS)
 		goto out;
+	state.db = db;
 
 	/* Allocate result array */
 	result->ids.ids_val = calloc(batch.idmap_mapping_batch_len,
@@ -214,7 +225,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	state.result = result;
 
 	/* Get directory-based name mapping info */
-	result->retcode = get_ds_namemap_type(&state);
+	result->retcode = load_cfg_in_state(&state);
 	if (result->retcode != IDMAP_SUCCESS)
 		goto out;
 
@@ -229,19 +240,16 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		if (IS_BATCH_SID(batch, i)) {
 			retcode = sid2pid_first_pass(
 			    &state,
-			    cache,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i]);
 		} else if (IS_BATCH_UID(batch, i)) {
 			retcode = pid2sid_first_pass(
 			    &state,
-			    cache,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i], 1, 0);
 		} else if (IS_BATCH_GID(batch, i)) {
 			retcode = pid2sid_first_pass(
 			    &state,
-			    cache,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i], 0, 0);
 		} else {
@@ -260,9 +268,13 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/*
 	 * native LDAP lookups:
-	 * If nldap or mixed mode is enabled then pid2sid mapping requests
-	 * need to lookup native LDAP directory service by uid/gid to get
-	 * winname and unixname.
+	 *  pid2sid:
+	 *	- nldap or mixed mode. Lookup nldap by pid or unixname to get
+	 *	  winname.
+	 *  sid2pid:
+	 *	- nldap mode. Got winname and sid (either given or found in
+	 *	  name_cache). Lookup nldap by winname to get pid and
+	 *	  unixname.
 	 */
 	if (state.nldap_nqueries) {
 		retcode = nldap_lookup_batch(&state, &batch, result);
@@ -274,13 +286,17 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/*
 	 * AD lookups:
-	 * 1. The pid2sid requests in the preceding step which successfully
-	 *    retrieved winname from native LDAP objects will now need to
-	 *    lookup AD by winname to get sid.
-	 * 2. The sid2pid requests will need to lookup AD by sid to get
-	 *    winname and unixname (AD or mixed mode).
-	 * 3. If AD-based name mapping is enabled then pid2sid mapping
-	 *    requests need to lookup AD by unixname to get winname and sid.
+	 *  pid2sid:
+	 *	- nldap or mixed mode. Got winname from nldap lookup.
+	 *	  winname2sid could not be resolved locally. Lookup AD
+	 *	  by winname to get sid.
+	 *	- ad mode. Got unixname. Lookup AD by unixname to get
+	 *	  winname and sid.
+	 *  sid2pid:
+	 *	- ad or mixed mode. Lookup AD by sid or winname to get
+	 *	  winname, sid and unixname.
+	 *	- any mode. Got either sid or winname but not both. Lookup
+	 *	  AD by sid or winname to get winname, sid.
 	 */
 	if (state.ad_nqueries) {
 		retcode = ad_lookup_batch(&state, &batch, result);
@@ -292,10 +308,9 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/*
 	 * native LDAP lookups:
-	 * If nldap mode is enabled then sid2pid mapping requests
-	 * which successfully retrieved winname from AD objects in the
-	 * preceding step, will now need to lookup native LDAP directory
-	 * service by winname to get unixname and pid.
+	 *  sid2pid:
+	 *	- nldap mode. Got winname and sid from AD lookup. Lookup nldap
+	 *	  by winname to get pid and unixname.
 	 */
 	if (state.nldap_nqueries) {
 		retcode = nldap_lookup_batch(&state, &batch, result);
@@ -314,22 +329,16 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		if (IS_BATCH_SID(batch, i)) {
 			retcode = sid2pid_second_pass(
 			    &state,
-			    cache,
-			    db,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i]);
 		} else if (IS_BATCH_UID(batch, i)) {
 			retcode = pid2sid_second_pass(
 			    &state,
-			    cache,
-			    db,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i], 1);
 		} else if (IS_BATCH_GID(batch, i)) {
 			retcode = pid2sid_second_pass(
 			    &state,
-			    cache,
-			    db,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i], 0);
 		} else {
@@ -359,14 +368,12 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		if (IS_BATCH_SID(batch, i)) {
 			(void) update_cache_sid2pid(
 			    &state,
-			    cache,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i]);
 		} else if ((IS_BATCH_UID(batch, i)) ||
 		    (IS_BATCH_GID(batch, i))) {
 			(void) update_cache_pid2sid(
 			    &state,
-			    cache,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i]);
 		}
@@ -590,6 +597,7 @@ idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit, int32_t flag,
 	    "%s;",
 	    rbuf, curtime, lbuf);
 	if (sql == NULL) {
+		result->retcode = IDMAP_ERR_MEMORY;
 		idmapdlog(LOG_ERR, "Out of memory");
 		goto out;
 	}
@@ -750,6 +758,7 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 	    rbuf, expr, w2ubuf, u2wbuf, lbuf);
 
 	if (sql == NULL) {
+		result->retcode = IDMAP_ERR_MEMORY;
 		idmapdlog(LOG_ERR, "Out of memory");
 		goto out;
 	}
@@ -976,6 +985,114 @@ out:
 		xdr_free(xdr_idmap_mappings_res, (caddr_t)result);
 		result->mappings.mappings_len = 0;
 		result->mappings.mappings_val = NULL;
+	}
+	result->retcode = idmap_stat4prot(result->retcode);
+	return (TRUE);
+}
+
+/* ARGSUSED */
+bool_t
+idmap_get_prop_1_svc(idmap_prop_type request,
+		idmap_prop_res *result, struct svc_req *rqstp)
+{
+	idmap_pg_config_t *pgcfg;
+	ad_disc_t ad_ctx;
+
+	/* Init */
+	(void) memset(result, 0, sizeof (*result));
+	result->retcode = IDMAP_SUCCESS;
+	result->value.prop = request;
+
+	RDLOCK_CONFIG();
+
+	/* Just shortcuts: */
+	pgcfg = &_idmapdstate.cfg->pgcfg;
+	ad_ctx = _idmapdstate.cfg->handles.ad_ctx;
+
+	switch (request) {
+	case PROP_LIST_SIZE_LIMIT:
+		result->value.idmap_prop_val_u.intval = pgcfg->list_size_limit;
+		result->auto_discovered = FALSE;
+		break;
+	case PROP_DEFAULT_DOMAIN:
+		result->auto_discovered = FALSE;
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->default_domain);
+		break;
+	case PROP_DOMAIN_NAME:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->domain_name);
+		result->auto_discovered =
+		    ad_ctx->domain_name.type == AD_TYPE_AUTO ? TRUE : FALSE;
+		break;
+	case PROP_MACHINE_SID:
+		result->auto_discovered = FALSE;
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->machine_sid);
+		break;
+	case PROP_DOMAIN_CONTROLLER:
+		if (pgcfg->domain_controller != NULL) {
+			(void) memcpy(&result->value.idmap_prop_val_u.dsval,
+			    pgcfg->domain_controller,
+			    sizeof (idmap_ad_disc_ds_t));
+		}
+		result->auto_discovered =
+		    ad_ctx->domain_controller.type == AD_TYPE_AUTO
+		    ? TRUE : FALSE;
+		break;
+	case PROP_FOREST_NAME:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->forest_name);
+		result->auto_discovered =
+		    ad_ctx->forest_name.type == AD_TYPE_AUTO
+		    ? TRUE : FALSE;
+		break;
+	case PROP_SITE_NAME:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->site_name);
+		result->auto_discovered =
+		    ad_ctx->site_name.type == AD_TYPE_AUTO
+		    ? TRUE : FALSE;
+		break;
+	case PROP_GLOBAL_CATALOG:
+		if (pgcfg->global_catalog != NULL) {
+			(void) memcpy(&result->value.idmap_prop_val_u.dsval,
+			    pgcfg->global_catalog, sizeof (idmap_ad_disc_ds_t));
+		}
+		result->auto_discovered =
+		    ad_ctx->global_catalog.type == AD_TYPE_AUTO
+		    ? TRUE : FALSE;
+		break;
+	case PROP_AD_UNIXUSER_ATTR:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->ad_unixuser_attr);
+		result->auto_discovered = FALSE;
+		break;
+	case PROP_AD_UNIXGROUP_ATTR:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->ad_unixgroup_attr);
+		result->auto_discovered = FALSE;
+		break;
+	case PROP_NLDAP_WINNAME_ATTR:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    pgcfg->nldap_winname_attr);
+		result->auto_discovered = FALSE;
+		break;
+	case PROP_DS_NAME_MAPPING_ENABLED:
+		result->value.idmap_prop_val_u.boolval =
+		    pgcfg->ds_name_mapping_enabled;
+		result->auto_discovered = FALSE;
+		break;
+	default:
+		result->retcode = IDMAP_ERR_PROP_UNKNOWN;
+		break;
+	}
+
+out:
+	UNLOCK_CONFIG();
+	if (IDMAP_FATAL_ERROR(result->retcode)) {
+		xdr_free(xdr_idmap_prop_res, (caddr_t)result);
+		result->value.prop = PROP_UNKNOWN;
 	}
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);

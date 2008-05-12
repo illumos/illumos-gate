@@ -99,7 +99,6 @@
 #include <errno.h>
 #include <ldap.h>
 #include <sasl/sasl.h>
-#include "idmapd.h"
 #include "addisc.h"
 
 
@@ -119,51 +118,6 @@
 /* A RR name for all GCs -- last resort this works */
 #define	GC_ALL_A_NAME_FSTR "gc._msdcs.%s."
 
-
-enum ad_item_type {
-		AD_TYPE_INVALID = 0,	/* The value is not valid */
-		AD_TYPE_FIXED,		/* The value was fixed by caller */
-		AD_TYPE_AUTO		/* The value is auto discovered */
-		};
-
-
-typedef struct ad_item {
-	enum ad_item_type type;
-	union {
-		char 		*str;
-		ad_disc_ds_t	*ds;
-	} value;
-	time_t 		ttl;
-	unsigned int 	version;	/* Version is only changed if the */
-					/* value changes */
-#define	PARAM1		0
-#define	PARAM2		1
-	int 		param_version[2];
-					/* These holds the version of */
-					/* dependents so that a dependent */
-					/* change can be detected */
-} ad_item_t;
-
-typedef struct ad_subnet {
-	char subnet[24];
-} ad_subnet_t;
-
-
-struct ad_disc {
-	struct __res_state state;
-	int		res_ninitted;
-	ad_subnet_t	*subnets;
-	int		subnets_changed;
-	time_t		subnets_last_check;
-	ad_item_t	domain_name;
-	ad_item_t	domain_controller;
-	ad_item_t	site_name;
-	ad_item_t	forest_name;
-	ad_item_t	global_catalog;
-	/* Site specfic versions */
-	ad_item_t	site_domain_controller;
-	ad_item_t	site_global_catalog;
-};
 
 /*
  * We try res_ninit() whenever we don't have one.  res_ninit() fails if
@@ -188,7 +142,7 @@ struct ad_disc {
  */
 static void validate_SiteName(ad_disc_t ctx);
 
-static ad_disc_ds_t *dsdup(const ad_disc_ds_t *);
+static idmap_ad_disc_ds_t *dsdup(const idmap_ad_disc_ds_t *);
 
 
 static void
@@ -234,7 +188,7 @@ update_string(ad_item_t *item, char *value, enum ad_item_type type,
 
 
 static void
-update_ds(ad_item_t *item, ad_disc_ds_t *value, enum ad_item_type type,
+update_ds(ad_item_t *item, idmap_ad_disc_ds_t *value, enum ad_item_type type,
 		uint32_t ttl)
 {
 	if (item->value.ds != NULL && value != NULL) {
@@ -499,7 +453,7 @@ subnets_to_DNs(ad_subnet_t *subnets, const char *base_dn)
 
 /* Compare DS lists */
 int
-ad_disc_compare_ds(ad_disc_ds_t *ds1, ad_disc_ds_t *ds2)
+ad_disc_compare_ds(idmap_ad_disc_ds_t *ds1, idmap_ad_disc_ds_t *ds2)
 {
 	int	i, j;
 	int	num_ds1;
@@ -531,17 +485,17 @@ ad_disc_compare_ds(ad_disc_ds_t *ds1, ad_disc_ds_t *ds2)
 
 
 /* Copy a list of DSs */
-static ad_disc_ds_t *
-dsdup(const ad_disc_ds_t *srv)
+static idmap_ad_disc_ds_t *
+dsdup(const idmap_ad_disc_ds_t *srv)
 {
 	int	i;
 	int	size;
-	ad_disc_ds_t *new = NULL;
+	idmap_ad_disc_ds_t *new = NULL;
 
 	for (i = 0; srv[i].host[0] != '\0'; i++)
 		;
 
-	size = (i + 1) * sizeof (ad_disc_ds_t);
+	size = (i + 1) * sizeof (idmap_ad_disc_ds_t);
 	new = malloc(size);
 	if (new != NULL)
 		memcpy(new, srv, size);
@@ -551,7 +505,7 @@ dsdup(const ad_disc_ds_t *srv)
 
 /* Compare SRC RRs; used with qsort() */
 static int
-srvcmp(ad_disc_ds_t *s1, ad_disc_ds_t *s2)
+srvcmp(idmap_ad_disc_ds_t *s1, idmap_ad_disc_ds_t *s2)
 {
 	if (s1->priority < s2->priority)
 		return (1);
@@ -575,12 +529,12 @@ srvcmp(ad_disc_ds_t *s1, ad_disc_ds_t *s2)
  *
  * The output TTL will be the one of the SRV RR with the lowest TTL.
  */
-ad_disc_ds_t *
+idmap_ad_disc_ds_t *
 srv_query(res_state state, const char *svc_name, const char *dname,
 		char **rrname, uint32_t *ttl)
 {
-	ad_disc_ds_t *srv;
-	ad_disc_ds_t *srv_res;
+	idmap_ad_disc_ds_t *srv;
+	idmap_ad_disc_ds_t *srv_res;
 	union {
 		HEADER hdr;
 		uchar_t buf[NS_MAXMSG];
@@ -648,7 +602,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 
 	/* 3. walk through the answer section */
 
-	srv_res = calloc(ancount + 1, sizeof (ad_disc_ds_t));
+	srv_res = calloc(ancount + 1, sizeof (idmap_ad_disc_ds_t));
 	*ttl = (uint32_t)-1;
 
 	for (srv = srv_res, cnt = ancount;
@@ -730,7 +684,7 @@ saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts)
  * or more AD LDAP objects named by the dn_list; first found one wins.
  */
 static char *
-ldap_lookup_entry_attr(LDAP **ld, ad_disc_ds_t *domainControllers,
+ldap_lookup_entry_attr(LDAP **ld, idmap_ad_disc_ds_t *domainControllers,
 			char **dn_list, char *attr)
 {
 	int 	i;
@@ -913,7 +867,7 @@ ad_disc_refresh(ad_disc_t ctx)
 static void
 validate_DomainName(ad_disc_t ctx)
 {
-	ad_disc_ds_t *domain_controller = NULL;
+	idmap_ad_disc_ds_t *domain_controller = NULL;
 	char *dname, *srvname;
 	uint32_t ttl = 0;
 
@@ -976,7 +930,7 @@ static void
 validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 {
 	uint32_t ttl = 0;
-	ad_disc_ds_t *domain_controller = NULL;
+	idmap_ad_disc_ds_t *domain_controller = NULL;
 	int validate_global = FALSE;
 	int validate_site = FALSE;
 
@@ -1043,10 +997,10 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 	}
 }
 
-ad_disc_ds_t *
+idmap_ad_disc_ds_t *
 ad_disc_get_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 {
-	ad_disc_ds_t *domain_controller = NULL;
+	idmap_ad_disc_ds_t *domain_controller = NULL;
 	ad_item_t *item;
 
 	validate_DomainController(ctx, req);
@@ -1275,7 +1229,7 @@ ad_disc_get_ForestName(ad_disc_t ctx)
 static void
 validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 {
-	ad_disc_ds_t *global_catalog = NULL;
+	idmap_ad_disc_ds_t *global_catalog = NULL;
 	uint32_t ttl = 0;
 	int	validate_global = FALSE;
 	int	validate_site = FALSE;
@@ -1344,10 +1298,10 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 }
 
 
-ad_disc_ds_t *
+idmap_ad_disc_ds_t *
 ad_disc_get_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 {
-	ad_disc_ds_t *global_catalog = NULL;
+	idmap_ad_disc_ds_t *global_catalog = NULL;
 	ad_item_t *item;
 
 	validate_GlobalCatalog(ctx, req);
@@ -1377,9 +1331,9 @@ ad_disc_set_DomainName(ad_disc_t ctx, const char *domainName)
 
 int
 ad_disc_set_DomainController(ad_disc_t ctx,
-				const ad_disc_ds_t *domainController)
+				const idmap_ad_disc_ds_t *domainController)
 {
-	ad_disc_ds_t *domain_controller = NULL;
+	idmap_ad_disc_ds_t *domain_controller = NULL;
 	if (domainController != NULL) {
 		domain_controller = dsdup(domainController);
 		if (domain_controller == NULL)
@@ -1422,9 +1376,10 @@ ad_disc_set_ForestName(ad_disc_t ctx, const char *forestName)
 }
 
 int
-ad_disc_set_GlobalCatalog(ad_disc_t ctx, const ad_disc_ds_t *globalCatalog)
+ad_disc_set_GlobalCatalog(ad_disc_t ctx,
+    const idmap_ad_disc_ds_t *globalCatalog)
 {
-	ad_disc_ds_t *global_catalog = NULL;
+	idmap_ad_disc_ds_t *global_catalog = NULL;
 	if (globalCatalog != NULL) {
 		global_catalog = dsdup(globalCatalog);
 		if (global_catalog == NULL)

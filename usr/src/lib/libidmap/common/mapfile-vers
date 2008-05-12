@@ -39,6 +39,8 @@ SUNWprivate {
 	xdr_idmap_mapping;
 	xdr_idmap_id_res;
 	xdr_idmap_update_res;
+	xdr_idmap_prop_res;
+	xdr_idmap_prop_type;
 	idmap_init;
 	idmap_fini;
 	idmap_free;
@@ -82,6 +84,29 @@ SUNWprivate {
 	idmap_getext_pidbysid;
 	idmap_getext_gidbysid;
 	idmap_getext_sidbyuid;
+	idmapdlog;
+	idmap_log_stderr;
+	idmap_log_syslog;
+	idmap_log_degraded;
+	idmap_set_namemap;
+	idmap_unset_namemap;
+	idmap_get_namemap;
+	ad_disc_fini;
+	ad_disc_init;
+	ad_disc_get_DomainName;
+	ad_disc_set_DomainName;
+	ad_disc_compare_ds;
+	ad_disc_SubnetChanged;
+	ad_disc_get_GlobalCatalog;
+	ad_disc_set_GlobalCatalog;
+	ad_disc_get_TTL;
+	ad_disc_set_ForestName;
+	ad_disc_get_ForestName;
+	ad_disc_get_DomainController;
+	ad_disc_set_DomainController;
+	ad_disc_set_SiteName;
+	ad_disc_refresh;
+	ad_disc_get_SiteName;
     local:
 	*;
 };

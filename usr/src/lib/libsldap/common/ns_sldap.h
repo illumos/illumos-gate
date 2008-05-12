@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -483,6 +483,9 @@ typedef struct ns_ldap_objectclass_map {
 	char		*mappedOC;	/* mapped objectclass */
 } ns_ldap_objectclass_map_t;
 
+/* Opaque handle for batch API */
+typedef struct ns_ldap_list_batch ns_ldap_list_batch_t;
+
 /*
  * Simplified LDAP Naming APIs
  */
@@ -498,6 +501,30 @@ int __ns_ldap_list(
 	ns_ldap_error_t ** errorp,
 	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
 	const void *userdata);
+
+int __ns_ldap_list_batch_start(
+	ns_ldap_list_batch_t **batch);
+
+int __ns_ldap_list_batch_add(
+	ns_ldap_list_batch_t *batch,
+	const char *service,
+	const char *filter,
+	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+			char **realfilter, const void *userdata),
+	const char * const *attribute,
+	const ns_cred_t *cred,
+	const int flags,
+	ns_ldap_result_t ** result,
+	ns_ldap_error_t ** errorp,
+	int *rcp,
+	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
+	const void *userdata);
+
+int __ns_ldap_list_batch_end(
+	ns_ldap_list_batch_t *batch);
+
+void __ns_ldap_list_batch_release(
+	ns_ldap_list_batch_t *batch);
 
 int  __ns_ldap_addAttr(
 	const char *service,

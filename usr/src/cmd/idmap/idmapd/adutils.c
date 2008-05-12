@@ -48,6 +48,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <sys/u8_textprep.h>
+#include "nldaputils.h"
 #include "idmapd.h"
 
 /*
@@ -1190,6 +1191,12 @@ idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
 		domain = NULL;
 	}
 	if (q->canonname != NULL) {
+		/*
+		 * The caller may be replacing the given winname by its
+		 * canonical name and therefore free any old name before
+		 * overwriting the field by the canonical name.
+		 */
+		free(*q->canonname);
 		*q->canonname = san;
 		san = NULL;
 	}
@@ -1803,8 +1810,6 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 		*sid_type = _IDMAP_T_OTHER;
 	if (sid != NULL)
 		*sid = NULL;
-	if (canonname != NULL)
-		*canonname = NULL;
 	if (dname != NULL)
 		*dname = NULL;
 	if (rid != NULL)
@@ -1824,6 +1829,12 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 		if (idmap_get_adobject_batch(state->qadh, &tv) != 0)
 			break;
 	}
+
+	/*
+	 * Don't set *canonname to NULL because it may be pointing to the
+	 * given winname. Later on if we get a canonical name from AD the
+	 * old name if any will be freed before assigning the new name.
+	 */
 
 	/* Send this lookup, don't wait for a result here */
 	lrc = LDAP_SUCCESS;
@@ -1884,7 +1895,7 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 {
 	idmap_retcode	retcode;
 	int		len, samAcctNameLen;
-	char		*filter = NULL;
+	char		*filter = NULL, *s_name;
 	char		*ecanonname, *edomain; /* expected canonname */
 
 	/*
@@ -1940,13 +1951,25 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 		}
 	}
 
-	/* Assemble filter */
-	len = snprintf(NULL, 0, SANFILTER, samAcctNameLen, name) + 1;
-	if ((filter = (char *)malloc(len)) == NULL) {
+	s_name = sanitize_for_ldap_filter(name);
+	if (s_name == NULL) {
 		free(ecanonname);
+		free(edomain);
 		return (IDMAP_ERR_MEMORY);
 	}
-	(void) snprintf(filter, len, SANFILTER, samAcctNameLen, name);
+
+	/* Assemble filter */
+	len = snprintf(NULL, 0, SANFILTER, samAcctNameLen, s_name) + 1;
+	if ((filter = (char *)malloc(len)) == NULL) {
+		free(ecanonname);
+		free(edomain);
+		if (s_name != name)
+			free(s_name);
+		return (IDMAP_ERR_MEMORY);
+	}
+	(void) snprintf(filter, len, SANFILTER, samAcctNameLen, s_name);
+	if (s_name != name)
+		free(s_name);
 
 	retcode = idmap_batch_add1(state, filter, ecanonname, edomain,
 	    eunixtype, dn, attr, value, canonname, NULL, sid, rid, sid_type,
@@ -2004,7 +2027,7 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 {
 	idmap_retcode	retcode;
 	int		len, ulen;
-	char		*filter = NULL;
+	char		*filter = NULL, *s_unixname;
 	const char	*attrname = NULL;
 
 	/* Get unixuser or unixgroup AD attribute name */
@@ -2013,14 +2036,23 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	if (attrname == NULL)
 		return (IDMAP_ERR_NOTFOUND);
 
+	s_unixname = sanitize_for_ldap_filter(unixname);
+	if (s_unixname == NULL)
+		return (IDMAP_ERR_MEMORY);
+
 	/*  Assemble filter */
 	ulen = strlen(unixname);
 	len = snprintf(NULL, 0, "(&(objectclass=%s)(%s=%.*s))",
-	    is_wuser ? "user" : "group", attrname, ulen, unixname) + 1;
-	if ((filter = (char *)malloc(len)) == NULL)
+	    is_wuser ? "user" : "group", attrname, ulen, s_unixname) + 1;
+	if ((filter = (char *)malloc(len)) == NULL) {
+		if (s_unixname != unixname)
+			free(s_unixname);
 		return (IDMAP_ERR_MEMORY);
+	}
 	(void) snprintf(filter, len, "(&(objectclass=%s)(%s=%.*s))",
-	    is_wuser ? "user" : "group", attrname, ulen, unixname);
+	    is_wuser ? "user" : "group", attrname, ulen, s_unixname);
+	if (s_unixname != unixname)
+		free(s_unixname);
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL,
 	    _IDMAP_T_UNDEF, dn, NULL, NULL, name, dname, sid, rid, sid_type,

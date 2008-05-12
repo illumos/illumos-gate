@@ -97,21 +97,38 @@ generate_machine_sid(char **machine_sid)
 	return (0);
 }
 
-static bool_t
-prop_exists(idmap_cfg_handles_t *handles, char *name)
-{
-	bool_t exists = FALSE;
 
-	scf_property_t *scf_prop = scf_property_create(handles->main);
-	scf_value_t *value = scf_value_create(handles->main);
+/* In the case of error, exists is set to FALSE anyway */
+static int
+prop_exists(idmap_cfg_handles_t *handles, char *name, bool_t *exists)
+{
+
+	scf_property_t *scf_prop;
+	scf_value_t *value;
+
+	*exists = FALSE;
+
+	scf_prop = scf_property_create(handles->main);
+	if (scf_prop == NULL) {
+		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
+		    scf_strerror(scf_error()));
+		return (-1);
+	}
+	value = scf_value_create(handles->main);
+	if (value == NULL) {
+		idmapdlog(LOG_ERR, "scf_value_create() failed: %s",
+		    scf_strerror(scf_error()));
+		scf_property_destroy(scf_prop);
+		return (-1);
+	}
 
 	if (scf_pg_get_property(handles->config_pg, name, scf_prop) == 0)
-		exists = TRUE;
+		*exists = TRUE;
 
 	scf_value_destroy(value);
 	scf_property_destroy(scf_prop);
 
-	return (exists);
+	return (0);
 }
 
 /* Check if in the case of failure the original value of *val is preserved */
@@ -121,8 +138,22 @@ get_val_int(idmap_cfg_handles_t *handles, char *name,
 {
 	int rc = 0;
 
-	scf_property_t *scf_prop = scf_property_create(handles->main);
-	scf_value_t *value = scf_value_create(handles->main);
+	scf_property_t *scf_prop;
+	scf_value_t *value;
+
+	scf_prop = scf_property_create(handles->main);
+	if (scf_prop == NULL) {
+		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
+		    scf_strerror(scf_error()));
+		return (-1);
+	}
+	value = scf_value_create(handles->main);
+	if (value == NULL) {
+		idmapdlog(LOG_ERR, "scf_value_create() failed: %s",
+		    scf_strerror(scf_error()));
+		scf_property_destroy(scf_prop);
+		return (-1);
+	}
 
 	if (scf_pg_get_property(handles->config_pg, name, scf_prop) < 0)
 	/* this is OK: the property is just undefined */
@@ -200,9 +231,9 @@ destruction:
 
 static int
 get_val_ds(idmap_cfg_handles_t *handles, const char *name, int defport,
-		ad_disc_ds_t **val)
+		idmap_ad_disc_ds_t **val)
 {
-	ad_disc_ds_t *servers = NULL;
+	idmap_ad_disc_ds_t *servers = NULL;
 	scf_property_t *scf_prop;
 	scf_value_t *value;
 	scf_iter_t *iter;
@@ -215,8 +246,28 @@ get_val_ds(idmap_cfg_handles_t *handles, const char *name, int defport,
 
 restart:
 	scf_prop = scf_property_create(handles->main);
+	if (scf_prop == NULL) {
+		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
+		    scf_strerror(scf_error()));
+		return (-1);
+	}
+
 	value = scf_value_create(handles->main);
+	if (value == NULL) {
+		idmapdlog(LOG_ERR, "scf_value_create() failed: %s",
+		    scf_strerror(scf_error()));
+		scf_property_destroy(scf_prop);
+		return (-1);
+	}
+
 	iter = scf_iter_create(handles->main);
+	if (iter == NULL) {
+		idmapdlog(LOG_ERR, "scf_iter_create() failed: %s",
+		    scf_strerror(scf_error()));
+		scf_value_destroy(value);
+		scf_property_destroy(scf_prop);
+		return (-1);
+	}
 
 	if (scf_pg_get_property(handles->config_pg, name, scf_prop) < 0) {
 		/* this is OK: the property is just undefined */
@@ -302,8 +353,22 @@ get_val_astring(idmap_cfg_handles_t *handles, char *name, char **val)
 {
 	int rc = 0;
 
-	scf_property_t *scf_prop = scf_property_create(handles->main);
-	scf_value_t *value = scf_value_create(handles->main);
+	scf_property_t *scf_prop;
+	scf_value_t *value;
+
+	scf_prop = scf_property_create(handles->main);
+	if (scf_prop == NULL) {
+		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
+		    scf_strerror(scf_error()));
+		return (-1);
+	}
+	value = scf_value_create(handles->main);
+	if (value == NULL) {
+		idmapdlog(LOG_ERR, "scf_value_create() failed: %s",
+		    scf_strerror(scf_error()));
+		scf_property_destroy(scf_prop);
+		return (-1);
+	}
 
 	*val = NULL;
 
@@ -445,7 +510,7 @@ update_value(char **value, char **new, char *name)
 }
 
 static int
-update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
+update_dirs(idmap_ad_disc_ds_t **value, idmap_ad_disc_ds_t **new, char *name)
 {
 	int i;
 
@@ -695,10 +760,25 @@ idmap_cfg_start_updates(void)
 }
 
 /*
+ * Reject attribute names with invalid characters.
+ */
+static
+int
+valid_ldap_attr(const char *attr) {
+	for (; *attr; attr++) {
+		if (!isalnum(*attr) && *attr != '-' &&
+		    *attr != '_' && *attr != '.' && *attr != ';')
+			return (0);
+	}
+	return (1);
+}
+
+/*
  * This is the half of idmap_cfg_load() that loads property values from
  * SMF (using the config/ property group of the idmap FMRI).
  *
  * Return values: 0 -> success, -1 -> failure, -2 -> hard failures
+ *               -3 -> hard smf config failures
  * reading from SMF.
  */
 static
@@ -723,7 +803,11 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		return (-2);
 	}
 
-	new_debug_mode = prop_exists(handles, "debug");
+
+	rc = prop_exists(handles, "debug", &new_debug_mode);
+	if (rc != 0)
+		errors++;
+
 	if (_idmapdstate.debug_mode != new_debug_mode) {
 		if (_idmapdstate.debug_mode == FALSE) {
 			_idmapdstate.debug_mode = new_debug_mode;
@@ -857,32 +941,42 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	    &pgcfg->ad_unixuser_attr);
 	if (rc != 0)
 		return (-2);
+	if (pgcfg->ad_unixuser_attr != NULL &&
+	    !valid_ldap_attr(pgcfg->ad_unixuser_attr)) {
+		idmapdlog(LOG_ERR, "config/ad_unixuser_attr=%s is not a "
+		    "valid LDAP attribute name", pgcfg->ad_unixuser_attr);
+		return (-3);
+	}
 
 	rc = get_val_astring(handles, "ad_unixgroup_attr",
 	    &pgcfg->ad_unixgroup_attr);
 	if (rc != 0)
 		return (-2);
+	if (pgcfg->ad_unixgroup_attr != NULL &&
+	    !valid_ldap_attr(pgcfg->ad_unixgroup_attr)) {
+		idmapdlog(LOG_ERR, "config/ad_unixgroup_attr=%s is not a "
+		    "valid LDAP attribute name", pgcfg->ad_unixgroup_attr);
+		return (-3);
+	}
 
 	rc = get_val_astring(handles, "nldap_winname_attr",
 	    &pgcfg->nldap_winname_attr);
 	if (rc != 0)
 		return (-2);
-
-	if (pgcfg->nldap_winname_attr != NULL) {
-		idmapdlog(LOG_ERR,
-		    "Native LDAP based name mapping not supported at this "
-		    "time. Please unset config/nldap_winname_attr and restart "
-		    "idmapd.");
+	if (pgcfg->nldap_winname_attr != NULL &&
+	    !valid_ldap_attr(pgcfg->nldap_winname_attr)) {
+		idmapdlog(LOG_ERR, "config/nldap_winname_attr=%s is not a "
+		    "valid LDAP attribute name", pgcfg->nldap_winname_attr);
 		return (-3);
 	}
-
 	if (pgcfg->ad_unixuser_attr == NULL &&
-	    pgcfg->ad_unixgroup_attr == NULL) {
+	    pgcfg->ad_unixgroup_attr == NULL &&
+	    pgcfg->nldap_winname_attr == NULL) {
 		idmapdlog(LOG_ERR,
 		    "If config/ds_name_mapping_enabled property is set to "
 		    "true then atleast one of the following name mapping "
 		    "attributes must be specified. (config/ad_unixuser_attr OR "
-		    "config/ad_unixgroup_attr)");
+		    "config/ad_unixgroup_attr OR config/nldap_winname_attr)");
 		return (-3);
 	}
 

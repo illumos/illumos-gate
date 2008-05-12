@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,13 +27,15 @@
 
 LIBRARY =	libidmap.a
 VERS =		.1
-OBJECTS =	idmap_xdr.o utils.o idmap_api.o
-LINT_OBJECTS =	utils.o idmap_api.o
+OBJECTS =	idmap_xdr.o utils.o idmap_api.o namemaps.o addisc.o
+LINT_OBJECTS =	utils.o idmap_api.o namemaps.o addisc.o
 
 include ../../Makefile.lib
 
+
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl
+LDLIBS +=	-lc -lnsl -lldap -lresolv -lsldap -lsocket
+CPPFLAGS += -I$(SRC)/lib/libsldap/common
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
@@ -60,5 +62,8 @@ $(SRCDIR)/idmap_xdr.c:	$(IDMAP_PROT_H) $(IDMAP_PROT_X)
 	$(RM) $@; $(RPCGEN) -CMNc -o $@ $(IDMAP_PROT_X)
 
 lint: lintcheck
+
+LINTFLAGS += -erroff=E_CONSTANT_CONDITION
+LINTFLAGS64 += -erroff=E_CONSTANT_CONDITION
 
 include ../../Makefile.targ

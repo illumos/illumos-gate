@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,9 +45,11 @@
 extern "C" {
 #endif
 
-extern idmap_retcode	nldap_lookup(idmap_mapping *, idmap_id_res *, int, int);
+extern idmap_retcode	nldap_lookup_one(lookup_state_t *, idmap_mapping *,
+			idmap_id_res *);
 extern idmap_retcode	nldap_lookup_batch(lookup_state_t *,
 			idmap_mapping_batch *, idmap_ids_res *);
+extern char		*sanitize_for_ldap_filter(const char *);
 
 #ifdef __cplusplus
 }

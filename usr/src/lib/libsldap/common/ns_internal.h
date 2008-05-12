@@ -582,6 +582,17 @@ typedef struct ns_referral_info {
 	char			*refFilter;
 } ns_referral_info_t;
 
+struct ns_ldap_cookie;
+
+/*
+ * Batch used by __ns_ldap_list_batch_xxx API
+ */
+struct ns_ldap_list_batch {
+	uint32_t		nactive;
+	struct ns_ldap_cookie	*next_cookie;
+	struct ns_ldap_cookie	*cookie_list;
+};
+
 /*
  * This structure used internally in searches
  */
@@ -659,6 +670,14 @@ typedef struct ns_ldap_cookie {
 	/* Flag to indicate password less account management is required */
 	int			nopasswd_acct_mgmt;
 	int			err_from_result;
+
+	/* BATCH PROCESSING */
+	ns_ldap_list_batch_t	*batch;
+	boolean_t		no_wait;
+	ns_ldap_result_t	**caller_result;
+	ns_ldap_error_t		**caller_errorp;
+	int			*caller_rc;
+	struct ns_ldap_cookie	*next_cookie_in_batch;
 } ns_ldap_cookie_t;
 
 /*
