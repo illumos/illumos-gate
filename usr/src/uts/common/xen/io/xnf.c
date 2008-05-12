@@ -1134,10 +1134,10 @@ xnf_send_one(xnf_t *xnfp, mblk_t *mp)
 
 	/* Make sure packet isn't too large */
 	if (pktlen > XNF_FRAMESIZE) {
-		cmn_err(CE_WARN, "xnf%d: large packet %d bytes",
+		cmn_err(CE_WARN, "xnf%d: oversized packet (%d bytes) dropped",
 		    ddi_get_instance(xnfp->xnf_devinfo), pktlen);
 		freemsg(mp);
-		return (B_FALSE);
+		return (B_TRUE);
 	}
 
 	/*
