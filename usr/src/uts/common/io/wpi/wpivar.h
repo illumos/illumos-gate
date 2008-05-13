@@ -214,7 +214,7 @@ typedef struct wpi_softc {
 #define	WPI_F_RADIO_OFF		(1 << 7)
 
 #define	WPI_SUCCESS		0
-#define	WPI_FAIL		1
+#define	WPI_FAIL		(EIO)
 #ifdef __cplusplus
 }
 #endif

@@ -779,6 +779,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sfe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:                $(UTSBASE)/common/io/ural/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/audio/usb_ac/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1657,6 +1661,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/softmac/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/sfe/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/ural/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/audio/usb_ac/%.c

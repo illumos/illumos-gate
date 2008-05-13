@@ -141,6 +141,7 @@ usr/src/uts/common/io/ppp/THIRDPARTYLICENSE
 usr/src/uts/common/io/ral/THIRDPARTYLICENSE
 usr/src/uts/common/io/rtw/THIRDPARTYLICENSE
 usr/src/uts/common/io/sfe/THIRDPARTYLICENSE
+usr/src/uts/common/io/ural/THIRDPARTYLICENSE
 usr/src/uts/common/io/wpi/THIRDPARTYLICENSE
 usr/src/uts/common/io/wpi/fw-wpi/LICENSE
 usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart

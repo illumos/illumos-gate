@@ -2001,7 +2001,7 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		    IEEE80211_FC0_TYPE_DATA) {
 			freemsg(mp);
 		}
-		err = WPI_FAIL;
+		err = ENXIO;
 		goto exit;
 	}
 
@@ -2014,7 +2014,7 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 			freemsg(mp);
 		}
 		sc->sc_tx_nobuf++;
-		err = WPI_FAIL;
+		err = ENOMEM;
 		goto exit;
 	}
 	mutex_exit(&sc->sc_tx_lock);

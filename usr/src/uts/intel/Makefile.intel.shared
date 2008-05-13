@@ -316,6 +316,7 @@ DRV_KMODS	+= tnf
 DRV_KMODS	+= udp
 DRV_KMODS	+= udp6
 DRV_KMODS	+= ucode
+DRV_KMODS	+= ural
 DRV_KMODS	+= vgatext
 DRV_KMODS	+= vni
 DRV_KMODS	+= vnic

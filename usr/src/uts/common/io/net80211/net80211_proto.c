@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,6 +231,9 @@ ieee80211_fix_rate(ieee80211_node_t *in, int flags)
 	if ((flags & IEEE80211_F_DOFRATE) &&
 	    (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE)) {
 		flags &= ~IEEE80211_F_DOFRATE;
+	}
+	if (in->in_chan == IEEE80211_CHAN_ANYC) {
+		return (IEEE80211_RATE_BASIC);
 	}
 	okrate = badrate = fixedrate = 0;
 	srs = &ic->ic_sup_rates[ieee80211_chan2mode(ic, in->in_chan)];

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -714,6 +714,9 @@ ieee80211_detach(ieee80211com_t *ic)
 	ieee80211_stop_watchdog(ic);
 	cv_destroy(&im->im_scan_cv);
 	kmem_free(im, sizeof (ieee80211_impl_t));
+
+	if (ic->ic_opt_ie != NULL)
+		ieee80211_free(ic->ic_opt_ie);
 
 	ieee80211_node_detach(ic);
 	ieee80211_crypto_detach(ic);
