@@ -62,7 +62,7 @@ static ddi_dma_attr_t igb_desc_dma_attr = {
 	0xFFFFFFFFFFFFFFFFull,		/* maximum segment size */
 	1,				/* scatter/gather list length */
 	0x00000001,			/* granularity */
-	0				/* DMA flags */
+	DDI_DMA_FLAGERR,		/* DMA flags */
 };
 
 /*
@@ -80,7 +80,7 @@ static ddi_dma_attr_t igb_buf_dma_attr = {
 	0xFFFFFFFFFFFFFFFFull,		/* maximum segment size	 */
 	1,				/* scatter/gather list length */
 	0x00000001,			/* granularity */
-	0				/* DMA flags */
+	DDI_DMA_FLAGERR,		/* DMA flags */
 };
 
 /*
@@ -98,7 +98,7 @@ static ddi_dma_attr_t igb_tx_dma_attr = {
 	0xFFFFFFFFFFFFFFFFull,		/* maximum segment size	 */
 	MAX_COOKIE,			/* scatter/gather list length */
 	0x00000001,			/* granularity */
-	0				/* DMA flags */
+	DDI_DMA_FLAGERR,		/* DMA flags */
 };
 
 /*
@@ -107,7 +107,8 @@ static ddi_dma_attr_t igb_tx_dma_attr = {
 static ddi_device_acc_attr_t igb_desc_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 /*
@@ -867,5 +868,25 @@ igb_free_rcb_lists(igb_rx_ring_t *rx_ring)
 		kmem_free(rx_ring->free_list,
 		    sizeof (rx_control_block_t *) * rx_ring->free_list_size);
 		rx_ring->free_list = NULL;
+	}
+}
+
+void
+igb_set_fma_flags(int acc_flag, int dma_flag)
+{
+	if (acc_flag) {
+		igb_desc_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+	} else {
+		igb_desc_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+	}
+
+	if (dma_flag) {
+		igb_tx_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		igb_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		igb_desc_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+	} else {
+		igb_tx_dma_attr.dma_attr_flags = 0;
+		igb_buf_dma_attr.dma_attr_flags = 0;
+		igb_desc_dma_attr.dma_attr_flags = 0;
 	}
 }

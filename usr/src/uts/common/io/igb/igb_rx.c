@@ -109,10 +109,16 @@ igb_rx_copy(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 {
 	rx_control_block_t *current_rcb;
 	mblk_t *mp;
+	igb_t *igb = rx_ring->igb;
 
 	current_rcb = rx_ring->work_list[index];
 
 	DMA_SYNC(&current_rcb->rx_buf, DDI_DMA_SYNC_FORKERNEL);
+
+	if (igb_check_dma_handle(
+	    current_rcb->rx_buf.dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	/*
 	 * Allocate buffer to receive this packet
@@ -146,6 +152,7 @@ igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	rx_control_block_t *free_rcb;
 	uint32_t free_index;
 	mblk_t *mp;
+	igb_t *igb = rx_ring->igb;
 
 	/*
 	 * If the free list is empty, we cannot proceed to send
@@ -179,6 +186,11 @@ igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	 * Sync up the data received
 	 */
 	DMA_SYNC(&current_rcb->rx_buf, DDI_DMA_SYNC_FORKERNEL);
+
+	if (igb_check_dma_handle(
+	    current_rcb->rx_buf.dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	mp = current_rcb->mp;
 	current_rcb->mp = NULL;
@@ -271,6 +283,11 @@ igb_rx(igb_rx_ring_t *rx_ring)
 	 */
 	DMA_SYNC(&rx_ring->rbd_area, DDI_DMA_SYNC_FORKERNEL);
 
+	if (igb_check_dma_handle(
+	    rx_ring->rbd_area.dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
+
 	/*
 	 * Get the start point of rx bd ring which should be examined
 	 * during this cycle.
@@ -359,6 +376,10 @@ rx_discard:
 	rx_tail = PREV_INDEX(rx_next, 1, rx_ring->ring_size);
 
 	E1000_WRITE_REG(&igb->hw, E1000_RDT(rx_ring->index), rx_tail);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	return (mblk_head);
 }

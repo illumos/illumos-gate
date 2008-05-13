@@ -427,6 +427,9 @@ igb_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	mutex_exit(&igb->gen_lock);
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
+
 	return (0);
 }
 
@@ -517,6 +520,11 @@ igb_m_promisc(void *arg, boolean_t on)
 	E1000_WRITE_REG(&igb->hw, E1000_RCTL, reg_val);
 
 	mutex_exit(&igb->gen_lock);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }

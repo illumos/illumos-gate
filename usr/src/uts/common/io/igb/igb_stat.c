@@ -138,6 +138,9 @@ igb_update_stats(kstat_t *ks, int rw)
 
 	mutex_exit(&igb->gen_lock);
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
+
 	return (0);
 }
 

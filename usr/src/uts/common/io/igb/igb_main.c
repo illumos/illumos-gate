@@ -30,7 +30,7 @@
 
 #include "igb_sw.h"
 
-static char ident[] = "Intel 1Gb Ethernet 1.1.1";
+static char ident[] = "Intel 1Gb Ethernet 1.1.2";
 
 /*
  * Local function protoypes
@@ -106,6 +106,11 @@ static int igb_detach(dev_info_t *, ddi_detach_cmd_t);
 static int igb_resume(dev_info_t *);
 static int igb_suspend(dev_info_t *);
 static void igb_unconfigure(dev_info_t *, igb_t *);
+static int igb_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
+    const void *);
+static void igb_fm_init(igb_t *);
+static void igb_fm_fini(igb_t *);
+
 
 static struct cb_ops igb_cb_ops = {
 	nulldev,		/* cb_open */
@@ -157,6 +162,7 @@ ddi_device_acc_attr_t igb_regs_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 #define	IGB_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
@@ -275,6 +281,15 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/* Attach the instance pointer to the dev_info data structure */
 	ddi_set_driver_private(devinfo, igb);
 
+
+	/* Initialize for fma support */
+	igb->fm_capabilities = igb_get_prop(igb, "fm-capable",
+	    0, 0x0f,
+	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+	igb_fm_init(igb);
+	igb->attach_progress |= ATTACH_PROGRESS_FMINIT;
+
 	/*
 	 * Map PCI config space registers
 	 */
@@ -342,6 +357,11 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	if (igb_init_driver_settings(igb) != IGB_SUCCESS) {
 		igb_error(igb, "Failed to initialize driver settings");
+		goto attach_fail;
+	}
+
+	if (igb_check_acc_handle(igb->osdep.cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 		goto attach_fail;
 	}
 
@@ -566,6 +586,8 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 		mutex_enter(&igb->gen_lock);
 		igb_chip_stop(igb);
 		mutex_exit(&igb->gen_lock);
+		if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+			ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
 	}
 
 	/*
@@ -596,6 +618,13 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 	 */
 	if (igb->attach_progress & ATTACH_PROGRESS_ALLOC_RINGS) {
 		igb_free_rings(igb);
+	}
+
+	/*
+	 * Remove FMA
+	 */
+	if (igb->attach_progress & ATTACH_PROGRESS_FMINIT) {
+		igb_fm_fini(igb);
 	}
 
 	/*
@@ -949,7 +978,10 @@ igb_init(igb_t *igb)
 	 * Reset chipset to put the hardware in a known state
 	 * before we try to do anything with the eeprom
 	 */
-	(void) e1000_reset_hw(hw);
+	if (e1000_reset_hw(hw) != E1000_SUCCESS) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
+		goto init_fail;
+	}
 
 	/*
 	 * NVM validation
@@ -964,6 +996,7 @@ igb_init(igb_t *igb)
 			igb_error(igb,
 			    "Invalid NVM checksum. Please contact "
 			    "the vendor to update the NVM.");
+			igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
 			goto init_fail;
 		}
 	}
@@ -1001,7 +1034,10 @@ igb_init(igb_t *igb)
 	 * Reset the chipset hardware the second time to validate
 	 * the PBA setting.
 	 */
-	(void) e1000_reset_hw(hw);
+	if (e1000_reset_hw(hw) != E1000_SUCCESS) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
+		goto init_fail;
+	}
 
 	/*
 	 * Don't wait for auto-negotiation to complete
@@ -1026,6 +1062,15 @@ igb_init(igb_t *igb)
 	 * Initialize the chipset hardware
 	 */
 	if (igb_chip_start(igb) != IGB_SUCCESS) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
+		goto init_fail;
+	}
+
+	if (igb_check_acc_handle(igb->osdep.cfg_handle) != DDI_FM_OK) {
+		goto init_fail;
+	}
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
 		goto init_fail;
 	}
 
@@ -1040,6 +1085,9 @@ init_fail:
 		(void) e1000_phy_hw_reset(hw);
 
 	mutex_exit(&igb->gen_lock);
+
+	ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
+
 	return (IGB_FAILURE);
 }
 
@@ -1185,7 +1233,10 @@ igb_chip_stop(igb_t *igb)
 	/*
 	 * Reset the chipset
 	 */
-	(void) e1000_reset_hw(hw);
+	if (e1000_reset_hw(hw) != E1000_SUCCESS) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
+	}
 
 	/*
 	 * Reset PHY if possible
@@ -1239,6 +1290,7 @@ igb_reset(igb_t *igb)
 	 * Start the chipset hardware
 	 */
 	if (igb_chip_start(igb) != IGB_SUCCESS) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
 		goto reset_failure;
 	}
 
@@ -1252,6 +1304,12 @@ igb_reset(igb_t *igb)
 	 * The interrupts must be enabled after the driver state is START
 	 */
 	igb_enable_adapter_interrupts(igb);
+
+	if (igb_check_acc_handle(igb->osdep.cfg_handle) != DDI_FM_OK)
+		goto reset_failure;
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		goto reset_failure;
 
 	for (i = igb->num_tx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
@@ -1269,6 +1327,8 @@ reset_failure:
 		mutex_exit(&igb->rx_rings[i].rx_lock);
 
 	mutex_exit(&igb->gen_lock);
+
+	ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 
 	return (IGB_FAILURE);
 }
@@ -1432,6 +1492,7 @@ igb_start(igb_t *igb)
 	 * Start the chipset hardware
 	 */
 	if (igb_chip_start(igb) != IGB_SUCCESS) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
 		goto start_failure;
 	}
 
@@ -1446,6 +1507,12 @@ igb_start(igb_t *igb)
 	 */
 	igb_enable_adapter_interrupts(igb);
 
+	if (igb_check_acc_handle(igb->osdep.cfg_handle) != DDI_FM_OK)
+		goto start_failure;
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		goto start_failure;
+
 	for (i = igb->num_tx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
 	for (i = igb->num_rx_rings - 1; i >= 0; i--)
@@ -1458,6 +1525,8 @@ start_failure:
 		mutex_exit(&igb->tx_rings[i].tx_lock);
 	for (i = igb->num_rx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->rx_rings[i].rx_lock);
+
+	ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 
 	return (IGB_FAILURE);
 }
@@ -1501,6 +1570,9 @@ igb_stop(igb_t *igb)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
 	for (i = igb->num_rx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->rx_rings[i].rx_lock);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 }
 
 /*
@@ -1572,6 +1644,9 @@ igb_setup_rings(igb_t *igb)
 	igb_setup_rx(igb);
 
 	igb_setup_tx(igb);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 }
 
 static void
@@ -1959,6 +2034,9 @@ igb_init_unicst(igb_t *igb)
 			e1000_rar_set(hw,
 			    igb->unicst_addr[slot].mac.addr, slot);
 	}
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 }
 
 /*
@@ -1981,6 +2059,11 @@ igb_unicst_set(igb_t *igb, const uint8_t *mac_addr,
 	 * Set the unicast address to the RAR register
 	 */
 	e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -2009,6 +2092,11 @@ igb_multicst_add(igb_t *igb, const uint8_t *multiaddr)
 	 * Update the multicast table in the hardware
 	 */
 	igb_setup_multicst(igb);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -2039,6 +2127,11 @@ igb_multicst_remove(igb_t *igb, const uint8_t *multiaddr)
 	 * Update the multicast table in the hardware
 	 */
 	igb_setup_multicst(igb);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -2384,6 +2477,9 @@ igb_link_check(igb_t *igb)
 		}
 	}
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+
 	return (link_changed);
 }
 
@@ -2401,8 +2497,11 @@ igb_local_timer(void *arg)
 	boolean_t link_changed;
 
 	if (igb_stall_check(igb)) {
+		igb_fm_ereport(igb, DDI_FM_DEVICE_STALL);
 		igb->reset_count++;
-		(void) igb_reset(igb);
+		if (igb_reset(igb) == IGB_SUCCESS)
+			ddi_fm_service_impact(igb->dip,
+			    DDI_SERVICE_RESTORED);
 	}
 
 	mutex_enter(&igb->gen_lock);
@@ -2417,6 +2516,9 @@ igb_local_timer(void *arg)
 	 */
 	if (igb->intr_type != DDI_INTR_TYPE_MSIX)
 		E1000_WRITE_REG(hw, E1000_ICS, E1000_IMS_RXT0);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 
 	igb_restart_watchdog_timer(igb);
 }
@@ -2823,6 +2925,11 @@ igb_loopback_ioctl(igb_t *igb, struct iocblk *iocp, mblk_t *mp)
 
 	iocp->ioc_count = size;
 	iocp->ioc_error = 0;
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (IOC_INVAL);
+	}
 
 	return (IOC_REPLY);
 }
@@ -4013,4 +4120,124 @@ igb_atomic_reserve(uint32_t *count_p, uint32_t n)
 	} while (atomic_cas_32(count_p, oldval, newval) != oldval);
 
 	return (newval);
+}
+
+/*
+ * FMA support
+ */
+
+int
+igb_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+	ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+int
+igb_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+/*
+ * The IO fault service error handling callback function
+ */
+/*ARGSUSED*/
+static int
+igb_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+static void
+igb_fm_init(igb_t *igb)
+{
+	ddi_iblock_cookie_t iblk;
+	int fma_acc_flag, fma_dma_flag;
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (igb->fm_capabilities & DDI_FM_ACCCHK_CAPABLE) {
+		igb_regs_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		fma_acc_flag = 1;
+	} else {
+		igb_regs_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		fma_acc_flag = 0;
+	}
+
+	if (igb->fm_capabilities & DDI_FM_DMACHK_CAPABLE) {
+		fma_dma_flag = 1;
+	} else {
+		fma_dma_flag = 0;
+	}
+
+	(void) igb_set_fma_flags(fma_acc_flag, fma_dma_flag);
+
+	if (igb->fm_capabilities) {
+
+		/* Register capabilities with IO Fault Services */
+		ddi_fm_init(igb->dip, &igb->fm_capabilities, &iblk);
+
+		/*
+		 * Initialize pci ereport capabilities if ereport capable
+		 */
+		if (DDI_FM_EREPORT_CAP(igb->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(igb->fm_capabilities))
+			pci_ereport_setup(igb->dip);
+
+		/*
+		 * Register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(igb->fm_capabilities))
+			ddi_fm_handler_register(igb->dip,
+			    igb_fm_error_cb, (void*) igb);
+	}
+}
+
+static void
+igb_fm_fini(igb_t *igb)
+{
+	/* Only unregister FMA capabilities if we registered some */
+	if (igb->fm_capabilities) {
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(igb->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(igb->fm_capabilities))
+			pci_ereport_teardown(igb->dip);
+
+		/*
+		 * Un-register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(igb->fm_capabilities))
+			ddi_fm_handler_unregister(igb->dip);
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(igb->dip);
+	}
+}
+
+void
+igb_fm_ereport(igb_t *igb, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(igb->fm_capabilities)) {
+		ddi_fm_ereport_post(igb->dip, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+	}
 }

@@ -65,6 +65,10 @@ extern "C" {
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
 #include "igb_api.h"
 #include "igb_82575.h"
 
@@ -181,6 +185,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_NDD		0x0400	/* NDD initialized */
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
+#define	ATTACH_PROGRESS_FMINIT		0x2000	/* FMA initialized */
 
 
 #define	PROP_ADV_AUTONEG_CAP		"adv_autoneg_cap"
@@ -673,6 +678,11 @@ typedef struct igb {
 	caddr_t			nd_data;
 	nd_param_t		nd_params[PARAM_COUNT];
 
+	/*
+	 * FMA capabilities
+	 */
+	int			fm_capabilities;
+
 } igb_t;
 
 typedef struct igb_stat {
@@ -769,6 +779,10 @@ enum ioc_reply igb_loopback_ioctl(igb_t *, struct iocblk *, mblk_t *);
 void igb_enable_watchdog_timer(igb_t *);
 void igb_disable_watchdog_timer(igb_t *);
 int igb_atomic_reserve(uint32_t *, uint32_t);
+int igb_check_acc_handle(ddi_acc_handle_t);
+int igb_check_dma_handle(ddi_dma_handle_t);
+void igb_fm_ereport(igb_t *, char *);
+void igb_set_fma_flags(int, int);
 
 /*
  * Function prototypes in igb_gld.c

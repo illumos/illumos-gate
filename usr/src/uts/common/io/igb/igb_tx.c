@@ -738,6 +738,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	tx_control_block_t *tcb, *first_tcb;
 	uint32_t hcksum_flags;
 	int i;
+	igb_t *igb = tx_ring->igb;
 
 	ASSERT(mutex_owned(&tx_ring->tx_lock));
 
@@ -890,6 +891,10 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	 */
 	E1000_WRITE_REG(hw, E1000_TDT(tx_ring->index), index);
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
+
 	return (desc_num);
 }
 
@@ -930,6 +935,7 @@ igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 	boolean_t desc_done;
 	tx_control_block_t *tcb;
 	link_list_t pending_list;
+	igb_t *igb = tx_ring->igb;
 
 	/*
 	 * The mutex_tryenter() is used to avoid unnecessary
@@ -951,6 +957,11 @@ igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 	 * Sync the DMA buffer of the tx descriptor ring
 	 */
 	DMA_SYNC(&tx_ring->tbd_area, DDI_DMA_SYNC_FORKERNEL);
+
+	if (igb_check_dma_handle(
+	    tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	LINK_LIST_INIT(&pending_list);
 	desc_num = 0;
@@ -1060,6 +1071,7 @@ igb_tx_recycle_head_wb(igb_tx_ring_t *tx_ring)
 	int desc_num;
 	tx_control_block_t *tcb;
 	link_list_t pending_list;
+	igb_t *igb = tx_ring->igb;
 
 	/*
 	 * The mutex_tryenter() is used to avoid unnecessary
@@ -1091,6 +1103,11 @@ igb_tx_recycle_head_wb(igb_tx_ring_t *tx_ring)
 	    sizeof (union e1000_adv_tx_desc) * tx_ring->ring_size,
 	    sizeof (uint32_t),
 	    DDI_DMA_SYNC_FORKERNEL);
+
+	if (igb_check_dma_handle(
+	    tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	LINK_LIST_INIT(&pending_list);
 	desc_num = 0;

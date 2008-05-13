@@ -292,6 +292,9 @@ igb_nd_set_param_val(nd_param_t *nd, uint32_t value)
 		break;
 	}
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
+
 	mutex_exit(&igb->gen_lock);
 }
 
