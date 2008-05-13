@@ -56,7 +56,7 @@ pics/elfcap.o:	$(ELFCAP)/elfcap.c
 # We make this depend on Makefile.targ, because a change to Makefile.targ
 # can change the limit, in which case we want to force everything to rebuild.
 report_bufsize.h:	../Makefile.targ
-		perl ../../tools/libconv_mk_report_bufsize.pl 2000
+		perl ../../tools/libconv_mk_report_bufsize.pl 8000
 
 ../common/%.c:	%_msg.h
 

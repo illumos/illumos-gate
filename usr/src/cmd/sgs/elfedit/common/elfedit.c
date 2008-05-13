@@ -597,21 +597,12 @@ elfedit_write(const void *ptr, size_t size)
 
 /*
  * Convert the NULL terminated string to the form used by the C
- * language to represent literal strings:
- *	- Printable characters are shown as themselves
- *	- Convert special characters to their 2-character escaped forms:
- *		alert (bell)	\a
- *		backspace	\b
- *		formfeed	\f
- *		newline		\n
- *		return		\r
- *		horizontal tab	\t
- *		vertical tab	\v
- *		backspace	\\
- *		single quote	\'
- *		double quote	\"
- *	- Display other non-printable characters as 4-character escaped
- *		octal constants.
+ * language to represent literal strings. See conv_str_to_c_literal()
+ * for details.
+ *
+ * This routine differs from conv_str_to_c_literal() in two ways:
+ *	1) String is NULL terminated instead of counted
+ *	2) Signature of outfunc
  *
  * entry:
  *	str - String to be processed
@@ -624,72 +615,19 @@ elfedit_write(const void *ptr, size_t size)
  *	The string has been processed, with the resulting data passed
  *	to outfunc for processing.
  */
+static void
+elfedit_str_to_c_literal_cb(const void *ptr, size_t size, void *uvalue)
+{
+	elfedit_write_func_t *outfunc = (elfedit_write_func_t *)uvalue;
+
+	(* outfunc)(ptr, size);
+
+}
 void
 elfedit_str_to_c_literal(const char *str, elfedit_write_func_t *outfunc)
 {
-	char		bs_buf[2];	/* For two-character backslash codes */
-	char		octal_buf[10];	/* For \000 style octal constants */
-
-	bs_buf[0] = '\\';
-	while (*str != '\0') {
-		switch (*str) {
-		case '\a':
-			bs_buf[1] = 'a';
-			break;
-		case '\b':
-			bs_buf[1] = 'b';
-			break;
-		case '\f':
-			bs_buf[1] = 'f';
-			break;
-		case '\n':
-			bs_buf[1] = 'n';
-			break;
-		case '\r':
-			bs_buf[1] = 'r';
-			break;
-		case '\t':
-			bs_buf[1] = 't';
-			break;
-		case '\v':
-			bs_buf[1] = 'v';
-			break;
-		case '\\':
-			bs_buf[1] = '\\';
-			break;
-		case '\'':
-			bs_buf[1] = '\'';
-			break;
-		case '"':
-			bs_buf[1] = '"';
-			break;
-		default:
-			bs_buf[1] = '\0';
-		}
-
-		if (bs_buf[1] != '\0') {
-			(*outfunc)(bs_buf, 2);
-			str++;
-		} else if (isprint(*str)) {
-			/*
-			 * Output the entire sequence of printable
-			 * characters in a single shot.
-			 */
-			const char	*tail;
-			size_t		outlen = 0;
-
-			for (tail = str; isprint(*tail); tail++)
-				outlen++;
-			(*outfunc)(str, outlen);
-			str = tail;
-		} else {
-			/* Generic unprintable character: Use octal notation */
-			(void) snprintf(octal_buf, sizeof (octal_buf),
-			    MSG_ORIG(MSG_FMT_OCTCONST), *str);
-			(*outfunc)(octal_buf, strlen(octal_buf));
-			str++;
-		}
-	}
+	conv_str_to_c_literal(str, strlen(str),
+	    elfedit_str_to_c_literal_cb, (void *) outfunc);
 }
 
 

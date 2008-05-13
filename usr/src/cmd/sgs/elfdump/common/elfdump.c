@@ -2740,14 +2740,30 @@ move(Cache *cache, Word shnum, const char *file, uint_t flags)
 }
 
 /*
+ * Callback function for use with conv_str_to_c_literal() below.
+ */
+/*ARGSUSED2*/
+static void
+c_literal_cb(const void *ptr, size_t size, void *uvalue)
+{
+	(void) fwrite(ptr, size, 1, stdout);
+}
+
+/*
  * Traverse a note section analyzing each note information block.
  * The data buffers size is used to validate references before they are made,
  * and is decremented as each element is processed.
  */
 void
-note_entry(Cache *cache, Word *data, size_t size, const char *file)
+note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 {
-	size_t	bsize = size;
+	size_t		bsize = size;
+	int		cnt = 0;
+	int		is_corenote;
+	int		do_swap;
+	Conv_inv_buf_t	inv_buf;
+
+	do_swap =  _elf_sys_encoding() != ehdr->e_ident[EI_DATA];
 
 	/*
 	 * Print out a single `note' information block.
@@ -2808,19 +2824,45 @@ note_entry(Cache *cache, Word *data, size_t size, const char *file)
 
 		type = *data++;
 
-		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
-		dbg_print(0, MSG_ORIG(MSG_NOTE_TYPE), EC_WORD(type));
+		/*
+		 * Is this a Solaris core note? Such notes all have
+		 * the name "CORE".
+		 */
+		is_corenote = (ehdr->e_type == ET_CORE) &&
+		    (namesz == (MSG_STR_CORE_SIZE + 1)) &&
+		    (strncmp(MSG_ORIG(MSG_STR_CORE), (char *)data,
+		    MSG_STR_CORE_SIZE + 1) == 0);
 
+		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+		dbg_print(0, MSG_INTL(MSG_FMT_NOTEENTNDX), EC_WORD(cnt));
+		cnt++;
 		dbg_print(0, MSG_ORIG(MSG_NOTE_NAMESZ), EC_WORD(namesz));
+		dbg_print(0, MSG_ORIG(MSG_NOTE_DESCSZ), EC_WORD(descsz));
+
+		if (is_corenote)
+			dbg_print(0, MSG_ORIG(MSG_NOTE_TYPE_STR),
+			    conv_cnote_type(type, 0, &inv_buf));
+		else
+			dbg_print(0, MSG_ORIG(MSG_NOTE_TYPE), EC_WORD(type));
 		if (namesz) {
 			char	*name = (char *)data;
 
+
+			dbg_print(0, MSG_ORIG(MSG_NOTE_NAME));
 			/*
-			 * Since the name string may have 'null' bytes
-			 * in it (ia32 .string) - we just write the
-			 * whole stream in a single fwrite.
+			 * The name string can contain embedded 'null'
+			 * bytes and/or unprintable characters. Also,
+			 * the final NULL is documented in the ELF ABI
+			 * as being included in the namesz. So, display
+			 * the name using C literal string notation, and
+			 * include the terminating NULL in the output.
+			 * We don't show surrounding double quotes, as
+			 * that implies the termination that we are showing
+			 * explicitly.
 			 */
-			(void) fwrite(name, namesz, 1, stdout);
+			(void) fwrite(MSG_ORIG(MSG_STR_8SP),
+			    MSG_STR_8SP_SIZE, 1, stdout);
+			conv_str_to_c_literal(name, namesz, c_literal_cb, NULL);
 			name = name + ((namesz + (sizeof (Word) - 1)) &
 			    ~(sizeof (Word) - 1));
 			/* LINTED */
@@ -2839,43 +2881,52 @@ note_entry(Cache *cache, Word *data, size_t size, const char *file)
 				size -= pad;
 		}
 
-		dbg_print(0, MSG_ORIG(MSG_NOTE_DESCSZ), EC_WORD(descsz));
 		if (descsz) {
-			int		ndx, byte, word;
-			char		string[58], *str = string;
-			uchar_t		*desc = (uchar_t *)data;
+			int		hexdump = 1;
+			const char	*desc = (const char *)data;
 
 			/*
-			 * Dump descriptor bytes.
+			 * If this is a core note, let the corenote()
+			 * function handle it.
 			 */
-			for (ndx = byte = word = 0; descsz; descsz--, desc++) {
-				int	tok = *desc;
+			if (is_corenote) {
+				/* We only issue the bad arch error once */
+				static int	badnote_done = 0;
+				corenote_ret_t	corenote_ret;
 
-				(void) snprintf(str, 58, MSG_ORIG(MSG_NOTE_TOK),
-				    tok);
-				str += 3;
-
-				if (++byte == 4) {
-					*str++ = ' ', *str++ = ' ';
-					word++;
-					byte = 0;
-				}
-				if (word == 4) {
-					*str = '\0';
-					dbg_print(0, MSG_ORIG(MSG_NOTE_DESC),
-					    ndx, string);
-					word = 0;
-					ndx += 16;
-					str = string;
+				corenote_ret = corenote(ehdr->e_machine,
+				    do_swap, type, desc, descsz);
+				switch (corenote_ret) {
+				case CORENOTE_R_OK:
+					hexdump = 0;
+					break;
+				case CORENOTE_R_BADDATA:
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_NOTE_BADCOREDATA),
+					    file);
+					break;
+				case CORENOTE_R_BADARCH:
+					if (badnote_done)
+						break;
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_NOTE_BADCOREARCH),
+					    file,
+					    conv_ehdr_mach(ehdr->e_machine,
+					    0, &inv_buf));
+					break;
 				}
 			}
-			if (byte || word) {
-				*str = '\0';
-				dbg_print(0, MSG_ORIG(MSG_NOTE_DESC),
-				    ndx, string);
-			}
 
-			desc += pad;
+			/*
+			 * The default thing when we don't understand
+			 * the note data is to display it as hex bytes.
+			 */
+			if (hexdump) {
+				dbg_print(0, MSG_ORIG(MSG_NOTE_DESC));
+				dump_hex_bytes(desc, descsz, 8, 4, 4);
+			}
+			desc += descsz + pad;
+
 			/* LINTED */
 			data = (Word *)desc;
 		}
@@ -2883,12 +2934,14 @@ note_entry(Cache *cache, Word *data, size_t size, const char *file)
 }
 
 /*
- * Search for and process a .note section.
+ * Search for and process .note sections.
+ *
+ * Returns the number of note sections seen.
  */
-static void
-note(Cache *cache, Word shnum, const char *file)
+static Word
+note(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 {
-	Word	cnt;
+	Word	cnt, note_cnt = 0;
 
 	/*
 	 * Otherwise look for any .note sections.
@@ -2899,6 +2952,7 @@ note(Cache *cache, Word shnum, const char *file)
 
 		if (shdr->sh_type != SHT_NOTE)
 			continue;
+		note_cnt++;
 		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
 			continue;
 
@@ -2924,8 +2978,10 @@ note(Cache *cache, Word shnum, const char *file)
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_NOTE), _cache->c_name);
 		note_entry(_cache, (Word *)_cache->c_data->d_buf,
 		/* LINTED */
-		    (Word)_cache->c_data->d_size, file);
+		    (Word)_cache->c_data->d_size, ehdr, file);
 	}
+
+	return (note_cnt);
 }
 
 /*
@@ -4020,8 +4076,37 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 	if (flags & FLG_SHOW_DYNAMIC)
 		dynamic(cache, shnum, ehdr, file);
 
-	if (flags & FLG_SHOW_NOTE)
-		note(cache, shnum, file);
+	if (flags & FLG_SHOW_NOTE) {
+		Word	note_cnt;
+		size_t	note_shnum;
+		Cache	*note_cache;
+
+		note_cnt = note(cache, shnum, ehdr, file);
+
+		/*
+		 * Solaris core files have section headers, but these
+		 * headers do not include SHT_NOTE sections that reference
+		 * the core note sections. This means that note() won't
+		 * find the core notes. Fake section headers (-P option)
+		 * recover these sections, but it is inconvenient to require
+		 * users to specify -P in this situation. If the following
+		 * are all true:
+		 *
+		 *	- No note sections were found
+		 *	- This is a core file
+		 *	- We are not already using fake section headers
+		 *
+		 * then we will automatically generate fake section headers
+		 * and then process them in a second call to note().
+		 */
+		if ((note_cnt == 0) && (ehdr->e_type == ET_CORE) &&
+		    !(flags & FLG_CTL_FAKESHDR) &&
+		    (fake_shdr_cache(file, fd, elf, ehdr,
+		    &note_cache, &note_shnum) != 0)) {
+			(void) note(note_cache, note_shnum, ehdr, file);
+			fake_shdr_cache_free(note_cache, note_shnum);
+		}
+	}
 
 	if (flags & FLG_SHOW_MOVE)
 		move(cache, shnum, file, flags);

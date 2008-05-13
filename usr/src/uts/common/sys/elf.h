@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -732,6 +732,8 @@ typedef struct {
 #define	NT_PRPRIVINFO	19	/* priv_impl_info_t <sys/priv.h>	*/
 #define	NT_CONTENT	20	/* core_content_t <sys/corectl.h>	*/
 #define	NT_ZONENAME	21	/* string from getzonenamebyid(3C)	*/
+#define	NT_NUM		21
+
 
 #ifdef _KERNEL
 /*

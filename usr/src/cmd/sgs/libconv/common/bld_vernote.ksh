@@ -46,11 +46,11 @@ pad_notestring()
 
 build_sparcnote()
 {
-	notestring="\tSolaris Link Editors: $release-$revision\n\0"
+	notestring="Solaris Link Editors: $release-$revision\0"
 	#
-	# The 'adjustment' is for the '\t\n\0'
+	# The 'adjustment' is for the '\0'
 	#
-	pad_notestring -3
+	pad_notestring -1
 
 cat > $notefile <<EOF
 	.section	".note"
@@ -76,11 +76,10 @@ EOF
 
 build_i386note()
 {
-	notestring="\tSolaris Link Editors: $release-$revision\n"
+	notestring="Solaris Link Editors: $release-$revision"
 	#
-	# The 'adjustment' is for the '\t\n' and the
-	# fact that the x86/amd64 assembler automatically
-	# append a '\0' at the end of a string.
+	# The 'adjustment' is for the the fact that the x86/amd64
+	# assembler automatically append a '\0' at the end of a string.
 	#
 	pad_notestring -1
 cat > $notefile <<EOF

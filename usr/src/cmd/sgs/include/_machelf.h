@@ -107,16 +107,19 @@
 	((((_word) << 24) | (((_word) & 0xff00) << 8) | \
 	(((_word) >> 8) & 0xff00) | ((_word) >> 24)))
 
+#define	BSWAP_LWORD(_lword) \
+	(((_lword) << 56) | \
+	(((_lword) & 0x0000ff00) << 40) | \
+	(((_lword) & 0x00ff0000) << 24) | \
+	(((_lword) & 0xff000000) << 8) | \
+	(((_lword) >> 8)  & 0xff000000) | \
+	(((_lword) >> 24) & 0x00ff0000) | \
+	(((_lword) >> 40) & 0x0000ff00) | \
+	((_lword) >> 56))	/* Lword is unsigned - 0 bits enter from left */
+
+
 #if	defined(_ELF64)
-#define	BSWAP_XWORD(_xword) \
-	(((_xword) << 56) | \
-	(((_xword) & 0x0000ff00) << 40) | \
-	(((_xword) & 0x00ff0000) << 24) | \
-	(((_xword) & 0xff000000) << 8) | \
-	(((_xword) >> 8)  & 0xff000000) | \
-	(((_xword) >> 24) & 0x00ff0000) | \
-	(((_xword) >> 40) & 0x0000ff00) | \
-	((_xword) >> 56))	/* Xword is unsigned - 0 bits enter from left */
+#define	BSWAP_XWORD(_xword) BSWAP_LWORD(_xword)
 #else
 #define	BSWAP_XWORD(_xword) BSWAP_WORD(_xword)
 #endif
@@ -139,8 +142,9 @@
 #define	UL_ASSIGN_WORD(_dst, _src) (void) \
 	((_dst)[0] = (_src)[0],	(_dst)[1] = (_src)[1], \
 	(_dst)[2] = (_src)[2], 	(_dst)[3] = (_src)[3])
+#define	UL_ASSIGN_LWORD(_dst, _src) (void) memcpy(_dst, (_src), sizeof (Lword))
 #if	defined(_ELF64)
-#define	UL_ASSIGN_XWORD(_dst, _src) (void) memcpy(_dst, (_src), sizeof (Xword))
+#define	UL_ASSIGN_XWORD(_dst, _src) UL_ASSIGN_LWORD(_dst, _src)
 #else
 #define	UL_ASSIGN_XWORD(_xword) UL_ASSIGN_WORD(_xword)
 #endif
@@ -150,12 +154,13 @@
 #define	UL_ASSIGN_BSWAP_WORD(_dst, _src) (void) \
 	((_dst)[0] = (_src)[3],	(_dst)[1] = (_src)[2], \
 	(_dst)[2] = (_src)[1],	(_dst)[3] = (_src)[0])
-#if	defined(_ELF64)
-#define	UL_ASSIGN_BSWAP_XWORD(_dst, _src) (void) \
+#define	UL_ASSIGN_BSWAP_LWORD(_dst, _src) (void) \
 	((_dst)[0] = (_src)[7],	(_dst)[1] = (_src)[6], \
 	(_dst)[2] = (_src)[5],	(_dst)[3] = (_src)[4], \
 	(_dst)[4] = (_src)[3],	(_dst)[5] = (_src)[2], \
 	(_dst)[6] = (_src)[1],	(_dst)[7] = (_src)[0])
+#if	defined(_ELF64)
+#define	UL_ASSIGN_BSWAP_XWORD(_dst, _src) UL_ASSIGN_BSWAP_LWORD(_dst, _src)
 #else
 #define	UL_ASSIGN_BSWAP_XWORD(_dst, _src) UL_ASSIGN_BSWAP_WORD(_dst, _src)
 #endif

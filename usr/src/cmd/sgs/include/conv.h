@@ -451,6 +451,126 @@ typedef union {
 } Conv64_syminfo_flags_buf_t;
 
 
+/* conv_cnote_pr_flags() */
+#define	CONV_CNOTE_PR_FLAGS_BUFSIZE	244
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_PR_FLAGS_BUFSIZE];
+} Conv32_cnote_pr_flags_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_PR_FLAGS_BUFSIZE];
+} Conv64_cnote_pr_flags_buf_t;
+
+
+/* conv_cnote_old_pr_flags() */
+#define	CONV_CNOTE_OLD_PR_FLAGS_BUFSIZE	164
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_OLD_PR_FLAGS_BUFSIZE];
+} Conv32_cnote_old_pr_flags_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_OLD_PR_FLAGS_BUFSIZE];
+} Conv64_cnote_old_pr_flags_buf_t;
+
+
+/* conv_cnote_proc_flag() */
+#define	CONV_CNOTE_PROC_FLAG_BUFSIZE	29
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_PROC_FLAG_BUFSIZE];
+} Conv32_cnote_proc_flag_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_PROC_FLAG_BUFSIZE];
+} Conv64_cnote_proc_flag_buf_t;
+
+
+/* conv_cnote_sigset() */
+#define	CONV_CNOTE_SIGSET_BUFSIZE	629
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SIGSET_BUFSIZE];
+} Conv32_cnote_sigset_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SIGSET_BUFSIZE];
+} Conv64_cnote_sigset_buf_t;
+
+
+/* conv_cnote_fltset() */
+#define	CONV_CNOTE_FLTSET_BUFSIZE	501
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_FLTSET_BUFSIZE];
+} Conv32_cnote_fltset_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_FLTSET_BUFSIZE];
+} Conv64_cnote_fltset_buf_t;
+
+
+/* conv_cnote_sysset() */
+#define	CONV_CNOTE_SYSSET_BUFSIZE	3212
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SYSSET_BUFSIZE];
+} Conv32_cnote_sysset_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SYSSET_BUFSIZE];
+} Conv64_cnote_sysset_buf_t;
+
+
+/* conv_cnote_sa_flags() */
+#define	CONV_CNOTE_SA_FLAGS_BUFSIZE	99
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SA_FLAGS_BUFSIZE];
+} Conv32_cnote_sa_flags_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SA_FLAGS_BUFSIZE];
+} Conv64_cnote_sa_flags_buf_t;
+
+
+/* conv_cnote_ss_flags() */
+#define	CONV_CNOTE_SS_FLAGS_BUFSIZE	38
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SS_FLAGS_BUFSIZE];
+} Conv32_cnote_ss_flags_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_SS_FLAGS_BUFSIZE];
+} Conv64_cnote_ss_flags_buf_t;
+
+
+/* conv_cnote_cc_content() */
+#define	CONV_CNOTE_CC_CONTENT_BUFSIZE	87
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_CC_CONTENT_BUFSIZE];
+} Conv32_cnote_cc_content_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_CC_CONTENT_BUFSIZE];
+} Conv64_cnote_cc_content_buf_t;
+
+
+/* conv_cnote_auxv_af() */
+#define	CONV_CNOTE_AUXV_AF_BUFSIZE	63
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_AUXV_AF_BUFSIZE];
+} Conv32_cnote_auxv_af_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_CNOTE_AUXV_AF_BUFSIZE];
+} Conv64_cnote_auxv_af_buf_t;
+
+
 
 /*
  * Generic names for class specific buffer types above
@@ -491,6 +611,16 @@ typedef union {
 #define	Conv_sec_flags_buf_t		Conv64_sec_flags_buf_t
 #define	Conv_dwarf_ehe_buf_t		Conv64_dwarf_ehe_buf_t
 #define	Conv_syminfo_flags_buf_t	Conv64_syminfo_flags_buf_t
+#define	Conv_cnote_pr_flags_buf_t	Conv64_cnote_pr_flags_buf_t
+#define	Conv_cnote_old_pr_flags_buf_t	Conv64_cnote_old_pr_flags_buf_t
+#define	Conv_cnote_proc_flag_buf_t	Conv64_cnote_proc_flag_buf_t
+#define	Conv_cnote_sigset_buf_t		Conv64_cnote_sigset_buf_t
+#define	Conv_cnote_fltset_buf_t		Conv64_cnote_fltset_buf_t
+#define	Conv_cnote_sysset_buf_t		Conv64_cnote_sysset_buf_t
+#define	Conv_cnote_sa_flags_buf_t	Conv64_cnote_sa_flags_buf_t
+#define	Conv_cnote_ss_flags_buf_t	Conv64_cnote_ss_flags_buf_t
+#define	Conv_cnote_cc_content_buf_t	Conv64_cnote_cc_content_buf_t
+#define	Conv_cnote_auxv_af_buf_t	Conv64_cnote_auxv_af_buf_t
 #else
 #define	CONV_INV_BUFSIZE		CONV32_INV_BUFSIZE
 #define	CONV_EHDR_FLAGS_BUFSIZE		CONV32_EHDR_FLAGS_BUFSIZE
@@ -527,6 +657,16 @@ typedef union {
 #define	Conv_sec_flags_buf_t		Conv32_sec_flags_buf_t
 #define	Conv_dwarf_ehe_buf_t		Conv32_dwarf_ehe_buf_t
 #define	Conv_syminfo_flags_buf_t	Conv32_syminfo_flags_buf_t
+#define	Conv_cnote_pr_flags_buf_t	Conv32_cnote_pr_flags_buf_t
+#define	Conv_cnote_old_pr_flags_buf_t	Conv32_cnote_old_pr_flags_buf_t
+#define	Conv_cnote_proc_flag_buf_t	Conv32_cnote_proc_flag_buf_t
+#define	Conv_cnote_sigset_buf_t		Conv32_cnote_sigset_buf_t
+#define	Conv_cnote_fltset_buf_t		Conv32_cnote_fltset_buf_t
+#define	Conv_cnote_sysset_buf_t		Conv32_cnote_sysset_buf_t
+#define	Conv_cnote_sa_flags_buf_t	Conv32_cnote_sa_flags_buf_t
+#define	Conv_cnote_ss_flags_buf_t	Conv32_cnote_ss_flags_buf_t
+#define	Conv_cnote_cc_content_buf_t	Conv32_cnote_cc_content_buf_t
+#define	Conv_cnote_auxv_af_buf_t	Conv32_cnote_auxv_af_buf_t
 #endif
 
 
@@ -633,6 +773,20 @@ typedef struct {
 				/*	If NULL, " ]" is used. */
 } CONV_EXPN_FIELD_ARG;
 
+
+/*
+ * Callback function for conv_str_to_c_literal(). A user supplied function
+ * of this type is called by conv_str_to_c_literal() in order to dispatch
+ * the translated output characters.
+ *
+ *	buf - Pointer to output text
+ *	n - # of characters to output
+ *	uvalue - User value argument to conv_str_to_c_literal(),
+ *		passed through without interpretation.
+ */
+typedef	void		Conv_str_to_c_literal_func_t(const void *ptr,
+			    size_t size, void *uvalue);
+
 /*
  * Define all generic interfaces.
  */
@@ -641,6 +795,54 @@ extern	const char	*conv_config_feat(int, Conv_config_feat_buf_t *);
 extern	const char	*conv_config_obj(ushort_t, Conv_config_obj_buf_t *);
 extern	const char	*conv_config_upm(const char *, const char *,
 			    const char *, size_t);
+extern	const char	*conv_cnote_auxv_af(Word, Conv_fmt_flags_t,
+			    Conv_cnote_auxv_af_buf_t *);
+extern	const char	*conv_cnote_auxv_type(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_cc_content(Lword, Conv_fmt_flags_t,
+			    Conv_cnote_cc_content_buf_t *);
+extern	const char	*conv_cnote_errno(int, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_fault(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_fltset(uint32_t *, int,
+			    Conv_fmt_flags_t, Conv_cnote_fltset_buf_t *);
+extern	const char	*conv_cnote_old_pr_flags(int, Conv_fmt_flags_t,
+			    Conv_cnote_old_pr_flags_buf_t *);
+extern	const char	*conv_cnote_pr_dmodel(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_pr_flags(int, Conv_fmt_flags_t,
+			    Conv_cnote_pr_flags_buf_t *);
+extern	const char	*conv_cnote_proc_flag(int, Conv_fmt_flags_t,
+			    Conv_cnote_proc_flag_buf_t *);
+extern	const char	*conv_cnote_pr_regname(Half, int, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *inv_buf);
+extern	const char	*conv_cnote_pr_stype(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_pr_what(short, short, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_pr_why(short, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_priv(int, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_psetid(int, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_sa_flags(int, Conv_fmt_flags_t,
+			    Conv_cnote_sa_flags_buf_t *);
+extern	const char	*conv_cnote_signal(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_si_code(Half, int, int, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_sigset(uint32_t *, int,
+			    Conv_fmt_flags_t, Conv_cnote_sigset_buf_t *);
+extern	const char	*conv_cnote_ss_flags(int, Conv_fmt_flags_t,
+			    Conv_cnote_ss_flags_buf_t *);
+extern	const char	*conv_cnote_syscall(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_cnote_sysset(uint32_t *, int,
+			    Conv_fmt_flags_t, Conv_cnote_sysset_buf_t *);
+extern	const char	*conv_cnote_type(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
 extern	const char	*conv_def_tag(Symref, Conv_inv_buf_t *);
 extern	const char	*conv_demangle_name(const char *);
 extern	const char	*conv_dl_flag(int, Conv_fmt_flags_t,
@@ -654,6 +856,9 @@ extern	Isa_desc	*conv_isalist(void);
 extern	const char	*conv_lddstub(int);
 extern	const char	*conv_seg_flags(Half, Conv_seg_flags_buf_t *);
 extern	int		conv_sys_eclass();
+extern	void		conv_str_to_c_literal(const char *buf, size_t n,
+			    Conv_str_to_c_literal_func_t *cb_func,
+			    void *uvalue);
 extern	Uts_desc	*conv_uts(void);
 extern	const char	*conv_ver_flags(Half);
 extern	const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
@@ -811,8 +1016,8 @@ extern	const char	*conv_sym_other_vis(uchar_t, Conv_fmt_flags_t,
 extern	const char	*conv_sym_value(Half, uchar_t, Addr, Conv_inv_buf_t *);
 extern	const char	*conv_sym_SPARC_value(Addr, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
-extern	const char	*conv_syminfo_flags(Xword flags, Conv_fmt_flags_t,
-			    Conv_syminfo_flags_buf_t *syminfo_flags_buf);
+extern	const char	*conv_syminfo_flags(Xword, Conv_fmt_flags_t,
+			    Conv_syminfo_flags_buf_t *);
 
 #ifdef	__cplusplus
 }

@@ -159,6 +159,18 @@ typedef enum {
 extern int	match(match_flags_t, const char *, uint_t, uint_t);
 
 /*
+ * Possible return values from corenote()
+ */
+typedef enum {
+	CORENOTE_R_OK = 0,	/* Note data successfully displayed */
+	CORENOTE_R_OK_DUMP = 1,	/* Note OK, but not handled. Display Hex dump */
+	CORENOTE_R_BADDATA = 2,	/* Note data truncated or otherwise malformed */
+	CORENOTE_R_BADARCH = 3,	/* core file note code does not contain */
+				/*	support for given architecture */
+	CORENOTE_R_BADTYPE = 4	/* Unknown note type */
+} corenote_ret_t;
+
+/*
  * Define various elfdump() functions into their 32-bit and 64-bit variants.
  */
 #if	defined(_ELF64)
@@ -211,10 +223,13 @@ extern int	match(match_flags_t, const char *, uint_t, uint_t);
 #define	version_need		version_need32
 #endif
 
+extern	corenote_ret_t	corenote(Half, int, Word, const char *, Word);
+extern	void	dump_hex_bytes(const char *, size_t, int, int, int);
+
 extern	int	fake_shdr_cache32(const char *, int, Elf *, Elf32_Ehdr *,
-    Cache **, size_t *);
+		    Cache **, size_t *);
 extern	int	fake_shdr_cache64(const char *, int, Elf *, Elf64_Ehdr *,
-    Cache **, size_t *);
+		    Cache **, size_t *);
 
 extern	void	fake_shdr_cache_free32(Cache *, size_t);
 extern	void	fake_shdr_cache_free64(Cache *, size_t);

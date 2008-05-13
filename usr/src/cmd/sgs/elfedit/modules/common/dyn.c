@@ -299,7 +299,7 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 {
 	elfedit_outstyle_t	outstyle;
 	Conv_fmt_flags_t	flags_fmt_flags;
-	Word	end_ndx, cnt, ndx, printed = 0;
+	Word	end_ndx, ndx, printed = 0;
 	Dyn	*dyn;
 	int	header_done = 0;
 	Xword	last_d_val;
@@ -322,15 +322,13 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	flags_fmt_flags = (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) ?
 	    CONV_FMT_NOBKT : 0;
 
-	/* How many elements do we examine? */
+	/* Starting index */
 	if (print_type == PRINT_DYN_T_NDX) {
 		if (arg >= argstate->dyn.num)
 			return;		/* Out of range */
 		ndx = arg;
-		cnt = 1;
 	} else {
 		ndx = 0;
-		cnt = argstate->dyn.num;
 	}
 
 	/*
@@ -342,7 +340,19 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	one_shot = 0;
 
 	dyn = &argstate->dyn.data[ndx];
-	for (; (one_shot && (ndx < argstate->dyn.num)) || cnt--; dyn++, ndx++) {
+
+	/*
+	 * Loop predicate explanation:
+	 * Normally, we want to iterate from the starting index
+	 * to the end. However, in the case of PRINT_DYN_T_NDX, we
+	 * only want to display one item (ndx == arg) and then quit,
+	 * with the exception that if we've been through the loop
+	 * and encountered a one_shot situation, we want to continue
+	 * iterating until the one-shot situation is cleared.
+	 */
+	for (; (ndx < argstate->dyn.num) &&
+	    ((print_type != PRINT_DYN_T_NDX) || ((ndx == arg) || one_shot));
+	    dyn++, ndx++) {
 		union {
 			Conv_inv_buf_t		inv;
 			Conv_dyn_flag_buf_t	flag;
@@ -393,7 +403,6 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 			    ((dyn + 1)->d_un.d_val == 0)) {
 				dyn++;
 				end_ndx++;
-				cnt--;
 			}
 			if (header_done == 0) {
 				header_done = 1;

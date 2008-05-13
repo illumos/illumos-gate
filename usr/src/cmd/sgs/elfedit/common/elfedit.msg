@@ -1392,7 +1392,6 @@
 @ MSG_FMT_WORDVAL	"%u"
 @ MSG_FMT_WRAPUSAGE	"\n%s"
 @ MSG_FMT_SECMSGPRE	"[%d: %s]"
-@ MSG_FMT_OCTCONST	"\\%03o"
 
 # Miscellaneous clutter
 

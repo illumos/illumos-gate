@@ -44,7 +44,8 @@ COMOBJS64 =	cap64.o			dynamic64.o \
 		symbols64.o		symbols_sparc64.o \
 		syminfo64.o
 
-COMOBJS=	arch.o			config.o \
+COMOBJS=	arch.o			c_literal.o \
+		config.o		corenote.o \
 		data.o			deftag.o \
 		demangle.o		dl.o \
 		dwarf_ehe.o		group.o	\

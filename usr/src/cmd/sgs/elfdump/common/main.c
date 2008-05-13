@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -328,6 +328,84 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL23));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL24));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL25));
+}
+
+/*
+ * Output a block of raw data as hex bytes. Each row is given
+ * the index of the first byte in the row.
+ *
+ * entry:
+ *	data - Pointer to first byte of data to be displayed
+ *	n - # of bytes of data
+ *	prefix - String to be output before each line. Useful
+ *		for indenting output.
+ *	bytes_per_col - # of space separated bytes to output
+ *		in each column.
+ *	col_per_row - # of columns to output per row
+ *
+ * exit:
+ *	The formatted data has been sent to stdout. Each row of output
+ *	shows (bytes_per_col * col_per_row) bytes of data.
+ */
+void
+dump_hex_bytes(const char *data, size_t n, int indent,
+	int bytes_per_col, int col_per_row)
+{
+	int	bytes_per_row = bytes_per_col * col_per_row;
+	int	ndx, byte, word;
+	char	string[128], *str = string;
+	char	index[MAXNDXSIZE];
+	int	index_width;
+	int	sp_prefix = 0;
+
+
+	/*
+	 * Determine the width to use for the index string. We follow
+	 * 8-byte tab rules, but don't use an actual \t character so
+	 * that the output can be arbitrarily shifted without odd
+	 * tab effects, and so that all the columns line up no matter
+	 * how many lines of output are produced.
+	 */
+	ndx = n / bytes_per_row;
+	(void) snprintf(index, sizeof (index),
+	    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(ndx));
+	index_width = strlen(index);
+	index_width = S_ROUND(index_width, 8);
+
+	for (ndx = byte = word = 0; n > 0; n--, data++) {
+		while (sp_prefix-- > 0)
+			*str++ = ' ';
+
+		(void) snprintf(str, sizeof (string),
+		    MSG_ORIG(MSG_HEXDUMP_TOK), (int)*data);
+		str += 2;
+		sp_prefix = 1;
+
+		if (++byte == bytes_per_col) {
+			sp_prefix += 2;
+			word++;
+			byte = 0;
+		}
+		if (word == col_per_row) {
+			*str = '\0';
+			(void) snprintf(index, sizeof (index),
+			    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(ndx));
+			dbg_print(0, MSG_ORIG(MSG_HEXDUMP_ROW),
+			    indent, MSG_ORIG(MSG_STR_EMPTY),
+			    index_width, index, string);
+			sp_prefix = 0;
+			word = 0;
+			ndx += bytes_per_row;
+			str = string;
+		}
+	}
+	if (byte || word) {
+		*str = '\0';	/*  */
+		(void) snprintf(index, sizeof (index),
+		    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(ndx));
+		dbg_print(0, MSG_ORIG(MSG_HEXDUMP_ROW), indent,
+		    MSG_ORIG(MSG_STR_EMPTY), index_width, index, string);
+	}
 }
 
 /*
