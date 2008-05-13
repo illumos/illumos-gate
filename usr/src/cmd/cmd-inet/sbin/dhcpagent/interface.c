@@ -803,25 +803,12 @@ canonize_lif(dhcp_lif_t *lif, boolean_t dhcponly)
 		}
 		return;
 	}
+	lif->lif_flags = lifr.lifr_flags;
 
 	if (dhcponly && !(lifr.lifr_flags & IFF_DHCPRUNNING)) {
 		dhcpmsg(MSG_INFO,
 		    "canonize_lif: cannot clear %s; flags are %llx",
 		    lif->lif_name, lifr.lifr_flags);
-		return;
-	}
-
-	/*
-	 * clear the UP flag, but don't clear DHCPRUNNING since
-	 * that should only be done when the interface is removed
-	 * (see clear_lif_dhcp() and remove_lif())
-	 */
-
-	lif->lif_flags = lifr.lifr_flags &= ~IFF_UP;
-
-	if (ioctl(fd, SIOCSLIFFLAGS, &lifr) == -1) {
-		dhcpmsg(MSG_ERR, "canonize_lif: can't set flags for %s",
-		    lif->lif_name);
 		return;
 	}
 
