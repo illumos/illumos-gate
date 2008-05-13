@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,17 +27,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
 #include <stddef.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <sys/dlpi.h>
 #include <sys/sysmacros.h>
 #include <sys/socket.h>
-#include <sys/sockio.h>
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>

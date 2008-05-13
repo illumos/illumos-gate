@@ -1,7 +1,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/cmd-inet/usr.bin/pppd/Makefile
@@ -24,7 +24,7 @@ clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 
-LDLIBS +=	-lpam -lmd -lsocket -lnsl
+LDLIBS +=	-lpam -lmd -lsocket -lnsl -ldlpi
 
 #
 # We need absolute path to /etc/ppp/plugins and /usr/lib/inet/ppp, not

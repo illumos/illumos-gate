@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,8 +22,8 @@
  * sppptun.c - Solaris STREAMS PPP multiplexing tunnel driver
  * installer.
  *
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,11 +35,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include <signal.h>
-#include <alloca.h>
 #include <stropts.h>
 #include <fcntl.h>
 #include <locale.h>
-#include <sys/dlpi.h>
 #include <sys/fcntl.h>
 #include <sys/stropts.h>
 #include <sys/socket.h>
@@ -48,24 +45,25 @@
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 #include <net/sppptun.h>
+#include <libdlpi.h>
 
 static char *myname;		/* Copied from argv[0] */
 static int verbose;		/* -v on command line */
 
 /* Data gathered during per-style attach routine. */
 struct attach_data {
-	ppptun_lname appstr;	/* String to append to interface name (PPA) */
-	ppptun_atype localaddr;	/* Local interface address */
-	int locallen;		/* Length of local address */
+	ppptun_lname appstr;    /* String to append to interface name (PPA) */
+	ppptun_atype localaddr; /* Local interface address */
+	uint_t locallen;	/* Length of local address */
 };
 
 /* Per-protocol plumbing data */
 struct protos {
 	const char *name;
 	const char *desc;
-	int (*attach)(struct protos *prot, char *ifname,
+	int (*attach)(struct protos *prot, char *linkname,
 	    struct attach_data *adata);
-	int protval;
+	uint_t protval;
 	int style;
 };
 
@@ -77,276 +75,70 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-		"Usage:\n\t%s plumb [<protocol> <device>]\n"
-		"\t%s unplumb <interface-name>\n"
-		"\t%s query\n"), myname, myname, myname);
+	    "Usage:\n\t%s plumb [<protocol> <device>]\n"
+	    "\t%s unplumb <interface-name>\n"
+	    "\t%s query\n"), myname, myname, myname);
 	exit(1);
 }
 
 /*
- * Await a DLPI response to a previous driver command.  "etype" is set
- * to the expected response primitive.  "rptr" and "rlen" may point to
- * a buffer to hold returned data, if desired.  Otherwise, "rptr" is
- * NULL.  Returns -1 on error, 0 on success.
- *
- * If "rlen" is a positive number, then it indicates the number of
- * bytes expected in return, and any longer response is truncated to
- * that value, and any shorter response generates a warning message.
- * If it's a negative number, then it indicates the maximum number of
- * bytes expected, and no warning is printed if fewer are received.
- */
-static int
-dlpi_reply(int fd, int etype, void *rptr, int rlen)
-{
-	/* Align 'buf' on natural boundary for aggregates. */
-	uintptr_t buf[BUFSIZ/sizeof (uintptr_t)];
-	int flags;
-	union DL_primitives *dlp = (union DL_primitives *)buf;
-	struct strbuf  ctl;
-
-	/* read reply */
-	ctl.buf = (caddr_t)dlp;
-	ctl.len = 0;
-	ctl.maxlen = BUFSIZ;
-	flags = 0;
-	if (getmsg(fd, &ctl, NULL, &flags) < 0) {
-		perror("getmsg");
-		return (-1);
-	}
-
-	/* Validate reply.  */
-	if (ctl.len < sizeof (t_uscalar_t)) {
-		(void) fprintf(stderr, gettext("%s: request: short reply\n"),
-		    myname);
-		return (-1);
-	}
-
-	if (dlp->dl_primitive == DL_ERROR_ACK) {
-		(void) fprintf(stderr,
-		    gettext("%s: request:  dl_errno %lu errno %lu\n"), myname,
-		    dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno);
-		return (-1);
-	}
-	if (dlp->dl_primitive != etype) {
-		(void) fprintf(stderr, gettext("%s: request: unexpected "
-		    "dl_primitive %lu received\n"), myname, dlp->dl_primitive);
-		return (-1);
-	}
-	if (rptr == NULL)
-		return (0);
-	if (ctl.len < rlen) {
-		(void) fprintf(stderr, gettext("%s: request: short information"
-		    " received %d < %d\n"), myname, ctl.len, rlen);
-		return (-1);
-	}
-	if (rlen < 0)
-		rlen = -rlen;
-	(void) memcpy(rptr, buf, rlen);
-	return (0);
-}
-
-/*
- * Send a DLPI Info-Request message and return the response in the
- * provided buffer.  Returns -1 on error, 0 on success.
- */
-static int
-dlpi_info_req(int fd, dl_info_ack_t *info_ack)
-{
-	dl_info_req_t info_req;
-	struct strbuf ctl;
-	int flags;
-
-	(void) memset(&info_req, '\0', sizeof (info_req));
-	info_req.dl_primitive = DL_INFO_REQ;
-
-	ctl.maxlen = 0;
-	ctl.len = DL_INFO_REQ_SIZE;
-	ctl.buf = (char *)&info_req;
-
-	flags = 0;
-	if (putmsg(fd, &ctl, (struct strbuf *)NULL, flags) < 0) {
-		perror("putmsg DL_INFO_REQ");
-		return (-1);
-	}
-	return (dlpi_reply(fd, DL_INFO_ACK, info_ack, sizeof (*info_ack)));
-}
-
-/*
- * Send a DLPI Attach-Request message for the indicated PPA.  Returns
- * -1 on error, 0 for success.
- */
-static int
-dlpi_attach_req(int fd, int ppa)
-{
-	dl_attach_req_t attach_req;
-	struct strbuf ctl;
-	int flags;
-
-	(void) memset(&attach_req, '\0', sizeof (attach_req));
-	attach_req.dl_primitive = DL_ATTACH_REQ;
-	attach_req.dl_ppa = ppa;
-
-	ctl.maxlen = 0;
-	ctl.len = DL_ATTACH_REQ_SIZE;
-	ctl.buf = (char *)&attach_req;
-
-	flags = 0;
-	if (putmsg(fd, &ctl, (struct strbuf *)NULL, flags) < 0) {
-		perror("putmsg DL_ATTACH_REQ");
-		return (-1);
-	}
-	return (dlpi_reply(fd, DL_OK_ACK, NULL, 0));
-}
-
-/*
- * Send a DLPI Bind-Request message for the requested SAP and set the
- * local address.  Returns -1 for error.  Otherwise, the length of the
- * local address is returned.
- */
-static int
-dlpi_bind_req(int fd, int sap, uint8_t *localaddr, int maxaddr)
-{
-	dl_bind_req_t bind_req;
-	dl_bind_ack_t *back;
-	struct strbuf ctl;
-	int flags, repsize, rsize;
-
-	(void) memset(&bind_req, '\0', sizeof (*&bind_req));
-	bind_req.dl_primitive = DL_BIND_REQ;
-	/* DLPI SAPs are in host byte order! */
-	bind_req.dl_sap = sap;
-	bind_req.dl_service_mode = DL_CLDLS;
-
-	ctl.maxlen = 0;
-	ctl.len = DL_BIND_REQ_SIZE;
-	ctl.buf = (char *)&bind_req;
-
-	flags = 0;
-	if (putmsg(fd, &ctl, (struct strbuf *)NULL, flags) < 0) {
-		perror("putmsg DL_BIND_REQ");
-		return (-1);
-	}
-
-	repsize = sizeof (*back) + maxaddr;
-	back = (dl_bind_ack_t *)alloca(repsize);
-	if (dlpi_reply(fd, DL_BIND_ACK, (void *)back, -repsize) < 0)
-		return (-1);
-	rsize = back->dl_addr_length;
-	if (rsize > maxaddr || back->dl_addr_offset+rsize > repsize) {
-		(void) fprintf(stderr, gettext("%s: Bad hardware address size "
-		    "from driver; %d > %d or %lu+%d > %d\n"), myname,
-		    rsize, maxaddr, back->dl_addr_offset, rsize, repsize);
-		return (-1);
-	}
-	(void) memcpy(localaddr, (char *)back + back->dl_addr_offset, rsize);
-	return (rsize);
-}
-
-/*
- * Return a printable string for a DLPI style number.  (Unfortunately,
- * these style numbers aren't just simple integer values, and printing
- * with %d gives ugly output.)
- */
-static const char *
-styleof(int dlstyle)
-{
-	static char buf[32];
-
-	switch (dlstyle) {
-	case DL_STYLE1:
-		return ("1");
-	case DL_STYLE2:
-		return ("2");
-	}
-	(void) snprintf(buf, sizeof (buf), gettext("Unknown (0x%04X)"),
-	    dlstyle);
-	return ((const char *)buf);
-}
-
-/*
- * General DLPI attach function.  This is called indirectly through
+ * General DLPI function.  This is called indirectly through
  * the protos structure for the selected lower stream protocol.
  */
 static int
-dlpi_attach(struct protos *prot, char *ifname, struct attach_data *adata)
+sppp_dlpi(struct protos *prot, char *linkname, struct attach_data *adata)
 {
-	int devfd, ppa, dlstyle, retv;
-	dl_info_ack_t dl_info;
-	char tname[MAXPATHLEN], *cp;
-
-	cp = ifname + strlen(ifname) - 1;
-	while (cp > ifname && isdigit(*cp))
-		cp--;
-	cp++;
-	ppa = strtol(cp, NULL, 10);
-
-	/*
-	 * Try once for the exact device name as a node.  If it's
-	 * there, then this should be a DLPI style 1 driver (one node
-	 * per instance).  If it's not, then it should be a style 2
-	 * driver (attach specifies instance number).
-	 */
-	dlstyle = DL_STYLE1;
-	(void) strlcpy(tname, ifname, MAXPATHLEN-1);
-	if ((devfd = open(tname, O_RDWR)) < 0) {
-		if (cp < ifname + MAXPATHLEN)
-			tname[cp - ifname] = '\0';
-		if ((devfd = open(tname, O_RDWR)) < 0) {
-			perror(ifname);
-			return (-1);
-		}
-		dlstyle = DL_STYLE2;
-	}
+	int retv;
+	uint_t ppa;
+	dlpi_handle_t dh;
 
 	if (verbose)
-		(void) printf(gettext("requesting device info on %s\n"),
-		    tname);
-	if (dlpi_info_req(devfd, &dl_info))
-		return (-1);
-	if (dl_info.dl_provider_style != dlstyle) {
-		(void) fprintf(stderr, gettext("%s: unexpected DLPI provider "
-		    "style on %s: got %s, "), myname, tname,
-		    styleof(dl_info.dl_provider_style));
-		(void) fprintf(stderr, gettext("expected %s\n"),
-		    styleof(dlstyle));
-		if (ifname[0] != '\0' &&
-		    !isdigit(ifname[strlen(ifname) - 1])) {
-			(void) fprintf(stderr, gettext("(did you forget an "
-			    "instance number?)\n"));
-		}
-		(void) close(devfd);
+		(void) printf(gettext("opening DLPI link %s\n"), linkname);
+	if ((retv = dlpi_open(linkname, &dh, 0)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, gettext("%s: failed opening %s: %s\n"),
+		    myname, linkname, dlpi_strerror(retv));
 		return (-1);
 	}
 
-	if (dlstyle == DL_STYLE2) {
-		if (verbose)
-			(void) printf(gettext("attaching to ppa %d\n"), ppa);
-		if (dlpi_attach_req(devfd, ppa)) {
-			(void) close(devfd);
-			return (-1);
-		}
-	}
-
-	if (verbose)
+	if (verbose) {
 		(void) printf(gettext("binding to Ethertype %04X\n"),
 		    prot->protval);
-	retv = dlpi_bind_req(devfd, prot->protval,
-	    (uint8_t *)&adata->localaddr, sizeof (adata->localaddr));
-	if (retv < 0) {
-		(void) close(devfd);
+	}
+	if ((retv = dlpi_bind(dh, prot->protval, NULL)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, gettext("%s: failed binding on %s: %s"),
+		    myname, linkname, dlpi_strerror(retv));
+		dlpi_close(dh);
 		return (-1);
 	}
-	adata->locallen = retv;
+
+	adata->locallen = DLPI_PHYSADDR_MAX;
+	if ((retv = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR, &adata->localaddr,
+	    &adata->locallen)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, gettext("%s: failed getting physical"
+		    " address on %s: %s"), myname, linkname,
+		    dlpi_strerror(retv));
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	/* Store ppa to append to interface name. */
+	if ((retv = dlpi_parselink(linkname, NULL, &ppa)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, gettext("%s: failed parsing linkname on"
+		    " %s: %s"), myname, linkname, dlpi_strerror(retv));
+		dlpi_close(dh);
+		return (-1);
+	}
 
 	(void) snprintf(adata->appstr, sizeof (adata->appstr), "%d", ppa);
-	return (devfd);
+
+	return (dlpi_fd(dh));
 }
 
 
 static struct protos proto_list[] = {
-	{ "pppoe", "RFC 2516 PPP over Ethernet", dlpi_attach, ETHERTYPE_PPPOES,
+	{ "pppoe", "RFC 2516 PPP over Ethernet", sppp_dlpi, ETHERTYPE_PPPOES,
 	    PTS_PPPOE },
-	{ "pppoed", "RFC 2516 PPP over Ethernet Discovery", dlpi_attach,
+	{ "pppoed", "RFC 2516 PPP over Ethernet Discovery", sppp_dlpi,
 	    ETHERTYPE_PPPOED, PTS_PPPOE },
 	{ NULL }
 };
@@ -394,9 +186,8 @@ plumb_it(int argc, char **argv)
 {
 	int devfd, muxfd, muxid;
 	struct ppptun_info pti;
-	char *cp, *ifname;
+	char *cp, *linkname;
 	struct protos *prot;
-	char dname[MAXPATHLEN];
 	struct attach_data adata;
 
 	/* If no protocol requested, then list known protocols. */
@@ -422,18 +213,12 @@ plumb_it(int argc, char **argv)
 		return (1);
 	}
 
-	/* Get interface and make relative to /dev/ if necessary. */
-	ifname = argv[optind];
-	if (ifname[0] != '.' && ifname[0] != '/') {
-		(void) snprintf(dname, sizeof (dname), "/dev/%s", ifname);
-		ifname = dname;
-	}
-
+	/* Get interface. */
+	linkname = argv[optind];
 	/* Call per-protocol attach routine to open device */
 	if (verbose)
-		(void) printf(gettext("opening %s\n"), ifname);
-	devfd = (*prot->attach)(prot, ifname, &adata);
-	if (devfd < 0)
+		(void) printf(gettext("opening %s\n"), linkname);
+	if ((devfd = (*prot->attach)(prot, linkname, &adata)) < 0)
 		return (1);
 
 	/* Open sppptun driver */
@@ -447,7 +232,7 @@ plumb_it(int argc, char **argv)
 	/* Push sppptun module on top of lower driver. */
 	if (verbose)
 		(void) printf(gettext("pushing %s on %s\n"), PPP_TUN_NAME,
-		    ifname);
+		    linkname);
 	if (ioctl(devfd, I_PUSH, PPP_TUN_NAME) == -1) {
 		perror("I_PUSH " PPP_TUN_NAME);
 		return (1);

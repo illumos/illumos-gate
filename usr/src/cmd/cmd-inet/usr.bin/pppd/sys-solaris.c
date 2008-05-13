@@ -1,7 +1,7 @@
 /*
  * System-dependent procedures for pppd under Solaris 2.x (SunOS 5.x).
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -64,7 +64,6 @@
 #include <sys/sockio.h>
 #include <sys/sysmacros.h>
 #include <sys/systeminfo.h>
-#include <sys/dlpi.h>
 #include <sys/stat.h>
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -79,6 +78,7 @@
 #include <inet/ip.h>
 #include <sys/ethernet.h>
 #include <sys/ser_sync.h>
+#include <libdlpi.h>
 
 #include "pppd.h"
 #include "fsm.h"
@@ -97,17 +97,9 @@ static const char rcsid[] = RCSID;
 #define	MAX_POLLFDS	32
 #define	NMODULES	32
 
-#ifndef LIFNAMSIZ
-#define	LIFNAMSIZ	32
-#endif /* LIFNAMSIZ */
-
 #ifndef MAXIFS
 #define	MAXIFS		256
 #endif /* MAXIFS */
-
-#ifndef ETHERADDRL
-#define	ETHERADDRL	6
-#endif /* ETHERADDRL */
 
 #ifdef INET6
 #define	_IN6_LLX_FROM_EUI64(l, s, eui64, as, len)	\
@@ -193,9 +185,6 @@ static option_t solaris_option_list[] = {
 static int translate_speed __P((int));
 static int baud_rate_of __P((int));
 static int get_ether_addr __P((u_int32_t, struct sockaddr_dl *, int));
-static int dlpi_attach __P((int, int));
-static int dlpi_info_req __P((int));
-static int dlpi_get_reply __P((int, union DL_primitives *, int, int));
 static int strioctl __P((int, int, void *, int, int));
 static int plumb_ipif __P((int));
 static int unplumb_ipif __P((int));
@@ -337,7 +326,7 @@ read_ip_interface(int unit)
 	dbglog("got MTU %d from interface", ifr.ifr_metric);
 	if (ifr.ifr_metric != 0 &&
 	    (lcp_allowoptions[unit].mru == 0 ||
-		lcp_allowoptions[unit].mru > ifr.ifr_metric))
+	    lcp_allowoptions[unit].mru > ifr.ifr_metric))
 		lcp_allowoptions[unit].mru = ifr.ifr_metric;
 
 	/* Get the local IP address */
@@ -399,7 +388,7 @@ read_ipv6_interface(int unit)
 	}
 	if (lifr.lifr_mtu != 0 &&
 	    (lcp_allowoptions[unit].mru == 0 ||
-		lcp_allowoptions[unit].mru > lifr.lifr_mtu))
+	    lcp_allowoptions[unit].mru > lifr.lifr_mtu))
 		lcp_allowoptions[unit].mru = lifr.lifr_mtu;
 
 	/* Get the local IPv6 address */
@@ -828,80 +817,40 @@ get_first_hwaddr(addr, msize)
  * Return the length of the MAC address (in bytes) or -1 if error.
  */
 int
-get_if_hwaddr(addr, msize, if_name)
-	uchar_t *addr;
-	int msize;
-	char *if_name;
+get_if_hwaddr(uchar_t *addrp, int msize, char *linkname)
 {
-	int unit, iffd, adrlen;
-	bool dlpi_err = 0;
-	char *adrp, *q;
-	char ifdev[4+LIFNAMSIZ+1];	/* take "/dev/" into account */
-	struct {
-		union DL_primitives prim;
-		char space[64];
-	} reply;
+	dlpi_handle_t dh;
+	uchar_t physaddr[DLPI_PHYSADDR_MAX];
+	size_t physaddrlen = sizeof (physaddr);
+	int retv;
 
-	if ((addr == NULL) || (if_name == NULL) || (if_name[0] == '\0')) {
+	if ((addrp == NULL) || (linkname == NULL))
 		return (-1);
-	}
+
 	/*
-	 * We have to open the device and ask it for its hardware address.
-	 * First split apart the device name and unit.
+	 * Open the link and ask for hardware address.
 	 */
-	(void) slprintf(ifdev, sizeof (ifdev), "/dev/%s", if_name);
-	for (q = ifdev + strlen(ifdev); --q >= ifdev; ) {
-		if (!isdigit(*q)) {
-			break;
-		}
-	}
-	unit = atoi(q + 1);
-	q[1] = '\0';
-	/*
-	 * Open the device and do a DLPI attach and phys_addr_req.
-	 */
-	iffd = open(ifdev, O_RDWR);
-	if (iffd < 0) {
-		error("Couldn't open %s: %m", ifdev);
+	if ((retv = dlpi_open(linkname, &dh, 0)) != DLPI_SUCCESS) {
+		error("Could not open %s: %s", linkname, dlpi_strerror(retv));
 		return (-1);
 	}
 
-	if (dlpi_attach(iffd, unit) < 0) {
-		error("DLPI attach to device %s failed", ifdev);
-		dlpi_err = 1;
-	} else if (dlpi_get_reply(iffd, &reply.prim, DL_OK_ACK,
-	    sizeof (reply)) < 0) {
-		error("DLPI get attach reply on device %s failed", ifdev);
-		dlpi_err = 1;
-	} else if (dlpi_info_req(iffd) < 0) {
-		error("DLPI info request on device %s failed", ifdev);
-		dlpi_err = 1;
-	} else if (dlpi_get_reply(iffd, &reply.prim, DL_INFO_ACK,
-	    sizeof (reply)) < 0) {
-		error("DLPI get info request reply on device %s failed", ifdev);
-		dlpi_err = 1;
-	}
-	(void) close(iffd);
-	iffd = -1;
-	if (dlpi_err) {
+	retv = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR,
+	    physaddr, &physaddrlen);
+	dlpi_close(dh);
+	if (retv != DLPI_SUCCESS) {
+		error("Could not get physical address on %s: %s", linkname,
+		    dlpi_strerror(retv));
 		return (-1);
 	}
-	adrlen = reply.prim.info_ack.dl_addr_length;
-	adrp = (caddr_t)&reply + reply.prim.info_ack.dl_addr_offset;
 
-	if (reply.prim.info_ack.dl_sap_length < 0) {
-		adrlen += reply.prim.info_ack.dl_sap_length;
-	} else {
-		adrp += reply.prim.info_ack.dl_sap_length;
-	}
 	/*
 	 * Check if we have enough space to copy the address to.
 	 */
-	if (adrlen > msize) {
+	if (physaddrlen > msize)
 		return (-1);
-	}
-	(void) memcpy(addr, adrp, adrlen);
-	return (adrlen);
+	(void) memcpy(addrp, physaddr, physaddrlen);
+	return (physaddrlen);
 }
 
 /*
@@ -2789,7 +2738,7 @@ get_ether_addr(u_int32_t ipaddr, struct sockaddr_dl *hwaddr, int quietflag)
 		 * point-to-point or loopback.
 		 */
 		(void) strlcpy(ifreq.ifr_name, ifr->ifr_name,
-			sizeof (ifreq.ifr_name));
+		    sizeof (ifreq.ifr_name));
 		if (myioctl(ipfd, SIOCGIFFLAGS, &ifreq) < 0) {
 			continue;
 		}
@@ -2848,117 +2797,6 @@ get_ether_addr(u_int32_t ipaddr, struct sockaddr_dl *hwaddr, int quietflag)
 	(void) close(s);
 	free(ifc.ifc_buf);
 	return (retv);
-}
-
-/*
- * dlpi_attach()
- *
- * Send down DL_ATTACH_REQ to driver.
- */
-static int
-dlpi_attach(int fd, int ppa)
-{
-	dl_attach_req_t	req;
-	struct strbuf buf;
-
-	if (fd < 0) {
-		return (-1);
-	}
-	BZERO(&req, sizeof (req));
-	req.dl_primitive = DL_ATTACH_REQ;
-	req.dl_ppa = ppa;
-
-	buf.len = sizeof (req);
-	buf.buf = (void *) &req;
-
-	return (putmsg(fd, &buf, NULL, RS_HIPRI));
-}
-
-/*
- * dlpi_info_req()
- *
- * Send down DL_INFO_REQ to driver.
- */
-static int
-dlpi_info_req(int fd)
-{
-	dl_info_req_t req;
-	struct strbuf buf;
-
-	if (fd < 0) {
-		return (-1);
-	}
-	BZERO(&req, sizeof (req));
-	req.dl_primitive = DL_INFO_REQ;
-
-	buf.len = sizeof (req);
-	buf.buf = (void *) &req;
-
-	return (putmsg(fd, &buf, NULL, RS_HIPRI));
-}
-
-/*
- * dlpi_get_reply()
- *
- * Poll to get DLPI reply message from driver.
- */
-static int
-dlpi_get_reply(int fd, union DL_primitives *reply, int expected_prim,
-    int maxlen)
-{
-	struct strbuf buf;
-	struct pollfd pfd;
-	int flags;
-	int n;
-
-	if (fd < 0) {
-		return (-1);
-	}
-	/*
-	 * Use poll to wait for a message with a timeout.
-	 */
-	pfd.fd = fd;
-	pfd.events = (POLLIN | POLLPRI);
-
-	do {
-		n = poll(&pfd, 1, 1000);
-	} while ((n == -1) && (errno == EINTR));
-
-	if (n <= 0) {
-		return (-1);
-	}
-	/*
-	 * Get the reply.
-	 */
-	buf.maxlen = maxlen;
-	buf.buf = (void *)reply;
-
-	flags = 0;
-
-	if (getmsg(fd, &buf, NULL, &flags) < 0) {
-		return (-1);
-	}
-	if (buf.len < sizeof (ulong_t)) {
-		if (debug) {
-			dbglog("dlpi response short (len=%d)\n", buf.len);
-		}
-		return (-1);
-	}
-	if (reply->dl_primitive == expected_prim) {
-		return (0);
-	}
-	if (debug) {
-		if (reply->dl_primitive == DL_ERROR_ACK) {
-			dbglog("dlpi error %d (unix errno %d) for prim %x\n",
-			    reply->error_ack.dl_errno,
-			    reply->error_ack.dl_unix_errno,
-			    reply->error_ack.dl_error_primitive);
-		} else {
-			dbglog("dlpi unexpected response prim %x\n",
-			    reply->dl_primitive);
-		}
-	}
-	return (-1);
 }
 
 /*

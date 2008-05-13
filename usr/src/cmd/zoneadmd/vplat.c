@@ -74,7 +74,6 @@
 #include <sys/stropts.h>
 #include <sys/conf.h>
 
-#include <sys/dlpi.h>
 #include <libdlpi.h>
 #include <libdllink.h>
 #include <libdlvlan.h>

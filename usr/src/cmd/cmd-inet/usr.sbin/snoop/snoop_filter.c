@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,10 +39,8 @@
 #include <sys/sockio.h>
 #include <sys/vlan.h>
 #include <net/if.h>
-#include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <netinet/ip6.h>
 #include <inet/ip6.h>
 #include <inet/ip.h>
 #include <netinet/if_ether.h>
@@ -53,7 +51,6 @@
 #include <rpc/rpc.h>
 #include <rpc/rpcent.h>
 
-#include <sys/dlpi.h>
 #include <snoop.h>
 #include "snoop_vlan.h"
 

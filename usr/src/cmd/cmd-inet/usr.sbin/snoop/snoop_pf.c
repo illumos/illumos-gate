@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
 #include <sys/isa_defs.h>
 
 #include <sys/socket.h>
-#include <sys/sockio.h>
-#include <sys/dlpi.h>
 #include <sys/vlan.h>
 #include <net/if.h>
 #include <netinet/in_systm.h>
@@ -988,8 +986,8 @@ pf_check_transport_protocol(uint_t transport_protocol)
 			pf_match_ethertype(mapping_table[i].network_protocol);
 			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
 			pf_compare_value(
-				mapping_table[i].offset + link_header_len, 1,
-				transport_protocol);
+			    mapping_table[i].offset + link_header_len, 1,
+			    transport_protocol);
 			pf_emit(ENF_AND);
 			if (number_of_matches > 1) {
 				/*
