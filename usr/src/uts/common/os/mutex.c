@@ -598,7 +598,7 @@ mutex_init(kmutex_t *mp, char *name, kmutex_type_t type, void *ibc)
 			    "aligned; caller %s+%lx in module %s. "
 			    "This is unsupported and may cause a panic. "
 			    "Please report this to the kernel module supplier.",
-			    lp, MUTEX_ALIGN,
+			    (void *)lp, MUTEX_ALIGN,
 			    funcname ? funcname : "unknown", offset,
 			    mod_containing_pc(caller()));
 			misalign_cnt++;
