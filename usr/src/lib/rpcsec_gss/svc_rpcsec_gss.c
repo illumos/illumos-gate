@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +112,7 @@ static int			max_gss_contexts = 128;
 static int			sweep_interval = 10;
 static int			last_swept = 0;
 static uint_t			max_lifetime = GSS_C_INDEFINITE;
-static int			init_lifetime = 300;
+static int			init_lifetime = 0;
 static uint_t			gid_timeout = 43200; /* 43200 secs = 12 hours */
 
 /*
@@ -1226,8 +1226,8 @@ create_client()
 			 */
 			if (!cleanup_cb_set) {
 				old_cleanup_cb =
-					(void (*)()) __svc_set_proc_cleanup_cb(
-							(void *)ctx_cleanup);
+				    (void (*)()) __svc_set_proc_cleanup_cb(
+				    (void *)ctx_cleanup);
 				cleanup_cb_set = TRUE;
 			}
 			mutex_unlock(&ctx_mutex);

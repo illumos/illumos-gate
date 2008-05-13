@@ -102,8 +102,6 @@ typedef struct _rpc_gss_data {
 /*
  *  RPCSEC_GSS auth cache definitions.
  */
-#define	CONTEXT_WINDOW	300	/* allow 5 mins clock skew for context */
-				/* expiration */
 
 /* The table size must be a power of two. */
 #define	GSSAUTH_TABLESIZE 16
@@ -311,7 +309,7 @@ if (HASH(cache_key, uid) < 0) {
 			ga_cache_hit++;
 			if (ap->invalid ||
 			    ((current->ctx_expired_time != GSS_C_INDEFINITE) &&
-			    ((gethrestime_sec() + CONTEXT_WINDOW) >=
+			    (gethrestime_sec() >=
 			    current->ctx_expired_time))) {
 			    RPCGSS_LOG0(1, "NOTICE: rpc_gss_secget: time to "
 					"refresh the auth\n");
