@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,7 @@ main(int argc, char **argv)
 	 */
 	if (chdir(ATDIR) == -1)
 		atabortperror(ATDIR);
-	if ((numentries = ascandir(".", &queue, filewanted,
+	if ((numentries = scandir(".", &queue, filewanted,
 	    (cflag) ? creation : execution)) < 0)
 		atabortperror(ATDIR);
 
@@ -453,7 +453,7 @@ printjobname(char *file)
 
 
 /*
- * Sort files by queue, time of creation, and sequence. (used by "ascandir")
+ * Sort files by queue, time of creation, and sequence. (used by "scandir")
  */
 int
 creation(struct dirent **d1, struct dirent **d2)
@@ -490,7 +490,7 @@ creation(struct dirent **d1, struct dirent **d2)
 }
 
 /*
- * Sort files by queue, time of execution, and sequence. (used by "ascandir")
+ * Sort files by queue, time of execution, and sequence. (used by "scandir")
  */
 int
 execution(struct dirent **d1, struct dirent **d2)

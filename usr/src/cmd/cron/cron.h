@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,6 @@ void	cron_sendmsg(char, char *, char *, char);
 time_t	 num(char **);
 void	*xmalloc(size_t);
 void	*xcalloc(size_t, size_t);
-int	ascandir(char *, struct dirent *(*[]), int (*)(), int (*)());
 
 #ifdef	__cplusplus
 }

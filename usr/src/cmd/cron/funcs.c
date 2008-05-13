@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +85,8 @@ days_btwn(int m1, int d1, int y1, int m2, int d2, int y2)
 		 */
 		if (d2 > days_in_mon(m2, y2)) {
 			int p;
-			for (p = 1; ! isleap(y2+YEAR+p); p++);
+			for (p = 1; ! isleap(y2+YEAR+p); p++)
+				;
 			return (p*365 + d2-d1-1);
 		}
 		return (d2-d1-1);
@@ -172,8 +172,6 @@ char
 		return (msg);
 }
 
-
-
 int
 filewanted(struct dirent *direntry)
 {
@@ -192,86 +190,6 @@ filewanted(struct dirent *direntry)
 	if (audit_cron_is_anc_name(direntry->d_name))
 		return (0);
 	return (1);
-}
-
-/*
- * Scan the directory dirname calling select to make a list of selected
- * directory entries then sort using qsort and compare routine dcomp.
- * Returns the number of entries and a pointer to a list of pointers to
- * struct direct (through namelist). Returns -1 if there were any errors.
- */
-
-
-#ifdef DIRSIZ
-#undef DIRSIZ
-
-#endif
-#define	DIRSIZ(dp) \
-	(dp)->d_reclen
-
-int
-ascandir(dirname, namelist, select, dcomp)
-	char		*dirname;
-	struct dirent	*(*namelist[]);
-	int		(*select)();
-	int		(*dcomp)();
-{
-	struct dirent *d, *p, **names;
-	int nitems;
-	char *cp1, *cp2;
-	struct stat stb;
-	long arraysz;
-	DIR *dirp;
-
-	if ((dirp = opendir(dirname)) == NULL)
-		return (-1);
-	if (fstat(dirp->dd_fd, &stb) < 0)
-		return (-1);
-
-	/*
-	 * estimate the array size by taking the size of the directory file
-	 * and dividing it by a multiple of the minimum size entry.
-	 */
-	arraysz = (stb.st_size / 24);
-	names = (struct dirent **)malloc(arraysz * sizeof (struct dirent *));
-	if (names == NULL)
-		return (-1);
-
-	nitems = 0;
-	while ((d = readdir(dirp)) != NULL) {
-		if (select != NULL && !(*select)(d))
-			continue;	/* just selected names */
-
-		/*
-		 * Make a minimum size copy of the data
-		 */
-		p = (struct dirent *)malloc(DIRSIZ(d));
-		if (p == NULL)
-			return (-1);
-		p->d_ino = d->d_ino;
-		p->d_reclen = d->d_reclen;
-		/* p->d_namlen = d->d_namlen; */
-		for (cp1 = p->d_name, cp2 = d->d_name; *cp1++ = *cp2++; );
-		/*
-		 * Check to make sure the array has space left and
-		 * realloc the maximum size.
-		 */
-		if (++nitems >= arraysz) {
-			if (fstat(dirp->dd_fd, &stb) < 0)
-				return (-1);	/* just might have grown */
-			arraysz = stb.st_size / 12;
-			names = (struct dirent **)realloc((char *)names,
-				arraysz * sizeof (struct dirent *));
-			if (names == NULL)
-				return (-1);
-		}
-		names[nitems-1] = p;
-	}
-	(void) closedir(dirp);
-	if (nitems && dcomp != NULL)
-		qsort(names, nitems, sizeof (struct dirent *), dcomp);
-	*namelist = names;
-	return (nitems);
 }
 
 void *

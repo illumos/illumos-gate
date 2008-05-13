@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -343,7 +343,7 @@ getjoblist(struct dirent ***namelistp, struct stat ***statlistp,
 	/*
 	 * Get a list of the files in the spooling area.
 	 */
-	if ((numjobs = ascandir(".", namelistp, filewanted, sortfunc)) < 0)
+	if ((numjobs = scandir(".", namelistp, filewanted, sortfunc)) < 0)
 		atabortperror(NOREADDIR);
 
 	if ((statlist =
