@@ -501,13 +501,14 @@ xc_one(int cix, xcfunc_t *func, uint64_t arg1, uint64_t arg2)
 
 	/*
 	 * Since we own xc_sys_mutex now, we are safe to
-	 * write to the xc_mobx.
+	 * write to the xc_mbox.
 	 */
 	ASSERT(xc_mbox[cix].xc_state == XC_IDLE);
 	XC_TRACE(XC_ONE_OTHER, &tset, func, arg1, arg2);
 	XC_SETUP(cix, func, arg1, arg2);
 	init_mondo(setsoftint_tl1, xc_serv_inum, 0);
 	send_one_mondo(cix);
+	xc_spl_enter[lcx] = 0;
 
 	/* xc_serv does membar_stld */
 	while (xc_mbox[cix].xc_state != XC_IDLE) {
@@ -527,7 +528,6 @@ xc_one(int cix, xcfunc_t *func, uint64_t arg1, uint64_t arg2)
 			    "xc_state[%d] != XC_IDLE", cix);
 		}
 	}
-	xc_spl_enter[lcx] = 0;
 	XC_STAT_INC(x_dstat[lcx][XC_ONE_OTHER]);
 	mutex_exit(&xc_sys_mutex);
 
