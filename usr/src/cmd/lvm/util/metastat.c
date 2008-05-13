@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,7 +229,7 @@ check_replica_state(mdsetname_t *sp, md_error_t *ep)
 
 	if (c.c_flags & MDDB_C_STALE) {
 		return (mdmddberror(ep, MDE_DB_STALE, NODEV32, sp->setno,
-			0, NULL));
+		    0, NULL));
 	} else
 		return (0);
 }
@@ -309,7 +309,7 @@ main(
 
 	if (sdssc_bind_library() == SDSSC_OKAY)
 		if (sdssc_cmd_proxy(argc, argv, SDSSC_PROXY_PRIMARY,
-			&error) == SDSSC_PROXY_DONE)
+		    &error) == SDSSC_PROXY_DONE)
 			exit(error);
 
 	/* initialize */
@@ -408,7 +408,7 @@ main(
 	if (inquire) {
 		if (geteuid() != 0) {
 			fprintf(stderr, gettext("metastat: -i "
-				"option requires super-user privilages\n"));
+			    "option requires super-user privilages\n"));
 			md_exit(sp, 1);
 		}
 		probe_all_devs(sp);
@@ -431,9 +431,10 @@ main(
 	/* status all devices */
 	if (argc == 0) {
 		if (all_sets_flag) {
-		    print_all_sets(options, concise_flag, quiet_flg);
+			print_all_sets(options, concise_flag, quiet_flg);
 		} else {
-		    print_specific_set(sp, options, concise_flag, quiet_flg);
+			print_specific_set(sp, options, concise_flag,
+			    quiet_flg);
 		}
 
 		if (meta_smf_isonline(meta_smf_getmask(), ep) == 0) {
@@ -460,24 +461,24 @@ main(
 		}
 
 		if (concise_flag) {
-		    mdname_t *np;
+			mdname_t *np;
 
-		    np = metaname(&sp, cname, META_DEVICE, ep);
-		    if (np == NULL) {
-			mde_perror(ep, "");
-			mdclrerror(ep);
-			eval = 1;
-		    } else {
-			print_concise_md(0, sp, np);
-		    }
+			np = metaname(&sp, cname, META_DEVICE, ep);
+			if (np == NULL) {
+				mde_perror(ep, "");
+				mdclrerror(ep);
+				eval = 1;
+			} else {
+				print_concise_md(0, sp, np);
+			}
 
 		} else {
-		    if (print_name(&sp, cname, &nlistp, NULL, stdout, options,
-			&meta_print_trans_msg, &lognlp, ep) != 0) {
-			    mde_perror(ep, "");
-			    mdclrerror(ep);
-			    eval = 1;
-		    }
+			if (print_name(&sp, cname, &nlistp, NULL, stdout,
+			    options, &meta_print_trans_msg, &lognlp, ep) != 0) {
+				mde_perror(ep, "");
+				mdclrerror(ep);
+				eval = 1;
+			}
 		}
 		Free(cname);
 		++devcnt;
@@ -507,11 +508,11 @@ main(
 
 				/* get hotsparepool */
 				if ((hspnamep = metahspname(&sp, cname,
-					ep)) == NULL)
+				    ep)) == NULL)
 					eval = 1;
 
 				if ((hsp = meta_get_hsp(sp, hspnamep,
-					ep)) == NULL)
+				    ep)) == NULL)
 					eval = 1;
 
 				for (hsi = 0;
@@ -536,8 +537,8 @@ main(
 
 				/* get metadevice */
 				if (((namep = metaname(&sp, cname,
-					META_DEVICE, ep)) == NULL) ||
-					(metachkmeta(namep, ep) != 0))
+				    META_DEVICE, ep)) == NULL) ||
+				    (metachkmeta(namep, ep) != 0))
 					eval = 1;
 
 				if (!(options &
@@ -579,37 +580,38 @@ print_all_sets(mdprtopts_t options, int concise_flag, int quiet_flg)
 	int		i;
 
 	if ((max_sets = get_max_sets(&error)) == 0) {
-	    return;
+		return;
 	}
 
 	if (!mdisok(&error)) {
-	    mdclrerror(&error);
-	    return;
+		mdclrerror(&error);
+		return;
 	}
 
 	/* for each possible set number, see if we really have a diskset */
 	for (i = 0; i < max_sets; i++) {
-	    mdsetname_t		*sp;
+		mdsetname_t		*sp;
 
-	    if ((sp = metasetnosetname(i, &error)) == NULL) {
-		if (!mdisok(&error) &&
-		    mdisrpcerror(&error, RPC_PROGNOTREGISTERED)) {
-		    /* metad rpc program not registered - no metasets */
-		    break;
+		if ((sp = metasetnosetname(i, &error)) == NULL) {
+			if (!mdisok(&error) &&
+			    mdisrpcerror(&error, RPC_PROGNOTREGISTERED)) {
+			/* metad rpc program not registered - no metasets */
+				break;
+			}
+
+			mdclrerror(&error);
+			continue;
+		}
+		mdclrerror(&error);
+
+		if (meta_check_ownership(sp, &error) == 0) {
+			/* we own the set, so we can print the metadevices */
+			print_specific_set(sp, options, concise_flag,
+			    quiet_flg);
+			(void) printf("\n");
 		}
 
-		mdclrerror(&error);
-		continue;
-	    }
-	    mdclrerror(&error);
-
-	    if (meta_check_ownership(sp, &error) == 0) {
-		/* we own the set, so we can print the metadevices */
-		print_specific_set(sp, options, concise_flag, quiet_flg);
-		(void) printf("\n");
-	    }
-
-	    metaflushsetname(sp);
+		metaflushsetname(sp);
 	}
 }
 
@@ -624,43 +626,43 @@ print_specific_set(mdsetname_t *sp, mdprtopts_t options, int concise_flag,
 	/* check for ownership */
 	assert(sp != NULL);
 	if (meta_check_ownership(sp, ep) != 0) {
-	    mde_perror(ep, "");
-	    md_exit(sp, 1);
+		mde_perror(ep, "");
+		md_exit(sp, 1);
 	}
 
 	if (concise_flag) {
-	    print_concise_diskset(sp);
+		print_concise_diskset(sp);
 
 	} else {
-	    mdnamelist_t	*nlistp = NULL;
+		mdnamelist_t	*nlistp = NULL;
 
-	    /* status devices */
-	    if (meta_print_all(sp, NULL, &nlistp, stdout, options,
-		&meta_print_trans_msg, ep) != 0) {
-		mde_perror(ep, "");
-		md_exit(sp, 1);
-	    }
-
-	    /* print relocation device id on all dev's */
-	    if ((options & PRINT_DEVID) && !quiet_flg) {
-		/*
-		 * Ignore return value from meta_getalldevs since
-		 * it will return a failure if even one device cannot
-		 * be found - which could occur in the case of device
-		 * failure or a device being powered off during
-		 * upgrade.  Even if meta_getalldevs fails, the
-		 * data in nlistp is still valid.
-		 */
-		if (!(options & (PRINT_LARGEDEVICES | PRINT_FN))) {
-		    (void) meta_getalldevs(sp, &nlistp, 0, ep);
-		}
-		if (nlistp != NULL) {
-		    if (print_devid(sp, nlistp, stdout, ep) != 0) {
+		/* status devices */
+		if (meta_print_all(sp, NULL, &nlistp, stdout, options,
+		    &meta_print_trans_msg, ep) != 0) {
 			mde_perror(ep, "");
 			md_exit(sp, 1);
-		    }
 		}
-	    }
+
+		/* print relocation device id on all dev's */
+		if ((options & PRINT_DEVID) && !quiet_flg) {
+			/*
+			 * Ignore return value from meta_getalldevs since
+			 * it will return a failure if even one device cannot
+			 * be found - which could occur in the case of device
+			 * failure or a device being powered off during
+			 * upgrade.  Even if meta_getalldevs fails, the
+			 * data in nlistp is still valid.
+			 */
+			if (!(options & (PRINT_LARGEDEVICES | PRINT_FN))) {
+				(void) meta_getalldevs(sp, &nlistp, 0, ep);
+			}
+			if (nlistp != NULL) {
+				if (print_devid(sp, nlistp, stdout, ep) != 0) {
+					mde_perror(ep, "");
+					md_exit(sp, 1);
+				}
+			}
+		}
 	}
 
 	print_trans_msg(options, meta_print_trans_msg);
@@ -718,8 +720,11 @@ hotspare_ok(char *bname)
 
 	if ((fd = open(bname, O_RDONLY)) < 0)
 		return (0);
-	if (read(fd, buf, sizeof (buf)) < 0)
+	if (read(fd, buf, sizeof (buf)) < 0) {
+		(void) close(fd);
 		return (0);
+	}
+	(void) close(fd);
 	return (1);
 }
 
@@ -745,9 +750,9 @@ delete_hotspares_impl(mdsetname_t *sp, mdhspname_t *hspnp, md_hsp_t *hspp)
 				continue;
 
 			fprintf(stderr,
-				"NOTICE: Hotspare %s in %s has failed.\n"
-				"\tDeleting %s since it not in use\n\n",
-				bname, hspnp->hspname, bname);
+			    "NOTICE: Hotspare %s in %s has failed.\n"
+			    "\tDeleting %s since it not in use\n\n",
+			    bname, hspnp->hspname, bname);
 
 			if (meta_hs_delete(sp, hspnp, nlp, 0, &e) != NULL) {
 				mde_perror(&e, "");
@@ -775,10 +780,8 @@ md_probe_ioctl(mdsetname_t *sp, mdnamelist_t *nlp, int ndevs, char *drvname)
 {
 	mdnamelist_t	*p;
 	mdname_t	*np;
-	md_probedev_t	probe_ioc,
-			*iocp;
-	int		i,
-			retval = 0;
+	md_probedev_t	probe_ioc, *iocp;
+	int		i, retval = 0;
 	/*
 	 * Allocate space for all the metadevices and fill in
 	 * the minor numbers.
@@ -1168,97 +1171,106 @@ print_concise_diskset(mdsetname_t *sp)
 	 * once.  This logic doesn't apply to any other metadevice type.
 	 */
 	if (meta_get_sp_names(sp, &nl, 0, &error) >= 0) {
-	    mdnamelist_t	*nlp;
-	    /* keep track of the softparts on the same underlying device */
-	    struct sp_base_list	*base_list = NULL;
+		mdnamelist_t	*nlp;
+		/* keep track of the softparts on the same underlying device */
+		struct sp_base_list	*base_list = NULL;
 
-	    for (nlp = nl; nlp != NULL; nlp = nlp->next) {
-		mdname_t	*mdn;
-		md_sp_t		*soft_part;
-		mdnamelist_t	*tnlp;
+		for (nlp = nl; nlp != NULL; nlp = nlp->next) {
+			mdname_t	*mdn;
+			md_sp_t		*soft_part;
+			mdnamelist_t	*tnlp;
 
-		mdn = metaname(&sp, nlp->namep->cname, META_DEVICE, &error);
-		mdclrerror(&error);
-		if (mdn == NULL) {
-		    print_concise_entry(0, nlp->namep->cname, 0, 'p');
-		    printf("\n");
-		    continue;
+			mdn = metaname(&sp, nlp->namep->cname,
+			    META_DEVICE, &error);
+			mdclrerror(&error);
+			if (mdn == NULL) {
+				print_concise_entry(0, nlp->namep->cname,
+				    0, 'p');
+				printf("\n");
+				continue;
+			}
+
+			soft_part = meta_get_sp_common(sp, mdn, 1, &error);
+			mdclrerror(&error);
+
+			if (soft_part == NULL ||
+			    MD_HAS_PARENT(soft_part->common.parent) ||
+			    sp_done(soft_part, base_list))
+				continue;
+
+			/* print this soft part */
+			print_concise_entry(0, soft_part->common.namep->cname,
+			    soft_part->common.size, 'p');
+			(void) printf(" %s\n", soft_part->compnamep->cname);
+
+			/*
+			 * keep track of the underlying device of
+			 * this soft part
+			 */
+			base_list = sp_add_done(soft_part, base_list);
+
+			/*
+			 * now print all of the other soft parts on the same
+			 * underlying device
+			 */
+			for (tnlp = nlp->next; tnlp != NULL; tnlp =
+			    tnlp->next) {
+				md_sp_t		*part;
+
+				mdn = metaname(&sp, tnlp->namep->cname,
+				    META_DEVICE, &error);
+
+				mdclrerror(&error);
+				if (mdn == NULL)
+					continue;
+
+				part = meta_get_sp_common(sp, mdn, 1, &error);
+				mdclrerror(&error);
+
+				if (part == NULL || MD_HAS_PARENT(
+				    part->common.parent) ||
+				    ! sp_match(part, base_list))
+					continue;
+
+				/* on the same base so print this soft part */
+				print_concise_entry(0,
+				    part->common.namep->cname,
+				    part->common.size, 'p');
+				(void) printf(" %s\n", part->compnamep->cname);
+			}
+
+			/*
+			 * print the common metadevice hierarchy
+			 * under these soft parts
+			 */
+			print_concise_md(META_INDENT, sp, soft_part->compnamep);
 		}
 
-		soft_part = meta_get_sp_common(sp, mdn, 1, &error);
-		mdclrerror(&error);
-
-		if (soft_part == NULL ||
-		    MD_HAS_PARENT(soft_part->common.parent) ||
-		    sp_done(soft_part, base_list))
-		    continue;
-
-		/* print this soft part */
-		print_concise_entry(0, soft_part->common.namep->cname,
-		    soft_part->common.size, 'p');
-		(void) printf(" %s\n", soft_part->compnamep->cname);
-
-		/* keep track of the underlying device of this soft part */
-		base_list = sp_add_done(soft_part, base_list);
-
-		/*
-		 * now print all of the other soft parts on the same
-		 * underlying device
-		 */
-		for (tnlp = nlp->next; tnlp != NULL; tnlp = tnlp->next) {
-		    md_sp_t		*part;
-
-		    mdn = metaname(&sp, tnlp->namep->cname,
-		    META_DEVICE, &error);
-
-		    mdclrerror(&error);
-		    if (mdn == NULL)
-			continue;
-
-		    part = meta_get_sp_common(sp, mdn, 1, &error);
-		    mdclrerror(&error);
-
-		    if (part == NULL || MD_HAS_PARENT(part->common.parent) ||
-			! sp_match(part, base_list))
-			continue;
-
-		    /* on the same base so print this soft part */
-		    print_concise_entry(0, part->common.namep->cname,
-			part->common.size, 'p');
-		    (void) printf(" %s\n", part->compnamep->cname);
-		}
-
-		/*
-		 * print the common metadevice hierarchy under these soft parts
-		 */
-		print_concise_md(META_INDENT, sp, soft_part->compnamep);
-	    }
-
-	    free_names(&nl);
-	    sp_free_list(base_list);
+		free_names(&nl);
+		sp_free_list(base_list);
 	}
 	mdclrerror(&error);
 
 	if (meta_get_trans_names(sp, &nl, 0, &error) >= 0)
-	    print_concise_namelist(sp, &nl, 't');
+		print_concise_namelist(sp, &nl, 't');
 	mdclrerror(&error);
 
 	if (meta_get_mirror_names(sp, &nl, 0, &error) >= 0)
-	    print_concise_namelist(sp, &nl, 'm');
+		print_concise_namelist(sp, &nl, 'm');
 	mdclrerror(&error);
 
 	if (meta_get_raid_names(sp, &nl, 0, &error) >= 0)
-	    print_concise_namelist(sp, &nl, 'r');
+		print_concise_namelist(sp, &nl, 'r');
 	mdclrerror(&error);
 
 	if (meta_get_stripe_names(sp, &nl, 0, &error) >= 0)
-	    print_concise_namelist(sp, &nl, 's');
+		print_concise_namelist(sp, &nl, 's');
 	mdclrerror(&error);
 
 	if (meta_get_hsp_names(sp, &hsp_list, 0, &error) >= 0) {
-	    mdhspnamelist_t *nlp;
+		mdhspnamelist_t *nlp;
 
-	    for (nlp = hsp_list; nlp != NULL; nlp = nlp->next) {
+	for (nlp = hsp_list; nlp != NULL; nlp = nlp->next) {
 		md_hsp_t	*hsp;
 
 		print_concise_entry(0, nlp->hspnamep->hspname, 0, 'h');
@@ -1266,26 +1278,26 @@ print_concise_diskset(mdsetname_t *sp)
 		hsp = meta_get_hsp_common(sp, nlp->hspnamep, 1, &error);
 		mdclrerror(&error);
 		if (hsp != NULL) {
-		    int	i;
+			int	i;
 
-		    for (i = 0; i < hsp->hotspares.hotspares_len; i++) {
-			md_hs_t	*hs;
-			char	*state;
+			for (i = 0; i < hsp->hotspares.hotspares_len; i++) {
+				md_hs_t	*hs;
+				char	*state;
 
-			hs = &hsp->hotspares.hotspares_val[i];
+				hs = &hsp->hotspares.hotspares_val[i];
 
-			(void) printf(" %s", hs->hsnamep->cname);
+				(void) printf(" %s", hs->hsnamep->cname);
 
-			state = get_hs_state(hs);
-			if (state != NULL)
-			    (void) printf(" (%s)", state);
-		    }
+				state = get_hs_state(hs);
+				if (state != NULL)
+					(void) printf(" (%s)", state);
+			}
 		}
 
 		(void) printf("\n");
-	    }
+	}
 
-	    metafreehspnamelist(hsp_list);
+	metafreehspnamelist(hsp_list);
 	}
 }
 
@@ -1299,22 +1311,22 @@ print_concise_namelist(mdsetname_t *sp, mdnamelist_t **nl, char mtype)
 	md_error_t	error = mdnullerror;
 
 	for (nlp = *nl; nlp != NULL; nlp = nlp->next) {
-	    mdname_t	*mdn;
-	    md_common_t	*u;
+		mdname_t	*mdn;
+		md_common_t	*u;
 
-	    mdn = metaname(&sp, nlp->namep->cname, META_DEVICE, &error);
-	    mdclrerror(&error);
-	    if (mdn == NULL) {
-		print_concise_entry(0, nlp->namep->cname, 0, mtype);
-		printf("\n");
-		continue;
-	    }
+		mdn = metaname(&sp, nlp->namep->cname, META_DEVICE, &error);
+		mdclrerror(&error);
+		if (mdn == NULL) {
+			print_concise_entry(0, nlp->namep->cname, 0, mtype);
+			printf("\n");
+			continue;
+		}
 
-	    u = get_concise_unit(sp, mdn, &error);
-	    mdclrerror(&error);
+		u = get_concise_unit(sp, mdn, &error);
+		mdclrerror(&error);
 
-	    if (u != NULL && !MD_HAS_PARENT(u->parent))
-		print_concise_md(0, sp, mdn);
+		if (u != NULL && !MD_HAS_PARENT(u->parent))
+			print_concise_md(0, sp, mdn);
 	}
 
 	free_names(nl);
@@ -1331,41 +1343,42 @@ print_concise_mirror(int indent, mdsetname_t *sp, md_mirror_t *mirror)
 	md_status_t	status = mirror->common.state;
 
 	if (mirror == NULL)
-	    return;
+		return;
 
 	print_concise_entry(indent, mirror->common.namep->cname,
 	    mirror->common.size, 'm');
 
 	for (i = 0; i < NMIRROR; i++) {
-	    uint_t	tstate = 0;
-	    char	*state;
+		uint_t	tstate = 0;
+		char	*state;
 
-	    if (mirror->submirrors[i].submirnamep == NULL)
-		continue;
-	    (void) printf(" %s", mirror->submirrors[i].submirnamep->cname);
+		if (mirror->submirrors[i].submirnamep == NULL)
+			continue;
+		(void) printf(" %s", mirror->submirrors[i].submirnamep->cname);
 
-	    if (mirror->submirrors[i].state & SMS_OFFLINE) {
-		(void) printf(gettext(" (offline)"));
-		continue;
-	    }
+		if (mirror->submirrors[i].state & SMS_OFFLINE) {
+			(void) printf(gettext(" (offline)"));
+			continue;
+		}
 
-	    if (metaismeta(mirror->submirrors[i].submirnamep))
-		(void) meta_get_tstate(mirror->submirrors[i].submirnamep->dev,
-		    &tstate, &error);
+		if (metaismeta(mirror->submirrors[i].submirnamep))
+			(void) meta_get_tstate(
+			    mirror->submirrors[i].submirnamep->dev,
+			    &tstate, &error);
 
-	    state = get_sm_state(mirror, i, status, tstate);
-	    if (state != NULL)
-		(void) printf(" (%s)", state);
+		state = get_sm_state(mirror, i, status, tstate);
+		if (state != NULL)
+			(void) printf(" (%s)", state);
 	}
 
 	(void) printf("\n");
 
 	indent += META_INDENT;
 	for (i = 0; i < NMIRROR; i++) {
-	    if (mirror->submirrors[i].submirnamep == NULL)
-		continue;
+		if (mirror->submirrors[i].submirnamep == NULL)
+			continue;
 
-	    print_concise_md(indent, sp, mirror->submirrors[i].submirnamep);
+		print_concise_md(indent, sp, mirror->submirrors[i].submirnamep);
 	}
 }
 
@@ -1380,53 +1393,54 @@ print_concise_raid(int indent, mdsetname_t *sp, md_raid_t *raid)
 	uint_t		tstate = 0;
 
 	if (raid == NULL)
-	    return;
+		return;
 
 	print_concise_entry(indent, raid->common.namep->cname,
 	    raid->common.size, 'r');
 
 	if (metaismeta(raid->common.namep))
-	    (void) meta_get_tstate(raid->common.namep->dev, &tstate, &error);
+		(void) meta_get_tstate(raid->common.namep->dev,
+		    &tstate, &error);
 
 	for (i = 0; i < raid->cols.cols_len; i++) {
-	    md_raidcol_t	*colp = &raid->cols.cols_val[i];
-	    mdname_t		*namep = ((colp->hsnamep != NULL) ?
-				    colp->hsnamep : colp->colnamep);
-	    char		*hsname = ((colp->hsnamep != NULL) ?
-				    colp->hsnamep->cname : NULL);
-	    char		*col_state = NULL;
+		md_raidcol_t	*colp = &raid->cols.cols_val[i];
+		mdname_t	*namep = ((colp->hsnamep != NULL) ?
+		    colp->hsnamep : colp->colnamep);
+		char	*hsname = ((colp->hsnamep != NULL) ?
+		    colp->hsnamep->cname : NULL);
+		char	*col_state = NULL;
 
-	    (void) printf(" %s", colp->colnamep->cname);
+		(void) printf(" %s", colp->colnamep->cname);
 
-	    if (metaismeta(namep)) {
-		uint_t tstate = 0;
+		if (metaismeta(namep)) {
+			uint_t tstate = 0;
 
-		(void) meta_get_tstate(namep->dev, &tstate, &error);
-		col_state = get_raid_col_state(colp, tstate);
+			(void) meta_get_tstate(namep->dev, &tstate, &error);
+			col_state = get_raid_col_state(colp, tstate);
 
-	    } else {
-		if (tstate != 0)
-		    col_state = "-";
-		else
-		    col_state = get_raid_col_state(colp, tstate);
-	    }
+		} else {
+			if (tstate != 0)
+				col_state = "-";
+			else
+				col_state = get_raid_col_state(colp, tstate);
+		}
 
-	    if (col_state != NULL) {
-		if (hsname != NULL)
-		    (void) printf(" (%s-%s)", col_state, hsname);
-		else
-		    (void) printf(" (%s)", col_state);
+		if (col_state != NULL) {
+			if (hsname != NULL)
+				(void) printf(" (%s-%s)", col_state, hsname);
+			else
+				(void) printf(" (%s)", col_state);
 
-	    } else if (hsname != NULL) {
-		(void) printf(gettext(" (spared-%s)"), hsname);
-	    }
+		} else if (hsname != NULL) {
+			(void) printf(gettext(" (spared-%s)"), hsname);
+		}
 	}
 
 	(void) printf("\n");
 
 	indent += META_INDENT;
 	for (i = 0; i < raid->cols.cols_len; i++) {
-	    print_concise_md(indent, sp, raid->cols.cols_val[i].colnamep);
+		print_concise_md(indent, sp, raid->cols.cols_val[i].colnamep);
 	}
 }
 
@@ -1441,71 +1455,72 @@ print_concise_stripe(int indent, mdsetname_t *sp, md_stripe_t *stripe)
 	uint_t		top_tstate = 0;
 
 	if (stripe == NULL)
-	    return;
+		return;
 
 	print_concise_entry(indent, stripe->common.namep->cname,
 	    stripe->common.size, 's');
 
 	if (metaismeta(stripe->common.namep))
-	    (void) meta_get_tstate(stripe->common.namep->dev, &top_tstate,
-		&error);
+		(void) meta_get_tstate(stripe->common.namep->dev, &top_tstate,
+		    &error);
 	mdclrerror(&error);
 
 	for (i = 0; i < stripe->rows.rows_len; i++) {
-	    md_row_t	*rowp;
-	    int		j;
+		md_row_t	*rowp;
+		int		j;
 
-	    rowp = &stripe->rows.rows_val[i];
+		rowp = &stripe->rows.rows_val[i];
 
-	    for (j = 0; j < rowp->comps.comps_len; j++) {
-		md_comp_t	*comp;
-		uint_t		tstate = 0;
-		char		*comp_state = NULL;
-		char		*hsname;
+		for (j = 0; j < rowp->comps.comps_len; j++) {
+			md_comp_t	*comp;
+			uint_t		tstate = 0;
+			char		*comp_state = NULL;
+			char		*hsname;
 
-		comp = &rowp->comps.comps_val[j];
-		(void) printf(" %s", comp->compnamep->cname);
+			comp = &rowp->comps.comps_val[j];
+			(void) printf(" %s", comp->compnamep->cname);
 
-		if (metaismeta(comp->compnamep)) {
-		    uint_t tstate = 0;
-		    (void) meta_get_tstate(comp->compnamep->dev, &tstate,
-			&error);
-		    comp_state = get_stripe_state(comp, tstate);
-		} else {
-		    if (top_tstate != 0)
-			comp_state = "-";
-		    else
-			comp_state = get_stripe_state(comp, tstate);
+			if (metaismeta(comp->compnamep)) {
+				uint_t tstate = 0;
+				(void) meta_get_tstate(comp->compnamep->dev,
+				    &tstate, &error);
+				comp_state = get_stripe_state(comp, tstate);
+			} else {
+			if (top_tstate != 0)
+				comp_state = "-";
+			else
+				comp_state = get_stripe_state(comp, tstate);
+			}
+
+			hsname = ((comp->hsnamep != NULL) ?
+			    comp->hsnamep->cname : NULL);
+
+			if (comp_state != NULL) {
+				if (hsname != NULL)
+					(void) printf(" (%s-%s)",
+					    comp_state, hsname);
+				else
+					(void) printf(" (%s)", comp_state);
+
+			} else if (hsname != NULL) {
+				(void) printf(gettext(" (spared-%s)"), hsname);
+			}
 		}
-
-		hsname = ((comp->hsnamep != NULL) ?
-		    comp->hsnamep->cname : NULL);
-
-		if (comp_state != NULL) {
-		    if (hsname != NULL)
-			(void) printf(" (%s-%s)", comp_state, hsname);
-		    else
-			(void) printf(" (%s)", comp_state);
-
-		} else if (hsname != NULL) {
-		    (void) printf(gettext(" (spared-%s)"), hsname);
-		}
-	    }
 	}
 
 	(void) printf("\n");
 
 	indent += META_INDENT;
 	for (i = 0; i < stripe->rows.rows_len; i++) {
-	    md_row_t	*rowp;
-	    int		j;
+		md_row_t	*rowp;
+		int		j;
 
-	    rowp = &stripe->rows.rows_val[i];
+		rowp = &stripe->rows.rows_val[i];
 
-	    for (j = 0; j < rowp->comps.comps_len; j++) {
-		print_concise_md(indent, sp,
-		    rowp->comps.comps_val[j].compnamep);
-	    }
+		for (j = 0; j < rowp->comps.comps_len; j++) {
+			print_concise_md(indent, sp,
+			    rowp->comps.comps_val[j].compnamep);
+		}
 	}
 }
 
@@ -1516,7 +1531,7 @@ static void
 print_concise_sp(int indent, mdsetname_t *sp, md_sp_t *part)
 {
 	if (part == NULL)
-	    return;
+	return;
 
 	print_concise_entry(indent, part->common.namep->cname,
 	    part->common.size, 'p');
@@ -1533,16 +1548,16 @@ static void
 print_concise_trans(int indent, mdsetname_t *sp, md_trans_t *trans)
 {
 	if (trans == NULL)
-	    return;
+		return;
 
 	print_concise_entry(indent, trans->common.namep->cname,
 	    trans->common.size, 't');
 
 	if (trans->masternamep != NULL)
-	    (void) printf(" %s", trans->masternamep->cname);
+		(void) printf(" %s", trans->masternamep->cname);
 
 	if (trans->lognamep != NULL)
-	    (void) printf(" %s", trans->lognamep->cname);
+		(void) printf(" %s", trans->lognamep->cname);
 
 	(void) printf("\n");
 
@@ -1568,39 +1583,39 @@ print_concise_md(int indent, mdsetname_t *sp, mdname_t *np)
 	md_trans_t	*trans;
 
 	if (np == NULL || !metaismeta(np))
-	    return;
+		return;
 
 	if ((u = meta_get_mdunit(sp, np, &error)) == NULL)
-	    return;
+		return;
 
 	switch (u->c.un_type) {
-	case MD_DEVICE:
-	    stripe = meta_get_stripe_common(sp, np, 1, &error);
-	    print_concise_stripe(indent, sp, stripe);
-	    break;
+		case MD_DEVICE:
+			stripe = meta_get_stripe_common(sp, np, 1, &error);
+			print_concise_stripe(indent, sp, stripe);
+			break;
 
-	case MD_METAMIRROR:
-	    mirror = meta_get_mirror(sp, np, &error);
-	    print_concise_mirror(indent, sp, mirror);
-	    break;
+		case MD_METAMIRROR:
+			mirror = meta_get_mirror(sp, np, &error);
+			print_concise_mirror(indent, sp, mirror);
+			break;
 
-	case MD_METATRANS:
-	    trans = meta_get_trans_common(sp, np, 1, &error);
-	    print_concise_trans(indent, sp, trans);
-	    break;
+		case MD_METATRANS:
+			trans = meta_get_trans_common(sp, np, 1, &error);
+			print_concise_trans(indent, sp, trans);
+			break;
 
-	case MD_METARAID:
-	    raid = meta_get_raid_common(sp, np, 1, &error);
-	    print_concise_raid(indent, sp, raid);
-	    break;
+		case MD_METARAID:
+			raid = meta_get_raid_common(sp, np, 1, &error);
+			print_concise_raid(indent, sp, raid);
+			break;
 
-	case MD_METASP:
-	    soft_part = meta_get_sp_common(sp, np, 1, &error);
-	    print_concise_sp(indent, sp, soft_part);
-	    break;
+		case MD_METASP:
+			soft_part = meta_get_sp_common(sp, np, 1, &error);
+			print_concise_sp(indent, sp, soft_part);
+			break;
 
-	default:
-	    return;
+		default:
+			return;
 	}
 }
 
@@ -1646,8 +1661,8 @@ free_names(mdnamelist_t **nlp)
 	mdnamelist_t *p;
 
 	for (p = *nlp; p != NULL; p = p->next) {
-	    meta_invalidate_name(p->namep);
-	    p->namep = NULL;
+		meta_invalidate_name(p->namep);
+		p->namep = NULL;
 	}
 	metafreenamelist(*nlp);
 	*nlp = NULL;
@@ -1661,8 +1676,8 @@ get_sm_state(md_mirror_t *mirror, int i, md_status_t mirror_status,
 	uint_t tstate)
 {
 	sm_state_t	state = mirror->submirrors[i].state;
-	uint_t		is_target =
-			    mirror->submirrors[i].flags & MD_SM_RESYNC_TARGET;
+	uint_t	is_target =
+	    mirror->submirrors[i].flags & MD_SM_RESYNC_TARGET;
 
 	/*
 	 * Only return Unavailable if there is no flagged error on the
@@ -1687,16 +1702,16 @@ get_sm_state(md_mirror_t *mirror, int i, md_status_t mirror_status,
 
 		if (mirror_status & MD_UN_RESYNC_ACTIVE) {
 
-		    if (mirror->common.revision & MD_64BIT_META_DEV) {
-			(void) snprintf(buf, sizeof (buf),
-			    gettext("resync-%2d.%1d%%"),
-			    mirror->percent_done / 10,
-			    mirror->percent_done % 10);
-		    } else {
-			(void) snprintf(buf, sizeof (buf),
-			    gettext("resync-%d%%"), mirror->percent_done);
-		    }
-		    return (buf);
+			if (mirror->common.revision & MD_64BIT_META_DEV) {
+				(void) snprintf(buf, sizeof (buf),
+				    gettext("resync-%2d.%1d%%"),
+				    mirror->percent_done / 10,
+				    mirror->percent_done % 10);
+			} else {
+				(void) snprintf(buf, sizeof (buf),
+				gettext("resync-%d%%"), mirror->percent_done);
+			}
+			return (buf);
 		}
 		return (gettext("maint"));
 	}
@@ -1716,7 +1731,7 @@ static char *
 get_raid_col_state(md_raidcol_t *colp, uint_t tstate)
 {
 	if (tstate != 0)
-	    return (gettext("unavail"));
+		return (gettext("unavail"));
 
 	return (meta_get_raid_col_state(colp->state));
 }
@@ -1730,7 +1745,7 @@ get_stripe_state(md_comp_t *mdcp, uint_t tstate)
 	comp_state_t	state = mdcp->state;
 
 	if (tstate != 0)
-	    return ("unavail");
+		return ("unavail");
 
 	return (meta_get_stripe_state(state));
 }
@@ -1757,11 +1772,11 @@ sp_add_done(md_sp_t *part, struct sp_base_list *lp)
 
 	n = (struct sp_base_list *)malloc(sizeof (struct sp_base_list));
 	if (n == NULL)
-	    return (lp);
+		return (lp);
 
 	if ((n->base = strdup(part->compnamep->cname)) == NULL) {
-	    free(n);
-	    return (lp);
+		free(n);
+		return (lp);
 	}
 
 	n->next = lp;
@@ -1776,8 +1791,8 @@ static int
 sp_done(md_sp_t *part, struct sp_base_list *lp)
 {
 	for (; lp != NULL; lp = lp->next) {
-	    if (strcmp(lp->base, part->compnamep->cname) == 0)
-		return (1);
+		if (strcmp(lp->base, part->compnamep->cname) == 0)
+			return (1);
 	}
 
 	return (0);
@@ -1790,7 +1805,7 @@ static int
 sp_match(md_sp_t *part, struct sp_base_list *lp)
 {
 	if (lp != NULL && strcmp(lp->base, part->compnamep->cname) == 0)
-	    return (1);
+		return (1);
 
 	return (0);
 }
@@ -1804,8 +1819,8 @@ sp_free_list(struct sp_base_list *lp)
 	struct sp_base_list *n;
 
 	for (; lp != NULL; lp = n) {
-	    n = lp->next;
-	    free(lp->base);
-	    free(lp);
+		n = lp->next;
+		free(lp->base);
+		free(lp);
 	}
 }

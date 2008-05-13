@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,8 +40,11 @@ hotspare_ok(char *bname)
 
 	if ((fd = open(bname, O_RDONLY)) < 0)
 		return (0);
-	if (read(fd, buf, sizeof (buf)) < 0)
+	if (read(fd, buf, sizeof (buf)) < 0) {
+		(void) close(fd);
 		return (0);
+	}
+	(void) close(fd);
 	return (1);
 }
 
@@ -75,9 +77,9 @@ delete_hotspares_impl(mdhspname_t *hspnp, md_hsp_t *hspp, boolean_e verbose)
 				continue;
 
 			monitord_print(6, gettext(
-				"NOTICE: Hotspare %s in %s has failed.\n"
-				"\tDeleting %s since it is not in use\n\n"),
-				bname, hspnp->hspname, bname);
+			    "NOTICE: Hotspare %s in %s has failed.\n"
+			    "\tDeleting %s since it is not in use\n\n"),
+			    bname, hspnp->hspname, bname);
 
 			if (meta_hs_delete(sp, hspnp, nlp, 0, &e) != NULL) {
 				mde_perror(&e, "");
@@ -87,7 +89,7 @@ delete_hotspares_impl(mdhspname_t *hspnp, md_hsp_t *hspp, boolean_e verbose)
 		} else {
 			if (verbose == True)
 				monitord_print(6, gettext(
-					"%s in use - skipping\n"), cname);
+				    "%s in use - skipping\n"), cname);
 		}
 	}
 }
@@ -103,10 +105,8 @@ md_probe_ioctl(mdnamelist_t *nlp, int ndevs, char *drvname, boolean_e verbose)
 {
 	mdnamelist_t	*p;
 	mdname_t	*np;
-	md_probedev_t	probe_ioc,
-			*iocp;
-	int		i,
-			retval = 0;
+	md_probedev_t	probe_ioc, *iocp;
+	int		i, retval = 0;
 	/*
 	 * Allocate space for all the metadevices and fill in
 	 * the minor numbers.
@@ -206,8 +206,8 @@ get_toplevel_mds(mdnamelist_t **lpp, mdnamelist_t **top_pp, boolean_e verbose)
 		if ((mdp = meta_get_unit(sp, p->namep, &e)) == NULL) {
 			if (verbose == True)
 				monitord_print(6, gettext(
-						"......error on (%d)%s\n"), i,
-						p->namep->devicesname);
+				    "......error on (%d)%s\n"), i,
+				    p->namep->devicesname);
 				prevp = p;
 				p = p->next;
 				continue;
@@ -357,7 +357,7 @@ probe_mirror_devs(boolean_e verbose)
 
 		cnt = get_toplevel_mds(&nlp, &toplp, verbose);
 		if (cnt && (md_probe_ioctl(toplp, cnt,
-						MD_MIRROR, verbose) < 0))
+		    MD_MIRROR, verbose) < 0))
 			monitord_print(0, gettext(
 			    "probe_mirror_devs: "
 			    "mirror components %d ioctl error\n"),
@@ -387,7 +387,7 @@ probe_raid_devs(boolean_e verbose)
 		cnt = get_toplevel_mds(&nlp, &toplp, verbose);
 
 		if (cnt && (md_probe_ioctl(toplp, cnt,
-						MD_RAID, verbose) < 0))
+		    MD_RAID, verbose) < 0))
 			monitord_print(0, gettext(
 			    "probe_raid_devs: "
 			    "RAID-5 components %d ioctl error\n"),
@@ -509,7 +509,7 @@ probe_hotspare_devs(boolean_e verbose)
 		if (hspp->hotspares.hotspares_len != 0) {
 			if (verbose == True)
 				monitord_print(6, " %u hotspares\n",
-					hspp->hotspares.hotspares_len);
+				    hspp->hotspares.hotspares_len);
 			delete_hotspares_impl(hspnp, hspp, verbose);
 		}
 	}
