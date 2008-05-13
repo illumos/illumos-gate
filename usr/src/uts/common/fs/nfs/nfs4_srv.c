@@ -6511,7 +6511,11 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 			if (screate == TRUE)
 				rfs4_state_close(state, FALSE, FALSE, cs->cr);
 			rfs4_state_rele(state);
-			resp->status = NFS4ERR_SERVERFAULT;
+			/* check if a monitor detected a delegation conflict */
+			if (err == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK))
+				resp->status = NFS4ERR_DELAY;
+			else
+				resp->status = NFS4ERR_SERVERFAULT;
 			return;
 		}
 	} else { /* open upgrade */
