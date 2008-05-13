@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,6 +30,7 @@
 #include <sys/systm.h>
 #include <sys/debug.h>
 #include <sys/mutex.h>
+#include <sys/atomic.h>
 #include <sys/timer.h>
 #include <sys/lwp_timer_impl.h>
 
@@ -66,6 +68,7 @@ lwp_timer_timeout(void *arg)
 	    (lwptp->lwpt_rqtime.tv_sec > now.tv_sec ||
 	    (lwptp->lwpt_rqtime.tv_sec == now.tv_sec &&
 	    lwptp->lwpt_rqtime.tv_nsec > now.tv_nsec))) {
+		lwptp->lwpt_imm_timeout = 0;
 		lwptp->lwpt_id = realtime_timeout(lwp_timer_timeout, lwptp,
 		    timespectohz(&lwptp->lwpt_rqtime, now));
 	} else {
@@ -75,6 +78,8 @@ lwp_timer_timeout(void *arg)
 		 * the t_delay_lock mutex).
 		 */
 		thread_lock(t);
+		/* do this for the benefit of upi mutexes */
+		(void) atomic_cas_uint(&lwptp->lwpt_imm_timeout, 0, 1);
 		if (t->t_state == TS_SLEEP &&
 		    (t->t_flag & T_WAKEABLE) &&
 		    t->t_wchan0 != NULL)
@@ -150,6 +155,7 @@ lwp_timer_enqueue(lwp_timer_t *lwptp)
 		/*
 		 * Queue the timeout.
 		 */
+		lwptp->lwpt_imm_timeout = 0;
 		lwptp->lwpt_id = realtime_timeout(lwp_timer_timeout, lwptp,
 		    timespectohz(&lwptp->lwpt_rqtime, now));
 		return (0);

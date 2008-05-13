@@ -801,16 +801,14 @@ retry:
 	prstop(PR_REQUESTED, 0);
 	if (lwptp->lwpt_tsp != NULL) {
 		/*
-		 * If we successfully queue the timeout
-		 * (lwp_timer_enqueue() returns zero),
-		 * then don't drop t_delay_lock until we are
-		 * on the sleep queue (in turnstile_block()).
-		 * Otherwise we will get an immediate timeout
-		 * when we attempt to sleep in turnstile_block().
+		 * Unlike the protocol for other lwp timedwait operations,
+		 * we must drop t_delay_lock before going to sleep in
+		 * turnstile_block() for a upi mutex.
+		 * See the comments below and in turnstile.c
 		 */
 		mutex_enter(&curthread->t_delay_lock);
-		if (lwp_timer_enqueue(lwptp) != 0)
-			mutex_exit(&curthread->t_delay_lock);
+		(void) lwp_timer_enqueue(lwptp);
+		mutex_exit(&curthread->t_delay_lock);
 	}
 	/*
 	 * Now, set the waiter bit and block for the lock in turnstile_block().
@@ -2617,7 +2615,7 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 		mutex_exit(&t->t_delay_lock);
 	locked = 0;
 	lwpchan_unlock(&lwpchan, LWPCHAN_CVPOOL);
-	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t))
+	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || imm_timeout)
 		setrun(t);
 	swtch();
 

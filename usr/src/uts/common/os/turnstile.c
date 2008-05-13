@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -513,19 +514,12 @@ turnstile_block(turnstile_t *ts, int qnum, void *sobj, sobj_ops_t *sobj_ops,
 			 * back to the application.
 			 */
 			thread_unlock_nopreempt(t);
-			if (lwptp->lwpt_id != 0) {
-				/*
-				 * We enqueued a timeout, we are
-				 * holding curthread->t_delay_lock.
-				 * Drop it and dequeue the timeout.
-				 */
-				mutex_exit(&curthread->t_delay_lock);
-				(void) lwp_timer_dequeue(lwptp);
-			}
 			mutex_exit(mp);
 			setrun(curthread);
 			swtch(); /* necessary to transition state */
 			curthread->t_flag &= ~T_WAKEABLE;
+			if (lwptp->lwpt_id != 0)
+				(void) lwp_timer_dequeue(lwptp);
 			setallwatch();
 			lwp->lwp_asleep = 0;
 			lwp->lwp_sysabort = 0;
@@ -616,22 +610,25 @@ turnstile_block(turnstile_t *ts, int qnum, void *sobj, sobj_ops_t *sobj_ops,
 	if (SOBJ_TYPE(sobj_ops) == SOBJ_USER_PI) {
 		ushort_t s = curthread->t_oldspl;
 		int timedwait = 0;
+		uint_t imm_timeout = 0;
 		clock_t tim = -1;
 
 		thread_unlock_high(t);
 		if (lwptp->lwpt_id != 0) {
 			/*
-			 * We enqueued a timeout and we are
-			 * holding curthread->t_delay_lock.
+			 * We enqueued a timeout.  If it has already fired,
+			 * lwptp->lwpt_imm_timeout has been set with cas,
+			 * so fetch it with cas.
 			 */
-			mutex_exit(&curthread->t_delay_lock);
 			timedwait = 1;
+			imm_timeout =
+			    atomic_cas_uint(&lwptp->lwpt_imm_timeout, 0, 0);
 		}
 		mutex_exit(mp);
 		splx(s);
 
 		if (ISSIG(curthread, JUSTLOOKING) ||
-		    MUSTRETURN(p, curthread) || lwptp->lwpt_imm_timeout)
+		    MUSTRETURN(p, curthread) || imm_timeout)
 			setrun(curthread);
 		swtch();
 		curthread->t_flag &= ~T_WAKEABLE;
@@ -641,7 +638,7 @@ turnstile_block(turnstile_t *ts, int qnum, void *sobj, sobj_ops_t *sobj_ops,
 		if (ISSIG(curthread, FORREAL) || lwp->lwp_sysabort ||
 		    MUSTRETURN(p, curthread))
 			error = EINTR;
-		else if (lwptp->lwpt_imm_timeout || (timedwait && tim == -1))
+		else if (imm_timeout || (timedwait && tim == -1))
 			error = ETIME;
 		lwp->lwp_sysabort = 0;
 		lwp->lwp_asleep = 0;
