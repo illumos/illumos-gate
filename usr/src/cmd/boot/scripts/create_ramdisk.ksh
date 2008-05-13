@@ -130,30 +130,14 @@ BOOT_ARCHIVE=platform/$PLATFORM/boot_archive
 BOOT_ARCHIVE_64=platform/$PLATFORM/$ARCH64/boot_archive
 
 if [ $PLATFORM = i86pc ] ; then
-	NM=/bin/nm
-	SYMDEF=/boot/solaris/bin/symdef
-	if [ -x $NM ]; then
-		$NM "$ALT_ROOT"/platform/i86pc/kernel/unix | \
-		    grep dboot_image >/dev/null 2>&1
-		if [ $? = 0 ]; then
-			SPLIT=yes
-		else
-			SPLIT=no
-			compress=no
-		fi
-	elif [ ! -x $SYMDEF ]; then
-		# Shouldn't happen
-		echo "Warning: both $NM and $SYMDEF not present."
+	if [ ! -x "$ALT_ROOT"/boot/solaris/bin/symdef ]; then
+		# no dboot implies combined archives for example
+		# live-upgrade from s9 to s10u6 is multiboot-only
 		echo "Creating single archive at $ALT_ROOT/$BOOT_ARCHIVE"
 		SPLIT=no
 		compress=no
-	elif $SYMDEF "$ALT_ROOT"/platform/i86pc/kernel/unix \
-	    dboot_image 2>/dev/null; then
-		SPLIT=yes
 	else
-		# no dboot
-		SPLIT=no
-		compress=no
+		SPLIT=yes
 	fi
 else			# must be sparc
 	SPLIT=no	# there's only 64-bit (sparcv9), so don't split
