@@ -3422,6 +3422,13 @@ waitforack(calllist_t *e, t_scalar_t ack_prim, const struct timeval *waitp,
 			return (ETIME);
 		if (cv_stat == 0)
 			return (EINTR);
+		/*
+		 * if we received an error from the server and we know a reply
+		 * is not going to be sent, do not wait for the full timeout,
+		 * return now.
+		 */
+		if (e->call_status == RPC_XPRTFAILED)
+			return (e->call_reason);
 	}
 	tpr = (union T_primitives *)e->call_reply->b_rptr;
 	if (tpr->type == ack_prim)
