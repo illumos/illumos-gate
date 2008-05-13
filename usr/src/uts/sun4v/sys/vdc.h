@@ -64,13 +64,6 @@ extern "C" {
 #define	VDC_HANDSHAKE_STOP	0x0200	/* stop further handshakes */
 
 /*
- * Definitions of strings to be used to create device node properties.
- * (vdc uses the capitalised versions of these properties as they are 64-bit)
- */
-#define	VDC_NBLOCKS_PROP_NAME		"Nblocks"
-#define	VDC_SIZE_PROP_NAME		"Size"
-
-/*
  * Definitions of MD nodes/properties.
  */
 #define	VDC_MD_CHAN_NAME		"channel-endpoint"

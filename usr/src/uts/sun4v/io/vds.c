@@ -153,6 +153,7 @@ typedef struct vd_driver_type {
 vd_driver_type_t vds_driver_types[] = {
 	{ "dad",	VD_DRIVER_DISK },	/* Solaris */
 	{ "did",	VD_DRIVER_DISK },	/* Sun Cluster */
+	{ "emcp",	VD_DRIVER_DISK },	/* EMC Powerpath */
 	{ "lofi",	VD_DRIVER_VOLUME },	/* Solaris */
 	{ "md",		VD_DRIVER_VOLUME },	/* Solaris - SVM */
 	{ "sd",		VD_DRIVER_DISK },	/* Solaris */
@@ -5508,6 +5509,11 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t options,
 		PRN("Could not create task queue");
 		return (EIO);
 	}
+
+	/* Allocate the staging buffer */
+	vd->max_msglen = sizeof (vio_msg_t);	/* baseline vio message size */
+	vd->vio_msgp = kmem_alloc(vd->max_msglen, KM_SLEEP);
+
 	vd->enabled = 1;	/* before callback can dispatch to startq */
 
 
@@ -5553,10 +5559,6 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t options,
 		PRN("Error adding vdisk ID %lu to table", id);
 		return (EIO);
 	}
-
-	/* Allocate the staging buffer */
-	vd->max_msglen	= sizeof (vio_msg_t);	/* baseline vio message size */
-	vd->vio_msgp = kmem_alloc(vd->max_msglen, KM_SLEEP);
 
 	/* store initial state */
 	vd->state = VD_STATE_INIT;

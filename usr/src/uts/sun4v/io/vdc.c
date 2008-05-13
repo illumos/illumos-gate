@@ -120,6 +120,8 @@ static int	vdc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,
 			void *arg, void **resultp);
 static int	vdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int	vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static int	vdc_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+		    int mod_flags, char *name, caddr_t valuep, int *lengthp);
 
 /* setup */
 static void	vdc_min(struct buf *bufp);
@@ -129,7 +131,6 @@ static int	vdc_start_ldc_connection(vdc_t *vdc);
 static int	vdc_create_device_nodes(vdc_t *vdc);
 static int	vdc_create_device_nodes_efi(vdc_t *vdc);
 static int	vdc_create_device_nodes_vtoc(vdc_t *vdc);
-static int	vdc_create_device_nodes_props(vdc_t *vdc);
 static void	vdc_create_io_kstats(vdc_t *vdc);
 static void	vdc_create_err_kstats(vdc_t *vdc);
 static void	vdc_set_err_kstats(vdc_t *vdc);
@@ -285,7 +286,7 @@ static struct cb_ops vdc_cb_ops = {
 	nodev,		/* cb_mmap */
 	nodev,		/* cb_segmap */
 	nochpoll,	/* cb_chpoll */
-	ddi_prop_op,	/* cb_prop_op */
+	vdc_prop_op,	/* cb_prop_op */
 	NULL,		/* cb_str */
 	D_MP | D_64BIT,	/* cb_flag */
 	CB_REV,		/* cb_rev */
@@ -516,10 +517,8 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (ownership_tid != 0)
 		thread_join(ownership_tid);
 
-	if (vdc->initialized & VDC_MINOR) {
-		ddi_prop_remove_all(dip);
+	if (vdc->initialized & VDC_MINOR)
 		ddi_remove_minor_node(dip, NULL);
-	}
 
 	if (vdc->io_stats) {
 		kstat_delete(vdc->io_stats);
@@ -701,19 +700,12 @@ vdc_do_attach(dev_info_t *dip)
 	mutex_exit(&vdc->lock);
 
 	/*
-	 * Now that we have the device info we can create the
-	 * device nodes and properties
+	 * Now that we have the device info we can create the device nodes
 	 */
 	status = vdc_create_device_nodes(vdc);
 	if (status) {
 		DMSG(vdc, 0, "[%d] Failed to create device nodes",
 		    instance);
-		goto return_status;
-	}
-	status = vdc_create_device_nodes_props(vdc);
-	if (status) {
-		DMSG(vdc, 0, "[%d] Failed to create device nodes"
-		    " properties (%d)", instance, status);
 		goto return_status;
 	}
 
@@ -1008,9 +1000,9 @@ vdc_create_device_nodes_vtoc(vdc_t *vdc)
  *
  * Description:
  *	This function creates the block and character device nodes under
- *	/devices along with the node properties. It is called as part of
- *	the attach(9E) of the instance during the handshake with vds after
- *	vds has sent the attributes to vdc.
+ *	/devices. It is called as part of the attach(9E) of the instance
+ *	during the handshake with vds after vds has sent the attributes
+ *	to vdc.
  *
  *	If the device is of type VD_DISK_TYPE_SLICE then the minor node
  *	of 2 is used in keeping with the Solaris convention that slice 2
@@ -1093,88 +1085,38 @@ vdc_create_device_nodes(vdc_t *vdc)
 }
 
 /*
- * Function:
- *	vdc_create_device_nodes_props
- *
- * Description:
- *	This function creates the block and character device nodes under
- *	/devices along with the node properties. It is called as part of
- *	the attach(9E) of the instance during the handshake with vds after
- *	vds has sent the attributes to vdc.
- *
- * Parameters:
- *	vdc 		- soft state pointer
- *
- * Return Values
- *	0		- Success
- *	EIO		- Failed to create device node property
- *	EINVAL		- Unknown type of disk exported
+ * Driver prop_op(9e) entry point function. Return the number of blocks for
+ * the partition in question or forward the request to the property facilities.
  */
 static int
-vdc_create_device_nodes_props(vdc_t *vdc)
+vdc_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
+    char *name, caddr_t valuep, int *lengthp)
 {
-	dev_info_t	*dip = NULL;
-	int		instance;
-	int		num_slices = 1;
-	int64_t		size = 0;
-	dev_t		dev;
-	int		rv;
-	int		i;
+	int instance = ddi_get_instance(dip);
+	vdc_t *vdc;
+	uint64_t nblocks;
+	uint_t blksize;
 
-	ASSERT(vdc != NULL);
+	vdc = ddi_get_soft_state(vdc_state, instance);
 
-	instance = vdc->instance;
-	dip = vdc->dip;
-
-	switch (vdc->vdisk_type) {
-	case VD_DISK_TYPE_DISK:
-		num_slices = V_NUMPAR;
-		break;
-	case VD_DISK_TYPE_SLICE:
-		num_slices = 1;
-		break;
-	case VD_DISK_TYPE_UNK:
-	default:
-		return (EINVAL);
+	if (dev == DDI_DEV_T_ANY || vdc == NULL) {
+		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+		    name, valuep, lengthp));
 	}
 
+	mutex_enter(&vdc->lock);
+	(void) vdc_validate_geometry(vdc);
 	if (vdc->vdisk_label == VD_DISK_LABEL_UNK) {
-		/* remove all properties */
-		for (i = 0; i < num_slices; i++) {
-			dev = makedevice(ddi_driver_major(dip),
-			    VD_MAKE_DEV(instance, i));
-			(void) ddi_prop_remove(dev, dip, VDC_SIZE_PROP_NAME);
-			(void) ddi_prop_remove(dev, dip, VDC_NBLOCKS_PROP_NAME);
-		}
-		return (0);
+		mutex_exit(&vdc->lock);
+		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+		    name, valuep, lengthp));
 	}
+	nblocks = vdc->slice[VDCPART(dev)].nblocks;
+	blksize = vdc->block_size;
+	mutex_exit(&vdc->lock);
 
-	for (i = 0; i < num_slices; i++) {
-		dev = makedevice(ddi_driver_major(dip),
-		    VD_MAKE_DEV(instance, i));
-
-		size = vdc->slice[i].nblocks * vdc->block_size;
-		DMSG(vdc, 0, "[%d] sz %ld (%ld Mb)  p_size %lx\n",
-		    instance, size, size / (1024 * 1024),
-		    vdc->slice[i].nblocks);
-
-		rv = ddi_prop_update_int64(dev, dip, VDC_SIZE_PROP_NAME, size);
-		if (rv != DDI_PROP_SUCCESS) {
-			cmn_err(CE_NOTE, "[%d] Couldn't add '%s' prop of [%ld]",
-			    instance, VDC_SIZE_PROP_NAME, size);
-			return (EIO);
-		}
-
-		rv = ddi_prop_update_int64(dev, dip, VDC_NBLOCKS_PROP_NAME,
-		    lbtodb(size));
-		if (rv != DDI_PROP_SUCCESS) {
-			cmn_err(CE_NOTE, "[%d] Couldn't add '%s' prop [%llu]",
-			    instance, VDC_NBLOCKS_PROP_NAME, lbtodb(size));
-			return (EIO);
-		}
-	}
-
-	return (0);
+	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, nblocks, blksize));
 }
 
 /*
@@ -7296,8 +7238,7 @@ vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	if (dir == VD_COPYOUT) {
 		/*
 		 * The disk label may have changed. Revalidate the disk
-		 * geometry. This will also update the device nodes and
-		 * properties.
+		 * geometry. This will also update the device nodes.
 		 */
 		vdc_validate(vdc);
 
@@ -7471,8 +7412,7 @@ vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	if (dir == VD_COPYOUT) {
 		/*
 		 * The disk label may have changed. Revalidate the disk
-		 * geometry. This will also update the device nodes and
-		 * properties.
+		 * geometry. This will also update the device nodes.
 		 */
 		vdc_validate(vdc);
 		return (0);
@@ -7815,15 +7755,6 @@ vdc_validate(vdc_t *vdc)
 		if (rv != 0) {
 			DMSG(vdc, 0, "![%d] Failed to update device nodes",
 			    vdc->instance);
-		}
-	}
-
-	/* if the vtoc has changed, update device nodes properties */
-	if (bcmp(vdc->slice, &old_slice, sizeof (vd_slice_t) * V_NUMPAR) != 0) {
-
-		if (vdc_create_device_nodes_props(vdc) != 0) {
-			DMSG(vdc, 0, "![%d] Failed to update device nodes"
-			    " properties", vdc->instance);
 		}
 	}
 
