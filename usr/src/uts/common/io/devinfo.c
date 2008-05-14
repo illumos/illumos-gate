@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1685,9 +1685,9 @@ di_copytree(struct dev_info *root, di_off_t *off_p, struct di_state *st)
 static di_off_t
 di_copynode(struct di_stack *dsp, struct di_state *st)
 {
-	di_off_t off;
-	struct di_node *me;
-	struct dev_info *node;
+	di_off_t	off;
+	struct di_node	*me;
+	struct dev_info	*node;
 
 	dcmn_err2((CE_CONT, "di_copynode: depth = %x\n", dsp->depth));
 
@@ -1751,35 +1751,25 @@ di_copynode(struct di_stack *dsp, struct di_state *st)
 
 #ifdef	DEVID_COMPATIBILITY
 	/* check for devid as property marker */
-	if (node->devi_devid) {
+	if (node->devi_devid_str) {
 		ddi_devid_t	devid;
-		char 		*devidstr;
 		int		devid_size;
 
 		/*
-		 * The devid is now represented as a property.
-		 * For micro release compatibility with di_devid interface
-		 * in libdevinfo we must return it as a binary structure in'
-		 * the snapshot.  When di_devid is removed from libdevinfo
-		 * in a future release (and devi_devid is deleted) then
-		 * code related to DEVID_COMPATIBILITY can be removed.
+		 * The devid is now represented as a property. For
+		 * compatibility with di_devid() interface in libdevinfo we
+		 * must return it as a binary structure in the snapshot. When
+		 * (if) di_devid() is removed from libdevinfo then the code
+		 * related to DEVID_COMPATIBILITY can be removed.
 		 */
-		ASSERT(node->devi_devid == DEVID_COMPATIBILITY);
-/* XXX should be DDI_DEV_T_NONE! */
-		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, (dev_info_t *)node,
-		    DDI_PROP_DONTPASS, DEVID_PROP_NAME, &devidstr) ==
-		    DDI_PROP_SUCCESS) {
-			if (ddi_devid_str_decode(devidstr, &devid, NULL) ==
-			    DDI_SUCCESS) {
-				devid_size = ddi_devid_sizeof(devid);
-				off = di_checkmem(st, off, devid_size);
-				me->devid = off;
-				bcopy(devid,
-				    di_mem_addr(st, off), devid_size);
-				off += devid_size;
-				ddi_devid_free(devid);
-			}
-			ddi_prop_free(devidstr);
+		if (ddi_devid_str_decode(node->devi_devid_str, &devid, NULL) ==
+		    DDI_SUCCESS) {
+			devid_size = ddi_devid_sizeof(devid);
+			off = di_checkmem(st, off, devid_size);
+			me->devid = off;
+			bcopy(devid, di_mem_addr(st, off), devid_size);
+			off += devid_size;
+			ddi_devid_free(devid);
 		}
 	}
 #endif	/* DEVID_COMPATIBILITY */
@@ -2869,6 +2859,8 @@ di_getpath_data(dev_info_t *dip, di_off_t *poff_p, di_off_t noff,
 
 		state = mdi_pi_get_state(pip);
 		me->path_state = path_state_convert(state);
+
+		me->path_instance = mdi_pi_get_path_instance(pip);
 
 		/*
 		 * Get intermediate addressing info.

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -147,6 +147,10 @@ SUNWprivate_1.1 {
 	nvlist_lookup_hrtime;
 	nvlist_print;
 	nvpair_value_hrtime;
+	nvpair_type_is_array;
+	nvlist_lookup_nvpair_embedded_index;
+	nvpair_value_match;
+	nvpair_value_match_regex;
     local:
 	*;
 };

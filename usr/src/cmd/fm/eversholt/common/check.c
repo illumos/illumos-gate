@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * check.c -- routines for checking the prop tree
@@ -80,6 +80,7 @@ static struct {
 	{ T_DEFECT, "ASRU", 0, check_fru_asru, O_ERR },
 	{ T_EREPORT, "poller", 0, check_id, O_ERR },
 	{ T_EREPORT, "delivery", 0, check_timeval, O_ERR },
+	{ T_EREPORT, "discard_if_config_unknown", 0, check_num, O_ERR },
 	{ T_SERD, "N", 1, check_num, O_ERR },
 	{ T_SERD, "T", 1, check_timeval, O_ERR },
 	{ T_SERD, "method", 1, check_serd_method, O_ERR },
@@ -991,18 +992,18 @@ check_func(struct node *np)
 					    "first parameter of within must be"
 					    " either a time value or zero.");
 
-				/*
-				 * if two parameters, the right or max must
-				 * be either T_NUM, T_NAME or T_TIMEVAL
-				 */
-				if (arglist->u.expr.right->t != T_NUM &&
-				    arglist->u.expr.right->t != T_TIMEVAL &&
-				    arglist->u.expr.right->t != T_NAME)
-					outfl(O_ERR,
-					    arglist->file, arglist->line,
-					    "second parameter of within must "
-					    "be 0, \"infinity\" "
-					    "or time value.");
+			/*
+			 * if two parameters, the right or max must
+			 * be either T_NUM, T_NAME or T_TIMEVAL
+			 */
+			if (arglist->u.expr.right->t != T_NUM &&
+			    arglist->u.expr.right->t != T_TIMEVAL &&
+			    arglist->u.expr.right->t != T_NAME)
+				outfl(O_ERR,
+				    arglist->file, arglist->line,
+				    "second parameter of within must "
+				    "be 0, \"infinity\" "
+				    "or time value.");
 
 				/*
 				 * if right or left is a T_NUM it must
@@ -1034,21 +1035,12 @@ check_func(struct node *np)
 						    "valid name for within "
 						    "parameter.");
 
-				/*
-				 * the first parameter [min] must not be greater
-				 * than the second parameter [max].
-				 */
-				if (arglist->u.expr.left->u.ull >
-				    arglist->u.expr.right->u.ull)
-					outfl(O_ERR,
-					    arglist->file, arglist->line,
-					    "the first value (min) of"
-					    " within must be less than"
-					    " the second (max) value");
-				break;
-			case T_TIMEVAL:
-				break; /* no restrictions on T_TIMEVAL */
-			default:
+			/*
+			 * the first parameter [min] must not be greater
+			 * than the second parameter [max].
+			 */
+			if (arglist->u.expr.left->u.ull >
+			    arglist->u.expr.right->u.ull)
 				outfl(O_ERR, arglist->file, arglist->line,
 				    "parameter of within must be 0"
 				    ", \"infinity\" or a time value.");

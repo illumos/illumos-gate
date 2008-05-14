@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,9 @@ extern void scsi_sync_cache_pkt(struct scsi_address *,
  * provided by kmem_alloc().
  */
 #define	ROUNDUP(x)	(((x) + 0x07) & ~0x07)
+
+/* Magic number to track correct allocations in wrappers */
+#define	PKT_WRAPPER_MAGIC	0xa110ced	/* alloced correctly */
 
 static kmutex_t	scsi_hba_mutex;
 
@@ -132,7 +135,8 @@ static int scsi_hba_bus_config(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp);
 static int scsi_hba_bus_unconfig(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *arg);
-
+static int scsi_hba_fm_init_child(dev_info_t *self, dev_info_t *child,
+    int cap, ddi_iblock_cookie_t *ibc);
 static int scsi_hba_bus_power(dev_info_t *parent, void *impl_arg,
     pm_bus_power_op_t op, void *arg, void *result);
 
@@ -163,7 +167,7 @@ static struct bus_ops scsi_hba_busops = {
 	NULL,				/* bus_intr_ctl */
 	scsi_hba_bus_config,		/* bus_config */
 	scsi_hba_bus_unconfig,		/* bus_unconfig */
-	NULL,				/* bus_fm_init */
+	scsi_hba_fm_init_child,		/* bus_fm_init */
 	NULL,				/* bus_fm_fini */
 	NULL,				/* bus_fm_access_enter */
 	NULL,				/* bus_fm_access_exit */
@@ -222,12 +226,11 @@ scsi_uninitialize_hba_interface()
 int
 scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
 {
+	struct scsi_pkt_cache_wrapper *pktw;
 	struct scsi_pkt		*pkt;
 	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
 	int			pkt_len;
 	char			*ptr;
-
-	pkt = &((struct scsi_pkt_cache_wrapper *)buf)->pcw_pkt;
 
 	/*
 	 * allocate a chunk of memory for the following:
@@ -244,15 +247,20 @@ scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
 	if (tran->tran_hba_flags & SCSI_HBA_TRAN_SCB)
 		pkt_len += DEFAULT_SCBLEN;
 	bzero(buf, pkt_len);
+
 	ptr = buf;
+	pktw = buf;
 	ptr += sizeof (struct scsi_pkt_cache_wrapper);
+	pkt = &(pktw->pcw_pkt);
 	pkt->pkt_ha_private = (opaque_t)ptr;
+
+	pktw->pcw_magic = PKT_WRAPPER_MAGIC;	/* alloced correctly */
 	/*
 	 * keep track of the granularity at the time this handle was
 	 * allocated
 	 */
-	((struct scsi_pkt_cache_wrapper *)buf)->pcw_granular =
-	    tran->tran_dma_attr.dma_attr_granular;
+	pktw->pcw_granular = tran->tran_dma_attr.dma_attr_granular;
+
 	if (ddi_dma_alloc_handle(tran->tran_hba_dip,
 	    &tran->tran_dma_attr,
 	    kmflag == KM_SLEEP ? SLEEP_FUNC: NULL_FUNC, NULL,
@@ -283,6 +291,7 @@ scsi_hba_pkt_destructor(void *buf, void *arg)
 	struct scsi_pkt *pkt	= &(pktw->pcw_pkt);
 	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
 
+	ASSERT(pktw->pcw_magic == PKT_WRAPPER_MAGIC);
 	ASSERT((pktw->pcw_flags & PCW_BOUND) == 0);
 	if (tran->tran_pkt_destructor)
 		(*tran->tran_pkt_destructor)(pkt, arg);
@@ -293,8 +302,8 @@ scsi_hba_pkt_destructor(void *buf, void *arg)
 	ASSERT(((tran->tran_hba_flags & SCSI_HBA_TRAN_SCB) == 0) ||
 	    (pkt->pkt_scbp == (opaque_t)((char *)pkt +
 	    tran->tran_hba_len +
-	    (((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0)
-	    ? 0 : DEFAULT_CDBLEN) +
+	    (((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0) ?
+	    0 : DEFAULT_CDBLEN) +
 	    DEFAULT_PRIVLEN + sizeof (struct scsi_pkt_cache_wrapper))));
 	ASSERT(((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0) ||
 	    (pkt->pkt_cdbp == (opaque_t)((char *)pkt +
@@ -382,7 +391,8 @@ scsi_hba_attach_setup(
 	int			len;
 	char			*prop_name;
 	const char		*prop_value;
-	char			*errmsg =
+	int			capable;
+	static char		*errmsg =
 	    "scsi_hba_attach: cannot create property '%s' for %s%d\n";
 	static const char	*interconnect[] = INTERCONNECT_TYPE_ASCII;
 
@@ -467,7 +477,7 @@ scsi_hba_attach_setup(
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-			    ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}
 	}
 
@@ -479,7 +489,7 @@ scsi_hba_attach_setup(
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-			    ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}
 	}
 
@@ -491,7 +501,7 @@ scsi_hba_attach_setup(
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-			    ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}
 	}
 
@@ -503,7 +513,7 @@ scsi_hba_attach_setup(
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-			    ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}
 	}
 
@@ -515,7 +525,7 @@ scsi_hba_attach_setup(
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-			    ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}
 	}
 	if ((hba_tran->tran_hba_flags & SCSI_HBA_TRAN_ALLOC) &&
@@ -531,7 +541,8 @@ scsi_hba_attach_setup(
 			    prop_name, (char *)prop_value)
 			    != DDI_PROP_SUCCESS) {
 				cmn_err(CE_CONT, errmsg, prop_name,
-				    ddi_get_name(dip), ddi_get_instance(dip));
+				    ddi_driver_name(dip),
+				    ddi_get_instance(dip));
 			}
 		}
 	}
@@ -565,9 +576,55 @@ scsi_hba_attach_setup(
 		}
 	}
 
+	/*
+	 * NOTE: SCSA maintains an 'fm-capable' domain, in tran_fm_capable,
+	 * that is not dependent (limited by) the capabilities of its parents.
+	 * For example a dip in a branch that is not DDI_FM_EREPORT_CAPABLE
+	 * may report as capable, via tran_fm_capable, to its scsi_device
+	 * children.
+	 *
+	 * Get 'fm-capable' property from driver.conf, if present. If not
+	 * present, default to the scsi_fm_capable global (which has
+	 * DDI_FM_EREPORT_CAPABLE set by default).
+	 */
+	if (hba_tran->tran_fm_capable == DDI_FM_NOT_CAPABLE)
+		hba_tran->tran_fm_capable = ddi_getprop(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
+		    "fm-capable", scsi_fm_capable);
+
+	/*
+	 * If an HBA is *not* doing its own fma support by calling
+	 * ddi_fm_init() prior to scsi_hba_attach_setup(), we provide a
+	 * minimal common SCSA implementation so that scsi_device children
+	 * can generate ereports via scsi_fm_ereport_post().  We use
+	 * ddi_fm_capable() to detect an HBA calling ddi_fm_init() prior to
+	 * scsi_hba_attach_setup().
+	 */
+	if (hba_tran->tran_fm_capable &&
+	    (ddi_fm_capable(dip) == DDI_FM_NOT_CAPABLE)) {
+		/*
+		 * We are capable of something, pass our capabilities up
+		 * the tree, but use a local variable so our parent can't
+		 * limit our capabilities (we don't want our parent to
+		 * clear DDI_FM_EREPORT_CAPABLE).
+		 *
+		 * NOTE: iblock cookies are not important because scsi
+		 * HBAs always interrupt below LOCK_LEVEL.
+		 */
+		capable = hba_tran->tran_fm_capable;
+		ddi_fm_init(dip, &capable, NULL);
+
+		/*
+		 * Set SCSI_HBA_TRAN_FMSCSA bit to mark us as usiung the
+		 * common minimal SCSA fm implementation -  we called
+		 * ddi_fm_init(), so we are responsible for calling
+		 * ddi_fm_fini() in scsi_hba_detach().
+		 */
+		hba_tran->tran_hba_flags |= SCSI_HBA_TRAN_FMSCSA;
+	}
+
 	return (DDI_SUCCESS);
 }
-
 
 /*
  * Called by an HBA to detach an instance of the driver
@@ -584,6 +641,14 @@ scsi_hba_detach(dev_info_t *dip)
 	ddi_set_driver_private(dip, NULL);
 	ASSERT(hba != NULL);
 	ASSERT(hba->tran_open_flag == 0);
+
+	/*
+	 * If we are taking care of mininal default fma implementation,
+	 * call ddi_fm_fini(9F).
+	 */
+	if (hba->tran_hba_flags & SCSI_HBA_TRAN_FMSCSA) {
+		ddi_fm_fini(dip);
+	}
 
 	hba_dev_ops = ddi_get_driver(dip);
 	ASSERT(hba_dev_ops != NULL);
@@ -680,8 +745,8 @@ smp_ctlops_reportdev(dev_info_t	*dip, dev_info_t *rdip)
 	ASSERT(hba != NULL);
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS, SMP_WWN, &smp_wwn)
-	    != DDI_SUCCESS) {
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
+	    SMP_WWN, &smp_wwn) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 	cmn_err(CE_CONT,
@@ -729,8 +794,8 @@ smp_ctlops_initchild(dev_info_t	*dip, dev_info_t *rdip)
 	smp->smp_addr.a_hba_tran = hba;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS, SMP_WWN, &smp_wwn)
-	    != DDI_SUCCESS) {
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
+	    SMP_WWN, &smp_wwn) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
@@ -816,7 +881,8 @@ scsi_hba_bus_ctl(
 		hba = ddi_get_driver_private(dip);
 		ASSERT(hba != NULL);
 
-		if (ddi_prop_exists(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
+		if (ddi_prop_exists(DDI_DEV_T_ANY, rdip,
+		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
 		    SMP_PROP)) {
 			return (smp_ctlops_reportdev(dip, rdip));
 		}
@@ -883,7 +949,8 @@ scsi_hba_bus_ctl(
 		scsi_hba_tran_t		*hba;
 		dev_info_t		*ndip;
 
-		if (ddi_prop_exists(DDI_DEV_T_ANY, child_dip, DDI_PROP_DONTPASS,
+		if (ddi_prop_exists(DDI_DEV_T_ANY, child_dip,
+		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
 		    SMP_PROP)) {
 			return (smp_ctlops_initchild(dip, child_dip));
 		}
@@ -931,7 +998,8 @@ scsi_hba_bus_ctl(
 				cmn_err(CE_CONT,
 				    "%s%d: should support both or none of "
 				    "tran_get_name and tran_get_bus_addr\n",
-				    ddi_get_name(dip), ddi_get_instance(dip));
+				    ddi_driver_name(dip),
+				    ddi_get_instance(dip));
 				goto failure;
 			}
 		}
@@ -1059,7 +1127,8 @@ failure:
 		dev_info_t		*child_dip = (dev_info_t *)arg;
 		scsi_hba_tran_t		*hba;
 
-		if (ddi_prop_exists(DDI_DEV_T_ANY, child_dip, DDI_PROP_DONTPASS,
+		if (ddi_prop_exists(DDI_DEV_T_ANY, child_dip,
+		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
 		    SMP_PROP)) {
 			return (smp_ctlops_uninitchild(dip, child_dip));
 		}
@@ -1122,8 +1191,8 @@ failure:
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
 		cmn_err(CE_CONT, "%s%d: invalid op (%d) from %s%d\n",
-		    ddi_get_name(dip), ddi_get_instance(dip),
-		    op, ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    op, ddi_driver_name(rdip), ddi_get_instance(rdip));
 		return (DDI_FAILURE);
 
 	/*
@@ -1194,13 +1263,12 @@ scsi_hba_tran_free(
 	kmem_free(hba_tran, sizeof (scsi_hba_tran_t));
 }
 
-
-
 /*
  * Private wrapper for scsi_pkt's allocated via scsi_hba_pkt_alloc()
  */
 struct scsi_pkt_wrapper {
 	struct scsi_pkt		scsi_pkt;
+	int			pkt_wrapper_magic;
 	int			pkt_wrapper_len;
 };
 
@@ -1227,6 +1295,7 @@ scsi_hba_pkt_alloc(
 	struct scsi_pkt		*pkt;
 	struct scsi_pkt_wrapper	*hba_pkt;
 	caddr_t			p;
+	int			acmdlen, astatuslen, atgtlen, ahbalen;
 	int			pktlen;
 
 	/*
@@ -1240,12 +1309,12 @@ scsi_hba_pkt_alloc(
 	/*
 	 * Round up so everything gets allocated on long-word boundaries
 	 */
-	cmdlen = ROUNDUP(cmdlen);
-	tgtlen = ROUNDUP(tgtlen);
-	hbalen = ROUNDUP(hbalen);
-	statuslen = ROUNDUP(statuslen);
-	pktlen = sizeof (struct scsi_pkt_wrapper)
-	    + cmdlen + tgtlen + hbalen + statuslen;
+	acmdlen = ROUNDUP(cmdlen);
+	astatuslen = ROUNDUP(statuslen);
+	atgtlen = ROUNDUP(tgtlen);
+	ahbalen = ROUNDUP(hbalen);
+	pktlen = sizeof (struct scsi_pkt_wrapper) +
+	    acmdlen + astatuslen + atgtlen + ahbalen;
 
 	hba_pkt = kmem_zalloc(pktlen,
 	    (callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP);
@@ -1258,23 +1327,24 @@ scsi_hba_pkt_alloc(
 	 * Set up our private info on this pkt
 	 */
 	hba_pkt->pkt_wrapper_len = pktlen;
+	hba_pkt->pkt_wrapper_magic = PKT_WRAPPER_MAGIC;	/* alloced correctly */
 	pkt = &hba_pkt->scsi_pkt;
-	p = (caddr_t)(hba_pkt + 1);
 
 	/*
 	 * Set up pointers to private data areas, cdb, and status.
 	 */
+	p = (caddr_t)(hba_pkt + 1);
 	if (hbalen > 0) {
 		pkt->pkt_ha_private = (opaque_t)p;
-		p += hbalen;
+		p += ahbalen;
 	}
 	if (tgtlen > 0) {
 		pkt->pkt_private = (opaque_t)p;
-		p += tgtlen;
+		p += atgtlen;
 	}
 	if (statuslen > 0) {
 		pkt->pkt_scbp = (uchar_t *)p;
-		p += statuslen;
+		p += astatuslen;
 	}
 	if (cmdlen > 0) {
 		pkt->pkt_cdbp = (uchar_t *)p;
@@ -1285,9 +1355,17 @@ scsi_hba_pkt_alloc(
 	 */
 	pkt->pkt_address = *ap;
 
+	/*
+	 * NB: It may not be safe for drivers, esp target drivers, to depend
+	 * on the following fields being set until all the scsi_pkt
+	 * allocation violations discussed in scsi_pkt.h are all resolved.
+	 */
+	pkt->pkt_cdblen = cmdlen;
+	pkt->pkt_tgtlen = tgtlen;
+	pkt->pkt_scblen = statuslen;
+
 	return (pkt);
 }
-
 
 /*
  * Called by an HBA to free a scsi_pkt
@@ -1301,6 +1379,146 @@ scsi_hba_pkt_free(
 	kmem_free(pkt, ((struct scsi_pkt_wrapper *)pkt)->pkt_wrapper_len);
 }
 
+/*
+ * Return 1 if the scsi_pkt used a proper allocator.
+ *
+ * The DDI does not allow a driver to allocate it's own scsi_pkt(9S), a
+ * driver should not have *any* compiled in dependencies on "sizeof (struct
+ * scsi_pkt)". While this has been the case for many years, a number of
+ * drivers have still not been fixed. This function can be used to detect
+ * improperly allocated scsi_pkt structures, and produce messages identifying
+ * drivers that need to be fixed.
+ *
+ * While drivers in violation are being fixed, this function can also
+ * be used by the framework to detect packets that violated allocation
+ * rules.
+ *
+ * NB: It is possible, but very unlikely, for this code to return a false
+ * positive (finding correct magic, but for wrong reasons).  Careful
+ * consideration is needed for callers using this interface to condition
+ * access to newer scsi_pkt fields (those after pkt_reason).
+ *
+ * NB: As an aid to minimizing the amount of work involved in 'fixing' legacy
+ * drivers that violate scsi_*(9S) allocation rules, private
+ * scsi_pkt_size()/scsi_size_clean() functions are available (see their
+ * implementation for details).
+ *
+ * *** Non-legacy use of scsi_pkt_size() is discouraged. ***
+ *
+ * NB: When supporting broken HBA drivers is not longer a concern, this
+ * code should be removed.
+ */
+int
+scsi_pkt_allocated_correctly(struct scsi_pkt *pkt)
+{
+	struct scsi_pkt_wrapper	*hba_pkt = (struct scsi_pkt_wrapper *)pkt;
+	int	magic;
+	major_t	major;
+#ifdef	DEBUG
+	int	*pspwm, *pspcwm;
+
+	/*
+	 * We are getting scsi packets from two 'correct' wrapper schemes,
+	 * make sure we are looking at the same place in both to detect
+	 * proper allocation.
+	 */
+	pspwm = &((struct scsi_pkt_wrapper *)0)->pkt_wrapper_magic;
+	pspcwm = &((struct scsi_pkt_cache_wrapper *)0)->pcw_magic;
+	ASSERT(pspwm == pspcwm);
+#endif	/* DEBUG */
+
+
+	/*
+	 * Check to see if driver is scsi_size_clean(), assume it
+	 * is using the scsi_pkt_size() interface everywhere it needs to
+	 * if the driver indicates it is scsi_size_clean().
+	 */
+	major = ddi_driver_major(P_TO_TRAN(pkt)->tran_hba_dip);
+	if (devnamesp[major].dn_flags & DN_SCSI_SIZE_CLEAN)
+		return (1);		/* ok */
+
+	/*
+	 * Special case crossing a page boundary. If the scsi_pkt was not
+	 * allocated correctly, then accross a page boundary we have a
+	 * fault hazzard.
+	 */
+	if ((((uintptr_t)(&hba_pkt->scsi_pkt)) & MMU_PAGEMASK) ==
+	    (((uintptr_t)(&hba_pkt->pkt_wrapper_magic)) & MMU_PAGEMASK)) {
+		/* fastpath, no cross-page hazzard */
+		magic = hba_pkt->pkt_wrapper_magic;
+	} else {
+		/* add protection for cross-page hazzard */
+		if (ddi_peek32((dev_info_t *)NULL,
+		    &hba_pkt->pkt_wrapper_magic, &magic) == DDI_FAILURE) {
+			return (0);	/* violation */
+		}
+	}
+
+	/* properly allocated packet always has correct magic */
+	return ((magic == PKT_WRAPPER_MAGIC) ? 1 : 0);
+}
+
+/*
+ * Private interfaces to simplify conversion of legacy drivers so they don't
+ * depend on scsi_*(9S) size. Instead of using these private interface, HBA
+ * drivers should use DDI sanctioned allocation methods:
+ *
+ *	scsi_pkt	Use scsi_hba_pkt_alloc(9F), or implement
+ *			tran_setup_pkt(9E).
+ *
+ *	scsi_device	You are doing something strange/special, a scsi_device
+ *			structure should only be allocated by scsi_hba.c
+ *			initchild code or scsi_vhci.c code.
+ *
+ *	scsi_hba_tran	Use scsi_hba_tran_alloc(9F).
+ */
+size_t
+scsi_pkt_size()
+{
+	return (sizeof (struct scsi_pkt));
+}
+
+size_t
+scsi_hba_tran_size()
+{
+	return (sizeof (scsi_hba_tran_t));
+}
+
+size_t
+scsi_device_size()
+{
+	return (sizeof (struct scsi_device));
+}
+
+/*
+ * Legacy compliance to scsi_pkt(9S) allocation rules through use of
+ * scsi_pkt_size() is detected by the 'scsi-size-clean' driver.conf property
+ * or an HBA driver calling to scsi_size_clean() from attach(9E).  A driver
+ * developer should only indicate that a legacy driver is clean after using
+ * SCSI_SIZE_CLEAN_VERIFY to ensure compliance (see scsi_pkt.h).
+ */
+void
+scsi_size_clean(dev_info_t *dip)
+{
+	major_t		major;
+	struct devnames	*dnp;
+
+	ASSERT(dip);
+	major = ddi_driver_major(dip);
+	ASSERT(major < devcnt);
+	if (major >= devcnt) {
+		cmn_err(CE_WARN, "scsi_pkt_size: bogus major: %d", major);
+		return;
+	}
+
+	/* Set DN_SCSI_SIZE_CLEAN flag in dn_flags. */
+	dnp = &devnamesp[major];
+	if ((dnp->dn_flags & DN_SCSI_SIZE_CLEAN) == 0) {
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		dnp->dn_flags |= DN_SCSI_SIZE_CLEAN;
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+	}
+}
 
 
 /*
@@ -2446,6 +2664,16 @@ scsi_hba_nodename_compatible_free(char *nodename, char **compatible)
 	if (compatible)
 		kmem_free(compatible, (NCOMPAT * sizeof (char *)) +
 		    (NCOMPAT * COMPAT_LONGEST));
+}
+
+/*ARGSUSED*/
+static int
+scsi_hba_fm_init_child(dev_info_t *self, dev_info_t *child, int cap,
+    ddi_iblock_cookie_t *ibc)
+{
+	scsi_hba_tran_t	*hba = ddi_get_driver_private(self);
+
+	return (hba ? hba->tran_fm_capable : scsi_fm_capable);
 }
 
 static int

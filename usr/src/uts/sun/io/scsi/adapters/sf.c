@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -577,7 +575,7 @@ sf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		(void) sprintf(buf, "sf%d_cache", instance);
 		sf->sf_pkt_cache = kmem_cache_create(buf,
 		    sizeof (fcal_packet_t) + sizeof (struct sf_pkt) +
-		    sizeof (struct scsi_pkt), 8,
+		    scsi_pkt_size(), 8,
 		    sf_kmem_cache_constructor, sf_kmem_cache_destructor,
 		    NULL, NULL, NULL, 0);
 		if (sf->sf_pkt_cache == NULL) {
@@ -670,6 +668,9 @@ sf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    instance);
 			goto fail;
 		}
+
+		/* Indicate that we are 'sizeof (scsi_*(9S))' clean. */
+		scsi_size_clean(dip);		/* SCSI_SIZE_CLEAN_VERIFY ok */
 
 		/* save ptr to new transport structure and fill it in */
 		sf->sf_tran = tran;
@@ -1559,7 +1560,7 @@ sf_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		new_cmd = cmd;		/* for later cleanup if needed */
 	} else {
 		/* pkt already exists -- just a request for DMA allocation */
-		cmd = (struct sf_pkt *)pkt->pkt_ha_private;
+		cmd = PKT2CMD(pkt);
 		fpkt = cmd->cmd_fp_pkt;
 	}
 
@@ -1687,7 +1688,7 @@ sf_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 static void
 sf_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct sf_pkt *cmd = (struct sf_pkt *)pkt->pkt_ha_private;
+	struct sf_pkt *cmd = PKT2CMD(pkt);
 	struct sf *sf = ADDR2SF(ap);
 	struct sf_target *target = ADDR2TARGET(ap);
 	struct fcal_packet	*fpkt = cmd->cmd_fp_pkt;
@@ -1727,7 +1728,7 @@ sf_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 static void
 sf_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct sf_pkt *cmd = (struct sf_pkt *)pkt->pkt_ha_private;
+	struct sf_pkt *cmd = PKT2CMD(pkt);
 
 
 	if (cmd->cmd_flags & CFLAG_DMAVALID) {
@@ -1745,7 +1746,7 @@ sf_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 static void
 sf_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct sf_pkt *cmd = (struct sf_pkt *)pkt->pkt_ha_private;
+	struct sf_pkt *cmd = PKT2CMD(pkt);
 
 
 	if (cmd->cmd_flags & CFLAG_DMAVALID) {
@@ -4599,10 +4600,8 @@ sf_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 	deferred_destroy = 0;
 
 	if (pkt != NULL) {
-		cmd = (struct sf_pkt *)((char *)pkt - sizeof (struct sf_pkt)
-		    - sizeof (struct fcal_packet));
-		fpkt = (struct fcal_packet *)((char *)cmd +
-		    sizeof (struct sf_pkt));
+		cmd = PKT2CMD(pkt);
+		fpkt = cmd->cmd_fp_pkt;
 		SF_DEBUG(2, (sf, CE_NOTE, "sf_abort packet %p\n",
 		    (void *)fpkt));
 		pcmd = NULL;
@@ -6230,7 +6229,7 @@ sf_target_timeout(struct sf *sf, struct sf_pkt *cmd)
 	SF_DEBUG(1, (sf, CE_NOTE, "Command 0x%p to target %x timed out\n",
 	    (void *)cmd->cmd_fp_pkt, cmd->cmd_pkt->pkt_address.a_target));
 
-	fpkt = (struct fcal_packet *)((char *)cmd + sizeof (struct sf_pkt));
+	fpkt = cmd->cmd_fp_pkt;
 
 	if (sf_core && (sf_core & SF_CORE_CMD_TIMEOUT)) {
 		sf_token = (int *)(uintptr_t)
@@ -6819,7 +6818,7 @@ sf_ioctl(dev_t dev,
 	struct devctl_iocdata *dcp;
 	dev_info_t *cdip;
 	struct scsi_address ap;
-	scsi_hba_tran_t tran;
+	scsi_hba_tran_t *tran;
 
 
 	sf = ddi_get_soft_state(sf_state, SF_MINOR2INST(getminor(dev)));
@@ -6967,15 +6966,20 @@ sf_ioctl(dev_t dev,
 			retval = ENXIO;
 			goto dun;
 		}
-		tran = *target->sft_tran;
+
+		/* This is ugly */
+		tran = kmem_zalloc(scsi_hba_tran_size(), KM_SLEEP);
+		bcopy(target->sft_tran, tran, scsi_hba_tran_size());
 		mutex_exit(&target->sft_mutex);
-		ap.a_hba_tran = &tran;
+		ap.a_hba_tran = tran;
 		ap.a_target = sf_alpa_to_switch[target->sft_al_pa];
 		if (sf_reset(&ap, RESET_TARGET) == FALSE) {
 			retval = EIO;
-			goto dun;
+		} else {
+			retval = 0;
 		}
-		break;
+		kmem_free(tran, scsi_hba_tran_size());
+		goto dun;
 
 	case DEVCTL_BUS_QUIESCE:
 	case DEVCTL_BUS_UNQUIESCE:

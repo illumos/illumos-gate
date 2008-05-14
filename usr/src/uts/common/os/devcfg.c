@@ -401,6 +401,9 @@ i_ddi_free_node(dev_info_t *dip)
 	if (devi->devi_hw_prop_ptr)
 		i_ddi_prop_list_delete(devi->devi_hw_prop_ptr);
 
+	if (DEVI(dip)->devi_devid_str)
+		ddi_devid_str_free(DEVI(dip)->devi_devid_str);
+
 	i_ddi_set_node_state(dip, DS_INVAL);
 	da_log_enter(dip);
 	if (devi->devi_audit) {
@@ -1211,8 +1214,7 @@ attach_node(dev_info_t *dip)
 		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
 			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
 			mutex_exit(&DEVI(dip)->devi_lock);
-
-			e_devid_cache_unregister(dip);
+			ddi_devid_unregister(dip);
 		} else
 			mutex_exit(&DEVI(dip)->devi_lock);
 
@@ -1319,8 +1321,7 @@ detach_node(dev_info_t *dip, uint_t flag)
 	if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
 		DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
 		mutex_exit(&DEVI(dip)->devi_lock);
-
-		e_devid_cache_unregister(dip);
+		ddi_devid_unregister(dip);
 	} else
 		mutex_exit(&DEVI(dip)->devi_lock);
 

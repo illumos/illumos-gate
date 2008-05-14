@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,9 @@
 #define	_DISK_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <fm/topo_mod.h>
+#include <libdevinfo.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,18 +42,31 @@ extern "C" {
 /* Max. number of devices for thumper */
 #define	DEVID_MAX		48
 
-/* Properties for binding group */
-#define	TOPO_BINDING_PGROUP		"binding"
-#define	TOPO_BINDING_OCCUPANT		"occupant-path"
-
 /* Properties added to the "storage" pgroup: */
-#define	TOPO_STORAGE_PGROUP		"storage"
+#define	TOPO_PGROUP_STORAGE		"storage"
 #define	TOPO_STORAGE_LOGICAL_DISK_NAME	"logical-disk"
 #define	TOPO_STORAGE_MODEL		"model"
 #define	TOPO_STORAGE_MANUFACTURER	"manufacturer"
 #define	TOPO_STORAGE_SERIAL_NUM		"serial-number"
 #define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
 #define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
+
+/*
+ * Properties for binding group: The binding group required in platform
+ * specific xml that describes 'bay' nodes containing internal disks.
+ */
+#define	TOPO_PGROUP_BINDING		"binding"
+#define	TOPO_BINDING_OCCUPANT		"occupant-path"
+
+struct topo_list;
+
+/* Methods shared with the ses module (disk_common.c) */
+extern int disk_list_gather(topo_mod_t *, struct topo_list *);
+extern void disk_list_free(topo_mod_t *, struct topo_list *);
+extern int disk_declare_path(topo_mod_t *, tnode_t *,
+    struct topo_list *, const char *);
+extern int disk_declare_addr(topo_mod_t *, tnode_t *,
+    struct topo_list *, const char *);
 
 #ifdef __cplusplus
 }

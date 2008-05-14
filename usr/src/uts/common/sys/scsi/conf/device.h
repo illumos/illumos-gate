@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +98,22 @@ struct scsi_device {
 	 * attach(9E), and freed in the target driver detach(9E).
 	 */
 	caddr_t			sd_private;
+
+
+	/*
+	 * FMA capabilities of scsi_device.
+	 */
+	int			sd_fm_capable;
+
+#ifdef	SCSI_SIZE_CLEAN_VERIFY
+	/*
+	 * Must be last: Building a driver with-and-without
+	 * -DSCSI_SIZE_CLEAN_VERIFY, and checking driver modules for
+	 * differences with a tools like 'wsdiff' allows a developer to verify
+	 * that their driver has no dependencies on scsi*(9S) size.
+	 */
+	int			_pad[8];
+#endif	/* SCSI_SIZE_CLEAN_VERIFY */
 };
 
 #ifdef	_KERNEL
@@ -106,6 +121,7 @@ int	scsi_slave(struct scsi_device *devp, int (*callback)(void));
 int	scsi_probe(struct scsi_device *devp, int (*callback)(void));
 void	scsi_unslave(struct scsi_device *devp);
 void	scsi_unprobe(struct scsi_device *devp);
+size_t	scsi_device_size();			/* private */
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

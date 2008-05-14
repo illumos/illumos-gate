@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@ extern "C" {
 #endif
 
 #include <sys/dditypes.h>
+#include <sys/va_list.h>
 
 extern int ddi_system_fmcap;
 
@@ -89,10 +90,15 @@ typedef int (*ddi_err_func_t)(dev_info_t *, ddi_fm_error_t *, const void *);
  * DDI for error handling and ereport generation
  */
 
-/* ereporting and service changes */
+/*
+ * ereport generation: [ddi|ndi]_fm_ereport_post
+ */
 extern void ddi_fm_ereport_post(dev_info_t *, const char *, uint64_t, int, ...);
+extern void ndi_fm_ereport_post(dev_info_t *, const char *, uint64_t, int, ...);
 
 /*
+ * service changes:
+ *
  * After a hardened driver raises an ereport (or after pci_ereport_post() has
  * raised an ereport for an event which implecated one of a driver's access or
  * dma handles), the driver should always determine the service impact and

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,19 +71,17 @@ struct scsi_pkt	*scsi_init_pkt(struct scsi_address *,
 		    int (*)(caddr_t), caddr_t);
 void		scsi_destroy_pkt(struct scsi_pkt *);
 void		scsi_free_consistent_buf(struct buf *);
-struct scsi_pkt	*scsi_resalloc(struct scsi_address *, int,
-		    int, opaque_t, int (*)(void));
-struct scsi_pkt	*scsi_pktalloc(struct scsi_address *, int, int, int (*)(void));
+int		scsi_pkt_allocated_correctly(struct scsi_pkt *);
 struct scsi_pkt	*scsi_dmaget(struct scsi_pkt *, opaque_t, int (*)(void));
 void		scsi_dmafree(struct scsi_pkt *);
 void		scsi_sync_pkt(struct scsi_pkt *);
-void		scsi_resfree(struct scsi_pkt *);
 
 /*
  * Private wrapper for scsi_pkt's allocated via scsi_init_cache_pkt()
  */
 struct scsi_pkt_cache_wrapper {
 	struct scsi_pkt		 pcw_pkt;
+	int			 pcw_magic;
 	uint_t			 pcw_total_xfer;
 	uint_t			 pcw_curwin;
 	uint_t			 pcw_totalwin;
@@ -112,12 +110,15 @@ struct buf	*scsi_pkt2bp(struct scsi_pkt *);
 #define	DEFAULT_PRIVLEN	0
 #define	DEFAULT_SCBLEN	(sizeof (struct scsi_arq_status))
 
-/*
- * Preliminary version of the SCSA specification
- * mentioned a routine called scsi_pktfree, which
- * turned out to be semantically equivialent to
- * scsi_resfree.
- */
+/* Private functions */
+size_t		scsi_pkt_size();
+void		scsi_size_clean(dev_info_t *);
+
+/* Obsolete kernel functions: */
+struct scsi_pkt	*scsi_pktalloc(struct scsi_address *, int, int, int (*)(void));
+struct scsi_pkt	*scsi_resalloc(struct scsi_address *, int,
+		    int, opaque_t, int (*)(void));
+void		scsi_resfree(struct scsi_pkt *);
 #define	scsi_pktfree	scsi_resfree
 
 #endif	/* _KERNEL */

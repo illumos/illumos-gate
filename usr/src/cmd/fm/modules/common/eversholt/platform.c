@@ -229,86 +229,98 @@ hc_fmri_nodeize(nvlist_t *hcfmri)
 struct node *
 platform_getpath(nvlist_t *nvl)
 {
-	struct node *ret;
-	nvlist_t *dfmri = NULL;
-	char *scheme = NULL;
-	char *path = NULL;
+	struct node	*ret;
+	nvlist_t	*dfmri;
+	char		*scheme;
+	char		*path;
+	char		*devid;
+	uint32_t	cpuid;
+	enum {DT_HC, DT_DEVID, DT_DEV, DT_CPU, DT_UNKNOWN} type = DT_UNKNOWN;
 
-	/*
-	 * For now we assume the "path" part of the error report is
-	 * the detector FMRI
-	 */
+	/* Find the detector */
 	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &dfmri) != 0) {
 		out(O_ALTFP, "XFILE: ereport has no detector FMRI");
 		return (NULL);
 	}
 
+	/* get the scheme from the detector */
 	if (nvlist_lookup_string(dfmri, FM_FMRI_SCHEME, &scheme) != 0) {
 		out(O_ALTFP, "XFILE: detector FMRI missing scheme");
 		return (NULL);
 	}
 
-	if (strcmp(scheme, FM_FMRI_SCHEME_HC) != 0) {
-		/*
-		 *  later, if FM_FMRI_SCHEME_DEV or FM_FMRI_SCHEME_CPU
-		 *  we can look and perform a reverse translation into
-		 *  an hc node
-		 */
-		uint32_t id;
-		int isdev = 0;
-
-		out(O_ALTFP|O_VERB, "Received ereport in scheme %s", scheme);
-		if (strcmp(scheme, FM_FMRI_SCHEME_DEV) == 0) {
-			isdev = 1;
-		} else if (strcmp(scheme, FM_FMRI_SCHEME_CPU) != 0) {
-			out(O_ALTFP, "XFILE: detector FMRI not recognized "
-			    "(scheme is %s, expect %s or %s or %s)",
-			    scheme, FM_FMRI_SCHEME_HC, FM_FMRI_SCHEME_DEV,
-			    FM_FMRI_SCHEME_CPU);
+	/* based on scheme, determine type */
+	if (strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+		/* already in hc scheme */
+		return (hc_fmri_nodeize(dfmri));
+	} else if (strcmp(scheme, FM_FMRI_SCHEME_DEV) == 0) {
+		/* devid takes precedence over path */
+		if (nvlist_lookup_string(dfmri,
+		    FM_FMRI_DEV_ID, &devid) == 0)
+			type = DT_DEVID;
+		else if (nvlist_lookup_string(dfmri,
+		    FM_FMRI_DEV_PATH, &path) == 0)
+			type = DT_DEV;
+		else {
+			out(O_ALTFP, "XFILE: detector FMRI missing %s or %s",
+			    FM_FMRI_DEV_ID, FM_FMRI_DEV_PATH);
 			return (NULL);
 		}
-
-		if (isdev == 1 &&
-		    nvlist_lookup_string(dfmri, FM_FMRI_DEV_PATH, &path) != 0) {
-			out(O_ALTFP, "XFILE: detector FMRI missing %s",
-			    FM_FMRI_DEV_PATH);
-			return (NULL);
-		} else if (isdev == 0 &&
-		    nvlist_lookup_uint32(dfmri, FM_FMRI_CPU_ID, &id) != 0) {
+	} else if (strcmp(scheme, FM_FMRI_SCHEME_CPU) != 0) {
+		if (nvlist_lookup_uint32(dfmri, FM_FMRI_CPU_ID, &cpuid) == 0)
+			type = DT_CPU;
+		else {
 			out(O_ALTFP, "XFILE: detector FMRI missing %s",
 			    FM_FMRI_CPU_ID);
 			return (NULL);
 		}
-
-		lut_free(Usednames, NULL, NULL);
-		Usednames = NULL;
-		in_getpath = 1;
-		if (config_snapshot() == NULL) {
-			out(O_ALTFP,
-			    "XFILE: cannot snapshot configuration");
-			in_getpath = 0;
-			return (NULL);
-		}
-
-		/*
-		 * Look up the path or cpu id in the last config snapshot.
-		 */
-		if (isdev == 1 &&
-		    (ret = config_bydev_lookup(Lastcfg, path)) == NULL)
-			out(O_ALTFP, "XFILE: no configuration node has "
-			    "device path matching %s.", path);
-		else if (isdev == 0 &&
-		    (ret = config_bycpuid_lookup(Lastcfg, id)) == NULL)
-			out(O_ALTFP, "XFILE: no configuration node has "
-			    "cpu-id matching %u.", id);
-
-		structconfig_free(Lastcfg->cooked);
-		config_free(Lastcfg);
-		in_getpath = 0;
-		return (ret);
+	} else {
+		out(O_ALTFP, "XFILE: detector FMRI not recognized "
+		    "(scheme is %s, expect %s or %s or %s)",
+		    scheme, FM_FMRI_SCHEME_HC, FM_FMRI_SCHEME_DEV,
+		    FM_FMRI_SCHEME_CPU);
+		return (NULL);
 	}
 
-	return (hc_fmri_nodeize(dfmri));
+	out(O_ALTFP|O_VERB, "Received ereport in scheme %s", scheme);
+
+	/* take a config snapshot */
+	lut_free(Usednames, NULL, NULL);
+	Usednames = NULL;
+	in_getpath = 1;
+	if (config_snapshot() == NULL) {
+		out(O_ALTFP, "XFILE: cannot snapshot configuration");
+		in_getpath = 0;
+		return (NULL);
+	}
+
+	/* Look up the path, cpuid, or devid in the last config snapshot. */
+	switch (type) {
+	case DT_DEV:
+		if ((ret = config_bydev_lookup(Lastcfg, path)) == NULL)
+			out(O_ALTFP, "platform_getpath: no configuration node "
+			    "has device path matching \"%s\".", path);
+
+		break;
+
+	case DT_DEVID:
+		if ((ret = config_bydevid_lookup(Lastcfg, devid)) == NULL)
+			out(O_ALTFP, "platform_getpath: no configuration node "
+			    "has devid matching \"%s\".", devid);
+		break;
+
+	case DT_CPU:
+		if ((ret = config_bycpuid_lookup(Lastcfg, cpuid)) == NULL)
+			out(O_ALTFP, "platform_getpath: no configuration node "
+			    "has cpu-id matching %u.", cpuid);
+		break;
+	}
+
+	/* free the snapshot */
+	structconfig_free(Lastcfg->cooked);
+	config_free(Lastcfg);
+	in_getpath = 0;
+	return (ret);
 }
 
 /* Allocate space for raw config strings in chunks of this size */
@@ -672,6 +684,7 @@ platform_config_snapshot(void)
 	Lastcfg->begin = Lastcfg->nextfree = Lastcfg->end = NULL;
 	Lastcfg->cooked = NULL;
 	Lastcfg->devcache = NULL;
+	Lastcfg->devidcache = NULL;
 	Lastcfg->cpucache = NULL;
 
 

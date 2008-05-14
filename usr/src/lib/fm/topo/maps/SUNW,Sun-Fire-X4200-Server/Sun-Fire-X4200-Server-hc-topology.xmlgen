@@ -24,16 +24,14 @@
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 use Getopt::Std;
 
-# X4500: platform specific begin
-my $sys_supported = {	"name" => "Sun-Fire-X4500",
-			"prop_name" => "sfx4500",
-			"num_bays" => "48",
-			"bay_label" => "HD_ID_"};
-# X4500: platform specific end
+# X4200-Server: platform specific begin
+my $sys_supported = {	"name" => "Sun-Fire-X4200-Server",
+			"num_bays" => "4",
+			"bay_label" => "HD"};
+# X4200-Server: platform specific end
 
 $IFILE = "filehandle";
 $OFILE = "filehandle";
@@ -44,88 +42,23 @@ sub Usage()
 	    "-i <input_xml_file> -o <output_xml_file>\n";
 }
 
-# Define properties associated with LED manipulation.
-# We have three LEDs per disk: Present (PRSNT), OK-to-remove (OK2RM), and fault.
-# We track the following states (absent present configured unconfigured) via
-# the PRSNT/OK2RM LEDs (FAULT LED is maintained separately).
-sub calc_sfx_prop
-{
-	my $name = shift;
-	my $bay = shift;
-	my $sid = shift;
-	my @names = (
-	    "+PRSNT",			"-PRSNT",
-	    "+OK2RM",			"-OK2RM",
-	    "+FAULT",			"-FAULT");
-	my @masks = (
-	    "amask=0x0001",		"dmask=0x0001",
-	    "amask=0x0008",		"dmask=0x0008",
-	    "amask=0x0002",		"dmask=0x0002");
-	my @states = (
-	    "absent>present",		"present>configured",
-	    "configured>unconfigured",	"unconfigured>configured",
-	    "unconfigured>absent",	"configured>absent",
-	    "present>absent",		"absent>configured");
-	my @actions = (
-	    "+PRSNT&amp;+OK2RM",	"+PRSNT&amp;-OK2RM",
-	    "+OK2RM",			"-OK2RM",
-	    "-OK2RM&amp;-PRSNT",	"-OK2RM&amp;-PRSNT",
-	    "-OK2RM&amp;-PRSNT",	"-OK2RM&amp;+PRSNT");
-
-	printf OFILE "\n";
-	printf OFILE
-	    "      <propgroup name='%s-properties' version='1' " .
-		"name-stability='Private' data-stability='Private' >\n", $name;
-	printf OFILE
-	    "        <propval name='fru-update-action' type='string' " .
-		"value='ipmi:fru gid=3 hdd=%d' />\n", $bay;
-
-	for ($i = 0; $i < 6; $i++) {
-		printf OFILE
-		    "        <propval name='indicator-name-%d' type='string' " .
-			"value='%s' />\n", $i, $names[$i];
-		printf OFILE
-		    "        <propval name='indicator-action-%d' " .
-			"type='string' value='ipmi:state sid=%d %s' />\n",
-			$i, $sid, $masks[$i];
-	}
-
-	for ($i = 0; $i < 8; $i++) {
-		printf OFILE
-		    "        <propval name='indicator-rule-states-%d' " .
-			"type='string' value='%s' />\n", $i, $states[$i];
-		printf OFILE
-		    "        <propval name='indicator-rule-actions-%d' " .
-			"type='string' value='%s' />\n", $i, $actions[$i];
-	}
-	printf OFILE
-		    "      </propgroup>\n\n";
-}
-
 sub calc_nodes
 {
-
-# X4500: platform specific begin
-	my @pci0=(1, 2, 0);
-	my @pci1=(4, 3, 8, 7, 2, 1);
-# X4500: platform specific end
+# X4200-Server: platform specific begin
+	$controller = 0;
+# X4200-Server: platform specific end
 
 	for ($bay = 0; $bay < $sys_supported->{"num_bays"}; $bay++) {
 
-# X4500: platform specific begin
-		$sid = 90 + $bay;
-		$target = (($bay/12) + (($bay & 1) << 2));
-		$index = (($bay >> 2) % 3);
-		$p0 = $pci0[$index];
-		$index = (($bay >> 1) % 6);
-		$p1 = $pci1[$index];
+# X4200-Server: platform specific begin
+		$target = $bay;
 
 		# set hba path, target path, bay path, and attachment point
-		$hpath = sprintf("/pci\@%x,0/pci1022,7458\@%x/pci11ab,11ab\@1",
-		    $p0, $p1);
-		$tpath = sprintf("/disk\@%x,0", $target);
-		$apoint = sprintf(":%d", $target);
-# X4500: platform specific end
+		$hpath = "/pci\@0,0/pci1022,7450\@2/pci1000,3060\@3";
+		$tpath = sprintf("/sd\@%x,0", $target);
+		$apoint = sprintf(":scsi::dsk/c%dt%dd0",
+		    $controller + 1, $target);
+# X4200-Server: platform specific end
 
 		printf OFILE "\n    <node instance='%d'>\n\n", $bay;
 
@@ -148,8 +81,7 @@ sub calc_nodes
 		printf OFILE
 		    "      </propgroup>\n";
 
-#		platform specific LED support
-		calc_sfx_prop($sys_supported->{"prop_name"}, $bay, $sid);
+#		no LED support
 
 		printf OFILE
 		    "      <propgroup name='binding' version='1' " .

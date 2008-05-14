@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,7 +508,7 @@ scsa1394_create_cmd_cache(scsa1394_state_t *sp)
 
 	(void) sprintf(name, "scsa1394%d_cache", sp->s_instance);
 	sp->s_cmd_cache = kmem_cache_create(name,
-	    sizeof (scsa1394_cmd_t), sizeof (void *),
+	    SCSA1394_CMD_SIZE, sizeof (void *),
 	    scsa1394_cmd_cache_constructor, scsa1394_cmd_cache_destructor,
 	    NULL, (void *)sp, NULL, 0);
 
@@ -1316,7 +1316,7 @@ scsa1394_cmd_cache_constructor(void *buf, void *cdrarg, int kf)
 {
 	scsa1394_cmd_t	*cmd = buf;
 
-	bzero(buf, sizeof (scsa1394_cmd_t));
+	bzero(buf, SCSA1394_CMD_SIZE);
 	cmd->sc_task.ts_drv_priv = cmd;
 
 	return (0);

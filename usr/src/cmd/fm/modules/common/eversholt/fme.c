@@ -742,6 +742,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	cfgdata = MALLOC(sizeof (struct cfgdata));
 	cfgdata->cooked = NULL;
 	cfgdata->devcache = NULL;
+	cfgdata->devidcache = NULL;
 	cfgdata->cpucache = NULL;
 	cfgdata->raw_refcnt = 1;
 
@@ -1377,28 +1378,42 @@ retry_lone_ereport:
  */
 void
 fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
-    const char *eventstring)
+    const char *class)
 {
-	struct node *epnamenp = platform_getpath(nvl);
-	const struct ipath *ipp;
+	struct node		*epnamenp;
+	fmd_case_t		*fmcase;
+	const struct ipath	*ipp;
 
-	/*
-	 * XFILE: If we ended up without a path, it's an X-file.
-	 * For now, use our undiagnosable interface.
-	 */
+	class = stable(class);
+
+	/* Get the component path from the ereport */
+	epnamenp = platform_getpath(nvl);
+
+	/* See if we ended up without a path. */
 	if (epnamenp == NULL) {
-		fmd_case_t *fmcase;
-
-		out(O_ALTFP, "XFILE: Unable to get path from ereport");
-		Undiag_reason = UD_NOPATH;
-		fmcase = fmd_case_open(hdl, NULL);
-		publish_undiagnosable(hdl, ffep, fmcase);
+		/* See if class permits silent discard on unknown component. */
+		if (lut_lookup(Ereportenames_discard, (void *)class, NULL)) {
+			out(O_ALTFP|O_VERB2, "Unable to map \"%s\" ereport "
+			    "to component path, but silent discard allowed.",
+			    class);
+		} else {
+			/*
+			 * XFILE: Failure to find a component is bad unless
+			 * 'discard_if_config_unknown=1' was specified in the
+			 * ereport definition. Indicate undiagnosable.
+			 */
+			out(O_ALTFP, "XFILE: Unable to map \"%s\" ereport "
+			    "to component path.", class);
+			Undiag_reason = UD_NOPATH;
+			fmcase = fmd_case_open(hdl, NULL);
+			publish_undiagnosable(hdl, ffep, fmcase);
+		}
 		return;
 	}
 
 	ipp = ipath(epnamenp);
 	tree_free(epnamenp);
-	fme_receive_report(hdl, ffep, stable(eventstring), ipp, nvl);
+	fme_receive_report(hdl, ffep, class, ipp, nvl);
 }
 
 /*ARGSUSED*/

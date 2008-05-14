@@ -143,9 +143,8 @@ struct dev_info  {
 	int (*devi_bus_dma_unbindfunc)(dev_info_t *, dev_info_t *,
 	    ddi_dma_handle_t);
 
-#ifdef	DEVID_COMPATIBILITY
-	ddi_devid_t	devi_devid;		/* registered device id */
-#endif	/* DEVID_COMPATIBILITY */
+	char		*devi_devid_str;	/* registered device id */
+
 	/*
 	 * power management entries
 	 * components exist even if the device is not currently power managed
@@ -210,6 +209,7 @@ struct dev_info  {
 	char		*devi_addr_buf;		/* buffer for devi_addr */
 
 	char		*devi_rebinding_name;	/* binding_name of rebind */
+
 	/* For device contracts that have this dip's minor node as resource */
 	kmutex_t	devi_ct_lock;		/* contract lock */
 	kcondvar_t	devi_ct_cv;		/* contract cv */

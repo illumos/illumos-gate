@@ -327,15 +327,17 @@ search_children_match_busaddr(di_node_t node, char *matchbusaddr)
 	di_node_t cnode;
 	char *busaddr;
 	di_path_t pi = DI_PATH_NIL;
-	char pbuf[MAXPATHLEN];
 
 	if (matchbusaddr == NULL)
 		return (DI_NODE_NIL);
 
-	while ((pi = di_path_next_client(node, pi)) != DI_PATH_NIL)
-		if (strncmp(di_path_addr(pi, pbuf),  matchbusaddr, MAXPATHLEN)
-		    == 0)
+	while ((pi = di_path_phci_next_path(node, pi)) != DI_PATH_NIL) {
+		busaddr = di_path_bus_addr(pi);
+		if (busaddr == NULL)
+			continue;
+		if (strncmp(busaddr, matchbusaddr, MAXNAMELEN) == 0)
 			return (di_path_client_node(pi));
+	}
 
 	for (cnode = di_child_node(node); cnode != DI_NODE_NIL;
 	    cnode = di_sibling_node(cnode)) {
@@ -343,9 +345,10 @@ search_children_match_busaddr(di_node_t node, char *matchbusaddr)
 		if (busaddr == NULL)
 			continue;
 		if (strncmp(busaddr, matchbusaddr, MAXNAMELEN) == 0)
-			break;
+			return (cnode);
 	}
-	return (cnode);
+
+	return (DI_NODE_NIL);
 }
 
 /*

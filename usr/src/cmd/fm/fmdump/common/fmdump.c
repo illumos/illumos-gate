@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <time.h>
 #include <ctype.h>
+#include <regex.h>
 
 #include <fmdump.h>
 
@@ -136,7 +137,8 @@ static int
 usage(FILE *fp)
 {
 	(void) fprintf(fp, "Usage: %s [-efvV] [-c class] [-R root] [-t time] "
-	    "[-T time] [-u uuid] [file]\n", g_pname);
+	    "[-T time] [-u uuid]\n\t\t[-n name[.name]*[=value]] [file]\n",
+	    g_pname);
 
 	(void) fprintf(fp,
 	    "\t-c  select events that match the specified class\n"
@@ -146,6 +148,8 @@ usage(FILE *fp)
 	    "\t-t  select events that occurred after the specified time\n"
 	    "\t-T  select events that occurred before the specified time\n"
 	    "\t-u  select events that match the specified uuid\n"
+	    "\t-n  select events containing named nvpair "
+	    "(with matching value)\n"
 	    "\t-v  set verbose mode: display additional event detail\n"
 	    "\t-V  set very verbose mode: display complete event contents\n");
 
@@ -176,7 +180,7 @@ gettimeopt(const char *arg)
 		const char *name;
 		hrtime_t mul;
 	} suffix[] = {
-		{ "ns", 	NANOSEC / NANOSEC },
+		{ "ns",		NANOSEC / NANOSEC },
 		{ "nsec",	NANOSEC / NANOSEC },
 		{ "us",		NANOSEC / MICROSEC },
 		{ "usec",	NANOSEC / MICROSEC },
@@ -375,6 +379,59 @@ xoff_iter(fmd_log_t *lp, const fmd_log_record_t *rp, void *arg)
 }
 
 /*
+ * Initialize fmd_log_filter_nvarg_t from -n name=value argument string.
+ */
+static fmd_log_filter_nvarg_t *
+setupnamevalue(char *namevalue)
+{
+	fmd_log_filter_nvarg_t	*argt;
+	char			*value;
+	regex_t			*value_regex = NULL;
+	char			errstr[128];
+	int			rv;
+
+	if ((value = strchr(namevalue, '=')) == NULL) {
+		value_regex = NULL;
+	} else {
+		*value++ = '\0';	/* separate name and value string */
+
+		/*
+		 * Skip white space before value to facilitate direct
+		 * cut/paste from previous fmdump output.
+		 */
+		while (isspace(*value))
+			value++;
+
+		if ((value_regex = malloc(sizeof (regex_t))) == NULL) {
+			(void) fprintf(stderr, "%s: failed to allocate memory: "
+			    "%s\n", g_pname, strerror(errno));
+			exit(FMDUMP_EXIT_FATAL);
+		}
+
+		/* compile regular expression for possible string match */
+		if ((rv = regcomp(value_regex, value,
+		    REG_NOSUB|REG_NEWLINE)) != 0) {
+			(void) regerror(rv, value_regex, errstr,
+			    sizeof (errstr));
+			(void) fprintf(stderr, "unexpected regular expression "
+			    "in %s: %s\n", value, errstr);
+			free(value_regex);
+			exit(FMDUMP_EXIT_USAGE);
+		}
+	}
+
+	if ((argt = malloc(sizeof (fmd_log_filter_nvarg_t))) == NULL) {
+		(void) fprintf(stderr, "%s: failed to allocate memory: %s\n",
+		    g_pname, strerror(errno));
+		exit(FMDUMP_EXIT_FATAL);
+	}
+	argt->nvarg_name = namevalue;		/* now just name */
+	argt->nvarg_value = value;
+	argt->nvarg_value_regex = value_regex;
+	return (argt);
+}
+
+/*
  * If the -a option is not present, filter out fault records that correspond
  * to events that the producer requested not be messaged for administrators.
  */
@@ -420,7 +477,8 @@ main(int argc, char *argv[])
 	allfv = alloca(sizeof (fmd_log_filter_t) * argc);
 
 	while (optind < argc) {
-		while ((c = getopt(argc, argv, "ac:efHO:R:t:T:u:vV")) != EOF) {
+		while ((c =
+		    getopt(argc, argv, "ac:efHn:O:R:t:T:u:vV")) != EOF) {
 			switch (c) {
 			case 'a':
 				opt_a++;
@@ -463,6 +521,12 @@ main(int argc, char *argv[])
 				opt_u++;
 				opt_a++; /* -u implies -a */
 				break;
+			case 'n': {
+				fltfv[fltfc].filt_func = fmd_log_filter_nv;
+				fltfv[fltfc].filt_arg = setupnamevalue(optarg);
+				allfv[allfc++] = fltfv[fltfc++];
+				break;
+			}
 			case 'v':
 				opt_v++;
 				break;

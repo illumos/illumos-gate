@@ -688,7 +688,7 @@ add_disk2controller(disk_t *diskp, struct search_args *args)
 	    /* note: mpxio di_path stuff is all consolidation private */
 	    di_path_t   pi = DI_PATH_NIL;
 
-	    while ((pi = di_path_next_phci(node, pi)) != DI_PATH_NIL) {
+	    while ((pi = di_path_client_next_path(node, pi)) != DI_PATH_NIL) {
 		int	cnt;
 		uchar_t	*bytes;
 		char	str[MAXPATHLEN];
@@ -770,7 +770,8 @@ add_int2array(int p, int **parray)
 
 	cnt = 0;
 	if (pa != NULL) {
-	    for (; pa[cnt] != -1; cnt++);
+	    for (; pa[cnt] != -1; cnt++)
+		;
 	}
 
 	new_array = (int *)calloc(cnt + 2, sizeof (int *));
@@ -804,7 +805,8 @@ add_ptr2array(void *p, void ***parray)
 
 	cnt = 0;
 	if (pa != NULL) {
-	    for (; pa[cnt]; cnt++);
+	    for (; pa[cnt]; cnt++)
+		;
 	}
 
 	new_array = (void **)calloc(cnt + 2, sizeof (void *));

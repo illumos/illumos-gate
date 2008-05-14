@@ -23,33 +23,19 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		sparc \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140 \
-		SUNW,Netra-T2000 \
-		SUNW,Netra-CP3060 \
-		SUNW,Netra-CP3260 \
-		SUNW,USBRDT-5240 \
-		SUNW,Netra-T5220 \
-		SUNW,Netra-T5440 \
-		SUNW,USBRDT-5440
+# NOTE: The name of the xml file we are building is 'platform'
+# specific, but its build is structured as 'arch' specific since
+# 'uname -i' on all x86 platforms returns i86pc.
 
-i386_SUBDIRS = i86pc \
-		i386 \
-		SUNW,Sun-Fire-X4200-Server \
-		SUNW,Sun-Fire-X4200-M2 \
-		SUNW,Sun-Fire-X4500 \
-		SUNW,Sun-Fire-X4540
+ARCH = i86pc
+CLASS = arch
+DTDFILE =
+TOPOFILE = Sun-Fire-X4200-Server-hc-topology.xml
+SRCDIR = ../SUNW,Sun-Fire-X4200-Server
 
-SUBDIRS = $($(MACH)_SUBDIRS)
+PLATFORM = Sun-Fire-X4200
+TOPOBASE = ../i86pc/i86pc-hc-topology.xml
 
-include ../../Makefile.subdirs
+include ../Makefile.map

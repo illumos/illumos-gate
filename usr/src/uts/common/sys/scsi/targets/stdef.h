@@ -1195,12 +1195,15 @@ typedef enum {
 }errstate;
 #ifdef _KERNEL
 typedef struct {
-	struct scsi_pkt ei_failed_pkt;
-	struct scsi_arq_status ei_failing_status;
-	tapepos_t ei_expected_pos;
-	errstate ei_error_type;
-	buf_t *ei_failing_bp;
+	struct scsi_arq_status	ei_failing_status;
+	tapepos_t		ei_expected_pos;
+	errstate		ei_error_type;
+	buf_t			*ei_failing_bp;
+	struct scsi_pkt		ei_failed_pkt;		/* must be last */
+							/* ...scsi_pkt_size() */
 } st_err_info;
+#define	ST_ERR_INFO_SIZE	(sizeof (st_err_info) - \
+				sizeof (struct scsi_pkt) + scsi_pkt_size())
 #endif
 
 

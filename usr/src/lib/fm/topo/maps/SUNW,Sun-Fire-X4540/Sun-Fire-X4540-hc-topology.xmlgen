@@ -23,154 +23,143 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 use Getopt::Std;
 
-
-my $sys_supported = {"name" => "Sun-Fire-X4540",
-		"prop_name" => "sfx4500",
-		"num_bays" => "48"};
-
+# X4540: platform specific begin
+my $sys_supported = {	"name" => "Sun-Fire-X4540",
+			"prop_name" => "sfx4500",
+			"num_bays" => "48",
+			"bay_label" => "HD_ID_"};
+# X4540: platform specific end
 
 $IFILE = "filehandle";
 $OFILE = "filehandle";
 
 sub Usage()
 {
-	print STDERR "Usage: xml-gen -p <platform> -i <input_xml_file> -o <output_xml_file>\n";
+	print STDERR "Usage: xml-gen -p <platform> " .
+	    "-i <input_xml_file> -o <output_xml_file>\n";
 }
 
+# Define properties associated with LED manipulation.
+# We have three LEDs per disk: Present (PRSNT), OK-to-remove (OK2RM), and fault.
+# We track the following states (absent present configured unconfigured) via
+# the PRSNT/OK2RM LEDs (FAULT LED is maintained separately).
 sub calc_sfx_prop
 {
 	my $name = shift;
-	my $hdd = shift;
+	my $bay = shift;
 	my $sid = shift;
-	printf OFILE  "\n";
-	printf OFILE  "        <propgroup name='%s-properties'", $name;
-	printf OFILE " version='1' name-stability='Private'";
-	printf OFILE " data-stability='Private' >\n";
-	printf OFILE  "          <propval name='fru-update-action'";
-	printf OFILE " type='string' value='ipmi:fru gid=3 hdd=%d' />\n", $hdd;
-	printf OFILE  "          <propval name='indicator-name-0'";
-	printf OFILE " type='string' value='+PRSNT' />\n";
-	printf OFILE  "          <propval name='indicator-action-0'";
-	printf OFILE " type='string' value='ipmi:state sid=%d amask=0x0001' />\n",
-		$sid;
-	printf OFILE  "          <propval name='indicator-name-1'";
-	printf OFILE " type='string' value='-PRSNT' />\n";
-	printf OFILE  "          <propval name='indicator-action-1'";
-	printf OFILE " type='string' value='ipmi:state sid=%d dmask=0x0001' />\n",
-		$sid;
-	printf OFILE "          <propval name='indicator-name-2'";
-	printf OFILE " type='string' value='+OK2RM' />\n";
-	printf OFILE  "          <propval name='indicator-action-2'";
-	printf OFILE " type='string' value='ipmi:state sid=%d amask=0x0008' />\n",
-		$sid;
-	printf OFILE  "          <propval name='indicator-name-3'";
-	printf OFILE " type='string' value='-OK2RM' />\n";
-	printf OFILE  "          <propval name='indicator-action-3'";
-	printf OFILE " type='string' value='ipmi:state sid=%d dmask=0x0008' />\n",
-		$sid;
-	printf OFILE  "          <propval name='indicator-name-4'";
-	printf OFILE " type='string' value='+FAULT' />\n";
-	printf OFILE  "          <propval name='indicator-action-4'";
-	printf OFILE " type='string' value='ipmi:state sid=%d amask=0x0002' />\n",
-		$sid;
-	printf OFILE  "          <propval name='indicator-name-5'";
-	printf OFILE " type='string' value='-FAULT' />\n";
-	printf OFILE  "          <propval name='indicator-action-5'";
-	printf OFILE " type='string' value='ipmi:state sid=%d dmask=0x0002' />\n",
-		$sid;
-	printf OFILE  "          <propval name='indicator-rule-";
-	printf OFILE "states-0' type='string' value='absent>present' />\n";
-	printf OFILE  "          <propval name='indicator-rule-";
-	printf OFILE "actions-0' type='string' value='+PRSNT&amp;+OK2RM' />\n";
-	printf OFILE  "          <propval name='indicator-rule-";
-	printf OFILE "states-1' type='string' value='present>configured' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-1' type='string' value='+PRSNT&amp;-OK2RM' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "states-2' type='string' value='configured>unconfigured' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-2' type='string' value='+OK2RM' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "states-3' type='string' value='unconfigured>configured' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-3' type='string' value='-OK2RM' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "states-4' type='string' value='unconfigured>absent' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-4' type='string' value='-OK2RM&amp;-PRSNT' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "states-5' type='string' value='configured>absent' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-5' type='string' value='-OK2RM&amp;-PRSNT' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "states-6' type='string' value='present>absent' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-6' type='string' value='-OK2RM&amp;-PRSNT' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "states-7' type='string' value='absent>configured' />\n";
-	printf OFILE "          <propval name='indicator-rule-";
-	printf OFILE "actions-7' type='string' value='-OK2RM&amp;+PRSNT' />\n";
-	printf OFILE  "       </propgroup>\n";
-	printf OFILE  "\n";
+	my @names = (
+	    "+PRSNT",			"-PRSNT",
+	    "+OK2RM",			"-OK2RM",
+	    "+FAULT",			"-FAULT");
+	my @masks = (
+	    "amask=0x0001",		"dmask=0x0001",
+	    "amask=0x0008",		"dmask=0x0008",
+	    "amask=0x0002",		"dmask=0x0002");
+	my @states = (
+	    "absent>present",		"present>configured",
+	    "configured>unconfigured",	"unconfigured>configured",
+	    "unconfigured>absent",	"configured>absent",
+	    "present>absent",		"absent>configured");
+	my @actions = (
+	    "+PRSNT&amp;+OK2RM",	"+PRSNT&amp;-OK2RM",
+	    "+OK2RM",			"-OK2RM",
+	    "-OK2RM&amp;-PRSNT",	"-OK2RM&amp;-PRSNT",
+	    "-OK2RM&amp;-PRSNT",	"-OK2RM&amp;+PRSNT");
+
+	printf OFILE "\n";
+	printf OFILE
+	    "      <propgroup name='%s-properties' version='1' " .
+		"name-stability='Private' data-stability='Private' >\n", $name;
+	printf OFILE
+	    "        <propval name='fru-update-action' type='string' " .
+		"value='ipmi:fru gid=3 hdd=%d' />\n", $bay;
+
+	for ($i = 0; $i < 6; $i++) {
+		printf OFILE
+		    "        <propval name='indicator-name-%d' type='string' " .
+			"value='%s' />\n", $i, $names[$i];
+		printf OFILE
+		    "        <propval name='indicator-action-%d' " .
+			"type='string' value='ipmi:state sid=%d %s' />\n",
+			$i, $sid, $masks[$i];
+	}
+
+	for ($i = 0; $i < 8; $i++) {
+		printf OFILE
+		    "        <propval name='indicator-rule-states-%d' " .
+			"type='string' value='%s' />\n", $i, $states[$i];
+		printf OFILE
+		    "        <propval name='indicator-rule-actions-%d' " .
+			"type='string' value='%s' />\n", $i, $actions[$i];
+	}
+	printf OFILE
+		    "      </propgroup>\n\n";
 }
 
-sub calc_nodes 
+sub calc_nodes
 {
+
+# X4540: platform specific begin
 	my @pci0=(0, 0, 0, 0x3c, 0x3c, 0x3c);
 	my @pci1=(0x377, 0x375, 0x376, 0x377, 0x375, 0x376);
 	my @pci2=(0xa, 0xb, 0xf, 0xa, 0xb, 0xf);
+# X4540: platform specific end
 
 	for ($bay = 0; $bay < $sys_supported->{"num_bays"}; $bay++) {
 
-		$controller = $bay / 8;
-		$target = $bay % 8 ;
+# X4540: platform specific begin
 		$sid = 90 + $bay;
+		$target = $bay % 8;
+		$controller = $bay / 8;
 
-		$physdev = "/pci\@" . sprintf("%x", $pci0[$controller]) .
-		    ",0/pci10de," .  sprintf("%x", $pci1[$controller]) .
-		    "\@" . sprintf("%x", $pci2[$controller]) .
-		    "/pci1000,1000\@0";
+		# set hba path, target path, bay path, and attachment point
+		$hpath = sprintf("/pci\@%x,0/pci10de,%x\@%x/pci1000,1000\@0",
+		    $pci0[$controller], $pci1[$controller], $pci2[$controller]);
+		$tpath = sprintf("/sd\@%x,0", $target);
+		$apoint = sprintf(":scsi::dsk/c%dt%dd0",
+		    $controller + 1, $target);
+# X4540: platform specific end
 
-		printf OFILE "\n";
-		printf OFILE "      <node instance='%d'>\n", $bay;
-		printf OFILE  "\n";
-		printf OFILE "        <propgroup name='protocol'";
-		printf OFILE " version='1' name-stability='Private'";
-		printf OFILE " data-stability='Private' >\n";
-		printf OFILE "          <propval name='ASRU' ";
-		printf OFILE "type='fmri' value=";
-		printf OFILE "'dev:///" . $physdev . "' />\n";
-		printf OFILE "          <propval name='label'";
-		printf OFILE " type='string' value='bay%d' />\n", $bay;
-		printf OFILE "        </propgroup>\n";
+		printf OFILE "\n    <node instance='%d'>\n\n", $bay;
 
-		printf OFILE "        <propgroup name='io'";
-		printf OFILE " version='1' name-stability='Private'";
-		printf OFILE " data-stability='Private' >\n";
-		printf OFILE "          <propval name='ap-path'";
-		printf OFILE " type='string'";
-		printf OFILE " value='/devices" . $physdev;
-		printf OFILE ":scsi::dsk/c%dt%dd0", $controller + 1, $target;
-		printf OFILE "' />\n";
-		printf OFILE "        </propgroup>\n";
+		printf OFILE
+		    "      <propgroup name='protocol' version='1' " .
+			"name-stability='Private' data-stability='Private' >\n";
+		printf OFILE
+		    "        <propval name='label' type='string' " .
+			"value='%s%d' />\n",
+			$sys_supported->{"bay_label"}, $bay;
+		printf OFILE
+		    "      </propgroup>\n";
 
+		printf OFILE
+		    "      <propgroup name='io' version='1' " .
+			"name-stability='Private' data-stability='Private' >\n";
+		printf OFILE
+		    "        <propval name='ap-path' type='string' " .
+			"value='/devices%s%s' />\n", $hpath, $apoint;
+		printf OFILE
+		    "      </propgroup>\n";
+
+#		platform specific LED support
 		calc_sfx_prop($sys_supported->{"prop_name"}, $bay, $sid);
-		printf OFILE "        <propgroup name='binding'";
-		printf OFILE " version='1' name-stability='Private'";
-		printf OFILE " data-stability='Private' >\n";
-		printf OFILE "          <propval name='occupant-path'";
-		printf OFILE " type='string'";
-		printf OFILE " value='" . $physdev . "/sd\@%d,0", $target;
-		printf OFILE "' />\n";
-		printf OFILE "        </propgroup>\n";
-		printf OFILE "\n";
-		printf OFILE "      </node>\n";
-		printf OFILE "\n";
+
+		printf OFILE
+		    "      <propgroup name='binding' version='1' " .
+			"name-stability='Private' data-stability='Private' >\n";
+		printf OFILE
+		    "        <propval name='occupant-path' type='string' " .
+			"value='%s%s' />\n", $hpath, $tpath;
+		printf OFILE
+		    "      </propgroup>\n";
+
+		printf OFILE "\n    </node>\n\n";
 	}
 }
 
@@ -178,7 +167,7 @@ $ok = getopts("p:i:o:h", \%options);
 if ($options{'h'}) {
 	Usage();
 	exit (1);
-} 
+}
 
 $platform = $options{'p'};
 $input_file = $options{'i'};
@@ -192,30 +181,33 @@ if (!$platform || !$input_file || !$output_file) {
 open(IFILE, "< $input_file") || die("$input_file cannot be opened.");
 open(OFILE, "> $output_file") || die("$output_file cannot be opened.");
 my $in_chassis_range = 0;
+
 while ($line = <IFILE>) {
 	chomp($line);
+
 	if ($line =~ /range\s+name\s?=\s?\Wchassis\W/) {
 		$in_chassis_range = 1;
 	}
-	if ($in_chassis_range && ($line =~ /\/dependents/)) {
+	if ($in_chassis_range && ($line =~ /<\/dependents>/)) {
 		last;
 	} else {
 		print OFILE "$line\n";
 	}
 }
-print OFILE "    <!--xml-gen internal storage-->\n";
-printf OFILE "    <range name='bay' min='0' max='%d'>\n", $sys_supported->{"num_bays"};
+
+print OFILE "  <!--xml-gen internal storage-->\n";
+printf OFILE "  <range name='bay' min='0' max='%d'>\n",
+		$sys_supported->{"num_bays"}-1;
+
 calc_nodes(0);
 
-printf OFILE "      <dependents grouping='children'>\n";
-printf OFILE "        <range name='disk' min='0'";
-printf OFILE " max='1'>\n";
-printf OFILE "          <enum-method name='disk'";
-printf OFILE " version='1' />\n";
-printf OFILE "        </range>\n";
-printf OFILE "      </dependents>\n";
-printf OFILE "\n";
-printf OFILE "    </range>\n";
+printf OFILE "    <dependents grouping='children'>\n";
+printf OFILE "      <range name='disk' min='0' max='0'>\n";
+printf OFILE "        <enum-method name='disk' version='1' />\n";
+printf OFILE "      </range>\n";
+printf OFILE "    </dependents>\n\n";
+printf OFILE "  </range>\n";
+
 print OFILE "$line\n";
 while ($line = <IFILE>) {
 	print OFILE $line;

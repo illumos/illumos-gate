@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -855,12 +855,12 @@ int
 di_walk_minor(di_node_t root, const char *minor_type, uint_t flag, void *arg,
 	int (*minor_callback)(di_node_t, di_minor_t, void *))
 {
-	struct node_list  *head;	/* node_list for tree walk */
+	struct node_list	*head;	/* node_list for tree walk */
 
 #ifdef DEBUG
-	char *path = di_devfs_path(root);
-	DPRINTF((DI_INFO, "walking minor nodes under %s\n", path));
-	di_devfs_path_free(path);
+	char	*devfspath = di_devfs_path(root);
+	DPRINTF((DI_INFO, "walking minor nodes under %s\n", devfspath));
+	di_devfs_path_free(devfspath);
 #endif
 
 	if (root == NULL) {
@@ -877,7 +877,7 @@ di_walk_minor(di_node_t root, const char *minor_type, uint_t flag, void *arg,
 	head->node = root;
 
 	DPRINTF((DI_INFO, "Start minor walking from node %s\n",
-		di_node_name(root)));
+	    di_node_name(root)));
 
 	while (head != NULL)
 		walk_one_minor_list(&head, minor_type, flag, arg,
@@ -931,7 +931,7 @@ di_compatible_names(di_node_t node, char **names)
 	}
 
 	*names = (caddr_t)node +
-		DI_NODE(node)->compat_names - DI_NODE(node)->self;
+	    DI_NODE(node)->compat_names - DI_NODE(node)->self;
 
 	c = *names;
 	len = DI_NODE(node)->compat_length;
@@ -1130,7 +1130,7 @@ char *
 di_devfs_minor_path(di_minor_t minor)
 {
 	di_node_t	node;
-	char		*full_path, *name, *path;
+	char		*full_path, *name, *devfspath;
 	int		full_path_len;
 
 	if (minor == DI_MINOR_NIL) {
@@ -1140,18 +1140,70 @@ di_devfs_minor_path(di_minor_t minor)
 
 	name = di_minor_name(minor);
 	node = di_minor_devinfo(minor);
-	path = di_devfs_path(node);
-	if (path == NULL)
+	devfspath = di_devfs_path(node);
+	if (devfspath == NULL)
 		return (NULL);
 
 	/* make the full path to the device minor node */
-	full_path_len = strlen(path) + strlen(name) + 2;
+	full_path_len = strlen(devfspath) + strlen(name) + 2;
 	full_path = (char *)calloc(1, full_path_len);
 	if (full_path != NULL)
-		(void) snprintf(full_path, full_path_len, "%s:%s", path, name);
+		(void) snprintf(full_path, full_path_len, "%s:%s",
+		    devfspath, name);
 
-	di_devfs_path_free(path);
+	di_devfs_path_free(devfspath);
 	return (full_path);
+}
+
+/*
+ * Produce a string representation of path to di_path_t (pathinfo node). This
+ * string is identical to di_devfs_path had the device been enumerated under
+ * the pHCI: it has a base path to pHCI, then uses node_name of client, and
+ * device unit-address of pathinfo node.
+ */
+char *
+di_path_devfs_path(di_path_t path)
+{
+	di_node_t	phci_node;
+	char		*phci_path, *path_name, *path_addr;
+	char		*full_path;
+	int		full_path_len;
+
+	if (path == DI_PATH_NIL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	/* get name@addr for path */
+	path_name = di_path_node_name(path);
+	path_addr = di_path_bus_addr(path);
+	if ((path_name == NULL) || (path_addr == NULL))
+		return (NULL);
+
+	/* base path to pHCI devinfo node */
+	phci_node = di_path_phci_node(path);
+	if (phci_node == NULL)
+		return (NULL);
+	phci_path = di_devfs_path(phci_node);
+	if (phci_path == NULL)
+		return (NULL);
+
+	/* make the full string representation of path */
+	full_path_len = strlen(phci_path) + 1 + strlen(path_name) +
+	    1 + strlen(path_addr) + 1;
+	full_path = (char *)calloc(1, full_path_len);
+
+	if (full_path != NULL)
+		(void) snprintf(full_path, full_path_len, "%s/%s@%s",
+		    phci_path, path_name, path_addr);
+	di_devfs_path_free(phci_path);
+	return (full_path);
+}
+
+char *
+di_path_client_devfs_path(di_path_t path)
+{
+	return (di_devfs_path(di_path_client_node(path)));
 }
 
 void
@@ -1163,6 +1215,128 @@ di_devfs_path_free(char *buf)
 	}
 
 	free(buf);
+}
+
+/*
+ * Return 1 if name is a IEEE-1275 generic name. If new generic
+ * names are defined, they should be added to this table
+ */
+static int
+is_generic(const char *name, int len)
+{
+	const char	**gp;
+
+	/* from IEEE-1275 recommended practices section 3 */
+	static const char *generic_names[] = {
+	    "atm",
+	    "disk",
+	    "display",
+	    "dma-controller",
+	    "ethernet",
+	    "fcs",
+	    "fdc",
+	    "fddi",
+	    "fibre-channel",
+	    "ide",
+	    "interrupt-controller",
+	    "isa",
+	    "keyboard",
+	    "memory",
+	    "mouse",
+	    "nvram",
+	    "pc-card",
+	    "pci",
+	    "printer",
+	    "rtc",
+	    "sbus",
+	    "scanner",
+	    "scsi",
+	    "serial",
+	    "sound",
+	    "ssa",
+	    "tape",
+	    "timer",
+	    "token-ring",
+	    "vme",
+	    0
+	};
+
+	for (gp = generic_names; *gp; gp++) {
+		if ((strncmp(*gp, name, len) == 0) &&
+		    (strlen(*gp) == len))
+			return (1);
+	}
+	return (0);
+}
+
+/*
+ * Determine if two paths below /devices refer to the same device, ignoring
+ * any generic .vs. non-generic 'name' issues in "[[/]name[@addr[:minor]]]*".
+ * Return 1 if the paths match.
+ */
+int
+di_devfs_path_match(const char *dp1, const char *dp2)
+{
+	const char	*p1, *p2;
+	const char	*ec1, *ec2;
+	const char	*at1, *at2;
+	char		nc;
+	int		g1, g2;
+
+	/* progress through both strings */
+	for (p1 = dp1, p2 = dp2; (*p1 == *p2) && *p1; p1++, p2++) {
+		/* require match until the start of a component */
+		if (*p1 != '/')
+			continue;
+
+		/* advance p1 and p2 to start of 'name' in component */
+		nc = *(p1 + 1);
+		if ((nc == '\0') || (nc == '/'))
+			continue;		/* skip trash */
+		p1++;
+		p2++;
+
+		/*
+		 * Both p1 and p2 point to beginning of 'name' in component.
+		 * Determine where current component ends: next '/' or '\0'.
+		 */
+		ec1 = strchr(p1, '/');
+		if (ec1 == NULL)
+			ec1 = p1 + strlen(p1);
+		ec2 = strchr(p2, '/');
+		if (ec2 == NULL)
+			ec2 = p2 + strlen(p2);
+
+		/* Determine where name ends based on whether '@' exists */
+		at1 = strchr(p1, '@');
+		at2 = strchr(p2, '@');
+		if (at1 && (at1 < ec1))
+			ec1 = at1;
+		if (at2 && (at2 < ec2))
+			ec2 = at2;
+
+		/*
+		 * At this point p[12] point to beginning of name and
+		 * ec[12] point to character past the end of name. Determine
+		 * if the names are generic.
+		 */
+		g1 = is_generic(p1, ec1 - p1);
+		g2 = is_generic(p2, ec2 - p2);
+
+		if (g1 != g2) {
+			/*
+			 * one generic and one non-generic
+			 * skip past the names in the match.
+			 */
+			p1 = ec1;
+			p2 = ec2;
+		} else {
+			if (*p1 != *p2)
+				break;
+		}
+	}
+
+	return ((*p1 == *p2) ? 1 : 0);
 }
 
 /* minor data access */
@@ -1245,7 +1419,7 @@ dev_t
 di_minor_devt(di_minor_t minor)
 {
 	return (makedev(DI_MINOR(minor)->dev_major,
-		DI_MINOR(minor)->dev_minor));
+	    DI_MINOR(minor)->dev_minor));
 }
 
 int
@@ -1261,7 +1435,7 @@ di_minor_nodetype(di_minor_t minor)
 		return (NULL);
 
 	return ((caddr_t)minor -
-		DI_MINOR(minor)->self + DI_MINOR(minor)->node_type);
+	    DI_MINOR(minor)->self + DI_MINOR(minor)->node_type);
 }
 
 /*
@@ -1712,7 +1886,7 @@ di_prop_rawdata(di_prop_t prop, uchar_t **prop_data)
  * Consolidation private interfaces for accessing I/O multipathing data
  */
 di_path_t
-di_path_next_client(di_node_t node, di_path_t path)
+di_path_phci_next_path(di_node_t node, di_path_t path)
 {
 	caddr_t pa;
 
@@ -1733,7 +1907,8 @@ di_path_next_client(di_node_t node, di_path_t path)
 	 * Path is NIL; the caller is asking for the first path info node
 	 */
 	if (DI_NODE(node)->multipath_phci != 0) {
-		DPRINTF((DI_INFO, "phci: returning %p\n", ((caddr_t)node -
+		DPRINTF((DI_INFO, "phci_next_path: returning %p\n",
+		    ((caddr_t)node -
 		    DI_NODE(node)->self + DI_NODE(node)->multipath_phci)));
 		return (DI_PATH((caddr_t)node - DI_NODE(node)->self +
 		    DI_NODE(node)->multipath_phci));
@@ -1753,7 +1928,7 @@ di_path_next_client(di_node_t node, di_path_t path)
 }
 
 di_path_t
-di_path_next_phci(di_node_t node, di_path_t path)
+di_path_client_next_path(di_node_t node, di_path_t path)
 {
 	caddr_t pa;
 
@@ -1774,7 +1949,8 @@ di_path_next_phci(di_node_t node, di_path_t path)
 	 * Path is NIL; the caller is asking for the first path info node
 	 */
 	if (DI_NODE(node)->multipath_client != 0) {
-		DPRINTF((DI_INFO, "client: returning %p\n", ((caddr_t)node -
+		DPRINTF((DI_INFO, "client_next_path: returning %p\n",
+		    ((caddr_t)node -
 		    DI_NODE(node)->self + DI_NODE(node)->multipath_client)));
 		return (DI_PATH((caddr_t)node - DI_NODE(node)->self +
 		    DI_NODE(node)->multipath_client));
@@ -1794,36 +1970,10 @@ di_path_next_phci(di_node_t node, di_path_t path)
 }
 
 /*
- * XXX Obsolete wrapper to be removed. Won't work under multilevel.
+ * XXX Remove the private di_path_(addr,next,next_phci,next_client) interfaces
+ * below after NWS consolidation switches to using di_path_bus_addr,
+ * di_path_phci_next_path, and di_path_client_next_path per CR6638521.
  */
-di_path_t
-di_path_next(di_node_t node, di_path_t path)
-{
-	if (node == DI_NODE_NIL) {
-		errno = EINVAL;
-		return (DI_PATH_NIL);
-	}
-
-	if (DI_NODE(node)->multipath_client) {
-		return (di_path_next_phci(node, path));
-	} else if (DI_NODE(node)->multipath_phci) {
-		return (di_path_next_client(node, path));
-	} else {
-		/*
-		 * The node had multipathing data but didn't appear to be a
-		 * phci *or* a client; probably a programmer error.
-		 */
-		errno = EINVAL;
-		return (DI_PATH_NIL);
-	}
-}
-
-di_path_state_t
-di_path_state(di_path_t path)
-{
-	return ((di_path_state_t)DI_PATH(path)->path_state);
-}
-
 char *
 di_path_addr(di_path_t path, char *buf)
 {
@@ -1834,6 +1984,74 @@ di_path_addr(di_path_t path, char *buf)
 	(void) strncpy(buf, (char *)(pa + DI_PATH(path)->path_addr),
 	    MAXPATHLEN);
 	return (buf);
+}
+di_path_t
+di_path_next(di_node_t node, di_path_t path)
+{
+	if (node == DI_NODE_NIL) {
+		errno = EINVAL;
+		return (DI_PATH_NIL);
+	}
+
+	if (DI_NODE(node)->multipath_client) {
+		return (di_path_client_next_path(node, path));
+	} else if (DI_NODE(node)->multipath_phci) {
+		return (di_path_phci_next_path(node, path));
+	} else {
+		/*
+		 * The node had multipathing data but didn't appear to be a
+		 * phci *or* a client; probably a programmer error.
+		 */
+		errno = EINVAL;
+		return (DI_PATH_NIL);
+	}
+}
+di_path_t
+di_path_next_phci(di_node_t node, di_path_t path)
+{
+	return (di_path_client_next_path(node, path));
+}
+di_path_t
+di_path_next_client(di_node_t node, di_path_t path)
+{
+	return (di_path_phci_next_path(node, path));
+}
+
+
+
+
+di_path_state_t
+di_path_state(di_path_t path)
+{
+	return ((di_path_state_t)DI_PATH(path)->path_state);
+}
+
+char *
+di_path_node_name(di_path_t path)
+{
+	di_node_t	client_node;
+
+	/* pathinfo gets node_name from client */
+	if ((client_node = di_path_client_node(path)) == NULL)
+		return (NULL);
+	return (di_node_name(client_node));
+}
+
+char *
+di_path_bus_addr(di_path_t path)
+{
+	caddr_t pa = (caddr_t)path - DI_PATH(path)->self;
+
+	if (DI_PATH(path)->path_addr == 0)
+		return (NULL);
+
+	return ((char *)(pa + DI_PATH(path)->path_addr));
+}
+
+int
+di_path_instance(di_path_t path)
+{
+	return (DI_PATH(path)->path_instance);
 }
 
 di_node_t
@@ -2472,7 +2690,7 @@ di_prom_prop_next(di_prom_handle_t ph, di_node_t node, di_prom_prop_t prom_prop)
 	struct di_prom_handle *p = (struct di_prom_handle *)ph;
 
 	DPRINTF((DI_TRACE1, "Search next prop for node 0x%p with ph 0x%p\n",
-		node, p));
+	    node, p));
 
 	/*
 	 * paranoid check
@@ -2656,7 +2874,7 @@ di_prom_prop_lookup_ints(di_prom_handle_t ph, di_node_t node,
 	}
 
 	len = di_prop_decode_common((void *)&prop->data, prop->len,
-		DI_PROP_TYPE_INT, 1);
+	    DI_PROP_TYPE_INT, 1);
 	*prom_prop_data = (int *)((void *)prop->data);
 
 	return (len);
@@ -2905,6 +3123,18 @@ di_node_private_get(di_node_t node)
 }
 
 void
+di_path_private_set(di_path_t path, void *data)
+{
+	DI_PATH(path)->user_private_data = (uintptr_t)data;
+}
+
+void *
+di_path_private_get(di_path_t path)
+{
+	return ((void *)(uintptr_t)DI_PATH(path)->user_private_data);
+}
+
+void
 di_lnode_private_set(di_lnode_t lnode, void *data)
 {
 	DI_LNODE(lnode)->user_private_data = (uintptr_t)data;
@@ -3028,24 +3258,24 @@ di_link_next_by_lnode(di_lnode_t lnode, di_link_t link, uint_t endpoint)
 			if (DI_LNODE(lnode)->link_out == NULL)
 				return (DI_LINK_NIL);
 			return (DI_LINK((caddr_t)di_all +
-				    DI_LNODE(lnode)->link_out));
+			    DI_LNODE(lnode)->link_out));
 		} else {
 			if (DI_LINK(link)->src_link_next == NULL)
 				return (DI_LINK_NIL);
 			return (DI_LINK((caddr_t)di_all +
-				    DI_LINK(link)->src_link_next));
+			    DI_LINK(link)->src_link_next));
 		}
 	} else {
 		if (link == DI_LINK_NIL) {
 			if (DI_LNODE(lnode)->link_in == NULL)
 				return (DI_LINK_NIL);
 			return (DI_LINK((caddr_t)di_all +
-				    DI_LNODE(lnode)->link_in));
+			    DI_LNODE(lnode)->link_in));
 		} else {
 			if (DI_LINK(link)->tgt_link_next == NULL)
 				return (DI_LINK_NIL);
 			return (DI_LINK((caddr_t)di_all +
-				    DI_LINK(link)->tgt_link_next));
+			    DI_LINK(link)->tgt_link_next));
 		}
 	}
 	/* NOTREACHED */
@@ -3084,10 +3314,10 @@ di_walk_link(di_node_t root, uint_t flag, uint_t endpoint, void *arg,
 	struct node_list  *head;	/* node_list for tree walk */
 
 #ifdef DEBUG
-	char *path = di_devfs_path(root);
+	char *devfspath = di_devfs_path(root);
 	DPRINTF((DI_INFO, "walking %s link data under %s\n",
-		    (endpoint == DI_LINK_SRC) ? "src" : "tgt", path));
-	di_devfs_path_free(path);
+	    (endpoint == DI_LINK_SRC) ? "src" : "tgt", devfspath));
+	di_devfs_path_free(devfspath);
 #endif
 
 	/*
@@ -3108,7 +3338,7 @@ di_walk_link(di_node_t root, uint_t flag, uint_t endpoint, void *arg,
 	head->node = root;
 
 	DPRINTF((DI_INFO, "Start link data walking from node %s\n",
-		di_node_name(root)));
+	    di_node_name(root)));
 
 	while (head != NULL)
 		walk_one_link(&head, endpoint, arg, link_callback);
@@ -3149,9 +3379,9 @@ di_walk_lnode(di_node_t root, uint_t flag, void *arg,
 	struct node_list  *head;	/* node_list for tree walk */
 
 #ifdef DEBUG
-	char *path = di_devfs_path(root);
-	DPRINTF((DI_INFO, "walking lnode data under %s\n", path));
-	di_devfs_path_free(path);
+	char *devfspath = di_devfs_path(root);
+	DPRINTF((DI_INFO, "walking lnode data under %s\n", devfspath));
+	di_devfs_path_free(devfspath);
 #endif
 
 	/*
@@ -3171,7 +3401,7 @@ di_walk_lnode(di_node_t root, uint_t flag, void *arg,
 	head->node = root;
 
 	DPRINTF((DI_INFO, "Start lnode data walking from node %s\n",
-		di_node_name(root)));
+	    di_node_name(root)));
 
 	while (head != NULL)
 		walk_one_lnode(&head, arg, lnode_callback);
@@ -3180,18 +3410,17 @@ di_walk_lnode(di_node_t root, uint_t flag, void *arg,
 }
 
 di_node_t
-di_lookup_node(di_node_t root, char *path)
+di_lookup_node(di_node_t root, char *devfspath)
 {
 	struct di_all *dap;
 	di_node_t node;
-	char copy[MAXPATHLEN];
-	char *slash, *pname, *paddr;
+	char *copy, *slash, *pname, *paddr;
 
 	/*
 	 * Path must be absolute and musn't have duplicate slashes
 	 */
-	if (*path != '/' || strstr(path, "//")) {
-		DPRINTF((DI_ERR, "Invalid path: %s\n", path));
+	if (*devfspath != '/' || strstr(devfspath, "//")) {
+		DPRINTF((DI_ERR, "Invalid path: %s\n", devfspath));
 		return (DI_NODE_NIL);
 	}
 
@@ -3206,15 +3435,15 @@ di_lookup_node(di_node_t root, char *path)
 		return (DI_NODE_NIL);
 	}
 
-	if (strlcpy(copy, path, sizeof (copy)) >= sizeof (copy)) {
-		DPRINTF((DI_ERR, "path too long: %s\n", path));
+	if ((copy = strdup(devfspath)) == NULL) {
+		DPRINTF((DI_ERR, "strdup failed on: %s\n", devfspath));
 		return (DI_NODE_NIL);
 	}
 
 	for (slash = copy, node = root; slash; ) {
 
 		/*
-		 * Handle path = "/" case as well as trailing '/'
+		 * Handle devfspath = "/" case as well as trailing '/'
 		 */
 		if (*(slash + 1) == '\0')
 			break;
@@ -3259,12 +3488,70 @@ di_lookup_node(di_node_t root, char *path)
 		 */
 		if (node == DI_NODE_NIL) {
 			DPRINTF((DI_ERR, "%s@%s: no node\n", pname, paddr));
+			free(copy);
 			return (DI_NODE_NIL);
 		}
 	}
 
 	assert(node != DI_NODE_NIL);
+	free(copy);
 	return (node);
+}
+
+di_path_t
+di_lookup_path(di_node_t root, char *devfspath)
+{
+	di_node_t	phci_node;
+	di_path_t	path = DI_PATH_NIL;
+	char		*copy, *lastslash;
+	char		*pname, *paddr;
+	char		*path_name, *path_addr;
+
+	if ((copy = strdup(devfspath)) == NULL) {
+		DPRINTF((DI_ERR, "strdup failed on: %s\n", devfspath));
+		return (DI_NODE_NIL);
+	}
+
+	if ((lastslash = strrchr(copy, '/')) == NULL) {
+		DPRINTF((DI_ERR, "failed to find component: %s\n", devfspath));
+		goto out;
+	}
+
+	/* stop at pHCI and find the node for the phci */
+	*lastslash = '\0';
+	phci_node = di_lookup_node(root, copy);
+	if (phci_node == NULL) {
+		DPRINTF((DI_ERR, "failed to find component: %s\n", devfspath));
+		goto out;
+	}
+
+	/* set up pname and paddr for last component */
+	pname = lastslash + 1;
+	if ((paddr = strchr(pname, '@')) == NULL) {
+		DPRINTF((DI_ERR, "failed to find unit-addr: %s\n", devfspath));
+		goto out;
+	}
+	*paddr++ = '\0';
+
+	/* walk paths below phci looking for match */
+	for (path = di_path_phci_next_path(phci_node, DI_PATH_NIL);
+	    path != DI_PATH_NIL;
+	    path = di_path_phci_next_path(phci_node, path)) {
+
+		/* get name@addr of path */
+		path_name = di_path_node_name(path);
+		path_addr = di_path_bus_addr(path);
+		if ((path_name == NULL) || (path_addr == NULL))
+			continue;
+
+		/* break on match */
+		if ((strcmp(pname, path_name) == 0) &&
+		    (strcmp(paddr, path_addr) == 0))
+			break;
+	}
+
+out:	free(copy);
+	return (path);
 }
 
 static char *

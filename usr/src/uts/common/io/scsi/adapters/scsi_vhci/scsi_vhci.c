@@ -68,7 +68,7 @@ int vhci_prout_not_ready_retry = 180;
 /*
  * Version Macros
  */
-#define	VHCI_NAME_VERSION	"SCSI VHCI Driver 1.68"
+#define	VHCI_NAME_VERSION	"SCSI VHCI Driver %I%"
 char		vhci_version_name[] = VHCI_NAME_VERSION;
 
 int		vhci_first_time = 0;
@@ -1347,6 +1347,17 @@ pkt_cleanup:
 	 * If this changes it needs to be handled for the polled scenario.
 	 */
 	flags = vpkt->vpkt_hba_pkt->pkt_flags;
+
+	/*
+	 * Set the path_instance *before* sending the scsi_pkt down the path
+	 * to mpxio's pHCI so that additional path abstractions at a pHCI
+	 * level (like maybe iSCSI at some point in the future) can update
+	 * the path_instance.
+	 */
+	if (scsi_pkt_allocated_correctly(vpkt->vpkt_hba_pkt))
+		vpkt->vpkt_hba_pkt->pkt_path_instance =
+		    mdi_pi_get_path_instance(vpkt->vpkt_path);
+
 	rval = scsi_transport(vpkt->vpkt_hba_pkt);
 	if (rval == TRAN_ACCEPT) {
 		if (flags & FLAG_NOINTR) {
@@ -2101,6 +2112,7 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 	int			mps_flag = MDI_SELECT_ONLINE_PATH;
 	struct scsi_vhci_lun	*vlun;
 	time_t			tnow;
+	int			path_instance;
 
 	vlun = ADDR2VLUN(ap);
 	ASSERT(vlun != 0);
@@ -2171,6 +2183,17 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 	}
 
 	/*
+	 * Get path_instance. Non-zero indicates that mdi_select_path should
+	 * be called to select a specific instance.
+	 *
+	 * NB: Condition pkt_path_instance reference on proper allocation.
+	 */
+	if (scsi_pkt_allocated_correctly(vpkt->vpkt_tgt_pkt))
+		path_instance = vpkt->vpkt_tgt_pkt->pkt_path_instance;
+	else
+		path_instance = 0;
+
+	/*
 	 * If reservation is active bind the transport directly to the pip
 	 * with the reservation.
 	 */
@@ -2190,8 +2213,9 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 			}
 		}
 try_again:
-		rval = mdi_select_path(cdip, vpkt->vpkt_tgt_init_bp, 0, NULL,
-		    &pip);
+		rval = mdi_select_path(cdip, vpkt->vpkt_tgt_init_bp,
+		    path_instance ? MDI_SELECT_PATH_INSTANCE : 0,
+		    (void *)(intptr_t)path_instance, &pip);
 		if (rval == MDI_BUSY) {
 			if (pgr_sema_held) {
 				sema_v(&vlun->svl_pgr_sema);
@@ -2351,6 +2375,10 @@ bind_path:
 		pkt = vpkt->vpkt_hba_pkt;
 		address = &pkt->pkt_address;
 	}
+
+	/* Verify match of specified path_instance and selected path_instance */
+	ASSERT((path_instance == 0) ||
+	    (path_instance == mdi_pi_get_path_instance(vpkt->vpkt_path)));
 
 	/*
 	 * For PKT_PARTIAL_DMA case, call pHCI's scsi_init_pkt whenever
@@ -2987,6 +3015,21 @@ vhci_intr(struct scsi_pkt *pkt)
 	tpkt->pkt_state = pkt->pkt_state;
 	tpkt->pkt_statistics = pkt->pkt_statistics;
 	tpkt->pkt_reason = pkt->pkt_reason;
+
+	/* Return path_instance information back to the target driver. */
+	if (scsi_pkt_allocated_correctly(tpkt)) {
+		if (scsi_pkt_allocated_correctly(pkt)) {
+			/*
+			 * If both packets were correctly allocated,
+			 * return path returned by pHCI.
+			 */
+			tpkt->pkt_path_instance = pkt->pkt_path_instance;
+		} else {
+			/* Otherwise return path of pHCI we used */
+			tpkt->pkt_path_instance =
+			    mdi_pi_get_path_instance(lpath);
+		}
+	}
 
 	if (pkt->pkt_cdbp[0] == SCMD_PROUT &&
 	    ((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_REGISTER) ||
@@ -3699,6 +3742,9 @@ vhci_update_pathstates(void *arg)
 					    SCMD_READ, 1, 1, 0);
 					pkt->pkt_time = 3*30;
 					pkt->pkt_flags = FLAG_NOINTR;
+					pkt->pkt_path_instance =
+					    mdi_pi_get_path_instance(pip);
+
 					if ((scsi_transport(pkt) ==
 					    TRAN_ACCEPT) && (pkt->pkt_reason
 					    == CMD_CMPLT) && (SCBP_C(pkt) ==
@@ -6741,7 +6787,9 @@ next_pathclass:
 			    pkt->pkt_cdbp, SCMD_READ, 1, 1, 0);
 			pkt->pkt_flags = FLAG_NOINTR;
 check_path_again:
+			pkt->pkt_path_instance = mdi_pi_get_path_instance(npip);
 			pkt->pkt_time = 3*30;
+
 			if (scsi_transport(pkt) == TRAN_ACCEPT) {
 				switch (pkt->pkt_reason) {
 				case CMD_CMPLT:
@@ -7109,7 +7157,6 @@ vhci_lun_free(dev_info_t *tgt_dip)
 		kmem_free(dvlp->svl_lun_wwn, strlen(dvlp->svl_lun_wwn)+1);
 	}
 	dvlp->svl_lun_wwn = NULL;
-
 
 	if (dvlp->svl_fops_name) {
 		kmem_free(dvlp->svl_fops_name, strlen(dvlp->svl_fops_name)+1);
@@ -8115,6 +8162,13 @@ vhci_uscsi_send_sense(struct scsi_pkt *pkt, mp_uscsi_cmd_t *mp_uscmdp)
 	rqpkt->pkt_comp = vhci_uscsi_iodone;
 	rqpkt->pkt_private = mp_uscmdp;
 
+	/*
+	 * NOTE: This code path is related to MPAPI uscsi(7I), so path
+	 * selection is not based on path_instance.
+	 */
+	if (scsi_pkt_allocated_correctly(rqpkt))
+		rqpkt->pkt_path_instance = 0;
+
 	/* get her done */
 	switch (scsi_transport(rqpkt)) {
 	case TRAN_ACCEPT:
@@ -8339,6 +8393,13 @@ vhci_uscsi_iostart(struct buf *bp)
 	    (void *)mp_uscmdp->ap, (void *)pkt, (void *)pkt->pkt_cdbp,
 	    (void *)uscmdp, (void *)uscmdp->uscsi_cdb, pkt->pkt_cdblen,
 	    (void *)bp, bp->b_bcount, (void *)mp_uscmdp->pip, stat_size));
+
+	/*
+	 * NOTE: This code path is related to MPAPI uscsi(7I), so path
+	 * selection is not based on path_instance.
+	 */
+	if (scsi_pkt_allocated_correctly(pkt))
+		pkt->pkt_path_instance = 0;
 
 	while (((rval = scsi_transport(pkt)) == TRAN_BUSY) &&
 	    retry < vhci_uscsi_retry_count) {

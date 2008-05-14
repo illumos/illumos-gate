@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ struct uscsi_cmd {
 	uchar_t		uscsi_rqstatus;	/* status of request sense cmd */
 	uchar_t		uscsi_rqresid;	/* resid of request sense cmd */
 	caddr_t		uscsi_rqbuf;	/* request sense buffer */
-	void		*uscsi_reserved_5;	/* Reserved for Future Use */
+	ulong_t		uscsi_path_instance; /* private: hardware path */
 };
 
 #if defined(_SYSCALL32)
@@ -69,7 +69,7 @@ struct uscsi_cmd32 {
 	uchar_t		uscsi_rqstatus;	/* status of request sense cmd */
 	uchar_t		uscsi_rqresid;	/* resid of request sense cmd */
 	caddr32_t	uscsi_rqbuf;	/* request sense buffer */
-	caddr32_t	uscsi_reserved_5;	/* Reserved for Future Use */
+	uint32_t	uscsi_path_instance; /* private: hardware path */
 };
 
 #define	uscsi_cmd32touscsi_cmd(u32, ucmd)				\
@@ -85,7 +85,7 @@ struct uscsi_cmd32 {
 	ucmd->uscsi_rqstatus	= u32->uscsi_rqstatus;			\
 	ucmd->uscsi_rqresid	= u32->uscsi_rqresid;			\
 	ucmd->uscsi_rqbuf	= (caddr_t)(uintptr_t)u32->uscsi_rqbuf;	\
-	ucmd->uscsi_reserved_5	= (void *)(uintptr_t)u32->uscsi_reserved_5;
+	ucmd->uscsi_path_instance = (ulong_t)u32->uscsi_path_instance;
 
 
 #define	uscsi_cmdtouscsi_cmd32(ucmd, u32)				\
@@ -101,7 +101,7 @@ struct uscsi_cmd32 {
 	u32->uscsi_rqstatus	= ucmd->uscsi_rqstatus;			\
 	u32->uscsi_rqresid	= ucmd->uscsi_rqresid;			\
 	u32->uscsi_rqbuf	= (caddr32_t)(uintptr_t)ucmd->uscsi_rqbuf; \
-	u32->uscsi_reserved_5	= (caddr32_t)(uintptr_t)ucmd->uscsi_reserved_5;
+	u32->uscsi_path_instance = (uint32_t)ucmd->uscsi_path_instance;
 
 #endif /* _SYSCALL32 */
 
@@ -112,23 +112,27 @@ struct uscsi_cmd32 {
 /*
  * generic flags
  */
-#define	USCSI_WRITE	0x00000	/* send data to device */
-#define	USCSI_SILENT	0x00001	/* no error messages */
-#define	USCSI_DIAGNOSE	0x00002	/* fail if any error occurs */
-#define	USCSI_ISOLATE	0x00004	/* isolate from normal commands */
-#define	USCSI_READ	0x00008	/* get data from device */
-#define	USCSI_RESET_LUN	0x40000	/* Reset logical unit */
-#define	USCSI_RESET	0x04000	/* Reset target */
-#define	USCSI_RESET_TARGET	USCSI_RESET	/* Reset target */
-#define	USCSI_RESET_ALL	0x08000	/* Reset all targets */
-#define	USCSI_RQENABLE	0x10000	/* Enable Request Sense extensions */
-#define	USCSI_RENEGOT	0x20000	/* renegotiate wide/sync on next I/O */
+#define	USCSI_SILENT	0x00000001	/* no error messages */
+#define	USCSI_DIAGNOSE	0x00000002	/* fail if any error occurs */
+#define	USCSI_ISOLATE	0x00000004	/* isolate from normal commands */
+#define	USCSI_READ	0x00000008	/* get data from device */
+#define	USCSI_WRITE	0x00000000	/* send data to device */
+
+#define	USCSI_RESET	0x00004000	/* Reset target */
+#define	USCSI_RESET_TARGET	\
+			USCSI_RESET	/* Reset target */
+#define	USCSI_RESET_ALL	0x00008000	/* Reset all targets */
+#define	USCSI_RQENABLE	0x00010000	/* Enable Request Sense extensions */
+#define	USCSI_RENEGOT	0x00020000	/* renegotiate wide/sync on next I/O */
+#define	USCSI_RESET_LUN	0x00040000	/* Reset logical unit */
+#define	USCSI_PATH_INSTANCE	\
+			0x00080000	/* use path instance for transport */
 
 /*
  * suitable for parallel SCSI bus only
  */
-#define	USCSI_ASYNC	0x01000	/* Set bus to asynchronous mode */
-#define	USCSI_SYNC	0x02000	/* Return bus to sync mode if possible */
+#define	USCSI_ASYNC	0x00001000	/* Set bus to asynchronous mode */
+#define	USCSI_SYNC	0x00002000	/* Set bus to sync mode if possible */
 
 /*
  * the following flags should not be used at user level but may
@@ -137,20 +141,20 @@ struct uscsi_cmd32 {
 /*
  * generic flags
  */
-#define	USCSI_NOINTR	0x00040	/* No interrupts, NEVER to use this flag */
-#define	USCSI_NOTAG	0x00100	/* Disable tagged queueing */
-#define	USCSI_OTAG	0x00200	/* ORDERED QUEUE tagged cmd */
-#define	USCSI_HTAG	0x00400	/* HEAD OF QUEUE tagged cmd */
-#define	USCSI_HEAD	0x00800	/* Head of HA queue */
+#define	USCSI_NOINTR	0x00000040	/* No interrupts, NEVER use this flag */
+#define	USCSI_NOTAG	0x00000100	/* Disable tagged queueing */
+#define	USCSI_OTAG	0x00000200	/* ORDERED QUEUE tagged cmd */
+#define	USCSI_HTAG	0x00000400	/* HEAD OF QUEUE tagged cmd */
+#define	USCSI_HEAD	0x00000800	/* Head of HA queue */
 
 /*
  * suitable for parallel SCSI bus only
  */
-#define	USCSI_NOPARITY	0x00010	/* run command without parity */
-#define	USCSI_NODISCON	0x00020	/* run command without disconnects */
+#define	USCSI_NOPARITY	0x00000010	/* run command without parity */
+#define	USCSI_NODISCON	0x00000020	/* run command without disconnects */
 
 
-#define	USCSI_RESERVED	0xfffc0000	/* Reserved Bits, must be zero */
+#define	USCSI_RESERVED	0xfff00000	/* Reserved Bits, must be zero */
 
 struct uscsi_rqs {
 	int		rqs_flags;	/* see below */
@@ -188,9 +192,11 @@ struct uscsi_rqs32	{
 
 int	scsi_uscsi_alloc_and_copyin(intptr_t, int,
 	    struct scsi_address *, struct uscsi_cmd **);
+int	scsi_uscsi_pktinit(struct uscsi_cmd *, struct scsi_pkt *);
 int	scsi_uscsi_handle_cmd(dev_t, enum uio_seg,
 	    struct uscsi_cmd *, int (*)(struct buf *),
 	    struct buf *, void *);
+int	scsi_uscsi_pktfini(struct scsi_pkt *, struct uscsi_cmd *);
 int	scsi_uscsi_copyout_and_free(intptr_t, struct uscsi_cmd *);
 
 #endif	/* _KERNEL */

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +34,7 @@ SUNWprivate {
 	fmd_log_filter_after;
 	fmd_log_filter_before;
 	fmd_log_filter_class;
+	fmd_log_filter_nv;
 	fmd_log_filter_uuid;
 	fmd_log_header;
 	fmd_log_iter;

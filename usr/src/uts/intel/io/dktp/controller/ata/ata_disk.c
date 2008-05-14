@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -373,7 +373,8 @@ ata_disk_init_drive(
 	/*
 	 * set up the scsi_device and ctl_obj structures
 	 */
-	devp = &ata_drvp->ad_device;
+	devp = kmem_zalloc(scsi_device_size(), KM_SLEEP);
+	ata_drvp->ad_device = devp;
 	ctlobjp = &ata_drvp->ad_ctl_obj;
 
 	devp->sd_inq = &ata_drvp->ad_inquiry;
@@ -418,8 +419,11 @@ ata_disk_init_drive(
 	if (ata_drvp->ad_block_factor == 0)
 		ata_drvp->ad_block_factor = 1;
 
-	if (!ata_disk_setup_parms(ata_ctlp, ata_drvp))
+	if (!ata_disk_setup_parms(ata_ctlp, ata_drvp)) {
+		ata_drvp->ad_device = NULL;
+		kmem_free(devp, scsi_device_size());
 		return (FALSE);
+	}
 
 	ata_disk_fake_inquiry(ata_drvp);
 
@@ -750,12 +754,16 @@ void
 ata_disk_uninit_drive(
 	ata_drv_t *ata_drvp)
 {
-	struct scsi_device *devp = &ata_drvp->ad_device;
+	struct scsi_device *devp = ata_drvp->ad_device;
 
 	ADBG_TRACE(("ata_disk_uninit_drive entered\n"));
 
-	if (ata_drvp->ad_flags & AD_MUTEX_INIT)
-		mutex_destroy(&devp->sd_mutex);
+	if (devp) {
+		if (ata_drvp->ad_flags & AD_MUTEX_INIT)
+			mutex_destroy(&devp->sd_mutex);
+		ata_drvp->ad_device = NULL;
+		kmem_free(devp, scsi_device_size());
+	}
 }
 
 
@@ -811,13 +819,13 @@ ata_disk_bus_ctl(
 
 		/* set up pointers to child dip */
 
-		devp = &ata_drvp->ad_device;
+		devp = ata_drvp->ad_device;
 		/*
 		 * If sd_dev is set, it means that the target has already
 		 * being initialized. The cdip is a duplicate node from
 		 * reexpansion of driver.conf. Fail INITCHILD here.
 		 */
-		if (devp->sd_dev != NULL) {
+		if ((devp == NULL) || (devp->sd_dev != NULL)) {
 			return (DDI_FAILURE);
 		}
 		devp->sd_dev = cdip;

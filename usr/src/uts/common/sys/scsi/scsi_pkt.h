@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,15 +61,60 @@ struct scsi_pkt {
 	uint_t	pkt_state;		/* state of command */
 	uint_t	pkt_statistics;		/* statistics */
 	uchar_t	pkt_reason;		/* reason completion called */
-	uint_t	pkt_cdblen;
-	uint_t	pkt_tgtlen;
-	uint_t	pkt_scblen;
-	ddi_dma_handle_t pkt_handle;
-	uint_t	pkt_numcookies;
-	off_t	pkt_dma_offset;
-	size_t	pkt_dma_len;
-	uint_t	pkt_dma_flags;
-	ddi_dma_cookie_t *pkt_cookies;
+
+	/*
+	 * The DDI does not allow a driver to allocate it's own scsi_pkt(9S),
+	 * a driver should not have *any* compiled in dependencies on
+	 * "sizeof (struct scsi_pkt)". If the driver has such dependencies, it
+	 * limits SCSA's ability to evolve. The proper way for an HBA to
+	 * allocate a scsi_pkt is via scsi_hba_pkt_alloc(9F), or the newer
+	 * tran_setup_pkt(9E) interfaces. Allocation rules have been in place
+	 * for many years, unfortunately a significant number of drivers
+	 * are still broken.
+	 *
+	 * NB: Until we can trust drivers to follow DDI scsi_pkt(9S) allocation
+	 * rules, access to all fields below require special consideration.
+	 * Access to these fields is limited to code paths that 'know' correct
+	 * scsi_pkt allocation interfaces must have been used. This means that
+	 * any target driver access to these fields is suspect, since a target
+	 * knows nothing about how an HBA drivers performs scsi_pkt allocation.
+	 *
+	 * NB: A private scsi_pkt_size() interface has been added to simplify
+	 * 'fixing' legacy HBA drivers.  Use of scsi_pkt_size() is only
+	 * appropriate when the effort/cost of fixing a legacy driver to use
+	 * proper DDI scsi_pkt allocation interfaces is too great given the
+	 * remaining driver life. New HBA drivers should *not* use
+	 * scsi_pkt_size().
+	 *
+	 * NB: While HBA drivers with violations are being fixed, in
+	 * rare cases access conditioned by scsi_pkt_allocated_correctly() is
+	 * permitted.
+	 */
+	/* HBA driver only, iff scsi_hba_pkt_alloc(9F)|tran_seup_pkt(9E) used */
+	uint_t	pkt_cdblen;		/* length of pkt_cdbp */
+	uint_t	pkt_tgtlen;		/* length of pkt_private */
+	uint_t	pkt_scblen;		/* lenght of pkt_scbp */
+
+	/* HBA driver only, iff tran_seup_pkt(9E) used */
+	ddi_dma_handle_t pkt_handle;	/* private */
+	uint_t	pkt_numcookies;		/* number of DMA cookies */
+	off_t	pkt_dma_offset;		/* private */
+	size_t	pkt_dma_len;		/* private */
+	uint_t	pkt_dma_flags;		/* DMA flags */
+	ddi_dma_cookie_t *pkt_cookies;	/* array of DMA cookies */
+
+	/* private: iff scsi_pkt_allocated_correctly() */
+	int	pkt_path_instance;	/* pHCI transport path */
+
+#ifdef	SCSI_SIZE_CLEAN_VERIFY
+	/*
+	 * Must be last: Building a driver with-and-without
+	 * -DSCSI_SIZE_CLEAN_VERIFY, and checking driver modules for
+	 * differences with a tools like 'wsdiff' allows a developer to verify
+	 * that their driver has no dependencies on scsi*(9S) size.
+	 */
+	int			i_pkt_pad[8];
+#endif	/* SCSI_SIZE_CLEAN_VERIFY */
 };
 #endif	/* _KERNEL */
 
@@ -112,9 +157,9 @@ struct scsi_pkt {
 /*
  * Following defines are for USCSI options.
  */
-#define	FLAG_SILENT	0x00010000
-#define	FLAG_DIAGNOSE	0x00020000
-#define	FLAG_ISOLATE	0x00040000
+#define	FLAG_SILENT		0x00010000
+#define	FLAG_DIAGNOSE		0x00020000
+#define	FLAG_ISOLATE		0x00040000
 
 /*
  * Following define is for scsi_vhci.

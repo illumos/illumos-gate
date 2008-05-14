@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_ADAPTERS_ESPCMD_H
@@ -60,7 +59,6 @@ extern "C" {
  * needs 16 byte CDBs
  */
 struct esp_cmd {
-	struct scsi_pkt		cmd_pkt;	/* the generic packet itself */
 	struct esp_cmd		*cmd_forw;	/* ready fifo que link	*/
 	uchar_t			*cmd_cdbp;	/* active command pointer */
 	uchar_t			*cmd_scbp;	/* active status pointer */
@@ -91,7 +89,12 @@ struct esp_cmd {
 	uchar_t			cmd_scb[EXTCMDS_STATUS_SIZE]; /* arq size  */
 	ushort_t		cmd_age;	/* cmd age (tagged queing) */
 	uchar_t			cmd_tag[2];	/* command tag */
+	struct scsi_pkt		cmd_pkt;	/* must be last */
+						/* the generic packet itself */
+						/* ... scsi_pkt_size() */
 };
+#define	ESP_CMD_SIZE		(sizeof (struct esp_cmd) - \
+				sizeof (struct scsi_pkt) + scsi_pkt_size())
 
 
 /*

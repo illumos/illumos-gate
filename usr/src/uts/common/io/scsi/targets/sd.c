@@ -12369,6 +12369,9 @@ sd_initpkt_for_uscsi(struct buf *bp, struct scsi_pkt **pktpp)
 
 	pktp->pkt_flags = flags;
 
+	/* Transfer uscsi information to scsi_pkt */
+	(void) scsi_uscsi_pktinit(uscmd, pktp);
+
 	/* Copy the caller's CDB into the pkt... */
 	bcopy(uscmd->uscsi_cdb, pktp->pkt_cdbp, uscmd->uscsi_cdblen);
 
@@ -12431,6 +12434,9 @@ sd_destroypkt_for_uscsi(struct buf *bp)
 	/* Save the status and the residual into the uscsi_cmd struct */
 	uscmd->uscsi_status = ((*(pktp)->pkt_scbp) & STATUS_MASK);
 	uscmd->uscsi_resid  = bp->b_resid;
+
+	/* Transfer scsi_pkt information to uscsi */
+	(void) scsi_uscsi_pktfini(pktp, uscmd);
 
 	/*
 	 * If enabled, copy any saved sense data into the area specified

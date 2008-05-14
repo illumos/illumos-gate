@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -712,6 +712,7 @@ struct mdi_pathinfo {
 
 	/* protected by MDI_VHCI_CLIENT_LOCK vh_client_mutex... */
 	char			*pi_addr;	/* path unit address	*/
+	int			pi_path_instance; /* path instance */
 
 	/* protected by MDI_PI_LOCK pi_mutex... */
 	kmutex_t		pi_mutex;	/* per path mutex	*/
@@ -1123,19 +1124,23 @@ dev_info_t	*mdi_phci_path2devinfo(dev_info_t *, caddr_t);
  * starting point; it starts walking from there to find the next appropriate
  * path.
  *
- * The following values for 'flags' are currently defined:
+ * The following values for 'flags' are currently defined, the third argument
+ * to mdi_select_path depends on the flags used.
  *
- * 	MDI_SELECT_ONLINE_PATH: select an ONLINE path
- *	MDI_SELECT_STANDBY_PATH: select a STANDBY path
- * 	MDI_SELECT_USER_DISABLE_PATH: select user disable for failover and
- *		auto_failback
+ *   <none>:				default, arg is pip
+ *   MDI_SELECT_ONLINE_PATH:		select an ONLINE path, arg is pip
+ *   MDI_SELECT_STANDBY_PATH:		select a STANDBY path, arg is pip
+ *   MDI_SELECT_USER_DISABLE_PATH:	select user disable for failover and
+ *					auto_failback
+ *   MDI_SELECT_PATH_INSTANCE:		select a specific path, arg is
+ *					path instance
  *
  * The selected paths are returned in an mdi_hold_path() state (pi_ref_cnt),
  * caller should release the hold by calling mdi_rele_path() at the end of
  * operation.
  */
 int		mdi_select_path(dev_info_t *, struct buf *, int,
-		    mdi_pathinfo_t *, mdi_pathinfo_t **);
+		    void *, mdi_pathinfo_t **);
 int		mdi_set_lb_policy(dev_info_t *, client_lb_t);
 int		mdi_set_lb_region_size(dev_info_t *, int);
 client_lb_t	mdi_get_lb_policy(dev_info_t *);
@@ -1146,6 +1151,7 @@ client_lb_t	mdi_get_lb_policy(dev_info_t *);
 #define	MDI_SELECT_ONLINE_PATH		0x0001
 #define	MDI_SELECT_STANDBY_PATH		0x0002
 #define	MDI_SELECT_USER_DISABLE_PATH	0x0004
+#define	MDI_SELECT_PATH_INSTANCE	0x0008
 
 /*
  * MDI client device utility functions

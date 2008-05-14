@@ -142,7 +142,7 @@ static int sgen_handle_autosense(sgen_state_t *, struct scsi_pkt *);
 static int sgen_handle_sense(sgen_state_t *);
 static int sgen_handle_incomplete(sgen_state_t *, struct scsi_pkt *);
 static int sgen_check_error(sgen_state_t *, struct buf *);
-static int sgen_initiate_sense(sgen_state_t *);
+static int sgen_initiate_sense(sgen_state_t *, int);
 static int sgen_scsi_transport(struct scsi_pkt *);
 static int sgen_tur(dev_t);
 
@@ -1506,6 +1506,9 @@ sgen_make_uscsi_cmd(sgen_state_t *sg_state, struct buf *bp)
 		pkt->pkt_flags |= FLAG_RENEGOTIATE_WIDE_SYNC;
 	}
 
+	/* Transfer uscsi information to scsi_pkt */
+	(void) scsi_uscsi_pktinit(ucmd, pkt);
+
 	sgen_log(sg_state, SGEN_DIAG2, "done sgen_make_uscsi_cmd()");
 	return (0);
 }
@@ -1560,6 +1563,7 @@ static void
 sgen_callback(struct scsi_pkt *pkt)
 {
 	sgen_state_t *sg_state;
+	struct uscsi_cmd *ucmd;
 	struct buf *bp;
 	int action;
 
@@ -1580,9 +1584,13 @@ sgen_callback(struct scsi_pkt *pkt)
 		sgen_log(sg_state, SGEN_DIAG2,
 		    "in sgen_callback() (command completion callback)");
 	}
+	ucmd = (struct uscsi_cmd *)bp->b_private;
 
 	sgen_log(sg_state, SGEN_DIAG3, "sgen_callback: reason=0x%x resid=%ld "
 	    "state=0x%x", pkt->pkt_reason, pkt->pkt_resid, pkt->pkt_state);
+
+	/* Transfer scsi_pkt information to uscsi */
+	(void) scsi_uscsi_pktfini(pkt, ucmd);
 
 	if (pkt->pkt_reason != CMD_CMPLT) {
 		/*
@@ -1628,7 +1636,9 @@ sgen_callback(struct scsi_pkt *pkt)
 		 * If there is sense to fetch, break out to prevent biodone'ing
 		 * until the sense fetch is complete.
 		 */
-		if (sgen_initiate_sense(sg_state) == 0)
+		if (sgen_initiate_sense(sg_state,
+		    scsi_pkt_allocated_correctly(pkt) ?
+		    pkt->pkt_path_instance : 0) == 0)
 			break;
 		/*FALLTHROUGH*/
 	case COMMAND_DONE_ERROR:
@@ -1651,8 +1661,12 @@ sgen_callback(struct scsi_pkt *pkt)
  *	Send the sgen_rqspkt to the target, thereby requesting sense data.
  */
 static int
-sgen_initiate_sense(sgen_state_t *sg_state)
+sgen_initiate_sense(sgen_state_t *sg_state, int path_instance)
 {
+	/* use same path_instance as command */
+	if (scsi_pkt_allocated_correctly(sg_state->sgen_rqspkt))
+		sg_state->sgen_rqspkt->pkt_path_instance = path_instance;
+
 	switch (sgen_scsi_transport(sg_state->sgen_rqspkt)) {
 	case TRAN_ACCEPT:
 		sgen_log(sg_state, SGEN_DIAG3, "sgen_initiate_sense: "

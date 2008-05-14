@@ -16203,7 +16203,7 @@ st_command_recovery(struct scsi_tape *un, struct scsi_pkt *pkt,
 		/*
 		 * Create structure to hold all error state info.
 		 */
-		errinfo = kmem_zalloc(sizeof (st_err_info), KM_SLEEP);
+		errinfo = kmem_zalloc(ST_ERR_INFO_SIZE, KM_SLEEP);
 		errinfo->ei_error_type = onentry;
 		errinfo->ei_failing_bp = ri->cmd_bp;
 		COPY_POS(&errinfo->ei_expected_pos, &ri->pos);
@@ -16212,13 +16212,13 @@ st_command_recovery(struct scsi_tape *un, struct scsi_pkt *pkt,
 		return (COMMAND_DONE_ERROR);
 	}
 
-	bcopy(pkt, &errinfo->ei_failed_pkt, sizeof (struct scsi_pkt));
+	bcopy(pkt, &errinfo->ei_failed_pkt, scsi_pkt_size());
 	bcopy(pkt->pkt_scbp, &errinfo->ei_failing_status, SECMDS_STATUS_SIZE);
 	ret = ddi_taskq_dispatch(un->un_recov_taskq, st_recover, errinfo,
 	    DDI_NOSLEEP);
 	ASSERT(ret == DDI_SUCCESS);
 	if (ret != DDI_SUCCESS) {
-		kmem_free(errinfo, sizeof (st_err_info));
+		kmem_free(errinfo, ST_ERR_INFO_SIZE);
 		return (COMMAND_DONE_ERROR);
 	}
 	return (JUST_RETURN); /* release calling thread */
@@ -16236,7 +16236,7 @@ st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 	ASSERT(MUTEX_HELD(&un->un_sd->sd_mutex));
 
 	bp = errinfo->ei_failing_bp;
-	kmem_free(errinfo, sizeof (st_err_info));
+	kmem_free(errinfo, ST_ERR_INFO_SIZE);
 
 	switch (err) {
 	case JUST_RETURN:

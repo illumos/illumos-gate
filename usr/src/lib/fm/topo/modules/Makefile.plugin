@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,9 +37,11 @@ include ../../../../../Makefile.lib
 # Set PROG and OBJS based on the values of MODULE and SRCS.  We expect that
 # these macros to be defined by the Makefile that is including this file.
 #
-SRCS = $(MODULESRCS:%.c=%.c)
+# SHAREDSRCS is used to share sources between multiple libtopo modules.
+#
+SRCS = $(MODULESRCS:%.c=%.c) $(SHAREDSRCS:%.c=../../common/$(SHAREDMODULE)/%.c)
 PROG = $(MODULE:%=%.so)
-OBJS = $(SRCS:%.c=%.o)
+OBJS = $(MODULESRCS:%.c=%.o) $(SHAREDSRCS:%.c=%.o)
 
 #
 # Set ROOTPROG and ROOTCONF based on the values of MODULE, CLASS, and PLATFORMS
@@ -81,6 +83,10 @@ $(PROG): $(OBJS) $(APIMAP)
 	$(POST_PROCESS_SO)
 
 %.o: ../../common/$(MODULE)/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: ../../common/$(SHAREDMODULE)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 

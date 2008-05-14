@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
  */
 #include <sys/scsi/scsi.h>
 #include <sys/thread.h>
+#include <sys/bitmap.h>
 
 #define	A_TO_TRAN(ap)	((ap)->a_hba_tran)
 #define	P_TO_TRAN(pkt)	((pkt)->pkt_address.a_hba_tran)
@@ -44,8 +45,12 @@ int	scsi_poll_user;
 int	scsi_poll_intr;
 #endif
 
+int			scsi_pkt_bad_alloc_msg = 1;
+extern	ulong_t		*scsi_pkt_bad_alloc_bitmap;
 extern	kmutex_t	scsi_flag_nointr_mutex;
 extern	kcondvar_t	scsi_flag_nointr_cv;
+
+extern int		do_polled_io;
 
 /*
  * we used to set the callback_done value to NULL after the callback
@@ -75,7 +80,7 @@ static void
 scsi_consistent_comp(struct scsi_pkt *pkt)
 {
 	struct scsi_pkt_cache_wrapper *pcw =
-		(struct scsi_pkt_cache_wrapper *)pkt;
+	    (struct scsi_pkt_cache_wrapper *)pkt;
 
 	pkt->pkt_comp = pcw->pcw_orig_comp;
 	scsi_sync_pkt(pkt);
@@ -96,18 +101,54 @@ int
 scsi_transport(struct scsi_pkt *pkt)
 {
 	struct scsi_address	*ap = P_TO_ADDR(pkt);
-	extern int do_polled_io;
-	int rval = TRAN_ACCEPT;
+	int			rval = TRAN_ACCEPT;
+	major_t			major;
+
+	/*
+	 * The DDI does not allow drivers to allocate their own scsi_pkt(9S),
+	 * a driver can't have *any* compiled in dependencies on the
+	 * "sizeof (struct scsi_pkt)". While this has been the case for years,
+	 * many drivers have still not been fixed (or have regressed - tempted
+	 * by kmem_cache_alloc()).  The correct way to allocate a scsi_pkt
+	 * is by calling scsi_hba_pkt_alloc(9F), or by implementing the
+	 * tran_setup_pkt(9E) interfaces.
+	 *
+	 * The code below will identify drivers that violate this rule, and
+	 * print a message. The message will identify broken drivers, and
+	 * encourage getting these drivers fixed - after which this code
+	 * can be removed. Getting HBA drivers fixed is important because
+	 * broken drivers are an impediment to SCSA enhancement.
+	 *
+	 * We use the scsi_pkt_allocated_correctly() to determine if the
+	 * scsi_pkt we are about to start was correctly allocated. The
+	 * scsi_pkt_bad_alloc_bitmap is used to limit messages to one per
+	 * driver per reboot, and with non-debug code we only check the
+	 * first scsi_pkt.
+	 */
+	if (scsi_pkt_bad_alloc_msg) {
+		major = ddi_driver_major(P_TO_TRAN(pkt)->tran_hba_dip);
+		if (!BT_TEST(scsi_pkt_bad_alloc_bitmap, major) &&
+		    !scsi_pkt_allocated_correctly(pkt)) {
+			BT_SET(scsi_pkt_bad_alloc_bitmap, major);
+			cmn_err(CE_WARN, "%s: violates DDI scsi_pkt(9S) "
+			    "allocation rules",
+			    ddi_driver_name(P_TO_TRAN(pkt)->tran_hba_dip));
+		}
+#ifndef	DEBUG
+		/* On non-debug kernel, only check the first packet */
+		BT_SET(scsi_pkt_bad_alloc_bitmap, major);
+#endif	/* DEBUG */
+	}
 
 	/* determine if we need to sync the data on the HBA's behalf */
 	if ((pkt->pkt_dma_flags & DDI_DMA_CONSISTENT) &&
 	    ((pkt->pkt_comp) != NULL) &&
 	    ((P_TO_TRAN(pkt)->tran_setup_pkt) != NULL)) {
 		struct scsi_pkt_cache_wrapper *pcw =
-			(struct scsi_pkt_cache_wrapper *)pkt;
+		    (struct scsi_pkt_cache_wrapper *)pkt;
 
 		_NOTE(SCHEME_PROTECTS_DATA("unique per pkt", \
-			scsi_pkt_cache_wrapper::pcw_orig_comp));  
+			scsi_pkt_cache_wrapper::pcw_orig_comp));
 
 		pcw->pcw_orig_comp = pkt->pkt_comp;
 		pkt->pkt_comp = scsi_consistent_comp;
@@ -192,11 +233,11 @@ scsi_transport(struct scsi_pkt *pkt)
 		pkt->pkt_flags |= FLAG_IMMEDIATE_CB;
 
 		if ((status = (*A_TO_TRAN(ap)->tran_start)(ap, pkt)) ==
-			TRAN_ACCEPT) {
+		    TRAN_ACCEPT) {
 			mutex_enter(&scsi_flag_nointr_mutex);
 			while (pkt->pkt_comp != CALLBACK_DONE) {
 				cv_wait(&scsi_flag_nointr_cv,
-					&scsi_flag_nointr_mutex);
+				    &scsi_flag_nointr_mutex);
 			}
 			mutex_exit(&scsi_flag_nointr_mutex);
 		}

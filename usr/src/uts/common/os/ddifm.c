@@ -212,119 +212,6 @@ ddi_fm_service_impact(dev_info_t *dip, int svc_impact)
 	mutex_exit(&(DEVI(dip)->devi_lock));
 }
 
-static int
-erpt_post_sleep(dev_info_t *dip, const char *error_class, uint64_t ena,
-    uint8_t version, va_list ap)
-{
-	char *devid, *name;
-	char device_path[MAXPATHLEN];
-	char ddi_error_class[ERPT_CLASS_SZ];
-	nvlist_t *ereport, *detector = NULL;
-
-	/*
-	 * Driver defect - should not call with DDI_SLEEP while
-	 * in interrupt context
-	 */
-	if (servicing_interrupt()) {
-		i_ddi_drv_ereport_post(dip, DVR_ECONTEXT, NULL, DDI_NOSLEEP);
-		return (1);
-	}
-
-	if ((ereport = fm_nvlist_create(NULL)) == NULL)
-		return (1);
-
-	/*
-	 * Use the dev_path/devid for this device instance.
-	 */
-	detector = fm_nvlist_create(NULL);
-	if (dip == ddi_root_node()) {
-		device_path[0] = '/';
-		device_path[1] = '\0';
-	} else {
-		(void) ddi_pathname(dip, device_path);
-	}
-
-	if (ddi_prop_lookup_string(DDI_DEV_T_NONE, dip,
-		DDI_PROP_DONTPASS, DEVID_PROP_NAME, &devid) == DDI_SUCCESS) {
-		fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
-		    device_path, devid);
-		ddi_prop_free(devid);
-	} else {
-		fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
-		    device_path, NULL);
-	}
-
-	if (ena == 0)
-		ena = fm_ena_generate(0, FM_ENA_FMT1);
-
-	(void) snprintf(ddi_error_class, ERPT_CLASS_SZ, "%s.%s",
-	    DDI_IO_CLASS, error_class);
-
-	fm_ereport_set(ereport, version, ddi_error_class,
-	    ena, detector, NULL);
-
-	name = va_arg(ap, char *);
-	(void) i_fm_payload_set(ereport, name, ap);
-
-	fm_ereport_post(ereport, EVCH_SLEEP);
-	fm_nvlist_destroy(ereport, FM_NVA_FREE);
-	fm_nvlist_destroy(detector, FM_NVA_FREE);
-
-	return (0);
-}
-
-static int
-erpt_post_nosleep(dev_info_t *dip, struct i_ddi_fmhdl *fmhdl,
-    const char *error_class, uint64_t ena, uint8_t version, va_list ap)
-{
-	char *name;
-	char device_path[MAXPATHLEN];
-	char ddi_error_class[ERPT_CLASS_SZ];
-	nvlist_t *ereport, *detector;
-	nv_alloc_t *nva;
-	errorq_elem_t *eqep;
-
-	eqep = errorq_reserve(fmhdl->fh_errorq);
-	if (eqep == NULL)
-		return (1);
-
-	ereport = errorq_elem_nvl(fmhdl->fh_errorq, eqep);
-	nva = errorq_elem_nva(fmhdl->fh_errorq, eqep);
-
-	ASSERT(ereport);
-	ASSERT(nva);
-
-	/*
-	 * Use the dev_path/devid for this device instance.
-	 */
-	detector = fm_nvlist_create(nva);
-	if (dip == ddi_root_node()) {
-		device_path[0] = '/';
-		device_path[1] = '\0';
-	} else {
-		(void) ddi_pathname(dip, device_path);
-	}
-
-	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
-	    device_path, NULL);
-
-	if (ena == 0)
-		ena = fm_ena_generate(0, FM_ENA_FMT1);
-
-	(void) snprintf(ddi_error_class, ERPT_CLASS_SZ, "%s.%s",
-	    DDI_IO_CLASS, error_class);
-
-	fm_ereport_set(ereport, version, ddi_error_class,
-	    ena, detector, NULL);
-
-	name = va_arg(ap, char *);
-	(void) i_fm_payload_set(ereport, name, ap);
-
-	errorq_commit(fmhdl->fh_errorq, eqep, ERRORQ_ASYNC);
-
-	return (0);
-}
-
 void
 i_ddi_drv_ereport_post(dev_info_t *dip, const char *error_class,
     nvlist_t *errp, int sflag)
@@ -404,54 +291,198 @@ i_ddi_drv_ereport_post(dev_info_t *dip, const char *error_class,
 }
 
 /*
+ * fm_dev_ereport_postv: Common consolidation private interface to
+ * post a device tree oriented dev_scheme ereport. The device tree is
+ * composed of the following entities: devinfo nodes, minor nodes, and
+ * pathinfo nodes. All entities are associated with some devinfo node,
+ * either directly or indirectly. The intended devinfo node association
+ * for the ereport is communicated by the 'dip' argument. A minor node,
+ * an entity below 'dip', is represented by a non-null 'minor_name'
+ * argument. An application specific caller, like scsi_fm_ereport_post,
+ * can override the devinfo path with a pathinfo path via a non-null
+ * 'devpath' argument - in this case 'dip' is the MPXIO client node and
+ * devpath should be the path through the pHCI devinfo node to the
+ * pathinfo node.
+ *
+ * This interface also allows the caller to decide if the error being
+ * reported is know to be associated with a specific device identity
+ * via the 'devid' argument. The caller needs to control wether the
+ * devid appears as an authority in the FMRI because for some types of
+ * errors, like transport errors, the identity of the device on the
+ * other end of the transport is not guaranteed to be the current
+ * identity of the dip. For transport errors the caller should specify
+ * a NULL devid, even when there is a valid devid associated with the dip.
+ *
+ * The ddi_fm_ereport_post() implementation calls this interface with
+ * just a dip: devpath, minor_name, and devid are all NULL. The
+ * scsi_fm_ereport_post() implementation may call this interface with
+ * non-null devpath, minor_name, and devid arguments depending on
+ * wether MPXIO is enabled, and wether a transport or non-transport
+ * error is being posted.
+ */
+void
+fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
+    const char *devpath, const char *minor_name, const char *devid,
+    const char *error_class, uint64_t ena, int sflag, va_list ap)
+{
+	struct i_ddi_fmhdl	*fmhdl;
+	errorq_elem_t		*eqep;
+	nv_alloc_t		*nva;
+	nvlist_t		*ereport = NULL;
+	nvlist_t		*detector = NULL;
+	char			*name;
+	data_type_t		type;
+	uint8_t			version;
+	char			class[ERPT_CLASS_SZ];
+	char			path[MAXPATHLEN];
+
+	ASSERT(dip && eqdip && error_class);
+
+	/*
+	 * This interface should be called with a fm_capable eqdip. The
+	 * ddi_fm_ereport_post* interfaces call with eqdip == dip,
+	 * ndi_fm_ereport_post* interfaces call with eqdip == ddi_parent(dip).
+	 */
+	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(eqdip)))
+		goto err;
+
+	/* get ereport nvlist handle */
+	if ((sflag == DDI_SLEEP) && !panicstr) {
+		/*
+		 * Driver defect - should not call with DDI_SLEEP while in
+		 * interrupt context.
+		 */
+		if (servicing_interrupt()) {
+			i_ddi_drv_ereport_post(dip, DVR_ECONTEXT, NULL, sflag);
+			goto err;
+		}
+
+		/* Use normal interfaces to allocate memory. */
+		if ((ereport = fm_nvlist_create(NULL)) == NULL)
+			goto err;
+		nva = NULL;
+	} else {
+		/* Use errorq interfaces to avoid memory allocation. */
+		fmhdl = DEVI(eqdip)->devi_fmhdl;
+		ASSERT(fmhdl);
+		eqep = errorq_reserve(fmhdl->fh_errorq);
+		if (eqep == NULL)
+			goto err;
+
+		ereport = errorq_elem_nvl(fmhdl->fh_errorq, eqep);
+		nva = errorq_elem_nva(fmhdl->fh_errorq, eqep);
+		ASSERT(nva);
+	}
+	ASSERT(ereport);
+
+	/*
+	 * Form parts of an ereport:
+	 *	A: version
+	 * 	B: error_class
+	 *	C: ena
+	 *	D: detector	(path and optional devid authority)
+	 *	E: payload
+	 *
+	 * A: ereport version: first payload tuple must be the version.
+	 */
+	name = va_arg(ap, char *);
+	type = va_arg(ap, data_type_t);
+	version = va_arg(ap, uint_t);
+	if ((strcmp(name, FM_VERSION) != 0) || (type != DATA_TYPE_UINT8)) {
+		i_ddi_drv_ereport_post(dip, DVR_EVER, NULL, sflag);
+		goto err;
+	}
+
+	/* B: ereport error_class: add "io." prefix to class. */
+	(void) snprintf(class, ERPT_CLASS_SZ, "%s.%s",
+	    DDI_IO_CLASS, error_class);
+
+	/* C: ereport ena: if not passed in, generate new ena. */
+	if (ena == 0)
+		ena = fm_ena_generate(0, FM_ENA_FMT1);
+
+	/* D: detector: form dev scheme fmri with path and devid. */
+	if (devpath) {
+		(void) strlcpy(path, devpath, sizeof (path));
+	} else {
+		/* derive devpath from dip */
+		if (dip == ddi_root_node())
+			(void) strcpy(path, "/");
+		else
+			(void) ddi_pathname(dip, path);
+	}
+	if (minor_name) {
+		(void) strlcat(path, ":", sizeof (path));
+		(void) strlcat(path, minor_name, sizeof (path));
+	}
+	detector = fm_nvlist_create(nva);
+	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, path, devid);
+
+	/* Pull parts of ereport together into ereport. */
+	fm_ereport_set(ereport, version, class, ena, detector, NULL);
+
+	/* Add the payload to ereport. */
+	name = va_arg(ap, char *);
+	(void) i_fm_payload_set(ereport, name, ap);
+
+	/* Post the ereport. */
+	if (nva)
+		errorq_commit(fmhdl->fh_errorq, eqep, ERRORQ_ASYNC);
+	else
+		fm_ereport_post(ereport, EVCH_SLEEP);
+	goto out;
+
+	/* Count errors as drops. */
+err:	if (fmhdl)
+		atomic_add_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64, 1);
+
+out:	if (ereport && (nva == NULL))
+		fm_nvlist_destroy(ereport, FM_NVA_FREE);
+	if (detector && (nva == NULL))
+		fm_nvlist_destroy(detector, FM_NVA_FREE);
+}
+
+/*
  * Generate an error report for consumption by the Solaris Fault Manager,
- * fmd(1M).  Valid ereport classes are defined in /usr/include/sys/fm/io.  The
- * ENA should be set if this error is a result of an error status returned
- * from ddi_dma_err_check() or ddi_acc_err_check().  Otherwise, an ENA
- * value of 0 is appropriate.
+ * fmd(1M).  Valid ereport classes are defined in /usr/include/sys/fm/io.
+ *
+ * The ENA should be set if this error is a result of an error status
+ * returned from ddi_dma_err_check() or ddi_acc_err_check().  Otherwise,
+ * an ENA value of 0 is appropriate.
  *
  * If sflag == DDI_NOSLEEP, ddi_fm_ereport_post () may be called
  * from user, kernel, interrupt or high-interrupt context.  Otherwise,
  * ddi_fm_ereport_post() must be called from user or kernel context.
+ *
+ * The ndi_interfaces are provided for use by nexus drivers to post
+ * ereports about children who may not themselves be fm_capable.
+ *
+ * All interfaces end up in the common fm_dev_ereport_postv code above.
  */
 void
-ddi_fm_ereport_post(dev_info_t *dip, const char *error_class, uint64_t ena,
-    int sflag, ...)
+ddi_fm_ereport_post(dev_info_t *dip,
+    const char *error_class, uint64_t ena, int sflag, ...)
 {
-	int ret;
-	char *name;
-	data_type_t type;
-	uint8_t version;
 	va_list ap;
-	struct i_ddi_fmhdl *fmhdl = DEVI(dip)->devi_fmhdl;
 
-	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(dip)))
-		return;
-
-	ASSERT(fmhdl);
-
+	ASSERT(dip && error_class);
 	va_start(ap, sflag);
-
-	/* First payload tuple should be the version */
-	name = va_arg(ap, char *);
-	type = va_arg(ap, data_type_t);
-	version = va_arg(ap, uint_t);
-	if (strcmp(name, FM_VERSION) != 0 && type != DATA_TYPE_UINT8) {
-		va_end(ap);
-		i_ddi_drv_ereport_post(dip, DVR_EVER, NULL, sflag);
-		return;
-	}
-
-	if (sflag == DDI_SLEEP)
-		ret = erpt_post_sleep(dip, error_class, ena, version, ap);
-	else
-		ret = erpt_post_nosleep(dip, fmhdl, error_class, ena, version,
-		    ap);
+	fm_dev_ereport_postv(dip, dip, NULL, NULL, NULL,
+	    error_class, ena, sflag, ap);
 	va_end(ap);
+}
 
-	if (ret != 0)
-		atomic_add_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64, 1);
+void
+ndi_fm_ereport_post(dev_info_t *dip,
+    const char *error_class, uint64_t ena, int sflag, ...)
+{
+	va_list ap;
 
+	ASSERT(dip && error_class && (sflag == DDI_SLEEP));
+	va_start(ap, sflag);
+	fm_dev_ereport_postv(dip, ddi_get_parent(dip), NULL, NULL, NULL,
+	    error_class, ena, sflag, ap);
+	va_end(ap);
 }
 
 /*

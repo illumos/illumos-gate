@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,9 @@ extern "C" {
 #define	DINFOSUBTREE	(DIIOC | 0x01)	/* include subtree */
 #define	DINFOMINOR	(DIIOC | 0x02)	/* include minor data */
 #define	DINFOPROP	(DIIOC | 0x04)	/* include properties */
+#define	DINFOPATH	(DIIOC | 0x08)	/* include i/o pathing information */
 
 /* private bits */
-#define	DINFOPATH	(DIIOC | 0x08)	/* include i/o pathing information */
 #define	DINFOPRIVDATA	(DIIOC | 0x10)	/* include private data */
 #define	DINFOFORCE	(DIIOC | 0x20)	/* force load all drivers */
 #define	DINFOCACHE	(DIIOC | 0x100000) /* use cached data  */
@@ -322,7 +322,9 @@ struct di_path {
 	di_off_t	path_prop;	/* property list */
 	di_off_t	path_addr;	/* path addressing information */
 	di_path_state_t path_state;	/* path state */
-	uint_t		path_snap_state;	/* describes valid fields */
+	uint_t		path_snap_state; /* describes valid fields */
+	int		path_instance;	/* path instance */
+	uint64_t 	user_private_data;
 };
 
 /*

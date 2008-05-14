@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tree.h -- public definitions for tree module
@@ -321,6 +321,7 @@ struct lut *Defects;
 struct lut *Errors;
 struct lut *Ereports;
 struct lut *Ereportenames;
+struct lut *Ereportenames_discard;
 struct lut *SERDs;
 struct lut *STATs;
 struct lut *ASRUs;

@@ -212,6 +212,15 @@ dosubscribe(struct node *lhs, struct node *rhs, void *arg)
 	FREE(ename);
 }
 
+/*ARGSUSED*/
+static void
+dodiscardprint(struct node *lhs, struct node *rhs, void *arg)
+{
+	char *ename = (char *)lhs;
+
+	out(O_DEBUG, "allow silent discard_if_config_unknown: \"%s\"", ename);
+}
+
 extern struct stats *Filecount;
 
 /*
@@ -260,11 +269,30 @@ _fmd_init(fmd_hdl_t *hdl)
 	/* keep handle for routines like out() which need it */
 	Hdl = hdl;
 
-	Estats = fmd_prop_get_int32(hdl, "estats");
-
+	/* set up out(O_ALTFP) first things so it is available for debug */
 	alloc_init();
 	out_init("eft");
+	if ((fname = fmd_prop_get_string(hdl, "status")) != NULL) {
+		FILE *fp;
+
+		if ((fp = fopen(fname, "a")) == NULL) {
+			fmd_prop_free_string(hdl, fname);
+			out(O_DIE|O_SYS, "status property file: %s", fname);
+		}
+
+		(void) setlinebuf(fp);
+		out_altfp(fp);
+
+		out(O_DEBUG, "appending status changes to \"%s\"", fname);
+		fmd_prop_free_string(hdl, fname);
+
+		out(O_ALTFP|O_STAMP, "\neft.so startup");
+	}
+
+
+	Estats = fmd_prop_get_int32(hdl, "estats");
 	stats_init(Estats);
+
 	stable_init(0);
 	literals_init();
 	platform_init();
@@ -297,6 +325,7 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	/* subscribe to events we expect to consume */
 	lut_walk(Ereportenames, (lut_cb)dosubscribe, NULL);
+	lut_walk(Ereportenames_discard, (lut_cb)dodiscardprint, NULL);
 
 	/* subscribe to repair events so we can clear state on repair */
 	fmd_hdl_subscribe(hdl, "list.repaired");
@@ -310,23 +339,6 @@ _fmd_init(fmd_hdl_t *hdl)
 	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
 	Serd_Override = fmd_prop_get_string(hdl, "serd_override");
 	Max_fme = fmd_prop_get_int32(hdl, "maxfme");
-
-	if ((fname = fmd_prop_get_string(hdl, "status")) != NULL) {
-		FILE *fp;
-
-		if ((fp = fopen(fname, "a")) == NULL) {
-			fmd_prop_free_string(hdl, fname);
-			out(O_DIE|O_SYS, "status property file: %s", fname);
-		}
-
-		(void) setlinebuf(fp);
-		out_altfp(fp);
-
-		out(O_DEBUG, "appending status changes to \"%s\"", fname);
-		fmd_prop_free_string(hdl, fname);
-
-		out(O_ALTFP|O_STAMP, "\neft.so startup");
-	}
 
 	out(O_DEBUG, "initialized, verbose %d warn %d autoclose %s "
 	    "maxfme %d", Verbose, Warn, Autoclose == NULL ? "(NULL)" :

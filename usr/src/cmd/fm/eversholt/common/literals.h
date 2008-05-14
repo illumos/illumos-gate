@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * literals.h -- public definitions for literals in string table
@@ -132,6 +132,7 @@ L_DECL(method);
 L_DECL(poller);
 L_DECL(timeout);
 L_DECL(trip);
+L_DECL(discard_if_config_unknown);
 
 /* property values */
 L_DECL(A);

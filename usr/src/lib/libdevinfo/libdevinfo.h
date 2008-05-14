@@ -100,31 +100,32 @@ extern "C" {
 	    ((type) == DI_PROP_TYPE_INT64))
 
 /* opaque handles */
+typedef struct di_node		*di_node_t;		/* node */
+typedef struct di_minor		*di_minor_t;		/* minor_node */
+typedef struct di_path		*di_path_t;		/* path_node */
+typedef struct di_link		*di_link_t;		/* link */
+typedef struct di_lnode		*di_lnode_t;		/* endpoint */
+typedef struct di_devlink	*di_devlink_t;		/* devlink */
 
-typedef struct di_node *di_node_t;	/* opaque handle to node */
-typedef struct di_minor *di_minor_t;	/* opaque handle to minor node */
-typedef struct di_prop *di_prop_t;	/* opaque handle to property */
-typedef struct di_prom_prop *di_prom_prop_t;	/* opaque handle to prom prop */
-typedef struct di_prom_handle *di_prom_handle_t;	/* opaque handle */
-typedef struct di_path *di_path_t;	/* opaque handle */
-typedef struct di_path_prop *di_path_prop_t;	/* opaque handle */
+typedef struct di_prop		*di_prop_t;		/* node property */
+typedef struct di_path_prop	*di_path_prop_t;	/* path property */
+typedef struct di_prom_prop	*di_prom_prop_t;	/* prom property */
 
+typedef struct di_prom_handle	*di_prom_handle_t;	/* prom snapshot */
 typedef struct di_devlink_handle *di_devlink_handle_t;	/* devlink snapshot */
-typedef struct di_devlink *di_devlink_t;	/* opaque handle to devlink */
-typedef struct di_link *di_link_t;	/* opaque handle to link */
-typedef struct di_lnode *di_lnode_t; /* opaque handle to endpoint */
+
 
 /*
  * Null handles to make handles really opaque
  */
-#define	DI_NODE_NIL	NULL
-#define	DI_LINK_NIL	NULL
-#define	DI_LNODE_NIL	NULL
-#define	DI_MINOR_NIL	NULL
-#define	DI_PROP_NIL	NULL
+#define	DI_NODE_NIL		NULL
+#define	DI_MINOR_NIL		NULL
+#define	DI_PATH_NIL		NULL
+#define	DI_LINK_NIL		NULL
+#define	DI_LNODE_NIL		NULL
+#define	DI_PROP_NIL		NULL
 #define	DI_PROM_PROP_NIL	NULL
 #define	DI_PROM_HANDLE_NIL	NULL
-#define	DI_PATH_NIL	NULL
 
 /*
  * IEEE 1275 properties and other standardized property names
@@ -138,92 +139,76 @@ typedef struct di_lnode *di_lnode_t; /* opaque handle to endpoint */
 #define	DI_PROP_REG		"reg"
 #define	DI_PROP_AP_NAMES	"ap-names"
 
-
 /* Interface Prototypes */
 
 /*
  * Snapshot initialization and cleanup
  */
-extern di_node_t di_init(const char *phys_path, uint_t flag);
-extern void di_fini(di_node_t root);
+extern di_node_t	di_init(const char *phys_path, uint_t flag);
+extern void		di_fini(di_node_t root);
 
 /*
- * tree traversal
+ * node: traversal, data access, and parameters
  */
-extern di_node_t di_parent_node(di_node_t node);
-extern di_node_t di_sibling_node(di_node_t node);
-extern di_node_t di_child_node(di_node_t node);
-extern di_node_t di_drv_first_node(const char *drv_name, di_node_t root);
-extern di_node_t di_drv_next_node(di_node_t node);
-extern di_node_t di_vhci_first_node(di_node_t root);
-extern di_node_t di_vhci_next_node(di_node_t node);
-extern di_node_t di_phci_first_node(di_node_t vhci_node);
-extern di_node_t di_phci_next_node(di_node_t node);
+extern int		di_walk_node(di_node_t root, uint_t flag, void *arg,
+			    int (*node_callback)(di_node_t node, void *arg));
+
+extern di_node_t	di_drv_first_node(const char *drv_name, di_node_t root);
+extern di_node_t	di_drv_next_node(di_node_t node);
+
+extern di_node_t	di_parent_node(di_node_t node);
+extern di_node_t	di_sibling_node(di_node_t node);
+extern di_node_t	di_child_node(di_node_t node);
+
+extern char		*di_node_name(di_node_t node);
+extern char		*di_bus_addr(di_node_t node);
+extern char		*di_binding_name(di_node_t node);
+extern int		di_compatible_names(di_node_t, char **names);
+extern int		di_instance(di_node_t node);
+extern int		di_nodeid(di_node_t node);
+extern int		di_driver_major(di_node_t node);
+extern uint_t		di_state(di_node_t node);
+extern ddi_node_state_t	di_node_state(di_node_t node);
+extern ddi_devid_t	di_devid(di_node_t node);
+extern char		*di_driver_name(di_node_t node);
+extern uint_t		di_driver_ops(di_node_t node);
+
+extern void		di_node_private_set(di_node_t node, void *data);
+extern void		*di_node_private_get(di_node_t node);
+
+extern char		*di_devfs_path(di_node_t node);
+extern char		*di_devfs_minor_path(di_minor_t minor);
+extern void		di_devfs_path_free(char *path_buf);
 
 /*
- * tree walking assistants
+ * path_node: traversal, data access, and parameters
  */
-extern int di_walk_node(di_node_t root, uint_t flag, void *arg,
-    int (*node_callback)(di_node_t node, void *arg));
-extern int di_walk_minor(di_node_t root, const char *minortype, uint_t flag,
-    void *arg, int (*minor_callback)(di_node_t node, di_minor_t minor,
-    void *arg));
-extern int di_walk_link(di_node_t root, uint_t flag, uint_t endpoint,
-    void *arg, int (*link_callback)(di_link_t link, void *arg));
-extern int di_walk_lnode(di_node_t root, uint_t flag,
-    void *arg, int (*lnode_callback)(di_lnode_t lnode, void *arg));
+extern di_path_t	di_path_phci_next_path(di_node_t node, di_path_t);
+extern di_path_t	di_path_client_next_path(di_node_t node, di_path_t);
 
-extern void di_node_private_set(di_node_t node, void *data);
-extern void *di_node_private_get(di_node_t node);
-extern void di_minor_private_set(di_minor_t minor, void *data);
-extern void *di_minor_private_get(di_minor_t minor);
-extern void di_lnode_private_set(di_lnode_t lnode, void *data);
-extern void *di_lnode_private_get(di_lnode_t lnode);
-extern void di_link_private_set(di_link_t link, void *data);
-extern void *di_link_private_get(di_link_t link);
+extern di_node_t	di_path_phci_node(di_path_t path);
+extern di_node_t	di_path_client_node(di_path_t path);
+
+extern char		*di_path_node_name(di_path_t path);
+extern char		*di_path_bus_addr(di_path_t path);
+extern int		di_path_instance(di_path_t path);
+extern di_path_state_t	di_path_state(di_path_t path);
+
+extern char		*di_path_devfs_path(di_path_t path);
+extern char		*di_path_client_devfs_path(di_path_t path);
+
+extern void		di_path_private_set(di_path_t path, void *data);
+extern void		*di_path_private_get(di_path_t path);
 
 /*
- * generic node parameters
+ * minor_node: traversal, data access, and parameters
  */
-extern char *di_node_name(di_node_t node);
-extern char *di_bus_addr(di_node_t node);
-extern char *di_binding_name(di_node_t node);
-extern int di_compatible_names(di_node_t, char **names);
-extern int di_instance(di_node_t node);
-extern int di_nodeid(di_node_t node);
-extern int di_driver_major(di_node_t node);
-extern uint_t di_state(di_node_t node);
-extern ddi_node_state_t di_node_state(di_node_t node);
-extern ddi_devid_t di_devid(di_node_t node);
-
-extern char *di_driver_name(di_node_t node);
-extern uint_t di_driver_ops(di_node_t node);
-
-extern char *di_devfs_path(di_node_t node);
-extern char *di_devfs_minor_path(di_minor_t minor);
-
-extern void di_devfs_path_free(char *path_buf);
-
-/*
- * layering data access
- */
-extern di_link_t	di_link_next_by_node(di_node_t node,
-    di_link_t link, uint_t endpoint);
-extern di_link_t	di_link_next_by_lnode(di_lnode_t lnode,
-    di_link_t link, uint_t endpoint);
-extern di_lnode_t	di_link_to_lnode(di_link_t link, uint_t endpoint);
-
-extern di_lnode_t	di_lnode_next(di_node_t node, di_lnode_t lnode);
-extern char		*di_lnode_name(di_lnode_t lnode);
-extern di_node_t	di_lnode_devinfo(di_lnode_t lnode);
-extern int		di_lnode_devt(di_lnode_t lnode, dev_t *devt);
-
-extern int		di_link_spectype(di_link_t link);
-
-/*
- * minor data access
- */
+extern int		di_walk_minor(di_node_t root, const char *minortype,
+			    uint_t flag, void *arg,
+			    int (*minor_callback)(di_node_t node,
+			    di_minor_t minor, void *arg));
 extern di_minor_t	di_minor_next(di_node_t node, di_minor_t minor);
+
 extern di_node_t	di_minor_devinfo(di_minor_t minor);
 extern ddi_minor_type	di_minor_type(di_minor_t minor);
 extern char		*di_minor_name(di_minor_t minor);
@@ -231,44 +216,109 @@ extern dev_t		di_minor_devt(di_minor_t minor);
 extern int		di_minor_spectype(di_minor_t minor);
 extern char		*di_minor_nodetype(di_minor_t node);
 
-/*
- * Software property access
- */
-extern di_prop_t di_prop_next(di_node_t node, di_prop_t prop);
-extern dev_t di_prop_devt(di_prop_t prop);
-extern char *di_prop_name(di_prop_t prop);
-extern int di_prop_type(di_prop_t prop);
-extern int di_prop_ints(di_prop_t prop, int **prop_data);
-extern int di_prop_int64(di_prop_t prop, int64_t **prop_data);
-extern int di_prop_strings(di_prop_t prop, char **prop_data);
-extern int di_prop_bytes(di_prop_t prop, uchar_t **prop_data);
-extern int di_prop_lookup_ints(dev_t dev, di_node_t node,
-    const char *prop_name, int **prop_data);
-extern int di_prop_lookup_int64(dev_t dev, di_node_t node,
-    const char *prop_name, int64_t **prop_data);
-extern int di_prop_lookup_strings(dev_t dev, di_node_t node,
-    const char *prop_name, char **prop_data);
-extern int di_prop_lookup_bytes(dev_t dev, di_node_t node,
-    const char *prop_name, uchar_t **prop_data);
+extern void		di_minor_private_set(di_minor_t minor, void *data);
+extern void		*di_minor_private_get(di_minor_t minor);
 
 /*
- * PROM property access
+ * node: property access
  */
-extern di_prom_handle_t di_prom_init(void);
-extern void di_prom_fini(di_prom_handle_t ph);
+extern di_prop_t	di_prop_next(di_node_t node, di_prop_t prop);
 
-extern di_prom_prop_t di_prom_prop_next(di_prom_handle_t ph, di_node_t node,
-    di_prom_prop_t prom_prop);
+extern char		*di_prop_name(di_prop_t prop);
+extern int		di_prop_type(di_prop_t prop);
+extern dev_t		di_prop_devt(di_prop_t prop);
 
-extern char *di_prom_prop_name(di_prom_prop_t prom_prop);
-extern int di_prom_prop_data(di_prom_prop_t prop, uchar_t **prom_prop_data);
+extern int		di_prop_ints(di_prop_t prop, int **prop_data);
+extern int		di_prop_int64(di_prop_t prop, int64_t **prop_data);
+extern int		di_prop_strings(di_prop_t prop, char **prop_data);
+extern int		di_prop_bytes(di_prop_t prop, uchar_t **prop_data);
 
-extern int di_prom_prop_lookup_ints(di_prom_handle_t prom, di_node_t node,
-    const char *prom_prop_name, int **prom_prop_data);
-extern int di_prom_prop_lookup_strings(di_prom_handle_t prom, di_node_t node,
-    const char *prom_prop_name, char **prom_prop_data);
-extern int di_prom_prop_lookup_bytes(di_prom_handle_t prom, di_node_t node,
-    const char *prom_prop_name, uchar_t **prom_prop_data);
+extern int		di_prop_lookup_bytes(dev_t dev, di_node_t node,
+			    const char *prop_name, uchar_t **prop_data);
+extern int		di_prop_lookup_ints(dev_t dev, di_node_t node,
+			    const char *prop_name, int **prop_data);
+extern int		di_prop_lookup_int64(dev_t dev, di_node_t node,
+			    const char *prop_name, int64_t **prop_data);
+extern int		di_prop_lookup_strings(dev_t dev, di_node_t node,
+			    const char *prop_name, char **prop_data);
+
+/*
+ * prom_node: property access
+ */
+extern di_prom_handle_t	di_prom_init(void);
+extern void		di_prom_fini(di_prom_handle_t ph);
+
+extern di_prom_prop_t	di_prom_prop_next(di_prom_handle_t ph, di_node_t node,
+			    di_prom_prop_t prom_prop);
+
+extern char		*di_prom_prop_name(di_prom_prop_t prom_prop);
+extern int		di_prom_prop_data(di_prom_prop_t prop,
+			    uchar_t **prom_prop_data);
+
+extern int		di_prom_prop_lookup_ints(di_prom_handle_t prom,
+			    di_node_t node, const char *prom_prop_name,
+			    int **prom_prop_data);
+extern int		di_prom_prop_lookup_strings(di_prom_handle_t prom,
+			    di_node_t node, const char *prom_prop_name,
+			    char **prom_prop_data);
+extern int		di_prom_prop_lookup_bytes(di_prom_handle_t prom,
+			    di_node_t node, const char *prom_prop_name,
+			    uchar_t **prom_prop_data);
+
+/*
+ * path_node: property access
+ */
+extern di_path_prop_t	di_path_prop_next(di_path_t path, di_path_prop_t prop);
+
+extern char		*di_path_prop_name(di_path_prop_t prop);
+extern int		di_path_prop_type(di_path_prop_t prop);
+extern int		di_path_prop_len(di_path_prop_t prop);
+
+extern int		di_path_prop_bytes(di_path_prop_t prop,
+			    uchar_t **prop_data);
+extern int		di_path_prop_ints(di_path_prop_t prop,
+			    int **prop_data);
+extern int		di_path_prop_int64s(di_path_prop_t prop,
+			    int64_t **prop_data);
+extern int		di_path_prop_strings(di_path_prop_t prop,
+			    char **prop_data);
+
+extern int		di_path_prop_lookup_bytes(di_path_t path,
+			    const char *prop_name, uchar_t **prop_data);
+extern int		di_path_prop_lookup_ints(di_path_t path,
+			    const char *prop_name, int **prop_data);
+extern int		di_path_prop_lookup_int64s(di_path_t path,
+			    const char *prop_name, int64_t **prop_data);
+extern int		di_path_prop_lookup_strings(di_path_t path,
+			    const char *prop_name, char **prop_data);
+
+/*
+ * layering link/lnode: traversal, data access, and parameters
+ */
+extern int		di_walk_link(di_node_t root, uint_t flag,
+			    uint_t endpoint, void *arg,
+			    int (*link_callback)(di_link_t link, void *arg));
+extern int		di_walk_lnode(di_node_t root, uint_t flag, void *arg,
+			    int (*lnode_callback)(di_lnode_t lnode, void *arg));
+
+extern di_link_t	di_link_next_by_node(di_node_t node,
+			    di_link_t link, uint_t endpoint);
+extern di_link_t	di_link_next_by_lnode(di_lnode_t lnode,
+			    di_link_t link, uint_t endpoint);
+extern di_lnode_t	di_lnode_next(di_node_t node, di_lnode_t lnode);
+extern char		*di_lnode_name(di_lnode_t lnode);
+
+extern int		di_link_spectype(di_link_t link);
+extern di_lnode_t	di_link_to_lnode(di_link_t link, uint_t endpoint);
+
+extern di_node_t	di_lnode_devinfo(di_lnode_t lnode);
+extern int		di_lnode_devt(di_lnode_t lnode, dev_t *devt);
+
+extern void		di_link_private_set(di_link_t link, void *data);
+extern void		*di_link_private_get(di_link_t link);
+extern void		di_lnode_private_set(di_lnode_t lnode, void *data);
+extern void		*di_lnode_private_get(di_lnode_t lnode);
+
 
 /*
  * Private interfaces
@@ -276,12 +326,17 @@ extern int di_prom_prop_lookup_bytes(di_prom_handle_t prom, di_node_t node,
  * The interfaces and structures below are private to this implementation
  * of Solaris and are subject to change at any time without notice.
  *
- * Applications and drivers using these interfaces will fail
+ * Applications and drivers using these interfaces may fail
  * to run on future releases.
  */
-
 extern di_prop_t di_prop_find(dev_t match_dev, di_node_t node,
     const char *name);
+extern int di_devfs_path_match(const char *dp1, const char *dp2);
+
+extern di_node_t	di_vhci_first_node(di_node_t root);
+extern di_node_t	di_vhci_next_node(di_node_t node);
+extern di_node_t	di_phci_first_node(di_node_t vhci_node);
+extern di_node_t	di_phci_next_node(di_node_t node);
 
 /*
  * Interfaces for handling IEEE 1275 and other standardized properties
@@ -305,35 +360,14 @@ extern int di_prom_prop_lookup_slot_names(di_prom_handle_t ph, di_node_t node,
     di_slot_name_t **prop_data);
 
 /*
- * Interfaces for accessing I/O multipathing data
+ * XXX Remove the private di_path_(addr,next,next_phci,next_client) interfaces
+ * below after NWS consolidation switches to using di_path_bus_addr,
+ * di_path_phci_next_path, and di_path_client_next_path per CR6638521.
  */
-/* XXX remove di_path_next() after updating NWS consolidation */
+extern char *di_path_addr(di_path_t path, char *buf);
 extern di_path_t di_path_next(di_node_t node, di_path_t path);
 extern di_path_t di_path_next_phci(di_node_t node, di_path_t path);
 extern di_path_t di_path_next_client(di_node_t node, di_path_t path);
-extern di_path_state_t di_path_state(di_path_t path);
-extern char *di_path_addr(di_path_t path, char *buf);
-extern di_node_t di_path_client_node(di_path_t path);
-extern void di_path_client_path(di_path_t path, char *buf);
-extern di_node_t di_path_phci_node(di_path_t path);
-extern void di_path_phci_path(di_path_t path, char *buf);
-extern di_path_prop_t di_path_prop_next(di_path_t path, di_path_prop_t prop);
-extern char *di_path_prop_name(di_path_prop_t prop);
-extern int di_path_prop_type(di_path_prop_t prop);
-extern int di_path_prop_len(di_path_prop_t prop);
-extern int di_path_prop_bytes(di_path_prop_t prop, uchar_t **prop_data);
-extern int di_path_prop_ints(di_path_prop_t prop, int **prop_data);
-extern int di_path_prop_int64s(di_path_prop_t prop, int64_t **prop_data);
-extern int di_path_prop_strings(di_path_prop_t prop, char **prop_data);
-extern int di_path_prop_lookup_bytes(di_path_t path, const char *prop_name,
-    uchar_t **prop_data);
-extern int di_path_prop_lookup_ints(di_path_t path, const char *prop_name,
-    int **prop_data);
-extern int di_path_prop_lookup_int64s(di_path_t path, const char *prop_name,
-    int64_t **prop_data);
-extern int di_path_prop_lookup_strings(di_path_t path, const char *prop_name,
-    char **prop_data);
-
 
 /*
  * Interfaces for private data
@@ -436,10 +470,11 @@ extern int di_devperm_login(const char *, uid_t, gid_t, void (*)(char *));
 extern int di_devperm_logout(const char *);
 
 /*
- * Private interface for looking up a node in a snapshot
+ * Private interface for looking up, by path string, a node/path/minor
+ * in a snapshot.
  */
+extern di_path_t di_lookup_path(di_node_t root, char *path);
 extern di_node_t di_lookup_node(di_node_t root, char *path);
-
 
 /*
  * Private hotplug interfaces to be used between cfgadm pci plugin and

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -254,6 +254,8 @@ struct scsi_hba_tran {
 	 * usr/src/uts/common/sys/scsi/impl/services.h
 	 */
 	int		tran_interconnect_type;
+
+	/* tran_setup_pkt(9E) related scsi_pkt fields */
 	int		(*tran_pkt_constructor)(
 				struct scsi_pkt		*pkt,
 				scsi_hba_tran_t		*tran,
@@ -262,7 +264,6 @@ struct scsi_hba_tran {
 				struct scsi_pkt		*pkt,
 				scsi_hba_tran_t		*tran);
 	kmem_cache_t	*tran_pkt_cache_ptr;
-
 	uint_t		tran_hba_len;
 	int		(*tran_setup_pkt)(
 				struct scsi_pkt		*pkt,
@@ -274,7 +275,24 @@ struct scsi_hba_tran {
 	ddi_dma_attr_t	tran_dma_attr;
 
 	void		*tran_extension;
+	/*
+	 * An fm_capable HBA driver can set tran_fm_capable prior to
+	 * scsi_hba_attach_setup().  If not set, SCSA provides a default
+	 * implementation.
+	 */
+	int		tran_fm_capable;
+
+#ifdef	SCSI_SIZE_CLEAN_VERIFY
+	/*
+	 * Must be last: Building a driver with-and-without
+	 * -DSCSI_SIZE_CLEAN_VERIFY, and checking driver modules for
+	 * differences with a tools like 'wsdiff' allows a developer to verify
+	 * that their driver has no dependencies on scsi*(9S) size.
+	 */
+	int		_pad[8];
+#endif	/* SCSI_SIZE_CLEAN_VERIFY */
 };
+size_t	scsi_hba_tran_size();			/* private */
 
 
 #ifdef __lock_lint
@@ -425,6 +443,7 @@ extern int		scsi_hba_prop_update_inqstring(
 						/* is called */
 #define	SCSI_HBA_TRAN_CDB	0x04		/* allocate cdb */
 #define	SCSI_HBA_TRAN_SCB	0x08		/* allocate sense */
+#define	SCSI_HBA_TRAN_FMSCSA	0x10		/* using common ddi_fm_* */
 
 /*
  * Flags for scsi_hba allocation functions
@@ -451,7 +470,6 @@ extern int		scsi_hba_prop_update_inqstring(
 #define	INST2DEVCTL(x)		(((x) << INST_MINOR_SHIFT) | DEVCTL_MINOR)
 #define	INST2SCSI(x)		(((x) << INST_MINOR_SHIFT) | SCSI_MINOR)
 #define	MINOR2INST(x)		((x) >> INST_MINOR_SHIFT)
-
 
 #endif	/* _KERNEL */
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,12 +355,18 @@ config_cook(struct cfgdata *cdata)
 		}
 
 		/*
-		 * If this property is a device path, cache it for quick lookup
+		 * If this property is a device path or devid, cache it
+		 * for quick lookup.
 		 */
 		if (pn == stable(TOPO_IO_DEV)) {
 			sv = stable(equals + 1);
-			out(O_ALTFP|O_VERB3, "caching %s\n", sv);
+			out(O_ALTFP|O_VERB3, "caching dev %s\n", sv);
 			cdata->devcache = lut_add(cdata->devcache,
+			    (void *)sv, (void *)newnode, NULL);
+		} else if (pn == stable(TOPO_IO_DEVID)) {
+			sv = stable(equals + 1);
+			out(O_ALTFP|O_VERB3, "caching devid %s\n", sv);
+			cdata->devidcache = lut_add(cdata->devidcache,
 			    (void *)sv, (void *)newnode, NULL);
 		}
 
@@ -424,6 +430,9 @@ config_free(struct cfgdata *cp)
 		if (cp->devcache != NULL)
 			lut_free(cp->devcache, NULL, NULL);
 		cp->devcache = NULL;
+		if (cp->devidcache != NULL)
+			lut_free(cp->devidcache, NULL, NULL);
+		cp->devidcache = NULL;
 		if (cp->cpucache != NULL)
 			lut_free(cp->cpucache, NULL, NULL);
 		cp->cpucache = NULL;
@@ -534,13 +543,20 @@ prtdevcache(void *lhs, void *rhs, void *arg)
 
 /*ARGSUSED*/
 static void
+prtdevidcache(void *lhs, void *rhs, void *arg)
+{
+	out(O_ALTFP|O_VERB3, "%s -> %p", (char *)lhs, rhs);
+}
+
+/*ARGSUSED*/
+static void
 prtcpucache(void *lhs, void *rhs, void *arg)
 {
 	out(O_ALTFP|O_VERB, "%u -> %p", (uint32_t)lhs, rhs);
 }
 
 /*
- * config_bydev_lookup -- look up the path in our DEVcache lut.  If we find
+ * config_bydev_lookup -- look up the path in our devcache lut.  If we find
  * it return the config path, but as a struct node.
  */
 struct node *
@@ -554,6 +570,32 @@ config_bydev_lookup(struct cfgdata *fromcfg, const char *path)
 
 	if ((find = lut_lookup(fromcfg->devcache,
 	    (void *) stable(path), NULL)) == NULL)
+		return (NULL);
+
+	np = config_nodeize(find);
+	if (np != NULL) {
+		out(O_ALTFP|O_VERB, "Matching config entry:");
+		ptree_name_iter(O_ALTFP|O_VERB|O_NONL, np);
+		out(O_ALTFP|O_VERB, NULL);
+	}
+	return (np);
+}
+
+/*
+ * config_bydevid_lookup -- look up the path in our DEVIDcache lut.
+ * If we find it return the config path, but as a struct node.
+ */
+struct node *
+config_bydevid_lookup(struct cfgdata *fromcfg, const char *devid)
+{
+	struct config *find;
+	struct node *np;
+
+	out(O_ALTFP|O_VERB3, "Device id cache:");
+	lut_walk(fromcfg->devcache, (lut_cb)prtdevidcache, NULL);
+
+	if ((find = lut_lookup(fromcfg->devidcache,
+	    (void *) stable(devid), NULL)) == NULL)
 		return (NULL);
 
 	np = config_nodeize(find);

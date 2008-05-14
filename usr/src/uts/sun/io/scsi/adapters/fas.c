@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -690,6 +689,9 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Allocate a transport structure
 	 */
 	tran = scsi_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP);
+
+	/* Indicate that we are 'sizeof (scsi_*(9S))' clean. */
+	scsi_size_clean(dip);		/* SCSI_SIZE_CLEAN_VERIFY ok */
 
 	/*
 	 * initialize transport structure
@@ -1636,7 +1638,8 @@ FAS_FLUSH_DMA_HARD(struct fas *fas)
 	fas->f_dma_csr |= (DMA_INTEN|DMA_TWO_CYCLE|DMA_DSBL_PARITY|
 		DMA_DSBL_DRAIN);
 	fas->f_dma_csr &= ~(DMA_ENDVMA | DMA_WRITE);
-	while (fas_dma_reg_read(fas, &fas->f_dma->dma_csr) & DMA_REQPEND);
+	while (fas_dma_reg_read(fas, &fas->f_dma->dma_csr) & DMA_REQPEND)
+		;
 	fas_dma_reg_write(fas, &fas->f_dma->dma_csr, 0);
 	fas_dma_reg_write(fas, &fas->f_dma->dma_csr, fas->f_dma_csr);
 	fas_dma_reg_write(fas, &fas->f_dma->dma_addr, 0);
@@ -8084,7 +8087,7 @@ fas_makeproxy_cmd(struct fas_cmd *sp, struct scsi_address *ap,
 	ASSERT(nmsgs <= (CDB_GROUP5 - CDB_GROUP0 - 3));
 
 	bzero(sp, sizeof (*sp));
-	bzero(pkt, sizeof (*pkt));
+	bzero(pkt, scsi_pkt_size());
 
 	pkt->pkt_address	= *ap;
 	pkt->pkt_cdbp		= (opaque_t)&sp->cmd_cdb[0];
@@ -8198,10 +8201,11 @@ static int
 fas_abort_disconnected_cmd(struct fas *fas, struct scsi_address *ap,
     struct fas_cmd *sp, uchar_t msg, int slot)
 {
-	auto struct fas_cmd local;
-	struct scsi_pkt pkt;
-	struct fas_cmd *proxy_cmdp = &local;
-	int target = ap->a_target;
+	auto struct fas_cmd	local;
+	struct fas_cmd		*proxy_cmdp = &local;
+	struct scsi_pkt		*pkt;
+	int			rval;
+	int			target = ap->a_target;
 
 	/*
 	 * if reset delay is active, we cannot start a selection
@@ -8216,16 +8220,19 @@ fas_abort_disconnected_cmd(struct fas *fas, struct scsi_address *ap,
 
 	IPRINTF1("aborting disconnected tagged cmd(s) with %s\n",
 		scsi_mname(msg));
+	pkt = kmem_alloc(scsi_pkt_size(), KM_SLEEP);
 	if (sp && (TAGGED(target) && (msg == MSG_ABORT_TAG))) {
 		int tag = sp->cmd_tag[1];
 		ASSERT(sp == fas->f_active[slot]->f_slot[tag]);
-		fas_makeproxy_cmd(proxy_cmdp, ap, &pkt, 3,
+		fas_makeproxy_cmd(proxy_cmdp, ap, pkt, 3,
 		    MSG_SIMPLE_QTAG, tag, msg);
 	} else {
-		fas_makeproxy_cmd(proxy_cmdp, ap, &pkt, 1, msg);
+		fas_makeproxy_cmd(proxy_cmdp, ap, pkt, 1, msg);
 	}
 
-	return (fas_do_proxy_cmd(fas, proxy_cmdp, ap, scsi_mname(msg)));
+	rval = fas_do_proxy_cmd(fas, proxy_cmdp, ap, scsi_mname(msg));
+	kmem_free(pkt, scsi_pkt_size());
+	return (rval);
 }
 
 /*
@@ -8530,12 +8537,16 @@ fas_reset_cleanup(struct fas *fas, int slot)
 static int
 fas_reset_disconnected_cmd(struct fas *fas, struct scsi_address *ap)
 {
-	auto struct fas_cmd local;
-	struct fas_cmd *sp = &local;
-	struct scsi_pkt pkt;
+	auto struct fas_cmd	local;
+	struct fas_cmd		*sp = &local;
+	struct scsi_pkt		*pkt;
+	int			rval;
 
-	fas_makeproxy_cmd(sp, ap, &pkt, 1, MSG_DEVICE_RESET);
-	return (fas_do_proxy_cmd(fas, sp, ap, scsi_mname(MSG_DEVICE_RESET)));
+	pkt = kmem_alloc(scsi_pkt_size(), KM_SLEEP);
+	fas_makeproxy_cmd(sp, ap, pkt, 1, MSG_DEVICE_RESET);
+	rval = fas_do_proxy_cmd(fas, sp, ap, scsi_mname(MSG_DEVICE_RESET));
+	kmem_free(pkt, scsi_pkt_size());
+	return (rval);
 }
 
 /*

@@ -400,6 +400,9 @@ impl_make_parlist(major_t major)
 		if (i_ddi_prop_search(DDI_DEV_T_ANY, DDI_OPEN_RETURNS_EINTR,
 		    DDI_PROP_TYPE_INT, &props))
 			dnp->dn_flags |= DN_OPEN_RETURNS_EINTR;
+		if (i_ddi_prop_search(DDI_DEV_T_ANY, "scsi-size-clean",
+		    DDI_PROP_TYPE_INT, &props))
+			dnp->dn_flags |= DN_SCSI_SIZE_CLEAN;
 	}
 
 	if (i_ddi_prop_search(DDI_DEV_T_ANY, DDI_VHCI_CLASS,

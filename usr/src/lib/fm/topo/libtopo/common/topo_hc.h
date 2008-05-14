@@ -82,8 +82,10 @@ extern "C" {
 #define	TOPO_IO_DRIVER		"driver"
 #define	TOPO_IO_MODULE		"module"
 #define	TOPO_IO_DEV		"dev"
+#define	TOPO_IO_DEVID		"devid"
 #define	TOPO_IO_DEV_PATH	"devfs-path"
 #define	TOPO_IO_AP_PATH		"ap-path"
+#define	TOPO_IO_PHYS_PATH	"phys-path"
 
 #define	TOPO_PGROUP_PCI		"pci"
 #define	TOPO_PCI_VENDID		"vendor-id"

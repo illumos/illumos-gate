@@ -126,6 +126,8 @@ tree_fini(void)
 	Ereports = NULL;
 	lut_free(Ereportenames, NULL, NULL);
 	Ereportenames = NULL;
+	lut_free(Ereportenames_discard, NULL, NULL);
+	Ereportenames_discard = NULL;
 	lut_free(SERDs, NULL, NULL);
 	SERDs = NULL;
 	lut_free(STATs, NULL, NULL);
@@ -1119,13 +1121,28 @@ tree_decl(enum nodetype t, struct node *np, struct node *nvpairs,
 			ret = dodecl(T_EREPORT, file, line, np, nvpairs,
 			    &Ereports, Ereportcount, 0);
 			/*
-			 * keep a lut of just the enames, so that the DE
+			 * Keep a lut of just the enames, so that the DE
 			 * can subscribe to a uniqified list of event
 			 * classes.
 			 */
 			Ereportenames =
 			    tree_name2np_lut_add(Ereportenames,
 			    np->u.event.ename, np);
+
+			/*
+			 * Keep a lut of the enames (event classes) to
+			 * silently discard if we can't find a matching
+			 * configuration node when an ereport of of a given
+			 * class is received.  Such events are declaired
+			 * with 'discard_if_config_unknown=1'.
+			 */
+			if (tree_s2np_lut_lookup(ret->u.stmt.lutp,
+			    L_discard_if_config_unknown)) {
+				Ereportenames_discard = lut_add(
+				    Ereportenames_discard,
+				    (void *)np->u.event.ename->u.name.s,
+				    (void *)np->u.event.ename->u.name.s, NULL);
+			}
 			break;
 
 		default:

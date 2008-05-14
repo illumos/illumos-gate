@@ -361,6 +361,16 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 			(void) printf("]");
 			break;
 		}
+		case DATA_TYPE_STRING_ARRAY: {
+			char **val;
+
+			(void) nvpair_value_string_array(pv_nvp, &val, &nelem);
+			(void) printf(" [ ");
+			for (i = 0; i < nelem; i++)
+				(void) printf("%s ", val[i]);
+			(void) printf("]");
+			break;
+		}
 		default:
 			(void) fprintf(stderr, " unknown data type (%d)",
 			    nvpair_type(pv_nvp));

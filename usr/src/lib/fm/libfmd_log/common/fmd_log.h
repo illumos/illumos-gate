@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,7 @@
 
 #include <libnvpair.h>
 #include <exacct.h>
+#include <regex.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -101,9 +101,16 @@ extern fmd_log_rec_f fmd_log_filter_class;	/* char *name of event class */
 extern fmd_log_rec_f fmd_log_filter_uuid;	/* char *uuid of list.suspect */
 extern fmd_log_rec_f fmd_log_filter_before;	/* struct timeval * latest */
 extern fmd_log_rec_f fmd_log_filter_after;	/* struct timeval * earliest */
+extern fmd_log_rec_f fmd_log_filter_nv;		/* char *namevalue in event */
 
 extern int fmd_log_filter(fmd_log_t *,
     uint_t, fmd_log_filter_t *, const fmd_log_record_t *);
+
+typedef struct fmd_log_filter_nvarg {
+	char	*nvarg_name;
+	char	*nvarg_value;
+	regex_t	*nvarg_value_regex;
+} fmd_log_filter_nvarg_t;
 
 /*
  * fmd_log_xiter() can be used to perform sophisticated iteration over an fmd

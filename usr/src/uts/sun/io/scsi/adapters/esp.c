@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -723,6 +723,9 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	tran = scsi_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP);
 
+	/* Indicate that we are 'sizeof (scsi_*(9S))' clean. */
+	scsi_size_clean(dip);		/* SCSI_SIZE_CLEAN_VERIFY ok */
+
 	/*
 	 * the ESC has a rerun bug and the workaround is
 	 * to round up the ESC count; rather than
@@ -1041,7 +1044,7 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	(void) sprintf(buf, "esp%d_cache", instance);
 	esp->e_kmem_cache = kmem_cache_create(buf,
-		sizeof (struct esp_cmd), 8,
+		ESP_CMD_SIZE, 8,
 		esp_kmem_cache_constructor, esp_kmem_cache_destructor,
 		NULL, (void *)esp, NULL, 0);
 	if (esp->e_kmem_cache == NULL) {
@@ -1979,7 +1982,7 @@ esp_wakeup_callback_thread(struct callback_info *cb_info)
 				}
 				cb_info->c_qlen--;
 				mutex_exit(&cb_info->c_mutex);
-				(*sp->cmd_pkt.pkt_comp)((struct scsi_pkt *)sp);
+				(*sp->cmd_pkt.pkt_comp)(&sp->cmd_pkt);
 				mutex_enter(&cb_info->c_mutex);
 			}
 		/*
@@ -2057,7 +2060,7 @@ esp_callback(struct esp *esp)
 			ASSERT(sp->cmd_pkt.pkt_comp != 0);
 			serviced++;
 			mutex_exit(&cb_info->c_mutex);
-			(*sp->cmd_pkt.pkt_comp)((struct scsi_pkt *)sp);
+			(*sp->cmd_pkt.pkt_comp)(&sp->cmd_pkt);
 			mutex_enter(&cb_info->c_mutex);
 			n++;
 		}
@@ -2203,7 +2206,7 @@ esp_callback(struct esp *esp)
 static void
 esp_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct esp_cmd *cmd = (struct esp_cmd *)pkt;
+	struct esp_cmd *cmd = (struct esp_cmd *)pkt->pkt_ha_private;
 
 	TRACE_0(TR_FAC_SCSI, TR_ESP_SCSI_IMPL_DMAFREE_START,
 	    "esp_scsi_dmafree_start");
@@ -2225,7 +2228,7 @@ static void
 esp_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	int i;
-	struct esp_cmd *sp = (struct esp_cmd *)pkt;
+	struct esp_cmd *sp = (struct esp_cmd *)pkt->pkt_ha_private;
 
 	if (sp->cmd_flags & CFLAG_DMAVALID) {
 		i = ddi_dma_sync(sp->cmd_dmahandle, 0, 0,
@@ -2273,7 +2276,7 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			ddi_dma_handle_t save_dma_handle;
 
 			save_dma_handle = cmd->cmd_dmahandle;
-			bzero(cmd, sizeof (*cmd));
+			bzero(cmd, ESP_CMD_SIZE);
 			cmd->cmd_dmahandle = save_dma_handle;
 
 			cmd->cmd_pkt.pkt_scbp = (opaque_t)cmd->cmd_scb;
@@ -2285,6 +2288,7 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 
 			cmd->cmd_pkt.pkt_cdbp = (opaque_t)&cmd->cmd_cdb;
 			cmd->cmd_pkt.pkt_private = cmd->cmd_pkt_private;
+			cmd->cmd_pkt.pkt_ha_private = (opaque_t)cmd;
 		} else {
 			failure++;
 		}
@@ -2309,7 +2313,7 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		TRACE_0(TR_FAC_SCSI, TR_ESP_SCSI_IMPL_PKTALLOC_END,
 			"esp_scsi_pktalloc_end");
 	} else {
-		cmd = (struct esp_cmd *)pkt;
+		cmd = (struct esp_cmd *)pkt->pkt_ha_private;
 		new_cmd = NULL;
 	}
 
@@ -2361,8 +2365,7 @@ dma_failure:
 			}
 			cmd->cmd_flags = cmd_flags & ~CFLAG_DMAVALID;
 			if (new_cmd) {
-				esp_scsi_destroy_pkt(ap,
-				    (struct scsi_pkt *)new_cmd);
+				esp_scsi_destroy_pkt(ap, &new_cmd->cmd_pkt);
 			}
 			TRACE_0(TR_FAC_SCSI, TR_SCSI_IMPL_DMAGET_END,
 				"esp_scsi_dmaget_end");
@@ -2377,7 +2380,7 @@ dma_failure:
 		    "esp_scsi_dmaget_end");
 	}
 
-	return ((struct scsi_pkt *)cmd);
+	return (&cmd->cmd_pkt);
 }
 
 /*
@@ -2427,7 +2430,7 @@ esp_pkt_alloc_extern(struct esp *esp, struct esp_cmd *sp,
 static void
 esp_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct esp_cmd *sp = (struct esp_cmd *)pkt;
+	struct esp_cmd *sp = (struct esp_cmd *)pkt->pkt_ha_private;
 	struct esp *esp = ADDR2ESP(ap);
 
 	/*
@@ -2503,7 +2506,7 @@ esp_kmem_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	int  (*callback)(caddr_t) = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP:
 					DDI_DMA_DONTWAIT;
 
-	bzero(cmd, sizeof (struct esp_cmd));
+	bzero(cmd, ESP_CMD_SIZE);
 
 	if (ddi_dma_alloc_handle(esp->e_dev,
 	    esp->e_dma_attr, callback, NULL,
@@ -2731,8 +2734,7 @@ esp_empty_startQ(struct esp *esp)
 				}
 				if (sp->cmd_pkt.pkt_comp) {
 					mutex_exit(ESP_MUTEX);
-					(*sp->cmd_pkt.pkt_comp)(
-					    (struct scsi_pkt *)sp);
+					(*sp->cmd_pkt.pkt_comp)(&sp->cmd_pkt);
 					mutex_enter(ESP_MUTEX);
 				}
 				mutex_enter(&esp->e_startQ_mutex);
@@ -2771,7 +2773,7 @@ esp_empty_startQ(struct esp *esp)
 static int
 esp_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct esp_cmd *sp = (struct esp_cmd *)pkt;
+	struct esp_cmd *sp = (struct esp_cmd *)pkt->pkt_ha_private;
 	struct esp *esp = ADDR2ESP(ap);
 	int rval;
 
@@ -4482,7 +4484,7 @@ esp_call_pkt_comp(struct esp *esp, struct esp_cmd *sp)
 	} else if ((sp->cmd_pkt.pkt_flags & FLAG_IMMEDIATE_CB) &&
 	    sp->cmd_pkt.pkt_comp) {
 		mutex_exit(ESP_MUTEX);
-		(*sp->cmd_pkt.pkt_comp)((struct scsi_pkt *)sp);
+		(*sp->cmd_pkt.pkt_comp)(&sp->cmd_pkt);
 		mutex_enter(ESP_MUTEX);
 	} else {
 		EPRINTF2("No completion routine for 0x%p reason %x\n",
@@ -7952,7 +7954,7 @@ esp_makeproxy_cmd(struct esp_cmd *sp, struct scsi_address *ap, int nmsgs, ...)
 	int i;
 
 	ASSERT(nmsgs <= (CDB_GROUP5 - CDB_GROUP0 - 3));
-	bzero(sp, sizeof (*sp));
+	bzero(sp, ESP_CMD_SIZE);
 	sp->cmd_pkt.pkt_address = *ap;
 	sp->cmd_pkt.pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
 	sp->cmd_pkt.pkt_scbp = (opaque_t)&sp->cmd_scb[0];
@@ -8348,7 +8350,8 @@ esp_cmd_timeout(struct esp *esp, struct esp_cmd *sp,
 		 * disable DVMA to avoid a timeout on SS1
 		 */
 		if (dmar->dmaga_csr & DMAGA_ENDVMA) {
-			while (dmar->dmaga_csr & DMAGA_REQPEND);
+			while (dmar->dmaga_csr & DMAGA_REQPEND)
+				;
 			dmar->dmaga_csr &= ~DMAGA_ENDVMA;
 			dma_enabled++;
 		}
@@ -8573,7 +8576,9 @@ esp_create_arq_pkt(struct esp *esp, struct scsi_address *ap, int create)
 	/*
 	 * Allocate a request sense packet using get_pktiopb
 	 */
-	struct esp_cmd *rqpktp;
+	struct esp_cmd	*rqcmd;
+	struct scsi_pkt	*rqpkt;
+	struct buf	*bp;
 	int slot = ap->a_target * NLUNS_PER_TARGET | ap->a_lun;
 	int rval = 0;
 
@@ -8584,10 +8589,10 @@ esp_create_arq_pkt(struct esp *esp, struct scsi_address *ap, int create)
 		 */
 		if (esp->e_save_pkt[slot]) {
 			rval = -1;
-		} else if ((rqpktp = esp->e_arq_pkt[slot]) != 0) {
-			struct buf *bp = (struct buf *)
-				(rqpktp->cmd_pkt.pkt_private);
-			scsi_destroy_pkt((struct scsi_pkt *)rqpktp);
+		} else if ((rqcmd = esp->e_arq_pkt[slot]) != 0) {
+			rqpkt = &rqcmd->cmd_pkt;
+			bp = (struct buf *)rqpkt->pkt_private;
+			scsi_destroy_pkt(rqpkt);
 			scsi_free_consistent_buf(bp);
 			esp->e_rq_sense_data[slot] = 0;
 			esp->e_arq_pkt[slot] = 0;
@@ -8599,7 +8604,6 @@ esp_create_arq_pkt(struct esp *esp, struct scsi_address *ap, int create)
 		 * drivers to use SENSE_LENGTH
 		 * Allocate a request sense packet.
 		 */
-		struct buf *bp;
 
 		/*
 		 * if one exists, don't create another
@@ -8609,25 +8613,25 @@ esp_create_arq_pkt(struct esp *esp, struct scsi_address *ap, int create)
 		}
 		bp = scsi_alloc_consistent_buf(ap, (struct buf *)NULL,
 		    SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
-		rqpktp = (struct esp_cmd *)scsi_init_pkt(ap,
-		    (struct scsi_pkt *)NULL, bp, CDB_GROUP0, 1, 0,
-		    PKT_CONSISTENT, SLEEP_FUNC, NULL);
+		rqpkt = scsi_init_pkt(ap, (struct scsi_pkt *)NULL,
+		    bp, CDB_GROUP0, 1, 0, PKT_CONSISTENT, SLEEP_FUNC, NULL);
+		rqcmd = (struct esp_cmd *)rqpkt->pkt_ha_private;
 		esp->e_rq_sense_data[slot] =
 		    (struct scsi_extended_sense *)bp->b_un.b_addr;
-		rqpktp->cmd_pkt.pkt_private = (opaque_t)bp;
+		rqpkt->pkt_private = (opaque_t)bp;
 
-		RQ_MAKECOM_G0(((struct scsi_pkt *)rqpktp),
+		RQ_MAKECOM_G0(rqpkt,
 		    FLAG_NOPARITY | FLAG_SENSING | FLAG_HEAD | FLAG_NODISCON,
 		    (char)SCMD_REQUEST_SENSE, 0, (char)SENSE_LENGTH);
-		rqpktp->cmd_flags |= CFLAG_CMDARQ;
-		esp->e_arq_pkt[slot] = rqpktp;
+		rqcmd->cmd_flags |= CFLAG_CMDARQ;
+		esp->e_arq_pkt[slot] = rqcmd;
 		/*
 		 * we need a function ptr here so abort/reset can
 		 * delay callbacks; esp_call_pkt_comp() calls
 		 * esp_complete_arq_pkt() directly without releasing the lock
 		 */
 #ifndef __lock_lint
-		rqpktp->cmd_pkt.pkt_comp =
+		rqpkt->pkt_comp =
 			(void (*)(struct scsi_pkt *))esp_complete_arq_pkt;
 #endif
 	}
@@ -8762,7 +8766,7 @@ static int
 _esp_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	struct esp *esp = ADDR2ESP(ap);
-	struct esp_cmd *sp = (struct esp_cmd *)pkt;
+	struct esp_cmd *sp = (struct esp_cmd *)pkt->pkt_ha_private;
 	int rval = FALSE;
 	short slot = (ap->a_target * NLUNS_PER_TARGET) | ap->a_lun;
 	struct esp_cmd *cur_sp = esp->e_slots[slot];
@@ -9191,7 +9195,8 @@ esp_assert_atn(struct esp *esp)
 	volatile struct dmaga *dmar = esp->e_dma;
 
 	if (dmar->dmaga_csr & DMAGA_ENDVMA) {
-		while (dmar->dmaga_csr & DMAGA_REQPEND);
+		while (dmar->dmaga_csr & DMAGA_REQPEND)
+			;
 		dmar->dmaga_csr &= ~DMAGA_ENDVMA;
 		Esp_cmd(esp, CMD_SET_ATN);
 		dmar->dmaga_csr |= DMAGA_ENDVMA;
@@ -9255,9 +9260,9 @@ static int
 esp_abort_disconnected_cmd(struct esp *esp, struct scsi_address *ap,
     struct esp_cmd *sp, uchar_t msg, int slot)
 {
-	auto struct esp_cmd local;
-	struct esp_cmd *proxy_cmdp = &local;
-	int target = ap->a_target;
+	struct esp_cmd	*proxy_cmdp;
+	int		target = ap->a_target;
+	int		rval;
 
 	/*
 	 * if reset delay is active, we cannot start a selection
@@ -9269,6 +9274,7 @@ esp_abort_disconnected_cmd(struct esp *esp, struct scsi_address *ap,
 
 	IPRINTF1("aborting disconnected tagged cmd(s) with %s\n",
 		scsi_mname(msg));
+	proxy_cmdp = kmem_alloc(ESP_CMD_SIZE, KM_SLEEP);
 	if (TAGGED(target) && (msg == MSG_ABORT)) {
 		esp_makeproxy_cmd(proxy_cmdp, ap, 1, msg);
 	} else if (sp) {
@@ -9280,13 +9286,16 @@ esp_abort_disconnected_cmd(struct esp *esp, struct scsi_address *ap,
 		} else if (NOTAG(target) && (msg == MSG_ABORT)) {
 			esp_makeproxy_cmd(proxy_cmdp, ap, 1, msg);
 		} else {
-			return (FALSE);
+			rval = FALSE;
+			goto out;
 		}
 	} else {
 		esp_makeproxy_cmd(proxy_cmdp, ap, 1, msg);
 	}
 
-	return (esp_do_proxy_cmd(esp, proxy_cmdp, ap, slot, scsi_mname(msg)));
+	rval = esp_do_proxy_cmd(esp, proxy_cmdp, ap, slot, scsi_mname(msg));
+out:	kmem_free(proxy_cmdp, ESP_CMD_SIZE);
+	return (rval);
 }
 
 /*
@@ -9704,8 +9713,8 @@ esp_reset_cleanup(struct esp *esp, int slot)
 static int
 esp_reset_disconnected_cmd(struct esp *esp, struct scsi_address *ap, int slot)
 {
-	auto struct esp_cmd local;
-	struct esp_cmd *sp = &local;
+	struct esp_cmd	*proxy_cmdp;
+	int		rval;
 
 	/*
 	 * if reset delay active we cannot  access the target
@@ -9716,9 +9725,12 @@ esp_reset_disconnected_cmd(struct esp *esp, struct scsi_address *ap, int slot)
 
 	esp_check_in_transport(esp, NULL);
 
-	esp_makeproxy_cmd(sp, ap, 1, MSG_DEVICE_RESET);
-	return (esp_do_proxy_cmd(esp, sp, ap, slot,
-	    scsi_mname(MSG_DEVICE_RESET)));
+	proxy_cmdp = kmem_alloc(ESP_CMD_SIZE, KM_SLEEP);
+	esp_makeproxy_cmd(proxy_cmdp, ap, 1, MSG_DEVICE_RESET);
+	rval = esp_do_proxy_cmd(esp, proxy_cmdp, ap, slot,
+	    scsi_mname(MSG_DEVICE_RESET));
+	kmem_free(proxy_cmdp, ESP_CMD_SIZE);
+	return (rval);
 }
 
 /*
@@ -10432,7 +10444,8 @@ esp_printstate(struct esp *esp, char *msg)
 	 * disable DVMA to avoid a timeout on SS1
 	 */
 	if (dmar->dmaga_csr & DMAGA_ENDVMA) {
-		while (dmar->dmaga_csr & DMAGA_REQPEND);
+		while (dmar->dmaga_csr & DMAGA_REQPEND)
+			;
 		dmar->dmaga_csr &= ~DMAGA_ENDVMA;
 		fifo_flag = ep->esp_fifo_flag;
 		dmar->dmaga_csr |= DMAGA_ENDVMA;

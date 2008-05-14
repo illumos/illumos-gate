@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,7 +295,7 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	/*
 	 * Add the logical disk node, if it exists
 	 */
-	if (topo_prop_get_string(node, TOPO_STORAGE_PGROUP,
+	if (topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_LOGICAL_DISK_NAME, &devpath, &err) == 0) {
 		(void) nvlist_add_string(diskp->props, DISK_PROP_LOGNAME,
 		    devpath);
@@ -306,19 +306,19 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	 * Add the FRU information (if present in the node) to the diskmon's
 	 * fru data structure:
 	 */
-	(void) topo_prop_get_string(node, TOPO_STORAGE_PGROUP,
+	(void) topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_MODEL, &model, &err);
 
-	(void) topo_prop_get_string(node, TOPO_STORAGE_PGROUP,
+	(void) topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_MANUFACTURER, &manuf, &err);
 
-	(void) topo_prop_get_string(node, TOPO_STORAGE_PGROUP,
+	(void) topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_SERIAL_NUM, &serial, &err);
 
-	(void) topo_prop_get_string(node, TOPO_STORAGE_PGROUP,
+	(void) topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_FIRMWARE_REV, &firmrev, &err);
 
-	(void) topo_prop_get_string(node, TOPO_STORAGE_PGROUP,
+	(void) topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_CAPACITY, &capacity, &err);
 
 	frup = new_dmfru(manuf, model, firmrev, serial,

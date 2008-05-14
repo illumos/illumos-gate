@@ -1968,22 +1968,23 @@ scsi_uscsi_mincnt(struct buf *bp)
 }
 
 /*
- *    Function: scsi_uscsi_alloc_and_copyin
+ * Function: scsi_uscsi_alloc_and_copyin
  *
  * Description: Target drivers call this function to allocate memeory,
- *    copy in, and convert ILP32/LP64 to make preparations for handling
- *    uscsi commands.
+ *	copy in, and convert ILP32/LP64 to make preparations for handling
+ *	uscsi commands.
  *
- *   Arguments: arg - pointer to the caller's uscsi command struct
- *    flag      - mode, corresponds to ioctl(9e) 'mode'
- *    ap        - SCSI address structure
- *    uscmdp    - pointer to the converted uscsi command
+ * Arguments:
+ *	arg	- pointer to the caller's uscsi command struct
+ *	flag	- mode, corresponds to ioctl(9e) 'mode'
+ *	ap	- SCSI address structure
+ *	uscmdp	- pointer to the converted uscsi command
  *
  * Return code: 0
- *    EFAULT
- *    EINVAL
+ *	EFAULT
+ *	EINVAL
  *
- *     Context: Never called at interrupt context.
+ * Context: Never called at interrupt context.
  */
 
 int
@@ -2000,8 +2001,9 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 #endif /* _MULTI_DATAMODEL */
 	struct uscsi_i_cmd	*uicmd;
 	struct uscsi_cmd	*uscmd;
-	int	max_hba_cdb;
-	int	rval;
+	int			max_hba_cdb;
+	int			rval;
+	extern dev_info_t	*scsi_vhci_dip;
 
 	/*
 	 * In order to not worry about where the uscsi structure came
@@ -2063,6 +2065,16 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	}
 
 	/*
+	 * Currently, USCSI_PATH_INSTANCE is only valid when directed
+	 * to scsi_vhci.
+	 */
+	if ((uscmd->uscsi_flags & USCSI_PATH_INSTANCE) &&
+	    (A_TO_TRAN(ap)->tran_hba_dip != scsi_vhci_dip)) {
+		rval = EFAULT;
+		goto done;
+	}
+
+	/*
 	 * Perfunctory sanity checks. Get the maximum hba supported
 	 * cdb length first.
 	 */
@@ -2077,6 +2089,15 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	}
 	if ((uscmd->uscsi_flags & USCSI_RQENABLE) &&
 	    (uscmd->uscsi_rqlen == 0 || uscmd->uscsi_rqbuf == NULL)) {
+		rval = EINVAL;
+		goto done;
+	}
+
+	/*
+	 * To extend uscsi_cmd in the future, we need to ensure current
+	 * reserved bits remain unused (zero).
+	 */
+	if (uscmd->uscsi_flags & USCSI_RESERVED) {
 		rval = EINVAL;
 		goto done;
 	}
@@ -2141,26 +2162,27 @@ done:
 }
 
 /*
- *    Function: scsi_uscsi_handle_cmd
+ * Function: scsi_uscsi_handle_cmd
  *
  * Description: Target drivers call this function to handle uscsi commands.
  *
- *   Arguments: dev - device number
- *    dataspace     - UIO_USERSPACE or UIO_SYSSPACE
- *    uscmd         - pointer to the converted uscsi command
- *    strat         - pointer to the driver's strategy routine
- *    bp            - buf struct ptr
- *    private_data  - pointer to bp->b_private
+ * Arguments:
+ *	dev		- device number
+ *	dataspace	- UIO_USERSPACE or UIO_SYSSPACE
+ *	uscmd		- pointer to the converted uscsi command
+ *	strat		- pointer to the driver's strategy routine
+ *	bp		- buf struct ptr
+ *	private_data	- pointer to bp->b_private
  *
  * Return code: 0
- *    EIO      - scsi_reset() failed, or see biowait()/physio() codes.
+ *    EIO	- scsi_reset() failed, or see biowait()/physio() codes.
  *    EINVAL
  *    return code of biowait(9F) or physio(9F):
- *      EIO    - IO error
+ *      EIO	- IO error
  *      ENXIO
- *      EACCES - reservation conflict
+ *      EACCES	- reservation conflict
  *
- *     Context: Never called at interrupt context.
+ * Context: Never called at interrupt context.
  */
 
 int
@@ -2272,6 +2294,82 @@ scsi_uscsi_handle_cmd(dev_t dev, enum uio_seg dataspace,
 }
 
 /*
+ * Function: scsi_uscsi_pktinit
+ *
+ * Description: Target drivers call this function to transfer uscsi_cmd
+ *	information into a scsi_pkt before sending the scsi_pkt.
+ *
+ *	NB: At this point the implementation is limited to path_instance.
+ *	At some point more code could be removed from the target driver by
+ *	enhancing this function - with the added benifit of making the uscsi
+ *	implementation more consistent accross all drivers.
+ *
+ * Arguments:
+ *    uscmd     - pointer to the uscsi command
+ *    pkt	- pointer to the scsi_pkt
+ *
+ * Return code: 1 on successfull transfer, 0 on failure.
+ */
+int
+scsi_uscsi_pktinit(struct uscsi_cmd *uscmd, struct scsi_pkt *pkt)
+{
+	int	path_instance;
+
+	/* get path_instance from uscsi_cmd */
+	path_instance = (uscmd->uscsi_flags & USCSI_PATH_INSTANCE) ?
+	    uscmd->uscsi_path_instance : 0;
+
+	/*
+	 * Check to make sure the scsi_pkt was allocated correctly before
+	 * transferring uscsi(7i) path_instance to scsi_pkt(9S).
+	 */
+	if (!scsi_pkt_allocated_correctly(pkt)) {
+		/* If path_instance is zero, pretend success */
+		if (path_instance == 0)
+			return (1);	/* pretend success */
+
+		return (0);		/* failure */
+	}
+
+	pkt->pkt_path_instance = path_instance;
+	return (1);			/* success */
+}
+
+/*
+ * Function: scsi_uscsi_pktfini
+ *
+ * Description: Target drivers call this function to transfer completed
+ * 	scsi_pkt information back into uscsi_cmd.
+ *
+ *	NB: At this point the implementation is limited to path_instance.
+ *	At some point more code could be removed from the target driver by
+ *	enhancing this function - with the added benifit of making the uscsi
+ *	implementation more consistent accross all drivers.
+ *
+ * Arguments:
+ *    pkt	- pointer to the scsi_pkt
+ *    uscmd     - pointer to the uscsi command
+ *
+ * Return code: 1 on successfull transfer, 0 on failure.
+ */
+int
+scsi_uscsi_pktfini(struct scsi_pkt *pkt, struct uscsi_cmd *uscmd)
+{
+	/*
+	 * Check to make sure the scsi_pkt was allocated correctly before
+	 * transferring scsi_pkt(9S) path_instance to uscsi(7i).
+	 */
+	if (!scsi_pkt_allocated_correctly(pkt)) {
+		uscmd->uscsi_path_instance = 0;
+		return (0);		/* failure */
+	}
+
+	uscmd->uscsi_path_instance = pkt->pkt_path_instance;
+	pkt->pkt_path_instance = 0;
+	return (1);			/* success */
+}
+
+/*
  *    Function: scsi_uscsi_copyout_and_free
  *
  * Description: Target drivers call this function to undo what was done by
@@ -2285,7 +2383,6 @@ scsi_uscsi_handle_cmd(dev_t dev, enum uio_seg dataspace,
  *
  *     Context: Never called at interrupt context.
  */
-
 int
 scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 {

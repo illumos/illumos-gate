@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 
 #include <sys/scsi/scsi.h>
 #include <sys/modctl.h>
+#include <sys/bitmap.h>
 
 /*
  * macro for filling in lun value for scsi-1 support
@@ -174,6 +175,7 @@ uint64_t scsi_max_phys_addr = 0xFFFFFFFFull;
 int scsi_sgl_size = 0xFF;
 #endif
 
+ulong_t	*scsi_pkt_bad_alloc_bitmap;
 
 int
 _init()
@@ -193,6 +195,9 @@ _init()
 	 */
 	scsi_alloc_attr.dma_attr_sgllen = scsi_sgl_size;
 #endif
+
+	/* bitmap to limit scsi_pkt allocation violation messages */
+	scsi_pkt_bad_alloc_bitmap = kmem_zalloc(BT_SIZEOFMAP(devcnt), KM_SLEEP);
 
 	return (mod_install(&modlinkage));
 }
@@ -706,7 +711,7 @@ done:
 out:
 	/*
 	 * If lun > 0 we need to figure out if this is a scsi-1 device where
-	 * the "real" lun needs to be embeded into the cdb.
+	 * the "real" lun needs to be embedded into the cdb.
 	 */
 	if ((rval == SCSIPROBE_EXISTS) && (pass == 1) &&
 	    (devp->sd_address.a_lun > 0) && (devp->sd_inq->inq_ansi == 0x1)) {

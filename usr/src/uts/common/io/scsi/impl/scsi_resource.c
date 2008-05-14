@@ -309,6 +309,7 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		in_pktp->pkt_dma_offset = 0;
 		in_pktp->pkt_dma_len = 0;
 		in_pktp->pkt_dma_flags = 0;
+		in_pktp->pkt_path_instance = 0;
 		ASSERT(in_pktp->pkt_numcookies == 0);
 		pktw->pcw_curwin = 0;
 		pktw->pcw_totalwin = 0;

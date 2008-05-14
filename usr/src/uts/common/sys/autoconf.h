@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,7 @@ struct devnames {
 #define	DN_GLDV3_DRIVER		0x1000	/* gldv3 (Nemo) driver */
 #define	DN_PHCI_DRIVER		0x2000	/* pHCI driver */
 #define	DN_OPEN_RETURNS_EINTR	0x4000	/* DDI_OPEN_RETURNS_EINTR prop */
+#define	DN_SCSI_SIZE_CLEAN	0x8000	/* driver is scsi_size_clean() */
 
 #ifdef _KERNEL
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -640,7 +639,7 @@ get_nclients(di_node_t dinode, void *arg)
 static int
 is_client(di_node_t dinode)
 {
-	return (di_path_next_phci(dinode, DI_PATH_NIL) != DI_PATH_NIL);
+	return (di_path_client_next_path(dinode, DI_PATH_NIL) != DI_PATH_NIL);
 }
 
 /*
@@ -775,7 +774,8 @@ build_groups(di_node_t dinode, void *arg)
 	/*
 	 * Build a sorted array of PHCIs pertaining to the client.
 	 */
-	while ((dipath = di_path_next_phci(dinode, dipath)) != DI_PATH_NIL)
+	while ((dipath =
+	    di_path_client_next_path(dinode, dipath)) != DI_PATH_NIL)
 		nphcis++;
 
 	/* Skip non-clients. */
@@ -788,7 +788,8 @@ build_groups(di_node_t dinode, void *arg)
 		    strerror(errno));
 		return (DI_WALK_TERMINATE);
 	}
-	while ((dipath = di_path_next_phci(dinode, dipath)) != DI_PATH_NIL) {
+	while ((dipath =
+	    di_path_client_next_path(dinode, dipath)) != DI_PATH_NIL) {
 		phcinode = di_path_phci_node(dipath);
 		if (phcinode == DI_NODE_NIL) {
 			free_phcis(i, phcis);	/* free preceeding PHCIs */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -155,6 +155,19 @@ static int mdi_bus_config_cache_hash_size = 256;
 
 /* turns off multithreaded configuration for certain operations */
 static int mdi_mtc_off = 0;
+
+/*
+ * The "path" to a pathinfo node is identical to the /devices path to a
+ * devinfo node had the device been enumerated under a pHCI instead of
+ * a vHCI.  This pathinfo "path" is associated with a 'path_instance'.
+ * This association persists across create/delete of the pathinfo nodes,
+ * but not across reboot.
+ */
+static uint_t		mdi_pathmap_instance = 1;	/* 0 -> any path */
+static int		mdi_pathmap_hash_size = 256;
+static kmutex_t		mdi_pathmap_mutex;
+static mod_hash_t	*mdi_pathmap_bypath;		/* "path"->instance */
+static mod_hash_t	*mdi_pathmap_byinstance;	/* instance->"path" */
 
 /*
  * MDI component property name/value string definitions
@@ -306,13 +319,21 @@ i_mdi_init()
 	initialized = 1;
 
 	mutex_init(&mdi_mutex, NULL, MUTEX_DEFAULT, NULL);
-	/*
-	 * Create our taskq resources
-	 */
+
+	/* Create our taskq resources */
 	mdi_taskq = taskq_create("mdi_taskq", mdi_taskq_n_threads,
 	    MDI_TASKQ_PRI, MDI_TASKQ_MINALLOC, MDI_TASKQ_MAXALLOC,
 	    TASKQ_PREPOPULATE | TASKQ_CPR_SAFE);
 	ASSERT(mdi_taskq != NULL);	/* taskq_create never fails */
+
+	/* Allocate ['path_instance' <-> "path"] maps */
+	mutex_init(&mdi_pathmap_mutex, NULL, MUTEX_DRIVER, NULL);
+	mdi_pathmap_bypath = mod_hash_create_strhash(
+	    "mdi_pathmap_bypath", mdi_pathmap_hash_size,
+	    mod_hash_null_valdtor);
+	mdi_pathmap_byinstance = mod_hash_create_idhash(
+	    "mdi_pathmap_byinstance", mdi_pathmap_hash_size,
+	    mod_hash_null_valdtor);
 }
 
 /*
@@ -1915,11 +1936,15 @@ i_mdi_lba_lb(mdi_client_t *ct, mdi_pathinfo_t **ret_pip, struct buf *bp)
  *		through vHCI drivers configuration file (driver.conf).
  *
  *		vHCI drivers may override this default behavior by specifying
- *		appropriate flags.  If start_pip is specified (non NULL) is
- *		used as start point to walk and find the next appropriate path.
- *		The following values are currently defined:
- *		MDI_SELECT_ONLINE_PATH (to select an ONLINE path) and/or
- *		MDI_SELECT_STANDBY_PATH (to select an STANDBY path).
+ *		appropriate flags.  The meaning of the thrid argument depends
+ *		on the flags specified. If MDI_SELECT_PATH_INSTANCE is set
+ *		then the argument is the "path instance" of the path to select.
+ *		If MDI_SELECT_PATH_INSTANCE is not set then the argument is
+ *		"start_pip". A non NULL "start_pip" is the starting point to
+ *		walk and find the next appropriate path.  The following values
+ *		are currently defined: MDI_SELECT_ONLINE_PATH (to select an
+ *		ONLINE path) and/or MDI_SELECT_STANDBY_PATH (to select an
+ *		STANDBY path).
  *
  *		The non-standard behavior is used by the scsi_vhci driver,
  *		whenever it has to use a STANDBY/FAULTED path.  Eg. during
@@ -1945,7 +1970,7 @@ i_mdi_lba_lb(mdi_client_t *ct, mdi_pathinfo_t **ret_pip, struct buf *bp)
 /*ARGSUSED*/
 int
 mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
-    mdi_pathinfo_t *start_pip, mdi_pathinfo_t **ret_pip)
+    void *arg, mdi_pathinfo_t **ret_pip)
 {
 	mdi_client_t	*ct;
 	mdi_pathinfo_t	*pip;
@@ -1957,6 +1982,18 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 	int		preferred = 1;	/* preferred path */
 	int		cond, cont = 1;
 	int		retry = 0;
+	mdi_pathinfo_t	*start_pip;	/* request starting pathinfo */
+	int		path_instance;	/* request specific path instance */
+
+	/* determine type of arg based on flags */
+	if (flags & MDI_SELECT_PATH_INSTANCE) {
+		flags &= ~MDI_SELECT_PATH_INSTANCE;
+		path_instance = (int)(intptr_t)arg;
+		start_pip = NULL;
+	} else {
+		path_instance = 0;
+		start_pip = (mdi_pathinfo_t *)arg;
+	}
 
 	if (flags != 0) {
 		/*
@@ -2019,6 +2056,40 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 	if (head == NULL) {
 		MDI_CLIENT_UNLOCK(ct);
 		return (MDI_NOPATH);
+	}
+
+	/* Caller is specifying a specific pathinfo path by path_instance */
+	if (path_instance) {
+		/* search for pathinfo with correct path_instance */
+		for (pip = head;
+		    pip && (mdi_pi_get_path_instance(pip) != path_instance);
+		    pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link)
+			;
+
+		/* If path can't be selected then MDI_FAILURE is returned. */
+		if (pip == NULL) {
+			MDI_CLIENT_UNLOCK(ct);
+			return (MDI_FAILURE);
+		}
+
+		/* verify state of path */
+		MDI_PI_LOCK(pip);
+		if (MDI_PI(pip)->pi_state != MDI_PATHINFO_STATE_ONLINE) {
+			MDI_PI_UNLOCK(pip);
+			MDI_CLIENT_UNLOCK(ct);
+			return (MDI_FAILURE);
+		}
+
+		/*
+		 * Return the path in hold state. Caller should release the
+		 * lock by calling mdi_rele_path()
+		 */
+		MDI_PI_HOLD(pip);
+		MDI_PI_UNLOCK(pip);
+		ct->ct_path_last = pip;
+		*ret_pip = pip;
+		MDI_CLIENT_UNLOCK(ct);
+		return (MDI_SUCCESS);
 	}
 
 	/*
@@ -2753,8 +2824,12 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	mdi_pathinfo_t	*pip;
 	int		ct_circular;
 	int		ph_circular;
+	static char	path[MAXPATHLEN];
+	char		*path_persistent;
+	int		path_instance;
 	int		se_flag;
 	int		kmem_flag;
+	mod_hash_val_t	hv;
 
 	ASSERT(MDI_VHCI_CLIENT_LOCKED(ph->ph_vhci));
 
@@ -2778,6 +2853,36 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	MDI_PI(pip)->pi_phci = ph;
 	MDI_PI(pip)->pi_addr = kmem_alloc(strlen(paddr) + 1, KM_SLEEP);
 	(void) strcpy(MDI_PI(pip)->pi_addr, paddr);
+
+        /*
+	 * We form the "path" to the pathinfo node, and see if we have
+	 * already allocated a 'path_instance' for that "path".  If so,
+	 * we use the already allocated 'path_instance'.  If not, we
+	 * allocate a new 'path_instance' and associate it with a copy of
+	 * the "path" string (which is never freed). The association
+	 * between a 'path_instance' this "path" string persists until
+	 * reboot.
+	 */
+        mutex_enter(&mdi_pathmap_mutex);
+	(void) ddi_pathname(ph->ph_dip, path);
+	(void) sprintf(path + strlen(path), "/%s@%s", 
+	    ddi_node_name(ct->ct_dip), MDI_PI(pip)->pi_addr);
+        if (mod_hash_find(mdi_pathmap_bypath, (mod_hash_key_t)path, &hv) == 0) {
+                path_instance = (uint_t)(intptr_t)hv;
+        } else {
+		/* allocate a new 'path_instance' and persistent "path" */
+		path_instance = mdi_pathmap_instance++;
+		path_persistent = i_ddi_strdup(path, KM_SLEEP);
+                (void) mod_hash_insert(mdi_pathmap_bypath,
+                    (mod_hash_key_t)path_persistent,
+                    (mod_hash_val_t)(intptr_t)path_instance);
+		(void) mod_hash_insert(mdi_pathmap_byinstance,
+		    (mod_hash_key_t)(intptr_t)path_instance,
+		    (mod_hash_val_t)path_persistent);
+        }
+        mutex_exit(&mdi_pathmap_mutex);
+	MDI_PI(pip)->pi_path_instance = path_instance;
+
 	(void) nvlist_alloc(&MDI_PI(pip)->pi_prop, NV_UNIQUE_NAME, KM_SLEEP);
 	ASSERT(MDI_PI(pip)->pi_prop != NULL);
 	MDI_PI(pip)->pi_pprivate = NULL;
@@ -2814,6 +2919,28 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	i_ddi_di_cache_invalidate(kmem_flag);
 
 	return (pip);
+}
+
+/*
+ * mdi_pi_pathname_by_instance():
+ *	Lookup of "path" by 'path_instance'. Return "path".
+ *	NOTE: returned "path" remains valid forever (until reboot).
+ */
+char *
+mdi_pi_pathname_by_instance(int path_instance)
+{
+	char		*path;
+	mod_hash_val_t	hv;
+
+	/* mdi_pathmap lookup of "path" by 'path_instance' */
+	mutex_enter(&mdi_pathmap_mutex);
+	if (mod_hash_find(mdi_pathmap_byinstance,
+	    (mod_hash_key_t)(intptr_t)path_instance, &hv) == 0)
+		path = (char *)hv;
+	else
+		path = NULL;
+	mutex_exit(&mdi_pathmap_mutex);
+	return (path);
 }
 
 /*
@@ -3722,6 +3849,34 @@ mdi_pi_get_addr(mdi_pathinfo_t *pip)
 		return (NULL);
 
 	return (MDI_PI(pip)->pi_addr);
+}
+
+/*
+ * mdi_pi_get_path_instance():
+ *		Get the 'path_instance' of a mdi_pathinfo node
+ *
+ * Return Values:
+ *		path_instance
+ */
+int
+mdi_pi_get_path_instance(mdi_pathinfo_t *pip)
+{
+	if (pip == NULL)
+		return (0);
+
+	return (MDI_PI(pip)->pi_path_instance);
+}
+
+/*
+ * mdi_pi_pathname():
+ *		Return pointer to path to pathinfo node.
+ */
+char *
+mdi_pi_pathname(mdi_pathinfo_t *pip)
+{
+	if (pip == NULL)
+		return (NULL);
+	return (mdi_pi_pathname_by_instance(mdi_pi_get_path_instance(pip)));
 }
 
 /*

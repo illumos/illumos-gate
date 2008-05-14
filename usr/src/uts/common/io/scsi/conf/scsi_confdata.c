@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +27,7 @@
 
 #ifdef	_KERNEL
 
-#include <sys/scsi/conf/autoconf.h>
+#include <sys/scsi/scsi_types.h>
 
 /*
  * Autoconfiguration Dependent Data
@@ -93,5 +92,10 @@ int	scsi_tag_age_limit = 2;
  *	 it doesn't make sense to monitor every second.
  */
 int	scsi_watchdog_tick = 10;
+
+/*
+ * default scsi target driver "fm-capable" property value
+ */
+int	scsi_fm_capable = DDI_FM_EREPORT_CAPABLE;
 
 #endif	/* _KERNEL */

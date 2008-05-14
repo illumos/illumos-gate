@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,15 +37,19 @@
 
 #if defined(_KERNEL) && !defined(_BOOT)
 #include <sys/varargs.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #else
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #endif
 
 #ifndef	offsetof
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
+#define	offsetof(s, m)		((size_t)(&(((s *)0)->m)))
 #endif
-
+#define	skip_whitespace(p)	while ((*(p) == ' ') || (*(p) == '\t')) p++
 
 /*
  * nvpair.c - Provides kernel & userland interfaces for manipulating
@@ -1154,6 +1158,27 @@ nvpair_type(nvpair_t *nvp)
 	return (NVP_TYPE(nvp));
 }
 
+int
+nvpair_type_is_array(nvpair_t *nvp)
+{
+	data_type_t type = NVP_TYPE(nvp);
+
+	if ((type == DATA_TYPE_BYTE_ARRAY) ||
+	    (type == DATA_TYPE_UINT8_ARRAY) ||
+	    (type == DATA_TYPE_INT16_ARRAY) ||
+	    (type == DATA_TYPE_UINT16_ARRAY) ||
+	    (type == DATA_TYPE_INT32_ARRAY) ||
+	    (type == DATA_TYPE_UINT32_ARRAY) ||
+	    (type == DATA_TYPE_INT64_ARRAY) ||
+	    (type == DATA_TYPE_UINT64_ARRAY) ||
+	    (type == DATA_TYPE_BOOLEAN_ARRAY) ||
+	    (type == DATA_TYPE_STRING_ARRAY) ||
+	    (type == DATA_TYPE_NVLIST_ARRAY))
+		return (1);
+	return (0);
+
+}
+
 static int
 nvpair_value_common(nvpair_t *nvp, data_type_t type, uint_t *nelem, void *data)
 {
@@ -1484,30 +1509,201 @@ nvlist_lookup_pairs(nvlist_t *nvl, int flag, ...)
 	return (ret);
 }
 
+/*
+ * Find the 'name'ed nvpair in the nvlist 'nvl'. If 'name' found, the function
+ * returns zero and a pointer to the matching nvpair is returned in '*ret'
+ * (given 'ret' is non-NULL). If 'sep' is specified then 'name' will penitrate
+ * multiple levels of embedded nvlists, with 'sep' as the separator. As an
+ * example, if sep is '.', name might look like: "a" or "a.b" or "a.c[3]" or
+ * "a.d[3].e[1]".  This matches the C syntax for array embed (for convience,
+ * code also supports "a.d[3]e[1]" syntax).
+ *
+ * If 'ip' is non-NULL and the last name component is an array, return the
+ * value of the "...[index]" array index in *ip. For an array reference that
+ * is not indexed, *ip will be returned as -1. If there is a syntax error in
+ * 'name', and 'ep' is non-NULL then *ep will be set to point to the location
+ * inside the 'name' string where the syntax error was detected.
+ */
+static int
+nvlist_lookup_nvpair_ei_sep(nvlist_t *nvl, const char *name, const char sep,
+    nvpair_t **ret, int *ip, char **ep)
+{
+	nvpair_t	*nvp;
+	const char	*np;
+	char		*sepp;
+	char		*idxp, *idxep;
+	nvlist_t	**nva;
+	long		idx;
+	int		n;
+
+	if (ip)
+		*ip = -1;			/* not indexed */
+	if (ep)
+		*ep = NULL;
+
+	if ((nvl == NULL) || (name == NULL))
+		return (EINVAL);
+
+	/* step through components of name */
+	for (np = name; np && *np; np = sepp) {
+		/* ensure unique names */
+		if (!(nvl->nvl_nvflag & NV_UNIQUE_NAME))
+			return (ENOTSUP);
+
+		/* skip white space */
+		skip_whitespace(np);
+		if (*np == 0)
+			break;
+
+		/* set 'sepp' to end of current component 'np' */
+		if (sep)
+			sepp = strchr(np, sep);
+		else
+			sepp = NULL;
+
+		/* find start of next "[ index ]..." */
+		idxp = strchr(np, '[');
+
+		/* if sepp comes first, set idxp to NULL */
+		if (sepp && idxp && (sepp < idxp))
+			idxp = NULL;
+
+		/*
+		 * At this point 'idxp' is set if there is an index
+		 * expected for the current component.
+		 */
+		if (idxp) {
+			/* set 'n' to length of current 'np' name component */
+			n = idxp++ - np;
+
+			/* keep sepp up to date for *ep use as we advance */
+			skip_whitespace(idxp);
+			sepp = idxp;
+
+			/* determine the index value */
+#if defined(_KERNEL) && !defined(_BOOT)
+			if (ddi_strtol(idxp, &idxep, 0, &idx))
+				goto fail;
+#else
+			idx = strtol(idxp, &idxep, 0);
+#endif
+			if (idxep == idxp)
+				goto fail;
+
+			/* keep sepp up to date for *ep use as we advance */
+			sepp = idxep;
+
+			/* skip white space index value and check for ']' */
+			skip_whitespace(sepp);
+			if (*sepp++ != ']')
+				goto fail;
+
+			/* for embedded arrays, support C syntax: "a[1].b" */
+			skip_whitespace(sepp);
+			if (sep && (*sepp == sep))
+				sepp++;
+		} else if (sepp) {
+			n = sepp++ - np;
+		} else {
+			n = strlen(np);
+		}
+
+		/* trim trailing whitespace by reducing length of 'np' */
+		if (n == 0)
+			goto fail;
+		for (n--; (np[n] == ' ') || (np[n] == '\t'); n--)
+			;
+		n++;
+
+		/* skip whitespace, and set sepp to NULL if complete */
+		if (sepp) {
+			skip_whitespace(sepp);
+			if (*sepp == 0)
+				sepp = NULL;
+		}
+
+		/*
+		 * At this point:
+		 * o  'n' is the length of current 'np' component.
+		 * o  'idxp' is set if there was an index, and value 'idx'.
+		 * o  'sepp' is set to the beginning of the next component,
+		 *    and set to NULL if we have no more components.
+		 *
+		 * Search for nvpair with matching component name.
+		 */
+		for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
+		    nvp = nvlist_next_nvpair(nvl, nvp)) {
+
+			/* continue if no match on name */
+			if (strncmp(np, nvpair_name(nvp), n) ||
+			    (strlen(nvpair_name(nvp)) != n))
+				continue;
+
+			/* if indexed, verify type is array oriented */
+			if (idxp && !nvpair_type_is_array(nvp))
+				goto fail;
+
+			/*
+			 * Full match found, return nvp and idx if this
+			 * was the last component.
+			 */
+			if (sepp == NULL) {
+				if (ret)
+					*ret = nvp;
+				if (ip && idxp)
+					*ip = (int)idx;	/* return index */
+				return (0);		/* found */
+			}
+
+			/*
+			 * More components: current match must be
+			 * of DATA_TYPE_NVLIST or DATA_TYPE_NVLIST_ARRAY
+			 * to support going deeper.
+			 */
+			if (nvpair_type(nvp) == DATA_TYPE_NVLIST) {
+				nvl = EMBEDDED_NVL(nvp);
+				break;
+			} else if (nvpair_type(nvp) == DATA_TYPE_NVLIST_ARRAY) {
+				(void) nvpair_value_nvlist_array(nvp,
+				    &nva, (uint_t *)&n);
+				if ((n < 0) || (idx >= n))
+					goto fail;
+				nvl = nva[idx];
+				break;
+			}
+
+			/* type does not support more levels */
+			goto fail;
+		}
+		if (nvp == NULL)
+			goto fail;		/* 'name' not found */
+
+		/* search for match of next component in embedded 'nvl' list */
+	}
+
+fail:	if (ep && sepp)
+		*ep = sepp;
+	return (EINVAL);
+}
+
+/*
+ * Return pointer to nvpair with specified 'name'.
+ */
 int
 nvlist_lookup_nvpair(nvlist_t *nvl, const char *name, nvpair_t **ret)
 {
-	nvpriv_t *priv;
-	nvpair_t *nvp;
-	i_nvp_t *curr;
+	return (nvlist_lookup_nvpair_ei_sep(nvl, name, 0, ret, NULL, NULL));
+}
 
-	if (name == NULL || nvl == NULL ||
-	    (priv = (nvpriv_t *)(uintptr_t)nvl->nvl_priv) == NULL)
-		return (EINVAL);
-
-	if (!(nvl->nvl_nvflag & NV_UNIQUE_NAME))
-		return (ENOTSUP);
-
-	for (curr = priv->nvp_list; curr != NULL; curr = curr->nvi_next) {
-		nvp = &curr->nvi_nvp;
-
-		if (strcmp(name, NVP_NAME(nvp)) == 0) {
-			*ret = nvp;
-			return (0);
-		}
-	}
-
-	return (ENOENT);
+/*
+ * Determine if named nvpair exists in nvlist (use embedded separator of '.'
+ * and return array index).  See nvlist_lookup_nvpair_ei_sep for more detailed
+ * description.
+ */
+int nvlist_lookup_nvpair_embedded_index(nvlist_t *nvl,
+    const char *name, nvpair_t **ret, int *ip, char **ep)
+{
+	return (nvlist_lookup_nvpair_ei_sep(nvl, name, '.', ret, ip, ep));
 }
 
 boolean_t

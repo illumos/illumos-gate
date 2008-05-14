@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -939,15 +939,16 @@ path_state_name(di_path_state_t st)
 static void
 dump_pathing_data(int ilev, di_node_t node)
 {
-	di_path_t pi = DI_PATH_NIL;
-	int firsttime = 1;
+	di_path_t	pi = DI_PATH_NIL;
+	di_node_t	phci_node;
+	char		*phci_path;
+	int		path_instance;
+	int		firsttime = 1;
 
 	if (node == DI_PATH_NIL)
 		return;
 
-	while ((pi = di_path_next_phci(node, pi)) != DI_PATH_NIL) {
-		di_node_t phci_node = di_path_phci_node(pi);
-
+	while ((pi = di_path_client_next_path(node, pi)) != DI_PATH_NIL) {
 		if (firsttime) {
 			indent_to_level(ilev);
 			firsttime = 0;
@@ -955,9 +956,30 @@ dump_pathing_data(int ilev, di_node_t node)
 			(void) printf("Paths from multipath bus adapters:\n");
 		}
 
+		/*
+		 * Print the path instance and full "pathinfo" path, which is
+		 * the same as the /devices devifo path had the device been
+		 * enumerated under pHCI.
+		 */
+		phci_node = di_path_phci_node(pi);
+		phci_path = di_devfs_path(phci_node);
+		path_instance = di_path_instance(pi);
+		if (phci_path) {
+			if (path_instance > 0) {
+				indent_to_level(ilev);
+				(void) printf("Path %d: %s/%s@%s\n",
+				    path_instance, phci_path,
+				    di_node_name(node),
+				    di_path_bus_addr(pi));
+			}
+			di_devfs_path_free(phci_path);
+		}
+
+		/* print phci driver, instance, and path state information */
 		indent_to_level(ilev);
 		(void) printf("%s#%d (%s)\n", di_driver_name(phci_node),
 		    di_instance(phci_node), path_state_name(di_path_state(pi)));
+
 		dump_prop_list_common(&pathprop_dumpops, ilev + 1, pi);
 	}
 }

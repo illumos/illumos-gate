@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7559,15 +7559,10 @@ i_ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 		return (DDI_FAILURE);
 	}
 
-	ddi_devid_str_free(devid_str);
-
-#ifdef	DEVID_COMPATIBILITY
-	/*
-	 * marker for devinfo snapshot compatibility.
-	 * This code gets deleted when di_devid is gone from libdevid
-	 */
-	DEVI(dip)->devi_devid = DEVID_COMPATIBILITY;
-#endif	/* DEVID_COMPATIBILITY */
+	/* keep pointer to devid string for interrupt context fma code */
+	if (DEVI(dip)->devi_devid_str)
+		ddi_devid_str_free(DEVI(dip)->devi_devid_str);
+	DEVI(dip)->devi_devid_str = devid_str;
 	return (DDI_SUCCESS);
 }
 
@@ -7603,13 +7598,10 @@ ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 static void
 i_ddi_devid_unregister(dev_info_t *dip)
 {
-#ifdef	DEVID_COMPATIBILITY
-	/*
-	 * marker for micro release devinfo snapshot compatibility.
-	 * This code gets deleted for the minor release.
-	 */
-	DEVI(dip)->devi_devid = NULL;		/* unset DEVID_PROP */
-#endif	/* DEVID_COMPATIBILITY */
+	if (DEVI(dip)->devi_devid_str) {
+		ddi_devid_str_free(DEVI(dip)->devi_devid_str);
+		DEVI(dip)->devi_devid_str = NULL;
+	}
 
 	/* remove the devid property */
 	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, DEVID_PROP_NAME);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,6 +228,9 @@ dev_info_t *mdi_pi_get_client(mdi_pathinfo_t *);
 dev_info_t *mdi_pi_get_phci(mdi_pathinfo_t *);
 char *mdi_pi_get_addr(mdi_pathinfo_t *);
 mdi_pathinfo_state_t mdi_pi_get_state(mdi_pathinfo_t *);
+int mdi_pi_get_path_instance(mdi_pathinfo_t *);
+char *mdi_pi_pathname_by_instance(int path_instance);
+char *mdi_pi_pathname(mdi_pathinfo_t *);
 
 /*
  * mdi_pathinfo Property handling functions

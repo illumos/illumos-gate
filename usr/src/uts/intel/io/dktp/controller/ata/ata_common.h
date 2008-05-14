@@ -471,7 +471,7 @@ typedef struct ata_drv {
 
 	/* Used by disk side only */
 
-	struct scsi_device	ad_device;
+	struct scsi_device	*ad_device;
 	struct scsi_inquiry	ad_inquiry;
 	struct ctl_obj		ad_ctl_obj;
 	uchar_t			ad_rd_cmd;
