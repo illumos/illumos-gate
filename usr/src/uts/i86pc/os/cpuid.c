@@ -3808,6 +3808,11 @@ patch_tsc_read(int flag)
 		(void) memcpy((void *)tsc_read,
 		    (void *)&_tsc_mfence_start, cnt);
 		break;
+	case X86_TSC_LFENCE:
+		cnt = &_tsc_lfence_end - &_tsc_lfence_start;
+		(void) memcpy((void *)tsc_read,
+		    (void *)&_tsc_lfence_start, cnt);
+		break;
 	default:
 		break;
 	}

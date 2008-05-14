@@ -337,6 +337,7 @@ extern "C" {
 #define	X86_NO_TSC		0x0
 #define	X86_HAVE_TSCP		0x1
 #define	X86_TSC_MFENCE		0x2
+#define	X86_TSC_LFENCE		0x4
 
 #define	FMT_X86_FEATURE						\
 	"\20"							\
@@ -587,6 +588,8 @@ extern	char _tscp_start;
 extern	char _tscp_end;
 extern	char _no_rdtsc_start;
 extern	char _no_rdtsc_end;
+extern	char _tsc_lfence_start;
+extern	char _tsc_lfence_end;
 #endif
 
 extern uint_t workaround_errata(struct cpu *);

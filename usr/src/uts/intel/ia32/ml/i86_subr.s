@@ -809,6 +809,15 @@ _no_rdtsc_start:
 	ret
 	.globl _no_rdtsc_end
 _no_rdtsc_end:
+	.globl _tsc_lfence_start
+_tsc_lfence_start:
+	lfence
+	rdtsc
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+	ret
+	.globl _tsc_lfence_end
+_tsc_lfence_end:
 	SET_SIZE(tsc_read)
 
 #else /* __i386 */
@@ -840,6 +849,13 @@ _no_rdtsc_start:
 	ret
 	.globl _no_rdtsc_end
 _no_rdtsc_end:
+	.globl _tsc_lfence_start
+_tsc_lfence_start:
+	lfence
+	rdtsc
+	ret
+	.globl _tsc_lfence_end
+_tsc_lfence_end:
 	SET_SIZE(tsc_read)
 
 #endif	/* __i386 */

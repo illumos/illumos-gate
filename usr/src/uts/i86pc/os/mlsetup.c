@@ -190,7 +190,7 @@ mlsetup(struct regs *rp)
 		patch_tsc_read(X86_TSC_MFENCE);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
 	    cpuid_getfamily(CPU) <= 6 && (x86_feature & X86_SSE2) != 0)
-		patch_tsc_read(X86_TSC_MFENCE);
+		patch_tsc_read(X86_TSC_LFENCE);
 
 #endif	/* !__xpv */
 
