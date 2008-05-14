@@ -290,7 +290,7 @@ extern int zpool_export(zpool_handle_t *);
 extern int zpool_import(libzfs_handle_t *, nvlist_t *, const char *,
     char *altroot);
 extern int zpool_import_props(libzfs_handle_t *, nvlist_t *, const char *,
-    nvlist_t *);
+    nvlist_t *, boolean_t);
 
 /*
  * Search for pools to import

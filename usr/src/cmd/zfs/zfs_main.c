@@ -281,14 +281,12 @@ usage_prop_cb(int prop, void *cb)
 {
 	FILE *fp = cb;
 
-	(void) fprintf(fp, "\t%-14s ", zfs_prop_to_name(prop));
+	(void) fprintf(fp, "\t%-15s ", zfs_prop_to_name(prop));
 
-	if (prop == ZFS_PROP_CASE)
-		(void) fprintf(fp, "NO    ");
-	else if (zfs_prop_readonly(prop))
-		(void) fprintf(fp, "  NO    ");
+	if (zfs_prop_readonly(prop))
+		(void) fprintf(fp, " NO    ");
 	else
-		(void) fprintf(fp, " YES    ");
+		(void) fprintf(fp, "YES    ");
 
 	if (zfs_prop_inheritable(prop))
 		(void) fprintf(fp, "  YES   ");

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,15 @@ find_vdev(nvlist_t *nv, uint64_t search)
 		return (nv);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) != 0)
+		return (NULL);
+
+	for (c = 0; c < children; c++) {
+		if ((ret = find_vdev(child[c], search)) != NULL)
+			return (ret);
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
 	    &child, &children) != 0)
 		return (NULL);
 

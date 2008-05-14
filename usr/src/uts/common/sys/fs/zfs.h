@@ -100,6 +100,7 @@ typedef enum {
 	ZFS_PROP_SHARESMB,
 	ZFS_PROP_REFQUOTA,
 	ZFS_PROP_REFRESERVATION,
+	ZFS_PROP_GUID,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -352,11 +353,7 @@ typedef enum zfs_share_op {
  * The location of the pool configuration repository, shared between kernel and
  * userland.
  */
-#define	ZPOOL_CACHE_DIR		"/etc/zfs"
-#define	ZPOOL_CACHE_FILE	"zpool.cache"
-#define	ZPOOL_CACHE_TMP		".zpool.cache"
-
-#define	ZPOOL_CACHE		ZPOOL_CACHE_DIR "/" ZPOOL_CACHE_FILE
+#define	ZPOOL_CACHE		"/etc/zfs/zpool.cache"
 
 /*
  * vdev states are ordered from least to most healthy.

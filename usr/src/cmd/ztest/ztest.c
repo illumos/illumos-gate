@@ -3387,7 +3387,7 @@ main(int argc, char **argv)
 	(void) setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* Override location of zpool.cache */
-	spa_config_dir = "/tmp";
+	spa_config_path = "/tmp/zpool.cache";
 
 	ztest_random_fd = open("/dev/urandom", O_RDONLY);
 

@@ -270,7 +270,8 @@ dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx)
 	    zfs_write_limit_override : dp->dp_write_limit);
 
 	if (zfs_no_write_throttle) {
-		dp->dp_tempreserved[tx->tx_txg & TXG_MASK] += space;
+		atomic_add_64(&dp->dp_tempreserved[tx->tx_txg & TXG_MASK],
+		    space);
 		return (0);
 	}
 

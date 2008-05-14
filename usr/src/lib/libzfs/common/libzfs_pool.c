@@ -1050,7 +1050,7 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		}
 	}
 
-	ret = zpool_import_props(hdl, config, newname, props);
+	ret = zpool_import_props(hdl, config, newname, props, B_FALSE);
 	if (props)
 		nvlist_free(props);
 	return (ret);
@@ -1064,7 +1064,7 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
  */
 int
 zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
-    nvlist_t *props)
+    nvlist_t *props, boolean_t importfaulted)
 {
 	zfs_cmd_t zc = { 0 };
 	char *thename;
@@ -1113,6 +1113,7 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		return (-1);
 	}
 
+	zc.zc_cookie = (uint64_t)importfaulted;
 	ret = 0;
 	if (zfs_ioctl(hdl, ZFS_IOC_POOL_IMPORT, &zc) != 0) {
 		char desc[1024];
@@ -1348,13 +1349,8 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 	    is_guid_type(zhp, zc.zc_guid, ZPOOL_CONFIG_SPARES) == B_TRUE)
 		return (zfs_error(hdl, EZFS_ISSPARE, msg));
 
-	if (l2cache ||
-	    is_guid_type(zhp, zc.zc_guid, ZPOOL_CONFIG_L2CACHE) == B_TRUE)
-		return (zfs_error(hdl, EZFS_ISL2CACHE, msg));
-
 	zc.zc_cookie = VDEV_STATE_ONLINE;
 	zc.zc_obj = flags;
-
 
 	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_SET_STATE, &zc) != 0)
 		return (zpool_standard_error(hdl, errno, msg));
@@ -1387,10 +1383,6 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 	if (avail_spare ||
 	    is_guid_type(zhp, zc.zc_guid, ZPOOL_CONFIG_SPARES) == B_TRUE)
 		return (zfs_error(hdl, EZFS_ISSPARE, msg));
-
-	if (l2cache ||
-	    is_guid_type(zhp, zc.zc_guid, ZPOOL_CONFIG_L2CACHE) == B_TRUE)
-		return (zfs_error(hdl, EZFS_ISL2CACHE, msg));
 
 	zc.zc_cookie = VDEV_STATE_OFFLINE;
 	zc.zc_obj = istmp ? ZFS_OFFLINE_TEMPORARY : 0;

@@ -1188,10 +1188,12 @@ vdev_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	int recursive = FALSE;
 	int stats = FALSE;
+	uint64_t depth = 0;
 
 	if (mdb_getopts(argc, argv,
 	    'r', MDB_OPT_SETBITS, TRUE, &recursive,
 	    'e', MDB_OPT_SETBITS, TRUE, &stats,
+	    'd', MDB_OPT_UINT64, &depth,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -1200,7 +1202,7 @@ vdev_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	return (do_print_vdev(addr, flags, 0, stats, recursive));
+	return (do_print_vdev(addr, flags, (int)depth, stats, recursive));
 }
 
 typedef struct metaslab_walk_data {
@@ -1493,15 +1495,19 @@ spa_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * 	-e	Include error stats
  *
  * Print out a summarized list of vdevs for the given spa_t.
- * This is accomplished by invoking "::vdev -re" on the root vdev.
+ * This is accomplished by invoking "::vdev -re" on the root vdev, as well as
+ * iterating over the cache devices.
  */
 /* ARGSUSED */
 static int
 spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	spa_t spa;
-	mdb_arg_t v;
+	mdb_arg_t v[3];
 	int errors = FALSE;
+	int ret, i;
+	uintptr_t *aux;
+	size_t len;
 
 	if (mdb_getopts(argc, argv,
 	    'e', MDB_OPT_SETBITS, TRUE, &errors,
@@ -1524,11 +1530,50 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	v.a_type = MDB_TYPE_STRING;
-	v.a_un.a_str = errors ? "-re" : "-r";
+	v[0].a_type = MDB_TYPE_STRING;
+	v[0].a_un.a_str = errors ? "-re" : "-r";
 
-	return (mdb_call_dcmd("vdev", (uintptr_t)spa.spa_root_vdev,
-	    flags, 1, &v));
+	ret = mdb_call_dcmd("vdev", (uintptr_t)spa.spa_root_vdev,
+	    flags, 1, v);
+	if (ret != DCMD_OK)
+		return (ret);
+
+	/*
+	 * Iterate over cache devices and print those out as well.  This is a
+	 * little annoying because we don't have a root vdev to pass to ::vdev.
+	 * Instead, we print a single 'cache' line and then call it for each
+	 * child vdev.
+	 */
+	if (spa.spa_l2cache.sav_count != 0) {
+		v[1].a_type = MDB_TYPE_STRING;
+		v[1].a_un.a_str = "-d";
+		v[2].a_type = MDB_TYPE_IMMEDIATE;
+		v[2].a_un.a_val = 2;
+
+		len = spa.spa_l2cache.sav_count * sizeof (uintptr_t);
+		aux = mdb_alloc(len, UM_SLEEP);
+		if (mdb_vread(aux, len,
+		    (uintptr_t)spa.spa_l2cache.sav_vdevs) == -1) {
+			mdb_free(aux, len);
+			mdb_warn("failed to read l2cache vdevs at %p",
+			    spa.spa_l2cache.sav_vdevs);
+			return (DCMD_ERR);
+		}
+
+		mdb_printf("%-?s %-9s %-12s cache\n", "-", "-", "-");
+
+		for (i = 0; i < spa.spa_l2cache.sav_count; i++) {
+			ret = mdb_call_dcmd("vdev", aux[i], flags, 3, v);
+			if (ret != DCMD_OK) {
+				mdb_free(aux, len);
+				return (ret);
+			}
+		}
+
+		mdb_free(aux, len);
+	}
+
+	return (DCMD_OK);
 }
 
 /*

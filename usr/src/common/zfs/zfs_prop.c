@@ -282,6 +282,8 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET, "NAME");
 	register_hidden(ZFS_PROP_ISCSIOPTIONS, "iscsioptions", PROP_TYPE_STRING,
 	    PROP_INHERIT, ZFS_TYPE_VOLUME, "ISCSIOPTIONS");
+	register_hidden(ZFS_PROP_GUID, "guid", PROP_TYPE_NUMBER, PROP_READONLY,
+	    ZFS_TYPE_DATASET, "GUID");
 
 	/* oddball properties */
 	register_impl(ZFS_PROP_CREATION, "creation", PROP_TYPE_NUMBER, 0, NULL,

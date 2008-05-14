@@ -1235,6 +1235,52 @@ dump_config(const char *pool)
 }
 
 static void
+dump_cachefile(const char *cachefile)
+{
+	int fd;
+	struct stat64 statbuf;
+	char *buf;
+	nvlist_t *config;
+
+	if ((fd = open64(cachefile, O_RDONLY)) < 0) {
+		(void) printf("cannot open '%s': %s\n", cachefile,
+		    strerror(errno));
+		exit(1);
+	}
+
+	if (fstat64(fd, &statbuf) != 0) {
+		(void) printf("failed to stat '%s': %s\n", cachefile,
+		    strerror(errno));
+		exit(1);
+	}
+
+	if ((buf = malloc(statbuf.st_size)) == NULL) {
+		(void) fprintf(stderr, "failed to allocate %llu bytes\n",
+		    (u_longlong_t)statbuf.st_size);
+		exit(1);
+	}
+
+	if (read(fd, buf, statbuf.st_size) != statbuf.st_size) {
+		(void) fprintf(stderr, "failed to read %llu bytes\n",
+		    (u_longlong_t)statbuf.st_size);
+		exit(1);
+	}
+
+	(void) close(fd);
+
+	if (nvlist_unpack(buf, statbuf.st_size, &config, 0) != 0) {
+		(void) fprintf(stderr, "failed to unpack nvlist\n");
+		exit(1);
+	}
+
+	free(buf);
+
+	dump_nvlist(config, 0);
+
+	nvlist_free(config);
+}
+
+static void
 dump_label(const char *dev)
 {
 	int fd;
@@ -2182,7 +2228,9 @@ nvlist_string_match(nvlist_t *config, char *name, char *tgt)
 {
 	char *s;
 
-	verify(nvlist_lookup_string(config, name, &s) == 0);
+	if (nvlist_lookup_string(config, name, &s) != 0)
+		return (B_FALSE);
+
 	return (strcmp(s, tgt) == 0);
 }
 
@@ -2191,7 +2239,9 @@ nvlist_uint64_match(nvlist_t *config, char *name, uint64_t tgt)
 {
 	uint64_t val;
 
-	verify(nvlist_lookup_uint64(config, name, &val) == 0);
+	if (nvlist_lookup_uint64(config, name, &val) != 0)
+		return (B_FALSE);
+
 	return (val == tgt);
 }
 
@@ -2441,7 +2491,10 @@ main(int argc, char **argv)
 
 	if (argc < 1) {
 		if (dump_opt['C']) {
-			dump_config(NULL);
+			if (cachefile != NULL)
+				dump_cachefile(cachefile);
+			else
+				dump_config(NULL);
 			return (0);
 		}
 		usage();
@@ -2476,18 +2529,16 @@ main(int argc, char **argv)
 	if (dump_opt['C'])
 		dump_config(argv[0]);
 
-	if (exported == 0 && cachefile == NULL) {
-		if (strchr(argv[0], '/') != NULL) {
-			error = dmu_objset_open(argv[0], DMU_OST_ANY,
-			    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-		} else {
-			error = spa_open(argv[0], &spa, FTAG);
-		}
-	} else {
+	error = 0;
+	if (exported || cachefile != NULL) {
 		/*
 		 * Check to see if the name refers to an exported zpool
 		 */
+		char *slash;
 		nvlist_t *exported_conf = NULL;
+
+		if ((slash = strchr(argv[0], '/')) != NULL)
+			*slash = '\0';
 
 		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir,
 		    cachefile);
@@ -2504,11 +2555,22 @@ main(int argc, char **argv)
 			}
 
 			if (error == 0)
-				error = spa_import(argv[0], exported_conf, nvl);
-			if (error == 0)
-				error = spa_open(argv[0], &spa, FTAG);
+				error = spa_import_faulted(argv[0],
+				    exported_conf, nvl);
 
 			nvlist_free(nvl);
+		}
+
+		if (slash != NULL)
+			*slash = '/';
+	}
+
+	if (error == 0) {
+		if (strchr(argv[0], '/') != NULL) {
+			error = dmu_objset_open(argv[0], DMU_OST_ANY,
+			    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+		} else {
+			error = spa_open(argv[0], &spa, FTAG);
 		}
 	}
 

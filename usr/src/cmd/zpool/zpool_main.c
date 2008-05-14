@@ -1214,7 +1214,7 @@ show_import(nvlist_t *config)
  */
 static int
 do_import(nvlist_t *config, const char *newname, const char *mntopts,
-    int force, nvlist_t *props)
+    int force, nvlist_t *props, boolean_t allowfaulted)
 {
 	zpool_handle_t *zhp;
 	char *name;
@@ -1267,13 +1267,14 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		}
 	}
 
-	if (zpool_import_props(g_zfs, config, newname, props) != 0)
+	if (zpool_import_props(g_zfs, config, newname, props,
+	    allowfaulted) != 0)
 		return (1);
 
 	if (newname != NULL)
 		name = (char *)newname;
 
-	verify((zhp = zpool_open(g_zfs, name)) != NULL);
+	verify((zhp = zpool_open_canfail(g_zfs, name)) != NULL);
 
 	if (zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		zpool_close(zhp);
@@ -1306,6 +1307,11 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
  *
  *       -f	Force import, even if it appears that the pool is active.
  *
+ *       -F	Import even in the presence of faulted vdevs.  This is an
+ *       	intentionally undocumented option for testing purposes, and
+ *       	treats the pool configuration as complete, leaving any bad
+ *		vdevs in the FAULTED state.
+ *
  *       -a	Import all pools found.
  *
  *       -o	Set property=value and/or temporary mount options (without '=').
@@ -1333,11 +1339,12 @@ zpool_do_import(int argc, char **argv)
 	nvlist_t *found_config;
 	nvlist_t *props = NULL;
 	boolean_t first;
+	boolean_t allow_faulted = B_FALSE;
 	uint64_t pool_state;
 	char *cachefile = NULL;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":afc:d:Do:p:R:")) != -1) {
+	while ((c = getopt(argc, argv, ":ac:d:DfFo:p:R:")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
@@ -1363,6 +1370,9 @@ zpool_do_import(int argc, char **argv)
 			break;
 		case 'f':
 			do_force = B_TRUE;
+			break;
+		case 'F':
+			allow_faulted = B_TRUE;
 			break;
 		case 'o':
 			if ((propval = strchr(optarg, '=')) != NULL) {
@@ -1495,7 +1505,7 @@ zpool_do_import(int argc, char **argv)
 
 			if (do_all)
 				err |= do_import(config, NULL, mntopts,
-				    do_force, props);
+				    do_force, props, allow_faulted);
 			else
 				show_import(config);
 		} else if (searchname != NULL) {
@@ -1543,7 +1553,7 @@ zpool_do_import(int argc, char **argv)
 			err = B_TRUE;
 		} else {
 			err |= do_import(found_config, argc == 1 ? NULL :
-			    argv[1], mntopts, do_force, props);
+			    argv[1], mntopts, do_force, props, allow_faulted);
 		}
 	}
 

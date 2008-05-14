@@ -213,7 +213,7 @@ ses_plugin_destroy(ses_plugin_t *sp)
 	if (sp->sp_initialized && sp->sp_fini != NULL)
 		sp->sp_fini(sp);
 
-	if (!ses_plugin_dlclose)
+	if (ses_plugin_dlclose)
 		(void) dlclose(sp->sp_object);
 
 	ses_free(sp);

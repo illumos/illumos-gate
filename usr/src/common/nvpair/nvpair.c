@@ -208,7 +208,7 @@ nv_mem_free(nvpriv_t *nvp, void *buf, size_t size)
 static void
 nv_priv_init(nvpriv_t *priv, nv_alloc_t *nva, uint32_t stat)
 {
-	bzero(priv, sizeof (priv));
+	bzero(priv, sizeof (nvpriv_t));
 
 	priv->nvp_nva = nva;
 	priv->nvp_stat = stat;

@@ -50,7 +50,7 @@ ses2_setprop(ses_plugin_t *sp, ses_node_t *np,
 		for (cpp = ctlprops; cpp->scp_name != NULL; cpp++)
 			if (strcmp(cpp->scp_name, nvpair_name(nvp)) == 0)
 				break;
-		if (cpp == NULL)
+		if (cpp->scp_name == NULL)
 			continue;
 
 		if (cpp->scp_setprop(sp, np, cpp->scp_num, nvp) != 0)

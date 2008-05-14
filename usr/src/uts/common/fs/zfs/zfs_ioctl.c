@@ -777,6 +777,9 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) != 0 ||
 	    guid != zc->zc_guid)
 		error = EINVAL;
+	else if (zc->zc_cookie)
+		error = spa_import_faulted(zc->zc_name, config,
+		    props);
 	else
 		error = spa_import(zc->zc_name, config, props);
 
@@ -2576,22 +2579,8 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 
 	if (zc->zc_guid == 0) {
 		vd = NULL;
-	} else if ((vd = spa_lookup_by_guid(spa, zc->zc_guid)) == NULL) {
-		spa_aux_vdev_t *sav;
-		int i;
-
-		/*
-		 * Check if this is an l2cache device.
-		 */
-		ASSERT(spa != NULL);
-		sav = &spa->spa_l2cache;
-		for (i = 0; i < sav->sav_count; i++) {
-			if (sav->sav_vdevs[i]->vdev_guid == zc->zc_guid) {
-				vd = sav->sav_vdevs[i];
-				break;
-			}
-		}
-
+	} else {
+		vd = spa_lookup_by_guid(spa, zc->zc_guid, B_TRUE);
 		if (vd == NULL) {
 			(void) spa_vdev_exit(spa, NULL, txg, ENODEV);
 			spa_close(spa, FTAG);

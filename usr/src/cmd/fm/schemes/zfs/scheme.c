@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,15 @@ find_vdev_iter(nvlist_t *nv, uint64_t search)
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) != 0)
-		return (0);
+		return (NULL);
+
+	for (c = 0; c < children; c++)
+		if ((ret = find_vdev_iter(child[c], search)) != 0)
+			return (ret);
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
+	    &child, &children) != 0)
+		return (NULL);
 
 	for (c = 0; c < children; c++)
 		if ((ret = find_vdev_iter(child[c], search)) != 0)
@@ -115,8 +123,7 @@ find_vdev_iter(nvlist_t *nv, uint64_t search)
 static nvlist_t *
 find_vdev(zpool_handle_t *zhp, uint64_t guid)
 {
-	nvlist_t *config;
-	nvlist_t *nvroot;
+	nvlist_t *config, *nvroot;
 
 	config = zpool_get_config(zhp, NULL);
 

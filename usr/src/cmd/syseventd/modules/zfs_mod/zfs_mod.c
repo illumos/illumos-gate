@@ -161,16 +161,26 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 		 * This is overly complicated, and since we know how we labeled
 		 * this device in the first place, we know it's save to switch
 		 * from /dev/dsk to /dev/rdsk and append the backup slice.
+		 *
+		 * If any part of this process fails, then do a force online to
+		 * trigger a ZFS fault for the device (and any hot spare
+		 * replacement).
 		 */
-		if (strncmp(path, "/dev/dsk/", 9) != 0)
+		if (strncmp(path, "/dev/dsk/", 9) != 0) {
+			(void) zpool_vdev_online(zhp, fullpath,
+			    ZFS_ONLINE_FORCEFAULT, &newstate);
 			return;
+		}
 
 		(void) strlcpy(rawpath, path + 9, sizeof (rawpath));
 		len = strlen(rawpath);
 		rawpath[len - 2] = '\0';
 
-		if (zpool_label_disk(g_zfshdl, zhp, rawpath) != 0)
+		if (zpool_label_disk(g_zfshdl, zhp, rawpath) != 0) {
+			(void) zpool_vdev_online(zhp, fullpath,
+			    ZFS_ONLINE_FORCEFAULT, &newstate);
 			return;
+		}
 	}
 
 	/*

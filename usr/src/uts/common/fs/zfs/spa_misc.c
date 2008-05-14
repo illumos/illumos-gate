@@ -315,6 +315,7 @@ spa_t *
 spa_add(const char *name, const char *altroot)
 {
 	spa_t *spa;
+	spa_config_dirent_t *dp;
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
@@ -356,6 +357,16 @@ spa_add(const char *name, const char *altroot)
 		spa_active_count++;
 	}
 
+	/*
+	 * Every pool starts with the default cachefile
+	 */
+	list_create(&spa->spa_config_list, sizeof (spa_config_dirent_t),
+	    offsetof(spa_config_dirent_t, scd_link));
+
+	dp = kmem_zalloc(sizeof (spa_config_dirent_t), KM_SLEEP);
+	dp->scd_path = spa_strdup(spa_config_path);
+	list_insert_head(&spa->spa_config_list, dp);
+
 	return (spa);
 }
 
@@ -367,6 +378,8 @@ spa_add(const char *name, const char *altroot)
 void
 spa_remove(spa_t *spa)
 {
+	spa_config_dirent_t *dp;
+
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
 	ASSERT(spa->spa_scrub_thread == NULL);
@@ -382,10 +395,14 @@ spa_remove(spa_t *spa)
 	if (spa->spa_name)
 		spa_strfree(spa->spa_name);
 
-	if (spa->spa_config_dir)
-		spa_strfree(spa->spa_config_dir);
-	if (spa->spa_config_file)
-		spa_strfree(spa->spa_config_file);
+	while ((dp = list_head(&spa->spa_config_list)) != NULL) {
+		list_remove(&spa->spa_config_list, dp);
+		if (dp->scd_path != NULL)
+			spa_strfree(dp->scd_path);
+		kmem_free(dp, sizeof (spa_config_dirent_t));
+	}
+
+	list_destroy(&spa->spa_config_list);
 
 	spa_config_set(spa, NULL);
 
@@ -782,7 +799,7 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	 * If the config changed, update the config cache.
 	 */
 	if (config_changed)
-		spa_config_sync();
+		spa_config_sync(spa, B_FALSE, B_TRUE);
 
 	mutex_exit(&spa_namespace_lock);
 
@@ -837,7 +854,7 @@ spa_rename(const char *name, const char *newname)
 	/*
 	 * Sync the updated config cache.
 	 */
-	spa_config_sync();
+	spa_config_sync(spa, B_FALSE, B_TRUE);
 
 	spa_close(spa, FTAG);
 

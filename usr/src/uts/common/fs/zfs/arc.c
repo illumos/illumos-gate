@@ -125,6 +125,7 @@
 #include <sys/zfs_context.h>
 #include <sys/arc.h>
 #include <sys/refcount.h>
+#include <sys/vdev.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <vm/anon.h>
@@ -2562,11 +2563,14 @@ top:
 				daddr_t addr = hdr->b_l2hdr->b_daddr;
 				l2arc_read_callback_t *cb;
 
-				DTRACE_PROBE1(l2arc__hit, arc_buf_hdr_t *, hdr);
-				ARCSTAT_BUMP(arcstat_l2_hits);
+				if (vdev_is_dead(vd))
+					goto skip_l2arc;
 
 				hdr->b_flags |= ARC_L2_READING;
 				mutex_exit(hash_lock);
+
+				DTRACE_PROBE1(l2arc__hit, arc_buf_hdr_t *, hdr);
+				ARCSTAT_BUMP(arcstat_l2_hits);
 
 				cb = kmem_zalloc(sizeof (l2arc_read_callback_t),
 				    KM_SLEEP);
@@ -2600,6 +2604,8 @@ top:
 					ARCSTAT_BUMP(arcstat_l2_rw_clash);
 			}
 		}
+
+skip_l2arc:
 		mutex_exit(hash_lock);
 
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
@@ -3504,15 +3510,35 @@ l2arc_hdr_stat_remove(void)
 static l2arc_dev_t *
 l2arc_dev_get_next(void)
 {
-	l2arc_dev_t *next;
+	l2arc_dev_t *next, *first;
 
-	if (l2arc_dev_last == NULL) {
-		next = list_head(l2arc_dev_list);
-	} else {
-		next = list_next(l2arc_dev_list, l2arc_dev_last);
-		if (next == NULL)
+	/* if there are no vdevs, there is nothing to do */
+	if (l2arc_ndev == 0)
+		return (NULL);
+
+	first = NULL;
+	next = l2arc_dev_last;
+	do {
+		/* loop around the list looking for a non-faulted vdev */
+		if (next == NULL) {
 			next = list_head(l2arc_dev_list);
-	}
+		} else {
+			next = list_next(l2arc_dev_list, next);
+			if (next == NULL)
+				next = list_head(l2arc_dev_list);
+		}
+
+		/* if we have come back to the start, bail out */
+		if (first == NULL)
+			first = next;
+		else if (next == first)
+			break;
+
+	} while (vdev_is_dead(next->l2ad_vdev));
+
+	/* if we were unable to find any usable vdevs, return NULL */
+	if (vdev_is_dead(next->l2ad_vdev))
+		return (NULL);
 
 	l2arc_dev_last = next;
 
@@ -4051,11 +4077,15 @@ l2arc_feed_thread(void)
 		    lbolt + (hz * interval));
 		CALLB_CPR_SAFE_END(&cpr, &l2arc_feed_thr_lock);
 
-		/*
-		 * Do nothing until L2ARC devices exist.
-		 */
 		mutex_enter(&l2arc_dev_mtx);
-		if (l2arc_ndev == 0) {
+
+		/*
+		 * This selects the next l2arc device to write to, and in
+		 * doing so the next spa to feed from: dev->l2ad_spa.   This
+		 * will return NULL if there are no l2arc devices or if they
+		 * are all faulted.
+		 */
+		if ((dev = l2arc_dev_get_next()) == NULL) {
 			mutex_exit(&l2arc_dev_mtx);
 			continue;
 		}
@@ -4069,14 +4099,6 @@ l2arc_feed_thread(void)
 			continue;
 		}
 
-		/*
-		 * This selects the next l2arc device to write to, and in
-		 * doing so the next spa to feed from: dev->l2ad_spa.
-		 */
-		if ((dev = l2arc_dev_get_next()) == NULL) {
-			mutex_exit(&l2arc_dev_mtx);
-			continue;
-		}
 		spa = dev->l2ad_spa;
 		ASSERT(spa != NULL);
 		ARCSTAT_BUMP(arcstat_l2_feeds);
@@ -4099,6 +4121,22 @@ l2arc_feed_thread(void)
 	thread_exit();
 }
 
+boolean_t
+l2arc_vdev_present(vdev_t *vd)
+{
+	l2arc_dev_t *dev;
+
+	mutex_enter(&l2arc_dev_mtx);
+	for (dev = list_head(l2arc_dev_list); dev != NULL;
+	    dev = list_next(l2arc_dev_list, dev)) {
+		if (dev->l2ad_vdev == vd)
+			break;
+	}
+	mutex_exit(&l2arc_dev_mtx);
+
+	return (dev != NULL);
+}
+
 /*
  * Add a vdev for use by the L2ARC.  By this point the spa has already
  * validated the vdev and opened it.
@@ -4107,6 +4145,8 @@ void
 l2arc_add_vdev(spa_t *spa, vdev_t *vd, uint64_t start, uint64_t end)
 {
 	l2arc_dev_t *adddev;
+
+	ASSERT(!l2arc_vdev_present(vd));
 
 	/*
 	 * Create a new l2arc device entry.

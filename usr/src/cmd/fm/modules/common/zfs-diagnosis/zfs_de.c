@@ -184,13 +184,17 @@ zfs_mark_pool(zpool_handle_t *zhp, void *unused)
 			zcp->zc_present = B_TRUE;
 	}
 
-	if ((config = zpool_get_config(zhp, NULL)) == NULL)
+	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
+		zpool_close(zhp);
 		return (-1);
+	}
 
 	ret = nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &vd);
 	assert(ret == 0);
 
 	zfs_mark_vdev(pool_guid, vd);
+
+	zpool_close(zhp);
 
 	return (0);
 }
@@ -329,7 +333,7 @@ zfs_case_solve(fmd_hdl_t *hdl, zfs_case_t *zcp, const char *faultname,
 static void
 zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	zfs_case_t *zcp;
+	zfs_case_t *zcp, *dcp;
 	int32_t pool_state;
 	uint64_t ena, pool_guid, vdev_guid;
 	nvlist_t *detector;
@@ -362,6 +366,14 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 * with these ereports, so we continue generating them internally.
 	 */
 	if (pool_state == SPA_LOAD_IMPORT)
+		return;
+
+	/*
+	 * Device I/O errors are ignored during pool open.
+	 */
+	if (pool_state == SPA_LOAD_OPEN &&
+	    (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.checksum") ||
+	    fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.io")))
 		return;
 
 	/*
@@ -446,16 +458,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	}
 
 	if (isresource) {
-		if (fmd_nvl_class_match(hdl, nvl, "resource.fs.zfs.ok")) {
-			/*
-			 * The 'resource.fs.zfs.ok' event is a special
-			 * internal-only event that signifies that a pool or
-			 * device that was previously faulted has now come
-			 * online (as detected by ZFS).  This allows us to close
-			 * the associated case.
-			 */
-			fmd_case_close(hdl, zcp->zc_case);
-		} else if (fmd_nvl_class_match(hdl, nvl,
+		if (fmd_nvl_class_match(hdl, nvl,
 		    "resource.fs.zfs.autoreplace")) {
 			/*
 			 * The 'resource.fs.zfs.autoreplace' event indicates
@@ -465,7 +468,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			 * autoreplace handling will take care of them.
 			 */
 			fmd_case_close(hdl, zcp->zc_case);
-		} else {
+		} else if (fmd_nvl_class_match(hdl, nvl,
+		    "resource.fs.zfs.removed")) {
 			/*
 			 * The 'resource.fs.zfs.removed' event indicates that
 			 * device removal was detected, and the device was
@@ -517,36 +521,31 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 */
 	if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.zpool")) {
 		/*
-		 * Pool level fault.
+		 * Pool level fault.  Before solving the case, go through and
+		 * close any open device cases that may be pending.
 		 */
+		for (dcp = uu_list_first(zfs_cases); dcp != NULL;
+		    dcp = uu_list_next(zfs_cases, dcp)) {
+			if (dcp->zc_data.zc_pool_guid ==
+			    zcp->zc_data.zc_pool_guid &&
+			    dcp->zc_data.zc_vdev_guid != 0)
+				fmd_case_close(hdl, dcp->zc_case);
+		}
+
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.pool", B_TRUE);
-	} else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.*") &&
-	    pool_state == SPA_LOAD_NONE) {
+	} else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.*")) {
 		/*
-		 * Device fault.  Before solving the case, determine if the
-		 * device failed during open, and the 'autoreplace' property is
-		 * set.  If this is the case, then we post a sysevent which is
-		 * picked up by the syseventd module, and any processing is done
-		 * as needed.
+		 * Device fault.  If this occurred during pool open, then defer
+		 * reporting the fault.  If the pool itself could not be opeend,
+		 * we only report the pool fault, not every device fault that
+		 * may have caused the problem.  If we do not see a pool fault
+		 * within the timeout period, then we'll solve the device case.
 		 */
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.device",  B_TRUE);
-	} else {
+	} else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.io") ||
+	    fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.checksum") ||
+	    fmd_nvl_class_match(hdl, nvl, "ererpot.fs.zfs.io_failure")) {
 		char *failmode = NULL;
-
-		if (pool_state == SPA_LOAD_OPEN) {
-			/*
-			 * Error incurred during a pool open.  Reset the timer
-			 * associated with this case.
-			 */
-			if (zcp->zc_data.zc_has_timer)
-				fmd_timer_remove(hdl, zcp->zc_timer);
-			zcp->zc_timer = fmd_timer_install(hdl, zcp, NULL,
-			    zfs_case_timeout);
-			if (!zcp->zc_data.zc_has_timer) {
-				zcp->zc_data.zc_has_timer = 1;
-				zfs_case_serialize(hdl, zcp);
-			}
-		}
 
 		/*
 		 * If this is a checksum or I/O error, then toss it into the
@@ -615,7 +614,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 /*
  * Timeout indicates one of two scenarios:
  *
- * 	- The pool had faults but was eventually opened successfully.
+ * 	- A device could not be opened while opening a pool, but the pool
+ *	  itself was opened successfully.
  *
  * 	- We diagnosed an I/O error, and it was not due to device removal (which
  *	  would cause the timeout to be cancelled).
@@ -629,7 +629,7 @@ zfs_fm_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 
 	if (id == zcp->zc_timer) {
 		zcp->zc_data.zc_has_timer = 0;
-		fmd_case_close(hdl, zcp->zc_case);
+		zfs_case_solve(hdl, zcp, "fault.fs.zfs.device", B_TRUE);
 	}
 
 	if (id == zcp->zc_serd_timer) {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,11 @@ typedef struct spa_config_lock {
 	kcondvar_t	scl_cv;
 	refcount_t	scl_count;
 } spa_config_lock_t;
+
+typedef struct spa_config_dirent {
+	list_node_t	scd_link;
+	char		*scd_path;
+} spa_config_dirent_t;
 
 struct spa {
 	/*
@@ -152,12 +157,12 @@ struct spa {
 	uint64_t	spa_pool_props_object;	/* object for properties */
 	uint64_t	spa_bootfs;		/* default boot filesystem */
 	boolean_t	spa_delegation;		/* delegation on/off */
-	char		*spa_config_dir;	/* cache file directory */
-	char		*spa_config_file;	/* cache file name */
+	list_t		spa_config_list;	/* previous cache file(s) */
 	list_t		spa_zio_list;		/* zio error list */
 	kcondvar_t	spa_zio_cv;		/* resume I/O pipeline */
 	kmutex_t	spa_zio_lock;		/* zio error lock */
 	uint8_t		spa_failmode;		/* failure mode for the pool */
+	boolean_t	spa_import_faulted;	/* allow faulted vdevs */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.
@@ -168,7 +173,7 @@ struct spa {
 	refcount_t	spa_refcount;		/* number of opens */
 };
 
-extern const char *spa_config_dir;
+extern const char *spa_config_path;
 extern kmutex_t spa_namespace_lock;
 
 #ifdef	__cplusplus

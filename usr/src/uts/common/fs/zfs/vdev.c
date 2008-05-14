@@ -40,6 +40,7 @@
 #include <sys/zio.h>
 #include <sys/zap.h>
 #include <sys/fs/zfs.h>
+#include <sys/arc.h>
 
 /*
  * Virtual device management.
@@ -445,8 +446,9 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	 * Look for the 'not present' flag.  This will only be set if the device
 	 * was not present at the time of import.
 	 */
-	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
-	    &vd->vdev_not_present);
+	if (!spa->spa_import_faulted)
+		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
+		    &vd->vdev_not_present);
 
 	/*
 	 * Get the alignment requirement.
@@ -468,13 +470,17 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	/*
 	 * If we're a leaf vdev, try to load the DTL object and other state.
 	 */
-	if (vd->vdev_ops->vdev_op_leaf && alloctype == VDEV_ALLOC_LOAD) {
-		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_DTL,
-		    &vd->vdev_dtl.smo_object);
+	if (vd->vdev_ops->vdev_op_leaf &&
+	    (alloctype == VDEV_ALLOC_LOAD || alloctype == VDEV_ALLOC_L2CACHE)) {
+		if (alloctype == VDEV_ALLOC_LOAD) {
+			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_DTL,
+			    &vd->vdev_dtl.smo_object);
+			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_UNSPARE,
+			    &vd->vdev_unspare);
+		}
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE,
 		    &vd->vdev_offline);
-		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_UNSPARE,
-		    &vd->vdev_unspare);
+
 		/*
 		 * When importing a pool, we want to ignore the persistent fault
 		 * state, as the diagnosis made on another system may not be
@@ -964,18 +970,6 @@ vdev_open(vdev_t *vd)
 		    (vdev_psize_to_asize(vd, 1<<17) >> SPA_MINBLOCKSHIFT);
 	}
 
-	/*
-	 * This allows the ZFS DE to close cases appropriately.  If a device
-	 * goes away and later returns, we want to close the associated case.
-	 * But it's not enough to simply post this only when a device goes from
-	 * CANT_OPEN -> HEALTHY.  If we reboot the system and the device is
-	 * back, we also need to close the case (otherwise we will try to replay
-	 * it).  So we have to post this notifier every time.  Since this only
-	 * occurs during pool open or error recovery, this should not be an
-	 * issue.
-	 */
-	zfs_post_ok(vd->vdev_spa, vd);
-
 	return (0);
 }
 
@@ -1095,7 +1089,18 @@ vdev_reopen(vdev_t *vd)
 	 * Otherwise, a device with an invalid label could be successfully
 	 * opened in response to vdev_reopen().
 	 */
-	(void) vdev_validate(vd);
+	if (vd->vdev_aux) {
+		(void) vdev_validate_aux(vd);
+		if (!vdev_is_dead(vd) &&
+		    !l2arc_vdev_present(vd)) {
+			uint64_t size = vdev_get_rsize(vd);
+			l2arc_add_vdev(spa, vd,
+			    VDEV_LABEL_START_SIZE,
+			    size - VDEV_LABEL_START_SIZE);
+		}
+	} else {
+		(void) vdev_validate(vd);
+	}
 
 	/*
 	 * Reassess parent vdev's health.
@@ -1388,6 +1393,9 @@ vdev_validate_aux(vdev_t *vd)
 	uint64_t guid, version;
 	uint64_t state;
 
+	if (vdev_is_dead(vd))
+		return (0);
+
 	if ((label = vdev_label_read_config(vd)) == NULL) {
 		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
@@ -1484,7 +1492,7 @@ vdev_description(vdev_t *vd)
 int
 vdev_fault(spa_t *spa, uint64_t guid)
 {
-	vdev_t *rvd, *vd;
+	vdev_t *vd;
 	uint64_t txg;
 
 	/*
@@ -1500,9 +1508,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 
 	txg = spa_vdev_enter(spa);
 
-	rvd = spa->spa_root_vdev;
-
-	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
+	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
@@ -1520,7 +1526,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 	 * unavailable, then back off and simply mark the vdev as degraded
 	 * instead.
 	 */
-	if (vdev_is_dead(vd->vdev_top)) {
+	if (vdev_is_dead(vd->vdev_top) && vd->vdev_aux == NULL) {
 		vd->vdev_degraded = 1ULL;
 		vd->vdev_faulted = 0ULL;
 
@@ -1551,7 +1557,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 int
 vdev_degrade(spa_t *spa, uint64_t guid)
 {
-	vdev_t *rvd, *vd;
+	vdev_t *vd;
 	uint64_t txg;
 
 	/*
@@ -1567,9 +1573,7 @@ vdev_degrade(spa_t *spa, uint64_t guid)
 
 	txg = spa_vdev_enter(spa);
 
-	rvd = spa->spa_root_vdev;
-
-	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
+	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
@@ -1603,7 +1607,7 @@ int
 vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
     vdev_state_t *newstate)
 {
-	vdev_t *rvd, *vd;
+	vdev_t *vd;
 	uint64_t txg;
 
 	/*
@@ -1619,9 +1623,7 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
 
 	txg = spa_vdev_enter(spa);
 
-	rvd = spa->spa_root_vdev;
-
-	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
+	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 
 	if (!vd->vdev_ops->vdev_op_leaf)
@@ -1662,7 +1664,7 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
 int
 vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 {
-	vdev_t *rvd, *vd;
+	vdev_t *vd;
 	uint64_t txg;
 
 	/*
@@ -1678,9 +1680,7 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 
 	txg = spa_vdev_enter(spa);
 
-	rvd = spa->spa_root_vdev;
-
-	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
+	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 
 	if (!vd->vdev_ops->vdev_op_leaf)
@@ -1707,7 +1707,7 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 		 */
 		vd->vdev_offline = B_TRUE;
 		vdev_reopen(vd->vdev_top);
-		if (vdev_is_dead(vd->vdev_top)) {
+		if (vdev_is_dead(vd->vdev_top) && vd->vdev_aux == NULL) {
 			vd->vdev_offline = B_FALSE;
 			vdev_reopen(vd->vdev_top);
 			return (spa_vdev_exit(spa, NULL, txg, EBUSY));
@@ -1755,7 +1755,7 @@ vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted)
 		vdev_reopen(vd);
 		vdev_config_dirty(vd->vdev_top);
 
-		if (vd->vdev_faulted)
+		if (vd->vdev_faulted && vd->vdev_aux == NULL)
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
 
 		spa_event_notify(spa, vd, ESC_ZFS_VDEV_CLEAR);
@@ -2020,6 +2020,38 @@ vdev_config_dirty(vdev_t *vd)
 	int c;
 
 	/*
+	 * If this is an aux vdev (as with l2cache devices), then we update the
+	 * vdev config manually and set the sync flag.
+	 */
+	if (vd->vdev_aux != NULL) {
+		spa_aux_vdev_t *sav = vd->vdev_aux;
+		nvlist_t **aux;
+		uint_t naux;
+
+		for (c = 0; c < sav->sav_count; c++) {
+			if (sav->sav_vdevs[c] == vd)
+				break;
+		}
+
+		ASSERT(c < sav->sav_count);
+		sav->sav_sync = B_TRUE;
+
+		VERIFY(nvlist_lookup_nvlist_array(sav->sav_config,
+		    ZPOOL_CONFIG_L2CACHE, &aux, &naux) == 0);
+
+		ASSERT(c < naux);
+
+		/*
+		 * Setting the nvlist in the middle if the array is a little
+		 * sketchy, but it will work.
+		 */
+		nvlist_free(aux[c]);
+		aux[c] = vdev_config_generate(spa, vd, B_TRUE, B_FALSE, B_TRUE);
+
+		return;
+	}
+
+	/*
 	 * The dirty list is protected by the config lock.  The caller must
 	 * either hold the config lock as writer, or must be the sync thread
 	 * (which holds the lock as reader).  There's only one sync thread,
@@ -2107,6 +2139,7 @@ void
 vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 {
 	uint64_t save_state;
+	spa_t *spa = vd->vdev_spa;
 
 	if (state == vd->vdev_state) {
 		vd->vdev_stat.vs_aux = aux;
@@ -2148,7 +2181,7 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		 * Indicate to the ZFS DE that this device has been removed, and
 		 * any recent errors should be ignored.
 		 */
-		zfs_post_remove(vd->vdev_spa, vd);
+		zfs_post_remove(spa, vd);
 		vd->vdev_removed = B_TRUE;
 	} else if (state == VDEV_STATE_CANT_OPEN) {
 		/*
@@ -2157,7 +2190,8 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		 * begin with.  Failure to open such a device is not considered
 		 * an error.
 		 */
-		if (vd->vdev_spa->spa_load_state == SPA_LOAD_IMPORT &&
+		if (spa->spa_load_state == SPA_LOAD_IMPORT &&
+		    !spa->spa_import_faulted &&
 		    vd->vdev_ops->vdev_op_leaf)
 			vd->vdev_not_present = 1;
 
@@ -2178,7 +2212,7 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		 */
 		if ((vd->vdev_prevstate != state || vd->vdev_forcefault) &&
 		    !vd->vdev_not_present && !vd->vdev_checkremove &&
-		    vd != vd->vdev_spa->spa_root_vdev) {
+		    vd != spa->spa_root_vdev) {
 			const char *class;
 
 			switch (aux) {
@@ -2204,8 +2238,7 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 				class = FM_EREPORT_ZFS_DEVICE_UNKNOWN;
 			}
 
-			zfs_ereport_post(class, vd->vdev_spa,
-			    vd, NULL, save_state, 0);
+			zfs_ereport_post(class, spa, vd, NULL, save_state, 0);
 		}
 
 		/* Erase any notion of persistent removed state */

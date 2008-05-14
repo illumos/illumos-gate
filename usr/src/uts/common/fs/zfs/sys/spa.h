@@ -331,6 +331,7 @@ extern void spa_check_rootconf(char *devpath, char **the_dev_p,
 extern boolean_t spa_rootdev_validate(nvlist_t *nv);
 extern int spa_import_rootpool(char *devpath);
 extern int spa_import(const char *pool, nvlist_t *config, nvlist_t *props);
+extern int spa_import_faulted(const char *, nvlist_t *, nvlist_t *);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);
 extern int spa_export(char *pool, nvlist_t **oldconfig);
@@ -386,8 +387,7 @@ extern void spa_sync_allpools(void);
 #define	SPA_CONFIG_UPDATE_POOL	0
 #define	SPA_CONFIG_UPDATE_VDEVS	1
 
-extern void spa_config_sync(void);
-extern void spa_config_check(const char *, const char *);
+extern void spa_config_sync(spa_t *, boolean_t, boolean_t);
 extern void spa_config_load(void);
 extern nvlist_t *spa_all_configs(uint64_t *);
 extern void spa_config_set(spa_t *spa, nvlist_t *config);
@@ -454,7 +454,8 @@ extern void sprintf_blkptr(char *buf, int len, const blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
 extern void spa_upgrade(spa_t *spa, uint64_t version);
 extern void spa_evict_all(void);
-extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid);
+extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid,
+    boolean_t l2cache);
 extern boolean_t spa_has_spare(spa_t *, uint64_t guid);
 extern uint64_t bp_get_dasize(spa_t *spa, const blkptr_t *bp);
 extern boolean_t spa_has_slogs(spa_t *spa);
@@ -489,7 +490,6 @@ struct zio;
 extern void spa_log_error(spa_t *spa, struct zio *zio);
 extern void zfs_ereport_post(const char *class, spa_t *spa, vdev_t *vd,
     struct zio *zio, uint64_t stateoroffset, uint64_t length);
-extern void zfs_post_ok(spa_t *spa, vdev_t *vd);
 extern void zfs_post_remove(spa_t *spa, vdev_t *vd);
 extern void zfs_post_autoreplace(spa_t *spa, vdev_t *vd);
 extern uint64_t spa_get_errlog_size(spa_t *spa);

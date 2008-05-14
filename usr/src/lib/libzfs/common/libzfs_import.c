@@ -740,7 +740,7 @@ zpool_read_label(int fd, nvlist_t **config)
 		return (-1);
 
 	for (l = 0; l < VDEV_LABELS; l++) {
-		if (pread(fd, label, sizeof (vdev_label_t),
+		if (pread64(fd, label, sizeof (vdev_label_t),
 		    label_offset(size, l)) != sizeof (vdev_label_t))
 			continue;
 

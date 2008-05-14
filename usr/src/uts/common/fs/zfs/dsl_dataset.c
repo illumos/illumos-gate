@@ -1790,6 +1790,8 @@ dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 	    ds->ds_quota);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_REFRESERVATION,
 	    ds->ds_reserved);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_GUID,
+	    ds->ds_phys->ds_guid);
 
 	if (ds->ds_phys->ds_next_snap_obj) {
 		/*
