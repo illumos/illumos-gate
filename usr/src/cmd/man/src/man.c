@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,6 +170,61 @@ struct suffix {
 };
 
 /*
+ * Flags that control behavior of build_manpath()
+ *
+ *   BMP_ISPATH 	pathv is a vector constructed from PATH.
+ *                	Perform appropriate path translations for
+ * 			manpath.
+ *   BMP_APPEND_MANDIR	Add /usr/share/man to the end if it
+ *			hasn't already appeared earlier.
+ *   BMP_FALLBACK_MANDIR Append /usr/share/man only if no other
+ *			manpath (including derived from PATH)
+ * 			elements are valid.
+ */
+#define	BMP_ISPATH		1
+#define	BMP_APPEND_MANDIR	2
+#define	BMP_FALLBACK_MANDIR	4
+
+/*
+ * When doing equality comparisons of directories, device and inode
+ * comparisons are done.  The dupsec and dupnode structures are used
+ * to form a list of lists for this processing.
+ */
+struct secnode {
+	char		*secp;
+	struct secnode	*next;
+};
+struct dupnode {
+	dev_t		dev;	/* from struct stat st_dev */
+	ino_t		ino;	/* from struct stat st_ino */
+	struct secnode	*secl;	/* sections already considered */
+	struct dupnode	*next;
+};
+
+/*
+ * Map directories that may appear in PATH to the corresponding
+ * man directory
+ */
+static struct pathmap {
+	char	*bindir;
+	char	*mandir;
+	dev_t	dev;
+	ino_t	ino;
+} bintoman[] = {
+	{"/sbin",		"/usr/share/man,1m",			0, 0},
+	{"/usr/sbin",		"/usr/share/man,1m",			0, 0},
+	{"/usr/ucb",		"/usr/share/man,1b",			0, 0},
+	/*
+	 * Restrict to section 1 so that whatis /usr/{,xpg4,xpg6}/bin/ls
+	 * does not confuse users with section 1 and 1b
+	 */
+	{"/usr/bin",		"/usr/share/man,1,1m,1s,1t,1c,1f", 	0, 0},
+	{"/usr/xpg4/bin",	"/usr/share/man,1",			0, 0},
+	{"/usr/xpg6/bin",	"/usr/share/man,1",			0, 0},
+	{NULL,			NULL,					0, 0}
+};
+
+/*
  * Subdirectories to search for unformatted/formatted man page
  * versions, in nroff and troff variations.  The searching
  * code in manual() is structured to expect there to be two
@@ -180,20 +235,22 @@ static char	*nroffdirs[] = { "man", "cat", 0 };
 static char	*troffdirs[] = { "man", "fmt", 0 };
 
 #define	MAN_USAGE "\
-usage:\tman [-] [-adFlrt] [-M path] [-T macro-package ] [ -s section ] \
+usage:\tman [-] [-adFlprt] [-M path] [-T macro-package ] [ -s section ] \
 name ...\n\
 \tman [-M path] -k keyword ...\n\tman [-M path] -f file ..."
 #define	CATMAN_USAGE "\
 usage:\tcatman [-p] [-c|-ntw] [-M path] [-T macro-package ] [sections]"
 
 static char *opts[] = {
-	"FfkrP:M:T:ts:lad",	/* man */
+	"FfkrpP:M:T:ts:lad",	/* man */
 	"wpnP:M:T:tc"		/* catman */
 };
 
 struct man_node {
 	char *path;		/* mandir path */
 	char **secv;		/* submandir suffices */
+	int  defsrch;		/* hint for man -p to avoid section list */
+	int  frompath;		/* hint for man -d and catman -p */
 	struct man_node *next;
 };
 
@@ -219,10 +276,10 @@ static int	catmando;
 static int	nowhatis;
 static int	whatonly;
 static int	compargs;	/* -c option for catman */
+static int	printmp;
 
 static char	*CAT	= CAT_;
 static char	macros[MAXPATHLEN];
-static char	*manpath;
 static char	*mansec;
 static char	*pager;
 static char	*troffcmd;
@@ -230,7 +287,7 @@ static char	*troffcat;
 static char	**subdirs;
 
 static char *check_config(char *);
-static struct man_node *build_manpath(char **);
+static struct man_node *build_manpath(char **, int);
 static void getpath(struct man_node *, char **);
 static void getsect(struct man_node *, char **);
 static void get_all_sect(struct man_node *);
@@ -238,12 +295,13 @@ static void catman(struct man_node *, char **, int);
 static int makecat(char *, char **, int);
 static int getdirs(char *, char ***, short);
 static void whatapro(struct man_node *, char *, int);
-static void lookup_windex(char *, char *);
+static void lookup_windex(char *, char *, char **);
 static int icmp(wchar_t *, wchar_t *);
 static void more(char **, int);
 static void cleanup(char **);
 static void bye(int);
 static char **split(char *, char);
+static void freev(char **);
 static void fullpaths(struct man_node **);
 static void lower(char *);
 static int cmp(const void *, const void *);
@@ -253,8 +311,8 @@ static void sortdir(DIR *, char ***);
 static int searchdir(char *, char *, char *);
 static int windex(char **, char *, char *);
 static void section(struct suffix *, char *);
-static int bfsearch(FILE *, char **, char *);
-static int compare(char *, char *);
+static int bfsearch(FILE *, char **, char *, char **);
+static int compare(char *, char *, char **);
 static int format(char *, char *, char *, char *);
 static char *addlocale(char *);
 static int get_manconfig(FILE *, char *);
@@ -262,6 +320,11 @@ static void	malloc_error(void);
 static int	sgmlcheck(const char *);
 static char *map_section(char *, char *);
 static void free_manp(struct man_node *manp);
+static void init_bintoman(void);
+static char *path_to_manpath(char *);
+static int dupcheck(struct man_node *, struct dupnode **);
+static void free_dupnode(struct dupnode *);
+static void print_manpath(struct man_node *, char *);
 
 /*
  * This flag is used when the SGML-to-troff converter
@@ -289,9 +352,11 @@ main(int argc, char *argv[])
 {
 	int badopts = 0;
 	int c;
-	char **pathv, **p;
+	char **pathv;
 	char *cmdname;
+	char *manpath = NULL;
 	static struct man_node	*manpage = NULL;
+	int bmp_flags = 0;
 
 	if (access(SROFF_CMD, F_OK | X_OK) != 0)
 		no_sroff = 1;
@@ -308,11 +373,6 @@ main(int argc, char *argv[])
 
 	(void) strcpy(macros, TMAC_AN);
 
-	/*
-	 * get user defined stuff
-	 */
-	if ((manpath = getenv("MANPATH")) == NULL)
-		manpath = MANDIR;
 	/*
 	 * get base part of command name
 	 */
@@ -362,12 +422,19 @@ main(int argc, char *argv[])
 			all++;
 			break;
 		case 'd':
-
+			debug++;
+			break;
 		/*
-		 * catman specific options
+		 * man and catman use -p differently.  In catman it
+		 * enables debug mode and in man it prints the (possibly
+		 * derived from PATH or name operand) MANPATH.
 		 */
 		case 'p':
-			debug++;
+			if (catmando == 0) {
+				printmp++;
+			} else {
+				debug++;
+			}
 			break;
 		case 'n':
 			nowhatis++;
@@ -405,9 +472,9 @@ main(int argc, char *argv[])
 
 	/*
 	 *  Bad options or no args?
-	 *	(catman doesn't need args)
+	 *	(man -p and catman don't need args)
 	 */
-	if (badopts || (!catmando && optind == argc)) {
+	if (badopts || (!catmando && !printmp && optind == argc)) {
 		(void) fprintf(stderr, "%s\n", catmando ?
 		    gettext(CATMAN_USAGE) : gettext(MAN_USAGE));
 		exit(2);
@@ -445,17 +512,22 @@ main(int argc, char *argv[])
 doargs:
 	subdirs = troffit ? troffdirs : nroffdirs;
 
+	init_bintoman();
+
+	if (manpath == NULL && (manpath = getenv("MANPATH")) == NULL) {
+		if ((manpath = getenv("PATH")) != NULL) {
+			bmp_flags = BMP_ISPATH | BMP_APPEND_MANDIR;
+		} else {
+			manpath = MANDIR;
+		}
+	}
+
 	pathv = split(manpath, ':');
 
-	manpage = build_manpath(pathv);
+	manpage = build_manpath(pathv, bmp_flags);
 
 	/* release pathv allocated by split() */
-	p = pathv;
-	while (*p) {
-		free(*p);
-		p++;
-	}
-	free(pathv);
+	freev(pathv);
 
 	fullpaths(&manpage);
 
@@ -475,37 +547,90 @@ doargs:
 		(void) signal(SIGTERM, bye);
 	}
 
+	/*
+	 * "man -p" without operands
+	 */
+	if ((printmp != 0) && (optind == argc)) {
+		print_manpath(manpage, NULL);
+		exit(0);
+	}
+
 	for (; optind < argc; optind++) {
 		if (strcmp(argv[optind], "-") == 0) {
 			nomore++;
 			CAT = CAT_S;
-		} else if (whatis)
-			whatapro(manpage, argv[optind], apropos);
-		else
-			manual(manpage, argv[optind]);
+		} else {
+			char *cmd;
+			static struct man_node *mp;
+			char *pv[2];
+
+			/*
+			 * If full path to command specified, customize
+			 * manpath accordingly
+			 */
+			if ((cmd = strrchr(argv[optind], '/')) != NULL) {
+				*cmd = '\0';
+				if ((pv[0] = strdup(argv[optind])) == NULL) {
+					malloc_error();
+				}
+				pv[1] = NULL;
+				*cmd = '/';
+				mp = build_manpath(pv,
+				    BMP_ISPATH|BMP_FALLBACK_MANDIR);
+			} else {
+				mp = manpage;
+			}
+
+			if (whatis) {
+				whatapro(mp, argv[optind], apropos);
+			} else if (printmp != 0) {
+				print_manpath(mp, argv[optind]);
+			} else {
+				manual(mp, argv[optind]);
+			}
+
+			if (mp != NULL && mp != manpage) {
+				free(pv[0]);
+				free_manp(mp);
+			}
+		}
 	}
 	return (0);
 	/*NOTREACHED*/
 }
 
 /*
- * This routine builds the manpage structure from MANPATH.
+ * This routine builds the manpage structure from MANPATH or PATH,
+ * depending on flags.  See BMP_* definitions above for valid
+ * flags.
+ *
+ * Assumes pathv elements were malloc'd, as done by split().
+ * Elements may be freed and reallocated to have different contents.
  */
 
 static struct man_node *
-build_manpath(char **pathv)
+build_manpath(char **pathv, int flags)
 {
 	struct man_node *manpage = NULL;
 	struct man_node *currp = NULL;
 	struct man_node *lastp = NULL;
 	char **p;
 	char **q;
-	char **r;
+	char *mand = NULL;
+	char *mandir = MANDIR;
 	int s;
+	struct dupnode *didup = NULL;
 
 	s = sizeof (struct man_node);
-	for (p = pathv; *p; p++) {
+	for (p = pathv; *p; ) {
 
+		if (flags & BMP_ISPATH) {
+			if ((mand = path_to_manpath(*p)) == NULL) {
+				goto next;
+			}
+			free(*p);
+			*p = mand;
+		}
 		q = split(*p, ',');
 
 		if (access(q[0], R_OK|X_OK) != 0) {
@@ -517,27 +642,61 @@ build_manpath(char **pathv)
 			}
 		} else {
 
-			if (manpage == NULL)
-				currp = lastp = manpage =
-					(struct man_node *)malloc(s);
-			else
-				currp =  (struct man_node *)malloc(s);
+			/*
+			 * Some element exists.  Do not append MANDIR as a
+			 * fallback.
+			 */
+			flags &= ~BMP_FALLBACK_MANDIR;
 
-			if (currp == NULL)
+			if ((currp = (struct man_node *)calloc(1, s)) == NULL) {
 				malloc_error();
+			}
+
+			currp->frompath = (flags & BMP_ISPATH);
+
+			if (manpage == NULL) {
+				lastp = manpage = currp;
+			}
 
 			getpath(currp, p);
 			getsect(currp, p);
 
-			currp->next = NULL;
-			if (currp != manpage)
-				lastp->next = currp;
-			lastp = currp;
+			/*
+			 * If there are no new elements in this path,
+			 * do not add it to the manpage list
+			 */
+			if (dupcheck(currp, &didup) != 0) {
+				freev(currp->secv);
+				free(currp);
+			} else {
+				currp->next = NULL;
+				if (currp != manpage) {
+					lastp->next = currp;
+				}
+				lastp = currp;
+			}
 		}
-		for (r = q; *r != NULL; r++)
-			free(*r);
-		free(q);
-}
+		freev(q);
+next:
+		/*
+		 * Special handling of appending MANDIR.
+		 * After all pathv elements have been processed, append MANDIR
+		 * if needed.
+		 */
+		if (p == &mandir) {
+			break;
+		}
+		p++;
+		if (*p != NULL) {
+			continue;
+		}
+		if (flags & (BMP_APPEND_MANDIR|BMP_FALLBACK_MANDIR)) {
+			p = &mandir;
+			flags &= ~BMP_ISPATH;
+		}
+	}
+
+	free_dupnode(didup);
 
 	return (manpage);
 }
@@ -581,14 +740,25 @@ getsect(struct man_node *manp, char **pv)
 		for (sectp = manp->secv; *sectp; sectp++)
 			lower(*sectp);
 	} else if ((sections = strchr(*pv, ',')) != NULL) {
+		if (debug) {
+			if (manp->frompath != 0) {
+/*
+ * TRANSLATION_NOTE - message for man -d or catman -p
+ * ex. /usr/share/man: derived from PATH, MANSECTS=,1b
+ */
+				(void) printf(gettext(
+					"%s: derived from PATH, MANSECTS=%s\n"),
+						manp->path, sections);
+			} else {
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
  * ex. /usr/share/man: from -M option, MANSECTS=,1,2,3c
  */
-		if (debug)
-			(void) fprintf(stdout, gettext(
-				"%s: from -M option, MANSECTS=%s\n"),
-			    manp->path, sections);
+				(void) fprintf(stdout, gettext(
+					"%s: from -M option, MANSECTS=%s\n"),
+						manp->path, sections);
+			}
+		}
 		manp->secv = split(++sections, ',');
 		for (sectp = manp->secv; *sectp; sectp++)
 			lower(*sectp);
@@ -596,6 +766,7 @@ getsect(struct man_node *manp, char **pv)
 		if (*manp->secv == NULL)
 			get_all_sect(manp);
 	} else if ((sections = check_config(*pv)) != NULL) {
+		manp->defsrch = 1;
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
  * ex. /usr/share/man: from man.cf, MANSECTS=1,1m,1c,1f
@@ -612,6 +783,7 @@ getsect(struct man_node *manp, char **pv)
 		if (*manp->secv == NULL)
 			get_all_sect(manp);
 	} else {
+		manp->defsrch = 1;
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
  * if man.cf has not been found or sections has not been specified
@@ -733,8 +905,22 @@ catman(struct man_node *manp, char **argv, int argc)
 	int ndirs = 0;
 	char *ldir;
 	int	i;
+	struct dupnode *dnp = NULL;
+	char   **realsecv;
+	char   *fakesecv[2] = { " catman ", NULL };
 
 	for (p = manp; p != NULL; p = p->next) {
+		/*
+		 * prevent catman from doing very heavy lifting multiple
+		 * times on some directory
+		 */
+		realsecv = p->secv;
+		p->secv = fakesecv;
+		if (dupcheck(p, &dnp) != 0) {
+			p->secv = realsecv;
+			continue;
+		}
+
 /*
  * TRANSLATION_NOTE - message for catman -p
  * ex. mandir path = /usr/share/man
@@ -743,6 +929,7 @@ catman(struct man_node *manp, char **argv, int argc)
 			(void) fprintf(stdout, gettext(
 				"\nmandir path = %s\n"), p->path);
 		ndirs = 0;
+
 		/*
 		 * Build cat pages
 		 * addlocale() allocates memory and returns it
@@ -803,6 +990,7 @@ catman(struct man_node *manp, char **argv, int argc)
 		/* release memory allocated by addlocale() */
 		free(ldir);
 	}
+	free_dupnode(dnp);
 }
 
 /*
@@ -1050,7 +1238,7 @@ whatapro(struct man_node *manp, char *word, int apropos)
  * ex. mandir path = /usr/share/man/ja
  */
 				DPRINTF(gettext("\nmandir path = %s\n"), ldir);
-				lookup_windex(whatpath, p);
+				lookup_windex(whatpath, p, b->secv);
 			}
 			/* release memory allocated by addlocale() */
 			free(ldir);
@@ -1064,13 +1252,13 @@ whatapro(struct man_node *manp, char *word, int apropos)
  */
 		DPRINTF(gettext("\nmandir path = %s\n"), b->path);
 
-		lookup_windex(whatpath, p);
+		lookup_windex(whatpath, p, b->secv);
 	}
 }
 
 
 static void
-lookup_windex(char *whatpath, char *word)
+lookup_windex(char *whatpath, char *word, char **secv)
 {
 	FILE *fp;
 	char *matches[MAXPAGES];
@@ -1104,7 +1292,7 @@ lookup_windex(char *whatpath, char *word)
 					break;
 				}
 	} else {
-		if (bfsearch(fp, matches, word))
+		if (bfsearch(fp, matches, word, secv))
 			for (pp = matches; *pp; pp++) {
 				(void) printf("%s", *pp);
 				/*
@@ -1267,6 +1455,17 @@ split(char *s1, char sep)
 	return (tokv);
 }
 
+/*
+ * Free a vector allocated by split();
+ */
+static void
+freev(char **v) {
+	int i;
+	for (i = 0; v[i] != NULL; i++) {
+		free(v[i]);
+	}
+	free(v);
+}
 
 /*
  * Convert paths to full paths if necessary
@@ -1396,10 +1595,16 @@ static void
 manual(struct man_node *manp, char *name)
 {
 	struct man_node *p;
-	struct man_node *local = NULL;
+	struct man_node *local;
 	int ndirs = 0;
 	char *ldir;
 	char *ldirs[2];
+	char *fullname = name;
+	char *slash;
+
+	if ((slash = strrchr(name, '/')) != NULL) {
+		name = slash + 1;
+	}
 
 	/*
 	 *  for each path in MANPATH
@@ -1430,10 +1635,11 @@ manual(struct man_node *manp, char *name)
 			if (ndirs != 0) {
 				ldirs[0] = ldir;
 				ldirs[1] = NULL;
-				local = build_manpath(ldirs);
+				local = build_manpath(ldirs, 0);
 				if (force ||
 				    windex(local->secv, ldir, name) < 0)
 					mandir(local->secv, ldir, name);
+				free_manp(local);
 			}
 			/* release memory allocated by addlocale() */
 			free(ldir);
@@ -1458,16 +1664,16 @@ manual(struct man_node *manp, char *name)
 	} else {
 		if (sargs) {
 			(void) printf(gettext("No entry for %s in section(s) "
-			    "%s of the manual.\n"), name, mansec);
+			    "%s of the manual.\n"), fullname, mansec);
 		} else {
 			(void) printf(gettext(
-			    "No manual entry for %s.\n"), name, mansec);
+			    "No manual entry for %s.\n"), fullname, mansec);
 		}
 
 		if (sman_no_man_no_sroff)
 			(void) printf(gettext("(An SGML manpage was found "
 			    "for '%s' but it cannot be displayed.)\n"),
-			    name, mansec);
+			    fullname, mansec);
 	}
 	sman_no_man_no_sroff = 0;
 }
@@ -1746,7 +1952,7 @@ windex(char **secv, char *path, char *name)
 		(void) fprintf(stdout, gettext(
 			" search in = %s file\n"), whatfile);
 
-	if (bfsearch(fp, matches, name) == 0) {
+	if (bfsearch(fp, matches, name, NULL) == 0) {
 		(void) fclose(fp);
 		return (-1); /* force search in mandir */
 	}
@@ -1931,7 +2137,7 @@ section(struct suffix *sp, char *s)
  */
 
 static int
-bfsearch(FILE *fp, char **matchv, char *key)
+bfsearch(FILE *fp, char **matchv, char *key, char **secv)
 {
 	char entry[BUFSIZ];
 	char **vp;
@@ -1951,7 +2157,7 @@ bfsearch(FILE *fp, char **matchv, char *key)
 		} while (c != EOF && c != '\n');
 		if (fgets(entry, sizeof (entry), fp) == NULL)
 			break;
-		switch (compare(key, entry)) {
+		switch (compare(key, entry, secv)) {
 		case -2:
 		case -1:
 		case 0:
@@ -1972,7 +2178,7 @@ bfsearch(FILE *fp, char **matchv, char *key)
 			*matchv = 0;
 			return (matchv - vp);
 		}
-		switch (compare(key, entry)) {
+		switch (compare(key, entry, secv)) {
 		case -2:
 			*matchv = 0;
 			return (matchv - vp);
@@ -1991,7 +2197,7 @@ bfsearch(FILE *fp, char **matchv, char *key)
 		break;
 	}
 	while (fgets(entry, sizeof (entry), fp)) {
-		switch (compare(key, entry)) {
+		switch (compare(key, entry, secv)) {
 		case -1:
 		case 0:
 			*matchv = strdup(entry);
@@ -2008,17 +2214,21 @@ bfsearch(FILE *fp, char **matchv, char *key)
 }
 
 static int
-compare(char *key, char *entry)
+compare(char *key, char *entry, char **secv)
 {
 	char	*entbuf;
 	char	*s;
 	int	comp, mlen;
 	int	mbcurmax = MB_CUR_MAX;
+	char 	*secp = NULL;
+	int	rv;
+	int	eblen;
 
 	entbuf = strdup(entry);
 	if (entbuf == NULL) {
 		malloc_error();
 	}
+	eblen = strlen(entbuf);
 
 	s = entbuf;
 	while (*s) {
@@ -2034,16 +2244,38 @@ compare(char *key, char *entry)
 		}
 		s += mlen;
 	}
+	/*
+	 * Find the section within parantheses
+	 */
+	if (secv != NULL && (s - entbuf) < eblen) {
+		if ((secp = strchr(s + 1, ')')) != NULL) {
+			*secp = '\0';
+			if ((secp = strchr(s + 1, '(')) != NULL) {
+				secp++;
+			}
+		}
+	}
 
 	comp = strcmp(key, entbuf);
-	free(entbuf);
 	if (comp == 0) {
-		return (0);
+		if (secp == NULL) {
+			rv = 0;
+		} else {
+			while (*secv != NULL) {
+				if ((strcmp(*secv, secp)) == 0) {
+					rv = 0;
+					break;
+				}
+				secv++;
+			}
+		}
 	} else if (comp < 0) {
-		return (-2);
+		rv = -2;
 	} else {
-		return (2);
+		rv = 2;
 	}
+	free(entbuf);
+	return (rv);
 }
 
 
@@ -2737,36 +2969,288 @@ sgmlcheck(const char *s1)
 	return (0);
 }
 
-#ifdef notdef
 /*
- * This routine is for debugging purposes. It prints out all the
- * mandir paths.
+ * Initializes the bintoman array with appropriate device and inode info
  */
 
-printmandir(manp)
-struct man_node *manp;
+static void
+init_bintoman(void)
 {
-	struct man_node *p;
+	int i;
+	struct stat sb;
 
-	(void) fprintf(stdout,
-		"in printmandir, printing each mandir path ...\n");
-	for (p = manp; p != NULL; p = p->next) {
-		(void) printf("\tpath = %s\n", p->path);
+	for (i = 0; bintoman[i].bindir != NULL; i++) {
+		if (stat(bintoman[i].bindir, &sb) == 0) {
+			bintoman[i].dev = sb.st_dev;
+			bintoman[i].ino = sb.st_ino;
+		} else {
+			bintoman[i].dev = NODEV;
+		}
 	}
 }
 
 /*
- * This routine is for debugging purposes. It prints out the
- * corresponding sections (submandir directories) of a mandir.
+ * If a duplicate is found, return 1
+ * If a duplicate is not found, add it to the dupnode list and return 0
+ */
+static int
+dupcheck(struct man_node *mnp, struct dupnode **dnp) {
+	struct dupnode	*curdnp;
+	struct secnode	*cursnp;
+	struct stat 	sb;
+	int 		i;
+	int		rv = 1;
+	int		dupfound;
+
+	/*
+	 * If the path doesn't exist, treat it as a duplicate
+	 */
+	if (stat(mnp->path, &sb) != 0) {
+		return (1);
+	}
+
+	/*
+	 * Find the dupnode structure for the previous time this directory
+	 * was looked at.  Device and inode numbers are compared so that
+	 * directories that are reached via different paths (e.g. /usr/man vs.
+	 * /usr/share/man) are treated as equivalent.
+	 */
+	for (curdnp = *dnp; curdnp != NULL; curdnp = curdnp->next) {
+		if (curdnp->dev == sb.st_dev && curdnp->ino == sb.st_ino) {
+			break;
+		}
+	}
+
+	/*
+	 * First time this directory has been seen.  Add a new node to the
+	 * head of the list.  Since all entries are guaranteed to be unique
+	 * copy all sections to new node.
+	 */
+	if (curdnp == NULL) {
+		if ((curdnp = calloc(1, sizeof (struct dupnode))) == NULL) {
+			malloc_error();
+		}
+		for (i = 0; mnp->secv[i] != NULL; i++) {
+			if ((cursnp = calloc(1, sizeof (struct secnode)))
+			    == NULL) {
+				malloc_error();
+			}
+			cursnp->next = curdnp->secl;
+			curdnp->secl = cursnp;
+			if ((cursnp->secp = strdup(mnp->secv[i])) == NULL) {
+				malloc_error();
+			}
+		}
+		curdnp->dev = sb.st_dev;
+		curdnp->ino = sb.st_ino;
+		curdnp->next = *dnp;
+		*dnp = curdnp;
+		return (0);
+	}
+
+	/*
+	 * Traverse the section vector in the man_node and the section list
+	 * in dupnode cache to eliminate all duplicates from man_node
+	 */
+	for (i = 0; mnp->secv[i] != NULL; i++) {
+		dupfound = 0;
+		for (cursnp = curdnp->secl; cursnp != NULL;
+		    cursnp = cursnp->next) {
+			if (strcmp(mnp->secv[i], cursnp->secp) == 0) {
+				dupfound = 1;
+				break;
+			}
+		}
+		if (dupfound) {
+			mnp->secv[i][0] = '\0';
+			continue;
+		}
+
+
+		/*
+		 * Update curdnp and set return value to indicate that this
+		 * was not all duplicates.
+		 */
+		if ((cursnp = calloc(1, sizeof (struct secnode))) == NULL) {
+			malloc_error();
+		}
+		cursnp->next = curdnp->secl;
+		curdnp->secl = cursnp;
+		if ((cursnp->secp = strdup(mnp->secv[i])) == NULL) {
+			malloc_error();
+		}
+		rv = 0;
+	}
+
+	return (rv);
+}
+
+/*
+ * Given a bin directory, return the corresponding man directory.
+ * Return string must be free()d by the caller.
+ *
+ * NULL will be returned if no matching man directory can be found.
  */
 
-void
-printsect(char **s)
+static char *
+path_to_manpath(char *bindir)
 {
-	char **p;
+	char	*mand, *p;
+	int	i;
+	struct stat	sb;
 
-	(void) fprintf(stdout, "in printsect, printing sections ... \n");
-	for (p = s; *p; p++)
-		(void) printf("\t%s\n", *p);
+	/*
+	 * First look for known translations for specific bin paths
+	 */
+	if (stat(bindir, &sb) != 0) {
+		return (NULL);
+	}
+	for (i = 0; bintoman[i].bindir != NULL; i++) {
+		if (sb.st_dev == bintoman[i].dev &&
+		    sb.st_ino == bintoman[i].ino) {
+			if ((mand = strdup(bintoman[i].mandir)) == NULL) {
+				malloc_error();
+			}
+			if ((p = strchr(mand, ',')) != NULL) {
+				*p = '\0';
+			}
+			if (stat(mand, &sb) != 0) {
+				free(mand);
+				return (NULL);
+			}
+			if (p != NULL) {
+				*p = ',';
+			}
+			return (mand);
+		}
+	}
+
+	/*
+	 * No specific translation found.  Try `dirname $bindir`/man
+	 * and `dirname $bindir`/share/man
+	 */
+	if ((mand = malloc(PATH_MAX)) == NULL) {
+		malloc_error();
+	}
+
+	if (strlcpy(mand, bindir, PATH_MAX) >= PATH_MAX) {
+		free(mand);
+		return (NULL);
+	}
+
+	/*
+	 * Advance to end of buffer, strip trailing /'s then remove last
+	 * directory component.
+	 */
+	for (p = mand; *p != '\0'; p++)
+		;
+	for (; p > mand && *p == '/'; p--)
+		;
+	for (; p > mand && *p != '/'; p--)
+		;
+	if (p == mand && *p == '.') {
+		if (realpath("..", mand) == NULL) {
+			free(mand);
+			return (NULL);
+		}
+		for (; *p != '\0'; p++);
+	} else {
+		*p = '\0';
+	}
+
+	if (strlcat(mand, "/man", PATH_MAX) >= PATH_MAX) {
+		free(mand);
+		return (NULL);
+	}
+
+	if (stat(mand, &sb) == 0) {
+		return (mand);
+	}
+
+	/*
+	 * Strip the /man off and try /share/man
+	 */
+	*p = '\0';
+	if (strlcat(mand, "/share/man", PATH_MAX) >= PATH_MAX) {
+		free(mand);
+		return (NULL);
+	}
+	if (stat(mand, &sb) != 0) {
+		free(mand);
+		return (NULL);
+	}
+
+	return (mand);
 }
-#endif
+
+/*
+ * Free a linked list of dupnode structs
+ */
+void
+free_dupnode(struct dupnode *dnp) {
+	struct dupnode *dnp2;
+	struct secnode *snp;
+
+	while (dnp != NULL) {
+		dnp2 = dnp;
+		dnp = dnp->next;
+		while (dnp2->secl != NULL) {
+			snp = dnp2->secl;
+			dnp2->secl = dnp2->secl->next;
+			free(snp->secp);
+			free(snp);
+		}
+		free(dnp2);
+	}
+}
+
+/*
+ * prints manp linked list to stdout.
+ *
+ * If namep is NULL, output can be used for setting MANPATH.
+ *
+ * If namep is not NULL output is two columns.  First column is the string
+ * pointed to by namep.  Second column is a MANPATH-compatible representation
+ * of manp linked list.
+ */
+void
+print_manpath(struct man_node *manp, char *namep)
+{
+	char colon[2];
+	char **secp;
+
+	if (namep != NULL) {
+		(void) printf("%s ", namep);
+	}
+
+	colon[0] = '\0';
+	colon[1] = '\0';
+
+	for (; manp != NULL; manp = manp->next) {
+		(void) printf("%s%s", colon, manp->path);
+		colon[0] = ':';
+
+		/*
+		 * If man.cf or a directory scan was used to create section
+		 * list, do not print section list again.  If the output of
+		 * man -p is used to set MANPATH, subsequent runs of man
+		 * will re-read man.cf and/or scan man directories as
+		 * required.
+		 */
+		if (manp->defsrch != 0) {
+			continue;
+		}
+
+		for (secp = manp->secv; *secp != NULL; secp++) {
+			/*
+			 * Section deduplication may have eliminated some
+			 * sections from the vector. Avoid displaying this
+			 * detail which would appear as ",," in output
+			 */
+			if ((*secp)[0] != '\0') {
+				(void) printf(",%s", *secp);
+			}
+		}
+	}
+	(void) printf("\n");
+}
