@@ -562,22 +562,51 @@ plat_lgrp_init(void)
 {
 	extern uint32_t lgrp_expand_proc_thresh;
 	extern uint32_t lgrp_expand_proc_diff;
+	const uint_t m = LGRP_LOADAVG_THREAD_MAX;
 
 	/*
 	 * Set tuneables for the OPL architecture
 	 *
-	 * lgrp_expand_proc_thresh is the minimum load on the lgroups
-	 * this process is currently running on before considering
-	 * expanding threads to another lgroup.
+	 * lgrp_expand_proc_thresh is the threshold load on the set of
+	 * lgroups a process is currently using on before considering
+	 * adding another lgroup to the set.  For Oly-C and Jupiter
+	 * systems, there are four sockets per lgroup. Setting
+	 * lgrp_expand_proc_thresh to add lgroups when the load reaches
+	 * four threads will spread the load when it exceeds one thread
+	 * per socket, optimizing memory bandwidth and L2 cache space.
 	 *
-	 * lgrp_expand_proc_diff determines how much less the remote lgroup
-	 * must be loaded before expanding to it.
+	 * lgrp_expand_proc_diff determines how much less another lgroup
+	 * must be loaded before shifting the start location of a thread
+	 * to it.
 	 *
-	 * Since remote latencies can be costly, attempt to keep 3 threads
-	 * within the same lgroup before expanding to the next lgroup.
+	 * lgrp_loadavg_tolerance is the threshold where two lgroups are
+	 * considered to have different loads.  It is set to be less than
+	 * 1% so that even a small residual load will be considered different
+	 * from no residual load.
+	 *
+	 * We note loadavg values are not precise.
+	 * Every 1/10 of a second loadavg values are reduced by 5%.
+	 * This adjustment can come in the middle of the lgroup selection
+	 * process, and for larger parallel apps with many threads can
+	 * frequently occur between the start of the second thread
+	 * placement and the finish of the last thread placement.
+	 * We also must be careful to not use too small of a threshold
+	 * since the cumulative decay for 1 second idle time is 40%.
+	 * That is, the residual load from completed threads will still
+	 * be 60% one second after the proc goes idle or 8% after 5 seconds.
+	 *
+	 * To allow for lag time in loadavg calculations
+	 * remote thresh = 3.75 * LGRP_LOADAVG_THREAD_MAX
+	 * local thresh  = 0.75 * LGRP_LOADAVG_THREAD_MAX
+	 * tolerance	 = 0.0078 * LGRP_LOADAVG_THREAD_MAX
+	 *
+	 * The load placement algorithms consider LGRP_LOADAVG_THREAD_MAX
+	 * as the equivalent of a load of 1. To make the code more compact,
+	 * we set m = LGRP_LOADAVG_THREAD_MAX.
 	 */
-	lgrp_expand_proc_thresh = LGRP_LOADAVG_THREAD_MAX * 3;
-	lgrp_expand_proc_diff = LGRP_LOADAVG_THREAD_MAX;
+	lgrp_expand_proc_thresh = (m * 3) + (m >> 1) + (m >> 2);
+	lgrp_expand_proc_diff = (m >> 1) + (m >> 2);
+	lgrp_loadavg_tolerance = (m >> 7);
 }
 
 /*
