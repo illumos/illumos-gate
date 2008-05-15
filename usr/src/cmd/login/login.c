@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +212,11 @@ extern	int	getsecretkey();
  */
 static	char	user_name[NMAX];
 static	char	minusnam[16] = "-";
+
+/*
+ * login_pid, used to find utmpx entry to update.
+ */
+static pid_t	login_pid;
 
 /*
  * locale environments to be passed to shells.
@@ -407,6 +412,8 @@ main(int argc, char *argv[], char **renvp)
 	int sublogin;
 	int pam_rc;
 
+	login_pid = getpid();
+
 	/*
 	 * Set up Defaults and flags
 	 */
@@ -578,13 +585,6 @@ main(int argc, char *argv[], char **renvp)
 	/*
 	 * We only get here if we've been authenticated.
 	 */
-	/*
-	 * NOTE: telnetd and rlogind rely upon this updating of utmpx
-	 * to indicate that the authentication completed  successfully,
-	 * pam_open_session was called and therefore they are required to
-	 * call pam_close_session.
-	 */
-	update_utmpx_entry(sublogin);
 
 	/*
 	 * Now we set up the environment for the new user, which includes
@@ -604,7 +604,20 @@ main(int argc, char *argv[], char **renvp)
 	adjust_nice();		/* passwd file can specify nice value */
 
 /* ONC_PLUS EXTRACT START */
-	setup_credentials();	/* Set uid/gid - exits on failure */
+	setup_credentials();	/* Set user credentials  - exits on failure */
+
+	/*
+	 * NOTE: telnetd and rlogind rely upon this updating of utmpx
+	 * to indicate that the authentication completed  successfully,
+	 * pam_open_session was called and therefore they are required to
+	 * call pam_close_session.
+	 */
+	update_utmpx_entry(sublogin);
+
+	/* set the real (and effective) UID */
+	if (setuid(pwd->pw_uid) == -1) {
+		login_exit(1);
+	}
 
 	/*
 	 * Set up the basic environment for the exec.  This includes
@@ -1934,12 +1947,6 @@ setup_credentials(void)
 	 * system calls will work.
 	 */
 	audit_success(get_audit_id(), pwd, zone_name);
-
-	/* set the real (and effective) UID */
-	if (setuid(pwd->pw_uid) == -1) {
-		login_exit(1);
-	}
-
 }
 /* ONC_PLUS EXTRACT END */
 
@@ -2073,11 +2080,11 @@ update_utmpx_entry(int sublogin)
 
 	while ((u = getutxent()) != NULL) {
 		if ((u->ut_type == INIT_PROCESS ||
-			u->ut_type == LOGIN_PROCESS ||
-			u->ut_type == USER_PROCESS) &&
-			((sublogin && strncmp(u->ut_line, ttyntail,
-			sizeof (u->ut_line)) == 0) ||
-			u->ut_pid == utmpx.ut_pid)) {
+		    u->ut_type == LOGIN_PROCESS ||
+		    u->ut_type == USER_PROCESS) &&
+		    ((sublogin && strncmp(u->ut_line, ttyntail,
+		    sizeof (u->ut_line)) == 0) ||
+		    u->ut_pid == login_pid)) {
 			SCPYN(utmpx.ut_line, (ttyn+sizeof ("/dev/")-1));
 			(void) memcpy(utmpx.ut_id, u->ut_id,
 			    sizeof (utmpx.ut_id));
