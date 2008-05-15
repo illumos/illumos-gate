@@ -964,6 +964,7 @@ typedef	struct	tcpdata	{
 
 #define	TCP_WSCALE_SEEN		0x00000001
 #define	TCP_WSCALE_FIRST	0x00000002
+#define TCP_SACK_PERMIT		0x00000004
 
 
 typedef	struct tcpinfo {

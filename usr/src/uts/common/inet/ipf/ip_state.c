@@ -1269,9 +1269,9 @@ u_int flags;
 			    TH_SYN &&
 			    (TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2))) {
 				if (fr_tcpoptions(fin, tcp,
-					      &is->is_tcp.ts_data[0]))
-					is->is_swinflags = TCP_WSCALE_SEEN|
-							   TCP_WSCALE_FIRST;
+					      &is->is_tcp.ts_data[0]) == -1) {
+					fin->fin_flx |= FI_BAD;
+				}
 			}
 
 			if ((fin->fin_out != 0) && (pass & FR_NEWISN) != 0) {
@@ -1521,7 +1521,10 @@ tcpdata_t *td;
 					else if (i < 0)
 						i = 0;
 					td->td_winscale = i;
-				}
+					td->td_winflags |= TCP_WSCALE_SEEN|
+							   TCP_WSCALE_FIRST;
+				} else
+					retval = -1;
 				break;
 			case TCPOPT_MAXSEG :
 				/*
@@ -1533,7 +1536,14 @@ tcpdata_t *td;
 					i <<= 8;
 					i += (int)*(s + 3);
 					td->td_maxseg = i;
-				}
+				} else
+					retval = -1;
+				break;
+			case TCPOPT_SACK_PERMITTED :
+				if (ol == TCPOLEN_SACK_PERMITTED)
+					td->td_winflags |= TCP_SACK_PERMIT;
+				else
+					retval = -1;
 				break;
 			}
 		}
@@ -1634,25 +1644,15 @@ ipstate_t *is;
 		if (flags == (TH_SYN|TH_ACK)) {
 			is->is_s0[source] = ntohl(tcp->th_ack);
 			is->is_s0[!source] = ntohl(tcp->th_seq) + 1;
-			if ((TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2)) &&
-			    tdata->td_winscale) {
-				if (fr_tcpoptions(fin, tcp, fdata)) {
-					fdata->td_winflags = TCP_WSCALE_SEEN|
-							     TCP_WSCALE_FIRST;
-				} else {
-					if (!fdata->td_winscale)
-						tdata->td_winscale = 0;
-				}
+			if (TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2)) {
+				(void) fr_tcpoptions(fin, tcp, fdata);
 			}
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
 				fr_checknewisn(fin, is);
 		} else if (flags == TH_SYN) {
 			is->is_s0[source] = ntohl(tcp->th_seq) + 1;
 			if ((TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2)))
-				if (fr_tcpoptions(fin, tcp, tdata)) {
-					tdata->td_winflags = TCP_WSCALE_SEEN|
-							     TCP_WSCALE_FIRST;
-				}
+				(void) fr_tcpoptions(fin, tcp, tdata);
 
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
 				fr_checknewisn(fin, is);
@@ -1723,6 +1723,7 @@ int flags;
 	tcp_seq seq, ack, end;
 	int ackskew, tcpflags;
 	u_32_t win, maxwin;
+	int dsize, inseq;
 
 	/*
 	 * Find difference between last checked packet and this packet.
@@ -1730,12 +1731,25 @@ int flags;
 	tcpflags = tcp->th_flags;
 	seq = ntohl(tcp->th_seq);
 	ack = ntohl(tcp->th_ack);
+
 	if (tcpflags & TH_SYN)
 		win = ntohs(tcp->th_win);
 	else
 		win = ntohs(tcp->th_win) << fdata->td_winscale;
+	
+	/*
+	 * win 0 means the receiving endpoint has closed the window, because it
+	 * has not enough memory to receive data from sender. In such case we
+	 * are pretending window size to be 1 to let TCP probe data through.
+	 * TCP probe data can be either 0 or 1 octet of data, the RFC does not
+	 * state this accurately, so we have to allow 1 octet (win = 1) even if
+	 * the window is closed (win == 0).
+	 */
 	if (win == 0)
 		win = 1;
+
+	dsize = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
+	        ((tcpflags & TH_SYN) ? 1 : 0) + ((tcpflags & TH_FIN) ? 1 : 0);
 
 	/*
 	 * if window scaling is present, the scaling is only allowed
@@ -1749,19 +1763,10 @@ int flags;
 	 * the receiver also does window scaling)
 	 */
 	if (!(tcpflags & TH_SYN) && (fdata->td_winflags & TCP_WSCALE_FIRST)) {
-		if (tdata->td_winflags & TCP_WSCALE_SEEN) {
-			fdata->td_winflags &= ~TCP_WSCALE_FIRST;
-			fdata->td_maxwin = win;
-		} else {
-			fdata->td_winscale = 0;
-			fdata->td_winflags = 0;
-			tdata->td_winscale = 0;
-			tdata->td_winflags = 0;
-		  }
+		fdata->td_maxwin = win;
 	}
 
-	end = seq + fin->fin_dlen - (TCP_OFF(tcp) << 2) +
-	      ((tcpflags & TH_SYN) ? 1 : 0) + ((tcpflags & TH_FIN) ? 1 : 0);
+	end = seq + dsize;
 
 	if ((fdata->td_end == 0) &&
 	    (!(flags & IS_TCPFSM) ||
@@ -1769,7 +1774,7 @@ int flags;
 		/*
 		 * Must be a (outgoing) SYN-ACK in reply to a SYN.
 		 */
-		fdata->td_end = end;
+		fdata->td_end = end - 1;
 		fdata->td_maxwin = 1;
 		fdata->td_maxend = end + win;
 	}
@@ -1781,9 +1786,6 @@ int flags;
 		/* gross hack to get around certain broken tcp stacks */
 		ack = tdata->td_end;
 	}
-
-	if (seq == end)
-		seq = end = fdata->td_end;
 
 	maxwin = tdata->td_maxwin;
 	ackskew = tdata->td_end - ack;
@@ -1799,6 +1801,7 @@ int flags;
 
 #define	SEQ_GE(a,b)	((int)((a) - (b)) >= 0)
 #define	SEQ_GT(a,b)	((int)((a) - (b)) > 0)
+	inseq = 0;
 	if (
 #if defined(_KERNEL)
 	    (SEQ_GE(fdata->td_maxend, end)) &&
@@ -1808,7 +1811,39 @@ int flags;
 #define MAXACKWINDOW 66000
 	    (-ackskew <= (MAXACKWINDOW << fdata->td_winscale)) &&
 	    ( ackskew <= (MAXACKWINDOW << fdata->td_winscale))) {
+		inseq = 1;
+	/*
+	 * Microsoft Windows will send the next packet to the right of the
+	 * window if SACK is in use.
+	 */
+	} else if ((seq == fdata->td_maxend) && (ackskew == 0) &&
+	    (fdata->td_winflags & TCP_SACK_PERMIT) &&
+	    (tdata->td_winflags & TCP_SACK_PERMIT)) {
+		inseq = 1;
+	/*
+	 * RST ACK with SEQ equal to 0 is sent by some OSes (i.e. Solaris) as a
+	 * response to initial SYN packet, when  there is no application
+	 * listeing to on a port, where the SYN packet has came to.
+	 */
+	} else if ((seq == 0) && (tcpflags == (TH_RST|TH_ACK)) &&
+		   (ackskew >= -1) && (ackskew <= 1)) {
+		inseq = 1;
+	} else if (!(flags & IS_TCPFSM)) {
 
+		if (!(fdata->td_winflags &
+			    (TCP_WSCALE_SEEN|TCP_WSCALE_FIRST))) {
+			/*
+			 * No TCPFSM and no window scaling, so make some
+			 * extra guesses.
+			 */
+			if ((seq == fdata->td_maxend) && (ackskew == 0))
+				inseq = 1;
+			else if (SEQ_GE(seq + maxwin, fdata->td_end - maxwin))
+				inseq = 1;
+		}
+	}
+
+	if (inseq) {
 		/* if ackskew < 0 then this should be due to fragmented
 		 * packets. There is no way to know the length of the
 		 * total packet in advance.
@@ -1835,6 +1870,7 @@ int flags;
 			tdata->td_maxend = ack + win;
 		return 1;
 	}
+	fin->fin_flx |= FI_OOW;
 	return 0;
 }
 
@@ -3538,9 +3574,9 @@ int flags;
 			if (ostate >= IPF_TCPS_HALF_ESTAB) {
 				if ((tcpflags & TH_ACKMASK) == TH_ACK) {
 					nstate = IPF_TCPS_ESTABLISHED;
-					rval = 1;
 				}
 			}
+			rval = 1;
 				
 			break;
 
@@ -3628,22 +3664,14 @@ int flags;
 			break;
 
 		case IPF_TCPS_LAST_ACK: /* 9 */
-			if (tcpflags & TH_ACK) {
-				if ((tcpflags & TH_PUSH) || dlen)
-					/*
-					 * there is still data to be delivered,
-					 * reset timeout
-					 */
-					rval = 1;
-				else
-					rval = 2;
-			}
 			/*
-			 * we cannot detect when we go out of LAST_ACK state to
-			 * CLOSED because that is based on the reception of ACK
-			 * packets; ipfilter can only detect that a packet
-			 * has been sent by a host
+			 * We want to reset timer here to keep state in table.
+			 * If we would allow the state to time out here, while
+			 * there would still be packets being retransmitted, we
+			 * would cut off line between the two peers preventing
+			 * them to close connection properly. 
 			 */
+			rval = 1;
 			break;
 
 		case IPF_TCPS_FIN_WAIT_2: /* 10 */
