@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -700,6 +700,13 @@ end_arg:		*next++ = '\0';
 					while (c = getwchr())
 						if ((c == '\n') || (c == '\0'))
 							break;
+				if (strcmp(arg, LEOF) == 0 && *LEOF != '\0') {
+					/*
+					 * Encountered EOF string.
+					 * Don't read any more lines.
+					 */
+					N_lines = 0;
+				}
 				return (0);
 			} else {
 				++N_args;
@@ -735,10 +742,16 @@ end_arg:		*next++ = '\0';
 			break;
 
 		case L'\\':
-			c = getwchr();
-			/* store quoted char for potential requeueing */
-			requeue_offset = store_wchr(&requeue_buf, &requeue_len,
-			    requeue_offset, c);
+			/*
+			 * Any unquoted character can be escaped by
+			 * preceding it with a backslash.
+			 */
+			if (inquote == 0) {
+				c = getwchr();
+				/* store quoted char for potential requeueing */
+				requeue_offset = store_wchr(&requeue_buf,
+				    &requeue_len, requeue_offset, c);
+			}
 
 		default:
 is_default:		if (bytes == -1) {
