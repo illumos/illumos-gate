@@ -65,6 +65,7 @@ typedef struct door_client {
 	struct file	**d_fpp;	/* File ptrs  */
 	int		d_error;	/* Error (if any) */
 	kcondvar_t	d_cv;
+	uchar_t		d_args_done;	/* server has processed client's args */
 	uchar_t		d_hold;		/* Thread needs to stick around */
 	uchar_t		d_upcall;	/* Kernel level upcall */
 	uchar_t		d_noresults;	/* No results allowed */

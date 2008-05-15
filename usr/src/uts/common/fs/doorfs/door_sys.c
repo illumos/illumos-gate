@@ -554,6 +554,14 @@ door_call(int did, void *args)
 	if ((dp = door_lookup(did, NULL)) == NULL)
 		return (set_errno(EBADF));
 
+	/*
+	 * We don't want to hold the door FD over the entire operation;
+	 * instead, we put a hold on the door vnode and release the FD
+	 * immediately
+	 */
+	VN_HOLD(DTOV(dp));
+	releasef(did);
+
 	mutex_enter(&door_knob);
 	if (DOOR_INVALID(dp)) {
 		mutex_exit(&door_knob);
@@ -678,6 +686,7 @@ door_call(int did, void *args)
 
 	dp->door_active++;
 	ct->d_error = DOOR_WAIT;
+	ct->d_args_done = 0;
 	st->d_caller = curthread;
 	st->d_active = dp;
 
@@ -760,11 +769,21 @@ shuttle_return:
 			cv_wait(&ct->d_cv, &door_knob);
 
 		/*
+		 * If the server has not processed our message, free the
+		 * descriptors.
+		 */
+		if (!ct->d_args_done) {
+			door_fp_close(ct->d_fpp, ct->d_args.desc_num);
+			ct->d_args_done = 1;
+		}
+
+		/*
 		 * Find out if results were successfully copied.
 		 */
 		if (ct->d_error == 0)
 			gotresults = 1;
 	}
+	ASSERT(ct->d_args_done);
 	lwp->lwp_asleep = 0;		/* /proc */
 	lwp->lwp_sysabort = 0;		/* /proc */
 	if (--dp->door_active == 0 && (dp->door_flags & DOOR_DELAY))
@@ -800,7 +819,7 @@ results:
 		ct->d_args.data_ptr = ct->d_args.rbuf;
 		if (ct->d_kernel || (!ct->d_overflow &&
 		    ct->d_args.data_size <= door_max_arg)) {
-			if (copyout(ct->d_buf, ct->d_args.rbuf,
+			if (copyout_nowatch(ct->d_buf, ct->d_args.rbuf,
 			    ct->d_args.data_size)) {
 				door_fp_close(ct->d_fpp, ct->d_args.desc_num);
 				error = EFAULT;
@@ -834,7 +853,7 @@ results:
 		ct->d_args.desc_ptr = (door_desc_t *)(ct->d_args.rbuf +
 		    roundup(ct->d_args.data_size, sizeof (door_desc_t)));
 
-		if (copyout(start, ct->d_args.desc_ptr, dsize)) {
+		if (copyout_nowatch(start, ct->d_args.desc_ptr, dsize)) {
 			error = EFAULT;
 			goto out;
 		}
@@ -844,7 +863,8 @@ results:
 	 * Return the results
 	 */
 	if (datamodel == DATAMODEL_NATIVE) {
-		if (copyout(&ct->d_args, args, sizeof (door_arg_t)) != 0)
+		if (copyout_nowatch(&ct->d_args, args,
+		    sizeof (door_arg_t)) != 0)
 			error = EFAULT;
 	} else {
 		door_arg32_t    da32;
@@ -855,7 +875,7 @@ results:
 		da32.desc_num = ct->d_args.desc_num;
 		da32.rbuf = (caddr32_t)(uintptr_t)ct->d_args.rbuf;
 		da32.rsize = ct->d_args.rsize;
-		if (copyout(&da32, args, sizeof (door_arg32_t)) != 0) {
+		if (copyout_nowatch(&da32, args, sizeof (door_arg32_t)) != 0) {
 			error = EFAULT;
 		}
 	}
@@ -879,7 +899,7 @@ out:
 	}
 
 	if (dp)
-		releasef(did);
+		VN_RELE(DTOV(dp));
 
 	if (ct->d_buf) {
 		ASSERT(!ct->d_kernel);
@@ -1045,6 +1065,9 @@ door_getparam(int did, int type, size_t *out)
 /*
  * A copyout() which proceeds from high addresses to low addresses.  This way,
  * stack guard pages are effective.
+ *
+ * Note that we use copyout_nowatch();  this is called while the client is
+ * held.
  */
 static int
 door_stack_copyout(const void *kaddr, void *uaddr, size_t count)
@@ -1054,7 +1077,7 @@ door_stack_copyout(const void *kaddr, void *uaddr, size_t count)
 	size_t pgsize = PAGESIZE;
 
 	if (count <= pgsize)
-		return (copyout(kaddr, uaddr, count));
+		return (copyout_nowatch(kaddr, uaddr, count));
 
 	while (count > 0) {
 		uintptr_t start, end, offset, amount;
@@ -1069,7 +1092,7 @@ door_stack_copyout(const void *kaddr, void *uaddr, size_t count)
 
 		ASSERT(amount > 0 && amount <= count && amount <= pgsize);
 
-		if (copyout(kbase + offset, (void *)start, amount))
+		if (copyout_nowatch(kbase + offset, (void *)start, amount))
 			return (1);
 		count -= amount;
 	}
@@ -1258,7 +1281,7 @@ door_server_dispatch(door_client_t *ct, door_node_t *dp)
 		di.di_attributes = (dp->door_flags & DOOR_ATTR_MASK) |
 		    DOOR_LOCAL;
 
-		if (copyout(&di, infop, sizeof (di))) {
+		if (door_stack_copyout(&di, infop, sizeof (di))) {
 			error = E2BIG;
 			goto fail;
 		}
@@ -1276,7 +1299,7 @@ door_server_dispatch(door_client_t *ct, door_node_t *dp)
 		dr.nservers = !empty_pool;
 		dr.door_info = (door_info_t *)infop;
 
-		if (copyout(&dr, layout->dl_resultsp, sizeof (dr))) {
+		if (door_stack_copyout(&dr, layout->dl_resultsp, sizeof (dr))) {
 			error = E2BIG;
 			goto fail;
 		}
@@ -1293,7 +1316,8 @@ door_server_dispatch(door_client_t *ct, door_node_t *dp)
 		dr32.nservers = !empty_pool;
 		dr32.door_info = (caddr32_t)(uintptr_t)infop;
 
-		if (copyout(&dr32, layout->dl_resultsp, sizeof (dr32))) {
+		if (door_stack_copyout(&dr32, layout->dl_resultsp,
+		    sizeof (dr32))) {
 			error = E2BIG;
 			goto fail;
 		}
@@ -1456,6 +1480,9 @@ out:
 		error = door_server_dispatch(ct, dp);
 		mutex_enter(&door_knob);
 		DOOR_T_RELEASE(ct);
+
+		/* let the client know we have processed his message */
+		ct->d_args_done = 1;
 
 		if (error) {
 			caller = st->d_caller;
@@ -2319,7 +2346,7 @@ door_overflow(
 		int		fpp_size;
 
 		start = didpp = kmem_alloc(ds, KM_SLEEP);
-		if (copyin(desc_ptr, didpp, ds)) {
+		if (copyin_nowatch(desc_ptr, didpp, ds)) {
 			kmem_free(start, ds);
 			(void) as_unmap(as, addr, rlen);
 			return (EFAULT);
@@ -2413,7 +2440,7 @@ door_args(kthread_t *server, int is_private)
 			ct->d_bufsize = roundup(ct->d_args.data_size,
 			    DOOR_ROUND);
 			ct->d_buf = kmem_alloc(ct->d_bufsize, KM_SLEEP);
-			if (copyin(ct->d_args.data_ptr,
+			if (copyin_nowatch(ct->d_args.data_ptr,
 			    ct->d_buf, ct->d_args.data_size) != 0) {
 				kmem_free(ct->d_buf, ct->d_bufsize);
 				ct->d_buf = NULL;
@@ -2485,7 +2512,7 @@ door_args(kthread_t *server, int is_private)
 
 		start = didpp = kmem_alloc(dsize, KM_SLEEP);
 
-		if (copyin(ct->d_args.desc_ptr, didpp, dsize)) {
+		if (copyin_nowatch(ct->d_args.desc_ptr, didpp, dsize)) {
 			kmem_free(start, dsize);
 			return (EFAULT);
 		}
@@ -2556,7 +2583,7 @@ door_translate_in(void)
 
 		start = didpp = kmem_alloc(dsize, KM_SLEEP);
 
-		if (copyin(ct->d_args.desc_ptr, didpp, dsize)) {
+		if (copyin_nowatch(ct->d_args.desc_ptr, didpp, dsize)) {
 			kmem_free(start, dsize);
 			return (EFAULT);
 		}
@@ -2721,7 +2748,8 @@ door_results(kthread_t *caller, caddr_t data_ptr, size_t data_size,
 		}
 		ct->d_args.data_ptr = ct->d_args.rbuf;
 		if (data_size != 0 &&
-		    copyin(data_ptr, ct->d_args.data_ptr, data_size) != 0)
+		    copyin_nowatch(data_ptr, ct->d_args.data_ptr,
+		    data_size) != 0)
 			return (EFAULT);
 	} else if (result_size > ct->d_args.rsize) {
 		return (door_overflow(caller, data_ptr, data_size,
@@ -2739,7 +2767,7 @@ door_results(kthread_t *caller, caddr_t data_ptr, size_t data_size,
 				ct->d_bufsize = data_size;
 				ct->d_buf = kmem_alloc(ct->d_bufsize, KM_SLEEP);
 			}
-			if (copyin(data_ptr, ct->d_buf, data_size) != 0)
+			if (copyin_nowatch(data_ptr, ct->d_buf, data_size) != 0)
 				return (EFAULT);
 		} else {
 			struct as *as = ttoproc(caller)->p_as;
@@ -2785,7 +2813,7 @@ door_results(kthread_t *caller, caddr_t data_ptr, size_t data_size,
 			return (EMFILE);
 
 		start = didpp = kmem_alloc(dsize, KM_SLEEP);
-		if (copyin(desc_ptr, didpp, dsize)) {
+		if (copyin_nowatch(desc_ptr, didpp, dsize)) {
 			kmem_free(start, dsize);
 			return (EFAULT);
 		}
@@ -2898,7 +2926,8 @@ door_release_fds(door_desc_t *desc_ptr, uint_t ndesc)
 	while (ndesc > 0) {
 		uint_t count = MIN(ndesc, desc_num);
 
-		if (copyin(desc_ptr, didpp, count * sizeof (door_desc_t))) {
+		if (copyin_nowatch(desc_ptr, didpp,
+		    count * sizeof (door_desc_t))) {
 			kmem_free(didpp, dsize);
 			return (EFAULT);
 		}
@@ -2992,7 +3021,7 @@ door_copy(struct as *as, caddr_t src, caddr_t dest, uint_t len)
 	/*
 	 * Copy from src to dest
 	 */
-	if (copyin(src, kaddr + off, len) != 0)
+	if (copyin_nowatch(src, kaddr + off, len) != 0)
 		error = EFAULT;
 	/*
 	 * Unmap destination page from kernel
