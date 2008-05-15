@@ -1589,10 +1589,16 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 		}
 
 		if (i == MAX_SERDES_RDY_RETRIES) {
+			/*
+			 * RDY signal stays low may due to the absent of the
+			 * external PHY, it is not an error condition. But still
+			 * print the message for the debugging purpose when link
+			 * stays down
+			 */
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_10G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-				goto fail;
+			goto done;
 		}
 	} else if (portn == 1) {
 		/* Wait for serdes to be ready */
@@ -1612,10 +1618,16 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 		}
 
 		if (i == MAX_SERDES_RDY_RETRIES) {
+			/*
+			 * RDY signal stays low may due to the absent of the
+			 * external PHY, it is not an error condition. But still
+			 * print the message for the debugging purpose when link
+			 * stays down
+			 */
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_10G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-				goto fail;
+			goto done;
 		}
 	}
 
@@ -1839,22 +1851,30 @@ nxge_1G_serdes_init(p_nxge_t nxgep)
 	if (portn == 0) {
 		if ((val & ESR_SIG_P0_BITS_MASK_1G) !=
 		    (ESR_SIG_SERDES_RDY0_P0 | ESR_SIG_DETECT0_P0)) {
+			/*
+			 * RDY signal stays low may due to the absent of the
+			 * external PHY, it is not an error condition. But still
+			 * print the message for the debugging purpose when link
+			 * stays down
+			 */
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    "nxge_neptune_serdes_init: "
-			    "Failed to get Serdes up for port<%d> val 0x%x",
-			    portn, (val & ESR_SIG_P0_BITS_MASK)));
-			status = NXGE_ERROR;
-			goto fail;
+			    "nxge_neptune_1G_serdes_init: "
+			    "Serdes/signal for port<%d> not ready", portn));
+			goto done;
 		}
 	} else if (portn == 1) {
 		if ((val & ESR_SIG_P1_BITS_MASK_1G) !=
 		    (ESR_SIG_SERDES_RDY0_P1 | ESR_SIG_DETECT0_P1)) {
+			/*
+			 * RDY signal stays low may due to the absent of the
+			 * external PHY, it is not an error condition. But still
+			 * print the message for the debugging purpose when link
+			 * stays down
+			 */
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    "nxge_neptune_serdes_init: "
-			    "Failed to get Serdes up for port<%d> val 0x%x",
-			    portn, (val & ESR_SIG_P1_BITS_MASK)));
-			status = NXGE_ERROR;
-			goto fail;
+			    "nxge_neptune_1G_serdes_init: "
+			    "Serdes/signal for port<%d> not ready", portn));
+			goto done;
 		}
 	}
 done:
