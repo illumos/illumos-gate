@@ -1092,8 +1092,7 @@ cpuid_pass1(cpu_t *cpu)
 			if (x86_vendor == X86_VENDOR_AMD)
 				feature &= ~X86_SEP;
 #endif
-			if (x86_vendor == X86_VENDOR_AMD &&
-			    cp->cp_edx & CPUID_AMD_EDX_TSCP)
+			if (cp->cp_edx & CPUID_AMD_EDX_TSCP)
 				feature |= X86_TSCP;
 			break;
 		default:
@@ -2197,6 +2196,8 @@ cpuid_pass4(cpu_t *cpu)
 		 */
 		switch (cpi->cpi_vendor) {
 		case X86_VENDOR_Intel:
+			if ((x86_feature & X86_TSCP) == 0)
+				*edx &= ~CPUID_AMD_EDX_TSCP;
 			break;
 
 		case X86_VENDOR_AMD:
@@ -2251,6 +2252,8 @@ cpuid_pass4(cpu_t *cpu)
 			break;
 
 		case X86_VENDOR_Intel:
+			if (*edx & CPUID_AMD_EDX_TSCP)
+				hwcap_flags |= AV_386_TSCP;
 			/*
 			 * Aarrgh.
 			 * Intel uses a different bit in the same word.
