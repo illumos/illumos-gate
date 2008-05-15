@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,7 +165,7 @@ extern struct mod_ops mod_fsops;
 
 static struct modlfs modlfs = {
 	&mod_fsops,
-	"PC filesystem v1.2",
+	"PC filesystem",
 	&vfw
 };
 
@@ -537,11 +537,6 @@ pcfs_parse_mntopts(struct pcfs *fsp, struct mounta *uap)
 	ASSERT(fsp->pcfs_secondswest == 0);
 	ASSERT(fsp->pcfs_secsize == 0);
 
-	if (uap->flags & MS_RDONLY) {
-		vfsp->vfs_flag |= VFS_RDONLY;
-		vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
-	}
-
 	if (vfs_optionisset(vfsp, MNTOPT_PCFS_HIDDEN, NULL))
 		fsp->pcfs_flags |= PCFS_HIDDEN;
 	if (vfs_optionisset(vfsp, MNTOPT_PCFS_FOLDCASE, NULL))
@@ -651,6 +646,18 @@ pcfs_mount(
 		    "Ignoring mount(2) 'dataptr' argument.");
 
 	/*
+	 * This is needed early, to make sure the access / open calls
+	 * are done using the correct mode. Processing this mount option
+	 * only when calling pcfs_parse_mntopts() would lead us to attempt
+	 * a read/write access to a possibly writeprotected device, and
+	 * a readonly mount attempt might fail because of that.
+	 */
+	if (uap->flags & MS_RDONLY) {
+		vfsp->vfs_flag |= VFS_RDONLY;
+		vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
+	}
+
+	/*
 	 * For most filesystems, this is just a lookupname() on the
 	 * mount pathname string. PCFS historically has to do its own
 	 * partition table parsing because not all Solaris architectures
@@ -707,12 +714,6 @@ pcfs_mount(
 	fsp->pcfs_devvp = devvp;
 	fsp->pcfs_ldrive = dos_ldrive;
 	mutex_init(&fsp->pcfs_lock, NULL, MUTEX_DEFAULT, NULL);
-	vfsp->vfs_data = fsp;
-	vfsp->vfs_dev = pseudodev;
-	vfsp->vfs_fstype = pcfstype;
-	vfs_make_fsid(&vfsp->vfs_fsid, pseudodev, pcfstype);
-	vfsp->vfs_bcount = 0;
-	vfsp->vfs_bsize = fsp->pcfs_clsize;
 
 	pcfs_parse_mntopts(fsp, uap);
 
@@ -729,6 +730,17 @@ pcfs_mount(
 	 */
 	if (error = pc_getfattype(fsp))
 		goto errout;
+
+	/*
+	 * Now that the BPB has been parsed, this structural information
+	 * is available and known to be valid. Initialize the VFS.
+	 */
+	vfsp->vfs_data = fsp;
+	vfsp->vfs_dev = pseudodev;
+	vfsp->vfs_fstype = pcfstype;
+	vfs_make_fsid(&vfsp->vfs_fsid, pseudodev, pcfstype);
+	vfsp->vfs_bcount = 0;
+	vfsp->vfs_bsize = fsp->pcfs_clsize;
 
 	/*
 	 * Validate that we can access the FAT and that it is, to the
@@ -1854,8 +1866,38 @@ secondaryBPBChecks(struct pcfs *fsp, uchar_t *bpb, size_t secsize)
  * This looks far more complicated that it needs to be for pure structural
  * validation. The reason for this is that parseBPB() is also used for
  * debugging purposes (mdb dcmd) and we therefore want a bitmap of which
- * BPB fields have 'known good' values, even if we do not reject the BPB
- * when attempting to mount the filesystem.
+ * BPB fields (do not) have 'known good' values, even if we (do not) reject
+ * the BPB when attempting to mount the filesystem.
+ *
+ * Real-world usage of FAT shows there are a lot of corner-case situations
+ * and, following the specification strictly, invalid filesystems out there.
+ * Known are situations such as:
+ *	- FAT12/FAT16 filesystems with garbage in either totsec16/32
+ *	  instead of the zero in one of the fields mandated by the spec
+ *	- filesystems that claim to be larger than the partition they're in
+ *	- filesystems without valid media descriptor
+ *	- FAT32 filesystems with RootEntCnt != 0
+ *	- FAT32 filesystems with less than 65526 clusters
+ *	- FAT32 filesystems without valid FSI sector
+ *	- FAT32 filesystems with FAT size in fatsec16 instead of fatsec32
+ *
+ * Such filesystems are accessible by PCFS - if it'd know to start with that
+ * the filesystem should be treated as a specific FAT type. Before S10, it
+ * relied on the PC/fdisk partition type for the purpose and almost completely
+ * ignored the BPB; now it ignores the partition type for anything else but
+ * logical drive enumeration, which can result in rejection of (invalid)
+ * FAT32 - if the partition ID says FAT32, but the filesystem, for example
+ * has less than 65526 clusters.
+ *
+ * Without a "force this fs as FAT{12,16,32}" tunable or mount option, it's
+ * not possible to allow all such mostly-compliant filesystems in unless one
+ * accepts false positives (definitely invalid filesystems that cause problems
+ * later). This at least allows to pinpoint why the mount failed.
+ *
+ * Due to the use of FAT on removeable media, all relaxations of the rules
+ * here need to be carefully evaluated wrt. to potential effects on PCFS
+ * resilience. A faulty/"mis-crafted" filesystem must not cause a panic, so
+ * beware.
  */
 static int
 parseBPB(struct pcfs *fsp, uchar_t *bpb, int *valid)
@@ -1924,6 +1966,12 @@ parseBPB(struct pcfs *fsp, uchar_t *bpb, int *valid)
 
 	if (fsp->pcfs_mediasize == 0) {
 		mediasize = (len_t)totsec * (len_t)secsize;
+		/*
+		 * This is not an error because not all devices support the
+		 * dkio(7i) mediasize queries, and/or not all devices are
+		 * partitioned. If we have not been able to figure out the
+		 * size of the underlaying medium, we have to trust the BPB.
+		 */
 		PC_DPRINTF4(3, "!pcfs: parseBPB: mediasize autodetect failed "
 		    "on device (%x.%x):%d, trusting BPB totsec (%lld Bytes)\n",
 		    getmajor(fsp->pcfs_xdev), getminor(fsp->pcfs_xdev),
@@ -1989,17 +2037,20 @@ parseBPB(struct pcfs *fsp, uchar_t *bpb, int *valid)
 	    size_t, rdirsec, blkcnt_t, datasec);
 
 	/*
-	 * UINT32_MAX is an underflow check - we calculate in "blkcnt_t" which
-	 * is 64bit in order to be able to catch "impossible" sector counts.
-	 * A sector count in FAT must fit 32bit unsigned int.
+	 * 'totsec' is taken directly from the BPB and guaranteed to fit
+	 * into a 32bit unsigned integer. The calculation of 'datasec',
+	 * on the other hand, could underflow for incorrect values in
+	 * rdirsec/reserved/fatsec. Check for that.
+	 * We also check that the BPB conforms to the FAT specification's
+	 * requirement that either of the 16/32bit total sector counts
+	 * must be zero.
 	 */
 	if (totsec != 0 &&
 	    (totsec16 == totsec32 || totsec16 == 0 || totsec32 == 0) &&
-	    (len_t)totsec * (len_t)secsize <= mediasize &&
 	    datasec < totsec && datasec <= UINT32_MAX)
 		validflags |= BPB_TOTSEC_OK;
 
-	if (mediasize >= (len_t)datasec * (len_t)secsize)
+	if ((len_t)totsec * (len_t)secsize <= mediasize)
 		validflags |= BPB_MEDIASZ_OK;
 
 	if (VALID_SECSIZE(secsize))
