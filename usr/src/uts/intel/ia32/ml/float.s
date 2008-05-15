@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,7 @@ fxsave_insn(struct fxsave_state *fx)
 #if defined(__amd64)
 
 	ENTRY_NP(fxsave_insn)
-	fxsave	(%rdi)
+	FXSAVEQ	((%rdi))
 	ret
 	SET_SIZE(fxsave_insn)
 
@@ -218,7 +218,8 @@ fpnsave_ctxt(void *arg)
 	jne	1f
 
 	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%rdi)
-	fxsave	FPU_CTX_FPU_REGS(%rdi)
+	FXSAVEQ	(FPU_CTX_FPU_REGS(%rdi))
+
 	/*
 	 * On certain AMD processors, the "exception pointers" i.e. the last
 	 * instruction pointer, last data pointer, and last opcode
@@ -303,7 +304,7 @@ fpxsave(struct fxsave_state *f)
 
 	ENTRY_NP(fpxsave)
 	CLTS
-	fxsave	(%rdi)
+	FXSAVEQ	((%rdi))
 	fninit				/* clear exceptions, init x87 tags */
 	STTS(%rdi)			/* set TS bit in %cr0 (disable FPU) */
 	ret
@@ -349,7 +350,7 @@ fpxrestore(struct fxsave_state *f)
 
 	ENTRY_NP(fpxrestore)
 	CLTS
-	fxrstor	(%rdi)
+	FXRSTORQ	((%rdi))
 	ret
 	SET_SIZE(fpxrestore)
 
@@ -418,7 +419,7 @@ fpinit(void)
 	ENTRY_NP(fpinit)
 	CLTS
 	leaq	sse_initial(%rip), %rax
-	fxrstor	(%rax)			/* load clean initial state */
+	FXRSTORQ	((%rax))		/* load clean initial state */
 	ret
 	SET_SIZE(fpinit)
 

@@ -659,7 +659,7 @@ _emul_done:
 	 * kernel due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
-	fxrstor	(%r15)
+	FXRSTORQ	((%r15))
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
 	je	.return_to_kernel
 
@@ -722,7 +722,7 @@ _emul_done:
 	 * kernel due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
-	fxrstor	(%rax)
+	FXRSTORQ	((%rax))
 	popq	%rbx
 	popq	%rax
 	IRET
