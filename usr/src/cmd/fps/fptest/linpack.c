@@ -36,12 +36,7 @@
 #include <fps_ereport.h>
 #include <fpstestmsg.h>
 #include <linpack.h>
-
-#ifdef __i386
-#include "/shared/dp/mercury/latest/prod/include/cc/sunperf.h"
-#else
 #include <sunperf.h>
-#endif
 
 double fabs(double x);
 
