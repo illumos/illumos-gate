@@ -32,7 +32,8 @@ OBJS =		hald_marshal.o device.o device_info.o device_store.o hald.o \
 		hald_dbus.o hald_runner.o ids.o logger.o property.o util.o \
 		util_helper.o util_pm.o
 OBJS_SOL =	devinfo.o devinfo_ieee1394.o devinfo_misc.o devinfo_pci.o devinfo_storage.o \
-		devinfo_usb.o hotplug.o osspec.o sysevent.o devinfo_acpi.o
+		devinfo_usb.o hotplug.o osspec.o sysevent.o devinfo_acpi.o \
+		devinfo_cpu.o
 OBJS_ALL =	$(OBJS) $(OBJS_SOL:%=solaris/%)
 SRCS =		$(OBJS:%.o=%.c)
 
@@ -42,7 +43,7 @@ include ../Makefile.hal
 ROOTCMDDIR =	$(ROOTLIB_HAL)
 
 LDLIBS +=	-lc -lm -ldbus-1 -ldbus-glib-1 -lglib-2.0 -lgobject-2.0 \
-		-ldevinfo -lsysevent -lnvpair
+		-ldevinfo -lsysevent -lnvpair -lkstat -lcfgadm
 
 all install $(PROG) :=	LDLIBS += -lexpat
 

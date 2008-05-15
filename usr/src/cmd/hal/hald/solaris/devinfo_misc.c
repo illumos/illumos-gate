@@ -12,7 +12,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
-#  include <config.h>
+#include <config.h>
 #endif
 
 #include <stdio.h>
@@ -30,7 +30,6 @@
 #include "devinfo_misc.h"
 
 static HalDevice *devinfo_computer_add(HalDevice *, di_node_t, char *, char *);
-static HalDevice *devinfo_cpu_add(HalDevice *, di_node_t, char *, char *);
 static HalDevice *devinfo_keyboard_add(HalDevice *, di_node_t, char *, char *);
 static HalDevice *devinfo_default_add(HalDevice *, di_node_t, char *, char *);
 
@@ -42,14 +41,7 @@ DevinfoDevHandler devinfo_computer_handler = {
 	NULL,
 	NULL
 };
-DevinfoDevHandler devinfo_cpu_handler = {
-	devinfo_cpu_add,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
+
 DevinfoDevHandler devinfo_keyboard_handler = {
 	devinfo_keyboard_add,
 	NULL,
@@ -58,6 +50,7 @@ DevinfoDevHandler devinfo_keyboard_handler = {
 	NULL,
 	NULL
 };
+
 DevinfoDevHandler devinfo_default_handler = {
 	devinfo_default_add,
 	NULL,
@@ -119,25 +112,6 @@ devinfo_computer_add(HalDevice *parent, di_node_t node, char *devfs_path, char *
 	devinfo_add_enqueue (local_d, "/local", &devinfo_default_handler);
 
 	return (local_d);
-}
-
-static HalDevice *
-devinfo_cpu_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type)
-{
-	HalDevice *d;
-
-	if ((device_type == NULL) || (strcmp(device_type, "cpu") != 0)) {
-		return (NULL);
-	}
-
-	d = hal_device_new ();
-
-	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_add_capability (d, "processor");
-
-	devinfo_add_enqueue (d, devfs_path, &devinfo_cpu_handler);
-
-	return (d);
 }
 
 static HalDevice *

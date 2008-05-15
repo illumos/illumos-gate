@@ -1756,8 +1756,70 @@ Use is subject to license terms.
 	<see>svccfg(1M)</see>
     </event>
 
+<!-- CPUFreq related events -->
+
+    <event id="AUE_cpu_ondemand" header="0" idNo="93" omit="JNI">
+	<title>set CPU freq to minimal unless load increases</title>
+	<program>/usr/lib/hal/hald-addon-cpufreq</program>
+	<see>hald(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_cpu_performance" header="0" idNo="94" omit="JNI">
+	<title>set CPU freq to Max</title>
+	<program>/usr/lib/hal/hald-addon-cpufreq</program>
+	<see>hald(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_cpu_threshold" header="0" idNo="95" omit="JNI">
+	<title>set CPU frequency threshold percentage</title>
+	<program>/usr/lib/hal/hald-addon-cpufreq</program>
+	<see>hald(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="threshold">
+	    <internal token="text"/>
+	    <external opt="required" type="int"/>
+	    <comment>threshold percent 1-100</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 92, so next is 93, then fix this comment -->
+<!-- Highest idNo is 95, so next is 96, then fix this comment -->
 <!-- end of C Only events -->
 
 

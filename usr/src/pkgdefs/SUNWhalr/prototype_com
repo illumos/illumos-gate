@@ -69,6 +69,7 @@ d none etc/hal/fdi/policy/10osvendor 755 root bin
 f none etc/hal/fdi/policy/10osvendor/10-laptop-panel-mgmt-policy.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/10-network-attached.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/10-power-mgmt-policy.fdi 444 root bin
+f none etc/hal/fdi/policy/10osvendor/10-cpufreq.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/10-toshiba-buttons.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/20-storage-methods.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/20-zfs-methods.fdi 444 root bin

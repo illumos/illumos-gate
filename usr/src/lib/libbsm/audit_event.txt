@@ -452,6 +452,10 @@
 6248:AUE_ndmp_disconnect:ndmp disconnect:na
 6249:AUE_ndmp_backup:ndmp backup:na
 6250:AUE_ndmp_restore:ndmp restore:na
+6251:AUE_cpu_ondemand:set ondemand CPU freq governor:ss
+6252:AUE_cpu_performance:set max CPU freq governor:ss
+6253:AUE_cpu_threshold:set CPU freq threshold:ss
+
 #
 # SMF(5) svc.configd events (svcadm(1M) related)
 #

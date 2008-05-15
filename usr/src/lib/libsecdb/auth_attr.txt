@@ -157,6 +157,7 @@ solaris.system.power.suspend.:::Suspend the System::help=SysPowerMgmtSuspend.htm
 solaris.system.power.suspend.disk:::Suspend to Disk::help=SysPowerMgmtSuspendtoDisk.html 
 solaris.system.power.suspend.ram:::Suspend to RAM::help=SysPowerMgmtSuspendToRAM.html
 solaris.system.power.brightness:::Control LCD Brightness::help=SysPowerMgmtBrightness.html
+solaris.system.power.cpu:::Manage CPU related power::help=SysCpuPowerMgmt.html
 #
 solaris.smf.manage.iscsitgt:::Manage ISCSI Target Service States::help=SmfValueIscsitgt.html
 solaris.smf.read.iscsitgt:::Read ISCSI Target secrets::help=SmfValueIscsitgt.html

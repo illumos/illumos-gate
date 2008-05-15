@@ -313,6 +313,7 @@ f none usr/lib/help/auths/locale/SysPowerMgmtSuspend.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtSuspendtoDisk.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtSuspendtoRAM.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtBrightness.html 444 root bin
+f none usr/lib/help/auths/locale/SysCpuPowerMgmt.html 444 root bin
 #
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
@@ -373,6 +374,7 @@ f none usr/lib/help/profiles/locale/RtSysPowerMgmtSuspend.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSysPowerMgmtSuspendtoDisk.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSysPowerMgmtSuspendtoRAM.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSysPowerMgmtBrightness.html 444 root bin
+f none usr/lib/help/profiles/locale/RtCPUPowerManagement.html 444 root bin
 #
 #
 # OCF Messages

@@ -136,7 +136,8 @@ HTMLENTS = \
 	SysPowerMgmtSuspend.html \
 	SysPowerMgmtSuspendtoDisk.html \
 	SysPowerMgmtSuspendtoRAM.html \
-	SysPowerMgmtBrightness.html
+	SysPowerMgmtBrightness.html \
+	SysCpuPowerMgmt.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

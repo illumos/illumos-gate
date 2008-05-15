@@ -85,7 +85,8 @@ HTMLENTS = \
 	RtSysPowerMgmtSuspend.html \
 	RtSysPowerMgmtSuspendtoDisk.html \
 	RtSysPowerMgmtSuspendtoRAM.html \
-	RtSysPowerMgmtBrightness.html
+	RtSysPowerMgmtBrightness.html \
+	RtCPUPowerManagement.html
 
 
 HELPDIR =	$(ROOT)/usr/lib/help

@@ -35,6 +35,7 @@
 #include "devinfo_usb.h"
 #include "devinfo_misc.h"
 #include "devinfo_acpi.h"
+#include "devinfo_cpu.h"
 
 void devinfo_add_subtree(HalDevice *parent, di_node_t node, gboolean is_root);
 HalDevice *devinfo_add_node(HalDevice *parent, di_node_t node);

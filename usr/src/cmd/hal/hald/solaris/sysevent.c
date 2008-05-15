@@ -12,7 +12,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
-#  include <config.h>
+#include <config.h>
 #endif
 
 #include <stdio.h>
@@ -27,7 +27,10 @@
 #include <libsysevent.h>
 #include <sys/sysevent/dev.h>
 #include <sys/sysevent/pwrctl.h>
+#include <sys/sysevent/dr.h>
 #include <glib.h>
+#include <config_admin.h>
+#include <kstat.h>
 
 #include "../osspec.h"
 #include "../logger.h"
@@ -42,6 +45,8 @@
 #include "devinfo_acpi.h"
 #include "devinfo_usb.h"
 #include "sysevent.h"
+#include "devinfo_misc.h"
+#include "devinfo_cpu.h"
 
 #ifndef ESC_LOFI
 #define	ESC_LOFI "lofi"
@@ -57,6 +62,7 @@ static void	sysevent_lofi_remove(gchar *, gchar *);
 static void	sysevent_devfs_add(gchar *);
 static void	sysevent_pwrctl(gchar *, gchar *, gchar *, gchar *, gchar *,
 		    gchar *, uint_t);
+static void	sysevent_process_dr(gchar *, gchar *);
 
 static sysevent_handle_t	*shp;
 
@@ -132,6 +138,14 @@ sysevent_init(void)
 		return (FALSE);
 	}
 
+	subcl[0] = ESC_DR_AP_STATE_CHANGE;
+	if (sysevent_subscribe_event(shp, EC_DR, subcl, 1) != 0) {
+		HAL_INFO (("subscribe(dynamic reconfiguration) failed %d",
+		    errno));
+		sysevent_unbind_handle(shp);
+		return (FALSE);
+	}
+
 	return (B_TRUE);
 }
 
@@ -183,12 +197,24 @@ sysevent_dev_handler(sysevent_t *ev)
 		    &phys_path) != 0) {
 			goto out;
 		}
+	} else if (strcmp(class, EC_DR) == 0) {
+		if (nvlist_lookup_string(attr_list, DR_AP_ID,
+		    &phys_path) != 0) {
+			goto out;
+		}
 	} else if (nvlist_lookup_string(attr_list, DEV_PHYS_PATH, &phys_path)
 	    != 0) {
 		goto out;
 	}
 
-	if (nvlist_lookup_string(attr_list, DEV_NAME, &dev_name) != 0) {
+	/*
+	 * In case of EC_DR, use dev_name to store DR_HINT val
+	 */
+	if (strcmp(class, EC_DR) == 0) {
+		if (nvlist_lookup_string(attr_list, DR_HINT, &dev_name) != 0) {
+			goto out;
+		}
+	} else if (nvlist_lookup_string(attr_list, DEV_NAME, &dev_name) != 0) {
 		if (strcmp(class, EC_PWRCTL) == 0) {
 			dev_name = "noname";
 		} else {
@@ -241,7 +267,7 @@ sysevent_iochannel_data (GIOChannel *source,
 		if (len == 0) {
 			break;
 		}
-
+		HAL_INFO (("IOChannel val => %s", s));
 		class[0] = subclass[0] = phys_path[0] = dev_name[0] =
 		    dev_hid[0] = dev_uid[0] = '\0';
 		matches = sscanf(s, "%s %s %s %s %s %s %d", class, subclass,
@@ -275,6 +301,17 @@ sysevent_iochannel_data (GIOChannel *source,
 		} else if (strcmp(class, EC_DEVFS) == 0) {
 			if (strcmp(subclass, ESC_DEVFS_DEVI_ADD) == 0) {
 				sysevent_devfs_add(phys_path);
+			}
+		} else if (strcmp(class, EC_DR) == 0) {
+			/*
+			 * Note: AP_ID is stored in phys_path and HINT is
+			 * stored in dev_name, to avoid creating seperate
+			 * variables and multiple conditions checking
+			 */
+			HAL_DEBUG (("In %s, AP_ID-> %s, Hint-> %s", class,
+			    phys_path, dev_name));
+			if (strcmp(subclass, ESC_DR_AP_STATE_CHANGE) == 0) {
+				sysevent_process_dr(phys_path, dev_name);
 			}
 		}
 	}
@@ -466,4 +503,160 @@ sysevent_pwrctl(gchar *class, gchar *subclass, gchar *phys_path,
 	} else {
 		HAL_INFO(("Unmatched EC_PWRCTL"));
 	}
+}
+
+static void
+sysevent_dr_remove_cpu()
+{
+
+	HalDeviceStore	*gdl;
+	GSList		*iter;
+	HalDevice	*d, *del_dev;
+	int		cpu_id, del_cpuid;
+	kstat_ctl_t	*kc;
+	kstat_t		*ksp;
+	kstat_named_t	*ksdata;
+	const char	*cpu_devfs_path;
+	/*
+	 * Find the CPU's that are DR removed. For each "processor" device in
+	 * HAL device tree, check if it has its corresponding kstat_info. If
+	 * not, then, that cpu has been removed and can remove the entry from
+	 * HAL entry
+	 */
+
+	HAL_DEBUG (("sysevent_dr_remove_cpu()"));
+	kc = kstat_open ();
+	if (kc == NULL) {
+		HAL_INFO (("Error in removing HAL cpu entry during DR. Could"
+		    " not open kstat to get cpu info: %s", strerror (errno)));
+		return;
+	}
+
+	/*
+	 * Iterate through the HAL device list to get the processor devices
+	 */
+	gdl = hald_get_gdl ();
+	iter = gdl->devices;
+
+	while (iter != NULL) {
+		d = HAL_DEVICE (iter->data);
+
+		if (!hal_device_has_property (d, "processor.number")) {
+			iter = iter->next;
+			continue;
+		}
+
+		cpu_id = hal_device_property_get_int (d, "processor.number");
+
+		/*
+		 * Check if the above cpu_id has its info in kstat
+		 */
+
+		ksp = kstat_lookup (kc, "cpu_info", cpu_id, NULL);
+		if (ksp != NULL) {
+			iter = iter->next;
+			continue;
+		}
+		/*
+		 *  kstat info not found. Delete the device entry
+		 */
+		HAL_INFO ((" Remove CPU entry: %d", cpu_id));
+		iter = iter->next;
+		cpu_devfs_path = hal_device_property_get_string (d,
+		    "solaris.devfs_path");
+		if (cpu_devfs_path == NULL) {
+			HAL_INFO (("Could not get cpu_devfs_path to "
+			    "remove for cpu_id %d", cpu_id));
+		} else {
+			/*
+			 * Remove the cpu device
+			 */
+			HAL_DEBUG (("Queue %s for removal", cpu_devfs_path));
+			devinfo_remove_enqueue ((char *)cpu_devfs_path, NULL);
+			hotplug_event_process_queue ();
+		}
+	}
+
+	if (kc) {
+		kstat_close (kc);
+	}
+}
+
+int
+sysevent_dr_insert_cpu(di_node_t node, void *arg)
+{
+	char	*devfs_path;
+	char	*device_type = NULL;
+	DevinfoDevHandler *dh;
+
+	dh = &devinfo_cpu_handler;
+	devfs_path = di_devfs_path (node);
+
+	(void) di_prop_lookup_strings (DDI_DEV_T_ANY, node, "device_type",
+	    &device_type);
+
+	dh->add (NULL, node, devfs_path, device_type);
+
+	di_devfs_path_free (devfs_path);
+	return (DI_WALK_CONTINUE);
+}
+
+/*
+ * Remove/Add the DR event device
+ * Note: Currently it supports only CPU DR events
+ */
+static void
+sysevent_process_dr(gchar *ap_id, gchar *hint_val)
+{
+	cfga_err_t 		cfgerr;
+	cfga_list_data_t 	*cfg_stat;
+	int			nlist;
+	char			*errstr;
+	di_node_t		root_node;
+
+	if ((ap_id == NULL) || (hint_val == NULL))
+		return;
+	HAL_DEBUG (("sysevent_process_dr: %s", ap_id));
+
+	cfgerr = config_list_ext (1, (char *const *)&ap_id, &cfg_stat, &nlist,
+	    NULL, NULL, &errstr, 0);
+
+	if (cfgerr != CFGA_OK) {
+		HAL_INFO (("DR sysevent process %d config_list_ext error: %s",
+		    ap_id, errstr));
+		goto out;
+	}
+	/*
+	 * Check if the device type is CPU
+	 */
+	HAL_DEBUG ((" Ap-Type: %s, State: %d", cfg_stat->ap_type,
+	    cfg_stat->ap_r_state));
+	if (strcmp (cfg_stat->ap_type, "CPU") == 0) {
+		if (strcmp (hint_val, DR_HINT_REMOVE) == 0) {
+			sysevent_dr_remove_cpu();
+		} else if (strcmp (hint_val, DR_HINT_INSERT) == 0) {
+			/*
+			 * Go through the device list and add the new cpu
+			 * entries into HAL
+			 */
+			if ((root_node =
+			    di_init ("/", DINFOCPYALL)) == DI_NODE_NIL) {
+				HAL_INFO (("di_init failed. "\
+				    "Cannot insert CPU"));
+				goto out;
+			}
+			di_walk_node (root_node, DI_WALK_CLDFIRST, NULL,
+			    sysevent_dr_insert_cpu);
+			di_fini (root_node);
+			hotplug_event_process_queue ();
+		}
+	} else {
+		HAL_INFO (("Not a CPU, so cannot DR"));
+	}
+
+out:
+	if (cfg_stat)
+		free (cfg_stat);
+	if (errstr)
+		free (errstr);
 }

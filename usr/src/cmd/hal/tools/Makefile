@@ -48,9 +48,10 @@ STORAGE_PROG =	$(STORAGE_METHOD_PROG) \
 
 PROGSRCS =	$(PROG:%=%.c) $(STORAGE_PROG:%=%.c)
 
+
 STORAGE_OBJS =		$(STORAGE_PROG:%=%.o)
-STORAGE_SHAREDOBJS =	hal-storage-shared.o
-STORAGE_SHAREDSRCS =	$(STORAGE_SHAREDOBJS:%.o=%.c)
+STORAGE_SHAREDOBJS =	hal-storage-shared.o adt_data.o logger.o
+STORAGE_SHAREDSRCS =	$(STORAGE_SHAREDOBJS:%.o=%.c) $(STORAGE_SHAREDOBJS:%.o=../utils/%.c) $(STORAGE_SHAREDOBJS:%.o=../hald/%.c)
 
 SRCS =		$(PROGSRCS) $(STORAGE_SHAREDSRCS)
 
@@ -92,8 +93,14 @@ clobber :=      TARGET= clobber
 
 all: $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT_BIN) $(SCRIPT_LIB) $(HAL_LIB) $(SUBDIR)
 
-$(STORAGE_SHAREDOBJS): $(STORAGE_SHAREDSRCS)
-	$(COMPILE.c) $(STORAGE_SHAREDSRCS)
+hal-storage-shared.o: hal-storage-shared.c
+	$(COMPILE.c) -o $@ hal-storage-shared.c
+
+adt_data.o: ../utils/adt_data.c
+	$(COMPILE.c) -o $@ ../utils/adt_data.c
+
+logger.o: ../hald/logger.c
+	$(COMPILE.c) -o $@ ../hald/logger.c
 
 hal-storage-closetray: hal-storage-closetray.o $(STORAGE_SHAREDOBJS)
 	$(LINK.c) hal-storage-closetray.o $(STORAGE_SHAREDOBJS) -o $@ $(LDLIBS)

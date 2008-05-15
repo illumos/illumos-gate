@@ -17,41 +17,48 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
 #
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-OBJS =		devinfo.o devinfo_ieee1394.o devinfo_misc.o devinfo_pci.o \
-		devinfo_storage.o devinfo_usb.o hotplug.o osspec.o sysevent.o \
-		devinfo_acpi.o devinfo_cpu.o
-
-SRCS =		$(OBJS:%.o=%.c)
-
-MANIFEST =	hal.xml
-SVCMETHOD =	svc-hal
+PROG =		hald-addon-cpufreq
+OBJS =		addon-cpufreq.o logger.o adt_data.o
+SRCS =		addon-cpufreq.c ../../hald/logger.c ../../utils/adt_data.c
 
 include ../../../Makefile.cmd
 include ../../Makefile.hal
 
-ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)
-$(ROOTMANIFEST) :=	FILEMODE = 444
-$(ROOTLIBSVCMETHOD)/svc-hal:= FILEMODE = 555
+ROOTCMDDIR =	$(ROOTLIB_HAL)
 
-CPPFLAGS += $(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
-CPPFLAGS += -I/usr/sfw/include
+LDLIBS +=	-lc -ldbus-1 -lhal -lglib-2.0 -ldbus-glib-1 -lpolkit -lbsm
+
+CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
+CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald
+CPPFLAGS +=	-I$(ROOT)/usr/include/libpolkit -g
 C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
 
-all: $(OBJS)
+all:$(PROG)
 
-install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+logger.o: ../../hald/logger.c
+	$(COMPILE.c) -o $@ ../../hald/logger.c
+	$(POST_PROCESS_O)
 
-check: $(CHKMANIFEST)
+adt_data.o: ../../utils/adt_data.c
+	$(COMPILE.c) -o $@ ../../utils/adt_data.c
+	$(POST_PROCESS_O)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTCMD)
 
 clean:
 	$(RM) $(OBJS)

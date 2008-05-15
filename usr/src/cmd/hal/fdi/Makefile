@@ -45,6 +45,7 @@ FDIS =		information/10freedesktop/10-camera-ptp.fdi \
 		policy/10osvendor/10-laptop-panel-mgmt-policy.fdi \
 		policy/10osvendor/10-network-attached.fdi \
 		policy/10osvendor/10-power-mgmt-policy.fdi \
+		policy/10osvendor/10-cpufreq.fdi \
 		policy/10osvendor/10-toshiba-buttons.fdi \
 		policy/10osvendor/20-storage-methods.fdi \
 		policy/10osvendor/20-zfs-methods.fdi \

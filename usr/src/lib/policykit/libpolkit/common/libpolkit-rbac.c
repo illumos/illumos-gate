@@ -161,6 +161,8 @@ libpolkit_is_uid_allowed_for_privilege (LibPolKitContext   *ctx,
                 authname = "solaris.system.power.cpu";
 	} else if (strcmp(privilege, "hal-power-brightness") == 0) {
                 authname = "solaris.system.power.brightness";
+	} else if (strcmp (privilege, "hal-power-cpu") == 0) {
+		authname = "solaris.system.power.cpu";
 	} else {
 		/* replace '-' with '.' */
 		authname = g_strdup (privilege);
