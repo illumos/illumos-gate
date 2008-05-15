@@ -103,8 +103,8 @@ find_tgt_by_name(char *targ, char **iname)
 {
 	tgt_node_t	*tgt = NULL;
 
-	while ((tgt = tgt_node_next(targets_config, XML_ELEMENT_TARG, tgt))
-	    != NULL) {
+	while ((tgt = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    tgt)) != NULL) {
 		if (tgt_find_value_str(tgt, XML_ELEMENT_INAME, iname)
 		    == FALSE) {
 			syslog(LOG_ALERT, "ISNS: Missing iscsi name\n");
@@ -123,8 +123,8 @@ find_tgt_by_name(char *targ, char **iname)
 static tgt_node_t *
 find_next_tgt(tgt_node_t *tgt, char **iname)
 {
-	while ((tgt = tgt_node_next(targets_config, XML_ELEMENT_TARG, tgt))
-	    != NULL) {
+	while ((tgt = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    tgt)) != NULL) {
 		if (tgt_find_value_str(tgt, XML_ELEMENT_INAME, iname)
 		    == FALSE) {
 			continue;
@@ -166,7 +166,7 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 		while ((pgt = tgt_node_next(t, XML_ELEMENT_TPGT, pgt))
 		    != NULL) {
 			/* update isns only if TPGT contains ip_addr */
-			while ((tpgt = tgt_node_next(main_config,
+			while ((tpgt = tgt_node_next_child(main_config,
 			    XML_ELEMENT_TPGT, tpgt)) != NULL) {
 				if (strcmp(pgt->x_value, tpgt->x_value) != 0)
 					continue;
@@ -492,8 +492,8 @@ isns_op_all(uint16_t op)
 		return (-1);
 	}
 
-	while ((tgt = tgt_node_next(targets_config, XML_ELEMENT_TARG, tgt))
-	    != NULL) {
+	while ((tgt = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    tgt)) != NULL) {
 		if (tgt_find_value_str(tgt, XML_ELEMENT_INAME, &iname)
 		    == FALSE) {
 			continue;
@@ -1282,7 +1282,7 @@ isns_reg_all()
 	/*
 	 * get the 1st target and use it for the source attribute
 	 */
-	if ((tgt = tgt_node_next(targets_config, XML_ELEMENT_TARG, tgt))
+	if ((tgt = tgt_node_next_child(targets_config, XML_ELEMENT_TARG, tgt))
 	    == NULL) {
 		return (0);
 	}
@@ -1373,8 +1373,8 @@ isns_reg_all()
 	 * Open targets_config and devAttrReg all nodes
 	 */
 	tgt = NULL;
-	while ((tgt = tgt_node_next(targets_config, XML_ELEMENT_TARG, tgt))
-	    != NULL) {
+	while ((tgt = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    tgt)) != NULL) {
 		if (tgt->x_value == NULL) {
 			syslog(LOG_ALERT, "ISNS: target with NULL name\n");
 			continue;

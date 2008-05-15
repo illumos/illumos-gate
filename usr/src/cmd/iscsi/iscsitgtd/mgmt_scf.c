@@ -377,8 +377,19 @@ mgmt_get_main_config(tgt_node_t **node)
 				    > 0) {
 					scf_value_get_as_string(value, valuebuf,
 					    MAXPATHLEN);
-					vn = tgt_node_alloc(pname, String,
-					    valuebuf);
+					/*
+					 * map 'acl' to 'initiator' since that
+					 * is what used inside the acl-list.
+					 */
+					if (strcmp(pname, XML_ELEMENT_ACL)
+					    == 0) {
+						vn = tgt_node_alloc(
+						    XML_ELEMENT_INIT,
+						    String, valuebuf);
+					} else {
+						vn = tgt_node_alloc(
+						    pname, String, valuebuf);
+					}
 					if (vn == NULL)
 						goto error;
 					tgt_node_add(pn, vn);

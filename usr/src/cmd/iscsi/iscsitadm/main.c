@@ -581,7 +581,7 @@ modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	char		*first_str	= NULL;
 	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
-	char		chapSecret[MAX_CHAP_SECRET_LEN];
+	char		chapSecret[MAX_CHAP_SECRET_LEN+1];
 	int		secretLen	= 0;
 	int		ret		= 0;
 
@@ -680,7 +680,7 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	char		*first_str	= NULL;
 	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
-	char		chapSecret[MAX_CHAP_SECRET_LEN];
+	char		chapSecret[MAX_CHAP_SECRET_LEN+1];
 	char		olddir[MAXPATHLEN];
 	char		newdir[MAXPATHLEN];
 	int		secretLen	= 0;
@@ -1080,7 +1080,7 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		(void) printf("%s%s:\n", dospace(1), gettext("ACL list"));
 		n2 = tgt_node_next_child(n1, XML_ELEMENT_ACLLIST, NULL);
 		n3 = NULL;
-		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_ACLINIT, n3)) {
+		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_INIT, n3)) {
 			(void) printf("%s%s: %s\n", dospace(2),
 			    gettext("Initiator"),
 			    n3->x_value);

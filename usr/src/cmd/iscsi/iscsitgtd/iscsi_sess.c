@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,8 +188,8 @@ convert_i_local(char *ip, char **rtn)
 	tgt_node_t	*inode = NULL;
 	char		*iname, *name;
 
-	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT, inode)) !=
-	    NULL) {
+	while ((inode = tgt_node_next_child(main_config, XML_ELEMENT_INIT,
+	    inode)) != NULL) {
 		if (tgt_find_value_str(inode, XML_ELEMENT_INAME, &iname) ==
 		    False) {
 			continue;

@@ -115,7 +115,7 @@ list_targets(tgt_node_t *x)
 	(void) tgt_find_value_boolean(x, XML_ELEMENT_IOSTAT, &dostat);
 
 	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
 	    targ)) != NULL) {
 		if (targ->x_value == NULL) {
 			tgt_buf_add(&msg, XML_ELEMENT_TARG,
@@ -181,8 +181,8 @@ list_initiator(tgt_node_t *x)
 	(void) tgt_find_value_boolean(x, XML_ELEMENT_VERBOSE, &verbose);
 
 	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	while ((init = tgt_node_next(main_config, XML_ELEMENT_INIT, init)) !=
-	    NULL) {
+	while ((init = tgt_node_next_child(main_config, XML_ELEMENT_INIT, init))
+	    != NULL) {
 		if ((prop == NULL) ||
 		    ((prop != NULL) && (strcmp(prop, init->x_value) == 0))) {
 
@@ -239,8 +239,8 @@ list_tpgt(tgt_node_t *x)
 	(void) tgt_find_value_boolean(x, XML_ELEMENT_VERBOSE, &verbose);
 
 	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT, tpgt)) !=
-	    NULL) {
+	while ((tpgt = tgt_node_next_child(main_config, XML_ELEMENT_TPGT, tpgt))
+	    != NULL) {
 		if ((prop == NULL) ||
 		    ((prop != NULL) && (strcmp(prop, tpgt->x_value) == 0))) {
 
@@ -363,9 +363,9 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 	    NULL) {
 		lnp = NULL;
 		tgt_buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_Start);
-		while ((lnp = tgt_node_next(lnode, XML_ELEMENT_ACLINIT, lnp)) !=
+		while ((lnp = tgt_node_next(lnode, XML_ELEMENT_INIT, lnp)) !=
 		    NULL)
-			tgt_buf_add(msg, XML_ELEMENT_ACLINIT, lnp->x_value);
+			tgt_buf_add(msg, XML_ELEMENT_INIT, lnp->x_value);
 		tgt_buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_End);
 	}
 

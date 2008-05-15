@@ -374,6 +374,8 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 * SPC-4 revision 1a, section 7.6.3.8
 			 * Target port group designator format
 			 */
+			/* initialize descriptor */
+			bzero(&vd, sizeof (vd));
 			vd.code_set	= SPC_INQUIRY_CODE_SET_BINARY;
 			vd.id_type	= SPC_INQUIRY_ID_TYPE_TARG_PORT;
 			vd.proto_id	= SPC_INQUIRY_PROTOCOL_ISCSI;
@@ -423,7 +425,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			vd.code_set	= SPC_INQUIRY_CODE_SET_UTF8;
 			vd.id_type	= SPC_INQUIRY_ID_TYPE_SCSI;
 			vd.proto_id	= SPC_INQUIRY_PROTOCOL_ISCSI;
-			vd.association	= SPC_INQUIRY_ASSOC_LUN;
+			vd.association	= SPC_INQUIRY_ASSOC_TARG;
 			vd.piv		= 1;
 			vd.len		= scsi_len;
 			bcopy(&vd, rbp, sizeof (vd));
@@ -632,8 +634,8 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	select = cdb[2];
 
 	targ = NULL;
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
-	    NULL) {
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
 		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
 		    False) {
 			goto error;

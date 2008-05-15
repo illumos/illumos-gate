@@ -332,7 +332,7 @@ create_initiator(tgt_node_t *x)
 		goto error;
 	}
 
-	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
+	while ((inode = tgt_node_next_child(main_config, XML_ELEMENT_INIT,
 	    inode)) != NULL) {
 		if (strcmp(inode->x_value, name) == 0) {
 			xml_rtn_msg(&msg, ERR_INIT_EXISTS);
@@ -380,7 +380,7 @@ create_tpgt(tgt_node_t *x)
 		goto error;
 	}
 
-	while ((tnode = tgt_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tnode = tgt_node_next_child(main_config, XML_ELEMENT_TPGT,
 	    tnode)) != NULL) {
 		if (strcmp(tnode->x_value, tpgt) == 0) {
 			xml_rtn_msg(&msg, ERR_TPGT_EXISTS);
@@ -433,7 +433,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	 * same name does not exists
 	 */
 	c = NULL;
-	while ((c = tgt_node_next(targets_config, XML_ELEMENT_TARG, c))) {
+	while ((c = tgt_node_next_child(targets_config, XML_ELEMENT_TARG, c))) {
 		if (strcmp(c->x_value, dataset) == 0) {
 			xml_rtn_msg(&msg, ERR_LUN_EXISTS);
 			goto error;

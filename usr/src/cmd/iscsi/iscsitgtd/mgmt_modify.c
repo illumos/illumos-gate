@@ -129,7 +129,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		return (msg);
 	}
 
-	while ((t = tgt_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((t = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
 	    t)) != NULL) {
 		if (strcmp(t->x_value, name) == 0) {
 			break;
@@ -293,8 +293,9 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		}
 
 		/* update isns only if TPGT contains ip_addr */
-		while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT,
-		    tpgt)) != NULL) {
+		tpgt = NULL;
+		while ((tpgt = tgt_node_next_child(main_config,
+		    XML_ELEMENT_TPGT, tpgt)) != NULL) {
 			if (strcmp(prop, tpgt->x_value) != 0)
 				continue;
 			if (tgt_node_next(tpgt, XML_ELEMENT_IPADDR, NULL)
@@ -345,7 +346,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			return (msg);
 		}
 
-		c = tgt_node_alloc(XML_ELEMENT_ACLINIT, String, prop);
+		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
 		if (c == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
@@ -454,7 +455,7 @@ modify_initiator(tgt_node_t *x)
 		return (msg);
 	}
 
-	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
+	while ((inode = tgt_node_next_child(main_config, XML_ELEMENT_INIT,
 	    inode)) != NULL) {
 		if (strcmp(inode->x_value, name) == 0)
 			break;
@@ -590,7 +591,7 @@ modify_tpgt(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_INVALID_IP);
 		goto error;
 	}
-	while ((tnode = tgt_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tnode = tgt_node_next_child(main_config, XML_ELEMENT_TPGT,
 	    tnode)) != NULL) {
 		if (strcmp(tnode->x_value, name) == 0)
 			break;
@@ -660,7 +661,7 @@ modify_zfs(tgt_node_t *x, ucred_t *cred)
 		goto error;
 	}
 
-	while ((t = tgt_node_next(targets_config, XML_ELEMENT_TARG, t))
+	while ((t = tgt_node_next_child(targets_config, XML_ELEMENT_TARG, t))
 	    != NULL) {
 		if (strcmp(t->x_value, dataset) == 0)
 			break;
@@ -863,8 +864,8 @@ update_basedir(char *name, char *prop)
 		return (msg);
 	}
 
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
-	    != NULL) {
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
 		/*
 		 * Traverse the list of configured targets, serching for any
 		 * target that is using the current base-directory. Fail the

@@ -806,7 +806,7 @@ login_set_auth(iscsi_sess_t *s)
 	sess_auth->password_length_in = 0;
 
 	/* Load alias, iscsi-name, chap-name, chap-secret from config file */
-	while ((xnInitiator = tgt_node_next(main_config, XML_ELEMENT_INIT,
+	while ((xnInitiator = tgt_node_next_child(main_config, XML_ELEMENT_INIT,
 	    xnInitiator)) != NULL) {
 
 		(void) tgt_find_value_str(xnInitiator, XML_ELEMENT_INIT,
@@ -866,7 +866,9 @@ login_set_auth(iscsi_sess_t *s)
 	}
 
 	/*
-	 * If no acc_list for current target, transit.
+	 * If no acc_list for current target
+	 *    If no CHAP secret for the initiator, transit.
+	 *    If CHAP secret exists for the initiator, it must be authed.
 	 * If acc_list exists for the target, and
 	 * If the initiator not in the list, drop it.
 	 * If the initiator in the list, and
@@ -874,7 +876,7 @@ login_set_auth(iscsi_sess_t *s)
 	 * If a CHAP secret exists for the initiator, it must be authed.
 	 */
 
-	while ((xnTarget = tgt_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((xnTarget = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
 	    xnTarget)) != NULL) {
 
 		if ((tgt_find_value_str(xnTarget, XML_ELEMENT_INAME,
@@ -891,9 +893,11 @@ login_set_auth(iscsi_sess_t *s)
 			if ((xnAcl = tgt_node_next(xnTarget,
 			    XML_ELEMENT_ACLLIST, 0)) == NULL) {
 				/*
-				 * No acl_list found, return True for no auth
+				 * No acl_list found, return auth or no auth
 				 */
-				return (LOGIN_NO_AUTH);
+				if (sess_auth->password_length_in == 0)
+					return (LOGIN_NO_AUTH);
+				return (LOGIN_AUTH);
 			}
 
 			/*
@@ -903,10 +907,10 @@ login_set_auth(iscsi_sess_t *s)
 			 */
 			xnInitiator = NULL;
 			while ((xnInitiator = tgt_node_next(xnAcl,
-			    XML_ELEMENT_ACLINIT, xnInitiator)) != NULL) {
+			    XML_ELEMENT_INIT, xnInitiator)) != NULL) {
 
 				if ((tgt_find_value_str(xnInitiator,
-				    XML_ELEMENT_ACLINIT, &possible) == False) ||
+				    XML_ELEMENT_INIT, &possible) == False) ||
 				    (possible == NULL))
 					continue;
 

@@ -125,7 +125,7 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		goto error;
 	}
 
-	while ((t = tgt_node_next(targets_config, XML_ELEMENT_TARG, t))
+	while ((t = tgt_node_next_child(targets_config, XML_ELEMENT_TARG, t))
 	    != NULL) {
 		if (strcmp(t->x_value, dataset) == 0)
 			break;
@@ -254,8 +254,8 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		goto error;
 	}
 
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
-	    NULL) {
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
 		if (strcmp(targ->x_value, prop) == 0)
 			break;
 	}
@@ -282,7 +282,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 			xml_rtn_msg(&msg, ERR_ACL_NOT_FOUND);
 			goto error;
 		}
-		c = tgt_node_alloc(XML_ELEMENT_ACLINIT, String, prop);
+		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
 		if (tgt_node_remove(list, c, MatchBoth) == False) {
 			xml_rtn_msg(&msg, ERR_INIT_NOT_FOUND);
 			goto error;
@@ -384,8 +384,8 @@ remove_initiator(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
-	while ((node = tgt_node_next(main_config, XML_ELEMENT_INIT, node)) !=
-	    NULL) {
+	while ((node = tgt_node_next_child(main_config, XML_ELEMENT_INIT, node))
+	    != NULL) {
 		if (strcmp(node->x_value, name) == 0)
 			break;
 	}
@@ -419,7 +419,7 @@ remove_tpgt(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
-	while ((node = tgt_node_next(main_config, XML_ELEMENT_TPGT, node))
+	while ((node = tgt_node_next_child(main_config, XML_ELEMENT_TPGT, node))
 	    != NULL) {
 		if (strcmp(node->x_value, prop) == 0)
 			break;

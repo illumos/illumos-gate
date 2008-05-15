@@ -1444,8 +1444,8 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 
 	targ = NULL;
 
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
-	    != NULL) {
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
 		if ((tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
 		    True) && (strcmp(str, t->s_targ_base) == 0)) {
 			local_name = strdup(targ->x_value);

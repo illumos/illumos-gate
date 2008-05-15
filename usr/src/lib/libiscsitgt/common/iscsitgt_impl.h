@@ -85,7 +85,6 @@ typedef enum {
 #define	XML_ELEMENT_NAME	"name"
 #define	XML_ELEMENT_ACL		"acl"
 #define	XML_ELEMENT_ACLLIST	"acl-list"
-#define	XML_ELEMENT_ACLINIT	"acl-initiator"
 #define	XML_ELEMENT_TPGT	"tpgt"
 #define	XML_ELEMENT_TPGTLIST	"tpgt-list"
 #define	XML_ELEMENT_SIZE	"size"

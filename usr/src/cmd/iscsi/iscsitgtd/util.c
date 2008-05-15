@@ -99,8 +99,8 @@ check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 		}
 
 		/* Need to check if CHAP is needed for initiator */
-		while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
-		    inode)) != NULL) {
+		while ((inode = tgt_node_next_child(main_config,
+		    XML_ELEMENT_INIT, inode)) != NULL) {
 			if (tgt_find_value_str(inode, XML_ELEMENT_INAME, &dummy)
 			    == True) {
 				if (strcmp(dummy, initiator_name) == 0) {
@@ -132,7 +132,8 @@ check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 	 * Find the local initiator name and also save the knowledge
 	 * if the initiator had a CHAP secret.
 	 */
-	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
+	inode = NULL;
+	while ((inode = tgt_node_next_child(main_config, XML_ELEMENT_INIT,
 	    inode)) != NULL) {
 		if (tgt_find_value_str(inode, XML_ELEMENT_INAME, &dummy) ==
 		    True) {
@@ -153,7 +154,7 @@ check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 	if ((acl != NULL) && (inode == NULL))
 		return (False);
 
-	while ((tgt_initiator = tgt_node_next(acl, XML_ELEMENT_ACLINIT,
+	while ((tgt_initiator = tgt_node_next(acl, XML_ELEMENT_INIT,
 	    tgt_initiator)) != NULL) {
 
 		if (strcmp(inode->x_value, tgt_initiator->x_value) == 0) {
@@ -199,7 +200,7 @@ convert_local_tpgt(char **text, int *text_length, char *local_tpgt)
 	char		buf[80];
 	char		ipaddr[4];
 
-	while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tpgt = tgt_node_next_child(main_config, XML_ELEMENT_TPGT,
 	    tpgt)) != NULL) {
 		if (strcmp(tpgt->x_value, local_tpgt) == 0) {
 
@@ -265,7 +266,7 @@ add_target_address(iscsi_conn_t *c, char **text, int *text_length,
 		return;
 	}
 
-	while ((tpgt = tgt_node_next(tpgt_list, XML_ELEMENT_TPGT,
+	while ((tpgt = tgt_node_next_child(tpgt_list, XML_ELEMENT_TPGT,
 	    tpgt)) != NULL) {
 		if (convert_local_tpgt(text, text_length, tpgt->x_value) ==
 		    False) {
@@ -308,7 +309,7 @@ add_targets(iscsi_conn_t *c, char **text, int *text_length)
 	Boolean_t	rval		= True;
 	char		*targ_name	= NULL;
 
-	while ((rval == True) && ((targ = tgt_node_next(targets_config,
+	while ((rval == True) && ((targ = tgt_node_next_child(targets_config,
 	    XML_ELEMENT_TARG, targ)) != NULL)) {
 
 		if (check_access(targ, c->c_sess->s_i_name, False) == True) {
@@ -891,7 +892,7 @@ find_main_tpgt(struct sockaddr_storage *pst)
 	addr = ((struct sockaddr_in *)pst)->sin_addr;
 	addr6 = ((struct sockaddr_in6 *)pst)->sin6_addr;
 
-	while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tpgt = tgt_node_next_child(main_config, XML_ELEMENT_TPGT,
 	    tpgt)) != NULL) {
 
 		ip_node = NULL;
@@ -976,7 +977,7 @@ find_target_node(char *targ_name)
 	tgt_node_t	*tnode	= NULL;
 	char		*iname;
 
-	while ((tnode = tgt_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((tnode = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
 	    tnode)) != NULL) {
 		if (tgt_find_value_str(tnode, XML_ELEMENT_INAME, &iname) ==
 		    True) {
@@ -1511,8 +1512,8 @@ remove_target_common(char *name, int lun_num, char **msg)
 	int		chk;
 
 	(void) pthread_mutex_lock(&targ_config_mutex);
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
-	    NULL) {
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
 		/* ---- Look for a match on the friendly name ---- */
 		if (strcmp(targ->x_value, name) == 0) {
 			tname = name;
@@ -1663,8 +1664,8 @@ get_local_name(char *iname)
 	char		*str;
 	char		*ret = NULL;
 
-	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
-	    != NULL) {
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
 		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) == True) {
 			if (strcmp(str, iname) == 0)
 				ret = strdup(targ->x_value);
