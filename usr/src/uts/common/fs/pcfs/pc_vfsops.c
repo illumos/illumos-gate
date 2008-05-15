@@ -91,7 +91,7 @@ static int pc_readfat(struct pcfs *fsp, uchar_t *fatp);
 static int pc_writefat(struct pcfs *fsp, daddr_t start);
 
 static int pc_getfattype(struct pcfs *fsp);
-static void pcfs_parse_mntopts(struct pcfs *fsp, struct mounta *uap);
+static void pcfs_parse_mntopts(struct pcfs *fsp);
 
 
 /*
@@ -527,7 +527,7 @@ pcfs_device_ismounted(
  * that don't support the DKIOCGMEDIAINFO ioctl for autodetection.
  */
 static void
-pcfs_parse_mntopts(struct pcfs *fsp, struct mounta *uap)
+pcfs_parse_mntopts(struct pcfs *fsp)
 {
 	char *c;
 	char *endptr;
@@ -715,7 +715,7 @@ pcfs_mount(
 	fsp->pcfs_ldrive = dos_ldrive;
 	mutex_init(&fsp->pcfs_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	pcfs_parse_mntopts(fsp, uap);
+	pcfs_parse_mntopts(fsp);
 
 	/*
 	 * This is the actual "mount" - the PCFS superblock check.
