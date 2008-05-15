@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_init.c,v 1.13.2.2 2000/05/09 13:17:14 raeburn Exp $
@@ -331,8 +331,18 @@ _kadm5_initialize_rpcsec_gss_handle(kadm5_server_handle_t handle,
 	OM_uint32 gssstat, minor_stat;
 	void *handlep;
 	enum clnt_stat rpc_err_code;
+	char *server = handle->params.admin_server;
 
-	hp = gethostbyname(handle->params.admin_server);
+	/*
+	 * Try to find the kpasswd_server first if this is for the changepw
+	 * service.  If defined then it should be resolvable else return error.
+	 */
+	if (strncmp(service_name, KADM5_CHANGEPW_HOST_SERVICE, 
+	    strlen(KADM5_CHANGEPW_HOST_SERVICE)) == 0) {
+		if (handle->params.kpasswd_server != NULL)
+			server = handle->params.kpasswd_server;
+	}
+	hp = gethostbyname(server);
 	if (hp == (struct hostent *)NULL) {
 		code = KADM5_BAD_SERVER_NAME;
 		ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
@@ -707,8 +717,12 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 #define REQUIRED_PARAMS (KADM5_CONFIG_REALM | \
 			 KADM5_CONFIG_ADMIN_SERVER | \
 			 KADM5_CONFIG_KADMIND_PORT) 
+#define KPW_REQUIRED_PARAMS (KADM5_CONFIG_REALM | \
+			 KADM5_CONFIG_KPASSWD_SERVER | \
+			 KADM5_CONFIG_KPASSWD_PORT) 
 
-     if ((handle->params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
+     if (((handle->params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) &&
+	 ((handle->params.mask & KPW_REQUIRED_PARAMS) != KPW_REQUIRED_PARAMS)) {
 		(void) kadm5_free_config_params(handle->context,
 						&handle->params);
 	  krb5_free_context(handle->context);

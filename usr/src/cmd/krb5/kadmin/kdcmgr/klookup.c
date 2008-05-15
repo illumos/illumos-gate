@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,22 +37,64 @@
 #include <unistd.h>
 #include <ctype.h>
 
+/*
+ * Private resolver of target and type with arguments:
+ * klooukp [ target [ RR_type ] ]
+ *
+ * Utitilizes DNS lookups to discover domain and realm information.  This CLI
+ * is used primarily by kdcmgr(1M) and kclient(1M).
+ */
+
 int
 /* ARGSUSED */
 main(int argc, char **argv)
 {
-	unsigned char answer[NS_MAXMSG], *ansp = NULL, *end;
+	unsigned char answer[NS_MAXMSG], *ansp = NULL, *end, a, b, c, d;
 	int len = 0, anslen, hostlen, nq, na, type, class;
-	char hostname[MAXHOSTNAMELEN], *cp;
+	int ttl, priority, weight, port, size;
+	char name[NS_MAXDNAME], *cp, *typestr = NULL;
+	char nbuf[INET6_ADDRSTRLEN];
 	struct __res_state stat;
 	int found = 0;
+	int rr_type = T_A;
 	HEADER *h;
 
-	if (argc != 1)
+	if (argc > 3)
 		exit(1);
 
-	if (gethostname(hostname, MAXHOSTNAMELEN) != 0)
-		exit(1);
+	if (argc == 1) {
+		if (gethostname(name, MAXHOSTNAMELEN) != 0)
+			exit(1);
+	} else {
+		(void) strncpy(name, (char *)argv[1], NS_MAXDNAME);
+		if (argc == 3) {
+			typestr = argv[2];
+
+			switch (*typestr) {
+			case 'A':
+				rr_type = T_A;
+				break;
+			case 'C':
+				rr_type = T_CNAME;
+				break;
+			case 'I':
+				rr_type = T_A;
+				break;
+			case 'P':
+				rr_type = T_PTR;
+				(void) sscanf(name, "%d.%d.%d.%d",
+				    &a, &b, &c, &d);
+				(void) sprintf(name, "%d.%d.%d.%d.in-addr.arpa",
+				    d, c, b, a);
+				break;
+			case 'S':
+				rr_type = T_SRV;
+				break;
+			default:
+				exit(1);
+			}
+		}
+	}
 
 	(void) memset(&stat, 0, sizeof (stat));
 
@@ -60,10 +102,12 @@ main(int argc, char **argv)
 		exit(1);
 
 	anslen = sizeof (answer);
-	len = res_nsearch(&stat, hostname, C_IN, T_A, answer, anslen);
+	len = res_nsearch(&stat, name, C_IN, rr_type, answer, anslen);
 
-	if (len < sizeof (HEADER))
+	if (len < sizeof (HEADER)) {
+		res_ndestroy(&stat);
 		exit(1);
+	}
 
 	ansp = answer;
 	end = ansp + anslen;
@@ -74,47 +118,86 @@ main(int argc, char **argv)
 	na = ntohs(h->ancount);
 	ansp += HFIXEDSZ;
 
-	if (nq != 1 || na < 1)
+	if (nq != 1 || na < 1) {
+		res_ndestroy(&stat);
 		exit(1);
+	}
 
-	hostlen = sizeof (hostname);
-	len = dn_expand(answer, end, ansp, hostname, hostlen);
-	if (len < 0)
+	hostlen = sizeof (name);
+	len = dn_expand(answer, end, ansp, name, hostlen);
+	if (len < 0) {
+		res_ndestroy(&stat);
 		exit(1);
+	}
 
 	ansp += len + QFIXEDSZ;
 
-	if (ansp > end)
+	if (ansp > end) {
+		res_ndestroy(&stat);
 		exit(1);
+	}
 
 	while (na-- > 0 && ansp < end) {
-		len = dn_expand(answer, end, ansp, hostname, hostlen);
+
+		len = dn_expand(answer, end, ansp, name, hostlen);
 
 		if (len < 0)
 			continue;
-		ansp += len;			/* hostname */
-		type = ns_get16(ansp);
-		ansp += INT16SZ;		/* type */
-		class = ns_get16(ansp);
-		ansp += INT16SZ;		/* class */
-		ansp += INT32SZ;		/* ttl */
-		len = ns_get16(ansp);
-		ansp += INT16SZ;		/* size */
+		ansp += len;			/* name */
+		NS_GET16(type, ansp);		/* type */
+		NS_GET16(class, ansp);		/* class */
+		NS_GET32(ttl, ansp);		/* ttl */
+		NS_GET16(size, ansp);		/* size */
+
+		if ((ansp + size) > end) {
+			res_ndestroy(&stat);
+			exit(1);
+		}
+		if (type == T_SRV) {
+			NS_GET16(priority, ansp);
+			NS_GET16(weight, ansp);
+			NS_GET16(port, ansp);
+			len = dn_expand(answer, end, ansp, name, hostlen);
+			if (len < 0) {
+				res_ndestroy(&stat);
+				exit(1);
+			}
+			for (cp = name; *cp; cp++) {
+				*cp = tolower(*cp);
+			}
+			(void) printf("%s %d\n", name, port);
+		} else if (typestr && *typestr == 'I') {
+			(void) inet_ntop(AF_INET, (void *)ansp, nbuf,
+			    INET6_ADDRSTRLEN);
+			(void) strncpy(name, nbuf, MAXHOSTNAMELEN);
+		} else if (type == T_PTR) {
+			len = dn_expand(answer, end, ansp, name, hostlen);
+			if (len < 0) {
+				res_ndestroy(&stat);
+				exit(1);
+			}
+		}
 		ansp += len;
-		if (type == T_A && class == C_IN) {
+		if (type == rr_type && class == C_IN) {
 			found = 1;
-			break;
+			if (type != T_SRV)
+				break;
 		}
 	}
 
-	if (found != 1)
+	if (found != 1) {
+		res_ndestroy(&stat);
 		exit(1);
+	}
 
-	for (cp = hostname; *cp; cp++) {
+	for (cp = name; *cp; cp++) {
 		*cp = tolower(*cp);
 	}
 
-	(void) printf("%s\n", hostname);
+	if (type != T_SRV)
+		(void) printf("%s\n", name);
+
+	res_ndestroy(&stat);
 
 	return (0);
 }

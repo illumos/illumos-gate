@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,7 @@ f none usr/lib/krb5/db2.so.1 755 root bin
 s none usr/lib/krb5/db2.so=db2.so.1
 f none usr/lib/krb5/gkadmin.jar 444 root bin
 f none usr/lib/krb5/kadmind 500 root bin
+f none usr/lib/krb5/kdyndns 555 root bin
 f none usr/lib/krb5/kldap.so.1 755 root bin
 f none usr/lib/krb5/klookup 555 root bin
 s none usr/lib/krb5/kldap.so=kldap.so.1
@@ -62,6 +63,8 @@ f none usr/lib/krb5/kprop 555 root bin
 f none usr/lib/krb5/kprop_script 555 root bin
 f none usr/lib/krb5/kpropd 555 root bin
 f none usr/lib/krb5/krb5kdc 500 root bin
+f none usr/lib/krb5/ksetpw 555 root bin
+f none usr/lib/krb5/ksmb 555 root bin
 f none usr/lib/krb5/libdb2.so.1 755 root bin
 s none usr/lib/krb5/libdb2.so=libdb2.so.1
 f none usr/lib/krb5/libdyn.so.1 755 root bin
@@ -75,6 +78,10 @@ s none usr/lib/krb5/libkdb.so=libkdb.so.1
 f none usr/lib/krb5/libkdb_ldap.so.1 755 root bin
 s none usr/lib/krb5/libkdb_ldap.so=libkdb_ldap.so.1
 f none usr/lib/krb5/visualrt.jar 444 root bin
+d none usr/lib/security 0755 root bin
+f none usr/lib/security/pam_krb5_first 0444 root bin
+f none usr/lib/security/pam_krb5_only 0444 root bin
+f none usr/lib/security/pam_krb5_optional 0444 root bin
 d none usr/sbin 0755 root bin
 f none usr/sbin/gkadmin 555 root bin
 f none usr/sbin/k5srvutil 555 root bin

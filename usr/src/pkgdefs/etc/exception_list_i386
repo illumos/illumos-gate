@@ -563,13 +563,16 @@ usr/lib/krb5/README.db2			i386
 usr/lib/krb5/db2.so			i386
 usr/lib/krb5/db2.so.1			i386
 usr/lib/krb5/kadmind			i386
+usr/lib/krb5/kdyndns			i386
 usr/lib/krb5/klookup			i386
 usr/lib/krb5/kprop			i386
 usr/lib/krb5/kprop_script		i386
 usr/lib/krb5/kpropd			i386
-usr/lib/krb5/krb5kdc			i386
 usr/lib/krb5/kldap.so			i386
 usr/lib/krb5/kldap.so.1			i386
+usr/lib/krb5/krb5kdc			i386
+usr/lib/krb5/ksetpw			i386
+usr/lib/krb5/ksmb			i386
 usr/lib/krb5/libdb2.so			i386
 usr/lib/krb5/libdb2.so.1		i386
 usr/lib/krb5/libdyn.so			i386

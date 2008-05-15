@@ -568,13 +568,16 @@ usr/lib/krb5/README.db2			sparc
 usr/lib/krb5/db2.so			sparc
 usr/lib/krb5/db2.so.1			sparc
 usr/lib/krb5/kadmind			sparc
+usr/lib/krb5/kdyndns			sparc
 usr/lib/krb5/klookup			sparc
 usr/lib/krb5/kprop			sparc
 usr/lib/krb5/kprop_script		sparc
 usr/lib/krb5/kpropd			sparc
-usr/lib/krb5/krb5kdc			sparc
 usr/lib/krb5/kldap.so			sparc
 usr/lib/krb5/kldap.so.1			sparc
+usr/lib/krb5/krb5kdc			sparc
+usr/lib/krb5/ksetpw			sparc
+usr/lib/krb5/ksmb			sparc
 usr/lib/krb5/libdb2.so			sparc
 usr/lib/krb5/libdb2.so.1		sparc
 usr/lib/krb5/libdyn.so			sparc
