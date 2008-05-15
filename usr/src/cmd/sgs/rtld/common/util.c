@@ -652,9 +652,9 @@ call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
 
 		DBG_CALL(Dbg_util_call_array(lmp, (void *)fptr, ndx, shtype));
 
-		leave(LIST(lmp), thr_flg_reenter);
+		leave(LIST(lmp), 0);
 		(*fptr)();
-		(void) enter(thr_flg_reenter);
+		(void) enter(0);
 	}
 }
 
@@ -720,9 +720,9 @@ call_init(Rt_map **tobj, int flag)
 		}
 
 		if (iptr) {
-			leave(LIST(lmp), thr_flg_reenter);
+			leave(LIST(lmp), 0);
 			(*iptr)();
-			(void) enter(thr_flg_reenter);
+			(void) enter(0);
 		}
 
 		call_array(INITARRAY(lmp), INITARRAYSZ(lmp), lmp,
@@ -816,9 +816,9 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			    SHT_FINI_ARRAY);
 
 			if (fptr) {
-				leave(LIST(lmp), thr_flg_reenter);
+				leave(LIST(lmp), 0);
 				(*fptr)();
-				(void) enter(thr_flg_reenter);
+				(void) enter(0);
 			}
 		}
 

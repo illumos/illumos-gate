@@ -1343,3 +1343,4 @@ Bugid   Risk Synopsis
 	fully relocated (link-editor components only)
 6699594 The ld command has a problem handling 'protected' mapfile keyword.
 6699131 elfdump should display core file notes (D)
+6702260 single threading .init/.fini sections breaks staroffice
