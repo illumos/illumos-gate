@@ -78,6 +78,8 @@
 #include <sys/mount.h>
 #include <sys/sunddi.h>
 
+#include "zfs_namecheck.h"
+
 typedef struct zfsctl_node {
 	gfs_dir_t	zc_gfs_private;
 	uint64_t	zc_id;
@@ -428,6 +430,8 @@ zfsctl_snapshot_zname(vnode_t *vp, const char *name, int len, char *zname)
 {
 	objset_t *os = ((zfsvfs_t *)((vp)->v_vfsp->vfs_data))->z_os;
 
+	if (snapshot_namecheck(name, NULL, NULL) != 0)
+		return (EILSEQ);
 	dmu_objset_name(os, zname);
 	if (strlen(zname) + 1 + strlen(name) >= len)
 		return (ENAMETOOLONG);
@@ -654,6 +658,9 @@ zfsctl_snapdir_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t  **vpp,
 	int err;
 	static enum symfollow follow = NO_FOLLOW;
 	static enum uio_seg seg = UIO_SYSSPACE;
+
+	if (snapshot_namecheck(dirname, NULL, NULL) != 0)
+		return (EILSEQ);
 
 	dmu_objset_name(zfsvfs->z_os, name);
 

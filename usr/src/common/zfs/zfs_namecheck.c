@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ valid_char(char c)
 	return ((c >= 'a' && c <= 'z') ||
 	    (c >= 'A' && c <= 'Z') ||
 	    (c >= '0' && c <= '9') ||
-	    c == '-' || c == '_' || c == '.' || c == ':');
+	    c == '-' || c == '_' || c == '.' || c == ':' || c == ' ');
 }
 
 /*
