@@ -1163,16 +1163,16 @@ zfs_mount(void)
 	char *stack;
 	int label = 0;
 	uberblock_phys_t *ub_array, *ubbest = NULL;
+	vdev_boot_header_t *bh;
 	objset_phys_t *osp;
-
-	/* if zfs is already mounted, don't do it again */
-	if (is_zfs_mount == 1)
-		return (1);
 
 	stackbase = ZFS_SCRATCH;
 	stack = stackbase;
 	ub_array = (uberblock_phys_t *)stack;
 	stack += VDEV_UBERBLOCK_RING;
+
+	bh = (vdev_boot_header_t *)stack;
+	stack += VDEV_BOOT_HEADER_SIZE;
 
 	osp = (objset_phys_t *)stack;
 	stack += sizeof (objset_phys_t);
@@ -1180,7 +1180,15 @@ zfs_mount(void)
 	/* XXX add back labels support? */
 	for (label = 0; ubbest == NULL && label < (VDEV_LABELS/2); label++) {
 		uint64_t sector = (label * sizeof (vdev_label_t) +
-		    VDEV_SKIP_SIZE + VDEV_BOOT_HEADER_SIZE +
+		    VDEV_SKIP_SIZE) >> SPA_MINBLOCKSHIFT;
+		if (devread(sector, 0, VDEV_BOOT_HEADER_SIZE,
+		    (char *)bh) == 0)
+			continue;
+		if ((bh->vb_magic != VDEV_BOOT_MAGIC) ||
+		    (bh->vb_version != VDEV_BOOT_VERSION)) {
+			continue;
+		}
+		sector += (VDEV_BOOT_HEADER_SIZE +
 		    VDEV_PHYS_SIZE) >> SPA_MINBLOCKSHIFT;
 
 		/* Read in the uberblock ring (128K). */
@@ -1253,9 +1261,11 @@ zfs_open(char *filename)
 			    &current_bootfs_obj, mdn, stack))
 				return (0);
 		} else {
-			if (errnum = get_objset_mdn(MOS,
-			    current_bootfs, &current_bootfs_obj, mdn, stack))
+			if (errnum = get_objset_mdn(MOS, current_bootfs,
+			    &current_bootfs_obj, mdn, stack)) {
+				memset(current_bootfs, 0, MAXNAMELEN);
 				return (0);
+			}
 		}
 	}
 

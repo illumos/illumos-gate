@@ -4045,6 +4045,11 @@ bootfs_func (char *arg, int flags)
 		errnum = ERR_BAD_ARGUMENT;
 		return 0;
 	}
+	if (current_rootpool[0] != 0 && grub_strncmp(arg,
+	    current_rootpool, strlen(current_rootpool))) {
+		errnum = ERR_BAD_ARGUMENT;
+		return 0;
+	}
 
 	if (set_bootfs(arg) == 0) {
 		errnum = ERR_BAD_ARGUMENT;
