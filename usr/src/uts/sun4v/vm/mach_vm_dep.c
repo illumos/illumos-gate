@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -703,9 +703,11 @@ contig_mem_init(void)
 	    contig_mem_span_free, contig_mem_slab_arena, 0,
 	    VM_SLEEP | VM_BESTFIT | VMC_XALIGN);
 
-	if (vmem_add(contig_mem_arena, contig_mem_prealloc_buf,
-	    contig_mem_prealloc_size, VM_SLEEP) == NULL)
-		cmn_err(CE_PANIC, "Failed to pre-populate contig_mem_arena");
+	if (contig_mem_prealloc_buf == NULL || vmem_add(contig_mem_arena,
+	    contig_mem_prealloc_buf, contig_mem_prealloc_size, VM_SLEEP)
+	    == NULL) {
+		cmn_err(CE_WARN, "Failed to pre-populate contig_mem_arena");
+	}
 }
 
 /*
@@ -733,6 +735,8 @@ size_t contig_mem_prealloc_base_size = 0;
 caddr_t
 contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
 {
+	caddr_t	chunkp;
+
 	contig_mem_prealloc_size = MIN((PREALLOC_PER_CPU * ncpu_guest_max) +
 	    contig_mem_prealloc_base_size,
 	    (ptob(npages) * PREALLOC_PERCENT) / 100);
@@ -742,10 +746,34 @@ contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
 
 	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, MMU_PAGESIZE4M);
 	if (prom_alloc(alloc_base, contig_mem_prealloc_size,
-	    MMU_PAGESIZE4M) != alloc_base)
-		prom_panic("can't allocate contig mem");
+	    MMU_PAGESIZE4M) != alloc_base) {
 
-	contig_mem_prealloc_buf = alloc_base;
+		/*
+		 * Failed.  This may mean the physical memory has holes in it
+		 * and it will be more difficult to get large contiguous
+		 * pieces of memory.  Since we only guarantee contiguous
+		 * pieces of memory contig_mem_import_size_max or smaller,
+		 * loop, getting contig_mem_import_size_max at a time, until
+		 * failure or contig_mem_prealloc_size is reached.
+		 */
+		for (chunkp = alloc_base;
+		    (chunkp - alloc_base) < contig_mem_prealloc_size;
+		    chunkp += contig_mem_import_size_max) {
+
+			if (prom_alloc(chunkp, contig_mem_import_size_max,
+			    MMU_PAGESIZE4M) != chunkp) {
+				break;
+			}
+		}
+		contig_mem_prealloc_size = chunkp - alloc_base;
+		ASSERT(contig_mem_prealloc_size != 0);
+	}
+
+	if (contig_mem_prealloc_size != 0) {
+		contig_mem_prealloc_buf = alloc_base;
+	} else {
+		contig_mem_prealloc_buf = NULL;
+	}
 	alloc_base += contig_mem_prealloc_size;
 
 	return (alloc_base);
