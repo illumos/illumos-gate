@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ static cond_t	rebuild_cv;
 
 static thread_t pri_worker_thread_id, pri_reader_thread_id;
 static boolean_t all_thr_exit = B_FALSE;
+static boolean_t event_caught = B_FALSE;
 
 static void priplugin_init(void);
 static void priplugin_fini(void);
@@ -120,6 +121,7 @@ priplugin_init(void)
 	    "being created; callbacks being registered\n");
 
 	all_thr_exit = B_FALSE;
+	event_caught = B_FALSE;
 
 	(void) mutex_init(&rebuild_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&rebuild_cv, USYNC_THREAD, NULL);
@@ -175,6 +177,7 @@ pri_worker_thread(void *arg)
 	pri_debug(LOG_NOTICE, "pri_worker_thread: start\n");
 
 	(void) mutex_lock(&rebuild_lock);
+	/*LINTED E_FUNC_RET_MAYBE_IGNORED2*/
 	while (1) {
 		(void) cond_wait(&rebuild_cv, &rebuild_lock);
 
@@ -185,34 +188,46 @@ pri_worker_thread(void *arg)
 			break;
 		}
 
-		status = ptree_get_root(&picl_root_node);
-		if (status != PICL_SUCCESS) {
-			pri_debug(LOG_NOTICE, "pri_worker_thread: "
-			    "can't get picl tree root node: %s\n",
-			    picl_strerror(status));
-			continue;
-		}
+		/*
+		 * We don't get events for changes to system memory,
+		 * and we do not want to interfere with other plug-ins
+		 * by making changes to the picl tree.  So if we were
+		 * woken up by a thread then do not destroy and rebuild
+		 * the memory info.  Just go fix the labels.
+		 */
+		if (event_caught == B_FALSE) {
+			status = ptree_get_root(&picl_root_node);
+			if (status != PICL_SUCCESS) {
+				pri_debug(LOG_NOTICE, "pri_worker_thread: "
+				    "can't get picl tree root node: %s\n",
+				    picl_strerror(status));
+				continue;
+			}
 
-		pri_debug(LOG_NOTICE, "pri_worker_thread: have root picl "
-		    "and PRI nodes\n");
+			pri_debug(LOG_NOTICE, "pri_worker_thread: have root "
+			    "picl and PRI nodes\n");
 
-		status = ptree_walk_tree_by_class(picl_root_node,
-		    "memory-segment", NULL, remove_old_segments);
-		if (status != PICL_SUCCESS) {
-			pri_debug(LOG_NOTICE, "pri_worker_thread: can't remove "
-			    "old memory segments: \n", picl_strerror(status));
+			status = ptree_walk_tree_by_class(picl_root_node,
+			    "memory-segment", NULL, remove_old_segments);
+			if (status != PICL_SUCCESS) {
+				pri_debug(LOG_NOTICE, "pri_worker_thread: "
+				    "can't remove old memory segments: \n",
+				    picl_strerror(status));
+			} else
+				pri_debug(LOG_NOTICE, "pri_worker_thread: "
+				    "old memory segments removed\n");
+
+			status = ptree_walk_tree_by_class(picl_root_node,
+			    "memory", (void *) mdp, add_mem_prop);
+			if (status != PICL_SUCCESS) {
+				pri_debug(LOG_NOTICE, "pri_worker_thread: "
+				    "memory segments walk failed: \n",
+				    picl_strerror(status));
+			} else
+				pri_debug(LOG_NOTICE, "pri_worker_thread: "
+				    "success walking memory node\n");
 		} else
-			pri_debug(LOG_NOTICE, "pri_worker_thread: old memory "
-			    "segments removed\n");
-
-		status = ptree_walk_tree_by_class(picl_root_node, "memory",
-		    (void *) mdp, add_mem_prop);
-		if (status != PICL_SUCCESS) {
-			pri_debug(LOG_NOTICE, "pri_worker_thread: memory "
-			    "segments walk failed: \n", picl_strerror(status));
-		} else
-			pri_debug(LOG_NOTICE, "pri_worker_thread: success "
-			    "walking memory node\n");
+			event_caught = B_FALSE;
 
 		io_dev_addlabel(mdp);
 	}
@@ -249,6 +264,7 @@ pri_reader_thread(void *arg)
 	mdp = NULL;
 	tok = 0;
 	count = 0;
+	/*LINTED E_FUNC_RET_MAYBE_IGNORED2*/
 	while (1) {
 		/*
 		 * The _fini() function will close the PRI's fd, which will
@@ -379,6 +395,7 @@ priplugin_register(void)
 static void
 event_handler(const char *ename, const void *earg, size_t size, void *cookie)
 {
+
 	pri_debug(LOG_NOTICE, "pri: event_handler: caught event "
 	    "%s\n", ename);
 	if ((strcmp(ename, PICLEVENT_SYSEVENT_DEVICE_ADDED) == 0) ||
@@ -386,10 +403,17 @@ event_handler(const char *ename, const void *earg, size_t size, void *cookie)
 	    (strcmp(ename, PICLEVENT_DR_AP_STATE_CHANGE) == 0)) {
 		pri_debug(LOG_NOTICE, "pri: event_handler: handle event "
 		    "%s; waking worker thread\n", ename);
+
 		(void) mutex_lock(&rebuild_lock);
 
-		if (all_thr_exit == B_FALSE)
+		if (all_thr_exit == B_FALSE) {
+			/*
+			 * Tell the worker thread to only re-examine the
+			 * IO device labels.
+			 */
+			event_caught = B_TRUE;
 			(void) cond_signal(&rebuild_cv);
+		}
 
 		(void) mutex_unlock(&rebuild_lock);
 	}
