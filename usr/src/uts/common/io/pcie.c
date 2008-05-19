@@ -43,6 +43,10 @@
 static void pcie_init_pfd(dev_info_t *);
 static void pcie_fini_pfd(dev_info_t *);
 
+#if defined(__i386) || defined(__amd64)
+static void pcie_check_io_mem_range(ddi_acc_handle_t, boolean_t *, boolean_t *);
+#endif /* defined(__i386) || defined(__amd64) */
+
 #ifdef	DEBUG
 uint_t pcie_debug_flags = 0;
 
@@ -249,6 +253,30 @@ pcie_initchild(dev_info_t *cdip)
 	/* Setup the device's command register */
 	reg16 = PCIE_GET(16, bus_p, PCI_CONF_COMM);
 	tmp16 = (reg16 & pcie_command_default_fw) | pcie_command_default;
+
+#if defined(__i386) || defined(__amd64)
+	boolean_t empty_io_range = B_FALSE;
+	boolean_t empty_mem_range = B_FALSE;
+	/*
+	 * Check for empty IO and Mem ranges on bridges. If so disable IO/Mem
+	 * access as it can cause a hang if enabled.
+	 */
+	pcie_check_io_mem_range(bus_p->bus_cfg_hdl, &empty_io_range,
+	    &empty_mem_range);
+	if ((empty_io_range == B_TRUE) &&
+	    (pcie_command_default & PCI_COMM_IO)) {
+		tmp16 &= ~PCI_COMM_IO;
+		PCIE_DBG("No I/O range found for %s, bdf 0x%x\n",
+		    ddi_driver_name(cdip), bus_p->bus_bdf);
+	}
+	if ((empty_mem_range == B_TRUE) &&
+	    (pcie_command_default & PCI_COMM_MAE)) {
+		tmp16 &= ~PCI_COMM_MAE;
+		PCIE_DBG("No Mem range found for %s, bdf 0x%x\n",
+		    ddi_driver_name(cdip), bus_p->bus_bdf);
+	}
+#endif /* defined(__i386) || defined(__amd64) */
+
 	if (pcie_serr_disable_flag && PCIE_IS_PCIE(bus_p))
 		tmp16 &= ~PCI_COMM_SERR_ENABLE;
 
@@ -1130,3 +1158,31 @@ pcie_dbg(char *fmt, ...)
 	va_end(ap);
 }
 #endif	/* DEBUG */
+
+#if defined(__i386) || defined(__amd64)
+static void
+pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
+    boolean_t *empty_mem_range)
+{
+	uint8_t	class, subclass;
+	uint_t	val;
+
+	class = pci_config_get8(cfg_hdl, PCI_CONF_BASCLASS);
+	subclass = pci_config_get8(cfg_hdl, PCI_CONF_SUBCLASS);
+
+	if ((class == PCI_CLASS_BRIDGE) && (subclass == PCI_BRIDGE_PCI)) {
+		val = (((uint_t)pci_config_get8(cfg_hdl, PCI_BCNF_IO_BASE_LOW) &
+		    PCI_BCNF_IO_MASK) << 8);
+		/*
+		 * Assuming that a zero based io_range[0] implies an
+		 * invalid I/O range.  Likewise for mem_range[0].
+		 */
+		if (val == 0)
+			*empty_io_range = B_TRUE;
+		val = (((uint_t)pci_config_get16(cfg_hdl, PCI_BCNF_MEM_BASE) &
+		    PCI_BCNF_MEM_MASK) << 16);
+		if (val == 0)
+			*empty_mem_range = B_TRUE;
+	}
+}
+#endif /* defined(__i386) || defined(__amd64) */
