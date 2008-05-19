@@ -583,6 +583,9 @@ usr/lib/krb5/libkdb.so			i386
 usr/lib/krb5/libkdb.so.1		i386
 usr/lib/krb5/libkdb_ldap.so		i386
 usr/lib/krb5/libkdb_ldap.so.1		i386
+usr/lib/security/pam_krb5_first		i386
+usr/lib/security/pam_krb5_only		i386
+usr/lib/security/pam_krb5_optional	i386
 usr/sbin/k5srvutil			i386
 usr/sbin/kadmin.local			i386
 usr/sbin/kadmin				i386

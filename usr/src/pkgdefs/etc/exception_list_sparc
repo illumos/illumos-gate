@@ -588,6 +588,9 @@ usr/lib/krb5/libkdb.so			sparc
 usr/lib/krb5/libkdb.so.1		sparc
 usr/lib/krb5/libkdb_ldap.so		sparc
 usr/lib/krb5/libkdb_ldap.so.1		sparc
+usr/lib/security/pam_krb5_first		sparc
+usr/lib/security/pam_krb5_only		sparc
+usr/lib/security/pam_krb5_optional	sparc
 usr/sbin/k5srvutil			sparc
 usr/sbin/kadmin.local			sparc
 usr/sbin/kadmin				sparc
