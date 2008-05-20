@@ -3972,7 +3972,7 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 			hblktag.htag_rehash = ttesz;
 			hblktag.htag_rid = rid;
 			hblktag.htag_id = srdp;
-			hmebp = HME_HASH_FUNCTION(srdp, addr, hmeshift);
+			hmebp = HME_HASH_FUNCTION(srdp, va, hmeshift);
 			SFMMU_HASH_LOCK(hmebp);
 			HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa,
 			    pr_hblk, prevpa, &list);
