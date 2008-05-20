@@ -85,9 +85,8 @@
  * ---------------
  * The main data structures used by this code are the following:
  *
- * - lgrp_plat_cpu_node[]		APIC ID to node ID mapping table
- *					indexed by hashed APIC ID (only used
- *					for SRAT)
+ * - lgrp_plat_cpu_node[]		CPU to node ID mapping table indexed by
+ *					CPU ID (only used for SRAT)
  *
  * - lgrp_plat_lat_stats.latencies[][]	Table of latencies between same and
  *					different nodes indexed by node ID
@@ -120,6 +119,7 @@
 
 
 #include <sys/archsystm.h>	/* for {in,out}{b,w,l}() */
+#include <sys/bootconf.h>
 #include <sys/cmn_err.h>
 #include <sys/controlregs.h>
 #include <sys/cpupart.h>
@@ -165,12 +165,6 @@
 #define	LGRP_PLAT_PROBE_VENDOR		0x4	/* probe vendor ID register */
 
 /*
- * Hash CPU APIC ID into CPU to node mapping table using max_ncpus
- * to minimize span of entries used
- */
-#define	CPU_NODE_HASH(apicid)		((apicid) % max_ncpus)
-
-/*
  * Hash proximity domain ID into node to domain mapping table using to minimize
  * span of entries used
  */
@@ -178,7 +172,7 @@
 
 
 /*
- * CPU APIC ID to node ID mapping structure (only used with SRAT)
+ * CPU to node ID mapping structure (only used with SRAT)
  */
 typedef	struct cpu_node_map {
 	int		exists;
@@ -237,9 +231,13 @@ typedef	struct node_phys_addr_map {
 	uint32_t	prox_domain;
 } node_phys_addr_map_t;
 
+/*
+ * Error code from processing CPU to APIC ID array boot property
+ */
+static int				lgrp_plat_cpu_apicid_error = 0;
 
 /*
- * CPU APIC ID to node ID mapping table (only used for SRAT)
+ * CPU to node ID mapping table (only used for SRAT)
  */
 static cpu_node_map_t			lgrp_plat_cpu_node[NCPU];
 
@@ -368,6 +366,9 @@ lgrp_handle_t	lgrp_plat_root_hand(void);
  */
 static int	is_opteron(void);
 
+static int	lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
+    cpu_node_map_t *cpu_node, int nentries, uint32_t apicid, uint32_t domain);
+
 static int	lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node);
 
 static int	lgrp_plat_domain_to_node(node_domain_map_t *node_domain,
@@ -394,11 +395,14 @@ static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
     lgrp_plat_latency_stats_t *lat_stats,
     lgrp_plat_probe_stats_t *probe_stats);
 
+static int	lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node,
+    int boot_ncpus);
+
 static int	lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
     node_phys_addr_map_t *node_memory, lgrp_plat_latency_stats_t *lat_stats);
 
-static int	lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
-    node_domain_map_t *node_domain, cpu_node_map_t *cpu_node,
+static int	lgrp_plat_process_srat(struct srat *tp, int cpu_count,
+    uint_t *node_cnt, node_domain_map_t *node_domain, cpu_node_map_t *cpu_node,
     node_phys_addr_map_t *node_memory);
 
 static int	lgrp_plat_srat_domains(struct srat *tp);
@@ -690,18 +694,28 @@ lgrp_plat_init(void)
 	}
 
 	/*
+	 * Read boot property with CPU to APIC ID mapping table/array and fill
+	 * in CPU to node ID mapping table with APIC ID for each CPU
+	 */
+	lgrp_plat_cpu_apicid_error =
+	    lgrp_plat_process_cpu_apicids(lgrp_plat_cpu_node, boot_max_ncpus);
+
+	/*
 	 * Determine which CPUs and memory are local to each other and number
 	 * of NUMA nodes by reading ACPI System Resource Affinity Table (SRAT)
 	 */
-	lgrp_plat_srat_error = lgrp_plat_process_srat(srat_ptr,
-	    &lgrp_plat_node_cnt, lgrp_plat_node_domain, lgrp_plat_cpu_node,
-	    lgrp_plat_node_memory);
+	if (!lgrp_plat_cpu_apicid_error) {
+		lgrp_plat_srat_error = lgrp_plat_process_srat(srat_ptr,
+		    boot_max_ncpus, &lgrp_plat_node_cnt, lgrp_plat_node_domain,
+		    lgrp_plat_cpu_node, lgrp_plat_node_memory);
+	}
 
 	/*
-	 * Try to use PCI config space registers on Opteron if SRAT doesn't
-	 * exist or there is some error processing the SRAT
+	 * Try to use PCI config space registers on Opteron if there's an error
+	 * processing CPU to APIC ID mapping or SRAT
 	 */
-	if (lgrp_plat_srat_error != 0 && is_opteron())
+	if ((lgrp_plat_cpu_apicid_error != 0 || lgrp_plat_srat_error != 0) &&
+	    is_opteron())
 		opt_get_numa_config(&lgrp_plat_node_cnt, &lgrp_plat_mem_intrlv,
 		    lgrp_plat_node_memory);
 
@@ -1167,10 +1181,9 @@ lgrp_plat_root_hand(void)
  */
 static int
 lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
-    cpu_node_map_t *cpu_node, uint32_t apicid, uint32_t domain)
+    cpu_node_map_t *cpu_node, int nentries, uint32_t apicid, uint32_t domain)
 {
 	uint_t	i;
-	uint_t	start;
 	int	node;
 
 	/*
@@ -1184,65 +1197,53 @@ lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
 	}
 
 	/*
-	 * Hash given CPU APIC ID into CPU to node mapping table/array and
-	 * enter it and its corresponding node and proximity domain IDs into
-	 * first non-existent or matching entry
+	 * Search for entry with given APIC ID and fill in its node and
+	 * proximity domain IDs (if they haven't been set already)
 	 */
-	i = start = CPU_NODE_HASH(apicid);
-	do {
-		if (cpu_node[i].exists) {
-			/*
-			 * Update already existing entry for CPU
-			 */
-			if (cpu_node[i].apicid == apicid) {
-				/*
-				 * Just return when everything same
-				 */
-				if (cpu_node[i].prox_domain == domain &&
-				    cpu_node[i].node == node)
-					return (1);
+	for (i = 0; i < nentries; i++) {
+		/*
+		 * Skip nonexistent entries and ones without matching APIC ID
+		 */
+		if (!cpu_node[i].exists || cpu_node[i].apicid != apicid)
+			continue;
 
-				/*
-				 * Assert that proximity domain and node IDs
-				 * should be same and return error on non-debug
-				 * kernel
-				 */
-				ASSERT(cpu_node[i].prox_domain == domain &&
-				    cpu_node[i].node == node);
-				return (-1);
-			}
-		} else {
-			/*
-			 * Create new entry for CPU
-			 */
-			cpu_node[i].exists = 1;
-			cpu_node[i].apicid = apicid;
-			cpu_node[i].prox_domain = domain;
-			cpu_node[i].node = node;
-			return (0);
-		}
-		i = CPU_NODE_HASH(i + 1);
-	} while (i != start);
+		/*
+		 * Just return if entry completely and correctly filled in
+		 * already
+		 */
+		if (cpu_node[i].prox_domain == domain &&
+		    cpu_node[i].node == node)
+			return (1);
+
+		/*
+		 * Fill in node and proximity domain IDs
+		 */
+		cpu_node[i].prox_domain = domain;
+		cpu_node[i].node = node;
+
+		return (0);
+	}
 
 	/*
-	 * Ran out of supported number of entries which shouldn't happen....
+	 * Return error when entry for APIC ID wasn't found in table
 	 */
-	ASSERT(i != start);
-	return (-1);
+	return (-2);
 }
 
 
 /*
- * Get node ID for given CPU ID
+ * Get node ID for given CPU
  */
 static int
 lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node)
 {
-	uint32_t	apicid;
-	uint_t		i;
-	uint_t		start;
+	processorid_t	cpuid;
 
 	if (cp == NULL)
+		return (-1);
+
+	cpuid = cp->cpu_id;
+	if (cpuid < 0 || cpuid >= max_ncpus)
 		return (-1);
 
 	/*
@@ -1257,17 +1258,13 @@ lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node)
 	}
 
 	/*
-	 * SRAT does exist, so get APIC ID for given CPU and map that to its
-	 * node ID
+	 * Return -1 when CPU to node ID mapping entry doesn't exist for given
+	 * CPU
 	 */
-	apicid = cpuid_get_apicid(cp);
-	i = start = CPU_NODE_HASH(apicid);
-	do {
-		if (cpu_node[i].apicid == apicid && cpu_node[i].exists)
-			return (cpu_node[i].node);
-		i = CPU_NODE_HASH(i + 1);
-	} while (i != start);
-	return (-1);
+	if (!cpu_node[cpuid].exists)
+		return (-1);
+
+	return (cpu_node[cpuid].node);
 }
 
 
@@ -1894,6 +1891,55 @@ lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
 
 
 /*
+ * Read boot property with CPU to APIC ID array and fill in CPU to node ID
+ * mapping table with APIC ID for each CPU
+ *
+ * NOTE: This code assumes that CPU IDs are assigned in order that they appear
+ *       in in cpu_apicid_array boot property which is based on and follows
+ *	 same ordering as processor list in ACPI MADT.  If the code in
+ *	 usr/src/uts/i86pc/io/pcplusmp/apic.c that reads MADT and assigns
+ *	 CPU IDs ever changes, then this code will need to change too....
+ */
+static int
+lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node, int boot_ncpus)
+{
+	char	*boot_prop_name = BP_CPU_APICID_ARRAY;
+	uint8_t	cpu_apicid_array[UINT8_MAX + 1];
+	int	i;
+	int	boot_prop_len;
+
+	/*
+	 * Nothing to do when no array to fill in or not enough CPUs
+	 */
+	if (cpu_node == NULL || boot_ncpus <= 1)
+		return (1);
+
+	/*
+	 * Check length of property value
+	 */
+	boot_prop_len = BOP_GETPROPLEN(bootops, boot_prop_name);
+	if (boot_prop_len <= 0 || boot_prop_len > UINT8_MAX)
+		return (2);
+
+	/*
+	 * Get CPU to APIC ID property value
+	 */
+	if (BOP_GETPROP(bootops, boot_prop_name, cpu_apicid_array) < 0)
+		return (3);
+
+	/*
+	 * Fill in CPU to node ID mapping table with APIC ID for each CPU
+	 */
+	for (i = 0; i < boot_ncpus; i++) {
+		cpu_node[i].exists = 1;
+		cpu_node[i].apicid = cpu_apicid_array[i];
+	}
+
+	return (0);
+}
+
+
+/*
  * Read ACPI System Locality Information Table (SLIT) to determine how far each
  * NUMA node is from each other
  */
@@ -1970,13 +2016,14 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
  * and memory are local to each other in the same NUMA node
  */
 static int
-lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
+lgrp_plat_process_srat(struct srat *tp, int cpu_count, uint_t *node_cnt,
     node_domain_map_t *node_domain, cpu_node_map_t *cpu_node,
     node_phys_addr_map_t *node_memory)
 {
 	struct srat_item	*srat_end;
 	int			i;
 	struct srat_item	*item;
+	int			proc_entry_count;
 
 	if (tp == NULL || !lgrp_plat_srat_enable)
 		return (1);
@@ -2002,6 +2049,7 @@ lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
 	 */
 	item = tp->list;
 	srat_end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
+	proc_entry_count = 0;
 	while (item < srat_end) {
 		uint32_t	apic_id;
 		uint32_t	domain;
@@ -2027,8 +2075,10 @@ lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
 			apic_id = item->i.p.apic_id;
 
 			if (lgrp_plat_cpu_node_update(node_domain, cpu_node,
-			    apic_id, domain) < 0)
+			    cpu_count, apic_id, domain) < 0)
 				return (3);
+
+			proc_entry_count++;
 			break;
 
 		case SRAT_MEMORY:	/* memory entry */
@@ -2056,6 +2106,13 @@ lgrp_plat_process_srat(struct srat *tp, uint_t *node_cnt,
 
 		item = (struct srat_item *)((uintptr_t)item + item->len);
 	}
+
+	/*
+	 * Should have seen at least as many SRAT processor entries as CPUs
+	 */
+	if (proc_entry_count >= cpu_count)
+		return (5);
+
 	return (0);
 }
 

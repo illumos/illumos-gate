@@ -2623,19 +2623,6 @@ cpuid_get_dtlb_nent(cpu_t *cpu, size_t pagesize)
 	return (dtlb_nent);
 }
 
-uint_t
-cpuid_get_apicid(cpu_t *cpu)
-{
-	struct cpuid_info *cpi;
-
-	if (cpu == NULL)
-		cpu = CPU;
-	cpi = cpu->cpu_m.mcpu_cpi;
-
-	ASSERT(cpuid_checkpass(cpu, 1));
-	return (CPI_APIC_ID(cpi));
-}
-
 /*
  * Return 0 if the erratum is not present or not applicable, positive
  * if it is, and negative if the status of the erratum is unknown.

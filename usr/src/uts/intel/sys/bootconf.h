@@ -46,6 +46,11 @@ extern "C" {
 #endif
 
 /*
+ * Boot property names
+ */
+#define	BP_CPU_APICID_ARRAY	"cpu_apicid_array"
+
+/*
  * masks to hand to bsys_alloc memory allocator
  * XXX	These names shouldn't really be srmmu derived.
  */

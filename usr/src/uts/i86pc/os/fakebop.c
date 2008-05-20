@@ -1871,6 +1871,36 @@ process_madt(struct madt *tp)
 {
 	struct madt_processor *cpu, *end;
 	uint32_t cpu_count = 0;
+	uint8_t cpu_apicid_array[UINT8_MAX + 1];
+
+	if (tp != NULL) {
+		/*
+		 * Determine number of CPUs and keep track of "final" APIC ID
+		 * for each CPU by walking through ACPI MADT processor list
+		 */
+		end = (struct madt_processor *)(tp->hdr.len + (uintptr_t)tp);
+		cpu = tp->list;
+		while (cpu < end) {
+			if (cpu->type == MADT_PROCESSOR) {
+				if (cpu->flags & 1) {
+					if (cpu_count < UINT8_MAX)
+						cpu_apicid_array[cpu_count] =
+						    cpu->apic_id;
+					cpu_count++;
+				}
+			}
+
+			cpu = (struct madt_processor *)
+			    (cpu->len + (uintptr_t)cpu);
+		}
+
+		/*
+		 * Make boot property for array of "final" APIC IDs for each
+		 * CPU
+		 */
+		bsetprop(BP_CPU_APICID_ARRAY, strlen(BP_CPU_APICID_ARRAY),
+		    cpu_apicid_array, cpu_count * sizeof (uint8_t));
+	}
 
 	/*
 	 * User-set boot-ncpus overrides firmware count
@@ -1878,20 +1908,12 @@ process_madt(struct madt *tp)
 	if (do_bsys_getproplen(NULL, "boot-ncpus") >= 0)
 		return;
 
-	if (tp != NULL) {
-		end = (struct madt_processor *)(tp->hdr.len + (uintptr_t)tp);
-		cpu = tp->list;
-		while (cpu < end) {
-			if (cpu->type == MADT_PROCESSOR)
-				if (cpu->flags & 1)
-					cpu_count++;
-
-			cpu = (struct madt_processor *)
-			    (cpu->len + (uintptr_t)cpu);
-		}
+	/*
+	 * Set boot property for boot-ncpus to number of CPUs given in MADT
+	 * if user hasn't set the property already
+	 */
+	if (tp != NULL)
 		bsetpropsi("boot-ncpus", cpu_count);
-	}
-
 }
 
 static void
