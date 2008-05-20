@@ -44,13 +44,17 @@
 #define	X509_FORMAT_VERSION 2
 
 static KMF_RETURN
-sign_cert(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE *, KMF_DATA *);
+sign_cert(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE *,
+    KMF_OID *, KMF_DATA *);
 
 static KMF_RETURN
 verify_cert_with_key(KMF_HANDLE_T, KMF_DATA *, const KMF_DATA *);
 
 static KMF_RETURN
 verify_cert_with_cert(KMF_HANDLE_T, const KMF_DATA *, const KMF_DATA *);
+
+static KMF_RETURN
+get_sigalg_from_cert(KMF_DATA *, KMF_ALGORITHM_INDEX *);
 
 static KMF_RETURN
 get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
@@ -408,6 +412,8 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	KMF_KEY_HANDLE sign_key, *sign_key_ptr;
 	int freethekey = 0;
 	KMF_POLICY_RECORD *policy;
+	KMF_OID *oid = NULL;
+	KMF_ALGORITHM_INDEX AlgId;
 	KMF_X509_CERTIFICATE *x509cert;
 	KMF_ATTRIBUTE_TESTER required_attrs[] = {
 	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
@@ -431,7 +437,12 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	    numattr);
 	sign_key_ptr = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist,
 	    numattr);
+	/*
+	 * Only accept 1 or the other, not both.
+	 */
 	if (signer_cert == NULL && sign_key_ptr == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+	if (signer_cert != NULL && sign_key_ptr != NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	if (signer_cert != NULL) {
@@ -458,6 +469,18 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		}
 		sign_key_ptr = &sign_key;
 		freethekey = 1;
+
+		ret = get_sigalg_from_cert(signer_cert, &AlgId);
+		if (ret != KMF_OK)
+			goto out;
+		else
+			oid = x509_algid_to_algoid(AlgId);
+	} else if (sign_key_ptr != NULL) {
+		if (sign_key_ptr->keyalg == KMF_RSA) {
+			oid = (KMF_OID *)&KMFOID_SHA1WithRSA;
+		} else if (sign_key_ptr->keyalg == KMF_DSA) {
+			oid = (KMF_OID *)&KMFOID_SHA1WithDSA;
+		}
 	}
 
 	/* Now we are ready to sign */
@@ -484,7 +507,7 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		goto out;
 	}
 
-	ret = sign_cert(handle, tbs_cert, sign_key_ptr, signed_cert);
+	ret = sign_cert(handle, tbs_cert, sign_key_ptr, oid, signed_cert);
 
 out:
 	if (new_attrlist)
@@ -651,6 +674,8 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 	} else if (oid == NULL && ret == KMF_OK) {
 		/* AlgID was given by caller, convert it to OID */
 		oid = x509_algid_to_algoid(AlgId);
+	} else if (oid != NULL && ret == KMF_ERR_ATTR_NOT_FOUND) {
+		AlgId = x509_algoid_to_algid(oid);
 	} else { /* Else, the OID must have been given */
 		ret = KMF_OK;
 	}
@@ -724,7 +749,7 @@ kmf_verify_data(KMF_HANDLE_T handle,
 	uint32_t len;
 	KMF_DATA	derkey = {0, NULL};
 	KMF_KEY_HANDLE *KMFKey;
-	KMF_ALGORITHM_INDEX sigAlg;
+	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_NONE;
 	KMF_DATA *indata;
 	KMF_DATA *insig;
 	KMF_DATA *signer_cert;
@@ -2830,6 +2855,24 @@ IsEqualOid(KMF_OID *Oid1, KMF_OID *Oid2)
 	    !memcmp(Oid1->Data, Oid2->Data, Oid1->Length));
 }
 
+static KMF_RETURN
+set_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
+	KMF_OID *newoid)
+{
+	if (destid == NULL || newoid == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	destid->algorithm.Length = newoid->Length;
+	destid->algorithm.Data = malloc(destid->algorithm.Length);
+	if (destid->algorithm.Data == NULL)
+		return (KMF_ERR_MEMORY);
+
+	(void) memcpy(destid->algorithm.Data, newoid->Data,
+	    destid->algorithm.Length);
+
+	return (KMF_OK);
+}
+
 KMF_RETURN
 copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 	KMF_X509_ALGORITHM_IDENTIFIER *srcid)
@@ -2864,6 +2907,7 @@ static KMF_RETURN
 sign_cert(KMF_HANDLE_T handle,
 	const KMF_DATA *SubjectCert,
 	KMF_KEY_HANDLE	*Signkey,
+	KMF_OID		*signature_oid,
 	KMF_DATA	*SignedCert)
 {
 	KMF_X509_CERTIFICATE	*subj_cert = NULL;
@@ -2873,7 +2917,6 @@ sign_cert(KMF_HANDLE_T handle,
 	KMF_ALGORITHM_INDEX	algid;
 	int i = 0;
 	KMF_ATTRIBUTE attrlist[8];
-	KMF_OID *oid;
 
 	if (!SignedCert)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2918,8 +2961,13 @@ sign_cert(KMF_HANDLE_T handle,
 	/* We are re-signing this cert, so clear out old signature data */
 	if (subj_cert->signature.algorithmIdentifier.algorithm.Length == 0) {
 		kmf_free_algoid(&subj_cert->signature.algorithmIdentifier);
-		ret = copy_algoid(&subj_cert->signature.algorithmIdentifier,
-		    &subj_cert->certificate.signature);
+		ret = set_algoid(&subj_cert->signature.algorithmIdentifier,
+		    signature_oid);
+		if (ret != KMF_OK)
+			goto cleanup;
+		ret = set_algoid(&subj_cert->certificate.signature,
+		    signature_oid);
+
 	}
 
 	if (ret)
@@ -2937,9 +2985,8 @@ sign_cert(KMF_HANDLE_T handle,
 	kmf_set_attr_at_index(attrlist, i, KMF_OUT_DATA_ATTR,
 	    &signed_data, sizeof (KMF_DATA));
 	i++;
-	oid = CERT_ALG_OID(subj_cert);
 	kmf_set_attr_at_index(attrlist, i, KMF_OID_ATTR,
-	    oid, sizeof (KMF_OID));
+	    signature_oid, sizeof (KMF_OID));
 	i++;
 
 	/* Sign the data */
@@ -2948,7 +2995,7 @@ sign_cert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		goto cleanup;
 
-	algid = x509_algoid_to_algid(CERT_SIG_OID(subj_cert));
+	algid = x509_algoid_to_algid(signature_oid);
 
 	/*
 	 * For DSA, KMF_SignDataWithKey() returns a 40-bytes decoded

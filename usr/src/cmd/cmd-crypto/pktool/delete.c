@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -673,22 +673,20 @@ delete_file_keys(KMF_HANDLE_T kmfhandle, int oclass,
 }
 
 static KMF_RETURN
-delete_file_crl(void *kmfhandle, char *dir, char *filename)
+delete_file_crl(void *kmfhandle, char *filename)
 {
 	KMF_RETURN rv;
 	int numattr = 0;
 	KMF_ATTRIBUTE attrlist[4];
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
 
+	if (filename == NULL || strlen(filename) == 0)
+		return (KMF_ERR_BAD_PARAMETER);
+
 	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
 	    &kstype, sizeof (kstype));
 	numattr++;
 
-	if (dir) {
-		kmf_set_attr_at_index(attrlist, numattr, KMF_DIRPATH_ATTR,
-		    dir, strlen(dir));
-		numattr++;
-	}
 	if (filename) {
 		kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_FILENAME_ATTR,
 		    filename, strlen(filename));
@@ -897,7 +895,7 @@ pk_delete(int argc, char *argv[])
 			}
 			if (oclass & PK_CRL_OBJ)
 				kmfrv = delete_file_crl(kmfhandle,
-				    dir, infile);
+				    infile);
 			break;
 		case KMF_KEYSTORE_NSS:
 			if (oclass & PK_KEY_OBJ) {
@@ -938,7 +936,7 @@ pk_delete(int argc, char *argv[])
 			}
 			if (oclass & PK_CRL_OBJ)
 				kmfrv = delete_file_crl(kmfhandle,
-				    dir, infile);
+				    infile);
 			break;
 		default:
 			rv = PK_ERR_USAGE;

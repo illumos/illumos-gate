@@ -58,7 +58,7 @@
 static KMF_RETURN
 pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 	char *outfile, char *certfile, char *keyfile,
-	char *dir, char *keydir, KMF_ENCODE_FORMAT outformat)
+	KMF_ENCODE_FORMAT outformat)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_X509_DER_CERT *certs = NULL;
@@ -86,12 +86,6 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
 		numattr++;
-
-		if (dir != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_DIRPATH_ATTR, dir, strlen(dir));
-			numattr++;
-		}
 
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_ENCODE_FORMAT_ATTR, &outformat, sizeof (outformat));
@@ -144,13 +138,6 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
 		    sizeof (kstype));
 		numattr++;
-
-		if (keydir != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_DIRPATH_ATTR, keydir,
-			    strlen(keydir));
-			numattr++;
-		}
 
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_ENCODE_FORMAT_ATTR, &outformat,
@@ -436,7 +423,6 @@ static KMF_RETURN
 pk_import_file_crl(void *kmfhandle,
 	char *infile,
 	char *outfile,
-	char *outdir,
 	KMF_ENCODE_FORMAT outfmt)
 {
 	int numattr = 0;
@@ -449,11 +435,6 @@ pk_import_file_crl(void *kmfhandle,
 	if (infile) {
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_CRL_FILENAME_ATTR, infile, strlen(infile));
-		numattr++;
-	}
-	if (outdir) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_DIRPATH_ATTR, outdir, strlen(outdir));
 		numattr++;
 	}
 	if (outfile) {
@@ -822,7 +803,6 @@ pk_import(int argc, char *argv[])
 	char		*crlfile = NULL;
 	char		*label = NULL;
 	char		*dir = NULL;
-	char		*keydir = NULL;
 	char		*prefix = NULL;
 	char		*trustflags = NULL;
 	char		*verify_crl = NULL;
@@ -849,7 +829,7 @@ pk_import(int argc, char *argv[])
 	    "K:(outkey)c:(outcert)"
 	    "v:(verifycrl)l:(outcrl)"
 	    "E:(keytype)s:(sensitive)x:(extractable)"
-	    "t:(trust)D:(keydir)F:(outformat)")) != EOF) {
+	    "t:(trust)F:(outformat)")) != EOF) {
 		if (EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
 		switch (opt) {
@@ -890,9 +870,6 @@ pk_import(int argc, char *argv[])
 			break;
 		case 'd':
 			dir = optarg_av;
-			break;
-		case 'D':
-			keydir = optarg_av;
 			break;
 		case 'p':
 			if (prefix)
@@ -1104,7 +1081,7 @@ pk_import(int argc, char *argv[])
 			else if (oclass == PK_CRL_OBJ)
 				rv = pk_import_file_crl(
 				    kmfhandle, filename,
-				    crlfile, dir, okfmt);
+				    crlfile, okfmt);
 			else if (kfmt == KMF_FORMAT_RAWKEY &&
 			    oclass == PK_SYMKEY_OBJ) {
 				rv = pk_import_rawkey(kmfhandle,
@@ -1145,11 +1122,11 @@ pk_import(int argc, char *argv[])
 				rv = pk_import_pk12_files(
 				    kmfhandle, &pk12cred,
 				    filename, certfile, keyfile,
-				    dir, keydir, okfmt);
+				    okfmt);
 			else if (oclass == PK_CRL_OBJ) {
 				rv = pk_import_file_crl(
 				    kmfhandle, filename,
-				    crlfile, dir, okfmt);
+				    crlfile, okfmt);
 			} else
 				/*
 				 * It doesn't make sense to import anything

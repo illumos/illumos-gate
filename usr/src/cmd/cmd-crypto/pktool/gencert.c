@@ -239,7 +239,7 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	uint32_t ltime, char *subject, char *altname,
 	KMF_GENERALNAMECHOICES alttype, int altcrit,
 	KMF_BIGINT *serial, uint16_t kubits, int kucrit,
-	char *dir, char *outcert, char *outkey,
+	char *outcert, char *outkey,
 	EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv;
@@ -268,17 +268,7 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 		    "the cert or key\n"));
 		return (PK_ERR_USAGE);
 	}
-	if (dir != NULL) {
-		fullcertpath = get_fullpath(dir, outcert);
-		if (fullcertpath == NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Cannot create file %s in directory %s\n"),
-			    dir, outcert);
-			return (PK_ERR_USAGE);
-		}
-	} else {
-		fullcertpath = strdup(outcert);
-	}
+	fullcertpath = strdup(outcert);
 	if (verify_file(fullcertpath)) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Cannot write the indicated output "
@@ -286,18 +276,8 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 		free(fullcertpath);
 		return (PK_ERR_USAGE);
 	}
-	if (dir != NULL) {
-		fullkeypath = get_fullpath(dir, outkey);
-		if (fullkeypath == NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Cannot create file %s in directory %s\n"),
-			    dir, outkey);
-			free(fullcertpath);
-			return (PK_ERR_USAGE);
-		}
-	} else {
-		fullkeypath = strdup(outkey);
-	}
+
+	fullkeypath = strdup(outkey);
 	if (verify_file(fullkeypath)) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Cannot write the indicated output "
@@ -983,7 +963,7 @@ pk_gencert(int argc, char *argv[])
 		rv = gencert_file(kmfhandle,
 		    keyAlg, sigAlg, keylen, fmt,
 		    ltime, subname, altname, alttype, altcrit,
-		    &serial, kubits, kucrit, dir, outcert, outkey,
+		    &serial, kubits, kucrit, outcert, outkey,
 		    ekulist);
 	}
 

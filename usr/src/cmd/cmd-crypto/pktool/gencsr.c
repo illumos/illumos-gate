@@ -188,7 +188,7 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	int keylen, KMF_ENCODE_FORMAT fmt,
 	char *subject, char *altname, KMF_GENERALNAMECHOICES alttype,
 	int altcrit, uint16_t kubits, int kucrit,
-	char *dir, char *outcsr, char *outkey, EKU_LIST *ekulist)
+	char *outcsr, char *outkey, EKU_LIST *ekulist)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEY_HANDLE pubk, prik;
@@ -213,17 +213,7 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 		    "the csr or key\n"));
 		return (KMF_ERR_BAD_PARAMETER);
 	}
-	if (dir != NULL) {
-		fullcsrpath = get_fullpath(dir, outcsr);
-		if (fullcsrpath == NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Cannot create file %s in "
-			    "directory %s\n"), dir, outcsr);
-			return (PK_ERR_USAGE);
-		}
-	} else {
-		fullcsrpath = strdup(outcsr);
-	}
+	fullcsrpath = strdup(outcsr);
 	if (verify_file(fullcsrpath)) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Cannot write the indicated output "
@@ -231,18 +221,8 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 		free(fullcsrpath);
 		return (PK_ERR_USAGE);
 	}
-	if (dir != NULL) {
-		fullkeypath = get_fullpath(dir, outkey);
-		if (fullkeypath == NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Cannot create file %s in "
-			    "directory %s\n"), dir, outkey);
-			free(fullcsrpath);
-			return (PK_ERR_USAGE);
-		}
-	} else {
-		fullkeypath = strdup(outkey);
-	}
+
+	fullkeypath = strdup(outkey);
 	if (verify_file(fullcsrpath)) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Cannot write the indicated output "
@@ -380,6 +360,8 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 
 	(void) memset(&csr, 0, sizeof (csr));
 	(void) memset(&csrSubject, 0, sizeof (csrSubject));
+	(void) memset(&pubk, 0, sizeof (pubk));
+	(void) memset(&prik, 0, sizeof (prik));
 
 	/* If the subject name cannot be parsed, flag it now and exit */
 	if ((kmfrv = kmf_dn_parser(subject, &csrSubject)) != KMF_OK) {
@@ -781,7 +763,7 @@ pk_gencsr(int argc, char *argv[])
 		rv = gencsr_file(kmfhandle,
 		    keyAlg, keylen, fmt, subname, altname,
 		    alttype, altcrit, kubits, kucrit,
-		    dir, outcsr, outkey, ekulist);
+		    outcsr, outkey, ekulist);
 	}
 
 end:

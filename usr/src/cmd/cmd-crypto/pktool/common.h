@@ -86,7 +86,6 @@ typedef struct {
 } EKU_LIST;
 
 /* Common functions. */
-extern CK_RV	init_pk11(void);
 extern void	final_pk11(CK_SESSION_HANDLE sess);
 
 extern CK_RV	login_token(CK_SLOT_ID slot_id, CK_UTF8CHAR_PTR pin,

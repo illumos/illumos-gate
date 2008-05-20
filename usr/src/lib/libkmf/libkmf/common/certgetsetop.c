@@ -59,7 +59,7 @@ copy_data(KMF_DATA *dst, KMF_DATA *src)
 	return (ret);
 }
 
-static KMF_RETURN
+KMF_RETURN
 copy_extension_data(KMF_X509_EXTENSION *dstext,
 	KMF_X509_EXTENSION *srcext)
 {

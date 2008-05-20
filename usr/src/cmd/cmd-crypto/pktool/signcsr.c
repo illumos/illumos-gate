@@ -37,6 +37,8 @@
 #include "common.h"
 
 #include <kmfapi.h>
+#include <kmfapiP.h>
+
 #define	SET_VALUE(f, s) \
 	rv = f; \
 	if (rv != KMF_OK) { \
@@ -78,6 +80,28 @@ read_csrdata(KMF_HANDLE_T handle, char *csrfile, KMF_CSR_DATA *csrdata)
 	kmf_free_data(&rawcsr);
 
 	return (rv);
+}
+
+static KMF_RETURN
+find_csr_extn(KMF_X509_EXTENSIONS *extnlist, KMF_OID *extoid,
+	KMF_X509_EXTENSION *outextn)
+{
+	int i, found = 0;
+	KMF_X509_EXTENSION *eptr;
+	KMF_RETURN rv = KMF_OK;
+
+	(void) memset(outextn, 0, sizeof (KMF_X509_EXTENSION));
+	for (i = 0; !found && i < extnlist->numberOfExtensions; i++) {
+		eptr = &extnlist->extensions[i];
+		if (IsEqualOid(extoid, &eptr->extnId)) {
+			rv = copy_extension_data(outextn, eptr);
+			found++;
+		}
+	}
+	if (found == 0 || rv != KMF_OK)
+		return (1);
+	else
+		return (rv);
 }
 
 static int
@@ -140,8 +164,27 @@ build_cert_from_csr(KMF_CSR_DATA *csrdata,
 	    csrdata->signature.algorithmIdentifier;
 
 	if (kubits != 0) {
-		SET_VALUE(kmf_set_cert_ku(signedCert, kucrit, kubits),
-		    "KeyUsage");
+		KMF_X509_EXTENSION extn;
+		uint16_t oldbits;
+		/*
+		 * If the CSR already has KU, merge them.
+		 */
+		rv = find_csr_extn(&csrdata->csr.extensions,
+		    (KMF_OID *)&KMFOID_KeyUsage, &extn);
+		if (rv == KMF_OK) {
+			extn.critical |= kucrit;
+			if (extn.value.tagAndValue->value.Length > 1) {
+				oldbits =
+				    extn.value.tagAndValue->value.Data[1] << 8;
+			} else {
+				oldbits =
+				    extn.value.tagAndValue->value.Data[0];
+			}
+			oldbits |= kubits;
+		} else {
+			SET_VALUE(kmf_set_cert_ku(signedCert, kucrit, kubits),
+			    "KeyUsage");
+		}
 	}
 	if (altname != NULL) {
 		SET_VALUE(kmf_set_cert_subject_altname(signedCert,
@@ -680,6 +723,16 @@ pk_signcsr(int argc, char *argv[])
 		/* Need to get password for private key access */
 		(void) get_token_password(kstype, token_spec,
 		    &tokencred);
+	}
+	if (kustr != NULL) {
+		rv = verify_keyusage(kustr, &kubits, &kucrit);
+		if (rv != KMF_OK) {
+			(void) fprintf(stderr, gettext("KeyUsage "
+			    "must be specified as a comma-separated list. "
+			    "See the man page for details.\n"));
+			rv = PK_ERR_USAGE;
+			goto end;
+		}
 	}
 	if (ekustr != NULL) {
 		rv = verify_ekunames(ekustr, &ekulist);

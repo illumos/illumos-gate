@@ -73,8 +73,8 @@ static void logout_token(CK_SESSION_HANDLE);
  * Perform PKCS#11 setup here.  Currently only C_Initialize is required,
  * along with setting/resetting state variables.
  */
-CK_RV
-init_pk11(void)
+static CK_RV
+init_pkcs11(void)
 {
 	CK_RV		rv = CKR_OK;
 
@@ -269,7 +269,7 @@ get_token_slots(CK_SLOT_ID_PTR *slot_list, CK_ULONG *slot_count)
 	int		rv = CKR_OK;
 
 	if (!initialized)
-		if ((rv = init_pk11()) != CKR_OK)
+		if ((rv = init_pkcs11()) != CKR_OK)
 			return (rv);
 
 	/*

@@ -113,8 +113,7 @@ static int	pk_help(int argc, char *argv[]);
 	"[ token=token[:manuf[:serial]]]\n\t" \
  \
 	"list keystore=pkcs11 objtype=crl\n\t\t" \
-	"infile=crl-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t" \
+	"infile=crl-fn\n\t" \
  \
 	"list keystore=nss objtype=cert\n\t\t" \
 	"[ subject=subject-DN ]\n\t\t" \
@@ -145,8 +144,7 @@ static int	pk_help(int argc, char *argv[]);
 	"[ dir=directory-path ]\n\t" \
  \
 	"list keystore=file objtype=crl\n\t\t" \
-	"infile=crl-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t"
+	"infile=crl-fn\n\t"
 
 #define	DELETE_IDX 3
 #define	DELETE_VERB "delete"
@@ -195,8 +193,7 @@ static int	pk_help(int argc, char *argv[]);
 	"[ token=token[:manuf[:serial]]]\n\t" \
  \
 	"delete keystore=pkcs11 objtype=crl\n\t\t" \
-	"infile=crl-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t" \
+	"infile=crl-fn\n\t" \
  \
 	"delete keystore=file objtype=cert\n\t\t" \
 	"[ subject=subject-DN ]\n\t\t" \
@@ -211,8 +208,7 @@ static int	pk_help(int argc, char *argv[]);
 	"[ dir=directory-path ]\n\t" \
  \
 	"delete keystore=file objtype=crl\n\t\t" \
-	"infile=crl-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t"
+	"infile=crl-fn\n\t"
 
 #define	IMPORT_IDX 4
 #define	IMPORT_VERB "import"
@@ -248,22 +244,18 @@ static int	pk_help(int argc, char *argv[]);
 	"import keystore=pkcs11 objtype=crl\n\t\t" \
 	"infile=input-crl-fn\n\t\t" \
 	"outcrl=output-crl-fn\n\t\t" \
-	"outformat=pem|der\n\t\t" \
-	"[ dir=output-crl-directory-path ]\n\t" \
+	"outformat=pem|der\n\t" \
  \
 	"import keystore=file\n\t\t" \
 	"infile=input-fn\n\t\t" \
 	"outkey=output-key-fn\n\t\t" \
 	"outcert=output-cert-fn\n\t\t" \
-	"[ dir=output-cert-dir-path ]\n\t\t" \
-	"[ keydir=output-key-dir-path ]\n\t\t" \
 	"[ outformat=pem|der|pkcs12 ]\n\t" \
  \
 	"import keystore=file objtype=crl\n\t\t" \
 	"infile=input-crl-fn\n\t\t" \
 	"outcrl=output-crl-fn\n\t\t" \
-	"outformat=pem|der\n\t\t" \
-	"[ dir=output-crl-directory-path ]\n\t"
+	"outformat=pem|der\n\t"
 
 #define	EXPORT_IDX 5
 #define	EXPORT_VERB "export"
@@ -297,8 +289,7 @@ static int	pk_help(int argc, char *argv[]);
 	"export keystore=file\n\t\t" \
 	"certfile=cert-input-fn\n\t\t" \
 	"keyfile=key-input-fn\n\t\t" \
-	"outfile=output-pkcs12-fn\n\t\t" \
-	"[ dir=directory-path ]\n\t"
+	"outfile=output-pkcs12-fn\n\t"
 
 #define	GENCERT_IDX 6
 #define	GENCERT_VERB "gencert"
@@ -339,7 +330,6 @@ static int	pk_help(int argc, char *argv[]);
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ format=der|pem ]\n\t\t" \
-	"[ dir=directory-path ]\n\t\t" \
 	"[ prefix=DBprefix ]\n\t\t" \
 	"[ keytype=rsa|dsa ]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
@@ -387,7 +377,6 @@ static int	pk_help(int argc, char *argv[]);
 	"[ keytype=rsa|dsa ]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
-	"[ dir=directory-path ]\n\t\t" \
 	"[ format=pem|der ]\n\t"
 
 #define	DOWNLOAD_IDX 8
@@ -425,7 +414,6 @@ static int	pk_help(int argc, char *argv[]);
 	"outkey=key-fn\n\t\t" \
 	"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t" \
 	"[ keylen=key-size (AES, ARCFOUR or GENERIC only)]\n\t\t" \
-	"[ dir=directory-path ]\n\t\t" \
 	"[ print=y|n ]\n\t"
 
 #define	SIGNCSR_IDX 10

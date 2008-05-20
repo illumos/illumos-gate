@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,7 @@ pk_find_export_cert(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attrlist,
 static KMF_RETURN
 pk_export_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 	char *issuer, char *subject, KMF_BIGINT *serial,
-	char *dir, char *infile, char *filename)
+	char *infile, char *filename)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_X509_DER_CERT kmfcert;
@@ -119,13 +119,6 @@ pk_export_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 			kmf_set_attr_at_index(attrlist, numattr,
 			    KMF_BIGINT_ATTR, serial,
 			    sizeof (KMF_BIGINT));
-			numattr++;
-		}
-
-		if (dir != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_DIRPATH_ATTR, dir,
-			    strlen(dir));
 			numattr++;
 		}
 
@@ -243,7 +236,7 @@ pk_export_pk12_nss(KMF_HANDLE_T kmfhandle,
 
 static KMF_RETURN
 pk_export_pk12_files(KMF_HANDLE_T kmfhandle,
-	char *certfile, char *keyfile, char *dir,
+	char *certfile, char *keyfile,
 	char *outfile)
 {
 	KMF_RETURN rv;
@@ -256,12 +249,6 @@ pk_export_pk12_files(KMF_HANDLE_T kmfhandle,
 	kmf_set_attr_at_index(attrlist, numattr,
 	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
 	numattr++;
-
-	if (dir != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_DIRPATH_ATTR, dir, strlen(dir));
-		numattr++;
-	}
 
 	if (certfile != NULL) {
 		kmf_set_attr_at_index(attrlist, numattr,
@@ -929,12 +916,11 @@ pk_export(int argc, char *argv[])
 		case KMF_KEYSTORE_OPENSSL:
 			if (kfmt == KMF_FORMAT_PKCS12)
 				rv = pk_export_pk12_files(kmfhandle,
-				    certfile, keyfile, dir,
-				    filename);
+				    certfile, keyfile, filename);
 			else
 				rv = pk_export_file_objects(kmfhandle, oclass,
 				    issuer, subject, &serial,
-				    dir, infile, filename);
+				    infile, filename);
 			break;
 		default:
 			rv = PK_ERR_USAGE;

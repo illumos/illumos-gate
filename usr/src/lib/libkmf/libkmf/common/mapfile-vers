@@ -304,6 +304,7 @@ SUNW_1.1 {
 SUNWprivate_1.1 {
     global:
 	GetIDFromSPKI;
+	IsEqualOid;
 	KMF_ConfigureKeystore;
 	KMF_CreateCSRFile;
 	KMF_CreateKeypair;
@@ -329,6 +330,7 @@ SUNWprivate_1.1 {
 	KMF_SignDataWithKey;
 	KMF_VerifyCertWithCert;
 	KMF_VerifyDataWithCert;
+	copy_extension_data;
 	dup_entry;
 	free_entry;
 	free_entrylist;

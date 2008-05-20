@@ -351,6 +351,8 @@ extern conf_entry_t *dup_entry(conf_entry_t *);
 extern boolean_t is_valid_keystore_type(KMF_KEYSTORE_TYPE);
 extern KMF_BOOL is_eku_present(KMF_X509EXT_EKU *, KMF_OID *);
 extern KMF_RETURN parse_eku_data(const KMF_DATA *, KMF_X509EXT_EKU *);
+extern KMF_RETURN
+copy_extension_data(KMF_X509_EXTENSION *, KMF_X509_EXTENSION *);
 
 #ifdef __cplusplus
 }

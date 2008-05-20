@@ -48,7 +48,7 @@ POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_msg.po
 MSGFILES=$(SRCS:%.c=%.i)
 
-CPPFLAGS += -I. -I$(KMFDIR)/include
+CPPFLAGS += -I. -I$(KMFDIR)/include -I/usr/include/libxml2
 CFLAGS += $(CCVERBOSE) -DDEBUG
 
 LDFLAGS += -L$(SRC)/lib/libkmf/libkmf/$(MACH)
