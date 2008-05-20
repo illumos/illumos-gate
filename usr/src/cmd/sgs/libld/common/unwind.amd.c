@@ -296,13 +296,13 @@
 uintptr_t
 make_amd64_unwindhdr(Ofl_desc *ofl)
 {
-	Shdr	    *shdr;
-	Elf_Data    *elfdata;
-	Is_desc	    *isec;
-	Xword	    size;
-	Xword	    fde_cnt;
-	Listnode    *lnp;
-	Os_desc	    *osp;
+	Shdr		*shdr;
+	Elf_Data	*elfdata;
+	Is_desc		*isp;
+	size_t		size;
+	Xword		fde_cnt;
+	Listnode	*lnp;
+	Os_desc		*osp;
 
 	/*
 	 * we only build a unwind header if we have
@@ -320,7 +320,6 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	elfdata->d_align = M_WORD_ALIGN;
 	elfdata->d_version = ofl->ofl_dehdr->e_version;
 
-
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
@@ -334,63 +333,56 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Is_desc structure.
 	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
+	if ((isp = libld_calloc(1, sizeof (Is_desc))) == 0)
 		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_UNWINDHDR);
-	isec->is_shdr = shdr;
-	isec->is_indata = elfdata;
+	isp->is_name = MSG_ORIG(MSG_SCN_UNWINDHDR);
+	isp->is_shdr = shdr;
+	isp->is_indata = elfdata;
 
-
-	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isec,
+	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isp,
 	    M_ID_UNWINDHDR, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
-	 * Following we quickly scan through all of
-	 * the input Frame info - counting for each
-	 * FDE will have to index.  Each fde_entry
-	 * will get a corresponding entry in the
-	 * binary search table.
+	 * Scan through all of the input Frame information, counting each FDE
+	 * that requires an index.  Each fde_entry gets a corresponding entry
+	 * in the binary search table.
 	 */
 	fde_cnt = 0;
 	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, osp)) {
-		Is_desc	    *isp;
 		Listnode    *_lnp;
 
 		for (LIST_TRAVERSE(&osp->os_isdescs, _lnp, isp)) {
 			uchar_t		*data;
-			size_t		datasize;
-			uint64_t	off;
-			uint_t		length, id;
+			uint64_t	off = 0;
 
-			data = (uchar_t *)isp->is_indata->d_buf;
-			datasize = isp->is_indata->d_size;
-			off = 0;
-			while (off < datasize) {
-				uint_t	    ndx = 0;
+			data = isp->is_indata->d_buf;
+			size = isp->is_indata->d_size;
+
+			while (off < size) {
+				uint_t		length, id;
+				uint64_t	ndx;
 
 				/*
 				 * Extract length in lsb format.  A zero length
 				 * indicates that this CIE is a terminator and
-				 * that processing for this unwind information
-				 * should end.
+				 * that processing for unwind information is
+				 * complete.
 				 */
-				if ((length =
-				    LSB32EXTRACT(data + off + ndx)) == 0)
+				if ((length = LSB32EXTRACT(data + off)) == 0)
 					break;
 
-				ndx += 4;
-
 				/*
-				 * extract CIE id in lsb format
+				 * Extract CIE id in lsb format.
 				 */
+				ndx = 4;
 				id = LSB32EXTRACT(data + off + ndx);
 				ndx += 4;
 
 				/*
 				 * A CIE record has a id of '0', otherwise
 				 * this is a FDE entry and the 'id' is the
-				 *  CIE pointer.
+				 * CIE pointer.
 				 */
 				if (id == 0) {
 					uint_t	cieversion;
@@ -418,7 +410,6 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 		}
 	}
 
-
 	/*
 	 * section size:
 	 *	byte	    version		+1
@@ -438,7 +429,6 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 
 	return (1);
 }
-
 
 /*
  * the comparator function needs to calculate
@@ -526,12 +516,10 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 	fde_count = 0;
 
 	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, osp)) {
-		uchar_t		*fdata;
-		uint64_t	fdatasize;
-		uint_t		foff;
-		uint64_t	fndx;
-		uint_t		cieRflag;
-		uint_t		ciePflag;
+		uchar_t		*data;
+		size_t		size;
+		uint64_t	off = 0;
+		uint_t		cieRflag = 0, ciePflag = 0;
 		Shdr		*shdr;
 
 		/*
@@ -541,28 +529,28 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 		if (first_unwind == 0)
 			first_unwind = osp;
 
-		fdata = osp->os_outdata->d_buf;
+		data = osp->os_outdata->d_buf;
 		shdr = osp->os_shdr;
-		fdatasize = shdr->sh_size;
-		foff = 0;
-		ciePflag = 0;
-		cieRflag = 0;
-		while (foff < fdatasize) {
-			uint_t	    length;
-			uint_t	    id;
+		size = shdr->sh_size;
 
-			fndx = 0;
-			/*
-			 * extract length in lsb format
-			 */
-			length = LSB32EXTRACT(fdata + foff + fndx);
-			fndx += 4;
+		while (off < size) {
+			uint_t	    length, id;
+			uint64_t    ndx;
 
 			/*
-			 * extract id in lsb format
+			 * Extract length in lsb format.  A zero length
+			 * indicates that this CIE is a terminator and that
+			 * processing of unwind information is complete.
 			 */
-			id = LSB32EXTRACT(fdata + foff + fndx);
-			fndx += 4;
+			if ((length = LSB32EXTRACT(data + off)) == 0)
+				goto done;
+
+			/*
+			 * Extract CIE id in lsb format.
+			 */
+			ndx = 4;
+			id = LSB32EXTRACT(data + off + ndx);
+			ndx += 4;
 
 			/*
 			 * A CIE record has a id of '0'; otherwise
@@ -585,22 +573,24 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 				/*
 				 * burn through version
 				 */
-				fndx++;
+				ndx++;
+
 				/*
 				 * augstr
 				 */
-				cieaugstr = (char *)(&fdata[foff + fndx]);
-				fndx += strlen(cieaugstr) + 1;
+				cieaugstr = (char *)(&data[off + ndx]);
+				ndx += strlen(cieaugstr) + 1;
 
 				/*
 				 * calign & dalign
 				 */
-				(void) uleb_extract(&fdata[foff], &fndx);
-				(void) sleb_extract(&fdata[foff], &fndx);
+				(void) uleb_extract(&data[off], &ndx);
+				(void) sleb_extract(&data[off], &ndx);
+
 				/*
 				 * retreg
 				 */
-				fndx++;
+				ndx++;
 
 				/*
 				 * we walk through the augmentation
@@ -612,32 +602,32 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 					switch (cieaugstr[cieaugndx]) {
 					case 'z':
 					    /* size */
-					    (void) uleb_extract(&fdata[foff],
-						&fndx);
+					    (void) uleb_extract(&data[off],
+						&ndx);
 					    break;
 					case 'P':
 					    /* personality */
-					    ciePflag = fdata[foff + fndx];
-					    fndx++;
+					    ciePflag = data[off + ndx];
+					    ndx++;
 						/*
 						 * Just need to extract the
 						 * value to move on to the next
 						 * field.
 						 */
 					    (void) dwarf_ehe_extract(
-						&fdata[foff + fndx],
-						&fndx, ciePflag,
+						&data[off + ndx],
+						&ndx, ciePflag,
 						ofl->ofl_dehdr->e_ident,
-						shdr->sh_addr + foff + fndx);
+						shdr->sh_addr + off + ndx);
 					    break;
 					case 'R':
 					    /* code encoding */
-					    cieRflag = fdata[foff + fndx];
-					    fndx++;
+					    cieRflag = data[off + ndx];
+					    ndx++;
 					    break;
 					case 'L':
 					    /* lsda encoding */
-					    fndx++;
+					    ndx++;
 					    break;
 					}
 					/* END CSTYLED */
@@ -655,11 +645,11 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 				 * to account for the length & id which
 				 * have already been consumed.
 				 */
-				fdeaddr = shdr->sh_addr + foff;
+				fdeaddr = shdr->sh_addr + off;
 
-				initloc = dwarf_ehe_extract(&fdata[foff],
-				    &fndx, cieRflag, ofl->ofl_dehdr->e_ident,
-				    shdr->sh_addr + foff + fndx);
+				initloc = dwarf_ehe_extract(&data[off],
+				    &ndx, cieRflag, ofl->ofl_dehdr->e_ident,
+				    shdr->sh_addr + off + ndx);
 				binarytable[bintabndx] =
 				    (uint_t)(initloc - hdraddr);
 				binarytable[bintabndx + 1] =
@@ -670,10 +660,11 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 			 * the length does not include the length
 			 * itself - so account for that too.
 			 */
-			foff += length + 4;
+			off += length + 4;
 		}
 	}
 
+done:
 	/*
 	 * Do a quick sort on the binary table. If this is a cross
 	 * link from a system with the opposite byte order, xlate

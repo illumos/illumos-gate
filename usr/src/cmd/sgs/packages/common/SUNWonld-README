@@ -1344,3 +1344,5 @@ Bugid   Risk Synopsis
 6699594 The ld command has a problem handling 'protected' mapfile keyword.
 6699131 elfdump should display core file notes (D)
 6702260 single threading .init/.fini sections breaks staroffice
+6703683 Can't build VirtualBox on Build 88 or 89
+6703919 boot hangs intermittently on x86 with onnv daily.0430 and on
