@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,10 @@
 #define	DNS_ALIASES	0
 #define	DNS_ADDRLIST	1
 #define	DNS_MAPDLIST	2
+
+#ifndef	tolower
+#define	tolower(c) ((c) >= 'A' && (c) <= 'Z' ? (c) | 0x20 : (c))
+#endif
 
 static int
 dns_netdb_aliases(from_list, to_list, aliaspp, type, count, af_type)
@@ -283,6 +287,55 @@ __res_ndestroy(res_state statp) {
 }
 
 /*
+ * name_is_alias(aliases_ptr, name_ptr)
+ * Verify name matches an alias in the provided aliases list.
+ *
+ * Within DNS there should be only one canonical name, aliases should
+ * all refer to the one canonical.  However alias chains do occur and
+ * pre BIND 9 servers may also respond with multiple CNAMEs.  This
+ * routine checks if a given name has been provided as a CNAME in the
+ * response.  This assumes that the chains have been sent in-order.
+ *
+ * INPUT:
+ *  aliases_ptr: space separated list of alias names.
+ *  name_ptr: name to look for in aliases_ptr list.
+ * RETURNS: NSS_SUCCESS or NSS_ERROR
+ *  NSS_SUCCESS indicates that the name is listed in the collected aliases.
+ */
+static nss_status_t
+name_is_alias(char *aliases_ptr, char *name_ptr) {
+	char *host_ptr;
+	/* Loop through alias string and compare it against host string. */
+	while (*aliases_ptr != '\0') {
+		host_ptr = name_ptr;
+
+		/* Compare name with alias. */
+		while (tolower(*host_ptr) == tolower(*aliases_ptr) &&
+		    *host_ptr != '\0') {
+			host_ptr++;
+			aliases_ptr++;
+		}
+
+		/*
+		 * If name was exhausted and the next character in the
+		 * alias is either the end-of-string or space
+		 * character then we have a match.
+		 */
+		if (*host_ptr == '\0' &&
+		    (*aliases_ptr == '\0' || *aliases_ptr == ' ')) {
+			return (NSS_SUCCESS);
+		}
+
+		/* Alias did not match, step over remainder of alias. */
+		while (*aliases_ptr != ' ' && *aliases_ptr != '\0')
+			aliases_ptr++;
+		/* Step over separator character. */
+		while (*aliases_ptr == ' ') aliases_ptr++;
+	}
+	return (NSS_ERROR);
+}
+
+/*
  * nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
  *      nss2 get hosts/ipnodes with ttl backend DNS search engine.
  *
@@ -425,7 +478,12 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	while (ancount-- > 0 && cp < eom && blen < bsize) {
 		n = dn_expand(bom, eom, cp, ans, MAXHOSTNAMELEN);
 		if (n > 0) {
-			if (strncasecmp(host, ans, hlen) != 0) {
+			/*
+			 * Check that the expanded name is either the
+			 * name we asked for or a learned alias.
+			 */
+			if (strncasecmp(host, ans, hlen) != 0 && (alen == 0 ||
+			    name_is_alias(aliases, ans) == NSS_ERROR)) {
 				__res_ndestroy(statp);
 				return (NSS_ERROR);	/* spoof? */
 			}
@@ -448,7 +506,16 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		}
 		eor = cp + n;
 		if (type == T_CNAME) {
-			/* add an alias to the alias list */
+			/*
+			 * The name we looked up is really an alias
+			 * and the canonical name should be in the
+			 * RDATA.  A canonical name may have several
+			 * aliases but an alias should only have one
+			 * canonical name. However multiple CNAMEs and
+			 * CNAME chains do exist!  So for caching
+			 * purposes maintain the alias as the host
+			 * name, and the CNAME as an alias.
+			 */
 			n = dn_expand(bom, eor, cp, aname, MAXHOSTNAMELEN);
 			if (n > 0) {
 				len = strlen(aname);

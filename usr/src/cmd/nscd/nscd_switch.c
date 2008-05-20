@@ -377,8 +377,9 @@ trace_result(
 	}
 
 	_nscd_logit(me, "%s: database: %s, operation: %d, source: %s, "
-	    "erange= %d, errno: %s \n",
-	    res_str, db, op, src, arg->erange, strerror(arg->h_errno));
+	    "erange= %d, herrno: %s (%d)\n",
+	    res_str, db, op, src, arg->erange, hstrerror(arg->h_errno),
+	    arg->h_errno);
 }
 
 /*

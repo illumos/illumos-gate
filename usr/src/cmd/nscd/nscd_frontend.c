@@ -171,6 +171,24 @@ dozip(void)
 	/* not much here */
 }
 
+/*
+ * _nscd_restart_if_cfgfile_changed()
+ * Restart if modification times of nsswitch.conf or resolv.conf have changed.
+ *
+ * If nsswitch.conf has changed then it is possible that sources for
+ * various backends have changed and therefore the current cached
+ * data may not be consistent with the new data sources.  By
+ * restarting the cache will be cleared and the new configuration will
+ * be used.
+ *
+ * The check for resolv.conf is made as only the first call to
+ * res_gethostbyname() or res_getaddrbyname() causes a call to
+ * res_ninit() to occur which in turn parses resolv.conf.  Therefore
+ * to benefit from changes to resolv.conf nscd must be restarted when
+ * resolv.conf is updated, removed or created.  If res_getXbyY calls
+ * are removed from NSS then this check could be removed.
+ *
+ */
 void
 _nscd_restart_if_cfgfile_changed()
 {
@@ -178,12 +196,21 @@ _nscd_restart_if_cfgfile_changed()
 	static mutex_t		nsswitch_lock = DEFAULTMUTEX;
 	static timestruc_t	last_nsswitch_check = { 0 };
 	static timestruc_t	last_nsswitch_modified = { 0 };
-	static timestruc_t	last_resolv_modified = { 0 };
+	static timestruc_t	last_resolv_modified = { -1, 0 };
 	static mutex_t		restarting_lock = DEFAULTMUTEX;
 	static int 		restarting = 0;
 	int			restart = 0;
 	time_t			now = time(NULL);
 	char			*me = "_nscd_restart_if_cfgfile_changed";
+
+#define	FLAG_RESTART_REQUIRED	if (restarting == 0) {\
+					(void) mutex_lock(&restarting_lock);\
+					if (restarting == 0) {\
+						restarting = 1;\
+						restart = 1;\
+					}\
+					(void) mutex_unlock(&restarting_lock);\
+				}
 
 	if (restarting == 1)
 		return;
@@ -202,24 +229,6 @@ _nscd_restart_if_cfgfile_changed()
 
 		(void) mutex_unlock(&nsswitch_lock); /* let others continue */
 
-		/*
-		 *  This code keeps us from statting resolv.conf
-		 *  if it doesn't exist, yet prevents us from ignoring
-		 *  it if it happens to disappear later on for a bit.
-		 */
-
-		if (last_resolv_modified.tv_sec >= 0) {
-			if (stat("/etc/resolv.conf", &res_buf) < 0) {
-				if (last_resolv_modified.tv_sec == 0) {
-					last_resolv_modified.tv_sec = -1;
-					last_resolv_modified.tv_nsec = 0;
-				} else
-					res_buf.st_mtim = last_resolv_modified;
-			} else if (last_resolv_modified.tv_sec == 0) {
-				last_resolv_modified = res_buf.st_mtim;
-			}
-		}
-
 		if (stat("/etc/nsswitch.conf", &nss_buf) < 0) {
 			return;
 		} else if (last_nsswitch_modified.tv_sec == 0) {
@@ -228,19 +237,33 @@ _nscd_restart_if_cfgfile_changed()
 
 		if (last_nsswitch_modified.tv_sec < nss_buf.st_mtim.tv_sec ||
 		    (last_nsswitch_modified.tv_sec == nss_buf.st_mtim.tv_sec &&
-		    last_nsswitch_modified.tv_nsec < nss_buf.st_mtim.tv_nsec) ||
-		    (last_resolv_modified.tv_sec > 0 &&
-		    (last_resolv_modified.tv_sec < res_buf.st_mtim.tv_sec ||
-		    (last_resolv_modified.tv_sec == res_buf.st_mtim.tv_sec &&
-		    last_resolv_modified.tv_nsec < res_buf.st_mtim.tv_nsec)))) {
+		    last_nsswitch_modified.tv_nsec < nss_buf.st_mtim.tv_nsec)) {
+			FLAG_RESTART_REQUIRED;
+		}
 
-			if (restarting == 0) {
-				(void) mutex_lock(&restarting_lock);
-					if (restarting == 0) {
-						restarting = 1;
-						restart = 1;
-					}
-				(void) mutex_unlock(&restarting_lock);
+		if (restart == 0) {
+			if (stat("/etc/resolv.conf", &res_buf) < 0) {
+				/* Unable to stat file, were we previously? */
+				if (last_resolv_modified.tv_sec > 0) {
+					/* Yes, it must have been removed. */
+					FLAG_RESTART_REQUIRED;
+				} else if (last_resolv_modified.tv_sec == -1) {
+					/* No, then we've never seen it. */
+					last_resolv_modified.tv_sec = 0;
+				}
+			} else if (last_resolv_modified.tv_sec == -1) {
+				/* We've just started and file is present. */
+				last_resolv_modified = res_buf.st_mtim;
+			} else if (last_resolv_modified.tv_sec == 0) {
+				/* Wasn't there at start-up. */
+				FLAG_RESTART_REQUIRED;
+			} else if (last_resolv_modified.tv_sec <
+			    res_buf.st_mtim.tv_sec ||
+			    (last_resolv_modified.tv_sec ==
+			    res_buf.st_mtim.tv_sec &&
+			    last_resolv_modified.tv_nsec <
+			    res_buf.st_mtim.tv_nsec)) {
+				FLAG_RESTART_REQUIRED;
 			}
 		}
 
