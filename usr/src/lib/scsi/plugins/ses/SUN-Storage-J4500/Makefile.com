@@ -25,7 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE =	SUN-ST-J4500
+MODULE =	SUN-Storage-J4500
 SRCS =		loki.c
 SRCDIR =	../common
 PLUGINTYPE =	vendor

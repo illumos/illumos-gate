@@ -88,7 +88,7 @@ enc_do_ucode(ses_plugin_t *sp, ses_node_t *np, nvlist_t *nvl)
 
 		len = MIN(datalen - offset, SES_UCODE_CHUNK_SIZE);
 		if (len & 0x3)
-			pagelen = (len + 4) & 0x3;
+			pagelen = (len + 4) & ~0x3;
 		else
 			pagelen = len;
 

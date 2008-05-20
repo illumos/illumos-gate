@@ -113,14 +113,14 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	vdev_state_t newstate;
 	nvlist_t *nvroot, *newvd;
 	uint64_t wholedisk = 0ULL;
-	char *devid = NULL;
+	char *physpath = NULL;
 	char rawpath[PATH_MAX], fullpath[PATH_MAX];
 	size_t len;
 
 	if (nvlist_lookup_string(vdev, ZPOOL_CONFIG_PATH, &path) != 0)
 		return;
 
-	(void) nvlist_lookup_string(vdev, ZPOOL_CONFIG_DEVID, &devid);
+	(void) nvlist_lookup_string(vdev, ZPOOL_CONFIG_PHYS_PATH, &physpath);
 	(void) nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_WHOLE_DISK, &wholedisk);
 
 	/*
@@ -137,7 +137,7 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	 */
 	if (zpool_vdev_online(zhp, fullpath,
 	    ZFS_ONLINE_CHECKREMOVE | ZFS_ONLINE_UNSPARE, &newstate) == 0 &&
-	    newstate != VDEV_STATE_CANT_OPEN)
+	    (newstate == VDEV_STATE_HEALTHY || newstate == VDEV_STATE_DEGRADED))
 		return;
 
 	/*
@@ -186,7 +186,7 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	/*
 	 * Cosntruct the root vdev to pass to zpool_vdev_attach().  While adding
 	 * the entire vdev structure is harmless, we construct a reduced set of
-	 * path/devid/wholedisk to keep it simple.
+	 * path/physpath/wholedisk to keep it simple.
 	 */
 	if (nvlist_alloc(&nvroot, NV_UNIQUE_NAME, 0) != 0)
 		return;
@@ -198,8 +198,8 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 
 	if (nvlist_add_string(newvd, ZPOOL_CONFIG_TYPE, VDEV_TYPE_DISK) != 0 ||
 	    nvlist_add_string(newvd, ZPOOL_CONFIG_PATH, path) != 0 ||
-	    (devid && nvlist_add_string(newvd, ZPOOL_CONFIG_DEVID,
-	    devid) != 0) ||
+	    (physpath != NULL && nvlist_add_string(newvd,
+	    ZPOOL_CONFIG_PHYS_PATH, physpath) != 0) ||
 	    nvlist_add_uint64(newvd, ZPOOL_CONFIG_WHOLE_DISK, wholedisk) != 0 ||
 	    nvlist_add_string(nvroot, ZPOOL_CONFIG_TYPE, VDEV_TYPE_ROOT) != 0 ||
 	    nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN, &newvd,

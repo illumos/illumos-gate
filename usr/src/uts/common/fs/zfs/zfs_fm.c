@@ -116,22 +116,32 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 	    spa->spa_last_open_failed)
 		return;
 
-	/*
-	 * Ignore any errors from I/Os that we are going to retry anyway - we
-	 * only generate errors from the final failure.  Checksum errors are
-	 * generated after the pipeline stage responsible for retrying the I/O
-	 * (VDEV_IO_ASSESS), so this only applies to standard I/O errors.
-	 */
-	if (zio && zio_should_retry(zio) && zio->io_error != ECKSUM)
-		return;
+	if (zio != NULL) {
+		/*
+		 * Ignore any errors from I/Os that we are going to retry
+		 * anyway - we only generate errors from the final failure.
+		 * Checksum errors are generated after the pipeline stage
+		 * responsible for retrying the I/O (VDEV_IO_ASSESS), so this
+		 * only applies to standard I/O errors.
+		 */
+		if (zio_should_retry(zio) && zio->io_error != ECKSUM)
+			return;
 
-	/*
-	 * If this is not a read or write zio, ignore the error.  This can occur
-	 * if the DKIOCFLUSHWRITECACHE ioctl fails.
-	 */
-	if (zio && zio->io_type != ZIO_TYPE_READ &&
-	    zio->io_type != ZIO_TYPE_WRITE)
-		return;
+		/*
+		 * If this is not a read or write zio, ignore the error.  This
+		 * can occur if the DKIOCFLUSHWRITECACHE ioctl fails.
+		 */
+		if (zio->io_type != ZIO_TYPE_READ &&
+		    zio->io_type != ZIO_TYPE_WRITE)
+			return;
+
+		/*
+		 * Ignore any errors from speculative I/Os, as failure is an
+		 * expected result.
+		 */
+		if (zio->io_flags & ZIO_FLAG_SPECULATIVE)
+			return;
+	}
 
 	if ((ereport = fm_nvlist_create(NULL)) == NULL)
 		return;

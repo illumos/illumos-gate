@@ -78,6 +78,11 @@ vdev_disk_open_common(vdev_t *vd)
 	 * 3. Otherwise, the device may have moved.  Try opening the device
 	 *    by the devid instead.
 	 *
+	 * If the vdev is part of the root pool, we avoid opening it by path.
+	 * We do this because there is no /dev path available early in boot,
+	 * and if we try to open the device by path at a later point, we can
+	 * deadlock when devfsadm attempts to open the underlying backing store
+	 * file.
 	 */
 	if (vd->vdev_devid != NULL) {
 		if (ddi_devid_str_decode(vd->vdev_devid, &dvd->vd_devid,
@@ -89,7 +94,7 @@ vdev_disk_open_common(vdev_t *vd)
 
 	error = EINVAL;		/* presume failure */
 
-	if (vd->vdev_path != NULL) {
+	if (vd->vdev_path != NULL && !spa_is_root(vd->vdev_spa)) {
 		ddi_devid_t devid;
 
 		if (vd->vdev_wholedisk == -1ULL) {
@@ -159,7 +164,8 @@ vdev_disk_open_common(vdev_t *vd)
 		 * as above.  This hasn't been used in a very long time and we
 		 * don't need to propagate its oddities to this edge condition.
 		 */
-		if (error && vd->vdev_path != NULL)
+		if (error && vd->vdev_path != NULL &&
+		    !spa_is_root(vd->vdev_spa))
 			error = ldi_open_by_name(vd->vdev_path, spa_mode, kcred,
 			    &dvd->vd_lh, zfs_li);
 	}
@@ -360,6 +366,7 @@ vdev_disk_probe(vdev_t *vd)
 			nvd->vdev_devid = spa_strdup(vd->vdev_devid);
 		nvd->vdev_wholedisk = vd->vdev_wholedisk;
 		nvd->vdev_guid = vd->vdev_guid;
+		nvd->vdev_spa = vd->vdev_spa;
 		retries++;
 
 		error = vdev_disk_open_common(nvd);
@@ -598,8 +605,10 @@ vdev_disk_read_rootlabel(char *devpath)
 	if (ldi_open_by_name(devpath, FREAD, kcred, &vd_lh, zfs_li))
 		return (NULL);
 
-	if (ldi_get_size(vd_lh, &s))
+	if (ldi_get_size(vd_lh, &s)) {
+		(void) ldi_close(vd_lh, FREAD, kcred);
 		return (NULL);
+	}
 
 	size = P2ALIGN_TYPED(s, sizeof (vdev_label_t), uint64_t);
 	label = kmem_alloc(sizeof (vdev_label_t), KM_SLEEP);
@@ -638,5 +647,7 @@ vdev_disk_read_rootlabel(char *devpath)
 	}
 
 	kmem_free(label, sizeof (vdev_label_t));
+	(void) ldi_close(vd_lh, FREAD, kcred);
+
 	return (config);
 }

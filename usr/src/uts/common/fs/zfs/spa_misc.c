@@ -1295,3 +1295,12 @@ spa_has_slogs(spa_t *spa)
 {
 	return (spa->spa_log_class->mc_rotor != NULL);
 }
+
+/*
+ * Return whether this pool is the root pool.
+ */
+boolean_t
+spa_is_root(spa_t *spa)
+{
+	return (spa->spa_is_root);
+}

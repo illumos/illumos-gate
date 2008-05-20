@@ -1139,8 +1139,7 @@ ses_callback(struct scsi_pkt *pkt)
 	if (pkt->pkt_reason == CMD_CMPLT &&
 	    !SCBP_C(pkt) &&
 	    !(pkt->pkt_flags & FLAG_SENSING) &&
-	    !pkt->pkt_resid &&
-	    !(scmd->uscsi_flags & USCSI_READ)) {
+	    !pkt->pkt_resid) {
 		scsi_destroy_pkt(pkt);
 		SET_BP_PKT(bp, NULL);
 		biodone(bp);

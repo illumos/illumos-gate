@@ -2735,6 +2735,7 @@ expand_dollar_bootfs(char *in, char *out)
 {
 	char *token, *tmpout = out;
 	int outlen, blen;
+	int postcomma = 0;
 
 	outlen = strlen(in);
 	blen = current_bootfs_obj == 0 ? strlen(current_rootpool) :
@@ -2765,15 +2766,31 @@ expand_dollar_bootfs(char *in, char *out)
 	}
 
 	/*
-	 * If there is a $ZFS-BOOTFS expansion, it is a ZFS root,
-	 * then add bootpath property.
+	 * Check to see if 'zfs-bootfs' was explicitly specified on the command
+	 * line so that we can insert the 'bootpath' property.
+	 */
+	if ((tmpout == out) && (token = strstr(in, "zfs-bootfs")) != NULL) {
+		token[0] = '\0';
+		grub_strcpy(tmpout, in);
+		token[0] = 'z';
+		in = token;
+
+		tmpout = out + strlen(out);
+		postcomma = 1;
+	}
+
+	/*
+	 * Set the 'bootpath' property if a ZFS dataset was specified, either
+	 * through '$ZFS-BOOTFS' or an explicit 'zfs-bootfs' setting.
 	 */
 	if (tmpout != out) {
 		if ((outlen += 12 + strlen(current_bootpath)) > MAX_CMDLINE) {
 			errnum = ERR_WONT_FIT;
 			return (1);
 		}
-		grub_sprintf(tmpout, ",bootpath=\"%s\"", current_bootpath);
+		grub_sprintf(tmpout,
+		    postcomma ? "bootpath=\"%s\"," : ",bootpath=\"%s\"",
+		    current_bootpath);
 	}
 
 	strncat(out, in, MAX_CMDLINE);

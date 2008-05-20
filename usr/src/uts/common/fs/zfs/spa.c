@@ -2059,6 +2059,7 @@ spa_import_common(const char *pool, nvlist_t *config, nvlist_t *props,
 
 	if (allowfaulted)
 		spa->spa_import_faulted = B_TRUE;
+	spa->spa_is_root = isroot;
 
 	/*
 	 * Pass off the heavy lifting to spa_load().
@@ -2288,7 +2289,13 @@ spa_import_rootpool(char *devpath_list)
 
 	VERIFY(nvlist_lookup_string(conf, ZPOOL_CONFIG_POOL_NAME, &pname) == 0);
 
-	error = spa_import_common(pname, conf, NULL, B_TRUE, B_FALSE);
+	/*
+	 * We specify 'allowfaulted' for this to be treated like spa_open()
+	 * instead of spa_import().  This prevents us from marking vdevs as
+	 * persistently unavailable, and generates FMA ereports as if it were a
+	 * pool open, not import.
+	 */
+	error = spa_import_common(pname, conf, NULL, B_TRUE, B_TRUE);
 	if (error == EEXIST)
 		error = 0;
 
@@ -2852,6 +2859,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	vdev_t *vd, *pvd, *cvd, *tvd;
 	boolean_t unspare = B_FALSE;
 	uint64_t unspare_guid;
+	size_t len;
 
 	txg = spa_vdev_enter(spa);
 
@@ -2926,6 +2934,24 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	if ((pvd->vdev_ops == &vdev_mirror_ops || vd->vdev_id != 1) &&
 	    c == pvd->vdev_children)
 		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+
+	/*
+	 * If we are detaching the second disk from a replacing vdev, then
+	 * check to see if we changed the original vdev's path to have "/old"
+	 * at the end in spa_vdev_attach().  If so, undo that change now.
+	 */
+	if (pvd->vdev_ops == &vdev_replacing_ops && vd->vdev_id == 1 &&
+	    pvd->vdev_child[0]->vdev_path != NULL &&
+	    pvd->vdev_child[1]->vdev_path != NULL) {
+		ASSERT(pvd->vdev_child[1] == vd);
+		cvd = pvd->vdev_child[0];
+		len = strlen(vd->vdev_path);
+		if (strncmp(cvd->vdev_path, vd->vdev_path, len) == 0 &&
+		    strcmp(cvd->vdev_path + len, "/old") == 0) {
+			spa_strfree(cvd->vdev_path);
+			cvd->vdev_path = spa_strdup(vd->vdev_path);
+		}
+	}
 
 	/*
 	 * If we are detaching the original disk from a spare, then it implies

@@ -40,4 +40,4 @@ d none usr/lib/scsi/plugins/ses 755 root bin
 d none usr/lib/scsi/plugins/ses/vendor 755 root bin
 s none usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4200.so=SUN-Storage-J4400.so
 f none usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4400.so 755 root bin
-f none usr/lib/scsi/plugins/ses/vendor/SUN-ST-J4500.so 755 root bin
+f none usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4500.so 755 root bin

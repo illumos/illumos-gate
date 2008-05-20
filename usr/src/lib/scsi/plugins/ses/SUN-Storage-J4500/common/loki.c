@@ -115,7 +115,7 @@ sun_loki_parse_node(ses_plugin_t *sp, ses_node_t *np)
 
 	encprops = ses_node_props(encp);
 	if (nvlist_lookup_byte_array(encprops, SES_EN_PROP_STRING,
-	    &stringin, &len) != 0 || len == 0)
+	    &stringin, &len) != 0 || len < 4)
 		return (0);
 
 	/*
@@ -137,13 +137,13 @@ sun_loki_parse_node(ses_plugin_t *sp, ses_node_t *np)
 	 * identifier, then something has gone awry and we assume that the data
 	 * is corrupt.
 	 */
-	fieldlen = *stringin;
+	fieldlen = stringin[3];
 	if (fieldlen < 11)
 		return (0);
 
-	for (field = (char *)stringin + 1;
+	for (field = (char *)stringin + 4;
 	    field + fieldlen <= (char *)stringin + len; field += fieldlen) {
-		if (strncmp(field, "ST J4500", 8) == 0) {
+		if (strncmp(field, "Storage J4500", 13) == 0) {
 			/*
 			 * This is the part number for the enclosure itself.
 			 */
@@ -165,14 +165,16 @@ sun_loki_parse_node(ses_plugin_t *sp, ses_node_t *np)
 			 * Part numbers for the fans, of which there are 5.
 			 */
 			if (ses_node_type(np) != SES_NODE_ELEMENT ||
-			    type != SES_ET_COOLING)
+			    type != SES_ET_COOLING) {
+				field += fieldlen * 5;
 				continue;
+			}
 
 			field += fieldlen;
 
 			for (i = 0; i < 5 &&
 			    field + fieldlen <= (char *)stringin + len;
-			    i++, fieldlen += fieldlen) {
+			    i++, field += fieldlen) {
 				if (index == i &&
 				    strncmp(field, "Unknown", 7) != 0 &&
 				    strncmp(field, "Not Installed", 13) != 0) {
@@ -189,14 +191,16 @@ sun_loki_parse_node(ses_plugin_t *sp, ses_node_t *np)
 			 * are 2.
 			 */
 			if (ses_node_type(np) != SES_NODE_ELEMENT ||
-			    type != SES_ET_POWER_SUPPLY)
+			    type != SES_ET_POWER_SUPPLY) {
+				field += fieldlen * 2;
 				continue;
+			}
 
 			field += fieldlen;
 
 			for (i = 0; i < 2 &&
 			    field + fieldlen <= (char *)stringin + len;
-			    i++, fieldlen += fieldlen) {
+			    i++, field += fieldlen) {
 				if (index == i &&
 				    strncmp(field, "Unknown", 7) != 0 &&
 				    strncmp(field, "Not Installed", 13) != 0) {

@@ -163,6 +163,7 @@ struct spa {
 	kmutex_t	spa_zio_lock;		/* zio error lock */
 	uint8_t		spa_failmode;		/* failure mode for the pool */
 	boolean_t	spa_import_faulted;	/* allow faulted vdevs */
+	boolean_t	spa_is_root;		/* pool is root */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.
