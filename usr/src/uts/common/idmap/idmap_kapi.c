@@ -373,7 +373,10 @@ kidmap_getuidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
-		if (results.ids.ids_len >= 1 &&
+		if (results.retcode != IDMAP_SUCCESS) {
+			status = results.retcode;
+			*uid = UID_NOBODY;
+		} else if (results.ids.ids_len >= 1 &&
 		    results.ids.ids_val[0].id.idtype == IDMAP_UID) {
 			status = results.ids.ids_val[0].retcode;
 			*uid = results.ids.ids_val[0].id.idmap_id_u.uid;
@@ -446,7 +449,10 @@ kidmap_getgidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
-		if (results.ids.ids_len >= 1 &&
+		if (results.retcode != IDMAP_SUCCESS) {
+			status = results.retcode;
+			*gid = GID_NOBODY;
+		} else if (results.ids.ids_len >= 1 &&
 		    results.ids.ids_val[0].id.idtype == IDMAP_GID) {
 			status = results.ids.ids_val[0].retcode;
 			*gid = results.ids.ids_val[0].id.idmap_id_u.gid;
@@ -519,7 +525,11 @@ kidmap_getpidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
-		if (results.ids.ids_len >= 1 && (
+		if (results.retcode != IDMAP_SUCCESS) {
+			status = results.retcode;
+			*is_user = 1;
+			*pid = UID_NOBODY;
+		} else if (results.ids.ids_len >= 1 && (
 		    results.ids.ids_val[0].id.idtype == IDMAP_UID ||
 		    results.ids.ids_val[0].id.idtype == IDMAP_GID)) {
 			status = results.ids.ids_val[0].retcode;
@@ -603,7 +613,11 @@ kidmap_getsidbyuid(zone_t *zone, uid_t uid, const char **sid_prefix,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
-		if (results.ids.ids_len >= 1 &&
+		if (results.retcode != IDMAP_SUCCESS) {
+			status = results.retcode;
+			*rid = 0;
+			*sid_prefix = NULL;
+		} else if (results.ids.ids_len >= 1 &&
 		    (results.ids.ids_val[0].id.idtype == IDMAP_SID ||
 		    results.ids.ids_val[0].id.idtype == IDMAP_USID ||
 		    results.ids.ids_val[0].id.idtype == IDMAP_GSID)) {
@@ -681,7 +695,11 @@ kidmap_getsidbygid(zone_t *zone, gid_t gid, const char **sid_prefix,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
-		if (results.ids.ids_len >= 1 &&
+		if (results.retcode != IDMAP_SUCCESS) {
+			status = results.retcode;
+			*rid = 0;
+			*sid_prefix = NULL;
+		} else if (results.ids.ids_len >= 1 &&
 		    (results.ids.ids_val[0].id.idtype == IDMAP_SID ||
 		    results.ids.ids_val[0].id.idtype == IDMAP_USID ||
 		    results.ids.ids_val[0].id.idtype == IDMAP_GSID)) {
@@ -1065,8 +1083,8 @@ kidmap_batch_getsidbygid(idmap_get_handle_t *get_handle, gid_t gid,
 idmap_stat
 kidmap_get_mappings(idmap_get_handle_t *get_handle)
 {
-	idmap_mapping_batch	args;
-	idmap_ids_res		results;
+	idmap_mapping_batch	rpc_args;
+	idmap_ids_res		rpc_res;
 	uint32_t		op = IDMAP_GET_MAPPED_IDS;
 	idmap_mapping		*mapping;
 	idmap_get_res		*result;
@@ -1084,140 +1102,32 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 		return (IDMAP_SUCCESS);
 	cache = &get_handle->zs->cache;
 
-	bzero(&results, sizeof (idmap_ids_res));
+	bzero(&rpc_res, sizeof (idmap_ids_res));
 
-	args.idmap_mapping_batch_len = get_handle->mapping_num;
-	args.idmap_mapping_batch_val = get_handle->mapping;
+	rpc_args.idmap_mapping_batch_len = get_handle->mapping_num;
+	rpc_args.idmap_mapping_batch_val = get_handle->mapping;
 
 	if (kidmap_rpc_call(get_handle->zs, op, xdr_idmap_mapping_batch,
-	    (caddr_t)&args, xdr_idmap_ids_res,
-	    (caddr_t)&results) == 0) {
-		/* Door call succeded */
-		status = IDMAP_SUCCESS;
-		for (i = 0; i < get_handle->mapping_num; i++) {
-			mapping = &get_handle->mapping[i];
-			result =  &get_handle->result[i];
-
-			if (i > results.ids.ids_len) {
-				*result->stat =	IDMAP_ERR_NOMAPPING;
-				if (result->uid)
-					*result->uid = UID_NOBODY;
-				if (result->gid)
-					*result->gid = GID_NOBODY;
-				if (result->pid)
-					*result->pid = UID_NOBODY;
-				if (result->is_user)
-					*result->is_user = 1;
-				if (result->sid_prefix)
-					*result->sid_prefix = NULL;
-				if (result->rid)
-					*result->rid = 0;
-				continue;
-			}
-			*result->stat = results.ids.ids_val[i].retcode;
-
-			id = &results.ids.ids_val[i].id;
-			switch (id->idtype) {
-			case IDMAP_UID:
-				if (result->uid)
-					*result->uid = id->idmap_id_u.uid;
-				if (result->pid)
-					*result->pid = id->idmap_id_u.uid;
-				if (result->is_user)
-					*result->is_user = 1;
-				sid_prefix = kidmap_find_sid_prefix(
-				    mapping->id1.idmap_id_u.sid.prefix);
-				if (*result->stat == IDMAP_SUCCESS &&
-				    result->uid)
-					kidmap_cache_add_uidbysid(
-					    cache,
-					    sid_prefix,
-					    mapping->id1.idmap_id_u.sid.rid,
-					    id->idmap_id_u.uid);
-				else if (*result->stat == IDMAP_SUCCESS &&
-				    result->pid)
-					kidmap_cache_add_uidbysid(
-					    cache,
-					    sid_prefix,
-					    mapping->id1.idmap_id_u.sid.rid,
-					    id->idmap_id_u.uid);
-				break;
-
-			case IDMAP_GID:
-				if (result->gid)
-					*result->gid = id->idmap_id_u.gid;
-				if (result->pid)
-					*result->pid = id->idmap_id_u.gid;
-				if (result->is_user)
-					*result->is_user = 0;
-				sid_prefix = kidmap_find_sid_prefix(
-				    mapping->id1.idmap_id_u.sid.prefix);
-				if (*result->stat == IDMAP_SUCCESS &&
-				    result->gid)
-					kidmap_cache_add_gidbysid(
-					    cache,
-					    sid_prefix,
-					    mapping->id1.idmap_id_u.sid.rid,
-					    id->idmap_id_u.gid);
-				else if (*result->stat == IDMAP_SUCCESS &&
-				    result->pid)
-					kidmap_cache_add_gidbysid(
-					    cache,
-					    sid_prefix,
-					    mapping->id1.idmap_id_u.sid.rid,
-					    id->idmap_id_u.gid);
-				break;
-
-			case IDMAP_SID:
-			case IDMAP_USID:
-			case IDMAP_GSID:
-				sid_prefix = kidmap_find_sid_prefix(
-				    id->idmap_id_u.sid.prefix);
-				if (result->sid_prefix && result->rid) {
-					*result->sid_prefix = sid_prefix;
-					*result->rid = id->idmap_id_u.sid.rid;
-				}
-				if (*result->stat == IDMAP_SUCCESS &&
-				    mapping->id1.idtype == IDMAP_UID)
-					kidmap_cache_add_sidbyuid(
-					    cache,
-					    sid_prefix,
-					    id->idmap_id_u.sid.rid,
-					    mapping->id1.idmap_id_u.uid);
-				else if (*result->stat == IDMAP_SUCCESS &&
-				    mapping->id1.idtype == IDMAP_GID)
-					kidmap_cache_add_sidbygid(
-					    cache,
-					    sid_prefix,
-					    id->idmap_id_u.sid.rid,
-					    mapping->id1.idmap_id_u.gid);
-				break;
-
-			default:
-				*result->stat = IDMAP_ERR_NORESULT;
-				if (result->uid)
-					*result->uid = UID_NOBODY;
-				if (result->gid)
-					*result->gid = GID_NOBODY;
-				if (result->pid)
-					*result->pid = UID_NOBODY;
-				if (result->is_user)
-					*result->is_user = 1;
-				if (result->sid_prefix)
-					*result->sid_prefix = NULL;
-				if (result->rid)
-					*result->rid = 0;
-				break;
-			}
-		}
-		xdr_free(xdr_idmap_ids_res, (char *)&results);
-	} else {
+	    (caddr_t)&rpc_args, xdr_idmap_ids_res,
+	    (caddr_t)&rpc_res) != 0) {
 		/* Door call failed */
 		status = IDMAP_ERR_NOMAPPING;
-		for (i = 0; i < get_handle->mapping_num; i++) {
-			result =  &get_handle->result[i];
+		goto error;
+	}
 
-			*result->stat = IDMAP_ERR_NOMAPPING;
+	status = rpc_res.retcode;
+	if (status != IDMAP_SUCCESS) {
+		/* RPC returned idmap error code */
+		xdr_free(xdr_idmap_ids_res, (char *)&rpc_res);
+		goto error;
+	}
+
+	for (i = 0; i < get_handle->mapping_num; i++) {
+		mapping = &get_handle->mapping[i];
+		result =  &get_handle->result[i];
+
+		if (i >= rpc_res.ids.ids_len) {
+			*result->stat =	IDMAP_ERR_NOMAPPING;
 			if (result->uid)
 				*result->uid = UID_NOBODY;
 			if (result->gid)
@@ -1230,7 +1140,118 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				*result->sid_prefix = NULL;
 			if (result->rid)
 				*result->rid = 0;
+			continue;
 		}
+
+		*result->stat = rpc_res.ids.ids_val[i].retcode;
+
+		id = &rpc_res.ids.ids_val[i].id;
+		switch (id->idtype) {
+		case IDMAP_UID:
+			if (result->uid)
+				*result->uid = id->idmap_id_u.uid;
+			if (result->pid)
+				*result->pid = id->idmap_id_u.uid;
+			if (result->is_user)
+				*result->is_user = 1;
+			sid_prefix = kidmap_find_sid_prefix(
+			    mapping->id1.idmap_id_u.sid.prefix);
+			if (*result->stat == IDMAP_SUCCESS && result->uid)
+				kidmap_cache_add_uidbysid(
+				    cache, sid_prefix,
+				    mapping->id1.idmap_id_u.sid.rid,
+				    id->idmap_id_u.uid);
+			else if (*result->stat == IDMAP_SUCCESS && result->pid)
+				kidmap_cache_add_uidbysid(
+				    cache, sid_prefix,
+				    mapping->id1.idmap_id_u.sid.rid,
+				    id->idmap_id_u.uid);
+			break;
+
+		case IDMAP_GID:
+			if (result->gid)
+				*result->gid = id->idmap_id_u.gid;
+			if (result->pid)
+				*result->pid = id->idmap_id_u.gid;
+			if (result->is_user)
+				*result->is_user = 0;
+			sid_prefix = kidmap_find_sid_prefix(
+			    mapping->id1.idmap_id_u.sid.prefix);
+			if (*result->stat == IDMAP_SUCCESS && result->gid)
+				kidmap_cache_add_gidbysid(
+				    cache, sid_prefix,
+				    mapping->id1.idmap_id_u.sid.rid,
+				    id->idmap_id_u.gid);
+			else if (*result->stat == IDMAP_SUCCESS && result->pid)
+				kidmap_cache_add_gidbysid(
+				    cache, sid_prefix,
+				    mapping->id1.idmap_id_u.sid.rid,
+				    id->idmap_id_u.gid);
+			break;
+
+		case IDMAP_SID:
+		case IDMAP_USID:
+		case IDMAP_GSID:
+			sid_prefix = kidmap_find_sid_prefix(
+			    id->idmap_id_u.sid.prefix);
+			if (result->sid_prefix && result->rid) {
+				*result->sid_prefix = sid_prefix;
+				*result->rid = id->idmap_id_u.sid.rid;
+			}
+			if (*result->stat == IDMAP_SUCCESS &&
+			    mapping->id1.idtype == IDMAP_UID)
+				kidmap_cache_add_sidbyuid(
+				    cache, sid_prefix,
+				    id->idmap_id_u.sid.rid,
+				    mapping->id1.idmap_id_u.uid);
+			else if (*result->stat == IDMAP_SUCCESS &&
+			    mapping->id1.idtype == IDMAP_GID)
+				kidmap_cache_add_sidbygid(
+				    cache, sid_prefix,
+				    id->idmap_id_u.sid.rid,
+				    mapping->id1.idmap_id_u.gid);
+			break;
+
+		default:
+			*result->stat = IDMAP_ERR_NORESULT;
+			if (result->uid)
+				*result->uid = UID_NOBODY;
+			if (result->gid)
+				*result->gid = GID_NOBODY;
+			if (result->pid)
+				*result->pid = UID_NOBODY;
+			if (result->is_user)
+				*result->is_user = 1;
+			if (result->sid_prefix)
+				*result->sid_prefix = NULL;
+			if (result->rid)
+				*result->rid = 0;
+			break;
+		}
+	}
+	xdr_free(xdr_idmap_ids_res, (char *)&rpc_res);
+
+	/* Reset get_handle for new resquests */
+	get_handle->mapping_num = 0;
+	return (status);
+
+error:
+	for (i = 0; i < get_handle->mapping_num; i++) {
+		result =  &get_handle->result[i];
+
+		*result->stat = status;
+		if (result->uid)
+			*result->uid = UID_NOBODY;
+		if (result->gid)
+			*result->gid = GID_NOBODY;
+		if (result->pid)
+			*result->pid = UID_NOBODY;
+		if (result->is_user)
+			*result->is_user = 1;
+		if (result->sid_prefix)
+			*result->sid_prefix = NULL;
+		if (result->rid)
+			*result->rid = 0;
 	}
 
 	/* Reset get_handle for new resquests */
