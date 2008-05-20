@@ -481,7 +481,21 @@ typedef struct sadb_x_kmc {
 #define	sadb_x_kmc_reserved sadb_x_kmc_u.sadb_x_kmc_actual.sadb_x_kmc_ureserved
 } sadb_x_kmc_t;
 
-
+typedef struct sadb_x_pair {
+	union {
+		/* Union is for guaranteeing 64-bit alignment. */
+		struct {
+			uint16_t sadb_x_pair_ulen;
+			uint16_t sadb_x_pair_uexttype;
+			uint32_t sadb_x_pair_uspi;	/* SPI of paired SA */
+		} sadb_x_pair_actual;
+		uint64_t sadb_x_ext_alignment;
+	} sadb_x_pair_u;
+#define	sadb_x_pair_len sadb_x_pair_u.sadb_x_pair_actual.sadb_x_pair_ulen
+#define	sadb_x_pair_exttype \
+	sadb_x_pair_u.sadb_x_pair_actual.sadb_x_pair_uexttype
+#define	sadb_x_pair_spi sadb_x_pair_u.sadb_x_pair_actual.sadb_x_pair_uspi
+} sadb_x_pair_t;
 
 /*
  * Base message types.
@@ -500,7 +514,9 @@ typedef struct sadb_x_kmc {
 #define	SADB_DUMP	10   /* not used normally */
 #define	SADB_X_PROMISC	11
 #define	SADB_X_INVERSE_ACQUIRE	12
-#define	SADB_MAX		12
+#define	SADB_X_UPDATEPAIR	13
+#define	SADB_X_DELPAIR	14
+#define	SADB_MAX	14
 
 /*
  * SA flags
@@ -525,6 +541,9 @@ typedef struct sadb_x_kmc {
 #define	SADB_X_SAFLAGS_NATT_REM	   0x80000	/* this has a natted dst SA */
 #define	SADB_X_SAFLAGS_KRES2	   0x40000	/* Reserved by the kernel */
 #define	SADB_X_SAFLAGS_TUNNEL	   0x20000	/* tunnel mode */
+#define	SADB_X_SAFLAGS_PAIRED	   0x10000	/* inbound/outbound pair */
+#define	SADB_X_SAFLAGS_OUTBOUND	    0x8000	/* SA direction bit */
+#define	SADB_X_SAFLAGS_INBOUND	    0x4000	/* SA direction bit */
 
 #define	SADB_X_SAFLAGS_KRES	\
 	SADB_X_SAFLAGS_KRES1 | SADB_X_SAFLAGS_KRES2
@@ -612,8 +631,9 @@ typedef struct sadb_x_kmc {
 #define	SADB_X_EXT_ADDRESS_NATT_LOC	20
 #define	SADB_X_EXT_ADDRESS_NATT_REM	21
 #define	SADB_X_EXT_ADDRESS_INNER_DST	22
+#define	SADB_X_EXT_PAIR			23
 
-#define	SADB_EXT_MAX			22
+#define	SADB_EXT_MAX			23
 
 /*
  * Identity types.
@@ -748,7 +768,15 @@ typedef struct sadb_x_kmc {
 
 #define	SADB_X_DIAGNOSTIC_DUAL_PORT_SETS	72
 
-#define	SADB_X_DIAGNOSTIC_MAX			72
+#define	SADB_X_DIAGNOSTIC_PAIR_INAPPROPRIATE	73
+#define	SADB_X_DIAGNOSTIC_PAIR_ADD_MISMATCH	74
+#define	SADB_X_DIAGNOSTIC_PAIR_ALREADY		75
+#define	SADB_X_DIAGNOSTIC_PAIR_SA_NOTFOUND	76
+#define	SADB_X_DIAGNOSTIC_BAD_SA_DIRECTION	77
+
+#define	SADB_X_DIAGNOSTIC_SA_NOTFOUND		78
+#define	SADB_X_DIAGNOSTIC_SA_EXPIRED		79
+#define	SADB_X_DIAGNOSTIC_MAX			79
 
 /* Algorithm type for sadb_x_algdesc above... */
 

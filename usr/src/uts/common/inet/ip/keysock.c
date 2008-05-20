@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1663,7 +1663,9 @@ keysock_parse(queue_t *q, mblk_t *mp)
 	case SADB_GETSPI:
 	case SADB_ADD:
 	case SADB_UPDATE:
+	case SADB_X_UPDATEPAIR:
 	case SADB_DELETE:
+	case SADB_X_DELPAIR:
 	case SADB_GET:
 		/*
 		 * Pass down to appropriate consumer.
@@ -1978,8 +1980,10 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 	case SADB_FLUSH:
 	case SADB_GETSPI:
 	case SADB_UPDATE:
+	case SADB_X_UPDATEPAIR:
 	case SADB_ADD:
 	case SADB_DELETE:
+	case SADB_X_DELPAIR:
 	case SADB_EXPIRE:
 		/*
 		 * These are most likely replies.  Don't worry about

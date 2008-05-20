@@ -1573,7 +1573,7 @@ esp_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecesp_stack_t *espstack)
 	newbie->ipsa_type = SADB_SATYPE_ESP;
 
 	/*
-	 * Construct successful return message.  We have one thing going
+	 * Construct successful return message. We have one thing going
 	 * for us in PF_KEY v2.  That's the fact that
 	 *	sizeof (sadb_spirange_t) == sizeof (sadb_sa_t)
 	 */
@@ -3058,7 +3058,7 @@ static int
 esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
     int *diagnostic, ipsecesp_stack_t *espstack)
 {
-	isaf_t *primary, *secondary, *inbound, *outbound;
+	isaf_t *primary = NULL, *secondary, *inbound, *outbound;
 	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
@@ -3096,13 +3096,35 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
 	outbound = &sp->sdb_of[outhash];
 
-	switch (ksi->ks_in_dsttype) {
-	case KS_IN_ADDR_MBCAST:
-		clone = B_TRUE;	/* All mcast SAs can be bidirectional */
-		/* FALLTHRU */
-	case KS_IN_ADDR_ME:
+	/*
+	 * Use the direction flags provided by the KMD to determine
+	 * if the inbound or outbound table should be the primary
+	 * for this SA. If these flags were absent then make this
+	 * decision based on the addresses.
+	 */
+	if (assoc->sadb_sa_flags & IPSA_F_INBOUND) {
 		primary = inbound;
 		secondary = outbound;
+		is_inbound = B_TRUE;
+		if (assoc->sadb_sa_flags & IPSA_F_OUTBOUND)
+			clone = B_TRUE;
+	} else {
+		if (assoc->sadb_sa_flags & IPSA_F_OUTBOUND) {
+			primary = outbound;
+			secondary = inbound;
+		}
+	}
+
+	if (primary == NULL) {
+		/*
+		 * The KMD did not set a direction flag, determine which
+		 * table to insert the SA into based on addresses.
+		 */
+		switch (ksi->ks_in_dsttype) {
+		case KS_IN_ADDR_MBCAST:
+			clone = B_TRUE;	/* All mcast SAs can be bidirectional */
+			assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
+			/* FALLTHRU */
 		/*
 		 * If the source address is either one of mine, or unspecified
 		 * (which is best summed up by saying "not 'not mine'"),
@@ -3111,13 +3133,14 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		 * traffic.  The best example of such an SA is a multicast
 		 * SA (which allows me to receive the outbound traffic).
 		 */
-		if (ksi->ks_in_srctype != KS_IN_ADDR_NOTME)
-			clone = B_TRUE;
-		is_inbound = B_TRUE;
-		break;
-	case KS_IN_ADDR_NOTME:
-		primary = outbound;
-		secondary = inbound;
+		case KS_IN_ADDR_ME:
+			assoc->sadb_sa_flags |= IPSA_F_INBOUND;
+			primary = inbound;
+			secondary = outbound;
+			if (ksi->ks_in_srctype != KS_IN_ADDR_NOTME)
+				clone = B_TRUE;
+			is_inbound = B_TRUE;
+			break;
 		/*
 		 * If the source address literally not mine (either
 		 * unspecified or not mine), then this SA may have an
@@ -3125,12 +3148,19 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		 * We pay the price for this by making it a bi-directional
 		 * SA.
 		 */
-		if (ksi->ks_in_srctype != KS_IN_ADDR_ME)
-			clone = B_TRUE;
-		break;
-	default:
-		*diagnostic = SADB_X_DIAGNOSTIC_BAD_DST;
-		return (EINVAL);
+		case KS_IN_ADDR_NOTME:
+			assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
+			primary = outbound;
+			secondary = inbound;
+			if (ksi->ks_in_srctype != KS_IN_ADDR_ME) {
+				assoc->sadb_sa_flags |= IPSA_F_INBOUND;
+				clone = B_TRUE;
+			}
+			break;
+		default:
+			*diagnostic = SADB_X_DIAGNOSTIC_BAD_DST;
+			return (EINVAL);
+		}
 	}
 
 	/*
@@ -3186,6 +3216,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		mutex_exit(&inbound->isaf_lock);
 
 		if (larval == NULL) {
+			*diagnostic = SADB_X_DIAGNOSTIC_SA_NOTFOUND;
 			esp0dbg(("Larval update, but larval disappeared.\n"));
 			return (ESRCH);
 		} /* Else sadb_common_add unlinks it for me! */
@@ -3197,7 +3228,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 
 	rc = sadb_common_add(espstack->esp_sadb.s_ip_q, espstack->esp_pfkey_q,
 	    mp, samsg, ksi, primary, secondary, larval, clone, is_inbound,
-	    diagnostic, espstack->ipsecesp_netstack);
+	    diagnostic, espstack->ipsecesp_netstack, &espstack->esp_sadb);
 
 	if (rc == 0 && lpkt != NULL) {
 		rc = !taskq_dispatch(esp_taskq, inbound_task,
@@ -3339,7 +3370,8 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 
 	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
 	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM |
-	    SADB_X_SAFLAGS_TUNNEL)) {
+	    SADB_X_SAFLAGS_TUNNEL | SADB_X_SAFLAGS_OUTBOUND |
+	    SADB_X_SAFLAGS_INBOUND | SADB_X_SAFLAGS_PAIRED)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}
@@ -3475,22 +3507,19 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
  */
 static int
 esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
-    ipsecesp_stack_t *espstack)
+    ipsecesp_stack_t *espstack, uint8_t sadb_msg_type)
 {
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
-	struct sockaddr_in *sin;
 
 	if (dstext == NULL) {
 		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_DST;
 		return (EINVAL);
 	}
 
-	sin = (struct sockaddr_in *)(dstext + 1);
-	return (sadb_update_sa(mp, ksi,
-	    (sin->sin_family == AF_INET6) ? &espstack->esp_sadb.s_v6 :
-	    &espstack->esp_sadb.s_v4, diagnostic, espstack->esp_pfkey_q,
-	    esp_add_sa, espstack->ipsecesp_netstack));
+	return (sadb_update_sa(mp, ksi, &espstack->esp_sadb,
+	    diagnostic, espstack->esp_pfkey_q,
+	    esp_add_sa, espstack->ipsecesp_netstack, sadb_msg_type));
 }
 
 /*
@@ -3499,7 +3528,7 @@ esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
  */
 static int
 esp_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
-    ipsecesp_stack_t *espstack)
+    ipsecesp_stack_t *espstack, uint8_t sadb_msg_type)
 {
 	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
 	sadb_address_t *dstext =
@@ -3523,8 +3552,8 @@ esp_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		    espstack->esp_sadb.s_ip_q));
 	}
 
-	return (sadb_del_sa(mp, ksi, &espstack->esp_sadb, diagnostic,
-	    espstack->esp_pfkey_q));
+	return (sadb_delget_sa(mp, ksi, &espstack->esp_sadb, diagnostic,
+	    espstack->esp_pfkey_q, sadb_msg_type));
 }
 
 /*
@@ -3628,7 +3657,9 @@ esp_parse_pfkey(mblk_t *mp, ipsecesp_stack_t *espstack)
 		/* else esp_add_sa() took care of things. */
 		break;
 	case SADB_DELETE:
-		error = esp_del_sa(mp, ksi, &diagnostic, espstack);
+	case SADB_X_DELPAIR:
+		error = esp_del_sa(mp, ksi, &diagnostic, espstack,
+		    samsg->sadb_msg_type);
 		if (error != 0) {
 			sadb_pfkey_error(espstack->esp_pfkey_q, mp, error,
 			    diagnostic, ksi->ks_in_serial);
@@ -3636,8 +3667,8 @@ esp_parse_pfkey(mblk_t *mp, ipsecesp_stack_t *espstack)
 		/* Else esp_del_sa() took care of things. */
 		break;
 	case SADB_GET:
-		error = sadb_get_sa(mp, ksi, &espstack->esp_sadb, &diagnostic,
-		    espstack->esp_pfkey_q);
+		error = sadb_delget_sa(mp, ksi, &espstack->esp_sadb,
+		    &diagnostic, espstack->esp_pfkey_q, samsg->sadb_msg_type);
 		if (error != 0) {
 			sadb_pfkey_error(espstack->esp_pfkey_q, mp, error,
 			    diagnostic, ksi->ks_in_serial);
@@ -3670,11 +3701,13 @@ esp_parse_pfkey(mblk_t *mp, ipsecesp_stack_t *espstack)
 		}
 		break;
 	case SADB_UPDATE:
+	case SADB_X_UPDATEPAIR:
 		/*
 		 * Find a larval, if not there, find a full one and get
 		 * strict.
 		 */
-		error = esp_update_sa(mp, ksi, &diagnostic, espstack);
+		error = esp_update_sa(mp, ksi, &diagnostic, espstack,
+		    samsg->sadb_msg_type);
 		if (error != 0) {
 			sadb_pfkey_error(espstack->esp_pfkey_q, mp, error,
 			    diagnostic, ksi->ks_in_serial);

@@ -237,9 +237,11 @@ msg_init(struct sadb_msg *msg, uint8_t type, uint8_t satype)
 
 #define	CMD_NONE	0
 #define	CMD_UPDATE	2
-#define	CMD_ADD		3
-#define	CMD_DELETE	4
-#define	CMD_GET		5
+#define	CMD_UPDATE_PAIR	3
+#define	CMD_ADD		4
+#define	CMD_DELETE	5
+#define	CMD_DELETE_PAIR	6
+#define	CMD_GET		7
 #define	CMD_FLUSH	9
 #define	CMD_DUMP	10
 #define	CMD_MONITOR	11
@@ -264,8 +266,10 @@ parsecmd(char *cmdstr)
 		 *    or it isn't relevant until we support non IPsec SA types.
 		 */
 		{"update",		CMD_UPDATE},
+		{"update-pair",		CMD_UPDATE_PAIR},
 		{"add",			CMD_ADD},
 		{"delete", 		CMD_DELETE},
+		{"delete-pair",		CMD_DELETE_PAIR},
 		{"get", 		CMD_GET},
 		/*
 		 * Q: And ACQUIRE and REGISTER and EXPIRE?
@@ -312,7 +316,7 @@ parsenum(char *num, boolean_t bail, char *ebuf)
 	rc = strtoull(num, &end, 0);
 	if (errno != 0 || end == num || *end != '\0') {
 		if (bail) {
-			ERROR1(ep, ebuf, gettext(
+			FATAL1(ep, ebuf, gettext(
 			"Expecting a number, not \"%s\"!\n"), num);
 		} else {
 			/*
@@ -429,6 +433,9 @@ parsesatype(char *type, char *ebuf)
 #define	TOK_IDSTADDR6		45
 #define	TOK_ISRCPORT		46
 #define	TOK_IDSTPORT		47
+#define	TOK_PAIR_SPI		48
+#define	TOK_FLAG_INBOUND	49
+#define	TOK_FLAG_OUTBOUND	50
 
 static struct toktable {
 	char *string;
@@ -437,6 +444,7 @@ static struct toktable {
 } tokens[] = {
 	/* "String",		token value,		next arg is */
 	{"spi",			TOK_SPI,		NEXTNUM},
+	{"pair-spi",		TOK_PAIR_SPI,		NEXTNUM},
 	{"replay",		TOK_REPLAY,		NEXTNUM},
 	{"state",		TOK_STATE,		NEXTNUMSTR},
 	{"auth_alg",		TOK_AUTHALG,		NEXTNUMSTR},
@@ -508,6 +516,9 @@ static struct toktable {
 	{"nat_lport",		TOK_NATLPORT,		NEXTNUM},
 	{"nat_rport",		TOK_NATRPORT,		NEXTNUM},
 	{"encap",		TOK_ENCAP,		NEXTNUMSTR},
+
+	{"outbound",		TOK_FLAG_OUTBOUND,	NULL},
+	{"inbound",		TOK_FLAG_INBOUND,	NULL},
 	{NULL,			TOK_UNKNOWN,		NEXTEOF}
 };
 
@@ -1473,7 +1484,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 				    SADB_64TO8(msgp->sadb_msg_len));
 				continue;
 			} else {
-				if (errno == EINVAL) {
+				if (errno == EINVAL || errno == ESRCH) {
 					ERROR2(ep, ebuf, gettext(
 					    "PF_KEY Diagnostic code %u: %s.\n"),
 					    msgp->sadb_x_msg_diagnostic,
@@ -1523,6 +1534,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	uint64_t *buffer, *nexthdr;
 	struct sadb_msg msg;
 	struct sadb_sa *assoc = NULL;
+	struct sadb_x_pair *sadb_pair = NULL;
 	struct sadb_address *src = NULL, *dst = NULL;
 	struct sadb_address *isrc = NULL, *idst = NULL;
 	struct sadb_address *natt_local = NULL, *natt_remote = NULL;
@@ -1533,6 +1545,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	/* MLS TODO:  Need sensitivity eventually. */
 	int next, token, sa_len, alloclen, totallen = sizeof (msg), prefix;
 	uint32_t spi = 0;
+	uint8_t	sadb_msg_type;
 	char *thiscmd, *pstr;
 	boolean_t readstate = B_FALSE, unspec_src = B_FALSE;
 	boolean_t alloc_inner = B_FALSE, use_natt = B_FALSE;
@@ -1544,11 +1557,22 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	uint8_t proto = 0, iproto = 0;
 	char *ep = NULL;
 
-	thiscmd = (cmd == CMD_ADD) ? "add" : "update";
+	switch (cmd) {
+	case CMD_ADD:
+		thiscmd = "add";
+		sadb_msg_type = SADB_ADD;
+		break;
+	case CMD_UPDATE:
+		thiscmd = "update";
+		sadb_msg_type = SADB_UPDATE;
+		break;
+	case CMD_UPDATE_PAIR:
+		thiscmd = "update-pair";
+		sadb_msg_type = SADB_X_UPDATEPAIR;
+		break;
+	}
 
-	msg_init(&msg, ((cmd == CMD_ADD) ? SADB_ADD : SADB_UPDATE),
-	    (uint8_t)satype);
-
+	msg_init(&msg, sadb_msg_type, (uint8_t)satype);
 	/* Assume last element in argv is set to NULL. */
 	do {
 		token = parseextval(*argv, &next);
@@ -1562,6 +1586,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			    "Unknown extension field \"%s\" \n"), *(argv - 1));
 			break;
 		case TOK_SPI:
+		case TOK_PAIR_SPI:
 		case TOK_REPLAY:
 		case TOK_STATE:
 		case TOK_AUTHALG:
@@ -1605,6 +1630,40 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 					ERROR(ep, ebuf, gettext(
 					    "Invalid SPI value \"0\" .\n"));
 				}
+				break;
+			case TOK_PAIR_SPI:
+				if (cmd == CMD_UPDATE_PAIR) {
+					ERROR(ep, ebuf, gettext(
+					    "pair-spi can not be used with the "
+					    "\"update-pair\" command.\n"));
+				}
+				if (sadb_pair == NULL) {
+					sadb_pair = malloc(sizeof (*sadb_pair));
+					if (assoc == NULL)
+						Bail("malloc(assoc)");
+					bzero(sadb_pair, sizeof (*sadb_pair));
+					totallen += sizeof (*sadb_pair);
+				}
+				if (sadb_pair->sadb_x_pair_spi != 0) {
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single pair SPI value.\n"));
+					break;
+				}
+				/* Must convert SPI to network order! */
+				sadb_pair->sadb_x_pair_len =
+				    SADB_8TO64(sizeof (*sadb_pair));
+				sadb_pair->sadb_x_pair_exttype =
+				    SADB_X_EXT_PAIR;
+				sadb_pair->sadb_x_pair_spi =
+				    htonl((uint32_t)parsenum(*argv, B_TRUE,
+				    ebuf));
+				if (sadb_pair->sadb_x_pair_spi == 0) {
+					ERROR(ep, ebuf, gettext(
+					    "Invalid SPI value \"0\" .\n"));
+				}
+				assoc->sadb_sa_flags |=
+				    SADB_X_SAFLAGS_PAIRED;
 				break;
 			case TOK_REPLAY:
 				/*
@@ -2354,6 +2413,12 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			}
 			argv++;
 			break;
+		case TOK_FLAG_INBOUND:
+			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_INBOUND;
+			break;
+		case TOK_FLAG_OUTBOUND:
+			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_OUTBOUND;
+			break;
 		default:
 			ERROR1(ep, ebuf, gettext(
 			    "Don't use extension %s for add/update.\n"),
@@ -2512,6 +2577,18 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		    "Need SA parameters for %s.\n"), thiscmd);
 	}
 
+	if (sadb_pair != NULL) {
+		if (sadb_pair->sadb_x_pair_spi == 0) {
+			ERROR1(ep, ebuf, gettext(
+			    "The SPI value is missing for the "
+			    "association you wish to %s.\n"), thiscmd);
+		}
+		bcopy(sadb_pair, nexthdr,
+		    SADB_64TO8(sadb_pair->sadb_x_pair_len));
+		nexthdr += sadb_pair->sadb_x_pair_len;
+		free(sadb_pair);
+	}
+
 	if (hard != NULL) {
 		bcopy(hard, nexthdr, SADB_64TO8(hard->sadb_lifetime_len));
 		nexthdr += hard->sadb_lifetime_len;
@@ -2637,7 +2714,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		 */
 		lines_added++;
 	} else {
-		doaddresses((cmd == CMD_ADD) ? SADB_ADD : SADB_UPDATE, satype,
+		doaddresses(sadb_msg_type, satype,
 		    cmd, srchp, dsthp, src, dst, unspec_src, buffer, totallen,
 		    spi, ebuf);
 	}
@@ -2674,6 +2751,7 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 	int next, token, sa_len;
 	char *thiscmd;
 	uint32_t spi;
+	uint8_t	sadb_msg_type;
 	struct hostent *srchp = NULL, *dsthp = NULL;
 	struct sockaddr_in6 *sin6;
 	boolean_t unspec_src = B_TRUE;
@@ -2681,13 +2759,26 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 	uint8_t proto = 0;
 	char *ep = NULL;
 
-	msg_init(msg, ((cmd == CMD_GET) ? SADB_GET : SADB_DELETE),
-	    (uint8_t)satype);
 	/* Set the first extension header to right past the base message. */
 	nextext = (uint64_t *)(msg + 1);
 	bzero(nextext, sizeof (get_buffer) - sizeof (*msg));
 
-	thiscmd = (cmd == CMD_GET) ? "get" : "delete";
+	switch (cmd) {
+	case CMD_GET:
+		thiscmd = "get";
+		sadb_msg_type = SADB_GET;
+		break;
+	case CMD_DELETE:
+		thiscmd = "delete";
+		sadb_msg_type = SADB_DELETE;
+		break;
+	case CMD_DELETE_PAIR:
+		thiscmd = "delete-pair";
+		sadb_msg_type = SADB_X_DELPAIR;
+		break;
+	}
+
+	msg_init(msg, sadb_msg_type, (uint8_t)satype);
 
 #define	ALLOC_ADDR_EXT(ext, exttype)			\
 	(ext) = (struct sadb_address *)nextext;		\
@@ -2815,6 +2906,12 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 			}
 			/* The rest is pre-bzeroed for us. */
 			break;
+		case TOK_FLAG_INBOUND:
+			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_INBOUND;
+			break;
+		case TOK_FLAG_OUTBOUND:
+			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_OUTBOUND;
+			break;
 		default:
 			ERROR2(ep, ebuf, gettext(
 			    "Don't use extension %s for '%s' command.\n"),
@@ -2859,7 +2956,7 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 		 */
 		lines_added++;
 	} else {
-		doaddresses((cmd == CMD_GET) ? SADB_GET : SADB_DELETE, satype,
+		doaddresses(sadb_msg_type, satype,
 		    cmd, srchp, dsthp, src, dst, unspec_src, get_buffer,
 		    sizeof (get_buffer), spi, NULL);
 	}
@@ -2973,11 +3070,17 @@ dohelpcmd(char *cmds)
 	case CMD_UPDATE:
 		puts_tr("update	 - Update an existing SA");
 		break;
+	case CMD_UPDATE_PAIR:
+		puts_tr("update-pair - Update an existing pair of SA's");
+		break;
 	case CMD_ADD:
 		puts_tr("add	 - Add a new security association (SA)");
 		break;
 	case CMD_DELETE:
 		puts_tr("delete - Delete an SA");
+		break;
+	case CMD_DELETE_PAIR:
+		puts_tr("delete-pair - Delete a pair of SA's");
 		break;
 	case CMD_GET:
 		puts_tr("get - Display an SA");
@@ -3038,7 +3141,9 @@ dohelp(char *cmds)
 	puts_tr("");
 	puts_tr("add (interactive only) - Add a new security association (SA)");
 	puts_tr("update (interactive only) - Update an existing SA");
+	puts_tr("update-pair (interactive only) - Update an existing SA pair");
 	puts_tr("delete - Delete an SA");
+	puts_tr("delete-pair - Delete an SA pair");
 	puts_tr("get - Display an SA");
 	puts_tr("flush - Delete all SAs");
 	puts_tr("dump - Display all SAs");
@@ -3123,6 +3228,7 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 		break;
 	case CMD_ADD:
 	case CMD_UPDATE:
+	case CMD_UPDATE_PAIR:
 		/*
 		 * NOTE: Shouldn't allow ADDs or UPDATEs with keying material
 		 * from the command line.
@@ -3140,6 +3246,7 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 		doaddup(cmd, satype, argv, ebuf);
 		break;
 	case CMD_DELETE:
+	case CMD_DELETE_PAIR:
 	case CMD_GET:
 		if (satype == SADB_SATYPE_UNSPEC) {
 			FATAL(ep, ebuf, gettext(

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,7 @@ typedef struct ipsa_s {
 	 */
 	uint_t ipsa_softalloc;	/* Allocations allowed (soft). */
 	uint_t ipsa_hardalloc;	/* Allocations allowed (hard). */
+	uint_t ipsa_alloc;	/* Allocations made. */
 
 	uint_t ipsa_integlen;	/* Length of the integrity bitmap (bytes). */
 	uint_t ipsa_senslen;	/* Length of the sensitivity bitmap (bytes). */
@@ -230,6 +231,11 @@ typedef struct ipsa_s {
 	 */
 	ipsec_status_t (*ipsa_output_func)(mblk_t *);
 	ipsec_status_t (*ipsa_input_func)(mblk_t *, void *);
+
+	/*
+	 * Soft reference to paired SA
+	 */
+	uint32_t	ipsa_otherspi;
 
 	/* MLS boxen will probably need more fields in here. */
 
@@ -327,6 +333,9 @@ typedef struct ipsa_s {
 #define	IPSA_F_NATT_REM	SADB_X_SAFLAGS_NATT_REM
 #define	IPSA_F_NATT	(SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM)
 #define	IPSA_F_CINVALID	0x40000		/* SA shouldn't be cached */
+#define	IPSA_F_PAIRED	SADB_X_SAFLAGS_PAIRED	/* SA is one of a pair */
+#define	IPSA_F_OUTBOUND	SADB_X_SAFLAGS_OUTBOUND	/* SA direction bit */
+#define	IPSA_F_INBOUND	SADB_X_SAFLAGS_INBOUND	/* SA direction bit */
 #define	IPSA_F_TUNNEL	SADB_X_SAFLAGS_TUNNEL
 
 /* SA states are important for handling UPDATE PF_KEY messages. */
@@ -459,6 +468,25 @@ typedef struct sadbp_s
 	sadb_t		s_v6;
 } sadbp_t;
 
+/*
+ * A pair of SA's for a single connection, the structure contains a
+ * pointer to a SA and the SA its paired with (opposite direction) as well
+ * as the SA's respective hash buckets.
+ */
+typedef struct ipsap_s
+{
+	isaf_t		*ipsap_bucket;
+	ipsa_t		*ipsap_sa_ptr;
+	isaf_t		*ipsap_pbucket;
+	ipsa_t		*ipsap_psa_ptr;
+} ipsap_t;
+
+typedef struct templist_s
+{
+	ipsa_t		*ipsa;
+	struct templist_s	*next;
+} templist_t;
+
 /* Pointer to an all-zeroes IPv6 address. */
 #define	ALL_ZEROES_PTR	((uint32_t *)&ipv6_all_zeros)
 
@@ -525,6 +553,10 @@ ipsa_t *ipsec_getassocbyspi(isaf_t *, uint32_t, uint32_t *, uint32_t *,
     sa_family_t);
 ipsa_t *ipsec_getassocbyconn(isaf_t *, ipsec_out_t *, uint32_t *, uint32_t *,
     sa_family_t, uint8_t);
+ipsap_t *get_ipsa_pair(sadb_sa_t *, sadb_address_t *, sadb_address_t *,
+    sadbp_t *);
+void destroy_ipsa_pair(ipsap_t *);
+int update_pairing(ipsap_t *, keysock_in_t *, int *, sadbp_t *);
 
 /* SA insertion. */
 int sadb_insertassoc(ipsa_t *, isaf_t *);
@@ -550,19 +582,17 @@ int sadb_addrcheck(queue_t *, mblk_t *, sadb_ext_t *, uint_t, netstack_t *);
 boolean_t sadb_addrfix(keysock_in_t *, queue_t *, mblk_t *, netstack_t *);
 int sadb_addrset(ire_t *);
 int sadb_delget_sa(mblk_t *, keysock_in_t *, sadbp_t *, int *, queue_t *,
-    boolean_t);
-#define	sadb_get_sa(m, k, s, i, q)	sadb_delget_sa(m, k, s, i, q, B_FALSE)
-#define	sadb_del_sa(m, k, s, i, q)	sadb_delget_sa(m, k, s, i, q, B_TRUE)
+    uint8_t);
 
 int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, queue_t *, queue_t *);
 int sadb_common_add(queue_t *, queue_t *, mblk_t *, sadb_msg_t *,
     keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t, int *,
-    netstack_t *);
+    netstack_t *, sadbp_t *);
 void sadb_set_usetime(ipsa_t *);
 boolean_t sadb_age_bytes(queue_t *, ipsa_t *, uint64_t, boolean_t);
-int sadb_update_sa(mblk_t *, keysock_in_t *, sadb_t *,
+int sadb_update_sa(mblk_t *, keysock_in_t *, sadbp_t *,
     int *, queue_t *, int (*)(mblk_t *, keysock_in_t *, int *, netstack_t *),
-    netstack_t *);
+    netstack_t *, uint8_t);
 void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
 
 void sadb_destroy_acquire(ipsacq_t *, netstack_t *);

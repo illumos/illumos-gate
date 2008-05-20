@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,8 @@
 #define	INET_NAME	"ipsecah"
 #define	INET_MODSTRTAB	ipsecahinfo
 #define	INET_DEVSTRTAB	ipinfov6
-#define	INET_MODDESC	"IPsec AH STREAMS module %I%"
-#define	INET_DEVDESC	"IPsec AH STREAMS driver %I%"
+#define	INET_MODDESC	"IPsec AH STREAMS module"
+#define	INET_DEVDESC	"IPsec AH STREAMS driver"
 #define	INET_DEVMINOR	0
 #define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
 #define	INET_MODMTFLAGS	(D_MP|D_MTOCEXCL|D_MTOUTPERIM)

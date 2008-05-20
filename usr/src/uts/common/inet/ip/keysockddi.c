@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,8 @@
 #define	INET_NAME	"keysock"
 #define	INET_MODSTRTAB	keysockinfo
 #define	INET_DEVSTRTAB	keysockinfo
-#define	INET_MODDESC	"PF_KEY socket STREAMS module %I%"
-#define	INET_DEVDESC	"PF_KEY socket STREAMS driver %I%"
+#define	INET_MODDESC	"PF_KEY socket STREAMS module"
+#define	INET_DEVDESC	"PF_KEY socket STREAMS driver"
 #define	INET_DEVMINOR	0
 #define	INET_DEVMTFLAGS	(D_MP|D_MTPERMOD|D_MTPUTSHARED)
 #define	INET_MODMTFLAGS	INET_DEVMTFLAGS

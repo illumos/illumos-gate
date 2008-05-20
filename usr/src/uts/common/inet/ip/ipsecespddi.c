@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,8 @@
 #define	INET_NAME	"ipsecesp"
 #define	INET_MODSTRTAB	ipsecespinfo
 #define	INET_DEVSTRTAB	ipinfov6
-#define	INET_MODDESC	"IPsec ESP STREAMS module %I%"
-#define	INET_DEVDESC	"IPsec ESP STREAMS driver %I%"
+#define	INET_MODDESC	"IPsec ESP STREAMS module"
+#define	INET_DEVDESC	"IPsec ESP STREAMS driver"
 #define	INET_DEVMINOR	0
 #define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
 #define	INET_MODMTFLAGS	(D_MP|D_MTOCEXCL|D_MTOUTPERIM)

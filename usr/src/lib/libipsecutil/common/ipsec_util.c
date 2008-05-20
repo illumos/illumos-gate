@@ -1300,6 +1300,27 @@ keysock_diag(int diagnostic)
 	case SADB_X_DIAGNOSTIC_DUAL_PORT_SETS:
 		return (dgettext(TEXT_DOMAIN,
 		    "Both inner ports and outer ports are set"));
+	case SADB_X_DIAGNOSTIC_PAIR_INAPPROPRIATE:
+		return (dgettext(TEXT_DOMAIN,
+		    "Pairing failed, target SA unsuitable for pairing"));
+	case SADB_X_DIAGNOSTIC_PAIR_ADD_MISMATCH:
+		return (dgettext(TEXT_DOMAIN,
+		    "Source/destination address differs from pair SA"));
+	case SADB_X_DIAGNOSTIC_PAIR_ALREADY:
+		return (dgettext(TEXT_DOMAIN,
+		    "Already paired with another security association"));
+	case SADB_X_DIAGNOSTIC_PAIR_SA_NOTFOUND:
+		return (dgettext(TEXT_DOMAIN,
+		    "Command failed, pair security association not found"));
+	case SADB_X_DIAGNOSTIC_BAD_SA_DIRECTION:
+		return (dgettext(TEXT_DOMAIN,
+		    "Inappropriate SA direction"));
+	case SADB_X_DIAGNOSTIC_SA_NOTFOUND:
+		return (dgettext(TEXT_DOMAIN,
+		    "Security association not found"));
+	case SADB_X_DIAGNOSTIC_SA_EXPIRED:
+		return (dgettext(TEXT_DOMAIN,
+		    "Security association is not valid"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown diagnostic code"));
 	}
@@ -1375,11 +1396,17 @@ print_sadb_msg(FILE *file, struct sadb_msg *samsg, time_t wallclock,
 	case SADB_UPDATE:
 		(void) fprintf(file, "UPDATE");
 		break;
+	case SADB_X_UPDATEPAIR:
+		(void) fprintf(file, "UPDATE PAIR");
+		break;
 	case SADB_ADD:
 		(void) fprintf(file, "ADD");
 		break;
 	case SADB_DELETE:
 		(void) fprintf(file, "DELETE");
+		break;
+	case SADB_X_DELPAIR:
+		(void) fprintf(file, "DELETE PAIR");
 		break;
 	case SADB_GET:
 		(void) fprintf(file, "GET");
@@ -1512,6 +1539,12 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 	/* BEGIN Solaris-specific flags. */
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_USED)
 		(void) fprintf(file, "X_USED ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_PAIRED)
+		(void) fprintf(file, "X_PAIRED ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_OUTBOUND)
+		(void) fprintf(file, "X_OUTBOUND ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_INBOUND)
+		(void) fprintf(file, "X_INBOUND ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_UNIQUE)
 		(void) fprintf(file, "X_UNIQUE ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_AALG1)
@@ -2124,6 +2157,15 @@ print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 	    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
 	    kmc->sadb_x_kmc_proto, cookie_label, kmc->sadb_x_kmc_cookie);
 }
+/*
+ * Print an SADB_X_EXT_PAIR extension.
+ */
+static void
+print_pair(FILE *file, char *prefix, struct sadb_x_pair *pair)
+{
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, "%sPaired with spi=0x%x\n"),
+	    prefix, ntohl(pair->sadb_x_pair_spi));
+}
 
 /*
  * Take a PF_KEY message pointed to buffer and print it.  Useful for DUMP
@@ -2235,6 +2277,10 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 		case SADB_X_EXT_ADDRESS_NATT_LOC:
 			print_address(file, dgettext(TEXT_DOMAIN, "NLC: "),
 			    (struct sadb_address *)current, ignore_nss);
+			break;
+		case SADB_X_EXT_PAIR:
+			print_pair(file, dgettext(TEXT_DOMAIN, "OTH: "),
+			    (struct sadb_x_pair *)current);
 			break;
 		default:
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
