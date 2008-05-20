@@ -23,17 +23,57 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include $(SRC)/Makefile.master
+#
+# ASSERTION: Make sure that we can map in and read the Xen trace buffers.
+#
 
-SUBDIRS= common $(MACH:i386=i386 i86xpv)
-include ../Makefile.subdirs
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
 
-dstyle := TARGET += dstyle
+#
+# Do not fail the test in a domU
+#
+if [ ! -c /dev/xen/privcmd ]; then
+	exit 0
+fi
 
-check: FRC
-	@$(ECHO) "checking dstyle"
-	@$(MAKE) dstyle
+dtrace=$1
 
-dstyle: $(SUBDIRS)
+script()
+{
+	$dtrace -qs /dev/stdin <<EOF
+	xdt:sched::on-cpu
+	/arg1 == 0/
+	{
+		self->on++;
+	}
+
+	xdt:sched::off-cpu
+	/arg1 == 0 && self->on/
+	{
+		self->off++;
+	}
+
+	xdt:sched::off-cpu
+	/self->on > 50 && self->off > 50/
+	{
+		exit(0);
+	}
+
+	profile:::tick-1sec
+	/n++ > 10/
+	{
+		exit(1);
+	}
+EOF
+}
+
+script
+status=$?
+
+exit $status

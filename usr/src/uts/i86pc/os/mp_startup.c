@@ -654,7 +654,7 @@ opteron_get_nnodes(void)
  * This number is important when figuring out what workarounds are
  * appropriate, so compute it now.
  */
-static uint_t
+uint_t
 xen_get_nphyscpus(void)
 {
 	static uint_t nphyscpus = 0;

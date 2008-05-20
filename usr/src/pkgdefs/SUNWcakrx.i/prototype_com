@@ -60,6 +60,8 @@ f none platform/i86xpv/kernel/drv/privcmd 755 root sys
 f none platform/i86xpv/kernel/drv/rootnex 755 root sys
 f none platform/i86xpv/kernel/drv/xdb 755 root sys
 f none platform/i86xpv/kernel/drv/xdf 755 root sys
+f none platform/i86xpv/kernel/drv/xdt 755 root sys
+f none platform/i86xpv/kernel/drv/xdt.conf 644 root sys
 f none platform/i86xpv/kernel/drv/xenbus 755 root sys
 f none platform/i86xpv/kernel/drv/xencons 755 root sys
 f none platform/i86xpv/kernel/drv/xencons.conf 644 root sys
@@ -94,6 +96,7 @@ f none platform/i86xpv/kernel/drv/amd64/rootnex 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xenbus 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xdb 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xdf 755 root sys
+f none platform/i86xpv/kernel/drv/amd64/xdt 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xencons 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xnbe 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xnbo 755 root sys

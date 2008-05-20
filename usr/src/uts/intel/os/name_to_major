@@ -125,6 +125,7 @@ xencons 194
 xenbus 195
 privcmd 196
 evtchn 197
+xdt 198
 xdb 199
 domcaps 200
 balloon 201

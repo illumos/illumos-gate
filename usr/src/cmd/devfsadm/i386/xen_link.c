@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
  * Handle miscellaneous children of xendev
  */
 static int devxen(di_minor_t, di_node_t);
+static int xdt(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t xen_cbt[] = {
 	{ "xendev", DDI_PSEUDO, "xenbus",
@@ -55,6 +56,9 @@ static devfsadm_create_t xen_cbt[] = {
 	},
 	{ "xendev", DDI_PSEUDO, BALLOON_DRIVER_NAME,
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, devxen,
+	},
+	{ "pseudo", DDI_PSEUDO, "xdt",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, xdt
 	},
 };
 
@@ -90,6 +94,18 @@ devxen(di_minor_t minor, di_node_t node)
 
 	(void) snprintf(buf, sizeof (buf), "xen/%s", di_minor_name(minor));
 	(void) devfsadm_mklink(buf, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
+
+static int
+xdt(di_minor_t minor, di_node_t node)
+{
+	char *mname = di_minor_name(minor);
+	char path[MAXPATHLEN];
+
+	(void) snprintf(path, sizeof (path), "dtrace/provider/%s", mname);
+	(void) devfsadm_mklink(path, node, minor, 0);
 
 	return (DEVFSADM_CONTINUE);
 }

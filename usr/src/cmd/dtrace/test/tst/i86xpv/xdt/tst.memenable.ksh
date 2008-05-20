@@ -23,17 +23,43 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include $(SRC)/Makefile.master
+#
+# ASSERTION: Mem probes should enable successfully.
+#
 
-SUBDIRS= common $(MACH:i386=i386 i86xpv)
-include ../Makefile.subdirs
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
 
-dstyle := TARGET += dstyle
+#
+# Do not fail the test in a domU
+#
+if [ ! -c /dev/xen/privcmd ]; then
+	exit 0
+fi
 
-check: FRC
-	@$(ECHO) "checking dstyle"
-	@$(MAKE) dstyle
+dtrace=$1
 
-dstyle: $(SUBDIRS)
+script()
+{
+	$dtrace -qs /dev/stdin <<EOF
+	dtrace:::BEGIN
+	{
+		exit(0);
+	}
+
+	xdt:mem::page-grant-map,
+	xdt:mem::page-grant-unmap,
+	xdt:mem::page-grant-transfer
+	{}
+EOF
+}
+
+script
+status=$?
+
+exit $status

@@ -23,17 +23,41 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include $(SRC)/Makefile.master
+UTSBASE	= ../..
 
-SUBDIRS= common $(MACH:i386=i386 i86xpv)
-include ../Makefile.subdirs
+MODULE		= xdt
+OBJECTS		= $(XDT_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(XDT_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/common/xen/dtrace
 
-dstyle := TARGET += dstyle
+include $(UTSBASE)/i86xpv/Makefile.i86xpv
 
-check: FRC
-	@$(ECHO) "checking dstyle"
-	@$(MAKE) dstyle
+ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
+LINT_TARGET	= $(MODULE).lint
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-dstyle: $(SUBDIRS)
+LDFLAGS		+= -dy -Ndrv/dtrace
+
+.KEEP_STATE:
+
+def:		$(DEF_DEPS)
+
+all:		$(ALL_DEPS)
+
+clean:		$(CLEAN_DEPS)
+
+clobber:	$(CLOBBER_DEPS)
+
+lint:		$(LINT_DEPS)
+
+modlintlib:	$(MODLINTLIB_DEPS)
+
+clean.lint:	$(CLEAN_LINT_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+include $(UTSBASE)/i86xpv/Makefile.targ

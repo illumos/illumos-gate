@@ -70,10 +70,11 @@ struct xen_sysctl_tbuf_op {
 #define XEN_SYSCTL_TBUFOP_enable       4
 #define XEN_SYSCTL_TBUFOP_disable      5
     uint32_t cmd;
-    uint8_t pad[4];
+    uint8_t pad1[4];
     /* IN/OUT variables */
     struct xenctl_cpumap cpu_mask;
     uint32_t             evt_mask;
+    uint8_t pad2[4];
     /* OUT variables */
     uint64_aligned_t buffer_mfn;
     uint32_t size;

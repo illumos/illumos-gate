@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,3 +59,10 @@ f none SUNWdtrt/tst/i386/ustack/tst.circstack.exe 0555 root bin
 f none SUNWdtrt/tst/i386/ustack/tst.helper.d 0444 root bin
 f none SUNWdtrt/tst/i386/ustack/tst.helper.d.out 0444 root bin
 f none SUNWdtrt/tst/i386/ustack/tst.helper.exe 0555 root bin
+d none SUNWdtrt/tst/i86xpv 0755 root bin
+d none SUNWdtrt/tst/i86xpv/xdt 0755 root bin
+f none SUNWdtrt/tst/i86xpv/xdt/tst.basic.ksh 0444 root bin
+f none SUNWdtrt/tst/i86xpv/xdt/tst.hvmenable.ksh 0444 root bin
+f none SUNWdtrt/tst/i86xpv/xdt/tst.memenable.ksh 0444 root bin
+f none SUNWdtrt/tst/i86xpv/xdt/tst.schedenable.ksh 0444 root bin
+f none SUNWdtrt/tst/i86xpv/xdt/tst.schedargs.ksh 0444 root bin

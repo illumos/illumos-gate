@@ -206,6 +206,7 @@ XNF_OBJS += xnf.o
 XSVC_OBJS += xsvc.o
 XDF_OBJS += xdf.o
 XDB_OBJS += xdb.o
+XDT_OBJS += xdt.o
 
 #
 #	Build up defines and paths.

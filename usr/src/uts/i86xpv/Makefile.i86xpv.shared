@@ -254,6 +254,7 @@ DRV_KMODS	+= xnbu
 DRV_KMODS	+= xnf
 DRV_KMODS	+= xdb
 DRV_KMODS	+= xdf
+DRV_KMODS	+= xdt
 DRV_KMODS	+= privcmd
 DRV_KMODS	+= domcaps
 DRV_KMODS	+= evtchn

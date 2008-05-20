@@ -23,17 +23,52 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include $(SRC)/Makefile.master
+#
+# ASSERTION: Sched probes should enable successfully.
+#
 
-SUBDIRS= common $(MACH:i386=i386 i86xpv)
-include ../Makefile.subdirs
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
 
-dstyle := TARGET += dstyle
+#
+# do not fail test in a domU
+#
+if [ ! -c /dev/xen/privcmd ]; then
+	exit 0
+fi
 
-check: FRC
-	@$(ECHO) "checking dstyle"
-	@$(MAKE) dstyle
+dtrace=$1
 
-dstyle: $(SUBDIRS)
+script()
+{
+	$dtrace -qs /dev/stdin <<EOF
+	dtrace:::BEGIN
+	{
+		exit(0);
+	}
+
+	xdt:sched::off-cpu,
+	xdt:sched::on-cpu,
+	xdt:sched::idle-off-cpu,
+	xdt:sched::idle-on-cpu,
+	xdt:sched::block,
+	xdt:sched::sleep,
+	xdt:sched::wake,
+	xdt:sched::yield,
+	xdt:sched::shutdown-poweroff,
+	xdt:sched::shutdown-reboot,
+	xdt:sched::shutdown-suspend,
+	xdt:sched::shutdown-crash
+	{}
+EOF
+}
+
+script
+status=$?
+
+exit $status

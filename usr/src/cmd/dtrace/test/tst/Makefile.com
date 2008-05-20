@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,6 +97,6 @@ scripts: FRC
 	@cd ../cmd/scripts; pwd; $(MAKE) install
 
 dstyle: FRC
-	@$(DSTYLE) $(DSRCS)
+	@if [ -n "$(DSRCS)" ]; then $(DSTYLE) $(DSRCS); fi
 
 FRC:
