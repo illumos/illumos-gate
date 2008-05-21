@@ -204,6 +204,17 @@ missing_names_t Missing = {
 	plats_missing
 };
 
+char *usT1_plats[] = {
+	"Sun-Fire-T200",
+	"Netra-T2000",
+	"SPARC-Enterprise-T1000",
+	"SPARC-Enterprise-T2000",
+	"Sun-Fire-T1000",
+	"Netra-CP3060",
+	"Sun-Blade-T6300",
+	NULL
+};
+
 slotnm_rewrite_t *Slot_Rewrites = NULL;
 physlot_names_t *Physlot_Names = &PhyslotNMs;
 missing_names_t *Missing_Names = &Missing;

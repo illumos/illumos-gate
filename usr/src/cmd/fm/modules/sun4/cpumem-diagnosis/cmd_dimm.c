@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,11 +83,23 @@ cmd_dimm_create_fault(fmd_hdl_t *hdl, cmd_dimm_t *dimm, const char *fltnm,
 {
 #ifdef sun4v
 	nvlist_t *flt, *nvlfru;
-	nvlfru = cmd_mem2hc(hdl, dimm->dimm_asru_nvl);
-	flt = cmd_nvl_create_fault(hdl, fltnm, cert,
-	    dimm->dimm_asru_nvl, nvlfru, NULL);
-	if (nvlfru != NULL)
-		nvlist_free(nvlfru);
+	/*
+	 * Do NOT issue hc scheme FRU FMRIs for ultraSPARC-T1 platforms.
+	 * The SP will misinterpret the FRU. Instead, reuse the ASRU FMRI
+	 *
+	 * Use the BR string as a distinguisher. BR (branch) is only
+	 * present in ultraSPARC-T2/T2plus DIMM unums
+	 */
+	if (strstr(dimm->dimm_unum, "BR") == NULL) {
+		flt = cmd_nvl_create_fault(hdl, fltnm, cert,
+		    dimm->dimm_asru_nvl, dimm->dimm_asru_nvl, NULL);
+	} else {
+		nvlfru = cmd_mem2hc(hdl, dimm->dimm_asru_nvl);
+		flt = cmd_nvl_create_fault(hdl, fltnm, cert,
+		    dimm->dimm_asru_nvl, nvlfru, NULL);
+		if (nvlfru != NULL)
+			nvlist_free(nvlfru);
+	}
 	return (cmd_fault_add_location(hdl, flt, dimm->dimm_unum));
 #else
 	return (cmd_nvl_create_fault(hdl, fltnm, cert, dimm->dimm_asru_nvl,
