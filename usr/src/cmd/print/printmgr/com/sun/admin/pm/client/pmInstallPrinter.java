@@ -22,7 +22,7 @@
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Install and Modify Printer implementation
@@ -788,18 +788,33 @@ public class pmInstallPrinter extends pmInstallScreen {
 		if (filecontents.equals("postscript")) {
 		    fileCombo.setSelectedItem(pmUtility.getResource(
 								"PostScript"));
+		} else if (filecontents.equals("application/postscript")) {
+		    fileCombo.setSelectedItem(pmUtility.getResource(
+								"PostScript"));
+
 		} else if (filecontents.equals("simple")) {
 		    fileCombo.setSelectedItem(pmUtility.getResource("ASCII"));
+		} else if (filecontents.equals("text/plain")) {
+		    fileCombo.setSelectedItem(pmUtility.getResource("ASCII"));
+
 		} else if (filecontents.equals("postscript,simple")) {
 		    fileCombo.setSelectedItem(pmUtility.getResource(
 						"Both.PostScript.and.ASCII"));
 		} else if (filecontents.equals("simple,postscript")) {
 			fileCombo.setSelectedItem(pmUtility.getResource(
 						"Both.PostScript.and.ASCII"));
+		} else if (filecontents.equals(
+					"text/plain,application/postscript")) {
+			fileCombo.setSelectedItem(pmUtility.getResource(
+						"Both.PostScript.and.ASCII"));
+
 		} else if (filecontents.equals("none")) {
 			fileCombo.setSelectedItem(
 				pmUtility.getResource("None"));
 		} else if (filecontents.equals("any")) {
+			fileCombo.setSelectedItem(
+				pmUtility.getResource("Any"));
+		} else if (filecontents.equals("application/octet-stream")) {
 			fileCombo.setSelectedItem(
 				pmUtility.getResource("Any"));
 		} else {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -388,7 +388,7 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 					"document-format-supported", &str);
 		printf(gettext("\tContent types: %s"), str);
 		while (papiAttributeListGetString(attrs, &iter, NULL, &str)
-				== PAPI_OK)
+				== PAPI_OK) 
 			printf(", %s", str);
 		printf("\n");
 
@@ -396,6 +396,16 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 		(void) papiAttributeListGetString(attrs, NULL,
 					"printer-info", &str);
 		printf(gettext("\tDescription: %s\n"), str);
+
+		str = "";
+		iter = NULL;
+		(void) papiAttributeListGetString(attrs, &iter,
+		    "lpsched-printer-type", &str);
+		printf(gettext("\tPrinter types: %s"), str);
+		while (papiAttributeListGetString(attrs, &iter, NULL, &str)
+		    == PAPI_OK)
+			printf(", %s", str);
+		printf("\n");
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
@@ -477,9 +487,15 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
 					"job-sheets-supported", &str);
-		printf(gettext("\tBanner %s\n"),
-			(strcasecmp(str, "none") == 0 ?
-				gettext("not required") : gettext("required")));
+		if ((strcasecmp(str, "none")) == 0)
+			str = gettext("page never printed");
+		else if (strcasecmp(str, "optional") == 0)
+			str = gettext("not required");
+		else
+			str = gettext("required");
+
+		printf(gettext("\tBanner %s\n"), str);
+
 
 		str = "";
 		iter = NULL;
