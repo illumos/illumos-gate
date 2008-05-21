@@ -959,22 +959,25 @@ int
 acpi_poweroff(void)
 {
 	extern int acpica_powering_off;
+	ACPI_STATUS status;
 
 	PSM_VERBOSE_POWEROFF(("acpi_poweroff: starting poweroff\n"));
 
 	acpica_powering_off = 1;
 
-	if (AcpiEnterSleepStatePrep(5) != AE_OK)
-		return (1);
-	ACPI_DISABLE_IRQS();
-	if (AcpiEnterSleepState(5) != AE_OK) {
-		ACPI_ENABLE_IRQS();
+	status = AcpiEnterSleepStatePrep(5);
+	if (status != AE_OK) {
+		PSM_VERBOSE_POWEROFF(("acpi_poweroff: failed to prepare for "
+		    "poweroff, status=0x%x\n", status));
 		return (1);
 	}
+	ACPI_DISABLE_IRQS();
+	status = AcpiEnterSleepState(5);
 	ACPI_ENABLE_IRQS();
 
 	/* we should be off; if we get here it's an error */
-	PSM_VERBOSE_POWEROFF(("acpi_poweroff: failed to actually power off\n"));
+	PSM_VERBOSE_POWEROFF(("acpi_poweroff: failed to actually power "
+	    "off, status=0x%x\n", status));
 	return (1);
 }
 
