@@ -388,7 +388,7 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 					"document-format-supported", &str);
 		printf(gettext("\tContent types: %s"), str);
 		while (papiAttributeListGetString(attrs, &iter, NULL, &str)
-				== PAPI_OK) 
+				== PAPI_OK)
 			printf(", %s", str);
 		printf("\n");
 
