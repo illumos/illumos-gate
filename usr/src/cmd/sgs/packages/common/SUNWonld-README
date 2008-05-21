@@ -1346,3 +1346,4 @@ Bugid   Risk Synopsis
 6702260 single threading .init/.fini sections breaks staroffice
 6703683 Can't build VirtualBox on Build 88 or 89
 6703919 boot hangs intermittently on x86 with onnv daily.0430 and on
+6701798 ld can enter infinite loop processing bad mapfile
