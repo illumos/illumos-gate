@@ -126,12 +126,38 @@ adt_write_syslog(const char *message, int err)
  *	is returned.
  */
 
+/*
+ * XXX	this should probably be eliminated and adt_audit_state() replace it.
+ *	All the legitimate uses	are to not fork a waiting process for
+ *	process exit processing, as in su, login, dtlogin.  Other bogus
+ *	users are zoneadmd and init.
+ *	All but dtlogin are in ON, so we can do this without cross gate
+ *	synchronization.
+ */
+
 boolean_t
-adt_audit_enabled(void) {
+adt_audit_enabled(void)
+{
 
 	(void) auditon(A_GETCOND, (caddr_t)&auditstate, sizeof (auditstate));
 
 	return (auditstate != AUC_DISABLED);
+}
+
+/*
+ *	See adt_audit_enabled() for state discussions.
+ *	The state parameter is a hedge until all the uses become clear.
+ *	Likely if adt_audit_enabled is brought internal to this file,
+ *	it can take a parameter discussing the state.
+ */
+
+boolean_t
+adt_audit_state(int state)
+{
+
+	(void) auditon(A_GETCOND, (caddr_t)&auditstate, sizeof (auditstate));
+
+	return (auditstate == state);
 }
 
 /*

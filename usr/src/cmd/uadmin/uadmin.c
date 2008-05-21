@@ -41,14 +41,19 @@
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 
+#include <sys/types.h>
 #include <sys/uadmin.h>
+#include <sys/wait.h>
 
 #define	SMF_RST	"/etc/svc/volatile/resetting"
+#define	RETRY_COUNT 15	/* number of 1 sec retries for audit(1M) to complete */
 
 static const char *Usage = "Usage: %s cmd fcn [mdep]\n";
 
-static int turnoff_auditd(int, int);
+static int closeout_audit(int, int);
+static int turnoff_auditd(void);
 static void wait_for_auqueue();
+static int change_audit_file(void);
 
 int
 main(int argc, char *argv[])
@@ -222,7 +227,7 @@ main(int argc, char *argv[])
 			wait_for_auqueue();
 		}
 
-		if (turnoff_auditd(cmd, fcn) == -1)
+		if (closeout_audit(cmd, fcn) == -1)
 			(void) fprintf(stderr, "%s: can't turn off auditd\n",
 			    argv[0]);
 
@@ -231,8 +236,6 @@ main(int argc, char *argv[])
 	}
 
 	(void) adt_free_event(event);
-	(void) adt_end_session(ah);
-
 	if (uadmin(cmd, fcn, mdep) < 0) {
 		perror("uadmin");
 
@@ -241,21 +244,41 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
+	/* If returning from a suspend, audit thaw */
+	if ((cmd == A_FREEZE) &&
+	    ((fcn == AD_FORCE) ||
+	    (fcn == AD_REUSABLE) ||
+	    (fcn == AD_SUSPEND_TO_DISK) ||
+	    (fcn == AD_SUSPEND_TO_RAM))) {
+		if ((event = adt_alloc_event(ah, ADT_uadmin_thaw)) == NULL) {
+			(void) fprintf(stderr, "%s: can't allocate thaw audit "
+			    "event\n", argv[0]);
+		}
+		event->adt_uadmin_thaw.fcn = fcn_id;
+		if (adt_put_event(event, ADT_SUCCESS, 0) != 0) {
+			(void) fprintf(stderr, "%s: can't put thaw audit "
+			    "event\n", argv[0]);
+		}
+		(void) adt_free_event(event);
+	}
+	(void) adt_end_session(ah);
+
 	return (0);
 }
 
 static int
-turnoff_auditd(int cmd, int fcn)
+closeout_audit(int cmd, int fcn)
 {
-	int	rc;
-	int	retries = 15;
-
+	if (!adt_audit_state(AUC_AUDITING)) {
+		/* auditd not running, just return */
+		return (0);
+	}
 	switch (cmd) {
 	case A_SHUTDOWN:
 	case A_REBOOT:
 	case A_DUMP:
 		/* system shutting down, turn off auditd */
-		break;
+		return (turnoff_auditd());
 	case A_REMOUNT:
 	case A_SWAPCTL:
 	case A_FTRACE:
@@ -274,27 +297,30 @@ turnoff_auditd(int cmd, int fcn)
 		case AD_SUSPEND_TO_RAM:
 		case AD_FORCE:
 			/* suspend the system, change audit files */
-			/* XXX not implemented for now */
+			return (change_audit_file());
 		default:
-			return (-1);
+			return (0);	/* not an audit error */
 		}
 	default:
-		return (-1);
+		return (0);	/* not an audit error */
 	}
+}
 
-	if (adt_audit_enabled()) {
-		if ((rc = fork()) == 0) {
-			(void) execl("/usr/sbin/audit", "audit", "-t", NULL);
-			(void) fprintf(stderr, "error disabling auditd: %s\n",
-			    strerror(errno));
-			_exit(-1);
-		} else if (rc == -1) {
-			(void) fprintf(stderr, "error disabling auditd: %s\n",
-			    strerror(errno));
-			return (-1);
-		}
-	} else {
-		return (0);
+static int
+turnoff_auditd(void)
+{
+	int	rc;
+	int	retries = RETRY_COUNT;
+
+	if ((rc = (int)fork()) == 0) {
+		(void) execl("/usr/sbin/audit", "audit", "-t", NULL);
+		(void) fprintf(stderr, "error disabling auditd: %s\n",
+		    strerror(errno));
+		_exit(-1);
+	} else if (rc == -1) {
+		(void) fprintf(stderr, "error disabling auditd: %s\n",
+		    strerror(errno));
+		return (-1);
 	}
 
 	/*
@@ -317,6 +343,43 @@ turnoff_auditd(int cmd, int fcn)
 	} while ((rc != 0) && (retries != 0));
 
 	return (rc);
+}
+
+static int
+change_audit_file(void)
+{
+	pid_t	pid;
+
+	if ((pid = fork()) == 0) {
+		(void) execl("/usr/sbin/audit", "audit", "-n", NULL);
+		(void) fprintf(stderr, "error changing audit files: %s\n",
+		    strerror(errno));
+		_exit(-1);
+	} else if (pid == -1) {
+		(void) fprintf(stderr, "error changing audit files: %s\n",
+		    strerror(errno));
+		return (-1);
+	} else {
+		pid_t	rc;
+		int	retries = RETRY_COUNT;
+
+		/*
+		 * Wait for audit(1M) -n process to complete
+		 *
+		 */
+		do {
+			if ((rc = waitpid(pid, NULL, WNOHANG)) == pid) {
+				return (0);
+			} else if (rc == -1) {
+				return (-1);
+			} else {
+				(void) sleep(1);
+				retries--;
+			}
+
+		} while (retries != 0);
+	}
+	return (-1);
 }
 
 static void

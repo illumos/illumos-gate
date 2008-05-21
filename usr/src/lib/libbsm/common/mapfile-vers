@@ -143,6 +143,7 @@ SUNWprivate_1.1 {
 	adr_start;
 	adt_alloc_event;
 	adt_audit_enabled;
+	adt_audit_state;
 	adt_dup_session;
 	adt_end_session;
 	adt_export_session_data;

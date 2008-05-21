@@ -1231,6 +1231,25 @@ Use is subject to license terms.
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
+    <event id="AUE_uadmin_thaw" header="0" idNo="96" omit="JNI">
+    	<title>thaw after freeze</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="fcn">
+	    <internal token="text"/>
+	    <external opt="required" type="msg uadmin_fcn"/>
+	    <comment>freeze action type</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
 
 <!-- smbd service event; smbd session setup -->
     <event id="AUE_smbd_session" header="0" idNo="58" omit="JNI">
@@ -1819,7 +1838,7 @@ Use is subject to license terms.
     </event>
 
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 95, so next is 96, then fix this comment -->
+<!-- Highest idNo is 96, so next is 97, then fix this comment -->
 <!-- end of C Only events -->
 
 
