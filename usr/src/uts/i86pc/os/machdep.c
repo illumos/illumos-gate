@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,11 @@ extern void audit_enterprom(int);
 extern void audit_exitprom(int);
 
 /*
+ * Occassionally the kernel knows better whether to power-off or reboot.
+ */
+int force_shutdown_method = AD_UNKNOWN;
+
+/*
  * The panicbuf array is used to record messages and state:
  */
 char panicbuf[PANICBUFSIZE];
@@ -173,6 +178,9 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 		kpreempt_disable();
 		affinity_set(CPU_CURRENT);
 	}
+
+	if (force_shutdown_method != AD_UNKNOWN)
+		fcn = force_shutdown_method;
 
 	/*
 	 * XXX - rconsvp is set to NULL to ensure that output messages

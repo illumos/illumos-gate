@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@ extern "C" {
 #define	A_SWAPCTL	16
 /*			17-21	   reserved for obsolete interface */
 
+#define	AD_UNKNOWN	-1	/* no method */
 #define	AD_HALT		0	/* halt the processor */
 #define	AD_BOOT		1	/* multi-user reboot */
 #define	AD_IBOOT	2	/* multi-user reboot, ask for name of file */

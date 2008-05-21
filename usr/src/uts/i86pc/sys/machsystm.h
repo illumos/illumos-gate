@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,6 +135,8 @@ extern void memlist_add(uint64_t, uint64_t, struct memlist *,
 extern page_t *page_get_physical(uintptr_t);
 extern int linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 extern int dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
+
+extern int force_shutdown_method;
 
 #ifdef __xpv
 #include <sys/xen_mmu.h>

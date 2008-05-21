@@ -327,13 +327,6 @@ taskq_t *xen_shutdown_tq;
 
 #define	SHUTDOWN_TIMEOUT_SECS (60 * 5)
 
-static const char *cmd_strings[SHUTDOWN_MAX] = {
-	"poweroff",
-	"reboot",
-	"suspend",
-	"halt"
-};
-
 int
 xen_suspend_devices(dev_info_t *dip)
 {
@@ -588,11 +581,8 @@ xen_dirty_shutdown(void *arg)
 static void
 xen_shutdown(void *arg)
 {
-	nvlist_t *attr_list = NULL;
-	sysevent_t *event = NULL;
-	sysevent_id_t eid;
 	int cmd = (uintptr_t)arg;
-	int err;
+	proc_t *initpp;
 
 	ASSERT(cmd > SHUTDOWN_INVALID && cmd < SHUTDOWN_MAX);
 
@@ -601,38 +591,37 @@ xen_shutdown(void *arg)
 		return;
 	}
 
-	err = nvlist_alloc(&attr_list, NV_UNIQUE_NAME, KM_SLEEP);
-	if (err != DDI_SUCCESS)
-		goto failure;
+	switch (cmd) {
+	case SHUTDOWN_POWEROFF:
+		force_shutdown_method = AD_POWEROFF;
+		break;
+	case SHUTDOWN_HALT:
+		force_shutdown_method = AD_HALT;
+		break;
+	case SHUTDOWN_REBOOT:
+		force_shutdown_method = AD_BOOT;
+		break;
+	}
 
-	err = nvlist_add_string(attr_list, "shutdown", cmd_strings[cmd]);
-	if (err != DDI_SUCCESS)
-		goto failure;
 
-	if ((event = sysevent_alloc("EC_xpvsys", "control", "SUNW:kern:xpv",
-	    SE_SLEEP)) == NULL)
-		goto failure;
-	(void) sysevent_attach_attributes(event,
-	    (sysevent_attr_list_t *)attr_list);
+	/*
+	 * If we're still booting and init(1) isn't set up yet, simply halt.
+	 */
+	mutex_enter(&pidlock);
+	initpp = prfind(P_INITPID);
+	mutex_exit(&pidlock);
+	if (initpp == NULL) {
+		extern void halt(char *);
+		halt("Power off the System");   /* just in case */
+	}
 
-	err = log_sysevent(event, SE_SLEEP, &eid);
-
-	sysevent_detach_attributes(event);
-	sysevent_free(event);
-
-	if (err != 0)
-		goto failure;
+	/*
+	 * else, graceful shutdown with inittab and all getting involved
+	 */
+	psignal(initpp, SIGPWR);
 
 	(void) timeout(xen_dirty_shutdown, arg,
 	    SHUTDOWN_TIMEOUT_SECS * drv_usectohz(MICROSEC));
-
-	nvlist_free(attr_list);
-	return;
-
-failure:
-	if (attr_list != NULL)
-		nvlist_free(attr_list);
-	xen_dirty_shutdown(arg);
 }
 
 /*ARGSUSED*/
