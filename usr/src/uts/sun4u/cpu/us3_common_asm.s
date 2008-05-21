@@ -3055,6 +3055,8 @@ cpu_feature_init(void)
 	!
 	call itlb_erratum34_fixup
 	  nop
+	call dtlb_erratum34_fixup
+	  nop
 #endif	/* CHEETAHPLUS_ERRATUM_34 */
 	ret
 	  restore
@@ -3156,6 +3158,75 @@ itlb_erratum34_fixup(void)
 	retl
 	  wrpr	%g0, %o3, %pstate		! Enable interrupts
 	SET_SIZE(itlb_erratum34_fixup)
+
+#endif	/* lint */
+
+#if	defined(lint)
+
+/*ARGSUSED*/
+void
+dtlb_erratum34_fixup(void)
+{}
+
+#else	/* lint */
+
+	!
+	! In Cheetah+ erratum 34, under certain conditions a DTLB locked
+	! index 0 TTE will erroneously be displaced when a new TTE is
+	! loaded.  In order to avoid cheetah+ erratum 34, locked index 0
+	! TTEs must be relocated.
+	!
+	ENTRY_NP(dtlb_erratum34_fixup)
+	rdpr	%pstate, %o3
+#ifdef DEBUG
+	PANIC_IF_INTR_DISABLED_PSTR(%o3, u3_di_label2, %g1)
+#endif /* DEBUG */
+	wrpr	%o3, PSTATE_IE, %pstate		! Disable interrupts
+	ldxa	[%g0]ASI_DTLB_ACCESS, %o1	! %o1 = entry 0 data
+	ldxa	[%g0]ASI_DTLB_TAGREAD, %o2	! %o2 = entry 0 tag
+
+	cmp	%o1, %g0			! Is this entry valid?
+	bge	%xcc, 1f
+	  andcc	%o1, TTE_LCK_INT, %g0		! Is this entry locked?
+	bnz	%icc, 2f
+	  nop
+1:
+	retl					! Nope, outta here...
+	  wrpr	%g0, %o3, %pstate		! Enable interrupts
+2:
+	stxa	%g0, [%o2]ASI_DTLB_DEMAP	! Flush this mapping
+	membar	#Sync
+	!
+	! Start search from index 1 up.
+	!
+	! NOTE: We assume that we'll be successful in finding an unlocked
+	! or invalid entry.  If that isn't the case there are bound to
+	! bigger problems.
+	!
+	set	(1 << 3), %g3
+3:
+	ldxa	[%g3]ASI_DTLB_ACCESS, %o4	! Load TTE from t16
+	!
+	! If this entry isn't valid, we'll choose to displace it (regardless
+	! of the lock bit).
+	!
+	cmp	%o4, %g0			! TTE is > 0 iff not valid
+	bge	%xcc, 4f			! If invalid, go displace
+	  andcc	%o4, TTE_LCK_INT, %g0		! Check for lock bit
+	bnz,a	%icc, 3b			! If locked, look at next
+	  add	%g3, (1 << 3), %g3		!  entry
+4:
+	!
+	! We found an unlocked or invalid entry; we'll explicitly load
+	! the former index 0 entry here.
+	!
+	set	MMU_TAG_ACCESS, %g4
+	stxa	%o2, [%g4]ASI_DMMU
+	stxa	%o1, [%g3]ASI_DTLB_ACCESS
+	membar	#Sync
+	retl
+	  wrpr	%g0, %o3, %pstate		! Enable interrupts
+	SET_SIZE(dtlb_erratum34_fixup)
 
 #endif	/* lint */
 

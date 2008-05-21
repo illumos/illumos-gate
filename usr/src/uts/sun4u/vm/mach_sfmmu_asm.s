@@ -300,9 +300,14 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	retl
 	  wrpr	%g0, %o3, %pstate		! enable interrupts
 2:
+#ifdef	CHEETAHPLUS_ERRATUM_34
+	GET_CPU_IMPL(%g2)
+#endif
 	ld	[%g3 + %lo(dtlb_resv_ttenum)], %g3
 	sll	%g3, 3, %g3			! First reserved idx in TLB 0
 	sub	%g3, (1 << 3), %g3		! Decrement idx
+	! Erratum 15 workaround due to ld [%g3 + %lo(dtlb_resv_ttenum)], %g3
+	ldxa	[%g3]ASI_DTLB_ACCESS, %g4	! Load TTE from TLB 0
 3:
 	ldxa	[%g3]ASI_DTLB_ACCESS, %g4	! Load TTE from TLB 0
 	!
@@ -315,8 +320,25 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	bz,pn	%icc, 4f			! If unlocked, go displace
 	  nop
 	sub	%g3, (1 << 3), %g3		! Decrement idx
+#ifdef	CHEETAHPLUS_ERRATUM_34
+	!
+	! If this is a Cheetah or derivative, we must work around Erratum 34
+	! for the DTLB.  Erratum 34 states that under certain conditions, 
+	! a locked entry 0 TTE may be improperly displaced.  To avoid this,
+	! we do not place a locked TTE in entry 0.
+	!
+	brgz	%g3, 3b
+	  nop
+	cmp	%g2, CHEETAH_IMPL
+	bge,pt	%icc, 5f
+	  nop
+	brz	%g3, 3b
+	 nop
+#else	/* CHEETAHPLUS_ERRATUM_34 */
 	brgez	%g3, 3b
 	  nop
+#endif	/* CHEETAHPLUS_ERRATUM_34 */
+5:
 	sethi	%hi(sfmmu_panic5), %o0		! We searched all entries and
 	call	panic				! found no unlocked TTE so
 	  or	%o0, %lo(sfmmu_panic5), %o0	! give up.
