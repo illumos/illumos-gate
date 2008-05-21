@@ -422,8 +422,6 @@ CONSKBD_OBJS += conskbd.o
 
 CONSMS_OBJS +=	consms.o
 
-DIAUDIO_OBJS += audio.o
-
 OLDPTY_OBJS +=	tty_ptyconf.o
 
 PTC_OBJS +=	tty_pty.o

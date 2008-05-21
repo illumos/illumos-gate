@@ -528,7 +528,6 @@ MISC_KMODS	+= cmlb
 MISC_KMODS	+= consconfig
 MISC_KMODS	+= ctf
 MISC_KMODS	+= dadk
-MISC_KMODS	+= diaudio
 MISC_KMODS	+= dls
 MISC_KMODS	+= drm
 MISC_KMODS	+= fssnap_if

@@ -80,12 +80,10 @@ find_files "s.*"	\
 	usr/src/uts/sparc/audiosup	\
 	usr/src/uts/sparc/mixer		\
 	usr/src/uts/sparc/amsrc2	\
-	usr/src/uts/sparc/diaudio	\
 	usr/src/uts/intel/audio810	\
 	usr/src/uts/intel/audiohd	\
 	usr/src/uts/intel/audiosup	\
-	usr/src/uts/intel/mixer		\
-	usr/src/uts/intel/diaudio
+	usr/src/uts/intel/mixer	
 
 echo_file usr/src/uts/sparc/os/driver_classes
 echo_file usr/src/uts/sparc/os/driver_aliases

@@ -89,7 +89,6 @@ CHKHDRS=			\
 	atomic.h		\
 	attr.h			\
 	audio.h			\
-	audiodebug.h		\
 	audioio.h		\
 	audiovar.h		\
 	autoconf.h		\

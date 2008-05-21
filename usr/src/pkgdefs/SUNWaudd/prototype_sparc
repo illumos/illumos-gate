@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,5 +56,4 @@ d none kernel/misc/sparcv9 755 root sys
 f none kernel/misc/sparcv9/amsrc1 755 root sys
 f none kernel/misc/sparcv9/amsrc2 755 root sys
 f none kernel/misc/sparcv9/audiosup 755 root sys
-f none kernel/misc/sparcv9/diaudio 755 root sys
 f none kernel/misc/sparcv9/mixer 755 root sys

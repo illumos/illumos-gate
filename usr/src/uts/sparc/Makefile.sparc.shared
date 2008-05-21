@@ -364,7 +364,7 @@ SYS_KMODS	+= doorfs pset acctctl portfs
 #
 #	'User' Modules (/kernel/misc):
 #
-MISC_KMODS	+= amsrc2 audiosup diaudio mixer
+MISC_KMODS	+= amsrc2 audiosup mixer
 MISC_KMODS	+= bignum
 MISC_KMODS	+= consconfig gld ipc nfs_dlboot nfssrv scsi
 MISC_KMODS	+= strplumb swapgeneric tlimod
