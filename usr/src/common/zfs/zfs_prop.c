@@ -363,7 +363,7 @@ zfs_prop_index_to_string(zfs_prop_t prop, uint64_t index, const char **string)
 /*
  * Returns TRUE if the property applies to any of the given dataset types.
  */
-int
+boolean_t
 zfs_prop_valid_for_type(int prop, zfs_type_t types)
 {
 	return (zprop_valid_for_type(prop, types));
