@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,6 +196,7 @@ extern "C" {
 
 #define	MSR_AMD_HWCR	0xc0010015
 
+#define	AMD_HWCR_TLBCACHEDIS		(UINT64_C(1) << 3)
 #define	AMD_HWCR_FFDIS			0x00040	/* disable TLB Flush Filter */
 #define	AMD_HWCR_MCI_STATUS_WREN	0x40000	/* enable write of MCi_STATUS */
 
@@ -203,10 +204,20 @@ extern "C" {
 
 #define	MSR_AMD_NB_CFG	0xc001001f
 
-#define	MSR_BU_CFG	0xc0011023
-
 #define	AMD_NB_CFG_SRQ_HEARTBEAT	(UINT64_C(1) << 20)
 #define	AMD_NB_CFG_SRQ_SPR		(UINT64_C(1) << 32)
+
+#define	MSR_AMD_BU_CFG	0xc0011023
+
+#define	AMD_BU_CFG_E298			(UINT64_C(1) << 1)
+
+/* AMD's osvw MSRs */
+#define	MSR_AMD_OSVW_ID_LEN		0xc0010140
+#define	MSR_AMD_OSVW_STATUS		0xc0010141
+
+
+#define	OSVW_ID_LEN_MASK		0xffffULL
+#define	OSVW_ID_CNT_PER_MSR		64
 
 /*
  * Enable PCI Extended Configuration Space (ECS) on Greyhound

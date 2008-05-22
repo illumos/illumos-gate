@@ -168,9 +168,17 @@ extern "C" {
 #define	CPUID_AMD_ECX_CR8D	0x00000010	/* AMD: 32-bit mov %cr8 */
 #define	CPUID_AMD_ECX_LZCNT	0x00000020	/* AMD: LZCNT insn */
 #define	CPUID_AMD_ECX_SSE4A	0x00000040	/* AMD: SSE4A insns */
+#define	CPUID_AMD_ECX_MAS	0x00000080	/* AMD: MisAlignSse mnode */
+#define	CPUID_AMD_ECX_3DNP	0x00000100	/* AMD: 3DNowPrefectch */
+#define	CPUID_AMD_ECX_OSVW	0x00000200	/* AMD: OSVW */
+#define	CPUID_AMD_ECX_IBS	0x00000400	/* AMD: IBS */
+#define	CPUID_AMD_ECX_SSE5	0x00000800	/* AMD: SSE5 */
+#define	CPUID_AMD_ECX_SKINIT	0x00001000	/* AMD: SKINIT */
+#define	CPUID_AMD_ECX_WDT	0x00002000	/* AMD: WDT */
 
 #define	FMT_CPUID_AMD_ECX					\
 	"\20"							\
+	"\14wdt\13skinit\12sse5\11ibs\10osvw\93dnp\8mas"	\
 	"\7sse4a\6lzcnt\5cr8d\3svm\2lcmplgcy\1ahf64"
 
 /*

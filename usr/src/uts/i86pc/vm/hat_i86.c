@@ -130,8 +130,22 @@ static int num_kernel_ranges;
 uint_t use_boot_reserve = 1;	/* cleared after early boot process */
 uint_t can_steal_post_boot = 0;	/* set late in boot to enable stealing */
 
-/* export 1g page size to user applications if set */
+/*
+ * enable_1gpg: controls 1g page support for user applications.
+ * By default, 1g pages are exported to user applications. enable_1gpg can
+ * be set to 0 to not export.
+ */
 int	enable_1gpg = 1;
+
+/*
+ * AMD shanghai processors provide better management of 1gb ptes in its tlb.
+ * By default, 1g page suppport will be disabled for pre-shanghai AMD
+ * processors that don't have optimal tlb support for the 1g page size.
+ * chk_optimal_1gtlb can be set to 0 to force 1g page support on sub-optimal
+ * processors.
+ */
+int	chk_optimal_1gtlb = 1;
+
 
 #ifdef DEBUG
 uint_t	map1gcnt;
@@ -461,6 +475,36 @@ hat_kernelbase(uintptr_t va)
 }
 
 /*
+ *
+ */
+static void
+set_max_page_level()
+{
+	level_t lvl;
+
+	if (!kbm_largepage_support) {
+		lvl = 0;
+	}
+	if (x86_feature & X86_1GPG) {
+		lvl = 2;
+		if (chk_optimal_1gtlb && cpuid_opteron_erratum(CPU, 6671130)) {
+			lvl = 1;
+		}
+		if (plat_mnode_xcheck(LEVEL_SIZE(2) >> LEVEL_SHIFT(0))) {
+			lvl = 1;
+		}
+	} else {
+		lvl = 1;
+	}
+	mmu.max_page_level = lvl;
+
+	if ((lvl == 2) && (enable_1gpg == 0))
+		mmu.umax_page_level = 1;
+	else
+		mmu.umax_page_level = lvl;
+}
+
+/*
  * Initialize hat data structures based on processor MMU information.
  */
 void
@@ -571,24 +615,8 @@ mmu_init(void)
 		mmu.level_mask[i] = ~mmu.level_offset[i];
 	}
 
-	/*
-	 * Initialize parameters based on the 64 or 32 bit kernels and
-	 * for the 32 bit kernel decide if we should use PAE.
-	 */
-	if (kbm_largepage_support) {
+	set_max_page_level();
 
-		if ((x86_feature & X86_1GPG) &&
-		    plat_mnode_xcheck((LEVEL_SIZE(2) >> LEVEL_SHIFT(0))) == 0) {
-			mmu.max_page_level = 2;
-			mmu.umax_page_level = (enable_1gpg) ? 2 : 1;
-		} else {
-			mmu.max_page_level = 1;
-			mmu.umax_page_level = 1;
-		}
-	} else {
-		mmu.max_page_level = 0;
-		mmu.umax_page_level = 0;
-	}
 	mmu_page_sizes = mmu.max_page_level + 1;
 	mmu_exported_page_sizes = mmu.umax_page_level + 1;
 

@@ -592,6 +592,10 @@ int opteron_workaround_6336786_UP = 0;	/* Not needed for UP */
 int opteron_workaround_6323525;	/* if non-zero -> at least one cpu has it */
 #endif
 
+#if defined(OPTERON_ERRATUM_298)
+int opteron_erratum_298;
+#endif
+
 static void
 workaround_warning(cpu_t *cp, uint_t erratum)
 {
@@ -675,6 +679,57 @@ xen_get_nphyscpus(void)
 	return (nphyscpus);
 }
 #endif
+
+uint_t
+do_erratum_298(struct cpu *cpu)
+{
+	static int	osvwrc = -3;
+	extern int	osvw_opteron_erratum(cpu_t *, uint_t);
+
+	/*
+	 * L2 Eviction May Occur During Processor Operation To Set
+	 * Accessed or Dirty Bit.
+	 */
+	if (osvwrc == -3) {
+		osvwrc = osvw_opteron_erratum(cpu, 298);
+	} else {
+		/* osvw return codes should be consistent for all cpus */
+		ASSERT(osvwrc == osvw_opteron_erratum(cpu, 298));
+	}
+
+	switch (osvwrc) {
+	case 0:		/* erratum is not present: do nothing */
+		break;
+	case 1:		/* erratum is present: BIOS workaround applied */
+		/*
+		 * check if workaround is actually in place and issue warning
+		 * if not.
+		 */
+		if (((rdmsr(MSR_AMD_HWCR) & AMD_HWCR_TLBCACHEDIS) == 0) ||
+		    ((rdmsr(MSR_AMD_BU_CFG) & AMD_BU_CFG_E298) == 0)) {
+#if defined(OPTERON_ERRATUM_298)
+			opteron_erratum_298++;
+#else
+			workaround_warning(cpu, 298);
+			return (1);
+#endif
+		}
+		break;
+	case -1:	/* cannot determine via osvw: check cpuid */
+		if ((cpuid_opteron_erratum(cpu, 298) > 0) &&
+		    (((rdmsr(MSR_AMD_HWCR) & AMD_HWCR_TLBCACHEDIS) == 0) ||
+		    ((rdmsr(MSR_AMD_BU_CFG) & AMD_BU_CFG_E298) == 0))) {
+#if defined(OPTERON_ERRATUM_298)
+			opteron_erratum_298++;
+#else
+			workaround_warning(cpu, 298);
+			return (1);
+#endif
+		}
+		break;
+	}
+	return (0);
+}
 
 uint_t
 workaround_errata(struct cpu *cpu)
@@ -1041,7 +1096,7 @@ workaround_errata(struct cpu *cpu)
 #if defined(OPTERON_WORKAROUND_6323525)
 		/*
 		 * This problem only occurs with 2 or more cores. If bit in
-		 * MSR_BU_CFG set, then not applicable. The workaround
+		 * MSR_AMD_BU_CFG set, then not applicable. The workaround
 		 * is to patch the semaphone routines with the lfence
 		 * instruction to provide necessary load memory barrier with
 		 * possible subsequent read-modify-write ops.
@@ -1072,7 +1127,7 @@ workaround_errata(struct cpu *cpu)
 #else	/* __xpv */
 		} else if ((x86_feature & X86_SSE2) && ((opteron_get_nnodes() *
 		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
-			if ((xrdmsr(MSR_BU_CFG) & 0x02) == 0)
+			if ((xrdmsr(MSR_AMD_BU_CFG) & 0x02) == 0)
 				opteron_workaround_6323525++;
 #endif	/* __xpv */
 		}
@@ -1081,6 +1136,8 @@ workaround_errata(struct cpu *cpu)
 		missing++;
 #endif
 	}
+
+	missing += do_erratum_298(cpu);
 
 #ifdef __xpv
 	return (0);
@@ -1161,6 +1218,16 @@ workaround_errata_end()
 #if defined(OPTERON_WORKAROUND_6323525)
 	if (opteron_workaround_6323525)
 		workaround_applied(6323525);
+#endif
+#if defined(OPTERON_ERRATUM_298)
+	if (opteron_erratum_298) {
+		cmn_err(CE_WARN,
+		    "BIOS microcode patch for AMD 64/Opteron(tm)"
+		    " processor\nerratum 298 was not detected; updating your"
+		    " system's BIOS to a version\ncontaining this"
+		    " microcode patch is HIGHLY recommended or erroneous"
+		    " system\noperation may occur.\n");
+	}
 #endif
 }
 

@@ -2676,6 +2676,14 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 			    SH_E4(eax) || BH_E4(eax) || SH_E5(eax) || \
 			    DH_E6(eax) || JH_E6(eax))
 
+#define	DR_AX(eax)	(eax == 0x100f00 || eax == 0x100f01 || eax == 0x100f02)
+#define	DR_B0(eax)	(eax == 0x100f20)
+#define	DR_B1(eax)	(eax == 0x100f21)
+#define	DR_BA(eax)	(eax == 0x100f2a)
+#define	DR_B2(eax)	(eax == 0x100f22)
+#define	DR_B3(eax)	(eax == 0x100f23)
+#define	RB_C0(eax)	(eax == 0x100f40)
+
 	switch (erratum) {
 	case 1:
 		return (cpi->cpi_family < 0x10);
@@ -2684,11 +2692,11 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 52:
 		return (B(eax));
 	case 57:
-		return (cpi->cpi_family <= 0x10);
+		return (cpi->cpi_family <= 0x11);
 	case 58:
 		return (B(eax));
 	case 60:
-		return (cpi->cpi_family <= 0x10);
+		return (cpi->cpi_family <= 0x11);
 	case 61:
 	case 62:
 	case 63:
@@ -2709,7 +2717,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 76:
 		return (B(eax));
 	case 77:
-		return (cpi->cpi_family <= 0x10);
+		return (cpi->cpi_family <= 0x11);
 	case 78:
 		return (B(eax) || SH_C0(eax));
 	case 79:
@@ -2791,7 +2799,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 121:
 		return (B(eax) || SH_C0(eax) || CG(eax) || D0(eax) || EX(eax));
 	case 122:
-		return (cpi->cpi_family < 0x10);
+		return (cpi->cpi_family < 0x10 || cpi->cpi_family == 0x11);
 	case 123:
 		return (JH_E1(eax) || BH_E4(eax) || JH_E6(eax));
 	case 131:
@@ -2811,6 +2819,81 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 6323525:
 		return (((((eax >> 12) & 0xff00) + (eax & 0xf00)) |
 		    (((eax >> 4) & 0xf) | ((eax >> 12) & 0xf0))) < 0xf40);
+
+	case 6671130:
+		/*
+		 * check for processors (pre-Shanghai) that do not provide
+		 * optimal management of 1gb ptes in its tlb.
+		 */
+		return (cpi->cpi_family == 0x10 && cpi->cpi_model < 4);
+
+	case 298:
+		return (DR_AX(eax) || DR_B0(eax) || DR_B1(eax) || DR_BA(eax) ||
+		    DR_B2(eax) || RB_C0(eax));
+
+	default:
+		return (-1);
+
+	}
+}
+
+/*
+ * Determine if specified erratum is present via OSVW (OS Visible Workaround).
+ * Return 1 if erratum is present, 0 if not present and -1 if indeterminate.
+ */
+int
+osvw_opteron_erratum(cpu_t *cpu, uint_t erratum)
+{
+	struct cpuid_info	*cpi;
+	uint_t			osvwid;
+	static int		osvwfeature = -1;
+	uint64_t		osvwlength;
+
+
+	cpi = cpu->cpu_m.mcpu_cpi;
+
+	/* confirm OSVW supported */
+	if (osvwfeature == -1) {
+		osvwfeature = cpi->cpi_extd[1].cp_ecx & CPUID_AMD_ECX_OSVW;
+	} else {
+		/* assert that osvw feature setting is consistent on all cpus */
+		ASSERT(osvwfeature ==
+		    (cpi->cpi_extd[1].cp_ecx & CPUID_AMD_ECX_OSVW));
+	}
+	if (!osvwfeature)
+		return (-1);
+
+	osvwlength = rdmsr(MSR_AMD_OSVW_ID_LEN) & OSVW_ID_LEN_MASK;
+
+	switch (erratum) {
+	case 298:	/* osvwid is 0 */
+		osvwid = 0;
+		if (osvwlength <= (uint64_t)osvwid) {
+			/* osvwid 0 is unknown */
+			return (-1);
+		}
+
+		/*
+		 * Check the OSVW STATUS MSR to determine the state
+		 * of the erratum where:
+		 *   0 - fixed by HW
+		 *   1 - BIOS has applied the workaround when BIOS
+		 *   workaround is available. (Or for other errata,
+		 *   OS workaround is required.)
+		 * For a value of 1, caller will confirm that the
+		 * erratum 298 workaround has indeed been applied by BIOS.
+		 *
+		 * A 1 may be set in cpus that have a HW fix
+		 * in a mixed cpu system. Regarding erratum 298:
+		 *   In a multiprocessor platform, the workaround above
+		 *   should be applied to all processors regardless of
+		 *   silicon revision when an affected processor is
+		 *   present.
+		 */
+
+		return (rdmsr(MSR_AMD_OSVW_STATUS +
+		    (osvwid / OSVW_ID_CNT_PER_MSR)) &
+		    (1ULL << (osvwid % OSVW_ID_CNT_PER_MSR)));
 
 	default:
 		return (-1);

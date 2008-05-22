@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -111,3 +111,9 @@ WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6323525
 # Some Registered DIMMs incompatible with address parity feature
 #
 WORKAROUND_DEFS += -DOPTERON_ERRATUM_172
+
+#
+# L2 Eviction May Occur During Processor Operation To Set
+# Accessed or Dirty Bit.
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_298
