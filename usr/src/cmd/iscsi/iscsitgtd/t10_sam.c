@@ -491,7 +491,7 @@ t10_cmd_done(t10_cmd_t *cmd)
  *	---+---------+---+---+---+---+-------+
  *	 S5|T6       | - |T4 | - | - | - | - |
  *	---+---------+---+---+---+---+-------+
- *       S6|T2/6     | - | - | - | - | - |T3 |
+ *       S6|T2/4/5/6 | - | - | - | - | - |T3 |
  *	---+---------+---+---+---+---+-------+
  *       S7|T4/5     | - | - | - | - | - |T6 |
  *	---+---------+---+---+---+---+-------+
@@ -649,6 +649,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		switch (e) {
 		case T10_Cmd_T2:
 		case T10_Cmd_T4: /* AIO complete */
+		case T10_Cmd_T5: /* command complete */
 		case T10_Cmd_T6: /* warm reset */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
