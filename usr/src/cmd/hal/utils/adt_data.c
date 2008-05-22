@@ -37,7 +37,7 @@ get_audit_export_data(DBusConnection *bus, const char *invoked_by_syscon_name, s
 						"org.freedesktop.DBus",
 						"GetAuditSessionData");
 	if (message == NULL) {
-		HAL_INFO (("cannot get GetAuditSessionData message\n"));
+		printf ("cannot get GetAuditSessionData message\n");
 		return NULL;
 	}
 
@@ -52,7 +52,7 @@ get_audit_export_data(DBusConnection *bus, const char *invoked_by_syscon_name, s
 							   message, -1,
 							   &error);
 	if (dbus_error_is_set (&error)) {
-		HAL_INFO (("send failed %s\n", error.message));
+		printf ("send failed %s\n", error.message);
 		dbus_error_free (&error);
 		dbus_message_unref (message);
 		return NULL;
@@ -66,7 +66,7 @@ get_audit_export_data(DBusConnection *bus, const char *invoked_by_syscon_name, s
 
 	if (dbus_message_iter_get_arg_type (&iter) != DBUS_TYPE_ARRAY  ||
 	    dbus_message_iter_get_element_type (&iter) != DBUS_TYPE_BYTE) {
-		HAL_INFO (("expecting an array of byte entries\n"));
+		printf ("expecting an array of byte entries\n");
 		dbus_message_unref (message);
 		dbus_message_unref (reply);
 		return NULL;

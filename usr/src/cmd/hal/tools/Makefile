@@ -50,8 +50,8 @@ PROGSRCS =	$(PROG:%=%.c) $(STORAGE_PROG:%=%.c)
 
 
 STORAGE_OBJS =		$(STORAGE_PROG:%=%.o)
-STORAGE_SHAREDOBJS =	hal-storage-shared.o adt_data.o logger.o
-STORAGE_SHAREDSRCS =	$(STORAGE_SHAREDOBJS:%.o=%.c) $(STORAGE_SHAREDOBJS:%.o=../utils/%.c) $(STORAGE_SHAREDOBJS:%.o=../hald/%.c)
+STORAGE_SHAREDOBJS =	hal-storage-shared.o adt_data.o
+STORAGE_SHAREDSRCS =	$(STORAGE_SHAREDOBJS:%.o=%.c) $(STORAGE_SHAREDOBJS:%.o=../utils/%.c)
 
 SRCS =		$(PROGSRCS) $(STORAGE_SHAREDSRCS)
 
@@ -98,9 +98,6 @@ hal-storage-shared.o: hal-storage-shared.c
 
 adt_data.o: ../utils/adt_data.c
 	$(COMPILE.c) -o $@ ../utils/adt_data.c
-
-logger.o: ../hald/logger.c
-	$(COMPILE.c) -o $@ ../hald/logger.c
 
 hal-storage-closetray: hal-storage-closetray.o $(STORAGE_SHAREDOBJS)
 	$(LINK.c) hal-storage-closetray.o $(STORAGE_SHAREDOBJS) -o $@ $(LDLIBS)
