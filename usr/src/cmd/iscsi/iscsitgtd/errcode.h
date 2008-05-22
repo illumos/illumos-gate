@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,8 @@ typedef enum {
 	ERR_NO_PERMISSION,
 	ERR_INVALID_ISNS_SRV,
 	ERR_ISNS_ERROR,
-	ERR_TPGT_NO_IPADDR
+	ERR_TPGT_NO_IPADDR,
+	ERR_TPGT_IN_USE
 } err_code_t;
 
 char *

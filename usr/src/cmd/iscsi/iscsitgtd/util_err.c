@@ -199,6 +199,8 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("ISNS error"));
 	case ERR_TPGT_NO_IPADDR:
 		return ((char *)gettext("TPGT has no ip-addr"));
+	case ERR_TPGT_IN_USE:
+		return ((char *)gettext("Specified TPGT is in-use"));
 	default:
 		return ((char *)gettext("Internal error: unknown message"));
 	}

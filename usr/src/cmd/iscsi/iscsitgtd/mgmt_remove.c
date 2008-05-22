@@ -411,6 +411,9 @@ remove_tpgt(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*prop		= NULL;
+	tgt_node_t	*targ		= NULL;
+	tgt_node_t	*lnode		= NULL;
+	tgt_node_t	*lnp		= NULL;
 	tgt_node_t	*node		= NULL;
 	tgt_node_t	*c		= NULL;
 	Boolean_t	change_made	= False;
@@ -424,10 +427,24 @@ remove_tpgt(tgt_node_t *x)
 		if (strcmp(node->x_value, prop) == 0)
 			break;
 	}
-	free(prop);
 	if (node == NULL) {
 		xml_rtn_msg(&msg, ERR_TPGT_NOT_FOUND);
+		free(prop);
 		return (msg);
+	}
+	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
+	    targ)) != NULL) {
+		if ((lnode = tgt_node_next(targ, XML_ELEMENT_TPGTLIST,
+		    NULL)) != NULL) {
+		lnp = NULL;
+		while ((lnp = tgt_node_next_child(lnode, XML_ELEMENT_TPGT,
+		    lnp)) != NULL)
+			if (strcmp(lnp->x_value, prop) == 0) {
+				xml_rtn_msg(&msg, ERR_TPGT_IN_USE);
+				free(prop);
+				return (msg);
+			}
+		}
 	}
 	if (tgt_find_value_str(x, XML_ELEMENT_IPADDR, &prop) == True) {
 		if (prop == NULL) {
