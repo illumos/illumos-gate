@@ -438,7 +438,7 @@ dsl_prop_set(const char *ddname, const char *propname,
  * Iterate over all properties for this dataset and return them in an nvlist.
  */
 int
-dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
+dsl_prop_get_all(objset_t *os, nvlist_t **nvp, boolean_t local)
 {
 	dsl_dataset_t *ds = os->os->os_dsl_dataset;
 	dsl_dir_t *dd = ds->ds_dir;
@@ -522,6 +522,12 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 		if (err != ENOENT)
 			break;
 		err = 0;
+		/*
+		 * If we are just after the props that have been set
+		 * locally, then we are done after the first iteration.
+		 */
+		if (local)
+			break;
 	}
 	rw_exit(&dp->dp_config_rwlock);
 

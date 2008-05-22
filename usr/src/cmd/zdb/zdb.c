@@ -1336,7 +1336,7 @@ dump_one_dir(char *dsname, void *arg)
 	objset_t *os;
 
 	error = dmu_objset_open(dsname, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	    DS_MODE_USER | DS_MODE_READONLY, &os);
 	if (error) {
 		(void) printf("Could not open %s\n", dsname);
 		return (0);
@@ -2568,7 +2568,7 @@ main(int argc, char **argv)
 	if (error == 0) {
 		if (strchr(argv[0], '/') != NULL) {
 			error = dmu_objset_open(argv[0], DMU_OST_ANY,
-			    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+			    DS_MODE_USER | DS_MODE_READONLY, &os);
 		} else {
 			error = spa_open(argv[0], &spa, FTAG);
 		}

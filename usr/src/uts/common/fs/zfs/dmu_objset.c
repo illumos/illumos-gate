@@ -265,20 +265,23 @@ static int
 dmu_objset_open_ds_os(dsl_dataset_t *ds, objset_t *os, dmu_objset_type_t type)
 {
 	objset_impl_t *osi;
-	int err;
 
 	mutex_enter(&ds->ds_opening_lock);
 	osi = dsl_dataset_get_user_ptr(ds);
 	if (osi == NULL) {
+		int err;
+
 		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
 		    ds, &ds->ds_phys->ds_bp, &osi);
-		if (err)
+		if (err) {
+			mutex_exit(&ds->ds_opening_lock);
 			return (err);
+		}
 	}
 	mutex_exit(&ds->ds_opening_lock);
 
 	os->os = osi;
-	os->os_mode = DS_MODE_NONE;
+	os->os_mode = DS_MODE_NOHOLD;
 
 	if (type != DMU_OST_ANY && type != os->os->os_phys->os_type)
 		return (EINVAL);
@@ -309,21 +312,28 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 	dsl_dataset_t *ds;
 	int err;
 
-	ASSERT(mode != DS_MODE_NONE);
+	ASSERT(DS_MODE_TYPE(mode) == DS_MODE_USER ||
+	    DS_MODE_TYPE(mode) == DS_MODE_OWNER);
 
 	os = kmem_alloc(sizeof (objset_t), KM_SLEEP);
-	err = dsl_dataset_open(name, mode, os, &ds);
+	if (DS_MODE_TYPE(mode) == DS_MODE_USER)
+		err = dsl_dataset_hold(name, os, &ds);
+	else
+		err = dsl_dataset_own(name, mode, os, &ds);
 	if (err) {
 		kmem_free(os, sizeof (objset_t));
 		return (err);
 	}
 
 	err = dmu_objset_open_ds_os(ds, os, type);
-	os->os_mode = mode;
 	if (err) {
+		if (DS_MODE_TYPE(mode) == DS_MODE_USER)
+			dsl_dataset_rele(ds, os);
+		else
+			dsl_dataset_disown(ds, os);
 		kmem_free(os, sizeof (objset_t));
-		dsl_dataset_close(ds, mode, os);
 	} else {
+		os->os_mode = mode;
 		*osp = os;
 	}
 	return (err);
@@ -332,8 +342,14 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 void
 dmu_objset_close(objset_t *os)
 {
-	if (os->os_mode != DS_MODE_NONE)
-		dsl_dataset_close(os->os->os_dsl_dataset, os->os_mode, os);
+	ASSERT(DS_MODE_TYPE(os->os_mode) == DS_MODE_USER ||
+	    DS_MODE_TYPE(os->os_mode) == DS_MODE_OWNER ||
+	    DS_MODE_TYPE(os->os_mode) == DS_MODE_NOHOLD);
+
+	if (DS_MODE_TYPE(os->os_mode) == DS_MODE_USER)
+		dsl_dataset_rele(os->os->os_dsl_dataset, os);
+	else if (DS_MODE_TYPE(os->os_mode) == DS_MODE_OWNER)
+		dsl_dataset_disown(os->os->os_dsl_dataset, os);
 	kmem_free(os, sizeof (objset_t));
 }
 
@@ -389,7 +405,7 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 		ASSERT(list_head(&osi->os_free_dnodes[i]) == NULL);
 	}
 
-	if (ds && ds->ds_phys->ds_num_children == 0) {
+	if (ds && ds->ds_phys && ds->ds_phys->ds_num_children == 0) {
 		VERIFY(0 == dsl_prop_unregister(ds, "checksum",
 		    checksum_changed_cb, osi));
 		VERIFY(0 == dsl_prop_unregister(ds, "compression",
@@ -530,8 +546,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_parent, oa->flags, cr, tx);
 
-	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds));
+	VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj, FTAG, &ds));
 	bp = dsl_dataset_get_blkptr(ds);
 	if (BP_IS_HOLE(bp)) {
 		objset_impl_t *osi;
@@ -547,7 +562,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	spa_history_internal_log(LOG_DS_CREATE, dd->dd_pool->dp_spa,
 	    tx, cr, "dataset = %llu", dsobj);
 
-	dsl_dataset_close(ds, DS_MODE_STANDARD | DS_MODE_READONLY, FTAG);
+	dsl_dataset_rele(ds, FTAG);
 }
 
 int
@@ -606,17 +621,16 @@ dmu_objset_destroy(const char *name)
 	 * but the replay log objset is modified in open context.
 	 */
 	error = dmu_objset_open(name, DMU_OST_ANY,
-	    DS_MODE_EXCLUSIVE|DS_MODE_READONLY, &os);
+	    DS_MODE_OWNER|DS_MODE_READONLY|DS_MODE_INCONSISTENT, &os);
 	if (error == 0) {
 		dsl_dataset_t *ds = os->os->os_dsl_dataset;
 		zil_destroy(dmu_objset_zil(os), B_FALSE);
 
+		error = dsl_dataset_destroy(ds, os);
 		/*
 		 * dsl_dataset_destroy() closes the ds.
-		 * os is just used as the tag after it's freed.
 		 */
 		kmem_free(os, sizeof (objset_t));
-		error = dsl_dataset_destroy(ds, os);
 	}
 
 	return (error);
@@ -633,7 +647,7 @@ dmu_objset_rollback(objset_t *os)
 
 	ds = os->os->os_dsl_dataset;
 
-	if (!dsl_dataset_tryupgrade(ds, DS_MODE_STANDARD, DS_MODE_EXCLUSIVE)) {
+	if (!dsl_dataset_tryown(ds, TRUE, os)) {
 		dmu_objset_close(os);
 		return (EBUSY);
 	}
@@ -645,7 +659,7 @@ dmu_objset_rollback(objset_t *os)
 	 * actually implicitly called dmu_objset_evict(), thus freeing
 	 * the objset_impl_t.
 	 */
-	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, os);
+	dsl_dataset_disown(ds, os);
 	kmem_free(os, sizeof (objset_t));
 	return (err);
 }
@@ -668,7 +682,6 @@ dmu_objset_snapshot_one(char *name, void *arg)
 {
 	struct snaparg *sn = arg;
 	objset_t *os;
-	dmu_objset_stats_t stat;
 	int err;
 
 	(void) strcpy(sn->failed, name);
@@ -682,15 +695,12 @@ dmu_objset_snapshot_one(char *name, void *arg)
 	    (err = zfs_secpolicy_snapshot_perms(name, CRED())))
 		return (err);
 
-	err = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_STANDARD, &os);
+	err = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_USER, &os);
 	if (err != 0)
 		return (err);
 
-	/*
-	 * If the objset is in an inconsistent state, return busy.
-	 */
-	dmu_objset_fast_stat(os, &stat);
-	if (stat.dds_inconsistent) {
+	/* If the objset is in an inconsistent state, return busy */
+	if (os->os->os_dsl_dataset->ds_phys->ds_flags & DS_FLAG_INCONSISTENT) {
 		dmu_objset_close(os);
 		return (EBUSY);
 	}
@@ -1096,7 +1106,7 @@ dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 	 */
 	if ((flags & DS_FIND_SNAPSHOTS) &&
 	    dmu_objset_open(name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os) == 0) {
+	    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
 
 		snapobj = os->os->os_dsl_dataset->ds_phys->ds_snapnames_zapobj;
 		dmu_objset_close(os);

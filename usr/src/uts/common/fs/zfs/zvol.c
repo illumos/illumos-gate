@@ -589,7 +589,7 @@ zvol_create_minor(const char *name, major_t maj)
 	uint64_t volsize;
 	minor_t minor = 0;
 	struct pathname linkpath;
-	int ds_mode = DS_MODE_PRIMARY;
+	int ds_mode = DS_MODE_OWNER;
 	vnode_t *vp = NULL;
 	char *devpath;
 	size_t devpathlen = strlen(ZVOL_FULL_DEV_DIR) + strlen(name) + 1;

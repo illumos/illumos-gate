@@ -1135,7 +1135,7 @@ ztest_destroy_cb(char *name, void *arg)
 	 * Verify that the dataset contains a directory object.
 	 */
 	error = dmu_objset_open(name, DMU_OST_OTHER,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	    DS_MODE_USER | DS_MODE_READONLY, &os);
 	ASSERT3U(error, ==, 0);
 	error = dmu_object_info(os, ZTEST_DIROBJ, doi);
 	if (error != ENOENT) {
@@ -1150,7 +1150,11 @@ ztest_destroy_cb(char *name, void *arg)
 	 * Destroy the dataset.
 	 */
 	error = dmu_objset_destroy(name);
-	ASSERT3U(error, ==, 0);
+	if (error) {
+		(void) dmu_objset_open(name, DMU_OST_OTHER,
+		    DS_MODE_USER | DS_MODE_READONLY, &os);
+		fatal(0, "dmu_objset_destroy(os=%p) = %d\n", &os, error);
+	}
 	return (0);
 }
 
@@ -1190,9 +1194,9 @@ void
 ztest_dmu_objset_create_destroy(ztest_args_t *za)
 {
 	int error;
-	objset_t *os;
+	objset_t *os, *os2;
 	char name[100];
-	int mode, basemode, expected_error;
+	int basemode, expected_error;
 	zilog_t *zilog;
 	uint64_t seq;
 	uint64_t objects;
@@ -1202,9 +1206,9 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	(void) snprintf(name, 100, "%s/%s_temp_%llu", za->za_pool, za->za_pool,
 	    (u_longlong_t)za->za_instance);
 
-	basemode = DS_MODE_LEVEL(za->za_instance);
-	if (basemode == DS_MODE_NONE)
-		basemode++;
+	basemode = DS_MODE_TYPE(za->za_instance);
+	if (basemode != DS_MODE_USER && basemode != DS_MODE_OWNER)
+		basemode = DS_MODE_USER;
 
 	/*
 	 * If this dataset exists from a previous run, process its replay log
@@ -1212,7 +1216,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	 * (invoked from ztest_destroy_cb() below) should just throw it away.
 	 */
 	if (ztest_random(2) == 0 &&
-	    dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_PRIMARY, &os) == 0) {
+	    dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_OWNER, &os) == 0) {
 		zr.zr_os = os;
 		zil_replay(os, &zr, &zr.zr_assign, ztest_replay_vector);
 		dmu_objset_close(os);
@@ -1298,21 +1302,24 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 		fatal(0, "created existing dataset, error = %d", error);
 
 	/*
-	 * Verify that multiple dataset opens are allowed, but only when
+	 * Verify that multiple dataset holds are allowed, but only when
 	 * the new access mode is compatible with the base mode.
-	 * We use a mixture of typed and typeless opens, and when the
-	 * open succeeds, verify that the discovered type is correct.
 	 */
-	for (mode = DS_MODE_STANDARD; mode < DS_MODE_LEVELS; mode++) {
-		objset_t *os2;
-		error = dmu_objset_open(name, DMU_OST_OTHER, mode, &os2);
-		expected_error = (basemode + mode < DS_MODE_LEVELS) ? 0 : EBUSY;
-		if (error != expected_error)
-			fatal(0, "dmu_objset_open('%s') = %d, expected %d",
-			    name, error, expected_error);
-		if (error == 0)
+	if (basemode == DS_MODE_OWNER) {
+		error = dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_USER,
+		    &os2);
+		if (error)
+			fatal(0, "dmu_objset_open('%s') = %d", name, error);
+		else
 			dmu_objset_close(os2);
 	}
+	error = dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_OWNER, &os2);
+	expected_error = (basemode == DS_MODE_OWNER) ? EBUSY : 0;
+	if (error != expected_error)
+		fatal(0, "dmu_objset_open('%s') = %d, expected %d",
+		    name, error, expected_error);
+	if (error == 0)
+		dmu_objset_close(os2);
 
 	zil_close(zilog);
 	dmu_objset_close(os);
@@ -3232,7 +3239,7 @@ ztest_run(char *pool)
 				    name, error);
 			}
 			error = dmu_objset_open(name, DMU_OST_OTHER,
-			    DS_MODE_STANDARD, &za[d].za_os);
+			    DS_MODE_USER, &za[d].za_os);
 			if (error)
 				fatal(0, "dmu_objset_open('%s') = %d",
 				    name, error);

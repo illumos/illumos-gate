@@ -47,6 +47,8 @@ struct dsl_pool;
 typedef void dsl_dataset_evict_func_t(struct dsl_dataset *, void *);
 
 #define	DS_FLAG_INCONSISTENT	(1ULL<<0)
+#define	DS_IS_INCONSISTENT(ds)	\
+	((ds)->ds_phys->ds_flags & DS_FLAG_INCONSISTENT)
 /*
  * NB: nopromote can not yet be set, but we want support for it in this
  * on-disk version, so that we don't need to upgrade for it later.  It
@@ -119,7 +121,13 @@ typedef struct dsl_dataset {
 	kmutex_t ds_lock;
 	void *ds_user_ptr;
 	dsl_dataset_evict_func_t *ds_user_evict_func;
-	uint64_t ds_open_refcount;
+
+	/*
+	 * ds_owner is protected by the ds_rwlock and the ds_lock
+	 */
+	krwlock_t ds_rwlock;
+	kcondvar_t ds_exclusive_cv;
+	void *ds_owner;
 
 	/* no locking; only for making guesses */
 	uint64_t ds_trysnap_txg;
@@ -140,21 +148,23 @@ typedef struct dsl_dataset {
 #define	DS_UNIQUE_IS_ACCURATE(ds)	\
 	(((ds)->ds_phys->ds_flags & DS_FLAG_UNIQUE_ACCURATE) != 0)
 
-int dsl_dataset_open_spa(spa_t *spa, const char *name, int mode,
-    void *tag, dsl_dataset_t **dsp);
-int dsl_dataset_open(const char *name, int mode, void *tag,
+int dsl_dataset_hold(const char *name, void *tag, dsl_dataset_t **dsp);
+int dsl_dataset_hold_obj(struct dsl_pool *dp, uint64_t dsobj,
+    void *tag, dsl_dataset_t **);
+int dsl_dataset_own(const char *name, int flags, void *owner,
     dsl_dataset_t **dsp);
-int dsl_dataset_open_obj(struct dsl_pool *dp, uint64_t dsobj,
-    const char *tail, int mode, void *tag, dsl_dataset_t **);
+int dsl_dataset_own_obj(struct dsl_pool *dp, uint64_t dsobj,
+    int flags, void *owner, dsl_dataset_t **);
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
-void dsl_dataset_close(dsl_dataset_t *ds, int mode, void *tag);
-void dsl_dataset_downgrade(dsl_dataset_t *ds, int oldmode, int newmode);
-boolean_t dsl_dataset_tryupgrade(dsl_dataset_t *ds, int oldmode, int newmode);
+void dsl_dataset_rele(dsl_dataset_t *ds, void *tag);
+void dsl_dataset_disown(dsl_dataset_t *ds, void *owner);
+boolean_t dsl_dataset_tryown(dsl_dataset_t *ds, boolean_t inconsistentok,
+    void *owner);
+void dsl_dataset_make_exclusive(dsl_dataset_t *ds, void *owner);
 uint64_t dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin,
     uint64_t flags, dmu_tx_t *tx);
-uint64_t dsl_dataset_create_sync(dsl_dir_t *pds,
-    const char *lastname, dsl_dataset_t *origin, uint64_t flags,
-    cred_t *, dmu_tx_t *);
+uint64_t dsl_dataset_create_sync(dsl_dir_t *pds, const char *lastname,
+    dsl_dataset_t *origin, uint64_t flags, cred_t *, dmu_tx_t *);
 int dsl_dataset_destroy(dsl_dataset_t *ds, void *tag);
 int dsl_snapshots_destroy(char *fsname, char *snapname);
 dsl_checkfunc_t dsl_dataset_destroy_check;

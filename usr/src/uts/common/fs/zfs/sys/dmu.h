@@ -136,12 +136,11 @@ void zfs_oldacl_byteswap(void *buf, size_t size);
 void zfs_acl_byteswap(void *buf, size_t size);
 void zfs_znode_byteswap(void *buf, size_t size);
 
-#define	DS_MODE_NONE		0	/* invalid, to aid debugging */
-#define	DS_MODE_STANDARD	1	/* normal access, no special needs */
-#define	DS_MODE_PRIMARY		2	/* the "main" access, e.g. a mount */
-#define	DS_MODE_EXCLUSIVE	3	/* exclusive access, e.g. to destroy */
-#define	DS_MODE_LEVELS		4
-#define	DS_MODE_LEVEL(x)	((x) & (DS_MODE_LEVELS - 1))
+#define	DS_MODE_NOHOLD		0	/* internal use only */
+#define	DS_MODE_USER		1	/* simple access, no special needs */
+#define	DS_MODE_OWNER		2	/* the "main" access, e.g. a mount */
+#define	DS_MODE_TYPE_MASK	0x3
+#define	DS_MODE_TYPE(x)		((x) & DS_MODE_TYPE_MASK)
 #define	DS_MODE_READONLY	0x8
 #define	DS_MODE_IS_READONLY(x)	((x) & DS_MODE_READONLY)
 #define	DS_MODE_INCONSISTENT	0x10

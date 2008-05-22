@@ -782,7 +782,7 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 		return (err);
 	}
 	if (dmu_objset_open(snapname, DMU_OST_ZFS,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &snap) != 0) {
+	    DS_MODE_USER | DS_MODE_READONLY, &snap) != 0) {
 		mutex_exit(&sdp->sd_lock);
 		ZFS_EXIT(zfsvfs);
 		return (ENOENT);

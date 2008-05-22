@@ -247,9 +247,8 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 		if (ds->ds_dir->dd_phys->dd_origin_obj != NULL) {
 			dsl_pool_t *dp = ds->ds_dir->dd_pool;
 			rw_enter(&dp->dp_config_rwlock, RW_READER);
-			err = dsl_dataset_open_obj(dp,
-			    ds->ds_dir->dd_phys->dd_origin_obj, NULL,
-			    DS_MODE_NONE, FTAG, &fromds);
+			err = dsl_dataset_hold_obj(dp,
+			    ds->ds_dir->dd_phys->dd_origin_obj, FTAG, &fromds);
 			rw_exit(&dp->dp_config_rwlock);
 			if (err)
 				return (err);
@@ -279,7 +278,7 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	if (fromds)
 		fromtxg = fromds->ds_phys->ds_creation_txg;
 	if (fromorigin)
-		dsl_dataset_close(fromds, DS_MODE_NONE, FTAG);
+		dsl_dataset_rele(fromds, FTAG);
 
 	ba.drr = drr;
 	ba.vp = vp;
@@ -336,8 +335,10 @@ recv_full_sync_impl(dsl_pool_t *dp, uint64_t dsobj, dmu_objset_type_t type,
 {
 	dsl_dataset_t *ds;
 
-	VERIFY(0 == dsl_dataset_open_obj(dp, dsobj, NULL,
-	    DS_MODE_EXCLUSIVE, dmu_recv_tag, &ds));
+	/* This should always work, since we just created it */
+	/* XXX - create should return an owned ds */
+	VERIFY(0 == dsl_dataset_own_obj(dp, dsobj,
+	    DS_MODE_INCONSISTENT, dmu_recv_tag, &ds));
 
 	if (type != DMU_OST_NONE) {
 		(void) dmu_objset_create_impl(dp->dp_spa,
@@ -345,8 +346,7 @@ recv_full_sync_impl(dsl_pool_t *dp, uint64_t dsobj, dmu_objset_type_t type,
 	}
 
 	spa_history_internal_log(LOG_DS_REPLAY_FULL_SYNC,
-	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
-	    ds->ds_phys->ds_dir_obj);
+	    dp->dp_spa, tx, cr, "dataset = %lld", dsobj);
 
 	return (ds);
 }
@@ -385,10 +385,8 @@ recv_full_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
+	uint64_t flags = DS_FLAG_INCONSISTENT | rbsa->dsflags;
 	uint64_t dsobj;
-	uint64_t flags = DS_FLAG_INCONSISTENT;
-
-	flags |= rbsa->dsflags;
 
 	dsobj = dsl_dataset_create_sync(dd, strrchr(rbsa->tofs, '/') + 1,
 	    rbsa->origin, flags, cr, tx);
@@ -435,10 +433,8 @@ recv_full_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsl_dataset_t *ds = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
 	dsl_dir_t *dd = ds->ds_dir;
+	uint64_t flags = DS_FLAG_INCONSISTENT | rbsa->dsflags;
 	uint64_t dsobj;
-	uint64_t flags = DS_FLAG_INCONSISTENT;
-
-	flags |= rbsa->dsflags;
 
 	/*
 	 * NB: caller must provide an extra hold on the dsl_dir_t, so it
@@ -501,21 +497,19 @@ recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	struct recvbeginsyncarg *rbsa = arg2;
 	dsl_pool_t *dp = ohds->ds_dir->dd_pool;
 	dsl_dataset_t *ods, *cds;
+	uint64_t flags = DS_FLAG_INCONSISTENT | rbsa->dsflags;
 	uint64_t dsobj;
-	uint64_t flags = DS_FLAG_INCONSISTENT;
-
-	flags |= rbsa->dsflags;
 
 	/* create the temporary clone */
-	VERIFY(0 == dsl_dataset_open_obj(dp, ohds->ds_phys->ds_prev_snap_obj,
-	    NULL, DS_MODE_STANDARD, FTAG, &ods));
+	VERIFY(0 == dsl_dataset_hold_obj(dp, ohds->ds_phys->ds_prev_snap_obj,
+	    FTAG, &ods));
 	dsobj = dsl_dataset_create_sync(ohds->ds_dir,
 	    rbsa->clonelastname, ods, flags, cr, tx);
-	dsl_dataset_close(ods, DS_MODE_STANDARD, FTAG);
+	dsl_dataset_rele(ods, FTAG);
 
 	/* open the temporary clone */
-	VERIFY(0 == dsl_dataset_open_obj(dp, dsobj, NULL,
-	    DS_MODE_EXCLUSIVE, dmu_recv_tag, &cds));
+	VERIFY(0 == dsl_dataset_own_obj(dp, dsobj,
+	    DS_MODE_INCONSISTENT, dmu_recv_tag, &cds));
 
 	/* copy the refquota from the target fs to the clone */
 	if (ohds->ds_quota > 0)
@@ -524,8 +518,7 @@ recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	rbsa->ds = cds;
 
 	spa_history_internal_log(LOG_DS_REPLAY_INC_SYNC,
-	    dp->dp_spa, tx, cr, "dataset = %lld",
-	    cds->ds_phys->ds_dir_obj);
+	    dp->dp_spa, tx, cr, "dataset = %lld", dsobj);
 }
 
 /* ARGSUSED */
@@ -539,7 +532,7 @@ recv_offline_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	spa_history_internal_log(LOG_DS_REPLAY_INC_SYNC,
 	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
-	    ds->ds_phys->ds_dir_obj);
+	    ds->ds_object);
 }
 
 /*
@@ -599,8 +592,7 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 	 */
 	if (rbsa.fromguid && !(flags & DRR_FLAG_CLONE) && !online) {
 		/* offline incremental receive */
-		err = dsl_dataset_open(tofs,
-		    DS_MODE_EXCLUSIVE, dmu_recv_tag, &ds);
+		err = dsl_dataset_own(tofs, 0, dmu_recv_tag, &ds);
 		if (err)
 			return (err);
 
@@ -612,8 +604,7 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 			if (ds->ds_prev == NULL ||
 			    ds->ds_prev->ds_phys->ds_guid !=
 			    rbsa.fromguid) {
-				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE,
-				    dmu_recv_tag);
+				dsl_dataset_disown(ds, dmu_recv_tag);
 				return (ENODEV);
 			}
 			(void) dsl_dataset_rollback(ds, DMU_OST_NONE);
@@ -621,10 +612,9 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		rbsa.force = B_FALSE;
 		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    recv_incremental_check,
-		    recv_offline_incremental_sync,
-		    ds, &rbsa, 1);
+		    recv_offline_incremental_sync, ds, &rbsa, 1);
 		if (err) {
-			dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, dmu_recv_tag);
+			dsl_dataset_disown(ds, dmu_recv_tag);
 			return (err);
 		}
 		drc->drc_logical_ds = drc->drc_real_ds = ds;
@@ -636,8 +626,7 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		    "%%%s", tosnap);
 
 		/* open the dataset we are logically receiving into */
-		err = dsl_dataset_open(tofs,
-		    DS_MODE_STANDARD, dmu_recv_tag, &ds);
+		err = dsl_dataset_hold(tofs, dmu_recv_tag, &ds);
 		if (err)
 			return (err);
 
@@ -646,7 +635,7 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		    recv_incremental_check,
 		    recv_online_incremental_sync, ds, &rbsa, 5);
 		if (err) {
-			dsl_dataset_close(ds, DS_MODE_STANDARD, dmu_recv_tag);
+			dsl_dataset_rele(ds, dmu_recv_tag);
 			return (err);
 		}
 		drc->drc_logical_ds = ds;
@@ -666,27 +655,23 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 			}
 
 			rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
-			err = dsl_dataset_open_obj(dd->dd_pool,
-			    dd->dd_phys->dd_head_dataset_obj, NULL,
-			    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT,
-			    FTAG, &ds);
+			err = dsl_dataset_own_obj(dd->dd_pool,
+			    dd->dd_phys->dd_head_dataset_obj,
+			    DS_MODE_INCONSISTENT, FTAG, &ds);
 			rw_exit(&dd->dd_pool->dp_config_rwlock);
 			if (err) {
 				dsl_dir_close(dd, FTAG);
 				return (err);
 			}
 
+			dsl_dataset_make_exclusive(ds, FTAG);
 			err = dsl_sync_task_do(dd->dd_pool,
 			    recv_full_existing_check,
 			    recv_full_existing_sync, ds, &rbsa, 5);
-			/* if successful, sync task closes the ds for us */
-			if (err)
-				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+			dsl_dataset_disown(ds, FTAG);
 		} else {
 			err = dsl_sync_task_do(dd->dd_pool, recv_full_check,
 			    recv_full_sync, dd, &rbsa, 5);
-			if (err)
-				return (err);
 		}
 		dsl_dir_close(dd, FTAG);
 		if (err)
@@ -694,10 +679,6 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		drc->drc_logical_ds = drc->drc_real_ds = rbsa.ds;
 		drc->drc_newfs = B_TRUE;
 	}
-
-	/* downgrade our hold on the ds from EXCLUSIVE to PRIMARY */
-	dsl_dataset_downgrade(drc->drc_real_ds,
-	    DS_MODE_EXCLUSIVE, DS_MODE_PRIMARY);
 
 	return (0);
 }
@@ -992,22 +973,14 @@ dmu_recv_abort_cleanup(dmu_recv_cookie_t *drc)
 		 * may be a clone) that we created
 		 */
 		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
-		if (drc->drc_real_ds != drc->drc_logical_ds) {
-			dsl_dataset_close(drc->drc_logical_ds,
-			    DS_MODE_STANDARD, dmu_recv_tag);
-		}
+		if (drc->drc_real_ds != drc->drc_logical_ds)
+			dsl_dataset_rele(drc->drc_logical_ds, dmu_recv_tag);
 	} else {
 		/*
 		 * offline incremental: rollback to most recent snapshot.
 		 */
-		int lmode = DS_MODE_PRIMARY;
-		if (dsl_dataset_tryupgrade(drc->drc_real_ds,
-		    DS_MODE_PRIMARY, DS_MODE_EXCLUSIVE)) {
-			lmode = DS_MODE_EXCLUSIVE;
-			(void) dsl_dataset_rollback(drc->drc_real_ds,
-			    DMU_OST_NONE);
-		}
-		dsl_dataset_close(drc->drc_real_ds, lmode, FTAG);
+		(void) dsl_dataset_rollback(drc->drc_real_ds, DMU_OST_NONE);
+		dsl_dataset_disown(drc->drc_real_ds, dmu_recv_tag);
 	}
 }
 
@@ -1186,64 +1159,51 @@ recv_end_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 int
 dmu_recv_end(dmu_recv_cookie_t *drc)
 {
-	int err = 0;
-	int lmode;
+	struct recvendsyncarg resa;
+	dsl_dataset_t *ds = drc->drc_logical_ds;
+	int err;
 
 	/*
 	 * XXX hack; seems the ds is still dirty and
-	 * dsl_pool_zil_clean() expects it to have a ds_user_ptr (and
-	 * zil), but clone_swap() can close it.
+	 * dsl_pool_zil_clean() expects it to have a ds_user_ptr
+	 * (and zil), but clone_swap() can close it.
 	 */
-	txg_wait_synced(drc->drc_real_ds->ds_dir->dd_pool, 0);
+	txg_wait_synced(ds->ds_dir->dd_pool, 0);
 
-	if (dsl_dataset_tryupgrade(drc->drc_real_ds,
-	    DS_MODE_PRIMARY, DS_MODE_EXCLUSIVE)) {
-		lmode = DS_MODE_EXCLUSIVE;
-	} else {
-		dmu_recv_abort_cleanup(drc);
-		return (EBUSY);
-	}
-
-	if (drc->drc_logical_ds != drc->drc_real_ds) {
-		if (err == 0 && dsl_dataset_tryupgrade(drc->drc_logical_ds,
-		    DS_MODE_STANDARD, DS_MODE_EXCLUSIVE)) {
-			lmode = DS_MODE_EXCLUSIVE;
-			err = dsl_dataset_clone_swap(drc->drc_real_ds,
-			    drc->drc_logical_ds, drc->drc_force);
+	if (ds != drc->drc_real_ds) {
+		/* we are doing an online recv */
+		if (dsl_dataset_tryown(ds, FALSE, dmu_recv_tag)) {
+			err = dsl_dataset_clone_swap(drc->drc_real_ds, ds,
+			    drc->drc_force);
+			if (err)
+				dsl_dataset_disown(ds, dmu_recv_tag);
 		} else {
-			lmode = DS_MODE_STANDARD;
 			err = EBUSY;
+			dsl_dataset_rele(ds, dmu_recv_tag);
 		}
-	}
-
-	if (err == 0) {
-		struct recvendsyncarg resa;
-
-		resa.creation_time = drc->drc_drrb->drr_creation_time;
-		resa.toguid = drc->drc_drrb->drr_toguid;
-		resa.tosnap = drc->drc_tosnap;
-
-		err = dsl_sync_task_do(drc->drc_real_ds->ds_dir->dd_pool,
-		    recv_end_check, recv_end_sync,
-		    drc->drc_logical_ds, &resa, 3);
-		if (err) {
-			if (drc->drc_newfs) {
-				ASSERT(drc->drc_logical_ds == drc->drc_real_ds);
-				(void) dsl_dataset_destroy(drc->drc_real_ds,
-				    dmu_recv_tag);
-				return (err);
-			} else {
-				(void) dsl_dataset_rollback(drc->drc_logical_ds,
-				    DMU_OST_NONE);
-			}
-		}
-	}
-
-	if (drc->drc_logical_ds != drc->drc_real_ds) {
-		/* dsl_dataset_destroy() will close the ds */
+		/* dsl_dataset_destroy() will disown the ds */
 		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
+		if (err)
+			return (err);
 	}
-	/* close the hold from dmu_recv_begin */
-	dsl_dataset_close(drc->drc_logical_ds, lmode, dmu_recv_tag);
+
+	resa.creation_time = drc->drc_drrb->drr_creation_time;
+	resa.toguid = drc->drc_drrb->drr_toguid;
+	resa.tosnap = drc->drc_tosnap;
+
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
+	    recv_end_check, recv_end_sync, ds, &resa, 3);
+	if (err) {
+		if (drc->drc_newfs) {
+			ASSERT(ds == drc->drc_real_ds);
+			(void) dsl_dataset_destroy(ds, dmu_recv_tag);
+			return (err);
+		} else {
+			(void) dsl_dataset_rollback(ds, DMU_OST_NONE);
+		}
+	}
+
+	/* release the hold from dmu_recv_begin */
+	dsl_dataset_disown(ds, dmu_recv_tag);
 	return (err);
 }

@@ -165,7 +165,7 @@ object_from_path(const char *dataset, const char *path, struct stat64 *statbuf,
 	sync();
 
 	if ((err = dmu_objset_open(dataset, DMU_OST_ZFS,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os)) != 0) {
+	    DS_MODE_USER | DS_MODE_READONLY, &os)) != 0) {
 		(void) fprintf(stderr, "cannot open dataset '%s': %s\n",
 		    dataset, strerror(err));
 		return (-1);
@@ -250,7 +250,7 @@ calculate_range(const char *dataset, err_type_t type, int level, char *range,
 	 * size.
 	 */
 	if ((err = dmu_objset_open(dataset, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os)) != 0) {
+	    DS_MODE_USER | DS_MODE_READONLY, &os)) != 0) {
 		(void) fprintf(stderr, "cannot open dataset '%s': %s\n",
 		    dataset, strerror(err));
 		goto out;

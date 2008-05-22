@@ -499,7 +499,7 @@ zil_claim(char *osname, void *txarg)
 	objset_t *os;
 	int error;
 
-	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_STANDARD, &os);
+	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
 	if (error) {
 		cmn_err(CE_WARN, "can't process intent log for %s", osname);
 		return (0);

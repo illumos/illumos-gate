@@ -201,9 +201,8 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 
 				dp = spa_get_dsl(spa);
 				rw_enter(&dp->dp_config_rwlock, RW_READER);
-				if (err = dsl_dataset_open_obj(dp,
-				    za.za_first_integer, NULL, DS_MODE_NONE,
-				    FTAG, &ds)) {
+				if (err = dsl_dataset_hold_obj(dp,
+				    za.za_first_integer, FTAG, &ds)) {
 					rw_exit(&dp->dp_config_rwlock);
 					break;
 				}
@@ -212,7 +211,7 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 				    MAXNAMELEN + strlen(MOS_DIR_NAME) + 1,
 				    KM_SLEEP);
 				dsl_dataset_name(ds, strval);
-				dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+				dsl_dataset_rele(ds, FTAG);
 				rw_exit(&dp->dp_config_rwlock);
 			} else {
 				strval = NULL;
@@ -329,7 +328,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				}
 
 				if (error = dmu_objset_open(strval, DMU_OST_ZFS,
-				    DS_MODE_STANDARD | DS_MODE_READONLY, &os))
+				    DS_MODE_USER | DS_MODE_READONLY, &os))
 					break;
 				objnum = dmu_objset_id(os);
 				dmu_objset_close(os);

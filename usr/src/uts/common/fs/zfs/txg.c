@@ -333,7 +333,7 @@ txg_sync_thread(dsl_pool_t *dp)
 		mutex_exit(&tx->tx_sync_lock);
 		start = lbolt;
 		spa_sync(dp->dp_spa, txg);
-		delta = lbolt - start;
+		delta = (lbolt - start) + 1;
 
 		written = dp->dp_space_towrite[txg & TXG_MASK];
 		dp->dp_space_towrite[txg & TXG_MASK] = 0;

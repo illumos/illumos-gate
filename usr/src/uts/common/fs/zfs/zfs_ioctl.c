@@ -176,24 +176,22 @@ zfs_check_version(const char *name, int version)
 }
 
 /*
- * zpl_check_version
+ * zpl_earlier_version
  *
- * Return non-zero if the ZPL version is less than requested version.
+ * Return TRUE if the ZPL version is less than requested version.
  */
-static int
-zpl_check_version(const char *name, int version)
+static boolean_t
+zpl_earlier_version(const char *name, int version)
 {
 	objset_t *os;
-	int rc = 1;
+	boolean_t rc = B_TRUE;
 
 	if (dmu_objset_open(name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os) == 0) {
-		uint64_t propversion;
+	    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
+		uint64_t zplversion;
 
-		if (zfs_get_zplprop(os, ZFS_PROP_VERSION,
-		    &propversion) == 0) {
-			rc = !(propversion >= version);
-		}
+		if (zfs_get_zplprop(os, ZFS_PROP_VERSION, &zplversion) == 0)
+			rc = zplversion < version;
 		dmu_objset_close(os);
 	}
 	return (rc);
@@ -494,7 +492,7 @@ zfs_secpolicy_promote(zfs_cmd_t *zc, cred_t *cr)
 		return (error);
 
 	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &clone);
+	    DS_MODE_USER | DS_MODE_READONLY, &clone);
 
 	if (error == 0) {
 		dsl_dataset_t *pclone = NULL;
@@ -502,9 +500,8 @@ zfs_secpolicy_promote(zfs_cmd_t *zc, cred_t *cr)
 		dd = clone->os->os_dsl_dataset->ds_dir;
 
 		rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
-		error = dsl_dataset_open_obj(dd->dd_pool,
-		    dd->dd_phys->dd_origin_obj, NULL,
-		    DS_MODE_NONE, FTAG, &pclone);
+		error = dsl_dataset_hold_obj(dd->dd_pool,
+		    dd->dd_phys->dd_origin_obj, FTAG, &pclone);
 		rw_exit(&dd->dd_pool->dp_config_rwlock);
 		if (error) {
 			dmu_objset_close(clone);
@@ -516,7 +513,7 @@ zfs_secpolicy_promote(zfs_cmd_t *zc, cred_t *cr)
 
 		dsl_dataset_name(pclone, parentname);
 		dmu_objset_close(clone);
-		dsl_dataset_close(pclone, DS_MODE_NONE, FTAG);
+		dsl_dataset_rele(pclone, FTAG);
 		if (error == 0)
 			error = zfs_secpolicy_write_perms(parentname,
 			    ZFS_DELEG_PERM_PROMOTE, cr);
@@ -972,9 +969,8 @@ zfs_ioc_obj_to_path(zfs_cmd_t *zc)
 	int error;
 
 	if ((error = dmu_objset_open(zc->zc_name, DMU_OST_ZFS,
-	    DS_MODE_NONE | DS_MODE_READONLY, &osp)) != 0)
+	    DS_MODE_USER | DS_MODE_READONLY, &osp)) != 0)
 		return (error);
-
 	error = zfs_obj_to_path(osp, zc->zc_obj, zc->zc_value,
 	    sizeof (zc->zc_value));
 	dmu_objset_close(osp);
@@ -1126,30 +1122,6 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 	return (error);
 }
 
-static int
-zfs_os_open_retry(char *name, objset_t **os)
-{
-	int error;
-
-retry:
-	error = dmu_objset_open(name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, os);
-	if (error != 0) {
-		/*
-		 * This is ugly: dmu_objset_open() can return EBUSY if
-		 * the objset is held exclusively. Fortunately this hold is
-		 * only for a short while, so we retry here.
-		 * This avoids user code having to handle EBUSY,
-		 * for example for a "zfs list".
-		 */
-		if (error == EBUSY) {
-			delay(1);
-			goto retry;
-		}
-	}
-	return (error);
-}
-
 /*
  * inputs:
  * zc_name		name of filesystem
@@ -1168,18 +1140,19 @@ zfs_ioc_objset_stats(zfs_cmd_t *zc)
 	int error;
 	nvlist_t *nv;
 
-	if ((error = zfs_os_open_retry(zc->zc_name, &os)) != 0)
+	if (error = dmu_objset_open(zc->zc_name,
+	    DMU_OST_ANY, DS_MODE_USER | DS_MODE_READONLY, &os))
 		return (error);
 
 	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
 
 	if (zc->zc_nvlist_dst != 0 &&
-	    (error = dsl_prop_get_all(os, &nv)) == 0) {
+	    (error = dsl_prop_get_all(os, &nv, FALSE)) == 0) {
 		dmu_objset_stats(os, nv);
 		/*
 		 * NB: zvol_get_stats() will read the objset contents,
 		 * which we aren't supposed to do with a
-		 * DS_MODE_STANDARD open, because it could be
+		 * DS_MODE_USER hold, because it could be
 		 * inconsistent.  So this is a bit of a workaround...
 		 */
 		if (!zc->zc_objset_stats.dds_inconsistent) {
@@ -1227,15 +1200,16 @@ zfs_ioc_objset_zplprops(zfs_cmd_t *zc)
 	objset_t *os;
 	int err;
 
-	if ((err = zfs_os_open_retry(zc->zc_name, &os)) != 0)
+	if (err = dmu_objset_open(zc->zc_name,
+	    DMU_OST_ANY, DS_MODE_USER | DS_MODE_READONLY, &os))
 		return (err);
 
 	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
 
 	/*
 	 * NB: nvl_add_zplprop() will read the objset contents,
-	 * which we aren't supposed to do with a DS_MODE_STANDARD
-	 * open, because it could be inconsistent.
+	 * which we aren't supposed to do with a DS_MODE_USER
+	 * hold, because it could be inconsistent.
 	 */
 	if (zc->zc_nvlist_dst != NULL &&
 	    !zc->zc_objset_stats.dds_inconsistent &&
@@ -1276,7 +1250,8 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 	int error;
 	char *p;
 
-	if ((error = zfs_os_open_retry(zc->zc_name, &os)) != 0) {
+	if (error = dmu_objset_open(zc->zc_name,
+	    DMU_OST_ANY, DS_MODE_USER | DS_MODE_READONLY, &os)) {
 		if (error == ENOENT)
 			error = ESRCH;
 		return (error);
@@ -1295,6 +1270,7 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 			error = ESRCH;
 	} while (error == 0 && !INGLOBALZONE(curproc) &&
 	    !zone_dataset_visible(zc->zc_name, NULL));
+	dmu_objset_close(os);
 
 	/*
 	 * If it's a hidden dataset (ie. with a '$' in its name), don't
@@ -1303,7 +1279,6 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 	if (error == 0 && strchr(zc->zc_name, '$') == NULL)
 		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
 
-	dmu_objset_close(os);
 	return (error);
 }
 
@@ -1326,11 +1301,10 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	objset_t *os;
 	int error;
 
-	if ((error = zfs_os_open_retry(zc->zc_name, &os)) != 0) {
-		if (error == ENOENT)
-			error = ESRCH;
-		return (error);
-	}
+	error = dmu_objset_open(zc->zc_name,
+	    DMU_OST_ANY, DS_MODE_USER | DS_MODE_READONLY, &os);
+	if (error)
+		return (error == ENOENT ? ESRCH : error);
 
 	/*
 	 * A dataset name of maximum length cannot have any snapshots,
@@ -1344,17 +1318,15 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	error = dmu_snapshot_list_next(os,
 	    sizeof (zc->zc_name) - strlen(zc->zc_name),
 	    zc->zc_name + strlen(zc->zc_name), NULL, &zc->zc_cookie, NULL);
-	if (error == ENOENT)
-		error = ESRCH;
-
+	dmu_objset_close(os);
 	if (error == 0)
 		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
+	else if (error == ENOENT)
+		error = ESRCH;
 
 	/* if we failed, undo the @ that we tacked on to zc_name */
-	if (error != 0)
+	if (error)
 		*strchr(zc->zc_name, '@') = '\0';
-
-	dmu_objset_close(os);
 	return (error);
 }
 
@@ -1418,7 +1390,7 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 			break;
 
 		case ZFS_PROP_SHARESMB:
-			if (zpl_check_version(name, ZPL_VERSION_FUID))
+			if (zpl_earlier_version(name, ZPL_VERSION_FUID))
 				return (ENOTSUP);
 			break;
 		}
@@ -1871,7 +1843,8 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 	 * Open parent object set so we can inherit zplprop values if
 	 * necessary.
 	 */
-	if ((error = zfs_os_open_retry(parentname, &os)) != 0)
+	if (error = dmu_objset_open(parentname,
+	    DMU_OST_ANY, DS_MODE_USER | DS_MODE_READONLY, &os))
 		return (error);
 
 	if (norm == ZFS_PROP_UNDEFINED)
@@ -1957,7 +1930,7 @@ zfs_ioc_create(zfs_cmd_t *zc)
 		}
 
 		error = dmu_objset_open(zc->zc_value, type,
-		    DS_MODE_STANDARD | DS_MODE_READONLY, &clone);
+		    DS_MODE_USER | DS_MODE_READONLY, &clone);
 		if (error) {
 			nvlist_free(nvprops);
 			return (error);
@@ -2091,21 +2064,18 @@ zfs_ioc_snapshot(zfs_cmd_t *zc)
 int
 zfs_unmount_snap(char *name, void *arg)
 {
-	char *snapname = arg;
-	char *cp;
 	vfs_t *vfsp = NULL;
 
-	/*
-	 * Snapshots (which are under .zfs control) must be unmounted
-	 * before they can be destroyed.
-	 */
+	if (arg) {
+		char *snapname = arg;
+		int len = strlen(name) + strlen(snapname) + 2;
+		char *buf = kmem_alloc(len, KM_SLEEP);
 
-	if (snapname) {
-		(void) strcat(name, "@");
-		(void) strcat(name, snapname);
-		vfsp = zfs_get_vfs(name);
-		cp = strchr(name, '@');
-		*cp = '\0';
+		(void) strcpy(buf, name);
+		(void) strcat(buf, "@");
+		(void) strcat(buf, snapname);
+		vfsp = zfs_get_vfs(buf);
+		kmem_free(buf, len);
 	} else if (strchr(name, '@')) {
 		vfsp = zfs_get_vfs(name);
 	}
@@ -2186,8 +2156,7 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 	 * won't be one if we're operating on a zvol, if the
 	 * objset doesn't exist yet, or is not mounted.
 	 */
-	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD, &os);
+	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY, DS_MODE_USER, &os);
 	if (error)
 		return (error);
 
@@ -2218,7 +2187,7 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 	} else {
 		error = dmu_objset_rollback(os);
 	}
-	/* Note, the dmu_objset_rollback() closes the objset for us. */
+	/* Note, the dmu_objset_rollback() releases the objset for us. */
 
 	return (error);
 }
@@ -2252,8 +2221,26 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 		if (err)
 			return (err);
 	}
-
 	return (dmu_objset_rename(zc->zc_name, zc->zc_value, recursive));
+}
+
+static void
+clear_props(char *dataset, nvlist_t *props)
+{
+	zfs_cmd_t *zc;
+	nvpair_t *prop;
+
+	if (props == NULL)
+		return;
+	zc = kmem_alloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	(void) strcpy(zc->zc_name, dataset);
+	for (prop = nvlist_next_nvpair(props, NULL); prop;
+	    prop = nvlist_next_nvpair(props, prop)) {
+		(void) strcpy(zc->zc_value, nvpair_name(prop));
+		if (zfs_secpolicy_inherit(zc, CRED()) == 0)
+			(void) zfs_ioc_inherit_prop(zc);
+	}
+	kmem_free(zc, sizeof (zfs_cmd_t));
 }
 
 /*
@@ -2280,6 +2267,7 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	int error, fd;
 	offset_t off;
 	nvlist_t *props = NULL;
+	nvlist_t *origprops = NULL;
 	objset_t *origin = NULL;
 	char *tosnap;
 	char tofs[ZFS_MAXNAMELEN];
@@ -2306,133 +2294,102 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		return (EBADF);
 	}
 
-	/*
-	 * Get the zfsvfs for the receiving objset. There
-	 * won't be one if we're operating on a zvol, if the
-	 * objset doesn't exist yet, or is not mounted.
-	 */
-
-	error = dmu_objset_open(tofs, DMU_OST_ZFS,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-	if (!error) {
+	if (dmu_objset_open(tofs, DMU_OST_ANY,
+	    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
+		/*
+		 * Try to get the zfsvfs for the receiving objset.
+		 * There won't be one if we're operating on a zvol,
+		 * if the objset doesn't exist yet, or is not mounted.
+		 */
 		mutex_enter(&os->os->os_user_ptr_lock);
-		zfsvfs = dmu_objset_get_user(os);
-		if (zfsvfs != NULL) {
-			VFS_HOLD(zfsvfs->z_vfs);
-			mutex_exit(&os->os->os_user_ptr_lock);
+		if (zfsvfs = dmu_objset_get_user(os)) {
 			if (!mutex_tryenter(&zfsvfs->z_online_recv_lock)) {
-				VFS_RELE(zfsvfs->z_vfs);
+				mutex_exit(&os->os->os_user_ptr_lock);
 				dmu_objset_close(os);
-				nvlist_free(props);
-				releasef(fd);
-				return (EBUSY);
+				zfsvfs = NULL;
+				error = EBUSY;
+				goto out;
 			}
-		} else {
-			mutex_exit(&os->os->os_user_ptr_lock);
+			VFS_HOLD(zfsvfs->z_vfs);
 		}
+		mutex_exit(&os->os->os_user_ptr_lock);
+
+		/*
+		 * If new properties are supplied, they are to completely
+		 * replace the existing ones, so stash away the existing ones.
+		 */
+		if (props)
+			(void) dsl_prop_get_all(os, &origprops, TRUE);
+
 		dmu_objset_close(os);
 	}
 
 	if (zc->zc_string[0]) {
 		error = dmu_objset_open(zc->zc_string, DMU_OST_ANY,
-		    DS_MODE_STANDARD | DS_MODE_READONLY, &origin);
-		if (error) {
-			if (zfsvfs != NULL) {
-				mutex_exit(&zfsvfs->z_online_recv_lock);
-				VFS_RELE(zfsvfs->z_vfs);
-			}
-			nvlist_free(props);
-			releasef(fd);
-			return (error);
-		}
+		    DS_MODE_USER | DS_MODE_READONLY, &origin);
+		if (error)
+			goto out;
 	}
 
 	error = dmu_recv_begin(tofs, tosnap, &zc->zc_begin_record,
 	    force, origin, zfsvfs != NULL, &drc);
 	if (origin)
 		dmu_objset_close(origin);
-	if (error) {
-		if (zfsvfs != NULL) {
-			mutex_exit(&zfsvfs->z_online_recv_lock);
-			VFS_RELE(zfsvfs->z_vfs);
-		}
-		nvlist_free(props);
-		releasef(fd);
-		return (error);
-	}
+	if (error)
+		goto out;
 
 	/*
-	 * If properties are supplied, they are to completely replace
-	 * the existing ones; "inherit" any existing properties.
+	 * Reset properties.  We do this before we receive the stream
+	 * so that the properties are applied to the new data.
 	 */
 	if (props) {
-		objset_t *os;
-		nvlist_t *nv = NULL;
-
-		error = dmu_objset_open(tofs, DMU_OST_ANY,
-		    DS_MODE_STANDARD | DS_MODE_READONLY | DS_MODE_INCONSISTENT,
-		    &os);
-		if (error == 0) {
-			error = dsl_prop_get_all(os, &nv);
-			dmu_objset_close(os);
-		}
-		if (error == 0) {
-			nvpair_t *elem;
-			zfs_cmd_t *zc2;
-			zc2 = kmem_alloc(sizeof (zfs_cmd_t), KM_SLEEP);
-
-			(void) strcpy(zc2->zc_name, tofs);
-			for (elem = nvlist_next_nvpair(nv, NULL); elem;
-			    elem = nvlist_next_nvpair(nv, elem)) {
-				(void) strcpy(zc2->zc_value, nvpair_name(elem));
-				if (zfs_secpolicy_inherit(zc2, CRED()) == 0)
-					(void) zfs_ioc_inherit_prop(zc2);
-			}
-			kmem_free(zc2, sizeof (zfs_cmd_t));
-		}
-		if (nv)
-			nvlist_free(nv);
+		clear_props(tofs, origprops);
+		/*
+		 * XXX - Note, this is all-or-nothing; should be best-effort.
+		 */
+		(void) zfs_set_prop_nvlist(tofs, props);
 	}
-
-	/*
-	 * Set properties.  Note, we ignore errors.  Would be better to
-	 * do best-effort in zfs_set_prop_nvlist, too.
-	 */
-	(void) zfs_set_prop_nvlist(tofs, props);
-	nvlist_free(props);
 
 	off = fp->f_offset;
 	error = dmu_recv_stream(&drc, fp->f_vnode, &off);
 
-	if (error == 0) {
-		if (zfsvfs != NULL) {
-			char osname[MAXNAMELEN];
-			int mode;
+	if (error == 0 && zfsvfs) {
+		char osname[MAXNAMELEN];
+		int mode;
 
-			error = zfs_suspend_fs(zfsvfs, osname, &mode);
-			if (error == 0) {
-				int resume_err;
+		/* online recv */
+		error = zfs_suspend_fs(zfsvfs, osname, &mode);
+		if (error == 0) {
+			int resume_err;
 
-				error = dmu_recv_end(&drc);
-				resume_err = zfs_resume_fs(zfsvfs,
-				    osname, mode);
-				error = error ? error : resume_err;
-			} else {
-				dmu_recv_abort_cleanup(&drc);
-			}
-		} else {
 			error = dmu_recv_end(&drc);
+			resume_err = zfs_resume_fs(zfsvfs, osname, mode);
+			error = error ? error : resume_err;
+		} else {
+			dmu_recv_abort_cleanup(&drc);
 		}
-	}
-	if (zfsvfs != NULL) {
-		mutex_exit(&zfsvfs->z_online_recv_lock);
-		VFS_RELE(zfsvfs->z_vfs);
+	} else if (error == 0) {
+		error = dmu_recv_end(&drc);
 	}
 
 	zc->zc_cookie = off - fp->f_offset;
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;
 
+	/*
+	 * On error, restore the original props.
+	 */
+	if (error && props) {
+		clear_props(tofs, props);
+		(void) zfs_set_prop_nvlist(tofs, origprops);
+	}
+out:
+	if (zfsvfs) {
+		mutex_exit(&zfsvfs->z_online_recv_lock);
+		VFS_RELE(zfsvfs->z_vfs);
+	}
+	nvlist_free(props);
+	nvlist_free(origprops);
 	releasef(fd);
 	return (error);
 }
@@ -2456,7 +2413,7 @@ zfs_ioc_send(zfs_cmd_t *zc)
 	offset_t off;
 
 	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &tosnap);
+	    DS_MODE_USER | DS_MODE_READONLY, &tosnap);
 	if (error)
 		return (error);
 
@@ -2470,7 +2427,7 @@ zfs_ioc_send(zfs_cmd_t *zc)
 			*(cp+1) = 0;
 		(void) strncat(buf, zc->zc_value, sizeof (buf));
 		error = dmu_objset_open(buf, DMU_OST_ANY,
-		    DS_MODE_STANDARD | DS_MODE_READONLY, &fromsnap);
+		    DS_MODE_USER | DS_MODE_READONLY, &fromsnap);
 		if (error) {
 			dmu_objset_close(tosnap);
 			return (error);

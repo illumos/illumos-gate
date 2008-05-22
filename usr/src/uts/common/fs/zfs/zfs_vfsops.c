@@ -693,14 +693,13 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	if (error = dsl_prop_get_integer(osname, "readonly", &readonly, NULL))
 		goto out;
 
+	mode = DS_MODE_OWNER;
 	if (readonly)
-		mode = DS_MODE_PRIMARY | DS_MODE_READONLY;
-	else
-		mode = DS_MODE_PRIMARY;
+		mode |= DS_MODE_READONLY;
 
 	error = dmu_objset_open(osname, DMU_OST_ZFS, mode, &zfsvfs->z_os);
 	if (error == EROFS) {
-		mode = DS_MODE_PRIMARY | DS_MODE_READONLY;
+		mode = DS_MODE_OWNER | DS_MODE_READONLY;
 		error = dmu_objset_open(osname, DMU_OST_ZFS, mode,
 		    &zfsvfs->z_os);
 	}
@@ -1311,7 +1310,7 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		mutex_exit(&os->os->os_user_ptr_lock);
 
 		/*
-		 * Finally close the objset
+		 * Finally release the objset
 		 */
 		dmu_objset_close(os);
 	}
@@ -1580,7 +1579,7 @@ zfs_set_version(const char *name, uint64_t newvers)
 	if (newvers < ZPL_VERSION_INITIAL || newvers > ZPL_VERSION)
 		return (EINVAL);
 
-	error = dmu_objset_open(name, DMU_OST_ZFS, DS_MODE_PRIMARY, &os);
+	error = dmu_objset_open(name, DMU_OST_ZFS, DS_MODE_OWNER, &os);
 	if (error)
 		return (error);
 

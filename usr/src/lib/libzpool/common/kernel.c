@@ -186,9 +186,9 @@ rw_enter(krwlock_t *rwlp, krw_t rw)
 	ASSERT(rwlp->rw_owner != curthread);
 
 	if (rw == RW_READER)
-		(void) rw_rdlock(&rwlp->rw_lock);
+		VERIFY(rw_rdlock(&rwlp->rw_lock) == 0);
 	else
-		(void) rw_wrlock(&rwlp->rw_lock);
+		VERIFY(rw_wrlock(&rwlp->rw_lock) == 0);
 
 	rwlp->rw_owner = curthread;
 }
@@ -200,7 +200,7 @@ rw_exit(krwlock_t *rwlp)
 	ASSERT(rwlp->rw_owner != (void *)-1UL);
 
 	rwlp->rw_owner = NULL;
-	(void) rw_unlock(&rwlp->rw_lock);
+	VERIFY(rw_unlock(&rwlp->rw_lock) == 0);
 }
 
 int
