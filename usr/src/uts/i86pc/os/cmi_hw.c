@@ -919,7 +919,13 @@ cmi_hdl_t
 cmi_hdl_lookup(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
     uint_t strandid)
 {
-	int idx = CMI_HDL_ARR_IDX(chipid, coreid, strandid);
+	int idx;
+
+	if (chipid > CMI_MAX_CHIPS - 1 || coreid > CMI_MAX_CORES_PER_CHIP - 1 ||
+	    strandid > CMI_MAX_STRANDS_PER_CORE - 1)
+		return (NULL);
+
+	idx = CMI_HDL_ARR_IDX(chipid, coreid, strandid);
 
 	if (!cmi_hdl_canref(idx))
 		return (NULL);
