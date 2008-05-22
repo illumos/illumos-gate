@@ -28,6 +28,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -38,11 +42,7 @@
 #include <sys/devops.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
-#include <sys/priv.h>
-#include <sys/policy.h>
-#include <sys/cred.h>
 #include <sys/cmn_err.h>
-#include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <sys/kmem.h>
 #include <sys/time.h>
@@ -121,7 +121,10 @@ static mblk_t	*afe_m_tx(void *, mblk_t *);
 static int	afe_m_stat(void *, uint_t, uint64_t *);
 static int	afe_m_start(void *);
 static void	afe_m_stop(void *);
-static void	afe_m_ioctl(void *, queue_t *, mblk_t *);
+static int	afe_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    uint_t, void *);
+static int	afe_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
 static unsigned	afe_intr(caddr_t);
 static void	afe_startmac(afe_t *);
 static void	afe_stopmac(afe_t *);
@@ -145,14 +148,14 @@ static uint8_t	afe_sromwidth(afe_t *);
 static uint16_t	afe_readsromword(afe_t *, unsigned);
 static void	afe_readsrom(afe_t *, unsigned, unsigned, char *);
 static void	afe_getfactaddr(afe_t *, uchar_t *);
-static int	afe_miireadbit(afe_t *);
-static void	afe_miiwritebit(afe_t *, int);
+static uint8_t	afe_miireadbit(afe_t *);
+static void	afe_miiwritebit(afe_t *, uint8_t);
 static void	afe_miitristate(afe_t *);
-static unsigned	afe_miiread(afe_t *, int, int);
+static uint16_t	afe_miiread(afe_t *, int, int);
 static void	afe_miiwrite(afe_t *, int, int, uint16_t);
-static unsigned	afe_miireadgeneral(afe_t *, int, int);
+static uint16_t	afe_miireadgeneral(afe_t *, int, int);
 static void	afe_miiwritegeneral(afe_t *, int, int, uint16_t);
-static unsigned	afe_miireadcomet(afe_t *, int, int);
+static uint16_t	afe_miireadcomet(afe_t *, int, int);
 static void	afe_miiwritecomet(afe_t *, int, int, uint16_t);
 static int	afe_getmiibit(afe_t *, uint16_t, uint16_t);
 static void	afe_startphy(afe_t *);
@@ -166,23 +169,6 @@ static void	afe_disableinterrupts(afe_t *);
 static void	afe_enableinterrupts(afe_t *);
 static void	afe_reclaim(afe_t *);
 static mblk_t	*afe_receive(afe_t *);
-static int	afe_ndaddbytes(mblk_t *, char *, int);
-static int	afe_ndaddstr(mblk_t *, char *, int);
-static void	afe_ndparsestring(mblk_t *, char *, int);
-static int	afe_ndparselen(mblk_t *);
-static int	afe_ndparseint(mblk_t *);
-static void	afe_ndget(afe_t *, queue_t *, mblk_t *);
-static void	afe_ndset(afe_t *, queue_t *, mblk_t *);
-static void	afe_ndfini(afe_t *);
-static void	afe_ndinit(afe_t *);
-static int	afe_ndquestion(afe_t *, mblk_t *, afe_nd_t *);
-static int	afe_ndgetint(afe_t *, mblk_t *, afe_nd_t *);
-static int	afe_ndgetmiibit(afe_t *, mblk_t *, afe_nd_t *);
-static int	afe_ndsetadv(afe_t *, mblk_t *, afe_nd_t *);
-static afe_nd_t *afe_ndfind(afe_t *, char *);
-static void	afe_ndempty(mblk_t *);
-static void	afe_ndadd(afe_t *, char *, afe_nd_pf_t, afe_nd_pf_t,
-    intptr_t, intptr_t);
 
 #ifdef	DEBUG
 static void	afe_dprintf(afe_t *, const char *, int, char *, ...);
@@ -191,7 +177,7 @@ static void	afe_dprintf(afe_t *, const char *, int, char *, ...);
 #define	KIOIP	KSTAT_INTR_PTR(afep->afe_intrstat)
 
 static mac_callbacks_t afe_m_callbacks = {
-	MC_IOCTL,
+	MC_SETPROP | MC_GETPROP,
 	afe_m_stat,
 	afe_m_start,
 	afe_m_stop,
@@ -199,9 +185,13 @@ static mac_callbacks_t afe_m_callbacks = {
 	afe_m_multicst,
 	afe_m_unicst,
 	afe_m_tx,
-	NULL,
-	afe_m_ioctl,
-	NULL,		/* m_getcapab */
+	NULL,		/* mc_resources */
+	NULL,		/* mc_ioctl */
+	NULL,		/* mc_getcapab */
+	NULL,		/* mc_open */
+	NULL,		/* mc_close */
+	afe_m_setprop,
+	afe_m_getprop,
 };
 
 
@@ -428,17 +418,17 @@ afe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	afep->afe_cachesize = cachesize;
 
 	/* default properties */
-	afep->afe_adv_aneg = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	afep->afe_adv_aneg = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "adv_autoneg_cap", 1);
-	afep->afe_adv_100T4 = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	afep->afe_adv_100T4 = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "adv_100T4_cap", 1);
-	afep->afe_adv_100fdx = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	afep->afe_adv_100fdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "adv_100fdx_cap", 1);
-	afep->afe_adv_100hdx = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	afep->afe_adv_100hdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "adv_100hdx_cap", 1);
-	afep->afe_adv_10fdx = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	afep->afe_adv_10fdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "adv_10fdx_cap", 1);
-	afep->afe_adv_10hdx = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	afep->afe_adv_10hdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "adv_10hdx_cap", 1);
 
 	afep->afe_forcefiber = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
@@ -452,8 +442,6 @@ afe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mutex_init(&afep->afe_xmtlock, NULL, MUTEX_DRIVER, afep->afe_icookie);
 	mutex_init(&afep->afe_intrlock, NULL, MUTEX_DRIVER, afep->afe_icookie);
-
-	afe_ndinit(afep);
 
 	/*
 	 * Enable bus master, IO space, and memory space accesses.
@@ -559,7 +547,6 @@ failed:
 	if (afep->afe_intrstat) {
 		kstat_delete(afep->afe_intrstat);
 	}
-	afe_ndfini(afep);
 	mutex_destroy(&afep->afe_intrlock);
 	mutex_destroy(&afep->afe_xmtlock);
 
@@ -611,7 +598,6 @@ afe_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		afe_freerxring(afep);
 		afe_freetxring(afep);
 
-		afe_ndfini(afep);
 		ddi_regs_map_free(&afep->afe_regshandle);
 		mutex_destroy(&afep->afe_intrlock);
 		mutex_destroy(&afep->afe_xmtlock);
@@ -666,27 +652,6 @@ afe_resume(dev_info_t *dip)
 	mutex_exit(&afep->afe_intrlock);
 
 	return (DDI_SUCCESS);
-}
-
-void
-afe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
-{
-	afe_t *afep = arg;
-
-	switch (*(int *)(void *)(mp->b_rptr)) {
-
-	case NDIOC_GET:
-		afe_ndget(afep, wq, mp);
-		break;
-
-	case NDIOC_SET:
-		afe_ndset(afep, wq, mp);
-		break;
-
-	default:
-		miocnak(wq, mp, 0, EINVAL);
-		break;
-	}
 }
 
 void
@@ -1077,7 +1042,6 @@ afe_startphy(afe_t *afep)
 	unsigned	phyidr2;
 	unsigned	nosqe = 0;
 	int		retries;
-	int		force;
 	int		fiber;
 	int		cnt;
 
@@ -1135,7 +1099,6 @@ afe_startphy(afe_t *afep)
 	    MII_ABILITY_100BASE_TX_FD | MII_ABILITY_100BASE_TX |
 	    MII_ABILITY_10BASE_T_FD | MII_ABILITY_10BASE_T);
 
-	force = 0;
 	fiber = 0;
 
 	/* if fiber is being forced, and device supports fiber... */
@@ -1154,7 +1117,6 @@ afe_startphy(afe_t *afep)
 			break;
 		case 1:
 			/* Fiber Port */
-			force = 1;
 			DBG(DPHY, "forcing 100BaseFX");
 			mcr |= MCR_FIBER;
 			bmcr = (MII_CONTROL_100MB | MII_CONTROL_FDUPLEX);
@@ -1194,25 +1156,35 @@ afe_startphy(afe_t *afep)
 		bmsr |= MII_STATUS_100_BASEX_FD;
 	}
 
+	/* assume full support for everything to start */
+	afep->afe_cap_aneg = afep->afe_cap_100T4 =
+	    afep->afe_cap_100fdx = afep->afe_cap_100hdx =
+	    afep->afe_cap_10fdx = afep->afe_cap_10hdx = 1;
+
 	/* disable modes not supported in hardware */
 	if (!(bmsr & MII_STATUS_100_BASEX_FD)) {
 		afep->afe_adv_100fdx = 0;
+		afep->afe_cap_100fdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_100_BASE_T4)) {
 		afep->afe_adv_100T4 = 0;
+		afep->afe_cap_100T4 = 0;
 	}
 	if (!(bmsr & MII_STATUS_100_BASEX)) {
 		afep->afe_adv_100hdx = 0;
+		afep->afe_cap_100hdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_10_FD)) {
 		afep->afe_adv_10fdx = 0;
+		afep->afe_cap_10fdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_10)) {
 		afep->afe_adv_10hdx = 0;
+		afep->afe_cap_10hdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_CANAUTONEG)) {
 		afep->afe_adv_aneg = 0;
-		force = 1;
+		afep->afe_cap_aneg = 0;
 	}
 
 	cnt = 0;
@@ -1257,7 +1229,6 @@ afe_startphy(afe_t *afep)
 		bmcr = (MII_CONTROL_ANE | MII_CONTROL_RSAN);
 	} else {
 		DBG(DPHY, "using forced mode");
-		force = 1;
 		if (afep->afe_adv_100fdx) {
 			bmcr = (MII_CONTROL_100MB | MII_CONTROL_FDUPLEX);
 		} else if (afep->afe_adv_100hdx) {
@@ -1269,8 +1240,6 @@ afe_startphy(afe_t *afep)
 			bmcr = 0;
 		}
 	}
-
-	afep->afe_forcephy = force;
 
 	DBG(DPHY, "programming anar to 0x%x", anar);
 	afe_miiwrite(afep, phyaddr, MII_AN_ADVERT, anar);
@@ -1461,7 +1430,7 @@ afe_checklinkmii(afe_t *afep)
 	}
 	if ((bmsr & MII_STATUS_LINKUP) == 0) {
 		/* no link */
-		if (afep->afe_linkup) {
+		if (afep->afe_linkup == LINK_STATE_UP) {
 			reinit = 1;
 		}
 		afep->afe_ifspeed = 0;
@@ -1519,7 +1488,8 @@ afe_checklinkmii(afe_t *afep)
 void
 afe_miitristate(afe_t *afep)
 {
-	unsigned val = SPR_SROM_WRITE | SPR_MII_CTRL;
+	uint32_t val = SPR_SROM_WRITE | SPR_MII_CTRL;
+
 	PUTCSR(afep, CSR_SPR, val);
 	drv_usecwait(1);
 	PUTCSR(afep, CSR_SPR, val | SPR_MII_CLOCK);
@@ -1527,20 +1497,22 @@ afe_miitristate(afe_t *afep)
 }
 
 void
-afe_miiwritebit(afe_t *afep, int bit)
+afe_miiwritebit(afe_t *afep, uint8_t bit)
 {
-	unsigned val = bit ? SPR_MII_DOUT : 0;
+	uint32_t val = bit ? SPR_MII_DOUT : 0;
+
 	PUTCSR(afep, CSR_SPR, val);
 	drv_usecwait(1);
 	PUTCSR(afep, CSR_SPR, val | SPR_MII_CLOCK);
 	drv_usecwait(1);
 }
 
-int
+uint8_t
 afe_miireadbit(afe_t *afep)
 {
-	unsigned val = SPR_MII_CTRL | SPR_SROM_READ;
-	int bit;
+	uint32_t	val = SPR_MII_CTRL | SPR_SROM_READ;
+	uint8_t		bit;
+
 	PUTCSR(afep, CSR_SPR, val);
 	drv_usecwait(1);
 	bit = (GETCSR(afep, CSR_SPR) & SPR_MII_DIN) ? 1 : 0;
@@ -1549,7 +1521,7 @@ afe_miireadbit(afe_t *afep)
 	return (bit);
 }
 
-unsigned
+uint16_t
 afe_miiread(afe_t *afep, int phy, int reg)
 {
 	/*
@@ -1568,10 +1540,10 @@ afe_miiread(afe_t *afep, int phy, int reg)
 	return (0xffff);
 }
 
-unsigned
+uint16_t
 afe_miireadgeneral(afe_t *afep, int phy, int reg)
 {
-	unsigned	value = 0;
+	uint16_t	value = 0;
 	int		i;
 
 	/* send the 32 bit preamble */
@@ -1610,7 +1582,7 @@ afe_miireadgeneral(afe_t *afep, int phy, int reg)
 	return (value);
 }
 
-unsigned
+uint16_t
 afe_miireadcomet(afe_t *afep, int phy, int reg)
 {
 	if (phy != 1) {
@@ -2752,27 +2724,27 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_CAP_100T4:
-		*val = GETMIIBIT(MII_STATUS, MII_STATUS_100_BASE_T4);
+		*val = afep->afe_cap_100T4;
 		break;
 
 	case ETHER_STAT_CAP_100FDX:
-		*val = GETMIIBIT(MII_STATUS, MII_STATUS_100_BASEX_FD);
+		*val = afep->afe_cap_100fdx;
 		break;
 
 	case ETHER_STAT_CAP_100HDX:
-		*val = GETMIIBIT(MII_STATUS, MII_STATUS_100_BASEX);
+		*val = afep->afe_cap_100hdx;
 		break;
 
 	case ETHER_STAT_CAP_10FDX:
-		*val = GETMIIBIT(MII_STATUS, MII_STATUS_10_FD);
+		*val = afep->afe_cap_10fdx;
 		break;
 
 	case ETHER_STAT_CAP_10HDX:
-		*val = GETMIIBIT(MII_STATUS, MII_STATUS_10);
+		*val = afep->afe_cap_10hdx;
 		break;
 
 	case ETHER_STAT_CAP_AUTONEG:
-		*val = GETMIIBIT(MII_STATUS, MII_STATUS_CANAUTONEG);
+		*val = afep->afe_cap_aneg;
 		break;
 
 	case ETHER_STAT_LINK_AUTONEG:
@@ -2842,321 +2814,140 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
-/*
- * NDD support.
- */
-afe_nd_t *
-afe_ndfind(afe_t *afep, char *name)
-{
-	afe_nd_t	*ndp;
-
-	for (ndp = afep->afe_ndp; ndp != NULL; ndp = ndp->nd_next) {
-		if (strcmp(name, ndp->nd_name) == 0) {
-			break;
-		}
-	}
-	return (ndp);
-}
-
-void
-afe_ndadd(afe_t *afep, char *name, afe_nd_pf_t get, afe_nd_pf_t set,
-    intptr_t arg1, intptr_t arg2)
-{
-	afe_nd_t	*newndp;
-	afe_nd_t	**ndpp;
-
-	newndp = (afe_nd_t *)kmem_alloc(sizeof (afe_nd_t), KM_SLEEP);
-	newndp->nd_next = NULL;
-	newndp->nd_name = name;
-	newndp->nd_get = get;
-	newndp->nd_set = set;
-	newndp->nd_arg1 = arg1;
-	newndp->nd_arg2 = arg2;
-
-	/* seek to the end of the list */
-	for (ndpp = &afep->afe_ndp; *ndpp; ndpp = &(*ndpp)->nd_next) {
-	}
-
-	*ndpp = newndp;
-}
-
-void
-afe_ndempty(mblk_t *mp)
-{
-	while (mp != NULL) {
-		mp->b_rptr = mp->b_datap->db_base;
-		mp->b_wptr = mp->b_rptr;
-		mp = mp->b_cont;
-	}
-}
-
-void
-afe_ndget(afe_t *afep, queue_t *wq, mblk_t *mp)
-{
-	mblk_t		*nmp = mp->b_cont;
-	afe_nd_t	*ndp;
-	int		rv;
-	char		name[128];
-
-	/* assumption, name will fit in first mblk of chain */
-	if ((nmp == NULL) || (nmp->b_wptr <= nmp->b_rptr)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	if (afe_ndparselen(nmp) >= sizeof (name)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-	afe_ndparsestring(nmp, name, sizeof (name));
-
-	/* locate variable */
-	if ((ndp = afe_ndfind(afep, name)) == NULL) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	/* locate get callback */
-	if (ndp->nd_get == NULL) {
-		miocnak(wq, mp, 0, EACCES);
-		return;
-	}
-
-	/* clear the result buffer */
-	afe_ndempty(nmp);
-
-	rv = (*ndp->nd_get)(afep, nmp, ndp);
-	if (rv == 0) {
-		/* add final null bytes */
-		rv = afe_ndaddbytes(nmp, "\0", 1);
-	}
-
-	if (rv == 0) {
-		miocack(wq, mp, msgsize(nmp), 0);
-	} else {
-		miocnak(wq, mp, 0, rv);
-	}
-}
-
-void
-afe_ndset(afe_t *afep, queue_t *wq, mblk_t *mp)
-{
-	struct iocblk	*iocp = (void *)mp->b_rptr;
-	mblk_t		*nmp = mp->b_cont;
-	afe_nd_t	*ndp;
-	int		rv;
-	char		name[128];
-
-	/* enforce policy */
-	if ((rv = priv_getbyname(PRIV_SYS_NET_CONFIG, 0)) < 0) {
-		/* priv_getbyname returns a negative errno */
-		miocnak(wq, mp, 0, -rv);
-		return;
-	}
-	if ((rv = priv_policy(iocp->ioc_cr, rv, B_FALSE, EPERM, NULL)) != 0) {
-		miocnak(wq, mp, 0, rv);
-		return;
-	}
-
-	/* assumption, name will fit in first mblk of chain */
-	if ((nmp == NULL) || (nmp->b_wptr <= nmp->b_rptr)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	if (afe_ndparselen(nmp) >= sizeof (name)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-	afe_ndparsestring(nmp, name, sizeof (name));
-
-	/* locate variable */
-	if ((ndp = afe_ndfind(afep, name)) == NULL) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	/* locate set callback */
-	if (ndp->nd_set == NULL) {
-		miocnak(wq, mp, 0, EACCES);
-		return;
-	}
-
-	rv = (*ndp->nd_set)(afep, nmp, ndp);
-
-	if (rv == 0) {
-		miocack(wq, mp, 0, 0);
-	} else {
-		miocnak(wq, mp, 0, rv);
-	}
-}
-
+/*ARGSUSED*/
 int
-afe_ndaddbytes(mblk_t *mp, char *bytes, int cnt)
+afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
+    uint_t sz, void *val)
 {
-	int index;
+	afe_t		*afep = arg;
+	int		err = 0;
+	boolean_t	dfl = flags & DLD_DEFAULT;
 
-	for (index = 0; index < cnt; index++) {
-		while (mp && (mp->b_wptr >= DB_LIM(mp))) {
-			mp = mp->b_cont;
-		}
-		if (mp == NULL) {
-			return (ENOSPC);
-		}
-		*(mp->b_wptr) = *bytes;
-		mp->b_wptr++;
-		bytes++;
-	}
-	return (0);
-}
+	if (sz == 0)
+		return (EINVAL);
 
-int
-afe_ndaddstr(mblk_t *mp, char *str, int addnull)
-{
-	/* store the string, plus the terminating null */
-	return (afe_ndaddbytes(mp, str, strlen(str) + (addnull ? 1 : 0)));
-}
-
-int
-afe_ndparselen(mblk_t *mp)
-{
-	int	len = 0;
-	int	done = 0;
-	uchar_t	*ptr;
-
-	while (mp && !done) {
-		for (ptr = mp->b_rptr; ptr < mp->b_wptr; ptr++) {
-			if (!(*ptr)) {
-				done = 1;
-				break;
-			}
-			len++;
-		}
-		mp = mp->b_cont;
-	}
-	return (len);
-}
-
-int
-afe_ndparseint(mblk_t *mp)
-{
-	int	done = 0;
-	int	val = 0;
-	while (mp && !done) {
-		while (mp->b_rptr < mp->b_wptr) {
-			uchar_t ch = *(mp->b_rptr);
-			mp->b_rptr++;
-			if ((ch >= '0') && (ch <= '9')) {
-				val *= 10;
-				val += ch - '0';
-			} else if (ch == 0) {
-				return (val);
-			} else {
-				/* parse error, put back rptr */
-				mp->b_rptr--;
-				return (val);
-			}
-		}
-		mp = mp->b_cont;
-	}
-	return (val);
-}
-
-void
-afe_ndparsestring(mblk_t *mp, char *buf, int maxlen)
-{
-	int	done = 0;
-	int	len = 0;
-
-	/* ensure null termination */
-	buf[maxlen - 1] = 0;
-	while (mp && !done) {
-		while (mp->b_rptr < mp->b_wptr) {
-			char ch = *((char *)mp->b_rptr);
-			mp->b_rptr++;
-			buf[len++] = ch;
-			if ((ch == 0) || (len == maxlen)) {
-				return;
-			}
-		}
-		mp = mp->b_cont;
-	}
-}
-
-int
-afe_ndquestion(afe_t *afep, mblk_t *mp, afe_nd_t *ndp)
-{
-	for (ndp = afep->afe_ndp; ndp; ndp = ndp->nd_next) {
-		int	rv;
-		char	*s;
-		if ((rv = afe_ndaddstr(mp, ndp->nd_name, 0)) != 0) {
-			return (rv);
-		}
-		if (ndp->nd_get && ndp->nd_set) {
-			s = " (read and write)";
-		} else if (ndp->nd_get) {
-			s = " (read only)";
-		} else if (ndp->nd_set) {
-			s = " (write only)";
+	switch (num) {
+	case DLD_PROP_DUPLEX:
+		if (sz >= sizeof (link_duplex_t)) {
+			bcopy(&afep->afe_duplex, val, sizeof (link_duplex_t));
 		} else {
-			s = " (no read or write)";
+			err = EINVAL;
 		}
-		if ((rv = afe_ndaddstr(mp, s, 1)) != 0) {
-			return (rv);
+		break;
+
+	case DLD_PROP_SPEED:
+		if (sz >= sizeof (uint64_t)) {
+			bcopy(&afep->afe_ifspeed, val, sizeof (uint64_t));
+		} else {
+			err = EINVAL;
 		}
+		break;
+
+	case DLD_PROP_AUTONEG:
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_aneg : afep->afe_adv_aneg;
+		break;
+
+#if 0
+	case DLD_PROP_ADV_1000FDX_CAP:
+	case DLD_PROP_EN_1000FDX_CAP:
+	case DLD_PROP_ADV_1000HDX_CAP:
+	case DLD_PROP_EN_1000HDX_CAP:
+		/* We don't support gigabit! */
+		*(uint8_t *)val = 0;
+		break;
+#endif
+
+	case DLD_PROP_ADV_100FDX_CAP:
+	case DLD_PROP_EN_100FDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_100fdx : afep->afe_adv_100fdx;
+		break;
+
+	case DLD_PROP_ADV_100HDX_CAP:
+	case DLD_PROP_EN_100HDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_100hdx : afep->afe_adv_100hdx;
+		break;
+
+	case DLD_PROP_ADV_10FDX_CAP:
+	case DLD_PROP_EN_10FDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_10fdx : afep->afe_adv_10fdx;
+		break;
+
+	case DLD_PROP_ADV_10HDX_CAP:
+	case DLD_PROP_EN_10HDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_10hdx : afep->afe_adv_10hdx;
+		break;
+
+	case DLD_PROP_ADV_100T4_CAP:
+	case DLD_PROP_EN_100T4_CAP:
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_100T4 : afep->afe_adv_100T4;
+		break;
+
+	default:
+		err = ENOTSUP;
 	}
-	return (0);
+
+	return (err);
 }
 
 /*ARGSUSED*/
 int
-afe_ndgetint(afe_t *afep, mblk_t *mp, afe_nd_t *ndp)
+afe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    const void *val)
 {
-	int		val;
-	char		buf[16];
+	afe_t		*afep = arg;
+	uint8_t		*advp;
+	uint8_t		*capp;
 
-	val = *(int *)ndp->nd_arg1;
+	switch (num) {
+	case DLD_PROP_EN_100FDX_CAP:
+		advp = &afep->afe_adv_100fdx;
+		capp = &afep->afe_cap_100fdx;
+		break;
 
-	(void) snprintf(buf, sizeof (buf), "%d", val);
-	return (afe_ndaddstr(mp, buf, 1));
-}
+	case DLD_PROP_EN_100HDX_CAP:
+		advp = &afep->afe_adv_100hdx;
+		capp = &afep->afe_cap_100hdx;
+		break;
 
-int
-afe_ndgetmiibit(afe_t *afep, mblk_t *mp, afe_nd_t *ndp)
-{
-	unsigned	val;
-	unsigned	mask;
-	int		reg;
+	case DLD_PROP_EN_10FDX_CAP:
+		advp = &afep->afe_adv_10fdx;
+		capp = &afep->afe_cap_10fdx;
+		break;
 
-	reg = (int)ndp->nd_arg1;
-	mask = (unsigned)ndp->nd_arg2;
+	case DLD_PROP_EN_10HDX_CAP:
+		advp = &afep->afe_adv_10hdx;
+		capp = &afep->afe_cap_10hdx;
+		break;
 
-	mutex_enter(&afep->afe_xmtlock);
-	if (afep->afe_flags & AFE_SUSPENDED) {
-		mutex_exit(&afep->afe_xmtlock);
-		/* device is suspended */
-		return (EIO);
+	case DLD_PROP_EN_100T4_CAP:
+		advp = &afep->afe_adv_100T4;
+		capp = &afep->afe_cap_100T4;
+		break;
+
+	case DLD_PROP_AUTONEG:
+		advp = &afep->afe_adv_aneg;
+		capp = &afep->afe_cap_aneg;
+		break;
+
+	default:
+		return (ENOTSUP);
 	}
-	val = afe_miiread(afep, afep->afe_phyaddr, reg);
-	mutex_exit(&afep->afe_xmtlock);
 
-	return (afe_ndaddstr(mp, val & mask ? "1" : "0", 1));
-}
-
-int
-afe_ndsetadv(afe_t *afep, mblk_t *mp, afe_nd_t *ndp)
-{
-	unsigned	*ptr = (unsigned *)ndp->nd_arg1;
-	unsigned	oldval, newval;
-
-	newval = afe_ndparseint(mp) ? 1 : 0;
+	if (*capp == 0)		/* ensure phy can support value */
+		return (ENOTSUP);
 
 	mutex_enter(&afep->afe_intrlock);
 	mutex_enter(&afep->afe_xmtlock);
 
-	oldval = *ptr;
-	if (oldval != newval) {
-		*ptr = newval;
+	if (*advp != *(const uint8_t *)val) {
+		*advp = *(const uint8_t *)val;
+
 		if ((afep->afe_flags & (AFE_RUNNING|AFE_SUSPENDED)) ==
 		    AFE_RUNNING) {
 			/*
@@ -3173,65 +2964,6 @@ afe_ndsetadv(afe_t *afep, mblk_t *mp, afe_nd_t *ndp)
 	mutex_exit(&afep->afe_intrlock);
 
 	return (0);
-}
-
-void
-afe_ndfini(afe_t *afep)
-{
-	afe_nd_t	*ndp;
-
-	while ((ndp = afep->afe_ndp) != NULL) {
-		afep->afe_ndp = ndp->nd_next;
-		kmem_free(ndp, sizeof (afe_nd_t));
-	}
-}
-
-void
-afe_ndinit(afe_t *afep)
-{
-	afe_ndadd(afep, "?", afe_ndquestion, NULL, 0, 0);
-	afe_ndadd(afep, "link_status", afe_ndgetint, NULL,
-	    (intptr_t)&afep->afe_linkup, 0);
-	afe_ndadd(afep, "link_speed", afe_ndgetint, NULL,
-	    (intptr_t)&afep->afe_ifspeed, 0);
-	afe_ndadd(afep, "link_duplex", afe_ndgetint, NULL,
-	    (intptr_t)&afep->afe_duplex, 0);
-	afe_ndadd(afep, "adv_autoneg_cap", afe_ndgetint, afe_ndsetadv,
-	    (intptr_t)&afep->afe_adv_aneg, 0);
-	afe_ndadd(afep, "adv_100T4_cap", afe_ndgetint, afe_ndsetadv,
-	    (intptr_t)&afep->afe_adv_100T4, 0);
-	afe_ndadd(afep, "adv_100fdx_cap", afe_ndgetint, afe_ndsetadv,
-	    (intptr_t)&afep->afe_adv_100fdx, 0);
-	afe_ndadd(afep, "adv_100hdx_cap", afe_ndgetint, afe_ndsetadv,
-	    (intptr_t)&afep->afe_adv_100hdx, 0);
-	afe_ndadd(afep, "adv_10fdx_cap", afe_ndgetint, afe_ndsetadv,
-	    (intptr_t)&afep->afe_adv_10fdx, 0);
-	afe_ndadd(afep, "adv_10hdx_cap", afe_ndgetint, afe_ndsetadv,
-	    (intptr_t)&afep->afe_adv_10hdx, 0);
-	afe_ndadd(afep, "autoneg_cap", afe_ndgetmiibit, NULL,
-	    MII_STATUS, MII_STATUS_CANAUTONEG);
-	afe_ndadd(afep, "100T4_cap", afe_ndgetmiibit, NULL,
-	    MII_STATUS, MII_STATUS_100_BASE_T4);
-	afe_ndadd(afep, "100fdx_cap", afe_ndgetmiibit, NULL,
-	    MII_STATUS, MII_STATUS_100_BASEX_FD);
-	afe_ndadd(afep, "100hdx_cap", afe_ndgetmiibit, NULL,
-	    MII_STATUS, MII_STATUS_100_BASEX);
-	afe_ndadd(afep, "10fdx_cap", afe_ndgetmiibit, NULL,
-	    MII_STATUS, MII_STATUS_10_FD);
-	afe_ndadd(afep, "10hdx_cap", afe_ndgetmiibit, NULL,
-	    MII_STATUS, MII_STATUS_10);
-	afe_ndadd(afep, "lp_autoneg_cap", afe_ndgetmiibit, NULL,
-	    MII_AN_EXPANSION, MII_AN_EXP_LPCANAN);
-	afe_ndadd(afep, "lp_100T4_cap", afe_ndgetmiibit, NULL,
-	    MII_AN_LPABLE, MII_ABILITY_100BASE_T4);
-	afe_ndadd(afep, "lp_100fdx_cap", afe_ndgetmiibit, NULL,
-	    MII_AN_LPABLE, MII_ABILITY_100BASE_TX_FD);
-	afe_ndadd(afep, "lp_100hdx_cap", afe_ndgetmiibit, NULL,
-	    MII_AN_LPABLE, MII_ABILITY_100BASE_TX);
-	afe_ndadd(afep, "lp_10fdx_cap", afe_ndgetmiibit, NULL,
-	    MII_AN_LPABLE, MII_ABILITY_10BASE_T_FD);
-	afe_ndadd(afep, "lp_10hdx_cap", afe_ndgetmiibit, NULL,
-	    MII_AN_LPABLE, MII_ABILITY_10BASE_T);
 }
 
 /*

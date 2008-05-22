@@ -28,6 +28,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef	_MXFEIMPL_H
 #define	_MXFEIMPL_H
@@ -60,11 +64,9 @@
 
 typedef struct mxfe mxfe_t;
 typedef struct mxfe_card mxfe_card_t;
-typedef struct mxfe_nd mxfe_nd_t;
 typedef struct mxfe_rxbuf mxfe_rxbuf_t;
 typedef struct mxfe_txbuf mxfe_txbuf_t;
 typedef struct mxfe_desc mxfe_desc_t;
-typedef int (*mxfe_nd_pf_t)(mxfe_t *, mblk_t *, mxfe_nd_t *);
 
 struct mxfe_card {
 	uint16_t	card_venid;	/* PCI vendor id */
@@ -73,15 +75,6 @@ struct mxfe_card {
 	uint16_t	card_revmask;
 	char		*card_cardname;	/* Description of the card */
 	unsigned	card_model;	/* Card specific flags */
-};
-
-struct mxfe_nd {
-	mxfe_nd_t	*nd_next;
-	char		*nd_name;
-	mxfe_nd_pf_t	nd_get;
-	mxfe_nd_pf_t	nd_set;
-	intptr_t	nd_arg1;
-	intptr_t	nd_arg2;
 };
 
 /*
@@ -137,19 +130,14 @@ struct mxfe {
 	/*
 	 * Link state.
 	 */
-	int			mxfe_linkstate;
-	int			mxfe_lastifspeed;
-	int			mxfe_lastduplex;
-	int			mxfe_lastlinkup;
-	int			mxfe_linkup;
-	int			mxfe_duplex;
-	int			mxfe_ifspeed;
+	int			mxfe_nwaystate;
+	uint64_t		mxfe_lastifspeed;
+	link_duplex_t		mxfe_lastduplex;
+	link_state_t		mxfe_lastlinkup;
+	link_state_t		mxfe_linkup;
+	link_duplex_t		mxfe_duplex;
+	uint64_t		mxfe_ifspeed;
 	boolean_t		mxfe_resetting;	/* no link warning */
-
-	/*
-	 * NDD related support.
-	 */
-	mxfe_nd_t		*mxfe_ndp;
 
 	/*
 	 * Transceiver stuff.
@@ -157,16 +145,22 @@ struct mxfe {
 	int			mxfe_phyaddr;
 	int			mxfe_phyid;
 	int			mxfe_phyinuse;
-	int			mxfe_adv_aneg;
-	int			mxfe_adv_100T4;
-	int			mxfe_adv_100fdx;
-	int			mxfe_adv_100hdx;
-	int			mxfe_adv_10fdx;
-	int			mxfe_adv_10hdx;
+	uint8_t			mxfe_adv_aneg;
+	uint8_t			mxfe_adv_100T4;
+	uint8_t			mxfe_adv_100fdx;
+	uint8_t			mxfe_adv_100hdx;
+	uint8_t			mxfe_adv_10fdx;
+	uint8_t			mxfe_adv_10hdx;
+	uint8_t			mxfe_cap_aneg;
+	uint8_t			mxfe_cap_100T4;
+	uint8_t			mxfe_cap_100fdx;
+	uint8_t			mxfe_cap_100hdx;
+	uint8_t			mxfe_cap_10fdx;
+	uint8_t			mxfe_cap_10hdx;
 	int			mxfe_forcephy;
-	int			mxfe_bmsr;
-	int			mxfe_anlpar;
-	int			mxfe_aner;
+	uint16_t		mxfe_bmsr;
+	uint16_t		mxfe_anlpar;
+	uint16_t		mxfe_aner;
 
 	/*
 	 * Kstats.

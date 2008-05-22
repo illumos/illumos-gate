@@ -28,6 +28,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -45,9 +49,6 @@
 #include <sys/time.h>
 #include <sys/miiregs.h>
 #include <sys/strsun.h>
-#include <sys/priv.h>
-#include <sys/policy.h>
-#include <sys/cred.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
 #include <sys/ddi.h>
@@ -112,7 +113,10 @@ static mblk_t	*mxfe_m_tx(void *, mblk_t *);
 static int	mxfe_m_stat(void *, uint_t, uint64_t *);
 static int	mxfe_m_start(void *);
 static void	mxfe_m_stop(void *);
-static void	mxfe_m_ioctl(void *, queue_t *, mblk_t *);
+static int	mxfe_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    uint_t, void *);
+static int	mxfe_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
 static unsigned	mxfe_intr(caddr_t);
 static void	mxfe_startmac(mxfe_t *);
 static void	mxfe_stopmac(mxfe_t *);
@@ -136,14 +140,14 @@ static uint8_t	mxfe_sromwidth(mxfe_t *);
 static uint16_t	mxfe_readsromword(mxfe_t *, unsigned);
 static void	mxfe_readsrom(mxfe_t *, unsigned, unsigned, void *);
 static void	mxfe_getfactaddr(mxfe_t *, uchar_t *);
-static int	mxfe_miireadbit(mxfe_t *);
-static void	mxfe_miiwritebit(mxfe_t *, int);
+static uint8_t	mxfe_miireadbit(mxfe_t *);
+static void	mxfe_miiwritebit(mxfe_t *, uint8_t);
 static void	mxfe_miitristate(mxfe_t *);
-static unsigned	mxfe_miiread(mxfe_t *, int, int);
+static uint16_t	mxfe_miiread(mxfe_t *, int, int);
 static void	mxfe_miiwrite(mxfe_t *, int, int, uint16_t);
-static unsigned	mxfe_miireadgeneral(mxfe_t *, int, int);
+static uint16_t	mxfe_miireadgeneral(mxfe_t *, int, int);
 static void	mxfe_miiwritegeneral(mxfe_t *, int, int, uint16_t);
-static unsigned	mxfe_miiread98713(mxfe_t *, int, int);
+static uint16_t	mxfe_miiread98713(mxfe_t *, int, int);
 static void	mxfe_miiwrite98713(mxfe_t *, int, int, uint16_t);
 static void	mxfe_startphy(mxfe_t *);
 static void	mxfe_stopphy(mxfe_t *);
@@ -158,23 +162,6 @@ static void	mxfe_disableinterrupts(mxfe_t *);
 static void	mxfe_enableinterrupts(mxfe_t *);
 static void	mxfe_reclaim(mxfe_t *);
 static mblk_t	*mxfe_receive(mxfe_t *);
-static int	mxfe_ndaddbytes(mblk_t *, char *, int);
-static int	mxfe_ndaddstr(mblk_t *, char *, int);
-static void	mxfe_ndparsestring(mblk_t *, char *, int);
-static int	mxfe_ndparselen(mblk_t *);
-static int	mxfe_ndparseint(mblk_t *);
-static void	mxfe_ndget(mxfe_t *, queue_t *, mblk_t *);
-static void	mxfe_ndset(mxfe_t *, queue_t *, mblk_t *);
-static void	mxfe_ndfini(mxfe_t *);
-static void	mxfe_ndinit(mxfe_t *);
-static int	mxfe_ndquestion(mxfe_t *, mblk_t *, mxfe_nd_t *);
-static int	mxfe_ndgetint(mxfe_t *, mblk_t *, mxfe_nd_t *);
-static int	mxfe_ndgetbit(mxfe_t *, mblk_t *, mxfe_nd_t *);
-static int	mxfe_ndsetadv(mxfe_t *, mblk_t *, mxfe_nd_t *);
-static mxfe_nd_t *mxfe_ndfind(mxfe_t *, char *);
-static void	mxfe_ndempty(mblk_t *);
-static void	mxfe_ndadd(mxfe_t *, char *, mxfe_nd_pf_t, mxfe_nd_pf_t,
-    intptr_t, intptr_t);
 
 #ifdef	DEBUG
 static void	mxfe_dprintf(mxfe_t *, const char *, int, char *, ...);
@@ -183,7 +170,7 @@ static void	mxfe_dprintf(mxfe_t *, const char *, int, char *, ...);
 #define	KIOIP	KSTAT_INTR_PTR(mxfep->mxfe_intrstat)
 
 static mac_callbacks_t mxfe_m_callbacks = {
-	MC_IOCTL,
+	MC_SETPROP | MC_GETPROP,
 	mxfe_m_stat,
 	mxfe_m_start,
 	mxfe_m_stop,
@@ -191,9 +178,13 @@ static mac_callbacks_t mxfe_m_callbacks = {
 	mxfe_m_multicst,
 	mxfe_m_unicst,
 	mxfe_m_tx,
-	NULL,
-	mxfe_m_ioctl,
-	NULL,		/* m_getcapab */
+	NULL,		/* mc_resources */
+	NULL,		/* mc_ioctl */
+	NULL,		/* mc_getcapab */
+	NULL,		/* mc_open */
+	NULL,		/* mc_close */
+	mxfe_m_setprop,
+	mxfe_m_getprop
 };
 
 /*
@@ -436,8 +427,6 @@ mxfe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&mxfep->mxfe_intrlock, NULL, MUTEX_DRIVER,
 	    mxfep->mxfe_icookie);
 
-	mxfe_ndinit(mxfep);
-
 	/*
 	 * Enable bus master, IO space, and memory space accesses.
 	 */
@@ -539,7 +528,6 @@ failed:
 	if (mxfep->mxfe_intrstat) {
 		kstat_delete(mxfep->mxfe_intrstat);
 	}
-	mxfe_ndfini(mxfep);
 	mutex_destroy(&mxfep->mxfe_intrlock);
 	mutex_destroy(&mxfep->mxfe_xmtlock);
 
@@ -591,7 +579,6 @@ mxfe_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mxfe_freerxring(mxfep);
 		mxfe_freetxring(mxfep);
 
-		mxfe_ndfini(mxfep);
 		ddi_regs_map_free(&mxfep->mxfe_regshandle);
 		mutex_destroy(&mxfep->mxfe_intrlock);
 		mutex_destroy(&mxfep->mxfe_xmtlock);
@@ -646,27 +633,6 @@ mxfe_resume(dev_info_t *dip)
 	mutex_exit(&mxfep->mxfe_intrlock);
 
 	return (DDI_SUCCESS);
-}
-
-void
-mxfe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
-{
-	mxfe_t *mxfep = arg;
-
-	switch (*(int *)(void *)(mp->b_rptr)) {
-
-	case NDIOC_GET:
-		mxfe_ndget(mxfep, wq, mp);
-		break;
-
-	case NDIOC_SET:
-		mxfe_ndset(mxfep, wq, mp);
-		break;
-
-	default:
-		miocnak(wq, mp, 0, EINVAL);
-		break;
-	}
 }
 
 /*ARGSUSED*/
@@ -1027,9 +993,9 @@ mxfe_startnway(mxfe_t *mxfep)
 	unsigned	restart;
 
 	/* this should not happen in a healthy system */
-	if (mxfep->mxfe_linkstate != MXFE_NOLINK) {
+	if (mxfep->mxfe_nwaystate != MXFE_NOLINK) {
 		DBG(DWARN, "link start called out of state (%x)",
-		    mxfep->mxfe_linkstate);
+		    mxfep->mxfe_nwaystate);
 		return;
 	}
 
@@ -1084,15 +1050,16 @@ mxfe_startnway(mxfe_t *mxfep)
 	PUTCSR(mxfep, CSR_MXMAGIC, 0x0b2c0000);
 	PUTCSR(mxfep, CSR_ACOMP, 0x11000);
 
-	mxfep->mxfe_linkstate = MXFE_NWAYCHECK;
+	mxfep->mxfe_nwaystate = MXFE_NWAYCHECK;
 }
 
 void
 mxfe_checklinknway(mxfe_t *mxfep)
 {
-	unsigned	tstat, lpar;
+	unsigned	tstat;
+	uint16_t	lpar;
 
-	DBG(DPHY, "NWay check, state %x", mxfep->mxfe_linkstate);
+	DBG(DPHY, "NWay check, state %x", mxfep->mxfe_nwaystate);
 	tstat = GETCSR(mxfep, CSR_TSTAT);
 	lpar = TSTAT_LPAR(tstat);
 
@@ -1117,7 +1084,7 @@ mxfe_checklinknway(mxfe_t *mxfep)
 		mxfep->mxfe_linkup = LINK_STATE_DOWN;
 		mxfep->mxfe_ifspeed = 0;
 		mxfep->mxfe_duplex = LINK_DUPLEX_UNKNOWN;
-		mxfep->mxfe_linkstate = MXFE_NOLINK;
+		mxfep->mxfe_nwaystate = MXFE_NOLINK;
 		mxfe_reportlink(mxfep);
 		mxfe_startnway(mxfep);
 		return;
@@ -1187,7 +1154,7 @@ mxfe_checklinknway(mxfe_t *mxfep)
 		}
 	}
 	mxfe_reportlink(mxfep);
-	mxfep->mxfe_linkstate = MXFE_GOODLINK;
+	mxfep->mxfe_nwaystate = MXFE_GOODLINK;
 }
 
 void
@@ -1197,10 +1164,13 @@ mxfe_startphynway(mxfe_t *mxfep)
 	PUTCSR(mxfep, CSR_SIA, SIA_NRESET);
 	drv_usecwait(500);
 
-	mxfep->mxfe_linkstate = MXFE_NOLINK;
+	mxfep->mxfe_nwaystate = MXFE_NOLINK;
 	mxfep->mxfe_bmsr = MII_STATUS_CANAUTONEG |
 	    MII_STATUS_100_BASEX_FD | MII_STATUS_100_BASEX |
 	    MII_STATUS_10_FD | MII_STATUS_10;
+	mxfep->mxfe_cap_aneg =
+	    mxfep->mxfe_cap_100fdx = mxfep->mxfe_cap_100hdx =
+	    mxfep->mxfe_cap_10fdx = mxfep->mxfe_cap_10hdx = 1;
 
 	/* lie about the transceiver... its not really 802.3u compliant */
 	mxfep->mxfe_phyaddr = 0;
@@ -1209,6 +1179,7 @@ mxfe_startphynway(mxfe_t *mxfep)
 
 	/* 100-T4 not supported with NWay */
 	mxfep->mxfe_adv_100T4 = 0;
+	mxfep->mxfe_cap_100T4 = 0;
 
 	/* make sure at least one valid mode is selected */
 	if ((!mxfep->mxfe_adv_100fdx) &&
@@ -1304,6 +1275,11 @@ mxfe_startphymii(mxfe_t *mxfep)
 		mxfep->mxfe_phyinuse = XCVR_100X;
 	}
 
+	/* assume we support everything to start */
+	mxfep->mxfe_cap_aneg = mxfep->mxfe_cap_100T4 =
+	    mxfep->mxfe_cap_100fdx = mxfep->mxfe_cap_100hdx =
+	    mxfep->mxfe_cap_10fdx = mxfep->mxfe_cap_10hdx = 1;
+
 	DBG(DPHY, "phy at %d: %x,%x", phyaddr, phyidr1, phyidr2);
 	DBG(DPHY, "bmsr = %x", mxfe_miiread(mxfep,
 	    mxfep->mxfe_phyaddr, MII_STATUS));
@@ -1349,21 +1325,27 @@ mxfe_startphymii(mxfe_t *mxfep)
 	/* disable modes not supported in hardware */
 	if (!(bmsr & MII_STATUS_100_BASE_T4)) {
 		mxfep->mxfe_adv_100T4 = 0;
+		mxfep->mxfe_cap_100T4 = 0;
 	}
 	if (!(bmsr & MII_STATUS_100_BASEX_FD)) {
 		mxfep->mxfe_adv_100fdx = 0;
+		mxfep->mxfe_cap_100fdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_100_BASEX)) {
 		mxfep->mxfe_adv_100hdx = 0;
+		mxfep->mxfe_cap_100hdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_10_FD)) {
 		mxfep->mxfe_adv_10fdx = 0;
+		mxfep->mxfe_cap_10fdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_10)) {
 		mxfep->mxfe_adv_10hdx = 0;
+		mxfep->mxfe_cap_10hdx = 0;
 	}
 	if (!(bmsr & MII_STATUS_CANAUTONEG)) {
 		mxfep->mxfe_adv_aneg = 0;
+		mxfep->mxfe_cap_aneg = 0;
 	}
 
 	cnt = 0;
@@ -1417,8 +1399,6 @@ mxfe_startphymii(mxfe_t *mxfep)
 			bmcr = 0;
 		}
 	}
-
-	mxfep->mxfe_forcephy = 0;
 
 	DBG(DPHY, "programming anar to 0x%x", anar);
 	mxfe_miiwrite(mxfep, phyaddr, MII_AN_ADVERT, anar);
@@ -1567,7 +1547,7 @@ mxfe_miitristate(mxfe_t *mxfep)
 }
 
 void
-mxfe_miiwritebit(mxfe_t *mxfep, int bit)
+mxfe_miiwritebit(mxfe_t *mxfep, uint8_t bit)
 {
 	unsigned val = bit ? SPR_MII_DOUT : 0;
 	PUTCSR(mxfep, CSR_SPR, val);
@@ -1576,11 +1556,11 @@ mxfe_miiwritebit(mxfe_t *mxfep, int bit)
 	drv_usecwait(1);
 }
 
-int
+uint8_t
 mxfe_miireadbit(mxfe_t *mxfep)
 {
 	unsigned val = SPR_MII_CTRL | SPR_SROM_READ;
-	int bit;
+	uint8_t bit;
 	PUTCSR(mxfep, CSR_SPR, val);
 	drv_usecwait(1);
 	bit = (GETCSR(mxfep, CSR_SPR) & SPR_MII_DIN) ? 1 : 0;
@@ -1589,7 +1569,7 @@ mxfe_miireadbit(mxfe_t *mxfep)
 	return (bit);
 }
 
-unsigned
+uint16_t
 mxfe_miiread(mxfe_t *mxfep, int phy, int reg)
 {
 	switch (MXFE_MODEL(mxfep)) {
@@ -1600,10 +1580,10 @@ mxfe_miiread(mxfe_t *mxfep, int phy, int reg)
 	}
 }
 
-unsigned
+uint16_t
 mxfe_miireadgeneral(mxfe_t *mxfep, int phy, int reg)
 {
-	unsigned	value = 0;
+	uint16_t	value = 0;
 	int		i;
 
 	/* send the 32 bit preamble */
@@ -1642,11 +1622,11 @@ mxfe_miireadgeneral(mxfe_t *mxfep, int phy, int reg)
 	return (value);
 }
 
-unsigned
+uint16_t
 mxfe_miiread98713(mxfe_t *mxfep, int phy, int reg)
 {
 	unsigned nar;
-	unsigned retval;
+	uint16_t retval;
 	/*
 	 * like an ordinary MII, but we have to turn off portsel while
 	 * we read it.
@@ -2774,10 +2754,6 @@ mxfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = mxfep->mxfe_jabber;
 		break;
 
-	case ETHER_STAT_CAP_100T4:
-		*val = mxfep->mxfe_bmsr & MII_STATUS_100_BASE_T4 ? 1 : 0;
-		break;
-
 	case ETHER_STAT_ADV_CAP_100T4:
 		*val = mxfep->mxfe_adv_100T4;
 		break;
@@ -2786,24 +2762,28 @@ mxfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = (mxfep->mxfe_anlpar & MII_ABILITY_100BASE_T4) ? 1 : 0;
 		break;
 
+	case ETHER_STAT_CAP_100T4:
+		*val = mxfep->mxfe_cap_100T4;
+		break;
+
 	case ETHER_STAT_CAP_100FDX:
-		*val = mxfep->mxfe_bmsr & MII_STATUS_100_BASEX_FD ? 1 : 0;
+		*val = mxfep->mxfe_cap_100fdx;
 		break;
 
 	case ETHER_STAT_CAP_100HDX:
-		*val = mxfep->mxfe_bmsr & MII_STATUS_100_BASEX ? 1 : 0;
+		*val = mxfep->mxfe_cap_100hdx;
 		break;
 
 	case ETHER_STAT_CAP_10FDX:
-		*val = mxfep->mxfe_bmsr & MII_STATUS_10_FD ? 1 : 0;
+		*val = mxfep->mxfe_cap_10fdx;
 		break;
 
 	case ETHER_STAT_CAP_10HDX:
-		*val = mxfep->mxfe_bmsr & MII_STATUS_10 ? 1 : 0;
+		*val = mxfep->mxfe_cap_10hdx;
 		break;
 
 	case ETHER_STAT_CAP_AUTONEG:
-		*val = mxfep->mxfe_bmsr & MII_STATUS_CANAUTONEG ? 1 : 0;
+		*val = mxfep->mxfe_cap_aneg;
 		break;
 
 	case ETHER_STAT_LINK_AUTONEG:
@@ -2869,312 +2849,131 @@ mxfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
-/*
- * NDD support.
- */
-mxfe_nd_t *
-mxfe_ndfind(mxfe_t *mxfep, char *name)
-{
-	mxfe_nd_t	*ndp;
-
-	for (ndp = mxfep->mxfe_ndp; ndp != NULL; ndp = ndp->nd_next) {
-		if (strcmp(name, ndp->nd_name) == 0) {
-			break;
-		}
-	}
-	return (ndp);
-}
-
-void
-mxfe_ndadd(mxfe_t *mxfep, char *name, mxfe_nd_pf_t get, mxfe_nd_pf_t set,
-    intptr_t arg1, intptr_t arg2)
-{
-	mxfe_nd_t	*newndp;
-	mxfe_nd_t	**ndpp;
-
-	newndp = (mxfe_nd_t *)kmem_alloc(sizeof (mxfe_nd_t), KM_SLEEP);
-	newndp->nd_next = NULL;
-	newndp->nd_name = name;
-	newndp->nd_get = get;
-	newndp->nd_set = set;
-	newndp->nd_arg1 = arg1;
-	newndp->nd_arg2 = arg2;
-
-	/* seek to the end of the list */
-	for (ndpp = &mxfep->mxfe_ndp; *ndpp; ndpp = &(*ndpp)->nd_next) {
-	}
-
-	*ndpp = newndp;
-}
-
-void
-mxfe_ndempty(mblk_t *mp)
-{
-	while (mp != NULL) {
-		mp->b_rptr = mp->b_datap->db_base;
-		mp->b_wptr = mp->b_rptr;
-		mp = mp->b_cont;
-	}
-}
-
-void
-mxfe_ndget(mxfe_t *mxfep, queue_t *wq, mblk_t *mp)
-{
-	mblk_t		*nmp = mp->b_cont;
-	mxfe_nd_t	*ndp;
-	int		rv;
-	char		name[128];
-
-	/* assumption, name will fit in first mblk of chain */
-	if ((nmp == NULL) || (nmp->b_wptr <= nmp->b_rptr)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	if (mxfe_ndparselen(nmp) >= sizeof (name)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-	mxfe_ndparsestring(nmp, name, sizeof (name));
-
-	/* locate variable */
-	if ((ndp = mxfe_ndfind(mxfep, name)) == NULL) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	/* locate get callback */
-	if (ndp->nd_get == NULL) {
-		miocnak(wq, mp, 0, EACCES);
-		return;
-	}
-
-	/* clear the result buffer */
-	mxfe_ndempty(nmp);
-
-	rv = (*ndp->nd_get)(mxfep, nmp, ndp);
-	if (rv == 0) {
-		/* add final null bytes */
-		rv = mxfe_ndaddbytes(nmp, "\0", 1);
-	}
-
-	if (rv == 0) {
-		miocack(wq, mp, msgsize(nmp), 0);
-	} else {
-		miocnak(wq, mp, 0, rv);
-	}
-}
-
-void
-mxfe_ndset(mxfe_t *mxfep, queue_t *wq, mblk_t *mp)
-{
-	struct iocblk	*iocp = (void *)mp->b_rptr;
-	mblk_t		*nmp = mp->b_cont;
-	mxfe_nd_t	*ndp;
-	int		rv;
-	char		name[128];
-
-	/* enforce policy */
-	if ((rv = priv_getbyname(PRIV_SYS_NET_CONFIG, 0)) < 0) {
-		/* priv_getbyname returns a negative errno */
-		miocnak(wq, mp, 0, -rv);
-		return;
-	}
-	if ((rv = priv_policy(iocp->ioc_cr, rv, B_FALSE, EPERM, NULL)) != 0) {
-		miocnak(wq, mp, 0, rv);
-		return;
-	}
-
-	/* assumption, name will fit in first mblk of chain */
-	if ((nmp == NULL) || (nmp->b_wptr <= nmp->b_rptr)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	if (mxfe_ndparselen(nmp) >= sizeof (name)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-	mxfe_ndparsestring(nmp, name, sizeof (name));
-
-	/* locate variable */
-	if ((ndp = mxfe_ndfind(mxfep, name)) == NULL) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	/* locate set callback */
-	if (ndp->nd_set == NULL) {
-		miocnak(wq, mp, 0, EACCES);
-		return;
-	}
-
-	rv = (*ndp->nd_set)(mxfep, nmp, ndp);
-
-	if (rv == 0) {
-		miocack(wq, mp, 0, 0);
-	} else {
-		miocnak(wq, mp, 0, rv);
-	}
-}
-
+/*ARGSUSED*/
 int
-mxfe_ndaddbytes(mblk_t *mp, char *bytes, int cnt)
+mxfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
+    uint_t sz, void *val)
 {
-	int index;
+	mxfe_t		*mxfep = arg;
+	int		err = 0;
+	boolean_t	dfl = flags & DLD_DEFAULT;
 
-	for (index = 0; index < cnt; index++) {
-		while (mp && (mp->b_wptr >= DB_LIM(mp))) {
-			mp = mp->b_cont;
-		}
-		if (mp == NULL) {
-			return (ENOSPC);
-		}
-		*(mp->b_wptr) = *bytes;
-		mp->b_wptr++;
-		bytes++;
-	}
-	return (0);
-}
+	if (sz == 0)
+		return (EINVAL);
 
-int
-mxfe_ndaddstr(mblk_t *mp, char *str, int addnull)
-{
-	/* store the string, plus the terminating null */
-	return (mxfe_ndaddbytes(mp, str, strlen(str) + (addnull ? 1 : 0)));
-}
-
-int
-mxfe_ndparselen(mblk_t *mp)
-{
-	int	len = 0;
-	int	done = 0;
-	uchar_t	*ptr;
-
-	while (mp && !done) {
-		for (ptr = mp->b_rptr; ptr < mp->b_wptr; ptr++) {
-			if (!(*ptr)) {
-				done = 1;
-				break;
-			}
-			len++;
-		}
-		mp = mp->b_cont;
-	}
-	return (len);
-}
-
-int
-mxfe_ndparseint(mblk_t *mp)
-{
-	int	done = 0;
-	int	val = 0;
-	while (mp && !done) {
-		while (mp->b_rptr < mp->b_wptr) {
-			uchar_t ch = *(mp->b_rptr);
-			mp->b_rptr++;
-			if ((ch >= '0') && (ch <= '9')) {
-				val *= 10;
-				val += ch - '0';
-			} else if (ch == 0) {
-				return (val);
-			} else {
-				/* parse error, put back rptr */
-				mp->b_rptr--;
-				return (val);
-			}
-		}
-		mp = mp->b_cont;
-	}
-	return (val);
-}
-
-void
-mxfe_ndparsestring(mblk_t *mp, char *buf, int maxlen)
-{
-	int	done = 0;
-	int	len = 0;
-
-	/* ensure null termination */
-	buf[maxlen - 1] = 0;
-	while (mp && !done) {
-		while (mp->b_rptr < mp->b_wptr) {
-			char ch = *((char *)mp->b_rptr);
-			mp->b_rptr++;
-			buf[len++] = ch;
-			if ((ch == 0) || (len == maxlen)) {
-				return;
-			}
-		}
-		mp = mp->b_cont;
-	}
-}
-
-int
-mxfe_ndquestion(mxfe_t *mxfep, mblk_t *mp, mxfe_nd_t *ndp)
-{
-	for (ndp = mxfep->mxfe_ndp; ndp; ndp = ndp->nd_next) {
-		int	rv;
-		char	*s;
-		if ((rv = mxfe_ndaddstr(mp, ndp->nd_name, 0)) != 0) {
-			return (rv);
-		}
-		if (ndp->nd_get && ndp->nd_set) {
-			s = " (read and write)";
-		} else if (ndp->nd_get) {
-			s = " (read only)";
-		} else if (ndp->nd_set) {
-			s = " (write only)";
+	switch (num) {
+	case DLD_PROP_DUPLEX:
+		if (sz >= sizeof (link_duplex_t)) {
+			bcopy(&mxfep->mxfe_duplex, val,
+			    sizeof (link_duplex_t));
 		} else {
-			s = " (no read or write)";
+			err = EINVAL;
 		}
-		if ((rv = mxfe_ndaddstr(mp, s, 1)) != 0) {
-			return (rv);
+		break;
+
+	case DLD_PROP_SPEED:
+		if (sz >= sizeof (uint64_t)) {
+			bcopy(&mxfep->mxfe_ifspeed, val, sizeof (uint64_t));
+		} else {
+			err = EINVAL;
 		}
+		break;
+
+	case DLD_PROP_AUTONEG:
+		*(uint8_t *)val =
+		    dfl ? mxfep->mxfe_cap_aneg : mxfep->mxfe_adv_aneg;
+		break;
+
+	case DLD_PROP_ADV_100FDX_CAP:
+	case DLD_PROP_EN_100FDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? mxfep->mxfe_cap_100fdx : mxfep->mxfe_adv_100fdx;
+		break;
+
+	case DLD_PROP_ADV_100HDX_CAP:
+	case DLD_PROP_EN_100HDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? mxfep->mxfe_cap_100hdx : mxfep->mxfe_adv_100hdx;
+		break;
+
+	case DLD_PROP_ADV_10FDX_CAP:
+	case DLD_PROP_EN_10FDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? mxfep->mxfe_cap_10fdx : mxfep->mxfe_adv_10fdx;
+		break;
+
+	case DLD_PROP_ADV_10HDX_CAP:
+	case DLD_PROP_EN_10HDX_CAP:
+		*(uint8_t *)val =
+		    dfl ? mxfep->mxfe_cap_10hdx : mxfep->mxfe_adv_10hdx;
+		break;
+
+	case DLD_PROP_ADV_100T4_CAP:
+	case DLD_PROP_EN_100T4_CAP:
+		*(uint8_t *)val =
+		    dfl ? mxfep->mxfe_cap_100T4 : mxfep->mxfe_adv_100T4;
+		break;
+
+	default:
+		err = ENOTSUP;
 	}
-	return (0);
+
+	return (err);
 }
 
 /*ARGSUSED*/
 int
-mxfe_ndgetint(mxfe_t *mxfep, mblk_t *mp, mxfe_nd_t *ndp)
+mxfe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    const void *val)
 {
-	int		val;
-	char		buf[16];
+	mxfe_t		*mxfep = arg;
+	uint8_t		*advp;
+	uint8_t		*capp;
 
-	val = *(int *)ndp->nd_arg1;
+	switch (num) {
+	case DLD_PROP_EN_100FDX_CAP:
+		advp = &mxfep->mxfe_adv_100fdx;
+		capp = &mxfep->mxfe_cap_100fdx;
+		break;
 
-	(void) snprintf(buf, sizeof (buf), "%d", val);
-	return (mxfe_ndaddstr(mp, buf, 1));
-}
+	case DLD_PROP_EN_100HDX_CAP:
+		advp = &mxfep->mxfe_adv_100hdx;
+		capp = &mxfep->mxfe_cap_100hdx;
+		break;
 
-/*ARGSUSED*/
-int
-mxfe_ndgetbit(mxfe_t *mxfep, mblk_t *mp, mxfe_nd_t *ndp)
-{
-	unsigned	val;
-	unsigned	mask;
+	case DLD_PROP_EN_10FDX_CAP:
+		advp = &mxfep->mxfe_adv_10fdx;
+		capp = &mxfep->mxfe_cap_10fdx;
+		break;
 
-	val = *(unsigned *)ndp->nd_arg1;
-	mask = (unsigned)ndp->nd_arg2;
+	case DLD_PROP_EN_10HDX_CAP:
+		advp = &mxfep->mxfe_adv_10hdx;
+		capp = &mxfep->mxfe_cap_10hdx;
+		break;
 
-	return (mxfe_ndaddstr(mp, val & mask ? "1" : "0", 1));
-}
+	case DLD_PROP_EN_100T4_CAP:
+		advp = &mxfep->mxfe_adv_100T4;
+		capp = &mxfep->mxfe_cap_100T4;
+		break;
 
-int
-mxfe_ndsetadv(mxfe_t *mxfep, mblk_t *mp, mxfe_nd_t *ndp)
-{
-	unsigned	*ptr = (unsigned *)ndp->nd_arg1;
-	unsigned	oldval, newval;
+	case DLD_PROP_AUTONEG:
+		advp = &mxfep->mxfe_adv_aneg;
+		capp = &mxfep->mxfe_cap_aneg;
+		break;
 
-	newval = mxfe_ndparseint(mp) ? 1 : 0;
+	default:
+		return (ENOTSUP);
+	}
+
+	if (*capp == 0)		/* ensure phy can support value */
+		return (ENOTSUP);
 
 	mutex_enter(&mxfep->mxfe_intrlock);
 	mutex_enter(&mxfep->mxfe_xmtlock);
 
-	oldval = *ptr;
-	if (oldval != newval) {
-		*ptr = newval;
+	if (*advp != *(const uint8_t *)val) {
+		*advp = *(const uint8_t *)val;
+
 		if ((mxfep->mxfe_flags & (MXFE_RUNNING|MXFE_SUSPENDED)) ==
 		    MXFE_RUNNING) {
 			/*
@@ -3191,65 +2990,6 @@ mxfe_ndsetadv(mxfe_t *mxfep, mblk_t *mp, mxfe_nd_t *ndp)
 	mutex_exit(&mxfep->mxfe_intrlock);
 
 	return (0);
-}
-
-void
-mxfe_ndfini(mxfe_t *mxfep)
-{
-	mxfe_nd_t	*ndp;
-
-	while ((ndp = mxfep->mxfe_ndp) != NULL) {
-		mxfep->mxfe_ndp = ndp->nd_next;
-		kmem_free(ndp, sizeof (mxfe_nd_t));
-	}
-}
-
-void
-mxfe_ndinit(mxfe_t *mxfep)
-{
-	mxfe_ndadd(mxfep, "?", mxfe_ndquestion, NULL, 0, 0);
-	mxfe_ndadd(mxfep, "link_status", mxfe_ndgetint, NULL,
-	    (intptr_t)&mxfep->mxfe_linkup, 0);
-	mxfe_ndadd(mxfep, "link_speed", mxfe_ndgetint, NULL,
-	    (intptr_t)&mxfep->mxfe_ifspeed, 0);
-	mxfe_ndadd(mxfep, "link_duplex", mxfe_ndgetint, NULL,
-	    (intptr_t)&mxfep->mxfe_duplex, 0);
-	mxfe_ndadd(mxfep, "adv_autoneg_cap", mxfe_ndgetint, mxfe_ndsetadv,
-	    (intptr_t)&mxfep->mxfe_adv_aneg, 0);
-	mxfe_ndadd(mxfep, "adv_100T4_cap", mxfe_ndgetint, mxfe_ndsetadv,
-	    (intptr_t)&mxfep->mxfe_adv_100T4, 0);
-	mxfe_ndadd(mxfep, "adv_100fdx_cap", mxfe_ndgetint, mxfe_ndsetadv,
-	    (intptr_t)&mxfep->mxfe_adv_100fdx, 0);
-	mxfe_ndadd(mxfep, "adv_100hdx_cap", mxfe_ndgetint, mxfe_ndsetadv,
-	    (intptr_t)&mxfep->mxfe_adv_100hdx, 0);
-	mxfe_ndadd(mxfep, "adv_10fdx_cap",  mxfe_ndgetint, mxfe_ndsetadv,
-	    (intptr_t)&mxfep->mxfe_adv_10fdx, 0);
-	mxfe_ndadd(mxfep, "adv_10hdx_cap",  mxfe_ndgetint, mxfe_ndsetadv,
-	    (intptr_t)&mxfep->mxfe_adv_10hdx, 0);
-	mxfe_ndadd(mxfep, "autoneg_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_bmsr, MII_STATUS_CANAUTONEG);
-	mxfe_ndadd(mxfep, "100T4_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_bmsr, MII_STATUS_100_BASE_T4);
-	mxfe_ndadd(mxfep, "100fdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_bmsr, MII_STATUS_100_BASEX_FD);
-	mxfe_ndadd(mxfep, "100hdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_bmsr, MII_STATUS_100_BASEX);
-	mxfe_ndadd(mxfep, "10fdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_bmsr, MII_STATUS_10_FD);
-	mxfe_ndadd(mxfep, "10hdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_bmsr, MII_STATUS_10);
-	mxfe_ndadd(mxfep, "lp_autoneg_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_aner, MII_AN_EXP_LPCANAN);
-	mxfe_ndadd(mxfep, "lp_100T4_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_anlpar, MII_ABILITY_100BASE_T4);
-	mxfe_ndadd(mxfep, "lp_100fdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_anlpar, MII_ABILITY_100BASE_TX_FD);
-	mxfe_ndadd(mxfep, "lp_100hdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_anlpar, MII_ABILITY_100BASE_TX);
-	mxfe_ndadd(mxfep, "lp_10fdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_anlpar, MII_ABILITY_10BASE_T_FD);
-	mxfe_ndadd(mxfep, "lp_10hdx_cap", mxfe_ndgetbit, NULL,
-	    (intptr_t)&mxfep->mxfe_anlpar, MII_ABILITY_10BASE_T);
 }
 
 /*

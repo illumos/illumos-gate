@@ -28,6 +28,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef	_AFEIMPL_H
 #define	_AFEIMPL_H
@@ -54,11 +58,9 @@
 
 typedef struct afe afe_t;
 typedef struct afe_card afe_card_t;
-typedef struct afe_nd afe_nd_t;
 typedef struct afe_rxbuf afe_rxbuf_t;
 typedef struct afe_txbuf afe_txbuf_t;
 typedef struct afe_desc afe_desc_t;
-typedef int (*afe_nd_pf_t)(afe_t *, mblk_t *, afe_nd_t *);
 
 /*
  * Card models.
@@ -73,15 +75,6 @@ struct afe_card {
 	uint16_t	card_devid;	/* PCI device id */
 	char		*card_cardname;	/* Description of the card */
 	afe_model_t	card_model;	/* Card specific flags */
-};
-
-struct afe_nd {
-	afe_nd_t	*nd_next;
-	char		*nd_name;
-	afe_nd_pf_t	nd_get;
-	afe_nd_pf_t	nd_set;
-	intptr_t	nd_arg1;
-	intptr_t	nd_arg2;
 };
 
 /*
@@ -131,17 +124,12 @@ struct afe {
 	/*
 	 * Link state.
 	 */
-	int			afe_lastifspeed;
-	int			afe_lastduplex;
-	int			afe_linkup;
-	int			afe_duplex;
-	int			afe_ifspeed;
+	uint64_t		afe_lastifspeed;
+	link_state_t		afe_linkup;
+	link_duplex_t		afe_lastduplex;
+	link_duplex_t		afe_duplex;
+	uint64_t		afe_ifspeed;
 	boolean_t		afe_resetting;	/* no link warning */
-
-	/*
-	 * NDD related support.
-	 */
-	afe_nd_t		*afe_ndp;
 
 	/*
 	 * Transceiver stuff.
@@ -149,13 +137,20 @@ struct afe {
 	int			afe_phyaddr;
 	int			afe_phyid;
 	int			afe_phyinuse;
-	int			afe_adv_aneg;
-	int			afe_adv_100T4;
-	int			afe_adv_100fdx;
-	int			afe_adv_100hdx;
-	int			afe_adv_10fdx;
-	int			afe_adv_10hdx;
-	int			afe_forcephy;
+
+	uint8_t			afe_adv_aneg;
+	uint8_t			afe_adv_100T4;
+	uint8_t			afe_adv_100fdx;
+	uint8_t			afe_adv_100hdx;
+	uint8_t			afe_adv_10fdx;
+	uint8_t			afe_adv_10hdx;
+	uint8_t			afe_cap_aneg;
+	uint8_t			afe_cap_100T4;
+	uint8_t			afe_cap_100fdx;
+	uint8_t			afe_cap_100hdx;
+	uint8_t			afe_cap_10fdx;
+	uint8_t			afe_cap_10hdx;
+
 	int			afe_forcefiber;
 
 	/*
