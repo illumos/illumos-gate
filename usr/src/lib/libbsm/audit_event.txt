@@ -347,6 +347,10 @@
 300:AUE_PF_POLICY_ALGS:Update IPsec algorithms:as
 301:AUE_PORTFS:portfs(2) - file events source:fa
 #
+302:AUE_LABELSYS_TNRH:tnrh(2) - config TN remote host cache:as
+303:AUE_LABELSYS_TNRHTP:tnrhtp(2) - config TN remote host template cache:as
+304:AUE_LABELSYS_TNMLP:tnmlp(2) - config TN multi-level port entry:as
+#
 # user level audit events
 #	2048 -  6143	Reserved
 #

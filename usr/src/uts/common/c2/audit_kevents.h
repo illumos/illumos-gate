@@ -338,9 +338,13 @@ extern "C" {
 #define	AUE_PF_POLICY_FLUSH	299	/* =as Flush IPsec policy rules */
 #define	AUE_PF_POLICY_ALGS	300	/* =as Update IPsec algorithms */
 #define	AUE_PORTFS		301	/* =fa */
+#define	AUE_LABELSYS_TNRH	302	/* =as tnrh(2) */
+#define	AUE_LABELSYS_TNRHTP	303	/* =as tnrhtp(2) */
+#define	AUE_LABELSYS_TNMLP	304	/* =as tnmlp(2) */
+
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		301
+#define	MAX_KEVENTS		304
 
 
 #ifdef __cplusplus

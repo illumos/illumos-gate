@@ -2282,3 +2282,44 @@ label=AUE_uadmin_solaris
   comment=function code:argument code
 # not used. Replaced by AUE_uadmin_* events, see uadmin.c, adt.xml
 
+label=AUE_LABELSYS_TNRH
+  title=config Trusted Network remote host cache
+  see=tnrh(2)
+  syscall=labelsys: TSOL_TNRH
+  case=With the flush command (cmd=3)
+    format=arg1
+      comment=1, command, "cmd"
+  case=With the load (cmd=1) and delete (cmd=2) commands
+    format=arg1:inaddr2:arg3
+      comment=1, command, "cmd":
+      comment=ip address of host:
+      comment=2, prefix length, "prefix len"
+
+label=AUE_LABELSYS_TNRHTP
+  title=config Trusted Network remote host template
+  see=tnrhtp(2)
+  syscall=labelsys: TSOL_TNRHTP
+  case=With the flush command (cmd=3)
+    format=arg1
+      comment=1, command, "cmd"
+  case=With the load (cmd=1) and delete (cmd=2) commands
+    format=arg1:text2
+      comment=1, command, "cmd":
+      comment=name of template
+
+label=AUE_LABELSYS_TNMLP
+  title=config Trusted Network multi-level port entry
+  see=tnmlp(2)
+  syscall=labelsys: TSOL_TNMLP
+  case=With the flush command (cmd=3)
+    format=arg1:text2
+      comment=1, command, "cmd":
+      comment="shared", or name of zone
+  case=With the load (cmd=1) and delete (cmd=2) commands
+    format=arg1:text2:arg3:arg4:[arg]5
+      comment=1, command, "cmd":
+      comment="shared", or name of zone:
+      comment=2, protocol number, "proto num":
+      comment=2, starting mlp port number, "mlp_port":
+      comment=2, ending mlp port number, "mlp_port_upper"
+

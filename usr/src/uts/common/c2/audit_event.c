@@ -57,6 +57,8 @@
 #include <sys/file.h>		/* for accept */
 #include <sys/utssys.h>		/* for fuser */
 #include <sys/tsol/label.h>
+#include <sys/tsol/tndb.h>
+#include <sys/tsol/tsyscall.h>
 #include <c2/audit.h>
 #include <c2/audit_kernel.h>
 #include <c2/audit_kevents.h>
@@ -98,6 +100,7 @@ static au_event_t	aui_acl(au_event_t);
 static au_event_t	aui_doorfs(au_event_t);
 static au_event_t	aui_privsys(au_event_t);
 static au_event_t	aui_forksys(au_event_t);
+static au_event_t	aui_labelsys(au_event_t);
 
 static void	aus_open(struct t_audit_data *);
 static void	aus_acl(struct t_audit_data *);
@@ -142,6 +145,7 @@ static void	aus_kill(struct t_audit_data *);
 static void	aus_xmknod(struct t_audit_data *);
 static void	aus_setregid(struct t_audit_data *);
 static void	aus_setreuid(struct t_audit_data *);
+static void	aus_labelsys(struct t_audit_data *);
 
 static void	auf_mknod(struct t_audit_data *, int, rval_t *);
 static void	auf_msgsys(struct t_audit_data *, int, rval_t *);
@@ -580,7 +584,7 @@ aui_portfs,	AUE_PORTFS,	aus_null,	/* 182 (loadable) portfs */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 183 (loadable) */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 184 (loadable) tsolsys */
+aui_labelsys,	AUE_NULL,	aus_labelsys,	/* 184 labelsys */
 		auf_null,	0,
 aui_acl,	AUE_ACLSET,	aus_acl,	/* 185 acl */
 		auf_null,	0,
@@ -2577,6 +2581,167 @@ aus_getpmsg(struct t_audit_data *tad)
 }
 
 static au_event_t
+aui_labelsys(au_event_t e)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t code;
+	uint32_t cmd;
+
+	struct a {
+		long	code;
+		long	cmd;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	code = (uint32_t)uap->code;
+	cmd = (uint32_t)uap->cmd;
+
+	/* not security relevant if not changing kernel cache */
+	if (cmd == TNDB_GET)
+		return (NULL);
+
+	switch (code) {
+	case TSOL_TNRH:
+		e = AUE_LABELSYS_TNRH;
+		break;
+	case TSOL_TNRHTP:
+		e = AUE_LABELSYS_TNRHTP;
+		break;
+	case TSOL_TNMLP:
+		e = AUE_LABELSYS_TNMLP;
+		break;
+	default:
+		e = AUE_NULL;
+		break;
+	}
+
+	return (e);
+
+}
+
+/*ARGSUSED*/
+static void
+aus_labelsys(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t cmd;
+	uintptr_t a2;
+
+	struct a {
+		long	code;
+		long	cmd;
+		long	a2;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	cmd = (uint32_t)uap->cmd;
+	a2 = (uintptr_t)uap->a2;
+
+	switch (tad->tad_event) {
+	case AUE_LABELSYS_TNRH:
+	{
+		tsol_rhent_t	*rhent;
+		tnaddr_t	*rh_addr;
+
+		au_uwrite(au_to_arg32(1, "cmd", cmd));
+
+		/* Remaining args don't apply for FLUSH, so skip */
+		if (cmd == TNDB_FLUSH)
+			break;
+
+		rhent = kmem_alloc(sizeof (tsol_rhent_t), KM_SLEEP);
+		if (copyin((caddr_t)a2, rhent, sizeof (tsol_rhent_t))) {
+			kmem_free(rhent, sizeof (tsol_rhent_t));
+			return;
+		}
+
+		rh_addr = &rhent->rh_address;
+		if (rh_addr->ta_family == AF_INET) {
+			struct in_addr	*ipaddr;
+
+			ipaddr = &(rh_addr->ta_addr_v4);
+			au_uwrite(au_to_in_addr(ipaddr));
+		} else if (rh_addr->ta_family == AF_INET6) {
+			int32_t		*ipaddr;
+
+			ipaddr = (int32_t *)&(rh_addr->ta_addr_v6);
+			au_uwrite(au_to_in_addr_ex(ipaddr));
+		}
+		au_uwrite(au_to_arg32(2, "prefix len", rhent->rh_prefix));
+
+		kmem_free(rhent, sizeof (tsol_rhent_t));
+
+		break;
+	}
+	case AUE_LABELSYS_TNRHTP:
+	{
+		tsol_tpent_t	*tpent;
+
+		au_uwrite(au_to_arg32(1, "cmd", cmd));
+
+		/* Remaining args don't apply for FLUSH, so skip */
+		if (cmd == TNDB_FLUSH)
+			break;
+
+		tpent = kmem_alloc(sizeof (tsol_tpent_t), KM_SLEEP);
+		if (copyin((caddr_t)a2, tpent, sizeof (tsol_tpent_t))) {
+			kmem_free(tpent, sizeof (tsol_tpent_t));
+			return;
+		}
+
+		au_uwrite(au_to_text(tpent->name));
+		kmem_free(tpent, sizeof (tsol_tpent_t));
+
+		break;
+	}
+	case AUE_LABELSYS_TNMLP:
+	{
+		tsol_mlpent_t	*mlpent;
+
+		au_uwrite(au_to_arg32(1, "cmd", cmd));
+
+		mlpent = kmem_alloc(sizeof (tsol_mlpent_t), KM_SLEEP);
+		if (copyin((caddr_t)a2, mlpent, sizeof (tsol_mlpent_t))) {
+			kmem_free(mlpent, sizeof (tsol_mlpent_t));
+			return;
+		}
+
+		if (mlpent->tsme_flags & TSOL_MEF_SHARED) {
+			au_uwrite(au_to_text("shared"));
+		} else {
+			zone_t	*zone;
+
+			zone = zone_find_by_id(mlpent->tsme_zoneid);
+			if (zone != NULL) {
+				au_uwrite(au_to_text(zone->zone_name));
+				zone_rele(zone);
+			}
+		}
+
+		/* Remaining args don't apply for FLUSH, so skip */
+		if (cmd == TNDB_FLUSH) {
+			kmem_free(mlpent, sizeof (tsol_mlpent_t));
+			break;
+		}
+
+		au_uwrite(au_to_arg32(2, "proto num",
+		    (uint32_t)mlpent->tsme_mlp.mlp_ipp));
+		au_uwrite(au_to_arg32(2, "mlp_port",
+		    (uint32_t)mlpent->tsme_mlp.mlp_port));
+
+		if (mlpent->tsme_mlp.mlp_port_upper != 0)
+			au_uwrite(au_to_arg32(2, "mlp_port_upper",
+			    (uint32_t)mlpent->tsme_mlp.mlp_port_upper));
+
+		kmem_free(mlpent, sizeof (tsol_mlpent_t));
+
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+
+static au_event_t
 aui_auditsys(au_event_t e)
 {
 	klwp_t *clwp = ttolwp(curthread);
@@ -2686,15 +2851,7 @@ aui_auditsys(au_event_t e)
 
 	return (e);
 
-
-
-
 }	/* AUI_AUDITSYS */
-
-
-
-
-
 
 
 static void
