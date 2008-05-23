@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -346,10 +346,13 @@ queue_str(target_queue_t *q, uint32_t lvl, msg_type_t type, char *fmt)
 	hrtime_t	h	= gethrtime();
 	hrtime_t	delta;
 	static hrtime_t	last_h	= 0;
+	time_t		tval = time((time_t *)0);
+	char		debug[80];
 
 	(void) pthread_mutex_lock(&q_mutex);
 	if ((qlog) && (qlog_lvl & lvl)) {
-		(void) fprintf(qlog, "%s", fmt);
+		ctime_r(&tval, debug, sizeof (debug));
+		(void) fprintf(qlog, "%s %s", debug, fmt);
 		(void) fflush(qlog);
 	}
 	(void) pthread_mutex_unlock(&q_mutex);

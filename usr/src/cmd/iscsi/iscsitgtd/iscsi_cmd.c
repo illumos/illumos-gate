@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,7 @@ void
 iscsi_cmd_cancel(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 {
 	(void) pthread_mutex_lock(&c->c_mutex);
+	(void) pthread_mutex_lock(&c->c_state_mutex);
 	if (cmd->c_state == CmdAlloc) {
 		cmd->c_state = CmdCanceled;
 		if (cmd->c_t10_cmd != NULL) {
@@ -167,6 +168,7 @@ iscsi_cmd_cancel(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 			cmd->c_t10_cmd = NULL;
 		}
 	}
+	(void) pthread_mutex_unlock(&c->c_state_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);
 }
 
@@ -184,9 +186,8 @@ iscsi_cmd_cancel(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 void
 iscsi_cmd_remove(iscsi_conn_t *c, uint32_t statsn)
 {
-	iscsi_cmd_t	*cmd,
-			*cmd_free = NULL,
-			*n;
+	iscsi_cmd_t	*cmd, *n;
+	iscsi_cmd_t	*cmd_free = NULL;
 
 	(void) pthread_mutex_lock(&c->c_mutex);
 	for (cmd = c->c_cmd_head; cmd; ) {
@@ -290,7 +291,8 @@ iscsi_cmd_window(iscsi_conn_t *c)
 		 * complete on our end. Close down the command window to
 		 * prevent the initiator from timing out commands.
 		 */
-		cnt = (c->c_cmds_active > 5) ? 0 : 5 - c->c_cmds_active;
+		cnt = (c->c_cmds_active >= c->c_maxcmdsn) ? 0 :
+		    (c->c_maxcmdsn - c->c_cmds_active) / 2;
 
 	} else {
 		cnt = (c->c_cmds_active >= c->c_maxcmdsn) ? 0 :
@@ -303,9 +305,8 @@ iscsi_cmd_window(iscsi_conn_t *c)
 void
 iscsi_cmd_delayed_store(iscsi_cmd_t *cmd, t10_cmd_t *t)
 {
-	iscsi_delayed_t	*d,
-			*n,
-			*l	= NULL;
+	iscsi_delayed_t	*d, *n;
+	iscsi_delayed_t	*l	= NULL;
 
 	if ((d = (iscsi_delayed_t *)calloc(1, sizeof (*d))) == NULL) {
 		syslog(LOG_ERR, "Failed to allocate space for delayed I/O");
