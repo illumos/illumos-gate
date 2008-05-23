@@ -4023,12 +4023,14 @@ static struct builtin builtin_findroot =
   "findroot",
   findroot_func,
   BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
-  "findroot  <SIGNATURE-FILE | (SIGNATURE-FILE,partition[,slice])>",
-  "Search for the root partition that contains the specified SIGNATURE-FILE."
-  " The SIGNATURE-FILE is assumed to be unique across all partitions."
+  "findroot  <SIGNATURE | (SIGNATURE,partition[,slice])>",
+  "Searches across all partitions for the file name SIGNATURE."
+  " GRUB looks only in the directory /boot/grub/bootsign for the"
+  " filename and it stops as soon as it finds the first instance of"
+  " the file - so to be useful the name of the signature file must be"
+  " unique across all partitions. Once the signature file is found,"
+  " GRUB invokes the \"root\" command on that partition."
   " An optional partition and slice may be specified to optimize the search."
-  " GRUB stops at the first root partition that has the specified"
-  " SIGNATURE-FILE and then invokes the \"root\" command on that device."
 };
 
 

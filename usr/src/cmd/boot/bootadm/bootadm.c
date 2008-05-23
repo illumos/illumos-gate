@@ -58,6 +58,7 @@
 #include <ctype.h>
 #include <libgen.h>
 #include <sys/sysmacros.h>
+#include <libscf.h>
 
 #if !defined(_OPB)
 #include <sys/ucode.h>
@@ -104,8 +105,10 @@ typedef struct {
 #define	ALL_ENTRIES	-2	/* selects all boot entries */
 
 #define	GRUB_DIR		"/boot/grub"
+#define	GRUB_STAGE2		GRUB_DIR "/stage2"
 #define	GRUB_MENU		"/boot/grub/menu.lst"
 #define	MENU_TMP		"/boot/grub/menu.lst.tmp"
+#define	GRUB_BACKUP_MENU	"/etc/lu/GRUB_backup_menu"
 #define	RAMDISK_SPECIAL		"/ramdisk"
 #define	STUBBOOT		"/stubboot"
 #define	MULTIBOOT		"/platform/i86pc/multiboot"
@@ -132,6 +135,12 @@ typedef struct {
 #define	GRUB_root		"/etc/lu/GRUB_root"
 #define	GRUB_fdisk		"/etc/lu/GRUB_fdisk"
 #define	GRUB_fdisk_target	"/etc/lu/GRUB_fdisk_target"
+#define	FINDROOT_INSTALLGRUB	"/etc/lu/installgrub.findroot"
+#define	LULIB			"/usr/lib/lu/lulib"
+#define	LULIB_PROPAGATE_FILE	"lulib_propagate_file"
+#define	CKSUM			"/usr/bin/cksum"
+#define	LU_MENU_CKSUM		"/etc/lu/menu.cksum"
+#define	BOOTADM			"/sbin/bootadm"
 
 #define	INSTALLGRUB		"/sbin/installgrub"
 #define	STAGE1			"/boot/grub/stage1"
@@ -274,6 +283,7 @@ static void append_to_flist(filelist_t *, char *);
 static char *mount_top_dataset(char *pool, zfs_mnted_t *mnted);
 static int umount_top_dataset(char *pool, zfs_mnted_t mnted, char *mntpt);
 static int ufs_add_to_sign_list(char *sign);
+static error_t synchronize_BE_menu(void);
 
 #if !defined(_OPB)
 static void ucode_install();
@@ -1153,7 +1163,9 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 		bam_error(OPEN_FAIL, tmpfile, strerror(errno));
 		return (BAM_ERROR);
 	}
-	if (fclose(fp) == EOF) {
+	ret = fclose(fp);
+	INJECT_ERROR1("LIST2FILE_TRUNC_FCLOSE", ret = EOF);
+	if (ret == EOF) {
 		bam_error(CLOSE_FAIL, tmpfile, strerror(errno));
 		return (BAM_ERROR);
 	}
@@ -1166,14 +1178,18 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 	}
 
 	for (; start; start = start->next) {
-		if (s_fputs(start->line, fp) == EOF) {
+		ret = s_fputs(start->line, fp);
+		INJECT_ERROR1("LIST2FILE_FPUTS", ret = EOF);
+		if (ret == EOF) {
 			bam_error(WRITE_FAIL, tmpfile, strerror(errno));
 			(void) fclose(fp);
 			return (BAM_ERROR);
 		}
 	}
 
-	if (fclose(fp) == EOF) {
+	ret = fclose(fp);
+	INJECT_ERROR1("LIST2FILE_APPEND_FCLOSE", ret = EOF);
+	if (ret == EOF) {
 		bam_error(CLOSE_FAIL, tmpfile, strerror(errno));
 		return (BAM_ERROR);
 	}
@@ -1202,6 +1218,7 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 	 * Do an atomic rename
 	 */
 	ret = rename(tmpfile, path);
+	INJECT_ERROR1("LIST2FILE_RENAME", ret = -1);
 	if (ret != 0) {
 		bam_error(RENAME_FAIL, path, strerror(errno));
 		return (BAM_ERROR);
@@ -1926,6 +1943,12 @@ is_boot_archive(char *root)
 
 /*
  * Need to call this for anything that operates on the GRUB menu
+ * In the x86 live upgrade case the directory /boot/grub may be present
+ * even on pre-newboot BEs. The authoritative way to check for a GRUB target
+ * is to check for the presence of the stage2 binary which is present
+ * only on GRUB targets (even on x86 boot partitions). Checking for the
+ * presence of the multiboot binary is not correct as it is not present
+ * on x86 boot partitions.
  */
 int
 is_grub(const char *root)
@@ -1934,7 +1957,7 @@ is_grub(const char *root)
 	struct stat sb;
 	const char *fcn = "is_grub()";
 
-	(void) snprintf(path, sizeof (path), "%s%s", root, GRUB_DIR);
+	(void) snprintf(path, sizeof (path), "%s%s", root, GRUB_STAGE2);
 	if (stat(path, &sb) == -1) {
 		BAM_DPRINTF((D_NO_GRUB_DIR, fcn, path));
 		return (0);
@@ -2124,32 +2147,186 @@ update_archive(char *root, char *opt)
 	return (ret);
 }
 
-static void
-update_fdisk(void)
+static error_t
+synchronize_BE_menu(void)
 {
-	struct stat sb;
-	char cmd[PATH_MAX];
-	int ret1, ret2;
+	struct stat	sb;
+	char		cmdline[PATH_MAX];
+	char		cksum_line[PATH_MAX];
+	filelist_t	flist = {0};
+	char		*old_cksum_str;
+	char		*old_size_str;
+	char		*old_file;
+	char		*curr_cksum_str;
+	char		*curr_size_str;
+	char		*curr_file;
+	FILE		*cfp;
+	int		found;
+	int		ret;
+	const char	*fcn = "synchronize_BE_menu()";
 
-	assert(stat(GRUB_fdisk, &sb) == 0);
-	assert(stat(GRUB_fdisk_target, &sb) == 0);
+	BAM_DPRINTF((D_FUNC_ENTRY0, fcn));
 
-	(void) snprintf(cmd, sizeof (cmd), "/sbin/fdisk -F %s `/bin/cat %s`",
-	    GRUB_fdisk, GRUB_fdisk_target);
-
-	bam_print(UPDATING_FDISK);
-	if (exec_cmd(cmd, NULL) != 0) {
-		bam_error(FDISK_UPDATE_FAILED);
+	/* Check if findroot enabled LU BE */
+	if (stat(FINDROOT_INSTALLGRUB, &sb) != 0) {
+		BAM_DPRINTF((D_NOT_LU_BE, fcn));
+		return (BAM_SUCCESS);
 	}
 
-	/*
-	 * We are done, remove the files.
-	 */
-	ret1 = unlink(GRUB_fdisk);
-	ret2 = unlink(GRUB_fdisk_target);
-	if (ret1 != 0 || ret2 != 0) {
-		bam_error(FILE_REMOVE_FAILED, GRUB_fdisk, GRUB_fdisk_target);
+	if (stat(LU_MENU_CKSUM, &sb) != 0) {
+		BAM_DPRINTF((D_NO_CKSUM_FILE, fcn, LU_MENU_CKSUM));
+		goto menu_sync;
 	}
+
+	cfp = fopen(LU_MENU_CKSUM, "r");
+	INJECT_ERROR1("CKSUM_FILE_MISSING", cfp = NULL);
+	if (cfp == NULL) {
+		bam_error(CANNOT_READ_LU_CKSUM, LU_MENU_CKSUM);
+		goto menu_sync;
+	}
+	BAM_DPRINTF((D_CKSUM_FILE_OPENED, fcn, LU_MENU_CKSUM));
+
+	found = 0;
+	while (s_fgets(cksum_line, sizeof (cksum_line), cfp) != NULL) {
+		INJECT_ERROR1("MULTIPLE_CKSUM", found = 1);
+		if (found) {
+			bam_error(MULTIPLE_LU_CKSUM, LU_MENU_CKSUM);
+			(void) fclose(cfp);
+			goto menu_sync;
+		}
+		found = 1;
+	}
+	BAM_DPRINTF((D_CKSUM_FILE_READ, fcn, LU_MENU_CKSUM));
+
+
+	old_cksum_str = strtok(cksum_line, " \t");
+	old_size_str = strtok(NULL, " \t");
+	old_file = strtok(NULL, " \t");
+
+	INJECT_ERROR1("OLD_CKSUM_NULL", old_cksum_str = NULL);
+	INJECT_ERROR1("OLD_SIZE_NULL", old_size_str = NULL);
+	INJECT_ERROR1("OLD_FILE_NULL", old_file = NULL);
+	if (old_cksum_str == NULL || old_size_str == NULL || old_file == NULL) {
+		bam_error(CANNOT_PARSE_LU_CKSUM, LU_MENU_CKSUM);
+		goto menu_sync;
+	}
+	BAM_DPRINTF((D_CKSUM_FILE_PARSED, fcn, LU_MENU_CKSUM));
+
+	/* Get checksum of current menu */
+	(void) snprintf(cmdline, sizeof (cmdline), "%s %s",
+	    CKSUM, GRUB_MENU);
+	ret = exec_cmd(cmdline, &flist);
+	INJECT_ERROR1("GET_CURR_CKSUM", ret = 1);
+	if (ret != 0) {
+		bam_error(MENU_CKSUM_FAIL);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_CKSUM_GEN_SUCCESS, fcn));
+
+	INJECT_ERROR1("GET_CURR_CKSUM_OUTPUT", flist.head = NULL);
+	if ((flist.head == NULL) || (flist.head != flist.tail)) {
+		bam_error(BAD_CKSUM);
+		filelist_free(&flist);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_CKSUM_GEN_OUTPUT_VALID, fcn));
+
+	curr_cksum_str = strtok(flist.head->line, " \t");
+	curr_size_str = strtok(NULL, " \t");
+	curr_file = strtok(NULL, " \t");
+
+	INJECT_ERROR1("CURR_CKSUM_NULL", curr_cksum_str = NULL);
+	INJECT_ERROR1("CURR_SIZE_NULL", curr_size_str = NULL);
+	INJECT_ERROR1("CURR_FILE_NULL", curr_file = NULL);
+	if (curr_cksum_str == NULL || curr_size_str == NULL ||
+	    curr_file == NULL) {
+		bam_error(BAD_CKSUM_PARSE);
+		filelist_free(&flist);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_CKSUM_GEN_PARSED, fcn));
+
+	if (strcmp(old_cksum_str, curr_cksum_str) == 0 &&
+	    strcmp(old_size_str, curr_size_str) == 0 &&
+	    strcmp(old_file, curr_file) == 0) {
+		filelist_free(&flist);
+		BAM_DPRINTF((D_CKSUM_NO_CHANGE, fcn));
+		return (BAM_SUCCESS);
+	}
+
+	filelist_free(&flist);
+
+	/* cksum doesn't match - the menu has changed */
+	BAM_DPRINTF((D_CKSUM_HAS_CHANGED, fcn));
+
+menu_sync:
+	bam_print(PROP_GRUB_MENU);
+
+	(void) snprintf(cmdline, sizeof (cmdline),
+	    "/bin/sh -c '. %s; %s %s yes'",
+	    LULIB, LULIB_PROPAGATE_FILE, GRUB_MENU);
+	ret = exec_cmd(cmdline, NULL);
+	INJECT_ERROR1("PROPAGATE_MENU", ret = 1);
+	if (ret != 0) {
+		bam_error(MENU_PROP_FAIL);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_PROPAGATED_MENU, fcn));
+
+	(void) snprintf(cmdline, sizeof (cmdline), "/bin/cp %s %s",
+	    GRUB_MENU, GRUB_BACKUP_MENU);
+	ret = exec_cmd(cmdline, NULL);
+	INJECT_ERROR1("CREATE_BACKUP", ret = 1);
+	if (ret != 0) {
+		bam_error(MENU_BACKUP_FAIL, GRUB_BACKUP_MENU);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_CREATED_BACKUP, fcn, GRUB_BACKUP_MENU));
+
+	(void) snprintf(cmdline, sizeof (cmdline),
+	    "/bin/sh -c '. %s; %s %s no'",
+	    LULIB, LULIB_PROPAGATE_FILE, GRUB_BACKUP_MENU);
+	ret = exec_cmd(cmdline, NULL);
+	INJECT_ERROR1("PROPAGATE_BACKUP", ret = 1);
+	if (ret != 0) {
+		bam_error(BACKUP_PROP_FAIL, GRUB_BACKUP_MENU);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_PROPAGATED_BACKUP, fcn, GRUB_BACKUP_MENU));
+
+	(void) snprintf(cmdline, sizeof (cmdline), "%s %s > %s",
+	    CKSUM, GRUB_MENU, LU_MENU_CKSUM);
+	ret = exec_cmd(cmdline, NULL);
+	INJECT_ERROR1("CREATE_CKSUM_FILE", ret = 1);
+	if (ret != 0) {
+		bam_error(MENU_CKSUM_WRITE_FAIL, LU_MENU_CKSUM);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_CREATED_CKSUM_FILE, fcn, LU_MENU_CKSUM));
+
+	(void) snprintf(cmdline, sizeof (cmdline),
+	    "/bin/sh -c '. %s; %s %s no'",
+	    LULIB, LULIB_PROPAGATE_FILE, LU_MENU_CKSUM);
+	ret = exec_cmd(cmdline, NULL);
+	INJECT_ERROR1("PROPAGATE_MENU_CKSUM_FILE", ret = 1);
+	if (ret != 0) {
+		bam_error(MENU_CKSUM_PROP_FAIL, LU_MENU_CKSUM);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_PROPAGATED_CKSUM_FILE, fcn, LU_MENU_CKSUM));
+
+	(void) snprintf(cmdline, sizeof (cmdline),
+	    "/bin/sh -c '. %s; %s %s no'",
+	    LULIB, LULIB_PROPAGATE_FILE, BOOTADM);
+	ret = exec_cmd(cmdline, NULL);
+	INJECT_ERROR1("PROPAGATE_BOOTADM_FILE", ret = 1);
+	if (ret != 0) {
+		bam_error(BOOTADM_PROP_FAIL, BOOTADM);
+		return (BAM_ERROR);
+	}
+	BAM_DPRINTF((D_PROPAGATED_BOOTADM, fcn, BOOTADM));
+
+	return (BAM_SUCCESS);
 }
 
 static error_t
@@ -2161,7 +2338,6 @@ update_all(char *root, char *opt)
 	char multibt[PATH_MAX];
 	char creatram[PATH_MAX];
 	error_t ret = BAM_SUCCESS;
-	int ret1, ret2;
 
 	assert(root);
 	assert(opt == NULL);
@@ -2268,25 +2444,20 @@ update_all(char *root, char *opt)
 
 out:
 	/*
-	 * Update fdisk table as we go down. Updating it when
-	 * the system is running will confuse biosdev.
+	 * We no longer use biosdev for Live Upgrade. Hence
+	 * there is no need to defer (to shutdown time) any fdisk
+	 * updates
 	 */
-	ret1 = stat(GRUB_fdisk, &sb);
-	ret2 = stat(GRUB_fdisk_target, &sb);
-	if ((ret1 == 0) && (ret2 == 0)) {
-		update_fdisk();
-	} else if ((ret1 == 0) ^ (ret2 == 0)) {
-		/*
-		 * It is an error for one file to be
-		 * present and the other absent.
-		 * It is normal for both files to be
-		 * absent - it indicates that no fdisk
-		 * update is required.
-		 */
-		bam_error(MISSING_FDISK_FILE,
-		    ret1 ? GRUB_fdisk : GRUB_fdisk_target);
-		ret = BAM_ERROR;
+	if (stat(GRUB_fdisk, &sb) == 0 || stat(GRUB_fdisk_target, &sb) == 0) {
+		bam_error(FDISK_FILES_FOUND, GRUB_fdisk, GRUB_fdisk_target);
 	}
+
+	/*
+	 * If user has updated menu in current BE, propagate the
+	 * updates to all BEs.
+	 */
+	if (synchronize_BE_menu() != BAM_SUCCESS)
+		ret = BAM_ERROR;
 
 	return (ret);
 }
@@ -5509,6 +5680,92 @@ zfs_get_physical(char *special, char ***physarray, int *n)
 	return (0);
 }
 
+/*
+ * Certain services needed to run metastat successfully may not
+ * be enabled. Enable them now.
+ */
+/*
+ * Checks if the specified service is online
+ * Returns: 	1 if the service is online
+ *		0 if the service is not online
+ *		-1 on error
+ */
+static int
+is_svc_online(char *svc)
+{
+	char			*state;
+	const char		*fcn = "is_svc_online()";
+
+	BAM_DPRINTF((D_FUNC_ENTRY1, fcn, svc));
+
+	state = smf_get_state(svc);
+	INJECT_ERROR2("GET_SVC_STATE", free(state), state = NULL);
+	if (state == NULL) {
+		bam_error(GET_SVC_STATE_ERR, svc);
+		return (-1);
+	}
+	BAM_DPRINTF((D_GOT_SVC_STATUS, fcn, svc));
+
+	if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
+		BAM_DPRINTF((D_SVC_ONLINE, fcn, svc));
+		free(state);
+		return (1);
+	}
+
+	BAM_DPRINTF((D_SVC_NOT_ONLINE, fcn, state, svc));
+
+	free(state);
+
+	return (0);
+}
+
+static int
+enable_svc(char *svc)
+{
+	int			ret;
+	int			sleeptime;
+	const char		*fcn = "enable_svc()";
+
+	ret = is_svc_online(svc);
+	if (ret == -1) {
+		bam_error(SVC_IS_ONLINE_FAILED, svc);
+		return (-1);
+	} else if (ret == 1) {
+		BAM_DPRINTF((D_SVC_ALREADY_ONLINE, fcn, svc));
+		return (0);
+	}
+
+	/* Service is not enabled. Enable it now. */
+	ret = smf_enable_instance(svc, 0);
+	INJECT_ERROR1("ENABLE_SVC_FAILED", ret = -1);
+	if (ret != 0) {
+		bam_error(ENABLE_SVC_FAILED, svc);
+		return (-1);
+	}
+
+	BAM_DPRINTF((D_SVC_ONLINE_INITIATED, fcn, svc));
+
+	sleeptime = 0;
+	do {
+		ret = is_svc_online(svc);
+		INJECT_ERROR1("SVC_ONLINE_SUCCESS", ret = 1);
+		INJECT_ERROR1("SVC_ONLINE_FAILURE", ret = -1);
+		INJECT_ERROR1("SVC_ONLINE_NOTYET", ret = 0);
+		if (ret == -1) {
+			bam_error(ERR_SVC_GET_ONLINE, svc);
+			return (-1);
+		} else if (ret == 1) {
+			BAM_DPRINTF((D_SVC_NOW_ONLINE, fcn, svc));
+			return (1);
+		}
+		(void) sleep(1);
+	} while (sleeptime < 60);
+
+	bam_error(TIMEOUT_ENABLE_SVC, svc);
+
+	return (-1);
+}
+
 static int
 ufs_get_physical(char *special, char ***physarray, int *n)
 {
@@ -5524,6 +5781,7 @@ ufs_get_physical(char *special, char ***physarray, int *n)
 	int			i;
 	line_t			*lp;
 	int			ret;
+	char			*svc;
 	const char		*fcn = "ufs_get_physical()";
 
 	assert(special);
@@ -5546,6 +5804,11 @@ ufs_get_physical(char *special, char ***physarray, int *n)
 	}
 
 	BAM_DPRINTF((D_UFS_SVM_SHORT, fcn, special, shortname));
+
+	svc = "network/rpc/meta:default";
+	if (enable_svc(svc) == -1) {
+		bam_error(UFS_SVM_METASTAT_SVC_ERR, svc);
+	}
 
 	(void) snprintf(cmd, sizeof (cmd), "/sbin/metastat -p %s", shortname);
 
@@ -6214,9 +6477,7 @@ update_entry(menu_t *mp, char *menu_root, char *osdev)
 		(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot,
 		    DIRECT_BOOT_FAILSAFE_KERNEL);
 		if (stat(failsafe, &sbuf) == 0) {
-			failsafe_kernel =
-			    (bam_zfs ? DIRECT_BOOT_FAILSAFE_LINE_ZFS :
-			    DIRECT_BOOT_FAILSAFE_LINE);
+			failsafe_kernel = DIRECT_BOOT_FAILSAFE_LINE;
 		} else {
 			(void) snprintf(failsafe, sizeof (failsafe), "%s%s",
 			    osroot, MULTI_BOOT_FAILSAFE);

@@ -216,7 +216,6 @@ extern int is_sparc(void);
 #define	DIRECT_BOOT_FAILSAFE_KERNEL	"/boot/platform/i86pc/kernel/unix"
 #define	DIRECT_BOOT_FAILSAFE_LINE	DIRECT_BOOT_FAILSAFE_KERNEL " -s"
 #define	DIRECT_BOOT_KERNEL_ZFS	DIRECT_BOOT_KERNEL " " ZFS_BOOT
-#define	DIRECT_BOOT_FAILSAFE_LINE_ZFS	DIRECT_BOOT_FAILSAFE_LINE " " ZFS_BOOT
 
 /* xVM kernels */
 #define	XEN_KERNEL_SUBSTR "xen.gz"

@@ -622,11 +622,9 @@ find_matching_entry(
 	BAM_DPRINTF((D_FUNC_ENTRY3, fcn, grubsign, grubroot, opt));
 
 	for (entry = estart; entry; entry = entry->next) {
-#if 0
+
 		if (!(entry->flags & (BAM_ENTRY_BOOTADM|BAM_ENTRY_LU)) &&
 		    !bam_force) {
-#endif
-		if (!(entry->flags & BAM_ENTRY_BOOTADM) && !bam_force) {
 			BAM_DPRINTF((D_SKIP_ENTRY, fcn, entry->entryNum));
 			continue;
 		}

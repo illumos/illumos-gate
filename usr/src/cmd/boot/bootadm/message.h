@@ -237,15 +237,8 @@ extern "C" {
 #define	REBOOT_WITH_ARGS_ADD_ENTRY_FAILED \
 	gettext("Cannot update menu. Cannot reboot with requested arguments\n")
 
-#define	UPDATING_FDISK gettext("Updating fdisk table.\n")
-
-#define	FDISK_UPDATE_FAILED gettext("Update of fdisk table failed.\n")
-
-#define	MISSING_FDISK_FILE \
-	gettext("Missing file (%s). Cannot update fdisk table.\n")
-
-#define	FILE_REMOVE_FAILED \
-	gettext("Failed to delete one or more of (%s,%s). Remove manually.\n")
+#define	FDISK_FILES_FOUND \
+	gettext("Deferred FDISK update file(s) found: %s, %s. Not supported.\n")
 
 #define	UNKNOWN_KERNEL	gettext("Unable to expand %s to a full file path.\n")
 
@@ -552,6 +545,9 @@ gettext("invalid SVM metadevice name: %s. Cannot derive physical device\n")
 #define	UFS_SVM_METASTAT_ERR \
 gettext("metastat command failed on SVM metadevice: %s\n")
 
+#define	UFS_SVM_METASTAT_SVC_ERR \
+gettext("failed to start service %s for metastat command\n")
+
 #define	BAD_UFS_SVM_METASTAT \
 gettext("bad output from metastat command on SVM metadevice: %s\n")
 
@@ -576,6 +572,57 @@ gettext("failed to get special file for osroot: %s\n")
 #define	GET_MENU_ROOT_SPECIAL_ERR \
 gettext("failed to get special file for menu_root: %s\n")
 
+#define	GET_SVC_STATE_ERR gettext("failed to determine state of service: %s\n")
+
+#define	SVC_IS_ONLINE_FAILED \
+	gettext("failed to determine if service is online: %s\n")
+
+#define	ENABLE_SVC_FAILED gettext("failed to online service: %s\n")
+
+#define	ERR_SVC_GET_ONLINE \
+	gettext("failed to get online status for service: %s\n")
+
+#define	TIMEOUT_ENABLE_SVC \
+	gettext("timed out waiting for service to online: %s\n")
+
+#define	CANNOT_READ_LU_CKSUM \
+	gettext("failed to read GRUB menu checksum file: %s\n")
+
+#define	MULTIPLE_LU_CKSUM \
+	gettext("multiple checksums for GRUB menu in checksum file: %s\n")
+
+#define	CANNOT_PARSE_LU_CKSUM \
+	gettext("error parsing GRUB menu checksum file: %s\n")
+
+#define	MENU_CKSUM_FAIL \
+	gettext("error generating checksum of GRUB menu\n")
+
+#define	BAD_CKSUM \
+	gettext("bad checksum generated for GRUB menu\n")
+
+#define	BAD_CKSUM_PARSE \
+	gettext("error parsing checksum generated for GRUB menu\n")
+
+#define	MENU_PROP_FAIL \
+	gettext("error propagating updated GRUB menu\n")
+
+#define	MENU_BACKUP_FAIL \
+	gettext("failed to create backup for GRUB menu: %s\n")
+
+#define	BACKUP_PROP_FAIL \
+	gettext("error propagating backup GRUB menu: %s\n")
+
+#define	MENU_CKSUM_WRITE_FAIL \
+	gettext("failed to write GRUB menu checksum file: %s\n")
+
+#define	MENU_CKSUM_PROP_FAIL \
+	gettext("error propagating GRUB menu checksum file: %s\n")
+
+#define	BOOTADM_PROP_FAIL \
+	gettext("error propagating bootadm: %s\n")
+
+#define	PROP_GRUB_MENU \
+	gettext("propagating updated GRUB menu\n")
 
 /*
  * NOTE: The following are debug messages and not I18Ned
@@ -1157,6 +1204,52 @@ gettext("failed to get special file for menu_root: %s\n")
 #define	D_GET_SPECIAL "%s: returning special: %s\n"
 
 #define	D_MENU_WRITE_ENTER "%s: entered menu_write() for root: <%s>\n"
+
+#define	D_GOT_SVC_STATUS "%s: got status for service: %s\n"
+
+#define	D_SVC_ONLINE "%s: service is online: %s\n"
+
+#define	D_SVC_NOT_ONLINE "%s: service is *NOT* online(%s): %s\n"
+
+#define	D_SVC_ALREADY_ONLINE "%s: service is already online: %s\n"
+
+#define	D_SVC_ONLINE_INITIATED "%s: initiated online of service: %s\n"
+
+#define	D_SVC_NOW_ONLINE "%s: service is NOW online: %s\n"
+
+#define	D_NOT_LU_BE "%s: not a Live Upgrade BE\n"
+
+#define	D_NO_CKSUM_FILE "%s: checksum file absent: %s\n"
+
+#define	D_CKSUM_FILE_OPENED "%s: opened checksum file: %s\n"
+
+#define	D_CKSUM_FILE_READ "%s: read checksum file: %s\n"
+
+#define	D_CKSUM_FILE_PARSED "%s: parsed checksum file: %s\n"
+
+#define	D_CKSUM_GEN_SUCCESS "%s: successfully generated checksum\n"
+
+#define	D_CKSUM_GEN_OUTPUT_VALID "%s: generated checksum output valid\n"
+
+#define	D_CKSUM_GEN_PARSED "%s: successfully parsed generated checksum\n"
+
+#define	D_CKSUM_NO_CHANGE "%s: no change in checksum of GRUB menu\n"
+
+#define	D_CKSUM_HAS_CHANGED "%s: checksum of GRUB menu has changed\n"
+
+#define	D_PROPAGATED_MENU "%s: successfully propagated GRUB menu\n"
+
+#define	D_CREATED_BACKUP "%s: successfully created backup GRUB menu: %s\n"
+
+#define	D_PROPAGATED_BACKUP "%s: successfully propagated backup GRUB menu: %s\n"
+
+#define	D_CREATED_CKSUM_FILE "%s: successfully created checksum file: %s\n"
+
+#define	D_PROPAGATED_CKSUM_FILE \
+	"%s: successfully propagated checksum file: %s\n"
+
+#define	D_PROPAGATED_BOOTADM \
+	"%s: successfully propagated bootadm: %s\n"
 
 #ifdef	__cplusplus
 }
