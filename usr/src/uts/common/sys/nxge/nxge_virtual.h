@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,8 @@ typedef enum {
 #define	COMMON_INIT_DONE	0x08
 #define	COMMON_TCAM_BUSY	0x10
 #define	COMMON_VLAN_BUSY	0x20
+#define	COMMON_RESET_NIU_PCI	0x40
+
 
 #define	NXGE_SR_FUNC_BUSY_SHIFT	0x8
 #define	NXGE_SR_FUNC_BUSY_MASK	0xf00

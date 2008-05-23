@@ -48,6 +48,16 @@ uint32_t	nxge_msi_enable = 1;
 #endif
 
 /*
+ * Software workaround for a Neptune (PCI-E)
+ * hardware interrupt bug which the hardware
+ * may generate spurious interrupts after the
+ * device interrupt handler was removed. If this flag
+ * is enabled, the driver will reset the
+ * hardware when devices are being detached.
+ */
+uint32_t	nxge_peu_reset_enable = 0;
+
+/*
  * Software workaround for the hardware
  * checksum bugs that affect packet transmission
  * and receive:
@@ -270,6 +280,7 @@ static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, uint_t,
     void *);
 static int nxge_get_def_val(nxge_t *, mac_prop_id_t, uint_t, void *);
 
+static void nxge_niu_peu_reset(p_nxge_t nxgep);
 
 mac_priv_prop_t nxge_priv_props[] = {
 	{"_adv_10gfdx_cap", MAC_PROP_PERM_RW},
@@ -928,6 +939,14 @@ nxge_unattach(p_nxge_t nxgep)
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
 		nxgep->nxge_timerid = 0;
+	}
+
+	/*
+	 * If this flag is set, it will affect the Neptune
+	 * only.
+	 */
+	if ((nxgep->niu_type != N2_NIU) && nxge_peu_reset_enable) {
+		nxge_niu_peu_reset(nxgep);
 	}
 
 #if	defined(sun4v)
@@ -1653,7 +1672,17 @@ nxge_uninit(p_nxge_t nxgep)
 
 	nxge_free_mem_pool(nxgep);
 
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+	/*
+	 * Start the timer if the reset flag is not set.
+	 * If this reset flag is set, the link monitor
+	 * will not be started in order to stop furthur bus
+	 * activities coming from this interface.
+	 * The driver will start the monitor function
+	 * if the interface was initialized again later.
+	 */
+	if (!nxge_peu_reset_enable) {
+		(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+	}
 
 	nxgep->drv_state &= ~STATE_HW_INITIALIZED;
 
@@ -3613,6 +3642,10 @@ nxge_m_start(void *arg)
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_start"));
 
+	if (nxge_peu_reset_enable && !nxgep->nxge_link_poll_timerid) {
+		(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+	}
+
 	MUTEX_ENTER(nxgep->genlock);
 	if (nxge_init(nxgep) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -4447,7 +4480,7 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			/*
 			 * No dynamic allocation of groups and
 			 * rings at this time.  Shares dictate the
-			 * configurartion.
+			 * configuration.
 			 */
 			mrings->mr_gadd_ring = NULL;
 			mrings->mr_grem_ring = NULL;
@@ -5472,42 +5505,8 @@ done:
  * Module loading and removing entry points.
  */
 
-static	struct cb_ops 	nxge_cb_ops = {
-	nodev,			/* cb_open */
-	nodev,			/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	NULL,
-	D_MP, 			/* cb_flag */
-	CB_REV,			/* rev */
-	nodev,			/* int (*cb_aread)() */
-	nodev			/* int (*cb_awrite)() */
-};
-
-static struct dev_ops nxge_dev_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	nulldev,
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	nxge_attach,		/* devo_attach */
-	nxge_detach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&nxge_cb_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL, /* devo_bus_ops	*/
-	ddi_power		/* devo_power */
-};
-
-extern	struct	mod_ops	mod_driverops;
+DDI_DEFINE_STREAM_OPS(nxge_dev_ops, nulldev, nulldev, nxge_attach, nxge_detach,
+    nodev, NULL, D_MP, NULL);
 
 #define	NXGE_DESC_VER		"Sun NIU 10Gb Ethernet"
 
@@ -6678,4 +6677,114 @@ nxge_get_def_val(nxge_t *nxgep, mac_prop_id_t pr_num, uint_t pr_valsize,
 		break;
 	}
 	return (err);
+}
+
+
+/*
+ * The following is a software around for the Neptune hardware's
+ * interrupt bugs; The Neptune hardware may generate spurious interrupts when
+ * an interrupr handler is removed.
+ */
+#define	NXGE_PCI_PORT_LOGIC_OFFSET	0x98
+#define	NXGE_PIM_RESET			(1ULL << 29)
+#define	NXGE_GLU_RESET			(1ULL << 30)
+#define	NXGE_NIU_RESET			(1ULL << 31)
+#define	NXGE_PCI_RESET_ALL		(NXGE_PIM_RESET |	\
+					NXGE_GLU_RESET |	\
+					NXGE_NIU_RESET)
+
+#define	NXGE_WAIT_QUITE_TIME		200000
+#define	NXGE_WAIT_QUITE_RETRY		40
+#define	NXGE_PCI_RESET_WAIT		1000000 /* one second */
+
+static void
+nxge_niu_peu_reset(p_nxge_t nxgep)
+{
+	uint32_t	rvalue;
+	p_nxge_hw_list_t hw_p;
+	p_nxge_t	fnxgep;
+	int		i, j;
+
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL, "==> nxge_niu_peu_reset"));
+	if ((hw_p = nxgep->nxge_hw_p) == NULL) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_niu_peu_reset: NULL hardware pointer"));
+		return;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "==> nxge_niu_peu_reset: flags 0x%x link timer id %d timer id %d",
+	    hw_p->flags, nxgep->nxge_link_poll_timerid,
+	    nxgep->nxge_timerid));
+
+	MUTEX_ENTER(&hw_p->nxge_cfg_lock);
+	/*
+	 * Make sure other instances from the same hardware
+	 * stop sending PIO and in quiescent state.
+	 */
+	for (i = 0; i < NXGE_MAX_PORTS; i++) {
+		fnxgep = hw_p->nxge_p[i];
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_niu_peu_reset: checking entry %d "
+		    "nxgep $%p", i, fnxgep));
+#ifdef	NXGE_DEBUG
+		if (fnxgep) {
+			NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_niu_peu_reset: entry %d (function %d) "
+			    "link timer id %d hw timer id %d",
+			    i, fnxgep->function_num,
+			    fnxgep->nxge_link_poll_timerid,
+			    fnxgep->nxge_timerid));
+		}
+#endif
+		if (fnxgep && fnxgep != nxgep &&
+		    (fnxgep->nxge_timerid || fnxgep->nxge_link_poll_timerid)) {
+			NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_niu_peu_reset: checking $%p "
+			    "(function %d) timer ids",
+			    fnxgep, fnxgep->function_num));
+			for (j = 0; j < NXGE_WAIT_QUITE_RETRY; j++) {
+				NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+				    "==> nxge_niu_peu_reset: waiting"));
+				NXGE_DELAY(NXGE_WAIT_QUITE_TIME);
+				if (!fnxgep->nxge_timerid &&
+				    !fnxgep->nxge_link_poll_timerid) {
+					break;
+				}
+			}
+			NXGE_DELAY(NXGE_WAIT_QUITE_TIME);
+			if (fnxgep->nxge_timerid ||
+			    fnxgep->nxge_link_poll_timerid) {
+				MUTEX_EXIT(&hw_p->nxge_cfg_lock);
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "<== nxge_niu_peu_reset: cannot reset "
+				    "hardware (devices are still in use)"));
+				return;
+			}
+		}
+	}
+
+	if ((hw_p->flags & COMMON_RESET_NIU_PCI) != COMMON_RESET_NIU_PCI) {
+		hw_p->flags |= COMMON_RESET_NIU_PCI;
+		rvalue = pci_config_get32(nxgep->dev_regs->nxge_pciregh,
+		    NXGE_PCI_PORT_LOGIC_OFFSET);
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_niu_peu_reset: read offset 0x%x (%d) "
+		    "(data 0x%x)",
+		    NXGE_PCI_PORT_LOGIC_OFFSET,
+		    NXGE_PCI_PORT_LOGIC_OFFSET,
+		    rvalue));
+
+		rvalue |= NXGE_PCI_RESET_ALL;
+		pci_config_put32(nxgep->dev_regs->nxge_pciregh,
+		    NXGE_PCI_PORT_LOGIC_OFFSET, rvalue);
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_niu_peu_reset: RESETTING NIU: write NIU reset 0x%x",
+		    rvalue));
+
+		NXGE_DELAY(NXGE_PCI_RESET_WAIT);
+	}
+
+	MUTEX_EXIT(&hw_p->nxge_cfg_lock);
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_niu_peu_reset"));
 }
