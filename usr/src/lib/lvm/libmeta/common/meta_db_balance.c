@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,8 +171,7 @@ add_drv_to_ctl_lst(
 	md_ctlr_drv_t		**dpp;
 	mdname_t		*np;
 	mdcinfo_t		*tcinfop;
-	char			*cmp_name_1,
-				*cmp_name_2;
+	char			*cmp_name_1, *cmp_name_2;
 	int			not_found;
 
 	/*
@@ -248,7 +247,7 @@ add_drv_to_ctl_lst(
 			sdssc_convert_path_free(cmp_name_2);
 
 			if (not_found)
-			    continue;
+				continue;
 
 			/*
 			 * Found drive, must be deleting.
@@ -375,16 +374,34 @@ add_replica_to_ctl(
 			}
 			if (add_replica(sp, d->drv_dnp, (d->drv_dbcnt + 1),
 			    d->drv_dbsize, ep) == -1) {
+				md_error_t nep;
+
+				mdclrerror(&nep);
 				if (d->drv_dbcnt) {
-					c->ctl_dbcnt -= d->drv_dbcnt;
-					d->drv_dbcnt = 0;
+					/*
+					 * We have to to bring the replica
+					 * in the drive to the previous
+					 * status by adding the original no
+					 * of replicas to the drive since
+					 * the addition of (drv_dbcnt+1) no
+					 * of replicas has failed. If we
+					 * leave it at this state, we might
+					 * end up having no replicas at
+					 * all for the diskset.
+					 */
+					if (add_replica(sp, d->drv_dnp,
+					    d->drv_dbcnt, d->drv_dbsize,
+					    &nep) == -1) {
+						c->ctl_dbcnt -= d->drv_dbcnt;
+						d->drv_dbcnt = 0;
+					}
 				}
 
 				if (mdismddberror(ep, MDE_TOOMANY_REPLICAS))
 					return (-1);
 
 				if (mdismddberror(ep, MDE_REPLICA_TOOSMALL))
-					return (-1);
+					continue;
 
 				d->drv_flags |= DRV_F_ERROR;
 				if (! (d->drv_flags & DRV_F_INDISKSET))
@@ -841,9 +858,8 @@ balance_replicas(
 	uint_t			drvcnt = ~0U;
 	uint_t			save_cnum;
 	mhd_ctlrtype_t		save_ctype;
-	char			save_cname[16],
-				*cmp_name_1,
-				*cmp_name_2;
+	char			save_cname[16];
+	char			*cmp_name_1, *cmp_name_2;
 	int			reps;
 	md_ctlr_ctl_t		*c;
 
