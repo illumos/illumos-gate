@@ -109,7 +109,7 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 	/* The SQ size should not be more than that supported by the HCA */
 	if (((MaxDataSendBuffers + RDS_NUM_ACKS) > hattrp->hca_max_chan_sz) ||
 	    ((MaxDataSendBuffers + RDS_NUM_ACKS) > hattrp->hca_max_cq_sz)) {
-		RDS_DPRINTF0("RDSIB", "MaxDataSendBuffers + %d is greater "
+		RDS_DPRINTF2("RDSIB", "MaxDataSendBuffers + %d is greater "
 		    "than that supported by the HCA driver "
 		    "(%d + %d > %d or %d), lowering it to a supported value.",
 		    RDS_NUM_ACKS, MaxDataSendBuffers, RDS_NUM_ACKS,
@@ -124,7 +124,7 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 	/* The RQ size should not be more than that supported by the HCA */
 	if ((MaxDataRecvBuffers > hattrp->hca_max_chan_sz) ||
 	    (MaxDataRecvBuffers > hattrp->hca_max_cq_sz)) {
-		RDS_DPRINTF0("RDSIB", "MaxDataRecvBuffers is greater than that "
+		RDS_DPRINTF2("RDSIB", "MaxDataRecvBuffers is greater than that "
 		    "supported by the HCA driver (%d > %d or %d), lowering it "
 		    "to a supported value.", MaxDataRecvBuffers,
 		    hattrp->hca_max_chan_sz, hattrp->hca_max_cq_sz);
@@ -137,7 +137,7 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 	/* The SQ size should not be more than that supported by the HCA */
 	if ((MaxCtrlSendBuffers > hattrp->hca_max_chan_sz) ||
 	    (MaxCtrlSendBuffers > hattrp->hca_max_cq_sz)) {
-		RDS_DPRINTF0("RDSIB", "MaxCtrlSendBuffers is greater than that "
+		RDS_DPRINTF2("RDSIB", "MaxCtrlSendBuffers is greater than that "
 		    "supported by the HCA driver (%d > %d or %d), lowering it "
 		    "to a supported value.", MaxCtrlSendBuffers,
 		    hattrp->hca_max_chan_sz, hattrp->hca_max_cq_sz);
@@ -150,7 +150,7 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 	/* The RQ size should not be more than that supported by the HCA */
 	if ((MaxCtrlRecvBuffers > hattrp->hca_max_chan_sz) ||
 	    (MaxCtrlRecvBuffers > hattrp->hca_max_cq_sz)) {
-		RDS_DPRINTF0("RDSIB", "MaxCtrlRecvBuffers is greater than that "
+		RDS_DPRINTF2("RDSIB", "MaxCtrlRecvBuffers is greater than that "
 		    "supported by the HCA driver (%d > %d or %d), lowering it "
 		    "to a supported value.", MaxCtrlRecvBuffers,
 		    hattrp->hca_max_chan_sz, hattrp->hca_max_cq_sz);
@@ -162,7 +162,7 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 
 	/* The MaxRecvMemory should be less than that supported by the HCA */
 	if ((NDataRX * RdsPktSize) > hattrp->hca_max_memr_len) {
-		RDS_DPRINTF0("RDSIB", "MaxRecvMemory is greater than that "
+		RDS_DPRINTF2("RDSIB", "MaxRecvMemory is greater than that "
 		    "supported by the HCA driver (%d > %d), lowering it to %d",
 		    NDataRX * RdsPktSize, hattrp->hca_max_memr_len,
 		    hattrp->hca_max_memr_len);
@@ -507,7 +507,7 @@ rds_send_acknowledgement(rds_ep_t *ep)
 		RDS_INCR_TXACKS();
 		ret = ibt_post_send(ep->ep_chanhdl, &ep->ep_ackwr, 1, &ix);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF1("rds_send_acknowledgement",
+			RDS_DPRINTF2("rds_send_acknowledgement",
 			    "EP(%p): ibt_post_send for acknowledgement "
 			    "failed: %d, SQ depth: %d",
 			    ep, ret, ep->ep_sndpool.pool_nbusy);
@@ -583,7 +583,7 @@ rds_poll_ctrl_completions(ibt_cq_hdl_t cq, rds_ep_t *ep)
 		ret = ddi_taskq_dispatch(rds_taskq,
 		    rds_post_recv_buf, (void *)ep->ep_chanhdl, DDI_NOSLEEP);
 		if (ret != DDI_SUCCESS) {
-			RDS_DPRINTF1(LABEL, "ddi_taskq_dispatch failed: %d",
+			RDS_DPRINTF2(LABEL, "ddi_taskq_dispatch failed: %d",
 			    ret);
 			mutex_enter(&recvqp->qp_lock);
 			recvqp->qp_taskqpending = B_FALSE;
@@ -677,7 +677,7 @@ rds_post_recv_buf(void *arg)
 		ret = ddi_taskq_dispatch(rds_taskq, rds_post_recv_buf,
 		    (void *)ep->ep_chanhdl, DDI_NOSLEEP);
 		if (ret != DDI_SUCCESS) {
-			RDS_DPRINTF1(LABEL, "ddi_taskq_dispatch failed: %d",
+			RDS_DPRINTF2(LABEL, "ddi_taskq_dispatch failed: %d",
 			    ret);
 			mutex_enter(&recvqp->qp_lock);
 			recvqp->qp_taskqpending = B_FALSE;
@@ -722,7 +722,7 @@ rds_post_recv_buf(void *arg)
 
 		ret = ibt_post_recv(chanhdl, wrp, jx, &kx);
 		if ((ret != IBT_SUCCESS) || (kx != jx)) {
-			RDS_DPRINTF1(LABEL, "ibt_post_recv for %d WRs failed: "
+			RDS_DPRINTF2(LABEL, "ibt_post_recv for %d WRs failed: "
 			    "%d", npost, ret);
 			npost -= kx;
 			break;
@@ -750,7 +750,7 @@ rds_post_recv_buf(void *arg)
 		ret = ddi_taskq_dispatch(rds_taskq,
 		    rds_post_recv_buf, (void *)ep->ep_chanhdl, DDI_NOSLEEP);
 		if (ret != DDI_SUCCESS) {
-			RDS_DPRINTF1("rds_post_recv_buf",
+			RDS_DPRINTF2("rds_post_recv_buf",
 			    "ddi_taskq_dispatch failed: %d", ret);
 			mutex_enter(&recvqp->qp_lock);
 			recvqp->qp_taskqpending = B_FALSE;
@@ -831,7 +831,7 @@ rds_poll_data_completions(ibt_cq_hdl_t cq, rds_ep_t *ep)
 		ret = ddi_taskq_dispatch(rds_taskq,
 		    rds_post_recv_buf, (void *)ep->ep_chanhdl, DDI_NOSLEEP);
 		if (ret != DDI_SUCCESS) {
-			RDS_DPRINTF1(LABEL, "ddi_taskq_dispatch failed: %d",
+			RDS_DPRINTF2(LABEL, "ddi_taskq_dispatch failed: %d",
 			    ret);
 			mutex_enter(&recvqp->qp_lock);
 			recvqp->qp_taskqpending = B_FALSE;
@@ -1086,7 +1086,7 @@ rds_ep_free_rc_channel(rds_ep_t *ep)
 		(void) rds_is_recvq_empty(ep, B_TRUE);
 		ret = ibt_free_channel(ep->ep_chanhdl);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF1("rds_ep_free_rc_channel", "EP(%p) "
+			RDS_DPRINTF2("rds_ep_free_rc_channel", "EP(%p) "
 			    "ibt_free_channel returned: %d", ep, ret);
 		}
 		ep->ep_chanhdl = NULL;
@@ -1099,7 +1099,7 @@ rds_ep_free_rc_channel(rds_ep_t *ep)
 	if (ep->ep_sendcq != NULL) {
 		ret = ibt_free_cq(ep->ep_sendcq);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF1("rds_ep_free_rc_channel",
+			RDS_DPRINTF2("rds_ep_free_rc_channel",
 			    "EP(%p) - for sendcq, ibt_free_cq returned %d",
 			    ep, ret);
 		}
@@ -1113,7 +1113,7 @@ rds_ep_free_rc_channel(rds_ep_t *ep)
 	if (ep->ep_recvcq != NULL) {
 		ret = ibt_free_cq(ep->ep_recvcq);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF1("rds_ep_free_rc_channel",
+			RDS_DPRINTF2("rds_ep_free_rc_channel",
 			    "EP(%p) - for recvcq, ibt_free_cq returned %d",
 			    ep, ret);
 		}

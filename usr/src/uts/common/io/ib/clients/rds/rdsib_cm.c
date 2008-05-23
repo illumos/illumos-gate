@@ -120,7 +120,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 
 	/* validate service id */
 	if (reqp->req_service_id == RDS_SERVICE_ID) {
-		RDS_DPRINTF0(LABEL, "Version Mismatch: Remote system "
+		RDS_DPRINTF2(LABEL, "Version Mismatch: Remote system "
 		    "(GUID: 0x%llx) is running an older version of RDS",
 		    rgid.gid_guid);
 		return (IBT_CM_REJECT);
@@ -148,7 +148,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	    ntohl(ipcm_info.SRCIP), ntohl(ipcm_info.DSTIP), cmp.cmp_eptype);
 
 	if (cmp.cmp_version != RDS_VERSION) {
-		RDS_DPRINTF0(LABEL, "Version Mismatch: Local version: %d "
+		RDS_DPRINTF2(LABEL, "Version Mismatch: Local version: %d "
 		    "Remote version: %d", RDS_VERSION, cmp.cmp_version);
 		return (IBT_CM_REJECT);
 	}
@@ -602,9 +602,9 @@ rds_handle_cm_event_failure(ibt_cm_event_t *evp)
 	    evp->cm_event.failed.cf_reason);
 
 	if (evp->cm_event.failed.cf_reason == IBT_CM_INVALID_SID) {
-		RDS_DPRINTF0(LABEL,
+		RDS_DPRINTF2(LABEL,
 		    "Received REJ with reason IBT_CM_INVALID_SID: "
-		    "The remote system could be running an older RDS version");
+		    "RDS may not be loaded on the remote system");
 	}
 
 	if (evp->cm_channel == NULL) {
@@ -653,7 +653,7 @@ rds_handle_cm_event_failure(ibt_cm_event_t *evp)
 			    rds_cleanup_passive_session, (void *)sp,
 			    DDI_NOSLEEP);
 			if (ret != DDI_SUCCESS) {
-				RDS_DPRINTF1("rds_handle_cm_event_failure",
+				RDS_DPRINTF2("rds_handle_cm_event_failure",
 				    "SP(%p) TaskQ dispatch FAILED:%d", sp, ret);
 			}
 			return (IBT_CM_ACCEPT);

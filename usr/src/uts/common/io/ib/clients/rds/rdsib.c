@@ -268,14 +268,16 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rds_taskq = ddi_taskq_create(dip, "rds_taskq", RDS_NUM_TASKQ_THREADS,
 	    TASKQ_DEFAULTPRI, 0);
 	if (rds_taskq == NULL) {
-		RDS_DPRINTF1(LABEL, "ddi_taskq_create failed for rds_taskq");
+		RDS_DPRINTF1("rdsib_attach",
+		    "ddi_taskq_create failed for rds_taskq");
 		rdsib_dev_info = NULL;
 		return (DDI_FAILURE);
 	}
 
 	ret = ddi_create_minor_node(dip, "rdsib", S_IFCHR, 0, DDI_PSEUDO, 0);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_CONT, "ddi_create_minor_node failed: %d", ret);
+		RDS_DPRINTF1("rdsib_attach",
+		    "ddi_create_minor_node failed: %d", ret);
 		ddi_taskq_destroy(rds_taskq);
 		rds_taskq = NULL;
 		rdsib_dev_info = NULL;
@@ -295,7 +297,8 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	ret = rdsib_initialize_ib();
 	if (ret != 0) {
-		cmn_err(CE_CONT, "rdsib_initialize_ib failed: %d", ret);
+		RDS_DPRINTF1("rdsib_attach",
+		    "rdsib_initialize_ib failed: %d", ret);
 		ddi_taskq_destroy(rds_taskq);
 		rds_taskq = NULL;
 		rdsib_dev_info = NULL;

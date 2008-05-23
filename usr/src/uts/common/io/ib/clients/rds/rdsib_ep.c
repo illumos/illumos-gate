@@ -275,25 +275,35 @@ rds_unmark_all_ports(rds_session_t *sp, uint_t qualifier)
 	}
 }
 
-static void
+static boolean_t
 rds_add_session(rds_session_t *sp, boolean_t locked)
 {
+	boolean_t retval = B_TRUE;
+
 	RDS_DPRINTF2("rds_add_session", "Enter: SP(%p)", sp);
 
 	if (!locked) {
 		rw_enter(&rdsib_statep->rds_sessionlock, RW_WRITER);
 	}
 
-	sp->session_nextp = rdsib_statep->rds_sessionlistp;
-	rdsib_statep->rds_sessionlistp = sp;
-	rdsib_statep->rds_nsessions++;
+	/* Don't allow more sessions than configured in rdsib.conf */
+	if (rdsib_statep->rds_nsessions >= (MaxNodes - 1)) {
+		RDS_DPRINTF1("rds_add_session", "Max session limit reached");
+		retval = B_FALSE;
+	} else {
+		sp->session_nextp = rdsib_statep->rds_sessionlistp;
+		rdsib_statep->rds_sessionlistp = sp;
+		rdsib_statep->rds_nsessions++;
+		RDS_INCR_SESS();
+	}
 
 	if (!locked) {
 		rw_exit(&rdsib_statep->rds_sessionlock);
 	}
-	RDS_INCR_SESS();
 
 	RDS_DPRINTF2("rds_add_session", "Return: SP(%p)", sp);
+
+	return (retval);
 }
 
 /* Session lookup based on destination IP or destination node guid */
@@ -465,7 +475,7 @@ rds_session_init(rds_session_t *sp)
 
 	hcap = rds_gid_to_hcap(rdsib_statep, sp->session_lgid);
 	if (hcap == NULL) {
-		RDS_DPRINTF1("rds_session_init", "SGID is on an uninitialized "
+		RDS_DPRINTF2("rds_session_init", "SGID is on an uninitialized "
 		    "HCA: %llx", sp->session_lgid.gid_guid);
 		return (-1);
 	}
@@ -527,14 +537,14 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 
 	hcap = rds_gid_to_hcap(rdsib_statep, lgid);
 	if (hcap == NULL) {
-		RDS_DPRINTF1("rds_session_reinit", "SGID is on an "
+		RDS_DPRINTF2("rds_session_reinit", "SGID is on an "
 		    "uninitialized HCA: %llx", lgid.gid_guid);
 		return (-1);
 	}
 
 	hcap1 = rds_gid_to_hcap(rdsib_statep, sp->session_lgid);
 	if (hcap1 == NULL) {
-		RDS_DPRINTF1("rds_session_reinit", "Seems like HCA %llx "
+		RDS_DPRINTF2("rds_session_reinit", "Seems like HCA %llx "
 		    "is unplugged", sp->session_lgid.gid_guid);
 	} else if (hcap->hca_guid == hcap1->hca_guid) {
 		/*
@@ -880,7 +890,7 @@ rds_failover_session(void *arg)
 			break;
 		}
 
-		RDS_DPRINTF1(LABEL, "ibt_get_ip_paths failed, ret: %d ", ret);
+		RDS_DPRINTF2(LABEL, "ibt_get_ip_paths failed, ret: %d ", ret);
 
 		/* wait 1 sec before re-trying */
 		delay(drv_usectohz(1000000));
@@ -1186,6 +1196,15 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 	RDS_DPRINTF2("rds_session_create", "Enter: 0x%p 0x%x 0x%x, type: %d",
 	    statep, localip, remip, type);
 
+	/* Check if there is space for a new session */
+	rw_enter(&statep->rds_sessionlock, RW_READER);
+	if (statep->rds_nsessions >= (MaxNodes - 1)) {
+		rw_exit(&statep->rds_sessionlock);
+		RDS_DPRINTF1("rds_session_create", "No More Sessions allowed");
+		return (NULL);
+	}
+	rw_exit(&statep->rds_sessionlock);
+
 	/* Allocate and initialize global buffer pool */
 	ret = rds_init_recv_caches(statep);
 	if (ret != 0) {
@@ -1262,7 +1281,17 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 	}
 
 	/* Insert this session into the list */
-	rds_add_session(newp, B_TRUE);
+	if (rds_add_session(newp, B_TRUE) != B_TRUE) {
+		/* No room to add this session */
+		rw_exit(&statep->rds_sessionlock);
+		rw_destroy(&newp->session_lock);
+		rw_destroy(&newp->session_local_portmap_lock);
+		rw_destroy(&newp->session_remote_portmap_lock);
+		mutex_destroy(&dataep->ep_lock);
+		mutex_destroy(&ctrlep->ep_lock);
+		kmem_free(newp, sizeof (rds_session_t));
+		return (NULL);
+	}
 
 	/* unlock the session list */
 	rw_exit(&statep->rds_sessionlock);
@@ -1301,7 +1330,7 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 		    IBT_PATH_NO_FLAGS, &ipattr, &newp->session_pinfo,
 		    NULL, NULL);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF1(LABEL, "ibt_get_ip_paths failed, ret: %d "
+			RDS_DPRINTF2(LABEL, "ibt_get_ip_paths failed, ret: %d "
 			    "lgid: %llx:%llx rgid: %llx:%llx", lgid.gid_prefix,
 			    lgid.gid_guid, rgid.gid_prefix, rgid.gid_guid);
 
@@ -2049,7 +2078,7 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 			    IBT_PATH_NO_FLAGS, &ipattr, &sp->session_pinfo,
 			    NULL, NULL);
 			if (ret != IBT_SUCCESS) {
-				RDS_DPRINTF1("rds_sendmsg",
+				RDS_DPRINTF2("rds_sendmsg",
 				    "ibt_get_ip_paths failed, ret: %d ", ret);
 
 				rw_enter(&sp->session_lock, RW_WRITER);
@@ -2222,7 +2251,7 @@ rds_received_msg(rds_ep_t *ep, rds_buf_t *bp)
 			    pktp->dh_recvport);
 			rds_stall_port(ep->ep_sp, pktp->dh_recvport, RDS_LOCAL);
 		} else {
-			RDS_DPRINTF1(LABEL, "rds_deliver_new_msg returned: %d",
+			RDS_DPRINTF2(LABEL, "rds_deliver_new_msg returned: %d",
 			    ret);
 		}
 	}
@@ -2238,7 +2267,7 @@ rds_received_msg(rds_ep_t *ep, rds_buf_t *bp)
 		RDS_INCR_TXACKS();
 		ret = ibt_post_send(ep->ep_chanhdl, &ep->ep_ackwr, 1, &ix);
 		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF1(LABEL, "EP(%p): ibt_post_send for "
+			RDS_DPRINTF2(LABEL, "EP(%p): ibt_post_send for "
 			    "acknowledgement failed: %d, SQ depth: %d",
 			    ep, ret, ep->ep_sndpool.pool_nbusy);
 			mutex_enter(&ep->ep_lock);

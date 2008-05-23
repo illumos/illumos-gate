@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,9 +189,9 @@ rds_vlog(char *name, uint_t level, char *fmt, va_list ap)
 			    (uintptr_t)rds_buf_sptr;
 
 			bcopy((caddr_t)rds_print_buf,
-				(caddr_t)rds_buf_sptr, left);
+			    (caddr_t)rds_buf_sptr, left);
 			bcopy((caddr_t)rds_print_buf + left,
-				(caddr_t)rds_debug_buf, len - left);
+			    (caddr_t)rds_debug_buf, len - left);
 			rds_buf_sptr = rds_debug_buf + len - left;
 		} else {
 			bcopy((caddr_t)rds_print_buf, rds_buf_sptr, len);
@@ -204,10 +204,8 @@ rds_vlog(char *name, uint_t level, char *fmt, va_list ap)
 
 	/*
 	 * LINTR, L5-L2 message may go to the rds_debug_buf
-	 * L1 messages will go to the log buf in non-debug kernels and
-	 * to console and log buf in debug kernels
-	 * L0 messages are warnings and will go to msgbuf in non-debug kernels
-	 * and to console and log buf in debug kernels
+	 * L1 messages will go to the /var/adm/messages (debug & non-debug).
+	 * L0 messages will go to console (debug & non-debug).
 	 */
 	switch (level) {
 	case RDS_LOG_LINTR:
@@ -220,13 +218,12 @@ rds_vlog(char *name, uint_t level, char *fmt, va_list ap)
 		}
 		break;
 	case RDS_LOG_L1:
-#ifdef DEBUG
-		cmn_err(CE_CONT, "%s", rds_print_buf);
-#else
 		if (!rds_buffer_dprintf) {
 			cmn_err(CE_CONT, "^%s", rds_print_buf);
+		} else {
+			/* go to messages file */
+			cmn_err(CE_CONT, "!%s", rds_print_buf);
 		}
-#endif
 		break;
 	case RDS_LOG_L0:
 		/* Strip the "\n" added earlier */
@@ -236,11 +233,8 @@ rds_vlog(char *name, uint_t level, char *fmt, va_list ap)
 		if (msg_ptr[len - 1] == '\n') {
 			msg_ptr[len - 1] = '\0';
 		}
-#ifdef DEBUG
-		cmn_err(CE_CONT, rds_print_buf);
-#else
-		cmn_err(CE_CONT, "!%s", rds_print_buf);
-#endif
+		/* go to console */
+		cmn_err(CE_CONT, "^%s", rds_print_buf);
 		break;
 	}
 
