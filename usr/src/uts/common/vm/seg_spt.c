@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,8 +174,8 @@ struct seg_ops segspt_shmops = {
 };
 
 static void segspt_purge(struct seg *seg);
-static int segspt_reclaim(struct seg *, caddr_t, size_t, struct page **,
-		enum seg_rw);
+static int segspt_reclaim(void *, caddr_t, size_t, struct page **,
+		enum seg_rw, int);
 static int spt_anon_getpages(struct seg *seg, caddr_t addr, size_t len,
 		page_t **ppa);
 
@@ -833,6 +833,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	uint_t	szc;
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(type == L_PAGELOCK || type == L_PAGEUNLOCK);
 
 	/*
 	 * We want to lock/unlock the entire ISM segment. Therefore,
@@ -857,8 +858,8 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	if (type == L_PAGEUNLOCK) {
 		ASSERT(sptd->spt_ppa != NULL);
 
-		seg_pinactive(seg, seg->s_base, sptd->spt_amp->size,
-		    sptd->spt_ppa, sptd->spt_prot, segspt_reclaim);
+		seg_pinactive(seg, NULL, seg->s_base, sptd->spt_amp->size,
+		    sptd->spt_ppa, S_WRITE, SEGP_FORCE_WIRED, segspt_reclaim);
 
 		/*
 		 * If someone is blocked while unmapping, we purge
@@ -868,16 +869,15 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 		 * raw async i/o is still in progress or where a thread
 		 * exits on data fault in a multithreaded application.
 		 */
-		if (AS_ISUNMAPWAIT(seg->s_as) && (shmd->shm_softlockcnt > 0)) {
+		if ((sptd->spt_flags & DISM_PPA_CHANGED) ||
+		    (AS_ISUNMAPWAIT(seg->s_as) &&
+		    shmd->shm_softlockcnt > 0)) {
 			segspt_purge(seg);
 		}
 		return (0);
-	} else if (type == L_PAGERECLAIM) {
-		ASSERT(sptd->spt_ppa != NULL);
-		(void) segspt_reclaim(seg, seg->s_base, sptd->spt_amp->size,
-		    sptd->spt_ppa, sptd->spt_prot);
-		return (0);
 	}
+
+	/* The L_PAGELOCK case ... */
 
 	if (sptd->spt_flags & DISM_PPA_CHANGED) {
 		segspt_purge(seg);
@@ -893,17 +893,17 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	 * First try to find pages in segment page cache, without
 	 * holding the segment lock.
 	 */
-	pplist = seg_plookup(seg, seg->s_base, sptd->spt_amp->size,
-	    sptd->spt_prot);
+	pplist = seg_plookup(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    S_WRITE, SEGP_FORCE_WIRED);
 	if (pplist != NULL) {
 		ASSERT(sptd->spt_ppa != NULL);
 		ASSERT(sptd->spt_ppa == pplist);
 		ppa = sptd->spt_ppa;
 		for (an_idx = pg_idx; an_idx < pg_idx + npages; ) {
 			if (ppa[an_idx] == NULL) {
-				seg_pinactive(seg, seg->s_base,
+				seg_pinactive(seg, NULL, seg->s_base,
 				    sptd->spt_amp->size, ppa,
-				    sptd->spt_prot, segspt_reclaim);
+				    S_WRITE, SEGP_FORCE_WIRED, segspt_reclaim);
 				*ppp = NULL;
 				return (ENOTSUP);
 			}
@@ -923,13 +923,12 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 		return (0);
 	}
 
-	/* The L_PAGELOCK case... */
 	mutex_enter(&sptd->spt_lock);
 	/*
 	 * try to find pages in segment page cache with mutex
 	 */
-	pplist = seg_plookup(seg, seg->s_base, sptd->spt_amp->size,
-	    sptd->spt_prot);
+	pplist = seg_plookup(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    S_WRITE, SEGP_FORCE_WIRED);
 	if (pplist != NULL) {
 		ASSERT(sptd->spt_ppa != NULL);
 		ASSERT(sptd->spt_ppa == pplist);
@@ -937,9 +936,9 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 		for (an_idx = pg_idx; an_idx < pg_idx + npages; ) {
 			if (ppa[an_idx] == NULL) {
 				mutex_exit(&sptd->spt_lock);
-				seg_pinactive(seg, seg->s_base,
+				seg_pinactive(seg, NULL, seg->s_base,
 				    sptd->spt_amp->size, ppa,
-				    sptd->spt_prot, segspt_reclaim);
+				    S_WRITE, SEGP_FORCE_WIRED, segspt_reclaim);
 				*ppp = NULL;
 				return (ENOTSUP);
 			}
@@ -959,8 +958,8 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 		*ppp = &(sptd->spt_ppa[pg_idx]);
 		return (0);
 	}
-	if (seg_pinsert_check(seg, sptd->spt_amp->size, SEGP_FORCE_WIRED) ==
-	    SEGP_FAIL) {
+	if (seg_pinsert_check(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    SEGP_FORCE_WIRED) == SEGP_FAIL) {
 		mutex_exit(&sptd->spt_lock);
 		*ppp = NULL;
 		return (ENOTSUP);
@@ -1038,16 +1037,18 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 		}
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 
-		mutex_enter(&freemem_lock);
-		if (availrmem < tune.t_minarmem + claim_availrmem) {
+		if (claim_availrmem) {
+			mutex_enter(&freemem_lock);
+			if (availrmem < tune.t_minarmem + claim_availrmem) {
+				mutex_exit(&freemem_lock);
+				ret = ENOTSUP;
+				claim_availrmem = 0;
+				goto insert_fail;
+			} else {
+				availrmem -= claim_availrmem;
+			}
 			mutex_exit(&freemem_lock);
-			ret = FC_MAKE_ERR(ENOMEM);
-			claim_availrmem = 0;
-			goto insert_fail;
-		} else {
-			availrmem -= claim_availrmem;
 		}
-		mutex_exit(&freemem_lock);
 
 		sptd->spt_ppa = pl;
 	} else {
@@ -1059,8 +1060,8 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 
 	ASSERT(pl != NULL);
 
-	ret = seg_pinsert(seg, seg->s_base, sptd->spt_amp->size,
-	    pl, sptd->spt_prot, SEGP_FORCE_WIRED | SEGP_ASYNC_FLUSH,
+	ret = seg_pinsert(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    sptd->spt_amp->size, pl, S_WRITE, SEGP_FORCE_WIRED,
 	    segspt_reclaim);
 	if (ret == SEGP_FAIL) {
 		/*
@@ -1089,8 +1090,9 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	for (an_idx = pg_idx; an_idx < pg_idx + npages; ) {
 		if (ppa[an_idx] == NULL) {
 			mutex_exit(&sptd->spt_lock);
-			seg_pinactive(seg, seg->s_base, sptd->spt_amp->size,
-			    pl, sptd->spt_prot, segspt_reclaim);
+			seg_pinactive(seg, NULL, seg->s_base,
+			    sptd->spt_amp->size,
+			    pl, S_WRITE, SEGP_FORCE_WIRED, segspt_reclaim);
 			*ppp = NULL;
 			return (ENOTSUP);
 		}
@@ -1113,7 +1115,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	 * to the requested addr, i.e. pg_idx.
 	 */
 	*ppp = &(sptd->spt_ppa[pg_idx]);
-	return (ret);
+	return (0);
 
 insert_fail:
 	/*
@@ -1125,9 +1127,11 @@ insert_fail:
 	mutex_exit(&sptd->spt_lock);
 
 	if (pl_built) {
-		mutex_enter(&freemem_lock);
-		availrmem += claim_availrmem;
-		mutex_exit(&freemem_lock);
+		if (claim_availrmem) {
+			mutex_enter(&freemem_lock);
+			availrmem += claim_availrmem;
+			mutex_exit(&freemem_lock);
+		}
 
 		/*
 		 * We created pl and we need to destroy it.
@@ -1184,6 +1188,8 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 	u_offset_t off;
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(type == L_PAGELOCK || type == L_PAGEUNLOCK);
+
 
 	/*
 	 * We want to lock/unlock the entire ISM segment. Therefore,
@@ -1213,8 +1219,8 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 
 		ASSERT(sptd->spt_ppa != NULL);
 
-		seg_pinactive(seg, seg->s_base, sptd->spt_amp->size,
-		    sptd->spt_ppa, sptd->spt_prot, segspt_reclaim);
+		seg_pinactive(seg, NULL, seg->s_base, sptd->spt_amp->size,
+		    sptd->spt_ppa, S_WRITE, SEGP_FORCE_WIRED, segspt_reclaim);
 
 		/*
 		 * If someone is blocked while unmapping, we purge
@@ -1228,20 +1234,16 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 			segspt_purge(seg);
 		}
 		return (0);
-	} else if (type == L_PAGERECLAIM) {
-		ASSERT(sptd->spt_ppa != NULL);
-
-		(void) segspt_reclaim(seg, seg->s_base, sptd->spt_amp->size,
-		    sptd->spt_ppa, sptd->spt_prot);
-		return (0);
 	}
+
+	/* The L_PAGELOCK case... */
 
 	/*
 	 * First try to find pages in segment page cache, without
 	 * holding the segment lock.
 	 */
-	pplist = seg_plookup(seg, seg->s_base, sptd->spt_amp->size,
-	    sptd->spt_prot);
+	pplist = seg_plookup(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    S_WRITE, SEGP_FORCE_WIRED);
 	if (pplist != NULL) {
 		ASSERT(sptd->spt_ppa == pplist);
 		ASSERT(sptd->spt_ppa[page_index]);
@@ -1254,14 +1256,13 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 		return (0);
 	}
 
-	/* The L_PAGELOCK case... */
 	mutex_enter(&sptd->spt_lock);
 
 	/*
 	 * try to find pages in segment page cache
 	 */
-	pplist = seg_plookup(seg, seg->s_base, sptd->spt_amp->size,
-	    sptd->spt_prot);
+	pplist = seg_plookup(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    S_WRITE, SEGP_FORCE_WIRED);
 	if (pplist != NULL) {
 		ASSERT(sptd->spt_ppa == pplist);
 		/*
@@ -1274,8 +1275,8 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 		return (0);
 	}
 
-	if (seg_pinsert_check(seg, sptd->spt_amp->size, SEGP_FORCE_WIRED) ==
-	    SEGP_FAIL) {
+	if (seg_pinsert_check(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    SEGP_FORCE_WIRED) == SEGP_FAIL) {
 		mutex_exit(&sptd->spt_lock);
 		*ppp = NULL;
 		return (ENOTSUP);
@@ -1338,8 +1339,9 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 
 	ASSERT(pl != NULL);
 
-	ret = seg_pinsert(seg, seg->s_base, sptd->spt_amp->size,
-	    pl, sptd->spt_prot, SEGP_FORCE_WIRED, segspt_reclaim);
+	ret = seg_pinsert(seg, NULL, seg->s_base, sptd->spt_amp->size,
+	    sptd->spt_amp->size, pl, S_WRITE, SEGP_FORCE_WIRED,
+	    segspt_reclaim);
 	if (ret == SEGP_FAIL) {
 		/*
 		 * seg_pinsert failed. We return
@@ -1375,7 +1377,7 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 	 * to the requested addr, i.e. page_index.
 	 */
 	*ppp = &(sptd->spt_ppa[page_index]);
-	return (ret);
+	return (0);
 
 insert_fail:
 	/*
@@ -1419,13 +1421,14 @@ insert_fail:
 static void
 segspt_purge(struct seg *seg)
 {
-	seg_ppurge(seg);
+	seg_ppurge(seg, NULL, SEGP_FORCE_WIRED);
 }
 
 static int
-segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
-	enum seg_rw rw)
+segspt_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
+	enum seg_rw rw, int async)
 {
+	struct seg *seg = (struct seg *)ptag;
 	struct	shm_data *shmd = (struct shm_data *)seg->s_data;
 	struct	seg	*sptseg;
 	struct	spt_data *sptd;
@@ -1442,6 +1445,8 @@ segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 	ASSERT(sptd->spt_pcachecnt != 0);
 	ASSERT(sptd->spt_ppa == pplist);
 	ASSERT(npages == btopr(sptd->spt_amp->size));
+	ASSERT(async || AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+
 	/*
 	 * Acquire the lock on the dummy seg and destroy the
 	 * ppa array IF this is the last pcachecnt.
@@ -1462,7 +1467,7 @@ segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 				free_availrmem++;
 			page_unlock(pplist[i]);
 		}
-		if (sptd->spt_flags & SHM_PAGEABLE) {
+		if ((sptd->spt_flags & SHM_PAGEABLE) && free_availrmem) {
 			mutex_enter(&freemem_lock);
 			availrmem += free_availrmem;
 			mutex_exit(&freemem_lock);
@@ -1482,14 +1487,41 @@ segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 		done = 1;
 	}
 	mutex_exit(&sptd->spt_lock);
+
+	/*
+	 * If we are pcache async thread or called via seg_ppurge_wiredpp() we
+	 * may not hold AS lock (in this case async argument is not 0). This
+	 * means if softlockcnt drops to 0 after the decrement below address
+	 * space may get freed. We can't allow it since after softlock
+	 * derement to 0 we still need to access as structure for possible
+	 * wakeup of unmap waiters. To prevent the disappearance of as we take
+	 * this segment's shm_segfree_syncmtx. segspt_shmfree() also takes
+	 * this mutex as a barrier to make sure this routine completes before
+	 * segment is freed.
+	 *
+	 * The second complication we have to deal with in async case is a
+	 * possibility of missed wake up of unmap wait thread. When we don't
+	 * hold as lock here we may take a_contents lock before unmap wait
+	 * thread that was first to see softlockcnt was still not 0. As a
+	 * result we'll fail to wake up an unmap wait thread. To avoid this
+	 * race we set nounmapwait flag in as structure if we drop softlockcnt
+	 * to 0 if async is not 0.  unmapwait thread
+	 * will not block if this flag is set.
+	 */
+	if (async)
+		mutex_enter(&shmd->shm_segfree_syncmtx);
+
 	/*
 	 * Now decrement softlockcnt.
 	 */
+	ASSERT(shmd->shm_softlockcnt > 0);
 	atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), -1);
 
 	if (shmd->shm_softlockcnt <= 0) {
-		if (AS_ISUNMAPWAIT(seg->s_as)) {
+		if (async || AS_ISUNMAPWAIT(seg->s_as)) {
 			mutex_enter(&seg->s_as->a_contents);
+			if (async)
+				AS_SETNOUNMAPWAIT(seg->s_as);
 			if (AS_ISUNMAPWAIT(seg->s_as)) {
 				AS_CLRUNMAPWAIT(seg->s_as);
 				cv_broadcast(&seg->s_as->a_cv);
@@ -1497,6 +1529,10 @@ segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 			mutex_exit(&seg->s_as->a_contents);
 		}
 	}
+
+	if (async)
+		mutex_exit(&shmd->shm_segfree_syncmtx);
+
 	return (done);
 }
 
@@ -1604,6 +1640,7 @@ segspt_softunlock(struct seg *seg, caddr_t sptseg_addr,
 
 softlock_decrement:
 	npages = btopr(len);
+	ASSERT(shmd->shm_softlockcnt >= npages);
 	atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), -npages);
 	if (shmd->shm_softlockcnt == 0) {
 		/*
@@ -1645,6 +1682,8 @@ segspt_shmattach(struct seg *seg, caddr_t *argsp)
 
 	(void) lgrp_shm_policy_set(LGRP_MEM_POLICY_DEFAULT, shm_amp, 0,
 	    NULL, 0, seg->s_size);
+
+	mutex_init(&shmd->shm_segfree_syncmtx, NULL, MUTEX_DEFAULT, NULL);
 
 	seg->s_data = (void *)shmd;
 	seg->s_ops = &segspt_shmops;
@@ -1741,6 +1780,15 @@ segspt_shmfree(struct seg *seg)
 		kmem_free(shmd->shm_vpage, btopr(shm_amp->size));
 		shmd->shm_vpage = NULL;
 	}
+
+	/*
+	 * Take shm_segfree_syncmtx lock to let segspt_reclaim() finish if it's
+	 * still working with this segment without holding as lock.
+	 */
+	ASSERT(shmd->shm_softlockcnt == 0);
+	mutex_enter(&shmd->shm_segfree_syncmtx);
+	mutex_destroy(&shmd->shm_segfree_syncmtx);
+
 	kmem_free(shmd, sizeof (*shmd));
 }
 
@@ -1834,14 +1882,6 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 
 	case F_SOFTLOCK:
 
-		mutex_enter(&freemem_lock);
-		if (availrmem < tune.t_minarmem + npages) {
-			mutex_exit(&freemem_lock);
-			return (FC_MAKE_ERR(ENOMEM));
-		} else {
-			availrmem -= npages;
-		}
-		mutex_exit(&freemem_lock);
 		atomic_add_long((ulong_t *)(&(shmd->shm_softlockcnt)), npages);
 		/*
 		 * Fall through to the F_INVAL case to load up the hat layer
@@ -1858,9 +1898,6 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 		err = spt_anon_getpages(sptseg, segspt_addr, size, ppa);
 		if (err != 0) {
 			if (type == F_SOFTLOCK) {
-				mutex_enter(&freemem_lock);
-				availrmem += npages;
-				mutex_exit(&freemem_lock);
 				atomic_add_long((ulong_t *)(
 				    &(shmd->shm_softlockcnt)), -npages);
 			}
@@ -1933,10 +1970,6 @@ dism_err:
 		return (err);
 
 	case F_SOFTUNLOCK:
-
-		mutex_enter(&freemem_lock);
-		availrmem += npages;
-		mutex_exit(&freemem_lock);
 
 		/*
 		 * This is a bit ugly, we pass in the real seg pointer,
@@ -2616,6 +2649,7 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 		int		kernel;
 		anon_sync_obj_t cookie;
 		rctl_qty_t	unlocked = 0;
+		page_t		**ppa;
 
 		amp = sptd->spt_amp;
 		mutex_enter(&sptd->spt_lock);
@@ -2661,12 +2695,15 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 			}
 		}
 		ANON_LOCK_EXIT(&amp->a_rwlock);
-		if (sptd->spt_ppa != NULL)
+		if ((ppa = sptd->spt_ppa) != NULL)
 			sptd->spt_flags |= DISM_PPA_CHANGED;
 		mutex_exit(&sptd->spt_lock);
 
 		rctl_decr_locked_mem(NULL, proj, unlocked, 0);
 		mutex_exit(&sp->shm_mlock);
+
+		if (ppa != NULL)
+			seg_ppurge_wiredpp(ppa);
 	}
 	return (sts);
 }
@@ -2748,6 +2785,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	ushort_t gen;
 	clock_t	end_lbolt;
 	int writer;
+	page_t **ppa;
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
@@ -2759,7 +2797,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		pg_idx = seg_page(seg, addr);
 
 		mutex_enter(&sptd->spt_lock);
-		if (sptd->spt_ppa == NULL) {
+		if ((ppa = sptd->spt_ppa) == NULL) {
 			mutex_exit(&sptd->spt_lock);
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 			anon_disclaim(amp, pg_idx, len);
@@ -2775,7 +2813,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		/*
 		 * Purge all DISM cached pages
 		 */
-		seg_ppurge_seg(segspt_reclaim);
+		seg_ppurge_wiredpp(ppa);
 
 		/*
 		 * Drop the AS_LOCK so that other threads can grab it

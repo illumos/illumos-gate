@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,7 +167,7 @@ swap_getapage(
 	int upgrade = 0;
 
 	SWAPFS_PRINT(SWAP_VOPS, "swap_getapage: vp %p, off %llx, len %lx\n",
-		vp, off, len, 0, 0);
+	    vp, off, len, 0, 0);
 
 	/*
 	 * Until there is a call-back mechanism to cause SEGKP
@@ -247,8 +247,10 @@ again:
 					mutex_enter(ahm);
 
 					ap = swap_anon(vp, off);
-					if (ap == NULL)
-					    panic("swap_getapage: null anon");
+					if (ap == NULL) {
+						panic("swap_getapage:"
+						    " null anon");
+					}
 
 					if (ap->an_pvp == pvp &&
 					    ap->an_poff == poff) {
@@ -298,7 +300,7 @@ again:
 			pvn_plist_init(pp, pl, plsz, off, PAGESIZE, rw);
 	}
 	TRACE_3(TR_FAC_SWAPFS, TR_SWAPFS_GETAPAGE,
-		"swapfs getapage:pp %p vp %p off %llx", pp, vp, off);
+	    "swapfs getapage:pp %p vp %p off %llx", pp, vp, off);
 	return (err);
 }
 
@@ -340,7 +342,7 @@ swap_getconpage(
 	ASSERT(nreloc != NULL);
 	ASSERT(!SEG_IS_SEGKP(seg)); /* XXX for now not supported */
 	SWAPFS_PRINT(SWAP_VOPS, "swap_getconpage: vp %p, off %llx, len %lx\n",
-		vp, off, len, 0, 0);
+	    vp, off, len, 0, 0);
 
 	/*
 	 * If we are not using a preallocated page then we know one already
@@ -384,7 +386,7 @@ swap_getconpage(
 			pl[1] = NULL;
 			if (page_pptonum(pp) &
 			    (page_get_pagecnt(conpp->p_szc) - 1))
-			    cmn_err(CE_PANIC, "swap_getconpage: no root");
+				cmn_err(CE_PANIC, "swap_getconpage: no root");
 		}
 		return (err);
 	}
@@ -415,9 +417,27 @@ swap_getconpage(
 			    "swap_getconpage: swap_getphysname failed!");
 		}
 
-		if (pvp) {
-			err = VOP_PAGEIO(pvp, pp, poff, PAGESIZE, B_READ, cr,
-				NULL);
+		if (pvp != NULL) {
+			err = VOP_PAGEIO(pvp, pp, poff, PAGESIZE, B_READ,
+			    cr, NULL);
+			if (err == 0) {
+				struct anon *ap;
+				kmutex_t *ahm;
+
+				ahm = &anonhash_lock[AH_LOCK(vp, off)];
+				mutex_enter(ahm);
+				ap = swap_anon(vp, off);
+				if (ap == NULL)
+					panic("swap_getconpage: null anon");
+				if (ap->an_pvp != pvp || ap->an_poff != poff)
+					panic("swap_getconpage: bad anon");
+
+				swap_phys_free(pvp, poff, PAGESIZE);
+				ap->an_pvp = NULL;
+				ap->an_poff = NULL;
+				hat_setmod(pp);
+				mutex_exit(ahm);
+			}
 		} else {
 			pagezero(pp, 0, PAGESIZE);
 		}
@@ -435,7 +455,7 @@ swap_getconpage(
 	ASSERT(pp->p_prev == pp);
 
 	TRACE_3(TR_FAC_SWAPFS, TR_SWAPFS_GETAPAGE,
-		"swapfs getconpage:pp %p vp %p off %llx", pp, vp, off);
+	    "swapfs getconpage:pp %p vp %p off %llx", pp, vp, off);
 
 	pl[0] = pp;
 	pl[1] = NULL;
@@ -552,7 +572,7 @@ swap_putpage(
 				pp = page_lookup(vp, io_off, SE_EXCL);
 			else
 				pp = page_lookup_nowait(vp, io_off,
-					(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 
 			if (pp == NULL || pvn_getdirty(pp, flags) == 0)
 				io_len = PAGESIZE;
@@ -628,8 +648,8 @@ swap_putapage(
 	}
 
 	SWAPFS_PRINT(SWAP_PUTP,
-		"swap_putapage: pp %p, vp %p, off %llx, flags %x\n",
-		pp, vp, pp->p_offset, flags, 0);
+	    "swap_putapage: pp %p, vp %p, off %llx, flags %x\n",
+	    pp, vp, pp->p_offset, flags, 0);
 
 	ASSERT(PAGE_LOCKED(pp));
 
@@ -683,7 +703,7 @@ swap_putapage(
 		doff = off;
 		dlen = PAGESIZE;
 		if (err = swap_newphysname(vp, off, &doff, &dlen,
-						&pvp, &poff)) {
+		    &pvp, &poff)) {
 			swap_otherfail++;
 			swap_otherpages += btop(klsz);
 			hat_setmod(pp);
@@ -715,7 +735,7 @@ swap_putapage(
 	}
 
 	err = VOP_PAGEIO(klvp, pplist, klstart, klsz,
-		    B_WRITE | flags, cr, NULL);
+	    B_WRITE | flags, cr, NULL);
 
 	if ((flags & B_ASYNC) == 0)
 		pvn_write_done(pp, ((err) ? B_ERROR : 0) | B_WRITE | flags);
@@ -727,8 +747,8 @@ swap_putapage(
 	}
 out:
 	TRACE_4(TR_FAC_SWAPFS, TR_SWAPFS_PUTAPAGE,
-		"swapfs putapage:vp %p klvp %p, klstart %lx, klsz %lx",
-		vp, klvp, klstart, klsz);
+	    "swapfs putapage:vp %p klvp %p, klstart %lx, klsz %lx",
+	    vp, klvp, klstart, klsz);
 	if (err && err != ENOMEM)
 		cmn_err(CE_WARN, "swapfs_putapage: err %d\n", err);
 	if (lenp)

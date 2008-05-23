@@ -676,6 +676,7 @@ schedctl_freepage(struct anon_map *amp, caddr_t kaddr)
 		 * we have to free everything rather than letting as_free
 		 * do the work.
 		 */
+		anonmap_purge(amp);
 		anon_free(amp->ahp, 0, PAGESIZE);
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 		anonmap_free(amp);

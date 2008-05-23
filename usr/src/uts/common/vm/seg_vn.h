@@ -86,7 +86,7 @@ typedef struct segvn_crargs {
  */
 typedef struct	segvn_data {
 	krwlock_t lock;		/* protect segvn_data and vpage array */
-	kmutex_t segp_slock;	/* serialize insertions into seg_pcache */
+	kmutex_t segfree_syncmtx; /* barrier lock for segvn_free() */
 	uchar_t	pageprot;	/* true if per page protections present */
 	uchar_t	prot;		/* current segment prot if pageprot == 0 */
 	uchar_t	maxprot;	/* maximum segment protections */
@@ -101,7 +101,7 @@ typedef struct	segvn_data {
 	uchar_t	advice;		/* madvise flags for segment */
 	uchar_t	pageadvice;	/* true if per page advice set */
 	ushort_t flags;		/* flags - from sys/mman.h */
-	ssize_t	softlockcnt;	/* # of pages SOFTLOCKED in seg */
+	spgcnt_t softlockcnt;	/* # of pages SOFTLOCKED in seg */
 	lgrp_mem_policy_info_t policy_info; /* memory allocation policy */
 	hat_region_cookie_t rcookie;	/* region for hat calls */
 	lgrp_mem_policy_info_t tr_policy_info; /* memory allocation for TR */
@@ -110,6 +110,8 @@ typedef struct	segvn_data {
 	struct	segvn_data *svn_trprev; /* textrepl list prev link */
 	int	tr_state;	/* TR (text replication) state */
 	uchar_t	pageswap;	/* true if per page swap accounting is set */
+	spgcnt_t softlockcnt_sbase; /* # of softlocks for seg start addr */
+	spgcnt_t softlockcnt_send; /* # of softlocks for seg end addr */
 } segvn_data_t;
 
 #ifdef _KERNEL

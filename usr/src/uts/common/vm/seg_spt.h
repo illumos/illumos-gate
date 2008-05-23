@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ typedef struct spt_data {
 typedef struct shm_data {
 	struct as	*shm_sptas;
 	struct anon_map *shm_amp;
-	size_t		shm_softlockcnt; /* # outstanding lock operations */
+	spgcnt_t	shm_softlockcnt; /* # outstanding lock operations */
 	struct seg 	*shm_sptseg;	/* pointer to spt segment */
 	char		*shm_vpage;	/* indicating locked pages */
 	spgcnt_t	shm_lckpgs;	/* # of locked pages per attached seg */
@@ -82,6 +82,7 @@ typedef struct shm_data {
 	 * Memory allocation policy after shmat()
 	 */
 	lgrp_mem_policy_info_t	shm_policy_info;
+	kmutex_t shm_segfree_syncmtx;	/* barrier lock for segspt_shmfree() */
 } shm_data_t;
 
 #define	DISM_PG_LOCKED		0x1	/* DISM page is locked */

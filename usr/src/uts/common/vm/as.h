@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,23 +131,26 @@ struct as {
 #define	AS_CLAIMGAP		0x40
 #define	AS_UNMAPWAIT		0x20
 #define	AS_NEEDSPURGE		0x10	/* mostly for seg_nf, see as_purge() */
+#define	AS_NOUNMAPWAIT		0x02
 #define	AS_BUSY			0x01	/* needed by XHAT framework */
 
 #define	AS_ISPGLCK(as)		((as)->a_flags & AS_PAGLCK)
 #define	AS_ISCLAIMGAP(as)	((as)->a_flags & AS_CLAIMGAP)
 #define	AS_ISUNMAPWAIT(as)	((as)->a_flags & AS_UNMAPWAIT)
 #define	AS_ISBUSY(as)		((as)->a_flags & AS_BUSY)
-
+#define	AS_ISNOUNMAPWAIT(as)	((as)->a_flags & AS_NOUNMAPWAIT)
 
 #define	AS_SETPGLCK(as)		((as)->a_flags |= AS_PAGLCK)
 #define	AS_SETCLAIMGAP(as)	((as)->a_flags |= AS_CLAIMGAP)
 #define	AS_SETUNMAPWAIT(as)	((as)->a_flags |= AS_UNMAPWAIT)
 #define	AS_SETBUSY(as)		((as)->a_flags |= AS_BUSY)
+#define	AS_SETNOUNMAPWAIT(as)	((as)->a_flags |= AS_NOUNMAPWAIT)
 
 #define	AS_CLRPGLCK(as)		((as)->a_flags &= ~AS_PAGLCK)
 #define	AS_CLRCLAIMGAP(as)	((as)->a_flags &= ~AS_CLAIMGAP)
 #define	AS_CLRUNMAPWAIT(as)	((as)->a_flags &= ~AS_UNMAPWAIT)
 #define	AS_CLRBUSY(as)		((as)->a_flags &= ~AS_BUSY)
+#define	AS_CLRNOUNMAPWAIT(as)	((as)->a_flags &= ~AS_NOUNMAPWAIT)
 
 #define	AS_TYPE_64BIT(as)	\
 	    (((as)->a_userlimit > (caddr_t)UINT32_MAX) ? 1 : 0)
@@ -280,8 +283,6 @@ int	as_exec(struct as *oas, caddr_t ostka, size_t stksz,
 int	as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 		size_t size, enum seg_rw rw);
 void	as_pageunlock(struct as *as, struct page **pp, caddr_t addr,
-		size_t size, enum seg_rw rw);
-void	as_pagereclaim(struct as *as, struct page **pp, caddr_t addr,
 		size_t size, enum seg_rw rw);
 int	as_setpagesize(struct as *as, caddr_t addr, size_t size, uint_t szc,
 		boolean_t wait);

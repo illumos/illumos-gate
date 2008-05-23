@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -494,7 +494,7 @@ kstat_init(void)
 	 */
 	kstat_chain_id = 0;
 	ksp = kstat_create("unix", 0, "kstat_headers", "kstat", KSTAT_TYPE_RAW,
-		0, KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
+	    0, KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
 	if (ksp) {
 		ksp->ks_lock = &kstat_chain_lock;
 		ksp->ks_update = header_kstat_update;
@@ -505,35 +505,35 @@ kstat_init(void)
 	}
 
 	ksp = kstat_create("unix", 0, "kstat_types", "kstat",
-		KSTAT_TYPE_NAMED, KSTAT_NUM_TYPES, 0);
+	    KSTAT_TYPE_NAMED, KSTAT_NUM_TYPES, 0);
 	if (ksp) {
 		int i;
 		kstat_named_t *kn = KSTAT_NAMED_PTR(ksp);
 
 		for (i = 0; i < KSTAT_NUM_TYPES; i++) {
 			kstat_named_init(&kn[i], kstat_data_type[i].name,
-				KSTAT_DATA_ULONG);
+			    KSTAT_DATA_ULONG);
 			kn[i].value.ul = i;
 		}
 		kstat_install(ksp);
 	}
 
 	ksp = kstat_create("unix", 0, "sysinfo", "misc", KSTAT_TYPE_RAW,
-		sizeof (sysinfo_t), KSTAT_FLAG_VIRTUAL);
+	    sizeof (sysinfo_t), KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &sysinfo;
 		kstat_install(ksp);
 	}
 
 	ksp = kstat_create("unix", 0, "vminfo", "vm", KSTAT_TYPE_RAW,
-		sizeof (vminfo_t), KSTAT_FLAG_VIRTUAL);
+	    sizeof (vminfo_t), KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &vminfo;
 		kstat_install(ksp);
 	}
 
 	ksp = kstat_create("unix", 0, "segmap", "vm", KSTAT_TYPE_NAMED,
-		segmapcnt_ndata, KSTAT_FLAG_VIRTUAL);
+	    segmapcnt_ndata, KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) segmapcnt_ptr;
 		ksp->ks_update = segmap_kstat_update;
@@ -541,7 +541,7 @@ kstat_init(void)
 	}
 
 	ksp = kstat_create("unix", 0, "biostats", "misc", KSTAT_TYPE_NAMED,
-		biostats_ndata, KSTAT_FLAG_VIRTUAL);
+	    biostats_ndata, KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) biostats_ptr;
 		kstat_install(ksp);
@@ -549,7 +549,7 @@ kstat_init(void)
 
 #ifdef VAC
 	ksp = kstat_create("unix", 0, "flushmeter", "hat", KSTAT_TYPE_RAW,
-		sizeof (struct flushmeter), KSTAT_FLAG_VIRTUAL);
+	    sizeof (struct flushmeter), KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &flush_cnt;
 		kstat_install(ksp);
@@ -557,15 +557,15 @@ kstat_init(void)
 #endif	/* VAC */
 
 	ksp = kstat_create("unix", 0, "var", "misc", KSTAT_TYPE_RAW,
-		sizeof (struct var), KSTAT_FLAG_VIRTUAL);
+	    sizeof (struct var), KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &v;
 		kstat_install(ksp);
 	}
 
 	ksp = kstat_create("unix", 0, "system_misc", "misc", KSTAT_TYPE_NAMED,
-		sizeof (system_misc_kstat) / sizeof (kstat_named_t),
-		KSTAT_FLAG_VIRTUAL);
+	    sizeof (system_misc_kstat) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &system_misc_kstat;
 		ksp->ks_update = system_misc_kstat_update;
@@ -573,8 +573,8 @@ kstat_init(void)
 	}
 
 	ksp = kstat_create("unix", 0, "system_pages", "pages", KSTAT_TYPE_NAMED,
-		sizeof (system_pages_kstat) / sizeof (kstat_named_t),
-		KSTAT_FLAG_VIRTUAL);
+	    sizeof (system_pages_kstat) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &system_pages_kstat;
 		ksp->ks_update = system_pages_kstat_update;
@@ -911,9 +911,9 @@ system_pages_kstat_update(kstat_t *ksp, int rw)
 	 * user explicit page locking.
 	 */
 	system_pages_kstat.pp_kernel.value.ul   = (ulong_t)(physinstalled -
-		obp_pages - availrmem - k_anoninfo.ani_mem_resv -
-		anon_segkp_pages_locked - segvn_pages_locked -
-		pages_locked - pages_claimed - pages_useclaim);
+	    obp_pages - availrmem - k_anoninfo.ani_mem_resv -
+	    anon_segkp_pages_locked - pages_locked -
+	    pages_claimed - pages_useclaim);
 
 	return (0);
 }
@@ -923,7 +923,7 @@ kstat_create(const char *ks_module, int ks_instance, const char *ks_name,
     const char *ks_class, uchar_t ks_type, uint_t ks_ndata, uchar_t ks_flags)
 {
 	return (kstat_create_zone(ks_module, ks_instance, ks_name, ks_class,
-		    ks_type, ks_ndata, ks_flags, ALL_ZONES));
+	    ks_type, ks_ndata, ks_flags, ALL_ZONES));
 }
 
 /*
@@ -966,8 +966,8 @@ kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
 	 */
 	if (ks_type >= KSTAT_NUM_TYPES) {
 		cmn_err(CE_WARN, "kstat_create('%s', %d, '%s'): "
-			"invalid kstat type %d",
-			ks_module, ks_instance, ks_name, ks_type);
+		    "invalid kstat type %d",
+		    ks_module, ks_instance, ks_name, ks_type);
 		return (NULL);
 	}
 
@@ -978,8 +978,8 @@ kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
 	if ((ks_flags & KSTAT_FLAG_PERSISTENT) &&
 	    (ks_flags & KSTAT_FLAG_VIRTUAL)) {
 		cmn_err(CE_WARN, "kstat_create('%s', %d, '%s'): "
-			"cannot create persistent virtual kstat",
-			ks_module, ks_instance, ks_name);
+		    "cannot create persistent virtual kstat",
+		    ks_module, ks_instance, ks_name);
 		return (NULL);
 	}
 
@@ -990,8 +990,8 @@ kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
 	if ((ks_flags & KSTAT_FLAG_VAR_SIZE) &&
 	    !(ks_flags & KSTAT_FLAG_VIRTUAL)) {
 		cmn_err(CE_WARN, "kstat_create('%s', %d, '%s'): "
-			"cannot create variable-size physical kstat",
-			ks_module, ks_instance, ks_name);
+		    "cannot create variable-size physical kstat",
+		    ks_module, ks_instance, ks_name);
 		return (NULL);
 	}
 
@@ -1001,10 +1001,10 @@ kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
 	if (ks_ndata < kstat_data_type[ks_type].min_ndata ||
 	    ks_ndata > kstat_data_type[ks_type].max_ndata) {
 		cmn_err(CE_WARN, "kstat_create('%s', %d, '%s'): "
-			"ks_ndata=%d out of range [%d, %d]",
-			ks_module, ks_instance, ks_name, (int)ks_ndata,
-			kstat_data_type[ks_type].min_ndata,
-			kstat_data_type[ks_type].max_ndata);
+		    "ks_ndata=%d out of range [%d, %d]",
+		    ks_module, ks_instance, ks_name, (int)ks_ndata,
+		    kstat_data_type[ks_type].min_ndata,
+		    kstat_data_type[ks_type].max_ndata);
 		return (NULL);
 	}
 
@@ -1036,8 +1036,8 @@ kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
 			 */
 			kstat_rele(ksp);
 			cmn_err(CE_WARN, "kstat_create('%s', %d, '%s'): "
-				"invalid reactivation of dormant kstat",
-				ks_module, ks_instance, ks_name);
+			    "invalid reactivation of dormant kstat",
+			    ks_module, ks_instance, ks_name);
 			return (NULL);
 		}
 		/*
@@ -1056,8 +1056,8 @@ kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
 	e = kstat_alloc(ks_flags & KSTAT_FLAG_VIRTUAL ? 0 : ks_data_size);
 	if (e == NULL) {
 		cmn_err(CE_NOTE, "kstat_create('%s', %d, '%s'): "
-			"insufficient kernel memory",
-			ks_module, ks_instance, ks_name);
+		    "insufficient kernel memory",
+		    ks_module, ks_instance, ks_name);
 		return (NULL);
 	}
 

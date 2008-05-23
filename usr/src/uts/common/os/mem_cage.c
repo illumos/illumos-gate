@@ -1271,6 +1271,11 @@ kcage_create_throttle(pgcnt_t npages, int flags)
 				}
 			}
 		}
+
+		if (NOMEMWAIT() && freemem < minfree) {
+			return (KCT_CRIT);
+		}
+
 	}
 	return (KCT_NONCRIT);
 }

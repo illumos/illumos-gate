@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,7 +139,6 @@ extern struct anon **anon_hash;
  * Declaration for the Global counters to accurately
  * track the kernel foot print in memory.
  */
-extern  pgcnt_t segvn_pages_locked;
 extern  pgcnt_t pages_locked;
 extern  pgcnt_t pages_claimed;
 extern  pgcnt_t pages_useclaim;
@@ -278,7 +277,7 @@ struct kshmid;
  * 0 (base page size) or page_num_pagesizes() - 1, while MAP_PRIVATE
  * the amp->szc could be anything in [0, page_num_pagesizes() - 1].
  */
-struct anon_map {
+typedef struct anon_map {
 	krwlock_t a_rwlock;	/* protect anon_map and anon array */
 	size_t	size;		/* size in bytes mapped by the anon array */
 	struct	anon_hdr *ahp; 	/* anon array header pointer, containing */
@@ -288,7 +287,13 @@ struct anon_map {
 	ushort_t a_szc;		/* max szc among shared processes */
 	void	*locality;	/* lgroup locality info */
 	struct kshmid *a_sp;	/* kshmid if amp backs sysV, or NULL */
-};
+	int	a_purgewait;	/* somebody waits for slocks to go away */
+	kcondvar_t a_purgecv;	/* cv for waiting for slocks to go away */
+	kmutex_t a_purgemtx;	/* mutex for anonmap_purge() */
+	spgcnt_t a_softlockcnt; /* number of pages locked in pcache */
+	kmutex_t a_pmtx;	/* protects amp's pcache list */
+	pcache_link_t a_phead;	/* head of amp's pcache list */
+} amp_t;
 
 #ifdef _KERNEL
 
@@ -303,6 +308,9 @@ struct anon_map {
 
 #define	ANON_LOCK_ENTER(lock, type)	rw_enter((lock), (type))
 #define	ANON_LOCK_EXIT(lock)		rw_exit((lock))
+#define	ANON_LOCK_HELD(lock)		RW_LOCK_HELD((lock))
+#define	ANON_READ_HELD(lock)		RW_READ_HELD((lock))
+#define	ANON_WRITE_HELD(lock)		RW_WRITE_HELD((lock))
 
 #define	ANON_ARRAY_HASH(amp, idx)\
 	((((idx) + ((idx) >> ANON_ARRAY_SHIFT) +\
@@ -334,9 +342,9 @@ typedef struct anon_sync_obj {
 /*
  * Swap slots currently available for reservation
  */
-#define	CURRENT_TOTAL_AVAILABLE_SWAP \
+#define	CURRENT_TOTAL_AVAILABLE_SWAP				\
 	((k_anoninfo.ani_max - k_anoninfo.ani_phys_resv) +	\
-			MAX((spgcnt_t)(availrmem - swapfs_minfree), 0))
+	    MAX((spgcnt_t)(availrmem - swapfs_minfree), 0))
 
 struct k_anoninfo {
 	pgcnt_t	ani_max;	/* total reservable slots on phys */
@@ -392,6 +400,8 @@ extern int	anon_resvmem(size_t, boolean_t, zone_t *, int);
 extern void	anon_unresvmem(size_t, zone_t *);
 extern struct	anon_map *anonmap_alloc(size_t, size_t, int);
 extern void	anonmap_free(struct anon_map *);
+extern void	anonmap_purge(struct anon_map *);
+extern void	anon_swap_free(struct anon *, struct page *);
 extern void	anon_decref(struct anon *);
 extern int	non_anon(struct anon_hdr *, ulong_t, u_offset_t *, size_t *);
 extern pgcnt_t	anon_pages(struct anon_hdr *, ulong_t, pgcnt_t);

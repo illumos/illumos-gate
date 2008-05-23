@@ -162,6 +162,11 @@ caddr_t	stack_noexec_argsp = (caddr_t)&stack_noexec_crargs; /* noexec stack */
 
 size_t	segvn_comb_thrshld = UINT_MAX;	/* patchable -- see 1196681 */
 
+size_t	segvn_pglock_comb_thrshld = (1UL << 16);	/* 64K */
+size_t	segvn_pglock_comb_balign = (1UL << 16);		/* 64K */
+uint_t	segvn_pglock_comb_bshift;
+size_t	segvn_pglock_comb_palign;
+
 static int	segvn_concat(struct seg *, struct seg *, int);
 static int	segvn_extend_prev(struct seg *, struct seg *,
 		    struct segvn_crargs *, size_t);
@@ -180,13 +185,15 @@ static faultcode_t segvn_fault_anonpages(struct hat *, struct seg *, caddr_t,
     caddr_t, enum fault_type, enum seg_rw, caddr_t, caddr_t, int);
 static faultcode_t segvn_faultpage(struct hat *, struct seg *, caddr_t,
     u_offset_t, struct vpage *, page_t **, uint_t,
-    enum fault_type, enum seg_rw, int, int);
+    enum fault_type, enum seg_rw, int);
 static void	segvn_vpage(struct seg *);
 static size_t	segvn_count_swap_by_vpages(struct seg *);
 
 static void segvn_purge(struct seg *seg);
-static int segvn_reclaim(struct seg *, caddr_t, size_t, struct page **,
-    enum seg_rw);
+static int segvn_reclaim(void *, caddr_t, size_t, struct page **,
+    enum seg_rw, int);
+static int shamp_reclaim(void *, caddr_t, size_t, struct page **,
+    enum seg_rw, int);
 
 static int sameprot(struct seg *, caddr_t, size_t);
 
@@ -199,9 +206,6 @@ static int segvn_claim_pages(struct seg *, struct vpage *, u_offset_t,
 static void segvn_hat_rgn_unload_callback(caddr_t, caddr_t, caddr_t,
     size_t, void *, u_offset_t);
 
-static int segvn_slock_anonpages(page_t *, int);
-static void segvn_sunlock_anonpages(page_t *, int);
-
 static struct kmem_cache *segvn_cache;
 static struct kmem_cache **segvn_szc_cache;
 
@@ -212,7 +216,7 @@ static struct segvnvmstats_str {
 	ulong_t	fullszcpages[10];
 	ulong_t	relocatepages[3];
 	ulong_t	fltanpages[17];
-	ulong_t pagelock[3];
+	ulong_t pagelock[2];
 	ulong_t	demoterange[3];
 } segvnvmstats;
 #endif /* VM_STATS */
@@ -240,7 +244,7 @@ segvn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	struct segvn_data *svd = buf;
 
 	rw_init(&svd->lock, NULL, RW_DEFAULT, NULL);
-	mutex_init(&svd->segp_slock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&svd->segfree_syncmtx, NULL, MUTEX_DEFAULT, NULL);
 	svd->svn_trnext = svd->svn_trprev = NULL;
 	return (0);
 }
@@ -252,7 +256,7 @@ segvn_cache_destructor(void *buf, void *cdrarg)
 	struct segvn_data *svd = buf;
 
 	rw_destroy(&svd->lock);
-	mutex_destroy(&svd->segp_slock);
+	mutex_destroy(&svd->segfree_syncmtx);
 }
 
 /*ARGSUSED*/
@@ -467,6 +471,13 @@ segvn_init(void)
 		    NULL, 0, &p0, TS_RUN, minclsyspri);
 	}
 #endif
+
+	if (!ISP2(segvn_pglock_comb_balign) ||
+	    segvn_pglock_comb_balign < PAGESIZE) {
+		segvn_pglock_comb_balign = 1UL << 16; /* 64K */
+	}
+	segvn_pglock_comb_bshift = highbit(segvn_pglock_comb_balign) - 1;
+	segvn_pglock_comb_palign = btop(segvn_pglock_comb_balign);
 }
 
 #define	SEGVN_PAGEIO	((void *)0x1)
@@ -786,6 +797,8 @@ segvn_create(struct seg *seg, void *argsp)
 	svd->pageadvice = 0;
 	svd->flags = (ushort_t)a->flags;
 	svd->softlockcnt = 0;
+	svd->softlockcnt_sbase = 0;
+	svd->softlockcnt_send = 0;
 	svd->rcookie = HAT_INVALID_REGION_COOKIE;
 	svd->pageswap = 0;
 
@@ -991,7 +1004,7 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 	    (!svd1->pageprot && !svd2->pageprot && incompat(prot)) ||
 	    incompat(type) || incompat(cred) || incompat(flags) ||
 	    seg1->s_szc != seg2->s_szc || incompat(policy_info.mem_policy) ||
-	    (svd2->softlockcnt > 0))
+	    (svd2->softlockcnt > 0) || svd1->softlockcnt_send > 0)
 		return (-1);
 #undef incompat
 
@@ -1232,7 +1245,7 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 	if (svd1->vp != a->vp || svd1->maxprot != a->maxprot ||
 	    (!svd1->pageprot && (svd1->prot != a->prot)) ||
 	    svd1->type != a->type || svd1->flags != a->flags ||
-	    seg1->s_szc != a->szc)
+	    seg1->s_szc != a->szc || svd1->softlockcnt_send > 0)
 		return (-1);
 
 	/* vp == NULL implies zfod, offset doesn't matter */
@@ -1353,7 +1366,7 @@ segvn_extend_next(
 	if (svd2->vp != a->vp || svd2->maxprot != a->maxprot ||
 	    (!svd2->pageprot && (svd2->prot != a->prot)) ||
 	    svd2->type != a->type || svd2->flags != a->flags ||
-	    seg2->s_szc != a->szc)
+	    seg2->s_szc != a->szc || svd2->softlockcnt_sbase > 0)
 		return (-1);
 	/* vp == NULL implies zfod, offset doesn't matter */
 	if (svd2->vp != NULL &&
@@ -1498,6 +1511,8 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	newsvd->pageswap = svd->pageswap;
 	newsvd->flags = svd->flags;
 	newsvd->softlockcnt = 0;
+	newsvd->softlockcnt_sbase = 0;
+	newsvd->softlockcnt_send = 0;
 	newsvd->policy_info = svd->policy_info;
 	newsvd->rcookie = HAT_INVALID_REGION_COOKIE;
 
@@ -1797,6 +1812,15 @@ segvn_unmap(struct seg *seg, caddr_t addr, size_t len)
 retry:
 	if (svd->softlockcnt > 0) {
 		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+
+		/*
+		 * If this is shared segment non 0 softlockcnt
+		 * means locked pages are still in use.
+		 */
+		if (svd->type == MAP_SHARED) {
+			return (EAGAIN);
+		}
+
 		/*
 		 * since we do have the writers lock nobody can fill
 		 * the cache during the purge. The flush either succeeds
@@ -1946,6 +1970,16 @@ retry:
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
 			if (amp->refcnt == 1 || svd->type == MAP_PRIVATE) {
 				/*
+				 * Shared anon map is no longer in use. Before
+				 * freeing its pages purge all entries from
+				 * pcache that belong to this amp.
+				 */
+				if (svd->type == MAP_SHARED) {
+					ASSERT(amp->refcnt == 1);
+					ASSERT(svd->softlockcnt == 0);
+					anonmap_purge(amp);
+				}
+				/*
 				 * Free up now unused parts of anon_map array.
 				 */
 				if (amp->a_szc == seg->s_szc) {
@@ -2040,6 +2074,18 @@ retry:
 				 * Free up now unused parts of anon_map array.
 				 */
 				ulong_t an_idx = svd->anon_index + npages;
+
+				/*
+				 * Shared anon map is no longer in use. Before
+				 * freeing its pages purge all entries from
+				 * pcache that belong to this amp.
+				 */
+				if (svd->type == MAP_SHARED) {
+					ASSERT(amp->refcnt == 1);
+					ASSERT(svd->softlockcnt == 0);
+					anonmap_purge(amp);
+				}
+
 				if (amp->a_szc == seg->s_szc) {
 					if (seg->s_szc != 0) {
 						anon_free_pages(amp->ahp,
@@ -2123,6 +2169,8 @@ retry:
 	nsvd->offset = svd->offset + (uintptr_t)(nseg->s_base - seg->s_base);
 	nsvd->swresv = 0;
 	nsvd->softlockcnt = 0;
+	nsvd->softlockcnt_sbase = 0;
+	nsvd->softlockcnt_send = 0;
 	ASSERT(nsvd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	if (svd->vp != NULL) {
@@ -2173,6 +2221,18 @@ retry:
 			 * Free up now unused parts of anon_map array.
 			 */
 			ulong_t an_idx = svd->anon_index + opages;
+
+			/*
+			 * Shared anon map is no longer in use. Before
+			 * freeing its pages purge all entries from
+			 * pcache that belong to this amp.
+			 */
+			if (svd->type == MAP_SHARED) {
+				ASSERT(amp->refcnt == 1);
+				ASSERT(svd->softlockcnt == 0);
+				anonmap_purge(amp);
+			}
+
 			if (amp->a_szc == seg->s_szc) {
 				if (seg->s_szc != 0) {
 					anon_free_pages(amp->ahp, an_idx, len,
@@ -2316,6 +2376,15 @@ segvn_free(struct seg *seg)
 					    seg->s_size);
 				}
 			} else {
+
+				/*
+				 * Shared anon map is no longer in use. Before
+				 * freeing its pages purge all entries from
+				 * pcache that belong to this amp.
+				 */
+				ASSERT(svd->softlockcnt == 0);
+				anonmap_purge(amp);
+
 				/*
 				 * Shared - anon_free the entire
 				 * anon_map's worth of stuff and
@@ -2380,153 +2449,17 @@ segvn_free(struct seg *seg)
 	svd->pageswap = 0;
 	svd->cred = NULL;
 
+	/*
+	 * Take segfree_syncmtx lock to let segvn_reclaim() finish if it's
+	 * still working with this segment without holding as lock (in case
+	 * it's called by pcache async thread).
+	 */
+	ASSERT(svd->softlockcnt == 0);
+	mutex_enter(&svd->segfree_syncmtx);
+	mutex_exit(&svd->segfree_syncmtx);
+
 	seg->s_data = NULL;
 	kmem_cache_free(segvn_cache, svd);
-}
-
-#ifdef DEBUG
-uint32_t segvn_slock_mtbf = 0;
-#endif
-
-ulong_t segvn_lpglck_limit = 0;
-
-/*
- * Support routines used by segvn_pagelock() and softlock faults for anonymous
- * pages to implement availrmem accounting in a way that makes sure the
- * same memory is accounted just once for all softlock/pagelock purposes.
- * This prevents a bug when availrmem is quickly incorrectly exhausted from
- * several pagelocks to different parts of the same large page since each
- * pagelock has to decrement availrmem by the size of the entire large
- * page. Note those pages are not COW shared until softunlock/pageunlock so
- * we don't need to use cow style accounting here.  We also need to make sure
- * the entire large page is accounted even if softlock range is less than the
- * entire large page because large anon pages can't be demoted when any of
- * constituent pages is locked. The caller calls this routine for every page_t
- * it locks. The very first page in the range may not be the root page of a
- * large page. For all other pages it's guaranteed we are going to visit the
- * root of a particular large page before any other constituent page as we are
- * locking sequential pages belonging to the same anon map. So we do all the
- * locking when the root is encountered except for the very first page.  Since
- * softlocking is not supported (except S_READ_NOCOW special case) for vmpss
- * segments and since vnode pages can be demoted without locking all
- * constituent pages vnode pages don't come here.  Unlocking relies on the
- * fact that pagesize can't change whenever any of constituent large pages is
- * locked at least SE_SHARED. This allows unlocking code to find the right
- * root and decrement availrmem by the same amount it was incremented when the
- * page was locked.
- */
-static int
-segvn_slock_anonpages(page_t *pp, int first)
-{
-	pgcnt_t		pages;
-	pfn_t		pfn;
-	uchar_t		szc = pp->p_szc;
-
-	ASSERT(PAGE_LOCKED(pp));
-	ASSERT(pp->p_vnode != NULL);
-	ASSERT(IS_SWAPFSVP(pp->p_vnode));
-
-	/*
-	 * pagesize won't change as long as any constituent page is locked.
-	 */
-	pages = page_get_pagecnt(pp->p_szc);
-	pfn = page_pptonum(pp);
-
-	if (!first) {
-		if (!IS_P2ALIGNED(pfn, pages)) {
-#ifdef DEBUG
-			pp = &pp[-(spgcnt_t)(pfn & (pages - 1))];
-			pfn = page_pptonum(pp);
-			ASSERT(IS_P2ALIGNED(pfn, pages));
-			ASSERT(pp->p_szc == szc);
-			ASSERT(pp->p_vnode != NULL);
-			ASSERT(IS_SWAPFSVP(pp->p_vnode));
-			ASSERT(pp->p_slckcnt != 0);
-#endif /* DEBUG */
-			return (1);
-		}
-	} else if (!IS_P2ALIGNED(pfn, pages)) {
-		pp = &pp[-(spgcnt_t)(pfn & (pages - 1))];
-#ifdef DEBUG
-		pfn = page_pptonum(pp);
-		ASSERT(IS_P2ALIGNED(pfn, pages));
-		ASSERT(pp->p_szc == szc);
-		ASSERT(pp->p_vnode != NULL);
-		ASSERT(IS_SWAPFSVP(pp->p_vnode));
-#endif /* DEBUG */
-	}
-
-#ifdef DEBUG
-	if (segvn_slock_mtbf && !(gethrtime() % segvn_slock_mtbf)) {
-		return (0);
-	}
-#endif /* DEBUG */
-
-	/*
-	 * pp is a root page.
-	 * We haven't locked this large page yet.
-	 */
-	page_struct_lock(pp);
-	if (pp->p_slckcnt != 0) {
-		if (pp->p_slckcnt < PAGE_SLOCK_MAXIMUM) {
-			pp->p_slckcnt++;
-			page_struct_unlock(pp);
-			return (1);
-		}
-		page_struct_unlock(pp);
-		segvn_lpglck_limit++;
-		return (0);
-	}
-	mutex_enter(&freemem_lock);
-	if (availrmem < tune.t_minarmem + pages) {
-		mutex_exit(&freemem_lock);
-		page_struct_unlock(pp);
-		return (0);
-	}
-	pp->p_slckcnt++;
-	availrmem -= pages;
-	mutex_exit(&freemem_lock);
-	page_struct_unlock(pp);
-	return (1);
-}
-
-static void
-segvn_sunlock_anonpages(page_t *pp, int first)
-{
-	pgcnt_t		pages;
-	pfn_t		pfn;
-
-	ASSERT(PAGE_LOCKED(pp));
-	ASSERT(pp->p_vnode != NULL);
-	ASSERT(IS_SWAPFSVP(pp->p_vnode));
-
-	/*
-	 * pagesize won't change as long as any constituent page is locked.
-	 */
-	pages = page_get_pagecnt(pp->p_szc);
-	pfn = page_pptonum(pp);
-
-	if (!first) {
-		if (!IS_P2ALIGNED(pfn, pages)) {
-			return;
-		}
-	} else if (!IS_P2ALIGNED(pfn, pages)) {
-		pp = &pp[-(spgcnt_t)(pfn & (pages - 1))];
-#ifdef DEBUG
-		pfn = page_pptonum(pp);
-		ASSERT(IS_P2ALIGNED(pfn, pages));
-#endif /* DEBUG */
-	}
-	ASSERT(pp->p_vnode != NULL);
-	ASSERT(IS_SWAPFSVP(pp->p_vnode));
-	ASSERT(pp->p_slckcnt != 0);
-	page_struct_lock(pp);
-	if (--pp->p_slckcnt == 0) {
-		mutex_enter(&freemem_lock);
-		availrmem += pages;
-		mutex_exit(&freemem_lock);
-	}
-	page_struct_unlock(pp);
 }
 
 /*
@@ -2601,19 +2534,10 @@ segvn_softunlock(struct seg *seg, caddr_t addr, size_t len, enum seg_rw rw)
 		}
 		TRACE_3(TR_FAC_VM, TR_SEGVN_FAULT,
 		    "segvn_fault:pp %p vp %p offset %llx", pp, vp, offset);
-		if (svd->vp == NULL) {
-			segvn_sunlock_anonpages(pp, adr == addr);
-		}
 		page_unlock(pp);
 	}
-	mutex_enter(&freemem_lock); /* for availrmem */
-	if (svd->vp != NULL) {
-		availrmem += btop(len);
-	}
-	segvn_pages_locked -= btop(len);
-	svd->softlockcnt -= btop(len);
-	mutex_exit(&freemem_lock);
-	if (svd->softlockcnt == 0) {
+	ASSERT(svd->softlockcnt >= btop(len));
+	if (!atomic_add_long_nv((ulong_t *)&svd->softlockcnt, -btop(len))) {
 		/*
 		 * All SOFTLOCKS are gone. Wakeup any waiting
 		 * unmappers so they can try again to unmap.
@@ -2691,8 +2615,7 @@ segvn_faultpage(
 	uint_t vpprot,			/* access allowed to object pages */
 	enum fault_type type,		/* type of fault */
 	enum seg_rw rw,			/* type of access at fault */
-	int brkcow,			/* we may need to break cow */
-	int first)			/* first page for this fault if 1 */
+	int brkcow)			/* we may need to break cow */
 {
 	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
 	page_t *pp, **ppp;
@@ -2749,17 +2672,8 @@ segvn_faultpage(
 		prot = svd->prot;
 	}
 
-	if (type == F_SOFTLOCK && svd->vp != NULL) {
-		mutex_enter(&freemem_lock);
-		if (availrmem <= tune.t_minarmem) {
-			mutex_exit(&freemem_lock);
-			return (FC_MAKE_ERR(ENOMEM));	/* out of real memory */
-		} else {
-			availrmem--;
-			svd->softlockcnt++;
-			segvn_pages_locked++;
-		}
-		mutex_exit(&freemem_lock);
+	if (type == F_SOFTLOCK) {
+		atomic_add_long((ulong_t *)&svd->softlockcnt, 1);
 	}
 
 	/*
@@ -2808,19 +2722,6 @@ segvn_faultpage(
 			 */
 			if (lgrp_optimizations())
 				page_migrate(seg, addr, &pp, 1);
-
-			if (type == F_SOFTLOCK) {
-				if (!segvn_slock_anonpages(pp, first)) {
-					page_unlock(pp);
-					err = ENOMEM;
-					goto out;
-				} else {
-					mutex_enter(&freemem_lock);
-					svd->softlockcnt++;
-					segvn_pages_locked++;
-					mutex_exit(&freemem_lock);
-				}
-			}
 
 			if (enable_mbit_wa) {
 				if (rw == S_WRITE)
@@ -2981,23 +2882,6 @@ segvn_faultpage(
 		if (lgrp_optimizations())
 			page_migrate(seg, addr, &opp, 1);
 
-		if (type == F_SOFTLOCK && svd->vp == NULL) {
-
-			ASSERT(opp->p_szc == 0 ||
-			    (svd->type == MAP_SHARED &&
-			    amp != NULL && amp->a_szc != 0));
-
-			if (!segvn_slock_anonpages(opp, first)) {
-				page_unlock(opp);
-				err = ENOMEM;
-				goto out;
-			} else {
-				mutex_enter(&freemem_lock);
-				svd->softlockcnt++;
-				segvn_pages_locked++;
-				mutex_exit(&freemem_lock);
-			}
-		}
 		if (IS_VMODSORT(opp->p_vnode) || enable_mbit_wa) {
 			if (rw == S_WRITE)
 				hat_setmod(opp);
@@ -3124,18 +3008,6 @@ segvn_faultpage(
 		page_migrate(seg, addr, &pp, 1);
 
 	ASSERT(pp->p_szc == 0);
-	if (type == F_SOFTLOCK && svd->vp == NULL) {
-		if (!segvn_slock_anonpages(pp, first)) {
-			page_unlock(pp);
-			err = ENOMEM;
-			goto out;
-		} else {
-			mutex_enter(&freemem_lock);
-			svd->softlockcnt++;
-			segvn_pages_locked++;
-			mutex_exit(&freemem_lock);
-		}
-	}
 
 	ASSERT(!IS_VMODSORT(pp->p_vnode));
 	if (enable_mbit_wa) {
@@ -3158,12 +3030,8 @@ out:
 	if (anon_lock)
 		anon_array_exit(&cookie);
 
-	if (type == F_SOFTLOCK && svd->vp != NULL) {
-		mutex_enter(&freemem_lock);
-		availrmem++;
-		segvn_pages_locked--;
-		svd->softlockcnt--;
-		mutex_exit(&freemem_lock);
+	if (type == F_SOFTLOCK) {
+		atomic_add_long((ulong_t *)&svd->softlockcnt, -1);
 	}
 	return (FC_MAKE_ERR(err));
 }
@@ -3819,13 +3687,10 @@ out:
 
 int segvn_anypgsz = 0;
 
-#define	SEGVN_RESTORE_SOFTLOCK(type, pages) 		\
-		if ((type) == F_SOFTLOCK) {		\
-			mutex_enter(&freemem_lock);	\
-			availrmem += (pages);		\
-			segvn_pages_locked -= (pages);	\
-			svd->softlockcnt -= (pages);	\
-			mutex_exit(&freemem_lock);	\
+#define	SEGVN_RESTORE_SOFTLOCK_VP(type, pages) 				\
+		if ((type) == F_SOFTLOCK) {				\
+			atomic_add_long((ulong_t *)&(svd)->softlockcnt, \
+			    -(pages));					\
 		}
 
 #define	SEGVN_UPDATE_MODBITS(ppa, pages, rw, prot, vpprot)		\
@@ -4032,17 +3897,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				}
 			}
 			if (type == F_SOFTLOCK) {
-				mutex_enter(&freemem_lock);
-				if (availrmem < tune.t_minarmem + pages) {
-					mutex_exit(&freemem_lock);
-					err = FC_MAKE_ERR(ENOMEM);
-					goto out;
-				} else {
-					availrmem -= pages;
-					segvn_pages_locked += pages;
-					svd->softlockcnt += pages;
-				}
-				mutex_exit(&freemem_lock);
+				atomic_add_long((ulong_t *)&svd->softlockcnt,
+				    pages);
 			}
 
 			pplist = NULL;
@@ -4123,7 +3979,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					page_free_replacement_page(pplist);
 					page_create_putback(pages);
 				}
-				SEGVN_RESTORE_SOFTLOCK(type, pages);
+				SEGVN_RESTORE_SOFTLOCK_VP(type, pages);
 				if (a + pgsz <= eaddr) {
 					SEGVN_VMSTAT_FLTVNPAGES(19);
 					err = FC_MAKE_ERR(ierr);
@@ -4179,7 +4035,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					page_free_replacement_page(pplist);
 					page_create_putback(pages);
 				}
-				SEGVN_RESTORE_SOFTLOCK(type, pages);
+				SEGVN_RESTORE_SOFTLOCK_VP(type, pages);
 				if (szc < seg->s_szc) {
 					SEGVN_VMSTAT_FLTVNPAGES(26);
 					/*
@@ -4226,7 +4082,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					SEGVN_VMSTAT_FLTVNPAGES(28);
 					anon_array_exit(&an_cookie);
 					ANON_LOCK_EXIT(&amp->a_rwlock);
-					SEGVN_RESTORE_SOFTLOCK(type, pages);
+					SEGVN_RESTORE_SOFTLOCK_VP(type, pages);
 					err = FC_MAKE_ERR(ierr);
 					goto out;
 				}
@@ -4724,9 +4580,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	ulong_t i;
 	int hat_flag = (type == F_SOFTLOCK) ? HAT_LOAD_LOCK : HAT_LOAD;
 	anon_sync_obj_t cookie;
-	int first = 1;
 	int adjszc_chk;
-	int purged = 0;
 	int pgflags = (svd->tr_state == SEGVN_TR_ON) ? PG_LOCAL : 0;
 
 	ASSERT(szc != 0);
@@ -4794,18 +4648,9 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				lpgeaddr = (caddr_t)P2ROUNDUP((uintptr_t)eaddr,
 				    pgsz);
 			}
-			if (type == F_SOFTLOCK && svd->vp != NULL) {
-				mutex_enter(&freemem_lock);
-				if (availrmem < tune.t_minarmem + pages) {
-					mutex_exit(&freemem_lock);
-					err = FC_MAKE_ERR(ENOMEM);
-					goto error;
-				} else {
-					availrmem -= pages;
-					segvn_pages_locked += pages;
-					svd->softlockcnt += pages;
-				}
-				mutex_exit(&freemem_lock);
+			if (type == F_SOFTLOCK) {
+				atomic_add_long((ulong_t *)&svd->softlockcnt,
+				    pages);
 			}
 			anon_array_enter(amp, aindx, &cookie);
 			ppa_szc = (uint_t)-1;
@@ -4815,13 +4660,10 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			if (ierr != 0) {
 				anon_array_exit(&cookie);
 				VM_STAT_ADD(segvnvmstats.fltanpages[4]);
-				if (type == F_SOFTLOCK && svd->vp != NULL) {
-					VM_STAT_ADD(segvnvmstats.fltanpages[5]);
-					mutex_enter(&freemem_lock);
-					availrmem += pages;
-					segvn_pages_locked -= pages;
-					svd->softlockcnt -= pages;
-					mutex_exit(&freemem_lock);
+				if (type == F_SOFTLOCK) {
+					atomic_add_long(
+					    (ulong_t *)&svd->softlockcnt,
+					    -pages);
 				}
 				if (ierr > 0) {
 					VM_STAT_ADD(segvnvmstats.fltanpages[6]);
@@ -4845,41 +4687,6 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				page_migrate(seg, a, ppa, pages);
 
 			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
-			if (type == F_SOFTLOCK && svd->vp == NULL) {
-				/*
-				 * If all pages in ppa array belong to the same
-				 * large page call segvn_slock_anonpages()
-				 * just for ppa[0].
-				 */
-				for (i = 0; i < pages; i++) {
-					if (!segvn_slock_anonpages(ppa[i],
-					    i == 0 && first)) {
-						ulong_t j;
-						for (j = 0; j < i; j++) {
-							segvn_sunlock_anonpages(
-							    ppa[j], j == 0 &&
-							    first);
-							page_unlock(ppa[j]);
-						}
-						for (j = i; j < pages; j++) {
-							page_unlock(ppa[j]);
-						}
-						anon_array_exit(&cookie);
-						err = FC_MAKE_ERR(ENOMEM);
-						goto error;
-					}
-					if (i == 0 && ppa[0]->p_szc >= szc) {
-						ASSERT(!(page_pptonum(ppa[0]) &
-						    (pages - 1)));
-						break;
-					}
-				}
-				first = 0;
-				mutex_enter(&freemem_lock);
-				svd->softlockcnt += pages;
-				segvn_pages_locked += pages;
-				mutex_exit(&freemem_lock);
-			}
 
 			if (segtype == MAP_SHARED) {
 				vpprot |= PROT_WRITE;
@@ -4920,17 +4727,6 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 		 * have relocated locked pages.
 		 */
 		ASSERT(ierr == -1 || ierr == -2);
-		/*
-		 * For the very first relocation failure try to purge this
-		 * segment's cache so that the relocator can obtain an
-		 * exclusive lock on pages we want to relocate.
-		 */
-		if (!purged && ierr == -1 && ppa_szc != (uint_t)-1 &&
-		    svd->softlockcnt != 0) {
-			purged = 1;
-			segvn_purge(seg);
-			continue;
-		}
 
 		if (segvn_anypgsz) {
 			ASSERT(ierr == -2 || szc != 0);
@@ -5613,7 +5409,7 @@ slow:
 	 */
 	for (a = addr; a < addr + len; a += PAGESIZE, off += PAGESIZE) {
 		err = segvn_faultpage(hat, seg, a, off, vpage, plp, vpprot,
-		    type, rw, brkcow, a == addr);
+		    type, rw, brkcow);
 		if (err) {
 			if (amp != NULL)
 				ANON_LOCK_EXIT(&amp->a_rwlock);
@@ -5826,6 +5622,16 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	 */
 	if (svd->softlockcnt > 0) {
 		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+
+		/*
+		 * If this is shared segment non 0 softlockcnt
+		 * means locked pages are still in use.
+		 */
+		if (svd->type == MAP_SHARED) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (EAGAIN);
+		}
+
 		/*
 		 * Since we do have the segvn writers lock nobody can fill
 		 * the cache with entries belonging to this seg during
@@ -6084,15 +5890,17 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 					if ((VPP_PROT(svp) ^ prot) &
 					    PROT_WRITE) {
 						if (prot & PROT_WRITE) {
-						    if (!page_addclaim(pp)) {
-							page_unlock(pp);
-							break;
-						    }
+							if (!page_addclaim(
+							    pp)) {
+								page_unlock(pp);
+								break;
+							}
 						} else {
-						    if (!page_subclaim(pp)) {
-							page_unlock(pp);
-							break;
-						    }
+							if (!page_subclaim(
+							    pp)) {
+								page_unlock(pp);
+								break;
+							}
 						}
 					}
 					page_unlock(pp);
@@ -6257,6 +6065,15 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 	 */
 	if (svd->softlockcnt > 0) {
 		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+
+		/*
+		 * If this is shared segment non 0 softlockcnt
+		 * means locked pages are still in use.
+		 */
+		if (svd->type == MAP_SHARED) {
+			return (EAGAIN);
+		}
+
 		/*
 		 * Since we do have the segvn writers lock nobody can fill
 		 * the cache with entries belonging to this seg during
@@ -6339,6 +6156,13 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 		}
 		nsvd = (struct segvn_data *)nseg->s_data;
 		if (nsvd->softlockcnt > 0) {
+			/*
+			 * If this is shared segment non 0 softlockcnt
+			 * means locked pages are still in use.
+			 */
+			if (nsvd->type == MAP_SHARED) {
+				return (EAGAIN);
+			}
 			segvn_purge(nseg);
 			if (nsvd->softlockcnt > 0) {
 				return (EAGAIN);
@@ -6698,6 +6522,8 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 	}
 
 	ASSERT(svd->softlockcnt == 0);
+	ASSERT(svd->softlockcnt_sbase == 0);
+	ASSERT(svd->softlockcnt_send == 0);
 	crhold(svd->cred);
 
 	if (svd->vpage != NULL) {
@@ -7336,11 +7162,20 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 
 	if (svd->softlockcnt > 0) {
 		/*
+		 * If this is shared segment non 0 softlockcnt
+		 * means locked pages are still in use.
+		 */
+		if (svd->type == MAP_SHARED) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (EAGAIN);
+		}
+
+		/*
 		 * flush all pages from seg cache
 		 * otherwise we may deadlock in swap_putpage
 		 * for B_INVAL page (4175402).
 		 *
-		 * Even if we grab segvn WRITER's lock or segp_slock
+		 * Even if we grab segvn WRITER's lock
 		 * here, there might be another thread which could've
 		 * successfully performed lookup/insert just before
 		 * we acquired the lock here.  So, grabbing either
@@ -7351,6 +7186,18 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 		 */
 		segvn_purge(seg);
 		if (svd->softlockcnt > 0) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (EAGAIN);
+		}
+	} else if (svd->type == MAP_SHARED && svd->amp != NULL &&
+	    svd->amp->a_softlockcnt > 0) {
+		/*
+		 * Try to purge this amp's entries from pcache. It will
+		 * succeed only if other segments that share the amp have no
+		 * outstanding softlock's.
+		 */
+		segvn_purge(seg);
+		if (svd->amp->a_softlockcnt > 0 || svd->softlockcnt > 0) {
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (EAGAIN);
 		}
@@ -7904,8 +7751,10 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 					vp = svd->vp;
 					off = offset;
 				}
-				anon_array_exit(&cookie);
-				ANON_LOCK_EXIT(&amp->a_rwlock);
+				if (op != MC_LOCK || ap == NULL) {
+					anon_array_exit(&cookie);
+					ANON_LOCK_EXIT(&amp->a_rwlock);
+				}
 			} else {
 				vp = svd->vp;
 				off = offset;
@@ -7932,6 +7781,11 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 				error = VOP_GETPAGE(vp, (offset_t)off, PAGESIZE,
 				    (uint_t *)NULL, pl, PAGESIZE, seg, addr,
 				    S_OTHER, svd->cred, NULL);
+
+				if (error && ap != NULL) {
+					anon_array_exit(&cookie);
+					ANON_LOCK_EXIT(&amp->a_rwlock);
+				}
 
 				/*
 				 * If the error is EDEADLK then we must bounce
@@ -8004,6 +7858,13 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 				ASSERT(!VPP_ISPPLOCK(vpp));
 
 				ret = page_pp_lock(pp, claim, 0);
+				if (ap != NULL) {
+					if (ap->an_pvp != NULL) {
+						anon_swap_free(ap, pp);
+					}
+					anon_array_exit(&cookie);
+					ANON_LOCK_EXIT(&amp->a_rwlock);
+				}
 				if (ret == 0) {
 					/* locking page failed */
 					page_unlock(pp);
@@ -8146,6 +8007,14 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		 */
 		if (svd->softlockcnt > 0) {
 			/*
+			 * If this is shared segment non 0 softlockcnt
+			 * means locked pages are still in use.
+			 */
+			if (svd->type == MAP_SHARED) {
+				SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+				return (EAGAIN);
+			}
+			/*
 			 * Since we do have the segvn writers lock
 			 * nobody can fill the cache with entries
 			 * belonging to this seg during the purge.
@@ -8164,6 +8033,14 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 				SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 				return (EAGAIN);
 			}
+		} else if (svd->type == MAP_SHARED && svd->amp != NULL &&
+		    svd->amp->a_softlockcnt > 0) {
+			/*
+			 * Try to purge this amp's entries from pcache. It
+			 * will succeed only if other segments that share the
+			 * amp have no outstanding softlock's.
+			 */
+			segvn_purge(seg);
 		}
 	}
 
@@ -8181,6 +8058,8 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (0);
 		}
+
+		segvn_purge(seg);
 
 		page = seg_page(seg, addr);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
@@ -8623,59 +8502,289 @@ segvn_dump(struct seg *seg)
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 }
 
+#ifdef DEBUG
+static uint32_t segvn_pglock_mtbf = 0;
+#endif
+
+#define	PCACHE_SHWLIST		((page_t *)-2)
+#define	NOPCACHE_SHWLIST	((page_t *)-1)
+
 /*
- * lock/unlock anon pages over a given range. Return shadow list
+ * Lock/Unlock anon pages over a given range. Return shadow list. This routine
+ * uses global segment pcache to cache shadow lists (i.e. pp arrays) of pages
+ * to avoid the overhead of per page locking, unlocking for subsequent IOs to
+ * the same parts of the segment. Currently shadow list creation is only
+ * supported for pure anon segments. MAP_PRIVATE segment pcache entries are
+ * tagged with segment pointer, starting virtual address and length. This
+ * approach for MAP_SHARED segments may add many pcache entries for the same
+ * set of pages and lead to long hash chains that decrease pcache lookup
+ * performance. To avoid this issue for shared segments shared anon map and
+ * starting anon index are used for pcache entry tagging. This allows all
+ * segments to share pcache entries for the same anon range and reduces pcache
+ * chain's length as well as memory overhead from duplicate shadow lists and
+ * pcache entries.
+ *
+ * softlockcnt field in segvn_data structure counts the number of F_SOFTLOCK'd
+ * pages via segvn_fault() and pagelock'd pages via this routine. But pagelock
+ * part of softlockcnt accounting is done differently for private and shared
+ * segments. In private segment case softlock is only incremented when a new
+ * shadow list is created but not when an existing one is found via
+ * seg_plookup(). pcache entries have reference count incremented/decremented
+ * by each seg_plookup()/seg_pinactive() operation. Only entries that have 0
+ * reference count can be purged (and purging is needed before segment can be
+ * freed). When a private segment pcache entry is purged segvn_reclaim() will
+ * decrement softlockcnt. Since in private segment case each of its pcache
+ * entries only belongs to this segment we can expect that when
+ * segvn_pagelock(L_PAGEUNLOCK) was called for all outstanding IOs in this
+ * segment purge will succeed and softlockcnt will drop to 0. In shared
+ * segment case reference count in pcache entry counts active locks from many
+ * different segments so we can't expect segment purging to succeed even when
+ * segvn_pagelock(L_PAGEUNLOCK) was called for all outstanding IOs in this
+ * segment. To be able to determine when there're no pending pagelocks in
+ * shared segment case we don't rely on purging to make softlockcnt drop to 0
+ * but instead softlockcnt is incremented and decremented for every
+ * segvn_pagelock(L_PAGELOCK/L_PAGEUNLOCK) call regardless if a new shadow
+ * list was created or an existing one was found. When softlockcnt drops to 0
+ * this segment no longer has any claims for pcached shadow lists and the
+ * segment can be freed even if there're still active pcache entries
+ * shared by this segment anon map. Shared segment pcache entries belong to
+ * anon map and are typically removed when anon map is freed after all
+ * processes destroy the segments that use this anon map.
  */
 static int
 segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
     enum lock_type type, enum seg_rw rw)
 {
 	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
-	size_t np, adjustpages = 0, npages = (len >> PAGESHIFT);
+	size_t np;
+	pgcnt_t adjustpages;
+	pgcnt_t npages;
 	ulong_t anon_index;
-	uint_t protchk;
+	uint_t protchk = (rw == S_READ) ? PROT_READ : PROT_WRITE;
 	uint_t error;
 	struct anon_map *amp;
+	pgcnt_t anpgcnt;
 	struct page **pplist, **pl, *pp;
 	caddr_t a;
 	size_t page;
 	caddr_t lpgaddr, lpgeaddr;
-	pgcnt_t szc0_npages = 0;
+	anon_sync_obj_t cookie;
+	int anlock;
+	struct anon_map *pamp;
+	caddr_t paddr;
+	seg_preclaim_cbfunc_t preclaim_callback;
+	size_t pgsz;
+	int use_pcache;
+	size_t wlen;
+	uint_t pflags = 0;
+	int sftlck_sbase = 0;
+	int sftlck_send = 0;
+
+#ifdef DEBUG
+	if (type == L_PAGELOCK && segvn_pglock_mtbf) {
+		hrtime_t ts = gethrtime();
+		if ((ts % segvn_pglock_mtbf) == 0) {
+			return (ENOTSUP);
+		}
+		if ((ts % segvn_pglock_mtbf) == 1) {
+			return (EFAULT);
+		}
+	}
+#endif
 
 	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_START,
 	    "segvn_pagelock: start seg %p addr %p", seg, addr);
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
-	if (seg->s_szc != 0 && (type == L_PAGELOCK || type == L_PAGEUNLOCK)) {
+	ASSERT(type == L_PAGELOCK || type == L_PAGEUNLOCK);
+
+	SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
+
+	/*
+	 * for now we only support pagelock to anon memory. We would have to
+	 * check protections for vnode objects and call into the vnode driver.
+	 * That's too much for a fast path. Let the fault entry point handle
+	 * it.
+	 */
+	if (svd->vp != NULL) {
+		if (type == L_PAGELOCK) {
+			error = ENOTSUP;
+			goto out;
+		}
+		panic("segvn_pagelock(L_PAGEUNLOCK): vp != NULL");
+	}
+	if ((amp = svd->amp) == NULL) {
+		if (type == L_PAGELOCK) {
+			error = EFAULT;
+			goto out;
+		}
+		panic("segvn_pagelock(L_PAGEUNLOCK): amp == NULL");
+	}
+	if (rw != S_READ && rw != S_WRITE) {
+		if (type == L_PAGELOCK) {
+			error = ENOTSUP;
+			goto out;
+		}
+		panic("segvn_pagelock(L_PAGEUNLOCK): bad rw");
+	}
+
+	if (seg->s_szc != 0) {
 		/*
 		 * We are adjusting the pagelock region to the large page size
 		 * boundary because the unlocked part of a large page cannot
 		 * be freed anyway unless all constituent pages of a large
-		 * page are locked. Therefore this adjustment allows us to
-		 * decrement availrmem by the right value (note we don't want
-		 * to just decrement availrem by the large page size without
-		 * adjusting addr and len because then we may end up
-		 * decrementing availrmem by large page size for every
-		 * constituent page locked by a new as_pagelock call).
-		 * as_pageunlock caller must always match as_pagelock call's
-		 * addr and len.
+		 * page are locked. Bigger regions reduce pcache chain length
+		 * and improve lookup performance. The tradeoff is that the
+		 * very first segvn_pagelock() call for a given page is more
+		 * expensive if only 1 page_t is needed for IO. This is only
+		 * an issue if pcache entry doesn't get reused by several
+		 * subsequent calls. We optimize here for the case when pcache
+		 * is heavily used by repeated IOs to the same address range.
 		 *
 		 * Note segment's page size cannot change while we are holding
 		 * as lock.  And then it cannot change while softlockcnt is
 		 * not 0. This will allow us to correctly recalculate large
-		 * page size region for the matching pageunlock/reclaim call.
+		 * page size region for the matching pageunlock/reclaim call
+		 * since as_pageunlock() caller must always match
+		 * as_pagelock() call's addr and len.
 		 *
-		 * for pageunlock *ppp points to the pointer of page_t that
+		 * For pageunlock *ppp points to the pointer of page_t that
 		 * corresponds to the real unadjusted start address. Similar
 		 * for pagelock *ppp must point to the pointer of page_t that
 		 * corresponds to the real unadjusted start address.
 		 */
-		size_t pgsz = page_get_pagesize(seg->s_szc);
+		pgsz = page_get_pagesize(seg->s_szc);
 		CALC_LPG_REGION(pgsz, seg, addr, len, lpgaddr, lpgeaddr);
-		adjustpages = ((uintptr_t)(addr - lpgaddr)) >> PAGESHIFT;
+		adjustpages = btop((uintptr_t)(addr - lpgaddr));
+	} else if (len < segvn_pglock_comb_thrshld) {
+		lpgaddr = addr;
+		lpgeaddr = addr + len;
+		adjustpages = 0;
+		pgsz = PAGESIZE;
+	} else {
+		/*
+		 * Align the address range of large enough requests to allow
+		 * combining of different shadow lists into 1 to reduce memory
+		 * overhead from potentially overlapping large shadow lists
+		 * (worst case is we have a 1MB IO into buffers with start
+		 * addresses separated by 4K).  Alignment is only possible if
+		 * padded chunks have sufficient access permissions. Note
+		 * permissions won't change between L_PAGELOCK and
+		 * L_PAGEUNLOCK calls since non 0 softlockcnt will force
+		 * segvn_setprot() to wait until softlockcnt drops to 0. This
+		 * allows us to determine in L_PAGEUNLOCK the same range we
+		 * computed in L_PAGELOCK.
+		 *
+		 * If alignment is limited by segment ends set
+		 * sftlck_sbase/sftlck_send flags. In L_PAGELOCK case when
+		 * these flags are set bump softlockcnt_sbase/softlockcnt_send
+		 * per segment counters. In L_PAGEUNLOCK case decrease
+		 * softlockcnt_sbase/softlockcnt_send counters if
+		 * sftlck_sbase/sftlck_send flags are set.  When
+		 * softlockcnt_sbase/softlockcnt_send are non 0
+		 * segvn_concat()/segvn_extend_prev()/segvn_extend_next()
+		 * won't merge the segments. This restriction combined with
+		 * restriction on segment unmapping and splitting for segments
+		 * that have non 0 softlockcnt allows L_PAGEUNLOCK to
+		 * correctly determine the same range that was previously
+		 * locked by matching L_PAGELOCK.
+		 */
+		pflags = SEGP_PSHIFT | (segvn_pglock_comb_bshift << 16);
+		pgsz = PAGESIZE;
+		if (svd->type == MAP_PRIVATE) {
+			lpgaddr = (caddr_t)P2ALIGN((uintptr_t)addr,
+			    segvn_pglock_comb_balign);
+			if (lpgaddr < seg->s_base) {
+				lpgaddr = seg->s_base;
+				sftlck_sbase = 1;
+			}
+		} else {
+			ulong_t aix = svd->anon_index + seg_page(seg, addr);
+			ulong_t aaix = P2ALIGN(aix, segvn_pglock_comb_palign);
+			if (aaix < svd->anon_index) {
+				lpgaddr = seg->s_base;
+				sftlck_sbase = 1;
+			} else {
+				lpgaddr = addr - ptob(aix - aaix);
+				ASSERT(lpgaddr >= seg->s_base);
+			}
+		}
+		if (svd->pageprot && lpgaddr != addr) {
+			struct vpage *vp = &svd->vpage[seg_page(seg, lpgaddr)];
+			struct vpage *evp = &svd->vpage[seg_page(seg, addr)];
+			while (vp < evp) {
+				if ((VPP_PROT(vp) & protchk) == 0) {
+					break;
+				}
+				vp++;
+			}
+			if (vp < evp) {
+				lpgaddr = addr;
+				pflags = 0;
+			}
+		}
+		lpgeaddr = addr + len;
+		if (pflags) {
+			if (svd->type == MAP_PRIVATE) {
+				lpgeaddr = (caddr_t)P2ROUNDUP(
+				    (uintptr_t)lpgeaddr,
+				    segvn_pglock_comb_balign);
+			} else {
+				ulong_t aix = svd->anon_index +
+				    seg_page(seg, lpgeaddr);
+				ulong_t aaix = P2ROUNDUP(aix,
+				    segvn_pglock_comb_palign);
+				if (aaix < aix) {
+					lpgeaddr = 0;
+				} else {
+					lpgeaddr += ptob(aaix - aix);
+				}
+			}
+			if (lpgeaddr == 0 ||
+			    lpgeaddr > seg->s_base + seg->s_size) {
+				lpgeaddr = seg->s_base + seg->s_size;
+				sftlck_send = 1;
+			}
+		}
+		if (svd->pageprot && lpgeaddr != addr + len) {
+			struct vpage *vp;
+			struct vpage *evp;
+
+			vp = &svd->vpage[seg_page(seg, addr + len)];
+			evp = &svd->vpage[seg_page(seg, lpgeaddr)];
+
+			while (vp < evp) {
+				if ((VPP_PROT(vp) & protchk) == 0) {
+					break;
+				}
+				vp++;
+			}
+			if (vp < evp) {
+				lpgeaddr = addr + len;
+			}
+		}
+		adjustpages = btop((uintptr_t)(addr - lpgaddr));
+	}
+
+	/*
+	 * For MAP_SHARED segments we create pcache entries tagged by amp and
+	 * anon index so that we can share pcache entries with other segments
+	 * that map this amp.  For private segments pcache entries are tagged
+	 * with segment and virtual address.
+	 */
+	if (svd->type == MAP_SHARED) {
+		pamp = amp;
+		paddr = (caddr_t)((lpgaddr - seg->s_base) +
+		    ptob(svd->anon_index));
+		preclaim_callback = shamp_reclaim;
+	} else {
+		pamp = NULL;
+		paddr = lpgaddr;
+		preclaim_callback = segvn_reclaim;
 	}
 
 	if (type == L_PAGEUNLOCK) {
+		VM_STAT_ADD(segvnvmstats.pagelock[0]);
 
 		/*
 		 * update hat ref bits for /proc. We need to make sure
@@ -8694,13 +8803,50 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 				}
 			}
 		}
-		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
-		if (seg->s_szc != 0) {
-			VM_STAT_ADD(segvnvmstats.pagelock[0]);
-			seg_pinactive(seg, lpgaddr, lpgeaddr - lpgaddr,
-			    *ppp - adjustpages, rw, segvn_reclaim);
+
+		/*
+		 * Check the shadow list entry after the last page used in
+		 * this IO request. If it's NOPCACHE_SHWLIST the shadow list
+		 * was not inserted into pcache and is not large page
+		 * adjusted.  In this case call reclaim callback directly and
+		 * don't adjust the shadow list start and size for large
+		 * pages.
+		 */
+		npages = btop(len);
+		if ((*ppp)[npages] == NOPCACHE_SHWLIST) {
+			void *ptag;
+			if (pamp != NULL) {
+				ASSERT(svd->type == MAP_SHARED);
+				ptag = (void *)pamp;
+				paddr = (caddr_t)((addr - seg->s_base) +
+				    ptob(svd->anon_index));
+			} else {
+				ptag = (void *)seg;
+				paddr = addr;
+			}
+			(*preclaim_callback)(ptag, paddr, len, *ppp, rw, 0);
 		} else {
-			seg_pinactive(seg, addr, len, *ppp, rw, segvn_reclaim);
+			ASSERT((*ppp)[npages] == PCACHE_SHWLIST ||
+			    IS_SWAPFSVP((*ppp)[npages]->p_vnode));
+			len = lpgeaddr - lpgaddr;
+			npages = btop(len);
+			seg_pinactive(seg, pamp, paddr, len,
+			    *ppp - adjustpages, rw, pflags, preclaim_callback);
+		}
+
+		if (pamp != NULL) {
+			ASSERT(svd->type == MAP_SHARED);
+			ASSERT(svd->softlockcnt >= npages);
+			atomic_add_long((ulong_t *)&svd->softlockcnt, -npages);
+		}
+
+		if (sftlck_sbase) {
+			ASSERT(svd->softlockcnt_sbase > 0);
+			atomic_add_long((ulong_t *)&svd->softlockcnt_sbase, -1);
+		}
+		if (sftlck_send) {
+			ASSERT(svd->softlockcnt_send > 0);
+			atomic_add_long((ulong_t *)&svd->softlockcnt_send, -1);
 		}
 
 		/*
@@ -8711,77 +8857,97 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 		 * raw async i/o is still in progress or where a thread
 		 * exits on data fault in a multithreaded application.
 		 */
-		if (AS_ISUNMAPWAIT(seg->s_as) && (svd->softlockcnt > 0)) {
-			/*
-			 * Even if we grab segvn WRITER's lock or segp_slock
-			 * here, there might be another thread which could've
-			 * successfully performed lookup/insert just before
-			 * we acquired the lock here.  So, grabbing either
-			 * lock here is of not much use.  Until we devise
-			 * a strategy at upper layers to solve the
-			 * synchronization issues completely, we expect
-			 * applications to handle this appropriately.
-			 */
-			segvn_purge(seg);
+		if (AS_ISUNMAPWAIT(seg->s_as)) {
+			if (svd->softlockcnt == 0) {
+				mutex_enter(&seg->s_as->a_contents);
+				if (AS_ISUNMAPWAIT(seg->s_as)) {
+					AS_CLRUNMAPWAIT(seg->s_as);
+					cv_broadcast(&seg->s_as->a_cv);
+				}
+				mutex_exit(&seg->s_as->a_contents);
+			} else if (pamp == NULL) {
+				/*
+				 * softlockcnt is not 0 and this is a
+				 * MAP_PRIVATE segment. Try to purge its
+				 * pcache entries to reduce softlockcnt.
+				 * If it drops to 0 segvn_reclaim()
+				 * will wake up a thread waiting on
+				 * unmapwait flag.
+				 *
+				 * We don't purge MAP_SHARED segments with non
+				 * 0 softlockcnt since IO is still in progress
+				 * for such segments.
+				 */
+				ASSERT(svd->type == MAP_PRIVATE);
+				segvn_purge(seg);
+			}
 		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_UNLOCK_END,
 		    "segvn_pagelock: unlock seg %p addr %p", seg, addr);
 		return (0);
-	} else if (type == L_PAGERECLAIM) {
-		VM_STAT_COND_ADD(seg->s_szc != 0, segvnvmstats.pagelock[1]);
-		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
-		(void) segvn_reclaim(seg, addr, len, *ppp, rw);
-		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_UNLOCK_END,
-		    "segvn_pagelock: reclaim seg %p addr %p", seg, addr);
-		return (0);
 	}
 
-	if (seg->s_szc != 0) {
-		VM_STAT_ADD(segvnvmstats.pagelock[2]);
-		addr = lpgaddr;
-		len = lpgeaddr - lpgaddr;
-		npages = (len >> PAGESHIFT);
-	}
+	/* The L_PAGELOCK case ... */
+
+	VM_STAT_ADD(segvnvmstats.pagelock[1]);
 
 	/*
-	 * for now we only support pagelock to anon memory. We've to check
-	 * protections for vnode objects and call into the vnode driver.
-	 * That's too much for a fast path. Let the fault entry point handle it.
+	 * For MAP_SHARED segments we have to check protections before
+	 * seg_plookup() since pcache entries may be shared by many segments
+	 * with potentially different page protections.
 	 */
-	if (svd->vp != NULL) {
-		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_MISS_END,
-		    "segvn_pagelock: mapped vnode seg %p addr %p", seg, addr);
-		*ppp = NULL;
-		return (ENOTSUP);
+	if (pamp != NULL) {
+		ASSERT(svd->type == MAP_SHARED);
+		if (svd->pageprot == 0) {
+			if ((svd->prot & protchk) == 0) {
+				error = EACCES;
+				goto out;
+			}
+		} else {
+			/*
+			 * check page protections
+			 */
+			caddr_t ea;
+
+			if (seg->s_szc) {
+				a = lpgaddr;
+				ea = lpgeaddr;
+			} else {
+				a = addr;
+				ea = addr + len;
+			}
+			for (; a < ea; a += pgsz) {
+				struct vpage *vp;
+
+				ASSERT(seg->s_szc == 0 ||
+				    sameprot(seg, a, pgsz));
+				vp = &svd->vpage[seg_page(seg, a)];
+				if ((VPP_PROT(vp) & protchk) == 0) {
+					error = EACCES;
+					goto out;
+				}
+			}
+		}
 	}
-
-	/*
-	 * if anonmap is not yet created, let the fault entry point populate it
-	 * with anon ptrs.
-	 */
-	if ((amp = svd->amp) == NULL) {
-		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_MISS_END,
-		    "segvn_pagelock: anonmap null seg %p addr %p", seg, addr);
-		*ppp = NULL;
-		return (EFAULT);
-	}
-
-	SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
-
-	/*
-	 * we acquire segp_slock to prevent duplicate entries
-	 * in seg_pcache
-	 */
-	mutex_enter(&svd->segp_slock);
 
 	/*
 	 * try to find pages in segment page cache
 	 */
-	pplist = seg_plookup(seg, addr, len, rw);
+	pplist = seg_plookup(seg, pamp, paddr, lpgeaddr - lpgaddr, rw, pflags);
 	if (pplist != NULL) {
-		mutex_exit(&svd->segp_slock);
+		if (pamp != NULL) {
+			npages = btop((uintptr_t)(lpgeaddr - lpgaddr));
+			ASSERT(svd->type == MAP_SHARED);
+			atomic_add_long((ulong_t *)&svd->softlockcnt,
+			    npages);
+		}
+		if (sftlck_sbase) {
+			atomic_add_long((ulong_t *)&svd->softlockcnt_sbase, 1);
+		}
+		if (sftlck_send) {
+			atomic_add_long((ulong_t *)&svd->softlockcnt_send, 1);
+		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		*ppp = pplist + adjustpages;
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_HIT_END,
@@ -8789,145 +8955,211 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 		return (0);
 	}
 
-	if (rw == S_READ) {
-		protchk = PROT_READ;
-	} else {
-		protchk = PROT_WRITE;
-	}
-
-	if (svd->pageprot == 0) {
-		if ((svd->prot & protchk) == 0) {
-			mutex_exit(&svd->segp_slock);
-			error = EFAULT;
-			goto out;
-		}
-	} else {
-		/*
-		 * check page protections
-		 */
-		for (a = addr; a < addr + len; a += PAGESIZE) {
-			struct vpage *vp;
-
-			vp = &svd->vpage[seg_page(seg, a)];
-			if ((VPP_PROT(vp) & protchk) == 0) {
-				mutex_exit(&svd->segp_slock);
-				error = EFAULT;
+	/*
+	 * For MAP_SHARED segments we already verified above that segment
+	 * protections allow this pagelock operation.
+	 */
+	if (pamp == NULL) {
+		ASSERT(svd->type == MAP_PRIVATE);
+		if (svd->pageprot == 0) {
+			if ((svd->prot & protchk) == 0) {
+				error = EACCES;
 				goto out;
 			}
+			if (svd->prot & PROT_WRITE) {
+				wlen = lpgeaddr - lpgaddr;
+			} else {
+				wlen = 0;
+				ASSERT(rw == S_READ);
+			}
+		} else {
+			int wcont = 1;
+			/*
+			 * check page protections
+			 */
+			for (a = lpgaddr, wlen = 0; a < lpgeaddr; a += pgsz) {
+				struct vpage *vp;
+
+				ASSERT(seg->s_szc == 0 ||
+				    sameprot(seg, a, pgsz));
+				vp = &svd->vpage[seg_page(seg, a)];
+				if ((VPP_PROT(vp) & protchk) == 0) {
+					error = EACCES;
+					goto out;
+				}
+				if (wcont && (VPP_PROT(vp) & PROT_WRITE)) {
+					wlen += pgsz;
+				} else {
+					wcont = 0;
+					ASSERT(rw == S_READ);
+				}
+			}
 		}
+		ASSERT(rw == S_READ || wlen == lpgeaddr - lpgaddr);
+		ASSERT(rw == S_WRITE || wlen <= lpgeaddr - lpgaddr);
 	}
 
 	/*
-	 * Avoid per page overhead of segvn_slock_anonpages() for small
-	 * pages. For large pages segvn_slock_anonpages() only does real
-	 * work once per large page.  The tradeoff is that we may decrement
-	 * availrmem more than once for the same page but this is ok
-	 * for small pages.
+	 * Only build large page adjusted shadow list if we expect to insert
+	 * it into pcache. For large enough pages it's a big overhead to
+	 * create a shadow list of the entire large page. But this overhead
+	 * should be amortized over repeated pcache hits on subsequent reuse
+	 * of this shadow list (IO into any range within this shadow list will
+	 * find it in pcache since we large page align the request for pcache
+	 * lookups). pcache performance is improved with bigger shadow lists
+	 * as it reduces the time to pcache the entire big segment and reduces
+	 * pcache chain length.
 	 */
-	if (seg->s_szc == 0) {
-		mutex_enter(&freemem_lock);
-		if (availrmem < tune.t_minarmem + npages) {
-			mutex_exit(&freemem_lock);
-			mutex_exit(&svd->segp_slock);
-			error = ENOMEM;
-			goto out;
-		}
-		availrmem -= npages;
-		mutex_exit(&freemem_lock);
+	if (seg_pinsert_check(seg, pamp, paddr,
+	    lpgeaddr - lpgaddr, pflags) == SEGP_SUCCESS) {
+		addr = lpgaddr;
+		len = lpgeaddr - lpgaddr;
+		use_pcache = 1;
+	} else {
+		use_pcache = 0;
+		/*
+		 * Since this entry will not be inserted into the pcache, we
+		 * will not do any adjustments to the starting address or
+		 * size of the memory to be locked.
+		 */
+		adjustpages = 0;
 	}
+	npages = btop(len);
 
-	pplist = kmem_alloc(sizeof (page_t *) * npages, KM_SLEEP);
+	pplist = kmem_alloc(sizeof (page_t *) * (npages + 1), KM_SLEEP);
 	pl = pplist;
 	*ppp = pplist + adjustpages;
+	/*
+	 * If use_pcache is 0 this shadow list is not large page adjusted.
+	 * Record this info in the last entry of shadow array so that
+	 * L_PAGEUNLOCK can determine if it should large page adjust the
+	 * address range to find the real range that was locked.
+	 */
+	pl[npages] = use_pcache ? PCACHE_SHWLIST : NOPCACHE_SHWLIST;
 
 	page = seg_page(seg, addr);
 	anon_index = svd->anon_index + page;
 
+	anlock = 0;
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
+	ASSERT(amp->a_szc >= seg->s_szc);
+	anpgcnt = page_get_pagecnt(amp->a_szc);
 	for (a = addr; a < addr + len; a += PAGESIZE, anon_index++) {
 		struct anon *ap;
 		struct vnode *vp;
 		u_offset_t off;
-		anon_sync_obj_t cookie;
 
-		anon_array_enter(amp, anon_index, &cookie);
+		/*
+		 * Lock and unlock anon array only once per large page.
+		 * anon_array_enter() locks the root anon slot according to
+		 * a_szc which can't change while anon map is locked.  We lock
+		 * anon the first time through this loop and each time we
+		 * reach anon index that corresponds to a root of a large
+		 * page.
+		 */
+		if (a == addr || P2PHASE(anon_index, anpgcnt) == 0) {
+			ASSERT(anlock == 0);
+			anon_array_enter(amp, anon_index, &cookie);
+			anlock = 1;
+		}
 		ap = anon_get_ptr(amp->ahp, anon_index);
-		if (ap == NULL) {
+
+		/*
+		 * We must never use seg_pcache for COW pages
+		 * because we might end up with original page still
+		 * lying in seg_pcache even after private page is
+		 * created. This leads to data corruption as
+		 * aio_write refers to the page still in cache
+		 * while all other accesses refer to the private
+		 * page.
+		 */
+		if (ap == NULL || ap->an_refcnt != 1) {
+			struct vpage *vpage;
+
+			if (seg->s_szc) {
+				error = EFAULT;
+				break;
+			}
+			if (svd->vpage != NULL) {
+				vpage = &svd->vpage[seg_page(seg, a)];
+			} else {
+				vpage = NULL;
+			}
+			ASSERT(anlock);
 			anon_array_exit(&cookie);
-			break;
-		} else {
-			/*
-			 * We must never use seg_pcache for COW pages
-			 * because we might end up with original page still
-			 * lying in seg_pcache even after private page is
-			 * created. This leads to data corruption as
-			 * aio_write refers to the page still in cache
-			 * while all other accesses refer to the private
-			 * page.
-			 */
-			if (ap->an_refcnt != 1) {
-				anon_array_exit(&cookie);
+			anlock = 0;
+			pp = NULL;
+			error = segvn_faultpage(seg->s_as->a_hat, seg, a, 0,
+			    vpage, &pp, 0, F_INVAL, rw, 1);
+			if (error) {
+				error = fc_decode(error);
+				break;
+			}
+			anon_array_enter(amp, anon_index, &cookie);
+			anlock = 1;
+			ap = anon_get_ptr(amp->ahp, anon_index);
+			if (ap == NULL || ap->an_refcnt != 1) {
+				error = EFAULT;
 				break;
 			}
 		}
 		swap_xlate(ap, &vp, &off);
-		anon_array_exit(&cookie);
-
 		pp = page_lookup_nowait(vp, off, SE_SHARED);
 		if (pp == NULL) {
+			error = EFAULT;
 			break;
 		}
-		if (seg->s_szc != 0 || pp->p_szc != 0) {
-			if (!segvn_slock_anonpages(pp, a == addr)) {
-				page_unlock(pp);
-				break;
-			}
-		} else {
-			szc0_npages++;
+		if (ap->an_pvp != NULL) {
+			anon_swap_free(ap, pp);
+		}
+		/*
+		 * Unlock anon if this is the last slot in a large page.
+		 */
+		if (P2PHASE(anon_index, anpgcnt) == anpgcnt - 1) {
+			ASSERT(anlock);
+			anon_array_exit(&cookie);
+			anlock = 0;
 		}
 		*pplist++ = pp;
 	}
+	if (anlock) {		/* Ensure the lock is dropped */
+		anon_array_exit(&cookie);
+	}
 	ANON_LOCK_EXIT(&amp->a_rwlock);
 
-	ASSERT(npages >= szc0_npages);
-
 	if (a >= addr + len) {
-		mutex_enter(&freemem_lock);
-		if (seg->s_szc == 0 && npages != szc0_npages) {
-			ASSERT(svd->type == MAP_SHARED && amp->a_szc > 0);
-			availrmem += (npages - szc0_npages);
+		atomic_add_long((ulong_t *)&svd->softlockcnt, npages);
+		if (pamp != NULL) {
+			ASSERT(svd->type == MAP_SHARED);
+			atomic_add_long((ulong_t *)&pamp->a_softlockcnt,
+			    npages);
+			wlen = len;
 		}
-		svd->softlockcnt += npages;
-		segvn_pages_locked += npages;
-		mutex_exit(&freemem_lock);
-		(void) seg_pinsert(seg, addr, len, pl, rw, SEGP_ASYNC_FLUSH,
-		    segvn_reclaim);
-		mutex_exit(&svd->segp_slock);
+		if (sftlck_sbase) {
+			atomic_add_long((ulong_t *)&svd->softlockcnt_sbase, 1);
+		}
+		if (sftlck_send) {
+			atomic_add_long((ulong_t *)&svd->softlockcnt_send, 1);
+		}
+		if (use_pcache) {
+			(void) seg_pinsert(seg, pamp, paddr, len, wlen, pl,
+			    rw, pflags, preclaim_callback);
+		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_FILL_END,
 		    "segvn_pagelock: cache fill seg %p addr %p", seg, addr);
 		return (0);
 	}
 
-	mutex_exit(&svd->segp_slock);
-	if (seg->s_szc == 0) {
-		mutex_enter(&freemem_lock);
-		availrmem += npages;
-		mutex_exit(&freemem_lock);
-	}
-	error = EFAULT;
 	pplist = pl;
 	np = ((uintptr_t)(a - addr)) >> PAGESHIFT;
 	while (np > (uint_t)0) {
 		ASSERT(PAGE_LOCKED(*pplist));
-		if (seg->s_szc != 0 || (*pplist)->p_szc != 0) {
-			segvn_sunlock_anonpages(*pplist, pplist == pl);
-		}
 		page_unlock(*pplist);
 		np--;
 		pplist++;
 	}
-	kmem_free(pl, sizeof (page_t *) * npages);
+	kmem_free(pl, sizeof (page_t *) * (npages + 1));
 out:
 	SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 	*ppp = NULL;
@@ -8942,34 +9174,55 @@ out:
 static void
 segvn_purge(struct seg *seg)
 {
-	seg_ppurge(seg);
+	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
+
+	/*
+	 * pcache is only used by pure anon segments.
+	 */
+	if (svd->amp == NULL || svd->vp != NULL) {
+		return;
+	}
+
+	/*
+	 * For MAP_SHARED segments non 0 segment's softlockcnt means
+	 * active IO is still in progress via this segment. So we only
+	 * purge MAP_SHARED segments when their softlockcnt is 0.
+	 */
+	if (svd->type == MAP_PRIVATE) {
+		if (svd->softlockcnt) {
+			seg_ppurge(seg, NULL, 0);
+		}
+	} else if (svd->softlockcnt == 0 && svd->amp->a_softlockcnt != 0) {
+		seg_ppurge(seg, svd->amp, 0);
+	}
 }
 
+/*
+ * If async argument is not 0 we are called from pcache async thread and don't
+ * hold AS lock.
+ */
+
+/*ARGSUSED*/
 static int
-segvn_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
-	enum seg_rw rw)
+segvn_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
+	enum seg_rw rw, int async)
 {
+	struct seg *seg = (struct seg *)ptag;
 	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
 	pgcnt_t np, npages;
 	struct page **pl;
-	pgcnt_t szc0_npages = 0;
 
-#ifdef lint
-	addr = addr;
-#endif
-
-	npages = np = (len >> PAGESHIFT);
+	npages = np = btop(len);
 	ASSERT(npages);
-	pl = pplist;
-	if (seg->s_szc != 0) {
-		size_t pgsz = page_get_pagesize(seg->s_szc);
-		if (!IS_P2ALIGNED(addr, pgsz) || !IS_P2ALIGNED(len, pgsz)) {
-			panic("segvn_reclaim: unaligned addr or len");
-			/*NOTREACHED*/
-		}
-	}
 
 	ASSERT(svd->vp == NULL && svd->amp != NULL);
+	ASSERT(svd->softlockcnt >= npages);
+	ASSERT(async || AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+
+	pl = pplist;
+
+	ASSERT(pl[np] == NOPCACHE_SHWLIST || pl[np] == PCACHE_SHWLIST);
+	ASSERT(!async || pl[np] == PCACHE_SHWLIST);
 
 	while (np > (uint_t)0) {
 		if (rw == S_WRITE) {
@@ -8977,27 +9230,41 @@ segvn_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 		} else {
 			hat_setref(*pplist);
 		}
-		if (seg->s_szc != 0 || (*pplist)->p_szc != 0) {
-			segvn_sunlock_anonpages(*pplist, pplist == pl);
-		} else {
-			szc0_npages++;
-		}
 		page_unlock(*pplist);
 		np--;
 		pplist++;
 	}
-	kmem_free(pl, sizeof (page_t *) * npages);
 
-	mutex_enter(&freemem_lock);
-	segvn_pages_locked -= npages;
-	svd->softlockcnt -= npages;
-	if (szc0_npages != 0) {
-		availrmem += szc0_npages;
+	kmem_free(pl, sizeof (page_t *) * (npages + 1));
+
+	/*
+	 * If we are pcache async thread we don't hold AS lock. This means if
+	 * softlockcnt drops to 0 after the decrement below address space may
+	 * get freed. We can't allow it since after softlock derement to 0 we
+	 * still need to access as structure for possible wakeup of unmap
+	 * waiters. To prevent the disappearance of as we take this segment
+	 * segfree_syncmtx. segvn_free() also takes this mutex as a barrier to
+	 * make sure this routine completes before segment is freed.
+	 *
+	 * The second complication we have to deal with in async case is a
+	 * possibility of missed wake up of unmap wait thread. When we don't
+	 * hold as lock here we may take a_contents lock before unmap wait
+	 * thread that was first to see softlockcnt was still not 0. As a
+	 * result we'll fail to wake up an unmap wait thread. To avoid this
+	 * race we set nounmapwait flag in as structure if we drop softlockcnt
+	 * to 0 when we were called by pcache async thread.  unmapwait thread
+	 * will not block if this flag is set.
+	 */
+	if (async) {
+		mutex_enter(&svd->segfree_syncmtx);
 	}
-	mutex_exit(&freemem_lock);
-	if (svd->softlockcnt <= 0) {
-		if (AS_ISUNMAPWAIT(seg->s_as)) {
+
+	if (!atomic_add_long_nv((ulong_t *)&svd->softlockcnt, -npages)) {
+		if (async || AS_ISUNMAPWAIT(seg->s_as)) {
 			mutex_enter(&seg->s_as->a_contents);
+			if (async) {
+				AS_SETNOUNMAPWAIT(seg->s_as);
+			}
 			if (AS_ISUNMAPWAIT(seg->s_as)) {
 				AS_CLRUNMAPWAIT(seg->s_as);
 				cv_broadcast(&seg->s_as->a_cv);
@@ -9005,8 +9272,59 @@ segvn_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 			mutex_exit(&seg->s_as->a_contents);
 		}
 	}
+
+	if (async) {
+		mutex_exit(&svd->segfree_syncmtx);
+	}
 	return (0);
 }
+
+/*ARGSUSED*/
+static int
+shamp_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
+	enum seg_rw rw, int async)
+{
+	amp_t *amp = (amp_t *)ptag;
+	pgcnt_t np, npages;
+	struct page **pl;
+
+	npages = np = btop(len);
+	ASSERT(npages);
+	ASSERT(amp->a_softlockcnt >= npages);
+
+	pl = pplist;
+
+	ASSERT(pl[np] == NOPCACHE_SHWLIST || pl[np] == PCACHE_SHWLIST);
+	ASSERT(!async || pl[np] == PCACHE_SHWLIST);
+
+	while (np > (uint_t)0) {
+		if (rw == S_WRITE) {
+			hat_setrefmod(*pplist);
+		} else {
+			hat_setref(*pplist);
+		}
+		page_unlock(*pplist);
+		np--;
+		pplist++;
+	}
+
+	kmem_free(pl, sizeof (page_t *) * (npages + 1));
+
+	/*
+	 * If somebody sleeps in anonmap_purge() wake them up if a_softlockcnt
+	 * drops to 0. anon map can't be freed until a_softlockcnt drops to 0
+	 * and anonmap_purge() acquires a_purgemtx.
+	 */
+	mutex_enter(&amp->a_purgemtx);
+	if (!atomic_add_long_nv((ulong_t *)&amp->a_softlockcnt, -npages) &&
+	    amp->a_purgewait) {
+		amp->a_purgewait = 0;
+		cv_broadcast(&amp->a_purgecv);
+	}
+	mutex_exit(&amp->a_purgemtx);
+	return (0);
+}
+
 /*
  * get a memory ID for an addr in a given segment
  *

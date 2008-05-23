@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,9 +718,8 @@ shmctl(int shmid, int cmd, void *arg)
 			if (error = shmem_lock(sp, sp->shm_amp)) {
 				ANON_LOCK_ENTER(&sp->shm_amp->a_rwlock,
 				    RW_WRITER);
-				cmn_err(CE_NOTE,
-				    "shmctl - couldn't lock %ld pages into "
-				    "memory", sp->shm_amp->size);
+				cmn_err(CE_NOTE, "shmctl - couldn't lock %ld"
+				    " pages into memory", sp->shm_amp->size);
 				ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
 				error = ENOMEM;
 				sp->shm_lkcnt--;
@@ -1253,13 +1252,14 @@ shm_rm_amp(kshmid_t *sp)
 	 * Free up the anon_map.
 	 */
 	lgrp_shm_policy_fini(amp, NULL);
+	ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
+	anonmap_purge(amp);
 	if (amp->a_szc != 0) {
-		ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
 		anon_shmap_free_pages(amp, 0, amp->size);
-		ANON_LOCK_EXIT(&amp->a_rwlock);
 	} else {
 		anon_free(amp->ahp, 0, amp->size);
 	}
+	ANON_LOCK_EXIT(&amp->a_rwlock);
 	anon_unresv_zone(amp->swresv, zone);
 	anonmap_free(amp);
 }

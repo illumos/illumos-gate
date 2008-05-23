@@ -531,7 +531,7 @@ schedpaging(void *arg)
 	if (freemem < lotsfree + needfree + kmem_reapahead)
 		kmem_reap();
 
-	if (freemem < lotsfree + needfree + seg_preapahead)
+	if (freemem < lotsfree + needfree)
 		seg_preap();
 
 	if (kcage_on && (kcage_freemem < kcage_desfree || kcage_needfree))
@@ -957,9 +957,10 @@ checkpage(struct page *pp, int whichhand)
 	 *
 	 * NOTE:  These optimizations assume that reads are atomic.
 	 */
-top:
-	if ((PP_ISKAS(pp)) || (PP_ISFREE(pp)) ||
-	    hat_page_checkshare(pp, po_share) || PAGE_LOCKED(pp)) {
+
+	if (PP_ISKAS(pp) || PAGE_LOCKED(pp) || PP_ISFREE(pp) ||
+	    pp->p_lckcnt != 0 || pp->p_cowcnt != 0 ||
+	    hat_page_checkshare(pp, po_share)) {
 		return (-1);
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,8 @@ extern "C" {
 /*
  * VM - Segments.
  */
+
+struct anon_map;
 
 /*
  * kstat statistics for segment advise
@@ -93,7 +95,12 @@ typedef struct memid { u_longlong_t val[2]; } memid_t;
  * write locked.
  */
 
-struct seg {
+typedef struct pcache_link {
+	struct pcache_link	*p_lnext;
+	struct pcache_link	*p_lprev;
+} pcache_link_t;
+
+typedef struct seg {
 	caddr_t	s_base;			/* base virtual address */
 	size_t	s_size;			/* size in bytes */
 	uint_t	s_szc;			/* max page size code */
@@ -102,7 +109,9 @@ struct seg {
 	avl_node_t s_tree;		/* AVL tree links to segs in this as */
 	struct	seg_ops *s_ops;		/* ops vector: see below */
 	void *s_data;			/* private data for instance */
-};
+	kmutex_t s_pmtx;		/* protects seg's pcache list */
+	pcache_link_t s_phead;		/* head of seg's pcache list */
+} seg_t;
 
 #define	S_PURGE		(0x01)		/* seg should be purged in as_gap() */
 
@@ -136,6 +145,7 @@ struct	seg_ops {
 };
 
 #ifdef _KERNEL
+
 /*
  * Generic segment operations
  */
@@ -149,28 +159,41 @@ extern	void	seg_free(struct seg *seg);
 /*
  * functions for pagelock cache support
  */
-extern	void	seg_ppurge(struct seg *seg);
-extern	void	seg_ppurge_seg(int (*callback)());
-extern	void	seg_pinactive(struct seg *seg, caddr_t addr, size_t len,
-			struct page **pp, enum seg_rw rw, int (*callback)());
-extern	int	seg_pinsert_check(struct seg *seg, size_t len, uint_t flags);
-extern	int	seg_pinsert(struct seg *seg, caddr_t addr, size_t len,
-			struct page **pp, enum seg_rw rw, uint_t flags,
-			int (*callback)());
-extern	struct	page **seg_plookup(struct seg *seg, caddr_t addr,
-			size_t len, enum seg_rw rw);
+typedef	int (*seg_preclaim_cbfunc_t)(void *, caddr_t, size_t,
+    struct page **, enum seg_rw, int);
+
+extern	struct	page **seg_plookup(struct seg *seg, struct anon_map *amp,
+    caddr_t addr, size_t len, enum seg_rw rw, uint_t flags);
+extern	void	seg_pinactive(struct seg *seg, struct anon_map *amp,
+    caddr_t addr, size_t len, struct page **pp, enum seg_rw rw,
+    uint_t flags, seg_preclaim_cbfunc_t callback);
+
+extern	void	seg_ppurge(struct seg *seg, struct anon_map *amp,
+    uint_t flags);
+extern	void	seg_ppurge_wiredpp(struct page **pp);
+
+extern	int	seg_pinsert_check(struct seg *seg, struct anon_map *amp,
+    caddr_t addr, size_t len, uint_t flags);
+extern	int	seg_pinsert(struct seg *seg, struct anon_map *amp,
+    caddr_t addr, size_t len, size_t wlen, struct page **pp, enum seg_rw rw,
+    uint_t flags, seg_preclaim_cbfunc_t callback);
+
 extern	void	seg_pasync_thread(void);
 extern	void	seg_preap(void);
 extern	int	seg_p_disable(void);
 extern	void	seg_p_enable(void);
 
-extern	int	seg_preapahead;
-extern	segadvstat_t  segadvstat;
+extern	segadvstat_t	segadvstat;
+
 /*
- * Flags for pagelock cache support
+ * Flags for pagelock cache support.
+ * Flags argument is passed as uint_t to pcache routines.  upper 16 bits of
+ * the flags argument are reserved for alignment page shift when SEGP_PSHIFT
+ * is set.
  */
-#define	SEGP_ASYNC_FLUSH	0x1	/* flushed by async thread */
-#define	SEGP_FORCE_WIRED	0x2	/* skip check against seg_pwindow */
+#define	SEGP_FORCE_WIRED	0x1	/* skip check against seg_pwindow */
+#define	SEGP_AMP		0x2	/* anon map's pcache entry */
+#define	SEGP_PSHIFT		0x4	/* addr pgsz shift for hash function */
 
 /*
  * Return values for seg_pinsert and seg_pinsert_check functions.

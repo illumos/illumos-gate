@@ -106,9 +106,6 @@ pgcnt_t availrmem_initial;
  * These new counters will track the pages locked through segvn and
  * by explicit user locking.
  *
- * segvn_pages_locked : This keeps track on a global basis how many pages
- * are currently locked because of I/O.
- *
  * pages_locked : How many pages are locked because of user specified
  * locking through mlock or plock.
  *
@@ -117,10 +114,9 @@ pgcnt_t availrmem_initial;
  *
  * All these globals are protected by the same lock which protects availrmem.
  */
-pgcnt_t segvn_pages_locked;
-pgcnt_t pages_locked;
-pgcnt_t pages_useclaim;
-pgcnt_t pages_claimed;
+pgcnt_t pages_locked = 0;
+pgcnt_t pages_useclaim = 0;
+pgcnt_t pages_claimed = 0;
 
 
 /*
@@ -5878,7 +5874,6 @@ page_reclaim_mem(pgcnt_t npages, pgcnt_t epages, int adjust)
 		deficit = tune.t_minarmem + npages + epages - availrmem;
 		mutex_exit(&freemem_lock);
 		page_needfree(deficit);
-		seg_preap();
 		kmem_reap();
 		delay(hz);
 		page_needfree(-(spgcnt_t)deficit);
@@ -6285,7 +6280,7 @@ kcondvar_t pc_cv;
 static kmutex_t pc_thread_mutex;
 static clock_t pc_thread_shortwait;
 static clock_t pc_thread_longwait;
-static int pc_thread_ism_retry;
+static int pc_thread_retry;
 
 struct page_capture_callback pc_cb[PC_NUM_CALLBACKS];
 
@@ -6782,17 +6777,13 @@ page_capture_pre_checks(page_t *pp, uint_t flags)
 
 	ASSERT(pp != NULL);
 
-	/* only physmem currently has restrictions */
-	if (!(flags & CAPTURE_PHYSMEM)) {
-		return (0);
-	}
-
 #if defined(__sparc)
 	if (pp->p_vnode == &prom_ppages) {
 		return (EPERM);
 	}
 
-	if (PP_ISNORELOC(pp) && !(flags & CAPTURE_GET_CAGE)) {
+	if (PP_ISNORELOC(pp) && !(flags & CAPTURE_GET_CAGE) &&
+	    (flags & CAPTURE_PHYSMEM)) {
 		return (ENOENT);
 	}
 
@@ -6804,6 +6795,11 @@ page_capture_pre_checks(page_t *pp, uint_t flags)
 		return (EPERM);
 	}
 #endif /* __sparc */
+
+	/* only physmem currently has the restrictions checked below */
+	if (!(flags & CAPTURE_PHYSMEM)) {
+		return (0);
+	}
 
 	if (availrmem < swapfs_minfree) {
 		/*
@@ -7187,7 +7183,7 @@ page_capture_init()
 
 	pc_thread_shortwait = 23 * hz;
 	pc_thread_longwait = 1201 * hz;
-	pc_thread_ism_retry = 3;
+	pc_thread_retry = 3;
 	mutex_init(&pc_thread_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&pc_cv, NULL, CV_DEFAULT, NULL);
 	pc_thread_id = thread_create(NULL, 0, page_capture_thread, NULL, 0, &p0,
@@ -7358,7 +7354,6 @@ do_aio_cleanup(void)
 static void
 page_capture_handle_outstanding(void)
 {
-	extern size_t spt_used;
 	int ntry;
 
 	if (!page_retire_pend_count()) {
@@ -7380,34 +7375,23 @@ page_capture_handle_outstanding(void)
 		 * we reap prior to attempting to capture.
 		 */
 		kmem_reap();
-		/*
-		 * When ISM is in use, we need to disable and
-		 * purge the seg_pcache, and initiate aio
-		 * cleanup in order to release page locks and
-		 * subsquently retire pages in need of
-		 * retirement.
-		 */
-		if (spt_used) {
-			/* disable and purge seg_pcache */
-			(void) seg_p_disable();
-			for (ntry = 0; ntry < pc_thread_ism_retry; ntry++) {
-				if (!page_retire_pend_count())
-					break;
-				if (do_aio_cleanup()) {
-					/*
-					 * allow the apps cleanup threads
-					 * to run
-					 */
-					delay(pc_thread_shortwait);
-				}
-				page_capture_async();
+
+		/* disable and purge seg_pcache */
+		(void) seg_p_disable();
+		for (ntry = 0; ntry < pc_thread_retry; ntry++) {
+			if (!page_retire_pend_count())
+				break;
+			if (do_aio_cleanup()) {
+				/*
+				 * allow the apps cleanup threads
+				 * to run
+				 */
+				delay(pc_thread_shortwait);
 			}
-			/* reenable seg_pcache */
-			seg_p_enable();
-		} else {
-			seg_preap();
 			page_capture_async();
 		}
+		/* reenable seg_pcache */
+		seg_p_enable();
 	}
 }
 

@@ -106,6 +106,7 @@
 #include <sys/sysmacros.h>
 #include <sys/bitmap.h>
 #include <sys/vmsystm.h>
+#include <sys/tuneable.h>
 #include <sys/debug.h>
 #include <sys/fs/swapnode.h>
 #include <sys/tnf_probe.h>
@@ -156,7 +157,6 @@ static struct anonvmstats_str {
 } anonvmstats;
 #endif /* VM_STATS */
 
-
 /*ARGSUSED*/
 static int
 anonmap_cache_constructor(void *buf, void *cdrarg, int kmflags)
@@ -164,6 +164,9 @@ anonmap_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	struct anon_map *amp = buf;
 
 	rw_init(&amp->a_rwlock, NULL, RW_DEFAULT, NULL);
+	cv_init(&amp->a_purgecv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&amp->a_pmtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&amp->a_purgemtx, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
@@ -174,6 +177,9 @@ anonmap_cache_destructor(void *buf, void *cdrarg)
 	struct anon_map *amp = buf;
 
 	rw_destroy(&amp->a_rwlock);
+	cv_destroy(&amp->a_purgecv);
+	mutex_destroy(&amp->a_pmtx);
+	mutex_destroy(&amp->a_purgemtx);
 }
 
 kmutex_t	anonhash_lock[AH_LOCK_SIZE];
@@ -870,6 +876,7 @@ anon_unresvmem(size_t size, zone_t *zone)
 	mutex_enter(&anoninfo_lock);
 
 	ASSERT(k_anoninfo.ani_mem_resv >= k_anoninfo.ani_locked_swap);
+
 	/*
 	 * If some of this reservation belonged to swapfs
 	 * give it back to availrmem.
@@ -941,6 +948,48 @@ anon_alloc(struct vnode *vp, anoff_t off)
 	ANON_PRINT(A_ANON, ("anon_alloc: returning ap %p, vp %p\n",
 	    (void *)ap, (ap ? (void *)ap->an_vp : NULL)));
 	return (ap);
+}
+
+/*
+ * Called for pages locked in memory via softlock/pagelock/mlock to make sure
+ * such pages don't consume any physical swap resources needed for swapping
+ * unlocked pages.
+ */
+void
+anon_swap_free(struct anon *ap, page_t *pp)
+{
+	kmutex_t *ahm;
+
+	ASSERT(ap != NULL);
+	ASSERT(pp != NULL);
+	ASSERT(PAGE_LOCKED(pp));
+	ASSERT(pp->p_vnode != NULL);
+	ASSERT(IS_SWAPFSVP(pp->p_vnode));
+	ASSERT(ap->an_refcnt != 0);
+	ASSERT(pp->p_vnode == ap->an_vp);
+	ASSERT(pp->p_offset == ap->an_off);
+
+	if (ap->an_pvp == NULL)
+		return;
+
+	page_io_lock(pp);
+	ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+	mutex_enter(ahm);
+
+	ASSERT(ap->an_refcnt != 0);
+	ASSERT(pp->p_vnode == ap->an_vp);
+	ASSERT(pp->p_offset == ap->an_off);
+
+	if (ap->an_pvp != NULL) {
+		swap_phys_free(ap->an_pvp, ap->an_poff, PAGESIZE);
+		ap->an_pvp = NULL;
+		ap->an_poff = 0;
+		mutex_exit(ahm);
+		hat_setmod(pp);
+	} else {
+		mutex_exit(ahm);
+	}
+	page_io_unlock(pp);
 }
 
 /*
@@ -3154,7 +3203,7 @@ anon_shmap_free_pages(struct anon_map *amp, ulong_t sidx, size_t len)
 	ulong_t sidx_aligned;
 	ulong_t eidx_aligned;
 
-	ASSERT(RW_WRITE_HELD(&amp->a_rwlock));
+	ASSERT(ANON_WRITE_HELD(&amp->a_rwlock));
 	ASSERT(amp->refcnt <= 1);
 	ASSERT(amp->a_szc > 0);
 	ASSERT(eidx <= ahp->size);
@@ -3205,6 +3254,53 @@ anon_shmap_free_pages(struct anon_map *amp, ulong_t sidx, size_t len)
 }
 
 /*
+ * This routine should be called with amp's writer lock when there're no other
+ * users of amp.  All pcache entries of this amp must have been already
+ * inactivated. We must not drop a_rwlock here to prevent new users from
+ * attaching to this amp.
+ */
+void
+anonmap_purge(struct anon_map *amp)
+{
+	ASSERT(ANON_WRITE_HELD(&amp->a_rwlock));
+	ASSERT(amp->refcnt <= 1);
+
+	if (amp->a_softlockcnt != 0) {
+		seg_ppurge(NULL, amp, 0);
+	}
+
+	/*
+	 * Since all pcache entries were already inactive before this routine
+	 * was called seg_ppurge() couldn't return while there're still
+	 * entries that can be found via the list anchored at a_phead. So we
+	 * can assert this list is empty now. a_softlockcnt may be still non 0
+	 * if asynchronous thread that manages pcache already removed pcache
+	 * entries but hasn't unlocked the pages yet. If a_softlockcnt is non
+	 * 0 we just wait on a_purgecv for shamp_reclaim() to finish. Even if
+	 * a_softlockcnt is 0 we grab a_purgemtx to avoid freeing anon map
+	 * before shamp_reclaim() is done with it. a_purgemtx also taken by
+	 * shamp_reclaim() while a_softlockcnt was still not 0 acts as a
+	 * barrier that prevents anonmap_purge() to complete while
+	 * shamp_reclaim() may still be referencing this amp.
+	 */
+	ASSERT(amp->a_phead.p_lnext == &amp->a_phead);
+	ASSERT(amp->a_phead.p_lprev == &amp->a_phead);
+
+	mutex_enter(&amp->a_purgemtx);
+	while (amp->a_softlockcnt != 0) {
+		ASSERT(amp->a_phead.p_lnext == &amp->a_phead);
+		ASSERT(amp->a_phead.p_lprev == &amp->a_phead);
+		amp->a_purgewait = 1;
+		cv_wait(&amp->a_purgecv, &amp->a_purgemtx);
+	}
+	mutex_exit(&amp->a_purgemtx);
+
+	ASSERT(amp->a_phead.p_lnext == &amp->a_phead);
+	ASSERT(amp->a_phead.p_lprev == &amp->a_phead);
+	ASSERT(amp->a_softlockcnt == 0);
+}
+
+/*
  * Allocate and initialize an anon_map structure for seg
  * associating the given swap reservation with the new anon_map.
  */
@@ -3232,14 +3328,22 @@ anonmap_alloc(size_t size, size_t swresv, int flags)
 	amp->locality = 0;
 	amp->a_szc = 0;
 	amp->a_sp = NULL;
+	amp->a_softlockcnt = 0;
+	amp->a_purgewait = 0;
+	amp->a_phead.p_lnext = &amp->a_phead;
+	amp->a_phead.p_lprev = &amp->a_phead;
+
 	return (amp);
 }
 
 void
 anonmap_free(struct anon_map *amp)
 {
-	ASSERT(amp->ahp);
+	ASSERT(amp->ahp != NULL);
 	ASSERT(amp->refcnt == 0);
+	ASSERT(amp->a_softlockcnt == 0);
+	ASSERT(amp->a_phead.p_lnext == &amp->a_phead);
+	ASSERT(amp->a_phead.p_lprev == &amp->a_phead);
 
 	lgrp_shm_policy_fini(amp, NULL);
 	anon_release(amp->ahp, btopr(amp->size));

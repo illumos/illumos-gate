@@ -116,13 +116,12 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 			 * of these counters.
 			 */
 			dumpsize_in_pages = (physinstalled - obp_pages -
-						availrmem -
-						anon_segkp_pages_locked -
-						k_anoninfo.ani_mem_resv -
-						segvn_pages_locked -
-						pages_locked -
-						pages_claimed -
-						pages_useclaim);
+			    availrmem -
+			    anon_segkp_pages_locked -
+			    k_anoninfo.ani_mem_resv -
+			    pages_locked -
+			    pages_claimed -
+			    pages_useclaim);
 
 			/*
 			 * Protect against vm vagaries.

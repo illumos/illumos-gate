@@ -7379,28 +7379,23 @@ hat_pagesync(struct page *pp, uint_t clearflag)
 		return (PP_GENERIC_ATTR(pp));
 	}
 
-	if ((clearflag == (HAT_SYNC_STOPON_REF | HAT_SYNC_DONTZERO)) &&
-	    PP_ISREF(pp)) {
-		return (PP_GENERIC_ATTR(pp));
+	if ((clearflag & HAT_SYNC_ZERORM) == 0) {
+		if ((clearflag & HAT_SYNC_STOPON_REF) && PP_ISREF(pp)) {
+			return (PP_GENERIC_ATTR(pp));
+		}
+		if ((clearflag & HAT_SYNC_STOPON_MOD) && PP_ISMOD(pp)) {
+			return (PP_GENERIC_ATTR(pp));
+		}
+		if (clearflag & HAT_SYNC_STOPON_SHARED) {
+			if (pp->p_share > po_share) {
+				hat_page_setattr(pp, P_REF);
+				return (PP_GENERIC_ATTR(pp));
+			}
+			stop_on_sh = 1;
+			shcnt = 0;
+		}
 	}
 
-	if ((clearflag == (HAT_SYNC_STOPON_MOD | HAT_SYNC_DONTZERO)) &&
-	    PP_ISMOD(pp)) {
-		return (PP_GENERIC_ATTR(pp));
-	}
-
-	if ((clearflag & HAT_SYNC_STOPON_SHARED) != 0 &&
-	    (pp->p_share > po_share) &&
-	    !(clearflag & HAT_SYNC_ZERORM)) {
-		hat_page_setattr(pp, P_REF);
-		return (PP_GENERIC_ATTR(pp));
-	}
-
-	if ((clearflag & HAT_SYNC_STOPON_SHARED) &&
-	    !(clearflag & HAT_SYNC_ZERORM)) {
-		stop_on_sh = 1;
-		shcnt = 0;
-	}
 	clearflag &= ~HAT_SYNC_STOPON_SHARED;
 	pml = sfmmu_mlist_enter(pp);
 	index = PP_MAPINDEX(pp);

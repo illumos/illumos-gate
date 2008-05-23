@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -715,12 +715,13 @@ top:
 		int err;
 
 		next = AS_SEGNEXT(as, seg);
+retry:
 		err = SEGOP_UNMAP(seg, seg->s_base, seg->s_size);
 		if (err == EAGAIN) {
 			mutex_enter(&as->a_contents);
 			if (as->a_callbacks) {
 				AS_LOCK_EXIT(as, &as->a_lock);
-			} else {
+			} else if (!AS_ISNOUNMAPWAIT(as)) {
 				/*
 				 * Memory is currently locked. Wait for a
 				 * cv_signal that it has been unlocked, then
@@ -732,6 +733,20 @@ top:
 				AS_LOCK_EXIT(as, &as->a_lock);
 				while (AS_ISUNMAPWAIT(as))
 					cv_wait(&as->a_cv, &as->a_contents);
+			} else {
+				/*
+				 * We may have raced with
+				 * segvn_reclaim()/segspt_reclaim(). In this
+				 * case clean nounmapwait flag and retry since
+				 * softlockcnt in this segment may be already
+				 * 0.  We don't drop as writer lock so our
+				 * number of retries without sleeping should
+				 * be very small. See segvn_reclaim() for
+				 * more comments.
+				 */
+				AS_CLRNOUNMAPWAIT(as);
+				mutex_exit(&as->a_contents);
+				goto retry;
 			}
 			mutex_exit(&as->a_contents);
 			goto top;
@@ -1193,6 +1208,7 @@ setprot_top:
 			ssize = seg->s_base + seg->s_size - raddr;
 		else
 			ssize = rsize;
+retry:
 		error = SEGOP_SETPROT(seg, raddr, ssize, prot);
 
 		if (error == IE_NOMEM) {
@@ -1254,13 +1270,27 @@ setprot_top:
 			    seg->s_base, seg->s_size))) {
 				AS_LOCK_EXIT(as, &as->a_lock);
 				as_execute_callback(as, cb, AS_SETPROT_EVENT);
-			} else {
+			} else if (!AS_ISNOUNMAPWAIT(as)) {
 				if (AS_ISUNMAPWAIT(as) == 0)
 					cv_broadcast(&as->a_cv);
 				AS_SETUNMAPWAIT(as);
 				AS_LOCK_EXIT(as, &as->a_lock);
 				while (AS_ISUNMAPWAIT(as))
 					cv_wait(&as->a_cv, &as->a_contents);
+			} else {
+				/*
+				 * We may have raced with
+				 * segvn_reclaim()/segspt_reclaim(). In this
+				 * case clean nounmapwait flag and retry since
+				 * softlockcnt in this segment may be already
+				 * 0.  We don't drop as writer lock so our
+				 * number of retries without sleeping should
+				 * be very small. See segvn_reclaim() for
+				 * more comments.
+				 */
+				AS_CLRNOUNMAPWAIT(as);
+				mutex_exit(&as->a_contents);
+				goto retry;
 			}
 			mutex_exit(&as->a_contents);
 			goto setprot_top;
@@ -1385,6 +1415,7 @@ top:
 		 */
 		seg_next = AS_SEGNEXT(as, seg);
 
+retry:
 		err = SEGOP_UNMAP(seg, raddr, ssize);
 		if (err == EAGAIN) {
 			/*
@@ -1419,25 +1450,37 @@ top:
 			 *	either there were no callbacks for this event
 			 *	or they were already in progress.
 			 */
-			as_setwatch(as);
 			mutex_enter(&as->a_contents);
 			if (as->a_callbacks &&
 			    (cb = as_find_callback(as, AS_UNMAP_EVENT,
 			    seg->s_base, seg->s_size))) {
 				AS_LOCK_EXIT(as, &as->a_lock);
 				as_execute_callback(as, cb, AS_UNMAP_EVENT);
-			} else {
+			} else if (!AS_ISNOUNMAPWAIT(as)) {
 				if (AS_ISUNMAPWAIT(as) == 0)
 					cv_broadcast(&as->a_cv);
 				AS_SETUNMAPWAIT(as);
 				AS_LOCK_EXIT(as, &as->a_lock);
 				while (AS_ISUNMAPWAIT(as))
 					cv_wait(&as->a_cv, &as->a_contents);
+			} else {
+				/*
+				 * We may have raced with
+				 * segvn_reclaim()/segspt_reclaim(). In this
+				 * case clean nounmapwait flag and retry since
+				 * softlockcnt in this segment may be already
+				 * 0.  We don't drop as writer lock so our
+				 * number of retries without sleeping should
+				 * be very small. See segvn_reclaim() for
+				 * more comments.
+				 */
+				AS_CLRNOUNMAPWAIT(as);
+				mutex_exit(&as->a_contents);
+				goto retry;
 			}
 			mutex_exit(&as->a_contents);
 			goto top;
 		} else if (err == IE_RETRY) {
-			as_setwatch(as);
 			AS_LOCK_EXIT(as, &as->a_lock);
 			goto top;
 		} else if (err) {
@@ -2539,6 +2582,167 @@ fc_decode(faultcode_t fault_err)
 }
 
 /*
+ * Pagelock pages from a range that spans more than 1 segment.  Obtain shadow
+ * lists from each segment and copy them to one contiguous shadow list (plist)
+ * as expected by the caller.  Save pointers to per segment shadow lists at
+ * the tail of plist so that they can be used during as_pageunlock().
+ */
+static int
+as_pagelock_segs(struct as *as, struct seg *seg, struct page ***ppp,
+    caddr_t addr, size_t size, enum seg_rw rw)
+{
+	caddr_t sv_addr = addr;
+	size_t sv_size = size;
+	struct seg *sv_seg = seg;
+	ulong_t segcnt = 1;
+	ulong_t cnt;
+	size_t ssize;
+	pgcnt_t npages = btop(size);
+	page_t **plist;
+	page_t **pl;
+	int error;
+	caddr_t eaddr;
+	faultcode_t fault_err = 0;
+	pgcnt_t pl_off;
+	extern struct seg_ops segspt_shmops;
+
+	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(seg != NULL);
+	ASSERT(addr >= seg->s_base && addr < seg->s_base + seg->s_size);
+	ASSERT(addr + size > seg->s_base + seg->s_size);
+	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
+	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
+
+	/*
+	 * Count the number of segments covered by the range we are about to
+	 * lock. The segment count is used to size the shadow list we return
+	 * back to the caller.
+	 */
+	for (; size != 0; size -= ssize, addr += ssize) {
+		if (addr >= seg->s_base + seg->s_size) {
+
+			seg = AS_SEGNEXT(as, seg);
+			if (seg == NULL || addr != seg->s_base) {
+				AS_LOCK_EXIT(as, &as->a_lock);
+				return (EFAULT);
+			}
+			/*
+			 * Do a quick check if subsequent segments
+			 * will most likely support pagelock.
+			 */
+			if (seg->s_ops == &segvn_ops) {
+				vnode_t *vp;
+
+				if (SEGOP_GETVP(seg, addr, &vp) != 0 ||
+				    vp != NULL) {
+					AS_LOCK_EXIT(as, &as->a_lock);
+					goto slow;
+				}
+			} else if (seg->s_ops != &segspt_shmops) {
+				AS_LOCK_EXIT(as, &as->a_lock);
+				goto slow;
+			}
+			segcnt++;
+		}
+		if (addr + size > seg->s_base + seg->s_size) {
+			ssize = seg->s_base + seg->s_size - addr;
+		} else {
+			ssize = size;
+		}
+	}
+	ASSERT(segcnt > 1);
+
+	plist = kmem_zalloc((npages + segcnt) * sizeof (page_t *), KM_SLEEP);
+
+	addr = sv_addr;
+	size = sv_size;
+	seg = sv_seg;
+
+	for (cnt = 0, pl_off = 0; size != 0; size -= ssize, addr += ssize) {
+		if (addr >= seg->s_base + seg->s_size) {
+			seg = AS_SEGNEXT(as, seg);
+			ASSERT(seg != NULL && addr == seg->s_base);
+			cnt++;
+			ASSERT(cnt < segcnt);
+		}
+		if (addr + size > seg->s_base + seg->s_size) {
+			ssize = seg->s_base + seg->s_size - addr;
+		} else {
+			ssize = size;
+		}
+		pl = &plist[npages + cnt];
+		error = SEGOP_PAGELOCK(seg, addr, ssize, (page_t ***)pl,
+		    L_PAGELOCK, rw);
+		if (error) {
+			break;
+		}
+		ASSERT(plist[npages + cnt] != NULL);
+		ASSERT(pl_off + btop(ssize) <= npages);
+		bcopy(plist[npages + cnt], &plist[pl_off],
+		    btop(ssize) * sizeof (page_t *));
+		pl_off += btop(ssize);
+	}
+
+	if (size == 0) {
+		AS_LOCK_EXIT(as, &as->a_lock);
+		ASSERT(cnt == segcnt - 1);
+		*ppp = plist;
+		return (0);
+	}
+
+	/*
+	 * one of pagelock calls failed. The error type is in error variable.
+	 * Unlock what we've locked so far and retry with F_SOFTLOCK if error
+	 * type is either EFAULT or ENOTSUP. Otherwise just return the error
+	 * back to the caller.
+	 */
+
+	eaddr = addr;
+	seg = sv_seg;
+
+	for (cnt = 0, addr = sv_addr; addr < eaddr; addr += ssize) {
+		if (addr >= seg->s_base + seg->s_size) {
+			seg = AS_SEGNEXT(as, seg);
+			ASSERT(seg != NULL && addr == seg->s_base);
+			cnt++;
+			ASSERT(cnt < segcnt);
+		}
+		if (eaddr > seg->s_base + seg->s_size) {
+			ssize = seg->s_base + seg->s_size - addr;
+		} else {
+			ssize = eaddr - addr;
+		}
+		pl = &plist[npages + cnt];
+		ASSERT(*pl != NULL);
+		(void) SEGOP_PAGELOCK(seg, addr, ssize, (page_t ***)pl,
+		    L_PAGEUNLOCK, rw);
+	}
+
+	AS_LOCK_EXIT(as, &as->a_lock);
+
+	kmem_free(plist, (npages + segcnt) * sizeof (page_t *));
+
+	if (error != ENOTSUP && error != EFAULT) {
+		return (error);
+	}
+
+slow:
+	/*
+	 * If we are here because pagelock failed due to the need to cow fault
+	 * in the pages we want to lock F_SOFTLOCK will do this job and in
+	 * next as_pagelock() call for this address range pagelock will
+	 * hopefully succeed.
+	 */
+	fault_err = as_fault(as->a_hat, as, sv_addr, sv_size, F_SOFTLOCK, rw);
+	if (fault_err != 0) {
+		return (fc_decode(fault_err));
+	}
+	*ppp = NULL;
+
+	return (0);
+}
+
+/*
  * lock pages in a given address space. Return shadow list. If
  * the list is NULL, the MMU mapping is also locked.
  */
@@ -2547,12 +2751,10 @@ as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
     size_t size, enum seg_rw rw)
 {
 	size_t rsize;
-	caddr_t base;
 	caddr_t raddr;
 	faultcode_t fault_err;
 	struct seg *seg;
-	int res;
-	int prefaulted = 0;
+	int err;
 
 	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_AS_LOCK_START,
 	    "as_pagelock_start: addr %p size %ld", addr, size);
@@ -2560,17 +2762,25 @@ as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
 	    (size_t)raddr;
-top:
+
 	/*
 	 * if the request crosses two segments let
 	 * as_fault handle it.
 	 */
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-	seg = as_findseg(as, addr, 0);
-	if ((seg == NULL) || ((base = seg->s_base) > addr) ||
-	    (addr + size) > base + seg->s_size) {
+
+	seg = as_segat(as, raddr);
+	if (seg == NULL) {
 		AS_LOCK_EXIT(as, &as->a_lock);
-		goto slow;
+		return (EFAULT);
+	}
+	ASSERT(raddr >= seg->s_base && raddr < seg->s_base + seg->s_size);
+	if (raddr + rsize > seg->s_base + seg->s_size) {
+		return (as_pagelock_segs(as, seg, ppp, raddr, rsize, rw));
+	}
+	if (raddr + rsize <= raddr) {
+		AS_LOCK_EXIT(as, &as->a_lock);
+		return (EFAULT);
 	}
 
 	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEG_LOCK_START,
@@ -2579,46 +2789,22 @@ top:
 	/*
 	 * try to lock pages and pass back shadow list
 	 */
-	res = SEGOP_PAGELOCK(seg, raddr, rsize, ppp, L_PAGELOCK, rw);
+	err = SEGOP_PAGELOCK(seg, raddr, rsize, ppp, L_PAGELOCK, rw);
 
 	TRACE_0(TR_FAC_PHYSIO, TR_PHYSIO_SEG_LOCK_END, "seg_lock_1_end");
+
 	AS_LOCK_EXIT(as, &as->a_lock);
-	if (res == 0) {
-		return (0);
-	} else if (res == ENOTSUP || prefaulted) {
-		/*
-		 * (1) segment driver doesn't support PAGELOCK fastpath, or
-		 * (2) we've already tried fast path unsuccessfully after
-		 *    faulting in the addr range below; system might be
-		 *    thrashing or there may not be enough availrmem.
-		 */
-		goto slow;
+
+	if (err == 0 || (err != ENOTSUP && err != EFAULT)) {
+		return (err);
 	}
 
-	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_AS_FAULT_START,
-	    "as_fault_start: addr %p size %ld", addr, size);
-
 	/*
-	 * we might get here because of some COW fault or non
-	 * existing page. Let as_fault deal with it. Just load
-	 * the page, don't lock the MMU mapping.
-	 */
-	fault_err = as_fault(as->a_hat, as, addr, size, F_INVAL, rw);
-	if (fault_err != 0) {
-		return (fc_decode(fault_err));
-	}
-
-	prefaulted = 1;
-
-	/*
-	 * try fast path again; since we've dropped a_lock,
-	 * we need to try the dance from the start to see if
-	 * the addr range is still valid.
-	 */
-	goto top;
-slow:
-	/*
-	 * load the page and lock the MMU mapping.
+	 * Use F_SOFTLOCK to lock the pages because pagelock failed either due
+	 * to no pagelock support for this segment or pages need to be cow
+	 * faulted in. If fault is needed F_SOFTLOCK will do this job for
+	 * this as_pagelock() call and in the next as_pagelock() call for the
+	 * same address range pagelock call will hopefull succeed.
 	 */
 	fault_err = as_fault(as->a_hat, as, addr, size, F_SOFTLOCK, rw);
 	if (fault_err != 0) {
@@ -2628,6 +2814,52 @@ slow:
 
 	TRACE_0(TR_FAC_PHYSIO, TR_PHYSIO_AS_LOCK_END, "as_pagelock_end");
 	return (0);
+}
+
+/*
+ * unlock pages locked by as_pagelock_segs().  Retrieve per segment shadow
+ * lists from the end of plist and call pageunlock interface for each segment.
+ * Drop as lock and free plist.
+ */
+static void
+as_pageunlock_segs(struct as *as, struct seg *seg, caddr_t addr, size_t size,
+    struct page **plist, enum seg_rw rw)
+{
+	ulong_t cnt;
+	caddr_t eaddr = addr + size;
+	pgcnt_t npages = btop(size);
+	size_t ssize;
+	page_t **pl;
+
+	ASSERT(AS_LOCK_HELD(as, &as->a_lock));
+	ASSERT(seg != NULL);
+	ASSERT(addr >= seg->s_base && addr < seg->s_base + seg->s_size);
+	ASSERT(addr + size > seg->s_base + seg->s_size);
+	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
+	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
+	ASSERT(plist != NULL);
+
+	for (cnt = 0; addr < eaddr; addr += ssize) {
+		if (addr >= seg->s_base + seg->s_size) {
+			seg = AS_SEGNEXT(as, seg);
+			ASSERT(seg != NULL && addr == seg->s_base);
+			cnt++;
+		}
+		if (eaddr > seg->s_base + seg->s_size) {
+			ssize = seg->s_base + seg->s_size - addr;
+		} else {
+			ssize = eaddr - addr;
+		}
+		pl = &plist[npages + cnt];
+		ASSERT(*pl != NULL);
+		(void) SEGOP_PAGELOCK(seg, addr, ssize, (page_t ***)pl,
+		    L_PAGEUNLOCK, rw);
+	}
+	ASSERT(cnt > 0);
+	AS_LOCK_EXIT(as, &as->a_lock);
+
+	cnt++;
+	kmem_free(plist, (npages + cnt) * sizeof (page_t *));
 }
 
 /*
@@ -2652,43 +2884,28 @@ as_pageunlock(struct as *as, struct page **pp, caddr_t addr, size_t size,
 		(void) as_fault(as->a_hat, as, addr, size, F_SOFTUNLOCK, rw);
 		return;
 	}
+
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
 	    (size_t)raddr;
+
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-	seg = as_findseg(as, addr, 0);
-	ASSERT(seg);
+	seg = as_segat(as, raddr);
+	ASSERT(seg != NULL);
+
 	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEG_UNLOCK_START,
 	    "seg_unlock_start: raddr %p rsize %ld", raddr, rsize);
-	SEGOP_PAGELOCK(seg, raddr, rsize, &pp, L_PAGEUNLOCK, rw);
+
+	ASSERT(raddr >= seg->s_base && raddr < seg->s_base + seg->s_size);
+	if (raddr + rsize <= seg->s_base + seg->s_size) {
+		SEGOP_PAGELOCK(seg, raddr, rsize, &pp, L_PAGEUNLOCK, rw);
+	} else {
+		as_pageunlock_segs(as, seg, raddr, rsize, pp, rw);
+		return;
+	}
 	AS_LOCK_EXIT(as, &as->a_lock);
 	TRACE_0(TR_FAC_PHYSIO, TR_PHYSIO_AS_UNLOCK_END, "as_pageunlock_end");
 }
-
-/*
- * reclaim cached pages in a given address range
- */
-void
-as_pagereclaim(struct as *as, struct page **pp, caddr_t addr,
-    size_t size, enum seg_rw rw)
-{
-	struct seg *seg;
-	size_t rsize;
-	caddr_t raddr;
-
-	ASSERT(AS_READ_HELD(as, &as->a_lock));
-	ASSERT(pp != NULL);
-
-	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
-	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-	    (size_t)raddr;
-	seg = as_findseg(as, addr, 0);
-	ASSERT(seg);
-	SEGOP_PAGELOCK(seg, raddr, rsize, &pp, L_PAGERECLAIM, rw);
-}
-
-#define	MAXPAGEFLIP	4
-#define	MAXPAGEFLIPSIZ	MAXPAGEFLIP*PAGESIZE
 
 int
 as_setpagesize(struct as *as, caddr_t addr, size_t size, uint_t szc,
@@ -2735,6 +2952,7 @@ setpgsz_top:
 			ssize = rsize;
 		}
 
+retry:
 		error = SEGOP_SETPAGESIZE(seg, raddr, ssize, szc);
 
 		if (error == IE_NOMEM) {
@@ -2778,13 +2996,29 @@ setpgsz_top:
 			 *	as_unmap, as_setprot or as_free would do.
 			 */
 			mutex_enter(&as->a_contents);
-			if (AS_ISUNMAPWAIT(as) == 0) {
-				cv_broadcast(&as->a_cv);
-			}
-			AS_SETUNMAPWAIT(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
-			while (AS_ISUNMAPWAIT(as)) {
-				cv_wait(&as->a_cv, &as->a_contents);
+			if (!AS_ISNOUNMAPWAIT(as)) {
+				if (AS_ISUNMAPWAIT(as) == 0) {
+					cv_broadcast(&as->a_cv);
+				}
+				AS_SETUNMAPWAIT(as);
+				AS_LOCK_EXIT(as, &as->a_lock);
+				while (AS_ISUNMAPWAIT(as)) {
+					cv_wait(&as->a_cv, &as->a_contents);
+				}
+			} else {
+				/*
+				 * We may have raced with
+				 * segvn_reclaim()/segspt_reclaim(). In this
+				 * case clean nounmapwait flag and retry since
+				 * softlockcnt in this segment may be already
+				 * 0.  We don't drop as writer lock so our
+				 * number of retries without sleeping should
+				 * be very small. See segvn_reclaim() for
+				 * more comments.
+				 */
+				AS_CLRNOUNMAPWAIT(as);
+				mutex_exit(&as->a_contents);
+				goto retry;
 			}
 			mutex_exit(&as->a_contents);
 			goto setpgsz_top;
@@ -2808,6 +3042,8 @@ as_iset3_default_lpsize(struct as *as, caddr_t raddr, size_t rsize, uint_t szc,
 	struct seg *seg;
 	size_t ssize;
 	int error;
+
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
 
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
@@ -2863,6 +3099,8 @@ as_iset2_default_lpsize(struct as *as, caddr_t addr, size_t size, uint_t szc,
 {
 	int error;
 	int retry;
+
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
 
 	for (;;) {
 		error = as_iset3_default_lpsize(as, addr, size, szc, &retry);
@@ -3150,16 +3388,30 @@ again:
 		error = EINVAL;
 	} else if (error == EAGAIN) {
 		mutex_enter(&as->a_contents);
-		if (AS_ISUNMAPWAIT(as) == 0) {
-			cv_broadcast(&as->a_cv);
+		if (!AS_ISNOUNMAPWAIT(as)) {
+			if (AS_ISUNMAPWAIT(as) == 0) {
+				cv_broadcast(&as->a_cv);
+			}
+			AS_SETUNMAPWAIT(as);
+			AS_LOCK_EXIT(as, &as->a_lock);
+			while (AS_ISUNMAPWAIT(as)) {
+				cv_wait(&as->a_cv, &as->a_contents);
+			}
+			mutex_exit(&as->a_contents);
+			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		} else {
+			/*
+			 * We may have raced with
+			 * segvn_reclaim()/segspt_reclaim(). In this case
+			 * clean nounmapwait flag and retry since softlockcnt
+			 * in this segment may be already 0.  We don't drop as
+			 * writer lock so our number of retries without
+			 * sleeping should be very small. See segvn_reclaim()
+			 * for more comments.
+			 */
+			AS_CLRNOUNMAPWAIT(as);
+			mutex_exit(&as->a_contents);
 		}
-		AS_SETUNMAPWAIT(as);
-		AS_LOCK_EXIT(as, &as->a_lock);
-		while (AS_ISUNMAPWAIT(as)) {
-			cv_wait(&as->a_cv, &as->a_contents);
-		}
-		mutex_exit(&as->a_contents);
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
 		goto again;
 	}
 

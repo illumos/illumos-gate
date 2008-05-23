@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -673,9 +673,6 @@ segkmem_pagelock(struct seg *seg, caddr_t addr, size_t len,
 	if (segkp_bitmap && seg == &kvseg &&
 	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
 		return (SEGOP_PAGELOCK(segkp, addr, len, ppp, type, rw));
-
-	if (type == L_PAGERECLAIM)
-		return (ENOTSUP);
 
 	npages = btopr(len);
 	nb = sizeof (page_t *) * npages;
