@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,10 @@
 #include <cmd_opl.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include <sys/fm/protocol.h>
 #include <sys/fm/io/opl_mc_fm.h>
@@ -44,6 +48,9 @@
 #include <sys/opl_olympus_regs.h>
 #include <sys/fm/cpu/SPARC64-VI.h>
 #include <sys/int_const.h>
+#include <sys/mutex.h>
+#include <sys/dditypes.h>
+#include <opl/sys/mc-opl.h>
 
 /*
  * The following is the common function for handling
@@ -264,13 +271,110 @@ opl_ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 }
 
 /*
+ * Notify fault page information (pa and errlog) to XSCF via mc-opl
+ */
+#define	MC_PHYDEV_DIR	"/devices"
+#define	MC_PHYPREFIX	"pseudo-mc@"
+static int
+opl_scf_log(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	uint32_t *eadd, *elog;
+	uint_t n;
+	uint64_t pa;
+	char path[MAXPATHLEN];
+	char *unum;
+	nvlist_t *rsrc;
+	DIR *mcdir;
+	struct dirent *dp;
+	mc_flt_page_t flt_page;
+	cmd_page_t *page;
+	struct stat statbuf;
+
+	/*
+	 * Extract ereport.
+	 * Sanity check of pa is already done at cmd_opl_mac_common().
+	 * mc-opl sets only one entry for MC_OPL_ERR_ADD, MC_OPL_ERR_LOG,
+	 * and MC_OPL_BANK.
+	 */
+	if ((nvlist_lookup_uint64(nvl, MC_OPL_PA, &pa) != 0) ||
+	    (nvlist_lookup_uint32_array(nvl, MC_OPL_ERR_ADD, &eadd, &n) != 0) ||
+	    (nvlist_lookup_uint32_array(nvl, MC_OPL_ERR_LOG, &elog, &n) != 0)) {
+		fmd_hdl_debug(hdl, "opl_scf_log failed to extract ereport.\n");
+		return (-1);
+	}
+	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
+	    &rsrc) != 0) {
+		fmd_hdl_debug(hdl, "opl_scf_log failed to get resource.\n");
+		return (-1);
+	}
+	if (nvlist_lookup_string(rsrc, FM_FMRI_MEM_UNUM, &unum) != 0) {
+		fmd_hdl_debug(hdl, "opl_scf_log failed to get unum.\n");
+		return (-1);
+	}
+
+	page = cmd_page_lookup(pa);
+	if (page != NULL && page->page_flags & CMD_MEM_F_FAULTING) {
+		/*
+		 * fault.memory.page will not be created.
+		 */
+		return (0);
+	}
+
+	flt_page.err_add = eadd[0];
+	flt_page.err_log = elog[0];
+	flt_page.fmri_addr = (uint64_t)(uint32_t)unum;
+	flt_page.fmri_sz = strlen(unum) + 1;
+
+	fmd_hdl_debug(hdl, "opl_scf_log DIMM: %s (%d)\n",
+	    unum, strlen(unum) + 1);
+	fmd_hdl_debug(hdl, "opl_scf_log pa:%llx add:%x log:%x\n",
+	    pa, eadd[0], elog[0]);
+
+	if ((mcdir = opendir(MC_PHYDEV_DIR)) != NULL) {
+		while ((dp = readdir(mcdir)) != NULL) {
+			int fd;
+
+			if (strncmp(dp->d_name, MC_PHYPREFIX,
+			    strlen(MC_PHYPREFIX)) != 0)
+				continue;
+
+			(void) snprintf(path, sizeof (path),
+			    "%s/%s", MC_PHYDEV_DIR, dp->d_name);
+
+			if (stat(path, &statbuf) != 0 ||
+			    (statbuf.st_mode & S_IFCHR) == 0) {
+				/* skip if not a character device */
+				continue;
+			}
+
+			if ((fd = open(path, O_RDONLY)) < 0)
+				continue;
+
+			if (ioctl(fd, MCIOC_FAULT_PAGE, &flt_page) == 0) {
+				fmd_hdl_debug(hdl, "opl_scf_log ioctl(%s)\n",
+				    path);
+				(void) close(fd);
+				(void) closedir(mcdir);
+				return (0);
+			}
+			(void) close(fd);
+		}
+		(void) closedir(mcdir);
+	}
+
+	fmd_hdl_debug(hdl, "opl_scf_log failed ioctl().\n");
+
+	return (-1);
+}
+
+/*
  * This is the common function for processing MAC detected
  * Intermittent and Permanent CEs.
  */
 
 cmd_evdisp_t
 cmd_opl_mac_ce(fmd_hdl_t *hdl, fmd_event_t *ep, const char *class,
-    nvlist_t *asru, nvlist_t *fru, uint64_t pa)
+    nvlist_t *asru, nvlist_t *fru, uint64_t pa, nvlist_t *nvl)
 {
 	cmd_dimm_t *dimm;
 	const char *uuid;
@@ -310,6 +414,7 @@ cmd_opl_mac_ce(fmd_hdl_t *hdl, fmd_event_t *ep, const char *class,
 		    dimm->dimm_case.cc_serdnm);
 		fmd_serd_reset(hdl, dimm->dimm_case.cc_serdnm);
 
+		(void) opl_scf_log(hdl, nvl);
 	} else {
 		CMD_STAT_BUMP(ce_sticky);
 	}
@@ -388,7 +493,7 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    strcmp(class, "ereport.asic.mac.ptrl-ice") == 0) {
 		cmd_evdisp_t ret;
 
-		ret = cmd_opl_mac_ce(hdl, ep, class, asru, fru, pa);
+		ret = cmd_opl_mac_ce(hdl, ep, class, asru, fru, pa, nvl);
 		nvlist_free(asru);
 		nvlist_free(fru);
 		if (ret != CMD_EVD_OK) {

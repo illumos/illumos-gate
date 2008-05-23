@@ -60,6 +60,7 @@
 #include <vm/hat_sfmmu.h>
 #include <sys/vmsystm.h>
 #include <sys/membar.h>
+#include <sys/mem.h>
 
 /*
  * Function prototypes
@@ -103,6 +104,7 @@ static int mc_opl_get_physical_board(int);
 
 static void mc_clear_rewrite(mc_opl_t *mcp, int i);
 static void mc_set_rewrite(mc_opl_t *mcp, int bank, uint32_t addr, int state);
+static int mc_scf_log_event(mc_flt_page_t *flt_pag);
 
 #ifdef	DEBUG
 static int mc_ioctl_debug(dev_t, int, intptr_t, int, cred_t *, int *);
@@ -508,6 +510,12 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (ddi_soft_state_zalloc(mc_statep, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
+	if (ddi_create_minor_node(devi, "mc-opl", S_IFCHR, instance,
+	    "ddi_mem_ctrl", 0) != DDI_SUCCESS) {
+		MC_LOG("mc_attach: create_minor_node failed\n");
+		return (DDI_FAILURE);
+	}
+
 	if ((mcp = ddi_get_soft_state(mc_statep, instance)) == NULL) {
 		goto bad;
 	}
@@ -542,6 +550,7 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 bad:
+	ddi_remove_minor_node(devi, NULL);
 	ddi_soft_state_free(mc_statep, instance);
 	return (DDI_FAILURE);
 }
@@ -575,6 +584,8 @@ mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	ddi_remove_minor_node(devi, NULL);
+
 	/* free up the soft state */
 	ddi_soft_state_free(mc_statep, instance);
 
@@ -600,10 +611,22 @@ static int
 mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
+	mc_flt_page_t flt_page;
+
+	if (cmd == MCIOC_FAULT_PAGE) {
+		if (arg == NULL)
+			return (EINVAL);
+
+		if (ddi_copyin((const void *)arg, (void *)&flt_page,
+		    sizeof (mc_flt_page_t), 0) < 0)
+			return (EFAULT);
+
+		return (mc_scf_log_event(&flt_page));
+	}
 #ifdef DEBUG
 	return (mc_ioctl_debug(dev, cmd, arg, mode, credp, rvalp));
 #else
-	return (ENXIO);
+	return (ENOTTY);
 #endif
 }
 
@@ -698,7 +721,7 @@ mcaddr_to_pa(mc_opl_t *mcp, mc_addr_t *maddr, uint64_t *pa)
 	    maddr1.ma_dimm_addr)) {
 		return (0);
 	} else {
-		cmn_err(CE_WARN, "Translation error source /LSB%d/B%d/%x, "
+		MC_LOG("Translation error source /LSB%d/B%d/%x, "
 		    "PA %lx, target /LSB%d/B%d/%x\n", maddr->ma_bd, bank,
 		    maddr->ma_dimm_addr, *pa, maddr1.ma_bd, maddr1.ma_bank,
 		    maddr1.ma_dimm_addr);
@@ -1419,7 +1442,27 @@ mc_set_rewrite(mc_opl_t *mcp, int bank, uint32_t addr, int state)
 
 	retry = mc_retry_info_get(&bankp->mcb_retry_freelist);
 
-	ASSERT(retry != NULL);
+	if (retry == NULL) {
+		mc_addr_t maddr;
+		uint64_t paddr;
+		/*
+		 * previous rewrite request has not completed yet.
+		 * So we discard this rewrite request.
+		 */
+		maddr.ma_bd = mcp->mc_board_num;
+		maddr.ma_bank =  bank;
+		maddr.ma_dimm_addr = addr;
+		if (mcaddr_to_pa(mcp, &maddr, &paddr) == 0) {
+			cmn_err(CE_WARN, "Discard CE rewrite request"
+			    " for 0x%lx (/LSB%d/B%d/%x).\n",
+			    paddr, mcp->mc_board_num, bank, addr);
+		} else {
+			cmn_err(CE_WARN, "Discard CE rewrite request"
+			    " for /LSB%d/B%d/%x.\n",
+			    mcp->mc_board_num, bank, addr);
+		}
+		return;
+	}
 
 	retry->ri_addr = addr;
 	retry->ri_state = state;
@@ -1477,8 +1520,7 @@ mc_process_scf_log(mc_opl_t *mcp)
 			} else {
 				if ((++mc_pce_dropped & 0xff) == 0) {
 					cmn_err(CE_WARN, "Cannot "
-					    "report Permanent CE to "
-					    "SCF\n");
+					    "report CE to SCF\n");
 				}
 			}
 		}
@@ -1497,7 +1539,7 @@ mc_queue_scf_log(mc_opl_t *mcp, mc_flt_stat_t *flt_stat, int bank)
 
 	if (mcp->mc_scf_total[bank] >= mc_max_scf_logs) {
 		if ((++mc_pce_dropped & 0xff) == 0) {
-			cmn_err(CE_WARN, "Too many Permanent CE requests.\n");
+			cmn_err(CE_WARN, "Too many CE requests.\n");
 		}
 		return;
 	}
@@ -1918,11 +1960,13 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 	if ((((flt_stat[0].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
 	    MAC_CNTL_PTRL_ERR_SHIFT) == ((mi_flt_stat[0].mf_cntl &
 	    MAC_CNTL_MI_ERRS) >> MAC_CNTL_MI_ERR_SHIFT)) &&
-	    (flt_stat[0].mf_err_add == mi_flt_stat[0].mf_err_add) &&
+	    (flt_stat[0].mf_err_add ==
+	    ROUNDDOWN(mi_flt_stat[0].mf_err_add, MC_BOUND_BYTE)) &&
 	    (((flt_stat[1].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
 	    MAC_CNTL_PTRL_ERR_SHIFT) == ((mi_flt_stat[1].mf_cntl &
 	    MAC_CNTL_MI_ERRS) >> MAC_CNTL_MI_ERR_SHIFT)) &&
-	    (flt_stat[1].mf_err_add == mi_flt_stat[1].mf_err_add)) {
+	    (flt_stat[1].mf_err_add ==
+	    ROUNDDOWN(mi_flt_stat[1].mf_err_add, MC_BOUND_BYTE))) {
 #ifdef DEBUG
 		MC_LOG("discarding PTRL error because "
 		    "it is the same as MI\n");
@@ -2032,7 +2076,8 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 	if ((((flt_stat.mf_cntl & MAC_CNTL_PTRL_ERRS) >>
 	    MAC_CNTL_PTRL_ERR_SHIFT) == ((mi_flt_stat.mf_cntl &
 	    MAC_CNTL_MI_ERRS) >> MAC_CNTL_MI_ERR_SHIFT)) &&
-	    (flt_stat.mf_err_add == mi_flt_stat.mf_err_add)) {
+	    (flt_stat.mf_err_add ==
+	    ROUNDDOWN(mi_flt_stat.mf_err_add, MC_BOUND_BYTE))) {
 #ifdef DEBUG
 		MC_LOG("discarding PTRL error because "
 		    "it is the same as MI\n");
@@ -3703,6 +3748,8 @@ mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr)
 				MC_LOG("mc_get_mem_addr: "
 				    "mcaddr_to_pa failed\n");
 				ret = ENODEV;
+				mutex_exit(&mcp->mc_lock);
+				continue;
 			}
 			mutex_exit(&mcp->mc_lock);
 			break;
@@ -3815,6 +3862,112 @@ mc_prepare_dimmlist(board_dimm_info_t *bd_dimmp)
 	return (dimm_list);
 }
 
+static int
+mc_get_mem_fmri(mc_flt_page_t *fpag, char **unum)
+{
+	if (fpag->fmri_addr == 0 || fpag->fmri_sz > MEM_FMRI_MAX_BUFSIZE)
+		return (EINVAL);
+
+	*unum = kmem_alloc(fpag->fmri_sz, KM_SLEEP);
+	if (copyin((void *)fpag->fmri_addr, *unum, fpag->fmri_sz) != 0) {
+		kmem_free(*unum, fpag->fmri_sz);
+		return (EFAULT);
+	}
+	return (0);
+}
+
+static int
+mc_scf_log_event(mc_flt_page_t *flt_pag)
+{
+	mc_opl_t *mcp;
+	int board, bank, slot;
+	int len, rv = 0;
+	char *unum, *sid;
+	char dname[MCOPL_MAX_DIMMNAME + 1];
+	size_t sid_sz;
+	uint64_t pa;
+	mc_flt_stat_t flt_stat;
+
+	if ((sid_sz = cpu_get_name_bufsize()) == 0)
+		return (ENOTSUP);
+
+	if ((rv = mc_get_mem_fmri(flt_pag, &unum)) != 0) {
+		MC_LOG("mc_scf_log_event: mc_get_mem_fmri failed\n");
+		return (rv);
+	}
+
+	sid = kmem_zalloc(sid_sz, KM_SLEEP);
+
+	if ((rv = mc_get_mem_sid(unum, sid, sid_sz, &len)) != 0) {
+		MC_LOG("mc_scf_log_event: mc_get_mem_sid failed\n");
+		goto out;
+	}
+
+	if ((rv = mc_get_mem_addr(unum, sid, (uint64_t)flt_pag->err_add,
+	    &pa)) != 0) {
+		MC_LOG("mc_scf_log_event: mc_get_mem_addr failed\n");
+		goto out;
+	}
+
+	if (parse_unum_memory(unum, &board, dname) != 0) {
+		MC_LOG("mc_scf_log_event: parse_unum_memory failed\n");
+		rv = EINVAL;
+		goto out;
+	}
+
+	if (board < 0) {
+		MC_LOG("mc_scf_log_event: Invalid board=%d dimm=%s\n",
+		    board, dname);
+		rv = EINVAL;
+		goto out;
+	}
+
+	if (dname_to_bankslot(dname, &bank, &slot) != 0) {
+		MC_LOG("mc_scf_log_event: dname_to_bankslot failed\n");
+		rv = EINVAL;
+		goto out;
+	}
+
+	mutex_enter(&mcmutex);
+
+	flt_stat.mf_err_add = flt_pag->err_add;
+	flt_stat.mf_err_log = flt_pag->err_log;
+	flt_stat.mf_flt_paddr = pa;
+
+	if ((mcp = mc_pa_to_mcp(pa)) == NULL) {
+		mutex_exit(&mcmutex);
+		MC_LOG("mc_scf_log_event: invalid pa\n");
+		rv = EINVAL;
+		goto out;
+	}
+
+	MC_LOG("mc_scf_log_event: DIMM%s, /LSB%d/B%d/%x, pa %lx elog %x\n",
+	    unum, mcp->mc_board_num, bank, flt_pag->err_add, pa,
+	    flt_pag->err_log);
+
+	mutex_enter(&mcp->mc_lock);
+
+	if (!pa_is_valid(mcp, pa)) {
+		mutex_exit(&mcp->mc_lock);
+		mutex_exit(&mcmutex);
+		rv = EINVAL;
+		goto out;
+	}
+
+	rv = 0;
+
+	mc_queue_scf_log(mcp, &flt_stat, bank);
+
+	mutex_exit(&mcp->mc_lock);
+	mutex_exit(&mcmutex);
+
+out:
+	kmem_free(unum, flt_pag->fmri_sz);
+	kmem_free(sid, sid_sz);
+
+	return (rv);
+}
+
 #ifdef DEBUG
 void
 mc_dump_dimm(char *buf, int dnamesz, int serialsz, int partnumsz)
@@ -3868,7 +4021,7 @@ static int
 mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
-	caddr_t	buf;
+	caddr_t	buf, kbuf;
 	uint64_t pa;
 	int rv = 0;
 	int i;
@@ -3937,9 +4090,9 @@ mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 */
 		cmn_err(CE_NOTE, "Allocating kmem %d MB\n", flags * 512);
 		for (i = 0; i < flags; i++) {
-			buf = kmem_alloc(512 * 1024 * 1024, KM_SLEEP);
+			kbuf = kmem_alloc(512 * 1024 * 1024, KM_SLEEP);
 			cmn_err(CE_NOTE, "kmem buf %llx PA %llx\n",
-			    (u_longlong_t)buf, (u_longlong_t)va_to_pa(buf));
+			    (u_longlong_t)kbuf, (u_longlong_t)va_to_pa(kbuf));
 		}
 		break;
 	case MCI_SUSPEND:
@@ -3951,6 +4104,9 @@ mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	default:
 		rv = ENXIO;
 	}
+	if (buf)
+		kmem_free(buf, PAGESIZE);
+
 	return (rv);
 }
 

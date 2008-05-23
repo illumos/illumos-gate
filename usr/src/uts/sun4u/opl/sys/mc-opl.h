@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,6 +190,13 @@ typedef struct mc_aflt {
 	mc_flt_stat_t *mflt_stat[2];	/* fault status */
 } mc_aflt_t;
 
+typedef struct mc_flt_page {
+	uint32_t err_add;		/* MAC_BANKm_{PTRL|MI}_ERR_ADD reg */
+	uint32_t err_log;		/* MAC_BANKm_{PTRL|MI}_ERR_LOG reg */
+	uint64_t fmri_addr;		/* FRU name string */
+	uint32_t fmri_sz;		/* length of FRU name +1 */
+} mc_flt_page_t;
+
 #define	MAC_PTRL_STAT(mcp, i)		(mcp->mc_bank[i].mcb_reg_base)
 #define	MAC_PTRL_CNTL(mcp, i)		(mcp->mc_bank[i].mcb_reg_base + 0x10)
 #define	MAC_PTRL_ERR_ADD(mcp, i)	(mcp->mc_bank[i].mcb_reg_base + 0x20)
@@ -206,6 +213,14 @@ typedef struct mc_aflt {
 
 /* use PA[37:6] */
 #define	MAC_RESTART_PA(pa)		((pa >> 6) & 0xffffffff)
+
+/*
+ * This is for changing MI_ERR_ADDR accuracy.
+ * Last two bits of PTRL_ERR_ADDR are always 0.
+ */
+#define	ROUNDDOWN(a, n) (((a) & ~((n) - 1)))
+#define	MC_BOUND_BYTE   4
+
 /*
  * MAC_BANKm_PTRL_STAT_Register
  */
@@ -398,6 +413,9 @@ extern int mc_inject_error(int error_type, uint64_t pa, uint32_t flags);
 #define	MC_INJECT_FLAG_LD	0x20
 #define	MC_INJECT_FLAG_ST	0x40
 #define	MC_INJECT_FLAG_PATH	0x80
+
+#define	MCIOC			('M' << 8)
+#define	MCIOC_FAULT_PAGE	(MCIOC|1)
 
 #ifdef DEBUG
 
