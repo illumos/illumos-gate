@@ -660,8 +660,12 @@ etm_xport_buffered_read(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 		pollfd.revents = 0;
 		pollfd.fd = _conn->fd;
 
-		if (poll(&pollfd, 1, -1) < 1)
-			return (-EIO);
+		if ((n = poll(&pollfd, 1, -1)) < 1) {
+			if (n == 0)
+				return (-EIO);
+			else
+				return (-errno);
+		}
 
 		/*
 		 * set i to the maximum size --- read(..., i) below will
@@ -846,7 +850,7 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_addr_t addr)
 			(void) close(_conn->fd);
 			etm_xport_free_addr(hdl, _addr);
 			fmd_hdl_free(hdl, _conn, sizeof (_etm_xport_conn_t));
-			etm_xport_stats.xport_os_open_fail.fmds_value.ui64++;
+			etm_xport_stats.xport_os_ioctl_fail.fmds_value.ui64++;
 			(void) pthread_mutex_unlock(&etm_xport_vldc_lock);
 			return (NULL);
 		}
@@ -956,8 +960,10 @@ etm_xport_accept(fmd_hdl_t *hdl, etm_xport_addr_t *addrp)
 		pollfd.revents = 0;
 		pollfd.fd = _conn->fd;
 
-		if (poll(&pollfd, 1, -1) < 1) {
-			errno = -EIO;
+		if ((n = poll(&pollfd, 1, -1)) < 1) {
+			if (n == 0) {
+				errno = EIO;
+			}
 			goto func_ret;
 		}
 	} else {
@@ -1263,6 +1269,12 @@ etm_xport_fini(fmd_hdl_t *hdl)
 	etm_xport_irb_tail = NULL;
 	etm_xport_irb_mtu_sz = 0;
 
+	/* cleanup statistics from FMD */
+
+	(void) fmd_stat_destroy(hdl,
+	    sizeof (etm_xport_stats) / sizeof (fmd_stat_t),
+	    (fmd_stat_t *)&etm_xport_stats);
+
 	fmd_hdl_debug(hdl, "info: xport finalized ok\n");
 	return (0);
 
@@ -1373,8 +1385,8 @@ etm_xport_get_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn, etm_xport_opt_t opt)
 	}
 	if (n < 0) {
 		/* errno assumed set by above call */
-		etm_xport_stats.xport_os_ioctl_fail.fmds_value.ui64++;
 		rv = (-errno);
+		etm_xport_stats.xport_os_ioctl_fail.fmds_value.ui64++;
 	} else {
 		rv = (int)op_ctl.oo_val;
 	}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,8 @@ static const fmd_prop_t fmd_props[] = {
 	{ ETM_PROP_NM_CONSOLE,		FMD_TYPE_BOOL, "false" },
 	{ ETM_PROP_NM_SYSLOGD,		FMD_TYPE_BOOL, "true" },
 	{ ETM_PROP_NM_FACILITY,		FMD_TYPE_STRING, "LOG_DAEMON" },
-	{ ETM_PROP_NM_MAX_RESP_Q_LEN,	FMD_TYPE_INT32, "512" },
+	{ ETM_PROP_NM_MAX_RESP_Q_LEN,	FMD_TYPE_UINT32, "512" },
+	{ ETM_PROP_NM_BAD_ACC_TO_SEC,	FMD_TYPE_UINT32, "1" },
 	{ NULL, 0, NULL }
 };
 
@@ -174,6 +175,9 @@ etm_resp_q_cur_len = 0;	/* cur length (ele cnt) of responder queue */
 
 static uint32_t
 etm_resp_q_max_len = 0;	/* max length (ele cnt) of responder queue */
+
+static uint32_t
+etm_bad_acc_to_sec = 0;	/* sleep timeout (in sec) after bad conn accept */
 
 static pthread_mutex_t
 etm_resp_q_lock = PTHREAD_MUTEX_INITIALIZER;	/* protects responder queue */
@@ -328,6 +332,10 @@ static struct stats {
 
 	fmd_stat_t etm_log_err;
 	fmd_stat_t etm_msg_err;
+
+	/* miscellaneous stats */
+
+	fmd_stat_t etm_reset_xport;
 
 } etm_stats = {
 
@@ -490,7 +498,12 @@ static struct stats {
 	{ "etm_log_err", FMD_TYPE_UINT64,
 		"failed to log message to log(7D)" },
 	{ "etm_msg_err", FMD_TYPE_UINT64,
-		"failed to log message to sysmsg(7D)" }
+		"failed to log message to sysmsg(7D)" },
+
+	/* miscellaneous stats */
+
+	{ "etm_reset_xport", FMD_TYPE_UINT64,
+		"xport resets after xport API failure" }
 };
 
 /*
@@ -1555,6 +1568,25 @@ func_ret:
 } /* etm_send_response() */
 
 /*
+ * etm_reset_xport - reset the transport layer (via fini;init)
+ *			presumably for an error condition we cannot
+ *			otherwise recover from (ex: hung LDC channel)
+ *
+ * caveats - no checking/locking is done to ensure an existing connection
+ *		is idle during an xport reset; we don't want to deadlock
+ *		and presumably the transport is stuck/unusable anyway
+ */
+
+static void
+etm_reset_xport(fmd_hdl_t *hdl)
+{
+	(void) etm_xport_fini(hdl);
+	(void) etm_xport_init(hdl);
+	etm_stats.etm_reset_xport.fmds_value.ui64++;
+
+} /* etm_reset_xport() */
+
+/*
  * etm_handle_new_conn - receive an ETM message sent from the other end via
  *			the given open connection, pull out any FMA events
  *			and post them to the local FMD (or handle any ETM
@@ -1579,12 +1611,14 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	nvlist_t		*evp;		/* ptr to unpacked FMA event */
 	char			*class;		/* FMA event class */
 	ssize_t			i, n;		/* gen use */
+	int			should_reset_xport; /* bool to reset xport */
 
 	if (etm_debug_lvl >= 2) {
 		etm_show_time(hdl, "ante conn handle");
 	}
 	fmd_hdl_debug(hdl, "info: handling new conn %p\n", conn);
 
+	should_reset_xport = 0;
 	ev_hdrp = NULL;
 	ctl_hdrp = NULL;
 	resp_hdrp = NULL;
@@ -1599,6 +1633,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 	if ((ev_hdrp = etm_hdr_read(hdl, conn, &hdr_sz)) == NULL) {
 		/* errno assumed set by above call */
+		should_reset_xport = (errno == ENOTACTIVE);
 		fmd_hdl_debug(hdl, "error: FMA event dropped: "
 		    "bad hdr read errno %d\n", errno);
 		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
@@ -1636,6 +1671,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 		if ((n = etm_io_op(hdl, "FMA event dropped: "
 		    "bad io read on event bodies", conn, body_buf, body_sz,
 		    ETM_IO_OP_RD)) < 0) {
+			should_reset_xport = (n == -ENOTACTIVE);
 			etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
 			goto func_ret;
 		}
@@ -1729,6 +1765,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 			if ((n = etm_io_op(hdl, "bad io read on ctl body",
 			    conn, body_buf, body_sz, ETM_IO_OP_RD)) < 0) {
+				should_reset_xport = (n == -ENOTACTIVE);
 				goto func_ret;
 			}
 
@@ -1768,6 +1805,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 		if ((n = etm_io_op(hdl, "bad io read on resp len",
 		    conn, body_buf, body_sz, ETM_IO_OP_RD)) < 0) {
+			should_reset_xport = (n == -ENOTACTIVE);
 			goto func_ret;
 		}
 
@@ -1811,6 +1849,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 		if ((n = etm_io_op(hdl, "bad io read on sa body",
 		    conn, body_buf, body_sz, ETM_IO_OP_RD)) < 0) {
+			should_reset_xport = (n == -ENOTACTIVE);
 			goto func_ret;
 		}
 
@@ -1863,7 +1902,28 @@ func_ret:
 	if (body_buf != NULL) {
 		fmd_hdl_free(hdl, body_buf, body_sz);
 	}
+	if (should_reset_xport) {
+		etm_reset_xport(hdl);
+	}
 } /* etm_handle_new_conn() */
+
+/*
+ * etm_handle_bad_accept - recover from a failed connection acceptance
+ */
+
+static void
+etm_handle_bad_accept(fmd_hdl_t *hdl, int nev)
+{
+	int	should_reset_xport; /* bool to reset xport */
+
+	should_reset_xport = (nev == -ENOTACTIVE);
+	fmd_hdl_debug(hdl, "error: bad conn accept errno %d\n", (-nev));
+	etm_stats.etm_xport_accept_fail.fmds_value.ui64++;
+	(void) etm_sleep(etm_bad_acc_to_sec); /* avoid spinning CPU */
+	if (should_reset_xport) {
+		etm_reset_xport(hdl);
+	}
+} /* etm_handle_bad_accept() */
 
 /*
  * etm_server - loop forever accepting new connections
@@ -1876,7 +1936,7 @@ static void
 etm_server(void *arg)
 {
 	etm_xport_conn_t	conn;		/* connection handle */
-	ssize_t			n;		/* gen use */
+	int			nev;		/* -errno val */
 	fmd_hdl_t		*hdl;		/* FMD handle */
 
 	hdl = arg;
@@ -1887,15 +1947,11 @@ etm_server(void *arg)
 
 		if ((conn = etm_xport_accept(hdl, NULL)) == NULL) {
 			/* errno assumed set by above call */
-			n = errno;
+			nev = (-errno);
 			if (etm_is_dying) {
 				break;
 			}
-			fmd_hdl_debug(hdl,
-			    "error: bad conn accept errno %d\n", n);
-			etm_stats.etm_xport_accept_fail.fmds_value.ui64++;
-			/* avoid spinning CPU */
-			(void) etm_sleep(ETM_SLEEP_SLOW);
+			etm_handle_bad_accept(hdl, nev);
 			continue;
 		}
 
@@ -2078,6 +2134,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	etm_resp_q_max_len = fmd_prop_get_int32(hdl,
 	    ETM_PROP_NM_MAX_RESP_Q_LEN);
 	etm_stats.etm_resp_q_max_len.fmds_value.ui64 = etm_resp_q_max_len;
+	etm_bad_acc_to_sec = fmd_prop_get_int32(hdl,
+	    ETM_PROP_NM_BAD_ACC_TO_SEC);
 
 	/* obtain an FMD transport handle so we can post FMA events later */
 
