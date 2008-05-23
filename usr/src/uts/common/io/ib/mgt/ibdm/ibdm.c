@@ -151,6 +151,8 @@ static void ibdm_bump_transactionID(ibdm_dp_gidinfo_t *);
 static ibdm_ioc_info_t	*ibdm_handle_prev_iou();
 static int ibdm_serv_cmp(ibdm_srvents_info_t *, ibdm_srvents_info_t *,
     int);
+static ibdm_ioc_info_t *ibdm_get_ioc_info_with_gid(ib_guid_t,
+    ibdm_dp_gidinfo_t **);
 
 int	ibdm_dft_timeout	= IBDM_DFT_TIMEOUT;
 int	ibdm_dft_retry_cnt	= IBDM_DFT_NRETRIES;
@@ -325,6 +327,7 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info, ibdm_iou_info_t **ioup)
 		/* handle the case where an ioc_timeout_id is scheduled */
 		if (ioc->ioc_timeout_id) {
 			timeout_id = ioc->ioc_timeout_id;
+			ioc->ioc_timeout_id = 0;
 			mutex_exit(&gid_info->gl_mutex);
 			IBTF_DPRINTF_L5("ibdm", "free_iou_info: "
 			    "ioc_timeout_id = 0x%x", timeout_id);
@@ -335,12 +338,12 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info, ibdm_iou_info_t **ioup)
 				return (-1);
 			}
 			mutex_enter(&gid_info->gl_mutex);
-			ioc->ioc_timeout_id = 0;
 		}
 
 		/* handle the case where an ioc_dc_timeout_id is scheduled */
 		if (ioc->ioc_dc_timeout_id) {
 			timeout_id = ioc->ioc_dc_timeout_id;
+			ioc->ioc_dc_timeout_id = 0;
 			mutex_exit(&gid_info->gl_mutex);
 			IBTF_DPRINTF_L5("ibdm", "free_iou_info: "
 			    "ioc_dc_timeout_id = 0x%x", timeout_id);
@@ -351,13 +354,13 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info, ibdm_iou_info_t **ioup)
 				return (-1);
 			}
 			mutex_enter(&gid_info->gl_mutex);
-			ioc->ioc_dc_timeout_id = 0;
 		}
 
 		/* handle the case where serv[k].se_timeout_id is scheduled */
 		for (k = 0; k < ioc->ioc_profile.ioc_service_entries; k++) {
 			if (ioc->ioc_serv[k].se_timeout_id) {
 				timeout_id = ioc->ioc_serv[k].se_timeout_id;
+				ioc->ioc_serv[k].se_timeout_id = 0;
 				mutex_exit(&gid_info->gl_mutex);
 				IBTF_DPRINTF_L5("ibdm", "free_iou_info: "
 				    "ioc->ioc_serv[%d].se_timeout_id = 0x%x",
@@ -369,7 +372,6 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info, ibdm_iou_info_t **ioup)
 					return (-1);
 				}
 				mutex_enter(&gid_info->gl_mutex);
-				ioc->ioc_serv[k].se_timeout_id = 0;
 			}
 		}
 
@@ -1860,6 +1862,7 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 		gid_info->gl_min_transactionID  = gid_info->gl_transactionID;
 		gid_info->gl_max_transactionID  = (ibdm.ibdm_transactionID +1)
 		    << IBDM_GID_TRANSACTIONID_SHIFT;
+		gid_info->gl_SL			= precp->SL;
 
 		/*
 		 * get the node record with this guid if the destination
@@ -1998,13 +2001,16 @@ ibdm_set_classportinfo(ibdm_dp_gidinfo_t *gid_info)
 		return (IBDM_FAILURE);
 	}
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 
 	msg->im_local_addr.ia_local_lid		= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
 	msg->im_local_addr.ia_remote_qno	= 1;
 	msg->im_local_addr.ia_p_key		= gid_info->gl_p_key;
 	msg->im_local_addr.ia_q_key		= IB_GSI_QKEY;
+	msg->im_local_addr.ia_service_level	= gid_info->gl_SL;
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
 	hdr->BaseVersion	= MAD_CLASS_BASE_VERS_1;
@@ -2025,7 +2031,7 @@ ibdm_set_classportinfo(ibdm_dp_gidinfo_t *gid_info)
 	cpi->TrapGID_hi = h2b64(gid_info->gl_sgid_hi);
 	cpi->TrapGID_lo = h2b64(gid_info->gl_sgid_lo);
 	cpi->TrapLID = h2b16(gid_info->gl_slid);
-	cpi->TrapSL = 0;
+	cpi->TrapSL = gid_info->gl_SL;
 	cpi->TrapP_Key = h2b16(gid_info->gl_p_key);
 	cpi->TrapQP = h2b32((((ibmf_alt_qp_t *)gid_info->gl_qp_hdl)->isq_qpn));
 	cpi->TrapQ_Key = h2b32((((ibmf_alt_qp_t *)
@@ -2036,8 +2042,10 @@ ibdm_set_classportinfo(ibdm_dp_gidinfo_t *gid_info)
 	cb_args->cb_retry_count	= ibdm_dft_retry_cnt;
 	cb_args->cb_req_type = IBDM_REQ_TYPE_CLASSPORTINFO;
 
+	mutex_enter(&gid_info->gl_mutex);
 	gid_info->gl_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "\tset_classportinfo: "
 	    "timeout id %x", gid_info->gl_timeout_id);
@@ -2080,13 +2088,16 @@ ibdm_send_classportinfo(ibdm_dp_gidinfo_t *gid_info)
 		return (IBDM_FAILURE);
 	}
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 
 	msg->im_local_addr.ia_local_lid		= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
 	msg->im_local_addr.ia_remote_qno	= 1;
 	msg->im_local_addr.ia_p_key		= gid_info->gl_p_key;
 	msg->im_local_addr.ia_q_key		= IB_GSI_QKEY;
+	msg->im_local_addr.ia_service_level	= gid_info->gl_SL;
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
 	hdr->BaseVersion	= MAD_CLASS_BASE_VERS_1;
@@ -2103,8 +2114,10 @@ ibdm_send_classportinfo(ibdm_dp_gidinfo_t *gid_info)
 	cb_args->cb_retry_count	= ibdm_dft_retry_cnt;
 	cb_args->cb_req_type = IBDM_REQ_TYPE_CLASSPORTINFO;
 
+	mutex_enter(&gid_info->gl_mutex);
 	gid_info->gl_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "\tsend_classportinfo: "
 	    "timeout id %x", gid_info->gl_timeout_id);
@@ -2248,6 +2261,7 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	gid_info->gl_redirect_qkey	= b2h32(cpi->RedirectQ_Key);
 	gid_info->gl_redirectGID_hi	= b2h64(cpi->RedirectGID_hi);
 	gid_info->gl_redirectGID_lo	= b2h64(cpi->RedirectGID_lo);
+	gid_info->gl_redirectSL		= cpi->RedirectSL;
 
 	ibdm_dump_classportinfo(cpi);
 
@@ -2257,7 +2271,9 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	 * Check whether DM agent on the remote node requested redirection
 	 * If so, send the request to the redirect DGID/DLID/PKEY/QP.
 	 */
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 	msg->im_local_addr.ia_local_lid	= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
 
@@ -2269,10 +2285,12 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 		msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 		msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
 		msg->im_local_addr.ia_q_key = gid_info->gl_redirect_qkey;
+		msg->im_local_addr.ia_service_level = gid_info->gl_redirectSL;
 	} else {
 		msg->im_local_addr.ia_remote_qno = 1;
 		msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
 		msg->im_local_addr.ia_q_key = IB_GSI_QKEY;
+		msg->im_local_addr.ia_service_level = gid_info->gl_SL;
 	}
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
@@ -2289,8 +2307,10 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	gid_info->gl_iou_cb_args.cb_gid_info = gid_info;
 	gid_info->gl_iou_cb_args.cb_retry_count = ibdm_dft_retry_cnt;
 
+	mutex_enter(&gid_info->gl_mutex);
 	gid_info->gl_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    &gid_info->gl_iou_cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "handle_classportinfo:"
 	    "timeout %x", gid_info->gl_timeout_id);
@@ -2332,12 +2352,15 @@ ibdm_send_iounitinfo(ibdm_dp_gidinfo_t *gid_info)
 	mutex_exit(&gid_info->gl_mutex);
 
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 	msg->im_local_addr.ia_local_lid		= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
 	msg->im_local_addr.ia_remote_qno	= 1;
 	msg->im_local_addr.ia_p_key		= gid_info->gl_p_key;
 	msg->im_local_addr.ia_q_key		= IB_GSI_QKEY;
+	msg->im_local_addr.ia_service_level	= gid_info->gl_SL;
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
 	hdr->BaseVersion	= MAD_CLASS_BASE_VERS_1;
@@ -2353,8 +2376,10 @@ ibdm_send_iounitinfo(ibdm_dp_gidinfo_t *gid_info)
 	gid_info->gl_iou_cb_args.cb_retry_count = ibdm_dft_retry_cnt;
 	gid_info->gl_iou_cb_args.cb_req_type = IBDM_REQ_TYPE_IOUINFO;
 
+	mutex_enter(&gid_info->gl_mutex);
 	gid_info->gl_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    &gid_info->gl_iou_cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "send_iouunitinfo:"
 	    "timeout %x", gid_info->gl_timeout_id);
@@ -2546,7 +2571,9 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 		}
 
 		/* allocate send buffers for all messages */
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 		ibdm_alloc_send_buffers(msg);
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 
 		msg->im_local_addr.ia_local_lid	= gid_info->gl_slid;
 		msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
@@ -2561,10 +2588,13 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 			    gid_info->gl_redirect_pkey;
 			msg->im_local_addr.ia_q_key =
 			    gid_info->gl_redirect_qkey;
+			msg->im_local_addr.ia_service_level =
+			    gid_info->gl_redirectSL;
 		} else {
 			msg->im_local_addr.ia_remote_qno = 1;
 			msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
 			msg->im_local_addr.ia_q_key = IB_GSI_QKEY;
+			msg->im_local_addr.ia_service_level = gid_info->gl_SL;
 		}
 
 		hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
@@ -2586,10 +2616,10 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 
 		mutex_enter(&gid_info->gl_mutex);
 		gid_info->gl_pending_cmds++; /* for diag code */
-		mutex_exit(&gid_info->gl_mutex);
 
 		ioc_info->ioc_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 		    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+		mutex_exit(&gid_info->gl_mutex);
 
 		IBTF_DPRINTF_L5("ibdm", "\thandle_iounitinfo:"
 		    "timeout 0x%x, ioc_num %d", ioc_info->ioc_timeout_id, ii);
@@ -2670,6 +2700,7 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 	ioc_info->ioc_cb_args.cb_req_type = 0;
 	if (ioc_info->ioc_timeout_id) {
 		timeout_id = ioc_info->ioc_timeout_id;
+		ioc_info->ioc_timeout_id = 0;
 		mutex_exit(&gid_info->gl_mutex);
 		IBTF_DPRINTF_L5("ibdm", "handle_ioc_profile: "
 		    "ioc_timeout_id = 0x%x", timeout_id);
@@ -2678,7 +2709,6 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 			    "untimeout ioc_timeout_id failed");
 		}
 		mutex_enter(&gid_info->gl_mutex);
-		ioc_info->ioc_timeout_id = 0;
 	}
 
 	ioc_info->ioc_state = IBDM_IOC_STATE_PROBE_SUCCESS;
@@ -2775,7 +2805,9 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 			}
 
 		}
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 		ibdm_alloc_send_buffers(msg);
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 		msg->im_local_addr.ia_local_lid	= gid_info->gl_slid;
 		msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
 		if (gid_info->gl_redirected == B_TRUE) {
@@ -2789,10 +2821,13 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 			    gid_info->gl_redirect_pkey;
 			msg->im_local_addr.ia_q_key =
 			    gid_info->gl_redirect_qkey;
+			msg->im_local_addr.ia_service_level =
+			    gid_info->gl_redirectSL;
 		} else {
 			msg->im_local_addr.ia_remote_qno = 1;
 			msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
 			msg->im_local_addr.ia_q_key = IB_GSI_QKEY;
+			msg->im_local_addr.ia_service_level = gid_info->gl_SL;
 		}
 
 		hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
@@ -2821,11 +2856,15 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 			    (cb_args->cb_srvents_start + nserv_entries - 1);
 			nserv_entries = 0;
 		}
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*hdr))
 		ibdm_fill_srv_attr_mod(hdr, cb_args);
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*hdr))
 
+		mutex_enter(&gid_info->gl_mutex);
 		ioc_info->ioc_serv[srv_start].se_timeout_id = timeout(
 		    ibdm_pkt_timeout_hdlr, cb_args,
 		    IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+		mutex_exit(&gid_info->gl_mutex);
 
 		IBTF_DPRINTF_L5("ibdm", "\thandle_ioc_profile:"
 		    "timeout %x, ioc %d srv %d",
@@ -2911,6 +2950,7 @@ ibdm_handle_srventry_mad(ibmf_msg_t *msg,
 		IBTF_DPRINTF_L2("ibdm",
 		    "\thandle_srventry_mad: ioc %d start %d", ioc_no, start);
 		timeout_id = ioc_info->ioc_serv[start].se_timeout_id;
+		ioc_info->ioc_serv[start].se_timeout_id = 0;
 		mutex_exit(&gid_info->gl_mutex);
 		IBTF_DPRINTF_L5("ibdm", "handle_srverntry_mad: "
 		    "se_timeout_id = 0x%x", timeout_id);
@@ -2919,7 +2959,6 @@ ibdm_handle_srventry_mad(ibmf_msg_t *msg,
 			    "untimeout se_timeout_id failed");
 		}
 		mutex_enter(&gid_info->gl_mutex);
-		ioc_info->ioc_serv[start].se_timeout_id = 0;
 	}
 
 	gsrv_ents->se_state = IBDM_SE_VALID;
@@ -2956,7 +2995,9 @@ ibdm_get_diagcode(ibdm_dp_gidinfo_t *gid_info, int attr)
 		return (IBDM_FAILURE);
 	}
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 
 	mutex_enter(&gid_info->gl_mutex);
 	ibdm_bump_transactionID(gid_info);
@@ -2973,10 +3014,12 @@ ibdm_get_diagcode(ibdm_dp_gidinfo_t *gid_info, int attr)
 		msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 		msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
 		msg->im_local_addr.ia_q_key = gid_info->gl_redirect_qkey;
+		msg->im_local_addr.ia_service_level = gid_info->gl_redirectSL;
 	} else {
 		msg->im_local_addr.ia_remote_qno = 1;
 		msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
 		msg->im_local_addr.ia_q_key = IB_GSI_QKEY;
+		msg->im_local_addr.ia_service_level = gid_info->gl_SL;
 	}
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
@@ -3008,9 +3051,10 @@ ibdm_get_diagcode(ibdm_dp_gidinfo_t *gid_info, int attr)
 	cb_args->cb_retry_count	= ibdm_dft_retry_cnt;
 	cb_args->cb_srvents_start = 0;
 
-
+	mutex_enter(&gid_info->gl_mutex);
 	*timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "\tget_diagcode:"
 	    "timeout %x, ioc %d", *timeout_id, cb_args->cb_ioc_num);
@@ -3082,6 +3126,7 @@ ibdm_handle_diagcode(ibmf_msg_t *ibmf_msg,
 		ioc->ioc_dc_valid = B_TRUE;
 		timeout_id = iou->iou_ioc_info[attrmod - 1].ioc_dc_timeout_id;
 		if (timeout_id) {
+			iou->iou_ioc_info[attrmod - 1].ioc_dc_timeout_id = 0;
 			mutex_exit(&gid_info->gl_mutex);
 			IBTF_DPRINTF_L5("ibdm", "handle_diagcode: "
 			    "timeout_id = 0x%x", timeout_id);
@@ -3090,7 +3135,6 @@ ibdm_handle_diagcode(ibmf_msg_t *ibmf_msg,
 				    "untimeout ioc_dc_timeout_id failed");
 			}
 			mutex_enter(&gid_info->gl_mutex);
-			iou->iou_ioc_info[attrmod - 1].ioc_dc_timeout_id = 0;
 		}
 	}
 	mutex_exit(&gid_info->gl_mutex);
@@ -3573,6 +3617,7 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 	gid_info->gl_redirect_qkey	= b2h32(cpi->RedirectQ_Key);
 	gid_info->gl_redirectGID_hi	= b2h64(cpi->RedirectGID_hi);
 	gid_info->gl_redirectGID_lo	= b2h64(cpi->RedirectGID_lo);
+	gid_info->gl_redirectSL		= cpi->RedirectSL;
 
 	if (gid_info->gl_redirect_dlid != 0) {
 		msg->im_local_addr.ia_remote_lid =
@@ -3581,6 +3626,7 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 	ibdm_bump_transactionID(gid_info);
 	mutex_exit(&gid_info->gl_mutex);
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg, *hdr))
 	ibdm_alloc_send_buffers(msg);
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
@@ -3594,13 +3640,17 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 	    msg->im_msgbufs_recv.im_bufs_mad_hdr->AttributeID;
 	hdr->AttributeModifier	=
 	    msg->im_msgbufs_recv.im_bufs_mad_hdr->AttributeModifier;
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg, *hdr))
 
 	msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 	msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
 	msg->im_local_addr.ia_q_key = gid_info->gl_redirect_qkey;
+	msg->im_local_addr.ia_service_level = gid_info->gl_redirectSL;
 
+	mutex_enter(&gid_info->gl_mutex);
 	*timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "\thandle_redirect:"
 	    "timeout %x", *timeout_id);
@@ -3628,7 +3678,6 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 static void
 ibdm_pkt_timeout_hdlr(void *arg)
 {
-	int			probe_done = B_FALSE;
 	ibdm_iou_info_t		*iou;
 	ibdm_ioc_info_t		*ioc;
 	ibdm_timeout_cb_args_t	*cb_args = arg;
@@ -3658,9 +3707,12 @@ ibdm_pkt_timeout_hdlr(void *arg)
 	}
 	if (cb_args->cb_retry_count) {
 		cb_args->cb_retry_count--;
+		/*
+		 * A new timeout_id is set inside ibdm_retry_command().
+		 * When the function returns an error, the timeout_id
+		 * is reset (to zero) in the switch statement below.
+		 */
 		if (ibdm_retry_command(cb_args) == IBDM_SUCCESS) {
-			if (gid_info->gl_timeout_id)
-				gid_info->gl_timeout_id = 0;
 			mutex_exit(&gid_info->gl_mutex);
 			return;
 		}
@@ -3672,73 +3724,71 @@ ibdm_pkt_timeout_hdlr(void *arg)
 	    cb_args->cb_req_type, cb_args->cb_ioc_num,
 	    cb_args->cb_srvents_start);
 
-	new_gl_state = IBDM_GID_PROBING_COMPLETE;
 	switch (cb_args->cb_req_type) {
 
 	case IBDM_REQ_TYPE_CLASSPORTINFO:
 	case IBDM_REQ_TYPE_IOUINFO:
 		new_gl_state = IBDM_GID_PROBING_FAILED;
-		if (--gid_info->gl_pending_cmds == 0)
-			probe_done = B_TRUE;
 		if (gid_info->gl_timeout_id)
 			gid_info->gl_timeout_id = 0;
-		mutex_exit(&gid_info->gl_mutex);
-		ibdm_delete_glhca_list(gid_info);
-		mutex_enter(&gid_info->gl_mutex);
 		break;
+
 	case IBDM_REQ_TYPE_IOCINFO:
+		new_gl_state = IBDM_GID_PROBING_COMPLETE;
 		iou = gid_info->gl_iou;
 		ioc = &iou->iou_ioc_info[cb_args->cb_ioc_num];
 		ioc->ioc_state = IBDM_IOC_STATE_PROBE_FAILED;
-		if (--gid_info->gl_pending_cmds == 0)
-			probe_done = B_TRUE;
-#ifndef __lock_lint
 		if (ioc->ioc_timeout_id)
 			ioc->ioc_timeout_id = 0;
-#endif
 		break;
+
 	case IBDM_REQ_TYPE_SRVENTS:
+		new_gl_state = IBDM_GID_PROBING_COMPLETE;
 		iou = gid_info->gl_iou;
 		ioc = &iou->iou_ioc_info[cb_args->cb_ioc_num];
 		ioc->ioc_state = IBDM_IOC_STATE_PROBE_FAILED;
-		if (--gid_info->gl_pending_cmds == 0)
-			probe_done = B_TRUE;
 		srv_ent = cb_args->cb_srvents_start;
-#ifndef __lock_lint
 		if (ioc->ioc_serv[srv_ent].se_timeout_id)
 			ioc->ioc_serv[srv_ent].se_timeout_id = 0;
-#endif
 		break;
+
 	case IBDM_REQ_TYPE_IOU_DIAGCODE:
+		new_gl_state = IBDM_GID_PROBING_COMPLETE;
 		iou = gid_info->gl_iou;
 		iou->iou_dc_valid = B_FALSE;
-		if (--gid_info->gl_pending_cmds == 0)
-			probe_done = B_TRUE;
 		if (gid_info->gl_timeout_id)
 			gid_info->gl_timeout_id = 0;
 		break;
+
 	case IBDM_REQ_TYPE_IOC_DIAGCODE:
+		new_gl_state = IBDM_GID_PROBING_COMPLETE;
 		iou = gid_info->gl_iou;
 		ioc = &iou->iou_ioc_info[cb_args->cb_ioc_num];
 		ioc->ioc_dc_valid = B_FALSE;
-		if (--gid_info->gl_pending_cmds == 0)
-			probe_done = B_TRUE;
-#ifndef __lock_lint
 		if (ioc->ioc_dc_timeout_id)
 			ioc->ioc_dc_timeout_id = 0;
-#endif
 		break;
+
 	default: /* ERROR State */
-		IBTF_DPRINTF_L2("ibdm",
-		    "\tpkt_timeout_hdlr: wrong request type.");
 		new_gl_state = IBDM_GID_PROBING_FAILED;
 		if (gid_info->gl_timeout_id)
 			gid_info->gl_timeout_id = 0;
+		IBTF_DPRINTF_L2("ibdm",
+		    "\tpkt_timeout_hdlr: wrong request type.");
 		break;
 	}
-	if (probe_done == B_TRUE) {
+
+	--gid_info->gl_pending_cmds; /* decrease the counter */
+
+	if (gid_info->gl_pending_cmds == 0) {
 		gid_info->gl_state = new_gl_state;
 		mutex_exit(&gid_info->gl_mutex);
+		/*
+		 * Delete this gid_info if the gid probe fails.
+		 */
+		if (new_gl_state == IBDM_GID_PROBING_FAILED) {
+			ibdm_delete_glhca_list(gid_info);
+		}
 		ibdm_notify_newgid_iocs(gid_info);
 		mutex_enter(&ibdm.ibdm_mutex);
 		if (--ibdm.ibdm_ngid_probes_in_progress == 0) {
@@ -3747,8 +3797,25 @@ ibdm_pkt_timeout_hdlr(void *arg)
 			cv_broadcast(&ibdm.ibdm_probe_cv);
 		}
 		mutex_exit(&ibdm.ibdm_mutex);
-	} else
+	} else {
+		/*
+		 * Reset gl_pending_cmd if the extra timeout happens since
+		 * gl_pending_cmd becomes negative as a result.
+		 */
+		if (gid_info->gl_pending_cmds < 0) {
+			gid_info->gl_pending_cmds = 0;
+			IBTF_DPRINTF_L2("ibdm",
+			    "\tpkt_timeout_hdlr: extra timeout request."
+			    " reset gl_pending_cmds");
+		}
 		mutex_exit(&gid_info->gl_mutex);
+		/*
+		 * Delete this gid_info if the gid probe fails.
+		 */
+		if (new_gl_state == IBDM_GID_PROBING_FAILED) {
+			ibdm_delete_glhca_list(gid_info);
+		}
+	}
 }
 
 
@@ -3767,6 +3834,7 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 	timeout_id_t		*timeout_id;
 	ibdm_ioc_info_t		*ioc;
 	int			ioc_no;
+	ASSERT(MUTEX_HELD(&gid_info->gl_mutex));
 
 	IBTF_DPRINTF_L2("ibdm", "\tretry_command: gid_info: %p "
 	    "rtype 0x%x iocidx 0x%x srvidx %d", cb_args->cb_gid_info,
@@ -3801,7 +3869,9 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 		return (IBDM_FAILURE);
 	}
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 
 	ibdm_bump_transactionID(gid_info);
 
@@ -3815,12 +3885,15 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 		msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 		msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
 		msg->im_local_addr.ia_q_key = gid_info->gl_redirect_qkey;
+		msg->im_local_addr.ia_service_level = gid_info->gl_redirectSL;
 	} else {
 		msg->im_local_addr.ia_remote_qno = 1;
 		msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
 		msg->im_local_addr.ia_q_key = IB_GSI_QKEY;
+		msg->im_local_addr.ia_service_level = gid_info->gl_SL;
 	}
 	hdr = IBDM_OUT_IBMFMSG_MADHDR(msg);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*hdr))
 	hdr->BaseVersion	= MAD_CLASS_BASE_VERS_1;
 	hdr->MgmtClass		= MAD_MGMT_CLASS_DEV_MGT;
 	hdr->ClassVersion	= IB_DM_CLASS_VERSION_1;
@@ -3865,11 +3938,12 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 		timeout_id = &ioc->ioc_dc_timeout_id;
 		break;
 	}
-
-	mutex_exit(&gid_info->gl_mutex);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*hdr))
 
 	*timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "\tretry_command: %p,%x,%d,%d:"
 	    "timeout %x", cb_args->cb_req_type, cb_args->cb_ioc_num,
@@ -4280,6 +4354,7 @@ ibdm_create_gid_info(ibdm_port_attr_t *port, ib_gid_t sgid, ib_gid_t dgid)
 		gid_info->gl_min_transactionID  = gid_info->gl_transactionID;
 		gid_info->gl_max_transactionID  = (ibdm.ibdm_transactionID +1)
 		    << IBDM_GID_TRANSACTIONID_SHIFT;
+		gid_info->gl_SL			= path->SL;
 
 		gid_info->gl_qp_hdl = IBMF_QP_HANDLE_DEFAULT;
 		for (ii = 0; ii < port->pa_npkeys; ii++) {
@@ -4711,12 +4786,13 @@ ibdm_ibnex_probe_ioc(ib_guid_t iou, ib_guid_t ioc_guid, int reprobe_flag)
 {
 	int			k;
 	ibdm_ioc_info_t		*ioc_info;
-	ibdm_dp_gidinfo_t	*gid_info;
+	ibdm_dp_gidinfo_t	*gid_info; /* used as index and arg */
+	timeout_id_t		*timeout_id;
 
 	IBTF_DPRINTF_L4("ibdm", "\tibnex_probe_ioc: (%llX, %llX, %d) Begin",
 	    iou, ioc_guid, reprobe_flag);
 	/* Check whether we know this already */
-	ioc_info = ibdm_ibnex_get_ioc_info(ioc_guid);
+	ioc_info = ibdm_get_ioc_info_with_gid(ioc_guid, &gid_info);
 	if (ioc_info == NULL) {
 		mutex_enter(&ibdm.ibdm_mutex);
 		while (ibdm.ibdm_busy & IBDM_BUSY)
@@ -4728,43 +4804,53 @@ ibdm_ibnex_probe_ioc(ib_guid_t iou, ib_guid_t ioc_guid, int reprobe_flag)
 		ibdm.ibdm_busy &= ~IBDM_BUSY;
 		cv_broadcast(&ibdm.ibdm_busy_cv);
 		mutex_exit(&ibdm.ibdm_mutex);
-		ioc_info = ibdm_ibnex_get_ioc_info(ioc_guid);
+		ioc_info = ibdm_get_ioc_info_with_gid(ioc_guid, &gid_info);
 	} else if (reprobe_flag) {	/* Handle Reprobe for the IOC */
+		ASSERT(gid_info != NULL);
 		/* Free the ioc_list before reprobe; and cancel any timers */
 		mutex_enter(&ibdm.ibdm_mutex);
+		mutex_enter(&gid_info->gl_mutex);
 		if (ioc_info->ioc_timeout_id) {
+			timeout_id = ioc_info->ioc_timeout_id;
+			ioc_info->ioc_timeout_id = 0;
+			mutex_exit(&gid_info->gl_mutex);
 			IBTF_DPRINTF_L5("ibdm", "\tprobe_ioc: "
-			    "ioc_timeout_id = 0x%x",
-			    ioc_info->ioc_timeout_id);
-			if (untimeout(ioc_info->ioc_timeout_id) == -1) {
+			    "ioc_timeout_id = 0x%x", timeout_id);
+			if (untimeout(timeout_id) == -1) {
 				IBTF_DPRINTF_L2("ibdm", "\tprobe_ioc: "
 				    "untimeout ioc_timeout_id failed");
 			}
-			ioc_info->ioc_timeout_id = 0;
+			mutex_enter(&gid_info->gl_mutex);
 		}
 		if (ioc_info->ioc_dc_timeout_id) {
+			timeout_id = ioc_info->ioc_dc_timeout_id;
+			ioc_info->ioc_dc_timeout_id = 0;
+			mutex_exit(&gid_info->gl_mutex);
 			IBTF_DPRINTF_L5("ibdm", "\tprobe_ioc: "
-			    "ioc_dc_timeout_id = 0x%x",
-			    ioc_info->ioc_dc_timeout_id);
-			if (untimeout(ioc_info->ioc_dc_timeout_id) == -1) {
+			    "ioc_dc_timeout_id = 0x%x", timeout_id);
+			if (untimeout(timeout_id) == -1) {
 				IBTF_DPRINTF_L2("ibdm", "\tprobe_ioc: "
 				    "untimeout ioc_dc_timeout_id failed");
 			}
-			ioc_info->ioc_dc_timeout_id = 0;
+			mutex_enter(&gid_info->gl_mutex);
 		}
 		for (k = 0; k < ioc_info->ioc_profile.ioc_service_entries; k++)
 			if (ioc_info->ioc_serv[k].se_timeout_id) {
+				timeout_id = ioc_info->ioc_serv[k].
+				    se_timeout_id;
+				ioc_info->ioc_serv[k].se_timeout_id = 0;
+				mutex_exit(&gid_info->gl_mutex);
 				IBTF_DPRINTF_L5("ibdm", "\tprobe_ioc: "
 				    "ioc_info->ioc_serv[k].se_timeout_id = %x",
-				    k, ioc_info->ioc_serv[k].se_timeout_id);
-				if (untimeout(ioc_info->ioc_serv[k].
-				    se_timeout_id) == -1) {
+				    k, timeout_id);
+				if (untimeout(timeout_id) == -1) {
 					IBTF_DPRINTF_L2("ibdm", "\tprobe_ioc: "
 					    "untimeout se_timeout_id %d "
 					    "failed", k);
 				}
-				ioc_info->ioc_serv[k].se_timeout_id = 0;
+				mutex_enter(&gid_info->gl_mutex);
 			}
+		mutex_exit(&gid_info->gl_mutex);
 		mutex_exit(&ibdm.ibdm_mutex);
 		ibdm_ibnex_free_ioc_list(ioc_info);
 
@@ -4810,20 +4896,25 @@ ibdm_ibnex_probe_ioc(ib_guid_t iou, ib_guid_t ioc_guid, int reprobe_flag)
 		cv_broadcast(&ibdm.ibdm_busy_cv);
 		mutex_exit(&ibdm.ibdm_mutex);
 
-		ioc_info = ibdm_ibnex_get_ioc_info(ioc_guid);
+		ioc_info = ibdm_get_ioc_info_with_gid(ioc_guid, &gid_info);
 	}
 	return (ioc_info);
 }
 
 
 /*
- * ibdm_ibnex_get_ioc_info()
+ * ibdm_get_ioc_info_with_gid()
  *	Returns pointer to ibdm_ioc_info_t if it finds
- *	matching record for the ioc_guid, otherwise NULL
- *	is returned
+ *	matching record for the ioc_guid. Otherwise NULL is returned.
+ *	The pointer to gid_info is set to the second argument in case that
+ *	the non-NULL value returns (and the second argument is not NULL).
+ *
+ * Note. use the same strings as "ibnex_get_ioc_info" in
+ *       IBTF_DPRINTF() to keep compatibility.
  */
-ibdm_ioc_info_t *
-ibdm_ibnex_get_ioc_info(ib_guid_t ioc_guid)
+static ibdm_ioc_info_t *
+ibdm_get_ioc_info_with_gid(ib_guid_t ioc_guid,
+    ibdm_dp_gidinfo_t **gid_info)
 {
 	int			ii;
 	ibdm_ioc_info_t		*ioc = NULL, *tmp = NULL;
@@ -4836,6 +4927,9 @@ ibdm_ibnex_get_ioc_info(ib_guid_t ioc_guid)
 	while (ibdm.ibdm_busy & IBDM_BUSY)
 		cv_wait(&ibdm.ibdm_busy_cv, &ibdm.ibdm_mutex);
 	ibdm.ibdm_busy |= IBDM_BUSY;
+
+	if (gid_info)
+		*gid_info = NULL; /* clear the value of gid_info */
 
 	gid_list = ibdm.ibdm_dp_gidlist_head;
 	while (gid_list) {
@@ -4858,6 +4952,8 @@ ibdm_ibnex_get_ioc_info(ib_guid_t ioc_guid)
 			if ((tmp->ioc_profile.ioc_guid == ioc_guid) &&
 			    (tmp->ioc_state == IBDM_IOC_STATE_PROBE_SUCCESS)) {
 				ioc = ibdm_dup_ioc_info(tmp, gid_list);
+				if (gid_info)
+					*gid_info = gid_list; /* set this ptr */
 				mutex_exit(&gid_list->gl_mutex);
 				ibdm.ibdm_busy &= ~IBDM_BUSY;
 				cv_broadcast(&ibdm.ibdm_busy_cv);
@@ -4880,6 +4976,20 @@ ibdm_ibnex_get_ioc_info(ib_guid_t ioc_guid)
 	return (ioc);
 }
 
+/*
+ * ibdm_ibnex_get_ioc_info()
+ *	Returns pointer to ibdm_ioc_info_t if it finds
+ *	matching record for the ioc_guid, otherwise NULL
+ *	is returned
+ *
+ * Note. this is a wrapper function to ibdm_get_ioc_info_with_gid() now.
+ */
+ibdm_ioc_info_t *
+ibdm_ibnex_get_ioc_info(ib_guid_t ioc_guid)
+{
+	/* will not use the gid_info pointer, so the second arg is NULL */
+	return (ibdm_get_ioc_info_with_gid(ioc_guid, NULL));
+}
 
 /*
  * ibdm_ibnex_get_ioc_count()
@@ -5175,7 +5285,9 @@ ibdm_send_ioc_profile(ibdm_dp_gidinfo_t *gid_info, uint8_t ioc_no)
 		return (IBDM_FAILURE);
 	}
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*msg))
 	ibdm_alloc_send_buffers(msg);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*msg))
 
 	mutex_enter(&gid_info->gl_mutex);
 	ibdm_bump_transactionID(gid_info);
@@ -5191,10 +5303,12 @@ ibdm_send_ioc_profile(ibdm_dp_gidinfo_t *gid_info, uint8_t ioc_no)
 		msg->im_local_addr.ia_remote_qno = gid_info->gl_redirect_QP;
 		msg->im_local_addr.ia_p_key = gid_info->gl_redirect_pkey;
 		msg->im_local_addr.ia_q_key = gid_info->gl_redirect_qkey;
+		msg->im_local_addr.ia_service_level = gid_info->gl_redirectSL;
 	} else {
 		msg->im_local_addr.ia_remote_qno = 1;
 		msg->im_local_addr.ia_p_key = gid_info->gl_p_key;
 		msg->im_local_addr.ia_q_key = IB_GSI_QKEY;
+		msg->im_local_addr.ia_service_level = gid_info->gl_SL;
 	}
 
 	hdr			= IBDM_OUT_IBMFMSG_MADHDR(msg);
@@ -5214,8 +5328,10 @@ ibdm_send_ioc_profile(ibdm_dp_gidinfo_t *gid_info, uint8_t ioc_no)
 	cb_args->cb_req_type	= IBDM_REQ_TYPE_IOCINFO;
 	cb_args->cb_ioc_num	= ioc_no;
 
+	mutex_enter(&gid_info->gl_mutex);
 	ioc_info->ioc_timeout_id = timeout(ibdm_pkt_timeout_hdlr,
 	    cb_args, IBDM_TIMEOUT_VALUE(ibdm_dft_timeout));
+	mutex_exit(&gid_info->gl_mutex);
 
 	IBTF_DPRINTF_L5("ibdm", "\tsend_ioc_profile:"
 	    "timeout %x", ioc_info->ioc_timeout_id);
@@ -6524,8 +6640,9 @@ ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 		gidinfo->gl_slid	= path->SLID;
 		gidinfo->gl_dlid	= path->DLID;
 		/* Reset redirect info, next MAD will set if redirected */
-		gidinfo->gl_redirected = 0;
-		gidinfo->gl_devid = (*tmp).NodeInfo.DeviceID;
+		gidinfo->gl_redirected	= 0;
+		gidinfo->gl_devid	= (*tmp).NodeInfo.DeviceID;
+		gidinfo->gl_SL		= path->SL;
 
 		gidinfo->gl_qp_hdl = IBMF_QP_HANDLE_DEFAULT;
 		for (ii = 0; ii < port->pa_npkeys; ii++) {
@@ -6784,8 +6901,10 @@ ibdm_dump_ibmf_msg(ibmf_msg_t *ibmf_msg, int flag)
 	    " Remote Qp  : 0x%x", ibmf_msg->im_local_addr.ia_local_lid,
 	    ibmf_msg->im_local_addr.ia_remote_lid,
 	    ibmf_msg->im_local_addr.ia_remote_qno);
-	IBTF_DPRINTF_L4("ibdm", "\tP_key      : 0x%x\tQ_key      : 0x%x",
-	    ibmf_msg->im_local_addr.ia_p_key, ibmf_msg->im_local_addr.ia_q_key);
+	IBTF_DPRINTF_L4("ibdm", "\tP_key      : 0x%x\tQ_key      : 0x%x"
+	    " SL  : 0x%x", ibmf_msg->im_local_addr.ia_p_key,
+	    ibmf_msg->im_local_addr.ia_q_key,
+	    ibmf_msg->im_local_addr.ia_service_level);
 
 	if (flag)
 		mad_hdr = (ib_mad_hdr_t *)IBDM_OUT_IBMFMSG_MADHDR(ibmf_msg);
@@ -6794,6 +6913,7 @@ ibdm_dump_ibmf_msg(ibmf_msg_t *ibmf_msg, int flag)
 
 	ibdm_dump_mad_hdr(mad_hdr);
 }
+
 
 void
 ibdm_dump_path_info(sa_path_record_t *path)
@@ -6805,9 +6925,10 @@ ibdm_dump_path_info(sa_path_record_t *path)
 	    path->DGID.gid_prefix, path->DGID.gid_guid);
 	IBTF_DPRINTF_L4("ibdm", "\t SGID hi  : %llx\tSGID lo  : %llx",
 	    path->SGID.gid_prefix, path->SGID.gid_guid);
-	IBTF_DPRINTF_L4("ibdm", "\t SLID     : %x\tDlID     : %x",
+	IBTF_DPRINTF_L4("ibdm", "\t SLID     : %x\t\tDlID     : %x",
 	    path->SLID, path->DLID);
-	IBTF_DPRINTF_L4("ibdm", "\t P Key    : %x", path->P_Key);
+	IBTF_DPRINTF_L4("ibdm", "\t P Key    : %x\t\tSL       : %x",
+	    path->P_Key, path->SL);
 }
 
 
@@ -6820,29 +6941,43 @@ ibdm_dump_classportinfo(ib_mad_classportinfo_t *classportinfo)
 	IBTF_DPRINTF_L4("ibdm", "\t Response Time Value : 0x%x",
 	    ((b2h32(classportinfo->RespTimeValue)) & 0x1F));
 
-	IBTF_DPRINTF_L4("ibdm", "\t Redirected QP       : 0x%x",
-	    (b2h32(classportinfo->RedirectQP)));
-	IBTF_DPRINTF_L4("ibdm", "\t Redirected P KEY    : 0x%x",
-	    b2h16(classportinfo->RedirectP_Key));
-	IBTF_DPRINTF_L4("ibdm", "\t Redirected Q KEY    : 0x%x",
-	    b2h16(classportinfo->RedirectQ_Key));
 	IBTF_DPRINTF_L4("ibdm", "\t Redirected GID hi   : 0x%llx",
 	    b2h64(classportinfo->RedirectGID_hi));
 	IBTF_DPRINTF_L4("ibdm", "\t Redirected GID lo   : 0x%llx",
 	    b2h64(classportinfo->RedirectGID_lo));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapGID hi   : 0x%llx",
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected TC       : 0x%x",
+	    classportinfo->RedirectTC);
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected SL       : 0x%x",
+	    classportinfo->RedirectSL);
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected FL       : 0x%x",
+	    classportinfo->RedirectFL);
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected LID      : 0x%x",
+	    b2h16(classportinfo->RedirectLID));
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected P KEY    : 0x%x",
+	    b2h16(classportinfo->RedirectP_Key));
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected QP       : 0x%x",
+	    classportinfo->RedirectQP);
+	IBTF_DPRINTF_L4("ibdm", "\t Redirected Q KEY    : 0x%x",
+	    b2h32(classportinfo->RedirectQ_Key));
+	IBTF_DPRINTF_L4("ibdm", "\t Trap GID hi         : 0x%llx",
 	    b2h64(classportinfo->TrapGID_hi));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapGID lo   : 0x%llx",
+	IBTF_DPRINTF_L4("ibdm", "\t Trap GID lo         : 0x%llx",
 	    b2h64(classportinfo->TrapGID_lo));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapTC       : 0x%x",
-	    b2h32(classportinfo->TrapTC));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapLID      : 0x%x",
+	IBTF_DPRINTF_L4("ibdm", "\t Trap TC             : 0x%x",
+	    classportinfo->TrapTC);
+	IBTF_DPRINTF_L4("ibdm", "\t Trap SL             : 0x%x",
+	    classportinfo->TrapSL);
+	IBTF_DPRINTF_L4("ibdm", "\t Trap FL             : 0x%x",
+	    classportinfo->TrapFL);
+	IBTF_DPRINTF_L4("ibdm", "\t Trap LID            : 0x%x",
 	    b2h16(classportinfo->TrapLID));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapP_Key    : 0x%x",
+	IBTF_DPRINTF_L4("ibdm", "\t Trap P_Key          : 0x%x",
 	    b2h16(classportinfo->TrapP_Key));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapHL       : 0x%x",
-	    b2h16(classportinfo->TrapHL));
-	IBTF_DPRINTF_L4("ibdm", "\t TrapQ_Key    : 0x%x",
+	IBTF_DPRINTF_L4("ibdm", "\t Trap HL             : 0x%x",
+	    classportinfo->TrapHL);
+	IBTF_DPRINTF_L4("ibdm", "\t Trap QP             : 0x%x",
+	    classportinfo->TrapQP);
+	IBTF_DPRINTF_L4("ibdm", "\t Trap Q_Key          : 0x%x",
 	    b2h32(classportinfo->TrapQ_Key));
 }
 

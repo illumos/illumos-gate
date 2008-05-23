@@ -201,11 +201,17 @@ typedef struct ibdm_dp_gidinfo_s {
 	uint16_t		gl_devid;	/* device ID info */
 	kcondvar_t		gl_probe_cv;	/* sync for Cisco FC GW */
 	uint32_t		gl_flag;
+	uint8_t			gl_SL:4; 	/* SL from path_record */
+	uint8_t			gl_redirectSL:4; /* SL from redirection */
 } ibdm_dp_gidinfo_t;
 _NOTE(MUTEX_PROTECTS_DATA(ibdm_dp_gidinfo_s::gl_mutex,
 	ibdm_dp_gidinfo_s::{gl_state gl_timeout_id gl_pending_cmds}))
 _NOTE(SCHEME_PROTECTS_DATA("Serialized access by cv", ibdm_dp_gidinfo_s))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibdm_dp_gidinfo_s::{gl_ibmf_hdl gl_sa_hdl}))
+_NOTE(MUTEX_PROTECTS_DATA(ibdm_dp_gidinfo_s::gl_mutex,
+	ibdm_ioc_info_s::{ioc_timeout_id ioc_dc_timeout_id}))
+_NOTE(MUTEX_PROTECTS_DATA(ibdm_dp_gidinfo_s::gl_mutex,
+	ibdm_srvents_info_s::se_timeout_id))
 
 /*
  * The transaction ID for the GID contains of two parts :
