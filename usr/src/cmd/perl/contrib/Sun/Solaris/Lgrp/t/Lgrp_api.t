@@ -24,12 +24,22 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)Lgrp_api.t	1.1	06/09/01 SMI"
 #
 
 require 5.8.0;
 use strict;
 use warnings;
+
+# Make sure that Lgrp test is not executed on anything less than 5.8.0,
+# as Lgrp is not implemented there
+BEGIN {
+	if ($] < 5.008) {
+		# Fake one successfull test and exit
+		printf "1..1\nok\n";
+		exit 0;
+	}
+}
 
 ######################################################################
 # Tests for Sun::Solaris::Lgrp API.

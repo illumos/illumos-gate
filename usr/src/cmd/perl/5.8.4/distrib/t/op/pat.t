@@ -6,7 +6,7 @@
 
 $| = 1;
 
-print "1..1056\n";
+print "1..1058\n";
 
 BEGIN {
     chdir 't' if -d 't';
@@ -3255,6 +3255,15 @@ for (120 .. 130) {
 	);
     }
 }
+ 
+{
+    use warnings;
+    my @w;
+    local $SIG{__WARN__}=sub{push @w,"@_"};
+    my $c=qq(\x{DF}); 
+    ok($c=~/${c}|\x{100}/, "ASCII pattern that really is utf8");
+    ok(@w==0, "No warnings");
+}    
 
 # perl #25269: panic: pp_match start/end pointers
 ok("a-bc" eq eval {
