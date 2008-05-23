@@ -1514,6 +1514,17 @@ smb_fsop_statfs(
 
 /*
  * smb_fsop_access
+ *
+ * Named streams do not have separate permissions from the associated
+ * unnamed stream.  Thus, if node is a named stream, the permissions
+ * check will be performed on the associated unnamed stream.
+ *
+ * However, our named streams do have their own quarantine attribute,
+ * separate from that on the unnamed stream. If READ or EXECUTE
+ * access has been requested on a named stream, an additional access
+ * check is performed on the named stream in case it has been
+ * quarantined.  kcred is used to avoid issues with the permissions
+ * set on the extended attribute file representing the named stream.
  */
 int
 smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
@@ -1545,6 +1556,19 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if (unnamed_node) {
 		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
 		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
+
+		/*
+		 * Perform VREAD access check on the named stream in case it
+		 * is quarantined. kcred is passed to smb_vop_access so it
+		 * doesn't fail due to lack of permission.
+		 */
+		if (faccess & (FILE_READ_DATA | FILE_EXECUTE)) {
+			error = smb_vop_access(snode->vp, VREAD,
+			    0, NULL, kcred);
+			if (error)
+				return (NT_STATUS_ACCESS_DENIED);
+		}
+
 		/*
 		 * Streams authorization should be performed against the
 		 * unnamed stream.
