@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * write binary audit records directly to a file.
@@ -61,6 +61,8 @@
 #include <tzfile.h>
 #include <unistd.h>
 #include <sys/vfs.h>
+#include <limits.h>
+#include <syslog.h>
 #include <security/auditd.h>
 #include <audit_plugin.h>
 
@@ -79,6 +81,8 @@
 
 #define	ALLHARD_DELAY	20	/* Call audit_warn(allhard) every 20 seconds */
 
+/* minimum reasonable size in bytes to roll over an audit file */
+#define	FSIZE_MIN	512000
 
 /*
  * The directory list is a circular linked list.  It is pointed into by
@@ -124,6 +128,14 @@ static int		hung_count = 0;		/* count of audit_warn hard */
 static int		am_open = 0;
 /* preferred dir state */
 static int		fullness_state = PLENTY_SPACE;
+
+/*
+ * These are used to implement a maximum size for the auditing
+ * file. binfile_maxsize is set via the 'p_fsize' parameter to the
+ * audit_binfile plugin.
+ */
+static uint_t		binfile_cursize = 0;
+static uint_t		binfile_maxsize = 0;
 
 static int open_log(dirlist_t *);
 
@@ -624,6 +636,13 @@ open_log(dirlist_t *current_dir)
 		current_dir->dl_fd = newfd;
 		current_dir->dl_filename = strdup(newname);
 
+		/*
+		 * New file opened, so reset file size statistic (used
+		 * to ensure audit log does not grow above size limit
+		 * set by p_fsize).
+		 */
+		binfile_cursize = 0;
+
 		__logpost(newname);
 
 		DPRINT((dbfp, "binfile: Log opened: %s\n", newname));
@@ -689,12 +708,63 @@ spacecheck(dirlist_t *thisdir, int test_limit, size_t next_buf_size)
 }
 
 /*
+ * Parses p_fsize value and contains it within the range FSIZE_MIN and
+ * INT_MAX so using uints won't cause an undetected overflow of
+ * INT_MAX.  Defaults to 0 if the value is invalid or is missing.
+ */
+static void
+save_maxsize(char *maxsize) {
+	/*
+	 * strtol() returns a long which could be larger than int so
+	 * store here for sanity checking first
+	 */
+	long proposed_maxsize;
+
+	if (maxsize != NULL) {
+		/*
+		 * There is no explicit error return from strtol() so
+		 * we may need to depend on the value of errno.
+		 */
+		errno = 0;
+		proposed_maxsize = strtol(maxsize, (char **)NULL, 10);
+
+		/*
+		 * If sizeof(long) is greater than sizeof(int) on this
+		 * platform, proposed_maxsize might be greater than
+		 * INT_MAX without it being reported as ERANGE.
+		 */
+		if ((errno == ERANGE) ||
+		    ((proposed_maxsize != 0) &&
+			(proposed_maxsize < FSIZE_MIN)) ||
+		    (proposed_maxsize > INT_MAX)) {
+			binfile_maxsize = 0;
+			DPRINT((dbfp, "binfile: p_fsize parameter out of "
+					"range: %s\n", maxsize));
+			/*
+			 * Inform administrator of the error via
+			 * syslog
+			 */
+			__audit_syslog("audit_binfile.so",
+			    LOG_CONS | LOG_NDELAY,
+			    LOG_DAEMON, LOG_ERR,
+			    gettext("p_fsize parameter out of range\n"));
+		} else {
+			binfile_maxsize = proposed_maxsize;
+		}
+	} else { /* p_fsize string was not present */
+		binfile_maxsize = 0;
+	}
+
+	DPRINT((dbfp, "binfile: set maxsize to %d\n", binfile_maxsize));
+}
+
+/*
  * auditd_plugin() writes a buffer to the currently open file. The
- * global "openNewFile" is used to force a new log file for cases
- * such as the initial open, when minfree is reached or the current
- * file system fills up, and "audit -s" with changed audit_control
- * data.  For "audit -n" a new log file is opened immediately in
- * auditd_plugin_open().
+ * global "openNewFile" is used to force a new log file for cases such
+ * as the initial open, when minfree is reached, the p_fsize value is
+ * exceeded or the current file system fills up, and "audit -s" with
+ * changed parameters.  For "audit -n" a new log file is opened
+ * immediately in auditd_plugin_open().
  *
  * This function manages one or more audit directories as follows:
  *
@@ -746,6 +816,19 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 	 * lock is for activeDir, referenced by open_log() and close_log()
 	 */
 	(void) pthread_mutex_lock(&log_mutex);
+
+	/*
+	 * If this would take us over the maximum size, open a new
+	 * file, unless maxsize is 0, in which case growth of the
+	 * audit log is unrestricted.
+	 */
+	if ((binfile_maxsize != 0) &&
+	    ((binfile_cursize + in_len) > binfile_maxsize)) {
+		DPRINT((dbfp, "binfile: maxsize exceeded, opening new audit "
+		    "file.\n"));
+		openNewFile = 1;
+	}
+
 	while (rc == AUDITD_FAIL) {
 		open_status = 1;
 		if (openNewFile) {
@@ -780,6 +863,8 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 #endif
 			out_len = write(activeDir->dl_fd, input, in_len);
 			DPRINT((dbfp, "binfile:  finished the write\n"));
+
+			binfile_cursize += out_len;
 
 			if (out_len == in_len) {
 				DPRINT((dbfp,
@@ -886,6 +971,7 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 	int		reason;
 	char		*dirlist;
 	char		*minfree;
+	char		*maxsize;
 	kva_t		*kv;
 
 	*error = NULL;
@@ -910,9 +996,11 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 	if (kvlist == NULL) {
 		dirlist = NULL;
 		minfree = NULL;
+		maxsize = NULL;
 	} else {
 		dirlist = kva_match(kv, "p_dir");
 		minfree = kva_match(kv, "p_minfree");
+		maxsize = kva_match(kv, "p_fsize");
 	}
 	switch (reason) {
 	case 0:			/* initial open */
@@ -922,6 +1010,9 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 		openNewFile = 1;
 		/* FALLTHRU */
 	case 2:			/* audit -s */
+		/* handle p_fsize parameter */
+		save_maxsize(maxsize);
+
 		fullness_state = PLENTY_SPACE;
 		status = loadauditlist(dirlist, minfree);
 
