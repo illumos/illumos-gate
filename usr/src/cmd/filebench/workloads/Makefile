@@ -58,6 +58,7 @@ WORKLOADS = \
 	randomread.f \
 	randomrw.f \
 	randomwrite.f \
+	ratelimcopyfiles.f \
 	singlestreamread.f \
 	singlestreamreaddirect.f \
 	singlestreamwrite.f \

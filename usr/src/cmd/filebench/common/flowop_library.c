@@ -1021,6 +1021,29 @@ flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 	return (FILEBENCH_OK);
 }
 
+static int
+flowoplib_event_find_target(threadflow_t *threadflow, flowop_t *flowop)
+{
+	if (flowop->fo_targetname[0] != '\0') {
+
+		/* Try to use statistics from specific flowop */
+		flowop->fo_targets =
+		    flowop_find_from_list(flowop->fo_targetname,
+		    threadflow->tf_thrd_fops);
+		if (flowop->fo_targets == NULL) {
+			filebench_log(LOG_ERROR,
+			    "limit target: could not find flowop %s",
+			    flowop->fo_targetname);
+			filebench_shutdown(1);
+			return (FILEBENCH_ERROR);
+		}
+	} else {
+		/* use total workload statistics */
+		flowop->fo_targets = NULL;
+	}
+	return (FILEBENCH_OK);
+}
+
 /*
  * Blocks the calling thread if the number of issued I/O
  * operations exceeds the number of posted events, thus
@@ -1042,12 +1065,33 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
 		    flowop, threadflow->tf_name, threadflow->tf_instance);
 		flowop->fo_initted = 1;
+
+		if (flowoplib_event_find_target(threadflow, flowop)
+		    == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+
+		if (flowop->fo_targets && ((flowop->fo_targets->fo_attrs &
+		    (FLOW_ATTR_READ | FLOW_ATTR_WRITE)) == 0)) {
+			filebench_log(LOG_ERROR,
+			    "WARNING: Flowop %s does no IO",
+			    flowop->fo_targets->fo_name);
+			filebench_shutdown(1);
+			return (FILEBENCH_ERROR);
+		}
 	}
 
-	(void) ipc_mutex_lock(&controlstats_lock);
-	iops = (controlstats.fs_rcount +
-	    controlstats.fs_wcount);
-	(void) ipc_mutex_unlock(&controlstats_lock);
+	if (flowop->fo_targets) {
+		/*
+		 * Note that fs_count is already the sum of fs_rcount
+		 * and fs_wcount if looking at a single flowop.
+		 */
+		iops = flowop->fo_targets->fo_stats.fs_count;
+	} else {
+		(void) ipc_mutex_lock(&controlstats_lock);
+		iops = (controlstats.fs_rcount +
+		    controlstats.fs_wcount);
+		(void) ipc_mutex_unlock(&controlstats_lock);
+	}
 
 	/* Is this the first time around */
 	if (flowop->fo_tputlast == 0) {
@@ -1109,11 +1153,19 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
 		    flowop, threadflow->tf_name, threadflow->tf_instance);
 		flowop->fo_initted = 1;
+
+		if (flowoplib_event_find_target(threadflow, flowop)
+		    == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
 	}
 
-	(void) ipc_mutex_lock(&controlstats_lock);
-	ops = controlstats.fs_count;
-	(void) ipc_mutex_unlock(&controlstats_lock);
+	if (flowop->fo_targets) {
+		ops = flowop->fo_targets->fo_stats.fs_count;
+	} else {
+		(void) ipc_mutex_lock(&controlstats_lock);
+		ops = controlstats.fs_count;
+		(void) ipc_mutex_unlock(&controlstats_lock);
+	}
 
 	/* Is this the first time around */
 	if (flowop->fo_tputlast == 0) {
@@ -1176,14 +1228,36 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
 		    flowop, threadflow->tf_name, threadflow->tf_instance);
 		flowop->fo_initted = 1;
+
+		if (flowoplib_event_find_target(threadflow, flowop)
+		    == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+
+		if ((flowop->fo_targets) &&
+		    ((flowop->fo_targets->fo_attrs &
+		    (FLOW_ATTR_READ | FLOW_ATTR_WRITE)) == 0)) {
+			filebench_log(LOG_ERROR,
+			    "WARNING: Flowop %s does no Reads or Writes",
+			    flowop->fo_targets->fo_name);
+			filebench_shutdown(1);
+			return (FILEBENCH_ERROR);
+		}
 	}
 
-	(void) ipc_mutex_lock(&controlstats_lock);
-	bytes = (controlstats.fs_rbytes +
-	    controlstats.fs_wbytes);
-	(void) ipc_mutex_unlock(&controlstats_lock);
+	if (flowop->fo_targets) {
+		/*
+		 * Note that fs_bytes is already the sum of fs_rbytes
+		 * and fs_wbytes if looking at a single flowop.
+		 */
+		bytes = flowop->fo_targets->fo_stats.fs_bytes;
+	} else {
+		(void) ipc_mutex_lock(&controlstats_lock);
+		bytes = (controlstats.fs_rbytes +
+		    controlstats.fs_wbytes);
+		(void) ipc_mutex_unlock(&controlstats_lock);
+	}
 
-	/* Is this the first time around */
+	/* Is this the first time around? */
 	if (flowop->fo_tputlast == 0) {
 		flowop->fo_tputlast = bytes;
 		return (FILEBENCH_OK);
@@ -1240,15 +1314,40 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 static int
 flowoplib_finishonbytes(threadflow_t *threadflow, flowop_t *flowop)
 {
-	uint64_t b;
-	uint64_t bytes = flowop->fo_constvalue; /* use constant value */
+	uint64_t bytes_io;		/* Bytes of I/O delivered so far */
+	uint64_t byte_lim = flowop->fo_constvalue;  /* Total Bytes desired */
+						    /* Uses constant value */
 
-	(void) ipc_mutex_lock(&controlstats_lock);
-	b = controlstats.fs_bytes;
-	(void) ipc_mutex_unlock(&controlstats_lock);
+	if (flowop->fo_initted == 0) {
+		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
+		    flowop, threadflow->tf_name, threadflow->tf_instance);
+		flowop->fo_initted = 1;
+
+		if (flowoplib_event_find_target(threadflow, flowop)
+		    == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+
+		if ((flowop->fo_targets) &&
+		    ((flowop->fo_targets->fo_attrs &
+		    (FLOW_ATTR_READ | FLOW_ATTR_WRITE)) == 0)) {
+			filebench_log(LOG_ERROR,
+			    "WARNING: Flowop %s does no Reads or Writes",
+			    flowop->fo_targets->fo_name);
+			filebench_shutdown(1);
+			return (FILEBENCH_ERROR);
+		}
+	}
+
+	if (flowop->fo_targets) {
+		bytes_io = flowop->fo_targets->fo_stats.fs_bytes;
+	} else {
+		(void) ipc_mutex_lock(&controlstats_lock);
+		bytes_io = controlstats.fs_bytes;
+		(void) ipc_mutex_unlock(&controlstats_lock);
+	}
 
 	flowop_beginop(threadflow, flowop);
-	if (b > bytes) {
+	if (bytes_io > byte_lim) {
 		flowop_endop(threadflow, flowop, 0);
 		return (FILEBENCH_DONE);
 	}
@@ -1269,9 +1368,23 @@ flowoplib_finishoncount(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t ops;
 	uint64_t count = flowop->fo_constvalue; /* use constant value */
 
-	(void) ipc_mutex_lock(&controlstats_lock);
-	ops = controlstats.fs_count;
-	(void) ipc_mutex_unlock(&controlstats_lock);
+	if (flowop->fo_initted == 0) {
+		filebench_log(LOG_DEBUG_IMPL, "rate %zx %s-%d locking",
+		    flowop, threadflow->tf_name, threadflow->tf_instance);
+		flowop->fo_initted = 1;
+
+		if (flowoplib_event_find_target(threadflow, flowop)
+		    == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+	}
+
+	if (flowop->fo_targets) {
+		ops = flowop->fo_targets->fo_stats.fs_count;
+	} else {
+		(void) ipc_mutex_lock(&controlstats_lock);
+		ops = controlstats.fs_count;
+		(void) ipc_mutex_unlock(&controlstats_lock);
+	}
 
 	flowop_beginop(threadflow, flowop);
 	if (ops >= count) {
@@ -1875,6 +1988,9 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	(void) unlink(path);
 	flowop_endop(threadflow, flowop, 0);
 	file->fse_flags &= ~FSE_EXISTS;
+	(void) ipc_mutex_lock(&fileset->fs_num_files_lock);
+	fileset->fs_num_act_files--;
+	(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
 	(void) ipc_mutex_unlock(&file->fse_lock);
 
 	filebench_log(LOG_DEBUG_SCRIPT, "deleted file %s", file->fse_path);

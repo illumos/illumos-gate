@@ -118,6 +118,10 @@ typedef struct fileset {
 	double		fs_meansize;	/* Specified mean file size */
 	int		fs_realfiles;	/* Actual files */
 	off64_t		fs_bytes;	/* Total space consumed by files */
+	fbint_t		fs_num_act_files;   /* total number of files */
+					    /* actually existing in the */
+					    /* host or server's file system */
+	pthread_mutex_t	fs_num_files_lock; /* lock for fs_num_act_files */
 	filesetentry_t	*fs_filelist;	/* List of files */
 	filesetentry_t	*fs_dirlist;	/* List of directories */
 	filesetentry_t	*fs_filefree;	/* Ptr to next free file */

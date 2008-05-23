@@ -332,10 +332,10 @@ procflow_exec(char *name, int instance)
 		    "procflow_createproc exiting...");
 	}
 
+	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
+	filebench_shm->shm_procs_running --;
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 	procflow->pf_running = 0;
-	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
-	filebench_shm->shm_running --;
-	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	return (ret);
 }
@@ -371,9 +371,21 @@ procflow_createnwait(void *nothing)
 		if (waitid(P_ALL, 0, &status, WEXITED) != 0)
 			pthread_exit(0);
 
+		(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 		/* if normal shutdown in progress, just quit */
 		if (filebench_shm->shm_f_abort)
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_procflow_lock);
 			pthread_exit(0);
+
+		/* if nothing running, exit */
+		if (filebench_shm->shm_procs_running == 0) {
+			filebench_shm->shm_f_abort = FILEBENCH_ABORT_RSRC;
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_procflow_lock);
+			pthread_exit(0);
+		}
+		(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 		if (status.si_code == CLD_EXITED) {
 			/* A process called exit(); check returned status */
@@ -391,11 +403,6 @@ procflow_createnwait(void *nothing)
 			filebench_shutdown(1);
 		}
 
-		/* nothing running, exit */
-		if (filebench_shm->shm_running == 0) {
-			filebench_shm->shm_f_abort = FILEBENCH_ABORT_RSRC;
-			pthread_exit(0);
-		}
 	}
 	/* NOTREACHED */
 	return (NULL);
@@ -507,7 +514,7 @@ procflow_delete(procflow_t *procflow, int wait_cnt)
 #ifdef USE_PROCESS_MODEL
 		(void) kill(procflow->pf_pid, SIGKILL);
 		filebench_log(LOG_DEBUG_SCRIPT,
-		    "Had to kill process %s-%d %d!",
+		    "procflow_delete: Had to kill process %s-%d %d!",
 		    procflow->pf_name,
 		    procflow->pf_instance,
 		    procflow->pf_pid);
@@ -605,7 +612,9 @@ procflow_allstarted()
 
 		procflow = procflow->pf_next;
 	}
-	filebench_shm->shm_running = running_procs;
+	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
+	filebench_shm->shm_procs_running = running_procs;
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
@@ -620,6 +629,7 @@ procflow_allstarted()
  * through the procflow list and deletes all procflows except
  * for the FLOW_MASTER procflow. Resets the f_abort flag when
  * finished.
+ *
  */
 void
 procflow_shutdown(void)
@@ -627,8 +637,16 @@ procflow_shutdown(void)
 	procflow_t *procflow = filebench_shm->shm_proclist;
 	int wait_cnt;
 
+	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
+	if (filebench_shm->shm_procs_running == 0) {
+		/* No processes running, so no need to do anything */
+		(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
+		return;
+	}
+	filebench_shm->shm_procs_running = 0;
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
+
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
-	filebench_shm->shm_running = 0;
 	filebench_shm->shm_f_abort = 1;
 	wait_cnt = SHUTDOWN_WAIT_SECONDS;
 

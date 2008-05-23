@@ -36,7 +36,7 @@ set $nfiles=5000
 set $meandirwidth=100
 set $nthreads=16
 
-set mode quit alldone
+set mode quit firstdone
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100,paralloc
 
@@ -50,8 +50,8 @@ define process name=filedelete,instances=1
   }
 }
 
-echo  "FileMicro-Delete Version 2.3 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo  "FileMicro-Delete Version 2.4 personality successfully loaded"
+usage "Usage: set \$dir=<dir>           defaults to $dir"
 usage "       set \$count=<value>       defaults to $count"
 usage "       set \$filesize=<size>     defaults to $filesize"
 usage "       set \$nfiles=<value>      defaults to $nfiles"

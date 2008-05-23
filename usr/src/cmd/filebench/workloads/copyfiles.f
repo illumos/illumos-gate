@@ -31,9 +31,9 @@ set $filesize=16k
 set $iosize=1m
 set $nthreads=1
 
-set mode quit alldone
+set mode quit firstdone
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc=100
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc=100,paralloc
 define fileset name=destfiles,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth
 
 define process name=filereader,instances=1
@@ -49,8 +49,8 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "CopyFiles Version 2.3 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo  "CopyFiles Version 2.4 personality successfully loaded"
+usage "Usage: set \$dir=<dir>         defaults to $dir"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$nfiles=<value>    defaults to $nfiles"
 usage "       set \$iosize=<size>     defaults to $iosize"

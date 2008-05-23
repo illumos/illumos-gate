@@ -47,6 +47,13 @@
  * is rooted in a directory specified by fileset_path, and once the populated
  * fileset has been created, has a tree of directories and files
  * corresponding to the fileset's filesetentry tree.
+ *
+ * This routine is called from fileset_createset(), which is in turn
+ * called from parser_gram.y: parser_create_fileset() when a
+ * "create fileset" or "run" command is encountered.
+ * When the "create fileset" command is used, it is generally paired with
+ * a "create processes" command, and must appear first, in order to
+ * instantiate all the files in the fileset before trying to use them.
  */
 
 static int fileset_checkraw(fileset_t *fileset);
@@ -298,6 +305,12 @@ fileset_alloc_file(filesetentry_t *entry)
 				    entry->fse_size);
 
 			entry->fse_flags |= FSE_EXISTS;
+			(void) ipc_mutex_lock(
+			    &entry->fse_fileset->fs_num_files_lock);
+			entry->fse_fileset->fs_num_act_files++;
+			(void) ipc_mutex_unlock(
+			    &entry->fse_fileset->fs_num_files_lock);
+
 			(void) close(fd);
 			return (0);
 
@@ -317,6 +330,13 @@ fileset_alloc_file(filesetentry_t *entry)
 				    entry->fse_size);
 
 			entry->fse_flags |= FSE_EXISTS;
+
+			(void) ipc_mutex_lock(
+			    &entry->fse_fileset->fs_num_files_lock);
+			entry->fse_fileset->fs_num_act_files++;
+			(void) ipc_mutex_unlock(
+			    &entry->fse_fileset->fs_num_files_lock);
+
 			(void) close(fd);
 			return (0);
 		}
@@ -336,6 +356,10 @@ fileset_alloc_file(filesetentry_t *entry)
 		return (-1);
 
 	entry->fse_flags |= FSE_EXISTS;
+
+	(void) ipc_mutex_lock(&entry->fse_fileset->fs_num_files_lock);
+	entry->fse_fileset->fs_num_act_files++;
+	(void) ipc_mutex_unlock(&entry->fse_fileset->fs_num_files_lock);
 
 	for (seek = 0; seek < entry->fse_size; ) {
 		off64_t wsize;
@@ -431,8 +455,13 @@ fileset_openfile(fileset_t *fileset,
 			return (-1);
 	}
 
-	if (flag & O_CREAT)
+	if (flag & O_CREAT) {
 		entry->fse_flags |= FSE_EXISTS;
+
+		(void) ipc_mutex_lock(&fileset->fs_num_files_lock);
+		fileset->fs_num_act_files++;
+		(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
+	}
 
 	if (attrs & FLOW_ATTR_DSYNC) {
 #ifdef sun
@@ -485,6 +514,25 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 	filesetentry_t *first = NULL;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
+
+	/* see if asking for impossible */
+	(void) ipc_mutex_lock(&fileset->fs_num_files_lock);
+	if (flags & FILESET_PICKEXISTS) {
+		if (fileset->fs_num_act_files == 0) {
+			(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_fileset_lock);
+			return (NULL);
+		}
+	} else if (flags & FILESET_PICKNOEXIST) {
+		if (fileset->fs_num_act_files == fileset->fs_realfiles) {
+			(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
+			(void) ipc_mutex_unlock(
+			    &filebench_shm->shm_fileset_lock);
+			return (NULL);
+		}
+	}
+	(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
 
 	while (entry == NULL) {
 
@@ -608,6 +656,9 @@ fileset_create(fileset_t *fileset)
 		    fileset_entity_name(fileset));
 		return (-1);
 	}
+
+	/* declare all files currently non existant (single threaded code) */
+	fileset->fs_num_act_files = 0;
 
 #ifdef HAVE_RAW_SUPPORT
 	/* treat raw device as special case */
@@ -1002,6 +1053,7 @@ exists:
 		    fileset->fs_meandepth,
 		    (u_longlong_t)(fileset->fs_bytes / 1024UL / 1024UL));
 	}
+
 	return (0);
 }
 
@@ -1010,6 +1062,10 @@ exists:
  * fileset_sizegamma default values, and sets the fileset name to the
  * supplied name string. Puts the allocated fileset on the
  * master fileset list and returns a pointer to it.
+ *
+ * This routine implements the 'define fileset' calls found in a .f
+ * workload, such as in the following example:
+ * define fileset name=drew4ever, entries=$nfiles
  */
 fileset_t *
 fileset_define(avd_t name)
@@ -1027,6 +1083,10 @@ fileset_define(avd_t name)
 
 	filebench_log(LOG_DEBUG_IMPL,
 	    "Defining file %s", avd_get_str(name));
+
+	/* initialize fs_num_act_files lock */
+	(void) pthread_mutex_init(&fileset->fs_num_files_lock,
+	    ipc_mutexattr());
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
 

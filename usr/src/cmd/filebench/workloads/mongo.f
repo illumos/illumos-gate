@@ -32,10 +32,10 @@ set $nthreads=1
 set $meaniosize=16k
 set $readiosize=1m
 
-set mode quit alldone
+set mode quit firstdone
 
-define fileset name=postset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
-define fileset name=postsetdel,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
+define fileset name=postset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc,paralloc
+define fileset name=postsetdel,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc,paralloc
 
 define process name=filereader,instances=1
 {
@@ -51,8 +51,8 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "Mongo-like Version 2.2 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo  "Mongo-like Version 2.3 personality successfully loaded"
+usage "Usage: set \$dir=<dir>          defaults to $dir"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"
 usage "       set \$dirwidth=<value>   defaults to $dirwidth"

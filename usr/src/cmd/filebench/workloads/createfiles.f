@@ -31,7 +31,7 @@ set $filesize=16k
 set $iosize=1m
 set $nthreads=16
 
-set mode quit alldone
+set mode quit firstdone
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth
 
@@ -46,8 +46,8 @@ define process name=filecreate,instances=1
   }
 }
 
-echo  "Createfiles Version 2.3 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo  "Createfiles Version 2.4 personality successfully loaded"
+usage "Usage: set \$dir=<dir>          defaults to $dir"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$iosize=<size>      defaults to $iosize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"

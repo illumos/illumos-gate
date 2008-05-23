@@ -145,6 +145,7 @@ flowop_t *flowop_define(threadflow_t *, char *name, flowop_t *inherit,
     flowop_t **flowoplist_hdp, int instance, int type);
 flowop_t *flowop_find(char *name);
 flowop_t *flowop_find_one(char *name, int instance);
+flowop_t *flowop_find_from_list(char *name, flowop_t *list);
 void flowoplib_usage(void);
 void flowoplib_init(void);
 void flowop_delete_all(flowop_t **threadlist);

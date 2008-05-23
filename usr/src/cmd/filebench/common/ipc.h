@@ -87,6 +87,7 @@ typedef struct filebench_shm {
 	pthread_mutex_t shm_msg_lock;
 	pthread_mutex_t shm_malloc_lock;
 	pthread_mutex_t shm_ism_lock;
+	pthread_mutex_t shm_procs_running_lock;	/* protects shm_procs_running */
 	pthread_rwlock_t shm_run_lock;
 	pthread_rwlock_t shm_flowop_find_lock;
 
@@ -119,7 +120,7 @@ typedef struct filebench_shm {
 	size_t		shm_allocated;
 	caddr_t		shm_addr;
 	char		*shm_ptr;
-	int		shm_running;
+	int		shm_procs_running;
 	int		shm_f_abort;
 	int		shm_rmode;
 	int		shm_1st_err;

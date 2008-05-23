@@ -336,6 +336,8 @@ ipc_init(void)
 	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->shm_procflow_lock,
 	    ipc_mutexattr());
+	(void) pthread_mutex_init(&filebench_shm->shm_procs_running_lock,
+	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->shm_threadflow_lock,
 	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->shm_flowop_lock,

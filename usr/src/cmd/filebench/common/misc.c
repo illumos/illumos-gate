@@ -341,8 +341,7 @@ filebench_shutdown(int error) {
 		filebench_log(LOG_DEBUG_IMPL, "Shutdown");
 	}
 
-	if (filebench_shm->shm_running)
-		procflow_shutdown();
+	procflow_shutdown();
 
 	(void) unlink("/tmp/filebench_shm");
 	ipc_ismdelete();

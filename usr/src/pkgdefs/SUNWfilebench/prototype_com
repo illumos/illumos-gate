@@ -80,6 +80,7 @@ f none usr/benchmarks/filebench/workloads/oltp.f 444 root bin
 f none usr/benchmarks/filebench/workloads/randomread.f 444 root bin
 f none usr/benchmarks/filebench/workloads/randomrw.f 444 root bin
 f none usr/benchmarks/filebench/workloads/randomwrite.f 444 root bin
+f none usr/benchmarks/filebench/workloads/ratelimcopyfiles.f 444 root bin
 f none usr/benchmarks/filebench/workloads/singlestreamread.f 444 root bin
 f none usr/benchmarks/filebench/workloads/singlestreamreaddirect.f 444 root bin
 f none usr/benchmarks/filebench/workloads/singlestreamwrite.f 444 root bin

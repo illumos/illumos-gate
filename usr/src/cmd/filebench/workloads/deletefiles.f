@@ -30,9 +30,9 @@ set $meandirwidth=100
 set $filesize=16k
 set $nthreads=16
 
-set mode quit alldone
+set mode quit firstdone
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100,paralloc
 
 define process name=filedelete,instances=1
 {
@@ -43,8 +43,8 @@ define process name=filedelete,instances=1
   }
 }
 
-echo  "Deletefiles Version 2.2 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo  "Deletefiles Version 2.3 personality successfully loaded"
+usage "Usage: set \$dir=<dir>          defaults to $dir"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"
 usage "       set \$nthreads=<value>   defaults to $nthreads"

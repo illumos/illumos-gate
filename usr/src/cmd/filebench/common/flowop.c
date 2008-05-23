@@ -324,6 +324,9 @@ flowop_destruct_all_flows(threadflow_t *threadflow)
 {
 	flowop_t *flowop;
 
+	/* wait a moment to give other threads a chance to stop too */
+	(void) sleep(1);
+
 	(void) ipc_mutex_lock(&threadflow->tf_lock);
 
 	/* prepare to call destruct flow routines, if necessary */
@@ -459,7 +462,7 @@ flowop_start(threadflow_t *threadflow)
 		}
 
 		/* Take it easy until everyone is ready to go */
-		if (!filebench_shm->shm_running) {
+		if (!filebench_shm->shm_procs_running) {
 			(void) sleep(1);
 			continue;
 		}
@@ -896,7 +899,7 @@ flowop_find(char *name)
 
 /*
  * Returns a pointer to the specified instance of flowop
- * "name" from the supplied list.
+ * "name" from the global list.
  */
 flowop_t *
 flowop_find_one(char *name, int instance)
@@ -920,6 +923,86 @@ flowop_find_one(char *name, int instance)
 	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
 
 	return (test_flowop);
+}
+
+/*
+ * recursively searches through lists of flowops on a given thread
+ * and those on any included composite flowops for the named flowop.
+ * either returns with a pointer to the named flowop or NULL if it
+ * cannot be found.
+ */
+static flowop_t *
+flowop_recurse_search(char *path, char *name, flowop_t *list)
+{
+	flowop_t *test_flowop;
+	char fullname[MAXPATHLEN];
+
+	test_flowop = list;
+
+	/*
+	 * when searching a list of inner flowops, "path" is the fullname
+	 * of the containing composite flowop. Use it to form the
+	 * full name of the inner flowop to search for.
+	 */
+	if (path) {
+		if ((strlen(path) + strlen(name) + 1) > MAXPATHLEN) {
+			filebench_log(LOG_ERROR,
+			    "composite flowop path name %s.%s too long",
+			    path, name);
+			return (NULL);
+		}
+
+		/* create composite_name.name for recursive search */
+		(void) strcpy(fullname, path);
+		(void) strcat(fullname, ".");
+		(void) strcat(fullname, name);
+	} else {
+		(void) strcpy(fullname, name);
+	}
+
+	/*
+	 * loop through all flowops on the supplied tf_thrd_fops (flowop)
+	 * list or fo_comp_fops (inner flowop) list.
+	 */
+	while (test_flowop) {
+		if (strcmp(fullname, test_flowop->fo_name) == 0)
+			return (test_flowop);
+
+		if (test_flowop->fo_type == FLOW_TYPE_COMPOSITE) {
+			flowop_t *found_flowop;
+
+			found_flowop = flowop_recurse_search(
+			    test_flowop->fo_name, name,
+			    test_flowop->fo_comp_fops);
+
+			if (found_flowop)
+				return (found_flowop);
+		}
+		test_flowop = test_flowop->fo_exec_next;
+	}
+
+	/* not found here or on any child lists */
+	return (NULL);
+}
+
+/*
+ * Returns a pointer to flowop named "name" from the supplied tf_thrd_fops
+ * list of flowops. Returns the named flowop if found, or NULL.
+ */
+flowop_t *
+flowop_find_from_list(char *name, flowop_t *list)
+{
+	flowop_t *found_flowop;
+
+	flowop_find_barrier();
+
+	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
+
+	found_flowop = flowop_recurse_search(NULL, name, list);
+
+	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
+
+	return (found_flowop);
 }
 
 /*
