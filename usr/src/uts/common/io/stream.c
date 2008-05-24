@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,8 +318,8 @@ streams_msg_init(void)
 	int offset;
 
 	mblk_cache = kmem_cache_create("streams_mblk",
-		sizeof (mblk_t), 32, NULL, NULL, NULL, NULL, NULL,
-		mblk_kmem_flags);
+	    sizeof (mblk_t), 32, NULL, NULL, NULL, NULL, NULL,
+	    mblk_kmem_flags);
 
 	for (sizep = dblk_sizes; (size = *sizep) != 0; sizep++) {
 
@@ -330,7 +330,7 @@ streams_msg_init(void)
 			 */
 			tot_size = size + sizeof (dblk_t);
 			ASSERT((offset + sizeof (dblk_t) + sizeof (kmem_slab_t))
-								< PAGESIZE);
+			    < PAGESIZE);
 			ASSERT((tot_size & (DBLK_CACHE_ALIGN - 1)) == 0);
 
 		} else {
@@ -346,9 +346,9 @@ streams_msg_init(void)
 
 		(void) sprintf(name, "streams_dblk_%ld", size);
 		cp = kmem_cache_create(name, tot_size,
-			DBLK_CACHE_ALIGN, dblk_constructor,
-			dblk_destructor, NULL,
-			(void *)(size), NULL, dblk_kmem_flags);
+		    DBLK_CACHE_ALIGN, dblk_constructor,
+		    dblk_destructor, NULL,
+		    (void *)(size), NULL, dblk_kmem_flags);
 
 		while (lastsize <= size) {
 			dblk_cache[(lastsize - 1) >> DBLK_SIZE_SHIFT] = cp;
@@ -357,13 +357,13 @@ streams_msg_init(void)
 	}
 
 	dblk_esb_cache = kmem_cache_create("streams_dblk_esb",
-			sizeof (dblk_t), DBLK_CACHE_ALIGN,
-			dblk_esb_constructor, dblk_destructor, NULL,
-			(void *) sizeof (dblk_t), NULL, dblk_kmem_flags);
+	    sizeof (dblk_t), DBLK_CACHE_ALIGN,
+	    dblk_esb_constructor, dblk_destructor, NULL,
+	    (void *) sizeof (dblk_t), NULL, dblk_kmem_flags);
 	fthdr_cache = kmem_cache_create("streams_fthdr",
-		sizeof (fthdr_t), 32, NULL, NULL, NULL, NULL, NULL, 0);
+	    sizeof (fthdr_t), 32, NULL, NULL, NULL, NULL, NULL, 0);
 	ftblk_cache = kmem_cache_create("streams_ftblk",
-		sizeof (ftblk_t), 32, NULL, NULL, NULL, NULL, NULL, 0);
+	    sizeof (ftblk_t), 32, NULL, NULL, NULL, NULL, NULL, 0);
 
 	/* Initialize Multidata caches */
 	mmd_init();
@@ -545,8 +545,8 @@ dblk_lastfree(mblk_t *mp, dblk_t *dbp)
 	dbp->db_struioflag = 0;
 	dbp->db_struioun.cksum.flags = 0;
 
-	/* and the COOKED flag */
-	dbp->db_flags &= ~DBLK_COOKED;
+	/* and the COOKED and/or UIOA flag(s) */
+	dbp->db_flags &= ~(DBLK_COOKED | DBLK_UIOA);
 
 	kmem_cache_free(dbp->db_cache, dbp);
 }
@@ -739,7 +739,7 @@ desballoc(unsigned char *base, size_t size, uint_t pri, frtn_t *frp)
 	 */
 	if (!str_ftnever) {
 		mp = gesballoc(base, size, DBLK_RTFU(1, M_DATA, 0, 0),
-			frp, dblk_lastfree_desb, KM_NOSLEEP);
+		    frp, dblk_lastfree_desb, KM_NOSLEEP);
 
 		if (mp != NULL)
 			STR_FTALLOC(&DB_FTHDR(mp), FTEV_DESBALLOC, size);
@@ -857,7 +857,7 @@ bcache_create(char *name, size_t size, uint_t align)
 	(void) sprintf(buffer, "%s_dblk_cache", name);
 	bcp->dblk_cache = kmem_cache_create(buffer, sizeof (dblk_t),
 	    DBLK_CACHE_ALIGN, bcache_dblk_constructor, bcache_dblk_destructor,
-						NULL, (void *)bcp, NULL, 0);
+	    NULL, (void *)bcp, NULL, 0);
 
 	return (bcp);
 }
@@ -1584,7 +1584,7 @@ adjmsg(mblk_t *mp, ssize_t len)
 			 */
 
 			if ((save_bp != mp) &&
-				(save_bp->b_wptr == save_bp->b_rptr)) {
+			    (save_bp->b_wptr == save_bp->b_rptr)) {
 				bcont = save_bp->b_cont;
 				freeb(save_bp);
 				prev_bp->b_cont = bcont;
@@ -2129,8 +2129,8 @@ flushband(queue_t *q, unsigned char pri, int flag)
 			nmp = mp->b_next;
 			mp->b_next = mp->b_prev = NULL;
 			if ((mp->b_band == 0) &&
-				((flag == FLUSHALL) ||
-				datamsg(mp->b_datap->db_type)))
+			    ((flag == FLUSHALL) ||
+			    datamsg(mp->b_datap->db_type)))
 				freemsg(mp);
 			else
 				(void) putq(q, mp);
@@ -2242,7 +2242,7 @@ bcanput(queue_t *q, unsigned char pri)
 			q->q_flag |= QWANTW;
 			mutex_exit(QLOCK(q));
 			TRACE_3(TR_FAC_STREAMS_FR, TR_BCANPUT_OUT,
-				"bcanput:%p %X %d", q, pri, 0);
+			    "bcanput:%p %X %d", q, pri, 0);
 			return (0);
 		}
 	} else {	/* pri != 0 */
@@ -2252,7 +2252,7 @@ bcanput(queue_t *q, unsigned char pri)
 			 */
 			mutex_exit(QLOCK(q));
 			TRACE_3(TR_FAC_STREAMS_FR, TR_BCANPUT_OUT,
-				"bcanput:%p %X %d", q, pri, 1);
+			    "bcanput:%p %X %d", q, pri, 1);
 			return (1);
 		}
 		qbp = q->q_bandp;
@@ -2262,13 +2262,13 @@ bcanput(queue_t *q, unsigned char pri)
 			qbp->qb_flag |= QB_WANTW;
 			mutex_exit(QLOCK(q));
 			TRACE_3(TR_FAC_STREAMS_FR, TR_BCANPUT_OUT,
-				"bcanput:%p %X %d", q, pri, 0);
+			    "bcanput:%p %X %d", q, pri, 0);
 			return (0);
 		}
 	}
 	mutex_exit(QLOCK(q));
 	TRACE_3(TR_FAC_STREAMS_FR, TR_BCANPUT_OUT,
-		"bcanput:%p %X %d", q, pri, 1);
+	    "bcanput:%p %X %d", q, pri, 1);
 	return (1);
 }
 
@@ -2847,7 +2847,7 @@ putnextctl1(queue_t *q, int type, int param)
 	mblk_t *bp;
 
 	if ((datamsg(type) && (type != M_DELAY)) ||
-		((bp = allocb_tryhard(1)) == NULL))
+	    ((bp = allocb_tryhard(1)) == NULL))
 		return (0);
 
 	bp->b_datap->db_type = (unsigned char)type;
@@ -2864,7 +2864,7 @@ putnextctl(queue_t *q, int type)
 	mblk_t *bp;
 
 	if ((datamsg(type) && (type != M_DELAY)) ||
-		((bp = allocb_tryhard(0)) == NULL))
+	    ((bp = allocb_tryhard(0)) == NULL))
 		return (0);
 	bp->b_datap->db_type = (unsigned char)type;
 

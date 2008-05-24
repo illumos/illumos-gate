@@ -287,6 +287,20 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		if ((mp = allocb(sizeof (*stropt), BPRI_HI)) == NULL)
 			goto failed;
 
+		/* If either tcp or peer_tcp sodirect enabled then disable */
+		if (tcp->tcp_sodirect != NULL) {
+			mutex_enter(tcp->tcp_sodirect->sod_lock);
+			SOD_DISABLE(tcp->tcp_sodirect);
+			mutex_exit(tcp->tcp_sodirect->sod_lock);
+			tcp->tcp_sodirect = NULL;
+		}
+		if (peer_tcp->tcp_sodirect != NULL) {
+			mutex_enter(peer_tcp->tcp_sodirect->sod_lock);
+			SOD_DISABLE(peer_tcp->tcp_sodirect);
+			mutex_exit(peer_tcp->tcp_sodirect->sod_lock);
+			peer_tcp->tcp_sodirect = NULL;
+		}
+
 		/* Fuse both endpoints */
 		peer_tcp->tcp_loopback_peer = tcp;
 		tcp->tcp_loopback_peer = peer_tcp;

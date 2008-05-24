@@ -138,6 +138,7 @@ CMDK_OBJS += cmdk.o
 CMLB_OBJS += cmlb.o
 CPUNEX_OBJS += cpunex.o
 DADK_OBJS += dadk.o
+DCOPY_OBJS += dcopy.o
 DNET_OBJS += dnet.o mii.o
 FD_OBJS += fd.o
 GDA_OBJS += gda.o

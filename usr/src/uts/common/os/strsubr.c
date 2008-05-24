@@ -2467,13 +2467,18 @@ devflg_to_qflag(struct streamtab *stp, uint32_t devflag, uint32_t *qflagp,
 	/*
 	 * Private flag used by a transport module to indicate
 	 * to sockfs that it supports direct-access mode without
-	 * having to go through STREAMS.
+	 * having to go through STREAMS or the transport can use
+	 * sodirect_t sharing to bypass STREAMS for receive-side
+	 * M_DATA processing.
 	 */
-	if (devflag & _D_DIRECT) {
+	if (devflag & (_D_DIRECT|_D_SODIRECT)) {
 		/* Reject unless the module is fully-MT (no perimeter) */
 		if ((qflag & QMT_TYPEMASK) != QMTSAFE)
 			goto bad;
-		qflag |= _QDIRECT;
+		if (devflag & _D_DIRECT)
+			qflag |= _QDIRECT;
+		if (devflag & _D_SODIRECT)
+			qflag |= _QSODIRECT;
 	}
 
 	*qflagp = qflag;

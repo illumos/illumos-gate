@@ -39,6 +39,10 @@ extern "C" {
  * *** This interface is for private use by the IP stack only ***
  */
 
+/* Private dcopy/uioa interface for dcopy to enable/disable dcopy KAPI */
+extern void uioa_dcopy_enable();
+extern void uioa_dcopy_disable();
+
 /* Function return status */
 #define	DCOPY_FAILURE		(-1)
 #define	DCOPY_SUCCESS		(0)

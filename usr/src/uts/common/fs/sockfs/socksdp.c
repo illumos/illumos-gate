@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,8 @@ sosdp_sock_constructor(void *buf, void *cdrarg, int kmflags)
 	so->so_nl7c_uri		= NULL;
 	so->so_nl7c_rcv_mp	= NULL;
 
+	so->so_direct		= NULL;
+
 	vp = vn_alloc(kmflags);
 	if (vp == NULL) {
 		return (-1);
@@ -158,6 +160,8 @@ sosdp_sock_destructor(void *buf, void *cdrarg)
 	struct sdp_sonode *ss = buf;
 	struct sonode *so = &ss->ss_so;
 	struct vnode *vp = SOTOV(so);
+
+	ASSERT(so->so_direct == NULL);
 
 	ASSERT(so->so_nl7c_flags == 0);
 	ASSERT(so->so_nl7c_uri == NULL);

@@ -1313,6 +1313,22 @@ fcnname/**/_info:							\
 	END_MODULE(kssl);
 #endif
 
+/*
+ * Stubs for dcopy, for Intel IOAT KAPIs
+ */
+#ifndef DCOPY_MODULE
+	MODULE(dcopy,misc);
+	NO_UNLOAD_STUB(dcopy, dcopy_query, nomod_minus_one);
+	NO_UNLOAD_STUB(dcopy, dcopy_query_channel, nomod_minus_one);
+	NO_UNLOAD_STUB(dcopy, dcopy_alloc, nomod_minus_one);
+	NO_UNLOAD_STUB(dcopy, dcopy_free, nomod_minus_one);
+	NO_UNLOAD_STUB(dcopy, dcopy_cmd_alloc, nomod_minus_one);
+	NO_UNLOAD_STUB(dcopy, dcopy_cmd_free, nomod_void);
+	NO_UNLOAD_STUB(dcopy, dcopy_cmd_post, nomod_minus_one);
+	NO_UNLOAD_STUB(dcopy, dcopy_cmd_poll, nomod_minus_one);
+	END_MODULE(dcopy);
+#endif
+
 / this is just a marker for the area of text that contains stubs 
 
 	ENTRY_NP(stubs_end)

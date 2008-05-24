@@ -689,6 +689,10 @@ dcopy_device_register(void *device_private, dcopy_device_info_t *info,
 	mutex_exit(&dcopy_statep->d_globalchan_list.dl_mutex);
 
 	*handle = device;
+
+	/* last call-back into kernel for dcopy KAPI enabled */
+	uioa_dcopy_enable();
+
 	return (DCOPY_SUCCESS);
 
 registerfail_alloc:
@@ -723,6 +727,8 @@ dcopy_device_unregister(dcopy_device_handle_t *handle)
 	dcopy_device_handle_t device;
 	boolean_t device_busy;
 
+	/* first call-back into kernel for dcopy KAPI disable */
+	uioa_dcopy_disable();
 
 	device = *handle;
 	device_busy = B_FALSE;
