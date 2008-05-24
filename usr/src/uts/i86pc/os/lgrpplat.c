@@ -168,7 +168,7 @@
  * Hash proximity domain ID into node to domain mapping table using to minimize
  * span of entries used
  */
-#define	NODE_DOMAIN_HASH(domain)	((domain) % lgrp_plat_node_cnt)
+#define	NODE_DOMAIN_HASH(domain, node_cnt)	((domain) % node_cnt)
 
 
 /*
@@ -232,9 +232,9 @@ typedef	struct node_phys_addr_map {
 } node_phys_addr_map_t;
 
 /*
- * Error code from processing CPU to APIC ID array boot property
+ * Number of CPUs for which we got APIC IDs
  */
-static int				lgrp_plat_cpu_apicid_error = 0;
+static int				lgrp_plat_apic_ncpus = 0;
 
 /*
  * CPU to node ID mapping table (only used for SRAT)
@@ -367,12 +367,13 @@ lgrp_handle_t	lgrp_plat_root_hand(void);
 static int	is_opteron(void);
 
 static int	lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
-    cpu_node_map_t *cpu_node, int nentries, uint32_t apicid, uint32_t domain);
+    int node_cnt, cpu_node_map_t *cpu_node, int nentries, uint32_t apicid,
+    uint32_t domain);
 
 static int	lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node);
 
 static int	lgrp_plat_domain_to_node(node_domain_map_t *node_domain,
-    uint32_t domain);
+    int node_cnt, uint32_t domain);
 
 static void	lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
     lgrp_plat_latency_stats_t *lat_stats,
@@ -384,25 +385,24 @@ static int	lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 static pgcnt_t	lgrp_plat_mem_size_default(lgrp_handle_t, lgrp_mem_query_t);
 
 static int	lgrp_plat_node_domain_update(node_domain_map_t *node_domain,
-    uint32_t domain);
+    int node_cnt, uint32_t domain);
 
 static int	lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
-    node_phys_addr_map_t *node_memory, uint64_t start, uint64_t end,
-    uint32_t domain);
+    int node_cnt, node_phys_addr_map_t *node_memory, uint64_t start,
+    uint64_t end, uint32_t domain);
 
 static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
     lgrp_plat_probe_mem_config_t *probe_mem_config,
     lgrp_plat_latency_stats_t *lat_stats,
     lgrp_plat_probe_stats_t *probe_stats);
 
-static int	lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node,
-    int boot_ncpus);
+static int	lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node);
 
 static int	lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
     node_phys_addr_map_t *node_memory, lgrp_plat_latency_stats_t *lat_stats);
 
-static int	lgrp_plat_process_srat(struct srat *tp, int cpu_count,
-    uint_t *node_cnt, node_domain_map_t *node_domain, cpu_node_map_t *cpu_node,
+static int	lgrp_plat_process_srat(struct srat *tp,
+    node_domain_map_t *node_domain, cpu_node_map_t *cpu_node, int cpu_count,
     node_phys_addr_map_t *node_memory);
 
 static int	lgrp_plat_srat_domains(struct srat *tp);
@@ -697,24 +697,33 @@ lgrp_plat_init(void)
 	 * Read boot property with CPU to APIC ID mapping table/array and fill
 	 * in CPU to node ID mapping table with APIC ID for each CPU
 	 */
-	lgrp_plat_cpu_apicid_error =
-	    lgrp_plat_process_cpu_apicids(lgrp_plat_cpu_node, boot_max_ncpus);
+	lgrp_plat_apic_ncpus =
+	    lgrp_plat_process_cpu_apicids(lgrp_plat_cpu_node);
 
 	/*
 	 * Determine which CPUs and memory are local to each other and number
 	 * of NUMA nodes by reading ACPI System Resource Affinity Table (SRAT)
 	 */
-	if (!lgrp_plat_cpu_apicid_error) {
-		lgrp_plat_srat_error = lgrp_plat_process_srat(srat_ptr,
-		    boot_max_ncpus, &lgrp_plat_node_cnt, lgrp_plat_node_domain,
-		    lgrp_plat_cpu_node, lgrp_plat_node_memory);
+	if (lgrp_plat_apic_ncpus > 0) {
+		int	retval;
+
+		retval = lgrp_plat_process_srat(srat_ptr,
+		    lgrp_plat_node_domain, lgrp_plat_cpu_node,
+		    lgrp_plat_apic_ncpus, lgrp_plat_node_memory);
+		if (retval <= 0) {
+			lgrp_plat_srat_error = retval;
+			lgrp_plat_node_cnt = 1;
+		} else {
+			lgrp_plat_srat_error = 0;
+			lgrp_plat_node_cnt = retval;
+		}
 	}
 
 	/*
 	 * Try to use PCI config space registers on Opteron if there's an error
 	 * processing CPU to APIC ID mapping or SRAT
 	 */
-	if ((lgrp_plat_cpu_apicid_error != 0 || lgrp_plat_srat_error != 0) &&
+	if ((lgrp_plat_apic_ncpus <= 0 || lgrp_plat_srat_error != 0) &&
 	    is_opteron())
 		opt_get_numa_config(&lgrp_plat_node_cnt, &lgrp_plat_mem_intrlv,
 		    lgrp_plat_node_memory);
@@ -1180,7 +1189,7 @@ lgrp_plat_root_hand(void)
  * negative numbers for errors and positive ones for success)
  */
 static int
-lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
+lgrp_plat_cpu_node_update(node_domain_map_t *node_domain, int node_cnt,
     cpu_node_map_t *cpu_node, int nentries, uint32_t apicid, uint32_t domain)
 {
 	uint_t	i;
@@ -1189,9 +1198,10 @@ lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
 	/*
 	 * Get node number for proximity domain
 	 */
-	node = lgrp_plat_domain_to_node(node_domain, domain);
+	node = lgrp_plat_domain_to_node(node_domain, node_cnt, domain);
 	if (node == -1) {
-		node = lgrp_plat_node_domain_update(node_domain, domain);
+		node = lgrp_plat_node_domain_update(node_domain, node_cnt,
+		    domain);
 		if (node == -1)
 			return (-1);
 	}
@@ -1272,7 +1282,8 @@ lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node)
  * Return node number for given proximity domain/system locality
  */
 static int
-lgrp_plat_domain_to_node(node_domain_map_t *node_domain, uint32_t domain)
+lgrp_plat_domain_to_node(node_domain_map_t *node_domain, int node_cnt,
+    uint32_t domain)
 {
 	uint_t	node;
 	uint_t	start;
@@ -1282,12 +1293,12 @@ lgrp_plat_domain_to_node(node_domain_map_t *node_domain, uint32_t domain)
 	 * search for entry with matching proximity domain ID, and return index
 	 * of matching entry as node ID.
 	 */
-	node = start = NODE_DOMAIN_HASH(domain);
+	node = start = NODE_DOMAIN_HASH(domain, node_cnt);
 	do {
 		if (node_domain[node].prox_domain == domain &&
 		    node_domain[node].exists)
 			return (node);
-		node = NODE_DOMAIN_HASH(node + 1);
+		node = NODE_DOMAIN_HASH(node + 1, node_cnt);
 	} while (node != start);
 	return (-1);
 }
@@ -1687,7 +1698,8 @@ lgrp_plat_mem_size_default(lgrp_handle_t lgrphand, lgrp_mem_query_t query)
  * Update node to proximity domain mappings for given domain and return node ID
  */
 static int
-lgrp_plat_node_domain_update(node_domain_map_t *node_domain, uint32_t domain)
+lgrp_plat_node_domain_update(node_domain_map_t *node_domain, int node_cnt,
+    uint32_t domain)
 {
 	uint_t	node;
 	uint_t	start;
@@ -1696,7 +1708,7 @@ lgrp_plat_node_domain_update(node_domain_map_t *node_domain, uint32_t domain)
 	 * Hash proximity domain ID into node to domain mapping table (array)
 	 * and add entry for it into first non-existent or matching entry found
 	 */
-	node = start = NODE_DOMAIN_HASH(domain);
+	node = start = NODE_DOMAIN_HASH(domain, node_cnt);
 	do {
 		/*
 		 * Entry doesn't exist yet, so create one for this proximity
@@ -1714,7 +1726,7 @@ lgrp_plat_node_domain_update(node_domain_map_t *node_domain, uint32_t domain)
 		 */
 		if (node_domain[node].prox_domain == domain)
 			return (node);
-		node = NODE_DOMAIN_HASH(node + 1);
+		node = NODE_DOMAIN_HASH(node + 1, node_cnt);
 	} while (node != start);
 
 	/*
@@ -1731,7 +1743,7 @@ lgrp_plat_node_domain_update(node_domain_map_t *node_domain, uint32_t domain)
  * success and negative ones for errors)
  */
 static int
-lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
+lgrp_plat_node_memory_update(node_domain_map_t *node_domain, int node_cnt,
     node_phys_addr_map_t *node_memory, uint64_t start, uint64_t end,
     uint32_t domain)
 {
@@ -1740,9 +1752,10 @@ lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
 	/*
 	 * Get node number for proximity domain
 	 */
-	node = lgrp_plat_domain_to_node(node_domain, domain);
+	node = lgrp_plat_domain_to_node(node_domain, node_cnt, domain);
 	if (node == -1) {
-		node = lgrp_plat_node_domain_update(node_domain, domain);
+		node = lgrp_plat_node_domain_update(node_domain, node_cnt,
+		    domain);
 		if (node == -1)
 			return (-1);
 	}
@@ -1891,8 +1904,8 @@ lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
 
 
 /*
- * Read boot property with CPU to APIC ID array and fill in CPU to node ID
- * mapping table with APIC ID for each CPU
+ * Read boot property with CPU to APIC ID array, fill in CPU to node ID
+ * mapping table with APIC ID for each CPU, and return number of CPU APIC IDs.
  *
  * NOTE: This code assumes that CPU IDs are assigned in order that they appear
  *       in in cpu_apicid_array boot property which is based on and follows
@@ -1901,41 +1914,53 @@ lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
  *	 CPU IDs ever changes, then this code will need to change too....
  */
 static int
-lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node, int boot_ncpus)
+lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 {
+	int	boot_prop_len;
 	char	*boot_prop_name = BP_CPU_APICID_ARRAY;
 	uint8_t	cpu_apicid_array[UINT8_MAX + 1];
 	int	i;
-	int	boot_prop_len;
+	int	n;
 
 	/*
 	 * Nothing to do when no array to fill in or not enough CPUs
 	 */
-	if (cpu_node == NULL || boot_ncpus <= 1)
-		return (1);
+	if (cpu_node == NULL)
+		return (-1);
 
 	/*
 	 * Check length of property value
 	 */
 	boot_prop_len = BOP_GETPROPLEN(bootops, boot_prop_name);
-	if (boot_prop_len <= 0 || boot_prop_len > UINT8_MAX)
-		return (2);
+	if (boot_prop_len <= 0 || boot_prop_len > sizeof (cpu_apicid_array))
+		return (-2);
+
+	/*
+	 * Calculate number of entries in array and return when there's just
+	 * one CPU since that's not very interesting for NUMA
+	 */
+	n = boot_prop_len / sizeof (uint8_t);
+	if (n == 1)
+		return (-3);
 
 	/*
 	 * Get CPU to APIC ID property value
 	 */
 	if (BOP_GETPROP(bootops, boot_prop_name, cpu_apicid_array) < 0)
-		return (3);
+		return (-4);
 
 	/*
 	 * Fill in CPU to node ID mapping table with APIC ID for each CPU
 	 */
-	for (i = 0; i < boot_ncpus; i++) {
+	for (i = 0; i < n; i++) {
 		cpu_node[i].exists = 1;
 		cpu_node[i].apicid = cpu_apicid_array[i];
 	}
 
-	return (0);
+	/*
+	 * Return number of CPUs based on number of APIC IDs
+	 */
+	return (n);
 }
 
 
@@ -2013,35 +2038,35 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
 
 /*
  * Read ACPI System Resource Affinity Table (SRAT) to determine which CPUs
- * and memory are local to each other in the same NUMA node
+ * and memory are local to each other in the same NUMA node and return number
+ * of nodes
  */
 static int
-lgrp_plat_process_srat(struct srat *tp, int cpu_count, uint_t *node_cnt,
-    node_domain_map_t *node_domain, cpu_node_map_t *cpu_node,
-    node_phys_addr_map_t *node_memory)
+lgrp_plat_process_srat(struct srat *tp, node_domain_map_t *node_domain,
+    cpu_node_map_t *cpu_node, int cpu_count, node_phys_addr_map_t *node_memory)
 {
 	struct srat_item	*srat_end;
 	int			i;
 	struct srat_item	*item;
+	int			node_cnt;
 	int			proc_entry_count;
 
+	/*
+	 * Nothing to do when no SRAT or disabled
+	 */
 	if (tp == NULL || !lgrp_plat_srat_enable)
-		return (1);
+		return (-1);
 
 	/*
 	 * Determine number of nodes by counting number of proximity domains in
-	 * SRAT
+	 * SRAT and return if number of nodes is 1 or less since don't need to
+	 * read SRAT then
 	 */
-	if (node_cnt) {
-		int	nodes;
-
-		nodes = lgrp_plat_srat_domains(tp);
-		if (nodes < 0) {
-			*node_cnt = 1;
-			return (2);
-		}
-		*node_cnt = nodes;
-	}
+	node_cnt = lgrp_plat_srat_domains(tp);
+	if (node_cnt == 1)
+		return (1);
+	else if (node_cnt <= 0)
+		return (-2);
 
 	/*
 	 * Walk through SRAT, examining each CPU and memory entry to determine
@@ -2074,9 +2099,9 @@ lgrp_plat_process_srat(struct srat *tp, int cpu_count, uint_t *node_cnt,
 			}
 			apic_id = item->i.p.apic_id;
 
-			if (lgrp_plat_cpu_node_update(node_domain, cpu_node,
-			    cpu_count, apic_id, domain) < 0)
-				return (3);
+			if (lgrp_plat_cpu_node_update(node_domain, node_cnt,
+			    cpu_node, cpu_count, apic_id, domain) < 0)
+				return (-3);
 
 			proc_entry_count++;
 			break;
@@ -2095,9 +2120,9 @@ lgrp_plat_process_srat(struct srat *tp, int cpu_count, uint_t *node_cnt,
 			length = item->i.m.len;
 			end = start + length - 1;
 
-			if (lgrp_plat_node_memory_update(node_domain,
+			if (lgrp_plat_node_memory_update(node_domain, node_cnt,
 			    node_memory, start, end, domain) < 0)
-				return (4);
+				return (-4);
 			break;
 
 		default:
@@ -2110,10 +2135,10 @@ lgrp_plat_process_srat(struct srat *tp, int cpu_count, uint_t *node_cnt,
 	/*
 	 * Should have seen at least as many SRAT processor entries as CPUs
 	 */
-	if (proc_entry_count >= cpu_count)
-		return (5);
+	if (proc_entry_count < cpu_count)
+		return (-5);
 
-	return (0);
+	return (node_cnt);
 }
 
 
