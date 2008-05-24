@@ -48,7 +48,6 @@
 #include <libintl.h> /* for gettext(3c) */
 #include <libdevinfo.h>
 #include <note.h>
-
 #include <fwflash/fwflash.h>
 
 
@@ -145,7 +144,7 @@ main(int argc, char **argv) {
 	}
 
 
-	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:")) != EOF) {
+	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:M")) != EOF) {
 		switch (ch) {
 		case 'h':
 			fwflash_arg_list |= FWFLASH_HELP_FLAG;
@@ -191,8 +190,15 @@ main(int argc, char **argv) {
 			/* NOT in the manpage */
 			fwflash_debug = 1;
 			break;
-
-	/* illegal options */
+		case 'M':
+			/* NOT in the manpage */
+#if defined(MANUFACTURING_MODE)
+			manufacturing_mode = 1;
+			logmsg(MSG_WARN, "Enabling Manufactuing Mode "
+			    "operations. This can be destructive!\n");
+			break;
+#endif
+		/* illegal options */
 		default:
 			fwflash_usage(optarg);
 			return (FWFLASH_FAILURE);
@@ -421,7 +427,20 @@ flash_load_plugins() {
 		    != NULL) {
 			/* max length of drivername */
 			tmpplug->drvname = calloc(1, 17);
-			(void) strlcpy(tmpplug->drvname, (char *)sym, 17);
+
+			/* are we doing double-time? */
+			if (strncmp((char *)sym, plugdir->d_name, 17) != 0) {
+				char *tempnm = calloc(1, 17);
+
+				memcpy(tempnm, plugdir->d_name, 17);
+				(void) strlcpy(tmpplug->drvname,
+				    strtok(tempnm, "."),
+				    strlen(plugdir->d_name) + 1);
+				free(tempnm);
+			} else {
+				(void) strlcpy(tmpplug->drvname,
+				    (char *)sym, strlen(sym) + 1);
+			}
 		} else {
 			CLOSEFREE();
 			continue;
@@ -476,7 +495,7 @@ flash_load_plugins() {
 			    gettext("Unable to allocate %d bytes for "
 				"filename %s\n"),
 			    strlen(tmpplug->filename) + 1,
-			    tmpplug->drvname);
+			    tmpplug->filename);
 			return (FWFLASH_FAILURE);
 		}
 
@@ -522,7 +541,6 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 	int imgfd;
 	char *fwvrfydirpath, *tempdirpath, *filename;
 	char *clean; /* for the space-removed vid */
-
 	struct stat fwstat;
 	struct vrfyplugin *vrfy;
 	void *vrfysym;
@@ -1126,12 +1144,9 @@ fwflash_intr(int sig)
 			free(thisdev->access_devname);
 			free(thisdev->drvname);
 			free(thisdev->classname);
-			if (thisdev->ident != NULL) {
-				free(thisdev->ident->vid);
-				free(thisdev->ident->pid);
-				free(thisdev->ident->revid);
+			if (thisdev->ident != NULL)
 				free(thisdev->ident);
-			}
+
 			thisdev->ident = NULL;
 			thisdev->plugin = NULL; /* we free this elsewhere */
 			/* CONSTCOND */
