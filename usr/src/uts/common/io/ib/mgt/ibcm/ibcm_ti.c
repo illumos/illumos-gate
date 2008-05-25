@@ -345,6 +345,12 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	}
 
 #endif
+	if (chan_args->oc_path->pi_prim_pkt_lt > ibcm_max_ib_pkt_lt) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
+		    "Huge PktLifeTime %d, Max is %d", channel,
+		    chan_args->oc_path->pi_prim_pkt_lt, ibcm_max_ib_pkt_lt);
+		return (IBT_PATH_PKT_LT_TOO_HIGH);
+	}
 
 	/* If no HCA found return failure */
 	if ((hcap = ibcm_find_hca_entry(hca_guid)) == NULL) {
@@ -360,22 +366,15 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	if ((rdma_in > hcap->hca_max_rdma_in_qp) ||
 	    (rdma_out > hcap->hca_max_rdma_out_qp)) {
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
-		    "rdma in %d/out %d values exceed hca limits", channel,
-		    rdma_in, rdma_out);
+		    "rdma in %d/out %d values exceed hca limits(%d/%d)",
+		    channel, rdma_in, rdma_out, hcap->hca_max_rdma_in_qp,
+		    hcap->hca_max_rdma_out_qp);
 		ibcm_dec_hca_acc_cnt(hcap);
 		return (IBT_INVALID_PARAM);
 	}
 
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
 	    "rdma_in %d rdma_out %d", channel, rdma_in, rdma_out);
-
-	if (chan_args->oc_path->pi_prim_pkt_lt > ibcm_max_ib_pkt_lt) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
-		    "Huge Primary Pkt lt %d", channel,
-		    chan_args->oc_path->pi_prim_pkt_lt);
-		ibcm_dec_hca_acc_cnt(hcap);
-		return (IBT_PATH_PKT_LT_TOO_HIGH);
-	}
 
 	status = ibt_get_port_state_byguid(hcap->hca_guid, port_no,
 	    NULL, &base_lid);
@@ -415,7 +414,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
 	    "primary ibmf_hdl = 0x%p", channel, ibmf_hdl);
 
-
 	primary_slid = base_lid + IBCM_PRIM_ADDS_VECT(chan_args).av_src_path;
 
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: channel 0x%p "
@@ -452,7 +450,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		alternate_slid =
 		    base_lid + IBCM_ALT_ADDS_VECT(chan_args).av_src_path;
 
-		IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan %0xp "
+		IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "alternate SLID = %x", channel, alternate_slid);
 	}
 
@@ -2756,8 +2754,8 @@ ibt_bind_service(ibt_srv_hdl_t srv_hdl, ib_gid_t gid, ibt_srv_bind_t *srv_bind,
 			    srv_bind->sb_pkey == sbp->sbind_pkey) {
 				IBTF_DPRINTF_L2(cmlog, "ibt_bind_service: "
 				    "failed: GID %llX:%llX and PKEY %x is "
-				    "already bound", gid.gid_guid,
-				    gid.gid_prefix, sbp->sbind_pkey);
+				    "already bound", gid.gid_prefix,
+				    gid.gid_guid, sbp->sbind_pkey);
 				mutex_exit(&ibcm_svc_info_lock);
 				ibcm_dec_hca_acc_cnt(hcap);
 				kmem_free(sbindp, sizeof (*sbindp));
@@ -5797,7 +5795,7 @@ get_comp_for_multihca:
 	/* We will be here, if request is for remote node */
 	for (i = 0; i < num_hcas; i++) {
 		int		multism;
-		uint8_t		count = 0;
+		uint_t		count = 0;
 		int		multi_sm_loop = 0;
 		uint_t		k = 0, l;
 

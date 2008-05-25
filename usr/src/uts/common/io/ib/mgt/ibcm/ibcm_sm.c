@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1843,9 +1843,9 @@ ibcm_return_open_data(ibcm_state_data_t *statep, ibcm_rep_msg_t *rep_msgp,
 			    statep->open_return_data->rc_priv_data,
 			    statep->open_return_data->rc_priv_data_len);
 		statep->open_return_data->rc_rdma_ra_in =
-		    rep_msgp->rep_resp_resources;
-		statep->open_return_data->rc_rdma_ra_out =
 		    rep_msgp->rep_initiator_depth;
+		statep->open_return_data->rc_rdma_ra_out =
+		    rep_msgp->rep_resp_resources;
 		statep->open_return_data->rc_failover_status =
 		    rep_msgp->rep_target_delay_plus >> 1 & 3;
 		statep->open_return_data->rc_status = reject_reason;
@@ -6139,6 +6139,29 @@ ibcm_cep_state_req(ibcm_state_data_t *statep, ibcm_req_msg_t *cm_req_msgp,
 	IBCM_EVT_REQ(event).req_rdma_ra_out =
 	    ((uint8_t *)&cm_req_msgp->req_local_eec_no_plus)[3];
 
+	/* Check for HCA limits for RDMA Resources */
+	if (IBCM_EVT_REQ(event).req_rdma_ra_in >
+	    statep->hcap->hca_max_rdma_in_qp) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_cep_state_req: statep 0x%p, REQ "
+		    "req_rdma_ra_in %d is greater than HCA Limit %d, resetting"
+		    "it to HCA limit", statep,
+		    IBCM_EVT_REQ(event).req_rdma_ra_in,
+		    statep->hcap->hca_max_rdma_in_qp);
+		IBCM_EVT_REQ(event).req_rdma_ra_in =
+		    statep->hcap->hca_max_rdma_in_qp;
+	}
+
+	if (IBCM_EVT_REQ(event).req_rdma_ra_out >
+	    statep->hcap->hca_max_rdma_out_qp) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_cep_state_req: statep 0x%p, REQ "
+		    "req_rdma_ra_out %d is greater than HCA Limit %d, resetting"
+		    "it to HCA limit", statep,
+		    IBCM_EVT_REQ(event).req_rdma_ra_out,
+		    statep->hcap->hca_max_rdma_out_qp);
+		IBCM_EVT_REQ(event).req_rdma_ra_out =
+		    statep->hcap->hca_max_rdma_out_qp;
+	}
+
 	/* Account for CM and other software delays */
 	if (IBCM_EVT_REQ(event).req_timeout > ibcm_sw_delay) {
 		IBCM_EVT_REQ(event).req_timeout -= ibcm_sw_delay;
@@ -6437,6 +6460,46 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 		}
 
 		/* fill in the REP msg based on ret_args from client */
+		if (clnt_info->reply_event->rep.cm_rdma_ra_out >
+		    ((uint8_t *)&cm_req_msg->req_local_eec_no_plus)[3]) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_req_cm_hdlr "
+			    "statep 0x%p ERROR: InitiatorDepth(%d) is Greater "
+			    "than ResponderResource(%d)", statep,
+			    clnt_info->reply_event->rep.cm_rdma_ra_out,
+			    ((uint8_t *)&cm_req_msg->req_local_eec_no_plus)[3]);
+			*reject_reason = IBT_CM_NOT_SUPPORTED;
+			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
+			    IBT_CM_FAILURE_REQ, IBT_CM_NOT_SUPPORTED, NULL, 0);
+			return (IBCM_SEND_REJ);
+		}
+
+		/* Check for HCA limits for RDMA Resources */
+		if (clnt_info->reply_event->rep.cm_rdma_ra_in >
+		    statep->hcap->hca_max_rdma_in_qp) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_req_cm_hdlr: "
+			    "statep %p, ERROR: client specified rdma_ra_in %d "
+			    "is greater than HCA Limit %d, rejecting MAD",
+			    statep, clnt_info->reply_event->rep.cm_rdma_ra_in,
+			    statep->hcap->hca_max_rdma_in_qp);
+			*reject_reason = IBT_CM_NOT_SUPPORTED;
+			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
+			    IBT_CM_FAILURE_REQ, IBT_CM_NOT_SUPPORTED, NULL, 0);
+			return (IBCM_SEND_REJ);
+		}
+
+		if (clnt_info->reply_event->rep.cm_rdma_ra_out >
+		    statep->hcap->hca_max_rdma_out_qp) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_req_cm_hdlr: "
+			    "statep %p, ERROR: client specified rdma_ra_out %d "
+			    "is greater than HCA Limit %d, rejecting MAD",
+			    statep, clnt_info->reply_event->rep.cm_rdma_ra_out,
+			    statep->hcap->hca_max_rdma_out_qp);
+			*reject_reason = IBT_CM_NOT_SUPPORTED;
+			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
+			    IBT_CM_FAILURE_REQ, IBT_CM_NOT_SUPPORTED, NULL, 0);
+			return (IBCM_SEND_REJ);
+		}
+
 		rep_msgp->rep_resp_resources =
 		    clnt_info->reply_event->rep.cm_rdma_ra_in;
 		rep_msgp->rep_initiator_depth =
@@ -6630,6 +6693,7 @@ ibcm_cep_state_rep(ibcm_state_data_t *statep, ibcm_rep_msg_t *cm_rep_msgp,
 	ibt_cm_status_t		cb_status = IBT_CM_ACCEPT;
 	ibt_cm_return_args_t	ret_args;
 	ibcm_clnt_reply_info_t	clnt_info;
+	uint8_t			req_init_depth;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_cep_state_rep: statep 0x%p", statep);
 
@@ -6642,9 +6706,18 @@ ibcm_cep_state_rep(ibcm_state_data_t *statep, ibcm_rep_msg_t *cm_rep_msgp,
 		event.cm_session_id = statep;
 
 		IBCM_EVT_REP(event).rep_rdma_ra_in =
-		    cm_rep_msgp->rep_resp_resources;
-		IBCM_EVT_REP(event).rep_rdma_ra_out =
 		    cm_rep_msgp->rep_initiator_depth;
+		req_init_depth =
+		    ((uint8_t *)&(((ibcm_req_msg_t *)IBCM_OUT_MSGP(
+		    statep->stored_msg))->req_local_eec_no_plus))[3];
+		IBCM_EVT_REP(event).rep_rdma_ra_out =
+		    min(cm_rep_msgp->rep_resp_resources, req_init_depth);
+
+		IBTF_DPRINTF_L3(cmlog, "ibcm_cep_state_rep: statep 0x%p, "
+		    "InitDepth %d, RespResr %d", statep,
+		    cm_rep_msgp->rep_initiator_depth,
+		    IBCM_EVT_REP(event).rep_rdma_ra_out);
+
 		IBCM_EVT_REP(event).rep_service_time = ibt_ib2usec(
 		    ((uint8_t *)&(((ibcm_req_msg_t *)IBCM_OUT_MSGP(
 		    statep->stored_msg))->req_starting_psn_plus))[3] >> 3);
@@ -7221,7 +7294,7 @@ ibcm_copy_addl_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
     ibt_cm_conn_failed_t *failed)
 {
 	uint16_t 	rej_reason = b2h16(rej_msgp->rej_rejection_reason);
-	int		ari_len = rej_msgp->rej_reject_info_len_plus >> 1;
+	uint8_t		ari_len = rej_msgp->rej_reject_info_len_plus >> 1;
 	ibcm_classportinfo_msg_t tclp;
 	ibt_arej_info_t	*cf_addl = &failed->cf_additional;
 
@@ -8218,7 +8291,7 @@ static void
 ibcm_set_apr_arej(int ap_status, ibcm_apr_msg_t *apr_msgp,
     ibt_arej_info_t *ari, boolean_t *ari_valid)
 {
-	int ari_len = apr_msgp->apr_addl_info_len;
+	uint8_t ari_len = apr_msgp->apr_addl_info_len;
 	ibcm_classportinfo_msg_t tclp;
 
 	*ari_valid = B_FALSE;

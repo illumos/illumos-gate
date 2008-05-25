@@ -665,14 +665,24 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 	if (ret == IBT_SUCCESS) {
 		int		i;
 		uint8_t		cnt;
+		boolean_t	no_srcip_configured = B_FALSE;
+		uint8_t		no_srcip_cnt = 0;
 
 		plistp = port_list_p[0];
 		cnt = plistp->p_count;
 		for (i = 0; i < cnt; i++, plistp++) {
 			ipp = ibcm_arp_ibd_gid2mac(&plistp->p_sgid, 0, &ibds);
-			if (ipp == NULL)
+			if ((ipp == NULL) ||
+			    (ipp->ip_inet_family == AF_UNSPEC)) {
 				plistp->p_src_ip.family = AF_UNSPEC;
-			else {
+				no_srcip_configured = B_TRUE;
+				no_srcip_cnt++;
+				IBTF_DPRINTF_L3(cmlog,
+				    "ibcm_arp_get_srcip_plist: SrcIP NOT "
+				    "Configured for GID %llX:%llX",
+				    plistp->p_sgid.gid_prefix,
+				    plistp->p_sgid.gid_guid);
+			} else {
 				IBTF_DPRINTF_L4(cmlog,
 				    "ibcm_arp_get_srcip_plist: GID %llX:%llX",
 				    plistp->p_sgid.gid_prefix,
@@ -693,6 +703,54 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 					    sizeof (in6_addr_t));
 				}
 			}
+		}
+		if (no_srcip_configured == B_TRUE) {
+			ibtl_cm_port_list_t	*n_plistp, *tmp_n_plistp;
+			uint8_t			new_cnt;
+
+			new_cnt = cnt - no_srcip_cnt;
+
+			/*
+			 * Looks like some of the SRC GID we found have no
+			 * IP ADDR configured, so remove these entries from
+			 * our list.
+			 */
+			plistp = port_list_p[0];
+			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_srcip_plist: "
+			    "Only %d SGID (%d/%d) have SrcIP Configured",
+			    new_cnt, no_srcip_cnt, cnt);
+			if (new_cnt) {
+				/* Allocate Memory to hold Src Point info. */
+				n_plistp = kmem_zalloc(new_cnt *
+				    sizeof (ibtl_cm_port_list_t), KM_SLEEP);
+
+				tmp_n_plistp = n_plistp;
+				for (i = 0; i < cnt; i++, plistp++) {
+					if (plistp->p_src_ip.family ==
+					    AF_UNSPEC)
+						continue;
+
+					bcopy(plistp, n_plistp,
+					    sizeof (ibtl_cm_port_list_t));
+					n_plistp->p_count = new_cnt;
+					n_plistp++;
+				}
+				plistp = port_list_p[0];
+				*port_list_p = tmp_n_plistp;
+			} else {
+				/*
+				 * All entries we have, do not have IP-Addr
+				 * configured so return empty hand.
+				 */
+				IBTF_DPRINTF_L2(cmlog,
+				    "ibcm_arp_get_srcip_plist: None of SGID "
+				    "found have SrcIP Configured");
+				*port_list_p = NULL;
+				ret = IBT_SRC_IP_NOT_FOUND;
+			}
+			IBTF_DPRINTF_L4(cmlog, "FREE OLD list %p, NEW list is "
+			    "%p - %p", plistp, port_list_p, *port_list_p);
+			kmem_free(plistp, cnt * sizeof (ibtl_cm_port_list_t));
 		}
 	}
 
