@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ _init(void)
 
 	if (rval == 0) {
 		usbms_log_handle = usb_alloc_log_hdl(NULL, "usbms",
-			&usbms_errlevel, &usbms_errmask, NULL, 0);
+		    &usbms_errlevel, &usbms_errmask, NULL, 0);
 	}
 
 	return (rval);
@@ -426,13 +426,13 @@ usbms_close(queue_t			*q,
 	register struct	ms_softc	*ms = &usbmsp->usbms_softc;
 
 	USB_DPRINTF_L3(PRINT_MASK_CLOSE, usbms_log_handle,
-		"usbms_close entering");
+	    "usbms_close entering");
 
 	qprocsoff(q);
 
 	if (usbmsp->usbms_jitter) {
 		(void) quntimeout(q,
-			(timeout_id_t)(long)usbmsp->usbms_timeout_id);
+		    (timeout_id_t)(long)usbmsp->usbms_timeout_id);
 		usbmsp->usbms_jitter = 0;
 	}
 	if (usbmsp->usbms_reioctl_id) {
@@ -467,7 +467,7 @@ usbms_close(queue_t			*q,
 
 
 	USB_DPRINTF_L3(PRINT_MASK_CLOSE, usbms_log_handle,
-		"usbms_close exiting");
+	    "usbms_close exiting");
 
 	return (0);
 }
@@ -493,7 +493,7 @@ usbms_rserv(queue_t		*q)
 	b = usbmsp->usbms_buf;
 
 	USB_DPRINTF_L3(PRINT_MASK_SERV, usbms_log_handle,
-		"usbms_rserv entering");
+	    "usbms_rserv entering");
 
 	while (canputnext(q) && ms->ms_oldoff != b->mb_off) {
 		mi = &b->mb_info[ms->ms_oldoff];
@@ -524,13 +524,14 @@ usbms_rserv(queue_t		*q)
 			} else {
 				if (usbmsp->usbms_resched_id) {
 					qunbufcall(q,
-					(bufcall_id_t)usbmsp->usbms_resched_id);
+					    (bufcall_id_t)usbmsp->
+					    usbms_resched_id);
 				}
 				usbmsp->usbms_resched_id = qbufcall(q,
-							(size_t)3,
-							(uint_t)BPRI_HI,
-						(void (*)())usbms_resched,
-							(void *) usbmsp);
+				    (size_t)3,
+				    (uint_t)BPRI_HI,
+				    (void (*)())usbms_resched,
+				    (void *) usbmsp);
 				if (usbmsp->usbms_resched_id == 0)
 
 					return;	/* try again later */
@@ -556,12 +557,12 @@ usbms_rserv(queue_t		*q)
 
 				case EVENT_WHEEL:
 					loop = (usbmsp->usbms_num_wheels ?
-						1 : 0);
+					    1 : 0);
 
 					if (usbmsp->usbms_num_wheels) {
 						for (i = 0; i < loop; i++) {
-						    usbms_rserv_vuid_event_wheel
-							    (q, mi, &bp, i);
+						usbms_rserv_vuid_event_wheel
+						    (q, mi, &bp, i);
 						}
 					}
 
@@ -612,7 +613,7 @@ usbms_rserv(queue_t		*q)
 		}
 	}
 	USB_DPRINTF_L3(PRINT_MASK_SERV, usbms_log_handle,
-		"usbms_rserv exiting");
+	    "usbms_rserv exiting");
 }
 
 
@@ -649,7 +650,7 @@ usbms_rserv_vuid_event_wheel(queue_t		*q,
 		} else {
 			if (usbmsp->usbms_resched_id) {
 				qunbufcall(q,
-				(bufcall_id_t)usbmsp->usbms_resched_id);
+				    (bufcall_id_t)usbmsp->usbms_resched_id);
 			}
 			usbmsp->usbms_resched_id =
 			    qbufcall(q, sizeof (Firm_event), BPRI_HI,
@@ -728,15 +729,15 @@ usbms_rserv_vuid_button(queue_t			*q,
 	}
 
 	if ((ms->ms_prevbuttons & hwbit) !=
-			(mi->mi_buttons & hwbit)) {
+	    (mi->mi_buttons & hwbit)) {
 		if ((bp = allocb(sizeof (Firm_event),
-			BPRI_HI)) != NULL) {
+		    BPRI_HI)) != NULL) {
 			*bpaddr = bp;
 			fep = (Firm_event *)bp->b_wptr;
 			fep->id = vuid_id_addr(
-				ms->ms_vuidaddr) |
-				vuid_id_offset(BUT(1)
-				+ button_number);
+			    ms->ms_vuidaddr) |
+			    vuid_id_offset(BUT(1)
+			    + button_number);
 			fep->pair_type = FE_PAIR_NONE;
 			fep->pair = 0;
 
@@ -747,24 +748,24 @@ usbms_rserv_vuid_button(queue_t			*q,
 			if (mi->mi_buttons & hwbit) {
 				fep->value = 0;
 				ms->ms_prevbuttons |=
-					hwbit;
+				    hwbit;
 			} else {
 				fep->value = 1;
 				ms->ms_prevbuttons &=
-						~hwbit;
+				    ~hwbit;
 			}
 			fep->time = mi->mi_time;
 		} else {
 			if (usbmsp->usbms_resched_id) {
 				qunbufcall(q,
-				(bufcall_id_t)usbmsp->usbms_resched_id);
+				    (bufcall_id_t)usbmsp->usbms_resched_id);
 			}
 			usbmsp->usbms_resched_id =
-				qbufcall(q,
-				sizeof (Firm_event),
-				BPRI_HI,
-			(void (*)())usbms_resched,
-				(void *) usbmsp);
+			    qbufcall(q,
+			    sizeof (Firm_event),
+			    BPRI_HI,
+			    (void (*)())usbms_resched,
+			    (void *) usbmsp);
 			if (usbmsp->usbms_resched_id == 0)
 				/* try again later */
 				return;
@@ -811,25 +812,25 @@ usbms_rserv_vuid_event_y(register queue_t		*q,
 	/* Send y if changed. */
 	if (mi->mi_y != 0) {
 		if ((bp = allocb(sizeof (Firm_event),
-			BPRI_HI)) != NULL) {
+		    BPRI_HI)) != NULL) {
 			*bpaddr = bp;
 			fep = (Firm_event *)bp->b_wptr;
 			if (((usbmsp->usbms_idf).yattr) &
 			    HID_MAIN_ITEM_RELATIVE) {
 				fep->id = vuid_id_addr(
-					ms->ms_vuidaddr) |
-					vuid_id_offset(
-						LOC_Y_DELTA);
+				    ms->ms_vuidaddr) |
+				    vuid_id_offset(
+				    LOC_Y_DELTA);
 				fep->pair_type =
-					FE_PAIR_ABSOLUTE;
+				    FE_PAIR_ABSOLUTE;
 				fep->pair =
-					(uchar_t)LOC_Y_ABSOLUTE;
+				    (uchar_t)LOC_Y_ABSOLUTE;
 				fep->value = -(mi->mi_y);
 			} else {
 				fep->id = vuid_id_addr(
-					ms->ms_vuidaddr) |
-					vuid_id_offset(
-						LOC_Y_ABSOLUTE);
+				    ms->ms_vuidaddr) |
+				    vuid_id_offset(
+				    LOC_Y_ABSOLUTE);
 				fep->pair_type = FE_PAIR_DELTA;
 				fep->pair = (uchar_t)LOC_Y_DELTA;
 				fep->value = (mi->mi_y *
@@ -846,14 +847,14 @@ usbms_rserv_vuid_event_y(register queue_t		*q,
 		} else {
 			if (usbmsp->usbms_resched_id) {
 				qunbufcall(q,
-		(bufcall_id_t)usbmsp->usbms_resched_id);
+				    (bufcall_id_t)usbmsp->usbms_resched_id);
 			}
 			usbmsp->usbms_resched_id =
-				qbufcall(q,
-				sizeof (Firm_event),
-				BPRI_HI,
-			(void (*)())usbms_resched,
-				(void *)usbmsp);
+			    qbufcall(q,
+			    sizeof (Firm_event),
+			    BPRI_HI,
+			    (void (*)())usbms_resched,
+			    (void *)usbmsp);
 			if (usbmsp->usbms_resched_id == 0) {
 				/* try again later */
 				return;
@@ -902,22 +903,22 @@ usbms_rserv_vuid_event_x(register queue_t		*q,
 	/* Send x if changed. */
 	if (mi->mi_x != 0) {
 		if ((bp = allocb(sizeof (Firm_event),
-			BPRI_HI)) != NULL) {
+		    BPRI_HI)) != NULL) {
 			*bpaddr = bp;
 			fep = (Firm_event *)bp->b_wptr;
 			if (((usbmsp->usbms_idf).xattr) &
 			    HID_MAIN_ITEM_RELATIVE) {
 				fep->id = vuid_id_addr(
-					ms->ms_vuidaddr) |
-				vuid_id_offset(LOC_X_DELTA);
+				    ms->ms_vuidaddr) |
+				    vuid_id_offset(LOC_X_DELTA);
 				fep->pair_type =
-					FE_PAIR_ABSOLUTE;
+				    FE_PAIR_ABSOLUTE;
 				fep->pair =
-					(uchar_t)LOC_X_ABSOLUTE;
+				    (uchar_t)LOC_X_ABSOLUTE;
 				fep->value = mi->mi_x;
 			} else {
 				fep->id = vuid_id_addr(ms->ms_vuidaddr) |
-					    vuid_id_offset(LOC_X_ABSOLUTE);
+				    vuid_id_offset(LOC_X_ABSOLUTE);
 				fep->pair_type = FE_PAIR_DELTA;
 				fep->pair = (uchar_t)LOC_X_DELTA;
 				fep->value = (mi->mi_x *
@@ -934,13 +935,13 @@ usbms_rserv_vuid_event_x(register queue_t		*q,
 		} else {
 			if (usbmsp->usbms_resched_id)
 				qunbufcall(q,
-	(bufcall_id_t)usbmsp->usbms_resched_id);
+				    (bufcall_id_t)usbmsp->usbms_resched_id);
 			usbmsp->usbms_resched_id =
-				qbufcall(q,
-				sizeof (Firm_event),
-				BPRI_HI,
-		(void (*)())usbms_resched,
-				(void *) usbmsp);
+			    qbufcall(q,
+			    sizeof (Firm_event),
+			    BPRI_HI,
+			    (void (*)())usbms_resched,
+			    (void *) usbmsp);
 			if (usbmsp->usbms_resched_id == 0)
 				/* try again later */
 				return;
@@ -983,7 +984,7 @@ usbms_wput(queue_t		*q,
 	mblk_t			*mp)
 {
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
-			"usbms_wput entering");
+	    "usbms_wput entering");
 	switch (mp->b_datap->db_type) {
 
 	case M_FLUSH:  /* Canonical flush handling */
@@ -1011,7 +1012,7 @@ usbms_wput(queue_t		*q,
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
-		"usbms_wput exiting");
+	    "usbms_wput exiting");
 
 	return (0);
 }
@@ -1037,7 +1038,7 @@ usbms_ioctl(register queue_t		*q,
 	mblk_t	*mb;
 
 	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbms_log_handle,
-		"usbms_ioctl entering");
+	    "usbms_ioctl entering");
 
 	if (usbmsp == NULL) {
 		miocnak(q, mp, 0, EINVAL);
@@ -1185,7 +1186,7 @@ usbms_ioctl(register queue_t		*q,
 			return;
 		}
 		if (mp->b_cont == NULL || iocp->ioc_count !=
-					    sizeof (wheel_info)) {
+		    sizeof (wheel_info)) {
 			err = EINVAL;
 			break;
 		}
@@ -1321,8 +1322,8 @@ allocfailure:
 		qunbufcall(q, (bufcall_id_t)usbmsp->usbms_reioctl_id);
 	}
 	usbmsp->usbms_reioctl_id = qbufcall(q, ioctlrespsize, BPRI_HI,
-					(void (*)())usbms_reioctl,
-					(void *)usbmsp);
+	    (void (*)())usbms_reioctl,
+	    (void *)usbmsp);
 }
 
 
@@ -1525,7 +1526,7 @@ usbms_flush(usbms_state_t		*usbmsp)
 	register queue_t		*q;
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
-		"usbms_flush entering");
+	    "usbms_flush entering");
 
 	ms->ms_oldoff = 0;
 	ms->ms_eventstate = EVENT_BUT(usbmsp->usbms_num_buttons);
@@ -1537,7 +1538,7 @@ usbms_flush(usbms_state_t		*usbmsp)
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
-		"usbms_flush exiting");
+	    "usbms_flush exiting");
 }
 
 
@@ -1675,8 +1676,8 @@ usbms_mctl_receive(register queue_t		*q,
 
 		/* FALLTHRU */
 	default:
-	    freemsg(mp);
-	    break;
+		freemsg(mp);
+		break;
 	}
 }
 
@@ -1716,7 +1717,7 @@ usbms_input(usbms_state_t		*usbmsp,
 	b = usbmsp->usbms_buf;
 
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-		"usbms_input entering");
+	    "usbms_input entering");
 
 	if (b == NULL) {
 
@@ -1733,49 +1734,49 @@ usbms_input(usbms_state_t		*usbmsp,
 	if (c & USBMS_BUT(1)) {	 /* left button is pressed */
 		mi->mi_buttons = mi->mi_buttons & USB_LEFT_BUT_PRESSED;
 		USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR,
-			usbms_log_handle,
-			"left button pressed");
+		    usbms_log_handle,
+		    "left button pressed");
 	}
 	if (c & USBMS_BUT(2)) {	/* right button is pressed */
 		mi->mi_buttons = mi->mi_buttons & USB_RIGHT_BUT_PRESSED;
 		USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR,
-			usbms_log_handle,
-			"right button pressed");
+		    usbms_log_handle,
+		    "right button pressed");
 	}
 	if (c & USBMS_BUT(3)) {   /* middle button is pressed */
 		mi->mi_buttons = mi->mi_buttons &
-					USB_MIDDLE_BUT_PRESSED;
+		    USB_MIDDLE_BUT_PRESSED;
 		USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR,
-			usbms_log_handle,
-			"middle button pressed");
+		    usbms_log_handle,
+		    "middle button pressed");
 	}
 
 	if (nbutt > 3) {
 		for (i = 4; i < (nbutt + 1); i++) {
 			if (c & USBMS_BUT(i)) {
 				mi->mi_buttons = mi->mi_buttons &
-					USB_BUT_PRESSED(i);
+				    USB_BUT_PRESSED(i);
 				USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR,
-					usbms_log_handle,
-					"%d button pressed", i);
+				    usbms_log_handle,
+				    "%d button pressed", i);
 			}
 		}
 	}
 
 	/* get the delta X and Y from the sample */
 	mi->mi_x += usbms_get_coordinate((usbmsp->usbms_idf).xpos,
-				    (usbmsp->usbms_idf).xlen, mp);
+	    (usbmsp->usbms_idf).xlen, mp);
 
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR,
-		usbms_log_handle, "x = %d", (int)mi->mi_x);
+	    usbms_log_handle, "x = %d", (int)mi->mi_x);
 
 	uniqtime32(&mi->mi_time); /* record time when sample arrived */
 
 	mi->mi_y += usbms_get_coordinate((usbmsp->usbms_idf).ypos,
-				    (usbmsp->usbms_idf).ylen, mp);
+	    (usbmsp->usbms_idf).ylen, mp);
 
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-		"y = %d", (int)mi->mi_y);
+	    "y = %d", (int)mi->mi_y);
 
 	/*
 	 * Check the wheel data in the current event.
@@ -1784,15 +1785,15 @@ usbms_input(usbms_state_t		*usbmsp,
 
 	if (usbmsp->usbms_num_wheels) {
 		mi->mi_z += usbms_get_coordinate((usbmsp->usbms_idf).zpos,
-					    (usbmsp->usbms_idf).zlen, mp);
+		    (usbmsp->usbms_idf).zlen, mp);
 
 		USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-			"z = %d", (int)mi->mi_z);
+		    "z = %d", (int)mi->mi_z);
 	}
 
 	if (usbmsp->usbms_jitter) {
 		(void) quntimeout(usbmsp->usbms_rq_ptr,
-				(timeout_id_t)usbmsp->usbms_timeout_id);
+		    (timeout_id_t)usbmsp->usbms_timeout_id);
 		usbmsp->usbms_jitter = 0;
 	}
 
@@ -1819,7 +1820,7 @@ usbms_input(usbms_state_t		*usbmsp,
 		 */
 		jitter_radius = usbmsp->usbms_jitter_thresh;
 		if (USB_ABS((int)mi->mi_x) <= jitter_radius &&
-			USB_ABS((int)mi->mi_y) <= jitter_radius) {
+		    USB_ABS((int)mi->mi_y) <= jitter_radius) {
 			/*
 			 * Mouse moved less than the jitter threshhold.
 			 * Don't indicate an event; keep accumulating motions.
@@ -1828,8 +1829,10 @@ usbms_input(usbms_state_t		*usbmsp,
 			 */
 			usbmsp->usbms_jitter = 1;
 			usbmsp->usbms_timeout_id =
-			qtimeout(usbmsp->usbms_rq_ptr, (void (*)())usbms_incr,
-			(void *)usbmsp, (clock_t)usbmsp->usbms_jittertimeout);
+			    qtimeout(usbmsp->usbms_rq_ptr,
+			    (void (*)())usbms_incr,
+			    (void *)usbmsp,
+			    (clock_t)usbmsp->usbms_jittertimeout);
 
 			return;
 		}
@@ -1838,7 +1841,7 @@ usbms_input(usbms_state_t		*usbmsp,
 	usbms_incr(usbmsp);
 
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-			"usbms_input exiting");
+	    "usbms_input exiting");
 }
 
 
@@ -1898,7 +1901,7 @@ usbms_incr(void				*arg)
 	b = usbmsp->usbms_buf;
 
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-		"usbms_incr entering");
+	    "usbms_incr entering");
 
 	if (b == NULL) {
 
@@ -1940,7 +1943,7 @@ usbms_incr(void				*arg)
 	if (b->mb_off == ms->ms_oldoff) {
 		if (overrun_msg) {
 			USB_DPRINTF_L1(PRINT_MASK_ALL, usbms_log_handle,
-				"Mouse buffer flushed when overrun.");
+			    "Mouse buffer flushed when overrun.");
 		}
 		usbms_flush(usbmsp);
 		overrun_cnt++;
@@ -1955,11 +1958,11 @@ usbms_incr(void				*arg)
 
 	if (wake) {
 		USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-			"usbms_incr run service");
+		    "usbms_incr run service");
 		qenable(usbmsp->usbms_rq_ptr);	/* run the service proc */
 	}
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
-		"usbms_incr exiting");
+	    "usbms_incr exiting");
 }
 
 
@@ -1991,20 +1994,20 @@ usbms_check_for_wheels(usbms_state_t *usbmsp)
 
 		/* find no. of wheels in this report */
 		rval = hidparser_get_usage_attribute(
-			usbmsp->usbms_report_descr_handle,
-			report_id,
-			HIDPARSER_ITEM_INPUT,
-			HID_GENERIC_DESKTOP,
-			HID_GD_WHEEL,
-			HIDPARSER_ITEM_REPORT_COUNT,
-			&usbmsp->usbms_num_wheels);
+		    usbmsp->usbms_report_descr_handle,
+		    report_id,
+		    HIDPARSER_ITEM_INPUT,
+		    HID_GENERIC_DESKTOP,
+		    HID_GD_WHEEL,
+		    HIDPARSER_ITEM_REPORT_COUNT,
+		    &usbmsp->usbms_num_wheels);
 		if (rval == HIDPARSER_SUCCESS) {
 			/*
 			 * Found wheel. By default enable the wheel.
 			 * Currently only enable only the first wheel.
 			 */
 			usbmsp->usbms_wheel_state_bf |=
-					VUID_WHEEL_STATE_ENABLED;
+			    VUID_WHEEL_STATE_ENABLED;
 
 			return (USB_SUCCESS);
 		}
@@ -2054,11 +2057,22 @@ usbms_make_copyreq(mblk_t 	*mp,
 		}
 		cq->cq_private = ioctmp;
 		ioctmp = cq->cq_private;
-	}
+	} else {
+		/*
+		 * Here we need to set cq_private even if there's
+		 * no private data, otherwise its value will be
+		 * TRANSPARENT (-1) on 64bit systems because it
+		 * overlaps iocp->ioc_count. If user address (cq_addr)
+		 * is invalid, it would cause panic later in
+		 * usbms_miocdata:
+		 * 	freemsg((mblk_t *)copyresp->cp_private);
+		 */
+		cq->cq_private = NULL;
+		}
 	if (state) {
 		usbmsioc = (usbms_iocstate_t *)ioctmp->b_rptr;
 		usbmsioc->ioc_state = state;
-		if (pvtsize) {
+		if (pvtsize) {  /* M_COPYIN */
 			usbmsioc->u_addr = cq->cq_addr;
 		} else {
 			cq->cq_addr = usbmsioc->u_addr;
@@ -2254,10 +2268,10 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 	 */
 
 	rval = hidparser_get_usage_list_in_order(
-		usbmsp->usbms_report_descr_handle,
-		usbmsp->usbms_rptid,
-		HIDPARSER_ITEM_INPUT,
-		ms_rpt);
+	    usbmsp->usbms_report_descr_handle,
+	    usbmsp->usbms_rptid,
+	    HIDPARSER_ITEM_INPUT,
+	    ms_rpt);
 
 	if (rval != HIDPARSER_SUCCESS) {
 
@@ -2270,7 +2284,7 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 		rptcnt = ms_rpt->usage_descr[i].rptcnt;
 		rptsz = ms_rpt->usage_descr[i].rptsz;
 		if ((ms_rpt->usage_descr[i].usage_page ==
-				    HID_BUTTON_PAGE) && (!button_page)) {
+		    HID_BUTTON_PAGE) && (!button_page)) {
 			idf->bpos = limit;
 			limit += (rptcnt * rptsz);
 			button_page = 1;
@@ -2321,12 +2335,12 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 
 	/* Check whether X and Y are relative or absolute */
 	rval = hidparser_get_main_item_data_descr(
-		usbmsp->usbms_report_descr_handle,
-		usbmsp->usbms_rptid,
-		HIDPARSER_ITEM_INPUT,
-		HID_GENERIC_DESKTOP,
-		HID_GD_X,
-		&idf->xattr);
+	    usbmsp->usbms_report_descr_handle,
+	    usbmsp->usbms_rptid,
+	    HIDPARSER_ITEM_INPUT,
+	    HID_GENERIC_DESKTOP,
+	    HID_GD_X,
+	    &idf->xattr);
 
 	if (rval != HIDPARSER_SUCCESS) {
 
@@ -2347,13 +2361,13 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 			return (USB_FAILURE);
 		}
 		if (hidparser_get_usage_attribute(
-			    usbmsp->usbms_report_descr_handle,
-			    usbmsp->usbms_rptid,
-			    HIDPARSER_ITEM_INPUT,
-			    HID_GENERIC_DESKTOP,
-			    HID_GD_X,
-			    HIDPARSER_ITEM_LOGICAL_MAXIMUM,
-			    &usbmsp->usbms_logical_Xmax) != HIDPARSER_SUCCESS) {
+		    usbmsp->usbms_report_descr_handle,
+		    usbmsp->usbms_rptid,
+		    HIDPARSER_ITEM_INPUT,
+		    HID_GENERIC_DESKTOP,
+		    HID_GD_X,
+		    HIDPARSER_ITEM_LOGICAL_MAXIMUM,
+		    &usbmsp->usbms_logical_Xmax) != HIDPARSER_SUCCESS) {
 
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
 			    "fail to get X logical max.");
@@ -2361,13 +2375,13 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 			return (USB_FAILURE);
 		}
 		if (hidparser_get_usage_attribute(
-			    usbmsp->usbms_report_descr_handle,
-			    usbmsp->usbms_rptid,
-			    HIDPARSER_ITEM_INPUT,
-			    HID_GENERIC_DESKTOP,
-			    HID_GD_Y,
-			    HIDPARSER_ITEM_LOGICAL_MAXIMUM,
-			    &usbmsp->usbms_logical_Ymax) != HIDPARSER_SUCCESS) {
+		    usbmsp->usbms_report_descr_handle,
+		    usbmsp->usbms_rptid,
+		    HIDPARSER_ITEM_INPUT,
+		    HID_GENERIC_DESKTOP,
+		    HID_GD_Y,
+		    HIDPARSER_ITEM_LOGICAL_MAXIMUM,
+		    &usbmsp->usbms_logical_Ymax) != HIDPARSER_SUCCESS) {
 
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
 			    "fail to get Y logical max.");

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,16 +519,15 @@ static void
 vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 {
 	struct copyresp		*copyresp;
-	struct copyreq		*copyreq;
 	struct iocblk		*iocbp;
 	mblk_t			*ioctmp;
 	mblk_t			*datap;
 	Mouse_iocstate_t	*Mouseioc;
+	size_t			size;
 	int			err = 0;
 
 
 	copyresp = (struct copyresp *)mp->b_rptr;
-	copyreq = (struct copyreq *)mp->b_rptr;
 	iocbp = (struct iocblk *)mp->b_rptr;
 
 	if (copyresp->cp_rval) {
@@ -571,17 +570,14 @@ vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 			}
 
 			if (copyresp->cp_cmd == VUIDGWHEELSTATE) {
-				copyreq->cq_size = sizeof (wheel_state);
+				size = sizeof (wheel_state);
 			} else {
-				copyreq->cq_size = sizeof (wheel_info);
-				copyreq->cq_flag = 0;
+				size = sizeof (wheel_info);
 			}
 
-			copyreq->cq_private = ioctmp;
-			copyreq->cq_addr = Mouseioc->u_addr;
 			Mouseioc->ioc_state = GETRESULT;
-			mp->b_datap->db_type = M_COPYOUT;
-			mp->b_wptr = mp->b_rptr + sizeof (struct copyreq);
+			ASSERT(Mouseioc->u_addr != NULL);
+			mcopyout(mp, ioctmp, size, Mouseioc->u_addr, NULL);
 		} else if (Mouseioc->ioc_state == GETRESULT) {
 			freemsg(ioctmp);
 			mp->b_datap->db_type = M_IOCACK;
@@ -664,63 +660,49 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 {
 	int			err = 0;
 	Mouse_iocstate_t	*Mouseioc;
-	struct copyreq		*copyreq;
+	caddr_t			useraddr;
+	size_t			size;
 	mblk_t			*ioctmp;
 	mblk_t			*datap;
 
 	struct iocblk *iocbp = (struct iocblk *)mp->b_rptr;
 
 	if (iocbp->ioc_count == TRANSPARENT) {
-		copyreq = (struct copyreq *)mp->b_rptr;
-		if (mp->b_cont == NULL) {
-			err = EINVAL;
-
-			return (err);
-		}
-		copyreq->cq_addr = (caddr_t)*((caddr_t *)mp->b_cont->b_rptr);
+		if (mp->b_cont == NULL)
+			return (EINVAL);
+		useraddr = (caddr_t)*((caddr_t *)mp->b_cont->b_rptr);
 		switch (cmd) {
 		case VUIDGWHEELCOUNT:
-			copyreq->cq_size = sizeof (int);
-			mp->b_datap->db_type = M_COPYOUT;
-			mp->b_wptr = mp->b_rptr + sizeof (struct copyreq);
-			freemsg(mp->b_cont);
-			datap = allocb(sizeof (int), BPRI_HI);
+			size = sizeof (int);
+			if ((datap = allocb(sizeof (int), BPRI_HI)) == NULL)
+				return (EAGAIN);
 			*((int *)datap->b_wptr) = STATEP->vuid_mouse_mode;
-			datap->b_wptr +=  sizeof (int);
-			mp->b_cont = datap;
+			mcopyout(mp, NULL, size, NULL, datap);
 			qreply(qp, mp);
 
 			return (err);
 		case VUIDGWHEELINFO:
-			copyreq->cq_size = sizeof (wheel_info);
+			size = sizeof (wheel_info);
 			break;
 
 		case VUIDSWHEELSTATE:
 		case VUIDGWHEELSTATE:
-			copyreq->cq_size = sizeof (wheel_state);
+			size = sizeof (wheel_state);
 			break;
 
 		case MSIOSRESOLUTION:
-			copyreq->cq_size = sizeof (Ms_screen_resolution);
+			size = sizeof (Ms_screen_resolution);
 			break;
 		}
 
 		if ((ioctmp = (mblk_t *)allocb(sizeof (Mouse_iocstate_t),
-		    BPRI_MED)) == NULL) {
-			err = EAGAIN;
-
-			return (err);
-		}
-		copyreq->cq_private = ioctmp;
+		    BPRI_MED)) == NULL)
+			return (EAGAIN);
 		Mouseioc = (Mouse_iocstate_t *)ioctmp->b_rptr;
 		Mouseioc->ioc_state = GETSTRUCT;
-		Mouseioc->u_addr = copyreq->cq_addr;
+		Mouseioc->u_addr = useraddr;
 		ioctmp->b_wptr = ioctmp->b_rptr + sizeof (Mouse_iocstate_t);
-		copyreq->cq_flag = 0;
-		mp->b_datap->db_type = M_COPYIN;
-		freemsg(mp->b_cont);
-		mp->b_cont = (mblk_t *)NULL;
-		mp->b_wptr = mp->b_rptr + sizeof (struct copyreq);
+		mcopyin(mp, ioctmp, size, NULL);
 		qreply(qp, mp);
 
 		return (err);
@@ -731,7 +713,10 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 				freemsg(mp->b_cont);
 				mp->b_cont = NULL;
 			}
-			datap = allocb(sizeof (int), BPRI_HI);
+			if ((datap = allocb(sizeof (int), BPRI_HI)) == NULL) {
+				err = EAGAIN;
+				break;
+			}
 			*((int *)datap->b_wptr) = STATEP->vuid_mouse_mode;
 			datap->b_wptr +=  sizeof (int);
 			mp->b_cont = datap;
