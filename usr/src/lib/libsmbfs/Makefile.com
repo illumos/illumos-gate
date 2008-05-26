@@ -32,6 +32,9 @@ VERS=		.1
 # leaving out: kiconv.o
 
 OBJECTS=\
+	acl_api.o \
+	acl_conv.o \
+	acl_print.o \
 	charsets.o \
 	cfopt.o \
 	ctx.o \
@@ -66,7 +69,7 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 C99MODE=	$(C99_ENABLE)
 
-LDLIBS += -lsocket -lnsl -lc -lkrb5
+LDLIBS += -lsocket -lnsl -lc -lkrb5 -lsec -lidmap
 
 # normal warnings...
 CFLAGS	+=	$(CCVERBOSE) 

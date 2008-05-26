@@ -907,9 +907,6 @@ smb_nt_reply(struct smb_ntrq *ntp)
 	return (error ? error : error2);
 }
 
-int md_get_mbuf(struct mdchain *mdp, int size, mblk_t **ret);
-int mb_put_mbuf(struct mbchain *mbp, mblk_t *m);
-
 /*
  * Perform a full round of TRANS2 request
  */

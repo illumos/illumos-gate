@@ -60,6 +60,14 @@ SUNWprivate_1.0 {
 	smb_read;
 	smb_write;
 	smb_verbose;
+	smbfs_acl_free_sd;
+	smbfs_acl_get;
+	smbfs_acl_getsd;
+	smbfs_acl_print_sd;
+	smbfs_acl_sd2zfs;
+	smbfs_acl_set;
+	smbfs_acl_setsd;
+	smbfs_acl_zfs2sd;
 	smbfs_default_dom_usr;
 	smbfs_keychain_add;
 	smbfs_keychain_chk;

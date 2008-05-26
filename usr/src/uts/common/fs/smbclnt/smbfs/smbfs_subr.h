@@ -42,8 +42,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* This defines terms used in the error messages */
 #include <sys/cmn_err.h>
+#include <netsmb/mchain.h>
 
 #if defined(DEBUG) || defined(lint)
 #define	SMB_VNODE_DEBUG 1
@@ -73,7 +73,6 @@
 #define	SMB_LOCK_SHARED		1
 #define	SMB_LOCK_RELEASE	2
 
-struct mbchain;
 struct smb_cred;
 struct smb_vc;
 struct statvfs;
@@ -205,6 +204,23 @@ int  smbfs_smb_unhideit(struct smbnode *np, const char *name, int len,
 int smbfs_smb_flush(struct smbnode *np, struct smb_cred *scrp);
 int smbfs_0extend(vnode_t *vp, uint16_t fid, len_t from, len_t to,
 		struct smb_cred *scredp, int timo);
+
+/* get/set security descriptor */
+int  smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
+	struct smb_cred *scrp, uint32_t selector,
+	mblk_t **res, uint32_t *reslen);
+int  smbfs_smb_setsec_m(struct smb_share *ssp, uint16_t fid,
+	struct smb_cred *scrp, uint32_t selector, mblk_t **mp);
+
+int  smbfs_getacl(vnode_t *vp, vsecattr_t *vsecattr,
+	int *uidp, int *gidp, int flag, cred_t *cr);
+int  smbfs_setacl(vnode_t *vp, vsecattr_t *vsecattr,
+	int uid, int gid, int flag, cred_t *cr);
+
+int  smbfs_getsd(vnode_t *vp, uint32_t sel, mblk_t **mp, cred_t *cr);
+int  smbfs_setsd(vnode_t *vp, uint32_t sel, mblk_t **mp, cred_t *cr);
+int  smbfs_ioc_getsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr);
+int  smbfs_ioc_setsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr);
 
 #ifdef NOT_YET
 int  smbfs_smb_getsec(struct smb_share *ssp, uint16_t fid,

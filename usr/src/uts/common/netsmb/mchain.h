@@ -160,7 +160,7 @@ int  mb_put_uint64be(struct mbchain *mbp, uint64_t x);
 int  mb_put_uint64le(struct mbchain *mbp, uint64_t x);
 int  mb_put_mem(struct mbchain *mbp, const char *src, int size, int type);
 
-int  mb_put_mblk(struct mbchain *mbp, mblk_t *m);
+int  mb_put_mbuf(struct mbchain *mbp, mblk_t *m);
 int  mb_put_uio(struct mbchain *mbp, uio_t *uiop, int size);
 
 int  md_init(struct mdchain *mdp);
@@ -179,7 +179,7 @@ int  md_get_uint64(struct mdchain *mdp, uint64_t *x);
 int  md_get_uint64be(struct mdchain *mdp, uint64_t *x);
 int  md_get_uint64le(struct mdchain *mdp, uint64_t *x);
 int  md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type);
-int  md_get_mblk(struct mdchain *mdp, int size, mblk_t **m);
+int  md_get_mbuf(struct mdchain *mdp, int size, mblk_t **m);
 int  md_get_uio(struct mdchain *mdp, uio_t *uiop, int size);
 
 /*

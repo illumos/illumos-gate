@@ -1167,3 +1167,7 @@ usr/lib/sparcv9/libsmbfs.so		sparc
 usr/lib/llib-lsmbfs			sparc
 usr/lib/llib-lsmbfs.ln			sparc
 usr/lib/sparcv9/llib-lsmbfs.ln		sparc
+#
+# demo & test program for smbfs (private) ACL support
+#
+usr/lib/fs/smbfs/lsacl		sparc

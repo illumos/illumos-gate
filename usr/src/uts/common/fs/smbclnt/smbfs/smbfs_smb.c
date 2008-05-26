@@ -2814,13 +2814,14 @@ again:
 static int
 smbfs_smb_findcloseLM2(struct smbfs_fctx *ctx)
 {
+	int error = 0;
 	if (ctx->f_name)
 		kmem_free(ctx->f_name, ctx->f_namesz);
 	if (ctx->f_t2)
 		smb_t2_done(ctx->f_t2);
 	if ((ctx->f_flags & SMBFS_RDD_NOCLOSE) == 0)
-		smbfs_smb_findclose2(ctx);
-	return (0);
+		error = smbfs_smb_findclose2(ctx);
+	return (error);
 }
 
 int
@@ -2850,7 +2851,7 @@ smbfs_smb_findopen(struct smbnode *dnp, const char *wildcard, int wclen,
 		error = smbfs_smb_findopenLM2(ctx, dnp, wildcard, wclen,
 		    attr, scrp);
 	if (error)
-		smbfs_smb_findclose(ctx, scrp);
+		(void) smbfs_smb_findclose(ctx, scrp);
 	else
 		*ctxpp = ctx;
 	return (error);
@@ -2915,17 +2916,18 @@ smbfs_smb_findnext(struct smbfs_fctx *ctx, int limit, struct smb_cred *scrp)
 int
 smbfs_smb_findclose(struct smbfs_fctx *ctx, struct smb_cred *scrp)
 {
+	int error;
 	ctx->f_scred = scrp;
 	if (ctx->f_flags & SMBFS_RDD_USESEARCH) {
-		smbfs_smb_findcloseLM1(ctx);
+		error = smbfs_smb_findcloseLM1(ctx);
 	} else
-		smbfs_smb_findcloseLM2(ctx);
+		error = smbfs_smb_findcloseLM2(ctx);
 	if (ctx->f_rname)
 		kmem_free(ctx->f_rname, ctx->f_rnamelen);
 	if (ctx->f_firstnm)
 		kmem_free(ctx->f_firstnm, ctx->f_firstnmlen);
 	kmem_free(ctx, sizeof (*ctx));
-	return (0);
+	return (error);
 }
 
 
@@ -2991,7 +2993,7 @@ smbfs_smb_lookup(struct smbnode *dnp, const char **namep, int *nmlenp,
 		if (nmlenp)
 			*nmlenp = ctx->f_nmlen;
 	}
-	smbfs_smb_findclose(ctx, scrp);
+	(void) smbfs_smb_findclose(ctx, scrp);
 
 out:
 	smbfs_rw_exit(&dnp->r_lkserlock);
@@ -2999,14 +3001,15 @@ out:
 }
 
 /*
- * Support functions for get/set security
+ * OTW function to Get a security descriptor (SD).
+ *
+ * Note: On success, this fills in mdp->md_top,
+ * which the caller should free.
  */
-#ifdef APPLE
-
 int
-smbfs_smb_getsec_int(struct smb_share *ssp,	uint16_t fid,
-			struct smb_cred *scrp,	uint32_t selector,
-			struct ntsecdesc **res,	int *reslen)
+smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
+		struct smb_cred *scrp, uint32_t selector,
+		mblk_t **res, uint32_t *reslen)
 {
 	struct smb_ntrq *ntp;
 	struct mbchain *mbp;
@@ -3017,85 +3020,194 @@ smbfs_smb_getsec_int(struct smb_share *ssp,	uint16_t fid,
 	    scrp, &ntp);
 	if (error)
 		return (error);
+
+	/* Parameters part */
 	mbp = &ntp->nt_tparam;
 	mb_init(mbp);
 	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
 	mb_put_uint16le(mbp, 0); /* reserved */
 	mb_put_uint32le(mbp, selector);
+	/* Data part (none) */
+
+	/* Max. returned parameters and data. */
 	ntp->nt_maxpcount = 4;
 	ntp->nt_maxdcount = *reslen;
+
 	error = smb_nt_request(ntp);
 	if (error && !(ntp->nt_flags & SMBT2_MOREDATA))
 		goto done;
 	*res = NULL;
+
 	/*
 	 * if there's more data than we said we could receive, here
 	 * is where we pick up the length of it
 	 */
 	mdp = &ntp->nt_rparam;
 	md_get_uint32le(mdp, reslen);
+	if (error)
+		goto done;
 
+	/*
+	 * get the data part.
+	 */
 	mdp = &ntp->nt_rdata;
-	if (mdp->md_top) {	/* XXX md_cur safer than md_top */
-		len = m_fixhdr(mdp->md_top);
-		/*
-		 * The following "if (len < *reslen)" handles a Windows bug
-		 * observed when the underlying filesystem is FAT32.  In that
-		 * case a 32 byte security descriptor comes back (S-1-1-0, ie
-		 * "Everyone") but the Parameter Block claims 44 is the length
-		 * of the security descriptor.  (The Data Block length
-		 * claimed is 32.  This server bug was reported against NT
-		 * first and I've personally observed it with W2K.
-		 */
-		if (len < *reslen)
-			*reslen = len;
-		if (len == *reslen) {
-			MALLOC(*res, struct ntsecdesc *, len, M_TEMP, M_WAITOK);
-			md_get_mem(mdp, (caddr_t)*res, len, MB_MSYSTEM);
-		} else if (len > *reslen)
-			SMBVDEBUG("len %d *reslen %d fid 0x%x\n", len, *reslen,
-			    letohs(fid));
-	} else
+	if (mdp->md_top == NULL) {
 		SMBVDEBUG("null md_top? fid 0x%x\n", letohs(fid));
+		error = EBADRPC;
+		goto done;
+	}
+
+	/*
+	 * The returned parameter SD_length should match
+	 * the length of the returned data.  Unfortunately,
+	 * we have to work around server bugs here.
+	 */
+	len = m_fixhdr(mdp->md_top);
+	if (len != *reslen) {
+		SMBVDEBUG("len %d *reslen %d fid 0x%x\n",
+		    len, *reslen, letohs(fid));
+	}
+
+	/*
+	 * Actual data provided is < returned SD_length.
+	 *
+	 * The following "if (len < *reslen)" handles a Windows bug
+	 * observed when the underlying filesystem is FAT32.  In that
+	 * case a 32 byte security descriptor comes back (S-1-1-0, ie
+	 * "Everyone") but the Parameter Block claims 44 is the length
+	 * of the security descriptor.  (The Data Block length
+	 * claimed is 32.  This server bug was reported against NT
+	 * first and I've personally observed it with W2K.
+	 */
+	if (len < *reslen)
+		*reslen = len;
+
+	/*
+	 * Actual data provided is > returned SD_length.
+	 * (Seen on StorageTek NAS 5320, s/w ver. 4.21 M0)
+	 * Narrow work-around for returned SD_length==0.
+	 */
+	if (len > *reslen) {
+		/*
+		 * Increase *reslen, but carefully.
+		 */
+		if (*reslen == 0 && len <= ntp->nt_maxdcount)
+			*reslen = len;
+	}
+	error = md_get_mbuf(mdp, len, res);
+
 done:
+	if (error == 0 && *res == NULL) {
+		ASSERT(*res);
+		error = EBADRPC;
+	}
+
 	smb_nt_done(ntp);
 	return (error);
 }
 
+#ifdef	APPLE
+/*
+ * Wrapper for _getsd() compatible with darwin code.
+ */
 int
 smbfs_smb_getsec(struct smb_share *ssp, uint16_t fid, struct smb_cred *scrp,
 	uint32_t selector, struct ntsecdesc **res)
 {
-	int error, olen, seclen;
+	int error;
+	uint32_t len, olen;
+	struct mdchain *mdp, md_store;
+	struct mbuf *m;
 
-	olen = seclen = 500; /* "overlarge" values => server errors */
-	error = smbfs_smb_getsec_int(ssp, fid, scrp, selector, res, &seclen);
-	if (error && seclen > olen)
-		error = smbfs_smb_getsec_int(ssp, fid, scrp, selector, res,
-		    &seclen);
+	bzero(mdp, sizeof (*mdp));
+	len = 500; /* "overlarge" values => server errors */
+again:
+	olen = len;
+	error = smbfs_smb_getsec_m(ssp, fid, scrp, selector, &m, &len);
+	/*
+	 * Server may give us an error indicating that we
+	 * need a larger data buffer to receive the SD,
+	 * and the size we'll need.  Use the given size,
+	 * but only after a sanity check.
+	 *
+	 * XXX: Check for specific error values here?
+	 * XXX: also ... && len <= MAX_RAW_SD_SIZE
+	 */
+	if (error && len > olen)
+		goto again;
+
+	if (error)
+		return (error);
+
+	mdp = &md_store;
+	md_initm(mdp, m);
+	MALLOC(*res, struct ntsecdesc *, len, M_TEMP, M_WAITOK);
+	error = md_get_mem(mdp, (caddr_t)*res, len, MB_MSYSTEM);
+	md_done(mdp);
+
 	return (error);
 }
+#endif /* APPLE */
 
-int
-smbfs_smb_setsec(struct smb_share *ssp, uint16_t fid, struct smb_cred *scrp,
-	uint32_t selector, uint16_t flags, struct ntsid *owner,
-	struct ntsid *group, struct ntacl *sacl, struct ntacl *dacl)
+/*
+ * OTW function to Set a security descriptor (SD).
+ * Caller data are carried in an mbchain_t.
+ *
+ * Note: This normally consumes mbp->mb_top, and clears
+ * that pointer when it does.
+ */
+int  smbfs_smb_setsec_m(struct smb_share *ssp, uint16_t fid,
+	struct smb_cred *scrp, uint32_t selector, mblk_t **mp)
 {
 	struct smb_ntrq *ntp;
 	struct mbchain *mbp;
-	int error, off;
-	struct ntsecdesc ntsd;
+	int error;
 
 	error = smb_nt_alloc(SSTOCP(ssp), NT_TRANSACT_SET_SECURITY_DESC,
 	    scrp, &ntp);
 	if (error)
 		return (error);
+
+	/* Parameters part */
 	mbp = &ntp->nt_tparam;
 	mb_init(mbp);
 	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
 	mb_put_uint16le(mbp, 0); /* reserved */
 	mb_put_uint32le(mbp, selector);
+
+	/* Data part */
 	mbp = &ntp->nt_tdata;
+	mb_initm(mbp, *mp);
+	*mp = NULL; /* consumed */
+
+	/* No returned parameters or data. */
+	ntp->nt_maxpcount = 0;
+	ntp->nt_maxdcount = 0;
+
+	error = smb_nt_request(ntp);
+	smb_nt_done(ntp);
+
+	return (error);
+}
+
+#ifdef	APPLE
+/*
+ * This function builds the SD given the various parts.
+ */
+int
+smbfs_smb_setsec(struct smb_share *ssp, uint16_t fid, struct smb_cred *scrp,
+	uint32_t selector, uint16_t flags, struct ntsid *owner,
+	struct ntsid *group, struct ntacl *sacl, struct ntacl *dacl)
+{
+	struct mbchain *mbp, mb_store;
+	struct ntsecdesc ntsd;
+	int error, off;
+
+	/*
+	 * Build the SD as its own mbuf chain and pass it to
+	 * smbfs_smb_setsec_m()
+	 */
+	mbp = &mb_store;
 	mb_init(mbp);
 	bzero(&ntsd, sizeof (ntsd));
 	wset_sdrevision(&ntsd);
@@ -3137,10 +3249,14 @@ smbfs_smb_setsec(struct smb_share *ssp, uint16_t fid, struct smb_cred *scrp,
 		mb_put_mem(mbp, (caddr_t)sacl, acllen(sacl), MB_MSYSTEM);
 	if (dacl)
 		mb_put_mem(mbp, (caddr_t)dacl, acllen(dacl), MB_MSYSTEM);
-	ntp->nt_maxpcount = 0;
-	ntp->nt_maxdcount = 0;
-	error = smb_nt_request(ntp);
-	smb_nt_done(ntp);
+
+	/*
+	 * Just pass the mbuf to _setsec_m
+	 * It will clear mb_top if consumed.
+	 */
+	error = smbfs_smb_setsec_m(ssp, fid, scrp, selector, &mbp->mb_top);
+	mb_done(mbp);
+
 	return (error);
 }
 

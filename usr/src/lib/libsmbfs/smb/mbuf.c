@@ -42,6 +42,7 @@
 #include <string.h>
 #include <strings.h>
 #include <libintl.h>
+#include <assert.h>
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
@@ -57,6 +58,8 @@ static int
 m_get(size_t len, struct mbuf **mpp)
 {
 	struct mbuf *m;
+
+	assert(len < 0x100000); /* sanity */
 
 	len = M_ALIGN(len);
 	if (len < M_MINSIZE)
@@ -163,10 +166,13 @@ int
 m_getm(struct mbuf *top, size_t len, struct mbuf **mpp)
 {
 	struct mbuf *m, *mp;
-	int error;
+	int  error, ts;
 
 	for (mp = top; ; mp = mp->m_next) {
-		len -= M_TRAILINGSPACE(mp);
+		ts = M_TRAILINGSPACE(mp);
+		if (len <= ts)
+			goto out;
+		len -= ts;
 		if (mp->m_next == NULL)
 			break;
 
@@ -176,6 +182,7 @@ m_getm(struct mbuf *top, size_t len, struct mbuf **mpp)
 			return (error);
 		mp->m_next = m;
 	}
+out:
 	*mpp = top;
 	return (0);
 }

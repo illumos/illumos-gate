@@ -43,6 +43,7 @@
 #include <sys/cred.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
+#include <sys/filio.h>
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/errno.h>
@@ -62,6 +63,7 @@
 #include <smbfs/smbfs_node.h>
 #include <smbfs/smbfs_subr.h>
 
+#include <sys/fs/smbfs_ioctl.h>
 #include <fs/fs_subr.h>
 
 /*
@@ -116,6 +118,8 @@ static int	smbfs_read(vnode_t *, struct uio *, int, cred_t *,
 			caller_context_t *);
 static int	smbfs_write(vnode_t *, struct uio *, int, cred_t *,
 			caller_context_t *);
+static int	smbfs_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *,
+			caller_context_t *);
 static int	smbfs_getattr(vnode_t *, struct vattr *, int, cred_t *,
 			caller_context_t *);
 static int	smbfs_setattr(vnode_t *, struct vattr *, int, cred_t *,
@@ -148,6 +152,10 @@ static int	smbfs_space(vnode_t *, int, struct flock64 *, int, offset_t,
 			cred_t *, caller_context_t *);
 static int	smbfs_pathconf(vnode_t *, int, ulong_t *, cred_t *,
 			caller_context_t *);
+static int	smbfs_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+			caller_context_t *);
+static int	smbfs_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+			caller_context_t *);
 static int	smbfs_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *,
 			caller_context_t *);
 
@@ -161,48 +169,47 @@ struct vnodeops *smbfs_vnodeops = NULL;
 /*
  * Most unimplemented ops will return ENOSYS because of fs_nosys().
  * The only ops where that won't work are ACCESS (due to open(2)
- * failures) and GETSECATTR (due to acl(2) failures).
+ * failures) and ... (anything else left?)
  */
 const fs_operation_def_t smbfs_vnodeops_template[] = {
-	{ VOPNAME_OPEN, { .vop_open = smbfs_open } },
-	{ VOPNAME_CLOSE, { .vop_close = smbfs_close } },
-	{ VOPNAME_READ, { .vop_read = smbfs_read } },
-	{ VOPNAME_WRITE, { .vop_write = smbfs_write } },
-	{ VOPNAME_IOCTL, { .error = fs_nosys } }, /* smbfs_ioctl, */
-	{ VOPNAME_GETATTR, { .vop_getattr = smbfs_getattr } },
-	{ VOPNAME_SETATTR, { .vop_setattr = smbfs_setattr } },
-	{ VOPNAME_ACCESS, { .vop_access = smbfs_access } },
-	{ VOPNAME_LOOKUP, { .vop_lookup = smbfs_lookup } },
-	{ VOPNAME_CREATE, { .vop_create = smbfs_create } },
-	{ VOPNAME_REMOVE, { .vop_remove = smbfs_remove } },
-	{ VOPNAME_LINK, { .error = fs_nosys } }, /* smbfs_link, */
-	{ VOPNAME_RENAME, { .vop_rename = smbfs_rename } },
-	{ VOPNAME_MKDIR, { .vop_mkdir = smbfs_mkdir } },
-	{ VOPNAME_RMDIR, { .vop_rmdir = smbfs_rmdir } },
-	{ VOPNAME_READDIR, { .vop_readdir = smbfs_readdir } },
-	{ VOPNAME_SYMLINK, { .error = fs_nosys } }, /* smbfs_symlink, */
-	{ VOPNAME_READLINK, { .error = fs_nosys } }, /* smbfs_readlink, */
-	{ VOPNAME_FSYNC, { .vop_fsync = smbfs_fsync } },
-	{ VOPNAME_INACTIVE, { .vop_inactive = smbfs_inactive } },
-	{ VOPNAME_FID, { .error = fs_nosys } }, /* smbfs_fid, */
-	{ VOPNAME_RWLOCK, { .vop_rwlock = smbfs_rwlock } },
-	{ VOPNAME_RWUNLOCK, { .vop_rwunlock = smbfs_rwunlock } },
-	{ VOPNAME_SEEK, { .vop_seek = smbfs_seek } },
-	{ VOPNAME_FRLOCK, { .vop_frlock = smbfs_frlock } },
-	{ VOPNAME_SPACE, { .vop_space = smbfs_space } },
-	{ VOPNAME_REALVP, { .error = fs_nosys } }, /* smbfs_realvp, */
-	{ VOPNAME_GETPAGE, { .error = fs_nosys } }, /* smbfs_getpage, */
-	{ VOPNAME_PUTPAGE, { .error = fs_nosys } }, /* smbfs_putpage, */
-	{ VOPNAME_MAP, { .error = fs_nosys } }, /* smbfs_map, */
-	{ VOPNAME_ADDMAP, { .error = fs_nosys } }, /* smbfs_addmap, */
-	{ VOPNAME_DELMAP, { .error = fs_nosys } }, /* smbfs_delmap, */
-	{ VOPNAME_DUMP, { .error = fs_nosys } }, /* smbfs_dump, */
-	{ VOPNAME_PATHCONF, { .vop_pathconf = smbfs_pathconf } },
-	{ VOPNAME_PAGEIO, { .error = fs_nosys } }, /* smbfs_pageio, */
-	{ VOPNAME_SETSECATTR, { .error = fs_nosys } }, /* smbfs_setsecattr, */
-	{ VOPNAME_GETSECATTR, { .error = noop_vnodeop } },
-						/* smbfs_getsecattr, */
-	{ VOPNAME_SHRLOCK, { .vop_shrlock = smbfs_shrlock } },
+	{ VOPNAME_OPEN,		{ .vop_open = smbfs_open } },
+	{ VOPNAME_CLOSE,	{ .vop_close = smbfs_close } },
+	{ VOPNAME_READ,		{ .vop_read = smbfs_read } },
+	{ VOPNAME_WRITE,	{ .vop_write = smbfs_write } },
+	{ VOPNAME_IOCTL,	{ .vop_ioctl = smbfs_ioctl } },
+	{ VOPNAME_GETATTR,	{ .vop_getattr = smbfs_getattr } },
+	{ VOPNAME_SETATTR,	{ .vop_setattr = smbfs_setattr } },
+	{ VOPNAME_ACCESS,	{ .vop_access = smbfs_access } },
+	{ VOPNAME_LOOKUP,	{ .vop_lookup = smbfs_lookup } },
+	{ VOPNAME_CREATE,	{ .vop_create = smbfs_create } },
+	{ VOPNAME_REMOVE,	{ .vop_remove = smbfs_remove } },
+	{ VOPNAME_LINK,		{ .error = fs_nosys } }, /* smbfs_link, */
+	{ VOPNAME_RENAME,	{ .vop_rename = smbfs_rename } },
+	{ VOPNAME_MKDIR,	{ .vop_mkdir = smbfs_mkdir } },
+	{ VOPNAME_RMDIR,	{ .vop_rmdir = smbfs_rmdir } },
+	{ VOPNAME_READDIR,	{ .vop_readdir = smbfs_readdir } },
+	{ VOPNAME_SYMLINK,	{ .error = fs_nosys } }, /* smbfs_symlink, */
+	{ VOPNAME_READLINK,	{ .error = fs_nosys } }, /* smbfs_readlink, */
+	{ VOPNAME_FSYNC,	{ .vop_fsync = smbfs_fsync } },
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = smbfs_inactive } },
+	{ VOPNAME_FID,		{ .error = fs_nosys } }, /* smbfs_fid, */
+	{ VOPNAME_RWLOCK,	{ .vop_rwlock = smbfs_rwlock } },
+	{ VOPNAME_RWUNLOCK,	{ .vop_rwunlock = smbfs_rwunlock } },
+	{ VOPNAME_SEEK,		{ .vop_seek = smbfs_seek } },
+	{ VOPNAME_FRLOCK,	{ .vop_frlock = smbfs_frlock } },
+	{ VOPNAME_SPACE,	{ .vop_space = smbfs_space } },
+	{ VOPNAME_REALVP,	{ .error = fs_nosys } }, /* smbfs_realvp, */
+	{ VOPNAME_GETPAGE,	{ .error = fs_nosys } }, /* smbfs_getpage, */
+	{ VOPNAME_PUTPAGE,	{ .error = fs_nosys } }, /* smbfs_putpage, */
+	{ VOPNAME_MAP,		{ .error = fs_nosys } }, /* smbfs_map, */
+	{ VOPNAME_ADDMAP,	{ .error = fs_nosys } }, /* smbfs_addmap, */
+	{ VOPNAME_DELMAP,	{ .error = fs_nosys } }, /* smbfs_delmap, */
+	{ VOPNAME_DUMP,		{ .error = fs_nosys } }, /* smbfs_dump, */
+	{ VOPNAME_PATHCONF,	{ .vop_pathconf = smbfs_pathconf } },
+	{ VOPNAME_PAGEIO,	{ .error = fs_nosys } }, /* smbfs_pageio, */
+	{ VOPNAME_SETSECATTR,	{ .vop_setsecattr = smbfs_setsecattr } },
+	{ VOPNAME_GETSECATTR,	{ .vop_getsecattr = smbfs_getsecattr } },
+	{ VOPNAME_SHRLOCK,	{ .vop_shrlock = smbfs_shrlock } },
 	{ NULL, NULL }
 };
 
@@ -591,6 +598,64 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	smbfs_rw_exit(&np->r_lkserlock);
 	return (error);
 
+}
+
+
+/* ARGSUSED */
+static int
+smbfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag,
+	cred_t *cr, int *rvalp,	caller_context_t *ct)
+{
+	int		error;
+	smbmntinfo_t 	*smi;
+
+	smi = VTOSMI(vp);
+
+	if (curproc->p_zone != smi->smi_zone)
+		return (EIO);
+
+	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
+	switch (cmd) {
+		/* First three from ZFS. XXX - need these? */
+
+	case _FIOFFS:
+		error = smbfs_fsync(vp, 0, cr, ct);
+		break;
+
+		/*
+		 * The following two ioctls are used by bfu.
+		 * Silently ignore to avoid bfu errors.
+		 */
+	case _FIOGDIO:
+	case _FIOSDIO:
+		error = 0;
+		break;
+
+#ifdef NOT_YET	/* XXX - from the NFS code. */
+	case _FIODIRECTIO:
+		error = smbfs_directio(vp, (int)arg, cr);
+#endif
+
+		/*
+		 * Allow get/set with "raw" security descriptor (SD) data.
+		 * Useful for testing, diagnosing idmap problems, etc.
+		 */
+	case SMBFSIO_GETSD:
+		error = smbfs_ioc_getsd(vp, arg, flag, cr);
+		break;
+
+	case SMBFSIO_SETSD:
+		error = smbfs_ioc_setsd(vp, arg, flag, cr);
+		break;
+
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
 }
 
 
@@ -2466,8 +2531,16 @@ smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 		*valp = 1;
 		break;
 
+	case _PC_ACL_ENABLED:
+		/*
+		 * Always say "yes" here.  Our _getsecattr
+		 * will build a trivial ACL when needed,
+		 * i.e. when server does not have ACLs.
+		 */
+		*valp = _ACL_ACE_ENABLED;
+		break;
+
 	case _PC_SYMLINK_MAX:	/* No symlinks until we do Unix extensions */
-	case _PC_ACL_ENABLED:	/* No ACLs yet - see FILE_PERSISTENT_ACLS bit */
 	case _PC_XATTR_EXISTS:	/* No xattrs yet */
 		*valp = 0;
 		break;
@@ -2478,6 +2551,96 @@ smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 	return (0);
 }
 
+/* ARGSUSED */
+static int
+smbfs_getsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
+	caller_context_t *ct)
+{
+	vfs_t *vfsp;
+	smbmntinfo_t *smi;
+	int	error, uid, gid;
+	uint_t	mask;
+
+	vfsp = vp->v_vfsp;
+	smi = VFTOSMI(vfsp);
+
+	if (curproc->p_zone != smi->smi_zone)
+		return (EIO);
+
+	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
+	/*
+	 * Our _pathconf indicates _ACL_ACE_ENABLED,
+	 * so we should only see VSA_ACE, etc here.
+	 * Note: vn_create asks for VSA_DFACLCNT,
+	 * and it expects ENOSYS and empty data.
+	 */
+	mask = vsa->vsa_mask & (VSA_ACE | VSA_ACECNT |
+	    VSA_ACE_ACLFLAGS | VSA_ACE_ALLTYPES);
+	if (mask == 0)
+		return (ENOSYS);
+
+	/* XXX - access check ACE_READ_ACL? */
+
+	if (smi->smi_fsattr & FILE_PERSISTENT_ACLS) {
+		error = smbfs_getacl(vp, vsa, &uid, &gid, flag, cr);
+		/* XXX: Save uid/gid somewhere? */
+	} else
+		error = ENOSYS;
+
+	if (error == ENOSYS)
+		error = fs_fab_acl(vp, vsa, flag, cr, ct);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+smbfs_setsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
+	caller_context_t *ct)
+{
+	vfs_t *vfsp;
+	smbmntinfo_t *smi;
+	int	error;
+	uint_t	mask;
+
+	vfsp = vp->v_vfsp;
+	smi = VFTOSMI(vfsp);
+
+	if (curproc->p_zone != smi->smi_zone)
+		return (EIO);
+
+	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
+	/*
+	 * Our _pathconf indicates _ACL_ACE_ENABLED,
+	 * so we should only see VSA_ACE, etc here.
+	 */
+	mask = vsa->vsa_mask & (VSA_ACE | VSA_ACECNT);
+	if (mask == 0)
+		return (ENOSYS);
+
+	/*
+	 * If and when smbfs_access is extended, we can
+	 * check ACE_WRITE_ACL here instead.  (XXX todo)
+	 * For now, in-line parts of smbfs_access,
+	 * i.e. only allow _setacl by the owner,
+	 * and check for read-only FS.
+	 */
+	if (vfsp->vfs_flag & VFS_RDONLY)
+		return (EROFS);
+	if (crgetuid(cr) != smi->smi_args.uid)
+		return (EACCES);
+
+	if (smi->smi_fsattr & FILE_PERSISTENT_ACLS) {
+		error = smbfs_setacl(vp, vsa, -1, -1, flag, cr);
+	} else
+		error = ENOSYS;
+
+	return (error);
+}
 
 
 /*

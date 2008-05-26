@@ -19,44 +19,37 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/smbclnt/Makefile
-#
-#  cmd/fs.d/smbclnt contains the CIFS client commands
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include $(SRC)/Makefile.master
+FSTYPE=		smbfs
+LIBPROG=	lsacl
+ROOTFS_PROG=	$(LIBPROG)
 
-SUBDIRS_CATALOG=	smbutil mount umount
-SUBDIRS=		$(SUBDIRS_CATALOG) lsacl svc
+include		../../Makefile.fstype
 
-# for messaging catalog files
-#
-POFILES=        smbutil/smbutil_all.po mount/mount.po umount/umount.po
-POFILE=         smbclnt.po
+OBJS=	$(LIBPROG).o
+SRCS=	$(LIBPROG).c $(FSLIBSRC)
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+LDLIBS += -lsmbfs -lsec
+
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
+CPPFLAGS += -I$(SRC)/lib/libsmbfs \
+	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
+
+CLOBBERFILES	+= $(LIBPROG)
+
+all:	$(ROOTFS_PROG)
+
+install:	$(ROOTLIBFSTYPEPROG)
+
+lint:	lint_SRCS
+
+clean:     
+	$(RM) $(OBJS)
 
 .KEEP_STATE:
-
-.PARALLEL:	$(SUBDIRS)
-
-install clean clobber: $(SUBDIRS)
-
-all lint catalog: $(SUBDIRS_CATALOG)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
