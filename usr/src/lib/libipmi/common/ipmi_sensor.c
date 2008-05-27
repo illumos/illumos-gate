@@ -69,14 +69,17 @@ ipmi_set_sensor_reading(ipmi_handle_t *ihp, ipmi_set_sensor_reading_t *req)
 {
 	ipmi_set_sensor_reading_t realreq;
 	ipmi_cmd_t cmd, *resp;
+	uint16_t tmp;
 
 	/*
 	 * Convert states to little endian.
 	 */
 	(void) memcpy(&realreq, req, sizeof (realreq));
 
-	realreq.iss_assert_state = LE_IN16(&realreq.iss_assert_state);
-	realreq.iss_deassert_state = LE_IN16(&realreq.iss_deassert_state);
+	tmp = LE_IN16(&realreq.iss_assert_state);
+	(void) memcpy(&realreq.iss_assert_state, &tmp, sizeof (tmp));
+	tmp = LE_IN16(&realreq.iss_deassert_state);
+	(void) memcpy(&realreq.iss_deassert_state, &tmp, sizeof (tmp));
 
 	cmd.ic_netfn = IPMI_NETFN_SE;
 	cmd.ic_cmd = IPMI_CMD_SET_SENSOR_READING;

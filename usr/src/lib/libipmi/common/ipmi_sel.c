@@ -41,6 +41,8 @@ ipmi_sel_get_info(ipmi_handle_t *ihp)
 {
 	ipmi_cmd_t cmd, *rsp;
 	ipmi_sel_info_t *ip;
+	uint16_t tmp16;
+	uint32_t tmp32;
 
 	cmd.ic_netfn = IPMI_NETFN_STORAGE;
 	cmd.ic_lun = 0;
@@ -53,10 +55,14 @@ ipmi_sel_get_info(ipmi_handle_t *ihp)
 
 	ip = (ipmi_sel_info_t *)rsp->ic_data;
 
-	ip->isel_entries = LE_IN16(&ip->isel_entries);
-	ip->isel_free = LE_IN16(&ip->isel_free);
-	ip->isel_add_ts = LE_IN32(&ip->isel_add_ts);
-	ip->isel_erase_ts = LE_IN32(&ip->isel_erase_ts);
+	tmp16 = LE_IN16(&ip->isel_entries);
+	(void) memcpy(&ip->isel_entries, &tmp16, sizeof (tmp16));
+	tmp16 = LE_IN16(&ip->isel_free);
+	(void) memcpy(&ip->isel_free, &tmp16, sizeof (tmp16));
+	tmp32 = LE_IN32(&ip->isel_add_ts);
+	(void) memcpy(&ip->isel_add_ts, &tmp32, sizeof (tmp32));
+	tmp32 = LE_IN32(&ip->isel_erase_ts);
+	(void) memcpy(&ip->isel_erase_ts, &tmp32, sizeof (tmp32));
 
 	return (ip);
 }
@@ -74,6 +80,7 @@ ipmi_sel_get_entry(ipmi_handle_t *ihp, uint16_t id)
 	ipmi_cmd_t cmd, *rsp;
 	ipmi_sel_event_t *evp;
 	ipmi_cmd_get_sel_entry_t data;
+	uint32_t tmp;
 
 	data.ic_sel_ent_resid = 0;
 	data.ic_sel_ent_recid = LE_16(id);
@@ -99,9 +106,11 @@ ipmi_sel_get_entry(ipmi_handle_t *ihp, uint16_t id)
 	evp->isel_ev_next = LE_IN16(&evp->isel_ev_next);
 	evp->isel_ev_recid = LE_IN16(&evp->isel_ev_recid);
 	if (evp->isel_ev_rectype == IPMI_SEL_SYSTEM ||
-	    evp->isel_ev_rectype >= IPMI_SEL_OEM_LO)
-		evp->isel_ev_ts = LE_IN32(&evp->isel_ev_ts);
+	    evp->isel_ev_rectype >= IPMI_SEL_OEM_LO) {
 
+		tmp = LE_IN32(&evp->isel_ev_ts);
+		(void) memcpy(&evp->isel_ev_ts, &tmp, sizeof (tmp));
+	}
 	return (evp);
 }
 

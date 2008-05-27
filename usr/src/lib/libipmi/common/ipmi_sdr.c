@@ -59,6 +59,8 @@ ipmi_sdr_get_info(ipmi_handle_t *ihp)
 {
 	ipmi_cmd_t cmd, *rsp;
 	ipmi_sdr_info_t *sip;
+	uint16_t tmp16;
+	uint32_t tmp32;
 
 	cmd.ic_netfn = IPMI_NETFN_STORAGE;
 	cmd.ic_lun = 0;
@@ -71,10 +73,17 @@ ipmi_sdr_get_info(ipmi_handle_t *ihp)
 
 	sip = rsp->ic_data;
 
-	sip->isi_record_count = LE_IN16(&sip->isi_record_count);
-	sip->isi_free_space = LE_IN16(&sip->isi_free_space);
-	sip->isi_add_ts = LE_IN32(&sip->isi_add_ts);
-	sip->isi_erase_ts = LE_IN32(&sip->isi_erase_ts);
+	tmp16 = LE_IN16(&sip->isi_record_count);
+	(void) memcpy(&sip->isi_record_count, &tmp16, sizeof (tmp16));
+
+	tmp16 = LE_IN16(&sip->isi_free_space);
+	(void) memcpy(&sip->isi_free_space, &tmp16, sizeof (tmp16));
+
+	tmp32 = LE_IN32(&sip->isi_add_ts);
+	(void) memcpy(&sip->isi_add_ts, &tmp32, sizeof (tmp32));
+
+	tmp32 = LE_IN32(&sip->isi_erase_ts);
+	(void) memcpy(&sip->isi_erase_ts, &tmp32, sizeof (tmp32));
 
 	return (sip);
 }
@@ -182,34 +191,48 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				ipmi_sdr_compact_sensor_t *csp =
 				    (ipmi_sdr_compact_sensor_t *)
 				    sdr->is_record;
+				uint16_t tmp;
+
 				namelen = csp->is_cs_idlen;
 				type = csp->is_cs_idtype;
 				name = csp->is_cs_idstring;
 
-				csp->is_cs_assert_mask =
-				    LE_IN16(&csp->is_cs_assert_mask);
-				csp->is_cs_deassert_mask =
-				    LE_IN16(&csp->is_cs_deassert_mask);
-				csp->is_cs_reading_mask =
-				    LE_IN16(&csp->is_cs_reading_mask);
+				tmp = LE_IN16(&csp->is_cs_assert_mask);
+				(void) memcpy(&csp->is_cs_assert_mask, &tmp,
+				    sizeof (tmp));
+
+				tmp = LE_IN16(&csp->is_cs_deassert_mask);
+				(void) memcpy(&csp->is_cs_deassert_mask, &tmp,
+				    sizeof (tmp));
+
+				tmp = LE_IN16(&csp->is_cs_reading_mask);
+				(void) memcpy(&csp->is_cs_reading_mask, &tmp,
+				    sizeof (tmp));
 				break;
 			}
 
 		case IPMI_SDR_TYPE_FULL_SENSOR:
 			{
-				ipmi_sdr_full_sensor_t *csp =
+				ipmi_sdr_full_sensor_t *fsp =
 				    (ipmi_sdr_full_sensor_t *)
 				    sdr->is_record;
-				namelen = csp->is_fs_idlen;
-				type = csp->is_fs_idtype;
-				name = csp->is_fs_idstring;
+				uint16_t tmp;
 
-				csp->is_fs_assert_mask =
-				    LE_IN16(&csp->is_fs_assert_mask);
-				csp->is_fs_deassert_mask =
-				    LE_IN16(&csp->is_fs_deassert_mask);
-				csp->is_fs_reading_mask =
-				    LE_IN16(&csp->is_fs_reading_mask);
+				namelen = fsp->is_fs_idlen;
+				type = fsp->is_fs_idtype;
+				name = fsp->is_fs_idstring;
+
+				tmp = LE_IN16(&fsp->is_fs_assert_mask);
+				(void) memcpy(&fsp->is_fs_assert_mask, &tmp,
+				    sizeof (tmp));
+
+				tmp = LE_IN16(&fsp->is_fs_deassert_mask);
+				(void) memcpy(&fsp->is_fs_deassert_mask, &tmp,
+				    sizeof (tmp));
+
+				tmp = LE_IN16(&fsp->is_fs_reading_mask);
+				(void) memcpy(&fsp->is_fs_reading_mask, &tmp,
+				    sizeof (tmp));
 				break;
 			}
 
@@ -240,9 +263,12 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				ipmi_sdr_management_confirmation_t *mcp =
 				    (ipmi_sdr_management_confirmation_t *)
 				    sdr->is_record;
+				uint16_t tmp;
+
 				name = NULL;
-				mcp->is_mc_product =
-				    LE_IN16(&mcp->is_mc_product);
+				tmp = LE_IN16(&mcp->is_mc_product);
+				(void) memcpy(&mcp->is_mc_product, &tmp,
+				    sizeof (tmp));
 				break;
 			}
 
