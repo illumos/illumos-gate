@@ -1813,6 +1813,7 @@ zvol_dump_fini(zvol_state_t *zv)
 
 	(void) zap_remove(os, ZVOL_ZAP_OBJ, ZVOL_DUMPSIZE, tx);
 	zvol_free_extents(zv);
+	zvol_truncate(zv, 0, DMU_OBJECT_END);
 	zv->zv_flags &= ~ZVOL_DUMPIFIED;
 	dmu_tx_commit(tx);
 
