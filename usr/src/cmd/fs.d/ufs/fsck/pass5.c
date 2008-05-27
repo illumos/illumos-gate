@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,8 @@ pass5(void)
 	size_t	basesize, sumsize, mapsize;
 	int excessdirs;
 	int inomapsize, blkmapsize;
-	int update_csums, bad_csum_sb, bad_csum_cg, update_bitmaps;
+	int update_csums, update_bitmaps;
+	int bad_csum_sb, bad_csum_cg, bad_cgblks_cg, bad_cgblktot_cg;
 	struct fs *fs = &sblock;
 	struct cg *cg = &cgrp;
 	diskaddr_t dbase, dmax;
@@ -71,7 +72,7 @@ pass5(void)
 
 	if (fs->fs_postblformat != FS_DYNAMICPOSTBLFMT) {
 		pfatal("UNSUPPORTED ROTATIONAL TABLE FORMAT %d\n",
-			fs->fs_postblformat);
+		    fs->fs_postblformat);
 		errexit("Program terminated.");
 		/* NOTREACHED */
 	}
@@ -94,7 +95,7 @@ pass5(void)
 	newcg->cg_btotoff = basesize;
 	newcg->cg_boff = newcg->cg_btotoff + fs->fs_cpg * sizeof (daddr32_t);
 	newcg->cg_iusedoff = newcg->cg_boff +
-		fs->fs_cpg * fs->fs_nrpos * sizeof (uint16_t);
+	    fs->fs_cpg * fs->fs_nrpos * sizeof (uint16_t);
 	(void) memset(&newcg->cg_space[0], 0, newcg->cg_iusedoff - basesize);
 
 	inomapsize = howmany(fs->fs_ipg, NBBY);
@@ -289,7 +290,7 @@ pass5(void)
 			if (preen) {
 				update_csums = 1;
 				(void) printf("CORRECTING BAD CG SUMMARIES"
-					" FOR CG %d\n", c);
+				    " FOR CG %d\n", c);
 			} else if (update_csums == -1) {
 				update_csums = (reply(
 				    "CORRECT BAD CG SUMMARIES FOR CG %d",
@@ -302,7 +303,7 @@ pass5(void)
 			    sizeof (*cs));
 			sbdirty();
 			(void) printf("CORRECTED SUPERBLOCK SUMMARIES FOR"
-				    " CG %d\n", c);
+			    " CG %d\n", c);
 		}
 
 		if (bad_csum_cg && (update_csums == 1)) {
@@ -366,6 +367,47 @@ pass5(void)
 			if (preen || update_bitmaps || reply("FIX") == 1) {
 				(void) memmove((void *)cg_blksfree(cg),
 				    (void *)cg_blksfree(newcg), blkmapsize);
+				cgdirty();
+				if (preen ||
+				    (!verbose && update_bitmaps))
+					(void) printf("(CORRECTED)\n");
+				update_bitmaps = 1;
+			}
+		}
+
+		bad_cgblks_cg = (memcmp((void *)&cg_blks(fs, cg, 0)[0],
+		    (void *)&cg_blks(fs, newcg, 0)[0],
+		    fs->fs_cpg * fs->fs_nrpos * sizeof (int32_t)) != 0);
+
+		if (bad_cgblks_cg) {
+			if (!verbose)
+				(void) printf("ROTATIONAL POSITIONS "
+				    "BLOCK COUNT WRONG ");
+			if (preen || update_bitmaps || reply("FIX") == 1) {
+				(void) memmove((void *)&cg_blks(fs, cg, 0)[0],
+				    (void *)&cg_blks(fs, newcg, 0)[0],
+				    fs->fs_cpg * fs->fs_nrpos *
+				    sizeof (int32_t));
+				cgdirty();
+				if (preen ||
+				    (!verbose && update_bitmaps))
+					(void) printf("(CORRECTED)\n");
+				update_bitmaps = 1;
+			}
+		}
+
+		bad_cgblktot_cg = (memcmp((void *)&cg_blktot(cg)[0],
+		    (void *)&cg_blktot(newcg)[0],
+		    fs->fs_cpg * sizeof (int32_t)) != 0);
+
+		if (bad_cgblktot_cg) {
+			if (!verbose)
+				(void) printf("ROTATIONAL POSITIONS "
+				    "BLOCK TOTAL WRONG ");
+			if (preen || update_bitmaps || reply("FIX") == 1) {
+				(void) memmove((void *)&cg_blktot(cg)[0],
+				    (void *)&cg_blktot(newcg)[0],
+				    fs->fs_cpg * sizeof (int32_t));
 				cgdirty();
 				if (preen ||
 				    (!verbose && update_bitmaps))

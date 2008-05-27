@@ -5577,6 +5577,7 @@ ufs_map(struct vnode *vp,
 	struct ulockfs *ulp;
 	int error, sig;
 	k_sigset_t smask;
+	caddr_t hint = *addrp;
 
 	if (vp->v_flag & VNOMAP) {
 		error = ENOSYS;
@@ -5594,6 +5595,7 @@ ufs_map(struct vnode *vp,
 	}
 
 retry_map:
+	*addrp = hint;
 	/*
 	 * If file is being locked, disallow mapping.
 	 */
