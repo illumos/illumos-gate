@@ -105,15 +105,15 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	papiAttributeListGetLPString(attributes, "form", &r->form);
 
 	/* set the page range */
-        memset(tmp, NULL, sizeof (tmp));
-        tmp[0] = papiAttributeListFind(attributes, "page-ranges");
-        if (tmp[0] != NULL) {
-                char buf[BUFSIZ];
+	memset(tmp, NULL, sizeof (tmp));
+	tmp[0] = papiAttributeListFind(attributes, "page-ranges");
+	if (tmp[0] != NULL) {
+		char buf[BUFSIZ];
 
-                papiAttributeListToString(tmp, " ", buf, sizeof (buf));
-                if ((s = strchr(buf, '=')) != NULL)
+		papiAttributeListToString(tmp, " ", buf, sizeof (buf));
+		if ((s = strchr(buf, '=')) != NULL)
 			r->pages = (char *)strdup(++s);
-        }
+	}
 
 	/*
 	 * set the document format, converting to old format names as
@@ -411,7 +411,8 @@ lpsched_request_to_job_attributes(REQUEST *r, job_t *j)
 
 	/* priority (map 0-39 to 1-100) */
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-				"job-priority", (int)(100 - (r->priority * 2.5)));
+				"job-priority",
+				(int)(100 - (r->priority * 2.5)));
 
 	/* pages */
 	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,

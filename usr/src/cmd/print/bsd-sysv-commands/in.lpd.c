@@ -326,7 +326,7 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 
 				snprintf(buf, sizeof (buf), "page-ranges=%s",
 						++entry);
-				papiAttributeListFromString(&list, 
+				papiAttributeListFromString(&list,
 						PAPI_ATTR_EXCL, buf);
 				}
 				break;
