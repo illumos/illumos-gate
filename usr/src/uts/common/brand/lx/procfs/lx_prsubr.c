@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +111,7 @@ lxpr_uiobuf_flush(struct lxpr_uiobuf *uiobuf)
 		if (beg+size > off && off >= 0)
 			uiobuf->error =
 			    uiomove(uaddr+(off-beg), size-(off-beg),
-				UIO_READ, uiobuf->uiop);
+			    UIO_READ, uiobuf->uiop);
 
 		uiobuf->beg += size;
 	}
@@ -249,11 +249,9 @@ lxpr_unlock(proc_t *p)
 void
 lxpr_initnodecache()
 {
-	lxpr_node_cache =
-	    kmem_cache_create(LXPRCACHE_NAME,
-		sizeof (lxpr_node_t), 0,
-		lxpr_node_constructor, lxpr_node_destructor, NULL,
-		NULL, NULL, 0);
+	lxpr_node_cache = kmem_cache_create(LXPRCACHE_NAME,
+	    sizeof (lxpr_node_t), 0,
+	    lxpr_node_constructor, lxpr_node_destructor, NULL, NULL, NULL, 0);
 }
 
 void
@@ -269,10 +267,12 @@ lxpr_node_constructor(void *buf, void *un, int kmflags)
 	lxpr_node_t	*lxpnp = buf;
 	vnode_t		*vp;
 
-	vp = lxpnp->lxpr_vnode = vn_alloc(KM_SLEEP);
+	vp = lxpnp->lxpr_vnode = vn_alloc(kmflags);
+	if (vp == NULL)
+		return (-1);
 
 	(void) vn_setops(vp, lxpr_vnodeops);
-	vp->v_data = (caddr_t)lxpnp;
+	vp->v_data = lxpnp;
 
 	return (0);
 }

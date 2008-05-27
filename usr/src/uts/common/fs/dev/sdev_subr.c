@@ -184,9 +184,7 @@ sdev_prof_free(struct sdev_node *dv)
 	bzero(&dv->sdev_prof, sizeof (dv->sdev_prof));
 }
 
-/*
- * sdev_node cache constructor
- */
+/* sdev_node cache constructor */
 /*ARGSUSED1*/
 static int
 i_sdev_node_ctor(void *buf, void *cfarg, int flag)
@@ -194,17 +192,17 @@ i_sdev_node_ctor(void *buf, void *cfarg, int flag)
 	struct sdev_node *dv = (struct sdev_node *)buf;
 	struct vnode *vp;
 
-	ASSERT(flag == KM_SLEEP);
-
 	bzero(buf, sizeof (struct sdev_node));
+	vp = dv->sdev_vnode = vn_alloc(flag);
+	if (vp == NULL) {
+		return (-1);
+	}
+	vp->v_data = dv;
 	rw_init(&dv->sdev_contents, NULL, RW_DEFAULT, NULL);
-	dv->sdev_vnode = vn_alloc(KM_SLEEP);
-	vp = SDEVTOV(dv);
-	vp->v_data = (caddr_t)dv;
 	return (0);
 }
 
-/* sdev_node destructor for kmem cache */
+/* sdev_node cache destructor */
 /*ARGSUSED1*/
 static void
 i_sdev_node_dtor(void *buf, void *arg)

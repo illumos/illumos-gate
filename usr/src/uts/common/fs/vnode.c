@@ -814,16 +814,37 @@ done:
 void
 vn_rele(vnode_t *vp)
 {
-	if (vp->v_count == 0)
-		cmn_err(CE_PANIC, "vn_rele: vnode ref count 0");
+	VERIFY(vp->v_count > 0);
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
 		VOP_INACTIVE(vp, CRED(), NULL);
-	} else {
-		vp->v_count--;
-		mutex_exit(&vp->v_lock);
+		return;
 	}
+	vp->v_count--;
+	mutex_exit(&vp->v_lock);
+}
+
+/*
+ * Release a vnode referenced by the DNLC. Multiple DNLC references are treated
+ * as a single reference, so v_count is not decremented until the last DNLC hold
+ * is released. This makes it possible to distinguish vnodes that are referenced
+ * only by the DNLC.
+ */
+void
+vn_rele_dnlc(vnode_t *vp)
+{
+	VERIFY((vp->v_count > 0) && (vp->v_count_dnlc > 0));
+	mutex_enter(&vp->v_lock);
+	if (--vp->v_count_dnlc == 0) {
+		if (vp->v_count == 1) {
+			mutex_exit(&vp->v_lock);
+			VOP_INACTIVE(vp, CRED(), NULL);
+			return;
+		}
+		vp->v_count--;
+	}
+	mutex_exit(&vp->v_lock);
 }
 
 /*
@@ -836,17 +857,16 @@ vn_rele(vnode_t *vp)
 void
 vn_rele_stream(vnode_t *vp)
 {
-	if (vp->v_count == 0)
-		cmn_err(CE_PANIC, "vn_rele: vnode ref count 0");
+	VERIFY(vp->v_count > 0);
 	mutex_enter(&vp->v_lock);
 	vp->v_stream = NULL;
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
 		VOP_INACTIVE(vp, CRED(), NULL);
-	} else {
-		vp->v_count--;
-		mutex_exit(&vp->v_lock);
+		return;
 	}
+	vp->v_count--;
+	mutex_exit(&vp->v_lock);
 }
 
 int
@@ -2190,7 +2210,6 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&vp->v_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&vp->v_cv, NULL, CV_DEFAULT, NULL);
 	rw_init(&vp->v_nbllock, NULL, RW_DEFAULT, NULL);
-	rw_init(&vp->v_mslock, NULL, RW_DEFAULT, NULL);
 	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
 	vp->v_path = NULL;
 	vp->v_mpssdata = NULL;
@@ -2208,7 +2227,6 @@ vn_cache_destructor(void *buf, void *cdrarg)
 
 	vp = buf;
 
-	rw_destroy(&vp->v_mslock);
 	rw_destroy(&vp->v_nbllock);
 	cv_destroy(&vp->v_cv);
 	mutex_destroy(&vp->v_lock);
@@ -2284,6 +2302,7 @@ void
 vn_reinit(vnode_t *vp)
 {
 	vp->v_count = 1;
+	vp->v_count_dnlc = 0;
 	vp->v_vfsp = NULL;
 	vp->v_stream = NULL;
 	vp->v_vfsmountedhere = NULL;
@@ -2294,17 +2313,8 @@ vn_reinit(vnode_t *vp)
 	vp->v_filocks = NULL;
 	vp->v_shrlocks = NULL;
 	vp->v_pages = NULL;
-	vp->v_npages = 0;
-	vp->v_msnpages = 0;
-	vp->v_scanfront = NULL;
-	vp->v_scanback = NULL;
 
 	vp->v_locality = NULL;
-	vp->v_scantime = 0;
-	vp->v_mset = 0;
-	vp->v_msflags = 0;
-	vp->v_msnext = NULL;
-	vp->v_msprev = NULL;
 	vp->v_xattrdir = NULL;
 
 	/* Handles v_femhead, v_path, and the r/w/map counts */
@@ -2339,6 +2349,7 @@ vn_free(vnode_t *vp)
 	 * never be anything else.
 	 */
 	ASSERT((vp->v_count == 0) || (vp->v_count == 1));
+	ASSERT(vp->v_count_dnlc == 0);
 	if (vp->v_path != NULL) {
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
 		vp->v_path = NULL;
@@ -2570,6 +2581,15 @@ vfs_t *
 vn_mountedvfs(vnode_t *vp)
 {
 	return (vp->v_vfsmountedhere);
+}
+
+/*
+ * Return nonzero if the vnode is referenced by the dnlc, zero if not.
+ */
+int
+vn_in_dnlc(vnode_t *vp)
+{
+	return (vp->v_count_dnlc > 0);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,18 +257,19 @@ ufs_inode_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	struct inode *ip = buf;
 	struct vnode *vp;
 
+	vp = ip->i_vnode = vn_alloc(kmflags);
+	if (vp == NULL) {
+		return (-1);
+	}
+	vn_setops(vp, ufs_vnodeops);
+	vp->v_data = ip;
+
 	rw_init(&ip->i_rwlock, NULL, RW_DEFAULT, NULL);
 	rw_init(&ip->i_contents, NULL, RW_DEFAULT, NULL);
 	mutex_init(&ip->i_tlock, NULL, MUTEX_DEFAULT, NULL);
 	dnlc_dir_init(&ip->i_danchor);
 
 	cv_init(&ip->i_wrcv, NULL, CV_DRIVER, NULL);
-
-	vp = vn_alloc(KM_SLEEP);
-	ip->i_vnode = vp;
-
-	vn_setops(vp, ufs_vnodeops);
-	vp->v_data = (caddr_t)ip;
 
 	return (0);
 }
@@ -284,7 +285,6 @@ ufs_inode_cache_destructor(void *buf, void *cdrarg)
 
 	rw_destroy(&ip->i_rwlock);
 	rw_destroy(&ip->i_contents);
-
 	mutex_destroy(&ip->i_tlock);
 	if (vp->v_type == VDIR) {
 		dnlc_dir_fini(&ip->i_danchor);

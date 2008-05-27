@@ -164,6 +164,7 @@ sosctp_sock_constructor(void *buf, void *cdrarg, int kmflags)
 	so->so_discon_ind_mp	= NULL;
 	so->so_ux_bound_vp	= NULL;
 	so->so_unbind_mp	= NULL;
+	so->so_ops		= NULL;
 	so->so_accessvp		= NULL;
 	so->so_priv = NULL;
 
@@ -219,7 +220,8 @@ sosctp_sock_destructor(void *buf, void *cdrarg)
 	ASSERT(so->so_discon_ind_mp == NULL);
 	ASSERT(so->so_ux_bound_vp == NULL);
 	ASSERT(so->so_unbind_mp == NULL);
-	ASSERT(so->so_ops == &sosctp_sonodeops ||
+	ASSERT(so->so_ops == NULL ||
+	    so->so_ops == &sosctp_sonodeops ||
 	    so->so_ops == &sosctp_seq_sonodeops);
 
 	ASSERT(ss->ss_rxdata == NULL);

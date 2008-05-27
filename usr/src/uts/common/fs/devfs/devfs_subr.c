@@ -135,9 +135,7 @@ extern dev_info_t	*clone_dip;
 extern major_t		clone_major;
 extern struct dev_ops	*ddi_hold_driver(major_t);
 
-/*
- * dv_node cache constructor, destructor, can cache creation
- */
+/* dev_info node cache constructor */
 /*ARGSUSED1*/
 static int
 i_dv_node_ctor(void *buf, void *cfarg, int flag)
@@ -146,18 +144,16 @@ i_dv_node_ctor(void *buf, void *cfarg, int flag)
 	struct vnode	*vp;
 
 	bzero(buf, sizeof (struct dv_node));
-
-	/* initialize persistent parts of dv_node */
+	vp = dv->dv_vnode = vn_alloc(flag);
+	if (vp == NULL) {
+		return (-1);
+	}
+	vp->v_data = dv;
 	rw_init(&dv->dv_contents, NULL, RW_DEFAULT, NULL);
-
-	/* allocate vnode and initialize link back to dv_node */
-	dv->dv_vnode = vn_alloc(KM_SLEEP);
-	vp = DVTOV(dv);
-	vp->v_data = (caddr_t)dv;
 	return (0);
 }
 
-/* dev_info node destructor for kmem cache */
+/* dev_info node cache destructor */
 /*ARGSUSED1*/
 static void
 i_dv_node_dtor(void *buf, void *arg)
@@ -183,7 +179,7 @@ dv_node_cache_init()
 	tsd_create(&devfs_clean_key, NULL);
 }
 
-/* initialize dev_info node cache */
+/* destroy dev_info node cache */
 void
 dv_node_cache_fini()
 {
@@ -1233,8 +1229,7 @@ dv_filldir(struct dv_node *ddv)
 	pdevi = ddv->dv_devi;
 
 	if (ndi_devi_config(pdevi, NDI_NO_EVENT) != NDI_SUCCESS) {
-		dcmn_err3(("dv_filldir: config error %s\n",
-		    ddv->dv_name));
+		dcmn_err3(("dv_filldir: config error %s\n", ddv->dv_name));
 	}
 
 	ndi_devi_enter(pdevi, &circ);

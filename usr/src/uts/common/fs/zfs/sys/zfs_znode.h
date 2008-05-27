@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,19 +257,19 @@ typedef struct znode {
  * Macros for dealing with dmu_buf_hold
  */
 #define	ZFS_OBJ_HASH(obj_num)	((obj_num) & (ZFS_OBJ_MTX_SZ - 1))
-#define	ZFS_OBJ_MUTEX(zp)	\
-	(&(zp)->z_zfsvfs->z_hold_mtx[ZFS_OBJ_HASH((zp)->z_id)])
+#define	ZFS_OBJ_MUTEX(zfsvfs, obj_num)	\
+	(&(zfsvfs)->z_hold_mtx[ZFS_OBJ_HASH(obj_num)])
 #define	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj_num) \
-	mutex_enter(&(zfsvfs)->z_hold_mtx[ZFS_OBJ_HASH(obj_num)]);
+	mutex_enter(ZFS_OBJ_MUTEX((zfsvfs), (obj_num)))
 #define	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num) \
-	mutex_exit(&(zfsvfs)->z_hold_mtx[ZFS_OBJ_HASH(obj_num)])
+	mutex_exit(ZFS_OBJ_MUTEX((zfsvfs), (obj_num)))
 
 /*
  * Macros to encode/decode ZFS stored time values from/to struct timespec
  */
 #define	ZFS_TIME_ENCODE(tp, stmp)		\
 {						\
-	(stmp)[0] = (uint64_t)(tp)->tv_sec; 	\
+	(stmp)[0] = (uint64_t)(tp)->tv_sec;	\
 	(stmp)[1] = (uint64_t)(tp)->tv_nsec;	\
 }
 

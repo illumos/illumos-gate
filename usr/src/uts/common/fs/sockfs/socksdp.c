@@ -126,6 +126,7 @@ sosdp_sock_constructor(void *buf, void *cdrarg, int kmflags)
 	so->so_discon_ind_mp	= NULL;
 	so->so_ux_bound_vp	= NULL;
 	so->so_unbind_mp	= NULL;
+	so->so_ops		= NULL;
 	so->so_accessvp		= NULL;
 	so->so_priv = NULL;
 
@@ -174,7 +175,7 @@ sosdp_sock_destructor(void *buf, void *cdrarg)
 	ASSERT(so->so_discon_ind_mp == NULL);
 	ASSERT(so->so_ux_bound_vp == NULL);
 	ASSERT(so->so_unbind_mp == NULL);
-	ASSERT(so->so_ops == &sosdp_sonodeops);
+	ASSERT(so->so_ops == NULL || so->so_ops == &sosdp_sonodeops);
 
 	ASSERT(vn_matchops(vp, socksdp_vnodeops));
 	ASSERT(vp->v_data == (caddr_t)so);
@@ -303,7 +304,7 @@ sosdp_create(vnode_t *accessvp, int domain, int type, int protocol,
 	cred_t *cr;
 
 	dprint(4, ("Inside sosdp_create: domain:%d proto:%d type:%d",
-		domain, protocol, type));
+	    domain, protocol, type));
 
 	if (is_system_labeled()) {
 		*errorp = EOPNOTSUPP;
@@ -782,7 +783,7 @@ sosdp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	}
 
 	if (uiop->uio_fmode & (FNDELAY|FNONBLOCK))
-	    flags |= MSG_DONTWAIT;
+		flags |= MSG_DONTWAIT;
 
 	count = uiop->uio_resid;
 
@@ -1109,7 +1110,7 @@ sosdp_setsockopt(struct sonode *so, int level, int option_name,
 	}
 
 	dprint(2, ("sosdp_setsockopt (%d) - conn %p %d %d \n",
-		so->so_type, conn, level, option_name));
+	    so->so_type, conn, level, option_name));
 	if (conn != NULL) {
 		mutex_exit(&so->so_lock);
 		error = sdp_set_opt(conn, level, option_name, optval, optlen);
@@ -1191,12 +1192,12 @@ sosdp_setsockopt(struct sonode *so, int level, int option_name,
 			if (intvalue != 0) {
 				dprintso(so, 1,
 				    ("sosdp_setsockopt: setting 0x%x\n",
-					option_name));
+				    option_name));
 				so->so_options |= option_name;
 			} else {
 				dprintso(so, 1,
 				    ("sosdp_setsockopt: clearing 0x%x\n",
-					option_name));
+				    option_name));
 				so->so_options &= ~option_name;
 			}
 			break;
@@ -1231,7 +1232,7 @@ sosdp_setsockopt(struct sonode *so, int level, int option_name,
 			    error == EINVAL) && handled) {
 				dprintso(so, 1,
 				    ("sosdp_setsockopt: ignoring error %d "
-					"for 0x%x\n", error, option_name));
+				    "for 0x%x\n", error, option_name));
 				error = 0;
 			}
 		}
@@ -1426,7 +1427,7 @@ sdp_sock_xmitted(void *handle, int writeable)
 	struct sonode *so = &ss->ss_so;
 
 	dprint(4, ("sosdp_sock_xmitted: so:%p priv:%p txq:%d",
-		(void *)so, so->so_priv, writeable));
+	    (void *)so, so->so_priv, writeable));
 	mutex_enter(&so->so_lock);
 	ASSERT(so->so_priv != NULL); /* closed conn */
 
@@ -1491,7 +1492,7 @@ sdp_sock_connfail(void *handle, int error)
 	struct sonode *so = &ss->ss_so;
 
 	dprint(3, ("sosdp_conn Failed: so:%p priv:%p", (void *)so,
-		so->so_priv));
+	    so->so_priv));
 	mutex_enter(&so->so_lock);
 	ASSERT(so->so_priv != NULL); /* closed conn */
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);

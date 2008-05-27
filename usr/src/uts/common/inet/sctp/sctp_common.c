@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1852,11 +1852,8 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	fp->timer_mp = timer_mp;
 	fp->hb_pending = B_FALSE;
 	fp->hb_enabled = B_TRUE;
-	fp->timer_running = 0;
 	fp->df = 1;
 	fp->pmtu_discovered = 0;
-	fp->rc_timer_mp = NULL;
-	fp->rc_timer_running = 0;
 	fp->next = NULL;
 	fp->ire = NULL;
 	fp->T3expire = 0;
@@ -1869,8 +1866,23 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 }
 
 /*ARGSUSED*/
+static int
+faddr_constructor(void *buf, void *arg, int flags)
+{
+	sctp_faddr_t *fp = buf;
+
+	fp->timer_mp = NULL;
+	fp->timer_running = 0;
+
+	fp->rc_timer_mp = NULL;
+	fp->rc_timer_running = 0;
+
+	return (0);
+}
+
+/*ARGSUSED*/
 static void
-faddr_destructor(void *buf, void *cdrarg)
+faddr_destructor(void *buf, void *arg)
 {
 	sctp_faddr_t *fp = buf;
 
@@ -1885,7 +1897,7 @@ void
 sctp_faddr_init(void)
 {
 	sctp_kmem_faddr_cache = kmem_cache_create("sctp_faddr_cache",
-	    sizeof (sctp_faddr_t), 0, NULL, faddr_destructor,
+	    sizeof (sctp_faddr_t), 0, faddr_constructor, faddr_destructor,
 	    NULL, NULL, NULL, 0);
 }
 

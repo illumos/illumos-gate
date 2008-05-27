@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,15 +35,12 @@ extern "C" {
 #endif
 
 extern int kmem_cache_walk_init(mdb_walk_state_t *);
-extern int kmem_cache_walk_step(mdb_walk_state_t *);
-extern void kmem_cache_walk_fini(mdb_walk_state_t *);
 
 extern int kmem_cpu_cache_walk_init(mdb_walk_state_t *);
 extern int kmem_cpu_cache_walk_step(mdb_walk_state_t *);
 
 extern int kmem_slab_walk_init(mdb_walk_state_t *);
 extern int kmem_slab_walk_partial_init(mdb_walk_state_t *);
-extern int kmem_slab_walk_step(mdb_walk_state_t *);
 
 extern int kmem_hash_walk_init(mdb_walk_state_t *wsp);
 extern int kmem_hash_walk_step(mdb_walk_state_t *wsp);
@@ -104,11 +101,12 @@ extern int vmem(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int vmem_seg(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kmalog(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kmausers(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern void kmem_cache_help(void);
+extern void kmem_slabs_help(void);
 extern void whatis_help(void);
 extern void bufctl_help(void);
 extern void vmem_seg_help(void);
 extern void kmausers_help(void);
-extern void kmem_slabs_help(void);
 
 extern int whatthread(uintptr_t, uint_t, int, const mdb_arg_t *);
 

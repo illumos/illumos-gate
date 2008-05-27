@@ -1148,6 +1148,7 @@ kcf_areq_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	kcf_areq_node_t *areq = (kcf_areq_node_t *)buf;
 
 	areq->an_type = CRYPTO_ASYNCH;
+	areq->an_refcnt = 0;
 	mutex_init(&areq->an_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&areq->an_done, NULL, CV_DEFAULT, NULL);
 	cv_init(&areq->an_turn_cv, NULL, CV_DEFAULT, NULL);
@@ -1176,6 +1177,7 @@ kcf_context_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	kcf_context_t *kctx = (kcf_context_t *)buf;
 
+	kctx->kc_refcnt = 0;
 	mutex_init(&kctx->kc_in_use_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	return (0);

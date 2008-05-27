@@ -758,12 +758,12 @@ snode_constructor(void *buf, void *cdrarg, int kmflags)
 	struct snode *sp = buf;
 	struct vnode *vp;
 
-	vp = vn_alloc(KM_SLEEP);
-
-	sp->s_vnode = vp;
-
+	vp = sp->s_vnode = vn_alloc(kmflags);
+	if (vp == NULL) {
+		return (-1);
+	}
 	vn_setops(vp, spec_getvnodeops());
-	vp->v_data = (caddr_t)sp;
+	vp->v_data = sp;
 
 	mutex_init(&sp->s_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sp->s_cv, NULL, CV_DEFAULT, NULL);

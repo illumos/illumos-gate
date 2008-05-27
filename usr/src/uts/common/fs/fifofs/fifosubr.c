@@ -139,6 +139,8 @@ static void fifo_fastturnoff(fifonode_t *);
 
 static void fifo_reinit_vp(vnode_t *);
 
+static void fnode_destructor(void *, void *);
+
 /*
  * Constructor/destructor routines for fifos and pipes.
  *
@@ -168,7 +170,6 @@ static void fifo_reinit_vp(vnode_t *);
  * deducing the number of fnodes from the total size.  Thus, the fnode
  * constructor does most of the work for the pipe constructor.
  */
-/*ARGSUSED1*/
 static int
 fnode_constructor(void *buf, void *cdrarg, int kmflags)
 {
@@ -185,7 +186,12 @@ fnode_constructor(void *buf, void *cdrarg, int kmflags)
 
 		vnode_t *vp;
 
-		vp = vn_alloc(KM_SLEEP);
+		vp = vn_alloc(kmflags);
+		if (vp == NULL) {
+			fnp->fn_vnode = NULL; /* mark for destructor */
+			fnode_destructor(buf, cdrarg);
+			return (-1);
+		}
 		fnp->fn_vnode = vp;
 
 		fnp->fn_lock = flp;
@@ -232,6 +238,10 @@ fnode_destructor(void *buf, void *cdrarg)
 	while ((char *)fnp < (char *)buf + size) {
 
 		vnode_t *vp = FTOV(fnp);
+
+		if (vp == NULL) {
+			return; /* constructor failed here */
+		}
 
 		ASSERT(fnp->fn_mp == NULL);
 		ASSERT(fnp->fn_count == 0);
@@ -831,7 +841,7 @@ fiforemove(fifonode_t *fnp)
 	 */
 	if (fnode != NULL && fnode == fnp &&
 	    !fnode->fn_nextp && !fnode->fn_backp) {
-			fifoalloc[idx] = NULL;
+		fifoalloc[idx] = NULL;
 	} else {
 
 		for (;  fnode;  fnode = fnode->fn_nextp) {
@@ -919,8 +929,7 @@ fifo_connld(struct vnode **vpp, int flag, cred_t *crp)
 	    0 ||
 	    (error = fifo_stropen(&vp2, flag, filep->f_cred, 0, 0)) != 0) {
 #if DEBUG
-		cmn_err(CE_NOTE, "fifo stropen failed error 0x%x",
-		    error);
+		cmn_err(CE_NOTE, "fifo stropen failed error 0x%x", error);
 #endif
 		/*
 		 * this will call fifo_close and VN_RELE on vp1

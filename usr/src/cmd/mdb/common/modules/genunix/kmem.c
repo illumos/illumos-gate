@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,9 +39,12 @@
 #include <sys/sysmacros.h>
 #include <vm/page.h>
 
+#include "avl.h"
+#include "combined.h"
 #include "dist.h"
 #include "kmem.h"
 #include "leaky.h"
+#include "list.h"
 
 #define	dprintf(x) if (mdb_debug_level) { \
 	mdb_printf("kmem debug: ");  \
@@ -92,65 +95,19 @@ kmem_debug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-typedef struct {
-	uintptr_t kcw_first;
-	uintptr_t kcw_current;
-} kmem_cache_walk_t;
-
 int
 kmem_cache_walk_init(mdb_walk_state_t *wsp)
 {
-	kmem_cache_walk_t *kcw;
-	kmem_cache_t c;
-	uintptr_t cp;
 	GElf_Sym sym;
 
-	if (mdb_lookup_by_name("kmem_null_cache", &sym) == -1) {
-		mdb_warn("couldn't find kmem_null_cache");
+	if (mdb_lookup_by_name("kmem_caches", &sym) == -1) {
+		mdb_warn("couldn't find kmem_caches");
 		return (WALK_ERR);
 	}
 
-	cp = (uintptr_t)sym.st_value;
+	wsp->walk_addr = (uintptr_t)sym.st_value;
 
-	if (mdb_vread(&c, sizeof (kmem_cache_t), cp) == -1) {
-		mdb_warn("couldn't read cache at %p", cp);
-		return (WALK_ERR);
-	}
-
-	kcw = mdb_alloc(sizeof (kmem_cache_walk_t), UM_SLEEP);
-
-	kcw->kcw_first = cp;
-	kcw->kcw_current = (uintptr_t)c.cache_next;
-	wsp->walk_data = kcw;
-
-	return (WALK_NEXT);
-}
-
-int
-kmem_cache_walk_step(mdb_walk_state_t *wsp)
-{
-	kmem_cache_walk_t *kcw = wsp->walk_data;
-	kmem_cache_t c;
-	int status;
-
-	if (mdb_vread(&c, sizeof (kmem_cache_t), kcw->kcw_current) == -1) {
-		mdb_warn("couldn't read cache at %p", kcw->kcw_current);
-		return (WALK_DONE);
-	}
-
-	status = wsp->walk_callback(kcw->kcw_current, &c, wsp->walk_cbdata);
-
-	if ((kcw->kcw_current = (uintptr_t)c.cache_next) == kcw->kcw_first)
-		return (WALK_DONE);
-
-	return (status);
-}
-
-void
-kmem_cache_walk_fini(mdb_walk_state_t *wsp)
-{
-	kmem_cache_walk_t *kcw = wsp->walk_data;
-	mdb_free(kcw, sizeof (kmem_cache_walk_t));
+	return (list_walk_init_named(wsp, "cache list", "cache"));
 }
 
 int
@@ -188,27 +145,132 @@ kmem_cpu_cache_walk_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(caddr, &cc, wsp->walk_cbdata));
 }
 
+static int
+kmem_slab_check(void *p, uintptr_t saddr, void *arg)
+{
+	kmem_slab_t *sp = p;
+	uintptr_t caddr = (uintptr_t)arg;
+	if ((uintptr_t)sp->slab_cache != caddr) {
+		mdb_warn("slab %p isn't in cache %p (in cache %p)\n",
+		    saddr, caddr, sp->slab_cache);
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+kmem_partial_slab_check(void *p, uintptr_t saddr, void *arg)
+{
+	kmem_slab_t *sp = p;
+
+	int rc = kmem_slab_check(p, saddr, arg);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	if (!KMEM_SLAB_IS_PARTIAL(sp)) {
+		mdb_warn("slab %p is not a partial slab\n", saddr);
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+kmem_complete_slab_check(void *p, uintptr_t saddr, void *arg)
+{
+	kmem_slab_t *sp = p;
+
+	int rc = kmem_slab_check(p, saddr, arg);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	if (!KMEM_SLAB_IS_ALL_USED(sp)) {
+		mdb_warn("slab %p is not completely allocated\n", saddr);
+		return (-1);
+	}
+
+	return (0);
+}
+
+typedef struct {
+	uintptr_t kns_cache_addr;
+	int kns_nslabs;
+} kmem_nth_slab_t;
+
+static int
+kmem_nth_slab_check(void *p, uintptr_t saddr, void *arg)
+{
+	kmem_nth_slab_t *chkp = arg;
+
+	int rc = kmem_slab_check(p, saddr, (void *)chkp->kns_cache_addr);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	return (chkp->kns_nslabs-- == 0 ? 1 : 0);
+}
+
+static int
+kmem_complete_slab_walk_init(mdb_walk_state_t *wsp)
+{
+	uintptr_t caddr = wsp->walk_addr;
+
+	wsp->walk_addr = (uintptr_t)(caddr +
+	    offsetof(kmem_cache_t, cache_complete_slabs));
+
+	return (list_walk_init_checked(wsp, "slab list", "slab",
+	    kmem_complete_slab_check, (void *)caddr));
+}
+
+static int
+kmem_partial_slab_walk_init(mdb_walk_state_t *wsp)
+{
+	uintptr_t caddr = wsp->walk_addr;
+
+	wsp->walk_addr = (uintptr_t)(caddr +
+	    offsetof(kmem_cache_t, cache_partial_slabs));
+
+	return (avl_walk_init_checked(wsp, "slab list", "slab",
+	    kmem_partial_slab_check, (void *)caddr));
+}
+
 int
 kmem_slab_walk_init(mdb_walk_state_t *wsp)
 {
 	uintptr_t caddr = wsp->walk_addr;
-	kmem_cache_t c;
 
 	if (caddr == NULL) {
 		mdb_warn("kmem_slab doesn't support global walks\n");
 		return (WALK_ERR);
 	}
 
-	if (mdb_vread(&c, sizeof (c), caddr) == -1) {
-		mdb_warn("couldn't read kmem_cache at %p", caddr);
-		return (WALK_ERR);
-	}
-
-	wsp->walk_data =
-	    (void *)(caddr + offsetof(kmem_cache_t, cache_nullslab));
-	wsp->walk_addr = (uintptr_t)c.cache_nullslab.slab_next;
+	combined_walk_init(wsp);
+	combined_walk_add(wsp,
+	    kmem_complete_slab_walk_init, list_walk_step, list_walk_fini);
+	combined_walk_add(wsp,
+	    kmem_partial_slab_walk_init, avl_walk_step, avl_walk_fini);
 
 	return (WALK_NEXT);
+}
+
+static int
+kmem_first_complete_slab_walk_init(mdb_walk_state_t *wsp)
+{
+	uintptr_t caddr = wsp->walk_addr;
+	kmem_nth_slab_t *chk;
+
+	chk = mdb_alloc(sizeof (kmem_nth_slab_t),
+	    UM_SLEEP | UM_GC);
+	chk->kns_cache_addr = caddr;
+	chk->kns_nslabs = 1;
+	wsp->walk_addr = (uintptr_t)(caddr +
+	    offsetof(kmem_cache_t, cache_complete_slabs));
+
+	return (list_walk_init_checked(wsp, "slab list", "slab",
+	    kmem_nth_slab_check, chk));
 }
 
 int
@@ -227,55 +289,38 @@ kmem_slab_walk_partial_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	wsp->walk_data =
-	    (void *)(caddr + offsetof(kmem_cache_t, cache_nullslab));
-	wsp->walk_addr = (uintptr_t)c.cache_freelist;
+	combined_walk_init(wsp);
 
 	/*
 	 * Some consumers (umem_walk_step(), in particular) require at
 	 * least one callback if there are any buffers in the cache.  So
-	 * if there are *no* partial slabs, report the last full slab, if
+	 * if there are *no* partial slabs, report the first full slab, if
 	 * any.
 	 *
 	 * Yes, this is ugly, but it's cleaner than the other possibilities.
 	 */
-	if ((uintptr_t)wsp->walk_data == wsp->walk_addr)
-		wsp->walk_addr = (uintptr_t)c.cache_nullslab.slab_prev;
+	if (c.cache_partial_slabs.avl_numnodes == 0) {
+		combined_walk_add(wsp, kmem_first_complete_slab_walk_init,
+		    list_walk_step, list_walk_fini);
+	} else {
+		combined_walk_add(wsp, kmem_partial_slab_walk_init,
+		    avl_walk_step, avl_walk_fini);
+	}
 
 	return (WALK_NEXT);
-}
-
-int
-kmem_slab_walk_step(mdb_walk_state_t *wsp)
-{
-	kmem_slab_t s;
-	uintptr_t addr = wsp->walk_addr;
-	uintptr_t saddr = (uintptr_t)wsp->walk_data;
-	uintptr_t caddr = saddr - offsetof(kmem_cache_t, cache_nullslab);
-
-	if (addr == saddr)
-		return (WALK_DONE);
-
-	if (mdb_vread(&s, sizeof (s), addr) == -1) {
-		mdb_warn("failed to read slab at %p", wsp->walk_addr);
-		return (WALK_ERR);
-	}
-
-	if ((uintptr_t)s.slab_cache != caddr) {
-		mdb_warn("slab %p isn't in cache %p (in cache %p)\n",
-		    addr, caddr, s.slab_cache);
-		return (WALK_ERR);
-	}
-
-	wsp->walk_addr = (uintptr_t)s.slab_next;
-
-	return (wsp->walk_callback(addr, &s, wsp->walk_cbdata));
 }
 
 int
 kmem_cache(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *argv)
 {
 	kmem_cache_t c;
+	const char *filter = NULL;
+
+	if (mdb_getopts(ac, argv,
+	    'n', MDB_OPT_STR, &filter,
+	    NULL) != ac) {
+		return (DCMD_USAGE);
+	}
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (mdb_walk_dcmd("kmem_cache", "kmem_cache", ac, argv) == -1) {
@@ -294,25 +339,35 @@ kmem_cache(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if ((filter != NULL) && (strstr(c.cache_name, filter) == NULL))
+		return (DCMD_OK);
+
 	mdb_printf("%0?p %-25s %04x %06x %8ld %8lld\n", addr, c.cache_name,
 	    c.cache_flags, c.cache_cflags, c.cache_bufsize, c.cache_buftotal);
 
 	return (DCMD_OK);
 }
 
-typedef struct kmem_slab_usage {
-	int ksu_refcnt;			/* count of allocated buffers on slab */
-} kmem_slab_usage_t;
-
-typedef struct kmem_slab_stats {
-	int ks_slabs;			/* slabs in cache */
-	int ks_partial_slabs;		/* partially allocated slabs in cache */
-	uint64_t ks_unused_buffers;	/* total unused buffers in cache */
-	int ks_buffers_per_slab;	/* buffers per slab */
-	int ks_usage_len;		/* ks_usage array length */
-	kmem_slab_usage_t *ks_usage;	/* partial slab usage */
-	uint_t *ks_bucket;		/* slab usage distribution */
-} kmem_slab_stats_t;
+void
+kmem_cache_help(void)
+{
+	mdb_printf("%s", "Print kernel memory caches.\n\n");
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+	mdb_printf("%s",
+"  -n name\n"
+"        name of kmem cache (or matching partial name)\n"
+"\n"
+"Column\tDescription\n"
+"\n"
+"ADDR\t\taddress of kmem cache\n"
+"NAME\t\tname of kmem cache\n"
+"FLAG\t\tvarious cache state flags\n"
+"CFLAG\t\tcache creation flags\n"
+"BUFSIZE\tobject size in bytes\n"
+"BUFTOTL\tcurrent total buffers in cache (allocated and free)\n");
+}
 
 #define	LABEL_WIDTH	11
 static void
@@ -388,14 +443,29 @@ kmem_first_partial_slab(uintptr_t addr, const kmem_slab_t *sp,
     boolean_t *is_slab)
 {
 	/*
-	 * The "kmem_partial_slab" walker reports the last full slab if there
+	 * The "kmem_partial_slab" walker reports the first full slab if there
 	 * are no partial slabs (for the sake of consumers that require at least
 	 * one callback if there are any buffers in the cache).
 	 */
-	*is_slab = ((sp->slab_refcnt > 0) &&
-	    (sp->slab_refcnt < sp->slab_chunks));
+	*is_slab = KMEM_SLAB_IS_PARTIAL(sp);
 	return (WALK_DONE);
 }
+
+typedef struct kmem_slab_usage {
+	int ksu_refcnt;			/* count of allocated buffers on slab */
+	boolean_t ksu_nomove;		/* slab marked non-reclaimable */
+} kmem_slab_usage_t;
+
+typedef struct kmem_slab_stats {
+	const kmem_cache_t *ks_cp;
+	int ks_slabs;			/* slabs in cache */
+	int ks_partial_slabs;		/* partially allocated slabs in cache */
+	uint64_t ks_unused_buffers;	/* total unused buffers in cache */
+	int ks_max_buffers_per_slab;	/* max buffers per slab */
+	int ks_usage_len;		/* ks_usage array length */
+	kmem_slab_usage_t *ks_usage;	/* partial slab usage */
+	uint_t *ks_bucket;		/* slab usage distribution */
+} kmem_slab_stats_t;
 
 /*ARGSUSED*/
 static int
@@ -406,12 +476,6 @@ kmem_slablist_stat(uintptr_t addr, const kmem_slab_t *sp,
 	long unused;
 
 	ks->ks_slabs++;
-	if (ks->ks_buffers_per_slab == 0) {
-		ks->ks_buffers_per_slab = sp->slab_chunks;
-		/* +1 to include a zero bucket */
-		ks->ks_bucket = mdb_zalloc((ks->ks_buffers_per_slab + 1) *
-		    sizeof (*ks->ks_bucket), UM_SLEEP | UM_GC);
-	}
 	ks->ks_bucket[sp->slab_refcnt]++;
 
 	unused = (sp->slab_chunks - sp->slab_refcnt);
@@ -440,6 +504,7 @@ kmem_slablist_stat(uintptr_t addr, const kmem_slab_t *sp,
 
 	ksu = &ks->ks_usage[ks->ks_partial_slabs - 1];
 	ksu->ksu_refcnt = sp->slab_refcnt;
+	ksu->ksu_nomove = (sp->slab_flags & KMEM_SLAB_NOMOVE);
 	return (WALK_NEXT);
 }
 
@@ -466,21 +531,23 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	size_t maxbuckets = 1;
 	size_t minbucketsize = 0;
 	const char *filter = NULL;
+	const char *name = NULL;
 	uint_t opt_v = FALSE;
-	boolean_t verbose = B_FALSE;
+	boolean_t buckets = B_FALSE;
 	boolean_t skip = B_FALSE;
 
 	if (mdb_getopts(argc, argv,
 	    'B', MDB_OPT_UINTPTR, &minbucketsize,
 	    'b', MDB_OPT_UINTPTR, &maxbuckets,
 	    'n', MDB_OPT_STR, &filter,
+	    'N', MDB_OPT_STR, &name,
 	    'v', MDB_OPT_SETBITS, TRUE, &opt_v,
 	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
-	if (opt_v || (maxbuckets != 1) || (minbucketsize != 0)) {
-		verbose = 1;
+	if ((maxbuckets != 1) || (minbucketsize != 0)) {
+		buckets = B_TRUE;
 	}
 
 	if (!(flags & DCMD_ADDRSPEC)) {
@@ -497,13 +564,20 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if ((filter != NULL) && (strstr(c.cache_name, filter) == NULL)) {
-		skip = B_TRUE;
+	if (name == NULL) {
+		skip = ((filter != NULL) &&
+		    (strstr(c.cache_name, filter) == NULL));
+	} else if (filter == NULL) {
+		skip = (strcmp(c.cache_name, name) != 0);
+	} else {
+		/* match either -n or -N */
+		skip = ((strcmp(c.cache_name, name) != 0) &&
+		    (strstr(c.cache_name, filter) == NULL));
 	}
 
-	if (!verbose && DCMD_HDRSPEC(flags)) {
+	if (!(opt_v || buckets) && DCMD_HDRSPEC(flags)) {
 		kmem_slabs_header();
-	} else if (verbose && !skip) {
+	} else if ((opt_v || buckets) && !skip) {
 		if (DCMD_HDRSPEC(flags)) {
 			kmem_slabs_header();
 		} else {
@@ -528,6 +602,11 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	bzero(&stats, sizeof (kmem_slab_stats_t));
+	stats.ks_cp = &c;
+	stats.ks_max_buffers_per_slab = c.cache_maxchunks;
+	/* +1 to include a zero bucket */
+	stats.ks_bucket = mdb_zalloc((stats.ks_max_buffers_per_slab + 1) *
+	    sizeof (*stats.ks_bucket), UM_SLEEP);
 	cb = (mdb_walk_cb_t)kmem_slablist_stat;
 	(void) mdb_pwalk("kmem_slab", cb, &stats, addr);
 
@@ -550,19 +629,22 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    stats.ks_slabs, stats.ks_partial_slabs, c.cache_buftotal,
 	    stats.ks_unused_buffers, pct, tenths_pct);
 
-	if (!verbose) {
-		return (DCMD_OK);
-	}
-
 	if (maxbuckets == 0) {
-		maxbuckets = stats.ks_buffers_per_slab;
+		maxbuckets = stats.ks_max_buffers_per_slab;
 	}
 
 	if (((maxbuckets > 1) || (minbucketsize > 0)) &&
 	    (stats.ks_slabs > 0)) {
 		mdb_printf("\n");
 		kmem_slabs_print_dist(stats.ks_bucket,
-		    stats.ks_buffers_per_slab, maxbuckets, minbucketsize);
+		    stats.ks_max_buffers_per_slab, maxbuckets, minbucketsize);
+	}
+
+	mdb_free(stats.ks_bucket, (stats.ks_max_buffers_per_slab + 1) *
+	    sizeof (*stats.ks_bucket));
+
+	if (!opt_v) {
+		return (DCMD_OK);
 	}
 
 	if (opt_v && (stats.ks_partial_slabs > 0)) {
@@ -573,11 +655,16 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    (stats.ks_slabs - stats.ks_partial_slabs),
 		    stats.ks_partial_slabs);
 		if (stats.ks_partial_slabs > 0) {
-			mdb_printf(" (%d):", stats.ks_buffers_per_slab);
+			mdb_printf(" (%d):", stats.ks_max_buffers_per_slab);
 		}
 		for (i = 0; i < stats.ks_partial_slabs; i++) {
 			ksu = &stats.ks_usage[i];
-			mdb_printf(" %d", ksu->ksu_refcnt);
+			if (ksu->ksu_nomove) {
+				const char *symbol = "*";
+				mdb_printf(" %d%s", ksu->ksu_refcnt, symbol);
+			} else {
+				mdb_printf(" %d", ksu->ksu_refcnt);
+			}
 		}
 		mdb_printf("\n\n");
 	}
@@ -593,14 +680,16 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 void
 kmem_slabs_help(void)
 {
-	mdb_printf("%s\n",
-"Display slab usage per kmem cache.\n");
+	mdb_printf("%s",
+"Display slab usage per kmem cache.\n\n");
 	mdb_dec_indent(2);
 	mdb_printf("%<b>OPTIONS%</b>\n");
 	mdb_inc_indent(2);
 	mdb_printf("%s",
 "  -n name\n"
 "        name of kmem cache (or matching partial name)\n"
+"  -N name\n"
+"        exact name of kmem cache\n"
 "  -b maxbins\n"
 "        Print a distribution of allocated buffers per slab using at\n"
 "        most maxbins bins. The first bin is reserved for completely\n"
@@ -629,9 +718,19 @@ kmem_slabs_help(void)
 "        list and least-used at the back (as in the example above).\n"
 "        However, if a slab contains an allocated buffer that will not\n"
 "        soon be freed, it would be better for that slab to be at the\n"
-"        front where it can get used up. Taking a slab off the partial\n"
-"        slab list (either with all buffers freed or all buffers\n"
-"        allocated) reduces cache fragmentation.\n"
+"        front where all of its buffers can be allocated. Taking a slab\n"
+"        off the partial slab list (either with all buffers freed or all\n"
+"        buffers allocated) reduces cache fragmentation.\n"
+"\n"
+"        A slab's allocated buffer count representing a partial slab (9 in\n"
+"        the example below) may be marked as follows:\n"
+"\n"
+"        9*   An asterisk indicates that kmem has marked the slab non-\n"
+"        reclaimable because the kmem client refused to move one of the\n"
+"        slab's buffers. Since kmem does not expect to completely free the\n"
+"        slab, it moves it to the front of the list in the hope of\n"
+"        completely allocating it instead. A slab marked with an asterisk\n"
+"        stays marked for as long as it remains on the partial slab list.\n"
 "\n"
 "Column\t\tDescription\n"
 "\n"
@@ -2729,8 +2828,8 @@ bufctl_history_callback(uintptr_t addr, const void *ign, void *arg)
 void
 bufctl_help(void)
 {
-	mdb_printf("%s\n",
-"Display the contents of kmem_bufctl_audit_ts, with optional filtering.\n");
+	mdb_printf("%s",
+"Display the contents of kmem_bufctl_audit_ts, with optional filtering.\n\n");
 	mdb_dec_indent(2);
 	mdb_printf("%<b>OPTIONS%</b>\n");
 	mdb_inc_indent(2);
@@ -3509,8 +3608,8 @@ vmem(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 void
 vmem_seg_help(void)
 {
-	mdb_printf("%s\n",
-"Display the contents of vmem_seg_ts, with optional filtering.\n"
+	mdb_printf("%s",
+"Display the contents of vmem_seg_ts, with optional filtering.\n\n"
 "\n"
 "A vmem_seg_t represents a range of addresses (or arbitrary numbers),\n"
 "representing a single chunk of data.  Only ALLOC segments have debugging\n"
@@ -4180,7 +4279,7 @@ kmem_init(void)
 {
 	mdb_walker_t w = {
 		"kmem_cache", "walk list of kmem caches", kmem_cache_walk_init,
-		kmem_cache_walk_step, kmem_cache_walk_fini
+		list_walk_step, list_walk_fini
 	};
 
 	/*

@@ -529,9 +529,9 @@ mutex_vector_exit(mutex_impl_t *lp)
 }
 
 int
-mutex_owned(kmutex_t *mp)
+mutex_owned(const kmutex_t *mp)
 {
-	mutex_impl_t *lp = (mutex_impl_t *)mp;
+	const mutex_impl_t *lp = (const mutex_impl_t *)mp;
 
 	if (panicstr)
 		return (1);
@@ -542,9 +542,9 @@ mutex_owned(kmutex_t *mp)
 }
 
 kthread_t *
-mutex_owner(kmutex_t *mp)
+mutex_owner(const kmutex_t *mp)
 {
-	mutex_impl_t *lp = (mutex_impl_t *)mp;
+	const mutex_impl_t *lp = (const mutex_impl_t *)mp;
 	kthread_id_t t;
 
 	if (MUTEX_TYPE_ADAPTIVE(lp) && (t = MUTEX_OWNER(lp)) != MUTEX_NO_OWNER)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,28 @@
  * Cache is indexed by hash value obtained from (vp, name)
  * where the vp refers to the directory containing the name.
  */
+
+/*
+ * We want to be able to identify files that are referenced only by the DNLC.
+ * When adding a reference from the DNLC, call VN_HOLD_DNLC instead of VN_HOLD,
+ * since multiple DNLC references should only be counted once in v_count. This
+ * file contains only two(2) calls to VN_HOLD, renamed VN_HOLD_CALLER in the
+ * hope that no one will mistakenly add a VN_HOLD to this file. (Unfortunately
+ * it is not possible to #undef VN_HOLD and retain VN_HOLD_CALLER. Ideally a
+ * Makefile rule would grep uncommented C tokens to check that VN_HOLD is
+ * referenced only once in this file, to define VN_HOLD_CALLER.)
+ */
+#define	VN_HOLD_CALLER	VN_HOLD
+#define	VN_HOLD_DNLC(vp)	{	\
+	mutex_enter(&(vp)->v_lock);	\
+	if ((vp)->v_count_dnlc == 0)	\
+		(vp)->v_count++;	\
+	(vp)->v_count_dnlc++;		\
+	mutex_exit(&(vp)->v_lock);	\
+}
+#define	VN_RELE_DNLC(vp)	{	\
+	vn_rele_dnlc(vp);		\
+}
 
 /*
  * Tunable nc_hashavelen is the average length desired for this chain, from
@@ -387,13 +409,14 @@ dnlc_init()
 	 * so that it never goes away (VOP_INACTIVE isn't called on it).
 	 */
 	negative_cache_vnode.v_count = 1;
+	negative_cache_vnode.v_count_dnlc = 0;
 
 	/*
 	 * Initialise kstats - both the old compatability raw kind and
 	 * the more extensive named stats.
 	 */
 	ksp = kstat_create("unix", 0, "ncstats", "misc", KSTAT_TYPE_RAW,
-		sizeof (struct ncstats), KSTAT_FLAG_VIRTUAL);
+	    sizeof (struct ncstats), KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *) &ncstats;
 		kstat_install(ksp);
@@ -433,9 +456,9 @@ dnlc_enter(vnode_t *dp, char *name, vnode_t *vp)
 	if ((ncp = dnlc_get(namlen)) == NULL)
 		return;
 	ncp->dp = dp;
-	VN_HOLD(dp);
+	VN_HOLD_DNLC(dp);
 	ncp->vp = vp;
-	VN_HOLD(vp);
+	VN_HOLD_DNLC(vp);
 	bcopy(name, ncp->name, namlen + 1); /* name and null */
 	ncp->hash = hash;
 	hp = &nc_hash[hash & nc_hashmask];
@@ -445,12 +468,11 @@ dnlc_enter(vnode_t *dp, char *name, vnode_t *vp)
 		mutex_exit(&hp->hash_lock);
 		ncstats.dbl_enters++;
 		ncs.ncs_dbl_enters.value.ui64++;
-		VN_RELE(dp);
-		VN_RELE(vp);
+		VN_RELE_DNLC(dp);
+		VN_RELE_DNLC(vp);
 		dnlc_free(ncp);		/* crfree done here */
 		TRACE_2(TR_FAC_NFS, TR_DNLC_ENTER_END,
-			"dnlc_enter_end:(%S) %d",
-			"dbl enter", ncstats.dbl_enters);
+		    "dnlc_enter_end:(%S) %d", "dbl enter", ncstats.dbl_enters);
 		return;
 	}
 	/*
@@ -508,9 +530,9 @@ dnlc_update(vnode_t *dp, char *name, vnode_t *vp)
 		return;
 	}
 	ncp->dp = dp;
-	VN_HOLD(dp);
+	VN_HOLD_DNLC(dp);
 	ncp->vp = vp;
-	VN_HOLD(vp);
+	VN_HOLD_DNLC(vp);
 	bcopy(name, ncp->name, namlen + 1); /* name and null */
 	ncp->hash = hash;
 	hp = &nc_hash[hash & nc_hashmask];
@@ -521,21 +543,21 @@ dnlc_update(vnode_t *dp, char *name, vnode_t *vp)
 			tvp = tcp->vp;
 			tcp->vp = vp;
 			mutex_exit(&hp->hash_lock);
-			VN_RELE(tvp);
+			VN_RELE_DNLC(tvp);
 			ncstats.enters++;
 			ncs.ncs_enters.value.ui64++;
 			TRACE_2(TR_FAC_NFS, TR_DNLC_ENTER_END,
 			    "dnlc_update_end:(%S) %d", "done", ncstats.enters);
 		} else {
 			mutex_exit(&hp->hash_lock);
-			VN_RELE(vp);
+			VN_RELE_DNLC(vp);
 			ncstats.dbl_enters++;
 			ncs.ncs_dbl_enters.value.ui64++;
 			TRACE_2(TR_FAC_NFS, TR_DNLC_ENTER_END,
 			    "dnlc_update_end:(%S) %d",
 			    "dbl enter", ncstats.dbl_enters);
 		}
-		VN_RELE(dp);
+		VN_RELE_DNLC(dp);
 		dnlc_free(ncp);		/* crfree done here */
 		return;
 	}
@@ -612,7 +634,7 @@ dnlc_lookup(vnode_t *dp, char *name)
 			 * put a hold on it.
 			 */
 			vp = ncp->vp;
-			VN_HOLD(vp);
+			VN_HOLD_CALLER(vp); /* VN_HOLD 1 of 2 in this file */
 			mutex_exit(&hp->hash_lock);
 			ncstats.hits++;
 			ncs.ncs_hits.value.ui64++;
@@ -620,8 +642,8 @@ dnlc_lookup(vnode_t *dp, char *name)
 				ncs.ncs_neg_hits.value.ui64++;
 			}
 			TRACE_4(TR_FAC_NFS, TR_DNLC_LOOKUP_END,
-				"dnlc_lookup_end:%S %d vp %x name %s",
-				"hit", ncstats.hits, vp, name);
+			    "dnlc_lookup_end:%S %d vp %x name %s", "hit",
+			    ncstats.hits, vp, name);
 			return (vp);
 		}
 		depth++;
@@ -631,7 +653,7 @@ dnlc_lookup(vnode_t *dp, char *name)
 	ncstats.misses++;
 	ncs.ncs_misses.value.ui64++;
 	TRACE_4(TR_FAC_NFS, TR_DNLC_LOOKUP_END,
-		"dnlc_lookup_end:%S %d vp %x name %s", "miss", ncstats.misses,
+	    "dnlc_lookup_end:%S %d vp %x name %s", "miss", ncstats.misses,
 	    NULL, name);
 	return (NULL);
 }
@@ -659,8 +681,8 @@ dnlc_remove(vnode_t *dp, char *name)
 		 */
 		nc_rmhash(ncp);
 		mutex_exit(&hp->hash_lock);
-		VN_RELE(ncp->vp);
-		VN_RELE(ncp->dp);
+		VN_RELE_DNLC(ncp->vp);
+		VN_RELE_DNLC(ncp->dp);
 		dnlc_free(ncp);
 		return;
 	}
@@ -707,7 +729,7 @@ dnlc_purge()
 
 		/* Release holds on all the vnodes now that we have no locks */
 		for (i = 0; i < index; i++) {
-			VN_RELE(nc_rele[i]);
+			VN_RELE_DNLC(nc_rele[i]);
 		}
 		if (ncp != (ncache_t *)nch) {
 			nch--; /* Do current hash chain again */
@@ -716,9 +738,8 @@ dnlc_purge()
 }
 
 /*
- * Purge any cache entries referencing a vnode.
- * Exit as soon as the vnode reference count goes to 1, as the caller
- * must hold a reference, and the dnlc can therefore have no more.
+ * Purge any cache entries referencing a vnode. Exit as soon as the dnlc
+ * reference count goes to zero (the caller still holds a reference).
  */
 void
 dnlc_purge_vp(vnode_t *vp)
@@ -729,7 +750,7 @@ dnlc_purge_vp(vnode_t *vp)
 	vnode_t *nc_rele[DNLC_MAX_RELE];
 
 	ASSERT(vp->v_count > 0);
-	if (vp->v_count == 1) {
+	if (vp->v_count_dnlc == 0) {
 		return;
 	}
 
@@ -764,11 +785,11 @@ dnlc_purge_vp(vnode_t *vp)
 
 		/* Release holds on all the vnodes now that we have no locks */
 		while (index) {
-			VN_RELE(nc_rele[--index]);
+			VN_RELE_DNLC(nc_rele[--index]);
 		}
 
-		if (vp->v_count == 1) {
-			return; /* no more dnlc references */
+		if (vp->v_count_dnlc == 0) {
+			return;
 		}
 
 		if (ncp != (ncache_t *)nch) {
@@ -830,7 +851,7 @@ dnlc_purge_vfsp(vfs_t *vfsp, int count)
 		mutex_exit(&nch->hash_lock);
 		/* Release holds on all the vnodes now that we have no locks */
 		for (i = 0; i < index; i++) {
-			VN_RELE(nc_rele[i]);
+			VN_RELE_DNLC(nc_rele[i]);
 		}
 		if (count != 0 && n >= count) {
 			return (n);
@@ -889,8 +910,8 @@ dnlc_fs_purge1(vnodeops_t *vop)
 		if (ncp != (ncache_t *)hp) {
 			nc_rmhash(ncp);
 			mutex_exit(&hp->hash_lock);
-			VN_RELE(ncp->dp);
-			VN_RELE(vp)
+			VN_RELE_DNLC(ncp->dp);
+			VN_RELE_DNLC(vp)
 			dnlc_free(ncp);
 			ncs.ncs_purge_total.value.ui64++;
 			return (1);
@@ -932,7 +953,8 @@ dnlc_reverse_lookup(vnode_t *vp, char *buf, size_t buflen)
 				bcopy(ncp->name, buf, ncp->namlen);
 				buf[ncp->namlen] = '\0';
 				pvp = ncp->dp;
-				VN_HOLD(pvp);
+				/* VN_HOLD 2 of 2 in this file */
+				VN_HOLD_CALLER(pvp);
 				mutex_exit(&nch->hash_lock);
 				return (pvp);
 			}
@@ -1101,8 +1123,8 @@ found:
 		 */
 		nc_rmhash(ncp);
 		mutex_exit(&hp->hash_lock);
-		VN_RELE(vp);
-		VN_RELE(ncp->dp);
+		VN_RELE_DNLC(vp);
+		VN_RELE_DNLC(ncp->dp);
 		dnlc_free(ncp);
 	} while (dnlc_nentries > low_water);
 
@@ -1329,7 +1351,7 @@ ok:
 		 * then free this cache
 		 */
 		if ((dcp->dc_num_entries + dcp->dc_num_free) >
-			dnlc_dir_max_size) {
+		    dnlc_dir_max_size) {
 			mutex_exit(&dcap->dca_lock);
 			dnlc_dir_purge(dcap);
 			kmem_free(dep, sizeof (dcentry_t) - 1 + namlen);
@@ -1434,7 +1456,7 @@ ok:
 	dcp = (dircache_t *)dcap->dca_dircache;
 	if (VALID_DIR_CACHE(dcp)) {
 		if ((dcp->dc_num_entries + dcp->dc_num_free) >
-			dnlc_dir_max_size) {
+		    dnlc_dir_max_size) {
 			mutex_exit(&dcap->dca_lock);
 			dnlc_dir_purge(dcap);
 			kmem_cache_free(dnlc_dir_space_cache, dfp);

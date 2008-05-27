@@ -239,10 +239,6 @@ typedef struct vnode {
 	struct vfs	*v_vfsmountedhere; /* ptr to vfs mounted here */
 	struct vnodeops	*v_op;		/* vnode operations */
 	struct page	*v_pages;	/* vnode pages list */
-	pgcnt_t		v_npages;	/* # pages on this vnode */
-	pgcnt_t		v_msnpages;	/* # pages charged to v_mset */
-	struct page	*v_scanfront;	/* scanner front hand */
-	struct page	*v_scanback;	/* scanner back hand */
 	struct filock	*v_filocks;	/* ptr to filock list */
 	struct shrlocklist *v_shrlocks;	/* ptr to shrlock list */
 	krwlock_t	v_nbllock;	/* sync for NBMAND locks */
@@ -255,15 +251,10 @@ typedef struct vnode {
 	u_longlong_t	v_mmap_read;	/* mmap read count */
 	u_longlong_t	v_mmap_write;	/* mmap write count */
 	void		*v_mpssdata;	/* info for large page mappings */
-	hrtime_t	v_scantime;	/* last time this vnode was scanned */
-	ushort_t	v_mset;		/* memory set ID */
-	uint_t		v_msflags;	/* memory set flags */
-	struct vnode	*v_msnext;	/* list of vnodes on an mset */
-	struct vnode	*v_msprev;	/* list of vnodes on an mset */
-	krwlock_t	v_mslock;	/* protects v_mset */
 	void		*v_fopdata;	/* list of file ops event watches */
 	struct vsd_node *v_vsd;		/* vnode specific data */
 	struct vnode	*v_xattrdir;	/* unnamed extended attr dir (GFS) */
+	uint_t		v_count_dnlc;	/* dnlc reference count */
 } vnode_t;
 
 #define	IS_DEVVP(vp)	\
@@ -1187,6 +1178,8 @@ int	vn_ismntpt(vnode_t *);
 
 struct vfs *vn_mountedvfs(vnode_t *);
 
+int	vn_in_dnlc(vnode_t *);
+
 void	vn_create_cache(void);
 void	vn_destroy_cache(void);
 
@@ -1207,6 +1200,7 @@ int	vn_rdwr(enum uio_rw rw, struct vnode *vp, caddr_t base, ssize_t len,
 		offset_t offset, enum uio_seg seg, int ioflag, rlim64_t ulimit,
 		cred_t *cr, ssize_t *residp);
 void	vn_rele(struct vnode *vp);
+void	vn_rele_dnlc(struct vnode *vp);
 void	vn_rele_stream(struct vnode *vp);
 int	vn_link(char *from, char *to, enum uio_seg seg);
 int	vn_rename(char *from, char *to, enum uio_seg seg);

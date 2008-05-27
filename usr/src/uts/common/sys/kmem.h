@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,15 @@ struct kmem_cache;		/* cache structure is opaque to kmem clients */
 
 typedef struct kmem_cache kmem_cache_t;
 
+/* Client response to kmem move callback */
+typedef enum kmem_cbrc {
+	KMEM_CBRC_YES,
+	KMEM_CBRC_NO,
+	KMEM_CBRC_LATER,
+	KMEM_CBRC_DONT_NEED,
+	KMEM_CBRC_DONT_KNOW
+} kmem_cbrc_t;
+
 #ifdef _KERNEL
 
 extern int kmem_ready;
@@ -99,11 +108,14 @@ extern size_t kmem_maxavail(void);
 extern kmem_cache_t *kmem_cache_create(char *, size_t, size_t,
 	int (*)(void *, void *, int), void (*)(void *, void *),
 	void (*)(void *), void *, vmem_t *, int);
+extern void kmem_cache_set_move(kmem_cache_t *,
+	kmem_cbrc_t (*)(void *, void *, size_t, void *));
 extern void kmem_cache_destroy(kmem_cache_t *);
 extern void *kmem_cache_alloc(kmem_cache_t *, int);
 extern void kmem_cache_free(kmem_cache_t *, void *);
 extern uint64_t kmem_cache_stat(kmem_cache_t *, char *);
 extern void kmem_cache_reap_now(kmem_cache_t *);
+extern void kmem_cache_move_notify(kmem_cache_t *, void *);
 
 #endif	/* _KERNEL */
 

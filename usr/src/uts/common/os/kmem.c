@@ -26,7 +26,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Kernel memory allocator, as described in the following two papers:
+ * Kernel memory allocator, as described in the following two papers and a
+ * statement about the consolidator:
  *
  * Jeff Bonwick,
  * The Slab Allocator: An Object-Caching Kernel Memory Allocator.
@@ -38,6 +39,768 @@
  * Arbitrary Resources.
  * Proceedings of the 2001 Usenix Conference.
  * Available as /shared/sac/PSARC/2000/550/materials/vmem.pdf.
+ *
+ * kmem Slab Consolidator Big Theory Statement:
+ *
+ * 1. Motivation
+ *
+ * As stated in Bonwick94, slabs provide the following advantages over other
+ * allocation structures in terms of memory fragmentation:
+ *
+ *  - Internal fragmentation (per-buffer wasted space) is minimal.
+ *  - Severe external fragmentation (unused buffers on the free list) is
+ *    unlikely.
+ *
+ * Segregating objects by size eliminates one source of external fragmentation,
+ * and according to Bonwick:
+ *
+ *   The other reason that slabs reduce external fragmentation is that all
+ *   objects in a slab are of the same type, so they have the same lifetime
+ *   distribution. The resulting segregation of short-lived and long-lived
+ *   objects at slab granularity reduces the likelihood of an entire page being
+ *   held hostage due to a single long-lived allocation [Barrett93, Hanson90].
+ *
+ * While unlikely, severe external fragmentation remains possible. Clients that
+ * allocate both short- and long-lived objects from the same cache cannot
+ * anticipate the distribution of long-lived objects within the allocator's slab
+ * implementation. Even a small percentage of long-lived objects distributed
+ * randomly across many slabs can lead to a worst case scenario where the client
+ * frees the majority of its objects and the system gets back almost none of the
+ * slabs. Despite the client doing what it reasonably can to help the system
+ * reclaim memory, the allocator cannot shake free enough slabs because of
+ * lonely allocations stubbornly hanging on. Although the allocator is in a
+ * position to diagnose the fragmentation, there is nothing that the allocator
+ * by itself can do about it. It only takes a single allocated object to prevent
+ * an entire slab from being reclaimed, and any object handed out by
+ * kmem_cache_alloc() is by definition in the client's control. Conversely,
+ * although the client is in a position to move a long-lived object, it has no
+ * way of knowing if the object is causing fragmentation, and if so, where to
+ * move it. A solution necessarily requires further cooperation between the
+ * allocator and the client.
+ *
+ * 2. Move Callback
+ *
+ * The kmem slab consolidator therefore adds a move callback to the
+ * allocator/client interface, improving worst-case external fragmentation in
+ * kmem caches that supply a function to move objects from one memory location
+ * to another. In a situation of low memory kmem attempts to consolidate all of
+ * a cache's slabs at once; otherwise it works slowly to bring external
+ * fragmentation within the 1/8 limit guaranteed for internal fragmentation,
+ * thereby helping to avoid a low memory situation in the future.
+ *
+ * The callback has the following signature:
+ *
+ *   kmem_cbrc_t move(void *old, void *new, size_t size, void *user_arg)
+ *
+ * It supplies the kmem client with two addresses: the allocated object that
+ * kmem wants to move and a buffer selected by kmem for the client to use as the
+ * copy destination. The callback is kmem's way of saying "Please get off of
+ * this buffer and use this one instead." kmem knows where it wants to move the
+ * object in order to best reduce fragmentation. All the client needs to know
+ * about the second argument (void *new) is that it is an allocated, constructed
+ * object ready to take the contents of the old object. When the move function
+ * is called, the system is likely to be low on memory, and the new object
+ * spares the client from having to worry about allocating memory for the
+ * requested move. The third argument supplies the size of the object, in case a
+ * single move function handles multiple caches whose objects differ only in
+ * size (such as zio_buf_512, zio_buf_1024, etc). Finally, the same optional
+ * user argument passed to the constructor, destructor, and reclaim functions is
+ * also passed to the move callback.
+ *
+ * 2.1 Setting the Move Callback
+ *
+ * The client sets the move callback after creating the cache and before
+ * allocating from it:
+ *
+ *	object_cache = kmem_cache_create(...);
+ *      kmem_cache_set_move(object_cache, object_move);
+ *
+ * 2.2 Move Callback Return Values
+ *
+ * Only the client knows about its own data and when is a good time to move it.
+ * The client is cooperating with kmem to return unused memory to the system,
+ * and kmem respectfully accepts this help at the client's convenience. When
+ * asked to move an object, the client can respond with any of the following:
+ *
+ *   typedef enum kmem_cbrc {
+ *           KMEM_CBRC_YES,
+ *           KMEM_CBRC_NO,
+ *           KMEM_CBRC_LATER,
+ *           KMEM_CBRC_DONT_NEED,
+ *           KMEM_CBRC_DONT_KNOW
+ *   } kmem_cbrc_t;
+ *
+ * The client must not explicitly kmem_cache_free() either of the objects passed
+ * to the callback, since kmem wants to free them directly to the slab layer
+ * (bypassing the per-CPU magazine layer). The response tells kmem which of the
+ * objects to free:
+ *
+ *       YES: (Did it) The client moved the object, so kmem frees the old one.
+ *        NO: (Never) The client refused, so kmem frees the new object (the
+ *            unused copy destination). kmem also marks the slab of the old
+ *            object so as not to bother the client with further callbacks for
+ *            that object as long as the slab remains on the partial slab list.
+ *            (The system won't be getting the slab back as long as the
+ *            immovable object holds it hostage, so there's no point in moving
+ *            any of its objects.)
+ *     LATER: The client is using the object and cannot move it now, so kmem
+ *            frees the new object (the unused copy destination). kmem still
+ *            attempts to move other objects off the slab, since it expects to
+ *            succeed in clearing the slab in a later callback. The client
+ *            should use LATER instead of NO if the object is likely to become
+ *            movable very soon.
+ * DONT_NEED: The client no longer needs the object, so kmem frees the old along
+ *            with the new object (the unused copy destination). This response
+ *            is the client's opportunity to be a model citizen and give back as
+ *            much as it can.
+ * DONT_KNOW: The client does not know about the object because
+ *            a) the client has just allocated the object and not yet put it
+ *               wherever it expects to find known objects
+ *            b) the client has removed the object from wherever it expects to
+ *               find known objects and is about to free it, or
+ *            c) the client has freed the object.
+ *            In all these cases (a, b, and c) kmem frees the new object (the
+ *            unused copy destination) and searches for the old object in the
+ *            magazine layer. If found, the object is removed from the magazine
+ *            layer and freed to the slab layer so it will no longer hold the
+ *            slab hostage.
+ *
+ * 2.3 Object States
+ *
+ * Neither kmem nor the client can be assumed to know the object's whereabouts
+ * at the time of the callback. An object belonging to a kmem cache may be in
+ * any of the following states:
+ *
+ * 1. Uninitialized on the slab
+ * 2. Allocated from the slab but not constructed (still uninitialized)
+ * 3. Allocated from the slab, constructed, but not yet ready for business
+ *    (not in a valid state for the move callback)
+ * 4. In use (valid and known to the client)
+ * 5. About to be freed (no longer in a valid state for the move callback)
+ * 6. Freed to a magazine (still constructed)
+ * 7. Allocated from a magazine, not yet ready for business (not in a valid
+ *    state for the move callback), and about to return to state #4
+ * 8. Deconstructed on a magazine that is about to be freed
+ * 9. Freed to the slab
+ *
+ * Since the move callback may be called at any time while the object is in any
+ * of the above states (except state #1), the client needs a safe way to
+ * determine whether or not it knows about the object. Specifically, the client
+ * needs to know whether or not the object is in state #4, the only state in
+ * which a move is valid. If the object is in any other state, the client should
+ * immediately return KMEM_CBRC_DONT_KNOW, since it is unsafe to access any of
+ * the object's fields.
+ *
+ * Note that although an object may be in state #4 when kmem initiates the move
+ * request, the object may no longer be in that state by the time kmem actually
+ * calls the move function. Not only does the client free objects
+ * asynchronously, kmem itself puts move requests on a queue where thay are
+ * pending until kmem processes them from another context. Also, objects freed
+ * to a magazine appear allocated from the point of view of the slab layer, so
+ * kmem may even initiate requests for objects in a state other than state #4.
+ *
+ * 2.3.1 Magazine Layer
+ *
+ * An important insight revealed by the states listed above is that the magazine
+ * layer is populated only by kmem_cache_free(). Magazines of constructed
+ * objects are never populated directly from the slab layer (which contains raw,
+ * unconstructed objects). Whenever an allocation request cannot be satisfied
+ * from the magazine layer, the magazines are bypassed and the request is
+ * satisfied from the slab layer (creating a new slab if necessary). kmem calls
+ * the object constructor only when allocating from the slab layer, and only in
+ * response to kmem_cache_alloc() or to prepare the destination buffer passed in
+ * the move callback. kmem does not preconstruct objects in anticipation of
+ * kmem_cache_alloc().
+ *
+ * 2.3.2 Object Constructor and Destructor
+ *
+ * If the client supplies a destructor, it must be valid to call the destructor
+ * on a newly created object (immediately after the constructor).
+ *
+ * 2.4 Recognizing Known Objects
+ *
+ * There is a simple test to determine safely whether or not the client knows
+ * about a given object in the move callback. It relies on the fact that kmem
+ * guarantees that the object of the move callback has only been touched by the
+ * client itself or else by kmem. kmem does this by ensuring that none of the
+ * cache's slabs are freed to the virtual memory (VM) subsystem while a move
+ * callback is pending. When the last object on a slab is freed, if there is a
+ * pending move, kmem puts the slab on a per-cache dead list and defers freeing
+ * slabs on that list until all pending callbacks are completed. That way,
+ * clients can be certain that the object of a move callback is in one of the
+ * states listed above, making it possible to distinguish known objects (in
+ * state #4) using the two low order bits of any pointer member (with the
+ * exception of 'char *' or 'short *' which may not be 4-byte aligned on some
+ * platforms).
+ *
+ * The test works as long as the client always transitions objects from state #4
+ * (known, in use) to state #5 (about to be freed, invalid) by setting the low
+ * order bit of the client-designated pointer member. Since kmem only writes
+ * invalid memory patterns, such as 0xbaddcafe to uninitialized memory and
+ * 0xdeadbeef to freed memory, any scribbling on the object done by kmem is
+ * guaranteed to set at least one of the two low order bits. Therefore, given an
+ * object with a back pointer to a 'container_t *o_container', the client can
+ * test
+ *
+ *      container_t *container = object->o_container;
+ *      if ((uintptr_t)container & 0x3) {
+ *              return (KMEM_CBRC_DONT_KNOW);
+ *      }
+ *
+ * Typically, an object will have a pointer to some structure with a list or
+ * hash where objects from the cache are kept while in use. Assuming that the
+ * client has some way of knowing that the container structure is valid and will
+ * not go away during the move, and assuming that the structure includes a lock
+ * to protect whatever collection is used, then the client would continue as
+ * follows:
+ *
+ *	// Ensure that the container structure does not go away.
+ *      if (container_hold(container) == 0) {
+ *              return (KMEM_CBRC_DONT_KNOW);
+ *      }
+ *      mutex_enter(&container->c_objects_lock);
+ *      if (container != object->o_container) {
+ *              mutex_exit(&container->c_objects_lock);
+ *              container_rele(container);
+ *              return (KMEM_CBRC_DONT_KNOW);
+ *      }
+ *
+ * At this point the client knows that the object cannot be freed as long as
+ * c_objects_lock is held. Note that after acquiring the lock, the client must
+ * recheck the o_container pointer in case the object was removed just before
+ * acquiring the lock.
+ *
+ * When the client is about to free an object, it must first remove that object
+ * from the list, hash, or other structure where it is kept. At that time, to
+ * mark the object so it can be distinguished from the remaining, known objects,
+ * the client sets the designated low order bit:
+ *
+ *      mutex_enter(&container->c_objects_lock);
+ *      object->o_container = (void *)((uintptr_t)object->o_container | 0x1);
+ *      list_remove(&container->c_objects, object);
+ *      mutex_exit(&container->c_objects_lock);
+ *
+ * In the common case, the object is freed to the magazine layer, where it may
+ * be reused on a subsequent allocation without the overhead of calling the
+ * constructor. While in the magazine it appears allocated from the point of
+ * view of the slab layer, making it a candidate for the move callback. Most
+ * objects unrecognized by the client in the move callback fall into this
+ * category and are cheaply distinguished from known objects by the test
+ * described earlier. Since recognition is cheap for the client, and searching
+ * magazines is expensive for kmem, kmem defers searching until the client first
+ * returns KMEM_CBRC_DONT_KNOW. As long as the needed effort is reasonable, kmem
+ * elsewhere does what it can to avoid bothering the client unnecessarily.
+ *
+ * Invalidating the designated pointer member before freeing the object marks
+ * the object to be avoided in the callback, and conversely, assigning a valid
+ * value to the designated pointer member after allocating the object makes the
+ * object fair game for the callback:
+ *
+ *      ... allocate object ...
+ *      ... set any initial state not set by the constructor ...
+ *
+ *      mutex_enter(&container->c_objects_lock);
+ *      list_insert_tail(&container->c_objects, object);
+ *      membar_producer();
+ *      object->o_container = container;
+ *      mutex_exit(&container->c_objects_lock);
+ *
+ * Note that everything else must be valid before setting o_container makes the
+ * object fair game for the move callback. The membar_producer() call ensures
+ * that all the object's state is written to memory before setting the pointer
+ * that transitions the object from state #3 or #7 (allocated, constructed, not
+ * yet in use) to state #4 (in use, valid). That's important because the move
+ * function has to check the validity of the pointer before it can safely
+ * acquire the lock protecting the collection where it expects to find known
+ * objects.
+ *
+ * This method of distinguishing known objects observes the usual symmetry:
+ * invalidating the designated pointer is the first thing the client does before
+ * freeing the object, and setting the designated pointer is the last thing the
+ * client does after allocating the object. Of course, the client is not
+ * required to use this method. Fundamentally, how the client recognizes known
+ * objects is completely up to the client, but this method is recommended as an
+ * efficient and safe way to take advantage of the guarantees made by kmem. If
+ * the entire object is arbitrary data without any markable bits from a suitable
+ * pointer member, then the client must find some other method, such as
+ * searching a hash table of known objects.
+ *
+ * 2.5 Preventing Objects From Moving
+ *
+ * Besides a way to distinguish known objects, the other thing that the client
+ * needs is a strategy to ensure that an object will not move while the client
+ * is actively using it. The details of satisfying this requirement tend to be
+ * highly cache-specific. It might seem that the same rules that let a client
+ * remove an object safely should also decide when an object can be moved
+ * safely. However, any object state that makes a removal attempt invalid is
+ * likely to be long-lasting for objects that the client does not expect to
+ * remove. kmem knows nothing about the object state and is equally likely (from
+ * the client's point of view) to request a move for any object in the cache,
+ * whether prepared for removal or not. Even a low percentage of objects stuck
+ * in place by unremovability will defeat the consolidator if the stuck objects
+ * are the same long-lived allocations likely to hold slabs hostage.
+ * Fundamentally, the consolidator is not aimed at common cases. Severe external
+ * fragmentation is a worst case scenario manifested as sparsely allocated
+ * slabs, by definition a low percentage of the cache's objects. When deciding
+ * what makes an object movable, keep in mind the goal of the consolidator: to
+ * bring worst-case external fragmentation within the limits guaranteed for
+ * internal fragmentation. Removability is a poor criterion if it is likely to
+ * exclude more than an insignificant percentage of objects for long periods of
+ * time.
+ *
+ * A tricky general solution exists, and it has the advantage of letting you
+ * move any object at almost any moment, practically eliminating the likelihood
+ * that an object can hold a slab hostage. However, if there is a cache-specific
+ * way to ensure that an object is not actively in use in the vast majority of
+ * cases, a simpler solution that leverages this cache-specific knowledge is
+ * preferred.
+ *
+ * 2.5.1 Cache-Specific Solution
+ *
+ * As an example of a cache-specific solution, the ZFS znode cache takes
+ * advantage of the fact that the vast majority of znodes are only being
+ * referenced from the DNLC. (A typical case might be a few hundred in active
+ * use and a hundred thousand in the DNLC.) In the move callback, after the ZFS
+ * client has established that it recognizes the znode and can access its fields
+ * safely (using the method described earlier), it then tests whether the znode
+ * is referenced by anything other than the DNLC. If so, it assumes that the
+ * znode may be in active use and is unsafe to move, so it drops its locks and
+ * returns KMEM_CBRC_LATER. The advantage of this strategy is that everywhere
+ * else znodes are used, no change is needed to protect against the possibility
+ * of the znode moving. The disadvantage is that it remains possible for an
+ * application to hold a znode slab hostage with an open file descriptor.
+ * However, this case ought to be rare and the consolidator has a way to deal
+ * with it: If the client responds KMEM_CBRC_LATER repeatedly for the same
+ * object, kmem eventually stops believing it and treats the slab as if the
+ * client had responded KMEM_CBRC_NO. Having marked the hostage slab, kmem can
+ * then focus on getting it off of the partial slab list by allocating rather
+ * than freeing all of its objects. (Either way of getting a slab off the
+ * free list reduces fragmentation.)
+ *
+ * 2.5.2 General Solution
+ *
+ * The general solution, on the other hand, requires an explicit hold everywhere
+ * the object is used to prevent it from moving. To keep the client locking
+ * strategy as uncomplicated as possible, kmem guarantees the simplifying
+ * assumption that move callbacks are sequential, even across multiple caches.
+ * Internally, a global queue processed by a single thread supports all caches
+ * implementing the callback function. No matter how many caches supply a move
+ * function, the consolidator never moves more than one object at a time, so the
+ * client does not have to worry about tricky lock ordering involving several
+ * related objects from different kmem caches.
+ *
+ * The general solution implements the explicit hold as a read-write lock, which
+ * allows multiple readers to access an object from the cache simultaneously
+ * while a single writer is excluded from moving it. A single rwlock for the
+ * entire cache would lock out all threads from using any of the cache's objects
+ * even though only a single object is being moved, so to reduce contention,
+ * the client can fan out the single rwlock into an array of rwlocks hashed by
+ * the object address, making it probable that moving one object will not
+ * prevent other threads from using a different object. The rwlock cannot be a
+ * member of the object itself, because the possibility of the object moving
+ * makes it unsafe to access any of the object's fields until the lock is
+ * acquired.
+ *
+ * Assuming a small, fixed number of locks, it's possible that multiple objects
+ * will hash to the same lock. A thread that needs to use multiple objects in
+ * the same function may acquire the same lock multiple times. Since rwlocks are
+ * reentrant for readers, and since there is never more than a single writer at
+ * a time (assuming that the client acquires the lock as a writer only when
+ * moving an object inside the callback), there would seem to be no problem.
+ * However, a client locking multiple objects in the same function must handle
+ * one case of potential deadlock: Assume that thread A needs to prevent both
+ * object 1 and object 2 from moving, and thread B, the callback, meanwhile
+ * tries to move object 3. It's possible, if objects 1, 2, and 3 all hash to the
+ * same lock, that thread A will acquire the lock for object 1 as a reader
+ * before thread B sets the lock's write-wanted bit, preventing thread A from
+ * reacquiring the lock for object 2 as a reader. Unable to make forward
+ * progress, thread A will never release the lock for object 1, resulting in
+ * deadlock.
+ *
+ * There are two ways of avoiding the deadlock just described. The first is to
+ * use rw_tryenter() rather than rw_enter() in the callback function when
+ * attempting to acquire the lock as a writer. If tryenter discovers that the
+ * same object (or another object hashed to the same lock) is already in use, it
+ * aborts the callback and returns KMEM_CBRC_LATER. The second way is to use
+ * rprwlock_t (declared in common/fs/zfs/sys/rprwlock.h) instead of rwlock_t,
+ * since it allows a thread to acquire the lock as a reader in spite of a
+ * waiting writer. This second approach insists on moving the object now, no
+ * matter how many readers the move function must wait for in order to do so,
+ * and could delay the completion of the callback indefinitely (blocking
+ * callbacks to other clients). In practice, a less insistent callback using
+ * rw_tryenter() returns KMEM_CBRC_LATER infrequently enough that there seems
+ * little reason to use anything else.
+ *
+ * Avoiding deadlock is not the only problem that an implementation using an
+ * explicit hold needs to solve. Locking the object in the first place (to
+ * prevent it from moving) remains a problem, since the object could move
+ * between the time you obtain a pointer to the object and the time you acquire
+ * the rwlock hashed to that pointer value. Therefore the client needs to
+ * recheck the value of the pointer after acquiring the lock, drop the lock if
+ * the value has changed, and try again. This requires a level of indirection:
+ * something that points to the object rather than the object itself, that the
+ * client can access safely while attempting to acquire the lock. (The object
+ * itself cannot be referenced safely because it can move at any time.)
+ * The following lock-acquisition function takes whatever is safe to reference
+ * (arg), follows its pointer to the object (using function f), and tries as
+ * often as necessary to acquire the hashed lock and verify that the object
+ * still has not moved:
+ *
+ *      object_t *
+ *      object_hold(object_f f, void *arg)
+ *      {
+ *              object_t *op;
+ *
+ *              op = f(arg);
+ *              if (op == NULL) {
+ *                      return (NULL);
+ *              }
+ *
+ *              rw_enter(OBJECT_RWLOCK(op), RW_READER);
+ *              while (op != f(arg)) {
+ *                      rw_exit(OBJECT_RWLOCK(op));
+ *                      op = f(arg);
+ *                      if (op == NULL) {
+ *                              break;
+ *                      }
+ *                      rw_enter(OBJECT_RWLOCK(op), RW_READER);
+ *              }
+ *
+ *              return (op);
+ *      }
+ *
+ * The OBJECT_RWLOCK macro hashes the object address to obtain the rwlock. The
+ * lock reacquisition loop, while necessary, almost never executes. The function
+ * pointer f (used to obtain the object pointer from arg) has the following type
+ * definition:
+ *
+ *      typedef object_t *(*object_f)(void *arg);
+ *
+ * An object_f implementation is likely to be as simple as accessing a structure
+ * member:
+ *
+ *      object_t *
+ *      s_object(void *arg)
+ *      {
+ *              something_t *sp = arg;
+ *              return (sp->s_object);
+ *      }
+ *
+ * The flexibility of a function pointer allows the path to the object to be
+ * arbitrarily complex and also supports the notion that depending on where you
+ * are using the object, you may need to get it from someplace different.
+ *
+ * The function that releases the explicit hold is simpler because it does not
+ * have to worry about the object moving:
+ *
+ *      void
+ *      object_rele(object_t *op)
+ *      {
+ *              rw_exit(OBJECT_RWLOCK(op));
+ *      }
+ *
+ * The caller is spared these details so that obtaining and releasing an
+ * explicit hold feels like a simple mutex_enter()/mutex_exit() pair. The caller
+ * of object_hold() only needs to know that the returned object pointer is valid
+ * if not NULL and that the object will not move until released.
+ *
+ * Although object_hold() prevents an object from moving, it does not prevent it
+ * from being freed. The caller must take measures before calling object_hold()
+ * (afterwards is too late) to ensure that the held object cannot be freed. The
+ * caller must do so without accessing the unsafe object reference, so any lock
+ * or reference count used to ensure the continued existence of the object must
+ * live outside the object itself.
+ *
+ * Obtaining a new object is a special case where an explicit hold is impossible
+ * for the caller. Any function that returns a newly allocated object (either as
+ * a return value, or as an in-out paramter) must return it already held; after
+ * the caller gets it is too late, since the object cannot be safely accessed
+ * without the level of indirection described earlier. The following
+ * object_alloc() example uses the same code shown earlier to transition a new
+ * object into the state of being recognized (by the client) as a known object.
+ * The function must acquire the hold (rw_enter) before that state transition
+ * makes the object movable:
+ *
+ *      static object_t *
+ *      object_alloc(container_t *container)
+ *      {
+ *              object_t *object = kmem_cache_create(object_cache, 0);
+ *              ... set any initial state not set by the constructor ...
+ *              rw_enter(OBJECT_RWLOCK(object), RW_READER);
+ *              mutex_enter(&container->c_objects_lock);
+ *              list_insert_tail(&container->c_objects, object);
+ *              membar_producer();
+ *              object->o_container = container;
+ *              mutex_exit(&container->c_objects_lock);
+ *              return (object);
+ *      }
+ *
+ * Functions that implicitly acquire an object hold (any function that calls
+ * object_alloc() to supply an object for the caller) need to be carefully noted
+ * so that the matching object_rele() is not neglected. Otherwise, leaked holds
+ * prevent all objects hashed to the affected rwlocks from ever being moved.
+ *
+ * The pointer to a held object can be hashed to the holding rwlock even after
+ * the object has been freed. Although it is possible to release the hold
+ * after freeing the object, you may decide to release the hold implicitly in
+ * whatever function frees the object, so as to release the hold as soon as
+ * possible, and for the sake of symmetry with the function that implicitly
+ * acquires the hold when it allocates the object. Here, object_free() releases
+ * the hold acquired by object_alloc(). Its implicit object_rele() forms a
+ * matching pair with object_hold():
+ *
+ *      void
+ *      object_free(object_t *object)
+ *      {
+ *              container_t *container;
+ *
+ *              ASSERT(object_held(object));
+ *              container = object->o_container;
+ *              mutex_enter(&container->c_objects_lock);
+ *              object->o_container =
+ *                  (void *)((uintptr_t)object->o_container | 0x1);
+ *              list_remove(&container->c_objects, object);
+ *              mutex_exit(&container->c_objects_lock);
+ *              object_rele(object);
+ *              kmem_cache_free(object_cache, object);
+ *      }
+ *
+ * Note that object_free() cannot safely accept an object pointer as an argument
+ * unless the object is already held. Any function that calls object_free()
+ * needs to be carefully noted since it similarly forms a matching pair with
+ * object_hold().
+ *
+ * To complete the picture, the following callback function implements the
+ * general solution by moving objects only if they are currently unheld:
+ *
+ *      static kmem_cbrc_t
+ *      object_move(void *buf, void *newbuf, size_t size, void *arg)
+ *      {
+ *              object_t *op = buf, *np = newbuf;
+ *              container_t *container;
+ *
+ *              container = op->o_container;
+ *              if ((uintptr_t)container & 0x3) {
+ *                      return (KMEM_CBRC_DONT_KNOW);
+ *              }
+ *
+ *	        // Ensure that the container structure does not go away.
+ *              if (container_hold(container) == 0) {
+ *                      return (KMEM_CBRC_DONT_KNOW);
+ *              }
+ *
+ *              mutex_enter(&container->c_objects_lock);
+ *              if (container != op->o_container) {
+ *                      mutex_exit(&container->c_objects_lock);
+ *                      container_rele(container);
+ *                      return (KMEM_CBRC_DONT_KNOW);
+ *              }
+ *
+ *              if (rw_tryenter(OBJECT_RWLOCK(op), RW_WRITER) == 0) {
+ *                      mutex_exit(&container->c_objects_lock);
+ *                      container_rele(container);
+ *                      return (KMEM_CBRC_LATER);
+ *              }
+ *
+ *              object_move_impl(op, np); // critical section
+ *              rw_exit(OBJECT_RWLOCK(op));
+ *
+ *              op->o_container = (void *)((uintptr_t)op->o_container | 0x1);
+ *              list_link_replace(&op->o_link_node, &np->o_link_node);
+ *              mutex_exit(&container->c_objects_lock);
+ *              container_rele(container);
+ *              return (KMEM_CBRC_YES);
+ *      }
+ *
+ * Note that object_move() must invalidate the designated o_container pointer of
+ * the old object in the same way that object_free() does, since kmem will free
+ * the object in response to the KMEM_CBRC_YES return value.
+ *
+ * The lock order in object_move() differs from object_alloc(), which locks
+ * OBJECT_RWLOCK first and &container->c_objects_lock second, but as long as the
+ * callback uses rw_tryenter() (preventing the deadlock described earlier), it's
+ * not a problem. Holding the lock on the object list in the example above
+ * through the entire callback not only prevents the object from going away, it
+ * also allows you to lock the list elsewhere and know that none of its elements
+ * will move during iteration.
+ *
+ * Adding an explicit hold everywhere an object from the cache is used is tricky
+ * and involves much more change to client code than a cache-specific solution
+ * that leverages existing state to decide whether or not an object is
+ * movable. However, this approach has the advantage that no object remains
+ * immovable for any significant length of time, making it extremely unlikely
+ * that long-lived allocations can continue holding slabs hostage; and it works
+ * for any cache.
+ *
+ * 3. Consolidator Implementation
+ *
+ * Once the client supplies a move function that a) recognizes known objects and
+ * b) avoids moving objects that are actively in use, the remaining work is up
+ * to the consolidator to decide which objects to move and when to issue
+ * callbacks.
+ *
+ * The consolidator relies on the fact that a cache's slabs are ordered by
+ * usage. Each slab has a fixed number of objects. Depending on the slab's
+ * "color" (the offset of the first object from the beginning of the slab;
+ * offsets are staggered to mitigate false sharing of cache lines) it is either
+ * the maximum number of objects per slab determined at cache creation time or
+ * else the number closest to the maximum that fits within the space remaining
+ * after the initial offset. A completely allocated slab may contribute some
+ * internal fragmentation (per-slab overhead) but no external fragmentation, so
+ * it is of no interest to the consolidator. At the other extreme, slabs whose
+ * objects have all been freed to the slab are released to the virtual memory
+ * (VM) subsystem (objects freed to magazines are still allocated as far as the
+ * slab is concerned). External fragmentation exists when there are slabs
+ * somewhere between these extremes. A partial slab has at least one but not all
+ * of its objects allocated. The more partial slabs, and the fewer allocated
+ * objects on each of them, the higher the fragmentation. Hence the
+ * consolidator's overall strategy is to reduce the number of partial slabs by
+ * moving allocated objects from the least allocated slabs to the most allocated
+ * slabs.
+ *
+ * Partial slabs are kept in an AVL tree ordered by usage. Completely allocated
+ * slabs are kept separately in an unordered list. Since the majority of slabs
+ * tend to be completely allocated (a typical unfragmented cache may have
+ * thousands of complete slabs and only a single partial slab), separating
+ * complete slabs improves the efficiency of partial slab ordering, since the
+ * complete slabs do not affect the depth or balance of the AVL tree. This
+ * ordered sequence of partial slabs acts as a "free list" supplying objects for
+ * allocation requests.
+ *
+ * Objects are always allocated from the first partial slab in the free list,
+ * where the allocation is most likely to eliminate a partial slab (by
+ * completely allocating it). Conversely, when a single object from a completely
+ * allocated slab is freed to the slab, that slab is added to the front of the
+ * free list. Since most free list activity involves highly allocated slabs
+ * coming and going at the front of the list, slabs tend naturally toward the
+ * ideal order: highly allocated at the front, sparsely allocated at the back.
+ * Slabs with few allocated objects are likely to become completely free if they
+ * keep a safe distance away from the front of the free list. Slab misorders
+ * interfere with the natural tendency of slabs to become completely free or
+ * completely allocated. For example, a slab with a single allocated object
+ * needs only a single free to escape the cache; its natural desire is
+ * frustrated when it finds itself at the front of the list where a second
+ * allocation happens just before the free could have released it. Another slab
+ * with all but one object allocated might have supplied the buffer instead, so
+ * that both (as opposed to neither) of the slabs would have been taken off the
+ * free list.
+ *
+ * Although slabs tend naturally toward the ideal order, misorders allowed by a
+ * simple list implementation defeat the consolidator's strategy of merging
+ * least- and most-allocated slabs. Without an AVL tree to guarantee order, kmem
+ * needs another way to fix misorders to optimize its callback strategy. One
+ * approach is to periodically scan a limited number of slabs, advancing a
+ * marker to hold the current scan position, and to move extreme misorders to
+ * the front or back of the free list and to the front or back of the current
+ * scan range. By making consecutive scan ranges overlap by one slab, the least
+ * allocated slab in the current range can be carried along from the end of one
+ * scan to the start of the next.
+ *
+ * Maintaining partial slabs in an AVL tree relieves kmem of this additional
+ * task, however. Since most of the cache's activity is in the magazine layer,
+ * and allocations from the slab layer represent only a startup cost, the
+ * overhead of maintaining a balanced tree is not a significant concern compared
+ * to the opportunity of reducing complexity by eliminating the partial slab
+ * scanner just described. The overhead of an AVL tree is minimized by
+ * maintaining only partial slabs in the tree and keeping completely allocated
+ * slabs separately in a list. To avoid increasing the size of the slab
+ * structure the AVL linkage pointers are reused for the slab's list linkage,
+ * since the slab will always be either partial or complete, never stored both
+ * ways at the same time. To further minimize the overhead of the AVL tree the
+ * compare function that orders partial slabs by usage divides the range of
+ * allocated object counts into bins such that counts within the same bin are
+ * considered equal. Binning partial slabs makes it less likely that allocating
+ * or freeing a single object will change the slab's order, requiring a tree
+ * reinsertion (an avl_remove() followed by an avl_add(), both potentially
+ * requiring some rebalancing of the tree). Allocation counts closest to
+ * completely free and completely allocated are left unbinned (finely sorted) to
+ * better support the consolidator's strategy of merging slabs at either
+ * extreme.
+ *
+ * 3.1 Assessing Fragmentation and Selecting Candidate Slabs
+ *
+ * The consolidator piggybacks on the kmem maintenance thread and is called on
+ * the same interval as kmem_cache_update(), once per cache every fifteen
+ * seconds. kmem maintains a running count of unallocated objects in the slab
+ * layer (cache_bufslab). The consolidator checks whether that number exceeds
+ * 12.5% (1/8) of the total objects in the cache (cache_buftotal), and whether
+ * there is a significant number of slabs in the cache (arbitrarily a minimum
+ * 101 total slabs). Unused objects that have fallen out of the magazine layer's
+ * working set are included in the assessment, and magazines in the depot are
+ * reaped if those objects would lift cache_bufslab above the fragmentation
+ * threshold. Once the consolidator decides that a cache is fragmented, it looks
+ * for a candidate slab to reclaim, starting at the end of the partial slab free
+ * list and scanning backwards. At first the consolidator is choosy: only a slab
+ * with fewer than 12.5% (1/8) of its objects allocated qualifies (or else a
+ * single allocated object, regardless of percentage). If there is difficulty
+ * finding a candidate slab, kmem raises the allocation threshold incrementally,
+ * up to a maximum 87.5% (7/8), so that eventually the consolidator will reduce
+ * external fragmentation (unused objects on the free list) below 12.5% (1/8),
+ * even in the worst case of every slab in the cache being almost 7/8 allocated.
+ * The threshold can also be lowered incrementally when candidate slabs are easy
+ * to find, and the threshold is reset to the minimum 1/8 as soon as the cache
+ * is no longer fragmented.
+ *
+ * 3.2 Generating Callbacks
+ *
+ * Once an eligible slab is chosen, a callback is generated for every allocated
+ * object on the slab, in the hope that the client will move everything off the
+ * slab and make it reclaimable. Objects selected as move destinations are
+ * chosen from slabs at the front of the free list. Assuming slabs in the ideal
+ * order (most allocated at the front, least allocated at the back) and a
+ * cooperative client, the consolidator will succeed in removing slabs from both
+ * ends of the free list, completely allocating on the one hand and completely
+ * freeing on the other. Objects selected as move destinations are allocated in
+ * the kmem maintenance thread where move requests are enqueued. A separate
+ * callback thread removes pending callbacks from the queue and calls the
+ * client. The separate thread ensures that client code (the move function) does
+ * not interfere with internal kmem maintenance tasks. A map of pending
+ * callbacks keyed by object address (the object to be moved) is checked to
+ * ensure that duplicate callbacks are not generated for the same object.
+ * Allocating the move destination (the object to move to) prevents subsequent
+ * callbacks from selecting the same destination as an earlier pending callback.
+ *
+ * Move requests can also be generated by kmem_cache_reap() when the system is
+ * desperate for memory and by kmem_cache_move_notify(), called by the client to
+ * notify kmem that a move refused earlier with KMEM_CBRC_LATER is now possible.
+ * The map of pending callbacks is protected by the same lock that protects the
+ * slab layer.
+ *
+ * When the system is desperate for memory, kmem does not bother to determine
+ * whether or not the cache exceeds the fragmentation threshold, but tries to
+ * consolidate as many slabs as possible. Normally, the consolidator chews
+ * slowly, one sparsely allocated slab at a time during each maintenance
+ * interval that the cache is fragmented. When desperate, the consolidator
+ * starts at the last partial slab and enqueues callbacks for every allocated
+ * object on every partial slab, working backwards until it reaches the first
+ * partial slab. The first partial slab, meanwhile, advances in pace with the
+ * consolidator as allocations to supply move destinations for the enqueued
+ * callbacks use up the highly allocated slabs at the front of the free list.
+ * Ideally, the overgrown free list collapses like an accordion, starting at
+ * both ends and ending at the center with a single partial slab.
+ *
+ * 3.3 Client Responses
+ *
+ * When the client returns KMEM_CBRC_NO in response to the move callback, kmem
+ * marks the slab that supplied the stuck object non-reclaimable and moves it to
+ * front of the free list. The slab remains marked as long as it remains on the
+ * free list, and it appears more allocated to the partial slab compare function
+ * than any unmarked slab, no matter how many of its objects are allocated.
+ * Since even one immovable object ties up the entire slab, the goal is to
+ * completely allocate any slab that cannot be completely freed. kmem does not
+ * bother generating callbacks to move objects from a marked slab unless the
+ * system is desperate.
+ *
+ * When the client responds KMEM_CBRC_LATER, kmem increments a count for the
+ * slab. If the client responds LATER too many times, kmem disbelieves and
+ * treats the response as a NO. The count is cleared when the slab is taken off
+ * the partial slab list or when the client moves one of the slab's objects.
+ *
+ * 4. Observability
+ *
+ * A kmem cache's external fragmentation is best observed with 'mdb -k' using
+ * the ::kmem_slabs dcmd. For a complete description of the command, enter
+ * '::help kmem_slabs' at the mdb prompt.
  */
 
 #include <sys/kmem_impl.h>
@@ -50,6 +813,7 @@
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <sys/sdt.h>
 #include <sys/mutex.h>
 #include <sys/bitmap.h>
 #include <sys/atomic.h>
@@ -64,6 +828,9 @@
 #include <sys/id32.h>
 #include <sys/zone.h>
 #include <sys/netstack.h>
+#ifdef	DEBUG
+#include <sys/random.h>
+#endif
 
 extern void streams_msg_init(void);
 extern int segkp_fromheap;
@@ -96,6 +863,13 @@ struct kmem_cache_kstat {
 	kstat_named_t	kmc_full_magazines;
 	kstat_named_t	kmc_empty_magazines;
 	kstat_named_t	kmc_magazine_size;
+	kstat_named_t	kmc_move_callbacks;
+	kstat_named_t	kmc_move_yes;
+	kstat_named_t	kmc_move_no;
+	kstat_named_t	kmc_move_later;
+	kstat_named_t	kmc_move_dont_need;
+	kstat_named_t	kmc_move_dont_know;
+	kstat_named_t	kmc_move_hunt_found;
 } kmem_cache_kstat = {
 	{ "buf_size",		KSTAT_DATA_UINT64 },
 	{ "align",		KSTAT_DATA_UINT64 },
@@ -123,6 +897,13 @@ struct kmem_cache_kstat {
 	{ "full_magazines",	KSTAT_DATA_UINT64 },
 	{ "empty_magazines",	KSTAT_DATA_UINT64 },
 	{ "magazine_size",	KSTAT_DATA_UINT64 },
+	{ "move_callbacks",	KSTAT_DATA_UINT64 },
+	{ "move_yes",		KSTAT_DATA_UINT64 },
+	{ "move_no",		KSTAT_DATA_UINT64 },
+	{ "move_later",		KSTAT_DATA_UINT64 },
+	{ "move_dont_need",	KSTAT_DATA_UINT64 },
+	{ "move_dont_know",	KSTAT_DATA_UINT64 },
+	{ "move_hunt_found",	KSTAT_DATA_UINT64 },
 };
 
 static kmutex_t kmem_cache_kstat_lock;
@@ -210,7 +991,7 @@ static kmem_cache_t	*kmem_bufctl_cache;
 static kmem_cache_t	*kmem_bufctl_audit_cache;
 
 static kmutex_t		kmem_cache_lock;	/* inter-cache linkage only */
-kmem_cache_t		kmem_null_cache;
+static list_t		kmem_caches;
 
 static taskq_t		*kmem_taskq;
 static kmutex_t		kmem_flags_lock;
@@ -224,6 +1005,101 @@ static vmem_t		*kmem_va_arena;
 static vmem_t		*kmem_default_arena;
 static vmem_t		*kmem_firewall_va_arena;
 static vmem_t		*kmem_firewall_arena;
+
+/*
+ * Define KMEM_STATS to turn on statistic gathering. By default, it is only
+ * turned on when DEBUG is also defined.
+ */
+#ifdef	DEBUG
+#define	KMEM_STATS
+#endif	/* DEBUG */
+
+#ifdef	KMEM_STATS
+#define	KMEM_STAT_ADD(stat)			((stat)++)
+#define	KMEM_STAT_COND_ADD(cond, stat)		((void) (!(cond) || (stat)++))
+#else
+#define	KMEM_STAT_ADD(stat)			/* nothing */
+#define	KMEM_STAT_COND_ADD(cond, stat)		/* nothing */
+#endif	/* KMEM_STATS */
+
+/*
+ * kmem slab consolidator thresholds (tunables)
+ */
+static size_t kmem_frag_minslabs = 101;	/* minimum total slabs */
+static size_t kmem_frag_numer = 1;	/* free buffers (numerator) */
+static size_t kmem_frag_denom = KMEM_VOID_FRACTION; /* buffers (denominator) */
+/*
+ * Maximum number of slabs from which to move buffers during a single
+ * maintenance interval while the system is not low on memory.
+ */
+static size_t kmem_reclaim_max_slabs = 1;
+/*
+ * Number of slabs to scan backwards from the end of the partial slab list
+ * when searching for buffers to relocate.
+ */
+static size_t kmem_reclaim_scan_range = 12;
+
+#ifdef	KMEM_STATS
+static struct {
+	uint64_t kms_callbacks;
+	uint64_t kms_yes;
+	uint64_t kms_no;
+	uint64_t kms_later;
+	uint64_t kms_dont_need;
+	uint64_t kms_dont_know;
+	uint64_t kms_hunt_found_slab;
+	uint64_t kms_hunt_found_mag;
+	uint64_t kms_hunt_notfound;
+	uint64_t kms_hunt_alloc_fail;
+	uint64_t kms_hunt_lucky;
+	uint64_t kms_notify;
+	uint64_t kms_notify_callbacks;
+	uint64_t kms_disbelief;
+	uint64_t kms_already_pending;
+	uint64_t kms_callback_alloc_fail;
+	uint64_t kms_endscan_slab_destroyed;
+	uint64_t kms_endscan_nomem;
+	uint64_t kms_endscan_slab_all_used;
+	uint64_t kms_endscan_refcnt_changed;
+	uint64_t kms_endscan_nomove_changed;
+	uint64_t kms_endscan_freelist;
+	uint64_t kms_avl_update;
+	uint64_t kms_avl_noupdate;
+	uint64_t kms_no_longer_reclaimable;
+	uint64_t kms_notify_no_longer_reclaimable;
+	uint64_t kms_alloc_fail;
+	uint64_t kms_constructor_fail;
+	uint64_t kms_dead_slabs_freed;
+	uint64_t kms_defrags;
+	uint64_t kms_scan_depot_ws_reaps;
+	uint64_t kms_debug_reaps;
+	uint64_t kms_debug_move_scans;
+} kmem_move_stats;
+#endif	/* KMEM_STATS */
+
+/* consolidator knobs */
+static boolean_t kmem_move_noreap;
+static boolean_t kmem_move_blocked;
+static boolean_t kmem_move_fulltilt;
+static boolean_t kmem_move_any_partial;
+
+#ifdef	DEBUG
+/*
+ * Ensure code coverage by occasionally running the consolidator even when the
+ * caches are not fragmented (they may never be). These intervals are mean time
+ * in cache maintenance intervals (kmem_cache_update).
+ */
+static int kmem_mtb_move = 60;		/* defrag 1 slab (~15min) */
+static int kmem_mtb_reap = 1800;	/* defrag all slabs (~7.5hrs) */
+#endif	/* DEBUG */
+
+static kmem_cache_t	*kmem_defrag_cache;
+static kmem_cache_t	*kmem_move_cache;
+static taskq_t		*kmem_move_taskq;
+
+static void kmem_cache_scan(kmem_cache_t *);
+static void kmem_cache_defrag(kmem_cache_t *);
+
 
 kmem_log_header_t	*kmem_transaction_log;
 kmem_log_header_t	*kmem_content_log;
@@ -310,8 +1186,8 @@ kmem_cache_applyall(void (*func)(kmem_cache_t *), taskq_t *tq, int tqflag)
 	kmem_cache_t *cp;
 
 	mutex_enter(&kmem_cache_lock);
-	for (cp = kmem_null_cache.cache_next; cp != &kmem_null_cache;
-	    cp = cp->cache_next)
+	for (cp = list_head(&kmem_caches); cp != NULL;
+	    cp = list_next(&kmem_caches, cp))
 		if (tq != NULL)
 			(void) taskq_dispatch(tq, (task_func_t *)func, cp,
 			    tqflag);
@@ -326,8 +1202,8 @@ kmem_cache_applyall_id(void (*func)(kmem_cache_t *), taskq_t *tq, int tqflag)
 	kmem_cache_t *cp;
 
 	mutex_enter(&kmem_cache_lock);
-	for (cp = kmem_null_cache.cache_next; cp != &kmem_null_cache;
-	    cp = cp->cache_next) {
+	for (cp = list_head(&kmem_caches); cp != NULL;
+	    cp = list_next(&kmem_caches, cp)) {
 		if (!(cp->cache_cflags & KMC_IDENTIFIER))
 			continue;
 		if (tq != NULL)
@@ -348,8 +1224,15 @@ kmem_findslab(kmem_cache_t *cp, void *buf)
 	kmem_slab_t *sp;
 
 	mutex_enter(&cp->cache_lock);
-	for (sp = cp->cache_nullslab.slab_next;
-	    sp != &cp->cache_nullslab; sp = sp->slab_next) {
+	for (sp = list_head(&cp->cache_complete_slabs); sp != NULL;
+	    sp = list_next(&cp->cache_complete_slabs, sp)) {
+		if (KMEM_SLAB_MEMBER(sp, buf)) {
+			mutex_exit(&cp->cache_lock);
+			return (sp);
+		}
+	}
+	for (sp = avl_first(&cp->cache_partial_slabs); sp != NULL;
+	    sp = AVL_NEXT(&cp->cache_partial_slabs, sp)) {
 		if (KMEM_SLAB_MEMBER(sp, buf)) {
 			mutex_exit(&cp->cache_lock);
 			return (sp);
@@ -376,8 +1259,8 @@ kmem_error(int error, kmem_cache_t *cparg, void *bufarg)
 
 	sp = kmem_findslab(cp, buf);
 	if (sp == NULL) {
-		for (cp = kmem_null_cache.cache_prev; cp != &kmem_null_cache;
-		    cp = cp->cache_prev) {
+		for (cp = list_tail(&kmem_caches); cp != NULL;
+		    cp = list_prev(&kmem_caches, cp)) {
 			if ((sp = kmem_findslab(cp, buf)) != NULL)
 				break;
 		}
@@ -615,6 +1498,8 @@ kmem_slab_create(kmem_cache_t *cp, int kmflag)
 	kmem_bufctl_t *bcp;
 	vmem_t *vmp = cp->cache_arena;
 
+	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
+
 	color = cp->cache_color + cp->cache_align;
 	if (color > cp->cache_maxcolor)
 		color = cp->cache_mincolor;
@@ -627,6 +1512,13 @@ kmem_slab_create(kmem_cache_t *cp, int kmflag)
 
 	ASSERT(P2PHASE((uintptr_t)slab, vmp->vm_quantum) == 0);
 
+	/*
+	 * Reverify what was already checked in kmem_cache_set_move(), since the
+	 * consolidator depends (for correctness) on slabs being initialized
+	 * with the 0xbaddcafe memory pattern (setting a low order bit usable by
+	 * clients to distinguish uninitialized memory from known objects).
+	 */
+	ASSERT((cp->cache_move == NULL) || !(cp->cache_cflags & KMC_NOTOUCH));
 	if (!(cp->cache_cflags & KMC_NOTOUCH))
 		copy_pattern(KMEM_UNINITIALIZED_PATTERN, slab, slabsize);
 
@@ -644,6 +1536,9 @@ kmem_slab_create(kmem_cache_t *cp, int kmflag)
 	sp->slab_refcnt	= 0;
 	sp->slab_base	= buf = slab + color;
 	sp->slab_chunks	= chunks;
+	sp->slab_stuck_offset = (uint32_t)-1;
+	sp->slab_later_count = 0;
+	sp->slab_flags = 0;
 
 	ASSERT(chunks > 0);
 	while (chunks-- != 0) {
@@ -710,6 +1605,9 @@ kmem_slab_destroy(kmem_cache_t *cp, kmem_slab_t *sp)
 	vmem_t *vmp = cp->cache_arena;
 	void *slab = (void *)P2ALIGN((uintptr_t)sp->slab_base, vmp->vm_quantum);
 
+	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
+	ASSERT(sp->slab_refcnt == 0);
+
 	if (cp->cache_flags & KMF_HASH) {
 		kmem_bufctl_t *bcp;
 		while ((bcp = sp->slab_head) != NULL) {
@@ -721,53 +1619,51 @@ kmem_slab_destroy(kmem_cache_t *cp, kmem_slab_t *sp)
 	vmem_free(vmp, slab, cp->cache_slabsize);
 }
 
-/*
- * Allocate a raw (unconstructed) buffer from cp's slab layer.
- */
 static void *
-kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
+kmem_slab_alloc_impl(kmem_cache_t *cp, kmem_slab_t *sp)
 {
 	kmem_bufctl_t *bcp, **hash_bucket;
-	kmem_slab_t *sp;
 	void *buf;
 
-	mutex_enter(&cp->cache_lock);
-	cp->cache_slab_alloc++;
-	sp = cp->cache_freelist;
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	/*
+	 * kmem_slab_alloc() drops cache_lock when it creates a new slab, so we
+	 * can't ASSERT(avl_is_empty(&cp->cache_partial_slabs)) here when the
+	 * slab is newly created (sp->slab_refcnt == 0).
+	 */
+	ASSERT((sp->slab_refcnt == 0) || (KMEM_SLAB_IS_PARTIAL(sp) &&
+	    (sp == avl_first(&cp->cache_partial_slabs))));
 	ASSERT(sp->slab_cache == cp);
-	if (sp->slab_head == NULL) {
-		ASSERT(cp->cache_bufslab == 0);
 
-		/*
-		 * The freelist is empty.  Create a new slab.
-		 */
-		mutex_exit(&cp->cache_lock);
-		if ((sp = kmem_slab_create(cp, kmflag)) == NULL)
-			return (NULL);
-		mutex_enter(&cp->cache_lock);
-		cp->cache_slab_create++;
-		if ((cp->cache_buftotal += sp->slab_chunks) > cp->cache_bufmax)
-			cp->cache_bufmax = cp->cache_buftotal;
-		cp->cache_bufslab += sp->slab_chunks;
-		sp->slab_next = cp->cache_freelist;
-		sp->slab_prev = cp->cache_freelist->slab_prev;
-		sp->slab_next->slab_prev = sp;
-		sp->slab_prev->slab_next = sp;
-		cp->cache_freelist = sp;
-	}
-
+	cp->cache_slab_alloc++;
 	cp->cache_bufslab--;
 	sp->slab_refcnt++;
-	ASSERT(sp->slab_refcnt <= sp->slab_chunks);
 
-	/*
-	 * If we're taking the last buffer in the slab,
-	 * remove the slab from the cache's freelist.
-	 */
 	bcp = sp->slab_head;
 	if ((sp->slab_head = bcp->bc_next) == NULL) {
-		cp->cache_freelist = sp->slab_next;
-		ASSERT(sp->slab_refcnt == sp->slab_chunks);
+		ASSERT(KMEM_SLAB_IS_ALL_USED(sp));
+		if (sp->slab_refcnt == 1) {
+			ASSERT(sp->slab_chunks == 1);
+		} else {
+			ASSERT(sp->slab_chunks > 1); /* the slab was partial */
+			avl_remove(&cp->cache_partial_slabs, sp);
+			sp->slab_later_count = 0; /* clear history */
+			sp->slab_flags &= ~KMEM_SLAB_NOMOVE;
+			sp->slab_stuck_offset = (uint32_t)-1;
+		}
+		list_insert_head(&cp->cache_complete_slabs, sp);
+		cp->cache_complete_slab_count++;
+	} else {
+		ASSERT(KMEM_SLAB_IS_PARTIAL(sp));
+		if (sp->slab_refcnt == 1) {
+			avl_add(&cp->cache_partial_slabs, sp);
+		} else {
+			/*
+			 * The slab is now more allocated than it was, so the
+			 * order remains unchanged.
+			 */
+			ASSERT(!avl_update(&cp->cache_partial_slabs, sp));
+		}
 	}
 
 	if (cp->cache_flags & KMF_HASH) {
@@ -786,11 +1682,48 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 	}
 
 	ASSERT(KMEM_SLAB_MEMBER(sp, buf));
+	return (buf);
+}
 
+/*
+ * Allocate a raw (unconstructed) buffer from cp's slab layer.
+ */
+static void *
+kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
+{
+	kmem_slab_t *sp;
+	void *buf;
+
+	mutex_enter(&cp->cache_lock);
+	sp = avl_first(&cp->cache_partial_slabs);
+	if (sp == NULL) {
+		ASSERT(cp->cache_bufslab == 0);
+
+		/*
+		 * The freelist is empty.  Create a new slab.
+		 */
+		mutex_exit(&cp->cache_lock);
+		if ((sp = kmem_slab_create(cp, kmflag)) == NULL) {
+			return (NULL);
+		}
+		mutex_enter(&cp->cache_lock);
+		cp->cache_slab_create++;
+		if ((cp->cache_buftotal += sp->slab_chunks) > cp->cache_bufmax)
+			cp->cache_bufmax = cp->cache_buftotal;
+		cp->cache_bufslab += sp->slab_chunks;
+	}
+
+	buf = kmem_slab_alloc_impl(cp, sp);
+	ASSERT((cp->cache_slab_create - cp->cache_slab_destroy) ==
+	    (cp->cache_complete_slab_count +
+	    avl_numnodes(&cp->cache_partial_slabs) +
+	    (cp->cache_defrag == NULL ? 0 : cp->cache_defrag->kmd_deadcount)));
 	mutex_exit(&cp->cache_lock);
 
 	return (buf);
 }
+
+static void kmem_slab_move_yes(kmem_cache_t *, kmem_slab_t *, void *);
 
 /*
  * Free a raw (unconstructed) buffer to cp's slab layer.
@@ -831,6 +1764,17 @@ kmem_slab_free(kmem_cache_t *cp, void *buf)
 		return;
 	}
 
+	if (KMEM_SLAB_OFFSET(sp, buf) == sp->slab_stuck_offset) {
+		/*
+		 * If this is the buffer that prevented the consolidator from
+		 * clearing the slab, we can reset the slab flags now that the
+		 * buffer is freed. (It makes sense to do this in
+		 * kmem_cache_free(), where the client gives up ownership of the
+		 * buffer, but on the hot path the test is too expensive.)
+		 */
+		kmem_slab_move_yes(cp, sp, buf);
+	}
+
 	if ((cp->cache_flags & (KMF_AUDIT | KMF_BUFTAG)) == KMF_AUDIT) {
 		if (cp->cache_flags & KMF_CONTENTS)
 			((kmem_bufctl_audit_t *)bcp)->bc_contents =
@@ -839,45 +1783,93 @@ kmem_slab_free(kmem_cache_t *cp, void *buf)
 		KMEM_AUDIT(kmem_transaction_log, cp, bcp);
 	}
 
-	/*
-	 * If this slab isn't currently on the freelist, put it there.
-	 */
-	if (sp->slab_head == NULL) {
-		ASSERT(sp->slab_refcnt == sp->slab_chunks);
-		ASSERT(cp->cache_freelist != sp);
-		sp->slab_next->slab_prev = sp->slab_prev;
-		sp->slab_prev->slab_next = sp->slab_next;
-		sp->slab_next = cp->cache_freelist;
-		sp->slab_prev = cp->cache_freelist->slab_prev;
-		sp->slab_next->slab_prev = sp;
-		sp->slab_prev->slab_next = sp;
-		cp->cache_freelist = sp;
-	}
-
 	bcp->bc_next = sp->slab_head;
 	sp->slab_head = bcp;
 
 	cp->cache_bufslab++;
 	ASSERT(sp->slab_refcnt >= 1);
+
 	if (--sp->slab_refcnt == 0) {
 		/*
 		 * There are no outstanding allocations from this slab,
 		 * so we can reclaim the memory.
 		 */
-		sp->slab_next->slab_prev = sp->slab_prev;
-		sp->slab_prev->slab_next = sp->slab_next;
-		if (sp == cp->cache_freelist)
-			cp->cache_freelist = sp->slab_next;
-		cp->cache_slab_destroy++;
+		if (sp->slab_chunks == 1) {
+			list_remove(&cp->cache_complete_slabs, sp);
+			cp->cache_complete_slab_count--;
+		} else {
+			avl_remove(&cp->cache_partial_slabs, sp);
+		}
+
 		cp->cache_buftotal -= sp->slab_chunks;
 		cp->cache_bufslab -= sp->slab_chunks;
-		mutex_exit(&cp->cache_lock);
-		kmem_slab_destroy(cp, sp);
+		/*
+		 * Defer releasing the slab to the virtual memory subsystem
+		 * while there is a pending move callback, since we guarantee
+		 * that buffers passed to the move callback have only been
+		 * touched by kmem or by the client itself. Since the memory
+		 * patterns baddcafe (uninitialized) and deadbeef (freed) both
+		 * set at least one of the two lowest order bits, the client can
+		 * test those bits in the move callback to determine whether or
+		 * not it knows about the buffer (assuming that the client also
+		 * sets one of those low order bits whenever it frees a buffer).
+		 */
+		if (cp->cache_defrag == NULL ||
+		    (avl_is_empty(&cp->cache_defrag->kmd_moves_pending) &&
+		    !(sp->slab_flags & KMEM_SLAB_MOVE_PENDING))) {
+			cp->cache_slab_destroy++;
+			mutex_exit(&cp->cache_lock);
+			kmem_slab_destroy(cp, sp);
+		} else {
+			list_t *deadlist = &cp->cache_defrag->kmd_deadlist;
+			/*
+			 * Slabs are inserted at both ends of the deadlist to
+			 * distinguish between slabs freed while move callbacks
+			 * are pending (list head) and a slab freed while the
+			 * lock is dropped in kmem_move_buffers() (list tail) so
+			 * that in both cases slab_destroy() is called from the
+			 * right context.
+			 */
+			if (sp->slab_flags & KMEM_SLAB_MOVE_PENDING) {
+				list_insert_tail(deadlist, sp);
+			} else {
+				list_insert_head(deadlist, sp);
+			}
+			cp->cache_defrag->kmd_deadcount++;
+			mutex_exit(&cp->cache_lock);
+		}
 		return;
 	}
+
+	if (bcp->bc_next == NULL) {
+		/* Transition the slab from completely allocated to partial. */
+		ASSERT(sp->slab_refcnt == (sp->slab_chunks - 1));
+		ASSERT(sp->slab_chunks > 1);
+		list_remove(&cp->cache_complete_slabs, sp);
+		cp->cache_complete_slab_count--;
+		avl_add(&cp->cache_partial_slabs, sp);
+	} else {
+#ifdef	DEBUG
+		if (avl_update_gt(&cp->cache_partial_slabs, sp)) {
+			KMEM_STAT_ADD(kmem_move_stats.kms_avl_update);
+		} else {
+			KMEM_STAT_ADD(kmem_move_stats.kms_avl_noupdate);
+		}
+#else
+		(void) avl_update_gt(&cp->cache_partial_slabs, sp);
+#endif
+	}
+
+	ASSERT((cp->cache_slab_create - cp->cache_slab_destroy) ==
+	    (cp->cache_complete_slab_count +
+	    avl_numnodes(&cp->cache_partial_slabs) +
+	    (cp->cache_defrag == NULL ? 0 : cp->cache_defrag->kmd_deadcount)));
 	mutex_exit(&cp->cache_lock);
 }
 
+/*
+ * Return -1 if kmem_error, 1 if constructor fails, 0 if successful.
+ */
 static int
 kmem_cache_alloc_debug(kmem_cache_t *cp, void *buf, int kmflag, int construct,
     caddr_t caller)
@@ -937,7 +1929,7 @@ kmem_cache_alloc_debug(kmem_cache_t *cp, void *buf, int kmflag, int construct,
 		if (cp->cache_flags & KMF_DEADBEEF)
 			copy_pattern(KMEM_FREE_PATTERN, buf, cp->cache_verify);
 		kmem_slab_free(cp, buf);
-		return (-1);
+		return (1);
 	}
 
 	if (cp->cache_flags & KMF_AUDIT) {
@@ -1016,7 +2008,8 @@ kmem_magazine_destroy(kmem_cache_t *cp, kmem_magazine_t *mp, int nrounds)
 {
 	int round;
 
-	ASSERT(cp->cache_next == NULL || taskq_member(kmem_taskq, curthread));
+	ASSERT(!list_link_active(&cp->cache_link) ||
+	    taskq_member(kmem_taskq, curthread));
 
 	for (round = 0; round < nrounds; round++) {
 		void *buf = mp->mag_round[round];
@@ -1113,7 +2106,8 @@ kmem_depot_ws_reap(kmem_cache_t *cp)
 	long reap;
 	kmem_magazine_t *mp;
 
-	ASSERT(cp->cache_next == NULL || taskq_member(kmem_taskq, curthread));
+	ASSERT(!list_link_active(&cp->cache_link) ||
+	    taskq_member(kmem_taskq, curthread));
 
 	reap = MIN(cp->cache_full.ml_reaplimit, cp->cache_full.ml_min);
 	while (reap-- && (mp = kmem_depot_alloc(cp, &cp->cache_full)) != NULL)
@@ -1159,7 +2153,7 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 			mutex_exit(&ccp->cc_lock);
 			if ((ccp->cc_flags & KMF_BUFTAG) &&
 			    kmem_cache_alloc_debug(cp, buf, kmflag, 0,
-			    caller()) == -1) {
+			    caller()) != 0) {
 				if (kmflag & KM_NOSLEEP)
 					return (NULL);
 				mutex_enter(&ccp->cc_lock);
@@ -1216,14 +2210,17 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 		/*
 		 * Make kmem_cache_alloc_debug() apply the constructor for us.
 		 */
-		if (kmem_cache_alloc_debug(cp, buf, kmflag, 1,
-		    caller()) == -1) {
+		int rc = kmem_cache_alloc_debug(cp, buf, kmflag, 1, caller());
+		if (rc != 0) {
 			if (kmflag & KM_NOSLEEP)
 				return (NULL);
 			/*
 			 * kmem_cache_alloc_debug() detected corruption
-			 * but didn't panic (kmem_panic <= 0).  Try again.
+			 * but didn't panic (kmem_panic <= 0). We should not be
+			 * here because the constructor failed (indicated by a
+			 * return code of 1). Try again.
 			 */
+			ASSERT(rc == -1);
 			return (kmem_cache_alloc(cp, kmflag));
 		}
 		return (buf);
@@ -1240,6 +2237,38 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 }
 
 /*
+ * The freed argument tells whether or not kmem_cache_free_debug() has already
+ * been called so that we can avoid the duplicate free error. For example, a
+ * buffer on a magazine has already been freed by the client but is still
+ * constructed.
+ */
+static void
+kmem_slab_free_constructed(kmem_cache_t *cp, void *buf, boolean_t freed)
+{
+	if (!freed && (cp->cache_flags & KMF_BUFTAG))
+		if (kmem_cache_free_debug(cp, buf, caller()) == -1)
+			return;
+
+	/*
+	 * Note that if KMF_DEADBEEF is in effect and KMF_LITE is not,
+	 * kmem_cache_free_debug() will have already applied the destructor.
+	 */
+	if ((cp->cache_flags & (KMF_DEADBEEF | KMF_LITE)) != KMF_DEADBEEF &&
+	    cp->cache_destructor != NULL) {
+		if (cp->cache_flags & KMF_DEADBEEF) {	/* KMF_LITE implied */
+			kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
+			*(uint64_t *)buf = btp->bt_redzone;
+			cp->cache_destructor(buf, cp->cache_private);
+			*(uint64_t *)buf = KMEM_FREE_PATTERN;
+		} else {
+			cp->cache_destructor(buf, cp->cache_private);
+		}
+	}
+
+	kmem_slab_free(cp, buf);
+}
+
+/*
  * Free a constructed object to cache cp.
  */
 void
@@ -1248,6 +2277,15 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 	kmem_cpu_cache_t *ccp = KMEM_CPU_CACHE(cp);
 	kmem_magazine_t *emp;
 	kmem_magtype_t *mtp;
+
+	/*
+	 * The client must not free either of the buffers passed to the move
+	 * callback function.
+	 */
+	ASSERT(cp->cache_defrag == NULL ||
+	    cp->cache_defrag->kmd_thread != curthread ||
+	    (buf != cp->cache_defrag->kmd_from_buf &&
+	    buf != cp->cache_defrag->kmd_to_buf));
 
 	if (ccp->cc_flags & KMF_BUFTAG)
 		if (kmem_cache_free_debug(cp, buf, caller()) == -1)
@@ -1337,22 +2375,8 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 	/*
 	 * We couldn't free our constructed object to the magazine layer,
 	 * so apply its destructor and free it to the slab layer.
-	 * Note that if KMF_DEADBEEF is in effect and KMF_LITE is not,
-	 * kmem_cache_free_debug() will have already applied the destructor.
 	 */
-	if ((cp->cache_flags & (KMF_DEADBEEF | KMF_LITE)) != KMF_DEADBEEF &&
-	    cp->cache_destructor != NULL) {
-		if (cp->cache_flags & KMF_DEADBEEF) {	/* KMF_LITE implied */
-			kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
-			*(uint64_t *)buf = btp->bt_redzone;
-			cp->cache_destructor(buf, cp->cache_private);
-			*(uint64_t *)buf = KMEM_FREE_PATTERN;
-		} else {
-			cp->cache_destructor(buf, cp->cache_private);
-		}
-	}
-
-	kmem_slab_free(cp, buf);
+	kmem_slab_free_constructed(cp, buf, B_TRUE);
 }
 
 void *
@@ -1527,6 +2551,8 @@ kmem_alloc_tryhard(size_t size, size_t *asize, int kmflag)
 static void
 kmem_cache_reap(kmem_cache_t *cp)
 {
+	ASSERT(taskq_member(kmem_taskq, curthread));
+
 	/*
 	 * Ask the cache's owner to free some memory if possible.
 	 * The idea is to handle things like the inode cache, which
@@ -1534,10 +2560,29 @@ kmem_cache_reap(kmem_cache_t *cp)
 	 * *need*.  Reclaim policy is entirely up to the owner; this
 	 * callback is just an advisory plea for help.
 	 */
-	if (cp->cache_reclaim != NULL)
+	if (cp->cache_reclaim != NULL) {
+		long delta;
+
+		/*
+		 * Reclaimed memory should be reapable (not included in the
+		 * depot's working set).
+		 */
+		delta = cp->cache_full.ml_total;
 		cp->cache_reclaim(cp->cache_private);
+		delta = cp->cache_full.ml_total - delta;
+		if (delta > 0) {
+			mutex_enter(&cp->cache_depot_lock);
+			cp->cache_full.ml_reaplimit += delta;
+			cp->cache_full.ml_min += delta;
+			mutex_exit(&cp->cache_depot_lock);
+		}
+	}
 
 	kmem_depot_ws_reap(cp);
+
+	if (cp->cache_defrag != NULL && !kmem_move_noreap) {
+		kmem_cache_defrag(cp);
+	}
 }
 
 static void
@@ -1634,7 +2679,8 @@ kmem_cache_magazine_purge(kmem_cache_t *cp)
 	kmem_magazine_t *mp, *pmp;
 	int rounds, prounds, cpu_seqid;
 
-	ASSERT(cp->cache_next == NULL || taskq_member(kmem_taskq, curthread));
+	ASSERT(!list_link_active(&cp->cache_link) ||
+	    taskq_member(kmem_taskq, curthread));
 	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
 
 	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++) {
@@ -1696,6 +2742,8 @@ kmem_cache_magazine_enable(kmem_cache_t *cp)
 void
 kmem_cache_reap_now(kmem_cache_t *cp)
 {
+	ASSERT(list_link_active(&cp->cache_link));
+
 	kmem_depot_ws_update(cp);
 	kmem_depot_ws_update(cp);
 
@@ -1785,8 +2833,8 @@ kmem_hash_rescale(kmem_cache_t *cp)
 }
 
 /*
- * Perform periodic maintenance on a cache: hash rescaling,
- * depot working-set update, and magazine resizing.
+ * Perform periodic maintenance on a cache: hash rescaling, depot working-set
+ * update, magazine resizing, and slab consolidation.
  */
 static void
 kmem_cache_update(kmem_cache_t *cp)
@@ -1837,6 +2885,10 @@ kmem_cache_update(kmem_cache_t *cp)
 	if (need_magazine_resize)
 		(void) taskq_dispatch(kmem_taskq,
 		    (task_func_t *)kmem_cache_magazine_resize, cp, TQ_NOSLEEP);
+
+	if (cp->cache_defrag != NULL)
+		(void) taskq_dispatch(kmem_taskq,
+		    (task_func_t *)kmem_cache_scan, cp, TQ_NOSLEEP);
 }
 
 static void
@@ -1936,6 +2988,25 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 	kmcp->kmc_hash_rescale.value.ui64	= cp->cache_rescale;
 	kmcp->kmc_vmem_source.value.ui64	= cp->cache_arena->vm_id;
 
+	if (cp->cache_defrag == NULL) {
+		kmcp->kmc_move_callbacks.value.ui64	= 0;
+		kmcp->kmc_move_yes.value.ui64		= 0;
+		kmcp->kmc_move_no.value.ui64		= 0;
+		kmcp->kmc_move_later.value.ui64		= 0;
+		kmcp->kmc_move_dont_need.value.ui64	= 0;
+		kmcp->kmc_move_dont_know.value.ui64	= 0;
+		kmcp->kmc_move_hunt_found.value.ui64	= 0;
+	} else {
+		kmem_defrag_t *kd = cp->cache_defrag;
+		kmcp->kmc_move_callbacks.value.ui64	= kd->kmd_callbacks;
+		kmcp->kmc_move_yes.value.ui64		= kd->kmd_yes;
+		kmcp->kmc_move_no.value.ui64		= kd->kmd_no;
+		kmcp->kmc_move_later.value.ui64		= kd->kmd_later;
+		kmcp->kmc_move_dont_need.value.ui64	= kd->kmd_dont_need;
+		kmcp->kmc_move_dont_know.value.ui64	= kd->kmd_dont_know;
+		kmcp->kmc_move_hunt_found.value.ui64	= kd->kmd_hunt_found;
+	}
+
 	mutex_exit(&cp->cache_lock);
 	return (0);
 }
@@ -2007,6 +3078,109 @@ kmem_debugging(void)
 	return (kmem_flags & (KMF_AUDIT | KMF_REDZONE));
 }
 
+/* binning function, sorts finely at the two extremes */
+#define	KMEM_PARTIAL_SLAB_WEIGHT(sp, binshift)				\
+	((((sp)->slab_refcnt <= (binshift)) ||				\
+	    (((sp)->slab_chunks - (sp)->slab_refcnt) <= (binshift)))	\
+	    ? -(sp)->slab_refcnt					\
+	    : -((binshift) + ((sp)->slab_refcnt >> (binshift))))
+
+/*
+ * Minimizing the number of partial slabs on the freelist minimizes
+ * fragmentation (the ratio of unused buffers held by the slab layer). There are
+ * two ways to get a slab off of the freelist: 1) free all the buffers on the
+ * slab, and 2) allocate all the buffers on the slab. It follows that we want
+ * the most-used slabs at the front of the list where they have the best chance
+ * of being completely allocated, and the least-used slabs at a safe distance
+ * from the front to improve the odds that the few remaining buffers will all be
+ * freed before another allocation can tie up the slab. For that reason a slab
+ * with a higher slab_refcnt sorts less than than a slab with a lower
+ * slab_refcnt.
+ *
+ * However, if a slab has at least one buffer that is deemed unfreeable, we
+ * would rather have that slab at the front of the list regardless of
+ * slab_refcnt, since even one unfreeable buffer makes the entire slab
+ * unfreeable. If the client returns KMEM_CBRC_NO in response to a cache_move()
+ * callback, the slab is marked unfreeable for as long as it remains on the
+ * freelist.
+ */
+static int
+kmem_partial_slab_cmp(const void *p0, const void *p1)
+{
+	const kmem_cache_t *cp;
+	const kmem_slab_t *s0 = p0;
+	const kmem_slab_t *s1 = p1;
+	int w0, w1;
+	size_t binshift;
+
+	ASSERT(KMEM_SLAB_IS_PARTIAL(s0));
+	ASSERT(KMEM_SLAB_IS_PARTIAL(s1));
+	ASSERT(s0->slab_cache == s1->slab_cache);
+	cp = s1->slab_cache;
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	binshift = cp->cache_partial_binshift;
+
+	/* weight of first slab */
+	w0 = KMEM_PARTIAL_SLAB_WEIGHT(s0, binshift);
+	if (s0->slab_flags & KMEM_SLAB_NOMOVE) {
+		w0 -= cp->cache_maxchunks;
+	}
+
+	/* weight of second slab */
+	w1 = KMEM_PARTIAL_SLAB_WEIGHT(s1, binshift);
+	if (s1->slab_flags & KMEM_SLAB_NOMOVE) {
+		w1 -= cp->cache_maxchunks;
+	}
+
+	if (w0 < w1)
+		return (-1);
+	if (w0 > w1)
+		return (1);
+
+	/* compare pointer values */
+	if ((uintptr_t)s0 < (uintptr_t)s1)
+		return (-1);
+	if ((uintptr_t)s0 > (uintptr_t)s1)
+		return (1);
+
+	return (0);
+}
+
+static void
+kmem_check_destructor(kmem_cache_t *cp)
+{
+	if (cp->cache_destructor == NULL)
+		return;
+
+	/*
+	 * Assert that it is valid to call the destructor on a newly constructed
+	 * object without any intervening client code using the object.
+	 * Allocate from the slab layer to ensure that the client has not
+	 * touched the buffer.
+	 */
+	void *buf = kmem_slab_alloc(cp, KM_NOSLEEP);
+	if (buf == NULL)
+		return;
+
+	if (cp->cache_flags & KMF_BUFTAG) {
+		if (kmem_cache_alloc_debug(cp, buf, KM_NOSLEEP, 1,
+		    caller()) != 0)
+			return;
+	} else if (cp->cache_constructor != NULL &&
+	    cp->cache_constructor(buf, cp->cache_private, KM_NOSLEEP) != 0) {
+		atomic_add_64(&cp->cache_alloc_fail, 1);
+		kmem_slab_free(cp, buf);
+		return;
+	}
+
+	kmem_slab_free_constructed(cp, buf, B_FALSE);
+}
+
+/*
+ * It must be valid to call the destructor (if any) on a newly created object.
+ * That is, the constructor (if any) must leave the object in a valid state for
+ * the destructor.
+ */
 kmem_cache_t *
 kmem_cache_create(
 	char *name,		/* descriptive name for this cache */
@@ -2021,7 +3195,7 @@ kmem_cache_create(
 {
 	int cpu_seqid;
 	size_t chunksize;
-	kmem_cache_t *cp, *cnext, *cprev;
+	kmem_cache_t *cp;
 	kmem_magtype_t *mtp;
 	size_t csize = KMEM_CACHE_SIZE(max_ncpus);
 
@@ -2056,6 +3230,7 @@ kmem_cache_create(
 	cp = vmem_xalloc(kmem_cache_arena, csize, KMEM_CPU_CACHE_SIZE,
 	    P2NPHASE(csize, KMEM_CPU_CACHE_SIZE), 0, NULL, NULL, VM_SLEEP);
 	bzero(cp, csize);
+	list_link_init(&cp->cache_link);
 
 	if (align == 0)
 		align = KMEM_ALIGN;
@@ -2136,7 +3311,7 @@ kmem_cache_create(
 	 * Set cache properties.
 	 */
 	(void) strncpy(cp->cache_name, name, KMEM_CACHE_NAMELEN);
-	strident_canon(cp->cache_name, KMEM_CACHE_NAMELEN);
+	strident_canon(cp->cache_name, KMEM_CACHE_NAMELEN + 1);
 	cp->cache_bufsize = bufsize;
 	cp->cache_align = align;
 	cp->cache_constructor = constructor;
@@ -2215,6 +3390,9 @@ kmem_cache_create(
 		cp->cache_flags |= KMF_HASH;
 	}
 
+	cp->cache_maxchunks = (cp->cache_slabsize / cp->cache_chunksize);
+	cp->cache_partial_binshift = highbit(cp->cache_maxchunks / 16) + 1;
+
 	if (cp->cache_flags & KMF_HASH) {
 		ASSERT(!(cflags & KMC_NOHASH));
 		cp->cache_bufctl_cache = (cp->cache_flags & KMF_AUDIT) ?
@@ -2231,11 +3409,13 @@ kmem_cache_create(
 	 */
 	mutex_init(&cp->cache_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	cp->cache_freelist = &cp->cache_nullslab;
-	cp->cache_nullslab.slab_cache = cp;
-	cp->cache_nullslab.slab_refcnt = -1;
-	cp->cache_nullslab.slab_next = &cp->cache_nullslab;
-	cp->cache_nullslab.slab_prev = &cp->cache_nullslab;
+	avl_create(&cp->cache_partial_slabs, kmem_partial_slab_cmp,
+	    sizeof (kmem_slab_t), offsetof(kmem_slab_t, slab_link));
+	/* LINTED: E_TRUE_LOGICAL_EXPR */
+	ASSERT(sizeof (list_node_t) <= sizeof (avl_node_t));
+	/* reuse partial slab AVL linkage for complete slab list linkage */
+	list_create(&cp->cache_complete_slabs,
+	    sizeof (kmem_slab_t), offsetof(kmem_slab_t, slab_link));
 
 	if (cp->cache_flags & KMF_HASH) {
 		cp->cache_hash_table = vmem_alloc(kmem_hash_arena,
@@ -2286,16 +3466,115 @@ kmem_cache_create(
 	 * to kmem_update(), so the cache must be ready for business.
 	 */
 	mutex_enter(&kmem_cache_lock);
-	cp->cache_next = cnext = &kmem_null_cache;
-	cp->cache_prev = cprev = kmem_null_cache.cache_prev;
-	cnext->cache_prev = cp;
-	cprev->cache_next = cp;
+	list_insert_tail(&kmem_caches, cp);
 	mutex_exit(&kmem_cache_lock);
 
 	if (kmem_ready)
 		kmem_cache_magazine_enable(cp);
 
+	if (kmem_move_taskq != NULL && cp->cache_destructor != NULL) {
+		(void) taskq_dispatch(kmem_move_taskq,
+		    (task_func_t *)kmem_check_destructor, cp,
+		    TQ_NOSLEEP);
+	}
+
 	return (cp);
+}
+
+static int
+kmem_move_cmp(const void *buf, const void *p)
+{
+	const kmem_move_t *kmm = p;
+	uintptr_t v1 = (uintptr_t)buf;
+	uintptr_t v2 = (uintptr_t)kmm->kmm_from_buf;
+	return (v1 < v2 ? -1 : (v1 > v2 ? 1 : 0));
+}
+
+static void
+kmem_reset_reclaim_threshold(kmem_defrag_t *kmd)
+{
+	kmd->kmd_reclaim_numer = 1;
+}
+
+/*
+ * Initially, when choosing candidate slabs for buffers to move, we want to be
+ * very selective and take only slabs that are less than
+ * (1 / KMEM_VOID_FRACTION) allocated. If we have difficulty finding candidate
+ * slabs, then we raise the allocation ceiling incrementally. The reclaim
+ * threshold is reset to (1 / KMEM_VOID_FRACTION) as soon as the cache is no
+ * longer fragmented.
+ */
+static void
+kmem_adjust_reclaim_threshold(kmem_defrag_t *kmd, int direction)
+{
+	if (direction > 0) {
+		/* make it easier to find a candidate slab */
+		if (kmd->kmd_reclaim_numer < (KMEM_VOID_FRACTION - 1)) {
+			kmd->kmd_reclaim_numer++;
+		}
+	} else {
+		/* be more selective */
+		if (kmd->kmd_reclaim_numer > 1) {
+			kmd->kmd_reclaim_numer--;
+		}
+	}
+}
+
+void
+kmem_cache_set_move(kmem_cache_t *cp,
+    kmem_cbrc_t (*move)(void *, void *, size_t, void *))
+{
+	kmem_defrag_t *defrag;
+
+	ASSERT(move != NULL);
+	/*
+	 * The consolidator does not support NOTOUCH caches because kmem cannot
+	 * initialize their slabs with the 0xbaddcafe memory pattern, which sets
+	 * a low order bit usable by clients to distinguish uninitialized memory
+	 * from known objects (see kmem_slab_create).
+	 */
+	ASSERT(!(cp->cache_cflags & KMC_NOTOUCH));
+	ASSERT(!(cp->cache_cflags & KMC_IDENTIFIER));
+
+	/*
+	 * We should not be holding anyone's cache lock when calling
+	 * kmem_cache_alloc(), so allocate in all cases before acquiring the
+	 * lock.
+	 */
+	defrag = kmem_cache_alloc(kmem_defrag_cache, KM_SLEEP);
+
+	mutex_enter(&cp->cache_lock);
+
+	if (KMEM_IS_MOVABLE(cp)) {
+		if (cp->cache_move == NULL) {
+			/*
+			 * The client must not have allocated any objects from
+			 * this cache before setting a move callback function.
+			 */
+			ASSERT(cp->cache_bufmax == 0);
+
+			cp->cache_defrag = defrag;
+			defrag = NULL; /* nothing to free */
+			bzero(cp->cache_defrag, sizeof (kmem_defrag_t));
+			avl_create(&cp->cache_defrag->kmd_moves_pending,
+			    kmem_move_cmp, sizeof (kmem_move_t),
+			    offsetof(kmem_move_t, kmm_entry));
+			/* LINTED: E_TRUE_LOGICAL_EXPR */
+			ASSERT(sizeof (list_node_t) <= sizeof (avl_node_t));
+			/* reuse the slab's AVL linkage for deadlist linkage */
+			list_create(&cp->cache_defrag->kmd_deadlist,
+			    sizeof (kmem_slab_t),
+			    offsetof(kmem_slab_t, slab_link));
+			kmem_reset_reclaim_threshold(cp->cache_defrag);
+		}
+		cp->cache_move = move;
+	}
+
+	mutex_exit(&cp->cache_lock);
+
+	if (defrag != NULL) {
+		kmem_cache_free(kmem_defrag_cache, defrag); /* unused */
+	}
 }
 
 void
@@ -2309,13 +3588,13 @@ kmem_cache_destroy(kmem_cache_t *cp)
 	 * complete, purge the cache, and then destroy it.
 	 */
 	mutex_enter(&kmem_cache_lock);
-	cp->cache_prev->cache_next = cp->cache_next;
-	cp->cache_next->cache_prev = cp->cache_prev;
-	cp->cache_prev = cp->cache_next = NULL;
+	list_remove(&kmem_caches, cp);
 	mutex_exit(&kmem_cache_lock);
 
 	if (kmem_taskq != NULL)
 		taskq_wait(kmem_taskq);
+	if (kmem_move_taskq != NULL)
+		taskq_wait(kmem_move_taskq);
 
 	kmem_cache_magazine_purge(cp);
 
@@ -2323,14 +3602,22 @@ kmem_cache_destroy(kmem_cache_t *cp)
 	if (cp->cache_buftotal != 0)
 		cmn_err(CE_WARN, "kmem_cache_destroy: '%s' (%p) not empty",
 		    cp->cache_name, (void *)cp);
-	cp->cache_reclaim = NULL;
+	if (cp->cache_defrag != NULL) {
+		avl_destroy(&cp->cache_defrag->kmd_moves_pending);
+		list_destroy(&cp->cache_defrag->kmd_deadlist);
+		kmem_cache_free(kmem_defrag_cache, cp->cache_defrag);
+		cp->cache_defrag = NULL;
+	}
 	/*
-	 * The cache is now dead.  There should be no further activity.
-	 * We enforce this by setting land mines in the constructor and
-	 * destructor routines that induce a kernel text fault if invoked.
+	 * The cache is now dead.  There should be no further activity.  We
+	 * enforce this by setting land mines in the constructor, destructor,
+	 * reclaim, and move routines that induce a kernel text fault if
+	 * invoked.
 	 */
 	cp->cache_constructor = (int (*)(void *, void *, int))1;
 	cp->cache_destructor = (void (*)(void *, void *))2;
+	cp->cache_reclaim = (void (*)(void *))3;
+	cp->cache_move = (kmem_cbrc_t (*)(void *, void *, size_t, void *))4;
 	mutex_exit(&cp->cache_lock);
 
 	kstat_delete(cp->cache_kstat);
@@ -2473,8 +3760,8 @@ kmem_init(void)
 	/* LINTED */
 	ASSERT(sizeof (kmem_cpu_cache_t) == KMEM_CPU_CACHE_SIZE);
 
-	kmem_null_cache.cache_next = &kmem_null_cache;
-	kmem_null_cache.cache_prev = &kmem_null_cache;
+	list_create(&kmem_caches, sizeof (kmem_cache_t),
+	    offsetof(kmem_cache_t, cache_link));
 
 	kmem_metadata_arena = vmem_create("kmem_metadata", NULL, 0, PAGESIZE,
 	    vmem_alloc, vmem_free, heap_arena, 8 * PAGESIZE,
@@ -2505,9 +3792,6 @@ kmem_init(void)
 	kmem_oversize_arena = vmem_create("kmem_oversize", NULL, 0, PAGESIZE,
 	    segkmem_alloc, segkmem_free, heap_arena, 0, VM_SLEEP);
 
-	kmem_null_cache.cache_next = &kmem_null_cache;
-	kmem_null_cache.cache_prev = &kmem_null_cache;
-
 	kmem_reap_interval = 15 * hz;
 
 	/*
@@ -2522,7 +3806,7 @@ kmem_init(void)
 
 	mod_read_system_file(boothowto & RB_ASKNAME);
 
-	while ((cp = kmem_null_cache.cache_prev) != &kmem_null_cache)
+	while ((cp = list_tail(&kmem_caches)) != NULL)
 		kmem_cache_destroy(cp);
 
 	vmem_destroy(kmem_oversize_arena);
@@ -2660,11 +3944,34 @@ kmem_init(void)
 	netstack_init();
 }
 
+static void
+kmem_move_init(void)
+{
+	kmem_defrag_cache = kmem_cache_create("kmem_defrag_cache",
+	    sizeof (kmem_defrag_t), 0, NULL, NULL, NULL, NULL,
+	    kmem_msb_arena, KMC_NOHASH);
+	kmem_move_cache = kmem_cache_create("kmem_move_cache",
+	    sizeof (kmem_move_t), 0, NULL, NULL, NULL, NULL,
+	    kmem_msb_arena, KMC_NOHASH);
+
+	/*
+	 * kmem guarantees that move callbacks are sequential and that even
+	 * across multiple caches no two moves ever execute simultaneously.
+	 * Move callbacks are processed on a separate taskq so that client code
+	 * does not interfere with internal maintenance tasks.
+	 */
+	kmem_move_taskq = taskq_create_instance("kmem_move_taskq", 0, 1,
+	    minclsyspri, 100, INT_MAX, TASKQ_PREPOPULATE);
+}
+
 void
 kmem_thread_init(void)
 {
+	kmem_move_init();
 	kmem_taskq = taskq_create_instance("kmem_taskq", 0, 1, minclsyspri,
 	    300, INT_MAX, TASKQ_PREPOPULATE);
+	kmem_cache_applyall(kmem_check_destructor, kmem_move_taskq,
+	    TQ_NOSLEEP);
 }
 
 void
@@ -2675,4 +3982,935 @@ kmem_mp_init(void)
 	mutex_exit(&cpu_lock);
 
 	kmem_update_timeout(NULL);
+}
+
+/*
+ * Return the slab of the allocated buffer, or NULL if the buffer is not
+ * allocated. This function may be called with a known slab address to determine
+ * whether or not the buffer is allocated, or with a NULL slab address to obtain
+ * an allocated buffer's slab.
+ */
+static kmem_slab_t *
+kmem_slab_allocated(kmem_cache_t *cp, kmem_slab_t *sp, void *buf)
+{
+	kmem_bufctl_t *bcp, *bufbcp;
+
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	ASSERT(sp == NULL || KMEM_SLAB_MEMBER(sp, buf));
+
+	if (cp->cache_flags & KMF_HASH) {
+		for (bcp = *KMEM_HASH(cp, buf);
+		    (bcp != NULL) && (bcp->bc_addr != buf);
+		    bcp = bcp->bc_next) {
+			continue;
+		}
+		ASSERT(sp != NULL && bcp != NULL ? sp == bcp->bc_slab : 1);
+		return (bcp == NULL ? NULL : bcp->bc_slab);
+	}
+
+	if (sp == NULL) {
+		sp = KMEM_SLAB(cp, buf);
+	}
+	bufbcp = KMEM_BUFCTL(cp, buf);
+	for (bcp = sp->slab_head;
+	    (bcp != NULL) && (bcp != bufbcp);
+	    bcp = bcp->bc_next) {
+		continue;
+	}
+	return (bcp == NULL ? sp : NULL);
+}
+
+static boolean_t
+kmem_slab_is_reclaimable(kmem_cache_t *cp, kmem_slab_t *sp, int flags)
+{
+	long refcnt;
+
+	ASSERT(cp->cache_defrag != NULL);
+
+	/* If we're desperate, we don't care if the client said NO. */
+	refcnt = sp->slab_refcnt;
+	if (flags & KMM_DESPERATE) {
+		return (refcnt < sp->slab_chunks); /* any partial */
+	}
+
+	if (sp->slab_flags & KMEM_SLAB_NOMOVE) {
+		return (B_FALSE);
+	}
+
+	if (kmem_move_any_partial) {
+		return (refcnt < sp->slab_chunks);
+	}
+
+	if ((refcnt == 1) && (refcnt < sp->slab_chunks)) {
+		return (B_TRUE);
+	}
+
+	/*
+	 * The reclaim threshold is adjusted at each kmem_cache_scan() so that
+	 * slabs with a progressively higher percentage of used buffers can be
+	 * reclaimed until the cache as a whole is no longer fragmented.
+	 *
+	 *	sp->slab_refcnt   kmd_reclaim_numer
+	 *	--------------- < ------------------
+	 *	sp->slab_chunks   KMEM_VOID_FRACTION
+	 */
+	return ((refcnt * KMEM_VOID_FRACTION) <
+	    (sp->slab_chunks * cp->cache_defrag->kmd_reclaim_numer));
+}
+
+static void *
+kmem_hunt_mag(kmem_cache_t *cp, kmem_magazine_t *m, int n, void *buf,
+    void *tbuf)
+{
+	int i;		/* magazine round index */
+
+	for (i = 0; i < n; i++) {
+		if (buf == m->mag_round[i]) {
+			if (cp->cache_flags & KMF_BUFTAG) {
+				(void) kmem_cache_free_debug(cp, tbuf,
+				    caller());
+			}
+			m->mag_round[i] = tbuf;
+			return (buf);
+		}
+	}
+
+	return (NULL);
+}
+
+/*
+ * Hunt the magazine layer for the given buffer. If found, the buffer is
+ * removed from the magazine layer and returned, otherwise NULL is returned.
+ * The state of the returned buffer is freed and constructed.
+ */
+static void *
+kmem_hunt_mags(kmem_cache_t *cp, void *buf)
+{
+	kmem_cpu_cache_t *ccp;
+	kmem_magazine_t	*m;
+	int cpu_seqid;
+	int n;		/* magazine rounds */
+	void *tbuf;	/* temporary swap buffer */
+
+	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
+
+	/*
+	 * Allocated a buffer to swap with the one we hope to pull out of a
+	 * magazine when found.
+	 */
+	tbuf = kmem_cache_alloc(cp, KM_NOSLEEP);
+	if (tbuf == NULL) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_hunt_alloc_fail);
+		return (NULL);
+	}
+	if (tbuf == buf) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_hunt_lucky);
+		if (cp->cache_flags & KMF_BUFTAG) {
+			(void) kmem_cache_free_debug(cp, buf, caller());
+		}
+		return (buf);
+	}
+
+	/* Hunt the depot. */
+	mutex_enter(&cp->cache_depot_lock);
+	n = cp->cache_magtype->mt_magsize;
+	for (m = cp->cache_full.ml_list; m != NULL; m = m->mag_next) {
+		if (kmem_hunt_mag(cp, m, n, buf, tbuf) != NULL) {
+			mutex_exit(&cp->cache_depot_lock);
+			return (buf);
+		}
+	}
+	mutex_exit(&cp->cache_depot_lock);
+
+	/* Hunt the per-CPU magazines. */
+	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++) {
+		ccp = &cp->cache_cpu[cpu_seqid];
+
+		mutex_enter(&ccp->cc_lock);
+		m = ccp->cc_loaded;
+		n = ccp->cc_rounds;
+		if (kmem_hunt_mag(cp, m, n, buf, tbuf) != NULL) {
+			mutex_exit(&ccp->cc_lock);
+			return (buf);
+		}
+		m = ccp->cc_ploaded;
+		n = ccp->cc_prounds;
+		if (kmem_hunt_mag(cp, m, n, buf, tbuf) != NULL) {
+			mutex_exit(&ccp->cc_lock);
+			return (buf);
+		}
+		mutex_exit(&ccp->cc_lock);
+	}
+
+	kmem_cache_free(cp, tbuf);
+	return (NULL);
+}
+
+/*
+ * May be called from the kmem_move_taskq, from kmem_cache_move_notify_task(),
+ * or when the buffer is freed.
+ */
+static void
+kmem_slab_move_yes(kmem_cache_t *cp, kmem_slab_t *sp, void *from_buf)
+{
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	ASSERT(KMEM_SLAB_MEMBER(sp, from_buf));
+
+	if (!KMEM_SLAB_IS_PARTIAL(sp)) {
+		return;
+	}
+
+	if (sp->slab_flags & KMEM_SLAB_NOMOVE) {
+		if (KMEM_SLAB_OFFSET(sp, from_buf) == sp->slab_stuck_offset) {
+			avl_remove(&cp->cache_partial_slabs, sp);
+			sp->slab_flags &= ~KMEM_SLAB_NOMOVE;
+			sp->slab_stuck_offset = (uint32_t)-1;
+			avl_add(&cp->cache_partial_slabs, sp);
+		}
+	} else {
+		sp->slab_later_count = 0;
+		sp->slab_stuck_offset = (uint32_t)-1;
+	}
+}
+
+static void
+kmem_slab_move_no(kmem_cache_t *cp, kmem_slab_t *sp, void *from_buf)
+{
+	ASSERT(taskq_member(kmem_move_taskq, curthread));
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	ASSERT(KMEM_SLAB_MEMBER(sp, from_buf));
+
+	if (!KMEM_SLAB_IS_PARTIAL(sp)) {
+		return;
+	}
+
+	avl_remove(&cp->cache_partial_slabs, sp);
+	sp->slab_later_count = 0;
+	sp->slab_flags |= KMEM_SLAB_NOMOVE;
+	sp->slab_stuck_offset = KMEM_SLAB_OFFSET(sp, from_buf);
+	avl_add(&cp->cache_partial_slabs, sp);
+}
+
+static void kmem_move_end(kmem_cache_t *, kmem_move_t *);
+
+/*
+ * The move callback takes two buffer addresses, the buffer to be moved, and a
+ * newly allocated and constructed buffer selected by kmem as the destination.
+ * It also takes the size of the buffer and an optional user argument specified
+ * at cache creation time. kmem guarantees that the buffer to be moved has not
+ * been unmapped by the virtual memory subsystem. Beyond that, it cannot
+ * guarantee the present whereabouts of the buffer to be moved, so it is up to
+ * the client to safely determine whether or not it is still using the buffer.
+ * The client must not free either of the buffers passed to the move callback,
+ * since kmem wants to free them directly to the slab layer. The client response
+ * tells kmem which of the two buffers to free:
+ *
+ * YES		kmem frees the old buffer (the move was successful)
+ * NO		kmem frees the new buffer, marks the slab of the old buffer
+ *              non-reclaimable to avoid bothering the client again
+ * LATER	kmem frees the new buffer, increments slab_later_count
+ * DONT_KNOW	kmem frees the new buffer, searches mags for the old buffer
+ * DONT_NEED	kmem frees both the old buffer and the new buffer
+ *
+ * The pending callback argument now being processed contains both of the
+ * buffers (old and new) passed to the move callback function, the slab of the
+ * old buffer, and flags related to the move request, such as whether or not the
+ * system was desperate for memory.
+ */
+static void
+kmem_move_buffer(kmem_move_t *callback)
+{
+	kmem_cbrc_t response;
+	kmem_slab_t *sp = callback->kmm_from_slab;
+	kmem_cache_t *cp = sp->slab_cache;
+	boolean_t free_on_slab;
+
+	ASSERT(taskq_member(kmem_move_taskq, curthread));
+	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
+	ASSERT(KMEM_SLAB_MEMBER(sp, callback->kmm_from_buf));
+
+	/*
+	 * The number of allocated buffers on the slab may have changed since we
+	 * last checked the slab's reclaimability (when the pending move was
+	 * enqueued), or the client may have responded NO when asked to move
+	 * another buffer on the same slab.
+	 */
+	if (!kmem_slab_is_reclaimable(cp, sp, callback->kmm_flags)) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_no_longer_reclaimable);
+		KMEM_STAT_COND_ADD((callback->kmm_flags & KMM_NOTIFY),
+		    kmem_move_stats.kms_notify_no_longer_reclaimable);
+		kmem_slab_free(cp, callback->kmm_to_buf);
+		kmem_move_end(cp, callback);
+		return;
+	}
+
+	/*
+	 * Hunting magazines is expensive, so we'll wait to do that until the
+	 * client responds KMEM_CBRC_DONT_KNOW. However, checking the slab layer
+	 * is cheap, so we might as well do that here in case we can avoid
+	 * bothering the client.
+	 */
+	mutex_enter(&cp->cache_lock);
+	free_on_slab = (kmem_slab_allocated(cp, sp,
+	    callback->kmm_from_buf) == NULL);
+	mutex_exit(&cp->cache_lock);
+
+	if (free_on_slab) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_hunt_found_slab);
+		kmem_slab_free(cp, callback->kmm_to_buf);
+		kmem_move_end(cp, callback);
+		return;
+	}
+
+	if (cp->cache_flags & KMF_BUFTAG) {
+		/*
+		 * Make kmem_cache_alloc_debug() apply the constructor for us.
+		 */
+		if (kmem_cache_alloc_debug(cp, callback->kmm_to_buf,
+		    KM_NOSLEEP, 1, caller()) != 0) {
+			KMEM_STAT_ADD(kmem_move_stats.kms_alloc_fail);
+			kmem_move_end(cp, callback);
+			return;
+		}
+	} else if (cp->cache_constructor != NULL &&
+	    cp->cache_constructor(callback->kmm_to_buf, cp->cache_private,
+	    KM_NOSLEEP) != 0) {
+		atomic_add_64(&cp->cache_alloc_fail, 1);
+		KMEM_STAT_ADD(kmem_move_stats.kms_constructor_fail);
+		kmem_slab_free(cp, callback->kmm_to_buf);
+		kmem_move_end(cp, callback);
+		return;
+	}
+
+	KMEM_STAT_ADD(kmem_move_stats.kms_callbacks);
+	KMEM_STAT_COND_ADD((callback->kmm_flags & KMM_NOTIFY),
+	    kmem_move_stats.kms_notify_callbacks);
+	cp->cache_defrag->kmd_callbacks++;
+	cp->cache_defrag->kmd_thread = curthread;
+	cp->cache_defrag->kmd_from_buf = callback->kmm_from_buf;
+	cp->cache_defrag->kmd_to_buf = callback->kmm_to_buf;
+	DTRACE_PROBE2(kmem__move__start, kmem_cache_t *, cp, kmem_move_t *,
+	    callback);
+
+	response = cp->cache_move(callback->kmm_from_buf,
+	    callback->kmm_to_buf, cp->cache_bufsize, cp->cache_private);
+
+	DTRACE_PROBE3(kmem__move__end, kmem_cache_t *, cp, kmem_move_t *,
+	    callback, kmem_cbrc_t, response);
+	cp->cache_defrag->kmd_thread = NULL;
+	cp->cache_defrag->kmd_from_buf = NULL;
+	cp->cache_defrag->kmd_to_buf = NULL;
+
+	if (response == KMEM_CBRC_YES) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_yes);
+		cp->cache_defrag->kmd_yes++;
+		kmem_slab_free_constructed(cp, callback->kmm_from_buf, B_FALSE);
+		mutex_enter(&cp->cache_lock);
+		kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
+		mutex_exit(&cp->cache_lock);
+		kmem_move_end(cp, callback);
+		return;
+	}
+
+	switch (response) {
+	case KMEM_CBRC_NO:
+		KMEM_STAT_ADD(kmem_move_stats.kms_no);
+		cp->cache_defrag->kmd_no++;
+		mutex_enter(&cp->cache_lock);
+		kmem_slab_move_no(cp, sp, callback->kmm_from_buf);
+		mutex_exit(&cp->cache_lock);
+		break;
+	case KMEM_CBRC_LATER:
+		KMEM_STAT_ADD(kmem_move_stats.kms_later);
+		cp->cache_defrag->kmd_later++;
+		mutex_enter(&cp->cache_lock);
+		if (!KMEM_SLAB_IS_PARTIAL(sp)) {
+			mutex_exit(&cp->cache_lock);
+			break;
+		}
+
+		if (++sp->slab_later_count >= KMEM_DISBELIEF) {
+			KMEM_STAT_ADD(kmem_move_stats.kms_disbelief);
+			kmem_slab_move_no(cp, sp, callback->kmm_from_buf);
+		} else if (!(sp->slab_flags & KMEM_SLAB_NOMOVE)) {
+			sp->slab_stuck_offset = KMEM_SLAB_OFFSET(sp,
+			    callback->kmm_from_buf);
+		}
+		mutex_exit(&cp->cache_lock);
+		break;
+	case KMEM_CBRC_DONT_NEED:
+		KMEM_STAT_ADD(kmem_move_stats.kms_dont_need);
+		cp->cache_defrag->kmd_dont_need++;
+		kmem_slab_free_constructed(cp, callback->kmm_from_buf, B_FALSE);
+		mutex_enter(&cp->cache_lock);
+		kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
+		mutex_exit(&cp->cache_lock);
+		break;
+	case KMEM_CBRC_DONT_KNOW:
+		KMEM_STAT_ADD(kmem_move_stats.kms_dont_know);
+		cp->cache_defrag->kmd_dont_know++;
+		if (kmem_hunt_mags(cp, callback->kmm_from_buf) != NULL) {
+			KMEM_STAT_ADD(kmem_move_stats.kms_hunt_found_mag);
+			cp->cache_defrag->kmd_hunt_found++;
+			kmem_slab_free_constructed(cp, callback->kmm_from_buf,
+			    B_TRUE);
+			mutex_enter(&cp->cache_lock);
+			kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
+			mutex_exit(&cp->cache_lock);
+		} else {
+			KMEM_STAT_ADD(kmem_move_stats.kms_hunt_notfound);
+		}
+		break;
+	default:
+		panic("'%s' (%p) unexpected move callback response %d\n",
+		    cp->cache_name, (void *)cp, response);
+	}
+
+	kmem_slab_free_constructed(cp, callback->kmm_to_buf, B_FALSE);
+	kmem_move_end(cp, callback);
+}
+
+/* Return B_FALSE if there is insufficient memory for the move request. */
+static boolean_t
+kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
+{
+	void *to_buf;
+	avl_index_t index;
+	kmem_move_t *callback, *pending;
+
+	ASSERT(taskq_member(kmem_taskq, curthread));
+	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
+	ASSERT(sp->slab_flags & KMEM_SLAB_MOVE_PENDING);
+
+	callback = kmem_cache_alloc(kmem_move_cache, KM_NOSLEEP);
+	if (callback == NULL) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_callback_alloc_fail);
+		return (B_FALSE);
+	}
+
+	callback->kmm_from_slab = sp;
+	callback->kmm_from_buf = buf;
+	callback->kmm_flags = flags;
+
+	mutex_enter(&cp->cache_lock);
+
+	if (avl_numnodes(&cp->cache_partial_slabs) <= 1) {
+		mutex_exit(&cp->cache_lock);
+		kmem_cache_free(kmem_move_cache, callback);
+		return (B_TRUE); /* there is no need for the move request */
+	}
+
+	pending = avl_find(&cp->cache_defrag->kmd_moves_pending, buf, &index);
+	if (pending != NULL) {
+		/*
+		 * If the move is already pending and we're desperate now,
+		 * update the move flags.
+		 */
+		if (flags & KMM_DESPERATE) {
+			pending->kmm_flags |= KMM_DESPERATE;
+		}
+		mutex_exit(&cp->cache_lock);
+		KMEM_STAT_ADD(kmem_move_stats.kms_already_pending);
+		kmem_cache_free(kmem_move_cache, callback);
+		return (B_TRUE);
+	}
+
+	to_buf = kmem_slab_alloc_impl(cp, avl_first(&cp->cache_partial_slabs));
+	callback->kmm_to_buf = to_buf;
+	avl_insert(&cp->cache_defrag->kmd_moves_pending, callback, index);
+
+	mutex_exit(&cp->cache_lock);
+
+	if (!taskq_dispatch(kmem_move_taskq, (task_func_t *)kmem_move_buffer,
+	    callback, TQ_NOSLEEP)) {
+		mutex_enter(&cp->cache_lock);
+		avl_remove(&cp->cache_defrag->kmd_moves_pending, callback);
+		mutex_exit(&cp->cache_lock);
+		kmem_slab_free_constructed(cp, to_buf, B_FALSE);
+		kmem_cache_free(kmem_move_cache, callback);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+static void
+kmem_move_end(kmem_cache_t *cp, kmem_move_t *callback)
+{
+	avl_index_t index;
+
+	ASSERT(cp->cache_defrag != NULL);
+	ASSERT(taskq_member(kmem_move_taskq, curthread));
+	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
+
+	mutex_enter(&cp->cache_lock);
+	VERIFY(avl_find(&cp->cache_defrag->kmd_moves_pending,
+	    callback->kmm_from_buf, &index) != NULL);
+	avl_remove(&cp->cache_defrag->kmd_moves_pending, callback);
+	if (avl_is_empty(&cp->cache_defrag->kmd_moves_pending)) {
+		list_t *deadlist = &cp->cache_defrag->kmd_deadlist;
+		kmem_slab_t *sp;
+
+		/*
+		 * The last pending move completed. Release all slabs from the
+		 * front of the dead list except for any slab at the tail that
+		 * needs to be released from the context of kmem_move_buffers().
+		 * kmem deferred unmapping the buffers on these slabs in order
+		 * to guarantee that buffers passed to the move callback have
+		 * been touched only by kmem or by the client itself.
+		 */
+		while ((sp = list_remove_head(deadlist)) != NULL) {
+			if (sp->slab_flags & KMEM_SLAB_MOVE_PENDING) {
+				list_insert_tail(deadlist, sp);
+				break;
+			}
+			cp->cache_defrag->kmd_deadcount--;
+			cp->cache_slab_destroy++;
+			mutex_exit(&cp->cache_lock);
+			kmem_slab_destroy(cp, sp);
+			KMEM_STAT_ADD(kmem_move_stats.kms_dead_slabs_freed);
+			mutex_enter(&cp->cache_lock);
+		}
+	}
+	mutex_exit(&cp->cache_lock);
+	kmem_cache_free(kmem_move_cache, callback);
+}
+
+/*
+ * Move buffers from least used slabs first by scanning backwards from the end
+ * of the partial slab list. Scan at most max_scan candidate slabs and move
+ * buffers from at most max_slabs slabs (0 for all partial slabs in both cases).
+ * If desperate to reclaim memory, move buffers from any partial slab, otherwise
+ * skip slabs with a ratio of allocated buffers at or above the current
+ * threshold. Return the number of unskipped slabs (at most max_slabs, -1 if the
+ * scan is aborted) so that the caller can adjust the reclaimability threshold
+ * depending on how many reclaimable slabs it finds.
+ *
+ * kmem_move_buffers() drops and reacquires cache_lock every time it issues a
+ * move request, since it is not valid for kmem_move_begin() to call
+ * kmem_cache_alloc() or taskq_dispatch() with cache_lock held.
+ */
+static int
+kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
+    int flags)
+{
+	kmem_slab_t *sp;
+	void *buf;
+	int i, j; /* slab index, buffer index */
+	int s; /* reclaimable slabs */
+	int b; /* allocated (movable) buffers on reclaimable slab */
+	boolean_t success;
+	int refcnt;
+	int nomove;
+
+	ASSERT(taskq_member(kmem_taskq, curthread));
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	ASSERT(kmem_move_cache != NULL);
+	ASSERT(cp->cache_move != NULL && cp->cache_defrag != NULL);
+	ASSERT(avl_numnodes(&cp->cache_partial_slabs) > 1);
+
+	if (kmem_move_blocked) {
+		return (0);
+	}
+
+	if (kmem_move_fulltilt) {
+		max_slabs = 0;
+		flags |= KMM_DESPERATE;
+	}
+
+	if (max_scan == 0 || (flags & KMM_DESPERATE)) {
+		/*
+		 * Scan as many slabs as needed to find the desired number of
+		 * candidate slabs.
+		 */
+		max_scan = (size_t)-1;
+	}
+
+	if (max_slabs == 0 || (flags & KMM_DESPERATE)) {
+		/* Find as many candidate slabs as possible. */
+		max_slabs = (size_t)-1;
+	}
+
+	sp = avl_last(&cp->cache_partial_slabs);
+	ASSERT(sp != NULL && KMEM_SLAB_IS_PARTIAL(sp));
+	for (i = 0, s = 0; (i < max_scan) && (s < max_slabs) &&
+	    (sp != avl_first(&cp->cache_partial_slabs));
+	    sp = AVL_PREV(&cp->cache_partial_slabs, sp), i++) {
+
+		if (!kmem_slab_is_reclaimable(cp, sp, flags)) {
+			continue;
+		}
+		s++;
+
+		/* Look for allocated buffers to move. */
+		for (j = 0, b = 0, buf = sp->slab_base;
+		    (j < sp->slab_chunks) && (b < sp->slab_refcnt);
+		    buf = (((char *)buf) + cp->cache_chunksize), j++) {
+
+			if (kmem_slab_allocated(cp, sp, buf) == NULL) {
+				continue;
+			}
+
+			b++;
+
+			/*
+			 * Prevent the slab from being destroyed while we drop
+			 * cache_lock and while the pending move is not yet
+			 * registered. Flag the pending move while
+			 * kmd_moves_pending may still be empty, since we can't
+			 * yet rely on a non-zero pending move count to prevent
+			 * the slab from being destroyed.
+			 */
+			ASSERT(!(sp->slab_flags & KMEM_SLAB_MOVE_PENDING));
+			sp->slab_flags |= KMEM_SLAB_MOVE_PENDING;
+			/*
+			 * Recheck refcnt and nomove after reacquiring the lock,
+			 * since these control the order of partial slabs, and
+			 * we want to know if we can pick up the scan where we
+			 * left off.
+			 */
+			refcnt = sp->slab_refcnt;
+			nomove = (sp->slab_flags & KMEM_SLAB_NOMOVE);
+			mutex_exit(&cp->cache_lock);
+
+			success = kmem_move_begin(cp, sp, buf, flags);
+
+			/*
+			 * Now, before the lock is reacquired, kmem could
+			 * process all pending move requests and purge the
+			 * deadlist, so that upon reacquiring the lock, sp has
+			 * been remapped. Therefore, the KMEM_SLAB_MOVE_PENDING
+			 * flag causes the slab to be put at the end of the
+			 * deadlist and prevents it from being purged, since we
+			 * plan to destroy it here after reacquiring the lock.
+			 */
+			mutex_enter(&cp->cache_lock);
+			ASSERT(sp->slab_flags & KMEM_SLAB_MOVE_PENDING);
+			sp->slab_flags &= ~KMEM_SLAB_MOVE_PENDING;
+
+			/*
+			 * Destroy the slab now if it was completely freed while
+			 * we dropped cache_lock.
+			 */
+			if (sp->slab_refcnt == 0) {
+				list_t *deadlist =
+				    &cp->cache_defrag->kmd_deadlist;
+
+				ASSERT(!list_is_empty(deadlist));
+				ASSERT(list_link_active((list_node_t *)
+				    &sp->slab_link));
+
+				list_remove(deadlist, sp);
+				cp->cache_defrag->kmd_deadcount--;
+				cp->cache_slab_destroy++;
+				mutex_exit(&cp->cache_lock);
+				kmem_slab_destroy(cp, sp);
+				KMEM_STAT_ADD(kmem_move_stats.
+				    kms_dead_slabs_freed);
+				KMEM_STAT_ADD(kmem_move_stats.
+				    kms_endscan_slab_destroyed);
+				mutex_enter(&cp->cache_lock);
+				/*
+				 * Since we can't pick up the scan where we left
+				 * off, abort the scan and say nothing about the
+				 * number of reclaimable slabs.
+				 */
+				return (-1);
+			}
+
+			if (!success) {
+				/*
+				 * Abort the scan if there is not enough memory
+				 * for the request and say nothing about the
+				 * number of reclaimable slabs.
+				 */
+				KMEM_STAT_ADD(
+				    kmem_move_stats.kms_endscan_nomem);
+				return (-1);
+			}
+
+			/*
+			 * The slab may have been completely allocated while the
+			 * lock was dropped.
+			 */
+			if (KMEM_SLAB_IS_ALL_USED(sp)) {
+				KMEM_STAT_ADD(
+				    kmem_move_stats.kms_endscan_slab_all_used);
+				return (-1);
+			}
+
+			/*
+			 * The slab's position changed while the lock was
+			 * dropped, so we don't know where we are in the
+			 * sequence any more.
+			 */
+			if (sp->slab_refcnt != refcnt) {
+				KMEM_STAT_ADD(
+				    kmem_move_stats.kms_endscan_refcnt_changed);
+				return (-1);
+			}
+			if ((sp->slab_flags & KMEM_SLAB_NOMOVE) != nomove) {
+				KMEM_STAT_ADD(
+				    kmem_move_stats.kms_endscan_nomove_changed);
+				return (-1);
+			}
+
+			/*
+			 * Generating a move request allocates a destination
+			 * buffer from the slab layer, bumping the first slab if
+			 * it is completely allocated.
+			 */
+			ASSERT(!avl_is_empty(&cp->cache_partial_slabs));
+			if (sp == avl_first(&cp->cache_partial_slabs)) {
+				goto end_scan;
+			}
+		}
+	}
+end_scan:
+
+	KMEM_STAT_COND_ADD(sp == avl_first(&cp->cache_partial_slabs),
+	    kmem_move_stats.kms_endscan_freelist);
+
+	return (s);
+}
+
+typedef struct kmem_move_notify_args {
+	kmem_cache_t *kmna_cache;
+	void *kmna_buf;
+} kmem_move_notify_args_t;
+
+static void
+kmem_cache_move_notify_task(void *arg)
+{
+	kmem_move_notify_args_t *args = arg;
+	kmem_cache_t *cp = args->kmna_cache;
+	void *buf = args->kmna_buf;
+	kmem_slab_t *sp;
+
+	ASSERT(taskq_member(kmem_taskq, curthread));
+	ASSERT(list_link_active(&cp->cache_link));
+
+	kmem_free(args, sizeof (kmem_move_notify_args_t));
+	mutex_enter(&cp->cache_lock);
+	sp = kmem_slab_allocated(cp, NULL, buf);
+
+	/* Ignore the notification if the buffer is no longer allocated. */
+	if (sp == NULL) {
+		mutex_exit(&cp->cache_lock);
+		return;
+	}
+
+	/* Ignore the notification if there's no reason to move the buffer. */
+	if (avl_numnodes(&cp->cache_partial_slabs) > 1) {
+		/*
+		 * So far the notification is not ignored. Ignore the
+		 * notification if the slab is not marked by an earlier refusal
+		 * to move a buffer.
+		 */
+		if (!(sp->slab_flags & KMEM_SLAB_NOMOVE) &&
+		    (sp->slab_later_count == 0)) {
+			mutex_exit(&cp->cache_lock);
+			return;
+		}
+
+		kmem_slab_move_yes(cp, sp, buf);
+		ASSERT(!(sp->slab_flags & KMEM_SLAB_MOVE_PENDING));
+		sp->slab_flags |= KMEM_SLAB_MOVE_PENDING;
+		mutex_exit(&cp->cache_lock);
+		/* see kmem_move_buffers() about dropping the lock */
+		(void) kmem_move_begin(cp, sp, buf, KMM_NOTIFY);
+		mutex_enter(&cp->cache_lock);
+		ASSERT(sp->slab_flags & KMEM_SLAB_MOVE_PENDING);
+		sp->slab_flags &= ~KMEM_SLAB_MOVE_PENDING;
+		if (sp->slab_refcnt == 0) {
+			list_t *deadlist = &cp->cache_defrag->kmd_deadlist;
+
+			ASSERT(!list_is_empty(deadlist));
+			ASSERT(list_link_active((list_node_t *)
+			    &sp->slab_link));
+
+			list_remove(deadlist, sp);
+			cp->cache_defrag->kmd_deadcount--;
+			cp->cache_slab_destroy++;
+			mutex_exit(&cp->cache_lock);
+			kmem_slab_destroy(cp, sp);
+			KMEM_STAT_ADD(kmem_move_stats.kms_dead_slabs_freed);
+			return;
+		}
+	} else {
+		kmem_slab_move_yes(cp, sp, buf);
+	}
+	mutex_exit(&cp->cache_lock);
+}
+
+void
+kmem_cache_move_notify(kmem_cache_t *cp, void *buf)
+{
+	kmem_move_notify_args_t *args;
+
+	KMEM_STAT_ADD(kmem_move_stats.kms_notify);
+	args = kmem_alloc(sizeof (kmem_move_notify_args_t), KM_NOSLEEP);
+	if (args != NULL) {
+		args->kmna_cache = cp;
+		args->kmna_buf = buf;
+		(void) taskq_dispatch(kmem_taskq,
+		    (task_func_t *)kmem_cache_move_notify_task, args,
+		    TQ_NOSLEEP);
+	}
+}
+
+static void
+kmem_cache_defrag(kmem_cache_t *cp)
+{
+	size_t n;
+
+	ASSERT(cp->cache_defrag != NULL);
+
+	mutex_enter(&cp->cache_lock);
+	n = avl_numnodes(&cp->cache_partial_slabs);
+	if (n > 1) {
+		/* kmem_move_buffers() drops and reacquires cache_lock */
+		(void) kmem_move_buffers(cp, n, 0, KMM_DESPERATE);
+		KMEM_STAT_ADD(kmem_move_stats.kms_defrags);
+	}
+	mutex_exit(&cp->cache_lock);
+}
+
+/* Is this cache above the fragmentation threshold? */
+static boolean_t
+kmem_cache_frag_threshold(kmem_cache_t *cp, uint64_t nfree)
+{
+	if (avl_numnodes(&cp->cache_partial_slabs) <= 1)
+		return (B_FALSE);
+
+	/*
+	 *	nfree		kmem_frag_numer
+	 * ------------------ > ---------------
+	 * cp->cache_buftotal	kmem_frag_denom
+	 */
+	return ((nfree * kmem_frag_denom) >
+	    (cp->cache_buftotal * kmem_frag_numer));
+}
+
+static boolean_t
+kmem_cache_is_fragmented(kmem_cache_t *cp, boolean_t *doreap)
+{
+	boolean_t fragmented;
+	uint64_t nfree;
+
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	*doreap = B_FALSE;
+
+	if (!kmem_move_fulltilt && ((cp->cache_complete_slab_count +
+	    avl_numnodes(&cp->cache_partial_slabs)) < kmem_frag_minslabs))
+		return (B_FALSE);
+
+	nfree = cp->cache_bufslab;
+	fragmented = kmem_cache_frag_threshold(cp, nfree);
+	/*
+	 * Free buffers in the magazine layer appear allocated from the point of
+	 * view of the slab layer. We want to know if the slab layer would
+	 * appear fragmented if we included free buffers from magazines that
+	 * have fallen out of the working set.
+	 */
+	if (!fragmented) {
+		long reap;
+
+		mutex_enter(&cp->cache_depot_lock);
+		reap = MIN(cp->cache_full.ml_reaplimit, cp->cache_full.ml_min);
+		reap = MIN(reap, cp->cache_full.ml_total);
+		mutex_exit(&cp->cache_depot_lock);
+
+		nfree += ((uint64_t)reap * cp->cache_magtype->mt_magsize);
+		if (kmem_cache_frag_threshold(cp, nfree)) {
+			*doreap = B_TRUE;
+		}
+	}
+
+	return (fragmented);
+}
+
+/* Called periodically from kmem_taskq */
+static void
+kmem_cache_scan(kmem_cache_t *cp)
+{
+	boolean_t reap = B_FALSE;
+
+	ASSERT(taskq_member(kmem_taskq, curthread));
+	ASSERT(cp->cache_defrag != NULL);
+
+	mutex_enter(&cp->cache_lock);
+
+	if (kmem_cache_is_fragmented(cp, &reap)) {
+		kmem_defrag_t *kmd = cp->cache_defrag;
+		size_t slabs_found;
+
+		/*
+		 * Consolidate reclaimable slabs from the end of the partial
+		 * slab list (scan at most kmem_reclaim_scan_range slabs to find
+		 * reclaimable slabs). Keep track of how many candidate slabs we
+		 * looked for and how many we actually found so we can adjust
+		 * the definition of a candidate slab if we're having trouble
+		 * finding them.
+		 *
+		 * kmem_move_buffers() drops and reacquires cache_lock.
+		 */
+		slabs_found = kmem_move_buffers(cp, kmem_reclaim_scan_range,
+		    kmem_reclaim_max_slabs, 0);
+		if (slabs_found >= 0) {
+			kmd->kmd_slabs_sought += kmem_reclaim_max_slabs;
+			kmd->kmd_slabs_found += slabs_found;
+		}
+
+		if (++kmd->kmd_scans >= kmem_reclaim_scan_range) {
+			kmd->kmd_scans = 0;
+
+			/*
+			 * If we had difficulty finding candidate slabs in
+			 * previous scans, adjust the threshold so that
+			 * candidates are easier to find.
+			 */
+			if (kmd->kmd_slabs_found == kmd->kmd_slabs_sought) {
+				kmem_adjust_reclaim_threshold(kmd, -1);
+			} else if ((kmd->kmd_slabs_found * 2) <
+			    kmd->kmd_slabs_sought) {
+				kmem_adjust_reclaim_threshold(kmd, 1);
+			}
+			kmd->kmd_slabs_sought = 0;
+			kmd->kmd_slabs_found = 0;
+		}
+	} else {
+		kmem_reset_reclaim_threshold(cp->cache_defrag);
+#ifdef	DEBUG
+		if (avl_numnodes(&cp->cache_partial_slabs) > 1) {
+			/*
+			 * In a debug kernel we want the consolidator to
+			 * run occasionally even when there is plenty of
+			 * memory.
+			 */
+			uint32_t debug_rand;
+
+			(void) random_get_bytes((uint8_t *)&debug_rand, 4);
+			if (!kmem_move_noreap &&
+			    ((debug_rand % kmem_mtb_reap) == 0)) {
+				mutex_exit(&cp->cache_lock);
+				kmem_cache_reap(cp);
+				KMEM_STAT_ADD(kmem_move_stats.kms_debug_reaps);
+				return;
+			} else if ((debug_rand % kmem_mtb_move) == 0) {
+				(void) kmem_move_buffers(cp,
+				    kmem_reclaim_scan_range, 1, 0);
+				KMEM_STAT_ADD(kmem_move_stats.
+				    kms_debug_move_scans);
+			}
+		}
+#endif	/* DEBUG */
+	}
+
+	mutex_exit(&cp->cache_lock);
+
+	if (reap) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_scan_depot_ws_reaps);
+		kmem_depot_ws_reap(cp);
+	}
 }

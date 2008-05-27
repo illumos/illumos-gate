@@ -38,6 +38,8 @@
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
 #include <vm/page.h>
+#include <sys/avl.h>
+#include <sys/list.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,6 +47,14 @@ extern "C" {
 
 /*
  * kernel memory allocator: implementation-private data structures
+ *
+ * Lock order:
+ * 1. cache_lock
+ * 2. cc_lock in order by CPU ID
+ * 3. cache_depot_lock
+ *
+ * Do not call kmem_cache_alloc() or taskq_dispatch() while holding any of the
+ * above locks.
  */
 
 #define	KMF_AUDIT	0x00000001	/* transaction auditing */
@@ -81,6 +91,16 @@ extern "C" {
 #define	KMEM_SIZE_ENCODE(x)	(251 * (x) + 1)
 #define	KMEM_SIZE_DECODE(x)	((x) / 251)
 #define	KMEM_SIZE_VALID(x)	((x) % 251 == 1 && (x) != 1)
+
+
+#define	KMEM_ALIGN		8	/* min guaranteed alignment */
+#define	KMEM_ALIGN_SHIFT	3	/* log2(KMEM_ALIGN) */
+#define	KMEM_VOID_FRACTION	8	/* never waste more than 1/8 of slab */
+
+#define	KMEM_SLAB_IS_PARTIAL(sp)		\
+	((sp)->slab_refcnt > 0 && (sp)->slab_refcnt < (sp)->slab_chunks)
+#define	KMEM_SLAB_IS_ALL_USED(sp)		\
+	((sp)->slab_refcnt == (sp)->slab_chunks)
 
 /*
  * The bufctl (buffer control) structure keeps some minimal information
@@ -159,21 +179,32 @@ typedef struct kmem_buftag_lite {
 	(((kmem_slab_t *)P2END((uintptr_t)(mp), PAGESIZE) - 1)->slab_cache == \
 	    (cp)->cache_magtype->mt_cache)
 
+#define	KMEM_SLAB_OFFSET(sp, buf)	\
+	((size_t)((uintptr_t)(buf) - (uintptr_t)((sp)->slab_base)))
+
 #define	KMEM_SLAB_MEMBER(sp, buf)	\
-	((size_t)(buf) - (size_t)(sp)->slab_base < \
-	    (sp)->slab_cache->cache_slabsize)
+	(KMEM_SLAB_OFFSET(sp, buf) < (sp)->slab_cache->cache_slabsize)
 
 #define	KMEM_BUFTAG_ALLOC	0xa110c8edUL
 #define	KMEM_BUFTAG_FREE	0xf4eef4eeUL
 
+/* slab_later_count thresholds */
+#define	KMEM_DISBELIEF		3
+
+/* slab_flags */
+#define	KMEM_SLAB_NOMOVE	0x1
+#define	KMEM_SLAB_MOVE_PENDING	0x2
+
 typedef struct kmem_slab {
 	struct kmem_cache	*slab_cache;	/* controlling cache */
 	void			*slab_base;	/* base of allocated memory */
-	struct kmem_slab	*slab_next;	/* next slab on freelist */
-	struct kmem_slab	*slab_prev;	/* prev slab on freelist */
+	avl_node_t		slab_link;	/* slab linkage */
 	struct kmem_bufctl	*slab_head;	/* first free buffer */
 	long			slab_refcnt;	/* outstanding allocations */
 	long			slab_chunks;	/* chunks (bufs) in this slab */
+	uint32_t		slab_stuck_offset; /* unmoved buffer offset */
+	uint16_t		slab_later_count; /* cf KMEM_CBRC_LATER */
+	uint16_t		slab_flags;	/* bits to mark the slab */
 } kmem_slab_t;
 
 #define	KMEM_HASH_INITIAL	64
@@ -228,6 +259,38 @@ typedef struct kmem_maglist {
 	uint64_t	ml_alloc;	/* allocations from this list */
 } kmem_maglist_t;
 
+typedef struct kmem_defrag {
+	/*
+	 * Statistics
+	 */
+	uint64_t	kmd_callbacks;		/* move callbacks */
+	uint64_t	kmd_yes;		/* KMEM_CBRC_YES responses */
+	uint64_t	kmd_no;			/* NO responses */
+	uint64_t	kmd_later;		/* LATER responses */
+	uint64_t	kmd_dont_need;		/* DONT_NEED responses */
+	uint64_t	kmd_dont_know;		/* DONT_KNOW responses */
+	uint64_t	kmd_hunt_found;		/* DONT_KNOW: # found in mag */
+
+	/*
+	 * Consolidator fields
+	 */
+	avl_tree_t	kmd_moves_pending;	/* buffer moves pending */
+	list_t		kmd_deadlist;		/* deferred slab frees */
+	size_t		kmd_deadcount;		/* # of slabs in kmd_deadlist */
+	uint8_t		kmd_reclaim_numer;	/* slab usage threshold */
+	uint8_t		kmd_pad1;		/* compiler padding */
+	size_t		kmd_slabs_sought;	/* reclaimable slabs sought */
+	size_t		kmd_slabs_found;	/* reclaimable slabs found */
+	size_t		kmd_scans;		/* nth scan interval counter */
+	/*
+	 * Fields used to ASSERT that the client does not kmem_cache_free()
+	 * objects passed to the move callback.
+	 */
+	void		*kmd_from_buf;		/* object to move */
+	void		*kmd_to_buf;		/* move destination */
+	kthread_t	*kmd_thread;		/* thread calling move */
+} kmem_defrag_t;
+
 #define	KMEM_CACHE_NAMELEN	31
 
 struct kmem_cache {
@@ -256,15 +319,15 @@ struct kmem_cache {
 	int		(*cache_constructor)(void *, void *, int);
 	void		(*cache_destructor)(void *, void *);
 	void		(*cache_reclaim)(void *);
+	kmem_cbrc_t	(*cache_move)(void *, void *, size_t, void *);
 	void		*cache_private;		/* opaque arg to callbacks */
 	vmem_t		*cache_arena;		/* vmem source for slabs */
 	int		cache_cflags;		/* cache creation flags */
 	int		cache_flags;		/* various cache state info */
 	uint32_t	cache_mtbf;		/* induced alloc failure rate */
-	uint32_t	cache_pad1;		/* to align cache_lock */
+	uint32_t	cache_pad1;		/* compiler padding */
 	kstat_t		*cache_kstat;		/* exported statistics */
-	kmem_cache_t	*cache_next;		/* forward cache linkage */
-	kmem_cache_t	*cache_prev;		/* backward cache linkage */
+	list_node_t	cache_link;		/* cache linkage */
 
 	/*
 	 * Slab layer
@@ -272,6 +335,7 @@ struct kmem_cache {
 	kmutex_t	cache_lock;		/* protects slab layer */
 	size_t		cache_chunksize;	/* buf + alignment [+ debug] */
 	size_t		cache_slabsize;		/* size of a slab */
+	size_t		cache_maxchunks;	/* max buffers per slab */
 	size_t		cache_bufctl;		/* buf-to-bufctl distance */
 	size_t		cache_buftag;		/* buf-to-buftag distance */
 	size_t		cache_verify;		/* bytes to verify */
@@ -281,18 +345,19 @@ struct kmem_cache {
 	size_t		cache_maxcolor;		/* maximum slab color */
 	size_t		cache_hash_shift;	/* get to interesting bits */
 	size_t		cache_hash_mask;	/* hash table mask */
-	kmem_slab_t	*cache_freelist;	/* slab free list */
-	kmem_slab_t	cache_nullslab;		/* end of freelist marker */
+	list_t		cache_complete_slabs;	/* completely allocated slabs */
+	size_t		cache_complete_slab_count;
+	avl_tree_t	cache_partial_slabs;	/* partial slab freelist */
+	size_t		cache_partial_binshift;	/* for AVL sort bins */
 	kmem_cache_t	*cache_bufctl_cache;	/* source of bufctls */
 	kmem_bufctl_t	**cache_hash_table;	/* hash table base */
-	void		*cache_pad2;		/* to align depot_lock */
+	kmem_defrag_t	*cache_defrag;		/* slab consolidator fields */
 
 	/*
 	 * Depot layer
 	 */
 	kmutex_t	cache_depot_lock;	/* protects depot */
 	kmem_magtype_t	*cache_magtype;		/* magazine type */
-	void		*cache_pad3;		/* to align cache_cpu */
 	kmem_maglist_t	cache_full;		/* full magazines */
 	kmem_maglist_t	cache_empty;		/* empty magazines */
 
@@ -324,9 +389,24 @@ typedef struct kmem_log_header {
 	kmem_cpu_log_header_t lh_cpu[1];	/* ncpus actually allocated */
 } kmem_log_header_t;
 
-#define	KMEM_ALIGN		8	/* min guaranteed alignment */
-#define	KMEM_ALIGN_SHIFT	3	/* log2(KMEM_ALIGN) */
-#define	KMEM_VOID_FRACTION	8	/* never waste more than 1/8 of slab */
+/* kmem_move kmm_flags */
+#define	KMM_DESPERATE		0x1
+#define	KMM_NOTIFY		0x2
+
+typedef struct kmem_move {
+	kmem_slab_t	*kmm_from_slab;
+	void		*kmm_from_buf;
+	void		*kmm_to_buf;
+	avl_node_t	kmm_entry;
+	int		kmm_flags;
+} kmem_move_t;
+
+/*
+ * In order to consolidate partial slabs, it must be possible for the cache to
+ * have partial slabs.
+ */
+#define	KMEM_IS_MOVABLE(cp)						\
+	(((cp)->cache_chunksize * 2) <= (cp)->cache_slabsize)
 
 #ifdef	__cplusplus
 }

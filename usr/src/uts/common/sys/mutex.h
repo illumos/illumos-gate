@@ -81,8 +81,8 @@ extern	void	mutex_destroy(kmutex_t *);
 extern	void	mutex_enter(kmutex_t *);
 extern	int	mutex_tryenter(kmutex_t *);
 extern	void	mutex_exit(kmutex_t *);
-extern	int	mutex_owned(kmutex_t *);
-extern	struct _kthread *mutex_owner(kmutex_t *);
+extern	int	mutex_owned(const kmutex_t *);
+extern	struct _kthread *mutex_owner(const kmutex_t *);
 
 extern  ushort_t mutex_backoff_base;
 extern  uint_t mutex_backoff_cap;

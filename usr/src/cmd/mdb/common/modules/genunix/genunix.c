@@ -69,6 +69,7 @@
 #include <sys/port_impl.h>
 
 #include "avl.h"
+#include "combined.h"
 #include "contract.h"
 #include "cpupart_mdb.h"
 #include "devinfo.h"
@@ -3370,9 +3371,10 @@ static const mdb_dcmd_t dcmds[] = {
 	    kmastat },
 	{ "kmausers", "?[-ef] [cache ...]", "current medium and large users "
 		"of the kmem allocator", kmausers, kmausers_help },
-	{ "kmem_cache", "?", "print kernel memory caches", kmem_cache },
-	{ "kmem_slabs", "?[-v] [-n cache] [-b maxbins] [-B minbinsize]",
-		"display slab usage per kmem cache",
+	{ "kmem_cache", "?[-n name]",
+		"print kernel memory caches", kmem_cache, kmem_cache_help},
+	{ "kmem_slabs", "?[-v] [-n cache] [-N cache] [-b maxbins] "
+		"[-B minbinsize]", "display slab usage per kmem cache",
 		kmem_slabs, kmem_slabs_help },
 	{ "kmem_debug", NULL, "toggle kmem dcmd/walk debugging", kmem_debug },
 	{ "kmem_log", "?[-b]", "dump kmem transaction log", kmem_log },
@@ -3705,10 +3707,11 @@ static const mdb_walker_t walkers[] = {
 	{ "kmem_log", "walk the kmem transaction log",
 		kmem_log_walk_init, kmem_log_walk_step, kmem_log_walk_fini },
 	{ "kmem_slab", "given a kmem cache, walk its slabs",
-		kmem_slab_walk_init, kmem_slab_walk_step, NULL },
+		kmem_slab_walk_init, combined_walk_step, combined_walk_fini },
 	{ "kmem_slab_partial",
 	    "given a kmem cache, walk its partially allocated slabs (min 1)",
-		kmem_slab_walk_partial_init, kmem_slab_walk_step, NULL },
+		kmem_slab_walk_partial_init, combined_walk_step,
+		combined_walk_fini },
 	{ "vmem", "walk vmem structures in pre-fix, depth-first order",
 		vmem_walk_init, vmem_walk_step, vmem_walk_fini },
 	{ "vmem_alloc", "given a vmem_t, walk its allocated vmem_segs",

@@ -23,33 +23,27 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_MDB_AVL_H
-#define	_MDB_AVL_H
+#ifndef	_COMBINED_H
+#define	_COMBINED_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	AVL_WALK_NAME	"avl"
-#define	AVL_WALK_DESC	"given any avl_tree_t *, forward walk all " \
-			"entries in tree"
-
-extern int avl_walk_init(mdb_walk_state_t *);
-extern int avl_walk_init_named(mdb_walk_state_t *wsp,
-    const char *, const char *);
-extern int avl_walk_init_checked(mdb_walk_state_t *wsp,
-    const char *, const char *,
-    int (*)(void *, uintptr_t, void *), void *);
-extern int avl_walk_init_range(mdb_walk_state_t *wsp, uintptr_t, uintptr_t,
-    const char *, const char *,
-    int (*)(void *, uintptr_t, void *), void *);
-extern int avl_walk_step(mdb_walk_state_t *);
-extern void avl_walk_fini(mdb_walk_state_t *wsp);
+extern void combined_walk_init(mdb_walk_state_t *wsp);
+extern void combined_walk_add(mdb_walk_state_t *wsp,
+	int (*walk_init)(mdb_walk_state_t *),
+	int (*walk_step)(mdb_walk_state_t *),
+	void (*walk_fini)(mdb_walk_state_t *));
+extern int combined_walk_step(mdb_walk_state_t *wsp);
+extern void combined_walk_fini(mdb_walk_state_t *wsp);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _MDB_AVL_H */
+#endif	/* _COMBINED_H */

@@ -580,6 +580,13 @@ socktpi_constructor(void *buf, void *cdrarg, int kmflags)
 	struct sonode *so = buf;
 	struct vnode *vp;
 
+	vp = so->so_vnode = vn_alloc(kmflags);
+	if (vp == NULL) {
+		return (-1);
+	}
+	vn_setops(vp, socktpi_vnodeops);
+	vp->v_data = so;
+
 	so->so_direct		= NULL;
 
 	so->so_nl7c_flags	= 0;
@@ -597,12 +604,6 @@ socktpi_constructor(void *buf, void *cdrarg, int kmflags)
 	so->so_laddr_sa		= NULL;
 	so->so_faddr_sa		= NULL;
 	so->so_ops		= &sotpi_sonodeops;
-
-	vp = vn_alloc(KM_SLEEP);
-	so->so_vnode = vp;
-
-	vn_setops(vp, socktpi_vnodeops);
-	vp->v_data = (caddr_t)so;
 
 	mutex_init(&so->so_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&so->so_plumb_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -637,7 +638,7 @@ socktpi_destructor(void *buf, void *cdrarg)
 	ASSERT(so->so_ops == &sotpi_sonodeops);
 
 	ASSERT(vn_matchops(vp, socktpi_vnodeops));
-	ASSERT(vp->v_data == (caddr_t)so);
+	ASSERT(vp->v_data == so);
 
 	vn_free(vp);
 
@@ -921,8 +922,7 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 	struct sonode	*so2;
 	int		error;
 
-	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n",
-	    so, soun->sun_path));
+	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n", so, soun->sun_path));
 
 	error = lookupname(soun->sun_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
 	if (error) {
@@ -1129,8 +1129,7 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	so->so_ux_faddr.soua_magic = SOU_MAGIC_EXPLICIT;
 	addr = &so->so_ux_faddr;
 	addrlen = (socklen_t)sizeof (so->so_ux_faddr);
-	dprintso(so, 1, ("ux_xlate UNIX: addrlen %d, vp %p\n",
-	    addrlen, vp));
+	dprintso(so, 1, ("ux_xlate UNIX: addrlen %d, vp %p\n", addrlen, vp));
 	VN_RELE(vp);
 	*addrp = addr;
 	*addrlenp = (socklen_t)addrlen;
@@ -2038,8 +2037,7 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 		bcopy(addr, &sin, sizeof (sin));
 
 		(void) sprintf(buf, "(len %d) %x/%d",
-		    addrlen, ntohl(sin.sin_addr.s_addr),
-		    ntohs(sin.sin_port));
+		    addrlen, ntohl(sin.sin_addr.s_addr), ntohs(sin.sin_port));
 		break;
 	}
 	case AF_INET6: {
@@ -2059,8 +2057,7 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 	case AF_UNIX: {
 		struct sockaddr_un *soun = (struct sockaddr_un *)addr;
 
-		(void) sprintf(buf, "(len %d) %s",
-		    addrlen,
+		(void) sprintf(buf, "(len %d) %s", addrlen,
 		    (soun == NULL) ? "(none)" : soun->sun_path);
 		break;
 	}
