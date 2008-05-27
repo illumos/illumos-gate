@@ -484,17 +484,20 @@ set_max_page_level()
 
 	if (!kbm_largepage_support) {
 		lvl = 0;
-	}
-	if (x86_feature & X86_1GPG) {
-		lvl = 2;
-		if (chk_optimal_1gtlb && cpuid_opteron_erratum(CPU, 6671130)) {
-			lvl = 1;
-		}
-		if (plat_mnode_xcheck(LEVEL_SIZE(2) >> LEVEL_SHIFT(0))) {
-			lvl = 1;
-		}
 	} else {
-		lvl = 1;
+		if (x86_feature & X86_1GPG) {
+			lvl = 2;
+			if (chk_optimal_1gtlb &&
+			    cpuid_opteron_erratum(CPU, 6671130)) {
+				lvl = 1;
+			}
+			if (plat_mnode_xcheck(LEVEL_SIZE(2) >>
+			    LEVEL_SHIFT(0))) {
+				lvl = 1;
+			}
+		} else {
+			lvl = 1;
+		}
 	}
 	mmu.max_page_level = lvl;
 
