@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1527,22 +1527,25 @@ struct allocsp_undo {
 
 /*
  * ufs_allocsp() can be used to pre-allocate blocks for a file on a given
- * file system. The blocks are not initialized and are only marked as allocated.
- * These addresses are then stored as negative block numbers in the inode to
- * imply special handling. UFS has been modified where necessary to understand
- * this new notion. Successfully fallocated files will have IFALLOCATE cflag
- * set in the inode.
+ * file system. For direct blocks, the blocks are allocated from the offset
+ * requested to the block boundary, then any full blocks are allocated,
+ * and finally any remainder.
+ * For indirect blocks the blocks are not initialized and are
+ * only marked as allocated. These addresses are then stored as negative
+ * block numbers in the inode to imply special handling. UFS has been modified
+ * where necessary to understand this new notion.
+ * Successfully fallocated files will have IFALLOCATE cflag set in the inode.
  */
 int
 ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 {
 	struct lockfs lf;
 	int berr, err, resv, issync;
-	off_t start, istart, len; /* istart, special for idb */
+	off_t istart, len; /* istart, special for idb */
 	struct inode *ip;
 	struct fs *fs;
 	struct ufsvfs *ufsvfsp;
-	u_offset_t resid, i;
+	u_offset_t resid, i, uoff;
 	daddr32_t db_undo[NDADDR];	/* old direct blocks */
 	struct allocsp_undo *ib_undo = NULL;	/* ib undo */
 	struct allocsp_undo *undo = NULL;
@@ -1552,6 +1555,9 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 	daddr_t allocblk;
 	daddr_t totblks = 0;
 	struct ulockfs	*ulp;
+	size_t done_len;
+	int nbytes, offsetn;
+
 
 	ASSERT(vp->v_type == VREG);
 
@@ -1562,7 +1568,7 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 		goto out_allocsp;
 	}
 
-	istart = start = blkroundup(fs, (lp->l_start));
+	istart = blkroundup(fs, (lp->l_start));
 	len = blkroundup(fs, (lp->l_len));
 	chunkblks = blkroundup(fs, ufsvfsp->vfs_iotransz) / fs->fs_bsize;
 	ulp = &ufsvfsp->vfs_ulockfs;
@@ -1594,8 +1600,17 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 	osz = ip->i_size;
 	rw_exit(&ip->i_contents);
 
-	/* Allocate any direct blocks now before we write lock the fs */
-	if (lblkno(fs, start) < NDADDR) {
+	/* Write lock the file system */
+	if (err = allocsp_wlockfs(vp, &lf))
+		goto exit;
+
+	/*
+	 * Allocate any direct blocks now.
+	 * Blocks are allocated from the offset requested to the block
+	 * boundary, then any full blocks are allocated, and finally any
+	 * remainder.
+	 */
+	if (lblkno(fs, lp->l_start) < NDADDR) {
 		ufs_trans_trunc_resv(ip, ip->i_size + (NDADDR * fs->fs_bsize),
 		    &resv, &resid);
 		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_ALLOCSP, resv);
@@ -1603,10 +1618,16 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 		rw_enter(&ufsvfsp->vfs_dqrwlock, RW_READER);
 		rw_enter(&ip->i_contents, RW_WRITER);
 
-		for (i = start; (i < (start + len)) && (lblkno(fs, i) < NDADDR);
-		    i += fs->fs_bsize) {
-			berr = bmap_write(ip, i, fs->fs_bsize, BI_FALLOCATE,
-			    &allocblk, cr);
+		done_len = 0;
+		while ((done_len < lp->l_len) &&
+		    (lblkno(fs, lp->l_start + done_len) < NDADDR)) {
+			uoff = (offset_t)(lp->l_start + done_len);
+			offsetn = (int)blkoff(fs, uoff);
+			nbytes = (int)MIN(fs->fs_bsize - offsetn,
+			    lp->l_len - done_len);
+
+			berr = bmap_write(ip, uoff, offsetn + nbytes,
+			    BI_FALLOCATE, &allocblk, cr);
 			/* Yikes error, quit */
 			if (berr) {
 				TRANS_INODE(ufsvfsp, ip);
@@ -1614,14 +1635,16 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 				rw_exit(&ufsvfsp->vfs_dqrwlock);
 				TRANS_END_CSYNC(ufsvfsp, err, issync,
 				    TOP_ALLOCSP, resv);
+				err = allocsp_unlockfs(vp, &lf);
 				goto exit;
 			}
 
 			if (allocblk) {
 				totblks++;
-				if (i >= ip->i_size)
-					ip->i_size += fs->fs_bsize;
+				if ((uoff + nbytes) > ip->i_size)
+					ip->i_size = (uoff + nbytes);
 			}
+			done_len += nbytes;
 		}
 
 		TRANS_INODE(ufsvfsp, ip);
@@ -1629,12 +1652,9 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 		rw_exit(&ufsvfsp->vfs_dqrwlock);
 		TRANS_END_CSYNC(ufsvfsp, err, issync, TOP_ALLOCSP, resv);
 
-		istart =  i;	/* start offset for indirect allocation */
+		/* start offset for indirect allocation */
+		istart =  (uoff + nbytes);
 	}
-
-	/* Write lock the file system */
-	if (err = allocsp_wlockfs(vp, &lf))
-		goto exit;
 
 	/* Break the transactions into vfs_iotransz units */
 	ufs_trans_trunc_resv(ip, ip->i_size +
@@ -1645,7 +1665,7 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 	rw_enter(&ip->i_contents, RW_WRITER);
 
 	/* Now go about fallocating necessary indirect blocks */
-	for (i = istart; i < (start + len); i += fs->fs_bsize) {
+	for (i = istart; i < (lp->l_start + lp->l_len); i += fs->fs_bsize) {
 		berr = bmap_write(ip, i, fs->fs_bsize, BI_FALLOCATE,
 		    &allocblk, cr);
 		if (berr) {
@@ -1691,6 +1711,7 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 				TRANS_END_CSYNC(ufsvfsp, err, issync,
 				    TOP_ALLOCSP, resv);
 				rw_exit(&ip->i_rwlock);
+				(void) allocsp_unlockfs(vp, &lf);
 				return (EIO);
 			}
 
@@ -1732,6 +1753,10 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 
 	if (!err && !berr)
 		ip->i_cflags |= IFALLOCATE;
+
+	/* If the file has grown then correct the file size */
+	if (osz < (lp->l_start + lp->l_len))
+		ip->i_size = (lp->l_start + lp->l_len);
 
 	/* Release locks, end log transaction and unlock fs */
 	TRANS_INODE(ufsvfsp, ip);
