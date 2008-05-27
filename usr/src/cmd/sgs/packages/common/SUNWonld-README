@@ -1203,6 +1203,15 @@ All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_x86	patch T127112-07
 --------------------------------------------------------------------------------
 
+-------------------------------------
+Solaris 10 908 (6th Q-update - s10u6)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+6672544 elf_rtbndr must support non-ABI aligned stacks on amd64
+6668050 First trip through PLT does not preserve args in xmm registers
+--------------------------------------------------------------------------------
+
 --------------
 Solaris Nevada
 --------------
@@ -1320,9 +1329,7 @@ Bugid   Risk Synopsis
 	relocation information
 6357282 ldd should recognize PARENT and EXTERN symbols (D)
 	PSARC/2008/148 new ldd(1) -p option
-6668050 First trip through PLT does not preserve args in xmm registers
 6672394 ldd(1) unused dependency processing is tricked by relocations errors
-6672544 elf_rtbndr must support non-ABI aligned stacks on amd64
 6671255 link-editor should support cross linking (D)
 	PSARC/2008/179 cross link-editor
 6606203 link editor ought to allow creation of >2gb sized objects (P)
@@ -1347,3 +1354,5 @@ Bugid   Risk Synopsis
 6703683 Can't build VirtualBox on Build 88 or 89
 6703919 boot hangs intermittently on x86 with onnv daily.0430 and on
 6701798 ld can enter infinite loop processing bad mapfile
+6706401 direct binding copy relocation fallback is insufficient for ild
+	generated objects

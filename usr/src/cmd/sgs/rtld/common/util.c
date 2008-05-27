@@ -603,6 +603,7 @@ is_dep_init(Rt_map *dlmp, Rt_map *clmp)
  *	block (see comments in load_completion()).
  */
 void
+/* ARGSUSED2 */
 is_dep_ready(Rt_map *dlmp, Rt_map *clmp, int what)
 {
 	thread_t	tid;

@@ -145,6 +145,7 @@ typedef enum {
 #define	AL_CNT_LMNOW	8		/* lm_now initial alist count */
 #define	AL_CNT_RELBIND	20		/* relocation binding alist count */
 #define	AL_CNT_ACTAUDIT	2		/* lm_actaudit alist count */
+#define	AL_CNT_MOVES	10		/* move_data alist count */
 
 
 /*
@@ -583,6 +584,7 @@ extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,
 			    Rt_map *, const char *, int, uint_t, int *);
 extern void		is_dep_ready(Rt_map *, Rt_map *, int);
 extern void		is_dep_init(Rt_map *, Rt_map *);
+extern int		is_move_data(caddr_t);
 extern int		is_sym_interposer(Rt_map *, Sym *);
 extern void		ldso_plt_init(Rt_map *);
 extern Listnode		*list_append(List *, const void *);
@@ -607,7 +609,7 @@ extern void		nfavl_insert(const char *, avl_index_t);
 extern int		nfavl_recorded(const char *, avl_index_t *);
 extern caddr_t		nu_map(Lm_list *, caddr_t, size_t, int, int);
 extern void		*malloc(size_t);
-extern void		move_data(Rt_map *);
+extern int		move_data(Rt_map *);
 extern int		pr_open(Lm_list *);
 extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, Word *, Word *, int);

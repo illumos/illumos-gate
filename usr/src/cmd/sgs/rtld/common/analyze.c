@@ -200,29 +200,68 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 }
 
 /*
- * Copy relocation test.  If the symbol definition is within .bss, then it's
- * zero filled, and as the destination is within .bss, we can skip copying
- * zero's to zero's.  However, if the destination object has a MOVE table, it's
- * .bss might contain non-zero data, in which case copy it regardless.
+ * Determine whether a symbol represents zero, .bss, bits.  Most commonly this
+ * function is used to determine whether the data for a copy relocation refers
+ * to initialized data or .bss.  If the data definition is within .bss, then the
+ * data is zero filled, and as the copy destination within the executable is
+ * .bss, we can skip copying zero's to zero's.
+ *
+ * However, if the defining object has MOVE data, it's .bss might contain
+ * non-zero data, in which case copy the definition regardless.
+ *
+ * For backward compatibility copy relocation processing, this routine can be
+ * used to determine precisely if a copy destination is a move record recipient.
  */
 static int
-copy_zerobits(Rt_map *dlmp, Sym *dsym)
+are_bits_zero(Rt_map *dlmp, Sym *dsym, int dest)
 {
-	if ((FLAGS(dlmp) & FLG_RT_MOVE) == 0) {
-		Mmap	*mmaps;
-		caddr_t	daddr = (caddr_t)dsym->st_value;
+	Mmap	*mmap = NULL, *mmaps;
+	caddr_t	daddr = (caddr_t)dsym->st_value;
 
-		if ((FLAGS(dlmp) & FLG_RT_FIXED) == 0)
-			daddr += ADDR(dlmp);
+	if ((FLAGS(dlmp) & FLG_RT_FIXED) == 0)
+		daddr += ADDR(dlmp);
 
-		for (mmaps = MMAPS(dlmp); mmaps->m_vaddr; mmaps++) {
-			if ((mmaps->m_fsize != mmaps->m_msize) &&
-			    (daddr >= (mmaps->m_vaddr + mmaps->m_fsize)) &&
-			    (daddr < (mmaps->m_vaddr + mmaps->m_msize)))
-				return (1);
+	/*
+	 * Determine the segment that contains the copy definition.  Given that
+	 * the copy relocation records have already been captured and verified,
+	 * a segment must be found (but we add an escape clause never the less).
+	 */
+	for (mmaps = MMAPS(dlmp); mmaps->m_vaddr; mmaps++) {
+		if ((daddr >= mmaps->m_vaddr) &&
+		    (daddr < (mmaps->m_vaddr + mmaps->m_msize))) {
+			mmap = mmaps;
+			break;
 		}
 	}
-	return (0);
+	if (mmap == NULL)
+		return (1);
+
+	/*
+	 * If the definition is not within .bss, indicate this is not zero data.
+	 */
+	if (daddr < (mmap->m_vaddr + mmaps->m_fsize))
+		return (0);
+
+	/*
+	 * If the definition is within .bss, make sure the definition isn't the
+	 * recipient of a move record.  Note, we don't precisely analyze whether
+	 * the address is a move record recipient, as the infrastructure to
+	 * prepare for, and carry out this analysis, is probably more costly
+	 * than just copying the bytes regardless.
+	 */
+	if ((FLAGS(dlmp) & FLG_RT_MOVE) == 0)
+		return (1);
+
+	/*
+	 * However, for backward compatibility copy relocation processing, we
+	 * can afford to work a little harder.  Here, determine precisely
+	 * whether the destination in the executable is a move record recipient.
+	 * See comments in lookup_sym_interpose(), below.
+	 */
+	if (dest && is_move_data(daddr))
+		return (0);
+
+	return (1);
 }
 
 /*
@@ -291,11 +330,17 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated, int *in_nfavl)
 		lml->lm_flags |= LML_FLG_OBJADDED;
 
 		/*
-		 * Process any move data (not necessary under ldd()).
+		 * Process any move data.  Note, this is carried out under ldd
+		 * under relocation processing too, as it can flush out move
+		 * errors, and enables lari(1) to provide a true representation
+		 * of the runtime bindings.
 		 */
 		if ((FLAGS(lmp) & FLG_RT_MOVE) &&
-		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
-			move_data(lmp);
+		    (((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0) ||
+		    (lml->lm_flags & LML_FLG_TRC_WARN))) {
+			if (move_data(lmp) == 0)
+				return (0);
+		}
 
 		/*
 		 * Determine if this object is a filter, and if a load filter
@@ -344,10 +389,11 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated, int *in_nfavl)
 				int zero;
 
 				/*
-				 * Only copy the bits if it's from non-zero
-				 * filled memory.
+				 * Only copy the data if the data is from
+				 * a non-zero definition (ie. not .bss).
 				 */
-				zero = copy_zerobits(rcp->r_dlmp, rcp->r_dsym);
+				zero = are_bits_zero(rcp->r_dlmp,
+				    rcp->r_dsym, 0);
 				DBG_CALL(Dbg_reloc_copy(rcp->r_dlmp, nlmp,
 				    rcp->r_name, zero));
 				if (zero)
@@ -2559,8 +2605,10 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 	lmp = lml->lm_head;
 	sl = *slp;
 	sl.sl_imap = lmp;
-	if (((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0) &&
-	    copy_zerobits(*dlmp, osym)) {
+
+	if (((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0) && (FCT(lmp) == &elf_fct) &&
+	    (ELF_ST_TYPE(osym->st_info) != STT_FUNC) &&
+	    are_bits_zero(*dlmp, osym, 0)) {
 		Rt_map	*ilmp;
 		Sym	*isym;
 
@@ -2572,7 +2620,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 		if (((isym = SYMINTP(lmp)(&sl, &ilmp, binfo,
 		    in_nfavl)) != NULL) && (isym->st_size == osym->st_size) &&
 		    (isym->st_info == osym->st_info) &&
-		    copy_zerobits(lmp, isym)) {
+		    are_bits_zero(lmp, isym, 1)) {
 			*dlmp = lmp;
 			*binfo |= (DBG_BINFO_INTERPOSE | DBG_BINFO_COPYREF);
 			return (isym);
