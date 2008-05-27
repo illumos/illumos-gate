@@ -431,6 +431,17 @@ main(int argc, char *argv[])
 
 	} else {
 		/* not a daemon, so just build /dev and /devices */
+
+		/*
+		 * If turning off device allocation, load the
+		 * minor_perm file because process_devinfo_tree() will
+		 * need this in order to reset the permissions of the
+		 * device files.
+		 */
+		if (devalloc_flag == DA_OFF) {
+			read_minor_perm_file();
+		}
+
 		process_devinfo_tree();
 		if (devalloc_flag != 0)
 			/* Enable/disable device allocation */
@@ -3014,10 +3025,13 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 		return;
 	}
 
-	if ((devalloc_flag == DA_ON) || (devalloc_is_on == 1)) {
+	if ((devalloc_flag == DA_ON) ||
+	    ((devalloc_is_on == 1) && (devalloc_flag != DA_OFF))) {
 		/*
-		 * we are here either to turn device allocation on
-		 * or to add a new device while device allocation in on
+		 * we are here either to turn device allocation on or
+		 * to add a new device while device allocation is on
+		 * (and we've confirmed that we're not turning it
+		 * off).
 		 */
 		mode = DEALLOC_MODE;
 		uid = DA_UID;
