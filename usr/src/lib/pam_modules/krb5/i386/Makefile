@@ -27,7 +27,7 @@
 
 include ../Makefile.com
 
-LDLIBS +=	-lpam -lnsl -lc
+LDLIBS +=	-lpam -lc
 
 DYNFLAGS +=	-L$(ROOT_KLIBDIR) -L$(ROOT)/$(KERBLIBDIR) \
 		$(KRUNPATH) $(KERBRUNPATH) -lkadm5clnt -lmech_krb5

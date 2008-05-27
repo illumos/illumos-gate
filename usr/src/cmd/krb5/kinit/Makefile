@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,12 +7,8 @@
 
 PROG= kinit
 
-OBJS	= kinit.o kwarnd_clnt_stubs.o kwarnd_clnt.o kwarnd_handle.o kwarnd_xdr.o
-SRCS	= kinit.c \
-	../kwarn/kwarnd_clnt_stubs.c \
-	../kwarn/kwarnd_clnt.c \
-	../kwarn/kwarnd_handle.c \
-	../kwarn/kwarnd_xdr.c
+OBJS	= kinit.o
+SRCS	= kinit.c
 
 DEFS =  -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_PWD_H=1 -DHAVE_COMPILE=1 -DHAVE_STEP=1 
 
@@ -28,19 +24,14 @@ CPPFLAGS += -I../../lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/gss_mechs/mech_krb5 \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
-		-I../kwarn \
 		$(DEFS)
 
 LDFLAGS += $(KRUNPATH)
-LDLIBS += $(KMECHLIB) -lnsl
+LDLIBS += $(KMECHLIB)
 
 .KEEP_STATE:
 
 all: $(PROG)
-
-%.o: ../kwarn/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 $(PROG):       $(OBJS)  
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

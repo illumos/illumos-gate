@@ -742,6 +742,8 @@ SUNWprivate_1.1 {
 	krb5int_pbkdf2_hmac_sha1;
 	krb5int_sendtokdc_debug_handler;
 	krb5int_vset_error;
+	kwarn_add_warning;
+	kwarn_del_warning;
 	kv5m_error_table;
 	mit_des_check_key_parity;
 	mit_des_fixup_key_parity;

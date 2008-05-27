@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,13 +32,13 @@ PROG= ktkt_warnd
 MANIFEST=	ktkt_warn.xml
 
 KWARNDOBJS = kwarnd.o kwarnd_svc.o kwarnd_proc.o kwarnd_generic.o kwarnd_send.o
-KWARNCOBJS = kwarndtest.o kwarnd_clnt.o \
-		kwarnd_clnt_stubs.o kwarnd_handle.o
+KWARNTOBJS = kwarndtest.o
+
 G_OBJS   = kwarnd_xdr.o 
 
-OBJS	= $(KWARNDOBJS) $(KWARNCOBJS) $(G_OBJS)
+OBJS	= $(KWARNDOBJS) $(KWARNTOBJS) $(G_OBJS)
 SRCS	= $(OBJS:.o=.c)
-RSRC	= kwarnd.h kwarnd_clnt.c kwarnd_svc.c kwarnd_xdr.c
+RSRC	= kwarnd_xdr.c
 
 CLOBBERFILES += $(TESTPROG)
 
@@ -72,8 +72,9 @@ $(PROG):	$(G_OBJS) $(KWARNDOBJS) $$(MAPFILES)
 	$(LINK.c) $(KWARNDOBJS) $(G_OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(TESTPROG):       $(G_OBJS) $(KWARNCOBJS) 
-	$(LINK.c) $(KWARNCOBJS) $(G_OBJS) -o $@ $(LDLIBS)
+# the client entry points (kwarn_*_warning) are now avail in mech_krb5.so
+$(TESTPROG):    $(KWARNTOBJS)
+	$(LINK.c) $(KWARNTOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 #  Rules to generate derived rpcgen files from kwarnd.x spec file.
@@ -81,14 +82,6 @@ $(TESTPROG):       $(G_OBJS) $(KWARNCOBJS)
 kwarnd.h:        kwarnd.x
 	$(RM) $@
 	$(RPCGEN) -M -h kwarnd.x > $@
-
-kwarnd_clnt.c:   kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -l kwarnd.x > $@
-
-kwarnd_svc.c:    kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -m kwarnd.x > $@
 
 kwarnd_xdr.c:    kwarnd.x
 	$(RM) $@

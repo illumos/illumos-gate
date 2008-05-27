@@ -98,31 +98,6 @@ include ../Makefile.cmd-inet
 ROOTSBINPROG = $(ROOTFS_PROG:%=$(ROOTSBIN)/%)
 ROOTUSRSBINLINKS = $(SBINLINKS:%=$(ROOTUSRSBIN)/%)
 
-KWARN_OBJS = kwarnd_clnt_stubs.o kwarnd_clnt.o kwarnd_handle.o kwarnd_xdr.o
-KWARN_SRC  = $(KWARN_OBJS:%.o=%.c)
-KWARN_SRC += kwarnd.h
-kwarnd.h:	$(SRC)/cmd/krb5/kwarn/kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -h $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
-	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
-
-kwarnd_xdr.c:	kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -c $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
-	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
-
-kwarnd_clnt.c:   kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -l $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
-	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
-kwarnd_clnt_stubs.c: kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c
-	$(RM) $@
-	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c $@
-
-kwarnd_handle.c: $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c
-	$(RM) $@
-	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c $@
-
 COMMONOBJS=	addr_match.o kcmd.o store_forw_creds.o
 COMMONSRCS=	$(COMMONOBJS:%.o=$(CMDINETCOMMONDIR)/%.c)
 SRCS+=		$(COMMONSRCS)
@@ -140,9 +115,8 @@ clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 _msg:=		TARGET= _msg
 
-CLOBBERFILES +=	$(ROOTFS_PROG) $(PROG) $(KWARN_SRC)
+CLOBBERFILES +=	$(ROOTFS_PROG) $(PROG)
 CLEANFILES += $(COMMONOBJS) $(K5RLOGINOBJS) $(K5RSHDOBJS) $(TFTPDOBJS)
-CLEANFILES += $(KWARN_OBJS)
 
 CPPFLAGS +=	-DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I
 
@@ -196,16 +170,16 @@ $(POFILE): $(POFILES)
 %.o: $(CMDINETCOMMONDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 
-in.telnetd: $(K5TELNETOBJS) $(KWARN_OBJS)
-	$(LINK.c) $(K5TELNETOBJS) $(KWARN_OBJS) -o $@ $(LDLIBS)
+in.telnetd: $(K5TELNETOBJS)
+	$(LINK.c) $(K5TELNETOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-in.rlogind: $(K5RLOGINOBJS) $(COMMONOBJS) $(KWARN_OBJS)
-	$(LINK.c) $(K5RLOGINOBJS) $(COMMONOBJS) $(KWARN_OBJS) -o $@ $(LDLIBS)
+in.rlogind: $(K5RLOGINOBJS) $(COMMONOBJS)
+	$(LINK.c) $(K5RLOGINOBJS) $(COMMONOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-in.rshd: $(K5RSHDOBJS) $(COMMONOBJS) $(KWARN_OBJS)
-	$(LINK.c) $(K5RSHDOBJS) $(COMMONOBJS) $(KWARN_OBJS) -o $@ $(LDLIBS)
+in.rshd: $(K5RSHDOBJS) $(COMMONOBJS)
+	$(LINK.c) $(K5RSHDOBJS) $(COMMONOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 in.tftpd: $(TFTPDOBJS)

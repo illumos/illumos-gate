@@ -28,7 +28,7 @@
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
-LDLIBS +=	-lpam -lnsl -lc
+LDLIBS +=	-lpam -lc
 
 DYNFLAGS +=	-L$(ROOT_KLIBDIR64) -L$(ROOT)/$(KERBLIBDIR64) \
 		$(KRUNPATH64) $(KERBRUNPATH64) -lkadm5clnt -lmech_krb5

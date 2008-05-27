@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/lib/pam_modules/krb5/Makefile.com
@@ -39,19 +38,7 @@ PRIV_OBJ=	krb5_authenticate.o \
 		krb5_session.o \
 		utils.o
 
-DERIVED_OBJ=	kwarnd_clnt_stubs.o \
-		kwarnd_clnt.o \
-		kwarnd_handle.o \
-		kwarnd_xdr.o
-
-OBJECTS=	$(PRIV_OBJ) $(DERIVED_OBJ)
-
-JOBJ=		kwarnd.x \
-		kwarnd.h \
-		kwarnd_clnt_stubs.c \
-		kwarnd_handle.c \
-		kwarnd_xdr.c \
-		kwarnd_clnt.c
+OBJECTS=	$(PRIV_OBJ)
 
 include 	../../Makefile.pam_modules
 
@@ -66,7 +53,7 @@ CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
 # called after dlclose()
 DYNFLAGS +=	$(ZNODELETE)
 
-CLOBBERFILES += $(LINTLIB) $(LINTOUT) $(JOBJ) $(POFILE)
+CLOBBERFILES += $(LINTLIB) $(LINTOUT) $(POFILE)
 
 #
 # Don't lint derived files
@@ -78,26 +65,3 @@ all:	$(LIBS)
 lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ
-
-kwarnd.h:	$(SRC)/cmd/krb5/kwarn/kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -h $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
-	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
-
-kwarnd_xdr.c:	kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -c $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
-	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
-
-kwarnd_clnt.c:   kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
-	$(RM) $@
-	$(RPCGEN) -M -l $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
-	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
-
-kwarnd_clnt_stubs.c: kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c
-	$(RM) $@
-	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c $@
-
-kwarnd_handle.c: $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c
-	$(RM) $@
-	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c $@

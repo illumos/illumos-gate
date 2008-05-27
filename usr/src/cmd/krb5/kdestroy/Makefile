@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,13 +7,9 @@
 
 PROG= kdestroy
 
-OBJS	= kdestroy.o kwarnd_clnt_stubs.o kwarnd_clnt.o kwarnd_handle.o kwarnd_xdr.o krpc_sys.o
+OBJS	= kdestroy.o krpc_sys.o
 
-SRCS	= kdestroy.c krpc_sys.c \
-	../kwarn/kwarnd_clnt_stubs.c \
-	../kwarn/kwarnd_clnt.c \
-	../kwarn/kwarnd_handle.c \
-	../kwarn/kwarnd_xdr.c
+SRCS	= kdestroy.c krpc_sys.c
 
 include ../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
@@ -22,24 +18,20 @@ POFILE = kdestroy.po
 POFILES = generic.po 
 
 CPPFLAGS += -I../../../lib/gss_mechs/mech_krb5/include \
-		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
-		-I../kwarn
+		-I$(SRC)/uts/common/gssapi/mechs/krb5/include
+
 
 i386_CPPFLAGS =
 sparc_CPPFLAGS += -D$(MACH)
 
 LDFLAGS += $(KRUNPATH)
-LDLIBS += $(KMECHLIB) -lnsl
+LDLIBS += $(KMECHLIB)
 
 .KEEP_STATE:
 all: $(PROG)
 
 krpc_sys.o: krpc_sys.c 
 	$(COMPILE.c)  -o  $@ krpc_sys.c
-	$(POST_PROCESS_O)
-
-%.o: ../kwarn/%.c
-	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 $(PROG):       $(OBJS)  
