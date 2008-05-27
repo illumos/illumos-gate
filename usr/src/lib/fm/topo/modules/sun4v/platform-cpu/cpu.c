@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +162,7 @@ cpu_present(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Otherwise, the cpu is identified by the <cpuid>.
 	 */
 	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
-		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid) \
+		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid)
 		    == 0)
 			present = nvlserid == mcmp->cpumap_serialno;
 		else
@@ -259,10 +259,28 @@ cpu_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	int status;
 	uint32_t cpuid;
 	ldom_hdl_t *lhp;
+	uint64_t nvlserid;
+	uint32_t present = 0;
+	md_cpumap_t *mcmp;
+	md_info_t *chip = (md_info_t *)topo_mod_getspecific(mod);
 
 	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0 ||
 	    version > FM_CPU_SCHEME_VERSION ||
 	    nvlist_lookup_uint32(in, FM_FMRI_CPU_ID, &cpuid) != 0) {
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	/*
+	 * Check the cpu presence
+	 */
+	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
+		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid)
+		    == 0)
+			present = nvlserid == mcmp->cpumap_serialno;
+		else
+			present = 1;
+	}
+	if (present == 0) {
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
