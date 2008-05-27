@@ -1706,6 +1706,11 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 	Connection *cp;
 	int id;
 	int use_lock = !fini;
+	struct timeval	zerotime;
+	LDAPMessage	*res;
+
+	zerotime.tv_sec = zerotime.tv_usec = 0L;
+
 #ifdef DEBUG
 	thread_t t = thr_self();
 #endif /* DEBUG */
@@ -1754,6 +1759,17 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 			cp->shared--;
 		cp->usedBit = B_FALSE;
 		cp->threadID = 0;	/* unmark the threadID */
+		/*
+		 * Do sanity cleanup of remaining results if connection is not
+		 * shared by any requests.
+		 */
+		if (cp->shared <= 0) {
+			while (ldap_result(cp->ld, LDAP_RES_ANY, LDAP_MSG_ALL,
+			    &zerotime, &res) > 0) {
+				if (res != NULL)
+					(void) ldap_msgfree(res);
+			}
+		}
 		if (use_lock)
 			(void) rw_unlock(&sessionPoolLock);
 	} else {

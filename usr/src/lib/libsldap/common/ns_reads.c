@@ -2038,6 +2038,49 @@ multi_result(ns_ldap_cookie_t *cookie)
 }
 
 /*
+ * clear_results(ns_ldap_cookie_t):
+ *
+ * Attempt to obtain remnants of ldap responses and free them.  If remnants are
+ * not obtained within a certain time period tell the server we wish to abandon
+ * the request.
+ *
+ * Note that we do not initially tell the server to abandon the request as that
+ * can be an expensive operation for the server, while it is cheap for us to
+ * just flush the input.
+ *
+ * If something was to remain in libldap queue as a result of some error then
+ * it would be freed later during drop connection call or when no other
+ * requests share the connection.
+ */
+static void
+clear_results(ns_ldap_cookie_t *cookie)
+{
+	int rc;
+	if (cookie->conn != NULL && cookie->conn->ld != NULL &&
+	    cookie->connectionId != -1 && cookie->msgId != 0) {
+		/*
+		 * We need to cleanup the rest of response (if there is such)
+		 * and LDAP abandon is too heavy for LDAP servers, so we will
+		 * wait for the rest of response till timeout and "process" it.
+		 */
+		rc = ldap_result(cookie->conn->ld, cookie->msgId, LDAP_MSG_ALL,
+		    (struct timeval *)&cookie->search_timeout,
+		    &cookie->resultMsg);
+		if (rc != -1 && rc != 0 && cookie->resultMsg != NULL)
+			(void) ldap_msgfree(cookie->resultMsg);
+		/*
+		 * If there was timeout then we will send  ABANDON request to
+		 * LDAP server to decrease load.
+		 */
+		if (rc == 0)
+			(void) ldap_abandon_ext(cookie->conn->ld, cookie->msgId,
+			    NULL, NULL);
+		/* Disassociate cookie with msgId */
+		cookie->msgId = 0;
+	}
+}
+
+/*
  * This state machine performs one or more LDAP searches to a given
  * directory server using service search descriptors and schema
  * mapping as appropriate.  The approximate pseudocode for
@@ -2078,12 +2121,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	for (;;) {
 		switch (cookie->state) {
 		case CLEAR_RESULTS:
-			if (cookie->conn != NULL && cookie->conn->ld != NULL &&
-			    cookie->connectionId != -1 && cookie->msgId != 0) {
-				(void) ldap_abandon_ext(cookie->conn->ld,
-				    cookie->msgId, NULL, NULL);
-				cookie->msgId = 0;
-			}
+			clear_results(cookie);
 			cookie->new_state = EXIT;
 			break;
 		case GET_ACCT_MGMT_INFO:
