@@ -1126,6 +1126,14 @@ nxge_tx_intr(void *arg1, void *arg2)
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
 		"==> nxge_tx_intr: nxgep(arg2) $%p ldvp(arg1) $%p",
 		nxgep, ldvp));
+
+	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
+	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
+		NXGE_DEBUG_MSG((nxgep, INT_CTL,
+		    "<== nxge_tx_intr: interface not started or intialized"));
+		return (DDI_INTR_CLAIMED);
+	}
+
 	/*
 	 * This interrupt handler is for a specific
 	 * transmit dma channel.
@@ -1627,6 +1635,11 @@ nxge_check_tx_hang(p_nxge_t nxgep)
 {
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_check_tx_hang"));
 
+	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
+	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
+		goto nxge_check_tx_hang_exit;
+	}
+
 	/*
 	 * Needs inputs from hardware for regs:
 	 *	head index had not moved since last timeout.
@@ -1635,6 +1648,8 @@ nxge_check_tx_hang(p_nxge_t nxgep)
 	if (nxge_txdma_hung(nxgep)) {
 		nxge_fixup_hung_txdma_rings(nxgep);
 	}
+
+nxge_check_tx_hang_exit:
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_check_tx_hang"));
 }
 
@@ -2511,6 +2526,7 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	MUTEX_INIT(&tx_ring_p->lock, NULL, MUTEX_DRIVER,
 		(void *)nxgep->interrupt_cookie);
 
+	(void) atomic_swap_32(&tx_ring_p->tx_ring_offline, NXGE_TX_RING_ONLINE);
 	tx_ring_p->nxgep = nxgep;
 	tx_ring_p->serial = nxge_serialize_create(nmsgs,
 				nxge_serial_tx, tx_ring_p);

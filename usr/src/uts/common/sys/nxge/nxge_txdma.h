@@ -124,12 +124,6 @@ typedef struct _nxge_tx_ring_stats_t {
 	txdma_ring_errlog_t	errlog;
 } nxge_tx_ring_stats_t, *p_nxge_tx_ring_stats_t;
 
-typedef enum {
-	TX_RING_STATE_IDLE,
-	TX_RING_STATE_BUSY,
-	TX_RING_STATE_OFFLINE
-} nxge_tx_state_t;
-
 typedef struct _tx_ring_t {
 	nxge_os_dma_common_t	tdc_desc;
 	struct _nxge_t		*nxgep;
@@ -152,7 +146,10 @@ typedef struct _tx_ring_t {
 	log_page_hdl_t		page_hdl;
 	txc_dma_max_burst_t	max_burst;
 	boolean_t		cfg_set;
-	nxge_tx_state_t		tx_ring_state;
+#define	NXGE_TX_RING_ONLINE	0x00
+#define	NXGE_TX_RING_OFFLINING	0x01
+#define	NXGE_TX_RING_OFFLINED	0x02
+	uint32_t		tx_ring_offline;
 
 	nxge_os_mutex_t		lock;
 	uint16_t 		index;

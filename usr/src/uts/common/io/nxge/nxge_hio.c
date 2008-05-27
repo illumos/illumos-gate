@@ -900,7 +900,8 @@ nxge_hio_init(
 		nxge->nxge_hw_p->hio = (uintptr_t)nhd;
 	}
 
-	if (nxge->environs == SOLARIS_DOMAIN) {
+	if ((nxge->environs == SOLARIS_DOMAIN) &&
+	    (nxge->niu_type == N2_NIU)) {
 		if (nxge->niu_hsvc_available == B_TRUE) {
 			hsvc_info_t *niu_hsvc = &nxge->niu_hsvc;
 			if (niu_hsvc->hsvc_major == 1 &&
@@ -1067,8 +1068,8 @@ nxge_hio_share_assign(
 	fp = &nhd->hio.vr;
 	if ((hv_rv = (*fp->assign)(vr->region, cookie, &vr->cookie))) {
 		NXGE_ERROR_MSG((nxge, HIO_CTL,
-			"nx_hio_share_assign: "
-			"vr->assign() returned %d", hv_rv));
+		    "nx_hio_share_assign: "
+		    "vr->assign() returned %d", hv_rv));
 		nxge_hio_unshare((vr_handle_t)vr);
 		return (-EIO);
 	}
@@ -1083,7 +1084,6 @@ nxge_hio_share_assign(
 		while (dc) {
 			hv_rv = (*tx->assign)
 			    (vr->cookie, dc->channel, &slot);
-cmn_err(CE_CONT, "tx->assign(%d, %d)", dc->channel, dc->page);
 			if (hv_rv != 0) {
 				NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 				    "nx_hio_share_assign: "
@@ -1112,7 +1112,6 @@ cmn_err(CE_CONT, "tx->assign(%d, %d)", dc->channel, dc->page);
 		while (dc) {
 			hv_rv = (*rx->assign)
 			    (vr->cookie, dc->channel, &slot);
-cmn_err(CE_CONT, "rx->assign(%d, %d)", dc->channel, dc->page);
 			if (hv_rv != 0) {
 				NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 				    "nx_hio_share_assign: "
@@ -1131,7 +1130,6 @@ cmn_err(CE_CONT, "rx->assign(%d, %d)", dc->channel, dc->page);
 		}
 	}
 
-	cmn_err(CE_CONT, "tmap %lx, rmap %lx", *tmap, *rmap);
 	return (0);
 }
 
@@ -1537,6 +1535,7 @@ nxge_hio_tdc_share(
 {
 	nxge_grp_set_t *set = &nxge->tx_set;
 	tx_ring_t *ring;
+	int count;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_tdc_share"));
 
@@ -1544,37 +1543,26 @@ nxge_hio_tdc_share(
 	 * Wait until this channel is idle.
 	 */
 	ring = nxge->tx_rings->rings[channel];
-	MUTEX_ENTER(&ring->lock);
-	switch (ring->tx_ring_state) {
-		int count;
-	case TX_RING_STATE_OFFLINE:
-		break;
-	case TX_RING_STATE_IDLE:
-		ring->tx_ring_state = TX_RING_STATE_OFFLINE;
-		break;
-	case TX_RING_STATE_BUSY:
-		/* 30 seconds */
-		for (count = 30 * 1000; count; count--) {
-			MUTEX_EXIT(&ring->lock);
-			drv_usecwait(1000); /* 1 millisecond */
-			MUTEX_ENTER(&ring->lock);
-			if (ring->tx_ring_state == TX_RING_STATE_IDLE) {
-				ring->tx_ring_state = TX_RING_STATE_OFFLINE;
-				break;
-			}
+
+	/*
+	 * Wait for 30 seconds.
+	 */
+	(void) atomic_swap_32(&ring->tx_ring_offline, NXGE_TX_RING_OFFLINING);
+	for (count = 30 * 1000; count; count--) {
+		if (ring->tx_ring_offline & NXGE_TX_RING_OFFLINED) {
+			break;
 		}
-		if (count == 0) {
-			MUTEX_EXIT(&ring->lock);
-			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
-			    "Tx ring %d was always BUSY", channel));
-			return (-EIO);
-		}
-		break;
-	default:
-		MUTEX_EXIT(&ring->lock);
+
+		drv_usecwait(1000);
+	}
+
+	if (count == 0) {
+		(void) atomic_swap_32(&ring->tx_ring_offline,
+		    NXGE_TX_RING_ONLINE);
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
+		    "Tx ring %d was always BUSY", channel));
 		return (-EIO);
 	}
-	MUTEX_EXIT(&ring->lock);
 
 	if (nxge_intr_remove(nxge, VP_BOUND_TX, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "

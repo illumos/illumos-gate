@@ -233,6 +233,15 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	lso_ngathers = 0;
 
 	MUTEX_ENTER(&tx_ring_p->lock);
+
+	if (isLDOMservice(nxgep)) {
+		if (tx_ring_p->tx_ring_offline) {
+			freemsg(mp);
+			MUTEX_EXIT(&tx_ring_p->lock);
+			return (status);
+		}
+	}
+
 	cur_index_lso = tx_ring_p->wr_index;
 	lso_tail_wrap = tx_ring_p->wr_index_wrap;
 start_again:
@@ -284,10 +293,21 @@ start_again:
 			    tx_ring_p->tdc));
 			goto nxge_start_fail_lso;
 		} else {
+			boolean_t skip_sched = B_FALSE;
+
 			cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
 			tdc_stats->tx_no_desc++;
+			if (isLDOMservice(nxgep) &&
+				tx_ring_p->tx_ring_offline) {
+				(void) atomic_swap_32(
+				    &tx_ring_p->tx_ring_offline,
+				    NXGE_TX_RING_OFFLINED);
+				skip_sched = B_TRUE;
+			}
+
 			MUTEX_EXIT(&tx_ring_p->lock);
-			if (nxgep->resched_needed && !nxgep->resched_running) {
+			if (nxgep->resched_needed &&
+			    !nxgep->resched_running && !skip_sched) {
 				nxgep->resched_running = B_TRUE;
 				ddi_trigger_softintr(nxgep->resched_id);
 			}
@@ -965,7 +985,9 @@ nxge_start_control_header_only:
 	tx_ring_p->descs_pending += ngathers;
 	tdc_stats->tx_starts++;
 
-	tx_ring_p->tx_ring_state = TX_RING_STATE_IDLE;
+	if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline)
+		(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
+		    NXGE_TX_RING_OFFLINED);
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
@@ -983,6 +1005,9 @@ nxge_start_fail_lso:
 		freemsg(mp_chain);
 	}
 	if (!lso_again && !ngathers) {
+		if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline)
+			(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
+			    NXGE_TX_RING_OFFLINED);
 		MUTEX_EXIT(&tx_ring_p->lock);
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
 		    "==> nxge_start: lso exit (nothing changed)"));
@@ -1055,7 +1080,10 @@ nxge_start_fail2:
 		nxgep->resched_needed = B_TRUE;
 	}
 
-	tx_ring_p->tx_ring_state = TX_RING_STATE_IDLE;
+
+	if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline)
+		(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
+		    NXGE_TX_RING_OFFLINED);
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
@@ -1072,8 +1100,18 @@ nxge_serial_tx(mblk_t *mp, void *arg)
 {
 	p_tx_ring_t		tx_ring_p = (p_tx_ring_t)arg;
 	p_nxge_t		nxgep = tx_ring_p->nxgep;
+	int			status = 0;
 
-	return (nxge_start(nxgep, tx_ring_p, mp));
+	if (isLDOMservice(nxgep)) {
+		if (tx_ring_p->tx_ring_offline) {
+			freemsg(mp);
+			return (status);
+		}
+	}
+
+	status = nxge_start(nxgep, tx_ring_p, mp);
+
+	return (status);
 }
 
 boolean_t
@@ -1094,29 +1132,19 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 	tx_rings = nxgep->tx_rings->rings;
 	tx_ring_p = tx_rings[group->legend[ring_index]];
 
-	MUTEX_ENTER(&tx_ring_p->lock);
-	if (tx_ring_p->tx_ring_state == TX_RING_STATE_OFFLINE) {
-		/*
-		 * OFFLINE means that it is in the process of being
-		 * shared - that is, it has been claimed by the HIO
-		 * code, but hasn't been unlinked from <group> yet.
-		 * So in this case use the first TDC, which always
-		 * belongs to the service domain and can't be shared.
-		 */
-		MUTEX_EXIT(&tx_ring_p->lock);
-
-		ring_index = 0;
-		tx_ring_p = tx_rings[group->legend[ring_index]];
-		MUTEX_ENTER(&tx_ring_p->lock);
-		tx_ring_p->tx_ring_state = TX_RING_STATE_BUSY;
-	} else {
-		/*
-		 * Otherwise, mark the TDC as BUSY: the HIO code
-		 * will wait until nxge_start() has completed.
-		 */
-		tx_ring_p->tx_ring_state = TX_RING_STATE_BUSY;
+	if (isLDOMservice(nxgep)) {
+		if (tx_ring_p->tx_ring_offline) {
+			/*
+			 * OFFLINE means that it is in the process of being
+			 * shared - that is, it has been claimed by the HIO
+			 * code, but hasn't been unlinked from <group> yet.
+			 * So in this case use the first TDC, which always
+			 * belongs to the service domain and can't be shared.
+			 */
+			ring_index = 0;
+			tx_ring_p = tx_rings[group->legend[ring_index]];
+		}
 	}
-	MUTEX_EXIT(&tx_ring_p->lock);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "count %d, tx_rings[%d] = %p",
 		(int)group->count, group->legend[ring_index], tx_ring_p));
