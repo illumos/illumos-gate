@@ -21,10 +21,10 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)Lgrp_api.t	1.1	06/09/01 SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 require 5.8.0;
