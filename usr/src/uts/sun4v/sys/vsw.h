@@ -46,6 +46,7 @@ extern "C" {
 #include <sys/vgen_stats.h>
 #include <sys/vsw_ldc.h>
 #include <sys/vsw_hio.h>
+#include <sys/callb.h>
 
 #define	DRV_NAME	"vsw"
 
@@ -222,6 +223,8 @@ typedef struct	vsw {
 	/* HybridIO related fields */
 	boolean_t		hio_capable;	/* Phys dev HIO capable */
 	vsw_hio_t		vhio;		/* HybridIO info */
+	callb_id_t		hio_reboot_cb_id; /* Reboot callb ID */
+	callb_id_t		hio_panic_cb_id; /* Panic callb ID */
 } vsw_t;
 
 /*

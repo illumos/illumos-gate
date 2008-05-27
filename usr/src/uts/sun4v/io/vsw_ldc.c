@@ -95,7 +95,7 @@ int vsw_port_attach(vsw_port_t *portp);
 vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
 void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
 int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
-void vsw_hio_port_reset(vsw_port_t *portp);
+void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
 
 /* Interrupt routines */
 static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
@@ -1232,7 +1232,7 @@ vsw_vlan_unaware_port_reset(vsw_port_t *portp)
 }
 
 void
-vsw_hio_port_reset(vsw_port_t *portp)
+vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate)
 {
 	vsw_ldc_list_t	*ldclp;
 	vsw_ldc_t	*ldcp;
@@ -1259,7 +1259,11 @@ vsw_hio_port_reset(vsw_port_t *portp)
 	 */
 	if ((ldcp->hphase == VSW_MILESTONE4) &&
 	    (portp->p_hio_capable == B_TRUE)) {
-		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+		if (immediate == B_TRUE) {
+			(void) ldc_down(ldcp->ldc_handle);
+		} else {
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+		}
 	}
 
 	mutex_exit(&ldcp->ldc_cblock);
@@ -1583,7 +1587,7 @@ vsw_conn_task(void *arg)
 	if ((evt == VSW_CONN_RESTART) && (curr_status == LDC_UP))
 		(void) ldc_down(ldcp->ldc_handle);
 
-	if ((vswp->hio_capable) && (portp->p_hio_enabled)) {
+	if ((portp->p_hio_capable) && (portp->p_hio_enabled)) {
 		vsw_hio_stop(vswp, ldcp);
 	}
 

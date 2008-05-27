@@ -84,7 +84,7 @@ extern int vsw_hio_cleanup_delay;
 extern int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
 extern int vsw_set_hw(vsw_t *, vsw_port_t *, int);
 extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
-extern void vsw_hio_port_reset(vsw_port_t *portp);
+extern void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
 
 /* Functions exported to other files */
 void vsw_hio_init(vsw_t *vswp);
@@ -96,6 +96,7 @@ void vsw_hio_start_ports(vsw_t *vswp);
 void vsw_hio_stop_port(vsw_port_t *portp);
 
 /* Support functions */
+static void vsw_hio_free_all_shares(vsw_t *vswp, boolean_t reboot);
 static vsw_share_t *vsw_hio_alloc_share(vsw_t *vswp, vsw_ldc_t *ldcp);
 static void vsw_hio_free_share(vsw_share_t *vsharep);
 static vsw_share_t *vsw_hio_find_free_share(vsw_t *vswp);
@@ -107,6 +108,8 @@ static int vsw_send_dds_resp_msg(vsw_ldc_t *ldcp, vio_dds_msg_t *dmsg, int ack);
 static int vsw_hio_send_delshare_msg(vsw_share_t *vsharep);
 static int vsw_hio_bind_macaddr(vsw_share_t *vsharep);
 static void vsw_hio_unbind_macaddr(vsw_share_t *vsharep);
+static boolean_t vsw_hio_reboot_callb(void *arg, int code);
+static boolean_t vsw_hio_panic_callb(void *arg, int code);
 
 
 /*
@@ -152,6 +155,17 @@ vsw_hio_init(vsw_t *vswp)
 		hiop->vh_shares[i].vs_vswp = vswp;
 	}
 	vswp->hio_capable = B_TRUE;
+
+	/*
+	 * Register to get reboot and panic events so that
+	 * we can cleanup HybridIO resources gracefully.
+	 */
+	vswp->hio_reboot_cb_id = callb_add(vsw_hio_reboot_callb,
+	    (void *)vswp, CB_CL_MDBOOT, "vsw_hio");
+
+	vswp->hio_panic_cb_id = callb_add(vsw_hio_panic_callb,
+	    (void *)vswp, CB_CL_PANIC, "vsw_hio");
+
 	D2(vswp, "%s: %s is HybridIO capable num_shares=%d\n", __func__,
 	    vswp->physname, hiop->vh_num_shares);
 	D1(vswp, "%s:exit\n", __func__);
@@ -379,7 +393,29 @@ vsw_hio_free_share(vsw_share_t *vsharep)
 
 
 /*
- * vsw_hio_cleanup -- A rountine to free all shares gracefully.
+ * vsw_hio_cleanup -- Cleanup the HybridIO. It unregisters the callbs
+ *	and frees all shares.
+ */
+void
+vsw_hio_cleanup(vsw_t *vswp)
+{
+	D1(vswp, "%s:enter\n", __func__);
+
+	/* Unregister reboot and panic callbs. */
+	if (vswp->hio_reboot_cb_id) {
+		(void) callb_delete(vswp->hio_reboot_cb_id);
+		vswp->hio_reboot_cb_id = 0;
+	}
+	if (vswp->hio_panic_cb_id) {
+		(void) callb_delete(vswp->hio_panic_cb_id);
+		vswp->hio_panic_cb_id = 0;
+	}
+	vsw_hio_free_all_shares(vswp, B_FALSE);
+	D1(vswp, "%s:exit\n", __func__);
+}
+
+/*
+ * vsw_hio_free_all_shares -- A routine to free all shares gracefully.
  *	The following are the steps followed to accomplish this:
  *
  *	- First clear 'hio_capable' to avoid further share allocations.
@@ -392,8 +428,8 @@ vsw_hio_free_share(vsw_share_t *vsharep)
  *	  to be freed. Give a little delay for the LDC reset code to
  *	  free the Share.
  */
-void
-vsw_hio_cleanup(vsw_t *vswp)
+static void
+vsw_hio_free_all_shares(vsw_t *vswp, boolean_t reboot)
 {
 	vsw_hio_t	*hiop = &vswp->vhio;
 	vsw_port_list_t	*plist = &vswp->plist;
@@ -443,15 +479,20 @@ vsw_hio_cleanup(vsw_t *vswp)
 					 * to force the release of Hybrid
 					 * resources.
 					 */
-					vsw_hio_port_reset(vsharep->vs_portp);
+					vsw_hio_port_reset(vsharep->vs_portp,
+					    B_FALSE);
 				}
 			}
 			if (max_retries == 1) {
-				/* Last retry,  reset the port */
+				/*
+				 * Last retry,  reset the port.
+				 * If it is reboot case, issue an immediate
+				 * reset.
+				 */
 				DWARN(vswp, "%s:All retries failed, "
 				    " cause a reset to trigger cleanup for "
 				    "share(%d)", __func__, vsharep->vs_index);
-				vsw_hio_port_reset(vsharep->vs_portp);
+				vsw_hio_port_reset(vsharep->vs_portp, reboot);
 			}
 		}
 		if (free_shares == hiop->vh_num_shares) {
@@ -472,10 +513,11 @@ vsw_hio_cleanup(vsw_t *vswp)
 	} while ((free_shares < hiop->vh_num_shares) && (max_retries > 0));
 
 	/* By now, all shares should be freed */
-	ASSERT(free_shares == hiop->vh_num_shares);
 	if (free_shares != hiop->vh_num_shares) {
-		cmn_err(CE_NOTE, "vsw%d: All physical resources "
-		    "could not be freed", vswp->instance);
+		if (reboot == B_FALSE) {
+			cmn_err(CE_NOTE, "vsw%d: All physical resources "
+			    "could not be freed", vswp->instance);
+		}
 	}
 
 	kmem_free(hiop->vh_shares, sizeof (vsw_share_t) * hiop->vh_num_shares);
@@ -518,7 +560,7 @@ vsw_hio_start_ports(vsw_t *vswp)
 
 		if (reset == B_TRUE) {
 			/* Cause a rest to trigger HybridIO setup */
-			vsw_hio_port_reset(portp);
+			vsw_hio_port_reset(portp, B_FALSE);
 		}
 	}
 	RW_EXIT(&plist->lockrw);
@@ -568,6 +610,7 @@ vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp)
 		mutex_exit(&vswp->hw_lock);
 		return;
 	}
+	vsharep->vs_state &= ~VSW_SHARE_DDS_ACKD;
 	vsharep->vs_state |= VSW_SHARE_DDS_SENT;
 	mutex_exit(&vswp->hw_lock);
 
@@ -637,8 +680,13 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 	req_id = VSW_DDS_NEXT_REQID(vsharep);
 	rv = vsw_send_dds_msg(ldcp, DDS_VNET_DEL_SHARE,
 	    cookie, macaddr, req_id);
+
 	RW_EXIT(&ldcl->lockrw);
 	mutex_enter(&vswp->hw_lock);
+	if (rv == 0) {
+		vsharep->vs_state &= ~VSW_SHARE_DDS_ACKD;
+		vsharep->vs_state |= VSW_SHARE_DDS_SENT;
+	}
 	return (rv);
 }
 
@@ -727,21 +775,22 @@ vsw_process_dds_msg(vsw_t *vswp, vsw_ldc_t *ldcp, void *msg)
 		/* A response for DEL_SHARE message */
 		D1(vswp, "%s:DDS_VNET_DEL_SHARE\n", __func__);
 		if (!(vsharep->vs_state & VSW_SHARE_DDS_SENT)) {
-			DWARN(vswp, "%s: invalid ADD_SHARE response message "
+			DWARN(vswp, "%s: invalid DEL_SHARE response message "
 			    " share state=0x%X", __func__, vsharep->vs_state);
 			break;
 		}
 
 		if (dmsg->dds_req_id != vsharep->vs_req_id) {
-			DWARN(vswp, "%s: invalid req_id in ADD_SHARE response"
+			DWARN(vswp, "%s: invalid req_id in DEL_SHARE response"
 			    " message share req_id=0x%X share's req_id=0x%X",
 			    __func__, dmsg->dds_req_id, vsharep->vs_req_id);
 			break;
 		}
 		if (dmsg->tag.vio_subtype == VIO_SUBTYPE_NACK) {
-			DWARN(vswp, "%s: NACK received for ADD_SHARE",
+			DWARN(vswp, "%s: NACK received for DEL_SHARE",
 			    __func__);
 		}
+
 		/* There is nothing we can do, free share now */
 		vsw_hio_free_share(vsharep);
 		break;
@@ -802,13 +851,13 @@ vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled)
 	} else {
 		portp->p_hio_enabled =  B_TRUE;
 		/* reset the port to initiate HybridIO setup */
-		vsw_hio_port_reset(portp);
+		vsw_hio_port_reset(portp, B_FALSE);
 	}
 }
 
 /*
  * vsw_hio_stop_port -- Stop HybridIO for a given port. Sequence
- *	followed is similar to vsw_hio_cleanup().
+ *	followed is similar to vsw_hio_free_all_shares().
  *
  */
 void
@@ -845,7 +894,7 @@ vsw_hio_stop_port(vsw_port_t *portp)
 				 * Cause a port reset to trigger
 				 * cleanup.
 				 */
-				vsw_hio_port_reset(vsharep->vs_portp);
+				vsw_hio_port_reset(vsharep->vs_portp, B_FALSE);
 			}
 		}
 		if (max_retries == 1) {
@@ -853,7 +902,7 @@ vsw_hio_stop_port(vsw_port_t *portp)
 			DWARN(vswp, "%s:All retries failed, "
 			    " cause a reset to trigger cleanup for "
 			    "share(%d)", __func__, vsharep->vs_index);
-			vsw_hio_port_reset(vsharep->vs_portp);
+			vsw_hio_port_reset(vsharep->vs_portp, B_FALSE);
 		}
 
 		/* Check if the share still assigned to this port */
@@ -881,4 +930,68 @@ vsw_hio_stop_port(vsw_port_t *portp)
 
 	mutex_exit(&vswp->hw_lock);
 	D1(vswp, "%s:exit\n", __func__);
+}
+
+/*
+ * vsw_hio_rest_all -- Resets all ports that have shares allocated.
+ *	It is called only in the panic code path, so the LDC channels
+ *	are reset immediately.
+ */
+static void
+vsw_hio_reset_all(vsw_t *vswp)
+{
+	vsw_hio_t	*hiop = &vswp->vhio;
+	vsw_share_t	*vsharep;
+	int		i;
+
+	D1(vswp, "%s:enter\n", __func__);
+
+	if (vswp->hio_capable != B_TRUE)
+		return;
+
+	for (i = 0; i < hiop->vh_num_shares; i++) {
+		vsharep = &hiop->vh_shares[i];
+		if (vsharep->vs_state == VSW_SHARE_FREE) {
+			continue;
+		}
+		/*
+		 * Reset the port with immediate flag enabled,
+		 * to cause LDC reset immediately.
+		 */
+		vsw_hio_port_reset(vsharep->vs_portp, B_TRUE);
+	}
+	D1(vswp, "%s:exit\n", __func__);
+}
+
+/*
+ * vsw_hio_reboot_callb -- Called for reboot event. It tries to
+ *	free all currently allocated shares.
+ */
+/* ARGSUSED */
+static boolean_t
+vsw_hio_reboot_callb(void *arg, int code)
+{
+	vsw_t *vswp = arg;
+
+	D1(vswp, "%s:enter\n", __func__);
+	vsw_hio_free_all_shares(vswp, B_TRUE);
+	D1(vswp, "%s:exit\n", __func__);
+	return (B_TRUE);
+}
+
+/*
+ * vsw_hio_panic_callb -- Called from panic event. It resets all
+ *	the ports that have shares allocated. This is done to
+ *	trigger the cleanup in the guest ahead of HV reset.
+ */
+/* ARGSUSED */
+static boolean_t
+vsw_hio_panic_callb(void *arg, int code)
+{
+	vsw_t *vswp = arg;
+
+	D1(vswp, "%s:enter\n", __func__);
+	vsw_hio_reset_all(vswp);
+	D1(vswp, "%s:exit\n", __func__);
+	return (B_TRUE);
 }
