@@ -93,6 +93,9 @@
 		</property_group>
 
 		<property_group name='config' type='framework'>
+			<!-- authorization to add/delete config properties -->
+			<propval name='modify_authorization' type='astring'
+				value='solaris.smf.value.discovery.printers.snmp' />
 			<!-- authorization to modify config properties -->
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.discovery.printers.snmp' />

@@ -331,6 +331,7 @@ static papi_status_t
 lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 		char **metadata, papi_attribute_t ***used)
 {
+	papi_attribute_t *tmp[2];
 	char *s;
 	int integer;
 
@@ -348,37 +349,44 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 
 	/* Handling */
 	s = NULL;
-	papiAttributeListGetString(attributes, NULL, "job_hold_until", &s);
+	papiAttributeListGetString(attributes, NULL, "job-hold-until", &s);
 	if ((s != NULL) && (strcmp(s, "indefinite"))) {
 		add_svr4_control_line(metadata, 'H', "hold");
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"media", "hold");
+				"job-hold-until", "indefinite");
 	} else if ((s != NULL) && (strcmp(s, "no-hold"))) {
-		add_svr4_control_line(metadata, 'H', "release");
+		add_svr4_control_line(metadata, 'H', "immediate");
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"media", "release");
-	} else if ((s != NULL) && (strcmp(s, "immediate"))) {
-		add_int_control_line(metadata, 'q', 0, LPD_SVR4);
+				"job-hold-until", "no-hold");
+	} else if (s != NULL) {
+		add_svr4_control_line(metadata, 'H', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"media", "immediate");
+				"job-hold-until", s);
 	}
 
 	/* Pages */
 	s = NULL;
-	papiAttributeListGetString(attributes, NULL, "page-ranges", &s);
-	if (s != NULL) {
-		add_svr4_control_line(metadata, 'P', s);
-		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"page-ranges", s);
+	memset(tmp, NULL, sizeof (tmp));
+	tmp[0] = papiAttributeListFind(attributes, "page-ranges");
+	if (tmp[0] != NULL) {
+		char buf[BUFSIZ];
+
+		papiAttributeListToString(tmp, " ", buf, sizeof (buf));
+		if ((s = strchr(buf, '=')) != NULL) {
+			add_svr4_control_line(metadata, 'P', ++s);
+			papiAttributeListAddString(used, PAPI_ATTR_EXCL,
+					"page-ranges", s);
+		}
 	}
 
 	/* Priority : lp -q */
 	integer = -1;
-	papiAttributeListGetInteger(attributes, NULL, "priority", &integer);
+	papiAttributeListGetInteger(attributes, NULL, "job-priority", &integer);
 	if (integer != -1) {
+		integer = 40 - (integer / 2.5);
 		add_int_control_line(metadata, 'q', integer, LPD_SVR4);
 		papiAttributeListAddInteger(used, PAPI_ATTR_EXCL,
-				"priority", integer);
+				"job-priority", integer);
 	}
 
 	/* Charset : lp -S */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -89,22 +89,22 @@ main(int ac, char *av[])
 				papiAttributeListAddString(&list,
 					PAPI_ATTR_EXCL,
 					"job-hold-until", "indefinite");
-			else if (strcasecmp(optarg, "release") == 0)
+			else if (strcasecmp(optarg, "immediate") == 0)
 				papiAttributeListAddString(&list,
 					PAPI_ATTR_EXCL,
 					"job-hold-until", "no-hold");
-			else if (strcasecmp(optarg, "immediate") == 0)
-				papiAttributeListAddInteger(&list,
-					PAPI_ATTR_EXCL,
-					"job-priority", 100);
 			else
 				papiAttributeListAddString(&list,
 					PAPI_ATTR_EXCL,
 					"job-hold-until", optarg);
 			break;
-		case 'P':	/* page list */
-			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"page-ranges", optarg);
+		case 'P': {	/* page list */
+			char buf[BUFSIZ];
+
+			snprintf(buf, sizeof (buf), "page-ranges=%s", optarg);
+			papiAttributeListFromString(&list,
+					PAPI_ATTR_EXCL, buf);
+			}
 			break;
 		case 'S':	/* charset */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
@@ -156,14 +156,14 @@ main(int ac, char *av[])
 		case 'q': {	/* priority */
 			int i = atoi(optarg);
 
-			i = 99 * (39 - i) / 39 + 1;
+			i = 100 - (i * 2.5);
 			if ((i < 1) || (i > 100)) {
 				fprintf(stderr, gettext(
 				    "priority must be between 0 and 39.\n"));
 				exit(1);
 			}
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"priority", i);
+					"job-priority", i);
 			}
 			break;
 		case 'r':	/* "raw" mode */

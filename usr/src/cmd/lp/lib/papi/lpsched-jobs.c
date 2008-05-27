@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	papi_status_t status = PAPI_OK;
 	papi_attribute_t *attr;
 	papi_attribute_t **unmapped = NULL;
+	papi_attribute_t *tmp[2];
 	int i;
 	char *s;
 
@@ -68,7 +69,7 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 			"job-originating-user-name", "job-printer",
 			"job-sheets", "lp-charset", "lp-modes", "number-up",
 			"orienttation-requested", "page-ranges", "pr-filter",
-			"pr-indent", "pr-title", "pr-width", "priority",
+			"pr-indent", "pr-title", "pr-width", "job-priority",
 			"requesting-user-name", "job-originating-host-name",
 			NULL };
 
@@ -90,11 +91,11 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	 * set the priority.  PAPI/IPP uses 1-100, lpsched use 0-39, so we
 	 * have to convert it.
 	 */
-	if (papiAttributeListGetInteger(attributes, NULL, "priority", &i)
+	if (papiAttributeListGetInteger(attributes, NULL, "job-priority", &i)
 			== PAPI_OK) {
 		if ((i < 1) || (i > 100))
 			i = 50;
-		i = (i + 1) / 2.5;
+		i = 40 - (i / 2.5);
 		r->priority = i;
 	}
 	if ((r->priority < 0) || (r->priority > 39))
@@ -104,23 +105,15 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	papiAttributeListGetLPString(attributes, "form", &r->form);
 
 	/* set the page range */
-#ifndef LP_USE_PAPI_ATTR
-	papiAttributeListGetLPString(attributes, "page-ranges", &r->pages);
-#else
-	for (status = papiAttributeListGetRange(attributes, &iterator,
-				"page-ranges", &lower, &upper);
-	    status == PAPI_OK;
-	    status = papiAttributeListGetRange(attributes, &iterator,
-				"page-ranges", &lower, &upper)) {
-		if (r->pages != NULL) {
-			snprintf(buf, sizeof (buf), "%s,%d-%d",
-					r->pages, lower, upper);
-			free(r->pages);
-		} else
-			snprintf(buf, sizeof (buf), "%d-%d", lower, upper);
-		r->pages = (char *)strdup(buf);
-	}
-#endif
+        memset(tmp, NULL, sizeof (tmp));
+        tmp[0] = papiAttributeListFind(attributes, "page-ranges");
+        if (tmp[0] != NULL) {
+                char buf[BUFSIZ];
+
+                papiAttributeListToString(tmp, " ", buf, sizeof (buf));
+                if ((s = strchr(buf, '=')) != NULL)
+			r->pages = (char *)strdup(++s);
+        }
 
 	/*
 	 * set the document format, converting to old format names as
@@ -167,13 +160,14 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	s = NULL;
 	papiAttributeListGetString(attributes, NULL, "job-hold-until", &s);
 	if (s != NULL) {
-		if (strcmp(s, "immediate") == 0)
-			r->actions |= ACT_IMMEDIATE;
-		else if ((strcmp(s, "resume") == 0) ||
-			    (strcmp(s, "no-hold") == 0))
+		r->actions &= ~(ACT_SPECIAL); /* strip immediate/hold/resume */
+		if (strcmp(s, "resume") == 0)
 			r->actions |= ACT_RESUME;
-		else if ((strcmp(s, "hold") == 0) ||
-			    (strcmp(s, "indefinite") == 0))
+		else if ((strcmp(s, "immediate") == 0) ||
+			    (strcmp(s, "no-hold") == 0))
+			r->actions |= ACT_IMMEDIATE;
+		else if ((strcmp(s, "indefinite") == 0) ||
+			    (strcmp(s, "hold") == 0))
 			r->actions |= ACT_HOLD;
 	}
 
@@ -281,7 +275,7 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 		char *buf = malloc(1024);
 		ssize_t size = 1024;
 
-		while (papiAttributeListToString(unmapped, ", ", buf, size)
+		while (papiAttributeListToString(unmapped, " ", buf, size)
 					!= PAPI_OK) {
 			size += 1024;
 			buf = realloc(buf, size);
@@ -417,7 +411,7 @@ lpsched_request_to_job_attributes(REQUEST *r, job_t *j)
 
 	/* priority (map 0-39 to 1-100) */
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-				"job-priority", (int)((r->priority + 1) * 2.5));
+				"job-priority", (int)(100 - (r->priority * 2.5)));
 
 	/* pages */
 	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,

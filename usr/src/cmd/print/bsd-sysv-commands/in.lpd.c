@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -308,14 +308,10 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 					papiAttributeListAddString(&list,
 						PAPI_ATTR_EXCL,
 						"job-hold-until", "indefinite");
-				else if (strcasecmp(entry, "release") == 0)
+				else if (strcasecmp(entry, "immediate") == 0)
 					papiAttributeListAddString(&list,
 						PAPI_ATTR_EXCL,
 						"job-hold-until", "no-hold");
-				else if (strcasecmp(entry, "immediate") == 0)
-					papiAttributeListAddInteger(&list,
-						PAPI_ATTR_EXCL,
-						"job-priority", 100);
 				else
 					papiAttributeListAddString(&list,
 						PAPI_ATTR_EXCL,
@@ -325,19 +321,23 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 				papiAttributeListAddBoolean(&list,
 					PAPI_ATTR_EXCL, "rfc-1179-mail", 1);
 				break;
-			case 'P':	/* Solaris page list */
-				papiAttributeListAddString(&list,
-						PAPI_ATTR_EXCL,
-						"page-ranges", ++entry);
+			case 'P': {	/* Solaris page list */
+				char buf[BUFSIZ];
+
+				snprintf(buf, sizeof (buf), "page-ranges=%s",
+						++entry);
+				papiAttributeListFromString(&list, 
+						PAPI_ATTR_EXCL, buf);
+				}
 				break;
 			case 'q': {	/* Solaris priority */
 				int i = atoi(optarg);
 
-				i = 99 * (39 - i) / 39 + 1;
+				i = 100 - (i * 2.5);
 				if ((i < 1) || (i > 100))
 					i = 50;
 				papiAttributeListAddInteger(&list,
-					PAPI_ATTR_EXCL, "priority", i);
+					PAPI_ATTR_EXCL, "job-priority", i);
 				}
 				break;
 			case 'S':	/* Solaris character set */

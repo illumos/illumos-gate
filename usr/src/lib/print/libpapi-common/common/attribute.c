@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -35,8 +35,10 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 #include <alloca.h>
 #include <papi.h>
+#include <regex.h>
 
 static void papiAttributeFree(papi_attribute_t *attribute);
 
@@ -617,335 +619,242 @@ papiAttributeListGetMetadata(papi_attribute_t **list, void **iter,
 	return (status);
 }
 
-/*
- * Description: The given string contains one or more attributes, in the
- *	      following form:
- *		  "aaaa=true bbbbb=1 ccccc=abcd"
- *	      extract the next attribute from that string; the 'next'
- *	      parameter should be set to zero to extract the first attribute
- *	      in the string.
- *
- */
 
+/* The string is modified by this call */
 static char *
-_getNextAttr(char *string, int *next)
-
+regvalue(regmatch_t match, char *string)
 {
 	char *result = NULL;
-	char *start = (char *)string + *next;
-	char *nl = NULL;
-	char *sp = NULL;
-	char *tab = NULL;
-	char *val = NULL;
-	int len = 0;
+	if (match.rm_so != match.rm_eo) {
+		result = string + match.rm_so;
+		*(result + (match.rm_eo - match.rm_so)) = '\0';
+	}
+	return (result);
+}
 
-	if ((string != NULL) && (*start != '\0')) {
-		while ((*start == ' ') || (*start == '\t') || (*start == '\n'))
-		{
-			start++;
+static papi_attribute_value_type_t
+_process_value(char *string, char ***parts)
+{
+	int i;
+	static struct {
+		papi_attribute_value_type_t	type;
+		size_t vals;
+		char *expression;
+		int	compiled;
+		regex_t re;
+	} types[] = {
+		{ PAPI_BOOLEAN,	   1, "^(true|false|yes|no)$", 0 }, 
+		{ PAPI_COLLECTION, 1, "^\\{(.+)\\}$", 0 },
+		/* PAPI_DATETIME is unsupported, too much like an integer */
+		{ PAPI_INTEGER,	   1, "^([+-]{0,1}[[:digit:]]+)$", 0 },
+		{ PAPI_RANGE,	   3, "^([[:digit:]]+)-([[:digit:]]+)$", 0 },
+		{ PAPI_RESOLUTION, 4, "^([[:digit:]]+)x([[:digit:]]+)dp(i|c)$",
+			0 },
+		NULL
+	};
+	regmatch_t matches[4];
+
+	for (i = 0; i < 5; i++) {
+		int j;
+
+		if (types[i].compiled == 0) {
+			(void) regcomp(&(types[i].re), types[i].expression,
+						REG_EXTENDED|REG_ICASE);
+			types[i].compiled = 1;
 		}
-		nl = strchr(start, '\n');
-		sp = strchr(start, ' ');
-		tab = strchr(start, '\t');
+		if (regexec(&(types[i].re), string, (size_t)types[i].vals,
+				matches, 0) == REG_NOMATCH)
+			continue;
 
-		val = strchr(start, '=');
-
-		if ((val != NULL) && ((val[1] == '"') || (val[1] == '\''))) {
-			val = strchr(&val[2], val[1]);
-			if (val != NULL) {
-				nl = strchr(&val[1], '\n');
-				sp = strchr(&val[1], ' ');
-				tab = strchr(&val[1], '\t');
-			}
-		}
-
-		if ((nl != NULL) &&
-		    ((sp == NULL) || ((sp != NULL) && (nl < sp))) &&
-		    ((tab == NULL) || ((tab != NULL) && (nl < tab)))) {
-			len = nl-start;
-		} else if ((sp != NULL) && (tab != NULL) && (sp > tab)) {
-			len = tab-start;
-		} else if ((sp != NULL) && (sp != NULL)) {
-			len = sp-start;
-		} else if ((tab != NULL) && (tab != NULL)) {
-			len = tab-start;
-		}
-
-		if (len == 0) {
-			len = strlen(start);
-		}
-
-		if (len > 0) {
-			result = (char *)malloc(len+1);
-			if (result != NULL) {
-				strncpy(result, start, len);
-				result[len] = '\0';
-				*next = (start-string)+len;
-			}
-		}
+		for (j = 0 ; j < types[i].vals; j++)
+			list_append(parts, regvalue(matches[j], string));
+		return (types[i].type);
 	}
 
-	return (result);
-} /* _getNextAttr() */
+	list_append(parts, string);
+	return (PAPI_STRING);
+}
 
+static void
+_add_attribute_value(papi_attribute_value_t ***list,
+			papi_attribute_value_type_t type,
+			papi_attribute_value_type_t dtype, char **parts)
+{
+	papi_attribute_value_t *value = calloc(1, sizeof (*value));
 
-/*
- * Description: Parse the given attribute string value and transform it into
- *	      the papi_attribute_value_t in the papi_attribute_t structure.
- *
- */
+	switch(type) {
+	case PAPI_STRING:
+		value->string = strdup(parts[0]);
+		list_append(list, value);
+		break;
+	case PAPI_BOOLEAN:
+		value->boolean = PAPI_TRUE;
+		if ((strcasecmp(parts[0], "false") == 0) ||
+		    (strcasecmp(parts[0], "no") == 0))
+			value->boolean = PAPI_FALSE;
+		list_append(list, value);
+		break;
+	case PAPI_INTEGER:
+		value->integer = atoi(parts[0]);
+		list_append(list, value);
+		break;
+	case PAPI_RANGE:
+		if (dtype == PAPI_INTEGER) 
+			value->range.lower = value->range.upper
+					 = atoi(parts[0]);
+		else if (dtype == PAPI_RANGE)  {
+			value->range.lower = atoi(parts[1]);
+			value->range.upper = atoi(parts[2]);
+		}
+		list_append(list, value);
+		break;
+	case PAPI_RESOLUTION:
+		value->resolution.xres = atoi(parts[1]);
+		value->resolution.yres = atoi(parts[2]);
+		if (parts[3][0] == 'i')
+			value->resolution.units = PAPI_RES_PER_INCH;
+		else
+			value->resolution.units = PAPI_RES_PER_CM;
+		list_append(list, value);
+		break;
+	case PAPI_COLLECTION:
+		papiAttributeListFromString(&(value->collection), 0, parts[0]);
+		list_append(list, value);
+		break;
+	}
+}
 
 static papi_status_t
-_parseAttrValue(char *value, papi_attribute_t *attr)
-
+_papiAttributeFromStrings(papi_attribute_t ***list, int flags,
+			char *key, char **values)
 {
+	int i;
 	papi_status_t result = PAPI_OK;
-	int len = 0;
-	int i = 0;
-	char *papiString = NULL;
-	char *tmp1 = NULL;
-	char *tmp2 = NULL;
-	char *tmp3 = NULL;
-	papi_attribute_value_t **avalues = NULL;
+	papi_attribute_t *attr = calloc(1, sizeof (*attr));
 
-	avalues = malloc(sizeof (papi_attribute_value_t *) * 2);
-	if (avalues == NULL) {
-		result = PAPI_TEMPORARY_ERROR;
-		return (result);
-	}
-	avalues[0] = malloc(sizeof (papi_attribute_value_t));
-	avalues[1] = NULL;
-	if (avalues[0] == NULL) {
-		free(avalues);
-		result = PAPI_TEMPORARY_ERROR;
-		return (result);
+	/* these are specified in the papi spec as ranges */
+	char *ranges[] = { "copies-supported", "job-impressions-supported",
+				"job-k-octets-supported",
+				"job-media-sheets-supported", "page-ranges", 
+				NULL };
+
+	if ((attr == NULL) || ((attr->name = strdup(key)) == NULL))
+		return (PAPI_TEMPORARY_ERROR);
+
+	attr->type = PAPI_METADATA;
+	/* these are known ranges */
+	for (i = 0; ranges[i] != NULL; i++)
+		if (strcasecmp(attr->name, ranges[i]) == 0) {
+			attr->type = PAPI_RANGE;
+			break;
 	}
 
+	if (values != NULL) {
+		papi_attribute_value_t **vals = NULL;
 
-/*
- * TODO - need to sort out 'resolution', 'dateandtime' & 'collection' values
- */
-	if ((value != NULL) && (strlen(value) > 0) && (attr != NULL)) {
+		for (i = 0; values[i] != NULL; i++) {
+			papi_attribute_value_type_t dtype;
+			char **parts = NULL;
 
-		len = strlen(value);
-		if ((len >= 2) && (((value[0] == '"') &&
-				(value[len-1] == '"')) || ((value[0] == '\'') &&
-				(value[len-1] == '\'')))) {
-			/* string value */
-			attr->type = PAPI_STRING;
-
-			papiString = strdup(value+1);
-			if (papiString != NULL) {
-				papiString[strlen(papiString)-1] = '\0';
-				avalues[0]->string = papiString;
-			} else {
-				result = PAPI_TEMPORARY_ERROR;
-			}
-		} else if ((strcasecmp(value, "true") == 0) ||
-		    (strcasecmp(value, "YES") == 0)) {
-			/* boolean = true */
-			attr->type = PAPI_BOOLEAN;
-			avalues[0]->boolean = PAPI_TRUE;
-		} else if ((strcasecmp(value, "false") == 0) ||
-		    (strcasecmp(value, "NO") == 0)) {
-			/* boolean = false */
-			attr->type = PAPI_BOOLEAN;
-			avalues[0]->boolean = PAPI_FALSE;
-		} else {
-			/* is value an integer or a range ? */
-
-			i = 0;
-			attr->type = PAPI_INTEGER;
-			tmp1 = strdup(value);
-			while (((value[i] >= '0') && (value[i] <= '9')) ||
-					(value[i] == '-')) {
-				if (value[i] == '-') {
-					tmp1[i] = '\0';
-					tmp2 = &tmp1[i+1];
-					attr->type = PAPI_RANGE;
-				}
-
-				i++;
-			}
-
-			if (strlen(value) == i) {
-				if (attr->type == PAPI_RANGE) {
-					avalues[0]->range.lower = atoi(tmp1);
-					avalues[0]->range.upper = atoi(tmp2);
-				} else {
-					avalues[0]->integer = atoi(value);
-				}
-			} else {
-				/* is value a resolution ? */
-				i = 0;
-				attr->type = PAPI_INTEGER;
-				tmp1 = strdup(value);
-				while (((value[i] >= '0') &&
-					(value[i] <= '9')) ||
-					(value[i] == 'x')) {
-					if (value[i] == 'x') {
-						tmp1[i] = '\0';
-						if (attr->type == PAPI_INTEGER)
-						{
-							tmp2 = &tmp1[i+1];
-							attr->type =
-								PAPI_RESOLUTION;
-						} else {
-							tmp3 = &tmp1[i+1];
-						}
-					}
-
-					i++;
-				}
-
-				if (strlen(value) == i) {
-					if (attr->type == PAPI_RESOLUTION) {
-						avalues[0]->resolution.xres =
-								atoi(tmp1);
-						avalues[0]->resolution.yres =
-								atoi(tmp2);
-						if (tmp3 != NULL) {
-							avalues[0]->
-							resolution.units =
-								atoi(tmp3);
-						} else {
-							avalues[0]->
-							resolution.units = 0;
-						}
-					}
-				}
-
-				if (attr->type != PAPI_RESOLUTION) {
-					attr->type = PAPI_STRING;
-					avalues[0]->string = strdup(value);
-					if (avalues[0]->string == NULL) {
-						result = PAPI_TEMPORARY_ERROR;
-					}
-				}
-			}
-			free(tmp1);
+			dtype = _process_value(values[i], &parts);
+			if (attr->type == PAPI_METADATA)
+				attr->type = dtype;
+			_add_attribute_value(&vals, attr->type, dtype, parts);
+			free(parts);
 		}
-
-	} else {
-		result = PAPI_BAD_ARGUMENT;
+		attr->values = vals;
 	}
 
-	if (result != PAPI_OK) {
-		i = 0;
-		while (avalues[i] != NULL) {
-			free(avalues[i]);
-			i++;
-		}
-		free(avalues);
-	} else {
-		attr->values = avalues;
-	}
+	list_append(list, attr);
 
 	return (result);
-} /* _parseAttrValue() */
-
-
-/*
- * Description: Parse the given attribute string and transform it into the
- *	      papi_attribute_t structure.
- *
- */
+}
 
 static papi_status_t
-_parseAttributeString(char *attrString, papi_attribute_t *attr)
-
+_parse_attribute_list(papi_attribute_t ***list, int flags, char *string)
 {
 	papi_status_t result = PAPI_OK;
-	char *string = NULL;
-	char *p = NULL;
-	papi_attribute_value_t **avalues = NULL;
+	char *ptr;
 
-	if ((attrString != NULL) && (strlen(attrString) >= 3) &&
-	    (attr != NULL)) {
-		attr->name = NULL;
-		string = strdup(attrString);
-		if (string != NULL) {
-			p = strchr(string, '=');
-			if (p != NULL) {
-				*p = '\0';
-				attr->name = string;
-				p++;  /* pointer to value */
+	if ((list == NULL) || (string == NULL))
+		return (PAPI_BAD_ARGUMENT);
 
-				result = _parseAttrValue(p, attr);
-			} else {
-				char value;
-				/* boolean - no value so assume 'true' */
-				if (strncasecmp(string, "no", 2) == 0) {
-					string += 2;
-					value = PAPI_FALSE;
-				} else
-					value = PAPI_TRUE;
+	if ((ptr = strdup(string)) == NULL)
+		return (PAPI_TEMPORARY_ERROR);
 
-				attr->name = string;
-				attr->type = PAPI_BOOLEAN;
+	while ((*ptr != '\0') && (result == PAPI_OK)) {
+		char *key, **values = NULL;
 
-				avalues = malloc(
-					sizeof (papi_attribute_value_t *) * 2);
-				if (avalues == NULL) {
-					result = PAPI_TEMPORARY_ERROR;
+		/* strip any leading whitespace */
+		while (isspace(*ptr) != 0)
+			ptr++;
+
+		/* Get the name: name[=value] */
+		key = ptr;
+		while ((*ptr != '\0') && (*ptr != '=') && (isspace(*ptr) == 0))
+			ptr++;
+
+		if (*ptr == '=') {
+			*ptr++ = '\0';
+
+			while ((*ptr != '\0') && (isspace(*ptr) == 0)) {
+				char *value = ptr;
+
+				if ((*ptr == '\'') || (*ptr == '"')) {
+					char q = *ptr++;
+
+					/* quoted string value */
+					while ((*ptr != '\0') && (*ptr != q))
+						ptr++;
+					if (*ptr == q)
+						ptr++;
+				} else if (*ptr == '{') {
+					/* collection */
+					while ((*ptr != '\0') && (*ptr != '}'))
+						ptr++;
+					if (*ptr == '}')
+						ptr++;
 				} else {
-					avalues[0] = malloc(
-					sizeof (papi_attribute_value_t));
-					avalues[1] = NULL;
-					if (avalues[0] == NULL) {
-						free(avalues);
-						result = PAPI_TEMPORARY_ERROR;
-					} else {
-						avalues[0]->boolean = value;
-						attr->values = avalues;
-					}
+					/* value */
+					while ((*ptr != '\0') &&
+					       (*ptr != ',') &&
+					       (isspace(*ptr) == 0))
+						ptr++;
 				}
+				if (*ptr == ',')
+					*ptr++ = '\0';
+				list_append(&values, value);
 			}
+		} else { /* boolean "[no]key" */
+			char *value = "true";
+
+			if (strncasecmp(key, "no", 2) == 0) {
+				key += 2;
+				value = "false";
+			}
+			list_append(&values, value);
 		}
-	} else {
-		result = PAPI_BAD_ARGUMENT;
+		if (*ptr != '\0')
+			*ptr++ = '\0';
+
+		result = _papiAttributeFromStrings(list, flags, key, values);
+		free(values);
 	}
 
 	return (result);
-} /* _parseAttributeString() */
-
+}
 
 papi_status_t
 papiAttributeListFromString(papi_attribute_t ***attrs,
 		int flags, char *string)
 {
 	papi_status_t result = PAPI_OK;
-	int	   next = 0;
-	char	 *attrString = NULL;
-	papi_attribute_t attr;
 
 	if ((attrs != NULL) && (string != NULL) &&
 	    ((flags & ~(PAPI_ATTR_APPEND+PAPI_ATTR_REPLACE+PAPI_ATTR_EXCL))
 			== 0)) {
-		attrString = _getNextAttr(string, &next);
-		while ((result == PAPI_OK) && (attrString != NULL)) {
-			result = _parseAttributeString(attrString, &attr);
-			if ((result == PAPI_OK) && (attr.name != NULL)) {
-				/* add this attribute to the list */
-				if ((attr.values != NULL) &&
-				    (attr.values[0] != NULL)) {
-					result = papiAttributeListAddValue(
-							attrs, PAPI_ATTR_APPEND,
-							attr.name, attr.type,
-							attr.values[0]);
-					free(attr.values[0]);
-					free(attr.values);
-				} else {
-					result = PAPI_TEMPORARY_ERROR;
-				}
-			}
-			free(attrString);
-
-			attrString = _getNextAttr(string, &next);
-		}
-	}
-	else
-	{
+		result = _parse_attribute_list(attrs, flags, string);
+	} else {
 		result = PAPI_BAD_ARGUMENT;
 	}
 
@@ -959,8 +868,18 @@ papiAttributeToString(papi_attribute_t *attribute, char *delim,
 	papi_attribute_value_t **values = attribute->values;
 	int rc, i;
 
-	strlcat(buffer, attribute->name, buflen);
-	strlcat(buffer, "=", buflen);
+	if ((attribute->type == PAPI_BOOLEAN) && (values[1] == NULL)) {
+		if (values[0]->boolean == PAPI_FALSE) {
+			if (isupper(attribute->name[0]) == 0)
+				strlcat(buffer, "no", buflen);
+			else
+				strlcat(buffer, "No", buflen);
+		}
+		rc = strlcat(buffer, attribute->name, buflen);
+	} else {
+		strlcat(buffer, attribute->name, buflen);
+		rc = strlcat(buffer, "=", buflen);
+	}
 
 	if (values == NULL)
 		return (PAPI_OK);
@@ -979,14 +898,20 @@ papiAttributeToString(papi_attribute_t *attribute, char *delim,
 			}
 			break;
 		case PAPI_BOOLEAN:
-			rc = strlcat(buffer, (values[i]->boolean ? "true" :
-							"false"), buflen);
+			if (values[1] != NULL)
+				rc = strlcat(buffer, (values[i]->boolean ?
+						"true" : "false"), buflen);
 			break;
 		case PAPI_RANGE: {
 			char string[24];
 
-			snprintf(string, sizeof (string), "%d-%d",
-				values[i]->range.lower, values[i]->range.upper);
+			if (values[i]->range.lower == values[i]->range.upper)
+				snprintf(string, sizeof (string), "%d",
+						values[i]->range.lower);
+			else
+				snprintf(string, sizeof (string), "%d-%d",
+						values[i]->range.lower,
+						values[i]->range.upper);
 			rc = strlcat(buffer, string, buflen);
 			}
 			break;
@@ -1013,18 +938,9 @@ papiAttributeToString(papi_attribute_t *attribute, char *delim,
 			break;
 		case PAPI_COLLECTION: {
 			char *string = alloca(buflen);
-#ifdef DEBUG
-			char prefix[256];
 
-			snprintf(prefix, sizeof (prefix), "%s  %s(%d)  ", delim,
-					attribute->name, i);
-
-			papiAttributeListToString(values[i]->collection,
-					prefix, string, buflen);
-#else
 			papiAttributeListToString(values[i]->collection,
 					delim, string, buflen);
-#endif
 			rc = strlcat(buffer, string, buflen);
 			}
 			break;
@@ -1061,9 +977,6 @@ papiAttributeListToString(papi_attribute_t **attrs,
 	if (!delim)
 		delim = " ";
 
-#ifdef DEBUG
-	strlcat(buffer, delim, buflen);
-#endif
 	for (i = 0; ((attrs[i] != NULL) && (status == PAPI_OK)); i++) {
 		status = papiAttributeToString(attrs[i], delim, buffer, buflen);
 		if (attrs[i+1] != NULL)

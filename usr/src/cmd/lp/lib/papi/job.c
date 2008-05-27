@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -623,7 +623,7 @@ papiJobValidate(papi_service_t handle, char *printer,
 	int i;
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-			"job-hold-until", "hold");
+			"job-hold-until", "indefinite");
 	for (i = 0; job_attributes[i]; i++)
 		list_append(&attributes, job_attributes[i]);
 
@@ -1032,6 +1032,10 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 
 	status = lpsched_end_change(svc, dest, job_id);
 	lpsched_request_to_job_attributes(r, j);
+
+	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
+			"job-id", job_id);
+
 	freerequest(r);
 
 	return (status);
