@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -930,7 +930,7 @@ lyr_set_gart_addr(uint64_t phy_base, agp_registered_dev_t *agp_regdev)
 	{
 		uint32_t base;
 
-		ASSERT((phy_base & ~I810_POINTER_MASK) == 0);
+		ASSERT((phy_base & I810_POINTER_MASK) == 0);
 		base = (uint32_t)phy_base;
 
 		hdl = agp_regdev->agprd_masterhdl;
@@ -943,7 +943,7 @@ lyr_set_gart_addr(uint64_t phy_base, agp_registered_dev_t *agp_regdev)
 		uint32_t addr;
 		addr = (uint32_t)phy_base;
 
-		ASSERT((phy_base & ~GTT_POINTER_MASK) == 0);
+		ASSERT((phy_base & GTT_POINTER_MASK) == 0);
 		hdl = agp_regdev->agprd_targethdl;
 		err = ldi_ioctl(hdl, AGP_TARGET_SET_GATTADDR,
 		    (intptr_t)&addr, FKIOCTL, kcred, 0);
@@ -953,7 +953,7 @@ lyr_set_gart_addr(uint64_t phy_base, agp_registered_dev_t *agp_regdev)
 	{
 		uint32_t addr;
 
-		ASSERT((phy_base & ~AMD64_POINTER_MASK) == 0);
+		ASSERT((phy_base & AMD64_POINTER_MASK) == 0);
 		addr = (uint32_t)((phy_base >> AMD64_GARTBASE_SHIFT)
 		    & AMD64_GARTBASE_MASK);
 
@@ -1455,30 +1455,6 @@ agp_dealloc_kmem(keytable_ent_t *entryp)
 }
 
 /*
- * agp_dealloc_pmem()
- *
- * Description:
- * 	This function deallocates memory resource for direct mapping to
- * 	userland applications.
- *
- * Arguments:
- * 	entryp		key table entity pointer
- *
- */
-static void
-agp_dealloc_pmem(keytable_ent_t *entryp)
-{
-	devmap_pmem_free(PMEMP(entryp->kte_memhdl)->pmem_cookie);
-	PMEMP(entryp->kte_memhdl)->pmem_cookie = NULL;
-	kmem_free(entryp->kte_memhdl, sizeof (agp_pmem_handle_t));
-	entryp->kte_memhdl = NULL;
-
-	/* free the page frame number array */
-	kmem_free(entryp->kte_pfnarray, sizeof (pfn_t) * entryp->kte_pages);
-	entryp->kte_pfnarray = NULL;
-}
-
-/*
  * agp_dealloc_mem()
  *
  * Description:
@@ -1521,14 +1497,12 @@ agp_dealloc_mem(agpgart_softstate_t *st, keytable_ent_t	*entryp)
 	}
 	if (entryp->kte_refcnt) {
 		AGPDB_PRINT2((CE_WARN,
-		    "agp_dealloc_pmem: memory is exported to users"));
+		    "agp_dealloc_mem: memory is exported to users"));
 		return (-1);
 	}
 
 	switch (entryp->kte_type) {
 	case AGP_NORMAL:
-		agp_dealloc_pmem(entryp);
-		break;
 	case AGP_PHYSICAL:
 		agp_dealloc_kmem(entryp);
 		break;
@@ -1601,13 +1575,15 @@ pfn2gartentry(agp_arc_type_t arc_type, pfn_t pfn, uint32_t *itemv)
 {
 	uint64_t paddr;
 
-	paddr = pfn<<AGP_PAGE_SHIFT;
+	paddr = (uint64_t)pfn << AGP_PAGE_SHIFT;
+	AGPDB_PRINT1((CE_NOTE, "checking pfn number %lu for type %d",
+	    pfn, arc_type));
 
 	switch (arc_type) {
 	case ARC_INTELAGP:
 	{
 		/* Only support 32-bit hardware address */
-		if ((paddr & ~AGP_INTEL_POINTER_MASK) != 0) {
+		if ((paddr & AGP_INTEL_POINTER_MASK) != 0) {
 			AGPDB_PRINT2((CE_WARN,
 			    "INTEL AGP Hardware only support 32 bits"));
 			return (-1);
@@ -1620,7 +1596,7 @@ pfn2gartentry(agp_arc_type_t arc_type, pfn_t pfn, uint32_t *itemv)
 	{
 		uint32_t value1, value2;
 		/* Physaddr should not exceed 40-bit */
-		if ((paddr & ~AMD64_POINTER_MASK) != 0) {
+		if ((paddr & AMD64_POINTER_MASK) != 0) {
 			AGPDB_PRINT2((CE_WARN,
 			    "AMD64 GART hardware only supoort 40 bits"));
 			return (-1);
@@ -1633,7 +1609,7 @@ pfn2gartentry(agp_arc_type_t arc_type, pfn_t pfn, uint32_t *itemv)
 		break;
 	}
 	case ARC_IGD810:
-		if ((paddr & ~I810_POINTER_MASK) != 0) {
+		if ((paddr & I810_POINTER_MASK) != 0) {
 			AGPDB_PRINT2((CE_WARN,
 			    "Intel i810 only support 30 bits"));
 			return (-1);
@@ -1641,7 +1617,7 @@ pfn2gartentry(agp_arc_type_t arc_type, pfn_t pfn, uint32_t *itemv)
 		break;
 
 	case ARC_IGD830:
-		if ((paddr & ~GTT_POINTER_MASK) != 0) {
+		if ((paddr & GTT_POINTER_MASK) != 0) {
 			AGPDB_PRINT2((CE_WARN,
 			    "Intel IGD only support 32 bits"));
 			return (-1);
@@ -1979,85 +1955,11 @@ agp_setup(agpgart_softstate_t *softstate, uint32_t mode)
 }
 
 /*
- * agp_alloc_pmem()
- *
- * Description:
- * 	This function allocates physical memory for direct mapping to userland
- * 	applications.
- *
- * Arguments:
- * 	softsate	driver soft state pointer
- * 	length		memory size
- * 	type		AGP_NORMAL: normal agp memory, AGP_PHISYCAL: specical
- *			memory type for intel i810 IGD
- *
- * Returns:
- * 	entryp		new key table entity pointer
- * 	NULL		no key table slot available
- */
-static keytable_ent_t *
-agp_alloc_pmem(agpgart_softstate_t *softstate, size_t length, int type)
-{
-	keytable_ent_t	keyentry;
-	keytable_ent_t	*entryp;
-
-	ASSERT(AGP_ALIGNED(length));
-	bzero(&keyentry, sizeof (keytable_ent_t));
-
-	keyentry.kte_pages = AGP_BYTES2PAGES(length);
-	keyentry.kte_type = type;
-
-	keyentry.kte_memhdl =
-	    (agp_pmem_handle_t *)kmem_zalloc(sizeof (agp_pmem_handle_t),
-	    KM_SLEEP);
-
-	if (devmap_pmem_alloc(length,
-	    PMEM_SLEEP,
-	    &PMEMP(keyentry.kte_memhdl)->pmem_cookie) != DDI_SUCCESS)
-		goto err1;
-
-	keyentry.kte_pfnarray = (pfn_t *)kmem_zalloc(sizeof (pfn_t) *
-	    keyentry.kte_pages, KM_SLEEP);
-
-	if (devmap_pmem_getpfns(
-	    PMEMP(keyentry.kte_memhdl)->pmem_cookie,
-	    0, keyentry.kte_pages, keyentry.kte_pfnarray) != DDI_SUCCESS) {
-		AGPDB_PRINT2((CE_WARN,
-		    "agp_alloc_pmem: devmap_map_getpfns failed"));
-		goto err2;
-	}
-	ASSERT(!agp_check_pfns(softstate->asoft_devreg.agprd_arctype,
-	    keyentry.kte_pfnarray, keyentry.kte_pages));
-	entryp = agp_fill_empty_keyent(softstate, &keyentry);
-
-	if (!entryp) {
-		AGPDB_PRINT2((CE_WARN,
-		    "agp_alloc_pmem: agp_fill_empty_keyent error"));
-		goto err2;
-	}
-	ASSERT((entryp->kte_key >= 0) && (entryp->kte_key < AGP_MAXKEYS));
-
-	return (entryp);
-
-err2:
-	kmem_free(keyentry.kte_pfnarray, sizeof (pfn_t) * keyentry.kte_pages);
-	keyentry.kte_pfnarray = NULL;
-	devmap_pmem_free(PMEMP(keyentry.kte_memhdl)->pmem_cookie);
-	PMEMP(keyentry.kte_memhdl)->pmem_cookie = NULL;
-err1:
-	kmem_free(keyentry.kte_memhdl, sizeof (agp_pmem_handle_t));
-	keyentry.kte_memhdl = NULL;
-
-	return (NULL);
-
-}
-
-/*
  * agp_alloc_kmem()
  *
  * Description:
  * 	This function allocates physical memory for userland applications
- * 	by ddi interfaces. This function can only be called to allocate
+ * 	by ddi interfaces. This function can also be called to allocate
  *	small phsyical contiguous pages, usually tens of kilobytes.
  *
  * Arguments:
@@ -2070,7 +1972,7 @@ err1:
  *			memory available
  */
 static keytable_ent_t *
-agp_alloc_kmem(agpgart_softstate_t *softstate, size_t length)
+agp_alloc_kmem(agpgart_softstate_t *softstate, size_t length, int type)
 {
 	keytable_ent_t	keyentry;
 	keytable_ent_t	*entryp;
@@ -2081,12 +1983,15 @@ agp_alloc_kmem(agpgart_softstate_t *softstate, size_t length)
 	bzero(&keyentry, sizeof (keytable_ent_t));
 
 	keyentry.kte_pages = AGP_BYTES2PAGES(length);
-	keyentry.kte_type = AGP_PHYSICAL;
+	keyentry.kte_type = type;
 
 	/*
 	 * Set dma_attr_sgllen to assure contiguous physical pages
 	 */
-	agpgart_dma_attr.dma_attr_sgllen = 1;
+	if (type == AGP_PHYSICAL)
+		agpgart_dma_attr.dma_attr_sgllen = 1;
+	else
+		agpgart_dma_attr.dma_attr_sgllen = keyentry.kte_pages;
 
 	/* 4k size pages */
 	keyentry.kte_memhdl = kmem_zalloc(sizeof (agp_kmem_handle_t), KM_SLEEP);
@@ -2132,7 +2037,8 @@ agp_alloc_kmem(agpgart_softstate_t *softstate, size_t length)
 	 */
 
 	if ((ret != DDI_DMA_MAPPED) ||
-	    (KMEMP(keyentry.kte_memhdl)->kmem_cookies_num != 1)) {
+	    ((agpgart_dma_attr.dma_attr_sgllen == 1) &&
+	    (KMEMP(keyentry.kte_memhdl)->kmem_cookies_num != 1))) {
 		AGPDB_PRINT2((CE_WARN,
 		    "agp_alloc_kmem: can not alloc physical memory properly"));
 		goto err2;
@@ -2152,6 +2058,9 @@ agp_alloc_kmem(agpgart_softstate_t *softstate, size_t length)
 
 	ASSERT(!agp_check_pfns(softstate->asoft_devreg.agprd_arctype,
 	    keyentry.kte_pfnarray, keyentry.kte_pages));
+	if (agp_check_pfns(softstate->asoft_devreg.agprd_arctype,
+	    keyentry.kte_pfnarray, keyentry.kte_pages))
+		goto err1;
 	entryp = agp_fill_empty_keyent(softstate, &keyentry);
 	if (!entryp) {
 		AGPDB_PRINT2((CE_WARN,
@@ -2199,7 +2108,7 @@ err4:
  *
  * Returns:
  * 	NULL 	Invalid memory type or can not allocate memory
- * 	Keytable entry pointer returned by agp_alloc_kmem or agp_alloc_pmem
+ * 	Keytable entry pointer returned by agp_alloc_kmem
  */
 static keytable_ent_t *
 agp_alloc_mem(agpgart_softstate_t *st, size_t length, int type)
@@ -2216,9 +2125,8 @@ agp_alloc_mem(agpgart_softstate_t *st, size_t length, int type)
 
 	switch (type) {
 	case AGP_NORMAL:
-		return (agp_alloc_pmem(st, length, type));
 	case AGP_PHYSICAL:
-		return (agp_alloc_kmem(st, length));
+		return (agp_alloc_kmem(st, length, type));
 	default:
 		return (NULL);
 	}
@@ -3249,11 +3157,22 @@ agpgart_devmap(dev_t dev, devmap_cookie_t cookie, offset_t offset, size_t len,
 
 	switch (mementry->kte_type) {
 	case AGP_NORMAL:
-		status = devmap_pmem_setup(cookie, softstate->asoft_dip,
-		    &agp_devmap_cb,
-		    PMEMP(mementry->kte_memhdl)->pmem_cookie, local_offset,
-		    len, PROT_ALL, (DEVMAP_DEFAULTS|IOMEM_DATA_UC_WR_COMBINE),
-		    &mem_dev_acc_attr);
+		if (PMEMP(mementry->kte_memhdl)->pmem_cookie) {
+			status = devmap_pmem_setup(cookie,
+			    softstate->asoft_dip,
+			    &agp_devmap_cb,
+			    PMEMP(mementry->kte_memhdl)->pmem_cookie,
+			    local_offset,
+			    len, PROT_ALL,
+			    (DEVMAP_DEFAULTS|IOMEM_DATA_UC_WR_COMBINE),
+			    &mem_dev_acc_attr);
+		} else {
+			AGPDB_PRINT2((CE_WARN,
+			    "agpgart_devmap: not a valid memory type"));
+			return (EINVAL);
+
+		}
+
 		break;
 	default:
 		AGPDB_PRINT2((CE_WARN,

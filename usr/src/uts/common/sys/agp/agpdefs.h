@@ -187,10 +187,10 @@ extern "C" {
 #define	GTT_TABLE_VALID			0x1
 #define	GTT_BASE_MASK			0xfffff000
 #define	GTT_MB_TO_PAGES(m)		((m) << 8)
-#define	GTT_POINTER_MASK		0xffffffff
+#define	GTT_POINTER_MASK		0xffffffff00000000
 
 /* Intel i810 register offset */
-#define	I810_POINTER_MASK		0x3fffffff
+#define	I810_POINTER_MASK		0xffffffffc0000000
 #define	I810_CONF_SMRAM			0x70 /* offset in PCI config space */
 #define	I810_GMS_MASK			0xc0 /* smram register mask */
 /*
@@ -256,7 +256,7 @@ extern "C" {
  */
 
 /* Intel agp bridge specific */
-#define	AGP_INTEL_POINTER_MASK		0xffffffff
+#define	AGP_INTEL_POINTER_MASK		0xffffffff00000000
 
 /* Amd64 cpu gart device reigster offset */
 #define	AMD64_APERTURE_CONTROL		0x90
@@ -269,7 +269,7 @@ extern "C" {
 #define	AMD64_APERBASE_MASK		0x00007fff
 #define	AMD64_GARTBASE_SHIFT		8
 #define	AMD64_GARTBASE_MASK		0xfffffff0
-#define	AMD64_POINTER_MASK		0xffffffffff
+#define	AMD64_POINTER_MASK		0xffffff0000000000
 #define	AMD64_INVALID_CACHE		0x1
 #define	AMD64_GART_SHIFT		12
 #define	AMD64_RESERVE_SHIFT		4
