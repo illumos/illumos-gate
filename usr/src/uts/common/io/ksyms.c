@@ -224,7 +224,8 @@ ksyms_open(dev_t *devp, int flag, int otyp, struct cred *cred)
 	list_create(&hdr.blist, PAGESIZE,
 	    offsetof(ksyms_buflist_t, buflist_node));
 
-	ASSERT(getminor(*devp) == 0);
+	if (getminor(*devp) != 0)
+		return (ENXIO);
 
 	for (;;) {
 		realsize = ksyms_snapshot(ksyms_bcopy, hptr, size);

@@ -14398,7 +14398,8 @@ dtrace_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	 * If this wasn't an open with the "helper" minor, then it must be
 	 * the "dtrace" minor.
 	 */
-	ASSERT(getminor(*devp) == DTRACEMNRN_DTRACE);
+	if (getminor(*devp) != DTRACEMNRN_DTRACE)
+		return (ENXIO);
 
 	/*
 	 * If no DTRACE_PRIV_* bits are set in the credential, then the

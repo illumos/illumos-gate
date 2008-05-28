@@ -189,6 +189,9 @@ mmopen(dev_t *devp, int flag, int typ, struct cred *cred)
 		/* Unsupported or unknown type */
 		return (EINVAL);
 	}
+	/* must be character device */
+	if (typ != OTYP_CHR)
+		return (EINVAL);
 	return (0);
 }
 

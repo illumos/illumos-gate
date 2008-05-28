@@ -633,7 +633,14 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr, caller_context_t *cc)
 	if ((error = secpolicy_spec_open(cr, vp, flag)) != 0)
 		return (error);
 
+	/* Verify existance of open(9E) implementation. */
 	maj = getmajor(dev);
+	if ((maj >= devcnt) ||
+	    (devopsp[maj]->devo_cb_ops == NULL) ||
+	    (devopsp[maj]->devo_cb_ops->cb_open == NULL))
+		return (ENXIO);
+
+	/* split streams .vs. non-streams */
 	if (STREAMSTAB(maj))
 		goto streams_open;
 
