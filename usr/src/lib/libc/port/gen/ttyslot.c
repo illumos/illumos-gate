@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Return the number of the slot in the utmp file
@@ -45,6 +45,7 @@
 #include <unistd.h>
 #include <utmpx.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #ifndef TRUE
 #define	TRUE 1
@@ -55,38 +56,46 @@ int
 ttyslot(void)
 {
 	struct futmpx ubuf;
-	char *tp, *p;
+	char *p;
 	int s;
-	int ret = -1, console = FALSE;
+	int ret = -1;
+	int console = FALSE;
 	char ttynm[128];
-	FILE	*fp;
+	FILE *fp;
+	int cancel_state;
 
-	if ((tp = ttyname_r(0, ttynm, 128)) == NULL &&
-	    (tp = ttyname_r(1, ttynm, 128)) == NULL &&
-	    (tp = ttyname_r(2, ttynm, 128)) == NULL)
-		return (-1);
+	/*
+	 * The UNIX98 Posix conformance test suite requires
+	 * ttyslot() to not be a cancellation point.
+	 */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 
-	p = tp;
-	if (strncmp(tp, "/dev/", 5) == 0)
-		p += 5;
-
-	if (strcmp(p, "console") == 0)
-		console = TRUE;
-
-	s = 0;
-	if ((fp = fopen(UTMPX_FILE, "rF")) == NULL)
-		return (-1);
-	while ((fread(&ubuf, sizeof (ubuf), 1, fp)) == 1) {
-		if ((ubuf.ut_type == INIT_PROCESS ||
-		    ubuf.ut_type == LOGIN_PROCESS ||
-		    ubuf.ut_type == USER_PROCESS) &&
-		    strncmp(p, ubuf.ut_line, sizeof (ubuf.ut_line)) == 0) {
-			ret = s;
-			if (!console || strncmp(ubuf.ut_host, ":0", 2) == 0)
-				break;
+	if ((p = ttyname_r(0, ttynm, 128)) != NULL ||
+	    (p = ttyname_r(1, ttynm, 128)) != NULL ||
+	    (p = ttyname_r(2, ttynm, 128)) != NULL) {
+		if (strncmp(p, "/dev/", 5) == 0)
+			p += 5;
+		if (strcmp(p, "console") == 0)
+			console = TRUE;
+		s = 0;
+		if ((fp = fopen(UTMPX_FILE, "rF")) != NULL) {
+			while ((fread(&ubuf, sizeof (ubuf), 1, fp)) == 1) {
+				if ((ubuf.ut_type == INIT_PROCESS ||
+				    ubuf.ut_type == LOGIN_PROCESS ||
+				    ubuf.ut_type == USER_PROCESS) &&
+				    strncmp(p, ubuf.ut_line,
+				    sizeof (ubuf.ut_line)) == 0) {
+					ret = s;
+					if (!console ||
+					    strncmp(ubuf.ut_host, ":0", 2) == 0)
+						break;
+				}
+				s++;
+			}
+			(void) fclose(fp);
 		}
-		s++;
 	}
-	(void) fclose(fp);
+
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	return (ret);
 }

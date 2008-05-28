@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -161,6 +162,12 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	}
 
 	/*
+	 * The UNIX98 Posix conformance test suite requires
+	 * wordexp() to not be a cancellation point.
+	 */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+
+	/*
 	 * Set up pipe from shell stdout to "fp" for us
 	 */
 	if (pipe(pv) < 0)
@@ -293,12 +300,10 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	(void) fclose(fp);	/* kill shell if still writing */
 
 wait_cleanup:
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	if (waitpid(pid, &status, 0) == -1)
 		rv = WRDE_ERRNO;
 	else if (rv == 0)
 		rv = WEXITSTATUS(status); /* shell WRDE_* status */
-	(void) pthread_setcancelstate(cancel_state, NULL);
 
 cleanup:
 	if (rv == 0)
@@ -317,6 +322,8 @@ cleanup:
 		rv = WRDE_BADVAL;
 	else if (rv == 6)
 		rv = WRDE_SYNTAX;
+
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	return (rv);
 }
 
@@ -408,6 +415,12 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 			wptmp.we_wordv[si] = NULL;
 		tmpalloc = 1;
 	}
+
+	/*
+	 * The UNIX98 Posix conformance test suite requires
+	 * wordexp() to not be a cancellation point.
+	 */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 
 	/*
 	 * Turn flags into shell options
@@ -549,7 +562,6 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	(void) fclose(fp);	/* kill shell if still writing */
 
 wait_cleanup:
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (waitpid(pid, &status, 0) == -1) {
 		if (errno != EINTR) {
 			if (rv == 0)
@@ -557,7 +569,6 @@ wait_cleanup:
 			break;
 		}
 	}
-	(void) pthread_setcancelstate(cancel_state, NULL);
 	if (rv == 0)
 		rv = WEXITSTATUS(status); /* shell WRDE_* status */
 
@@ -580,6 +591,8 @@ cleanup:
 		rv = WRDE_BADVAL;
 	else if (rv == 6)
 		rv = WRDE_SYNTAX;
+
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	return (rv);
 }
 
