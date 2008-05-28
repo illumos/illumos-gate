@@ -2231,8 +2231,13 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	if ((err = newprop(newnode, DTD_ATTR_PHYSICAL,
 	    tabptr->zone_nwif_physical)) != Z_OK)
 		return (err);
-	if ((err = newprop(newnode, DTD_ATTR_DEFROUTER,
-	    tabptr->zone_nwif_defrouter)) != Z_OK)
+	/*
+	 * Do not add this property when it is not set, for backwards
+	 * compatibility and because it is optional.
+	 */
+	if ((strlen(tabptr->zone_nwif_defrouter) > 0) &&
+	    ((err = newprop(newnode, DTD_ATTR_DEFROUTER,
+	    tabptr->zone_nwif_defrouter)) != Z_OK))
 		return (err);
 	return (Z_OK);
 }
