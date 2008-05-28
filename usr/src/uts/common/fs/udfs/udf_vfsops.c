@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,22 +91,22 @@ extern struct vnode *common_specvp(struct vnode *vp);
 
 extern kmutex_t ud_sync_busy;
 static int32_t ud_mountfs(struct vfs *,
-	enum whymountroot, dev_t, char *, struct cred *, int32_t);
+    enum whymountroot, dev_t, char *, struct cred *, int32_t);
 static struct udf_vfs *ud_validate_and_fill_superblock(dev_t,
-			int32_t, uint32_t);
+    int32_t, uint32_t);
 void ud_destroy_fsp(struct udf_vfs *);
 void ud_convert_to_superblock(struct udf_vfs *,
-	struct log_vol_int_desc *);
+    struct log_vol_int_desc *);
 void ud_update_superblock(struct vfs *);
 int32_t ud_get_last_block(dev_t, daddr_t *);
 static int32_t ud_val_get_vat(struct udf_vfs *,
-	dev_t, daddr_t, struct ud_map *);
+    dev_t, daddr_t, struct ud_map *);
 int32_t ud_read_sparing_tbls(struct udf_vfs *,
-	dev_t, struct ud_map *, struct pmap_typ2 *);
+    dev_t, struct ud_map *, struct pmap_typ2 *);
 uint32_t ud_get_lbsize(dev_t, uint32_t *);
 
 static int32_t udf_mount(struct vfs *,
-	struct vnode *, struct mounta *, struct cred *);
+    struct vnode *, struct mounta *, struct cred *);
 static int32_t udf_unmount(struct vfs *, int, struct cred *);
 static int32_t udf_root(struct vfs *, struct vnode **);
 static int32_t udf_statvfs(struct vfs *, struct statvfs64 *);
@@ -183,7 +183,8 @@ udf_mount(struct vfs *vfsp, struct vnode *mvp,
 	struct mounta *uap, struct cred *cr)
 {
 	dev_t dev;
-	struct vnode *bvp;
+	struct vnode *lvp = NULL;
+	struct vnode *svp = NULL;
 	struct pathname dpn;
 	int32_t error;
 	enum whymountroot why;
@@ -202,9 +203,9 @@ udf_mount(struct vfs *vfsp, struct vnode *mvp,
 	mutex_enter(&mvp->v_lock);
 	if ((uap->flags & MS_REMOUNT) == 0 &&
 	    (uap->flags & MS_OVERLAY) == 0 &&
-		(mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
-			mutex_exit(&mvp->v_lock);
-			return (EBUSY);
+	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
+		mutex_exit(&mvp->v_lock);
+		return (EBUSY);
 	}
 	mutex_exit(&mvp->v_lock);
 
@@ -213,18 +214,30 @@ udf_mount(struct vfs *vfsp, struct vnode *mvp,
 	}
 
 	/*
-	 * Resolve path name of special file being mounted.
+	 * Resolve path name of the file being mounted.
 	 */
 	if (error = lookupname(uap->spec, UIO_USERSPACE, FOLLOW, NULLVPP,
-	    &bvp)) {
+	    &svp)) {
 		pn_free(&dpn);
 		return (error);
 	}
-	if (bvp->v_type != VBLK) {
-		error = ENOTBLK;
+
+	error = vfs_get_lofi(vfsp, &lvp);
+
+	if (error > 0) {
+		if (error == ENOENT)
+			error = ENODEV;
 		goto out;
+	} else if (error == 0) {
+		dev = lvp->v_rdev;
+	} else {
+		dev = svp->v_rdev;
+
+		if (svp->v_type != VBLK) {
+			error = ENOTBLK;
+			goto out;
+		}
 	}
-	dev = bvp->v_rdev;
 
 	/*
 	 * Ensure that this device isn't already mounted,
@@ -282,19 +295,23 @@ udf_mount(struct vfs *vfsp, struct vnode *mvp,
 		oflag = FREAD | FWRITE;
 		aflag = VREAD | VWRITE;
 	}
-	if ((error = VOP_ACCESS(bvp, aflag, 0, cr, NULL)) != 0 ||
-	    (error = secpolicy_spec_open(cr, bvp, oflag)) != 0) {
+
+	if (lvp == NULL &&
+	    (error = secpolicy_spec_open(cr, svp, oflag)) != 0)
 		goto out;
-	}
+
+	if ((error = VOP_ACCESS(svp, aflag, 0, cr, NULL)) != 0)
+		goto out;
 
 	/*
 	 * Mount the filesystem.
 	 */
 	error = ud_mountfs(vfsp, why, dev, dpn.pn_path, cr, 0);
 out:
-	VN_RELE(bvp);
+	VN_RELE(svp);
+	if (lvp != NULL)
+		VN_RELE(lvp);
 	pn_free(&dpn);
-
 	return (error);
 }
 
@@ -436,15 +453,13 @@ udf_statvfs(struct vfs *vfsp, struct statvfs64 *sp)
 	 * 38(over head each dent) + MAXNAMLEN / 2 + inode_size(==block size)
 	 */
 	sp->f_ffree = sp->f_favail =
-		(sp->f_bavail * sp->f_bsize) / (146 + sp->f_bsize);
+	    (sp->f_bavail * sp->f_bsize) / (146 + sp->f_bsize);
 
 	/*
 	 * The total number of inodes is
 	 * the sum of files + directories + free inodes
 	 */
-	sp->f_files = sp->f_ffree +
-			udf_vfsp->udf_nfiles +
-			udf_vfsp->udf_ndirs;
+	sp->f_files = sp->f_ffree + udf_vfsp->udf_nfiles + udf_vfsp->udf_ndirs;
 	(void) cmpldev(&d32, vfsp->vfs_dev);
 	sp->f_fsid = d32;
 	(void) strcpy(sp->f_basetype, vfssw[vfsp->vfs_fstype].vsw_name);
@@ -495,14 +510,14 @@ udf_vget(struct vfs *vfsp,
 
 	udfid = (struct udf_fid *)fidp;
 	if ((error = ud_iget(vfsp, udfid->udfid_prn,
-		udfid->udfid_icb_lbn, &ip, NULL, CRED())) != 0) {
+	    udfid->udfid_icb_lbn, &ip, NULL, CRED())) != 0) {
 		*vpp = NULL;
 		return (error);
 	}
 
 	rw_enter(&ip->i_contents, RW_READER);
 	if ((udfid->udfid_uinq_lo != (ip->i_uniqid & 0xffffffff)) ||
-			(udfid->udfid_prn != ip->i_icb_prn)) {
+	    (udfid->udfid_prn != ip->i_icb_prn)) {
 		rw_exit(&ip->i_contents);
 		VN_RELE(ITOV(ip));
 		*vpp = NULL;
@@ -555,7 +570,7 @@ udf_mountroot(struct vfs *vfsp, enum whymountroot why)
 		(void) dnlc_purge_vfsp(vfsp, 0);
 		vp = common_specvp(vp);
 		(void) VOP_PUTPAGE(vp, (offset_t)0,
-			(uint32_t)0, B_INVAL, CRED(), NULL);
+		    (uint32_t)0, B_INVAL, CRED(), NULL);
 		binval(vfsp->vfs_dev);
 
 		ovflags = vfsp->vfs_flag;
@@ -566,7 +581,7 @@ udf_mountroot(struct vfs *vfsp, enum whymountroot why)
 		ud_update(0);
 		vp = ((struct udf_vfs *)vfsp->vfs_data)->udf_devvp;
 		(void) VOP_CLOSE(vp, FREAD|FWRITE, 1,
-					(offset_t)0, CRED(), NULL);
+		    (offset_t)0, CRED(), NULL);
 		return (0);
 	}
 
@@ -589,7 +604,7 @@ udf_mountroot(struct vfs *vfsp, enum whymountroot why)
 
 	if (why == ROOT_INIT) {
 		vfs_add((struct vnode *)0, vfsp,
-			(vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
+		    (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
 	}
 	vfs_unlock(vfsp);
 	return (0);
@@ -678,7 +693,7 @@ ud_mountfs(struct vfs *vfsp,
 		if (udf_vfsp->udf_flags & UDF_FL_RDONLY) {
 			(void) dnlc_purge_vfsp(vfsp, 0);
 			(void) VOP_PUTPAGE(devvp, (offset_t)0, (uint_t)0,
-					B_INVAL, CRED(), NULL);
+			    B_INVAL, CRED(), NULL);
 			(void) ud_iflush(vfsp);
 			bflush(dev);
 			binval(dev);
@@ -689,7 +704,7 @@ ud_mountfs(struct vfs *vfsp,
 		 * disallow mount of any highier version
 		 */
 		if ((udf_vfsp->udf_miread > UDF_150) ||
-			(udf_vfsp->udf_miwrite > UDF_150)) {
+		    (udf_vfsp->udf_miwrite > UDF_150)) {
 			error = EINVAL;
 			goto remountout;
 		}
@@ -715,8 +730,8 @@ ud_mountfs(struct vfs *vfsp,
 		 * mount in rw mode
 		 */
 		tpt = ud_bread(vfsp->vfs_dev,
-			udf_vfsp->udf_iseq_loc << udf_vfsp->udf_l2d_shift,
-			udf_vfsp->udf_iseq_len);
+		    udf_vfsp->udf_iseq_loc << udf_vfsp->udf_l2d_shift,
+		    udf_vfsp->udf_iseq_len);
 		if (tpt->b_flags & B_ERROR) {
 			error = EIO;
 			goto remountout;
@@ -735,7 +750,7 @@ ud_mountfs(struct vfs *vfsp,
 				lvid = (struct log_vol_int_desc *)ttag;
 
 				if (SWAP_32(lvid->lvid_int_type) !=
-					LOG_VOL_CLOSE_INT) {
+				    LOG_VOL_CLOSE_INT) {
 					error = EINVAL;
 					goto remountout;
 				}
@@ -744,7 +759,7 @@ ud_mountfs(struct vfs *vfsp,
 				 * Copy new data to old data
 				 */
 				bcopy(udf_vfsp->udf_iseq->b_un.b_addr,
-				tpt->b_un.b_addr, udf_vfsp->udf_iseq_len);
+				    tpt->b_un.b_addr, udf_vfsp->udf_iseq_len);
 				break;
 			}
 		}
@@ -846,7 +861,7 @@ remountout:
 		 * disallow mount of any highier version
 		 */
 		if ((udf_vfsp->udf_miread > UDF_150) ||
-			(udf_vfsp->udf_miwrite > UDF_150)) {
+		    (udf_vfsp->udf_miwrite > UDF_150)) {
 			error = EINVAL;
 			goto out;
 		}
@@ -904,7 +919,7 @@ remountout:
 	_NOTE(COMPETING_THREADS_NOW);
 #endif
 	if (error = ud_iget(vfsp, udf_vfsp->udf_ricb_prn,
-			udf_vfsp->udf_ricb_loc, &rip, NULL, cr)) {
+	    udf_vfsp->udf_ricb_loc, &rip, NULL, cr)) {
 		mutex_destroy(&udf_vfsp->udf_lock);
 		goto out;
 	}
@@ -937,7 +952,7 @@ out:
 	ud_destroy_fsp(udf_vfsp);
 	if (needclose) {
 		(void) VOP_CLOSE(devvp, (vfsp->vfs_flag & VFS_RDONLY) ?
-			FREAD : FREAD|FWRITE, 1, (offset_t)0, cr, NULL);
+		    FREAD : FREAD|FWRITE, 1, (offset_t)0, cr, NULL);
 		bflush(dev);
 		binval(dev);
 	}
@@ -982,8 +997,8 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 	 */
 	secbp = ud_bread(dev, avd_loc << shift, ANCHOR_VOL_DESC_LEN);
 	if ((error = geterror(secbp)) != 0) {
-		cmn_err(CE_NOTE,
-		"udfs : Could not read Anchor Volume Desc %x", error);
+		cmn_err(CE_NOTE, "udfs : Could not read Anchor Volume Desc %x",
+		    error);
 		brelse(secbp);
 		return (NULL);
 	}
@@ -994,7 +1009,7 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 		return (NULL);
 	}
 	udf_vfsp = (struct udf_vfs *)
-		kmem_zalloc(sizeof (struct udf_vfs), KM_SLEEP);
+	    kmem_zalloc(sizeof (struct udf_vfs), KM_SLEEP);
 	udf_vfsp->udf_mvds_loc = SWAP_32(avdp->avd_main_vdse.ext_loc);
 	udf_vfsp->udf_mvds_len = SWAP_32(avdp->avd_main_vdse.ext_len);
 	udf_vfsp->udf_rvds_loc = SWAP_32(avdp->avd_res_vdse.ext_loc);
@@ -1008,15 +1023,15 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 	 */
 	vds_loc = udf_vfsp->udf_mvds_loc;
 	secbp = ud_bread(dev, vds_loc << shift,
-			udf_vfsp->udf_mvds_len);
+	    udf_vfsp->udf_mvds_len);
 	if ((error = geterror(secbp)) != 0) {
 		brelse(secbp);
-		cmn_err(CE_NOTE,
-		"udfs : Could not read Main Volume Desc %x", error);
+		cmn_err(CE_NOTE, "udfs : Could not read Main Volume Desc %x",
+		    error);
 
 		vds_loc = udf_vfsp->udf_rvds_loc;
 		secbp = ud_bread(dev, vds_loc << shift,
-			udf_vfsp->udf_rvds_len);
+		    udf_vfsp->udf_rvds_len);
 		if ((error = geterror(secbp)) != 0) {
 			brelse(secbp);
 			cmn_err(CE_NOTE,
@@ -1046,7 +1061,7 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 		    1, desc_len) == 0) {
 			if (udf_vfsp->udf_pvd == NULL) {
 				udf_vfsp->udf_pvd =
-					(struct pri_vol_desc *)ttag;
+				    (struct pri_vol_desc *)ttag;
 			} else {
 				struct pri_vol_desc *opvd, *npvd;
 
@@ -1054,15 +1069,15 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 				npvd = (struct pri_vol_desc *)ttag;
 
 				if ((strncmp(opvd->pvd_vsi,
-					npvd->pvd_vsi, 128) == 0) &&
-					(strncmp(opvd->pvd_vol_id,
-					npvd->pvd_vol_id, 32) == 0) &&
-					(strncmp((caddr_t)&opvd->pvd_desc_cs,
-						(caddr_t)&npvd->pvd_desc_cs,
-						sizeof (charspec_t)) == 0)) {
+				    npvd->pvd_vsi, 128) == 0) &&
+				    (strncmp(opvd->pvd_vol_id,
+				    npvd->pvd_vol_id, 32) == 0) &&
+				    (strncmp((caddr_t)&opvd->pvd_desc_cs,
+				    (caddr_t)&npvd->pvd_desc_cs,
+				    sizeof (charspec_t)) == 0)) {
 
 					if (SWAP_32(opvd->pvd_vdsn) <
-						SWAP_32(npvd->pvd_vdsn)) {
+					    SWAP_32(npvd->pvd_vdsn)) {
 						udf_vfsp->udf_pvd = npvd;
 					}
 				} else {
@@ -1076,7 +1091,7 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 
 			lvd = (struct log_vol_desc *)ttag;
 			if (strncmp(lvd->lvd_dom_id.reg_id,
-					UDF_DOMAIN_NAME, 23) != 0) {
+			    UDF_DOMAIN_NAME, 23) != 0) {
 				printf("Domain ID in lvd is not valid\n");
 				goto out;
 			}
@@ -1088,12 +1103,12 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 
 				olvd = udf_vfsp->udf_lvd;
 				if ((strncmp((caddr_t)&olvd->lvd_desc_cs,
-						(caddr_t)&lvd->lvd_desc_cs,
-						sizeof (charspec_t)) == 0) &&
-					(strncmp(olvd->lvd_lvid,
-						lvd->lvd_lvid, 128) == 0)) {
+				    (caddr_t)&lvd->lvd_desc_cs,
+				    sizeof (charspec_t)) == 0) &&
+				    (strncmp(olvd->lvd_lvid,
+				    lvd->lvd_lvid, 128) == 0)) {
 					if (SWAP_32(olvd->lvd_vdsn) <
-						SWAP_32(lvd->lvd_vdsn)) {
+					    SWAP_32(lvd->lvd_vdsn)) {
 						udf_vfsp->udf_lvd = lvd;
 					}
 				} else {
@@ -1111,35 +1126,37 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 			pdesc = (struct part_desc *)ttag;
 			pold = udf_vfsp->udf_parts;
 			for (i = 0; i < udf_vfsp->udf_npart; i++) {
-				if (pold->udp_number ==
-					SWAP_16(pdesc->pd_pnum)) {
-					if (SWAP_32(pdesc->pd_vdsn) >
-						pold->udp_seqno) {
-						pold->udp_seqno =
-							SWAP_32(pdesc->pd_vdsn);
-						pold->udp_access =
-						SWAP_32(pdesc->pd_acc_type);
-						pold->udp_start =
-						SWAP_32(pdesc->pd_part_start);
-						pold->udp_length =
-						SWAP_32(pdesc->pd_part_length);
-					}
-					goto loop_end;
+				if (pold->udp_number !=
+				    SWAP_16(pdesc->pd_pnum)) {
+					pold++;
+					continue;
 				}
-				pold ++;
+
+				if (SWAP_32(pdesc->pd_vdsn) >
+				    pold->udp_seqno) {
+					pold->udp_seqno =
+					    SWAP_32(pdesc->pd_vdsn);
+					pold->udp_access =
+					    SWAP_32(pdesc->pd_acc_type);
+					pold->udp_start =
+					    SWAP_32(pdesc->pd_part_start);
+					pold->udp_length =
+					    SWAP_32(pdesc->pd_part_length);
+				}
+				goto loop_end;
 			}
 			pold = udf_vfsp->udf_parts;
 			udf_vfsp->udf_npart++;
 			pnew = kmem_zalloc(udf_vfsp->udf_npart *
-					sizeof (struct ud_part), KM_SLEEP);
+			    sizeof (struct ud_part), KM_SLEEP);
 			udf_vfsp->udf_parts = pnew;
 			if (pold) {
 				bcopy(pold, pnew,
-					sizeof (struct ud_part) *
-					(udf_vfsp->udf_npart - 1));
+				    sizeof (struct ud_part) *
+				    (udf_vfsp->udf_npart - 1));
 				kmem_free(pold,
-					sizeof (struct ud_part) *
-					(udf_vfsp->udf_npart - 1));
+				    sizeof (struct ud_part) *
+				    (udf_vfsp->udf_npart - 1));
 			}
 			part = pnew + (udf_vfsp->udf_npart - 1);
 			part->udp_number = SWAP_16(pdesc->pd_pnum);
@@ -1157,23 +1174,23 @@ ud_validate_and_fill_superblock(dev_t dev, int32_t bsize, uint32_t avd_loc)
 			if (hdr->phdr_ust.sad_ext_len) {
 				part->udp_flags = UDP_SPACETBLS;
 				part->udp_unall_loc =
-					SWAP_32(hdr->phdr_ust.sad_ext_loc);
+				    SWAP_32(hdr->phdr_ust.sad_ext_loc);
 				part->udp_unall_len =
-					SWAP_32(hdr->phdr_ust.sad_ext_len);
+				    SWAP_32(hdr->phdr_ust.sad_ext_len);
 				part->udp_freed_loc =
-					SWAP_32(hdr->phdr_fst.sad_ext_loc);
+				    SWAP_32(hdr->phdr_fst.sad_ext_loc);
 				part->udp_freed_len =
-					SWAP_32(hdr->phdr_fst.sad_ext_len);
+				    SWAP_32(hdr->phdr_fst.sad_ext_len);
 			} else {
 				part->udp_flags = UDP_BITMAPS;
 				part->udp_unall_loc =
-					SWAP_32(hdr->phdr_usb.sad_ext_loc);
+				    SWAP_32(hdr->phdr_usb.sad_ext_loc);
 				part->udp_unall_len =
-					SWAP_32(hdr->phdr_usb.sad_ext_len);
+				    SWAP_32(hdr->phdr_usb.sad_ext_len);
 				part->udp_freed_loc =
-					SWAP_32(hdr->phdr_fsb.sad_ext_loc);
+				    SWAP_32(hdr->phdr_fsb.sad_ext_loc);
 				part->udp_freed_len =
-					SWAP_32(hdr->phdr_fsb.sad_ext_len);
+				    SWAP_32(hdr->phdr_fsb.sad_ext_len);
 			}
 		} else if (ud_verify_tag_and_desc(ttag, UD_TERM_DESC,
 		    vds_loc + (index >> shift),
@@ -1185,8 +1202,8 @@ loop_end:
 		;
 	}
 	if ((udf_vfsp->udf_pvd == NULL) ||
-		(udf_vfsp->udf_lvd == NULL) ||
-		(udf_vfsp->udf_parts == NULL)) {
+	    (udf_vfsp->udf_lvd == NULL) ||
+	    (udf_vfsp->udf_parts == NULL)) {
 		goto out;
 	}
 
@@ -1201,7 +1218,7 @@ loop_end:
 	 * Process Logical Volume Descriptor
 	 */
 	udf_vfsp->udf_lbsize =
-		SWAP_32(udf_vfsp->udf_lvd->lvd_log_bsize);
+	    SWAP_32(udf_vfsp->udf_lvd->lvd_log_bsize);
 	udf_vfsp->udf_lbmask = udf_vfsp->udf_lbsize - 1;
 	udf_vfsp->udf_l2d_shift = shift;
 	udf_vfsp->udf_l2b_shift = shift + DEV_BSHIFT;
@@ -1211,7 +1228,7 @@ loop_end:
 	 * proper domain.
 	 */
 	if (strcmp(udf_vfsp->udf_lvd->lvd_dom_id.reg_id,
-			UDF_DOMAIN_NAME) != 0) {
+	    UDF_DOMAIN_NAME) != 0) {
 		goto out;
 	}
 
@@ -1224,16 +1241,16 @@ loop_end:
 	}
 
 	udf_vfsp->udf_iseq_loc =
-		SWAP_32(udf_vfsp->udf_lvd->lvd_int_seq_ext.ext_loc);
+	    SWAP_32(udf_vfsp->udf_lvd->lvd_int_seq_ext.ext_loc);
 	udf_vfsp->udf_iseq_len =
-		SWAP_32(udf_vfsp->udf_lvd->lvd_int_seq_ext.ext_len);
+	    SWAP_32(udf_vfsp->udf_lvd->lvd_int_seq_ext.ext_len);
 
 	udf_vfsp->udf_fsd_prn =
-		SWAP_16(udf_vfsp->udf_lvd->lvd_lvcu.lad_ext_prn);
+	    SWAP_16(udf_vfsp->udf_lvd->lvd_lvcu.lad_ext_prn);
 	udf_vfsp->udf_fsd_loc =
-		SWAP_32(udf_vfsp->udf_lvd->lvd_lvcu.lad_ext_loc);
+	    SWAP_32(udf_vfsp->udf_lvd->lvd_lvcu.lad_ext_loc);
 	udf_vfsp->udf_fsd_len =
-		SWAP_32(udf_vfsp->udf_lvd->lvd_lvcu.lad_ext_len);
+	    SWAP_32(udf_vfsp->udf_lvd->lvd_lvcu.lad_ext_len);
 
 
 	/*
@@ -1242,13 +1259,13 @@ loop_end:
 	udf_vfsp->udf_mtype = udf_vfsp->udf_parts[0].udp_access;
 	for (index = 0; index < udf_vfsp->udf_npart; index ++) {
 		if (udf_vfsp->udf_parts[index].udp_access <
-				udf_vfsp->udf_mtype) {
+		    udf_vfsp->udf_mtype) {
 			udf_vfsp->udf_mtype =
-				udf_vfsp->udf_parts[index].udp_access;
+			    udf_vfsp->udf_parts[index].udp_access;
 		}
 	}
 	if ((udf_vfsp->udf_mtype < UDF_MT_RO) ||
-		(udf_vfsp->udf_mtype > UDF_MT_OW)) {
+	    (udf_vfsp->udf_mtype > UDF_MT_OW)) {
 		udf_vfsp->udf_mtype = UDF_MT_RO;
 	}
 
@@ -1258,19 +1275,19 @@ loop_end:
 	for (index = 0; index < count; index++) {
 
 		if ((hdr->maph_type == MAP_TYPE1) &&
-			(hdr->maph_length == MAP_TYPE1_LEN)) {
+		    (hdr->maph_length == MAP_TYPE1_LEN)) {
 			typ1 = (struct pmap_typ1 *)hdr;
 
 			map = udf_vfsp->udf_maps;
 			udf_vfsp->udf_maps =
-				kmem_zalloc(sizeof (struct ud_map) *
-					(udf_vfsp->udf_nmaps + 1),
-					KM_SLEEP);
+			    kmem_zalloc(sizeof (struct ud_map) *
+			    (udf_vfsp->udf_nmaps + 1), KM_SLEEP);
 			if (map != NULL) {
 				bcopy(map, udf_vfsp->udf_maps,
-				sizeof (struct ud_map) * udf_vfsp->udf_nmaps);
-				kmem_free(map,
-				sizeof (struct ud_map) * udf_vfsp->udf_nmaps);
+				    sizeof (struct ud_map) *
+				    udf_vfsp->udf_nmaps);
+				kmem_free(map, sizeof (struct ud_map) *
+				    udf_vfsp->udf_nmaps);
 			}
 			map = udf_vfsp->udf_maps + udf_vfsp->udf_nmaps;
 			map->udm_flags = UDM_MAP_NORM;
@@ -1278,11 +1295,11 @@ loop_end:
 			map->udm_pn = SWAP_16(typ1->map1_pn);
 			udf_vfsp->udf_nmaps ++;
 		} else if ((hdr->maph_type == MAP_TYPE2) &&
-			(hdr->maph_length == MAP_TYPE2_LEN)) {
+		    (hdr->maph_length == MAP_TYPE2_LEN)) {
 			typ2 = (struct pmap_typ2 *)hdr;
 
 			if (strncmp(typ2->map2_pti.reg_id,
-				UDF_VIRT_PART, 23) == 0) {
+			    UDF_VIRT_PART, 23) == 0) {
 				/*
 				 * Add this to the normal
 				 * partition table so that
@@ -1290,16 +1307,15 @@ loop_end:
 				 */
 				map = udf_vfsp->udf_maps;
 				udf_vfsp->udf_maps =
-					kmem_zalloc(sizeof (struct ud_map) *
-						(udf_vfsp->udf_nmaps + 1),
-						KM_SLEEP);
+				    kmem_zalloc(sizeof (struct ud_map) *
+				    (udf_vfsp->udf_nmaps + 1), KM_SLEEP);
 				if (map != NULL) {
 					bcopy(map, udf_vfsp->udf_maps,
-						sizeof (struct ud_map) *
-						udf_vfsp->udf_nmaps);
+					    sizeof (struct ud_map) *
+					    udf_vfsp->udf_nmaps);
 					kmem_free(map,
-						sizeof (struct ud_map) *
-						udf_vfsp->udf_nmaps);
+					    sizeof (struct ud_map) *
+					    udf_vfsp->udf_nmaps);
 				}
 				map = udf_vfsp->udf_maps + udf_vfsp->udf_nmaps;
 				map->udm_flags = UDM_MAP_VPM;
@@ -1310,34 +1326,34 @@ loop_end:
 					goto out;
 				}
 				if (error = ud_val_get_vat(udf_vfsp, dev,
-					lblkno, map)) {
+				    lblkno, map)) {
 					goto out;
 				}
 			} else if (strncmp(typ2->map2_pti.reg_id,
-				UDF_SPAR_PART, 23) == 0) {
+			    UDF_SPAR_PART, 23) == 0) {
 
 				if (SWAP_16(typ2->map2_pl) != 32) {
 					printf(
-					"Packet Length is not valid %x\n",
-						SWAP_16(typ2->map2_pl));
+					    "Packet Length is not valid %x\n",
+					    SWAP_16(typ2->map2_pl));
 					goto out;
 				}
 				if ((typ2->map2_nst < 1) ||
-					(typ2->map2_nst > 4)) {
+				    (typ2->map2_nst > 4)) {
 					goto out;
 				}
 				map = udf_vfsp->udf_maps;
 				udf_vfsp->udf_maps =
-					kmem_zalloc(sizeof (struct ud_map) *
-						(udf_vfsp->udf_nmaps + 1),
-						KM_SLEEP);
+				    kmem_zalloc(sizeof (struct ud_map) *
+				    (udf_vfsp->udf_nmaps + 1),
+				    KM_SLEEP);
 				if (map != NULL) {
 					bcopy(map, udf_vfsp->udf_maps,
-						sizeof (struct ud_map) *
-						udf_vfsp->udf_nmaps);
+					    sizeof (struct ud_map) *
+					    udf_vfsp->udf_nmaps);
 					kmem_free(map,
-						sizeof (struct ud_map) *
-						udf_vfsp->udf_nmaps);
+					    sizeof (struct ud_map) *
+					    udf_vfsp->udf_nmaps);
 				}
 				map = udf_vfsp->udf_maps + udf_vfsp->udf_nmaps;
 				map->udm_flags = UDM_MAP_SPM;
@@ -1347,7 +1363,7 @@ loop_end:
 				udf_vfsp->udf_nmaps ++;
 
 				if (error = ud_read_sparing_tbls(udf_vfsp,
-						dev, map, typ2)) {
+				    dev, map, typ2)) {
 					goto out;
 				}
 			} else {
@@ -1373,11 +1389,11 @@ loop_end:
 	 * and process it
 	 */
 	secbp = ud_bread(dev, udf_vfsp->udf_iseq_loc << shift,
-			udf_vfsp->udf_iseq_len);
+	    udf_vfsp->udf_iseq_len);
 	if ((error = geterror(secbp)) != 0) {
 		cmn_err(CE_NOTE,
 		"udfs : Could not read Logical Volume Integrity Sequence %x",
-			error);
+		    error);
 		brelse(secbp);
 		goto out;
 	}
@@ -1424,8 +1440,8 @@ loop_end:
 	}
 
 	if ((blkno = ud_xlate_to_daddr(udf_vfsp,
-		udf_vfsp->udf_fsd_prn, udf_vfsp->udf_fsd_loc,
-			1, &dummy)) == 0) {
+	    udf_vfsp->udf_fsd_prn, udf_vfsp->udf_fsd_loc,
+	    1, &dummy)) == 0) {
 		goto out;
 	}
 	secbp = ud_bread(dev, blkno << shift, udf_vfsp->udf_fsd_len);
@@ -1449,8 +1465,8 @@ loop_end:
 	secbp->b_flags = B_AGE | B_STALE;
 	brelse(secbp);
 	udf_vfsp->udf_root_blkno = ud_xlate_to_daddr(udf_vfsp,
-			udf_vfsp->udf_ricb_prn, udf_vfsp->udf_ricb_loc,
-			1, &dummy);
+	    udf_vfsp->udf_ricb_prn, udf_vfsp->udf_ricb_loc,
+	    1, &dummy);
 
 	return (udf_vfsp);
 out:
@@ -1603,7 +1619,7 @@ ud_get_last_block(dev_t dev, daddr_t *blkno)
 	int32_t rval, error;
 
 	if ((error = cdev_ioctl(dev, DKIOCGVTOC, (intptr_t)&vtoc,
-			FKIOCTL|FREAD|FNATIVE, CRED(), &rval)) != 0) {
+	    FKIOCTL|FREAD|FNATIVE, CRED(), &rval)) != 0) {
 		cmn_err(CE_NOTE, "Could not get the vtoc information");
 		return (error);
 	}
@@ -1612,7 +1628,7 @@ ud_get_last_block(dev_t dev, daddr_t *blkno)
 		return (EINVAL);
 	}
 	if ((error = cdev_ioctl(dev, DKIOCINFO, (intptr_t)&dki_info,
-			FKIOCTL|FREAD|FNATIVE, CRED(), &rval)) != 0) {
+	    FKIOCTL|FREAD|FNATIVE, CRED(), &rval)) != 0) {
 		cmn_err(CE_NOTE, "Could not get the slice information");
 		return (error);
 	}
@@ -1656,8 +1672,8 @@ ud_val_get_vat(struct udf_vfs *udf_vfsp, dev_t dev,
 		udm->udm_vat_icb = end_loc - ud_sub_blks[i];
 
 		secbp = ud_bread(dev,
-			udm->udm_vat_icb << udf_vfsp->udf_l2d_shift,
-			udf_vfsp->udf_lbsize);
+		    udm->udm_vat_icb << udf_vfsp->udf_l2d_shift,
+		    udf_vfsp->udf_lbsize);
 		ASSERT(secbp->b_un.b_addr);
 
 		fe = (struct file_entry *)secbp->b_un.b_addr;
@@ -1683,10 +1699,10 @@ ud_val_get_vat(struct udf_vfs *udf_vfsp, dev_t dev,
 		udm->udm_nent = 1;
 	} else if (ad_type == ICB_FLAG_SHORT_AD) {
 		udm->udm_nent =
-			SWAP_32(fe->fe_len_adesc) / sizeof (struct short_ad);
+		    SWAP_32(fe->fe_len_adesc) / sizeof (struct short_ad);
 	} else if (ad_type == ICB_FLAG_LONG_AD) {
 		udm->udm_nent =
-			SWAP_32(fe->fe_len_adesc) / sizeof (struct long_ad);
+		    SWAP_32(fe->fe_len_adesc) / sizeof (struct long_ad);
 	} else {
 		err = EINVAL;
 		goto end;
@@ -1701,22 +1717,22 @@ ud_val_get_vat(struct udf_vfs *udf_vfsp, dev_t dev,
 
 	if (ad_type == ICB_FLAG_ONE_AD) {
 			udm->udm_count[0] = (SWAP_64(fe->fe_info_len) - 36) /
-						sizeof (uint32_t);
+			    sizeof (uint32_t);
 			udm->udm_bp[0] = secbp;
 			udm->udm_addr[0] = (uint32_t *)
-				&fe->fe_spec[SWAP_32(fe->fe_len_ear)];
+			    &fe->fe_spec[SWAP_32(fe->fe_len_ear)];
 			return (0);
 	}
 	for (i = 0; i < udm->udm_nent; i++) {
 		if (ad_type == ICB_FLAG_SHORT_AD) {
 			sad = (struct short_ad *)
-				(fe->fe_spec + SWAP_32(fe->fe_len_ear));
+			    (fe->fe_spec + SWAP_32(fe->fe_len_ear));
 			sad += i;
 			count = SWAP_32(sad->sad_ext_len);
 			blk = SWAP_32(sad->sad_ext_loc);
 		} else {
 			lad = (struct long_ad *)
-				(fe->fe_spec + SWAP_32(fe->fe_len_ear));
+			    (fe->fe_spec + SWAP_32(fe->fe_len_ear));
 			lad += i;
 			count = SWAP_32(lad->lad_ext_len);
 			blk = SWAP_32(lad->lad_ext_loc);
@@ -1744,9 +1760,9 @@ ud_val_get_vat(struct udf_vfs *udf_vfsp, dev_t dev,
 
 		count = (count + DEV_BSIZE - 1) & ~(DEV_BSIZE - 1);
 		udm->udm_bp[i] = ud_bread(dev,
-			blk << udf_vfsp->udf_l2d_shift, count);
+		    blk << udf_vfsp->udf_l2d_shift, count);
 		if ((udm->udm_bp[i]->b_error != 0) ||
-			(udm->udm_bp[i]->b_resid)) {
+		    (udm->udm_bp[i]->b_resid)) {
 			err = EINVAL;
 			break;
 		}
@@ -1782,7 +1798,7 @@ ud_read_sparing_tbls(struct udf_vfs *udf_vfsp,
 		map->udm_loc[index] = SWAP_32(typ2->map2_st[index]);
 
 		bp = ud_bread(dev,
-			map->udm_loc[index] << udf_vfsp->udf_l2d_shift, sz);
+		    map->udm_loc[index] << udf_vfsp->udf_l2d_shift, sz);
 		if ((bp->b_error != 0) || (bp->b_resid)) {
 			brelse(bp);
 			continue;
@@ -1840,23 +1856,23 @@ ud_get_lbsize(dev_t dev, uint32_t *loc)
 	}
 
 	if (cdev_ioctl(dev, CDROMREADOFFSET, (intptr_t)&session_offset,
-			FKIOCTL|FREAD|FNATIVE, CRED(), &rval) != 0) {
+	    FKIOCTL|FREAD|FNATIVE, CRED(), &rval) != 0) {
 		session_offset = 0;
 	}
 
 	for (index = 0; index < end_index; index++) {
 
 		for (bsize = DEV_BSIZE, shift = 0;
-			bsize <= MAXBSIZE; bsize <<= 1, shift++) {
+		    bsize <= MAXBSIZE; bsize <<= 1, shift++) {
 
 			if (index == 0) {
 				avd_loc = 256;
 				if (bsize <= 2048) {
 					avd_loc +=
-						session_offset * 2048 / bsize;
+					    session_offset * 2048 / bsize;
 				} else {
 					avd_loc +=
-						session_offset / (bsize / 2048);
+					    session_offset / (bsize / 2048);
 				}
 			} else if (index == 1) {
 				avd_loc = last_block - (1 << shift);
@@ -1865,7 +1881,7 @@ ud_get_lbsize(dev_t dev, uint32_t *loc)
 			}
 
 			bp = ud_bread(dev, avd_loc << shift,
-				ANCHOR_VOL_DESC_LEN);
+			    ANCHOR_VOL_DESC_LEN);
 			if (geterror(bp) != 0) {
 				brelse(bp);
 				continue;

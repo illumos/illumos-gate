@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,11 +325,14 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	mark_closed(lsp, otyp);
 
 	/*
-	 * If we have forcibly closed the underlying device, and this is the
-	 * last close, then tear down the rest of the device.
+	 * If we forcibly closed the underlying device (li_force), or
+	 * asked for cleanup (li_cleanup), finish up if we're the last
+	 * out of the door.
 	 */
-	if (minor != 0 && lsp->ls_vp == NULL && !is_opened(lsp))
+	if (minor != 0 && !is_opened(lsp) &&
+	    (lsp->ls_cleanup || lsp->ls_vp == NULL))
 		lofi_free_handle(dev, minor, lsp, credp);
+
 	mutex_exit(&lofi_lock);
 	return (0);
 }
@@ -1403,21 +1406,28 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 		return (ENXIO);
 	}
 
+	/*
+	 * If it's still held open, we'll do one of three things:
+	 *
+	 * If no flag is set, just return EBUSY.
+	 *
+	 * If the 'cleanup' flag is set, unmap and remove the device when
+	 * the last user finishes.
+	 *
+	 * If the 'force' flag is set, then we forcibly close the underlying
+	 * file.  Subsequent operations will fail, and the DKIOCSTATE ioctl
+	 * will return DKIO_DEV_GONE.  When the device is last closed, the
+	 * device will be cleaned up appropriately.
+	 *
+	 * This is complicated by the fact that we may have outstanding
+	 * dispatched I/Os.  Rather than having a single mutex to serialize all
+	 * I/O, we keep a count of the number of outstanding I/O requests, as
+	 * well as a flag to indicate that no new I/Os should be dispatched.
+	 * We set the flag, wait for the number of outstanding I/Os to reach 0,
+	 * and then close the underlying vnode.
+	 */
+
 	if (is_opened(lsp)) {
-		/*
-		 * If the 'force' flag is set, then we forcibly close the
-		 * underlying file.  Subsequent operations will fail, and the
-		 * DKIOCSTATE ioctl will return DKIO_DEV_GONE.  When the device
-		 * is last closed, the device will be cleaned up appropriately.
-		 *
-		 * This is complicated by the fact that we may have outstanding
-		 * dispatched I/Os.  Rather than having a single mutex to
-		 * serialize all I/O, we keep a count of the number of
-		 * outstanding I/O requests, as well as a flag to indicate that
-		 * no new I/Os should be dispatched.  We set the flag, wait for
-		 * the number of outstanding I/Os to reach 0, and then close the
-		 * underlying vnode.
-		 */
 		if (klip->li_force) {
 			mutex_enter(&lsp->ls_vp_lock);
 			lsp->ls_vp_closereq = B_TRUE;
@@ -1434,7 +1444,13 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 			(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 			free_lofi_ioctl(klip);
 			return (0);
+		} else if (klip->li_cleanup) {
+			lsp->ls_cleanup = 1;
+			mutex_exit(&lofi_lock);
+			free_lofi_ioctl(klip);
+			return (0);
 		}
+
 		mutex_exit(&lofi_lock);
 		free_lofi_ioctl(klip);
 		return (EBUSY);

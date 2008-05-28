@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,7 +265,8 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	char *data = uap->dataptr;
 	int datalen = uap->datalen;
 	dev_t dev;
-	struct vnode *bvp;
+	struct vnode *lvp = NULL;
+	struct vnode *svp = NULL;
 	struct pathname dpn;
 	int error;
 	enum whymountroot why = ROOT_INIT;
@@ -308,6 +309,16 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	} else {
 		datalen = 0;
 	}
+
+	if ((vfsp->vfs_flag & VFS_RDONLY) != 0 ||
+	    (uap->flags & MS_RDONLY) != 0) {
+		oflag = FREAD;
+		aflag = VREAD;
+	} else {
+		oflag = FREAD | FWRITE;
+		aflag = VREAD | VWRITE;
+	}
+
 	/*
 	 * Read in the mount point pathname
 	 * (so we can record the directory the file system was last mounted on).
@@ -318,55 +329,67 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	/*
 	 * Resolve path name of special file being mounted.
 	 */
-	if (error = lookupname(uap->spec, fromspace, FOLLOW, NULL, &bvp)) {
+	if (error = lookupname(uap->spec, fromspace, FOLLOW, NULL, &svp)) {
 		pn_free(&dpn);
 		return (error);
 	}
-	if (bvp->v_type != VBLK) {
-		VN_RELE(bvp);
+
+	error = vfs_get_lofi(vfsp, &lvp);
+
+	if (error > 0) {
+		VN_RELE(svp);
 		pn_free(&dpn);
-		return (ENOTBLK);
+		return (error);
+	} else if (error == 0) {
+		dev = lvp->v_rdev;
+
+		if (getmajor(dev) >= devcnt) {
+			error = ENXIO;
+			goto out;
+		}
+	} else {
+		dev = svp->v_rdev;
+
+		if (svp->v_type != VBLK) {
+			VN_RELE(svp);
+			pn_free(&dpn);
+			return (ENOTBLK);
+		}
+
+		if (getmajor(dev) >= devcnt) {
+			error = ENXIO;
+			goto out;
+		}
+
+		/*
+		 * In SunCluster, requests to a global device are
+		 * satisfied by a local device. We substitute the global
+		 * pxfs node with a local spec node here.
+		 */
+		if (IS_PXFSVP(svp)) {
+			ASSERT(lvp == NULL);
+			VN_RELE(svp);
+			svp = makespecvp(dev, VBLK);
+		}
+
+		if ((error = secpolicy_spec_open(cr, svp, oflag)) != 0) {
+			VN_RELE(svp);
+			pn_free(&dpn);
+			return (error);
+		}
 	}
-	dev = bvp->v_rdev;
-	if (getmajor(dev) >= devcnt) {
-		pn_free(&dpn);
-		VN_RELE(bvp);
-		return (ENXIO);
-	}
+
 	if (uap->flags & MS_REMOUNT)
 		why = ROOT_REMOUNT;
 
 	/*
-	 * In SunCluster, requests to a global device are satisfied by
-	 * a local device. We substitute the global pxfs node with a
-	 * local spec node here.
-	 */
-	if (IS_PXFSVP(bvp)) {
-		VN_RELE(bvp);
-		bvp = makespecvp(dev, VBLK);
-	}
-
-	/*
-	 * Open block device mounted on.  We need this to
-	 * check whether the caller has sufficient rights to
-	 * access the device in question.
-	 * When bio is fixed for vnodes this can all be vnode
+	 * Open device/file mounted on.  We need this to check whether
+	 * the caller has sufficient rights to access the resource in
+	 * question.  When bio is fixed for vnodes this can all be vnode
 	 * operations.
 	 */
-	if ((vfsp->vfs_flag & VFS_RDONLY) != 0 ||
-	    (uap->flags & MS_RDONLY) != 0) {
-		oflag = FREAD;
-		aflag = VREAD;
-	} else {
-		oflag = FREAD | FWRITE;
-		aflag = VREAD | VWRITE;
-	}
-	if ((error = VOP_ACCESS(bvp, aflag, 0, cr, NULL)) != 0 ||
-	    (error = secpolicy_spec_open(cr, bvp, oflag)) != 0) {
-		pn_free(&dpn);
-		VN_RELE(bvp);
-		return (error);
-	}
+	if ((error = VOP_ACCESS(svp, aflag, 0, cr, NULL)) != 0)
+		goto out;
 
 	/*
 	 * Ensure that this device isn't already mounted or in progress on a
@@ -376,15 +399,13 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	if ((uap->flags & MS_NOCHECK) == 0) {
 		if ((uap->flags & MS_GLOBAL) == 0 &&
 		    vfs_devmounting(dev, vfsp)) {
-			pn_free(&dpn);
-			VN_RELE(bvp);
-			return (EBUSY);
+			error = EBUSY;
+			goto out;
 		}
 		if (vfs_devismounted(dev)) {
 			if ((uap->flags & MS_REMOUNT) == 0) {
-				pn_free(&dpn);
-				VN_RELE(bvp);
-				return (EBUSY);
+				error = EBUSY;
+				goto out;
 			}
 		}
 	}
@@ -402,15 +423,31 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	/*
 	 * Mount the filesystem, free the device vnode on error.
 	 */
-	error = mountfs(vfsp, why, bvp, dpn.pn_path, cr, 0, &args, datalen);
-	pn_free(&dpn);
-	if (error) {
-		VN_RELE(bvp);
-	}
-	if (error == 0)
+	error = mountfs(vfsp, why, lvp != NULL ? lvp : svp,
+	    dpn.pn_path, cr, 0, &args, datalen);
+
+	if (error == 0) {
 		vfs_set_feature(vfsp, VFSFT_XVATTR);
+
+		/*
+		 * If lofi, drop our reference to the original file.
+		 */
+		if (lvp != NULL)
+			VN_RELE(svp);
+	}
+
+out:
+	pn_free(&dpn);
+
+	if (error) {
+		if (lvp != NULL)
+			VN_RELE(lvp);
+		if (svp != NULL)
+			VN_RELE(svp);
+	}
 	return (error);
 }
+
 /*
  * Mount root file system.
  * "why" is ROOT_INIT on initial call ROOT_REMOUNT if called to

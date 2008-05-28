@@ -8467,10 +8467,16 @@ out:
 	if (dev_name)
 		free(dev_name);
 
-	if (dev_name_lookup_err)
-		err_print(DEV_NAME_LOOKUP_FAILED, node_path);
-	else
+	if (dev_name_lookup_err) {
+		/*
+		 * If a lofi mount fails, the /devices node may well have
+		 * disappeared by the time we run, so let's not complain.
+		 */
+		if (strcmp(subclass, ESC_LOFI) != 0)
+			err_print(DEV_NAME_LOOKUP_FAILED, node_path);
+	} else {
 		err_print(BUILD_EVENT_ATTR_FAILED, (err) ? strerror(err) : "");
+	}
 	return (NULL);
 }
 

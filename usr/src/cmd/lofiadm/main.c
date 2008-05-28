@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -304,6 +304,8 @@ delete_mapping(int lfd, const char *devicename, const char *filename,
 	struct lofi_ioctl li;
 
 	li.li_force = force;
+	li.li_cleanup = B_FALSE;
+
 	if (devicename == NULL) {
 		/* delete by filename */
 		(void) strlcpy(li.li_filename, filename,

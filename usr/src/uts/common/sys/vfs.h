@@ -251,7 +251,9 @@ typedef struct vfs {
 	struct zone	*vfs_zone;		/* zone that owns the mount */
 	struct vfs	*vfs_zone_next;		/* next VFS visible in zone */
 	struct vfs	*vfs_zone_prev;		/* prev VFS visible in zone */
+
 	struct fem_head	*vfs_femhead;		/* fs monitoring */
+	minor_t		vfs_lofi_minor;		/* minor if lofi mount */
 } vfs_t;
 
 #define	vfs_featureset	vfs_implp->vi_featureset
@@ -534,6 +536,8 @@ void	fs_freevfs(vfs_t *);
 void	vfs_root_redev(vfs_t *vfsp, dev_t ndev, int fstype);
 
 int	vfs_zone_change_safe(vfs_t *);
+
+int	vfs_get_lofi(vfs_t *, vnode_t **);
 
 #define	VFSHASH(maj, min) (((int)((maj)+(min))) & (vfshsz - 1))
 #define	VFS_ON_LIST(vfsp) \

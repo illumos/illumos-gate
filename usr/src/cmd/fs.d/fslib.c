@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +173,7 @@ fsmkmntlist(FILE *mfp)
 
 	resetmnttab(mfp);
 	while ((ret = getextmntent(mfp, &mnt, sizeof (struct extmnttab)))
-		!= -1) {
+	    != -1) {
 		mntlist_t	*mp;
 
 		if (ret != 0)		/* bad entry */
@@ -216,19 +215,19 @@ fsgetmlast(mntlist_t *ml, struct mnttab *mntin)
 			 * match if and only if both are equal.
 			 */
 			if ((strcmp(ml->mntl_mnt->mnt_mountp,
-					mntin->mnt_mountp) == 0) &&
+			    mntin->mnt_mountp) == 0) &&
 			    (strcmp(ml->mntl_mnt->mnt_special,
-					mntin->mnt_special) == 0))
+			    mntin->mnt_special) == 0))
 				delete = ml;
 		} else if (mntin->mnt_mountp) {
 			if (strcmp(ml->mntl_mnt->mnt_mountp,
-					mntin->mnt_mountp) == 0)
+			    mntin->mnt_mountp) == 0)
 				delete = ml;
 		} else if (mntin->mnt_special) {
 			if (strcmp(ml->mntl_mnt->mnt_special,
-					mntin->mnt_special) == 0)
+			    mntin->mnt_special) == 0)
 				delete = ml;
-	    }
+		}
 	}
 	return (delete);
 }
@@ -309,7 +308,7 @@ cmp_requested_to_actual_options(char *requested_opts, char *actual_opts,
 
 	while (*requested_opts != '\0') {
 		(void) getsubopt(&requested_opts, empty_opt_vector,
-			&option_ptr);
+		    &option_ptr);
 
 		/*
 		 * Truncate any "=<value>" string from the end of
@@ -319,6 +318,14 @@ cmp_requested_to_actual_options(char *requested_opts, char *actual_opts,
 			*equalptr = '\0';
 
 		if (*option_ptr == '\0')
+			continue;
+
+		/*
+		 * Whilst we don't need this option to perform a lofi
+		 * mount, let's not be mendacious enough to complain
+		 * about it.
+		 */
+		if (strcmp(option_ptr, "loop") == 0)
 			continue;
 
 		/*
@@ -344,7 +351,7 @@ cmp_requested_to_actual_options(char *requested_opts, char *actual_opts,
 
 		while (*actual_opt_hold != '\0') {
 			(void) getsubopt(&actual_opt_hold, empty_opt_vector,
-				&actopt);
+			    &actopt);
 
 			/* Truncate the "=<value>", if any. */
 			if ((equalptr = strchr(actopt, '=')) != NULL)
@@ -428,10 +435,10 @@ fs_get_zone_summaries(void)
 
 	for (;;) {
 		if (zone_list(ids, &numzones) < 0) {
-			    perror("unable to retrieve list of zones");
-			    if (ids != NULL)
-				    free(ids);
-			    return (NULL);
+			perror("unable to retrieve list of zones");
+			if (ids != NULL)
+				free(ids);
+			return (NULL);
 		}
 		if (numzones <= oldnumzones)
 			break;

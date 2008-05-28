@@ -803,6 +803,17 @@ forkexec(zlog_t *zlogp, const char *path, char *const argv[])
 }
 
 static int
+isregfile(const char *path)
+{
+	struct stat64 st;
+
+	if (stat64(path, &st) == -1)
+		return (-1);
+
+	return (S_ISREG(st.st_mode));
+}
+
+static int
 dofsck(zlog_t *zlogp, const char *fstype, const char *rawdev)
 {
 	char cmdbuf[MAXPATHLEN];
@@ -818,6 +829,13 @@ dofsck(zlog_t *zlogp, const char *fstype, const char *rawdev)
 		zerror(zlogp, B_FALSE, "file-system type %s too long", fstype);
 		return (-1);
 	}
+
+	/*
+	 * If it doesn't exist, that's OK: we verified this previously
+	 * in zoneadm.
+	 */
+	if (isregfile(cmdbuf) == -1)
+		return (0);
 
 	argv[0] = "fsck";
 	argv[1] = "-m";
@@ -1260,8 +1278,12 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 	 * Run 'fsck -m' if there's a device to fsck.
 	 */
 	if (fsptr->zone_fs_raw[0] != '\0' &&
-	    dofsck(zlogp, fsptr->zone_fs_type, fsptr->zone_fs_raw) != 0)
+	    dofsck(zlogp, fsptr->zone_fs_type, fsptr->zone_fs_raw) != 0) {
 		return (-1);
+	} else if (isregfile(fsptr->zone_fs_special) == 1 &&
+	    dofsck(zlogp, fsptr->zone_fs_type, fsptr->zone_fs_special) != 0) {
+		return (-1);
+	}
 
 	/*
 	 * Build up mount option string.

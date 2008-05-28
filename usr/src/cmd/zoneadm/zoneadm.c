@@ -2437,7 +2437,7 @@ verify_ipd(zone_dochandle_t handle)
 static int
 verify_fs_special(struct zone_fstab *fstab)
 {
-	struct stat st;
+	struct stat64 st;
 
 	/*
 	 * This validation is really intended for standard zone administration.
@@ -2450,7 +2450,7 @@ verify_fs_special(struct zone_fstab *fstab)
 	if (strcmp(fstab->zone_fs_type, MNTTYPE_ZFS) == 0)
 		return (verify_fs_zfs(fstab));
 
-	if (stat(fstab->zone_fs_special, &st) != 0) {
+	if (stat64(fstab->zone_fs_special, &st) != 0) {
 		(void) fprintf(stderr, gettext("could not verify fs "
 		    "%s: could not access %s: %s\n"), fstab->zone_fs_dir,
 		    fstab->zone_fs_special, strerror(errno));
@@ -2471,6 +2471,17 @@ verify_fs_special(struct zone_fstab *fstab)
 	}
 
 	return (Z_OK);
+}
+
+static int
+isregfile(const char *path)
+{
+	struct stat64 st;
+
+	if (stat64(path, &st) == -1)
+		return (-1);
+
+	return (S_ISREG(st.st_mode));
 }
 
 static int
@@ -2529,8 +2540,10 @@ verify_filesystems(zone_dochandle_t handle)
 			goto next_fs;
 		}
 		/*
-		 * Verify /usr/lib/fs/<fstype>/fsck exists iff zone_fs_raw is
-		 * set.
+		 * If zone_fs_raw is set, verify that there's an fsck
+		 * binary for it.  If zone_fs_raw is not set, and it's
+		 * not a regular file (lofi mount), and there's an fsck
+		 * binary for it, complain.
 		 */
 		if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/lib/fs/%s/fsck",
 		    fstab.zone_fs_type) > sizeof (cmdbuf)) {
@@ -2540,19 +2553,20 @@ verify_filesystems(zone_dochandle_t handle)
 			return_code = Z_ERR;
 			goto next_fs;
 		}
-		if (fstab.zone_fs_raw[0] == '\0' && stat(cmdbuf, &st) == 0) {
-			(void) fprintf(stderr, gettext("could not verify fs "
-			    "%s: must specify 'raw' device for %s "
-			    "file systems\n"),
-			    fstab.zone_fs_dir, fstab.zone_fs_type);
-			return_code = Z_ERR;
-			goto next_fs;
-		}
 		if (fstab.zone_fs_raw[0] != '\0' &&
 		    (stat(cmdbuf, &st) != 0 || !S_ISREG(st.st_mode))) {
 			(void) fprintf(stderr, gettext("cannot verify fs %s: "
 			    "'raw' device specified but "
 			    "no fsck executable exists for %s\n"),
+			    fstab.zone_fs_dir, fstab.zone_fs_type);
+			return_code = Z_ERR;
+			goto next_fs;
+		} else if (fstab.zone_fs_raw[0] == '\0' &&
+		    stat(cmdbuf, &st) == 0 &&
+		    isregfile(fstab.zone_fs_special) != 1) {
+			(void) fprintf(stderr, gettext("could not verify fs "
+			    "%s: must specify 'raw' device for %s "
+			    "file systems\n"),
 			    fstab.zone_fs_dir, fstab.zone_fs_type);
 			return_code = Z_ERR;
 			goto next_fs;

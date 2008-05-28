@@ -293,7 +293,8 @@ pcfs_device_identify(
 {
 	struct pathname special;
 	char *c;
-	struct vnode *bvp;
+	struct vnode *svp = NULL;
+	struct vnode *lvp = NULL;
 	int oflag, aflag;
 	int error;
 
@@ -307,7 +308,7 @@ pcfs_device_identify(
 	*dos_ldrive = -1;
 
 	if (error =
-	    lookupname(special.pn_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &bvp)) {
+	    lookupname(special.pn_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &svp)) {
 		/*
 		 * If there's no device node, the name specified most likely
 		 * maps to a PCFS-style "partition specifier" to select a
@@ -384,7 +385,7 @@ pcfs_device_identify(
 
 
 		error = lookupname(special.pn_path, UIO_SYSSPACE, FOLLOW,
-		    NULLVPP, &bvp);
+		    NULLVPP, &svp);
 	} else {
 		*dos_ldrive = UNPARTITIONED_DRIVE;
 	}
@@ -394,8 +395,6 @@ devlookup_done:
 		return (error);
 
 	ASSERT(*dos_ldrive >= UNPARTITIONED_DRIVE);
-
-	*xdev = bvp->v_rdev;
 
 	/*
 	 * Verify caller's permission to open the device special file.
@@ -409,20 +408,38 @@ devlookup_done:
 		aflag = VREAD | VWRITE;
 	}
 
-	if (bvp->v_type != VBLK)
-		error = ENOTBLK;
-	else if (getmajor(*xdev) >= devcnt)
-		error = ENXIO;
+	error = vfs_get_lofi(vfsp, &lvp);
 
-	if ((error != 0) ||
-	    (error = VOP_ACCESS(bvp, aflag, 0, cr, NULL)) != 0 ||
-	    (error = secpolicy_spec_open(cr, bvp, oflag)) != 0) {
-		VN_RELE(bvp);
-		return (error);
+	if (error > 0) {
+		if (error == ENOENT)
+			error = ENODEV;
+		goto out;
+	} else if (error == 0) {
+		*xdev = lvp->v_rdev;
+	} else {
+		*xdev = svp->v_rdev;
+
+		if (svp->v_type != VBLK)
+			error = ENOTBLK;
+
+		if ((error = secpolicy_spec_open(cr, svp, oflag)) != 0)
+			goto out;
 	}
 
-	VN_RELE(bvp);
-	return (0);
+	if (getmajor(*xdev) >= devcnt) {
+		error = ENXIO;
+		goto out;
+	}
+
+	if ((error = VOP_ACCESS(svp, aflag, 0, cr, NULL)) != 0)
+		goto out;
+
+out:
+	if (svp != NULL)
+		VN_RELE(svp);
+	if (lvp != NULL)
+		VN_RELE(lvp);
+	return (error);
 }
 
 static int

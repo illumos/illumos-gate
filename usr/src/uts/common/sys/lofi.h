@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,11 @@ extern "C" {
  * removed, so the DKIOCSTATE ioctl will return DKIO_DEV_GONE.  When the device
  * is last closed, it will be torn down.
  *
+ * If the 'li_cleanup' flag is set for any of the LOFI_UNMAP_* commands, then
+ * if the device is busy, it is marked for removal at the next time it is
+ * no longer held open by anybody.  When the device is last closed, it will be
+ * torn down.
+ *
  * Oh, and last but not least: these ioctls are totally private and only
  * for use by lofiadm(1M).
  *
@@ -114,6 +119,7 @@ extern "C" {
 struct lofi_ioctl {
 	uint32_t 	li_minor;
 	boolean_t	li_force;
+	boolean_t	li_cleanup;
 	char	li_filename[MAXPATHLEN + 1];
 	char	li_algorithm[MAXALGLEN];
 };
@@ -163,6 +169,7 @@ struct lofi_state {
 	uint32_t	ls_chr_open;
 	uint32_t	ls_lyr_open_count;
 	int		ls_openflag;
+	boolean_t	ls_cleanup;	/* cleanup on close */
 	taskq_t		*ls_taskq;
 	kstat_t		*ls_kstat;
 	kmutex_t	ls_kstat_lock;

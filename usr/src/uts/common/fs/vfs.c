@@ -85,6 +85,7 @@
 #include <sys/reboot.h>
 #include <sys/attr.h>
 #include <sys/spa.h>
+#include <sys/lofi.h>
 
 #include <vm/page.h>
 
@@ -525,6 +526,7 @@ vfs_init(vfs_t *vfsp, vfsops_t *op, void *data)
 	vfsp->vfs_prev = vfsp;
 	vfsp->vfs_zone_next = vfsp;
 	vfsp->vfs_zone_prev = vfsp;
+	vfsp->vfs_lofi_minor = 0;
 	sema_init(&vfsp->vfs_reflock, 1, NULL, SEMA_DEFAULT, NULL);
 	vfsimpl_setup(vfsp);
 	vfsp->vfs_data = (data);
@@ -982,6 +984,129 @@ stripzonepath(const char *strpath)
 }
 
 /*
+ * Check to see if our "block device" is actually a file.  If so,
+ * automatically add a lofi device, and keep track of this fact.
+ */
+static int
+lofi_add(const char *fsname, struct vfs *vfsp,
+    mntopts_t *mntopts, struct mounta *uap)
+{
+	int fromspace = (uap->flags & MS_SYSSPACE) ?
+	    UIO_SYSSPACE : UIO_USERSPACE;
+	struct lofi_ioctl *li = NULL;
+	struct vnode *vp = NULL;
+	struct pathname	pn = { NULL };
+	ldi_ident_t ldi_id;
+	ldi_handle_t ldi_hdl;
+	int minor;
+	int err = 0;
+
+	if (fsname == NULL)
+		return (0);
+	if (strcmp(fsname, "mntfs") == 0 || strcmp(fsname, "lofs") == 0)
+		return (0);
+
+	if (pn_get(uap->spec, fromspace, &pn) != 0)
+		return (0);
+
+	if (lookupname(uap->spec, fromspace, FOLLOW, NULL, &vp) != 0)
+		goto out;
+
+	if (vp->v_type != VREG)
+		goto out;
+
+	/* OK, this is a lofi mount. */
+
+	if ((uap->flags & (MS_REMOUNT|MS_GLOBAL)) ||
+	    vfs_optionisset_nolock(mntopts, MNTOPT_SUID, NULL) ||
+	    vfs_optionisset_nolock(mntopts, MNTOPT_SETUID, NULL) ||
+	    vfs_optionisset_nolock(mntopts, MNTOPT_DEVICES, NULL)) {
+		err = EINVAL;
+		goto out;
+	}
+
+	ldi_id = ldi_ident_from_anon();
+	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
+	(void) strlcpy(li->li_filename, pn.pn_path, MAXPATHLEN + 1);
+
+	/*
+	 * The lofi control node is currently exclusive-open.  We'd like
+	 * to improve this, but in the meantime, we'll loop waiting for
+	 * access.
+	 */
+	for (;;) {
+		err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE | FEXCL,
+		    kcred, &ldi_hdl, ldi_id);
+
+		if (err != EBUSY)
+			break;
+
+		if ((err = delay_sig(hz / 8)) == EINTR)
+			break;
+	}
+
+	if (err)
+		goto out2;
+
+	err = ldi_ioctl(ldi_hdl, LOFI_MAP_FILE, (intptr_t)li,
+	    FREAD | FWRITE | FEXCL | FKIOCTL, kcred, &minor);
+
+	(void) ldi_close(ldi_hdl, FREAD | FWRITE | FEXCL, kcred);
+
+	if (!err)
+		vfsp->vfs_lofi_minor = minor;
+
+out2:
+	ldi_ident_release(ldi_id);
+out:
+	if (li != NULL)
+		kmem_free(li, sizeof (*li));
+	if (vp != NULL)
+		VN_RELE(vp);
+	pn_free(&pn);
+	return (err);
+}
+
+static void
+lofi_remove(struct vfs *vfsp)
+{
+	struct lofi_ioctl *li = NULL;
+	ldi_ident_t ldi_id;
+	ldi_handle_t ldi_hdl;
+	int err;
+
+	if (vfsp->vfs_lofi_minor == 0)
+		return;
+
+	ldi_id = ldi_ident_from_anon();
+
+	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
+	li->li_minor = vfsp->vfs_lofi_minor;
+	li->li_cleanup = B_TRUE;
+
+	do {
+		err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE | FEXCL,
+		    kcred, &ldi_hdl, ldi_id);
+	} while (err == EBUSY);
+
+	if (err)
+		goto out;
+
+	err = ldi_ioctl(ldi_hdl, LOFI_UNMAP_FILE_MINOR, (intptr_t)li,
+	    FREAD | FWRITE | FEXCL | FKIOCTL, kcred, NULL);
+
+	(void) ldi_close(ldi_hdl, FREAD | FWRITE | FEXCL, kcred);
+
+	if (!err)
+		vfsp->vfs_lofi_minor = 0;
+
+out:
+	ldi_ident_release(ldi_id);
+	if (li != NULL)
+		kmem_free(li, sizeof (*li));
+}
+
+/*
  * Common mount code.  Called from the system call entry point, from autofs,
  * nfsv4 trigger mounts, and from pxfs.
  *
@@ -1029,6 +1154,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	refstr_t	*oldresource, *oldmntpt;
 	struct pathname	pn, rpn;
 	vsk_anchor_t	*vskap;
+	char fstname[FSTYPSZ];
 
 	/*
 	 * The v_flag value for the mount point vp is permanently set
@@ -1069,7 +1195,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	} else if (uap->flags & (MS_OPTIONSTR | MS_DATA | MS_FSS)) {
 		size_t n;
 		uint_t fstype;
-		char name[FSTYPSZ];
+
+		fsname = fstname;
 
 		if ((fstype = (uintptr_t)uap->fstype) < 256) {
 			RLOCK_VFSSW();
@@ -1078,19 +1205,19 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 				RUNLOCK_VFSSW();
 				return (EINVAL);
 			}
-			(void) strcpy(name, vfssw[fstype].vsw_name);
+			(void) strcpy(fsname, vfssw[fstype].vsw_name);
 			RUNLOCK_VFSSW();
-			if ((vswp = vfs_getvfssw(name)) == NULL)
+			if ((vswp = vfs_getvfssw(fsname)) == NULL)
 				return (EINVAL);
 		} else {
 			/*
 			 * Handle either kernel or user address space.
 			 */
 			if (uap->flags & MS_SYSSPACE) {
-				error = copystr(uap->fstype, name,
+				error = copystr(uap->fstype, fsname,
 				    FSTYPSZ, &n);
 			} else {
-				error = copyinstr(uap->fstype, name,
+				error = copyinstr(uap->fstype, fsname,
 				    FSTYPSZ, &n);
 			}
 			if (error) {
@@ -1098,7 +1225,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 					return (EINVAL);
 				return (error);
 			}
-			if ((vswp = vfs_getvfssw(name)) == NULL)
+			if ((vswp = vfs_getvfssw(fsname)) == NULL)
 				return (EINVAL);
 		}
 	} else {
@@ -1354,6 +1481,26 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 
 	VFS_HOLD(vfsp);
 
+	if ((error = lofi_add(fsname, vfsp, &mnt_mntopts, uap)) != 0) {
+		if (!remount) {
+			if (splice)
+				vn_vfsunlock(vp);
+			vfs_free(vfsp);
+		} else {
+			vn_vfsunlock(vp);
+			VFS_RELE(vfsp);
+		}
+		goto errout;
+	}
+
+	/*
+	 * PRIV_SYS_MOUNT doesn't mean you can become root.
+	 */
+	if (vfsp->vfs_lofi_minor != 0) {
+		uap->flags |= MS_NOSUID;
+		vfs_setmntopt_nolock(&mnt_mntopts, MNTOPT_NOSUID, NULL, 0, 0);
+	}
+
 	/*
 	 * The vfs_reflock is not used anymore the code below explicitly
 	 * holds it preventing others accesing it directly.
@@ -1373,6 +1520,9 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	if (!remount) {
 		if (error = vfs_lock(vfsp)) {
 			vfsp->vfs_flag = ovflags;
+
+			lofi_remove(vfsp);
+
 			if (splice)
 				vn_vfsunlock(vp);
 			vfs_free(vfsp);
@@ -1397,8 +1547,32 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	}
 
 	if (addmip) {
-		bdev = bvp->v_rdev;
-		VN_RELE(bvp);
+		vnode_t *lvp = NULL;
+
+		error = vfs_get_lofi(vfsp, &lvp);
+		if (error > 0) {
+			lofi_remove(vfsp);
+
+			if (splice)
+				vn_vfsunlock(vp);
+			vfs_unlock(vfsp);
+
+			if (remount) {
+				VFS_RELE(vfsp);
+			} else {
+				vfs_free(vfsp);
+			}
+
+			goto errout;
+		} else if (error == -1) {
+			bdev = bvp->v_rdev;
+			VN_RELE(bvp);
+		} else {
+			bdev = lvp->v_rdev;
+			VN_RELE(lvp);
+			VN_RELE(bvp);
+		}
+
 		vfs_addmip(bdev, vfsp);
 		addmip = 0;
 		delmip = 1;
@@ -1478,6 +1652,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		vfs_setmntopt(vfsp, MNTOPT_GLOBAL, NULL, 0);
 
 	if (error) {
+		lofi_remove(vfsp);
+
 		if (remount) {
 			/* put back pre-remount options */
 			vfs_swapopttbl(&mnt_mntopts, &vfsp->vfs_mntopts);
@@ -1648,6 +1824,7 @@ errout:
 	if (inargs != opts)
 		kmem_free(inargs, MAX_MNTOPT_STR);
 	if (copyout_error) {
+		lofi_remove(vfsp);
 		VFS_RELE(vfsp);
 		error = copyout_error;
 	}
@@ -4137,6 +4314,7 @@ vfs_rele(vfs_t *vfsp)
 	ASSERT(vfsp->vfs_count != 0);
 	if (atomic_add_32_nv(&vfsp->vfs_count, -1) == 0) {
 		VFS_FREEVFS(vfsp);
+		lofi_remove(vfsp);
 		if (vfsp->vfs_zone)
 			zone_rele(vfsp->vfs_zone);
 		vfs_freemnttab(vfsp);
@@ -4482,4 +4660,36 @@ vfs_propagate_features(vfs_t *from, vfs_t *to)
 	for (i = 1; i <= to->vfs_featureset[0]; i++) {
 		to->vfs_featureset[i] = from->vfs_featureset[i];
 	}
+}
+
+#define	LOFICTL_PATH "/devices/pseudo/lofi@0:%d"
+
+/*
+ * Return the vnode for the lofi node if there's a lofi mount in place.
+ * Returns -1 when there's no lofi node, 0 on success, and > 0 on
+ * failure.
+ */
+int
+vfs_get_lofi(vfs_t *vfsp, vnode_t **vpp)
+{
+	char *path = NULL;
+	int strsize;
+	int err;
+
+	if (vfsp->vfs_lofi_minor == 0) {
+		*vpp = NULL;
+		return (-1);
+	}
+
+	strsize = snprintf(NULL, 0, LOFICTL_PATH, vfsp->vfs_lofi_minor);
+	path = kmem_alloc(strsize + 1, KM_SLEEP);
+	(void) snprintf(path, strsize + 1, LOFICTL_PATH, vfsp->vfs_lofi_minor);
+
+	err = lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, vpp);
+
+	if (err)
+		*vpp = NULL;
+
+	kmem_free(path, strsize + 1);
+	return (err);
 }

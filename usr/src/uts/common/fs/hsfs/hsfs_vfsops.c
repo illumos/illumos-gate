@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1343,40 +1343,57 @@ hs_getmdev(struct vfs *vfsp, char *fspec, int flags, dev_t *pdev, mode_t *mode,
     cred_t *cr)
 {
 	int error;
-	struct vnode *vp;
+	struct vnode *svp = NULL;
+	struct vnode *lvp = NULL;
+	struct vnode *bvp;
 	struct vattr vap;
 	dev_t dev;
+	enum uio_seg fromspace = (flags & MS_SYSSPACE) ?
+	    UIO_SYSSPACE : UIO_USERSPACE;
 
 	/*
-	 * Get the device to be mounted
+	 * Look up the device/file to be mounted.
 	 */
-	error = lookupname(fspec, (flags & MS_SYSSPACE) ?
-	    UIO_SYSSPACE : UIO_USERSPACE, FOLLOW, NULLVPP, &vp);
+	error = lookupname(fspec, fromspace, FOLLOW, NULLVPP, &svp);
 	if (error) {
-		if (error == ENOENT) {
-			return (ENODEV);	/* needs translation */
+		if (error == ENOENT)
+			error = ENODEV;
+		goto out;
+	}
+
+	error = vfs_get_lofi(vfsp, &lvp);
+
+	if (error > 0) {
+		if (error == ENOENT)
+			error = ENODEV;
+		goto out;
+	} else if (error == 0) {
+		bvp = lvp;
+	} else {
+		bvp = svp;
+
+		if (bvp->v_type != VBLK) {
+			error = ENOTBLK;
+			goto out;
 		}
-		return (error);
+
+		if ((error = secpolicy_spec_open(cr, bvp, FREAD)) != 0)
+			goto out;
 	}
-	if (vp->v_type != VBLK) {
-		VN_RELE(vp);
-		return (ENOTBLK);
-	}
+
 	/*
-	 * Can we read from the device?
+	 * Can we read from the device/file ?
 	 */
-	if ((error = VOP_ACCESS(vp, VREAD, 0, cr, NULL)) != 0 ||
-	    (error = secpolicy_spec_open(cr, vp, FREAD)) != 0) {
-		VN_RELE(vp);
-		return (error);
-	}
+	if ((error = VOP_ACCESS(svp, VREAD, 0, cr, NULL)) != 0)
+		goto out;
 
 	vap.va_mask = AT_MODE;		/* get protection mode */
-	(void) VOP_GETATTR(vp, &vap, 0, CRED(), NULL);
+	(void) VOP_GETATTR(bvp, &vap, 0, CRED(), NULL);
 	*mode = vap.va_mode;
 
-	dev = *pdev = vp->v_rdev;
-	VN_RELE(vp);
+	dev = *pdev = bvp->v_rdev;
+
+	error = EBUSY;
 
 	/*
 	 * Ensure that this device isn't already mounted,
@@ -1385,14 +1402,23 @@ hs_getmdev(struct vfs *vfsp, char *fspec, int flags, dev_t *pdev, mode_t *mode,
 	 */
 	if ((flags & MS_NOCHECK) == 0) {
 		if (vfs_devmounting(dev, vfsp))
-			return (EBUSY);
+			goto out;
 		if (vfs_devismounted(dev) && !(flags & MS_REMOUNT))
-			return (EBUSY);
+			goto out;
 	}
 
-	if (getmajor(*pdev) >= devcnt)
-		return (ENXIO);
-	return (0);
+	if (getmajor(*pdev) >= devcnt) {
+		error = ENXIO;
+		goto out;
+	}
+
+	error = 0;
+out:
+	if (svp != NULL)
+		VN_RELE(svp);
+	if (lvp != NULL)
+		VN_RELE(lvp);
+	return (error);
 }
 
 static void

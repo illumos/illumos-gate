@@ -696,7 +696,8 @@ check_sanity(char *filename)
 	int found_magic[MAGIC_LIMIT];
 	int magic_cnt;
 	int is_magic = 0;
-	int is_block;
+	int is_block = 0;
+	int is_file = 0;
 
 	(void) memset((void *)found_magic, 0, sizeof (found_magic));
 
@@ -706,22 +707,12 @@ check_sanity(char *filename)
 		exit(EXNOSTAT);
 	}
 
-	if ((stbd.st_mode & S_IFMT) == S_IFBLK) {
+	if (S_ISBLK(stbd.st_mode)) {
 		is_block = 1;
-	} else if ((stbd.st_mode & S_IFMT) == S_IFCHR) {
+	} else if (S_ISCHR(stbd.st_mode)) {
 		is_block = 0;
-	} else {
-		/*
-		 * In !mflag mode, we allow checking the contents
-		 * of a file.  Since this is intended primarily for
-		 * speeding up boot-time checks and allowing for a
-		 * file complicates the ok-input tests, we'll disallow
-		 * that option.
-		 */
-		(void) fprintf(stderr,
-		    "ufs fsck: sanity check failed: "
-		    "%s not block or character device\n", filename);
-		exit(EXNOSTAT);
+	} else if (S_ISREG(stbd.st_mode)) {
+		is_file = 1;
 	}
 
 	/*
@@ -729,7 +720,7 @@ check_sanity(char *filename)
 	 * silently on failures. The whole point of this is to be tolerant
 	 * of the magic file systems being already mounted.
 	 */
-	if ((vfstab = fopen(VFSTAB, "r")) != 0) {
+	if (!is_file && (vfstab = fopen(VFSTAB, "r")) != NULL) {
 		for (magic_cnt = 0; magic_cnt < MAGIC_LIMIT; magic_cnt++) {
 			if (magic_cnt == MAGIC_NONE)
 				continue;
