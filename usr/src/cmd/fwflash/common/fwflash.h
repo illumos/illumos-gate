@@ -355,8 +355,6 @@ di_node_t rootnode;
 struct fw_plugin *self;
 
 
-int manufacturing_mode;
-
 /*
  * utility defines and macros, since the firmware image we get
  * from LSI is ARM-format and that means byte- and short-swapping
