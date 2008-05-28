@@ -1049,7 +1049,6 @@ static struct {
 	uint64_t kms_dont_know;
 	uint64_t kms_hunt_found_slab;
 	uint64_t kms_hunt_found_mag;
-	uint64_t kms_hunt_notfound;
 	uint64_t kms_hunt_alloc_fail;
 	uint64_t kms_hunt_lucky;
 	uint64_t kms_notify;
@@ -3149,6 +3148,8 @@ kmem_partial_slab_cmp(const void *p0, const void *p1)
 static void
 kmem_check_destructor(kmem_cache_t *cp)
 {
+	ASSERT(taskq_member(kmem_move_taskq, curthread));
+
 	if (cp->cache_destructor == NULL)
 		return;
 
@@ -3548,10 +3549,22 @@ kmem_cache_set_move(kmem_cache_t *cp,
 	if (KMEM_IS_MOVABLE(cp)) {
 		if (cp->cache_move == NULL) {
 			/*
-			 * The client must not have allocated any objects from
-			 * this cache before setting a move callback function.
+			 * We want to assert that the client has not allocated
+			 * any objects from this cache before setting a move
+			 * callback function. However, it's possible that
+			 * kmem_check_destructor() has created a slab between
+			 * the time that the client called kmem_cache_create()
+			 * and this call to kmem_cache_set_move(). Currently
+			 * there are no correctness issues involved; the client
+			 * could allocate many objects before setting a
+			 * callback, but we want to enforce the rule anyway to
+			 * allow the greatest flexibility for the consolidator
+			 * in the future.
+			 *
+			 * It's possible that kmem_check_destructor() can be
+			 * called twice for the same cache.
 			 */
-			ASSERT(cp->cache_bufmax == 0);
+			ASSERT(cp->cache_slab_alloc <= 2);
 
 			cp->cache_defrag = defrag;
 			defrag = NULL; /* nothing to free */
@@ -4357,8 +4370,6 @@ kmem_move_buffer(kmem_move_t *callback)
 			mutex_enter(&cp->cache_lock);
 			kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
 			mutex_exit(&cp->cache_lock);
-		} else {
-			KMEM_STAT_ADD(kmem_move_stats.kms_hunt_notfound);
 		}
 		break;
 	default:
@@ -4753,9 +4764,10 @@ kmem_cache_move_notify(kmem_cache_t *cp, void *buf)
 	if (args != NULL) {
 		args->kmna_cache = cp;
 		args->kmna_buf = buf;
-		(void) taskq_dispatch(kmem_taskq,
+		if (!taskq_dispatch(kmem_taskq,
 		    (task_func_t *)kmem_cache_move_notify_task, args,
-		    TQ_NOSLEEP);
+		    TQ_NOSLEEP))
+			kmem_free(args, sizeof (kmem_move_notify_args_t));
 	}
 }
 
