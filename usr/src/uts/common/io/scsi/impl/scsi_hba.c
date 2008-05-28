@@ -745,7 +745,7 @@ smp_ctlops_reportdev(dev_info_t	*dip, dev_info_t *rdip)
 	ASSERT(hba != NULL);
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SMP_WWN, &smp_wwn) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
@@ -794,7 +794,7 @@ smp_ctlops_initchild(dev_info_t	*dip, dev_info_t *rdip)
 	smp->smp_addr.a_hba_tran = hba;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP | DDI_PROP_NOTPROM,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SMP_WWN, &smp_wwn) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
