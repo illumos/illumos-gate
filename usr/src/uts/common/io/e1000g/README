@@ -552,6 +552,7 @@ Notes on packaging:
 5.2.4
 ======
   This version has the following fix:
+   6619929 Sunvts test on Northstar QGC EM failed for "Not received any packets in loopback mode".
    6541233 e1000g driver performs 33X Slower for Tibco RV when running Multiple RVDs
    6572343 e1000g: needs to improve the ip forwarding performance
    6637039 e1000g_recycle() missed a mutex_exit()
@@ -570,4 +571,12 @@ Notes on packaging:
 ======
   This version has the following fix:
    6673650 e1000g needs to support Brussels
+
+5.2.8
+======
+  This version has the following fix:
+   6674179 doradi panics at e1000g_receive
+   6679136 E1000g with patch 128028-03 will not allow pause frames to be set
+   6687947 e1000g needs to integrate the latest Intel shared code to support ICH9m
+   6699622 e1000g: add support for network device in new development machine
 

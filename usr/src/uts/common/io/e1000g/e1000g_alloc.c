@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -1076,10 +1076,8 @@ e1000g_alloc_rx_packets(e1000g_rx_ring_t *rx_ring)
 
 	Adapter = rx_ring->adapter;
 	dma_attr = e1000g_buf_dma_attr;
-
-#ifndef NO_82542_SUPPORT
 	dma_attr.dma_attr_align = Adapter->rx_buf_align;
-#endif
+
 	/*
 	 * Allocate memory for the rx_sw_packet structures. Each one of these
 	 * structures will contain a virtual and physical address to an actual

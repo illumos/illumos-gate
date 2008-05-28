@@ -301,23 +301,23 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	rx_ring->rbd_next = rx_ring->rbd_first;
 
 	size = Adapter->rx_desc_num * sizeof (struct e1000_rx_desc);
-	E1000_WRITE_REG(hw, E1000_RDLEN, size);
-	size = E1000_READ_REG(hw, E1000_RDLEN);
+	E1000_WRITE_REG(hw, E1000_RDLEN(0), size);
+	size = E1000_READ_REG(hw, E1000_RDLEN(0));
 
 	/* To get lower order bits */
 	buf_low = (uint32_t)rx_ring->rbd_dma_addr;
 	/* To get the higher order bits */
 	buf_high = (uint32_t)(rx_ring->rbd_dma_addr >> 32);
 
-	E1000_WRITE_REG(hw, E1000_RDBAH, buf_high);
-	E1000_WRITE_REG(hw, E1000_RDBAL, buf_low);
+	E1000_WRITE_REG(hw, E1000_RDBAH(0), buf_high);
+	E1000_WRITE_REG(hw, E1000_RDBAL(0), buf_low);
 
 	/*
 	 * Setup our HW Rx Head & Tail descriptor pointers
 	 */
-	E1000_WRITE_REG(hw, E1000_RDT,
+	E1000_WRITE_REG(hw, E1000_RDT(0),
 	    (uint32_t)(rx_ring->rbd_last - rx_ring->rbd_first));
-	E1000_WRITE_REG(hw, E1000_RDH, 0);
+	E1000_WRITE_REG(hw, E1000_RDH(0), 0);
 
 	/*
 	 * Setup the Receive Control Register (RCTL), and ENABLE the
@@ -337,14 +337,14 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	if (Adapter->strip_crc)
 		reg_val |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
 
-	if ((hw->mac.max_frame_size > FRAME_SIZE_UPTO_2K) &&
-	    (hw->mac.max_frame_size <= FRAME_SIZE_UPTO_4K))
+	if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_2K) &&
+	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_4K))
 		reg_val |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX;
-	else if ((hw->mac.max_frame_size > FRAME_SIZE_UPTO_4K) &&
-	    (hw->mac.max_frame_size <= FRAME_SIZE_UPTO_8K))
+	else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_4K) &&
+	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_8K))
 		reg_val |= E1000_RCTL_SZ_8192 | E1000_RCTL_BSEX;
-	else if ((hw->mac.max_frame_size > FRAME_SIZE_UPTO_8K) &&
-	    (hw->mac.max_frame_size <= FRAME_SIZE_UPTO_16K))
+	else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_8K) &&
+	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_16K))
 		reg_val |= E1000_RCTL_SZ_16384 | E1000_RCTL_BSEX;
 	else
 		reg_val |= E1000_RCTL_SZ_2048;
@@ -513,7 +513,8 @@ e1000g_receive(struct e1000g *Adapter)
 
 			if (TBI_ACCEPT(hw,
 			    current_desc->status, current_desc->errors,
-			    current_desc->length, last_byte)) {
+			    current_desc->length, last_byte,
+			    Adapter->min_frame_size, Adapter->max_frame_size)) {
 
 				e1000_tbi_adjust_stats(Adapter,
 				    length, hw->mac.addr);
@@ -809,7 +810,7 @@ rx_next_desc:
 	/*
 	 * Advance the E1000's Receive Queue #0 "Tail Pointer".
 	 */
-	E1000_WRITE_REG(hw, E1000_RDT,
+	E1000_WRITE_REG(hw, E1000_RDT(0),
 	    (uint32_t)(last_desc - rx_ring->rbd_first));
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
@@ -854,7 +855,7 @@ rx_drop:
 	/*
 	 * Advance the E1000's Receive Queue #0 "Tail Pointer".
 	 */
-	E1000_WRITE_REG(hw, E1000_RDT,
+	E1000_WRITE_REG(hw, E1000_RDT(0),
 	    (uint32_t)(last_desc - rx_ring->rbd_first));
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {

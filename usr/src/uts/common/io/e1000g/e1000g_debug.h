@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -50,6 +50,8 @@ extern "C" {
  * It turns on diagnostics if DEBUG is defined (DEBUG also
  * enables other debugging code as ASSERT statements...
  */
+
+#include <sys/types.h>
 
 #ifdef DEBUG
 #define	E1000G_DEBUG
@@ -120,6 +122,7 @@ void eeprom_dump(void *);
 void phy_dump(void *);
 void mac_dump(void *);
 void pciconfig_dump(void *);
+void pciconfig_bar(void *, uint32_t, char *);
 #endif
 
 #ifdef E1000G_DEBUG

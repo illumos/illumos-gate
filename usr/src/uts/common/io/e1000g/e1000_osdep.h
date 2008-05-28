@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -93,27 +93,10 @@ extern "C" {
 #define	IEEE_ESR_1000X_HD_CAPS	0x4000	/* 1000X HD capable */
 #define	IEEE_ESR_1000X_FD_CAPS	0x8000	/* 1000X FD capable */
 
+/*
+ * required by shared code
+ */
 #define	E1000_WRITE_FLUSH(a)	E1000_READ_REG(a, E1000_STATUS)
-
-#ifdef NO_82542_SUPPORT
-#define	E1000_WRITE_REG(hw, reg, value)	\
-	ddi_put32((OS_DEP(hw))->reg_handle, \
-	    (uint32_t *)((hw)->hw_addr + reg), (value))
-
-#define	E1000_READ_REG(hw, reg)	\
-	ddi_get32((OS_DEP(hw))->reg_handle, \
-	    (uint32_t *)((hw)->hw_addr + reg))
-
-#define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value)	\
-	ddi_put32((OS_DEP(hw))->reg_handle, \
-	    (uint32_t *)((hw)->hw_addr + reg + ((offset) << 2)), \
-	    (value))
-
-#define	E1000_READ_REG_ARRAY(hw, reg, offset)	\
-	ddi_get32((OS_DEP(hw))->reg_handle, \
-	    (uint32_t *)((hw)->hw_addr + reg + ((offset) << 2)))
-
-#else	/* NO_82542_SUPPORT */
 
 #define	E1000_WRITE_REG(hw, reg, value)	\
 {\
@@ -157,7 +140,6 @@ extern "C" {
 		(uint32_t *)((hw)->hw_addr + \
 		e1000_translate_register_82542(reg) + \
 		((offset) << 2))))
-#endif	/* NO_82542_SUPPORT */
 
 
 #define	E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value)	NULL
@@ -207,6 +189,7 @@ typedef uint32_t	ULONG;	/* 32-bit unsigned */
 typedef uint32_t	UINT32;
 typedef uint32_t	UINT;	/* 32-bit unsigned */
 typedef UCHAR		BOOLEAN;
+typedef	BOOLEAN		bool;
 typedef UCHAR		*PUCHAR;
 typedef UINT		*PUINT;
 typedef ULONG		*PLONG;

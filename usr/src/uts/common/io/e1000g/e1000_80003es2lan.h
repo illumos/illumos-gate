@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.8 v2008-02-29
  */
 #ifndef _E1000_80003ES2LAN_H_
 #define	_E1000_80003ES2LAN_H_
@@ -38,6 +38,7 @@ extern "C" {
 #define	E1000_KMRNCTRLSTA_OFFSET_FIFO_CTRL	0x00
 #define	E1000_KMRNCTRLSTA_OFFSET_INB_CTRL	0x02
 #define	E1000_KMRNCTRLSTA_OFFSET_HD_CTRL	0x10
+#define	E1000_KMRNCTRLSTA_OFFSET_MAC2PHY_OPMODE	0x1F
 
 #define	E1000_KMRNCTRLSTA_FIFO_CTRL_RX_BYPASS	0x0008
 #define	E1000_KMRNCTRLSTA_FIFO_CTRL_TX_BYPASS	0x0800
@@ -45,6 +46,7 @@ extern "C" {
 
 #define	E1000_KMRNCTRLSTA_HD_CTRL_10_100_DEFAULT 0x0004
 #define	E1000_KMRNCTRLSTA_HD_CTRL_1000_DEFAULT	0x0000
+#define	E1000_KMRNCTRLSTA_OPMODE_E_IDLE		0x2000
 
 /* Gigabit Carry Extend Padding */
 #define	E1000_TCTL_EXT_GCEX_MASK		0x000FFC00

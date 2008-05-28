@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.15 v2008-02-29
  */
 #ifndef _E1000_MANAGE_H_
 #define	_E1000_MANAGE_H_
@@ -35,8 +35,8 @@
 extern "C" {
 #endif
 
-boolean_t e1000_check_mng_mode_generic(struct e1000_hw *hw);
-boolean_t e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw);
+bool e1000_check_mng_mode_generic(struct e1000_hw *hw);
+bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw);
 s32 e1000_mng_enable_host_if_generic(struct e1000_hw *hw);
 s32 e1000_mng_host_if_write_generic(struct e1000_hw *hw, u8 *buffer,
     u16 length, u16 offset, u8 *sum);
@@ -70,8 +70,8 @@ typedef enum {
 #define	E1000_VFTA_ENTRY_MASK		0x7F
 #define	E1000_VFTA_ENTRY_BIT_SHIFT_MASK	0x1F
 
-#define	E1000_HI_MAX_BLOCK_BYTE_LENGTH	1792	/* Number of bytes in range */
-#define	E1000_HI_MAX_BLOCK_DWORD_LENGTH	448	/* Number of dwords in range */
+#define	E1000_HI_MAX_BLOCK_BYTE_LENGTH	1792	/* Num of bytes in range */
+#define	E1000_HI_MAX_BLOCK_DWORD_LENGTH	448	/* Num of dwords in range */
 #define	E1000_HI_COMMAND_TIMEOUT	500	/* Process HI command limit */
 
 #define	E1000_HICR_EN			0x01	/* Enable bit - RO */

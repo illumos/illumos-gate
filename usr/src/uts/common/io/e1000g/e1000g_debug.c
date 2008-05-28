@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -53,7 +53,7 @@
 
 #ifdef E1000G_DEBUG
 #define	WPL		8	/* 8 16-bit words per line */
-#define	NUM_REGS	185	/* must match the array initializer */
+#define	NUM_REGS	155	/* must match the array initializer */
 typedef struct {
 	char		name[10];
 	uint32_t	offset;
@@ -285,26 +285,26 @@ mac_dump(void *instance)
 	    {"PBA",	E1000_PBA},	{"PBS",		E1000_PBS},
 	    {"EEMNGCTL", E1000_EEMNGCTL}, {"ERT",	E1000_ERT},
 	    {"FCRTL",	E1000_FCRTL},	{"FCRTH",	E1000_FCRTH},
-	    {"PSRCTL",	E1000_PSRCTL},	{"RDBAL",	E1000_RDBAL},
-	    {"RDBAH",	E1000_RDBAH},	{"RDLEN",	E1000_RDLEN},
-	    {"RDH",	E1000_RDH},	{"RDT",		E1000_RDT},
-	    {"RDTR",	E1000_RDTR},	{"RXDCTL",	E1000_RXDCTL},
-	    {"RADV",	E1000_RADV},	{"RDBAL1",	E1000_RDBAL1},
-	    {"RDBAH1",	E1000_RDBAH1},	{"RDLEN1",	E1000_RDLEN1},
-	    {"RDH1",	E1000_RDH1},	{"RDT1",	E1000_RDT1},
-	    {"RXDCTL1",	E1000_RXDCTL1},	{"RSRPD",	E1000_RSRPD},
+	    {"PSRCTL",	E1000_PSRCTL},	{"RDBAL(0)",	E1000_RDBAL(0)},
+	    {"RDBAH(0)", E1000_RDBAH(0)}, {"RDLEN(0)",	E1000_RDLEN(0)},
+	    {"RDH(0)",	E1000_RDH(0)},	{"RDT(0)",	E1000_RDT(0)},
+	    {"RDTR",	E1000_RDTR},	{"RXDCTL(0)",	E1000_RXDCTL(0)},
+	    {"RADV",	E1000_RADV},	{"RDBAL(1)",	E1000_RDBAL(1)},
+	    {"RDBAH(1)", E1000_RDBAH(1)}, {"RDLEN(1)",	E1000_RDLEN(1)},
+	    {"RDH(1)",	E1000_RDH(1)},	{"RDT(1)",	E1000_RDT(1)},
+	    {"RXDCTL(1)", E1000_RXDCTL(1)}, {"RSRPD",	E1000_RSRPD},
 	    {"RAID",	E1000_RAID},	{"CPUVEC",	E1000_CPUVEC},
 	    {"TDFH",	E1000_TDFH},	{"TDFT",	E1000_TDFT},
 	    {"TDFHS",	E1000_TDFHS},	{"TDFTS",	E1000_TDFTS},
-	    {"TDFPC",	E1000_TDFPC},	{"TDBAL",	E1000_TDBAL},
-	    {"TDBAH",	E1000_TDBAH},	{"TDLEN",	E1000_TDLEN},
-	    {"TDH",	E1000_TDH},	{"TDT",		E1000_TDT},
-	    {"TIDV",	E1000_TIDV},	{"TXDCTL",	E1000_TXDCTL},
-	    {"TADV",	E1000_TADV},	{"TARC0",	E1000_TARC0},
-	    {"TDBAL1",	E1000_TDBAL1},	{"TDBAH1",	E1000_TDBAH1},
-	    {"TDLEN1",	E1000_TDLEN1},	{"TDH1",	E1000_TDH1},
-	    {"TDT1",	E1000_TDT1},	{"TXDCTL1",	E1000_TXDCTL1},
-	    {"TARC1",	E1000_TARC1},	{"ALGNERRC",	E1000_ALGNERRC},
+	    {"TDFPC",	E1000_TDFPC},	{"TDBAL(0)",	E1000_TDBAL(0)},
+	    {"TDBAH(0)", E1000_TDBAH(0)}, {"TDLEN(0)",	E1000_TDLEN(0)},
+	    {"TDH(0)",	E1000_TDH(0)},	{"TDT(0)",	E1000_TDT(0)},
+	    {"TIDV",	E1000_TIDV},	{"TXDCTL(0)",	E1000_TXDCTL(0)},
+	    {"TADV",	E1000_TADV},	{"TARC(0)",	E1000_TARC(0)},
+	    {"TDBAL(1)", E1000_TDBAL(1)}, {"TDBAH(1)",	E1000_TDBAH(1)},
+	    {"TDLEN(1)", E1000_TDLEN(1)}, {"TDH(1)",	E1000_TDH(1)},
+	    {"TDT(1)",	E1000_TDT(1)},	{"TXDCTL(1)",	E1000_TXDCTL(1)},
+	    {"TARC(1)",	E1000_TARC(1)},	{"ALGNERRC",	E1000_ALGNERRC},
 	    {"RXERRC",	E1000_RXERRC},	{"MPC",		E1000_MPC},
 	    {"SCC",	E1000_SCC},	{"ECOL",	E1000_ECOL},
 	    {"MCC",	E1000_MCC},	{"LATECOL",	E1000_LATECOL},
@@ -347,22 +347,6 @@ mac_dump(void *instance)
 	    {"GSCL_2",	E1000_GSCL_2},	{"GSCL_3",	E1000_GSCL_3},
 	    {"GSCL_4",	E1000_GSCL_4},	{"FACTPS",	E1000_FACTPS},
 	    {"FWSM",	E1000_FWSM},
-
-	    {"CTRL",	E1000_CTRL},	{"STATUS",	E1000_STATUS},
-	    {"RCTL",	E1000_RCTL},	{"RDLEN",	E1000_RDLEN},
-	    {"RDH",	E1000_RDH},	{"RDT",		E1000_RDT},
-	    {"RDTR",	E1000_RDTR},	{"TCTL",	E1000_TCTL},
-	    {"TDBAL",	E1000_TDBAL},	{"TDBAH",	E1000_TDBAH},
-	    {"TDLEN",	E1000_TDLEN},	{"TDH",		E1000_TDH},
-	    {"TDT",	E1000_TDT},	{"TIDV",	E1000_TIDV},
-	    {"TXDCTL",	E1000_TXDCTL},	{"TADV",	E1000_TADV},
-	    {"TARC0",	E1000_TARC0},	{"TDBAL1",	E1000_TDBAL1},
-	    {"TDBAH1",	E1000_TDBAH1},	{"TDLEN1",	E1000_TDLEN1},
-	    {"TDH1",	E1000_TDH1},	{"TDT1",	E1000_TDT1},
-	    {"TXDCTL1",	E1000_TXDCTL1}, {"TARC1",	E1000_TARC1},
-	    {"CTRL_EXT", E1000_CTRL_EXT}, {"ERT",	E1000_ERT},
-	    {"RDBAL",	E1000_RDBAL},	{"RDBAH",	E1000_RDBAH},
-	    {"RXDCTL",	E1000_RXDCTL},	{"TXDMAC",	E1000_TXDMAC},
 	};
 
 	e1000g_log(Adapter, CE_CONT, "Begin MAC dump\n");
@@ -424,24 +408,14 @@ pciconfig_dump(void *instance)
 	e1000g_log(Adapter, CE_CONT,
 	    "PCI_CONF_BIST:\t0x%x\n",
 	    pci_config_get8(handle, PCI_CONF_BIST));
-	e1000g_log(Adapter, CE_CONT,
-	    "PCI_CONF_BASE0:\t0x%x\n",
-	    pci_config_get32(handle, PCI_CONF_BASE0));
-	e1000g_log(Adapter, CE_CONT,
-	    "PCI_CONF_BASE1:\t0x%x\n",
-	    pci_config_get32(handle, PCI_CONF_BASE1));
-	e1000g_log(Adapter, CE_CONT,
-	    "PCI_CONF_BASE2:\t0x%x\n",
-	    pci_config_get32(handle, PCI_CONF_BASE2));
-	e1000g_log(Adapter, CE_CONT,
-	    "PCI_CONF_BASE3:\t0x%x\n",
-	    pci_config_get32(handle, PCI_CONF_BASE3));
-	e1000g_log(Adapter, CE_CONT,
-	    "PCI_CONF_BASE4:\t0x%x\n",
-	    pci_config_get32(handle, PCI_CONF_BASE4));
-	e1000g_log(Adapter, CE_CONT,
-	    "PCI_CONF_BASE5:\t0x%x\n",
-	    pci_config_get32(handle, PCI_CONF_BASE5));
+
+	pciconfig_bar(Adapter, PCI_CONF_BASE0, "PCI_CONF_BASE0");
+	pciconfig_bar(Adapter, PCI_CONF_BASE1, "PCI_CONF_BASE1");
+	pciconfig_bar(Adapter, PCI_CONF_BASE2, "PCI_CONF_BASE2");
+	pciconfig_bar(Adapter, PCI_CONF_BASE3, "PCI_CONF_BASE3");
+	pciconfig_bar(Adapter, PCI_CONF_BASE4, "PCI_CONF_BASE4");
+	pciconfig_bar(Adapter, PCI_CONF_BASE5, "PCI_CONF_BASE5");
+
 	e1000g_log(Adapter, CE_CONT,
 	    "PCI_CONF_CIS:\t0x%x\n",
 	    pci_config_get32(handle, PCI_CONF_CIS));
@@ -552,5 +526,68 @@ pciconfig_dump(void *instance)
 	e1000g_log(Adapter, CE_CONT,
 	    "PCIE_LINKSTS:\t0x%x\n",
 	    pci_config_get16(handle, offset + PCIE_LINKSTS));
+}
+
+void
+pciconfig_bar(void *instance, uint32_t offset, char *name)
+{
+	struct e1000g *Adapter = (struct e1000g *)instance;
+	ddi_acc_handle_t handle = Adapter->osdep.cfg_handle;
+	uint32_t base = pci_config_get32(handle, offset);
+	uint16_t comm = pci_config_get16(handle, PCI_CONF_COMM);
+	uint32_t size;		/* derived size of the region */
+	uint32_t bits_comm;	/* command word bits to disable */
+	uint32_t size_mask;	/* mask for size extraction */
+	char tag_type[32];	/* tag to show memory vs. i/o */
+	char tag_mem[32];	/* tag to show memory characteristiccs */
+
+	/* base address zero, simple print */
+	if (base == 0) {
+		e1000g_log(Adapter, CE_CONT, "%s:\t0x%x\n", name, base);
+
+	/* base address non-zero, get size */
+	} else {
+		/* i/o factors that decode from the base address */
+		if (base & PCI_BASE_SPACE_IO) {
+			bits_comm = PCI_COMM_IO;
+			size_mask = PCI_BASE_IO_ADDR_M;
+			strcpy(tag_type, "i/o port size:");
+			strcpy(tag_mem, "");
+		/* memory factors that decode from the base address */
+		} else {
+			bits_comm = PCI_COMM_MAE;
+			size_mask = PCI_BASE_M_ADDR_M;
+			strcpy(tag_type, "memory size:");
+			if (base & PCI_BASE_TYPE_ALL)
+				strcpy(tag_mem, "64bit ");
+			else
+				strcpy(tag_mem, "32bit ");
+			if (base & PCI_BASE_PREF_M)
+				strcat(tag_mem, "prefetchable");
+			else
+				strcat(tag_mem, "non-prefetchable");
+		}
+
+		/* disable memory decode */
+		pci_config_put16(handle, PCI_CONF_COMM, (comm & ~bits_comm));
+
+		/* write to base register */
+		pci_config_put32(handle, offset, 0xffffffff);
+
+		/* read back & compute size */
+		size = pci_config_get32(handle, offset);
+		size &= size_mask;
+		size = (~size) + 1;
+
+		/* restore base register */
+		pci_config_put32(handle, offset, base);
+
+		/* re-enable memory decode */
+		pci_config_put16(handle, PCI_CONF_COMM, comm);
+
+		/* print results */
+		e1000g_log(Adapter, CE_CONT, "%s:\t0x%x %s 0x%x %s\n",
+		    name, base, tag_type, size, tag_mem);
+	}
 }
 #endif

@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,15 +19,16 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.59 v2008-02-29
  */
+
 /*
  * e1000_82543
  * e1000_82544
@@ -35,8 +36,6 @@
 
 #include "e1000_api.h"
 #include "e1000_82543.h"
-
-void e1000_init_function_pointers_82543(struct e1000_hw *hw);
 
 static s32 e1000_init_phy_params_82543(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_82543(struct e1000_hw *hw);
@@ -61,20 +60,20 @@ static void e1000_write_vfta_82543(struct e1000_hw *hw, u32 offset,
 static void e1000_mta_set_82543(struct e1000_hw *hw, u32 hash_value);
 static void e1000_clear_hw_cntrs_82543(struct e1000_hw *hw);
 static s32 e1000_config_mac_to_phy_82543(struct e1000_hw *hw);
-static boolean_t e1000_init_phy_disabled_82543(struct e1000_hw *hw);
+static bool e1000_init_phy_disabled_82543(struct e1000_hw *hw);
 static void e1000_lower_mdi_clk_82543(struct e1000_hw *hw, u32 *ctrl);
 static s32 e1000_polarity_reversal_workaround_82543(struct e1000_hw *hw);
 static void e1000_raise_mdi_clk_82543(struct e1000_hw *hw, u32 *ctrl);
 static u16 e1000_shift_in_mdi_bits_82543(struct e1000_hw *hw);
 static void e1000_shift_out_mdi_bits_82543(struct e1000_hw *hw, u32 data,
     u16 count);
-static boolean_t e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw);
-static void e1000_set_tbi_sbp_82543(struct e1000_hw *hw, boolean_t state);
+static bool e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw);
+static void e1000_set_tbi_sbp_82543(struct e1000_hw *hw, bool state);
 
 struct e1000_dev_spec_82543 {
 	u32 tbi_compatibility;
-	boolean_t dma_fairness;
-	boolean_t init_phy_disabled;
+	bool dma_fairness;
+	bool init_phy_disabled;
 };
 
 /*
@@ -87,14 +86,16 @@ static s32
 e1000_init_phy_params_82543(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_phy_params_82543");
 
-	if (hw->media_type != e1000_media_type_copper) {
+	if (hw->phy.media_type != e1000_media_type_copper) {
 		phy->type = e1000_phy_none;
 		goto out;
+	} else {
+		phy->ops.power_up = e1000_power_up_phy_copper;
+		phy->ops.power_down = e1000_power_down_phy_copper;
 	}
 
 	phy->addr = 1;
@@ -103,21 +104,21 @@ e1000_init_phy_params_82543(struct e1000_hw *hw)
 	phy->type = e1000_phy_m88;
 
 	/* Function Pointers */
-	func->check_polarity = e1000_check_polarity_m88;
-	func->commit_phy = e1000_phy_sw_reset_generic;
-	func->force_speed_duplex = e1000_phy_force_speed_duplex_82543;
-	func->get_cable_length = e1000_get_cable_length_m88;
-	func->get_cfg_done = e1000_get_cfg_done_generic;
-	func->read_phy_reg = (hw->mac.type == e1000_82543)
+	phy->ops.check_polarity = e1000_check_polarity_m88;
+	phy->ops.commit = e1000_phy_sw_reset_generic;
+	phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_82543;
+	phy->ops.get_cable_length = e1000_get_cable_length_m88;
+	phy->ops.get_cfg_done = e1000_get_cfg_done_generic;
+	phy->ops.read_reg = (hw->mac.type == e1000_82543)
 	    ? e1000_read_phy_reg_82543
 	    : e1000_read_phy_reg_m88;
-	func->reset_phy = (hw->mac.type == e1000_82543)
+	phy->ops.reset = (hw->mac.type == e1000_82543)
 	    ? e1000_phy_hw_reset_82543
 	    : e1000_phy_hw_reset_generic;
-	func->write_phy_reg = (hw->mac.type == e1000_82543)
+	phy->ops.write_reg = (hw->mac.type == e1000_82543)
 	    ? e1000_write_phy_reg_82543
 	    : e1000_write_phy_reg_m88;
-	func->get_phy_info = e1000_get_phy_info_m88;
+	phy->ops.get_info = e1000_get_phy_info_m88;
 
 	/*
 	 * The external PHY of the 82543 can be in a funky state.
@@ -125,7 +126,7 @@ e1000_init_phy_params_82543(struct e1000_hw *hw)
 	 * the PHY ID.
 	 */
 	if (!e1000_init_phy_disabled_82543(hw)) {
-		ret_val = e1000_phy_hw_reset(hw);
+		ret_val = phy->ops.reset(hw);
 		if (ret_val) {
 			DEBUGOUT("Resetting PHY during init failed.\n");
 			goto out;
@@ -170,7 +171,6 @@ static s32
 e1000_init_nvm_params_82543(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
-	struct e1000_functions *func = &hw->func;
 
 	DEBUGFUNC("e1000_init_nvm_params_82543");
 
@@ -181,11 +181,11 @@ e1000_init_nvm_params_82543(struct e1000_hw *hw)
 	nvm->opcode_bits = 3;
 
 	/* Function Pointers */
-	func->read_nvm = e1000_read_nvm_microwire;
-	func->update_nvm = e1000_update_nvm_checksum_generic;
-	func->valid_led_default = e1000_valid_led_default_generic;
-	func->validate_nvm = e1000_validate_nvm_checksum_generic;
-	func->write_nvm = e1000_write_nvm_microwire;
+	nvm->ops.read = e1000_read_nvm_microwire;
+	nvm->ops.update = e1000_update_nvm_checksum_generic;
+	nvm->ops.valid_led_default = e1000_valid_led_default_generic;
+	nvm->ops.validate = e1000_validate_nvm_checksum_generic;
+	nvm->ops.write = e1000_write_nvm_microwire;
 
 	return (E1000_SUCCESS);
 }
@@ -200,7 +200,6 @@ static s32
 e1000_init_mac_params_82543(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val;
 
 	DEBUGFUNC("e1000_init_mac_params_82543");
@@ -209,10 +208,10 @@ e1000_init_mac_params_82543(struct e1000_hw *hw)
 	switch (hw->device_id) {
 	case E1000_DEV_ID_82543GC_FIBER:
 	case E1000_DEV_ID_82544EI_FIBER:
-		hw->media_type = e1000_media_type_fiber;
+		hw->phy.media_type = e1000_media_type_fiber;
 		break;
 	default:
-		hw->media_type = e1000_media_type_copper;
+		hw->phy.media_type = e1000_media_type_copper;
 		break;
 	}
 
@@ -224,43 +223,43 @@ e1000_init_mac_params_82543(struct e1000_hw *hw)
 	/* Function pointers */
 
 	/* bus type/speed/width */
-	func->get_bus_info = e1000_get_bus_info_pci_generic;
+	mac->ops.get_bus_info = e1000_get_bus_info_pci_generic;
 	/* reset */
-	func->reset_hw = e1000_reset_hw_82543;
+	mac->ops.reset_hw = e1000_reset_hw_82543;
 	/* hw initialization */
-	func->init_hw = e1000_init_hw_82543;
+	mac->ops.init_hw = e1000_init_hw_82543;
 	/* link setup */
-	func->setup_link = e1000_setup_link_82543;
+	mac->ops.setup_link = e1000_setup_link_82543;
 	/* physical interface setup */
-	func->setup_physical_interface =
-	    (hw->media_type == e1000_media_type_copper)
+	mac->ops.setup_physical_interface =
+	    (hw->phy.media_type == e1000_media_type_copper)
 	    ? e1000_setup_copper_link_82543
 	    : e1000_setup_fiber_link_82543;
 	/* check for link */
-	func->check_for_link =
-	    (hw->media_type == e1000_media_type_copper)
+	mac->ops.check_for_link =
+	    (hw->phy.media_type == e1000_media_type_copper)
 	    ? e1000_check_for_copper_link_82543
 	    : e1000_check_for_fiber_link_82543;
 	/* link info */
-	func->get_link_up_info =
-	    (hw->media_type == e1000_media_type_copper)
+	mac->ops.get_link_up_info =
+	    (hw->phy.media_type == e1000_media_type_copper)
 	    ? e1000_get_speed_and_duplex_copper_generic
 	    : e1000_get_speed_and_duplex_fiber_serdes_generic;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
-	func->write_vfta = e1000_write_vfta_82543;
+	mac->ops.write_vfta = e1000_write_vfta_82543;
 	/* clearing VFTA */
-	func->clear_vfta = e1000_clear_vfta_generic;
+	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
-	func->mta_set = e1000_mta_set_82543;
+	mac->ops.mta_set = e1000_mta_set_82543;
 	/* turn on/off LED */
-	func->led_on = e1000_led_on_82543;
-	func->led_off = e1000_led_off_82543;
+	mac->ops.led_on = e1000_led_on_82543;
+	mac->ops.led_off = e1000_led_off_82543;
 	/* remove device */
-	func->remove_device = e1000_remove_device_generic;
+	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
-	func->clear_hw_cntrs = e1000_clear_hw_cntrs_82543;
+	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82543;
 
 	hw->dev_spec_size = sizeof (struct e1000_dev_spec_82543);
 
@@ -271,7 +270,7 @@ e1000_init_mac_params_82543(struct e1000_hw *hw)
 
 	/* Set tbi compatibility */
 	if ((hw->mac.type != e1000_82543) ||
-	    (hw->media_type == e1000_media_type_fiber))
+	    (hw->phy.media_type == e1000_media_type_fiber))
 		e1000_set_tbi_compatibility_82543(hw, FALSE);
 
 out:
@@ -290,23 +289,23 @@ e1000_init_function_pointers_82543(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82543");
 
-	hw->func.init_mac_params = e1000_init_mac_params_82543;
-	hw->func.init_nvm_params = e1000_init_nvm_params_82543;
-	hw->func.init_phy_params = e1000_init_phy_params_82543;
+	hw->mac.ops.init_params = e1000_init_mac_params_82543;
+	hw->nvm.ops.init_params = e1000_init_nvm_params_82543;
+	hw->phy.ops.init_params = e1000_init_phy_params_82543;
 }
 
 /*
  * e1000_tbi_compatibility_enabled_82543 - Returns TBI compat status
  * @hw: pointer to the HW structure
  *
- * Returns the curent status of 10-bit Interface (TBI) compatibility
+ * Returns the current status of 10-bit Interface (TBI) compatibility
  * (enabled/disabled).
  */
-static boolean_t
+static bool
 e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
-	boolean_t state = FALSE;
+	bool state = FALSE;
 
 	DEBUGFUNC("e1000_tbi_compatibility_enabled_82543");
 
@@ -337,7 +336,7 @@ out:
  * Enables or disabled 10-bit Interface (TBI) compatibility.
  */
 void
-e1000_set_tbi_compatibility_82543(struct e1000_hw *hw, boolean_t state)
+e1000_set_tbi_compatibility_82543(struct e1000_hw *hw, bool state)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
 
@@ -365,14 +364,14 @@ e1000_set_tbi_compatibility_82543(struct e1000_hw *hw, boolean_t state)
  * e1000_tbi_sbp_enabled_82543 - Returns TBI SBP status
  * @hw: pointer to the HW structure
  *
- * Returns the curent status of 10-bit Interface (TBI) store bad packet (SBP)
+ * Returns the current status of 10-bit Interface (TBI) store bad packet (SBP)
  * (enabled/disabled).
  */
-boolean_t
+bool
 e1000_tbi_sbp_enabled_82543(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
-	boolean_t state = FALSE;
+	bool state = FALSE;
 
 	DEBUGFUNC("e1000_tbi_sbp_enabled_82543");
 
@@ -403,7 +402,7 @@ out:
  * Enables or disabled 10-bit Interface (TBI) store bad packet (SBP).
  */
 static void
-e1000_set_tbi_sbp_82543(struct e1000_hw *hw, boolean_t state)
+e1000_set_tbi_sbp_82543(struct e1000_hw *hw, bool state)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
 
@@ -424,11 +423,11 @@ e1000_set_tbi_sbp_82543(struct e1000_hw *hw, boolean_t state)
  * Returns the current status of whether PHY initialization is disabled.
  * True if PHY initialization is disabled else false.
  */
-static boolean_t
+static bool
 e1000_init_phy_disabled_82543(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
-	boolean_t ret_val;
+	bool ret_val;
 
 	DEBUGFUNC("e1000_init_phy_disabled_82543");
 
@@ -457,15 +456,15 @@ out:
  * @stats: Struct containing statistic register values
  * @frame_len: The length of the frame in question
  * @mac_addr: The Ethernet destination address of the frame in question
+ * @max_frame_size: The maximum frame size
  *
  * Adjusts the statistic counters when a frame is accepted by TBI_ACCEPT
  */
 void
 e1000_tbi_adjust_stats_82543(struct e1000_hw *hw,
-    struct e1000_hw_stats *stats, u32 frame_len, u8 *mac_addr)
+    struct e1000_hw_stats *stats, u32 frame_len,
+    u8 *mac_addr, u32 max_frame_size)
 {
-	u64 carry_bit;
-
 	if (!(e1000_tbi_sbp_enabled_82543(hw)))
 		return;
 
@@ -482,22 +481,12 @@ e1000_tbi_adjust_stats_82543(struct e1000_hw *hw,
 	stats->gprc++;
 
 	/* Adjust the Good Octets received counters */
-	carry_bit = 0x80000000 & stats->gorcl;
-	stats->gorcl += frame_len;
+	stats->gorc += frame_len;
+
 	/*
-	 * If the high bit of Gorcl (the low 32 bits of the Good Octets
-	 * Received Count) was one before the addition,
-	 * AND it is zero after, then we lost the carry out,
-	 * need to add one to Gorch (Good Octets Received Count High).
-	 * This could be simplified if all environments supported
-	 * 64-bit integers.
-	 */
-	if (carry_bit && ((stats->gorcl & 0x80000000) == 0))
-		stats->gorch++;
-	/*
-	 * Is this a broadcast or multicast?  Check broadcast first,
-	 * since the test for a multicast frame will test positive on
-	 * a broadcast frame.
+	 * Is this a broadcast or multicast?  Check broadcast first, since
+	 * the test for a multicast frame will test positive on a broadcast
+	 * frame.
 	 */
 	if ((mac_addr[0] == 0xff) && (mac_addr[1] == 0xff))
 		/* Broadcast packet */
@@ -510,7 +499,7 @@ e1000_tbi_adjust_stats_82543(struct e1000_hw *hw,
 	 * In this case, the hardware has overcounted the number of
 	 * oversize frames.
 	 */
-	if ((frame_len == hw->mac.max_frame_size) && (stats->roc > 0))
+	if ((frame_len == max_frame_size) && (stats->roc > 0))
 		stats->roc--;
 
 	/*
@@ -829,29 +818,32 @@ out:
  * @hw: pointer to the HW structure
  *
  * When forcing link to 10 Full or 10 Half, the PHY can reverse the polarity
- * inadvertantly.  To workaround the issue, we disable the transmitter on
+ * inadvertently.  To workaround the issue, we disable the transmitter on
  * the PHY until we have established the link partner's link parameters.
  */
 static s32
 e1000_polarity_reversal_workaround_82543(struct e1000_hw *hw)
 {
-	s32 ret_val;
+	s32 ret_val = E1000_SUCCESS;
 	u16 mii_status_reg;
 	u16 i;
-	boolean_t link;
+	bool link;
+
+	if (!(hw->phy.ops.write_reg))
+		goto out;
 
 	/* Polarity reversal workaround for forced 10F/10H links. */
 
 	/* Disable the transmitter on the PHY */
 
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0019);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0019);
 	if (ret_val)
 		goto out;
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, 0xFFFF);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, 0xFFFF);
 	if (ret_val)
 		goto out;
 
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0000);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0000);
 	if (ret_val)
 		goto out;
 
@@ -865,11 +857,11 @@ e1000_polarity_reversal_workaround_82543(struct e1000_hw *hw)
 		 * to be clear.
 		 */
 
-		ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
 
-		ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
 
@@ -883,23 +875,23 @@ e1000_polarity_reversal_workaround_82543(struct e1000_hw *hw)
 
 	/* Now we will re-enable the transmitter on the PHY */
 
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0019);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0019);
 	if (ret_val)
 		goto out;
 	msec_delay_irq(50);
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, 0xFFF0);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, 0xFFF0);
 	if (ret_val)
 		goto out;
 	msec_delay_irq(50);
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, 0xFF00);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, 0xFF00);
 	if (ret_val)
 		goto out;
 	msec_delay_irq(50);
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, 0x0000);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, 0x0000);
 	if (ret_val)
 		goto out;
 
-	ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0000);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0000);
 	if (ret_val)
 		goto out;
 
@@ -927,7 +919,6 @@ out:
 static s32
 e1000_phy_hw_reset_82543(struct e1000_hw *hw)
 {
-	struct e1000_functions *func = &hw->func;
 	u32 ctrl_ext;
 	s32 ret_val;
 
@@ -952,7 +943,10 @@ e1000_phy_hw_reset_82543(struct e1000_hw *hw)
 
 	usec_delay(150);
 
-	ret_val = func->get_cfg_done(hw);
+	if (!(hw->phy.ops.get_cfg_done))
+		return (E1000_SUCCESS);
+
+	ret_val = hw->phy.ops.get_cfg_done(hw);
 
 	return (ret_val);
 }
@@ -1004,7 +998,7 @@ e1000_reset_hw_82543(struct e1000_hw *hw)
 	 * After MAC reset, force reload of NVM to restore power-on
 	 * settings to device.
 	 */
-	e1000_reload_nvm(hw);
+	hw->nvm.ops.reload(hw);
 	msec_delay(2);
 
 	/* Masking off and clearing any pending interrupts */
@@ -1041,7 +1035,7 @@ e1000_init_hw_82543(struct e1000_hw *hw)
 
 	/* Disabling VLAN filtering */
 	E1000_WRITE_REG(hw, E1000_VET, 0);
-	e1000_clear_vfta(hw);
+	mac->ops.clear_vfta(hw);
 
 	/* Setup the receive address. */
 	e1000_init_rx_addrs_generic(hw, mac->rar_entry_count);
@@ -1066,7 +1060,7 @@ e1000_init_hw_82543(struct e1000_hw *hw)
 	e1000_pcix_mmrbc_workaround_generic(hw);
 
 	/* Setup link and flow control */
-	ret_val = e1000_setup_link(hw);
+	ret_val = mac->ops.setup_link(hw);
 
 	/*
 	 * Clear all of the statistics registers (clear on read).  It is
@@ -1110,7 +1104,7 @@ e1000_setup_link_82543(struct e1000_hw *hw)
 	 * signal detection.  So this should be done before phy setup.
 	 */
 	if (hw->mac.type == e1000_82543) {
-		ret_val = e1000_read_nvm(hw, NVM_INIT_CONTROL2_REG, 1, &data);
+		ret_val = hw->nvm.ops.read(hw, NVM_INIT_CONTROL2_REG, 1, &data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error\n");
 			ret_val = -E1000_ERR_NVM;
@@ -1140,7 +1134,7 @@ e1000_setup_copper_link_82543(struct e1000_hw *hw)
 {
 	u32 ctrl;
 	s32 ret_val;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_setup_copper_link_82543");
 
@@ -1154,7 +1148,7 @@ e1000_setup_copper_link_82543(struct e1000_hw *hw)
 	if (hw->mac.type == e1000_82543) {
 		ctrl |= (E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
 		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
-		ret_val = e1000_phy_hw_reset(hw);
+		ret_val = hw->phy.ops.reset(hw);
 		if (ret_val)
 			goto out;
 		hw->phy.reset_disable = FALSE;
@@ -1253,7 +1247,7 @@ e1000_setup_fiber_link_82543(struct e1000_hw *hw)
 	msec_delay(1);
 
 	/*
-	 * For these adapters, the SW defineable pin 1 is cleared when the
+	 * For these adapters, the SW definable pin 1 is cleared when the
 	 * optics detect a signal.  If we have a signal, then poll for a
 	 * "Link-Up" indication.
 	 */
@@ -1285,7 +1279,7 @@ e1000_check_for_copper_link_82543(struct e1000_hw *hw)
 	u32 icr, rctl;
 	s32 ret_val;
 	u16 speed, duplex;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_check_for_copper_link_82543");
 
@@ -1369,7 +1363,7 @@ e1000_check_for_copper_link_82543(struct e1000_hw *hw)
 	 * at gigabit speed, we turn on TBI compatibility.
 	 */
 	if (e1000_tbi_compatibility_enabled_82543(hw)) {
-		ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex);
+		ret_val = mac->ops.get_link_up_info(hw, &speed, &duplex);
 		if (ret_val) {
 			DEBUGOUT("Error getting link speed and duplex\n");
 			return (ret_val);
@@ -1491,10 +1485,13 @@ static s32
 e1000_config_mac_to_phy_82543(struct e1000_hw *hw)
 {
 	u32 ctrl;
-	s32 ret_val;
+	s32 ret_val = E1000_SUCCESS;
 	u16 phy_data;
 
 	DEBUGFUNC("e1000_config_mac_to_phy_82543");
+
+	if (!(hw->phy.ops.read_reg))
+		goto out;
 
 	/* Set the bits to force speed and duplex */
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
@@ -1505,7 +1502,7 @@ e1000_config_mac_to_phy_82543(struct e1000_hw *hw)
 	 * Set up duplex in the Device Control and Transmit Control
 	 * registers depending on negotiated values.
 	 */
-	ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS, &phy_data);
+	ret_val = hw->phy.ops.read_reg(hw, M88E1000_PHY_SPEC_STATUS, &phy_data);
 	if (ret_val)
 		goto out;
 
@@ -1612,8 +1609,8 @@ e1000_led_on_82543(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_led_on_82543");
 
 	if (hw->mac.type == e1000_82544 &&
-	    hw->media_type == e1000_media_type_copper) {
-		/* Clear SW-defineable Pin 0 to turn on the LED */
+	    hw->phy.media_type == e1000_media_type_copper) {
+		/* Clear SW-definable Pin 0 to turn on the LED */
 		ctrl &= ~E1000_CTRL_SWDPIN0;
 		ctrl |= E1000_CTRL_SWDPIO0;
 	} else {
@@ -1641,8 +1638,8 @@ e1000_led_off_82543(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_led_off_82543");
 
 	if (hw->mac.type == e1000_82544 &&
-	    hw->media_type == e1000_media_type_copper) {
-		/* Set SW-defineable Pin 0 to turn off the LED */
+	    hw->phy.media_type == e1000_media_type_copper) {
+		/* Set SW-definable Pin 0 to turn off the LED */
 		ctrl |= E1000_CTRL_SWDPIN0;
 		ctrl |= E1000_CTRL_SWDPIO0;
 	} else {

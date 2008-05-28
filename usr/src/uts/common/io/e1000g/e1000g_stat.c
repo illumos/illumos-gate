@@ -103,7 +103,7 @@ e1000_tbi_adjust_stats(struct e1000g *Adapter,
 		e1000g_ksp->Mprc.value.ul++;
 	}
 
-	if (frame_len == hw->mac.max_frame_size) {
+	if (frame_len == Adapter->max_frame_size) {
 		/*
 		 * In this case, the hardware has overcounted the number of
 		 * oversize frames.
@@ -520,12 +520,12 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		switch (Adapter->link_speed) {
 		case SPEED_1000:
 			*val =
-			    (hw->media_type == e1000_media_type_copper) ?
+			    (hw->phy.media_type == e1000_media_type_copper) ?
 			    XCVR_1000T : XCVR_1000X;
 			break;
 		case SPEED_100:
 			*val =
-			    (hw->media_type == e1000_media_type_copper) ?
+			    (hw->phy.media_type == e1000_media_type_copper) ?
 			    (Adapter->phy_status & MII_SR_100T4_CAPS) ?
 			    XCVR_100T4 : XCVR_100T2 : XCVR_100X;
 			break;

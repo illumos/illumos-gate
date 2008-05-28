@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.45 v2008-02-29
  */
 #ifndef _E1000_PHY_H_
 #define	_E1000_PHY_H_
@@ -48,12 +48,16 @@ typedef enum {
 	e1000_smart_speed_off
 } e1000_smart_speed;
 
+void e1000_init_phy_ops_generic(struct e1000_hw *hw);
+s32 e1000_null_read_reg(struct e1000_hw *hw, u32 offset, u16 *data);
+void e1000_null_phy_generic(struct e1000_hw *hw);
+s32 e1000_null_lplu_state(struct e1000_hw *hw, bool active);
+s32 e1000_null_write_reg(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_check_downshift_generic(struct e1000_hw *hw);
 s32 e1000_check_polarity_m88(struct e1000_hw *hw);
 s32 e1000_check_polarity_igp(struct e1000_hw *hw);
 s32 e1000_check_reset_block_generic(struct e1000_hw *hw);
 s32 e1000_copper_link_autoneg(struct e1000_hw *hw);
-s32 e1000_phy_force_speed_duplex(struct e1000_hw *hw);
 s32 e1000_copper_link_setup_igp(struct e1000_hw *hw);
 s32 e1000_copper_link_setup_m88(struct e1000_hw *hw);
 s32 e1000_phy_force_speed_duplex_igp(struct e1000_hw *hw);
@@ -72,7 +76,7 @@ s32 e1000_phy_setup_autoneg(struct e1000_hw *hw);
 s32 e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_read_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 *data);
-s32 e1000_set_d3_lplu_state_generic(struct e1000_hw *hw, boolean_t active);
+s32 e1000_set_d3_lplu_state_generic(struct e1000_hw *hw, bool active);
 s32 e1000_setup_copper_link_generic(struct e1000_hw *hw);
 s32 e1000_wait_autoneg_generic(struct e1000_hw *hw);
 s32 e1000_write_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 data);
@@ -80,14 +84,18 @@ s32 e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_write_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_phy_reset_dsp(struct e1000_hw *hw);
 s32 e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
-    u32 usec_interval, boolean_t *success);
+    u32 usec_interval, bool *success);
 s32 e1000_phy_init_script_igp3(struct e1000_hw *hw);
 e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
 s32 e1000_determine_phy_address(struct e1000_hw *hw);
 s32 e1000_write_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_read_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data,
-    boolean_t read);
+    bool read);
+void e1000_power_up_phy_copper(struct e1000_hw *hw);
+void e1000_power_down_phy_copper(struct e1000_hw *hw);
+s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);
+s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
 
 #define	E1000_MAX_PHY_ADDR		4
 
@@ -100,7 +108,7 @@ s32 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data,
 #define	IGP01E1000_PHY_CHANNEL_QUALITY	0x15 /* PHY Channel Quality */
 #define	IGP02E1000_PHY_POWER_MGMT	0x19 /* Power Management */
 #define	IGP01E1000_PHY_PAGE_SELECT	0x1F /* Page Select */
-#define	BM_PHY_PAGE_SELECT		22   /* Page Select for IGP 4 */
+#define	BM_PHY_PAGE_SELECT		22   /* Page Select for BM */
 #define	IGP_PAGE_SHIFT			5
 #define	PHY_REG_MASK			0x1F
 
@@ -111,6 +119,14 @@ s32 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data,
 #define	BM_WUC_ENABLE_REG		17
 #define	BM_WUC_ENABLE_BIT		(1 << 2)
 #define	BM_WUC_HOST_WU_BIT		(1 << 4)
+
+/* BM PHY Copper Specific Control 1 */
+#define	BM_CS_CTRL1			16
+#define	BM_CS_CTRL1_ENERGY_DETECT	0x0300	/* Enable Energy Detect */
+
+/* BM PHY Copper Specific States */
+#define	BM_CS_STATUS			17
+#define	BM_CS_STATUS_ENERGY_DETECT	0x0010	/* Energy Detect Status */
 
 #define	IGP01E1000_PHY_PCS_INIT_REG	0x00B4
 #define	IGP01E1000_PHY_POLARITY_MASK	0x0078

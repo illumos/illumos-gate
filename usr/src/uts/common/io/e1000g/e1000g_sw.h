@@ -812,9 +812,7 @@ typedef struct e1000g {
 	uint32_t tx_bcopy_thresh;
 	uint32_t rx_limit_onintr;
 	uint32_t rx_bcopy_thresh;
-#ifndef NO_82542_SUPPORT
 	uint32_t rx_buf_align;
-#endif
 
 	boolean_t intr_adaptive;
 	boolean_t tx_intr_enable;
@@ -827,6 +825,8 @@ typedef struct e1000g {
 	uint32_t intr_throttling_rate;
 
 	uint32_t default_mtu;
+	uint32_t max_frame_size;
+	uint32_t min_frame_size;
 
 	boolean_t watchdog_timer_enabled;
 	boolean_t watchdog_timer_started;

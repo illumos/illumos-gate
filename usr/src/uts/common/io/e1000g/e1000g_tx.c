@@ -179,7 +179,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	}
 
 	/* Make sure packet is less than the max frame size */
-	if (msg_size > hw->mac.max_frame_size - ETHERFCSL) {
+	if (msg_size > Adapter->max_frame_size - ETHERFCSL) {
 		/*
 		 * For the over size packet, we'll just drop it.
 		 * So we return B_TRUE here.
@@ -535,7 +535,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	if (hw->mac.type == e1000_82547)
 		e1000g_82547_tx_move_tail(tx_ring);
 	else
-		E1000_WRITE_REG(hw, E1000_TDT,
+		E1000_WRITE_REG(hw, E1000_TDT(0),
 		    (uint32_t)(next_desc - tx_ring->tbd_first));
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
@@ -623,46 +623,46 @@ e1000g_tx_setup(struct e1000g *Adapter)
 	if ((hw->mac.type == e1000_82571) || (hw->mac.type == e1000_82572)) {
 		e1000_get_speed_and_duplex(hw, &speed, &duplex);
 
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC0);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC(0));
 		reg_tarc |= (1 << 25);
 		if (speed == SPEED_1000)
 			reg_tarc |= (1 << 21);
-		E1000_WRITE_REG(hw, E1000_TARC0, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC(0), reg_tarc);
 
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC1);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC(1));
 		reg_tarc |= (1 << 25);
 		if (reg_tctl & E1000_TCTL_MULR)
 			reg_tarc &= ~(1 << 28);
 		else
 			reg_tarc |= (1 << 28);
-		E1000_WRITE_REG(hw, E1000_TARC1, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC(1), reg_tarc);
 
 	} else if (hw->mac.type == e1000_80003es2lan) {
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC0);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC(0));
 		reg_tarc |= 1;
-		if (hw->media_type == e1000_media_type_internal_serdes)
+		if (hw->phy.media_type == e1000_media_type_internal_serdes)
 			reg_tarc |= (1 << 20);
-		E1000_WRITE_REG(hw, E1000_TARC0, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC(0), reg_tarc);
 
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC1);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC(1));
 		reg_tarc |= 1;
-		E1000_WRITE_REG(hw, E1000_TARC1, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC(1), reg_tarc);
 	}
 
 	/* Setup HW Base and Length of Tx descriptor area */
 	size = (Adapter->tx_desc_num * sizeof (struct e1000_tx_desc));
-	E1000_WRITE_REG(hw, E1000_TDLEN, size);
-	size = E1000_READ_REG(hw, E1000_TDLEN);
+	E1000_WRITE_REG(hw, E1000_TDLEN(0), size);
+	size = E1000_READ_REG(hw, E1000_TDLEN(0));
 
 	buf_low = (uint32_t)tx_ring->tbd_dma_addr;
 	buf_high = (uint32_t)(tx_ring->tbd_dma_addr >> 32);
 
-	E1000_WRITE_REG(hw, E1000_TDBAL, buf_low);
-	E1000_WRITE_REG(hw, E1000_TDBAH, buf_high);
+	E1000_WRITE_REG(hw, E1000_TDBAL(0), buf_low);
+	E1000_WRITE_REG(hw, E1000_TDBAH(0), buf_high);
 
 	/* Setup our HW Tx Head & Tail descriptor pointers */
-	E1000_WRITE_REG(hw, E1000_TDH, 0);
-	E1000_WRITE_REG(hw, E1000_TDT, 0);
+	E1000_WRITE_REG(hw, E1000_TDH(0), 0);
+	E1000_WRITE_REG(hw, E1000_TDT(0), 0);
 
 	/* Set the default values for the Tx Inter Packet Gap timer */
 	if ((hw->mac.type == e1000_82542) &&
@@ -674,7 +674,7 @@ e1000g_tx_setup(struct e1000g *Adapter)
 		reg_tipg |=
 		    DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
 	} else {
-		if (hw->media_type == e1000_media_type_fiber)
+		if (hw->phy.media_type == e1000_media_type_fiber)
 			reg_tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
 		else
 			reg_tipg = DEFAULT_82543_TIPG_IPGT_COPPER;
@@ -1338,7 +1338,7 @@ e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)
 	Adapter = tx_ring->adapter;
 	hw = &Adapter->shared;
 
-	hw_tdt = E1000_READ_REG(hw, E1000_TDT);
+	hw_tdt = E1000_READ_REG(hw, E1000_TDT(0));
 	sw_tdt = tx_ring->tbd_next - tx_ring->tbd_first;
 
 	while (hw_tdt != sw_tdt) {
@@ -1362,7 +1362,7 @@ e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)
 				return;
 
 			} else {
-				E1000_WRITE_REG(hw, E1000_TDT, hw_tdt);
+				E1000_WRITE_REG(hw, E1000_TDT(0), hw_tdt);
 				e1000_update_tx_fifo_head_82547(hw, length);
 				length = 0;
 			}

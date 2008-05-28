@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,15 +19,16 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.21 v2008-02-29
  */
+
 #include "e1000_api.h"
 #include "e1000_manage.h"
 
@@ -64,7 +65,7 @@ e1000_calculate_checksum(u8 *buffer, u32 length)
  *
  * Returns E1000_success upon success, else E1000_ERR_HOST_INTERFACE_COMMAND
  *
- * This function checks whether the HOST IF is enabled for command operaton
+ * This function checks whether the HOST IF is enabled for command operation
  * and also checks whether the previous command is completed.  It busy waits
  * in case of previous command is not completed.
  */
@@ -102,13 +103,13 @@ out:
 }
 
 /*
- * e1000_check_mng_mode_generic - Generic check managament mode
+ * e1000_check_mng_mode_generic - Generic check management mode
  * @hw: pointer to the HW structure
  *
  * Reads the firmware semaphore register and returns true (>0) if
  * manageability is enabled, else false (0).
  */
-boolean_t
+bool
 e1000_check_mng_mode_generic(struct e1000_hw *hw)
 {
 	u32 fwsm;
@@ -128,7 +129,7 @@ e1000_check_mng_mode_generic(struct e1000_hw *hw)
  * Enables packet filtering on transmit packets if manageability is enabled
  * and host interface is enabled.
  */
-boolean_t
+bool
 e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 {
 	struct e1000_host_mng_dhcp_cookie *hdr = &hw->mng_cookie;
@@ -136,12 +137,12 @@ e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	u32 offset;
 	s32 ret_val, hdr_csum, csum;
 	u8 i, len;
-	boolean_t tx_filter = TRUE;
+	bool tx_filter = TRUE;
 
 	DEBUGFUNC("e1000_enable_tx_pkt_filtering_generic");
 
 	/* No manageability, no filtering */
-	if (!e1000_check_mng_mode(hw)) {
+	if (!hw->mac.ops.check_mng_mode(hw)) {
 		tx_filter = FALSE;
 		goto out;
 	}
@@ -150,7 +151,7 @@ e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	 * If we can't read from the host interface for whatever reason,
 	 * disable filtering.
 	 */
-	ret_val = e1000_mng_enable_host_if(hw);
+	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val != E1000_SUCCESS) {
 		tx_filter = FALSE;
 		goto out;
@@ -212,18 +213,18 @@ e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw, u8 *buffer,
 	hdr.checksum = 0;
 
 	/* Enable the host interface */
-	ret_val = e1000_mng_enable_host_if(hw);
+	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val)
 		goto out;
 
 	/* Populate the host interface with the contents of "buffer". */
-	ret_val = e1000_mng_host_if_write(hw, buffer, length,
+	ret_val = hw->mac.ops.mng_host_if_write(hw, buffer, length,
 	    sizeof (hdr), &(hdr.checksum));
 	if (ret_val)
 		goto out;
 
 	/* Write the manageability command header */
-	ret_val = e1000_mng_write_cmd_header(hw, &hdr);
+	ret_val = hw->mac.ops.mng_write_cmd_header(hw, &hdr);
 	if (ret_val)
 		goto out;
 
@@ -266,7 +267,7 @@ e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
 }
 
 /*
- * e1000_mng_host_if_write_generic - Writes to the manageability host interface
+ * e1000_mng_host_if_write_generic - Write to the manageability host interface
  * @hw: pointer to the HW structure
  * @buffer: pointer to the host interface buffer
  * @length: size of the buffer
@@ -352,12 +353,12 @@ out:
  *
  * Verifies the hardware needs to allow ARPs to be processed by the host.
  */
-boolean_t
+bool
 e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 {
 	u32 manc;
 	u32 fwsm, factps;
-	boolean_t ret_val = FALSE;
+	bool ret_val = FALSE;
 
 	DEBUGFUNC("e1000_enable_mng_pass_thru");
 

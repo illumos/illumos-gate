@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,15 +19,16 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.55 v2008-02-29
  */
+
 /*
  * e1000_82541
  * e1000_82547
@@ -37,8 +38,6 @@
 
 #include "e1000_api.h"
 #include "e1000_82541.h"
-
-void e1000_init_function_pointers_82541(struct e1000_hw *hw);
 
 static s32 e1000_init_phy_params_82541(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_82541(struct e1000_hw *hw);
@@ -52,13 +51,14 @@ static s32 e1000_setup_copper_link_82541(struct e1000_hw *hw);
 static s32 e1000_check_for_link_82541(struct e1000_hw *hw);
 static s32 e1000_get_cable_length_igp_82541(struct e1000_hw *hw);
 static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw,
-    boolean_t active);
+    bool active);
 static s32 e1000_setup_led_82541(struct e1000_hw *hw);
 static s32 e1000_cleanup_led_82541(struct e1000_hw *hw);
 static void e1000_clear_hw_cntrs_82541(struct e1000_hw *hw);
 static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
-    boolean_t link_up);
+    bool link_up);
 static s32 e1000_phy_init_script_82541(struct e1000_hw *hw);
+static void e1000_power_down_phy_copper_82541(struct e1000_hw *hw);
 
 static const u16 e1000_igp_cable_length_table[] =
 {5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
@@ -84,9 +84,9 @@ struct e1000_dev_spec_82541 {
 	u16 dsp_reset_counter;
 #endif
 	u16 spd_default;
-	boolean_t phy_init_script;
+	bool phy_init_script;
 #ifndef FIFO_WORKAROUND
-	boolean_t ttl_workaround;
+	bool ttl_workaround;
 #endif
 };
 
@@ -100,7 +100,6 @@ static s32
 e1000_init_phy_params_82541(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_phy_params_82541");
@@ -111,15 +110,17 @@ e1000_init_phy_params_82541(struct e1000_hw *hw)
 	phy->type = e1000_phy_igp;
 
 	/* Function Pointers */
-	func->check_polarity = e1000_check_polarity_igp;
-	func->force_speed_duplex = e1000_phy_force_speed_duplex_igp;
-	func->get_cable_length = e1000_get_cable_length_igp_82541;
-	func->get_cfg_done = e1000_get_cfg_done_generic;
-	func->get_phy_info = e1000_get_phy_info_igp;
-	func->read_phy_reg = e1000_read_phy_reg_igp;
-	func->reset_phy = e1000_phy_hw_reset_82541;
-	func->set_d3_lplu_state = e1000_set_d3_lplu_state_82541;
-	func->write_phy_reg = e1000_write_phy_reg_igp;
+	phy->ops.check_polarity = e1000_check_polarity_igp;
+	phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_igp;
+	phy->ops.get_cable_length = e1000_get_cable_length_igp_82541;
+	phy->ops.get_cfg_done = e1000_get_cfg_done_generic;
+	phy->ops.get_info = e1000_get_phy_info_igp;
+	phy->ops.read_reg = e1000_read_phy_reg_igp;
+	phy->ops.reset = e1000_phy_hw_reset_82541;
+	phy->ops.set_d3_lplu_state = e1000_set_d3_lplu_state_82541;
+	phy->ops.write_reg = e1000_write_phy_reg_igp;
+	phy->ops.power_up = e1000_power_up_phy_copper;
+	phy->ops.power_down = e1000_power_down_phy_copper_82541;
 
 	ret_val = e1000_get_phy_id(hw);
 	if (ret_val)
@@ -144,7 +145,6 @@ static s32
 e1000_init_nvm_params_82541(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 	u32 eecd = E1000_READ_REG(hw, E1000_EECD);
 	u16 size;
@@ -184,13 +184,13 @@ e1000_init_nvm_params_82541(struct e1000_hw *hw)
 		    ? 32 : 8;
 
 		/* Function Pointers */
-		func->acquire_nvm = e1000_acquire_nvm_generic;
-		func->read_nvm = e1000_read_nvm_spi;
-		func->release_nvm = e1000_release_nvm_generic;
-		func->update_nvm = e1000_update_nvm_checksum_generic;
-		func->valid_led_default = e1000_valid_led_default_generic;
-		func->validate_nvm = e1000_validate_nvm_checksum_generic;
-		func->write_nvm = e1000_write_nvm_spi;
+		nvm->ops.acquire = e1000_acquire_nvm_generic;
+		nvm->ops.read = e1000_read_nvm_spi;
+		nvm->ops.release = e1000_release_nvm_generic;
+		nvm->ops.update = e1000_update_nvm_checksum_generic;
+		nvm->ops.valid_led_default = e1000_valid_led_default_generic;
+		nvm->ops.validate = e1000_validate_nvm_checksum_generic;
+		nvm->ops.write = e1000_write_nvm_spi;
 
 		/*
 		 * nvm->word_size must be discovered after the pointers
@@ -199,7 +199,7 @@ e1000_init_nvm_params_82541(struct e1000_hw *hw)
 		 * read will work.
 		 */
 		nvm->word_size = 64;
-		ret_val = e1000_read_nvm(hw, NVM_CFG, 1, &size);
+		ret_val = nvm->ops.read(hw, NVM_CFG, 1, &size);
 		if (ret_val)
 			goto out;
 		size = (size & NVM_SIZE_MASK) >> NVM_SIZE_SHIFT;
@@ -221,13 +221,13 @@ e1000_init_nvm_params_82541(struct e1000_hw *hw)
 		    ? 256 : 64;
 
 		/* Function Pointers */
-		func->acquire_nvm = e1000_acquire_nvm_generic;
-		func->read_nvm = e1000_read_nvm_microwire;
-		func->release_nvm = e1000_release_nvm_generic;
-		func->update_nvm = e1000_update_nvm_checksum_generic;
-		func->valid_led_default = e1000_valid_led_default_generic;
-		func->validate_nvm = e1000_validate_nvm_checksum_generic;
-		func->write_nvm = e1000_write_nvm_microwire;
+		nvm->ops.acquire = e1000_acquire_nvm_generic;
+		nvm->ops.read = e1000_read_nvm_microwire;
+		nvm->ops.release = e1000_release_nvm_generic;
+		nvm->ops.update = e1000_update_nvm_checksum_generic;
+		nvm->ops.valid_led_default = e1000_valid_led_default_generic;
+		nvm->ops.validate = e1000_validate_nvm_checksum_generic;
+		nvm->ops.write = e1000_write_nvm_microwire;
 	}
 
 out:
@@ -244,13 +244,12 @@ static s32
 e1000_init_mac_params_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val;
 
 	DEBUGFUNC("e1000_init_mac_params_82541");
 
 	/* Set media type */
-	hw->media_type = e1000_media_type_copper;
+	hw->phy.media_type = e1000_media_type_copper;
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
 	/* Set rar entry count */
@@ -261,38 +260,38 @@ e1000_init_mac_params_82541(struct e1000_hw *hw)
 	/* Function Pointers */
 
 	/* bus type/speed/width */
-	func->get_bus_info = e1000_get_bus_info_pci_generic;
+	mac->ops.get_bus_info = e1000_get_bus_info_pci_generic;
 	/* reset */
-	func->reset_hw = e1000_reset_hw_82541;
+	mac->ops.reset_hw = e1000_reset_hw_82541;
 	/* hw initialization */
-	func->init_hw = e1000_init_hw_82541;
+	mac->ops.init_hw = e1000_init_hw_82541;
 	/* link setup */
-	func->setup_link = e1000_setup_link_generic;
+	mac->ops.setup_link = e1000_setup_link_generic;
 	/* physical interface link setup */
-	func->setup_physical_interface = e1000_setup_copper_link_82541;
+	mac->ops.setup_physical_interface = e1000_setup_copper_link_82541;
 	/* check for link */
-	func->check_for_link = e1000_check_for_link_82541;
+	mac->ops.check_for_link = e1000_check_for_link_82541;
 	/* link info */
-	func->get_link_up_info = e1000_get_link_up_info_82541;
+	mac->ops.get_link_up_info = e1000_get_link_up_info_82541;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
-	func->write_vfta = e1000_write_vfta_generic;
+	mac->ops.write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
-	func->clear_vfta = e1000_clear_vfta_generic;
+	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
-	func->mta_set = e1000_mta_set_generic;
+	mac->ops.mta_set = e1000_mta_set_generic;
 	/* setup LED */
-	func->setup_led = e1000_setup_led_82541;
+	mac->ops.setup_led = e1000_setup_led_82541;
 	/* cleanup LED */
-	func->cleanup_led = e1000_cleanup_led_82541;
+	mac->ops.cleanup_led = e1000_cleanup_led_82541;
 	/* turn on/off LED */
-	func->led_on = e1000_led_on_generic;
-	func->led_off = e1000_led_off_generic;
+	mac->ops.led_on = e1000_led_on_generic;
+	mac->ops.led_off = e1000_led_off_generic;
 	/* remove device */
-	func->remove_device = e1000_remove_device_generic;
+	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
-	func->clear_hw_cntrs = e1000_clear_hw_cntrs_82541;
+	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82541;
 
 	hw->dev_spec_size = sizeof (struct e1000_dev_spec_82541);
 
@@ -314,9 +313,9 @@ e1000_init_function_pointers_82541(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82541");
 
-	hw->func.init_mac_params = e1000_init_mac_params_82541;
-	hw->func.init_nvm_params = e1000_init_nvm_params_82541;
-	hw->func.init_phy_params = e1000_init_phy_params_82541;
+	hw->mac.ops.init_params = e1000_init_mac_params_82541;
+	hw->nvm.ops.init_params = e1000_init_nvm_params_82541;
+	hw->phy.ops.init_params = e1000_init_phy_params_82541;
 }
 
 /*
@@ -430,7 +429,7 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	ret_val = e1000_id_led_init_generic(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
-		goto out;
+		/* This is not fatal and we should not stop init due to this */
 	}
 
 #ifndef FIFO_WORKAROUND
@@ -442,7 +441,7 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 #endif
 	/* Disabling VLAN filtering */
 	DEBUGOUT("Initializing the IEEE VLAN\n");
-	e1000_clear_vfta(hw);
+	mac->ops.clear_vfta(hw);
 
 	/* Setup the receive address. */
 	e1000_init_rx_addrs_generic(hw, mac->rar_entry_count);
@@ -461,12 +460,12 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	}
 
 	/* Setup link and flow control */
-	ret_val = e1000_setup_link(hw);
+	ret_val = mac->ops.setup_link(hw);
 
-	txdctl = E1000_READ_REG(hw, E1000_TXDCTL);
+	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 	    E1000_TXDCTL_FULL_TX_DESC_WB;
-	E1000_WRITE_REG(hw, E1000_TXDCTL, txdctl);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
 
 	/*
 	 * Clear all of the statistics registers (clear on read).  It is
@@ -476,7 +475,6 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	 */
 	e1000_clear_hw_cntrs_82541(hw);
 
-out:
 	return (ret_val);
 }
 
@@ -511,14 +509,14 @@ e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed, u16 *duplex)
 	 * Here we set the duplex settings to match the duplex in the
 	 * link partner's capabilities.
 	 */
-	ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &data);
+	ret_val = phy->ops.read_reg(hw, PHY_AUTONEG_EXP, &data);
 	if (ret_val)
 		goto out;
 
 	if (!(data & NWAY_ER_LP_NWAY_CAPS)) {
 		*duplex = HALF_DUPLEX;
 	} else {
-		ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY, &data);
+		ret_val = phy->ops.read_reg(hw, PHY_LP_ABILITY, &data);
 		if (ret_val)
 			goto out;
 
@@ -542,7 +540,7 @@ out:
  * Verify the reset block is not blocking us from resetting.  Acquire
  * semaphore (if necessary) and read/set/write the device control reset
  * bit in the PHY.  Wait the appropriate delay time for the device to
- * reset and relase the semaphore (if necessary).
+ * reset and release the semaphore (if necessary).
  * This is a function pointer entry point called by the api module.
  */
 static s32
@@ -642,7 +640,7 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_check_for_link_82541");
 
@@ -726,7 +724,7 @@ out:
  */
 static s32
 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
-    boolean_t link_up)
+    bool link_up)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_dev_spec_82541 *dev_spec;
@@ -745,7 +743,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 
 	if (link_up) {
-		ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex);
+		ret_val = hw->mac.ops.get_link_up_info(hw, &speed, &duplex);
 		if (ret_val) {
 			DEBUGOUT("Error getting link speed and duplex\n");
 			goto out;
@@ -756,7 +754,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			goto out;
 		}
 
-		ret_val = e1000_get_cable_length(hw);
+		ret_val = phy->ops.get_cable_length(hw);
 		if (ret_val)
 			goto out;
 
@@ -764,7 +762,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 		    phy->min_cable_length >= 50) {
 
 			for (i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-				ret_val = e1000_read_phy_reg(hw,
+				ret_val = phy->ops.read_reg(hw,
 				    dsp_reg_array[i],
 				    &phy_data);
 				if (ret_val)
@@ -772,7 +770,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 
 				phy_data &= ~IGP01E1000_PHY_EDAC_MU_INDEX;
 
-				ret_val = e1000_write_phy_reg(hw,
+				ret_val = phy->ops.write_reg(hw,
 				    dsp_reg_array[i],
 				    phy_data);
 				if (ret_val)
@@ -788,13 +786,13 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 		}
 
 		/* clear previous idle error counts */
-		ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data);
+		ret_val = phy->ops.read_reg(hw, PHY_1000T_STATUS, &phy_data);
 		if (ret_val)
 			goto out;
 
 		for (i = 0; i < ffe_idle_err_timeout; i++) {
 			usec_delay(1000);
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    PHY_1000T_STATUS,
 			    &phy_data);
 			if (ret_val)
@@ -804,7 +802,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			if (idle_errs > SR_1000T_PHY_EXCESSIVE_IDLE_ERR_COUNT) {
 				dev_spec->ffe_config = e1000_ffe_config_active;
 
-				ret_val = e1000_write_phy_reg(hw,
+				ret_val = phy->ops.write_reg(hw,
 				    IGP01E1000_PHY_DSP_FFE,
 				    IGP01E1000_PHY_DSP_FFE_CM_CP);
 				if (ret_val)
@@ -822,26 +820,26 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			 * Save off the current value of register 0x2F5B
 			 * to be restored at the end of the routines.
 			 */
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    0x2F5B,
 			    &phy_saved_data);
 			if (ret_val)
 				goto out;
 
 			/* Disable the PHY transmitter */
-			ret_val = e1000_write_phy_reg(hw, 0x2F5B, 0x0003);
+			ret_val = phy->ops.write_reg(hw, 0x2F5B, 0x0003);
 			if (ret_val)
 				goto out;
 
 			msec_delay_irq(20);
 
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    0x0000,
 			    IGP01E1000_IEEE_FORCE_GIG);
 			if (ret_val)
 				goto out;
 			for (i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-				ret_val = e1000_read_phy_reg(hw,
+				ret_val = phy->ops.read_reg(hw,
 				    dsp_reg_array[i],
 				    &phy_data);
 				if (ret_val)
@@ -850,14 +848,14 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 				phy_data &= ~IGP01E1000_PHY_EDAC_MU_INDEX;
 				phy_data |= IGP01E1000_PHY_EDAC_SIGN_EXT_9_BITS;
 
-				ret_val = e1000_write_phy_reg(hw,
+				ret_val = phy->ops.write_reg(hw,
 				    dsp_reg_array[i],
 				    phy_data);
 				if (ret_val)
 					goto out;
 			}
 
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    0x0000,
 			    IGP01E1000_IEEE_RESTART_AUTONEG);
 			if (ret_val)
@@ -866,7 +864,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			msec_delay_irq(20);
 
 			/* Now enable the transmitter */
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    0x2F5B,
 			    phy_saved_data);
 			if (ret_val)
@@ -884,30 +882,30 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 		 * Save off the current value of register 0x2F5B
 		 * to be restored at the end of the routines.
 		 */
-		ret_val = e1000_read_phy_reg(hw, 0x2F5B, &phy_saved_data);
+		ret_val = phy->ops.read_reg(hw, 0x2F5B, &phy_saved_data);
 		if (ret_val)
 			goto out;
 
 		/* Disable the PHY transmitter */
-		ret_val = e1000_write_phy_reg(hw, 0x2F5B, 0x0003);
+		ret_val = phy->ops.write_reg(hw, 0x2F5B, 0x0003);
 		if (ret_val)
 			goto out;
 
 		msec_delay_irq(20);
 
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = phy->ops.write_reg(hw,
 		    0x0000,
 		    IGP01E1000_IEEE_FORCE_GIG);
 		if (ret_val)
 			goto out;
 
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = phy->ops.write_reg(hw,
 		    IGP01E1000_PHY_DSP_FFE,
 		    IGP01E1000_PHY_DSP_FFE_DEFAULT);
 		if (ret_val)
 			goto out;
 
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = phy->ops.write_reg(hw,
 		    0x0000,
 		    IGP01E1000_IEEE_RESTART_AUTONEG);
 		if (ret_val)
@@ -916,7 +914,7 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 		msec_delay_irq(20);
 
 		/* Now enable the transmitter */
-		ret_val = e1000_write_phy_reg(hw, 0x2F5B, phy_saved_data);
+		ret_val = phy->ops.write_reg(hw, 0x2F5B, phy_saved_data);
 
 		if (ret_val)
 			goto out;
@@ -934,8 +932,8 @@ out:
  *
  * The automatic gain control (agc) normalizes the amplitude of the
  * received signal, adjusting for the attenuation produced by the
- * cable.  By reading the AGC registers, which reperesent the
- * cobination of course and fine gain value, the value can be put
+ * cable.  By reading the AGC registers, which represent the
+ * combination of coarse and fine gain value, the value can be put
  * into a lookup table to obtain the approximate cable length
  * for each channel.  This is a function pointer entry point called by the
  * api module.
@@ -958,7 +956,7 @@ e1000_get_cable_length_igp_82541(struct e1000_hw *hw)
 
 	/* Read the AGC registers for all channels */
 	for (i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-		ret_val = e1000_read_phy_reg(hw, agc_reg_array[i], &data);
+		ret_val = phy->ops.read_reg(hw, agc_reg_array[i], &data);
 		if (ret_val)
 			goto out;
 
@@ -1017,7 +1015,7 @@ out:
  * api module.
  */
 static s32
-e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
+e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -1034,13 +1032,13 @@ e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
 		goto out;
 	}
 
-	ret_val = e1000_read_phy_reg(hw, IGP01E1000_GMII_FIFO, &data);
+	ret_val = phy->ops.read_reg(hw, IGP01E1000_GMII_FIFO, &data);
 	if (ret_val)
 		goto out;
 
 	if (!active) {
 		data &= ~IGP01E1000_GMII_FLEX_SPD;
-		ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO, data);
+		ret_val = phy->ops.write_reg(hw, IGP01E1000_GMII_FIFO, data);
 		if (ret_val)
 			goto out;
 
@@ -1051,27 +1049,27 @@ e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
 		 * SmartSpeed, so performance is maintained.
 		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    &data);
 			if (ret_val)
 				goto out;
 
 			data |= IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    data);
 			if (ret_val)
 				goto out;
 		} else if (phy->smart_speed == e1000_smart_speed_off) {
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    &data);
 			if (ret_val)
 				goto out;
 
 			data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    data);
 			if (ret_val)
@@ -1081,19 +1079,19 @@ e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
 	    (phy->autoneg_advertised == E1000_ALL_NOT_GIG) ||
 	    (phy->autoneg_advertised == E1000_ALL_10_SPEED)) {
 		data |= IGP01E1000_GMII_FLEX_SPD;
-		ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO, data);
+		ret_val = phy->ops.write_reg(hw, IGP01E1000_GMII_FIFO, data);
 		if (ret_val)
 			goto out;
 
 		/* When LPLU is enabled, we should disable SmartSpeed */
-		ret_val = e1000_read_phy_reg(hw,
+		ret_val = phy->ops.read_reg(hw,
 		    IGP01E1000_PHY_PORT_CONFIG,
 		    &data);
 		if (ret_val)
 			goto out;
 
 		data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = phy->ops.write_reg(hw,
 		    IGP01E1000_PHY_PORT_CONFIG,
 		    data);
 	}
@@ -1120,13 +1118,13 @@ e1000_setup_led_82541(struct e1000_hw *hw)
 
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 
-	ret_val = e1000_read_phy_reg(hw,
+	ret_val = hw->phy.ops.read_reg(hw,
 	    IGP01E1000_GMII_FIFO,
 	    &dev_spec->spd_default);
 	if (ret_val)
 		goto out;
 
-	ret_val = e1000_write_phy_reg(hw,
+	ret_val = hw->phy.ops.write_reg(hw,
 	    IGP01E1000_GMII_FIFO,
 	    (u16)(dev_spec->spd_default &
 	    ~IGP01E1000_GMII_SPD));
@@ -1157,7 +1155,7 @@ e1000_cleanup_led_82541(struct e1000_hw *hw)
 
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 
-	ret_val = e1000_write_phy_reg(hw,
+	ret_val = hw->phy.ops.write_reg(hw,
 	    IGP01E1000_GMII_FIFO,
 	    dev_spec->spd_default);
 	if (ret_val)
@@ -1198,63 +1196,63 @@ e1000_phy_init_script_82541(struct e1000_hw *hw)
 	 * Save off the current value of register 0x2F5B to be restored at
 	 * the end of this routine.
 	 */
-	ret_val = e1000_read_phy_reg(hw, 0x2F5B, &phy_saved_data);
+	ret_val = hw->phy.ops.read_reg(hw, 0x2F5B, &phy_saved_data);
 
 	/* Disabled the PHY transmitter */
-	e1000_write_phy_reg(hw, 0x2F5B, 0x0003);
+	hw->phy.ops.write_reg(hw, 0x2F5B, 0x0003);
 
 	msec_delay(20);
 
-	e1000_write_phy_reg(hw, 0x0000, 0x0140);
+	hw->phy.ops.write_reg(hw, 0x0000, 0x0140);
 
 	msec_delay(5);
 
 	switch (hw->mac.type) {
 	case e1000_82541:
 	case e1000_82547:
-		e1000_write_phy_reg(hw, 0x1F95, 0x0001);
+		hw->phy.ops.write_reg(hw, 0x1F95, 0x0001);
 
-		e1000_write_phy_reg(hw, 0x1F71, 0xBD21);
+		hw->phy.ops.write_reg(hw, 0x1F71, 0xBD21);
 
-		e1000_write_phy_reg(hw, 0x1F79, 0x0018);
+		hw->phy.ops.write_reg(hw, 0x1F79, 0x0018);
 
-		e1000_write_phy_reg(hw, 0x1F30, 0x1600);
+		hw->phy.ops.write_reg(hw, 0x1F30, 0x1600);
 
-		e1000_write_phy_reg(hw, 0x1F31, 0x0014);
+		hw->phy.ops.write_reg(hw, 0x1F31, 0x0014);
 
-		e1000_write_phy_reg(hw, 0x1F32, 0x161C);
+		hw->phy.ops.write_reg(hw, 0x1F32, 0x161C);
 
-		e1000_write_phy_reg(hw, 0x1F94, 0x0003);
+		hw->phy.ops.write_reg(hw, 0x1F94, 0x0003);
 
-		e1000_write_phy_reg(hw, 0x1F96, 0x003F);
+		hw->phy.ops.write_reg(hw, 0x1F96, 0x003F);
 
-		e1000_write_phy_reg(hw, 0x2010, 0x0008);
+		hw->phy.ops.write_reg(hw, 0x2010, 0x0008);
 		break;
 	case e1000_82541_rev_2:
 	case e1000_82547_rev_2:
-		e1000_write_phy_reg(hw, 0x1F73, 0x0099);
+		hw->phy.ops.write_reg(hw, 0x1F73, 0x0099);
 		break;
 	default:
 		break;
 	}
 
-	e1000_write_phy_reg(hw, 0x0000, 0x3300);
+	hw->phy.ops.write_reg(hw, 0x0000, 0x3300);
 
 	msec_delay(20);
 
 	/* Now enable the transmitter */
-	e1000_write_phy_reg(hw, 0x2F5B, phy_saved_data);
+	hw->phy.ops.write_reg(hw, 0x2F5B, phy_saved_data);
 
 	if (hw->mac.type == e1000_82547) {
 		u16 fused, fine, coarse;
 
 		/* Move to analog registers page */
-		e1000_read_phy_reg(hw,
+		hw->phy.ops.read_reg(hw,
 		    IGP01E1000_ANALOG_SPARE_FUSE_STATUS,
 		    &fused);
 
 		if (!(fused & IGP01E1000_ANALOG_SPARE_FUSE_ENABLED)) {
-			e1000_read_phy_reg(hw,
+			hw->phy.ops.read_reg(hw,
 			    IGP01E1000_ANALOG_FUSE_STATUS,
 			    &fused);
 
@@ -1272,10 +1270,10 @@ e1000_phy_init_script_82541(struct e1000_hw *hw)
 			    (fine & IGP01E1000_ANALOG_FUSE_FINE_MASK) |
 			    (coarse & IGP01E1000_ANALOG_FUSE_COARSE_MASK);
 
-			e1000_write_phy_reg(hw,
+			hw->phy.ops.write_reg(hw,
 			    IGP01E1000_ANALOG_FUSE_CONTROL,
 			    fused);
-			e1000_write_phy_reg(hw,
+			hw->phy.ops.write_reg(hw,
 			    IGP01E1000_ANALOG_FUSE_BYPASS,
 			    IGP01E1000_ANALOG_FUSE_ENABLE_SW_CONTROL);
 		}
@@ -1294,7 +1292,7 @@ out:
  * IGP PHY.  This is a function pointer entry point called by the api module.
  */
 void
-e1000_init_script_state_82541(struct e1000_hw *hw, boolean_t state)
+e1000_init_script_state_82541(struct e1000_hw *hw, bool state)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 
@@ -1317,14 +1315,14 @@ e1000_init_script_state_82541(struct e1000_hw *hw, boolean_t state)
 
 #ifndef FIFO_WORKAROUND
 /*
- * e1000_fifo_workaround_82547 - Workaround for TX fifo failure
+ * e1000_fifo_workaround_82547 - Workaround for Tx fifo failure
  * @hw: pointer to the HW structure
  * @length: length of next outgoing frame
  *
  * Returns: E1000_ERR_FIFO_WRAP if the next packet cannot be transmitted yet
- *          E1000_SUCCESS if the next packet can be transmitted
+ *	E1000_SUCCESS if the next packet can be transmitted
  *
- * Workaround for the 82547 TX fifo failure.
+ * Workaround for the 82547 Tx fifo failure.
  */
 s32
 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length)
@@ -1355,7 +1353,8 @@ e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length)
 	    (dev_spec->tx_fifo_size + E1000_FIFO_PAD_82547))
 		goto out;
 
-	if (E1000_READ_REG(hw, E1000_TDT) != E1000_READ_REG(hw, E1000_TDH)) {
+	if (E1000_READ_REG(hw, E1000_TDT(0)) !=
+	    E1000_READ_REG(hw, E1000_TDH(0))) {
 		ret_val = -E1000_ERR_FIFO_WRAP;
 		goto out;
 	}
@@ -1392,11 +1391,11 @@ out:
 }
 
 /*
- * e1000_update_tx_fifo_head - Update TX fifo head pointer
+ * e1000_update_tx_fifo_head - Update Tx fifo head pointer
  * @hw: pointer to the HW structure
  * @length: length of next outgoing frame
  *
- * Updates the SW calculated TX FIFO head pointer.
+ * Updates the SW calculated Tx FIFO head pointer.
  */
 void
 e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length)
@@ -1426,7 +1425,7 @@ e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length)
  * TTL workaround.
  */
 void
-e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, boolean_t state)
+e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, bool state)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 
@@ -1447,11 +1446,11 @@ e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, boolean_t state)
  * Returns the current status of the TTL workaround, as to whether the
  * workaround is enabled or disabled.
  */
-boolean_t
+bool
 e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
-	boolean_t state = FALSE;
+	bool state = FALSE;
 
 	DEBUGFUNC("e1000_ttl_workaround_enabled_82541");
 
@@ -1486,7 +1485,7 @@ e1000_igp_ttl_workaround_82547(struct e1000_hw *hw)
 	s32 ret_val = E1000_SUCCESS;
 	u16 phy_data = 0;
 	u16 dsp_value = DSP_RESET_ENABLE;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_igp_ttl_workaround_82547");
 
@@ -1522,7 +1521,7 @@ e1000_igp_ttl_workaround_82547(struct e1000_hw *hw)
 			 * Workaround not activated,
 			 * check if it needs activation
 			 */
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = hw->phy.ops.read_reg(hw,
 			    PHY_AUTONEG_EXP,
 			    &phy_data);
 			if (ret_val)
@@ -1553,13 +1552,29 @@ e1000_igp_ttl_workaround_82547(struct e1000_hw *hw)
 		}
 	}
 
-	ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_DSP_RESET, dsp_value);
+	ret_val =
+	    hw->phy.ops.write_reg(hw, IGP01E1000_PHY_DSP_RESET, dsp_value);
 
 out:
 	return (ret_val);
 }
 
 #endif
+/*
+ * e1000_power_down_phy_copper_82541 - Remove link in case of PHY power down
+ * @hw: pointer to the HW structure
+ *
+ * In the case of a PHY power down to save power, or to turn off link during a
+ * driver unload, or wake on lan is not enabled, remove the link.
+ */
+static void
+e1000_power_down_phy_copper_82541(struct e1000_hw *hw)
+{
+	/* If the management interface is not enabled, then power down */
+	if (!(E1000_READ_REG(hw, E1000_MANC) & E1000_MANC_SMBUS_EN))
+		e1000_power_down_phy_copper(hw);
+}
+
 /*
  * e1000_clear_hw_cntrs_82541 - Clear device specific hardware counters
  * @hw: pointer to the HW structure

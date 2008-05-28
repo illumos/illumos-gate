@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,22 +19,21 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.38 v2008-02-29
  */
+
 /*
  * e1000_82542 (rev 1 & 2)
  */
 
 #include "e1000_api.h"
-
-void e1000_init_function_pointers_82542(struct e1000_hw *hw);
 
 static s32 e1000_init_phy_params_82542(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_82542(struct e1000_hw *hw);
@@ -48,7 +47,7 @@ static s32 e1000_led_off_82542(struct e1000_hw *hw);
 static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw);
 
 struct e1000_dev_spec_82542 {
-	boolean_t dma_fairness;
+	bool dma_fairness;
 };
 
 /*
@@ -80,7 +79,6 @@ static s32
 e1000_init_nvm_params_82542(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
-	struct e1000_functions *func = &hw->func;
 
 	DEBUGFUNC("e1000_init_nvm_params_82542");
 
@@ -91,11 +89,11 @@ e1000_init_nvm_params_82542(struct e1000_hw *hw)
 	nvm->word_size = 64;
 
 	/* Function Pointers */
-	func->read_nvm = e1000_read_nvm_microwire;
-	func->release_nvm = e1000_stop_nvm;
-	func->write_nvm = e1000_write_nvm_microwire;
-	func->update_nvm = e1000_update_nvm_checksum_generic;
-	func->validate_nvm = e1000_validate_nvm_checksum_generic;
+	nvm->ops.read = e1000_read_nvm_microwire;
+	nvm->ops.release = e1000_stop_nvm;
+	nvm->ops.write = e1000_write_nvm_microwire;
+	nvm->ops.update = e1000_update_nvm_checksum_generic;
+	nvm->ops.validate = e1000_validate_nvm_checksum_generic;
 
 	return (E1000_SUCCESS);
 }
@@ -110,13 +108,12 @@ static s32
 e1000_init_mac_params_82542(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_mac_params_82542");
 
 	/* Set media type */
-	hw->media_type = e1000_media_type_fiber;
+	hw->phy.media_type = e1000_media_type_fiber;
 
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
@@ -126,34 +123,35 @@ e1000_init_mac_params_82542(struct e1000_hw *hw)
 	/* Function pointers */
 
 	/* bus type/speed/width */
-	func->get_bus_info = e1000_get_bus_info_82542;
+	mac->ops.get_bus_info = e1000_get_bus_info_82542;
 	/* reset */
-	func->reset_hw = e1000_reset_hw_82542;
+	mac->ops.reset_hw = e1000_reset_hw_82542;
 	/* hw initialization */
-	func->init_hw = e1000_init_hw_82542;
+	mac->ops.init_hw = e1000_init_hw_82542;
 	/* link setup */
-	func->setup_link = e1000_setup_link_82542;
+	mac->ops.setup_link = e1000_setup_link_82542;
 	/* phy/fiber/serdes setup */
-	func->setup_physical_interface = e1000_setup_fiber_serdes_link_generic;
+	mac->ops.setup_physical_interface =
+	    e1000_setup_fiber_serdes_link_generic;
 	/* check for link */
-	func->check_for_link = e1000_check_for_fiber_link_generic;
+	mac->ops.check_for_link = e1000_check_for_fiber_link_generic;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
-	func->write_vfta = e1000_write_vfta_generic;
+	mac->ops.write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
-	func->clear_vfta = e1000_clear_vfta_generic;
+	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
-	func->mta_set = e1000_mta_set_generic;
+	mac->ops.mta_set = e1000_mta_set_generic;
 	/* turn on/off LED */
-	func->led_on = e1000_led_on_82542;
-	func->led_off = e1000_led_off_82542;
+	mac->ops.led_on = e1000_led_on_82542;
+	mac->ops.led_off = e1000_led_off_82542;
 	/* remove device */
-	func->remove_device = e1000_remove_device_generic;
+	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
-	func->clear_hw_cntrs = e1000_clear_hw_cntrs_82542;
+	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82542;
 	/* link info */
-	func->get_link_up_info =
+	mac->ops.get_link_up_info =
 	    e1000_get_speed_and_duplex_fiber_serdes_generic;
 
 	hw->dev_spec_size = sizeof (struct e1000_dev_spec_82542);
@@ -176,9 +174,9 @@ e1000_init_function_pointers_82542(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82542");
 
-	hw->func.init_mac_params = e1000_init_mac_params_82542;
-	hw->func.init_nvm_params = e1000_init_nvm_params_82542;
-	hw->func.init_phy_params = e1000_init_phy_params_82542;
+	hw->mac.ops.init_params = e1000_init_mac_params_82542;
+	hw->nvm.ops.init_params = e1000_init_nvm_params_82542;
+	hw->phy.ops.init_params = e1000_init_phy_params_82542;
 }
 
 /*
@@ -186,7 +184,7 @@ e1000_init_function_pointers_82542(struct e1000_hw *hw)
  * @hw: pointer to the HW structure
  *
  * This will obtain information about the HW bus for which the
- * adaper is attached and stores it in the hw structure.  This is a function
+ * adapter is attached and stores it in the hw structure.  This is a function
  * pointer entry point called by the api module.
  */
 static s32
@@ -240,7 +238,7 @@ e1000_reset_hw_82542(struct e1000_hw *hw)
 	DEBUGOUT("Issuing a global reset to 82542/82543 MAC\n");
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
 
-	e1000_reload_nvm(hw);
+	hw->nvm.ops.reload(hw);
 	msec_delay(2);
 
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
@@ -275,7 +273,7 @@ e1000_init_hw_82542(struct e1000_hw *hw)
 
 	/* Disabling VLAN filtering */
 	E1000_WRITE_REG(hw, E1000_VET, 0);
-	e1000_clear_vfta(hw);
+	mac->ops.clear_vfta(hw);
 
 	/* For 82542 (rev 2.0), disable MWI and put the receiver into reset */
 	if (hw->revision_id == E1000_REVISION_2) {
@@ -342,7 +340,6 @@ static s32
 e1000_setup_link_82542(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_setup_link_82542");
@@ -351,22 +348,22 @@ e1000_setup_link_82542(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	mac->fc &= ~e1000_fc_tx_pause;
+	hw->fc.type &= ~e1000_fc_tx_pause;
 
 	if (mac->report_tx_early == 1)
-		mac->fc &= ~e1000_fc_rx_pause;
+		hw->fc.type &= ~e1000_fc_rx_pause;
 
 	/*
 	 * We want to save off the original Flow Control configuration just in
 	 * case we get disconnected and then reconnected into a different hub
 	 * or switch with different Flow Control capabilities.
 	 */
-	mac->original_fc = mac->fc;
+	hw->fc.original_type = hw->fc.type;
 
-	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", mac->fc);
+	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.type);
 
 	/* Call the necessary subroutine to configure the link. */
-	ret_val = func->setup_physical_interface(hw);
+	ret_val = mac->ops.setup_physical_interface(hw);
 	if (ret_val)
 		goto out;
 
@@ -382,7 +379,7 @@ e1000_setup_link_82542(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_FCAH, FLOW_CONTROL_ADDRESS_HIGH);
 	E1000_WRITE_REG(hw, E1000_FCT, FLOW_CONTROL_TYPE);
 
-	E1000_WRITE_REG(hw, E1000_FCTTV, mac->fc_pause_time);
+	E1000_WRITE_REG(hw, E1000_FCTTV, hw->fc.pause_time);
 
 	ret_val = e1000_set_fc_watermarks_generic(hw);
 
@@ -433,7 +430,7 @@ e1000_led_off_82542(struct e1000_hw *hw)
 }
 
 /*
- * e1000_translate_register_82542 - Translate the proper regiser offset
+ * e1000_translate_register_82542 - Translate the proper register offset
  * @reg: e1000 register to be read
  *
  * Registers in 82542 are located in different offsets than other adapters
@@ -457,34 +454,34 @@ e1000_translate_register_82542(u32 reg)
 	case E1000_RDTR:
 		reg = 0x00108;
 		break;
-	case E1000_RDBAL:
+	case E1000_RDBAL(0):
 		reg = 0x00110;
 		break;
-	case E1000_RDBAH:
+	case E1000_RDBAH(0):
 		reg = 0x00114;
 		break;
-	case E1000_RDLEN:
+	case E1000_RDLEN(0):
 		reg = 0x00118;
 		break;
-	case E1000_RDH:
+	case E1000_RDH(0):
 		reg = 0x00120;
 		break;
-	case E1000_RDT:
+	case E1000_RDT(0):
 		reg = 0x00128;
 		break;
-	case E1000_RDBAL1:
+	case E1000_RDBAL(1):
 		reg = 0x00138;
 		break;
-	case E1000_RDBAH1:
+	case E1000_RDBAH(1):
 		reg = 0x0013C;
 		break;
-	case E1000_RDLEN1:
+	case E1000_RDLEN(1):
 		reg = 0x00140;
 		break;
-	case E1000_RDH1:
+	case E1000_RDH(1):
 		reg = 0x00148;
 		break;
-	case E1000_RDT1:
+	case E1000_RDT(1):
 		reg = 0x00150;
 		break;
 	case E1000_FCRTH:
@@ -496,19 +493,19 @@ e1000_translate_register_82542(u32 reg)
 	case E1000_MTA:
 		reg = 0x00200;
 		break;
-	case E1000_TDBAL:
+	case E1000_TDBAL(0):
 		reg = 0x00420;
 		break;
-	case E1000_TDBAH:
+	case E1000_TDBAH(0):
 		reg = 0x00424;
 		break;
-	case E1000_TDLEN:
+	case E1000_TDLEN(0):
 		reg = 0x00428;
 		break;
-	case E1000_TDH:
+	case E1000_TDH(0):
 		reg = 0x00430;
 		break;
-	case E1000_TDT:
+	case E1000_TDT(0):
 		reg = 0x00438;
 		break;
 	case E1000_TIDV:

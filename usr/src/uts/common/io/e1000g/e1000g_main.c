@@ -47,9 +47,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.7";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.8";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.7";
+static char e1000g_version[] = "Driver Ver. 5.2.8";
 
 /*
  * Proto types for DDI entry points
@@ -731,8 +731,8 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 
 	hw->mac.autoneg_failed = B_TRUE;
 
-	/* Set the wait_for_link flag to B_FALSE */
-	hw->phy.wait_for_link = B_FALSE;
+	/* Set the autoneg_wait_to_complete flag to B_FALSE */
+	hw->phy.autoneg_wait_to_complete = B_FALSE;
 
 	/* Adaptive IFS related changes */
 	hw->mac.adaptive_ifs = B_TRUE;
@@ -771,7 +771,7 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	Adapter->master_latency_timer = DEFAULT_MASTER_LATENCY_TIMER;
 
 	/* copper options */
-	if (hw->media_type == e1000_media_type_copper) {
+	if (hw->phy.media_type == e1000_media_type_copper) {
 		hw->phy.mdix = 0;	/* AUTO_ALL_MODES */
 		hw->phy.disable_polarity_correction = B_FALSE;
 		hw->phy.ms_type = e1000_ms_hw_default;	/* E1000_MASTER_SLAVE */
@@ -792,7 +792,7 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 
 	tx_ring = Adapter->tx_ring;
 	tx_ring->frags_limit =
-	    (hw->mac.max_frame_size / Adapter->tx_bcopy_thresh) + 2;
+	    (Adapter->max_frame_size / Adapter->tx_bcopy_thresh) + 2;
 	if (tx_ring->frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
 		tx_ring->frags_limit = (MAX_TX_DESC_PER_PACKET >> 1);
 
@@ -825,14 +825,14 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 				Adapter->sys_page_sz = iommu_pagesize;
 		}
 	}
-	Adapter->dvma_page_num = mac->max_frame_size /
+	Adapter->dvma_page_num = Adapter->max_frame_size /
 	    Adapter->sys_page_sz + E1000G_DEFAULT_DVMA_PAGE_NUM;
 	ASSERT(Adapter->dvma_page_num >= E1000G_DEFAULT_DVMA_PAGE_NUM);
 #endif
 
-	mac->min_frame_size = ETHERMIN + ETHERFCSL;
+	Adapter->min_frame_size = ETHERMIN + ETHERFCSL;
 
-	rx_size = mac->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
+	rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
 	if ((rx_size > FRAME_SIZE_UPTO_2K) && (rx_size <= FRAME_SIZE_UPTO_4K))
 		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
 	else if ((rx_size > FRAME_SIZE_UPTO_4K) &&
@@ -844,7 +844,7 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	else
 		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
 
-	tx_size = mac->max_frame_size;
+	tx_size = Adapter->max_frame_size;
 	if ((tx_size > FRAME_SIZE_UPTO_2K) && (tx_size <= FRAME_SIZE_UPTO_4K))
 		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_4K;
 	else if ((tx_size > FRAME_SIZE_UPTO_4K) &&
@@ -856,7 +856,6 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	else
 		Adapter->tx_buffer_size = E1000_TX_BUFFER_SIZE_2K;
 
-#ifndef NO_82542_SUPPORT
 	/*
 	 * For Wiseman adapters we have an requirement of having receive
 	 * buffers aligned at 256 byte boundary. Since Livengood does not
@@ -872,7 +871,6 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE;
 	else
 		Adapter->rx_buf_align = 1;
-#endif
 }
 
 /*
@@ -1216,7 +1214,7 @@ e1000g_init(struct e1000g *Adapter)
 		/*
 		 * Total FIFO is 64K
 		 */
-		if (hw->mac.max_frame_size > FRAME_SIZE_UPTO_8K)
+		if (Adapter->max_frame_size > FRAME_SIZE_UPTO_8K)
 			pba = E1000_PBA_40K;	/* 40K for Rx, 24K for Tx */
 		else
 			pba = E1000_PBA_48K;	/* 48K for Rx, 16K for Tx */
@@ -1225,7 +1223,7 @@ e1000g_init(struct e1000g *Adapter)
 		/*
 		 * Total FIFO is 48K
 		 */
-		if (hw->mac.max_frame_size > FRAME_SIZE_UPTO_8K)
+		if (Adapter->max_frame_size > FRAME_SIZE_UPTO_8K)
 			pba = E1000_PBA_30K;	/* 30K for Rx, 18K for Tx */
 		else
 			pba = E1000_PBA_38K;	/* 38K for Rx, 10K for Tx */
@@ -1237,7 +1235,7 @@ e1000g_init(struct e1000g *Adapter)
 		/*
 		 * Total FIFO is 40K
 		 */
-		if (hw->mac.max_frame_size > FRAME_SIZE_UPTO_8K)
+		if (Adapter->max_frame_size > FRAME_SIZE_UPTO_8K)
 			pba = E1000_PBA_22K;	/* 22K for Rx, 18K for Tx */
 		else
 			pba = E1000_PBA_30K;	/* 30K for Rx, 10K for Tx */
@@ -1261,17 +1259,16 @@ e1000g_init(struct e1000g *Adapter)
 	high_water = min(((pba << 10) * 9 / 10),
 	    ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_ich9lan) ?
 	    ((pba << 10) - (E1000_ERT_2048 << 3)) :
-	    ((pba << 10) - hw->mac.max_frame_size)));
+	    ((pba << 10) - Adapter->max_frame_size)));
 
-	hw->mac.fc_high_water = high_water & 0xFFF8;
-	hw->mac.fc_low_water = hw->mac.fc_high_water - 8;
+	hw->fc.high_water = high_water & 0xFFF8;
+	hw->fc.low_water = hw->fc.high_water - 8;
 
 	if (hw->mac.type == e1000_80003es2lan)
-		hw->mac.fc_pause_time = 0xFFFF;
+		hw->fc.pause_time = 0xFFFF;
 	else
-		hw->mac.fc_pause_time = E1000_FC_PAUSE_TIME;
-	hw->mac.fc_send_xon = B_TRUE;
-	hw->mac.fc = hw->mac.original_fc;
+		hw->fc.pause_time = E1000_FC_PAUSE_TIME;
+	hw->fc.send_xon = B_TRUE;
 
 	/*
 	 * Reset the adapter hardware the second time.
@@ -1333,7 +1330,7 @@ e1000g_init(struct e1000g *Adapter)
 		link_timeout = PHY_FORCE_LIMIT * drv_usectohz(100000);
 
 	mutex_enter(&Adapter->link_lock);
-	if (hw->phy.wait_for_link) {
+	if (hw->phy.autoneg_wait_to_complete) {
 		Adapter->link_complete = B_TRUE;
 	} else {
 		Adapter->link_complete = B_FALSE;
@@ -1386,7 +1383,7 @@ e1000g_link_up(struct e1000g *Adapter)
 
 	if ((E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU) ||
 	    ((!hw->mac.get_link_status) && (hw->mac.type == e1000_82543)) ||
-	    ((hw->media_type == e1000_media_type_internal_serdes) &&
+	    ((hw->phy.media_type == e1000_media_type_internal_serdes) &&
 	    (hw->mac.serdes_has_link))) {
 		link_up = B_TRUE;
 	} else {
@@ -1656,8 +1653,8 @@ e1000g_tx_clean(struct e1000g *Adapter)
 		tx_ring->tbd_oldest = tx_ring->tbd_first;
 
 		/* Setup our HW Tx Head & Tail descriptor pointers */
-		E1000_WRITE_REG(&Adapter->shared, E1000_TDH, 0);
-		E1000_WRITE_REG(&Adapter->shared, E1000_TDT, 0);
+		E1000_WRITE_REG(&Adapter->shared, E1000_TDH(0), 0);
+		E1000_WRITE_REG(&Adapter->shared, E1000_TDT(0), 0);
 	}
 }
 
@@ -1848,7 +1845,9 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 	if (icr & E1000_ICR_RXT0) {
 		mblk_t *mp;
 
+		mutex_enter(&Adapter->rx_ring->rx_lock);
 		mp = e1000g_receive(Adapter);
+		mutex_exit(&Adapter->rx_ring->rx_lock);
 
 		rw_exit(&Adapter->chip_lock);
 
@@ -2060,7 +2059,6 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
-#ifndef NO_82542_SUPPORT
 	/*
 	 * The first revision of Wiseman silicon (rev 2.0) has an errata
 	 * that requires the receiver to be in reset when any of the
@@ -2076,7 +2074,6 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 		E1000_WRITE_REG(hw, E1000_RCTL, E1000_RCTL_RST);
 		msec_delay(5);
 	}
-#endif
 
 	bcopy(mac_addr, Adapter->unicst_addr[slot].mac.addr, ETHERADDRL);
 	e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
@@ -2087,7 +2084,6 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 			e1000_rar_set(hw, (uint8_t *)mac_addr, LAST_RAR_ENTRY);
 	}
 
-#ifndef NO_82542_SUPPORT
 	/*
 	 * If we are using Wiseman rev 2.0 silicon, we will have previously
 	 * put the receive in reset, and disabled MWI, to work around some
@@ -2102,7 +2098,6 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 			e1000_pci_set_mwi(hw);
 		e1000g_rx_setup(Adapter);
 	}
-#endif
 
 	rw_exit(&Adapter->chip_lock);
 
@@ -2301,11 +2296,9 @@ multicst_add(struct e1000g *Adapter, const uint8_t *multiaddr)
 
 	e1000g_setup_multicast(Adapter);
 
-#ifndef NO_82542_SUPPORT
 	if ((hw->mac.type == e1000_82542) &&
 	    (hw->revision_id == E1000_REVISION_2))
 		e1000g_rx_setup(Adapter);
-#endif
 
 	e1000g_mask_interrupt(Adapter);
 
@@ -2346,11 +2339,9 @@ multicst_remove(struct e1000g *Adapter, const uint8_t *multiaddr)
 
 	e1000g_setup_multicast(Adapter);
 
-#ifndef NO_82542_SUPPORT
 	if ((hw->mac.type == e1000_82542) &&
 	    (hw->revision_id == E1000_REVISION_2))
 		e1000g_rx_setup(Adapter);
-#endif
 
 	e1000g_mask_interrupt(Adapter);
 
@@ -2404,7 +2395,6 @@ e1000g_setup_multicast(struct e1000g *Adapter)
 		 */
 		mc_addr_count = Adapter->mcast_count;
 	}
-#ifndef NO_82542_SUPPORT
 	/*
 	 * The Wiseman 2.0 silicon has an errata by which the receiver will
 	 * hang  while writing to the receive address registers if the receiver
@@ -2432,12 +2422,10 @@ e1000g_setup_multicast(struct e1000g *Adapter)
 		/* Allow receiver time to go in to reset */
 		msec_delay(5);
 	}
-#endif
 
-	e1000_mc_addr_list_update(hw, mc_addr_list, mc_addr_count,
+	e1000_update_mc_addr_list(hw, mc_addr_list, mc_addr_count,
 	    Adapter->unicst_total, hw->mac.rar_entry_count);
 
-#ifndef NO_82542_SUPPORT
 	/*
 	 * Only for Wiseman_2_0
 	 * If MWI was enabled then re-enable it after issueing (as we
@@ -2461,7 +2449,6 @@ e1000g_setup_multicast(struct e1000g *Adapter)
 		if (hw->bus.pci_cmd_word & CMD_MEM_WRT_INVALIDATE)
 			e1000_pci_set_mwi(hw);
 	}
-#endif
 
 	/*
 	 * Restore original value
@@ -2630,9 +2617,10 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	struct e1000g *Adapter = arg;
 	struct e1000_mac_info *mac = &Adapter->shared.mac;
 	struct e1000_phy_info *phy = &Adapter->shared.phy;
+	struct e1000_fc_info *fc = &Adapter->shared.fc;
 	e1000g_tx_ring_t *tx_ring;
 	int err = 0;
-	link_flowctrl_t fc;
+	link_flowctrl_t flowctrl;
 	uint32_t cur_mtu, new_mtu;
 	uint64_t tmp = 0;
 
@@ -2676,24 +2664,24 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			Adapter->param_adv_autoneg = *(uint8_t *)pr_val;
 			goto reset;
 		case DLD_PROP_FLOWCTRL:
-			mac->fc_send_xon = B_TRUE;
-			bcopy(pr_val, &fc, sizeof (fc));
+			fc->send_xon = B_TRUE;
+			bcopy(pr_val, &flowctrl, sizeof (flowctrl));
 
-			switch (fc) {
+			switch (flowctrl) {
 			default:
 				err = EINVAL;
 				break;
 			case LINK_FLOWCTRL_NONE:
-				mac->fc = e1000_fc_none;
+				fc->type = e1000_fc_none;
 				break;
 			case LINK_FLOWCTRL_RX:
-				mac->fc = e1000_fc_rx_pause;
+				fc->type = e1000_fc_rx_pause;
 				break;
 			case LINK_FLOWCTRL_TX:
-				mac->fc = e1000_fc_tx_pause;
+				fc->type = e1000_fc_tx_pause;
 				break;
 			case LINK_FLOWCTRL_BI:
-				mac->fc = e1000_fc_full;
+				fc->type = e1000_fc_full;
 				break;
 			}
 reset:
@@ -2749,11 +2737,12 @@ reset:
 
 			err = mac_maxsdu_update(Adapter->mh, new_mtu);
 			if (err == 0) {
-				mac->max_frame_size = tmp;
+				Adapter->max_frame_size = tmp;
 				Adapter->default_mtu = new_mtu;
 				e1000g_set_bufsize(Adapter);
 				tx_ring = Adapter->tx_ring;
-				tx_ring->frags_limit = (mac->max_frame_size /
+				tx_ring->frags_limit =
+				    (Adapter->max_frame_size /
 				    Adapter->tx_bcopy_thresh) + 2;
 				if (tx_ring->frags_limit >
 				    (MAX_TX_DESC_PER_PACKET >> 1))
@@ -2779,8 +2768,9 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 {
 	struct e1000g *Adapter = arg;
 	struct e1000_mac_info *mac = &Adapter->shared.mac;
+	struct e1000_fc_info *fc = &Adapter->shared.fc;
 	int err = 0;
-	link_flowctrl_t fc;
+	link_flowctrl_t flowctrl;
 	uint64_t tmp = 0;
 
 	if (pr_valsize == 0)
@@ -2812,21 +2802,21 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		case DLD_PROP_FLOWCTRL:
 			if (pr_valsize >= sizeof (link_flowctrl_t)) {
-				switch (mac->fc) {
+				switch (fc->type) {
 					case e1000_fc_none:
-						fc = LINK_FLOWCTRL_NONE;
+						flowctrl = LINK_FLOWCTRL_NONE;
 						break;
 					case e1000_fc_rx_pause:
-						fc = LINK_FLOWCTRL_RX;
+						flowctrl = LINK_FLOWCTRL_RX;
 						break;
 					case e1000_fc_tx_pause:
-						fc = LINK_FLOWCTRL_TX;
+						flowctrl = LINK_FLOWCTRL_TX;
 						break;
 					case e1000_fc_full:
-						fc = LINK_FLOWCTRL_BI;
+						flowctrl = LINK_FLOWCTRL_BI;
 						break;
 				}
-				bcopy(&fc, pr_val, sizeof (fc));
+				bcopy(&flowctrl, pr_val, sizeof (flowctrl));
 			} else
 				err = EINVAL;
 			break;
@@ -2902,7 +2892,8 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			err = EINVAL;
 		else {
 			Adapter->tx_bcopy_thresh = (uint32_t)result;
-			tx_ring->frags_limit = (hw->mac.max_frame_size /
+			tx_ring->frags_limit =
+			    (Adapter->max_frame_size /
 			    Adapter->tx_bcopy_thresh) + 2;
 			if (tx_ring->frags_limit >
 			    (MAX_TX_DESC_PER_PACKET >> 1))
@@ -3266,13 +3257,13 @@ e1000g_get_conf(struct e1000g *Adapter)
 	/*
 	 * FlowControl
 	 */
-	hw->mac.fc_send_xon = B_TRUE;
-	hw->mac.fc =
+	hw->fc.send_xon = B_TRUE;
+	hw->fc.type =
 	    e1000g_get_prop(Adapter, "FlowControl",
 	    e1000_fc_none, 4, DEFAULT_FLOW_CONTROL);
 	/* 4 is the setting that says "let the eeprom decide" */
-	if (hw->mac.fc == 4)
-		hw->mac.fc = e1000_fc_default;
+	if (hw->fc.type == 4)
+		hw->fc.type = e1000_fc_default;
 
 	/*
 	 * Max Num Receive Packets on Interrupt
@@ -3439,12 +3430,12 @@ e1000g_link_check(struct e1000g *Adapter)
 
 			if ((hw->mac.type == e1000_82571) ||
 			    (hw->mac.type == e1000_82572)) {
-				reg_tarc = E1000_READ_REG(hw, E1000_TARC0);
+				reg_tarc = E1000_READ_REG(hw, E1000_TARC(0));
 				if (speed == SPEED_1000)
 					reg_tarc |= (1 << 21);
 				else
 					reg_tarc &= ~(1 << 21);
-				E1000_WRITE_REG(hw, E1000_TARC0, reg_tarc);
+				E1000_WRITE_REG(hw, E1000_TARC(0), reg_tarc);
 			}
 		}
 		Adapter->smartspeed = 0;
@@ -3645,7 +3636,7 @@ e1000g_local_timer(void *ws)
 	 * change the value in steps...
 	 * These properties should only be set for 10/100
 	 */
-	if ((hw->media_type == e1000_media_type_copper) &&
+	if ((hw->phy.media_type == e1000_media_type_copper) &&
 	    ((Adapter->link_speed == SPEED_100) ||
 	    (Adapter->link_speed == SPEED_10))) {
 		e1000_update_adaptive(hw);
@@ -3797,18 +3788,18 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 		break;
 	}	/* switch */
 
-	mac->max_frame_size = Adapter->default_mtu +
+	Adapter->max_frame_size = Adapter->default_mtu +
 	    sizeof (struct ether_vlan_header) + ETHERFCSL;
 
 	/* ich8 does not do jumbo frames */
 	if (mac->type == e1000_ich8lan) {
-		mac->max_frame_size = ETHERMAX;
+		Adapter->max_frame_size = ETHERMAX;
 	}
 
 	/* ich9 does not do jumbo frames on one phy type */
 	if ((mac->type == e1000_ich9lan) &&
 	    (phy->type == e1000_phy_ife)) {
-		mac->max_frame_size = ETHERMAX;
+		Adapter->max_frame_size = ETHERMAX;
 	}
 }
 
@@ -4361,8 +4352,8 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		value = sizeof (lb_normal);
 		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
 		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
-		    (hw->media_type == e1000_media_type_fiber) ||
-		    (hw->media_type == e1000_media_type_internal_serdes)) {
+		    (hw->phy.media_type == e1000_media_type_fiber) ||
+		    (hw->phy.media_type == e1000_media_type_internal_serdes)) {
 			value += sizeof (lb_phy);
 			switch (hw->mac.type) {
 			case e1000_82571:
@@ -4385,8 +4376,8 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		value = sizeof (lb_normal);
 		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
 		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
-		    (hw->media_type == e1000_media_type_fiber) ||
-		    (hw->media_type == e1000_media_type_internal_serdes)) {
+		    (hw->phy.media_type == e1000_media_type_fiber) ||
+		    (hw->phy.media_type == e1000_media_type_internal_serdes)) {
 			value += sizeof (lb_phy);
 			switch (hw->mac.type) {
 			case e1000_82571:
@@ -4410,8 +4401,8 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		lbpp[value++] = lb_normal;
 		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
 		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
-		    (hw->media_type == e1000_media_type_fiber) ||
-		    (hw->media_type == e1000_media_type_internal_serdes)) {
+		    (hw->phy.media_type == e1000_media_type_fiber) ||
+		    (hw->phy.media_type == e1000_media_type_internal_serdes)) {
 			lbpp[value++] = lb_phy;
 			switch (hw->mac.type) {
 			case e1000_82571:
@@ -4475,9 +4466,9 @@ e1000g_set_loopback_mode(struct e1000g *Adapter, uint32_t mode)
 
 	if (mode == E1000G_LB_NONE) {
 		/* Reset the chip */
-		hw->phy.wait_for_link = B_TRUE;
+		hw->phy.autoneg_wait_to_complete = B_TRUE;
 		(void) e1000g_reset(Adapter);
-		hw->phy.wait_for_link = B_FALSE;
+		hw->phy.autoneg_wait_to_complete = B_FALSE;
 		return (B_TRUE);
 	}
 
@@ -4610,13 +4601,13 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 		 * For some serdes we'll need to commit the writes now
 		 * so that the status is updated on link
 		 */
-		if (hw->media_type == e1000_media_type_internal_serdes) {
+		if (hw->phy.media_type == e1000_media_type_internal_serdes) {
 			E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 			msec_delay(100);
 			ctrl = E1000_READ_REG(hw, E1000_CTRL);
 		}
 
-		if (hw->media_type == e1000_media_type_copper) {
+		if (hw->phy.media_type == e1000_media_type_copper) {
 			/* Invert Loss of Signal */
 			ctrl |= E1000_CTRL_ILOS;
 		} else {
@@ -4634,12 +4625,12 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 		 * accessible PHY. Therefore, loopback beyond MAC must be done
 		 * using SerDes analog loopback.
 		 */
-		if (hw->media_type != e1000_media_type_copper) {
+		if (hw->phy.media_type != e1000_media_type_copper) {
 			status = E1000_READ_REG(hw, E1000_STATUS);
 			/* Set ILOS on fiber nic if half duplex is detected */
 			if (((status & E1000_STATUS_LU) == 0) ||
 			    ((status & E1000_STATUS_FD) == 0) ||
-			    (hw->media_type ==
+			    (hw->phy.media_type ==
 			    e1000_media_type_internal_serdes))
 				ctrl |= E1000_CTRL_ILOS | E1000_CTRL_SLU;
 
@@ -4681,7 +4672,7 @@ e1000g_set_external_loopback_1000(struct e1000g *Adapter)
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
 
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_copper:
 		/* Force link up (Must be done before the PHY writes) */
 		ctrl = E1000_READ_REG(hw, E1000_CTRL);
@@ -4732,7 +4723,7 @@ e1000g_set_external_loopback_1000(struct e1000g *Adapter)
 	case e1000_media_type_internal_serdes:
 		status = E1000_READ_REG(hw, E1000_STATUS);
 		if (((status & E1000_STATUS_LU) == 0) ||
-		    (hw->media_type == e1000_media_type_internal_serdes)) {
+		    (hw->phy.media_type == e1000_media_type_internal_serdes)) {
 			ctrl = E1000_READ_REG(hw, E1000_CTRL);
 			ctrl |= E1000_CTRL_ILOS | E1000_CTRL_SLU;
 			E1000_WRITE_REG(hw, E1000_CTRL, ctrl);

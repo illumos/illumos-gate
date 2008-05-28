@@ -6,28 +6,29 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
  *
  * You should have received a copy of the License with this software.
  * You can obtain a copy of the License at
- *	http://www.opensolaris.org/os/licensing.
+ *      http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * IntelVersion: HSD_2343720b_DragonLake3 v2007-06-14_HSD_2343720b_DragonLake3
+ * IntelVersion: 1.100 v2008-02-29
  */
+
 /*
  * e1000_ich8lan
  * e1000_ich9lan
@@ -36,23 +37,21 @@
 #include "e1000_api.h"
 #include "e1000_ich8lan.h"
 
-void e1000_init_function_pointers_ich8lan(struct e1000_hw *hw);
-
 static s32 e1000_init_phy_params_ich8lan(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_ich8lan(struct e1000_hw *hw);
 static s32 e1000_init_mac_params_ich8lan(struct e1000_hw *hw);
 static s32 e1000_acquire_swflag_ich8lan(struct e1000_hw *hw);
 static void e1000_release_swflag_ich8lan(struct e1000_hw *hw);
-static boolean_t e1000_check_mng_mode_ich8lan(struct e1000_hw *hw);
+static bool e1000_check_mng_mode_ich8lan(struct e1000_hw *hw);
 static s32 e1000_check_polarity_ife_ich8lan(struct e1000_hw *hw);
 static s32 e1000_check_reset_block_ich8lan(struct e1000_hw *hw);
 static s32 e1000_phy_force_speed_duplex_ich8lan(struct e1000_hw *hw);
 static s32 e1000_phy_hw_reset_ich8lan(struct e1000_hw *hw);
 static s32 e1000_get_phy_info_ich8lan(struct e1000_hw *hw);
 static s32 e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw,
-    boolean_t active);
+    bool active);
 static s32 e1000_set_d3_lplu_state_ich8lan(struct e1000_hw *hw,
-    boolean_t active);
+    bool active);
 static s32 e1000_read_nvm_ich8lan(struct e1000_hw *hw, u16 offset,
     u16 words, u16 *data);
 static s32 e1000_write_nvm_ich8lan(struct e1000_hw *hw, u16 offset,
@@ -89,6 +88,7 @@ static s32 e1000_write_flash_byte_ich8lan(struct e1000_hw *hw,
 static s32 e1000_write_flash_data_ich8lan(struct e1000_hw *hw, u32 offset,
     u8 size, u16 data);
 static s32 e1000_get_cfg_done_ich8lan(struct e1000_hw *hw);
+static void e1000_power_down_phy_copper_ich8lan(struct e1000_hw *hw);
 
 /* ICH GbE Flash Hardware Sequencing Flash Status Register bit breakdown */
 /* Offset 04h HSFSTS */
@@ -133,11 +133,11 @@ union ich8_hws_flash_regacc {
 
 struct e1000_shadow_ram {
 	u16 value;
-	boolean_t modified;
+	bool modified;
 };
 
 struct e1000_dev_spec_ich8lan {
-	boolean_t kmrn_lock_loss_workaround_enabled;
+	bool kmrn_lock_loss_workaround_enabled;
 	struct e1000_shadow_ram shadow_ram[E1000_SHADOW_RAM_WORDS];
 };
 
@@ -151,7 +151,6 @@ static s32
 e1000_init_phy_params_ich8lan(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 	u16 i = 0;
 
@@ -160,19 +159,21 @@ e1000_init_phy_params_ich8lan(struct e1000_hw *hw)
 	phy->addr = 1;
 	phy->reset_delay_us = 100;
 
-	func->acquire_phy = e1000_acquire_swflag_ich8lan;
-	func->check_polarity = e1000_check_polarity_ife_ich8lan;
-	func->check_reset_block = e1000_check_reset_block_ich8lan;
-	func->force_speed_duplex = e1000_phy_force_speed_duplex_ich8lan;
-	func->get_cable_length = e1000_get_cable_length_igp_2;
-	func->get_cfg_done = e1000_get_cfg_done_ich8lan;
-	func->get_phy_info = e1000_get_phy_info_ich8lan;
-	func->read_phy_reg = e1000_read_phy_reg_igp;
-	func->release_phy = e1000_release_swflag_ich8lan;
-	func->reset_phy = e1000_phy_hw_reset_ich8lan;
-	func->set_d0_lplu_state = e1000_set_d0_lplu_state_ich8lan;
-	func->set_d3_lplu_state = e1000_set_d3_lplu_state_ich8lan;
-	func->write_phy_reg = e1000_write_phy_reg_igp;
+	phy->ops.acquire = e1000_acquire_swflag_ich8lan;
+	phy->ops.check_polarity = e1000_check_polarity_ife_ich8lan;
+	phy->ops.check_reset_block = e1000_check_reset_block_ich8lan;
+	phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_ich8lan;
+	phy->ops.get_cable_length = e1000_get_cable_length_igp_2;
+	phy->ops.get_cfg_done = e1000_get_cfg_done_ich8lan;
+	phy->ops.get_info = e1000_get_phy_info_ich8lan;
+	phy->ops.read_reg = e1000_read_phy_reg_igp;
+	phy->ops.release = e1000_release_swflag_ich8lan;
+	phy->ops.reset = e1000_phy_hw_reset_ich8lan;
+	phy->ops.set_d0_lplu_state = e1000_set_d0_lplu_state_ich8lan;
+	phy->ops.set_d3_lplu_state = e1000_set_d3_lplu_state_ich8lan;
+	phy->ops.write_reg = e1000_write_phy_reg_igp;
+	phy->ops.power_up = e1000_power_up_phy_copper;
+	phy->ops.power_down = e1000_power_down_phy_copper_ich8lan;
 
 	/*
 	 * We may need to do this twice - once for IGP and if that fails,
@@ -180,8 +181,8 @@ e1000_init_phy_params_ich8lan(struct e1000_hw *hw)
 	 */
 	ret_val = e1000_determine_phy_address(hw);
 	if (ret_val) {
-		func->write_phy_reg = e1000_write_phy_reg_bm;
-		func->read_phy_reg = e1000_read_phy_reg_bm;
+		phy->ops.write_reg = e1000_write_phy_reg_bm;
+		phy->ops.read_reg = e1000_read_phy_reg_bm;
 		ret_val = e1000_determine_phy_address(hw);
 		if (ret_val) {
 			DEBUGOUT("Can't determine PHY address. Erroring out\n");
@@ -213,8 +214,9 @@ e1000_init_phy_params_ich8lan(struct e1000_hw *hw)
 	case BME1000_E_PHY_ID:
 		phy->type = e1000_phy_bm;
 		phy->autoneg_mask = AUTONEG_ADVERTISE_SPEED_DEFAULT;
-		func->read_phy_reg = e1000_read_phy_reg_bm;
-		func->write_phy_reg = e1000_write_phy_reg_bm;
+		phy->ops.read_reg = e1000_read_phy_reg_bm;
+		phy->ops.write_reg = e1000_write_phy_reg_bm;
+		phy->ops.commit = e1000_phy_sw_reset_generic;
 		break;
 	default:
 		ret_val = -E1000_ERR_PHY;
@@ -236,7 +238,6 @@ static s32
 e1000_init_nvm_params_ich8lan(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
-	struct e1000_functions *func = &hw->func;
 	struct e1000_dev_spec_ich8lan *dev_spec;
 	u32 gfpreg, sector_base_addr, sector_end_addr;
 	s32 ret_val = E1000_SUCCESS;
@@ -292,13 +293,13 @@ e1000_init_nvm_params_ich8lan(struct e1000_hw *hw)
 	}
 
 	/* Function Pointers */
-	func->acquire_nvm = e1000_acquire_swflag_ich8lan;
-	func->read_nvm = e1000_read_nvm_ich8lan;
-	func->release_nvm = e1000_release_swflag_ich8lan;
-	func->update_nvm = e1000_update_nvm_checksum_ich8lan;
-	func->valid_led_default = e1000_valid_led_default_ich8lan;
-	func->validate_nvm = e1000_validate_nvm_checksum_ich8lan;
-	func->write_nvm = e1000_write_nvm_ich8lan;
+	nvm->ops.acquire = e1000_acquire_swflag_ich8lan;
+	nvm->ops.read = e1000_read_nvm_ich8lan;
+	nvm->ops.release = e1000_release_swflag_ich8lan;
+	nvm->ops.update = e1000_update_nvm_checksum_ich8lan;
+	nvm->ops.valid_led_default = e1000_valid_led_default_ich8lan;
+	nvm->ops.validate = e1000_validate_nvm_checksum_ich8lan;
+	nvm->ops.write = e1000_write_nvm_ich8lan;
 
 out:
 	return (ret_val);
@@ -315,13 +316,12 @@ static s32
 e1000_init_mac_params_ich8lan(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_mac_params_ich8lan");
 
 	/* Set media type function pointer */
-	hw->media_type = e1000_media_type_copper;
+	hw->phy.media_type = e1000_media_type_copper;
 
 	/* Set mta register count */
 	mac->mta_reg_count = 32;
@@ -337,38 +337,38 @@ e1000_init_mac_params_ich8lan(struct e1000_hw *hw)
 	/* Function pointers */
 
 	/* bus type/speed/width */
-	func->get_bus_info = e1000_get_bus_info_ich8lan;
+	mac->ops.get_bus_info = e1000_get_bus_info_ich8lan;
 	/* reset */
-	func->reset_hw = e1000_reset_hw_ich8lan;
+	mac->ops.reset_hw = e1000_reset_hw_ich8lan;
 	/* hw initialization */
-	func->init_hw = e1000_init_hw_ich8lan;
+	mac->ops.init_hw = e1000_init_hw_ich8lan;
 	/* link setup */
-	func->setup_link = e1000_setup_link_ich8lan;
+	mac->ops.setup_link = e1000_setup_link_ich8lan;
 	/* physical interface setup */
-	func->setup_physical_interface = e1000_setup_copper_link_ich8lan;
+	mac->ops.setup_physical_interface = e1000_setup_copper_link_ich8lan;
 	/* check for link */
-	func->check_for_link = e1000_check_for_copper_link_generic;
+	mac->ops.check_for_link = e1000_check_for_copper_link_generic;
 	/* check management mode */
-	func->check_mng_mode = e1000_check_mng_mode_ich8lan;
+	mac->ops.check_mng_mode = e1000_check_mng_mode_ich8lan;
 	/* link info */
-	func->get_link_up_info = e1000_get_link_up_info_ich8lan;
+	mac->ops.get_link_up_info = e1000_get_link_up_info_ich8lan;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* setting MTA */
-	func->mta_set = e1000_mta_set_generic;
+	mac->ops.mta_set = e1000_mta_set_generic;
 	/* blink LED */
-	func->blink_led = e1000_blink_led_generic;
+	mac->ops.blink_led = e1000_blink_led_generic;
 	/* setup LED */
-	func->setup_led = e1000_setup_led_generic;
+	mac->ops.setup_led = e1000_setup_led_generic;
 	/* cleanup LED */
-	func->cleanup_led = e1000_cleanup_led_ich8lan;
+	mac->ops.cleanup_led = e1000_cleanup_led_ich8lan;
 	/* turn on/off LED */
-	func->led_on = e1000_led_on_ich8lan;
-	func->led_off = e1000_led_off_ich8lan;
+	mac->ops.led_on = e1000_led_on_ich8lan;
+	mac->ops.led_off = e1000_led_off_ich8lan;
 	/* remove device */
-	func->remove_device = e1000_remove_device_generic;
+	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
-	func->clear_hw_cntrs = e1000_clear_hw_cntrs_ich8lan;
+	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_ich8lan;
 
 	hw->dev_spec_size = sizeof (struct e1000_dev_spec_ich8lan);
 
@@ -397,9 +397,9 @@ e1000_init_function_pointers_ich8lan(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_ich8lan");
 
-	hw->func.init_mac_params = e1000_init_mac_params_ich8lan;
-	hw->func.init_nvm_params = e1000_init_nvm_params_ich8lan;
-	hw->func.init_phy_params = e1000_init_phy_params_ich8lan;
+	hw->mac.ops.init_params = e1000_init_mac_params_ich8lan;
+	hw->nvm.ops.init_params = e1000_init_nvm_params_ich8lan;
+	hw->phy.ops.init_params = e1000_init_phy_params_ich8lan;
 }
 
 /*
@@ -432,6 +432,8 @@ e1000_acquire_swflag_ich8lan(struct e1000_hw *hw)
 
 	if (!timeout) {
 		DEBUGOUT("FW or HW has locked the resource for too long.\n");
+		extcnf_ctrl &= ~E1000_EXTCNF_CTRL_SWFLAG;
+		E1000_WRITE_REG(hw, E1000_EXTCNF_CTRL, extcnf_ctrl);
 		ret_val = -E1000_ERR_CONFIG;
 		goto out;
 	}
@@ -468,7 +470,7 @@ e1000_release_swflag_ich8lan(struct e1000_hw *hw)
  * This is a function pointer entry point only called by read/write
  * routines for the PHY and NVM parts.
  */
-static boolean_t
+static bool
 e1000_check_mng_mode_ich8lan(struct e1000_hw *hw)
 {
 	u32 fwsm;
@@ -516,7 +518,7 @@ e1000_phy_force_speed_duplex_ich8lan(struct e1000_hw *hw)
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
 	u16 data;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_phy_force_speed_duplex_ich8lan");
 
@@ -524,26 +526,25 @@ e1000_phy_force_speed_duplex_ich8lan(struct e1000_hw *hw)
 		ret_val = e1000_phy_force_speed_duplex_igp(hw);
 		goto out;
 	}
-
-	ret_val = e1000_read_phy_reg(hw, PHY_CONTROL, &data);
+	ret_val = phy->ops.read_reg(hw, PHY_CONTROL, &data);
 	if (ret_val)
 		goto out;
 
 	e1000_phy_force_speed_duplex_setup(hw, &data);
 
-	ret_val = e1000_write_phy_reg(hw, PHY_CONTROL, data);
+	ret_val = phy->ops.write_reg(hw, PHY_CONTROL, data);
 	if (ret_val)
 		goto out;
 
 	/* Disable MDI-X support for 10/100 */
-	ret_val = e1000_read_phy_reg(hw, IFE_PHY_MDIX_CONTROL, &data);
+	ret_val = phy->ops.read_reg(hw, IFE_PHY_MDIX_CONTROL, &data);
 	if (ret_val)
 		goto out;
 
 	data &= ~IFE_PMC_AUTO_MDIX;
 	data &= ~IFE_PMC_FORCE_MDIX;
 
-	ret_val = e1000_write_phy_reg(hw, IFE_PHY_MDIX_CONTROL, data);
+	ret_val = phy->ops.write_reg(hw, IFE_PHY_MDIX_CONTROL, data);
 	if (ret_val)
 		goto out;
 
@@ -551,7 +552,7 @@ e1000_phy_force_speed_duplex_ich8lan(struct e1000_hw *hw)
 
 	usec_delay(1);
 
-	if (phy->wait_for_link) {
+	if (phy->autoneg_wait_to_complete) {
 		DEBUGOUT("Waiting for forced speed/duplex link on IFE phy.\n");
 
 		ret_val = e1000_phy_has_link_generic(hw,
@@ -590,6 +591,7 @@ static s32
 e1000_phy_hw_reset_ich8lan(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
+	struct e1000_nvm_info *nvm = &hw->nvm;
 	u32 i, data, cnf_size, cnf_base_addr, sw_cfg_mask;
 	s32 ret_val;
 	u16 loop = E1000_ICH8_LAN_INIT_TIMEOUT;
@@ -665,14 +667,14 @@ e1000_phy_hw_reset_ich8lan(struct e1000_hw *hw)
 		word_addr = (u16)(cnf_base_addr << 1);
 
 		for (i = 0; i < cnf_size; i++) {
-			ret_val = e1000_read_nvm(hw,
+			ret_val = nvm->ops.read(hw,
 			    (word_addr + i * 2),
 			    1,
 			    &reg_data);
 			if (ret_val)
 				goto out;
 
-			ret_val = e1000_read_nvm(hw,
+			ret_val = nvm->ops.read(hw,
 			    (word_addr + i * 2 + 1),
 			    1,
 			    &reg_addr);
@@ -687,7 +689,7 @@ e1000_phy_hw_reset_ich8lan(struct e1000_hw *hw)
 
 			reg_addr |= phy_page;
 
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    (u32)reg_addr,
 			    reg_data);
 			if (ret_val)
@@ -743,7 +745,7 @@ e1000_get_phy_info_ife_ich8lan(struct e1000_hw *hw)
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
 	u16 data;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_get_phy_info_ife_ich8lan");
 
@@ -757,7 +759,7 @@ e1000_get_phy_info_ife_ich8lan(struct e1000_hw *hw)
 		goto out;
 	}
 
-	ret_val = e1000_read_phy_reg(hw, IFE_PHY_SPECIAL_CONTROL, &data);
+	ret_val = phy->ops.read_reg(hw, IFE_PHY_SPECIAL_CONTROL, &data);
 	if (ret_val)
 		goto out;
 	phy->polarity_correction = (data & IFE_PSC_AUTO_POLARITY_DISABLE)
@@ -774,7 +776,7 @@ e1000_get_phy_info_ife_ich8lan(struct e1000_hw *hw)
 		    : e1000_rev_polarity_normal;
 	}
 
-	ret_val = e1000_read_phy_reg(hw, IFE_PHY_MDIX_CONTROL, &data);
+	ret_val = phy->ops.read_reg(hw, IFE_PHY_MDIX_CONTROL, &data);
 	if (ret_val)
 		goto out;
 
@@ -793,7 +795,7 @@ out:
  * e1000_check_polarity_ife_ich8lan - Check cable polarity for IFE PHY
  * @hw: pointer to the HW structure
  *
- * Polarity is determined on the polarity reveral feature being enabled.
+ * Polarity is determined on the polarity reversal feature being enabled.
  * This function is only called by other family-specific
  * routines.
  */
@@ -817,7 +819,7 @@ e1000_check_polarity_ife_ich8lan(struct e1000_hw *hw)
 		mask = IFE_PSC_FORCE_POLARITY;
 	}
 
-	ret_val = e1000_read_phy_reg(hw, offset, &phy_data);
+	ret_val = phy->ops.read_reg(hw, offset, &phy_data);
 
 	if (!ret_val)
 		phy->cable_polarity = (phy_data & mask)
@@ -841,7 +843,8 @@ e1000_check_polarity_ife_ich8lan(struct e1000_hw *hw)
  * PHY setup routines.
  */
 static s32
-e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
+e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw,
+    bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	u32 phy_ctrl;
@@ -850,7 +853,7 @@ e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
 
 	DEBUGFUNC("e1000_set_d0_lplu_state_ich8lan");
 
-	if (phy->type != e1000_phy_igp_3)
+	if (phy->type == e1000_phy_ife)
 		goto out;
 
 	phy_ctrl = E1000_READ_REG(hw, E1000_PHY_CTRL);
@@ -868,11 +871,11 @@ e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
 			e1000_gig_downshift_workaround_ich8lan(hw);
 
 		/* When LPLU is enabled, we should disable SmartSpeed */
-		ret_val = e1000_read_phy_reg(hw,
+		ret_val = phy->ops.read_reg(hw,
 		    IGP01E1000_PHY_PORT_CONFIG,
 		    &data);
 		data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = phy->ops.write_reg(hw,
 		    IGP01E1000_PHY_PORT_CONFIG,
 		    data);
 		if (ret_val)
@@ -888,27 +891,27 @@ e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
 		 * SmartSpeed, so performance is maintained.
 		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    &data);
 			if (ret_val)
 				goto out;
 
 			data |= IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    data);
 			if (ret_val)
 				goto out;
 		} else if (phy->smart_speed == e1000_smart_speed_off) {
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    &data);
 			if (ret_val)
 				goto out;
 
 			data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    data);
 			if (ret_val)
@@ -934,7 +937,8 @@ out:
  * PHY setup routines.
  */
 static s32
-e1000_set_d3_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
+e1000_set_d3_lplu_state_ich8lan(struct e1000_hw *hw,
+    bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	u32 phy_ctrl;
@@ -955,27 +959,27 @@ e1000_set_d3_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
 		 * SmartSpeed, so performance is maintained.
 		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    &data);
 			if (ret_val)
 				goto out;
 
 			data |= IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    data);
 			if (ret_val)
 				goto out;
 		} else if (phy->smart_speed == e1000_smart_speed_off) {
-			ret_val = e1000_read_phy_reg(hw,
+			ret_val = phy->ops.read_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    &data);
 			if (ret_val)
 				goto out;
 
 			data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			    IGP01E1000_PHY_PORT_CONFIG,
 			    data);
 			if (ret_val)
@@ -996,19 +1000,39 @@ e1000_set_d3_lplu_state_ich8lan(struct e1000_hw *hw, boolean_t active)
 			e1000_gig_downshift_workaround_ich8lan(hw);
 
 		/* When LPLU is enabled, we should disable SmartSpeed */
-		ret_val = e1000_read_phy_reg(hw,
+		ret_val = phy->ops.read_reg(hw,
 		    IGP01E1000_PHY_PORT_CONFIG,
 		    &data);
 		if (ret_val)
 			goto out;
 
 		data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = phy->ops.write_reg(hw,
 		    IGP01E1000_PHY_PORT_CONFIG,
 		    data);
 	}
 
 out:
+	return (ret_val);
+}
+
+/*
+ * e1000_valid_nvm_bank_detect_ich8lan - finds out the valid bank 0 or 1
+ * @hw: pointer to the HW structure
+ * @bank:  pointer to the variable that returns the active bank
+ *
+ * Reads signature byte from the NVM using the flash access registers.
+ */
+static s32
+e1000_valid_nvm_bank_detect_ich8lan(struct e1000_hw *hw, u32 *bank)
+{
+	s32 ret_val = E1000_SUCCESS;
+
+	if (E1000_READ_REG(hw, E1000_EECD) & E1000_EECD_SEC1VAL)
+		*bank = 1;
+	else
+		*bank = 0;
+
 	return (ret_val);
 }
 
@@ -1022,12 +1046,14 @@ out:
  * Reads a word(s) from the NVM using the flash access registers.
  */
 static s32
-e1000_read_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
+e1000_read_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words,
+    u16 *data)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	struct e1000_dev_spec_ich8lan *dev_spec;
 	u32 act_offset;
 	s32 ret_val = E1000_SUCCESS;
+	u32 bank = 0;
 	u16 i, word;
 
 	DEBUGFUNC("e1000_read_nvm_ich8lan");
@@ -1047,14 +1073,15 @@ e1000_read_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
-	/* Start with the bank offset, then add the relative offset. */
-	act_offset = (E1000_READ_REG(hw, E1000_EECD) & E1000_EECD_SEC1VAL)
-	    ? nvm->flash_bank_size
-	    : 0;
+	ret_val = e1000_valid_nvm_bank_detect_ich8lan(hw, &bank);
+	if (ret_val != E1000_SUCCESS)
+		goto out;
+
+	act_offset = (bank) ? nvm->flash_bank_size : 0;
 	act_offset += offset;
 
 	for (i = 0; i < words; i++) {
@@ -1071,7 +1098,7 @@ e1000_read_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		}
 	}
 
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return (ret_val);
@@ -1111,7 +1138,7 @@ e1000_flash_cycle_init_ich8lan(struct e1000_hw *hw)
 	/*
 	 * Either we should have a hardware SPI cycle in progress bit to check
 	 * against, in order to start a new cycle or FDONE bit should be
-	 * changed in the hardware so that it is 1 after harware reset, which
+	 * changed in the hardware so that it is 1 after hardware reset, which
 	 * can then be used as an indication whether a cycle is in progress or
 	 * has been completed.
 	 */
@@ -1244,8 +1271,7 @@ e1000_read_flash_data_ich8lan(struct e1000_hw *hw, u32 offset,
 
 	DEBUGFUNC("e1000_read_flash_data_ich8lan");
 
-	if (size < 1 || size > 2 || data == 0x0 ||
-	    offset > ICH_FLASH_LINEAR_ADDR_MASK)
+	if (size < 1 || size > 2 || offset > ICH_FLASH_LINEAR_ADDR_MASK)
 		goto out;
 
 	flash_linear_addr = (ICH_FLASH_LINEAR_ADDR_MASK & offset) +
@@ -1341,7 +1367,7 @@ e1000_write_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -1350,7 +1376,7 @@ e1000_write_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		dev_spec->shadow_ram[offset + i].value = data[i];
 	}
 
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return (ret_val);
@@ -1364,7 +1390,7 @@ out:
  * which writes the checksum to the shadow ram.  The changes in the shadow
  * ram are then committed to the EEPROM by processing each bank at a time
  * checking for the modified bit and writing only the pending changes.
- * After a succesful commit, the shadow ram is cleared and is ready for
+ * After a successful commit, the shadow ram is cleared and is ready for
  * future writes.
  */
 static s32
@@ -1372,7 +1398,7 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	struct e1000_dev_spec_ich8lan *dev_spec;
-	u32 i, act_offset, new_bank_offset, old_bank_offset;
+	u32 i, act_offset, new_bank_offset, old_bank_offset, bank;
 	s32 ret_val;
 	u16 data;
 
@@ -1387,7 +1413,7 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	if (nvm->type != e1000_nvm_flash_sw)
 		goto out;
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -1396,7 +1422,11 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	 * bank 0 etc.  We also need to erase the segment that is going to be
 	 * written
 	 */
-	if (!(E1000_READ_REG(hw, E1000_EECD) & E1000_EECD_SEC1VAL)) {
+	ret_val = e1000_valid_nvm_bank_detect_ich8lan(hw, &bank);
+	if (ret_val != E1000_SUCCESS)
+		goto out;
+
+	if (bank == 0) {
 		new_bank_offset = nvm->flash_bank_size;
 		old_bank_offset = 0;
 		e1000_erase_flash_bank_ich8lan(hw, 1);
@@ -1455,7 +1485,7 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	 */
 	if (ret_val) {
 		DEBUGOUT("Flash commit failed.\n");
-		e1000_release_nvm(hw);
+		nvm->ops.release(hw);
 		goto out;
 	}
 
@@ -1471,7 +1501,7 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	    act_offset * 2 + 1,
 	    (u8)(data >> 8));
 	if (ret_val) {
-		e1000_release_nvm(hw);
+		nvm->ops.release(hw);
 		goto out;
 	}
 
@@ -1484,22 +1514,23 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	act_offset = (old_bank_offset + E1000_ICH_NVM_SIG_WORD) * 2 + 1;
 	ret_val = e1000_retry_write_flash_byte_ich8lan(hw, act_offset, 0);
 	if (ret_val) {
-		e1000_release_nvm(hw);
+		nvm->ops.release(hw);
 		goto out;
 	}
+
 	/* Great!  Everything worked, we can now clear the cached entries. */
 	for (i = 0; i < E1000_SHADOW_RAM_WORDS; i++) {
 		dev_spec->shadow_ram[i].modified = FALSE;
 		dev_spec->shadow_ram[i].value = 0xFFFF;
 	}
 
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 	/*
 	 * Reload the EEPROM, or else modifications will not appear until
 	 * after the next adapter reset.
 	 */
-	e1000_reload_nvm(hw);
+	nvm->ops.reload(hw);
 	msec_delay(10);
 
 out:
@@ -1511,8 +1542,9 @@ out:
  * @hw: pointer to the HW structure
  *
  * Check to see if checksum needs to be fixed by reading bit 6 in word 0x19.
- * If the bit is 0, that the EEPROM had been modified, but the checksum was not
- * calculated, in which case we need to calculate the checksum and set bit 6.
+ * If the bit is 0, that the EEPROM had been modified, but the checksum was
+ * not calculated, in which case we need to calculate the checksum and set
+ * bit 6.
  */
 static s32
 e1000_validate_nvm_checksum_ich8lan(struct e1000_hw *hw)
@@ -1528,16 +1560,16 @@ e1000_validate_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	 * OEM software and did not calculate the checksum...a likely
 	 * scenario.
 	 */
-	ret_val = e1000_read_nvm(hw, 0x19, 1, &data);
+	ret_val = hw->nvm.ops.read(hw, 0x19, 1, &data);
 	if (ret_val)
 		goto out;
 
 	if ((data & 0x40) == 0) {
 		data |= 0x40;
-		ret_val = e1000_write_nvm(hw, 0x19, 1, &data);
+		ret_val = hw->nvm.ops.write(hw, 0x19, 1, &data);
 		if (ret_val)
 			goto out;
-		ret_val = e1000_update_nvm_checksum(hw);
+		ret_val = hw->nvm.ops.update(hw);
 		if (ret_val)
 			goto out;
 	}
@@ -1659,7 +1691,8 @@ e1000_write_flash_byte_ich8lan(struct e1000_hw *hw, u32 offset, u8 data)
  * Goes through a retry algorithm before giving up.
  */
 static s32
-e1000_retry_write_flash_byte_ich8lan(struct e1000_hw *hw, u32 offset, u8 byte)
+e1000_retry_write_flash_byte_ich8lan(struct e1000_hw *hw,
+    u32 offset, u8 byte)
 {
 	s32 ret_val;
 	u16 program_retries;
@@ -1821,13 +1854,13 @@ out:
  * setting.
  */
 static s32
-e1000_valid_led_default_ich8lan(struct e1000_hw *hw, u16 * data)
+e1000_valid_led_default_ich8lan(struct e1000_hw *hw, u16 *data)
 {
 	s32 ret_val;
 
 	DEBUGFUNC("e1000_valid_led_default_ich8lan");
 
-	ret_val = e1000_read_nvm(hw, NVM_ID_LED_SETTINGS, 1, data);
+	ret_val = hw->nvm.ops.read(hw, NVM_ID_LED_SETTINGS, 1, data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
@@ -1914,9 +1947,10 @@ e1000_reset_hw_ich8lan(struct e1000_hw *hw)
 		/* Set Packet Buffer Size to 16k. */
 		E1000_WRITE_REG(hw, E1000_PBS, E1000_PBS_16K);
 	}
+
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
 
-	if (!e1000_check_reset_block(hw) && !hw->phy.reset_disable) {
+	if (!hw->phy.ops.check_reset_block(hw) && !hw->phy.reset_disable) {
 		/*
 		 * PHY HW reset requires MAC CORE reset at the same time to
 		 * make sure the interface between MAC and the external PHY is
@@ -1939,6 +1973,7 @@ e1000_reset_hw_ich8lan(struct e1000_hw *hw)
 		 */
 		DEBUGOUT("Auto Read Done did not complete\n");
 	}
+
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
 	icr = E1000_READ_REG(hw, E1000_ICR);
 
@@ -1958,7 +1993,7 @@ e1000_reset_hw_ich8lan(struct e1000_hw *hw)
  *  - initialize LED identification
  *  - setup receive address registers
  *  - setup flow control
- *  - setup transmit discriptors
+ *  - setup transmit descriptors
  *  - clear statistics
  */
 static s32
@@ -1977,7 +2012,7 @@ e1000_init_hw_ich8lan(struct e1000_hw *hw)
 	ret_val = e1000_id_led_init_generic(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
-		goto out;
+		/* This is not fatal and we should not stop init due to this */
 	}
 
 	/* Setup the receive address. */
@@ -1989,21 +2024,21 @@ e1000_init_hw_ich8lan(struct e1000_hw *hw)
 		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
 
 	/* Setup link and flow control */
-	ret_val = e1000_setup_link(hw);
+	ret_val = mac->ops.setup_link(hw);
 
 	/* Set the transmit descriptor write-back policy for both queues */
-	txdctl = E1000_READ_REG(hw, E1000_TXDCTL);
+	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 	    E1000_TXDCTL_FULL_TX_DESC_WB;
 	txdctl = (txdctl & ~E1000_TXDCTL_PTHRESH) |
 	    E1000_TXDCTL_MAX_TX_DESC_PREFETCH;
-	E1000_WRITE_REG(hw, E1000_TXDCTL, txdctl);
-	txdctl = E1000_READ_REG(hw, E1000_TXDCTL1);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
+	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(1));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 	    E1000_TXDCTL_FULL_TX_DESC_WB;
 	txdctl = (txdctl & ~E1000_TXDCTL_PTHRESH) |
 	    E1000_TXDCTL_MAX_TX_DESC_PREFETCH;
-	E1000_WRITE_REG(hw, E1000_TXDCTL1, txdctl);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(1), txdctl);
 
 	/*
 	 * ICH8 has opposite polarity of no_snoop bits. By default, we should
@@ -2027,7 +2062,6 @@ e1000_init_hw_ich8lan(struct e1000_hw *hw)
 	 */
 	e1000_clear_hw_cntrs_ich8lan(hw);
 
-out:
 	return (ret_val);
 }
 
@@ -2054,30 +2088,30 @@ e1000_initialize_hw_bits_ich8lan(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_CTRL_EXT, reg);
 
 	/* Transmit Descriptor Control 0 */
-	reg = E1000_READ_REG(hw, E1000_TXDCTL);
+	reg = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	reg |= (1 << 22);
-	E1000_WRITE_REG(hw, E1000_TXDCTL, reg);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), reg);
 
 	/* Transmit Descriptor Control 1 */
-	reg = E1000_READ_REG(hw, E1000_TXDCTL1);
+	reg = E1000_READ_REG(hw, E1000_TXDCTL(1));
 	reg |= (1 << 22);
-	E1000_WRITE_REG(hw, E1000_TXDCTL1, reg);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg);
 
 	/* Transmit Arbitration Control 0 */
-	reg = E1000_READ_REG(hw, E1000_TARC0);
+	reg = E1000_READ_REG(hw, E1000_TARC(0));
 	if (hw->mac.type == e1000_ich8lan)
 		reg |= (1 << 28) | (1 << 29);
 	reg |= (1 << 23) | (1 << 24) | (1 << 26) | (1 << 27);
-	E1000_WRITE_REG(hw, E1000_TARC0, reg);
+	E1000_WRITE_REG(hw, E1000_TARC(0), reg);
 
 	/* Transmit Arbitration Control 1 */
-	reg = E1000_READ_REG(hw, E1000_TARC1);
+	reg = E1000_READ_REG(hw, E1000_TARC(1));
 	if (E1000_READ_REG(hw, E1000_TCTL) & E1000_TCTL_MULR)
 		reg &= ~(1 << 28);
 	else
 		reg |= (1 << 28);
 	reg |= (1 << 24) | (1 << 26) | (1 << 30);
-	E1000_WRITE_REG(hw, E1000_TARC1, reg);
+	E1000_WRITE_REG(hw, E1000_TARC(1), reg);
 
 	/* Device Status */
 	if (hw->mac.type == e1000_ich8lan) {
@@ -2100,32 +2134,30 @@ e1000_initialize_hw_bits_ich8lan(struct e1000_hw *hw)
 static s32
 e1000_setup_link_ich8lan(struct e1000_hw *hw)
 {
-	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_setup_link_ich8lan");
 
-	if (e1000_check_reset_block(hw))
+	if (hw->phy.ops.check_reset_block(hw))
 		goto out;
 
 	/*
 	 * ICH parts do not have a word in the NVM to determine the default
 	 * flow control setting, so we explicitly set it to full.
 	 */
-	if (mac->fc == e1000_fc_default)
-		mac->fc = e1000_fc_full;
+	if (hw->fc.type == e1000_fc_default)
+		hw->fc.type = e1000_fc_full;
 
-	mac->original_fc = mac->fc;
+	hw->fc.original_type = hw->fc.type;
 
-	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", mac->fc);
+	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.type);
 
 	/* Continue to configure the copper link. */
-	ret_val = func->setup_physical_interface(hw);
+	ret_val = hw->mac.ops.setup_physical_interface(hw);
 	if (ret_val)
 		goto out;
 
-	E1000_WRITE_REG(hw, E1000_FCTTV, mac->fc_pause_time);
+	E1000_WRITE_REG(hw, E1000_FCTTV, hw->fc.pause_time);
 
 	ret_val = e1000_set_fc_watermarks_generic(hw);
 
@@ -2181,6 +2213,31 @@ e1000_setup_copper_link_ich8lan(struct e1000_hw *hw)
 			goto out;
 	}
 
+	if (hw->phy.type == e1000_phy_ife) {
+		ret_val = hw->phy.ops.read_reg(hw, IFE_PHY_MDIX_CONTROL,
+		    &reg_data);
+		if (ret_val)
+			goto out;
+
+		reg_data &= ~IFE_PMC_AUTO_MDIX;
+
+		switch (hw->phy.mdix) {
+		case 1:
+			reg_data &= ~IFE_PMC_FORCE_MDIX;
+			break;
+		case 2:
+			reg_data |= IFE_PMC_FORCE_MDIX;
+			break;
+		case 0:
+		default:
+			reg_data |= IFE_PMC_AUTO_MDIX;
+			break;
+		}
+		ret_val = hw->phy.ops.write_reg(hw, IFE_PHY_MDIX_CONTROL,
+		    reg_data);
+		if (ret_val)
+			goto out;
+	}
 	ret_val = e1000_setup_copper_link_generic(hw);
 
 out:
@@ -2193,7 +2250,7 @@ out:
  * @speed: pointer to store current link speed
  * @duplex: pointer to store the current link duplex
  *
- * Calls the generic get_speed_and_duplex to retreive the current link
+ * Calls the generic get_speed_and_duplex to retrieve the current link
  * information and then calls the Kumeran lock loss workaround for links at
  * gigabit speeds.
  */
@@ -2240,7 +2297,7 @@ e1000_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw)
 	u32 phy_ctrl;
 	s32 ret_val = E1000_SUCCESS;
 	u16 i, data;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_kmrn_lock_loss_workaround_ich8lan");
 
@@ -2267,11 +2324,11 @@ e1000_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw)
 
 	for (i = 0; i < 10; i++) {
 		/* read once to clear */
-		ret_val = e1000_read_phy_reg(hw, IGP3_KMRN_DIAG, &data);
+		ret_val = hw->phy.ops.read_reg(hw, IGP3_KMRN_DIAG, &data);
 		if (ret_val)
 			goto out;
 		/* and again to get new status */
-		ret_val = e1000_read_phy_reg(hw, IGP3_KMRN_DIAG, &data);
+		ret_val = hw->phy.ops.read_reg(hw, IGP3_KMRN_DIAG, &data);
 		if (ret_val)
 			goto out;
 
@@ -2282,7 +2339,7 @@ e1000_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw)
 		}
 
 		/* Issue PHY reset */
-		e1000_phy_hw_reset(hw);
+		hw->phy.ops.reset(hw);
 		msec_delay_irq(5);
 	}
 	/* Disable GigE link negotiation */
@@ -2292,7 +2349,7 @@ e1000_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_PHY_CTRL, phy_ctrl);
 
 	/*
-	 * Call gig speed drop workaround on Giga disable before accessing any
+	 * Call gig speed drop workaround on Gig disable before accessing any
 	 * PHY registers
 	 */
 	e1000_gig_downshift_workaround_ich8lan(hw);
@@ -2305,16 +2362,16 @@ out:
 }
 
 /*
- * e1000_set_kmrn_lock_loss_workaound_ich8lan - Set Kumeran workaround state
+ * e1000_set_kmrn_lock_loss_workaround_ich8lan - Set Kumeran workaround state
  * @hw: pointer to the HW structure
- * @state: boolean value used to set the current Kumaran workaround state
+ * @state: boolean value used to set the current Kumeran workaround state
  *
  * If ICH8, set the current Kumeran workaround state (enabled - TRUE
  * /disabled - FALSE).
  */
 void
 e1000_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
-    boolean_t state)
+    bool state)
 {
 	struct e1000_dev_spec_ich8lan *dev_spec;
 
@@ -2366,21 +2423,21 @@ e1000_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_PHY_CTRL, reg);
 
 		/*
-		 * Call gig speed drop workaround on Giga disable before
+		 * Call gig speed drop workaround on Gig disable before
 		 * accessing any PHY registers
 		 */
 		if (hw->mac.type == e1000_ich8lan)
 			e1000_gig_downshift_workaround_ich8lan(hw);
 
 		/* Write VR power-down enable */
-		e1000_read_phy_reg(hw, IGP3_VR_CTRL, &data);
+		hw->phy.ops.read_reg(hw, IGP3_VR_CTRL, &data);
 		data &= ~IGP3_VR_CTRL_DEV_POWERDOWN_MODE_MASK;
-		e1000_write_phy_reg(hw,
+		hw->phy.ops.write_reg(hw,
 		    IGP3_VR_CTRL,
 		    data | IGP3_VR_CTRL_MODE_SHUTDOWN);
 
 		/* Read it back and test */
-		e1000_read_phy_reg(hw, IGP3_VR_CTRL, &data);
+		hw->phy.ops.read_reg(hw, IGP3_VR_CTRL, &data);
 		data &= IGP3_VR_CTRL_DEV_POWERDOWN_MODE_MASK;
 		if ((data == IGP3_VR_CTRL_MODE_SHUTDOWN) || retry)
 			break;
@@ -2397,7 +2454,7 @@ e1000_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw)
  * @hw: pointer to the HW structure
  *
  * Steps to take when dropping from 1Gb/s (eg. link cable removal (LSC),
- * LPLU, Giga disable, MDIC PHY reset):
+ * LPLU, Gig disable, MDIC PHY reset):
  *   1) Set Kumeran Near-end loopback
  *   2) Clear Kumeran Near-end loopback
  * Should only be called for ICH8[m] devices with IGP_3 Phy.
@@ -2429,6 +2486,30 @@ e1000_gig_downshift_workaround_ich8lan(struct e1000_hw *hw)
 }
 
 /*
+ * e1000_disable_gig_wol_ich8lan - disable gig during WoL
+ * @hw: pointer to the HW structure
+ *
+ * During S0 to Sx transition, it is possible the link remains at gig
+ * instead of negotiating to a lower speed.  Before going to Sx, set
+ * 'LPLU Enabled' and 'Gig Disable' to force link speed negotiation
+ * to a lower speed.
+ *
+ * Should only be called for ICH9.
+ */
+void
+e1000_disable_gig_wol_ich8lan(struct e1000_hw *hw)
+{
+	u32 phy_ctrl;
+
+	if (hw->mac.type == e1000_ich9lan) {
+		phy_ctrl = E1000_READ_REG(hw, E1000_PHY_CTRL);
+		phy_ctrl |= E1000_PHY_CTRL_D0A_LPLU |
+		    E1000_PHY_CTRL_GBE_DISABLE;
+		E1000_WRITE_REG(hw, E1000_PHY_CTRL, phy_ctrl);
+	}
+}
+
+/*
  * e1000_cleanup_led_ich8lan - Restore the default LED operation
  * @hw: pointer to the HW structure
  *
@@ -2442,7 +2523,7 @@ e1000_cleanup_led_ich8lan(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_cleanup_led_ich8lan");
 
 	if (hw->phy.type == e1000_phy_ife)
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = hw->phy.ops.write_reg(hw,
 		    IFE_PHY_SPECIAL_CONTROL_LED,
 		    0);
 	else
@@ -2452,10 +2533,10 @@ e1000_cleanup_led_ich8lan(struct e1000_hw *hw)
 }
 
 /*
- * e1000_led_on_ich8lan - Turn LED's on
+ * e1000_led_on_ich8lan - Turn LEDs on
  * @hw: pointer to the HW structure
  *
- * Turn on the LED's.
+ * Turn on the LEDs.
  */
 static s32
 e1000_led_on_ich8lan(struct e1000_hw *hw)
@@ -2465,7 +2546,7 @@ e1000_led_on_ich8lan(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_led_on_ich8lan");
 
 	if (hw->phy.type == e1000_phy_ife)
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = hw->phy.ops.write_reg(hw,
 		    IFE_PHY_SPECIAL_CONTROL_LED,
 		    (IFE_PSCL_PROBE_MODE | IFE_PSCL_PROBE_LEDS_ON));
 	else
@@ -2475,10 +2556,10 @@ e1000_led_on_ich8lan(struct e1000_hw *hw)
 }
 
 /*
- * e1000_led_off_ich8lan - Turn LED's off
+ * e1000_led_off_ich8lan - Turn LEDs off
  * @hw: pointer to the HW structure
  *
- * Turn off the LED's.
+ * Turn off the LEDs.
  */
 static s32
 e1000_led_off_ich8lan(struct e1000_hw *hw)
@@ -2488,7 +2569,7 @@ e1000_led_off_ich8lan(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_led_off_ich8lan");
 
 	if (hw->phy.type == e1000_phy_ife)
-		ret_val = e1000_write_phy_reg(hw,
+		ret_val = hw->phy.ops.write_reg(hw,
 		    IFE_PHY_SPECIAL_CONTROL_LED,
 		    (IFE_PSCL_PROBE_MODE | IFE_PSCL_PROBE_LEDS_OFF));
 	else
@@ -2510,6 +2591,8 @@ e1000_led_off_ich8lan(struct e1000_hw *hw)
 static s32
 e1000_get_cfg_done_ich8lan(struct e1000_hw *hw)
 {
+	s32 ret_val = E1000_SUCCESS;
+
 	e1000_get_cfg_done_generic(hw);
 
 	/* If EEPROM is not marked present, init the IGP 3 PHY manually */
@@ -2517,7 +2600,25 @@ e1000_get_cfg_done_ich8lan(struct e1000_hw *hw)
 	    (hw->phy.type == e1000_phy_igp_3)) {
 		e1000_phy_init_script_igp3(hw);
 	}
-	return (E1000_SUCCESS);
+	return (ret_val);
+}
+
+/*
+ * e1000_power_down_phy_copper_ich8lan - Remove link during PHY power down
+ * @hw: pointer to the HW structure
+ *
+ * In the case of a PHY power down to save power, or to turn off link during a
+ * driver unload, or wake on lan is not enabled, remove the link.
+ */
+static void
+e1000_power_down_phy_copper_ich8lan(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	struct e1000_mac_info *mac = &hw->mac;
+
+	/* If the management interface is not enabled, then power down */
+	if (!(mac->ops.check_mng_mode(hw) || phy->ops.check_reset_block(hw)))
+		e1000_power_down_phy_copper(hw);
 }
 
 /*
