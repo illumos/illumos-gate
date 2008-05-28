@@ -22,25 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS	= sun4u \
-		  sun4v \
-		  SUNW,SPARC-Enterprise \
-		  SUNW,Netra-CP3060 \
-		  SUNW,Netra-CP3260 \
-		  SUNW,Sun-Blade-T6300 \
-		  SUNW,Sun-Blade-T6320 \
-		  SUNW,Netra-T5220 \
-		  SUNW,Sun-Fire-T200 \
-		  SUNW,Netra-T5440 \
-		  SUNW,T5140 \
-		  SUNW,USBRDT-5240 \
-		  SUNW,SPARC-Enterprise-T5120  \
-		  SUNW,USBRDT-5440
+SUBDIRS = etm
 
-i386_SUBDIRS	=
-
-SUBDIRS = common $($(MACH)_SUBDIRS)
-
-include ../Makefile.subdirs
+include ../../Makefile.subdirs

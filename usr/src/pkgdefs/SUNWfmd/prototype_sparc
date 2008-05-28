@@ -179,6 +179,10 @@ f none usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins/ioboard.so 555 root 
 d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
 d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-T200/lib/fm 755 root bin
+d none usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T200-hc-topology.xml 444 root bin
@@ -186,15 +190,30 @@ f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T1000-hc-topolo
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T1000-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Blade-T6300-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Netra-T2000-hc-topology.xml 444 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300 755 root sys
+d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300/lib/fm 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Sun-Blade-T6320 755 root sys
 d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320/lib/fm 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo/maps/Sun-Blade-T6320-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm 755 root bin
+d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5120-hc-topology.xml 444 root bin
@@ -202,6 +221,10 @@ f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterpris
 d none usr/platform/SUNW,T5140 755 root sys
 d none usr/platform/SUNW,T5140/lib 755 root bin
 d none usr/platform/SUNW,T5140/lib/fm 755 root bin
+d none usr/platform/SUNW,T5140/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,T5140/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,T5140/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,T5140/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,T5140/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,T5140/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5140-hc-topology.xml 444 root bin
@@ -211,36 +234,60 @@ f none usr/platform/SUNW,T5140/lib/fm/topo/maps/Sun-Blade-T6340-hc-topology.xml 
 d none usr/platform/SUNW,Netra-CP3060 755 root sys
 d none usr/platform/SUNW,Netra-CP3060/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3060/lib/fm 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Netra-CP3060/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Netra-CP3060/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Netra-CP3060/lib/fm/topo/maps/Netra-CP3060-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Netra-CP3260 755 root sys
 d none usr/platform/SUNW,Netra-CP3260/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib/fm 755 root bin
+d none usr/platform/SUNW,Netra-CP3260/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Netra-CP3260/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Netra-CP3260/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Netra-CP3260/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Netra-CP3260/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Netra-CP3260/lib/fm/topo/maps/Netra-CP3260-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,USBRDT-5240 755 root sys
 d none usr/platform/SUNW,USBRDT-5240/lib 755 root bin
 d none usr/platform/SUNW,USBRDT-5240/lib/fm 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,USBRDT-5240/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,USBRDT-5240/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,USBRDT-5240/lib/fm/topo/maps/USBRDT-5240-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Netra-T5220 755 root sys
 d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
 d none usr/platform/SUNW,Netra-T5220/lib/fm 755 root bin
+d none usr/platform/SUNW,Netra-T5220/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Netra-T5220/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Netra-T5220/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Netra-T5220/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Netra-T5220/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Netra-T5220/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Netra-T5220/lib/fm/topo/maps/Netra-T5220-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Netra-T5440 755 root sys
 d none usr/platform/SUNW,Netra-T5440/lib 755 root bin
 d none usr/platform/SUNW,Netra-T5440/lib/fm 755 root bin
+d none usr/platform/SUNW,Netra-T5440/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,Netra-T5440/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,Netra-T5440/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,Netra-T5440/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,Netra-T5440/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Netra-T5440/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Netra-T5440/lib/fm/topo/maps/Netra-T5440-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,USBRDT-5440 755 root sys
 d none usr/platform/SUNW,USBRDT-5440/lib 755 root bin
 d none usr/platform/SUNW,USBRDT-5440/lib/fm 755 root bin
+d none usr/platform/SUNW,USBRDT-5440/lib/fm/fmd 755 root bin
+d none usr/platform/SUNW,USBRDT-5440/lib/fm/fmd/plugins 755 root bin
+f none usr/platform/SUNW,USBRDT-5440/lib/fm/fmd/plugins/etm.conf 644 root bin
+s none usr/platform/SUNW,USBRDT-5440/lib/fm/fmd/plugins/etm.so=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 d none usr/platform/SUNW,USBRDT-5440/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,USBRDT-5440/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,USBRDT-5440/lib/fm/topo/maps/USBRDT-5440-hc-topology.xml 444 root bin

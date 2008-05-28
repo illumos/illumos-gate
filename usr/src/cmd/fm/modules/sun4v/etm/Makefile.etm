@@ -24,23 +24,47 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS	= sun4u \
-		  sun4v \
-		  SUNW,SPARC-Enterprise \
-		  SUNW,Netra-CP3060 \
-		  SUNW,Netra-CP3260 \
-		  SUNW,Sun-Blade-T6300 \
-		  SUNW,Sun-Blade-T6320 \
-		  SUNW,Netra-T5220 \
-		  SUNW,Sun-Fire-T200 \
-		  SUNW,Netra-T5440 \
-		  SUNW,T5140 \
-		  SUNW,USBRDT-5240 \
-		  SUNW,SPARC-Enterprise-T5120  \
-		  SUNW,USBRDT-5440
+.KEEP_STATE:
+.SUFFIXES:
 
-i386_SUBDIRS	=
+include ../../../../Makefile.cmd
 
-SUBDIRS = common $($(MACH)_SUBDIRS)
+MODULE = etm
+CLASS = plat
 
-include ../Makefile.subdirs
+MODCLASS = plugins
+
+#
+#
+CONF = $(MODULE:%=%.conf)
+
+common_ROOTCONF = $(ROOT)/usr/lib/fm/fmd/plugins/$(CONF)
+arch_ROOTCONF = $(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd/plugins/$(CONF)
+plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/fmd/plugins/$(CONF))
+ROOTCONF = $($(CLASS)_ROOTCONF)
+
+sun4v_ROOTPROG = ../../../../../sun4v/lib/fm/fmd/plugins/$(MODULE).so
+plat_ROOTPROG = $(ROOT)/usr/platform/$(PLATFORMS)/lib/fm/fmd/plugins/$(MODULE).so
+
+all:
+
+.NO_PARALLEL:
+.PARALLEL:
+
+clean:
+
+clobber: clean
+
+lint:
+
+install_h:
+
+$(ROOTCONF): $$(@D) $(CONF)
+	$(RM) $@ 
+	$(INS) -s -m 0644 -f $(@D) $(CONF)
+	$(RM) $(plat_ROOTPROG)
+	$(LN) -s $(sun4v_ROOTPROG) $(plat_ROOTPROG)
+
+install: $(ROOTCONF)
+
+include ../../Makefile.rootdirs
