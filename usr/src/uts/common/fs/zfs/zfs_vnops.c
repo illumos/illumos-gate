@@ -612,16 +612,8 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	ssize_t		n, nbytes;
 	rl_t		*rl;
 	int		max_blksz = zfsvfs->z_max_blksz;
-	uint64_t	pflags = zp->z_phys->zp_flags;
+	uint64_t	pflags;
 	int		error;
-
-	/*
-	 * If immutable or not appending then return EPERM
-	 */
-	if ((pflags & (ZFS_IMMUTABLE | ZFS_READONLY)) ||
-	    ((pflags & ZFS_APPENDONLY) && !(ioflag & FAPPEND) &&
-	    (uio->uio_loffset < zp->z_phys->zp_size)))
-		return (EPERM);
 
 	/*
 	 * Fasttrack empty write
@@ -635,6 +627,18 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
+
+	/*
+	 * If immutable or not appending then return EPERM
+	 */
+	pflags = zp->z_phys->zp_flags;
+	if ((pflags & (ZFS_IMMUTABLE | ZFS_READONLY)) ||
+	    ((pflags & ZFS_APPENDONLY) && !(ioflag & FAPPEND) &&
+	    (uio->uio_loffset < zp->z_phys->zp_size))) {
+		ZFS_EXIT(zfsvfs);
+		return (EPERM);
+	}
+
 	zilog = zfsvfs->z_log;
 
 	/*
