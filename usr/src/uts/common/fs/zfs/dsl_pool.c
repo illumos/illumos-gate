@@ -298,7 +298,7 @@ dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx)
 	 * the caller 1 clock tick.  This will slow down the "fill"
 	 * rate until the sync process can catch up with us.
 	 */
-	if (reserved && reserved > (write_limit - write_limit << 3))
+	if (reserved && reserved > (write_limit - (write_limit >> 3)))
 		txg_delay(dp, tx->tx_txg, 1);
 
 	return (0);
