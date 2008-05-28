@@ -38,7 +38,7 @@ G_OBJS   = kwarnd_xdr.o
 
 OBJS	= $(KWARNDOBJS) $(KWARNTOBJS) $(G_OBJS)
 SRCS	= $(OBJS:.o=.c)
-RSRC	= kwarnd_xdr.c
+RSRC	= kwarnd_xdr.c kwarnd_svc.c kwarnd.h
 
 CLOBBERFILES += $(TESTPROG)
 
@@ -82,6 +82,10 @@ $(TESTPROG):    $(KWARNTOBJS)
 kwarnd.h:        kwarnd.x
 	$(RM) $@
 	$(RPCGEN) -M -h kwarnd.x > $@
+
+kwarnd_svc.c:    kwarnd.x
+	$(RM) $@
+	$(RPCGEN) -M -m kwarnd.x > $@
 
 kwarnd_xdr.c:    kwarnd.x
 	$(RM) $@
