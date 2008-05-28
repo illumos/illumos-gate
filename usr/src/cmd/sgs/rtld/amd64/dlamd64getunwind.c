@@ -41,9 +41,10 @@
 #include <stdio.h>
 
 static Dl_amd64_unwindinfo *
-getunwind_core(Lm_list *lml, Rt_map *lmp, void *pc,
-    Dl_amd64_unwindinfo *unwindinfo)
+getunwind_core(Lm_list *lml, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 {
+	Rt_map	*lmp;
+
 	/*
 	 * Validate the version information.
 	 */
@@ -67,6 +68,15 @@ getunwind_core(Lm_list *lml, Rt_map *lmp, void *pc,
 	unwindinfo->dlui_unwindend = 0;
 	unwindinfo->dlui_segstart = 0;
 	unwindinfo->dlui_segend = 0;
+
+	/*
+	 * Identify the link-map associated with the exception "pc".  Note,
+	 * the "pc" might not correspond to a link-map (as can happen with a
+	 * "pc" fabricated by a debugger such as dbx).  In this case, the
+	 * unwind data buffer will be filled with flags set to indicate an
+	 * unknown caller.
+	 */
+	lmp = _caller(pc, CL_NONE);
 
 	if (lmp) {
 		Mmap	*immap;
@@ -123,22 +133,10 @@ _dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
 	Lm_list	*lml;
 	int	entry = enter(0);
 
-	/*
-	 * Identify the link-map associated with the exception "pc".  Note,
-	 * this is not the actual caller of _dlamd64getunwind(), which is
-	 * probably one of the libC libraries.  However, the caller and
-	 * exception object are both on the same link-map list.  In doing this,
-	 * we must guard against being given a pc that does not correspond to a
-	 * link-map (as can happen with a pc fabricated by a debugger such as
-	 * dbx).  In this case, getunwind_core() will fill the unwind data
-	 * buffer with flags set to indicate an unknown caller.
-	 */
-	if ((lmp = _caller(pc, CL_NONE)) != 0)
-		lml = LIST(lmp);
-	else
-		lml = 0;
+	lmp = _caller(caller(), CL_EXECDEF);
+	lml = LIST(lmp);
 
-	unwindinfo = getunwind_core(lml, lmp, pc, unwindinfo);
+	unwindinfo = getunwind_core(lml, pc, unwindinfo);
 
 	if (entry)
 		leave(lml, 0);

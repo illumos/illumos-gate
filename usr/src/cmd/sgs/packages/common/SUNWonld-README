@@ -1356,3 +1356,5 @@ Bugid   Risk Synopsis
 6701798 ld can enter infinite loop processing bad mapfile
 6706401 direct binding copy relocation fallback is insufficient for ild
 	generated objects
+6705846 multithreaded C++ application seems to get deadlocked in the dynamic
+	linker code
