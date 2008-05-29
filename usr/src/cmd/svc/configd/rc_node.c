@@ -4335,7 +4335,7 @@ again:
 	}
 
 	/*
-	 * when we drop cp's lock, all the children will be gone, so we
+	 * When we drop cp's lock, all the children will be gone, so we
 	 * can release DYING_FLAGS.
 	 */
 	rc_node_rele_flag(np, RC_NODE_DYING_FLAGS);
@@ -4343,7 +4343,7 @@ again:
 		np->rn_former = NULL;		/* unlink */
 		(void) pthread_mutex_lock(&cp->rn_lock);
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		np->rn_flags &= ~RC_NODE_ON_FORMER;
+		cp->rn_flags &= ~RC_NODE_ON_FORMER;
 
 		rc_node_hold_locked(cp);	/* hold while we loop */
 

@@ -1151,8 +1151,13 @@ retry:
 
 out:
 	inst->ri_method_thread = 0;
-	MUTEX_UNLOCK(&inst->ri_lock);
+
+	/*
+	 * Unlock the mutex after broadcasting to avoid a race condition
+	 * with restarter_delete_inst() when the 'inst' structure is freed.
+	 */
 	(void) pthread_cond_broadcast(&inst->ri_method_cv);
+	MUTEX_UNLOCK(&inst->ri_lock);
 
 	scf_instance_destroy(s_inst);
 	scf_handle_destroy(local_handle);
