@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple nfs ops - open, close, read, and lseek.
@@ -67,11 +66,9 @@ nfsread(struct nfs_file *filep, char *buf, size_t size)
 	int			framing_errs = 0;	/* stack errors */
 	char			*buf_offset;	/* current buffer offset */
 	struct timeval		timeout;
-#ifndef i386
 	static uint_t		pos;		/* progress indicator counter */
 	static char		ind[] = "|/-\\";	/* progress indicator */
 	static int		blks_read;
-#endif
 
 	read_args.file = filep->fh.fh2;		/* structure copy */
 	read_args.offset = filep->offset;
@@ -154,12 +151,12 @@ nfsread(struct nfs_file *filep, char *buf, size_t size)
 		 */
 		if (readcnt < read_args.count) {
 #ifdef NFS_OPS_DEBUG
-			if ((boothowto & DBFLAGS) == DBFLAGS)
-				printf("nfsread(): partial read %d"
-					" instead of %d\n",
-					readcnt, read_args.count);
+		if ((boothowto & DBFLAGS) == DBFLAGS)
+			printf("nfsread(): partial read %d"
+			    " instead of %d\n",
+			    readcnt, read_args.count);
 #endif
-			done = TRUE; /* update the counts and exit */
+		done = TRUE; /* update the counts and exit */
 		}
 
 		/* update various offsets */
@@ -167,14 +164,12 @@ nfsread(struct nfs_file *filep, char *buf, size_t size)
 		filep->offset += readcnt;
 		buf_offset += readcnt;
 		read_args.offset += readcnt;
-#ifndef i386
 		/*
 		 * round and round she goes (though not on every block..
 		 * - OBP's take a fair bit of time to actually print stuff)
 		 */
 		if ((blks_read++ & 0x3) == 0)
 			printf("%c\b", ind[pos++ & 3]);
-#endif
 	} while (count < size && !done);
 
 	return (count);
@@ -193,8 +188,8 @@ nfsgetattr(struct nfs_file *nfp, struct vattr *vap)
 	struct timeval timeout = {0, 0};	/* default */
 
 	getattr_stat = CLNT_CALL(root_CLIENT, NFSPROC_GETATTR,
-			    xdr_nfs_fh, (caddr_t)&(nfp->fh.fh2),
-			    xdr_attrstat, (caddr_t)&getattr_res, timeout);
+	    xdr_nfs_fh, (caddr_t)&(nfp->fh.fh2),
+	    xdr_attrstat, (caddr_t)&getattr_res, timeout);
 
 	if (getattr_stat != RPC_SUCCESS) {
 		dprintf("nfs_getattr: RPC error %d\n", getattr_stat);
@@ -324,8 +319,8 @@ nfslookup(struct nfs_file *dir, char *name, int *nstat)
 	dirop.name = name;
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC_LOOKUP, xdr_diropargs,
-			(caddr_t)&dirop, xdr_diropres, (caddr_t)&res_lookup,
-			zero_timeout);
+	    (caddr_t)&dirop, xdr_diropres, (caddr_t)&res_lookup,
+	    zero_timeout);
 	if (status != RPC_SUCCESS) {
 		dprintf("lookup: RPC error.\n");
 		return (NULL);
@@ -360,8 +355,8 @@ nfsgetsymlink(struct nfs_file *cfile, char **path)
 	linkres.readlinkres_u.data = &symlink_path[0];
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC_READLINK,
-		    xdr_nfs_fh, (caddr_t)&cfile->fh.fh2,
-		    xdr_readlinkres, (caddr_t)&linkres, zero_timeout);
+	    xdr_nfs_fh, (caddr_t)&cfile->fh.fh2,
+	    xdr_readlinkres, (caddr_t)&linkres, zero_timeout);
 	if (status != RPC_SUCCESS) {
 		dprintf("nfsgetsymlink: RPC call failed.\n");
 		return (-1);

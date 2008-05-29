@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,10 +62,6 @@
  */
 
 #include <sys/saio.h>
-#ifdef __i386
-#include <sys/obpdefs.h>	/* for phandle_t */
-#include <sys/ihandle.h>	/* for struct ihandle (and its routines) */
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -128,72 +123,6 @@ extern char *bootp_response;
  */
 extern char *bootcfg;
 #endif /* __sparc */
-
-#ifdef	__i386
-/*
- * From psm/stand/boot/i386/common/bootops.c:
- */
-extern char *new_root_type;
-extern struct bootops bootops;
-
-/*
- * From psm/stand/boot/i386/common/delayed.c:
- */
-typedef struct orf rffd_t;
-extern void RAMfiletoprop(rffd_t *);
-
-/*
- * From psm/stand/boot/i386/common/disk.c:
- */
-extern int is_floppy(int);
-extern int is_floppy0(int);
-extern int is_floppy1(int);
-extern int read_blocks(struct ihandle *, daddr_t, int);
-extern int floppy_status_changed(int);
-extern int SilentDiskFailures;
-
-/*
- * From psm/stand/boot/i386/common/disk.c:
- */
-extern int bgets(char *, int);
-
-/*
- * From psm/stand/boot/i386/common/i386_memlist.c:
- */
-extern int insert_node(struct memlist **, struct memlist *);
-extern struct memlist *search_list(struct memlist *, struct memlist *);
-
-/*
- * From psm/stand/boot/i386/common/memory.c:
- */
-extern uint_t top_virtaddr;
-extern uint32_t find_mem(unsigned int, int);
-
-/*
- * From psm/stand/boot/i386/common/net_pxe.c:
- */
-extern int pxe_ack_cache(char **);
-
-/*
- * From psm/stand/boot/i386/common/misc_utls.c:
- */
-extern void popup_prompt(char *, char *);
-
-/*
- * From psm/stand/boot/i386/i86pc/srt0.s:
- */
-extern int Oldstyleboot;
-extern uint_t bpd_loc;
-extern struct bootops *bop;
-extern struct pri_to_secboot *realp;
-
-/*
- * From psm/stand/boot/intel/bootprop.c:
- */
-extern int bgetprop(struct bootops *, char *, caddr_t, int, phandle_t);
-extern int bgetproplen(struct bootops *, char *, phandle_t);
-extern int bsetprop(struct bootops *, char *, caddr_t, int, phandle_t);
-#endif /* __i386 */
 
 #ifdef __cplusplus
 }

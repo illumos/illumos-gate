@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,9 +224,7 @@ static fileid_t		*logfp = (fileid_t *)NULL;
 static extent_block_t	*eb = (extent_block_t *)NULL;
 static ml_odunit_t	odi;
 
-#ifndef i386
 static char		logbuffer_min[LOGBUF_MINSIZE];
-#endif
 static caddr_t		logbuffer = (caddr_t)NULL;
 static caddr_t		elogbuffer = (caddr_t)NULL;
 static caddr_t		logbuf_curptr;
@@ -248,9 +245,7 @@ static	int	lufs_logscan(void);
 extern	int	diskread(fileid_t *filep);
 extern	caddr_t	resalloc(enum RESOURCES, size_t, caddr_t, int);
 
-#if defined(i386)
-#define	LOGBUF_BASEADDR	((caddr_t)(KERNEL_TEXT - LOGBUF_MAXSIZE))
-#elif defined(__sparcv9)
+#if defined(__sparcv9)
 #define	LOGBUF_BASEADDR	((caddr_t)(SYSBASE - LOGBUF_MAXSIZE))
 #endif
 
@@ -276,14 +271,8 @@ lufs_alloc_logbuf(void)
 	 * from resalloc 1 page at a time.
 	 */
 
-#ifdef i386
-	logbuffer = resalloc(RES_CHILDVIRT, LOGBUF_MAXSIZE,
-			LOGBUF_BASEADDR, 0UL);
-	elogbuffer = logbuffer+LOGBUF_MAXSIZE;
-#else
 	logbuffer = logbuffer_min;
 	elogbuffer = logbuffer+LOGBUF_MINSIZE;
-#endif
 	logbuf_curptr = logbuffer;
 	lfreelist = (lb_me_t *)NULL;
 
@@ -291,7 +280,7 @@ lufs_alloc_logbuf(void)
 		return (0);
 
 	dprintf("Buffer for boot loader logging support: 0x%p, size 0x%x\n",
-		logbuffer, elogbuffer-logbuffer);
+	    logbuffer, elogbuffer-logbuffer);
 
 	return (1);
 }
@@ -313,10 +302,8 @@ lufs_free_logbuf()
 	 *   prom_free anyway so that the kernel can reclaim this
 	 *   memory in the future.
 	 */
-#ifndef i386
 	if (logbuffer == LOGBUF_BASEADDR)
 		prom_free(logbuffer, elogbuffer-logbuffer);
-#endif
 	logbuffer = (caddr_t)NULL;
 }
 
@@ -336,9 +323,6 @@ lufs_alloc_from_logbuf(size_t sz)
 		return ((caddr_t)l);
 	}
 	if (elogbuffer < logbuf_curptr + sz) {
-#ifdef i386
-		return ((caddr_t)NULL);
-#else
 		caddr_t np;
 		size_t nsz;
 
@@ -363,7 +347,6 @@ lufs_alloc_from_logbuf(size_t sz)
 			logbuffer = LOGBUF_BASEADDR;
 		logbuf_curptr = np;
 		elogbuffer = logbuf_curptr + nsz;
-#endif
 	}
 
 	tmpaddr = logbuf_curptr;
@@ -404,10 +387,10 @@ lufs_read_log(int32_t addr, caddr_t va, int nb)
 		lblk = btodb(addr);
 		for (i = 0; i < eb->nextents; i++) {
 			if (lblk >= eb->extents[i].lbno &&
-				lblk < eb->extents[i].lbno +
-						eb->extents[i].nbno) {
+			    lblk < eb->extents[i].lbno +
+			    eb->extents[i].nbno) {
 				pblk = lblk - eb->extents[i].lbno +
-					eb->extents[i].pbno;
+				    eb->extents[i].pbno;
 				break;
 			}
 		}
@@ -418,7 +401,7 @@ lufs_read_log(int32_t addr, caddr_t va, int nb)
 			 * block always contains the primary superblock copy.
 			 */
 			dprintf("No log extent found for log offset 0x%llx.\n",
-				addr);
+			    addr);
 			return (0);
 		}
 
@@ -433,8 +416,8 @@ lufs_read_log(int32_t addr, caddr_t va, int nb)
 			logfp->fi_offset = 0;
 			if (diskread(logfp)) {
 				dprintf("I/O error reading the ufs log" \
-					" at block 0x%x.\n",
-					logfp->fi_blocknum);
+				    " at block 0x%x.\n",
+				    logfp->fi_blocknum);
 				return (0);
 			}
 			/*
@@ -448,7 +431,7 @@ lufs_read_log(int32_t addr, caddr_t va, int nb)
 			 * the valid part of the log.
 			 */
 			st = (sect_trailer_t *)(logfp->fi_memp +
-						LDL_USABLE_BSIZE);
+			    LDL_USABLE_BSIZE);
 			/* od_head_ident is where the sequence starts */
 			ident = odi.od_head_ident;
 			if (lblk >= lbtodb(odi.od_head_lof)) {
@@ -457,7 +440,7 @@ lufs_read_log(int32_t addr, caddr_t va, int nb)
 			} else {
 				/* log wrapped around the end */
 				ident += (lbtodb(odi.od_eol_lof) -
-					    lbtodb(odi.od_head_lof));
+				    lbtodb(odi.od_head_lof));
 				ident += (lblk - lbtodb(odi.od_bol_lof));
 			}
 
@@ -472,7 +455,7 @@ read_done:
 		i = MIN(NB_LEFT_IN_SECTOR(addr), nb);
 		if (va != NULL) {
 			bcopy(logfp->fi_buf + (addr - ldbtob(lbtodb(addr))),
-				va, i);
+			    va, i);
 			va += i;
 		}
 		nb -= i;
@@ -500,8 +483,8 @@ lufs_boot_init(fileid_t *filep)
 	 * Also return if lufs support was disabled on request.
 	 */
 	if (!lufs_support ||
-		sb != (struct fs *)&filep->fi_devp->un_fs.di_fs ||
-		sb->fs_clean != FSLOG || sb->fs_logbno == NULL) {
+	    sb != (struct fs *)&filep->fi_devp->un_fs.di_fs ||
+	    sb->fs_clean != FSLOG || sb->fs_logbno == NULL) {
 		return;
 	}
 
@@ -567,14 +550,14 @@ lufs_boot_init(fileid_t *filep)
 	 */
 	if (odi.od_version != LUFS_VERSION_LATEST) {
 		dprintf("On-disk log format v%d != supported format v%d.\n",
-			odi.od_version, LUFS_VERSION_LATEST);
+		    odi.od_version, LUFS_VERSION_LATEST);
 		err = LOG_IS_ERRORED;
 	} else if (odi.od_badlog) {
 		dprintf("On-disk log is marked bad.\n");
 		err = LOG_IS_ERRORED;
 	} else if (odi.od_chksum != odi.od_head_ident + odi.od_tail_ident) {
 		dprintf("On-disk log checksum %d != ident sum %d.\n",
-			odi.od_chksum, odi.od_head_ident + odi.od_tail_ident);
+		    odi.od_chksum, odi.od_head_ident + odi.od_tail_ident);
 		err = LOG_IS_ERRORED;
 	} else {
 		/*
@@ -633,8 +616,8 @@ lufs_logscan_skip(int32_t *addr, struct delta *d)
 		 * reflect that.
 		 */
 		*addr += ((*addr & (DEV_BSIZE - 1))) ?
-			NB_LEFT_IN_SECTOR(*addr) +
-			sizeof (sect_trailer_t) : 0;
+		    NB_LEFT_IN_SECTOR(*addr) +
+		    sizeof (sect_trailer_t) : 0;
 		return (1);
 	case DT_CANCEL:
 	case DT_ABZERO:
@@ -799,7 +782,7 @@ lufs_logscan_addmap(int32_t *addr, struct delta *d)
 					}
 				}
 			} else if (WITHIN(d->d_mof, d->d_nb,
-					l->l_mof, l->l_nb)) {
+			    l->l_mof, l->l_nb)) {
 				/*
 				 * This is the third case above.
 				 * With deltas DT_ABZERO/DT_AB and DT_FBI/DT_DIR
@@ -902,7 +885,7 @@ lufs_logscan_prescan(void)
 	}
 
 	loghash = (lb_me_t **)lufs_alloc_from_logbuf(
-				LB_HASHSIZE * sizeof (lb_me_t *));
+	    LB_HASHSIZE * sizeof (lb_me_t *));
 	if (loghash == (lb_me_t **)NULL) {
 		dprintf("Can't allocate loghash[] array.");
 		return (0);
@@ -1061,12 +1044,12 @@ lufs_merge_deltas(fileid_t *fp)
 				 * be incorrect if we'd started at l->l_lof.
 				 */
 				if (!(skip = lufs_read_log(l->l_lof, NULL,
-					MAX(bof - l->l_mof, 0))))
+				    MAX(bof - l->l_mof, 0))))
 					dprintf("scan/merge error, pre-skip\n");
 				if (!(skip = lufs_read_log(skip,
-					fp->fi_memp + MAX(l->l_mof - bof, 0),
-					MIN(l->l_mof + l->l_nb, bof + nb) -
-					MAX(l->l_mof, bof))))
+				    fp->fi_memp + MAX(l->l_mof - bof, 0),
+				    MIN(l->l_mof + l->l_nb, bof + nb) -
+				    MAX(l->l_mof, bof))))
 					dprintf("scan/merge error, merge\n");
 			} else {
 				/*
@@ -1075,8 +1058,8 @@ lufs_merge_deltas(fileid_t *fp)
 				 * the delta.
 				 */
 				bzero(fp->fi_memp + MAX(l->l_mof - bof, 0),
-					MIN(l->l_mof + l->l_nb, bof + nb) -
-					MAX(l->l_mof, bof));
+				    MIN(l->l_mof + l->l_nb, bof + nb) -
+				    MAX(l->l_mof, bof));
 			}
 		}
 	} while (l->l_prev != (*lh)->l_prev);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,6 @@ struct mac_type		mac_state;
 int			arp_index;	/* current arp table index */
 static struct arptable	atable[ARP_TABLE_SIZE];
 
-#if	!defined(__i386)
 struct ofw_net_types {
 	char	*n_name;	/* OFW network media name */
 	int	n_type;		/* IFT */
@@ -69,7 +68,6 @@ struct ofw_net_types {
 	{ "token-ring",	IFT_ISO88025 },
 	{ "ipib",	IFT_IB }
 };
-#endif	/* !__i386 */
 
 /*
  * given the mac type, initialize the mac interface state.
@@ -78,7 +76,6 @@ void
 mac_init(char *bootdevicename)
 {
 	int		type = 0;
-#if !defined(__i386)
 	static char	*mtu_name = "max-frame-size";
 	static char	*chosen_net = "chosen-network-type";
 	static char	*supported_net = "supported-network-types";
@@ -86,7 +83,6 @@ mac_init(char *bootdevicename)
 	pnode_t		node;
 	char		*wp, *media_type;
 	int		len = 0, i;
-#endif	/* !__i386 */
 	char		tmpbuf[MAXNAMELEN];
 	char		devname[MAXNAMELEN];
 
@@ -105,17 +101,12 @@ mac_init(char *bootdevicename)
 		prom_panic(tmpbuf);
 	}
 
-#if !defined(__i386)
 	(void) prom_devname_from_pathname(bootdevicename, devname);
-#else
-	(void) strcpy(devname, bootdevicename);
-#endif	/* !__i386 */
 
 #ifdef	DEBUG
 	printf("mac_init: Network device name: %s\n", devname);
 #endif	/* DEBUG */
 
-#if !defined(__i386)
 	/*
 	 * Ask the prom for our MTU and media type. "chosen-network-type"
 	 * is of the form of "<network type>,<speed (Mbps)>,<connector type>,
@@ -162,9 +153,6 @@ mac_init(char *bootdevicename)
 			}
 		}
 	}
-#else
-	type = IFT_ETHER;	/* default to ethernet */
-#endif	/* !__i386 */
 
 	switch (type) {
 	case IFT_ATM:

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple nfs V4 ops
@@ -67,11 +66,9 @@ nfs4read(struct nfs_file *filep, char *buf, size_t size)
 	bool_t		done = FALSE;
 	struct timeval	timeout;
 	int		framing_errs = 0;
-#ifndef i386
 	static uint_t	pos;
 	static char	ind[] = "|/-\\";
 	static int	blks_read;
-#endif
 	utf8string	str;
 	char		tagname[] = "inetboot read";
 
@@ -116,9 +113,9 @@ nfs4read(struct nfs_file *filep, char *buf, size_t size)
 
 		do {
 			status = CLNT_CALL(root_CLIENT, NFSPROC4_COMPOUND,
-					xdr_read4_args, (caddr_t)&readargs,
-					xdr_read4_res, (caddr_t)&readres,
-					timeout);
+			    xdr_read4_args, (caddr_t)&readargs,
+			    xdr_read4_res, (caddr_t)&readres,
+			    timeout);
 
 			if (status == RPC_TIMEDOUT) {
 	dprintf("NFS read(%d) timed out. Retrying...\n", readargs.r_count);
@@ -130,7 +127,7 @@ nfs4read(struct nfs_file *filep, char *buf, size_t size)
 					readargs.r_count /= 2;
 					nfs_readsize /= 2;
 					dprintf("NFS read size now %d.\n",
-						nfs_readsize);
+					    nfs_readsize);
 					timeout.tv_sec = NFS_REXMIT_MIN;
 					framing_errs = 0;
 				} else {
@@ -158,8 +155,8 @@ nfs4read(struct nfs_file *filep, char *buf, size_t size)
 		if (readcnt < readargs.r_count) {
 #ifdef NFS_OPS_DEBUG
 			if ((boothowto & DBFLAGS) == DBFLAGS)
-		printf("nfs4read: partial read %d instead of %d\n", readcnt,
-			readargs.count);
+				printf("nfs4read: partial read %d instead "
+				"of %d\n", readcnt, readargs.count);
 #endif
 			done = TRUE;
 		}
@@ -168,10 +165,8 @@ nfs4read(struct nfs_file *filep, char *buf, size_t size)
 		filep->offset += readcnt;
 		buf_offset += readcnt;
 		readargs.r_offset += readcnt;
-#ifndef i386
 		if ((blks_read++ & 0x3) == 0)
 			printf("%c\b", ind[pos++ & 3]);
-#endif
 	} while (count < size && !done);
 
 	return (count);
@@ -229,8 +224,8 @@ nfs4getattr(struct nfs_file *nfp, struct vattr *vap)
 	getattrargs.ga_attr_req.b_bitmap_val[1] = bitmap2.word;
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC4_COMPOUND, xdr_getattr4_args,
-				(caddr_t)&getattrargs, xdr_getattr4_res,
-				(caddr_t)&getattrres, zero_timeout);
+	    (caddr_t)&getattrargs, xdr_getattr4_res,
+	    (caddr_t)&getattrres, zero_timeout);
 
 	if (status != RPC_SUCCESS) {
 		dprintf("nfs4getattr: RPC error %d\n", status);
@@ -266,7 +261,7 @@ nfs4getattr(struct nfs_file *nfp, struct vattr *vap)
 	if (vap->va_mask & AT_CTIME) {
 		vap->va_ctime.tv_sec = bfattr4->b_fattr4_time_metadata.seconds;
 		vap->va_ctime.tv_nsec =
-			bfattr4->b_fattr4_time_metadata.nseconds;
+		    bfattr4->b_fattr4_time_metadata.nseconds;
 	}
 	if (vap->va_mask & AT_MTIME) {
 		vap->va_mtime.tv_sec = bfattr4->b_fattr4_time_modify.seconds;
@@ -422,13 +417,13 @@ nfs4lookup(struct nfs_file *dir, char *name, int *nstat)
 	 */
 	lookupargs.la_pathname.utf8string_len = strlen(name);
 	lookupargs.la_pathname.utf8string_val =
-		bkmem_alloc(lookupargs.la_pathname.utf8string_len);
+	    bkmem_alloc(lookupargs.la_pathname.utf8string_len);
 	if (lookupargs.la_pathname.utf8string_val == NULL) {
 		dprintf("nfs4lookup: bkmem_alloc failed\n");
 		return (NULL);
 	}
 	bcopy(name, lookupargs.la_pathname.utf8string_val,
-		lookupargs.la_pathname.utf8string_len);
+	    lookupargs.la_pathname.utf8string_len);
 
 	/*
 	 * Setup the attr bitmap.  All we need is the type and filehandle info
@@ -442,8 +437,8 @@ nfs4lookup(struct nfs_file *dir, char *name, int *nstat)
 	lookupargs.la_attr_req.b_bitmap_val[1] = 0;
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC4_COMPOUND, xdr_lookup4_args,
-			(caddr_t)&lookupargs, xdr_lookup4_res,
-			(caddr_t)&lookupres, zero_timeout);
+	    (caddr_t)&lookupargs, xdr_lookup4_res,
+	    (caddr_t)&lookupres, zero_timeout);
 
 	if (status != RPC_SUCCESS) {
 		dprintf("nfs4lookup: RPC error. status %d\n", status);
@@ -453,26 +448,26 @@ nfs4lookup(struct nfs_file *dir, char *name, int *nstat)
 	if (lookupres.lr_lookup_status != NFS4_OK) {
 #ifdef DEBUG
 		dprintf("nfs4lookup: lookup status = %d\n",
-			lookupres.lr_lookup_status);
+		    lookupres.lr_lookup_status);
 #endif
 		nfs4_error(lookupres.lr_lookup_status);
 		*nstat = (int)lookupres.lr_lookup_status;
 		if (lookupargs.la_pathname.utf8string_val != NULL)
 			bkmem_free(lookupargs.la_pathname.utf8string_val,
-					lookupargs.la_pathname.utf8string_len);
+			    lookupargs.la_pathname.utf8string_len);
 		return (NULL);
 	}
 
 	if (lookupres.lr_attr_status != NFS4_OK) {
 #ifdef DEBUG
 		dprintf("nfs4lookup: getattr status = %d\n",
-			lookupres.lr_attr_status);
+		    lookupres.lr_attr_status);
 #endif
 		nfs4_error(lookupres.lr_attr_status);
 		*nstat = (int)lookupres.lr_attr_status;
 		if (lookupargs.la_pathname.utf8string_val != NULL)
 			bkmem_free(lookupargs.la_pathname.utf8string_val,
-					lookupargs.la_pathname.utf8string_len);
+			    lookupargs.la_pathname.utf8string_len);
 		return (NULL);
 	}
 
@@ -484,14 +479,14 @@ nfs4lookup(struct nfs_file *dir, char *name, int *nstat)
 	cd.ftype.type4 = lookupres.lr_attrs.b_fattr4_type;
 	cd.fh.fh4.len = lookupres.lr_attrs.b_fattr4_filehandle.len;
 	bcopy(lookupres.lr_attrs.b_fattr4_filehandle.data, cd.fh.fh4.data,
-		cd.fh.fh4.len);
+	    cd.fh.fh4.len);
 
 	/*
 	 * Free the arg string
 	 */
 	if (lookupargs.la_pathname.utf8string_val != NULL)
 		bkmem_free(lookupargs.la_pathname.utf8string_val,
-				lookupargs.la_pathname.utf8string_len);
+		    lookupargs.la_pathname.utf8string_len);
 
 	return (&cd);
 }
@@ -546,8 +541,8 @@ nfs4lookupp(struct nfs_file *dir, int *nstat, uint64_t *fileid)
 	lookuppargs.la_attr_req.b_bitmap_val[1] = 0;
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC4_COMPOUND, xdr_lookupp4_args,
-			(caddr_t)&lookuppargs, xdr_lookup4_res,
-			(caddr_t)&lookupres, zero_timeout);
+	    (caddr_t)&lookuppargs, xdr_lookup4_res,
+	    (caddr_t)&lookupres, zero_timeout);
 
 	if (status != RPC_SUCCESS) {
 		dprintf("nfs4lookupp: RPC error. status %d\n", status);
@@ -557,7 +552,7 @@ nfs4lookupp(struct nfs_file *dir, int *nstat, uint64_t *fileid)
 	if (lookupres.lr_lookup_status != NFS4_OK) {
 #ifdef DEBUG
 		dprintf("nfs4lookupp: lookupp status = %d\n",
-			lookupres.lr_lookup_status);
+		    lookupres.lr_lookup_status);
 #endif
 		nfs4_error(lookupres.lr_lookup_status);
 		*nstat = (int)lookupres.lr_lookup_status;
@@ -567,7 +562,7 @@ nfs4lookupp(struct nfs_file *dir, int *nstat, uint64_t *fileid)
 	if (lookupres.lr_attr_status != NFS4_OK) {
 #ifdef DEBUG
 		dprintf("nfs4lookupp: getattr status = %d\n",
-			lookupres.lr_attr_status);
+		    lookupres.lr_attr_status);
 #endif
 		nfs4_error(lookupres.lr_attr_status);
 		*nstat = (int)lookupres.lr_attr_status;
@@ -582,7 +577,7 @@ nfs4lookupp(struct nfs_file *dir, int *nstat, uint64_t *fileid)
 	cd.ftype.type4 = lookupres.lr_attrs.b_fattr4_type;
 	cd.fh.fh4.len = lookupres.lr_attrs.b_fattr4_filehandle.len;
 	bcopy(lookupres.lr_attrs.b_fattr4_filehandle.data, cd.fh.fh4.data,
-		cd.fh.fh4.len);
+	    cd.fh.fh4.len);
 
 	/*
 	 * Fill in the fileid if the user passed in one
@@ -618,14 +613,14 @@ nfs4getsymlink(struct nfs_file *cfile, char **path)
 
 	if (cfile->fh.fh4.len > 0)
 		compound_init(&readlinkargs.rl_arg, &str, 0, 2,
-				&cfile->fh.fh4);
+		    &cfile->fh.fh4);
 	else
 		compound_init(&readlinkargs.rl_arg, &str, 0, 2,	NULL);
 
 	readlinkargs.rl_opreadlink = OP_READLINK;
 	status = CLNT_CALL(root_CLIENT, NFSPROC4_COMPOUND, xdr_readlink4_args,
-				(caddr_t)&readlinkargs, xdr_readlink4_res,
-				(caddr_t)&readlinkres, zero_timeout);
+	    (caddr_t)&readlinkargs, xdr_readlink4_res,
+	    (caddr_t)&readlinkres, zero_timeout);
 
 	if (status != RPC_SUCCESS) {
 		dprintf("nfs4getsymlink: RPC readlink error %d\n", status);

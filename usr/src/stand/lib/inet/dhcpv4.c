@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Standalone dhcp client.
@@ -75,11 +74,7 @@ PKT_LIST		*list_tl, *list_hd;
 PKT_LIST		*state_pl = NULL;
 
 #define	PROM_BOOT_CACHED	"bootp-response"
-#ifndef	__i386
 extern char	*bootp_response;	/* bootprop.c */
-#else
-char		*bootp_response;	/* i386 has *real* bsetprop */
-#endif	/* __i386 */
 extern int	pagesize;
 
 /*
@@ -573,7 +568,7 @@ select_best(void)
 		}
 #ifdef	DHCP_DEBUG
 		printf("%s: This server configuration has '%d' points.\n", s_n,
-			wk->offset);
+		    wk->offset);
 #endif	/* DHCP_DEBUG */
 		if (!best)
 			best = wk;
@@ -1048,10 +1043,6 @@ static void
 create_bootpresponse_bprop(PKT_LIST *pl)
 {
 	uint_t	buflen;
-#if defined(__i386)
-	extern struct bootops bootops;
-	extern int bsetprop(struct bootops *, char *, caddr_t, int, phandle_t);
-#endif	/* __i386 */
 
 	if (pl == NULL || bootp_response != NULL)
 		return;
@@ -1066,17 +1057,10 @@ create_bootpresponse_bprop(PKT_LIST *pl)
 		bootp_response = NULL;
 	}
 
-#if defined(__i386)
-	/* Use bsetprop to create the bootp-response property */
-	if (bsetprop(&bootops, "bootp-response", bootp_response, 0, 0) !=
-	    BOOT_SUCCESS) {
-		bkmem_free(bootp_response, (pl->len * 2) + 1);
-		bootp_response = NULL;
-	}
-#elif defined(__sparc)
+#if defined(__sparc)
 	prom_create_encoded_prop("bootp-response", pl->pkt, pl->len,
 	    ENCODE_BYTES);
-#endif	/* __i386 */
+#endif	/* __sparc */
 }
 
 /*
@@ -1103,13 +1087,6 @@ prom_cached_reply(int cache_present)
 {
 	PKT_LIST	*pl;
 	int	len;
-#if defined(__i386)
-	char	*ack;
-	int	pxe_ack_cache(char **);
-
-	if ((len = pxe_ack_cache(&ack)) <= 0)
-		return (B_FALSE);
-#else
 	pnode_t	chosen;
 	char	*prop = PROM_BOOT_CACHED;
 
@@ -1119,7 +1096,6 @@ prom_cached_reply(int cache_present)
 
 	if ((len = prom_getproplen(chosen, prop)) <= 0)
 		return (B_FALSE);
-#endif	/* __i386 */
 
 	if (cache_present)
 		return (B_TRUE);
@@ -1132,11 +1108,7 @@ prom_cached_reply(int cache_present)
 		return (B_FALSE);
 	}
 
-#if defined(__i386)
-	bcopy(ack, pl->pkt, len);
-#else
 	(void) prom_getprop(chosen, prop, (caddr_t)pl->pkt);
-#endif	/* __i386 */
 
 	pl->len = len;
 
@@ -1269,7 +1241,7 @@ dhcp_getinfo(uchar_t optcat, uint16_t code, uint16_t optsize, void *value,
 	size_t		len = *vallenp;
 
 	if (dhcp_getinfo_pl(state_pl, optcat, code,
-				optsize, value, &len)) {
+	    optsize, value, &len)) {
 
 		if (len <= *vallenp) {
 			*vallenp = len;

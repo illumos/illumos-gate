@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * socket.c, Code implementing a simple socket interface.
@@ -280,7 +279,7 @@ in_port_t
 get_source_port(boolean_t reserved)
 {
 	static in_port_t	dynamic = IPPORT_DYNAMIC_START - 1,
-				    rsvdport = (IPPORT_RESERVED / 2) - 1;
+	    rsvdport = (IPPORT_RESERVED / 2) - 1;
 	in_port_t		p;
 
 	if (reserved) {
@@ -441,7 +440,7 @@ shutdown(int s, int how)
 	}
 
 	switch (sockets[sock_id].so_state &
-				(SS_CANTRCVMORE | SS_CANTSENDMORE)) {
+	    (SS_CANTRCVMORE | SS_CANTSENDMORE)) {
 	case (SS_CANTRCVMORE | SS_CANTSENDMORE):
 		/* Call lower level protocol close routine. */
 		for (i = TRANSPORT_LVL; i >= MEDIA_LVL; i--) {
@@ -661,7 +660,7 @@ quickbind(int sock_id)
 #ifdef DEBUG
 		printf("quick bind done addr %s port %d\n",
 		    inet_ntoa(sockets[sock_id].bind.sin_addr),
-			ntohs(sockets[sock_id].bind.sin_port));
+		    ntohs(sockets[sock_id].bind.sin_port));
 #endif
 		return (0);
 	} else {
@@ -938,7 +937,7 @@ retry:
 					if (icp->igm_id != TCP_CALLB_MAGIC_ID)
 						break;
 					del_gram(&sockets[sock_id].inq, icp,
-						B_TRUE);
+					    B_TRUE);
 				}
 
 				if (icp == NULL)
@@ -1242,8 +1241,6 @@ int
 get_netconfig_strategy(void)
 {
 	int	i;
-#if !defined(__i386)
-	/* sparc */
 #define	ISSPACE(c) (c == ' ' || c == '\t' || c == '\n' || c == '\0')
 	char	lbootpath[OBP_MAXPATHLEN];
 	char	net_options[NCT_BUFSIZE];
@@ -1296,20 +1293,6 @@ get_netconfig_strategy(void)
 	}
 
 #undef	ISSPACE
-#else
-	/* i86 */
-	extern struct bootops bootops;
-	extern int bgetprop(struct bootops *, char *, caddr_t, int, phandle_t);
-	char	net_options[MAXNAMELEN];
-
-	/*
-	 * Look at net-config-strategy boot property to determine what protocol
-	 * will be used.
-	 */
-	(void) bgetprop(&bootops, "net-config-strategy", net_options,
-	    sizeof (net_options), 0);
-
-#endif	/* __i386 */
 
 	for (i = 0; i < nct_entries; i++)
 		if (strcmp(net_options, nct[i].p_name) == 0)

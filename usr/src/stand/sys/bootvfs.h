@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994-1996, 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,13 +81,6 @@ extern	int	stat(const char *filename, struct stat *buf);
  * The compfs filesystem provides additional fsswitch-like entry points,
  * though these are not yet hooked properly into the fsswitch.
  */
-#ifdef	__i386
-extern	int	ftruncate(int, off_t);
-extern	int	create(char *, ulong_t);
-extern	ssize_t	write(int, const void *, size_t);
-extern	int	rename(char *, char *);
-extern	int	unlink(char *);
-#endif
 
 extern	void	closeall(int flag);
 

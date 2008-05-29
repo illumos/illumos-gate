@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple nfs V3 ops
@@ -65,11 +64,9 @@ nfs3read(struct nfs_file *filep, char *buf, size_t size)
 	int			framing_errs = 0;	/* stack errors */
 	char			*buf_offset;	/* current buffer offset */
 	struct timeval		timeout;
-#ifndef i386
 	static uint_t		pos;		/* progress indicator counter */
 	static char		ind[] = "|/-\\";	/* progress indicator */
 	static int		blks_read;
-#endif
 
 	read_args.file.data.data_len = filep->fh.fh3.len;
 	read_args.file.data.data_val = filep->fh.fh3.data;
@@ -160,8 +157,8 @@ nfs3read(struct nfs_file *filep, char *buf, size_t size)
 #ifdef NFS_OPS_DEBUG
 			if ((boothowto & DBFLAGS) == DBFLAGS)
 				printf("nfs3read(): partial read %d"
-					" instead of %d\n",
-					readcnt, read_args.count);
+				    " instead of %d\n",
+				    readcnt, read_args.count);
 #endif
 			done = TRUE; /* update the counts and exit */
 		}
@@ -171,14 +168,12 @@ nfs3read(struct nfs_file *filep, char *buf, size_t size)
 		filep->offset += readcnt;
 		buf_offset += readcnt;
 		read_args.offset += readcnt;
-#ifndef i386
 		/*
 		 * round and round she goes (though not on every block..
 		 * - OBP's take a fair bit of time to actually print stuff)
 		 */
 		if ((blks_read++ & 0x3) == 0)
 			printf("%c\b", ind[pos++ & 3]);
-#endif
 	} while (count < size && !done);
 
 	return (count);
@@ -203,8 +198,8 @@ nfs3getattr(struct nfs_file *nfp, struct vattr *vap)
 	bzero(&getattr_res, sizeof (getattr_res));
 
 	getattr_stat = CLNT_CALL(root_CLIENT, NFSPROC3_GETATTR,
-			    xdr_GETATTR3args, (caddr_t)&getattr_args,
-			    xdr_GETATTR3res, (caddr_t)&getattr_res, timeout);
+	    xdr_GETATTR3args, (caddr_t)&getattr_args,
+	    xdr_GETATTR3res, (caddr_t)&getattr_res, timeout);
 
 	if (getattr_stat != RPC_SUCCESS) {
 		dprintf("nfs_getattr: RPC error %d\n", getattr_stat);
@@ -369,8 +364,8 @@ nfs3lookup(struct nfs_file *dir, char *name, int *nstat)
 	dirop.what.name = name;
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC3_LOOKUP, xdr_LOOKUP3args,
-			(caddr_t)&dirop, xdr_LOOKUP3res, (caddr_t)&res_lookup,
-			zero_timeout);
+	    (caddr_t)&dirop, xdr_LOOKUP3res, (caddr_t)&res_lookup,
+	    zero_timeout);
 	if (status != RPC_SUCCESS) {
 		dprintf("lookup: RPC error.\n");
 		return (NULL);
@@ -379,7 +374,7 @@ nfs3lookup(struct nfs_file *dir, char *name, int *nstat)
 		nfs3_error(res_lookup.status);
 		*nstat = (int)res_lookup.status;
 		(void) CLNT_FREERES(root_CLIENT,
-					xdr_LOOKUP3res, (caddr_t)&res_lookup);
+		    xdr_LOOKUP3res, (caddr_t)&res_lookup);
 		return (NULL);
 	}
 
@@ -389,18 +384,18 @@ nfs3lookup(struct nfs_file *dir, char *name, int *nstat)
 	 * Server must supply post_op_attr's
 	 */
 	if (res_lookup.LOOKUP3res_u.resok.obj_attributes.attributes_follow ==
-									FALSE) {
+	    FALSE) {
 		printf("nfs3lookup: server fails to return post_op_attr\n");
 		(void) CLNT_FREERES(root_CLIENT,
-					xdr_LOOKUP3res, (caddr_t)&res_lookup);
+		    xdr_LOOKUP3res, (caddr_t)&res_lookup);
 		return (NULL);
 	}
 
-	cd.ftype.type3 =
-res_lookup.LOOKUP3res_u.resok.obj_attributes.post_op_attr_u.attributes.type;
+	cd.ftype.type3 = res_lookup.LOOKUP3res_u.resok.obj_attributes
+	    .post_op_attr_u.attributes.type;
 	cd.fh.fh3.len = res_lookup.LOOKUP3res_u.resok.object.data.data_len;
 	bcopy(res_lookup.LOOKUP3res_u.resok.object.data.data_val,
-						cd.fh.fh3.data, cd.fh.fh3.len);
+	    cd.fh.fh3.data, cd.fh.fh3.len);
 	(void) CLNT_FREERES(root_CLIENT, xdr_LOOKUP3res, (caddr_t)&res_lookup);
 	return (&cd);
 }
@@ -429,8 +424,8 @@ nfs3getsymlink(struct nfs_file *cfile, char **path)
 	linkres.READLINK3res_u.resok.data = symlink_path;
 
 	status = CLNT_CALL(root_CLIENT, NFSPROC3_READLINK,
-		    xdr_READLINK3args, (caddr_t)&linkargs,
-		    xdr_READLINK3res, (caddr_t)&linkres, zero_timeout);
+	    xdr_READLINK3args, (caddr_t)&linkargs,
+	    xdr_READLINK3res, (caddr_t)&linkres, zero_timeout);
 	if (status != RPC_SUCCESS) {
 		dprintf("nfs3getsymlink: RPC call failed.\n");
 		return (-1);

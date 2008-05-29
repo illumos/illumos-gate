@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -455,11 +455,9 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 	int off, size, diff, zeroize;
 	daddr32_t lbn, fsbn;
 	devid_t	*devp;
-#ifndef	i386
 	static int	pos;
 	static char 	ind[] = "|/-\\";	/* that's entertainment? */
 	static int	blks_read;
-#endif
 	devp = filep->fi_devp;
 	p = filep->fi_memp;
 	if ((signed)filep->fi_count <= 0) {
@@ -509,10 +507,8 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 			*rcount = size;
 			filep->fi_count = 0;
 			read_opt++;
-#ifndef	i386
 			if ((blks_read++ & 0x3) == 0)
 				printf("%c\b", ind[pos++ & 3]);
-#endif
 			return (0);
 		} else {
 			if (zeroize) {
@@ -527,10 +523,8 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 		 * On x86, the screen oriented bootconf program doesn't
 		 * want this noise...
 		 */
-#ifndef	i386
 		if ((blks_read++ & 0x3) == 0)
 			printf("%c\b", ind[pos++ & 3]);
-#endif
 
 		if (filep->fi_offset - off + size >= filep->fi_inode->i_size)
 			filep->fi_count = diff + off;
