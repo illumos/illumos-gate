@@ -160,7 +160,7 @@ void ipc_seminit(void);
 char *ipc_ismmalloc(size_t size);
 int ipc_ismcreate(size_t size);
 void ipc_ismdelete(void);
-void ipc_cleanup(void);
+void ipc_fini(void);
 
 extern filebench_shm_t *filebench_shm;
 

@@ -86,6 +86,7 @@ stats                   { return FSC_STATS; }
 system                  { return FSC_SYSTEM; }
 usage                   { return FSC_USAGE; }
 vars                    { return FSC_VARS; }
+version                 { return FSC_VERSION; }
 quit		        { return FSC_QUIT; }
 
 file[s]*       	        { return FSE_FILE; }

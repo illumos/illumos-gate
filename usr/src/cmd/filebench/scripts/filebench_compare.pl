@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,14 +57,20 @@ foreach $dir (@ARGV) {
     $files = `ls $dir/stats.*.out $dir/*/stats.*.out 2>/dev/null`;
     foreach $file (split(/\n/, $files)) {
 	print "file = $file\n";
-	($prefix, $workload, $fstype) = split(/\./, $file);
+
+	# Search backwards in-case the hostname is of FQDN or there's a
+	# '.' in $dir.
+	$rstr = reverse $file;
+	($rfstype, $rworkload, $rprefix) = split(/\./, $rstr);
+	$prefix = reverse $rprefix;
+	$workload = reverse $rworkload;
+	$fstype = reverse $rfstype;
+
 	$dataset = $dir;
 	$dataset =~ s/.*\/(.+)$/$1/;
 	$dataset =~ s/\/$//;
         $desc{$dataset} = "$description";
-#	print "dataset = $dataset\n";
-#	print "workload = $workload\n";
-#	print "fstype = $fstype\n";
+
 	open (STATS, $file);
 	$tmp = <STATS>;
 	while (<STATS>) {

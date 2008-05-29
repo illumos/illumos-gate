@@ -148,6 +148,7 @@ static void parser_run_variable(cmd_t *cmd);
 static void parser_help(cmd_t *cmd);
 static void arg_parse(const char *command);
 static void parser_abort(int arg);
+static void parser_version(cmd_t *cmd);
 
 %}
 
@@ -168,7 +169,7 @@ static void parser_abort(int arg);
 %token FSC_LIST FSC_DEFINE FSC_EXEC FSC_QUIT FSC_DEBUG FSC_CREATE
 %token FSC_SLEEP FSC_STATS FSC_FOREACH FSC_SET FSC_SHUTDOWN FSC_LOG
 %token FSC_SYSTEM FSC_FLOWOP FSC_EVENTGEN FSC_ECHO FSC_LOAD FSC_RUN
-%token FSC_USAGE FSC_HELP FSC_VARS
+%token FSC_USAGE FSC_HELP FSC_VARS FSC_VERSION
 %token FSV_STRING FSV_VAL_INT FSV_VAL_BOOLEAN FSV_VARIABLE FSV_WHITESTRING
 %token FSV_RANDUNI FSV_RANDTAB FSV_RANDVAR FSV_URAND FSV_RAND48
 %token FST_INT FST_BOOLEAN
@@ -198,7 +199,7 @@ static void parser_abort(int arg);
 %type <sval> FSV_SET_LOCAL_VAR
 
 %type <ival> FSC_LIST FSC_DEFINE FSC_SET FSC_LOAD FSC_RUN
-%type <ival> FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSC_HELP
+%type <ival> FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSC_HELP FSC_VERSION
 
 %type <sval> name
 %type <ival> entity
@@ -211,6 +212,7 @@ static void parser_abort(int arg);
 %type <cmd> foreach_command log_command system_command flowop_command
 %type <cmd> eventgen_command quit_command flowop_list thread_list
 %type <cmd> thread echo_command usage_command help_command vars_command
+%type <cmd> version_command
 
 %type <attr> files_attr_op files_attr_ops pt_attr_op pt_attr_ops
 %type <attr> fo_attr_op fo_attr_ops ev_attr_op ev_attr_ops
@@ -292,6 +294,7 @@ command:
 | sleep_command
 | stats_command
 | system_command
+| version_command
 | quit_command;
 
 foreach_command: FSC_FOREACH
@@ -425,6 +428,13 @@ echo_command: FSC_ECHO whitevar_string_list
 
 	$$->cmd_param_list = $2;
 	$$->cmd = parser_echo;
+};
+
+version_command: FSC_VERSION
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = parser_version;
 };
 
 usage_command: FSC_USAGE whitevar_string_list
@@ -1778,9 +1788,11 @@ main(int argc, char *argv[])
 static void
 arg_parse(const char *command)
 {
-	if ((yyin = tmpfile()) == NULL)
+	if ((yyin = tmpfile()) == NULL) {
 		filebench_log(LOG_FATAL,
-		    "Cannot create tmpfile: %s", strerror(errno));
+		    "Exiting: Cannot create tmpfile: %s", strerror(errno));
+		exit(1);
+	}
 
 	if (fwrite(command, strlen(command), 1, yyin) != 1)
 		filebench_log(LOG_FATAL,
@@ -2800,7 +2812,7 @@ parser_filebench_shutdown(cmd_t *cmd)
 {
 	int f_abort = filebench_shm->shm_f_abort;
 
-	ipc_cleanup();
+	ipc_fini();
 
 	if (f_abort == FILEBENCH_ABORT_ERROR)
 		filebench_shutdown(1);
@@ -2911,8 +2923,6 @@ char *usagestr = NULL;
 static void
 parser_help(cmd_t *cmd)
 {
-	int runtime;
-
 	if (usagestr) {
 		filebench_log(LOG_INFO, "%s", usagestr);
 	} else {
@@ -2930,7 +2940,6 @@ char *varstr = NULL;
 static void
 parser_printvars(cmd_t *cmd)
 {
-	int runtime;
 	char *str, *c;
 
 	if (varstr) {
@@ -3247,6 +3256,14 @@ parser_echo(cmd_t *cmd)
 	filebench_log(LOG_INFO, "%s", string);
 }
 
+/*
+ * Prints out the version of FileBench.
+ */
+static void
+parser_version(cmd_t *cmd)
+{
+	filebench_log(LOG_INFO, "FileBench Version: %s", FILEBENCH_VERSION);
+}
 
 /*
  * Adds the string supplied as the argument to the usage command

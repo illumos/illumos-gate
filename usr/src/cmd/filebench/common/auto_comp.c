@@ -454,6 +454,7 @@ static ac_tokval_t fb_cmdnames[] = {
 	{ "system",	NULL },
 	{ "usage",	NULL },
 	{ "vars",	NULL },
+	{ "version",	NULL },
 	{ NULL,		NULL },
 };
 

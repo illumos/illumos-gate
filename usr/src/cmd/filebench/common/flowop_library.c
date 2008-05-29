@@ -1471,8 +1471,6 @@ flowoplib_semblock_destruct(flowop_t *flowop)
 #ifdef HAVE_SYSV_SEM
 	ipc_semidfree(flowop->fo_semid_lw);
 	ipc_semidfree(flowop->fo_semid_hw);
-	(void) semctl(filebench_shm->shm_sys_semid, 0, IPC_RMID);
-	filebench_shm->shm_sys_semid = -1;
 #else
 	sem_destroy(&flowop->fo_sem);
 #endif /* HAVE_SYSV_SEM */

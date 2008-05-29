@@ -387,11 +387,18 @@ ipc_init(void)
  * Otherwise a no-op.
  */
 void
-ipc_cleanup(void)
+ipc_fini(void)
 {
 #ifdef USE_PROCESS_MODEL
 	(void) unlink(shmpath);
 #endif /* USE_PROCESS_MODEL */
+
+#ifdef HAVE_SEM_RMID
+	if (filebench_shm->shm_sys_semid != -1) {
+		(void) semctl(filebench_shm->shm_sys_semid, 0, IPC_RMID);
+		filebench_shm->shm_sys_semid = -1;
+	}
+#endif
 }
 
 /*
