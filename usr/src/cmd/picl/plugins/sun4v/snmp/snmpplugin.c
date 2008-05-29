@@ -480,7 +480,7 @@ retry:
 	    &change_time1, &snmp_syserr);
 	if (ret < 0) {
 		if (snmp_syserr == ECANCELED) {
-			log_msg(LOG_WARNING, SNMPP_LINK_RESET);
+			LOGPRINTF(SNMPP_LINK_RESET);
 			clr_linkreset = 1;
 			goto retry;
 		}
