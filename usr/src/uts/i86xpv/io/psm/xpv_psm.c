@@ -826,6 +826,10 @@ xen_psm_enable_intr(processorid_t cpun)
 			continue;
 		xen_psm_rebind_irq(irq);
 	}
+
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		apic_cpus[cpun].aci_status |= APIC_CPU_INTR_ENABLE;
+	}
 }
 
 static int
@@ -835,13 +839,8 @@ xen_psm_post_cpu_start()
 
 	cpun = psm_get_cpu_id();
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		apic_cpus[cpun].aci_status =
-		    APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
+		apic_cpus[cpun].aci_status = APIC_CPU_ONLINE;
 	}
-	/*
-	 * Re-distribute interrupts to include the newly added cpu.
-	 */
-	xen_psm_enable_intr(cpun);
 	return (PSM_SUCCESS);
 }
 

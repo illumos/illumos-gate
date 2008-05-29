@@ -1477,7 +1477,6 @@ mp_startup(void)
 	 * since we get here by calling t_pc, we need to do that call
 	 * before swtch() overwrites it.
 	 */
-
 	(void) (*ap_mlsetup)();
 
 	new_x86_feature = cpuid_pass1(cp);
@@ -1560,8 +1559,7 @@ mp_startup(void)
 	pg_cpu_init(cp);
 	pg_cmt_cpu_startup(cp);
 
-	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_ENABLE | CPU_EXISTS;
-	cpu_add_active(cp);
+	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_EXISTS;
 
 	if (dtrace_cpu_init != NULL) {
 		(*dtrace_cpu_init)(cp->cpu_id);
@@ -1586,13 +1584,18 @@ mp_startup(void)
 	 */
 	curthread->t_preempt = 0;
 
-	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
-
 	/* The base spl should still be at LOCK LEVEL here */
 	ASSERT(cp->cpu_base_spl == ipltospl(LOCK_LEVEL));
 	set_base_spl();		/* Restore the spl to its proper value */
 
-	(void) spl0();				/* enable interrupts */
+	/* Enable interrupts */
+	(void) spl0();
+	mutex_enter(&cpu_lock);
+	cpu_enable_intr(cp);
+	cpu_add_active(cp);
+	mutex_exit(&cpu_lock);
+
+	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
 
 #ifndef __xpv
 	{

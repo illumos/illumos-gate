@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1119,9 +1119,7 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 static int
 apic_post_cpu_start()
 {
-	int i, cpun;
-	ulong_t iflag;
-	apic_irq_t *irq_ptr;
+	int cpun;
 
 	splx(ipltospl(LOCK_LEVEL));
 	apic_init_intr();
@@ -1136,27 +1134,7 @@ apic_post_cpu_start()
 		apic_ret();
 
 	cpun = psm_get_cpu_id();
-	apic_cpus[cpun].aci_status = APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
-
-	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {
-		irq_ptr = apic_irq_table[i];
-		if ((irq_ptr == NULL) ||
-		    ((irq_ptr->airq_cpu & ~IRQ_USER_BOUND) != cpun))
-			continue;
-
-		while (irq_ptr) {
-			if (irq_ptr->airq_temp_cpu != IRQ_UNINIT) {
-				iflag = intr_clear();
-				lock_set(&apic_ioapic_lock);
-
-				(void) apic_rebind(irq_ptr, cpun, NULL);
-
-				lock_clear(&apic_ioapic_lock);
-				intr_restore(iflag);
-			}
-			irq_ptr = irq_ptr->airq_next;
-		}
-	}
+	apic_cpus[cpun].aci_status = APIC_CPU_ONLINE;
 
 	apicadr[APIC_DIVIDE_REG] = apic_divide_reg_init;
 	return (PSM_SUCCESS);
