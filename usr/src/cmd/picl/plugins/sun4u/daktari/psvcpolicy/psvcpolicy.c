@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,8 @@ gettext("WARNING: Only 1 Power Supply in system. ADD a 2nd Power Supply.\n")
 	gettext("WARNING: Power Supply at 95%% current. Remove some load.\n")
 #define	PS_OVER_CURRENT_MSG		\
 	gettext("WARNING: Power Supply overcurrent detected\n")
+#define	PS_UNDER_CURRENT_MSG		\
+	gettext("WARNING: PS%d Undercurrent on one or more DC lines\n")
 #define	DEVICE_UNKNOWN_MSG	gettext("Unknown device %s instance %d\n")
 #define	DEVICE_HANDLE_FAIL_MSG		\
 	gettext("Failed to get device handle for %s, errno = %d\n")
@@ -162,6 +164,7 @@ static int32_t threshold_names[] = {
 static int n_retry_pshp_status = PSVC_NUM_OF_RETRIES;
 static int retry_sleep_pshp_status = 1;
 static int n_read_overcurrent = PSVC_THRESHOLD_COUNTER;
+static int n_read_undercurrent = PSVC_THRESHOLD_COUNTER;
 static int n_retry_devicefail = PSVC_NUM_OF_RETRIES;
 static int retry_sleep_devicefail = 1;
 static int n_read_fanfault = PSVC_THRESHOLD_COUNTER;
@@ -181,6 +184,7 @@ static i2c_noise_param_t i2cparams[] = {
 	&n_retry_pshp_status, "n_retry_pshp_status",
 	&retry_sleep_pshp_status, "retry_sleep_pshp_status",
 	&n_read_overcurrent, "n_read_overcurrent",
+	&n_read_undercurrent, "n_read_undercurrent",
 	&n_retry_devicefail, "n_retry_devicefail",
 	&retry_sleep_devicefail, "retry_sleep_devicefail",
 	&n_read_fanfault, "n_read_fanfault",
@@ -830,15 +834,96 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 }
 
 int32_t
+psvc_ps_undercurrent_check(psvc_opaque_t hdlp, char *id, int32_t *uc_flag)
+{
+	int32_t status = PSVC_SUCCESS;
+	boolean_t present;
+	static char *sensor_id[DAK_MAX_PS_I_SENSORS];
+	int32_t j;
+	int32_t amps;
+	static int32_t lo_warn[DAK_MAX_PS_I_SENSORS];
+	static int8_t undercurrent_failed_check = 0;
+
+	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &present);
+	if (status == PSVC_FAILURE) {
+		syslog(LOG_ERR, GET_PRESENCE_FAILED_MSG, id, errno);
+		return (status);
+	}
+
+	if (present == PSVC_ABSENT) {
+		errno = ENODEV;
+		return (PSVC_FAILURE);
+	}
+
+	for (j = 0; j < DAK_MAX_PS_I_SENSORS; ++j) {
+		status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR,
+		    &(sensor_id[j]), PSVC_PS_I_SENSOR, j);
+		if (status != PSVC_SUCCESS)
+			return (status);
+		status = psvc_get_attr(hdlp, sensor_id[j],
+		    PSVC_LO_WARN_ATTR, &(lo_warn[j]));
+		if (status != PSVC_SUCCESS)
+			return (status);
+	}
+
+	*uc_flag = 0;
+	for (j = 0; j < DAK_MAX_PS_I_SENSORS; ++j) {
+		status = psvc_get_attr(hdlp, sensor_id[j],
+		    PSVC_SENSOR_VALUE_ATTR, &amps);
+		if (status != PSVC_SUCCESS) {
+			if (undercurrent_failed_check == 0) {
+				/*
+				 * First time the get_attr call
+				 * failed  set count so that if we
+				 * fail again we will know.
+				 */
+				undercurrent_failed_check = 1;
+				/*
+				 * We probably failed because the power
+				 * supply was just inserted or removed
+				 * before the get_attr call. We then
+				 * return from this policy successfully
+				 * knowing it will be run again shortly
+				 * with the right PS state.
+				 */
+				return (PSVC_SUCCESS);
+			} else {
+				/*
+				 * Repeated failures are logged.
+				 */
+				syslog(LOG_ERR,
+				    "Failed getting %s sensor value",
+				    sensor_id[j]);
+				return (status);
+			}
+		}
+		/*
+		 * Because we have successfully gotten a value from the
+		 * i2c device on the PS we will set the failed_count
+		 * to 0.
+		 */
+		undercurrent_failed_check = 0;
+
+		if (amps <= lo_warn[j]) {
+			*uc_flag = 1;
+			return (PSVC_SUCCESS);
+		}
+	}
+
+	return (PSVC_SUCCESS);
+}
+
+int32_t
 psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 {
 	static char *ps_id[DAKTARI_MAX_PS] = {NULL};
 	static char *sensor_id[DAKTARI_MAX_PS][DAK_MAX_FAULT_SENSORS];
 	char *led_id = "FSP_POWER_FAULT_LED";
-	int i, j;
+	int i, j, uc_flag;
 	char state[32], fault[32], previous_state[32], past_state[32];
 	char led_state[32];
 	char bad_sensors[DAK_MAX_FAULT_SENSORS][256];
+	static int threshold_counter[DAKTARI_MAX_PS];
 	int32_t status = PSVC_SUCCESS;
 	boolean_t present;
 	int fail_state;
@@ -971,6 +1056,29 @@ psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 				should_retry = 1;
 			}
 		} while ((retry < n_retry_devicefail) && should_retry);
+
+		/* Under current check */
+		status = psvc_ps_undercurrent_check(hdlp, ps_id[i], &uc_flag);
+
+		if (status != PSVC_FAILURE) {
+			if (uc_flag) {
+				/*
+				 * Because we observed an undercurrent
+				 * condition, we increment threshold counter.
+				 * Once threshold counter reaches the value
+				 * of n_read_undercurrent we log the event.
+				 */
+				threshold_counter[i]++;
+				if (threshold_counter[i] >=
+				    n_read_undercurrent) {
+					fail_state++;
+					syslog(LOG_ERR, PS_UNDER_CURRENT_MSG,
+					    i);
+				}
+			} else {
+				threshold_counter[i] = 0;
+			}
+		}
 
 		if (fail_state != 0) {
 			strcpy(state, PSVC_ERROR);

@@ -675,12 +675,14 @@ int
 dak_env_print_ps(picl_nodehdl_t system_node)
 {
 	int		i, r, fail, err = 0;
+	int		low_warn_flag = 0;
 	int32_t		number;
 	char		name[PICL_PROPNAMELEN_MAX];
 	picl_nodehdl_t	*ps;
 	picl_nodehdl_t	*ps_fail[DAK_MAX_PS_FAULT_SENSORS];
 	picl_nodehdl_t	*ps_I_sensor[DAK_MAX_PS_VOLTAGE_SENSORS];
 	int32_t		volts[DAK_MAX_PS_VOLTAGE_SENSORS];
+	int32_t		lo_warn[DAK_MAX_PS_VOLTAGE_SENSORS];
 	char		fault_state
 	    [DAK_MAX_PS_FAULT_SENSORS][PICL_PROPNAMELEN_MAX];
 	char		ps_state[PICL_PROPNAMELEN_MAX];
@@ -775,17 +777,38 @@ dak_env_print_ps(picl_nodehdl_t system_node)
 			err = picl_get_propval_by_name(ps_I_sensor[i][r],
 			    "AtoDSensorValue", &volts[r],
 			    sizeof (int32_t));
+			if (err != PICL_SUCCESS) {
+				log_printf(dgettext(TEXT_DOMAIN,
+				    "failed to get A to D sensor "
+				    "value\n%s\n"), picl_strerror(err));
+				return (err);
+			}
+			err = picl_get_propval_by_name(ps_I_sensor[i][r],
+			    "LowWarningThreshold", &lo_warn[r],
+			    sizeof (int32_t));
+			if (err != PICL_SUCCESS) {
+				log_printf(dgettext(TEXT_DOMAIN,
+				    "failed to get low warning threshold "
+				    "value\n%s\n"), picl_strerror(err));
+				return (err);
+			}
+			if (volts[r] <= lo_warn[r])
+				low_warn_flag++;
+		}
+
+		if (fail != 0 || low_warn_flag != 0) {
+			log_printf(dgettext(TEXT_DOMAIN,
+			    "      FAIL      "));
+		} else {
+			log_printf(dgettext(TEXT_DOMAIN, "      GOOD      "));
 		}
 
 		if (fail != 0) {
-			log_printf(dgettext(TEXT_DOMAIN,
-			    "      FAIL      "));
 			for (r = 0; r < DAK_MAX_PS_FAULT_SENSORS; r++) {
 				log_printf(dgettext(TEXT_DOMAIN, "      %-4s"),
 				    fault_state[r]);
 			}
 		} else {
-			log_printf(dgettext(TEXT_DOMAIN, "      GOOD      "));
 			for (r = 0; r < DAK_MAX_PS_FAULT_SENSORS; r++) {
 				log_printf(dgettext(TEXT_DOMAIN, "          "));
 			}
