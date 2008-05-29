@@ -4458,6 +4458,20 @@ then
 		umount /platform/sun4u-us3/lib/sparcv9/libc_psr.so.1
 	fi
 
+	# 
+	# The libpiclsbl.so.1 library has been moved from
+	# /usr/platform/SUNW,Sun-Fire-T200/lib/... to
+	# /usr/platform/sun4v/lib/... .  Other sun4v platforms create
+	# symbolic link to T200's libpiclsbl.so.1. Therefore check
+	# if library is present in T200's directory and then remove
+	# it and the symbolic links.
+	if [ -a \
+	    $usr/platform/SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1 ]
+	then
+		print "Removing libpiclsbl.so library ..."
+		find $usr/platform -name libpiclsbl\* -exec rm {} \;
+	fi
+
 	if [ -x /usr/sbin/zoneadm ]; then
 		#
 		# Stop any running zones: the init script will print a

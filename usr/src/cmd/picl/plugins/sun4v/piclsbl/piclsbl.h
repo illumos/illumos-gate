@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@ typedef struct disk_lookup {
 #define	DISK_NOT_FOUND	0x01
 
 #define	PCPLIB		"libpcp.so"
-#define	LIB_PCP_PATH	"/usr/platform/SUNW,Sun-Fire-T200/lib/"
+#define	LIB_PCP_PATH	"/usr/platform/sun4v/lib/"
 #define	LED_CHANNEL	"/devices/virtual-devices@100/led@d:glvc"
 #define	PCPINIT_TIMEOUT	0x05
 #define	PCPCOMM_TIMEOUT	0x10

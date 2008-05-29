@@ -526,7 +526,7 @@ PSARC 2004/619: RULE W4: usr/lib/amd64/libcryptoutil.so.1
 PSARC 2004/035: RULE W4: usr/lib/libmilter.so.1
 6237411: RULE W4: usr/platform/sun4v/lib/libprtdiag.so.1
 6233613: RULE W4: usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so.1
-6236870: RULE W4: usr/platform/SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
+6687732: RULE W4: usr/platform/sun4v/lib/picl/plugins/libpiclsbl.so.1
 6567634: RULE W4: usr/platform/i86pc/lib/mtst/mtst_generic.so
 6567634: RULE W4: usr/platform/i86pc/lib/mtst/mtst_AuthenticAMD.so
 6567218: RULE W4: usr/platform/i86pc/lib/mtst/mtst_GenuineIntel.so

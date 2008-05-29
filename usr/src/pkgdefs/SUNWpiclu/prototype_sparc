@@ -68,6 +68,8 @@ d none usr/platform/sun4v/lib/picl 755 root sys
 d none usr/platform/sun4v/lib/picl/plugins 755 root sys
 f none usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so.1 755 root sys
 s none usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so=./libmdescplugin.so.1
+f none usr/platform/sun4v/lib/picl/plugins/libpiclsbl.so.1 755 root sys
+s none usr/platform/sun4v/lib/picl/plugins/libpiclsbl.so=./libpiclsbl.so.1
 f none usr/platform/sun4v/lib/picl/plugins/libpriplugin.so.1 755 root sys
 s none usr/platform/sun4v/lib/picl/plugins/libpriplugin.so=./libpriplugin.so.1
 f none usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 755 root sys
@@ -132,54 +134,6 @@ d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin
 f none usr/platform/SUNW,Netra-CP2300/lib/libctsmc.so.1 755 root sys
 s none usr/platform/SUNW,Netra-CP2300/lib/libctsmc.so=libctsmc.so.1 755 root sys
 f none usr/platform/SUNW,Netra-CP2300/lib/libprtdiag_psr.so.1 644 root bin
-d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
-d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
-d none usr/platform/SUNW,Sun-Fire-T200/lib/picl 755 root sys
-d none usr/platform/SUNW,Sun-Fire-T200/lib/picl/plugins 755 root sys
-f none usr/platform/SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1 755 root sys
-s none usr/platform/SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so=./libpiclsbl.so.1
-d none usr/platform/SUNW,Sun-Blade-T6300 755 root sys
-d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
-d none usr/platform/SUNW,Sun-Blade-T6300/lib/picl 755 root sys
-d none usr/platform/SUNW,Sun-Blade-T6300/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,Sun-Blade-T6300/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,Sun-Blade-T6300/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-d none usr/platform/SUNW,Sun-Blade-T6320 755 root sys
-d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
-d none usr/platform/SUNW,Sun-Blade-T6320/lib/picl 755 root sys
-d none usr/platform/SUNW,Sun-Blade-T6320/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,Sun-Blade-T6320/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,Sun-Blade-T6320/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-d none usr/platform/SUNW,SPARC-Enterprise-T5120 755 root sys
-d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib 755 root bin
-d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/picl 755 root sys
-d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-d none usr/platform/SUNW,T5140 755 root sys
-d none usr/platform/SUNW,T5140/lib 755 root bin
-d none usr/platform/SUNW,T5140/lib/picl 755 root sys
-d none usr/platform/SUNW,T5140/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,T5140/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,T5140/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-d none usr/platform/SUNW,USBRDT-5240 755 root sys
-d none usr/platform/SUNW,USBRDT-5240/lib 755 root bin
-d none usr/platform/SUNW,USBRDT-5240/lib/picl 755 root sys
-d none usr/platform/SUNW,USBRDT-5240/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,USBRDT-5240/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,USBRDT-5240/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-d none usr/platform/SUNW,Netra-T5220 755 root sys
-d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
-d none usr/platform/SUNW,Netra-T5220/lib/picl 755 root sys
-d none usr/platform/SUNW,Netra-T5220/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,Netra-T5220/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,Netra-T5220/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-d none usr/platform/SUNW,Netra-T5440 755 root sys
-d none usr/platform/SUNW,Netra-T5440/lib 755 root bin
-d none usr/platform/SUNW,Netra-T5440/lib/picl 755 root sys
-d none usr/platform/SUNW,Netra-T5440/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,Netra-T5440/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,Netra-T5440/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
 d none usr/platform/SUNW,Sun-Fire-V240 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V240/lib 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V240/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
@@ -434,9 +388,3 @@ d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libpicl.so.1 755 root bin
 s none usr/lib/sparcv9/libpicl.so=./libpicl.so.1 755 root bin
 f none usr/lib/sparcv9/llib-lpicl.ln 644 root bin
-d none usr/platform/SUNW,USBRDT-5440 755 root sys
-d none usr/platform/SUNW,USBRDT-5440/lib 755 root bin
-d none usr/platform/SUNW,USBRDT-5440/lib/picl 755 root sys
-d none usr/platform/SUNW,USBRDT-5440/lib/picl/plugins 755 root sys
-s none usr/platform/SUNW,USBRDT-5440/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
-s none usr/platform/SUNW,USBRDT-5440/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,7 @@
 # cmd/picl/plugins/sun4v/Makefile
 #
 
-SUBDIRS= lib .WAIT snmp .WAIT mdesc pri ontario
+SUBDIRS= lib .WAIT snmp .WAIT mdesc pri piclsbl
 
 MSGSUBDIRS=	snmp
 

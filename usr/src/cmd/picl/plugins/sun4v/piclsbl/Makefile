@@ -24,7 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/picl/plugins/sun4v/ontario/piclsbl/Makefile
+# cmd/picl/plugins/sun4v/piclsbl/Makefile
 
 LIBRARY=	libpiclsbl.a
 VERS=		.1
@@ -41,27 +41,25 @@ SRCS=		$(OBJECTS:%.o=%.c)
 
 LINT_SRC=	$(LINTLIB:%.ln=%)	
 
-$(OBJS_DIR)/%.o:		$(SRC)/sun4v/ontario/piclsbl/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/sun4v/piclsbl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(LINTS_DIR)/%.ln:              $(SRC)/sun4v/ontario/piclsbl/%.c
+$(LINTS_DIR)/%.ln:              $(SRC)/sun4v/piclsbl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 
 LIBS =		$(DYNLIB)
 
-PLATFORM      =		SUNW,Sun-Fire-T200
-ROOT_PLATFORM =		$(USR_PLAT_DIR)/$(PLATFORM)
-DYNFLAGS_PLAT =		/usr/platform/\$$PLATFORM/lib/picl/plugins 
+ROOT_PLATFORM =		$(USR_PLAT_DIR)/sun4v
+DYNFLAGS_PLAT =		/usr/platform/\$$PLATFORM/lib/picl/plugins
 DYNFLAGS_SUN4V =	/usr/platform/sun4v/lib/picl/plugins
 DYNFLAGS_COM =		/usr/lib/picl/plugins
-
-ROOTLIBDIR =	$(ROOT_PLAT_PLUGINDIR)
+ROOTLIBDIR =		$(ROOT_PLAT_PLUGINDIR)
 
 CLEANFILES=	$(LINTOUT) $(LINTLIB)
 
-CPPFLAGS +=	-I$(SRC)/sun4v/ontario/piclsbl
+CPPFLAGS +=	-I$(SRC)/sun4v/piclsbl
 CPPFLAGS +=	-I$(SRC)/uts/common/sys
 CPPFLAGS +=	-I$(SRC)/lib/libpcp/common
 CPPFLAGS +=	-D_REENTRANT
@@ -75,53 +73,17 @@ LDLIBS +=	-lc -lpicltree -lumem -lnvpair
 
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN -v
 
-LINKED_PLATFORMS	= SUNW,Sun-Blade-T6300 SUNW,T5140
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-T6320
-LINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T5120
-LINKED_PLATFORMS	+= SUNW,Netra-T5220
-LINKED_PLATFORMS	+= SUNW,USBRDT-5240
-LINKED_PLATFORMS	+= SUNW,Netra-T5440
-LINKED_PLATFORMS	+= SUNW,USBRDT-5440
-
-LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
-LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)
-LINKED_PICL_DIRS	= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/picl)
-LINKED_PLUGIN_DIRS	= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/picl/plugins)
-
-LINKED_PLUGINS_DYNLIBS = $(LINKED_PLUGIN_DIRS:%=%/$(DYNLIB))
-LINKED_PLUGINS_LIBLINKS = $(LINKED_PLUGIN_DIRS:%=%/$(LIBLINKS))
-
-ONTARIO_DYNLIB_DIR = ../../../../$(PLATFORM)/lib/picl/plugins
-
 .KEEP_STATE:
 
 all: $(LIBS) $(LIBLINKS)
 
-install:	all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS) \
-	$(LINKED_PLUGIN_DIRS) $(LINKED_PLUGINS_DYNLIBS) \
-	$(LINKED_PLUGINS_LIBLINKS)
+install:	all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)
+
+$(ROOTLIBDIR)/$(LIBS) :	$(LIBS)
+	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(LIBS)
 
 $(LIBLINKS):	FRC
-	$(RM) $(LIBLINKS); $(SYMLINK) $(DYNLIB) $(LIBLINKS)
-
-# Linked platforms directory hierarchy
-$(LINKED_DIRS):
-	$(INS.dir)
-$(LINKED_LIB_DIRS): $(LINKED_DIRS)
-	$(INS.dir)
-$(LINKED_PICL_DIRS): $(LINKED_LIB_DIRS)
-	$(INS.dir)
-$(LINKED_PLUGIN_DIRS): $(LINKED_PICL_DIRS)
-	$(INS.dir)
-
-# Linked platforms links 
-$(LINKED_PLUGINS_DYNLIBS): $(LINKED_PLUGIN_DIRS)
-	$(RM) -r $@ ;\
-	$(SYMLINK) $(ONTARIO_DYNLIB_DIR)/$(DYNLIB) $@
-
-$(LINKED_PLUGINS_LIBLINKS): $(LINKED_PLUGIN_DIRS)
-	$(RM) -r $@ ;\
-	$(SYMLINK) $(ONTARIO_DYNLIB_DIR)/$(DYNLIB) $@
+	$(RM) -r $(LIBLINKS); $(SYMLINK) $(DYNLIB) $(LIBLINKS)
 
 # include library targets
 include $(SRC)/cmd/picl/plugins/Makefile.targ
