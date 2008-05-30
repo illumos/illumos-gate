@@ -1479,6 +1479,7 @@ typedef struct ipsq_s {
 	mblk_t	*ipsq_mphead;		/* msgs on ipsq linked thru b_next */
 	mblk_t	*ipsq_mptail;		/* msgs on ipsq linked thru b_next */
 	int	ipsq_current_ioctl;	/* current ioctl, or 0 if no ioctl */
+	boolean_t ipsq_current_done; 	/* is the current op done? */
 	ipif_t	*ipsq_current_ipif;	/* ipif associated with current op */
 	ipif_t	*ipsq_pending_ipif;	/* ipif associated w. ipsq_pending_mp */
 	mblk_t	*ipsq_pending_mp;	/* current ioctl mp while waiting for */

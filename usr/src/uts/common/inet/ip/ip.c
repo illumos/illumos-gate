@@ -15536,15 +15536,11 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * We know the message is one we're waiting for (or DL_NOTIFY_IND),
-	 * and we need to become writer to continue to process it. If it's not
-	 * a DL_NOTIFY_IND, we assume we're in the middle of an exclusive
-	 * operation and pass CUR_OP.  If this isn't true, we'll end up doing
-	 * some work as part of the current exclusive operation that actually
-	 * is not part of it -- which is wrong, but better than the
-	 * alternative of deadlock (if NEW_OP is always used).  Someday, we
-	 * should track which DLPI requests have ACKs that we wait on
-	 * synchronously so we can know whether to use CUR_OP or NEW_OP.
+	 * The message is one we're waiting for (or DL_NOTIFY_IND), but we
+	 * need to become writer to continue to process it.  Because an
+	 * exclusive operation doesn't complete until replies to all queued
+	 * DLPI messages have been received, we know we're in the middle of an
+	 * exclusive operation and pass CUR_OP (except for DL_NOTIFY_IND).
 	 *
 	 * As required by qwriter_ip(), we refhold the ill; it will refrele.
 	 * Since this is on the ill stream we unconditionally bump up the

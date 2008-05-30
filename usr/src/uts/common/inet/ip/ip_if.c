@@ -1298,6 +1298,7 @@ ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
 	ipsq->ipsq_waitfor = 0;
 	ipsq->ipsq_current_ipif = NULL;
 	ipsq->ipsq_current_ioctl = 0;
+	ipsq->ipsq_current_done = B_TRUE;
 	mutex_exit(&ipsq->ipsq_lock);
 
 	if (DB_TYPE(mp) == M_IOCTL || DB_TYPE(mp) == M_IOCDATA) {
@@ -4985,7 +4986,8 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	ill->ill_name = (char *)ill + sizeof (*ill);
 	(void) strcpy(ill->ill_name, ipif_loopback_name);
 	ill->ill_name_length = sizeof (ipif_loopback_name);
-	/* Set ill_name_set for ill_phyint_reinit to work properly */
+	/* Set ill_dlpi_pending for ipsq_current_finish() to work properly */
+	ill->ill_dlpi_pending = DL_PRIM_INVAL;
 
 	ill->ill_global_timer = INFINITY;
 	ill->ill_mcast_v1_time = ill->ill_mcast_v2_time = 0;
@@ -8017,39 +8019,49 @@ ipsq_current_start(ipsq_t *ipsq, ipif_t *ipif, int ioccmd)
 	mutex_enter(&ipsq->ipsq_lock);
 	ASSERT(ipsq->ipsq_current_ipif == NULL);
 	ASSERT(ipsq->ipsq_current_ioctl == 0);
+	ipsq->ipsq_current_done = B_FALSE;
 	ipsq->ipsq_current_ipif = ipif;
 	ipsq->ipsq_current_ioctl = ioccmd;
 	mutex_exit(&ipsq->ipsq_lock);
 }
 
 /*
- * Finish the current exclusive operation on `ipsq'.  Note that other
- * operations will not be able to proceed until an ipsq_exit() is done.
+ * Finish the current exclusive operation on `ipsq'.  Usually, this will allow
+ * the next exclusive operation to begin once we ipsq_exit().  However, if
+ * pending DLPI operations remain, then we will wait for the queue to drain
+ * before allowing the next exclusive operation to begin.  This ensures that
+ * DLPI operations from one exclusive operation are never improperly processed
+ * as part of a subsequent exclusive operation.
  */
 void
 ipsq_current_finish(ipsq_t *ipsq)
 {
 	ipif_t *ipif = ipsq->ipsq_current_ipif;
+	t_uscalar_t dlpi_pending = DL_PRIM_INVAL;
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
 
 	/*
 	 * For SIOCSLIFREMOVEIF, the ipif has been already been blown away
-	 * (but we're careful to never set IPIF_CHANGING in that case).
+	 * (but in that case, IPIF_CHANGING will already be clear and no
+	 * pending DLPI messages can remain).
 	 */
 	if (ipsq->ipsq_current_ioctl != SIOCLIFREMOVEIF) {
-		mutex_enter(&ipif->ipif_ill->ill_lock);
-		ipif->ipif_state_flags &= ~IPIF_CHANGING;
+		ill_t *ill = ipif->ipif_ill;
 
+		mutex_enter(&ill->ill_lock);
+		dlpi_pending = ill->ill_dlpi_pending;
+		ipif->ipif_state_flags &= ~IPIF_CHANGING;
 		/* Send any queued event */
-		ill_nic_info_dispatch(ipif->ipif_ill);
-		mutex_exit(&ipif->ipif_ill->ill_lock);
+		ill_nic_info_dispatch(ill);
+		mutex_exit(&ill->ill_lock);
 	}
 
 	mutex_enter(&ipsq->ipsq_lock);
-	ASSERT(ipsq->ipsq_current_ipif != NULL);
-	ipsq->ipsq_current_ipif = NULL;
 	ipsq->ipsq_current_ioctl = 0;
+	ipsq->ipsq_current_done = B_TRUE;
+	if (dlpi_pending == DL_PRIM_INVAL)
+		ipsq->ipsq_current_ipif = NULL;
 	mutex_exit(&ipsq->ipsq_lock);
 }
 
@@ -14890,6 +14902,7 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	mutex_enter(&old_ipsq->ipsq_lock);
 	old_ipsq->ipsq_current_ipif = NULL;
 	old_ipsq->ipsq_current_ioctl = 0;
+	old_ipsq->ipsq_current_done = B_TRUE;
 	mutex_exit(&old_ipsq->ipsq_lock);
 	return (EINPROGRESS);
 }
@@ -18246,7 +18259,7 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 static void
 ill_dlpi_send_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 {
-	ill_dlpi_send((ill_t *)q->q_ptr, mp);
+	ill_dlpi_send(q->q_ptr, mp);
 }
 
 /*
@@ -18356,15 +18369,20 @@ ill_dlpi_pending(ill_t *ill, t_uscalar_t prim)
 }
 
 /*
- * Called when an DLPI control message has been acked or nacked to
- * send down the next queued message (if any).
+ * Complete the current DLPI operation associated with `prim' on `ill' and
+ * start the next queued DLPI operation (if any).  If there are no queued DLPI
+ * operations and the ill's current exclusive IPSQ operation has finished
+ * (i.e., ipsq_current_finish() was called), then clear ipsq_current_ipif to
+ * allow the next exclusive IPSQ operation to begin upon ipsq_exit().  See
+ * the comments above ipsq_current_finish() for details.
  */
 void
 ill_dlpi_done(ill_t *ill, t_uscalar_t prim)
 {
 	mblk_t *mp;
+	ipsq_t *ipsq = ill->ill_phyint->phyint_ipsq;
 
-	ASSERT(IAM_WRITER_ILL(ill));
+	ASSERT(IAM_WRITER_IPSQ(ipsq));
 	mutex_enter(&ill->ill_lock);
 
 	ASSERT(prim != DL_PRIM_INVAL);
@@ -18375,6 +18393,12 @@ ill_dlpi_done(ill_t *ill, t_uscalar_t prim)
 
 	if ((mp = ill->ill_dlpi_deferred) == NULL) {
 		ill->ill_dlpi_pending = DL_PRIM_INVAL;
+
+		mutex_enter(&ipsq->ipsq_lock);
+		if (ipsq->ipsq_current_done)
+			ipsq->ipsq_current_ipif = NULL;
+		mutex_exit(&ipsq->ipsq_lock);
+
 		cv_signal(&ill->ill_cv);
 		mutex_exit(&ill->ill_lock);
 		return;
