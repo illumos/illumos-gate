@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983-1989 by AT&T.
@@ -333,7 +333,7 @@ enum mtio_state { MTIO_NONE, MTIO_EJECTED, MTIO_INSERTED };
  * |    |    |    |    |    |----|--------------- Density Select
  * |    |    |    |    |------------------------- Resrvd.(add. campus dens. bit)
  * |    |    |    |------------------------------ BSD behavior
- * |----|----|----------------------------------- Unit #  bit 2-6
+ * |----|----|----------------------------------- Unit #  bit 2-10
  */
 
 #define	MTUNIT(dev)	(((getminor(dev) & 0xff80) >> 5) + \
@@ -347,8 +347,6 @@ enum mtio_state { MTIO_NONE, MTIO_EJECTED, MTIO_INSERTED };
 #define	MTMINOR(unit)	((((unit) & 0x7fc) << 5) + ((unit) & 0x3))
 #define	MT_BSD		(1 <<6)		/* BSD behavior on close */
 #define	MT_DENSITY(dev) ((getminor(dev) & MT_DENSITY_MASK) >> 3)
-
-#define	MT_TEM_DEV(inst)   (((inst) & 0x3) | (((inst) & 0xfc) << 5))
 
 #ifdef	__cplusplus
 }

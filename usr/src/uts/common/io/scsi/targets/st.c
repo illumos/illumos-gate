@@ -1075,7 +1075,7 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * find the drive type for this target
 	 */
 	mutex_enter(ST_MUTEX);
-	un->un_dev = MT_TEM_DEV(instance);
+	un->un_dev = MTMINOR(instance);
 	st_known_tape_type(un);
 	un->un_dev = 0;
 	mutex_exit(ST_MUTEX);
