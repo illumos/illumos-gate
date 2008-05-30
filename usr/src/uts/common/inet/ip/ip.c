@@ -12470,7 +12470,7 @@ reass_done:
 		/* Update per ipfb and ill byte counts */
 		ipfb->ipfb_count += ipf->ipf_count;
 		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
-		ill->ill_frag_count += ipf->ipf_count;
+		atomic_add_32(&ill->ill_frag_count, ipf->ipf_count);
 		/* If the frag timer wasn't already going, start it. */
 		mutex_enter(&ill->ill_lock);
 		ill_frag_timer_start(ill);
@@ -12516,7 +12516,7 @@ reass_done:
 		/* Update per ipfb and ill byte counts */
 		ipfb->ipfb_count += msg_len;
 		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
-		ill->ill_frag_count += msg_len;
+		atomic_add_32(&ill->ill_frag_count, msg_len);
 		if (frag_offset_flags & IPH_MF) {
 			/* More to come. */
 			ipf->ipf_end = end;
@@ -12541,7 +12541,7 @@ reass_done:
 			/* Update per ipfb and ill byte counts */
 			ipfb->ipfb_count += count;
 			ASSERT(ipfb->ipfb_count > 0); /* Wraparound */
-			ill->ill_frag_count += count;
+			atomic_add_32(&ill->ill_frag_count, count);
 		}
 		if (ret == IP_REASS_PARTIAL) {
 			goto reass_done;
@@ -12580,7 +12580,7 @@ reass_done:
 	if (ipf != NULL)
 		ipf->ipf_ptphn = ipfp;
 	ipfp[0] = ipf;
-	ill->ill_frag_count -= count;
+	atomic_add_32(&ill->ill_frag_count, -count);
 	ASSERT(ipfb->ipfb_count >= count);
 	ipfb->ipfb_count -= count;
 	ipfb->ipfb_frag_pkts--;

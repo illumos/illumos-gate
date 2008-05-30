@@ -1895,17 +1895,9 @@ typedef struct ill_s {
 	 */
 	hook_nic_event_t	*ill_nic_event_info;
 
-	/*
-	 * Used for IP frag reassembly throttling on a per ILL basis.
-	 *
-	 * Note: frag_count is approximate, its added to and subtracted from
-	 *	 without any locking, so simultaneous load/modify/stores can
-	 *	 collide, also ill_frag_purge() recalculates its value by
-	 *	 summing all the ipfb_count's without locking out updates
-	 *	 to the ipfb's.
-	 */
+	/* Used for IP frag reassembly throttling on a per ILL basis.  */
 	uint_t	ill_ipf_gen;		/* Generation of next fragment queue */
-	uint_t	ill_frag_count;		/* Approx count of all mblk bytes */
+	uint_t	ill_frag_count;		/* Count of all reassembly mblk bytes */
 	uint_t	ill_frag_free_num_pkts;	 /* num of fragmented packets to free */
 	clock_t	ill_last_frag_clean_time; /* time when frag's were pruned */
 	int	ill_type;		/* From <net/if_types.h> */
@@ -2076,7 +2068,7 @@ typedef struct ill_s {
  * ill_ip_muxid			ipsq			Not atomic
  *
  * ill_ipf_gen			Not atomic
- * ill_frag_count		Approx. not protected
+ * ill_frag_count		atomics			atomics
  * ill_type			ipsq + down ill		only when ill is up
  * ill_dlpi_multicast_state	ill_lock		ill_lock
  * ill_dlpi_fastpath_state	ill_lock		ill_lock

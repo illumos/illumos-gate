@@ -3659,7 +3659,7 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 				IP_REASS_SET_END(mp, 0);
 			}
 			mp = ipf->ipf_mp->b_cont;
-			ill->ill_frag_count -= ipf->ipf_count;
+			atomic_add_32(&ill->ill_frag_count, -ipf->ipf_count);
 			ASSERT(ipfb->ipfb_count >= ipf->ipf_count);
 			ipfb->ipfb_count -= ipf->ipf_count;
 			ASSERT(ipfb->ipfb_frag_pkts > 0);
@@ -3792,8 +3792,7 @@ ill_frag_prune(ill_t *ill, uint_t max_count)
 	}
 	/*
 	 * While the reassembly list for this ILL is too big, prune a fragment
-	 * queue by age, oldest first.  Note that the per ILL count is
-	 * approximate, while the per frag hash bucket counts are accurate.
+	 * queue by age, oldest first.
 	 */
 	while (ill->ill_frag_count > max_count) {
 		int	ix;
@@ -3812,12 +3811,9 @@ ill_frag_prune(ill_t *ill, uint_t max_count)
 			count += ipfb->ipfb_count;
 			mutex_exit(&ipfb->ipfb_lock);
 		}
-		/* Refresh the per ILL count */
-		ill->ill_frag_count = count;
-		if (oipfb == NULL) {
-			ill->ill_frag_count = 0;
+		if (oipfb == NULL)
 			break;
-		}
+
 		if (count <= max_count)
 			return;	/* Somebody beat us to it, nothing to do */
 		mutex_enter(&oipfb->ipfb_lock);
@@ -3852,7 +3848,7 @@ ill_frag_free_pkts(ill_t *ill, ipfb_t *ipfb, ipf_t *ipf, int free_cnt)
 			IP_REASS_SET_START(tmp, 0);
 			IP_REASS_SET_END(tmp, 0);
 		}
-		ill->ill_frag_count -= count;
+		atomic_add_32(&ill->ill_frag_count, -count);
 		ASSERT(ipfb->ipfb_count >= count);
 		ipfb->ipfb_count -= count;
 		ASSERT(ipfb->ipfb_frag_pkts > 0);
