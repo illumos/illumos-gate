@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -755,20 +755,22 @@ dcnode_constructor(void *buf, void *cdrarg, int kmflags)
 	struct dcnode *dp = buf;
 	struct vnode *vp;
 
-	ASSERT(!(kmflags & KM_NOSLEEP));
-
-	vp = vn_alloc(KM_SLEEP);
-	vp->v_data = (caddr_t)dp;
+	vp = dp->dc_vp = vn_alloc(kmflags);
+	if (vp == NULL) {
+		return (-1);
+	}
+	vp->v_data = dp;
 	vp->v_type = VREG;
 	vp->v_flag = VNOSWAP;
 	vp->v_vfsp = &dc_vfs;
 	vn_setops(vp, dc_vnodeops);
 	vn_exists(vp);
 
-	dp->dc_vp = vp;
 	mutex_init(&dp->dc_lock, NULL, MUTEX_DEFAULT, NULL);
 	dp->dc_mapcnt = 0;
 	dp->dc_lrunext = dp->dc_lruprev = NULL;
+	dp->dc_hdr = NULL;
+	dp->dc_subvp = NULL;
 	return (0);
 }
 
