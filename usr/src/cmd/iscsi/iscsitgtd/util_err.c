@@ -201,6 +201,8 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("TPGT has no ip-addr"));
 	case ERR_TPGT_IN_USE:
 		return ((char *)gettext("Specified TPGT is in-use"));
+	case ERR_ZFS_ISCSISHARE_OFF:
+		return ((char *)gettext("ZFS shareiscsi property is off"));
 	default:
 		return ((char *)gettext("Internal error: unknown message"));
 	}

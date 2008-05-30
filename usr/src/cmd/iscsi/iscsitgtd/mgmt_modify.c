@@ -39,6 +39,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <libgen.h>
+#include <libzfs.h>
 
 #include <iscsitgt_impl.h>
 #include "queue.h"
@@ -54,6 +55,7 @@ static char *modify_initiator(tgt_node_t *x);
 static char *modify_admin(tgt_node_t *x);
 static char *modify_tpgt(tgt_node_t *x);
 static char *modify_zfs(tgt_node_t *x, ucred_t *cred);
+static char *validate_zfs_iscsitgt(tgt_node_t *x);
 static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
 
 /*
@@ -646,10 +648,18 @@ modify_zfs(tgt_node_t *x, ucred_t *cred)
 	uint64_t	size;
 	int		status;
 	int		val;
+	char		*tru = "true";
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
+	}
+
+	/*
+	 * Validate request
+	 */
+	if (tgt_find_value_str(x, XML_ELEMENT_VALIDATE, &tru)) {
+		return (validate_zfs_iscsitgt(x));
 	}
 
 	/*
@@ -816,6 +826,59 @@ error:
 
 	return (msg);
 }
+
+/*
+ * Just checking the existance of the given target. Here we check whether
+ * both zfs and iscsitarget aware of the given target/volume. It neither
+ * care about the credentials nor SHAREISCSI properties.
+ */
+static char *
+validate_zfs_iscsitgt(tgt_node_t *x)
+{
+	char		*msg		= NULL;
+	char		*prop		= NULL;
+	char		*dataset	= NULL;
+	libzfs_handle_t	*zh		= NULL;
+	zfs_handle_t	*zfsh		= NULL;
+	tgt_node_t	*n		= NULL;
+
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
+		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
+		return (msg);
+	}
+
+	if (((zh = libzfs_init()) == NULL) ||
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
+		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		goto error;
+	}
+
+	while ((n = tgt_node_next_child(targets_config, XML_ELEMENT_TARG, n)) !=
+	    NULL) {
+		if (strcmp(n->x_value, dataset) == 0)
+			break;
+	}
+	if (n == NULL) {
+		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		goto error;
+	}
+
+	xml_rtn_msg(&msg, ERR_SUCCESS);
+
+error:
+	if (zfsh)
+		zfs_close(zfsh);
+	if (prop)
+		free(prop);
+	if (zh)
+		libzfs_fini(zh);
+	if (dataset)
+		free(dataset);
+
+	return (msg);
+
+}
+
 
 /*
  * []----

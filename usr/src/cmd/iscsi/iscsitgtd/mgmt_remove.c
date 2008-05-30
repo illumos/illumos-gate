@@ -120,7 +120,9 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 	 * Check for existance of ZFS shareiscsi properties
 	 */
 	status = get_zfs_shareiscsi(dataset, &n, &size, cred);
-	if ((status != ERR_SUCCESS) && (status != ERR_NULL_XML_MESSAGE)) {
+
+	if ((status != ERR_SUCCESS) && (status != ERR_ZFS_ISCSISHARE_OFF) &&
+	    (status != ERR_NULL_XML_MESSAGE)) {
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
 		goto error;
 	}
@@ -130,14 +132,28 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		if (strcmp(t->x_value, dataset) == 0)
 			break;
 	}
+
 	if (t == NULL) {
-		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		if (status == ERR_ZFS_ISCSISHARE_OFF) {
+			/*
+			 * This is iscsishare=off  request from zfs on a target
+			 * which is already unshared. In that case, zfs expects
+			 * "success" result.
+			 */
+			xml_rtn_msg(&msg, ERR_SUCCESS);
+		} else {
+			xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		}
 		goto error;
 	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
+			goto error;
+		}
+		if (status == ERR_ZFS_ISCSISHARE_OFF) {
+			xml_rtn_msg(&msg, status);
 			goto error;
 		}
 
@@ -175,6 +191,10 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
 			return (msg);
+		}
+		if (status == ERR_ZFS_ISCSISHARE_OFF) {
+			xml_rtn_msg(&msg, status);
+			goto error;
 		}
 		/*
 		 * Due to the fact that the targets_config differs from the

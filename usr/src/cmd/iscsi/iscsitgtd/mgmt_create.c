@@ -1249,7 +1249,7 @@ get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 	char			*cp;	/* current pair */
 	char			*np;	/* next pair */
 	char			*vp;	/* value pointer */
-	int			status;
+	int			status  = ERR_SUCCESS;
 
 	if (((zh = libzfs_init()) == NULL) ||
 	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
@@ -1299,6 +1299,7 @@ get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 	 * is called is an error.
 	 * Currently we only look for 'type=<value>' and ignore others.
 	 */
+
 	for (cp = prop; cp; cp = np) {
 		if (np = strchr(cp, ','))
 			*np++ = '\0';
@@ -1307,7 +1308,7 @@ get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 			continue;
 		}
 		if (strcmp(cp, "off") == 0) {
-			status = ERR_INTERNAL_ERROR;
+			status = ERR_ZFS_ISCSISHARE_OFF;
 			goto error;
 		}
 		if (vp = strchr(cp, '='))
@@ -1326,7 +1327,7 @@ get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 	 */
 	*prop = '\0';
 	if (zfs_prop_get(zfsh, ZFS_PROP_ISCSIOPTIONS, prop, ZFS_PROP_SIZE, NULL,
-	    NULL, 0, B_TRUE)) {
+	    NULL, 0, B_TRUE) && (status != ERR_ZFS_ISCSISHARE_OFF)) {
 		status = ERR_INTERNAL_ERROR;
 		goto error;
 	}
@@ -1362,7 +1363,6 @@ get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 				free(cp);
 			}
 
-			status = ERR_SUCCESS;
 		} else {
 			status = ERR_NULL_XML_MESSAGE;
 		}
