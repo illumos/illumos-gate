@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -45,6 +45,7 @@
 #include <nl_types.h>
 #include <langinfo.h>
 #include <libintl.h>
+#include <spawn.h>
 #include <security/pam_appl.h>
 #include "cron.h"
 #include "getresponse.h"
@@ -92,6 +93,7 @@
 #define	NAMETOOLONG	"login name too long"
 
 extern int	per_errno;
+extern char 	**environ;
 
 extern int	audit_crontab_modify(char *, char *, int);
 extern int	audit_crontab_delete(char *, int);
@@ -125,7 +127,6 @@ main(int argc, char **argv)
 	struct passwd *pwp;
 	time_t omodtime;
 	char *editor;
-	char buf[BUFSIZ];
 	uid_t ruid;
 	pid_t pid;
 	int stat_loc;
@@ -134,6 +135,9 @@ main(int argc, char **argv)
 	int tmpfd = -1;
 	pam_handle_t *pamh;
 	int pam_error;
+	pid_t cpid;
+	int cstatus;
+	char *argvec[3];
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -297,12 +301,39 @@ main(int argc, char **argv)
 #ifdef _XPG_NOTDEFINED
 			}
 #endif
-			(void) snprintf(buf, sizeof (buf),
-			    "%s %s", editor, edtemp);
+			argvec[0] = strdup(editor);
+			argvec[1] = strdup(edtemp);
+			argvec[2] = NULL;
+
+			if (argvec[0] == NULL || argvec[1] == NULL)
+				crabort("Insufficient memory");
+
 			sleep(1);
 
 			while (1) {
-				ret = system(buf);
+				/*
+				 * posix_spawnp() allows the file pointed to
+				 * by the 'EDITOR' variable to be searched in
+				 * the PATH environment variable
+				 */
+
+				ret = posix_spawnp(&cpid, editor, NULL, NULL,
+				    (char *const *)argvec,
+				    (char *const *)environ);
+				if (ret) {
+					(void) fprintf(stderr,
+					    gettext("crontab: %s: %s\n"),
+					    editor, strerror(errno));
+					cstatus = -1;
+				} else {
+					pid_t wpid = 0;
+					while ((wpid = waitpid(cpid, &cstatus,
+					    0)) == -1 && errno == EINTR)
+						;
+					if (wpid  == -1)
+						cstatus = -1;
+				}
+
 				/* sanity checks */
 				if ((tmpfp = fopen(edtemp, "r")) == NULL)
 					crabort("can't open temporary file");
@@ -317,35 +348,38 @@ main(int argc, char **argv)
 					    " changed.\n"));
 					exit(1);
 				}
-				if ((ret) && (errno != EINTR)) {
-				/*
-				 * Some editors (like 'vi') can return
-				 * a non-zero exit status even though
-				 * everything is okay. Need to check.
-				 */
-				fprintf(stderr, gettext(ED_ERROR));
-				fflush(stderr);
-				if (isatty(fileno(stdin))) {
-				    /* Interactive */
-					fprintf(stdout, gettext(ED_PROMPT),
-					    yesstr, nostr, nostr);
-					fflush(stdout);
+				if ((cstatus) && (errno != EINTR)) {
+					/*
+					 * Some editors (like 'vi') can return
+					 * a non-zero exit status even though
+					 * everything is okay. Need to check.
+					 */
+					fprintf(stderr, gettext(ED_ERROR));
+					fflush(stderr);
+					if (isatty(fileno(stdin))) {
+						/* Interactive */
+						fprintf(stdout,
+						    gettext(ED_PROMPT),
+						    yesstr, nostr, nostr);
+						fflush(stdout);
 
-					if (yes()) {
-						/* Edit again */
-						continue;
+						if (yes()) {
+							/* Edit again */
+							continue;
+						} else {
+							/* Dump changes */
+							(void) unlink(edtemp);
+							exit(1);
+						}
 					} else {
-						/* Dump changes */
+						/*
+						 * Non-interactive, dump changes
+						 */
 						(void) unlink(edtemp);
 						exit(1);
 					}
-				} else {
-					/* Non-interactive, dump changes */
-					(void) unlink(edtemp);
-					exit(1);
 				}
-			}
-			exit(0);
+				exit(0);
 			} /* while (1) */
 		}
 
@@ -358,17 +392,23 @@ main(int argc, char **argv)
 		if ((stat_loc & 0xFF00) != 0)
 			exit(1);
 
-		if ((seteuid(ruid) < 0) ||
-		    ((tmpfp = fopen(edtemp, "r")) == NULL)) {
+		/*
+		 * unlink edtemp as 'ruid'. The file contents will be held
+		 * since we open the file descriptor 'tmpfp' before calling
+		 * unlink.
+		 */
+		if (((ret = seteuid(ruid)) < 0) ||
+		    ((tmpfp = fopen(edtemp, "r")) == NULL) ||
+		    (unlink(edtemp) == -1)) {
 			fprintf(stderr, "crontab: %s: %s\n",
 			    edtemp, errmsg(errno));
-			(void) unlink(edtemp);
+			if ((ret < 0) || (tmpfp == NULL))
+				(void) unlink(edtemp);
 			exit(1);
 		} else
 			seteuid(0);
 
 		copycron(tmpfp);
-		(void) unlink(edtemp);
 	} else {
 		if (argc == 0)
 			copycron(stdin);
