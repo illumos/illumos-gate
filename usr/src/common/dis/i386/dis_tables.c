@@ -1413,9 +1413,6 @@ const instable_t dis_distable[16][16] = {
 #define	REX_X 0x02	/* high order bit extension of SIB index field */
 #define	REX_B 0x01	/* extends ModRM r_m, SIB base, or opcode reg */
 
-static uint_t opnd_size;	/* SIZE16, SIZE32 or SIZE64 */
-static uint_t addr_size;	/* SIZE16, SIZE32 or SIZE64 */
-
 /*
  * Even in 64 bit mode, usually only 4 byte immediate operands are supported.
  */
@@ -1908,6 +1905,8 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 #else
 #define	NOMEM	/* nothing */
 #endif
+	uint_t opnd_size;	/* SIZE16, SIZE32 or SIZE64 */
+	uint_t addr_size;	/* SIZE16, SIZE32 or SIZE64 */
 	uint_t wbit;		/* opcode wbit, 0 is 8 bit, !0 for opnd_size */
 	uint_t w2;		/* wbit value for second operand */
 	uint_t vbit;
