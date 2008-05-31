@@ -141,6 +141,7 @@ extern	void		reset_mrt_ill(ill_t *);
 extern	void		reset_mrt_vif_ipif(ipif_t *);
 extern	void		igmp_start_timers(unsigned, ip_stack_t *);
 extern	void		mld_start_timers(unsigned, ip_stack_t *);
+extern	void		ilm_inactive(ilm_t *);
 
 #endif /* _KERNEL */
 

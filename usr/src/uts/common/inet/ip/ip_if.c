@@ -16948,7 +16948,11 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				    &new_ilm->ilm_v6addr, ALL_ZONES) == NULL)
 					new_ilm->ilm_notify_driver = B_TRUE;
 
+				DTRACE_PROBE3(ill__incr__cnt, (ill_t *), to_ill,
+				    (char *), "ilm", (void *), new_ilm);
 				new_ilm->ilm_ill = to_ill;
+				to_ill->ill_ilm_cnt++;
+
 				/* Add to the to_ill's list */
 				new_ilm->ilm_next = to_ill->ill_ilm;
 				to_ill->ill_ilm = new_ilm;
@@ -17063,6 +17067,10 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 					new_ilm->ilm_notify_driver = B_TRUE;
 
 				new_ilm->ilm_ill = to_ill;
+				DTRACE_PROBE3(ill__incr__cnt, (ill_t *), to_ill,
+				    (char *), "ilm", (void *), new_ilm);
+				to_ill->ill_ilm_cnt++;
+
 				/* Add to the to_ill's list */
 				new_ilm->ilm_next = to_ill->ill_ilm;
 				to_ill->ill_ilm = new_ilm;
@@ -17147,6 +17155,9 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				to_ill->ill_ilm = new_ilm;
 				ASSERT(ilm->ilm_ipif == NULL);
 				new_ilm->ilm_ill = to_ill;
+				DTRACE_PROBE3(ill__incr__cnt, (ill_t *), to_ill,
+				    (char *), "ilm", (void *), new_ilm);
+				to_ill->ill_ilm_cnt++;
 				new_ilm->ilm_is_new = B_TRUE;
 			}
 
@@ -17165,12 +17176,15 @@ bottom:
 		if (new_ilm != ilm) {
 			if (from_ill->ill_ilm_walker_cnt == 0) {
 				*ilmp = ilm->ilm_next;
-				ilm->ilm_next = NULL;
-				FREE_SLIST(ilm->ilm_filter);
-				FREE_SLIST(ilm->ilm_pendsrcs);
-				FREE_SLIST(ilm->ilm_rtx.rtx_allow);
-				FREE_SLIST(ilm->ilm_rtx.rtx_block);
-				mi_free((char *)ilm);
+
+				ASSERT(ilm->ilm_ipif == NULL); /* ipv6 */
+				DTRACE_PROBE3(ill__decr__cnt, (ill_t *),
+				    from_ill, (char *), "ilm", (void *), ilm);
+				ASSERT(from_ill->ill_ilm_cnt > 0);
+				from_ill->ill_ilm_cnt--;
+
+				ilm_inactive(ilm); /* frees this ilm */
+
 			} else {
 				ilm->ilm_flags |= ILM_DELETED;
 				from_ill->ill_ilm_cleanup_reqd = 1;
@@ -17228,6 +17242,14 @@ ilm_move_v4(ill_t *from_ill, ill_t *to_ill, ipif_t *ipif)
 				new_ilm->ilm_is_new = B_TRUE;
 				new_ilm->ilm_fmode = MODE_IS_EXCLUDE;
 				CLEAR_SLIST(new_ilm->ilm_filter);
+				ASSERT(ilm->ilm_ipif == ipif);
+				ASSERT(ilm->ilm_ipif->ipif_ilm_cnt > 0);
+				if (from_ill->ill_ilm_walker_cnt == 0) {
+					DTRACE_PROBE3(ill__decr__cnt,
+					    (ill_t *), from_ill,
+					    (char *), "ilm", (void *), ilm);
+					ASSERT(ilm->ilm_ipif->ipif_ilm_cnt > 0);
+				}
 				goto delete_ilm;
 			}
 			/*
@@ -17263,6 +17285,9 @@ ilm_move_v4(ill_t *from_ill, ill_t *to_ill, ipif_t *ipif)
 				continue;
 			}
 			*new_ilm = *ilm;
+			DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), ipif,
+			    (char *), "ilm", (void *), ilm);
+			new_ilm->ilm_ipif->ipif_ilm_cnt++;
 			/* We don't want new_ilm linked to ilm's filter list */
 			new_ilm->ilm_filter = NULL;
 		} else {
@@ -17299,11 +17324,12 @@ delete_ilm:
 				/* Remove from the list */
 				*ilmp = ilm->ilm_next;
 				ilm->ilm_next = NULL;
-				FREE_SLIST(ilm->ilm_filter);
-				FREE_SLIST(ilm->ilm_pendsrcs);
-				FREE_SLIST(ilm->ilm_rtx.rtx_allow);
-				FREE_SLIST(ilm->ilm_rtx.rtx_block);
-				mi_free((char *)ilm);
+				DTRACE_PROBE3(ipif__decr__cnt,
+				    (ipif_t *), ilm->ilm_ipif,
+				    (char *), "ilm", (void *), ilm);
+				ASSERT(ilm->ilm_ipif->ipif_ilm_cnt > 0);
+				ilm->ilm_ipif->ipif_ilm_cnt--;
+				ilm_inactive(ilm);
 			} else {
 				ilm->ilm_flags |= ILM_DELETED;
 				from_ill->ill_ilm_cleanup_reqd = 1;

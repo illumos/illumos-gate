@@ -1738,7 +1738,7 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 	return (ilm);
 }
 
-static void
+void
 ilm_inactive(ilm_t *ilm)
 {
 	FREE_SLIST(ilm->ilm_filter);
@@ -1786,6 +1786,7 @@ ilm_walker_cleanup(ill_t *ill)
 				DTRACE_PROBE3(ill__decr__cnt,
 				    (ill_t *), ill,
 				    (char *), "ilm", (void *), ilm);
+				ASSERT(ill->ill_ilm_cnt > 0);
 				ill->ill_ilm_cnt--;
 				if (ILL_FREE_OK(ill))
 					need_wakeup = B_TRUE;
@@ -1855,6 +1856,7 @@ ilm_delete(ilm_t *ilm)
 	} else {
 		DTRACE_PROBE3(ill__decr__cnt, (ill_t *), ill,
 		    (char *), "ilm", (void *), ilm);
+		ASSERT(ill->ill_ilm_cnt > 0);
 		ill->ill_ilm_cnt--;
 		if (ILL_FREE_OK(ill))
 			need_wakeup = B_TRUE;
