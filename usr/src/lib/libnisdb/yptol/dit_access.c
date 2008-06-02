@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +135,7 @@ read_from_dit(char *map, char *domain, datum *key, datum *value)
 			continue;
 		if (0 == strcasecmp(domain, ypDomains.domainLabels[count])) {
 			__nisdb_get_tsd()->domainContext =
-					ypDomains.domains[count];
+			    ypDomains.domains[count];
 			break;
 		}
 	}
@@ -144,7 +144,7 @@ read_from_dit(char *map, char *domain, datum *key, datum *value)
 
 	/* Loop 'attempts' times of forever if -1 */
 	for (count = retrieveRetry->attempts; (0 <= count) ||
-			(-1 == retrieveRetry->attempts); count --) {
+	    (-1 == retrieveRetry->attempts); count --) {
 		if (TRUE == singleReadFromDIT(map, domain, key, value, &res))
 			/* It worked, return value irrelevant */
 			return (0);
@@ -212,7 +212,7 @@ write_to_dit(char *map, char *domain, datum key, datum value,
 			continue;
 		if (0 == strcasecmp(domain, ypDomains.domainLabels[count])) {
 			__nisdb_get_tsd()->domainContext =
-						ypDomains.domains[count];
+			    ypDomains.domains[count];
 			break;
 		}
 	}
@@ -221,7 +221,7 @@ write_to_dit(char *map, char *domain, datum key, datum value,
 
 	/* Loop 'attempts' times of forever if -1 */
 	for (count = storeRetry->attempts; (0 <= count) ||
-				(-1 == storeRetry->attempts); count --) {
+	    (-1 == storeRetry->attempts); count --) {
 		res = singleWriteToDIT(map, domain, &key, &value, replace);
 		if (LDAP_SUCCESS == res)
 			return (SUCCESS);
@@ -286,8 +286,8 @@ get_ttl_value(map_ctrl *map, TTL_TYPE type)
 
 	if (0 == table_map) {
 		logmsg(MSG_NOTIMECHECK, LOG_ERR,
-			"Get TTL request could not access map %s in domain %s "
-			"(error %d)", map->map_name, map->domain, res);
+		    "Get TTL request could not access map %s in domain %s "
+		    "(error %d)", map->map_name, map->domain, res);
 		return (-1);
 	}
 
@@ -448,7 +448,7 @@ get_passwd_list(bool_t adjunct, char *domain)
 			if (strlen(domain) >= strlen(it->name))
 				continue;
 			end_ptr = it->name + strlen(it->name) -
-							strlen(domain) - 1;
+			    strlen(domain) - 1;
 			if (',' != *(end_ptr - 1))
 				continue;
 			if (0 != strncmp(end_ptr, domain, strlen(domain)))
@@ -459,7 +459,7 @@ get_passwd_list(bool_t adjunct, char *domain)
 				array_size += ARRAY_CHUNK;
 				res_old = res;
 				res = realloc(res, array_size *
-							sizeof (char *));
+				    sizeof (char *));
 				if (NULL == res) {
 					res_old[res_count] = NULL;
 					free_passwd_list(res_old);
@@ -476,7 +476,7 @@ get_passwd_list(bool_t adjunct, char *domain)
 
 			/* Copy from start to end_ptr */
 			(void) memcpy(res[res_count], it->name,
-				    end_ptr-it->name - 1);
+			    end_ptr-it->name - 1);
 			res_count ++;
 		}
 	}
@@ -613,6 +613,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 	bool_t			secure_flag;
 	int			entry_count = 1;
 	int			next_print = PRINT_FREQ;
+	int			search_flag = SUCCESS;
 
 	if (!map || !map->map_name || !map->domain) {
 		return (FAILURE);
@@ -692,7 +693,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 	}
 
 	/* Try each mapping for the map */
-	for (flag = 0; t != 0; t = t->next) {
+	for (flag = 0; t != 0 && search_flag != FAILURE; t = t->next) {
 
 		/* Check if the mapping is the correct one */
 		if (strcmp(objname, t->objName) != 0) {
@@ -723,6 +724,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 					map->map_name,
 					objectDN->read.base);
 				statP = FAILURE;
+				search_flag = FAILURE;
 				break;
 			}
 
@@ -750,6 +752,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 					t->dbId, map->map_name,
 					objectDN->read.base);
 				statP = FAILURE;
+				search_flag = FAILURE;
 				break;
 			}
 
@@ -760,6 +763,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 			/* Obtain list of DNs for logging */
 			if ((dn = findDNs(myself, rv, nr, 0, &numDNs)) == 0) {
 				statP = FAILURE;
+				search_flag = FAILURE;
 				break;
 			}
 
@@ -864,7 +868,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 	}
 	sfree(objname);
 
-	if (t != 0 || flag == 0) {
+	if (t != 0 || flag == 0 || search_flag == FAILURE) {
 		if (temp_entries_db)
 			dbm_close(temp_entries_db);
 		if (temp_ttl_db)
@@ -976,7 +980,7 @@ get_mapping_map_list(char *domain)
 			if (strlen(domain) >= strlen(it->name))
 				continue;
 			end_ptr = it->name + strlen(it->name) -
-							strlen(domain) - 1;
+			    strlen(domain) - 1;
 			if (',' != *(end_ptr - 1))
 				continue;
 			if (0 != strncmp(end_ptr, domain, strlen(domain)))
@@ -987,7 +991,7 @@ get_mapping_map_list(char *domain)
 				array_size += ARRAY_CHUNK;
 				res_old = res;
 				res = realloc(res, array_size *
-							sizeof (char *));
+				    sizeof (char *));
 				if (NULL == res) {
 					res_old[res_count] = NULL;
 					free_passwd_list(res_old);
@@ -1012,7 +1016,7 @@ get_mapping_map_list(char *domain)
 	for (i = res_count - 2; 0 <= i; i--) {
 		for (j = 0; j <= i; j++) {
 			if (((__nis_table_mapping_t *)res[j + 1])->seq_num <
-				((__nis_table_mapping_t *)res[j])->seq_num) {
+			    ((__nis_table_mapping_t *)res[j])->seq_num) {
 				end_ptr = res[j];
 				res[j] = res[j+1];
 				res[j + 1] = end_ptr;
