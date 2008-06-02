@@ -1003,7 +1003,8 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 
 	if (fsname == NULL)
 		return (0);
-	if (strcmp(fsname, "mntfs") == 0 || strcmp(fsname, "lofs") == 0)
+	if (strcmp(fsname, "mntfs") == 0 || strcmp(fsname, "lofs") == 0 ||
+	    strcmp(fsname, "autofs") == 0)
 		return (0);
 
 	if (pn_get(uap->spec, fromspace, &pn) != 0)
