@@ -3188,13 +3188,6 @@ is_path_used(Lm_list *lml, Word unref, int *nl, Pnode *pnp, const char *obj)
 			continue;
 		}
 
-		/*
-		 * For now, disable any unused search path processing that has
-		 * been triggered for ldd(1).
-		 */
-		if (unref)
-			continue;
-
 		if (pnp->p_orig & LA_SER_LIBPATH) {
 			if (pnp->p_orig & LA_SER_CONFIG) {
 				if (pnp->p_orig & PN_FLG_DUPLICAT)

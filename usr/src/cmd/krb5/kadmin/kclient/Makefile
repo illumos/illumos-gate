@@ -61,12 +61,13 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	-I$(SRC)/uts/common/gssapi/include  \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
-LDFLAGS += $(KRUNPATH)
+ksetpw:=	LDFLAGS += $(KRUNPATH)
+kdyndns:=	LDFLAGS += -R/usr/lib/smbsrv
+ksmb:=		LDFLAGS += -R/usr/lib/smbsrv
 
-KSLDLIBS=	$(LDLIBS) $(KMECHLIB)
-KDLDLIBS=	$(LDLIBS) -L$(ROOT)/usr/lib/smbsrv
-
-DYNFLAGS +=	-R/usr/lib/smbsrv
+KS_LDLIBS =	$(LDLIBS) $(KMECHLIB)
+KD_LDLIBS =	$(LDLIBS) -L$(ROOT)/usr/lib/smbsrv -lsmbns
+KSMB_LDLIBS =	$(LDLIBS) -L$(ROOT)/usr/lib/smbsrv -lsmb
 
 .KEEP_STATE:
 
@@ -75,15 +76,15 @@ all: $(PROG) $(SHFILES) $(SEC)
 install: all $(KRB5SBIN) $(KRB5SBINSHFILES) $(KRB5LIBSHFILES) $(KRB5LIBPROG)
 
 kdyndns:	$(KD_OBJS)
-	$(LINK.c) $(KD_OBJS) -o $@ $(DYNFLAGS) $(KDLDLIBS) -lsmbns
+	$(LINK.c) $(KD_OBJS) -o $@ $(KD_LDLIBS)
 	$(POST_PROCESS)
 
 ksmb:		$(KSMB_OBJS)
-	$(LINK.c) $(KSMB_OBJS) -o $@ $(DYNFLAGS) $(KDLDLIBS) -lsmb
+	$(LINK.c) $(KSMB_OBJS) -o $@ $(KSMB_LDLIBS)
 	$(POST_PROCESS)
 
 ksetpw:		$(KS_OBJS)
-	$(LINK.c) $(KS_OBJS) -o $@ $(KSLDLIBS)
+	$(LINK.c) $(KS_OBJS) -o $@ $(KS_LDLIBS)
 	$(POST_PROCESS)
 
 $(KRB5SBIN):

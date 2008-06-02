@@ -172,7 +172,8 @@ $SkipUnusedSearchPath = qr{
 	/usr/X11/lib.*\ from\ .*libgobject-2\.0\.so\.0 |	# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8 |	# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.5 |		# non-OSNet
-	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1			# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1 |		# non-OSNet
+	/usr.*\ from\ .*tst\.gcc\.exe				# gcc built
 }x;
 
 # Skip "unreferenced object=" ldd(1) diagnostics.
