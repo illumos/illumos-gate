@@ -1328,7 +1328,7 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_0 *info0;
-	lmshare_iterator_t *iterator;
+	lmshare_iterator_t iterator;
 	lmshare_info_t *si;
 	DWORD status;
 
@@ -1341,12 +1341,10 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 	if (info0 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	iterator = lmshare_open_iterator(LMSHRM_ALL);
-	if (iterator == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
+	lmshare_init_iterator(&iterator, LMSHRM_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(iterator)) != NULL) {
+	while ((si = lmshare_iterate(&iterator)) != NULL) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1377,7 +1375,6 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 			++se->se_n_read;
 	}
 
-	lmshare_close_iterator(iterator);
 	infonres->entriesread = se->se_n_read;
 	infonres->entries = info0;
 	return (ERROR_SUCCESS);
@@ -1391,7 +1388,7 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_1 *info1;
-	lmshare_iterator_t *iterator;
+	lmshare_iterator_t iterator;
 	lmshare_info_t *si;
 	DWORD status;
 
@@ -1404,12 +1401,10 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 	if (info1 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	iterator = lmshare_open_iterator(LMSHRM_ALL);
-	if (iterator == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
+	lmshare_init_iterator(&iterator, LMSHRM_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(iterator)) != 0) {
+	while ((si = lmshare_iterate(&iterator)) != 0) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1440,7 +1435,6 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 			++se->se_n_read;
 	}
 
-	lmshare_close_iterator(iterator);
 	infonres->entriesread = se->se_n_read;
 	infonres->entries = info1;
 	return (ERROR_SUCCESS);
@@ -1454,7 +1448,7 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_2 *info2;
-	lmshare_iterator_t *iterator;
+	lmshare_iterator_t iterator;
 	lmshare_info_t *si;
 	DWORD status;
 
@@ -1467,12 +1461,10 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 	if (info2 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	iterator = lmshare_open_iterator(LMSHRM_ALL);
-	if (iterator == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
+	lmshare_init_iterator(&iterator, LMSHRM_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(iterator)) != 0) {
+	while ((si = lmshare_iterate(&iterator)) != 0) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1503,7 +1495,6 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 			++se->se_n_read;
 	}
 
-	lmshare_close_iterator(iterator);
 	infonres->entriesread = se->se_n_read;
 	infonres->entries = info2;
 	return (ERROR_SUCCESS);
@@ -1517,7 +1508,7 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_501 *info501;
-	lmshare_iterator_t *iterator;
+	lmshare_iterator_t iterator;
 	lmshare_info_t *si;
 	DWORD status;
 
@@ -1531,12 +1522,10 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 	if (info501 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	iterator = lmshare_open_iterator(LMSHRM_ALL);
-	if (iterator == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
+	lmshare_init_iterator(&iterator, LMSHRM_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(iterator)) != 0) {
+	while ((si = lmshare_iterate(&iterator)) != 0) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1567,7 +1556,6 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 			++se->se_n_read;
 	}
 
-	lmshare_close_iterator(iterator);
 	infonres->entriesread = se->se_n_read;
 	infonres->entries = info501;
 	return (ERROR_SUCCESS);
@@ -1581,7 +1569,7 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_502 *info502;
-	lmshare_iterator_t *iterator;
+	lmshare_iterator_t iterator;
 	lmshare_info_t *si;
 	DWORD status;
 
@@ -1595,12 +1583,10 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 	if (info502 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	iterator = lmshare_open_iterator(LMSHRM_ALL);
-	if (iterator == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
+	lmshare_init_iterator(&iterator, LMSHRM_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(iterator)) != NULL) {
+	while ((si = lmshare_iterate(&iterator)) != NULL) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1631,7 +1617,6 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 			++se->se_n_read;
 	}
 
-	lmshare_close_iterator(iterator);
 	infonres->entriesread = se->se_n_read;
 	infonres->entries = info502;
 	return (ERROR_SUCCESS);
@@ -1791,7 +1776,7 @@ srvsvc_add_autohome(struct mlrpc_xaction *mxa, srvsvc_enum_t *se, void *infop)
 	if (lmshare_getinfo(username, &si) != NERR_Success)
 		return (B_FALSE);
 
-	if (!(si.mode & LMSHRM_TRANS))
+	if ((si.mode & LMSHRM_AUTOHOME) == 0)
 		return (B_FALSE);
 
 	status = mlsvc_NetShareEnumCommon(mxa, se, &si, infop);

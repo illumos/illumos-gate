@@ -59,19 +59,41 @@ extern "C" {
  * Despite the fact that the MAXNAMELEN is 256, we only
  * support a maximum share name length of 15 characters.
  */
+
+#define	LMSHR_OEM_NAME_MAX		13
 #define	LMSHR_VALID_NAME_MAX		15
 #define	LMSHR_VALID_NAME_BUFSIZ		16
 #define	LMSHR_COMMENT_MAX		(64 * MTS_MB_CHAR_MAX)
+
+/*
+ *	struct SHARE_INFO_1 {
+ *		char		shi1_netname[13]
+ *		char		shi1_pad;
+ *		unsigned short	shi1_type
+ *		char		*shi1_remark;
+ *	}
+ */
+#define	SHARE_INFO_1_SIZE	(LMSHR_OEM_NAME_MAX + 1 + 2 + 4)
 
 /*
  * Mode should be renamed to flags.
  *
  * LMSHRM_TRANS		Transient share
  * LMSHRM_PERM		Permanent share
+ * LMSHRM_AUTOHOME	Autohome share.
+ * LMSHRM_LONGNAME	Share name in OEM is longer than 13 chars
+ * LMSHRM_ADMIN		Admin share
+ *
+ * All autohome shares are transient but not all transient shares are autohome.
+ * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
+ * not autohome.
  */
-#define	LMSHRM_TRANS			0x0001
-#define	LMSHRM_PERM			0x0002
-#define	LMSHRM_ALL			(LMSHRM_TRANS | LMSHRM_PERM)
+#define	LMSHRM_TRANS		0x0001
+#define	LMSHRM_PERM		0x0002
+#define	LMSHRM_AUTOHOME		0x0004
+#define	LMSHRM_LONGNAME		0x0008
+#define	LMSHRM_ADMIN		0x0010
+#define	LMSHRM_ALL		(LMSHRM_TRANS | LMSHRM_PERM)
 
 #define	LMSHR_PUBLISH	0
 #define	LMSHR_UNPUBLISH	1
@@ -86,20 +108,21 @@ extern "C" {
  * one is disconnected
  */
 typedef struct lmshare_info {
-	char	share_name[MAXNAMELEN];
-	char	directory[MAXPATHLEN];
-	char	comment[LMSHR_COMMENT_MAX];
-	char	container[MAXPATHLEN];
-	int	mode;
-	int	stype;
-	int	refcnt;
+	char		share_name[MAXNAMELEN];
+	char		directory[MAXPATHLEN];
+	char		comment[LMSHR_COMMENT_MAX];
+	char		container[MAXPATHLEN];
+	char		oem_name[LMSHR_OEM_NAME_MAX];
+	uint32_t	mode;
+	uint32_t	stype;
+	uint32_t	refcnt;
 } lmshare_info_t;
 
 typedef struct lmshare_iterator {
 	lmshare_info_t	si;
-	HT_ITERATOR	*iterator;
-	unsigned int	iteration;
-	int		mode;
+	HT_ITERATOR	iterator;
+	uint32_t	iteration;
+	uint32_t	mode;
 } lmshare_iterator_t;
 
 #define	LMSHARES_PER_REQUEST  10
@@ -107,6 +130,29 @@ typedef struct lmshare_list {
 	int		no;
 	lmshare_info_t	smbshr[LMSHARES_PER_REQUEST];
 } lmshare_list_t;
+
+/*
+ * This structure is a helper for building NetShareEnum response
+ * in user space and send it back down to kernel.
+ *
+ * es_username	name of the user requesting the shares list which
+ * 		is used to detect if the user has any autohome
+ * es_bufsize	size of the response buffer
+ * es_buf	pointer to the response buffer
+ * es_ntotal	total number of shares exported by server which
+ * 		their OEM names is less then 13 chars
+ * es_nsent	number of shares that can fit in the specified buffer
+ * es_datasize	actual data size (share's data) which was encoded
+ * 		in the response buffer
+ */
+typedef struct smb_enumshare_info {
+	char		*es_username;
+	uint16_t	es_bufsize;
+	char		*es_buf;
+	uint16_t	es_ntotal;
+	uint16_t	es_nsent;
+	uint16_t	es_datasize;
+} smb_enumshare_info_t;
 
 /*
  * LanMan share API (for both SMB kernel module and GUI/CLI sub-system)
@@ -124,11 +170,10 @@ typedef struct lmshare_list {
  */
 int lmshare_start(void);
 void lmshare_stop(void);
-lmshare_iterator_t *lmshare_open_iterator(int mode);
-void lmshare_close_iterator(lmshare_iterator_t *);
+void lmshare_init_iterator(lmshare_iterator_t *, uint32_t);
 lmshare_info_t *lmshare_iterate(lmshare_iterator_t *iterator);
 
-DWORD lmshare_list(int offset, lmshare_list_t *list);
+void lmshare_list(int offset, lmshare_list_t *list);
 DWORD lmshare_list_transient(int offset, lmshare_list_t *list);
 int lmshare_num_transient(void);
 
@@ -147,17 +192,12 @@ int lmshare_is_restricted(char *share_name);
 int lmshare_is_admin(char *share_name);
 int lmshare_is_valid(char *share_name);
 int lmshare_is_dir(char *path);
-/* XXX Move these 2 functions in mlsvc_util.h, after the libmlsvc cleanup */
-sa_group_t smb_get_smb_share_group(sa_handle_t handle);
-void smb_build_lmshare_info(char *share_name, char *path,
-    sa_optionset_t opts, lmshare_info_t *si);
 
-/* The following 3 functions are called by FSD user-space library */
 DWORD lmshare_add_adminshare(char *volname, unsigned char drive);
 
-uint64_t lmshrd_open_iterator(int);
-DWORD lmshrd_close_iterator(uint64_t);
-DWORD lmshrd_iterate(uint64_t iterator, lmshare_info_t *si);
+sa_group_t smb_get_smb_share_group(sa_handle_t);
+void smb_build_lmshare_info(char *, char *, sa_resource_t, lmshare_info_t *);
+
 DWORD lmshrd_list(int offset, lmshare_list_t *list);
 DWORD lmshrd_list_transient(int offset, lmshare_list_t *list);
 DWORD lmshrd_num_transient(void);
@@ -176,21 +216,11 @@ DWORD lmshrd_setinfo(lmshare_info_t *);
 
 #else
 
-door_handle_t lmshrd_kclient_init(int);
-void lmshrd_kclient_fini(door_handle_t);
-uint64_t lmshrd_open_iterator(door_handle_t, int);
-uint32_t lmshrd_close_iterator(door_handle_t, uint64_t);
-uint32_t lmshrd_iterate(door_handle_t, uint64_t, lmshare_info_t *);
-int lmshrd_num_shares(door_handle_t);
-uint32_t lmshrd_getinfo(door_handle_t, char *, lmshare_info_t *);
-int lmshrd_check(door_handle_t, char *, int);
-int lmshrd_exists(door_handle_t, char *);
-int lmshrd_is_special(door_handle_t, char *);
-int lmshrd_is_restricted(door_handle_t, char *);
-int lmshrd_is_admin(door_handle_t, char *);
-int lmshrd_is_valid(door_handle_t, char *);
-int lmshrd_is_dir(door_handle_t, char *);
-int lmshrd_share_upcall(door_handle_t, void *, boolean_t);
+door_handle_t smb_kshare_init(int);
+void smb_kshare_fini(door_handle_t);
+uint32_t smb_kshare_getinfo(door_handle_t, char *, lmshare_info_t *);
+int smb_kshare_upcall(door_handle_t, void *, boolean_t);
+uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 
 #endif
 

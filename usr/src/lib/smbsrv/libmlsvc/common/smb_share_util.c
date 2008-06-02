@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,16 +32,20 @@
 #include <libshare.h>
 #include <smbsrv/lmshare.h>
 
+#include <syslog.h>
+
 static pthread_mutex_t smb_group_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Sharemanager shared API */
 
 void
 smb_build_lmshare_info(char *share_name, char *path,
-    sa_optionset_t opts, lmshare_info_t *si)
+    sa_resource_t resource, lmshare_info_t *si)
 {
 	sa_property_t prop;
 	char *val = NULL;
+	sa_optionset_t opts;
+	sa_share_t share;
 
 	bzero(si, sizeof (lmshare_info_t));
 	/* Share is read from SMF so it should be permanent */
@@ -50,6 +54,18 @@ smb_build_lmshare_info(char *share_name, char *path,
 	(void) strlcpy(si->directory, path, sizeof (si->directory));
 	(void) strlcpy(si->share_name, share_name, sizeof (si->share_name));
 
+	val = sa_get_resource_description(resource);
+	if (val == NULL) {
+		share = sa_get_resource_parent(resource);
+		val = sa_get_resource_description(share);
+	}
+
+	if (val != NULL) {
+		(void) strlcpy(si->comment, val, sizeof (si->comment));
+		sa_free_share_description(val);
+	}
+
+	opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
 	if (opts == NULL)
 		return;
 
@@ -61,14 +77,7 @@ smb_build_lmshare_info(char *share_name, char *path,
 			free(val);
 		}
 	}
-
-	prop = (sa_property_t)sa_get_property(opts, "description");
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			(void) strlcpy(si->comment, val, sizeof (si->comment));
-			free(val);
-		}
-	}
+	sa_free_derived_optionset(opts);
 }
 
 /*

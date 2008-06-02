@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pwd.h>
+#include <assert.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -53,6 +55,10 @@ static smb_autohome_info_t smb_ai;
 static smb_autohome_t *smb_autohome_make_entry(smb_autohome_info_t *);
 static char *smb_autohome_keysub(const char *, char *, int);
 static smb_autohome_info_t *smb_autohome_getinfo(void);
+static smb_autohome_t *smb_autohome_lookup(const char *);
+static void smb_autohome_setent(void);
+static void smb_autohome_endent(void);
+static smb_autohome_t *smb_autohome_getent(const char *);
 
 /*
  * Add an autohome share.  See smb_autohome(4) for details.
@@ -60,95 +66,65 @@ static smb_autohome_info_t *smb_autohome_getinfo(void);
  * If share directory contains backslash path separators, they will
  * be converted to forward slash to support NT/DOS path style for
  * autohome shares.
- *
- * Returns 0 on success or -1 to indicate an error.
  */
-int
+void
 smb_autohome_add(const char *username)
 {
 	lmshare_info_t si;
-	char *sharename;
 	smb_autohome_t *ai;
 
-	if (username == NULL)
-		return (-1);
+	assert(username);
 
-	if ((sharename = strdup(username)) == NULL)
-		return (-1);
+	if ((ai = smb_autohome_lookup(username)) == NULL)
+		return;
 
-	if ((ai = smb_autohome_lookup(sharename)) == NULL) {
-		free(sharename);
-		return (0);
-	}
-
-	(void) memset(&si, 0, sizeof (lmshare_info_t));
+	bzero(&si, sizeof (lmshare_info_t));
 	(void) strlcpy(si.directory, ai->ah_path, MAXPATHLEN);
 	(void) strsubst(si.directory, '\\', '/');
 	(void) strlcpy(si.container, ai->ah_container, MAXPATHLEN);
 
-	if (lmshare_is_dir(si.directory) == 0) {
-		free(sharename);
-		return (0);
-	}
+	if (lmshare_is_dir(si.directory) == 0)
+		return;
 
-	if (lmshare_exists(sharename) != 0) {
-		(void) lmshare_getinfo(sharename, &si);
-		if (!(si.mode & LMSHRM_TRANS)) {
-			free(sharename);
-			return (0);
-		}
+	if (lmshare_getinfo((char *)username, &si) == NERR_Success) {
+		/*
+		 * autohome shares will be added for each login attemp
+		 * even if they already exist
+		 */
+		if ((si.mode & LMSHRM_AUTOHOME) == 0)
+			return;
 	} else {
-		(void) strcpy(si.share_name, sharename);
-		si.mode = LMSHRM_TRANS;
+		(void) strlcpy(si.share_name, username, MAXNAMELEN);
+		si.mode = LMSHRM_TRANS | LMSHRM_AUTOHOME;
 	}
 
 	(void) lmshare_add(&si, 0);
-	free(sharename);
-	return (0);
 }
 
 /*
  * Remove an autohome share.
- *
- * Returns 0 on success or -1 to indicate an error.
  */
-int
+void
 smb_autohome_remove(const char *username)
 {
 	lmshare_info_t si;
-	char *sharename;
 
-	if (username == NULL)
-		return (-1);
+	assert(username);
 
-	if ((sharename = strdup(username)) == NULL)
-		return (-1);
-
-	if (lmshare_getinfo(sharename, &si) == NERR_Success) {
-		if (si.mode & LMSHRM_TRANS) {
-			(void) lmshare_delete(sharename, 0);
+	if (lmshare_getinfo((char *)username, &si) == NERR_Success) {
+		if (si.mode & LMSHRM_AUTOHOME) {
+			(void) lmshare_delete((char *)username, 0);
 		}
 	}
-
-	free(sharename);
-	return (0);
 }
 
 /*
  * Find out if a share is an autohome share.
- *
- * Returns 1 if the share is an autohome share.
- * Otherwise returns 0.
  */
-int
+boolean_t
 smb_is_autohome(const lmshare_info_t *si)
 {
-	if (si && (si->mode & LMSHRM_TRANS) &&
-	    (lmshare_is_restricted((char *)si->share_name) == 0)) {
-		return (1);
-	}
-
-	return (0);
+	return (si && (si->mode & LMSHRM_AUTOHOME));
 }
 
 /*
@@ -162,11 +138,11 @@ smb_is_autohome(const lmshare_info_t *si)
  *
  * Returns a pointer to the entry on success or null on failure.
  */
-smb_autohome_t *
+static smb_autohome_t *
 smb_autohome_lookup(const char *name)
 {
 	struct passwd *pw;
-	smb_autohome_t *ah = 0;
+	smb_autohome_t *ah = NULL;
 
 	if (name == NULL)
 		return (NULL);
@@ -199,7 +175,7 @@ smb_autohome_lookup(const char *name)
 			if (strcasecmp("+nsswitch", ah->ah_name) != 0)
 				continue;
 			if ((pw = getpwnam(name)) == NULL) {
-				ah = 0;
+				ah = NULL;
 				break;
 			}
 
@@ -220,7 +196,7 @@ smb_autohome_lookup(const char *name)
 /*
  * Open or rewind the autohome database.
  */
-void
+static void
 smb_autohome_setent(void)
 {
 	smb_autohome_info_t *si;
@@ -257,7 +233,7 @@ smb_autohome_setent(void)
  * We can't zero the whole info structure because the application
  * should still have access to the data after the file is closed.
  */
-void
+static void
 smb_autohome_endent(void)
 {
 	smb_autohome_info_t *si;
@@ -278,7 +254,7 @@ smb_autohome_endent(void)
  * only used for key substitution, so that the caller sees the entry
  * in expanded form.
  */
-smb_autohome_t *
+static smb_autohome_t *
 smb_autohome_getent(const char *name)
 {
 	smb_autohome_info_t *si;

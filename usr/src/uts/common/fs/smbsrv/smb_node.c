@@ -864,7 +864,7 @@ smb_node_reset_delete_on_close(smb_node_t *node)
 }
 
 /*
- * smb_node_share_check
+ * smb_node_open_check
  *
  * check file sharing rules for current open request
  * against all existing opens for a file.
@@ -886,100 +886,30 @@ smb_node_open_check(struct smb_node *node, cred_t *cr,
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	of = smb_llist_head(&node->n_ofile_list);
 	while (of) {
-		status = smb_node_share_check(node, cr, desired_access,
-		    share_access, of);
-		if (status == NT_STATUS_SHARING_VIOLATION) {
+		status = smb_ofile_open_check(of, cr, desired_access,
+		    share_access);
+
+		switch (status) {
+		case NT_STATUS_INVALID_HANDLE:
+		case NT_STATUS_SUCCESS:
+			of = smb_llist_next(&node->n_ofile_list, of);
+			break;
+		default:
+			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
-		of = smb_llist_next(&node->n_ofile_list, of);
 	}
+
 	smb_llist_exit(&node->n_ofile_list);
-
 	return (NT_STATUS_SUCCESS);
 }
 
-/*
- * smb_open_share_check
- *
- * check file sharing rules for current open request
- * against the given existing open.
- *
- * Returns NT_STATUS_SHARING_VIOLATION if there is any
- * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
- */
 uint32_t
-smb_node_share_check(
-    struct smb_node *node,
-    cred_t *cr,
-    uint32_t desired_access,
-    uint32_t share_access,
-    smb_ofile_t *of)
-{
-	/*
-	 * It appears that share modes are not relevant to
-	 * directories, but this check will remain as it is not
-	 * clear whether it was originally put here for a reason.
-	 */
-	if (node->attr.sa_vattr.va_type == VDIR) {
-		if (SMB_DENY_RW(of->f_share_access) &&
-		    (node->n_orig_uid != crgetuid(cr))) {
-			return (NT_STATUS_SHARING_VIOLATION);
-		}
-
-		return (NT_STATUS_SUCCESS);
-	}
-
-	/* if it's just meta data */
-	if ((of->f_granted_access & FILE_DATA_ALL) == 0)
-		return (NT_STATUS_SUCCESS);
-
-	/*
-	 * Check requested share access against the
-	 * open granted (desired) access
-	 */
-	if (SMB_DENY_DELETE(share_access) && (of->f_granted_access & DELETE))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (SMB_DENY_READ(share_access) &&
-	    (of->f_granted_access & (FILE_READ_DATA | FILE_EXECUTE)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (SMB_DENY_WRITE(share_access) &&
-	    (of->f_granted_access & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	/* check requested desired access against the open share access */
-	if (SMB_DENY_DELETE(of->f_share_access) && (desired_access & DELETE))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (SMB_DENY_READ(of->f_share_access) &&
-	    (desired_access & (FILE_READ_DATA | FILE_EXECUTE)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (SMB_DENY_WRITE(of->f_share_access) &&
-	    (desired_access & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	return (NT_STATUS_SUCCESS);
-}
-
-/*
- * smb_rename_share_check
- *
- * An open file can be renamed if
- *
- *  1. isn't opened for data writing or deleting
- *
- *  2. Opened with "Deny Delete" share mode
- *         But not opened for data reading or executing
- *         (opened for accessing meta data)
- */
-
-DWORD
 smb_node_rename_check(struct smb_node *node)
 {
-	struct smb_ofile *open;
+	struct smb_ofile *of;
+	uint32_t status;
 
 	ASSERT(node);
 	ASSERT(node->n_magic == SMB_NODE_MAGIC);
@@ -990,22 +920,20 @@ smb_node_rename_check(struct smb_node *node)
 	 */
 
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	open = smb_llist_head(&node->n_ofile_list);
-	while (open) {
-		if (open->f_granted_access &
-		    (FILE_WRITE_DATA | FILE_APPEND_DATA | DELETE)) {
-			smb_llist_exit(&node->n_ofile_list);
-			return (NT_STATUS_SHARING_VIOLATION);
-		}
+	of = smb_llist_head(&node->n_ofile_list);
+	while (of) {
+		status = smb_ofile_rename_check(of);
 
-		if ((open->f_share_access & FILE_SHARE_DELETE) == 0) {
-			if (open->f_granted_access &
-			    (FILE_READ_DATA | FILE_EXECUTE)) {
-				smb_llist_exit(&node->n_ofile_list);
-				return (NT_STATUS_SHARING_VIOLATION);
-			}
+		switch (status) {
+		case NT_STATUS_INVALID_HANDLE:
+		case NT_STATUS_SUCCESS:
+			of = smb_llist_next(&node->n_ofile_list, of);
+			break;
+		default:
+			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			smb_llist_exit(&node->n_ofile_list);
+			return (status);
 		}
-		open = smb_llist_next(&node->n_ofile_list, open);
 	}
 	smb_llist_exit(&node->n_ofile_list);
 
@@ -1019,27 +947,11 @@ smb_node_rename_check(struct smb_node *node)
 		return (NT_STATUS_SUCCESS);
 }
 
-/*
- * smb_node_delete_check
- *
- * An open file can be deleted only if opened for
- * accessing meta data. Share modes aren't important
- * in this case.
- *
- * NOTE: there is another mechanism for deleting an
- * open file that NT clients usually use.
- * That's setting "Delete on close" flag for an open
- * file.  In this way the file will be deleted after
- * last close. This flag can be set by SmbTrans2SetFileInfo
- * with FILE_DISPOSITION_INFO information level.
- * For setting this flag, the file should be opened by
- * DELETE access in the FID that is passed in the Trans2
- * request.
- */
-DWORD
+uint32_t
 smb_node_delete_check(smb_node_t *node)
 {
-	smb_ofile_t *file;
+	smb_ofile_t *of;
+	uint32_t status;
 
 	ASSERT(node);
 	ASSERT(node->n_magic == SMB_NODE_MAGIC);
@@ -1053,19 +965,20 @@ smb_node_delete_check(smb_node_t *node)
 	 */
 
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	file = smb_llist_head(&node->n_ofile_list);
-	while (file) {
-		ASSERT(file->f_magic == SMB_OFILE_MAGIC);
-		if (file->f_granted_access &
-		    (FILE_READ_DATA |
-		    FILE_WRITE_DATA |
-		    FILE_APPEND_DATA |
-		    FILE_EXECUTE |
-		    DELETE)) {
+	of = smb_llist_head(&node->n_ofile_list);
+	while (of) {
+		status = smb_ofile_delete_check(of);
+
+		switch (status) {
+		case NT_STATUS_INVALID_HANDLE:
+		case NT_STATUS_SUCCESS:
+			of = smb_llist_next(&node->n_ofile_list, of);
+			break;
+		default:
+			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
 			smb_llist_exit(&node->n_ofile_list);
-			return (NT_STATUS_SHARING_VIOLATION);
+			return (status);
 		}
-		file = smb_llist_next(&node->n_ofile_list, file);
 	}
 	smb_llist_exit(&node->n_ofile_list);
 

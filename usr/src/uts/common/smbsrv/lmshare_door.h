@@ -44,35 +44,27 @@ extern "C" {
 #define	LMSHR_DOOR_VERSION	1
 
 #define	LMSHR_DOOR_COOKIE	((void*)(0xdeadbeef^LMSHR_DOOR_VERSION))
-#define	LMSHR_DOOR_SIZE		(sizeof (lmshare_list_t) + 32)
+#define	LMSHR_DOOR_SIZE		(65 * 1024)
 
 /*
  * Door interface
  *
  * Define door operations
  */
-#define	LMSHR_DOOR_OPEN_ITERATOR	1
-#define	LMSHR_DOOR_CLOSE_ITERATOR	2
-#define	LMSHR_DOOR_ITERATE		3
-#define	LMSHR_DOOR_NUM_SHARES		4
-#define	LMSHR_DOOR_DELETE		5
-#define	LMSHR_DOOR_RENAME		6
-#define	LMSHR_DOOR_GETINFO		7
-#define	LMSHR_DOOR_ADD			8
-#define	LMSHR_DOOR_SETINFO		9
-#define	LMSHR_DOOR_EXISTS		10
-#define	LMSHR_DOOR_IS_SPECIAL		11
-#define	LMSHR_DOOR_IS_RESTRICTED	12
-#define	LMSHR_DOOR_IS_ADMIN		13
-#define	LMSHR_DOOR_IS_VALID		14
-#define	LMSHR_DOOR_IS_DIR		15
-#define	LMSHR_DOOR_LIST			16
-
-#define	SMB_GET_KCONFIG			17
-
-void smb_load_kconfig(smb_kmod_cfg_t *);
-void smb_dr_get_kconfig(smb_dr_ctx_t *, smb_kmod_cfg_t *);
-void smb_dr_put_kconfig(smb_dr_ctx_t *, smb_kmod_cfg_t *);
+#define	LMSHR_DOOR_NUM_SHARES		1
+#define	LMSHR_DOOR_DELETE		2
+#define	LMSHR_DOOR_RENAME		3
+#define	LMSHR_DOOR_GETINFO		4
+#define	LMSHR_DOOR_ADD			5
+#define	LMSHR_DOOR_SETINFO		6
+#define	LMSHR_DOOR_EXISTS		7
+#define	LMSHR_DOOR_IS_SPECIAL		8
+#define	LMSHR_DOOR_IS_RESTRICTED	9
+#define	LMSHR_DOOR_IS_ADMIN		10
+#define	LMSHR_DOOR_IS_VALID		11
+#define	LMSHR_DOOR_IS_DIR		12
+#define	LMSHR_DOOR_LIST			13
+#define	LMSHR_DOOR_ENUM			14
 
 /*
  * Door server status
@@ -100,9 +92,6 @@ void smb_dr_put_kconfig(smb_dr_ctx_t *, smb_kmod_cfg_t *);
 void smb_dr_get_lmshare(smb_dr_ctx_t *, lmshare_info_t *);
 void smb_dr_put_lmshare(smb_dr_ctx_t *, lmshare_info_t *);
 
-uint64_t smb_dr_get_lmshr_iterator(smb_dr_ctx_t *);
-void smb_dr_put_lmshr_iterator(smb_dr_ctx_t *, uint64_t);
-void smb_dr_free_lmshr_iterator(smb_dr_ctx_t *);
 void smb_dr_get_lmshr_list(smb_dr_ctx_t *, lmshare_list_t *);
 void smb_dr_put_lmshr_list(smb_dr_ctx_t *, lmshare_list_t *);
 

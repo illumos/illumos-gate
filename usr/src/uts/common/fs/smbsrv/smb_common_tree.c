@@ -186,7 +186,6 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	smb_sid_t		*sid;
 	fsvol_attr_t		vol_attr;
 	smb_attr_t		attr;
-	int			is_admin;
 	smb_user_t		*user = sr->uid_user;
 	cred_t			*u_cred;
 
@@ -233,18 +232,18 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 		return (ERRaccess);
 	}
 
+	if (smb_kshare_getinfo(sr->sr_server->sv_lmshrd, sharename, &si) !=
+	    NERR_Success) {
+		(void) strlcpy(errmsg, "share not found", SMB_TREE_EMSZ);
+		return (ERRinvnetname);
+	}
+
 	/*
 	 * Handle the default administration shares: C$, D$ etc.
 	 * Only a user with admin rights is allowed to map these
 	 * shares.
 	 */
-	is_admin = lmshrd_is_admin(sr->sr_server->sv_lmshrd, sharename);
-	if (is_admin == NERR_InternalError) {
-		(void) strlcpy(errmsg, "internal error", SMB_TREE_EMSZ);
-		return (ERRaccess);
-	}
-
-	if (is_admin) {
+	if (si.mode & LMSHRM_ADMIN) {
 		sid = smb_sid_fromstr(ADMINISTRATORS_SID);
 		if (sid) {
 			rc = smb_cred_is_member(u_cred, sid);
@@ -257,11 +256,6 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 		}
 	}
 
-	if (lmshrd_getinfo(sr->sr_server->sv_lmshrd, sharename, &si) !=
-	    NERR_Success) {
-		(void) strlcpy(errmsg, "share not found", SMB_TREE_EMSZ);
-		return (ERRinvnetname);
-	}
 
 	resource = si.directory;
 	sr->arg.tcon.service = "A:";

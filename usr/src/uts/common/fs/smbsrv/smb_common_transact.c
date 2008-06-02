@@ -34,10 +34,6 @@
 #include <smbsrv/lmerr.h>
 #include <smbsrv/nterror.h>
 
-#define	MAX_SHARE_NAME_LEN	13
-#define	SHARE_INFO_1_SIZE	(MAX_SHARE_NAME_LEN + sizeof (char) + \
-    sizeof (short) + sizeof (uint32_t))
-
 /*
  * count of bytes in server response packet
  * except parameters and data. Note that setup
@@ -719,473 +715,39 @@ smb_trans_ready(struct smb_xa *xa)
 	return (rc);
 }
 
-
-/*
- * smb_emit_SHARE_INFO_0
- *
- * This function will convert unicode chars to oem chars before
- * and store the result in a fixed length, MAX_SHARE_NAME_LEN, buffer. If the
- * length after conversion is longer than 12, -1 will be reported
- * to indicate an error. The fixed length is a limitation of the
- * smb protocol.
- */
-static int
-smb_emit_SHARE_INFO_0(struct mbuf_chain *output, unsigned char *name)
+static void
+smb_encode_SHARE_INFO_1(struct mbuf_chain *output, struct mbuf_chain *text,
+    char *oem_name, uint16_t type, char *comment)
 {
-	unsigned int cpid = oem_get_smb_cpid();
-	unsigned int length;
-	char name_buf[MAX_SHARE_NAME_LEN];
-	mts_wchar_t *unibuf;
-	char *tmpbuf;
-	int rc = 0;
+	(void) smb_encode_mbc(output, "13c.wl", oem_name,
+	    type, MBC_LENGTH(text));
 
-	tmpbuf = (name == NULL) ? "" : (char *)name;
-	length = strlen(tmpbuf) + 1;
-
-	unibuf = kmem_alloc(length * sizeof (mts_wchar_t), KM_SLEEP);
-	(void) mts_mbstowcs(unibuf, tmpbuf, length);
-
-	tmpbuf = kmem_alloc(length, KM_SLEEP);
-	if (unicodestooems(tmpbuf, unibuf, length, cpid) == 0)
-		(void) strcpy(tmpbuf, (char *)name);
-
-	if (strlen(tmpbuf) + 1 <= MAX_SHARE_NAME_LEN) {
-		bzero(name_buf, sizeof (name_buf));
-		(void) strcpy(name_buf, tmpbuf);
-		(void) smb_encode_mbc(output, "13c", name_buf);
-	} else {
-		rc = -1;
-	}
-
-	kmem_free(unibuf, length * sizeof (mts_wchar_t));
-	kmem_free(tmpbuf, length);
-
-	return (rc);
+	(void) smb_encode_mbc(text, "s", comment ? comment : "");
 }
 
-static int
-smb_emit_SHARE_INFO_1(struct mbuf_chain *output, struct mbuf_chain *text,
-    unsigned char *name, uint16_t type,
-    unsigned char *comment)
+static void
+smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
+	smb_request_t *sr, char *oem_name, uint16_t type,
+	char *comment, uint16_t access, char *path, char *password)
 {
-	if (smb_emit_SHARE_INFO_0(output, name) < 0)
-		return (-1);
+	unsigned char pword[9];
 
-	(void) smb_encode_mbc(output, ".wl", type, MBC_LENGTH(text));
-	(void) smb_encode_mbc(text, "s",
-	    (comment ? comment : (unsigned char *)"No comment"));
-	return (0);
-}
-
-static void /*ARGSUSED*/
-smb_emit_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
-	struct smb_request *sr, unsigned char *name, uint16_t type,
-	unsigned char *comment, uint16_t access, char *path, char *password)
-{
-	unsigned char	pword[9];
-
-	/*
-	 * XXX PGD.  Is there a bug here?  We zero pword, copy password
-	 * into pword then ignore it and use password for smb_encode_mbc?
-	 */
 	bzero(pword, sizeof (pword));
 	(void) strncpy((char *)pword, password, sizeof (pword));
-	(void) smb_emit_SHARE_INFO_1(output, text, name, type, comment);
+	smb_encode_SHARE_INFO_1(output, text, oem_name, type, comment);
 	(void) smb_encode_mbc(output, "wwwl9c.",
 	    access,
 	    sr->sr_cfg->skc_maxconnections,
 	    smb_server_get_session_count(),
 	    MBC_LENGTH(text),
-	    password);
+	    pword);
 	(void) smb_encode_mbc(text, "s", path);
-}
-
-/*
- * is_long_sharename
- *
- * This function is extracted from smb_emit_SHARE_INFO_0 only for
- * finding shares that their names are longer than MAX_SHARE_NAME_LEN.
- *
- * The function returns 1 for long share names and 0 when the length
- * is Ok.
- */
-static boolean_t
-is_long_sharename(unsigned char *name)
-{
-	unsigned int cpid = oem_get_smb_cpid();
-	size_t length;
-	mts_wchar_t *unibuf;
-	char *tmpbuf;
-	boolean_t islong;
-
-	tmpbuf = (name == NULL) ? "" : (char *)name;
-	length = strlen(tmpbuf) + 1;
-
-	unibuf = kmem_alloc(length * sizeof (mts_wchar_t), KM_SLEEP);
-	(void) mts_mbstowcs(unibuf, tmpbuf, length);
-
-	tmpbuf = kmem_alloc(length, KM_SLEEP);
-	if (unicodestooems(tmpbuf, unibuf, length, cpid) == 0)
-		(void) strcpy(tmpbuf, (char *)name);
-
-	islong = (strlen(tmpbuf) + 1 > MAX_SHARE_NAME_LEN);
-
-	kmem_free(unibuf, length * sizeof (mts_wchar_t));
-	kmem_free(tmpbuf, length);
-
-	return (islong);
-}
-
-/*
- * This structure holds information about shares which will
- * fit in the specified client buffer size.
- *
- * sei_bufsize: Client specified buffer size
- * sei_count: Maximum number of shares that can be
- *            sent in the buffer.
- *
- * The return data section consists of a number of SHARE_INFO_1 structures.
- * In case there are multiple SHARE_INFO_1 data structures to return this
- * function put all fixed length part of these structures in the return buffer
- * and then put all the variable length data (shares' comment) at the end of
- * buffer.
- *
- * sei_info_len: Size of fixed length part of SHARE_INFO_1
- *               structures for sei_count shares
- * sei_cmnt_len: Size of comments for sei_count shares
- */
-typedef struct {
-	uint16_t sei_bufsize;
-	short sei_count;
-	int   sei_infolen;
-	int   sei_cmntlen;
-} smb_share_enum_t;
-
-/*
- * smb_share_update_info
- *
- * Check to see if the given buffer has enough
- * room to fit the information of the given share.
- * If there is enough room update the passed max_???
- * information.
- *
- * Return 1 if buffer is not full yet, 0 if it's full.
- */
-static int
-smb_share_update_info(door_handle_t dhdl, lmshare_info_t *si,
-    smb_share_enum_t *shr_enum_info)
-{
-	int cmnt_len;
-	int new_info_len = shr_enum_info->sei_infolen;
-	int new_cmnt_len = shr_enum_info->sei_cmntlen;
-
-	if (lmshrd_is_special(dhdl, si->share_name))
-		cmnt_len = 1;
-	else
-		cmnt_len = (strlen(si->comment) + 1);
-
-	new_info_len += SHARE_INFO_1_SIZE;
-	new_cmnt_len += cmnt_len;
-
-	if ((new_info_len + new_cmnt_len) < shr_enum_info->sei_bufsize) {
-		shr_enum_info->sei_count++;
-		shr_enum_info->sei_infolen = new_info_len;
-		shr_enum_info->sei_cmntlen = new_cmnt_len;
-		return (1);
-	}
-
-	return (0);
-}
-
-/*
- * smb_share_skip_share
- *
- * Determines whether the given share should be enumerated
- * or not. The share will not be enumerated if its name is
- * long or it's autohome share.
- *
- * Return 1 if the share should be skipped; otherwise returns
- * 0
- */
-static int
-smb_share_skip_share(lmshare_info_t *si)
-{
-	if (is_long_sharename((unsigned char *)si->share_name)) {
-		return (1);
-	}
-
-	/* Skip autohome share if autohome filter is enabled */
-	if (si->mode == LMSHRM_TRANS) {
-		return (1);
-	}
-
-	return (0);
-}
-
-/*
- * smb_share_add_autohome
- *
- * Determines if an autohome share should be added to shares' list
- * for the given user.
- * Autohome will be add when all the following conditions are true:
- *
- *  1. Autohome feature is enabled
- *  2. A share with the same name as the given user exists
- *  3. The share is not a permanent share
- *  4. Share name is not longer than maximum allowed
- */
-static int
-smb_share_add_autohome(door_handle_t dhdl, char *username, lmshare_info_t *si)
-{
-	int do_add = 0;
-
-	do_add = (lmshrd_getinfo(dhdl, username, si) == NERR_Success) &&
-	    (si->mode & LMSHRM_TRANS) &&
-	    (!is_long_sharename((unsigned char *)(si->share_name)));
-
-	return (do_add);
-}
-
-/*
- * smb_share_total_info
- *
- * This function calculates following informations
- *	- Maximum number of shares that can be sent for clients
- *	  according to its buffer size (cli_bufsize)
- *	- length of fixed information about above shares
- *	- length of comments of above shares
- *	- total number of shares that their names are no longer
- *	  than MAX_SHARE_NAME_LEN.
- *
- * Added SMB user object to the parameter list to filter out other
- * user autohome shares.
- */
-static void
-smb_share_total_info(door_handle_t dhdl, smb_share_enum_t *shr_enum_info,
-    short *tot_shares_num, smb_user_t *user)
-{
-	uint64_t iterator;
-	lmshare_info_t *si;
-	struct lmshare_info *auto_si;
-	int more_room = 1;
-
-	si = kmem_zalloc(sizeof (lmshare_info_t), KM_SLEEP);
-	auto_si = kmem_zalloc(sizeof (struct lmshare_info), KM_SLEEP);
-
-	*tot_shares_num = 0;
-	shr_enum_info->sei_count = 0;
-	shr_enum_info->sei_infolen = 0;
-	shr_enum_info->sei_cmntlen = 0;
-
-	if (smb_share_add_autohome(dhdl, user->u_name, auto_si)) {
-		(*tot_shares_num)++;
-		more_room = smb_share_update_info(dhdl, auto_si, shr_enum_info);
-	}
-
-	iterator = lmshrd_open_iterator(dhdl, LMSHRM_ALL);
-	if (iterator == 0) {
-		kmem_free(si, sizeof (lmshare_info_t));
-		kmem_free(auto_si, sizeof (struct lmshare_info));
-		return;
-	}
-
-	/* check for door errors */
-	if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
-		(void) lmshrd_close_iterator(dhdl, iterator);
-		kmem_free(si, sizeof (lmshare_info_t));
-		kmem_free(auto_si, sizeof (struct lmshare_info));
-		return;
-	}
-
-	while (*si->share_name != 0) {
-		if (smb_share_skip_share(si)) {
-			/* check for door errors */
-			if (lmshrd_iterate(dhdl, iterator, si) !=
-			    NERR_Success) {
-				(void) lmshrd_close_iterator(dhdl, iterator);
-				kmem_free(si, sizeof (lmshare_info_t));
-				kmem_free(auto_si,
-				    sizeof (struct lmshare_info));
-				return;
-			}
-			continue;
-		}
-
-		(*tot_shares_num)++;
-
-		if (more_room) {
-			more_room = smb_share_update_info(dhdl, si,
-			    shr_enum_info);
-		}
-
-		/* check for door errors */
-		if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
-			(void) lmshrd_close_iterator(dhdl, iterator);
-			kmem_free(si, sizeof (lmshare_info_t));
-			kmem_free(auto_si, sizeof (struct lmshare_info));
-			return;
-		}
-	}
-
-	(void) lmshrd_close_iterator(dhdl, iterator);
-	kmem_free(si, sizeof (lmshare_info_t));
-	kmem_free(auto_si, sizeof (struct lmshare_info));
-}
-
-/*
- * smb_encode_SHARE_INFO_1
- *
- * This function is extracted from smb_emit_SHARE_INFO_1 and only
- * encodes fixed part of SHARE_INFO_1 structure.
- *
- * The function returns -1 if encoding fails and 0 on success.
- */
-static int
-smb_encode_SHARE_INFO_1(struct mbuf_chain *output, unsigned char *name,
-    uint16_t type, int cmnt_len)
-{
-	if (smb_emit_SHARE_INFO_0(output, name) < 0)
-		return (-1);
-	(void) smb_encode_mbc(output, ".wl", type, cmnt_len);
-	return (0);
-}
-
-/*
- * collect_shares_info
- *
- * This function encodes information of shares_num of shares
- * into data_mb and cmnt_str.
- *
- * Added SMB user object to the parameter list to filter out other
- * user autohome shares.
- *
- */
-static void
-collect_shares_info(door_handle_t dhdl, uint64_t iterator, int shares_num,
-    struct mbuf_chain *data_mb, char *cmnt_str, int *cmnt_len, smb_user_t *user,
-    int first_resp)
-{
-	int i = 0;
-	lmshare_info_t *si;
-	struct lmshare_info *tsi;
-	int is_special;
-
-	si = kmem_zalloc(sizeof (lmshare_info_t), KM_SLEEP);
-	tsi = kmem_zalloc(sizeof (struct lmshare_info), KM_SLEEP);
-
-	if (first_resp && smb_share_add_autohome(dhdl, user->u_name, tsi)) {
-		if (smb_encode_SHARE_INFO_1(data_mb,
-		    (unsigned char *)tsi->share_name,
-		    tsi->stype, *cmnt_len) == 0) {
-			(void) memcpy(cmnt_str+(*cmnt_len),
-			    tsi->comment, strlen(tsi->comment)+1);
-			(*cmnt_len) += (strlen(tsi->comment) + 1);
-			i++;
-		}
-	}
-
-	/* check for door errors */
-	if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
-		kmem_free(si, sizeof (lmshare_info_t));
-		kmem_free(tsi, sizeof (struct lmshare_info));
-		return;
-	}
-
-	while ((i < shares_num) && (*si->share_name != 0)) {
-		if (smb_share_skip_share(si)) {
-			goto next;
-		}
-
-
-		is_special = lmshrd_is_special(dhdl, si->share_name);
-		/* check for door errors */
-		if (is_special == NERR_InternalError) {
-			kmem_free(si, sizeof (lmshare_info_t));
-			kmem_free(tsi, sizeof (struct lmshare_info));
-			return;
-		}
-
-		if (is_special) {
-			si->stype |= STYPE_HIDDEN;
-			if (smb_encode_SHARE_INFO_1(data_mb,
-			    (unsigned char *)si->share_name,
-			    si->stype, *cmnt_len) < 0) {
-				goto next;
-			}
-			cmnt_str[*cmnt_len] = '\0';
-			(*cmnt_len)++;
-		} else {
-			if (smb_encode_SHARE_INFO_1(data_mb,
-			    (unsigned char *)si->share_name, si->stype,
-			    *cmnt_len) < 0) {
-				goto next;
-			}
-			(void) memcpy(cmnt_str+(*cmnt_len), si->comment,
-			    strlen(si->comment)+1);
-			(*cmnt_len) += (strlen(si->comment) + 1);
-		}
-
-	next:
-		/* check for door errors */
-		if (lmshrd_iterate(dhdl, iterator, si) != NERR_Success) {
-			kmem_free(si, sizeof (lmshare_info_t));
-			kmem_free(tsi, sizeof (struct lmshare_info));
-			return;
-		}
-	}
-	kmem_free(si, sizeof (lmshare_info_t));
-	kmem_free(tsi, sizeof (struct lmshare_info));
 }
 
 int
 smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 {
 	door_handle_t dhdl = sr->sr_server->sv_lmshrd;
-	smb_share_enum_t shr_enum_info;
-	short left_shares_cnt;		/* Number of shares not sent yet */
-
-	/*
-	 * Number of shares that should be sent
-	 * in the current response packet.
-	 * It can be a number between 0 and
-	 * max_share_scnt.
-	 */
-	short shares_scnt;
-
-	/*
-	 * Maximum number of shares that can be
-	 * sent in one response packet regarding
-	 * the maximum negotiated buffer size
-	 * for SMB messages.
-	 */
-	short max_shares_per_packet;
-
-	/*
-	 * Total number of shares on the server
-	 * that their name is not greater than
-	 * MAX_SHARE_NAME_LEN
-	 */
-	short shares_tot_num;
-
-	/*
-	 * Size of total data (info + cmnt)
-	 * that should be sent for client
-	 */
-	int shares_tot_byte;
-
-	/*
-	 * Maximum size of data that can be
-	 * sent in one SMB transaction response
-	 * according to the maximum negotiated
-	 * buffer size for SMB  packets
-	 */
-	int data_buf_limit;
-
-	/*
-	 * Number of comment bytes that will
-	 * be sent in the current response
-	 */
-	uint16_t cmnt_scnt;
 
 	/*
 	 * Number of data bytes that will
@@ -1215,9 +777,6 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	/* data and parameter displacement */
 	uint16_t data_disp, param_disp;
 
-	/* return status by the 1st reply */
-	uint16_t ret_stat;
-
 	/* parameter and data offset and pad */
 	int param_off, param_pad, data_off, data_pad;
 
@@ -1227,19 +786,17 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	 */
 	int tot_packet_bytes;
 
-	char first_resp;
-	uint16_t opcode, level, cli_bufsize;
-	unsigned char *r_fmt;
-	char fmt[10];
-	uint64_t iterator;
-	char *cmnt_str, *cmnt_start;
-	int cmnt_len;
-	struct mbuf_chain reply;
-	smb_user_t *user;
-	size_t cmnt_size;
+	boolean_t first_resp;
 
-	user = sr->uid_user;
-	ASSERT(user);
+	char fmt[16];
+	struct mbuf_chain reply;
+
+	uint16_t level;
+	uint16_t pkt_bufsize;
+	smb_enumshare_info_t esi;
+	char *sent_buf;
+
+	ASSERT(sr->uid_user);
 
 	/*
 	 * Initialize the mbuf chain of reply to zero. If it is not
@@ -1247,49 +804,31 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	 */
 	bzero(&reply, sizeof (struct mbuf_chain));
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%wss(lev)w(size)w", sr,
-	    &opcode, &r_fmt, &r_fmt, &level, &cli_bufsize) != 0)
+	if (smb_decode_mbc(&xa->req_param_mb, "ww", &level,
+	    &esi.es_bufsize) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
 	if (level != 1) {
+		/*
+		 * Only level 1 is valid for NetShareEnum
+		 * None of the error codes in the spec are meaningful
+		 * here. This error code is returned by Windows.
+		 */
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
-		    NERR_BadTransactConfig, 0, 0, 0);
+		    ERROR_INVALID_LEVEL, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}
 
-	n_setup = 0;	/* Setup count for NetShareEnum SMB is 0 */
-	n_param = 8;
-	data_buf_limit = sr->session->smb_msg_size -
-	    (SMB_HEADER_ED_LEN + RESP_HEADER_LEN + n_param);
+	esi.es_buf = kmem_zalloc(esi.es_bufsize, KM_SLEEP);
+	esi.es_username = sr->uid_user->u_name;
+	(void) smb_kshare_enum(dhdl, &esi);
 
-	shr_enum_info.sei_bufsize = cli_bufsize;
-	smb_share_total_info(dhdl, &shr_enum_info, &shares_tot_num, user);
-
-	shares_tot_byte = shr_enum_info.sei_infolen + shr_enum_info.sei_cmntlen;
-
-	/* Check buffer to have enough space */
-	if (shares_tot_byte == 0) {
+	/* client buffer size is not big enough to hold any shares */
+	if (esi.es_nsent == 0) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
-		    ERROR_NOT_ENOUGH_MEMORY, 0, 0, 0);
+		    ERROR_MORE_DATA, 0, esi.es_nsent, esi.es_ntotal);
+		kmem_free(esi.es_buf, esi.es_bufsize);
 		return (SDRC_SUCCESS);
-	}
-
-	max_shares_per_packet = data_buf_limit / SHARE_INFO_1_SIZE;
-
-	shares_scnt = (shr_enum_info.sei_count > max_shares_per_packet)
-	    ? max_shares_per_packet : shr_enum_info.sei_count;
-
-	cmnt_size = shr_enum_info.sei_cmntlen * sizeof (char);
-	cmnt_str = kmem_alloc(cmnt_size, KM_SLEEP);
-	cmnt_len = 0;
-	/* save start of buffer to free it at the end of function */
-	cmnt_start = cmnt_str;
-
-	iterator = lmshrd_open_iterator(dhdl, LMSHRM_ALL);
-
-	if (iterator == NULL) {
-		kmem_free(cmnt_start, cmnt_size);
-		return (SDRC_DROP_VC);
 	}
 
 	/*
@@ -1298,47 +837,29 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	 * pointer to the mbuf chains will be lost. Therefore, we need
 	 * to free the resources before calling MBC_INIT() again.
 	 */
+	n_setup = 0;	/* Setup count for NetShareEnum SMB is 0 */
 	m_freem(xa->rep_setup_mb.chain);
 	MBC_INIT(&xa->rep_setup_mb, n_setup * 2);
 
-	left_shares_cnt = shr_enum_info.sei_count;
-	tot_data_scnt = 0;
-	cmnt_scnt = 0;
+	n_param = 8;
+	pkt_bufsize = sr->session->smb_msg_size -
+	    (SMB_HEADER_ED_LEN + RESP_HEADER_LEN + n_param);
 
-	first_resp = 1;
-	while (tot_data_scnt < shares_tot_byte) {
-		/*
-		 * Calling MBC_INIT() will initialized the structure and so the
-		 * pointer to the mbuf chains will be lost. Therefore, we need
-		 * to free the resources if any before calling MBC_INIT().
-		 */
+	tot_data_scnt = 0;
+	sent_buf = esi.es_buf;
+	first_resp = B_TRUE;
+
+	while (tot_data_scnt < esi.es_datasize) {
+		data_scnt = esi.es_datasize - tot_data_scnt;
+		if (data_scnt > pkt_bufsize)
+			data_scnt = pkt_bufsize;
 		m_freem(xa->rep_data_mb.chain);
-		MBC_INIT(&xa->rep_data_mb, data_buf_limit);
-		collect_shares_info(dhdl, iterator,
-		    shares_scnt, &xa->rep_data_mb, cmnt_str, &cmnt_len, user,
-		    first_resp);
-		data_scnt = shares_scnt * SHARE_INFO_1_SIZE;
-		left_shares_cnt -= shares_scnt;
-		if (left_shares_cnt < max_shares_per_packet)
-			shares_scnt = left_shares_cnt;
-		if (left_shares_cnt == 0) {
-			/*
-			 * Now send comments.
-			 * Append comments to the end of share_info_1
-			 * structures.
-			 */
-			cmnt_scnt = data_buf_limit -
-			    MBC_LENGTH(&xa->rep_data_mb);
-			if (cmnt_scnt > shr_enum_info.sei_cmntlen) {
-				/*LINTED E_ASSIGN_NARROW_CONV*/
-				cmnt_scnt = shr_enum_info.sei_cmntlen;
-			}
-			(void) sprintf(fmt, "%dc", cmnt_scnt);
-			(void) smb_encode_mbc(&xa->rep_data_mb, fmt, cmnt_str);
-			cmnt_str += cmnt_scnt;
-			shr_enum_info.sei_cmntlen -= cmnt_scnt;
-		}
-		data_scnt += cmnt_scnt;
+		MBC_INIT(&xa->rep_data_mb, data_scnt);
+
+		(void) sprintf(fmt, "%dc", data_scnt);
+		(void) smb_encode_mbc(&xa->rep_data_mb, fmt, sent_buf);
+
+		sent_buf += data_scnt;
 		tot_data_scnt += data_scnt;
 
 		/* Only the 1st response packet contains parameters */
@@ -1347,22 +868,15 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		param_off = SMB_HEADER_ED_LEN + RESP_HEADER_LEN;
 		param_disp = (first_resp) ? 0 : n_param;
 
-		/*
-		 * Calling MBC_INIT() will initialized the structure and so the
-		 * pointer to the mbuf chains will be lost. Therefore, we need
-		 * to free the resources if any before calling MBC_INIT().
-		 */
 		m_freem(xa->rep_param_mb.chain);
 		MBC_INIT(&xa->rep_param_mb, param_scnt);
+
 		if (first_resp) {
-			first_resp = 0;
-			/* Prepare parameters for the 1st response packet */
-			ret_stat = (shares_tot_num > shr_enum_info.sei_count)
-			    ? ERROR_MORE_DATA : 0;
+			first_resp = B_FALSE;
 			(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
-			    ret_stat, -shr_enum_info.sei_infolen,
-			    shr_enum_info.sei_count,
-			    shares_tot_num);
+			    (esi.es_ntotal > esi.es_nsent)
+			    ? ERROR_MORE_DATA : 0,
+			    0, esi.es_nsent, esi.es_ntotal);
 		}
 
 		data_pad = (param_off + n_param) & 1;	/* Pad to short */
@@ -1380,10 +894,10 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		 */
 		m_freem(reply.chain);
 		MBC_INIT(&reply, SMB_HEADER_ED_LEN
-		    + sizeof (uchar_t)		/* word parameters count */
-		    + 10*sizeof (ushort_t)	/* word parameters */
-		    + n_setup*sizeof (ushort_t)	/* setup parameters */
-		    + sizeof (ushort_t)		/* total data byte count */
+		    + sizeof (uint8_t)		/* word parameters count */
+		    + 10*sizeof (uint16_t)	/* word parameters */
+		    + n_setup*sizeof (uint16_t)	/* setup parameters */
+		    + sizeof (uint16_t)		/* total data byte count */
 		    + tot_packet_bytes);
 
 		(void) smb_encode_mbc(&reply, SMB_HEADER_ED_FMT,
@@ -1404,7 +918,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		    "b ww 2. www www b . C w #. C #. C",
 		    10 + n_setup,	/* wct */
 		    n_param,		/* Total Parameter Bytes */
-		    shares_tot_byte,	/* Total Data Bytes */
+		    esi.es_datasize,	/* Total Data Bytes */
 		    param_scnt,		/* Total Parameter Bytes this buffer */
 		    param_off,		/* Param offset from header start */
 		    param_disp,		/* Param displacement */
@@ -1425,82 +939,61 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_session_send(sr->session, 0, &reply);
 	}
 
-	(void) lmshrd_close_iterator(dhdl, iterator);
-	kmem_free(cmnt_start, cmnt_size);
+	kmem_free(esi.es_buf, esi.es_bufsize);
 	return (SDRC_NO_REPLY);
 }
 
 int
-smb_trans_net_share_get_info(smb_request_t *sr, struct smb_xa *xa)
+smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 {
-	uint16_t		opcode, level, max_bytes, access;
-	uint32_t		type;
-	unsigned char		*req_fmt;
-	unsigned char		*rep_fmt;
+	uint16_t		level, max_bytes, access;
 	struct mbuf_chain	str_mb;
 	char			*share;
-	char			*path;
 	char			*password;
-	char			*comment;
 	lmshare_info_t		si;
-	int			shr_found;
+	int			rc;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%wsss(lev)w(size)w", sr,
-	    &opcode, &req_fmt, &rep_fmt, &share, &level, &max_bytes) != 0)
+	if (smb_decode_mbc(&xa->req_param_mb, "%sww", sr,
+	    &share, &level, &max_bytes) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
 	(void) utf8_strlwr(share);
-	shr_found = lmshrd_getinfo(sr->sr_server->sv_lmshrd, share, &si);
-	if (strcmp(share, "ipc$") == 0) {
-		type = STYPE_IPC;
-		path = "";
-		password = "";
-		access = SHARE_ACCESS_ALL;
-	} else if (shr_found) {
-		path = si.directory;
-		type = STYPE_DISKTREE;
-		if (path[strlen(path)] == '$')
-			type |= STYPE_HIDDEN;
-		password = "";
-		access = SHARE_ACCESS_ALL;
-	} else {
-		/* We have no idea what this share is... */
+	rc = smb_kshare_getinfo(sr->sr_server->sv_lmshrd, share, &si);
+	if ((rc != NERR_Success) || (si.mode & LMSHRM_LONGNAME)) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
 		return (SDRC_SUCCESS);
 	}
 
-	if (shr_found)
-		comment = si.comment;
-	else
-		comment = "";
-
+	access = SHARE_ACCESS_ALL;
 	password = "";
 
 	MBC_INIT(&str_mb, max_bytes);
 
 	switch (level) {
 	case 0 :
-		(void) smb_emit_SHARE_INFO_0(&xa->rep_data_mb,
-		    (unsigned char *)share);
+		(void) smb_encode_mbc(&xa->rep_data_mb, "13c", si.oem_name);
 		break;
 
 	case 1 :
-		(void) smb_emit_SHARE_INFO_1(&xa->rep_data_mb, &str_mb,
-		    (unsigned char *)share, type,
-		    (unsigned char *)comment);
+		smb_encode_SHARE_INFO_1(&xa->rep_data_mb, &str_mb,
+		    si.oem_name, si.stype, si.comment);
 		break;
 
 	case 2 :
-		smb_emit_SHARE_INFO_2(&xa->rep_data_mb, &str_mb, sr,
-		    (unsigned char *)share, type, (unsigned char *)comment,
-		    access, path, password);
+		smb_encode_SHARE_INFO_2(&xa->rep_data_mb, &str_mb, sr,
+		    si.oem_name, si.stype, si.comment, access, si.directory,
+		    password);
+		break;
+
 	default:
+		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
 		return (SDRC_NOT_IMPLEMENTED);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "www", 0,
+	(void) smb_encode_mbc(&xa->rep_param_mb, "www", NERR_Success,
 	    -MBC_LENGTH(&xa->rep_data_mb),
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));
 	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
@@ -1509,17 +1002,15 @@ smb_trans_net_share_get_info(smb_request_t *sr, struct smb_xa *xa)
 }
 
 int
-smb_trans_net_workstation_get_info(struct smb_request *sr, struct smb_xa *xa)
+smb_trans_net_workstation_getinfo(struct smb_request *sr, struct smb_xa *xa)
 {
-	uint16_t		opcode, level, max_bytes;
-	unsigned char		*req_fmt;
-	unsigned char		*rep_fmt;
+	uint16_t		level, max_bytes;
 	struct mbuf_chain	str_mb;
 	char *domain;
 	char *hostname;
 
-	if ((smb_decode_mbc(&xa->req_param_mb, "%wss(lev)w(size)w", sr,
-	    &opcode, &req_fmt, &rep_fmt, &level, &max_bytes) != 0) ||
+	if ((smb_decode_mbc(&xa->req_param_mb, "ww",
+	    &level, &max_bytes) != 0) ||
 	    (level != 10)) {
 		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
 		    NERR_BadTransactConfig, 0, 0, 0);
@@ -1554,18 +1045,13 @@ smb_trans_net_workstation_get_info(struct smb_request *sr, struct smb_xa *xa)
 }
 
 int
-smb_trans_net_user_get_info(struct smb_request *sr, struct smb_xa *xa)
+smb_trans_net_user_getinfo(struct smb_request *sr, struct smb_xa *xa)
 {
-	uint16_t		opcode, level, max_bytes;
-	unsigned char		*req_fmt;
-	unsigned char		*rep_fmt;
+	uint16_t		level, max_bytes;
 	unsigned char		*user;
 	int rc;
 
-	rc = smb_decode_mbc(&xa->req_param_mb, "%wssww", sr,
-	    &opcode,
-	    &req_fmt,
-	    &rep_fmt,
+	rc = smb_decode_mbc(&xa->req_param_mb, "%sww", sr,
 	    &user,
 	    &level,
 	    &max_bytes);
@@ -1579,104 +1065,48 @@ smb_trans_net_user_get_info(struct smb_request *sr, struct smb_xa *xa)
 }
 
 smb_sdrc_t
-smb_trans_server_get_info(struct smb_request *sr, struct smb_xa *xa)
+smb_trans_net_server_getinfo(struct smb_request *sr, struct smb_xa *xa)
 {
-	uint16_t		opcode, level, buf_size;
-	char			*req_fmt;
-	char			*rep_fmt;
+	uint16_t		level, buf_size;
+	uint16_t		avail_data, max_data;
 	char			server_name[16];
 	struct mbuf_chain	str_mb;
-	char *hostname;
-	char *comment;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%wssww", sr,
-	    &opcode, &req_fmt, &rep_fmt, &level, &buf_size) != 0) {
+	if (smb_decode_mbc(&xa->req_param_mb, "ww", &level, &buf_size) != 0)
 		return (SDRC_ERROR);
-	}
 
-	comment = sr->sr_cfg->skc_system_comment;
-	hostname = sr->sr_cfg->skc_hostname;
+	max_data = MBC_MAXBYTES(&xa->rep_data_mb);
 
 	MBC_INIT(&str_mb, buf_size);
 
 	bzero(server_name, sizeof (server_name));
-	(void) strncpy(server_name, hostname, sizeof (server_name));
+	(void) strncpy(server_name, sr->sr_cfg->skc_hostname,
+	    sizeof (server_name));
 
+	/* valid levels are 0 and 1 */
 	switch (level) {
 	case 0:
 		(void) smb_encode_mbc(&xa->rep_data_mb, "16c", server_name);
 		break;
+
 	case 1:
-		(void) smb_encode_mbc(&str_mb, "."); /* Prevent NULL pointers */
+		(void) smb_encode_mbc(&str_mb, "s",
+		    sr->sr_cfg->skc_system_comment);
 		(void) smb_encode_mbc(&xa->rep_data_mb, "16cbbll", server_name,
 		    SMB_VERSION_MAJOR, SMB_VERSION_MINOR,
-		    MY_SERVER_TYPE, MBC_LENGTH(&str_mb));
-		(void) smb_encode_mbc(&str_mb, "s", comment);
+		    MY_SERVER_TYPE, max_data - MBC_LENGTH(&str_mb));
 		break;
-	case 2:
-		/* B16BBDzDDDWWzWWWWWWWB21BzWWWWWWWWWWWWWWWWWWWWWWz */
-		(void) smb_encode_mbc(&str_mb, "."); /* Prevent NULL pointers */
-					/*  B16BBDz */
-		(void) smb_encode_mbc(&xa->rep_data_mb, "16cbbll", server_name,
-		    SMB_VERSION_MAJOR,
-		    SMB_VERSION_MINOR, MY_SERVER_TYPE, MBC_LENGTH(&str_mb));
-		(void) smb_encode_mbc(&str_mb, "s", comment);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "lllwwl",
-		    (uint32_t)1,
-		    (uint32_t)2,
-		    (uint32_t)3,
-		    (uint16_t)4,
-		    (uint16_t)5,
-		    MBC_LENGTH(&str_mb));
-		(void) smb_encode_mbc(&str_mb, "s", "str1");
-		(void) smb_encode_mbc(&xa->rep_data_mb, "wwwwwww21cbl",
-		    (uint16_t)6,
-		    (uint16_t)7,
-		    (uint16_t)8,
-		    (uint16_t)9,
-		    (uint16_t)10,
-		    (uint16_t)11,
-		    (uint16_t)12,
-		    "21 byte comment       ",
-		    (unsigned char)13,
-		    MBC_LENGTH(&str_mb));
-		(void) smb_encode_mbc(&str_mb, "s", "str2");
-		(void) smb_encode_mbc(&xa->rep_data_mb,
-		    "wwwwwwwwwwwwwwwwwwwwwwl",
-		    (uint16_t)14,
-		    (uint16_t)15,
-		    (uint16_t)16,
-		    (uint16_t)17,
-		    (uint16_t)18,
-		    (uint16_t)19,
-		    (uint16_t)20,
-		    (uint16_t)21,
-		    (uint16_t)22,
-		    (uint16_t)23,
-		    (uint16_t)24,
-		    (uint16_t)25,
-		    (uint16_t)26,
-		    (uint16_t)27,
-		    (uint16_t)28,
-		    (uint16_t)29,
-		    (uint16_t)20,
-		    (uint16_t)31,
-		    (uint16_t)32,
-		    (uint16_t)33,
-		    (uint16_t)34,
-		    (uint16_t)35,
-		    MBC_LENGTH(&str_mb));
-		(void) smb_encode_mbc(&str_mb, "s", "str3");
-		break;
+
 	default:
+		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
-		return (SDRC_NOT_IMPLEMENTED);
+		return (SDRC_SUCCESS);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "www", 0,
-	    -MBC_LENGTH(&xa->rep_data_mb),
-	    (MBC_LENGTH(&xa->rep_data_mb)) +
-	    (MBC_LENGTH(&str_mb)));
+	avail_data = MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb);
+	(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+	    NERR_Success, max_data - avail_data, avail_data);
 	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
 	return (SDRC_SUCCESS);
@@ -2011,30 +1441,29 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		    xa->xa_smb_trans_name, MAILSLOT_MSBROWSE) != 0))
 			goto trans_err_not_supported;
 
-		if ((rc = smb_decode_mbc(&xa->req_param_mb, "%wss\b", sr,
+		if ((rc = smb_decode_mbc(&xa->req_param_mb, "%wss", sr,
 		    &opcode, &req_fmt, &rep_fmt)) != 0)
 			goto trans_err_not_supported;
 
-		/* for now, only respond to the */
 		switch (opcode) {
 		case API_WshareEnum:
 			rc = smb_trans_net_share_enum(sr, xa);
 			break;
 
 		case API_WshareGetInfo:
-			rc = smb_trans_net_share_get_info(sr, xa);
+			rc = smb_trans_net_share_getinfo(sr, xa);
 			break;
 
 		case API_WserverGetInfo:
-			rc = smb_trans_server_get_info(sr, xa);
+			rc = smb_trans_net_server_getinfo(sr, xa);
 			break;
 
 		case API_WUserGetInfo:
-			rc = smb_trans_net_user_get_info(sr, xa);
+			rc = smb_trans_net_user_getinfo(sr, xa);
 			break;
 
 		case API_WWkstaGetInfo:
-			rc = smb_trans_net_workstation_get_info(sr, xa);
+			rc = smb_trans_net_workstation_getinfo(sr, xa);
 			break;
 
 		case API_NetServerEnum2:

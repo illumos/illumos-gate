@@ -450,6 +450,10 @@ smb_lock_range_overlap(struct smb_lock *lock, uint64_t start, uint64_t length)
 	if (length == 0 || lock->l_length == 0)
 		return (RANGE_NO_OVERLAP);
 
+	/* The following test is intended to catch roll over locks. */
+	if ((start == lock->l_start) && (length == lock->l_length))
+		return (RANGE_OVERLAP);
+
 	if (start < lock->l_start) {
 		if (start + length > lock->l_start)
 			return (RANGE_OVERLAP);

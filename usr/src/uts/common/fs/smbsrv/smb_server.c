@@ -548,7 +548,7 @@ smb_server_start(struct smb_io_start *io_start)
 		if (rc = smb_server_fsop_start(sv))
 			break;
 		ASSERT(sv->sv_lmshrd == NULL);
-		sv->sv_lmshrd = lmshrd_kclient_init(io_start->lmshrd);
+		sv->sv_lmshrd = smb_kshare_init(io_start->lmshrd);
 		if (sv->sv_lmshrd == NULL)
 			break;
 		if (rc = smb_kdoor_clnt_start(io_start->udoor))
@@ -1023,7 +1023,7 @@ smb_server_share(void *arg, boolean_t add_share)
 		mutex_enter(&sv->sv_mutex);
 		if (sv->sv_state == SMB_SERVER_STATE_RUNNING) {
 			mutex_exit(&sv->sv_mutex);
-			rc = lmshrd_share_upcall(sv->sv_lmshrd, arg, add_share);
+			rc = smb_kshare_upcall(sv->sv_lmshrd, arg, add_share);
 		} else {
 			mutex_exit(&sv->sv_mutex);
 			rc = EPERM;
@@ -1172,7 +1172,7 @@ smb_server_stop(smb_server_t *sv)
 	smb_winpipe_close();
 	smb_thread_stop(&sv->si_thread_timers);
 	smb_kdoor_clnt_stop();
-	lmshrd_kclient_fini(sv->sv_lmshrd);
+	smb_kshare_fini(sv->sv_lmshrd);
 	smb_server_fsop_stop(sv);
 	if (sv->sv_session) {
 		smb_session_delete(sv->sv_session);

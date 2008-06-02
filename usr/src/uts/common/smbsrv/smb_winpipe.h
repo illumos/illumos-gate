@@ -58,6 +58,9 @@ extern "C" {
 #define	SMB_RPC_WRITE	 3
 #define	SMB_RPC_FLUSH	 4
 
+#define	SMB_WINPIPE_MIN_REQ_SIZE	(sizeof (uint64_t) + \
+	(2 * sizeof (uint32_t)) + (2 * sizeof (uint16_t)))
+
 typedef struct {
 	uint64_t md_tid;	/* caller's thread id */
 	uint16_t md_version;	/* version number, start with 1 */

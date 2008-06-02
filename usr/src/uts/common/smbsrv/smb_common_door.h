@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,12 +103,14 @@ extern DWORD smb_dr_get_dword(smb_dr_ctx_t *ctx);
 extern uint32_t smb_dr_get_uint32(smb_dr_ctx_t *ctx);
 extern int64_t smb_dr_get_int64(smb_dr_ctx_t *ctx);
 extern uint64_t smb_dr_get_uint64(smb_dr_ctx_t *ctx);
+extern unsigned short smb_dr_get_ushort(smb_dr_ctx_t *ctx);
 
 extern void smb_dr_put_int32(smb_dr_ctx_t *ctx, int32_t num);
 extern void smb_dr_put_dword(smb_dr_ctx_t *ctx, DWORD num);
 extern void smb_dr_put_uint32(smb_dr_ctx_t *ctx, uint32_t num);
 extern void smb_dr_put_int64(smb_dr_ctx_t *ctx, int64_t num);
 extern void smb_dr_put_uint64(smb_dr_ctx_t *ctx, uint64_t num);
+extern void smb_dr_put_ushort(smb_dr_ctx_t *ctx, unsigned short num);
 
 extern char *smb_dr_get_string(smb_dr_ctx_t *ctx);
 extern void smb_dr_put_string(smb_dr_ctx_t *ctx, char *buf);

@@ -385,8 +385,6 @@ int smb_node_in_crit(smb_node_t *node);
 
 uint32_t smb_node_open_check(smb_node_t *, cred_t *,
     uint32_t, uint32_t);
-uint32_t smb_node_share_check(smb_node_t *, cred_t *,
-    uint32_t, uint32_t, smb_ofile_t *);
 DWORD smb_node_rename_check(smb_node_t *);
 DWORD smb_node_delete_check(smb_node_t *);
 
@@ -532,6 +530,11 @@ void smb_ofile_close_all_by_pid(smb_tree_t *tree, uint16_t pid);
 void smb_ofile_set_flags(smb_ofile_t *of, uint32_t flags);
 void smb_ofile_close_timestamp_update(smb_ofile_t *of, uint32_t last_wtime);
 boolean_t smb_ofile_is_open(smb_ofile_t *of);
+uint32_t smb_ofile_open_check(smb_ofile_t *, cred_t *,
+    uint32_t, uint32_t);
+uint32_t smb_ofile_rename_check(smb_ofile_t *);
+uint32_t smb_ofile_delete_check(smb_ofile_t *);
+
 
 #define	smb_ofile_granted_access(_of_)	((_of_)->f_granted_access)
 

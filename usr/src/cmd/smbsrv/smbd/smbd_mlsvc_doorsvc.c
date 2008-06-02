@@ -166,6 +166,11 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 	char lfp[START_OUTDOOR_SIZE];
 	boolean_t more_data = B_FALSE;
 
+	if ((cookie != &smb_winpipe_cookie) || (argp == NULL) ||
+	    (arg_size < SMB_WINPIPE_MIN_REQ_SIZE)) {
+		(void) door_return(NULL, 0, NULL, 0);
+	}
+
 	bufp = argp;
 	bcopy(bufp, &mdhin.md_tid, sizeof (uint64_t));
 	bytes_off = sizeof (uint64_t);
@@ -338,5 +343,5 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 
 zero_exit:
 	smb_user_ctx_free(user_ctx);
-	(void) door_return(0, 0, NULL, 0);
+	(void) door_return(NULL, 0, NULL, 0);
 }

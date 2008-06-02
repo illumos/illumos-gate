@@ -62,13 +62,9 @@ typedef struct smb_autohome {
 	char *ah_container;	/* ADS container distinguished name */
 } smb_autohome_t;
 
-extern int smb_autohome_add(const char *);
-extern int smb_autohome_remove(const char *);
-extern int smb_is_autohome(const lmshare_info_t *);
-extern void smb_autohome_setent(void);
-extern void smb_autohome_endent(void);
-extern smb_autohome_t *smb_autohome_getent(const char *name);
-extern smb_autohome_t *smb_autohome_lookup(const char *name);
+extern void smb_autohome_add(const char *);
+extern void smb_autohome_remove(const char *);
+extern boolean_t smb_is_autohome(const lmshare_info_t *);
 
 #ifdef	__cplusplus
 }

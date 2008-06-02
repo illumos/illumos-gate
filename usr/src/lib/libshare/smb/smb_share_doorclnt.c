@@ -54,9 +54,6 @@ static cond_t lmshrd_cv;
 
 char *lmshrd_desc[] = {
 	"",
-	"LmshrdOpenIter",
-	"LmshrdCloseIter",
-	"LmshrdIterate",
 	"LmshrdNumShares",
 	"LmshrdDelete",
 	"LmshrdRename",
@@ -70,7 +67,6 @@ char *lmshrd_desc[] = {
 	"LmshrdIsValid",
 	"LmshrdIsDir",
 	"LmshrdList",
-	"LmshrdListTrans",
 	"LmshrdNumTrans",
 	"N/A",
 	0
@@ -179,140 +175,6 @@ lmshrd_door_check_status(smb_dr_ctx_t *dec_ctx)
 	return (0);
 }
 
-uint64_t
-lmshrd_open_iterator(int mode)
-{
-	door_arg_t *arg;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	uint64_t lmshr_iter = 0;
-	int rc;
-
-	if ((arg = lmshrd_door_enter()) == NULL)
-		return (lmshr_iter);
-
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_OPEN_ITERATOR);
-	smb_dr_put_int32(enc_ctx, mode);
-
-	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
-	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
-		return (lmshr_iter);
-	}
-
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
-		return (lmshr_iter);
-	}
-
-	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
-		return (lmshr_iter);
-	}
-
-	lmshr_iter = smb_dr_get_lmshr_iterator(dec_ctx);
-	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
-		return (lmshr_iter);
-	}
-
-	lmshrd_door_exit(arg, NULL);
-	return (lmshr_iter);
-}
-
-
-DWORD
-lmshrd_close_iterator(uint64_t iterator)
-{
-	door_arg_t *arg;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	int rc;
-
-	if ((arg = lmshrd_door_enter()) == NULL)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_CLOSE_ITERATOR);
-	smb_dr_put_lmshr_iterator(enc_ctx, iterator);
-
-	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
-	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
-		return (NERR_InternalError);
-	}
-
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
-		return (NERR_InternalError);
-	}
-
-	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
-		return (NERR_InternalError);
-	}
-
-	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
-		return (NERR_InternalError);
-	}
-
-	lmshrd_door_exit(arg, NULL);
-	return (NERR_Success);
-}
-
-DWORD
-lmshrd_iterate(uint64_t iterator, lmshare_info_t *si)
-{
-	door_arg_t *arg;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	int rc;
-
-	if ((arg = lmshrd_door_enter()) == NULL)
-		return (NERR_InternalError);
-
-	bzero(si, sizeof (lmshare_info_t));
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_ITERATE);
-	smb_dr_put_lmshr_iterator(enc_ctx, iterator);
-
-	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
-	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
-		return (NERR_InternalError);
-	}
-
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
-		return (NERR_InternalError);
-	}
-
-	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
-		return (NERR_InternalError);
-	}
-
-	smb_dr_get_lmshare(dec_ctx, si);
-	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
-		return (NERR_InternalError);
-	}
-
-	lmshrd_door_exit(arg, NULL);
-	return (NERR_Success);
-}
-
 DWORD
 lmshrd_list(int offset, lmshare_list_t *list)
 {
@@ -347,7 +209,6 @@ lmshrd_list(int offset, lmshare_list_t *list)
 		return (NERR_InternalError);
 	}
 
-	rc = smb_dr_get_uint32(dec_ctx);
 	smb_dr_get_lmshr_list(dec_ctx, list);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
 		lmshrd_door_exit(arg, "decode error");
@@ -355,7 +216,7 @@ lmshrd_list(int offset, lmshare_list_t *list)
 	}
 
 	lmshrd_door_exit(arg, NULL);
-	return (rc);
+	return (NERR_Success);
 }
 
 int

@@ -158,7 +158,7 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		entry->sa_username = strdup(clnt->username);
 		entry->sa_domain = strdup(clnt->domain);
 
-		(void) smb_autohome_add(entry->sa_username);
+		smb_autohome_add(entry->sa_username);
 		smbd_audit_link(entry);
 		token->tkn_audit_sid = entry->sa_audit_sid;
 	}
@@ -205,7 +205,7 @@ smbd_user_auth_logoff(uint32_t audit_sid)
 	if ((entry = smbd_audit_unlink(audit_sid)) == NULL)
 		return;
 
-	(void) smb_autohome_remove(entry->sa_username);
+	smb_autohome_remove(entry->sa_username);
 
 	ah = entry->sa_handle;
 

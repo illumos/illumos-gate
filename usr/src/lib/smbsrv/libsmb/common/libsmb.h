@@ -193,6 +193,8 @@ extern int smb_config_set_secmode(int);
 extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
 
+extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
+
 extern boolean_t smb_match_netlogon_seqnum(void);
 extern int smb_setdomainprops(char *, char *, char *);
 extern void smb_update_netlogon_seqnum(void);

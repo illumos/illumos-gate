@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <syslog.h>
 #include <string.h>
+#include <strings.h>
 #include <pthread.h>
 
 #include <smbsrv/libsmb.h>
@@ -45,155 +46,123 @@
 #include <smbsrv/lmshare_door.h>
 #include <smbsrv/smbinfo.h>
 
-static smb_kmod_cfg_t smb_kcfg;
+static int smb_share_dsrv_fd = -1;
+static pthread_mutex_t smb_share_dsrv_mtx = PTHREAD_MUTEX_INITIALIZER;
 
-static int smb_lmshrd_fildes = -1;
-static pthread_mutex_t smb_lmshrd_srv_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-/* forward declaration */
-static void smb_lmshrd_srv_door(void *cookie, char *ptr, size_t size,
-    door_desc_t *dp, uint_t n_desc);
-static int smb_lmshrd_srv_check(int opcode, char *sharename);
+static void smb_share_dsrv_dispatch(void *, char *, size_t, door_desc_t *,
+    uint_t);
+static int smb_share_dsrv_check(int, char *);
+static int smb_share_dsrv_enum(smb_enumshare_info_t *esi);
 
 /*
- * smb_lmshrd_srv_start
+ * smb_share_dsrv_start
  *
  * Start the LanMan share door service.
  * Returns 0 on success. Otherwise, -1.
  */
 int
-smb_lmshrd_srv_start(void)
+smb_share_dsrv_start(void)
 {
 	int	newfd;
 
-	(void) pthread_mutex_lock(&smb_lmshrd_srv_mutex);
+	(void) pthread_mutex_lock(&smb_share_dsrv_mtx);
 
-	if (smb_lmshrd_fildes != -1) {
-		syslog(LOG_ERR, "smb_lmshrd_srv_start: duplicate");
-		(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
-		return (smb_lmshrd_fildes);
+	if (smb_share_dsrv_fd != -1) {
+		syslog(LOG_ERR, "smb_share_dsrv_start: duplicate");
+		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
+		return (smb_share_dsrv_fd);
 	}
 
-	if ((smb_lmshrd_fildes = door_create(smb_lmshrd_srv_door,
+	if ((smb_share_dsrv_fd = door_create(smb_share_dsrv_dispatch,
 	    LMSHR_DOOR_COOKIE, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
-		syslog(LOG_ERR, "smb_lmshrd_srv_start: door_create: %s",
+		syslog(LOG_ERR, "smb_share_dsrv_start: door_create: %s",
 		    strerror(errno));
-		(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
+		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (-1);
 	}
 
 	(void) unlink(LMSHR_DOOR_NAME);
 
 	if ((newfd = creat(LMSHR_DOOR_NAME, 0644)) < 0) {
-		syslog(LOG_ERR, "smb_lmshrd_srv_start: open: %s",
+		syslog(LOG_ERR, "smb_share_dsrv_start: open: %s",
 		    strerror(errno));
-		(void) door_revoke(smb_lmshrd_fildes);
-		smb_lmshrd_fildes = -1;
-		(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
+		(void) door_revoke(smb_share_dsrv_fd);
+		smb_share_dsrv_fd = -1;
+		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (-1);
 	}
 
 	(void) close(newfd);
 	(void) fdetach(LMSHR_DOOR_NAME);
 
-	if (fattach(smb_lmshrd_fildes, LMSHR_DOOR_NAME) < 0) {
-		syslog(LOG_ERR, "smb_lmshrd_srv_start: fattach: %s",
+	if (fattach(smb_share_dsrv_fd, LMSHR_DOOR_NAME) < 0) {
+		syslog(LOG_ERR, "smb_share_dsrv_start: fattach: %s",
 		    strerror(errno));
-		(void) door_revoke(smb_lmshrd_fildes);
-		smb_lmshrd_fildes = -1;
-		(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
+		(void) door_revoke(smb_share_dsrv_fd);
+		smb_share_dsrv_fd = -1;
+		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (-1);
 	}
 
-	(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
-	return (smb_lmshrd_fildes);
+	(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
+	return (smb_share_dsrv_fd);
 }
 
-
 /*
- * smb_lmshrd_srv_stop
+ * smb_share_dsrv_stop
  *
  * Stop the LanMan share door service.
  */
 void
-smb_lmshrd_srv_stop(void)
+smb_share_dsrv_stop(void)
 {
-	(void) pthread_mutex_lock(&smb_lmshrd_srv_mutex);
+	(void) pthread_mutex_lock(&smb_share_dsrv_mtx);
 
-	if (smb_lmshrd_fildes != -1) {
+	if (smb_share_dsrv_fd != -1) {
 		(void) fdetach(LMSHR_DOOR_NAME);
-		(void) door_revoke(smb_lmshrd_fildes);
-		smb_lmshrd_fildes = -1;
+		(void) door_revoke(smb_share_dsrv_fd);
+		smb_share_dsrv_fd = -1;
 	}
 
-	(void) pthread_mutex_unlock(&smb_lmshrd_srv_mutex);
+	(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 }
 
-
 /*
- * smb_lmshrd_srv_door
+ * smb_share_dsrv_dispatch
  *
  * This function with which the LMSHARE door is associated
  * will invoke the appropriate CIFS share management function
  * based on the request type of the door call.
  */
 /*ARGSUSED*/
-void
-smb_lmshrd_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
+static void
+smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
     uint_t n_desc)
 {
 	DWORD rc;
-	int req_type, mode, rc2;
+	int req_type, rc2;
 	char buf[LMSHR_DOOR_SIZE];
 	unsigned int used;
-	smb_dr_ctx_t *dec_ctx = smb_dr_decode_start(ptr, size);
-	smb_dr_ctx_t *enc_ctx = smb_dr_encode_start(buf, sizeof (buf));
+	smb_dr_ctx_t *dec_ctx;
+	smb_dr_ctx_t *enc_ctx;
 	unsigned int dec_status;
 	unsigned int enc_status;
 	char *sharename, *sharename2;
 	lmshare_info_t lmshr_info;
-	lmshare_info_t *lmshr_infop;
-	lmshare_iterator_t *lmshr_iter;
-	int offset;
 	lmshare_list_t lmshr_list;
+	smb_enumshare_info_t esi;
+	int offset;
 
+	if ((cookie != LMSHR_DOOR_COOKIE) || (ptr == NULL) ||
+	    (size < sizeof (uint32_t))) {
+		(void) door_return(NULL, 0, NULL, 0);
+	}
+
+	dec_ctx = smb_dr_decode_start(ptr, size);
+	enc_ctx = smb_dr_encode_start(buf, sizeof (buf));
 	req_type = smb_dr_get_uint32(dec_ctx);
 
 	switch (req_type) {
-	case LMSHR_DOOR_OPEN_ITERATOR:
-		mode = smb_dr_get_int32(dec_ctx);
-
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
-			goto decode_error;
-
-		lmshr_iter = lmshare_open_iterator(mode);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		smb_dr_put_lmshr_iterator(enc_ctx,
-		    (uint64_t)(uintptr_t)lmshr_iter);
-
-		break;
-
-	case LMSHR_DOOR_CLOSE_ITERATOR:
-		lmshr_iter = (lmshare_iterator_t *)(uintptr_t)
-		    smb_dr_get_lmshr_iterator(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
-			goto decode_error;
-
-		lmshare_close_iterator(lmshr_iter);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		break;
-
-	case LMSHR_DOOR_ITERATE:
-		lmshr_iter = (lmshare_iterator_t *)(uintptr_t)
-		    smb_dr_get_lmshr_iterator(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
-			goto decode_error;
-
-		lmshr_infop = lmshare_iterate(lmshr_iter);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		smb_dr_put_lmshare(enc_ctx, lmshr_infop);
-		break;
-
 	case LMSHR_DOOR_NUM_SHARES:
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
@@ -281,7 +250,7 @@ smb_lmshrd_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		rc2 = smb_lmshrd_srv_check(req_type, sharename);
+		rc2 = smb_share_dsrv_check(req_type, sharename);
 		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc2);
 		smb_dr_free_string(sharename);
@@ -292,19 +261,33 @@ smb_lmshrd_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		rc = lmshare_list(offset, &lmshr_list);
+		lmshare_list(offset, &lmshr_list);
 		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_put_lmshr_list(enc_ctx, &lmshr_list);
 		break;
 
-	case SMB_GET_KCONFIG:
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
+	case LMSHR_DOOR_ENUM:
+		esi.es_bufsize = smb_dr_get_ushort(dec_ctx);
+		esi.es_username = smb_dr_get_string(dec_ctx);
+		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
+			smb_dr_free_string(esi.es_username);
 			goto decode_error;
+		}
 
-		smb_load_kconfig(&smb_kcfg);
+		rc = smb_share_dsrv_enum(&esi);
+
+		smb_dr_free_string(esi.es_username);
+
 		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		smb_dr_put_kconfig(enc_ctx, &smb_kcfg);
+		smb_dr_put_uint32(enc_ctx, rc);
+		if (rc == NERR_Success) {
+			smb_dr_put_ushort(enc_ctx, esi.es_ntotal);
+			smb_dr_put_ushort(enc_ctx, esi.es_nsent);
+			smb_dr_put_ushort(enc_ctx, esi.es_datasize);
+			smb_dr_put_buf(enc_ctx,
+			    (unsigned char *)esi.es_buf, esi.es_bufsize);
+			free(esi.es_buf);
+		}
 		break;
 
 	default:
@@ -312,11 +295,14 @@ smb_lmshrd_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		goto decode_error;
 	}
 
-	if ((enc_status = smb_dr_encode_finish(enc_ctx, &used)) != 0)
-		goto encode_error;
+	if ((enc_status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
+		enc_ctx = smb_dr_encode_start(buf, sizeof (buf));
+		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_ERROR);
+		smb_dr_put_uint32(enc_ctx, enc_status);
+		(void) smb_dr_encode_finish(enc_ctx, &used);
+	}
 
 	(void) door_return(buf, used, NULL, 0);
-
 	return;
 
 decode_error:
@@ -324,25 +310,17 @@ decode_error:
 	smb_dr_put_uint32(enc_ctx, dec_status);
 	(void) smb_dr_encode_finish(enc_ctx, &used);
 	(void) door_return(buf, used, NULL, 0);
-	return;
-
-encode_error:
-	enc_ctx = smb_dr_encode_start(buf, sizeof (buf));
-	smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_ERROR);
-	smb_dr_put_uint32(enc_ctx, enc_status);
-	(void) smb_dr_encode_finish(enc_ctx, &used);
-	(void) door_return(buf, used, NULL, 0);
 }
 
 /*
- * smb_lmshrd_srv_check
+ * smb_share_dsrv_check
  *
  * Depending upon the opcode, this function will
  * either check the existence of a share/dir or
  * the the type of the specified share.
  */
 static int
-smb_lmshrd_srv_check(int opcode, char *sharename)
+smb_share_dsrv_check(int opcode, char *sharename)
 {
 	int rc;
 
@@ -372,4 +350,112 @@ smb_lmshrd_srv_check(int opcode, char *sharename)
 	}
 
 	return (rc);
+}
+
+/*
+ * smb_share_dsrv_enum
+ *
+ * This function builds a response for a NetShareEnum RAP request which
+ * originates from smbsrv kernel module. A response buffer is allocated
+ * with the specified size in esi->es_bufsize. List of shares is scanned
+ * twice. In the first round the total number of shares which their OEM
+ * name is shorter than 13 chars (esi->es_ntotal) and also the number of
+ * shares that fit in the given buffer are calculated. In the second
+ * round the shares data are encoded in the buffer.
+ *
+ * The data associated with each share has two parts, a fixed size part and
+ * a variable size part which is share's comment. The outline of the response
+ * buffer is so that fixed part for all the shares will appear first and follows
+ * with the comments for all those shares and that's why the data cannot be
+ * encoded in one round without unnecessarily complicating the code.
+ */
+static int
+smb_share_dsrv_enum(smb_enumshare_info_t *esi)
+{
+	lmshare_iterator_t shi;
+	lmshare_info_t *si;
+	int remained;
+	uint16_t infolen = 0;
+	uint16_t cmntlen = 0;
+	uint16_t sharelen;
+	uint16_t clen;
+	uint32_t cmnt_offs;
+	smb_msgbuf_t info_mb;
+	smb_msgbuf_t cmnt_mb;
+	boolean_t autohome_added = B_FALSE;
+
+	esi->es_ntotal = esi->es_nsent = 0;
+
+	if ((esi->es_buf = malloc(esi->es_bufsize)) == NULL)
+		return (NERR_InternalError);
+
+	bzero(esi->es_buf, esi->es_bufsize);
+	remained = esi->es_bufsize;
+
+	/* Do the necessary calculations in the first round */
+	lmshare_init_iterator(&shi, LMSHRM_ALL);
+
+	while ((si = lmshare_iterate(&shi)) != NULL) {
+		if (si->mode & LMSHRM_LONGNAME)
+			continue;
+
+		if ((si->mode & LMSHRM_AUTOHOME) && !autohome_added) {
+			if (strcasecmp(esi->es_username, si->share_name) == 0)
+				autohome_added = B_TRUE;
+			else
+				continue;
+		}
+
+		esi->es_ntotal++;
+
+		if (remained <= 0)
+			continue;
+
+		clen = strlen(si->comment) + 1;
+		sharelen = SHARE_INFO_1_SIZE + clen;
+
+		if (sharelen <= remained) {
+			infolen += SHARE_INFO_1_SIZE;
+			cmntlen += clen;
+		}
+
+		remained -= sharelen;
+	}
+
+	esi->es_datasize = infolen + cmntlen;
+
+	smb_msgbuf_init(&info_mb, (uint8_t *)esi->es_buf, infolen, 0);
+	smb_msgbuf_init(&cmnt_mb, (uint8_t *)esi->es_buf + infolen, cmntlen, 0);
+	cmnt_offs = infolen;
+
+	/* Encode the data in the second round */
+	lmshare_init_iterator(&shi, LMSHRM_ALL);
+	autohome_added = B_FALSE;
+
+	while ((si = lmshare_iterate(&shi)) != NULL) {
+		if (si->mode & LMSHRM_LONGNAME)
+			continue;
+
+		if ((si->mode & LMSHRM_AUTOHOME) && !autohome_added) {
+			if (strcasecmp(esi->es_username, si->share_name) == 0)
+				autohome_added = B_TRUE;
+			else
+				continue;
+		}
+
+		if (smb_msgbuf_encode(&info_mb, "13c.wl",
+		    si->oem_name, si->stype, cmnt_offs) < 0)
+			break;
+
+		if (smb_msgbuf_encode(&cmnt_mb, "s", si->comment) < 0)
+			break;
+
+		cmnt_offs += strlen(si->comment) + 1;
+		esi->es_nsent++;
+	}
+
+	smb_msgbuf_term(&info_mb);
+	smb_msgbuf_term(&cmnt_mb);
+
+	return (NERR_Success);
 }

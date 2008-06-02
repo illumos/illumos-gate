@@ -407,7 +407,7 @@ smbd_service_init(void)
 		(void) lsa_query_primary_domain_info();
 	}
 
-	smbd.s_door_lmshr = smb_lmshrd_srv_start();
+	smbd.s_door_lmshr = smb_share_dsrv_start();
 	if (smbd.s_door_lmshr < 0) {
 		smbd_report("share initialization failed");
 	}
@@ -457,7 +457,7 @@ smbd_service_fini(void)
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
 	smb_door_srv_stop();
-	smb_lmshrd_srv_stop();
+	smb_share_dsrv_stop();
 	lmshare_stop();
 	smb_nicmon_stop();
 	smb_idmap_stop();
@@ -528,6 +528,9 @@ smbd_refresh_monitor(void *arg)
 	char		*old_dom;
 	char		fqdn[MAXHOSTNAMELEN];
 	int		rc = 0;
+
+	bzero(&smb_io, sizeof (smb_io));
+	smb_io.sio_version = SMB_IOC_VERSION;
 
 	(void) pthread_mutex_lock(&refresh_mutex);
 	while (pthread_cond_wait(&refresh_cond, &refresh_mutex) == 0) {

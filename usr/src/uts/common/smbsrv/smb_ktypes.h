@@ -375,6 +375,7 @@ typedef struct {
 } smb_xprt_t;
 
 int MBC_LENGTH(struct mbuf_chain *);
+int MBC_MAXBYTES(struct mbuf_chain *);
 void MBC_SETUP(struct mbuf_chain *, uint32_t);
 void MBC_INIT(struct mbuf_chain *, uint32_t);
 void MBC_FLUSH(struct mbuf_chain *);

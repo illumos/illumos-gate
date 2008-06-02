@@ -189,6 +189,12 @@ MBC_LENGTH(struct mbuf_chain *MBC)
 	return (used);
 }
 
+int
+MBC_MAXBYTES(struct mbuf_chain *MBC)
+{
+	return (MBC->max_bytes);
+}
+
 void
 MBC_SETUP(struct mbuf_chain *MBC, uint32_t max_bytes)
 {

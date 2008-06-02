@@ -413,7 +413,6 @@ smb_enable_share(sa_share_t share)
 	for (resource = sa_get_share_resource(share, NULL);
 	    resource != NULL;
 	    resource = sa_get_next_resource(resource)) {
-		sa_optionset_t opts;
 		bzero(&si, sizeof (lmshare_info_t));
 		rname = sa_get_resource_attr(resource, "name");
 		if (rname == NULL) {
@@ -421,11 +420,9 @@ smb_enable_share(sa_share_t share)
 			return (SA_NO_SUCH_RESOURCE);
 		}
 
-		opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
-		smb_build_lmshare_info(rname, path, opts, &si);
+		smb_build_lmshare_info(rname, path, resource, &si);
 		sa_free_attr_string(rname);
 
-		sa_free_derived_optionset(opts);
 		if (!iszfs) {
 			err = lmshrd_add(&si);
 		} else {
@@ -458,7 +455,6 @@ smb_enable_resource(sa_resource_t resource)
 {
 	char *path;
 	char *rname;
-	sa_optionset_t opts;
 	sa_share_t share;
 	lmshare_info_t si;
 	int ret = SA_OK;
@@ -492,11 +488,9 @@ smb_enable_resource(sa_resource_t resource)
 		return (SA_NO_SUCH_RESOURCE);
 	}
 
-	opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
-	smb_build_lmshare_info(rname, path, opts, &si);
+	smb_build_lmshare_info(rname, path, resource, &si);
 	sa_free_attr_string(path);
 	sa_free_attr_string(rname);
-	sa_free_derived_optionset(opts);
 
 	/*
 	 * Attempt to add the share. Any error that occurs if it was
@@ -595,7 +589,6 @@ smb_resource_changed(sa_resource_t resource)
 	lmshare_info_t si;
 	lmshare_info_t new_si;
 	char *rname, *path;
-	sa_optionset_t opts;
 	sa_share_t share;
 
 	rname = sa_get_resource_attr(resource, "name");
@@ -627,9 +620,7 @@ smb_resource_changed(sa_resource_t resource)
 		return (SA_CONFIG_ERR);
 	}
 
-	opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
-	smb_build_lmshare_info(rname, path, opts, &new_si);
-	sa_free_derived_optionset(opts);
+	smb_build_lmshare_info(rname, path, resource, &new_si);
 	sa_free_attr_string(path);
 	sa_free_attr_string(rname);
 

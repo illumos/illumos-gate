@@ -167,6 +167,11 @@ smb_door_srv_func(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	int err;
 	smb_dr_op_t smbop;
 
+	if ((cookie != SMB_DR_SVC_COOKIE) || (argp == NULL) ||
+	    (arg_size < sizeof (uint32_t))) {
+		(void) door_return(NULL, 0, NULL, 0);
+	}
+
 	if ((opcode = smb_dr_get_opcode(argp, arg_size)) < 0) {
 		tmpbuf = smb_door_srv_err_hdlr(SMB_DR_OP_ERR_DECODE,
 		    &rbufsize);

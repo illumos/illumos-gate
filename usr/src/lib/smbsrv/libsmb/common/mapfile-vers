@@ -142,7 +142,6 @@ SUNWprivate {
 	smb_dr_get_dword;
 	smb_dr_get_int32;
 	smb_dr_get_lmshare;
-	smb_dr_get_lmshr_iterator;
 	smb_dr_get_lmshr_list;
 	smb_dr_get_opcode;
 	smb_dr_get_res_stat;
@@ -156,9 +155,7 @@ SUNWprivate {
 	smb_dr_put_buf;
 	smb_dr_put_dword;
 	smb_dr_put_int32;
-	smb_dr_put_kconfig;
 	smb_dr_put_lmshare;
-	smb_dr_put_lmshr_iterator;
 	smb_dr_put_lmshr_list;
 	smb_dr_put_short;
 	smb_dr_put_string;

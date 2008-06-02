@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,28 +44,6 @@
 #include <smbsrv/lmshare_door.h>
 #include <smbsrv/alloc.h>
 #include <smbsrv/smbinfo.h>
-
-void
-smb_dr_get_kconfig(smb_dr_ctx_t *ctx, smb_kmod_cfg_t *cfg)
-{
-	if (ctx->status == 0) {
-		(void) memcpy(cfg, ctx->ptr, sizeof (smb_kmod_cfg_t));
-		ctx->ptr += sizeof (smb_kmod_cfg_t);
-	}
-	else
-		bzero(cfg, sizeof (smb_kmod_cfg_t));
-}
-
-void
-smb_dr_put_kconfig(smb_dr_ctx_t *ctx, smb_kmod_cfg_t *cfg)
-{
-	if (ctx->ptr + sizeof (smb_kmod_cfg_t) <= ctx->end_ptr) {
-		(void) memcpy(ctx->ptr, cfg, sizeof (smb_kmod_cfg_t));
-		ctx->ptr += sizeof (smb_kmod_cfg_t);
-	}
-	else
-		ctx->status = ENOSPC;
-}
 
 void
 smb_dr_get_lmshare(smb_dr_ctx_t *ctx, lmshare_info_t *si)
@@ -93,30 +71,6 @@ smb_dr_put_lmshare(smb_dr_ctx_t *ctx, lmshare_info_t *si)
 		}
 		else
 			ctx->status = ENOSPC;
-	}
-	else
-		smb_dr_put_int32(ctx, 0);
-}
-
-uint64_t
-smb_dr_get_lmshr_iterator(smb_dr_ctx_t *ctx)
-{
-	uint64_t lmshr_iter;
-
-	if (smb_dr_get_int32(ctx))
-		lmshr_iter = smb_dr_get_uint64(ctx);
-	else
-		lmshr_iter = 0;
-
-	return (lmshr_iter);
-}
-
-void
-smb_dr_put_lmshr_iterator(smb_dr_ctx_t *ctx, uint64_t lmshr_iter)
-{
-	if (lmshr_iter) {
-		smb_dr_put_int32(ctx, 1);
-		smb_dr_put_uint64(ctx, lmshr_iter);
 	}
 	else
 		smb_dr_put_int32(ctx, 0);

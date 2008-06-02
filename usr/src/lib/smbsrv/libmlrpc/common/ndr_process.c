@@ -899,11 +899,14 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 			return (0);
 		}
 
-		valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
-		if (!valp) {
-			NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
-			return (0);
+		if (size_is > 0) {
+			valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
+			if (!valp) {
+				NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
+				return (0);
+			}
 		}
+
 		if (outer_ref->backptr)
 			*outer_ref->backptr = valp;
 		outer_ref->datum = valp;
@@ -914,28 +917,30 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 		return (0);
 	}
 
-	bzero(&myref, sizeof (myref));
-	myref.stream = mlnds;
-	myref.enclosing = outer_ref;
-	myref.ti = outer_ref->ti;
-	myref.datum = outer_ref->datum;
-	myref.name = "CONFORMANT-ARRAY";
-	myref.outer_flags = NDR_F_NONE;
-	myref.inner_flags = NDR_F_SIZE_IS;
-	myref.size_is = outer_ref->size_is;
-
-	myref.inner_flags = NDR_F_DIMENSION_IS;		/* convenient */
-	myref.dimension_is = outer_ref->size_is;	/* convenient */
-
-	myref.pdu_offset = outer_ref->pdu_offset + 4;
 	outer_ref->pdu_end_offset = outer_ref->pdu_offset + n_pdu_total;
-
 	outer_ref->type_flags = NDR_F_NONE;
 	outer_ref->inner_flags = NDR_F_NONE;
 
-	rc = mlndr_inner(&myref);
-	if (!rc)
-		return (rc);		/* error already set */
+	if (size_is > 0) {
+		bzero(&myref, sizeof (myref));
+		myref.stream = mlnds;
+		myref.enclosing = outer_ref;
+		myref.ti = outer_ref->ti;
+		myref.datum = outer_ref->datum;
+		myref.name = "CONFORMANT-ARRAY";
+		myref.outer_flags = NDR_F_NONE;
+		myref.inner_flags = NDR_F_SIZE_IS;
+		myref.size_is = outer_ref->size_is;
+
+		myref.inner_flags = NDR_F_DIMENSION_IS;		/* convenient */
+		myref.dimension_is = outer_ref->size_is;	/* convenient */
+
+		myref.pdu_offset = outer_ref->pdu_offset + 4;
+
+		rc = mlndr_inner(&myref);
+		if (!rc)
+			return (rc);		/* error already set */
+	}
 
 	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
 	return (1);
@@ -1041,6 +1046,10 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 		return (0);
 	}
 
+	outer_ref->pdu_end_offset = outer_ref->pdu_offset + n_pdu_total;
+	outer_ref->type_flags = NDR_F_SIZE_IS; /* indicate pending */
+	outer_ref->inner_flags = NDR_F_NONE;   /* indicate pending */
+
 	bzero(&myref, sizeof (myref));
 	myref.stream = mlnds;
 	myref.enclosing = outer_ref;
@@ -1052,10 +1061,6 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 	myref.size_is = outer_ref->size_is;
 
 	myref.pdu_offset = outer_ref->pdu_offset + 4;
-	outer_ref->pdu_end_offset = outer_ref->pdu_offset + n_pdu_total;
-
-	outer_ref->type_flags = NDR_F_SIZE_IS; /* indicate pending */
-	outer_ref->inner_flags = NDR_F_NONE;   /* indicate pending */
 
 	rc = mlndr_inner(&myref);
 	if (!rc)

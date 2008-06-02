@@ -68,10 +68,11 @@ static HT_HANDLE *lmshare_handle = NULL;
 static rwlock_t lmshare_lock;
 static pthread_t lmshare_load_thread;
 static void *lmshare_load(void *);
-static DWORD lmshare_create_table();
+static DWORD lmshare_create_table(void);
 static int lmshare_delete_shmgr(struct lmshare_info *);
 static int lmshare_setinfo_shmgr(struct lmshare_info *);
-static DWORD lmshare_set_refcnt(char *share_name, int refcnt);
+static DWORD lmshare_set_refcnt(char *, int);
+static void lmshare_set_oemname(lmshare_info_t *);
 
 typedef struct lmshare_ad_item {
 	TAILQ_ENTRY(lmshare_ad_item) next;
@@ -139,7 +140,6 @@ lmshare_load_shares(sa_group_t group)
 {
 	sa_share_t share;
 	sa_resource_t resource;
-	sa_optionset_t opts;
 	lmshare_info_t si;
 	char *path, *rname;
 
@@ -162,10 +162,7 @@ lmshare_load_shares(sa_group_t group)
 				    "resource for path: %s", path);
 				continue;
 			}
-			opts = sa_get_derived_optionset(resource,
-			    SMB_PROTOCOL_NAME, 1);
-			smb_build_lmshare_info(rname, path, opts, &si);
-			sa_free_derived_optionset(opts);
+			smb_build_lmshare_info(rname, path, resource, &si);
 			sa_free_attr_string(rname);
 			if (lmshare_add(&si, 0) != NERR_Success) {
 				syslog(LOG_ERR, "Failed to load "
@@ -250,7 +247,7 @@ static void
 lmshare_callback(HT_ITEM *item)
 {
 	if (item && item->hi_data)
-		(void) free(item->hi_data);
+		free(item->hi_data);
 }
 
 /*
@@ -297,7 +294,7 @@ lmshare_add_adminshare(char *volname, unsigned char drive)
 
 	bzero(&si, sizeof (lmshare_info_t));
 	(void) strcpy(si.directory, volname);
-	si.mode = LMSHRM_TRANS;
+	si.mode = LMSHRM_TRANS | LMSHRM_ADMIN;
 	(void) snprintf(si.share_name, sizeof (si.share_name), "%c$", drive);
 	rc = lmshare_add(&si, 0);
 
@@ -324,55 +321,22 @@ lmshare_num_shares(void)
 }
 
 /*
- * lmshare_open_iterator
+ * lmshare_init_iterator
  *
- * Create and initialize an iterator for traversing hash table.
- * It gets a mode that can be LMSHR_IM_ALL to iterate through all
- * the shares stored in table or LMSHR_IM_PRES to iterate through
- * only presentable shares.
- *
- * It also accepts a local IP address. This is used in dual head
- * systems to only return the shares that belong to the head which
- * is specified by the 'ipaddr'. If ipaddr is 0 it'll return shares
- * of both heads.
- *
- * On success return pointer to the new iterator.
- * On failure return (NULL).
- */
-lmshare_iterator_t *
-lmshare_open_iterator(int mode)
-{
-	lmshare_iterator_t *shi;
-	int sz = sizeof (lmshare_iterator_t) + sizeof (HT_ITERATOR);
-
-	shi = malloc(sz);
-	if (shi != NULL) {
-		bzero(shi, sz);
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		shi->iterator = (HT_ITERATOR *)
-		    ((char *)shi + sizeof (lmshare_iterator_t));
-		shi->mode = mode;
-	} else {
-		syslog(LOG_DEBUG, "Failed to create share iterator handle");
-	}
-	return (shi);
-}
-
-/*
- * lmshare_close_iterator
- *
- * Free memory allocated by the given iterator.
+ * Initialize an iterator for traversing hash table.
+ * 'mode' is used for filtering shares when iterating.
  */
 void
-lmshare_close_iterator(lmshare_iterator_t *shi)
+lmshare_init_iterator(lmshare_iterator_t *shi, uint32_t mode)
 {
-	(void) free(shi);
+	bzero(shi, sizeof (lmshare_iterator_t));
+	shi->mode = mode;
 }
 
 /*
  * lmshare_iterate
  *
- * Iterate on the shares in the hash table. The iterator must be opened
+ * Iterate on the shares in the hash table. The iterator must be initialized
  * before the first iteration. On subsequent calls, the iterator must be
  * passed unchanged.
  *
@@ -396,6 +360,7 @@ lmshare_iterate(lmshare_iterator_t *shi)
 		 * IPC$ is always first.
 		 */
 		(void) strcpy(shi->si.share_name, "IPC$");
+		lmshare_set_oemname(&shi->si);
 		shi->si.mode = LMSHRM_TRANS;
 		shi->si.stype = (int)(STYPE_IPC | STYPE_SPECIAL);
 		shi->iteration = 1;
@@ -404,7 +369,7 @@ lmshare_iterate(lmshare_iterator_t *shi)
 
 	if (shi->iteration == 1) {
 		if ((item = ht_findfirst(
-		    lmshare_handle, shi->iterator)) == NULL) {
+		    lmshare_handle, &shi->iterator)) == NULL) {
 			return (NULL);
 		}
 
@@ -412,18 +377,16 @@ lmshare_iterate(lmshare_iterator_t *shi)
 		++shi->iteration;
 
 		if (si->mode & shi->mode) {
-			(void) memcpy(&(shi->si), si,
-			    sizeof (lmshare_info_t));
+			(void) memcpy(&(shi->si), si, sizeof (lmshare_info_t));
 			return (&(shi->si));
 		}
 	}
 
-	while ((item = ht_findnext(shi->iterator)) != NULL) {
+	while ((item = ht_findnext(&shi->iterator)) != NULL) {
 		si = (lmshare_info_t *)(item->hi_data);
 		++shi->iteration;
 		if (si->mode & shi->mode) {
 			(void) memcpy(&(shi->si), si, sizeof (lmshare_info_t));
-
 			return (&(shi->si));
 		}
 	}
@@ -451,7 +414,10 @@ lmshare_add(lmshare_info_t *si, int doshm)
 	(void) utf8_strlwr(si->share_name);
 
 	if (lmshare_exists(si->share_name)) {
-		if ((si->mode & LMSHRM_TRANS) == 0)
+		/*
+		 * Only autohome shares can be added multiple times
+		 */
+		if ((si->mode & LMSHRM_AUTOHOME) == 0)
 			return (NERR_DuplicateShare);
 	}
 
@@ -460,7 +426,7 @@ lmshare_add(lmshare_info_t *si, int doshm)
 		lmshare_do_publish(si, LMSHR_PUBLISH, 1);
 	}
 
-	if ((si->mode & LMSHRM_TRANS) && (status == NERR_Success)) {
+	if ((si->mode & LMSHRM_AUTOHOME) && (status == NERR_Success)) {
 		si->refcnt++;
 		status = lmshare_set_refcnt(si->share_name, si->refcnt);
 	}
@@ -507,7 +473,7 @@ lmshare_delete(char *share_name, int doshm)
 		return (NERR_InternalError);
 	}
 
-	if ((si->mode & LMSHRM_TRANS) != 0) {
+	if ((si->mode & LMSHRM_AUTOHOME) == LMSHRM_AUTOHOME) {
 		si->refcnt--;
 		if (si->refcnt > 0) {
 			status = lmshare_set_refcnt(si->share_name, si->refcnt);
@@ -993,11 +959,13 @@ lmshare_setinfo(lmshare_info_t *si, int doshm)
 		}
 	} else {
 		/* Unpublish old share from AD */
-		if ((si->mode & LMSHRM_TRANS) == 0) {
+		if ((add_si->mode & LMSHRM_PERM) == LMSHRM_PERM)
 			lmshare_do_publish(&old_si, LMSHR_UNPUBLISH, 1);
-		}
 		(void) del_fromhash(si->share_name);
 	}
+
+	lmshare_set_oemname(add_si);
+
 	/* if it's not transient it should be permanent */
 	if ((add_si->mode & LMSHRM_TRANS) == 0)
 		add_si->mode |= LMSHRM_PERM;
@@ -1016,7 +984,7 @@ lmshare_setinfo(lmshare_info_t *si, int doshm)
 	}
 	(void) rw_unlock(&lmshare_lock);
 
-	if ((add_si->mode & LMSHRM_TRANS) == 0) {
+	if ((add_si->mode & LMSHRM_PERM) == LMSHRM_PERM) {
 		if (doshm && (lmshare_setinfo_shmgr(add_si) != 0)) {
 			syslog(LOG_ERR, "Update share %s in sharemgr failed",
 			    add_si->share_name);
@@ -1028,21 +996,20 @@ lmshare_setinfo(lmshare_info_t *si, int doshm)
 	return (res);
 }
 
-DWORD
+void
 lmshare_list(int offset, lmshare_list_t *list)
 {
-	lmshare_iterator_t *iterator;
+	lmshare_iterator_t iterator;
 	lmshare_info_t *si;
 	int list_idx = 0;
 	int i = 0;
 
 	bzero(list, sizeof (lmshare_list_t));
-	if ((iterator = lmshare_open_iterator(LMSHRM_ALL)) == NULL)
-		return (NERR_InternalError);
+	lmshare_init_iterator(&iterator, LMSHRM_ALL);
 
-	(void) lmshare_iterate(iterator);	/* To skip IPC$ */
+	(void) lmshare_iterate(&iterator);	/* To skip IPC$ */
 
-	while ((si = lmshare_iterate(iterator)) != NULL) {
+	while ((si = lmshare_iterate(&iterator)) != NULL) {
 		if (lmshare_is_special(si->share_name)) {
 			/*
 			 * Don't return restricted shares.
@@ -1059,11 +1026,8 @@ lmshare_list(int offset, lmshare_list_t *list)
 		if (++list_idx == LMSHARES_PER_REQUEST)
 			break;
 	}
-	lmshare_close_iterator(iterator);
 
 	list->no = list_idx;
-
-	return (NERR_Success);
 }
 
 /*
@@ -1076,8 +1040,10 @@ lmshare_do_publish(lmshare_info_t *si, char flag, int poke)
 
 	if (publish_on == 0)
 		return;
+
 	if ((si == NULL) || (si->container[0] == '\0'))
 		return;
+
 	(void) mutex_lock(&lmshare_publish_mutex);
 	item = (lmshare_ad_item_t *)malloc(sizeof (lmshare_ad_item_t));
 	if (item == NULL) {
@@ -1220,4 +1186,48 @@ lmshare_get_realpath(const char *clipath, char *realpath, int maxlen)
 {
 	/* XXX do this translation */
 	return (NERR_Success);
+}
+
+/*
+ * lmshare_set_oemname
+ *
+ * Generates the OEM name of the given share. If it's
+ * shorter than 13 chars it'll be saved in si->oem_name.
+ * Otherwise si->oem_name will be empty and LMSHRM_LONGNAME
+ * will be set in si->mode.
+ */
+static void
+lmshare_set_oemname(lmshare_info_t *si)
+{
+	unsigned int cpid = oem_get_smb_cpid();
+	mts_wchar_t *unibuf;
+	char *oem_name;
+	int length;
+
+	length = strlen(si->share_name) + 1;
+
+	oem_name = malloc(length);
+	unibuf = malloc(length * sizeof (mts_wchar_t));
+	if ((oem_name == NULL) || (unibuf == NULL)) {
+		free(oem_name);
+		free(unibuf);
+		return;
+	}
+
+	(void) mts_mbstowcs(unibuf, si->share_name, length);
+
+	if (unicodestooems(oem_name, unibuf, length, cpid) == 0)
+		(void) strcpy(oem_name, si->share_name);
+
+	free(unibuf);
+
+	if (strlen(oem_name) + 1 > LMSHR_OEM_NAME_MAX) {
+		si->mode |= LMSHRM_LONGNAME;
+		*si->oem_name = '\0';
+	} else {
+		si->mode &= ~LMSHRM_LONGNAME;
+		(void) strlcpy(si->oem_name, oem_name, LMSHR_OEM_NAME_MAX);
+	}
+
+	free(oem_name);
 }

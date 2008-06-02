@@ -28,7 +28,6 @@
 SUNWprivate {
     global:
 	lmshare_add;
-	lmshare_close_iterator;
 	lmshare_delete;
 	lmshare_exists;
 	lmshare_getinfo;
@@ -41,7 +40,7 @@ SUNWprivate {
 	lmshare_iterate;
 	lmshare_list;
 	lmshare_num_shares;
-	lmshare_open_iterator;
+	lmshare_init_iterator;
 	lmshare_rename;
 	lmshare_setinfo;
 	lmshare_start;
@@ -60,11 +59,7 @@ SUNWprivate {
 	smb_build_lmshare_info;
 	smb_get_smb_share_group;
 	smb_autohome_add;
-	smb_autohome_endent;
-	smb_autohome_getent;
-	smb_autohome_lookup;
 	smb_autohome_remove;
-	smb_autohome_setent;
 	smb_is_autohome;
     local:
 	*;

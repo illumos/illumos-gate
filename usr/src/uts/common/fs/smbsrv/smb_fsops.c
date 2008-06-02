@@ -2594,6 +2594,27 @@ smb_fsop_frlock(smb_node_t *node, smb_lock_t *lock, boolean_t unlock,
 	flock64_t bf;
 	int flag = F_REMOTELOCK;
 
+	/*
+	 * VOP_FRLOCK() will not be called if:
+	 *
+	 * 1) The lock has a range of zero bytes. The semantics of Windows and
+	 *    POSIX are different. In the case of POSIX it asks for the locking
+	 *    of all the bytes from the offset provided until the end of the
+	 *    file. In the case of Windows a range of zero locks nothing and
+	 *    doesn't conflict with any other lock.
+	 *
+	 * 2) The lock rolls over (start + lenght < start). Solaris will assert
+	 *    if such a request is submitted. This will not create
+	 *    incompatibilities between POSIX and Windows. In the Windows world,
+	 *    if a client submits such a lock, the server will not lock any
+	 *    bytes. Interestingly if the same lock (same offset and length) is
+	 *    resubmitted Windows will consider that there is an overlap and
+	 *    the granting rules will then apply.
+	 */
+	if ((lock->l_length == 0) ||
+	    ((lock->l_start + lock->l_length - 1) < lock->l_start))
+		return (0);
+
 	bzero(&bf, sizeof (bf));
 
 	if (unlock) {
