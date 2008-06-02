@@ -987,9 +987,10 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 	sodirect_t *sodp = stp->sd_sodirect;
 	mblk_t *bp;
 	int error;
+	ssize_t rbytes = 0;
 
-	ASSERT(MUTEX_HELD(&stp->sd_lock));
 	/* Holding sd_lock prevents the read queue from changing  */
+	ASSERT(MUTEX_HELD(&stp->sd_lock));
 
 	if (uiop != NULL && stp->sd_struiordq != NULL &&
 	    q->q_first == NULL &&
@@ -1073,6 +1074,7 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 	}
 	*errorp = 0;
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
+
 	if (sodp != NULL && (sodp->sod_state & SOD_ENABLED) &&
 	    (sodp->sod_uioa.uioa_state & UIOA_INIT)) {
 		/*
@@ -1085,10 +1087,18 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 		if (q->q_first != NULL) {
 			struioainit(q, sodp, uiop);
 		}
+	} else {
+		/*
+		 * If we have a valid uio, try and use this as a guide for how
+		 * many bytes to retrieve from the queue via getq_noenab().
+		 * Doing this can avoid unneccesary counting of overlong
+		 * messages in putback(). We currently only do this for sockets.
+		 */
+		if ((uiop != NULL) && (stp->sd_vnode->v_type == VSOCK))
+			rbytes = uiop->uio_resid;
 	}
 
-	bp = getq_noenab(q);
-
+	bp = getq_noenab(q, rbytes);
 	if (bp != NULL && (bp->b_datap->db_flags & DBLK_UIOA)) {
 		/*
 		 * A uioa flaged mblk_t chain, already uio processed,
@@ -1431,7 +1441,7 @@ ismdata:
 			 */
 			while ((((bp = q->q_first)) != NULL) &&
 			    (bp->b_datap->db_type == M_SIG)) {
-				bp = getq_noenab(q);
+				bp = getq_noenab(q, 0);
 				/*
 				 * sd_lock is held so the content of the
 				 * read queue can not change.
@@ -6745,14 +6755,14 @@ strgetmsg(
 		 */
 		} else if ((*flagsp & MSG_HIPRI) && q_first != NULL &&
 		    q_first->b_datap->db_type >= QPCTL &&
-		    (bp = getq_noenab(q)) != NULL) {
+		    (bp = getq_noenab(q, 0)) != NULL) {
 			/* Asked for HIPRI and got one */
 			ASSERT(bp->b_datap->db_type >= QPCTL);
 			break;
 		} else if ((*flagsp & MSG_BAND) && q_first != NULL &&
 		    ((q_first->b_band >= *prip) ||
 		    q_first->b_datap->db_type >= QPCTL) &&
-		    (bp = getq_noenab(q)) != NULL) {
+		    (bp = getq_noenab(q, 0)) != NULL) {
 			/*
 			 * Asked for at least band "prip" and got either at
 			 * least that band or a hipri message.
@@ -7286,13 +7296,13 @@ retry:
 		 */
 		} else if ((flags & MSG_HIPRI) && q_first != NULL &&
 		    q_first->b_datap->db_type >= QPCTL &&
-		    (bp = getq_noenab(q)) != NULL) {
+		    (bp = getq_noenab(q, 0)) != NULL) {
 			ASSERT(bp->b_datap->db_type >= QPCTL);
 			break;
 		} else if ((flags & MSG_BAND) && q_first != NULL &&
 		    ((q_first->b_band >= *prip) ||
 		    q_first->b_datap->db_type >= QPCTL) &&
-		    (bp = getq_noenab(q)) != NULL) {
+		    (bp = getq_noenab(q, 0)) != NULL) {
 			/*
 			 * Asked for at least band "prip" and got either at
 			 * least that band or a hipri message.
@@ -8467,19 +8477,32 @@ chkrd:
 static void
 putback(struct stdata *stp, queue_t *q, mblk_t *bp, int band)
 {
-	mblk_t	*qfirst = q->q_first;
+	mblk_t	*qfirst;
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
 
+	/*
+	 * As a result of lock-step ordering around q_lock and sd_lock,
+	 * it's possible for function calls like putnext() and
+	 * canputnext() to get an inaccurate picture of how much
+	 * data is really being processed at the stream head.
+	 * We only consolidate with existing messages on the queue
+	 * if the length of the message we want to put back is smaller
+	 * than the queue hiwater mark.
+	 */
 	if ((stp->sd_rput_opt & SR_CONSOL_DATA) &&
-	    (qfirst != NULL) &&
-	    (qfirst->b_datap->db_type == M_DATA) &&
-	    ((qfirst->b_flag & (MSGMARK|MSGDELIM)) == 0)) {
+	    (DB_TYPE(bp) == M_DATA) && ((qfirst = q->q_first) != NULL) &&
+	    (DB_TYPE(qfirst) == M_DATA) &&
+	    ((qfirst->b_flag & (MSGMARK|MSGDELIM)) == 0) &&
+	    ((bp->b_flag & (MSGMARK|MSGDELIM|MSGMARKNEXT)) == 0) &&
+	    (mp_cont_len(bp, NULL) < q->q_hiwat)) {
 		/*
 		 * We use the same logic as defined in strrput()
 		 * but in reverse as we are putting back onto the
 		 * queue and want to retain byte ordering.
-		 * Consolidate an M_DATA message onto an M_DATA,
-		 * M_PROTO, or M_PCPROTO by merging it with q_first.
+		 * Consolidate M_DATA messages with M_DATA ONLY.
+		 * strrput() allows the consolidation of M_DATA onto
+		 * M_PROTO | M_PCPROTO but not the other way round.
+		 *
 		 * The consolidation does not take place if the message
 		 * we are returning to the queue is marked with either
 		 * of the marks or the delim flag or if q_first
@@ -8489,38 +8512,33 @@ putback(struct stdata *stp, queue_t *q, mblk_t *bp, int band)
 		 * Carry any MSGMARKNEXT and MSGNOTMARKNEXT from q_first
 		 * to the front of the b_cont chain.
 		 */
-		unsigned char db_type = bp->b_datap->db_type;
+		rmvq_noenab(q, qfirst);
 
-		if ((db_type == M_DATA || db_type == M_PROTO ||
-		    db_type == M_PCPROTO) &&
-		    !(bp->b_flag & (MSGMARK|MSGDELIM|MSGMARKNEXT))) {
-			rmvq_noenab(q, qfirst);
-			/*
-			 * The first message in the b_cont list
-			 * tracks MSGMARKNEXT and MSGNOTMARKNEXT.
-			 * We need to handle the case where we
-			 * are appending:
-			 *
-			 * 1) a MSGMARKNEXT to a MSGNOTMARKNEXT.
-			 * 2) a MSGMARKNEXT to a plain message.
-			 * 3) a MSGNOTMARKNEXT to a plain message
-			 * 4) a MSGNOTMARKNEXT to a MSGNOTMARKNEXT
-			 *    message.
-			 *
-			 * Thus we never append a MSGMARKNEXT or
-			 * MSGNOTMARKNEXT to a MSGMARKNEXT message.
-			 */
-			if (qfirst->b_flag & MSGMARKNEXT) {
-				bp->b_flag |= MSGMARKNEXT;
-				bp->b_flag &= ~MSGNOTMARKNEXT;
-				qfirst->b_flag &= ~MSGMARKNEXT;
-			} else if (qfirst->b_flag & MSGNOTMARKNEXT) {
-				bp->b_flag |= MSGNOTMARKNEXT;
-				qfirst->b_flag &= ~MSGNOTMARKNEXT;
-			}
-
-			linkb(bp, qfirst);
+		/*
+		 * The first message in the b_cont list
+		 * tracks MSGMARKNEXT and MSGNOTMARKNEXT.
+		 * We need to handle the case where we
+		 * are appending:
+		 *
+		 * 1) a MSGMARKNEXT to a MSGNOTMARKNEXT.
+		 * 2) a MSGMARKNEXT to a plain message.
+		 * 3) a MSGNOTMARKNEXT to a plain message
+		 * 4) a MSGNOTMARKNEXT to a MSGNOTMARKNEXT
+		 *    message.
+		 *
+		 * Thus we never append a MSGMARKNEXT or
+		 * MSGNOTMARKNEXT to a MSGMARKNEXT message.
+		 */
+		if (qfirst->b_flag & MSGMARKNEXT) {
+			bp->b_flag |= MSGMARKNEXT;
+			bp->b_flag &= ~MSGNOTMARKNEXT;
+			qfirst->b_flag &= ~MSGMARKNEXT;
+		} else if (qfirst->b_flag & MSGNOTMARKNEXT) {
+			bp->b_flag |= MSGNOTMARKNEXT;
+			qfirst->b_flag &= ~MSGNOTMARKNEXT;
 		}
+
+		linkb(bp, qfirst);
 	}
 	(void) putbq(q, bp);
 

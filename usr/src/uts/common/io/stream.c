@@ -1670,7 +1670,7 @@ getq(queue_t *q)
 	mblk_t *bp;
 	uchar_t band = 0;
 
-	bp = getq_noenab(q);
+	bp = getq_noenab(q, 0);
 	if (bp != NULL)
 		band = bp->b_band;
 
@@ -1701,15 +1701,43 @@ getq(queue_t *q)
 	}
 
 /*
+ * Returns the number of bytes in a message (a message is defined as a
+ * chain of mblks linked by b_cont). If a non-NULL mblkcnt is supplied we
+ * also return the number of distinct mblks in the message.
+ */
+int
+mp_cont_len(mblk_t *bp, int *mblkcnt)
+{
+	mblk_t	*mp;
+	int	mblks = 0;
+	int	bytes = 0;
+
+	for (mp = bp; mp != NULL; mp = mp->b_cont) {
+		ADD_MBLK_SIZE(mp, bytes);
+		mblks++;
+	}
+
+	if (mblkcnt != NULL)
+		*mblkcnt = mblks;
+
+	return (bytes);
+}
+
+/*
  * Like getq() but does not backenable.  This is used by the stream
  * head when a putback() is likely.  The caller must call qbackenable()
  * after it is done with accessing the queue.
+ * The rbytes arguments to getq_noneab() allows callers to specify a
+ * the maximum number of bytes to return. If the current amount on the
+ * queue is less than this then the entire message will be returned.
+ * A value of 0 returns the entire message and is equivalent to the old
+ * default behaviour prior to the addition of the rbytes argument.
  */
 mblk_t *
-getq_noenab(queue_t *q)
+getq_noenab(queue_t *q, ssize_t rbytes)
 {
-	mblk_t *bp;
-	mblk_t *tmp;
+	mblk_t *bp, *mp1;
+	mblk_t *mp2 = NULL;
 	qband_t *qbp;
 	kthread_id_t freezer;
 	int	bytecnt = 0, mblkcnt = 0;
@@ -1725,17 +1753,115 @@ getq_noenab(queue_t *q)
 	if ((bp = q->q_first) == 0) {
 		q->q_flag |= QWANTR;
 	} else {
-		if ((q->q_first = bp->b_next) == NULL)
-			q->q_last = NULL;
-		else
-			q->q_first->b_prev = NULL;
-
-		/* Get message byte count for q_count accounting */
-		for (tmp = bp; tmp; tmp = tmp->b_cont) {
-			ADD_MBLK_SIZE(tmp, bytecnt);
-			mblkcnt++;
+		/*
+		 * If the caller supplied a byte threshold and there is
+		 * more than this amount on the queue then break up the
+		 * the message appropriately.  We can only safely do
+		 * this for M_DATA messages.
+		 */
+		if ((DB_TYPE(bp) == M_DATA) && (rbytes > 0) &&
+		    (q->q_count > rbytes)) {
+			/*
+			 * Inline version of mp_cont_len() which terminates
+			 * when we meet or exceed rbytes.
+			 */
+			for (mp1 = bp; mp1 != NULL; mp1 = mp1->b_cont) {
+				mblkcnt++;
+				ADD_MBLK_SIZE(mp1, bytecnt);
+				if (bytecnt  >= rbytes)
+					break;
+			}
+			/*
+			 * We need to account for the following scenarios:
+			 *
+			 * 1) Too much data in the first message:
+			 *	mp1 will be the mblk which puts us over our
+			 *	byte limit.
+			 * 2) Not enough data in the first message:
+			 *	mp1 will be NULL.
+			 * 3) Exactly the right amount of data contained within
+			 *    whole mblks:
+			 *	mp1->b_cont will be where we break the message.
+			 */
+			if (bytecnt > rbytes) {
+				/*
+				 * Dup/copy mp1 and put what we don't need
+				 * back onto the queue. Adjust the read/write
+				 * and continuation pointers appropriately
+				 * and decrement the current mblk count to
+				 * reflect we are putting an mblk back onto
+				 * the queue.
+				 * When adjusting the message pointers, it's
+				 * OK to use the existing bytecnt and the
+				 * requested amount (rbytes) to calculate the
+				 * the new write offset (b_wptr) of what we
+				 * are taking. However, we  cannot use these
+				 * values when calculating the read offset of
+				 * the mblk we are putting back on the queue.
+				 * This is because the begining (b_rptr) of the
+				 * mblk represents some arbitrary point within
+				 * the message.
+				 * It's simplest to do this by advancing b_rptr
+				 * by the new length of mp1 as we don't have to
+				 * remember any intermediate state.
+				 */
+				ASSERT(mp1 != NULL);
+				mblkcnt--;
+				if ((mp2 = dupb(mp1)) == NULL &&
+				    (mp2 = copyb(mp1)) == NULL) {
+					bytecnt = mblkcnt = 0;
+					goto dup_failed;
+				}
+				mp2->b_cont = mp1->b_cont;
+				mp1->b_wptr -= bytecnt - rbytes;
+				mp2->b_rptr += mp1->b_wptr - mp1->b_rptr;
+				mp1->b_cont = NULL;
+				bytecnt = rbytes;
+			} else {
+				/*
+				 * Either there is not enough data in the first
+				 * message or there is no excess data to deal
+				 * with. If mp1 is NULL, we are taking the
+				 * whole message. No need to do anything.
+				 * Otherwise we assign mp1->b_cont to mp2 as
+				 * we will be putting this back onto the head of
+				 * the queue.
+				 */
+				if (mp1 != NULL) {
+					mp2 = mp1->b_cont;
+					mp1->b_cont = NULL;
+				}
+			}
+			/*
+			 * If mp2 is not NULL then we have part of the message
+			 * to put back onto the queue.
+			 */
+			if (mp2 != NULL) {
+				if ((mp2->b_next = bp->b_next) == NULL)
+					q->q_last = mp2;
+				else
+					bp->b_next->b_prev = mp2;
+				q->q_first = mp2;
+			} else {
+				if ((q->q_first = bp->b_next) == NULL)
+					q->q_last = NULL;
+				else
+					q->q_first->b_prev = NULL;
+			}
+		} else {
+			/*
+			 * Either no byte threshold was supplied, there is
+			 * not enough on the queue or we failed to
+			 * duplicate/copy a data block. In these cases we
+			 * just take the entire first message.
+			 */
+dup_failed:
+			bytecnt = mp_cont_len(bp, &mblkcnt);
+			if ((q->q_first = bp->b_next) == NULL)
+				q->q_last = NULL;
+			else
+				q->q_first->b_prev = NULL;
 		}
-
 		if (bp->b_band == 0) {
 			q->q_count -= bytecnt;
 			q->q_mblkcnt -= mblkcnt;
@@ -1900,7 +2026,6 @@ rmvq(queue_t *q, mblk_t *mp)
 void
 rmvq_noenab(queue_t *q, mblk_t *mp)
 {
-	mblk_t *tmp;
 	int i;
 	qband_t *qbp = NULL;
 	kthread_id_t freezer;
@@ -1952,10 +2077,7 @@ rmvq_noenab(queue_t *q, mblk_t *mp)
 	mp->b_prev = NULL;
 
 	/* Get the size of the message for q_count accounting */
-	for (tmp = mp; tmp; tmp = tmp->b_cont) {
-		ADD_MBLK_SIZE(tmp, bytecnt);
-		mblkcnt++;
-	}
+	bytecnt = mp_cont_len(mp, &mblkcnt);
 
 	if (mp->b_band == 0) {		/* Perform q_count accounting */
 		q->q_count -= bytecnt;
@@ -2444,10 +2566,7 @@ putq(queue_t *q, mblk_t *bp)
 	}
 
 	/* Get message byte count for q_count accounting */
-	for (tmp = bp; tmp; tmp = tmp->b_cont) {
-		ADD_MBLK_SIZE(tmp, bytecnt);
-		mblkcnt++;
-	}
+	bytecnt = mp_cont_len(bp, &mblkcnt);
 
 	if (qbp) {
 		qbp->qb_count += bytecnt;
@@ -2629,10 +2748,8 @@ putbq(queue_t *q, mblk_t *bp)
 	}
 
 	/* Get message byte count for q_count accounting */
-	for (tmp = bp; tmp; tmp = tmp->b_cont) {
-		ADD_MBLK_SIZE(tmp, bytecnt);
-		mblkcnt++;
-	}
+	bytecnt = mp_cont_len(bp, &mblkcnt);
+
 	if (qbp) {
 		qbp->qb_count += bytecnt;
 		qbp->qb_mblkcnt += mblkcnt;
@@ -2760,10 +2877,7 @@ badord:
 	}
 
 	/* Get mblk and byte count for q_count accounting */
-	for (tmp = mp; tmp; tmp = tmp->b_cont) {
-		ADD_MBLK_SIZE(tmp, bytecnt);
-		mblkcnt++;
-	}
+	bytecnt = mp_cont_len(mp, &mblkcnt);
 
 	if (qbp) {	/* adjust qband pointers and count */
 		if (!qbp->qb_first) {

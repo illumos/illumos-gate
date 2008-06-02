@@ -121,7 +121,7 @@ log_flushq(queue_t *q)
 	log_t *lp = (log_t *)q->q_ptr;
 
 	/* lp will be NULL if the queue was created via log_makeq */
-	while ((mp = getq_noenab(q)) != NULL)
+	while ((mp = getq_noenab(q, 0)) != NULL)
 		log_sendmsg(mp, lp == NULL ? GLOBAL_ZONEID : lp->log_zoneid);
 }
 
@@ -322,7 +322,7 @@ log_conswitch(log_t *src, log_t *dst)
 	mblk_t *tmp = NULL;
 	log_ctl_t *hlc;
 
-	while ((mp = getq_noenab(src->log_q)) != NULL) {
+	while ((mp = getq_noenab(src->log_q, 0)) != NULL) {
 		log_ctl_t *lc = (log_ctl_t *)mp->b_rptr;
 		lc->flags |= SL_LOGONLY;
 
@@ -500,7 +500,7 @@ log_makemsg(int mid, int sid, int level, int sl, int pri, void *msg,
 
 	if (size <= LOG_MSGSIZE &&
 	    (on_intr || log_freeq->q_count > log_freeq->q_lowat))
-		mp = getq_noenab(log_freeq);
+		mp = getq_noenab(log_freeq, 0);
 
 	if (mp == NULL) {
 		if (on_intr ||
@@ -688,7 +688,7 @@ log_sendmsg(mblk_t *mp, zoneid_t zoneid)
 		    (mp2 = copymsg(mp)) != NULL) {
 			mp2->b_cont->b_rptr += body;
 			if (log_recentq->q_flag & QFULL)
-				freemsg(getq_noenab(log_recentq));
+				freemsg(getq_noenab(log_recentq, 0));
 			(void) putq(log_recentq, mp2);
 		}
 	}

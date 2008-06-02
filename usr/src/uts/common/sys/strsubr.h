@@ -1159,7 +1159,7 @@ extern void backenable(queue_t *, uchar_t);
 extern void set_qend(queue_t *);
 extern int strgeterr(stdata_t *, int32_t, int);
 extern void qenable_locked(queue_t *);
-extern mblk_t *getq_noenab(queue_t *);
+extern mblk_t *getq_noenab(queue_t *, ssize_t);
 extern void rmvq_noenab(queue_t *, mblk_t *);
 extern void qbackenable(queue_t *, uchar_t);
 extern void set_qfull(queue_t *);
