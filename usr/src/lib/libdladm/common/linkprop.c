@@ -696,6 +696,13 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 		break;
 
 	case DLADM_PROP_VAL_DEFAULT:
+		/*
+		 * If defaults are not defined for the property,
+		 * pd_defval.vd_name should be null. If the driver
+		 * has to be contacted for the value, vd_name should
+		 * be the empty string (""). Otherwise, dladm will
+		 * just print whatever is in the table.
+		 */
 		if (pdp->pd_defval.vd_name == NULL) {
 			status = DLADM_STATUS_NOTSUP;
 			break;
@@ -2059,6 +2066,17 @@ i_dladm_getset_defval(prop_desc_t *pdp, datalink_id_t linkid,
 		    sizeof (char *) * DLADM_MAX_PROP_VALCNT +
 		    i * DLADM_PROP_VAL_MAX;
 	}
+
+	/*
+	 * PD_EMPTY_RESET is used for properties like zone where the
+	 * "" itself is used to reset the property. So libdladm can
+	 * copy pdp->pd_defval over to the val_desc_t passed down on
+	 * the setprop using the global values in the table. For other
+	 * cases (PD_EMPTY_RESET is not set, vd_name is ""), doing
+	 * reset-linkprop will cause libdladm to do a getprop to find
+	 * the default value and then do a setprop to reset the value
+	 * to default.
+	 */
 	status = pdp->pd_get(pdp, linkid, prop_vals, &cnt, media, DLD_DEFAULT);
 	if (status == DLADM_STATUS_OK) {
 		status = i_dladm_set_single_prop(linkid, pdp->pd_class,
