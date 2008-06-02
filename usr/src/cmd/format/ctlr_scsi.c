@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2035,7 +2034,6 @@ uscsi_cmd(fd, ucmd, flags)
 		return (status);
 	}
 
-#ifdef sparc
 	/*
 	 * Check the status and return appropriate errors if the disk is
 	 * unavailable (could be formatting) or reserved (by other host).
@@ -2056,7 +2054,6 @@ uscsi_cmd(fd, ucmd, flags)
 		disk_error = DISK_STAT_UNAVAILABLE;
 		return (DSK_UNAVAILABLE);
 	}
-#endif /* sparc */
 
 	/*
 	 * If an automatic Request Sense gave us valid
@@ -2091,7 +2088,12 @@ uscsi_cmd(fd, ucmd, flags)
 			err_print("Sense data:\n");
 			dump("", (caddr_t)rqbuf, rqlen, HEX_ONLY);
 		}
-		return (-1);
+		if (errno == EIO) {
+			disk_error = DISK_STAT_UNAVAILABLE;
+			return (DSK_UNAVAILABLE);
+		} else {
+			return (-1);
+		}
 	}
 
 	/*
@@ -2127,6 +2129,12 @@ uscsi_cmd(fd, ucmd, flags)
 	if ((rq->es_key != KEY_RECOVERABLE_ERROR) || (flags & F_ALLERRS)) {
 		return (-1);
 	}
+
+	if (status == -1 && errno == EIO) {
+		disk_error = DISK_STAT_UNAVAILABLE;
+		return (DSK_UNAVAILABLE);
+	}
+
 	return (0);
 }
 
