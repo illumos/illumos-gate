@@ -710,14 +710,15 @@ rge_m_tx(void *arg, mblk_t *mp)
 	mblk_t *next;
 
 	ASSERT(mp != NULL);
-	ASSERT(rgep->rge_mac_state == RGE_MAC_STARTED);
 
-	if (rgep->rge_chip_state != RGE_CHIP_RUNNING) {
-		RGE_DEBUG(("rge_m_tx: chip not running"));
+	rw_enter(rgep->errlock, RW_READER);
+	if ((rgep->rge_mac_state != RGE_MAC_STARTED) ||
+	    (rgep->rge_chip_state != RGE_CHIP_RUNNING)) {
+		RGE_DEBUG(("rge_m_tx: tx doesn't work"));
+		rw_exit(rgep->errlock);
 		return (mp);
 	}
 
-	rw_enter(rgep->errlock, RW_READER);
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;

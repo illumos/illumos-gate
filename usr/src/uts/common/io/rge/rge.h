@@ -479,6 +479,8 @@ typedef struct rge {
 	rge_stats_t		stats;
 	enum rge_mac_state	rge_mac_state;	/* definitions above	*/
 	enum rge_chip_state	rge_chip_state;	/* definitions above	*/
+
+	boolean_t		suspended;
 } rge_t;
 
 /*

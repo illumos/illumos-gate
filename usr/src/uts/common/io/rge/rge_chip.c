@@ -1141,7 +1141,9 @@ rge_chip_stop(rge_t *rgep, boolean_t fault)
 	/*
 	 * Clear pended interrupt
 	 */
-	rge_reg_put16(rgep, INT_STATUS_REG, INT_MASK_ALL);
+	if (!rgep->suspended) {
+		rge_reg_put16(rgep, INT_STATUS_REG, INT_MASK_ALL);
+	}
 
 	/*
 	 * Stop the board and disable transmit/receive
@@ -1383,6 +1385,12 @@ rge_intr(caddr_t arg1, caddr_t arg2)
 	_NOTE(ARGUNUSED(arg2))
 
 	mutex_enter(rgep->genlock);
+
+	if (rgep->suspended) {
+		mutex_exit(rgep->genlock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	/*
 	 * Was this interrupt caused by our device...
 	 */

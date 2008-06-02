@@ -794,6 +794,11 @@ rge_m_stop(void *arg)
 	 * Just stop processing, then record new MAC state
 	 */
 	mutex_enter(rgep->genlock);
+	if (rgep->suspended) {
+		ASSERT(rgep->rge_mac_state == RGE_MAC_STOPPED);
+		mutex_exit(rgep->genlock);
+		return;
+	}
 	rge_stop(rgep);
 	/*
 	 * Wait for posted buffer to be freed...
@@ -820,7 +825,10 @@ rge_m_start(void *arg)
 	rge_t *rgep = arg;		/* private device info	*/
 
 	mutex_enter(rgep->genlock);
-
+	if (rgep->suspended) {
+		mutex_exit(rgep->genlock);
+		return (DDI_FAILURE);
+	}
 	/*
 	 * Clear hw/sw statistics
 	 */
@@ -854,6 +862,12 @@ rge_m_unicst(void *arg, const uint8_t *macaddr)
 	 */
 	mutex_enter(rgep->genlock);
 	bcopy(macaddr, rgep->netaddr, ETHERADDRL);
+
+	if (rgep->suspended) {
+		mutex_exit(rgep->genlock);
+		return (DDI_SUCCESS);
+	}
+
 	rge_chip_sync(rgep, RGE_SET_MAC);
 	mutex_exit(rgep->genlock);
 
@@ -935,6 +949,11 @@ rge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		hashp[reg] &= ~ (1 << (index % RGE_MCAST_NUM));
 	}
 
+	if (rgep->suspended) {
+		mutex_exit(rgep->genlock);
+		return (DDI_SUCCESS);
+	}
+
 	/*
 	 * Set multicast register
 	 */
@@ -965,6 +984,12 @@ rge_m_promisc(void *arg, boolean_t on)
 		return (0);
 	}
 	rgep->promisc = on;
+
+	if (rgep->suspended) {
+		mutex_exit(rgep->genlock);
+		return (DDI_SUCCESS);
+	}
+
 	rge_chip_sync(rgep, RGE_SET_PROMISC);
 	RGE_DEBUG(("rge_m_promisc_set($%p) done", arg));
 	mutex_exit(rgep->genlock);
@@ -1077,6 +1102,20 @@ rge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	boolean_t need_privilege;
 	int err;
 	int cmd;
+
+	/*
+	 * If suspended, we might actually be able to do some of
+	 * these ioctls, but it is harder to make sure they occur
+	 * without actually putting the hardware in an undesireable
+	 * state.  So just NAK it.
+	 */
+	mutex_enter(rgep->genlock);
+	if (rgep->suspended) {
+		miocnak(wq, mp, 0, EINVAL);
+		mutex_exit(rgep->genlock);
+		return;
+	}
+	mutex_exit(rgep->genlock);
 
 	/*
 	 * Validate the command before bothering with the mutex ...
@@ -1474,14 +1513,23 @@ rge_resume(dev_info_t *devinfo)
 	chip_id_t chipid;
 
 	rgep = ddi_get_driver_private(devinfo);
+
+	/*
+	 * If there are state inconsistancies, this is bad.  Returning
+	 * DDI_FAILURE here will eventually cause the machine to panic,
+	 * so it is best done here so that there is a possibility of
+	 * debugging the problem.
+	 */
 	if (rgep == NULL)
-		return (DDI_FAILURE);
+		cmn_err(CE_PANIC,
+		    "rge: ngep returned from ddi_get_driver_private was NULL");
 
 	/*
 	 * Refuse to resume if the data structures aren't consistent
 	 */
 	if (rgep->devinfo != devinfo)
-		return (DDI_FAILURE);
+		cmn_err(CE_PANIC,
+		    "rge: passed devinfo not the same as saved devinfo");
 
 	/*
 	 * Read chip ID & set up config space command register(s)
@@ -1496,12 +1544,25 @@ rge_resume(dev_info_t *devinfo)
 	if (chipid.revision != cidp->revision)
 		return (DDI_FAILURE);
 
+	mutex_enter(rgep->genlock);
+
+	/*
+	 * Only in one case, this conditional branch can be executed: the port
+	 * hasn't been plumbed.
+	 */
+	if (rgep->suspended == B_FALSE) {
+		mutex_exit(rgep->genlock);
+		return (DDI_SUCCESS);
+	}
+	rgep->rge_mac_state = RGE_MAC_STARTED;
 	/*
 	 * All OK, reinitialise h/w & kick off NEMO scheduling
 	 */
-	mutex_enter(rgep->genlock);
 	rge_restart(rgep);
+	rgep->suspended = B_FALSE;
+
 	mutex_exit(rgep->genlock);
+
 	return (DDI_SUCCESS);
 }
 
@@ -1666,7 +1727,11 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	/*
 	 * Add the h/w interrupt handler and initialise mutexes
+	 * RTL8101E is observed to have MSI invalidation issue after S/R.
+	 * So the FIXED interrupt is used instead.
 	 */
+	if (rgep->chipid.mac_ver == MAC_VER_8101E)
+		rgep->msi_enable = B_FALSE;
 	if ((intr_types & DDI_INTR_TYPE_MSI) && rgep->msi_enable) {
 		if (rge_add_intrs(rgep, DDI_INTR_TYPE_MSI) != DDI_SUCCESS) {
 			rge_error(rgep, "MSI registration failed, "
@@ -1801,7 +1866,18 @@ rge_suspend(rge_t *rgep)
 	 * Stop processing and idle (powerdown) the PHY ...
 	 */
 	mutex_enter(rgep->genlock);
+	rw_enter(rgep->errlock, RW_READER);
+
+	if (rgep->rge_mac_state != RGE_MAC_STARTED) {
+		mutex_exit(rgep->genlock);
+		return (DDI_SUCCESS);
+	}
+
+	rgep->suspended = B_TRUE;
 	rge_stop(rgep);
+	rgep->rge_mac_state = RGE_MAC_STOPPED;
+
+	rw_exit(rgep->errlock);
 	mutex_exit(rgep->genlock);
 
 	return (DDI_SUCCESS);
