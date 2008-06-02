@@ -325,9 +325,9 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
     const char *devpath, const char *minor_name, const char *devid,
     const char *error_class, uint64_t ena, int sflag, va_list ap)
 {
-	struct i_ddi_fmhdl	*fmhdl;
+	nv_alloc_t		*nva = NULL;
+	struct i_ddi_fmhdl	*fmhdl = NULL;
 	errorq_elem_t		*eqep;
-	nv_alloc_t		*nva;
 	nvlist_t		*ereport = NULL;
 	nvlist_t		*detector = NULL;
 	char			*name;
@@ -360,7 +360,7 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
 		/* Use normal interfaces to allocate memory. */
 		if ((ereport = fm_nvlist_create(NULL)) == NULL)
 			goto err;
-		nva = NULL;
+		ASSERT(nva == NULL);
 	} else {
 		/* Use errorq interfaces to avoid memory allocation. */
 		fmhdl = DEVI(eqdip)->devi_fmhdl;
@@ -436,6 +436,7 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
 err:	if (fmhdl)
 		atomic_add_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64, 1);
 
+	/* Free up nvlists if normal interfaces were used to allocate memory */
 out:	if (ereport && (nva == NULL))
 		fm_nvlist_destroy(ereport, FM_NVA_FREE);
 	if (detector && (nva == NULL))
