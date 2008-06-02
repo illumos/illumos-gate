@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,6 +72,8 @@
 static int audiohd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int audiohd_attach(dev_info_t *, ddi_attach_cmd_t);
 static int audiohd_detach(dev_info_t *, ddi_detach_cmd_t);
+static int audiohd_resume(audiohd_state_t *);
+static int audiohd_suspend(audiohd_state_t *);
 
 /*
  * Entry point routine prototypes
@@ -93,6 +95,7 @@ static uint_t audiohd_intr(caddr_t);
 static int audiohd_init_state(audiohd_state_t *, dev_info_t *);
 static int audiohd_init_pci(audiohd_state_t *, ddi_device_acc_attr_t *);
 static void audiohd_fini_pci(audiohd_state_t *);
+static int audiohd_reinit_hda(audiohd_state_t *);
 static int audiohd_reset_controller(audiohd_state_t *);
 static int audiohd_init_controller(audiohd_state_t *);
 static void audiohd_fini_controller(audiohd_state_t *);
@@ -117,6 +120,8 @@ static uint32_t audioha_codec_verb_get(void *, uint8_t,
     uint8_t, uint16_t, uint8_t);
 static uint32_t audioha_codec_4bit_verb_get(void *, uint8_t,
     uint8_t, uint16_t, uint16_t);
+static void audiohd_set_busy(audiohd_state_t *);
+static void audiohd_set_idle(audiohd_state_t *);
 
 /*
  * operation routines for ALC260, ALC262 and ALC88x
@@ -347,7 +352,7 @@ static struct dev_ops audiohd_dev_ops = {
 /* Linkage structure for loadable drivers */
 static struct modldrv audiohd_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	AUDIOHD_MOD_NAME"%I%",	/* drv_linkinfo */
+	AUDIOHD_MOD_NAME,	/* drv_linkinfo */
 	&audiohd_dev_ops,		/* drv_dev_ops */
 };
 
@@ -483,7 +488,9 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	case DDI_RESUME:
 		ATRACE("audiohd_attach() DDI_RESUME", NULL);
-		return (DDI_FAILURE);
+		statep = ddi_get_soft_state(audiohd_statep, instance);
+		ASSERT(statep != NULL);
+		return (audiohd_resume(statep));
 
 	default:
 		return (DDI_FAILURE);
@@ -618,6 +625,7 @@ err_attach_exit5:
 
 err_attach_exit4:
 	mutex_destroy(&statep->hda_mutex);
+	cv_destroy(&statep->hda_cv);
 
 err_attach_exit3:
 	(void) audio_sup_unregister(statep->hda_ahandle);
@@ -657,7 +665,7 @@ audiohd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		break;
 
 	case DDI_SUSPEND:
-		return (DDI_FAILURE);
+		return (audiohd_suspend(statep));
 
 	default:
 		return (DDI_FAILURE);
@@ -675,12 +683,72 @@ audiohd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	audiohd_fini_controller(statep);
 	audiohd_fini_pci(statep);
 	mutex_destroy(&statep->hda_mutex);
+	cv_destroy(&statep->hda_cv);
 	(void) audio_sup_unregister(statep->hda_ahandle);
 	ddi_soft_state_free(audiohd_statep, instance);
 
 	return (DDI_SUCCESS);
 
 }	/* audiohd_detach() */
+
+static int
+audiohd_resume(audiohd_state_t *statep)
+{
+	mutex_enter(&statep->hda_mutex);
+	statep->suspended = B_FALSE;
+	/* Restore the hda state */
+	if (audiohd_reinit_hda(statep) == AUDIO_FAILURE) {
+		audio_sup_log(statep->hda_ahandle, CE_WARN,
+		    "!audiohd_resume() hda reinit failed");
+		mutex_exit(&statep->hda_mutex);
+		return (DDI_SUCCESS);
+	}
+	/* Enable interrupt */
+	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL,
+	    AUDIOHD_INTCTL_BIT_GIE | AUDIOHD_INTCTL_BIT_SIE);
+	mutex_exit(&statep->hda_mutex);
+
+	/* Resume playing and recording */
+	if (audio_sup_restore_state(statep->hda_ahandle,
+	    AUDIO_ALL_DEVICES, AUDIO_BOTH) == AUDIO_FAILURE) {
+		audio_sup_log(statep->hda_ahandle, CE_WARN,
+		    "!audiohd_resume() audio restore failed");
+		audiohd_disable_intr(statep);
+		audiohd_stop_dma(statep);
+	}
+
+	mutex_enter(&statep->hda_mutex);
+	cv_broadcast(&statep->hda_cv); /* wake up entry points */
+	mutex_exit(&statep->hda_mutex);
+
+	return (DDI_SUCCESS);
+}	/* audiohd_resume() */
+
+static int
+audiohd_suspend(audiohd_state_t *statep)
+{
+	mutex_enter(&statep->hda_mutex);
+	statep->suspended = B_TRUE;
+	/* wait for current operations to complete */
+	while (statep->hda_busy_cnt != 0)
+		cv_wait(&statep->hda_cv, &statep->hda_mutex);
+	if (audio_sup_save_state(statep->hda_ahandle,
+	    AUDIO_ALL_DEVICES, AUDIO_BOTH) == AUDIO_FAILURE) {
+		audio_sup_log(statep->hda_ahandle, CE_WARN,
+		    "!audiohd_suspend() audio save failed");
+		statep->suspended = B_FALSE;
+		cv_broadcast(&statep->hda_cv);
+		mutex_exit(&statep->hda_mutex);
+		return (DDI_FAILURE);
+	}
+	/* Disable h/w */
+	audiohd_disable_intr(statep);
+	audiohd_stop_dma(statep);
+	mutex_exit(&statep->hda_mutex);
+
+	return (DDI_SUCCESS);
+}	/* audiohd_suspend() */
+
 
 /*
  * audiohd_intr()
@@ -706,8 +774,12 @@ audiohd_intr(caddr_t arg)
 	int	i;
 
 	mutex_enter(&statep->hda_mutex);
-	status = AUDIOHD_REG_GET32(AUDIOHD_REG_INTSTS);
+	if (statep->suspended) {
+		mutex_exit(&statep->hda_mutex);
+		return (DDI_INTR_UNCLAIMED);
+	}
 
+	status = AUDIOHD_REG_GET32(AUDIOHD_REG_INTSTS);
 	if (status == 0) {
 		mutex_exit(&statep->hda_mutex);
 		return (DDI_INTR_UNCLAIMED);
@@ -788,16 +860,17 @@ audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 	uint64_t	sbd_phys_addr;
 	uint8_t		cTmp;
 	uint_t	regbase;
+	int		rc = AUDIO_SUCCESS;
 
 	ATRACE_32("audiohd_ad_start_play() stream", stream);
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audiohd_set_busy(statep);
+
 	mutex_enter(&statep->hda_mutex);
-	if (statep->hda_flags & AUDIOHD_PLAY_STARTED) {
-		mutex_exit(&statep->hda_mutex);
-		return (AUDIO_SUCCESS);
-	}
+	if (statep->hda_flags & AUDIOHD_PLAY_STARTED)
+		goto done;
 
 	regbase = statep->hda_play_regbase;
 	if (statep->hda_flags & AUDIOHD_PLAY_PAUSED) {
@@ -806,16 +879,15 @@ audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 		statep->hda_flags &= ~AUDIOHD_PLAY_PAUSED;
 		AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL,
 		    cTmp | AUDIOHDR_SD_CTL_SRUN);
-		mutex_exit(&statep->hda_mutex);
-		return (AUDIO_SUCCESS);
+		goto done;
 	}
 
 	if (audiohd_reset_stream(statep, statep->hda_input_streams)
 	    != AUDIO_SUCCESS) {
 		audio_sup_log(statep->hda_ahandle, CE_WARN,
 		    "!start_play() failed to reset play stream");
-		mutex_exit(&statep->hda_mutex);
-		return (AUDIO_FAILURE);
+		rc = AUDIO_FAILURE;
+		goto done;
 	}
 
 	statep->hda_flags |= AUDIOHD_PLAY_STARTED;
@@ -823,6 +895,7 @@ audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 	if (audiohd_fill_pbuf(statep) != AUDIO_SUCCESS) {
 		mutex_exit(&statep->hda_mutex);
 		am_play_shutdown(statep->hda_ahandle, NULL);
+		audiohd_set_idle(statep);
 		return (AUDIO_FAILURE);
 	}
 
@@ -854,8 +927,10 @@ audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL,
 	    AUDIOHDR_SD_CTL_INTS | AUDIOHDR_SD_CTL_SRUN);
 
+done:
 	mutex_exit(&statep->hda_mutex);
-	return (AUDIO_SUCCESS);
+	audiohd_set_idle(statep);
+	return (rc);
 
 }	/* audiohd_ad_start_play() */
 
@@ -880,7 +955,10 @@ audiohd_ad_set_config(audiohdl_t ahandle, int stream, int command,
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audiohd_set_busy(statep);
+
 	mutex_enter(&statep->hda_mutex);
+
 	switch (command) {
 	case AM_SET_GAIN:
 		/*
@@ -953,7 +1031,9 @@ audiohd_ad_set_config(audiohdl_t ahandle, int stream, int command,
 		    command);
 		break;
 	}
+
 	mutex_exit(&statep->hda_mutex);
+	audiohd_set_idle(statep);
 
 	return (rc);
 
@@ -1022,6 +1102,8 @@ audiohd_ad_pause_play(audiohdl_t ahandle, int stream)
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audiohd_set_busy(statep);
+
 	mutex_enter(&statep->hda_mutex);
 	regbase = statep->hda_play_regbase;
 	cTmp = AUDIOHD_REG_GET8(regbase + AUDIOHD_SDREG_OFFSET_CTL);
@@ -1031,6 +1113,7 @@ audiohd_ad_pause_play(audiohdl_t ahandle, int stream)
 	statep->hda_flags |= AUDIOHD_PLAY_PAUSED;
 	mutex_exit(&statep->hda_mutex);
 
+	audiohd_set_idle(statep);
 }	/* audiohd_ad_pause_play() */
 
 /*
@@ -1046,6 +1129,8 @@ audiohd_ad_stop_play(audiohdl_t ahandle, int stream)
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audiohd_set_busy(statep);
+
 	mutex_enter(&statep->hda_mutex);
 	regbase = statep->hda_play_regbase;
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL, 0);
@@ -1053,6 +1138,7 @@ audiohd_ad_stop_play(audiohdl_t ahandle, int stream)
 	    ~(AUDIOHD_PLAY_EMPTY | AUDIOHD_PLAY_STARTED);
 	mutex_exit(&statep->hda_mutex);
 
+	audiohd_set_idle(statep);
 }	/* audiohd_ad_stop_play() */
 
 /*
@@ -1065,21 +1151,22 @@ audiohd_ad_start_record(audiohdl_t ahandle, int stream)
 	audiohd_state_t	*statep;
 	uint64_t	sbd_phys_addr;
 	uint_t		regbase;
+	int		rc = AUDIO_SUCCESS;
 
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audiohd_set_busy(statep);
+
 	mutex_enter(&statep->hda_mutex);
-	if (statep->hda_flags & AUDIOHD_RECORD_STARTED) {
-		mutex_exit(&statep->hda_mutex);
-		return (AUDIO_SUCCESS);
-	}
+	if (statep->hda_flags & AUDIOHD_RECORD_STARTED)
+		goto done;
 
 	if (audiohd_reset_stream(statep, 0) != AUDIO_SUCCESS) {
 		audio_sup_log(statep->hda_ahandle, CE_WARN,
 		    "!start_record() failed to reset record stream");
-		mutex_exit(&statep->hda_mutex);
-		return (AUDIO_FAILURE);
+		rc = AUDIO_FAILURE;
+		goto done;
 	}
 
 	audiohd_preset_rbuf(statep);
@@ -1114,8 +1201,10 @@ audiohd_ad_start_record(audiohdl_t ahandle, int stream)
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL,
 	    AUDIOHDR_SD_CTL_INTS | AUDIOHDR_SD_CTL_SRUN);
 
+done:
 	mutex_exit(&statep->hda_mutex);
-	return (AUDIO_SUCCESS);
+	audiohd_set_idle(statep);
+	return (rc);
 
 }	/* audiohd_ad_start_record() */
 
@@ -1133,12 +1222,15 @@ audiohd_ad_stop_record(audiohdl_t ahandle, int stream)
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audiohd_set_busy(statep);
+
 	mutex_enter(&statep->hda_mutex);
 	regbase = statep->hda_record_regbase;
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL, 0);
 	statep->hda_flags &= ~(AUDIOHD_RECORD_STARTED);
 	mutex_exit(&statep->hda_mutex);
 
+	audiohd_set_idle(statep);
 }	/* audiohd_ad_stop_play */
 
 /*
@@ -1297,6 +1389,7 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	}
 	mutex_init(&statep->hda_mutex, NULL,
 	    MUTEX_DRIVER, statep->hda_intr_cookie);
+	cv_init(&statep->hda_cv, NULL, CV_DRIVER, NULL);
 
 	statep->hda_outputs_muted = B_FALSE;
 	statep->hda_rirb_rp = 0;
@@ -1321,18 +1414,21 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 	dev_info_t	*dip = statep->hda_dip;
 	audiohdl_t	ahandle = statep->hda_ahandle;
 
-	if (pci_config_setup(dip, &statep->hda_pci_handle) == DDI_FAILURE) {
-		audio_sup_log(ahandle, CE_WARN,
-		    "!map_regs() pci config mapping failed");
-		goto err_init_pci_exit1;
-	}
+	if (!statep->suspended) {
+		if (pci_config_setup(dip, &statep->hda_pci_handle)
+		    == DDI_FAILURE) {
+			audio_sup_log(ahandle, CE_WARN,
+			    "!map_regs() pci config mapping failed");
+			goto err_init_pci_exit1;
+		}
 
-	if (ddi_regs_map_setup(dip, 1, &statep->hda_reg_base, 0,
-	    AUDIOHD_MEMIO_LEN, acc_attr, &statep->hda_reg_handle) !=
-	    DDI_SUCCESS) {
-		audio_sup_log(ahandle, CE_WARN,
-		    "!map_regs() memory I/O mapping failed");
-		goto err_init_pci_exit2;
+		if (ddi_regs_map_setup(dip, 1, &statep->hda_reg_base, 0,
+		    AUDIOHD_MEMIO_LEN, acc_attr, &statep->hda_reg_handle) !=
+		    DDI_SUCCESS) {
+			audio_sup_log(ahandle, CE_WARN,
+			    "!map_regs() memory I/O mapping failed");
+			goto err_init_pci_exit2;
+		}
 	}
 
 	/*
@@ -1596,6 +1692,48 @@ audiohd_release_dma_mem(audiohd_dma_t *pdma)
 	}
 
 }	/* audiohd_release_dma_mem() */
+
+/*
+ * audiohd_reinit_hda()
+ *
+ * Description:
+ *	This routine is used to re-initialize HD controller and codec.
+ */
+static int
+audiohd_reinit_hda(audiohd_state_t *statep)
+{
+	uint64_t	addr;
+
+	/* set PCI configure space in case it's not restored OK */
+	(void) audiohd_init_pci(statep, &hda_dev_accattr);
+
+	/* reset controller */
+	if (audiohd_reset_controller(statep) != AUDIO_SUCCESS)
+		return (AUDIO_FAILURE);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_SYNC, 0); /* needn't sync stream */
+
+	/* Initialize controller RIRB */
+	addr = statep->hda_dma_rirb.ad_paddr;
+	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBLBASE, (uint32_t)addr);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBUBASE,
+	    (uint32_t)(addr >> 32));
+	AUDIOHD_REG_SET16(AUDIOHD_REG_RIRBWP, AUDIOHDR_RIRBWP_RESET);
+	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSIZE, AUDIOHDR_RIRBSZ_256);
+	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBCTL, AUDIOHDR_RIRBCTL_DMARUN);
+
+	/* Initialize controller CORB */
+	addr = statep->hda_dma_corb.ad_paddr;
+	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, AUDIOHDR_CORBRP_RESET);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBLBASE, (uint32_t)addr);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBUBASE,
+	    (uint32_t)(addr >> 32));
+	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBSIZE, AUDIOHDR_CORBSZ_256);
+	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBWP, 0);
+	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, 0);
+	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBCTL, AUDIOHDR_CORBCTL_DMARUN);
+
+	return (audiohd_init_codec(statep));	/* Initialize codec */
+}	/* audiohd_reinit_hda() */
 
 /*
  * audiohd_init_controller()
@@ -2498,7 +2636,7 @@ audioha_codec_4bit_verb_get(void *arg, uint8_t caddr, uint8_t nid, uint16_t
 		return (resp);
 	}
 
-	audio_sup_log(NULL, CE_WARN, "!%s: verb_get() timeout when get "
+	audio_sup_log(NULL, CE_WARN, "!%s: 4bit_verb_get() timeout when get "
 	    " response from codec: nid=%d, verb=0x%04x, param=0x%04x",
 	    audiohd_name, nid, verb, param);
 
@@ -4757,3 +4895,78 @@ audiohd_ad1988_max_gain(audiohd_state_t *statep, uint_t *pgain, uint_t
 	*mgain = (lTmp & AUDIOHDC_AMP_CAP_STEP_NUMS) >> 8;
 
 }	/* audiohd_ad1988_max_gain() */
+
+/*
+ * audiohd_set_busy()
+ *
+ * Description:
+ *	This routine is called whenever a routine needs to guarantee
+ *	that it will not be suspended.  It will also block any routine
+ *	while a suspend is going on.
+ *
+ *	CAUTION: This routine cannot be called by routines that will
+ *		block. Otherwise DDI_SUSPEND will be blocked for a
+ *		long time. And that is the wrong thing to do.
+ *
+ * Arguments:
+ *	audiohd_state_t	*statep		The device's state structure
+ *
+ * Returns:
+ *	void
+ */
+static void
+audiohd_set_busy(audiohd_state_t *statep)
+{
+	ASSERT(!mutex_owned(&statep->hda_mutex));
+
+	mutex_enter(&statep->hda_mutex);
+
+	/* block if we are suspended */
+	while (statep->suspended) {
+		cv_wait(&statep->hda_cv, &statep->hda_mutex);
+	}
+
+	/*
+	 * Okay, we aren't suspended, so mark as busy.
+	 * This will keep us from being suspended when we release the lock.
+	 */
+	ASSERT(statep->hda_busy_cnt >= 0);
+	statep->hda_busy_cnt++;
+
+	mutex_exit(&statep->hda_mutex);
+
+}	/* audiohd_set_busy() */
+
+/*
+ * audiohd_set_idle()
+ *
+ * Description:
+ *	This routine reduces the busy count. It then does a cv_broadcast()
+ *	if the count is 0 so a waiting DDI_SUSPEND will continue forward.
+ *
+ * Arguments:
+ *	audiohd_state_t	*state		The device's state structure
+ *
+ * Returns:
+ *	void
+ */
+static void
+audiohd_set_idle(audiohd_state_t *statep)
+{
+	ASSERT(!mutex_owned(&statep->hda_mutex));
+
+	mutex_enter(&statep->hda_mutex);
+
+	ASSERT(!statep->suspended);
+
+	/* decrement the busy count */
+	ASSERT(statep->hda_busy_cnt > 0);
+	statep->hda_busy_cnt--;
+
+	/* if no longer busy, then we wake up a waiting SUSPEND */
+	if (statep->hda_busy_cnt == 0) {
+		cv_broadcast(&statep->hda_cv);
+	}
+
+	mutex_exit(&statep->hda_mutex);
+}	/* audiohd_set_idle() */

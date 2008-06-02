@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _SYS_AUDIOHD_IMPL_H_
@@ -474,6 +474,10 @@ struct audiohd_state {
 	uint_t		hda_in_ports;		/* active inputs */
 
 	audiohd_hda_codec_t	*hda_codec;
+
+	boolean_t	suspended;		/* suspend/resume state */
+	int		hda_busy_cnt;		/* device busy count */
+	kcondvar_t	hda_cv;
 };
 
 typedef struct audiohd_state audiohd_state_t;
