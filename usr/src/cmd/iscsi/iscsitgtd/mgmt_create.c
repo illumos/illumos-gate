@@ -264,8 +264,10 @@ create_target(tgt_node_t *x)
 
 	if (create_lun(node_name, name, type, lun, size, backing, &code)
 	    == True) {
-		if (mgmt_config_save2scf() == False)
+		if (mgmt_config_save2scf() == False) {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 			goto error;
+		}
 
 		/* Only isns register on the 1st creation of the target */
 		if (lun == 0 && isns_enabled() == True) {
@@ -347,6 +349,8 @@ create_initiator(tgt_node_t *x)
 
 	if (mgmt_config_save2scf() == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
+	else
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 
 error:
 	if (name)
@@ -393,6 +397,8 @@ create_tpgt(tgt_node_t *x)
 
 	if (mgmt_config_save2scf() == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
+	else
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 
 error:
 	if (tpgt)

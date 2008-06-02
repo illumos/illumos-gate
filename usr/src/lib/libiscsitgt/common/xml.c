@@ -611,12 +611,49 @@ tgt_node_dup(tgt_node_t *n)
 	return (d);
 }
 
+#define	MAX_REPLACEMENT_ENTITY	8
+#define	MAX_REPLACEMENT_BUFFER	1024
 void
 tgt_buf_add(char **b, char *element, const char *cdata)
 {
+	char	entity[MAX_REPLACEMENT_ENTITY];
+	char	buf[MAX_REPLACEMENT_BUFFER];
+	int	len, i;
+
+	bzero(buf, sizeof (buf));
+
 	tgt_buf_add_tag(b, element, Tag_Start);
-	if (cdata != NULL)
-		tgt_buf_add_tag(b, cdata, Tag_String);
+	/*
+	 * we have to transform the predefined xml entities;
+	 */
+	if (cdata != NULL) {
+		len = strlen(cdata);
+		for (i = 0; i < len; i++) {
+			switch (cdata[i]) {
+			case '&':
+				(void) strcpy(entity, "&amp;");
+				break;
+			case '<':
+				(void) strcpy(entity, "&lt;");
+				break;
+			case '>':
+				(void) strcpy(entity, "&gt;");
+				break;
+			case '\'':
+				(void) strcpy(entity, "&apos;");
+				break;
+			case '"':
+				(void) strcpy(entity, "&quot;");
+				break;
+			default:
+				entity[0] = cdata[i];
+				entity[1] = '\0';
+				break;
+			}
+			(void) strlcat(buf, entity, sizeof (buf));
+		}
+		tgt_buf_add_tag(b, buf, Tag_String);
+	}
 	tgt_buf_add_tag(b, element, Tag_End);
 }
 

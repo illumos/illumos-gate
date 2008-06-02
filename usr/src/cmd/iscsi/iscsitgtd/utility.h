@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,17 @@ typedef struct thick_provo {
 	target_queue_t		*q;
 } thick_provo_t;
 
+/*
+ * in_mark presents the state in validate_xml()
+ * in_lt means it enters a '<' and wants a '>' to return normal
+ * in_amp means it meets a '&' and wants a ';' to return normal
+ */
+typedef enum {
+	in_none,
+	in_lt,
+	in_amp
+} in_mark_t;
+
 void util_init();
 int read_retry(int fd, char *buf, int count);
 Boolean_t parse_text(iscsi_conn_t *c, int dlen, char **text,
@@ -85,6 +96,7 @@ void *thick_provo_start(void *v);
 Boolean_t thick_provo_chk_thr(char *targ, int lun);
 void remove_target_common(char *name, int lun, char **msg);
 char *get_local_name(char *iname);
+Boolean_t validate_xml(char *req);
 
 
 #ifdef __cplusplus

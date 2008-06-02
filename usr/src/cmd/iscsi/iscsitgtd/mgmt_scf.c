@@ -67,6 +67,8 @@
 #include "errcode.h"
 #include "t10.h"
 
+#define	PGNAME_SIZE	64
+
 static Boolean_t create_pg(targ_scf_t *h, char *pgname, char *prop);
 static void new_property(targ_scf_t *h, tgt_node_t *n);
 static void new_value_list(targ_scf_t *h, tgt_node_t *p);
@@ -74,6 +76,9 @@ static int isnumber(char *s);
 static void backup(char *file, char *ext);
 static pthread_mutex_t scf_conf_mutex;
 static pthread_mutex_t scf_param_mutex;
+
+static void pgname_encode(char *instr, char *outstr, int max_len);
+static void pgname_decode(char *instr);
 
 Boolean_t
 mgmt_scf_init()
@@ -221,15 +226,32 @@ mgmt_transaction_abort(targ_scf_t *h)
 	}
 }
 
+/*
+ * process property group name first
+ * a reasonable buf to receive encoded pgname is double size of pgname
+ */
+#define	PG_FACTOR	2
 static Boolean_t
 create_pg(targ_scf_t *h, char *pgname, char *prop)
 {
-	if (scf_service_get_pg(h->t_service, pgname, h->t_pg) != 0) {
-		if (scf_service_add_pg(h->t_service, pgname,
+	int len;
+	char *buf = NULL;
+
+	len = strlen(pgname);
+	buf = (char *)calloc(1, len * PG_FACTOR);
+	if (buf == NULL)
+		return (False);
+
+	pgname_encode(pgname, buf, len * PG_FACTOR);
+
+	if (scf_service_get_pg(h->t_service, buf, h->t_pg) != 0) {
+		if (scf_service_add_pg(h->t_service, buf,
 		    prop, 0, h->t_pg) != 0) {
+			free(buf);
 			return (False);
 		}
 	}
+	free(buf);
 	return (True);
 }
 
@@ -323,6 +345,7 @@ mgmt_get_main_config(tgt_node_t **node)
 		char *iname;
 
 		scf_pg_get_name(h->t_pg, pname, sizeof (pname));
+		pgname_decode(pname);
 		iname = strchr(pname, '_');
 		if (iname == NULL) {
 			/* the pg found here is not a tgt/initiator/tpgt */
@@ -544,7 +567,7 @@ mgmt_config_save2scf()
 	scf_property_t *prop = NULL;
 	scf_value_t *value = NULL;
 	scf_iter_t *iter = NULL;
-	char pgname[64];
+	char pgname[PGNAME_SIZE];
 	char passcode[32];
 	unsigned int	outlen;
 	tgt_node_t	*n = NULL;
@@ -670,7 +693,8 @@ mgmt_config_save2scf()
 				tgt_node_free(tn);
 			}
 			mgmt_transaction_end(h);
-		}
+		} else
+			goto error;
 	}
 
 	if (mgmt_transaction_start(h, "passwords", "application") == True) {
@@ -735,7 +759,7 @@ mgmt_param_save2scf(tgt_node_t *node, char *target_name, int lun)
 	scf_property_t *prop = NULL;
 	scf_value_t *value = NULL;
 	scf_iter_t *iter = NULL;
-	char pgname[64];
+	char pgname[PGNAME_SIZE];
 	tgt_node_t	*n = NULL;
 
 	h = mgmt_handle_init();
@@ -799,7 +823,8 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	scf_value_t *value = NULL;
 	scf_iter_t *iter = NULL;
 	char pname[64];
-	char pgname[64];
+	char expgname[PGNAME_SIZE * PG_FACTOR];
+	char pgname[PGNAME_SIZE];
 	char valuebuf[MAXPATHLEN];
 	tgt_node_t	*n;
 	Boolean_t status = False;
@@ -814,10 +839,11 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	iter = scf_iter_create(h->t_handle);
 
 	snprintf(pgname, sizeof (pgname), "param_%s_%d", target_name, lun);
+	pgname_encode(pgname, expgname, PGNAME_SIZE);
 
 	(void) pthread_mutex_lock(&scf_param_mutex);
 
-	if (scf_service_get_pg(h->t_service, pgname, h->t_pg) == -1) {
+	if (scf_service_get_pg(h->t_service, expgname, h->t_pg) == -1) {
 		goto error;
 	}
 
@@ -867,7 +893,7 @@ Boolean_t
 mgmt_param_remove(char *target_name, int lun)
 {
 	targ_scf_t *h = NULL;
-	char pgname[64];
+	char pgname[PGNAME_SIZE];
 
 	h = mgmt_handle_init();
 	if (h == NULL)
@@ -1346,4 +1372,78 @@ check_auth_modify(ucred_t *cred)
 	}
 
 	return (ret);
+}
+
+/*
+ * Following two functions replace ':' and '.' in target/initiator
+ * names into '__2' and '__1' when write to SMF, and do a reverse
+ * replacement when read from SMF.
+ * pgname_encode's buffers are allocated by caller.
+ * see CR 6626684
+ */
+#define	SMF_COLON	"__2"
+#define	SMF_DOT		"__1"
+
+static void
+pgname_encode(char *instr, char *outstr, int max_len)
+{
+	int i = 0;
+
+	assert(instr != NULL && outstr != NULL);
+	for (; *instr != '\0'; instr++) {
+		switch (*instr) {
+		case ':':
+			strcpy(outstr + i, SMF_COLON);
+			i += 3;
+			break;
+		case '.':
+			strcpy(outstr + i, SMF_DOT);
+			i += 3;
+			break;
+		default:
+			*(outstr + i) = *instr;
+			i ++;
+			break;
+		}
+		/* in case of next possible ':' or '.', we cease on len-3 */
+		if (i >= max_len - 3)
+			break;
+	}
+	outstr[i] = '\0';
+}
+
+/*
+ * pgname_decode use original buffer, since it reduces string length
+ */
+static void
+pgname_decode(char *instr)
+{
+	char *buf;
+	char *rec;
+
+	assert(instr != NULL);
+	buf = strdup(instr);
+
+	if (buf == NULL)
+		return;
+
+	rec = buf;
+	for (; *buf != '\0'; buf++) {
+		if (*buf == '_') {
+			if (memcmp(buf, SMF_COLON, strlen(SMF_COLON)) == 0) {
+				*instr = ':';
+				buf += 2;
+			} else if (memcmp(buf, SMF_DOT, strlen(SMF_DOT)) == 0) {
+				*instr = '.';
+				buf += 2;
+			} else {
+				*instr = *buf;
+			}
+		} else {
+			*instr = *buf;
+		}
+		instr ++;
+	}
+	*instr = '\0';
+	free(rec);
 }

@@ -146,6 +146,8 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("Failed to encode GUID value"));
 	case ERR_INIT_XML_READER_FAILED:
 		return ((char *)gettext("Failed to initialize XML reader"));
+	case ERR_INVALID_XML_REQUEST:
+		return ((char *)gettext("Invalid characters in XML request"));
 	case ERR_OPEN_PARAM_FILE_FAILED:
 		return ((char *)gettext("Failed to open parameter file"));
 	case ERR_UPDATE_MAINCFG_FAILED:

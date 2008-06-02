@@ -1651,6 +1651,54 @@ error:
 
 /*
  * []----
+ * | validate_xml
+ * |
+ * | This function checks if there is predefined entities &<>'" in xml request
+ * []----
+ */
+Boolean_t
+validate_xml(char *req)
+{
+	in_mark_t in_mark = in_none;
+
+	if (req == NULL)
+		return (False);
+	for (; *req != '\0'; req++) {
+		if (in_mark == in_none) {
+			if (*req == '<') {
+				in_mark = in_lt;
+				continue;
+			} else if (*req == '&') {
+				in_mark = in_amp;
+				continue;
+			} else if (strchr("\"\'>", *req) != NULL) {
+				return (False);
+			}
+		} else if (in_mark == in_lt) {
+			if (*req == '>') {
+				in_mark = in_none;
+				continue;
+			} else if (*req == '<') {
+				return (False);
+			}
+		} else {
+			if (*req == ';') {
+				in_mark = in_none;
+				continue;
+			} else if (*req == '&' || *req == '<') {
+				return (False);
+			}
+		}
+	}
+
+	if (in_mark == in_none)
+		return (True);
+	else
+		return (False);
+}
+
+/*
+ * []----
  * | get_local_name
  * |
  * | This function fetches local name from a iscsi-name

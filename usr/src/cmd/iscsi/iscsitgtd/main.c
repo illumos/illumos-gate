@@ -437,6 +437,14 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 		return;
 	}
 
+	if (validate_xml(argp) != True) {
+		xml_rtn_msg(&err_rply, ERR_INVALID_XML_REQUEST);
+		strlcpy(argp, err_rply, arg_size);
+		free(err_rply);
+		(void) door_return(argp, strlen(argp) + 1, NULL, 0);
+		return;
+	}
+
 	bzero(&m, sizeof (m));
 
 	if ((r = (xmlTextReaderPtr)xmlReaderForMemory(argp, strlen(argp),
