@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,6 @@
 
 #include <sys/dlpi.h>
 #include <sys/mac.h>
-#include <sys/dld.h>
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
@@ -2594,14 +2593,14 @@ e1000g_param_locked(mac_prop_id_t pr_num)
 	 * the device is in any sort of loopback mode ...
 	 */
 	switch (pr_num) {
-		case DLD_PROP_EN_1000FDX_CAP:
-		case DLD_PROP_EN_1000HDX_CAP:
-		case DLD_PROP_EN_100FDX_CAP:
-		case DLD_PROP_EN_100HDX_CAP:
-		case DLD_PROP_EN_10FDX_CAP:
-		case DLD_PROP_EN_10HDX_CAP:
-		case DLD_PROP_AUTONEG:
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
+		case MAC_PROP_AUTONEG:
+		case MAC_PROP_FLOWCTRL:
 			return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -2636,34 +2635,34 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	}
 
 	switch (pr_num) {
-		case DLD_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
 			Adapter->param_en_1000fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_1000fdx = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
 			Adapter->param_en_1000hdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_1000hdx = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
 			Adapter->param_en_100fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_100fdx = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
 			Adapter->param_en_100hdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_100hdx = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
 			Adapter->param_en_10fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_10fdx = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_EN_10HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
 			Adapter->param_en_10hdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_10hdx = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_AUTONEG:
+		case MAC_PROP_AUTONEG:
 			Adapter->param_adv_autoneg = *(uint8_t *)pr_val;
 			goto reset;
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_FLOWCTRL:
 			fc->send_xon = B_TRUE;
 			bcopy(pr_val, &flowctrl, sizeof (flowctrl));
 
@@ -2690,18 +2689,18 @@ reset:
 					err = EINVAL;
 			}
 			break;
-		case DLD_PROP_ADV_1000FDX_CAP:
-		case DLD_PROP_ADV_1000HDX_CAP:
-		case DLD_PROP_ADV_100FDX_CAP:
-		case DLD_PROP_ADV_100HDX_CAP:
-		case DLD_PROP_ADV_10FDX_CAP:
-		case DLD_PROP_ADV_10HDX_CAP:
-		case DLD_PROP_STATUS:
-		case DLD_PROP_SPEED:
-		case DLD_PROP_DUPLEX:
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_STATUS:
+		case MAC_PROP_SPEED:
+		case MAC_PROP_DUPLEX:
 			err = ENOTSUP; /* read-only prop. Can't set this. */
 			break;
-		case DLD_PROP_MTU:
+		case MAC_PROP_MTU:
 			cur_mtu = Adapter->default_mtu;
 			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 			if (new_mtu == cur_mtu) {
@@ -2750,7 +2749,7 @@ reset:
 				    (MAX_TX_DESC_PER_PACKET >> 1);
 			}
 			break;
-		case DLD_PROP_PRIVATE:
+		case MAC_PROP_PRIVATE:
 			err = e1000g_set_priv_prop(Adapter, pr_name,
 			    pr_valsize, pr_val);
 			break;
@@ -2777,30 +2776,30 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		return (EINVAL);
 
 	bzero(pr_val, pr_valsize);
-	if ((pr_flags & DLD_DEFAULT) && (pr_num != DLD_PROP_PRIVATE)) {
+	if ((pr_flags & MAC_PROP_DEFAULT) && (pr_num != MAC_PROP_PRIVATE)) {
 		return (e1000g_get_def_val(Adapter, pr_num,
 		    pr_valsize, pr_val));
 	}
 
 	switch (pr_num) {
-		case DLD_PROP_DUPLEX:
+		case MAC_PROP_DUPLEX:
 			if (pr_valsize >= sizeof (link_duplex_t)) {
 				bcopy(&Adapter->link_duplex, pr_val,
 				    sizeof (link_duplex_t));
 			} else
 				err = EINVAL;
 			break;
-		case DLD_PROP_SPEED:
+		case MAC_PROP_SPEED:
 			if (pr_valsize >= sizeof (uint64_t)) {
 				tmp = Adapter->link_speed * 1000000ull;
 				bcopy(&tmp, pr_val, sizeof (tmp));
 			} else
 				err = EINVAL;
 			break;
-		case DLD_PROP_AUTONEG:
+		case MAC_PROP_AUTONEG:
 			*(uint8_t *)pr_val = Adapter->param_adv_autoneg;
 			break;
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_FLOWCTRL:
 			if (pr_valsize >= sizeof (link_flowctrl_t)) {
 				switch (fc->type) {
 					case e1000_fc_none:
@@ -2820,47 +2819,47 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			} else
 				err = EINVAL;
 			break;
-		case DLD_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_1000fdx;
 			break;
-		case DLD_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_1000fdx;
 			break;
-		case DLD_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_1000hdx;
 			break;
-		case DLD_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_1000hdx;
 			break;
-		case DLD_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_100fdx;
 			break;
-		case DLD_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_100fdx;
 			break;
-		case DLD_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_100hdx;
 			break;
-		case DLD_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_100hdx;
 			break;
-		case DLD_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_10fdx;
 			break;
-		case DLD_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_10fdx;
 			break;
-		case DLD_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_10hdx;
 			break;
-		case DLD_PROP_EN_10HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_10hdx;
 			break;
-		case DLD_PROP_ADV_100T4_CAP:
-		case DLD_PROP_EN_100T4_CAP:
+		case MAC_PROP_ADV_100T4_CAP:
+		case MAC_PROP_EN_100T4_CAP:
 			*(uint8_t *)pr_val = Adapter->param_adv_100t4;
 			break;
-		case DLD_PROP_PRIVATE:
+		case MAC_PROP_PRIVATE:
 			err = e1000g_get_priv_prop(Adapter, pr_name,
 			    pr_flags, pr_valsize, pr_val);
 			break;
@@ -3106,7 +3105,7 @@ e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
 	char valstr[MAXNAMELEN];
 	int err = ENOTSUP;
 	uint_t strsize;
-	boolean_t is_default = (pr_flags & DLD_DEFAULT);
+	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
@@ -5388,46 +5387,46 @@ e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
 
 	ASSERT(pr_valsize > 0);
 	switch (pr_num) {
-	case DLD_PROP_AUTONEG:
+	case MAC_PROP_AUTONEG:
 		*(uint8_t *)pr_val =
 		    ((Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0);
 		break;
-	case DLD_PROP_FLOWCTRL:
+	case MAC_PROP_FLOWCTRL:
 		if (pr_valsize < sizeof (link_flowctrl_t))
 			return (EINVAL);
 		fl = LINK_FLOWCTRL_BI;
 		bcopy(&fl, pr_val, sizeof (fl));
 		break;
-	case DLD_PROP_ADV_1000FDX_CAP:
-	case DLD_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
 		*(uint8_t *)pr_val =
 		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
 		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
 		break;
-	case DLD_PROP_ADV_1000HDX_CAP:
-	case DLD_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
 		*(uint8_t *)pr_val =
 		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
 		    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
 		break;
-	case DLD_PROP_ADV_100FDX_CAP:
-	case DLD_PROP_EN_100FDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
 		*(uint8_t *)pr_val =
 		    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
 		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
-	case DLD_PROP_ADV_100HDX_CAP:
-	case DLD_PROP_EN_100HDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
 		*(uint8_t *)pr_val =
 		    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
 		    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
 		break;
-	case DLD_PROP_ADV_10FDX_CAP:
-	case DLD_PROP_EN_10FDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
 		*(uint8_t *)pr_val =
 		    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
 		break;
-	case DLD_PROP_ADV_10HDX_CAP:
-	case DLD_PROP_EN_10HDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
 		*(uint8_t *)pr_val =
 		    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
 		break;

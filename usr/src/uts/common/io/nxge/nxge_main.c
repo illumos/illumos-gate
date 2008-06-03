@@ -4533,20 +4533,20 @@ nxge_param_locked(mac_prop_id_t pr_num)
 	 * the device is in any sort of loopback mode ...
 	 */
 	switch (pr_num) {
-		case DLD_PROP_ADV_1000FDX_CAP:
-		case DLD_PROP_EN_1000FDX_CAP:
-		case DLD_PROP_ADV_1000HDX_CAP:
-		case DLD_PROP_EN_1000HDX_CAP:
-		case DLD_PROP_ADV_100FDX_CAP:
-		case DLD_PROP_EN_100FDX_CAP:
-		case DLD_PROP_ADV_100HDX_CAP:
-		case DLD_PROP_EN_100HDX_CAP:
-		case DLD_PROP_ADV_10FDX_CAP:
-		case DLD_PROP_EN_10FDX_CAP:
-		case DLD_PROP_ADV_10HDX_CAP:
-		case DLD_PROP_EN_10HDX_CAP:
-		case DLD_PROP_AUTONEG:
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
+		case MAC_PROP_AUTONEG:
+		case MAC_PROP_FLOWCTRL:
 			return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -4585,48 +4585,48 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 
 	val = *(uint8_t *)pr_val;
 	switch (pr_num) {
-		case DLD_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
 			nxgep->param_en_1000fdx = val;
 			param_arr[param_anar_1000fdx].value = val;
 
 			goto reprogram;
 
-		case DLD_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
 			nxgep->param_en_100fdx = val;
 			param_arr[param_anar_100fdx].value = val;
 
 			goto reprogram;
 
-		case DLD_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
 			nxgep->param_en_10fdx = val;
 			param_arr[param_anar_10fdx].value = val;
 
 			goto reprogram;
 
-		case DLD_PROP_EN_1000HDX_CAP:
-		case DLD_PROP_EN_100HDX_CAP:
-		case DLD_PROP_EN_10HDX_CAP:
-		case DLD_PROP_ADV_1000FDX_CAP:
-		case DLD_PROP_ADV_1000HDX_CAP:
-		case DLD_PROP_ADV_100FDX_CAP:
-		case DLD_PROP_ADV_100HDX_CAP:
-		case DLD_PROP_ADV_10FDX_CAP:
-		case DLD_PROP_ADV_10HDX_CAP:
-		case DLD_PROP_STATUS:
-		case DLD_PROP_SPEED:
-		case DLD_PROP_DUPLEX:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_STATUS:
+		case MAC_PROP_SPEED:
+		case MAC_PROP_DUPLEX:
 			err = EINVAL; /* cannot set read-only properties */
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_setprop:  read only property %d",
 			    pr_num));
 			break;
 
-		case DLD_PROP_AUTONEG:
+		case MAC_PROP_AUTONEG:
 			param_arr[param_autoneg].value = val;
 
 			goto reprogram;
 
-		case DLD_PROP_MTU:
+		case MAC_PROP_MTU:
 			if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
 				err = EBUSY;
 				break;
@@ -4678,7 +4678,7 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			    new_mtu, nxgep->mac.maxframesize));
 			break;
 
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_FLOWCTRL:
 			bcopy(pr_val, &fl, sizeof (fl));
 			switch (fl) {
 			default:
@@ -4706,7 +4706,7 @@ reprogram:
 				}
 			}
 			break;
-		case DLD_PROP_PRIVATE:
+		case MAC_PROP_PRIVATE:
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_setprop: private property"));
 			err = nxge_set_priv_prop(nxgep, pr_name, pr_valsize,
@@ -4736,7 +4736,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	link_flowctrl_t	fl;
 	uint64_t	tmp = 0;
 	link_state_t	ls;
-	boolean_t	is_default = (pr_flags & DLD_DEFAULT);
+	boolean_t	is_default = (pr_flags & MAC_PROP_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_m_getprop: pr_num %d", pr_num));
@@ -4744,28 +4744,28 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	if (pr_valsize == 0)
 		return (EINVAL);
 
-	if ((is_default) && (pr_num != DLD_PROP_PRIVATE)) {
+	if ((is_default) && (pr_num != MAC_PROP_PRIVATE)) {
 		err = nxge_get_def_val(nxgep, pr_num, pr_valsize, pr_val);
 		return (err);
 	}
 
 	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
-		case DLD_PROP_DUPLEX:
+		case MAC_PROP_DUPLEX:
 			*(uint8_t *)pr_val = statsp->mac_stats.link_duplex;
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_getprop: duplex mode %d",
 			    *(uint8_t *)pr_val));
 			break;
 
-		case DLD_PROP_SPEED:
+		case MAC_PROP_SPEED:
 			if (pr_valsize < sizeof (uint64_t))
 				return (EINVAL);
 			tmp = statsp->mac_stats.link_speed * 1000000ull;
 			bcopy(&tmp, pr_val, sizeof (tmp));
 			break;
 
-		case DLD_PROP_STATUS:
+		case MAC_PROP_STATUS:
 			if (pr_valsize < sizeof (link_state_t))
 				return (EINVAL);
 			if (!statsp->mac_stats.link_up)
@@ -4775,12 +4775,12 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			bcopy(&ls, pr_val, sizeof (ls));
 			break;
 
-		case DLD_PROP_AUTONEG:
+		case MAC_PROP_AUTONEG:
 			*(uint8_t *)pr_val =
 			    param_arr[param_autoneg].value;
 			break;
 
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_FLOWCTRL:
 			if (pr_valsize < sizeof (link_flowctrl_t))
 				return (EINVAL);
 
@@ -4791,43 +4791,43 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			bcopy(&fl, pr_val, sizeof (fl));
 			break;
 
-		case DLD_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000FDX_CAP:
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_1000fdx].value;
 			break;
 
-		case DLD_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
 			*(uint8_t *)pr_val = nxgep->param_en_1000fdx;
 			break;
 
-		case DLD_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_100fdx].value;
 			break;
 
-		case DLD_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
 			*(uint8_t *)pr_val = nxgep->param_en_100fdx;
 			break;
 
-		case DLD_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_10fdx].value;
 			break;
 
-		case DLD_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
 			*(uint8_t *)pr_val = nxgep->param_en_10fdx;
 			break;
 
-		case DLD_PROP_EN_1000HDX_CAP:
-		case DLD_PROP_EN_100HDX_CAP:
-		case DLD_PROP_EN_10HDX_CAP:
-		case DLD_PROP_ADV_1000HDX_CAP:
-		case DLD_PROP_ADV_100HDX_CAP:
-		case DLD_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
 			err = ENOTSUP;
 			break;
 
-		case DLD_PROP_PRIVATE:
+		case MAC_PROP_PRIVATE:
 			err = nxge_get_priv_prop(nxgep, pr_name, pr_flags,
 			    pr_valsize, pr_val);
 			break;
@@ -5138,7 +5138,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	char		valstr[MAXNAMELEN];
 	int		err = EINVAL;
 	uint_t		strsize;
-	boolean_t	is_default = (pr_flags & DLD_DEFAULT);
+	boolean_t	is_default = (pr_flags & MAC_PROP_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_get_priv_prop: property %s", pr_name));
@@ -6655,21 +6655,21 @@ nxge_get_def_val(nxge_t *nxgep, mac_prop_id_t pr_num, uint_t pr_valsize,
 	link_flowctrl_t fl;
 
 	switch (pr_num) {
-	case DLD_PROP_AUTONEG:
+	case MAC_PROP_AUTONEG:
 		*(uint8_t *)pr_val = 1;
 		break;
-	case DLD_PROP_FLOWCTRL:
+	case MAC_PROP_FLOWCTRL:
 		if (pr_valsize < sizeof (link_flowctrl_t))
 			return (EINVAL);
 		fl = LINK_FLOWCTRL_RX;
 		bcopy(&fl, pr_val, sizeof (fl));
 		break;
-	case DLD_PROP_ADV_1000FDX_CAP:
-	case DLD_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
 		*(uint8_t *)pr_val = 1;
 		break;
-	case DLD_PROP_ADV_100FDX_CAP:
-	case DLD_PROP_EN_100FDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
 		*(uint8_t *)pr_val = 1;
 		break;
 	default:

@@ -35,7 +35,7 @@
 #include	<sys/stat.h>
 #include	<sys/strsun.h>
 #include	<sys/vlan.h>
-#include	<sys/dld.h>
+#include	<sys/mac.h>
 #include	<sys/dld_impl.h>
 #include	<sys/dls_impl.h>
 #include	<sys/softmac.h>
@@ -507,27 +507,27 @@ failed:
 }
 
 /*
- * DLDIOCSETPROP
+ * DLDIOC_SETPROP
  */
 static void
 drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 {
 	int		err = EINVAL, dsize;
 	queue_t		*q = ctls->cs_wq;
-	dld_ioc_prop_t	*dipp;
+	dld_ioc_macprop_t	*dipp;
 	dls_dl_handle_t 	dlh;
 	dls_vlan_t		*dvp;
 	datalink_id_t 		linkid;
 	mac_prop_t		macprop;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_prop_t))) != 0)
+	if ((err = miocpullup(mp, sizeof (dld_ioc_macprop_t))) != 0)
 		goto done;
-	dipp = (dld_ioc_prop_t *)mp->b_cont->b_rptr;
+	dipp = (dld_ioc_macprop_t *)mp->b_cont->b_rptr;
 
-	dsize = sizeof (dld_ioc_prop_t) + dipp->pr_valsize - 1;
+	dsize = sizeof (dld_ioc_macprop_t) + dipp->pr_valsize - 1;
 	if ((err = miocpullup(mp, dsize)) != 0)
 		goto done;
-	dipp = (dld_ioc_prop_t *)mp->b_cont->b_rptr;
+	dipp = (dld_ioc_macprop_t *)mp->b_cont->b_rptr;
 
 	linkid = dipp->pr_linkid;
 
@@ -966,10 +966,10 @@ drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
 	case DLDIOC_SECOBJ_UNSET:
 		drv_ioc_secobj_unset(ctls, mp);
 		return;
-	case DLDIOCSETPROP:
+	case DLDIOC_SETMACPROP:
 		drv_ioc_setprop(ctls, mp);
 		return;
-	case DLDIOCGETPROP:
+	case DLDIOC_GETMACPROP:
 		drv_ioc_getprop(ctls, mp);
 		return;
 	case DLDIOC_CREATE_VLAN:

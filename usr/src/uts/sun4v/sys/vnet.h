@@ -35,6 +35,7 @@ extern "C" {
 
 #include <sys/vnet_res.h>
 #include <sys/vnet_mailbox.h>
+#include <sys/modhash.h>
 
 #define	VNET_SUCCESS		(0)	/* successful return */
 #define	VNET_FAILURE		(-1)	/* unsuccessful return */

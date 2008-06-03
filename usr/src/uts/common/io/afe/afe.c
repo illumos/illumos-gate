@@ -2821,13 +2821,13 @@ afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 {
 	afe_t		*afep = arg;
 	int		err = 0;
-	boolean_t	dfl = flags & DLD_DEFAULT;
+	boolean_t	dfl = flags & MAC_PROP_DEFAULT;
 
 	if (sz == 0)
 		return (EINVAL);
 
 	switch (num) {
-	case DLD_PROP_DUPLEX:
+	case MAC_PROP_DUPLEX:
 		if (sz >= sizeof (link_duplex_t)) {
 			bcopy(&afep->afe_duplex, val, sizeof (link_duplex_t));
 		} else {
@@ -2835,7 +2835,7 @@ afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		}
 		break;
 
-	case DLD_PROP_SPEED:
+	case MAC_PROP_SPEED:
 		if (sz >= sizeof (uint64_t)) {
 			bcopy(&afep->afe_ifspeed, val, sizeof (uint64_t));
 		} else {
@@ -2843,47 +2843,47 @@ afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		}
 		break;
 
-	case DLD_PROP_AUTONEG:
+	case MAC_PROP_AUTONEG:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_aneg : afep->afe_adv_aneg;
 		break;
 
 #if 0
-	case DLD_PROP_ADV_1000FDX_CAP:
-	case DLD_PROP_EN_1000FDX_CAP:
-	case DLD_PROP_ADV_1000HDX_CAP:
-	case DLD_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
 		/* We don't support gigabit! */
 		*(uint8_t *)val = 0;
 		break;
 #endif
 
-	case DLD_PROP_ADV_100FDX_CAP:
-	case DLD_PROP_EN_100FDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_100fdx : afep->afe_adv_100fdx;
 		break;
 
-	case DLD_PROP_ADV_100HDX_CAP:
-	case DLD_PROP_EN_100HDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_100hdx : afep->afe_adv_100hdx;
 		break;
 
-	case DLD_PROP_ADV_10FDX_CAP:
-	case DLD_PROP_EN_10FDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_10fdx : afep->afe_adv_10fdx;
 		break;
 
-	case DLD_PROP_ADV_10HDX_CAP:
-	case DLD_PROP_EN_10HDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_10hdx : afep->afe_adv_10hdx;
 		break;
 
-	case DLD_PROP_ADV_100T4_CAP:
-	case DLD_PROP_EN_100T4_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_100T4 : afep->afe_adv_100T4;
 		break;
@@ -2905,32 +2905,32 @@ afe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	uint8_t		*capp;
 
 	switch (num) {
-	case DLD_PROP_EN_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
 		advp = &afep->afe_adv_100fdx;
 		capp = &afep->afe_cap_100fdx;
 		break;
 
-	case DLD_PROP_EN_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
 		advp = &afep->afe_adv_100hdx;
 		capp = &afep->afe_cap_100hdx;
 		break;
 
-	case DLD_PROP_EN_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
 		advp = &afep->afe_adv_10fdx;
 		capp = &afep->afe_cap_10fdx;
 		break;
 
-	case DLD_PROP_EN_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
 		advp = &afep->afe_adv_10hdx;
 		capp = &afep->afe_cap_10hdx;
 		break;
 
-	case DLD_PROP_EN_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
 		advp = &afep->afe_adv_100T4;
 		capp = &afep->afe_cap_100T4;
 		break;
 
-	case DLD_PROP_AUTONEG:
+	case MAC_PROP_AUTONEG:
 		advp = &afep->afe_adv_aneg;
 		capp = &afep->afe_cap_aneg;
 		break;

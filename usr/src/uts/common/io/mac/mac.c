@@ -2898,10 +2898,10 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 	link_state_t link_state;
 
 	switch (macprop->mp_id) {
-	case DLD_PROP_MTU:
+	case MAC_PROP_MTU:
 		if (valsize < sizeof (sdu))
 			return (EINVAL);
-		if ((macprop->mp_flags & DLD_DEFAULT) == 0) {
+		if ((macprop->mp_flags & MAC_PROP_DEFAULT) == 0) {
 			mac_sdu_get(mh, NULL, &sdu);
 			bcopy(&sdu, val, sizeof (sdu));
 			return (0);
@@ -2916,7 +2916,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 			 */
 			break;
 		}
-	case DLD_PROP_STATUS:
+	case MAC_PROP_STATUS:
 		if (valsize < sizeof (link_state))
 			return (EINVAL);
 		link_state = mac_link_get(mh);

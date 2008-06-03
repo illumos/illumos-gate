@@ -75,8 +75,6 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #include <sys/netlb.h>
 #include <sys/miiregs.h>
 
-#include <sys/dld.h>
-
 #include "nge_chip.h"
 
 #define	PIO_ADDR(ngep, offset)	((void *)((caddr_t)(ngep)->io_regs+(offset)))

@@ -1511,20 +1511,20 @@ nge_param_locked(mac_prop_id_t pr_num)
 	 * the device is in any sort of loopback mode ...
 	 */
 	switch (pr_num) {
-		case DLD_PROP_ADV_1000FDX_CAP:
-		case DLD_PROP_EN_1000FDX_CAP:
-		case DLD_PROP_ADV_1000HDX_CAP:
-		case DLD_PROP_EN_1000HDX_CAP:
-		case DLD_PROP_ADV_100FDX_CAP:
-		case DLD_PROP_EN_100FDX_CAP:
-		case DLD_PROP_ADV_100HDX_CAP:
-		case DLD_PROP_EN_100HDX_CAP:
-		case DLD_PROP_ADV_10FDX_CAP:
-		case DLD_PROP_EN_10FDX_CAP:
-		case DLD_PROP_ADV_10HDX_CAP:
-		case DLD_PROP_EN_10HDX_CAP:
-		case DLD_PROP_AUTONEG:
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
+		case MAC_PROP_AUTONEG:
+		case MAC_PROP_FLOWCTRL:
 			return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -1553,23 +1553,23 @@ nge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		return (EBUSY);
 	}
 	switch (pr_num) {
-		case DLD_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
 			ngep->param_en_1000fdx = *(uint8_t *)pr_val;
 			ngep->param_adv_1000fdx = *(uint8_t *)pr_val;
 			goto reprogram;
-		case DLD_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
 			ngep->param_en_100fdx = *(uint8_t *)pr_val;
 			ngep->param_adv_100fdx = *(uint8_t *)pr_val;
 			goto reprogram;
-		case DLD_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
 			ngep->param_en_100hdx = *(uint8_t *)pr_val;
 			ngep->param_adv_100hdx = *(uint8_t *)pr_val;
 			goto reprogram;
-		case DLD_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
 			ngep->param_en_10fdx = *(uint8_t *)pr_val;
 			ngep->param_adv_10fdx = *(uint8_t *)pr_val;
 			goto reprogram;
-		case DLD_PROP_EN_10HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
 			ngep->param_en_10hdx = *(uint8_t *)pr_val;
 			ngep->param_adv_10hdx = *(uint8_t *)pr_val;
 reprogram:
@@ -1577,24 +1577,24 @@ reprogram:
 		nge_chip_sync(ngep);
 		break;
 
-		case DLD_PROP_ADV_1000FDX_CAP:
-		case DLD_PROP_ADV_1000HDX_CAP:
-		case DLD_PROP_ADV_100FDX_CAP:
-		case DLD_PROP_ADV_100HDX_CAP:
-		case DLD_PROP_ADV_10FDX_CAP:
-		case DLD_PROP_ADV_10HDX_CAP:
-		case DLD_PROP_STATUS:
-		case DLD_PROP_SPEED:
-		case DLD_PROP_DUPLEX:
-		case DLD_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_STATUS:
+		case MAC_PROP_SPEED:
+		case MAC_PROP_DUPLEX:
+		case MAC_PROP_EN_1000HDX_CAP:
 			err = ENOTSUP; /* read-only prop. Can't set this */
 			break;
-		case DLD_PROP_AUTONEG:
+		case MAC_PROP_AUTONEG:
 			ngep->param_adv_autoneg = *(uint8_t *)pr_val;
 			(*ngep->physops->phys_update)(ngep);
 			nge_chip_sync(ngep);
 			break;
-		case DLD_PROP_MTU:
+		case MAC_PROP_MTU:
 			cur_mtu = ngep->default_mtu;
 			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 			if (new_mtu == cur_mtu) {
@@ -1668,7 +1668,7 @@ reprogram:
 			err = mac_maxsdu_update(ngep->mh, ngep->default_mtu);
 
 			break;
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_FLOWCTRL:
 			bcopy(pr_val, &fl, sizeof (fl));
 			switch (fl) {
 			default:
@@ -1723,7 +1723,7 @@ reprogram:
 			}
 
 			break;
-		case DLD_PROP_PRIVATE:
+		case MAC_PROP_PRIVATE:
 			err = nge_set_priv_prop(ngep, pr_name, pr_valsize,
 			    pr_val);
 			if (err == 0) {
@@ -1746,37 +1746,37 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	int err = 0;
 	link_flowctrl_t fl;
 	uint64_t speed;
-	boolean_t is_default = (pr_flags & DLD_DEFAULT);
+	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 
 	if (pr_valsize == 0)
 		return (EINVAL);
 
 	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
-		case DLD_PROP_DUPLEX:
+		case MAC_PROP_DUPLEX:
 			if (pr_valsize >= sizeof (link_duplex_t)) {
 				bcopy(&ngep->param_link_duplex, pr_val,
 				    sizeof (link_duplex_t));
 			} else
 				err = EINVAL;
 			break;
-		case DLD_PROP_SPEED:
+		case MAC_PROP_SPEED:
 			if (pr_valsize >= sizeof (uint64_t)) {
 				speed = ngep->param_link_speed * 1000000ull;
 				bcopy(&speed, pr_val, sizeof (speed));
 			} else
 				err = EINVAL;
 			break;
-		case DLD_PROP_AUTONEG:
+		case MAC_PROP_AUTONEG:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_autoneg;
 			}
 			break;
-		case DLD_PROP_FLOWCTRL:
+		case MAC_PROP_FLOWCTRL:
 			if (pr_valsize >= sizeof (link_flowctrl_t)) {
-				if (pr_flags & DLD_DEFAULT) {
+				if (pr_flags & MAC_PROP_DEFAULT) {
 					fl = LINK_FLOWCTRL_BI;
 					bcopy(&fl, pr_val, sizeof (fl));
 					break;
@@ -1800,95 +1800,95 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			} else
 				err = EINVAL;
 			break;
-		case DLD_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000FDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_1000fdx;
 			}
 			break;
-		case DLD_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_en_1000fdx;
 			}
 			break;
-		case DLD_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 0;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_1000hdx;
 			}
 			break;
-		case DLD_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 0;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_en_1000hdx;
 			}
 			break;
-		case DLD_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_100fdx;
 			}
 			break;
-		case DLD_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_en_100fdx;
 			}
 			break;
-		case DLD_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_100hdx;
 			}
 			break;
-		case DLD_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_en_100hdx;
 			}
 			break;
-		case DLD_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_10fdx;
 			}
 			break;
-		case DLD_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_en_10fdx;
 			}
 			break;
-		case DLD_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_adv_10hdx;
 			}
 			break;
-		case DLD_PROP_EN_10HDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
 				*(uint8_t *)pr_val = ngep->param_en_10hdx;
 			}
 			break;
-		case DLD_PROP_ADV_100T4_CAP:
-		case DLD_PROP_EN_100T4_CAP:
+		case MAC_PROP_ADV_100T4_CAP:
+		case MAC_PROP_EN_100T4_CAP:
 			*(uint8_t *)pr_val = 0;
 			break;
-		case DLD_PROP_PRIVATE:
+		case MAC_PROP_PRIVATE:
 			err = nge_get_priv_prop(ngep, pr_name, pr_flags,
 			    pr_valsize, pr_val);
 			break;
@@ -2036,7 +2036,7 @@ nge_get_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_flags,
     uint_t pr_valsize, void *pr_val)
 {
 	int err = ENOTSUP;
-	boolean_t is_default = (pr_flags & DLD_DEFAULT);
+	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {

@@ -32,7 +32,6 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/stream.h>
-#include <sys/dld.h>
 
 /*
  * MAC Services Module
@@ -95,6 +94,45 @@ typedef enum {
 	LINK_FLOWCTRL_TX,
 	LINK_FLOWCTRL_BI
 } link_flowctrl_t;
+
+typedef uint32_t datalink_id_t;
+
+/*
+ * Encodings for public properties.
+ * A most significant bit value of 1 indicates private property, intended
+ * to allow private property implementations to use internal encodings
+ * if desired.
+ *
+ * Note that there are 2 sets of parameters: the *_EN_*
+ * values are those that the Administrator configures for autonegotiation.
+ * The _ADV_* values are those that are currently exposed over the wire.
+ */
+#define	MAXLINKPROPNAME		256
+#define	MAC_PROP_DEFAULT	0x0001
+typedef enum {
+	MAC_PROP_DUPLEX = 0x00000001,
+	MAC_PROP_SPEED,
+	MAC_PROP_STATUS,
+	MAC_PROP_AUTONEG,
+	MAC_PROP_EN_AUTONEG,
+	MAC_PROP_MTU,
+	MAC_PROP_FLOWCTRL,
+	MAC_PROP_ADV_1000FDX_CAP,
+	MAC_PROP_EN_1000FDX_CAP,
+	MAC_PROP_ADV_1000HDX_CAP,
+	MAC_PROP_EN_1000HDX_CAP,
+	MAC_PROP_ADV_100FDX_CAP,
+	MAC_PROP_EN_100FDX_CAP,
+	MAC_PROP_ADV_100HDX_CAP,
+	MAC_PROP_EN_100HDX_CAP,
+	MAC_PROP_ADV_10FDX_CAP,
+	MAC_PROP_EN_10FDX_CAP,
+	MAC_PROP_ADV_10HDX_CAP,
+	MAC_PROP_EN_10HDX_CAP,
+	MAC_PROP_ADV_100T4_CAP,
+	MAC_PROP_EN_100T4_CAP,
+	MAC_PROP_PRIVATE = -1
+} mac_prop_id_t;
 
 /*
  * Maximum MAC address length

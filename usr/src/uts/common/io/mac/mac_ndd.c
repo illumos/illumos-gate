@@ -279,7 +279,7 @@ mac_ndd_get_ioctl(mac_impl_t *mip, mblk_t *mp, int avail, int *rval)
 	 */
 	(void) snprintf(priv_name, sizeof (priv_name), "_%s", name);
 	status = mip->mi_callbacks->mc_getprop(mip->mi_driver, priv_name,
-	    DLD_PROP_PRIVATE, 0, avail - 2, mp1->b_rptr);
+	    MAC_PROP_PRIVATE, 0, avail - 2, mp1->b_rptr);
 	if (status != 0)
 		goto get_done;
 
@@ -386,7 +386,7 @@ mac_ndd_set_ioctl(mac_impl_t *mip, mblk_t *mp, int avail, int *rval)
 priv_prop:
 	(void) snprintf(priv_name, sizeof (priv_name), "_%s", name);
 	status = mip->mi_callbacks->mc_setprop(mip->mi_driver, priv_name,
-	    DLD_PROP_PRIVATE, strlen(new_valuep), new_valuep);
+	    MAC_PROP_PRIVATE, strlen(new_valuep), new_valuep);
 done:
 	freemsg(mp1);
 	mp->b_cont = NULL;

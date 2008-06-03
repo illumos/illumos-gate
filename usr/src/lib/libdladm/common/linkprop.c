@@ -102,13 +102,13 @@ typedef dladm_status_t	pd_checkf_t(struct prop_desc *pd,
 			    datalink_media_t);
 
 typedef struct dld_public_prop_s {
-	dld_prop_id_t	pp_id;
+	mac_prop_id_t	pp_id;
 	size_t		pp_valsize;
 	char		*pp_name;
 	char		*pp_desc;
 } dld_public_prop_t;
 
-static dld_ioc_prop_t *dld_buf_alloc(size_t, datalink_id_t, const char *,
+static dld_ioc_macprop_t *dld_buf_alloc(size_t, datalink_id_t, const char *,
 					uint_t, dladm_status_t *);
 static dladm_status_t dld_set_prop(datalink_id_t, const char *, char **,
 					uint_t, uint_t);
@@ -191,65 +191,65 @@ typedef struct prop_desc {
 	datalink_media_t	pd_dmedia;
 } prop_desc_t;
 
-#define	DLD_PROPBUF_SIZE(v)	sizeof (dld_ioc_prop_t) + (v) - 1
+#define	MAC_PROP_BUFSIZE(v)	sizeof (dld_ioc_macprop_t) + (v) - 1
 
 
 static dld_public_prop_t dld_prop[] = {
-	{ DLD_PROP_DUPLEX,	sizeof (link_duplex_t),
+	{ MAC_PROP_DUPLEX,	sizeof (link_duplex_t),
 	    "duplex",		"link duplex mode" },
 
-	{DLD_PROP_SPEED,	sizeof (uint64_t),
+	{MAC_PROP_SPEED,	sizeof (uint64_t),
 	    "speed",		"link speed (bps)" },
 
-	{ DLD_PROP_STATUS,	sizeof (link_state_t),
+	{ MAC_PROP_STATUS,	sizeof (link_state_t),
 	    "state",		"link up/down" },
 
-	{ DLD_PROP_AUTONEG,	sizeof (uint8_t),
+	{ MAC_PROP_AUTONEG,	sizeof (uint8_t),
 	    "adv_autoneg_cap",	"Advertised auto-negotiation" },
 
-	{ DLD_PROP_MTU,		sizeof (uint32_t),
+	{ MAC_PROP_MTU,		sizeof (uint32_t),
 	    "mtu",		"current link mtu" },
 
-	{ DLD_PROP_FLOWCTRL,	sizeof (link_flowctrl_t),
+	{ MAC_PROP_FLOWCTRL,	sizeof (link_flowctrl_t),
 	    "flowctrl",		"flowcontrol" },
 
-	{ DLD_PROP_ADV_1000FDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_ADV_1000FDX_CAP, sizeof (uint8_t),
 	    "adv_1000fdx_cap",	"Adv 1000 Mbps fdx" },
 
-	{ DLD_PROP_EN_1000FDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_EN_1000FDX_CAP, sizeof (uint8_t),
 	    "en_1000fdx_cap",	"Enable 1000 Mbps fdx" },
 
-	{ DLD_PROP_ADV_1000HDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_ADV_1000HDX_CAP, sizeof (uint8_t),
 	    "adv_1000hdx_cap", "Adv 1000 Mbps hdx" },
 
-	{ DLD_PROP_EN_1000HDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_EN_1000HDX_CAP, sizeof (uint8_t),
 	    "en_1000hdx_cap",	"Enable 1000 Mbps hdx" },
 
-	{ DLD_PROP_ADV_100FDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_ADV_100FDX_CAP, sizeof (uint8_t),
 	    "adv_100fdx_cap",	"Adv 100 Mbps fdx" },
 
-	{ DLD_PROP_EN_100FDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_EN_100FDX_CAP, sizeof (uint8_t),
 	    "en_100fdx_cap",	"Enable 100 Mbps fdx" },
 
-	{ DLD_PROP_ADV_100HDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_ADV_100HDX_CAP, sizeof (uint8_t),
 	    "adv_100hdx_cap",	"Adv 100 Mbps hdx" },
 
-	{ DLD_PROP_EN_100HDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_EN_100HDX_CAP, sizeof (uint8_t),
 	    "en_100hdx_cap",	"Enable 100 Mbps hdx" },
 
-	{ DLD_PROP_ADV_10FDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_ADV_10FDX_CAP, sizeof (uint8_t),
 	    "adv_10fdx_cap",	"Adv 10 Mbps fdx" },
 
-	{ DLD_PROP_EN_10FDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_EN_10FDX_CAP, sizeof (uint8_t),
 	    "en_10fdx_cap",	"Enable 10 Mbps fdx" },
 
-	{ DLD_PROP_ADV_10HDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_ADV_10HDX_CAP, sizeof (uint8_t),
 	    "adv_10hdx_cap",	"Adv 10 Mbps hdx" },
 
-	{ DLD_PROP_EN_10HDX_CAP, sizeof (uint8_t),
+	{ MAC_PROP_EN_10HDX_CAP, sizeof (uint8_t),
 	    "en_10hdx_cap",	"Enable 10 Mbps hdx" },
 
-	{ DLD_PROP_PRIVATE, 0,
+	{ MAC_PROP_PRIVATE, 0,
 	    "driver-private",	"" }
 };
 
@@ -655,7 +655,7 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 	int			i;
 
 	if (type == DLADM_PROP_VAL_DEFAULT)
-		dld_flags = DLD_DEFAULT;
+		dld_flags = MAC_PROP_DEFAULT;
 
 	if (linkid == DATALINK_INVALID_LINKID || prop_name == NULL ||
 	    prop_val == NULL || val_cntp == NULL || *val_cntp == 0)
@@ -1023,7 +1023,7 @@ do_get_autopush(struct prop_desc *pd, datalink_id_t linkid,
 	dld_ioc_ap_t	dia;
 	int		fd, i, len;
 
-	if (flags & DLD_DEFAULT)
+	if (flags & MAC_PROP_DEFAULT)
 		return (DLADM_STATUS_NOTSUP);
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
@@ -1613,7 +1613,7 @@ dladm_name2prop(const char *prop_name)
 {
 	dld_public_prop_t *p;
 
-	for (p = dld_prop; p->pp_id != DLD_PROP_PRIVATE; p++) {
+	for (p = dld_prop; p->pp_id != MAC_PROP_PRIVATE; p++) {
 		if (strcmp(p->pp_name, prop_name) == 0)
 			break;
 	}
@@ -1621,20 +1621,20 @@ dladm_name2prop(const char *prop_name)
 }
 
 
-static dld_ioc_prop_t *
+static dld_ioc_macprop_t *
 dld_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
     uint_t flags, dladm_status_t *status)
 {
 	int dsize;
-	dld_ioc_prop_t *dip;
+	dld_ioc_macprop_t *dip;
 	dld_public_prop_t *p;
 
 	*status = DLADM_STATUS_OK;
 	p = dladm_name2prop(prop_name);
-	if (p->pp_id != DLD_PROP_PRIVATE)
+	if (p->pp_id != MAC_PROP_PRIVATE)
 		valsize = p->pp_valsize;
 
-	dsize = DLD_PROPBUF_SIZE(valsize);
+	dsize = MAC_PROP_BUFSIZE(valsize);
 	dip = malloc(dsize);
 	if (dip == NULL) {
 		*status = DLADM_STATUS_NOMEM;
@@ -1643,7 +1643,7 @@ dld_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
 	bzero(dip, dsize);
 	dip->pr_valsize = valsize;
 	(void) strlcpy(dip->pr_name, prop_name, sizeof (dip->pr_name));
-	dip->pr_version = DLD_PROP_VERSION;
+	dip->pr_version = MAC_PROP_VERSION;
 	dip->pr_linkid = linkid;
 	dip->pr_num = p->pp_id;
 	dip->pr_flags = flags;
@@ -1655,7 +1655,7 @@ static dladm_status_t
 dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
     val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
 {
-	dld_ioc_prop_t	*dip;
+	dld_ioc_macprop_t	*dip;
 	int		fd, dsize;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	uint8_t		u8;
@@ -1694,12 +1694,12 @@ dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 	}
 
 	(void) memcpy(dip->pr_val, val, dip->pr_valsize);
-	dsize = DLD_PROPBUF_SIZE(dip->pr_valsize);
+	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
-	if (i_dladm_ioctl(fd, DLDIOCSETPROP, dip, dsize) < 0)
+	if (i_dladm_ioctl(fd, DLDIOC_SETMACPROP, dip, dsize) < 0)
 		status = dladm_errno2status(errno);
 
 	(void) close(fd);
@@ -1708,12 +1708,12 @@ done:
 	return (status);
 }
 
-static dld_ioc_prop_t *
+static dld_ioc_macprop_t *
 dld_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
     dladm_status_t *status)
 {
 	int fd, dsize;
-	dld_ioc_prop_t *dip = NULL;
+	dld_ioc_macprop_t *dip = NULL;
 
 	*status = DLADM_STATUS_OK;
 
@@ -1721,13 +1721,13 @@ dld_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
 	if (dip == NULL)
 		return (NULL);
 
-	dsize = DLD_PROPBUF_SIZE(dip->pr_valsize);
+	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		*status = dladm_errno2status(errno);
 		goto done;
 	}
-	if (i_dladm_ioctl(fd, DLDIOCGETPROP, dip, dsize) < 0) {
+	if (i_dladm_ioctl(fd, DLDIOC_GETMACPROP, dip, dsize) < 0) {
 		*status = dladm_errno2status(errno);
 	}
 
@@ -1759,7 +1759,7 @@ dld_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
 	link_duplex_t   link_duplex;
 	dladm_status_t  status;
 
-	if (flags & DLD_DEFAULT)
+	if (flags & MAC_PROP_DEFAULT)
 		return (DLADM_STATUS_NOTSUP);
 
 	if ((status = dladm_get_single_mac_stat(linkid, "link_duplex",
@@ -1789,7 +1789,7 @@ dld_speed_get(struct prop_desc *pd, datalink_id_t linkid,
 	uint64_t	ifspeed = 0;
 	dladm_status_t status;
 
-	if (flags & DLD_DEFAULT)
+	if (flags & MAC_PROP_DEFAULT)
 		return (DLADM_STATUS_NOTSUP);
 
 	if ((status = dladm_get_single_mac_stat(linkid, "ifspeed",
@@ -1815,9 +1815,9 @@ dld_status_get(struct prop_desc *pd, datalink_id_t linkid,
 	link_state_t	link_state;
 	dladm_status_t	status;
 	uchar_t 	*cp;
-	dld_ioc_prop_t  *dip;
+	dld_ioc_macprop_t  *dip;
 
-	if (flags & DLD_DEFAULT)
+	if (flags & MAC_PROP_DEFAULT)
 		return (DLADM_STATUS_NOTSUP);
 	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (status != DLADM_STATUS_OK)
@@ -1846,7 +1846,7 @@ static dladm_status_t
 dld_binary_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	dld_ioc_prop_t *dip;
+	dld_ioc_macprop_t *dip;
 	dladm_status_t status;
 
 	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
@@ -1863,7 +1863,7 @@ static dladm_status_t
 dld_uint32_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	dld_ioc_prop_t *dip;
+	dld_ioc_macprop_t *dip;
 	uint32_t v  = 0;
 	uchar_t *cp;
 	dladm_status_t status;
@@ -1884,7 +1884,7 @@ static dladm_status_t
 dld_flowctl_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	dld_ioc_prop_t *dip;
+	dld_ioc_macprop_t *dip;
 	link_flowctrl_t v;
 	dladm_status_t status;
 	uchar_t *cp;
@@ -1921,7 +1921,7 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 {
 	int		fd, i, slen;
 	int 		bufsize = 0, dsize;
-	dld_ioc_prop_t *dip = NULL;
+	dld_ioc_macprop_t *dip = NULL;
 	uchar_t 	*dp;
 	dld_public_prop_t *p;
 	dladm_status_t	status = DLADM_STATUS_OK;
@@ -1930,7 +1930,7 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 	    (prop_val != NULL && val_cnt == 0))
 		return (DLADM_STATUS_BADARG);
 	p = dladm_name2prop(prop_name);
-	if (p->pp_id != DLD_PROP_PRIVATE)
+	if (p->pp_id != MAC_PROP_PRIVATE)
 		return (DLADM_STATUS_BADARG);
 
 	/*
@@ -1949,19 +1949,19 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 	}
 
 	dip = dld_buf_alloc(bufsize + 1, linkid, prop_name,
-	    (prop_val != NULL ? 0 : DLD_DEFAULT), &status);
+	    (prop_val != NULL ? 0 : MAC_PROP_DEFAULT), &status);
 	if (dip == NULL)
 		return (status);
 
 	dp = (uchar_t *)dip->pr_val;
-	dsize = sizeof (dld_ioc_prop_t) + bufsize;
+	dsize = sizeof (dld_ioc_macprop_t) + bufsize;
 	slen = 0;
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
 	if (prop_val == NULL) {
-		if (i_dladm_ioctl(fd, DLDIOCGETPROP, dip, dsize) < 0) {
+		if (i_dladm_ioctl(fd, DLDIOC_GETMACPROP, dip, dsize) < 0) {
 			status = dladm_errno2status(errno);
 			goto done;
 		}
@@ -1980,7 +1980,7 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 			dp += (plen + 1);
 		}
 	}
-	if (i_dladm_ioctl(fd, DLDIOCSETPROP, dip, dsize) < 0) {
+	if (i_dladm_ioctl(fd, DLDIOC_SETMACPROP, dip, dsize) < 0) {
 		status = dladm_errno2status(errno);
 	}
 
@@ -1998,7 +1998,7 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 	int		fd;
 	dladm_status_t  status = DLADM_STATUS_OK;
 	uint_t 		dsize;
-	dld_ioc_prop_t *dip = NULL;
+	dld_ioc_macprop_t *dip = NULL;
 	dld_public_prop_t *p;
 	char tmp = '\0';
 
@@ -2007,7 +2007,7 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 		return (DLADM_STATUS_BADARG);
 
 	p = dladm_name2prop(prop_name);
-	if (p->pp_id != DLD_PROP_PRIVATE)
+	if (p->pp_id != MAC_PROP_PRIVATE)
 		return (DLADM_STATUS_BADARG);
 
 	if (type == DLADM_PROP_VAL_MODIFIABLE) {
@@ -2022,14 +2022,14 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 	dip = dld_buf_alloc(1024, linkid, prop_name, dld_flags, &status);
 	if (dip == NULL)
 		return (status);
-	dsize = DLD_PROPBUF_SIZE(dip->pr_valsize);
+	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		free(dip);
 		return (DLADM_STATUS_BADARG);
 	}
 
-	if ((status = i_dladm_ioctl(fd, DLDIOCGETPROP, dip, dsize)) < 0) {
+	if ((status = i_dladm_ioctl(fd, DLDIOC_GETMACPROP, dip, dsize)) < 0) {
 		status = dladm_errno2status(errno);
 	} else {
 		(void) strncpy(*prop_val, dip->pr_val, DLADM_PROP_VAL_MAX);
@@ -2077,7 +2077,8 @@ i_dladm_getset_defval(prop_desc_t *pdp, datalink_id_t linkid,
 	 * the default value and then do a setprop to reset the value
 	 * to default.
 	 */
-	status = pdp->pd_get(pdp, linkid, prop_vals, &cnt, media, DLD_DEFAULT);
+	status = pdp->pd_get(pdp, linkid, prop_vals, &cnt, media,
+	    MAC_PROP_DEFAULT);
 	if (status == DLADM_STATUS_OK) {
 		status = i_dladm_set_single_prop(linkid, pdp->pd_class,
 		    media, pdp, prop_vals, cnt, flags);

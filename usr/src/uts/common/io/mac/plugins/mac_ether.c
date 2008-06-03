@@ -120,37 +120,37 @@ static struct modlinkage mac_ether_modlinkage = {
 static mactype_ops_t mac_ether_type_ops;
 
 static mac_ndd_mapping_t  mac_ether_mapping[] = {
-	{"adv_autoneg_cap",	DLD_PROP_AUTONEG, 0, 1, sizeof (uint8_t),
+	{"adv_autoneg_cap",	MAC_PROP_AUTONEG, 0, 1, sizeof (uint8_t),
 	    MAC_PROP_PERM_RW},
 
-	{"adv_1000fdx_cap",	DLD_PROP_EN_1000FDX_CAP, 0, 1,
+	{"adv_1000fdx_cap",	MAC_PROP_EN_1000FDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_1000hdx_cap",	DLD_PROP_EN_1000HDX_CAP, 0, 1,
+	{"adv_1000hdx_cap",	MAC_PROP_EN_1000HDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_100fdx_cap",	DLD_PROP_EN_100FDX_CAP, 0, 1,
+	{"adv_100fdx_cap",	MAC_PROP_EN_100FDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_100hdx_cap",	DLD_PROP_EN_100HDX_CAP, 0, 1,
+	{"adv_100hdx_cap",	MAC_PROP_EN_100HDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_10fdx_cap",	DLD_PROP_EN_10FDX_CAP, 0, 1,
+	{"adv_10fdx_cap",	MAC_PROP_EN_10FDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_10hdx_cap",	DLD_PROP_EN_10HDX_CAP, 0, 1,
+	{"adv_10hdx_cap",	MAC_PROP_EN_10HDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_100T4_cap",	DLD_PROP_EN_100T4_CAP, 0, 1,
+	{"adv_100T4_cap",	MAC_PROP_EN_100T4_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_READ},
 
 	{"link_status",		MAC_STAT_LINK_UP, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"link_speed",		DLD_PROP_SPEED, 0, LONG_MAX,
+	{"link_speed",		MAC_PROP_SPEED, 0, LONG_MAX,
 	    sizeof (uint64_t), MAC_PROP_PERM_READ},
 
-	{"link_duplex",		DLD_PROP_DUPLEX, 0, 2,
+	{"link_duplex",		MAC_PROP_DUPLEX, 0, 2,
 	    sizeof (link_duplex_t), MAC_PROP_PERM_READ},
 
 	{"autoneg_cap",		ETHER_STAT_CAP_AUTONEG, 0, 1,

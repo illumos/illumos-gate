@@ -2856,13 +2856,13 @@ mxfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 {
 	mxfe_t		*mxfep = arg;
 	int		err = 0;
-	boolean_t	dfl = flags & DLD_DEFAULT;
+	boolean_t	dfl = flags & MAC_PROP_DEFAULT;
 
 	if (sz == 0)
 		return (EINVAL);
 
 	switch (num) {
-	case DLD_PROP_DUPLEX:
+	case MAC_PROP_DUPLEX:
 		if (sz >= sizeof (link_duplex_t)) {
 			bcopy(&mxfep->mxfe_duplex, val,
 			    sizeof (link_duplex_t));
@@ -2871,7 +2871,7 @@ mxfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		}
 		break;
 
-	case DLD_PROP_SPEED:
+	case MAC_PROP_SPEED:
 		if (sz >= sizeof (uint64_t)) {
 			bcopy(&mxfep->mxfe_ifspeed, val, sizeof (uint64_t));
 		} else {
@@ -2879,37 +2879,37 @@ mxfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		}
 		break;
 
-	case DLD_PROP_AUTONEG:
+	case MAC_PROP_AUTONEG:
 		*(uint8_t *)val =
 		    dfl ? mxfep->mxfe_cap_aneg : mxfep->mxfe_adv_aneg;
 		break;
 
-	case DLD_PROP_ADV_100FDX_CAP:
-	case DLD_PROP_EN_100FDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? mxfep->mxfe_cap_100fdx : mxfep->mxfe_adv_100fdx;
 		break;
 
-	case DLD_PROP_ADV_100HDX_CAP:
-	case DLD_PROP_EN_100HDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? mxfep->mxfe_cap_100hdx : mxfep->mxfe_adv_100hdx;
 		break;
 
-	case DLD_PROP_ADV_10FDX_CAP:
-	case DLD_PROP_EN_10FDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? mxfep->mxfe_cap_10fdx : mxfep->mxfe_adv_10fdx;
 		break;
 
-	case DLD_PROP_ADV_10HDX_CAP:
-	case DLD_PROP_EN_10HDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? mxfep->mxfe_cap_10hdx : mxfep->mxfe_adv_10hdx;
 		break;
 
-	case DLD_PROP_ADV_100T4_CAP:
-	case DLD_PROP_EN_100T4_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
 		*(uint8_t *)val =
 		    dfl ? mxfep->mxfe_cap_100T4 : mxfep->mxfe_adv_100T4;
 		break;
@@ -2931,32 +2931,32 @@ mxfe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	uint8_t		*capp;
 
 	switch (num) {
-	case DLD_PROP_EN_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
 		advp = &mxfep->mxfe_adv_100fdx;
 		capp = &mxfep->mxfe_cap_100fdx;
 		break;
 
-	case DLD_PROP_EN_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
 		advp = &mxfep->mxfe_adv_100hdx;
 		capp = &mxfep->mxfe_cap_100hdx;
 		break;
 
-	case DLD_PROP_EN_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
 		advp = &mxfep->mxfe_adv_10fdx;
 		capp = &mxfep->mxfe_cap_10fdx;
 		break;
 
-	case DLD_PROP_EN_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
 		advp = &mxfep->mxfe_adv_10hdx;
 		capp = &mxfep->mxfe_cap_10hdx;
 		break;
 
-	case DLD_PROP_EN_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
 		advp = &mxfep->mxfe_adv_100T4;
 		capp = &mxfep->mxfe_cap_100T4;
 		break;
 
-	case DLD_PROP_AUTONEG:
+	case MAC_PROP_AUTONEG:
 		advp = &mxfep->mxfe_adv_aneg;
 		capp = &mxfep->mxfe_cap_aneg;
 		break;
