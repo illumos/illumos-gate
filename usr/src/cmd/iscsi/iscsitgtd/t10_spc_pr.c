@@ -174,8 +174,46 @@ spc_pgr_is_conflicting(uint8_t *cdb, uint_t type)
 
 /*
  * []----
+ * | spc_npr_check --  NON-PERSISTENT RESERVE check of I_T_L
+ * |	Refer to SPC-2, Section 5.5.1, Tables 10
+ * []----
+ */
+Boolean_t
+spc_npr_check(t10_cmd_t *cmd, uint8_t *cdb)
+{
+	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
+	sbc_reserve_t		*res = &p->d_sbc_reserve;
+	Boolean_t		conflict = False;
+
+	/*
+	 * If a logical unit has been reserved by any RESERVE command and
+	 * is still reserved by any initiator, all PERSISTENT RESERVE IN
+	 * and all PRESISTENT RESERVE OUT commands shall conflict regardless
+	 * of initiator or service action and shall terminate with a
+	 * RESERVATION CONLICT status. SPC-2 section 5.5.1.
+	 */
+	if ((cdb[0] == SCMD_PERSISTENT_RESERVE_IN) ||
+	    (cdb[0] == SCMD_PERSISTENT_RESERVE_OUT) ||
+	    (res->res_owner != cmd->c_lu)) {
+		conflict = True;
+	}
+
+	queue_prt(mgmtq, Q_PR_IO,
+	    "NPR%x LUN%d CDB:%s - spc_npr_check(Reservation:%s)\n",
+	    cmd->c_lu->l_targ->s_targ_num,
+	    cmd->c_lu->l_common->l_num,
+	    cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name == NULL
+	    ? "(no name)"
+	    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name,
+	    (conflict) ? "Conflict" : "Allowed");
+
+	return (conflict);
+}
+
+/*
+ * []----
  * | spc_pgr_check --  PERSISTENT_RESERVE {IN|OUT} check of I_T_L
- * |	Refer to SPC-3, Section ?.?, Tables ?? and ??
+ * |	Refer to SPC-3, Section 5.6.1, Tables 31
  * []----
  */
 Boolean_t
@@ -191,8 +229,27 @@ spc_pgr_check(t10_cmd_t *cmd, uint8_t *cdb)
 	 * If no reservations exist, allow all remaining command types.
 	 */
 	assert(res->res_type == RT_PGR);
-	if (pgr->pgr_numrsrv == 0) {
+	if ((cdb[0] == SCMD_PERSISTENT_RESERVE_IN) ||
+	    (cdb[0] == SCMD_TEST_UNIT_READY) ||
+	    (pgr->pgr_numrsrv == 0)) {
 		conflict = False;
+		goto done;
+	}
+
+	/*
+	 * If a logical unit has executed a PERSISTENT RESERVE OUT command
+	 * with the REGISTER or REGISTER AND IGNORE EXISTING KEY service
+	 * action and is still registered by any initiator, all RESERVE
+	 * commands and all RELEASE commands regardless of initiator shall
+	 * conflict and shall terminate with a RESERVATION CONFLICT status.
+	 * SPC-2 section 5.5.1.
+	 *
+	 * CRH bit 0, no support for exception defined in
+	 * SPC-3 section 5.6.3.
+	 */
+	if ((cdb[0] == SCMD_RESERVE) ||
+	    (cdb[0] == SCMD_RELEASE)) {
+		conflict = True;
 		goto done;
 	}
 
@@ -270,6 +327,88 @@ done:
 	    (conflict) ? "Conflict" : "Allowed");
 
 	return (conflict);
+}
+
+/*
+ * []----
+ * | spc_cmd_reserve6 -- RESERVE(6) command
+ * []----
+ */
+/*ARGSUSED*/
+void
+spc_cmd_reserve6(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
+{
+	disk_params_t	*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
+	sbc_reserve_t	*res = &p->d_sbc_reserve;
+	t10_lu_impl_t	*lu;
+
+	if (cdb[1] & 0xe0 || SAM_CONTROL_BYTE_RESERVED(cdb[5])) {
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+		trans_send_complete(cmd, STATUS_CHECK);
+		return;
+	}
+
+	pthread_rwlock_wrlock(&res->res_rwlock);
+	/*
+	 * The ways to get in here are,
+	 * 1) to be the owner of the reservation (SPC-2 section 7.21.2)
+	 * 2) reservation not applied, nobody is the owner.
+	 */
+	if (res->res_owner != cmd->c_lu) {
+		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
+		do {
+			if (lu != cmd->c_lu)
+				lu->l_cmd = sbc_cmd_reserved;
+			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
+		} while (lu != NULL);
+		res->res_owner = cmd->c_lu;
+	}
+	res->res_type = RT_NPR;
+	pthread_rwlock_unlock(&res->res_rwlock);
+
+	trans_send_complete(cmd, STATUS_GOOD);
+}
+
+/*
+ * []----
+ * | spc_cmd_release6 -- RELEASE(6) command
+ * []----
+ */
+/*ARGSUSED*/
+void
+spc_cmd_release6(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
+{
+	disk_params_t	*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
+	sbc_reserve_t	*res = &p->d_sbc_reserve;
+	t10_lu_impl_t	*lu;
+
+	if (cdb[1] & 0xe0 || cdb[3] || cdb[4] ||
+	    SAM_CONTROL_BYTE_RESERVED(cdb[5])) {
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+		trans_send_complete(cmd, STATUS_CHECK);
+		return;
+	}
+
+	pthread_rwlock_wrlock(&res->res_rwlock);
+	/*
+	 * The ways to get in here are,
+	 * 1) to be the owner of the reservation
+	 * 2) reservation not applied, nobody is the owner.
+	 */
+	if (res->res_owner != NULL) {
+		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
+		do {
+			lu->l_cmd = sbc_cmd;
+			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
+		} while (lu != NULL);
+		res->res_owner = NULL;
+		res->res_type = RT_NONE;
+	}
+	pthread_rwlock_unlock(&res->res_rwlock);
+
+	trans_send_complete(cmd, STATUS_GOOD);
 }
 
 /*
@@ -507,7 +646,7 @@ spc_pr_in_repcap(
 {
 	scsi_prin_rpt_cap_t	*buf = (scsi_prin_rpt_cap_t *)bp;
 
-	buf->crh = 0;			/* Supports Reserve / Release */
+	buf->crh = 0;			/* Support Reserve/Release Exceptions */
 	buf->sip_c = 1;			/* Specify Initiator Ports Capable */
 	buf->atp_c = 1;			/* All Target Ports Capable */
 	buf->ptpl_c = 1;		/* Persist Through Power Loss C */

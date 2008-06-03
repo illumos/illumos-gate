@@ -1074,7 +1074,11 @@ queue_noop_in(iscsi_conn_t *c)
 	if (in == NULL)
 		return;
 
-	in->opcode = ISCSI_OP_NOOP_IN | ISCSI_OP_IMMEDIATE;
+	/*
+	 * Immediate flag is reserved in nop-in command. RFC-3720 10.19.
+	 * See CR 6597310.
+	 */
+	in->opcode = ISCSI_OP_NOOP_IN;
 	in->flags = ISCSI_FLAG_FINAL;
 	in->ttt = cmd->c_ttt;
 	in->itt = ISCSI_RSVD_TASK_TAG;

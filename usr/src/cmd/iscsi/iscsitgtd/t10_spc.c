@@ -51,6 +51,8 @@
 #include "t10_spc.h"
 #include "target.h"
 
+#define	VMWARE_I_NAME	"iqn.1998-01.com.vmware"
+
 void spc_free(emul_handle_t id);
 
 /*
@@ -319,11 +321,23 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 * page length as defined by (n - 3) where 'n' is
 			 * the last valid byte. In this case 5.
 			 */
-			rsp_buf[3]	= 4;
-			rsp_buf[4]	= SPC_INQ_PAGE0;
-			rsp_buf[5]	= SPC_INQ_PAGE80;
-			rsp_buf[6]	= SPC_INQ_PAGE83;
-			rsp_buf[7]	= SPC_INQ_PAGE86;
+			/*
+			 * do not provide inquiry of page 80 for vmware
+			 * iscsi initiator, see CR 6597310.
+			 */
+			if (strncmp(cmd->c_lu->l_targ->s_i_name,
+			    VMWARE_I_NAME, strlen(VMWARE_I_NAME)) != 0) {
+				rsp_buf[3]	= 4;
+				rsp_buf[4]	= SPC_INQ_PAGE0;
+				rsp_buf[5]	= SPC_INQ_PAGE80;
+				rsp_buf[6]	= SPC_INQ_PAGE83;
+				rsp_buf[7]	= SPC_INQ_PAGE86;
+			} else {
+				rsp_buf[3]	= 3;
+				rsp_buf[4]	= SPC_INQ_PAGE0;
+				rsp_buf[5]	= SPC_INQ_PAGE83;
+				rsp_buf[6]	= SPC_INQ_PAGE86;
+			}
 
 			/*
 			 * Return the smallest amount of data between the

@@ -57,11 +57,14 @@
  * External declarations
  */
 void sbc_cmd(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len);
+void spc_cmd_reserve6(t10_cmd_t *, uint8_t *, size_t);
+void spc_cmd_release6(t10_cmd_t *, uint8_t *, size_t);
 void spc_cmd_pr_in(t10_cmd_t *, uint8_t *, size_t);
 void spc_cmd_pr_out(t10_cmd_t *, uint8_t *, size_t);
 void spc_cmd_pr_out_data(t10_cmd_t *, emul_handle_t, size_t, char *, size_t);
 void spc_pr_read(t10_cmd_t *);
 Boolean_t spc_pgr_check(t10_cmd_t *, uint8_t *);
+Boolean_t spc_npr_check(t10_cmd_t *, uint8_t *);
 
 /*
  * Forward declarations
@@ -233,12 +236,10 @@ sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	switch (cdb[0]) {
 	case SCMD_INQUIRY:
 	case SCMD_LOG_SENSE_G1:
-	case SCMD_PERSISTENT_RESERVE_IN:
-	case SCMD_SVC_ACTION_IN_G5:
 	case SCMD_REPORT_LUNS:
-	case SCMD_MAINTENANCE_OUT:
 	case SCMD_REQUEST_SENSE:
-	case SCMD_TEST_UNIT_READY:
+	case SCMD_MAINTENANCE_IN: /* REPORT TARGET PORT GROUPS (A3h/0Ah) */
+	case SCMD_SVC_ACTION_IN_G5: /* READ MEDIA SERIAL NUMBER (ABh) */
 		break;
 	default:
 		pthread_rwlock_rdlock(&res->res_rwlock);
@@ -248,6 +249,9 @@ sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			break;
 		case RT_PGR:
 			conflict = spc_pgr_check(cmd, cdb);
+			break;
+		case RT_NPR:
+			conflict = spc_npr_check(cmd, cdb);
 			break;
 		default:
 			conflict = True;
@@ -264,6 +268,7 @@ sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	    ? "(no name)"
 	    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name,
 	    res->res_type == RT_PGR ? "PGR" :
+	    res->res_type == RT_NPR ? "NPR" :
 	    res->res_type == RT_NONE ? "" : "unknown",
 	    conflict ? "Conflict" : "Allowed");
 
@@ -1900,8 +1905,8 @@ static scsi_cmd_table_t lba_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_mselect, spc_mselect_data, NULL,		"MODE_SELECT" },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
+	{ spc_cmd_reserve6,	NULL,	NULL,		"RESERVE(6)" },
+	{ spc_cmd_release6,	NULL,	NULL,		"RELEASE(6)" },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ sbc_msense,		NULL,	NULL,		"MODE_SENSE" },

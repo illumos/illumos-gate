@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,8 @@ typedef struct key_link {
  */
 typedef enum {
 	RT_NONE = 0,			/* None */
-	RT_PGR				/* SCSI-3 Persistent Reservation */
+	RT_PGR,				/* SCSI-3 Persistent Reservation */
+	RT_NPR				/* SCSI-2 Non-Persistent Reservation */
 } spc_reserve_types;
 
 /*
@@ -106,6 +107,7 @@ typedef struct sbc_reserve {
 	spc_reserve_types	res_type;	/* standard or pr active */
 	pthread_rwlock_t	res_rwlock;	/* Lock for coordination */
 	scsi3_pgr_t		res_scsi_3_pgr;	/* SCSI-3 PGR */
+	t10_lu_impl_t		*res_owner;	/* SCSI-2 Reservation */
 } sbc_reserve_t;
 
 /*
