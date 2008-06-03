@@ -27,6 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -358,6 +359,7 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 	tgt_node_t		*params;
 	int			lun_num;
 	Boolean_t		incore;
+	struct stat		s;
 
 	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_ACLLIST, NULL)) !=
 	    NULL) {
@@ -444,14 +446,16 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 			tgt_buf_add(msg, XML_ELEMENT_SIZE, prop);
 			free(prop);
 		}
-		if (tgt_find_value_str(params, XML_ELEMENT_STATUS, &prop) ==
-		    True) {
-			tgt_buf_add(msg, XML_ELEMENT_STATUS, prop);
-			free(prop);
-		}
 		if (tgt_find_value_str(params, XML_ELEMENT_BACK, &prop) ==
 		    True) {
 			tgt_buf_add(msg, XML_ELEMENT_BACK, prop);
+			if (stat(prop, &s) == 0) {
+				tgt_buf_add(msg, XML_ELEMENT_STATUS,
+				    TGT_STATUS_ONLINE);
+			} else {
+				tgt_buf_add(msg, XML_ELEMENT_STATUS,
+				    strerror(errno));
+			}
 			free(prop);
 		}
 		tgt_buf_add_tag(msg, XML_ELEMENT_LUN, Tag_End);
