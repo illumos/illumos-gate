@@ -4383,7 +4383,9 @@ handle_drv_ioctl(struct megasas_instance *instance, struct megasas_ioctl *ioctl,
 
 		pci_conf_buf = (uint8_t *)&pi.pciHeaderInfo;
 
-		for (i = 0; i < sizeof (struct megasas_pci_information); i++) {
+		for (i = 0; i < (sizeof (struct megasas_pci_information) -
+		    offsetof(struct megasas_pci_information, pciHeaderInfo));
+		    i++) {
 			pci_conf_buf[i] =
 			    pci_config_get8(instance->pci_handle, i);
 		}
