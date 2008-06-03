@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,7 +296,7 @@ do_scan(flags, mode)
 			/*
 			 * Do the actual analysis.
 			 */
-			status = analyze_blocks(flags, (daddr_t)curnt, size,
+			status = analyze_blocks(flags, curnt, size,
 			    (unsigned)data, needinit, (F_ALLERRS | F_SILENT),
 			    &xfercnt);
 			/*
@@ -336,9 +336,8 @@ do_scan(flags, mode)
 			for (j = 0; j < size * 5; j++) {
 				i = j % size;
 				disk_error = 0;
-				status = analyze_blocks(flags, (daddr_t)
-				    (curnt + i), 1, (unsigned)data, needinit,
-				    F_ALLERRS, NULL);
+				status = analyze_blocks(flags, (curnt + i), 1,
+				    (unsigned)data, needinit, F_ALLERRS, NULL);
 				needinit = 0;
 				if (!status)
 					continue;
