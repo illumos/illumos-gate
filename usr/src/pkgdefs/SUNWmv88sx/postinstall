@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -113,4 +113,5 @@ check_add_drv -i \
      "pci11ab,5040"
      "pci11ab,6041.9"
      "pci11ab,6081.9"'\
-     -b "$BASEDIR" -m '* 0644 root sys' marvell88sx
+     -b "$BASEDIR" -m '* 0644 root sys'\
+     -c scsi-self-identifying  marvell88sx

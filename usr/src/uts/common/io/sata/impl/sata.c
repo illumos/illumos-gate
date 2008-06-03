@@ -1637,6 +1637,24 @@ sata_free_error_retrieval_pkt(sata_pkt_t *sata_pkt)
 
 }
 
+/*
+ * sata_name_child is for composing the name of the node
+ * the format of the name is "target,0".
+ */
+static int
+sata_name_child(dev_info_t *dip, char *name, int namelen)
+{
+	int target;
+
+	target = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "target", -1);
+	if (target == -1)
+		return (DDI_FAILURE);
+	(void) snprintf(name, namelen, "%x,0", target);
+	return (DDI_SUCCESS);
+}
+
+
 
 /* ****************** SCSA required entry points *********************** */
 
@@ -1664,6 +1682,15 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	char			fw[SATA_ID_FW_LEN + 1];
 	char			*vid, *pid;
 	int			i;
+
+	/*
+	 * Fail tran_tgt_init for .conf stub node
+	 */
+	if (ndi_dev_is_persistent_node(tgt_dip) == 0) {
+		(void) ndi_merge_node(tgt_dip, sata_name_child);
+		ddi_set_name_addr(tgt_dip, NULL);
+		return (DDI_FAILURE);
+	}
 
 	sata_hba_inst = (sata_hba_inst_t *)(hba_tran->tran_hba_private);
 

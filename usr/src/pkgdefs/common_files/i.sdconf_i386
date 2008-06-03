@@ -1,11 +1,9 @@
-#!/bin/sh
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,18 +18,25 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
-add_sata_entry() {
-cat >> $dest << EOF
-name="sd" parent="$1";
+add_self_identifying_entry() {
+cat >> $dest <<EOF
+
+#
+# The following stub node is needed for pathological bottom-up
+# devid resolution on a self-identifying transport. 
+#
+name="sd" class="scsi-self-identifying";
 EOF
 }
 
@@ -94,6 +99,11 @@ do
 		-e '/^name="sd" parent="flashpt"\n	target=4 lun=0;\n$/d' \
 		-e '/^name="sd" parent="flashpt"\n	target=5 lun=0;\n$/d' \
 		-e '/^name="sd" parent="flashpt"\n	target=6 lun=0;\n$/d' \
+		-e '/^# Add SATA HBA drivers as parents of sd driver.$/d' \
+		-e '/^name="sd" parent="nv_sata";$/d' \
+		-e '/^name="sd" parent="ahci";$/d' \
+		-e '/^name="sd" parent="si3124";$/d' \
+		-e '/^name="sd" parent="marvell88sx";$/d' \
 			/tmp/d.$$ > /tmp/d2.$$
 
 		if cmp -s /tmp/d.$$ /tmp/d2.$$  > /dev/null 2>&1
@@ -102,29 +112,11 @@ do
 		else
 			cp /tmp/d2.$$ $dest
 		fi
+		echo `cat $dest` | grep "scsi-self-identifying" > /dev/null
 
-		# Add SATA HBA driver entries if not present
-		line1="name=\"sd\" parent=\"nv_sata\";"
-		echo `cat $dest` | grep "$line1" >/dev/null
 		if [ $? -ne 0 ]; then
-			add_sata_entry "nv_sata"
+			add_self_identifying_entry
 		fi
-		line1="name=\"sd\" parent=\"ahci\";"
-		echo `cat $dest` | grep "$line1" >/dev/null
-		if [ $? -ne 0 ]; then
-			add_sata_entry "ahci"
-		fi
-		line1="name=\"sd\" parent=\"si3124\";"
-		echo `cat $dest` | grep "$line1" >/dev/null
-		if [ $? -ne 0 ]; then
-			add_sata_entry "si3124"
-		fi
-		line1="name=\"sd\" parent=\"marvell88sx\";"
-		echo `cat $dest` | grep "$line1" >/dev/null
-		if [ $? -ne 0 ]; then
-			add_sata_entry "marvell88sx"
-		fi
-
 		# remove temporary files
 		rm -f /tmp/d.$$ /tmp/d2.$$ /tmp/newident.$$ /tmp/rest.$$
 	fi

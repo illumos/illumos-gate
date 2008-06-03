@@ -19,7 +19,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +44,17 @@ name="sd" parent="mpt"
 EOF
 }
 
+add_self_identifying_entry() {
+cat >> $dest <<EOF
+
+#
+# The following stub node is needed for pathological bottom-up
+# devid resolution on a self-identifying transport. 
+#
+name="sd" class="scsi-self-identifying";
+EOF
+}
+
 while read src dest; do
 	if [ ! -f $dest ]; then
 		cp $src $dest
@@ -53,6 +66,11 @@ while read src dest; do
 		if [ $? -ne 0 ]; then
 			add_mpt_entry
 		fi
+		echo `cat $dest` | grep "scsi-self-identifying" > /dev/null
+
+		if [ $? -ne 0 ]; then
+			add_self_identifying_entry
+		fi	
 	fi
 done
 

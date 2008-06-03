@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -36,3 +36,4 @@ glm	scsi
 uata	dada
 uata	scsi
 mpt	scsi
+scsi_vhci	scsi-self-identifying

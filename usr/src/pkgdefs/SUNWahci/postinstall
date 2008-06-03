@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,16 +41,29 @@ installed() {
         return $?
 }
 
+verify_drv_class() {
+	driver=$1
+	class=$2
+	egrep "^$driver[ 	]+$class( |	|$)" \
+	    $BASEDIR/etc/driver_classes
+	return $?
+}
+
 EXIT=0
 
 if installed ahci; then
-        echo "ahci already installed" || EXIT=1
-
-else
+	if verify_drv_class ahci scsi-self-identifying; then
+	    echo "ahci already installed" || EXIT=1
+	else
+	    echo "ahci\tscsi-self-identifying" >> \
+	        $BASEDIR/etc/driver_classes
+	fi
+else	
 	add_drv -i \
 	    '"pciclass,010601"' \
-	    ${BASEDIR_OPT} -m '* 0644 root sys' ahci || \
-            EXIT=1
+	    ${BASEDIR_OPT} -m '* 0644 root sys' -c \
+	    scsi-self-identifying ahci || EXIT=1
+
 fi
 
 exit $EXIT

@@ -915,7 +915,6 @@ vhci_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	return (DDI_SUCCESS);
 }
 
-
 /*ARGSUSED*/
 static int
 vhci_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
@@ -931,27 +930,39 @@ vhci_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	ASSERT(hba_dip != NULL);
 	ASSERT(tgt_dip != NULL);
 
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, tgt_dip, PROPFLAGS,
+	    MDI_CLIENT_GUID_PROP, &guid) != DDI_SUCCESS) {
+		/*
+		 * This must be the .conf node without GUID property.
+		 * The node under fp already inserts a delay, so we
+		 * just return from here. We rely on this delay to have
+		 * all dips be posted to the ndi hotplug thread's newdev
+		 * list. This is necessary for the deferred attach
+		 * mechanism to work and opens() done soon after boot to
+		 * succeed.
+		 */
+		VHCI_DEBUG(4, (CE_WARN, hba_dip, "tgt_init: lun guid "
+		    "property failed"));
+		return (DDI_NOT_WELL_FORMED);
+	}
+
+	if (ndi_dev_is_persistent_node(tgt_dip) == 0) {
+		/*
+		 * This must be .conf node with the GUID property. We don't
+		 * merge property by ndi_merge_node() here  because the
+		 * devi_addr_buf of .conf node is "" always according the
+		 * implementation of vhci_scsi_get_name_bus_addr().
+		 */
+		ddi_set_name_addr(tgt_dip, NULL);
+		return (DDI_FAILURE);
+	}
+
 	vhci = ddi_get_soft_state(vhci_softstate, ddi_get_instance(hba_dip));
 	ASSERT(vhci != NULL);
 
 	VHCI_DEBUG(4, (CE_NOTE, hba_dip,
 	    "!tgt_init: called for %s (instance %d)\n",
 	    ddi_driver_name(tgt_dip), ddi_get_instance(tgt_dip)));
-
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, tgt_dip, PROPFLAGS,
-	    MDI_CLIENT_GUID_PROP, &guid) != DDI_SUCCESS) {
-		/*
-		 * This must be the .conf node.  The ssd node under
-		 * fp already inserts a delay, so we just return from here.
-		 * We rely on this delay to have all dips be posted to
-		 * the ndi hotplug thread's newdev list.  This is
-		 * necessary for the deferred attach mechanism to work
-		 * and opens() done soon after boot to succeed.
-		 */
-		VHCI_DEBUG(4, (CE_WARN, hba_dip, "tgt_init: lun guid "
-		    "property failed"));
-		return (DDI_NOT_WELL_FORMED);
-	}
 
 	vlun = vhci_lun_lookup(tgt_dip);
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,7 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 ata	scsi
 mscsi	scsi
@@ -30,3 +30,4 @@ eisa	sysbus
 pci	pci
 pci_pci	pci
 mpt	scsi
+scsi_vhci	scsi-self-identifying

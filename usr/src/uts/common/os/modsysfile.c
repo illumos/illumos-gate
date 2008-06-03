@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3160,8 +3160,9 @@ add_spec(struct hwc_spec *spec, struct par_list **par)
 	major_t maj;
 	struct par_list *pl, *par_last = NULL;
 	char *parent = spec->hwc_parent_name;
+	char *class = spec->hwc_class_name;
 
-	ASSERT(parent || spec->hwc_class_name);
+	ASSERT(parent || class);
 
 	/*
 	 * If given a parent=/full-pathname, see if the platform
@@ -3191,10 +3192,14 @@ add_spec(struct hwc_spec *spec, struct par_list **par)
 		maj = (major_t)-1;
 
 	/*
-	 * Scan the list looking for a matching parent.
+	 * Scan the list looking for a matching parent. When parent is
+	 * not NULL, we match the parent by major. If parent is NULL but
+	 * class is not NULL, we mache the pl by class name.
 	 */
 	for (pl = *par; pl; pl = pl->par_next) {
-		if (maj == pl->par_major) {
+		if ((parent && (maj == pl->par_major)) || ((parent == NULL) &&
+		    class && pl->par_specs->hwc_class_name && (strncmp(class,
+		    pl->par_specs->hwc_class_name, strlen(class)) == 0))) {
 			append(spec, pl);
 			return;
 		}

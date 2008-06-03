@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -1301,7 +1301,7 @@ check_add_drv()
 #
 # Main program starts here.
 #
-check_add_drv -b ${ROOT} -i '"pci10de,37f" "pci10de,55" "pci10de,54"' -m '* 0644 root sys' nv_sata
+check_add_drv -b ${ROOT} -i '"pci10de,37f" "pci10de,55" "pci10de,54"' -m '* 0644 root sys' -c scsi-self-identifying nv_sata
 
 #
 # Create temporary directory for node migration 

@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -98,6 +98,10 @@ do
 		grep '^mpt[ 	].*scsi' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then
 			echo 'mpt	scsi' >> $dest
+		fi
+		grep '^scsi_vhci[ 	].*scsi-self-identifying' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'scsi_vhci	scsi-self-identifying' >> $dest
 		fi
 	fi
 done

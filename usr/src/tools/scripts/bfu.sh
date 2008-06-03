@@ -762,6 +762,34 @@ update_etc_mach_i386()
 	fi
 }
 
+# check and update driver class for scsi-self-identifying
+chk_update_drv_class()
+{
+
+    drvclassfile=$rootprefix/etc/driver_classes
+    name2majorfile=$rootprefix/etc/name_to_major
+    drvname=$1
+    classentry="^$drvname[ 	].*scsi-self-identifying"
+
+    [ -f $drvclassfile ] || return
+    [ -f $name2majorfile ] || return
+
+    grep -w $drvname $name2majorfile > /dev/null 2>&1 || return
+
+    egrep -s "$classentry" $drvclassfile
+    if [ $? -ne 0 ]; then
+	echo "$drvname	scsi-self-identifying" >> $drvclassfile
+    fi
+}
+
+update_drvclass_i386()
+{
+    chk_update_drv_class ahci
+    chk_update_drv_class si3124
+    chk_update_drv_class marvell88sx
+    chk_update_drv_class nv_sata
+}
+
 update_policy_conf() {
 	# update /etc/security/policy.conf with the default
 	# Solaris crypt(3c) policy.
@@ -7774,6 +7802,10 @@ mondo_loop() {
 	    update_mptconf_i386
 
 	    update_etc_mach_i386
+	fi
+
+	if [ $target_isa = i386 ]; then
+	    update_drvclass_i386
 	fi
 
 	if [ $zone != global ]; then
