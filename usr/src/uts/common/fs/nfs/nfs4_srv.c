@@ -5451,11 +5451,13 @@ extern int	sec_svc_getcred(struct svc_req *, cred_t *,  caddr_t *, int *);
 
 void
 rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+	struct svc_req *req, cred_t *cr, int *rv)
 {
 	uint_t i;
 	struct compound_state cs;
 
+	if (rv != NULL)
+		*rv = 0;
 	rfs4_init_compound_state(&cs);
 	/*
 	 * Form a reply tag by copying over the reqeuest tag.
@@ -5480,13 +5482,8 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 		resp->status = NFS4ERR_MINOR_VERS_MISMATCH;
 		DTRACE_NFSV4_2(compound__done, struct compound_state *,
 		    &cs, COMPOUND4res *, resp);
-		resp->array_len = 0;
 		return;
 	}
-
-	resp->array_len = args->array_len;
-	resp->array = kmem_zalloc(args->array_len * sizeof (nfs_resop4),
-	    KM_SLEEP);
 
 	ASSERT(exi == NULL);
 	ASSERT(cr == NULL);
@@ -5500,8 +5497,14 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 		crfree(cr);
 		DTRACE_NFSV4_2(compound__done, struct compound_state *,
 		    &cs, COMPOUND4res *, resp);
+		svcerr_badcred(req->rq_xprt);
+		if (rv != NULL)
+			*rv = 1;
 		return;
 	}
+	resp->array_len = args->array_len;
+	resp->array = kmem_zalloc(args->array_len * sizeof (nfs_resop4),
+	    KM_SLEEP);
 
 	cs.basecr = cr;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1368,7 +1368,7 @@ extern stateid4 clnt_special1;
  */
 
 extern void	rfs4_compound(COMPOUND4args *, COMPOUND4res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+			struct exportinfo *, struct svc_req *, cred_t *, int *);
 extern void	rfs4_compound_free(COMPOUND4res *);
 extern void	rfs4_compound_flagproc(COMPOUND4args *, int *);
 

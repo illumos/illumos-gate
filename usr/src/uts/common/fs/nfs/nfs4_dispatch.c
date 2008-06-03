@@ -377,14 +377,15 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 		SVCXPRT *xprt, char *ap)
 {
 
-	COMPOUND4res res_buf, *rbp;
-	COMPOUND4args *cap;
-
-	cred_t 	*cr = NULL;
-	int	error = 0;
-	int 	dis_flags = 0;
-	int 	dr_stat = NFS4_NOT_DUP;
-	rfs4_dupreq_t *drp = NULL;
+	COMPOUND4res	 res_buf;
+	COMPOUND4res	*rbp;
+	COMPOUND4args	*cap;
+	cred_t		*cr = NULL;
+	int		 error = 0;
+	int		 dis_flags = 0;
+	int		 dr_stat = NFS4_NOT_DUP;
+	rfs4_dupreq_t	*drp = NULL;
+	int		 rv;
 
 	ASSERT(disp);
 
@@ -443,9 +444,11 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 		case NFS4_DUP_NEW:
 			curthread->t_flag |= T_DONTPEND;
 			/* NON-IDEMPOTENT proc call */
-			rfs4_compound(cap, rbp, NULL, req, cr);
-
+			rfs4_compound(cap, rbp, NULL, req, cr, &rv);
 			curthread->t_flag &= ~T_DONTPEND;
+
+			if (rv)		/* short ckt sendreply on error */
+				return (rv);
 
 			/*
 			 * dr_res must be initialized before calling
@@ -474,9 +477,12 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 	} else {
 		curthread->t_flag |= T_DONTPEND;
 		/* IDEMPOTENT proc call */
-		rfs4_compound(cap, rbp, NULL, req, cr);
-
+		rfs4_compound(cap, rbp, NULL, req, cr, &rv);
 		curthread->t_flag &= ~T_DONTPEND;
+
+		if (rv)		/* short ckt sendreply on error */
+			return (rv);
+
 		if (curthread->t_flag & T_WOULDBLOCK) {
 			curthread->t_flag &= ~T_WOULDBLOCK;
 			return (1);

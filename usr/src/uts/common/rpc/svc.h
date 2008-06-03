@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -741,6 +741,7 @@ extern void	svcerr_progvers(const SVCXPRT *, const rpcvers_t,
 extern void	svcerr_auth(const SVCXPRT *, const enum auth_stat);
 extern void	svcerr_noprog(const SVCXPRT *);
 extern void	svcerr_systemerr(const SVCXPRT *);
+extern void	svcerr_badcred(const SVCXPRT *);
 #else	/* __STDC__ */
 extern bool_t	svc_sendreply();
 extern void	svcerr_decode();
@@ -750,6 +751,7 @@ extern void	svcerr_progvers();
 extern void	svcerr_auth();
 extern void	svcerr_noprog();
 extern void	svcerr_systemerr();
+extern void	svcerr_badcred();
 #endif	/* __STDC__ */
 
 #ifdef	_KERNEL
