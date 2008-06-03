@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,9 @@ typedef struct kssl_tokinfo_s {
 #define	SSL_RSA_WITH_RC4_128_SHA	0x0005
 #define	SSL_RSA_WITH_DES_CBC_SHA	0x0009
 #define	SSL_RSA_WITH_3DES_EDE_CBC_SHA	0x000a
-#define	CIPHER_SUITE_COUNT		5
+#define	TLS_RSA_WITH_AES_128_CBC_SHA	0x002f
+#define	TLS_RSA_WITH_AES_256_CBC_SHA	0x0035
+#define	CIPHER_SUITE_COUNT		7
 #define	CIPHER_NOTSET			0xffff
 
 #define	DEFAULT_SID_TIMEOUT		86400	/* 24 hours in seconds */

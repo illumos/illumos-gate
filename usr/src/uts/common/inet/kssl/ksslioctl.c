@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -395,8 +395,8 @@ create_sessinfo(kssl_params_t *kssl_params, kssl_entry_t *kssl_entry)
 	kssl_entry->ke_sessinfo->do_reauth = B_FALSE;
 	kssl_entry->ke_sessinfo->evnt_handle =
 	    crypto_notify_events(kssl_prov_evnt,
-		CRYPTO_EVENT_PROVIDER_REGISTERED |
-		CRYPTO_EVENT_PROVIDER_UNREGISTERED);
+	    CRYPTO_EVENT_PROVIDER_REGISTERED |
+	    CRYPTO_EVENT_PROVIDER_UNREGISTERED);
 
 	return (0);
 }
@@ -407,10 +407,11 @@ create_kssl_entry(kssl_params_t *kssl_params, Certificate_t *cert,
 {
 	int i;
 	uint16_t s;
-	kssl_entry_t *kssl_entry;
+	kssl_entry_t *kssl_entry, *ep;
 	uint_t cnt, mech_count;
 	crypto_mech_name_t *mechs;
 	boolean_t got_rsa, got_md5, got_sha1, got_rc4, got_des, got_3des;
+	boolean_t got_aes;
 
 	kssl_entry = kmem_zalloc(sizeof (kssl_entry_t), KM_SLEEP);
 
@@ -441,7 +442,7 @@ create_kssl_entry(kssl_params_t *kssl_params, Certificate_t *cert,
 	mechs = crypto_get_mech_list(&mech_count, KM_SLEEP);
 	if (mechs != NULL) {
 		got_rsa = got_md5 = got_sha1 = got_rc4 =
-		    got_des = got_3des = B_FALSE;
+		    got_des = got_3des = got_aes = B_FALSE;
 		for (i = 0; i < mech_count; i++) {
 			if (strncmp(SUN_CKM_RSA_X_509, mechs[i],
 			    CRYPTO_MAX_MECH_NAME) == 0)
@@ -461,26 +462,38 @@ create_kssl_entry(kssl_params_t *kssl_params, Certificate_t *cert,
 			else if (strncmp(SUN_CKM_DES3_CBC, mechs[i],
 			    CRYPTO_MAX_MECH_NAME) == 0)
 				got_3des = B_TRUE;
+			else if (strncmp(SUN_CKM_AES_CBC, mechs[i],
+			    CRYPTO_MAX_MECH_NAME) == 0)
+				got_aes = B_TRUE;
 		}
 
 		cnt = 0;
+		ep = kssl_entry;
 		for (i = 0; i < CIPHER_SUITE_COUNT - 1; i++) {
 			switch (s = kssl_params->kssl_suites[i]) {
 			case SSL_RSA_WITH_RC4_128_MD5:
 				if (got_rsa && got_rc4 && got_md5)
-				    kssl_entry->kssl_cipherSuites[cnt++] = s;
+					ep->kssl_cipherSuites[cnt++] = s;
 				break;
 			case SSL_RSA_WITH_RC4_128_SHA:
 				if (got_rsa && got_rc4 && got_sha1)
-				    kssl_entry->kssl_cipherSuites[cnt++] = s;
+					ep->kssl_cipherSuites[cnt++] = s;
 				break;
 			case SSL_RSA_WITH_DES_CBC_SHA:
 				if (got_rsa && got_des && got_sha1)
-				    kssl_entry->kssl_cipherSuites[cnt++] = s;
+					ep->kssl_cipherSuites[cnt++] = s;
 				break;
 			case SSL_RSA_WITH_3DES_EDE_CBC_SHA:
 				if (got_rsa && got_3des && got_sha1)
-				    kssl_entry->kssl_cipherSuites[cnt++] = s;
+					ep->kssl_cipherSuites[cnt++] = s;
+				break;
+			case TLS_RSA_WITH_AES_128_CBC_SHA:
+				if (got_rsa && got_aes && got_sha1)
+					ep->kssl_cipherSuites[cnt++] = s;
+				break;
+			case TLS_RSA_WITH_AES_256_CBC_SHA:
+				if (got_rsa && got_aes && got_sha1)
+					ep->kssl_cipherSuites[cnt++] = s;
 				break;
 			case CIPHER_NOTSET:
 			default:

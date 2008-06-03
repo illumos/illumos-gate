@@ -138,6 +138,12 @@ KSSLCipherDef cipher_defs[] = { /* indexed by SSL3BulkCipher */
 
 	/* mech_type to be initialized with CKM_DES3_CBC's */
 	{type_block, 8, 24, CRYPTO_MECH_INVALID},
+
+	/* mech_type to be initialized with CKM_AES_CBC with 128-bit key  */
+	{type_block, 16, 16, CRYPTO_MECH_INVALID},
+
+	/* mech_type to be initialized with CKM_AES_CBC with 256-bit key  */
+	{type_block, 16, 32, CRYPTO_MECH_INVALID},
 };
 
 int kssl_enabled = 1;
@@ -337,21 +343,25 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 	return (error);
 }
 
-#define	NUM_MECHS	6
+#define	NUM_MECHS	7
 mech_to_cipher_t mech_to_cipher_tab[NUM_MECHS] = {
 	{CRYPTO_MECH_INVALID, SUN_CKM_RSA_X_509,
 	    {SSL_RSA_WITH_RC4_128_MD5, SSL_RSA_WITH_RC4_128_SHA,
 	    SSL_RSA_WITH_DES_CBC_SHA, SSL_RSA_WITH_3DES_EDE_CBC_SHA,
+	    TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_256_CBC_SHA,
 	    SSL_RSA_WITH_NULL_SHA}},
 	{CRYPTO_MECH_INVALID, SUN_CKM_MD5_HMAC, {SSL_RSA_WITH_RC4_128_MD5}},
 	{CRYPTO_MECH_INVALID, SUN_CKM_SHA1_HMAC,
 	    {SSL_RSA_WITH_RC4_128_SHA, SSL_RSA_WITH_DES_CBC_SHA,
-	    SSL_RSA_WITH_3DES_EDE_CBC_SHA, SSL_RSA_WITH_NULL_SHA}},
+	    SSL_RSA_WITH_3DES_EDE_CBC_SHA, SSL_RSA_WITH_NULL_SHA,
+	    TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_256_CBC_SHA}},
 	{CRYPTO_MECH_INVALID, SUN_CKM_RC4,
 	    {SSL_RSA_WITH_RC4_128_MD5, SSL_RSA_WITH_RC4_128_SHA}},
 	{CRYPTO_MECH_INVALID, SUN_CKM_DES_CBC, {SSL_RSA_WITH_DES_CBC_SHA}},
 	{CRYPTO_MECH_INVALID, SUN_CKM_DES3_CBC,
-	    {SSL_RSA_WITH_3DES_EDE_CBC_SHA}}
+	    {SSL_RSA_WITH_3DES_EDE_CBC_SHA}},
+	{CRYPTO_MECH_INVALID, SUN_CKM_AES_CBC,
+	    {TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_256_CBC_SHA}},
 };
 
 static void
@@ -370,6 +380,9 @@ kssl_init_mechs()
 	    crypto_mech2id(SUN_CKM_DES_CBC);
 	mech_to_cipher_tab[5].mech = cipher_defs[cipher_3des].mech_type =
 	    crypto_mech2id(SUN_CKM_DES3_CBC);
+	mech_to_cipher_tab[6].mech = cipher_defs[cipher_aes128].mech_type =
+	    cipher_defs[cipher_aes256].mech_type =
+	    crypto_mech2id(SUN_CKM_AES_CBC);
 }
 
 static int

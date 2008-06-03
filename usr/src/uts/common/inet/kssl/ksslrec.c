@@ -56,10 +56,24 @@
 #include "ksslproto.h"
 
 static ssl3CipherSuiteDef cipher_suite_defs[] = {
+	/* 2 X 16 byte keys +  2 x 20 byte MAC secrets, no IVs */
 	{SSL_RSA_WITH_RC4_128_SHA,	cipher_rc4,	mac_sha,	72},
+
+	/* 2 X 16 byte keys +  2 x 16 byte MAC secrets, no IVs */
 	{SSL_RSA_WITH_RC4_128_MD5,	cipher_rc4,	mac_md5,	64},
+
+	/* 2 X 8 byte keys +  2 x 20 byte MAC secrets, 2 x 8 byte IVs */
 	{SSL_RSA_WITH_DES_CBC_SHA,	cipher_des,	mac_sha,	72},
+
+	/* 2 X 24 byte keys +  2 x 20 byte MAC secrets, 2 x 8 byte IVs */
 	{SSL_RSA_WITH_3DES_EDE_CBC_SHA,	cipher_3des,	mac_sha,	104},
+
+	/* 2 X 16 byte keys +  2 x 20 byte MAC secrets, 2 x 16 byte IVs */
+	{TLS_RSA_WITH_AES_128_CBC_SHA,	cipher_aes128,	mac_sha,	104},
+
+	/* 2 X 32 byte keys +  2 x 20 byte MAC secrets, 2 x 16 byte IVs */
+	{TLS_RSA_WITH_AES_256_CBC_SHA,	cipher_aes256,	mac_sha,	136},
+
 	{SSL_RSA_WITH_NULL_SHA,		cipher_null,	mac_sha,	40}
 };
 
@@ -128,8 +142,6 @@ static int kssl_tls_PRF(ssl_t *, uchar_t *, size_t,
 static int kssl_tls_P_hash(crypto_mechanism_t *, crypto_key_t *,
     size_t, uchar_t *, size_t, uchar_t *, size_t, uchar_t *, size_t);
 static void kssl_cke_done(void *, int);
-
-#define	MAX_TLS_KEYBLOCK_SIZE 160 /* more than enough for largest TLS key */
 
 #define	HMAC_INIT(m, k, c) \
 	rv = crypto_mac_init(m, k, NULL, c, NULL); if (CRYPTO_ERR(rv)) goto end;
@@ -900,13 +912,13 @@ kssl_tls_PRF(ssl_t *ssl,
 	 */
 
 	int rv = 0, i;
-	uchar_t psha1[MAX_TLS_KEYBLOCK_SIZE];
+	uchar_t psha1[MAX_KEYBLOCK_LENGTH];
 	crypto_key_t S1, S2;
 
 	/* length of secret keys is ceil(length/2) */
 	size_t slen = roundup(secret_len, 2) / 2;
 
-	if (prfresult_len > MAX_TLS_KEYBLOCK_SIZE) {
+	if (prfresult_len >  MAX_KEYBLOCK_LENGTH) {
 		DTRACE_PROBE1(kssl_err__unexpected_keyblock_size,
 		    size_t, prfresult_len);
 		return (CRYPTO_ARGUMENTS_BAD);
@@ -1053,8 +1065,8 @@ kssl_generate_keyblock(ssl_t *ssl)
 	}
 }
 
-static char *ssl3_key_derive_seeds[8] = {"A", "BB", "CCC", "DDDD", "EEEEE",
-					    "FFFFFF", "GGGGGGG", "HHHHHHHH"};
+static char *ssl3_key_derive_seeds[9] = {"A", "BB", "CCC", "DDDD", "EEEEE",
+	"FFFFFF", "GGGGGGG", "HHHHHHHH", "IIIIIIIII"};
 
 static void
 kssl_ssl3_key_material_derive_step(

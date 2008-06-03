@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -978,6 +978,8 @@ struct csuite {
 } cipher_suites[CIPHER_SUITE_COUNT - 1] = {
 	{"rsa_rc4_128_sha", SSL_RSA_WITH_RC4_128_SHA, B_FALSE},
 	{"rsa_rc4_128_md5", SSL_RSA_WITH_RC4_128_MD5, B_FALSE},
+	{"rsa_aes_256_cbc_sha", TLS_RSA_WITH_AES_256_CBC_SHA, B_FALSE},
+	{"rsa_aes_128_cbc_sha", TLS_RSA_WITH_AES_128_CBC_SHA, B_FALSE},
 	{"rsa_3des_ede_cbc_sha", SSL_RSA_WITH_3DES_EDE_CBC_SHA, B_FALSE},
 	{"rsa_des_cbc_sha", SSL_RSA_WITH_DES_CBC_SHA, B_FALSE},
 };
