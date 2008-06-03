@@ -404,9 +404,9 @@ lofi_uncompress(int lfd, const char *filename)
 
 	/* If the file isn't compressed, we just return */
 	if ((ioctl(lfd, LOFI_CHECK_COMPRESSED, &li) == -1) ||
-	    (li.li_algorithm == '\0')) {
+	    (li.li_algorithm[0] == '\0')) {
 		delete_mapping(lfd, devicename, filename, B_TRUE);
-		return;
+		die("%s is not compressed\n", filename);
 	}
 
 	if ((compfd = open64(devicename, O_RDONLY | O_NONBLOCK)) == -1) {
@@ -426,7 +426,7 @@ lofi_uncompress(int lfd, const char *filename)
 		delete_mapping(lfd, devicename, filename, B_TRUE);
 		free(dir);
 		free(file);
-		return;
+		die("%s could not be uncompressed\n", filename);
 	}
 
 	/*
@@ -441,7 +441,7 @@ lofi_uncompress(int lfd, const char *filename)
 		delete_mapping(lfd, devicename, filename, B_TRUE);
 		free(dir);
 		free(file);
-		return;
+		die("%s could not be uncompressed\n", filename);
 	}
 
 	/* Now read from the device in MAXBSIZE-sized chunks */
