@@ -222,7 +222,7 @@ optionRules_t optionRules[] = {
 	{TPGT, DELETE, "Ai", B_TRUE, NULL},
 	{TPGT, LIST,   "v", B_FALSE, NULL},
 	{ADMIN, MODIFY, "dHCRrPSsf", B_TRUE, NULL},
-	{STATS, SHOW, "vIN", B_FALSE, NULL},
+	{STATS, SHOW, "IN", B_FALSE, NULL},
 };
 
 
@@ -597,8 +597,14 @@ modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
 		case 'H': /* chap-name */
-			tgt_buf_add(&first_str, XML_ELEMENT_CHAPNAME,
-			    optionList->optarg);
+			if (strlen(optionList->optarg) != 0) {
+				tgt_buf_add(&first_str, XML_ELEMENT_CHAPNAME,
+				    optionList->optarg);
+			} else {
+				tgt_buf_add(&first_str,
+				    XML_ELEMENT_DELETE_CHAPNAME,
+				    OPT_TRUE);
+			}
 			break;
 		case 'C': /* chap-secret */
 			ret = getSecret((char *)&chapSecret[0], &secretLen,
@@ -609,8 +615,14 @@ modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 				return (ret);
 			}
 			chapSecret[secretLen] = '\0';
-			tgt_buf_add(&first_str, XML_ELEMENT_CHAPSECRET,
-			    chapSecret);
+			if (secretLen != 0) {
+				tgt_buf_add(&first_str, XML_ELEMENT_CHAPSECRET,
+				    chapSecret);
+			} else {
+				tgt_buf_add(&first_str,
+				    XML_ELEMENT_DELETE_CHAPSECRET,
+				    OPT_TRUE);
+			}
 			break;
 		default:
 			(void) fprintf(stderr, "%s: %c: %s\n",
@@ -723,8 +735,15 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				chdir(olddir);
 				break;
 			case 'H': /* chap name */
-				tgt_buf_add(&first_str, XML_ELEMENT_CHAPNAME,
-				    optionList->optarg);
+				if (strlen(optionList->optarg) != 0) {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_CHAPNAME,
+					    optionList->optarg);
+				} else {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_DELETE_CHAPNAME,
+					    OPT_TRUE);
+				}
 				break;
 			case 'C': /* chap secert */
 				ret = getSecret((char *)&chapSecret[0],
@@ -739,8 +758,15 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 					return (ret);
 				}
 				chapSecret[secretLen] = '\0';
-				tgt_buf_add(&first_str, XML_ELEMENT_CHAPSECRET,
-				    chapSecret);
+				if (secretLen != 0) {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_CHAPSECRET,
+					    chapSecret);
+				} else {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_DELETE_CHAPSECRET,
+					    OPT_TRUE);
+				}
 				break;
 			case 'R': /* radius access */
 				if (strcmp(optionList->optarg,
@@ -762,8 +788,15 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				}
 				break;
 			case 'r': /* radius server */
-				tgt_buf_add(&first_str, XML_ELEMENT_RAD_SERV,
-				    optionList->optarg);
+				if (strlen(optionList->optarg) != 0) {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_RAD_SERV,
+					    optionList->optarg);
+				} else {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_DELETE_RAD_SERV,
+					    OPT_TRUE);
+				}
 				break;
 			case 'P': /* radius secret */
 				ret = getSecret((char *)&chapSecret[0],
@@ -778,8 +811,15 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 					return (ret);
 				}
 				chapSecret[secretLen] = '\0';
-				tgt_buf_add(&first_str, XML_ELEMENT_RAD_SECRET,
-				    chapSecret);
+				if (secretLen != 0) {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_RAD_SECRET,
+					    chapSecret);
+				} else {
+					tgt_buf_add(&first_str,
+					    XML_ELEMENT_DELETE_RAD_SECRET,
+					    OPT_TRUE);
+				}
 				break;
 			case 'S': /* iSNS access */
 				if (strcmp(optionList->optarg,

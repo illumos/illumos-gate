@@ -57,6 +57,7 @@ static char *modify_tpgt(tgt_node_t *x);
 static char *modify_zfs(tgt_node_t *x, ucred_t *cred);
 static char *validate_zfs_iscsitgt(tgt_node_t *x);
 static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
+static Boolean_t delete_element(char *,  tgt_node_t *, match_type_t);
 
 /*
  * []----
@@ -483,10 +484,29 @@ modify_initiator(tgt_node_t *x)
 
 		if (modify_element(XML_ELEMENT_CHAPSECRET, prop, inode,
 		    MatchName) == False) {
+			free(prop);
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
 		free(prop);
+		changes_made = True;
+	}
+
+	if (tgt_find_value_str(x, XML_ELEMENT_DELETE_CHAPSECRET,
+	    &prop) == True) {
+		if (prop == NULL || strcmp(prop, XML_VALUE_TRUE) != 0) {
+			if (prop != NULL)
+				free(prop);
+			xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
+			return (msg);
+		}
+		free(prop);
+
+		if (delete_element(XML_ELEMENT_CHAPSECRET, inode,
+		    MatchName) == False) {
+			xml_rtn_msg(&msg, ERR_NO_MEM);
+			return (msg);
+		}
 		changes_made = True;
 	}
 
@@ -502,6 +522,24 @@ modify_initiator(tgt_node_t *x)
 			return (msg);
 		}
 		free(prop);
+		changes_made = True;
+	}
+
+	if (tgt_find_value_str(x, XML_ELEMENT_DELETE_CHAPNAME, &prop) == True) {
+		if (prop == NULL || strcmp(prop, XML_VALUE_TRUE) != 0) {
+			if (prop != NULL)
+				free(prop);
+			xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
+			return (msg);
+		}
+		free(prop);
+
+
+		if (delete_element(XML_ELEMENT_CHAPNAME, inode,
+		    MatchName) == False) {
+			xml_rtn_msg(&msg, ERR_NO_MEM);
+			return (msg);
+		}
 		changes_made = True;
 	}
 
@@ -530,7 +568,6 @@ modify_admin(tgt_node_t *x)
 
 	for (ap = admin_prop_list; ap->name; ap++) {
 		if (tgt_find_value_str(x, ap->name, &prop) == True) {
-
 			if ((prop == NULL) || (strlen(prop) == 0))
 				break;
 
@@ -539,13 +576,33 @@ modify_admin(tgt_node_t *x)
 			 * will allow possible checking to be done first.
 			 */
 			if (ap->func) {
-				if ((msg = (*ap->func)(ap->name, prop)) != NULL)
+				msg = (*ap->func)(ap->name, prop);
+				if (msg != NULL) {
+					free(prop);
 					return (msg);
+				}
 			}
-			if (modify_element(ap->name, prop, main_config,
-			    MatchName) == False) {
-				xml_rtn_msg(&msg, ERR_NO_MEM);
-				return (msg);
+
+			if (ap->delete_name == NULL) {
+				if (modify_element(ap->name, prop, main_config,
+				    MatchName) == False) {
+					xml_rtn_msg(&msg, ERR_NO_MEM);
+					free(prop);
+					return (msg);
+				}
+			} else {
+				if (strcmp(prop, XML_VALUE_TRUE) != 0) {
+					xml_rtn_msg(&msg,
+					    ERR_SYNTAX_MISSING_OPERAND);
+					free(prop);
+					return (msg);
+				}
+				if (delete_element(ap->delete_name,
+				    main_config, MatchName) == False) {
+					xml_rtn_msg(&msg, ERR_NO_MEM);
+					free(prop);
+					return (msg);
+				}
 			}
 			free(prop);
 			changes_made = True;
@@ -900,6 +957,26 @@ modify_element(char *name, char *value, tgt_node_t *p, match_type_t m)
 		tgt_node_free(c);
 		return (True);
 	}
+}
+
+/*
+ * []----
+ * | delete_element -- helper function to remove a node from a parent
+ * |
+ * | A False return value indicates a failure to allocate enough memory.
+ * []----
+ */
+static Boolean_t
+delete_element(char *name, tgt_node_t *p, match_type_t m)
+{
+	tgt_node_t	*c;
+
+	if ((c = tgt_node_alloc(name, String, NULL)) == NULL) {
+		return (False);
+	}
+	tgt_node_remove(p, c, m);
+	tgt_node_free(c);
+	return (True);
 }
 
 /*

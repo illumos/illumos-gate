@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,7 +190,7 @@ getSecret(char *secret, int *secretLen, int minSecretLen, int maxSecretLen)
 		    return (1);
 	}
 
-	if (strlen(chapSecret) < minSecretLen) {
+	if (strlen(chapSecret) < minSecretLen  && strlen(chapSecret) != 0) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 			gettext("secret too short"));
 			*secret = NULL;

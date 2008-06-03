@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,6 +173,7 @@ typedef struct eui_16 {
 typedef struct {
 	char	*name;
 	char	*(*func)(char *, char *);
+	char	*delete_name;
 } admin_table_t;
 
 #include <sys/socket.h>
