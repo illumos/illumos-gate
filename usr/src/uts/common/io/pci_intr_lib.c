@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1132,13 +1132,13 @@ pci_devclass_to_ipl(int class)
 	case PCI_CLASS_SERIALBUS:
 		ipl = (sub_class == PCI_SERIAL_IB) ? 6 : 1;
 		break;
+	case PCI_CLASS_MM:
+		ipl = 0x8;
+		break;
 	/*
 	 * for high priority interrupt handlers, use level 12
 	 * as the highest for device drivers
 	 */
-	case PCI_CLASS_MM:
-		ipl = 0xc;
-		break;
 	case PCI_CLASS_MEM:
 		ipl = 0xc;
 		break;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,15 +153,15 @@ map_pcidev_cfg_reg(dev_info_t *dip, dev_info_t *rdip, ddi_acc_handle_t *hdl_p)
 	for (cdip = rdip; cdip && cdip != dip; cdip = ddi_get_parent(cdip)) {
 		ddi_acc_handle_t config_handle;
 		uint32_t vendor_id = ddi_getprop(DDI_DEV_T_ANY, cdip,
-			DDI_PROP_DONTPASS, "vendor-id", 0xffff);
+		    DDI_PROP_DONTPASS, "vendor-id", 0xffff);
 
 		DEBUG4(DBG_A_INTX, pci_p->pci_dip,
-			"map dev cfg reg for %s%d: @%s%d\n",
-			ddi_driver_name(rdip), ddi_get_instance(rdip),
-			ddi_driver_name(cdip), ddi_get_instance(cdip));
+		    "map dev cfg reg for %s%d: @%s%d\n",
+		    ddi_driver_name(rdip), ddi_get_instance(rdip),
+		    ddi_driver_name(cdip), ddi_get_instance(cdip));
 
 		if (ddi_prop_exists(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-				"no-dma-interrupt-sync"))
+		    "no-dma-interrupt-sync"))
 			continue;
 
 		/* continue to search up-stream if not a PCI device */
@@ -179,7 +179,7 @@ map_pcidev_cfg_reg(dev_info_t *dip, dev_info_t *rdip, ddi_acc_handle_t *hdl_p)
 			if (device_id == PCI_SIMBA_DEVID) {
 				simba_found = 1;
 				DEBUG0(DBG_A_INTX, pci_p->pci_dip,
-					"\tFound simba\n");
+				    "\tFound simba\n");
 				continue; /* do not check bridge if simba */
 			}
 		}
@@ -188,14 +188,14 @@ map_pcidev_cfg_reg(dev_info_t *dip, dev_info_t *rdip, ddi_acc_handle_t *hdl_p)
 		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
 			    "%s%d: can't get brdg cfg space for %s%d\n",
-				ddi_driver_name(dip), ddi_get_instance(dip),
-				ddi_driver_name(cdip), ddi_get_instance(cdip));
+			    ddi_driver_name(dip), ddi_get_instance(dip),
+			    ddi_driver_name(cdip), ddi_get_instance(cdip));
 			return (DDI_FAILURE);
 		}
 		if (pci_config_get8(config_handle, PCI_CONF_BASCLASS)
 		    == PCI_CLASS_BRIDGE) {
 			DEBUG0(DBG_A_INTX, pci_p->pci_dip,
-				"\tFound PCI to xBus bridge\n");
+			    "\tFound PCI to xBus bridge\n");
 			pci_bridge_found = 1;
 		}
 		pci_config_teardown(&config_handle);
@@ -207,8 +207,8 @@ map_pcidev_cfg_reg(dev_info_t *dip, dev_info_t *rdip, ddi_acc_handle_t *hdl_p)
 		return (DDI_SUCCESS);
 	if (pci_config_setup(pci_dip, hdl_p) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: can not get config space for %s%d\n",
-			ddi_driver_name(dip), ddi_get_instance(dip),
-			ddi_driver_name(cdip), ddi_get_instance(cdip));
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    ddi_driver_name(cdip), ddi_get_instance(cdip));
 		return (DDI_FAILURE);
 	}
 	return (DDI_SUCCESS);
@@ -381,7 +381,7 @@ pci_class_val_t pci_default_pil [] = {
 	{0x010000, 0xff0000, 0x4},	/* Mass Storage Controller */
 	{0x020000, 0xff0000, 0x6},	/* Network Controller */
 	{0x030000, 0xff0000, 0x9},	/* Display Controller */
-	{0x040000, 0xff0000, 0x9},	/* Multimedia Controller */
+	{0x040000, 0xff0000, 0x8},	/* Multimedia Controller */
 	{0x050000, 0xff0000, 0xb},	/* Memory Controller */
 	{0x060000, 0xff0000, 0xb},	/* Bridge Controller */
 	{0x0c0000, 0xffff00, 0x9},	/* Serial Bus, FireWire (IEEE 1394) */
@@ -568,7 +568,7 @@ pci_ks_update(kstat_t *ksp, int rw)
 		    ino_p->ino_cpuid);
 		pciintr_ks_template.pciintr_ks_ino.value.ui64 = ino;
 		pciintr_ks_template.pciintr_ks_cookie.value.ui64 =
-			IB_INO_TO_MONDO(ib_p, ino);
+		    IB_INO_TO_MONDO(ib_p, ino);
 	} else {
 		(void) strcpy(pciintr_ks_template.pciintr_ks_type.value.c,
 		    "disabled");
@@ -715,7 +715,7 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 
 #ifdef _STARFIRE
 	cpu_id = pc_translate_tgtid(cb_p->cb_ittrans_cookie, cpu_id,
-		IB_GET_MAPREG_INO(ino));
+	    IB_GET_MAPREG_INO(ino));
 #endif /* _STARFIRE */
 	if (!ipil_list) {
 		*ino_p->ino_map_reg = ib_get_map_reg(mondo, cpu_id);
@@ -740,7 +740,7 @@ ino_done:
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 done:
 	DEBUG2(DBG_A_INTX, dip, "done! Interrupt 0x%x pil=%x\n",
-		hdlp->ih_vector, hdlp->ih_pri);
+	    hdlp->ih_vector, hdlp->ih_pri);
 	return (DDI_SUCCESS);
 fail4:
 	ib_delete_ino_pil(ib_p, ipil_p);
@@ -752,7 +752,7 @@ fail2:
 	kmem_free(ih_p, sizeof (ih_t));
 fail1:
 	DEBUG2(DBG_A_INTX, dip, "Failed! Interrupt 0x%x pil=%x\n",
-		hdlp->ih_vector, hdlp->ih_pri);
+	    hdlp->ih_vector, hdlp->ih_pri);
 	return (DDI_FAILURE);
 }
 
@@ -787,7 +787,7 @@ pci_remove_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 		mondo = pci_xlate_intr(dip, rdip, ib_p, ino);
 		if (mondo == 0) {
 			DEBUG1(DBG_R_INTX, dip,
-				"can't get mondo for ino %x\n", ino);
+			    "can't get mondo for ino %x\n", ino);
 			return (DDI_FAILURE);
 		}
 
@@ -802,7 +802,7 @@ pci_remove_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 		i_ddi_rem_ivintr(hdlp);
 
 		DEBUG2(DBG_R_INTX, dip, "pulse success mondo=%x reg=%p\n",
-			mondo, map_reg_addr);
+		    mondo, map_reg_addr);
 		return (DDI_SUCCESS);
 	}
 

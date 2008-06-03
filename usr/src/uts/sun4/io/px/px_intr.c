@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -463,7 +463,7 @@ px_class_val_t px_default_pil [] = {
 	{0x010000, 0xff0000, 0x4},	/* Mass Storage Controller */
 	{0x020000, 0xff0000, 0x6},	/* Network Controller */
 	{0x030000, 0xff0000, 0x9},	/* Display Controller */
-	{0x040000, 0xff0000, 0x9},	/* Multimedia Controller */
+	{0x040000, 0xff0000, 0x8},	/* Multimedia Controller */
 	{0x050000, 0xff0000, 0x9},	/* Memory Controller */
 	{0x060000, 0xff0000, 0x9},	/* Bridge Controller */
 	{0x0c0000, 0xffff00, 0x9},	/* Serial Bus, FireWire (IEEE 1394) */
