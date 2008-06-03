@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _MSGFMT_H
 #define	_MSGFMT_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <stdint.h>
+#include <stddef.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -120,46 +122,49 @@ struct msg_struct {
 /*
  *
  *             +-----------------------------------------+
- *           0 | (unsigned int) magic number             |
+ *           0 | (uint32_t) magic number                 |
  *             +-----------------------------------------+
- *           4 | (unsigned int) format revision          |
+ *           4 | (uint32_t) format revision              |
  *             +-----------------------------------------+
- *           8 | (unsigned int) number of strings        | == N
+ *           8 | (uint32_t) number of strings            | == N
  *             +-----------------------------------------+
- *          12 | (unsigned int) offset of msgid table    | == O
+ *          12 | (uint32_t) offset of msgid table        | == O
  *             +-----------------------------------------+
- *          16 | (unsigned int) offset of msgstr table   | == T
+ *          16 | (uint32_t) offset of msgstr table       | == T
  *             +-----------------------------------------+
- *          20 | (unsigned int) size of hashing table    | == S
+ *          20 | (uint32_t) size of hashing table        | == S
  *             +-----------------------------------------+
- *          24 | (unsigned int) offset of hashing table  | == H
+ *          24 | (uint32_t) offset of hashing table      | == H
  *             +-----------------------------------------+
  *             +-----------------------------------------+
- *           O | (unsigned int) length of 0th msgid      |
+ *           O | (uint32_t) length of 0th msgid          |
  *             +-----------------------------------------+
- *         O+4 | (unsigned int) offset of 0th msgid      | == M(0)
+ *         O+4 | (uint32_t) offset of 0th msgid          | == M(0)
  *             +-----------------------------------------+
  *             ...............................
  *             +-----------------------------------------+
- * O+((N-1)*8) | (unsigned int) length of (N-1)th msgid  |
+ * O+((N-1)*8) | (uint32_t) length of (N-1)th msgid      |
  *             +-----------------------------------------+
- * O+((N-1)*8) | (unsigned int) offset of (N-1)th msgid  | == M(N-1)
+ * O+((N-1)*8) | (uint32_t) offset of (N-1)th msgid      | == M(N-1)
  *       +4    +-----------------------------------------+
- *           T | (unsigned int) length of 0th msgstr     |
  *             +-----------------------------------------+
- *         T+4 | (unsigned int) offset of 0th msgstr     | == Q(0)
+ *           T | (uint32_t) length of 0th msgstr         |
+ *             +-----------------------------------------+
+ *         T+4 | (uint32_t) offset of 0th msgstr         | == Q(0)
  *             +-----------------------------------------+
  *             ...............................
  *             +-----------------------------------------+
- * T+((N-1)*8) | (unsigned int) length of (N-1)th msgstr |
+ * T+((N-1)*8) | (uint32_t) length of (N-1)th msgstr     |
  *             +-----------------------------------------+
- * T+((N-1)*8) | (unsigned int) offset of (N-1)th msgstr | == Q(N-1)
+ * T+((N-1)*8) | (uint32_t) offset of (N-1)th msgstr     | == Q(N-1)
  *       +4    +-----------------------------------------+
- *           H | (unsigned int) start hashing table      |
+ *             +-----------------------------------------+
+ *           H | (uint32_t) start hashing table          |
  *             +-----------------------------------------+
  *             ...............................
  *             +-----------------------------------------+
- *   H + S * 4 | (unsigned int) end hashing table        |
+ *   H + S * 4 | (uint32_t) end hashing table            |
+ *             +-----------------------------------------+
  *             +-----------------------------------------+
  *        M(0) | NULL terminated 0th msgid string        |
  *             +-----------------------------------------+
@@ -168,6 +173,7 @@ struct msg_struct {
  *             ...............................
  *             +-----------------------------------------+
  *      M(N-1) | NULL terminated (N-1)th msgid string    |
+ *             +-----------------------------------------+
  *             +-----------------------------------------+
  *        Q(0) | NULL terminated 0th msgstr string       |
  *             +-----------------------------------------+
@@ -179,24 +185,229 @@ struct msg_struct {
  *             +-----------------------------------------+
  */
 
-#define	GNU_MAGIC	0x950412de
-#define	GNU_MAGIC_SWAPPED	0xde120495
-#define	GNU_REVISION	0
-#define	GNU_REVISION_SWAPPED	0
+/*
+ *	GNU MO file format (Revision 1)
+ */
+/*
+ *
+ *             +-----------------------------------------------+
+ *           0 | (uint32_t) magic number                       |
+ *             +-----------------------------------------------+
+ *           4 | (uint32_t) format revision                    |
+ *             +-----------------------------------------------+
+ *           8 | (uint32_t) number of strings                  | == N
+ *             +-----------------------------------------------+
+ *          12 | (uint32_t) offset of msgid table              | == O
+ *             +-----------------------------------------------+
+ *          16 | (uint32_t) offset of msgstr table             | == T
+ *             +-----------------------------------------------+
+ *          20 | (uint32_t) size of hashing table              | == S
+ *             +-----------------------------------------------+
+ *          24 | (uint32_t) offset of hashing table            | == H
+ *             +-----------------------------------------------+
+ *          32 | (uint32_t) number of dynamic macros           | == M
+ *             +-----------------------------------------------+
+ *          36 | (uint32_t) offset of dynamic macros           | == P
+ *             +-----------------------------------------------+
+ *          40 | (uint32_t) number of dynamic strings          | == D
+ *             +-----------------------------------------------+
+ *          44 | (uint32_t) offset of dynamic msgid tbl        | == A
+ *             +-----------------------------------------------+
+ *          48 | (uint32_t) offset of dynamic msgstr tbl       | == B
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *           O | (uint32_t) length of 0th msgid                |
+ *             +-----------------------------------------------+
+ *         O+4 | (uint32_t) offset of 0th msgid                | == M(0)
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ * O+((N-1)*8) | (uint32_t) length of (N-1)th msgid            |
+ *             +-----------------------------------------------+
+ * O+((N-1)*8) | (uint32_t) offset of (N-1)th msgid            | == M(N-1)
+ *       +4    +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *           T | (uint32_t) length of 0th msgstr               |
+ *             +-----------------------------------------------+
+ *         T+4 | (uint32_t) offset of 0th msgstr               | == Q(0)
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ * T+((N-1)*8) | (uint32_t) length of (N-1)th msgstr           |
+ *             +-----------------------------------------------+
+ * T+((N-1)*8) | (uint32_t) offset of (N-1)th msgstr           | == Q(N-1)
+ *       +4    +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *           H | (uint32_t) start hashing table                |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *   H + S * 4 | (uint32_t) end hashing table                  |
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *           P | (uint32_t) length of 0th macro                |
+ *             +-----------------------------------------------+
+ *         P+4 | (uint32_t) offset of 0th macro                | == C(0)
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ * P+((M-1)*8) | (uint32_t) length of (M-1)th macro            |
+ *             +-----------------------------------------------+
+ * P+((M-1)*8) | (uint32_t) offset of (M-1)th macro            | == C(M-1)
+ *       +4    +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *           A | (uint32_t) offset of 0th d_msgid              | == L(0)
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ * A+((D-1)*4) | (uint32_t) offset of (D-1)th d_msgid          | == L(D-1)
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *           B | (uint32_t) offset of 0th d_msgstr             | == E(0)
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ * B+((D-1)*4) | (uint32_t) offset of (D-1)th d_msgstr         | == E(D-1)
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *        L(0) | (uint32_t) offset of 0th d_msgid message      | == F(0)
+ *             +-----------------------------------------------+
+ *      L(0)+4 | (uint32_t) length of 0th fixed substring      |
+ *             +-----------------------------------------------+
+ *      L(0)+8 | (uint32_t) index to a dynamic macro           |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *     L(0)+4+ | (uint32_t) length of (m-1)th fixed substring  |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *     L(0)+8+ | (uint32_t) NOMORE_DYNAMIC_STR                 |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *      L(D-1) | (uint32_t) offset of 0th d_msgid message      | == F(D-1)
+ *             +-----------------------------------------------+
+ *    L(D-1)+4 | (uint32_t) length of 0th fixed substring      |
+ *             +-----------------------------------------------+
+ *    L(D-1)+8 | (uint32_t) index to a dynamic macro           |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *    L(D-1)+4 | (uint32_t) length of (m-1)th fixed substring  |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *    L(D-1)+8 | (uint32_t) NOMORE_DYNAMIC_STR                 |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *        E(0) | (uint32_t) offset of 0th d_msgstr message     | == G(0)
+ *             +-----------------------------------------------+
+ *      E(0)+4 | (uint32_t) length of 0th fixed substring      |
+ *             +-----------------------------------------------+
+ *      E(0)+8 | (uint32_t) index to a dynamic macro           |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *     E(0)+4+ | (uint32_t) length of (m-1)th fixed substring  |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *     E(0)+8+ | (uint32_t) NOMORE_DYNAMIC_STR                 |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *      E(D-1) | (uint32_t) offset of 0th d_msgstr message     | == G(D-1)
+ *             +-----------------------------------------------+
+ *    E(D-1)+4 | (uint32_t) length of 0th fixed substring      |
+ *             +-----------------------------------------------+
+ *    E(D-1)+8 | (uint32_t) index to a dynamic macro           |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *    E(D-1)+4 | (uint32_t) length of (m-1)th fixed substring  |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *    E(D-1)+8 | (uint32_t) NOMORE_DYNAMIC_STR                 |
+ *   ((m-1)*8) +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *        M(0) | NULL terminated 0th msgid string              |
+ *             +-----------------------------------------------+
+ *        M(1) | NULL terminated 1st msgid string              |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *      M(N-1) | NULL terminated (N-1)th msgid string          |
+ *             +-----------------------------------------------+
+ *        Q(0) | NULL terminated 0th msgstr string             |
+ *             +-----------------------------------------------+
+ *        Q(1) | NULL terminated 1st msgstr string             |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *      Q(N-1) | NULL terminated (N-1)th msgstr string         |
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *        C(0) | NULL terminated 0th macro                     |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *      C(M-1) | NULL terminated (M-1)th macro                 |
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *        F(0) | NULL terminated 0th dynamic msgid string      |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *      F(D-1) | NULL terminated (D-1)th dynamic msgid string  |
+ *             +-----------------------------------------------+
+ *             +-----------------------------------------------+
+ *        G(0) | NULL terminated 0th dynamic msgstr string     |
+ *             +-----------------------------------------------+
+ *             ...............................
+ *             +-----------------------------------------------+
+ *      G(D-1) | NULL terminated (D-1)th dynamic msgstr string |
+ *             +-----------------------------------------------+
+ */
+
+#define	GNU_MAGIC			0x950412de
+#define	GNU_MAGIC_SWAPPED		0xde120495
+#define	GNU_REVISION			0
+#define	GNU_REVISION_0_0		0
+#define	GNU_REVISION_0_0_SWAPPED	0
+#define	GNU_REVISION_0_1		0x00000001
+#define	GNU_REVISION_0_1_SWAPPED	0x01000000
+#define	GNU_REVISION_1_1		0x00010001
+#define	GNU_REVISION_1_1_SWAPPED	0x01000100
+#define	NOMORE_DYNAMIC_MACRO		0xffffffff
+
+enum gnu_msgidstr {
+	MSGID = 0,
+	MSGSTR = 1
+};
 
 struct gnu_msg_info {
-	unsigned int	magic;
-	unsigned int	revision;
-	unsigned int	num_of_str;
-	unsigned int	off_msgid_tbl;
-	unsigned int	off_msgstr_tbl;
-	unsigned int	sz_hashtbl;
-	unsigned int	off_hashtbl;
+	uint32_t	magic;
+	uint32_t	revision;
+	uint32_t	num_of_str;
+	uint32_t	off_msgid_tbl;
+	uint32_t	off_msgstr_tbl;
+	uint32_t	sz_hashtbl;
+	uint32_t	off_hashtbl;
+};
+
+struct gnu_msg_rev1_info {
+	uint32_t	num_of_dynamic_macro;
+	uint32_t	off_dynamic_macro;
+	uint32_t	num_of_dynamic_str;
+	uint32_t	off_dynamic_msgid_tbl;
+	uint32_t	off_dynamic_msgstr_tbl;
 };
 
 struct gnu_msg_ent {
-	unsigned int	len;
-	unsigned int	offset;
+	uint32_t	len;
+	uint32_t	offset;
+};
+
+struct gnu_dynamic_ent {
+	uint32_t	len;
+	uint32_t	idx;
+};
+
+struct gnu_dynamic_tbl {
+	uint32_t	offset;
+	struct gnu_dynamic_ent	entry[1];
 };
 
 #ifdef	__cplusplus

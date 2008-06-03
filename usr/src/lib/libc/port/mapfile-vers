@@ -33,6 +33,9 @@
 #
 
 SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
+    global:
+	_nl_domain_bindings;
+	_nl_msg_cat_cntr;
     protected:
 	addrtosymstr;
 	aio_cancel;
