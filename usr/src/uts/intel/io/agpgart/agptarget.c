@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -359,7 +359,9 @@ static gms_mode_t gms_modes[] = {
 	{INTEL_BR_G33, I8XX_CONF_GC, IX33_GC_MODE_MASK,
 		GMS_SIZE(gms_X33), gms_X33},
 	{INTEL_BR_Q33, I8XX_CONF_GC, IX33_GC_MODE_MASK,
-		GMS_SIZE(gms_X33), gms_X33}
+		GMS_SIZE(gms_X33), gms_X33},
+	{INTEL_BR_GM45, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_965GM), gms_965GM}
 };
 
 /* Returns the size (kbytes) of pre-allocated graphics memory */

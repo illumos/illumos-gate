@@ -51,10 +51,14 @@
 #define	I965_GTTMMADR	1	/* mem-mapped registers BAR + GTT */
 /* In 965 1MB GTTMMADR, GTT reside in the latter 512KB */
 #define	I965_GTT_OFFSET	0x80000
+#define	GM45_GTT_OFFSET	0x200000
 #define	GTT_SIZE_MASK	0xe
 #define	GTT_512KB	(0 << 1)
 #define	GTT_256KB	(1 << 1)
 #define	GTT_128KB	(2 << 1)
+#define	GTT_1MB		(3 << 1)
+#define	GTT_2MB		(4 << 1)
+#define	GTT_1_5MB	(5 << 1)
 
 #define	MMIO_BASE(x)	(x)->agpm_data.agpm_gtt.gtt_mmio_base
 #define	MMIO_HANDLE(x)	(x)->agpm_data.agpm_gtt.gtt_mmio_handle
@@ -98,7 +102,8 @@ int agpm_debug = 0;
 	(agpmaster->agpm_id == INTEL_IGD_965Q) || \
 	(agpmaster->agpm_id == INTEL_IGD_965G2) || \
 	(agpmaster->agpm_id == INTEL_IGD_965GM) || \
-	(agpmaster->agpm_id == INTEL_IGD_965GME))
+	(agpmaster->agpm_id == INTEL_IGD_965GME) || \
+	(agpmaster->agpm_id == INTEL_IGD_GM45))
 
 /* Intel G33 series */
 #define	IS_INTEL_X33(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_Q35) || \
@@ -200,6 +205,15 @@ i965_apersize(agp_master_softc_t *agpmaster)
 	apersize = AGPM_READ(agpmaster, PGTBL_CTL);
 	AGPM_DEBUG((CE_NOTE, "i965_apersize: PGTBL_CTL = %lx", apersize));
 	switch (apersize & GTT_SIZE_MASK) {
+	case GTT_2MB:
+		apersize = 2048;
+		break;
+	case GTT_1_5MB:
+		apersize = 1536;
+		break;
+	case GTT_1MB:
+		apersize = 1024;
+		break;
 	case GTT_512KB:
 		apersize = 512;
 		break;
@@ -289,7 +303,12 @@ set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster,
 		    &MMIO_BASE(agpmaster), 0, 0, &i8xx_dev_access,
 		    &MMIO_HANDLE(agpmaster));
 		CHECK_STATUS(status);
-		GTT_ADDR(agpmaster) = MMIO_BASE(agpmaster) + I965_GTT_OFFSET;
+		if (agpmaster->agpm_id == INTEL_IGD_GM45)
+			GTT_ADDR(agpmaster) =
+			    MMIO_BASE(agpmaster) + GM45_GTT_OFFSET;
+		else
+			GTT_ADDR(agpmaster) =
+			    MMIO_BASE(agpmaster) + I965_GTT_OFFSET;
 		GTT_HANDLE(agpmaster) = MMIO_HANDLE(agpmaster);
 
 		gmadr_off = I915_CONF_GMADR;
@@ -619,6 +638,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_Q35:
 	case INTEL_IGD_G33:
 	case INTEL_IGD_Q33:
+	case INTEL_IGD_GM45:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */
