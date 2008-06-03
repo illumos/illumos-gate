@@ -75,9 +75,9 @@ buffer_xml(char *s, char **storage, tgt_node_t **np)
 	tgt_node_t		*node		= NULL;
 	xmlTextReaderPtr	r;
 	char			*p,
-				*e,
-				*end_tag,
-				hold_ch;
+	    *e,
+	    *end_tag,
+	    hold_ch;
 
 	p = *storage;
 	if (s != NULL) {
@@ -147,7 +147,7 @@ buffer_xml(char *s, char **storage, tgt_node_t **np)
 	*e = '\0';
 
 	if ((r = (xmlTextReaderPtr)xmlReaderForMemory(p, strlen(p), NULL,
-			NULL, 0)) == NULL)
+	    NULL, 0)) == NULL)
 		return (False);
 
 	while (xmlTextReaderRead(r) == 1) {
@@ -186,13 +186,13 @@ getSecret(char *secret, int *secretLen, int minSecretLen, int maxSecretLen)
 	if (strlen(chapSecret) > maxSecretLen) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    gettext("secret too long"));
-		    *secret = NULL;
-		    return (1);
+		*secret = NULL;
+		return (1);
 	}
 
-	if (strlen(chapSecret) < minSecretLen  && strlen(chapSecret) != 0) {
+	if (strlen(chapSecret) < minSecretLen && strlen(chapSecret) != 0) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
-			gettext("secret too short"));
+		gettext("secret too short"));
 			*secret = NULL;
 			return (1);
 	}
@@ -274,8 +274,8 @@ parseAddress(char *address_port_str,
 				    64);
 				tmp_port = atoi(port_str);
 				if (((tmp_port > 0) &&
-					(tmp_port > USHRT_MAX)) ||
-					(tmp_port < 0)) {
+				    (tmp_port > USHRT_MAX)) ||
+				    (tmp_port < 0)) {
 					/* Port number out of range */
 					syslog(LOG_USER|LOG_DEBUG,
 					    "Specified port out of range: %d",
@@ -312,8 +312,8 @@ parseAddress(char *address_port_str,
 				(void) strlcpy(port_str, colon_pos, 64);
 				tmp_port = atoi(port_str);
 				if (((tmp_port > 0) &&
-					(tmp_port > USHRT_MAX)) ||
-					(tmp_port < 0)) {
+				    (tmp_port > USHRT_MAX)) ||
+				    (tmp_port < 0)) {
 					/* Port number out of range */
 					syslog(LOG_USER|LOG_DEBUG,
 					    "Specified port out of range: %d",
@@ -414,7 +414,7 @@ void
 stats_load_counts(tgt_node_t *n, stat_delta_t *d)
 {
 	tgt_node_t	*conn	= NULL,
-			*lun;
+	    *lun;
 	char		*val;
 
 	bzero(d, sizeof (*d));
