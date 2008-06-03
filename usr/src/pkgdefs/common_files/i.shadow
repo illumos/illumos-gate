@@ -139,6 +139,17 @@ do
 			printf '/^nuucp:NP\na\n%s\n.\nw\nq\n' \
 				"$DLADM_LINE" | ed -s $dest > /dev/null
 		fi
+
+		#
+		# Add the 'xvm' reserved user if it doesn't exist.
+		#
+		XVM_LINE="xvm:*LK*:::::::"
+		if grep "^xvm:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^gdm:\*LK\*\na\n%s\n.\nw\nq\n' \
+				"$XVM_LINE" | ed -s $dest > /dev/null
+		fi
 	fi
 done
 

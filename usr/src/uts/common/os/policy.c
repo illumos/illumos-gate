@@ -2221,3 +2221,21 @@ secpolicy_smbfs_login(const cred_t *cr, uid_t uid)
 	return (PRIV_POLICY(cr, PRIV_PROC_OWNER, B_FALSE,
 	    EPERM, NULL));
 }
+
+/*
+ * secpolicy_xvm_control
+ *
+ * Determines if a caller can control the xVM hypervisor and/or running
+ * domains (x86 specific).
+ *
+ * Returns:
+ * 0       access is allowed.
+ * EPERM   access is NOT allowed.
+ */
+int
+secpolicy_xvm_control(const cred_t *cr)
+{
+	if (PRIV_POLICY(cr, PRIV_XVM_CONTROL, B_FALSE, EPERM, NULL))
+		return (EPERM);
+	return (0);
+}

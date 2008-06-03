@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,7 @@
 #include <sys/cpu.h>
 #include <sys/cmn_err.h>
 #include <sys/xen_errno.h>
+#include <sys/policy.h>
 #include <xen/sys/evtchn.h>
 
 /* Some handy macros */
@@ -158,13 +159,16 @@ done:
 
 /* ARGSUSED */
 static int
-evtchndrv_read(dev_t dev, struct uio *uio, cred_t *cred)
+evtchndrv_read(dev_t dev, struct uio *uio, cred_t *cr)
 {
 	int rc = 0;
 	ssize_t count;
 	unsigned int c, p, bytes1 = 0, bytes2 = 0;
 	struct evtsoftdata *ep;
 	minor_t minor = getminor(dev);
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	ep = EVTCHNDRV_INST2SOFTS(EVTCHNDRV_MINOR2INST(minor));
 
@@ -231,7 +235,7 @@ done:
 
 /* ARGSUSED */
 static int
-evtchndrv_write(dev_t dev, struct uio *uio, cred_t *cred)
+evtchndrv_write(dev_t dev, struct uio *uio, cred_t *cr)
 {
 	int  rc, i;
 	ssize_t count;
@@ -239,6 +243,9 @@ evtchndrv_write(dev_t dev, struct uio *uio, cred_t *cred)
 	struct evtsoftdata *ep;
 	ulong_t flags;
 	minor_t minor = getminor(dev);
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	ep = EVTCHNDRV_INST2SOFTS(EVTCHNDRV_MINOR2INST(minor));
 
@@ -320,12 +327,15 @@ evtchndrv_close_evtchn(int port)
 
 /* ARGSUSED */
 static int
-evtchndrv_ioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred,
+evtchndrv_ioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cr,
     int *rvalp)
 {
 	int err = 0;
 	struct evtsoftdata *ep;
 	minor_t minor = getminor(dev);
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	ep = EVTCHNDRV_INST2SOFTS(EVTCHNDRV_MINOR2INST(minor));
 

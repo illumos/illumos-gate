@@ -331,6 +331,11 @@ acpi_drv:*
 smbsrv:*
 vscan:*
 nsmb:*
+balloon:*
+domcaps:*
+evtchn:*
+privcmd:*
+xenbus:*
 EOF
 }
 

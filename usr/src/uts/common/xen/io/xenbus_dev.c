@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,8 @@
 #include <sys/condvar.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/policy.h>
+
 #ifdef XPV_HVM_DRIVER
 #include <public/io/xenbus.h>
 #include <public/io/xs_wire.h>
@@ -138,6 +140,8 @@ static int xenbusdrv_read(dev_t, struct uio *, cred_t *);
 static int xenbusdrv_write(dev_t, struct uio *, cred_t *);
 static int xenbusdrv_devmap(dev_t, devmap_cookie_t, offset_t, size_t, size_t *,
     uint_t);
+static int xenbusdrv_segmap(dev_t, off_t, ddi_as_handle_t, caddr_t *, off_t,
+    uint_t, uint_t, uint_t, cred_t *);
 static int xenbusdrv_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int xenbusdrv_queue_reply(xenbus_dev_t *, const struct xsd_sockmsg *,
     const char *);
@@ -155,7 +159,7 @@ static 	struct cb_ops xenbusdrv_cb_ops = {
 	xenbusdrv_ioctl,		/* cb_ioctl */
 	xenbusdrv_devmap,		/* cb_devmap */
 	NULL,				/* cb_mmap */
-	NULL,				/* cb_segmap */
+	xenbusdrv_segmap,		/* cb_segmap */
 	nochpoll,			/* cb_chpoll */
 	ddi_prop_op,			/* cb_prop_op */
 	0,				/* cb_stream */
@@ -329,7 +333,7 @@ xenbusdrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /* ARGSUSED */
 static int
-xenbusdrv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+xenbusdrv_open(dev_t *devp, int flag, int otyp, cred_t *cr)
 {
 	xenbus_dev_t *xbs;
 	minor_t minor = getminor(*devp);
@@ -384,7 +388,7 @@ xenbusdrv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 /* ARGSUSED */
 static int
-xenbusdrv_close(dev_t dev, int flag, int otyp, struct cred *credp)
+xenbusdrv_close(dev_t dev, int flag, int otyp, struct cred *cr)
 {
 	xenbus_dev_t *xbs;
 	minor_t minor = getminor(dev);
@@ -431,7 +435,7 @@ xenbusdrv_close(dev_t dev, int flag, int otyp, struct cred *credp)
 
 /* ARGSUSED */
 static int
-xenbusdrv_read(dev_t dev, struct uio *uiop, cred_t *credp)
+xenbusdrv_read(dev_t dev, struct uio *uiop, cred_t *cr)
 {
 	xenbus_dev_t *xbs;
 	size_t len;
@@ -439,6 +443,9 @@ xenbusdrv_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	int idx;
 
 	XENBUSDRV_DBPRINT((CE_NOTE, "xenbusdrv_read called"));
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	xbs = XENBUSDRV_INST2SOFTS(XENBUSDRV_MINOR2INST(getminor(dev)));
 
@@ -512,7 +519,7 @@ xenbusdrv_queue_reply(xenbus_dev_t *xbs, const struct xsd_sockmsg *msg,
 
 /* ARGSUSED */
 static int
-xenbusdrv_write(dev_t dev, struct uio *uiop, cred_t *credp)
+xenbusdrv_write(dev_t dev, struct uio *uiop, cred_t *cr)
 {
 	xenbus_dev_t *xbs;
 	struct xenbus_dev_transaction *trans;
@@ -521,6 +528,9 @@ xenbusdrv_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	int rc = 0;
 
 	XENBUSDRV_DBPRINT((CE_NOTE, "xenbusdrv_write called"));
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	xbs = XENBUSDRV_INST2SOFTS(XENBUSDRV_MINOR2INST(getminor(dev)));
 	len = uiop->uio_resid;
@@ -628,12 +638,27 @@ xenbusdrv_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	return (0);
 }
 
+static int
+xenbusdrv_segmap(dev_t dev, off_t off, ddi_as_handle_t as, caddr_t *addrp,
+    off_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cr)
+{
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
+
+	return (ddi_devmap_segmap(dev, off, as, addrp, len, prot,
+	    maxprot, flags, cr));
+}
+
 /*ARGSUSED*/
 static int
-xenbusdrv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+xenbusdrv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr,
     int *rvalp)
 {
 	xenbus_dev_t *xbs;
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	xbs = XENBUSDRV_INST2SOFTS(XENBUSDRV_MINOR2INST(getminor(dev)));
 	switch (cmd) {

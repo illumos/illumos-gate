@@ -87,6 +87,8 @@
 	<privilege set="prohibited" name="sys_net_config" />
 	<privilege set="prohibited" name="sys_res_config" />
 	<privilege set="prohibited" name="sys_suser_compat" />
+	<privilege set="prohibited" name="xvm_control" />
+	<privilege set="prohibited" name="virt_manage" />
 
 	<privilege set="required" name="proc_exec" />
 	<privilege set="required" name="proc_fork" />

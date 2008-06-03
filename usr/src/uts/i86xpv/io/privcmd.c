@@ -40,6 +40,7 @@
 #include <sys/sdt.h>
 #include <sys/hypervisor.h>
 #include <sys/xen_errno.h>
+#include <sys/policy.h>
 
 #include <vm/hat_i86.h>
 #include <vm/hat_pte.h>
@@ -271,12 +272,14 @@ done:
 static int
 privcmd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 {
-	if ((mode & FMODELS) != FNATIVE)
-		return (EOVERFLOW);
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	/*
 	 * Everything is a -native- data type.
 	 */
+	if ((mode & FMODELS) != FNATIVE)
+		return (EOVERFLOW);
 
 	switch (cmd) {
 	case IOCTL_PRIVCMD_HYPERCALL:
@@ -305,6 +308,9 @@ privcmd_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp,
 {
 	struct segmf_crargs a;
 	int error;
+
+	if (secpolicy_xvm_control(cr))
+		return (EPERM);
 
 	as_rangelock(as);
 	if ((flags & MAP_FIXED) == 0) {

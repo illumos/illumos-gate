@@ -215,6 +215,24 @@ do
 			printf '/^smmsp::25:\ni\n%s\n.\nw\nq\n' \
 			"$GAMESGROUP_LINE" | ed -s $dest > /dev/null
 		fi
+		#
+		# Add the 'xvm' group if it doesn't already exist.
+		#
+		XVMGROUP_LINE="xvm::60:"
+		cur_name=`awk -F: '$3 == 60 {print $1}' $dest`
+		cur_id=`awk -F: '$1 == "xvm" {print $3}' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "xvm" ]; then
+			echo "ERROR: Reserved GID 60 already assigned" \
+			"to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "60" ]; then
+			echo "NOTE: xvm group already assigned" \
+			"to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$XVMGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^mysql::70:\ni\n%s\n.\nw\nq\n' \
+                            "$XVMGROUP_LINE" | ed -s $dest > /dev/null
+		fi
 	fi
 done
 exit 0

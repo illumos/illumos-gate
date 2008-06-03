@@ -41,6 +41,7 @@ privilege PRIV_CONTRACT_EVENT
 	any event queue.
 
 privilege PRIV_CONTRACT_IDENTITY
+
 	Allows a process to set the service FMRI value of a process
 	contract template.
 
@@ -439,6 +440,11 @@ privilege PRIV_SYS_TRANS_LABEL
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
+privilege PRIV_VIRT_MANAGE
+
+	Allows a process to manage virtualized environments such as
+	xVM(5).
+
 privilege PRIV_WIN_COLORMAP
 
 	Allows a process to override colormap restrictions.
@@ -540,6 +546,12 @@ privilege PRIV_WIN_UPGRADE_SL
 	sensitivity label.
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
+
+privilege PRIV_XVM_CONTROL
+
+	Allows a process access to the xVM(5) control devices for
+	managing guest domains and the hypervisor. This privilege is
+	used only if booted into xVM on x86 platforms.
 
 set PRIV_EFFECTIVE
 

@@ -7516,6 +7516,11 @@ mondo_loop() {
 		rm -f $rootprefix/etc/datalink.conf
 	fi
 
+	#
+	# Force xVM privilege fixups to occur on next boot.
+	#
+	rm -f $rootprefix/var/lib/xend/.xvmuser
+	
 	print "\nRestoring configuration files.\n"
 
 	cd $root

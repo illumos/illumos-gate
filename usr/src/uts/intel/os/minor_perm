@@ -173,3 +173,8 @@ afe:* 0666 root sys
 mxfe:* 0666 root sys
 vscan:* 0640 root sys
 nsmb:* 0666 root sys
+balloon:* 0444 root sys
+domcaps:* 0444 root sys
+evtchn:* 0666 root sys
+privcmd:* 0666 root sys
+xenbus:* 0666 root sys
