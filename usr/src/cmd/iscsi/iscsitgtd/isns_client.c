@@ -375,12 +375,14 @@ static void
 	if ((so = isns_open(args->server)) < 0) {
 		syslog(LOG_ERR,
 		    "esi_scn_thr: isns server %s not found", args->server);
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 	len = sizeof (sa);
 	if (getsockname(so, &sa, &len) < 0) {
 		isns_close(so);
 		syslog(LOG_ALERT, "getsockname failed");
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 	pf = sa.sa_family;
@@ -388,6 +390,7 @@ static void
 
 	if (pf != PF_INET && pf != PF_INET6) {
 		syslog(LOG_ERR, "esi_scn_thr: unknown domain type");
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 
@@ -397,6 +400,7 @@ static void
 	 */
 	if ((so = socket(pf, SOCK_STREAM, 0)) == -1) {
 		syslog(LOG_ALERT, "socket failed");
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 
@@ -420,6 +424,7 @@ static void
 
 	if (bind(so, ai, len) < 0) {
 		syslog(LOG_ALERT, "esi_scn_thr: bind failed");
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 
@@ -427,11 +432,13 @@ static void
 	len = sizeof (sa);
 	if (getsockname(so, &sa, &len) < 0) {
 		syslog(LOG_ALERT, "getsockname failed");
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 	if (getnameinfo(&sa, len, NULL, 0, strport, NI_MAXSERV,
 	    NI_NUMERICSERV) != 0) {
 		syslog(LOG_ALERT, "getnameinfo failed");
+		sema_post(&isns_sema);
 		return (NULL);
 	}
 	scn_port = atoi(strport);
