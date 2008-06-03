@@ -956,7 +956,6 @@ pentry(struct lbuf *ap)
 		(void) strcpy(buf + 4, p->flinkto);
 		dmark = buf;
 	}
-
 	if (p->lflags & ISARG) {
 		if (qflg || bflg)
 			pprintf(p->ln.namep, dmark);
@@ -1371,9 +1370,21 @@ gstat(char *file, int argfl, struct ditem *myparent)
 	} else {
 		rep = flist[nfiles++];
 	}
+
+	/* Initialize */
+
 	rep->lflags = (mode_t)0;
 	rep->flinkto = NULL;
 	rep->cycle = 0;
+	rep->lat.tv_sec = time(NULL);
+	rep->lat.tv_nsec = 0;
+	rep->lct.tv_sec = time(NULL);
+	rep->lct.tv_nsec = 0;
+	rep->lmt.tv_sec = time(NULL);
+	rep->lmt.tv_nsec = 0;
+	rep->exttr = NULL;
+	rep->extm = NULL;
+
 	if (argfl || statreq) {
 		int doacl;
 
@@ -1381,6 +1392,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 			doacl = 1;
 		else
 			doacl = 0;
+
 		if ((*statf)(file, &statb) < 0) {
 			if (argfl || errno != ENOENT ||
 			    (Lflg && lstat(file, &statb) == 0)) {
@@ -1523,6 +1535,19 @@ gstat(char *file, int argfl, struct ditem *myparent)
 		if (!S_ISREG(statb.st_mode))
 			rep->lflags |= LS_NOTREG;
 
+		rep->luid = statb.st_uid;
+		rep->lgid = statb.st_gid;
+		rep->lnl = statb.st_nlink;
+		if (uflg || (tmflg && atm))
+			rep->lmtime = statb.st_atim;
+		else if (cflg || (tmflg && ctm))
+			rep->lmtime = statb.st_ctim;
+		else
+			rep->lmtime = statb.st_mtim;
+		rep->lat = statb.st_atim;
+		rep->lct = statb.st_ctim;
+		rep->lmt = statb.st_mtim;
+
 		/* ACL: check acl entries count */
 		if (doacl) {
 
@@ -1531,7 +1556,8 @@ gstat(char *file, int argfl, struct ditem *myparent)
 				(void) fprintf(stderr,
 				    gettext("ls: can't read ACL on %s: %s\n"),
 				    file, acl_strerror(error));
-				return (NULL);
+				rep->acl = ' ';
+				return (rep);
 			}
 
 			rep->acl = ' ';
@@ -1615,26 +1641,11 @@ gstat(char *file, int argfl, struct ditem *myparent)
 
 		/* mask ISARG and other file-type bits */
 
-		rep->luid = statb.st_uid;
-		rep->lgid = statb.st_gid;
-		rep->lnl = statb.st_nlink;
-		if (uflg || (tmflg && atm))
-			rep->lmtime = statb.st_atim;
-		else if (cflg || (tmflg && ctm))
-			rep->lmtime = statb.st_ctim;
-		else
-			rep->lmtime = statb.st_mtim;
-		rep->lat = statb.st_atim;
-		rep->lct = statb.st_ctim;
-		rep->lmt = statb.st_mtim;
-
 		if (rep->ltype != 'b' && rep->ltype != 'c')
 			tblocks += rep->lblocks;
 
 		/* Get extended system attributes */
 
-		rep->exttr = NULL;
-		rep->extm = NULL;
 		if ((saflg || (tmflg && crtm) || (tmflg && alltm)) &&
 		    (sysattr_support(file, _PC_SATTR_EXISTS) == 1)) {
 			int i;
