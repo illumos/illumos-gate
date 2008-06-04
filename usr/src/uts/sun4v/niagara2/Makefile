@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/niagara2/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,6 +74,16 @@ CFLAGS += $(CCVERBOSE) -DNIAGARA2_IMPL
 CPPFLAGS += -DCPU_MODULE -DNIAGARA2_IMPL
 CPPFLAGS += -DSUN4V_CONTIG_MEM_PREALLOC_SIZE_MB=196
 AS_CPPFLAGS += -DCPU_MODULE -DNIAGARA2_IMPL
+
+#
+# The ATOMIC_BO_ENABLE_SHIFT enables backoff in atomic routines.
+# It is also used to scale final limit value w.r.t. number of
+# online cpus.
+#
+ATOMIC_BO_FLAG = -DATOMIC_BO_ENABLE_SHIFT=4
+CFLAGS += $(ATOMIC_BO_FLAG)
+CPPFLAGS +=$(ATOMIC_BO_FLAG)
+AS_CPPFLAGS += $(ATOMIC_BO_FLAG)
 
 #
 #	Default build targets.

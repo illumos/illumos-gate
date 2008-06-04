@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,3 +150,21 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 
 	SET_SIZE(cpu_inv_tsb)
 #endif /* lint */
+
+#if defined (lint)
+/*
+ * This is CPU specific delay routine for atomic backoff. It is used in case
+ * of Niagara2 and VF CPUs. The rd instruction uses less resources than casx
+ * on these CPUs.
+ */
+void
+cpu_atomic_delay(void)
+{}
+#else	/* lint */
+	ENTRY(cpu_atomic_delay)
+	rd	%ccr, %g0
+	rd	%ccr, %g0
+	retl
+	rd	%ccr, %g0
+	SET_SIZE(cpu_atomic_delay)
+#endif	/* lint */

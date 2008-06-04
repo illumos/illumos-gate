@@ -179,14 +179,13 @@ N2_PCBE_OBJS	= niagara2_pcbe.o
 
 #
 #			cpu modules
-# XXXQ Make generic4vcpu
 #
 CPU_OBJ		+= $(OBJS_DIR)/mach_cpu_module.o
 GENERIC_OBJS = generic.o generic_copy.o common_asm.o atomic.o
 NIAGARACPU_OBJS = niagara.o niagara_copy.o common_asm.o niagara_perfctr.o
 NIAGARACPU_OBJS += niagara_asm.o atomic.o
 NIAGARA2CPU_OBJS = niagara2.o niagara_copy.o common_asm.o niagara_perfctr.o
-NIAGARA2CPU_OBJS += niagara2_asm.o niagara2_atomic.o
+NIAGARA2CPU_OBJS += niagara2_asm.o atomic.o
 
 #
 #			platform module

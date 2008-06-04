@@ -123,7 +123,8 @@ cpu_setup(void)
 		    " 8K, 64K and 4M: MD mask is 0x%x",
 		    mmu_exported_pagesize_mask);
 
-	cpu_hwcap_flags = AV_SPARC_VIS | AV_SPARC_VIS2 | AV_SPARC_ASI_BLK_INIT;
+	cpu_hwcap_flags = AV_SPARC_VIS | AV_SPARC_VIS2 |
+	    AV_SPARC_ASI_BLK_INIT | AV_SPARC_POPC;
 
 	/*
 	 * Niagara2 supports a 48-bit subset of the full 64-bit virtual

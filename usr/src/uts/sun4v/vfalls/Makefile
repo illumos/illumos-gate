@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/vfalls/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,14 +66,24 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 #
 # lint pass one enforcement
 #
-CFLAGS += $(CCVERBOSE) -DVFALLS_IMPL -DN2_ERRATUM_181_WORKAROUND
+CFLAGS += $(CCVERBOSE) -DVFALLS_IMPL
 
 #
 # cpu-module-specific flags
 #
-CPPFLAGS += -DCPU_MODULE -DVFALLS_IMPL -DN2_ERRATUM_181_WORKAROUND
+CPPFLAGS += -DCPU_MODULE -DVFALLS_IMPL
 CPPFLAGS += -DSUN4V_CONTIG_MEM_PREALLOC_SIZE_MB=68
-AS_CPPFLAGS += -DCPU_MODULE -DVFALLS_IMPL -DN2_ERRATUM_181_WORKAROUND
+AS_CPPFLAGS += -DCPU_MODULE -DVFALLS_IMPL
+
+#
+# The ATOMIC_BO_ENABLE_SHIFT enables backoff in atomic routines.
+# It is also used to scale final limit value w.r.t. number of
+# online cpus.
+#
+ATOMIC_BO_FLAG = -DATOMIC_BO_ENABLE_SHIFT=4
+CFLAGS += $(ATOMIC_BO_FLAG)
+CPPFLAGS +=$(ATOMIC_BO_FLAG)
+AS_CPPFLAGS += $(ATOMIC_BO_FLAG)
 
 #
 #	Default build targets.

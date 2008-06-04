@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,15 @@
 	.file	"%M%"
 
 #include <sys/asm_linkage.h>
+
+/*
+ * ATOMIC_BO_ENABLE_SHIFT can be selectively defined by processors
+ * to enable exponential backoff. No definition means backoff is
+ * not desired i.e. backoff should be disabled.
+ * By default, the shift value is used to generate a power of 2
+ * value for backoff limit. In the kernel, processors scale this
+ * shift value with the number of online cpus.
+ */
 
 #if defined(_KERNEL)
 	/*
@@ -41,12 +50,122 @@
 	ANSI_PRAGMA_WEAK2(atomic_and_long,atomic_and_ulong,function)
 	ANSI_PRAGMA_WEAK2(atomic_or_long,atomic_or_ulong,function)
 	ANSI_PRAGMA_WEAK2(swapl,atomic_swap_32,function)
-#else
+
+#ifdef ATOMIC_BO_ENABLE_SHIFT
+
+#if !defined(lint)
+	.weak   cpu_atomic_delay
+	.type   cpu_atomic_delay, #function
+#endif  /* lint */
+
+/*
+ * For the kernel, invoke processor specific delay routine to perform
+ * low-impact spin delay. The value of ATOMIC_BO_ENABLE_SHIFT is tuned
+ * with respect to the specific spin delay implementation.
+ */
+#define	DELAY_SPIN(label, tmp1, tmp2)					\
+	/*								; \
+	 * Define a pragma weak reference to a cpu specific		; \
+	 * delay routine for atomic backoff. For CPUs that		; \
+	 * have no such delay routine defined, the delay becomes	; \
+	 * just a simple tight loop.					; \
+	 *								; \
+	 * tmp1 = holds CPU specific delay routine			; \
+	 * tmp2 = holds atomic routine's callee return address		; \
+	 */								; \
+	sethi	%hi(cpu_atomic_delay), tmp1				; \
+	or	tmp1, %lo(cpu_atomic_delay), tmp1			; \
+label/**/0:								; \
+	brz,pn	tmp1, label/**/1					; \
+	mov	%o7, tmp2						; \
+	jmpl	tmp1, %o7	/* call CPU specific delay routine */	; \
+	  nop			/* delay slot : do nothing */		; \
+	mov	tmp2, %o7	/* restore callee's return address */	; \
+label/**/1:
+
+/*
+ * For the kernel, we take into consideration of cas failures
+ * and also scale the backoff limit w.r.t. the number of cpus.
+ * For cas failures, we reset the backoff value to 1 if the cas
+ * failures exceed or equal to the number of online cpus. This
+ * will enforce some degree of fairness and prevent starvation.
+ * We also scale/normalize the processor provided specific
+ * ATOMIC_BO_ENABLE_SHIFT w.r.t. the number of online cpus to
+ * obtain the actual final limit to use.
+ */
+#define ATOMIC_BACKOFF_CPU(val, limit, ncpu, cas_cnt, label)		\
+	brnz,pt	ncpu, label/**/0					; \
+	  inc	cas_cnt							; \
+	sethi	%hi(ncpus_online), ncpu					; \
+	ld	[ncpu + %lo(ncpus_online)], ncpu			; \
+label/**/0:								; \
+	cmp	cas_cnt, ncpu						; \
+	blu,pt	%xcc, label/**/1					; \
+	  sllx	ncpu, ATOMIC_BO_ENABLE_SHIFT, limit			; \
+	mov	%g0, cas_cnt						; \
+	mov	1, val							; \
+label/**/1:
+#endif	/* ATOMIC_BO_ENABLE_SHIFT */
+
+#else	/* _KERNEL */
 	/*
 	 * Include the definitions for the libc weak aliases.
 	 */
 #include "../atomic_asm_weak.h"
-#endif
+
+/*
+ * ATOMIC_BO_ENABLE_SHIFT may be enabled/defined here for generic
+ * libc atomics. None for now.
+ */
+#ifdef ATOMIC_BO_ENABLE_SHIFT
+#define	DELAY_SPIN(label, tmp1, tmp2)	\
+label/**/0:
+
+#define ATOMIC_BACKOFF_CPU(val, limit, ncpu, cas_cnt, label)  \
+	set	1 << ATOMIC_BO_ENABLE_SHIFT, limit
+#endif	/* ATOMIC_BO_ENABLE_SHIFT */
+#endif	/* _KERNEL */
+
+#ifdef ATOMIC_BO_ENABLE_SHIFT
+/*
+ * ATOMIC_BACKOFF_INIT macro for initialization.
+ * backoff val is initialized to 1.
+ * ncpu is initialized to 0
+ * The cas_cnt counts the cas instruction failure and is
+ * initialized to 0.
+ */
+#define ATOMIC_BACKOFF_INIT(val, ncpu, cas_cnt)	\
+	mov	1, val				; \
+	mov	%g0, ncpu			; \
+	mov	%g0, cas_cnt
+
+#define ATOMIC_BACKOFF_BRANCH(cr, backoff, loop) \
+	bne,a,pn cr, backoff
+
+/*
+ * Main ATOMIC_BACKOFF_BACKOFF macro for backoff.
+ */
+#define ATOMIC_BACKOFF_BACKOFF(val, limit, ncpu, cas_cnt, label, retlabel) \
+	ATOMIC_BACKOFF_CPU(val, limit, ncpu, cas_cnt, label/**/_0)	; \
+	cmp	val, limit						; \
+	blu,a,pt %xcc, label/**/_1					; \
+	  mov	val, limit						; \
+label/**/_1:								; \
+	mov	limit, val						; \
+	DELAY_SPIN(label/**/_2, %g2, %g3)				; \
+	deccc	limit							; \
+	bgu,pn	%xcc, label/**/_20 /* branch to middle of DELAY_SPIN */	; \
+	  nop								; \
+	ba	retlabel						; \
+	  sllx  val, 1, val
+#else	/* ATOMIC_BO_ENABLE_SHIFT */
+#define ATOMIC_BACKOFF_INIT(val, ncpu, cas_cnt)
+
+#define ATOMIC_BACKOFF_BRANCH(cr, backoff, loop) \
+	bne,a,pn cr, loop
+
+#define ATOMIC_BACKOFF_BACKOFF(val, limit, ncpu, cas_cnt, label, retlabel)
+#endif	/* ATOMIC_BO_ENABLE_SHIFT */
 
 	/*
 	 * NOTE: If atomic_inc_8 and atomic_inc_8_nv are ever
@@ -239,15 +358,19 @@ add_16:
 	ALTENTRY(atomic_add_int)
 	ALTENTRY(atomic_add_int_nv)
 add_32:
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ld	[%o0], %o2
 1:
 	add	%o2, %o1, %o3
 	cas	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %icc, 1b
+	ATOMIC_BACKOFF_BRANCH(%icc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	add	%o2, %o1, %o0		! return new value
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, add32, 0b)
 	SET_SIZE(atomic_add_int_nv)
 	SET_SIZE(atomic_add_int)
 	SET_SIZE(atomic_add_32_nv)
@@ -300,15 +423,19 @@ add_32:
 	ALTENTRY(atomic_add_long)
 	ALTENTRY(atomic_add_long_nv)
 add_64:
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ldx	[%o0], %o2
 1:
 	add	%o2, %o1, %o3
 	casx	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %xcc, 1b
+	ATOMIC_BACKOFF_BRANCH(%xcc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	add	%o2, %o1, %o0		! return new value
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, add64, 0b)
 	SET_SIZE(atomic_add_long_nv)
 	SET_SIZE(atomic_add_long)
 	SET_SIZE(atomic_add_ptr_nv)
@@ -396,15 +523,19 @@ add_64:
 	ALTENTRY(atomic_or_32_nv)
 	ALTENTRY(atomic_or_uint)
 	ALTENTRY(atomic_or_uint_nv)
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ld	[%o0], %o2
 1:
 	or	%o2, %o1, %o3
 	cas	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %icc, 1b
+	ATOMIC_BACKOFF_BRANCH(%icc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	or	%o2, %o1, %o0		! return new value
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, or32, 0b)
 	SET_SIZE(atomic_or_uint_nv)
 	SET_SIZE(atomic_or_uint)
 	SET_SIZE(atomic_or_32_nv)
@@ -420,15 +551,19 @@ add_64:
 	ALTENTRY(atomic_or_64_nv)
 	ALTENTRY(atomic_or_ulong)
 	ALTENTRY(atomic_or_ulong_nv)
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ldx	[%o0], %o2
 1:
 	or	%o2, %o1, %o3
 	casx	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %xcc, 1b
+	ATOMIC_BACKOFF_BRANCH(%xcc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	or	%o2, %o1, %o0		! return new value
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, or64, 0b)
 	SET_SIZE(atomic_or_ulong_nv)
 	SET_SIZE(atomic_or_ulong)
 	SET_SIZE(atomic_or_64_nv)
@@ -514,15 +649,19 @@ add_64:
 	ALTENTRY(atomic_and_32_nv)
 	ALTENTRY(atomic_and_uint)
 	ALTENTRY(atomic_and_uint_nv)
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ld	[%o0], %o2
 1:
 	and	%o2, %o1, %o3
 	cas	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %icc, 1b
+	ATOMIC_BACKOFF_BRANCH(%icc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	and	%o2, %o1, %o0		! return new value
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, and32, 0b)
 	SET_SIZE(atomic_and_uint_nv)
 	SET_SIZE(atomic_and_uint)
 	SET_SIZE(atomic_and_32_nv)
@@ -538,15 +677,19 @@ add_64:
 	ALTENTRY(atomic_and_64_nv)
 	ALTENTRY(atomic_and_ulong)
 	ALTENTRY(atomic_and_ulong_nv)
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ldx	[%o0], %o2
 1:
 	and	%o2, %o1, %o3
 	casx	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %xcc, 1b
+	ATOMIC_BACKOFF_BRANCH(%xcc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	and	%o2, %o1, %o0		! return new value
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, and64, 0b)
 	SET_SIZE(atomic_and_ulong_nv)
 	SET_SIZE(atomic_and_ulong)
 	SET_SIZE(atomic_and_64_nv)
@@ -684,37 +827,47 @@ add_64:
 
 	ENTRY(atomic_swap_32)
 	ALTENTRY(atomic_swap_uint)
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ld	[%o0], %o2
 1:
 	mov	%o1, %o3
 	cas	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %icc, 1b
+	ATOMIC_BACKOFF_BRANCH(%icc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	mov	%o3, %o0
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, swap32, 0b)
 	SET_SIZE(atomic_swap_uint)
 	SET_SIZE(atomic_swap_32)
 
 	ENTRY(atomic_swap_64)
 	ALTENTRY(atomic_swap_ptr)
 	ALTENTRY(atomic_swap_ulong)
+	ATOMIC_BACKOFF_INIT(%o4, %g4, %g5)
+0:
 	ldx	[%o0], %o2
 1:
 	mov	%o1, %o3
 	casx	[%o0], %o2, %o3
 	cmp	%o2, %o3
-	bne,a,pn %xcc, 1b
+	ATOMIC_BACKOFF_BRANCH(%xcc, 2f, 1b)
 	  mov	%o3, %o2
 	retl
 	mov	%o3, %o0
+2:
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, %g4, %g5, swap64, 0b)
 	SET_SIZE(atomic_swap_ulong)
 	SET_SIZE(atomic_swap_ptr)
 	SET_SIZE(atomic_swap_64)
 
 	ENTRY(atomic_set_long_excl)
+	ATOMIC_BACKOFF_INIT(%o5, %g4, %g5)
 	mov	1, %o3
 	slln	%o3, %o1, %o3
+0:
 	ldn	[%o0], %o2
 1:
 	andcc	%o2, %o3, %g0		! test if the bit is set
@@ -723,17 +876,21 @@ add_64:
 	or	%o2, %o3, %o4		! set the bit, and try to commit it
 	casn	[%o0], %o2, %o4
 	cmp	%o2, %o4
-	bne,a,pn %ncc, 1b		! failed to commit, try again
+	ATOMIC_BACKOFF_BRANCH(%ncc, 5f, 1b)
 	  mov	%o4, %o2
 	mov	%g0, %o0
 2:
 	retl
 	nop
+5:
+	ATOMIC_BACKOFF_BACKOFF(%o5, %g1, %g4, %g5, setlongexcl, 0b)
 	SET_SIZE(atomic_set_long_excl)
 
 	ENTRY(atomic_clear_long_excl)
+	ATOMIC_BACKOFF_INIT(%o5, %g4, %g5)
 	mov	1, %o3
 	slln	%o3, %o1, %o3
+0:
 	ldn	[%o0], %o2
 1:
 	andncc	%o3, %o2, %g0		! test if the bit is clear
@@ -742,12 +899,14 @@ add_64:
 	andn	%o2, %o3, %o4		! clear the bit, and try to commit it
 	casn	[%o0], %o2, %o4
 	cmp	%o2, %o4
-	bne,a,pn %ncc, 1b		! failed to commit, try again
+	ATOMIC_BACKOFF_BRANCH(%ncc, 5f, 1b)
 	  mov	%o4, %o2
 	mov	%g0, %o0
 2:
 	retl
 	nop
+5:
+	ATOMIC_BACKOFF_BACKOFF(%o5, %g1, %g4, %g5, clrlongexcl, 0b)
 	SET_SIZE(atomic_clear_long_excl)
 
 #if !defined(_KERNEL)
