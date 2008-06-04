@@ -3946,12 +3946,7 @@ ehci_wait_for_sof(ehci_state_t	*ehcip)
 			return (USB_FAILURE);
 		}
 
-		/* Get new usb frame number */
-		after_frame_number = before_frame_number =
-		    ehci_get_current_frame_number(ehcip);
 	}
-
-	ASSERT(after_frame_number > before_frame_number);
 
 	return (USB_SUCCESS);
 }
