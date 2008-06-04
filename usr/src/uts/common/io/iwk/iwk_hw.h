@@ -1459,7 +1459,7 @@ extern "C" {
 #define	IWK_MAX_WIN_SIZE	64
 #define	IWK_QUEUE_SIZE	256
 #define	IWK_NUM_FIFOS	7
-#define	IWK_NUM_QUEUES	16
+#define	IWK_NUM_QUEUES	6
 #define	IWK_CMD_QUEUE_NUM	4
 #define	IWK_KW_SIZE 0x1000	/* 4k */
 

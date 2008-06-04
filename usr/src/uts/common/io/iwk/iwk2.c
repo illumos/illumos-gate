@@ -419,7 +419,23 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	wifi_data_t		wd = { 0 };
 	mac_register_t		*macp;
 
-	if (cmd != DDI_ATTACH) {
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		sc = ddi_get_soft_state(iwk_soft_state_p,
+		    ddi_get_instance(dip));
+		ASSERT(sc != NULL);
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags &= ~IWK_F_SUSPEND;
+		mutex_exit(&sc->sc_glock);
+		if (sc->sc_flags & IWK_F_RUNNING) {
+			(void) iwk_init(sc);
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+		}
+		IWK_DBG((IWK_DEBUG_RESUME, "iwk: resume\n"));
+		return (DDI_SUCCESS);
+	default:
 		err = DDI_FAILURE;
 		goto attach_fail1;
 	}
@@ -722,8 +738,21 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	sc = ddi_get_soft_state(iwk_soft_state_p, ddi_get_instance(dip));
 	ASSERT(sc != NULL);
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		if (sc->sc_flags & IWK_F_RUNNING) {
+			iwk_stop(sc);
+		}
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags |= IWK_F_SUSPEND;
+		mutex_exit(&sc->sc_glock);
+		IWK_DBG((IWK_DEBUG_RESUME, "iwk: suspend\n"));
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	if (!(sc->sc_flags & IWK_F_ATTACHED))
 		return (DDI_FAILURE);
@@ -2089,6 +2118,12 @@ iwk_intr(caddr_t arg)
 	uint32_t r, rfh;
 
 	mutex_enter(&sc->sc_glock);
+
+	if (sc->sc_flags & IWK_F_SUSPEND) {
+		mutex_exit(&sc->sc_glock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	r = IWK_READ(sc, CSR_INT);
 	if (r == 0 || r == 0xffffffff) {
 		mutex_exit(&sc->sc_glock);
@@ -2199,6 +2234,11 @@ iwk_m_tx(void *arg, mblk_t *mp)
 	ieee80211com_t	*ic = &sc->sc_ic;
 	mblk_t			*next;
 
+	if (sc->sc_flags & IWK_F_SUSPEND) {
+		freemsgchain(mp);
+		return (NULL);
+	}
+
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		freemsgchain(mp);
 		return (NULL);
@@ -2241,6 +2281,16 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	bzero(cmd, sizeof (*cmd));
 
 	mutex_enter(&sc->sc_tx_lock);
+	if (sc->sc_flags & IWK_F_SUSPEND) {
+		mutex_exit(&sc->sc_tx_lock);
+		if ((type & IEEE80211_FC0_TYPE_MASK) !=
+		    IEEE80211_FC0_TYPE_DATA) {
+			freemsg(mp);
+		}
+		err = IWK_FAIL;
+		goto exit;
+	}
+
 	if (ring->queued > ring->count - 64) {
 		IWK_DBG((IWK_DEBUG_TX, "iwk_send(): no txbuf\n"));
 		sc->sc_need_reschedule = 1;
@@ -2652,9 +2702,10 @@ iwk_thread(iwk_sc_t *sc)
 			sc->sc_flags |= IWK_F_RADIO_OFF;
 		}
 		/*
-		 * If the RF is OFF, do nothing.
+		 * If in SUSPEND or the RF is OFF, do nothing
 		 */
-		if (sc->sc_flags & IWK_F_RADIO_OFF) {
+		if ((sc->sc_flags & IWK_F_SUSPEND) ||
+		    (sc->sc_flags & IWK_F_RADIO_OFF)) {
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(100000));
 			mutex_enter(&sc->sc_mt_lock);
@@ -3488,7 +3539,7 @@ iwk_init(iwk_sc_t *sc)
 	iwk_mac_access_enter(sc);
 	iwk_reg_write(sc, SCD_TXFACT, 0);
 
-	/* keep warn page */
+	/* keep warm page */
 	iwk_reg_write(sc, IWK_FH_KW_MEM_ADDR_REG,
 	    sc->sc_dma_kw.cookie.dmac_address >> 4);
 
