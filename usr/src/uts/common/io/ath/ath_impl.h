@@ -85,7 +85,8 @@ extern "C" {
 #define	ATH_DBG_OSDEP		0x00001000	/* osdep		*/
 #define	ATH_DBG_ATTACH		0x00002000	/* attach		*/
 #define	ATH_DBG_DETACH		0x00004000	/* detach		*/
-#define	ATH_DBG_ALL		0x00007fff	/* all			*/
+#define	ATH_DBG_SUSPEND		0x00008000	/* suspend/resume	*/
+#define	ATH_DBG_ALL		0x0000ffff	/* all			*/
 
 #ifdef DEBUG
 #define	ATH_DDB(command)	do {				\
@@ -260,6 +261,7 @@ typedef struct ath {
 	dev_info_t		*asc_dev;	/* back pointer to dev_info_t */
 	struct ath_hal		*asc_ah;	/* Atheros HAL */
 	uint32_t		asc_invalid : 1, /* being detached */
+				asc_isrunning : 1, /* device is operational */
 				asc_mrretry : 1, /* multi-rate retry support */
 				asc_have11g : 1, /* have 11g support */
 				asc_splitmic : 1, /* Split TKIP mic keys */
@@ -321,7 +323,8 @@ typedef struct ath {
 #define	ATH_UNLOCK(_asc)	mutex_exit(&(_asc)->asc_genlock)
 #define	ATH_LOCK_ASSERT(_asc)	ASSERT(mutex_owned(&(_asc)->asc_genlock))
 
-#define	ATH_IS_RUNNING(_asc)	((_asc)->asc_invalid == 0)
+#define	ATH_IS_RUNNING(_asc)	\
+	(((_asc)->asc_invalid == 0) && ((_asc)->asc_isrunning == 1))
 
 /* Debug and log functions */
 void ath_dbg(uint32_t dbg_flags, const char *fmt, ...);	/* debug function */

@@ -921,6 +921,14 @@ ath_xmit(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	ASSERT(mp->b_next == NULL);
 
+	if (!ATH_IS_RUNNING(asc)) {
+		if ((type & IEEE80211_FC0_TYPE_MASK) !=
+		    IEEE80211_FC0_TYPE_DATA) {
+			freemsg(mp);
+		}
+		return (ENXIO);
+	}
+
 	/* Grab a TX buffer */
 	mutex_enter(&asc->asc_txbuflock);
 	bf = list_head(&asc->asc_txbuf_list);
@@ -1536,6 +1544,9 @@ ath_stop_locked(ath_t *asc)
 	struct ath_hal *ah = asc->asc_ah;
 
 	ATH_LOCK_ASSERT(asc);
+	if (!asc->asc_isrunning)
+		return;
+
 	/*
 	 * Shutdown the hardware and driver:
 	 *    reset 802.11 state machine
@@ -1557,12 +1568,13 @@ ath_stop_locked(ath_t *asc)
 	ATH_LOCK(asc);
 	ATH_HAL_INTRSET(ah, 0);
 	ath_draintxq(asc);
-	if (ATH_IS_RUNNING(asc)) {
+	if (!asc->asc_invalid) {
 		ath_stoprecv(asc);
 		ATH_HAL_PHYDISABLE(ah);
 	} else {
 		asc->asc_rxlink = NULL;
 	}
+	asc->asc_isrunning = 0;
 }
 
 static void
@@ -1578,20 +1590,14 @@ ath_m_stop(void *arg)
 	ATH_UNLOCK(asc);
 }
 
-int
-ath_m_start(void *arg)
+static int
+ath_start_locked(ath_t *asc)
 {
-	ath_t *asc = arg;
 	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 	HAL_STATUS status;
 
-	ATH_LOCK(asc);
-	/*
-	 * Stop anything previously setup.  This is safe
-	 * whether this is the first time through or not.
-	 */
-	ath_stop_locked(asc);
+	ATH_LOCK_ASSERT(asc);
 
 	/*
 	 * The basic interface to setting the hardware in a good
@@ -1607,7 +1613,6 @@ ath_m_start(void *arg)
 		ATH_DEBUG((ATH_DBG_HAL, "ath: ath_m_start(): "
 		    "reset hardware failed: '%s' (HAL status %u)\n",
 		    ath_get_hal_status_desc(status), status));
-		ATH_UNLOCK(asc);
 		return (ENOTACTIVE);
 	}
 
@@ -1621,16 +1626,39 @@ ath_m_start(void *arg)
 	    | HAL_INT_FATAL | HAL_INT_GLOBAL;
 	ATH_HAL_INTRSET(ah, asc->asc_imask);
 
-	ic->ic_state = IEEE80211_S_INIT;
-
 	/*
 	 * The hardware should be ready to go now so it's safe
 	 * to kick the 802.11 state machine as it's likely to
 	 * immediately call back to us to send mgmt frames.
 	 */
 	ath_chan_change(asc, ic->ic_curchan);
+
+	asc->asc_isrunning = 1;
+
+	return (0);
+}
+
+int
+ath_m_start(void *arg)
+{
+	ath_t *asc = arg;
+	int err;
+
+	ATH_LOCK(asc);
+	/*
+	 * Stop anything previously setup.  This is safe
+	 * whether this is the first time through or not.
+	 */
+	ath_stop_locked(asc);
+
+	if ((err = ath_start_locked(asc)) != 0) {
+		ATH_UNLOCK(asc);
+		return (err);
+	}
+
 	asc->asc_invalid = 0;
 	ATH_UNLOCK(asc);
+
 	return (0);
 }
 
@@ -1795,6 +1823,67 @@ ath_m_stat(void *arg, uint_t stat, uint64_t *val)
 }
 
 static int
+ath_pci_setup(ath_t *asc)
+{
+	uint16_t command;
+
+	/*
+	 * Enable memory mapping and bus mastering
+	 */
+	ASSERT(asc != NULL);
+	command = pci_config_get16(asc->asc_cfg_handle, PCI_CONF_COMM);
+	command |= PCI_COMM_MAE | PCI_COMM_ME;
+	pci_config_put16(asc->asc_cfg_handle, PCI_CONF_COMM, command);
+	command = pci_config_get16(asc->asc_cfg_handle, PCI_CONF_COMM);
+	if ((command & PCI_COMM_MAE) == 0) {
+		ath_problem("ath: ath_pci_setup(): "
+		    "failed to enable memory mapping\n");
+		return (EIO);
+	}
+	if ((command & PCI_COMM_ME) == 0) {
+		ath_problem("ath: ath_pci_setup(): "
+		    "failed to enable bus mastering\n");
+		return (EIO);
+	}
+	ATH_DEBUG((ATH_DBG_INIT, "ath: ath_pci_setup(): "
+	    "set command reg to 0x%x \n", command));
+
+	return (0);
+}
+
+static int
+ath_resume(dev_info_t *devinfo)
+{
+	ath_t *asc;
+	int ret = DDI_SUCCESS;
+
+	asc = ddi_get_soft_state(ath_soft_state_p, ddi_get_instance(devinfo));
+	if (asc == NULL) {
+		ATH_DEBUG((ATH_DBG_SUSPEND, "ath: ath_resume(): "
+		    "failed to get soft state\n"));
+		return (DDI_FAILURE);
+	}
+
+	ATH_LOCK(asc);
+	/*
+	 * Set up config space command register(s). Refuse
+	 * to resume on failure.
+	 */
+	if (ath_pci_setup(asc) != 0) {
+		ATH_DEBUG((ATH_DBG_SUSPEND, "ath: ath_resume(): "
+		    "ath_pci_setup() failed\n"));
+		ATH_UNLOCK(asc);
+		return (DDI_FAILURE);
+	}
+
+	if (!asc->asc_invalid)
+		ret = ath_start_locked(asc);
+	ATH_UNLOCK(asc);
+
+	return (ret);
+}
+
+static int
 ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	ath_t *asc;
@@ -1804,7 +1893,7 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	HAL_STATUS status;
 	caddr_t regs;
 	uint32_t i, val;
-	uint16_t vendor_id, device_id, command;
+	uint16_t vendor_id, device_id;
 	const char *athname;
 	int32_t ath_countrycode = CTRY_DEFAULT;	/* country code */
 	int32_t err, ath_regdomain = 0; /* regulatory domain */
@@ -1813,8 +1902,16 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	wifi_data_t wd = { 0 };
 	mac_register_t *macp;
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+
+	case DDI_RESUME:
+		return (ath_resume(devinfo));
+
+	default:
 		return (DDI_FAILURE);
+	}
 
 	instance = ddi_get_instance(devinfo);
 	if (ddi_soft_state_zalloc(ath_soft_state_p, instance) != DDI_SUCCESS) {
@@ -1838,6 +1935,9 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		    "pci_config_setup() failed"));
 		goto attach_fail0;
 	}
+
+	if (ath_pci_setup(asc) != 0)
+		goto attach_fail1;
 
 	/*
 	 * Cache line size is used to size and align various
@@ -1863,15 +1963,6 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	athname = ath_hal_probe(vendor_id, device_id);
 	ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): athname: %s\n",
 	    athname ? athname : "Atheros ???"));
-
-	/*
-	 * Enable response to memory space accesses,
-	 * and enabe bus master.
-	 */
-	command = PCI_COMM_MAE | PCI_COMM_ME;
-	pci_config_put16(asc->asc_cfg_handle, PCI_CONF_COMM, command);
-	ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
-	    "set command reg to 0x%x \n", command));
 
 	pci_config_put8(asc->asc_cfg_handle, PCI_CONF_LATENCY_TIMER, 0xa8);
 	val = pci_config_get32(asc->asc_cfg_handle, 0x40);
@@ -2132,6 +2223,7 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 	asc->asc_invalid = 1;
+	asc->asc_isrunning = 0;
 	asc->asc_promisc = B_FALSE;
 	bzero(asc->asc_mcast_refs, sizeof (asc->asc_mcast_refs));
 	bzero(asc->asc_mcast_hash, sizeof (asc->asc_mcast_hash));
@@ -2167,6 +2259,20 @@ attach_fail0:
 	return (DDI_FAILURE);
 }
 
+/*
+ * Suspend transmit/receive for powerdown
+ */
+static int
+ath_suspend(ath_t *asc)
+{
+	ATH_LOCK(asc);
+	ath_stop_locked(asc);
+	ATH_UNLOCK(asc);
+	ATH_DEBUG((ATH_DBG_SUSPEND, "ath: suspended.\n"));
+
+	return (DDI_SUCCESS);
+}
+
 static int32_t
 ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
@@ -2175,8 +2281,16 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	asc = ddi_get_soft_state(ath_soft_state_p, ddi_get_instance(devinfo));
 	ASSERT(asc != NULL);
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+
+	case DDI_SUSPEND:
+		return (ath_suspend(asc));
+
+	default:
 		return (DDI_FAILURE);
+	}
 
 	ath_stop_scantimer(asc);
 
